@@ -36,7 +36,7 @@ def wp_myproc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 10 ≤ k.avail) : Prop :=
   kctx cpu k ∗ pcIs cpu myprocAddr ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ R' : RegMap,
-    kctx cpu' (k.withRegs R') -∗ pcIs cpu' (retPc (k.regs 1#5)) -∗
+    kctx cpu' (k.withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = k.proc⌝ -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 

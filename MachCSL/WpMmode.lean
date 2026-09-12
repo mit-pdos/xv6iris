@@ -349,14 +349,15 @@ theorem wp_m_csrr_mhartid (cpu : CPU) (dq dq' : DFrac) (c : MConf) (hok : MConf.
 /-- `jal rd, imm` to an even target. -/
 theorem wp_m_jal (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c)
     (pc : BitVec 64) (is_rvc : Bool)
-    (imm : BitVec 21) (rd : BitVec 5) (hrd : rd ≠ 0#5) (v : BitVec 64)
-    (htgt : (pc + BitVec.signExtend 64 imm).toNat % 2 = 0) :
+    (imm : BitVec 21) (rd : BitVec 5) (hrd : rd ≠ 0#5) (v : BitVec 64) :
     instr (GF := GF) pc is_rvc (instruction.JAL (imm, regidx.Regidx rd)) ∗
     mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu pc ∗ gpr cpu rd (DFrac.own 1) v ∗
     ▷ (mConf cpu dq c -∗ clockCells cpu -∗ pcIs cpu (pc + BitVec.signExtend 64 imm) -∗
         gpr cpu rd (DFrac.own 1) (pc + instrLen is_rvc) -∗ wpLoop cpu)
     ⊢ wpLoop cpu :=
-  wpLoop_m_instr cpu dq c c hok pc _ is_rvc _ _ _ (execSpec_jal cpu dq c pc _ imm rd hrd v htgt)
+  instr_pure_elim pc is_rvc _ _ _ (fun hpc hwf =>
+    wpLoop_m_instr cpu dq c c hok pc _ is_rvc _ _ _ (execSpec_jal cpu dq c pc _ imm rd hrd v
+      (jumpTgt_even_21 pc imm hpc (instrWf_jal hwf))))
 
 /-- `ld rd, imm(rd)` from an 8-aligned RAM address. -/
 theorem wp_m_ld_same [CurCtx] (cpu : CPU) (dq dq' : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c)

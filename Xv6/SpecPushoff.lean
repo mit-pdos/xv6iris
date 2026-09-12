@@ -38,7 +38,7 @@ def wp_push_off_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurC
     (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 6 ≤ k.avail) : Prop :=
   kctx cpu k ∗ pcIs cpu pushOffAddr ∗
-  (∀ R' : RegMap, kctx cpu (k.pushOff.withRegs R') -∗ pcIs cpu (retPc (k.regs 1#5)) -∗
+  (∀ R' : RegMap, kctx cpu (k.pushOff.withRegs R') -∗ pcIs cpu (jumpPc (k.regs 1#5)) -∗
     ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu)
   ⊢ wpLoop (GF := GF) cpu
 

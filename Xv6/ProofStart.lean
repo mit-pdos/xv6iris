@@ -272,7 +272,7 @@ theorem StartProof (T : TIMERINIT) : START where
       MConf.ok_xv6 _ ⟨by decide, by decide⟩ rfl rfl
     st_norm
     -- 800000be: jal timerinit
-    st_step wp_m_jal cpu (DFrac.own 1) _ ok8 0x800000be#64 false 2096990#21 1#5 (by decide) _ (by decide)
+    st_step wp_m_jal cpu (DFrac.own 1) _ ok8 0x800000be#64 false 2096990#21 1#5 (by decide) _
     iintro HmConf Hclock Hpc Hx1
     st_norm
     -- the call: timerinit's contract

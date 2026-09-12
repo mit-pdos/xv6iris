@@ -365,7 +365,7 @@ theorem wpLoop_m_instrClk (cpu : CPU) (dq : DFrac) (c : MConf) (p' : Privilege)
     ⊢ wpLoop cpu := by
   iintro ⟨HI, HmConf, Hclock, Hpc, HP, HΦ⟩
   unfold instr
-  icases HI with ⟨%r, %hr, #HB, %hdec⟩
+  icases HI with ⟨%r, %hr, %hwf, #HB, %hdec⟩
   cases r with
   | F_Base w =>
     simp only [fetchIsRvc] at hr

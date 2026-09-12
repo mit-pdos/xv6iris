@@ -100,9 +100,8 @@ theorem strlen_iter {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
   iintro Hk Hpc Hb
   ihave Hbuf := Hclose $$ Hb
   -- bnez a4,e16
-  k_step (wp_s_branch cpu _ ?hs ?ht 0x80000e1e#64 true 8184#13 14#5 0#5 (by decide) bop.BNE ?htgt) from (text_instr _ _ _ _ rfl rfl) HT
+  k_step (wp_s_branch cpu _ ?hs ?ht 0x80000e1e#64 true 8184#13 14#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc] with [h15, ite_bne_byte]
-  case htgt => k_tgt
   iintro Hk Hpc
   iapply HΦ $$ Hk Hpc Hbuf
 
@@ -187,9 +186,8 @@ theorem strlen_proof : STRLEN := ⟨fun cpu k bs n dq hsie htier hK hcstr hn31 =
   iintro Hk Hpc Hb
   ihave Hbuf := Hclose $$ Hb
   -- beqz a5,e2c
-  k_step (wp_s_branch cpu _ ?hs ?ht 0x80000e10#64 true 28#13 15#5 0#5 (by decide) bop.BEQ ?htgt) from (text_instr _ _ _ _ rfl rfl) Htext
+  k_step (wp_s_branch cpu _ ?hs ?ht 0x80000e10#64 true 28#13 15#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc] with [ite_beq_byte]
-  case htgt => k_tgt
   iintro Hk Hpc
   by_cases hn0 : n = 0
   · -- the empty string: a0 := 0, jump to the epilogue
@@ -200,8 +198,7 @@ theorem strlen_proof : STRLEN := ⟨fun cpu k bs n dq hsie htier hK hcstr hn31 =
     simp only [ite_true]
     k_step (wp_s_addi cpu _ ?hs ?ht 0x80000e2c#64 true 0#12 10#5 0#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
-    k_step (wp_s_j cpu _ ?hs ?ht 0x80000e2e#64 true 2097142#21 ?htgt) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    case htgt => k_tgt
+    k_step (wp_s_j cpu _ ?hs ?ht 0x80000e2e#64 true 2097142#21) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
     iapply (wp_epilogue2 cpu k hsie htier 0x80000e24#64 hK _ ?hR2 (k.regs 1#5) (k.regs 8#5)) $$ [- $Hk $Hpc]
     rotate_right 1

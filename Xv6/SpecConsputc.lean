@@ -30,7 +30,7 @@ def wp_consputc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     (hnoff : k.noff + 1 < 2 ^ 31) (huart : "uart" ∉ k.locks) : Prop :=
   kctx cpu k ∗ pcIs cpu consputcAddr ∗ isTxLock γl γd ∗ uartSentSub γd bs ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ (R' : RegMap) (cs : List (BitVec 8)),
-    kctx cpu' (k.withRegs R') -∗ pcIs cpu' (retPc (k.regs 1#5)) -∗
+    kctx cpu' (k.withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     ⌜calleeSaved k.regs R'⌝ -∗ uartSentSub γd (bs ++ cs) -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 

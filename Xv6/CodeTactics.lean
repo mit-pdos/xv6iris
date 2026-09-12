@@ -44,14 +44,15 @@ noncomputable def textDecodeWith (dref : (r : Register) → Option (RegisterType
       match runRead dref (Functions.ext_decode (BitVec.ofNat 32 k.enc)) with
       | some (i, true) =>
         if Functions.isRVC (BitVec.extractLsb' 0 16 (BitVec.ofNat 32 k.enc)) = false ∧ inRam pc 4 ∧
-            pc.toNat % 2 = 0 then some (false, i, i) else none
+            pc.toNat % 2 = 0 ∧ instrWf i then some (false, i, i) else none
       | _ => none
     else if k.width = 2 then
       match runRead dref (Functions.ext_decode_compressed (BitVec.ofNat 16 k.enc)) with
       | some (i₀, true) =>
         match Functions.execute i₀ with
         | .pure (.ExecuteAs i) =>
-          if Functions.isRVC (BitVec.ofNat 16 k.enc) = true ∧ inRam pc 4 ∧ pc.toNat % 2 = 0 then
+          if Functions.isRVC (BitVec.ofNat 16 k.enc) = true ∧ inRam pc 4 ∧ pc.toNat % 2 = 0 ∧
+              instrWf i then
             if pc.toNat % 4 = 2 then some (true, i, i₀)
             else if pc.toNat % 4 = 0 then
               match Kernel.textTree.find? (pc.toNat + 2) with
@@ -102,7 +103,8 @@ theorem text_instr (pc : BitVec 64) (rvc : Bool) (i i₀ : instruction)
       · rename_i i₂ heqS
         split at hM
         · rename_i hgeo
-          rw [if_pos hgeo] at hS
+          split at hS
+          case isFalse => exact absurd hS (by simp)
           simp only [Option.some.injEq, Prod.mk.injEq] at hM hS
           obtain ⟨rfl, rfl, rfl⟩ := hM
           obtain ⟨-, h21, -⟩ := hS
@@ -112,9 +114,11 @@ theorem text_instr (pc : BitVec 64) (rvc : Bool) (i i₀ : instruction)
           isplitl []
           · ipureintro; rfl
           isplitl []
+          · ipureintro; exact hgeo.2.2.2
+          isplitl []
           · simp only [MachCSL.instrBytes]
             isplitl []
-            · ipureintro; exact ⟨hgeo.2.1, hgeo.2.2, hgeo.1⟩
+            · ipureintro; exact ⟨hgeo.2.1, hgeo.2.2.1, hgeo.1⟩
             · iexact H1
           · ipureintro
             exact MachCSL.decodesAll32_bridge _ _ heqM heqS
@@ -137,7 +141,8 @@ theorem text_instr (pc : BitVec 64) (rvc : Bool) (i i₀ : instruction)
             · rename_i i₄ hex'
               split at hM
               · rename_i hgeo
-                rw [if_pos hgeo] at hS
+                split at hS
+                case isFalse => exact absurd hS (by simp)
                 by_cases h2 : pc.toNat % 4 = 2
                 · rw [if_pos h2] at hM hS
                   simp only [Option.some.injEq, Prod.mk.injEq] at hM hS
@@ -149,9 +154,11 @@ theorem text_instr (pc : BitVec 64) (rvc : Bool) (i i₀ : instruction)
                   isplitl []
                   · ipureintro; rfl
                   isplitl []
+                  · ipureintro; exact hgeo.2.2.2
+                  isplitl []
                   · simp only [MachCSL.instrBytes]
                     isplitl []
-                    · ipureintro; exact ⟨hgeo.2.1, hgeo.2.2, hgeo.1⟩
+                    · ipureintro; exact ⟨hgeo.2.1, hgeo.2.2.1, hgeo.1⟩
                     · iright
                       isplitl []
                       · ipureintro; exact h2
@@ -182,9 +189,11 @@ theorem text_instr (pc : BitVec 64) (rvc : Bool) (i i₀ : instruction)
                         isplitl []
                         · ipureintro; rfl
                         isplitl []
+                        · ipureintro; exact hgeo.2.2.2
+                        isplitl []
                         · simp only [MachCSL.instrBytes]
                           isplitl []
-                          · ipureintro; exact ⟨hgeo.2.1, hgeo.2.2, hgeo.1⟩
+                          · ipureintro; exact ⟨hgeo.2.1, hgeo.2.2.1, hgeo.1⟩
                           · ileft
                             isplitl []
                             · ipureintro; exact h0

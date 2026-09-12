@@ -31,8 +31,7 @@ theorem memcpy_proof (M : MEMMOVE) : MEMCPY := ⟨fun {hlc GF} _ _ cpu k bs olds
   inext
   iintro Hk Hpc Hframe
   -- jal ra, memmove
-  k_step (wp_s_jal cpu _ ?hs ?ht 0x80000d42#64 false 2097048#21 1#5 (by decide) ?htgt) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-  case htgt => k_tgt
+  k_step (wp_s_jal cpu _ ?hs ?ht 0x80000d42#64 false 2097048#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- the call
   have hm := M.wp_memmove (hlc := hlc) (GF := GF) cpu ((k.pushed 2).withRegs
@@ -45,7 +44,7 @@ theorem memcpy_proof (M : MEMMOVE) : MEMCPY := ⟨fun {hlc GF} _ _ cpu k bs olds
   iframe
   iapply wpNext_off_intro
   iintro %R' Hk Hpc Hsrc Hdst %⟨hcs, h10⟩
-  have hret : retPc 0x80000d46#64 = 0x80000d46#64 := by simp only [retPc, BitVec.reduceAnd]
+  have hret : jumpPc 0x80000d46#64 = 0x80000d46#64 := by simp only [jumpPc, BitVec.reduceAnd]
   k_norm [hret]
   have hR2 : R' 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFF0#64 := by
     rw [hcs.1]; simp [RegMap.set_apply]

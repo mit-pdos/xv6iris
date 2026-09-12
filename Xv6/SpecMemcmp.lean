@@ -41,7 +41,7 @@ def wp_memcmp_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx
   kctx cpu k ∗ pcIs cpu memcmpAddr ∗
   byteBuf (k.regs 10#5) dq1 bs1 ∗ byteBuf (k.regs 11#5) dq2 bs2 ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ R' : RegMap,
-    kctx cpu' (k.withRegs R') -∗ pcIs cpu' (retPc (k.regs 1#5)) -∗
+    kctx cpu' (k.withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     byteBuf (k.regs 10#5) dq1 bs1 -∗ byteBuf (k.regs 11#5) dq2 bs2 -∗
     ⌜calleeSaved k.regs R' ∧ memcmpRes bs1 bs2 n (R' 10#5)⌝ -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu

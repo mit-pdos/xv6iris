@@ -27,7 +27,7 @@ def wp_memcpy_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx
   kctx cpu k ∗ pcIs cpu memcpyAddr ∗
   byteBuf (k.regs 11#5) dqs bs ∗ byteBuf (k.regs 10#5) (DFrac.own 1) olds ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ R' : RegMap,
-    kctx cpu' (k.withRegs R') -∗ pcIs cpu' (retPc (k.regs 1#5)) -∗
+    kctx cpu' (k.withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     byteBuf (k.regs 11#5) dqs bs -∗ byteBuf (k.regs 10#5) (DFrac.own 1) bs -∗
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = k.regs 10#5⌝ -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu

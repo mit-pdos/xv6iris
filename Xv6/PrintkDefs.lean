@@ -839,7 +839,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx
 abbrev pkPost (cpu : CPU) (k : KCtx) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac) (f : List (BitVec 8))
     (descs : List PkArgDesc) : IProp GF := iprop%
   ∀ (R' : RegMap) (cs : List (BitVec 8)),
-    kctx cpu (k.withRegs R') -∗ pcIs cpu (retPc (k.regs 1#5)) -∗
+    kctx cpu (k.withRegs R') -∗ pcIs cpu (jumpPc (k.regs 1#5)) -∗
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = 0#64⌝ -∗
     byteBuf (k.regs 10#5) dqf (f ++ [0#8]) -∗ pkDescs k.regs descs -∗
     uartSentSub γd (bs ++ cs) -∗ wpLoop cpu
@@ -944,7 +944,7 @@ theorem pkDescRes_str_acc (v : BitVec 64) (dq : DFrac) (s : List (BitVec 8)) :
 theorem pkPost_of_cstr [Xv6G GF] (cpu : CPU) (k : KCtx) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc) (hnonul : nonul f) :
     (∀ (R' : RegMap) (cs : List (BitVec 8)),
-      kctx cpu (k.withRegs R') -∗ pcIs cpu (retPc (k.regs 1#5)) -∗
+      kctx cpu (k.withRegs R') -∗ pcIs cpu (jumpPc (k.regs 1#5)) -∗
       ⌜calleeSaved k.regs R' ∧ R' 10#5 = 0#64⌝ -∗
       cstr (k.regs 10#5) dqf f -∗ pkDescs k.regs descs -∗
       uartSentSub γd (bs ++ cs) -∗ wpLoop cpu)
@@ -1024,7 +1024,7 @@ theorem pkKinds_at_none (f : List (BitVec 8)) (i : Nat) (hi : i < f.length) (hp 
 theorem pr_addr_520 : 0x80000520#64 + (BitVec.signExtend 64 (18#20 ++ 0#12) + 18446744073709551128#64) = 0x80012338#64 := by
   decide
 
-theorem ret_52c : retPc 0x8000052c#64 = 0x8000052c#64 := by decide
+theorem ret_52c : jumpPc 0x8000052c#64 = 0x8000052c#64 := by decide
 
 
 theorem pkRegsN_of_cs (R0 R R' : RegMap) (h : pkRegsN R0 R)

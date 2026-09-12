@@ -93,15 +93,11 @@ macro_rules
       BitVec.reduceShiftLeft, BitVec.reduceHShiftLeft, BitVec.reduceHShiftRight,
       BitVec.toNat_ofNat, Nat.reducePow, Nat.reduceMod, Bool.false_eq_true, hsie, htier, $lems,*] at $h:ident)
 
-/-- A literal branch/jump target is even. -/
-macro "k_tgt" : tactic =>
-  `(tactic| simp only [BitVec.reduceSignExtend, BitVec.reduceAdd, BitVec.toNat_ofNat, Nat.reducePow, Nat.reduceMod])
-
 /-- One instruction: apply its rule (written with `?hs ?ht` for the
 interrupt/tier facts) with the pattern `[- $Hk $Hpc]` (frame the
 context, clock and pc, carry the rest); normalise (optionally with extra
 lemmas), frame the rest, strip the later, land on this hart (interrupts
-off).  Side goals other than `hs`/`ht` (RAM range, alignment, targets) are
+off).  Side goals other than `hs`/`ht` (RAM range, alignment) are
 left for the caller, after the main goal. -/
 syntax "k_step" term:max " $$ " specPat : tactic
 syntax "k_step" term:max " $$ " specPat " with " "[" term,* "]" : tactic
@@ -196,7 +192,7 @@ theorem wp_epilogue2 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
     instr (GF := GF) (pc + 6#64) true (instruction.JALR (0#12, regidx.Regidx 1#5, regidx.Regidx 0#5)) ∗
     kctx cpu ((k.pushed 2).withRegs R) ∗ pcIs cpu pc ∗ frame2 (k.regs 2#5) ra s0 ∗
     ▷ (kctx cpu (k.withRegs (((R.set 1#5 ra).set 8#5 s0).set 2#5 (k.regs 2#5))) -∗
-        pcIs cpu (retPc ra) -∗ wpLoop cpu)
+        pcIs cpu (jumpPc ra) -∗ wpLoop cpu)
     ⊢ wpLoop cpu := by
   unfold frame2
   iintro ⟨#Hi0, #Hi2, #Hi4, #Hi6, Hk, Hpc, ⟨%hf, Hf8, Hf16⟩, HΦ⟩
@@ -288,7 +284,7 @@ theorem wp_epilogue4s1 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : K
     instr (GF := GF) (pc + 8#64) true (instruction.JALR (0#12, regidx.Regidx 1#5, regidx.Regidx 0#5)) ∗
     kctx cpu ((k.pushed 4).withRegs R) ∗ pcIs cpu pc ∗ frame4s1 (k.regs 2#5) ra s0 s1 ∗
     ▷ (kctx cpu (k.withRegs ((((R.set 1#5 ra).set 8#5 s0).set 9#5 s1).set 2#5 (k.regs 2#5))) -∗
-        pcIs cpu (retPc ra) -∗ wpLoop cpu)
+        pcIs cpu (jumpPc ra) -∗ wpLoop cpu)
     ⊢ wpLoop cpu := by
   unfold frame4s1
   iintro ⟨#Hi0, #Hi2, #Hi4, #Hi6, #Hi8, Hk, Hpc, ⟨%hf, Hf8, Hf16, Hf24, %w₄, Hf32⟩, HΦ⟩

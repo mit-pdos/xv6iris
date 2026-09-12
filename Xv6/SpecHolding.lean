@@ -40,7 +40,7 @@ def wp_holding_notheld_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
     (cpu : CPU) (k : KCtx) (γ : GName) (s : String) (R : CtxId → IProp GF)
     (hsie : k.sie = false) (htier : k.tier = KTier.bare) (hK : 6 ≤ k.avail) (hs : s ∉ k.locks) : Prop :=
   kctx cpu k ∗ pcIs cpu holdingAddr ∗ isLock γ (k.regs 10#5) s R ∗
-  (∀ R' : RegMap, kctx cpu (k.withRegs R') -∗ pcIs cpu (retPc (k.regs 1#5)) -∗
+  (∀ R' : RegMap, kctx cpu (k.withRegs R') -∗ pcIs cpu (jumpPc (k.regs 1#5)) -∗
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = 0#64⌝ -∗ wpLoop cpu)
   ⊢ wpLoop (GF := GF) cpu
 
@@ -51,7 +51,7 @@ def wp_holding_locked_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
     (hsie : k.sie = false) (htier : k.tier = KTier.bare) (hK : 6 ≤ k.avail) : Prop :=
   kctx cpu k ∗ pcIs cpu holdingAddr ∗ isLock γ (k.regs 10#5) s R ∗
   locked γ cpu ∗
-  (∀ R' : RegMap, kctx cpu (k.withRegs R') -∗ pcIs cpu (retPc (k.regs 1#5)) -∗
+  (∀ R' : RegMap, kctx cpu (k.withRegs R') -∗ pcIs cpu (jumpPc (k.regs 1#5)) -∗
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = 1#64⌝ -∗ locked γ cpu -∗ wpLoop cpu)
   ⊢ wpLoop (GF := GF) cpu
 

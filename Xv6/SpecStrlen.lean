@@ -39,7 +39,7 @@ def wp_strlen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx
     (hcstr : cstrAt bs n) (hn31 : n < 2 ^ 31) : Prop :=
   kctx cpu k ∗ pcIs cpu strlenAddr ∗ byteBuf (k.regs 10#5) dq bs ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ R' : RegMap,
-    kctx cpu' (k.withRegs R') -∗ pcIs cpu' (retPc (k.regs 1#5)) -∗
+    kctx cpu' (k.withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     byteBuf (k.regs 10#5) dq bs -∗
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.ofNat 64 n⌝ -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu

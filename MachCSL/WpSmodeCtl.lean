@@ -16,8 +16,9 @@ open LeanRV64D LeanRV64D.Functions
 
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
-/-- Bit 0 cleared: the target of `jalr`. -/
-def retPc (v : BitVec 64) : BitVec 64 := v &&& 0xFFFFFFFFFFFFFFFE#64
+/-- The pc an indirect jump lands on: the register value with bit 0 cleared,
+as `execute_JALR` clears it (both `ret` and a computed `jalr`). -/
+def jumpPc (v : BitVec 64) : BitVec 64 := v &&& 0xFFFFFFFFFFFFFFFE#64
 
 /-- The branch condition of `op` on the two source values. -/
 def bcond : bop → BitVec 64 → BitVec 64 → Bool
@@ -85,14 +86,14 @@ theorem execSpecF_ret (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool) (hok : S
     (pc npc₀ : BitVec 64) (rs1 : BitVec 5) (R : RegMap) :
     execSpecPP (GF := GF) cpu dq Privilege.Supervisor c Privilege.Supervisor c
       (instruction.JALR (0#12, regidx.Regidx rs1, regidx.Regidx 0#5))
-      pc npc₀ (retPc (RegMap.get R rs1)) (gprFile cpu R) (gprFile cpu R) := by
+      pc npc₀ (jumpPc (RegMap.get R rs1)) (gprFile cpu R) (gprFile cpu R) := by
   intro Φ
   iintro ⟨HmConf, HPC, HnextPC, HF, HΦ⟩
   conf_cases HmConf
   obtain ⟨hpmp, hmode, hms, hpmm, hlpe⟩ := hok
   have hupd := update_bit0_eq (RegMap.get R rs1)
   have hb0 := ofBool_bit0_and_mask (RegMap.get R rs1)
-  unfold execute retPc
+  unfold execute jumpPc
   swp_run 40
   iapply swp_bind
   iapply swp_rX_file

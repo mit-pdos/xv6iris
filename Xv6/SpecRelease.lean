@@ -38,7 +38,7 @@ def wp_release_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
   kctx cpu k ∗ pcIs cpu releaseAddr ∗ isLock γ (k.regs 10#5) s R ∗
   locked γ cpu ∗ R curCtx ∗
   (∀ R' : RegMap, kctx cpu ((k.popOff.withRegs R').withLocks (k.locks.filter (fun x => x ≠ s))) -∗
-    pcIs cpu (retPc (k.regs 1#5)) -∗ ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu)
+    pcIs cpu (jumpPc (k.regs 1#5)) -∗ ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu)
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `release`. -/

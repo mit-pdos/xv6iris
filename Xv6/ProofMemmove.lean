@@ -242,9 +242,8 @@ theorem memmove_fwd_iter {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
   ihave Hdst := (show byteBuf (GF := GF) d (DFrac.own 1) ((mixF bs olds i).set i b) ⊢
       byteBuf d (DFrac.own 1) (mixF bs olds (i + 1)) by rw [mixF_set bs olds i b hb (by omega)]) $$ Hdst
   -- bne a5,a1,cf2
-  k_step (wp_s_branch cpu _ ?hs ?ht 0x80000cfe#64 false 8180#13 15#5 11#5 (by decide) bop.BNE ?htgt) from (text_instr _ _ _ _ rfl rfl) HT
+  k_step (wp_s_branch cpu _ ?hs ?ht 0x80000cfe#64 false 8180#13 15#5 11#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc] with [h15, ite_bne_eq, add_ofNat_succ_eq_iff s n i hn32 (by omega)]
-  case htgt => k_tgt
   iintro Hk Hpc
   iapply HΦ $$ Hk Hpc Hsrc Hdst
 
@@ -346,9 +345,8 @@ theorem memmove_bwd_iter {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
   ihave Hdst := (show byteBuf (GF := GF) d (DFrac.own 1) ((mixB bs olds i).set (i - 1) b) ⊢
       byteBuf d (DFrac.own 1) (mixB bs olds (i - 1)) by rw [mixB_set bs olds i hi1 b hb (by omega) (by omega)]) $$ Hdst
   -- bne a5,a4,d28
-  k_step (wp_s_branch cpu _ ?hs ?ht 0x80000d34#64 false 8180#13 15#5 14#5 (by decide) bop.BNE ?htgt) from (text_instr _ _ _ _ rfl rfl) HT
+  k_step (wp_s_branch cpu _ ?hs ?ht 0x80000d34#64 false 8180#13 15#5 14#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc] with [h15, ite_bne_eq, self_eq_add_ofNat_iff s (i - 1) (by omega)]
-  case htgt => k_tgt
   iintro Hk Hpc
   iapply HΦ $$ Hk Hpc Hsrc Hdst
 
@@ -415,7 +413,7 @@ theorem memmove_finish {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Cu
     kctx cpu ((k.pushed 2).withRegs R') ∗ pcIs cpu 0x80000d02#64 ∗
     frame2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) ∗
     byteBuf (k.regs 11#5) dqs bs ∗ byteBuf (k.regs 10#5) (DFrac.own 1) bs ∗
-    (∀ R'' : RegMap, kctx cpu (k.withRegs R'') -∗ pcIs cpu (retPc (k.regs 1#5)) -∗
+    (∀ R'' : RegMap, kctx cpu (k.withRegs R'') -∗ pcIs cpu (jumpPc (k.regs 1#5)) -∗
       byteBuf (k.regs 11#5) dqs bs -∗ byteBuf (k.regs 10#5) (DFrac.own 1) bs -∗
       ⌜calleeSaved k.regs R'' ∧ R'' 10#5 = k.regs 10#5⌝ -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
@@ -458,7 +456,7 @@ theorem memmove_fwd_seg {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [C
     kctx cpu ((k.pushed 2).withRegs R) ∗ pcIs cpu 0x80000ce8#64 ∗
     frame2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) ∗
     byteBuf (k.regs 11#5) dqs bs ∗ byteBuf (k.regs 10#5) (DFrac.own 1) olds ∗
-    (∀ R'' : RegMap, kctx cpu (k.withRegs R'') -∗ pcIs cpu (retPc (k.regs 1#5)) -∗
+    (∀ R'' : RegMap, kctx cpu (k.withRegs R'') -∗ pcIs cpu (jumpPc (k.regs 1#5)) -∗
       byteBuf (k.regs 11#5) dqs bs -∗ byteBuf (k.regs 10#5) (DFrac.own 1) bs -∗
       ⌜calleeSaved k.regs R'' ∧ R'' 10#5 = k.regs 10#5⌝ -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
@@ -519,9 +517,8 @@ theorem memmove_proof : MEMMOVE := ⟨fun cpu k bs olds n dqs hsie htier hK hn h
   inext
   iintro Hk Hpc Hframe
   -- beqz a2,d02
-  k_step (wp_s_branch cpu _ ?hs ?ht 0x80000ce2#64 true 32#13 12#5 0#5 (by decide) bop.BEQ ?htgt) from (text_instr _ _ _ _ rfl rfl) Htext
+  k_step (wp_s_branch cpu _ ?hs ?ht 0x80000ce2#64 true 32#13 12#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc] with [hn, ite_beq_ofNat' n hn32]
-  case htgt => k_tgt
   iintro Hk Hpc
   by_cases hn0 : n = 0
   · -- nothing to copy
@@ -539,9 +536,8 @@ theorem memmove_proof : MEMMOVE := ⟨fun cpu k bs olds n dqs hsie htier hK hn h
   · simp only [hn0, ite_false]
     have hn1 : 1 ≤ n := by omega
     -- bltu a1,a0,d0a
-    k_step (wp_s_branch cpu _ ?hs ?ht 0x80000ce4#64 false 38#13 11#5 10#5 (by decide) bop.BLTU ?htgt) from (text_instr _ _ _ _ rfl rfl) Htext
+    k_step (wp_s_branch cpu _ ?hs ?ht 0x80000ce4#64 false 38#13 11#5 10#5 (by decide) bop.BLTU) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc]
-    case htgt => k_tgt
     iintro Hk Hpc
     rcases Bool.eq_false_or_eq_true (bcond bop.BLTU (k.regs 11#5) (k.regs 10#5)) with hlt | hlt
     · -- src < dst
@@ -556,9 +552,8 @@ theorem memmove_proof : MEMMOVE := ⟨fun cpu k bs olds n dqs hsie htier hK hn h
       k_step (wp_s_add cpu _ ?hs ?ht 0x80000d10#64 false 14#5 11#5 13#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       iintro Hk Hpc
       -- bgeu a0,a4,ce8
-      k_step (wp_s_branch cpu _ ?hs ?ht 0x80000d14#64 false 8148#13 10#5 14#5 (by decide) bop.BGEU ?htgt) from (text_instr _ _ _ _ rfl rfl) Htext
+      k_step (wp_s_branch cpu _ ?hs ?ht 0x80000d14#64 false 8148#13 10#5 14#5 (by decide) bop.BGEU) from (text_instr _ _ _ _ rfl rfl) Htext
         $$ [- $Hk $Hpc]
-      case htgt => k_tgt
       iintro Hk Hpc
       rcases Bool.eq_false_or_eq_true (bcond bop.BGEU (k.regs 10#5) (k.regs 11#5 + BitVec.ofNat 64 n)) with hge | hge
       · -- dst ≥ src + n: forward after all
@@ -601,8 +596,7 @@ theorem memmove_proof : MEMMOVE := ⟨fun cpu k bs olds n dqs hsie htier hK hn h
         case h15 => simp [RegMap.set_apply, hn, bwd_a5 (k.regs 11#5) n hn1 hn32]
         iintro %R' Hk Hpc Hsrc Hdst %hother
         -- j d02
-        k_step (wp_s_j cpu _ ?hs ?ht 0x80000d38#64 true 2097098#21 ?htgt) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-        case htgt => k_tgt
+        k_step (wp_s_j cpu _ ?hs ?ht 0x80000d38#64 true 2097098#21) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         iintro Hk Hpc
         iapply (memmove_finish cpu k hsie htier hK bs dqs R' ?hR2 ?h10 ?hcs) $$ [- $Hk $Hpc]
         rotate_right 1

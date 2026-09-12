@@ -39,13 +39,12 @@ theorem release_proof (HO : HOLDING) (PO : POPOFF) : RELEASE := ⟨
   k_step (wp_s_add cpu _ ?hs ?ht 0x80000c4c#64 true 9#5 0#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- jal holding
-  k_step (wp_s_jal cpu _ ?hs ?ht 0x80000c4e#64 false 2096902#21 1#5 (by decide) ?htgt) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-  case htgt => k_tgt
+  k_step (wp_s_jal cpu _ ?hs ?ht 0x80000c4e#64 false 2096902#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   have hho : ∀ (k' : KCtx) (hsie' : k'.sie = false) (htier' : k'.tier = KTier.bare) (hK' : 6 ≤ k'.avail),
       kctx cpu k' ∗ pcIs cpu 0x80000b54#64 ∗ isLock γ (k'.regs 10#5) s R ∗
       locked γ cpu ∗
-      (∀ R' : RegMap, kctx cpu (k'.withRegs R') -∗ pcIs cpu (retPc (k'.regs 1#5)) -∗
+      (∀ R' : RegMap, kctx cpu (k'.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
         ⌜calleeSaved k'.regs R' ∧ R' 10#5 = 1#64⌝ -∗ locked γ cpu -∗ wpLoop cpu) ⊢ wpLoop (GF := GF) cpu := by
     intro k' hsie' htier' hK'
     have h := HO.wp_holding_locked (hlc := hlc) (GF := GF) cpu k' γ s R hsie' htier' hK'
@@ -60,7 +59,7 @@ theorem release_proof (HO : HOLDING) (PO : POPOFF) : RELEASE := ⟨
   case ht => k_norm
   case hK => k_norm; omega
   iintro %R2 Hk Hpc %⟨hcs2, h10⟩ Hlocked
-  have hret1 : retPc 0x80000c52#64 = 0x80000c52#64 := by simp only [retPc, BitVec.reduceAnd]
+  have hret1 : jumpPc 0x80000c52#64 = 0x80000c52#64 := by simp only [jumpPc, BitVec.reduceAnd]
   k_norm [hret1]
   k_norm at hcs2
   have h29 : R2 9#5 = k.regs 10#5 := by
@@ -68,9 +67,8 @@ theorem release_proof (HO : HOLDING) (PO : POPOFF) : RELEASE := ⟨
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at this
     exact this
   -- beqz a0, panic: not taken (holding answered 1)
-  k_step (wp_s_branch cpu _ ?hs ?ht 0x80000c52#64 true 28#13 10#5 0#5 (by decide) bop.BEQ ?htgt) from (text_instr _ _ _ _ rfl rfl) Htext
+  k_step (wp_s_branch cpu _ ?hs ?ht 0x80000c52#64 true 28#13 10#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc] with [h10, bcond_beq_one]
-  case htgt => k_tgt
   iintro Hk Hpc
   icases locked_cases γ cpu $$ Hlocked with ⟨Hlc, Hheld⟩
   -- sd zero,16(s1): lk->cpu = 0
@@ -87,13 +85,12 @@ theorem release_proof (HO : HOLDING) (PO : POPOFF) : RELEASE := ⟨
   case haddr => k_norm [h29]
   iintro Hk Hpc %hmem
   -- jal pop_off
-  k_step (wp_s_jal cpu _ ?hs ?ht 0x80000c60#64 false 2097050#21 1#5 (by decide) ?htgt) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-  case htgt => k_tgt
+  k_step (wp_s_jal cpu _ ?hs ?ht 0x80000c60#64 false 2097050#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   have hpo : ∀ (k' : KCtx) (hsie' : k'.sie = false) (htier' : k'.tier = KTier.bare) (hnoff' : 1 ≤ k'.noff)
       (hK' : 4 ≤ k'.avail) (hlks' : k'.locks.length ≤ k'.noff - 1) (hexit' : k'.noff = 1 → k'.intena = false),
       kctx cpu k' ∗ pcIs cpu 0x80000bfa#64 ∗
-      (∀ R' : RegMap, kctx cpu (k'.popOff.withRegs R') -∗ pcIs cpu (retPc (k'.regs 1#5)) -∗
+      (∀ R' : RegMap, kctx cpu (k'.popOff.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
         ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu) ⊢ wpLoop (GF := GF) cpu := by
     intro k' hsie' htier' hnoff' hK' hlks' hexit'
     have h := PO.wp_pop_off (hlc := hlc) (GF := GF) cpu k' hsie' htier' hnoff' hK' hlks' hexit'
@@ -112,7 +109,7 @@ theorem release_proof (HO : HOLDING) (PO : POPOFF) : RELEASE := ⟨
   case hl => k_norm; have := hwf.2.2.2.1; omega
   case he => k_norm; exact hexit
   iintro %R3 Hk Hpc %hcs3
-  have hret2 : retPc 0x80000c64#64 = 0x80000c64#64 := by simp only [retPc, BitVec.reduceAnd]
+  have hret2 : jumpPc 0x80000c64#64 = 0x80000c64#64 := by simp only [jumpPc, BitVec.reduceAnd]
   k_norm [hret2]
   k_norm at hcs3
   -- epilogue

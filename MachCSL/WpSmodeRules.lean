@@ -356,8 +356,7 @@ theorem wp_s_sd [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (h
 
 /-- The conditional branches. -/
 theorem wp_s_branch [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
-    (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 13) (rs1 rs2 : BitVec 5) (hrs1 : rs1 ≠ 0#5) (op : bop)
-    (htgt : (pc + BitVec.signExtend 64 imm).toNat % 2 = 0) :
+    (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 13) (rs1 rs2 : BitVec 5) (hrs1 : rs1 ≠ 0#5) (op : bop) :
     instr (GF := GF) pc is_rvc (instruction.BTYPE (imm, regidx.Regidx rs2, regidx.Regidx rs1, op)) ∗
     kctx cpu k ∗ pcIs cpu pc ∗
     ▷ wpNext k.sie k.proc cpu (fun cpu' =>
@@ -365,34 +364,37 @@ theorem wp_s_branch [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx
           pcIs cpu' (if bcond op (k.rget cpu rs1) (k.rget cpu rs2) then pc + BitVec.signExtend 64 imm
             else pc + instrLen is_rvc) -∗ wpLoop cpu'))
     ⊢ wpLoop cpu :=
-  wpLoop_k_keep0 cpu k hsie htier pc _ is_rvc _
-    (fun c _ _ => execSpecF_btype cpu (DFrac.own 1) c pc (pc + instrLen is_rvc) imm rs1 rs2 hrs1 op
-      (tpPin cpu k.regs) htgt)
+  instr_pure_elim pc is_rvc _ _ _ (fun hpc hwf =>
+    wpLoop_k_keep0 cpu k hsie htier pc _ is_rvc _
+      (fun c _ _ => execSpecF_btype cpu (DFrac.own 1) c pc (pc + instrLen is_rvc) imm rs1 rs2 hrs1 op
+        (tpPin cpu k.regs) (jumpTgt_even_13 pc imm hpc (instrWf_btype hwf))))
 
 /-- `j off`. -/
 theorem wp_s_j [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
-    (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 21)
-    (htgt : (pc + BitVec.signExtend 64 imm).toNat % 2 = 0) :
+    (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 21) :
     instr (GF := GF) pc is_rvc (instruction.JAL (imm, regidx.Regidx 0#5)) ∗
     kctx cpu k ∗ pcIs cpu pc ∗
     ▷ wpNext k.sie k.proc cpu (fun cpu' =>
         iprop(kctx cpu' k -∗ pcIs cpu' (pc + BitVec.signExtend 64 imm) -∗ wpLoop cpu'))
     ⊢ wpLoop cpu :=
-  wpLoop_k_keep0 cpu k hsie htier pc _ is_rvc _
-    (fun c _ _ => execSpecF_j cpu (DFrac.own 1) c pc (pc + instrLen is_rvc) imm (tpPin cpu k.regs) htgt)
+  instr_pure_elim pc is_rvc _ _ _ (fun hpc hwf =>
+    wpLoop_k_keep0 cpu k hsie htier pc _ is_rvc _
+      (fun c _ _ => execSpecF_j cpu (DFrac.own 1) c pc (pc + instrLen is_rvc) imm (tpPin cpu k.regs)
+        (jumpTgt_even_21 pc imm hpc (instrWf_jal hwf))))
 
 /-- `jal rd, off` (`rd` not `x0`/`sp`/`tp`, e.g. `ra`): link, jump. -/
 theorem wp_s_jal [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
-    (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 21) (rd : BitVec 5) (hrd : rdOk rd)
-    (htgt : (pc + BitVec.signExtend 64 imm).toNat % 2 = 0) :
+    (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 21) (rd : BitVec 5) (hrd : rdOk rd) :
     instr (GF := GF) pc is_rvc (instruction.JAL (imm, regidx.Regidx rd)) ∗
     kctx cpu k ∗ pcIs cpu pc ∗
     ▷ wpNext k.sie k.proc cpu (fun cpu' =>
         iprop(kctx cpu' (k.setReg rd (pc + instrLen is_rvc)) -∗
           pcIs cpu' (pc + BitVec.signExtend 64 imm) -∗ wpLoop cpu'))
     ⊢ wpLoop cpu :=
-  wpLoop_k_setReg cpu k hsie htier pc _ is_rvc _ rd hrd _
-    (fun c _ _ => execSpecF_jal cpu (DFrac.own 1) c pc _ imm rd hrd.1 (tpPin cpu k.regs) htgt)
+  instr_pure_elim pc is_rvc _ _ _ (fun hpc hwf =>
+    wpLoop_k_setReg cpu k hsie htier pc _ is_rvc _ rd hrd _
+      (fun c _ _ => execSpecF_jal cpu (DFrac.own 1) c pc _ imm rd hrd.1 (tpPin cpu k.regs)
+        (jumpTgt_even_21 pc imm hpc (instrWf_jal hwf))))
 
 /-- `ret` (`jalr x0, 0(rs1)`, `rs1 = ra`): jump to `rs1` with bit 0 cleared. -/
 theorem wp_s_ret [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
@@ -400,7 +402,7 @@ theorem wp_s_ret [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (
     instr (GF := GF) pc is_rvc (instruction.JALR (0#12, regidx.Regidx rs1, regidx.Regidx 0#5)) ∗
     kctx cpu k ∗ pcIs cpu pc ∗
     ▷ wpNext k.sie k.proc cpu (fun cpu' =>
-        iprop(kctx cpu' k -∗ pcIs cpu' (retPc (k.rget cpu rs1)) -∗ wpLoop cpu'))
+        iprop(kctx cpu' k -∗ pcIs cpu' (jumpPc (k.rget cpu rs1)) -∗ wpLoop cpu'))
     ⊢ wpLoop cpu :=
   wpLoop_k_keep0 cpu k hsie htier pc _ is_rvc _
     (fun c hok _ => execSpecF_ret cpu (DFrac.own 1) c false hok pc (pc + instrLen is_rvc) rs1 (tpPin cpu k.regs))
@@ -692,8 +694,7 @@ theorem wp_s_sw [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (h
 
 /-- The conditional branches against `x0` as `rs1` (`blez`, `bgtz`, ...). -/
 theorem wp_s_branch0 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
-    (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 13) (rs2 : BitVec 5) (hrs2 : rs2 ≠ 0#5) (op : bop)
-    (htgt : (pc + BitVec.signExtend 64 imm).toNat % 2 = 0) :
+    (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 13) (rs2 : BitVec 5) (hrs2 : rs2 ≠ 0#5) (op : bop) :
     instr (GF := GF) pc is_rvc (instruction.BTYPE (imm, regidx.Regidx rs2, regidx.Regidx 0#5, op)) ∗
     kctx cpu k ∗ pcIs cpu pc ∗
     ▷ wpNext k.sie k.proc cpu (fun cpu' =>
@@ -701,9 +702,10 @@ theorem wp_s_branch0 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
           pcIs cpu' (if bcond op 0#64 (k.rget cpu rs2) then pc + BitVec.signExtend 64 imm
             else pc + instrLen is_rvc) -∗ wpLoop cpu'))
     ⊢ wpLoop cpu :=
-  wpLoop_k_keep0 cpu k hsie htier pc _ is_rvc _
-    (fun c _ _ => execSpecF_btype0 cpu (DFrac.own 1) c pc (pc + instrLen is_rvc) imm rs2 hrs2 op
-      (tpPin cpu k.regs) htgt)
+  instr_pure_elim pc is_rvc _ _ _ (fun hpc hwf =>
+    wpLoop_k_keep0 cpu k hsie htier pc _ is_rvc _
+      (fun c _ _ => execSpecF_btype0 cpu (DFrac.own 1) c pc (pc + instrLen is_rvc) imm rs2 hrs2 op
+        (tpPin cpu k.regs) (jumpTgt_even_13 pc imm hpc (instrWf_btype hwf))))
 
 /-! ## The per-cpu cells -/
 

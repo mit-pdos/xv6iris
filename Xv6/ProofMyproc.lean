@@ -69,14 +69,13 @@ theorem myproc_proof (PU : PUSHOFF) (PO : POPOFF) : MYPROC := ⟨fun {hlc GF} _ 
   inext
   iintro Hk Hpc Hframe
   -- jal push_off
-  k_step (wp_s_jal cpu _ ?hs ?ht 0x800018e4#64 false 2093724#21 1#5 (by decide) ?htgt) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-  case htgt => k_tgt
+  k_step (wp_s_jal cpu _ ?hs ?ht 0x800018e4#64 false 2093724#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- push_off (its contract, unfolded, at the callee's context)
   have hpu : ∀ (k' : KCtx) (hsie' : k'.sie = false) (htier' : k'.tier = KTier.bare) (hnoff' : k'.noff + 1 < 2 ^ 31)
       (hK' : 6 ≤ k'.avail),
       kctx cpu k' ∗ pcIs cpu 0x80000b80#64 ∗
-      (∀ R' : RegMap, kctx cpu (k'.pushOff.withRegs R') -∗ pcIs cpu (retPc (k'.regs 1#5)) -∗
+      (∀ R' : RegMap, kctx cpu (k'.pushOff.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
         ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu) ⊢ wpLoop (GF := GF) cpu := by
     intro k' hsie' htier' hnoff' hK'
     have h := PU.wp_push_off (hlc := hlc) (GF := GF) cpu k' hsie' htier' hnoff' hK'
@@ -90,7 +89,7 @@ theorem myproc_proof (PU : PUSHOFF) (PO : POPOFF) : MYPROC := ⟨fun {hlc GF} _ 
   case hn => k_norm; omega
   case hK => k_norm; omega
   iintro %R2 Hk Hpc %hcs2
-  have hret1 : retPc 0x800018e8#64 = 0x800018e8#64 := by simp only [retPc, BitVec.reduceAnd]
+  have hret1 : jumpPc 0x800018e8#64 = 0x800018e8#64 := by simp only [jumpPc, BitVec.reduceAnd]
   k_norm [hret1]
   -- mv a5,tp
   k_step (wp_s_add cpu _ ?hs ?ht 0x800018e8#64 true 15#5 0#5 4#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -125,14 +124,13 @@ theorem myproc_proof (PU : PUSHOFF) (PO : POPOFF) : MYPROC := ⟨fun {hlc GF} _ 
   k_step (wp_s_add cpu _ ?hs ?ht 0x800018fa#64 true 9#5 0#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- jal pop_off
-  k_step (wp_s_jal cpu _ ?hs ?ht 0x800018fc#64 false 2093822#21 1#5 (by decide) ?htgt) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-  case htgt => k_tgt
+  k_step (wp_s_jal cpu _ ?hs ?ht 0x800018fc#64 false 2093822#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- pop_off (its contract, unfolded, at the callee's context)
   have hpo : ∀ (k' : KCtx) (hsie' : k'.sie = false) (htier' : k'.tier = KTier.bare) (hnoff' : 1 ≤ k'.noff)
       (hK' : 4 ≤ k'.avail) (hlks' : k'.locks.length ≤ k'.noff - 1) (hexit' : k'.noff = 1 → k'.intena = false),
       kctx cpu k' ∗ pcIs cpu 0x80000bfa#64 ∗
-      (∀ R' : RegMap, kctx cpu (k'.popOff.withRegs R') -∗ pcIs cpu (retPc (k'.regs 1#5)) -∗
+      (∀ R' : RegMap, kctx cpu (k'.popOff.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
         ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu) ⊢ wpLoop (GF := GF) cpu := by
     intro k' hsie' htier' hnoff' hK' hlks' hexit'
     have h := PO.wp_pop_off (hlc := hlc) (GF := GF) cpu k' hsie' htier' hnoff' hK' hlks' hexit'
@@ -148,7 +146,7 @@ theorem myproc_proof (PU : PUSHOFF) (PO : POPOFF) : MYPROC := ⟨fun {hlc GF} _ 
   case hl => k_norm; exact hwf.2.2.2.1
   case he => k_norm; intro h; have := hwf.1 (by omega); rw [hsie] at this; exact this.symm
   iintro %R4 Hk Hpc %hcs4
-  have hret2 : retPc 0x80001900#64 = 0x80001900#64 := by simp only [retPc, BitVec.reduceAnd]
+  have hret2 : jumpPc 0x80001900#64 = 0x80001900#64 := by simp only [jumpPc, BitVec.reduceAnd]
   k_norm [hret2]
   simp only [KCtx.withRegs_regs] at hcs2 hcs4
   -- mv a0,s1

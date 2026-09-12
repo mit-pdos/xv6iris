@@ -33,7 +33,7 @@ hart's id in `a0`. -/
 def wp_cpuid_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare) (hK : 2 ≤ k.avail) : Prop :=
   kctx cpu k ∗ pcIs cpu cpuidAddr ∗
-  (∀ R' : RegMap, kctx cpu (k.withRegs R') -∗ pcIs cpu (retPc (k.regs 1#5)) -∗
+  (∀ R' : RegMap, kctx cpu (k.withRegs R') -∗ pcIs cpu (jumpPc (k.regs 1#5)) -∗
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = cpuidRet (hartId cpu)⌝ -∗ wpLoop cpu)
   ⊢ wpLoop (GF := GF) cpu
 

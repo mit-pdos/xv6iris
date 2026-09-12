@@ -115,7 +115,7 @@ MachCSL/                          the framework (nothing xv6-specific)
                    reading of register chains on literal indices
   WpSmodeFrame.lean the standard two-slot frame as two derived rules
                    (`wp_prologue2`, `wp_epilogue2`) and the tactics
-                   `k_step`/`k_norm`/`k_tgt` the function proofs use
+                   `k_step`/`k_norm` the function proofs use
 Xv6/                              the xv6 verification (client of MachCSL)
   KernelImage.lean (generated) the kernel text as data, symbol addresses
   KernelTree.lean  (generated) the same text as an address-keyed search tree
@@ -155,7 +155,7 @@ over `kctx cpu k` (registers as the map `k.regs`, the arguments in
 buffers (`byteBuf`, the source at the caller's fraction, a written
 destination owned whole) and a `wpNext` continuation that receives the
 context back at any register map `R'` with `calleeSaved k.regs R'`, the
-result in `R' 10`, control at `retPc (k.regs 1)`, and the buffers.  The
+result in `R' 10`, control at `jumpPc (k.regs 1)`, and the buffers.  The
 proofs chain the `wp_s_*` rules through `k_step`; loops are lemmas by
 induction on the remaining count (the loop body is one lemma, e.g.
 `strlen_iter`); `memcpy`'s proof takes the `memmove` interface as a

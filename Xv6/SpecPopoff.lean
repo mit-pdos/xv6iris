@@ -37,7 +37,7 @@ def wp_pop_off_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
     (hnoff : 1 ≤ k.noff) (hK : 4 ≤ k.avail) (hlks : k.locks.length ≤ k.noff - 1)
     (hexit : k.noff = 1 → k.intena = false) : Prop :=
   kctx cpu k ∗ pcIs cpu popOffAddr ∗
-  (∀ R' : RegMap, kctx cpu (k.popOff.withRegs R') -∗ pcIs cpu (retPc (k.regs 1#5)) -∗
+  (∀ R' : RegMap, kctx cpu (k.popOff.withRegs R') -∗ pcIs cpu (jumpPc (k.regs 1#5)) -∗
     ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu)
   ⊢ wpLoop (GF := GF) cpu
 

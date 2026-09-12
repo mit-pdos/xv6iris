@@ -49,7 +49,7 @@ def wp_acquire_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
   kctx cpu k ∗ pcIs cpu acquireAddr ∗ isLock γ (k.regs 10#5) s R ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ R' : RegMap,
     kctx cpu' ((k.pushOff.withRegs R').withLocks (s :: k.locks)) -∗
-    pcIs cpu' (retPc (k.regs 1#5)) -∗ ⌜calleeSaved k.regs R'⌝ -∗
+    pcIs cpu' (jumpPc (k.regs 1#5)) -∗ ⌜calleeSaved k.regs R'⌝ -∗
     locked γ cpu' -∗ R curCtx -∗ (∃ K : Nat, viewLb cpu' K) -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 

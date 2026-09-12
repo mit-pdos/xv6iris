@@ -73,7 +73,7 @@ theorem EntryProof : ENTRY where
     iintro HmBoot Hclock Hpc Hx2 Hx10
     entry_norm
     -- 80000016: jal start
-    entry_step wp_m_jal cpu dq bootConf bootConf_ok 0x80000016#64 false 66#21 1#5 (by decide) v1 (by decide)
+    entry_step wp_m_jal cpu dq bootConf bootConf_ok 0x80000016#64 false 66#21 1#5 (by decide) v1
     iintro HmBoot Hclock Hpc Hx1
     entry_norm
     iapply HΦ $$ HmBoot Hmhartid Hclock Htok Hslot Hpc Hx1 Hx2 Hx10 Hx11
