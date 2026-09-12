@@ -340,9 +340,11 @@ Section UkShEcho.
      names it *)
   Hypothesis Hpsok_free : forall k : Z, free_num k -> psok k.
 
+  Local Notation ra_idx := (mword_of_int 1 : mword 5).
+  Local Notation s1_idx := (mword_of_int 9 : mword 5).
   Local Notation a0_idx := (mword_of_int 10 : mword 5).
   Local Notation a1_idx := (mword_of_int 11 : mword 5).
-  Local Notation s1_idx := (mword_of_int 9 : mword 5).
+  Local Notation a7_idx := (mword_of_int 17 : mword 5).
 
   (* =================================================================== *)
   (*  THE NODE, ADDRESSED.  Three accessors so that no consumer of the     *)
@@ -391,6 +393,27 @@ Section UkShEcho.
   Lemma echo_cmd_addr (gd : gname) (t s0 : Z) (g : nat -> bv 8) :
     ush_cmd gd t (echo_cmd s0 g) -∗ ⌜ 0 < t < 2 ^ 38 /\ t mod 8 = 0 ⌝.
   Proof. iIntros "#Hc". iApply (ush_cmd_addr with "Hc"). Qed.
+
+  (* argv[0], in the two shapes runcmd's EXEC arm reads it: the POINTER
+     SLOT the [c.ld a0,8(s1)] at 0xce loads, and the STRING the diagnostic
+     tail prints.  [UkShRun.ush_argv0] is the generic form; at [echo_cmd]
+     the [match] on the vector is already decided. *)
+  Lemma echo_cmd_argv0 (gd : gname) (t s0 : Z) (g : nat -> bv 8) :
+    ush_cmd gd t (echo_cmd s0 g) -∗
+    ush_ptr gd (t + 8) (s0 + Z.of_nat (echo_off 0%nat))
+    ∗ ush_str gd (UArg (s0 + Z.of_nat (echo_off 0%nat)) (echo_alen 0%nat)
+                    (fun j : nat => g (echo_off 0%nat + j)%nat)).
+  Proof.
+    iIntros "#Hc". iSplit.
+    - iDestruct (echo_cmd_word gd t s0 g 0%nat ltac:(lia) with "Hc") as "#Hw".
+      rewrite /ush_ptr.
+      assert (E : t + 8 = t + 8 + 8 * Z.of_nat 0%nat) by lia.
+      rewrite E. iExact "Hw".
+    - iDestruct (echo_cmd_str gd t s0 g 0%nat ltac:(lia) with "Hc")
+        as "[%Hr #Hs]".
+      rewrite /ush_str. cbn [ua_ptr ua_len ua_bytes].
+      iSplit; [ iPureIntro; exact Hr | iExact "Hs" ].
+  Qed.
 
   (* =================================================================== *)
   (* S2  THE PINNED EXEC SUPPLY, at sh's own key.                         *)
