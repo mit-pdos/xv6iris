@@ -2485,7 +2485,19 @@ live (`uw_addr`), and the flag turns live into mapped.  Row 5's receipt
 (CONS-SWALLOW's `∃ P, perm_of (ud_um P) sz = uvis_perm W ∗ receipt P …`)
 gains `⌜uvis_lazy W = false -> live_pages (uvis_sz W) ⊆ dom (ud_um P)⌝`, and
 sh refutes the copyout-fault swallow from that.  Lane LAZY-FLAG, after
-CONS-SWALLOW (the set form `uvis_map` is withdrawn).
+CONS-SWALLOW (the set form `uvis_map` is withdrawn).  TWO CORRECTIONS FROM
+CONS-SWALLOW PHASE 1 (2026-09-12): (i) copyout fails on a MAPPED page too --
+a text page (R|X|U, no W) at the re-walk's `PTE_W` test, a `uvmclear`'d guard
+page (no U) at walkaddr -- so the predicate is `uva_wmapped` (leaf with V, U
+AND W) and the flag's invariant is "the projection's fill is empty": `∀ p q,
+perm_of um sz !! p = Some q -> up_W q = true -> ∃ w, um !! p = Some w ∧
+pte_vu w ∧ pte_w w` (a fill entry is `uperm_rw`; a leaf entry's `up_W` IS
+`pte_w`), which is what `uw_addr` from `ubytes` needs; (ii) a post row that
+reads `uvis_perm`/`uvis_sz` off the key needs `UexecSG.skey_eq` to pin them
+(CONS-SWALLOW extended it; five construction sites) -- `uvis_lazy` must be
+pinned there as well.
+
+
 
 WHAT PROCEEDS MEANWHILE.  SH-LINE phase 2a (S1-S3, the CLOSED arm, the
 exit/kill payments, the red files; `gets`/S5 deferred, `ushf_lexable` stays
