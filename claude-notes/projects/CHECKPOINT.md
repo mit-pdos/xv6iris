@@ -185,3 +185,10 @@ E2 INIT-BOOT brief written (`brief-init-boot.md`); launches in `-disc` on
 `lane/supply-split-r1` when the rebase is green.  In flight: LAZY-FLAG p1
 (stored form, main), TX-TAG p2 + LOOP-off rider (`-tlw`), SH-OPEN p1 (`-sup`),
 REBASE-SUPPLY-SPLIT (`-disc`).
+
+LAZY-FLAG CORE LANDED on main (`05d689c1b`); the stored form is banked as
+`wx-briefs/lazy-flag-stored.patch`; LAZY-FLAG-2 LAUNCHED in main (fresh agent,
+brief `brief-lazy-flag-2.md`: close the patch, sbrk's block-level arm, exec's
+domain row in `kexec_built`, the read-leaf refutation).  In flight: LAZY-FLAG-2
+(main), TX-TAG p2 (`-tlw`), SH-OPEN p1 (`-sup`), REBASE-SUPPLY-SPLIT (`-disc`,
+then E2 INIT-BOOT there).
