@@ -2404,6 +2404,39 @@ ORDER: GENERIC-PAY → CONS-SWALLOW → SH-LINE 2b (gets on `ush_gets_line`,
 `wp_uk_ecall_read_recv` with `upos` threaded read → gets_loop → gets → getcmd
 → main) → LAZY-FLAG (the owner's form of (A)).
 
+SUPPLY-SPLIT PHASE 1 (2026-09-12; sibling `/shared/xv6iris-2-sup`, branch
+`lane/supply-split`, `0411ea97b`, build `sup11`).  THE CLASSIFICATION of every
+syscall bundle (`UexecExecInst.xv6_sbundle`): FREE (no application resource at
+any key) = fork, exit, wait, pipe, kill, fstat, CHDIR (`fsabs_chdir_pre` takes
+no `app_sup`), dup, getpid, sbrk, sleep, uptime, close, sync, and every
+undefined number; CLAIM = read 5 (the console arm only: `fsabs_fileread_in`
+spends `app_sup` at `cons_acc_cred`; the inode/pipe arms are free), open 15
+(the TRUNC leg is in both branches, no omode is free), write 16, mknod 17;
+TAINT-ONLY = unlink, link, mkdir (no program calls them); exec is explicit
+(`uxsup`).  THE CONSOLE WRITE'S DEPOSIT COSTS NOTHING: at a CONSOLE fd row
+`fsabs_filewrite_in`'s payload is `uart_sent γu []`, minted from unit -- what
+makes 16 unpayable through `udep` is only that `udep`'s law is KEY-FREE (an
+inode row needs `app_step`s); so E5's write leaf is a ledger-fixed deposit on
+`udepwf_std`'s mould plus a receipt-keeping quiet leaf, and a REAL receipt
+about the bytes is where the claim re-enters (`wf_Q f`/`wf_tr0 f`).  Landed:
+`xv6_free`, `xv6_sbundle_free`, `uprogSG_free` (a Definition, used as
+`(PS := uprogSG_free)`), `udep_free`, `udepw_free` -- all numbers proved.
+FLAGGED generic-route sites (owe a named per-call deposit, not `udep`):
+init's open/mknod TAINT arms (`UkInit.v:201/466`; the credential arms are
+pinned), init's banner write (`UkInit.v:939`), sh's write (`UkSh.v:458` via
+`wp_ksh_write`), sh's console open at start (`UkSh.v:529`), sh's console read
+(`UkSh.v:5913`/`UShKernel.v:300`), echo's write (`UkEcho.v:1000` -- echo's
+ONLY generic site), cat's three.  Also: read's claim route (`udepwf_std`,
+`wp_uk_ecall_read_recv`) has NO user yet; `UkShRun.wp_kshr_qstub` is dead
+(deleted in phase 2); `USYS_write` does not exist (write is the literal 16).
+PHASE-2 RULINGS: the free predicate `free_num` lives LOW (UkRun/UexecSG) so
+program sections replace `Hpsok` by `Hpsok_free : ∀ k, free_num k → psok k`;
+the flagged sites take named `udepw N m pc <n>` premises that bubble to the
+program's top lemma as persistent laws (init's taint arms: `□ (T -∗ ∀ m pc,
+udepw N m pc 15)`, discharged at the era from `□ (T -∗ app_sup)` +
+`udep_gen`); `cond_entry_slot` takes the explicit instance for its gated
+arms; the unused UkRunSys leaves stay as 2b's moulds.
+
 E5 -- THE OUTPUT SIDE: DESIGN PROPOSAL (coordinator, 2026-09-12; after the
 pre-mortem review `review-echo-plan-2026-09-12.md` findings 2-5, 7, 12 and
 the owner's ruling "the output includes the 'hart N starting' outputs, along

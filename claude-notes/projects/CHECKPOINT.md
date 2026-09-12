@@ -131,3 +131,10 @@ THE OUTPUT SIDE: DESIGN PROPOSAL"); awaiting the owner on O3 (rate discipline
 (b)) and O5 (allocation failure (i)).  Main-tree pipeline unchanged:
 CONS-SWALLOW (phase 2 running) → LAZY-FLAG → DISC-RATE → TX-TAG → TX-RECEIPT
 + ECHO-RECEIPT → APP-IFACE → write leaf + cones → SH-LINE 2b → E4 → E2 → E5.
+
+LANES RUNNING (2026-09-12, later): main tree CONS-SWALLOW phase 2; siblings
+SUPPLY-SPLIT phase 2 (`-sup`, rulings (a)-(f) in the note "SUPPLY-SPLIT PHASE
+1"), TEXT-LW phase 1 (`-tlw`), DISC-RATE phase 1 (`-disc`, brief
+`brief-disc-rate.md`; O3/O5 RULED: wait for the harts; failure outputs valid).
+Landing order when green: CONS-SWALLOW (main) → fetch the sibling branches one
+at a time (rebase on main, rebuild, re-gate) → LAZY-FLAG in main.
