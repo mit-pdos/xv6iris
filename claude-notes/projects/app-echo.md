@@ -2645,12 +2645,19 @@ PRODUCES `uart_sent_exact_at` (the receipt TX-TAG stated without a producer);
 the token; `tx_free src` on uartputc_sync/consputc.  THE BLOCKER: the MINT --
 pids are REUSED (`allocpid` re-picks against live slots; `PIDMAX = 1000`), and
 `ghost_map_insert`'s freshness `mine !! pid = None` is known only to the proc
-layer.  RULED FIX: the UART invariant holds a SLICE of `SlotGen.pid_reg pid`
-per issued entry (the quarters become a three-way split), `dev_inv` a
-persistent premise of SpecAllocproc/SpecFreeproc, allocproc deposits its slice
-and inserts at `(length tg, [])` (true of any trace: the seed is what makes
-the mint unconditional), freeproc reclaims and deletes, `proc_priv_core` gains
-`∃ n0 l, tx_mine fsc_uart pid n0 l` LAST.  R3 RULED: the transcript on the key,
+layer.  RULED FIX (REVISED 2026-09-12 -- the pid_reg SLICE is unbuildable: `pid_reg`
+lives in `wchG`, and binding it in WpUart's section rides `uart_ghosts`/
+`dev_inv` into 44 files incl. ConsoleInv): a DOMAIN SHADOW -- `pidset` (a
+one-field record over `gset Z`, so the camera is fresh), `un_dom` in
+`uart_names`, `tx_dom γ q D`; `uart_tagsE` holds `tx_dom γ (1/2) (dom mine)`,
+`PidLock.nextpid_res_at` holds `tx_dom fsc_uart (1/2) (dom R)` beside
+`pid_reg_auth R` (PidLock at `{FSC : fscfg}`); allocproc mints inside its
+pid-lock section from its existing `R !! pid = None` (⇒ `pid ∉ dom mine`),
+opening `dev_inv` to insert at `(length tg, [])` (the seed makes the mint
+unconditional) and bumping both halves; freeproc releases under pid_lock
+where it deletes the registration; the boot founds both halves at ∅;
+SlotGen's quarters untouched; `proc_priv_core` (and `proc_priv_nocwd`/`proc_priv_nopt`, outside
+`proc_priv_bare`) gains `∃ n0 l, tx_mine fsc_uart pid n0 l` LAST.  R3 RULED: the transcript on the key,
 `uvis_tx : list (bv 8)` (PID-KEY precedent; rows identity except 16 = `tx ++
 bs`; row 16 = `filewrite_in … (uvis_pid W) (uvis_tx W)` with the console arm
 at `tx_mine`).  R4: `wp_uk_ecall_write_recv` on a ledger-fixed deposit at 16

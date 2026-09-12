@@ -292,3 +292,7 @@ TX-RECEIPT resumes IN MAIN (rebase `lane/tx-receipt` from `-tlw` onto main; then
 the pid_reg slice, the block conjunct, `uvis_tx`, row 16, the write leaf).  E2
 rebases onto main at its end.  In flight: TX-RECEIPT (main), E2 p2 (`-disc`),
 PRINTK-LEDGER-2 A (`-sup`), E4 p3 (`-tlw`).
+
+TX-RECEIPT resumed in main (rebase clean, `9de28358a`); the pid_reg SLICE is
+unbuildable (wchG layering) → RULED the DOMAIN SHADOW (`tx_dom` halves in the
+UART invariant and the pid lock's payload); R1 proceeds.
