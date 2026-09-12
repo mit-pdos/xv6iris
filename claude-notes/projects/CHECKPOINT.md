@@ -339,3 +339,12 @@ on the VM AFTER UNTAG's last build finishes (so the tree is post-UNTAG main),
 then one `vmbuild.sh xv6iris-2-uart uartseed10`.  The UART agent should start
 from post-UNTAG main (UNTAG deletes the tag column from `uart_ghosts`, which the
 second-instance change also touches).
+
+STATE (2026-09-12, after E4 phase 3): FOUR agents live -- UNTAG in main
+(working tree dirty with the label removal; do not stage iris/ until it
+reports), E2 INIT-BOOT in -disc (`lane/init-boot`), SH-LINE 2b in -sup
+(`lane/sh-line-2b`), REBASE-SH-ECHO in -tlw (`lane/sh-echo-r2` = E4's eight
+commits rebased onto main; E4's own gate was green at c2879f176).  LANDING
+ORDER: UNTAG first (main), then sh-echo-r2 (re-rebase over UNTAG if its five
+files conflict; else ff), then 2b and E2 as they gate.  Then seed the -uart VM
+tree and hand the owner's dual-UART agent post-UNTAG main.
