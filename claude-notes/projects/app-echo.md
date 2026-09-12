@@ -2334,6 +2334,36 @@ DEVICE arm says the walk of THIS path ended at a device node; rows 15/17 read
 `uvis_M W` and `xk_a W 0`; the generic suppliers are `*_at_of_all` instances;
 `UkRunSys`/`UkInit` unchanged.  chdir/unlink keep `∀ pl`.
 
+OPEN-PIN COMPLETE (2026-09-12; phases 3-4 landed: `92716856c`, and the phase-4
+commit after it).  Phase 3: three receipt-keeping U-tier leaves
+(`UkRunSys.wp_uk_ecall_open_recv` at the TRAPPING key handing back `uvis_cwd W =
+c` and `take NSTD (uvis_fd W) = l`; `wp_uk_ecall_quiet_recv` for the quiet
+numbers; `wp_uk_ecall_dup_closed` -- the ledger does not move and nothing about
+`r`); `UkRun.udepwf_at` (the deposit family-named AND cwd-fixed); `UInitFd.v`
+(init's ledger rows at an ABSTRACT descriptor: `ufd_l0 = take NSTD fdt0`, the
+per-call scans/`ualloc` readings, `ufd_head T st γfd := (slot 0 = st at a ledger
+it does not name) ∨ ustd ufd_l0 ∨ (ustd_any ∗ T)` -- ONE head from the second
+open to the fork, closed under both dups); `UkInit`'s three console calls as leaf
+bodies over `T`/`K`/`stc` (`uki_open_absent_leaf`, `uki_open_console_leaf`,
+`uki_mknod_leaf`, `init_cons_leaves`), the dups proved (`wp_kinit_dup_cons`,
+`wp_kinit_dup_closed`, `wp_kinit_dup_head` whose taint arm alone uses the
+untracked leaf); `UkInitMain` carries the head at all seven sites and no
+`ustd_any` remains; `UInitCons.init_cons_laws` (nine laws) with
+`init_cons_laws_echo` from the era's record equation.  Phase 4: `UInitConsK.v`
+discharges the three leaves at echo's era (the path read off the loaned heap at
+0x970; the pinned `xfam`s; three `udepwf_at` suppliers; the credential riding in
+the dead walk's own cursor and miss family so every failure arm hands it back);
+`init_cons_leaves_echo : file_app = MkAppcfg echo_names (echo_pred γ) r →
+app_inv fsc_fs -∗ □ (∀ N, init_cons_leaves N (echo_taint γ) (cons_key r)
+init_cons_fd)` discharges `UInitKernel.init_uexec_slot`'s premise;
+`wp_uk_ecall_open_recv_img`/`_quiet_recv_img` (the receipt's path row is
+readable only inside the leaf); the leaf bodies carry `init_rodata` and the
+argument words.  E2 OWES init's entry: `cons_key` (from `echo_init_key`), the
+era's record equation, `app_inv`, `init_cons_leaves` (by `init_cons_leaves_echo`),
+and the entry-ledger fact `take NSTD (uvis_fd W) = ufd_l0`.  DEAD (retire in a
+hygiene pass): `UInitCons.init_cons_laws_open_absent`, `init_cons_open_recv_
+absent` at `pobs_P_dead`.
+
 OPEN-PIN PHASE 2 MILESTONE LANDED (2026-09-12; 20 files).  THE CREATE LEG SPENDS
 THE ARM'S PERMIT: `FsAbsCreateFire.acre_commit_at_gen` takes `cre_arm_fired Farm i`
 as the unarm does; one permit per armed inode makes the create/unarm legs

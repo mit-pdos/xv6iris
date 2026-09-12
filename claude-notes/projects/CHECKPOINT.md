@@ -56,9 +56,12 @@ patch: `projects/wx-briefs/`.
   LANDED") → OPEN-PIN phase 3 LANDED (2026-09-12; 7 files + `UInitFd.v`; VM build
   `openpin68` EXIT=0, audit = the thirteen, lemma_diff = one justified GONE; the
   three receipt-keeping leaves, init's console calls as leaf bodies, one head
-  from the second open to the fork; see the commit message) → OPEN-PIN phase 4
-  (`wx-briefs/brief-open-pin-4.md`: the era-level discharge of
-  `UkInit.init_cons_leaves` in a new `UInitConsK.v`; LAUNCHED 2026-09-12)
+  from the second open to the fork; see the commit message) → OPEN-PIN phase 4 LANDED (2026-09-12; `UInitConsK.v`; VM build
+  `openpin80` EXIT=0, audit = the thirteen, lemma_diff clean) -- OPEN-PIN COMPLETE
+  (note "OPEN-PIN COMPLETE"; E2 owes init's entry the key, the record equation,
+  app_inv, init_cons_leaves and the entry-ledger fact) → SH-LINE phase 2
+  (`wx-briefs/brief-sh-line-2.md`, a fresh agent; LAUNCHED 2026-09-12) → E4 → E2 →
+  E5
   → SH-LINE phase 2 → E4 → E2 → E5.
 - Standing rulings from the lanes (WX-EXIT/WX-INV build on them): rows per slot
   born at boot; the map's and the orphans' names canonical on `wchG`; ZOMBIE row
