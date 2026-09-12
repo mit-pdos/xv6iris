@@ -20,6 +20,7 @@ coupling `locks.length ≤ noff` must survive the pop).  Both
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
+import Xv6.Image
 import Xv6.SpecPushoff
 
 namespace Xv6
@@ -35,7 +36,7 @@ def wp_pop_off_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
     (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
     (hnoff : 1 ≤ k.noff) (hK : 4 ≤ k.avail) (hlks : k.locks.length ≤ k.noff - 1)
     (hexit : k.noff = 1 → k.intena = false) : Prop :=
-  kctx cpu k ∗ kernelText ∗ pcIs cpu popOffAddr ∗
+  kctx cpu k ∗ pcIs cpu popOffAddr ∗
   (∀ R' : RegMap, kctx cpu (k.popOff.withRegs R') -∗ pcIs cpu (retPc (k.regs 1#5)) -∗
     ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu)
   ⊢ wpLoop (GF := GF) cpu

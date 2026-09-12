@@ -156,7 +156,7 @@ macro_rules
 
 set_option maxHeartbeats 4000000 in
 /-- The standard prologue at `pc`: push two slots, save `ra`/`s0`, `s0 := sp₀`. -/
-theorem wp_prologue2 [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+theorem wp_prologue2 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
     (pc : BitVec 64) (hK : 2 ≤ k.avail) :
     instr (GF := GF) pc true (instruction.ITYPE (4080#12, regidx.Regidx 2#5, regidx.Regidx 2#5, iop.ADDI)) ∗
     instr (GF := GF) (pc + 2#64) true (instruction.STORE (8#12, regidx.Regidx 1#5, regidx.Regidx 2#5, 8)) ∗
@@ -187,7 +187,7 @@ theorem wp_prologue2 [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) (hsie : k.sie 
 set_option maxHeartbeats 4000000 in
 /-- The standard epilogue at `pc`: restore `ra`/`s0`, pop, return.  The body
 left the context at `(k.pushed 2).withRegs R` with `sp` untouched. -/
-theorem wp_epilogue2 [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+theorem wp_epilogue2 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
     (pc : BitVec 64) (hK : 2 ≤ k.avail) (R : RegMap)
     (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFF0#64) (ra s0 : BitVec 64) :
     instr (GF := GF) pc true (instruction.LOAD (8#12, regidx.Regidx 2#5, regidx.Regidx 1#5, false, 8)) ∗
@@ -244,7 +244,7 @@ theorem imm_p32 : BitVec.signExtend 64 32#12 = 8#64 * BitVec.ofNat 64 4 := by
 set_option maxHeartbeats 4000000 in
 /-- The prologue `addi sp,sp,-32; sd ra,24(sp); sd s0,16(sp); sd s1,8(sp);
 addi s0,sp,32` at `pc`. -/
-theorem wp_prologue4s1 [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+theorem wp_prologue4s1 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
     (pc : BitVec 64) (hK : 4 ≤ k.avail) :
     instr (GF := GF) pc true (instruction.ITYPE (4064#12, regidx.Regidx 2#5, regidx.Regidx 2#5, iop.ADDI)) ∗
     instr (GF := GF) (pc + 2#64) true (instruction.STORE (24#12, regidx.Regidx 1#5, regidx.Regidx 2#5, 8)) ∗
@@ -278,7 +278,7 @@ theorem wp_prologue4s1 [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) (hsie : k.si
 set_option maxHeartbeats 4000000 in
 /-- The epilogue `ld ra,24(sp); ld s0,16(sp); ld s1,8(sp); addi sp,sp,32; ret`
 at `pc`, from the body context `(k.pushed 4).withRegs R` (`sp` untouched). -/
-theorem wp_epilogue4s1 [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+theorem wp_epilogue4s1 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
     (pc : BitVec 64) (hK : 4 ≤ k.avail) (R : RegMap)
     (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64) (ra s0 s1 : BitVec 64) :
     instr (GF := GF) pc true (instruction.LOAD (24#12, regidx.Regidx 2#5, regidx.Regidx 1#5, false, 8)) ∗

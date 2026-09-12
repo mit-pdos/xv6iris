@@ -1,6 +1,7 @@
 import Xv6.KernelImage
 import Xv6.KernelTree
 import Xv6.KernelText
+import Xv6.Image
 import Xv6.SpecEntry
 import Xv6.SpecTimerinit
 import Xv6.SpecStart

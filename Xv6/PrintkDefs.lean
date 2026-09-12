@@ -927,19 +927,17 @@ theorem fmt_i3 (a : BitVec 64) (i : Nat) :
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
 
+/-- The C string a `.str` description owns, given back on return.  The
+string's own facts (no NUL inside, the pointer not null) travel with the
+`cstr`; a client that needs one reads it off with `cstr_pure`. -/
 theorem pkDescRes_str_acc (v : BitVec 64) (dq : DFrac) (s : List (BitVec 8)) :
     pkDescRes (GF := GF) v (.str dq s) ⊢
-      ⌜nonul s ∧ v ≠ 0#64⌝ ∗ byteBuf v dq (s ++ [0#8]) ∗
-      (byteBuf v dq (s ++ [0#8]) -∗ pkDescRes v (.str dq s)) := by
+      cstr v dq s ∗ (cstr v dq s -∗ pkDescRes v (.str dq s)) := by
   simp only [pkDescRes]
   iintro H
-  icases cstr_pure _ _ _ $$ H with ⟨%h, H⟩
-  icases cstr_elim _ _ _ $$ H with ⟨%_, Hb⟩
-  isplitr
-  · ipureintro; exact h
-  · iframe Hb
-    iintro Hb
-    iapply cstr_intro _ _ _ h.1 $$ Hb
+  iframe H
+  iintro H
+  iexact H
 
 /-- `printk`'s postcondition as the contract states it (the format as a
 `cstr`) implies the walk's form (the terminated buffer). -/
@@ -1052,6 +1050,21 @@ theorem byteBuf_acc0 (a : BitVec 64) (dq : DFrac) (bs : List (BitVec 8)) (b : Bi
     byteBuf (GF := GF) a dq bs ⊢ wordPointsTo a 1 dq b ∗ (wordPointsTo a 1 dq b -∗ byteBuf a dq bs) := by
   have h := byteBuf_acc (GF := GF) a dq bs 0 b hb
   rwa [show a + BitVec.ofNat 64 0 = a by simp] at h
+
+/-- The first byte of a C string. -/
+theorem cstr_acc0 (a : BitVec 64) (dq : DFrac) (s : List (BitVec 8)) (b : BitVec 8)
+    (hb : (s ++ [0#8])[0]? = some b) :
+    cstr (GF := GF) a dq s ⊢ wordPointsTo a 1 dq b ∗ (wordPointsTo a 1 dq b -∗ cstr a dq s) := by
+  have h := cstr_acc (GF := GF) a dq s 0 b hb
+  rwa [show a + BitVec.ofNat 64 0 = a by simp] at h
+
+/-- `"(null)"` at `0x80007008`, as the C string `printk` walks. -/
+theorem kernelData_nullBody : kernelData (GF := GF) ⊢ cstr 0x80007008#64 DFrac.discard nullBody := by
+  iintro H
+  ihave H := kernelData_null $$ H
+  ihave H := (show byteBuf 0x80007008#64 DFrac.discard nullStr ⊢
+    byteBuf (GF := GF) 0x80007008#64 DFrac.discard (nullBody ++ [0#8]) from by rw [nullStr_eq]) $$ H
+  iapply cstr_intro _ _ _ nullBody_nonul $$ H
 
 end
 

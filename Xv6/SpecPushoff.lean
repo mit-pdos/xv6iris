@@ -21,7 +21,7 @@ push_off's own frame is 4 slots over mycpu's 2.
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import MachCSL.CallConv
-import Xv6.KernelText
+import Xv6.Image
 import Xv6.Geom
 
 
@@ -37,7 +37,7 @@ def pushOffAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«push_off»
 def wp_push_off_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 6 ≤ k.avail) : Prop :=
-  kctx cpu k ∗ kernelText ∗ pcIs cpu pushOffAddr ∗
+  kctx cpu k ∗ pcIs cpu pushOffAddr ∗
   (∀ R' : RegMap, kctx cpu (k.pushOff.withRegs R') -∗ pcIs cpu (retPc (k.regs 1#5)) -∗
     ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu)
   ⊢ wpLoop (GF := GF) cpu

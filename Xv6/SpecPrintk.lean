@@ -27,6 +27,7 @@ supports today.
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
+import Xv6.Image
 import Xv6.SpecPrintint
 
 namespace Xv6
@@ -138,7 +139,7 @@ def wp_printk_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G G
     (hflen : f.length + 4 < 2 ^ 31)
     (hkinds : pkKinds f = descs.map PkArgDesc.kind) (hdlen : descs.length ≤ 7)
     (hnoff : k.noff + 2 < 2 ^ 31) (hpr : "pr" ∉ k.locks) (huart : "uart" ∉ k.locks) : Prop :=
-  kctx cpu k ∗ kernelText ∗ kernelData ∗ pcIs cpu printkAddr ∗
+  kctx cpu k ∗ pcIs cpu printkAddr ∗
   cstr (k.regs 10#5) dqf f ∗ pkDescs k.regs descs ∗
   isLock γpr prLock "pr" (fun _ => emp) ∗ isTxLock γl γd ∗ uartSentSub γd bs ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ (R' : RegMap) (cs : List (BitVec 8)),

@@ -784,9 +784,19 @@ def KCtx.pop (k : KCtx) (m : Nat) : KCtx :=
   simp [KCtx.sp, KCtx.pop]
 @[simp] theorem KCtx.wf_pop (k : KCtx) (m : Nat) : (k.pop m).wf ↔ k.wf := Iff.rfl
 
+/-- The kernel's read-only image, as the client presents it: a persistent
+proposition (the xv6 client's `kernelText ∗ kernelData`).  `kctx` owns a
+copy, so no contract states it, and a proof takes the copy out (`kctx_ro`)
+to derive the instruction facts and read-only data its rules need. -/
+class KernelImage (GF : BundledGFunctors) where
+  ro : IProp GF
+  ro_persistent : Persistent ro
+
+attribute [instance] KernelImage.ro_persistent
+
 /-- The kernel execution context resource of hart `cpu`: everything below
-shares the index `k.sie`. -/
-def kctx [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) : IProp GF := iprop%
+shares the index `k.sie`; the kernel's read-only image rides along. -/
+def kctx [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) : IProp GF := iprop%
   ⌜k.wf⌝ ∗
   kConf cpu k.tier k.root k.sie ∗
   gprFile cpu (tpPin cpu k.regs) ∗
@@ -795,41 +805,55 @@ def kctx [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) : IProp GF := iprop%
   sieArm cpu k.sie k.proc ∗
   cpuOwn cpu k.noff k.intena k.proc k.locks ∗
   ctxToken cpu ∗
-  clockCells cpu
+  clockCells cpu ∗
+  KernelImage.ro
 
 /-- A register the generic write rules may target: not `x0`, not `sp` (the
 stack is keyed on it) and not `tp` (pinned to the hart). -/
 def rdOk (rd : BitVec 5) : Prop := rd ≠ 0#5 ∧ rd ≠ 2#5 ∧ rd ≠ 4#5
 
-theorem kctx_cases [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) :
+theorem kctx_cases [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) :
     kctx (GF := GF) cpu k ⊢
       ⌜k.wf⌝ ∗ kConf cpu k.tier k.root k.sie ∗ gprFile cpu (tpPin cpu k.regs) ∗
       stackOwn k.sp (trapRes k.sie + k.avail) ∗ transSlot cpu k.tier k.root ∗
-      sieArm cpu k.sie k.proc ∗ cpuOwn cpu k.noff k.intena k.proc k.locks ∗ ctxToken cpu ∗ clockCells cpu := by
+      sieArm cpu k.sie k.proc ∗ cpuOwn cpu k.noff k.intena k.proc k.locks ∗ ctxToken cpu ∗ clockCells cpu ∗
+      KernelImage.ro := by
   unfold kctx
   iintro H
   iexact H
 
-theorem kctx_intro [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) :
+theorem kctx_intro [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) :
     ⌜k.wf⌝ ∗ kConf cpu k.tier k.root k.sie ∗ gprFile cpu (tpPin cpu k.regs) ∗
       stackOwn k.sp (trapRes k.sie + k.avail) ∗ transSlot cpu k.tier k.root ∗
-      sieArm cpu k.sie k.proc ∗ cpuOwn cpu k.noff k.intena k.proc k.locks ∗ ctxToken cpu ∗ clockCells cpu ⊢
+      sieArm cpu k.sie k.proc ∗ cpuOwn cpu k.noff k.intena k.proc k.locks ∗ ctxToken cpu ∗ clockCells cpu ∗
+      KernelImage.ro ⊢
     kctx (GF := GF) cpu k := by
   unfold kctx
   iintro H
   iexact H
 
 /-- `kctx_intro` with the well-formedness as a Lean hypothesis. -/
-theorem kctx_intro' [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) (hwf : k.wf) :
+theorem kctx_intro' [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hwf : k.wf) :
     kConf cpu k.tier k.root k.sie ∗ gprFile cpu (tpPin cpu k.regs) ∗
       stackOwn k.sp (trapRes k.sie + k.avail) ∗ transSlot cpu k.tier k.root ∗
-      sieArm cpu k.sie k.proc ∗ cpuOwn cpu k.noff k.intena k.proc k.locks ∗ ctxToken cpu ∗ clockCells cpu ⊢
+      sieArm cpu k.sie k.proc ∗ cpuOwn cpu k.noff k.intena k.proc k.locks ∗ ctxToken cpu ∗ clockCells cpu ∗
+      KernelImage.ro ⊢
     kctx (GF := GF) cpu k := by
   unfold kctx
   iintro H
   iframe
   ipureintro
   exact hwf
+
+/-- The context's copy of the read-only image (persistent: the context
+keeps it). -/
+theorem kctx_ro [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) :
+    kctx (GF := GF) cpu k ⊢ KernelImage.ro ∗ kctx cpu k := by
+  unfold kctx
+  iintro ⟨%hwf, HConf, HF, Hstack, Htrans, Harm, Hcpu, Htok, Hclock, #Htext⟩
+  iframe Htext
+  iframe HConf HF Hstack Htrans Harm Hcpu Htok Hclock
+  ipureintro; exact hwf
 
 instance rdOk_decidable (rd : BitVec 5) : Decidable (rdOk rd) := by
   unfold rdOk; infer_instance

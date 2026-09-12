@@ -11,7 +11,7 @@ consputc's frame over uartputc_sync's (16 slots).
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import MachCSL.CallConv
-import Xv6.KernelText
+import Xv6.Image
 import Xv6.Geom
 import Xv6.UartTrace
 
@@ -28,7 +28,7 @@ def wp_consputc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     (cpu : CPU) (k : KCtx) (γl : GName) (γd : UartNames) (bs : List (BitVec 8))
     (hsie : k.sie = false) (htier : k.tier = KTier.bare) (hK : 16 ≤ k.avail)
     (hnoff : k.noff + 1 < 2 ^ 31) (huart : "uart" ∉ k.locks) : Prop :=
-  kctx cpu k ∗ kernelText ∗ pcIs cpu consputcAddr ∗ isTxLock γl γd ∗ uartSentSub γd bs ∗
+  kctx cpu k ∗ pcIs cpu consputcAddr ∗ isTxLock γl γd ∗ uartSentSub γd bs ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ (R' : RegMap) (cs : List (BitVec 8)),
     kctx cpu' (k.withRegs R') -∗ pcIs cpu' (retPc (k.regs 1#5)) -∗
     ⌜calleeSaved k.regs R'⌝ -∗ uartSentSub γd (bs ++ cs) -∗ wpLoop cpu'))

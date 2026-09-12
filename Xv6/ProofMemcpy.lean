@@ -18,7 +18,8 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option maxHeartbeats 4000000 in
 theorem memcpy_proof (M : MEMMOVE) : MEMCPY := ⟨fun {hlc GF} _ _ cpu k bs olds n dqs hsie htier hK hn hn32 hls hld => by
   unfold wp_memcpy_body
-  iintro ⟨Hk, #Htext, Hpc, Hsrc, Hdst, HΦ⟩
+  iintro ⟨Hk, Hpc, Hsrc, Hdst, HΦ⟩
+  icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   simp only [memcpyAddr, KernelSyms.«memcpy»]
   k_norm
   ihave HΦ := wpNext_off _ _ _ $$ HΦ
@@ -42,7 +43,6 @@ theorem memcpy_proof (M : MEMMOVE) : MEMCPY := ⟨fun {hlc GF} _ _ cpu k bs olds
   k_norm at hm
   iapply hm
   iframe
-  iframe #
   iapply wpNext_off_intro
   iintro %R' Hk Hpc Hsrc Hdst %⟨hcs, h10⟩
   have hret : retPc 0x80000d46#64 = 0x80000d46#64 := by simp only [retPc, BitVec.reduceAnd]

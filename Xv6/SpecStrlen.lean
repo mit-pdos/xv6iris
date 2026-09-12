@@ -17,7 +17,7 @@ exist).
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import MachCSL.WpSmodeFrame
-import Xv6.KernelText
+import Xv6.Image
 import Xv6.Geom
 
 namespace Xv6
@@ -37,7 +37,7 @@ def wp_strlen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx
     (cpu : CPU) (k : KCtx) (bs : List (BitVec 8)) (n : Nat) (dq : DFrac)
     (hsie : k.sie = false) (htier : k.tier = KTier.bare) (hK : 2 ≤ k.avail)
     (hcstr : cstrAt bs n) (hn31 : n < 2 ^ 31) : Prop :=
-  kctx cpu k ∗ kernelText ∗ pcIs cpu strlenAddr ∗ byteBuf (k.regs 10#5) dq bs ∗
+  kctx cpu k ∗ pcIs cpu strlenAddr ∗ byteBuf (k.regs 10#5) dq bs ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ R' : RegMap,
     kctx cpu' (k.withRegs R') -∗ pcIs cpu' (retPc (k.regs 1#5)) -∗
     byteBuf (k.regs 10#5) dq bs -∗

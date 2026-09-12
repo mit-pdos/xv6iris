@@ -13,7 +13,7 @@ cannot move, the id is the entry hart's -- so the contract is stated at
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import MachCSL.CallConv
-import Xv6.KernelText
+import Xv6.Image
 import Xv6.Geom
 
 namespace Xv6
@@ -32,7 +32,7 @@ def cpuidRet (tp : BitVec 64) : BitVec 64 := BitVec.signExtend 64 (BitVec.extrac
 hart's id in `a0`. -/
 def wp_cpuid_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare) (hK : 2 ≤ k.avail) : Prop :=
-  kctx cpu k ∗ kernelText ∗ pcIs cpu cpuidAddr ∗
+  kctx cpu k ∗ pcIs cpu cpuidAddr ∗
   (∀ R' : RegMap, kctx cpu (k.withRegs R') -∗ pcIs cpu (retPc (k.regs 1#5)) -∗
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = cpuidRet (hartId cpu)⌝ -∗ wpLoop cpu)
   ⊢ wpLoop (GF := GF) cpu

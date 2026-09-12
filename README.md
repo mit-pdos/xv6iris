@@ -121,6 +121,9 @@ Xv6/                              the xv6 verification (client of MachCSL)
   KernelTree.lean  (generated) the same text as an address-keyed search tree
   KernelText.lean  `kernelText`: the text section as persistent byte windows,
                    `kernelText_find`: any instruction the tree finds
+  Image.lean       the read-only image (`kernelText ∗ kernelData`) as the
+                   `KernelImage` instance `kctx` owns; `kctx_kernelText`/
+                   `kctx_kernelData` take a copy out of the context
   CodeTactics.lean `text_instr`: an `instr` fact from `kernelText` by a tree
                    lookup and a decode walk, both evaluated by `rfl`
   SpecEntry.lean   the WP specification of `_entry` (`ENTRY`)

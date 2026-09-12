@@ -6,7 +6,7 @@ search-tree lookup of `pc` plus the read-only decode walk, both evaluated by
 import MachCSL.WpCycle
 import MachCSL.DecodeBridge
 import MachCSL.Instr
-import Xv6.KernelText
+import Xv6.Image
 
 namespace Xv6
 

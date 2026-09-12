@@ -99,13 +99,14 @@ theorem memcmp_iter {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
     (s1 s2 : BitVec 64) (dq1 dq2 : DFrac) (bs1 bs2 : List (BitVec 8)) (i : Nat) (a b : BitVec 8)
     (ha : bs1[i]? = some a) (hb : bs2[i]? = some b)
     (R : RegMap) (h10 : R 10#5 = s1 + BitVec.ofNat 64 i) (h11 : R 11#5 = s2 + BitVec.ofNat 64 i) :
-    kernelText ∗ kctx cpu (kb.withRegs R) ∗ pcIs cpu 0x80000cb2#64 ∗
+    kctx cpu (kb.withRegs R) ∗ pcIs cpu 0x80000cb2#64 ∗
     byteBuf s1 dq1 bs1 ∗ byteBuf s2 dq2 bs2 ∗
     (kctx cpu (kb.withRegs ((R.set 15#5 (BitVec.setWidth 64 a)).set 14#5 (BitVec.setWidth 64 b))) -∗
       pcIs cpu (if a = b then 0x80000cbe#64 else 0x80000cca#64) -∗
       byteBuf s1 dq1 bs1 -∗ byteBuf s2 dq2 bs2 -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
-  iintro ⟨#HT, Hk, Hpc, Hbuf1, Hbuf2, HΦ⟩
+  iintro ⟨Hk, Hpc, Hbuf1, Hbuf2, HΦ⟩
+  icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
   -- lbu a5,0(a0)
   icases byteBuf_acc s1 dq1 bs1 i a ha $$ Hbuf1 with ⟨Hb1, Hclose1⟩
   k_step (wp_s_lbu cpu _ ?hs ?ht 0x80000cb2#64 false 0#12 15#5 10#5 (by decide) dq1 a) from (text_instr _ _ _ _ rfl rfl) HT
@@ -146,7 +147,7 @@ theorem memcmp_loop {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
     ∀ (i : Nat) (_ : i < n) (_ : n - i = d + 1) (_ : ∀ j, j < i → bs1[j]? = bs2[j]?) (R : RegMap)
       (_ : R 10#5 = s1 + BitVec.ofNat 64 i) (_ : R 11#5 = s2 + BitVec.ofNat 64 i)
       (_ : R 13#5 = s1 + BitVec.ofNat 64 n),
-    kernelText ∗ kctx cpu (kb.withRegs R) ∗ pcIs cpu 0x80000cb2#64 ∗
+    kctx cpu (kb.withRegs R) ∗ pcIs cpu 0x80000cb2#64 ∗
     byteBuf s1 dq1 bs1 ∗ byteBuf s2 dq2 bs2 ∗
     (∀ R' : RegMap, kctx cpu (kb.withRegs R') -∗ byteBuf s1 dq1 bs1 -∗ byteBuf s2 dq2 bs2 -∗
       ⌜∀ r, r ≠ 10#5 → r ≠ 11#5 → r ≠ 14#5 → r ≠ 15#5 → R' r = R r⌝ -∗
@@ -158,10 +159,10 @@ theorem memcmp_loop {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
     have hi : i + 1 = n := by omega
     have ha : bs1[i]? = some bs1[i] := List.getElem?_eq_getElem (by omega)
     have hb : bs2[i]? = some bs2[i] := List.getElem?_eq_getElem (by omega)
-    iintro ⟨#HT, Hk, Hpc, Hbuf1, Hbuf2, HΦ⟩
+    iintro ⟨Hk, Hpc, Hbuf1, Hbuf2, HΦ⟩
+    icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
     iapply (memcmp_iter cpu kb hsie htier s1 s2 dq1 dq2 bs1 bs2 i bs1[i] bs2[i] ha hb R h10 h11)
     iframe
-    iframe #
     iintro Hk Hpc Hbuf1 Hbuf2
     by_cases hab : bs1[i] = bs2[i]
     · simp only [hab, ite_true]
@@ -205,10 +206,10 @@ theorem memcmp_loop {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
     have hi : i + 1 < n := by omega
     have ha : bs1[i]? = some bs1[i] := List.getElem?_eq_getElem (by omega)
     have hb : bs2[i]? = some bs2[i] := List.getElem?_eq_getElem (by omega)
-    iintro ⟨#HT, Hk, Hpc, Hbuf1, Hbuf2, HΦ⟩
+    iintro ⟨Hk, Hpc, Hbuf1, Hbuf2, HΦ⟩
+    icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
     iapply (memcmp_iter cpu kb hsie htier s1 s2 dq1 dq2 bs1 bs2 i bs1[i] bs2[i] ha hb R h10 h11)
     iframe
-    iframe #
     iintro Hk Hpc Hbuf1 Hbuf2
     by_cases hab : bs1[i] = bs2[i]
     · simp only [hab, ite_true]
@@ -232,7 +233,6 @@ theorem memcmp_loop {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
         _ ?h10 ?h11 ?h13) $$ [- $Hk $Hpc]
       rotate_right 1
       iframe
-      iframe #
       case h10 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; rw [BitVec.ofNat_add]
       case h11 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; rw [BitVec.ofNat_add]
       case h13 => simp [RegMap.set_apply, h13]
@@ -259,7 +259,8 @@ theorem memcmp_loop {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
 set_option maxHeartbeats 4000000 in
 theorem memcmp_proof : MEMCMP := ⟨fun cpu k bs1 bs2 n dq1 dq2 hsie htier hK hn hn32 hl1 hl2 => by
   unfold wp_memcmp_body
-  iintro ⟨Hk, #Htext, Hpc, Hbuf1, Hbuf2, HΦ⟩
+  iintro ⟨Hk, Hpc, Hbuf1, Hbuf2, HΦ⟩
+  icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- the spec's continuation, at this hart
   simp only [memcmpAddr, KernelSyms.«memcmp»]
   k_norm
@@ -313,7 +314,6 @@ theorem memcmp_proof : MEMCMP := ⟨fun cpu k bs1 bs2 n dq1 dq2 hsie htier hK hn
       $$ [- $Hk $Hpc]
     rotate_right 1
     iframe
-    iframe #
     case h10 => simp [RegMap.set_apply]
     case h11 => simp [RegMap.set_apply]
     case h13 => simp [RegMap.set_apply]

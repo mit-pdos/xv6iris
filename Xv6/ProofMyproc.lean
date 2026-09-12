@@ -55,7 +55,8 @@ theorem myproc_cpu_addr (cpu : CPU) :
 set_option maxHeartbeats 4000000 in
 theorem myproc_proof (PU : PUSHOFF) (PO : POPOFF) : MYPROC := ⟨fun {hlc GF} _ _ cpu k hsie htier hnoff hK => by
   unfold wp_myproc_body
-  iintro ⟨Hk, #Htext, Hpc, HΦ⟩
+  iintro ⟨Hk, Hpc, HΦ⟩
+  icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   simp only [myprocAddr, KernelSyms.«myproc»]
   k_norm
@@ -74,7 +75,7 @@ theorem myproc_proof (PU : PUSHOFF) (PO : POPOFF) : MYPROC := ⟨fun {hlc GF} _ 
   -- push_off (its contract, unfolded, at the callee's context)
   have hpu : ∀ (k' : KCtx) (hsie' : k'.sie = false) (htier' : k'.tier = KTier.bare) (hnoff' : k'.noff + 1 < 2 ^ 31)
       (hK' : 6 ≤ k'.avail),
-      kctx cpu k' ∗ kernelText ∗ pcIs cpu 0x80000b80#64 ∗
+      kctx cpu k' ∗ pcIs cpu 0x80000b80#64 ∗
       (∀ R' : RegMap, kctx cpu (k'.pushOff.withRegs R') -∗ pcIs cpu (retPc (k'.regs 1#5)) -∗
         ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu) ⊢ wpLoop (GF := GF) cpu := by
     intro k' hsie' htier' hnoff' hK'
@@ -84,7 +85,6 @@ theorem myproc_proof (PU : PUSHOFF) (PO : POPOFF) : MYPROC := ⟨fun {hlc GF} _ 
     exact h
   iapply (hpu _ ?hs ?ht ?hn ?hK) $$ [- $Hk $Hpc]
   rotate_right 1
-  iframe #
   case hs => k_norm
   case ht => k_norm
   case hn => k_norm; omega
@@ -131,7 +131,7 @@ theorem myproc_proof (PU : PUSHOFF) (PO : POPOFF) : MYPROC := ⟨fun {hlc GF} _ 
   -- pop_off (its contract, unfolded, at the callee's context)
   have hpo : ∀ (k' : KCtx) (hsie' : k'.sie = false) (htier' : k'.tier = KTier.bare) (hnoff' : 1 ≤ k'.noff)
       (hK' : 4 ≤ k'.avail) (hlks' : k'.locks.length ≤ k'.noff - 1) (hexit' : k'.noff = 1 → k'.intena = false),
-      kctx cpu k' ∗ kernelText ∗ pcIs cpu 0x80000bfa#64 ∗
+      kctx cpu k' ∗ pcIs cpu 0x80000bfa#64 ∗
       (∀ R' : RegMap, kctx cpu (k'.popOff.withRegs R') -∗ pcIs cpu (retPc (k'.regs 1#5)) -∗
         ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu) ⊢ wpLoop (GF := GF) cpu := by
     intro k' hsie' htier' hnoff' hK' hlks' hexit'
@@ -141,7 +141,6 @@ theorem myproc_proof (PU : PUSHOFF) (PO : POPOFF) : MYPROC := ⟨fun {hlc GF} _ 
     exact h
   iapply (hpo _ ?hs ?ht ?hn ?hK ?hl ?he) $$ [- $Hk $Hpc]
   rotate_right 1
-  iframe #
   case hs => k_norm
   case ht => k_norm
   case hn => k_norm; omega

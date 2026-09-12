@@ -44,7 +44,8 @@ theorem mycpu_addr (cpu : CPU) :
 set_option maxHeartbeats 4000000 in
 theorem mycpu_proof : MYCPU := ⟨fun {hlc GF} _ _ cpu k hsie htier hK => by
   unfold wp_mycpu_body
-  iintro ⟨Hk, #Htext, Hpc, HΦ⟩
+  iintro ⟨Hk, Hpc, HΦ⟩
+  icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   simp only [mycpuAddr, KernelSyms.«mycpu»]
   k_norm
   -- prologue

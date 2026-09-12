@@ -30,6 +30,7 @@ above.  Stack: acquire's 4 slots over holding's 6 (and push_off's 6).
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
+import Xv6.Image
 import Xv6.SpecHolding
 
 namespace Xv6
@@ -45,7 +46,7 @@ def wp_acquire_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
     (cpu : CPU) (k : KCtx) (γ : GName) (s : String) (R : CtxId → IProp GF) [CtxMorph R]
     (hsie : k.sie = false) (htier : k.tier = KTier.bare)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 10 ≤ k.avail) (hs : s ∉ k.locks) : Prop :=
-  kctx cpu k ∗ kernelText ∗ pcIs cpu acquireAddr ∗ isLock γ (k.regs 10#5) s R ∗
+  kctx cpu k ∗ pcIs cpu acquireAddr ∗ isLock γ (k.regs 10#5) s R ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ R' : RegMap,
     kctx cpu' ((k.pushOff.withRegs R').withLocks (s :: k.locks)) -∗
     pcIs cpu' (retPc (k.regs 1#5)) -∗ ⌜calleeSaved k.regs R'⌝ -∗

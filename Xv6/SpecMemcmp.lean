@@ -13,7 +13,7 @@ Present limits of the context layer: interrupts off and the Bare tier.
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import MachCSL.WpSmodeFrame
-import Xv6.KernelText
+import Xv6.Image
 import Xv6.Geom
 
 namespace Xv6
@@ -38,7 +38,7 @@ def wp_memcmp_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx
     (hsie : k.sie = false) (htier : k.tier = KTier.bare) (hK : 2 ≤ k.avail)
     (hn : k.regs 12#5 = BitVec.ofNat 64 n) (hn32 : n < 2 ^ 32)
     (hl1 : n ≤ bs1.length) (hl2 : n ≤ bs2.length) : Prop :=
-  kctx cpu k ∗ kernelText ∗ pcIs cpu memcmpAddr ∗
+  kctx cpu k ∗ pcIs cpu memcmpAddr ∗
   byteBuf (k.regs 10#5) dq1 bs1 ∗ byteBuf (k.regs 11#5) dq2 bs2 ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ R' : RegMap,
     kctx cpu' (k.withRegs R') -∗ pcIs cpu' (retPc (k.regs 1#5)) -∗

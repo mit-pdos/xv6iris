@@ -108,12 +108,13 @@ theorem push_off_tail {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Cur
     (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 6 ≤ k.avail) (hwf : k.wf) (R : RegMap)
     (hsp : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64) (hcs : csRegs k.regs R) :
-    kernelText ∗ kctx cpu ((k.pushed 4).withRegs R) ∗ pcIs cpu 0x80000b98#64 ∗
+    kctx cpu ((k.pushed 4).withRegs R) ∗ pcIs cpu 0x80000b98#64 ∗
     frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
     (∀ R' : RegMap, kctx cpu (k.pushOff.withRegs R') -∗ pcIs cpu (retPc (k.regs 1#5)) -∗
       ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
-  iintro ⟨#HT, Hk, Hpc, Hframe, HΦ⟩
+  iintro ⟨Hk, Hpc, Hframe, HΦ⟩
+  icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
   -- jal mycpu
   k_step (wp_s_jal cpu _ ?hs ?ht 0x80000b98#64 false 3362#21 1#5 (by decide) ?htgt) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   case htgt => k_tgt
@@ -125,7 +126,6 @@ theorem push_off_tail {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Cur
   k_norm at hm
   iapply hm
   iframe
-  iframe #
   iintro %R2 Hk Hpc %⟨hcs2, h10⟩
   have hret : retPc 0x80000b9c#64 = 0x80000b9c#64 := by simp only [retPc, BitVec.reduceAnd]
   k_norm [hret]
@@ -173,7 +173,8 @@ theorem push_off_tail {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Cur
 set_option maxHeartbeats 4000000 in
 theorem push_off_proof (M : MYCPU) : PUSHOFF := ⟨fun {hlc GF} _ _ cpu k hsie htier hnoff hK => by
   unfold wp_push_off_body
-  iintro ⟨Hk, #Htext, Hpc, HΦ⟩
+  iintro ⟨Hk, Hpc, HΦ⟩
+  icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   have hn31 : k.noff < 2 ^ 31 := hwf.2.2.2.2
   simp only [pushOffAddr, KernelSyms.«push_off»]
@@ -206,7 +207,6 @@ theorem push_off_proof (M : MYCPU) : PUSHOFF := ⟨fun {hlc GF} _ _ cpu k hsie h
   k_norm at hm
   iapply hm
   iframe
-  iframe #
   iintro %R2 Hk Hpc %⟨hcs2, h10⟩
   have hret : retPc 0x80000b94#64 = 0x80000b94#64 := by simp only [retPc, BitVec.reduceAnd]
   k_norm [hret]
@@ -236,7 +236,6 @@ theorem push_off_proof (M : MYCPU) : PUSHOFF := ⟨fun {hlc GF} _ _ cpu k hsie h
     k_norm at hm4
     iapply hm4
     iframe
-    iframe #
     iintro %R4 Hk Hpc %⟨hcs4, h10'⟩
     have hret' : retPc 0x80000bb0#64 = 0x80000bb0#64 := by simp only [retPc, BitVec.reduceAnd]
     k_norm [hret']
@@ -269,7 +268,6 @@ theorem push_off_proof (M : MYCPU) : PUSHOFF := ⟨fun {hlc GF} _ _ cpu k hsie h
     iintro Hk Hpc
     iapply (push_off_tail M cpu k hsie htier hnoff hK hwf _ ?hsp ?hcs) $$ [- $Hk $Hpc]
     rotate_right 1
-    iframe #
     iframe
     case hsp =>
       simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]
@@ -292,7 +290,6 @@ theorem push_off_proof (M : MYCPU) : PUSHOFF := ⟨fun {hlc GF} _ _ cpu k hsie h
     iintro Hk Hpc
     iapply (push_off_tail M cpu k hsie htier hnoff hK hwf _ ?hsp ?hcs) $$ [- $Hk $Hpc]
     rotate_right 1
-    iframe #
     iframe
     case hsp => simp [RegMap.set_apply]; rw [hcs2.1]; simp [RegMap.set_apply]
     case hcs =>

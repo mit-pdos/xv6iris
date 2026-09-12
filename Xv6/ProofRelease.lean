@@ -23,7 +23,8 @@ set_option maxHeartbeats 4000000 in
 theorem release_proof (HO : HOLDING) (PO : POPOFF) : RELEASE := ⟨
   fun {hlc GF} _ _ cpu k γ s R _ hsie htier hnoff hK hexit => by
   unfold wp_release_body
-  iintro ⟨Hk, #Htext, Hpc, #Hlk, Hlocked, HR, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hlk, Hlocked, HR, HΦ⟩
+  icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   simp only [releaseAddr, KernelSyms.«release»]
   k_norm
@@ -42,7 +43,7 @@ theorem release_proof (HO : HOLDING) (PO : POPOFF) : RELEASE := ⟨
   case htgt => k_tgt
   iintro Hk Hpc
   have hho : ∀ (k' : KCtx) (hsie' : k'.sie = false) (htier' : k'.tier = KTier.bare) (hK' : 6 ≤ k'.avail),
-      kctx cpu k' ∗ kernelText ∗ pcIs cpu 0x80000b54#64 ∗ isLock γ (k'.regs 10#5) s R ∗
+      kctx cpu k' ∗ pcIs cpu 0x80000b54#64 ∗ isLock γ (k'.regs 10#5) s R ∗
       locked γ cpu ∗
       (∀ R' : RegMap, kctx cpu (k'.withRegs R') -∗ pcIs cpu (retPc (k'.regs 1#5)) -∗
         ⌜calleeSaved k'.regs R' ∧ R' 10#5 = 1#64⌝ -∗ locked γ cpu -∗ wpLoop cpu) ⊢ wpLoop (GF := GF) cpu := by
@@ -91,7 +92,7 @@ theorem release_proof (HO : HOLDING) (PO : POPOFF) : RELEASE := ⟨
   iintro Hk Hpc
   have hpo : ∀ (k' : KCtx) (hsie' : k'.sie = false) (htier' : k'.tier = KTier.bare) (hnoff' : 1 ≤ k'.noff)
       (hK' : 4 ≤ k'.avail) (hlks' : k'.locks.length ≤ k'.noff - 1) (hexit' : k'.noff = 1 → k'.intena = false),
-      kctx cpu k' ∗ kernelText ∗ pcIs cpu 0x80000bfa#64 ∗
+      kctx cpu k' ∗ pcIs cpu 0x80000bfa#64 ∗
       (∀ R' : RegMap, kctx cpu (k'.popOff.withRegs R') -∗ pcIs cpu (retPc (k'.regs 1#5)) -∗
         ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu) ⊢ wpLoop (GF := GF) cpu := by
     intro k' hsie' htier' hnoff' hK' hlks' hexit'
@@ -104,7 +105,6 @@ theorem release_proof (HO : HOLDING) (PO : POPOFF) : RELEASE := ⟨
     exact ⟨s, hmem, by simp⟩
   iapply (hpo _ ?hs ?ht ?hn ?hK ?hl ?he) $$ [- $Hk $Hpc]
   rotate_right 1
-  iframe #
   case hs => k_norm
   case ht => k_norm
   case hn => k_norm; omega

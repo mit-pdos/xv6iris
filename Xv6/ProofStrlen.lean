@@ -77,13 +77,14 @@ theorem strlen_iter {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
     (cpu : CPU) (kb : KCtx) (hsie : kb.sie = false) (htier : kb.tier = KTier.bare)
     (s : BitVec 64) (dq : DFrac) (bs : List (BitVec 8)) (i : Nat) (b : BitVec 8) (hb : bs[i]? = some b)
     (R : RegMap) (h15 : R 15#5 = s + BitVec.ofNat 64 i) :
-    kernelText ∗ kctx cpu (kb.withRegs R) ∗ pcIs cpu 0x80000e16#64 ∗ byteBuf s dq bs ∗
+    kctx cpu (kb.withRegs R) ∗ pcIs cpu 0x80000e16#64 ∗ byteBuf s dq bs ∗
     (kctx cpu (kb.withRegs (((R.set 13#5 (s + BitVec.ofNat 64 i)).set 15#5 (s + BitVec.ofNat 64 i + 1#64)).set 14#5
         (BitVec.setWidth 64 b))) -∗
       pcIs cpu (if b = 0#8 then 0x80000e20#64 else 0x80000e16#64) -∗ byteBuf s dq bs -∗
       wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
-  iintro ⟨#HT, Hk, Hpc, Hbuf, HΦ⟩
+  iintro ⟨Hk, Hpc, Hbuf, HΦ⟩
+  icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
   -- mv a3,a5
   k_step (wp_s_add cpu _ ?hs ?ht 0x80000e16#64 true 13#5 0#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
     with [h15]
@@ -113,7 +114,7 @@ theorem strlen_loop {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
     (s : BitVec 64) (dq : DFrac) (bs : List (BitVec 8)) (n : Nat) (hcstr : cstrAt bs n)
     (d : Nat) :
     ∀ (i : Nat) (_ : 1 ≤ i) (_ : i ≤ n) (_ : n - i = d) (R : RegMap) (_ : R 15#5 = s + BitVec.ofNat 64 i),
-    kernelText ∗ kctx cpu (kb.withRegs R) ∗ pcIs cpu 0x80000e16#64 ∗ byteBuf s dq bs ∗
+    kctx cpu (kb.withRegs R) ∗ pcIs cpu 0x80000e16#64 ∗ byteBuf s dq bs ∗
     (∀ R' : RegMap, kctx cpu (kb.withRegs R') -∗ pcIs cpu 0x80000e20#64 -∗ byteBuf s dq bs -∗
       ⌜R' 13#5 = s + BitVec.ofNat 64 n ∧ ∀ r, r ≠ 13#5 → r ≠ 14#5 → r ≠ 15#5 → R' r = R r⌝ -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
@@ -123,10 +124,9 @@ theorem strlen_loop {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
     intro i hi1 hin hd R h15
     have hi : i = n := by omega
     subst hi
-    iintro ⟨#HT, Hk, Hpc, Hbuf, HΦ⟩
+    iintro ⟨Hk, Hpc, Hbuf, HΦ⟩
     iapply (strlen_iter cpu kb hsie htier s dq bs i 0#8 hcstr.2 R h15)
     iframe
-    iframe #
     simp only [ite_true]
     iintro Hk Hpc Hbuf
     iapply HΦ $$ %_ Hk Hpc Hbuf
@@ -138,17 +138,15 @@ theorem strlen_loop {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
     intro i hi1 hin hd R h15
     have hlt : i < n := by omega
     obtain ⟨b, hb, hb0⟩ := hcstr.1 i hlt
-    iintro ⟨#HT, Hk, Hpc, Hbuf, HΦ⟩
+    iintro ⟨Hk, Hpc, Hbuf, HΦ⟩
     iapply (strlen_iter cpu kb hsie htier s dq bs i b hb R h15)
     iframe
-    iframe #
     simp only [hb0, ite_false]
     iintro Hk Hpc Hbuf
     iapply (ih (i + 1) (by omega) (by omega) (by omega)
       (((R.set 13#5 (s + BitVec.ofNat 64 i)).set 15#5 (s + BitVec.ofNat 64 i + 1#64)).set 14#5 (BitVec.setWidth 64 b))
       (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; rw [BitVec.ofNat_add, ← BitVec.add_assoc]))
     iframe
-    iframe #
     iintro %R' Hk Hpc Hbuf %⟨h13, hother⟩
     iapply HΦ $$ %R' Hk Hpc Hbuf
     ipureintro
@@ -163,7 +161,8 @@ set_option maxHeartbeats 4000000 in
 theorem strlen_proof : STRLEN := ⟨fun cpu k bs n dq hsie htier hK hcstr hn31 => by
   unfold wp_strlen_body
   have hn := cstrAt_len hcstr
-  iintro ⟨Hk, #Htext, Hpc, Hbuf, HΦ⟩
+  iintro ⟨Hk, Hpc, Hbuf, HΦ⟩
+  icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- the spec's continuation, at this hart
   simp only [strlenAddr, KernelSyms.«strlen»]
   k_norm
@@ -226,7 +225,6 @@ theorem strlen_proof : STRLEN := ⟨fun cpu k bs n dq hsie htier hK hcstr hn31 =
       (by omega) (by omega) rfl _ ?h15) $$ [- $Hk $Hpc]
     rotate_right 1
     iframe
-    iframe #
     case h15 => simp [RegMap.set_apply]
     iintro %R' Hk Hpc Hbuf %⟨h13, hother⟩
     have h10 : R' 10#5 = k.regs 10#5 := by

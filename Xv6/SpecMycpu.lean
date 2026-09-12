@@ -10,7 +10,7 @@ code's `auipc/addi/add` chain spelled as the address it denotes).
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import MachCSL.CallConv
-import Xv6.KernelText
+import Xv6.Image
 import Xv6.Geom
 
 namespace Xv6
@@ -24,7 +24,7 @@ def mycpuAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«mycpu»
 /-- **WP of `mycpu`.**  Two stack slots; returns `&cpus[hartid]` in `a0`. -/
 def wp_mycpu_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare) (hK : 2 ≤ k.avail) : Prop :=
-  kctx cpu k ∗ kernelText ∗ pcIs cpu mycpuAddr ∗
+  kctx cpu k ∗ pcIs cpu mycpuAddr ∗
   (∀ R' : RegMap, kctx cpu (k.withRegs R') -∗ pcIs cpu (retPc (k.regs 1#5)) -∗
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = cpuAddr cpu⌝ -∗ wpLoop cpu)
   ⊢ wpLoop (GF := GF) cpu

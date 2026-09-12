@@ -19,6 +19,7 @@ interrupts-off index the context layer supports today).  Stack: release's
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
+import Xv6.Image
 import Xv6.SpecHolding
 
 namespace Xv6
@@ -34,7 +35,7 @@ def wp_release_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
     (cpu : CPU) (k : KCtx) (γ : GName) (s : String) (R : CtxId → IProp GF) [CtxMorph R]
     (hsie : k.sie = false) (htier : k.tier = KTier.bare)
     (hnoff : 1 ≤ k.noff) (hK : 10 ≤ k.avail) (hexit : k.noff = 1 → k.intena = false) : Prop :=
-  kctx cpu k ∗ kernelText ∗ pcIs cpu releaseAddr ∗ isLock γ (k.regs 10#5) s R ∗
+  kctx cpu k ∗ pcIs cpu releaseAddr ∗ isLock γ (k.regs 10#5) s R ∗
   locked γ cpu ∗ R curCtx ∗
   (∀ R' : RegMap, kctx cpu ((k.popOff.withRegs R').withLocks (k.locks.filter (fun x => x ≠ s))) -∗
     pcIs cpu (retPc (k.regs 1#5)) -∗ ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu)

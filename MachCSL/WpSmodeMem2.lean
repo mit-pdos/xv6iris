@@ -30,7 +30,7 @@ theorem execSpecF_lwu [CurCtx] (cpu : CPU) (dq dq' : DFrac) (c : MConf) (sie : B
 
 /-- `lwu rd, imm(rs1)`: the word at `rs1 + imm` (4-aligned), zero-extended
 (the raw form: a byte window plus the facts; clients use `wp_s_lwu`). -/
-theorem wp_s_lwu_bytes [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+theorem wp_s_lwu_bytes [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rd rs1 : BitVec 5) (hrd : rdOk rd)
     (dq' : DFrac) (w : BitVec 32) (hram : inRam (k.rget cpu rs1 + BitVec.signExtend 64 imm) 4)
     (hal : (k.rget cpu rs1 + BitVec.signExtend 64 imm).toNat % 4 = 0) :
@@ -47,7 +47,7 @@ theorem wp_s_lwu_bytes [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) (hsie : k.si
       (tpPin cpu k.regs) w hram hal)
 
 /-- `lwu rd, imm(rs1)`: the word at `rs1 + imm`, zero-extended. -/
-theorem wp_s_lwu [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+theorem wp_s_lwu [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rd rs1 : BitVec 5) (hrd : rdOk rd)
     (dq' : DFrac) (w : BitVec 32) :
     instr (GF := GF) pc is_rvc (instruction.LOAD (imm, regidx.Regidx rs1, regidx.Regidx rd, true, 4)) ∗

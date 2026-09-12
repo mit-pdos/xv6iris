@@ -33,7 +33,7 @@ set_option maxHeartbeats 4000000 in
 /-- The schema for a lock instruction: the token and the held set are lent
 to the execute stage; the exit registers, held set and resources depend on
 a value `v` the stage produces. -/
-theorem wpLoop_k_lock [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
+theorem wpLoop_k_lock [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (htier : k.tier = KTier.bare) (pc npc : BitVec 64) (is_rvc : Bool) (i : instruction)
     {X : Type} (R' : X → RegMap) (hsp : ∀ v, R' v 2#5 = k.regs 2#5) (locks' : X → List String)
     (hwf' : ∀ v, ((k.withRegs (R' v)).withLocks (locks' v)).wf) (P : IProp GF) (Q : X → IProp GF)
@@ -49,7 +49,7 @@ theorem wpLoop_k_lock [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) (hsie : k.sie
     ⊢ wpLoop cpu := by
   have hsp' : ∀ v, (k.withRegs (R' v)).sp = k.sp := fun v => KCtx.withRegs_sp k (R' v) (hsp v)
   iintro ⟨HI, Hk, Hpc, HP, HΦ⟩
-  icases kctx_cases cpu k $$ Hk with ⟨%hwf, HConf, HF, Hstack, Htrans, Harm, Hcpu, Htok, Hclock⟩
+  icases kctx_cases cpu k $$ Hk with ⟨%hwf, HConf, HF, Hstack, Htrans, Harm, Hcpu, Htok, Hclock, #Hro⟩
   icases kConf_cases cpu _ _ _ $$ HConf with ⟨%ms, %mdl, %mepc, %stc, %⟨hsm, hmdl⟩, HmConf⟩
   unfold cpuOwn
   icases Hcpu with ⟨Hcells, Hlocks, Hcsrs⟩
@@ -71,11 +71,12 @@ theorem wpLoop_k_lock [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) (hsie : k.sie
     KCtx.withRegs_intena, KCtx.withRegs_locks, KCtx.withRegs_tier, KCtx.withRegs_root, KCtx.withRegs_proc,
     hsp', hsie, htier]
   iframe
+  iexact Hro
 
 /-! ## Fences and `sltiu` -/
 
 /-- `fence rw,w`. -/
-theorem wp_s_fence_rw_w [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
+theorem wp_s_fence_rw_w [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (htier : k.tier = KTier.bare) (pc : BitVec 64) (is_rvc : Bool) (rs rd : BitVec 5) :
     instr (GF := GF) pc is_rvc (instruction.FENCE (0#4, 3#4, 1#4, regidx.Regidx rs, regidx.Regidx rd)) ∗
     kctx cpu k ∗ pcIs cpu pc ∗
@@ -86,7 +87,7 @@ theorem wp_s_fence_rw_w [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) (hsie : k.s
     (fun c hok hmenv => execSpecF_fence_rw_w cpu (DFrac.own 1) c false hok hmenv pc _ rs rd (tpPin cpu k.regs))
 
 /-- `fence rw,rw`. -/
-theorem wp_s_fence_rw_rw [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
+theorem wp_s_fence_rw_rw [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (htier : k.tier = KTier.bare) (pc : BitVec 64) (is_rvc : Bool) (rs rd : BitVec 5) :
     instr (GF := GF) pc is_rvc (instruction.FENCE (0#4, 3#4, 3#4, regidx.Regidx rs, regidx.Regidx rd)) ∗
     kctx cpu k ∗ pcIs cpu pc ∗
@@ -97,7 +98,7 @@ theorem wp_s_fence_rw_rw [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) (hsie : k.
     (fun c hok hmenv => execSpecF_fence_rw_rw cpu (DFrac.own 1) c false hok hmenv pc _ rs rd (tpPin cpu k.regs))
 
 /-- `sltiu rd, rs1, imm` (covers `seqz rd, rs1`). -/
-theorem wp_s_sltiu [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+theorem wp_s_sltiu [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rd rs1 : BitVec 5) (hrd : rdOk rd) :
     instr (GF := GF) pc is_rvc (instruction.ITYPE (imm, regidx.Regidx rs1, regidx.Regidx rd, iop.SLTIU)) ∗
     kctx cpu k ∗ pcIs cpu pc ∗
@@ -140,7 +141,7 @@ theorem acqPost_ne [CurCtx] (γ : GName) (R : CtxId → IProp GF) (cpu : CPU) {o
   simp [acqPost, h]
 
 section lock
-variable [CurCtx] [KernelGeom]
+variable [CurCtx] [KernelGeom] [KernelImage GF]
 
 /-- The two views a lock reader cashes: the lock's floor and, for a holder,
 its acquire position. -/

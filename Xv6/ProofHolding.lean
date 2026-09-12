@@ -68,11 +68,12 @@ theorem holding_tail (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors} [MachGS 
             pcIs cpu' (0x80000b66#64 + instrLen true) -∗ Q w -∗ wpLoop cpu'))
       ⊢ wpLoop cpu)
     (hans : ∀ w, Q w ⊢ ⌜(if (w + -cpuAddr cpu).ult 1#64 then 1#64 else 0#64) = ans⌝ ∗ Q w) :
-    kernelText ∗ kctx cpu k ∗ pcIs cpu 0x80000b5c#64 ∗ P ∗
+    kctx cpu k ∗ pcIs cpu 0x80000b5c#64 ∗ P ∗
     (∀ (R' : RegMap) (w : BitVec 64), kctx cpu (k.withRegs R') -∗ pcIs cpu (retPc (k.regs 1#5)) -∗
       ⌜calleeSaved k.regs R' ∧ R' 10#5 = ans⌝ -∗ Q w -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
-  iintro ⟨#HT, Hk, Hpc, HP, HΦ⟩
+  iintro ⟨Hk, Hpc, HP, HΦ⟩
+  icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   -- prologue
   iapply (wp_prologue4s1 cpu k hsie htier 0x80000b5c#64 (by omega))
@@ -97,7 +98,7 @@ theorem holding_tail (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors} [MachGS 
   case htgt => k_tgt
   iintro Hk Hpc
   have hmc : ∀ (k' : KCtx) (hsie' : k'.sie = false) (htier' : k'.tier = KTier.bare) (hK' : 2 ≤ k'.avail),
-      kctx cpu k' ∗ kernelText ∗ pcIs cpu 0x800018ba#64 ∗
+      kctx cpu k' ∗ pcIs cpu 0x800018ba#64 ∗
       (∀ R' : RegMap, kctx cpu (k'.withRegs R') -∗ pcIs cpu (retPc (k'.regs 1#5)) -∗
         ⌜calleeSaved k'.regs R' ∧ R' 10#5 = cpuAddr cpu⌝ -∗ wpLoop cpu) ⊢ wpLoop (GF := GF) cpu := by
     intro k' hsie' htier' hK'
@@ -107,7 +108,6 @@ theorem holding_tail (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors} [MachGS 
     exact h
   iapply (hmc _ ?hs ?ht ?hK) $$ [- $Hk $Hpc]
   rotate_right 1
-  iframe #
   case hs => k_norm
   case ht => k_norm
   case hK => k_norm; omega
@@ -154,7 +154,8 @@ theorem holding_notheld_proof (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors}
     (hsie : k.sie = false) (htier : k.tier = KTier.bare) (hK : 6 ≤ k.avail) (hs : s ∉ k.locks) :
     wp_holding_notheld_body (hlc := hlc) (GF := GF) cpu k γ s R hsie htier hK hs := by
   unfold wp_holding_notheld_body
-  iintro ⟨Hk, #Htext, Hpc, #Hlk, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hlk, HΦ⟩
+  icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   ihave Hk := (show kctx cpu k ⊢ kctx cpu (k.withRegs k.regs) from by rw [KCtx.withRegs_self]) $$ Hk
   simp only [holdingAddr, KernelSyms.«holding»]
@@ -226,7 +227,8 @@ theorem holding_locked_proof (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors} 
     (hsie : k.sie = false) (htier : k.tier = KTier.bare) (hK : 6 ≤ k.avail) :
     wp_holding_locked_body (hlc := hlc) (GF := GF) cpu k γ s R hsie htier hK := by
   unfold wp_holding_locked_body
-  iintro ⟨Hk, #Htext, Hpc, #Hlk, Hlocked, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hlk, Hlocked, HΦ⟩
+  icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   ihave Hk := (show kctx cpu k ⊢ kctx cpu (k.withRegs k.regs) from by rw [KCtx.withRegs_self]) $$ Hk
   icases locked_cases γ cpu $$ Hlocked with ⟨Hlc, Hheld⟩

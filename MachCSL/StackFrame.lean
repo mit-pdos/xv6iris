@@ -53,7 +53,21 @@ theorem stackOwn_24_cases [CurCtx] (sp : BitVec 64) :
     iframe H0 H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 H18 H19 H20 H21 H22 H23
     ipureintro; exact hf
 
-theorem stackOwn_24_intro [CurCtx] (sp : BitVec 64) (hf : stackFacts sp 24) (w0 w1 w2 w3 w4 w5 w6 w7 w8 w9 w10 w11 w12 w13 w14 w15 w16 w17 w18 w19 w20 w21 w22 w23 : BitVec 64) :
+/-- The geometry of a 24-slot frame, read off the frame's own cells: the
+top cell fixes the alignment and the upper bound, the bottom cell the room
+below `sp` (neither can have wrapped past `2 ^ 64`, since the far side of
+the wrap is above `ramEnd`).  So a caller holding the cells need not carry
+`stackFacts` beside them. -/
+theorem stackFacts_24_of_cells {sp : BitVec 64}
+    (htop : inRam (sp + 0xFFFFFFFFFFFFFFF8#64) 8)
+    (hal : (sp + 0xFFFFFFFFFFFFFFF8#64).toNat % 8 = 0)
+    (hbot : inRam (sp + 0xFFFFFFFFFFFFFF40#64) 8) :
+    stackFacts sp 24 := by
+  unfold inRam ramBase ramEnd at htop hbot
+  unfold stackFacts ramBase ramEnd
+  bv_omega
+
+theorem stackOwn_24_intro [CurCtx] (sp : BitVec 64) (w0 w1 w2 w3 w4 w5 w6 w7 w8 w9 w10 w11 w12 w13 w14 w15 w16 w17 w18 w19 w20 w21 w22 w23 : BitVec 64) :
     wordPointsTo (sp + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) w0 ∗
     wordPointsTo (sp + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) w1 ∗
     wordPointsTo (sp + 0xFFFFFFFFFFFFFFE8#64) 8 (DFrac.own 1) w2 ∗
@@ -80,8 +94,10 @@ theorem stackOwn_24_intro [CurCtx] (sp : BitVec 64) (hf : stackFacts sp 24) (w0 
     wordPointsTo (sp + 0xFFFFFFFFFFFFFF40#64) 8 (DFrac.own 1) w23 ⊢ stackOwn (GF := GF) sp 24 := by
   unfold stackOwn stackSlots
   iintro ⟨H0, H1, H2, H3, H4, H5, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, H17, H18, H19, H20, H21, H22, H23⟩
+  icases wordPointsTo_facts _ _ _ _ $$ H0 with ⟨%f0, H0⟩
+  icases wordPointsTo_facts _ _ _ _ $$ H23 with ⟨%f23, H23⟩
   isplitr
-  · ipureintro; exact hf
+  · ipureintro; exact stackFacts_24_of_cells f0.1 f0.2 f23.1
   · iexists [w0, w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13, w14, w15, w16, w17, w18, w19, w20, w21, w22, w23]
     simp only [Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil, BitVec.sub_eq_add_neg,
       BitVec.reduceMul, BitVec.reduceNeg, Nat.reduceAdd]

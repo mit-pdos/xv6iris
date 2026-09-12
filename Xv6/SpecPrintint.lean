@@ -7,6 +7,7 @@ consputc's (24 slots).
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
+import Xv6.Image
 import Xv6.SpecConsputc
 import Xv6.KernelData
 
@@ -24,7 +25,7 @@ def wp_printint_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     (hsie : k.sie = false) (htier : k.tier = KTier.bare) (hK : 24 ≤ k.avail)
     (hbase : k.regs 11#5 = 10#64 ∨ k.regs 11#5 = 16#64)
     (hnoff : k.noff + 1 < 2 ^ 31) (huart : "uart" ∉ k.locks) : Prop :=
-  kctx cpu k ∗ kernelText ∗ kernelData ∗ pcIs cpu printintAddr ∗ isTxLock γl γd ∗
+  kctx cpu k ∗ pcIs cpu printintAddr ∗ isTxLock γl γd ∗
   uartSentSub γd bs ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ (R' : RegMap) (cs : List (BitVec 8)),
     kctx cpu' (k.withRegs R') -∗ pcIs cpu' (retPc (k.regs 1#5)) -∗

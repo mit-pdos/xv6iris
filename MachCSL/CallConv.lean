@@ -260,10 +260,10 @@ theorem KCtx.rget_sp (cpu : CPU) (k : KCtx) : k.rget cpu 2#5 = k.sp :=
   KCtx.rget_ne cpu k 2#5 (by decide) (by decide)
 
 /-- The stack geometry a context carries. -/
-theorem kctx_stackFacts [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) :
+theorem kctx_stackFacts [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) :
     kctx (GF := GF) cpu k ⊢ ⌜stackFacts k.sp (trapRes k.sie + k.avail)⌝ ∗ kctx cpu k := by
   unfold kctx stackOwn
-  iintro ⟨%hwf, HConf, HF, ⟨%hf, Hs⟩, Htrans, Harm, Hcpu, Htok, Hclock⟩
+  iintro ⟨%hwf, HConf, HF, ⟨%hf, Hs⟩, Htrans, Harm, Hcpu, Htok, Hclock, Hcode⟩
   isplitr
   · ipureintro; exact hf
   · iframe
@@ -335,7 +335,7 @@ theorem KCtx.rget_withLocks (cpu : CPU) (k : KCtx) (l : List String) (i : BitVec
     (k.withLocks l).rget cpu i = k.rget cpu i := rfl
 
 /-- The well-formedness a context carries. -/
-theorem kctx_wf [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) :
+theorem kctx_wf [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) :
     kctx (GF := GF) cpu k ⊢ ⌜k.wf⌝ ∗ kctx cpu k := by
   unfold kctx
   iintro ⟨%hwf, H⟩

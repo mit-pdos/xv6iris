@@ -110,7 +110,8 @@ theorem withCpu_popOff2 (k : KCtx) (R : RegMap) :
 set_option maxHeartbeats 4000000 in
 theorem pop_off_proof (M : MYCPU) : POPOFF := ⟨fun {hlc GF} _ _ cpu k hsie htier hnoff hK hlks hexit => by
   unfold wp_pop_off_body
-  iintro ⟨Hk, #Htext, Hpc, HΦ⟩
+  iintro ⟨Hk, Hpc, HΦ⟩
+  icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   have hn31 : k.noff < 2 ^ 31 := hwf.2.2.2.2
   simp only [popOffAddr, KernelSyms.«pop_off»]
@@ -134,7 +135,6 @@ theorem pop_off_proof (M : MYCPU) : POPOFF := ⟨fun {hlc GF} _ _ cpu k hsie hti
   k_norm at hm
   iapply hm
   iframe
-  iframe #
   iintro %R2 Hk Hpc %⟨hcs2, h10⟩
   have hret : retPc 0x80000c06#64 = 0x80000c06#64 := by simp only [retPc, BitVec.reduceAnd]
   k_norm [hret]
