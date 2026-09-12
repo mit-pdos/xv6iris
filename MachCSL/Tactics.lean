@@ -290,6 +290,71 @@ def modelConsts (env : Environment) (e : Lean.Expr) : Array Name :=
   e.foldConsts #[] fun n acc =>
     if isUnfoldable env n && !acc.contains n then acc.push n else acc
 
+/-- If `x` is an `if` whose condition is closed and decides, its selected
+branch (a dependent `if` applied to the decision's proof), beta-reduced. -/
+def reduceClosedCond (x : Lean.Expr) : MetaM (Option Lean.Expr) := do
+  let ite := x.isAppOfArity ``ite 5
+  let dite := x.isAppOfArity ``dite 5
+  unless ite || dite do return none
+  let args := x.getAppArgs
+  let c := args[1]!
+  let inst := args[2]!
+  if c.hasFVar || c.hasMVar then return none
+  let d ← withDefault <| whnf (mkApp2 (mkConst ``Decidable.decide) c inst)
+  if ite then
+    if d.isConstOf ``Bool.true then return some args[3]!
+    if d.isConstOf ``Bool.false then return some args[4]!
+    return none
+  let rflTrue := mkApp2 (mkConst ``Eq.refl [1]) (mkConst ``Bool) (mkConst ``Bool.true)
+  let rflFalse := mkApp2 (mkConst ``Eq.refl [1]) (mkConst ``Bool) (mkConst ``Bool.false)
+  if d.isConstOf ``Bool.true then
+    return some (mkApp args[3]! (mkApp3 (mkConst ``of_decide_eq_true) c inst rflTrue)).headBeta
+  if d.isConstOf ``Bool.false then
+    return some (mkApp args[4]! (mkApp3 (mkConst ``of_decide_eq_false) c inst rflFalse)).headBeta
+  return none
+
+/-- Replace, everywhere in the goal (types and instance arguments included),
+each closed decided `if` by its branch, definitionally.  The model's
+`BitVec (if sv_width = 32 then 22 else 44)` types at `sv_width = 39` are
+otherwise reduced by `simp` in the explicit arguments only, never inside the
+`Monad` instances, after which `ExceptT.run_bind` and the event rules no
+longer match syntactically. -/
+def closedNatHeads : List Name := [``Int.toNat, ``HMul.hMul, ``HAdd.hAdd, ``HSub.hSub]
+
+/-- A closed arithmetic `Nat` term (e.g. the walk's `(2 ^ 3).toNat` entry
+width) evaluated to its literal, if it is one. -/
+def reduceClosedNat (e : Lean.Expr) : MetaM (Option Lean.Expr) := do
+  let .const n _ := e.getAppFn | return none
+  unless closedNatHeads.contains n do return none
+  if e.hasFVar || e.hasMVar then return none
+  unless (← isDefEq (← inferType e) (mkConst ``Nat)) do return none
+  let r ← withDefault <| whnf e
+  match r with
+  | .lit (.natVal v) => return some (mkNatLit v)
+  | _ =>
+    if r.isAppOfArity ``OfNat.ofNat 3 then
+      if let .lit (.natVal v) := r.getAppArgs[1]! then return some (mkNatLit v)
+    return none
+
+def reduceClosedEverywhere (nats : Bool) : TacticM Unit := withMainContext do
+  let goal ← getMainGoal
+  let tgt ← instantiateMVars (← goal.getType)
+  let tgt' ← Meta.transform tgt (pre := fun e => do
+    if let some e' ← reduceClosedCond e then return .visit e'
+    else if nats then
+      if let some e' ← reduceClosedNat e then return .done e' else return .continue
+    else return .continue)
+  if tgt != tgt' then replaceMainGoal [← goal.replaceTargetDefEq tgt']
+
+def reduceClosedItesEverywhere : TacticM Unit := reduceClosedEverywhere false
+
+elab "reduce_closed_ites" : tactic => reduceClosedItesEverywhere
+
+/-- The same, also evaluating closed `Int.toNat` widths (the walk's
+`(2 ^ 3).toNat`); not part of `swp_run`, since some loop proofs unfold their
+bounds by hand. -/
+elab "reduce_closed_widths" : tactic => reduceClosedEverywhere true
+
 /-- Unfold the constants `cs` (plain definitions by delta, recursive ones by
 their equation lemmas) and re-normalise. -/
 def unfoldConsts (cs : Array Name) : TacticM Unit := do
@@ -307,6 +372,7 @@ def unfoldConsts (cs : Array Name) : TacticM Unit := do
     let ids := recs.map fun n => mkIdent n
     let args ← ids.mapM fun i => `(Lean.Parser.Tactic.simpLemma| $i:ident)
     evalTactic (← `(tactic| try simp only [$args,*]))
+  reduceClosedItesEverywhere
   try sailNormFocused catch _ => pure ()
 
 /-- Evaluate the pure model helpers (`LeanRV64D.Functions.*`) left in the goal
@@ -428,6 +494,7 @@ partial def unfoldHead (x : Lean.Expr) : TacticM Unit := do
     else if (`LeanRV64D.Functions).isPrefixOf n then
       let f := mkIdent n
       evalTactic (← `(tactic| unfold $f:ident))
+      reduceClosedItesEverywhere
     else if let some c ← headCondition x then
       if ← rewriteWithHyps then (try sailNormFocused catch _ => pure ())
       else unfoldModelIn c
@@ -539,7 +606,14 @@ def specced : List Name :=
    ``LeanRV64D.Functions.fetch, ``LeanRV64D.Functions.ext_decode,
    ``LeanRV64D.Functions.ext_decode_compressed, ``LeanRV64D.Functions.execute,
    ``LeanRV64D.Functions.wX_bits, ``LeanRV64D.Functions.rX_bits,
-   ``LeanRV64D.Functions.wX, ``LeanRV64D.Functions.rX]
+   ``LeanRV64D.Functions.wX, ``LeanRV64D.Functions.rX,
+   -- the page walk
+   ``LeanRV64D.Functions.read_pte, ``LeanRV64D.Functions.read_pte_exclusive,
+   ``LeanRV64D.Functions.write_pte_conditional, ``LeanRV64D.Functions.pt_walk,
+   ``LeanRV64D.Functions.check_leaf_pte, ``LeanRV64D.Functions.pte_is_invalid,
+   ``LeanRV64D.Functions.check_PTE_permission, ``LeanRV64D.Functions.update_and_write_pte,
+   ``LeanRV64D.Functions.translate_TLB_hit, ``LeanRV64D.Functions.translate_TLB_miss,
+   ``LeanRV64D.Functions.lookup_TLB, ``LeanRV64D.Functions.add_to_TLB]
 
 /-- Succeeds (doing nothing) iff the head of the `swp` goal is a call of a
 function with its own stage spec, so that `swp_run` stops there. -/
@@ -611,29 +685,6 @@ def contsOf (m : Lean.Expr) : Array Lean.Expr :=
   if m.isAppOfArity ``Bind.bind 6 then branchesOf m.getAppArgs[4]! |>.push m.getAppArgs[5]!
   else if isBind m then branchesOf m.getAppArgs[2]! |>.push m.getAppArgs[3]!
   else branchesOf m
-
-/-- If `x` is an `if` whose condition is closed and decides, its selected
-branch (a dependent `if` applied to the decision's proof), beta-reduced. -/
-def reduceClosedCond (x : Lean.Expr) : MetaM (Option Lean.Expr) := do
-  let ite := x.isAppOfArity ``ite 5
-  let dite := x.isAppOfArity ``dite 5
-  unless ite || dite do return none
-  let args := x.getAppArgs
-  let c := args[1]!
-  let inst := args[2]!
-  if c.hasFVar || c.hasMVar then return none
-  let d ← withDefault <| whnf (mkApp2 (mkConst ``Decidable.decide) c inst)
-  if ite then
-    if d.isConstOf ``Bool.true then return some args[3]!
-    if d.isConstOf ``Bool.false then return some args[4]!
-    return none
-  let rflTrue := mkApp2 (mkConst ``Eq.refl [1]) (mkConst ``Bool) (mkConst ``Bool.true)
-  let rflFalse := mkApp2 (mkConst ``Eq.refl [1]) (mkConst ``Bool) (mkConst ``Bool.false)
-  if d.isConstOf ``Bool.true then
-    return some (mkApp args[3]! (mkApp3 (mkConst ``of_decide_eq_true) c inst rflTrue)).headBeta
-  if d.isConstOf ``Bool.false then
-    return some (mkApp args[4]! (mkApp3 (mkConst ``of_decide_eq_false) c inst rflFalse)).headBeta
-  return none
 
 /-- A `match`/recursor application on a constructor, reduced (definitionally). -/
 def reduceHeadMatch (x : Lean.Expr) : MetaM (Option Lean.Expr) := do
@@ -784,6 +835,7 @@ that reached the continuation were never looked at.
 The normalisation is skipped between two consecutive register events (a
 register read/write only substitutes a value; nothing to fold yet). -/
 elab "swp_run " n:num : tactic => withSailNormCtx do
+  reduceClosedItesEverywhere
   let mut i := 0
   let mut skipNorm := false
   -- whether the most recent normalisation pass hid a continuation: if not,

@@ -54,7 +54,7 @@ def kLeaf (ppn : BitVec 44) (perm : KPerm) (a d : BitVec 1) : BitVec 64 :=
 def kPtr (ppn : BitVec 44) : BitVec 64 := mkPte ppn ptrFlags
 
 /-- The two values of a one-bit vector. -/
-private theorem bv1_cases (x : BitVec 1) : x = 0#1 ∨ x = 1#1 := by revert x; decide
+theorem bv1_cases (x : BitVec 1) : x = 0#1 ∨ x = 1#1 := by revert x; decide
 
 /-! ## What the model reads off them -/
 
@@ -125,6 +125,13 @@ theorem flags_of_kLeaf (ppn : BitVec 44) (perm : KPerm) (a d : BitVec 1) :
       _update_PTE_Flags_D (_update_PTE_Flags_A perm.flags a) d := by
   unfold kLeaf; rw [flags_of_pteSetAD, flags_of_mkPte]
 
+/-- The same, in the normal form the executor leaves (`extractLsb' 0 8`). -/
+theorem flags_of_kLeaf' (ppn : BitVec 44) (perm : KPerm) (a d : BitVec 1) :
+    BitVec.extractLsb' 0 8 (kLeaf ppn perm a d) =
+      _update_PTE_Flags_D (_update_PTE_Flags_A perm.flags a) d := by
+  have h := flags_of_kLeaf ppn perm a d
+  simpa [Sail.BitVec.extractLsb, BitVec.extractLsb] using h
+
 theorem ppn_of_kLeaf (ppn : BitVec 44) (perm : KPerm) (a d : BitVec 1) : PPN_of_PTE (kLeaf ppn perm a d) = ppn := by
   unfold kLeaf; rw [ppn_of_pteSetAD, ppn_of_mkPte]
 
@@ -136,6 +143,10 @@ theorem ppn_of_kPtr (ppn : BitVec 44) : PPN_of_PTE (kPtr ppn) = ppn := ppn_of_mk
 theorem ext_of_kPtr (ppn : BitVec 44) : ext_bits_of_PTE (kPtr ppn) = 0#10 := ext_of_mkPte _ _
 
 theorem flags_of_kPtr (ppn : BitVec 44) : Sail.BitVec.extractLsb (kPtr ppn) 7 0 = ptrFlags := flags_of_mkPte _ _
+
+theorem flags_of_kPtr' (ppn : BitVec 44) : BitVec.extractLsb' 0 8 (kPtr ppn) = ptrFlags := by
+  have h := flags_of_kPtr ppn
+  simpa [Sail.BitVec.extractLsb, BitVec.extractLsb] using h
 
 /-- A pointer entry is a non-leaf; a kernel leaf is not (at any `A`/`D`). -/
 theorem nonLeaf_ptr : pte_is_non_leaf (Mk_PTE_Flags ptrFlags) = true := by decide

@@ -132,6 +132,13 @@ instance kptOn_persistent [CurCtx] (t : PTree) (M : RegMapF (BitVec 64)) :
   unfold kptOn; infer_instance
 
 /-- A mapping element is in the published mapping. -/
+theorem kptOn_facts [CurCtx] (t : PTree) (M : RegMapF (BitVec 64)) :
+    kptOn (GF := GF) t M ⊢ ⌜kptFacts t M⌝ := by
+  unfold kptOn
+  iintro ⟨%h, _, _⟩
+  ipureintro
+  exact h
+
 theorem kptOn_kmapAt [CurCtx] (t : PTree) (M : RegMapF (BitVec 64)) (vpn : BitVec 27) (v : BitVec 64) :
     kptOn (GF := GF) t M ∗ kmapAt vpn v ⊢
       ⌜∃ (addr : BitVec 64) (ppn : BitVec 44) (perm : KPerm), v = kLeaf ppn perm 0#1 0#1 ∧ t.maps vpn addr ppn perm⌝ := by
