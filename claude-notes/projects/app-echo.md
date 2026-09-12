@@ -2404,6 +2404,51 @@ ORDER: GENERIC-PAY → CONS-SWALLOW → SH-LINE 2b (gets on `ush_gets_line`,
 `wp_uk_ecall_read_recv` with `upos` threaded read → gets_loop → gets → getcmd
 → main) → LAZY-FLAG (the owner's form of (A)).
 
+LAZY-FLAG-2 PHASE 1 (2026-09-12; main, 60 files dirty +1926/-815, build `lazy48`:
+506 compiled, 10 red -- all owed phase-2 sites; banked as
+`wx-briefs/lazy-flag-stored-2.patch`).  CORRECTION TO "LAZY-FLAG CORE LANDED":
+exec's proof DOES keep the final table's domain -- `UmCovered.um_covered_z z um
+:= ∀ vpn, vpn*4096 < z -> is_Some (um !! vpn)` rides the third pure slot of every
+phase-B/C/D state invariant of kexec, survives `uvmclear` (`kxc_um_covered_insert`)
+and `uptd_ext_sz`, and is in scope at the `split_and!` that assembles
+`kexec_built` (`ProofKexecD.v:2029-2048`).  So K4 IS A ROW: `kexec_built` gains
+`lazy_free (ud_um (pv_upt (us_V U'))) (uint sz1)` via one bridge
+`lazy_free_of_covered`; `upd_exec` writes `pv_lazy := false`
+(`proc_priv_newspace` takes the bit and its guarded premise); `KexecDefs`/
+`KexecBridge` relay to `kexec_image_ok`'s `uvis_lazy W' = false`; the kernel
+discharges both slot-wand rows at `ProofKexecA.v:791/817/1056/1156`,
+`ProofKexec.v:656` (the cwd row from `exec_key_cwd` + `kexec_ok_exec_cwi`).
+LANDED (statements/proofs in the dirty tree): `pv_lazy` LAST in `MkPPriv`,
+`upd_lazy`/`us_lazy`; `uvis_lazy` LAST in `MkUvis`, `uvis_lz`; `skey_eq`'s
+eleventh clause; THE INVARIANT `⌜pv_lazy = false -> lazy_free …⌝` in
+`proc_priv_core` AND `proc_priv_nocwd` AND `proc_priv_nopt` (the U-mode
+residue carrying it across user execution) and as a give-back premise of the
+three address-space accessors (`proc_priv_addrspace`, `_core_addrspace`,
+`_newspace` with the bit `b`) and kfork's (`kfk_priv_open*`); vmfault's arm
+PROVED once for every copy caller (`proc_priv_copy` by `lazy_free_mono`);
+`proc_priv_nocwd_bare` takes the pure claim as a premise (else FALSE);
+sbrk's row wired (`usys_sbrk_lazy` in `usys_mem_ok`; the U-tier eager fact is
+sh's WRAPPER's `c.li a1,1` at 0xc5a, threaded up from `wp_kshm_sys_sbrk` to
+`wp_kshm_sbrk`); `uround_ok`/`urun_eq`/`ukb_F`/`uslot_key_cong` at the bit;
+row 5's tie `⌜proc_pt_wf P⌝ ∗ ⌜uvis_lazy W = false -> lazy_free (ud_um P)
+(uvis_sz W)⌝`; the U tier at `false` (`ukcq` hardwired; `uslot_of_urun*` take
+`uvis_lazy W = false`; sync/echo gates decide it; `ukb_F'` at the literal);
+THE DELIVERABLE `UkRunSys.uk_read_nofault` PROVED (positive form:
+`uva_wmapped P (dst + d)` from `d < k`, `proc_pt_wf P`, `perm_of … = pm`,
+`lazy_free`, `uheap`, `ubytesq`) and `wp_uk_ecall_read_recv` hands back
+`⌜uvis_lazy W = false⌝`; THE TWO ROWS ON `exec_slot_pre` (now with a `cw`
+parameter passed by both bundle shapes): `⌜kexec_image_ok …⌝ -∗ ⌜uvis_cwd W' =
+cw⌝ -∗ ⌜uvis_lazy W' = false⌝ -∗ my_pay … -∗ Q (-1) -∗ S W'`, consumers green
+(PinnedExec's three, the trivial bundle, the generic mint).  OWED (phase 2,
+the ten reds): K1 tails (`ProofUsertrapTail`, `ProofUserretClosed`,
+`ProofKforkB6`, `ProofForkret`, `ProofUservec`; `ProofSyscall`'s clause-(iv)
+sweep at ~20 arms + `ProofUsertrapSys`), K2 closes (`ProofGrowproc:686`,
+`ProofSysSbrk:979`; `ProofAllocproc:2915` needs `proc_dormant` to pin
+`pv_lazy = true`), K3's last statement (`SpecSysSbrk.sys_sbrk_ok` names the
+arm at the block level, LAZY writes `upd_lazy V true`; `sysc_sbrk_ok` relays),
+K4 (a)-(d).  The one placeholder `true` is `upd_exec`'s, documented, removed
+by K4.
+
 TX-RECEIPT PHASE 1 + RULINGS (2026-09-12; `-tlw`, `lane/tx-receipt`, 19 files
 +760/-213, red at `ProofFilewrite.v:4675` only).  Landed: `tx_mine γ pid n0 l`
 (ghost_map pid ↦ (seed, own bytes)) with the tie `tx_mine_tie tg mine` (each

@@ -243,3 +243,9 @@ TX-RECEIPT milestone committed (`6ac4b8626` on `lane/tx-receipt`, red only at
 ProofFilewrite:4675 pending the block conjunct); the agent stands by for a ping
 after LAZY-FLAG-2 lands.  `-tlw` switched to `lane/supply-split-r1`; E4 SH-ECHO
 launching there (brief `brief-sh-echo.md`).
+
+LAZY-FLAG-2 phase 1 DONE (2026-09-12; 60 dirty files in main; banked as
+`wx-briefs/lazy-flag-stored-2.patch`; K4 is a ROW -- `um_covered` survives to
+`kexec_built`); LAZY-FLAG-3 (fresh agent, `brief-lazy-flag-3.md`) finishes the
+ten reds and gates IN THE SAME DIRTY TREE.  Waiting on it: SUPPLY-SPLIT-r1,
+SH-OPEN, TX-RECEIPT (resume by ping), E2's cwd seam.
