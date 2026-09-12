@@ -47,11 +47,11 @@ patch: `projects/wx-briefs/`.
   PATH-ARGS LANDED (21 files + `ArgPath.v`; VM build `pathargs8` EXIT=0, audit =
   the thirteen, lemma_diff clean; note "PATH-ARGS LANDED") → OPEN-PIN phase 1 LANDED (the linear two-state claim with the
   mono_list flag, FsConsPin, PinnedOpen, UInitCons statements, the open leaf;
-  note "OPEN-PIN PHASE 1 LANDED + FINDINGS") → SPEC-TIGHTEN (kernel: open's trunc
-  commit guarded by om_trunc; mknod's unarm tied to its arm;
-  `wx-briefs/brief-spec-tighten.md`, LAUNCHED 2026-09-11) → OPEN-PIN phase 2
-  (a fresh agent: PinnedObs generalized to an existential inum with a free miss;
-  BOTH of init's opens pinned; init's head CONSOLE ∨ CLOSED ∨ TAINT; the proofs)
+  note "OPEN-PIN PHASE 1 LANDED + FINDINGS") → SPEC-TIGHTEN LANDED (19 files; VM build
+  `tighten7` EXIT=0, audit = the thirteen, lemma_diff clean; note "SPEC-TIGHTEN
+  LANDED") → OPEN-PIN phase 2 (`wx-briefs/brief-open-pin-2.md`: PinnedObs with a
+  free miss and an existential inum; BOTH of init's opens pinned; the mknod step;
+  init's head CONSOLE ∨ CLOSED ∨ TAINT; the proofs; LAUNCHED 2026-09-11)
   → SH-LINE phase 2 → E4 → E2 → E5.
 - Standing rulings from the lanes (WX-EXIT/WX-INV build on them): rows per slot
   born at boot; the map's and the orphans' names canonical on `wchG`; ZOMBIE row

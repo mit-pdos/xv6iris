@@ -2334,6 +2334,19 @@ DEVICE arm says the walk of THIS path ended at a device node; rows 15/17 read
 `uvis_M W` and `xk_a W 0`; the generic suppliers are `*_at_of_all` instances;
 `UkRunSys`/`UkInit` unchanged.  chdir/unlink keep `∀ pl`.
 
+SPEC-TIGHTEN LANDED (2026-09-11; brief `brief-spec-tighten.md`; 19 files).
+`SysOpenDefs.open_trunc_piece Γ vom Ft := if om_trunc vom then pf_at
+(atrunc_commit_at Γ appE) Ft else emp` on the four open bundles, arms and
+receipts (FILE arms return `emp` when nothing was owed); NOT keyed at the
+opened inum (the bundle precedes argstr; the commits sit outside the path
+wand); `PinnedOpen.pinned_open_bundle_notrunc`, `UInitCons.
+init_cons_open_bundle_rdwr` pay no truncation piece.  `FsAbsCreateFire.
+aunarm_commit_at` is inum-indexed and reached only through `aunarm_of_arm`
+(at the inum the ARM's receipt names; `cre_arm_fired Farm i` carries `av !! i
+= None`); create/mknod/open(O_CREATE)/mkdir share the pair, link has none;
+`FsConsPin.file_pin_unarm_fresh`/`cons_present_unarm_fresh`.  Sealed
+SYSOPEN/CREATE/SYSMKNOD textually unchanged.
+
 OPEN-PIN PHASE 1 LANDED (2026-09-11) + FINDINGS.  Landed: the two-state console
 claim with a `mono_list` flag IN the claim (`echo_pred` is LINEAR and timeless
 now; `echo_cons_law` collapses it to the pure pin under `cons_made r i`; the
