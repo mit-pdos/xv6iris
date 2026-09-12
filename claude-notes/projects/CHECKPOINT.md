@@ -73,15 +73,15 @@ patch: `projects/wx-briefs/`.
   is `UserConsole.ucons_reader cn 0` at the narrow class, held as
   `UConsLine.uinit_tok cn T` on the restart head) → BLOCKER 2026-09-12 (note "SH-LINE PHASE 2 -- THE
   SWALLOWED BYTE"): consoleread's `dc = d+1` arm; the ^D face is fixed by a
-  kernel lane, the copyout-fault face needs the OWNER'S CALL between (A) MAP-KEY
-  (recommended) and (B) a no-exhaustion premise. Pipeline meanwhile: SH-LINE 2a
+  kernel lane, the copyout-fault face RULED: the lazy flag on the key (LAZY-FLAG). Pipeline meanwhile: SH-LINE 2a
   LANDED (`69e38c9f0`, build `shline37`; the payload half blocked by a SECOND
   seam: the generic slot exists only at the trivial payload -- note "SECOND SEAM
   FOUND") → GENERIC-PAY LANDED (2026-09-12, build `gpay28`; note "GENERIC-PAY
   LANDED") → CONS-SWALLOW (`wx-briefs/brief-cons-swallow.md`, kernel lane, fresh
   agent, LAUNCHED 2026-09-12)
   (`wx-briefs/brief-cons-swallow.md`, kernel lane, option-independent) → SH-LINE
-  2b → [MAP-KEY if (A)] → E4 → E2 → E5
+  2b → LAZY-FLAG (RULED 2026-09-12: `uvis_lazy : bool`, false at exec, set only
+  by sbrklazy; note "THE OWNER'S RULING ON THE FORK") → E4 → E2 → E5
   → SH-LINE phase 2 → E4 → E2 → E5.
 - Standing rulings from the lanes (WX-EXIT/WX-INV build on them): rows per slot
   born at boot; the map's and the orphans' names canonical on `wchG`; ZOMBIE row

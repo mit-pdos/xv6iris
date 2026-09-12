@@ -2402,7 +2402,7 @@ ush_fd0 T (take NSTD sts))` replaced by threading `UInitFd.ufd_head` into
 ORDER: GENERIC-PAY → CONS-SWALLOW → SH-LINE 2b (gets on `ush_gets_line`,
 `ushf_lexable` deleted, `ush_std3` collapsed into `ush_fd0`, sh's read through
 `wp_uk_ecall_read_recv` with `upos` threaded read → gets_loop → gets → getcmd
-→ main) → [MAP-KEY if (A)].
+→ main) → LAZY-FLAG (the owner's form of (A)).
 
 SH-LINE PHASE 2 -- THE SWALLOWED BYTE (BLOCKER FOUND 2026-09-12; phase 1
 green at `shline14`, the read leaf and the `ukn_triv` split green at
@@ -2465,6 +2465,27 @@ THE FORK (the owner's call; both are honest):
       (`panic("fork")` PRINTS) raise the same question for E5 anyway.  Not
       recommended as the fix for THIS arm; the E5 session should still decide
       what the output claim says about allocation failure.
+
+THE OWNER'S RULING ON THE FORK (2026-09-12): (A), in the FLAG form, not the
+set form.  `uvis` gains `uvis_lazy : bool` -- "this process MAY have lazily
+allocated pages".  Invariant (kernel-side, in the process's private block):
+`uvis_lazy = false -> live_pages sz ⊆ dom (ud_um pt)`, i.e. the projection's
+fill is empty and every page `perm_of` shows is a real user leaf.  Rows: exec
+→ false (the fresh image is eager: uvmalloc fills every gap from 0 to sz, the
+guard page is in the table without U and so absent from the projection
+either way); `sbrk` with SBRK_EAGER or n < 0 → unchanged (growproc maps the
+run; dealloc lowers sz below what it unmaps); `sbrklazy` (SBRK_LAZY, n > 0)
+→ true, and it stays true until exec; fork's child inherits (uvmcopy copies
+the mapped pages, which under `false` are all the live ones); vmfault and
+every other entry → identity.  This xv6 has both calls (`user.h:41-42`,
+`vm.h:1-2`); umalloc uses the eager `sbrk`, so init/sh/echo never set it.
+NO resource is threaded through the user heap: a verified program reads the
+flag off its key as it reads the pid, `ubytes` already proves the page is
+live (`uw_addr`), and the flag turns live into mapped.  Row 5's receipt
+(CONS-SWALLOW's `∃ P, perm_of (ud_um P) sz = uvis_perm W ∗ receipt P …`)
+gains `⌜uvis_lazy W = false -> live_pages (uvis_sz W) ⊆ dom (ud_um P)⌝`, and
+sh refutes the copyout-fault swallow from that.  Lane LAZY-FLAG, after
+CONS-SWALLOW (the set form `uvis_map` is withdrawn).
 
 WHAT PROCEEDS MEANWHILE.  SH-LINE phase 2a (S1-S3, the CLOSED arm, the
 exit/kill payments, the red files; `gets`/S5 deferred, `ushf_lexable` stays
