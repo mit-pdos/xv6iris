@@ -161,3 +161,11 @@ APP-IFACE phase 1 LAUNCHED (2026-09-12) in `-disc` on `lane/app-iface` from
 DIFF for the owner's review -- no commit, no phase 2 without the owner.  In
 flight: LAZY-FLAG p1 (main), SUPPLY-SPLIT p2 (`-sup`), TX-TAG p2 (`-tlw`),
 APP-IFACE p1 (`-disc`).
+
+SUPPLY-SPLIT phase 2 GREEN on `lane/supply-split` (`d2708e5b7`); LANDING DEFERRED
+behind LAZY-FLAG (shared tier files).  SH-OPEN LAUNCHED (2026-09-12) in `-sup` on
+`lane/sh-open` off `lane/supply-split` (brief `brief-sh-open.md`).  In flight:
+LAZY-FLAG p1 continued in the STORED form (main; the computed refinement is
+withdrawn), TX-TAG p2 (`-tlw`), APP-IFACE p1 (`-disc`), SH-OPEN p1 (`-sup`).
+Landing order: LAZY-FLAG (main) → SUPPLY-SPLIT (rebase) → SH-OPEN → TX-TAG →
+APP-IFACE after the owner's review.
