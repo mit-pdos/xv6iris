@@ -1,7 +1,7 @@
 /-
 The process predicates of the xv6 kernel, modelled on the Rocq prototype's
 `ProcGeom.v` / `ProcDefs.v` / `SchedCtx.v` / `ProcInv.v` / `IntrDefs.v`,
-scaled to what the Lean framework has: memory cells (`bytesPointsTo`),
+scaled to what the Lean framework has: memory cells (`wordPointsTo`),
 byte buffers, the per-cpu bookkeeping of `MachCSL/KCtx.lean`.  No page
 tables, trapframe pages, files, inodes or locks yet: the places where the
 Rocq predicates own those are named placeholders (like `kptSlot` in
@@ -111,11 +111,11 @@ def pnameWf (bs : List (BitVec 8)) : Prop := bs.length = PNAMELEN ∧ ∃ j, j <
 
 /-- The 14 context words (Rocq: the `p_context` cells of `proc_ctx`). -/
 def contextCells (pa : BitVec 64) (dq : DFrac) (ws : List (BitVec 64)) : IProp GF := iprop%
-  ⌜ws.length = 14⌝ ∗ [∗list] j ↦ w ∈ ws, bytesPointsTo (pContext pa j) 8 dq w
+  ⌜ws.length = 14⌝ ∗ [∗list] j ↦ w ∈ ws, wordPointsTo (pContext pa j) 8 dq w
 
 /-- `p->ofile[0..NOFILE)` (Rocq `ofile_cells`). -/
 def ofileCells (pa : BitVec 64) (dq : DFrac) (fs : List (BitVec 64)) : IProp GF := iprop%
-  ⌜fs.length = NOFILE⌝ ∗ [∗list] j ↦ f ∈ fs, bytesPointsTo (pOfile pa j) 8 dq f
+  ⌜fs.length = NOFILE⌝ ∗ [∗list] j ↦ f ∈ fs, wordPointsTo (pOfile pa j) 8 dq f
 
 /-- `p->name` (Rocq `pname_cells`). -/
 def pnameCells (pa : BitVec 64) (dq : DFrac) (bs : List (BitVec 8)) : IProp GF := iprop%
@@ -125,13 +125,13 @@ def pnameCells (pa : BitVec 64) (dq : DFrac) (bs : List (BitVec 8)) : IProp GF :
 `cwd`, `name`; here also `kstack`, `pagetable`, `trapframe`, the context
 words and the descriptor pointers). -/
 def procFields (pa : BitVec 64) (dq : DFrac) (V : ProcPriv) : IProp GF := iprop%
-  bytesPointsTo (pKstack pa) 8 dq V.kstack ∗
-  bytesPointsTo (pSz pa) 8 dq V.sz ∗
-  bytesPointsTo (pPagetable pa) 8 dq V.pagetable ∗
-  bytesPointsTo (pTrapframe pa) 8 dq V.trapframe ∗
+  wordPointsTo (pKstack pa) 8 dq V.kstack ∗
+  wordPointsTo (pSz pa) 8 dq V.sz ∗
+  wordPointsTo (pPagetable pa) 8 dq V.pagetable ∗
+  wordPointsTo (pTrapframe pa) 8 dq V.trapframe ∗
   contextCells pa dq V.context ∗
   ofileCells pa dq V.ofile ∗
-  bytesPointsTo (pCwd pa) 8 dq V.cwd ∗
+  wordPointsTo (pCwd pa) 8 dq V.cwd ∗
   pnameCells pa dq V.name
 
 /-- The process's user page table at `V.pagetable`, `V.sz` bytes mapped
@@ -153,7 +153,7 @@ def pidHalf : DFrac := DFrac.own (Qp.half 1)
 `p->pid`, the private fields, the page table and the trapframe page. -/
 def procPriv (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) : IProp GF := iprop%
   ⌜V.sz.toNat ≤ MAXVA⌝ ∗
-  bytesPointsTo (pPid pa) 4 pidHalf pid ∗
+  wordPointsTo (pPid pa) 4 pidHalf pid ∗
   procFields pa (DFrac.own 1) V ∗
   procPt V ∗
   tfPage V
@@ -165,11 +165,11 @@ and the state ghost mirror): `state`, `chan`, `killed`, `xstate` whole and
 the other half of `pid`. -/
 def procPub (pa : BitVec 64) (st : BitVec 32) (chan : BitVec 64) (killed xstate pid : BitVec 32) :
     IProp GF := iprop%
-  bytesPointsTo (pState pa) 4 (DFrac.own 1) st ∗
-  bytesPointsTo (pChan pa) 8 (DFrac.own 1) chan ∗
-  bytesPointsTo (pKilled pa) 4 (DFrac.own 1) killed ∗
-  bytesPointsTo (pXstate pa) 4 (DFrac.own 1) xstate ∗
-  bytesPointsTo (pPid pa) 4 pidHalf pid
+  wordPointsTo (pState pa) 4 (DFrac.own 1) st ∗
+  wordPointsTo (pChan pa) 8 (DFrac.own 1) chan ∗
+  wordPointsTo (pKilled pa) 4 (DFrac.own 1) killed ∗
+  wordPointsTo (pXstate pa) 4 (DFrac.own 1) xstate ∗
+  wordPointsTo (pPid pa) 4 pidHalf pid
 
 /-! ## Dormant slots (Rocq `proc_dormant`, `proc_slots`) -/
 
@@ -180,7 +180,7 @@ def procDormant (pa : BitVec 64) (st : BitVec 32) : IProp GF := iprop%
   ⌜st = UNUSED ∨ st = ZOMBIE⌝ ∗
   ∃ (V : ProcPriv) (pid : BitVec 32),
     ⌜V.ofile = List.replicate NOFILE 0#64 ∧ V.cwd = 0#64 ∧ V.sz.toNat ≤ MAXVA⌝ ∗
-    bytesPointsTo (pPid pa) 4 pidHalf pid ∗
+    wordPointsTo (pPid pa) 4 pidHalf pid ∗
     procFields pa (DFrac.own 1) V
 
 /-- What slot `i` owes at state `st` besides the lock-protected part
@@ -195,7 +195,7 @@ def procSlot (i : Nat) (st : BitVec 32) : IProp GF :=
 `cur_proc p`; the hart is explicit here where Rocq's is the ambient
 `CpuId`).  `myproc()` returns exactly this value. -/
 def curProc [KernelGeom] (cpu : CPU) (p : BitVec 64) : IProp GF :=
-  bytesPointsTo (aCpuProc cpu) 8 (DFrac.own 1) p
+  wordPointsTo (aCpuProc cpu) 8 (DFrac.own 1) p
 
 /-- `cur_proc` is the first cell of the per-cpu bundle (Rocq `cpu_cells`). -/
 theorem cpuCells_curProc [KernelGeom] (cpu : CPU) (noff : Nat) (intena : Bool) (p : BitVec 64) :

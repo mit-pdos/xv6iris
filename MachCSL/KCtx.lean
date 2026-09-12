@@ -490,11 +490,13 @@ leaves `intena` scratch at depth 0; here it is pinned at every depth --
 `KCtx.wf` ties it to the live `SIE` bit there, which is exactly the value
 the 0→1 push writes, and boot finds the cell at 0 = interrupts off.) -/
 def cpuCells [CurCtx] [KernelGeom] (cpu : CPU) (noff : Nat) (intena : Bool) (p : BitVec 64) : IProp GF := iprop%
-  bytesPointsTo (aCpuProc cpu) 8 (DFrac.own 1) p ∗
-  bytesPointsTo (aCpuNoff cpu) 4 (DFrac.own 1) (BitVec.ofNat 32 noff) ∗
-  bytesPointsTo (aCpuIntena cpu) 4 (DFrac.own 1) (intenaVal intena)
+  wordPointsTo (aCpuProc cpu) 8 (DFrac.own 1) p ∗
+  wordPointsTo (aCpuNoff cpu) 4 (DFrac.own 1) (BitVec.ofNat 32 noff) ∗
+  wordPointsTo (aCpuIntena cpu) 4 (DFrac.own 1) (intenaVal intena)
 
-/-- The cells are aligned RAM words. -/
+/-- The cells are aligned RAM words: the geometry facts the constructor of
+`cpuCells` needs (`aCpu*_ok`; once the cells are built, they carry the facts
+themselves and their rules read them off the cell). -/
 theorem cpuAddr_toNat [KernelGeom] (cpu : CPU) :
     (cpuAddr cpu).toNat = KernelGeom.cpusBase.toNat + 128 * cpu.val := by
   have hr := KernelGeom.cpus_ram
@@ -545,6 +547,24 @@ theorem aCpuIntena_ok [KernelGeom] (cpu : CPU) : inRam (aCpuIntena cpu) 4 ∧ (a
   unfold inRam ramBase ramEnd NCPU at *
   omega
 
+/-- The cells' own facts: each is an aligned RAM word, and says so.  The
+rules that read or write a `struct cpu` field take what their leaf needs
+from the cell itself, not from the geometry. -/
+theorem cpuCells_facts [CurCtx] [KernelGeom] (cpu : CPU) (noff : Nat) (intena : Bool) (p : BitVec 64) :
+    cpuCells (GF := GF) cpu noff intena p ⊢
+      ⌜(inRam (aCpuProc cpu) 8 ∧ (aCpuProc cpu).toNat % 8 = 0) ∧
+        (inRam (aCpuNoff cpu) 4 ∧ (aCpuNoff cpu).toNat % 4 = 0) ∧
+        (inRam (aCpuIntena cpu) 4 ∧ (aCpuIntena cpu).toNat % 4 = 0)⌝ ∗
+      cpuCells cpu noff intena p := by
+  unfold cpuCells
+  iintro ⟨Hp, Hn, Hi⟩
+  icases wordPointsTo_facts _ _ _ _ $$ Hp with ⟨%hp, Hp⟩
+  icases wordPointsTo_facts _ _ _ _ $$ Hn with ⟨%hn, Hn⟩
+  icases wordPointsTo_facts _ _ _ _ $$ Hi with ⟨%hi, Hi⟩
+  iframe Hp Hn Hi
+  ipureintro
+  exact ⟨hp, hn, hi⟩
+
 /-- The CSRs the kernel owns but never reads while it runs: `sscratch`
 (scratch; the trampoline writes it) and the state-enable pins, which stay at
 their reset value. -/
@@ -558,6 +578,21 @@ each held lock's invariant keeps a fragment of), and the kernel-owned CSRs. -/
 def cpuOwn [CurCtx] [KernelGeom] (cpu : CPU) (noff : Nat) (intena : Bool) (p : BitVec 64) (locks : List String) :
     IProp GF := iprop%
   cpuCells cpu noff intena p ∗ lockSet cpu locks ∗ hartCsrs cpu
+
+/-- The `struct cpu` cells' facts, from the bookkeeping. -/
+theorem cpuOwn_facts [CurCtx] [KernelGeom] (cpu : CPU) (noff : Nat) (intena : Bool) (p : BitVec 64)
+    (locks : List String) :
+    cpuOwn (GF := GF) cpu noff intena p locks ⊢
+      ⌜(inRam (aCpuProc cpu) 8 ∧ (aCpuProc cpu).toNat % 8 = 0) ∧
+        (inRam (aCpuNoff cpu) 4 ∧ (aCpuNoff cpu).toNat % 4 = 0) ∧
+        (inRam (aCpuIntena cpu) 4 ∧ (aCpuIntena cpu).toNat % 4 = 0)⌝ ∗
+      cpuOwn cpu noff intena p locks := by
+  unfold cpuOwn
+  iintro ⟨Hcells, Hlocks, Hcsrs⟩
+  icases cpuCells_facts _ _ _ _ $$ Hcells with ⟨%h, Hcells⟩
+  iframe Hcells Hlocks Hcsrs
+  ipureintro
+  exact h
 
 /-! ## The bundle -/
 
@@ -754,6 +789,21 @@ theorem kctx_ro [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) :
   iframe Htext
   iframe HConf HF Hstack Htrans Harm Hcpu Htok Hclock
   ipureintro; exact hwf
+
+/-- The `struct cpu` cells' facts, from the context: the cells ride inside
+`cpuOwn`, and carry the RAM membership and alignment their rules need. -/
+theorem kctx_cpu_facts [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) :
+    kctx (GF := GF) cpu k ⊢
+      ⌜(inRam (aCpuProc cpu) 8 ∧ (aCpuProc cpu).toNat % 8 = 0) ∧
+        (inRam (aCpuNoff cpu) 4 ∧ (aCpuNoff cpu).toNat % 4 = 0) ∧
+        (inRam (aCpuIntena cpu) 4 ∧ (aCpuIntena cpu).toNat % 4 = 0)⌝ ∗
+      kctx cpu k := by
+  unfold kctx
+  iintro ⟨%hwf, HConf, HF, Hstack, Htrans, Harm, Hcpu, Htok, Hclock, #Htext⟩
+  icases cpuOwn_facts _ _ _ _ _ $$ Hcpu with ⟨%h, Hcpu⟩
+  iframe Htext
+  iframe HConf HF Hstack Htrans Harm Hcpu Htok Hclock
+  ipureintro; exact ⟨h, hwf⟩
 
 instance rdOk_decidable (rd : BitVec 5) : Decidable (rdOk rd) := by
   unfold rdOk; infer_instance

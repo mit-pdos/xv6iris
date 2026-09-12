@@ -802,7 +802,8 @@ theorem wp_s_lw_noff [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
   iintro ⟨HI, Hk, Hpc, HΦ⟩
   icases kctx_cases cpu k $$ Hk with ⟨%hwf, Hrest⟩
   ihave Hk := kctx_intro' cpu k hwf $$ Hrest
-  have ⟨hram, hal⟩ := aCpuNoff_ok cpu
+  icases kctx_cpu_facts cpu k $$ Hk with ⟨%hf, Hk⟩
+  have ⟨hram, hal⟩ := hf.2.1
   rw [← haddr] at hram hal
   have htp := tpPin_set cpu k.regs rd (BitVec.ofNat 64 k.noff) hrd.2.2
   have hsx := signExtend_noff k hwf
@@ -810,7 +811,14 @@ theorem wp_s_lw_noff [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
     (RegMap.set_other _ _ _ _ (Ne.symm hrd.2.1)) k.noff k.intena (by rw [KCtx.withCpu_self]; exact hwf)
     (bytesPointsTo (aCpuNoff cpu) 4 (DFrac.own 1) (BitVec.ofNat 32 k.noff))
     (bytesPointsTo (aCpuNoff cpu) 4 (DFrac.own 1) (BitVec.ofNat 32 k.noff))
-    (by unfold cpuCells; iintro ⟨Hp, Hn, Hi⟩; iframe Hn; iintro Hn; iframe)
+    (by
+      unfold cpuCells
+      iintro ⟨Hp, Hn, Hi⟩
+      icases wordPointsTo_cases _ _ _ _ $$ Hn with ⟨%⟨hr, ha⟩, Hn⟩
+      iframe Hn
+      iintro Hn
+      ihave Hn := wordPointsTo_intro _ _ _ _ hr ha $$ Hn
+      iframe)
     (fun c hok _ => by
       have e := execSpecF_lw (GF := GF) cpu (DFrac.own 1) (DFrac.own 1) c false hok pc (pc + instrLen is_rvc) imm rd rs1
         hrd.1 (tpPin cpu k.regs) (BitVec.ofNat 32 k.noff) hram hal
@@ -836,7 +844,8 @@ theorem wp_s_lw_intena [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : K
   iintro ⟨HI, Hk, Hpc, HΦ⟩
   icases kctx_cases cpu k $$ Hk with ⟨%hwf, Hrest⟩
   ihave Hk := kctx_intro' cpu k hwf $$ Hrest
-  have ⟨hram, hal⟩ := aCpuIntena_ok cpu
+  icases kctx_cpu_facts cpu k $$ Hk with ⟨%hf, Hk⟩
+  have ⟨hram, hal⟩ := hf.2.2
   rw [← haddr] at hram hal
   have htp := tpPin_set cpu k.regs rd (if k.intena then 1#64 else 0#64) hrd.2.2
   have hsx := signExtend_intena k.intena
@@ -845,7 +854,14 @@ theorem wp_s_lw_intena [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : K
     (RegMap.set_other _ _ _ _ (Ne.symm hrd.2.1)) k.noff k.intena (by rw [KCtx.withCpu_self]; exact hwf)
     (bytesPointsTo (aCpuIntena cpu) 4 (DFrac.own 1) (intenaVal k.intena))
     (bytesPointsTo (aCpuIntena cpu) 4 (DFrac.own 1) (intenaVal k.intena))
-    (by unfold cpuCells; iintro ⟨Hp, Hn, Hi⟩; iframe Hi; iintro Hi; iframe)
+    (by
+      unfold cpuCells
+      iintro ⟨Hp, Hn, Hi⟩
+      icases wordPointsTo_cases _ _ _ _ $$ Hi with ⟨%⟨hr, ha⟩, Hi⟩
+      iframe Hi
+      iintro Hi
+      ihave Hi := wordPointsTo_intro _ _ _ _ hr ha $$ Hi
+      iframe)
     (fun c hok _ => by
       have e := execSpecF_lw (GF := GF) cpu (DFrac.own 1) (DFrac.own 1) c false hok pc (pc + instrLen is_rvc) imm rd rs1
         hrd.1 (tpPin cpu k.regs) (intenaVal k.intena) hram hal
@@ -872,12 +888,20 @@ theorem wp_s_sw_noff [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
           pcIs cpu' (pc + instrLen is_rvc) -∗ wpLoop cpu'))
     ⊢ wpLoop cpu := by
   iintro ⟨HI, Hk, Hpc, HΦ⟩
-  have ⟨hram, hal⟩ := aCpuNoff_ok cpu
+  icases kctx_cpu_facts cpu k $$ Hk with ⟨%hf, Hk⟩
+  have ⟨hram, hal⟩ := hf.2.1
   rw [← haddr] at hram hal
   iapply (wpLoop_k_cpu cpu k hsie htier pc (pc + instrLen is_rvc) is_rvc _ k.regs rfl n' k.intena hwf'
     (bytesPointsTo (aCpuNoff cpu) 4 (DFrac.own 1) (BitVec.ofNat 32 k.noff))
     (bytesPointsTo (aCpuNoff cpu) 4 (DFrac.own 1) (BitVec.ofNat 32 n'))
-    (by unfold cpuCells; iintro ⟨Hp, Hn, Hi⟩; iframe Hn; iintro Hn; iframe)
+    (by
+      unfold cpuCells
+      iintro ⟨Hp, Hn, Hi⟩
+      icases wordPointsTo_cases _ _ _ _ $$ Hn with ⟨%⟨hr, ha⟩, Hn⟩
+      iframe Hn
+      iintro Hn
+      ihave Hn := wordPointsTo_intro _ _ _ _ hr ha $$ Hn
+      iframe)
     (fun c hok _ => by
       have e := execSpecF_sw (GF := GF) cpu (DFrac.own 1) c false hok pc (pc + instrLen is_rvc) imm rs1 rs2
         (tpPin cpu k.regs) (BitVec.ofNat 32 k.noff) hram hal
@@ -900,12 +924,20 @@ theorem wp_s_sw_intena [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : K
           pcIs cpu' (pc + instrLen is_rvc) -∗ wpLoop cpu'))
     ⊢ wpLoop cpu := by
   iintro ⟨HI, Hk, Hpc, HΦ⟩
-  have ⟨hram, hal⟩ := aCpuIntena_ok cpu
+  icases kctx_cpu_facts cpu k $$ Hk with ⟨%hf, Hk⟩
+  have ⟨hram, hal⟩ := hf.2.2
   rw [← haddr] at hram hal
   iapply (wpLoop_k_cpu cpu k hsie htier pc (pc + instrLen is_rvc) is_rvc _ k.regs rfl k.noff b' hwf'
     (bytesPointsTo (aCpuIntena cpu) 4 (DFrac.own 1) (intenaVal k.intena))
     (bytesPointsTo (aCpuIntena cpu) 4 (DFrac.own 1) (intenaVal b'))
-    (by unfold cpuCells; iintro ⟨Hp, Hn, Hi⟩; iframe Hi; iintro Hi; iframe)
+    (by
+      unfold cpuCells
+      iintro ⟨Hp, Hn, Hi⟩
+      icases wordPointsTo_cases _ _ _ _ $$ Hi with ⟨%⟨hr, ha⟩, Hi⟩
+      iframe Hi
+      iintro Hi
+      ihave Hi := wordPointsTo_intro _ _ _ _ hr ha $$ Hi
+      iframe)
     (fun c hok _ => by
       have e := execSpecF_sw (GF := GF) cpu (DFrac.own 1) c false hok pc (pc + instrLen is_rvc) imm rs1 rs2
         (tpPin cpu k.regs) (intenaVal k.intena) hram hal
@@ -926,14 +958,22 @@ theorem wp_s_ld_proc [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
   iintro ⟨HI, Hk, Hpc, HΦ⟩
   icases kctx_cases cpu k $$ Hk with ⟨%hwf, Hrest⟩
   ihave Hk := kctx_intro' cpu k hwf $$ Hrest
-  have ⟨hram, hal⟩ := aCpuProc_ok cpu
+  icases kctx_cpu_facts cpu k $$ Hk with ⟨%hf, Hk⟩
+  have ⟨hram, hal⟩ := hf.1
   rw [← haddr] at hram hal
   have htp := tpPin_set cpu k.regs rd k.proc hrd.2.2
   iapply (wpLoop_k_cpu cpu k hsie htier pc (pc + instrLen is_rvc) is_rvc _ (k.regs.set rd k.proc)
     (RegMap.set_other _ _ _ _ (Ne.symm hrd.2.1)) k.noff k.intena (by rw [KCtx.withCpu_self]; exact hwf)
     (bytesPointsTo (aCpuProc cpu) 8 (DFrac.own 1) k.proc)
     (bytesPointsTo (aCpuProc cpu) 8 (DFrac.own 1) k.proc)
-    (by unfold cpuCells; iintro ⟨Hp, Hn, Hi⟩; iframe Hp; iintro Hp; iframe)
+    (by
+      unfold cpuCells
+      iintro ⟨Hp, Hn, Hi⟩
+      icases wordPointsTo_cases _ _ _ _ $$ Hp with ⟨%⟨hr, ha⟩, Hp⟩
+      iframe Hp
+      iintro Hp
+      ihave Hp := wordPointsTo_intro _ _ _ _ hr ha $$ Hp
+      iframe)
     (fun c hok _ => by
       have e := execSpecF_ld (GF := GF) cpu (DFrac.own 1) (DFrac.own 1) c false hok pc (pc + instrLen is_rvc) imm rd rs1
         hrd.1 (tpPin cpu k.regs) k.proc hram hal
