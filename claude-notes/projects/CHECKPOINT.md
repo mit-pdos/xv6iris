@@ -249,3 +249,8 @@ LAZY-FLAG-2 phase 1 DONE (2026-09-12; 60 dirty files in main; banked as
 `kexec_built`); LAZY-FLAG-3 (fresh agent, `brief-lazy-flag-3.md`) finishes the
 ten reds and gates IN THE SAME DIRTY TREE.  Waiting on it: SUPPLY-SPLIT-r1,
 SH-OPEN, TX-RECEIPT (resume by ping), E2's cwd seam.
+
+E4 phase 1 green (2026-09-12; `lane/sh-echo` = `5b4c88ef8`); phase 2 go-ahead
+(the big item: `echo_slot_of_kexec`); E2 told to hand sh the one `echo_fs_pure`
+law.  In flight: LAZY-FLAG-3 (main), E2 p2 (`-disc`), PRINTK-LEDGER p1 (`-sup`),
+E4 p2 (`-tlw`).

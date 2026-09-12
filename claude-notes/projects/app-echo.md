@@ -2404,6 +2404,41 @@ ORDER: GENERIC-PAY → CONS-SWALLOW → SH-LINE 2b (gets on `ush_gets_line`,
 `wp_uk_ecall_read_recv` with `upos` threaded read → gets_loop → gets → getcmd
 → main) → LAZY-FLAG (the owner's form of (A)).
 
+E4 SH-ECHO PHASE 1 (2026-09-12; `-tlw`, `lane/sh-echo` = `5b4c88ef8` on
+`lane/supply-split-r1`; two NEW files `UkShEcho.v` (u-tier) + `UShEcho.v`
+(application), no existing .v edited, build `shecho14` green).  THE PARSER IS
+FUNCTIONAL FOR THE LINE: `UkShParseCmd.wp_kshp_parser` takes the token list as a
+PREMISE, so the disciplined branch owes a closed computation over the seventeen
+literal bytes -- `ush_echo_tokens_holds` PROVED (tokens (0,4),(5,10),(11,16));
+`echo_cmd s0 g := UExec (ush_args s0 g echo_toks)` (heap: type word 1 at t;
+argv pointers s0, s0+5, s0+11 at t+8..t+24; NULL at t+32; the three strings
+NUL-cut at s0+4/10/16 -- all DfracDiscarded, readable off the `uheap` that
+`udepw_at` lends); `echo_argv_bytes g`; `ush_line_toks` (the transport from
+`echo_line !!! j` to `f (k+j)`, 2b's).  THE SPECIALISED ARM `wp_kshr_exec_echo`
+consumes NO generic supply (the EXEC arm pays exec from `uxsup_at` alone; the
+LIST/BACK arms are the only users of `uxsup` and are never reached: review
+finding 13 is a re-walk of one ~40-instruction arm, not a re-proof of the
+induction); `sh_exec_sup_echo` (the supply, on `init_exec_sup_pos`'s mould);
+`wp_kshr_exec_at_cwd` (a CWD-INDEXED sh exec stub, needed because
+`wp_kshr_exec` is at the ∀-cwd deposit a pin cannot pay); `wp_kshm_child_echo`
+(the dispatch: `wp_kshm_child_alloc` with `uxsup` → `sh_exec_sup_echo`,
+`ucwd_any` → `ucwd ROOTINO`, the two line premises → `ush_line_is`);
+`sh_echo_slot T` (`init_sh_slot` at /echo, `Pay := emp`);
+`sh_echo_pin_resolves` at `[ROOTINO; ECHO_INO]` PROVED; `kexec_loadable
+echo_elf` PROVED (did not exist; home is ElfLoadable, left in UShEcho for the
+cone); `echo_out := "hello world\n"`, `echo_key_args`, `echo_writes_out recv tx`
+(echo's post over its transcript, against E5's write leaf as a named
+hypothesis).  THE PARENT'S ROUND IS ALREADY THE LANDED ONE (the wait's answer is
+unconstrained; nothing about the child crosses); E4 adds only the cwd index
+(`ush_pstate_at`).  THE BIG PHASE-2 ITEM: `echo_slot_of_kexec` -- echo has NO
+bridge from `kexec_image_ok` to its key-level entry (`echo_uexec_slot` is
+stated on the key; sh's bridge `sh_slot_of_kexec` is ~100 lines of geometry;
+echo's must turn `kexec_args_at` (the block kexec BUILT) into `UkAbi.uk_args_c`
+(the block echo READS) + the presence rows).  Named seams: the line fact (2b),
+`ucwd ROOTINO` at sh's entry (SH-OPEN/LAZY-FLAG-2's exec row), `sh_echo_slot`'s
+law (E2: `init_sh_slot` hands ONE `echo_fs_pure` law), `udepw_law 16` (E5),
+`recv`/`tx` (TX-RECEIPT).  Phase 2 launched.
+
 LAZY-FLAG-2 PHASE 1 (2026-09-12; main, 60 files dirty +1926/-815, build `lazy48`:
 506 compiled, 10 red -- all owed phase-2 sites; banked as
 `wx-briefs/lazy-flag-stored-2.patch`).  CORRECTION TO "LAZY-FLAG CORE LANDED":
