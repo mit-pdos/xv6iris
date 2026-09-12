@@ -96,9 +96,14 @@ Import Defs.
    a LINE BOUNDARY -- which is where sh's previous [gets] stopped, because
    it stopped at a '\n' -- is therefore a prefix of one [echo_line].
 
-   STATED OVER [ins] ALONE, which is all [AppEcho.disc] gives (S6): it says
-   nothing about which stored bytes were dropped, and it does not have to
-   -- contiguity of the STORED sequence is what [ConsoleInv.cons_window] /
+   STATED OVER [ins] ALONE, at [EchoDisc.disc_seg] -- the CONTENT half D3
+   of the discipline, which is all this lane needs (S6).  The discipline
+   itself is stronger since DISC-RATE ([EchoDisc.disc_seg'] adds the owner's
+   rate bound D0/D1/D2, which is what excludes the ring overflow), and a
+   supplier reaches D3 from it in one step ([EchoDisc.disc_seg'_proj], or
+   [disc_proj] to the whole-history [disc_old]).  These statements say
+   nothing about which stored bytes were dropped, and do not have to --
+   contiguity of the STORED sequence is what [ConsoleInv.cons_window] /
    [cons_chain] carry, and contiguity of the INPUT sequence is E5's
    overflow argument, not this lane's. *)
 Definition ush_disc_line : Prop :=
