@@ -2990,6 +2990,285 @@ Section UkRunSys.
     cbn [uvis_M uvis_of_run]. iExact "Hpost".
   Qed.
 
+
+  (* ------------------------------------------------------------------- *)
+  (* ...AND THE TWO OF THEM WITH THE IMAGE ROW (lane OPEN-PIN, phase 4).    *)
+  (*                                                                       *)
+  (* A PINNED open or mknod is about a PATH, and the receipt names the      *)
+  (* path only through [ArgPath.arg_path_of (uvis_M W) (xk_a W 0) pl] --    *)
+  (* a fact about the TRAPPING KEY'S image.  A program holds a persistent   *)
+  (* view of its own rodata ([UserHeap.utext_img]; /init's is               *)
+  (* [UCodeInit.init_rodata]) and the run holds the heap the key is built   *)
+  (* from, so the inclusion is readable exactly HERE, where both halves     *)
+  (* are in one hand -- and nowhere in the caller, where [urun] has hidden  *)
+  (* the image again.  Without the row a caller can supply a pinned bundle  *)
+  (* and still not know which file its own receipt is about.                *)
+  (*                                                                       *)
+  (* Each is its recv leaf's walk with that one extra reading; the two      *)
+  (* leaves above are unchanged.                                           *)
+  (* ------------------------------------------------------------------- *)
+  Lemma wp_uk_ecall_open_recv_img (N : uk_names Σ) (h : CpuId)
+      (m : regfile) (pc : mword 64) (l : list fdstate) (avail : nat)
+      (fdep : sfam) (c : Z) (Img : gmap Z (bv 8)) :
+    usysno m = USYS_open ->
+    is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
+    uinstr_is (ukn_t N) pc false (ECALL tt) -∗
+    (* the caller's own PERSISTENT view of a piece of its image *)
+    utext_img (ukn_t N) Img -∗
+    urun N h m pc avail -∗
+    (* the program's half of its working directory... *)
+    UserCwd.ucwd (ukn_cwd N) c -∗
+    (* ...and the deposit at every key whose cwd is that one inum, at the
+       family the program will read its receipt at *)
+    udepwf_at N m pc USYS_open fdep c -∗
+    ustd (ukn_fd N) l -∗
+    (∀ (h' : CpuId) (r : mword 64) (W : uvis)
+       (M' : gmap Z (bv 8)) (fdv' : list fdstate) (cw' : Z)
+       (cs' : gset gname),
+       (* THE TRAPPING KEY'S TWO ARGUMENT WORDS ARE THE CALLER'S OWN, which
+          is what lets a program that knows its image read its own path
+          argument off the receipt ([ArgPath.arg_path_of] at [uvis_M W] and
+          [tf_arg_idx 0]). *)
+       ⌜ forall (a : Z) (b : bv 8),
+           Img !! a = Some b -> uvis_M W !! a = Some b ⌝ -∗
+       (* ...AND THE TABLE'S LENGTH, which is what bounds the descriptor a
+          receipt names and so lets a caller identify it with the one its
+          own ledger decided. *)
+       ⌜length (uvis_fd W) = NOFILE⌝ -∗
+       ⌜tf_w (uvis_tf W) (tf_arg_idx 0) = m !!! Regidx (mword_of_int 10)⌝ -∗
+       ⌜tf_w (uvis_tf W) (tf_arg_idx 1) = m !!! Regidx (mword_of_int 11)⌝ -∗
+       (* ...AND ITS CWD AND ITS LEDGER ARE THE CALLER'S OWN TOO *)
+       ⌜uvis_cwd W = c⌝ -∗
+       ⌜take NSTD (uvis_fd W) = l⌝ -∗
+       (* the ledger, exactly [wp_uk_ecall_open]'s two arms *)
+       ((∃ (fd : nat) (rd wr : bool) (t : fdtype),
+           (* ...AND THE ROW THE ALLOCATION LEFT IN THE RESUME VIEW, beside
+              the number and the handle: the receipt's own descriptor row
+              is about [fdv'], so without this the caller cannot tie the
+              TYPE the receipt names to the SLOT its ledger decided. *)
+           ⌜r = (mword_of_int (Z.of_nat fd) : mword 64)
+            /\ (fd < NOFILE)%nat
+            /\ fdv' = <[fd := FdOpen rd wr t]> (uvis_fd W)⌝ ∗
+           ualloc (ukn_fd N) l fd (FdOpen rd wr t))
+        ∨ (⌜r = (mword_of_int (-1) : mword 64)
+             /\ fdv' = uvis_fd W⌝ ∗ ustd (ukn_fd N) l)) -∗
+       (* ...AND THE POST, at the TRAPPING key and the resume view *)
+       spost_at uslot USYS_open fdep W r M' fdv' cw' cs' -∗
+       UserCwd.ucwd (ukn_cwd N) c -∗
+       urun N h' (<[Regidx (mword_of_int 10) := r]> m)
+         (add_vec_int pc 4) avail -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hn Hal4.
+    iIntros "#Hi #Himg Hrun Hcwd Hsb Hstd Hcont".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs pidv) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & Hcha & #Hmy & Hpayv & #Hdep & Hb)".
+    (* the key's cwd IS the one the caller's PINNED bundle is stated at *)
+    iDestruct (ucwd_agree with "Hcwda Hcwd") as %->.
+    (* ...and the key's low three slots ARE the caller's own ledger, which
+       is what makes the receipt's descriptor row readable at all *)
+    iDestruct (ustd_agree (ukn_fd N) fdv l with "Hufd Hstd") as %Htake.
+    (* ...AND THE IMAGE ROW: the caller's persistent view is a submap of the
+       key's own image, which is what lets it read its path argument off
+       the receipt ([ArgPath.arg_path_of] at [uvis_M W]). *)
+    iAssert (⌜ forall (a : Z) (b : bv 8),
+                Img !! a = Some b -> M !! a = Some b ⌝)%I as %Hsimg.
+    { iIntros (a b Hb).
+      iDestruct (big_sepM_lookup _ _ a b Hb with "Himg") as "Hb'".
+      iDestruct (uheap_text with "Hheap Hb'") as %(HM & _ & _).
+      iPureIntro. exact HM. }
+    (* the deposit, at the family the receipt will come back at *)
+    iDestruct "Hsb" as "[%Hfp Hsb]".
+    iDestruct ("Hsb" $! M pm sz fdv gn cs pidv with "Hmy Hheap Hufd")
+      as "(Hheap & Hufd & Hdepn)".
+    iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
+    iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
+    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv c gn cs pidv Hui
+              (fun (s : mstate)
+                   (Hp : register_lookup cur_privilege s.(sregs) = User)
+                   (Hc : register_lookup (R_bitvector_64 PC) s.(sregs) = pc) =>
+                 UserExecFacts.goodmb_execute_ECALL_U UserFrame.Du_r UserFrame.Du_w
+                   s pc ltac:(vm_compute; reflexivity)
+                   ltac:(vm_compute; reflexivity) Hp Hc)
+              with "Hb Hmy Hpayv").
+    iIntros "Hpayv".
+    rewrite (uexec_ret_ecall _ _ eq_refl).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c gn cs pidv)) = USYS_open).
+    { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
+    rewrite /uexec_pay_dep /upay_at /uexec_pay_arm.
+    rewrite Hnum. cbv zeta.
+    destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
+      [ | exfalso; exact (Hpne eq_refl) ].
+    destruct (decide (USYS_open = USYS_exit)) as [He | _];
+      [ exfalso; vm_compute in He; discriminate | ].
+    destruct (decide (USYS_open = USYS_fork)) as [He | _];
+      [ exfalso; vm_compute in He; discriminate | ].
+    iExists fdep. rewrite Hfp.
+    cbn [uvis_gen uvis_of_run].
+    iSplitL "Hpayv"; [ iFrame "Hmy Hpayv" | ].
+    iSplitL "Hdepn"; [ iExact "Hdepn" | ].
+    iIntros "Hpayv".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs')
+      "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hchrow Hpost".
+    assert (Hcw : cw' = c)
+      by (refine (usys_cwd_ok_quiet _ _ _ _ _ Hcwrow); vm_compute; discriminate).
+    assert (Hgn : gn' = gn) by exact (usys_gen_ok_quiet _ _ _ Hgnrow).
+    assert (Hch : cs' = cs) by exact (usys_ch_ok_quiet _ _ _ _ Hchrow).
+    subst gn' cs' cw'.
+    destruct (usys_mem_ok_quiet USYS_open _ r _ _ _ _ _ _
+                ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
+                ltac:(discriminate) ltac:(discriminate) ltac:(discriminate) Hok)
+      as [-> [-> ->]].
+    unfold usys_fd_ok in Hfdok.
+    destruct (decide (USYS_open = USYS_close)) as [Hc | _]; [ discriminate Hc | ].
+    destruct (decide (USYS_open = USYS_dup)) as [Hc | _]; [ discriminate Hc | ].
+    destruct (decide (USYS_open = USYS_open)) as [_ | Hc];
+      [ | exfalso; exact (Hc eq_refl) ].
+    cbn [uvis_M uvis_perm uvis_fd uvis_of_run] in Hfdok |- *.
+    iDestruct (ufd_auth_len with "Hufd") as %Hfdlen.
+    iApply uslot_bupd.
+    destruct Hfdok as [(fd & rd & wr & t & Hr & Hcl & ->) | [Hrm ->]].
+    - (* A DESCRIPTOR CAME BACK, at the LOWEST free slot, and the RECEIPT
+         says at which type *)
+      iMod (ufd_alloc_least (ukn_fd N) fdv l fd (FdOpen rd wr t) Hcl
+              ltac:(discriminate) with "Hufd Hstd") as "[Hufd Hh]".
+      iModIntro.
+      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv
+                 (<[fd := FdOpen rd wr t]> fdv) c c gn gn cs cs pidv r Hx0 Hal4).
+      iApply ukcq_ukc.
+      iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _ _ _ _
+                ltac:(unfold unot_sp; vm_compute; discriminate)
+                with "Hheap Hstk Hufd Hcwda Hcha Hmy Hpayv Hdep").
+      iIntros (h') "Hrun".
+      iApply ("Hcont" $! h' r (uvis_of_run m pc M pm sz fdv c gn cs pidv)
+                _ _ _ _ with "[%] [%] [%] [%] [%] [%] [Hh] Hpost Hcwd Hrun").
+      { exact Hsimg. }
+      { rewrite (uvis_of_run_fd m pc M pm sz fdv c gn cs pidv). exact Hfdlen. }
+      { rewrite /tf_w. cbn [uvis_tf uvis_of_run]. exact (tf_of_arg0 m pc). }
+      { rewrite /tf_w. cbn [uvis_tf uvis_of_run]. exact (tf_of_arg1 m pc). }
+      { exact (uvis_of_run_cwd m pc M pm sz fdv c gn cs pidv). }
+      { rewrite (uvis_of_run_fd m pc M pm sz fdv c gn cs pidv). exact Htake. }
+      iLeft. iExists fd, rd, wr, t. iFrame "Hh". iPureIntro.
+      split_and!; [ exact Hr | | ].
+      { rewrite <- Hfdlen. exact (fd_least_closed_lt _ _ Hcl). }
+      rewrite (uvis_of_run_fd m pc M pm sz fdv c gn cs pidv). reflexivity.
+    - (* the call failed: nothing moved, and the ledger comes straight back *)
+      iModIntro.
+      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv c c gn gn cs cs pidv r Hx0 Hal4).
+      iApply ukcq_ukc.
+      iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _ _ _ _
+                ltac:(unfold unot_sp; vm_compute; discriminate)
+                with "Hheap Hstk Hufd Hcwda Hcha Hmy Hpayv Hdep").
+      iIntros (h') "Hrun".
+      iApply ("Hcont" $! h' r (uvis_of_run m pc M pm sz fdv c gn cs pidv)
+                _ _ _ _ with "[%] [%] [%] [%] [%] [%] [Hstd] Hpost Hcwd Hrun").
+      { exact Hsimg. }
+      { rewrite (uvis_of_run_fd m pc M pm sz fdv c gn cs pidv). exact Hfdlen. }
+      { rewrite /tf_w. cbn [uvis_tf uvis_of_run]. exact (tf_of_arg0 m pc). }
+      { rewrite /tf_w. cbn [uvis_tf uvis_of_run]. exact (tf_of_arg1 m pc). }
+      { exact (uvis_of_run_cwd m pc M pm sz fdv c gn cs pidv). }
+      { rewrite (uvis_of_run_fd m pc M pm sz fdv c gn cs pidv). exact Htake. }
+      iRight. iFrame "Hstd". iPureIntro. split; [ exact Hrm | ].
+      rewrite (uvis_of_run_fd m pc M pm sz fdv c gn cs pidv). reflexivity.
+  Qed.
+
+  Lemma wp_uk_ecall_quiet_recv_img (N : uk_names Σ) (h : CpuId)
+      (m : regfile) (pc : mword 64) (n : Z) (avail : nat) (fdep : sfam)
+      (c : Z) (Img : gmap Z (bv 8)) :
+    usysno m = n ->
+    n <> USYS_exit -> n <> USYS_fork ->
+    n <> USYS_exec -> n <> USYS_sbrk ->
+    n <> USYS_wait -> n <> USYS_pipe -> n <> USYS_read -> n <> USYS_fstat ->
+    n <> USYS_close -> n <> USYS_dup -> n <> USYS_open ->
+    n <> USYS_chdir ->
+    is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
+    uinstr_is (ukn_t N) pc false (ECALL tt) -∗
+    (* the caller's own PERSISTENT view of a piece of its image *)
+    utext_img (ukn_t N) Img -∗
+    urun N h m pc avail -∗
+    UserCwd.ucwd (ukn_cwd N) c -∗
+    udepwf_at N m pc n fdep c -∗
+    (∀ (h' : CpuId) (r : mword 64) (W : uvis) (cs' : gset gname),
+       ⌜ forall (a : Z) (b : bv 8),
+           Img !! a = Some b -> uvis_M W !! a = Some b ⌝ -∗
+       ⌜tf_w (uvis_tf W) (tf_arg_idx 0) = m !!! Regidx (mword_of_int 10)⌝ -∗
+       ⌜tf_w (uvis_tf W) (tf_arg_idx 1) = m !!! Regidx (mword_of_int 11)⌝ -∗
+       ⌜tf_w (uvis_tf W) (tf_arg_idx 2) = m !!! Regidx (mword_of_int 12)⌝ -∗
+       ⌜uvis_cwd W = c⌝ -∗
+       spost_at uslot n fdep W r (uvis_M W) (uvis_fd W) c cs' -∗
+       UserCwd.ucwd (ukn_cwd N) c -∗
+       urun N h' (<[Regidx (mword_of_int 10) := r]> m)
+         (add_vec_int pc 4) avail -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hn Hexit Hfork Hexec Hsbrk H3 H4 H5 H8 Hcl Hdp Hop Hcd Hal4.
+    iIntros "#Hi #Himg Hrun Hcwd Hsb Hcont".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs pidv) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & Hcha & #Hmy & Hpayv & #Hdep & Hb)".
+    iDestruct (ucwd_agree with "Hcwda Hcwd") as %->.
+    (* ...AND THE IMAGE ROW ([wp_uk_ecall_open_recv_img]'s) *)
+    iAssert (⌜ forall (a : Z) (b : bv 8),
+                Img !! a = Some b -> M !! a = Some b ⌝)%I as %Hsimg.
+    { iIntros (a b Hb).
+      iDestruct (big_sepM_lookup _ _ a b Hb with "Himg") as "Hb'".
+      iDestruct (uheap_text with "Hheap Hb'") as %(HM & _ & _).
+      iPureIntro. exact HM. }
+    iDestruct "Hsb" as "[%Hfp Hsb]".
+    iDestruct ("Hsb" $! M pm sz fdv gn cs pidv with "Hmy Hheap Hufd")
+      as "(Hheap & Hufd & Hdepn)".
+    iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
+    iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
+    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv c gn cs pidv Hui
+              (fun (s : mstate)
+                   (Hp : register_lookup cur_privilege s.(sregs) = User)
+                   (Hc : register_lookup (R_bitvector_64 PC) s.(sregs) = pc) =>
+                 UserExecFacts.goodmb_execute_ECALL_U UserFrame.Du_r UserFrame.Du_w
+                   s pc ltac:(vm_compute; reflexivity)
+                   ltac:(vm_compute; reflexivity) Hp Hc)
+              with "Hb Hmy Hpayv").
+    iIntros "Hpayv".
+    rewrite (uexec_ret_ecall _ _ eq_refl).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c gn cs pidv)) = n).
+    { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
+    rewrite /uexec_pay_dep /upay_at /uexec_pay_arm.
+    rewrite Hnum. cbv zeta.
+    destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
+      [ | exfalso; exact (Hpne eq_refl) ].
+    destruct (decide (n = USYS_exit)) as [He | _]; [ exfalso; exact (Hexit He) | ].
+    destruct (decide (n = USYS_fork)) as [He | _]; [ exfalso; exact (Hfork He) | ].
+    destruct (decide (n = USYS_wait)) as [He | _]; [ exfalso; exact (H3 He) | ].
+    iExists fdep. rewrite Hfp.
+    cbn [uvis_gen uvis_of_run].
+    iSplitL "Hpayv"; [ iFrame "Hmy Hpayv" | ].
+    iSplitL "Hdepn"; [ iExact "Hdepn" | ].
+    iIntros "Hpayv".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs')
+      "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hchrow Hpost".
+    assert (Hcw : cw' = c) by (exact (usys_cwd_ok_quiet n r c cw' Hcd Hcwrow)).
+    assert (Hgn : gn' = gn) by exact (usys_gen_ok_quiet _ _ _ Hgnrow).
+    assert (Hch : cs' = cs) by exact (usys_ch_ok_quiet _ _ _ _ Hchrow).
+    subst gn' cs' cw'.
+    destruct (usys_mem_ok_quiet n _ r _ _ _ _ _ _ Hexec Hsbrk H3 H4 H5 H8 Hok)
+      as [-> [-> ->]].
+    pose proof (usys_fd_ok_quiet n _ r _ _ Hcl Hdp Hop H4 Hfdok) as ->.
+    cbn [uvis_M uvis_perm uvis_of_run].
+    rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv c c gn gn cs cs pidv r Hx0 Hal4).
+    iApply ukcq_ukc.
+    iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _ _ _ _
+              ltac:(unfold unot_sp; vm_compute; discriminate)
+              with "Hheap Hstk Hufd Hcwda Hcha Hmy Hpayv Hdep").
+    iIntros (h') "Hrun".
+    iApply ("Hcont" $! h' r (uvis_of_run m pc M pm sz fdv c gn cs pidv) cs
+              with "[%] [%] [%] [%] [%] [Hpost] Hcwd Hrun").
+    { exact Hsimg. }
+    { rewrite /tf_w. cbn [uvis_tf uvis_of_run]. exact (tf_of_arg0 m pc). }
+    { rewrite /tf_w. cbn [uvis_tf uvis_of_run]. exact (tf_of_arg1 m pc). }
+    { rewrite /tf_w. cbn [uvis_tf uvis_of_run]. exact (tf_of_arg2 m pc). }
+    { exact (uvis_of_run_cwd m pc M pm sz fdv c gn cs pidv). }
+    rewrite (uvis_of_run_fd m pc M pm sz fdv c gn cs pidv).
+    cbn [uvis_M uvis_of_run]. iExact "Hpost".
+  Qed.
+
   (* THE PAGE FLOOR OF AN ADDRESS AT OR ABOVE A PAGE BOUNDARY is itself at
      or above it -- the one arithmetic fact the sbrk leaf's two page-set
      arguments turn on. *)

@@ -262,6 +262,17 @@ Section UkInit.
   Definition uki_open_console_leaf (T : iProp Σ) (stc : fdstate) : iProp Σ :=
     (∀ (h : CpuId) (m : regfile) (avail : nat),
        init_code γt -∗
+       (* THE READ-ONLY IMAGE AND THE TWO ARGUMENT WORDS.  A pinned open is
+          about a PATH, and the path is a string in /init's own .rodata at
+          0x970 read through the LOANED heap ([UInitConsK]'s supplier), so
+          the era-level discharge needs the persistent view of those bytes
+          and the two registers the stub is called with: a0 = "console",
+          a1 = O_RDWR.  Both call sites hold them
+          ([UkInitMain.wp_kinit_main] @0x0e-0x16,
+          [wp_kinit_main_repair_tail] @0x74-0x7e). *)
+       init_rodata γt -∗
+       ⌜ m !!! Regidx a0_idx = (mword_of_int 0x970 : mword 64)
+         /\ m !!! Regidx a1_idx = (mword_of_int 2 : mword 64) ⌝ -∗
        urun N h m (mword_of_int InitSyms.open) avail -∗
        UserCwd.ucwd γcwd FsImg.ROOTINO -∗
        ustd γfd ufd_l0 -∗
@@ -291,6 +302,11 @@ Section UkInit.
   Definition uki_open_absent_leaf (T K : iProp Σ) : iProp Σ :=
     (∀ (h : CpuId) (m : regfile) (l : list fdstate) (avail : nat),
        init_code γt -∗
+       (* the read-only image and the two argument words, for
+          [uki_open_console_leaf]'s reason *)
+       init_rodata γt -∗
+       ⌜ m !!! Regidx a0_idx = (mword_of_int 0x970 : mword 64)
+         /\ m !!! Regidx a1_idx = (mword_of_int 2 : mword 64) ⌝ -∗
        urun N h m (mword_of_int InitSyms.open) avail -∗
        UserCwd.ucwd γcwd FsImg.ROOTINO -∗
        ustd γfd l -∗
@@ -315,6 +331,14 @@ Section UkInit.
   Definition uki_mknod_leaf (T K : iProp Σ) (stc : fdstate) : iProp Σ :=
     (∀ (h : CpuId) (m : regfile) (avail : nat),
        init_code γt -∗
+       (* the read-only image and the THREE argument words: a0 = "console"
+          at 0x970, a1 = CONSOLE, a2 = 0 -- the numbers row 17 reads
+          through [SysMknodDefs.dev_arg].  The repair arm holds all four
+          ([UkInitMain.wp_kinit_main_repair] @0x64-0x70). *)
+       init_rodata γt -∗
+       ⌜ m !!! Regidx a0_idx = (mword_of_int 0x970 : mword 64)
+         /\ m !!! Regidx a1_idx = (mword_of_int 1 : mword 64)
+         /\ m !!! Regidx a2_idx = (mword_of_int 0 : mword 64) ⌝ -∗
        urun N h m (mword_of_int InitSyms.mknod) avail -∗
        UserCwd.ucwd γcwd FsImg.ROOTINO -∗
        K -∗
@@ -359,6 +383,11 @@ Section UkInit.
   Definition uki_open2 (T : iProp Σ) (stc : fdstate) : iProp Σ :=
     (∀ (h : CpuId) (m : regfile) (avail : nat),
        init_code γt -∗
+       (* the read-only image and the two argument words, threaded to
+          whichever of the three leaves the mknod's answer chose *)
+       init_rodata γt -∗
+       ⌜ m !!! Regidx a0_idx = (mword_of_int 0x970 : mword 64)
+         /\ m !!! Regidx a1_idx = (mword_of_int 2 : mword 64) ⌝ -∗
        urun N h m (mword_of_int InitSyms.open) avail -∗
        UserCwd.ucwd γcwd FsImg.ROOTINO -∗
        uki_open2_in T -∗
@@ -740,7 +769,7 @@ Section UkInit.
     T -∗ uki_open2 T stc.
   Proof.
     rewrite /uki_open2 /uki_open2_in.
-    iIntros "#Ht" (h m avail) "#Hcode Hrun Hcwd Hin Hcont".
+    iIntros "#Ht" (h m avail) "#Hcode #Hro %Hargs Hrun Hcwd Hin Hcont".
     iApply (wp_kinit_open h m avail with "Hcode Hrun [Hin]").
     { iDestruct "Hin" as "[H | [H _]]"; [ by iExists ufd_l0 | iExact "H" ]. }
     iIntros (h' ret) "Hstd Hrun".
@@ -755,13 +784,15 @@ Section UkInit.
   Proof.
     iIntros "Hlf".
     rewrite /uki_open2 /uki_open2_in.
-    iIntros (h m avail) "#Hcode Hrun Hcwd Hin Hcont".
+    iIntros (h m avail) "#Hcode #Hro %Hargs Hrun Hcwd Hin Hcont".
     iDestruct "Hin" as "[Hstd | [Hstd #Ht]]"; last first.
     { iDestruct (uki_open2_taint_arm T stc with "Ht") as "Hop".
       rewrite /uki_open2 /uki_open2_in.
-      iApply ("Hop" $! h m avail with "Hcode Hrun Hcwd [Hstd] Hcont").
+      iApply ("Hop" $! h m avail with "Hcode Hro [%] Hrun Hcwd [Hstd] Hcont");
+        [ exact Hargs | ].
       iRight. iFrame "Hstd Ht". }
-    iApply ("Hlf" $! h m avail with "Hcode Hrun Hcwd Hstd").
+    iApply ("Hlf" $! h m avail with "Hcode Hro [%] Hrun Hcwd Hstd");
+      [ exact Hargs | ].
     iIntros (h' ret) "Hans Hcwd Hrun".
     iApply ("Hcont" $! h' ret with "[Hans] Hcwd Hrun").
     iDestruct "Hans" as "[[_ H] | [[_ H] | [H Ht]]]".
@@ -777,13 +808,15 @@ Section UkInit.
   Proof.
     iIntros "Hlf HK".
     rewrite /uki_open2 /uki_open2_in.
-    iIntros (h m avail) "#Hcode Hrun Hcwd Hin Hcont".
+    iIntros (h m avail) "#Hcode #Hro %Hargs Hrun Hcwd Hin Hcont".
     iDestruct "Hin" as "[Hstd | [Hstd #Ht]]"; last first.
     { iDestruct (uki_open2_taint_arm T stc with "Ht") as "Hop".
       rewrite /uki_open2 /uki_open2_in.
-      iApply ("Hop" $! h m avail with "Hcode Hrun Hcwd [Hstd] Hcont").
+      iApply ("Hop" $! h m avail with "Hcode Hro [%] Hrun Hcwd [Hstd] Hcont");
+        [ exact Hargs | ].
       iRight. iFrame "Hstd Ht". }
-    iApply ("Hlf" $! h m ufd_l0 avail with "Hcode Hrun Hcwd Hstd HK").
+    iApply ("Hlf" $! h m ufd_l0 avail with "Hcode Hro [%] Hrun Hcwd Hstd HK");
+      [ exact Hargs | ].
     iIntros (h' ret) "Hans Hcwd Hrun".
     iApply ("Hcont" $! h' ret with "[Hans] Hcwd Hrun").
     iDestruct "Hans" as "[(_ & H & _) | [H Ht]]".

@@ -2051,3 +2051,11 @@ UConsLine.v
 # step's families are stated.  On UConsLine's mold; above AppEcho and
 # PinnedOpen, whose claim law and bundle it instantiates.
 UInitCons.v
+# UInitConsK = OPEN-PIN'S LAST STEP: /init's three console leaf BODIES
+# (UkInit.uki_open_absent_leaf / uki_open_console_leaf / uki_mknod_leaf)
+# DISCHARGED at echo's era -- the three udepwf_at suppliers at the pinned
+# xfams, the three walks through UkRunSys's receipt-keeping ecall leaves,
+# and init_cons_leaves_echo out of the era's record equation.  UInitSh's
+# sibling one syscall over; needs both UkInit and UInitCons, which cannot
+# see each other.
+UInitConsK.v

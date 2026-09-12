@@ -113,6 +113,16 @@ Section UkInitMain.
   Local Notation a5_idx := (mword_of_int 15 : mword 5).
   Local Notation a6_idx := (mword_of_int 16 : mword 5).
 
+  (* THE ARGUMENT ROWS THE THREE CONSOLE LEAVES TAKE.  A pinned open or
+     mknod is about the PATH in argument 0 and the mode words beside it,
+     so [UkInit.uki_open_absent_leaf] and its two siblings name them; each
+     is one register lookup through the chain of writes the walk built, and
+     the chain is closed by computation.  [unfold] the [set] names first --
+     [rewrite] does not see through a local definition. *)
+  Local Ltac argrow :=
+    repeat (rewrite upd_ne; [| vm_compute; discriminate ]);
+    rewrite upd_eq; apply bv_eq; vm_compute; reflexivity.
+
   (* init's four literals, by base.  Lengths: 18, 18, 21, 29. *)
   Local Notation LIT_START := 0x978.   (* "init: starting sh\n"            *)
   Local Notation LIT_FORK  := 0x990.   (* "init: fork failed\n"            *)
@@ -1636,8 +1646,12 @@ Section UkInitMain.
                   := regval_into_reg (mword_of_int 0x82 : mword 64)]> mr5b).
     assert (Hrar6 : mr6 !!! Regidx ra_idx = (mword_of_int 0x82 : mword 64))
       by exact (upd_eq mr5b (Regidx ra_idx) (regval_into_reg _)).
+    assert (Hargs6 : mr6 !!! Regidx a0_idx = (mword_of_int 0x970 : mword 64)
+                     /\ mr6 !!! Regidx a1_idx = (mword_of_int 2 : mword 64)).
+    { unfold mr6, mr5b, mr5a, mr5, mr4. split; argrow. }
     iApply ("Hop2" $! hr6 mr6 ((12 + (12 + (4 + n)))%nat)
-              with "Hcode Hrun Hcwd Hin").
+              with "Hcode Hro [%] Hrun Hcwd Hin");
+      [ exact Hargs6 | ].
     iIntros (hr7 rr2) "Hstd Hcwd Hrun".
     assert (Er6 : ret_pc (mr6 !!! Regidx ra_idx)
                   = (mword_of_int 0x82 : mword 64))
@@ -1779,8 +1793,13 @@ Section UkInitMain.
        PINNED bundle; under the taint there is no pin and the generic stub
        walks it. ---- *)
     iDestruct "Hin" as "[[Hstd HK] | [Hstd #HT]]".
-    - iApply ("Hmkl" $! hr3 mr3 ((12 + (12 + (4 + n)))%nat)
-                with "Hcode Hrun Hcwd HK").
+    - assert (Hargs3 : mr3 !!! Regidx a0_idx = (mword_of_int 0x970 : mword 64)
+                       /\ mr3 !!! Regidx a1_idx = (mword_of_int 1 : mword 64)
+                       /\ mr3 !!! Regidx a2_idx = (mword_of_int 0 : mword 64)).
+      { unfold mr3, mr2b, mr2a, mr2, mr1. split_and!; argrow. }
+      iApply ("Hmkl" $! hr3 mr3 ((12 + (12 + (4 + n)))%nat)
+                with "Hcode Hro [%] Hrun Hcwd HK");
+        [ exact Hargs3 | ].
       iIntros (hr4 rr1) "Hans Hcwd Hrun".
       rewrite Er3.
       iAssert (uki_open2 N T stc) with "[Hans]" as "Hop2".
@@ -2034,8 +2053,12 @@ Section UkInitMain.
     assert (Hram6 : mm6 !!! Regidx ra_idx = (mword_of_int 0x1a : mword 64))
       by exact (upd_eq mm5 (Regidx ra_idx) (regval_into_reg _)).
     (* ---- 0x16  the FIRST open, AT THE PIN THAT MISSES ---- *)
+    assert (Hargsm6 : mm6 !!! Regidx a0_idx = (mword_of_int 0x970 : mword 64)
+                      /\ mm6 !!! Regidx a1_idx = (mword_of_int 2 : mword 64)).
+    { unfold mm6, mm5, mm4, mm3. split; argrow. }
     iApply ("Habs" $! hm9 mm6 ufd_l0 ((12 + (12 + (4 + n)))%nat)
-              with "Hcode Hrun Hcwd Hstd HK").
+              with "Hcode Hro [%] Hrun Hcwd Hstd HK");
+      [ exact Hargsm6 | ].
     iIntros (hm10 ro) "Hans Hcwd Hrun".
     assert (Em6 : ret_pc (mm6 !!! Regidx ra_idx)
                   = (mword_of_int 0x1a : mword 64))
