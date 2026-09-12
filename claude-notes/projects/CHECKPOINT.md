@@ -233,3 +233,8 @@ wait to land.
 E2 phase 1 green (2026-09-12); phase 2 go-ahead with rulings (d)(e)(h)(i) (note
 "E2 INIT-BOOT PHASE 1 + RULINGS"); E2 will be red at the cwd seam until
 LAZY-FLAG-2 lands.
+
+TX-RECEIPT phase 1: design blocker at the mint (pid reuse) RULED (pid_reg slice
+in the UART invariant); `uvis_tx` key component ruled; PAUSED at a milestone
+commit until LAZY-FLAG-2 lands (shared sweep).  `-tlw` to host E4 SH-ECHO on
+`lane/supply-split-r1` meanwhile.

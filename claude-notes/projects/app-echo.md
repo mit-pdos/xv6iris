@@ -2404,6 +2404,32 @@ ORDER: GENERIC-PAY → CONS-SWALLOW → SH-LINE 2b (gets on `ush_gets_line`,
 `wp_uk_ecall_read_recv` with `upos` threaded read → gets_loop → gets → getcmd
 → main) → LAZY-FLAG (the owner's form of (A)).
 
+TX-RECEIPT PHASE 1 + RULINGS (2026-09-12; `-tlw`, `lane/tx-receipt`, 19 files
++760/-213, red at `ProofFilewrite.v:4675` only).  Landed: `tx_mine γ pid n0 l`
+(ghost_map pid ↦ (seed, own bytes)) with the tie `tx_mine_tie tg mine` (each
+entry's list = the `TxW pid` projection of the tagged trace from its seed)
+inside `uart_tagsE`; the THR leaf DEMANDS `tx_claim γ src n0 ml` (the token
+for `TxW`, `emp` otherwise) and returns it one byte longer; `tx_mine_exact`
+PRODUCES `uart_sent_exact_at` (the receipt TX-TAG stated without a producer);
+`cons_sent_cnt_exact` beside the sublist receipt; uartwrite/consolewrite thread
+the token; `tx_free src` on uartputc_sync/consputc.  THE BLOCKER: the MINT --
+pids are REUSED (`allocpid` re-picks against live slots; `PIDMAX = 1000`), and
+`ghost_map_insert`'s freshness `mine !! pid = None` is known only to the proc
+layer.  RULED FIX: the UART invariant holds a SLICE of `SlotGen.pid_reg pid`
+per issued entry (the quarters become a three-way split), `dev_inv` a
+persistent premise of SpecAllocproc/SpecFreeproc, allocproc deposits its slice
+and inserts at `(length tg, [])` (true of any trace: the seed is what makes
+the mint unconditional), freeproc reclaims and deletes, `proc_priv_core` gains
+`∃ n0 l, tx_mine fsc_uart pid n0 l` LAST.  R3 RULED: the transcript on the key,
+`uvis_tx : list (bv 8)` (PID-KEY precedent; rows identity except 16 = `tx ++
+bs`; row 16 = `filewrite_in … (uvis_pid W) (uvis_tx W)` with the console arm
+at `tx_mine`).  R4: `wp_uk_ecall_write_recv` on a ledger-fixed deposit at 16
+REPLACES `udepw_law 16` for init/sh/echo.  SEQUENCING: all of that shares
+LAZY-FLAG-2's sweep (block, key, rows, UkRunSys), so TX-RECEIPT PAUSES at a
+milestone commit and resumes with a rebase after LAZY-FLAG-2 lands.  ALSO:
+ECHO-RECEIPT (exact erase arms) is NOT needed for the theorem -- D3's input
+never contains ^H/^U/^D, so the filed-arm implication suffices.
+
 E2 INIT-BOOT PHASE 1 + RULINGS (2026-09-12; `-disc`, `lane/init-boot` on
 `lane/supply-split-r1`, build `e2boot25` green, 5 files +579/-44 + new
 `UInitBoot.v`).  Landed: THE SEAL -- `cons_seal_tok r := own r.2 (●ML [0])`,
