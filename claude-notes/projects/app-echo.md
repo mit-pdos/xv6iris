@@ -2404,6 +2404,29 @@ ORDER: GENERIC-PAY → CONS-SWALLOW → SH-LINE 2b (gets on `ush_gets_line`,
 `wp_uk_ecall_read_recv` with `upos` threaded read → gets_loop → gets → getcmd
 → main) → LAZY-FLAG (the owner's form of (A)).
 
+TWO UARTS (the owner's plan, 2026-09-12): xv6 and QEMU change to use two
+UARTs -- one for kernel messages (printk), one for the console, entirely under
+user-process control; NO mixing of kernel and user output.  CONSEQUENCES:
+the theorem is about the CONSOLE UART's wire only; D0 (waiting for the hart
+lines) and the boot-message SHUFFLE disappear from the discipline and the
+claim -- `good_out` becomes `∃ cs, obs_wire seg prefix_of sess cs (ins seg)`
+(the failure alternatives stay); the kernel-diagnostics admission (O5')
+dissolves (they are on the other wire); the prologue-tail subtlety in D1
+disappears (the prologue is pure console output); PRINTK-LEDGER/RENDER is not
+needed for the theorem (stopped; its pure rendering model may be kept on its
+branch); OUT-FUPD narrows to the CONSOLE UART: the application-fixed `out_ok`
+in the console UART's invariant, the store's view shift, the echo's Ψ fixed
+at boot through the console environment, the write path's Ψ from the process;
+printk stores to the kernel UART with no application justification.  NEEDS: a
+machine-model lane (second UART instance in DevModel/RiscvLang at its MMIO
+address, per-UART trace events or a per-UART wire, the device threads and
+adequacy), the kernel's own split (printk/panic → kernel UART; consputc/
+consoleintr/uartwrite → console UART), the re-dumped ELF/symbols and the
+re-proved touched functions, then a DISC-SIMPLIFY lane in EchoDisc.
+OPEN QUESTIONS for the owner: (a) who does the Rocq machine-model change and
+when; (b) which UART gets which role and MMIO address; (c) confirm the kernel
+UART is unconstrained by the theorem.
+
 THE OWNER'S REDESIGN OF THE UART OUTPUT SIDE (2026-09-12).  "There will be
 some pure theorem about the raw bytes, tagless.  That theorem will apply to
 the bytes output so far, maintained by the invariant.  Every output to the

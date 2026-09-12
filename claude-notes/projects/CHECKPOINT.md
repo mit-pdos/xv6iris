@@ -312,3 +312,9 @@ flight: OUT-FUPD p1 (main), E2 p2 (`-disc`), PRINTK-LEDGER-2 → rendering B/C
 (`-sup`), E4 p3 (`-tlw`).  COORDINATOR RULE: check `git branch --show-current` =
 main before any notes commit in the main checkout (two notes commits went onto
 lane/tx-receipt while an agent had it checked out; both cherry-picked to main).
+
+TWO UARTS (owner's plan, 2026-09-12): kernel messages on their own UART; the
+theorem is about the console UART only.  PRINTK-LEDGER-2 STOPPED; OUT-FUPD
+narrowed to the console UART (printk untouched).  Pending the owner: who
+changes the Rocq machine model; roles/addresses.  Then DISC-SIMPLIFY (drop D0,
+the shuffle, kernel_msgs).
