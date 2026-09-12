@@ -144,5 +144,7 @@ at a time (rebase on main, rebuild, re-gate) → LAZY-FLAG in main.
 TX-TAG LAUNCHED (2026-09-12) in the freed sibling `/shared/xv6iris-2-tlw` on
 `lane/tx-tag` from `2c0d32048` (brief `brief-tx-tag.md`; scope = the UART/
 console/printk layer + boot; the filewrite/row-16 relay is the next lane
-TX-RECEIPT).  Main: verify build `mainverify1` of the merged HEAD running; then
-LAZY-FLAG launches in main.
+TX-RECEIPT).  Main: verify build `mainverify1` of the merged HEAD GREEN (audit = the
+thirteen); LAZY-FLAG LAUNCHED in main (2026-09-12, brief `brief-lazy-flag.md`,
+based on `ed3d61934`).  Four lanes in flight: LAZY-FLAG (main), SUPPLY-SPLIT p2
+(`-sup`), DISC-RATE p1 (`-disc`), TX-TAG p1 (`-tlw`).
