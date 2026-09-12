@@ -2404,6 +2404,40 @@ ORDER: GENERIC-PAY → CONS-SWALLOW → SH-LINE 2b (gets on `ush_gets_line`,
 `wp_uk_ecall_read_recv` with `upos` threaded read → gets_loop → gets → getcmd
 → main) → LAZY-FLAG (the owner's form of (A)).
 
+LAZY-FLAG CORE LANDED + STORED-FORM FINDINGS (2026-09-12; the iris commit
+after `9692d108a`, 4 files +289/-11, build `lazy27`, audit = the thirteen).
+Landed: `UserPerm.lazy_free` and readings (`lazy_free_wmapped`,
+`lazy_free_mono`, …), `UserHeap.lazy_free_uw_addr`, `UsysMemOk.usys_lazy_keep`/
+`usys_sbrk_eager`/`usys_sbrk_lazy` (unwired).  BANKED: the stored form as
+`wx-briefs/lazy-flag-stored.patch` (25 files against `3169da98b`, compiling
+through UexecRet/UexecSG/UsysMemOk/ProcDefs; four mechanical reds: ProcInv's
+`proc_priv_split_cwd`, UexecApply's `uslot_key_cong`, UkStepGen's primed
+family, UkRun's `urun_close`; behind them the `ut_round_same` premise sites,
+UkFork, UkRunSys's 27 `uslot_bump_run` sites).  DESIGN FACTS: the invariant
+`pv_lazy = false -> lazy_free …` sits in `proc_priv_core` AFTER `tf_page`,
+OUTSIDE `proc_priv_bare` (the fs chain must not see it); `pv_lazy` goes LAST
+in `MkPPriv` (24 positional sites gain a trailing literal; fresh/dormant
+blocks at `true`, vacuous); `uvis_of` reads the block (no new argument) but
+`uvis_of_run` takes an explicit `lz` (the kernel's `UexecApply.uvis_run` and
+`user_trap_frame_trapped` pass the key's bit; the U tier passes `false`);
+`ukcq` is hardwired at `false` (L6 in one place); the sites that re-establish
+the invariant: vmfault arms (`lazy_free_mono`), growproc grow (dom equation
+`SpecGrowproc.v:138`), shrink (`uptd_del_run` + `um_below`), sbrk LAZY
+(`upd_lazy V true`), fork's child (uvmcopy's per-vpn correspondence via
+`KforkChild.urun_eq_kfork_child` + `pv_lazy Uc = pv_lazy Up`).  THE ONE
+BLOCKER: exec's proof does NOT keep the final table's domain --
+`KexecDefs.kexec_ok` names only `ud_tfp`, `KexecBuilt.kexec_built` stops at
+`perm_of`; the fact exists one level down (`SpecUvmalloc.v:137`'s dom
+equation, `ProofKexecB3.v:2807`'s `vpn_run` reasoning) -- so a `dom` row must
+be ADDED to `kexec_built` and relayed through `KexecBridge` (a row, not a
+re-proof); until then `upd_exec` sets `pv_lazy := true` (sound, vacuous) and
+L4 (`⌜uvis_lazy W' = false⌝` on exec's slot key) waits.  Also owed: sbrk's row
+needs `SpecSysSbrk.sys_sbrk_ok` to say which arm ran at the block level
+(`upd_lazy V true` on LAZY) and `sysc_sbrk_ok` to relay it.  PROCESS NOTE: a
+tree-wide `"false false" -> "false"` text collapse silently damaged 79 files
+(caught and repaired by a per-file diff filter) -- never collapse a literal
+token sequence tree-wide.
+
 APP-IFACE LANDED (2026-09-12; `40988622b` rebased onto main; 3 files
 +444/-79; build `iface21`, audit = the thirteen, lemma_diff CLEAN; the owner
 approved the diff).  `xv6_app.app_boot`; `Happ_boot : ⊢ app_xfer_boot_raw

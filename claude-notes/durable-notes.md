@@ -1321,3 +1321,11 @@ Introducing a whole conjunction of persistent wands with `iIntros "#Hdp"` (e.g.
 return -- `UInitKernel.v` sat 40 minutes at flat 1.1 GB RSS on that one tactic.
 Intro such a bundle LINEARLY (`iIntros "Hdp"`) or destructure it per conjunct
 (`iIntros "#(Hwr & Hwl15 & Hwl17)"`) so each piece answers on its own.
+
+## Never collapse a literal token sequence tree-wide (2026-09-12)
+
+A sweep script's global `"false false" -> "false"` substitution silently damaged
+79 unrelated files (every `… false false …` in the tree, not just the new
+trailing argument).  Restrict a textual substitution to the exact matched
+pattern (the lemma name and argument position), and diff every modified file
+against HEAD with a lane-content filter before building.
