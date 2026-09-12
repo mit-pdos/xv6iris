@@ -2404,6 +2404,39 @@ ORDER: GENERIC-PAY → CONS-SWALLOW → SH-LINE 2b (gets on `ush_gets_line`,
 `wp_uk_ecall_read_recv` with `upos` threaded read → gets_loop → gets → getcmd
 → main) → LAZY-FLAG (the owner's form of (A)).
 
+THE OWNER'S REDESIGN OF THE UART OUTPUT SIDE (2026-09-12).  "There will be
+some pure theorem about the raw bytes, tagless.  That theorem will apply to
+the bytes output so far, maintained by the invariant.  Every output to the
+UART will open that invariant and extend the sequence.  All UART output needs
+a fupd to justify outputting.  Ditch the uart_bytes_sub or whatever other
+resource we currently had for the append-only prefixes of the UART output
+sequence -- that's not a useful way to think about UART output in the
+application setting."  CONSEQUENCES: (1) TX-TAG's per-byte labels and
+TX-RECEIPT's per-writer tokens are WITHDRAWN as the attribution mechanism
+(TX-RECEIPT cancelled; its branch is history only; the landed tags are
+removed once nothing references them); (2) the sublist / located-prefix
+receipts (`uart_sent_sub`, `uart_sent_from`, `cons_sent_cnt*`, TX-TAG's `_at`
+variants) are RETIRED as the application-facing story; (3) the K-message
+LEDGER resource (PRINTK-LEDGER's milestone A) is dropped; what survives of
+that lane is the pinned rendering (printint's digits, printk's bytes), since
+a printk site can only justify its bytes if it knows them; (4) THE NEW
+MECHANISM, lane OUT-FUPD: the UART invariant carries an application-fixed
+pure predicate `P : (input histories) -> (accepted bytes) -> Prop` over the
+receive column it already has and `uart_acc u`; the ONE lemma modelling a
+store to the transmit register takes a view shift from its caller `∀ hs acc,
+⌜P hs acc⌝ ∗ … ={⊤ ∖ ↑uartN}=∗ ⌜P hs (acc ++ [b])⌝ ∗ Φ` -- the writer proves
+AT THE STORE, with its own private resources in the closure, that its byte
+keeps `P`; printk, consputc/consoleintr's echo and uartwrite/consolewrite
+thread the caller's shift and return its `Φ`; the kernel's own printk sites
+get theirs from the environment (`printk_env`, an era appender fixed at
+boot); the application chooses `P` at boot as it fixes `riscv_rx_tag`, and
+keeps whatever WITNESS it likes (per-process transcripts, the boot-message
+decomposition) as its own private ghost state, updated inside its shifts --
+attribution is application-private knowledge, not invariant data; the wire
+is a prefix of the accepted sequence, so a prefix-closed `P` transfers to
+the theorem's raw bytes.  E5's `good_out` is such a `P` (with the per-cycle
+input read off the receive column).
+
 OWNER'S RULING ON PRINTK'S CONTRACT (2026-09-12): "the printk spec should
 require a fupd to append to the UART output resource".  So printk does not
 take a ledger lower bound in and hand one back; the CALLER supplies a view

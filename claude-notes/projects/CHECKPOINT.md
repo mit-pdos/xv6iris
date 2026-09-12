@@ -296,3 +296,10 @@ PRINTK-LEDGER-2 A (`-sup`), E4 p3 (`-tlw`).
 TX-RECEIPT resumed in main (rebase clean, `9de28358a`); the pid_reg SLICE is
 unbuildable (wchG layering) → RULED the DOMAIN SHADOW (`tx_dom` halves in the
 UART invariant and the pid lock's payload); R1 proceeds.
+
+OWNER'S REDESIGN (2026-09-12): tagless raw-byte theorem; ONE invariant with an
+application-fixed pure predicate over (rx history, accepted bytes); EVERY UART
+output opens it via a caller-supplied fupd; the sublist/prefix receipts and the
+tags are retired.  TX-RECEIPT CANCELLED (branch = history).  PRINTK-LEDGER-2
+redirected: revert the ledger, keep rendering (milestones B/C).  New lane
+OUT-FUPD (brief being written) runs in main.
