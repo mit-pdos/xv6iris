@@ -357,7 +357,26 @@ Section UkInit.
      is what the whole lane is for: the node exists, so the SECOND open's
      leaf is available.  On failure the credential comes back -- and then
      the second open is the MISS leaf again, and fd 0 stays closed. *)
-  Definition uki_mknod_leaf (T K : iProp Σ) (stc : fdstate) : iProp Σ :=
+  (* WHAT THE MKNOD LEAVES, as ONE resource (lane E2).  Three arms:
+     the node exists now, so the SECOND open's leaf is available; the call
+     failed and what comes back is SOME credential with its own miss leaf
+     (at the KEY arm that is the SEAL -- [AppEcho.cons_never] -- and not
+     the key, because /init will not try again and sh's own first open has
+     to be able to miss too: lane SH-OPEN); or the taint.
+
+     [Cns] RIDES THE FIRST TWO ARMS.  It is the console credential /init's
+     exec of sh hands on ([UkSh.ush_fd0]'s pin side, SH-OPEN's
+     [ush_cons_in]), and WHICH credential it is is decided HERE and not at
+     /init's entry -- the mknod's outcome is what decides it.  Abstract at
+     this tier for the reason every application fact is
+     ([UConsLine.v:202]: THE PROGRAM TIER NAMES NO APPLICATION); the taint
+     arm carries none because [init_cons_sup]'s second law pays it. *)
+  Definition uki_mknod_out (T Cns : iProp Σ) (stc : fdstate) : iProp Σ :=
+    ((uki_open_console_leaf T stc ∗ Cns)
+     ∨ (∃ K' : iProp Σ, □ uki_open_absent_leaf T K' ∗ K' ∗ Cns)
+     ∨ T)%I.
+
+  Definition uki_mknod_leaf (T K Cns : iProp Σ) (stc : fdstate) : iProp Σ :=
     (∀ (h : CpuId) (m : regfile) (avail : nat),
        init_code γt -∗
        (* the read-only image and the THREE argument words: a0 = "console"
@@ -372,7 +391,7 @@ Section UkInit.
        UserCwd.ucwd γcwd FsImg.ROOTINO -∗
        K -∗
        (∀ (h' : CpuId) (ret : mword 64),
-          (uki_open_console_leaf T stc ∨ K ∨ T) -∗
+          uki_mknod_out T Cns stc -∗
           UserCwd.ucwd γcwd FsImg.ROOTINO -∗
           urun N h'
             (<[Regidx a0_idx := ret]>
@@ -387,8 +406,8 @@ Section UkInit.
      -- [AppInv.app_inv], the [□] claim law and
      [UInitCons.init_cons_abs_law] -- so the bundle is a [□] and threads
      through the restart loop's [iLöb] the way [init_exec_sup] does. *)
-  Definition init_cons_leaves (T K : iProp Σ) (stc : fdstate) : iProp Σ :=
-    (□ uki_open_absent_leaf T K ∗ □ uki_mknod_leaf T K stc)%I.
+  Definition init_cons_leaves (T K Cns : iProp Σ) (stc : fdstate) : iProp Σ :=
+    (□ uki_open_absent_leaf T K ∗ □ uki_mknod_leaf T K Cns stc)%I.
 
   (* WHAT THE FIRST OPEN LEAVES, as ONE resource: the call returned [-1]
      (the pure half is read at the [blt] and dropped), so the ledger and the
@@ -430,9 +449,97 @@ Section UkInit.
           WP (Loop : expr riscv_lang)) -∗
        WP (Loop : expr riscv_lang))%I.
 
-  Global Instance init_cons_leaves_persistent T K stc :
-    Persistent (init_cons_leaves T K stc).
+  Global Instance init_cons_leaves_persistent T K Cns stc :
+    Persistent (init_cons_leaves T K Cns stc).
   Proof. rewrite /init_cons_leaves. apply _. Qed.
+
+  (* ===================================================================== *)
+  (* THE OTHER ARM OF THE CONSOLE DANCE (lane E2): THE VIEW ALREADY HAS      *)
+  (* THE NODE.                                                              *)
+  (*                                                                        *)
+  (* Everything above is /init's dance when its FIRST open MISSES, and that  *)
+  (* is one of the two states the application's boot resource can be in      *)
+  (* ([AppEcho.echo_boot] is [cons_key r ∨ ∃ i, cons_made r i], and THE ARM  *)
+  (* IS DECIDED BY THE VIEW, never by the era: era 0's image carries no      *)
+  (* device node, but any later era's view does once /init's mknod           *)
+  (* committed).  At the FLAG arm the first open HITS, so                    *)
+  (* [uki_open_absent_leaf] -- whose post says the call returned [-1] -- is  *)
+  (* not provable and must not be what the walk's first open takes.  What it *)
+  (* takes there is [uki_open_console_leaf], the SAME leaf as the second     *)
+  (* open at the miss arm: the node is there, the pin resolves, and the      *)
+  (* three arms are fd 0 / the allocation failed / the taint.                *)
+  (*                                                                        *)
+  (* THE REPAIR ARM IS STILL WALKED AT THE FLAG, and that is the whole       *)
+  (* reason this is a PAIR and not a single leaf: /init proves nothing about *)
+  (* [filealloc]/[fdalloc] succeeding (app-echo.md, OPEN-PIN FINDINGS, FACT  *)
+  (* 3), so the first open can return [-1] with the node present, the [blt]  *)
+  (* at 0x1a takes the repair arm, and the mknod at 0x64 runs -- against a   *)
+  (* view that ALREADY HAS `console` in the root, where [create] finds the   *)
+  (* entry and returns 0, so the call fails and nothing commits.  The leaf   *)
+  (* for it therefore takes NO credential and always hands the console leaf  *)
+  (* back: the node was there before the call and is there after it.         *)
+  (* ===================================================================== *)
+  Definition uki_mknod_hit_leaf (T Cns : iProp Σ) (stc : fdstate) : iProp Σ :=
+    (∀ (h : CpuId) (m : regfile) (avail : nat),
+       init_code γt -∗
+       init_rodata γt -∗
+       ⌜ m !!! Regidx a0_idx = (mword_of_int 0x970 : mword 64)
+         /\ m !!! Regidx a1_idx = (mword_of_int 1 : mword 64)
+         /\ m !!! Regidx a2_idx = (mword_of_int 0 : mword 64) ⌝ -∗
+       urun N h m (mword_of_int InitSyms.mknod) avail -∗
+       UserCwd.ucwd γcwd FsImg.ROOTINO -∗
+       (∀ (h' : CpuId) (ret : mword 64),
+          uki_mknod_out T Cns stc -∗
+          UserCwd.ucwd γcwd FsImg.ROOTINO -∗
+          urun N h'
+            (<[Regidx a0_idx := ret]>
+               (<[Regidx a7_idx := (mword_of_int 17 : mword 64)]> m))
+            (ret_pc (m !!! Regidx ra_idx)) avail -∗
+          WP (Loop : expr riscv_lang)) -∗
+       WP (Loop : expr riscv_lang))%I.
+
+  (* THE THREE WAYS TO GET ONE, and they are the three states /init's
+     repair arm can be in: the MISS route spends its credential in the
+     pinned leaf; the FLAG route already has one; and under the taint
+     there is no pin at all and the generic stub walks the call, paid by
+     17's deposit off the taint. *)
+  Lemma uki_mknod_hit_of_leaf (T K Cns : iProp Σ) (stc : fdstate) :
+    uki_mknod_leaf T K Cns stc -∗ K -∗ uki_mknod_hit_leaf T Cns stc.
+  Proof.
+    iIntros "Hl HK" (h m avail) "#Hcode #Hro %Hargs Hrun Hcwd Hcont".
+    iApply ("Hl" $! h m avail with "Hcode Hro [%] Hrun Hcwd HK Hcont").
+    exact Hargs.
+  Qed.
+
+
+  (* ...AND THE PAIR THE FLAG ARM CARRIES FROM THE ENTRY, [init_cons_leaves]'
+     twin: the first open's leaf is the CONSOLE one and the repair's mknod
+     needs no credential. *)
+  Definition init_cons_hit (T Cns : iProp Σ) (stc : fdstate) : iProp Σ :=
+    (□ uki_open_console_leaf T stc ∗ □ uki_mknod_hit_leaf T Cns stc ∗ Cns)%I.
+
+  (* THE CONSOLE DANCE, AS ONE ENTRY PREMISE.  This is what
+     [UInitKernel.init_uexec_slot] takes in place of the pair
+     [init_cons_leaves T K stc] and [K]: the arm the application's boot
+     resource decided, WITH its credential inside it -- so the constructor
+     no longer carries a [K] parameter that only one of the two arms has.
+     LINEAR, because the miss arm's credential is exclusive; the leaves
+     inside both arms are persistent, which is what lets one dance serve
+     every round of the restart loop's [iLob]. *)
+  Definition init_cons_dance (T Cns : iProp Σ) (stc : fdstate) : iProp Σ :=
+    ((∃ K : iProp Σ, init_cons_leaves T K Cns stc ∗ K)
+     ∨ init_cons_hit T Cns stc)%I.
+
+  Lemma init_cons_dance_miss (T K Cns : iProp Σ) (stc : fdstate) :
+    init_cons_leaves T K Cns stc -∗ K -∗ init_cons_dance T Cns stc.
+  Proof.
+    iIntros "#Hl HK". rewrite /init_cons_dance. iLeft.
+    iExists K. iFrame "Hl HK".
+  Qed.
+
+  Lemma init_cons_dance_hit (T Cns : iProp Σ) (stc : fdstate) :
+    init_cons_hit T Cns stc -∗ init_cons_dance T Cns stc.
+  Proof. iIntros "Hh". rewrite /init_cons_dance. by iRight. Qed.
 
   (* ===================================================================== *)
   (* THE DEPOSITS /init OWES (lane SUPPLY-SPLIT, P4), as ONE persistent      *)
@@ -538,6 +645,95 @@ Section UkInit.
     { iApply (uis_init_3c0 with "Hcode"). }
     iIntros (h3) "Hrun".
     iApply ("Hcont" $! h3 ret with "Hrun").
+  Qed.
+
+  Lemma uki_mknod_hit_of_taint (T Cns : iProp Σ) `{!Persistent T}
+      (stc : fdstate) :
+    □ (T -∗ udepw_law 17) -∗ T -∗ uki_mknod_hit_leaf T Cns stc.
+  Proof.
+    iIntros "#Hwl #Ht" (h m avail) "#Hcode #Hro %Hargs Hrun Hcwd Hcont".
+    iDestruct ("Hwl" with "Ht") as "#Hwr17".
+    iApply (wp_kinit_mknod h m avail with "Hwr17 Hcode Hrun").
+    iIntros (h' ret) "Hrun".
+    iApply ("Hcont" $! h' ret with "[] Hcwd Hrun").
+    rewrite /uki_mknod_out. iRight. iRight. iExact "Ht".
+  Qed.
+
+  (* ===================================================================== *)
+  (* THE FIRST open, AT EITHER ARM OF THE DANCE -- ONE SHAPE, so /init's     *)
+  (* walk is written once.                                                  *)
+  (*                                                                        *)
+  (* The two arms of [init_cons_dance] differ in WHICH leaf answers the      *)
+  (* call at 0x16 (the MISS leaf at the key, or the CONSOLE leaf at the      *)
+  (* flag) and in nothing else: the [blt] at 0x1a reads the return value,    *)
+  (* the repair arm at 0x64 needs a mknod step, and the fall-through at      *)
+  (* 0x1e needs the head.  So both are collapsed to THIS post before the     *)
+  (* call, and the walk below sees three arms at either era.                 *)
+  (*                                                                        *)
+  (* THE MKNOD STEP RIDES THE TWO ARMS THAT REACH THE REPAIR.  At the miss   *)
+  (* arm it is the pinned leaf with the credential already spent into it;    *)
+  (* at the taint it is the generic stub off 17's deposit; at the flag's     *)
+  (* own [-1] arm (the open failed at [filealloc]/[fdalloc], about which     *)
+  (* /init proves NOTHING) it is the credential-free leaf.                   *)
+  (* ===================================================================== *)
+  Definition uki_open1_out (T Cns : iProp Σ) (stc : fdstate)
+      (ret : mword 64) : iProp Σ :=
+    ((⌜ret = (mword_of_int 0 : mword 64)⌝ ∗ ustd γfd (ufd_l1 stc) ∗ Cns)
+     ∨ (⌜ret = (mword_of_int (-1) : mword 64)⌝ ∗ ustd γfd ufd_l0
+        ∗ uki_mknod_hit_leaf T Cns stc)
+     ∨ (ustd_any γfd ∗ T ∗ uki_mknod_hit_leaf T Cns stc))%I.
+
+  Definition uki_open1 (T Cns : iProp Σ) (stc : fdstate) : iProp Σ :=
+    (∀ (h : CpuId) (m : regfile) (avail : nat),
+       init_code γt -∗
+       init_rodata γt -∗
+       ⌜ m !!! Regidx a0_idx = (mword_of_int 0x970 : mword 64)
+         /\ m !!! Regidx a1_idx = (mword_of_int 2 : mword 64) ⌝ -∗
+       urun N h m (mword_of_int InitSyms.open) avail -∗
+       UserCwd.ucwd γcwd FsImg.ROOTINO -∗
+       ustd γfd ufd_l0 -∗
+       (∀ (h' : CpuId) (ret : mword 64),
+          uki_open1_out T Cns stc ret -∗
+          UserCwd.ucwd γcwd FsImg.ROOTINO -∗
+          urun N h'
+            (<[Regidx a0_idx := ret]>
+               (<[Regidx a7_idx := (mword_of_int 15 : mword 64)]> m))
+            (ret_pc (m !!! Regidx ra_idx)) avail -∗
+          WP (Loop : expr riscv_lang)) -∗
+       WP (Loop : expr riscv_lang))%I.
+
+  Lemma uki_open1_of_dance (T Cns : iProp Σ) `{!Persistent T}
+      (stc : fdstate) :
+    init_deps T -∗ init_cons_dance T Cns stc -∗ uki_open1 T Cns stc.
+  Proof.
+    iIntros "Hdp Hd".
+    iDestruct "Hdp" as "#(_ & _ & Hwl17)".
+    iIntros (h m avail) "#Hcode #Hro %Hargs Hrun Hcwd Hstd Hcont".
+    iDestruct "Hd" as "[[%K [[#Habs #Hmkl] HK]] | (#Hcl0 & #Hmklh & HC)]".
+    - (* THE MISS ROUTE: the first open is the dead walk, and it returns -1 *)
+      iApply ("Habs" $! h m ufd_l0 avail
+                with "Hcode Hro [%] Hrun Hcwd Hstd HK"); [ exact Hargs | ].
+      iIntros (h' ret) "Hans Hcwd Hrun".
+      iApply ("Hcont" $! h' ret with "[Hans] Hcwd Hrun").
+      rewrite /uki_open1_out.
+      iDestruct "Hans" as "[(%Hr & Hstd & HK) | [Hstd #HT]]".
+      + iRight. iLeft. iSplitR; [ by iPureIntro | ]. iFrame "Hstd".
+        iApply (uki_mknod_hit_of_leaf T K Cns stc with "Hmkl HK").
+      + iRight. iRight. iFrame "Hstd HT".
+        iApply (uki_mknod_hit_of_taint T Cns stc with "Hwl17 HT").
+    - (* THE FLAG ROUTE: the node is there, so the first open is the PINNED
+         one -- the same leaf as the miss route's SECOND open. *)
+      iApply ("Hcl0" $! h m avail
+                with "Hcode Hro [%] Hrun Hcwd Hstd"); [ exact Hargs | ].
+      iIntros (h' ret) "Hans Hcwd Hrun".
+      iApply ("Hcont" $! h' ret with "[Hans HC] Hcwd Hrun").
+      rewrite /uki_open1_out.
+      iDestruct "Hans" as "[(%Hr & Hstd) | [(%Hr & Hstd) | [Hstd #HT]]]".
+      + iLeft. iSplitR; [ by iPureIntro | ]. iFrame "Hstd HC".
+      + iRight. iLeft. iSplitR; [ by iPureIntro | ]. iFrame "Hstd".
+        iExact "Hmklh".
+      + iRight. iRight. iFrame "Hstd HT".
+        iApply (uki_mknod_hit_of_taint T Cns stc with "Hwl17 HT").
   Qed.
 
   Lemma wp_kinit_dup (h : CpuId) (m : regfile) (avail : nat) :
@@ -1188,6 +1384,29 @@ Section UkInit.
   Global Instance init_exec_sup_lend_persistent cn T st :
     Persistent (init_exec_sup_lend cn T st).
   Proof. rewrite /init_exec_sup_lend. apply _. Qed.
+
+  (* ...AND THE SAME SUPPLY AS A WAND FROM THE CONSOLE CREDENTIAL (lane E2).
+     The exec'd shell's entry is told which console state its parent left
+     ([UkSh.ush_fd0] / SH-OPEN's [ush_cons_in]), and WHICH one that is is
+     decided by /init's own mknod -- MID-WALK, not at the entry.  So what
+     the entry carries is not the supply but a WAND from the credential to
+     it, applied once the console dance has settled, plus the law that
+     pays it under the taint (where the shell proves nothing anyway).
+     Both halves are [□], so the restart loop applies them per round. *)
+  Definition init_cons_sup (cn : cons_names) (T Cns : iProp Σ)
+      (st : fdstate) : iProp Σ :=
+    (□ (Cns -∗ init_exec_sup_lend cn T st) ∗ □ (T -∗ Cns))%I.
+
+  Global Instance init_cons_sup_persistent cn T Cns st :
+    Persistent (init_cons_sup cn T Cns st).
+  Proof. rewrite /init_cons_sup. apply _. Qed.
+
+  Lemma init_cons_sup_taint (cn : cons_names) (T Cns : iProp Σ)
+      (st : fdstate) :
+    init_cons_sup cn T Cns st -∗ T -∗ init_exec_sup_lend cn T st.
+  Proof.
+    iIntros "[#Hw #Ht] HT". iApply "Hw". iApply ("Ht" with "HT").
+  Qed.
 
   (* ...AND THE LEAF IS CWD-INDEXED.  [UkRunSys.wp_uk_ecall_exec_at_cwd]
      takes the program's own half of its working directory beside the

@@ -45,6 +45,9 @@ Require Import UexecCond.       (* [cond_entry_slot] -- the plain generic slot *
 Require Import FirstTok.        (* in the require block for FsAbsInvFire's
                                    sake; nothing here names its [fsabs_env] *)
 Require Import UexecExecInst.   (* the class INSTANCE: [uexecSG_xv6] / [uprogSG_gen] *)
+Require Import FsAbsInvFire.    (* [fsabs_open_in] / [fsabs_mknod_pre]: the two
+                                   branches the supply pays update-free *)
+Require Import UsysMemOk.       (* [USYS_exec] *)
 Require Import RegFile.         (* [regfile] -- [udepw]'s register argument *)
 Require Import UkRun.           (* [udep] -- the supplier and its key-free law *)
 Require Import AppInv.          (* [app_sup] -- the credential both mints take *)
@@ -109,6 +112,71 @@ Section UexecExecMint.
     intros Hn.
     exact (udepw_of_psok (PS := uprogSG_free) N m pc n Hn
              (proj1 Hn)).
+  Qed.
+
+  (* ===================================================================== *)
+  (* ...AND THE DEPOSIT FOR ONE NUMBER THE FREE INSTANCE DOES NOT ADMIT,     *)
+  (* OUT OF THE SUPPLY (lane E2).  [UkInit.init_deps] is three named         *)
+  (* deposits, and two of them -- open(15) and mknod(17) -- are owed only ON *)
+  (* THE TAINT ARMS: with its credential in hand /init walks both calls      *)
+  (* through the PINNED leaves, and the arms where it has none walk the      *)
+  (* generic stub, which is exactly what the application's supply pays for.  *)
+  (* So what the era owes is [□ (T -∗ udepw_law n)], and this is its         *)
+  (* second half ([AppEcho.echo_sup_of_taint] is the first).                 *)
+  (*                                                                        *)
+  (* WHY IT IS NOT [UkRun.udepw_of_psok] AND NOT [udep_dep]: the first needs *)
+  (* [psok n], and at the verified instance [UexecSG.free_num] excludes 15   *)
+  (* and 17 by construction (their branches move the abstract state); the    *)
+  (* second produces the bundle UNDER A BASIC UPDATE, and [UkRun.udepw]'s    *)
+  (* explicit disjunct is update-free.  Both branches are in fact update-    *)
+  (* free at the supply ([UexecExecInst.xv6_sbundle_of_supply_ne] introduces *)
+  (* the [==∗] on them and on nothing else), so the two are read straight    *)
+  (* off [FsAbsInvFire].                                                     *)
+  (*                                                                        *)
+  (* THE PROGRAM'S INSTANCE IS A PARAMETER: the law is about the RIGHT       *)
+  (* disjunct, which mentions no [psok], so it holds at whichever [uprogSG]  *)
+  (* the taking program runs at ([uprogSG_free] for /init).                  *)
+  (* ===================================================================== *)
+  Lemma udepw_of_sup `{PSx : uprogSG Σ} (N : uk_names Σ) (m : regfile)
+      (pc : mword 64) (n : Z) :
+    n = 15 \/ n = 17 -> app_sup -∗ udepw (PS := PSx) N m pc n.
+  Proof.
+    intros Hn. iIntros "#Hsup".
+    rewrite /udepw. iIntros (M pm sz fdv cw gn cs pidv) "#Hmp Hheap Hufd".
+    iFrame "Hheap Hufd". iRight.
+    rewrite /sbundle_pay. iExists (xfam_at (ukn_pay N) xfam_pt).
+    iSplitR; [ done | ].
+    rewrite /sbundle_at /= /xv6_sbundle /xfam_at /xfam_pt /xfam_exec /=.
+    destruct Hn as [-> | ->].
+    - destruct (decide ((15 : Z) = UsysMemOk.USYS_exec)) as [He | _];
+        [ exfalso; discriminate He | ].
+      destruct (decide ((15 : Z) = 5)) as [He | _];
+        [ exfalso; discriminate He | ].
+      destruct (decide ((15 : Z) = 9)) as [He | _];
+        [ exfalso; discriminate He | ].
+      destruct (decide ((15 : Z) = 15)) as [_ | Hc];
+        [ | exfalso; exact (Hc eq_refl) ].
+      iApply (fsabs_open_in with "Hsup").
+    - destruct (decide ((17 : Z) = UsysMemOk.USYS_exec)) as [He | _];
+        [ exfalso; discriminate He | ].
+      destruct (decide ((17 : Z) = 5)) as [He | _];
+        [ exfalso; discriminate He | ].
+      destruct (decide ((17 : Z) = 9)) as [He | _];
+        [ exfalso; discriminate He | ].
+      destruct (decide ((17 : Z) = 15)) as [He | _];
+        [ exfalso; discriminate He | ].
+      destruct (decide ((17 : Z) = 16)) as [He | _];
+        [ exfalso; discriminate He | ].
+      destruct (decide ((17 : Z) = 17)) as [_ | Hc];
+        [ | exfalso; exact (Hc eq_refl) ].
+      iApply (fsabs_mknod_pre with "Hsup").
+  Qed.
+
+  Lemma udepw_law_of_sup `{PSx : uprogSG Σ} (n : Z) :
+    n = 15 \/ n = 17 -> app_sup -∗ udepw_law (PS := PSx) n.
+  Proof.
+    intros Hn. iIntros "#Hsup". rewrite /udepw_law.
+    iIntros "!>" (N m pc). iApply (udepw_of_sup N m pc n Hn with "Hsup").
   Qed.
 
   (* the loop's mint: the generic slot at every key, out of the supply.

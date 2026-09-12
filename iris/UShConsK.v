@@ -283,7 +283,7 @@ Section UShConsK.
               with "[] [] Hrun Hcwd [] Hstd").
     { iApply (UCodeShK.uis_shk_cc8 with "Hcode"). }
     { iApply (shk_rodata_img with "Hro"). }
-    { iApply (cons_sup_console N T K r i UCodeShK.shk_ro
+    { iApply (cons_sup_console N cons_absent T K r i UCodeShK.shk_ro
                 (mword_of_int UkSh.sh_cons_pv) m1 (mword_of_int 0xcc8)
                 HPT HTT (fun M H => sh_cons_path_of M H) Ha0' Ha1'
                 with "Hlaws Hmade Hinv [Hro]").

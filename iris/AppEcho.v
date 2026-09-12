@@ -369,6 +369,85 @@ Section EchoPred.
   Global Instance cons_key_timeless r : Timeless (cons_key r).
   Proof. rewrite /cons_key. apply _. Qed.
 
+  (* ...AND WHAT THE KEY BECOMES WHEN /init's MKNOD FAILS: THE SEAL.
+     app-echo.md, lane SH-OPEN's finding -- sh's own console preamble has
+     to be able to prove ITS first [open] misses, and sh cannot hold the
+     key (it is exclusive, and it would have to cross init's [box]-ed exec
+     supply).  So on the repair arm's failure /init SPENDS the key into
+     the claim: the key's own name is advanced from [[]] to [[0]], the
+     AUTHORITY at [[0]] goes into a fourth, SEALED-ABSENT arm of
+     [cons_state], and the LOWER BOUND at [[0]] -- persistent -- is handed
+     out as [cons_never].
+
+     WHY THE SEAL LIVES AT THE KEY'S NAME [r.2] AND NOT AT THE FLAG'S
+     [r.1] AT A SENTINEL INUM: a sentinel in the flag would have to be
+     refuted against the PRESENT arms, whose inum is existential and which
+     nothing constrains to be non-negative, so "the sentinel is not an
+     inum" is not provable.  At the key's name it is one exclusion and no
+     arithmetic: every PRESENT arm holds [cons_key r = ●ML []] at [r.2],
+     and a lower bound at [[0]] does not compose with it.
+
+     ABSENCE IS STABLE UNDER THE SEAL because law (f) -- the only step
+     that puts the console under `console` at the root -- DEMANDS the key,
+     and after the seal nobody holds one.  A power cycle does not inherit
+     the seal: the transport mints a FRESH key for the clone at every
+     view whose [cons_inum] is [[]], so a sealed era does not seal the
+     next. *)
+  Definition cons_seal_tok (r : echo_names) : iProp Σ :=
+    own r.2 (●ML ([0] : list (leibnizO Z))).
+
+  (* THE CREDENTIAL: "the console will never be made at this instance",
+     persistent, and it is what [UInitCons.init_cons_abs_law] is
+     instantiated at once /init's mknod has failed. *)
+  Definition cons_never (r : echo_names) : iProp Σ :=
+    own r.2 (◯ML ([0] : list (leibnizO Z))).
+
+  Global Instance cons_never_persistent r : Persistent (cons_never r).
+  Proof. rewrite /cons_never. apply _. Qed.
+  Global Instance cons_never_timeless r : Timeless (cons_never r).
+  Proof. rewrite /cons_never. apply _. Qed.
+  Global Instance cons_seal_tok_timeless r : Timeless (cons_seal_tok r).
+  Proof. rewrite /cons_seal_tok. apply _. Qed.
+
+  (* the two exclusions the sealed arm is read by: an UNSEALED key refutes
+     it, and so does a second seal *)
+  Lemma cons_key_never_False (r : echo_names) :
+    cons_key r -∗ cons_never r -∗ False.
+  Proof.
+    rewrite /cons_key /cons_never. iIntros "Ha Hb".
+    iDestruct (own_valid_2 with "Ha Hb") as %Hv%mono_list_both_valid_L.
+    iPureIntro. destruct Hv as [k Hk]. by destruct k; simplify_eq/=.
+  Qed.
+
+  Lemma cons_key_seal_False (r : echo_names) :
+    cons_key r -∗ cons_seal_tok r -∗ False.
+  Proof.
+    rewrite /cons_key /cons_seal_tok. iIntros "Ha Hb".
+    iDestruct (own_valid_2 with "Ha Hb") as %Hv.
+    iPureIntro. apply mono_list_auth_dfrac_op_valid_L in Hv.
+    destruct Hv as [Hd _]. exact (exclusive_l (DfracOwn 1) (DfracOwn 1) Hd).
+  Qed.
+
+  (* the seal's snapshot, and the update that takes it: [cons_shoot]'s
+     twin at the key's name *)
+  Lemma cons_seal_never (r : echo_names) :
+    cons_seal_tok r -∗ cons_seal_tok r ∗ cons_never r.
+  Proof.
+    rewrite /cons_seal_tok /cons_never. iIntros "Ha".
+    iDestruct (own_mono _ _ (◯ML ([0] : list (leibnizO Z)))
+                 with "Ha") as "#Hb"; [ apply mono_list_included |].
+    iFrame "Ha Hb".
+  Qed.
+
+  Lemma cons_seal (r : echo_names) :
+    cons_key r ==∗ cons_seal_tok r ∗ cons_never r.
+  Proof.
+    rewrite /cons_key /cons_seal_tok. iIntros "Ha".
+    iMod (own_update _ _ (●ML ([0] : list (leibnizO Z))) with "Ha") as "Ha".
+    { apply mono_list_update. apply prefix_nil. }
+    iModIntro. iApply (cons_seal_never r with "Ha").
+  Qed.
+
   Lemma cons_key_excl (r : echo_names) : cons_key r -∗ cons_key r -∗ False.
   Proof.
     rewrite /cons_key. iIntros "Ha Hb".
@@ -460,10 +539,17 @@ Section EchoPred.
      /sh's row stays -- an unlink of either is a view move no verified
      program of this application pays for, and the generic slot's payer
      ([AppInv.app_sup]) is tainted by construction. *)
+  (* ...AND A FOURTH, SEALED-ABSENT (lane SH-OPEN's finding): the console
+     is not there, nobody made it, AND THE KEY HAS BEEN SPENT -- /init's
+     repair mknod failed and it will not try again, so the state can no
+     longer move to a PRESENT one.  The arm holds the SEALED key
+     authority; the persistent [cons_never] a holder reads it by is what
+     sh's own first open runs on. *)
   Definition cons_state (r : echo_names) (av : aview) : iProp Σ :=
     ((⌜cons_absent av⌝ ∗ cons_tok r)
      ∨ (∃ i : Z, ⌜cons_present_at i av⌝ ∗ cons_key r ∗ cons_tok r)
-     ∨ (∃ i : Z, ⌜cons_present_at i av⌝ ∗ cons_key r ∗ cons_shot r i))%I.
+     ∨ (∃ i : Z, ⌜cons_present_at i av⌝ ∗ cons_key r ∗ cons_shot r i)
+     ∨ (⌜cons_absent av⌝ ∗ cons_tok r ∗ cons_seal_tok r))%I.
 
   Global Instance cons_state_timeless r av : Timeless (cons_state r av).
   Proof. rewrite /cons_state. apply _. Qed.
@@ -515,7 +601,7 @@ Section EchoPred.
     iDestruct "Hp" as "[#Ht | [%Hpins Hcs]]".
     { iSplitR; [ iLeft; iExact "Ht" |]. iRight. iExact "Ht". }
     rewrite /cons_state.
-    iDestruct "Hcs" as "[[%Hab Htok] | [Hc | Hc]]".
+    iDestruct "Hcs" as "[[%Hab Htok] | [Hc | [Hc | [%Hab4 [Htok Hseal]]]]]".
     - iDestruct (cons_tok_made_False r i with "Htok Hm") as %[].
     - iDestruct "Hc" as (j) "(%Hpr & Hkey & Htok)".
       iDestruct (cons_tok_made_False r i with "Htok Hm") as %[].
@@ -524,8 +610,10 @@ Section EchoPred.
       subst i.
       iSplitL "Hsh Hkey".
       + iRight. iSplitR; [ by iPureIntro |]. rewrite /cons_state.
-        iRight. iRight. iExists j. iFrame "Hkey Hsh". by iPureIntro.
+        iRight. iRight. iLeft. iExists j. iFrame "Hkey Hsh". by iPureIntro.
       + iLeft. by iPureIntro.
+    - (* SEALED-ABSENT: the token is still unspent, so the flag refutes it *)
+      iDestruct (cons_tok_made_False r i with "Htok Hm") as %[].
   Qed.
 
   (* ---------------------------------------------------------------- *)
@@ -550,7 +638,7 @@ Section EchoPred.
     iDestruct "Hp" as "[#Ht | [%Hpins Hcs]]".
     { iSplitR; [ iLeft; iExact "Ht" |]. iFrame "Hkey". iRight. iExact "Ht". }
     rewrite /cons_state.
-    iDestruct "Hcs" as "[[%Hab Htok] | [Hc | Hc]]".
+    iDestruct "Hcs" as "[[%Hab Htok] | [Hc | [Hc | [%Hab4 [Htok Hseal]]]]]".
     - iSplitL "Htok".
       + iRight. iSplitR; [ by iPureIntro |]. iLeft.
         iSplitR; [ by iPureIntro | iExact "Htok" ].
@@ -559,6 +647,78 @@ Section EchoPred.
       iDestruct (cons_key_excl r with "Hkey Hk2") as %[].
     - iDestruct "Hc" as (j) "(_ & Hk2 & _)".
       iDestruct (cons_key_excl r with "Hkey Hk2") as %[].
+    - (* SEALED: the seal IS the key's name advanced, so an unsealed key
+         beside it is two authorities at one name *)
+      iDestruct (cons_key_seal_False r with "Hkey Hseal") as %[].
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (*  3c''. THE CLAIM LAW SH'S FIRST OPEN RUNS ON (lane SH-OPEN)        *)
+  (*                                                                    *)
+  (*  The SEAL's law, and the [□] shape of [echo_cons_abs_law]: the      *)
+  (*  credential is persistent, so nothing goes in and comes back.  A    *)
+  (*  holder knows the console is absent at EVERY view the claim holds   *)
+  (*  of -- the two PRESENT arms each carry an UNSEALED key, which a     *)
+  (*  lower bound at [[0]] refutes, and the two absent arms say it.      *)
+  (*  [UInitCons.init_cons_abs_law T (cons_never r)] is this, one        *)
+  (*  weakening away.                                                    *)
+  (* ---------------------------------------------------------------- *)
+  (* THE CREDENTIAL IS THE GHOST FRAGMENT ITSELF, never a derived
+     [□]-wand, and the law is stated [□ (K -∗ □ …)] rather than
+     [K -∗ □ …]: lane SH-OPEN's consumer ([UShConsK.sh_cons_never_law])
+     takes it at an abstract [K] with [Persistent K] AND [Timeless K],
+     because its walk strips a later off the credential inside
+     [AppInv.app_inv].  [cons_never] is [◯ML [0]] at the key's own name,
+     so both instances hold ([cons_never_persistent] /
+     [cons_never_timeless] above) and the discharge is one [exact]. *)
+  Lemma echo_cons_never_law (γ : echo_fixed) (r : echo_names) :
+    ⊢ □ (cons_never r -∗
+           □ (∀ v : aview, echo_pred γ r v -∗
+                echo_pred γ r v ∗ (⌜cons_absent v⌝ ∨ echo_taint γ))).
+  Proof.
+    iIntros "!> #Hn !>" (v) "Hp". rewrite /echo_pred.
+    iDestruct "Hp" as "[#Ht | [%Hpins Hcs]]".
+    { iSplitR; [ iLeft; iExact "Ht" |]. iRight. iExact "Ht". }
+    rewrite /cons_state.
+    iDestruct "Hcs" as "[[%Hab Htok] | [Hc | [Hc | [%Hab4 [Htok Hseal]]]]]".
+    - iSplitL "Htok".
+      + iRight. iSplitR; [ by iPureIntro |]. iLeft.
+        iSplitR; [ by iPureIntro | iExact "Htok" ].
+      + iLeft. by iPureIntro.
+    - iDestruct "Hc" as (j) "(_ & Hk2 & _)".
+      iDestruct (cons_key_never_False r with "Hk2 Hn") as %[].
+    - iDestruct "Hc" as (j) "(_ & Hk2 & _)".
+      iDestruct (cons_key_never_False r with "Hk2 Hn") as %[].
+    - iSplitL "Htok Hseal".
+      + iRight. iSplitR; [ by iPureIntro |]. iRight. iRight. iRight.
+        iFrame "Htok Hseal". by iPureIntro.
+      + iLeft. by iPureIntro.
+  Qed.
+
+  (* ...AND THE STEP THAT MINTS IT, which is /init's repair arm when the
+     mknod FAILED: the key it went in with is spent into the claim and
+     what comes back is the persistent credential.  The view is absent --
+     that is what the key already said -- so the arm the claim lands in is
+     the sealed one.  THE TOKEN IS NOT SPENT: the console was never made. *)
+  Lemma echo_cons_seal_step (γ : echo_fixed) (r : echo_names) (av : aview) :
+    cons_key r -∗ echo_pred γ r av ==∗
+      echo_pred γ r av ∗ (cons_never r ∨ echo_taint γ).
+  Proof.
+    iIntros "Hkey Hp". rewrite /echo_pred.
+    iDestruct "Hp" as "[#Ht | [%Hpins Hcs]]".
+    { iModIntro. iSplitR; [ by iLeft |]. iRight. iExact "Ht". }
+    rewrite /cons_state.
+    iDestruct "Hcs" as "[[%Hab Htok] | [Hc | [Hc | [%Hab4 [Htok Hseal]]]]]".
+    - iMod (cons_seal r with "Hkey") as "[Hseal #Hn]".
+      iModIntro. iSplitR "Hn".
+      + iRight. iSplitR; [ by iPureIntro |]. iRight. iRight. iRight.
+        iFrame "Htok Hseal". by iPureIntro.
+      + iLeft. iExact "Hn".
+    - iDestruct "Hc" as (j) "(_ & Hk2 & _)".
+      iDestruct (cons_key_excl r with "Hkey Hk2") as %[].
+    - iDestruct "Hc" as (j) "(_ & Hk2 & _)".
+      iDestruct (cons_key_excl r with "Hkey Hk2") as %[].
+    - iDestruct (cons_key_seal_False r with "Hkey Hseal") as %[].
   Qed.
 
   (* ...and the step the mknod's PHASE 1 takes with it: the key turns the
@@ -590,13 +750,17 @@ Section EchoPred.
                  fname_console ents nl i CONSOLE 0 av Hpre
                  (proj2 (file_pin_echo av) H3)). }
     rewrite /cons_state.
-    iDestruct "Hcs" as "[[%Hab Htok] | [Hc | Hc]]".
+    iDestruct "Hcs" as "[[%Hab Htok] | [Hc | [Hc | [%Hab4 [Htok Hseal]]]]]".
     - iRight. iLeft. iExists i. iFrame "Hkey Htok". iPureIntro.
       exact (cons_state_mknod ents nl i av Hpre).
     - iDestruct "Hc" as (j) "(_ & Hk2 & _)".
       iDestruct (cons_key_excl r with "Hkey Hk2") as %[].
     - iDestruct "Hc" as (j) "(_ & Hk2 & _)".
       iDestruct (cons_key_excl r with "Hkey Hk2") as %[].
+    - (* THE SEAL IS WHY ABSENCE IS STABLE: this step is the only one that
+         puts the console under `console` at the root, and it demands the
+         key -- which a sealed claim has already taken. *)
+      iDestruct (cons_key_seal_False r with "Hkey Hseal") as %[].
   Qed.
 
   (* ...AND THE SHOOT, which is the mknod commit's PHASE 2: the view is
@@ -613,14 +777,18 @@ Section EchoPred.
     iDestruct "Hp" as "[#Ht | [%Hpins Hcs]]".
     { iModIntro. iSplitR; [ by iLeft |]. iRight. iExact "Ht". }
     rewrite /cons_state.
-    iDestruct "Hcs" as "[[%Hab _] | [Hc | Hc]]".
+    iDestruct "Hcs" as "[[%Hab _] | [Hc | [Hc | [%Hab4 _]]]]";
+      [ | | | (* the sealed arm is absent too, and absent and present at
+                 once is the same contradiction *)
+        exfalso; rewrite /cons_absent (cons_present_astep i av Hpr) in Hab4;
+        discriminate Hab4 ].
     { (* absent and present at once: the entry both is and is not there *)
       exfalso. rewrite /cons_absent (cons_present_astep i av Hpr) in Hab.
       discriminate Hab. }
     - iDestruct "Hc" as (j) "(%Hprj & Hkey & Htok)".
       iMod (cons_shoot r i with "Htok") as "[Hsh #Hm]".
       iModIntro. iSplitR "Hm".
-      + iRight. iSplitR; [ by iPureIntro |]. iRight. iRight.
+      + iRight. iSplitR; [ by iPureIntro |]. iRight. iRight. iLeft.
         iExists i. iFrame "Hkey Hsh". by iPureIntro.
       + iLeft. iExact "Hm".
     - iDestruct "Hc" as (j) "(%Hprj & Hkey & Hsh)".
@@ -630,7 +798,7 @@ Section EchoPred.
       subst j.
       iDestruct (cons_shot_made r i with "Hsh") as "[Hsh #Hm]".
       iModIntro. iSplitR "Hm".
-      + iRight. iSplitR; [ by iPureIntro |]. iRight. iRight.
+      + iRight. iSplitR; [ by iPureIntro |]. iRight. iRight. iLeft.
         iExists i. iFrame "Hkey Hsh". by iPureIntro.
       + iLeft. iExact "Hm".
   Qed.
@@ -669,14 +837,16 @@ Section EchoPred.
         exact (file_pin_arm fname_echo ECHO_INO echo_bytes i ma mi av Hfree
                  (proj2 (file_pin_echo av) H3)). }
     rewrite /cons_state.
-    iDestruct "Hcs" as "[[%Hab Htok] | [Hc | Hc]]".
+    iDestruct "Hcs" as "[[%Hab Htok] | [Hc | [Hc | [%Hab4 [Htok Hseal]]]]]".
     - iLeft. iFrame "Htok". iPureIntro. exact (cons_absent_arm i ma mi av Hab).
     - iDestruct "Hc" as (j) "(%Hprj & Hkey & Htok)".
       iRight. iLeft. iExists j. iFrame "Hkey Htok". iPureIntro.
       exact (cons_present_arm j i ma mi av Hfree Hprj).
     - iDestruct "Hc" as (j) "(%Hprj & Hkey & Hsh)".
-      iRight. iRight. iExists j. iFrame "Hkey Hsh". iPureIntro.
+      iRight. iRight. iLeft. iExists j. iFrame "Hkey Hsh". iPureIntro.
       exact (cons_present_arm j i ma mi av Hfree Hprj).
+    - iRight. iRight. iRight. iFrame "Htok Hseal". iPureIntro.
+      exact (cons_absent_arm i ma mi av Hab4).
   Qed.
 
   (* THE UNARM LEG'S STEP, and it is PURE: the row at a FRESH inum goes
@@ -711,7 +881,7 @@ Section EchoPred.
                  Hfree (proj2 (file_pin_echo av0) G3)
                  (proj2 (file_pin_echo av) H3)). }
     rewrite /cons_state.
-    iDestruct "Hcs" as "[[%Hab Htok] | [Hc | Hc]]".
+    iDestruct "Hcs" as "[[%Hab Htok] | [Hc | [Hc | [%Hab4 [Htok Hseal]]]]]".
     - iLeft. iFrame "Htok". iPureIntro. exact (cons_absent_unarm i av Hab).
     - iDestruct "Hc" as (j) "(%Hprj & _ & _)".
       exfalso. rewrite /cons_absent (cons_present_astep j av Hprj) in Hab0.
@@ -719,6 +889,8 @@ Section EchoPred.
     - iDestruct "Hc" as (j) "(%Hprj & _ & _)".
       exfalso. rewrite /cons_absent (cons_present_astep j av Hprj) in Hab0.
       discriminate Hab0.
+    - iRight. iRight. iRight. iFrame "Htok Hseal". iPureIntro.
+      exact (cons_absent_unarm i av Hab4).
   Qed.
 
   (* ...and the create that is NOT the console's: the claim survives with
@@ -746,15 +918,98 @@ Section EchoPred.
         exact (file_pin_create fname_echo ECHO_INO echo_bytes d nmn ents nl i
                  ma mi av Hpre (proj2 (file_pin_echo av) H3)). }
     rewrite /cons_state.
-    iDestruct "Hcs" as "[[%Hab Htok] | [Hc | Hc]]".
+    iDestruct "Hcs" as "[[%Hab Htok] | [Hc | [Hc | [%Hab4 [Htok Hseal]]]]]".
     - iLeft. iFrame "Htok". iPureIntro.
       exact (cons_absent_create_other d nmn ents nl i ma mi av Hpre Hother Hab).
     - iDestruct "Hc" as (j) "(%Hprj & Hkey & Htok)".
       iRight. iLeft. iExists j. iFrame "Hkey Htok". iPureIntro.
       exact (cons_present_create_other j d nmn ents nl i ma mi av Hpre Hprj).
     - iDestruct "Hc" as (j) "(%Hprj & Hkey & Hsh)".
-      iRight. iRight. iExists j. iFrame "Hkey Hsh". iPureIntro.
+      iRight. iRight. iLeft. iExists j. iFrame "Hkey Hsh". iPureIntro.
       exact (cons_present_create_other j d nmn ents nl i ma mi av Hpre Hprj).
+    - iRight. iRight. iRight. iFrame "Htok Hseal". iPureIntro.
+      exact (cons_absent_create_other d nmn ents nl i ma mi av Hpre Hother Hab4).
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (*  3d.  THE SAME TWO STEPS AT THE *FLAG* ARM (lane E2)               *)
+  (*                                                                    *)
+  (*  /init's console dance has to be proved at BOTH arms of             *)
+  (*  [echo_boot], and at the FLAG arm there is no key: what /init holds  *)
+  (*  is the persistent [cons_made r i], the node is already there, and   *)
+  (*  its repair [mknod] -- reached when the FIRST open failed at         *)
+  (*  [filealloc]/[fdalloc], which /init proves nothing about (app-echo   *)
+  (*  .md, OPEN-PIN FINDINGS, FACT 3) -- cannot commit.  So the two steps *)
+  (*  its bundle still owes are these: the UNARM leg at a PRESENT view,   *)
+  (*  and the console's OWN create at a PRESENT view, which is VACUOUS    *)
+  (*  ([cre_pre] wants the name free in the root and the pin says it is   *)
+  (*  taken).  The other six laws are the landed ones verbatim: the arm   *)
+  (*  leg, any other create, the pure half and the supply do not read the *)
+  (*  console's state at all.                                            *)
+  (* ---------------------------------------------------------------- *)
+
+  (* THE UNARM LEG AT THE FLAG.  [echo_cons_unarm]'s twin: the permit
+     carries the ARM's own view [av0], and what survives the removal of a
+     row at a FRESH inum is the console at the flag's inum
+     ([FsConsPin.cons_present_unarm_fresh]) rather than its absence. *)
+  Lemma echo_cons_unarm_present (γ : echo_fixed) (r : echo_names)
+      (av0 av : aview) (i j : Z) :
+    av0 !! i = None ->
+    echo_fs_pure av0 ->
+    cons_present_at j av0 ->
+    cons_made r j -∗ echo_pred γ r av -∗ echo_pred γ r (delta_unarm i av).
+  Proof.
+    intros Hfree Hp0 Hpr0. iIntros "#Hm Hp". rewrite /echo_pred.
+    iDestruct "Hp" as "[#Ht | [%Hpins Hcs]]"; [ by iLeft |].
+    iRight. iSplitR.
+    { iPureIntro. destruct Hpins as (H1 & H2 & H3).
+      destruct Hp0 as (G1 & G2 & G3). split_and!.
+      - apply file_pin_init.
+        exact (file_pin_unarm_fresh fname_init INIT_INO init_bytes i av0 av
+                 Hfree (proj2 (file_pin_init av0) G1)
+                 (proj2 (file_pin_init av) H1)).
+      - apply file_pin_sh.
+        exact (file_pin_unarm_fresh fname_sh SH_INO sh_bytes i av0 av
+                 Hfree (proj2 (file_pin_sh av0) G2)
+                 (proj2 (file_pin_sh av) H2)).
+      - apply file_pin_echo.
+        exact (file_pin_unarm_fresh fname_echo ECHO_INO echo_bytes i av0 av
+                 Hfree (proj2 (file_pin_echo av0) G3)
+                 (proj2 (file_pin_echo av) H3)). }
+    rewrite /cons_state.
+    iDestruct "Hcs" as "[[%Hab Htok] | [Hc | [Hc | [%Hab4 [Htok Hseal]]]]]".
+    - iDestruct (cons_tok_made_False r j with "Htok Hm") as %[].
+    - iDestruct "Hc" as (k) "(_ & _ & Htok)".
+      iDestruct (cons_tok_made_False r j with "Htok Hm") as %[].
+    - iDestruct "Hc" as (k) "(%Hprk & Hkey & Hsh)".
+      iDestruct (cons_shot_made_agree r k j with "Hsh Hm") as %Heq.
+      subst k.
+      iRight. iRight. iLeft. iExists j. iFrame "Hkey Hsh". iPureIntro.
+      exact (cons_present_unarm_fresh j i av0 av Hfree Hpr0 Hprk).
+    - iDestruct (cons_tok_made_False r j with "Htok Hm") as %[].
+  Qed.
+
+  (* THE CONSOLE'S OWN CREATE AT THE FLAG, and it is VACUOUS: the pin says
+     `console` resolves in the root, [cre_pre] says the root's map does not
+     have the name.  This is the law [UInitCons]'s mknod bundle takes at
+     (f) when /init is running on the flag rather than the key, and it is
+     why nothing has to be spent there. *)
+  Lemma echo_cons_mknod_present (γ : echo_fixed) (r : echo_names)
+      (av : aview) (ents : gmap fname Z) (nl : nat) (i j : Z) :
+    cre_pre av FsImg.ROOTINO fname_console ents nl i (ADev CONSOLE 0) ->
+    cons_made r j -∗ echo_pred γ r av -∗
+      echo_pred γ r (delta_create FsImg.ROOTINO fname_console i
+                       (ADev CONSOLE 0) av).
+  Proof.
+    intros Hpre. iIntros "#Hm Hp".
+    iDestruct (echo_cons_law γ r j with "Hm") as "#Hl".
+    iDestruct ("Hl" $! av with "Hp") as "[Hp [%Hpr | #Ht]]"; last first.
+    { rewrite /echo_pred. by iLeft. }
+    exfalso.
+    pose proof (cons_present_astep j av Hpr) as Hst.
+    destruct Hpre as (Hd & Hfresh & _).
+    rewrite /astep /aents Hd /= /anode_ents /= Hfresh in Hst.
+    discriminate Hst.
   Qed.
 
   (* ---------------------------------------------------------------- *)
@@ -791,8 +1046,8 @@ Section EchoPred.
     iNext. rewrite /echo_pred.
     iDestruct "H" as "[#Ht | [%Hpins Hcs]]".
     { iSplitR; [ by iLeft | by iLeft ]. }
-    rewrite /cons_state /cons_tok /cons_shot /cons_key /r' /=.
-    iDestruct "Hcs" as "[[%Hab Htok] | [Hc | Hc]]".
+    rewrite /cons_state /cons_tok /cons_shot /cons_key /cons_seal_tok /r' /=.
+    iDestruct "Hcs" as "[[%Hab Htok] | [Hc | [Hc | [%Hab4 [Htok Hseal]]]]]".
     - rewrite (cons_inum_absent av Hab).
       iSplitL "Htok".
       + iRight. iSplitR; [ by iPureIntro |]. iLeft.
@@ -804,15 +1059,24 @@ Section EchoPred.
       iSplitL "Htok Hkey".
       + iRight. iSplitR; [ by iPureIntro |]. iRight. iLeft.
         iExists i. iFrame "Hkey Htok". by iPureIntro.
-      + iRight. iSplitR; [ by iPureIntro |]. iRight. iRight.
+      + iRight. iSplitR; [ by iPureIntro |]. iRight. iRight. iLeft.
         iExists i. iFrame "Hk Ha". by iPureIntro.
     - iDestruct "Hc" as (i) "(%Hpr & Hkey & Hsh)".
       rewrite (cons_inum_present i av Hpr).
       iSplitL "Hsh Hkey".
-      + iRight. iSplitR; [ by iPureIntro |]. iRight. iRight.
+      + iRight. iSplitR; [ by iPureIntro |]. iRight. iRight. iLeft.
         iExists i. iFrame "Hkey Hsh". by iPureIntro.
-      + iRight. iSplitR; [ by iPureIntro |]. iRight. iRight.
+      + iRight. iSplitR; [ by iPureIntro |]. iRight. iRight. iLeft.
         iExists i. iFrame "Hk Ha". by iPureIntro.
+    - (* SEALED-ABSENT: the original keeps its seal; the copy is born
+         UNSEALED, at a fresh key it does not yet need -- a sealed era does
+         not seal the next. *)
+      rewrite (cons_inum_absent av Hab4).
+      iSplitL "Htok Hseal".
+      + iRight. iSplitR; [ by iPureIntro |]. iRight. iRight. iRight.
+        iSplitR; [ by iPureIntro | iFrame "Htok Hseal" ].
+      + iRight. iSplitR; [ by iPureIntro |]. iLeft.
+        iSplitR; [ by iPureIntro | iExact "Ha" ].
   Qed.
 
   (* ---------------------------------------------------------------- *)
@@ -859,8 +1123,8 @@ Section EchoPred.
       iNext. rewrite /echo_pred.
       iDestruct "H" as "[#Ht | [%Hpins Hcs]]".
       { iSplitR; [ by iLeft | by iLeft ]. }
-      rewrite /cons_state /cons_tok /cons_shot /cons_key /r' /=.
-      iDestruct "Hcs" as "[[%Hab Htok] | [Hc | Hc]]".
+      rewrite /cons_state /cons_tok /cons_shot /cons_key /cons_seal_tok /r' /=.
+      iDestruct "Hcs" as "[[%Hab Htok] | [Hc | [Hc | [%Hab4 [Htok Hseal]]]]]".
       + iSplitL "Htok".
         * iRight. iSplitR; [ by iPureIntro |]. iLeft.
           iSplitR; [ by iPureIntro | iExact "Htok" ].
@@ -870,6 +1134,13 @@ Section EchoPred.
         pose proof (cons_inum_present i av Hpr) as Hx. congruence.
       + iDestruct "Hc" as (i) "(%Hpr & _ & _)".
         pose proof (cons_inum_present i av Hpr) as Hx. congruence.
+      + (* SEALED-ABSENT: the FRESH key is still what /init gets -- the
+           seal is this instance's, not the next one's *)
+        iSplitL "Htok Hseal".
+        * iRight. iSplitR; [ by iPureIntro |]. iRight. iRight. iRight.
+          iSplitR; [ by iPureIntro | iFrame "Htok Hseal" ].
+        * iRight. iSplitR; [ by iPureIntro |]. iLeft.
+          iSplitR; [ by iPureIntro | iExact "Ha" ].
     - (* THE CONSOLE IS THERE: /init gets the flag, off the fresh
          authority's own lower bound, and the fresh key goes into the
          copy's claim where the two PRESENT arms want it. *)
@@ -886,8 +1157,9 @@ Section EchoPred.
       iNext. rewrite /echo_pred.
       iDestruct "H" as "[#Ht | [%Hpins Hcs]]".
       { iSplitR; [ by iLeft | by iLeft ]. }
-      rewrite /cons_state /cons_tok /cons_shot /cons_key /r' /=.
-      iDestruct "Hcs" as "[[%Hab Htok] | [Hc | Hc]]".
+      rewrite /cons_state /cons_tok /cons_shot /cons_key /cons_seal_tok /r' /=.
+      iDestruct "Hcs" as "[[%Hab Htok] | [Hc | [Hc | [%Hab4 _]]]]";
+        [ | | | pose proof (cons_inum_absent av Hab4) as Hx; congruence ].
       + pose proof (cons_inum_absent av Hab) as Hx. congruence.
       + iDestruct "Hc" as (i) "(%Hpr & Hkey & Htok)".
         pose proof (cons_inum_present i av Hpr) as Hx.
@@ -895,15 +1167,15 @@ Section EchoPred.
         iSplitL "Htok Hkey".
         * iRight. iSplitR; [ by iPureIntro |]. iRight. iLeft.
           iExists _. iFrame "Hkey Htok". by iPureIntro.
-        * iRight. iSplitR; [ by iPureIntro |]. iRight. iRight.
+        * iRight. iSplitR; [ by iPureIntro |]. iRight. iRight. iLeft.
           iExists _. iFrame "Hk Ha". by iPureIntro.
       + iDestruct "Hc" as (i) "(%Hpr & Hkey & Hsh)".
         pose proof (cons_inum_present i av Hpr) as Hx.
         rewrite Hci in Hx. simplify_eq.
         iSplitL "Hsh Hkey".
-        * iRight. iSplitR; [ by iPureIntro |]. iRight. iRight.
+        * iRight. iSplitR; [ by iPureIntro |]. iRight. iRight. iLeft.
           iExists _. iFrame "Hkey Hsh". by iPureIntro.
-        * iRight. iSplitR; [ by iPureIntro |]. iRight. iRight.
+        * iRight. iSplitR; [ by iPureIntro |]. iRight. iRight. iLeft.
           iExists _. iFrame "Hk Ha". by iPureIntro.
   Qed.
 

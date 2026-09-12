@@ -1696,7 +1696,6 @@ UexecExecInst.v
 # ABOVE UexecExecInst because the last step is [sbundle_exec_intro], which
 # is the kernel's INSTANCE of UexecSG -- the u-tier files below state
 # everything over the class.
-UInitSh.v
 # UexecExecMint = the generic mint: the loop's slot at every key, from the
 # invariant and UexecCond.cond_entry_slot with both premises discharged from
 # the instance.
@@ -2097,3 +2096,15 @@ UShConsK.v
 # its transcript against E5's named write receipt.  Above UexecExecInst,
 # UkShEcho and AppEcho, as UInitSh is one level up.
 UShEcho.v
+
+# UInitSh must sit above AppEcho and UInitCons: E4 has sh receive the
+# WHOLE pins law (AppEcho.echo_fs_pure, /echo among them) rather than only
+# /sh's, and SH-OPEN has it receive UInitCons's console credential.
+UInitSh.v
+# UInitBoot = E2 (ARM-c (1b)): the first process's exec bundle for a
+# CONSTRAINING application -- /init's pin at "/init" resolved, and
+# InitBoot.init_boot_bundle assembled out of PinnedExec's BOOT shape
+# (SpecKexec.exec_au_pre at a literal path and a literal argument vector,
+# which is what forkret's kexec("/init") is) rather than out of the
+# syscall shape UInitSh uses.
+UInitBoot.v

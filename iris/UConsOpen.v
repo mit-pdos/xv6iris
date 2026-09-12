@@ -548,14 +548,17 @@ Section UConsOpen.
   (* ...AND AT THE RESOLVING PIN.  The credential does NOT appear: the
      flag [AppEcho.cons_made r i] is persistent, which is what lets sh have
      this arm while /init keeps the key. *)
-  Lemma cons_sup_console (N : uk_names Σ) (T K : iProp Σ) (r : echo_names)
+  (* GENERALISED OVER THE FACT THE CREDENTIAL PINS (lane E2): only conjunct
+     (i) of the bundle is read here, and it does not mention [Pv]. *)
+  Lemma cons_sup_console (N : uk_names Σ) (Pv : aview -> Prop)
+      (T K : iProp Σ) (r : echo_names)
       (i : Z) (Img : gmap Z (bv 8)) (pv : mword 64)
       (m : regfile) (pc : mword 64) :
     Persistent T -> Timeless T ->
     (forall M : gmap Z (bv 8), uimg_sub Img M -> arg_path_of M pv init_cons_pl) ->
     m !!! Regidx a0_idx = pv ->
     m !!! Regidx a1_idx = (mword_of_int 2 : mword 64) ->
-    init_cons_laws T K r -∗ cons_made r i -∗ app_inv fsc_fs -∗
+    init_cons_laws_at Pv T K r -∗ cons_made r i -∗ app_inv fsc_fs -∗
     utext_img (ukn_t N) Img -∗
     udepwf_at N m pc USYS_open (init_cons_console_fam T i (ukn_pay N))
       FsImg.ROOTINO.
@@ -574,7 +577,7 @@ Section UConsOpen.
               (eq_trans (tf_of_arg1 m pc) Ha1)).
     cbn [init_cons_console_fam xfam_open of_P of_Pmiss of_Farm of_Fun
          of_Fok of_Fex of_Fo of_Ft].
-    iApply (init_cons_laws_open_console fsc_fs r T K i
+    iApply (init_cons_laws_open_console fsc_fs r Pv T K i
               M pv (mword_of_int 2)
               (pfam_triv (fun (_ : aview) (_ : Z) (_ : list (bv 8)) => True%I))
               (pfam_triv (fun (_ : aview) (_ : Z) => True%I))

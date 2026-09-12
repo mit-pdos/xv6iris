@@ -401,6 +401,35 @@ Section AppInv.
     iModIntro. iExact "Hx".
   Qed.
 
+  (* AN UPDATE OF THE CLAIM THAT DOES NOT MOVE THE MAP (lane E2 / SH-OPEN).
+     [app_top_update] is for a party that HOLDS half the authority and is
+     moving a row; this is for one that holds neither and only wants to
+     trade a resource against the claim AT WHATEVER VIEW the invariant is
+     at -- /init's failed [mknod] spending its console key for the
+     persistent SEAL ([AppEcho.echo_cons_seal_step]).  The map is put back
+     unchanged, so no [app_dom] obligation and no [app_step] arise.
+
+     THE LATER IS THE CALLER'S: the body is under one and only the caller
+     knows whether its own claim is timeless (echo's is), so the wand is
+     handed [▷ app_pred] and owes [▷ app_pred] back. *)
+  Lemma app_claim_update (E : coPset) (γfs : fs_names) (R Q : iProp Σ) :
+    ↑appN ⊆ E ->
+    app_inv γfs -∗
+    □ (∀ av : aview, R -∗ ▷ app_pred app_run av ={E ∖ ↑appN}=∗
+         ▷ app_pred app_run av ∗ Q) -∗
+    R ={E}=∗ Q.
+  Proof.
+    iIntros (HE) "#Hinv #Hstep HR".
+    iMod (inv_acc E appN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iEval (rewrite /app_body) in "Hbody".
+    iDestruct "Hbody" as (I) "(>Hh & Hp & >%Hd & #Hx)".
+    iMod ("Hstep" $! (abs_view I) with "HR Hp") as "[Hp HQ]".
+    iMod ("Hclose" with "[Hh Hp]") as "_".
+    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp Hx".
+      iPureIntro. exact Hd. }
+    iModIntro. iExact "HQ".
+  Qed.
+
   (* THE STEP, OFF THE SUPPLY.  A claim that holds of every view survives
      every move of the map, so a discharger holding [app_sup] pays a
      write-kind commit's [app_step] by throwing the pre-view claim away and

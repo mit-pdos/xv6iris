@@ -1775,21 +1775,25 @@ Section UkInitMain.
               with "[$Hwr $Hwl15 $Hwl17] Hcode Hxs Hro Hargv Hsz Hstd Hcwd Hch Htk Hrun").
   Qed.
 
-  Lemma wp_kinit_main_repair (T K : iProp Σ) `{!Persistent T} `{!Timeless T}
+  Lemma wp_kinit_main_repair (T Cns : iProp Σ) `{!Persistent T} `{!Timeless T}
       (stc : fdstate) (cn : cons_names)
       (szv : Z) (h : CpuId) (m : regfile) (n : nat) :
     stc <> FdClosed ->
     init_deps T -∗
     init_code γt -∗
-    (* the exec deposit's supplier -- [UkInit.init_exec_sup] *)
-    init_exec_sup_lend cn T stc -∗
-    (* ...and the two PINNED console leaves, persistently *)
-    init_cons_leaves N T K stc -∗
+    (* the exec deposit's supplier, AS A WAND FROM THE CONSOLE CREDENTIAL
+       ([UkInit.init_cons_sup]): which credential the shell is handed is
+       decided by the mknod below, so the supply is only assembled after
+       it -- see [UkInit.init_cons_sup]'s note. *)
+    init_cons_sup cn T Cns stc -∗
+    (* ...and THE MKNOD STEP the first open left, whichever of the three
+       things it is ([UkInit.uki_mknod_hit_leaf]) *)
+    uki_mknod_hit_leaf N T Cns stc -∗
     init_rodata γt -∗ init_argv γd -∗ usz γs szv -∗
-    (* WHAT THE FIRST OPEN LEFT: the all-closed ledger and the credential,
-       or the taint.  BOTH reach this arm -- /init's [blt] at 0x1a tests the
-       return value, and under the taint nothing is known about it. *)
-    uki_cons_in N T K -∗
+    (* WHAT THE FIRST OPEN LEFT of the LEDGER: all-closed, or the taint.
+       BOTH reach this arm -- /init's [blt] at 0x1a tests the return value,
+       and under the taint nothing is known about it. *)
+    uki_open2_in N T -∗
     UserCwd.ucwd γcwd FsImg.ROOTINO -∗
     UserChildren.uch_any γch -∗
     (* THE CONSOLE INPUT, on its way to the restart head: the reader token
@@ -1800,8 +1804,7 @@ Section UkInitMain.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hne.
-    rewrite /init_cons_leaves /uki_cons_in.
-    iIntros "#(Hwr & Hwl15 & Hwl17) #Hcode #Hxs [#Habs #Hmkl] #Hro #Hargv Hsz Hin Hcwd Hch Htk Hrun".
+    iIntros "#(Hwr & Hwl15 & Hwl17) #Hcode #Hxs Hmkl #Hro #Hargv Hsz Hin Hcwd Hch Htk Hrun".
     destruct init_syms_pins
       as (_ & _ & _ & _ & _ & Hopen & Hmknod & _ & _ & _ & _ & _ & _).
     (* ---- 0x64  c.li a2,0 ---- *)
@@ -1895,34 +1898,33 @@ Section UkInitMain.
        step of the application's claim.  Under the credential it is the
        PINNED bundle; under the taint there is no pin and the generic stub
        walks it. ---- *)
-    iDestruct "Hin" as "[[Hstd HK] | [Hstd #HT]]".
-    - assert (Hargs3 : mr3 !!! Regidx a0_idx = (mword_of_int 0x970 : mword 64)
-                       /\ mr3 !!! Regidx a1_idx = (mword_of_int 1 : mword 64)
-                       /\ mr3 !!! Regidx a2_idx = (mword_of_int 0 : mword 64)).
-      { unfold mr3, mr2b, mr2a, mr2, mr1. split_and!; argrow. }
-      iApply ("Hmkl" $! hr3 mr3 ((12 + (12 + (4 + n)))%nat)
-                with "Hcode Hro [%] Hrun Hcwd HK");
-        [ exact Hargs3 | ].
-      iIntros (hr4 rr1) "Hans Hcwd Hrun".
-      rewrite Er3.
-      iAssert (uki_open2 N T stc) with "[Hans]" as "Hop2".
-      { iDestruct "Hans" as "[Hc | [HK | HT]]".
-        - iApply (uki_open2_of_console N T stc with "Hwl15 Hc").
-        - iApply (uki_open2_of_absent N T K stc with "Hwl15 Habs HK").
-        - iApply (uki_open2_taint_arm N T stc with "Hwl15 HT"). }
-      iApply (wp_kinit_main_repair_tail T stc cn szv hr4 _ n Hne
-                with "[$Hwr $Hwl15 $Hwl17] Hcode Hxs Hro Hargv Hsz Hop2 [Hstd] Hcwd Hch Htk Hrun").
-      rewrite /uki_open2_in. by iLeft.
-    - (* the TAINT branch's mknod: 17's deposit off the taint (P4) *)
-      iDestruct ("Hwl17" with "HT") as "#Hwr17".
-      iApply (wp_kinit_mknod N hr3 mr3 (12 + (12 + (4 + n)))
-                with "Hwr17 Hcode Hrun").
-      iIntros (hr4 rr1) "Hrun".
-      rewrite Er3.
-      iApply (wp_kinit_main_repair_tail T stc cn szv hr4 _ n Hne
-                with "[$Hwr $Hwl15 $Hwl17] Hcode Hxs Hro Hargv Hsz [] [Hstd] Hcwd Hch Htk Hrun").
-      { iApply (uki_open2_taint_arm N T stc with "Hwl15 HT"). }
-      rewrite /uki_open2_in. iRight. iFrame "Hstd HT".
+    assert (Hargs3 : mr3 !!! Regidx a0_idx = (mword_of_int 0x970 : mword 64)
+                     /\ mr3 !!! Regidx a1_idx = (mword_of_int 1 : mword 64)
+                     /\ mr3 !!! Regidx a2_idx = (mword_of_int 0 : mword 64)).
+    { unfold mr3, mr2b, mr2a, mr2, mr1. split_and!; argrow. }
+    iApply ("Hmkl" $! hr3 mr3 ((12 + (12 + (4 + n)))%nat)
+              with "Hcode Hro [%] Hrun Hcwd");
+      [ exact Hargs3 | ].
+    iIntros (hr4 rr1) "Hans Hcwd Hrun".
+    rewrite Er3.
+    (* THE SECOND OPEN AND THE EXEC SUPPLY COME OUT OF THE SAME ANSWER: the
+       node exists (the pinned open, and the flag as the credential), the
+       mknod failed (the SEAL, and the dead walk again), or the taint. *)
+    iAssert (uki_open2 N T stc ∗ init_exec_sup_lend cn T stc)%I
+      with "[Hans]" as "[Hop2 #Hxsl]".
+    { iDestruct "Hxs" as "#[Hw Ht]".
+      iDestruct "Hans" as "[[Hc HC] | [[%K' (Habs & HK & HC)] | #HT]]".
+      - iSplitL "Hc";
+          [ iApply (uki_open2_of_console N T stc with "Hwl15 Hc") | ].
+        iApply ("Hw" with "HC").
+      - iSplitL "Habs HK";
+          [ iApply (uki_open2_of_absent N T K' stc with "Hwl15 Habs HK") | ].
+        iApply ("Hw" with "HC").
+      - iSplitR;
+          [ iApply (uki_open2_taint_arm N T stc with "Hwl15 HT") | ].
+        iApply ("Hw" with "[]"). iApply ("Ht" with "HT"). }
+    iApply (wp_kinit_main_repair_tail T stc cn szv hr4 _ n Hne
+              with "[$Hwr $Hwl15 $Hwl17] Hcode Hxsl Hro Hargv Hsz Hop2 Hin Hcwd Hch Htk Hrun").
   Qed.
 
 
@@ -1937,7 +1939,7 @@ Section UkInitMain.
   (* repair arm at 0x64, which rejoins at 0x1e.  Nothing is assumed about    *)
   (* which one the kernel takes.                                             *)
   (* --------------------------------------------------------------------- *)
-  Lemma wp_kinit_main (T K : iProp Σ) `{!Persistent T} `{!Timeless T}
+  Lemma wp_kinit_main (T Cns : iProp Σ) `{!Persistent T} `{!Timeless T}
       (stc : fdstate) (cn : cons_names)
       (szv : Z) (h : CpuId) (m : regfile) (n : nat) :
     stc <> FdClosed ->
@@ -1950,14 +1952,18 @@ Section UkInitMain.
        supply, at its own two argument registers and at the one working
        directory it ever has, and it is LENT the heap and the fd authority
        so a pinned bundle can read them. *)
-    init_exec_sup_lend cn T stc -∗
-    (* the two PINNED console leaves, persistently *)
-    init_cons_leaves N T K stc -∗
+    (* ...AS A WAND FROM THE CONSOLE CREDENTIAL ([UkInit.init_cons_sup]),
+       because which credential the shell gets is decided by the dance
+       below and not at /init's entry. *)
+    init_cons_sup cn T Cns stc -∗
+    (* THE CONSOLE DANCE, at whichever arm the application's boot resource
+       decided ([UkInit.init_cons_dance]): the miss route's two leaves WITH
+       their credential, or the flag route's pinned open and its
+       credential-free mknod. *)
+    init_cons_dance N T Cns stc -∗
     init_rodata γt -∗ init_argv γd -∗ usz γs szv -∗
-    (* the all-closed ledger /init is born with, and the ABSENCE CREDENTIAL
-       its first open runs on *)
+    (* the all-closed ledger /init is born with *)
     ustd γfd ufd_l0 -∗
-    K -∗
     UserCwd.ucwd γcwd FsImg.ROOTINO -∗
     UserChildren.uch_any γch -∗
     (* THE CONSOLE INPUT, on its way to the restart head: the reader token
@@ -1969,8 +1975,9 @@ Section UkInitMain.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hne.
-    rewrite /init_cons_leaves.
-    iIntros "#(Hwr & Hwl15 & Hwl17) #Hcode #Hxs [#Habs #Hmkl] #Hro #Hargv Hsz Hstd HK Hcwd Hch Htk Hrun".
+    iIntros "#(Hwr & Hwl15 & Hwl17) #Hcode #Hxs Hdance #Hro #Hargv Hsz Hstd Hcwd Hch Htk Hrun".
+    iDestruct (uki_open1_of_dance N T Cns stc
+                 with "[$Hwr $Hwl15 $Hwl17] Hdance") as "Hop1".
     destruct init_syms_pins
       as (_ & Hmain & _ & _ & _ & Hopen & _ & _ & _ & _ & _ & _ & _).
     rewrite Hmain.
@@ -2167,8 +2174,8 @@ Section UkInitMain.
     assert (Hargsm6 : mm6 !!! Regidx a0_idx = (mword_of_int 0x970 : mword 64)
                       /\ mm6 !!! Regidx a1_idx = (mword_of_int 2 : mword 64)).
     { unfold mm6, mm5, mm4, mm3. split; argrow. }
-    iApply ("Habs" $! hm9 mm6 ufd_l0 ((12 + (12 + (4 + n)))%nat)
-              with "Hcode Hro [%] Hrun Hcwd Hstd HK");
+    iApply ("Hop1" $! hm9 mm6 ((12 + (12 + (4 + n)))%nat)
+              with "Hcode Hro [%] Hrun Hcwd Hstd");
       [ exact Hargsm6 | ].
     iIntros (hm10 ro) "Hans Hcwd Hrun".
     assert (Em6 : ret_pc (mm6 !!! Regidx ra_idx)
@@ -2184,10 +2191,33 @@ Section UkInitMain.
                        (sign_extend' 64 (mword_of_int 74 : mword 13))
                      = mword_of_int 0x64)
       by (apply bv_eq; vm_compute; reflexivity).
-    iDestruct "Hans" as "[(%Hro & Hstd & HK) | [Hstd #HT]]".
-    - (* THE PIN MISSED, so the call RETURNED [-1] and the branch is TAKEN.
-         That is what turns /init's head from four arms into three: the
-         fall-through at 0x1e is reached only through the [c.j] at 0x82. *)
+    assert (E1a : add_vec_int (mword_of_int 0x1a : mword 64) 4
+                  = mword_of_int 0x1e)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite /uki_open1_out.
+    iDestruct "Hans"
+      as "[(%Hro & Hstd & HC) | [(%Hro & Hstd & Hmk) | (Hstd & #HT & Hmk)]]".
+    - (* THE NODE WAS ALREADY THERE and the open SUCCEEDED (the FLAG arm's
+         own first open): the branch is NOT taken and /init falls through
+         to the dups at 0x1e with fd 0 the console. *)
+      assert (Hblt0 : uv_btaken BLT (mm7 !!! Regidx a0_idx) zero_reg = false)
+        by (rewrite Ha0m7 Hro; vm_compute; reflexivity).
+      iApply (wp_uk_btype0 N hm10 mm7 (mword_of_int 0x1a)
+                (mword_of_int 74 : mword 13) a0_idx BLT false
+                (add_vec (mword_of_int 0x1a : mword 64)
+                   (sign_extend' 64 (mword_of_int 74 : mword 13)))
+                (12 + (12 + (4 + n)))
+                (eq_sym Hblt0) eq_refl ltac:(discriminate)
+                with "[] Hrun").
+      { iApply (uis_init_1a with "Hcode"). }
+      rewrite E1a. iIntros (hm11) "Hrun".
+      iDestruct "Hxs" as "#[Hw _]".
+      iDestruct ("Hw" with "HC") as "#Hxsl".
+      iApply (wp_kinit_main_from_1e T stc cn szv hm11 mm7 n Hne
+                with "[$Hwr $Hwl15 $Hwl17] Hcode Hxsl Hro Hargv Hsz [Hstd] Hcwd Hch Htk Hrun").
+      iApply (ufd_head_l1 with "Hstd").
+    - (* THE CALL RETURNED [-1] -- the pin missed, or the node is there and
+         the allocation failed (FACT 3) -- so the branch is TAKEN. *)
       assert (Hblt0 : uv_btaken BLT (mm7 !!! Regidx a0_idx) zero_reg = true)
         by (rewrite Ha0m7 Hro; vm_compute; reflexivity).
       iApply (wp_uk_btype0 N hm10 mm7 (mword_of_int 0x1a)
@@ -2198,10 +2228,9 @@ Section UkInitMain.
                 with "[] Hrun").
       { iApply (uis_init_1a with "Hcode"). }
       iIntros (hm11) "Hrun".
-      iApply (wp_kinit_main_repair T K stc cn szv hm11 mm7 n Hne
-                with "[$Hwr $Hwl15 $Hwl17] Hcode Hxs [] Hro Hargv Hsz [Hstd HK] Hcwd Hch Htk Hrun").
-      { rewrite /init_cons_leaves. iFrame "Habs Hmkl". }
-      { rewrite /uki_cons_in. iLeft. iFrame "Hstd HK". }
+      iApply (wp_kinit_main_repair T Cns stc cn szv hm11 mm7 n Hne
+                with "[$Hwr $Hwl15 $Hwl17] Hcode Hxs Hmk Hro Hargv Hsz [Hstd] Hcwd Hch Htk Hrun").
+      rewrite /uki_open2_in. by iLeft.
     - (* THE TAINT: nothing is known about the return value, so both ways
          of the branch are walked and both reach the head's third arm. *)
       destruct (uv_btaken BLT (mm7 !!! Regidx a0_idx) zero_reg) eqn:Hblt0.
@@ -2213,10 +2242,9 @@ Section UkInitMain.
                   with "[] Hrun").
         { iApply (uis_init_1a with "Hcode"). }
         iIntros (hm11) "Hrun".
-        iApply (wp_kinit_main_repair T K stc cn szv hm11 mm7 n Hne
-                  with "[$Hwr $Hwl15 $Hwl17] Hcode Hxs [] Hro Hargv Hsz [Hstd] Hcwd Hch Htk Hrun").
-        { rewrite /init_cons_leaves. iFrame "Habs Hmkl". }
-        { rewrite /uki_cons_in. iRight. iFrame "Hstd HT". }
+        iApply (wp_kinit_main_repair T Cns stc cn szv hm11 mm7 n Hne
+                  with "[$Hwr $Hwl15 $Hwl17] Hcode Hxs Hmk Hro Hargv Hsz [Hstd] Hcwd Hch Htk Hrun").
+        rewrite /uki_open2_in. iRight. iFrame "Hstd HT".
       + iApply (wp_uk_btype0 N hm10 mm7 (mword_of_int 0x1a)
                   (mword_of_int 74 : mword 13) a0_idx BLT false
                   (add_vec (mword_of_int 0x1a : mword 64)
@@ -2225,12 +2253,10 @@ Section UkInitMain.
                   (eq_sym Hblt0) eq_refl ltac:(discriminate)
                   with "[] Hrun").
         { iApply (uis_init_1a with "Hcode"). }
-        assert (E1a : add_vec_int (mword_of_int 0x1a : mword 64) 4
-                      = mword_of_int 0x1e)
-          by (apply bv_eq; vm_compute; reflexivity).
         rewrite E1a. iIntros (hm11) "Hrun".
+        iDestruct (init_cons_sup_taint cn T Cns stc with "Hxs HT") as "#Hxsl".
         iApply (wp_kinit_main_from_1e T stc cn szv hm11 mm7 n Hne
-                  with "[$Hwr $Hwl15 $Hwl17] Hcode Hxs Hro Hargv Hsz [Hstd] Hcwd Hch Htk Hrun").
+                  with "[$Hwr $Hwl15 $Hwl17] Hcode Hxsl Hro Hargv Hsz [Hstd] Hcwd Hch Htk Hrun").
         iDestruct "Hstd" as (l) "Hstd".
         iApply (ufd_head_taint with "HT Hstd").
   Qed.
@@ -2253,7 +2279,7 @@ Section UkInitMain.
      obligation belongs to the constructor ([UInitKernel.init_uexec_slot])
      and E2 discharges it there, exactly as it discharges [uvis_cwd W =
      ROOTINO]. *)
-  Lemma wp_kinit_start (T K : iProp Σ) `{!Persistent T} `{!Timeless T}
+  Lemma wp_kinit_start (T Cns : iProp Σ) `{!Persistent T} `{!Timeless T}
       (stc : fdstate) (cn : cons_names)
       (szv : Z) (h : CpuId) (m : regfile) (n : nat) :
     stc <> FdClosed ->
@@ -2266,11 +2292,12 @@ Section UkInitMain.
        supply, at its own two argument registers and at the one working
        directory it ever has, and it is LENT the heap and the fd authority
        so a pinned bundle can read them. *)
-    init_exec_sup_lend cn T stc -∗
-    init_cons_leaves N T K stc -∗
+    (* ...AS A WAND FROM THE CONSOLE CREDENTIAL: see
+       [UkInit.init_cons_sup]. *)
+    init_cons_sup cn T Cns stc -∗
+    init_cons_dance N T Cns stc -∗
     init_rodata γt -∗ init_argv γd -∗ usz γs szv -∗
     ustd γfd ufd_l0 -∗
-    K -∗
     UserCwd.ucwd γcwd FsImg.ROOTINO -∗
     UserChildren.uch_any γch -∗
     (* THE CONSOLE INPUT, on its way to the restart head: the reader token
@@ -2282,7 +2309,7 @@ Section UkInitMain.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hne.
-    iIntros "#(Hwr & Hwl15 & Hwl17) #Hcode #Hxs #Hcl #Hro #Hargv Hsz Hstd HK Hcwd Hch Htk Hrun".
+    iIntros "#(Hwr & Hwl15 & Hwl17) #Hcode #Hxs Hcl #Hro #Hargv Hsz Hstd Hcwd Hch Htk Hrun".
     destruct init_syms_pins
       as (Hstart & Hmain & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _).
     rewrite Hstart.
@@ -2394,8 +2421,8 @@ Section UkInitMain.
               with "[] Hrun").
     { iApply (uis_init_c4 with "Hcode"). }
     iIntros (hs4) "Hrun".
-    iApply (wp_kinit_main T K stc cn szv hs4 _ n Hne
-              with "[$Hwr $Hwl15 $Hwl17] Hcode Hxs Hcl Hro Hargv Hsz Hstd HK Hcwd Hch Htk Hrun").
+    iApply (wp_kinit_main T Cns stc cn szv hs4 _ n Hne
+              with "[$Hwr $Hwl15 $Hwl17] Hcode Hxs Hcl Hro Hargv Hsz Hstd Hcwd Hch Htk Hrun").
   Qed.
 
 End UkInitMain.

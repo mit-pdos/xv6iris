@@ -200,7 +200,35 @@ Section UInitKernel.
   (* ------------------------------------------------------------------- *)
   (* SS1 THE DEPOSIT: init's entry conditions on a key.                    *)
   (* ------------------------------------------------------------------- *)
-  Lemma init_uexec_slot (T K : iProp Σ) `{!Persistent T} `{!Timeless T}
+  (* ===================================================================== *)
+  (* THE CONSOLE DANCE, N-QUANTIFIED (lane E2).                             *)
+  (*                                                                        *)
+  (* The entry constructor builds ONE run, at a record [N] the carve binds   *)
+  (* inside it, so every persistent ingredient reaches it under a [∀ N] --   *)
+  (* which is why the leaves were always a [□ (∀ N, …)].  The dance's        *)
+  (* CREDENTIAL is linear and record-free, so it factors out of the          *)
+  (* quantifier: one credential, spent at whichever [N] the carve chose.     *)
+  (* ===================================================================== *)
+  Definition init_cons_dance_all (T Cns : iProp Σ) (stc : fdstate) : iProp Σ :=
+    ((∃ K : iProp Σ,
+        □ (∀ N : uk_names Σ, UkInit.init_cons_leaves N T K Cns stc) ∗ K)
+     ∨ (□ (∀ N : uk_names Σ,
+             □ UkInit.uki_open_console_leaf N T stc
+             ∗ □ UkInit.uki_mknod_hit_leaf N T Cns stc) ∗ Cns))%I.
+
+  Lemma init_cons_dance_at (N : uk_names Σ) (T Cns : iProp Σ)
+      (stc : fdstate) :
+    init_cons_dance_all T Cns stc -∗ UkInit.init_cons_dance N T Cns stc.
+  Proof.
+    iIntros "[[%K [#Hl HK]] | [#Hh HC]]".
+    - iApply (UkInit.init_cons_dance_miss N T K Cns stc with "[] HK").
+      iApply "Hl".
+    - iApply (UkInit.init_cons_dance_hit N T Cns stc).
+      rewrite /UkInit.init_cons_hit.
+      iDestruct ("Hh" $! N) as "[#H1 #H2]". iFrame "H1 H2 HC".
+  Qed.
+
+  Lemma init_uexec_slot (T Cns : iProp Σ) `{!Persistent T} `{!Timeless T}
       (stc : fdstate) (cn : cons_names)
       (W : uvis) (n0 : nat) :
     stc <> FdClosed ->
@@ -267,13 +295,17 @@ Section UInitKernel.
     (* ...and the EXEC supplier, which init's child arm spends on
        exec("sh", argv): its OWN, at its own two argument registers and at
        the root, not the generic bundle at every key. *)
-    UkInit.init_exec_sup_lend cn T stc -∗
-    (* ...AND THE TWO PINNED CONSOLE LEAVES, at whatever record the entry
-       carve mints, beside the ABSENCE CREDENTIAL /init's first open runs
-       on ([AppEcho.cons_key] at echo's era, handed over by E2's boot arm
-       with the era-0 claim -- [AppEcho.echo_init_key]). *)
-    □ (∀ N : uk_names Σ, UkInit.init_cons_leaves N T K stc) -∗
-    K -∗
+    (* ...AS A WAND FROM THE CONSOLE CREDENTIAL ([UkInit.init_cons_sup]):
+       which credential the shell it execs is handed is decided by /init's
+       OWN mknod, mid-walk, so the supply is assembled there and not
+       here. *)
+    UkInit.init_cons_sup cn T Cns stc -∗
+    (* ...AND THE CONSOLE DANCE, at whichever arm the application's boot
+       resource decided ([App.app_boot]; [AppEcho.echo_boot] is
+       [cons_key r ∨ ∃ i, cons_made r i], and THE ARM IS DECIDED BY THE
+       VIEW): the miss route's two pinned leaves with the KEY, or the flag
+       route's pinned open and its credential-free mknod. *)
+    init_cons_dance_all T Cns stc -∗
     (* ...AND THE CONSOLE READER TOKEN AT POSITION 0, which is what makes
        <init> the process that owns the console input: it lends it to each
        shell it forks and gets it back at the reap
@@ -302,7 +334,7 @@ Section UInitKernel.
        it does not come back.  The bundle is spent once here, so a linear
        intro is what it wants; the destructuring [#(Hwr & Hwl15 & Hwl17)]
        the walk uses checks each conjunct on its own and is fine. *)
-    iIntros "Hdp #Hdep #Hxs #Hcl HK Hrd #Hmp".
+    iIntros "Hdp #Hdep #Hxs Hdn Hrd #Hmp".
     iApply (uslot_of_urun_all W (2 + (4 + (12 + (12 + (4 + n0))))) (fun _ => True)%I
               Hal8 Hroom Hstk Hfdlen Hstop Hlzf with "Hdep Hmp []").
     (* the payload at the trivial one -- <init> has no parent *)
@@ -333,12 +365,12 @@ Section UInitKernel.
       as "Dargv".
     iMod (uarea_persist (ukn_d N) init_argv_map with "Dargv") as "#Hargv".
     rewrite Hpc.
-    iApply (wp_kinit_start N Hpsok_free T K stc cn (uvis_sz W) h
+    iApply (wp_kinit_start N Hpsok_free T Cns stc cn (uvis_sz W) h
               (tf_resume_gpr0 (uvis_tf W)) n0 Hne
-              with "Hdp [] Hxs [] [] [] Hszf [Hstd] HK [Hcwf] [Hchf] [Hrd] Hrun").
+              with "Hdp [] Hxs [Hdn] [] [] Hszf [Hstd] [Hcwf] [Hchf] [Hrd] Hrun").
     - iApply (init_code_of_text (ukn_t N) (uvis_M W) (uvis_perm W)
                 (init_img_text _ Hsub) Hx with "Ht").
-    - iApply ("Hcl" $! N).
+    - iApply (init_cons_dance_at N T Cns stc with "Hdn").
     - iApply (init_rodata_of_text (ukn_t N) (uvis_M W) (uvis_perm W)
                 (init_img_data _ Hsub) Hx with "Ht").
     - rewrite /init_argv. iExact "Hargv".
@@ -353,7 +385,7 @@ Section UInitKernel.
   (* ------------------------------------------------------------------- *)
   (* SS2 THE BRIDGE from the kernel's image fact.                          *)
   (* ------------------------------------------------------------------- *)
-  Lemma init_slot_of_kexec (T K : iProp Σ) `{!Persistent T} `{!Timeless T}
+  Lemma init_slot_of_kexec (T Cns : iProp Σ) `{!Persistent T} `{!Timeless T}
       (stc : fdstate) (cn : cons_names)
       (na : nat) (alen : nat -> nat)
       (afun : nat -> nat -> bv 8) (sts : list fdstate)
@@ -380,9 +412,8 @@ Section UInitKernel.
        [init_uexec_slot] and [UkInit.init_deps] *)
     UkInit.init_deps T -∗
     (* the pay fact, passed straight through: see [init_uexec_slot] *)
-    udep -∗ UkInit.init_exec_sup_lend cn T stc -∗
-    □ (∀ N : uk_names Σ, UkInit.init_cons_leaves N T K stc) -∗
-    K -∗
+    udep -∗ UkInit.init_cons_sup cn T Cns stc -∗
+    init_cons_dance_all T Cns stc -∗
     (* the console reader token, passed straight through: see
        [init_uexec_slot] *)
     ucons_reader cn 0%nat -∗
@@ -464,7 +495,7 @@ Section UInitKernel.
               0x3000 <= spv - 8 * Z.of_nat (2 + (4 + (12 + (12 + (4 + n0)))))
                         + Z.of_nat j < spv)
       by (intros j Hj; clear -Hj Hroom; lia).
-    iApply (init_uexec_slot T K stc cn W' n0 Hne).
+    iApply (init_uexec_slot T Cns stc cn W' n0 Hne).
     - rewrite Hpc. exact init_start_pc.
     - exact (init_img_sub_of_elf M Himg).
     - exact Hx.

@@ -72,6 +72,15 @@ Require Import UkSh UShKernel.
 Require Import PathElems.          (* [path_elems] *)
 Require Import ElfUser.
 Require Import ElfLoadable.        (* [sh_elf_loadable] *)
+Require Import AppEcho.            (* [echo_fs_pure] -- the WHOLE pins law
+                                      sh is handed (lane E4: its own exec of
+                                      /echo needs [FsEchoPin.era0_echo_pins],
+                                      which is one of its conjuncts) *)
+Require Import FsConsPin.          (* [cons_absent] / [cons_present_at] *)
+Require Import UInitCons.          (* [init_cons_cred] -- the console
+                                      credential /init hands the shell *)
+Require Import UShConsK.           (* sh's two console leaf discharges at
+                                      echo's era (lane SH-OPEN) *)
 Require Import PageGeom.           (* [PGSIZE] *)
 Require Import KexecDefs.
 Require Import SpecKexec.
@@ -387,17 +396,60 @@ Section UInitSh.
      because the arm is persistent and is spent at whatever payload the
      ROUND chose -- the console token of that round's own position pair.
      [UexecExecMint.uslot_mint_all] is exactly this proposition. *)
-  Definition init_sh_slot (T : iProp Σ) (Pay : iProp Σ) : iProp Σ :=
+  (* THE PINS LAW IS THE WHOLE ONE (lane E4).  sh does not only get its own
+     row: its [exec] of the parsed command is a PINNED exec at
+     [FsEchoPin.era0_echo_pins], and both that and [FsShPin.era0_sh_pins]
+     are conjuncts of [AppEcho.echo_fs_pure], so what crosses is the one
+     law and each consumer projects ([sh_pins_of_fs_pure] below is /sh's
+     projection; E4's is /echo's). *)
+  Definition init_sh_slot_core (T : iProp Σ) (Pay : iProp Σ) : iProp Σ :=
     (app_inv fsc_fs
      ∗ □ (∀ v : aview, app_pred app_run v -∗
-                         app_pred app_run v ∗ (⌜FsShPin.era0_sh_pins v⌝ ∨ T))
+                         app_pred app_run v ∗ (⌜echo_fs_pure v⌝ ∨ T))
      ∗ □ (∀ (R : iProp Σ) (W : uvis),
             T -∗ my_pay (uvis_gen W) (fun _ => R)%I -∗ R -∗ uslot W)
      ∗ Pay)%I.
 
+  (* THE CONSOLE CREDENTIAL IS NOT HERE but a premise of the constructor
+     ([init_exec_sup_of_sh_slot]'s third, lane SH-OPEN): which of sh's two
+     pinned leaves it can make is decided by /INIT'S OWN mknod, mid-walk,
+     and this record is fixed at /init's entry. *)
+  Definition init_sh_slot (T : iProp Σ) (Pay : iProp Σ) : iProp Σ :=
+    init_sh_slot_core T Pay.
+
+  Global Instance init_sh_slot_core_persistent T Pay `{!Persistent Pay} :
+    Persistent (init_sh_slot_core T Pay).
+  Proof. rewrite /init_sh_slot_core. apply _. Qed.
+
   Global Instance init_sh_slot_persistent T Pay `{!Persistent Pay} :
     Persistent (init_sh_slot T Pay).
-  Proof. rewrite /init_sh_slot. apply _. Qed.
+  Proof. rewrite /init_sh_slot /init_sh_slot_core. apply _. Qed.
+
+  (* the projection /sh's own pinned exec wants *)
+  Lemma sh_pins_of_fs_pure (T : iProp Σ) :
+    □ (∀ v : aview, app_pred app_run v -∗
+         app_pred app_run v ∗ (⌜echo_fs_pure v⌝ ∨ T)) -∗
+    □ (∀ v : aview, app_pred app_run v -∗
+         app_pred app_run v ∗ (⌜FsShPin.era0_sh_pins v⌝ ∨ T)).
+  Proof.
+    iIntros "#Hl !>" (v) "Hp".
+    iDestruct ("Hl" $! v with "Hp") as "[Hp [%Hf | HT]]";
+      [ iFrame "Hp"; iLeft; iPureIntro; exact (proj1 (proj2 Hf))
+      | iFrame "Hp"; iRight; iExact "HT" ].
+  Qed.
+
+  (* ...and /echo's, which is lane E4's seam: one [iApply] of this. *)
+  Lemma echo_pins_of_fs_pure (T : iProp Σ) :
+    □ (∀ v : aview, app_pred app_run v -∗
+         app_pred app_run v ∗ (⌜echo_fs_pure v⌝ ∨ T)) -∗
+    □ (∀ v : aview, app_pred app_run v -∗
+         app_pred app_run v ∗ (⌜FsEchoPin.era0_echo_pins v⌝ ∨ T)).
+  Proof.
+    iIntros "#Hl !>" (v) "Hp".
+    iDestruct ("Hl" $! v with "Hp") as "[Hp [%Hf | HT]]";
+      [ iFrame "Hp"; iLeft; iPureIntro; exact (proj2 (proj2 Hf))
+      | iFrame "Hp"; iRight; iExact "HT" ].
+  Qed.
 
   (* ------------------------------------------------------------------- *)
   (* THE ROOM, as closed arithmetic.                                       *)
@@ -488,7 +540,9 @@ Section UInitSh.
     UkInit.init_exec_sup_lend cn T st.
   Proof.
     intros Hpsok_free Hn0 Hst.
-    iIntros "#Hdep #Hdp #Hcons (#Hinv & #Hcl & #Hgen & #Hpay)".
+    iIntros "#Hdep #Hdp #Hcons (#Hinv & #Hcl0 & #Hgen & #Hpay)".
+    (* E4: what crosses is the WHOLE pins law and each consumer projects *)
+    iDestruct (sh_pins_of_fs_pure T with "Hcl0") as "#Hcl".
     (* THE LEDGER IS TAKEN AND NOT READ: sh's entry says nothing about its
        standard streams, and the only descriptor fact this constructor
        needs is [length fdv = NOFILE], which comes off the LENT authority
@@ -602,6 +656,69 @@ Section UInitSh.
               (ukn_pay N) P Pmiss Fo R).
     { cbn [uvis_gen uvis_of_run]. iExact "Hmpay". }
     rewrite Hpeq Ea0 Ea1. iExact "Hb".
+  Qed.
+
+  (* =================================================================== *)
+  (*  THE EXEC SUPPLY AS THE WALK TAKES IT (lane E2)                      *)
+  (*                                                                      *)
+  (*  /init's walk does not hold the console credential at its entry --   *)
+  (*  which credential it is is decided by its own mknod, mid-walk -- so   *)
+  (*  what the entry carries is [UkInit.init_cons_sup]: the supply as a    *)
+  (*  WAND from the credential, beside the law that pays it under the      *)
+  (*  taint.  Everything else the shell's slot needs is persistent and is  *)
+  (*  fixed at the entry.                                                  *)
+  (* =================================================================== *)
+  (* ...AND THE SEAM SH-OPEN CONSUMES.  [UShConsK] states sh's two console
+     leaves against an abstract credential; these are its two discharges,
+     chosen by the credential /init's own mknod left.  At the SEAL the
+     credential is [AppEcho.cons_never] and sh's first open MISSES (its
+     repair arm runs); at the FLAG it is [cons_made r i] and sh's first
+     open is the pinned one; under the taint sh proves nothing. *)
+  Lemma ush_cons_in_of_Cns (γ : echo_fixed) (r : echo_names) :
+    file_app = MkAppcfg echo_names (echo_pred γ) r ->
+    app_inv fsc_fs -∗ init_cons_cred (echo_taint γ) r -∗
+    (□ (∀ N : uk_names Σ, UkSh.ush_open_console_leaf N (echo_taint γ))
+     ∨ (□ (∀ N : uk_names Σ,
+             UkSh.ush_open_absent_leaf N (echo_taint γ) (cons_never r))
+        ∗ cons_never r)
+     ∨ echo_taint γ).
+  Proof.
+    intros Heq. iIntros "#Hinv #Hc".
+    rewrite /init_cons_cred.
+    iDestruct "Hc" as "[#Hn | [[%i #Hm] | #HT]]".
+    - iRight. iLeft. iSplitR; [ | iExact "Hn" ].
+      iApply (sh_cons_absent_echo γ r (cons_never r)
+                ltac:(apply _) ltac:(apply _) Heq with "[] Hinv").
+      rewrite /sh_cons_never_law. rewrite Heq.
+      cbn [app_pred app_run app_names].
+      iApply (echo_cons_never_law γ r).
+    - iLeft. iApply (sh_cons_console_echo γ r i Heq with "Hm Hinv").
+    - iRight. iRight. iExact "HT".
+  Qed.
+
+  Lemma init_cons_sup_of_sh_slot (γ : echo_fixed) (r : echo_names)
+      (cn : cons_names) (st : fdstate)
+      (Rsh : gname -> gname -> gname -> iProp Σ) (n0 : nat) :
+    file_app = MkAppcfg echo_names (echo_pred γ) r ->
+    (forall k : Z, free_num k -> psok k) ->
+    8 * Z.of_nat (2 + (8 + (16 + (ush_Dbody + n0)))) <= 0xFE0 ->
+    (exists wr : bool, st = FdOpen true wr (FdDevice ConsoleInv.CONSOLE)) ->
+    udep -∗ UkSh.sh_deps -∗
+    init_sh_slot (echo_taint γ) (sh_pay Rsh n0) -∗
+    UkInit.init_cons_sup cn (echo_taint γ)
+      (init_cons_cred (echo_taint γ) r) st.
+  Proof.
+    intros Heq Hpsok_free Hn0 Hst.
+    iIntros "#Hdep #Hdp #Hcore". rewrite /UkInit.init_cons_sup. iSplit.
+    - iIntros "!> #Hcns".
+      iDestruct "Hcore" as "#Hcore'".
+      iApply (init_exec_sup_of_sh_slot (echo_taint γ) cn st (cons_never r)
+                ltac:(apply _) Rsh n0 Hpsok_free Hn0 Hst
+                with "Hdep Hdp [] Hcore'").
+      iApply (ush_cons_in_of_Cns γ r Heq with "[] Hcns").
+      iDestruct "Hcore'" as "(#Hinv & _)". iExact "Hinv".
+    - iIntros "!> #HT".
+      iApply (init_cons_cred_of_taint (echo_taint γ) r with "HT").
   Qed.
 
 End UInitSh.

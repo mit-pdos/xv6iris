@@ -160,6 +160,58 @@ Section PinnedExec.
      [Pay] goes to ARM (a) ONLY: arm (b) never returns and needs nothing
      but the persistent facts.  The refund is [Pay] itself, and the [∧]
      of [pf_at] is what lets the same payload answer both. *)
+  (* THE PIECE ITSELF, AT ONE ARGUMENT SHAPE.  [SpecKexec.exec_slot_pre]
+     is the two wands at a FIXED [(na, alen, afun)]; the syscall's own
+     piece quantifies them under the argument reading and the KERNEL'S
+     BOOT CALL does not -- [SpecKexec.exec_au_pre] names them, because
+     forkret calls [kexec("/init", {"/init", 0})] with a literal vector
+     and there is no caller image to read one out of.  So the identifying
+     step is stated ONCE here and the two bundles below differ only in
+     how their arguments arrive ([pinned_exec_bundle_at] reads them,
+     [pinned_exec_bundle_boot] is handed them). *)
+  Lemma pex_slot_at (γfs : fs_names) (X : uvis -d> iPropO Σ)
+      (Pin : aview -> Prop) (T : iProp Σ) `{!Persistent T} `{!Timeless T}
+      (cw : Z) (pl : list (bv 8)) (hops : list Z) (ino : Z)
+      (f : elf_bytes) (nl : nat) (Pay : iProp Σ) (Q : Z -> iProp Σ)
+      (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
+      (sts : list fdstate) :
+    pin_resolves Pin cw pl hops ino f nl ->
+    kexec_loadable f ->
+    □ (∀ W' : uvis,
+         ⌜kexec_image_ok f na alen afun sts W'⌝ -∗
+         ⌜uvis_cwd W' = cw⌝ -∗ ⌜uvis_lazy W' = false⌝ -∗
+         my_pay (uvis_gen W') Q -∗ Q (-1) -∗ Pay -∗ X W') -∗
+    □ (∀ W' : uvis, T -∗ my_pay (uvis_gen W') Q -∗ Q (-1) -∗ X W') -∗
+    Pay -∗
+    exec_slot_pre X Q (pobs_P T hops (length (path_elems pl)))
+      (pobs_recv Pin T) cw na alen afun sts.
+  Proof.
+    intros Hres Hload. iIntros "#Hcon #Hgen HPay".
+    rewrite /exec_slot_pre. iSplitL "HPay".
+    - (* ---- ARM (a): the observed node IS the pinned file ---- *)
+      iIntros (av' i f' nl' W') "HP Hrecv %Hload' %Hok %Hcwq %Hlzq #Hp HQ".
+      iDestruct (pobs_node Pin T cw pl hops ino (MkAnode (AFile f) nl)
+                   av' i (MkAnode (AFile f') nl') Hres with "HP Hrecv")
+        as "[%Hid | #HT]"; last first.
+      { iApply ("Hgen" with "HT Hp HQ"). }
+      (* [subst f' nl'] and not a bare [subst]: the two rows introduced
+         just above are equations on [cw] and on [uvis_lazy W'] (lane
+         LAZY-FLAG). *)
+      destruct Hid as [_ Hnode]. injection Hnode; intros Hnl Hf.
+      subst f' nl'.
+      iApply ("Hcon" $! W' with "[%] [%] [%] Hp HQ HPay");
+        [ exact Hok | exact Hcwq | exact Hlzq ].
+    - (* ---- ARM (b): a pinned file IS loadable, so this arm is dead ---- *)
+      iIntros (av' i a W') "HP Hrecv %Hnload %Hkey %Hcwq %Hlzq #Hp HQ".
+      iDestruct (pobs_node Pin T cw pl hops ino (MkAnode (AFile f) nl)
+                   av' i a Hres with "HP Hrecv")
+        as "[%Hid | #HT]"; last first.
+      { iApply ("Hgen" with "HT Hp HQ"). }
+      destruct Hid as [_ ->].
+      exfalso. apply Hnload. exists f, nl.
+      split; [ reflexivity | exact Hload ].
+  Qed.
+
   Lemma pex_slot (γfs : fs_names) (X : uvis -d> iPropO Σ)
       (Pin : aview -> Prop) (T : iProp Σ) `{!Persistent T} `{!Timeless T}
       (cw : Z) (pl : list (bv 8)) (hops : list Z) (ino : Z)
@@ -327,6 +379,86 @@ Section PinnedExec.
     iExists (pobs_P T hops), (pobs_Pmiss T), (pobs_Fo Pin T), Pay.
     iApply (pinned_exec_bundle_at γfs X Pin T cw pl hops ino f nl Pay Q
               M pv av sts Hres Hload Hpath with "Hcl Hinv Hcon Hgen HPay").
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (*  8.  THE KERNEL'S OWN CALL: THE BOOT BUNDLE                          *)
+  (*                                                                      *)
+  (*  [SpecKexec.exec_au_pre] rather than [SpecSysExec.sys_exec_au_pre],   *)
+  (*  and the difference is exactly the two argument readings: forkret's   *)
+  (*  boot arm calls [kexec("/init", (char *[]){"/init", 0})] with a       *)
+  (*  literal path and a literal vector, so there is no caller image [M],  *)
+  (*  no path pointer and no argv pointer -- the walk is owed at THE       *)
+  (*  path [pl] instead of at every path the image reads, and the slot     *)
+  (*  piece at THE shape [(na, alen, afun)] instead of at every shape.     *)
+  (*  Everything else is the syscall bundle's: the same cursor family,     *)
+  (*  the same observation, the same two slot wands.                       *)
+  (*                                                                      *)
+  (*  This is what [InitBoot.init_boot_bundle] is discharged from by a     *)
+  (*  constraining application, exactly as [InitBoot.init_boot_bundle_triv]*)
+  (*  is from [SpecKexec.exec_au_pre_triv_at]. *)
+  (* ------------------------------------------------------------------ *)
+  Lemma pinned_exec_bundle_boot_at (γfs : fs_names) (X : uvis -d> iPropO Σ)
+      (Pin : aview -> Prop) (T : iProp Σ) `{!Persistent T} `{!Timeless T}
+      (cw : Z) (pl : list (bv 8)) (hops : list Z) (ino : Z)
+      (f : elf_bytes) (nl : nat) (Pay : iProp Σ) (Q : Z -> iProp Σ)
+      (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
+      (sts : list fdstate) :
+    pin_resolves Pin cw pl hops ino f nl ->
+    kexec_loadable f ->
+    □ (∀ v : aview, app_pred app_run v -∗
+                      app_pred app_run v ∗ (⌜Pin v⌝ ∨ T)) -∗
+    app_inv γfs -∗
+    □ (∀ W' : uvis,
+         ⌜kexec_image_ok f na alen afun sts W'⌝ -∗
+         ⌜uvis_cwd W' = cw⌝ -∗ ⌜uvis_lazy W' = false⌝ -∗
+         my_pay (uvis_gen W') Q -∗ Q (-1) -∗ Pay -∗ X W') -∗
+    □ (∀ W' : uvis, T -∗ my_pay (uvis_gen W') Q -∗ Q (-1) -∗ X W') -∗
+    Pay -∗
+    exec_au_pre (MkPfam X Pay) (fs_gamma_L γfs) γfs cw Q
+      (pobs_P T hops) (pobs_Pmiss T) (pobs_Fo Pin T) pl na alen afun sts.
+  Proof.
+    intros Hres Hload. iIntros "#Hcl #Hinv #Hcon #Hgen HPay".
+    rewrite /exec_au_pre. iSplitR.
+    { iApply (pobs_walk γfs Pin T (pobs_Pmiss T) cw pl hops ino
+                (MkAnode (AFile f) nl) Hres with "[] Hcl Hinv").
+      iApply pobs_miss_taint_Pmiss. }
+    iSplitR.
+    { iApply (pobs_aopen γfs Pin T with "Hcl Hinv"). }
+    rewrite /pobs_Fo /pfam_triv. cbn [pf_recv].
+    rewrite /pf_at. cbn [pf_recv pf_refund]. iSplit; [ | iExact "HPay" ].
+    iApply (pex_slot_at γfs X Pin T cw pl hops ino f nl Pay Q na alen afun
+              sts Hres Hload with "Hcon Hgen HPay").
+  Qed.
+
+  (* ...and the shape [InitBoot.init_boot_bundle] takes it at: the families
+     leave existentially, exactly as they do at a syscall deposit site. *)
+  Lemma pinned_exec_bundle_boot (γfs : fs_names) (X : uvis -d> iPropO Σ)
+      (Pin : aview -> Prop) (T : iProp Σ) `{!Persistent T} `{!Timeless T}
+      (cw : Z) (pl : list (bv 8)) (hops : list Z) (ino : Z)
+      (f : elf_bytes) (nl : nat) (Pay : iProp Σ) (Q : Z -> iProp Σ)
+      (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
+      (sts : list fdstate) :
+    pin_resolves Pin cw pl hops ino f nl ->
+    kexec_loadable f ->
+    □ (∀ v : aview, app_pred app_run v -∗
+                      app_pred app_run v ∗ (⌜Pin v⌝ ∨ T)) -∗
+    app_inv γfs -∗
+    □ (∀ W' : uvis,
+         ⌜kexec_image_ok f na alen afun sts W'⌝ -∗
+         ⌜uvis_cwd W' = cw⌝ -∗ ⌜uvis_lazy W' = false⌝ -∗
+         my_pay (uvis_gen W') Q -∗ Q (-1) -∗ Pay -∗ X W') -∗
+    □ (∀ W' : uvis, T -∗ my_pay (uvis_gen W') Q -∗ Q (-1) -∗ X W') -∗
+    Pay -∗
+    ∃ (P Pmiss : nat -> Z -> iProp Σ)
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)) (R : iProp Σ),
+      exec_au_pre (MkPfam X R) (fs_gamma_L γfs) γfs cw Q P Pmiss Fo
+        pl na alen afun sts.
+  Proof.
+    intros Hres Hload. iIntros "#Hcl #Hinv #Hcon #Hgen HPay".
+    iExists (pobs_P T hops), (pobs_Pmiss T), (pobs_Fo Pin T), Pay.
+    iApply (pinned_exec_bundle_boot_at γfs X Pin T cw pl hops ino f nl Pay Q
+              na alen afun sts Hres Hload with "Hcl Hinv Hcon Hgen HPay").
   Qed.
 
 End PinnedExec.

@@ -327,18 +327,19 @@ Section UInitConsK.
 
 
 
-  (* /INIT'S INSTANCE of [UConsOpen.cons_sup_absent]. *)
-  Lemma init_cons_sup_absent (N : uk_names Σ) (T K : iProp Σ) (r : echo_names)
+  (* /INIT'S INSTANCE of [UConsOpen.cons_sup_absent].  AND ONLY THE
+     ABSENCE LAW, not the whole bundle: /init runs it at the KEY and, once
+     its mknod has failed, at the SEAL ([AppEcho.cons_never]). *)
+  Lemma init_cons_sup_absent (N : uk_names Σ) (T K : iProp Σ)
       (m : regfile) (pc : mword 64) :
     Persistent T -> Timeless T -> Timeless K ->
     m !!! Regidx a0_idx = (mword_of_int 0x970 : mword 64) ->
     m !!! Regidx a1_idx = (mword_of_int 2 : mword 64) ->
-    init_cons_laws T K r -∗ app_inv fsc_fs -∗ init_rodata (ukn_t N) -∗ K -∗
+    init_cons_abs_law T K -∗ app_inv fsc_fs -∗ init_rodata (ukn_t N) -∗ K -∗
     udepwf_at N m pc USYS_open (init_cons_absent_fam T K (ukn_pay N))
       FsImg.ROOTINO.
   Proof.
-    intros HPT HTT HTK Ha0 Ha1. iIntros "#Hlaws #Hinv #Hro HK".
-    iDestruct "Hlaws" as "(_ & _ & #Habs & _)".
+    intros HPT HTT HTK Ha0 Ha1. iIntros "#Habs #Hinv #Hro HK".
     iApply (cons_sup_absent N T K UCodeInit.init_ro
               (mword_of_int 0x970) m pc HPT HTT HTK
               (fun M H => init_cons_path_of M H) Ha0 Ha1
@@ -349,18 +350,19 @@ Section UInitConsK.
 
   (* /INIT'S INSTANCE of [UConsOpen.cons_sup_console]: its own literal, at
      0x970 in its own .rodata. *)
-  Lemma init_cons_sup_console (N : uk_names Σ) (T K : iProp Σ) (r : echo_names)
+  Lemma init_cons_sup_console (N : uk_names Σ) (Pv : aview -> Prop)
+      (T K : iProp Σ) (r : echo_names)
       (i : Z) (m : regfile) (pc : mword 64) :
     Persistent T -> Timeless T ->
     m !!! Regidx a0_idx = (mword_of_int 0x970 : mword 64) ->
     m !!! Regidx a1_idx = (mword_of_int 2 : mword 64) ->
-    init_cons_laws T K r -∗ cons_made r i -∗ app_inv fsc_fs -∗
+    init_cons_laws_at Pv T K r -∗ cons_made r i -∗ app_inv fsc_fs -∗
     init_rodata (ukn_t N) -∗
     udepwf_at N m pc USYS_open (init_cons_console_fam T i (ukn_pay N))
       FsImg.ROOTINO.
   Proof.
     intros HPT HTT Ha0 Ha1. iIntros "#Hlaws #Hmade #Hinv #Hro".
-    iApply (cons_sup_console N T K r i UCodeInit.init_ro
+    iApply (cons_sup_console N Pv T K r i UCodeInit.init_ro
               (mword_of_int 0x970) m pc HPT HTT
               (fun M H => init_cons_path_of M H) Ha0 Ha1
               with "Hlaws Hmade Hinv [Hro]").
@@ -368,20 +370,22 @@ Section UInitConsK.
   Qed.
 
   (* ---- the MKNOD ---- *)
-  Definition init_cons_mknod_fam (T K : iProp Σ) (r : echo_names)
-      (Q : Z -> iProp Σ) : sfam :=
-    xfam_mknod (init_mk_P T) (init_mk_Farm T K) (init_mk_Fun T K)
+  Definition init_cons_mknod_fam (Pv : aview -> Prop) (T K : iProp Σ)
+      (r : echo_names) (Q : Z -> iProp Σ) : sfam :=
+    xfam_mknod (init_mk_P T) (init_mk_Farm Pv T K) (init_mk_Fun T K)
       (init_mk_Fok r T K) Q.
 
-  Lemma init_cons_sup_mknod (N : uk_names Σ) (T K : iProp Σ) (r : echo_names)
+  Lemma init_cons_sup_mknod (N : uk_names Σ) (Pv : aview -> Prop)
+      (T K : iProp Σ) (r : echo_names)
       (m : regfile) (pc : mword 64) :
     Persistent T -> Timeless T -> Timeless K ->
     (forall v : aview, Timeless (app_pred app_run v)) ->
     m !!! Regidx a0_idx = (mword_of_int 0x970 : mword 64) ->
     m !!! Regidx a1_idx = (mword_of_int 1 : mword 64) ->
     m !!! Regidx a2_idx = (mword_of_int 0 : mword 64) ->
-    init_cons_laws T K r -∗ app_inv fsc_fs -∗ init_rodata (ukn_t N) -∗ K -∗
-    udepwf_at N m pc 17 (init_cons_mknod_fam T K r (ukn_pay N)) FsImg.ROOTINO.
+    init_cons_laws_at Pv T K r -∗ app_inv fsc_fs -∗
+    init_rodata (ukn_t N) -∗ K -∗
+    udepwf_at N m pc 17 (init_cons_mknod_fam Pv T K r (ukn_pay N)) FsImg.ROOTINO.
   Proof.
     intros HPT HTT HTK HTL Ha0 Ha1 Ha2.
     iIntros "#Hlaws #Hinv #Hro HK".
@@ -390,7 +394,7 @@ Section UInitConsK.
     iDestruct (init_cons_ro_sub N M pm sz with "Hheap Hro") as %Hsro.
     iFrame "Hheap Hufd".
     iApply (sbundle_at_mknod_intro_at uslot
-              (init_cons_mknod_fam T K r (ukn_pay N))
+              (init_cons_mknod_fam Pv T K r (ukn_pay N))
               (uvis_of_run m pc M pm sz fdv FsImg.ROOTINO gn cs pidv false)
               FsImg.ROOTINO M (mword_of_int 0x970) CONSOLE 0
               eq_refl eq_refl
@@ -403,7 +407,7 @@ Section UInitConsK.
                     exact init_cons_dev_minor)).
     cbn [init_cons_mknod_fam xfam_mknod nf_P nf_Pmiss nf_Farm nf_Fun
          nf_Fok nf_Fex].
-    iApply (init_cons_laws_mknod_bundle fsc_fs r T K M (mword_of_int 0x970)
+    iApply (init_cons_laws_mknod_bundle fsc_fs r Pv T K M (mword_of_int 0x970)
               (init_cons_path_of M Hsro) with "Hlaws Hinv HK").
   Qed.
 
@@ -419,10 +423,9 @@ Section UInitConsK.
   (* ------------------------------------------------------------------- *)
   (* THE FIRST open, AND THE REPAIR ARM'S SECOND ONE WHEN THE MKNOD FAILED *)
   (* ------------------------------------------------------------------- *)
-  Lemma init_open_absent_leaf_holds (N : uk_names Σ) (T K : iProp Σ)
-      (r : echo_names) :
+  Lemma init_open_absent_leaf_holds (N : uk_names Σ) (T K : iProp Σ) :
     Persistent T -> Timeless T -> Timeless K ->
-    init_cons_laws T K r -∗ app_inv fsc_fs -∗
+    init_cons_abs_law T K -∗ app_inv fsc_fs -∗
     □ UkInit.uki_open_absent_leaf N T K.
   Proof.
     intros HPT HTT HTK. iIntros "#Hlaws #Hinv !>".
@@ -472,7 +475,7 @@ Section UInitConsK.
               with "[] [] Hrun Hcwd [HK] Hstd").
     { iApply (uis_init_3b4 with "Hcode"). }
     { iApply (init_rodata_img with "Hro"). }
-    { iApply (init_cons_sup_absent N T K r m1 (mword_of_int 0x3b4)
+    { iApply (init_cons_sup_absent N T K m1 (mword_of_int 0x3b4)
                 HPT HTT HTK Ha0' Ha1' with "Hlaws Hinv Hro HK"). }
     assert (E1 : add_vec_int (mword_of_int 0x3b4 : mword 64) 4
                  = mword_of_int 0x3b8)
@@ -537,10 +540,10 @@ Section UInitConsK.
   (* ------------------------------------------------------------------- *)
   (* THE SECOND open, AT THE RESOLVING PIN                                 *)
   (* ------------------------------------------------------------------- *)
-  Lemma init_open_console_leaf_holds (N : uk_names Σ) (T K : iProp Σ)
-      (r : echo_names) (i : Z) :
+  Lemma init_open_console_leaf_holds (N : uk_names Σ) (Pv : aview -> Prop)
+      (T K : iProp Σ) (r : echo_names) (i : Z) :
     Persistent T -> Timeless T ->
-    init_cons_laws T K r -∗ cons_made r i -∗ app_inv fsc_fs -∗
+    init_cons_laws_at Pv T K r -∗ cons_made r i -∗ app_inv fsc_fs -∗
     □ UkInit.uki_open_console_leaf N T init_cons_fd.
   Proof.
     intros HPT HTT. iIntros "#Hlaws #Hmade #Hinv !>".
@@ -590,7 +593,7 @@ Section UInitConsK.
               with "[] [] Hrun Hcwd [] Hstd").
     { iApply (uis_init_3b4 with "Hcode"). }
     { iApply (init_rodata_img with "Hro"). }
-    { iApply (init_cons_sup_console N T K r i m1 (mword_of_int 0x3b4)
+    { iApply (init_cons_sup_console N Pv T K r i m1 (mword_of_int 0x3b4)
                 HPT HTT Ha0' Ha1' with "Hlaws Hmade Hinv Hro"). }
     assert (E1 : add_vec_int (mword_of_int 0x3b4 : mword 64) 4
                  = mword_of_int 0x3b8)
@@ -681,14 +684,25 @@ Section UInitConsK.
   (* ------------------------------------------------------------------- *)
   (* THE MKNOD: where the console node comes into existence                *)
   (* ------------------------------------------------------------------- *)
-  Lemma init_mknod_leaf_holds (N : uk_names Σ) (T K : iProp Σ)
-      (r : echo_names) :
+  Lemma init_mknod_leaf_holds (N : uk_names Σ) (Pv : aview -> Prop)
+      (T K : iProp Σ) (r : echo_names) :
     Persistent T -> Timeless T -> Timeless K ->
     (forall v : aview, Timeless (app_pred app_run v)) ->
-    init_cons_laws T K r -∗ app_inv fsc_fs -∗
-    □ UkInit.uki_mknod_leaf N T K init_cons_fd.
+    init_cons_laws_at Pv T K r -∗
+    (* WHAT A FAILED MKNOD LEAVES, in the caller's own vocabulary.  The
+       call can fail at either arm of the dance, and what its credential
+       becomes differs: at the KEY arm the key is SPENT into the claim and
+       what comes back is the persistent SEAL beside the dead walk's leaf
+       again ([AppEcho.echo_cons_seal_step], lane SH-OPEN); at the FLAG arm
+       the credential IS the flag, the node is still there, and the second
+       open is the pinned one.  A [□] and a fupd, because the seal is an
+       update of the claim under [AppInv.app_inv]
+       ([AppInv.app_claim_update]). *)
+    □ (K ={⊤}=∗ UkInit.uki_mknod_out N T (init_cons_cred T r) init_cons_fd) -∗
+    app_inv fsc_fs -∗
+    □ UkInit.uki_mknod_leaf N T K (init_cons_cred T r) init_cons_fd.
   Proof.
-    intros HPT HTT HTK HTL. iIntros "#Hlaws #Hinv !>".
+    intros HPT HTT HTK HTL. iIntros "#Hlaws #Hfl #Hinv !>".
     iIntros (h m avail) "#Hcode #Hro %Hargs Hrun Hcwd HK Hcont".
     destruct Hargs as (Ha0 & Ha1 & Ha2).
     destruct init_syms_pins
@@ -731,7 +745,7 @@ Section UInitConsK.
       exact Ha2. }
     (* ---- 0x3bc  ecall -- the RECEIPT-KEEPING quiet leaf ---- *)
     iApply (wp_uk_ecall_quiet_recv_img N h1 m1 (mword_of_int 0x3bc) 17 avail
-              (init_cons_mknod_fam T K r (ukn_pay N)) FsImg.ROOTINO
+              (init_cons_mknod_fam Pv T K r (ukn_pay N)) FsImg.ROOTINO
               UCodeInit.init_ro
               ltac:(unfold m1, usysno;
                     rewrite (upd_eq m (Regidx a7_idx)
@@ -745,7 +759,7 @@ Section UInitConsK.
               with "[] [] Hrun Hcwd [HK]").
     { iApply (uis_init_3bc with "Hcode"). }
     { iApply (init_rodata_img with "Hro"). }
-    { iApply (init_cons_sup_mknod N T K r m1 (mword_of_int 0x3bc)
+    { iApply (init_cons_sup_mknod N Pv T K r m1 (mword_of_int 0x3bc)
                 HPT HTT HTK HTL Ha0' Ha1' Ha2'
                 with "Hlaws Hinv Hro HK"). }
     assert (E1 : add_vec_int (mword_of_int 0x3bc : mword 64) 4
@@ -757,7 +771,7 @@ Section UInitConsK.
                       init_cons_pl)
       by exact (init_cons_path_of (uvis_M W) Himg).
     iDestruct (spost_at_mknod_elim_at uslot
-                 (init_cons_mknod_fam T K r (ukn_pay N)) W
+                 (init_cons_mknod_fam Pv T K r (ukn_pay N)) W
                  FsImg.ROOTINO (uvis_M W) (mword_of_int 0x970) CONSOLE 0
                  ret (uvis_M W) (uvis_fd W) FsImg.ROOTINO cs'
                  Hcw eq_refl
@@ -782,23 +796,32 @@ Section UInitConsK.
               with "[] Hrun").
     { iApply (uis_init_3c0 with "Hcode"). }
     iIntros (h3) "Hrun".
-    iApply ("Hcont" $! h3 ret with "[Harms] Hcwd Hrun").
-    rewrite /mknod_arms.
-    iDestruct "Harms" as "[[_ Hok] | [_ Hfail]]".
-    - (* THE NODE EXISTS: the flag, and hence the SECOND open's leaf *)
-      iDestruct (init_cons_mknod_recv fsc_fs r T K
-                   (uvis_M W) (mword_of_int 0x970) Hpath with "Hok") as "Hm".
-      iDestruct "Hm" as "[Hm | #HT]"; last first.
-      { iRight. iRight. iExact "HT". }
-      iDestruct "Hm" as (i) "#Hmade".
-      iDestruct (init_open_console_leaf_holds N T K r i HPT HTT
-                   with "Hlaws Hmade Hinv") as "#Hlf".
-      iLeft. iExact "Hlf".
-    - (* THE MKNOD FAILED: the credential comes back *)
-      iDestruct (init_cons_mknod_fail_recv fsc_fs r T K (fun _ _ => True%I)
-                   (uvis_M W) (mword_of_int 0x970) with "Hfail") as "Hk".
-      iDestruct "Hk" as "[HK | #HT]"; [ iRight; iLeft; iExact "HK" |].
-      iRight. iRight. iExact "HT".
+    iApply fupd_wp_triv.
+    iAssert (|={⊤}=> UkInit.uki_mknod_out N T (init_cons_cred T r) init_cons_fd)%I
+      with "[Harms]" as ">Hout".
+    { rewrite /mknod_arms.
+      iDestruct "Harms" as "[[_ Hok] | [_ Hfail]]".
+      - (* THE NODE EXISTS: the flag, and hence the SECOND open's leaf *)
+        iDestruct (init_cons_mknod_recv fsc_fs r Pv T K
+                     (uvis_M W) (mword_of_int 0x970) Hpath with "Hok") as "Hm".
+        iDestruct "Hm" as "[Hm | #HT]"; last first.
+        { iModIntro. rewrite /UkInit.uki_mknod_out.
+          iRight. iRight. iExact "HT". }
+        iDestruct "Hm" as (i) "#Hmade".
+        iDestruct (init_open_console_leaf_holds N Pv T K r i HPT HTT
+                     with "Hlaws Hmade Hinv") as "#Hlf".
+        iModIntro. rewrite /UkInit.uki_mknod_out. iLeft. iFrame "Hlf".
+        iApply (init_cons_cred_of_made T r i with "Hmade").
+      - (* THE MKNOD FAILED: what the credential becomes is the caller's *)
+        iDestruct (init_cons_mknod_fail_recv fsc_fs r Pv T K
+                     (fun _ _ => True%I)
+                     (uvis_M W) (mword_of_int 0x970) with "Hfail") as "Hk".
+        iDestruct "Hk" as "[HK | #HT]"; last first.
+        { iModIntro. rewrite /UkInit.uki_mknod_out.
+          iRight. iRight. iExact "HT". }
+        iApply ("Hfl" with "HK"). }
+    iModIntro.
+    iApply ("Hcont" $! h3 ret with "Hout Hcwd Hrun").
   Qed.
 
   (* =================================================================== *)
@@ -810,11 +833,74 @@ Section UInitConsK.
   (*  [app_names file_app] is introduced ([UInitCons.init_cons_laws_echo]  *)
   (*  is the precedent and its note says why).                             *)
   (* =================================================================== *)
+  (* THE SEAL'S ABSENCE LAW at echo's era: the credential /init keeps when
+     its mknod FAILED, and the one sh's own first open then runs on (lane
+     SH-OPEN).  [AppEcho.cons_never] is the ghost FRAGMENT, so it is
+     persistent and timeless and the linear form is free. *)
+  Lemma init_cons_never_abs_law (γ : echo_fixed) (r : echo_names) :
+    file_app = MkAppcfg echo_names (echo_pred γ) r ->
+    ⊢ init_cons_abs_law (echo_taint γ) (cons_never r).
+  Proof.
+    intros Heq. rewrite /init_cons_abs_law /init_cons_pin_law.
+    rewrite Heq. cbn [app_pred app_run app_names].
+    iIntros "!>" (v) "#Hn Hp".
+    iDestruct (echo_cons_never_law γ r) as "#Hl".
+    iDestruct ("Hl" with "Hn") as "#Hl'".
+    iDestruct ("Hl'" $! v with "Hp") as "[Hp Hc]". iFrame "Hp Hn Hc".
+  Qed.
+
+  (* ...and the STEP that mints it, at the era's record: the key goes into
+     the claim and the credential comes out ([AppEcho.echo_cons_seal_step]).
+     Stated at the ambient record's [app_pred] so that
+     [AppInv.app_claim_update] applies without rewriting its caller's
+     goal. *)
+  Lemma init_cons_seal_law_echo (γ : echo_fixed) (r : echo_names) :
+    file_app = MkAppcfg echo_names (echo_pred γ) r ->
+    ⊢ □ (∀ av : aview, cons_key r -∗ ▷ app_pred app_run av
+           ={⊤ ∖ ↑appN}=∗
+           ▷ app_pred app_run av ∗ (cons_never r ∨ echo_taint γ)).
+  Proof.
+    intros Heq. rewrite Heq. cbn [app_pred app_run app_names].
+    iIntros "!>" (av) "HK >Hp".
+    iMod (echo_cons_seal_step γ r av with "HK Hp") as "[Hp Hn]".
+    iModIntro. iFrame "Hp Hn".
+  Qed.
+
+  (* WHAT A FAILED MKNOD LEAVES AT THE KEY ARM: the key is SPENT and what
+     comes back is the seal, its own dead-walk leaf, and the credential the
+     shell is handed. *)
+  Lemma init_cons_seal_out_echo (N : uk_names Σ) (γ : echo_fixed)
+      (r : echo_names) :
+    file_app = MkAppcfg echo_names (echo_pred γ) r ->
+    app_inv fsc_fs -∗
+    □ (cons_key r ={⊤}=∗
+         UkInit.uki_mknod_out N (echo_taint γ)
+           (init_cons_cred (echo_taint γ) r) init_cons_fd).
+  Proof.
+    intros Heq. iIntros "#Hinv !> HK".
+    iDestruct (init_cons_never_abs_law γ r Heq) as "#Habs".
+    iMod (app_claim_update ⊤ fsc_fs (cons_key r)
+            (cons_never r ∨ echo_taint γ)%I ltac:(set_solver)
+            with "Hinv [] HK") as "Hn".
+    { iApply (init_cons_seal_law_echo γ r Heq). }
+    iModIntro. rewrite /UkInit.uki_mknod_out.
+    iDestruct "Hn" as "[#Hn | #HT]"; last first.
+    { iRight. iRight. iExact "HT". }
+    iRight. iLeft. iExists (cons_never r).
+    iDestruct (init_open_absent_leaf_holds N (echo_taint γ) (cons_never r)
+                 ltac:(apply _) ltac:(apply _) ltac:(apply _)
+                 with "Habs Hinv") as "#Hlf".
+    iSplitR; [ iExact "Hlf" | ]. iSplitR; [ iExact "Hn" | ].
+    iApply (init_cons_cred_of_never (echo_taint γ) r with "Hn").
+  Qed.
+
+  (* ---- THE MISS ARM'S PAIR, at echo's era ---- *)
   Lemma init_cons_leaves_echo (γ : echo_fixed) (r : echo_names) :
     file_app = MkAppcfg echo_names (echo_pred γ) r ->
     app_inv fsc_fs -∗
     □ (∀ N : uk_names Σ,
-         UkInit.init_cons_leaves N (echo_taint γ) (cons_key r) init_cons_fd).
+         UkInit.init_cons_leaves N (echo_taint γ) (cons_key r)
+           (init_cons_cred (echo_taint γ) r) init_cons_fd).
   Proof.
     intros Heq.
     assert (HTL : forall v : aview, Timeless (app_pred app_run v)).
@@ -822,12 +908,58 @@ Section UInitConsK.
     iIntros "#Hinv".
     iDestruct (init_cons_laws_echo γ r Heq) as "#Hlaws".
     iModIntro. iIntros (N). rewrite /UkInit.init_cons_leaves. iSplit.
-    - iApply (init_open_absent_leaf_holds N (echo_taint γ) (cons_key r) r
+    - iApply (init_open_absent_leaf_holds N (echo_taint γ) (cons_key r)
                 ltac:(apply _) ltac:(apply _) ltac:(apply _)
-                with "Hlaws Hinv").
-    - iApply (init_mknod_leaf_holds N (echo_taint γ) (cons_key r) r
+                with "[] Hinv").
+      rewrite /init_cons_laws /init_cons_laws_at.
+      iDestruct "Hlaws" as "(_ & _ & #Hc & _)". iExact "Hc".
+    - iApply (init_mknod_leaf_holds N cons_absent (echo_taint γ) (cons_key r) r
                 ltac:(apply _) ltac:(apply _) ltac:(apply _) HTL
-                with "Hlaws Hinv").
+                with "Hlaws [] Hinv").
+      iApply (init_cons_seal_out_echo N γ r Heq with "Hinv").
+  Qed.
+
+  (* the credential the FLAG arm hands the shell *)
+  Lemma init_cons_cred_made_echo (γ : echo_fixed) (r : echo_names) (i0 : Z) :
+    cons_made r i0 -∗ init_cons_cred (echo_taint γ) r.
+  Proof. iApply (init_cons_cred_of_made (echo_taint γ) r i0). Qed.
+
+  (* ---- THE FLAG ARM'S PAIR (lane E2): the node is already there ---- *)
+  Lemma init_cons_hit_echo (γ : echo_fixed) (r : echo_names) (i0 : Z) :
+    file_app = MkAppcfg echo_names (echo_pred γ) r ->
+    cons_made r i0 -∗ app_inv fsc_fs -∗
+    □ (∀ N : uk_names Σ,
+         □ UkInit.uki_open_console_leaf N (echo_taint γ) init_cons_fd
+         ∗ □ UkInit.uki_mknod_hit_leaf N (echo_taint γ)
+               (init_cons_cred (echo_taint γ) r) init_cons_fd).
+  Proof.
+    intros Heq.
+    assert (HTL : forall v : aview, Timeless (app_pred app_run v)).
+    { rewrite Heq. cbn [app_pred app_run]. intro v. apply _. }
+    iIntros "#Hm #Hinv".
+    iDestruct (init_cons_laws_made_echo γ r i0 Heq with "Hm") as "#Hlaws".
+    (* the credential the shell is handed at this arm: the flag's own law *)
+    iAssert (init_cons_cred (echo_taint γ) r) as "#Hcred".
+    { iApply (init_cons_cred_of_made (echo_taint γ) r i0 with "Hm"). }
+    iModIntro. iIntros (N). iSplit.
+    - iApply (init_open_console_leaf_holds N (cons_present_at i0)
+                (echo_taint γ) (cons_made r i0) r i0
+                ltac:(apply _) ltac:(apply _) with "Hlaws Hm Hinv").
+    - (* the mknod at a view that ALREADY HAS the node: it cannot commit,
+         and the credential it hands on is the flag it went in with *)
+      iModIntro.
+      iApply (UkInit.uki_mknod_hit_of_leaf N (echo_taint γ)
+                (cons_made r i0) (init_cons_cred (echo_taint γ) r)
+                init_cons_fd with "[] Hm").
+      iApply (init_mknod_leaf_holds N (cons_present_at i0) (echo_taint γ)
+                (cons_made r i0) r
+                ltac:(apply _) ltac:(apply _) ltac:(apply _) HTL
+                with "Hlaws [] Hinv").
+      iIntros "!> #Hm'". iModIntro. rewrite /UkInit.uki_mknod_out. iLeft.
+      iSplitR; [ | iExact "Hcred" ].
+      iApply (init_open_console_leaf_holds N (cons_present_at i0)
+                (echo_taint γ) (cons_made r i0) r i0
+                ltac:(apply _) ltac:(apply _) with "Hlaws Hm Hinv").
   Qed.
 
 End UInitConsK.
