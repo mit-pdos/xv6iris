@@ -2788,8 +2788,23 @@ live (`uw_addr`), and the flag turns live into mapped.  Row 5's receipt
 (CONS-SWALLOW's `∃ P, perm_of (ud_um P) sz = uvis_perm W ∗ receipt P …`)
 gains `⌜uvis_lazy W = false -> live_pages (uvis_sz W) ⊆ dom (ud_um P)⌝`, and
 sh refutes the copyout-fault swallow from that.  Lane LAZY-FLAG, after
-CONS-SWALLOW (the set form `uvis_map` is withdrawn).  REFINEMENT (coordinator,
-2026-09-12): the flag is COMPUTED at the trap boundary, not stored --
+CONS-SWALLOW (the set form `uvis_map` is withdrawn).  REFINEMENT WITHDRAWN (2026-09-12, by LAZY-FLAG phase 1): the flag CANNOT be
+computed at the boundary -- the trap loop's TRANSPARENT arm (every page fault,
+answered by vmfault, which MAPS a page) re-keys the process at the SAME key
+(`uslot_key_cong` at equal components; `ProofUsertrapArms.v:1086` re-keys the
+round with `perm_of_uptd_ext_sz`, the projection stable while the domain
+grows), so a computed bit would flip under a trap the process cannot see and
+the congruence is false.  THE OWNER'S ORIGINAL FORM STANDS: a STORED bit
+`pv_lazy : bool` in `ProcDefs.pprivate`, read by `uvis_of` like `sts`/`g`/`cs`/
+`pid`, with the invariant `pv_lazy = false -> lazy_free (ud_um pt) sz` in
+`ProcInv.proc_priv_core`, re-established INSIDE each table-changing syscall's
+proof (sbrk from growproc's dom equation / dealloc's run; exec from the fresh
+image's coverage; fork's child from uvmcopy's domain equation; vmfault
+extensions by `lazy_free_mono`) -- the rows are then the identity everywhere
+except sbrk's LAZY-grow arm (`lz' = true` set by that proof) and exec's
+success (`false`); the transparent arm keeps the bit; `skey_eq`'s clause is
+reflexivity at every re-key site; the U tier's `false` is validated once at
+exec.  (The withdrawn text follows for the record.)  ORIGINALLY: the flag is COMPUTED at the trap boundary, not stored --
 `uvis_lazy := bool_decide (¬ live_pages sz ⊆ dom (ud_um pt))` in `uvis_of` --
 so there is no new kernel state and no new invariant; the rows are the
 implication `uvis_lazy W = false -> uvis_lazy W' = false` everywhere except
