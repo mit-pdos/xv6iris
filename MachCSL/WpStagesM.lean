@@ -140,6 +140,70 @@ theorem swp_checked_mem_read_load8_conf [CurCtx] (cpu : CPU) (dq dq' : DFrac) (c
         Privilege.Machine (physaddr.Physaddr pa) 8 false false false false) Φ := by
   checked_mem_read_conf_load_proof pa 8 hram hal
 
+/-! ### Pointer masking and translation in machine mode: none -/
+
+/-- The translation mode in machine mode: Bare, at once. -/
+theorem swp_translationMode_M (cpu : CPU) (Φ : SATPMode → IProp GF) :
+    Φ SATPMode.Bare ⊢ swp cpu (translationMode Privilege.Machine) Φ := by
+  iintro HΦ
+  unfold translationMode
+  swp_run 20
+  iexact HΦ
+
+theorem setWidth_extract64' (va : BitVec 64) : BitVec.setWidth 64 (BitVec.extractLsb' 0 64 va) = va := by
+  bv_decide
+
+theorem signExtend_extract64' (va : BitVec 64) : BitVec.signExtend 64 (BitVec.extractLsb' 0 64 va) = va := by
+  bv_decide
+
+set_option maxHeartbeats 4000000 in
+/-- The effective-address transform of a kernel access in machine mode:
+pointer masking is off (`mseccfg.PMM = 0`), the address is untouched. -/
+theorem swp_transform_effective_address_M (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c)
+    (va : BitVec 64) (acc : MemoryAccessType mem_payload) (hacc : kernelAccess acc)
+    (Φ : virtaddr → IProp GF) :
+    mConf cpu dq c ∗ (mConf cpu dq c -∗ Φ (virtaddr.Virtaddr va))
+    ⊢ swp cpu (transform_effective_address (virtaddr.Virtaddr va) acc) Φ := by
+  iintro ⟨HmConf, HΦ⟩
+  mconf_cases HmConf
+  obtain ⟨hMIE, hMPRV⟩ := hok.1
+  unfold transform_effective_address
+  rcases hacc with rfl | rfl | rfl | rfl | rfl | rfl
+  all_goals
+    swp_run 120
+    iapply swp_bind
+    iapply swp_translationMode_M
+    swp_run 60
+    reduce_closed_widths
+    simp only [pm_transform_PA, pm_transform_VA, zero_extend, sign_extend, Sail.BitVec.zeroExtend,
+      Sail.BitVec.signExtend, Sail.BitVec.extractLsb, BitVec.extractLsb, Functions.xlen, Int.reduceSub,
+      Int.reduceToNat, Int.reduceAdd, Nat.reduceSub, Nat.reduceAdd, Nat.sub_zero, Int.cast_ofNat_Int]
+    reduce_closed_widths
+    try simp only [BitVec.zeroExtend, setWidth_extract64', signExtend_extract64']
+    mconf_intro HmConf
+    iapply HΦ $$ HmConf
+
+
+set_option maxHeartbeats 4000000 in
+/-- `translateAddr` in machine mode (`MPRV = 0`): the address itself. -/
+theorem swp_translateAddr_M (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c)
+    (va : BitVec 64) (acc : MemoryAccessType mem_payload) (hacc : kernelAccess acc)
+    (Φ : Result (physaddr × page_based_mem_type × Unit) (ExceptionType × Unit) → IProp GF) :
+    mConf cpu dq c ∗
+    (mConf cpu dq c -∗ Φ (.Ok (physaddr.Physaddr va, page_based_mem_type.PBMT_PMA, ())))
+    ⊢ swp cpu (translateAddr (virtaddr.Virtaddr va) acc) Φ := by
+  iintro ⟨HmConf, HΦ⟩
+  mconf_cases HmConf
+  obtain ⟨hMIE, hMPRV⟩ := hok.1
+  unfold translateAddr
+  rw [is_shadow_stack_access_kernel acc hacc]
+  swp_run 60
+  iapply swp_bind
+  iapply swp_translationMode_M
+  swp_run 60
+  mconf_intro HmConf
+  iapply HΦ $$ HmConf
+
 /-! ### Fetch -/
 
 set_option maxHeartbeats 4000000 in
@@ -158,6 +222,13 @@ theorem swp_fetch_m4_conf (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (
     simp only [fetched4, hc, Bool.false_eq_true, ite_false, ite_true]
     unfold fetch
     swp_run 80
+    mconf_intro HmConf
+    iapply swp_bind
+    iapply (swp_translateAddr_M cpu dq c hok pc _ (Or.inl rfl))
+    iframe HmConf
+    iintro HmConf
+    mconf_cases HmConf
+    swp_run 40
     mconf_intro HmConf
     iapply swp_bind
     iapply swp_checked_mem_read_ifetch4_conf (hok := hok) (hram := hram) (hal := hal)
@@ -193,6 +264,13 @@ theorem swp_fetch_m2_conf (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (
     swp_run 80
     mconf_intro HmConf
     iapply swp_bind
+    iapply (swp_translateAddr_M cpu dq c hok pc _ (Or.inl rfl))
+    iframe HmConf
+    iintro HmConf
+    mconf_cases HmConf
+    swp_run 40
+    mconf_intro HmConf
+    iapply swp_bind
     iapply swp_checked_mem_read_ifetch2_conf (hok := hok) (hram := hram2) (hal := hal2)
     iframe
     inext
@@ -200,6 +278,13 @@ theorem swp_fetch_m2_conf (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (
   · swp_run 40
     iapply HΦ $$ HmConf HPC Hlo Hhi
   · mconf_cases HmConf
+    swp_run 40
+    mconf_intro HmConf
+    iapply swp_bind
+    iapply (swp_translateAddr_M cpu dq c hok (pc + 2#64) _ (Or.inl rfl))
+    iframe HmConf
+    iintro HmConf
+    mconf_cases HmConf
     swp_run 40
     mconf_intro HmConf
     iapply swp_bind
@@ -226,6 +311,13 @@ theorem swp_fetch_m2_rvc_conf (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.
   have hal2 : pc.toNat % 2 = 0 := by omega
   unfold fetch
   swp_run 80
+  mconf_intro HmConf
+  iapply swp_bind
+  iapply (swp_translateAddr_M cpu dq c hok pc _ (Or.inl rfl))
+  iframe HmConf
+  iintro HmConf
+  mconf_cases HmConf
+  swp_run 40
   mconf_intro HmConf
   iapply swp_bind
   iapply swp_checked_mem_read_ifetch2_conf (hok := hok) (hram := hram) (hal := hal2)

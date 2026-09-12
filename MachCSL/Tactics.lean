@@ -122,12 +122,95 @@ simproc_decl reduceClosedLe (@LE.le _ _ _ _) := reduceClosedPropCore
 simproc_decl reduceClosedLt (@LT.lt _ _ _ _) := reduceClosedPropCore
 simproc_decl reduceClosedMem (@Membership.mem _ _ _ _ _) := reduceClosedPropCore
 
+/-- Whether `m` is of the form `x >>= k`, either as an application of
+`Bind.bind` or of the raw structure projection some simp steps leave behind. -/
+def isBind (m : Lean.Expr) : Bool :=
+  m.isAppOfArity ``Bind.bind 6 ||
+  (match m.getAppFn with
+   | .proj ``Bind 0 _ => m.getAppNumArgs == 4
+   | _ => false)
+
+/-- Set (an option, so per thread) by `sailNormFocused` around its `simp`
+call: `pureBindValue` then defers the inlining of values that depend on
+variables bound inside the computation (those introduced by `simp`'s
+traversal of a binder: local declarations at index ≥ the context's
+`lctxInitIndices`). -/
+register_option swp_run.deferPure : Bool := { defValue := false, descr := "internal" }
+
+open Lean Meta Simp in
+/-- `pure_bind`, as a pre-step, deferred while the value depends on a
+variable bound *inside* the computation (the result of an earlier action):
+the model binds `let w ← pure (b && next_page_bytes >b 0)` and uses `w` as a
+bit-vector width, a dependent position `simp` cannot rewrite into once the
+value is there, so it is inlined only after the outer binders are gone and
+the value has been simplified.  Registered as pre- and post-step in place
+of `pure_bind` (a `pure` exposed by a post-rewrite of the action, e.g.
+`ExceptT.run_pure`, would otherwise be inlined by the lemma first).  A
+catch-all pattern: the bind may be the raw projection form. -/
+def pureBindValueCore (e : Lean.Expr) : SimpM Simp.Step := do
+  let some (ix, ik) :=
+    (if e.isAppOfArity ``Bind.bind 6 then some (4, 5) else if isBind e then some (2, 3) else none)
+    | return .continue
+  let x := e.getAppArgs[ix]!
+  let k := e.getAppArgs[ik]!
+  let some iv :=
+    (if x.isAppOfArity ``Pure.pure 4 then some 3
+     else match x.getAppFn with
+       | .proj ``Pure 0 _ => if x.getAppNumArgs == 2 then some 1 else none
+       | _ => none)
+    | return .continue
+  let v := x.getAppArgs[iv]!
+  let defer := (← getOptions).getBool `swp_run.deferPure
+  let r ← Simp.simp v
+  let init := (← Simp.getContext).lctxInitIndices
+  let lctx ← getLCtx
+  let isLocal (id : FVarId) : Bool := match lctx.find? id with
+    | some d => d.index ≥ init
+    | none => true
+  let deferred := defer && r.expr.hasAnyFVar isLocal
+  if (← getOptions).getBool `swp_run.trace then
+    logInfo m!"pureBind: {r.expr} deferred={deferred}"
+  let mk (y : Lean.Expr) : Lean.Expr :=
+    mkAppN e.getAppFn (e.getAppArgs.set! ix (mkAppN x.getAppFn (x.getAppArgs.set! iv y)))
+  if deferred then
+    -- keep the bind (`pure_bind` is not applied to it either); the
+    -- continuation is still to be simplified
+    let e' := mk r.expr
+    let r' ← Simp.simp k
+    let e'' := mkAppN e.getAppFn (e'.getAppArgs.set! ik r'.expr)
+    let h1? ← match r.proof? with
+      | some h =>
+        let motive ← withLocalDecl `v .default (← inferType v) fun y => mkLambdaFVars #[y] (mk y)
+        pure (some (← mkCongrArg motive h))
+      | none => pure none
+    let h2? ← match r'.proof? with
+      | some h' =>
+        let motive' ← withLocalDecl `k .default (← inferType k) fun y =>
+          mkLambdaFVars #[y] (mkAppN e.getAppFn (e'.getAppArgs.set! ik y))
+        pure (some (← mkCongrArg motive' h'))
+      | none => pure none
+    match h1?, h2? with
+    | some h1, some h2 => return .done { expr := e'', proof? := some (← mkEqTrans h1 h2) }
+    | some h1, none => return .done { expr := e'', proof? := some h1 }
+    | none, some h2 => return .done { expr := e'', proof? := some h2 }
+    | none, none => return .done { expr := e'' }
+  let some h2 ← (try some <$> mkAppM ``pure_bind #[r.expr, k] catch _ => pure none) | return .continue
+  let e' := (mkApp k r.expr).headBeta
+  match r.proof? with
+  | none => return .visit { expr := e', proof? := some h2 }
+  | some h =>
+    let motive ← withLocalDecl `v .default (← inferType v) fun y => mkLambdaFVars #[y] (mk y)
+    let h1 ← mkCongrArg motive h
+    return .visit { expr := e', proof? := some (← mkEqTrans h1 h2) }
+
+simproc_decl pureBindValue (_) := pureBindValueCore
+
 /-- Normalise the head of the computation. -/
 macro "sail_norm" : tactic =>
   `(tactic| simp only [reduceClosedBEq, reduceClosedBNe, reduceClosedNot, reduceClosedAnd,
       reduceClosedOr, reduceClosedDecide, reduceClosedIte, reduceClosedDIte, reduceClosedEq, reduceClosedNe, reduceClosedLe,
       reduceClosedLt, reduceClosedMem,
-      sail_facts, bind_assoc, pure_bind, bind_pure, map_eq_pure_bind,
+      sail_facts, ↓ pureBindValue, pureBindValue, bind_assoc, bind_pure, map_eq_pure_bind,
 BitVec.reduceNeg, BitVec.reduceNot, BitVec.reduceAnd, BitVec.reduceOr, BitVec.reduceXOr,
       BitVec.reduceAdd, BitVec.reduceMul, BitVec.reduceSub, BitVec.reduceShiftLeft,
       BitVec.reduceUShiftRight, BitVec.reduceSShiftRight, BitVec.reduceAppend, BitVec.reduceToNat,
@@ -161,14 +244,6 @@ BitVec.reduceNeg, BitVec.reduceNot, BitVec.reduceAnd, BitVec.reduceOr, BitVec.re
 /-- Find the `swp cpu m Φ` in the goal and return `m`. -/
 def findSwp (e : Lean.Expr) : Option Lean.Expr :=
   (e.find? fun t => t.isAppOfArity ``MachCSL.swp 7).map fun t => t.getAppArgs[5]!
-
-/-- Whether `m` is of the form `x >>= k`, either as an application of
-`Bind.bind` or of the raw structure projection some simp steps leave behind. -/
-def isBind (m : Lean.Expr) : Bool :=
-  m.isAppOfArity ``Bind.bind 6 ||
-  (match m.getAppFn with
-   | .proj ``Bind 0 _ => m.getAppNumArgs == 4
-   | _ => false)
 
 /-- The head action of `m`: for `x >>= k` it is `x`, otherwise `m` itself. -/
 def headAction (m : Lean.Expr) : Lean.Expr :=
@@ -238,7 +313,8 @@ def sailNormFocused : TacticM Unit := withMainContext do
   let tgt ← instantiateMVars (← goal.getType)
   let some m := getSwp tgt | evalTactic (← `(tactic| sail_norm))
   let (ctx, simprocs) ← getSailNormCtx
-  let (r, _) ← Lean.Meta.simp m ctx simprocs
+  let ctx ← ctx.setLctxInitIndices
+  let (r, _) ← withOptions (·.setBool `swp_run.deferPure true) <| Lean.Meta.simp m ctx simprocs
   if r.expr == m then throwError "simp made no progress"
   let tgt' := mapSwp tgt fun _ => r.expr
   match r.proof? with
@@ -613,7 +689,9 @@ def specced : List Name :=
    ``LeanRV64D.Functions.check_leaf_pte, ``LeanRV64D.Functions.pte_is_invalid,
    ``LeanRV64D.Functions.check_PTE_permission, ``LeanRV64D.Functions.update_and_write_pte,
    ``LeanRV64D.Functions.translate_TLB_hit, ``LeanRV64D.Functions.translate_TLB_miss,
-   ``LeanRV64D.Functions.lookup_TLB, ``LeanRV64D.Functions.add_to_TLB]
+   ``LeanRV64D.Functions.lookup_TLB, ``LeanRV64D.Functions.add_to_TLB,
+   ``LeanRV64D.Functions.translateAddr, ``LeanRV64D.Functions.transform_effective_address,
+   ``LeanRV64D.Functions.translationMode]
 
 /-- Succeeds (doing nothing) iff the head of the `swp` goal is a call of a
 function with its own stage spec, so that `swp_run` stops there. -/
@@ -623,8 +701,16 @@ register_option swp_run.memStop : Bool :=
 elab "swp_at_spec" : tactic => withMainContext do
   let tgt ← instantiateMVars (← getMainTarget)
   let some m := findSwp tgt | throwError "swp_at_spec: no swp goal"
-  let x := headAction m
-  let x := if x.isAppOfArity ``ExceptT.run 4 then x.getAppArgs[3]! else x
+  let mut x := headAction m
+  -- look through the wrappers the monad plumbing puts around a call: the
+  -- `ExceptT.run` of an early-return block, the binds inside it, the lift
+  for _ in [0:6] do
+    x := headAction x
+    if x.isAppOfArity ``ExceptT.run 4 then x := x.getAppArgs[3]!
+    else if let .const n _ := x.getAppFn then
+      if (n == ``liftM || n == ``MonadLiftT.monadLift || n == ``MonadLift.monadLift || n == ``ExceptT.lift) &&
+          x.getAppNumArgs > 0 then
+        x := x.getAppArgs.back!
   if let .const n _ := x.getAppFn then
     if specced.contains n then return
     if (← getOptions).getBool `swp_run.memStop then
@@ -732,6 +818,62 @@ partial def normHead (m : Lean.Expr) : MetaM Lean.Expr := do
     normHead x
   else
     return x
+
+/-! ## Simplifying `let` values before they are inlined
+
+A `let x := if b then 8 else 8` of the model, once zeta-reduced into a
+width position (`BitVec (8 * x)`), can no longer be rewritten by `simp`
+(the position is dependent).  So the value of a `let` at the head is
+simplified first, with the local equations (the split-on-page-boundary
+facts) and the boolean/conditional folds, by a genuine rewrite. -/
+
+def letValueLemmas : List Name :=
+  [``Bool.and_false, ``Bool.false_and, ``Bool.and_true, ``Bool.true_and, ``Bool.or_false, ``Bool.false_or,
+   ``ite_self, ``ite_true, ``ite_false, ``Bool.false_eq_true, ``decide_false, ``decide_true, ``Bool.not_true,
+   ``Bool.not_false, ``bne_self_eq_false, ``beq_self_eq_true]
+
+/-- The value of the `let` at the head of `m`, or of the `pure` a bind at
+the head feeds its continuation, if the head is one. -/
+partial def headLetValue (m : Lean.Expr) : Option Lean.Expr :=
+  match m with
+  | .letE _ _ v _ _ => some v
+  | .mdata _ e => headLetValue e
+  | _ =>
+    if m.isAppOfArity ``ExceptT.run 4 then headLetValue m.getAppArgs[3]!
+    else if m.isAppOfArity ``Bind.bind 6 then
+      let x := m.getAppArgs[4]!
+      if x.isAppOfArity ``Pure.pure 4 then some x.getAppArgs[3]! else headLetValue x
+    else if isBind m then
+      let x := m.getAppArgs[2]!
+      if x.isAppOfArity ``Pure.pure 4 then some x.getAppArgs[3]! else headLetValue x
+    else none
+
+/-- Simplify the value of the `let` at the head (a rewrite of the goal). -/
+def simpHeadLetValue : TacticM Bool := withMainContext do
+  let goal ← getMainGoal
+  let tgt ← instantiateMVars (← goal.getType)
+  let some m := getSwp tgt | return false
+  let some v := headLetValue m | return false
+  if v.hasLooseBVars then return false
+  let mut thms : SimpTheorems := {}
+  for d in ← getLCtx do
+    if d.isImplementationDetail then continue
+    let t := (← instantiateMVars d.type).consumeMData
+    if t.isAppOfArity ``Eq 3 then
+      thms ← thms.add (.fvar d.fvarId) #[] d.toExpr
+  for n in letValueLemmas do
+    thms ← thms.addConst n
+  let ctx ← Simp.mkContext {} (simpTheorems := #[thms]) (congrTheorems := ← getSimpCongrTheorems)
+  let (r, _) ← Simp.main v ctx (methods := ← Simp.mkDefaultMethods)
+  if (← getOptions).getBool `swp_run.trace then logInfo m!"letval: {v}\n  => {r.expr}"
+  if r.expr == v then return false
+  let some pf := r.proof? | return false
+  try
+    let res ← goal.rewrite tgt pf
+    let goal' ← goal.replaceTargetEq res.eNew res.eqProof
+    replaceMainGoal (goal' :: res.mvarIds)
+    return true
+  catch _ => return false
 
 /-- Expose the head of the computation: normalise it (`normHead`) and
 re-associate `(a >>= f) >>= g` at the head only (the normaliser would do it,
@@ -845,6 +987,12 @@ elab "swp_run " n:num : tactic => withSailNormCtx do
     let _ ← rewriteWithHyps
     try evalTactic (← `(tactic| sail_norm)) catch _ => pure ()
   while i < n.getNat do
+    -- a `let` at the head: its value first (see `simpHeadLetValue`)
+    for _ in [0:4] do
+      -- (exposed first: the value a `pure` feeds a bind is only visible once
+      -- the continuation a leaf left applied is beta-reduced)
+      let _ ← exposeHead
+      if !(← simpHeadLetValue) then break
     if !skipNorm then
       -- normalise the head until it is stable (a chain of decided
       -- conditionals collapses here, one per pass, each pass cheap)
@@ -867,6 +1015,7 @@ elab "swp_run " n:num : tactic => withSailNormCtx do
         -- plain event, which the step consumes as it is
         let some m ← exposeHead | break
         let x := headAction m
+        if trace then logInfo m!"swp_run: after pass head action = {x}\n  fn={x.getAppFn}"
         let x := if x.isAppOfArity ``ExceptT.run 4 then x.getAppArgs[3]! else x
         if let .const n _ := x.getAppFn then
           if stepableHeads.contains n then break
@@ -881,7 +1030,12 @@ elab "swp_run " n:num : tactic => withSailNormCtx do
       if lastHid then finish
       break
     let atSpec ← try evalTactic (← `(tactic| swp_at_spec)); pure true catch _ => pure false
-    if atSpec then break
+    if atSpec then
+      -- a register event just before it skipped the normalisation: the
+      -- spec'd call's arguments must be in normal form for its lemma
+      if skipNorm then
+        let _ ← try withHiddenConts sailNormFocused catch _ => pure false
+      break
     let wasReg ← headIsRegEvent
     let ok ← try let _ ← withHiddenConts (evalTactic (← `(tactic| swp_step))); pure true catch _ => pure false
     if !ok then break

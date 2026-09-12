@@ -11,6 +11,7 @@ prototype's `InstrBytes.instr`).
 -/
 import MachCSL.MConf
 import MachCSL.PlatformFacts
+import MachCSL.KMap
 
 namespace MachCSL
 
@@ -72,20 +73,18 @@ def fetchIsRvc : FetchResult → Bool
   | .F_RVC _ => true
   | _ => false
 
-/-- The bytes a fetch at `pc` reads to produce `r` -- the boot image's, never
-written (`imgBytes`), so readable by the instruction cache at every view --
-together with the geometric facts the fetch stage needs.  `pc` is in RAM and
-2-aligned.
-- `F_Base w`: the four bytes of `w` at `pc` (whether `pc` is 4-aligned, one
-  32-bit read, or only 2-aligned, two 16-bit reads), and `w` is not compressed;
-- `F_RVC h`: at a 4-aligned `pc` the fetch reads a whole 32-bit granule whose
-  low half is `h`; at a 2-aligned `pc` only the two bytes of `h`. -/
+/-- The kernel text's claim of the page of `a`: identity, executable. -/
+abbrev kmapRx (a : BitVec 64) : IProp GF := kmapAt (vpnOf a) (kLeaf (idPpn (vpnOf a)) .rx 0#1 0#1)
+
+/-- The bytes of an instruction at `pc` in the kernel text, with the text's
+claims of the pages they sit in (a 32-bit instruction at a 2-aligned `pc`
+may straddle a page boundary: its second half is at `pc + 2`). -/
 def instrBytes (pc : BitVec 64) : FetchResult → IProp GF
   | .F_Base w => iprop%
       ⌜inRam pc 4 ∧ pc.toNat % 2 = 0 ∧ isRVC (BitVec.extractLsb' 0 16 w) = false⌝ ∗
-      imgBytes pc 4 w
+      kmapRx pc ∗ kmapRx (pc + 2#64) ∗ imgBytes pc 4 w
   | .F_RVC h => iprop%
-      ⌜inRam pc 4 ∧ pc.toNat % 2 = 0 ∧ isRVC h = true⌝ ∗
+      ⌜inRam pc 4 ∧ pc.toNat % 2 = 0 ∧ isRVC h = true⌝ ∗ kmapRx pc ∗
       ((⌜pc.toNat % 4 = 0⌝ ∗
           ∃ w : BitVec 32, ⌜BitVec.extractLsb' 0 16 w = h⌝ ∗ imgBytes pc 4 w) ∨
        (⌜pc.toNat % 4 = 2⌝ ∗ imgBytes pc 2 h))

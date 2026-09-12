@@ -7,7 +7,7 @@ exclusive pair `read_pte_exclusive`/`write_pte_conditional`.  All three
 are the physical accesses of `WpSmodeAtomic` at another access kind, over
 the accessors the shared table's invariant provides (`MachCSL.KptInv`).
 -/
-import MachCSL.WpSmodeAtomic
+import MachCSL.WpSmodeAu
 import MachCSL.KptInv
 
 namespace MachCSL
@@ -825,11 +825,6 @@ theorem swp_translate_TLB_miss_kpt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf)
     ipureintro; exact tlbOk_write t tlb htlb vpn addr ppn perm a₀ d₀ a2 d2 hw
 
 
-/-- No kernel access is a shadow-stack access. -/
-theorem is_shadow_stack_access_kernel (acc : MemoryAccessType mem_payload) (hacc : kernelAccess acc) :
-    is_shadow_stack_access acc = (Pure.pure false : SailM Bool) := by
-  rcases hacc with rfl | rfl | rfl | rfl | rfl | rfl <;> rfl
-
 /-- The page number of a canonical Sv39 address, as the executor spells it. -/
 theorem extract_vpnOf (va : BitVec 64) :
     BitVec.setWidth 27 (BitVec.extractLsb' Functions.pagesize_bits 27 (BitVec.extractLsb' 0 39 va)) = vpnOf va := by
@@ -850,6 +845,21 @@ theorem satp_to_ppn_of (s : BitVec 64) (root : BitVec 44) (h : BitVec.extractLsb
   simp only [Sail.BitVec.length, Nat.reduceBEq, Bool.false_eq_true, ↓reduceIte, Sail.BitVec.extractLsb,
     BitVec.extractLsb, Nat.reduceAdd, Nat.reduceSub]
   exact h
+
+set_option maxHeartbeats 4000000 in
+/-- The translation mode in supervisor mode at the kernel page table: Sv39. -/
+theorem swp_translationMode_kpt (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool) (root : BitVec 44)
+    (hok : SConfKpt (GF := GF) c root sie) (Φ : SATPMode → IProp GF) :
+    confCells cpu dq Privilege.Supervisor c ∗ ▷ (confCells cpu dq Privilege.Supervisor c -∗ Φ SATPMode.Sv39)
+    ⊢ swp cpu (translationMode Privilege.Supervisor) Φ := by
+  iintro ⟨HmConf, HΦ⟩
+  obtain ⟨⟨hpmp, hms, hpmm, hlpe⟩, hmode, hasid, hroot, hadue⟩ := hok
+  obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
+  conf_cases HmConf
+  unfold translationMode
+  swp_run 80
+  conf_intro HmConf
+  iapply HΦ $$ HmConf
 
 set_option maxHeartbeats 1000000 in
 set_option maxRecDepth 100000 in
@@ -875,6 +885,7 @@ theorem swp_translateAddr_kpt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie
     ⊢ swp cpu (translateAddr (virtaddr.Virtaddr va) acc) Φ := by
   iintro ⟨HmConf, #Hkpt, Hctx, Hfrag, Htlb, HΦ⟩
   conf_cases HmConf
+  have hok0 := hok
   obtain ⟨⟨hpmp, hms, hpmm, hlpe⟩, hmode, hasid, hroot, hadue⟩ := hok
   obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
   have hok' : SConfPhys (GF := GF) c sie :=
@@ -882,6 +893,14 @@ theorem swp_translateAddr_kpt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie
   subst hbase
   unfold translateAddr
   rw [is_shadow_stack_access_kernel acc hacc]
+  swp_run 40
+  conf_intro HmConf
+  iapply swp_bind
+  iapply (swp_translationMode_kpt cpu dq c sie t.base hok0)
+  iframe HmConf
+  inext
+  iintro HmConf
+  conf_cases HmConf
   swp_run 120
   reduce_closed_widths
   rw [extract_vpnOf, satp_to_asid_of c.satp hasid, satp_to_ppn_of c.satp t.base hroot]

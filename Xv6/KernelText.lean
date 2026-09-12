@@ -5,12 +5,16 @@ The xv6 kernel text as a separation-logic resource.
 (`Xv6/KernelImage.lean`, dumped from the ELF) as never-written image bytes
 (`imgBytes`: timestamp 0 of the store order, hence persistent, duplicable,
 and fetched by every hart's instruction cache at every view) -- the paper's
-`kernel_text`.  Proofs look an instruction up by address in the search-tree
-form of the same list (`Kernel.textTree`, `kernelText_find`).
+`kernel_text`, together with the static mapping claims (`kmapStatic`), since
+an instruction fact says its page is mapped executable.  Proofs look an
+instruction up by address in the search-tree form of the same list
+(`Kernel.textTree`, `kernelText_find`).
 -/
 import MachCSL.Wp
+import MachCSL.KMap
 import Xv6.KernelImage
 import Xv6.KernelTree
+import Xv6.KernelMap
 
 namespace Xv6
 
@@ -23,19 +27,26 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 def instrBytes (k : Kernel.KInstr) : IProp GF :=
   imgBytes (BitVec.ofNat 64 k.addr) k.width (BitVec.ofNat (8 * k.width) k.enc)
 
-/-- The whole kernel text, read-only. -/
-def kernelText : IProp GF := iprop% [∗list] k ∈ Kernel.text, instrBytes k
+/-- The whole kernel text, read-only, with the static mapping claims (an
+instruction fact carries the execute claims of its page). -/
+def kernelText : IProp GF := iprop% kmapStatic ∗ [∗list] k ∈ Kernel.text, instrBytes k
 
 instance : Persistent (kernelText (GF := GF)) := by
   unfold kernelText instrBytes
   infer_instance
+
+/-- The static mapping claims, from the kernel text. -/
+theorem kernelText_kmapStatic : kernelText (GF := GF) ⊢ kmapStatic := by
+  unfold kernelText
+  iintro ⟨H, _⟩
+  iexact H
 
 /-- Any dumped instruction's bytes follow from the kernel text. -/
 theorem kernelText_instr (k : Kernel.KInstr) (h : k ∈ Kernel.text) :
     kernelText (GF := GF) ⊢ instrBytes k := by
   unfold kernelText
   obtain ⟨i, hi⟩ := List.getElem?_of_mem h
-  iintro H
+  iintro ⟨_, H⟩
   icases BigSepL.bigSepL_lookup hi $$ H with H
   iexact H
 

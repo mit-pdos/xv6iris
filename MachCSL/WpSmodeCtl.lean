@@ -5,7 +5,7 @@ branches (`beq`/`bne`/`blt`/`bge`/`bltu`/`bgeu`), and the word
 arithmetic `subw`/`addw`.  Execute stages only; the `kctx` rules are in
 `WpSmodeRules.lean`.
 -/
-import MachCSL.WpSmode
+import MachCSL.WpSmodeCycle
 import MachCSL.WpMmodeCtl
 
 namespace MachCSL
@@ -82,7 +82,7 @@ theorem execSpecF_j (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVec 64)
 
 set_option maxHeartbeats 4000000 in
 /-- `jalr x0, 0(rs1)` (`ret`, `c.jr`): jump to `rs1` with bit 0 cleared. -/
-theorem execSpecF_ret (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool) (hok : SConfBare (GF := GF) c sie)
+theorem execSpecF_ret (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool) (hok : SConfPhys (GF := GF) c sie)
     (pc npc₀ : BitVec 64) (rs1 : BitVec 5) (R : RegMap) :
     execSpecPP (GF := GF) cpu dq Privilege.Supervisor c Privilege.Supervisor c
       (instruction.JALR (0#12, regidx.Regidx rs1, regidx.Regidx 0#5))
@@ -90,7 +90,7 @@ theorem execSpecF_ret (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool) (hok : S
   intro Φ
   iintro ⟨HmConf, HPC, HnextPC, HF, HΦ⟩
   conf_cases HmConf
-  obtain ⟨⟨hpmp, hms, hpmm, hlpe⟩, hmode⟩ := hok
+  obtain ⟨hpmp, hms, hpmm, hlpe⟩ := hok
   have hupd := update_bit0_eq (RegMap.get R rs1)
   have hb0 := ofBool_bit0_and_mask (RegMap.get R rs1)
   unfold execute jumpPc

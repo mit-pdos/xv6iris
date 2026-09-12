@@ -242,6 +242,23 @@ theorem execSpec_ld_same [CurCtx] (cpu : CPU) (dq dq' : DFrac) (c : MConf) (hok 
   swp_run 150
   mconf_intro HmConf
   iapply swp_bind
+  iapply (swp_transform_effective_address_M cpu dq c hok _ _ (Or.inr (Or.inl rfl)))
+  iframe HmConf
+  iintro HmConf
+  mconf_cases HmConf
+  swp_run 100
+  iapply swp_bind
+  iapply swp_translationMode_M
+  swp_run 60
+  mconf_intro HmConf
+  iapply swp_bind
+  iapply (swp_translateAddr_M cpu dq c hok _ _ (Or.inr (Or.inl rfl)))
+  iframe HmConf
+  iintro HmConf
+  mconf_cases HmConf
+  swp_run 40
+  mconf_intro HmConf
+  iapply swp_bind
   iapply swp_checked_mem_read_load8_conf (hok := hok) (hram := hram) (hal := hal)
   iframe
   inext

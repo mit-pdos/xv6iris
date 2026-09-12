@@ -273,6 +273,11 @@ def kernelAccess (acc : MemoryAccessType mem_payload) : Prop :=
   acc = MemoryAccessType.Load mem_payload.PageTableEntry ∨
   acc = MemoryAccessType.Store mem_payload.PageTableEntry
 
+/-- No kernel access is a shadow-stack access. -/
+theorem is_shadow_stack_access_kernel (acc : MemoryAccessType mem_payload) (hacc : kernelAccess acc) :
+    is_shadow_stack_access acc = (Pure.pure false : SailM Bool) := by
+  rcases hacc with rfl | rfl | rfl | rfl | rfl | rfl <;> rfl
+
 /-- The PMP check passes, in machine mode, for every kernel access inside RAM. -/
 def pmpPassesM (cpu : CPU) (dq : DFrac) (c : MConf) : Prop :=
   ∀ (addr : BitVec 64) (width : Nat) (acc : MemoryAccessType mem_payload)

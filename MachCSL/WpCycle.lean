@@ -305,7 +305,7 @@ theorem fetchSpec_instrBytes_base (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MC
   intro Φ
   iintro ⟨HmConf, HPC, #HB, HΦ⟩
   simp only [instrBytes]
-  icases +keep HB with ⟨%hgeo, #Hbytes⟩
+  icases +keep HB with ⟨%hgeo, _, _, #Hbytes⟩
   obtain ⟨hram, hal2, hc⟩ := hgeo
   have h4 : pc.toNat % 4 = 0 ∨ pc.toNat % 4 = 2 := by omega
   rcases h4 with h4 | h4
@@ -334,7 +334,7 @@ theorem fetchSpec_instrBytes_rvc (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MCo
   intro Φ
   iintro ⟨HmConf, HPC, #HB, HΦ⟩
   simp only [instrBytes]
-  icases +keep HB with ⟨%hgeo, ⟨%h4, %w, %hw, #Hbytes⟩ | ⟨%h4, #Hbytes⟩⟩
+  icases +keep HB with ⟨%hgeo, _, ⟨%h4, %w, %hw, #Hbytes⟩ | ⟨%h4, #Hbytes⟩⟩
   · obtain ⟨hram, hal2, hc⟩ := hgeo
     have hf := fetchSpec_rvc4 (GF := GF) cpu dq c hok pc w hram h4 (hw ▸ hc)
     rw [hw] at hf

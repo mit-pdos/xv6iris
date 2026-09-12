@@ -2182,6 +2182,15 @@ theorem kmapStatic_rw [CurCtx] (a : BitVec 64) (h : kmapClass (vpnOf a).toNat = 
   unfold idLeaf
   rw [BitVec.ofNat_toNat, BitVec.setWidth_eq]
 
+/-- The identity execute claim of a static text page. -/
+theorem kmapStatic_rx (a : BitVec 64) (h : kmapClass (vpnOf a).toNat = some .rx) :
+    kmapStatic (GF := GF) ⊢ kmapRx a := by
+  apply kmapStatic_at
+  rw [regmap_get?_eq, show (KernelMap.static : RegMapF (BitVec 64)) = kmapStaticMap from rfl,
+    kmapStaticMap_get _ _ h]
+  unfold idLeaf
+  rw [BitVec.ofNat_toNat, BitVec.setWidth_eq]
+
 /-- One read-only byte, as a (discarded-fraction) points-to at the ambient
 context: the image's bytes are readable by every context. -/
 theorem kernelData_byte [CurCtx] (i a b : Nat) (h : Kernel.rodata[i]? = some (a, b))

@@ -4,8 +4,10 @@ context `kctx` for memory, control flow and the stack: `wp_s_lbu`,
 `wp_s_ld`, `wp_s_sb`, `wp_s_sd`, `wp_s_branch`, `wp_s_j`, `wp_s_jal`,
 `wp_s_ret`, `wp_s_subw`, `wp_s_addw`, `wp_s_push`, `wp_s_pop`.  All are
 instances of one schema, `wpLoop_k_gen`: an execute stage over the
-register file (plus some memory), run in the kernel context (Bare tier,
-interrupts off for now), delivering `wpNext`.
+register file (plus some memory), run in the kernel context at its
+translation tier (interrupts off for now), delivering `wpNext`.  The
+stages are stated at the ambient tier `curTier`; the context's tier is
+pinned to it by `transSlot`.
 -/
 import MachCSL.WpSmodeMem
 import MachCSL.WpSmodeCtl
@@ -45,11 +47,11 @@ theorem wpNext_mono (sie : Bool) (p : BitVec 64) (cpu : CPU) (K K' : CPU → IPr
 set_option maxHeartbeats 4000000 in
 /-- The general schema: an instruction whose execute stage, over the whole
 register file and the resources `P`, leaves the file at `R'` (same `sp`)
-and `Q`, run in the kernel context. -/
+and `Q`, run in the kernel context (its tier is the ambient one). -/
 theorem wpLoop_k_gen [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
-    (htier : k.tier = KTier.bare) (pc npc : BitVec 64) (is_rvc : Bool) (i : instruction)
+    (pc npc : BitVec 64) (is_rvc : Bool) (i : instruction)
     (R' : RegMap) (hsp : R' 2#5 = k.regs 2#5) (P Q : IProp GF)
-    (hexec : ∀ c : MConf, SConfBare (GF := GF) c false → c.menvcfg = menvcfgS →
+    (hexec : ∀ c : MConf, SConfAt (GF := GF) curTier c k.root false → c.menvcfg = menvcfgS →
       execSpecPP (GF := GF) cpu (DFrac.own 1) Privilege.Supervisor c Privilege.Supervisor c i pc
         (pc + instrLen is_rvc) npc
         iprop(gprFile cpu (tpPin cpu k.regs) ∗ P) iprop(gprFile cpu (tpPin cpu R') ∗ Q)) :
@@ -61,34 +63,45 @@ theorem wpLoop_k_gen [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
   iintro ⟨HI, Hk, Hpc, HP, HΦ⟩
   icases kctx_cases cpu k $$ Hk with ⟨%hwf, HConf, HF, Hstack, Htrans, Harm, Hcpu, Htok, Hclock, #Hro⟩
   icases kConf_cases cpu _ _ _ $$ HConf with ⟨%ms, %mdl, %mepc, %stc, %⟨hsm, hmdl⟩, HmConf⟩
+  unfold transSlot
+  icases Htrans with ⟨%hkt, Htrans⟩
   rw [hsie] at hsm
-  simp only [hsie, htier]
-  have hok := SConfBare_sConfOf_bare (GF := GF) k.root ms mdl mepc stc hsm
-  iapply (wpLoop_s_instr cpu (DFrac.own 1) _ _ hok hmdl rfl pc npc is_rvc i _ _ (hexec _ hok rfl))
-  iframe
+  simp only [hsie, hkt]
+  have hok := SConfAt_sConfOf (GF := GF) curTier k.root ms mdl mepc stc hsm
+  iapply (wpLoop_s_instr cpu (DFrac.own 1) _ _ curTier k.root hok hmdl rfl pc npc is_rvc i _ _
+    ((hexec _ hok rfl).frameL (transTok cpu curTier k.root)))
+  iframe HI HmConf Hclock Hpc HF HP
+  isplitl [Htrans Htok]
+  · unfold transTok; iframe Htrans Htok
   inext
-  iintro HmConf Hclock Hpc ⟨HF, HQ⟩
+  iintro HmConf Hclock Hpc HT ⟨HF, HQ⟩
+  unfold transTok
+  icases HT with ⟨Htrans, Htok⟩
   ihave HΦ' := wpNext_off _ _ _ $$ HΦ
-  ihave HConf := kConf_intro cpu KTier.bare k.root false ms mdl mepc stc ⟨hsm, hmdl⟩ $$ HmConf
+  ihave HConf := kConf_intro cpu curTier k.root false ms mdl mepc stc ⟨hsm, hmdl⟩ $$ HmConf
   iapply HΦ' $$ [HConf HF Hstack Htrans Harm Hcpu Htok Hclock] Hpc HQ
   iapply (kctx_intro' cpu (k.withRegs R') ((KCtx.wf_withRegs k R').mpr hwf))
   simp only [KCtx.withRegs_regs, KCtx.withRegs_sie, KCtx.withRegs_avail, KCtx.withRegs_noff,
     KCtx.withRegs_intena, KCtx.withRegs_locks, KCtx.withRegs_tier, KCtx.withRegs_root, KCtx.withRegs_proc,
-    hsp', hsie, htier]
-  iframe
-  iexact Hro
+    hsp', hsie, hkt]
+  unfold transSlot
+  iframe HConf HF Hstack Htrans Harm Hcpu Htok Hclock
+  isplit
+  · ipureintro; rfl
+  · iexact Hro
 
 set_option maxHeartbeats 4000000 in
 /-- The general schema for a memory instruction: as `wpLoop_k_gen`, with the
-context token lent to the execute stage. -/
+translation token (the tier's slot and the context token) lent to the
+execute stage. -/
 theorem wpLoop_k_mem [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
-    (htier : k.tier = KTier.bare) (pc npc : BitVec 64) (is_rvc : Bool) (i : instruction)
+    (pc npc : BitVec 64) (is_rvc : Bool) (i : instruction)
     (R' : RegMap) (hsp : R' 2#5 = k.regs 2#5) (P Q : IProp GF)
-    (hexec : ∀ c : MConf, SConfBare (GF := GF) c false → c.menvcfg = menvcfgS →
+    (hexec : ∀ c : MConf, SConfAt (GF := GF) curTier c k.root false → c.menvcfg = menvcfgS →
       execSpecPP (GF := GF) cpu (DFrac.own 1) Privilege.Supervisor c Privilege.Supervisor c i pc
         (pc + instrLen is_rvc) npc
-        iprop(gprFile cpu (tpPin cpu k.regs) ∗ ctxToken cpu ∗ P)
-        iprop(gprFile cpu (tpPin cpu R') ∗ ctxToken cpu ∗ Q)) :
+        iprop(transTok cpu curTier k.root ∗ gprFile cpu (tpPin cpu k.regs) ∗ P)
+        iprop(transTok cpu curTier k.root ∗ gprFile cpu (tpPin cpu R') ∗ Q)) :
     instr (GF := GF) pc is_rvc i ∗ kctx cpu k ∗ pcIs cpu pc ∗ P ∗
     ▷ wpNext k.sie k.proc cpu (fun cpu' =>
         iprop(kctx cpu' (k.withRegs R') -∗ pcIs cpu' npc -∗ Q -∗ wpLoop cpu'))
@@ -97,43 +110,52 @@ theorem wpLoop_k_mem [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
   iintro ⟨HI, Hk, Hpc, HP, HΦ⟩
   icases kctx_cases cpu k $$ Hk with ⟨%hwf, HConf, HF, Hstack, Htrans, Harm, Hcpu, Htok, Hclock, #Hro⟩
   icases kConf_cases cpu _ _ _ $$ HConf with ⟨%ms, %mdl, %mepc, %stc, %⟨hsm, hmdl⟩, HmConf⟩
+  unfold transSlot
+  icases Htrans with ⟨%hkt, Htrans⟩
   rw [hsie] at hsm
-  simp only [hsie, htier]
-  have hok := SConfBare_sConfOf_bare (GF := GF) k.root ms mdl mepc stc hsm
-  iapply (wpLoop_s_instr cpu (DFrac.own 1) _ _ hok hmdl rfl pc npc is_rvc i _ _ (hexec _ hok rfl))
-  iframe
+  simp only [hsie, hkt]
+  have hok := SConfAt_sConfOf (GF := GF) curTier k.root ms mdl mepc stc hsm
+  iapply (wpLoop_s_instr cpu (DFrac.own 1) _ _ curTier k.root hok hmdl rfl pc npc is_rvc i _ _ (hexec _ hok rfl))
+  iframe HI HmConf Hclock Hpc HF HP
+  isplitl [Htrans Htok]
+  · unfold transTok; iframe Htrans Htok
   inext
-  iintro HmConf Hclock Hpc ⟨HF, Htok, HQ⟩
+  iintro HmConf Hclock Hpc HT ⟨HF, HQ⟩
+  unfold transTok
+  icases HT with ⟨Htrans, Htok⟩
   ihave HΦ' := wpNext_off _ _ _ $$ HΦ
-  ihave HConf := kConf_intro cpu KTier.bare k.root false ms mdl mepc stc ⟨hsm, hmdl⟩ $$ HmConf
+  ihave HConf := kConf_intro cpu curTier k.root false ms mdl mepc stc ⟨hsm, hmdl⟩ $$ HmConf
   iapply HΦ' $$ [HConf HF Hstack Htrans Harm Hcpu Htok Hclock] Hpc HQ
   iapply (kctx_intro' cpu (k.withRegs R') ((KCtx.wf_withRegs k R').mpr hwf))
   simp only [KCtx.withRegs_regs, KCtx.withRegs_sie, KCtx.withRegs_avail, KCtx.withRegs_noff,
     KCtx.withRegs_intena, KCtx.withRegs_locks, KCtx.withRegs_tier, KCtx.withRegs_root, KCtx.withRegs_proc,
-    hsp', hsie, htier]
-  iframe
-  iexact Hro
+    hsp', hsie, hkt]
+  unfold transSlot
+  iframe HConf HF Hstack Htrans Harm Hcpu Htok Hclock
+  isplit
+  · ipureintro; rfl
+  · iexact Hro
 
 /-- `wpLoop_k_mem` for an execute stage that leaves the file alone. -/
 theorem wpLoop_k_keep_mem [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
-    (htier : k.tier = KTier.bare) (pc npc : BitVec 64) (is_rvc : Bool) (i : instruction) (P Q : IProp GF)
-    (hexec : ∀ c : MConf, SConfBare (GF := GF) c false → c.menvcfg = menvcfgS →
+    (pc npc : BitVec 64) (is_rvc : Bool) (i : instruction) (P Q : IProp GF)
+    (hexec : ∀ c : MConf, SConfAt (GF := GF) curTier c k.root false → c.menvcfg = menvcfgS →
       execSpecPP (GF := GF) cpu (DFrac.own 1) Privilege.Supervisor c Privilege.Supervisor c i pc
         (pc + instrLen is_rvc) npc
-        iprop(gprFile cpu (tpPin cpu k.regs) ∗ ctxToken cpu ∗ P)
-        iprop(gprFile cpu (tpPin cpu k.regs) ∗ ctxToken cpu ∗ Q)) :
+        iprop(transTok cpu curTier k.root ∗ gprFile cpu (tpPin cpu k.regs) ∗ P)
+        iprop(transTok cpu curTier k.root ∗ gprFile cpu (tpPin cpu k.regs) ∗ Q)) :
     instr (GF := GF) pc is_rvc i ∗ kctx cpu k ∗ pcIs cpu pc ∗ P ∗
     ▷ wpNext k.sie k.proc cpu (fun cpu' =>
         iprop(kctx cpu' k -∗ pcIs cpu' npc -∗ Q -∗ wpLoop cpu'))
     ⊢ wpLoop cpu := by
-  have := wpLoop_k_mem cpu k hsie htier pc npc is_rvc i k.regs rfl P Q hexec
+  have := wpLoop_k_mem cpu k hsie pc npc is_rvc i k.regs rfl P Q hexec
   rw [KCtx.withRegs_self] at this
   exact this
 
 /-- The schema for an execute stage that leaves the file alone. -/
 theorem wpLoop_k_keep [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
-    (htier : k.tier = KTier.bare) (pc npc : BitVec 64) (is_rvc : Bool) (i : instruction) (P Q : IProp GF)
-    (hexec : ∀ c : MConf, SConfBare (GF := GF) c false → c.menvcfg = menvcfgS →
+    (pc npc : BitVec 64) (is_rvc : Bool) (i : instruction) (P Q : IProp GF)
+    (hexec : ∀ c : MConf, SConfAt (GF := GF) curTier c k.root false → c.menvcfg = menvcfgS →
       execSpecPP (GF := GF) cpu (DFrac.own 1) Privilege.Supervisor c Privilege.Supervisor c i pc
         (pc + instrLen is_rvc) npc
         iprop(gprFile cpu (tpPin cpu k.regs) ∗ P) iprop(gprFile cpu (tpPin cpu k.regs) ∗ Q)) :
@@ -141,15 +163,15 @@ theorem wpLoop_k_keep [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KC
     ▷ wpNext k.sie k.proc cpu (fun cpu' =>
         iprop(kctx cpu' k -∗ pcIs cpu' npc -∗ Q -∗ wpLoop cpu'))
     ⊢ wpLoop cpu := by
-  have := wpLoop_k_gen cpu k hsie htier pc npc is_rvc i k.regs rfl P Q hexec
+  have := wpLoop_k_gen cpu k hsie pc npc is_rvc i k.regs rfl P Q hexec
   rw [KCtx.withRegs_self] at this
   exact this
 
 /-- The schema for an execute stage that touches nothing but the file (and
 leaves it alone). -/
 theorem wpLoop_k_keep0 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
-    (htier : k.tier = KTier.bare) (pc npc : BitVec 64) (is_rvc : Bool) (i : instruction)
-    (hexec : ∀ c : MConf, SConfBare (GF := GF) c false → c.menvcfg = menvcfgS →
+    (pc npc : BitVec 64) (is_rvc : Bool) (i : instruction)
+    (hexec : ∀ c : MConf, SConfAt (GF := GF) curTier c k.root false → c.menvcfg = menvcfgS →
       execSpecPP (GF := GF) cpu (DFrac.own 1) Privilege.Supervisor c Privilege.Supervisor c i pc
         (pc + instrLen is_rvc) npc (gprFile cpu (tpPin cpu k.regs)) (gprFile cpu (tpPin cpu k.regs))) :
     instr (GF := GF) pc is_rvc i ∗ kctx cpu k ∗ pcIs cpu pc ∗
@@ -157,7 +179,7 @@ theorem wpLoop_k_keep0 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : K
         iprop(kctx cpu' k -∗ pcIs cpu' npc -∗ wpLoop cpu'))
     ⊢ wpLoop cpu := by
   iintro ⟨HI, Hk, Hpc, HΦ⟩
-  iapply (wpLoop_k_keep cpu k hsie htier pc npc is_rvc i emp emp (fun c h1 h2 => (hexec c h1 h2).frame emp))
+  iapply (wpLoop_k_keep cpu k hsie pc npc is_rvc i emp emp (fun c h1 h2 => (hexec c h1 h2).frame emp))
   iframe
   isplitl []
   · iempintro
@@ -169,9 +191,9 @@ theorem wpLoop_k_keep0 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : K
 /-- The schema for an execute stage that writes one register `rd` (not
 `x0`, `sp`, `tp`) and touches the resources `P`/`Q`. -/
 theorem wpLoop_k_setReg' [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
-    (htier : k.tier = KTier.bare) (pc npc : BitVec 64) (is_rvc : Bool) (i : instruction)
+    (pc npc : BitVec 64) (is_rvc : Bool) (i : instruction)
     (rd : BitVec 5) (hrd : rdOk rd) (v : BitVec 64) (P Q : IProp GF)
-    (hexec : ∀ c : MConf, SConfBare (GF := GF) c false → c.menvcfg = menvcfgS →
+    (hexec : ∀ c : MConf, SConfAt (GF := GF) curTier c k.root false → c.menvcfg = menvcfgS →
       execSpecPP (GF := GF) cpu (DFrac.own 1) Privilege.Supervisor c Privilege.Supervisor c i pc
         (pc + instrLen is_rvc) npc
         iprop(gprFile cpu (tpPin cpu k.regs) ∗ P) iprop(gprFile cpu ((tpPin cpu k.regs).set rd v) ∗ Q)) :
@@ -182,18 +204,18 @@ theorem wpLoop_k_setReg' [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k :
   obtain ⟨hrd0, hrdsp, hrdtp⟩ := hrd
   have htp := tpPin_set cpu k.regs rd v hrdtp
   rw [htp] at hexec
-  exact wpLoop_k_gen cpu k hsie htier pc npc is_rvc i (k.regs.set rd v)
+  exact wpLoop_k_gen cpu k hsie pc npc is_rvc i (k.regs.set rd v)
     (RegMap.set_other _ _ _ _ (Ne.symm hrdsp)) P Q hexec
 
-/-- `wpLoop_k_setReg'` for a memory instruction (the token lent). -/
+/-- `wpLoop_k_setReg'` for a memory instruction (the translation token lent). -/
 theorem wpLoop_k_setReg_mem' [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
-    (htier : k.tier = KTier.bare) (pc npc : BitVec 64) (is_rvc : Bool) (i : instruction)
+    (pc npc : BitVec 64) (is_rvc : Bool) (i : instruction)
     (rd : BitVec 5) (hrd : rdOk rd) (v : BitVec 64) (P Q : IProp GF)
-    (hexec : ∀ c : MConf, SConfBare (GF := GF) c false → c.menvcfg = menvcfgS →
+    (hexec : ∀ c : MConf, SConfAt (GF := GF) curTier c k.root false → c.menvcfg = menvcfgS →
       execSpecPP (GF := GF) cpu (DFrac.own 1) Privilege.Supervisor c Privilege.Supervisor c i pc
         (pc + instrLen is_rvc) npc
-        iprop(gprFile cpu (tpPin cpu k.regs) ∗ ctxToken cpu ∗ P)
-        iprop(gprFile cpu ((tpPin cpu k.regs).set rd v) ∗ ctxToken cpu ∗ Q)) :
+        iprop(transTok cpu curTier k.root ∗ gprFile cpu (tpPin cpu k.regs) ∗ P)
+        iprop(transTok cpu curTier k.root ∗ gprFile cpu ((tpPin cpu k.regs).set rd v) ∗ Q)) :
     instr (GF := GF) pc is_rvc i ∗ kctx cpu k ∗ pcIs cpu pc ∗ P ∗
     ▷ wpNext k.sie k.proc cpu (fun cpu' =>
         iprop(kctx cpu' (k.setReg rd v) -∗ pcIs cpu' npc -∗ Q -∗ wpLoop cpu'))
@@ -201,26 +223,10 @@ theorem wpLoop_k_setReg_mem' [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) 
   obtain ⟨hrd0, hrdsp, hrdtp⟩ := hrd
   have htp := tpPin_set cpu k.regs rd v hrdtp
   rw [htp] at hexec
-  exact wpLoop_k_mem cpu k hsie htier pc npc is_rvc i (k.regs.set rd v)
+  exact wpLoop_k_mem cpu k hsie pc npc is_rvc i (k.regs.set rd v)
     (RegMap.set_other _ _ _ _ (Ne.symm hrdsp)) P Q hexec
 
 /-! ## Memory -/
-
-/-- `lbu rd, imm(rs1)`: the byte at `rs1 + imm`, zero-extended (the raw form: a byte window plus the RAM fact; clients use `wp_s_lbu`). -/
-theorem wp_s_lbu_bytes [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
-    (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rd rs1 : BitVec 5) (hrd : rdOk rd)
-    (dq' : DFrac) (b : BitVec 8) (hram : inRam (k.rget cpu rs1 + BitVec.signExtend 64 imm) 1) :
-    instr (GF := GF) pc is_rvc (instruction.LOAD (imm, regidx.Regidx rs1, regidx.Regidx rd, true, 1)) ∗
-    kctx cpu k ∗ pcIs cpu pc ∗
-    bytesPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 1 dq' b ∗
-    ▷ wpNext k.sie k.proc cpu (fun cpu' =>
-        iprop(kctx cpu' (k.setReg rd (BitVec.setWidth 64 b)) -∗
-          pcIs cpu' (pc + instrLen is_rvc) -∗
-          bytesPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 1 dq' b -∗ wpLoop cpu'))
-    ⊢ wpLoop cpu :=
-  wpLoop_k_setReg_mem' cpu k hsie htier pc _ is_rvc _ rd hrd _ _ _
-    (fun c hok _ => execSpecF_lbu cpu (DFrac.own 1) dq' c false hok pc _ imm rd rs1 hrd.1
-      (tpPin cpu k.regs) b hram)
 
 /-- `lbu rd, imm(rs1)`: the byte at `rs1 + imm`, zero-extended. -/
 theorem wp_s_lbu [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
@@ -232,33 +238,10 @@ theorem wp_s_lbu [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (
     ▷ wpNext k.sie k.proc cpu (fun cpu' =>
         iprop(kctx cpu' (k.setReg rd (BitVec.setWidth 64 b)) -∗ pcIs cpu' (pc + instrLen is_rvc) -∗
           wordPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 1 dq' b -∗ wpLoop cpu'))
-    ⊢ wpLoop cpu := by
-  iintro ⟨Hi, Hk, Hpc, Hw, Hnext⟩
-  icases kctx_tier _ _ $$ Hk with ⟨%hkt, Hk⟩
-  icases wordPointsTo_bare_acc _ _ _ _ (hkt ▸ htier) $$ Hw with ⟨%⟨hram, hal⟩, #Hcl, Hm⟩
-  iapply (wp_s_lbu_bytes cpu k hsie htier pc is_rvc imm rd rs1 hrd dq' b hram)
-  iframe Hi Hk Hpc Hm
-  inext
-  iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK Hk Hpc Hm
-  ihave Hw := wordPointsTo_intro_id _ _ _ _ hram hal $$ Hcl Hm
-  iapply HK $$ Hk Hpc Hw
-
-/-- `ld rd, imm(rs1)`: the word at `rs1 + imm` (8-aligned) (the raw form: a byte window plus the facts; clients use `wp_s_ld`). -/
-theorem wp_s_ld_bytes [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
-    (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rd rs1 : BitVec 5) (hrd : rdOk rd)
-    (dq' : DFrac) (v : BitVec 64) (hram : inRam (k.rget cpu rs1 + BitVec.signExtend 64 imm) 8)
-    (hal : (k.rget cpu rs1 + BitVec.signExtend 64 imm).toNat % 8 = 0) :
-    instr (GF := GF) pc is_rvc (instruction.LOAD (imm, regidx.Regidx rs1, regidx.Regidx rd, false, 8)) ∗
-    kctx cpu k ∗ pcIs cpu pc ∗
-    bytesPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 8 dq' v ∗
-    ▷ wpNext k.sie k.proc cpu (fun cpu' =>
-        iprop(kctx cpu' (k.setReg rd v) -∗ pcIs cpu' (pc + instrLen is_rvc) -∗
-          bytesPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 8 dq' v -∗ wpLoop cpu'))
     ⊢ wpLoop cpu :=
-  wpLoop_k_setReg_mem' cpu k hsie htier pc _ is_rvc _ rd hrd _ _ _
-    (fun c hok _ => execSpecF_ld cpu (DFrac.own 1) dq' c false hok pc _ imm rd rs1 hrd.1
-      (tpPin cpu k.regs) v hram hal)
+  wpLoop_k_setReg_mem' cpu k hsie pc _ is_rvc _ rd hrd _ _ _
+    (fun c hok _ => execSpecF_lbu cpu (DFrac.own 1) dq' c false k.root hok pc _ imm rd rs1 hrd.1
+      (tpPin cpu k.regs) b)
 
 /-- `ld rd, imm(rs1)`: the word at `rs1 + imm`. -/
 theorem wp_s_ld [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
@@ -270,32 +253,10 @@ theorem wp_s_ld [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (h
     ▷ wpNext k.sie k.proc cpu (fun cpu' =>
         iprop(kctx cpu' (k.setReg rd v) -∗ pcIs cpu' (pc + instrLen is_rvc) -∗
           wordPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 8 dq' v -∗ wpLoop cpu'))
-    ⊢ wpLoop cpu := by
-  iintro ⟨Hi, Hk, Hpc, Hw, Hnext⟩
-  icases kctx_tier _ _ $$ Hk with ⟨%hkt, Hk⟩
-  icases wordPointsTo_bare_acc _ _ _ _ (hkt ▸ htier) $$ Hw with ⟨%⟨hram, hal⟩, #Hcl, Hm⟩
-  iapply (wp_s_ld_bytes cpu k hsie htier pc is_rvc imm rd rs1 hrd dq' v hram hal)
-  iframe Hi Hk Hpc Hm
-  inext
-  iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK Hk Hpc Hm
-  ihave Hw := wordPointsTo_intro_id _ _ _ _ hram hal $$ Hcl Hm
-  iapply HK $$ Hk Hpc Hw
-
-/-- `sb rs2, imm(rs1)`: the low byte of `rs2` to `rs1 + imm` (the raw form: a byte window plus the RAM fact; clients use `wp_s_sb`). -/
-theorem wp_s_sb_bytes [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
-    (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rs1 rs2 : BitVec 5)
-    (old : BitVec 8) (hram : inRam (k.rget cpu rs1 + BitVec.signExtend 64 imm) 1) :
-    instr (GF := GF) pc is_rvc (instruction.STORE (imm, regidx.Regidx rs2, regidx.Regidx rs1, 1)) ∗
-    kctx cpu k ∗ pcIs cpu pc ∗
-    bytesPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 1 (DFrac.own 1) old ∗
-    ▷ wpNext k.sie k.proc cpu (fun cpu' =>
-        iprop(kctx cpu' k -∗ pcIs cpu' (pc + instrLen is_rvc) -∗
-          bytesPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 1 (DFrac.own 1)
-            (BitVec.extractLsb' 0 8 (k.rget cpu rs2)) -∗ wpLoop cpu'))
     ⊢ wpLoop cpu :=
-  wpLoop_k_keep_mem cpu k hsie htier pc _ is_rvc _ _ _
-    (fun c hok _ => execSpecF_sb cpu (DFrac.own 1) c false hok pc _ imm rs1 rs2 (tpPin cpu k.regs) old hram)
+  wpLoop_k_setReg_mem' cpu k hsie pc _ is_rvc _ rd hrd _ _ _
+    (fun c hok _ => execSpecF_ld cpu (DFrac.own 1) dq' c false k.root hok pc _ imm rd rs1 hrd.1
+      (tpPin cpu k.regs) v)
 
 /-- `sb rs2, imm(rs1)`: the low byte of `rs2` to the byte at `rs1 + imm`. -/
 theorem wp_s_sb [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
@@ -307,33 +268,9 @@ theorem wp_s_sb [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (h
         iprop(kctx cpu' k -∗ pcIs cpu' (pc + instrLen is_rvc) -∗
           wordPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 1 (DFrac.own 1)
             (BitVec.extractLsb' 0 8 (k.rget cpu rs2)) -∗ wpLoop cpu'))
-    ⊢ wpLoop cpu := by
-  iintro ⟨Hi, Hk, Hpc, Hw, Hnext⟩
-  icases kctx_tier _ _ $$ Hk with ⟨%hkt, Hk⟩
-  icases wordPointsTo_bare_acc _ _ _ _ (hkt ▸ htier) $$ Hw with ⟨%⟨hram, hal⟩, #Hcl, Hm⟩
-  iapply (wp_s_sb_bytes cpu k hsie htier pc is_rvc imm rs1 rs2 old hram)
-  iframe Hi Hk Hpc Hm
-  inext
-  iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK Hk Hpc Hm
-  ihave Hw := wordPointsTo_intro_id _ _ _ _ hram hal $$ Hcl Hm
-  iapply HK $$ Hk Hpc Hw
-
-/-- `sd rs2, imm(rs1)`: `rs2` to `rs1 + imm` (8-aligned) (the raw form: a byte window plus the facts; clients use `wp_s_sd`). -/
-theorem wp_s_sd_bytes [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
-    (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rs1 rs2 : BitVec 5)
-    (old : BitVec 64) (hram : inRam (k.rget cpu rs1 + BitVec.signExtend 64 imm) 8)
-    (hal : (k.rget cpu rs1 + BitVec.signExtend 64 imm).toNat % 8 = 0) :
-    instr (GF := GF) pc is_rvc (instruction.STORE (imm, regidx.Regidx rs2, regidx.Regidx rs1, 8)) ∗
-    kctx cpu k ∗ pcIs cpu pc ∗
-    bytesPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 8 (DFrac.own 1) old ∗
-    ▷ wpNext k.sie k.proc cpu (fun cpu' =>
-        iprop(kctx cpu' k -∗ pcIs cpu' (pc + instrLen is_rvc) -∗
-          bytesPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 8 (DFrac.own 1) (k.rget cpu rs2) -∗
-          wpLoop cpu'))
     ⊢ wpLoop cpu :=
-  wpLoop_k_keep_mem cpu k hsie htier pc _ is_rvc _ _ _
-    (fun c hok _ => execSpecF_sd cpu (DFrac.own 1) c false hok pc _ imm rs1 rs2 (tpPin cpu k.regs) old hram hal)
+  wpLoop_k_keep_mem cpu k hsie pc _ is_rvc _ _ _
+    (fun c hok _ => execSpecF_sb cpu (DFrac.own 1) c false k.root hok pc _ imm rs1 rs2 (tpPin cpu k.regs) old)
 
 /-- `sd rs2, imm(rs1)`: `rs2` to the word at `rs1 + imm`. -/
 theorem wp_s_sd [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
@@ -343,18 +280,11 @@ theorem wp_s_sd [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (h
     wordPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 8 (DFrac.own 1) old ∗
     ▷ wpNext k.sie k.proc cpu (fun cpu' =>
         iprop(kctx cpu' k -∗ pcIs cpu' (pc + instrLen is_rvc) -∗
-          wordPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 8 (DFrac.own 1) (k.rget cpu rs2) -∗ wpLoop cpu'))
-    ⊢ wpLoop cpu := by
-  iintro ⟨Hi, Hk, Hpc, Hw, Hnext⟩
-  icases kctx_tier _ _ $$ Hk with ⟨%hkt, Hk⟩
-  icases wordPointsTo_bare_acc _ _ _ _ (hkt ▸ htier) $$ Hw with ⟨%⟨hram, hal⟩, #Hcl, Hm⟩
-  iapply (wp_s_sd_bytes cpu k hsie htier pc is_rvc imm rs1 rs2 old hram hal)
-  iframe Hi Hk Hpc Hm
-  inext
-  iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK Hk Hpc Hm
-  ihave Hw := wordPointsTo_intro_id _ _ _ _ hram hal $$ Hcl Hm
-  iapply HK $$ Hk Hpc Hw
+          wordPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 8 (DFrac.own 1)
+            (k.rget cpu rs2) -∗ wpLoop cpu'))
+    ⊢ wpLoop cpu :=
+  wpLoop_k_keep_mem cpu k hsie pc _ is_rvc _ _ _
+    (fun c hok _ => execSpecF_sd cpu (DFrac.own 1) c false k.root hok pc _ imm rs1 rs2 (tpPin cpu k.regs) old)
 
 /-! ## Control flow -/
 
@@ -369,7 +299,7 @@ theorem wp_s_branch [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx
             else pc + instrLen is_rvc) -∗ wpLoop cpu'))
     ⊢ wpLoop cpu :=
   instr_pure_elim pc is_rvc _ _ _ (fun hpc hwf =>
-    wpLoop_k_keep0 cpu k hsie htier pc _ is_rvc _
+    wpLoop_k_keep0 cpu k hsie pc _ is_rvc _
       (fun c _ _ => execSpecF_btype cpu (DFrac.own 1) c pc (pc + instrLen is_rvc) imm rs1 rs2 hrs1 op
         (tpPin cpu k.regs) (jumpTgt_even_13 pc imm hpc (instrWf_btype hwf))))
 
@@ -382,7 +312,7 @@ theorem wp_s_j [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hs
         iprop(kctx cpu' k -∗ pcIs cpu' (pc + BitVec.signExtend 64 imm) -∗ wpLoop cpu'))
     ⊢ wpLoop cpu :=
   instr_pure_elim pc is_rvc _ _ _ (fun hpc hwf =>
-    wpLoop_k_keep0 cpu k hsie htier pc _ is_rvc _
+    wpLoop_k_keep0 cpu k hsie pc _ is_rvc _
       (fun c _ _ => execSpecF_j cpu (DFrac.own 1) c pc (pc + instrLen is_rvc) imm (tpPin cpu k.regs)
         (jumpTgt_even_21 pc imm hpc (instrWf_jal hwf))))
 
@@ -396,7 +326,7 @@ theorem wp_s_jal [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (
           pcIs cpu' (pc + BitVec.signExtend 64 imm) -∗ wpLoop cpu'))
     ⊢ wpLoop cpu :=
   instr_pure_elim pc is_rvc _ _ _ (fun hpc hwf =>
-    wpLoop_k_setReg cpu k hsie htier pc _ is_rvc _ rd hrd _
+    wpLoop_k_setReg cpu k hsie pc _ is_rvc _ rd hrd _
       (fun c _ _ => execSpecF_jal cpu (DFrac.own 1) c pc _ imm rd hrd.1 (tpPin cpu k.regs)
         (jumpTgt_even_21 pc imm hpc (instrWf_jal hwf))))
 
@@ -408,8 +338,8 @@ theorem wp_s_ret [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (
     ▷ wpNext k.sie k.proc cpu (fun cpu' =>
         iprop(kctx cpu' k -∗ pcIs cpu' (jumpPc (k.rget cpu rs1)) -∗ wpLoop cpu'))
     ⊢ wpLoop cpu :=
-  wpLoop_k_keep0 cpu k hsie htier pc _ is_rvc _
-    (fun c hok _ => execSpecF_ret cpu (DFrac.own 1) c false hok pc (pc + instrLen is_rvc) rs1 (tpPin cpu k.regs))
+  wpLoop_k_keep0 cpu k hsie pc _ is_rvc _
+    (fun c hok _ => execSpecF_ret cpu (DFrac.own 1) c false hok.phys pc (pc + instrLen is_rvc) rs1 (tpPin cpu k.regs))
 
 /-! ## Word arithmetic -/
 
@@ -423,7 +353,7 @@ theorem wp_s_subw [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) 
           (BitVec.extractLsb' 0 32 (k.rget cpu rs1) - BitVec.extractLsb' 0 32 (k.rget cpu rs2)))) -∗
           pcIs cpu' (pc + instrLen is_rvc) -∗ wpLoop cpu'))
     ⊢ wpLoop cpu :=
-  wpLoop_k_setReg cpu k hsie htier pc _ is_rvc _ rd hrd _
+  wpLoop_k_setReg cpu k hsie pc _ is_rvc _ rd hrd _
     (fun c _ _ => execSpecF_subw cpu (DFrac.own 1) c pc _ rd rs1 rs2 hrd.1 (tpPin cpu k.regs))
 
 /-- `addw rd, rs1, rs2`. -/
@@ -436,7 +366,7 @@ theorem wp_s_addw [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) 
           (BitVec.extractLsb' 0 32 (k.rget cpu rs1) + BitVec.extractLsb' 0 32 (k.rget cpu rs2)))) -∗
           pcIs cpu' (pc + instrLen is_rvc) -∗ wpLoop cpu'))
     ⊢ wpLoop cpu :=
-  wpLoop_k_setReg cpu k hsie htier pc _ is_rvc _ rd hrd _
+  wpLoop_k_setReg cpu k hsie pc _ is_rvc _ rd hrd _
     (fun c _ _ => execSpecF_addw cpu (DFrac.own 1) c pc _ rd rs1 rs2 hrd.1 (tpPin cpu k.regs))
 
 /-! ## The stack -/
@@ -462,27 +392,37 @@ theorem wp_s_push [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) 
   iintro ⟨HI, Hk, Hpc, HΦ⟩
   icases kctx_cases cpu k $$ Hk with ⟨%hwf, HConf, HF, Hstack, Htrans, Harm, Hcpu, Htok, Hclock, #Hro⟩
   icases kConf_cases cpu _ _ _ $$ HConf with ⟨%ms, %mdl, %mepc, %stc, %⟨hsm, hmdl⟩, HmConf⟩
+  unfold transSlot
+  icases Htrans with ⟨%hkt, Htrans⟩
   rw [hsie] at hsm
-  simp only [hsie, htier, trapRes_off]
+  simp only [hsie, hkt, trapRes_off]
   have hsplit : k.avail = m + (k.avail - m) := by omega
   rw [hsplit]
   icases stackOwn_split k.sp m (k.avail - m) $$ Hstack with ⟨Hframe, Hstack⟩
-  have hok := SConfBare_sConfOf_bare (GF := GF) k.root ms mdl mepc stc hsm
-  have hexec := execSpecF_addi (GF := GF) cpu (DFrac.own 1) (sConfOf KTier.bare k.root ms mdl mepc stc) pc
+  have hok := SConfAt_sConfOf (GF := GF) curTier k.root ms mdl mepc stc hsm
+  have hexec := execSpecF_addi (GF := GF) cpu (DFrac.own 1) (sConfOf curTier k.root ms mdl mepc stc) pc
     (pc + instrLen is_rvc) imm 2#5 2#5 (by decide) (tpPin cpu k.regs) Privilege.Supervisor
   rw [hval, htp] at hexec
-  iapply (wpLoop_s_instr cpu (DFrac.own 1) _ _ hok hmdl rfl pc _ is_rvc _ _ _ hexec)
-  iframe
+  iapply (wpLoop_s_instr cpu (DFrac.own 1) _ _ curTier k.root hok hmdl rfl pc _ is_rvc _ _ _
+    (hexec.frameL (transTok cpu curTier k.root)))
+  iframe HI HmConf Hclock Hpc HF
+  isplitl [Htrans Htok]
+  · unfold transTok; iframe Htrans Htok
   inext
-  iintro HmConf Hclock Hpc HF
+  iintro HmConf Hclock Hpc HT HF
+  unfold transTok
+  icases HT with ⟨Htrans, Htok⟩
   ihave HΦ' := wpNext_off _ _ _ $$ HΦ
-  ihave HConf := kConf_intro cpu KTier.bare k.root false ms mdl mepc stc ⟨hsm, hmdl⟩ $$ HmConf
+  ihave HConf := kConf_intro cpu curTier k.root false ms mdl mepc stc ⟨hsm, hmdl⟩ $$ HmConf
   iapply HΦ' $$ [HConf HF Hstack Htrans Harm Hcpu Htok Hclock] Hpc Hframe
   iapply (kctx_intro' cpu (k.push m) ((KCtx.wf_push k m).mpr hwf))
   simp only [KCtx.push_regs, KCtx.push_sie, KCtx.push_avail, KCtx.push_noff, KCtx.push_intena,
-    KCtx.push_locks, KCtx.push_tier, KCtx.push_root, KCtx.push_proc, KCtx.push_sp, hsie, htier, trapRes_off]
-  iframe
-  iexact Hro
+    KCtx.push_locks, KCtx.push_tier, KCtx.push_root, KCtx.push_proc, KCtx.push_sp, hsie, hkt, trapRes_off]
+  unfold transSlot
+  iframe HConf HF Hstack Htrans Harm Hcpu Htok Hclock
+  isplit
+  · ipureintro; rfl
+  · iexact Hro
 
 set_option maxHeartbeats 4000000 in
 /-- `addi sp, sp, 8m`: pop `m` slots; the frame `[sp, sp + 8m)` returns to
@@ -505,29 +445,39 @@ theorem wp_s_pop [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (
   iintro ⟨HI, Hk, Hpc, Hframe, HΦ⟩
   icases kctx_cases cpu k $$ Hk with ⟨%hwf, HConf, HF, Hstack, Htrans, Harm, Hcpu, Htok, Hclock, #Hro⟩
   icases kConf_cases cpu _ _ _ $$ HConf with ⟨%ms, %mdl, %mepc, %stc, %⟨hsm, hmdl⟩, HmConf⟩
+  unfold transSlot
+  icases Htrans with ⟨%hkt, Htrans⟩
   rw [hsie] at hsm
-  simp only [hsie, htier, trapRes_off]
+  simp only [hsie, hkt, trapRes_off]
   ihave Hstack := (show stackOwn (GF := GF) k.sp k.avail ⊢
       stackOwn (k.sp + 8#64 * BitVec.ofNat 64 m - 8#64 * BitVec.ofNat 64 m) k.avail by rw [hback]) $$ Hstack
   ihave Hstack := stackOwn_join _ m k.avail $$ [Hframe Hstack]
   case' _ => iframe
-  have hok := SConfBare_sConfOf_bare (GF := GF) k.root ms mdl mepc stc hsm
-  have hexec := execSpecF_addi (GF := GF) cpu (DFrac.own 1) (sConfOf KTier.bare k.root ms mdl mepc stc) pc
+  have hok := SConfAt_sConfOf (GF := GF) curTier k.root ms mdl mepc stc hsm
+  have hexec := execSpecF_addi (GF := GF) cpu (DFrac.own 1) (sConfOf curTier k.root ms mdl mepc stc) pc
     (pc + instrLen is_rvc) imm 2#5 2#5 (by decide) (tpPin cpu k.regs) Privilege.Supervisor
   rw [hval, htp] at hexec
-  iapply (wpLoop_s_instr cpu (DFrac.own 1) _ _ hok hmdl rfl pc _ is_rvc _ _ _ hexec)
-  iframe
+  iapply (wpLoop_s_instr cpu (DFrac.own 1) _ _ curTier k.root hok hmdl rfl pc _ is_rvc _ _ _
+    (hexec.frameL (transTok cpu curTier k.root)))
+  iframe HI HmConf Hclock Hpc HF
+  isplitl [Htrans Htok]
+  · unfold transTok; iframe Htrans Htok
   inext
-  iintro HmConf Hclock Hpc HF
+  iintro HmConf Hclock Hpc HT HF
+  unfold transTok
+  icases HT with ⟨Htrans, Htok⟩
   ihave HΦ' := wpNext_off _ _ _ $$ HΦ
-  ihave HConf := kConf_intro cpu KTier.bare k.root false ms mdl mepc stc ⟨hsm, hmdl⟩ $$ HmConf
+  ihave HConf := kConf_intro cpu curTier k.root false ms mdl mepc stc ⟨hsm, hmdl⟩ $$ HmConf
   iapply HΦ' $$ [HConf HF Hstack Htrans Harm Hcpu Htok Hclock] Hpc
   iapply (kctx_intro' cpu (k.pop m) ((KCtx.wf_pop k m).mpr hwf))
   simp only [KCtx.pop_regs, KCtx.pop_sie, KCtx.pop_avail, KCtx.pop_noff, KCtx.pop_intena,
-    KCtx.pop_locks, KCtx.pop_tier, KCtx.pop_root, KCtx.pop_proc, KCtx.pop_sp, hsie, htier, trapRes_off,
+    KCtx.pop_locks, KCtx.pop_tier, KCtx.pop_root, KCtx.pop_proc, KCtx.pop_sp, hsie, hkt, trapRes_off,
     Nat.add_comm m]
-  iframe
-  iexact Hro
+  unfold transSlot
+  iframe HConf HF Hstack Htrans Harm Hcpu Htok Hclock
+  isplit
+  · ipureintro; rfl
+  · iexact Hro
 
 /-! ## Value-dependent writes -/
 
@@ -536,11 +486,11 @@ set_option maxHeartbeats 4000000 in
 the (hidden) configuration into the file: the continuation gets the value
 `v` with the fact `P v` (`P` holds of `f c` at every context configuration). -/
 theorem wpLoop_k_genv [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
-    (htier : k.tier = KTier.bare) (pc npc : BitVec 64) (is_rvc : Bool) (i : instruction)
+    (pc npc : BitVec 64) (is_rvc : Bool) (i : instruction)
     (f : MConf → BitVec 64) (P : BitVec 64 → Prop)
-    (hP : ∀ c : MConf, SConfBare (GF := GF) c false → c.menvcfg = menvcfgS → P (f c))
+    (hP : ∀ c : MConf, SConfAt (GF := GF) curTier c k.root false → c.menvcfg = menvcfgS → P (f c))
     (R' : BitVec 64 → RegMap) (hsp : ∀ v, R' v 2#5 = k.regs 2#5)
-    (hexec : ∀ c : MConf, SConfBare (GF := GF) c false → c.menvcfg = menvcfgS →
+    (hexec : ∀ c : MConf, SConfAt (GF := GF) curTier c k.root false → c.menvcfg = menvcfgS →
       execSpecPP (GF := GF) cpu (DFrac.own 1) Privilege.Supervisor c Privilege.Supervisor c i pc
         (pc + instrLen is_rvc) npc
         (gprFile cpu (tpPin cpu k.regs)) (gprFile cpu (tpPin cpu (R' (f c))))) :
@@ -552,24 +502,34 @@ theorem wpLoop_k_genv [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KC
   iintro ⟨HI, Hk, Hpc, HΦ⟩
   icases kctx_cases cpu k $$ Hk with ⟨%hwf, HConf, HF, Hstack, Htrans, Harm, Hcpu, Htok, Hclock, #Hro⟩
   icases kConf_cases cpu _ _ _ $$ HConf with ⟨%ms, %mdl, %mepc, %stc, %⟨hsm, hmdl⟩, HmConf⟩
+  unfold transSlot
+  icases Htrans with ⟨%hkt, Htrans⟩
   rw [hsie] at hsm
-  simp only [hsie, htier]
-  have hok := SConfBare_sConfOf_bare (GF := GF) k.root ms mdl mepc stc hsm
-  have hsp' := KCtx.withRegs_sp k (R' (f (sConfOf KTier.bare k.root ms mdl mepc stc))) (hsp _)
+  simp only [hsie, hkt]
+  have hok := SConfAt_sConfOf (GF := GF) curTier k.root ms mdl mepc stc hsm
+  have hsp' := KCtx.withRegs_sp k (R' (f (sConfOf curTier k.root ms mdl mepc stc))) (hsp _)
   have hv := hP _ hok rfl
-  iapply (wpLoop_s_instr cpu (DFrac.own 1) _ _ hok hmdl rfl pc npc is_rvc i _ _ (hexec _ hok rfl))
-  iframe
+  iapply (wpLoop_s_instr cpu (DFrac.own 1) _ _ curTier k.root hok hmdl rfl pc npc is_rvc i _ _
+    ((hexec _ hok rfl).frameL (transTok cpu curTier k.root)))
+  iframe HI HmConf Hclock Hpc HF
+  isplitl [Htrans Htok]
+  · unfold transTok; iframe Htrans Htok
   inext
-  iintro HmConf Hclock Hpc HF
+  iintro HmConf Hclock Hpc HT HF
+  unfold transTok
+  icases HT with ⟨Htrans, Htok⟩
   ihave HΦ' := wpNext_off _ _ _ $$ HΦ
-  ihave HConf := kConf_intro cpu KTier.bare k.root false ms mdl mepc stc ⟨hsm, hmdl⟩ $$ HmConf
+  ihave HConf := kConf_intro cpu curTier k.root false ms mdl mepc stc ⟨hsm, hmdl⟩ $$ HmConf
   iapply HΦ' $$ %_ %hv [HConf HF Hstack Htrans Harm Hcpu Htok Hclock] Hpc
   iapply (kctx_intro' cpu (k.withRegs _) ((KCtx.wf_withRegs k _).mpr hwf))
   simp only [KCtx.withRegs_regs, KCtx.withRegs_sie, KCtx.withRegs_avail, KCtx.withRegs_noff,
     KCtx.withRegs_intena, KCtx.withRegs_locks, KCtx.withRegs_tier, KCtx.withRegs_root, KCtx.withRegs_proc,
-    hsp', hsie, htier]
-  iframe
-  iexact Hro
+    hsp', hsie, hkt]
+  unfold transSlot
+  iframe HConf HF Hstack Htrans Harm Hcpu Htok Hclock
+  isplit
+  · ipureintro; rfl
+  · iexact Hro
 
 /-- `sstatus` as the kernel reads it: its `SIE` bit is the context's index. -/
 def sstatusAt (sie : Bool) (v : BitVec 64) : Prop :=
@@ -585,13 +545,13 @@ theorem wp_s_csrr_sstatus [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k 
           pcIs cpu' (pc + instrLen is_rvc) -∗ wpLoop cpu'))
     ⊢ wpLoop cpu := by
   have htp := fun v => tpPin_set cpu k.regs rd v hrd.2.2
-  have h := wpLoop_k_genv cpu k hsie htier pc (pc + instrLen is_rvc) is_rvc _
+  have h := wpLoop_k_genv cpu k hsie pc (pc + instrLen is_rvc) is_rvc _
     (fun c => lower_mstatus c.mstatus) (sstatusAt k.sie)
-    (fun c hok _ => by
-      unfold sstatusAt; rw [lower_mstatus_sie, hsie]; exact hok.1.2.1.1)
+    (fun c (hok : SConfAt (GF := GF) curTier c k.root false) _ => by
+      unfold sstatusAt; rw [lower_mstatus_sie, hsie]; exact hok.phys.2.1.1)
     (fun v => k.regs.set rd v) (fun v => RegMap.set_other _ _ _ _ (Ne.symm hrd.2.1))
     (fun c hok _ => by
-      have e := execSpecF_csrr_sstatus (GF := GF) cpu (DFrac.own 1) c false hok pc (pc + instrLen is_rvc) rd hrd.1
+      have e := execSpecF_csrr_sstatus (GF := GF) cpu (DFrac.own 1) c false hok.phys pc (pc + instrLen is_rvc) rd hrd.1
         (tpPin cpu k.regs)
       rw [htp] at e; exact e)
   simpa only [KCtx.setReg_eq_withRegs] using h
@@ -607,34 +567,17 @@ theorem wp_s_csrrci_sstatus [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (
           pcIs cpu' (pc + instrLen is_rvc) -∗ wpLoop cpu'))
     ⊢ wpLoop cpu := by
   have htp := fun v => tpPin_set cpu k.regs rd v hrd.2.2
-  have h := wpLoop_k_genv cpu k hsie htier pc (pc + instrLen is_rvc) is_rvc _
+  have h := wpLoop_k_genv cpu k hsie pc (pc + instrLen is_rvc) is_rvc _
     (fun c => lower_mstatus c.mstatus) (sstatusAt k.sie)
-    (fun c hok _ => by
-      unfold sstatusAt; rw [lower_mstatus_sie, hsie]; exact hok.1.2.1.1)
+    (fun c (hok : SConfAt (GF := GF) curTier c k.root false) _ => by
+      unfold sstatusAt; rw [lower_mstatus_sie, hsie]; exact hok.phys.2.1.1)
     (fun v => k.regs.set rd v) (fun v => RegMap.set_other _ _ _ _ (Ne.symm hrd.2.1))
     (fun c hok _ => by
-      have e := execSpecF_csrrci_sstatus (GF := GF) cpu c hok pc (pc + instrLen is_rvc) rd hrd.1 (tpPin cpu k.regs)
+      have e := execSpecF_csrrci_sstatus (GF := GF) cpu c hok.phys pc (pc + instrLen is_rvc) rd hrd.1 (tpPin cpu k.regs)
       rw [htp] at e; exact e)
   simpa only [KCtx.setReg_eq_withRegs] using h
 
 /-! ## Words -/
-
-/-- `lw rd, imm(rs1)`: the sign-extended word at `rs1 + imm` (4-aligned) (the raw form: a byte window plus the facts; clients use `wp_s_lw`). -/
-theorem wp_s_lw_bytes [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
-    (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rd rs1 : BitVec 5) (hrd : rdOk rd)
-    (dq' : DFrac) (w : BitVec 32) (hram : inRam (k.rget cpu rs1 + BitVec.signExtend 64 imm) 4)
-    (hal : (k.rget cpu rs1 + BitVec.signExtend 64 imm).toNat % 4 = 0) :
-    instr (GF := GF) pc is_rvc (instruction.LOAD (imm, regidx.Regidx rs1, regidx.Regidx rd, false, 4)) ∗
-    kctx cpu k ∗ pcIs cpu pc ∗
-    bytesPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 4 dq' w ∗
-    ▷ wpNext k.sie k.proc cpu (fun cpu' =>
-        iprop(kctx cpu' (k.setReg rd (BitVec.signExtend 64 w)) -∗
-          pcIs cpu' (pc + instrLen is_rvc) -∗
-          bytesPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 4 dq' w -∗ wpLoop cpu'))
-    ⊢ wpLoop cpu :=
-  wpLoop_k_setReg_mem' cpu k hsie htier pc _ is_rvc _ rd hrd _ _ _
-    (fun c hok _ => execSpecF_lw cpu (DFrac.own 1) dq' c false hok pc _ imm rd rs1 hrd.1
-      (tpPin cpu k.regs) w hram hal)
 
 /-- `lw rd, imm(rs1)`: the sign-extended word at `rs1 + imm`. -/
 theorem wp_s_lw [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
@@ -646,33 +589,10 @@ theorem wp_s_lw [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (h
     ▷ wpNext k.sie k.proc cpu (fun cpu' =>
         iprop(kctx cpu' (k.setReg rd (BitVec.signExtend 64 w)) -∗ pcIs cpu' (pc + instrLen is_rvc) -∗
           wordPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 4 dq' w -∗ wpLoop cpu'))
-    ⊢ wpLoop cpu := by
-  iintro ⟨Hi, Hk, Hpc, Hw, Hnext⟩
-  icases kctx_tier _ _ $$ Hk with ⟨%hkt, Hk⟩
-  icases wordPointsTo_bare_acc _ _ _ _ (hkt ▸ htier) $$ Hw with ⟨%⟨hram, hal⟩, #Hcl, Hm⟩
-  iapply (wp_s_lw_bytes cpu k hsie htier pc is_rvc imm rd rs1 hrd dq' w hram hal)
-  iframe Hi Hk Hpc Hm
-  inext
-  iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK Hk Hpc Hm
-  ihave Hw := wordPointsTo_intro_id _ _ _ _ hram hal $$ Hcl Hm
-  iapply HK $$ Hk Hpc Hw
-
-/-- `sw rs2, imm(rs1)`: the low word of `rs2` to `rs1 + imm` (4-aligned) (the raw form: a byte window plus the facts; clients use `wp_s_sw`). -/
-theorem wp_s_sw_bytes [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
-    (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rs1 rs2 : BitVec 5)
-    (old : BitVec 32) (hram : inRam (k.rget cpu rs1 + BitVec.signExtend 64 imm) 4)
-    (hal : (k.rget cpu rs1 + BitVec.signExtend 64 imm).toNat % 4 = 0) :
-    instr (GF := GF) pc is_rvc (instruction.STORE (imm, regidx.Regidx rs2, regidx.Regidx rs1, 4)) ∗
-    kctx cpu k ∗ pcIs cpu pc ∗
-    bytesPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 4 (DFrac.own 1) old ∗
-    ▷ wpNext k.sie k.proc cpu (fun cpu' =>
-        iprop(kctx cpu' k -∗ pcIs cpu' (pc + instrLen is_rvc) -∗
-          bytesPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 4 (DFrac.own 1)
-            (BitVec.extractLsb' 0 32 (k.rget cpu rs2)) -∗ wpLoop cpu'))
     ⊢ wpLoop cpu :=
-  wpLoop_k_keep_mem cpu k hsie htier pc _ is_rvc _ _ _
-    (fun c hok _ => execSpecF_sw cpu (DFrac.own 1) c false hok pc _ imm rs1 rs2 (tpPin cpu k.regs) old hram hal)
+  wpLoop_k_setReg_mem' cpu k hsie pc _ is_rvc _ rd hrd _ _ _
+    (fun c hok _ => execSpecF_lw cpu (DFrac.own 1) dq' c false k.root hok pc _ imm rd rs1 hrd.1
+      (tpPin cpu k.regs) w)
 
 /-- `sw rs2, imm(rs1)`: the low word of `rs2` to the word at `rs1 + imm`. -/
 theorem wp_s_sw [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
@@ -684,17 +604,9 @@ theorem wp_s_sw [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (h
         iprop(kctx cpu' k -∗ pcIs cpu' (pc + instrLen is_rvc) -∗
           wordPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 4 (DFrac.own 1)
             (BitVec.extractLsb' 0 32 (k.rget cpu rs2)) -∗ wpLoop cpu'))
-    ⊢ wpLoop cpu := by
-  iintro ⟨Hi, Hk, Hpc, Hw, Hnext⟩
-  icases kctx_tier _ _ $$ Hk with ⟨%hkt, Hk⟩
-  icases wordPointsTo_bare_acc _ _ _ _ (hkt ▸ htier) $$ Hw with ⟨%⟨hram, hal⟩, #Hcl, Hm⟩
-  iapply (wp_s_sw_bytes cpu k hsie htier pc is_rvc imm rs1 rs2 old hram hal)
-  iframe Hi Hk Hpc Hm
-  inext
-  iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK Hk Hpc Hm
-  ihave Hw := wordPointsTo_intro_id _ _ _ _ hram hal $$ Hcl Hm
-  iapply HK $$ Hk Hpc Hw
+    ⊢ wpLoop cpu :=
+  wpLoop_k_keep_mem cpu k hsie pc _ is_rvc _ _ _
+    (fun c hok _ => execSpecF_sw cpu (DFrac.own 1) c false k.root hok pc _ imm rs1 rs2 (tpPin cpu k.regs) old)
 
 /-- The conditional branches against `x0` as `rs1` (`blez`, `bgtz`, ...). -/
 theorem wp_s_branch0 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
@@ -707,7 +619,7 @@ theorem wp_s_branch0 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
             else pc + instrLen is_rvc) -∗ wpLoop cpu'))
     ⊢ wpLoop cpu :=
   instr_pure_elim pc is_rvc _ _ _ (fun hpc hwf =>
-    wpLoop_k_keep0 cpu k hsie htier pc _ is_rvc _
+    wpLoop_k_keep0 cpu k hsie pc _ is_rvc _
       (fun c _ _ => execSpecF_btype0 cpu (DFrac.own 1) c pc (pc + instrLen is_rvc) imm rs2 hrs2 op
         (tpPin cpu k.regs) (jumpTgt_even_13 pc imm hpc (instrWf_btype hwf))))
 
@@ -735,15 +647,15 @@ set_option maxHeartbeats 4000000 in
 moving the context to depth `noff'` / saved enable `intena'` (which must
 keep it well formed). -/
 theorem wpLoop_k_cpu [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
-    (htier : k.tier = KTier.bare) (pc npc : BitVec 64) (is_rvc : Bool) (i : instruction)
+    (pc npc : BitVec 64) (is_rvc : Bool) (i : instruction)
     (R' : RegMap) (hsp : R' 2#5 = k.regs 2#5) (noff' : Nat) (intena' : Bool)
     (hwf' : (k.withCpu R' noff' intena').wf) (P Q : IProp GF)
     (hacc : cpuCells (GF := GF) cpu k.noff k.intena k.proc ⊢ P ∗ (Q -∗ cpuCells cpu noff' intena' k.proc))
-    (hexec : ∀ c : MConf, SConfBare (GF := GF) c false → c.menvcfg = menvcfgS →
+    (hexec : ∀ c : MConf, SConfAt (GF := GF) curTier c k.root false → c.menvcfg = menvcfgS →
       execSpecPP (GF := GF) cpu (DFrac.own 1) Privilege.Supervisor c Privilege.Supervisor c i pc
         (pc + instrLen is_rvc) npc
-        iprop(gprFile cpu (tpPin cpu k.regs) ∗ ctxToken cpu ∗ P)
-        iprop(gprFile cpu (tpPin cpu R') ∗ ctxToken cpu ∗ Q)) :
+        iprop(transTok cpu curTier k.root ∗ gprFile cpu (tpPin cpu k.regs) ∗ P)
+        iprop(transTok cpu curTier k.root ∗ gprFile cpu (tpPin cpu R') ∗ Q)) :
     instr (GF := GF) pc is_rvc i ∗ kctx cpu k ∗ pcIs cpu pc ∗
     ▷ wpNext k.sie k.proc cpu (fun cpu' =>
         iprop(kctx cpu' (k.withCpu R' noff' intena') -∗ pcIs cpu' npc -∗ wpLoop cpu'))
@@ -754,24 +666,33 @@ theorem wpLoop_k_cpu [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
   unfold cpuOwn
   icases Hcpu with ⟨Hcells, Hlocks, Hcsrs⟩
   icases hacc $$ Hcells with ⟨HP, Hclose⟩
+  unfold transSlot
+  icases Htrans with ⟨%hkt, Htrans⟩
   rw [hsie] at hsm
-  simp only [hsie, htier]
-  have hok := SConfBare_sConfOf_bare (GF := GF) k.root ms mdl mepc stc hsm
-  iapply (wpLoop_s_instr cpu (DFrac.own 1) _ _ hok hmdl rfl pc npc is_rvc i _ _ (hexec _ hok rfl))
-  iframe
+  simp only [hsie, hkt]
+  have hok := SConfAt_sConfOf (GF := GF) curTier k.root ms mdl mepc stc hsm
+  iapply (wpLoop_s_instr cpu (DFrac.own 1) _ _ curTier k.root hok hmdl rfl pc npc is_rvc i _ _ (hexec _ hok rfl))
+  iframe HI HmConf Hclock Hpc HF HP
+  isplitl [Htrans Htok]
+  · unfold transTok; iframe Htrans Htok
   inext
-  iintro HmConf Hclock Hpc ⟨HF, Htok, HQ⟩
+  iintro HmConf Hclock Hpc HT ⟨HF, HQ⟩
+  unfold transTok
+  icases HT with ⟨Htrans, Htok⟩
   ihave Hcells := Hclose $$ HQ
   ihave HΦ' := wpNext_off _ _ _ $$ HΦ
-  ihave HConf := kConf_intro cpu KTier.bare k.root false ms mdl mepc stc ⟨hsm, hmdl⟩ $$ HmConf
+  ihave HConf := kConf_intro cpu curTier k.root false ms mdl mepc stc ⟨hsm, hmdl⟩ $$ HmConf
   iapply HΦ' $$ [HConf HF Hstack Htrans Harm Hcells Hlocks Hcsrs Htok Hclock] Hpc
   iapply (kctx_intro' cpu (k.withCpu R' noff' intena') hwf')
   unfold cpuOwn
   simp only [KCtx.withCpu_regs, KCtx.withCpu_sie, KCtx.withCpu_avail, KCtx.withCpu_noff, KCtx.withCpu_intena,
-    KCtx.withCpu_locks, KCtx.withCpu_tier, KCtx.withCpu_root, KCtx.withCpu_proc, KCtx.withCpu_sp, hsp, hsie, htier,
+    KCtx.withCpu_locks, KCtx.withCpu_tier, KCtx.withCpu_root, KCtx.withCpu_proc, hsp, hsie, hkt,
     KCtx.sp]
-  iframe
-  iexact Hro
+  unfold transSlot
+  iframe HConf HF Hstack Htrans Harm Hcells Hlocks Hcsrs Htok Hclock
+  isplit
+  · ipureintro; rfl
+  · iexact Hro
 
 /-- A sign-extended 32-bit count below `2^31` is the count. -/
 theorem signExtend_ofNat32 (n : Nat) (hn : n < 2 ^ 31) :
@@ -808,27 +729,21 @@ theorem wp_s_lw_noff [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
   iintro ⟨HI, Hk, Hpc, HΦ⟩
   icases kctx_cases cpu k $$ Hk with ⟨%hwf, Hrest⟩
   ihave Hk := kctx_intro' cpu k hwf $$ Hrest
-  icases kctx_cpu_facts cpu k htier $$ Hk with ⟨%hf, Hk⟩
-  icases kctx_tier cpu k $$ Hk with ⟨%hkt, Hk⟩
-  have ⟨hram, hal⟩ := hf.2.1
-  rw [← haddr] at hram hal
   have htp := tpPin_set cpu k.regs rd (BitVec.ofNat 64 k.noff) hrd.2.2
   have hsx := signExtend_noff k hwf
-  iapply (wpLoop_k_cpu cpu k hsie htier pc (pc + instrLen is_rvc) is_rvc _ (k.regs.set rd (BitVec.ofNat 64 k.noff))
+  iapply (wpLoop_k_cpu cpu k hsie pc (pc + instrLen is_rvc) is_rvc _ (k.regs.set rd (BitVec.ofNat 64 k.noff))
     (RegMap.set_other _ _ _ _ (Ne.symm hrd.2.1)) k.noff k.intena (by rw [KCtx.withCpu_self]; exact hwf)
-    (bytesPointsTo (aCpuNoff cpu) 4 (DFrac.own 1) (BitVec.ofNat 32 k.noff))
-    (bytesPointsTo (aCpuNoff cpu) 4 (DFrac.own 1) (BitVec.ofNat 32 k.noff))
+    (wordPointsTo (aCpuNoff cpu) 4 (DFrac.own 1) (BitVec.ofNat 32 k.noff))
+    (wordPointsTo (aCpuNoff cpu) 4 (DFrac.own 1) (BitVec.ofNat 32 k.noff))
     (by
       unfold cpuCells
       iintro ⟨Hp, Hn, Hi⟩
-      icases wordPointsTo_bare_acc _ _ _ _ (hkt ▸ htier) $$ Hn with ⟨%⟨hr, ha⟩, #Hcl, Hn⟩
       iframe Hn
       iintro Hn
-      ihave Hn := wordPointsTo_intro_id _ _ _ _ hr ha $$ Hcl Hn
       iframe)
     (fun c hok _ => by
-      have e := execSpecF_lw (GF := GF) cpu (DFrac.own 1) (DFrac.own 1) c false hok pc (pc + instrLen is_rvc) imm rd rs1
-        hrd.1 (tpPin cpu k.regs) (BitVec.ofNat 32 k.noff) hram hal
+      have e := execSpecF_lw (GF := GF) cpu (DFrac.own 1) (DFrac.own 1) c false k.root hok pc (pc + instrLen is_rvc) imm rd rs1
+        hrd.1 (tpPin cpu k.regs) (BitVec.ofNat 32 k.noff)
       rw [hsx, htp] at e
       simp only [KCtx.rget] at haddr
       rw [haddr] at e
@@ -851,28 +766,22 @@ theorem wp_s_lw_intena [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : K
   iintro ⟨HI, Hk, Hpc, HΦ⟩
   icases kctx_cases cpu k $$ Hk with ⟨%hwf, Hrest⟩
   ihave Hk := kctx_intro' cpu k hwf $$ Hrest
-  icases kctx_cpu_facts cpu k htier $$ Hk with ⟨%hf, Hk⟩
-  icases kctx_tier cpu k $$ Hk with ⟨%hkt, Hk⟩
-  have ⟨hram, hal⟩ := hf.2.2
-  rw [← haddr] at hram hal
   have htp := tpPin_set cpu k.regs rd (if k.intena then 1#64 else 0#64) hrd.2.2
   have hsx := signExtend_intena k.intena
-  iapply (wpLoop_k_cpu cpu k hsie htier pc (pc + instrLen is_rvc) is_rvc _
+  iapply (wpLoop_k_cpu cpu k hsie pc (pc + instrLen is_rvc) is_rvc _
     (k.regs.set rd (if k.intena then 1#64 else 0#64))
     (RegMap.set_other _ _ _ _ (Ne.symm hrd.2.1)) k.noff k.intena (by rw [KCtx.withCpu_self]; exact hwf)
-    (bytesPointsTo (aCpuIntena cpu) 4 (DFrac.own 1) (intenaVal k.intena))
-    (bytesPointsTo (aCpuIntena cpu) 4 (DFrac.own 1) (intenaVal k.intena))
+    (wordPointsTo (aCpuIntena cpu) 4 (DFrac.own 1) (intenaVal k.intena))
+    (wordPointsTo (aCpuIntena cpu) 4 (DFrac.own 1) (intenaVal k.intena))
     (by
       unfold cpuCells
       iintro ⟨Hp, Hn, Hi⟩
-      icases wordPointsTo_bare_acc _ _ _ _ (hkt ▸ htier) $$ Hi with ⟨%⟨hr, ha⟩, #Hcl, Hi⟩
       iframe Hi
       iintro Hi
-      ihave Hi := wordPointsTo_intro_id _ _ _ _ hr ha $$ Hcl Hi
       iframe)
     (fun c hok _ => by
-      have e := execSpecF_lw (GF := GF) cpu (DFrac.own 1) (DFrac.own 1) c false hok pc (pc + instrLen is_rvc) imm rd rs1
-        hrd.1 (tpPin cpu k.regs) (intenaVal k.intena) hram hal
+      have e := execSpecF_lw (GF := GF) cpu (DFrac.own 1) (DFrac.own 1) c false k.root hok pc (pc + instrLen is_rvc) imm rd rs1
+        hrd.1 (tpPin cpu k.regs) (intenaVal k.intena)
       rw [hsx, htp] at e
       simp only [KCtx.rget] at haddr
       rw [haddr] at e
@@ -896,24 +805,18 @@ theorem wp_s_sw_noff [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
           pcIs cpu' (pc + instrLen is_rvc) -∗ wpLoop cpu'))
     ⊢ wpLoop cpu := by
   iintro ⟨HI, Hk, Hpc, HΦ⟩
-  icases kctx_cpu_facts cpu k htier $$ Hk with ⟨%hf, Hk⟩
-  icases kctx_tier cpu k $$ Hk with ⟨%hkt, Hk⟩
-  have ⟨hram, hal⟩ := hf.2.1
-  rw [← haddr] at hram hal
-  iapply (wpLoop_k_cpu cpu k hsie htier pc (pc + instrLen is_rvc) is_rvc _ k.regs rfl n' k.intena hwf'
-    (bytesPointsTo (aCpuNoff cpu) 4 (DFrac.own 1) (BitVec.ofNat 32 k.noff))
-    (bytesPointsTo (aCpuNoff cpu) 4 (DFrac.own 1) (BitVec.ofNat 32 n'))
+  iapply (wpLoop_k_cpu cpu k hsie pc (pc + instrLen is_rvc) is_rvc _ k.regs rfl n' k.intena hwf'
+    (wordPointsTo (aCpuNoff cpu) 4 (DFrac.own 1) (BitVec.ofNat 32 k.noff))
+    (wordPointsTo (aCpuNoff cpu) 4 (DFrac.own 1) (BitVec.ofNat 32 n'))
     (by
       unfold cpuCells
       iintro ⟨Hp, Hn, Hi⟩
-      icases wordPointsTo_bare_acc _ _ _ _ (hkt ▸ htier) $$ Hn with ⟨%⟨hr, ha⟩, #Hcl, Hn⟩
       iframe Hn
       iintro Hn
-      ihave Hn := wordPointsTo_intro_id _ _ _ _ hr ha $$ Hcl Hn
       iframe)
     (fun c hok _ => by
-      have e := execSpecF_sw (GF := GF) cpu (DFrac.own 1) c false hok pc (pc + instrLen is_rvc) imm rs1 rs2
-        (tpPin cpu k.regs) (BitVec.ofNat 32 k.noff) hram hal
+      have e := execSpecF_sw (GF := GF) cpu (DFrac.own 1) c false k.root hok pc (pc + instrLen is_rvc) imm rs1 rs2
+        (tpPin cpu k.regs) (BitVec.ofNat 32 k.noff)
       simp only [KCtx.rget] at haddr hval
       rw [haddr, hval] at e
       exact e))
@@ -933,24 +836,18 @@ theorem wp_s_sw_intena [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : K
           pcIs cpu' (pc + instrLen is_rvc) -∗ wpLoop cpu'))
     ⊢ wpLoop cpu := by
   iintro ⟨HI, Hk, Hpc, HΦ⟩
-  icases kctx_cpu_facts cpu k htier $$ Hk with ⟨%hf, Hk⟩
-  icases kctx_tier cpu k $$ Hk with ⟨%hkt, Hk⟩
-  have ⟨hram, hal⟩ := hf.2.2
-  rw [← haddr] at hram hal
-  iapply (wpLoop_k_cpu cpu k hsie htier pc (pc + instrLen is_rvc) is_rvc _ k.regs rfl k.noff b' hwf'
-    (bytesPointsTo (aCpuIntena cpu) 4 (DFrac.own 1) (intenaVal k.intena))
-    (bytesPointsTo (aCpuIntena cpu) 4 (DFrac.own 1) (intenaVal b'))
+  iapply (wpLoop_k_cpu cpu k hsie pc (pc + instrLen is_rvc) is_rvc _ k.regs rfl k.noff b' hwf'
+    (wordPointsTo (aCpuIntena cpu) 4 (DFrac.own 1) (intenaVal k.intena))
+    (wordPointsTo (aCpuIntena cpu) 4 (DFrac.own 1) (intenaVal b'))
     (by
       unfold cpuCells
       iintro ⟨Hp, Hn, Hi⟩
-      icases wordPointsTo_bare_acc _ _ _ _ (hkt ▸ htier) $$ Hi with ⟨%⟨hr, ha⟩, #Hcl, Hi⟩
       iframe Hi
       iintro Hi
-      ihave Hi := wordPointsTo_intro_id _ _ _ _ hr ha $$ Hcl Hi
       iframe)
     (fun c hok _ => by
-      have e := execSpecF_sw (GF := GF) cpu (DFrac.own 1) c false hok pc (pc + instrLen is_rvc) imm rs1 rs2
-        (tpPin cpu k.regs) (intenaVal k.intena) hram hal
+      have e := execSpecF_sw (GF := GF) cpu (DFrac.own 1) c false k.root hok pc (pc + instrLen is_rvc) imm rs1 rs2
+        (tpPin cpu k.regs) (intenaVal k.intena)
       simp only [KCtx.rget] at haddr hval
       rw [haddr, hval] at e
       exact e))
@@ -968,26 +865,20 @@ theorem wp_s_ld_proc [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
   iintro ⟨HI, Hk, Hpc, HΦ⟩
   icases kctx_cases cpu k $$ Hk with ⟨%hwf, Hrest⟩
   ihave Hk := kctx_intro' cpu k hwf $$ Hrest
-  icases kctx_cpu_facts cpu k htier $$ Hk with ⟨%hf, Hk⟩
-  icases kctx_tier cpu k $$ Hk with ⟨%hkt, Hk⟩
-  have ⟨hram, hal⟩ := hf.1
-  rw [← haddr] at hram hal
   have htp := tpPin_set cpu k.regs rd k.proc hrd.2.2
-  iapply (wpLoop_k_cpu cpu k hsie htier pc (pc + instrLen is_rvc) is_rvc _ (k.regs.set rd k.proc)
+  iapply (wpLoop_k_cpu cpu k hsie pc (pc + instrLen is_rvc) is_rvc _ (k.regs.set rd k.proc)
     (RegMap.set_other _ _ _ _ (Ne.symm hrd.2.1)) k.noff k.intena (by rw [KCtx.withCpu_self]; exact hwf)
-    (bytesPointsTo (aCpuProc cpu) 8 (DFrac.own 1) k.proc)
-    (bytesPointsTo (aCpuProc cpu) 8 (DFrac.own 1) k.proc)
+    (wordPointsTo (aCpuProc cpu) 8 (DFrac.own 1) k.proc)
+    (wordPointsTo (aCpuProc cpu) 8 (DFrac.own 1) k.proc)
     (by
       unfold cpuCells
       iintro ⟨Hp, Hn, Hi⟩
-      icases wordPointsTo_bare_acc _ _ _ _ (hkt ▸ htier) $$ Hp with ⟨%⟨hr, ha⟩, #Hcl, Hp⟩
       iframe Hp
       iintro Hp
-      ihave Hp := wordPointsTo_intro_id _ _ _ _ hr ha $$ Hcl Hp
       iframe)
     (fun c hok _ => by
-      have e := execSpecF_ld (GF := GF) cpu (DFrac.own 1) (DFrac.own 1) c false hok pc (pc + instrLen is_rvc) imm rd rs1
-        hrd.1 (tpPin cpu k.regs) k.proc hram hal
+      have e := execSpecF_ld (GF := GF) cpu (DFrac.own 1) (DFrac.own 1) c false k.root hok pc (pc + instrLen is_rvc) imm rd rs1
+        hrd.1 (tpPin cpu k.regs) k.proc
       rw [htp] at e
       simp only [KCtx.rget] at haddr
       rw [haddr] at e

@@ -46,6 +46,22 @@ theorem paOf_id (va : BitVec 64) (h : va.toNat < 2 ^ 39) : paOf (idPpn (vpnOf va
   revert h'
   bv_decide
 
+/-- The offset of the physical address is the offset of `va`. -/
+theorem paOf_extract (ppn : BitVec 44) (va : BitVec 64) :
+    BitVec.extractLsb' 0 12 (paOf ppn va) = BitVec.extractLsb' 0 12 va := by
+  unfold paOf; bv_decide
+
+theorem paOf_mod4096 (ppn : BitVec 44) (va : BitVec 64) :
+    (paOf ppn va).toNat % 4096 = va.toNat % 4096 := by
+  have h := congrArg BitVec.toNat (paOf_extract ppn va)
+  simpa [BitVec.extractLsb'_toNat] using h
+
+/-- The alignment of `va` at any divisor of the page size carries over. -/
+theorem paOf_mod (ppn : BitVec 44) (va : BitVec 64) (n : Nat) (hn : 4096 % n = 0) :
+    (paOf ppn va).toNat % n = va.toNat % n := by
+  have hd : n ∣ 4096 := Nat.dvd_of_mod_eq_zero hn
+  rw [← Nat.mod_mod_of_dvd (paOf ppn va).toNat hd, paOf_mod4096, Nat.mod_mod_of_dvd _ hd]
+
 /-- A RAM address is below `2^38` (a canonical kernel address). -/
 theorem inRam_lt38 (va : BitVec 64) (n : Nat) (h : inRam va n) : va.toNat < 2 ^ 38 := by
   unfold inRam ramEnd at h; omega

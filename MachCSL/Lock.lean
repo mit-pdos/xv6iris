@@ -504,10 +504,12 @@ def lockBody (γ : GName) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF)
 def lockAddrOk (lk : BitVec 64) : Prop :=
   inRam lk 4 ∧ lk.toNat % 4 = 0 ∧ inRam (lk + 16#64) 8 ∧ (lk + 16#64).toNat % 8 = 0
 
-/-- The lock predicate (persistent): the invariant at some floor the
+/-- The lock predicate (persistent): the two words are identity-mapped
+kernel RAM (the claims the loads and stores translate through), and the invariant at some floor the
 ambient context has passed. -/
 def isLock [CurCtx] (γ : GName) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF) : IProp GF := iprop%
-  ⌜lockAddrOk lk⌝ ∗ ∃ lo : Nat, inv lockN (lockBody γ lk s R lo) ∗ ctxFloor curCtx lo
+  ⌜lockAddrOk lk⌝ ∗ kmapId lk ∗ kmapId (lk + 16#64) ∗
+  ∃ lo : Nat, inv lockN (lockBody γ lk s R lo) ∗ ctxFloor curCtx lo
 
 instance isLock_persistent [CurCtx] (γ : GName) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF) :
     Persistent (isLock (GF := GF) γ lk s R) := by
@@ -516,18 +518,19 @@ instance isLock_persistent [CurCtx] (γ : GName) (lk : BitVec 64) (s : String) (
 
 theorem isLock_cases [CurCtx] (γ : GName) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF) :
     isLock (GF := GF) γ lk s R ⊢
-      ⌜lockAddrOk lk⌝ ∗ ∃ lo : Nat, inv lockN (lockBody γ lk s R lo) ∗ ctxFloor curCtx lo := by
+      ⌜lockAddrOk lk⌝ ∗ kmapId lk ∗ kmapId (lk + 16#64) ∗
+      ∃ lo : Nat, inv lockN (lockBody γ lk s R lo) ∗ ctxFloor curCtx lo := by
   unfold isLock; iintro H; iexact H
 
 /-- The lock is born free from two never-written windows; the payload is
 deposited at the creator's context. -/
 theorem newlock [CurCtx] (cpu : CPU) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF) [CtxMorph R]
     (hok : lockAddrOk lk) (tids tids' : Nat → Agent) (E : CoPset) :
-    ownCtx cpu curCtx ∗ R curCtx ∗
+    kmapId lk ∗ kmapId (lk + 16#64) ∗ ownCtx cpu curCtx ∗ R curCtx ∗
     histBytes lk 4 (fun _ => DFrac.own 1) (fun j => [⟨0, tids j, nthByte (0 : BitVec (8 * 4)) j⟩]) ∗
     histBytes (lk + 16#64) 8 (fun _ => DFrac.own 1) (fun j => [⟨0, tids' j, nthByte (0 : BitVec (8 * 8)) j⟩])
     ⊢ |={E}=> (ownCtx cpu curCtx ∗ ∃ γ, isLock (GF := GF) γ lk s R) := by
-  iintro ⟨Hrun, HR, Hw, Hc⟩
+  iintro ⟨#Hcl, #Hcl', Hrun, HR, Hw, Hc⟩
   imod lock_pay_born cpu R $$ [$Hrun $HR] with ⟨Hrun, Hpay⟩
   imod lockHalf_alloc with ⟨%γ, H1, H2⟩
   ihave Hw' := wordCell_of_fresh lk 4 0 tids $$ Hw
@@ -554,6 +557,10 @@ theorem newlock [CurCtx] (cpu : CPU) (lk : BitVec 64) (s : String) (R : CtxId �
   unfold isLock
   isplit
   · ipureintro; exact hok
+  isplit
+  · iexact Hcl
+  isplit
+  · iexact Hcl'
   iexists 0
   isplit
   · iexact Hinv

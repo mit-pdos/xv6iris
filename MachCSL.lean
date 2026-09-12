@@ -40,6 +40,7 @@ import MachCSL.CtxLaws
 import MachCSL.WpAtomic
 import MachCSL.WordHist
 import MachCSL.Lock
+import MachCSL.WpSmodeAu
 import MachCSL.WpSmodeAtomic
 import MachCSL.WpLock
 import MachCSL.WpSmodeMem2
@@ -50,3 +51,4 @@ import MachCSL.PtTree
 import MachCSL.KptInv
 import MachCSL.WpPtWalk
 import MachCSL.Translate
+import MachCSL.WpSmodeCycle

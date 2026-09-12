@@ -86,6 +86,23 @@ theorem execSpec_sd [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.o
   iintro Hrs1
   swp_run 150
   iapply swp_bind
+  mconf_intro HmConf
+  iapply (swp_transform_effective_address_M cpu dq c hok _ _ (Or.inr (Or.inr (Or.inl rfl))))
+  iframe HmConf
+  iintro HmConf
+  mconf_cases HmConf
+  swp_run 100
+  iapply swp_bind
+  iapply swp_translationMode_M
+  swp_run 60
+  iapply swp_bind
+  mconf_intro HmConf
+  iapply (swp_translateAddr_M cpu dq c hok _ _ (Or.inr (Or.inr (Or.inl rfl))))
+  iframe HmConf
+  iintro HmConf
+  mconf_cases HmConf
+  swp_run 40
+  iapply swp_bind
   iapply (hok.2 cpu dq _ 8 _ _ (by simp [kernelAccess]) hram)
   iframe
   inext
@@ -133,6 +150,23 @@ theorem execSpec_ld [CurCtx] (cpu : CPU) (dq dq' : DFrac) (c : MConf) (hok : MCo
   swp_run 150
   iapply swp_bind
   mconf_intro HmConf
+  iapply (swp_transform_effective_address_M cpu dq c hok _ _ (Or.inr (Or.inl rfl)))
+  iframe HmConf
+  iintro HmConf
+  mconf_cases HmConf
+  swp_run 100
+  iapply swp_bind
+  iapply swp_translationMode_M
+  swp_run 60
+  iapply swp_bind
+  mconf_intro HmConf
+  iapply (swp_translateAddr_M cpu dq c hok _ _ (Or.inr (Or.inl rfl)))
+  iframe HmConf
+  iintro HmConf
+  mconf_cases HmConf
+  swp_run 40
+  mconf_intro HmConf
+  iapply swp_bind
   iapply swp_checked_mem_read_load8_conf (hok := hok) (hram := hram) (hal := hal)
   iframe
   inext

@@ -43,6 +43,28 @@ theorem ppn_of_pin (ppn : BitVec 44) (va : BitVec 64) (h : paOf ppn va = va) (hl
   revert h h'
   bv_decide
 
+/-- The bytes at the mapped physical address, with the claim, the pin and
+the facts, are the word. -/
+theorem wordPointsTo_intro [CurCtx] (va : PAddr) (n : Nat) (dq : DFrac) (w : BitVec (8 * n))
+    (ppn : BitVec 44) (h : tierPin curTier ppn va ∧ va.toNat < 2 ^ 38 ∧ inRam (paOf ppn va) n ∧ va.toNat % n = 0) :
+    kmapAt (GF := GF) (vpnOf va) (kLeaf ppn .rw 0#1 0#1) ⊢ bytesPointsTo (paOf ppn va) n dq w -∗ wordPointsTo va n dq w := by
+  unfold wordPointsTo
+  iintro #Hcl Hb
+  iexists ppn
+  iframe Hb
+  isplit
+  · iexact Hcl
+  · ipureintro; exact h
+
+/-- A word is its bytes at the mapped physical address, with the claim, the
+pin and the facts. -/
+theorem wordPointsTo_cases [CurCtx] (va : PAddr) (n : Nat) (dq : DFrac) (w : BitVec (8 * n)) :
+    wordPointsTo (GF := GF) va n dq w ⊢ ∃ ppn : BitVec 44, kmapAt (vpnOf va) (kLeaf ppn .rw 0#1 0#1) ∗
+      ⌜tierPin curTier ppn va ∧ va.toNat < 2 ^ 38 ∧ inRam (paOf ppn va) n ∧ va.toNat % n = 0⌝ ∗
+      bytesPointsTo (paOf ppn va) n dq w := by
+  unfold wordPointsTo
+  iintro H; iexact H
+
 /-- A byte window in RAM at an aligned address, with the address's identity
 claim, is a word (at any tier). -/
 theorem wordPointsTo_intro_id [CurCtx] (va : PAddr) (n : Nat) (dq : DFrac) (w : BitVec (8 * n))

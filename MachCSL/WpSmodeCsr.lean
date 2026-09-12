@@ -9,7 +9,7 @@ lifted value; `mstatusLegalize` is that function with the platform's
 answers filled in (what the executor produces), and
 `sstatus_clear_sie_id` is the identity.
 -/
-import MachCSL.WpSmode
+import MachCSL.WpSmodeCycle
 import MachCSL.WpMmodeCsr
 import MachCSL.WpCsrS
 
@@ -45,7 +45,7 @@ theorem lower_mstatus_sie (m : BitVec 64) :
 
 set_option maxHeartbeats 4000000 in
 /-- `csrr rd, sstatus`: the supervisor view of `mstatus`. -/
-theorem execSpecF_csrr_sstatus (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool) (hok : SConfBare (GF := GF) c sie)
+theorem execSpecF_csrr_sstatus (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool) (hok : SConfPhys (GF := GF) c sie)
     (pc npc₀ : BitVec 64) (rd : BitVec 5) (hrd : rd ≠ 0#5) (R : RegMap) :
     execSpecPP (GF := GF) cpu dq Privilege.Supervisor c Privilege.Supervisor c
       (instruction.CSRReg (0x100#12, regidx.Regidx 0#5, regidx.Regidx rd, csrop.CSRRS)) pc npc₀ npc₀
@@ -53,7 +53,7 @@ theorem execSpecF_csrr_sstatus (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
   intro Φ
   iintro ⟨HmConf, HPC, HnextPC, HF, HΦ⟩
   conf_cases HmConf
-  obtain ⟨⟨hpmp, hms, hpmm, hlpe⟩, hmode⟩ := hok
+  obtain ⟨hpmp, hms, hpmm, hlpe⟩ := hok
   obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
   unfold execute
   swp_run 300
@@ -69,7 +69,7 @@ theorem execSpecF_csrr_sstatus (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
 set_option maxHeartbeats 4000000 in
 /-- `csrrci rd, sstatus, SIE` with `SIE = 0`: reads `sstatus`, leaves
 `mstatus` as it is. -/
-theorem execSpecF_csrrci_sstatus (cpu : CPU) (c : MConf) (hok : SConfBare (GF := GF) c false)
+theorem execSpecF_csrrci_sstatus (cpu : CPU) (c : MConf) (hok : SConfPhys (GF := GF) c false)
     (pc npc₀ : BitVec 64) (rd : BitVec 5) (hrd : rd ≠ 0#5) (R : RegMap) :
     execSpecPP (GF := GF) cpu (DFrac.own 1) Privilege.Supervisor c Privilege.Supervisor c
       (instruction.CSRImm (0x100#12, 2#5, regidx.Regidx rd, csrop.CSRRC)) pc npc₀ npc₀
@@ -77,8 +77,8 @@ theorem execSpecF_csrrci_sstatus (cpu : CPU) (c : MConf) (hok : SConfBare (GF :=
   intro Φ
   iintro ⟨HmConf, HPC, HnextPC, HF, HΦ⟩
   conf_cases HmConf
-  have hsm := hok.1.2.1
-  obtain ⟨⟨hpmp, hms, hpmm, hlpe⟩, hmode⟩ := hok
+  have hsm := hok.2.1
+  obtain ⟨hpmp, hms, hpmm, hlpe⟩ := hok
   obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
   have hid := sstatus_clear_sie_id c.mstatus hsm
   unfold execute
