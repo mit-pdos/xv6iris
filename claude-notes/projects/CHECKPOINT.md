@@ -140,3 +140,9 @@ SUPPLY-SPLIT phase 2 (`-sup`, rulings (a)-(f) in the note "SUPPLY-SPLIT PHASE
 `brief-disc-rate.md`; O3/O5 RULED: wait for the harts; failure outputs valid).
 Landing order when green: CONS-SWALLOW (main) → fetch the sibling branches one
 at a time (rebase on main, rebuild, re-gate) → LAZY-FLAG in main.
+
+TX-TAG LAUNCHED (2026-09-12) in the freed sibling `/shared/xv6iris-2-tlw` on
+`lane/tx-tag` from `2c0d32048` (brief `brief-tx-tag.md`; scope = the UART/
+console/printk layer + boot; the filewrite/row-16 relay is the next lane
+TX-RECEIPT).  Main: verify build `mainverify1` of the merged HEAD running; then
+LAZY-FLAG launches in main.
