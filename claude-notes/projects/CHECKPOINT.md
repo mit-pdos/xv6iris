@@ -318,3 +318,12 @@ theorem is about the console UART only.  PRINTK-LEDGER-2 STOPPED; OUT-FUPD
 narrowed to the console UART (printk untouched).  Pending the owner: who
 changes the Rocq machine model; roles/addresses.  Then DISC-SIMPLIFY (drop D0,
 the shuffle, kernel_msgs).
+
+2026-09-12 (late): OUT-FUPD PAUSED (banking its diff; design to be reported as
+text; main restored clean); UNTAG (`brief-untag.md`: remove TX-TAG's labels,
+keep the LOOP-off rider and the pinned consputc/echo posts) launches in main as
+soon as OUT-FUPD confirms the clean tree -- BEFORE the owner's dual-UART agent
+touches the UART layer; SH-LINE 2b LAUNCHED in `-sup` (`brief-sh-line-2b.md`);
+PRINTK-RENDER parked (`lane/printk-ledger`, pure files; the printint-digits WIP
+banked as `wx-briefs/printint-digits-wip.patch`).  In flight: E2 p2 (`-disc`),
+E4 p3 (`-tlw`), SH-LINE 2b p1 (`-sup`); OUT-FUPD pausing (main).
