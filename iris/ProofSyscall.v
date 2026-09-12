@@ -360,6 +360,8 @@ Require Import SpecSysFork SpecSysExit SpecSysWait SpecSysPipe SpecSysRead SpecS
                SysExecDefs SpecSysFstat SpecSysChdir SpecSysDup SpecSysGetpid SpecSysSbrk
                SpecSysPause SpecSysUptime SpecSysWrite SpecSysMknod SpecSysLink SpecSysMkdir
                SpecSysClose SpecSysSync.
+Require Import ArgPath.         (* [arg_path_of]: the reading of trapframe
+                                   argument 0, which the walk is at *)
 Require Import SpecSysOpen.
 (* THE ATOMIC-UPDATE CONTRACTS the three fs-mutating entries run on (their
    return blankets are corollaries: [open_arms_landed], [mknod_arms_ret],
@@ -3212,39 +3214,43 @@ Section SyscallArms.
 
   Lemma sysc_dep_open (U : ustate) (sts : list fdstate) (gn : gname) (cs : gset gname)
       (pid : mword 32) (f : sfam)
-      (v1 : mword 64) :
+      (v0 v1 : mword 64) :
     sysc_num (us_V U) = 15 ->
+    pv_tf (us_V U) !! tf_arg_idx 0 = Some v0 ->
     pv_tf (us_V U) !! tf_arg_idx 1 = Some v1 ->
     sysc_sys_in U sts gn cs pid f -∗
-    open_in (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) v1
+    open_in (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) (us_M U) v0 v1
       (of_P f) (of_Pmiss f) (of_Farm f) (of_Fun f) (of_Fok f) (of_Fex f)
       (of_Fo f) (of_Ft f).
   Proof.
-    intros Hn Hv1. iIntros "H".
+    intros Hn Hv0 Hv1. iIntros "H".
     iDestruct (sysc_sys_in_at U sts gn cs pid f 15 Hn ltac:(vm_compute; discriminate)
                  ltac:(vm_compute; discriminate) with "H") as "H".
     iDestruct (sbundle_at_open_elim uslot f _ with "H") as "H".
-    rewrite /uvis_of /tf_w. cbn [uvis_cwd uvis_tf].
-    rewrite (list_lookup_total_correct _ _ _ Hv1). iExact "H".
+    rewrite /uvis_of /tf_w. cbn [uvis_cwd uvis_tf uvis_M].
+    rewrite (list_lookup_total_correct _ _ _ Hv0)
+            (list_lookup_total_correct _ _ _ Hv1). iExact "H".
   Qed.
 
   Lemma sysc_dep_mknod (U : ustate) (sts : list fdstate) (gn : gname) (cs : gset gname)
       (pid : mword 32) (f : sfam)
-      (v1 v2 : mword 64) :
+      (v0 v1 v2 : mword 64) :
     sysc_num (us_V U) = 17 ->
+    pv_tf (us_V U) !! tf_arg_idx 0 = Some v0 ->
     pv_tf (us_V U) !! tf_arg_idx 1 = Some v1 ->
     pv_tf (us_V U) !! tf_arg_idx 2 = Some v2 ->
     sysc_sys_in U sts gn cs pid f -∗
-    mknod_au_pre (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U))
+    mknod_au_at (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) (us_M U) v0
       (dev_arg v1) (dev_arg v2)
       (nf_P f) (nf_Pmiss f) (nf_Farm f) (nf_Fun f) (nf_Fok f) (nf_Fex f).
   Proof.
-    intros Hn Hv1 Hv2. iIntros "H".
+    intros Hn Hv0 Hv1 Hv2. iIntros "H".
     iDestruct (sysc_sys_in_at U sts gn cs pid f 17 Hn ltac:(vm_compute; discriminate)
                  ltac:(vm_compute; discriminate) with "H") as "H".
     iDestruct (sbundle_at_mknod_elim uslot f _ with "H") as "H".
-    rewrite /uvis_of /tf_w. cbn [uvis_cwd uvis_tf].
-    rewrite (list_lookup_total_correct _ _ _ Hv1)
+    rewrite /uvis_of /tf_w. cbn [uvis_cwd uvis_tf uvis_M].
+    rewrite (list_lookup_total_correct _ _ _ Hv0)
+            (list_lookup_total_correct _ _ _ Hv1)
             (list_lookup_total_correct _ _ _ Hv2). iExact "H".
   Qed.
 
@@ -3366,21 +3372,23 @@ Section SyscallArms.
      mirror-image reason. *)
   Lemma sysc_out_open (U : ustate) (sts : list fdstate) (gn : gname) (cs : gset gname)
       (pid : mword 32) (f : sfam)
-      (v1 r : mword 64) (M' : gmap Z (bv 8)) (sts' : list fdstate) (cw' : Z) (cs' : gset gname) :
+      (v0 v1 r : mword 64) (M' : gmap Z (bv 8)) (sts' : list fdstate) (cw' : Z) (cs' : gset gname) :
     sysc_num (us_V U) = 15 ->
+    pv_tf (us_V U) !! tf_arg_idx 0 = Some v0 ->
     pv_tf (us_V U) !! tf_arg_idx 1 = Some v1 ->
-    open_receipt (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) v1
+    open_receipt (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) (us_M U) v0 v1
       (of_P f) (of_Pmiss f) (of_Farm f) (of_Fun f) (of_Fok f) (of_Fex f)
       (of_Fo f) (of_Ft f) sts r sts' -∗
     sysc_sys_out U sts gn cs pid f r M' sts' cw' cs'.
   Proof.
-    intros Hn Hv1. iIntros "H".
+    intros Hn Hv0 Hv1. iIntros "H".
     iApply (sysc_sys_out_at U sts gn cs pid f r M' sts' cw' cs' 15 Hn
               ltac:(vm_compute; discriminate)
               ltac:(vm_compute; discriminate)).
     iApply (spost_at_open_intro uslot f (uvis_of U sts gn cs pid) r M' sts' cw' cs').
-    rewrite /uvis_of /tf_w. cbn [uvis_cwd uvis_tf uvis_fd].
-    rewrite (list_lookup_total_correct _ _ _ Hv1). iExact "H".
+    rewrite /uvis_of /tf_w. cbn [uvis_cwd uvis_tf uvis_fd uvis_M].
+    rewrite (list_lookup_total_correct _ _ _ Hv0)
+            (list_lookup_total_correct _ _ _ Hv1). iExact "H".
   Qed.
 
   Lemma sysc_out_write (U : ustate) (sts : list fdstate) (gn : gname) (cs : gset gname)
@@ -3408,23 +3416,25 @@ Section SyscallArms.
 
   Lemma sysc_out_mknod (U : ustate) (sts : list fdstate) (gn : gname) (cs : gset gname)
       (pid : mword 32) (f : sfam)
-      (v1 v2 r : mword 64) (M' : gmap Z (bv 8))
+      (v0 v1 v2 r : mword 64) (M' : gmap Z (bv 8))
       (sts' : list fdstate) (cw' : Z) (cs' : gset gname) :
     sysc_num (us_V U) = 17 ->
+    pv_tf (us_V U) !! tf_arg_idx 0 = Some v0 ->
     pv_tf (us_V U) !! tf_arg_idx 1 = Some v1 ->
     pv_tf (us_V U) !! tf_arg_idx 2 = Some v2 ->
-    mknod_arms (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U))
+    mknod_arms (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) (us_M U) v0
       (dev_arg v1) (dev_arg v2)
       (nf_P f) (nf_Pmiss f) (nf_Farm f) (nf_Fun f) (nf_Fok f) (nf_Fex f) r -∗
     sysc_sys_out U sts gn cs pid f r M' sts' cw' cs'.
   Proof.
-    intros Hn Hv1 Hv2. iIntros "H".
+    intros Hn Hv0 Hv1 Hv2. iIntros "H".
     iApply (sysc_sys_out_at U sts gn cs pid f r M' sts' cw' cs' 17 Hn
               ltac:(vm_compute; discriminate)
               ltac:(vm_compute; discriminate)).
     iApply (spost_at_mknod_intro uslot f (uvis_of U sts gn cs pid) r M' sts' cw' cs').
-    rewrite /uvis_of /tf_w. cbn [uvis_cwd uvis_tf].
-    rewrite (list_lookup_total_correct _ _ _ Hv1)
+    rewrite /uvis_of /tf_w. cbn [uvis_cwd uvis_tf uvis_M].
+    rewrite (list_lookup_total_correct _ _ _ Hv0)
+            (list_lookup_total_correct _ _ _ Hv1)
             (list_lookup_total_correct _ _ _ Hv2). iExact "H".
   Qed.
 
@@ -6940,8 +6950,8 @@ Section SyscallArms.
               with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hpr Hbio Hlog Hseam
                     Hgen Hdevi Hgeom Hdlock Hbs Hit Hitinv Hesc Hsl2 Hireg
                     Hropen Hsbn Hisp Hsbs Hbmp Hbmr Hkalloc Hprocs Hir Hpriv [Hxin]").
-    { iApply (sysc_dep_mknod U sts gn cs pid fdep v1 v2
-                ltac:(rewrite Hnum; reflexivity) Hv1 Hv2 with "Hxin"). }
+    { iApply (sysc_dep_mknod U sts gn cs pid fdep v0 v1 v2
+                ltac:(rewrite Hnum; reflexivity) Hv0 Hv1 Hv2 with "Hxin"). }
     iIntros (CIDy Hsy mf ns' P')
       "%Hcs %Hextz Hcg Hcpu _ _ Hpc Hbs _ _ _ _ %Hns Hir Hpriv Harms".
     (* [Hextz] is the SIZED extension the callee reports, and it is what
@@ -7011,8 +7021,8 @@ Section SyscallArms.
     (* ...and wait answers nothing here either *)
     { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
     iApply (sysc_exec_out_ne _ _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
-    iApply (sysc_out_mknod U sts gn cs pid fdep v1 v2 (mf !!! Regidx Ra0) _ _ _ _
-              ltac:(rewrite Hnum; reflexivity) Hv1 Hv2 with "Harms").
+    iApply (sysc_out_mknod U sts gn cs pid fdep v0 v1 v2 (mf !!! Regidx Ra0) _ _ _ _
+              ltac:(rewrite Hnum; reflexivity) Hv0 Hv1 Hv2 with "Harms").
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -7121,7 +7131,8 @@ Section SyscallArms.
            ∗ proc_priv γf (proc_addr j) pid UW'
            ∗ fd_frags (pv_fdg (us_V (us_upt U P'))) sts'
            ∗ fd_slot
-           ∗ open_receipt (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) v1
+           ∗ open_receipt (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U))
+               (us_M U) v0 v1
                (of_P fdep) (of_Pmiss fdep) (of_Farm fdep) (of_Fun fdep)
                (of_Fok fdep) (of_Fex fdep) (of_Fo fdep) (of_Ft fdep) sts
                (mf !!! Regidx (mword_of_int 10 : mword 5)) sts') -∗
@@ -7145,8 +7156,8 @@ Section SyscallArms.
                       Hseam Hgen Hdevi Hgeom Hdlock Hbs Hit Hitinv Hesc Hsl2
                       Hireg Hropen Hsbn Hisp Hsbs Hbmp Hbmr Hkalloc Hprocs Hir
                       Hfd0 Hpriv Hufrag [Hxin]").
-      { iApply (sysc_dep_open U sts gn cs pid fdep v1
-                  ltac:(rewrite Hnum; reflexivity) Hv1 with "Hxin"). }
+      { iApply (sysc_dep_open U sts gn cs pid fdep v0 v1
+                  ltac:(rewrite Hnum; reflexivity) Hv0 Hv1 with "Hxin"). }
       iIntros (CIDy Hsy mf ns' P')
         "%Hcs %Hextz Hcg Hcpu Htcx2 Hccx2 Hpc Hbs _ _ _ _ %Hns Hir Harms".
       iSpecialize ("Hcont'" $! CIDy with "[//]").
@@ -7192,7 +7203,8 @@ Section SyscallArms.
                fd_frags (pv_fdg (us_V U)) sts' ∗
                (* ...AND THE RECEIPT, at that same resume view: the split's
                   process half, which [sysc_out_open] hands to the depositor *)
-               open_receipt (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) v1
+               open_receipt (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U))
+                 (us_M U) v0 v1
                  (of_P fdep) (of_Pmiss fdep) (of_Farm fdep) (of_Fun fdep)
                  (of_Fok fdep) (of_Fex fdep) (of_Fo fdep) (of_Ft fdep) sts
                  (mf !!! Regidx (mword_of_int 10 : mword 5)) sts')%I
@@ -7291,8 +7303,8 @@ Section SyscallArms.
     (* ...and wait answers nothing here either *)
     { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
     iApply (sysc_exec_out_ne _ _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
-    iApply (sysc_out_open U sts gn cs pid fdep v1 _ _ sts' (pv_cwi V') _
-              ltac:(rewrite Hnum; reflexivity) Hv1 with "Hrcpt").
+    iApply (sysc_out_open U sts gn cs pid fdep v0 v1 _ _ sts' (pv_cwi V') _
+              ltac:(rewrite Hnum; reflexivity) Hv0 Hv1 with "Hrcpt").
   Qed.
 
   (* THE COMBINATOR.  One [decide (k = <literal>)] branch per wired entry,

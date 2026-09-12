@@ -16,9 +16,11 @@
      jal create ; c.mv s1,a0 ; c.beqz a0 -> +0xd2
 
    ITEM 1 (create form): the call is [Create.wp_create_sconf] at [T_FILE],
-   and the walk one-shot the contract hands down is [npar_walk_pre_era],
-   which is create's [FsAbsEra.ep_start] at the fetched string by
-   [FsAbsMknodFire.np_start_of_mknod] -- a rename, no proof.  The child's
+   and the walk one-shot the contract hands down is create's own
+   [FsAbsEra.ep_start] AT THE FETCHED STRING -- the bundle owes it under
+   the reading of argument 0 ([SysOpenDefs.open_au_create_at],
+   [ArgPath.arg_path_of]) and the caller above fired that wand at this
+   buffer, so nothing is renamed here.  The child's
    content is the CONSTANT [AFile []] at this type, so the bundle create
    asks for is assembled by [SpecCreate.cre_commits_of_file] and the two
    arms are read back through [cre_ok_arms_file] / [cre_fail_arms_file].
@@ -119,8 +121,11 @@ Local Open Scope Z_scope.
 Require Import DirentEnc.        (* [bview]                                 *)
 Require Import FsTree.
 Require Import FsBytesGamma.
+Require Import ArgPath.         (* [arg_path_of]: the reading of trapframe
+                                   argument 0, which the walk is at *)
 Require Import SysOpenDefs.
 Require Import FsAbsMknodFire.
+Require Import FsAbsEra.          (* [ep_start]: the walk one-shot AT ONE PATH *)
 Require Import FsAbsOpenFire.
 Require Import ProofSysOpenShared.
 Require Import ProofSysOpenJoin.
@@ -159,7 +164,8 @@ Section ProofSysOpenEntryCCont.
   Definition so_cont0_au_create `{GEN : GenId}
       (gf : gname)
       (ns : nat) (dqb dqs dqbs dqn : dfrac)
-      (pj : mword 64) (pidv : mword 32) (vom : mword 64) (U : ustate)
+      (pj : mword 64) (pidv : mword 32)
+      (Mim : gmap Z (bv 8)) (pvv vom : mword 64) (U : ustate)
       (sts : list fdstate)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Phiarm Phiun : pfam Σ (aview -> Z -> iProp Σ))
@@ -183,7 +189,8 @@ Section ProofSysOpenEntryCCont.
          sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
          bslots 3 -∗
          iref_slots ns' -∗
-         open_arms_create (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) gf pj pidv vom
+         open_arms_create (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) gf pj pidv
+           Mim pvv vom
            P Pmiss Phiarm Phiun Phiok Phiex Phio Phit sts U
            (mf !!! Regidx Ra0 : mword 64) -∗
          WP (Loop : expr riscv_lang))%I.
@@ -230,7 +237,7 @@ Section ProofSysOpenEntryC.
       (m N : regfile) (sp0 : mword 64) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (w4 w5 w6 w24 : mword 64)
       (* ---- the AU side ---- *)
-      (vom : mword 64)
+      (Mim : gmap Z (bv 8)) (pvv vom : mword 64)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Phiarm Phiun : pfam Σ (aview -> Z -> iProp Σ))
       (Phiok Phiex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
@@ -256,6 +263,8 @@ Section ProofSysOpenEntryC.
     eb = true ->
     lks = ∅ ->
     (* ---- the AU side: the omode word is the caller's argument ---- *)
+    (* the string argstr fetched IS what the image holds at argument 0 *)
+    arg_path_of Mim pvv (bview plen bp) ->
     om = arg_int32 vom ->
     is_aligned_paddr (Physaddr (pa_stk sp0 23)) 8 = true ->
     sp0 = (m !!! Regidx csp_rs1 : mword 64) ->
@@ -309,7 +318,12 @@ Section ProofSysOpenEntryC.
     (pa_add (pa_stk sp0 23) 4) ↦₄[KT1] om -∗
     (pa_stk sp0 24) ↦₈[KT1] w24 -∗
     (* ---- THE AU BUNDLE (the contract's O_CREATE side, verbatim) ---- *)
-    npar_walk_pre_era fsc_fs (pv_cwi (us_V U)) P Pmiss -∗
+    (* THE WALK, AT THE STRING ARGSTR FETCHED: the contract's bundle owes
+       it under the reading of argument 0
+       ([SysOpenDefs.open_au_create_at]), and [Hpof] above is that reading
+       at this buffer, so what reaches this block is already create's
+       [FsAbsEra.ep_start] at the one path. *)
+    ep_start fsc_fs (pv_cwi (us_V U)) P Pmiss (bview plen bp) -∗
     pf_at (acre_commit_at (fs_gamma_L fsc_fs) appE (AFile [])) Phiok -∗
     pf_at (dlookup_commit_at (fs_gamma_L fsc_fs) appE) Phiex -∗
     pf_at (aopen_commit_at (fs_gamma_L fsc_fs) appE) Phio -∗
@@ -318,13 +332,13 @@ Section ProofSysOpenEntryC.
     cre_child_unfired (fs_gamma_L fsc_fs) (AFile []) Phiarm Phiun -∗
     wp_next true (proc_addr jx)
       (so_cont0_au_create gf ns
-                dqb dqs dqbs dqn (proc_addr jx) pidv vom U sts
+                dqb dqs dqbs dqn (proc_addr jx) pidv Mim pvv vom U sts
                 P Pmiss Phiarm Phiun Phiok Phiex Phio Phit m K eb b lks) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK HdevR Hnib0 Hgeom Hsize Hbm0 Hbmcov
            Hbmlog Hist0 Hcovb Hbmgeo Hiregb Hpcstr Hplen Hni1 Hni2 Hni3 Hush
-           Hprkc Hnsb Hj Hgl Heb Hlkempty Hom Hal23 Hsp0 HNsp HNthr HNs0 HNs2 HNs3
+           Hprkc Hnsb Hj Hgl Heb Hlkempty Hpof Hom Hal23 Hsp0 HNsp HNthr HNs0 HNs2 HNs3
            Hal.
     pose proof HK as HKfull.
     destruct (so_kb K HK) as (HKcr & HKna & HKai & HKas & HKbo & HKeo & HKil &
@@ -500,7 +514,7 @@ Section ProofSysOpenEntryC.
                     Hpriv [Hbufk] Hprocs Hdev Hgeo Hdlk Hbsl Hisl HopS Htx
                     [Hwp] Hdl Hcre").
     { iEval (rewrite HN5a0). iExact "Hbufk". }
-    { iApply (np_start_of_mknod with "Hwp"). }
+    { iExact "Hwp". }
     iIntros (CID6 Hq6 mcr ok made kk qi ss gy inum dn bm u1 Sb1 ns1)
       "%Hcscr Hcg Hown Hpc Hsbn Hsbi Hsbs Hsbb Hpriv Hbufk Hbsl
        %Hns1 Hisl %Hu1 HopS Hok".
@@ -598,7 +612,8 @@ Section ProofSysOpenEntryC.
       { cbn in Hns1. unfold sys_open_slots, create_slots in *. lia. }
       { rewrite /open_arms_create. iFrame "Hfds". iLeft.
         iSplitR; [iPureIntro; exact Ha0f |]. iFrame "Hpriv Hfrag".
-        iApply (cre_fail_to_open with "Hcf Hoc Htc"). } }
+        iApply (cre_fail_to_open _ _ _ Mim pvv _ _ _ _ _ _ _ _ _ _ _ _ Hpof
+                  with "Hcf Hoc Htc"). } }
     (* ---- create SUCCEEDED: the locked inode, straight to the join ---- *)
     iDestruct "Hok" as "(%Hokf & Hlocked & Hcauf)".
     destruct Hokf as (Hcra0 & Hkk & Hinum & Hpure).
@@ -681,7 +696,7 @@ Section ProofSysOpenEntryC.
                       (bv_unsigned inum) (era_node dn bm data)) as "Hobs".
       { rewrite -Harow. iApply socr_obs_pure. }
       iAssert (wp_next true (proc_addr jx)
-                 (so_cont_au gf ns1 dqb dqs (proc_addr jx) pidv vom U sts
+                 (so_cont_au gf ns1 dqb dqs (proc_addr jx) pidv Mim pvv vom U sts
                     (socr_P (socr_fresh P Phiarm Phiun Phiok Phiex Phio
                                (bview plen bp) (bv_unsigned inum))
                             (bv_unsigned inum))
@@ -697,9 +712,9 @@ Section ProofSysOpenEntryC.
         iIntros "Hcg Hown Htce Hcce Hpc Hsbb Hsbi Hbsl Hisl Hpost".
         iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
         iApply fupd_wp.
-        iMod (socr_arms_fresh gf (proc_addr jx) pidv vom P Pmiss
+        iMod (socr_arms_fresh gf (proc_addr jx) pidv Mim pvv vom P Pmiss
                 Phiarm Phiun Phiok Phiex Phio Phit U sts _ (bview plen bp) (bv_unsigned inum)
-                (fn_nlink (era_node dn bm data)) with "Hpost") as "Hpost".
+                (fn_nlink (era_node dn bm data)) Hpof with "Hpost") as "Hpost".
         iModIntro.
         iApply ("Hcont" $! mf ns2 with "[%] [%] Hcg Hown Htce Hcce Hpc
                   Hsbn Hsbi Hsbs Hsbb Hbsl Hisl Hpost").
@@ -708,7 +723,7 @@ Section ProofSysOpenEntryC.
       iApply (Join.so_join_au (CID0 := CID8) gfl gf gs jx gl pd pav pu
                 gil gisl kk qi ss gy loy tly inum dn bm om lo ns1 u1 pidv dqb dqs
                 U sts m P1 sp0 K eb b lks w4 w5 w6 w24 bp1
-                data vom (bview plen bp)
+                data Mim pvv vom (bview plen bp)
                 (socr_P (socr_fresh P Phiarm Phiun Phiok Phiex Phio
                            (bview plen bp) (bv_unsigned inum))
                         (bv_unsigned inum))
@@ -721,7 +736,7 @@ Section ProofSysOpenEntryC.
                 Hqs HKfull Hkk ltac:(exact (proj2 Hinum)) ltac:(exact (proj1 Hinum)) Hgeom Hsize Hbm0 Hbmcov Hbmlog
                 Hist0 Hibcov Hiblog Hcovb
                 ltac:(exact (proj2 (proj2 Hu1) eq_refl)) Hj Hgl Hlkempty
-                Hdirw Hom Hal23 Hsp0 HP1sp HP1thr HP1s0 HP1s1i HP1s2 HP1s3
+                Hdirw Hpof Hom Hal23 Hsp0 HP1sp HP1thr HP1s0 HP1s1i HP1s2 HP1s3
                 Hal ltac:(cbn in Hns1; unfold sys_open_slots, create_slots in *; lia)
                 with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hftab Hbio Hlog
                       Hseam Hgen Hitab Hitinv Hesc Hireg Hropen Hslk Hslkd
@@ -772,7 +787,7 @@ Section ProofSysOpenEntryC.
         iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
         iSplitR; [by iPureIntro |]. iFrame "HP HPhi Hac Hcl". }
       iAssert (wp_next true (proc_addr jx)
-                 (so_cont_au gf ns1 dqb dqs (proc_addr jx) pidv vom U sts
+                 (so_cont_au gf ns1 dqb dqs (proc_addr jx) pidv Mim pvv vom U sts
                     (socr_P (socr_exists P Phiarm Phiun Phiok Phiex (bview plen bp)
                                (bv_unsigned inum)) (bv_unsigned inum))
                     (socr_Pm (socr_exists P Phiarm Phiun Phiok Phiex (bview plen bp)
@@ -786,9 +801,9 @@ Section ProofSysOpenEntryC.
         iIntros "Hcg Hown Htce Hcce Hpc Hsbb Hsbi Hbsl Hisl Hpost".
         iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
         iApply fupd_wp.
-        iMod (socr_arms_exists gf (proc_addr jx) pidv vom P Pmiss
+        iMod (socr_arms_exists gf (proc_addr jx) pidv Mim pvv vom P Pmiss
                 Phiarm Phiun Phiok Phiex Phio Phit U sts _ (bview plen bp) (bv_unsigned inum)
-                (abs_row (era_node dn bm data)) Hnd with "Hpost") as "Hpost".
+                (abs_row (era_node dn bm data)) Hpof Hnd with "Hpost") as "Hpost".
         iModIntro.
         iApply ("Hcont" $! mf ns2 with "[%] [%] Hcg Hown Htce Hcce Hpc
                   Hsbn Hsbi Hsbs Hsbb Hbsl Hisl Hpost").
@@ -797,7 +812,7 @@ Section ProofSysOpenEntryC.
       iApply (Join.so_join_au (CID0 := CID8) gfl gf gs jx gl pd pav pu
                 gil gisl kk qi ss gy loy tly inum dn bm om lo ns1 u1 pidv dqb dqs
                 U sts m P1 sp0 K eb b lks w4 w5 w6 w24 bp1
-                data vom (bview plen bp)
+                data Mim pvv vom (bview plen bp)
                 (socr_P (socr_exists P Phiarm Phiun Phiok Phiex (bview plen bp)
                            (bv_unsigned inum)) (bv_unsigned inum))
                 (socr_Pm (socr_exists P Phiarm Phiun Phiok Phiex (bview plen bp)
@@ -808,7 +823,7 @@ Section ProofSysOpenEntryC.
                 Hqs HKfull Hkk ltac:(exact (proj2 Hinum)) ltac:(exact (proj1 Hinum)) Hgeom Hsize Hbm0 Hbmcov Hbmlog
                 Hist0 Hibcov Hiblog Hcovb
                 ltac:(exact (proj2 (proj2 Hu1) eq_refl)) Hj Hgl Hlkempty
-                Hdirw Hom Hal23 Hsp0 HP1sp HP1thr HP1s0 HP1s1i HP1s2 HP1s3
+                Hdirw Hpof Hom Hal23 Hsp0 HP1sp HP1thr HP1s0 HP1s1i HP1s2 HP1s3
                 Hal ltac:(cbn in Hns1; unfold sys_open_slots, create_slots in *; lia)
                 with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hftab Hbio Hlog
                       Hseam Hgen Hitab Hitinv Hesc Hireg Hropen Hslk Hslkd

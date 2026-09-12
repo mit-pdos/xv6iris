@@ -70,7 +70,9 @@
    TSO-rebase appends that no body ever read.
 
    WHAT EXEC'S BUNDLE IS.  [SpecSysExec.sys_exec_au_pre] at the TRAPPING
-   KEY's own data:
+   KEY's own data -- and open's and mknod's rows (15 and 17) read the same
+   two, the image and argument 0, for the same reason: their walks are at
+   the path THEIR argument 0 names ([ArgPath.arg_path_of]):
      - the image [uvis_M W]: the arguments are read off the image the
        process trapped at ([wp_sys_exec_sconf_body] takes the bundle at
        [us_M U], and the trap-out key's image IS that image -- the loop
@@ -496,14 +498,24 @@ Section UexecExecInst.
        chdir_au_pre (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
          (cf_P f) (cf_Pmiss f) (cf_Fo f)
      else if decide (n = 15) then
-       open_in (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W) (xk_a W 1)
+       (* ...AT THE PATH ARGUMENT, beside the omode: row 15 reads argument
+          0 (the path POINTER) through the key's own image
+          ([ArgPath.arg_path_of (uvis_M W) (xk_a W 0)]) as well as argument
+          1 (the omode), so what the process deposits is the walk at the
+          string IT passed -- what a pinned open hands in and what open's
+          receipt at row 15 below names. *)
+       open_in (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
+         (uvis_M W) (xk_a W 0) (xk_a W 1)
          (of_P f) (of_Pmiss f) (of_Farm f) (of_Fun f) (of_Fok f) (of_Fex f)
          (of_Fo f) (of_Ft f)
      else if decide (n = 16) then
        filewrite_in (fd_st_of_key (xk_a W 0) (uvis_fd W))
          (sys_rw_count (xk_a W 2)) (uvis_M W) (xk_a W 1) (wf_Q f) (wf_tr0 f)
      else if decide (n = 17) then
-       mknod_au_pre (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
+       (* ...and mknod's, at ITS path argument beside the two device
+          numbers, for open's reason *)
+       mknod_au_at (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
+         (uvis_M W) (xk_a W 0)
          (dev_arg (xk_a W 1)) (dev_arg (xk_a W 2))
          (nf_P f) (nf_Pmiss f) (nf_Farm f) (nf_Fun f) (nf_Fok f) (nf_Fex f)
      else if decide (n = 18) then
@@ -579,7 +591,8 @@ Section UexecExecInst.
        chdir_receipt (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
          (cf_P f) (cf_Pmiss f) (cf_Fo f) r cw'
      else if decide (n = 15) then
-       open_receipt (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W) (xk_a W 1)
+       open_receipt (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
+         (uvis_M W) (xk_a W 0) (xk_a W 1)
          (of_P f) (of_Pmiss f) (of_Farm f) (of_Fun f) (of_Fok f) (of_Fex f)
          (of_Fo f) (of_Ft f) (uvis_fd W) r fdv'
      else if decide (n = 16) then
@@ -588,6 +601,7 @@ Section UexecExecInst.
          (wf_Q f) (wf_tr0 f) r
      else if decide (n = 17) then
        mknod_arms (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
+         (uvis_M W) (xk_a W 0)
          (dev_arg (xk_a W 1)) (dev_arg (xk_a W 2))
          (nf_P f) (nf_Pmiss f) (nf_Farm f) (nf_Fun f) (nf_Fok f) (nf_Fex f) r
      else if decide (n = 18) then
@@ -903,6 +917,7 @@ Section UexecExecInst.
   Lemma sbundle_at_open_elim (X : uvis -d> iPropO Σ) (f : xfam) (W : uvis) :
     sbundle_at X 15 f W -∗
     open_in (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
+      (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 0))
       (tf_w (uvis_tf W) (tf_arg_idx 1))
       (of_P f) (of_Pmiss f) (of_Farm f) (of_Fun f) (of_Fok f) (of_Fex f)
       (of_Fo f) (of_Ft f).
@@ -923,7 +938,8 @@ Section UexecExecInst.
 
   Lemma sbundle_at_mknod_elim (X : uvis -d> iPropO Σ) (f : xfam) (W : uvis) :
     sbundle_at X 17 f W -∗
-    mknod_au_pre (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
+    mknod_au_at (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
+      (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 0))
       (dev_arg (tf_w (uvis_tf W) (tf_arg_idx 1)))
       (dev_arg (tf_w (uvis_tf W) (tf_arg_idx 2)))
       (nf_P f) (nf_Pmiss f) (nf_Farm f) (nf_Fun f) (nf_Fok f) (nf_Fex f).
@@ -1090,6 +1106,7 @@ Section UexecExecInst.
   Lemma spost_at_open_intro (X : uvis -d> iPropO Σ) (f : xfam) (W : uvis)
       (r : mword 64) (M' : gmap Z (bv 8)) (fdv' : list fdstate) (cw' : Z) (cs' : gset gname) :
     open_receipt (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
+      (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 0))
       (tf_w (uvis_tf W) (tf_arg_idx 1))
       (of_P f) (of_Pmiss f) (of_Farm f) (of_Fun f) (of_Fok f) (of_Fex f)
       (of_Fo f) (of_Ft f) (uvis_fd W) r fdv' -∗
@@ -1113,6 +1130,7 @@ Section UexecExecInst.
   Lemma spost_at_mknod_intro (X : uvis -d> iPropO Σ) (f : xfam) (W : uvis)
       (r : mword 64) (M' : gmap Z (bv 8)) (fdv' : list fdstate) (cw' : Z) (cs' : gset gname) :
     mknod_arms (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
+      (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 0))
       (dev_arg (tf_w (uvis_tf W) (tf_arg_idx 1)))
       (dev_arg (tf_w (uvis_tf W) (tf_arg_idx 2)))
       (nf_P f) (nf_Pmiss f) (nf_Farm f) (nf_Fun f) (nf_Fok f) (nf_Fex f) r -∗

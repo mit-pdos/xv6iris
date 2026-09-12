@@ -94,6 +94,8 @@ Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 
 Require Import FsBytesGamma.
+Require Import ArgPath.         (* [arg_path_of]: the reading of trapframe
+                                   argument 0, which the walk is at *)
 Require Import SysOpenDefs.
 Require Import SpecSysOpen.   (* the arms this block builds *)
 Require Import ProofSysOpenBits.
@@ -145,7 +147,7 @@ Section ProofSysOpenPub.
       (b : bool) (lks : gset string) (w6 w23 w24 : mword 64)
       (bp : nat -> bv 8)
       (* ---- the AU side ---- *)
-      (vom : mword 64)
+      (Mim : gmap Z (bv 8)) (pvv vom : mword 64)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
@@ -278,11 +280,11 @@ Section ProofSysOpenPub.
     (∀ r : mword 64,
        open_fd_ok gf (proc_addr jx) pidv U
          (om_readable vom) (om_writable vom) t sts r -∗
-       open_post_ok_plain (fs_gamma_L fsc_fs) gf (proc_addr jx) pidv vom
+       open_post_ok_plain (fs_gamma_L fsc_fs) gf (proc_addr jx) pidv Mim pvv vom
          P Fo Ft sts U r) -∗
     wp_next true (proc_addr jx)
       (so_cont_au gf nsj
-               dqb dqs (proc_addr jx) pidv vom U sts P Pmiss Fo Ft m K eb b lks) -∗
+               dqb dqs (proc_addr jx) pidv Mim pvv vom U sts P Pmiss Fo Ft m K eb b lks) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hqs HKiu HKeo HK24 Kpop Hkk Hinb Hipos Hgeom Hj Hgl Hlkempty Hkf Hfdlt

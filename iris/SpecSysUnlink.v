@@ -236,8 +236,11 @@
 
    ==== THE ARMS ========================================================
 
-   ret 0  -- [unlink_post_ok]: the fetched path (existential, as always:
-             no premise can pin user bytes), the cursor [P Lp d] at the
+   ret 0  -- [unlink_post_ok]: the fetched path (existential and tied to
+             nothing -- unlink still takes the [∀ pl] walk; exec, open and
+             mknod carry theirs at the argument's own reading,
+             [ArgPath.arg_path_of], and unlink will when a consumer needs
+             it), the cursor [P Lp d] at the
              parent, [unl_pre] restated purely at instant 1 beside the
              caller's own receipts [Fent]/[Ftgt], the instant-2 target
              pin, the region bound on [t], and the two observation

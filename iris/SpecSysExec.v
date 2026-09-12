@@ -27,14 +27,16 @@
    the bundle at ONE path and ONE vector; the success arm names what it
    ran at.
 
-   THE PATH IS READ.  The premise on it is [exec_path_of (us_M U) v0 pl]
-   below -- the bytes of [pl] ARE the process's bytes at argument 0, with
+   THE PATH IS READ, IN THE SHARED VOCABULARY.  The premise on it is
+   [exec_path_of (us_M U) v0 pl] -- [ArgPath.arg_path_of], which open's
+   and mknod's contracts state their own path arguments at too -- the
+   bytes of [pl] ARE the process's bytes at argument 0, with
    the NUL after them -- so a caller that knows its own image and its own
    argument 0 (init: "/init" at a known address) instantiates the bundle
    at ONE path, which is what a pinned caller's cursor needs.  It is
    [SpecArgstr]'s postcondition read through
    [SpecFetchstr.fetchstr_got] to [SpecCopyinstr.copyinstr_got], and
-   [exec_path_of_bview] below is the one step.
+   [exec_path_of_bview] ([ArgPath]'s) is the one step.
 
    THE ARGV VECTOR IS READ THE SAME WAY.  The premise on it is
    [exec_args_of (us_M U) v1 na alen afun] below: the SHAPE kexec wants
@@ -123,6 +125,9 @@ Require Import SpecCopyin.     (* [uimg_word_at]: the image's word at an address
 Require Import SpecCopyinstr.  (* [copyinstr_got]: the path's content *)
 Require Import PathElems.      (* [path_elems]                       *)
 Require Import DirentEnc.      (* [bview]                            *)
+Require Import ArgPath.        (* [arg_path_of]: the path argument, read
+                                  off the caller's own image -- exec's
+                                  [exec_path_of] is its alias below *)
 Require Import FsAbsEra.       (* [ex_start]: the walk at ONE path    *)
 Require Import FsBlocks.       (* [fs_names]                         *)
 Require Import KexecDefs.      (* [MAXARG], [kexec_ok]               *)
@@ -194,127 +199,30 @@ Lemma exec_args_of_shape (M : gmap Z (bv 8)) (av : mword 64)
   exec_args_of M av na alen afun -> exec_args_shape na alen afun.
 Proof. intros [H _]. exact H. Qed.
 
-(* THE PATH, THE SAME PAIR ONE ARGUMENT OVER.  sys_exec [argstr]s the
-   path at trapframe argument 0 into a kernel page and hands kexec the
-   buffer; the bundle's walk premise is therefore stated AT ONE [pl]
-   ([FsAbsEra.ex_start]) under a guard on that string, and not at every
-   path.  THE GUARD IS THE READING, [exec_path_of]: the shape
-   ([exec_path_shape]: NUL-free, int-sized) AND the tie to the image --
-   byte [j] of [pl] is the process's byte at [pv + j], counted the copy
-   loop's way ([exec_args_of] above), with a NUL just past the end.  So
-   the bundle is owed at the ONE path the caller actually passed, which
-   is what a pinned caller's cursor needs.
+(* THE PATH, THE SAME PAIR ONE ARGUMENT OVER, AND IT IS SHARED.  sys_exec
+   [argstr]s the path at trapframe argument 0 into a kernel page and hands
+   kexec the buffer; the bundle's walk premise is therefore stated AT ONE
+   [pl] ([FsAbsEra.ex_start]) under a guard on that string, and not at
+   every path.  THE GUARD IS THE READING, and the reading is not exec's:
+   every path-taking syscall asks the same pure question of its own
+   argument word, so it lives in [ArgPath.v] -- [arg_path_of M pv pl], the
+   shape ([arg_path_shape]: NUL-free, int-sized) beside the tie to the
+   image (byte [j] of [pl] is the process's byte at [pv + j], counted the
+   copy loop's way, with a NUL just past the end), together with its
+   [bview] suppliers and its uniqueness.  open and mknod state their
+   bundles and receipts over the very same definition ([SysOpenDefs.v],
+   [SpecSysMknod.v]).
 
-   [exec_path_shape] is named separately because the reading is the pair
-   and a proof usually wants one half at a time ([exec_path_of_shape]
-   projects it); nothing takes the shape alone as a premise. *)
-Definition exec_path_shape (pl : list (bv 8)) : Prop :=
-  (Z.of_nat (length pl) < 2 ^ 31)%Z
-  /\ (forall (j : nat) (b : bv 8), pl !! j = Some b ->
-        b <> (mword_of_int 0 : mword 8)).
-
-Definition exec_path_of (M : gmap Z (bv 8)) (pv : mword 64)
-    (pl : list (bv 8)) : Prop :=
-  exec_path_shape pl
-  /\ (forall (j : nat) (b : bv 8), pl !! j = Some b ->
-        M !! uint (add_vec_int pv (Z.of_nat j)) = Some b)
-  /\ M !! uint (add_vec_int pv (Z.of_nat (length pl))) = Some (bv_0 8).
-
-Lemma exec_path_of_shape (M : gmap Z (bv 8)) (pv : mword 64)
-    (pl : list (bv 8)) :
-  exec_path_of M pv pl -> exec_path_shape pl.
-Proof. intros [H _]. exact H. Qed.
-
-(* ...and the SHAPE supplier: the buffer sys_exec handed kexec.  [bb_cstr]
-   is exactly [fetchstr]'s shape promise about it. *)
-Lemma exec_path_shape_bview (plen : nat) (pfun : nat -> bv 8) :
-  (Z.of_nat plen < 2 ^ 31)%Z -> bb_cstr pfun plen ->
-  exec_path_shape (bview plen pfun).
-Proof.
-  intros Hlen [Hnn _]. split; [ by rewrite bview_length | ].
-  intros j b Hb.
-  destruct (decide (j < plen)%nat) as [Hj | Hj].
-  - rewrite (bview_lookup plen pfun j Hj) in Hb. injection Hb as <-.
-    exact (Hnn j Hj).
-  - rewrite lookup_ge_None_2 in Hb; [ discriminate | rewrite bview_length; lia ].
-Qed.
-
-(* ...and the READING supplier, the one step from the syscall's own
-   vocabulary.  [SpecCopyinstr.copyinstr_got] is what [argstr] relays about
-   the path buffer ([SpecFetchstr.fetchstr_got]); [bview] is the same buffer
-   as a list.
-
-   The step is an index shuffle and nothing else: both sides count bytes as
-   [uint (add_vec_int pv j)], the machine's own arithmetic, so there is no
-   no-wrap side condition to discharge -- a user may pass any 64-bit pointer
-   and the reading is about the addresses the copy loop actually touched.
-   [copyinstr_got]'s [j <= plen] range covers the terminator, which is the
-   third conjunct here. *)
-Lemma exec_path_of_bview (M : gmap Z (bv 8)) (pv : mword 64)
-    (plen : nat) (pfun : nat -> bv 8) :
-  (Z.of_nat plen < 2 ^ 31)%Z ->
-  bb_cstr pfun plen ->
-  copyinstr_got M pv pfun plen ->
-  exec_path_of M pv (bview plen pfun).
-Proof.
-  intros Hlen Hcstr Hgot.
-  split_and!.
-  - exact (exec_path_shape_bview plen pfun Hlen Hcstr).
-  - intros j b Hb.
-    destruct (decide (j < plen)%nat) as [Hj | Hj].
-    + rewrite (bview_lookup plen pfun j Hj) in Hb. injection Hb as <-.
-      exact (Hgot j ltac:(lia)).
-    + rewrite lookup_ge_None_2 in Hb; [ discriminate | rewrite bview_length; lia ].
-  - rewrite bview_length (Hgot plen ltac:(lia)) (proj2 Hcstr).
-    f_equal. apply bv_eq. vm_compute. reflexivity.
-Qed.
-
-(* THE READING PINS THE PATH.  [exec_path_of M pv] is a FUNCTION of the
-   image and the pointer: the bytes below the terminator are [M]'s, the
-   terminator is at [length pl], and the shape says no earlier byte is a
-   NUL -- so two readings at one [(M, pv)] have the same length and, byte
-   for byte, the same content.  This is what a bundle owed at every path
-   the caller MIGHT have passed reduces to at a caller whose image is
-   known: the one path it did pass ([PinnedExec.v] takes
-   [exec_path_of M pv pl] as its premise and answers the ∀ through this
-   lemma). *)
-Lemma exec_path_of_uniq (M : gmap Z (bv 8)) (pv : mword 64)
-    (pl1 pl2 : list (bv 8)) :
-  exec_path_of M pv pl1 -> exec_path_of M pv pl2 -> pl1 = pl2.
-Proof.
-  intros (Hs1 & Hb1 & Hn1) (Hs2 & Hb2 & Hn2).
-  assert (Hz : bv_0 8 = (mword_of_int 0 : mword 8))
-    by (apply bv_eq; vm_compute; reflexivity).
-  (* the terminator of the shorter reading is a non-NUL byte of the
-     longer one, which its shape forbids *)
-  assert (Hcut : forall (q1 q2 : list (bv 8)),
-             (forall (j : nat) (b : bv 8), q2 !! j = Some b ->
-                M !! uint (add_vec_int pv (Z.of_nat j)) = Some b) ->
-             (forall (j : nat) (b : bv 8), q2 !! j = Some b ->
-                b <> (mword_of_int 0 : mword 8)) ->
-             M !! uint (add_vec_int pv (Z.of_nat (length q1))) = Some (bv_0 8) ->
-             (length q2 <= length q1)%nat).
-  { intros q1 q2 Hb Hnn Hnul.
-    destruct (decide (length q2 <= length q1)%nat) as [Hle | Hgt]; [ exact Hle | ].
-    exfalso.
-    destruct (lookup_lt_is_Some_2 q2 (length q1) ltac:(lia)) as [b Hbj].
-    pose proof (Hb _ _ Hbj) as HM. rewrite Hnul in HM.
-    apply Some_inj in HM. rewrite Hz in HM.
-    exact (Hnn _ _ Hbj (eq_sym HM)). }
-  assert (Hlen : length pl1 = length pl2).
-  { pose proof (Hcut pl1 pl2 Hb2 (proj2 Hs2) Hn1) as H12.
-    pose proof (Hcut pl2 pl1 Hb1 (proj2 Hs1) Hn2) as H21. lia. }
-  apply list_eq. intros j.
-  destruct (pl1 !! j) as [b1 |] eqn:H1.
-  - destruct (lookup_lt_is_Some_2 pl2 j
-                ltac:(rewrite -Hlen; exact (lookup_lt_Some _ _ _ H1)))
-      as [b2 H2].
-    rewrite H2. f_equal.
-    pose proof (Hb1 _ _ H1) as E1. pose proof (Hb2 _ _ H2) as E2.
-    rewrite E1 in E2. by apply Some_inj in E2.
-  - apply lookup_ge_None in H1. symmetry.
-    apply lookup_ge_None_2. lia.
-Qed.
+   The six names below are exec's ALIASES for it, kept because this
+   contract, [SysExecDefs], [PinnedExec] and sh's and init's program-side
+   suppliers all read in exec's vocabulary; they are parsing-only
+   notations, so a goal prints the shared name. *)
+Notation exec_path_shape := arg_path_shape (only parsing).
+Notation exec_path_of := arg_path_of (only parsing).
+Notation exec_path_of_shape := arg_path_of_shape (only parsing).
+Notation exec_path_shape_bview := arg_path_shape_bview (only parsing).
+Notation exec_path_of_bview := arg_path_of_bview (only parsing).
+Notation exec_path_of_uniq := arg_path_of_uniq (only parsing).
 
 (* ===================================================================== *)
 (*  2.  THE BUNDLE AND THE ARMS AT THE SYSCALL BOUNDARY                   *)

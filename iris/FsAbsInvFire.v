@@ -330,14 +330,19 @@ Section FsAbsInvFire.
   (*  3.  The bundles the sealed contracts take, at the live Γ            *)
   (* ------------------------------------------------------------------ *)
 
-  Lemma fsabs_open_pre_plain (γfs : fs_names) (cw : Z) :
+  (* AT THE PATH THE CALLER PASSED.  The generic family answers the walk at
+     EVERY string ([fsabs_open_walk]), which is strictly more than the
+     one-path bundle asks for, so the instance is
+     [SysOpenDefs.open_au_pre_plain_of_all] and nothing else. *)
+  Lemma fsabs_open_pre_plain (γfs : fs_names) (cw : Z) (pl : list (bv 8)) :
     app_sup -∗
-    open_au_pre_plain (fs_gamma_L γfs) γfs cw (fun _ _ => True%I)
+    open_au_pre_plain (fs_gamma_L γfs) γfs cw pl (fun _ _ => True%I)
       (fun _ _ => True%I) (pfam_triv (fun _ _ _ => True%I)) (pfam_triv (fun _ _ _ => True%I)).
   Proof.
-    iIntros "#Hsup". rewrite /open_au_pre_plain.
-    iSplitR; [iApply fsabs_open_walk |].
-    iSplitR; [iApply fsabs_aopen | iApply (fsabs_atrunc with "Hsup")].
+    iIntros "#Hsup".
+    iApply (open_au_pre_plain_of_all with "[] [] []");
+      [ iApply fsabs_open_walk | iApply fsabs_aopen
+      | iApply (fsabs_atrunc with "Hsup") ].
   Qed.
 
   (* ...and the fs-facing half of exec's AU bundle
@@ -352,43 +357,52 @@ Section FsAbsInvFire.
     iSplitR; [iApply fsabs_open_walk | iApply fsabs_aopen].
   Qed.
 
-  Lemma fsabs_open_pre_create (γfs : fs_names) (cw : Z) :
+  Lemma fsabs_open_pre_create (γfs : fs_names) (cw : Z) (pl : list (bv 8)) :
     app_sup -∗
-    open_au_pre_create (fs_gamma_L γfs) γfs cw (fun _ _ => True%I)
+    open_au_pre_create (fs_gamma_L γfs) γfs cw pl (fun _ _ => True%I)
       (fun _ _ => True%I) (pfam_triv (fun _ _ => True%I)) (pfam_triv (fun _ _ => True%I)) (pfam_triv (fun _ _ _ _ => True%I)) (pfam_triv (fun _ _ _ _ => True%I))
       (pfam_triv (fun _ _ _ => True%I)) (pfam_triv (fun _ _ _ => True%I)).
   Proof.
-    iIntros "#Hsup". rewrite /open_au_pre_create.
-    iSplitR; [iApply fsabs_mknod_walk |].
-    iSplitR; [iApply (fsabs_acre with "Hsup") |].
-    iSplitR; [iApply fsabs_dlookup |].
-    iSplitR; [iApply fsabs_aopen |].
-    iSplitR; [iApply (fsabs_atrunc with "Hsup") | iApply (fsabs_child with "Hsup")].
+    iIntros "#Hsup".
+    iApply (open_au_pre_create_of_all with "[] [] [] [] [] []");
+      [ iApply fsabs_mknod_walk | iApply (fsabs_acre with "Hsup")
+      | iApply fsabs_dlookup | iApply fsabs_aopen
+      | iApply (fsabs_atrunc with "Hsup") | iApply (fsabs_child with "Hsup") ].
   Qed.
 
   (* ...AND THE ONE INPUT sys_open's contract takes, at the key the code
      branches on: the dispatcher hands this and never chooses an arm
      itself ([SpecSysOpen.open_in]). *)
-  Lemma fsabs_open_in (γfs : fs_names) (cw : Z) (vom : mword 64) :
+  (* ...at the READING of trapframe argument 0: the generic family owes the
+     bundle at whatever string the process's image holds there, and since
+     it owes the walk at EVERY string the guard is simply dropped. *)
+  Lemma fsabs_open_in (γfs : fs_names) (cw : Z)
+      (M : gmap Z (bv 8)) (pv vom : mword 64) :
     app_sup -∗
-    open_in (fs_gamma_L γfs) γfs cw vom (fun _ _ => True%I) (fun _ _ => True%I)
+    open_in (fs_gamma_L γfs) γfs cw M pv vom (fun _ _ => True%I) (fun _ _ => True%I)
       (pfam_triv (fun _ _ => True%I)) (pfam_triv (fun _ _ => True%I)) (pfam_triv (fun _ _ _ _ => True%I)) (pfam_triv (fun _ _ _ _ => True%I)) (pfam_triv (fun _ _ _ => True%I))
       (pfam_triv (fun _ _ _ => True%I)).
   Proof.
     iIntros "#Hsup". rewrite /open_in. destruct (om_create vom).
-    - iApply (fsabs_open_pre_create with "Hsup").
-    - iApply (fsabs_open_pre_plain with "Hsup").
+    - iApply (open_au_create_at_of_all with "[] [] [] [] [] []");
+        [ iApply fsabs_mknod_walk | iApply (fsabs_acre with "Hsup")
+        | iApply fsabs_dlookup | iApply fsabs_aopen
+        | iApply (fsabs_atrunc with "Hsup") | iApply (fsabs_child with "Hsup") ].
+    - iApply (open_au_plain_at_of_all with "[] [] []");
+        [ iApply fsabs_open_walk | iApply fsabs_aopen
+        | iApply (fsabs_atrunc with "Hsup") ].
   Qed.
 
-  Lemma fsabs_mknod_pre (γfs : fs_names) (cw : Z) (ma mi : Z) :
+  Lemma fsabs_mknod_pre (γfs : fs_names) (cw : Z)
+      (M : gmap Z (bv 8)) (pv : mword 64) (ma mi : Z) :
     app_sup -∗
-    mknod_au_pre (fs_gamma_L γfs) γfs cw ma mi (fun _ _ => True%I)
+    mknod_au_at (fs_gamma_L γfs) γfs cw M pv ma mi (fun _ _ => True%I)
       (fun _ _ => True%I) (pfam_triv (fun _ _ => True%I)) (pfam_triv (fun _ _ => True%I)) (pfam_triv (fun _ _ _ _ => True%I)) (pfam_triv (fun _ _ _ _ => True%I)).
   Proof.
-    iIntros "#Hsup". rewrite /mknod_au_pre.
-    iSplitR; [iApply fsabs_mknod_walk |].
-    iSplitR; [iApply (fsabs_acre with "Hsup") |].
-    iSplitR; [iApply fsabs_dlookup | iApply (fsabs_child with "Hsup")].
+    iIntros "#Hsup".
+    iApply (mknod_au_at_of_all with "[] [] [] []");
+      [ iApply fsabs_mknod_walk | iApply (fsabs_acre with "Hsup")
+      | iApply fsabs_dlookup | iApply (fsabs_child with "Hsup") ].
   Qed.
 
   (* ...and chdir's (lane C3): open's walk premise at any start beside

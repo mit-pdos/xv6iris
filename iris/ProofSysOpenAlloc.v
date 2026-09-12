@@ -92,6 +92,8 @@ Local Open Scope Z_scope.
 Require Import ConsoleInv.
 Require Import PathElems.
 Require Import FsBytesGamma.
+Require Import ArgPath.         (* [arg_path_of]: the reading of trapframe
+                                   argument 0, which the walk is at *)
 Require Import SysOpenDefs.
 Require Import ProofSysOpenShared.
 Require Import ProofSysOpenStores.
@@ -169,7 +171,7 @@ Section ProofSysOpenAlloc.
       (bp : nat -> bv 8)
       (* ---- the AU side ---- *)
       (data : nat -> list (bv 8))
-      (vom : mword 64) (pl : list (bv 8))
+      (Mim : gmap Z (bv 8)) (pvv vom : mword 64) (pl : list (bv 8))
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) :
@@ -193,6 +195,8 @@ Section ProofSysOpenAlloc.
     (bv_unsigned (di_type dn) = T_DIR_z -> om = (mword_of_int 0 : mword 32)) ->
     (* ---- the AU side: the omode word is the caller's argument, and the
        DEVICE arm's major bound is the join's single [bltu] ---- *)
+    (* the walk this block sits below ran on the caller's argument 0 *)
+    arg_path_of Mim pvv pl ->
     om = arg_int32 vom ->
     (bv_unsigned (di_type dn) = FsImg.T_DEVICE_z ->
        0 <= bv_unsigned (di_major dn) <= NDEV_max) ->
@@ -284,11 +288,11 @@ Section ProofSysOpenAlloc.
     pf_at (atrunc_commit_at (fs_gamma_L fsc_fs) appE) Ft -∗
     wp_next true (proc_addr jx)
       (so_cont_au gf nsj
-               dqb dqs (proc_addr jx) pidv vom U sts P Pmiss Fo Ft m K eb b lks) -∗
+               dqb dqs (proc_addr jx) pidv Mim pvv vom U sts P Pmiss Fo Ft m K eb b lks) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hqs HK Hkk Hinb Hipos Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk
-           Hiblog Hcovb Hiu Hj Hgl Hlkempty Hdir Hom Hmajb Hal23 Hsp0 HNsp
+           Hiblog Hcovb Hiu Hj Hgl Hlkempty Hdir Hpof Hom Hmajb Hal23 Hsp0 HNsp
            HNthr HNs0 HNs1 HNs2 HNs3 Hal Hnspos.
     destruct (so_kb K HK) as (HKcr & HKna & HKai & HKas & HKbo & HKeo & HKil &
                               HKiu & HKit & HKip & HKup & HKfc & HKfa & HKfd &
@@ -463,8 +467,8 @@ Section ProofSysOpenAlloc.
                 Hpc Hsbb Hsbi Hbsl Hisl [Hpriv Hfds Hfrag HP Hobs Htc]").
       { exact Hcsf. }
       { reflexivity. }
-      { iApply (so_arm_fail gf (proc_addr jx) pidv vom P Pmiss Fo Ft U sts _ pl
-                  (bv_unsigned inum) (era_node dn bm data) Ha0f
+      { iApply (so_arm_fail gf (proc_addr jx) pidv Mim pvv vom P Pmiss Fo Ft U sts _ pl
+                  (bv_unsigned inum) (era_node dn bm data) Hpof Ha0f
                   with "Hpriv Hfrag Hfds HP Hobs Htc"). } }
     (* ---- filealloc succeeded ---- *)
     iApply (wp_cbeqz_fall_s_sconf (CID := CID4) (mword_of_int (SO + 0x66))
@@ -645,8 +649,8 @@ Section ProofSysOpenAlloc.
                 Hpc Hsbb Hsbi Hbsl Hisl [Hpriv Hfds Hfrag HP Hobs Htc]").
       { exact Hcsf. }
       { reflexivity. }
-      { iApply (so_arm_fail gf (proc_addr jx) pidv vom P Pmiss Fo Ft U sts _ pl
-                  (bv_unsigned inum) (era_node dn bm data) Ha0f
+      { iApply (so_arm_fail gf (proc_addr jx) pidv Mim pvv vom P Pmiss Fo Ft U sts _ pl
+                  (bv_unsigned inum) (era_node dn bm data) Hpof Ha0f
                   with "Hpriv Hfrag Hfds HP Hobs Htc"). } }
     (* ---- fdalloc installed the descriptor ---- *)
     assert (Hfdlt : (fd < NOFILE)%nat).
@@ -849,13 +853,13 @@ Section ProofSysOpenAlloc.
                 (fc_readable Cf) (fc_writable Cf) (fc_pipe Cf) (fc_ip Cf)
                 (di_major dn) om (mword_of_int 0 : mword 32) lo nsj u pidv dqb dqs U sts m M7 sp0 K eb b
                 lks w6 w24 bp
-                data vom pl P Pmiss Fo Ft
+                data Mim pvv vom pl P Pmiss Fo Ft
                 (FdDevice (bv_unsigned (di_major dn))) 1%positive
                 Hqs HKiu HKeo HKit HK24 Kpop Hkk Hinb Hipos Hgeom Hsize
                 Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog Hcovb Hu2 Hj Hgl
                 Hlkempty Hkf Hfdlt Hlen Hfrees (or_intror eq_refl) Hdir
                 (so_wf_dev (mword_of_int 0 : mword 32))
-                Hom
+                Hpof Hom
                 ltac:(intros _;
                       exact (conj eq_refl
                                (conj eq_refl
@@ -977,12 +981,12 @@ Section ProofSysOpenAlloc.
               (fc_readable Cf) (fc_writable Cf) (fc_pipe Cf) (fc_ip Cf)
               (fc_major Cf) om (mword_of_int 0 : mword 32) lo nsj u pidv dqb
               dqs U sts m M8 sp0 K eb b lks w6 w24 bp
-              data vom pl P Pmiss Fo Ft (FdInode (bv_unsigned inum) γo) γo
+              data Mim pvv vom pl P Pmiss Fo Ft (FdInode (bv_unsigned inum) γo) γo
               Hqs HKiu HKeo HKit HK24 Kpop Hkk Hinb Hipos Hgeom Hsize
               Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog Hcovb Hu2 Hj Hgl Hlkempty
               Hkf Hfdlt Hlen Hfrees (or_introl eq_refl) Hdir
               (fun _ => off_wf_zero)
-              Hom
+              Hpof Hom
               ltac:(intros Hq; exfalso; exact (Hndz Hq))
               ltac:(intros _; split; reflexivity)
               Hal23 Hsp0 HM8sp HM8thr HM8s0 HM8s1 HM8s2 HM8s3 Hal

@@ -26,8 +26,9 @@
    ==== WHAT THE CREATE ARM ADDS TO THE PLAIN ENTRY, AND NOTHING ELSE ==
 
      - two more caller predicates ([Fok], [Fex]) on the binder list;
-     - the bundle destructed at [open_au_pre_create] (five pieces, not
-       three);
+     - the bundle destructed at [open_au_create_at] (six pieces, not three:
+       the walk under the reading of argument 0, then create's two commits,
+       open's two and the child's legs);
      - the exit continuation at [so_cont0_au_create] -- [so_cont0_au] with
        [open_arms_plain] replaced by [open_arms_create];
      - the branch, mirrored.
@@ -99,6 +100,9 @@ Local Open Scope Z_scope.
 
 Require Import FsTree.
 Require Import SpecNameiEra.
+Require Import DirentEnc.       (* [bview]: argstr's buffer as a list *)
+Require Import ArgPath.         (* [arg_path_of]: the reading of trapframe
+                                   argument 0, which the walk is at *)
 Require Import SysOpenDefs.
 Require Import SpecCreate.           (* [CREATE]: create's one contract   *)
 Require Import SpecSysOpen.   (* the ONE contract: the frame, the arms, [SYSOPEN] *)
@@ -190,7 +194,9 @@ Section ProofSysOpenFullBody.
              Hseam Hgen #Hdev #Hgeo #Hdlk Hbsl #Hitab #Hitinv #Hescrows #Hslks
              #Hireg #Hropen Hsbn Hsbi Hsbs Hsbb #Hbmres #Hkenv #Hprocs Hisl
              Hfds Hpriv Hfrag Hau Hcont".
-    iEval (rewrite /open_au_pre_create) in "Hau".
+    iEval (rewrite /open_au_create_at) in "Hau".
+    (* [Hwp] is the walk under the READING of argument 0 -- it fires into
+       [FsAbsEra.ep_start] at the string argstr fetched, below. *)
     iDestruct "Hau" as "(Hwp & Hac & Hdl & Hoc & Htc & Hclegs)".
     iPoseProof (printk_env_panic with "Hpre") as "#Hpe".
     iDestruct (cpu_own_zero_empty with "Hown") as "[%Hlkempty Hown]".
@@ -552,7 +558,7 @@ Section ProofSysOpenFullBody.
               (Hlb "kmem"%string)
               with "Hcg Hown Htext Hdata Hpc Hpriv Hkenv [Hbuf]").
     { iEval (rewrite HM9a1). iExact "Hbuf". }
-    iIntros (CID13 Hq13 mas P' bf) "%Hcsas %Huptz Hcg Hown Hpc Hpriv Hbuf %Hfsr _".
+    iIntros (CID13 Hq13 mas P' bf) "%Hcsas %Huptz Hcg Hown Hpc Hpriv Hbuf %Hfsr %Hfgot".
     (* argstr now reports [uptd_ext_sz]; this contract is stated at the
        bare [uptd_ext] (it is not on the dispatcher's permission path), so
        the extra content is dropped here. *)
@@ -669,8 +675,17 @@ Section ProofSysOpenFullBody.
         rewrite /open_arms_create. iFrame "Hfds". iLeft.
         iSplitR; [iPureIntro; exact Ha0m1 |]. iFrame "Hpriv Hfrag".
         rewrite /open_post_fail_create. iLeft.
-        rewrite /open_au_pre_create. iFrame "Hwp Hac Hdl Hoc Htc Hclegs". } }
+        rewrite /open_au_create_at. iFrame "Hwp Hac Hdl Hoc Htc Hclegs". } }
     (* ---- the string fetched: the [bltz] falls through ---- *)
+    (* THE PATH, AS THE BUNDLE IS OWED IT: [bview pk bf] is the buffer
+       argstr filled, and [Hfgot] says those bytes are the process's own at
+       trapframe argument 0. *)
+    pose proof (arg_path_of_bview (us_M U) v pk bf
+                  (proj2 (so_len_range pk Hpk)) Hpcstr (Hfgot pk Hpk Hpr))
+      as Hpof.
+    (* ...and the walk's wand fires there, once: from here down the block
+       speaks [FsAbsEra.ep_start] at the one path. *)
+    iDestruct ("Hwp" $! (bview pk bf) with "[%]") as "Hwp"; [ exact Hpof | ].
     iApply (wp_blt_x0_fall_s_sconf (CID := CID15) (mword_of_int (SO + 0x24))
               (mword_of_int 166 : mword 13) Ra5 R2 (K - 24)%nat b
               ltac:(nz)
@@ -809,7 +824,7 @@ Section ProofSysOpenFullBody.
        lands; everything below the split speaks [so_cont0_au_create]. ---- *)
     iAssert (wp_next (CID0 := CID21) true (proc_addr j)
                (so_cont0_au_create gf
- ns dqb dqs dqbs dqn (proc_addr j) pid vom
+ ns dqb dqs dqbs dqn (proc_addr j) pid (us_M U) v vom
                          (us_upt U P') sts P Pmiss Farm Fun Fok Fex Fo Ft m K eb b lks))
       with "[Hcont]" as "Hcont0".
     { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz".
@@ -858,10 +873,10 @@ Section ProofSysOpenFullBody.
  pk bf (arg_int32 vom) (word_lo u23) ns Sb0
               pid dqb dqs dqbs dqn (us_upt U P') sts m S2 sp0 K eb b lks
               u4 u5 u6 u24
-              vom P Pmiss Farm Fun Fok Fex Fo Ft
+              (us_M U) v vom P Pmiss Farm Fun Fok Fex Fo Ft
               HKfull HdevR Hnib0 Hgeom Hsize Hbm0
               Hbmcov Hbmlog Hist0 Hcovb Hbmgeo Hiregb Hpcstr Hpk Hni1 Hni2
-              Hni3 Hush Hprkc Hnsb Hj Hgl Heb Hlkempty eq_refl Hal23
+              Hni3 Hush Hprkc Hnsb Hj Hgl Heb Hlkempty Hpof eq_refl Hal23
               ltac:(reflexivity) HS2sp HS2thr HS2s0 HS2s2 HS2s3 Hal
               with "Hcg Hown [] [] Htext Hdata Hpc Hpre Hftab Hbio
                     Hlog Hseam Hgen Hkenv Hitab Hitinv Hescrows Hslks Hireg Hropen

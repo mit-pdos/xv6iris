@@ -1053,6 +1053,13 @@ SpecArgstr.v
 CodeArgstr.v
 ProofArgstr.v
 LinkArgstr.v
+
+# ArgPath = THE PATH ARGUMENT OF A PATH-TAKING SYSCALL, read off the
+# caller's own image: [arg_path_of M pv pl] (the shape plus the tie to the
+# bytes), its [bview] suppliers off argstr's buffer, and the uniqueness
+# that makes the guarded-forall form a ONE-PATH obligation.  A pure leaf
+# shared by exec, open and mknod; see its header.
+ArgPath.v
 SpecEitherCopyout.v
 SpecEitherCopyin.v
 CodeEitherCopy.v

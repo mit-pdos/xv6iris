@@ -71,6 +71,8 @@ Require Import ConsoleInv.
 Require Import PathElems.
 Require Import FsTree.
 Require Import FsBytesGamma.
+Require Import ArgPath.         (* [arg_path_of]: the reading of trapframe
+                                   argument 0, which the walk is at *)
 Require Import SysOpenDefs.
 Require Import SpecSysOpen.   (* the arms this block builds *)
 Require Import FsAbsOpenFire.
@@ -285,7 +287,8 @@ Section ProofSysOpenShared.
   Definition so_cont_au `{GEN : GenId}
       (gf : gname)
       (nsj : nat) (dqb dqs : dfrac)
-      (pj : mword 64) (pidv : mword 32) (vom : mword 64) (U : ustate)
+      (pj : mword 64) (pidv : mword 32)
+      (Mim : gmap Z (bv 8)) (pvv vom : mword 64) (U : ustate)
       (sts : list fdstate)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
@@ -305,14 +308,16 @@ Section ProofSysOpenShared.
          sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
          bslots 3 -∗
          iref_slots ns' -∗
-         open_arms_plain (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) gf pj pidv vom
+         open_arms_plain (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) gf pj pidv
+           Mim pvv vom
            P Pmiss Fo Ft sts U (mf !!! Regidx Ra0 : mword 64) -∗
          WP (Loop : expr riscv_lang))%I.
 
   Definition so_cont0_au `{GEN : GenId}
       (gf : gname)
       (ns : nat) (dqb dqs dqbs dqn : dfrac)
-      (pj : mword 64) (pidv : mword 32) (vom : mword 64) (U : ustate)
+      (pj : mword 64) (pidv : mword 32)
+      (Mim : gmap Z (bv 8)) (pvv vom : mword 64) (U : ustate)
       (sts : list fdstate)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
@@ -334,7 +339,8 @@ Section ProofSysOpenShared.
          sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
          bslots 3 -∗
          iref_slots ns' -∗
-         open_arms_plain (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) gf pj pidv vom
+         open_arms_plain (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) gf pj pidv
+           Mim pvv vom
            P Pmiss Fo Ft sts U (mf !!! Regidx Ra0 : mword 64) -∗
          WP (Loop : expr riscv_lang))%I.
 
@@ -353,12 +359,15 @@ Section ProofSysOpenShared.
      the observation HAS fired and its receipt is delivered, the trunc
      commit comes back ([SysOpenDefs]'s third fold arm). *)
   Lemma so_arm_fail `{GEN : GenId}
-      (gf : gname) (pj : mword 64) (pidv : mword 32) (vom : mword 64)
+      (gf : gname) (pj : mword 64) (pidv : mword 32)
+      (Mim : gmap Z (bv 8)) (pvv vom : mword 64)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
       (U : ustate) (sts : list fdstate)
       (r : mword 64) (pl : list (bv 8)) (i : Z) (n : fs_node) :
+    (* the walk that died ran on the caller's own argument 0 *)
+    arg_path_of Mim pvv pl ->
     r = (mword_of_int (-1) : mword 64) ->
     proc_priv gf pj pidv U -∗
     fd_frags (pv_fdg (us_V U)) sts -∗
@@ -366,13 +375,15 @@ Section ProofSysOpenShared.
     P (length (path_elems pl)) i -∗
     so_obs Fo i n -∗
     pf_at (atrunc_commit_at (fs_gamma_L fsc_fs) appE) Ft -∗
-    open_arms_plain (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) gf pj pidv vom
+    open_arms_plain (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) gf pj pidv
+           Mim pvv vom
       P Pmiss Fo Ft sts U r.
   Proof.
-    intros Hr. iIntros "Hpriv Hfrag Hfds HP Hobs Htc".
+    intros Hpl Hr. iIntros "Hpriv Hfrag Hfds HP Hobs Htc".
     rewrite /open_arms_plain. iFrame "Hfds". iLeft.
     iSplitR; [by iPureIntro |]. iFrame "Hpriv Hfrag".
-    rewrite /open_post_fail_plain. iRight. iExists pl. iRight.
+    rewrite /open_post_fail_plain. iRight. iExists pl.
+    iSplitR; [by iPureIntro |]. iRight.
     iExists i. iFrame "HP Htc".
     rewrite /so_obs. iDestruct "Hobs" as (av) "[%Hav HΦ]".
     iExists av, (abs_row n). iSplitR; [by iPureIntro |]. iExact "HΦ".
@@ -381,11 +392,13 @@ Section ProofSysOpenShared.
   (* ...and the WALK-DEAD arm (ARM B-FAIL): nothing was observed, the era
      refund comes back with both commits. *)
   Lemma so_arm_dead `{GEN : GenId}
-      (gf : gname) (pj : mword 64) (pidv : mword 32) (vom : mword 64)
+      (gf : gname) (pj : mword 64) (pidv : mword 32)
+      (Mim : gmap Z (bv 8)) (pvv vom : mword 64)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
       (U : ustate) (sts : list fdstate) (r : mword 64) (pl : list (bv 8)) :
+    arg_path_of Mim pvv pl ->
     r = (mword_of_int (-1) : mword 64) ->
     proc_priv gf pj pidv U -∗
     fd_frags (pv_fdg (us_V U)) sts -∗
@@ -393,19 +406,22 @@ Section ProofSysOpenShared.
     namei_walk_dead_era fsc_fs P Pmiss pl -∗
     pf_at (aopen_commit_at (fs_gamma_L fsc_fs) appE) Fo -∗
     pf_at (atrunc_commit_at (fs_gamma_L fsc_fs) appE) Ft -∗
-    open_arms_plain (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) gf pj pidv vom
+    open_arms_plain (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) gf pj pidv
+           Mim pvv vom
       P Pmiss Fo Ft sts U r.
   Proof.
-    intros Hr. iIntros "Hpriv Hfrag Hfds Hdead Hoc Htc".
+    intros Hpl Hr. iIntros "Hpriv Hfrag Hfds Hdead Hoc Htc".
     rewrite /open_arms_plain. iFrame "Hfds". iLeft.
     iSplitR; [by iPureIntro |]. iFrame "Hpriv Hfrag".
-    rewrite /open_post_fail_plain. iRight. iExists pl. iLeft.
+    rewrite /open_post_fail_plain. iRight. iExists pl.
+    iSplitR; [by iPureIntro |]. iLeft.
     iFrame "Hdead Hoc Htc".
   Qed.
 
   (* ...and the ARGSTR arm (ARM 0): nothing fs-visible happened at all. *)
   Lemma so_arm_unspent `{GEN : GenId}
-      (gf : gname) (pj : mword 64) (pidv : mword 32) (vom : mword 64)
+      (gf : gname) (pj : mword 64) (pidv : mword 32)
+      (Mim : gmap Z (bv 8)) (pvv vom : mword 64)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
@@ -414,8 +430,10 @@ Section ProofSysOpenShared.
     proc_priv gf pj pidv U -∗
     fd_frags (pv_fdg (us_V U)) sts -∗
     fd_slot -∗
-    open_au_pre_plain (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) P Pmiss Fo Ft -∗
-    open_arms_plain (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) gf pj pidv vom
+    open_au_plain_at (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) Mim pvv
+      P Pmiss Fo Ft -∗
+    open_arms_plain (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) gf pj pidv
+           Mim pvv vom
       P Pmiss Fo Ft sts U r.
   Proof.
     intros Hr. iIntros "Hpriv Hfrag Hfds Hpre".
@@ -433,12 +451,14 @@ Section ProofSysOpenShared.
   (* ------------------------------------------------------------------ *)
 
   Lemma so_arm_dev `{GEN : GenId}
-      (gf : gname) (pj : mword 64) (pidv : mword 32) (vom : mword 64)
+      (gf : gname) (pj : mword 64) (pidv : mword 32)
+      (Mim : gmap Z (bv 8)) (pvv vom : mword 64)
       (P : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
       (U : ustate) (sts : list fdstate)
       (pl : list (bv 8)) (i ma mi : Z) (nl : nat) :
+    arg_path_of Mim pvv pl ->
     0 <= ma <= NDEV_max ->
     P (length (path_elems pl)) i -∗
     (∃ av : aview, ⌜arow_at av i (MkAnode (ADev ma mi) nl)⌝
@@ -447,23 +467,25 @@ Section ProofSysOpenShared.
     (∀ r : mword 64,
        open_fd_ok gf pj pidv U (om_readable vom) (om_writable vom)
          (FdDevice ma) sts r -∗
-       open_post_ok_plain (fs_gamma_L fsc_fs) gf pj pidv vom P Fo Ft sts U r).
+       open_post_ok_plain (fs_gamma_L fsc_fs) gf pj pidv Mim pvv vom P Fo Ft sts U r).
   Proof.
-    intros Hma. iIntros "HP Hobs Htc".
+    intros Hpl Hma. iIntros "HP Hobs Htc".
     iDestruct "Hobs" as (av) "[%Hav HΦ]".
     iIntros (r) "Hfd". rewrite /open_post_ok_plain.
-    iExists pl, av, i. iFrame "HP". iLeft.
+    iExists pl, av, i. iSplitR; [by iPureIntro |]. iFrame "HP". iLeft.
     iExists ma, mi, nl. iSplitR; [by iPureIntro |].
     iSplitR; [by iPureIntro |]. iFrame "HΦ Htc Hfd".
   Qed.
 
   Lemma so_arm_file `{GEN : GenId}
-      (gf : gname) (pj : mword 64) (pidv : mword 32) (vom : mword 64)
+      (gf : gname) (pj : mword 64) (pidv : mword 32)
+      (Mim : gmap Z (bv 8)) (pvv vom : mword 64)
       (P : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
       (U : ustate) (sts : list fdstate)
       (pl : list (bv 8)) (i : Z) (bs0 : list (bv 8)) (nl : nat) (γo : gname) :
+    arg_path_of Mim pvv pl ->
     om_trunc vom = false ->
     P (length (path_elems pl)) i -∗
     (∃ av : aview, ⌜arow_at av i (MkAnode (AFile bs0) nl)⌝
@@ -472,24 +494,26 @@ Section ProofSysOpenShared.
     (∀ r : mword 64,
        open_fd_ok gf pj pidv U (om_readable vom) (om_writable vom)
          (FdInode i γo) sts r -∗
-       open_post_ok_plain (fs_gamma_L fsc_fs) gf pj pidv vom P Fo Ft sts U r).
+       open_post_ok_plain (fs_gamma_L fsc_fs) gf pj pidv Mim pvv vom P Fo Ft sts U r).
   Proof.
-    intros Hnt. iIntros "HP Hobs Htc".
+    intros Hpl Hnt. iIntros "HP Hobs Htc".
     iDestruct "Hobs" as (av) "[%Hav HΦ]".
     iIntros (r) "Hfd". rewrite /open_post_ok_plain.
-    iExists pl, av, i. iFrame "HP". iRight. iLeft.
+    iExists pl, av, i. iSplitR; [by iPureIntro |]. iFrame "HP". iRight. iLeft.
     iExists bs0, nl. iSplitR; [by iPureIntro |]. iFrame "HΦ".
     rewrite Hnt. iFrame "Htc". iExists γo. iFrame "Hfd".
   Qed.
 
   (* ...and the ONE arm that spends the trunc commit: the O_TRUNC file. *)
   Lemma so_arm_file_tr `{GEN : GenId}
-      (gf : gname) (pj : mword 64) (pidv : mword 32) (vom : mword 64)
+      (gf : gname) (pj : mword 64) (pidv : mword 32)
+      (Mim : gmap Z (bv 8)) (pvv vom : mword 64)
       (P : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
       (U : ustate) (sts : list fdstate)
       (pl : list (bv 8)) (i : Z) (bs0 : list (bv 8)) (nl : nat) (γo : gname) :
+    arg_path_of Mim pvv pl ->
     om_trunc vom = true ->
     P (length (path_elems pl)) i -∗
     (∃ av : aview, ⌜arow_at av i (MkAnode (AFile bs0) nl)⌝
@@ -499,12 +523,12 @@ Section ProofSysOpenShared.
     (∀ r : mword 64,
        open_fd_ok gf pj pidv U (om_readable vom) (om_writable vom)
          (FdInode i γo) sts r -∗
-       open_post_ok_plain (fs_gamma_L fsc_fs) gf pj pidv vom P Fo Ft sts U r).
+       open_post_ok_plain (fs_gamma_L fsc_fs) gf pj pidv Mim pvv vom P Fo Ft sts U r).
   Proof.
-    intros Ht. iIntros "HP Hobs Htr".
+    intros Hpl Ht. iIntros "HP Hobs Htr".
     iDestruct "Hobs" as (av) "[%Hav HΦ]".
     iIntros (r) "Hfd". rewrite /open_post_ok_plain.
-    iExists pl, av, i. iFrame "HP". iRight. iLeft.
+    iExists pl, av, i. iSplitR; [by iPureIntro |]. iFrame "HP". iRight. iLeft.
     iExists bs0, nl. iSplitR; [by iPureIntro |]. iFrame "HΦ".
     rewrite Ht. iFrame "Htr". iExists γo. iFrame "Hfd".
   Qed.
@@ -512,12 +536,14 @@ Section ProofSysOpenShared.
   (* the DIRECTORY arm, at O_RDONLY exactly -- and its own key is what pays
      the writable-fd-is-not-a-directory theorem here ([om_rdonly_modes]). *)
   Lemma so_arm_dir `{GEN : GenId}
-      (gf : gname) (pj : mword 64) (pidv : mword 32) (vom : mword 64)
+      (gf : gname) (pj : mword 64) (pidv : mword 32)
+      (Mim : gmap Z (bv 8)) (pvv vom : mword 64)
       (P : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
       (U : ustate) (sts : list fdstate)
       (pl : list (bv 8)) (i : Z) (ents : gmap fname Z) (nl : nat) (γo : gname) :
+    arg_path_of Mim pvv pl ->
     om_arg vom = 0 ->
     P (length (path_elems pl)) i -∗
     (∃ av : aview, ⌜arow_at av i (MkAnode (ADir ents) nl)⌝
@@ -526,14 +552,14 @@ Section ProofSysOpenShared.
     (∀ r : mword 64,
        open_fd_ok gf pj pidv U (om_readable vom) (om_writable vom)
          (FdInode i γo) sts r -∗
-       open_post_ok_plain (fs_gamma_L fsc_fs) gf pj pidv vom P Fo Ft sts U r).
+       open_post_ok_plain (fs_gamma_L fsc_fs) gf pj pidv Mim pvv vom P Fo Ft sts U r).
   Proof.
-    intros H0. iIntros "HP Hobs Htc".
+    intros Hpl H0. iIntros "HP Hobs Htc".
     iDestruct "Hobs" as (av) "[%Hav HΦ]".
     iIntros (r) "Hfd". rewrite /open_post_ok_plain.
     destruct (om_rdonly_modes vom H0) as [Hrd Hwr].
     rewrite Hrd Hwr.
-    iExists pl, av, i. iFrame "HP". iRight. iRight.
+    iExists pl, av, i. iSplitR; [by iPureIntro |]. iFrame "HP". iRight. iRight.
     iExists ents, nl. iSplitR; [by iPureIntro |].
     iSplitR; [by iPureIntro |]. iFrame "HΦ Htc". iExists γo. iFrame "Hfd".
   Qed.
@@ -543,13 +569,15 @@ Section ProofSysOpenShared.
      FILE case's [om_trunc = false] is forced by the exit's own key (either
      the mask was empty or the type test failed). *)
   Lemma so_arm_notr `{GEN : GenId}
-      (gf : gname) (pj : mword 64) (pidv : mword 32) (vom : mword 64)
+      (gf : gname) (pj : mword 64) (pidv : mword 32)
+      (Mim : gmap Z (bv 8)) (pvv vom : mword 64)
       (P : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
       (U : ustate) (sts : list fdstate) (pl : list (bv 8)) (i : Z)
       (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) (t : fdtype)
       (γo : gname) :
+    arg_path_of Mim pvv pl ->
     (om_trunc vom = false \/ bv_unsigned (di_type dn) <> FsImg.T_FILE_z) ->
     (bv_unsigned (di_type dn) = T_DIR_z -> om_arg vom = 0) ->
     (bv_unsigned (di_type dn) = FsImg.T_DEVICE_z ->
@@ -564,33 +592,33 @@ Section ProofSysOpenShared.
     pf_at (atrunc_commit_at (fs_gamma_L fsc_fs) appE) Ft -∗
     (∀ r : mword 64,
        open_fd_ok gf pj pidv U (om_readable vom) (om_writable vom) t sts r -∗
-       open_post_ok_plain (fs_gamma_L fsc_fs) gf pj pidv vom P Fo Ft sts U r).
+       open_post_ok_plain (fs_gamma_L fsc_fs) gf pj pidv Mim pvv vom P Fo Ft sts U r).
   Proof.
-    intros Hnt Hdirk Hdev Hino Hen. rewrite /so_obs.
+    intros Hpl Hnt Hdirk Hdev Hino Hen. rewrite /so_obs.
     destruct Hen as [Hd | [Hf | Hv]].
     - rewrite (opf_era_dir_row dn bm data Hd)
               (Hino ltac:(rewrite Hd; vm_compute; discriminate)).
       iIntros "HP Hobs Htc".
-      iApply (so_arm_dir gf pj pidv vom P Fo Ft U sts pl i
+      iApply (so_arm_dir gf pj pidv Mim pvv vom P Fo Ft U sts pl i
                 (dir_entries (era_node dn bm data))
-                (fn_nlink (era_node dn bm data)) γo (Hdirk Hd)
+                (fn_nlink (era_node dn bm data)) γo Hpl (Hdirk Hd)
                 with "HP Hobs Htc").
     - rewrite (opf_era_file_row dn bm data Hf)
               (Hino ltac:(rewrite Hf; vm_compute; discriminate)).
       assert (Hntf : om_trunc vom = false)
         by (destruct Hnt as [H | H]; [exact H | exfalso; exact (H Hf)]).
       iIntros "HP Hobs Htc".
-      iApply (so_arm_file gf pj pidv vom P Fo Ft U sts pl i
+      iApply (so_arm_file gf pj pidv Mim pvv vom P Fo Ft U sts pl i
                 (fn_file_bytes (era_node dn bm data))
-                (fn_nlink (era_node dn bm data)) γo Hntf with "HP Hobs Htc").
+                (fn_nlink (era_node dn bm data)) γo Hpl Hntf with "HP Hobs Htc").
     - destruct (Hdev Hv) as [Hmb Ht].
       rewrite (opf_era_dev_row dn bm data
                  ltac:(rewrite Hv; vm_compute; discriminate)
                  ltac:(rewrite Hv; vm_compute; discriminate)) Ht.
       iIntros "HP Hobs Htc".
-      iApply (so_arm_dev gf pj pidv vom P Fo Ft U sts pl i
+      iApply (so_arm_dev gf pj pidv Mim pvv vom P Fo Ft U sts pl i
                 (bv_unsigned (di_major dn)) (bv_unsigned (di_minor dn))
-                (fn_nlink (era_node dn bm data)) Hmb with "HP Hobs Htc").
+                (fn_nlink (era_node dn bm data)) Hpl Hmb with "HP Hobs Htc").
   Qed.
 
 End ProofSysOpenShared.

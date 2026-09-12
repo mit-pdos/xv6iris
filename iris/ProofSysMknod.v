@@ -131,6 +131,8 @@ Require Import SpecArgint.
 Require Import FsBytesGamma.     (* [fs_gamma_L]: the live Γ            *)
 Require Import SpecCreate.
 Require Import CodeSysMknod.
+Require Import ArgPath.         (* [arg_path_of]: the reading of trapframe
+                                   argument 0, which the walk is at *)
 Require Import SpecSysMknod.     (* the contract this file seals        *)
 Require Import DirentEnc.        (* [bview]                             *)
 Require Import FsTree.
@@ -1046,7 +1048,10 @@ Section ProofSysMknodBody.
              Hgen #Hdev #Hgeo #Hdlk Hbsl #Hitab #Hitinv #Hescrows #Hslks
              #Hireg #Hiopen Hsbn Hsbi Hsbs Hsbb #Hbmres #Hkenv #Hprocs Hir
              Hpriv Hau Hcont".
-    iEval (rewrite /mknod_au_pre) in "Hau".
+    iEval (rewrite /mknod_au_at) in "Hau".
+    (* [Hwp] is the walk AT THE STRING ARGUMENT 0 NAMES -- a wand under the
+       reading, not a one-shot at every path -- so it fires only once
+       argstr has answered, below. *)
     iDestruct "Hau" as "(Hwp & Hacre & Hdlkc & Hchild)".
     iPoseProof (printk_env_panic with "Hpre") as "#Hpe".
     iDestruct (cpu_own_zero_empty with "Hown") as "[%Hlkempty Hown]".
@@ -1490,7 +1495,7 @@ Section ProofSysMknodBody.
               (Hlb "kmem"%string)
               with "Hcg Hown Htext Hdata Hpc Hpriv Hkenv [Hbuf]").
     { iEval (rewrite HM13a1). iExact "Hbuf". }
-    iIntros (CID19 Hq19 mas P' bf) "%Hcsas %Hupt Hcg Hown Hpc Hpriv Hbuf %Hfsr _".
+    iIntros (CID19 Hq19 mas P' bf) "%Hcsas %Hupt Hcg Hown Hpc Hpriv Hbuf %Hfsr %Hfgot".
     iEval (rewrite HM13a1) in "Hbuf".
     assert (Hpc2e : ret_pc (M13 !!! Regidx Rra : mword 64)
                     = mword_of_int (MN + 0x2e)) by (rewrite HM13ra; pcw).
@@ -1507,6 +1512,13 @@ Section ProofSysMknodBody.
     (* ================= +0x2e bltz a0 -> ARM A ================= *)
     destruct Hfsr as [(pk & Hpk & Hpcstr & Hpr) | Hpr].
     - (* ---- the string fetched: the [bltz] FALLS THROUGH ---- *)
+      (* THE PATH, AS THE BUNDLE IS OWED IT ([SpecSysExec]'s mold at
+         ProofSysExec.v's [Hpof]): [bview pk bf] is the buffer argstr
+         filled, and [Hfgot] says those bytes are the process's own at
+         trapframe argument 0 -- so every occurrence below is at the ONE
+         path the caller actually passed. *)
+      pose proof (arg_path_of_bview (us_M U) v0 pk bf
+                    (mn_plen_lt pk Hpk) Hpcstr (Hfgot pk Hpk Hpr)) as Hpof.
       iApply (wp_blt_x0_fall_s_sconf (CID := CID19) (mword_of_int (MN + 0x2e))
                 (mword_of_int 42 : mword 13) Ra0 mas (K - 20)%nat b
                 ltac:(nz)
@@ -1694,13 +1706,14 @@ Section ProofSysMknodBody.
         iDestruct (log_op_openS with "Hop") as (Sb0) "[HopS Htx]".
         iDestruct (cpu_own_transport CID19 CID25 0 eb pj b
                      ltac:(wp_next_chain) with "Hown") as "Hown".
-           (* THE ONE-SHOT, HANDED DOWN UNFIRED
-              ([FsAbsNparMknod.np_start_of_mknod]): [ep_start] at the
-              string this call fetched IS [npar_walk_pre_era] at that
-              string, so nothing is fired here -- the WALK picks the start
+           (* THE ONE-SHOT, HANDED DOWN UNFIRED, AT THE PATH THE CALLER
+              PASSED: the bundle's walk row is the wand under the reading
+              of argument 0, and [Hpof] is that reading at the buffer
+              argstr filled, so this is where it fires into [ep_start] --
+              still unfired as a one-shot, since the WALK picks the start
               inum (ROOTINO, or the cwd's) and fires it there. *)
-           iDestruct (np_start_of_mknod fsc_fs (pv_cwi (us_V U)) P Pmiss (bview pk bf)
-                        with "Hwp") as "Htr".
+           iDestruct ("Hwp" $! (bview pk bf) with "[%]") as "Htr";
+             [ exact Hpof | ].
            (* THE BUNDLE AT THE DEVICE TYPE ([SpecCreate.cre_commits_of_dev]):
               mknod's caller owes no DOTS leg AND NEITHER DOES THIS PROOF --
               at [T_DEVICE] the [beq s4,a4] at +0xca is never taken, and
@@ -1935,6 +1948,7 @@ Section ProofSysMknodBody.
              iSplitR; [iPureIntro; rewrite Ha0f; exact HP2a0 |].
              rewrite /mknod_post_ok.
              iExists (bview pk bf), (bv_unsigned inum).
+             iSplitR; [iPureIntro; exact Hpof |].
              iSplitR; [iPureIntro; exact Hinum |].
              iApply (cre_ok_arms_dev with "Hcauok"). }
         + (* ---------- ARM B: create returned 0 ---------- *)
@@ -1985,6 +1999,7 @@ Section ProofSysMknodBody.
            { rewrite /mknod_arms. iRight. iSplitR; [by iPureIntro |].
              rewrite /mknod_post_fail. iRight.
              iExists (bview pk bf).
+             iSplitR; [iPureIntro; exact Hpof |].
              iApply (cre_fail_arms_dev with "Hcf"). }
       }
     - (* ================= ARM A: argstr returned -1 =================
@@ -2031,7 +2046,7 @@ Section ProofSysMknodBody.
            whole AU bundle comes home *)
         rewrite /mknod_arms. iRight. iSplitR; [by iPureIntro |].
         rewrite /mknod_post_fail. iLeft.
-        rewrite /mknod_au_pre. iFrame "Hwp Hacre Hdlkc Hchild". }
+        rewrite /mknod_au_at. iFrame "Hwp Hacre Hdlkc Hchild". }
   Qed.
 
 End ProofSysMknodBody.
@@ -2318,15 +2333,19 @@ Section MknodStable.
   (*  4.  THE ARMS.  ONE LEMMA PER ARM (the read lane's measured cut)     *)
   (* =================================================================== *)
 
-  Lemma mkr_ok_arm Γ (ma mi : Z) (root : Z) (ps : list fname) (ds : list Z)
+  (* the READING of argument 0 is DROPPED here, deliberately: the stable
+     client names a CHAIN it holds persistently and need not know its own
+     image at all (the closing note in SpecSysMknod.v). *)
+  Lemma mkr_ok_arm Γ (M : gmap Z (bv 8)) (pv : mword 64)
+      (ma mi : Z) (root : Z) (ps : list fname) (ds : list Z)
       (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
       (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) :
-    mknod_post_ok Γ ma mi (fun _ _ => True%I) Farm Fun
+    mknod_post_ok Γ M pv ma mi (fun _ _ => True%I) Farm Fun
       (mkr_fam root ps ds Fok) (mkr_fam root ps ds Fex)
     ⊢ mknod_stable_ok Γ ma mi root ps ds Farm Fun Fok Fex.
   Proof.
     rewrite /mknod_post_ok /mknod_stable_ok.
-    iIntros "H". iDestruct "H" as (pl i) "[%Hi H]".
+    iIntros "H". iDestruct "H" as (pl i) "[_ [%Hi H]]".
     iDestruct "H" as (av d nm ents nl)
       "(%Hlast & %Hpre & _ & Hcm & HΦ & Harmr & Hun)".
     iEval (rewrite /mkr_fam /mkr_recv /=) in "HΦ".
@@ -2341,21 +2360,28 @@ Section MknodStable.
     iSplitL "HΦ"; [iExact "HΦ" |]. iFrame "Harmr Hun".
   Qed.
 
-  Lemma mkr_fail_arm Γ (γfs : fs_names) (cw : Z) (ma mi : Z) (root : Z)
+  (* THE FIRST ARM IS WHY THE COMMITS SIT OUTSIDE THE WALK'S WAND
+     ([SpecSysMknod.mknod_au_at]): on the "nothing happened" arm argstr may
+     have failed, so no [pl] satisfies the reading and a whole-bundle wand
+     could never be opened -- this lemma would be underivable.  With the
+     commits beside the wand they come back on the nose and the walk is
+     dropped, exactly as before this syscall carried its path. *)
+  Lemma mkr_fail_arm Γ (γfs : fs_names) (cw : Z)
+      (M : gmap Z (bv 8)) (pv : mword 64) (ma mi : Z) (root : Z)
       (ps : list fname) (ds : list Z)
       (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
       (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) :
-    mknod_post_fail Γ γfs cw ma mi (fun _ _ => True%I) (fun _ _ => True%I)
+    mknod_post_fail Γ γfs cw M pv ma mi (fun _ _ => True%I) (fun _ _ => True%I)
       Farm Fun (mkr_fam root ps ds Fok) (mkr_fam root ps ds Fex)
     ⊢ mknod_stable_fail Γ ma mi root ps ds Farm Fun Fok Fex.
   Proof.
-    rewrite /mknod_post_fail /mknod_stable_fail /mknod_au_pre.
+    rewrite /mknod_post_fail /mknod_stable_fail /mknod_au_at.
     iIntros "[(_ & Hacre & Hdl & Hchild) | H]".
     { iLeft. iSplitL "Hacre".
       - iApply (mkr_acre_forget_at with "Hacre").
       - iSplitL "Hdl"; [iApply (mkr_dlookup_forget_at with "Hdl") |].
         iLeft. iExact "Hchild". }
-    iDestruct "H" as (pl) "[(_ & Hacre & Hdl & Hchild) | H]".
+    iDestruct "H" as (pl) "[_ [(_ & Hacre & Hdl & Hchild) | H]]".
     { iLeft. iSplitL "Hacre".
       - iApply (mkr_acre_forget_at with "Hacre").
       - iSplitL "Hdl"; [iApply (mkr_dlookup_forget_at with "Hdl") |].
@@ -2378,11 +2404,12 @@ Section MknodStable.
         iExact "Hch".
   Qed.
 
-  Lemma mkr_arms Γ (γfs : fs_names) (cw : Z) (ma mi : Z) (root : Z)
+  Lemma mkr_arms Γ (γfs : fs_names) (cw : Z)
+      (M : gmap Z (bv 8)) (pv : mword 64) (ma mi : Z) (root : Z)
       (ps : list fname) (ds : list Z)
       (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
       (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) (r : mword 64) :
-    mknod_arms Γ γfs cw ma mi (fun _ _ => True%I) (fun _ _ => True%I)
+    mknod_arms Γ γfs cw M pv ma mi (fun _ _ => True%I) (fun _ _ => True%I)
       Farm Fun (mkr_fam root ps ds Fok) (mkr_fam root ps ds Fex) r
     ⊢ mknod_stable_arms Γ ma mi root ps ds Farm Fun Fok Fex r.
   Proof.
@@ -2437,7 +2464,11 @@ Section MknodStableWp.
                     Hiregi Hropen Hsbn Hsbi Hsbs Hsbb Hbmres Hkenv Hprocs
                     Hiref Hpriv [Hacre Hdl Hchild]").
     (* ---- THE BUNDLE: the walk owed nothing, the commits are enriched ---- *)
-    { rewrite /mknod_au_pre. iSplitR; [iApply mkr_walk_triv |].
+    { rewrite /mknod_au_at.
+      iSplitR; [iIntros (pl) "_";
+                iApply (np_start_of_mknod fsc_fs (pv_cwi (us_V U))
+                          (fun _ _ => True%I) (fun _ _ => True%I) pl);
+                iApply mkr_walk_triv |].
       iSplitL "Hacre".
       - iApply (mkr_acre_compose_at _ _ _ avc root ps ds _ Hrun
                   with "Hchain Hacre").

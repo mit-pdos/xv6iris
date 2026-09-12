@@ -100,6 +100,9 @@ Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 
 Require Import SpecNameiEra.
+Require Import DirentEnc.       (* [bview]: argstr's buffer as a list *)
+Require Import ArgPath.         (* [arg_path_of]: the reading of trapframe
+                                   argument 0, which the walk is at *)
 Require Import SysOpenDefs.
 Require Import SpecSysOpen.   (* the ONE contract: the frame, the arms, [SYSOPEN] *)
 Require Import ProofSysOpenBits.
@@ -215,7 +218,9 @@ Section ProofSysOpenBody.
              Hseam Hgen #Hdev #Hgeo #Hdlk Hbsl #Hitab #Hitinv #Hescrows #Hslks
              #Hireg #Hropen Hsbn Hsbi Hsbs Hsbb #Hbmres #Hkenv #Hprocs Hisl
              Hfds Hpriv Hfrag Hau Hcont".
-    iEval (rewrite /open_au_pre_plain) in "Hau".
+    iEval (rewrite /open_au_plain_at) in "Hau".
+    (* [Hwp] is the walk under the READING of argument 0 -- it fires into
+       [FsAbsEra.ex_start] at the string argstr fetched, below. *)
     iDestruct "Hau" as "(Hwp & Hoc & Htc)".
     iPoseProof (printk_env_panic with "Hpre") as "#Hpe".
     iDestruct (cpu_own_zero_empty with "Hown") as "[%Hlkempty Hown]".
@@ -577,7 +582,7 @@ Section ProofSysOpenBody.
               (Hlb "kmem"%string)
               with "Hcg Hown Htext Hdata Hpc Hpriv Hkenv [Hbuf]").
     { iEval (rewrite HM9a1). iExact "Hbuf". }
-    iIntros (CID13 Hq13 mas P' bf) "%Hcsas %Huptz Hcg Hown Hpc Hpriv Hbuf %Hfsr _".
+    iIntros (CID13 Hq13 mas P' bf) "%Hcsas %Huptz Hcg Hown Hpc Hpriv Hbuf %Hfsr %Hfgot".
     (* argstr now reports [uptd_ext_sz]; this contract is stated at the
        bare [uptd_ext] (it is not on the dispatcher's permission path), so
        the extra content is dropped here. *)
@@ -688,11 +693,22 @@ Section ProofSysOpenBody.
         assert (Ha0m1 : (mf !!! Regidx Ra0 : mword 64)
                         = (mword_of_int (-1) : mword 64))
           by (rewrite Ha0f; exact HR2a0).
-        iApply (so_arm_unspent gf (proc_addr j) pid vom P Pmiss Fo Ft _ sts
+        iApply (so_arm_unspent gf (proc_addr j) pid (us_M U) v vom
+                  P Pmiss Fo Ft _ sts
                   (mf !!! Regidx Ra0 : mword 64) Ha0m1
                   with "Hpriv Hfrag Hfds [Hwp Hoc Htc]").
-        rewrite /open_au_pre_plain. iFrame "Hwp Hoc Htc". } }
+        rewrite /open_au_plain_at. iFrame "Hwp Hoc Htc". } }
     (* ---- the string fetched: the [bltz] falls through ---- *)
+    (* THE PATH, AS THE BUNDLE IS OWED IT (ProofSysExec.v's [Hpof] is the
+       mold): [bview pk bf] is the buffer argstr filled, and [Hfgot] says
+       those bytes are the process's own at trapframe argument 0 -- so the
+       walk below runs at the ONE path the caller actually passed. *)
+    pose proof (arg_path_of_bview (us_M U) v pk bf
+                  (proj2 (so_len_range pk Hpk)) Hpcstr (Hfgot pk Hpk Hpr))
+      as Hpof.
+    (* ...and the walk's wand fires there, once: from here down the block
+       speaks [FsAbsEra.ex_start] at the one path. *)
+    iDestruct ("Hwp" $! (bview pk bf) with "[%]") as "Hwp"; [ exact Hpof | ].
     iApply (wp_blt_x0_fall_s_sconf (CID := CID15) (mword_of_int (SO + 0x24))
               (mword_of_int 166 : mword 13) Ra5 R2 (K - 24)%nat b
               ltac:(nz)
@@ -831,7 +847,7 @@ Section ProofSysOpenBody.
        lands; everything below the split speaks [so_cont0]. ---- *)
     iAssert (wp_next (CID0 := CID21) true (proc_addr j)
                (so_cont0_au gf
- ns dqb dqs dqbs dqn (proc_addr j) pid vom
+ ns dqb dqs dqbs dqn (proc_addr j) pid (us_M U) v vom
                          (us_upt U P') sts P Pmiss Fo Ft m K eb b lks))
       with "[Hcont]" as "Hcont0".
     { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz".
@@ -872,10 +888,10 @@ Section ProofSysOpenBody.
  pk bf (arg_int32 vom) (word_lo u23) ns Sb0
                 pid dqb dqs dqbs dqn (us_upt U P') sts m S2 sp0 K eb b lks
                 u4 u5 u6 u24
-                vom P Pmiss Fo Ft
+                (us_M U) v vom P Pmiss Fo Ft
                 HKfull HdevR Hnib0 Hgeom Hsize Hbm0
                 Hbmcov Hbmlog Hist0 Hcovb Hbmgeo Hiregb Hpcstr Hpk Hni1 Hni2
-                Hni3 Hush Hprkc Hnsb Hj Hgl Heb Hlkempty eq_refl Hal23
+                Hni3 Hush Hprkc Hnsb Hj Hgl Heb Hlkempty Hpof eq_refl Hal23
                 ltac:(reflexivity) HS2sp HS2thr HS2s0 HS2s2 HS2s3 Hal
                 with "Hcg Hown [] [] Htext Hdata Hpc Hpre Hftab Hbio
                       Hlog Hseam Hgen Hkenv Hitab Hitinv Hescrows Hslks Hireg Hropen

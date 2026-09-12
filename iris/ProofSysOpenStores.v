@@ -103,6 +103,8 @@ Require Import ConsoleInv.
 Require Import PathElems.
 Require Import FsTree.
 Require Import FsBytesGamma.
+Require Import ArgPath.         (* [arg_path_of]: the reading of trapframe
+                                   argument 0, which the walk is at *)
 Require Import SysOpenDefs.
 Require Import FsAbsOpenFire.
 Require Import ProofSysOpenBits.
@@ -184,7 +186,7 @@ Section ProofSysOpenStores.
       (bp : nat -> bv 8)
       (* ---- the AU side ---- *)
       (data : nat -> list (bv 8))
-      (vom : mword 64) (pl : list (bv 8))
+      (Mim : gmap Z (bv 8)) (pvv vom : mword 64) (pl : list (bv 8))
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
@@ -222,6 +224,8 @@ Section ProofSysOpenStores.
     (* ---- the AU side: the omode word is the caller's argument, and the
        two type-dependent cells the block above wrote agree with the record
        (the DEVICE arm's major bound is the join's [bltu], relayed) ---- *)
+    (* the walk this block sits below ran on the caller's argument 0 *)
+    arg_path_of Mim pvv pl ->
     om = arg_int32 vom ->
     (bv_unsigned (di_type dn) = FsImg.T_DEVICE_z ->
        tyw = FD_DEVICE /\ maj = di_major dn
@@ -326,12 +330,12 @@ Section ProofSysOpenStores.
     pf_at (atrunc_commit_at (fs_gamma_L fsc_fs) appE) Ft -∗
     wp_next true (proc_addr jx)
       (so_cont_au gf nsj
-               dqb dqs (proc_addr jx) pidv vom U sts P Pmiss Fo Ft m K eb b lks) -∗
+               dqb dqs (proc_addr jx) pidv Mim pvv vom U sts P Pmiss Fo Ft m K eb b lks) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hqs HKiu HKeo HKit HK24 Kpop Hkk Hinb Hipos Hgeom Hsize Hbm0
            Hbmcov Hbmlog Hist0 Hiblk Hiblog Hcovb Hu2 Hj Hgl Hlkempty Hkf
-           Hfdlt Hlen Hfrees Htyor Hdir Hwf Hom Htd Hti Hal23 Hsp0 HNsp HNthr
+           Hfdlt Hlen Hfrees Htyor Hdir Hwf Hpof Hom Htd Hti Hal23 Hsp0 HNsp HNthr
            HNs0 HNs1 HNs2 HNs3 Hal.
 
     (* [2 <= u] as a SHAPE, not an inequality: itrunc's uncredited entry
@@ -597,15 +601,15 @@ Section ProofSysOpenStores.
         apply eq_vec_true_iff in Htr. rewrite Htr.
         apply bv_eq; vm_compute; reflexivity. }
       iDestruct (so_flat_close with "Hflat") as "Hload".
-      iDestruct (so_arm_notr gf (proc_addr jx) pidv vom P Fo Ft U sts pl
+      iDestruct (so_arm_notr gf (proc_addr jx) pidv Mim pvv vom P Fo Ft U sts pl
                    (bv_unsigned inum) dn bm data t g
-                   (or_introl Hntf) Hdirk Hdevb Hinob Htyen
+                   Hpof (or_introl Hntf) Hdirk Hdevb Hinob Htyen
                    with "HP Hobs Htc") as "Harm".
       iApply (Pub.so_tail_pub_au (CID0 := CID10) gf gs jx gl pd pav pu
                 gil gisl
  kk qi s gy loy tly inum dn bm kf fd l C pn om voff nsj
                 (S (S u2)) pidv dqb dqs U sts m N6 sp0 K eb b lks w6
-                (word_of_words lo om) w24 bp vom P Pmiss Fo Ft t g
+                (word_of_words lo om) w24 bp Mim pvv vom P Pmiss Fo Ft t g
                 Hqs HKiu HKeo HK24 Kpop Hkk Hinb Hipos Hgeom Hj Hgl Hlkempty Hkf
                 Hfdlt Hlen Hfrees eq_refl Htyor eq_refl eq_refl Hdir Hdvw Hwf
                 Hom Hfdty
@@ -706,15 +710,15 @@ Section ProofSysOpenStores.
       { intros Hc. apply Hnf. apply bv_eq. rewrite Hc.
         vm_compute. reflexivity. }
       iDestruct (so_flat_close with "Hflat") as "Hload".
-      iDestruct (so_arm_notr gf (proc_addr jx) pidv vom P Fo Ft U sts pl
+      iDestruct (so_arm_notr gf (proc_addr jx) pidv Mim pvv vom P Fo Ft U sts pl
                    (bv_unsigned inum) dn bm data t g
-                   (or_intror Hnf2) Hdirk Hdevb Hinob Htyen
+                   Hpof (or_intror Hnf2) Hdirk Hdevb Hinob Htyen
                    with "HP Hobs Htc") as "Harm".
       iApply (Pub.so_tail_pub_au (CID0 := CID13) gf gs jx gl pd pav pu
                 gil gisl
  kk qi s gy loy tly inum dn bm kf fd l C pn om voff nsj
                 (S (S u2)) pidv dqb dqs U sts m N8 sp0 K eb b lks w6
-                (word_of_words lo om) w24 bp vom P Pmiss Fo Ft t g
+                (word_of_words lo om) w24 bp Mim pvv vom P Pmiss Fo Ft t g
                 Hqs HKiu HKeo HK24 Kpop Hkk Hinb Hipos Hgeom Hj Hgl Hlkempty Hkf
                 Hfdlt Hlen Hfrees eq_refl Htyor eq_refl eq_refl Hdir Hdvw Hwf
                 Hom Hfdty
@@ -934,9 +938,9 @@ Section ProofSysOpenStores.
     { destruct (Hti ltac:(rewrite Htyfz; vm_compute; discriminate)) as [_ Hq].
       exact Hq. }
     iEval (rewrite /so_obs (opf_era_file_row dn bm data Htyfz)) in "Hobs".
-    iDestruct (so_arm_file_tr gf (proc_addr jx) pidv vom P Fo Ft U sts pl
+    iDestruct (so_arm_file_tr gf (proc_addr jx) pidv Mim pvv vom P Fo Ft U sts pl
                  (bv_unsigned inum) (fn_file_bytes (era_node dn bm data))
-                 (fn_nlink (era_node dn bm data)) g Htrue
+                 (fn_nlink (era_node dn bm data)) g Hpof Htrue
                  with "HP Hobs Htr2") as "Harm".
     iEval (rewrite -Htis) in "Harm".
     iApply (Pub.so_tail_pub_au (CID0 := CID17) gf gs jx gl pd pav pu
@@ -944,7 +948,7 @@ Section ProofSysOpenStores.
  kk qi s gy loy tly inum (di_trunc dn) bm_empty kf fd l C pn
               om voff nsj u3 pidv dqb dqs U sts m mit sp0 K
               eb b lks w6 (word_of_words lo om) w24 bp
-              vom P Pmiss Fo Ft t g
+              Mim pvv vom P Pmiss Fo Ft t g
               Hqs HKiu HKeo HK24 Kpop Hkk Hinb Hipos Hgeom Hj Hgl Hlkempty Hkf
               Hfdlt Hlen Hfrees eq_refl Htyor eq_refl eq_refl Hdir Hdvw Hwf
               Hom Hfdty

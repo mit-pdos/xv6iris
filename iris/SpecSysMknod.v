@@ -32,9 +32,9 @@
    ==== ONE CONTRACT ====================================================
 
    [Module Type SYSMKNOD] is sys_mknod's only seal.  Its body is the
-   whole-function FRAME below plus ONE caller INPUT ([mknod_au_pre], the
-   atomic-update bundle) and ONE armed OUTPUT ([mknod_arms], keyed on the
-   returned a0).  The landed return blanket [sys_mknod_ret] is a
+   whole-function FRAME below plus ONE caller INPUT ([mknod_au_at], the
+   atomic-update bundle at the path the caller passed) and ONE armed
+   OUTPUT ([mknod_arms], keyed on the returned a0).  The landed return blanket [sys_mknod_ret] is a
    consequence of the arms ([mknod_arms_ret]) rather than a second
    conjunct, because the arms already split on the two words a0 can hold.
    A STABLE form is a DERIVED corollary ([wp_sys_mknod_stable_body], proved
@@ -46,17 +46,21 @@
    [mknod_au_pre] is the one-shot bundle of this syscall's linearization
    instants, at the commit mask [appE]:
 
-     - [npar_walk_pre_era] -- nameiparent's PARENT PREFIX
+     - [FsAbsEra.ep_start] AT THE PATH -- nameiparent's PARENT PREFIX
        ([npar_elems pl = removelast (path_elems pl)]: create
        resolves with nameiparent, which fires dirlookup on every element
        but the last, and the LAST element is the created NAME, tied in the
-       post by [last (path_elems pl) = Some nm]).  It is a ONE-SHOT
-       UNIVERSAL over the fetched string: sys_mknod reads its path from
-       USER memory and the kernel contracts say nothing about which bytes
-       arrive ([SpecFetchstr]: "they came from user memory"), so no premise
-       can pin the path and the post EXPOSES it existentially.  The START
-       is [FsAbsStart.um_start_of cw pl] -- ROOTINO on an absolute fetch,
-       the calling process's cwd inum on a relative one.
+       post by [last (path_elems pl) = Some nm]).  WHICH path is fixed by
+       the READING of trapframe argument 0: sys_mknod reads its path out of
+       USER memory, and [ArgPath.arg_path_of M pv pl] says the bytes of
+       [pl] ARE the calling process's bytes at that pointer, with the NUL
+       after them.  So the caller-facing bundle [mknod_au_at] is that
+       reading's guarded wand -- one path's worth of walk for a caller that
+       knows its own image, which is what a PINNED cursor is -- and the
+       success arm's [pl] is tied to the same reading rather than merely
+       exposed.  The START is [FsAbsStart.um_start_of cw pl] -- ROOTINO on
+       an absolute fetch, the calling process's cwd inum on a relative
+       one.
      - [acre_commit_at] -- the success commit, two-phase, fired around the
        parent-row retag at dirlink's successful entry write.
      - [dlookup_commit_at] -- the read-only observation, fired at create's
@@ -214,7 +218,12 @@ Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Require Import FsTree.
 Require Import FsBytesGamma.
 Require Import SysMknodDefs.   (* [dev_arg]: the device numbers' reading *)
+Require Import FsAbsEra.         (* [ep_start]: the parent-prefix walk
+                                    one-shot AT ONE PATH                 *)
 Require Import FsAbsMknodFire.   (* the commits and the walk premise     *)
+Require Import ArgPath.          (* [arg_path_of]: the reading of
+                                    trapframe argument 0, shared with
+                                    sys_exec and sys_open               *)
 Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
 Require Import PieceFam.        (* [pfam]: a one-shot piece's receipt beside its refund *)
 Require Import FsAbs.            (* LAST (FsAbs's own rule)              *)
@@ -247,26 +256,108 @@ Section SysMknod.
             !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Implicit Types Γ : fs_view_names Σ.
 
-  (* everything the AU caller hands in, at the commit mask [appE] *)
-  Definition mknod_au_pre Γ (γfs : fs_names) (cw : Z) (ma mi : Z)
+  (* everything the AU caller hands in, AT THE PATH IT PASSED, at the
+     commit mask [appE].  The walk is the parent-prefix one-shot at that
+     one path ([FsAbsEra.ep_start], which is [npar_walk_pre_era]'s body
+     there -- [FsAbsMknodFire.np_start_of_mknod] is the rename), so a
+     caller whose cursor is PINNED can hand it in and the receipt below
+     says the device node was created at THIS path's parent, under THIS
+     path's last element. *)
+  Definition mknod_au_pre Γ (γfs : fs_names) (cw : Z) (pl : list (bv 8))
+      (ma mi : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
       (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) : iProp Σ :=
-    (npar_walk_pre_era γfs cw P Pmiss
+    (ep_start γfs cw P Pmiss pl
      ∗ pf_at (acre_commit_at Γ appE (ADev ma mi)) Fok
      ∗ pf_at (dlookup_commit_at Γ appE) Fex
      (* ...and the CHILD's two legs, unfired *)
      ∗ cre_child_unfired Γ (ADev ma mi) Farm Fun)%I.
+
+  (* ...AND THE SYSCALL TIER: the same bundle under the reading of
+     trapframe argument 0, which is the string sys_mknod [argstr]s and
+     create walks.  [SpecSysExec.sys_exec_au_pre] states exec's walk piece
+     under exactly this guard, and [SysOpenDefs.open_au_plain_at] open's.
+     It is ONE walk: the wand is linear and the reading is a function of
+     [(M, pv)] ([ArgPath.arg_path_of_uniq]).  THE COMMITS STAY OUTSIDE IT,
+     because argstr can fail and then no [pl] satisfies the reading at all
+     (an image with no NUL at or after [pv] has no reading) -- so the
+     failure fold's "nothing happened" arm has to hand the commits back on
+     the nose, which is what [mknod_stable_fail]'s first arm consumes.
+     Only the walk is path-shaped anyway: a commit is keyed by an inum and
+     a view, never by a string. *)
+  Definition mknod_au_at Γ (γfs : fs_names) (cw : Z)
+      (M : gmap Z (bv 8)) (pv : mword 64) (ma mi : Z)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) : iProp Σ :=
+    ((∀ pl : list (bv 8), ⌜arg_path_of M pv pl⌝ -∗ ep_start γfs cw P Pmiss pl)
+     ∗ pf_at (acre_commit_at Γ appE (ADev ma mi)) Fok
+     ∗ pf_at (dlookup_commit_at Γ appE) Fex
+     ∗ cre_child_unfired Γ (ADev ma mi) Farm Fun)%I.
+
+  (* ...and the INSTANCE, the step sys_mknod's proof takes once argstr has
+     answered: at the path it read, the walk wand fires. *)
+  Lemma mknod_au_at_inst Γ (γfs : fs_names) (cw : Z)
+      (M : gmap Z (bv 8)) (pv : mword 64) (pl : list (bv 8)) (ma mi : Z)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) :
+    arg_path_of M pv pl ->
+    mknod_au_at Γ γfs cw M pv ma mi P Pmiss Farm Fun Fok Fex -∗
+    mknod_au_pre Γ γfs cw pl ma mi P Pmiss Farm Fun Fok Fex.
+  Proof.
+    iIntros (Hpl) "(Hw & Hok & Hex & Hch)". rewrite /mknod_au_pre.
+    iFrame "Hok Hex Hch". iApply ("Hw" $! pl with "[%]"). exact Hpl.
+  Qed.
+
+  (* THE GENERIC SUPPLIER'S ONE LINE: a family that tracks nothing owes the
+     walk at EVERY string ([npar_walk_pre_era], what [FsAbsInvFire]
+     discharges), and that form instantiates to the one-path bundle. *)
+  Lemma mknod_au_at_of_all Γ (γfs : fs_names) (cw : Z)
+      (M : gmap Z (bv 8)) (pv : mword 64) (ma mi : Z)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) :
+    npar_walk_pre_era γfs cw P Pmiss -∗
+    pf_at (acre_commit_at Γ appE (ADev ma mi)) Fok -∗
+    pf_at (dlookup_commit_at Γ appE) Fex -∗
+    cre_child_unfired Γ (ADev ma mi) Farm Fun -∗
+    mknod_au_at Γ γfs cw M pv ma mi P Pmiss Farm Fun Fok Fex.
+  Proof.
+    iIntros "Hw Hok Hex Hch". rewrite /mknod_au_at. iFrame "Hok Hex Hch".
+    iIntros (pl) "_". iApply (np_start_of_mknod γfs cw P Pmiss pl with "Hw").
+  Qed.
+
+  Lemma mknod_au_pre_of_all Γ (γfs : fs_names) (cw : Z) (pl : list (bv 8))
+      (ma mi : Z)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) :
+    npar_walk_pre_era γfs cw P Pmiss -∗
+    pf_at (acre_commit_at Γ appE (ADev ma mi)) Fok -∗
+    pf_at (dlookup_commit_at Γ appE) Fex -∗
+    cre_child_unfired Γ (ADev ma mi) Farm Fun -∗
+    mknod_au_pre Γ γfs cw pl ma mi P Pmiss Farm Fun Fok Fex.
+  Proof.
+    iIntros "Hw Hok Hex Hch". rewrite /mknod_au_pre. iFrame "Hok Hex Hch".
+    iApply (np_start_of_mknod γfs cw P Pmiss pl with "Hw").
+  Qed.
 
   (* ret 0's real arm: create's ARM C-OK read at [T_DEVICE]
      ([SpecCreate.cre_ok_arms_dev]) at the fetched path, beside the region
      bound create's own post already states.  [made] does not key it: at a
      device type the found arm cannot succeed ([cre_made_of_ne_file]), so
      the fresh arm is the only one a zero return can come from. *)
-  Definition mknod_post_ok Γ (ma mi : Z) (P : nat -> Z -> iProp Σ)
+  Definition mknod_post_ok Γ (M : gmap Z (bv 8)) (pv : mword 64) (ma mi : Z)
+      (P : nat -> Z -> iProp Σ)
       (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
       (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) : iProp Σ :=
     (∃ (pl : list (bv 8)) (i : Z),
+       (* ...AND [pl] IS THE CALLER'S OWN ARGUMENT 0: the node
+          [ADev ma mi] was created under THIS path's last element, in the
+          directory THIS path's parent prefix resolves to. *)
+       ⌜arg_path_of M pv pl⌝ ∗
        ⌜0 < i < 16 * Z.of_nat icfg_nib⌝ ∗
        ∃ (av : aview) (d : Z) (nm : fname) (ents : gmap fname Z) (nl : nat),
          ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
@@ -282,12 +373,14 @@ Section SysMknod.
   (* ret -1's two-way fold: nothing fs-visible happened (argstr failed)
      and the whole bundle comes back, or create's own failure fold (the
      walk died, or create failed at the parent). *)
-  Definition mknod_post_fail Γ (γfs : fs_names) (cw : Z) (ma mi : Z)
+  Definition mknod_post_fail Γ (γfs : fs_names) (cw : Z)
+      (M : gmap Z (bv 8)) (pv : mword 64) (ma mi : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
       (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) : iProp Σ :=
-    (mknod_au_pre Γ γfs cw ma mi P Pmiss Farm Fun Fok Fex
+    (mknod_au_at Γ γfs cw M pv ma mi P Pmiss Farm Fun Fok Fex
      ∨ (∃ pl : list (bv 8),
+          ⌜arg_path_of M pv pl⌝ ∗
           (* create's own failure fold read at [T_DEVICE]
              ([SpecCreate.cre_fail_arms_dev]): the walk died and everything
              is whole, or the cursor comes home with the exists observation
@@ -314,24 +407,26 @@ Section SysMknod.
      ESCAPE on the [ret = 0] arm: the walk takes the relative start, so a
      success is a RECEIPT whatever the fetched string looked like.  See
      the header. *)
-  Definition mknod_arms Γ (γfs : fs_names) (cw : Z) (ma mi : Z)
+  Definition mknod_arms Γ (γfs : fs_names) (cw : Z)
+      (M : gmap Z (bv 8)) (pv : mword 64) (ma mi : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
       (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
       (r : mword 64) : iProp Σ :=
     ((⌜r = (zero_reg : mword 64)⌝
-      ∗ mknod_post_ok Γ ma mi P Farm Fun Fok Fex)
+      ∗ mknod_post_ok Γ M pv ma mi P Farm Fun Fok Fex)
      ∨ (⌜r = (mword_of_int (-1) : mword 64)⌝
-        ∗ mknod_post_fail Γ γfs cw ma mi P Pmiss Farm Fun Fok Fex))%I.
+        ∗ mknod_post_fail Γ γfs cw M pv ma mi P Pmiss Farm Fun Fok Fex))%I.
 
   (* the return blanket, read off the arms: the arms already split on the
      two words a0 can hold, so the blanket is a consequence and not a
      second conjunct of the continuation *)
-  Lemma mknod_arms_ret Γ (γfs : fs_names) (cw : Z) (ma mi : Z)
+  Lemma mknod_arms_ret Γ (γfs : fs_names) (cw : Z)
+      (M : gmap Z (bv 8)) (pv : mword 64) (ma mi : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
       (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) (r : mword 64) :
-    mknod_arms Γ γfs cw ma mi P Pmiss Farm Fun Fok Fex r ⊢ ⌜sys_mknod_ret r⌝.
+    mknod_arms Γ γfs cw M pv ma mi P Pmiss Farm Fun Fok Fex r ⊢ ⌜sys_mknod_ret r⌝.
   Proof.
     rewrite /mknod_arms /sys_mknod_ret.
     iIntros "[[%Hr _] | [%Hr _]]"; iPureIntro; [left | right]; exact Hr.
@@ -458,7 +553,7 @@ End SysMknod.
 (* big-op bodies behind Definitions at syscall altitude: seal them, or an
    [iFrame] near a consumer resolves instances through the whole hop family
    (durable-notes; optimization.md, "a big-op body is the predictor") *)
-Global Typeclasses Opaque mknod_au_pre mknod_post_ok
+Global Typeclasses Opaque mknod_au_pre mknod_au_at mknod_post_ok
   mknod_post_fail mknod_arms mkr_chain mknod_stable_ok
   mknod_stable_fail mknod_stable_arms.
 
@@ -632,8 +727,10 @@ Definition wp_sys_mknod_body
   let mi := dev_arg v2 in
   wp_sys_mknod_frame γf gs j gl pd pav pu ns dqb dqs dqbs dqn
     v0 v1 v2 pid U m K eb b lks
-    (mknod_au_pre Γfs fsc_fs (pv_cwi (us_V U)) ma mi P Pmiss Farm Fun Fok Fex)
-    (mknod_arms Γfs fsc_fs (pv_cwi (us_V U)) ma mi P Pmiss Farm Fun Fok Fex).
+    (mknod_au_at Γfs fsc_fs (pv_cwi (us_V U)) (us_M U) v0 ma mi
+       P Pmiss Farm Fun Fok Fex)
+    (mknod_arms Γfs fsc_fs (pv_cwi (us_V U)) (us_M U) v0 ma mi
+       P Pmiss Farm Fun Fok Fex).
 
 (* ===================================================================== *)
 (*  THE STABLE COROLLARY'S BODY                                           *)
@@ -738,10 +835,17 @@ End SYSMKNOD.
    So the honest content of a stable mknod is not "the walk was mine" but
    "MY TREE HELD AT THE INSTANT", which is what the form above states and
    what the two [_at_pinned] seeds were landed to buy.  The client is left
-   holding the comparison the contract cannot make for it: the parent inum
+   holding the comparison the corollary cannot make for it: the parent inum
    is exposed on the arm, [ds !!! |ps|] is the client's own, and equality
-   of the two is decidable where it matters.  A contract that could key on
-   the path needs a USER-MEMORY tie ([SpecFetchstr]: "they came from user
-   memory"), i.e. a different premise at a lower altitude, not a stronger
-   corollary here. *)
+   of the two is decidable where it matters.
+
+   WHAT THE NOTE ASKED FOR IS NOW IN THE AU FORM, and it is exactly the
+   USER-MEMORY TIE it names: [ArgPath.arg_path_of] is a premise at a lower
+   altitude ([SpecFetchstr]'s "they came from user memory", turned into
+   "and these are the bytes"), not a stronger corollary here.  So the AU
+   form above IS keyed on the fetched string, while the STABLE corollary is
+   not -- deliberately: its client names a CHAIN it holds persistently and
+   need not know its own image at all, and the obstruction above is about
+   deriving a string key from the cursor family, which is still where the
+   cursor cannot go. *)
 

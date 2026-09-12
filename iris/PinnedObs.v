@@ -288,12 +288,16 @@ Section PinnedObs.
      answer is the run's head, which is [pin_resolves_at]'s first conjunct;
      everything after it is [pobs_hop] under the big-op.
 
-     THE ONE PATH IS THE LIMIT OF THIS FILE.  A syscall whose bundle owes
-     the walk at EVERY path ([SysOpenDefs.namei_walk_pre_era]'s [∀ pl])
-     cannot be answered by a cursor that names one run's hops: at another
-     path the cursor is simply false.  exec's bundle owes it at the one
-     path its argument names ([SpecSysExec.exec_path_of]); a consumer with
-     the [∀ pl] shape needs that seam first. *)
+     THE ONE PATH IS THE LIMIT OF THIS FILE, and it is what decides which
+     syscalls a pin can be handed to.  A bundle that owes the walk at EVERY
+     path ([SysOpenDefs.namei_walk_pre_era]'s [∀ pl]) cannot be answered by
+     a cursor that names one run's hops: at another path the cursor is
+     simply false.  exec, open and mknod owe it at the ONE path their
+     argument 0 names, under the reading [ArgPath.arg_path_of] -- so a pin
+     goes straight in ([SpecSysExec.sys_exec_au_pre],
+     [SysOpenDefs.open_au_plain_at] / [_create_at],
+     [SpecSysMknod.mknod_au_at]).  chdir and unlink still carry the [∀ pl]
+     form and need that seam first. *)
   Lemma pobs_walk (γfs : fs_names) (Pin : aview -> Prop) (T : iProp Σ)
       `{!Persistent T} `{!Timeless T}
       (cw : Z) (pl : list (bv 8)) (hops : list Z) (ino : Z) (a : anode) :

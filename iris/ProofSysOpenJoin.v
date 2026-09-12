@@ -89,6 +89,8 @@ Local Open Scope Z_scope.
 Require Import ConsoleInv.
 Require Import PathElems.
 Require Import FsBytesGamma.
+Require Import ArgPath.         (* [arg_path_of]: the reading of trapframe
+                                   argument 0, which the walk is at *)
 Require Import SysOpenDefs.
 Require Import ProofSysOpenShared.
 Require Import ProofSysOpenAlloc.
@@ -166,7 +168,7 @@ Section ProofSysOpenJoin.
       (bp : nat -> bv 8)
       (* ---- the AU side ---- *)
       (data : nat -> list (bv 8))
-      (vom : mword 64) (pl : list (bv 8))
+      (Mim : gmap Z (bv 8)) (pvv vom : mword 64) (pl : list (bv 8))
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) :
@@ -189,6 +191,8 @@ Section ProofSysOpenJoin.
     lks = ∅ ->
     (bv_unsigned (di_type dn) = T_DIR_z -> om = (mword_of_int 0 : mword 32)) ->
     (* ---- the AU side ---- *)
+    (* the walk this block sits below ran on the caller's argument 0 *)
+    arg_path_of Mim pvv pl ->
     om = arg_int32 vom ->
     is_aligned_paddr (Physaddr (pa_stk sp0 23)) 8 = true ->
     sp0 = (m !!! Regidx csp_rs1 : mword 64) ->
@@ -273,11 +277,11 @@ Section ProofSysOpenJoin.
     pf_at (atrunc_commit_at (fs_gamma_L fsc_fs) appE) Ft -∗
     wp_next true (proc_addr jx)
       (so_cont_au gf nsj
-               dqb dqs (proc_addr jx) pidv vom U sts P Pmiss Fo Ft m K eb b lks) -∗
+               dqb dqs (proc_addr jx) pidv Mim pvv vom U sts P Pmiss Fo Ft m K eb b lks) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hqs HK Hkk Hinb Hipos Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk
-           Hiblog Hcovb Hiu Hj Hgl Hlkempty Hdir Hom Hal23 Hsp0 HMsp HMthr
+           Hiblog Hcovb Hiu Hj Hgl Hlkempty Hdir Hpof Hom Hal23 Hsp0 HMsp HMthr
            HMs0 HMs1 HMs2 HMs3 Hal Hnspos.
     pose proof HK as HKfull.
     destruct (so_kb K HK) as (HKcr & HKna & HKai & HKas & HKbo & HKeo & HKil &
@@ -373,9 +377,9 @@ Section ProofSysOpenJoin.
                 gil gisl
  kk qi s gy loy tly inum dn bm om lo nsj u
                 pidv dqb dqs U sts m M2 sp0 K eb b lks w4 w5 w6 w24 bp
-                data vom pl P Pmiss Fo Ft
+                data Mim pvv vom pl P Pmiss Fo Ft
                 Hqs HKfull Hkk Hinb Hipos Hgeom Hsize Hbm0 Hbmcov Hbmlog
-                Hist0 Hiblk Hiblog Hcovb Hiu Hj Hgl Hlkempty Hdir Hom
+                Hist0 Hiblk Hiblog Hcovb Hiu Hj Hgl Hlkempty Hdir Hpof Hom
                 ltac:(intros Hq; exfalso; apply Hnd3; apply bv_eq;
                       rewrite Hq; vm_compute; reflexivity)
                 Hal23 Hsp0
@@ -509,8 +513,8 @@ Section ProofSysOpenJoin.
                 Hpc Hsbb Hsbi Hbsl Hisl [Hpriv Hfds Hfrag HP Hobs Htc]").
       { exact Hcsf. }
       { reflexivity. }
-      { iApply (so_arm_fail gf (proc_addr jx) pidv vom P Pmiss Fo Ft U sts _ pl
-                  (bv_unsigned inum) (era_node dn bm data) Ha0f
+      { iApply (so_arm_fail gf (proc_addr jx) pidv Mim pvv vom P Pmiss Fo Ft U sts _ pl
+                  (bv_unsigned inum) (era_node dn bm data) Hpof Ha0f
                   with "Hpriv Hfrag Hfds HP Hobs Htc"). } }
     (* ---- the major is a legal device index ---- *)
     iApply (wp_bltu_fall_s_sconf (CID := CID5) (mword_of_int (SO + 0x5a))
@@ -548,9 +552,9 @@ Section ProofSysOpenJoin.
               gil gisl
  kk qi s gy loy tly inum dn bm om lo nsj u
                pidv dqb dqs U sts m M4 sp0 K eb b lks w4 w5 w6 w24 bp
-               data vom pl P Pmiss Fo Ft
+               data Mim pvv vom pl P Pmiss Fo Ft
                Hqs HKfull Hkk Hinb Hipos Hgeom Hsize Hbm0 Hbmcov Hbmlog
-               Hist0 Hiblk Hiblog Hcovb Hiu Hj Hgl Hlkempty Hdir Hom
+               Hist0 Hiblk Hiblog Hcovb Hiu Hj Hgl Hlkempty Hdir Hpof Hom
                Hmajb
                Hal23 Hsp0
                HM4sp HM4thr HM4s0 HM4s1 HM4s2 HM4s3 Hal Hnspos

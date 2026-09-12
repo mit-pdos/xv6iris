@@ -83,9 +83,22 @@
    [SysOpenDefs.om_create vom], the O_CREATE bit of the caller's own
    omode argument, which the machine tests with the [andi a5,a5,512] /
    [c.beqz] pair at +0x36.  On the [false] side the input is
-   [open_au_pre_plain] and the output [open_arms_plain]; on the [true] side
-   [open_au_pre_create] and [open_arms_create].  The two arm families are
-   stated below in full.
+   [SysOpenDefs.open_au_plain_at] and the output [open_arms_plain]; on the
+   [true] side [open_au_create_at] and [open_arms_create].  The two arm
+   families are stated below in full.
+
+   ...AND BOTH ARE AT THE PATH THE CALLER PASSED.  sys_open [argstr]s
+   trapframe argument 0, so every piece of this contract that mentions a
+   path mentions THAT one: the input is the bundle at whatever string the
+   process's image holds at the argument-0 pointer
+   ([ArgPath.arg_path_of (us_M U) v pl], the guard
+   [SpecSysExec.sys_exec_au_pre] states exec's walk piece under), the
+   success arms and the receipt bind [pl] together with that same reading,
+   and the failure fold carries the whole uninstantiated wand back on its
+   first disjunct -- the arm argstr's own failure lands in, where no [pl]
+   satisfies the reading at all.  A caller that knows its own image
+   therefore hands in ONE path's worth of walk, which is what a PINNED
+   cursor is, and reads back WHICH file it opened.
 
    THE LANDED RETURN BLANKET [sys_open_post] IS A CONSEQUENCE, not a
    conjunct ([open_arms_landed], via [open_arms_plain_landed] /
@@ -332,6 +345,8 @@ Require Import FsAbsEraMknod.   (* [npar_walk_pre_era], [npar_walk_dead_era]
                                    -- the parent-prefix one-shot, REUSED *)
 Require Import FsAbsMknodFire.  (* [acre_commit_at], [dlookup_commit_at] *)
 Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
+Require Import ArgPath.       (* [arg_path_of]: the reading of trapframe
+                                 argument 0, shared with sys_exec *)
 Require Import SysOpenDefs.   (* THE STATEMENT LEAF: the omode readings,
                                    the two commits, the walk package, the
                                    two bundles, [open_fd_ok] *)
@@ -490,12 +505,17 @@ Section SysOpenArms.
      terminal observation fired, and the arm is keyed by the observed
      [anode] (header, THE ARMS) *)
   Definition open_post_ok_plain `{XI : CurCtx} Γ (γf : gname) (p : mword 64)
-      (pid : mword 32) (vom : mword 64)
+      (pid : mword 32) (M : gmap Z (bv 8)) (pv vom : mword 64)
       (P : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
       (sts : list fdstate) (UW : ustate) (r : mword 64) : iProp Σ :=
     (∃ (pl : list (bv 8)) (av : aview) (i : Z),
+       (* ...AND [pl] IS THE CALLER'S OWN ARGUMENT 0, not merely some path:
+          the walk this arm reports ran on the string the process's image
+          holds at [pv] ([ArgPath.arg_path_of], sys_exec's guard), so a
+          caller that knows its image knows WHICH file it opened. *)
+       ⌜arg_path_of M pv pl⌝ ∗
        P (length (path_elems pl)) i ∗
        ((* DEVICE (the init arm): the major is in range, the fragment is
            [FdDevice ma], and O_TRUNC never applies *)
@@ -536,20 +556,28 @@ Section SysOpenArms.
      failure sits inside the child's lock window. *)
   (* NO [`{XI : CurCtx}]: nothing in the fold reads one, and the receipt
      ([open_receipt_plain]) is stated at a U-mode key where none resolves. *)
+  (* THE FIRST DISJUNCT IS THE UNINSTANTIATED BUNDLE, and it has to be:
+     argstr can fail (a bad pointer, a string past MAXPATH) and then NO
+     [pl] satisfies the reading at all, so the only thing that can come
+     back is the guarded wand the caller handed in.  The other two arms
+     ran the walk, so they name the path AND tie it to argument 0 --
+     [SpecSysExec.sys_exec_post_fail] folds exec's the same way. *)
   Definition open_post_fail_plain Γ (γfs : fs_names) (cw : Z)
+      (M : gmap Z (bv 8)) (pv : mword 64)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) : iProp Σ :=
-    (open_au_pre_plain Γ γfs cw P Pmiss Fo Ft
+    (open_au_plain_at Γ γfs cw M pv P Pmiss Fo Ft
      ∨ (∃ pl : list (bv 8),
-          (namei_walk_dead_era γfs P Pmiss pl
-             ∗ pf_at (aopen_commit_at Γ appE) Fo
-             ∗ pf_at (atrunc_commit_at Γ appE) Ft)
-          ∨ (∃ i : Z,
-               P (length (path_elems pl)) i
-               ∗ (∃ (av : aview) (a : anode),
-                    ⌜arow_at av i a⌝ ∗ Fo.(pf_recv) av i a)
-               ∗ pf_at (atrunc_commit_at Γ appE) Ft)))%I.
+          ⌜arg_path_of M pv pl⌝ ∗
+          ((namei_walk_dead_era γfs P Pmiss pl
+              ∗ pf_at (aopen_commit_at Γ appE) Fo
+              ∗ pf_at (atrunc_commit_at Γ appE) Ft)
+           ∨ (∃ i : Z,
+                P (length (path_elems pl)) i
+                ∗ (∃ (av : aview) (a : anode),
+                     ⌜arow_at av i a⌝ ∗ Fo.(pf_recv) av i a)
+                ∗ pf_at (atrunc_commit_at Γ appE) Ft))))%I.
 
   (* the armed disjunction the continuation receives, keyed on a0, with
      the landed post's fd-side bundle folded in per arm (the caller's
@@ -557,7 +585,7 @@ Section SysOpenArms.
      [fd_slot] back on every arm); [open_arms_plain_landed] below is the
      tie to [SpecSysOpen.sys_open_post] *)
   Definition open_arms_plain `{XI : CurCtx} Γ (γfs : fs_names) (cw : Z) (γf : gname)
-      (p : mword 64) (pid : mword 32) (vom : mword 64)
+      (p : mword 64) (pid : mword 32) (M : gmap Z (bv 8)) (pv vom : mword 64)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
@@ -567,8 +595,8 @@ Section SysOpenArms.
        (* the failure arms hand the caller's table back ON THE NOSE: no
           arm that installed a descriptor can fail after doing so *)
        ∗ fd_frags (pv_fdg (us_V UW)) sts
-       ∗ open_post_fail_plain Γ γfs cw P Pmiss Fo Ft)
-      ∨ open_post_ok_plain Γ γf p pid vom P Fo Ft sts UW r)
+       ∗ open_post_fail_plain Γ γfs cw M pv P Pmiss Fo Ft)
+      ∨ open_post_ok_plain Γ γf p pid M pv vom P Fo Ft sts UW r)
      ∗ fd_slot)%I.
 
   (* ------------------------------------------------------------------ *)
@@ -583,7 +611,7 @@ Section SysOpenArms.
      observation on the FOUND node -- [AFile] or [ADev] only, per
      SpecCreate's F-OK) *)
   Definition open_post_ok_create `{XI : CurCtx} Γ (γf : gname) (p : mword 64)
-      (pid : mword 32) (vom : mword 64)
+      (pid : mword 32) (M : gmap Z (bv 8)) (pv vom : mword 64)
       (P : nat -> Z -> iProp Σ)
       (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
       (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
@@ -591,6 +619,8 @@ Section SysOpenArms.
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
       (sts : list fdstate) (UW : ustate) (r : mword 64) : iProp Σ :=
     (∃ (pl : list (bv 8)) (d i : Z) (nm : fname),
+       (* the path is the caller's own argument 0, as on the plain side *)
+       ⌜arg_path_of M pv pl⌝ ∗
        ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
        P (length (npar_elems pl)) d ∗
        ((* FRESH *)
@@ -659,14 +689,16 @@ Section SysOpenArms.
      receipt is delivered -- the fs mutation of a failed open is real. *)
   (* ...and the create side's, context-free for the same reason *)
   Definition open_post_fail_create Γ (γfs : fs_names) (cw : Z)
+      (M : gmap Z (bv 8)) (pv : mword 64)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
       (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) : iProp Σ :=
-    (open_au_pre_create Γ γfs cw P Pmiss Farm Fun Fok Fex Fo Ft
+    (open_au_create_at Γ γfs cw M pv P Pmiss Farm Fun Fok Fex Fo Ft
      ∨ (∃ pl : list (bv 8),
-          (npar_walk_dead_era γfs P Pmiss pl
+          ⌜arg_path_of M pv pl⌝ ∗
+          ((npar_walk_dead_era γfs P Pmiss pl
              ∗ pf_at (acre_commit_at Γ appE (AFile [])) Fok
              ∗ pf_at (dlookup_commit_at Γ appE) Fex
              ∗ pf_at (aopen_commit_at Γ appE) Fo
@@ -713,10 +745,10 @@ Section SysOpenArms.
                    (* the guards and "out of inodes" fired nothing; a failed
                       [dirlink] fired the do-then-undo PAIR (ruling Q-h) *)
                    ∗ (cre_child_unfired Γ (AFile []) Farm Fun
-                      ∨ ∃ ic : Z, cre_child_pair Farm Fun ic))))))%I.
+                      ∨ ∃ ic : Z, cre_child_pair Farm Fun ic)))))))%I.
 
   Definition open_arms_create `{XI : CurCtx} Γ (γfs : fs_names) (cw : Z) (γf : gname)
-      (p : mword 64) (pid : mword 32) (vom : mword 64)
+      (p : mword 64) (pid : mword 32) (M : gmap Z (bv 8)) (pv vom : mword 64)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
       (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
@@ -726,8 +758,8 @@ Section SysOpenArms.
     (((⌜r = (mword_of_int (-1) : mword 64)⌝
        ∗ proc_priv γf p pid UW
        ∗ fd_frags (pv_fdg (us_V UW)) sts
-       ∗ open_post_fail_create Γ γfs cw P Pmiss Farm Fun Fok Fex Fo Ft)
-      ∨ open_post_ok_create Γ γf p pid vom P Farm Fun Fok Fex Fo Ft sts UW r)
+       ∗ open_post_fail_create Γ γfs cw M pv P Pmiss Farm Fun Fok Fex Fo Ft)
+      ∨ open_post_ok_create Γ γf p pid M pv vom P Farm Fun Fok Fex Fo Ft sts UW r)
      ∗ fd_slot)%I.
 
   (* ------------------------------------------------------------------ *)
@@ -795,12 +827,12 @@ Section SysOpenArms.
   Qed.
 
   Lemma open_arms_plain_landed `{XI : CurCtx} Γ (γfs : fs_names) (cw : Z) (γf : gname)
-      (p : mword 64) (pid : mword 32) (vom : mword 64)
+      (p : mword 64) (pid : mword 32) (M : gmap Z (bv 8)) (pv vom : mword 64)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
       (sts : list fdstate) (UW : ustate) (r : mword 64) :
-    open_arms_plain Γ γfs cw γf p pid vom P Pmiss Fo Ft sts UW r ⊢
+    open_arms_plain Γ γfs cw γf p pid M pv vom P Pmiss Fo Ft sts UW r ⊢
       sys_open_post γf p pid UW sts (trunc32 vom) r.
   Proof.
     destruct (om_modes_landed vom) as [Hrd Hwr].
@@ -808,7 +840,7 @@ Section SysOpenArms.
     iIntros "[[(%Hr & Hp & Hb & _) | H] $]".
     - iLeft. by iFrame "Hp Hb".
     - iRight.
-      iDestruct "H" as (pl av i) "(_ & [H | [H | H]])".
+      iDestruct "H" as (pl av i) "(_ & _ & [H | [H | H]])".
       + iDestruct "H" as (ma mi nl) "(_ & _ & _ & _ & H)".
         iApply (open_fd_ok_landed _ _ _ _ _ _ _ _ (trunc32 vom) with "H");
           [exact Hrd | exact Hwr].
@@ -822,14 +854,14 @@ Section SysOpenArms.
   Qed.
 
   Lemma open_arms_create_landed `{XI : CurCtx} Γ (γfs : fs_names) (cw : Z) (γf : gname)
-      (p : mword 64) (pid : mword 32) (vom : mword 64)
+      (p : mword 64) (pid : mword 32) (M : gmap Z (bv 8)) (pv vom : mword 64)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
       (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
       (sts : list fdstate) (UW : ustate) (r : mword 64) :
-    open_arms_create Γ γfs cw γf p pid vom P Pmiss Farm Fun Fok Fex Fo Ft sts UW r ⊢
+    open_arms_create Γ γfs cw γf p pid M pv vom P Pmiss Farm Fun Fok Fex Fo Ft sts UW r ⊢
       sys_open_post γf p pid UW sts (trunc32 vom) r.
   Proof.
     destruct (om_modes_landed vom) as [Hrd Hwr].
@@ -837,7 +869,7 @@ Section SysOpenArms.
     iIntros "[[(%Hr & Hp & Hb & _) | H] $]".
     - iLeft. by iFrame "Hp Hb".
     - iRight.
-      iDestruct "H" as (pl d i nm) "(_ & _ & [H | H])".
+      iDestruct "H" as (pl d i nm) "(_ & _ & _ & [H | H])".
       + iDestruct "H" as (av ents nl) "(_ & _ & _ & _ & _ & _ & _ & _ & H)".
         iDestruct "H" as (γo) "H".
         iApply (open_fd_ok_landed _ _ _ _ _ _ _ _ (trunc32 vom) with "H");
@@ -860,19 +892,28 @@ Section SysOpenArms.
      argument; the machine reads it with the [andi a5,a5,512] / [c.beqz]
      pair at +0x36.  A caller that knows its own omode knows which side it
      is on and owes only that side's pieces. *)
+  (* ...AND AT THE PATH THE CALLER PASSED.  Both sides are the guarded
+     form ([SysOpenDefs.open_au_plain_at] / [_create_at]): the bundle at
+     whatever string the process's own image holds at trapframe argument
+     0, which is the input [SpecSysExec.sys_exec_au_pre] takes for exec's
+     walk piece.  A caller that knows its image owes ONE path's worth; a
+     caller that knows nothing about it supplies the wand out of the
+     ∀-shaped walk premise in one line
+     ([SysOpenDefs.open_au_pre_plain_of_all]). *)
   Definition open_in Γ (γfs : fs_names) (cw : Z)
-      (vom : mword 64)
+      (M : gmap Z (bv 8)) (pv vom : mword 64)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
       (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) : iProp Σ :=
     if om_create vom
-    then open_au_pre_create Γ γfs cw P Pmiss Farm Fun Fok Fex Fo Ft
-    else open_au_pre_plain Γ γfs cw P Pmiss Fo Ft.
+    then open_au_create_at Γ γfs cw M pv P Pmiss Farm Fun Fok Fex Fo Ft
+    else open_au_plain_at Γ γfs cw M pv P Pmiss Fo Ft.
 
   Definition open_arms `{XI : CurCtx} Γ (γfs : fs_names) (cw : Z)
-      (γf : gname) (p : mword 64) (pid : mword 32) (vom : mword 64)
+      (γf : gname) (p : mword 64) (pid : mword 32)
+      (M : gmap Z (bv 8)) (pv vom : mword 64)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
       (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
@@ -880,9 +921,9 @@ Section SysOpenArms.
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
       (sts : list fdstate) (UW : ustate) (r : mword 64) : iProp Σ :=
     if om_create vom
-    then open_arms_create Γ γfs cw γf p pid vom P Pmiss Farm Fun Fok Fex
+    then open_arms_create Γ γfs cw γf p pid M pv vom P Pmiss Farm Fun Fok Fex
            Fo Ft sts UW r
-    else open_arms_plain Γ γfs cw γf p pid vom P Pmiss Fo Ft sts UW r.
+    else open_arms_plain Γ γfs cw γf p pid M pv vom P Pmiss Fo Ft sts UW r.
 
   (* ------------------------------------------------------------------ *)
   (*  2i.  THE RECEIPTS: the process-nameable half of the two arm         *)
@@ -905,15 +946,21 @@ Section SysOpenArms.
   (*  the kernel half beside the receipt so the arms lose no strength.      *)
   (* ------------------------------------------------------------------ *)
 
-  Definition open_receipt_plain Γ (γfs : fs_names) (cw : Z) (vom : mword 64)
+  Definition open_receipt_plain Γ (γfs : fs_names) (cw : Z)
+      (M : gmap Z (bv 8)) (pv vom : mword 64)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
       (sts : list fdstate) (r : mword 64) (fdv' : list fdstate) : iProp Σ :=
     ((* FAILURE: the table did not move, and the whole bundle is back *)
      (⌜r = (mword_of_int (-1) : mword 64)⌝ ∗ ⌜fdv' = sts⌝
-      ∗ open_post_fail_plain Γ γfs cw P Pmiss Fo Ft)
+      ∗ open_post_fail_plain Γ γfs cw M pv P Pmiss Fo Ft)
      ∨ (∃ (pl : list (bv 8)) (av : aview) (i : Z),
+          (* THE PATH IS THE ONE THE CALLER PASSED: byte for byte the
+             string its image holds at argument 0.  That is what makes
+             the DEVICE arm below an answer to "which file did I open?"
+             rather than "some file somewhere was a device". *)
+          ⌜arg_path_of M pv pl⌝ ∗
           P (length (path_elems pl)) i ∗
           ((* DEVICE *)
            (∃ (ma mi : Z) (nl : nat),
@@ -944,7 +991,8 @@ Section SysOpenArms.
               ∃ γo : gname,
                 ⌜open_fd_rcpt true false (FdInode i γo) sts r fdv'⌝))))%I.
 
-  Definition open_receipt_create Γ (γfs : fs_names) (cw : Z) (vom : mword 64)
+  Definition open_receipt_create Γ (γfs : fs_names) (cw : Z)
+      (M : gmap Z (bv 8)) (pv vom : mword 64)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
       (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
@@ -952,8 +1000,9 @@ Section SysOpenArms.
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
       (sts : list fdstate) (r : mword 64) (fdv' : list fdstate) : iProp Σ :=
     ((⌜r = (mword_of_int (-1) : mword 64)⌝ ∗ ⌜fdv' = sts⌝
-      ∗ open_post_fail_create Γ γfs cw P Pmiss Farm Fun Fok Fex Fo Ft)
+      ∗ open_post_fail_create Γ γfs cw M pv P Pmiss Farm Fun Fok Fex Fo Ft)
      ∨ (∃ (pl : list (bv 8)) (d i : Z) (nm : fname),
+          ⌜arg_path_of M pv pl⌝ ∗
           ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
           P (length (npar_elems pl)) d ∗
           ((* FRESH *)
@@ -1002,7 +1051,8 @@ Section SysOpenArms.
 
   (* ...and the one receipt, keyed on the O_CREATE bit exactly as [open_in]
      and [open_arms] are *)
-  Definition open_receipt Γ (γfs : fs_names) (cw : Z) (vom : mword 64)
+  Definition open_receipt Γ (γfs : fs_names) (cw : Z)
+      (M : gmap Z (bv 8)) (pv vom : mword 64)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
       (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
@@ -1010,9 +1060,9 @@ Section SysOpenArms.
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
       (sts : list fdstate) (r : mword 64) (fdv' : list fdstate) : iProp Σ :=
     if om_create vom
-    then open_receipt_create Γ γfs cw vom P Pmiss Farm Fun Fok Fex Fo Ft
+    then open_receipt_create Γ γfs cw M pv vom P Pmiss Farm Fun Fok Fex Fo Ft
            sts r fdv'
-    else open_receipt_plain Γ γfs cw vom P Pmiss Fo Ft sts r fdv'.
+    else open_receipt_plain Γ γfs cw M pv vom P Pmiss Fo Ft sts r fdv'.
 
   (* ------------------------------------------------------------------ *)
   (*  2j.  THE SPLIT: the arms as the kernel's half beside the receipt.    *)
@@ -1025,12 +1075,13 @@ Section SysOpenArms.
   (*  the arms appears on the right, so nothing is weakened.               *)
   (* ------------------------------------------------------------------ *)
   Lemma open_arms_plain_split `{XI : CurCtx} Γ (γfs : fs_names) (cw : Z)
-      (γf : gname) (p : mword 64) (pid : mword 32) (vom : mword 64)
+      (γf : gname) (p : mword 64) (pid : mword 32)
+      (M : gmap Z (bv 8)) (pv vom : mword 64)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
       (sts : list fdstate) (UW : ustate) (r : mword 64) :
-    open_arms_plain Γ γfs cw γf p pid vom P Pmiss Fo Ft sts UW r ⊢
+    open_arms_plain Γ γfs cw γf p pid M pv vom P Pmiss Fo Ft sts UW r ⊢
       ∃ (UW' : ustate) (sts' : list fdstate),
         ⌜(r = (mword_of_int (-1) : mword 64) /\ UW' = UW /\ sts' = sts)
          \/ (exists (fd : nat) (l : list nat) (k : nat) (rb wb : bool)
@@ -1051,7 +1102,7 @@ Section SysOpenArms.
         ∗ proc_priv γf p pid UW'
         ∗ fd_frags (pv_fdg (us_V UW)) sts'
         ∗ fd_slot
-        ∗ open_receipt_plain Γ γfs cw vom P Pmiss Fo Ft sts r sts'.
+        ∗ open_receipt_plain Γ γfs cw M pv vom P Pmiss Fo Ft sts r sts'.
   Proof.
     rewrite /open_arms_plain /open_post_ok_plain /open_receipt_plain.
     iIntros "[[(%Hr & Hpriv & Hb & Hfail) | H] Hslot]".
@@ -1062,7 +1113,7 @@ Section SysOpenArms.
       iSplitR; [ iPureIntro; exact Hr | ].
       iSplitR; [ iPureIntro; reflexivity | ].
       iExact "Hfail".
-    - iDestruct "H" as (pl av i) "(HP & [Hd | [Hf | Hdir]])".
+    - iDestruct "H" as (pl av i) "(%Hpl & HP & [Hd | [Hf | Hdir]])".
       + (* DEVICE *)
         iDestruct "Hd" as (ma mi nl) "(%Ha & %Hma & HFo & Ht & Hfd)".
         iDestruct (open_fd_ok_split with "Hfd") as (fd l k fdv')
@@ -1073,7 +1124,8 @@ Section SysOpenArms.
                      [ exact Hr | exact Hfl | reflexivity
                      | exact Hcl | exact Hins ] | ].
         iFrame "Hpriv Hb Hslot". iRight.
-        iExists pl, av, i. iFrame "HP". iLeft.
+        iExists pl, av, i.
+        iSplitR; [ iPureIntro; exact Hpl | ]. iFrame "HP". iLeft.
         iExists ma, mi, nl.
         iSplitR; [ iPureIntro; exact Ha | ].
         iSplitR; [ iPureIntro; exact Hma | ].
@@ -1091,7 +1143,8 @@ Section SysOpenArms.
                      [ exact Hr | exact Hfl | reflexivity
                      | exact Hcl | exact Hins ] | ].
         iFrame "Hpriv Hb Hslot". iRight.
-        iExists pl, av, i. iFrame "HP". iRight. iLeft.
+        iExists pl, av, i.
+        iSplitR; [ iPureIntro; exact Hpl | ]. iFrame "HP". iRight. iLeft.
         iExists bs0, nl.
         iSplitR; [ iPureIntro; exact Ha | ].
         iSplitL "HFo"; [ iExact "HFo" | ].
@@ -1108,7 +1161,8 @@ Section SysOpenArms.
                      [ exact Hr | exact Hfl | reflexivity
                      | exact Hcl | exact Hins ] | ].
         iFrame "Hpriv Hb Hslot". iRight.
-        iExists pl, av, i. iFrame "HP". iRight. iRight.
+        iExists pl, av, i.
+        iSplitR; [ iPureIntro; exact Hpl | ]. iFrame "HP". iRight. iRight.
         iExists ents, nl.
         iSplitR; [ iPureIntro; exact Ha | ].
         iSplitR; [ iPureIntro; exact Hom | ].
@@ -1118,14 +1172,15 @@ Section SysOpenArms.
   Qed.
 
   Lemma open_arms_create_split `{XI : CurCtx} Γ (γfs : fs_names) (cw : Z)
-      (γf : gname) (p : mword 64) (pid : mword 32) (vom : mword 64)
+      (γf : gname) (p : mword 64) (pid : mword 32)
+      (M : gmap Z (bv 8)) (pv vom : mword 64)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
       (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
       (sts : list fdstate) (UW : ustate) (r : mword 64) :
-    open_arms_create Γ γfs cw γf p pid vom P Pmiss Farm Fun Fok Fex Fo Ft
+    open_arms_create Γ γfs cw γf p pid M pv vom P Pmiss Farm Fun Fok Fex Fo Ft
       sts UW r ⊢
       ∃ (UW' : ustate) (sts' : list fdstate),
         ⌜(r = (mword_of_int (-1) : mword 64) /\ UW' = UW /\ sts' = sts)
@@ -1147,7 +1202,7 @@ Section SysOpenArms.
         ∗ proc_priv γf p pid UW'
         ∗ fd_frags (pv_fdg (us_V UW)) sts'
         ∗ fd_slot
-        ∗ open_receipt_create Γ γfs cw vom P Pmiss Farm Fun Fok Fex Fo Ft
+        ∗ open_receipt_create Γ γfs cw M pv vom P Pmiss Farm Fun Fok Fex Fo Ft
             sts r sts'.
   Proof.
     rewrite /open_arms_create /open_post_ok_create /open_receipt_create.
@@ -1159,7 +1214,7 @@ Section SysOpenArms.
       iSplitR; [ iPureIntro; exact Hr | ].
       iSplitR; [ iPureIntro; reflexivity | ].
       iExact "Hfail".
-    - iDestruct "H" as (pl d i nm) "(%Hlast & HP & [Hfresh | Hex])".
+    - iDestruct "H" as (pl d i nm) "(%Hpl & %Hlast & HP & [Hfresh | Hex])".
       + (* FRESH *)
         iDestruct "Hfresh" as (av ents nl)
           "(%Hcre & %Hib & HFok & Hex & Ho & Htr & Harm & Hun & Hfd)".
@@ -1173,6 +1228,7 @@ Section SysOpenArms.
                      | exact Hcl | exact Hins ] | ].
         iFrame "Hpriv Hb Hslot". iRight.
         iExists pl, d, i, nm.
+        iSplitR; [ iPureIntro; exact Hpl | ].
         iSplitR; [ iPureIntro; exact Hlast | ].
         iFrame "HP". iLeft.
         iExists av, ents, nl.
@@ -1200,6 +1256,7 @@ Section SysOpenArms.
                      | exact Hcl | exact Hins ] | ].
           iFrame "Hpriv Hb Hslot". iRight.
           iExists pl, d, i, nm.
+          iSplitR; [ iPureIntro; exact Hpl | ].
           iSplitR; [ iPureIntro; exact Hlast | ].
           iFrame "HP". iRight.
           iExists avx, entsx, nlx.
@@ -1223,6 +1280,7 @@ Section SysOpenArms.
                      | exact Hcl | exact Hins ] | ].
           iFrame "Hpriv Hb Hslot". iRight.
           iExists pl, d, i, nm.
+          iSplitR; [ iPureIntro; exact Hpl | ].
           iSplitR; [ iPureIntro; exact Hlast | ].
           iFrame "HP". iRight.
           iExists avx, entsx, nlx.
@@ -1242,14 +1300,15 @@ Section SysOpenArms.
   (* ...and the one split, keyed on the O_CREATE bit exactly as [open_arms]
      and [open_receipt] are *)
   Lemma open_arms_split `{XI : CurCtx} Γ (γfs : fs_names) (cw : Z)
-      (γf : gname) (p : mword 64) (pid : mword 32) (vom : mword 64)
+      (γf : gname) (p : mword 64) (pid : mword 32)
+      (M : gmap Z (bv 8)) (pv vom : mword 64)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
       (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
       (sts : list fdstate) (UW : ustate) (r : mword 64) :
-    open_arms Γ γfs cw γf p pid vom P Pmiss Farm Fun Fok Fex Fo Ft sts UW r ⊢
+    open_arms Γ γfs cw γf p pid M pv vom P Pmiss Farm Fun Fok Fex Fo Ft sts UW r ⊢
       ∃ (UW' : ustate) (sts' : list fdstate),
         ⌜(r = (mword_of_int (-1) : mword 64) /\ UW' = UW /\ sts' = sts)
          \/ (exists (fd : nat) (l : list nat) (k : nat) (rb wb : bool)
@@ -1270,7 +1329,7 @@ Section SysOpenArms.
         ∗ proc_priv γf p pid UW'
         ∗ fd_frags (pv_fdg (us_V UW)) sts'
         ∗ fd_slot
-        ∗ open_receipt Γ γfs cw vom P Pmiss Farm Fun Fok Fex Fo Ft sts r sts'.
+        ∗ open_receipt Γ γfs cw M pv vom P Pmiss Farm Fun Fok Fex Fo Ft sts r sts'.
   Proof.
     rewrite /open_arms /open_receipt. destruct (om_create vom).
     - apply open_arms_create_split.
@@ -1284,14 +1343,15 @@ Section SysOpenArms.
      conjoin its blanket only because that one is a pure [Prop]).  This is
      also what lets the dispatch consume [sys_open_post] unchanged. *)
   Lemma open_arms_landed `{XI : CurCtx} Γ (γfs : fs_names) (cw : Z)
-      (γf : gname) (p : mword 64) (pid : mword 32) (vom : mword 64)
+      (γf : gname) (p : mword 64) (pid : mword 32)
+      (M : gmap Z (bv 8)) (pv vom : mword 64)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
       (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
       (sts : list fdstate) (UW : ustate) (r : mword 64) :
-    open_arms Γ γfs cw γf p pid vom P Pmiss Farm Fun Fok Fex Fo Ft sts UW r
+    open_arms Γ γfs cw γf p pid M pv vom P Pmiss Farm Fun Fok Fex Fo Ft sts UW r
     ⊢ sys_open_post γf p pid UW sts (trunc32 vom) r.
   Proof.
     rewrite /open_arms. destruct (om_create vom).
@@ -1319,6 +1379,7 @@ Section SysOpenArms.
   (*  [open_fd_ok], which create never sees.                              *)
   (* ------------------------------------------------------------------ *)
   Lemma cre_fail_to_open `{XI : CurCtx} Γ (γfs : fs_names) (cw : Z)
+      (M : gmap Z (bv 8)) (pv : mword 64)
       (ma mi : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Farm : pfam Σ (aview -> Z -> iProp Σ))
@@ -1328,16 +1389,18 @@ Section SysOpenArms.
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
       (pl : list (bv 8)) :
+    (* the walk this fold is the payout of ran on the caller's argument 0 *)
+    arg_path_of M pv pl ->
     cre_fail_arms Γ γfs (bv_unsigned T_FILE) ma mi P Pmiss
       Farm Fdots Fun Fok Fex pl -∗
     pf_at (aopen_commit_at Γ appE) Fo -∗
     pf_at (atrunc_commit_at Γ appE) Ft -∗
-    open_post_fail_create Γ γfs cw P Pmiss Farm Fun Fok Fex Fo Ft.
+    open_post_fail_create Γ γfs cw M pv P Pmiss Farm Fun Fok Fex Fo Ft.
   Proof.
-    iIntros "Hcf Ho Ht".
+    intros Hpl. iIntros "Hcf Ho Ht".
     iDestruct (cre_fail_arms_file with "Hcf") as "Hcf".
     rewrite /open_post_fail_create.
-    iRight. iExists pl.
+    iRight. iExists pl. iSplitR; [ iPureIntro; exact Hpl | ].
     iDestruct "Hcf" as "[(Hd & Hac & Hdl & Hcl) | Hr]".
     - iLeft. iFrame "Hd Hac Hdl Ho Ht Hcl".
     - iRight. iDestruct "Hr" as (d) "(HP & Hac & Hrest & Hcl)".
@@ -1502,9 +1565,10 @@ Definition wp_sys_open_body
   let Γfs := fs_gamma_L fsc_fs in
   wp_sys_open_frame γfl γf gs j gl pd pav pu ns dqb dqs dqbs dqn
     v vom pid U sts m K eb b lks
-    (open_in Γfs fsc_fs (pv_cwi (us_V U)) vom P Pmiss Farm Fun Fok Fex Fo Ft)
-    (open_arms Γfs fsc_fs (pv_cwi (us_V U)) γf (proc_addr j) pid vom
-       P Pmiss Farm Fun Fok Fex Fo Ft sts).
+    (open_in Γfs fsc_fs (pv_cwi (us_V U)) (us_M U) v vom
+       P Pmiss Farm Fun Fok Fex Fo Ft)
+    (open_arms Γfs fsc_fs (pv_cwi (us_V U)) γf (proc_addr j) pid
+       (us_M U) v vom P Pmiss Farm Fun Fok Fex Fo Ft sts).
 
 (* ===================================================================== *)
 (*  THE TWO ARM STATEMENTS.  Each is the body above at a DECIDED key --   *)
@@ -1536,9 +1600,9 @@ Definition wp_sys_open_plain_body
   om_create vom = false ->
   wp_sys_open_frame γfl γf gs j gl pd pav pu ns dqb dqs dqbs dqn
     v vom pid U sts m K eb b lks
-    (open_au_pre_plain Γfs fsc_fs (pv_cwi (us_V U)) P Pmiss Fo Ft)
-    (open_arms_plain Γfs fsc_fs (pv_cwi (us_V U)) γf (proc_addr j) pid vom
-       P Pmiss Fo Ft sts).
+    (open_au_plain_at Γfs fsc_fs (pv_cwi (us_V U)) (us_M U) v P Pmiss Fo Ft)
+    (open_arms_plain Γfs fsc_fs (pv_cwi (us_V U)) γf (proc_addr j) pid
+       (us_M U) v vom P Pmiss Fo Ft sts).
 
 (* THE O_CREATE ARM: create's surface at the child [AFile []]. *)
 Definition wp_sys_open_create_body
@@ -1562,9 +1626,10 @@ Definition wp_sys_open_create_body
   om_create vom = true ->
   wp_sys_open_frame γfl γf gs j gl pd pav pu ns dqb dqs dqbs dqn
     v vom pid U sts m K eb b lks
-    (open_au_pre_create Γfs fsc_fs (pv_cwi (us_V U)) P Pmiss Farm Fun Fok Fex Fo Ft)
-    (open_arms_create Γfs fsc_fs (pv_cwi (us_V U)) γf (proc_addr j) pid vom P Pmiss
-       Farm Fun Fok Fex Fo Ft sts).
+    (open_au_create_at Γfs fsc_fs (pv_cwi (us_V U)) (us_M U) v
+       P Pmiss Farm Fun Fok Fex Fo Ft)
+    (open_arms_create Γfs fsc_fs (pv_cwi (us_V U)) γf (proc_addr j) pid
+       (us_M U) v vom P Pmiss Farm Fun Fok Fex Fo Ft sts).
 
 (* ===================================================================== *)
 (*  ONE MODULE TYPE                                                       *)

@@ -12,10 +12,13 @@
    SAME premise list with ONE row added -- [FsAbsStart.ex_start], the trace
    deferred in the start inum -- and the same post with the cursor
    [P L iL] on the success arm and the death receipt on the failure one.
-   The contract's one-shot is specialised to the string argstr fetched by
-   [FsAbsOpenFire.opf_start_of_open]; the walk itself decides whether it
-   starts at ROOTINO or at [p->cwd], which is what makes this theorem say
-   something about init's RELATIVE "console".
+   The contract's one-shot ARRIVES specialised to the string argstr fetched:
+   the bundle owes the walk under the reading of argument 0
+   ([SysOpenDefs.open_au_plain_at], [ArgPath.arg_path_of]), and the caller
+   above fired that wand at this buffer -- so this block takes
+   [FsAbsEra.ex_start] at [bview plen bp] directly.  The walk itself decides
+   whether it starts at ROOTINO or at [p->cwd], which is what makes this
+   theorem say something about init's RELATIVE "console".
 
    The death receipt IS [SysOpenDefs.namei_walk_dead_era] on the nose
    ([ex_hops_from] is [ax_hops_from (elend ...) (path_elems pl)] by
@@ -110,7 +113,10 @@ Local Open Scope Z_scope.
 Require Import DirentEnc.   (* [bview]: the fetched string as a list *)
 Require Import FsBytesGamma.
 Require Import SpecNameiEra.
+Require Import ArgPath.         (* [arg_path_of]: the reading of trapframe
+                                   argument 0, which the walk is at *)
 Require Import SysOpenDefs.
+Require Import FsAbsEra.          (* [ex_start]: the walk one-shot AT ONE PATH *)
 Require Import FsAbsOpenFire.
 Require Import ProofSysOpenShared.
 Require Import ProofSysOpenAlloc.
@@ -205,7 +211,7 @@ Section ProofSysOpenWalk.
       (m N : regfile) (sp0 : mword 64) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (w4 w5 w6 w24 : mword 64)
       (* ---- the AU side ---- *)
-      (vom : mword 64)
+      (Mim : gmap Z (bv 8)) (pvv vom : mword 64)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) :
@@ -228,7 +234,9 @@ Section ProofSysOpenWalk.
     (jx < NPROC)%nat -> gs !! jx = Some gl ->
     eb = true ->
     lks = ∅ ->
-    (* ---- the AU side: the omode word is the caller's argument ---- *)
+    (* ---- the AU side: the omode word is the caller's argument, and the
+       string argstr fetched IS what the image holds at argument 0 ---- *)
+    arg_path_of Mim pvv (bview plen bp) ->
     om = arg_int32 vom ->
     is_aligned_paddr (Physaddr (pa_stk sp0 23)) 8 = true ->
     sp0 = (m !!! Regidx csp_rs1 : mword 64) ->
@@ -289,18 +297,22 @@ Section ProofSysOpenWalk.
        ([SysOpenDefs.namei_walk_pre_era]), handed DOWN unfired: the walk
        picks the start inum -- ROOTINO on an absolute path, [p->cwd]'s on a
        relative one -- and fires it there. ---- *)
-    namei_walk_pre_era fsc_fs (pv_cwi (us_V U)) P Pmiss -∗
+    (* THE WALK, AT THE STRING ARGSTR FETCHED.  The contract's bundle owes
+       it under the reading of argument 0 ([SysOpenDefs.open_au_plain_at]),
+       and [Hpof] above is that reading at this buffer, so what reaches this
+       block is already [FsAbsEra.ex_start] at the one path. *)
+    ex_start fsc_fs (pv_cwi (us_V U)) P Pmiss (bview plen bp) -∗
     pf_at (aopen_commit_at (fs_gamma_L fsc_fs) appE) Fo -∗
     pf_at (atrunc_commit_at (fs_gamma_L fsc_fs) appE) Ft -∗
     wp_next true (proc_addr jx)
       (so_cont0_au gf ns
-                dqb dqs dqbs dqn (proc_addr jx) pidv vom U sts
+                dqb dqs dqbs dqn (proc_addr jx) pidv Mim pvv vom U sts
                 P Pmiss Fo Ft m K eb b lks) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK HdevR Hnib0 Hgeom Hsize Hbm0 Hbmcov
            Hbmlog Hist0 Hcovb Hbmgeo Hiregb Hpcstr Hplen Hni1 Hni2 Hni3 Hush
-           Hprkc Hnsb Hj Hgl Heb Hlkempty Hom Hal23 Hsp0 HNsp HNthr HNs0 HNs2
+           Hprkc Hnsb Hj Hgl Heb Hlkempty Hpof Hom Hal23 Hsp0 HNsp HNthr HNs0 HNs2
            HNs3 Hal.
     pose proof HK as HKfull.
     destruct (so_kb K HK) as (HKcr & HKna & HKai & HKas & HKbo & HKeo & HKil &
@@ -387,12 +399,11 @@ Section ProofSysOpenWalk.
       as "[Hbufk Hbufrest]".
     iDestruct (cpu_own_transport CID0 CID2 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
-    (* THE ONE-SHOT, HANDED DOWN UNFIRED ([FsAbsOpenFire.opf_start_of_open]):
-       [ex_start] at the string argstr fetched IS the contract's premise at
-       that string, so nothing is fired here -- the WALK picks the start
+    (* THE ONE-SHOT, HANDED DOWN UNFIRED: it arrived as [FsAbsEra.ex_start]
+       at the string argstr fetched (the contract owes it under the reading
+       of argument 0), so nothing is fired here -- the WALK picks the start
        inum and fires it there. *)
-    iDestruct (opf_start_of_open fsc_fs (pv_cwi (us_V U)) P Pmiss (bview plen bp) with "Hwp")
-      as "Htrace".
+    iRename "Hwp" into "Htrace".
     iApply (NameiEra.wp_namei_era (CID := CID2) gs jx gl pd pav pu
  gf
  plen bp MAXOPBLOCKS Sb P Pmiss
@@ -517,8 +528,8 @@ Section ProofSysOpenWalk.
       { unfold sys_open_slots, create_slots in *. lia. }
       { (* ARM B-FAIL: the walk died at some hop, so NOTHING was observed
            and both commits come home beside the era refund. *)
-        iApply (so_arm_dead gf (proc_addr jx) pidv vom P Pmiss Fo Ft U sts _
-                  (bview plen bp) Ha0f
+        iApply (so_arm_dead gf (proc_addr jx) pidv Mim pvv vom P Pmiss Fo Ft U sts _
+                  (bview plen bp) Hpof Ha0f
                   with "Hpriv Hfrag Hfds Hdead Hoc Htc"). } }
     (* ---- namei RESOLVED: the reference, shed and generation-named, and
        THE CURSOR at the end of the walk ---- *)
@@ -764,7 +775,7 @@ Section ProofSysOpenWalk.
          spent one of the three. *)
       iAssert (wp_next true (proc_addr jx)
                  (so_cont_au gf
-                          (ns - 1)%nat dqb dqs (proc_addr jx) pidv vom U sts
+                          (ns - 1)%nat dqb dqs (proc_addr jx) pidv Mim pvv vom U sts
                           P Pmiss Fo Ft m K eb b lks))
         with "[Hcont Hsbn Hsbs]" as "Hcontj".
       { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz".
@@ -780,9 +791,9 @@ Section ProofSysOpenWalk.
  kk (qq/2)%Qp (qq/2)%Qp gy loy tly inum dn bm om lo
                 (ns - 1)%nat n1 pidv dqb dqs U sts m Q2 sp0 K eb b lks w4 w5 w6 w24
                 bp1
-                data vom (bview plen bp) P Pmiss Fo Ft
+                data Mim pvv vom (bview plen bp) P Pmiss Fo Ft
                 eq_refl HKfull Hkk Hinb Hipos Hgeom Hsize Hbm0 Hbmcov Hbmlog
-                Hist0 Hiblk Hiblog Hcovb Hiu Hj Hgl Hlkempty Hdirw Hom
+                Hist0 Hiblk Hiblog Hcovb Hiu Hj Hgl Hlkempty Hdirw Hpof Hom
                 Hal23 Hsp0 HQ2sp HQ2thr HQ2s0 HQ2s1 HQ2s2 HQ2s3 Hal ltac:(unfold sys_open_slots, create_slots in *; lia)
                 with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hftab Hbio Hlog
                       Hseam Hgen Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd
@@ -854,7 +865,7 @@ Section ProofSysOpenWalk.
                    ltac:(wp_next_chain) with "Hown") as "Hown".
       iAssert (wp_next true (proc_addr jx)
                  (so_cont_au gf
-                          (ns - 1)%nat dqb dqs (proc_addr jx) pidv vom U sts
+                          (ns - 1)%nat dqb dqs (proc_addr jx) pidv Mim pvv vom U sts
                           P Pmiss Fo Ft m K eb b lks))
         with "[Hcont Hsbn Hsbs]" as "Hcontj".
       { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz".
@@ -872,10 +883,10 @@ Section ProofSysOpenWalk.
  kk (qq/2)%Qp (qq/2)%Qp gy loy tly inum dn bm om lo
                 (ns - 1)%nat n1 pidv dqb dqs U sts m Q3 sp0 K eb b lks w4 w5 w6 w24
                 bp1
-                data vom (bview plen bp) P Pmiss Fo Ft
+                data Mim pvv vom (bview plen bp) P Pmiss Fo Ft
                 eq_refl HKfull Hkk Hinb Hipos Hgeom Hsize Hbm0 Hbmcov Hbmlog
                 Hist0 Hiblk Hiblog Hcovb Hiu Hj Hgl Hlkempty
-                ltac:(intros _; exact Hom0) Hom
+                ltac:(intros _; exact Hom0) Hpof Hom
                 ltac:(intros Hq; exfalso; rewrite Hty in Hq;
                       vm_compute in Hq; discriminate)
                 Hal23 Hsp0 HQ3sp HQ3thr HQ3s0 HQ3s1 HQ3s2 HQ3s3 Hal ltac:(unfold sys_open_slots, create_slots in *; lia)
@@ -941,8 +952,8 @@ Section ProofSysOpenWalk.
     { unfold sys_open_slots, create_slots in *. lia. }
     { (* ARM C-FAIL: a directory opened for writing.  The observation HAS
          fired -- this refusal is inside the child's lock window. *)
-      iApply (so_arm_fail gf (proc_addr jx) pidv vom P Pmiss Fo Ft U sts _
-                (bview plen bp) (bv_unsigned inum) (era_node dn bm data) Ha0f
+      iApply (so_arm_fail gf (proc_addr jx) pidv Mim pvv vom P Pmiss Fo Ft U sts _
+                (bview plen bp) (bv_unsigned inum) (era_node dn bm data) Hpof Ha0f
                 with "Hpriv Hfrag Hfds HP Hobs Htc"). }
   Qed.
 

@@ -28,8 +28,12 @@
    - [om_arg] and the four bit readings: ProofSysOpenBits.v,
      ProofSysOpenShared.v, ProofSysOpenStores.v, SpecSysOpen.v.
    - [namei_walk_pre_era] / [namei_walk_dead_era]: SpecKexec.v,
-     SpecSysExec.v, SpecSysChdir.v, ProofKexecA.v -- every full-path
-     era walk states its premise at this shape.
+     SpecSysExec.v, SpecSysChdir.v, ProofKexecA.v -- the [∀ pl] shape every
+     full-path era walk that does NOT name its path states its premise at.
+     open's own bundles left it for [FsAbsEra.ex_start] at the path
+     argument 0 names; what still consumes the [∀ pl] form here is the
+     generic supplier's bridge ([open_au_plain_at_of_all]), and the death
+     receipt [namei_walk_dead_era] is unchanged (it always took its [pl]).
    - [aopen_commit_at] / [atrunc_commit_at]: FsAbsOpenFire.v (the fire
      lemmas), FsAbsInvFire.v (the trivial-family dischargers),
      SpecKexec.v, SpecSysExec.v, SpecSysChdir.v.
@@ -39,8 +43,11 @@
    ==== THE TWO BUNDLES ================================================
 
    [open_au_pre_plain] and [open_au_pre_create] are what a caller hands in
-   on each side of the O_CREATE key; [SpecSysOpen.open_in] is the [if] that
-   picks between them, and the contract carries only that.
+   AT THE PATH IT PASSED, and [open_au_plain_at]/[open_au_create_at] are
+   the same two under the reading of trapframe argument 0
+   ([ArgPath.arg_path_of], sys_exec's guard) -- one on each side of the
+   O_CREATE key.  [SpecSysOpen.open_in] is the [if] that picks between the
+   guarded pair, and the contract carries only that.
 
    - PLAIN ([om_create vom = false], the init arm): the walk premise covers
      the FULL path -- open resolves the whole path via namei, not
@@ -59,7 +66,8 @@
 
    ==== THE WALK PREMISE (the mknod era lesson, applied at authoring) ===
 
-   Both walk premises are one-shot fupds firing [FsAbs.ax_hop] at the ERA
+   Both walk premises are [FsAbsEra.ex_start] / [ep_start] AT THE PATH
+   ARGUMENT 0 NAMES -- one-shot fupds firing [FsAbs.ax_hop] at the ERA
    LEND [FsAbsEra.elend] -- the only trace walks that exist fire that
    family, and only that lend lets a hop's consumer read the authority's
    row ([elend_astate]).  The START INUM IS QUANTIFIED with only the
@@ -161,7 +169,12 @@ Require Import SysMknodDefs.  (* [delta_create], [cre_pre],
                                    [npar_elems], [abs_view_insert] *)
 Require Import SysWriteDefs.  (* the splice algebra it re-exports, which
                                    the mint justification below is cut from *)
-Require Import FsAbsEra.        (* [elend]: the era lend the hops fire *)
+Require Import FsAbsEra.        (* [elend]: the era lend the hops fire;
+                                   [ex_start]/[ep_start]: the walk one-shot
+                                   AT ONE PATH, which the two bundles are
+                                   stated over *)
+Require Import ArgPath.         (* [arg_path_of]: the reading of trapframe
+                                   argument 0, shared with sys_exec *)
 Require Import FsAbsEraMknod.   (* [npar_walk_pre_era], [npar_walk_dead_era]
                                    -- the parent-prefix one-shot, REUSED *)
 Require Import FsAbsMknodFire.  (* [acre_commit_at], [dlookup_commit_at],
@@ -398,36 +411,204 @@ Section OpenDefs.
   (*  2d.  The AU bundles                                                 *)
   (* ------------------------------------------------------------------ *)
 
-  (* Everything the PLAIN caller hands in, at the mask floor [∅].  Each
-     one-shot piece arrives as its AU CONJOINED with its own refund (the
-     REFUNDS ruling); the pair is [PieceFam.pfam], the receipt beside the
-     refund, so the list stays the length it had.  The walk's cursor pair
-     [P]/[Pmiss] stays BARE: a sequenced piece carries its refund as its
-     cursor and owes no second one. *)
+  (* Everything the PLAIN caller hands in, AT THE PATH IT PASSED, at the
+     mask floor [∅].  Each one-shot piece arrives as its AU CONJOINED with
+     its own refund (the REFUNDS ruling); the pair is [PieceFam.pfam], the
+     receipt beside the refund, so the list stays the length it had.  The
+     walk's cursor pair [P]/[Pmiss] stays BARE: a sequenced piece carries
+     its refund as its cursor and owes no second one.
+
+     THE WALK IS AT ONE PATH ([FsAbsEra.ex_start] at [pl]), not at every
+     path: [namei_walk_pre_era]'s body instantiated there, which is a
+     rename ([FsAbsOpenFire.opf_start_of_open] is the one-line bridge, and
+     [open_au_pre_plain_of_all] below is this bundle's).  A caller whose
+     cursor is PINNED -- a pin is sound at ONE path -- can hand this in;
+     the [∀ pl] form it could not.  The guard that says WHICH path is the
+     syscall tier's ([open_au_plain_at] below, [ArgPath.arg_path_of] at
+     trapframe argument 0), exactly as sys_exec's is. *)
   Definition open_au_pre_plain Γ (γfs : fs_names) (cw : Z)
+      (pl : list (bv 8))
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) : iProp Σ :=
-    (namei_walk_pre_era γfs cw P Pmiss
+    (ex_start γfs cw P Pmiss pl
      ∗ pf_at (aopen_commit_at Γ appE) Fo
      ∗ pf_at (atrunc_commit_at Γ appE) Ft)%I.
 
   (* ...and the O_CREATE caller: the parent-prefix one-shot REUSED from
-     the mknod era file, create's fused delta at the child [AFile []],
-     the exists observation, and open's own two commits *)
+     the mknod era file at that same path ([FsAbsEra.ep_start]), create's
+     fused delta at the child [AFile []], the exists observation, and
+     open's own two commits *)
   Definition open_au_pre_create Γ (γfs : fs_names) (cw : Z)
+      (pl : list (bv 8))
       (P Pmiss : nat -> Z -> iProp Σ)
       (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
       (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) : iProp Σ :=
-    (npar_walk_pre_era γfs cw P Pmiss
+    (ep_start γfs cw P Pmiss pl
      ∗ pf_at (acre_commit_at Γ appE (AFile [])) Fok
      ∗ pf_at (dlookup_commit_at Γ appE) Fex
      ∗ pf_at (aopen_commit_at Γ appE) Fo
      ∗ pf_at (atrunc_commit_at Γ appE) Ft
      (* ...and create's CHILD legs (round E2, lane E2-C) *)
      ∗ cre_child_unfired Γ (AFile []) Farm Fun)%I.
+
+  (* ------------------------------------------------------------------ *)
+  (*  2d'.  THE SYSCALL TIER: the same bundle under the reading of the    *)
+  (*  caller's argument 0.                                                *)
+  (*                                                                      *)
+  (*  sys_open [argstr]s trapframe argument 0 and walks THAT string, so    *)
+  (*  the WALK PIECE is owed at whatever the image holds there:            *)
+  (*  [∀ pl, ⌜arg_path_of M pv pl⌝ -∗ ex_start … pl], which is             *)
+  (*  [SpecSysExec.sys_exec_au_pre]'s first conjunct one syscall over.     *)
+  (*  It is ONE walk, not a family of them -- the wand is linear and the   *)
+  (*  reading is a function of [(M, pv)] ([ArgPath.arg_path_of_uniq]) --   *)
+  (*  so a caller that knows its own image pays at exactly one path, and   *)
+  (*  a caller that knows nothing about it still supplies the wand from    *)
+  (*  the ∀-shaped walk premise in one line ([_of_all] below).             *)
+  (*                                                                      *)
+  (*  THE COMMITS STAY OUTSIDE THE WAND, and that is forced rather than    *)
+  (*  chosen.  argstr can fail (a bad pointer, a string past MAXPATH), and *)
+  (*  then NO [pl] satisfies the reading at all -- an image with no NUL    *)
+  (*  at or after [pv] has no reading -- so a consumer of the failure      *)
+  (*  fold's "nothing happened" arm could never open a whole-bundle wand   *)
+  (*  to get its commits back.  It needs them back on the nose             *)
+  (*  ([SpecSysMknod.mknod_stable_fail]'s first arm is exactly that        *)
+  (*  consumer), and here they are.  Only the walk is path-shaped anyway:  *)
+  (*  a commit is keyed by an inum and a view, never by a string.          *)
+  (* ------------------------------------------------------------------ *)
+  Definition open_au_plain_at Γ (γfs : fs_names) (cw : Z)
+      (M : gmap Z (bv 8)) (pv : mword 64)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) : iProp Σ :=
+    ((∀ pl : list (bv 8), ⌜arg_path_of M pv pl⌝ -∗ ex_start γfs cw P Pmiss pl)
+     ∗ pf_at (aopen_commit_at Γ appE) Fo
+     ∗ pf_at (atrunc_commit_at Γ appE) Ft)%I.
+
+  Definition open_au_create_at Γ (γfs : fs_names) (cw : Z)
+      (M : gmap Z (bv 8)) (pv : mword 64)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) : iProp Σ :=
+    ((∀ pl : list (bv 8), ⌜arg_path_of M pv pl⌝ -∗ ep_start γfs cw P Pmiss pl)
+     ∗ pf_at (acre_commit_at Γ appE (AFile [])) Fok
+     ∗ pf_at (dlookup_commit_at Γ appE) Fex
+     ∗ pf_at (aopen_commit_at Γ appE) Fo
+     ∗ pf_at (atrunc_commit_at Γ appE) Ft
+     ∗ cre_child_unfired Γ (AFile []) Farm Fun)%I.
+
+  (* ...and the INSTANCE: at the path the syscall actually read, the walk
+     wand fires and the bundle is the one-path one above.  This is the step
+     sys_open's proof takes once argstr has answered. *)
+  Lemma open_au_plain_at_inst Γ (γfs : fs_names) (cw : Z)
+      (M : gmap Z (bv 8)) (pv : mword 64) (pl : list (bv 8))
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) :
+    arg_path_of M pv pl ->
+    open_au_plain_at Γ γfs cw M pv P Pmiss Fo Ft -∗
+    open_au_pre_plain Γ γfs cw pl P Pmiss Fo Ft.
+  Proof.
+    iIntros (Hpl) "(Hw & Ho & Ht)". rewrite /open_au_pre_plain. iFrame "Ho Ht".
+    iApply ("Hw" $! pl with "[%]"). exact Hpl.
+  Qed.
+
+  Lemma open_au_create_at_inst Γ (γfs : fs_names) (cw : Z)
+      (M : gmap Z (bv 8)) (pv : mword 64) (pl : list (bv 8))
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) :
+    arg_path_of M pv pl ->
+    open_au_create_at Γ γfs cw M pv P Pmiss Farm Fun Fok Fex Fo Ft -∗
+    open_au_pre_create Γ γfs cw pl P Pmiss Farm Fun Fok Fex Fo Ft.
+  Proof.
+    iIntros (Hpl) "(Hw & Hok & Hex & Ho & Ht & Hch)".
+    rewrite /open_au_pre_create. iFrame "Hok Hex Ho Ht Hch".
+    iApply ("Hw" $! pl with "[%]"). exact Hpl.
+  Qed.
+
+  (* THE GENERIC SUPPLIER'S ONE LINE.  A family that tracks nothing owes
+     the walk at EVERY string ([namei_walk_pre_era] / [npar_walk_pre_era],
+     what [FsAbsInvFire] discharges), and that form INSTANTIATES to the
+     one-path bundle -- the direction that matters, since the bundle is
+     the weaker thing to supply. *)
+  Lemma open_au_plain_at_of_all Γ (γfs : fs_names) (cw : Z)
+      (M : gmap Z (bv 8)) (pv : mword 64)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) :
+    namei_walk_pre_era γfs cw P Pmiss -∗
+    pf_at (aopen_commit_at Γ appE) Fo -∗
+    pf_at (atrunc_commit_at Γ appE) Ft -∗
+    open_au_plain_at Γ γfs cw M pv P Pmiss Fo Ft.
+  Proof.
+    iIntros "Hw Ho Ht". rewrite /open_au_plain_at. iFrame "Ho Ht".
+    iIntros (pl) "_". rewrite /ex_start /namei_walk_pre_era. iIntros (r Hr).
+    iMod ("Hw" $! pl r with "[%]") as "[$ $]"; [exact Hr | done].
+  Qed.
+
+  Lemma open_au_create_at_of_all Γ (γfs : fs_names) (cw : Z)
+      (M : gmap Z (bv 8)) (pv : mword 64)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) :
+    npar_walk_pre_era γfs cw P Pmiss -∗
+    pf_at (acre_commit_at Γ appE (AFile [])) Fok -∗
+    pf_at (dlookup_commit_at Γ appE) Fex -∗
+    pf_at (aopen_commit_at Γ appE) Fo -∗
+    pf_at (atrunc_commit_at Γ appE) Ft -∗
+    cre_child_unfired Γ (AFile []) Farm Fun -∗
+    open_au_create_at Γ γfs cw M pv P Pmiss Farm Fun Fok Fex Fo Ft.
+  Proof.
+    iIntros "Hw Hok Hex Ho Ht Hch". rewrite /open_au_create_at.
+    iFrame "Hok Hex Ho Ht Hch".
+    iIntros (pl) "_". rewrite /ep_start /npar_walk_pre_era. iIntros (r Hr).
+    iMod ("Hw" $! pl r with "[%]") as "[$ $]"; [exact Hr | done].
+  Qed.
+
+  Lemma open_au_pre_plain_of_all Γ (γfs : fs_names) (cw : Z)
+      (pl : list (bv 8))
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) :
+    namei_walk_pre_era γfs cw P Pmiss -∗
+    pf_at (aopen_commit_at Γ appE) Fo -∗
+    pf_at (atrunc_commit_at Γ appE) Ft -∗
+    open_au_pre_plain Γ γfs cw pl P Pmiss Fo Ft.
+  Proof.
+    iIntros "Hw Ho Ht". rewrite /open_au_pre_plain. iFrame "Ho Ht".
+    rewrite /ex_start /namei_walk_pre_era. iIntros (r Hr).
+    iMod ("Hw" $! pl r with "[%]") as "[$ $]"; [exact Hr | done].
+  Qed.
+
+  Lemma open_au_pre_create_of_all Γ (γfs : fs_names) (cw : Z)
+      (pl : list (bv 8))
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) :
+    npar_walk_pre_era γfs cw P Pmiss -∗
+    pf_at (acre_commit_at Γ appE (AFile [])) Fok -∗
+    pf_at (dlookup_commit_at Γ appE) Fex -∗
+    pf_at (aopen_commit_at Γ appE) Fo -∗
+    pf_at (atrunc_commit_at Γ appE) Ft -∗
+    cre_child_unfired Γ (AFile []) Farm Fun -∗
+    open_au_pre_create Γ γfs cw pl P Pmiss Farm Fun Fok Fex Fo Ft.
+  Proof.
+    iIntros "Hw Hok Hex Ho Ht Hch". rewrite /open_au_pre_create.
+    iFrame "Hok Hex Ho Ht Hch".
+    rewrite /ep_start /npar_walk_pre_era. iIntros (r Hr).
+    iMod ("Hw" $! pl r with "[%]") as "[$ $]"; [exact Hr | done].
+  Qed.
 
   (* ------------------------------------------------------------------ *)
   (*  2e.  The descriptor story                                           *)
@@ -536,4 +717,5 @@ End OpenDefs.
    The three commits are match-free single wands and stay transparent,
    as the family's do. *)
 Global Typeclasses Opaque namei_walk_pre_era namei_walk_dead_era
-  open_au_pre_plain open_au_pre_create open_fd_ok.
+  open_au_pre_plain open_au_pre_create
+  open_au_plain_at open_au_create_at open_fd_ok.
