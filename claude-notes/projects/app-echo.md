@@ -2404,6 +2404,23 @@ ORDER: GENERIC-PAY → CONS-SWALLOW → SH-LINE 2b (gets on `ush_gets_line`,
 `wp_uk_ecall_read_recv` with `upos` threaded read → gets_loop → gets → getcmd
 → main) → LAZY-FLAG (the owner's form of (A)).
 
+SH-OPEN PHASE 2 ON ITS BRANCH (2026-09-12; `lane/sh-open` = `ba3249c96` in
+`-sup`, 11 files +1802/-699; build `shopen28`: green except `UInitSh.v:567`,
+the ONE seam ruling (B) predicted -- `pex_slot`'s constructor premise is
+`exec_slot_pre`'s wand, so the cwd row cannot be threaded until LAZY-FLAG-2's
+kernel row lands; no `∀ W'` premise was added).  Landed: the pinned preamble
+as one walk; `UConsOpen.v` = the open FACTORED (dead walk, two suppliers over
+any image and literal base, two key-level rows; 23 lemmas moved verbatim out
+of UInitConsK), `UInitConsK` and the new `UShConsK.v` its two instantiations
+(0x970 in `init_ro`; `UkSh.sh_cons_pv = 0x1378` in `shk_ro`; the same
+seven-byte literal); `UConsLine`'s `ush_gen_slot/_run` deleted (copies in
+UkSh).  FINDING: the absence credential must be PERSISTENT AND TIMELESS
+(`cons_hop_dead` strips a later off it inside `app_inv`), so `cons_never r`
+must be the ghost fragment `cons_shot r (-1)`, never a derived law;
+`UShConsK.sh_cons_never_law T K` is the consumer's shape (E2 told).  LANDING
+ORDER: LAZY-FLAG-2 (main, with the cwd row) → `lane/supply-split-r1` rebased
+again → land → `lane/sh-open` rebased onto it, `UInitSh` closes → gate → land.
+
 SH-OPEN PHASE 1 + TWO RULINGS (2026-09-12; `-sup`, `lane/sh-open` on the old
 supply-split, one red file `UInitSh.v` pending the cwd row).  Landed as
 statements: `UkSh.ush_fd0p l` (pure: slot 0 console ∨ slot 0 closed) as the

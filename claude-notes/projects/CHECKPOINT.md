@@ -216,3 +216,7 @@ LAZY-FLAG-2 p1 (main), SH-OPEN p1 (`-sup`), E2 p1 (`-disc`), TX-RECEIPT p1
 SH-OPEN phase 1 green-but-one-file (2026-09-12); phase 2 go-ahead given with
 rulings (A) `cons_never` sealed-absent state → E2; (B) the cwd row on
 `exec_slot_pre`'s wands → LAZY-FLAG-2 (note "SH-OPEN PHASE 1 + TWO RULINGS").
+
+SH-OPEN phase 2 committed on `lane/sh-open` (`ba3249c96`), one seam red until
+LAZY-FLAG-2's cwd row; lands after supply-split-r1.  `-sup` idle → the K-side
+ledger lane (PRINTK-LEDGER) next there, on main.
