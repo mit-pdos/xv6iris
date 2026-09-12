@@ -264,3 +264,8 @@ PRINTK-LEDGER STAGED (2026-09-12): A (ledger threading, cs existential, green) �
 (printint digits) → C (printk's pinned post, 23 lemmas) → D (the tie with
 `k_push_ok`; hart lines); each its own commit on `lane/printk-ledger`; a fresh
 agent continues where context runs out.
+
+PRINTK-LEDGER agent out of context before milestone A's commit (2026-09-12);
+PRINTK-LEDGER-2 (fresh, `brief-printk-ledger-2.md`) continues on the dirty
+`lane/printk-ledger` in `-sup`.  NOTE: the VM is saturated (five trees building;
+load 22-40) -- builds queue.

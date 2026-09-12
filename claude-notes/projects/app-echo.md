@@ -2404,6 +2404,30 @@ ORDER: GENERIC-PAY → CONS-SWALLOW → SH-LINE 2b (gets on `ush_gets_line`,
 `wp_uk_ecall_read_recv` with `upos` threaded read → gets_loop → gets → getcmd
 → main) → LAZY-FLAG (the owner's form of (A)).
 
+PRINTK-LEDGER MILESTONE A, IN PROGRESS (2026-09-12; `lane/printk-ledger`
+uncommitted, 19 files +404/-71; `pkl32`: only ProofMain + ProofPrintk red).
+SOUNDNESS CORRECTION: the post `k_ledger_lb γd (ms ++ [(f, cs)])` was
+UNPROVABLE -- the caller's `ms` is a persistent LOWER BOUND and other harts
+commit in between; the post binds the lock's own ledger: `∀ mf cs ms', …
+⌜ms prefix_of ms'⌝ -∗ k_ledger_lb γd (ms' ++ [(f, cs)]) -∗ …` (chaining at
+`ms := ms' ++ [e]` still orders one hart's messages, which is all
+`kernel_msgs`'s interleaving needs).  `k_led_ok` staged to `pk_site (fst e)`;
+`k_ledger_kernel_msgs` takes `Forall template_match` as an explicit
+hypothesis until milestone C.  THE BOOT ROUTING crosses in `main_globals_raw`
+(`SpecMain.v:345`, already at `cn`; `cn_uart cn` names the UART): the
+alternatives -- `boot_shared_alloc`'s bundle (destructured by ONE flat
+positional pattern in SystemAdequacy.v:717) or `main_locks_raw`
+(BootCarveMain's conclusion) -- each cost a file outside the lane.  REMAINING
+FOR A: A-1 `ProofMain.v:2387` (`iEval (rewrite Hcnu)` before the group call;
+`pkl33` never ran -- the VM was saturated by five trees, load 22-40); A-2
+`ProofPrintk.v`: `pk_held` gains `γd` + `pr_res γd` (12 sites), epi/exit/
+exit2fe/setup gain `γd`, acquire/release at `<{ pr_res γd }>`, and THE COMMIT
+placement (RULED: pass `ms`/`e` down -- `wp_printk_epi` takes `k_ledger_lb γd
+ms`, its post `∀ mf ms0, ⌜ms prefix_of ms0⌝ -∗ k_ledger_lb γd (ms0 ++ [e]) -∗
+…` via `k_ledger_lb_le`; the three exits consume it).  The THR leaf has THREE
+callers (uartputc_sync, uartwrite, uartwriteLoc), not six.  A fresh agent
+continues.
+
 PRINTK-LEDGER PHASE 1 (2026-09-12; `-sup`, `lane/printk-ledger` on main
 `b0cc198c6`, build `pkl26`: 968 compiled, 2 red -- ProofPrintk's pinned post,
 ProofMain's newlock).  Landed: `un_kled`/`un_kfl` in `uart_names` (so
