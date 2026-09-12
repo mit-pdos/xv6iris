@@ -223,9 +223,9 @@ ledger lane (PRINTK-LEDGER) next there, on main.
 
 PRINTK-LEDGER LAUNCHED (2026-09-12) in `-sup` on `lane/printk-ledger` from main
 `b0cc198c6` (brief `brief-printk-ledger.md`: the K ledger under pr.lock, rendered
-messages pinned, `kernel_msgs`).  DESIGN POINT FOR THE OWNER: the output claim
-will ADMIT kernel error messages (e.g. "ialloc: no inodes\n" after enough
-crash-leaked inodes) as it admits sh's failure prints; the boot's ten stay
-exact.  In flight: LAZY-FLAG-2 p1 (main), E2 p1 (`-disc`), TX-RECEIPT p1
+messages pinned, `kernel_msgs`).  RULED (O5'): kernel diagnostics reachable from our processes' syscalls are
+ADMITTED in the output claim (recovering tail / ireclaim / ialloc / balloc
+templates; the boot's ten exact); the trap-side two are not ours (note "O5'
+RULED").  In flight: LAZY-FLAG-2 p1 (main), E2 p1 (`-disc`), TX-RECEIPT p1
 (`-tlw`), PRINTK-LEDGER p1 (`-sup`); `lane/sh-open` and `lane/supply-split-r1`
 wait to land.

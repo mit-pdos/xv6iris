@@ -2404,6 +2404,27 @@ ORDER: GENERIC-PAY → CONS-SWALLOW → SH-LINE 2b (gets on `ush_gets_line`,
 `wp_uk_ecall_read_recv` with `upos` threaded read → gets_loop → gets → getcmd
 → main) → LAZY-FLAG (the owner's form of (A)).
 
+O5' RULED BY THE OWNER (2026-09-12): KERNEL DIAGNOSTICS ARE ADMITTED "as
+appropriate based on the syscalls made by the processes we're concerned
+about".  So `good_out`'s K part becomes: the ten boot messages (each once,
+hart 0's three banners first, byte-exact) plus entries each matching the
+template of a kernel printk site that OUR processes' syscalls (and the boot
+across power cycles) can reach under the pins: `recovering tail %d dst %d\n`
+(log recovery after a crash mid-commit), `ireclaim: orphaned inode %d\n`
+(fsinit after a crash-leaked inode), `ialloc: no inodes\n` and `balloc: out of
+blocks\n` (init's mknod → create → ialloc / dirlink → writei → bmap → balloc,
+after enough leaked inodes or a full disk).  NOT caused by our processes:
+`%d %s: unknown sys call %d\n` and usertrap's two lines (a process at the
+GENERIC slot only); a first version may still list their templates (the
+claim is then weaker but true) and a later refinement excludes them by
+tagging those two sites' ledger entries with the trapping pid.  The
+messages' timing is unconstrained (no fairness), and any of them after the
+k-point breaks the pure-suffix prompt test, so the disciplined user types
+nothing and the claim holds vacuously there -- exactly as sh's failure
+prints leave the theorem true.  Consumer: `EchoDisc.boot_stream` generalises
+to `kernel_stream` over PRINTK-LEDGER's `kernel_msgs` (application lane,
+after PRINTK-LEDGER lands).
+
 SH-OPEN PHASE 2 ON ITS BRANCH (2026-09-12; `lane/sh-open` = `ba3249c96` in
 `-sup`, 11 files +1802/-699; build `shopen28`: green except `UInitSh.v:567`,
 the ONE seam ruling (B) predicted -- `pex_slot`'s constructor premise is
