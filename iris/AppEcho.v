@@ -124,6 +124,11 @@ Require Import DevModel.         (* [uart_state], [uart_tx_pop], [uart_loopback]
 Require Import UartNames.        (* [uart_names] *)
 Require Import RiscvPtsto.       (* [riscvGS], [obsN] *)
 Require Import WpUart.           (* [uart_ghosts], [uartN] *)
+Require Import FileInvDefs.      (* [fileG]/[file_app]: the era's classes, which
+                                    the tx/rx wands' identification premise
+                                    names (lane APP-IFACE item (c)) *)
+Require Import AppCfg.           (* [MkAppcfg]: ...and the record it equates *)
+Require Import FsCfg.            (* [fsc_uart]: the era's own UART names *)
 Require Import App.              (* [xv6_app], [MkApp] and the theorem whose
                                     binders the dischargers are stated at *)
 (* THE DISCIPLINE AND THE CLAIM, as pure combinatorics.  EXPORTED: the
@@ -805,6 +810,98 @@ Section EchoPred.
   Qed.
 
   (* ---------------------------------------------------------------- *)
+  (*  3a'. THE FIRST PROCESS'S BOOT RESOURCE ([App.app_boot])           *)
+  (* ---------------------------------------------------------------- *)
+
+  (* WHAT /init IS HANDED AT THE ERA MINT, and it is a DISJUNCTION, not the
+     bare key.  THE ARM IS DECIDED BY THE VIEW ([FsConsPin.cons_inum av]),
+     NEVER BY THE ERA NUMBER: the KEY arm whenever the view has no console
+     node (era 0's image, which carries none -- mkfs writes no device inode
+     -- and equally any later era whose /init never committed its [mknod] or
+     whose [mknod] failed), the FLAG arm whenever the view has one.  The key
+     is what makes a missing node's [open] provably return [-1]; the flag is
+     what makes a present node's [open] a pinned observation at its inum.
+     The key cannot be BOTH: at a view with the node, the claim's PRESENT
+     arms hold [cons_key r] themselves ([cons_state] below), so the
+     transport has no second copy to hand out -- and /init does not want
+     one there.  So /init's console dance has to be proved at BOTH arms,
+     at every era. *)
+  Definition echo_boot (γ : echo_fixed) (r : echo_names) : iProp Σ :=
+    (cons_key r ∨ ∃ i : Z, cons_made r i)%I.
+
+  (* THE TRANSPORT, WITH THE BOOT RESOURCE ([App.Happ_boot]).  The arm is
+     decided OUTSIDE the later, by [FsConsPin.cons_inum av] -- a pure
+     function of the view, which is exactly why the fresh flag is allocated
+     at it -- so the resource handed over is not under the claim's [▷]. *)
+  Lemma echo_xfer_boot (γ : echo_fixed) :
+    ⊢ app_xfer_boot_raw (echo_pred γ) (echo_boot γ).
+  Proof.
+    rewrite /app_xfer_boot_raw. iIntros "!>" (r av) "H".
+    iMod (own_alloc (●ML (cons_inum av : list (leibnizO Z)))) as (g1) "Ha";
+      [ apply mono_list_auth_valid |].
+    iMod (own_alloc (●ML ([] : list (leibnizO Z)))) as (g2) "Hk";
+      [ apply mono_list_auth_valid |].
+    set (r' := (g1, g2) : echo_names).
+    destruct (cons_inum av) as [| i0 tl] eqn:Hci.
+    - (* NO CONSOLE AT THIS VIEW: the fresh key is what /init gets, and the
+         copy's only reachable arm ([cons_absent]) needs the flag alone. *)
+      iAssert (▷ (echo_pred γ r av ∗ echo_pred γ r' av))%I
+        with "[H Ha]" as "HH"; last first.
+      { iDestruct "HH" as "[H1 H2]". iModIntro. iFrame "H1". iExists r'.
+        iSplitL "H2"; [ iExact "H2" |].
+        rewrite /echo_boot. iLeft. rewrite /cons_key /r' /=. iExact "Hk". }
+      iNext. rewrite /echo_pred.
+      iDestruct "H" as "[#Ht | [%Hpins Hcs]]".
+      { iSplitR; [ by iLeft | by iLeft ]. }
+      rewrite /cons_state /cons_tok /cons_shot /cons_key /r' /=.
+      iDestruct "Hcs" as "[[%Hab Htok] | [Hc | Hc]]".
+      + iSplitL "Htok".
+        * iRight. iSplitR; [ by iPureIntro |]. iLeft.
+          iSplitR; [ by iPureIntro | iExact "Htok" ].
+        * iRight. iSplitR; [ by iPureIntro |]. iLeft.
+          iSplitR; [ by iPureIntro | iExact "Ha" ].
+      + iDestruct "Hc" as (i) "(%Hpr & _ & _)".
+        pose proof (cons_inum_present i av Hpr) as Hx. congruence.
+      + iDestruct "Hc" as (i) "(%Hpr & _ & _)".
+        pose proof (cons_inum_present i av Hpr) as Hx. congruence.
+    - (* THE CONSOLE IS THERE: /init gets the flag, off the fresh
+         authority's own lower bound, and the fresh key goes into the
+         copy's claim where the two PRESENT arms want it. *)
+      iDestruct (own_mono _ _ (◯ML ([i0] : list (leibnizO Z))) with "Ha")
+        as "#Hmade".
+      { etrans; [| apply (mono_list_included (DfracOwn 1))].
+        apply mono_list_lb_mono. by exists tl. }
+      iAssert (▷ (echo_pred γ r av ∗ echo_pred γ r' av))%I
+        with "[H Ha Hk]" as "HH"; last first.
+      { iDestruct "HH" as "[H1 H2]". iModIntro. iFrame "H1". iExists r'.
+        iSplitL "H2"; [ iExact "H2" |].
+        rewrite /echo_boot. iRight. iExists i0.
+        rewrite /cons_made /r' /=. iExact "Hmade". }
+      iNext. rewrite /echo_pred.
+      iDestruct "H" as "[#Ht | [%Hpins Hcs]]".
+      { iSplitR; [ by iLeft | by iLeft ]. }
+      rewrite /cons_state /cons_tok /cons_shot /cons_key /r' /=.
+      iDestruct "Hcs" as "[[%Hab Htok] | [Hc | Hc]]".
+      + pose proof (cons_inum_absent av Hab) as Hx. congruence.
+      + iDestruct "Hc" as (i) "(%Hpr & Hkey & Htok)".
+        pose proof (cons_inum_present i av Hpr) as Hx.
+        rewrite Hci in Hx. simplify_eq.
+        iSplitL "Htok Hkey".
+        * iRight. iSplitR; [ by iPureIntro |]. iRight. iLeft.
+          iExists _. iFrame "Hkey Htok". by iPureIntro.
+        * iRight. iSplitR; [ by iPureIntro |]. iRight. iRight.
+          iExists _. iFrame "Hk Ha". by iPureIntro.
+      + iDestruct "Hc" as (i) "(%Hpr & Hkey & Hsh)".
+        pose proof (cons_inum_present i av Hpr) as Hx.
+        rewrite Hci in Hx. simplify_eq.
+        iSplitL "Hsh Hkey".
+        * iRight. iSplitR; [ by iPureIntro |]. iRight. iRight.
+          iExists _. iFrame "Hkey Hsh". by iPureIntro.
+        * iRight. iSplitR; [ by iPureIntro |]. iRight. iRight.
+          iExists _. iFrame "Hk Ha". by iPureIntro.
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
   (*  3b.  THE SUPPLY, OFF THE TAINT (app-echo.md "ARM-c")              *)
   (* ---------------------------------------------------------------- *)
 
@@ -998,7 +1095,8 @@ Section EchoApp.
   Context `{!mono_natG Σ, !inG Σ (mono_listR (leibnizO Z))}.
 
   Definition app_echo : xv6_app Σ :=
-    MkApp echo_fixed echo_cl echo_names echo_pred echo_R echo_tag echo_phi.
+    MkApp echo_fixed echo_cl echo_names echo_pred echo_boot echo_R echo_tag
+          echo_phi.
 
   (* ---- THE BIRTH STEP ---- *)
   Lemma echo_Hbirth : ⊢ |==> ∃ c : app_fixed app_echo, app_cl app_echo c.
@@ -1036,8 +1134,11 @@ Section EchoApp.
      [uartGhostG] is what [uart_ghosts] reads; it is a MEMBER of [Xv6G.xv6G],
      which the theorem carries ambiently, so a binder here is what the
      theorem's own context supplies at the application site. *)
-  Lemma echo_Htx `{!uartGhostG Σ}
-      (HR : riscvGS Σ) (c : app_fixed app_echo) (γ : uart_names) :
+  Lemma echo_Htx `{!uartGhostG Σ} `{HF : !fileG Σ}
+      (HR : riscvGS Σ) (c : app_fixed app_echo) (r : app_names app_echo)
+      (γ : uart_names) :
+    @file_app Σ HF = MkAppcfg (app_names app_echo) (app_pred app_echo c) r ->
+    FsCfg.fsc_uart = γ ->
     ⊢ □ (∀ (h : list mobs) (b : bv 8) (u u' : uart_state),
            ⌜uart_tx_pop u = Some (b, u')⌝ -∗ ⌜uart_loopback u = false⌝ -∗
            ⌜trace_shape h true⌝ -∗ ⌜obs_wire (open_seg h) = u_wire u⌝ -∗
@@ -1045,14 +1146,18 @@ Section EchoApp.
              ={⊤ ∖ ↑uartN ∖ ↑obsN}=∗
            uart_ghosts γ u' ∗ app_R app_echo c (h ++ [ObsUartOut b])%list).
   Proof.
+    intros _ _.
     cbn [app_echo app_fixed app_R] in c |- *.
     iIntros "!>" (h b u u') "_ _ %Hsh _ Hg Hled".
     iMod (echo_R_tx c h b Hsh with "Hled") as "Hled".
     iModIntro. iFrame "Hg Hled".
   Qed.
 
-  Lemma echo_Hrx `{!uartGhostG Σ}
-      (HR : riscvGS Σ) (c : app_fixed app_echo) (γ : uart_names) :
+  Lemma echo_Hrx `{!uartGhostG Σ} `{HF : !fileG Σ}
+      (HR : riscvGS Σ) (c : app_fixed app_echo) (r : app_names app_echo)
+      (γ : uart_names) :
+    @file_app Σ HF = MkAppcfg (app_names app_echo) (app_pred app_echo c) r ->
+    FsCfg.fsc_uart = γ ->
     ⊢ □ (∀ (h : list mobs) (b : bv 8) (u u' : uart_state),
            ⌜uart_rx_push u b = Some u'⌝ -∗ ⌜trace_shape h true⌝ -∗
            uart_ghosts γ u' -∗ app_R app_echo c h
@@ -1060,13 +1165,23 @@ Section EchoApp.
            uart_ghosts γ u' ∗ app_R app_echo c (h ++ [ObsUartIn b])%list ∗
            app_tag app_echo c (h ++ [ObsUartIn b])%list).
   Proof.
+    intros _ _.
     cbn [app_echo app_fixed app_R app_tag] in c |- *.
     iIntros "!>" (h b u u') "_ %Hsh Hg Hled".
     iMod (echo_R_rx c h b Hsh with "Hled") as "[Hled Htag]".
     iModIntro. iFrame "Hg Hled Htag".
   Qed.
 
-  (* ---- THE TRANSPORT ---- *)
+  (* ---- THE TRANSPORT, WITH THE FIRST PROCESS'S BOOT RESOURCE ---- *)
+  Lemma echo_Happ_boot (c : app_fixed app_echo) :
+    ⊢ app_xfer_boot_raw (app_pred app_echo c) (app_boot app_echo c).
+  Proof.
+    cbn [app_echo app_fixed app_names app_pred app_boot] in c |- *.
+    exact (echo_xfer_boot c).
+  Qed.
+
+  (* ...and the old obligation, which the commit's law and the era mint
+     still take ([SystemAdequacy.app_xfer_raw_of_boot]) *)
   Lemma echo_Happ_xfer (c : app_fixed app_echo) :
     ⊢ app_xfer_raw (app_pred app_echo c).
   Proof.

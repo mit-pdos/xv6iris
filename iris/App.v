@@ -1,8 +1,10 @@
 (* App.v -- APPLICATIONS: the record, and the whole-system theorem at one.
 
-   Design of record: claude-notes/projects/app-instances.md (sections 0-2,
-   6, 7), superseding design/applications.md sections 1-3 while its rounds
-   land.  An application is a collection of user programs plus what it
+   Design of record: claude-notes/design/applications.md and the
+   application-side sections of claude-notes/projects/app-echo.md (the
+   "app-instances.md" this header used to cite does not exist; its round
+   and section numbers survive below as cross-references into those two).
+   An application is a collection of user programs plus what it
    claims -- a FIXED PART (section 6 ruling 1: a [Type] of its own, born
    once by its birth step and carried by the machine's record for the
    whole run), a predicate on the abstract file-system state's VIEW at the
@@ -126,6 +128,16 @@ Record xv6_app (Σ : gFunctors) := MkApp {
      at the fixed part, the era's [AppCfg.app_pred] *)
   app_names : Type;
   app_pred  : app_fixed -> app_names -> aview -> iProp Σ;
+  (* WHAT THE ERA'S INSTANCE IS BORN WITH BESIDE ITS CLAIM (lane APP-IFACE
+     item (a), review-echo-plan finding 6): the resource the FIRST PROCESS'S
+     proof is handed at [Hinit_boot] -- for the echo application, the
+     console-absence key /init carries from its first [open] to its [mknod].
+     LINEAR, so it cannot live inside the claim (a resource borrowed from
+     the claim has to go back) and cannot be persistent (then it would say
+     nothing); its producer is therefore the TRANSPORT, which is where the
+     era's instance is born ([Happ_boot]).  [emp] for an application that
+     wants nothing. *)
+  app_boot  : app_fixed -> app_names -> iProp Σ;
   (* the trace ledger, at the fixed part (section 4) *)
   app_R     : app_fixed -> list mobs -> iProp Σ;
   (* THE INPUT TAG (app-echo.md lane L5): what the application claims of a
@@ -137,15 +149,16 @@ Record xv6_app (Σ : gFunctors) := MkApp {
   (* the conclusion, over the operational state and the run's trace *)
   app_phi   : gstate -> list mobs -> Prop;
 }.
-Arguments MkApp {Σ} _ _ _ _ _ _ _.
+Arguments MkApp {Σ} _ _ _ _ _ _ _ _.
 Arguments app_fixed {Σ} _. Arguments app_cl {Σ} _ _.
 Arguments app_names {Σ} _. Arguments app_pred {Σ} _ _ _ _.
+Arguments app_boot {Σ} _ _ _.
 Arguments app_R {Σ} _ _ _. Arguments app_tag {Σ} _ _ _.
 Arguments app_phi {Σ} _ _ _.
 
 (* THE GENERIC APPLICATION: no fixed part, nothing claimed, nothing read *)
 Definition app_triv (Σ : gFunctors) : xv6_app Σ :=
-  MkApp unit (fun _ => True%I) unit (fun _ _ _ => True%I)
+  MkApp unit (fun _ => True%I) unit (fun _ _ _ => True%I) (fun _ _ => emp%I)
         (fun _ _ => emp%I) (fun _ _ => True%I) (fun _ _ => True).
 
 (* ---------------------------------------------------------------------- *)
@@ -181,14 +194,31 @@ Theorem xv6_app_adequacy Σ
     (* the two UART-arm wands, at any value of the fixed part: the era
        instance's [riscv_client] is the one the boot's record carries, and
        the record's client type is [app_fixed A] only at that literal *)
-    (Htx : forall (HR : riscvGS Σ) (c : app_fixed A) (γ : uart_names),
+    (* THE ERA IDENTIFICATION (lane APP-IFACE item (c), review-echo-plan
+       finding 3).  These two used to be quantified over an ARBITRARY
+       [γ : uart_names], so the ledger could learn nothing about THE ERA's
+       UART ghosts at an event -- and the whole output side rests on doing
+       exactly that ([SystemUartAccepted.v]'s header, app-echo.md O4).  They
+       are quantified over the ERA's [fileG] instead, with the two equations
+       the boot HAS and hands over: the era's application record, and
+       [fsc_uart] -- the [γ] every kernel-side UART fact of this era is
+       stated at.  This is [Hinit_boot]'s own shape, and it is not a new
+       assumption about the world: it NARROWS the wands' domain from every
+       [γ] to the era's. *)
+    (Htx : forall (HR : riscvGS Σ) `{HF : !fileG Σ}
+                  (c : app_fixed A) (r : app_names A) (γ : uart_names),
+       @file_app Σ HF = MkAppcfg (app_names A) (app_pred A c) r ->
+       FsCfg.fsc_uart = γ ->
        ⊢ □ (∀ (h : list mobs) (b : bv 8) (u u' : uart_state),
               ⌜uart_tx_pop u = Some (b, u')⌝ -∗ ⌜uart_loopback u = false⌝ -∗
               ⌜trace_shape h true⌝ -∗ ⌜obs_wire (open_seg h) = u_wire u⌝ -∗
               uart_ghosts γ u' -∗ app_R A c h
                 ={⊤ ∖ ↑uartN ∖ ↑obsN}=∗
               uart_ghosts γ u' ∗ app_R A c (h ++ [ObsUartOut b])%list))
-    (Hrx : forall (HR : riscvGS Σ) (c : app_fixed A) (γ : uart_names),
+    (Hrx : forall (HR : riscvGS Σ) `{HF : !fileG Σ}
+                  (c : app_fixed A) (r : app_names A) (γ : uart_names),
+       @file_app Σ HF = MkAppcfg (app_names A) (app_pred A c) r ->
+       FsCfg.fsc_uart = γ ->
        ⊢ □ (∀ (h : list mobs) (b : bv 8) (u u' : uart_state),
               ⌜uart_rx_push u b = Some u'⌝ -∗ ⌜trace_shape h true⌝ -∗
               uart_ghosts γ u' -∗ app_R A c h
@@ -200,7 +230,15 @@ Theorem xv6_app_adequacy Σ
        durability obligation -- a copy of the claim at fresh instance names,
        under the later every crossing hands it over at), the ERA-0 claim
        at the image's own abstract state, and the supply ---- *)
-    (Happ_xfer : forall c : app_fixed A, ⊢ app_xfer_raw (app_pred A c))
+    (* ...the TRANSPORT, which since lane APP-IFACE item (a) also hands the
+       clone its own BOOT RESOURCE ([app_xfer_raw_of_boot] is the old
+       obligation, and is what the commit's law and the era mint keep
+       taking).  The transport is the producer because the era's instance is
+       born there: the machine starts powered OFF, so every boot -- era 0's
+       included -- founds its file system from the PowerOn arm's clone, and
+       [Happ_init]'s instance never reaches one. *)
+    (Happ_boot : forall c : app_fixed A,
+       ⊢ app_xfer_boot_raw (app_pred A c) (app_boot A c))
     (Happ_init : forall c : app_fixed A,
        ⊢ |==> ∃ r : app_names A,
            app_pred A c r (abs_view (fss_inodes (FsDurImg.img_state
@@ -217,7 +255,16 @@ Theorem xv6_app_adequacy Σ
                 HPav : !pavG Σ, HWc : !wchG Σ, HF : !fileG Σ}
               (c : app_fixed A) (r : app_names A),
          @file_app Σ HF = MkAppcfg (app_names A) (app_pred A c) r ->
-         ⊢ AppInv.app_inv FsCfg.fsc_fs -∗
+         (* (b) THE RX-TAG EQUATION (lane APP-IFACE): the machine's ambient
+            input-tag family IS this application's.  A FACT about the
+            instance the theorem is taken at -- the [boot_fixedGS] literal
+            below fixes the field to [app_tag A c] -- not an assumption
+            about the world, and the premise a pinned <init> discharges
+            [UConsLine.ush_tag_law] from. *)
+         riscv_rx_tag = app_tag A c ->
+         (* ...and (a) THE BOOT RESOURCE, LINEARLY, at the instance the
+            record equation names *)
+         ⊢ AppInv.app_inv FsCfg.fsc_fs -∗ app_boot A c r -∗
            |==> init_boot_bundle (bv_unsigned InodeInv.ROOTINO) fdt0)
     (* ---- the conclusion's proof, at the end of the run: it holds the
        COMPOSITE crash slot ([SystemAdequacy.xv6_slot]: the file system's
@@ -247,7 +294,8 @@ Proof.
   (* the permit at the ledger: the application's two wands, at the record
      the era boots over -- where [riscv_client] IS the fixed part the
      ledger was born with, by iota once the record's shape is destructed *)
-  assert (Hperm : forall (HR : riscvGS Σ) (GEN : GenId) (γ : uart_names),
+  assert (Hperm : forall (HR : riscvGS Σ) (GEN : GenId) (HF : fileG Σ)
+                         (r : app_names A) (γ : uart_names),
       (exists (Hinv : invGS Σ) (γgen γstart γreg γd γsw γobs γhist : gname)
               (c : app_fixed A) (T : list mobs),
          riscv_fixedGS =
@@ -255,17 +303,21 @@ Proof.
              (xv6_slot (app_names A) (app_pred A) cov (FsImg.sb_logstart sb)
                 γd γsw γreg γstart c)
              γobs T (obs_ledger_at (app_R A c) γobs) γhist
-             (app_tag A c) (Htagp c) (Htagt c) (app_fixed A) c) ->
+             (app_tag A c) (Htagp c) (Htagt c) (app_fixed A) c
+         /\ @file_app Σ HF = MkAppcfg (app_names A) (app_pred A c) r
+         /\ FsCfg.fsc_uart = γ) ->
       ⊢ obs_inv -∗ uart_obs_permit γ).
-  { intros HRg GEN γ (Hi & Gg & Gs & Gr & Gt & Gsw & Gob & Ghist & Gcl & GT & Heq).
+  { intros HRg GEN HFi ri γ
+      (Hi & Gg & Gs & Gr & Gt & Gsw & Gob & Ghist & Gcl & GT & Heq & Happ & Huart).
     refine (uart_obs_permit_ledger (app_R A Gcl) (app_tag A Gcl) γ (HRt Gcl)
-              _ _ (Htx HRg Gcl γ) (Hrx HRg Gcl γ));
+              _ _ (Htx HRg HFi Gcl ri γ Happ Huart)
+                  (Hrx HRg HFi Gcl ri γ Happ Huart));
       rewrite Heq; reflexivity. }
   exact (xv6_power_adequacy_gen Σ g sb nib cov
            (app_fixed A) (app_cl A) Hbirth
-           (app_names A) (app_pred A) Happ_xfer Happ_init Hinit_boot
+           (app_names A) (app_pred A) (app_boot A) Happ_boot Happ_init
+           (app_tag A) Htagp Htagt Hinit_boot
            (fun γobs c => obs_ledger_at (app_R A c) γobs)
-           (app_tag A) Htagp Htagt
            (fun γobs c =>
               obs_ledger_at_alloc_cl (app_R A c) γobs (app_cl A c) (HR0 c))
            (fun γd γobs c =>
@@ -290,11 +342,12 @@ Section AppTriv.
     iExists (). iPureIntro. exact Logic.I.
   Qed.
 
-  (* the transport: a predicate that holds of every view is its own copy *)
+  (* the transport: a predicate that holds of every view is its own copy,
+     and the generic application hands its first process nothing *)
   Lemma app_triv_xfer (c : app_fixed (app_triv Σ)) :
-    ⊢ app_xfer_raw (app_pred (app_triv Σ) c).
+    ⊢ app_xfer_boot_raw (app_pred (app_triv Σ) c) (app_boot (app_triv Σ) c).
   Proof.
-    cbn [app_triv app_pred]. apply app_xfer_raw_triv.
+    cbn [app_triv app_pred app_boot]. apply app_xfer_boot_raw_triv.
     intros r av. reflexivity.
   Qed.
 
@@ -323,10 +376,11 @@ Section AppTriv.
       (c : app_fixed (app_triv Σ)) (r : app_names (app_triv Σ)) :
     @file_app Σ HF
       = MkAppcfg (app_names (app_triv Σ)) (app_pred (app_triv Σ) c) r ->
-    ⊢ AppInv.app_inv FsCfg.fsc_fs -∗
+    riscv_rx_tag = app_tag (app_triv Σ) c ->
+    ⊢ AppInv.app_inv FsCfg.fsc_fs -∗ app_boot (app_triv Σ) c r -∗
       |==> init_boot_bundle (bv_unsigned InodeInv.ROOTINO) fdt0.
   Proof.
-    intros Heq. iIntros "_". iModIntro.
+    intros Heq _. iIntros "_ _". iModIntro.
     (* the rewrite goes BEFORE the [intros]: [r'] is typed at
        [app_names file_app], so rewriting under it is a dependent rewrite *)
     iApply init_boot_of_triv. rewrite Heq. intros r' av.
@@ -365,9 +419,9 @@ Proof.
            ltac:(intros c h; cbn [app_triv app_tag]; apply _)
            app_triv_R0
            ltac:(intros c h on dk _; cbn [app_triv app_R]; iIntros "_"; by iModIntro)
-           ltac:(intros HR c γ; cbn [app_triv app_R];
+           ltac:(intros HR HFi c r γ _ _; cbn [app_triv app_R];
                  iIntros "!>" (h b u u') "_ _ _ _ Hg _"; iModIntro; by iFrame "Hg")
-           ltac:(intros HR c γ; cbn [app_triv app_R app_tag];
+           ltac:(intros HR HFi c r γ _ _; cbn [app_triv app_R app_tag];
                  iIntros "!>" (h b u u') "_ _ Hg _"; iModIntro;
                  iFrame "Hg"; auto)
            app_triv_xfer
