@@ -316,13 +316,13 @@ Section ProofConsputc.
        rather than bridging a raw fact afterward. *)
     destruct (eq_vec (rget W3 a0_idx) (rget W3 a5_idx)) eqn:Hbs.
     - (* ============ BACKSPACE arm: '\b', ' ', '\b' ============ *)
-      iApply (wp_beq_taken_s_sconf (mword_of_int (KernelSyms.consputc + 0x0c)) (mword_of_int 16 : mword 13) a5_idx a0_idx
+      iApply (wp_beq_taken_s_sconf (mword_of_int (KernelSyms.consputc + 0x0c)) (mword_of_int 20 : mword 13) a5_idx a0_idx
                 W3 (K - 2)%nat b ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) Hbs
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (cpi_0c with "Htext"). }
       iApply bi.later_intro. iIntros (CIDta Hsta) "Hcg Hpc".
-      assert (Htgt1c : add_vec (mword_of_int (KernelSyms.consputc + 0x0c) : mword 64) (sign_extend' 64 (mword_of_int 16 : mword 13)) = mword_of_int (KernelSyms.consputc + 0x1c)) by (apply bv_eq; vm_compute; reflexivity).
+      assert (Htgt1c : add_vec (mword_of_int (KernelSyms.consputc + 0x0c) : mword 64) (sign_extend' 64 (mword_of_int 20 : mword 13)) = mword_of_int (KernelSyms.consputc + 0x1c)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgt1c) in "Hpc".
       (* +0x1c c.li a0,8 *)
       iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.consputc + 0x1c)) a0_idx (mword_of_int 8 : mword 6)
@@ -461,7 +461,7 @@ Section ProofConsputc.
       { rewrite Hbseq HT2a0 HT4a0 HT6a0 !cp_byte_sb cp_byte_bs1 cp_byte_bs2.
         reflexivity. }
     - (* ============ ordinary arm: uartputc_sync(c) ============ *)
-      iApply (wp_beq_fall_s_sconf (mword_of_int (KernelSyms.consputc + 0x0c)) (mword_of_int 16 : mword 13) a5_idx a0_idx
+      iApply (wp_beq_fall_s_sconf (mword_of_int (KernelSyms.consputc + 0x0c)) (mword_of_int 20 : mword 13) a5_idx a0_idx
                 W3 (K - 2)%nat b ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) Hbs
                 with "Hcg Hpc []").
       { iApply (cpi_0c with "Htext"). }

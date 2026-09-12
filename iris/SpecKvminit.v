@@ -27,7 +27,7 @@ Require Import TsoCtx.
 
 (* kvminit(): kvmmake() then store its result into the global
    [kernel_pagetable] cell (an identity 8-byte word at
-   KernelSyms.kernel_pagetable = 0x8000a238; pre = arbitrary [kpt0], post = the
+   KernelSyms.kernel_pagetable = 0x8000a338; pre = arbitrary [kpt0], post = the
    root page's byte address).  COUNTED-ONLY like kvmmake (boot-only, STRICT
    budget premise ⌜166 < nb⌝ -- see SpecKvmmake's spare-page note), so
    unconditional success, NO panic credential.  This is THE deliverable: the verified

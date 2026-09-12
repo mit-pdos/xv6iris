@@ -896,7 +896,7 @@ Section UtRet.
     { iDestruct "Hcaps" as "(_ & _ & #H & _)". iExact "H". }
     (* ---- +0xae: jal prepare_return ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (UT + 0xae)) Rra
-              (mword_of_int 2096658 : mword 21) m nx b
+              (mword_of_int 2096642 : mword 21) m nx b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc [] [-]").
     { iApply (uti_0ae with "Htext"). }
@@ -906,7 +906,7 @@ Section UtRet.
     change (<[Regidx Rra := regval_into_reg
                (add_vec_int (mword_of_int (UT + 0xae) : mword 64) 4)]> m) with M1.
     assert (Hentry : add_vec (mword_of_int (UT + 0xae) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2096658 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2096642 : mword 21))
                      = mword_of_int KernelSyms.prepare_return) by pcw.
     iEval (rewrite Hentry) in "Hpc".
     assert (HM1sp : M1 !!! Regidx csp_rs1 = pa_stk ksp 4)
@@ -1203,7 +1203,7 @@ Section UtA6.
       by (rewrite /M1; apply ut_cs_insert; [vm_compute; reflexivity | exact Hcs]).
     (* ---- +0xa8: jal killed ---- *)
     iApply (wp_jal_s_sconf (CID := CID1) (mword_of_int (UT + 0xa8)) Rra
-              (mword_of_int 2095870 : mword 21) M1 nx b
+              (mword_of_int 2095854 : mword 21) M1 nx b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc [] [-]").
     { iApply (uti_0a8 with "Htext"). }
@@ -1213,7 +1213,7 @@ Section UtA6.
     change (<[Regidx Rra := regval_into_reg
                (add_vec_int (mword_of_int (UT + 0xa8) : mword 64) 4)]> M1) with M2.
     assert (Hkilled : add_vec (mword_of_int (UT + 0xa8) : mword 64)
-                        (sign_extend' 64 (mword_of_int 2095870 : mword 21))
+                        (sign_extend' 64 (mword_of_int 2095854 : mword 21))
                       = mword_of_int KernelSyms.killed) by pcw.
     iEval (rewrite Hkilled) in "Hpc".
     assert (HM2a0 : M2 !!! Regidx Ra0 = proc_addr (un_j N))
@@ -1312,13 +1312,13 @@ Section UtA6.
       iEval (rewrite Hpf8) in "Hpc".
       (* +0xf8 jal kexit *)
       iApply (wp_jal_s_sconf (CID := CID6) (mword_of_int (UT + 0xf8)) Rra
-                (mword_of_int 2095486 : mword 21) K2 nx b
+                (mword_of_int 2095470 : mword 21) K2 nx b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc [] [-]").
       { iApply (uti_0f8 with "Htext"). }
       iIntros (CID7 Hk7) "Hcg Hpc".
       assert (Hkex : add_vec (mword_of_int (UT + 0xf8) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2095486 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2095470 : mword 21))
                      = mword_of_int KernelSyms.kexit) by pcw.
       iEval (rewrite Hkex) in "Hpc".
       iDestruct (cpu_own_transport CID3 CID7 0%nat b (un_pj N) b
@@ -1590,7 +1590,7 @@ Section UtFa.
       iEval (rewrite Hp102) in "Hpc".
       (* +0x102 jal yield *)
       iApply (wp_jal_s_sconf (CID := CID2) (mword_of_int (UT + 0x102)) Rra
-                (mword_of_int 2095136 : mword 21) M1 nx b
+                (mword_of_int 2095120 : mword 21) M1 nx b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc [] [-]").
       { iApply (uti_102 with "Htext"). }
@@ -1601,7 +1601,7 @@ Section UtFa.
                  (add_vec_int (mword_of_int (UT + 0x102) : mword 64) 4)]> M1)
         with M2.
       assert (Hyield : add_vec (mword_of_int (UT + 0x102) : mword 64)
-                         (sign_extend' 64 (mword_of_int 2095136 : mword 21))
+                         (sign_extend' 64 (mword_of_int 2095120 : mword 21))
                        = mword_of_int KernelSyms.yield) by pcw.
       iEval (rewrite Hyield) in "Hpc".
       assert (HM2sp : M2 !!! Regidx csp_rs1 = pa_stk ksp 4)

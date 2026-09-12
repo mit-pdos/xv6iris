@@ -1777,7 +1777,7 @@ Section ReadiLoop.
           iSplitL "Hp"; [iExact "Hp"|]. iExact "Hr". }
       (* ===== +0x60 jal ra,either_copyout ===== *)
       iApply (wp_jal_s_sconf (mword_of_int (RI + 0x60)) Rra
-                (mword_of_int 2092096 : mword 21) D7 (K - 14)%nat b
+                (mword_of_int 2092080 : mword 21) D7 (K - 14)%nat b
                 ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (rdi_060 with "Htext"). }
@@ -1785,7 +1785,7 @@ Section ReadiLoop.
       set (D8 := <[Regidx Rra := regval_into_reg
                     (add_vec_int (mword_of_int (RI + 0x60) : mword 64) 4)]> D7).
       assert (Htgtec : add_vec (mword_of_int (RI + 0x60) : mword 64)
-                         (sign_extend' 64 (mword_of_int 2092096 : mword 21))
+                         (sign_extend' 64 (mword_of_int 2092080 : mword 21))
                        = mword_of_int KernelSyms.either_copyout) by pcw.
       iEval (rewrite Htgtec) in "Hpc".
       assert (HD8ra : D8 !!! Regidx Rra

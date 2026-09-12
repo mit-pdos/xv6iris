@@ -17,15 +17,15 @@ Require Import WpMmodeLeafBase.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import KernelDecode01.
+Require Import KernelDecode03.
 Require Import KernelDecode06.
 Require Import KernelDecode07.
-Require Import KernelDecode10.
 Require Import KernelDecode11.
 Require Import KernelDecode13.
 Require Import KernelDecode14.
 Require Import KernelDecode16.
-Require Import KernelDecode21.
 Require Import KernelDecode24.
+Require Import KernelDecode27.
 Require Import KernelDecode31.
 Local Open Scope Z_scope.
 Import Defs.
@@ -53,17 +53,17 @@ Section CodeKvminit.
   Proof. mk_rvc (KernelSyms.kvminit + 0x6) (mword_of_int 0x0800 : mword 16)
     (mword_of_int (KernelSyms.kvminit + 0x6) : mword 64) (ITYPE (caddi4spn_imm (mword_of_int 4 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)) kd_0800 exec_execute_C_ADDI4SPN. Qed.
 
-  Lemma kii_08 : kernel_text -∗ instr (mword_of_int (KernelSyms.kvminit + 0x8) : mword 64) false (JAL (mword_of_int 2096970 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.kvminit + 0x8) (mword_of_int 0xf4bff0ef : mword 32)
-    (mword_of_int (KernelSyms.kvminit + 0x8) : mword 64) (JAL (mword_of_int 2096970 : mword 21, Regidx (mword_of_int 1))) kd_f4bff0ef. Qed.
+  Lemma kii_08 : kernel_text -∗ instr (mword_of_int (KernelSyms.kvminit + 0x8) : mword 64) false (JAL (mword_of_int 2096954 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.kvminit + 0x8) (mword_of_int 0xf3bff0ef : mword 32)
+    (mword_of_int (KernelSyms.kvminit + 0x8) : mword 64) (JAL (mword_of_int 2096954 : mword 21, Regidx (mword_of_int 1))) kd_f3bff0ef. Qed.
 
   Lemma kii_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.kvminit + 0xc) : mword 64) false (UTYPE (mword_of_int 9 : mword 20, Regidx (mword_of_int 15), AUIPC)).
   Proof. mk_base (KernelSyms.kvminit + 0xc) (mword_of_int 0x00009797 : mword 32)
     (mword_of_int (KernelSyms.kvminit + 0xc) : mword 64) (UTYPE (mword_of_int 9 : mword 20, Regidx (mword_of_int 15), AUIPC)) kd_00009797. Qed.
 
-  Lemma kii_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.kvminit + 0x10) : mword 64) false (STORE (mword_of_int 266 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 15), 8)).
-  Proof. mk_base (KernelSyms.kvminit + 0x10) (mword_of_int 0x10a7b523 : mword 32)
-    (mword_of_int (KernelSyms.kvminit + 0x10) : mword 64) (STORE (mword_of_int 266 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 15), 8)) kd_10a7b523. Qed.
+  Lemma kii_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.kvminit + 0x10) : mword 64) false (STORE (mword_of_int 270 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 15), 8)).
+  Proof. mk_base (KernelSyms.kvminit + 0x10) (mword_of_int 0x10a7b723 : mword 32)
+    (mword_of_int (KernelSyms.kvminit + 0x10) : mword 64) (STORE (mword_of_int 270 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 15), 8)) kd_10a7b723. Qed.
 
   Lemma kii_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.kvminit + 0x14) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
   Proof. mk_rvc (KernelSyms.kvminit + 0x14) (mword_of_int 0x60a2 : mword 16)

@@ -167,8 +167,8 @@ Proof. reflexivity. Qed.
 (*  (2) THE TWO NAME LITERALS                                             *)
 (* ===================================================================== *)
 
-Definition cr_dot_addr : Z := 0x800075d0.
-Definition cr_dotdot_addr : Z := 0x800075d8.
+Definition cr_dot_addr : Z := 0x800075e8.
+Definition cr_dotdot_addr : Z := 0x800075f0.
 
 (* the fourteen bytes each window actually holds, read off
    kernel-rocq/KernelData.v.  "." 's window runs into ".." (bytes 8 and 9)

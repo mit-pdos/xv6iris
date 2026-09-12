@@ -16,7 +16,7 @@ Require Import KernelText.
 Require Import WpMmodeLeafBase.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
-Require Import KernelDecode00.
+Require Import KernelDecode01.
 Require Import KernelDecode04.
 Require Import KernelDecode10.
 Require Import KernelDecode12.
@@ -68,9 +68,9 @@ Section CodeYield.
   Proof. mk_rvc (KernelSyms.yield + 0xe) (mword_of_int 0x84aa : mword 16)
     (mword_of_int (KernelSyms.yield + 0xe) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 9), ADD)) kd_84aa exec_execute_C_MV. Qed.
 
-  Lemma ydi_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.yield + 0x10) : mword 64) false (JAL (mword_of_int 2092206 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.yield + 0x10) (mword_of_int 0xcaffe0ef : mword 32)
-    (mword_of_int (KernelSyms.yield + 0x10) : mword 64) (JAL (mword_of_int 2092206 : mword 21, Regidx (mword_of_int 1))) kd_caffe0ef. Qed.
+  Lemma ydi_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.yield + 0x10) : mword 64) false (JAL (mword_of_int 2092190 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.yield + 0x10) (mword_of_int 0xc9ffe0ef : mword 32)
+    (mword_of_int (KernelSyms.yield + 0x10) : mword 64) (JAL (mword_of_int 2092190 : mword 21, Regidx (mword_of_int 1))) kd_c9ffe0ef. Qed.
 
   Lemma ydi_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.yield + 0x14) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 3 : mword 6), zreg, Regidx (mword_of_int 15), ADDI)).
   Proof. mk_rvc (KernelSyms.yield + 0x14) (mword_of_int 0x478d : mword 16)
@@ -88,9 +88,9 @@ Section CodeYield.
   Proof. mk_rvc (KernelSyms.yield + 0x1c) (mword_of_int 0x8526 : mword 16)
     (mword_of_int (KernelSyms.yield + 0x1c) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) kd_8526 exec_execute_C_MV. Qed.
 
-  Lemma ydi_1e : kernel_text -∗ instr (mword_of_int (KernelSyms.yield + 0x1e) : mword 64) false (JAL (mword_of_int 2092328 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.yield + 0x1e) (mword_of_int 0xd29fe0ef : mword 32)
-    (mword_of_int (KernelSyms.yield + 0x1e) : mword 64) (JAL (mword_of_int 2092328 : mword 21, Regidx (mword_of_int 1))) kd_d29fe0ef. Qed.
+  Lemma ydi_1e : kernel_text -∗ instr (mword_of_int (KernelSyms.yield + 0x1e) : mword 64) false (JAL (mword_of_int 2092312 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.yield + 0x1e) (mword_of_int 0xd19fe0ef : mword 32)
+    (mword_of_int (KernelSyms.yield + 0x1e) : mword 64) (JAL (mword_of_int 2092312 : mword 21, Regidx (mword_of_int 1))) kd_d19fe0ef. Qed.
 
   Lemma ydi_22 : kernel_text -∗ instr (mword_of_int (KernelSyms.yield + 0x22) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
   Proof. mk_rvc (KernelSyms.yield + 0x22) (mword_of_int 0x60e2 : mword 16)

@@ -302,7 +302,7 @@ Section ProofSysExit.
     assert (Hpp16 : add_vec_int (mword_of_int (SE + 0x12) : mword 64) 4 = mword_of_int (SE + 0x16)) by pcstep.
     iEval (rewrite Hpp16) in "Hpc".
     (* +0x16 jal ra,kexit *)
-    iApply (wp_jal_s_sconf (mword_of_int (SE + 0x16)) Rra (mword_of_int 2094870 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (SE + 0x16)) Rra (mword_of_int 2094854 : mword 21)
               B1 (av - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
@@ -326,7 +326,7 @@ Section ProofSysExit.
     assert (Hix : (trap_res b + av - 4)%nat = (trap_res b + (av - 4))%nat) by lia.
     iEval (rewrite Hix -HB2sp) in "Hcl4".
     assert (Hjke : add_vec (mword_of_int (SE + 0x16) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2094870 : mword 21)) = mword_of_int KernelSyms.kexit)
+                     (sign_extend' 64 (mword_of_int 2094854 : mword 21)) = mword_of_int KernelSyms.kexit)
       by pcstep.
     iEval (rewrite Hjke) in "Hpc".
     (* ===================== kexit(n) -- DIVERGES ===================== *)

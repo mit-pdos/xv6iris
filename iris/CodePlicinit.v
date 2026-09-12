@@ -26,6 +26,7 @@ Require Import KernelDecode13.
 Require Import KernelDecode14.
 Require Import KernelDecode22.
 Require Import KernelDecode24.
+Require Import KernelDecode28.
 Require Import KernelDecode29.
 Require Import KernelDecode31.
 Local Open Scope Z_scope.
@@ -36,7 +37,7 @@ Section CodePlicinit.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  (* ---- plicinit @ KernelSyms.plicinit, 26 bytes ---- *)
+  (* ---- plicinit @ KernelSyms.plicinit, 28 bytes ---- *)
 
   Lemma pi_00 : kernel_text -∗ instr (mword_of_int KernelSyms.plicinit : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 48 : mword 6), Regidx (mword_of_int 2), Regidx (mword_of_int 2), ADDI)).
   Proof. mk_rvc KernelSyms.plicinit (mword_of_int 0x1141 : mword 16)
@@ -66,24 +67,28 @@ Section CodePlicinit.
   Proof. mk_rvc (KernelSyms.plicinit + 0xe) (mword_of_int 0xd71c : mword 16)
     (mword_of_int (KernelSyms.plicinit + 0xe) : mword 64) (STORE (mword_of_int 40 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 14), 4)) kd_d71c ke_d71c. Qed.
 
-  Lemma pi_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.plicinit + 0x10) : mword 64) true (STORE (mword_of_int 4 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 14), 4)).
-  Proof. mk_rvc (KernelSyms.plicinit + 0x10) (mword_of_int 0xc35c : mword 16)
-    (mword_of_int (KernelSyms.plicinit + 0x10) : mword 64) (STORE (mword_of_int 4 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 14), 4)) kd_c35c ke_c35c. Qed.
+  Lemma pi_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.plicinit + 0x10) : mword 64) true (STORE (mword_of_int 48 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 14), 4)).
+  Proof. mk_rvc (KernelSyms.plicinit + 0x10) (mword_of_int 0xdb1c : mword 16)
+    (mword_of_int (KernelSyms.plicinit + 0x10) : mword 64) (STORE (mword_of_int 48 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 14), 4)) kd_db1c ke_db1c. Qed.
 
-  Lemma pi_12 : kernel_text -∗ instr (mword_of_int (KernelSyms.plicinit + 0x12) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
-  Proof. mk_rvc (KernelSyms.plicinit + 0x12) (mword_of_int 0x60a2 : mword 16)
-    (mword_of_int (KernelSyms.plicinit + 0x12) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)) kd_60a2 exec_execute_C_LDSP. Qed.
+  Lemma pi_12 : kernel_text -∗ instr (mword_of_int (KernelSyms.plicinit + 0x12) : mword 64) true (STORE (mword_of_int 4 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 14), 4)).
+  Proof. mk_rvc (KernelSyms.plicinit + 0x12) (mword_of_int 0xc35c : mword 16)
+    (mword_of_int (KernelSyms.plicinit + 0x12) : mword 64) (STORE (mword_of_int 4 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 14), 4)) kd_c35c ke_c35c. Qed.
 
-  Lemma pi_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.plicinit + 0x14) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)).
-  Proof. mk_rvc (KernelSyms.plicinit + 0x14) (mword_of_int 0x6402 : mword 16)
-    (mword_of_int (KernelSyms.plicinit + 0x14) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)) kd_6402 exec_execute_C_LDSP. Qed.
+  Lemma pi_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.plicinit + 0x14) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
+  Proof. mk_rvc (KernelSyms.plicinit + 0x14) (mword_of_int 0x60a2 : mword 16)
+    (mword_of_int (KernelSyms.plicinit + 0x14) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)) kd_60a2 exec_execute_C_LDSP. Qed.
 
-  Lemma pi_16 : kernel_text -∗ instr (mword_of_int (KernelSyms.plicinit + 0x16) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 16 : mword 6), Regidx (mword_of_int 2), Regidx (mword_of_int 2), ADDI)).
-  Proof. mk_rvc (KernelSyms.plicinit + 0x16) (mword_of_int 0x0141 : mword 16)
-    (mword_of_int (KernelSyms.plicinit + 0x16) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 16 : mword 6), Regidx (mword_of_int 2), Regidx (mword_of_int 2), ADDI)) kd_0141 exec_execute_C_ADDI. Qed.
+  Lemma pi_16 : kernel_text -∗ instr (mword_of_int (KernelSyms.plicinit + 0x16) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)).
+  Proof. mk_rvc (KernelSyms.plicinit + 0x16) (mword_of_int 0x6402 : mword 16)
+    (mword_of_int (KernelSyms.plicinit + 0x16) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)) kd_6402 exec_execute_C_LDSP. Qed.
 
-  Lemma pi_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.plicinit + 0x18) : mword 64) true (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).
-  Proof. mk_rvc (KernelSyms.plicinit + 0x18) (mword_of_int 0x8082 : mword 16)
-    (mword_of_int (KernelSyms.plicinit + 0x18) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) kd_8082 exec_execute_C_JR. Qed.
+  Lemma pi_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.plicinit + 0x18) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 16 : mword 6), Regidx (mword_of_int 2), Regidx (mword_of_int 2), ADDI)).
+  Proof. mk_rvc (KernelSyms.plicinit + 0x18) (mword_of_int 0x0141 : mword 16)
+    (mword_of_int (KernelSyms.plicinit + 0x18) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 16 : mword 6), Regidx (mword_of_int 2), Regidx (mword_of_int 2), ADDI)) kd_0141 exec_execute_C_ADDI. Qed.
+
+  Lemma pi_1a : kernel_text -∗ instr (mword_of_int (KernelSyms.plicinit + 0x1a) : mword 64) true (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).
+  Proof. mk_rvc (KernelSyms.plicinit + 0x1a) (mword_of_int 0x8082 : mword 16)
+    (mword_of_int (KernelSyms.plicinit + 0x1a) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) kd_8082 exec_execute_C_JR. Qed.
 
 End CodePlicinit.

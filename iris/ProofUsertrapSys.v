@@ -192,7 +192,7 @@ Section UtSysBlock.
     { iDestruct "Hcaps" as "(_ & _ & _ & _ & _ & $ & _)". }
     (* ---- +0x90: jal killed ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (UT + 0x90)) Rra
-              (mword_of_int 2095894 : mword 21) m nx false
+              (mword_of_int 2095878 : mword 21) m nx false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc [] [-]").
     { iApply (uti_090 with "Htext"). }
@@ -202,7 +202,7 @@ Section UtSysBlock.
     change (<[Regidx Rra := regval_into_reg
                (add_vec_int (mword_of_int (UT + 0x90) : mword 64) 4)]> m) with M1.
     assert (Hkilled : add_vec (mword_of_int (UT + 0x90) : mword 64)
-                        (sign_extend' 64 (mword_of_int 2095894 : mword 21))
+                        (sign_extend' 64 (mword_of_int 2095878 : mword 21))
                       = mword_of_int KernelSyms.killed) by pcw.
     iEval (rewrite Hkilled) in "Hpc".
     assert (HM1sp : M1 !!! Regidx csp_rs1 = pa_stk ksp 4)
@@ -271,13 +271,13 @@ Section UtSysBlock.
       iEval (rewrite Hpca) in "Hpc".
       (* +0xca jal kexit *)
       iApply (wp_jal_s_sconf (mword_of_int (UT + 0xca)) Rra
-                (mword_of_int 2095532 : mword 21) K1 nx false
+                (mword_of_int 2095516 : mword 21) K1 nx false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc [] [-]").
       { iApply (uti_0ca with "Htext"). }
       iApply wp_next_off_intro. iIntros "Hcg Hpc".
       assert (Hkex : add_vec (mword_of_int (UT + 0xca) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2095532 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2095516 : mword 21))
                      = mword_of_int KernelSyms.kexit) by pcw.
       iEval (rewrite Hkex) in "Hpc".
       (* ---- THE DYING THREAD'S STACK CLOSER, BUILT HERE.  usertrap was

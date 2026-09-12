@@ -22,7 +22,7 @@ Require Import KernelDecode03.
 Require Import KernelDecode04.
 Require Import KernelDecode06.
 Require Import KernelDecode07.
-Require Import KernelDecode08.
+Require Import KernelDecode09.
 Require Import KernelDecode10.
 Require Import KernelDecode11.
 Require Import KernelDecode12.
@@ -71,9 +71,9 @@ Section CodeSyscall.
   Proof. mk_rvc (KernelSyms.syscall + 0xa) (mword_of_int 0x1000 : mword 16)
     (mword_of_int (KernelSyms.syscall + 0xa) : mword 64) (ITYPE (caddi4spn_imm (mword_of_int 8 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)) kd_1000 exec_execute_C_ADDI4SPN. Qed.
 
-  Lemma syci_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.syscall + 0xc) : mword 64) false (JAL (mword_of_int 2093070 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.syscall + 0xc) (mword_of_int 0x80eff0ef : mword 32)
-    (mword_of_int (KernelSyms.syscall + 0xc) : mword 64) (JAL (mword_of_int 2093070 : mword 21, Regidx (mword_of_int 1))) kd_80eff0ef. Qed.
+  Lemma syci_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.syscall + 0xc) : mword 64) false (JAL (mword_of_int 2093054 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.syscall + 0xc) (mword_of_int 0xffffe0ef : mword 32)
+    (mword_of_int (KernelSyms.syscall + 0xc) : mword 64) (JAL (mword_of_int 2093054 : mword 21, Regidx (mword_of_int 1))) kd_ffffe0ef. Qed.
 
   Lemma syci_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.syscall + 0x10) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 9), ADD)).
   Proof. mk_rvc (KernelSyms.syscall + 0x10) (mword_of_int 0x84aa : mword 16)
@@ -111,9 +111,9 @@ Section CodeSyscall.
   Proof. mk_base (KernelSyms.syscall + 0x2a) (mword_of_int 0x00005797 : mword 32)
     (mword_of_int (KernelSyms.syscall + 0x2a) : mword 64) (UTYPE (mword_of_int 5 : mword 20, Regidx (mword_of_int 15), AUIPC)) kd_00005797. Qed.
 
-  Lemma syci_2e : kernel_text -∗ instr (mword_of_int (KernelSyms.syscall + 0x2e) : mword 64) false (ITYPE (mword_of_int 3764 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)).
-  Proof. mk_base (KernelSyms.syscall + 0x2e) (mword_of_int 0xeb478793 : mword 32)
-    (mword_of_int (KernelSyms.syscall + 0x2e) : mword 64) (ITYPE (mword_of_int 3764 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)) kd_eb478793. Qed.
+  Lemma syci_2e : kernel_text -∗ instr (mword_of_int (KernelSyms.syscall + 0x2e) : mword 64) false (ITYPE (mword_of_int 3568 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)).
+  Proof. mk_base (KernelSyms.syscall + 0x2e) (mword_of_int 0xdf078793 : mword 32)
+    (mword_of_int (KernelSyms.syscall + 0x2e) : mword 64) (ITYPE (mword_of_int 3568 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)) kd_df078793. Qed.
 
   Lemma syci_32 : kernel_text -∗ instr (mword_of_int (KernelSyms.syscall + 0x32) : mword 64) true (RTYPE (Regidx (mword_of_int 14), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADD)).
   Proof. mk_rvc (KernelSyms.syscall + 0x32) (mword_of_int 0x97ba : mword 16)
@@ -151,13 +151,13 @@ Section CodeSyscall.
   Proof. mk_base (KernelSyms.syscall + 0x46) (mword_of_int 0x00005517 : mword 32)
     (mword_of_int (KernelSyms.syscall + 0x46) : mword 64) (UTYPE (mword_of_int 5 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00005517. Qed.
 
-  Lemma syci_4a : kernel_text -∗ instr (mword_of_int (KernelSyms.syscall + 0x4a) : mword 64) false (ITYPE (mword_of_int 2712 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.syscall + 0x4a) (mword_of_int 0xa9850513 : mword 32)
-    (mword_of_int (KernelSyms.syscall + 0x4a) : mword 64) (ITYPE (mword_of_int 2712 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_a9850513. Qed.
+  Lemma syci_4a : kernel_text -∗ instr (mword_of_int (KernelSyms.syscall + 0x4a) : mword 64) false (ITYPE (mword_of_int 2516 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.syscall + 0x4a) (mword_of_int 0x9d450513 : mword 32)
+    (mword_of_int (KernelSyms.syscall + 0x4a) : mword 64) (ITYPE (mword_of_int 2516 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_9d450513. Qed.
 
-  Lemma syci_4e : kernel_text -∗ instr (mword_of_int (KernelSyms.syscall + 0x4e) : mword 64) false (JAL (mword_of_int 2087954 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.syscall + 0x4e) (mword_of_int 0xc13fd0ef : mword 32)
-    (mword_of_int (KernelSyms.syscall + 0x4e) : mword 64) (JAL (mword_of_int 2087954 : mword 21, Regidx (mword_of_int 1))) kd_c13fd0ef. Qed.
+  Lemma syci_4e : kernel_text -∗ instr (mword_of_int (KernelSyms.syscall + 0x4e) : mword 64) false (JAL (mword_of_int 2087770 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.syscall + 0x4e) (mword_of_int 0xb5bfd0ef : mword 32)
+    (mword_of_int (KernelSyms.syscall + 0x4e) : mword 64) (JAL (mword_of_int 2087770 : mword 21, Regidx (mword_of_int 1))) kd_b5bfd0ef. Qed.
 
   Lemma syci_52 : kernel_text -∗ instr (mword_of_int (KernelSyms.syscall + 0x52) : mword 64) true (LOAD (mword_of_int 88 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 8)).
   Proof. mk_rvc (KernelSyms.syscall + 0x52) (mword_of_int 0x6cbc : mword 16)

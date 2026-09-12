@@ -30,6 +30,7 @@ Require Import KernelDecode11.
 Require Import KernelDecode12.
 Require Import KernelDecode14.
 Require Import KernelDecode15.
+Require Import KernelDecode16.
 Require Import KernelDecode17.
 Require Import KernelDecode18.
 Require Import KernelDecode19.
@@ -229,13 +230,13 @@ Section CodeWalk.
   Proof. mk_base (KernelSyms.walk + 0x66) (mword_of_int 0x00006517 : mword 32)
     (mword_of_int (KernelSyms.walk + 0x66) : mword 64) (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00006517. Qed.
 
-  Lemma wi_6a : kernel_text -∗ instr (mword_of_int (KernelSyms.walk + 0x6a) : mword 64) false (ITYPE (mword_of_int 328 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.walk + 0x6a) (mword_of_int 0x14850513 : mword 32)
-    (mword_of_int (KernelSyms.walk + 0x6a) : mword 64) (ITYPE (mword_of_int 328 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_14850513. Qed.
+  Lemma wi_6a : kernel_text -∗ instr (mword_of_int (KernelSyms.walk + 0x6a) : mword 64) false (ITYPE (mword_of_int 164 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.walk + 0x6a) (mword_of_int 0x0a450513 : mword 32)
+    (mword_of_int (KernelSyms.walk + 0x6a) : mword 64) (ITYPE (mword_of_int 164 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_0a450513. Qed.
 
-  Lemma wi_6e : kernel_text -∗ instr (mword_of_int (KernelSyms.walk + 0x6e) : mword 64) false (JAL (mword_of_int 2095294 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.walk + 0x6e) (mword_of_int 0x8bfff0ef : mword 32)
-    (mword_of_int (KernelSyms.walk + 0x6e) : mword 64) (JAL (mword_of_int 2095294 : mword 21, Regidx (mword_of_int 1))) kd_8bfff0ef. Qed.
+  Lemma wi_6e : kernel_text -∗ instr (mword_of_int (KernelSyms.walk + 0x6e) : mword 64) false (JAL (mword_of_int 2095172 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.walk + 0x6e) (mword_of_int 0x845ff0ef : mword 32)
+    (mword_of_int (KernelSyms.walk + 0x6e) : mword 64) (JAL (mword_of_int 2095172 : mword 21, Regidx (mword_of_int 1))) kd_845ff0ef. Qed.
 
   Lemma wi_72 : kernel_text -∗ instr (mword_of_int (KernelSyms.walk + 0x72) : mword 64) false (BTYPE (mword_of_int 36 : mword 13, zreg, Regidx (mword_of_int 22), BEQ)).
   Proof. mk_base (KernelSyms.walk + 0x72) (mword_of_int 0x020b0263 : mword 32)

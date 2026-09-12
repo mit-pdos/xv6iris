@@ -26,7 +26,7 @@ Require Import TsoCtx.
 (* The address of the string literal "ftable" that fileinit passes as initlock's
    [name] argument.  It sits in .rodata just past etext and has no ELF symbol of
    its own, so it is spelled out here (see kernel.asm: 80007570 <etext+0x570>). *)
-Definition ftable_name_str : Z := 0x80007568%Z.
+Definition ftable_name_str : Z := 0x80007580%Z.
 
 (* fileinit() = initlock(&ftable.lock, "ftable").  The lock is the FIRST member
    of [struct ftable], so &ftable.lock = &ftable.  It takes no arguments and

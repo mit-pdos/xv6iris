@@ -350,7 +350,7 @@ Section ProofPrepareReturn.
     iEval (rewrite Hpp1c) in "Hpc".
     (* ---- +0x1c: addi a5,a5,-1128 ---- *)
     iApply (wp_addi4_s_sconf (mword_of_int (PRR + 0x1c)) a5_idx a5_idx
-              (mword_of_int 2924 : mword 12) T4 (trap_res b + (av - 2))%nat false
+              (mword_of_int 2720 : mword 12) T4 (trap_res b + (av - 2))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
     { iApply (prr_1c with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
@@ -379,7 +379,7 @@ Section ProofPrepareReturn.
     iEval (rewrite Hpp24) in "Hpc".
     (* ---- +0x24: addi a3,a3,-1136 ---- *)
     iApply (wp_addi4_s_sconf (mword_of_int (PRR + 0x24)) a3_idx a3_idx
-              (mword_of_int 2916 : mword 12) T6 (trap_res b + (av - 2))%nat false
+              (mword_of_int 2712 : mword 12) T6 (trap_res b + (av - 2))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
     { iApply (prr_24 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
@@ -651,7 +651,7 @@ Section ProofPrepareReturn.
     iEval (rewrite Hpp48) in "Hpc".
     (* ---- +0x48: addi a4,a4,252 -- and 0x44 + 252 = 0x140 = usertrap ---- *)
     iApply (wp_addi4_s_sconf (mword_of_int (PRR + 0x48)) a4_idx a4_idx
-              (mword_of_int 252 : mword 12) U8 (trap_res b + (av - 2))%nat false
+              (mword_of_int 268 : mword 12) U8 (trap_res b + (av - 2))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
     { iApply (prr_48 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".

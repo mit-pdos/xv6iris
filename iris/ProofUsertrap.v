@@ -454,17 +454,17 @@ Section UtEntry.
     iEval (rewrite Hp1a) in "Hpc".
     (* ---- +0x1a: addi a5,a5,3722 -- the pair sums to kernelvec ---- *)
     iApply (wp_addi4_s_sconf (mword_of_int (UT + 0x1a)) Ra5 Ra5
-              (mword_of_int 4046 : mword 12) M5 (av - 4)%nat false
+              (mword_of_int 4050 : mword 12) M5 (av - 4)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] [-]").
     { iApply (uti_01a with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (M6 := <[Regidx Ra5 := regval_into_reg
                    (add_vec (rget M5 Ra5)
-                      (sign_extend' 64 (mword_of_int 4046 : mword 12)))]> M5).
+                      (sign_extend' 64 (mword_of_int 4050 : mword 12)))]> M5).
     change (<[Regidx Ra5 := regval_into_reg
                (add_vec (rget M5 Ra5)
-                  (sign_extend' 64 (mword_of_int 4046 : mword 12)))]> M5) with M6.
+                  (sign_extend' 64 (mword_of_int 4050 : mword 12)))]> M5) with M6.
     assert (HM6sp : M6 !!! Regidx csp_rs1 = pa_stk ksp 4)
       by (rewrite /M6 upd_ne; [exact HM5sp | reg_neq]).
     assert (HM6a5 : rget M6 Ra5
@@ -489,7 +489,7 @@ Section UtEntry.
     (*  +0x22 .. +0x26: p = myproc(); s1 = p.                            *)
     (* =============================================================== *)
     iApply (wp_jal_s_sconf (mword_of_int (UT + 0x22)) Rra
-              (mword_of_int 2093790 : mword 21) M6 (av - 4)%nat false
+              (mword_of_int 2093774 : mword 21) M6 (av - 4)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc [] [-]").
     { iApply (uti_022 with "Htext"). }
@@ -499,7 +499,7 @@ Section UtEntry.
     change (<[Regidx Rra := regval_into_reg
                (add_vec_int (mword_of_int (UT + 0x22) : mword 64) 4)]> M6) with M7.
     assert (Hmyp : add_vec (mword_of_int (UT + 0x22) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2093790 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2093774 : mword 21))
                    = mword_of_int KernelSyms.myproc) by pcw.
     iEval (rewrite Hmyp) in "Hpc".
     assert (HM7sp : M7 !!! Regidx csp_rs1 = pa_stk ksp 4)
@@ -941,7 +941,7 @@ Section UtDispatch.
       iEval (rewrite Hp3a) in "Hpc".
       (* ---- +0x3a: jal devintr ---- *)
       iApply (wp_jal_s_sconf (mword_of_int (UT + 0x3a)) Rra
-                (mword_of_int 2096976 : mword 21) D2 nx false
+                (mword_of_int 2096960 : mword 21) D2 nx false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc [] [-]").
       { iApply (uti_03a with "Htext"). }
@@ -951,7 +951,7 @@ Section UtDispatch.
       change (<[Regidx Rra := regval_into_reg
                  (add_vec_int (mword_of_int (UT + 0x3a) : mword 64) 4)]> D2) with D3.
       assert (Hjdi : add_vec (mword_of_int (UT + 0x3a) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2096976 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2096960 : mword 21))
                      = mword_of_int KernelSyms.devintr) by pcw.
       iEval (rewrite Hjdi) in "Hpc".
       assert (HD3sp : D3 !!! Regidx csp_rs1 = pa_stk ksp 4)

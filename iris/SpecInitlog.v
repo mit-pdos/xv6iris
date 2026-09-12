@@ -147,7 +147,7 @@ Notation K_initlog := (74%nat) (only parsing).
    etext with no ELF symbol of its own (the [auipc a1,0x4 ; addi a1,a1,-1658]
    pair at +0x1a/+0x1e), so it is spelled out here; the proof reads its bytes
    out of [kernel_data] with [kernel_data_string]. *)
-Definition log_name_str : Z := 0x80007508.
+Definition log_name_str : Z := 0x80007520.
 
 (* the boot dirty map is [false] wherever the halves say so -- the pure
    form of the cov-wide big-op, which is what the recovering install's

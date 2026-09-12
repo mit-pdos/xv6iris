@@ -16,6 +16,7 @@ Require Import KernelText.
 Require Import WpMmodeLeafBase.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import KernelDecode01.
 Require Import KernelDecode04.
 Require Import KernelDecode05.
 Require Import KernelDecode09.
@@ -83,9 +84,9 @@ Section CodeHolding.
   Proof. mk_rvc (KernelSyms.holding + 0x14) (mword_of_int 0x84be : mword 16)
     (mword_of_int (KernelSyms.holding + 0x14) : mword 64) (RTYPE (Regidx (mword_of_int 15), zreg, Regidx (mword_of_int 9), ADD)) kd_84be exec_execute_C_MV. Qed.
 
-  Lemma hi_16 : kernel_text -∗ instr (mword_of_int (KernelSyms.holding + 0x16) : mword 64) false (JAL (mword_of_int 3408 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.holding + 0x16) (mword_of_int 0x551000ef : mword 32)
-    (mword_of_int (KernelSyms.holding + 0x16) : mword 64) (JAL (mword_of_int 3408 : mword 21, Regidx (mword_of_int 1))) kd_551000ef. Qed.
+  Lemma hi_16 : kernel_text -∗ instr (mword_of_int (KernelSyms.holding + 0x16) : mword 64) false (JAL (mword_of_int 3424 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.holding + 0x16) (mword_of_int 0x561000ef : mword 32)
+    (mword_of_int (KernelSyms.holding + 0x16) : mword 64) (JAL (mword_of_int 3424 : mword 21, Regidx (mword_of_int 1))) kd_561000ef. Qed.
 
   Lemma hi_1a : kernel_text -∗ instr (mword_of_int (KernelSyms.holding + 0x1a) : mword 64) false (RTYPE (Regidx (mword_of_int 10), Regidx (mword_of_int 9), Regidx (mword_of_int 10), SUB)).
   Proof. mk_base (KernelSyms.holding + 0x1a) (mword_of_int 0x40a48533 : mword 32)
@@ -161,9 +162,9 @@ Section CodeHolding.
   Proof. mk_rvc (KernelSyms.holding + 0x14) (mword_of_int 0x84be : mword 16)
     (mword_of_int (KernelSyms.holding + 0x14) : mword 64) (RTYPE (Regidx (mword_of_int 15), zreg, Regidx (mword_of_int 9), ADD)) kd_84be exec_execute_C_MV. Qed.
 
-  Lemma his_16 : kernel_text -∗ instr (mword_of_int (KernelSyms.holding + 0x16) : mword 64) false (JAL (mword_of_int 3408 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.holding + 0x16) (mword_of_int 0x551000ef : mword 32)
-    (mword_of_int (KernelSyms.holding + 0x16) : mword 64) (JAL (mword_of_int 3408 : mword 21, Regidx (mword_of_int 1))) kd_551000ef. Qed.
+  Lemma his_16 : kernel_text -∗ instr (mword_of_int (KernelSyms.holding + 0x16) : mword 64) false (JAL (mword_of_int 3424 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.holding + 0x16) (mword_of_int 0x561000ef : mword 32)
+    (mword_of_int (KernelSyms.holding + 0x16) : mword 64) (JAL (mword_of_int 3424 : mword 21, Regidx (mword_of_int 1))) kd_561000ef. Qed.
 
   Lemma his_1a : kernel_text -∗ instr (mword_of_int (KernelSyms.holding + 0x1a) : mword 64) false (RTYPE (Regidx (mword_of_int 10), Regidx (mword_of_int 9), Regidx (mword_of_int 10), SUB)).
   Proof. mk_base (KernelSyms.holding + 0x1a) (mword_of_int 0x40a48533 : mword 32)

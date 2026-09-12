@@ -122,9 +122,9 @@ Section CodeScheduler.
   Proof. mk_base (KernelSyms.scheduler + 0x22) (mword_of_int 0x00010717 : mword 32)
     (mword_of_int (KernelSyms.scheduler + 0x22) : mword 64) (UTYPE (mword_of_int 16 : mword 20, Regidx (mword_of_int 14), AUIPC)) kd_00010717. Qed.
 
-  Lemma schi_26 : kernel_text -∗ instr (mword_of_int (KernelSyms.scheduler + 0x26) : mword 64) false (ITYPE (mword_of_int 1512 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)).
-  Proof. mk_base (KernelSyms.scheduler + 0x26) (mword_of_int 0x5e870713 : mword 32)
-    (mword_of_int (KernelSyms.scheduler + 0x26) : mword 64) (ITYPE (mword_of_int 1512 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)) kd_5e870713. Qed.
+  Lemma schi_26 : kernel_text -∗ instr (mword_of_int (KernelSyms.scheduler + 0x26) : mword 64) false (ITYPE (mword_of_int 1492 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)).
+  Proof. mk_base (KernelSyms.scheduler + 0x26) (mword_of_int 0x5d470713 : mword 32)
+    (mword_of_int (KernelSyms.scheduler + 0x26) : mword 64) (ITYPE (mword_of_int 1492 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)) kd_5d470713. Qed.
 
   Lemma schi_2a : kernel_text -∗ instr (mword_of_int (KernelSyms.scheduler + 0x2a) : mword 64) true (RTYPE (Regidx (mword_of_int 21), Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADD)).
   Proof. mk_rvc (KernelSyms.scheduler + 0x2a) (mword_of_int 0x9756 : mword 16)
@@ -138,9 +138,9 @@ Section CodeScheduler.
   Proof. mk_base (KernelSyms.scheduler + 0x30) (mword_of_int 0x00010717 : mword 32)
     (mword_of_int (KernelSyms.scheduler + 0x30) : mword 64) (UTYPE (mword_of_int 16 : mword 20, Regidx (mword_of_int 14), AUIPC)) kd_00010717. Qed.
 
-  Lemma schi_34 : kernel_text -∗ instr (mword_of_int (KernelSyms.scheduler + 0x34) : mword 64) false (ITYPE (mword_of_int 1554 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)).
-  Proof. mk_base (KernelSyms.scheduler + 0x34) (mword_of_int 0x61270713 : mword 32)
-    (mword_of_int (KernelSyms.scheduler + 0x34) : mword 64) (ITYPE (mword_of_int 1554 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)) kd_61270713. Qed.
+  Lemma schi_34 : kernel_text -∗ instr (mword_of_int (KernelSyms.scheduler + 0x34) : mword 64) false (ITYPE (mword_of_int 1534 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)).
+  Proof. mk_base (KernelSyms.scheduler + 0x34) (mword_of_int 0x5fe70713 : mword 32)
+    (mword_of_int (KernelSyms.scheduler + 0x34) : mword 64) (ITYPE (mword_of_int 1534 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)) kd_5fe70713. Qed.
 
   Lemma schi_38 : kernel_text -∗ instr (mword_of_int (KernelSyms.scheduler + 0x38) : mword 64) true (RTYPE (Regidx (mword_of_int 14), Regidx (mword_of_int 21), Regidx (mword_of_int 21), ADD)).
   Proof. mk_rvc (KernelSyms.scheduler + 0x38) (mword_of_int 0x9aba : mword 16)
@@ -154,9 +154,9 @@ Section CodeScheduler.
   Proof. mk_base (KernelSyms.scheduler + 0x3c) (mword_of_int 0x00010b17 : mword 32)
     (mword_of_int (KernelSyms.scheduler + 0x3c) : mword 64) (UTYPE (mword_of_int 16 : mword 20, Regidx (mword_of_int 22), AUIPC)) kd_00010b17. Qed.
 
-  Lemma schi_40 : kernel_text -∗ instr (mword_of_int (KernelSyms.scheduler + 0x40) : mword 64) false (ITYPE (mword_of_int 1486 : mword 12, Regidx (mword_of_int 22), Regidx (mword_of_int 22), ADDI)).
-  Proof. mk_base (KernelSyms.scheduler + 0x40) (mword_of_int 0x5ceb0b13 : mword 32)
-    (mword_of_int (KernelSyms.scheduler + 0x40) : mword 64) (ITYPE (mword_of_int 1486 : mword 12, Regidx (mword_of_int 22), Regidx (mword_of_int 22), ADDI)) kd_5ceb0b13. Qed.
+  Lemma schi_40 : kernel_text -∗ instr (mword_of_int (KernelSyms.scheduler + 0x40) : mword 64) false (ITYPE (mword_of_int 1466 : mword 12, Regidx (mword_of_int 22), Regidx (mword_of_int 22), ADDI)).
+  Proof. mk_base (KernelSyms.scheduler + 0x40) (mword_of_int 0x5bab0b13 : mword 32)
+    (mword_of_int (KernelSyms.scheduler + 0x40) : mword 64) (ITYPE (mword_of_int 1466 : mword 12, Regidx (mword_of_int 22), Regidx (mword_of_int 22), ADDI)) kd_5bab0b13. Qed.
 
   Lemma schi_44 : kernel_text -∗ instr (mword_of_int (KernelSyms.scheduler + 0x44) : mword 64) true (SHIFTIOP (mword_of_int 7 : mword 6, Regidx (mword_of_int 15), Regidx (mword_of_int 15), SLLI)).
   Proof. mk_rvc (KernelSyms.scheduler + 0x44) (mword_of_int 0x079e : mword 16)
@@ -178,9 +178,9 @@ Section CodeScheduler.
   Proof. mk_rvc (KernelSyms.scheduler + 0x4e) (mword_of_int 0x8526 : mword 16)
     (mword_of_int (KernelSyms.scheduler + 0x4e) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) kd_8526 exec_execute_C_MV. Qed.
 
-  Lemma schi_50 : kernel_text -∗ instr (mword_of_int (KernelSyms.scheduler + 0x50) : mword 64) false (JAL (mword_of_int 2092646 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.scheduler + 0x50) (mword_of_int 0xe67fe0ef : mword 32)
-    (mword_of_int (KernelSyms.scheduler + 0x50) : mword 64) (JAL (mword_of_int 2092646 : mword 21, Regidx (mword_of_int 1))) kd_e67fe0ef. Qed.
+  Lemma schi_50 : kernel_text -∗ instr (mword_of_int (KernelSyms.scheduler + 0x50) : mword 64) false (JAL (mword_of_int 2092630 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.scheduler + 0x50) (mword_of_int 0xe57fe0ef : mword 32)
+    (mword_of_int (KernelSyms.scheduler + 0x50) : mword 64) (JAL (mword_of_int 2092630 : mword 21, Regidx (mword_of_int 1))) kd_e57fe0ef. Qed.
 
   Lemma schi_54 : kernel_text -∗ instr (mword_of_int (KernelSyms.scheduler + 0x54) : mword 64) false (ITYPE (mword_of_int 360 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)).
   Proof. mk_base (KernelSyms.scheduler + 0x54) (mword_of_int 0x16848493 : mword 32)
@@ -194,9 +194,9 @@ Section CodeScheduler.
   Proof. mk_rvc (KernelSyms.scheduler + 0x5c) (mword_of_int 0x8526 : mword 16)
     (mword_of_int (KernelSyms.scheduler + 0x5c) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) kd_8526 exec_execute_C_MV. Qed.
 
-  Lemma schi_5e : kernel_text -∗ instr (mword_of_int (KernelSyms.scheduler + 0x5e) : mword 64) false (JAL (mword_of_int 2092496 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.scheduler + 0x5e) (mword_of_int 0xdd1fe0ef : mword 32)
-    (mword_of_int (KernelSyms.scheduler + 0x5e) : mword 64) (JAL (mword_of_int 2092496 : mword 21, Regidx (mword_of_int 1))) kd_dd1fe0ef. Qed.
+  Lemma schi_5e : kernel_text -∗ instr (mword_of_int (KernelSyms.scheduler + 0x5e) : mword 64) false (JAL (mword_of_int 2092480 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.scheduler + 0x5e) (mword_of_int 0xdc1fe0ef : mword 32)
+    (mword_of_int (KernelSyms.scheduler + 0x5e) : mword 64) (JAL (mword_of_int 2092480 : mword 21, Regidx (mword_of_int 1))) kd_dc1fe0ef. Qed.
 
   Lemma schi_62 : kernel_text -∗ instr (mword_of_int (KernelSyms.scheduler + 0x62) : mword 64) true (LOAD (mword_of_int 24 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)).
   Proof. mk_rvc (KernelSyms.scheduler + 0x62) (mword_of_int 0x4c9c : mword 16)
@@ -282,9 +282,9 @@ Section CodeScheduler.
   Proof. mk_base (KernelSyms.scheduler + 0xa0) (mword_of_int 0x00011497 : mword 32)
     (mword_of_int (KernelSyms.scheduler + 0xa0) : mword 64) (UTYPE (mword_of_int 17 : mword 20, Regidx (mword_of_int 9), AUIPC)) kd_00011497. Qed.
 
-  Lemma schi_a4 : kernel_text -∗ instr (mword_of_int (KernelSyms.scheduler + 0xa4) : mword 64) false (ITYPE (mword_of_int 2458 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)).
-  Proof. mk_base (KernelSyms.scheduler + 0xa4) (mword_of_int 0x99a48493 : mword 32)
-    (mword_of_int (KernelSyms.scheduler + 0xa4) : mword 64) (ITYPE (mword_of_int 2458 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)) kd_99a48493. Qed.
+  Lemma schi_a4 : kernel_text -∗ instr (mword_of_int (KernelSyms.scheduler + 0xa4) : mword 64) false (ITYPE (mword_of_int 2438 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)).
+  Proof. mk_base (KernelSyms.scheduler + 0xa4) (mword_of_int 0x98648493 : mword 32)
+    (mword_of_int (KernelSyms.scheduler + 0xa4) : mword 64) (ITYPE (mword_of_int 2438 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)) kd_98648493. Qed.
 
   Lemma schi_a8 : kernel_text -∗ instr (mword_of_int (KernelSyms.scheduler + 0xa8) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 3 : mword 6), zreg, Regidx (mword_of_int 19), ADDI)).
   Proof. mk_rvc (KernelSyms.scheduler + 0xa8) (mword_of_int 0x498d : mword 16)
@@ -294,9 +294,9 @@ Section CodeScheduler.
   Proof. mk_base (KernelSyms.scheduler + 0xaa) (mword_of_int 0x00016917 : mword 32)
     (mword_of_int (KernelSyms.scheduler + 0xaa) : mword 64) (UTYPE (mword_of_int 22 : mword 20, Regidx (mword_of_int 18), AUIPC)) kd_00016917. Qed.
 
-  Lemma schi_ae : kernel_text -∗ instr (mword_of_int (KernelSyms.scheduler + 0xae) : mword 64) false (ITYPE (mword_of_int 912 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 18), ADDI)).
-  Proof. mk_base (KernelSyms.scheduler + 0xae) (mword_of_int 0x39090913 : mword 32)
-    (mword_of_int (KernelSyms.scheduler + 0xae) : mword 64) (ITYPE (mword_of_int 912 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 18), ADDI)) kd_39090913. Qed.
+  Lemma schi_ae : kernel_text -∗ instr (mword_of_int (KernelSyms.scheduler + 0xae) : mword 64) false (ITYPE (mword_of_int 892 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 18), ADDI)).
+  Proof. mk_base (KernelSyms.scheduler + 0xae) (mword_of_int 0x37c90913 : mword 32)
+    (mword_of_int (KernelSyms.scheduler + 0xae) : mword 64) (ITYPE (mword_of_int 892 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 18), ADDI)) kd_37c90913. Qed.
 
   Lemma schi_b2 : kernel_text -∗ instr (mword_of_int (KernelSyms.scheduler + 0xb2) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2005 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (KernelSyms.scheduler + 0xb2) (mword_of_int 0xb76d : mword 16)

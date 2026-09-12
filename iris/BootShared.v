@@ -556,7 +556,7 @@ Section BootBssChain.
                  with "Hcl Hst") as "(%Hstal & Hstpp & Hst)".
     iDestruct "Hstpp" as (ppnst) "(#Hkst & %Hstc & %Hstr & %Hstpin)".
     iDestruct (started_claim_intro ppnst Hstal Hstc Hstr Hstpin with "Hkst") as "#Hstcl".
-    (* ---- 0x8000a238 kernel_pagetable, 0x8000a260 initproc ---- *)
+    (* ---- 0x8000a338 kernel_pagetable, 0x8000a340 initproc ---- *)
     iDestruct (bss_cut g (KernelSyms.started + 4) KernelSyms.kernel_pagetable
                  (KernelSyms.kernel_pagetable + 8) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hkpt H]".
@@ -567,7 +567,7 @@ Section BootBssChain.
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hip H]".
     iDestruct (boot_cran_cell8 g KernelSyms.initproc Hmem ltac:(zlit)
                  ltac:(zlit) ltac:(zeq) with "Hcl Hip") as (vip) "Hip".
-    (* ---- 0x8000a248 ticks: the tick counter tickslock protects.  main needs
+    (* ---- 0x8000a348 ticks: the tick counter tickslock protects.  main needs
            it to ALLOCATE that lock (is_tickslock = is_lock … ticks_res), which
            is what the handler contract's [tick_keeper] asks of the tick
            hart. ---- *)

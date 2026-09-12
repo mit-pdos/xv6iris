@@ -17,18 +17,20 @@ Require Import WpMmodeLeafBase.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import KernelDecode01.
+Require Import KernelDecode05.
 Require Import KernelDecode06.
 Require Import KernelDecode07.
 Require Import KernelDecode08.
+Require Import KernelDecode09.
 Require Import KernelDecode11.
 Require Import KernelDecode13.
 Require Import KernelDecode14.
 Require Import KernelDecode19.
 Require Import KernelDecode20.
+Require Import KernelDecode22.
 Require Import KernelDecode23.
 Require Import KernelDecode24.
 Require Import KernelDecode28.
-Require Import KernelDecode30.
 Require Import KernelDecode31.
 Local Open Scope Z_scope.
 Import Defs.
@@ -38,7 +40,7 @@ Section CodePlicinithart.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  (* ---- plicinithart @ KernelSyms.plicinithart, 52 bytes ---- *)
+  (* ---- plicinithart @ KernelSyms.plicinithart, 54 bytes ---- *)
 
   Lemma phi_00 : kernel_text -∗ instr (mword_of_int KernelSyms.plicinithart : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 48 : mword 6), Regidx (mword_of_int 2), Regidx (mword_of_int 2), ADDI)).
   Proof. mk_rvc KernelSyms.plicinithart (mword_of_int 0x1141 : mword 16)
@@ -56,9 +58,9 @@ Section CodePlicinithart.
   Proof. mk_rvc (KernelSyms.plicinithart + 0x6) (mword_of_int 0x0800 : mword 16)
     (mword_of_int (KernelSyms.plicinithart + 0x6) : mword 64) (ITYPE (caddi4spn_imm (mword_of_int 4 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)) kd_0800 exec_execute_C_ADDI4SPN. Qed.
 
-  Lemma phi_08 : kernel_text -∗ instr (mword_of_int (KernelSyms.plicinithart + 0x8) : mword 64) false (JAL (mword_of_int 2081384 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.plicinithart + 0x8) (mword_of_int 0xa68fc0ef : mword 32)
-    (mword_of_int (KernelSyms.plicinithart + 0x8) : mword 64) (JAL (mword_of_int 2081384 : mword 21, Regidx (mword_of_int 1))) kd_a68fc0ef. Qed.
+  Lemma phi_08 : kernel_text -∗ instr (mword_of_int (KernelSyms.plicinithart + 0x8) : mword 64) false (JAL (mword_of_int 2081362 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.plicinithart + 0x8) (mword_of_int 0xa52fc0ef : mword 32)
+    (mword_of_int (KernelSyms.plicinithart + 0x8) : mword 64) (JAL (mword_of_int 2081362 : mword 21, Regidx (mword_of_int 1))) kd_a52fc0ef. Qed.
 
   Lemma phi_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.plicinithart + 0xc) : mword 64) false (SHIFTIWOP (mword_of_int 8 : mword 5, Regidx (mword_of_int 10), Regidx (mword_of_int 14), SLLIW)).
   Proof. mk_base (KernelSyms.plicinithart + 0xc) (mword_of_int 0x0085171b : mword 32)
@@ -72,44 +74,48 @@ Section CodePlicinithart.
   Proof. mk_rvc (KernelSyms.plicinithart + 0x14) (mword_of_int 0x97ba : mword 16)
     (mword_of_int (KernelSyms.plicinithart + 0x14) : mword 64) (RTYPE (Regidx (mword_of_int 14), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADD)) kd_97ba exec_execute_C_ADD. Qed.
 
-  Lemma phi_16 : kernel_text -∗ instr (mword_of_int (KernelSyms.plicinithart + 0x16) : mword 64) false (ITYPE (mword_of_int 1026 : mword 12, zreg, Regidx (mword_of_int 14), ADDI)).
-  Proof. mk_base (KernelSyms.plicinithart + 0x16) (mword_of_int 0x40200713 : mword 32)
-    (mword_of_int (KernelSyms.plicinithart + 0x16) : mword 64) (ITYPE (mword_of_int 1026 : mword 12, zreg, Regidx (mword_of_int 14), ADDI)) kd_40200713. Qed.
+  Lemma phi_16 : kernel_text -∗ instr (mword_of_int (KernelSyms.plicinithart + 0x16) : mword 64) true (UTYPE (sign_extend' 20 (mword_of_int 1 : mword 6), Regidx (mword_of_int 14), LUI)).
+  Proof. mk_rvc (KernelSyms.plicinithart + 0x16) (mword_of_int 0x6705 : mword 16)
+    (mword_of_int (KernelSyms.plicinithart + 0x16) : mword 64) (UTYPE (sign_extend' 20 (mword_of_int 1 : mword 6), Regidx (mword_of_int 14), LUI)) kd_6705 exec_execute_C_LUI. Qed.
 
-  Lemma phi_1a : kernel_text -∗ instr (mword_of_int (KernelSyms.plicinithart + 0x1a) : mword 64) false (STORE (mword_of_int 128 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 15), 4)).
-  Proof. mk_base (KernelSyms.plicinithart + 0x1a) (mword_of_int 0x08e7a023 : mword 32)
-    (mword_of_int (KernelSyms.plicinithart + 0x1a) : mword 64) (STORE (mword_of_int 128 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 15), 4)) kd_08e7a023. Qed.
+  Lemma phi_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.plicinithart + 0x18) : mword 64) false (ITYPE (mword_of_int 1026 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)).
+  Proof. mk_base (KernelSyms.plicinithart + 0x18) (mword_of_int 0x40270713 : mword 32)
+    (mword_of_int (KernelSyms.plicinithart + 0x18) : mword 64) (ITYPE (mword_of_int 1026 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)) kd_40270713. Qed.
 
-  Lemma phi_1e : kernel_text -∗ instr (mword_of_int (KernelSyms.plicinithart + 0x1e) : mword 64) false (SHIFTIWOP (mword_of_int 13 : mword 5, Regidx (mword_of_int 10), Regidx (mword_of_int 10), SLLIW)).
-  Proof. mk_base (KernelSyms.plicinithart + 0x1e) (mword_of_int 0x00d5151b : mword 32)
-    (mword_of_int (KernelSyms.plicinithart + 0x1e) : mword 64) (SHIFTIWOP (mword_of_int 13 : mword 5, Regidx (mword_of_int 10), Regidx (mword_of_int 10), SLLIW)) kd_00d5151b. Qed.
+  Lemma phi_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.plicinithart + 0x1c) : mword 64) false (STORE (mword_of_int 128 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 15), 4)).
+  Proof. mk_base (KernelSyms.plicinithart + 0x1c) (mword_of_int 0x08e7a023 : mword 32)
+    (mword_of_int (KernelSyms.plicinithart + 0x1c) : mword 64) (STORE (mword_of_int 128 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 15), 4)) kd_08e7a023. Qed.
 
-  Lemma phi_22 : kernel_text -∗ instr (mword_of_int (KernelSyms.plicinithart + 0x22) : mword 64) false (UTYPE (mword_of_int 49665 : mword 20, Regidx (mword_of_int 15), LUI)).
-  Proof. mk_base (KernelSyms.plicinithart + 0x22) (mword_of_int 0x0c2017b7 : mword 32)
-    (mword_of_int (KernelSyms.plicinithart + 0x22) : mword 64) (UTYPE (mword_of_int 49665 : mword 20, Regidx (mword_of_int 15), LUI)) kd_0c2017b7. Qed.
+  Lemma phi_20 : kernel_text -∗ instr (mword_of_int (KernelSyms.plicinithart + 0x20) : mword 64) false (SHIFTIWOP (mword_of_int 13 : mword 5, Regidx (mword_of_int 10), Regidx (mword_of_int 10), SLLIW)).
+  Proof. mk_base (KernelSyms.plicinithart + 0x20) (mword_of_int 0x00d5151b : mword 32)
+    (mword_of_int (KernelSyms.plicinithart + 0x20) : mword 64) (SHIFTIWOP (mword_of_int 13 : mword 5, Regidx (mword_of_int 10), Regidx (mword_of_int 10), SLLIW)) kd_00d5151b. Qed.
 
-  Lemma phi_26 : kernel_text -∗ instr (mword_of_int (KernelSyms.plicinithart + 0x26) : mword 64) true (RTYPE (Regidx (mword_of_int 10), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADD)).
-  Proof. mk_rvc (KernelSyms.plicinithart + 0x26) (mword_of_int 0x97aa : mword 16)
-    (mword_of_int (KernelSyms.plicinithart + 0x26) : mword 64) (RTYPE (Regidx (mword_of_int 10), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADD)) kd_97aa exec_execute_C_ADD. Qed.
+  Lemma phi_24 : kernel_text -∗ instr (mword_of_int (KernelSyms.plicinithart + 0x24) : mword 64) false (UTYPE (mword_of_int 49665 : mword 20, Regidx (mword_of_int 15), LUI)).
+  Proof. mk_base (KernelSyms.plicinithart + 0x24) (mword_of_int 0x0c2017b7 : mword 32)
+    (mword_of_int (KernelSyms.plicinithart + 0x24) : mword 64) (UTYPE (mword_of_int 49665 : mword 20, Regidx (mword_of_int 15), LUI)) kd_0c2017b7. Qed.
 
-  Lemma phi_28 : kernel_text -∗ instr (mword_of_int (KernelSyms.plicinithart + 0x28) : mword 64) false (STORE (mword_of_int 0 : mword 12, zreg, Regidx (mword_of_int 15), 4)).
-  Proof. mk_base (KernelSyms.plicinithart + 0x28) (mword_of_int 0x0007a023 : mword 32)
-    (mword_of_int (KernelSyms.plicinithart + 0x28) : mword 64) (STORE (mword_of_int 0 : mword 12, zreg, Regidx (mword_of_int 15), 4)) kd_0007a023. Qed.
+  Lemma phi_28 : kernel_text -∗ instr (mword_of_int (KernelSyms.plicinithart + 0x28) : mword 64) true (RTYPE (Regidx (mword_of_int 10), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADD)).
+  Proof. mk_rvc (KernelSyms.plicinithart + 0x28) (mword_of_int 0x97aa : mword 16)
+    (mword_of_int (KernelSyms.plicinithart + 0x28) : mword 64) (RTYPE (Regidx (mword_of_int 10), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADD)) kd_97aa exec_execute_C_ADD. Qed.
 
-  Lemma phi_2c : kernel_text -∗ instr (mword_of_int (KernelSyms.plicinithart + 0x2c) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
-  Proof. mk_rvc (KernelSyms.plicinithart + 0x2c) (mword_of_int 0x60a2 : mword 16)
-    (mword_of_int (KernelSyms.plicinithart + 0x2c) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)) kd_60a2 exec_execute_C_LDSP. Qed.
+  Lemma phi_2a : kernel_text -∗ instr (mword_of_int (KernelSyms.plicinithart + 0x2a) : mword 64) false (STORE (mword_of_int 0 : mword 12, zreg, Regidx (mword_of_int 15), 4)).
+  Proof. mk_base (KernelSyms.plicinithart + 0x2a) (mword_of_int 0x0007a023 : mword 32)
+    (mword_of_int (KernelSyms.plicinithart + 0x2a) : mword 64) (STORE (mword_of_int 0 : mword 12, zreg, Regidx (mword_of_int 15), 4)) kd_0007a023. Qed.
 
-  Lemma phi_2e : kernel_text -∗ instr (mword_of_int (KernelSyms.plicinithart + 0x2e) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)).
-  Proof. mk_rvc (KernelSyms.plicinithart + 0x2e) (mword_of_int 0x6402 : mword 16)
-    (mword_of_int (KernelSyms.plicinithart + 0x2e) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)) kd_6402 exec_execute_C_LDSP. Qed.
+  Lemma phi_2e : kernel_text -∗ instr (mword_of_int (KernelSyms.plicinithart + 0x2e) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
+  Proof. mk_rvc (KernelSyms.plicinithart + 0x2e) (mword_of_int 0x60a2 : mword 16)
+    (mword_of_int (KernelSyms.plicinithart + 0x2e) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)) kd_60a2 exec_execute_C_LDSP. Qed.
 
-  Lemma phi_30 : kernel_text -∗ instr (mword_of_int (KernelSyms.plicinithart + 0x30) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 16 : mword 6), Regidx (mword_of_int 2), Regidx (mword_of_int 2), ADDI)).
-  Proof. mk_rvc (KernelSyms.plicinithart + 0x30) (mword_of_int 0x0141 : mword 16)
-    (mword_of_int (KernelSyms.plicinithart + 0x30) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 16 : mword 6), Regidx (mword_of_int 2), Regidx (mword_of_int 2), ADDI)) kd_0141 exec_execute_C_ADDI. Qed.
+  Lemma phi_30 : kernel_text -∗ instr (mword_of_int (KernelSyms.plicinithart + 0x30) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)).
+  Proof. mk_rvc (KernelSyms.plicinithart + 0x30) (mword_of_int 0x6402 : mword 16)
+    (mword_of_int (KernelSyms.plicinithart + 0x30) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)) kd_6402 exec_execute_C_LDSP. Qed.
 
-  Lemma phi_32 : kernel_text -∗ instr (mword_of_int (KernelSyms.plicinithart + 0x32) : mword 64) true (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).
-  Proof. mk_rvc (KernelSyms.plicinithart + 0x32) (mword_of_int 0x8082 : mword 16)
-    (mword_of_int (KernelSyms.plicinithart + 0x32) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) kd_8082 exec_execute_C_JR. Qed.
+  Lemma phi_32 : kernel_text -∗ instr (mword_of_int (KernelSyms.plicinithart + 0x32) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 16 : mword 6), Regidx (mword_of_int 2), Regidx (mword_of_int 2), ADDI)).
+  Proof. mk_rvc (KernelSyms.plicinithart + 0x32) (mword_of_int 0x0141 : mword 16)
+    (mword_of_int (KernelSyms.plicinithart + 0x32) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 16 : mword 6), Regidx (mword_of_int 2), Regidx (mword_of_int 2), ADDI)) kd_0141 exec_execute_C_ADDI. Qed.
+
+  Lemma phi_34 : kernel_text -∗ instr (mword_of_int (KernelSyms.plicinithart + 0x34) : mword 64) true (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).
+  Proof. mk_rvc (KernelSyms.plicinithart + 0x34) (mword_of_int 0x8082 : mword 16)
+    (mword_of_int (KernelSyms.plicinithart + 0x34) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) kd_8082 exec_execute_C_JR. Qed.
 
 End CodePlicinithart.

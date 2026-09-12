@@ -1021,7 +1021,7 @@ Section ProofEitherCopyout.
       iEval (rewrite Hpp44) in "Hpc".
       (* ---- +0x42: jal ra,memmove ---- *)
       iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.either_copyout + 0x44))
-                Rra (mword_of_int 2091490 : mword 21) K3 (av - 6)%nat b
+                Rra (mword_of_int 2091474 : mword 21) K3 (av - 6)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (eco_44 with "Htext"). }
@@ -1031,7 +1031,7 @@ Section ProofEitherCopyout.
       change (<[Regidx Rra := regval_into_reg
                 (add_vec_int (mword_of_int (KernelSyms.either_copyout + 0x44) : mword 64) 4)]> K3) with K4.
       assert (Hjmm : add_vec (mword_of_int (KernelSyms.either_copyout + 0x44) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2091490 : mword 21)) = mword_of_int KernelSyms.memmove)
+                       (sign_extend' 64 (mword_of_int 2091474 : mword 21)) = mword_of_int KernelSyms.memmove)
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hjmm) in "Hpc".
       assert (HK4ra : K4 !!! Regidx Rra
@@ -1779,7 +1779,7 @@ Section ProofEitherCopyin.
       iEval (rewrite Hpp44) in "Hpc".
       (* ---- +0x42: jal ra,memmove ---- *)
       iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.either_copyin + 0x44))
-                Rra (mword_of_int 2091414 : mword 21) K3 (av - 6)%nat b
+                Rra (mword_of_int 2091398 : mword 21) K3 (av - 6)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (eci_44 with "Htext"). }
@@ -1789,7 +1789,7 @@ Section ProofEitherCopyin.
       change (<[Regidx Rra := regval_into_reg
                 (add_vec_int (mword_of_int (KernelSyms.either_copyin + 0x44) : mword 64) 4)]> K3) with K4.
       assert (Hjmm : add_vec (mword_of_int (KernelSyms.either_copyin + 0x44) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2091414 : mword 21)) = mword_of_int KernelSyms.memmove)
+                       (sign_extend' 64 (mword_of_int 2091398 : mword 21)) = mword_of_int KernelSyms.memmove)
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hjmm) in "Hpc".
       assert (HK4ra : K4 !!! Regidx Rra

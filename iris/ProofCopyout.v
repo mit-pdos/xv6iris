@@ -373,7 +373,7 @@ Section ProofCopyout.
     iEval (rewrite Hp7e) in "Hpc".
     (* +0x7e jal ra,walk *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.copyout + 0x7e)) Rra
-              (mword_of_int 2095486 : mword 21) G3 n b
+              (mword_of_int 2095470 : mword 21) G3 n b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
@@ -382,7 +382,7 @@ Section ProofCopyout.
     set (G4 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.copyout + 0x7e) : mword 64) 4)]> G3).
     assert (Htgtwk : add_vec (mword_of_int (KernelSyms.copyout + 0x7e) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2095486 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2095470 : mword 21))
                      = mword_of_int KernelSyms.walk)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtwk) in "Hpc".
@@ -969,7 +969,7 @@ Section ProofCopyout.
         iEval (rewrite Hp42) in "Hpc".
         (* +0x42 jal ra,memmove *)
         iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.copyout + 0x42)) Rra
-                  (mword_of_int 2094980 : mword 21) U4 (K - 14)%nat b
+                  (mword_of_int 2094964 : mword 21) U4 (K - 14)%nat b
                   ltac:(vm_compute; discriminate) ltac:(rdok)
                   ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
@@ -978,7 +978,7 @@ Section ProofCopyout.
         set (U5 := <[Regidx Rra := regval_into_reg
                       (add_vec_int (mword_of_int (KernelSyms.copyout + 0x42) : mword 64) 4)]> U4).
         assert (Htgtmv : add_vec (mword_of_int (KernelSyms.copyout + 0x42) : mword 64)
-                           (sign_extend' 64 (mword_of_int 2094980 : mword 21))
+                           (sign_extend' 64 (mword_of_int 2094964 : mword 21))
                          = mword_of_int KernelSyms.memmove)
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Htgtmv) in "Hpc".
@@ -1398,7 +1398,7 @@ Section ProofCopyout.
     iEval (rewrite Hp60) in "Hpc".
     (* +0x60 jal ra,walkaddr *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.copyout + 0x60)) Rra
-              (mword_of_int 2095670 : mword 21) V3 (K - 14)%nat b
+              (mword_of_int 2095654 : mword 21) V3 (K - 14)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
@@ -1407,7 +1407,7 @@ Section ProofCopyout.
     set (V4 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.copyout + 0x60) : mword 64) 4)]> V3).
     assert (Htgtwa : add_vec (mword_of_int (KernelSyms.copyout + 0x60) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2095670 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2095654 : mword 21))
                      = mword_of_int KernelSyms.walkaddr)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtwa) in "Hpc".

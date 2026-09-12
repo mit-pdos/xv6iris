@@ -68,7 +68,7 @@ Definition fkr_exec_msg  : Z := 0x80007178.   (* the string "exec"  *)
 Lemma fkr_first_addr :
   add_vec (add_vec (mword_of_int (FR + 0x14) : mword 64)
              (auipc_off (mword_of_int 9 : mword 20)))
-    (sign_extend' 64 (mword_of_int 2350 : mword 12))
+    (sign_extend' 64 (mword_of_int 2274 : mword 12))
   = (mword_of_int KernelSyms.first_1 : mword 64).
 Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 
@@ -109,7 +109,7 @@ Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 (* ---- +0x28 jal fsinit ---- *)
 Lemma fkr_fsinit_tgt :
   add_vec (mword_of_int (FR + 0x28) : mword 64)
-    (sign_extend' 64 (mword_of_int 7234 : mword 21))
+    (sign_extend' 64 (mword_of_int 7250 : mword 21))
   = (mword_of_int KernelSyms.fsinit : mword 64).
 Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 
@@ -123,15 +123,15 @@ Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 Lemma fkr_first_addr2 :
   add_vec (add_vec (mword_of_int (FR + 0x2c) : mword 64)
              (auipc_off (mword_of_int 9 : mword 20)))
-    (sign_extend' 64 (mword_of_int 2326 : mword 12))
+    (sign_extend' 64 (mword_of_int 2250 : mword 12))
   = (mword_of_int KernelSyms.first_1 : mword 64).
 Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 
 (* ---- +0x3c auipc a5,0x6 / +0x40 addi a5,a5,-1992 : the "/init" literal ---- *)
 Lemma fkr_init_path_addr :
   add_vec (add_vec (mword_of_int (FR + 0x3c) : mword 64)
-             (auipc_off (mword_of_int 6 : mword 20)))
-    (sign_extend' 64 (mword_of_int 2118 : mword 12))
+             (auipc_off (mword_of_int 5 : mword 20)))
+    (sign_extend' 64 (mword_of_int 1938 : mword 12))
   = (mword_of_int fkr_init_path : mword 64).
 Proof. rewrite /fkr_init_path. apply bv_eq. vm_compute. reflexivity. Qed.
 
@@ -157,7 +157,7 @@ Proof. apply stk_push. apply bv_eq; vm_compute; reflexivity. Qed.
 (* ---- +0x52 jal kexec ---- *)
 Lemma fkr_kexec_tgt :
   add_vec (mword_of_int (FR + 0x52) : mword 64)
-    (sign_extend' 64 (mword_of_int 11930 : mword 21))
+    (sign_extend' 64 (mword_of_int 11946 : mword 21))
   = (mword_of_int KernelSyms.kexec : mword 64).
 Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 
@@ -194,7 +194,7 @@ Proof. vm_compute. reflexivity. Qed.
 Lemma fkr_exec_msg_addr :
   add_vec (add_vec (mword_of_int (FR + 0x9a) : mword 64)
              (auipc_off (mword_of_int 5 : mword 20)))
-    (sign_extend' 64 (mword_of_int 2032 : mword 12))
+    (sign_extend' 64 (mword_of_int 1852 : mword 12))
   = (mword_of_int fkr_exec_msg : mword 64).
 Proof. rewrite /fkr_exec_msg. apply bv_eq. vm_compute. reflexivity. Qed.
 
@@ -203,7 +203,7 @@ Proof. rewrite /fkr_exec_msg. apply bv_eq. vm_compute. reflexivity. Qed.
    far below forkret in the image. *)
 Lemma fkr_panic_tgt :
   add_vec (mword_of_int (FR + 0xa2) : mword 64)
-    (sign_extend' 64 (mword_of_int 2092676 : mword 21))
+    (sign_extend' 64 (mword_of_int 2092508 : mword 21))
   = (mword_of_int KernelSyms.panic : mword 64).
 Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 
@@ -211,7 +211,7 @@ Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 Lemma fkr_userret_addr :
   add_vec (add_vec (mword_of_int (FR + 0x74) : mword 64)
              (auipc_off (mword_of_int 4 : mword 20)))
-    (sign_extend' 64 (mword_of_int 1850 : mword 12))
+    (sign_extend' 64 (mword_of_int 1646 : mword 12))
   = (mword_of_int KernelSyms.userret : mword 64).
 Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 
@@ -219,7 +219,7 @@ Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 Lemma fkr_trampoline_addr :
   add_vec (add_vec (mword_of_int (FR + 0x7c) : mword 64)
              (auipc_off (mword_of_int 4 : mword 20)))
-    (sign_extend' 64 (mword_of_int 1686 : mword 12))
+    (sign_extend' 64 (mword_of_int 1482 : mword 12))
   = (mword_of_int KernelSyms.trampoline : mword 64).
 Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 

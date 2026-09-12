@@ -150,14 +150,14 @@ Proof. rewrite /uservec_tvec /TRAMPOLINE. apply bv_eq. vm_compute. reflexivity. 
 Lemma prr_uservec_addr :
   add_vec (add_vec (mword_of_int (PRR + 0x18) : mword 64)
              (auipc_off (mword_of_int 4 : mword 20)))
-    (sign_extend' 64 (mword_of_int 2924 : mword 12))
+    (sign_extend' 64 (mword_of_int 2720 : mword 12))
   = (mword_of_int KernelSyms.uservec : mword 64).
 Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 
 Lemma prr_trampoline_addr :
   add_vec (add_vec (mword_of_int (PRR + 0x20) : mword 64)
              (auipc_off (mword_of_int 4 : mword 20)))
-    (sign_extend' 64 (mword_of_int 2916 : mword 12))
+    (sign_extend' 64 (mword_of_int 2712 : mword 12))
   = (mword_of_int KernelSyms.trampoline : mword 64).
 Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 
@@ -180,7 +180,7 @@ Proof. rewrite /uservec_tvec /TRAMPOLINE. vm_compute. discriminate. Qed.
 Lemma prr_usertrap_addr :
   add_vec (add_vec (mword_of_int (PRR + 0x44) : mword 64)
              (auipc_off (mword_of_int 0 : mword 20)))
-    (sign_extend' 64 (mword_of_int 252 : mword 12))
+    (sign_extend' 64 (mword_of_int 268 : mword 12))
   = (mword_of_int KernelSyms.usertrap : mword 64).
 Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 

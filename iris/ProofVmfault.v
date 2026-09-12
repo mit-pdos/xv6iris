@@ -808,7 +808,7 @@ Section ProofVmfault.
       iEval (rewrite Hpp3a) in "Hpc".
       (* +0x3a jal ra,kalloc *)
       iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.vmfault + 0x3a)) Rra
-                (mword_of_int 2094606 : mword 21) N1 (K - 6)%nat b
+                (mword_of_int 2094590 : mword 21) N1 (K - 6)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
@@ -817,7 +817,7 @@ Section ProofVmfault.
       set (A1 := <[Regidx Rra := regval_into_reg
                     (add_vec_int (mword_of_int (KernelSyms.vmfault + 0x3a) : mword 64) 4)]> N1).
       assert (Htgtka : add_vec (mword_of_int (KernelSyms.vmfault + 0x3a) : mword 64)
-                         (sign_extend' 64 (mword_of_int 2094606 : mword 21))
+                         (sign_extend' 64 (mword_of_int 2094590 : mword 21))
                        = mword_of_int KernelSyms.kalloc)
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtka) in "Hpc".
@@ -1051,7 +1051,7 @@ Section ProofVmfault.
       iEval (rewrite Hpp48) in "Hpc".
       (* +0x48 jal ra,memset *)
       iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.vmfault + 0x48)) Rra
-                (mword_of_int 2095002 : mword 21) A5 (K - 6)%nat b
+                (mword_of_int 2094986 : mword 21) A5 (K - 6)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
@@ -1060,7 +1060,7 @@ Section ProofVmfault.
       set (A6 := <[Regidx Rra := regval_into_reg
                     (add_vec_int (mword_of_int (KernelSyms.vmfault + 0x48) : mword 64) 4)]> A5).
       assert (Htgtms : add_vec (mword_of_int (KernelSyms.vmfault + 0x48) : mword 64)
-                         (sign_extend' 64 (mword_of_int 2095002 : mword 21))
+                         (sign_extend' 64 (mword_of_int 2094986 : mword 21))
                        = mword_of_int KernelSyms.memset)
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtms) in "Hpc".
@@ -1200,7 +1200,7 @@ Section ProofVmfault.
       iEval (rewrite Hpp56) in "Hpc".
       (* +0x56 jal ra,mappages *)
       iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.vmfault + 0x56)) Rra
-                (mword_of_int 2095862 : mword 21) G5 (K - 6)%nat b
+                (mword_of_int 2095846 : mword 21) G5 (K - 6)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
@@ -1209,7 +1209,7 @@ Section ProofVmfault.
       set (G6 := <[Regidx Rra := regval_into_reg
                     (add_vec_int (mword_of_int (KernelSyms.vmfault + 0x56) : mword 64) 4)]> G5).
       assert (Htgtmap : add_vec (mword_of_int (KernelSyms.vmfault + 0x56) : mword 64)
-                          (sign_extend' 64 (mword_of_int 2095862 : mword 21))
+                          (sign_extend' 64 (mword_of_int 2095846 : mword 21))
                         = mword_of_int KernelSyms.mappages)
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtmap) in "Hpc".
@@ -1488,7 +1488,7 @@ Section ProofVmfault.
       iEval (rewrite Hpp66) in "Hpc".
       (* +0x66 jal ra,kfree *)
       iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.vmfault + 0x66)) Rra
-                (mword_of_int 2094330 : mword 21) F1 (K - 6)%nat b
+                (mword_of_int 2094314 : mword 21) F1 (K - 6)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
@@ -1497,7 +1497,7 @@ Section ProofVmfault.
       set (F2 := <[Regidx Rra := regval_into_reg
                     (add_vec_int (mword_of_int (KernelSyms.vmfault + 0x66) : mword 64) 4)]> F1).
       assert (Htgtkf : add_vec (mword_of_int (KernelSyms.vmfault + 0x66) : mword 64)
-                         (sign_extend' 64 (mword_of_int 2094330 : mword 21))
+                         (sign_extend' 64 (mword_of_int 2094314 : mword 21))
                        = mword_of_int KernelSyms.kfree)
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtkf) in "Hpc".

@@ -529,7 +529,7 @@ Section ProofAcquire.
     { rewrite /B8 upd_ne; [| vm_compute; discriminate].
       rewrite /B3 upd_ne; [| vm_compute; discriminate].
       rewrite Hcsph. exact HcspB2. }
-    iApply (Mycpu.wp_call_mycpu_sconf_cs kt (mword_of_int (KernelSyms.acquire + 0x24)) (mword_of_int 0xcdc : mword 21) B8 (trap_res b + (av - 4))%nat p
+    iApply (Mycpu.wp_call_mycpu_sconf_cs kt (mword_of_int (KernelSyms.acquire + 0x24)) (mword_of_int 0xcec : mword 21) B8 (trap_res b + (av - 4))%nat p
               ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(lia)
               with "Hcg Htext Hpc []").

@@ -23,13 +23,13 @@ Require Import KernelDecode03.
 Require Import KernelDecode04.
 Require Import KernelDecode05.
 Require Import KernelDecode08.
-Require Import KernelDecode09.
 Require Import KernelDecode10.
 Require Import KernelDecode11.
 Require Import KernelDecode12.
 Require Import KernelDecode13.
 Require Import KernelDecode14.
 Require Import KernelDecode15.
+Require Import KernelDecode16.
 Require Import KernelDecode17.
 Require Import KernelDecode18.
 Require Import KernelDecode19.
@@ -155,9 +155,9 @@ Section CodeVmfault.
   Proof. mk_rvc (KernelSyms.vmfault + 0x38) (mword_of_int 0xe84a : mword 16)
     (mword_of_int (KernelSyms.vmfault + 0x38) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), Regidx (mword_of_int 18), sp, 8)) kd_e84a exec_execute_C_SDSP. Qed.
 
-  Lemma vfi_3a : kernel_text -∗ instr (mword_of_int (KernelSyms.vmfault + 0x3a) : mword 64) false (JAL (mword_of_int 2094606 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.vmfault + 0x3a) (mword_of_int 0xe0eff0ef : mword 32)
-    (mword_of_int (KernelSyms.vmfault + 0x3a) : mword 64) (JAL (mword_of_int 2094606 : mword 21, Regidx (mword_of_int 1))) kd_e0eff0ef. Qed.
+  Lemma vfi_3a : kernel_text -∗ instr (mword_of_int (KernelSyms.vmfault + 0x3a) : mword 64) false (JAL (mword_of_int 2094590 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.vmfault + 0x3a) (mword_of_int 0xdfeff0ef : mword 32)
+    (mword_of_int (KernelSyms.vmfault + 0x3a) : mword 64) (JAL (mword_of_int 2094590 : mword 21, Regidx (mword_of_int 1))) kd_dfeff0ef. Qed.
 
   Lemma vfi_3e : kernel_text -∗ instr (mword_of_int (KernelSyms.vmfault + 0x3e) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 18), ADD)).
   Proof. mk_rvc (KernelSyms.vmfault + 0x3e) (mword_of_int 0x892a : mword 16)
@@ -179,9 +179,9 @@ Section CodeVmfault.
   Proof. mk_rvc (KernelSyms.vmfault + 0x46) (mword_of_int 0x4581 : mword 16)
     (mword_of_int (KernelSyms.vmfault + 0x46) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 11), ADDI)) kd_4581 exec_execute_C_LI. Qed.
 
-  Lemma vfi_48 : kernel_text -∗ instr (mword_of_int (KernelSyms.vmfault + 0x48) : mword 64) false (JAL (mword_of_int 2095002 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.vmfault + 0x48) (mword_of_int 0xf9aff0ef : mword 32)
-    (mword_of_int (KernelSyms.vmfault + 0x48) : mword 64) (JAL (mword_of_int 2095002 : mword 21, Regidx (mword_of_int 1))) kd_f9aff0ef. Qed.
+  Lemma vfi_48 : kernel_text -∗ instr (mword_of_int (KernelSyms.vmfault + 0x48) : mword 64) false (JAL (mword_of_int 2094986 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.vmfault + 0x48) (mword_of_int 0xf8aff0ef : mword 32)
+    (mword_of_int (KernelSyms.vmfault + 0x48) : mword 64) (JAL (mword_of_int 2094986 : mword 21, Regidx (mword_of_int 1))) kd_f8aff0ef. Qed.
 
   Lemma vfi_4c : kernel_text -∗ instr (mword_of_int (KernelSyms.vmfault + 0x4c) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 22 : mword 6), zreg, Regidx (mword_of_int 14), ADDI)).
   Proof. mk_rvc (KernelSyms.vmfault + 0x4c) (mword_of_int 0x4759 : mword 16)
@@ -203,9 +203,9 @@ Section CodeVmfault.
   Proof. mk_rvc (KernelSyms.vmfault + 0x54) (mword_of_int 0x8526 : mword 16)
     (mword_of_int (KernelSyms.vmfault + 0x54) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) kd_8526 exec_execute_C_MV. Qed.
 
-  Lemma vfi_56 : kernel_text -∗ instr (mword_of_int (KernelSyms.vmfault + 0x56) : mword 64) false (JAL (mword_of_int 2095862 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.vmfault + 0x56) (mword_of_int 0xaf7ff0ef : mword 32)
-    (mword_of_int (KernelSyms.vmfault + 0x56) : mword 64) (JAL (mword_of_int 2095862 : mword 21, Regidx (mword_of_int 1))) kd_af7ff0ef. Qed.
+  Lemma vfi_56 : kernel_text -∗ instr (mword_of_int (KernelSyms.vmfault + 0x56) : mword 64) false (JAL (mword_of_int 2095846 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.vmfault + 0x56) (mword_of_int 0xae7ff0ef : mword 32)
+    (mword_of_int (KernelSyms.vmfault + 0x56) : mword 64) (JAL (mword_of_int 2095846 : mword 21, Regidx (mword_of_int 1))) kd_ae7ff0ef. Qed.
 
   Lemma vfi_5a : kernel_text -∗ instr (mword_of_int (KernelSyms.vmfault + 0x5a) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 5 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BNE)).
   Proof. mk_rvc (KernelSyms.vmfault + 0x5a) (mword_of_int 0xe509 : mword 16)
@@ -231,9 +231,9 @@ Section CodeVmfault.
   Proof. mk_rvc (KernelSyms.vmfault + 0x64) (mword_of_int 0x854a : mword 16)
     (mword_of_int (KernelSyms.vmfault + 0x64) : mword 64) (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 10), ADD)) kd_854a exec_execute_C_MV. Qed.
 
-  Lemma vfi_66 : kernel_text -∗ instr (mword_of_int (KernelSyms.vmfault + 0x66) : mword 64) false (JAL (mword_of_int 2094330 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.vmfault + 0x66) (mword_of_int 0xcfaff0ef : mword 32)
-    (mword_of_int (KernelSyms.vmfault + 0x66) : mword 64) (JAL (mword_of_int 2094330 : mword 21, Regidx (mword_of_int 1))) kd_cfaff0ef. Qed.
+  Lemma vfi_66 : kernel_text -∗ instr (mword_of_int (KernelSyms.vmfault + 0x66) : mword 64) false (JAL (mword_of_int 2094314 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.vmfault + 0x66) (mword_of_int 0xceaff0ef : mword 32)
+    (mword_of_int (KernelSyms.vmfault + 0x66) : mword 64) (JAL (mword_of_int 2094314 : mword 21, Regidx (mword_of_int 1))) kd_ceaff0ef. Qed.
 
   Lemma vfi_6a : kernel_text -∗ instr (mword_of_int (KernelSyms.vmfault + 0x6a) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 20), ADDI)).
   Proof. mk_rvc (KernelSyms.vmfault + 0x6a) (mword_of_int 0x4a01 : mword 16)

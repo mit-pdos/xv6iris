@@ -57,8 +57,8 @@ Import Defs.
    so the address is (usertrap + off - 4) + (5 << 12) + sext12(imm).
    (xv6 9dd28f5e had them at 0x80007280 / 0x800072b0, 0024d4b at
    0x80007298 / 0x800072c8.) *)
-Definition ut_fmt1_a : Z := 0x800072a0.
-Definition ut_fmt2_a : Z := 0x800072d0.
+Definition ut_fmt1_a : Z := 0x800072b8.
+Definition ut_fmt2_a : Z := 0x800072e8.
 
 Definition ut_nl : string := String (ascii_of_nat 10) EmptyString.
 

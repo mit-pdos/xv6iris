@@ -375,10 +375,10 @@ Section KexecCSetup.
                             Hf64 & Hf65 & Hf66 & Hf67 & Hf68)".
     (* ---- +0x1ae: jal ra,myproc ---- *)
     assert (Htmp : add_vec (mword_of_int (KXC + 0x1ae) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2084660 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2084644 : mword 21))
                    = mword_of_int KernelSyms.myproc) by pcw.
     iApply (wp_jal_s_sconf (mword_of_int (KXC + 0x1ae)) Rra
-              (mword_of_int 2084660 : mword 21) M (K - 68)%nat eb
+              (mword_of_int 2084644 : mword 21) M (K - 68)%nat eb
               ltac:(nz) ltac:(rdok)
               ltac:(rewrite Htmp; vm_compute; reflexivity)
               with "Hcg Hpc []").
@@ -767,10 +767,10 @@ Section KexecCSetup.
     iEval (rewrite Hpp1ce) in "Hpc".
     (* ---- +0x1ce: jal ra,uvmalloc ---- *)
     assert (Htuvm : add_vec (mword_of_int (KXC + 0x1ce) : mword 64)
-                      (sign_extend' 64 (mword_of_int 2083002 : mword 21))
+                      (sign_extend' 64 (mword_of_int 2082986 : mword 21))
                     = mword_of_int KernelSyms.uvmalloc) by pcw.
     iApply (wp_jal_s_sconf (mword_of_int (KXC + 0x1ce)) Rra
-              (mword_of_int 2083002 : mword 21) T12 (K - 68)%nat eb
+              (mword_of_int 2082986 : mword 21) T12 (K - 68)%nat eb
               ltac:(nz) ltac:(rdok)
               ltac:(rewrite Htuvm; vm_compute; reflexivity)
               with "Hcg Hpc []").
@@ -1225,10 +1225,10 @@ Section KexecCSetup.
       iEval (rewrite Hpp1fc) in "Hpc".
       (* ---- +0x1fa: jal ra,uvmclear ---- *)
       assert (Htuvc : add_vec (mword_of_int (KXC + 0x1fc) : mword 64)
-                        (sign_extend' 64 (mword_of_int 2083422 : mword 21))
+                        (sign_extend' 64 (mword_of_int 2083406 : mword 21))
                       = mword_of_int KernelSyms.uvmclear) by pcw.
       iApply (wp_jal_s_sconf (mword_of_int (KXC + 0x1fc)) Rra
-                (mword_of_int 2083422 : mword 21) U3 (K - 68)%nat eb
+                (mword_of_int 2083406 : mword 21) U3 (K - 68)%nat eb
                 ltac:(nz) ltac:(rdok)
                 ltac:(rewrite Htuvc; vm_compute; reflexivity)
                 with "Hcg Hpc []").
@@ -2552,10 +2552,10 @@ Section KexecCLoop.
     iDestruct (big_sepL_lookup_acc _ _ c c Hlac with "Hargs") as "[Hargc Hargsback]".
     (* ---- +0x21a: jal ra,strlen (a0 = avf c already) ---- *)
     assert (Htstr1 : add_vec (mword_of_int (KXC + 0x218) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2081780 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2081748 : mword 21))
                      = mword_of_int KernelSyms.strlen) by pcw.
     iApply (wp_jal_s_sconf (mword_of_int (KXC + 0x218)) Rra
-              (mword_of_int 2081780 : mword 21) M (K - 68)%nat eb
+              (mword_of_int 2081748 : mword 21) M (K - 68)%nat eb
               ltac:(nz) ltac:(rdok)
               ltac:(rewrite Htstr1; vm_compute; reflexivity)
               with "Hcg Hpc []").
@@ -2986,10 +2986,10 @@ Section KexecCLoop.
          gives it back read-only, and nothing between +0x21a and here
          touched it. ---- *)
       assert (Htstr2 : add_vec (mword_of_int (KXC + 0x236) : mword 64)
-                         (sign_extend' 64 (mword_of_int 2081750 : mword 21))
+                         (sign_extend' 64 (mword_of_int 2081718 : mword 21))
                        = mword_of_int KernelSyms.strlen) by pcw.
       iApply (wp_jal_s_sconf (mword_of_int (KXC + 0x236)) Rra
-                (mword_of_int 2081750 : mword 21) T6 (K - 68)%nat eb
+                (mword_of_int 2081718 : mword 21) T6 (K - 68)%nat eb
                 ltac:(nz) ltac:(rdok)
                 ltac:(rewrite Htstr2; vm_compute; reflexivity)
                 with "Hcg Hpc []").
@@ -3277,10 +3277,10 @@ Section KexecCLoop.
         change (2 ^ 38 - 8192)%Z with 274877898752%Z in Hmax.
         change (2 ^ 38)%Z with 274877906944%Z. lia. }
       assert (Htco236 : add_vec (mword_of_int (KXC + 0x246) : mword 64)
-                           (sign_extend' 64 (mword_of_int 2083542 : mword 21))
+                           (sign_extend' 64 (mword_of_int 2083526 : mword 21))
                          = mword_of_int KernelSyms.copyout) by pcw.
       iApply (wp_jal_s_sconf (mword_of_int (KXC + 0x246)) Rra
-                (mword_of_int 2083542 : mword 21) T12 (K - 68)%nat eb
+                (mword_of_int 2083526 : mword 21) T12 (K - 68)%nat eb
                 ltac:(nz) ltac:(rdok)
                 ltac:(rewrite Htco236; vm_compute; reflexivity)
                 with "Hcg Hpc []").
@@ -5045,10 +5045,10 @@ Section KexecCClose.
       iEval (rewrite Hpp294) in "Hpc".
       (* ---- +0x29e: jal ra,copyout ---- *)
       assert (Htco : add_vec (mword_of_int (KXC + 0x294) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2083464 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2083448 : mword 21))
                      = mword_of_int KernelSyms.copyout) by pcw.
       iApply (wp_jal_s_sconf (mword_of_int (KXC + 0x294)) Rra
-                (mword_of_int 2083464 : mword 21) X11 (K - 68)%nat eb
+                (mword_of_int 2083448 : mword 21) X11 (K - 68)%nat eb
                 ltac:(nz) ltac:(rdok)
                 ltac:(rewrite Htco; vm_compute; reflexivity)
                 with "Hcg Hpc []").

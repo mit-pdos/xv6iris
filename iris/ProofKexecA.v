@@ -335,10 +335,10 @@ Section KexecAUABody.
     destruct HM1 as (HM1sp & HM1s0 & HM1s2 & HM1a0 & HM1a1 & HM1thr).
     (* ---- +0x020: jal ra,myproc ---- *)
     assert (Htmp : add_vec (mword_of_int (KXA + 0x020) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2085058 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2085042 : mword 21))
                    = mword_of_int KernelSyms.myproc) by pcw.
     iApply (wp_jal_s_sconf (mword_of_int (KXA + 0x020)) Rra
-              (mword_of_int 2085058 : mword 21) M1 (K - 68)%nat eb
+              (mword_of_int 2085042 : mword 21) M1 (K - 68)%nat eb
               ltac:(nz) ltac:(rdok)
               ltac:(rewrite Htmp; vm_compute; reflexivity)
               with "Hcg Hpc []").

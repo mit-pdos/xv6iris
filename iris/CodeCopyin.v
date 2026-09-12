@@ -182,9 +182,9 @@ Section CodeCopyin.
   Proof. mk_rvc (KernelSyms.copyin + 0x46) (mword_of_int 0x8556 : mword 16)
     (mword_of_int (KernelSyms.copyin + 0x46) : mword 64) (RTYPE (Regidx (mword_of_int 21), zreg, Regidx (mword_of_int 10), ADD)) kd_8556 exec_execute_C_MV. Qed.
 
-  Lemma cii_48 : kernel_text -∗ instr (mword_of_int (KernelSyms.copyin + 0x48) : mword 64) false (JAL (mword_of_int 2094776 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.copyin + 0x48) (mword_of_int 0xeb8ff0ef : mword 32)
-    (mword_of_int (KernelSyms.copyin + 0x48) : mword 64) (JAL (mword_of_int 2094776 : mword 21, Regidx (mword_of_int 1))) kd_eb8ff0ef. Qed.
+  Lemma cii_48 : kernel_text -∗ instr (mword_of_int (KernelSyms.copyin + 0x48) : mword 64) false (JAL (mword_of_int 2094760 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.copyin + 0x48) (mword_of_int 0xea8ff0ef : mword 32)
+    (mword_of_int (KernelSyms.copyin + 0x48) : mword 64) (JAL (mword_of_int 2094760 : mword 21, Regidx (mword_of_int 1))) kd_ea8ff0ef. Qed.
 
   Lemma cii_4c : kernel_text -∗ instr (mword_of_int (KernelSyms.copyin + 0x4c) : mword 64) false (RTYPE (Regidx (mword_of_int 9), Regidx (mword_of_int 20), Regidx (mword_of_int 20), SUB)).
   Proof. mk_base (KernelSyms.copyin + 0x4c) (mword_of_int 0x409a0a33 : mword 32)
@@ -214,9 +214,9 @@ Section CodeCopyin.
   Proof. mk_rvc (KernelSyms.copyin + 0x60) (mword_of_int 0x855e : mword 16)
     (mword_of_int (KernelSyms.copyin + 0x60) : mword 64) (RTYPE (Regidx (mword_of_int 23), zreg, Regidx (mword_of_int 10), ADD)) kd_855e exec_execute_C_MV. Qed.
 
-  Lemma cii_62 : kernel_text -∗ instr (mword_of_int (KernelSyms.copyin + 0x62) : mword 64) false (JAL (mword_of_int 2095470 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.copyin + 0x62) (mword_of_int 0x96fff0ef : mword 32)
-    (mword_of_int (KernelSyms.copyin + 0x62) : mword 64) (JAL (mword_of_int 2095470 : mword 21, Regidx (mword_of_int 1))) kd_96fff0ef. Qed.
+  Lemma cii_62 : kernel_text -∗ instr (mword_of_int (KernelSyms.copyin + 0x62) : mword 64) false (JAL (mword_of_int 2095454 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.copyin + 0x62) (mword_of_int 0x95fff0ef : mword 32)
+    (mword_of_int (KernelSyms.copyin + 0x62) : mword 64) (JAL (mword_of_int 2095454 : mword 21, Regidx (mword_of_int 1))) kd_95fff0ef. Qed.
 
   Lemma cii_66 : kernel_text -∗ instr (mword_of_int (KernelSyms.copyin + 0x66) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 229 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BNE)).
   Proof. mk_rvc (KernelSyms.copyin + 0x66) (mword_of_int 0xf569 : mword 16)

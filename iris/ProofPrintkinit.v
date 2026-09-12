@@ -38,7 +38,7 @@ Section CodePrintkinitBundle.
      whole-function proof instantiates. *)
   Lemma pkni_code :
     kernel_text -∗ ilw_code KernelSyms.printkinit (mword_of_int 6) (mword_of_int 18)
-                            (mword_of_int 2016) (mword_of_int 2792) (mword_of_int 724).
+                            (mword_of_int 1966) (mword_of_int 2934) (mword_of_int 846).
   Proof.
     iIntros "#Ht". rewrite /ilw_code.
     iSplitR; [iApply (pkni_00 with "Ht")|].

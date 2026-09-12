@@ -723,7 +723,7 @@ Section ProofUartintr.
        moves [uart_acc] / [u_out] / DLAB ([DevModel.uart_read_stable]), so the
        ghost-free leaf serves.  Nothing is cashed out of the THRE bit either
        -- uartwrite polls it for itself. *)
-    iApply (wp_lui_s_sconf (mword_of_int (KernelSyms.uartintr + 0x14)) Ra5 (mword_of_int 0x10000 : mword 20)
+    iApply (wp_lui_s_sconf (mword_of_int (KernelSyms.uartintr + 0x14)) Ra5 (mword_of_int 0xa : mword 20)
               (uart_pa Uart0 0) A3 (av - 4)%nat b ltac:(nz) ltac:(rdok)
               ltac:(apply bv_eq; vm_compute; reflexivity) with "Hcg Hpc []").
     { iApply (uii2_14 with "Ht"). }
@@ -737,7 +737,7 @@ Section ProofUartintr.
               = uart_pa Uart0 5).
     { intros CID'; rgne. rewrite HA4a5. apply bv_eq; vm_compute; reflexivity. }
     iApply (UAcc.wp_uart_read_free_s_sconf γu γv 5 (mword_of_int (KernelSyms.uartintr + 0x18)) Ra5 Ra5
-              (mword_of_int 5 : mword 12) A4 (av - 4)%nat b
+              (mword_of_int 2198 : mword 12) A4 (av - 4)%nat b
               ltac:(unfold uart_size; lia) ltac:(nz) ltac:(nz) ltac:(rdok) (HA4ad _)
               with "Hcg Hpc [] Hdinv").
     { iApply (uii2_18 with "Ht"). }
@@ -809,15 +809,15 @@ Section ProofUartintr.
       iEval (rewrite P42) in "Hpc".
       assert (HT1rg : forall (CID' : CpuId), rget (CID := CID') T1 Ra0 = T1 !!! Regidx Ra0)
         by (intros CID'; rgne; reflexivity).
-      iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.uartintr + 0x42)) Ra0 Ra0 (mword_of_int 2208 : mword 12)
+      iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.uartintr + 0x42)) Ra0 Ra0 (mword_of_int 5 : mword 12)
                 T1 (av - 4)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
       { iApply (uii2_42 with "Ht"). }
       iIntros (CIDW2 HsW2) "Hcg Hpc".
       iEval (rewrite HT1rg) in "Hcg".
       set (T2 := <[Regidx Ra0 := regval_into_reg
-          (add_vec (T1 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 2208 : mword 12)))]> T1).
+          (add_vec (T1 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 5 : mword 12)))]> T1).
       change (<[Regidx Ra0 := regval_into_reg
-          (add_vec (T1 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 2208 : mword 12)))]> T1) with T2.
+          (add_vec (T1 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 5 : mword 12)))]> T1) with T2.
       (* the sanity check that a0 really is the wait channel; wakeup's contract
          does not name it, so this is documentation, not a premise. *)
       assert (HT2a0 : T2 !!! Regidx Ra0 = a_tx_chan).

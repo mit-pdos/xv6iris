@@ -49,8 +49,8 @@ Local Open Scope Z_scope.
    to every initsleeplock.  Both sit in .rodata past etext with no ELF symbol of
    their own, so they are spelled out here; the proof reads their bytes out of
    [kernel_data] with [kernel_data_string]. *)
-Definition bcache_name_str : Z := 0x800073a0.
-Definition buffer_name_str : Z := 0x800073a8.
+Definition bcache_name_str : Z := 0x800073b8.
+Definition buffer_name_str : Z := 0x800073c0.
 
 Definition wp_binit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (m : regfile) (K : nat)
     (vlock : mword 32) (vname vcpu : mword 64) (b : bool) (p : mword 64) :=

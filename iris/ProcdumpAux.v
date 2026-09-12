@@ -221,7 +221,7 @@ Definition pd_fmt : string := "%d %s %s".
    consecutive doublewords from [states_0]; the strings themselves are eight
    bytes apart starting at [pd_state_s0]. *)
 Definition pd_states_a : Z := KernelSyms.states_0.
-Definition pd_state_s0 : Z := 0x80007228.
+Definition pd_state_s0 : Z := 0x80007240.
 Definition pd_state_a (k : nat) : Z := pd_state_s0 + 8 * Z.of_nat k.
 Definition pd_state_p (k : nat) : mword 64 := mword_of_int (pd_state_a k).
 

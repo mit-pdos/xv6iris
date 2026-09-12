@@ -2555,11 +2555,11 @@ Section KexecB3Body.
                 iEval (rewrite Hpp17c) in "Hpc".
                 (* ---- +0x17c: jal ra,uvmalloc ---- *)
                 assert (Htuvm : add_vec (mword_of_int (KXB + 0x17c) : mword 64)
-                                  (sign_extend' 64 (mword_of_int 2083084
+                                  (sign_extend' 64 (mword_of_int 2083068
                                                     : mword 21))
                                 = mword_of_int KernelSyms.uvmalloc) by bpcw.
                 iApply (wp_jal_s_sconf (mword_of_int (KXB + 0x17c)) Rra
-                          (mword_of_int 2083084 : mword 21) U19 (K - 68)%nat eb
+                          (mword_of_int 2083068 : mword 21) U19 (K - 68)%nat eb
                           ltac:(bnz) ltac:(rdok)
                           ltac:(rewrite Htuvm; vm_compute; reflexivity)
                           with "Hcg Hpc []").

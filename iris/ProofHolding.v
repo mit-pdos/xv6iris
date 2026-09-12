@@ -315,7 +315,7 @@ Section ProofHolding.
       rewrite /S3 upd_ne; [| vm_compute; discriminate].
       rewrite /S2 upd_ne; [| vm_compute; discriminate].
       exact HcspS0. }
-    iApply (Mycpu.wp_call_mycpu_sconf_cs kt (mword_of_int (KernelSyms.holding + 0x16)) (mword_of_int 0xd50 : mword 21) S4 (n - 4)%nat p
+    iApply (Mycpu.wp_call_mycpu_sconf_cs kt (mword_of_int (KernelSyms.holding + 0x16)) (mword_of_int 0xd60 : mword 21) S4 (n - 4)%nat p
               ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(lia)
               with "Hcg Htext Hpc []").
@@ -679,7 +679,7 @@ Section ProofHolding.
       rewrite /S3 upd_ne; [| vm_compute; discriminate].
       rewrite /S2 upd_ne; [| vm_compute; discriminate].
       exact HcspS0. }
-    iApply (Mycpu.wp_call_mycpu_sconf_cs kt (mword_of_int (KernelSyms.holding + 0x16)) (mword_of_int 0xd50 : mword 21) S4 (n - 4)%nat p
+    iApply (Mycpu.wp_call_mycpu_sconf_cs kt (mword_of_int (KernelSyms.holding + 0x16)) (mword_of_int 0xd60 : mword 21) S4 (n - 4)%nat p
               ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(lia)
               with "Hcg Htext Hpc []").

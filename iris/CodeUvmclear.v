@@ -16,9 +16,9 @@ Require Import KernelText.
 Require Import WpMmodeLeafBase.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import KernelDecode00.
 Require Import KernelDecode01.
 Require Import KernelDecode03.
-Require Import KernelDecode04.
 Require Import KernelDecode05.
 Require Import KernelDecode06.
 Require Import KernelDecode07.
@@ -27,9 +27,10 @@ Require Import KernelDecode13.
 Require Import KernelDecode14.
 Require Import KernelDecode15.
 Require Import KernelDecode19.
+Require Import KernelDecode20.
 Require Import KernelDecode24.
 Require Import KernelDecode25.
-Require Import KernelDecode29.
+Require Import KernelDecode30.
 Require Import KernelDecode31.
 Local Open Scope Z_scope.
 Import Defs.
@@ -61,9 +62,9 @@ Section CodeUvmclear.
   Proof. mk_rvc (KernelSyms.uvmclear + 0x8) (mword_of_int 0x4601 : mword 16)
     (mword_of_int (KernelSyms.uvmclear + 0x8) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 12), ADDI)) kd_4601 exec_execute_C_LI. Qed.
 
-  Lemma ucli_0a : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmclear + 0xa) : mword 64) false (JAL (mword_of_int 2095796 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.uvmclear + 0xa) (mword_of_int 0xab5ff0ef : mword 32)
-    (mword_of_int (KernelSyms.uvmclear + 0xa) : mword 64) (JAL (mword_of_int 2095796 : mword 21, Regidx (mword_of_int 1))) kd_ab5ff0ef. Qed.
+  Lemma ucli_0a : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmclear + 0xa) : mword 64) false (JAL (mword_of_int 2095780 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.uvmclear + 0xa) (mword_of_int 0xaa5ff0ef : mword 32)
+    (mword_of_int (KernelSyms.uvmclear + 0xa) : mword 64) (JAL (mword_of_int 2095780 : mword 21, Regidx (mword_of_int 1))) kd_aa5ff0ef. Qed.
 
   Lemma ucli_0e : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmclear + 0xe) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 8 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BEQ)).
   Proof. mk_rvc (KernelSyms.uvmclear + 0xe) (mword_of_int 0xc901 : mword 16)
@@ -101,12 +102,12 @@ Section CodeUvmclear.
   Proof. mk_base (KernelSyms.uvmclear + 0x1e) (mword_of_int 0x00006517 : mword 32)
     (mword_of_int (KernelSyms.uvmclear + 0x1e) : mword 64) (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00006517. Qed.
 
-  Lemma ucli_22 : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmclear + 0x22) : mword 64) false (ITYPE (mword_of_int 3302 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.uvmclear + 0x22) (mword_of_int 0xce650513 : mword 32)
-    (mword_of_int (KernelSyms.uvmclear + 0x22) : mword 64) (ITYPE (mword_of_int 3302 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_ce650513. Qed.
+  Lemma ucli_22 : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmclear + 0x22) : mword 64) false (ITYPE (mword_of_int 3122 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.uvmclear + 0x22) (mword_of_int 0xc3250513 : mword 32)
+    (mword_of_int (KernelSyms.uvmclear + 0x22) : mword 64) (ITYPE (mword_of_int 3122 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_c3250513. Qed.
 
-  Lemma ucli_26 : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmclear + 0x26) : mword 64) false (JAL (mword_of_int 2094020 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.uvmclear + 0x26) (mword_of_int 0xbc4ff0ef : mword 32)
-    (mword_of_int (KernelSyms.uvmclear + 0x26) : mword 64) (JAL (mword_of_int 2094020 : mword 21, Regidx (mword_of_int 1))) kd_bc4ff0ef. Qed.
+  Lemma ucli_26 : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmclear + 0x26) : mword 64) false (JAL (mword_of_int 2093882 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.uvmclear + 0x26) (mword_of_int 0xb3aff0ef : mword 32)
+    (mword_of_int (KernelSyms.uvmclear + 0x26) : mword 64) (JAL (mword_of_int 2093882 : mword 21, Regidx (mword_of_int 1))) kd_b3aff0ef. Qed.
 
 End CodeUvmclear.

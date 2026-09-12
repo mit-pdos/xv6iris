@@ -847,7 +847,7 @@ Section ProofCopyin.
         iEval (rewrite Hp48) in "Hpc".
         (* ---- +0x44 jal ra,memmove ---- *)
         iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.copyin + 0x48)) Rra
-                  (mword_of_int 2094776 : mword 21) D4 (K - 12) b
+                  (mword_of_int 2094760 : mword 21) D4 (K - 12) b
                   ltac:(vm_compute; discriminate) ltac:(rdok)
                   ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
@@ -856,7 +856,7 @@ Section ProofCopyin.
         set (D5 := <[Regidx Rra := regval_into_reg
                       (add_vec_int (mword_of_int (KernelSyms.copyin + 0x48) : mword 64) 4)]> D4).
         assert (Htgtmm : add_vec (mword_of_int (KernelSyms.copyin + 0x48) : mword 64)
-                           (sign_extend' 64 (mword_of_int 2094776 : mword 21))
+                           (sign_extend' 64 (mword_of_int 2094760 : mword 21))
                          = mword_of_int KernelSyms.memmove)
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Htgtmm) in "Hpc".
@@ -1202,7 +1202,7 @@ Section ProofCopyin.
     iEval (rewrite Hp62) in "Hpc".
     (* ---- +0x5e jal ra,walkaddr ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.copyin + 0x62)) Rra
-              (mword_of_int 2095470 : mword 21) W3 (K - 12) b
+              (mword_of_int 2095454 : mword 21) W3 (K - 12) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
@@ -1211,7 +1211,7 @@ Section ProofCopyin.
     set (W4 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.copyin + 0x62) : mword 64) 4)]> W3).
     assert (Htgtwa : add_vec (mword_of_int (KernelSyms.copyin + 0x62) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2095470 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2095454 : mword 21))
                      = mword_of_int KernelSyms.walkaddr)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtwa) in "Hpc".

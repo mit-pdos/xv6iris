@@ -20,11 +20,13 @@ Require Import KernelDecode00.
 Require Import KernelDecode01.
 Require Import KernelDecode02.
 Require Import KernelDecode03.
+Require Import KernelDecode04.
 Require Import KernelDecode05.
 Require Import KernelDecode06.
 Require Import KernelDecode07.
 Require Import KernelDecode08.
 Require Import KernelDecode09.
+Require Import KernelDecode11.
 Require Import KernelDecode12.
 Require Import KernelDecode13.
 Require Import KernelDecode14.
@@ -146,9 +148,9 @@ Section CodeUvmcopy.
   Proof. mk_rvc (KernelSyms.uvmcopy + 0x2e) (mword_of_int 0x855a : mword 16)
     (mword_of_int (KernelSyms.uvmcopy + 0x2e) : mword 64) (RTYPE (Regidx (mword_of_int 22), zreg, Regidx (mword_of_int 10), ADD)) kd_855a exec_execute_C_MV. Qed.
 
-  Lemma uci_30 : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmcopy + 0x30) : mword 64) false (JAL (mword_of_int 2095912 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.uvmcopy + 0x30) (mword_of_int 0xb29ff0ef : mword 32)
-    (mword_of_int (KernelSyms.uvmcopy + 0x30) : mword 64) (JAL (mword_of_int 2095912 : mword 21, Regidx (mword_of_int 1))) kd_b29ff0ef. Qed.
+  Lemma uci_30 : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmcopy + 0x30) : mword 64) false (JAL (mword_of_int 2095896 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.uvmcopy + 0x30) (mword_of_int 0xb19ff0ef : mword 32)
+    (mword_of_int (KernelSyms.uvmcopy + 0x30) : mword 64) (JAL (mword_of_int 2095896 : mword 21, Regidx (mword_of_int 1))) kd_b19ff0ef. Qed.
 
   Lemma uci_34 : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmcopy + 0x34) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 248 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BEQ)).
   Proof. mk_rvc (KernelSyms.uvmcopy + 0x34) (mword_of_int 0xd965 : mword 16)
@@ -166,9 +168,9 @@ Section CodeUvmcopy.
   Proof. mk_rvc (KernelSyms.uvmcopy + 0x3e) (mword_of_int 0xd3fd : mword 16)
     (mword_of_int (KernelSyms.uvmcopy + 0x3e) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 243 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BEQ)) kd_d3fd exec_execute_C_BEQZ. Qed.
 
-  Lemma uci_40 : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmcopy + 0x40) : mword 64) false (JAL (mword_of_int 2094824 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.uvmcopy + 0x40) (mword_of_int 0xee8ff0ef : mword 32)
-    (mword_of_int (KernelSyms.uvmcopy + 0x40) : mword 64) (JAL (mword_of_int 2094824 : mword 21, Regidx (mword_of_int 1))) kd_ee8ff0ef. Qed.
+  Lemma uci_40 : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmcopy + 0x40) : mword 64) false (JAL (mword_of_int 2094808 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.uvmcopy + 0x40) (mword_of_int 0xed8ff0ef : mword 32)
+    (mword_of_int (KernelSyms.uvmcopy + 0x40) : mword 64) (JAL (mword_of_int 2094808 : mword 21, Regidx (mword_of_int 1))) kd_ed8ff0ef. Qed.
 
   Lemma uci_44 : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmcopy + 0x44) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 18), ADD)).
   Proof. mk_rvc (KernelSyms.uvmcopy + 0x44) (mword_of_int 0x892a : mword 16)
@@ -190,9 +192,9 @@ Section CodeUvmcopy.
   Proof. mk_rvc (KernelSyms.uvmcopy + 0x4e) (mword_of_int 0x05b2 : mword 16)
     (mword_of_int (KernelSyms.uvmcopy + 0x4e) : mword 64) (SHIFTIOP (mword_of_int 12 : mword 6, Regidx (mword_of_int 11), Regidx (mword_of_int 11), SLLI)) kd_05b2 exec_execute_C_SLLI. Qed.
 
-  Lemma uci_50 : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmcopy + 0x50) : mword 64) false (JAL (mword_of_int 2095314 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.uvmcopy + 0x50) (mword_of_int 0x8d3ff0ef : mword 32)
-    (mword_of_int (KernelSyms.uvmcopy + 0x50) : mword 64) (JAL (mword_of_int 2095314 : mword 21, Regidx (mword_of_int 1))) kd_8d3ff0ef. Qed.
+  Lemma uci_50 : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmcopy + 0x50) : mword 64) false (JAL (mword_of_int 2095298 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.uvmcopy + 0x50) (mword_of_int 0x8c3ff0ef : mword 32)
+    (mword_of_int (KernelSyms.uvmcopy + 0x50) : mword 64) (JAL (mword_of_int 2095298 : mword 21, Regidx (mword_of_int 1))) kd_8c3ff0ef. Qed.
 
   Lemma uci_54 : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmcopy + 0x54) : mword 64) false (ITYPE (mword_of_int 1023 : mword 12, Regidx (mword_of_int 19), Regidx (mword_of_int 14), ANDI)).
   Proof. mk_base (KernelSyms.uvmcopy + 0x54) (mword_of_int 0x3ff9f713 : mword 32)
@@ -214,9 +216,9 @@ Section CodeUvmcopy.
   Proof. mk_rvc (KernelSyms.uvmcopy + 0x5e) (mword_of_int 0x855e : mword 16)
     (mword_of_int (KernelSyms.uvmcopy + 0x5e) : mword 64) (RTYPE (Regidx (mword_of_int 23), zreg, Regidx (mword_of_int 10), ADD)) kd_855e exec_execute_C_MV. Qed.
 
-  Lemma uci_60 : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmcopy + 0x60) : mword 64) false (JAL (mword_of_int 2096076 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.uvmcopy + 0x60) (mword_of_int 0xbcdff0ef : mword 32)
-    (mword_of_int (KernelSyms.uvmcopy + 0x60) : mword 64) (JAL (mword_of_int 2096076 : mword 21, Regidx (mword_of_int 1))) kd_bcdff0ef. Qed.
+  Lemma uci_60 : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmcopy + 0x60) : mword 64) false (JAL (mword_of_int 2096060 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.uvmcopy + 0x60) (mword_of_int 0xbbdff0ef : mword 32)
+    (mword_of_int (KernelSyms.uvmcopy + 0x60) : mword 64) (JAL (mword_of_int 2096060 : mword 21, Regidx (mword_of_int 1))) kd_bbdff0ef. Qed.
 
   Lemma uci_64 : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmcopy + 0x64) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 224 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BEQ)).
   Proof. mk_rvc (KernelSyms.uvmcopy + 0x64) (mword_of_int 0xd161 : mword 16)
@@ -226,9 +228,9 @@ Section CodeUvmcopy.
   Proof. mk_rvc (KernelSyms.uvmcopy + 0x66) (mword_of_int 0x854a : mword 16)
     (mword_of_int (KernelSyms.uvmcopy + 0x66) : mword 64) (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 10), ADD)) kd_854a exec_execute_C_MV. Qed.
 
-  Lemma uci_68 : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmcopy + 0x68) : mword 64) false (JAL (mword_of_int 2094552 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.uvmcopy + 0x68) (mword_of_int 0xdd8ff0ef : mword 32)
-    (mword_of_int (KernelSyms.uvmcopy + 0x68) : mword 64) (JAL (mword_of_int 2094552 : mword 21, Regidx (mword_of_int 1))) kd_dd8ff0ef. Qed.
+  Lemma uci_68 : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmcopy + 0x68) : mword 64) false (JAL (mword_of_int 2094536 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.uvmcopy + 0x68) (mword_of_int 0xdc8ff0ef : mword 32)
+    (mword_of_int (KernelSyms.uvmcopy + 0x68) : mword 64) (JAL (mword_of_int 2094536 : mword 21, Regidx (mword_of_int 1))) kd_dc8ff0ef. Qed.
 
   Lemma uci_6c : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmcopy + 0x6c) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 13), ADDI)).
   Proof. mk_rvc (KernelSyms.uvmcopy + 0x6c) (mword_of_int 0x4685 : mword 16)

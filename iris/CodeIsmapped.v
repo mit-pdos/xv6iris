@@ -23,7 +23,6 @@ Require Import KernelDecode11.
 Require Import KernelDecode13.
 Require Import KernelDecode14.
 Require Import KernelDecode19.
-Require Import KernelDecode20.
 Require Import KernelDecode24.
 Require Import KernelDecode25.
 Require Import KernelDecode31.
@@ -57,9 +56,9 @@ Section CodeIsmapped.
   Proof. mk_rvc (KernelSyms.ismapped + 0x8) (mword_of_int 0x4601 : mword 16)
     (mword_of_int (KernelSyms.ismapped + 0x8) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 12), ADDI)) kd_4601 exec_execute_C_LI. Qed.
 
-  Lemma imi_0a : kernel_text -∗ instr (mword_of_int (KernelSyms.ismapped + 0xa) : mword 64) false (JAL (mword_of_int 2095754 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.ismapped + 0xa) (mword_of_int 0xa8bff0ef : mword 32)
-    (mword_of_int (KernelSyms.ismapped + 0xa) : mword 64) (JAL (mword_of_int 2095754 : mword 21, Regidx (mword_of_int 1))) kd_a8bff0ef. Qed.
+  Lemma imi_0a : kernel_text -∗ instr (mword_of_int (KernelSyms.ismapped + 0xa) : mword 64) false (JAL (mword_of_int 2095738 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.ismapped + 0xa) (mword_of_int 0xa7bff0ef : mword 32)
+    (mword_of_int (KernelSyms.ismapped + 0xa) : mword 64) (JAL (mword_of_int 2095738 : mword 21, Regidx (mword_of_int 1))) kd_a7bff0ef. Qed.
 
   Lemma imi_0e : kernel_text -∗ instr (mword_of_int (KernelSyms.ismapped + 0xe) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 3 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BEQ)).
   Proof. mk_rvc (KernelSyms.ismapped + 0xe) (mword_of_int 0xc119 : mword 16)

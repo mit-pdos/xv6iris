@@ -553,7 +553,7 @@ Section ProofSysUnlinkW5D.
     iEval (rewrite Hpp94) in "Hpc".
     (* ===== +0x94 jal ra,memset ===== *)
     iApply (wp_jal_s_sconf (CID := D4) (mword_of_int (SU + 0x94)) Rra
-              (mword_of_int 2079768 : mword 21) A4 (K - 30)%nat b
+              (mword_of_int 2079736 : mword 21) A4 (K - 30)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (suli_094 with "Htext"). }
@@ -561,7 +561,7 @@ Section ProofSysUnlinkW5D.
     set (A5 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (SU + 0x94) : mword 64) 4)]> A4).
     assert (Hjms : add_vec (mword_of_int (SU + 0x94) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2079768 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2079736 : mword 21))
                    = mword_of_int KernelSyms.memset) by pcw.
     iEval (rewrite Hjms) in "Hpc".
     assert (HA5ra : (A5 !!! Regidx Rra : mword 64)

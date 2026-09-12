@@ -1163,7 +1163,7 @@ Section CwBodies.
       iEval (rewrite Pb46) in "Hpc".
       (* +0x46  jal either_copyin *)
       iApply (wp_jal_s_sconf (mword_of_int (CW + 0x46)) Rra
-                (mword_of_int 8646 : mword 21) B5 (av - 16)%nat true
+                (mword_of_int 8850 : mword 21) B5 (av - 16)%nat true
                 ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
       { iApply (cnwi_46 with "Ht"). }
       iIntros (CIDc6 Hsc6) "Hcg Hpc".
@@ -1172,7 +1172,7 @@ Section CwBodies.
       change (<[Regidx Rra := regval_into_reg
           (add_vec_int (mword_of_int (CW + 0x46) : mword 64) 4)]> B5) with B6.
       assert (Jeci : add_vec (mword_of_int (CW + 0x46) : mword 64)
-                       (sign_extend' 64 (mword_of_int 8646 : mword 21))
+                       (sign_extend' 64 (mword_of_int 8850 : mword 21))
                      = mword_of_int KernelSyms.either_copyin) by pcw.
       iEval (rewrite Jeci) in "Hpc".
       assert (HB6a0 : B6 !!! Regidx Ra0 = buf)
@@ -1260,7 +1260,7 @@ Section CwBodies.
         assert (Heqf : eq_vec (rget mf1 Ra0) (rget mf1 Rs8) = false).
         { rgne. rgne. rewrite Hr0. rewrite Cs8. exact cw_eqv_m1_0. }
         iApply (wp_beq_fall_s_sconf (mword_of_int (CW + 0x4a))
-                  (mword_of_int 58 : mword 13) Rs8 Ra0 mf1 (av - 16)%nat true
+                  (mword_of_int 60 : mword 13) Rs8 Ra0 mf1 (av - 16)%nat true
                   ltac:(nz) ltac:(nz)
                   Heqf with "Hcg Hpc []").
         { iApply (cnwi_4a with "Ht"). }
@@ -1478,10 +1478,10 @@ Section CwBodies.
         assert (Heqt : eq_vec (rget mf1 Ra0) (rget mf1 Rs8) = true).
         { rgne. rgne. rewrite Hrm1. rewrite Cs8. exact cw_eqv_m1_m1. }
         assert (Htgtb : add_vec (mword_of_int (CW + 0x4a) : mword 64)
-                          (sign_extend' 64 (mword_of_int 58 : mword 13))
+                          (sign_extend' 64 (mword_of_int 60 : mword 13))
                         = mword_of_int (CW + 0x84)) by pcw.
         iApply (wp_beq_taken_s_sconf (mword_of_int (CW + 0x4a))
-                  (mword_of_int 58 : mword 13) Rs8 Ra0 mf1 (av - 16)%nat true
+                  (mword_of_int 60 : mword 13) Rs8 Ra0 mf1 (av - 16)%nat true
                   ltac:(nz) ltac:(nz)
                   Heqt ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
         { iApply (cnwi_4a with "Ht"). }
@@ -1762,10 +1762,10 @@ Section CwBodies.
     - (* ======== n <= 0: [i] is 0 and nothing else happens ======== *)
       assert (Hn0 : (n <= 0)%Z) by (apply Z.geb_le in Hb0z; lia).
       assert (Htgt80 : add_vec (mword_of_int (CW + 0xa) : mword 64)
-                         (sign_extend' 64 (mword_of_int 118 : mword 13))
+                         (sign_extend' 64 (mword_of_int 120 : mword 13))
                        = mword_of_int (CW + 0x80)) by pcw.
       iApply (wp_bge_x0_taken_s_sconf (mword_of_int (CW + 0xa))
-                (mword_of_int 118 : mword 13) Ra2 A1 (av - 16)%nat true
+                (mword_of_int 120 : mword 13) Ra2 A1 (av - 16)%nat true
                 ltac:(nz) ltac:(rewrite Hcmp0; reflexivity)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
       { iApply (cnwi_0a with "Ht"). }
@@ -1817,7 +1817,7 @@ Section CwBodies.
       assert (Hnpos : (0 < n)%Z)
         by (rewrite Z.geb_leb in Hb0z; apply Z.leb_gt in Hb0z; lia).
       iApply (wp_bge_x0_fall_s_sconf (mword_of_int (CW + 0xa))
-                (mword_of_int 118 : mword 13) Ra2 A1 (av - 16)%nat true
+                (mword_of_int 120 : mword 13) Ra2 A1 (av - 16)%nat true
                 ltac:(nz) ltac:(rewrite Hcmp0; reflexivity) with "Hcg Hpc []").
       { iApply (cnwi_0a with "Ht"). }
       iIntros (CID6 Hs6) "Hcg Hpc".
@@ -2063,10 +2063,10 @@ Section CwBodies.
       (* +0x36  c.j -> the loop head at +0x5e *)
       assert (Htgt5e : add_vec (mword_of_int (CW + 0x36) : mword 64)
                          (sign_extend' 64 (sign_extend' 21
-                            (concat_vec (mword_of_int 20 : mword 11) ('b"0"))))
+                            (concat_vec (mword_of_int 21 : mword 11) ('b"0"))))
                        = mword_of_int (CW + 0x5e)) by pcw.
       iApply (wp_cj_s_sconf (mword_of_int (CW + 0x36))
-                (sign_extend' 21 (concat_vec (mword_of_int 20 : mword 11) ('b"0")))
+                (sign_extend' 21 (concat_vec (mword_of_int 21 : mword 11) ('b"0")))
                 G8 (av - 16)%nat true ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (cnwi_36 with "Ht"). }

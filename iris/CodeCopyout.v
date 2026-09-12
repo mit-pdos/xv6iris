@@ -23,6 +23,7 @@ Require Import KernelDecode05.
 Require Import KernelDecode06.
 Require Import KernelDecode07.
 Require Import KernelDecode08.
+Require Import KernelDecode09.
 Require Import KernelDecode10.
 Require Import KernelDecode11.
 Require Import KernelDecode12.
@@ -174,9 +175,9 @@ Section CodeCopyout.
   Proof. mk_rvc (KernelSyms.copyout + 0x40) (mword_of_int 0x954e : mword 16)
     (mword_of_int (KernelSyms.copyout + 0x40) : mword 64) (RTYPE (Regidx (mword_of_int 19), Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADD)) kd_954e exec_execute_C_ADD. Qed.
 
-  Lemma coi_42 : kernel_text -∗ instr (mword_of_int (KernelSyms.copyout + 0x42) : mword 64) false (JAL (mword_of_int 2094980 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.copyout + 0x42) (mword_of_int 0xf84ff0ef : mword 32)
-    (mword_of_int (KernelSyms.copyout + 0x42) : mword 64) (JAL (mword_of_int 2094980 : mword 21, Regidx (mword_of_int 1))) kd_f84ff0ef. Qed.
+  Lemma coi_42 : kernel_text -∗ instr (mword_of_int (KernelSyms.copyout + 0x42) : mword 64) false (JAL (mword_of_int 2094964 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.copyout + 0x42) (mword_of_int 0xf74ff0ef : mword 32)
+    (mword_of_int (KernelSyms.copyout + 0x42) : mword 64) (JAL (mword_of_int 2094964 : mword 21, Regidx (mword_of_int 1))) kd_f74ff0ef. Qed.
 
   Lemma coi_46 : kernel_text -∗ instr (mword_of_int (KernelSyms.copyout + 0x46) : mword 64) false (RTYPE (Regidx (mword_of_int 18), Regidx (mword_of_int 21), Regidx (mword_of_int 21), SUB)).
   Proof. mk_base (KernelSyms.copyout + 0x46) (mword_of_int 0x412a8ab3 : mword 32)
@@ -210,9 +211,9 @@ Section CodeCopyout.
   Proof. mk_rvc (KernelSyms.copyout + 0x5e) (mword_of_int 0x855e : mword 16)
     (mword_of_int (KernelSyms.copyout + 0x5e) : mword 64) (RTYPE (Regidx (mword_of_int 23), zreg, Regidx (mword_of_int 10), ADD)) kd_855e exec_execute_C_MV. Qed.
 
-  Lemma coi_60 : kernel_text -∗ instr (mword_of_int (KernelSyms.copyout + 0x60) : mword 64) false (JAL (mword_of_int 2095670 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.copyout + 0x60) (mword_of_int 0xa37ff0ef : mword 32)
-    (mword_of_int (KernelSyms.copyout + 0x60) : mword 64) (JAL (mword_of_int 2095670 : mword 21, Regidx (mword_of_int 1))) kd_a37ff0ef. Qed.
+  Lemma coi_60 : kernel_text -∗ instr (mword_of_int (KernelSyms.copyout + 0x60) : mword 64) false (JAL (mword_of_int 2095654 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.copyout + 0x60) (mword_of_int 0xa27ff0ef : mword 32)
+    (mword_of_int (KernelSyms.copyout + 0x60) : mword 64) (JAL (mword_of_int 2095654 : mword 21, Regidx (mword_of_int 1))) kd_a27ff0ef. Qed.
 
   Lemma coi_64 : kernel_text -∗ instr (mword_of_int (KernelSyms.copyout + 0x64) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 19), ADD)).
   Proof. mk_rvc (KernelSyms.copyout + 0x64) (mword_of_int 0x89aa : mword 16)
@@ -262,9 +263,9 @@ Section CodeCopyout.
   Proof. mk_rvc (KernelSyms.copyout + 0x7c) (mword_of_int 0x855e : mword 16)
     (mword_of_int (KernelSyms.copyout + 0x7c) : mword 64) (RTYPE (Regidx (mword_of_int 23), zreg, Regidx (mword_of_int 10), ADD)) kd_855e exec_execute_C_MV. Qed.
 
-  Lemma coi_7e : kernel_text -∗ instr (mword_of_int (KernelSyms.copyout + 0x7e) : mword 64) false (JAL (mword_of_int 2095486 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.copyout + 0x7e) (mword_of_int 0x97fff0ef : mword 32)
-    (mword_of_int (KernelSyms.copyout + 0x7e) : mword 64) (JAL (mword_of_int 2095486 : mword 21, Regidx (mword_of_int 1))) kd_97fff0ef. Qed.
+  Lemma coi_7e : kernel_text -∗ instr (mword_of_int (KernelSyms.copyout + 0x7e) : mword 64) false (JAL (mword_of_int 2095470 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.copyout + 0x7e) (mword_of_int 0x96fff0ef : mword 32)
+    (mword_of_int (KernelSyms.copyout + 0x7e) : mword 64) (JAL (mword_of_int 2095470 : mword 21, Regidx (mword_of_int 1))) kd_96fff0ef. Qed.
 
   Lemma coi_82 : kernel_text -∗ instr (mword_of_int (KernelSyms.copyout + 0x82) : mword 64) true (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 15), false, 8)).
   Proof. mk_rvc (KernelSyms.copyout + 0x82) (mword_of_int 0x611c : mword 16)

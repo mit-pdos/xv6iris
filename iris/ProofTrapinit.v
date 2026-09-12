@@ -37,7 +37,7 @@ Section CodeTrapinitBundle.
      whole-function proof needs to know about trapinit's code. *)
   Lemma tri_code :
     kernel_text -∗ ilw_code KernelSyms.trapinit (mword_of_int 5) (mword_of_int 22)
-                            (mword_of_int 3604) (mword_of_int 3420) (mword_of_int 2090696).
+                            (mword_of_int 3424) (mword_of_int 3400) (mword_of_int 2090680).
   Proof.
     iIntros "#Ht". rewrite /ilw_code.
     iSplitR; [iApply (tri_00 with "Ht")|].

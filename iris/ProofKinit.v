@@ -144,12 +144,12 @@ Section ProofKinit.
     assert (Hpp0c : add_vec_int (mword_of_int (KernelSyms.kinit + 0x08) : mword 64) 4 = mword_of_int (KernelSyms.kinit + 0x0c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp0c) in "Hpc".
     (* +0x0c addi a1,a1,1386 *)
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.kinit + 0x0c)) (mword_of_int 11 : mword 5) (mword_of_int 11 : mword 5) (mword_of_int 1434 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.kinit + 0x0c)) (mword_of_int 11 : mword 5) (mword_of_int 11 : mword 5) (mword_of_int 1270 : mword 12)
               R3 (K - 2)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (kii_0c with "Htext"). }
     iIntros (CID6 Hs6) "Hcg Hpc".
-    set (R4 := <[Regidx (mword_of_int 11 : mword 5) := regval_into_reg (add_vec (R3 !!! Regidx (mword_of_int 11 : mword 5)) (sign_extend' 64 (mword_of_int 1434 : mword 12)))]> R3).
+    set (R4 := <[Regidx (mword_of_int 11 : mword 5) := regval_into_reg (add_vec (R3 !!! Regidx (mword_of_int 11 : mword 5)) (sign_extend' 64 (mword_of_int 1270 : mword 12)))]> R3).
     (* a1 now holds &"kmem" -- the string initlock is about to store *)
     assert (HR4a1 : R4 !!! Regidx (mword_of_int 11 : mword 5) = (mword_of_int 0x80007030 : mword 64)).
     { rewrite /R4 upd_eq. rewrite /R3 upd_eq. apply bv_eq; vm_compute; reflexivity. }
@@ -165,12 +165,12 @@ Section ProofKinit.
     assert (Hpp14 : add_vec_int (mword_of_int (KernelSyms.kinit + 0x10) : mword 64) 4 = mword_of_int (KernelSyms.kinit + 0x14)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp14) in "Hpc".
     (* +0x14 addi a0,a0,-2018  (a0 := &kmem = lk) *)
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.kinit + 0x14)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 2234 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.kinit + 0x14)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 2230 : mword 12)
               R5 (K - 2)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (kii_14 with "Htext"). }
     iIntros (CID8 Hs8) "Hcg Hpc".
-    set (R6 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (R5 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 2234 : mword 12)))]> R5).
+    set (R6 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (R5 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 2230 : mword 12)))]> R5).
     assert (Hpp18 : add_vec_int (mword_of_int (KernelSyms.kinit + 0x14) : mword 64) 4 = mword_of_int (KernelSyms.kinit + 0x18)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp18) in "Hpc".
     assert (HR6a0 : R6 !!! Regidx (mword_of_int 10 : mword 5) = lk).
@@ -276,12 +276,12 @@ Section ProofKinit.
     assert (Hpp24 : add_vec_int (mword_of_int (KernelSyms.kinit + 0x20) : mword 64) 4 = mword_of_int (KernelSyms.kinit + 0x24)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp24) in "Hpc".
     (* +0x24 addi a0,a0,-1474  (a0 := end) *)
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.kinit + 0x24)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 2778 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.kinit + 0x24)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 2774 : mword 12)
               R10 (K - 2)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (kii_24 with "Htext"). }
     iIntros (CID13 Hs13) "Hcg Hpc".
-    set (R11 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (R10 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 2778 : mword 12)))]> R10).
+    set (R11 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (R10 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 2774 : mword 12)))]> R10).
     assert (Hpp28 : add_vec_int (mword_of_int (KernelSyms.kinit + 0x24) : mword 64) 4 = mword_of_int (KernelSyms.kinit + 0x28)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp28) in "Hpc".
     assert (HR11a0 : R11 !!! Regidx (mword_of_int 10 : mword 5) = endaddr).

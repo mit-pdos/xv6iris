@@ -714,7 +714,7 @@ Section ProofUvmunmap.
     iEval (rewrite Hp56) in "Hpc".
     (* --- +0x56 jal ra,walk --- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.uvmunmap + 0x56)) Rra
-              (mword_of_int 2096392 : mword 21) L3 (K - 8) b
+              (mword_of_int 2096376 : mword 21) L3 (K - 8) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
@@ -723,7 +723,7 @@ Section ProofUvmunmap.
     set (L4 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.uvmunmap + 0x56) : mword 64) 4)]> L3).
     assert (Htgtwk : add_vec (mword_of_int (KernelSyms.uvmunmap + 0x56) : mword 64)
-              (sign_extend' 64 (mword_of_int 2096392 : mword 21))
+              (sign_extend' 64 (mword_of_int 2096376 : mword 21))
             = mword_of_int KernelSyms.walk) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtwk) in "Hpc".
     assert (HL4a0 : L4 !!! Regidx Ra0
@@ -1123,7 +1123,7 @@ Section ProofUvmunmap.
     { rewrite /uu_um. exact Humsome. }
     (* --- +0x70 jal ra,kfree --- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.uvmunmap + 0x70)) Rra
-              (mword_of_int 2095062 : mword 21) B5 (K - 8) b
+              (mword_of_int 2095046 : mword 21) B5 (K - 8) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
@@ -1132,7 +1132,7 @@ Section ProofUvmunmap.
     set (B6 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.uvmunmap + 0x70) : mword 64) 4)]> B5).
     assert (Htgtkf : add_vec (mword_of_int (KernelSyms.uvmunmap + 0x70) : mword 64)
-              (sign_extend' 64 (mword_of_int 2095062 : mword 21))
+              (sign_extend' 64 (mword_of_int 2095046 : mword 21))
             = mword_of_int KernelSyms.kfree) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtkf) in "Hpc".
     assert (HB6a0 : B6 !!! Regidx Ra0 = page_base (pte_ppn wu)).

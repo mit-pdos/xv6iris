@@ -1010,7 +1010,7 @@ Section ProofUvmcopy.
     iEval (rewrite Hp30) in "Hpc".
     (* --- +0x30 jal ra,walk --- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.uvmcopy + 0x30)) Rra
-              (mword_of_int 2095912 : mword 21) L3 (K - 10)%nat b
+              (mword_of_int 2095896 : mword 21) L3 (K - 10)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
     { iApply (uci_30 with "Htext"). }
@@ -1018,7 +1018,7 @@ Section ProofUvmcopy.
     set (L4 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.uvmcopy + 0x30) : mword 64) 4)]> L3).
     assert (Htgtwk : add_vec (mword_of_int (KernelSyms.uvmcopy + 0x30) : mword 64)
-              (sign_extend' 64 (mword_of_int 2095912 : mword 21))
+              (sign_extend' 64 (mword_of_int 2095896 : mword 21))
             = mword_of_int KernelSyms.walk) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtwk) in "Hpc".
     (* open the PARENT's table into its exact represented view *)
@@ -1240,7 +1240,7 @@ Section ProofUvmcopy.
     iEval (rewrite Hp40) in "Hpc".
     (* --- +0x40 jal ra,kalloc --- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.uvmcopy + 0x40)) Rra
-              (mword_of_int 2094824 : mword 21) B2 (K - 10)%nat b
+              (mword_of_int 2094808 : mword 21) B2 (K - 10)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
     { iApply (uci_40 with "Htext"). }
@@ -1248,7 +1248,7 @@ Section ProofUvmcopy.
     set (B3 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.uvmcopy + 0x40) : mword 64) 4)]> B2).
     assert (Htgtka : add_vec (mword_of_int (KernelSyms.uvmcopy + 0x40) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2094824 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2094808 : mword 21))
                      = mword_of_int KernelSyms.kalloc)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtka) in "Hpc".
@@ -1413,7 +1413,7 @@ Section ProofUvmcopy.
     iEval (rewrite Hp50) in "Hpc".
     (* --- +0x50 jal ra,memmove --- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.uvmcopy + 0x50)) Rra
-              (mword_of_int 2095314 : mword 21) C4 (K - 10)%nat b
+              (mword_of_int 2095298 : mword 21) C4 (K - 10)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
     { iApply (uci_50 with "Htext"). }
@@ -1421,7 +1421,7 @@ Section ProofUvmcopy.
     set (C5 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.uvmcopy + 0x50) : mword 64) 4)]> C4).
     assert (Htgtmm : add_vec (mword_of_int (KernelSyms.uvmcopy + 0x50) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2095314 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2095298 : mword 21))
                      = mword_of_int KernelSyms.memmove)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtmm) in "Hpc".
@@ -1561,7 +1561,7 @@ Section ProofUvmcopy.
     iEval (rewrite Hp60) in "Hpc".
     (* --- +0x60 jal ra,mappages --- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.uvmcopy + 0x60)) Rra
-              (mword_of_int 2096076 : mword 21) D5 (K - 10)%nat b
+              (mword_of_int 2096060 : mword 21) D5 (K - 10)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
     { iApply (uci_60 with "Htext"). }
@@ -1569,7 +1569,7 @@ Section ProofUvmcopy.
     set (D6 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.uvmcopy + 0x60) : mword 64) 4)]> D5).
     assert (Htgtmp : add_vec (mword_of_int (KernelSyms.uvmcopy + 0x60) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2096076 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2096060 : mword 21))
                      = mword_of_int KernelSyms.mappages)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtmp) in "Hpc".
@@ -1801,7 +1801,7 @@ Section ProofUvmcopy.
     iEval (rewrite Hp68) in "Hpc".
     (* --- +0x68 jal ra,kfree --- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.uvmcopy + 0x68)) Rra
-              (mword_of_int 2094552 : mword 21) F1 (K - 10)%nat b
+              (mword_of_int 2094536 : mword 21) F1 (K - 10)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
     { iApply (uci_68 with "Htext"). }
@@ -1809,7 +1809,7 @@ Section ProofUvmcopy.
     set (F2 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.uvmcopy + 0x68) : mword 64) 4)]> F1).
     assert (Htgtkf : add_vec (mword_of_int (KernelSyms.uvmcopy + 0x68) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2094552 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2094536 : mword 21))
                      = mword_of_int KernelSyms.kfree)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtkf) in "Hpc".

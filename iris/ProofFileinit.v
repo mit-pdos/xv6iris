@@ -37,7 +37,7 @@ Section CodeFileinitBundle.
      whole-function proof needs to know about fileinit's code. *)
   Lemma fii_code :
     kernel_text -∗ ilw_code KernelSyms.fileinit (mword_of_int 3) (mword_of_int 30)
-                            (mword_of_int 1256) (mword_of_int 1032) (mword_of_int 2083468).
+                            (mword_of_int 1060) (mword_of_int 996) (mword_of_int 2083436).
   Proof.
     iIntros "#Ht". rewrite /ilw_code.
     iSplitR; [iApply (fii_00 with "Ht")|].
