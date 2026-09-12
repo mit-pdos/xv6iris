@@ -2334,6 +2334,48 @@ DEVICE arm says the walk of THIS path ended at a device node; rows 15/17 read
 `uvis_M W` and `xk_a W 0`; the generic suppliers are `*_at_of_all` instances;
 `UkRunSys`/`UkInit` unchanged.  chdir/unlink keep `∀ pl`.
 
+SH-LINE PHASE 2a LANDED (2026-09-12; `69e38c9f0`; 25 u-tier files, +1043/-263;
+VM build `shline37`, audit = the thirteen).  `UkRunSys.wp_uk_ecall_read_recv`
+PROVED at the trapping key on `UkRun.udepwf_std`; `UkRun.urun_gen` (the taint's
+generic continuation from a run); sh's walk at `ukn_const` with `ukn_triv`
+only where exec's bundle is minted from `uxsup` (`UkShRun.wp_kshr_runcmd`,
+`UkShDiag.wp_kshr_runcmd_final`) and at the three fork child arms;
+`UkFork.wp_uk_ecall_fork`'s child lend `Rc`; `UserConsole.uinit_tok/_0/
+uinit_lend/uinit_redeem` proved; the position pair init → `Rc` →
+`UkInit.init_exec_sup_pos` → `PinnedExec`'s `Pay` → `UkSh.ush_pos` (last
+conjunct of `ush_pstate`); `wp_ksh_start` takes `UkSh.ush_fd0` (console /
+slot-0 closed / taint) and the CLOSED arm costs nothing (no lemma below reads
+the row); `AppEcho.echo_taint_of_sup`.
+
+SECOND SEAM FOUND (blocks S1/S2's payload half): THE GENERIC SLOT EXISTS ONLY
+AT THE TRIVIAL PAYLOAD.  `PinnedExec.pex_slot`'s taint arm is `□ (∀ W', T -∗
+my_pay (uvis_gen W') Q -∗ Q (-1) -∗ uslot W')` (`PinnedExec.v:201`); the only
+generic slot is `UexecExecMint.uslot_mint` (:87) → `UexecCond.cond_entry_slot`
+(:296) → `UexecRet.uexec_wp_uslot` (:1948), all at `my_pay _ (fun _ => True)`,
+and `ChildTok.my_pay_agree` makes a slot at the trivial payload unusable at
+`Qsh`.  Generalising fails at exec: `UexecExecInst.xv6_sbundle_of_supply`
+(:775) mints the exec bundle only at `⌜kf_xpay f = (fun _ => True)⌝`;
+`UkRun.uxsup`/`udepw_of_uxsup` say the same one tier up.  The console token
+and the fs taint are independent, so init cannot lend only on the untainted
+arm.  RULING: lane GENERIC-PAY (`wx-briefs/brief-generic-pay.md`) -- the
+generic slot at a CONSTANT payload `fun _ => R`, `R` a linear resource the
+slot holds and pays at every exit/kill (`R ∧ R` from one `R`), relayed
+through exec by the EXEC-PAY row (`sexit_pay f (-1) -∗ uslot`), the fork child
+staying trivial.  This is exactly the LEASE ruling's generic side: the
+tainted slot holds the reclaimed token as `R`.  Everything above the seam is
+already shaped for it (the header of `UkInit.init_exec_sup_pos` records the
+wall).  Owed to that lane's phase 2 as its acceptance test: `Qsh := ucons_pay
+cn γ T` through `sh_uexec_slot`, init's token premise (ruling (f)) at
+`UInitKernel.init_uexec_slot`, `UShKernel.v:388`'s `ukn_triv` ascription gone,
+and `UInitSh.init_exec_sup_of_sh_slot`'s undischargeable premise `(∀ sts, ⊢
+ush_fd0 T (take NSTD sts))` replaced by threading `UInitFd.ufd_head` into
+`init_exec_sup_pos` (`ufd_head_open` is the shape).
+
+ORDER: GENERIC-PAY → CONS-SWALLOW → SH-LINE 2b (gets on `ush_gets_line`,
+`ushf_lexable` deleted, `ush_std3` collapsed into `ush_fd0`, sh's read through
+`wp_uk_ecall_read_recv` with `upos` threaded read → gets_loop → gets → getcmd
+→ main) → [MAP-KEY if (A)].
+
 SH-LINE PHASE 2 -- THE SWALLOWED BYTE (BLOCKER FOUND 2026-09-12; phase 1
 green at `shline14`, the read leaf and the `ukn_triv` split green at
 `shline22`, 21 u-tier files uncommitted, no kernel diff).

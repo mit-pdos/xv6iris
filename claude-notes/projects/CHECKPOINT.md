@@ -75,7 +75,11 @@ patch: `projects/wx-briefs/`.
   SWALLOWED BYTE"): consoleread's `dc = d+1` arm; the ^D face is fixed by a
   kernel lane, the copyout-fault face needs the OWNER'S CALL between (A) MAP-KEY
   (recommended) and (B) a no-exhaustion premise. Pipeline meanwhile: SH-LINE 2a
-  (S1-S3, CLOSED arm, payments; `gets`/S5 deferred) RUNNING → CONS-SWALLOW
+  LANDED (`69e38c9f0`, build `shline37`; the payload half blocked by a SECOND
+  seam: the generic slot exists only at the trivial payload -- note "SECOND SEAM
+  FOUND") → GENERIC-PAY (`wx-briefs/brief-generic-pay.md`, fresh agent,
+  LAUNCHED 2026-09-12: the generic slot at a constant payload, then sh's real
+  payload) → CONS-SWALLOW
   (`wx-briefs/brief-cons-swallow.md`, kernel lane, option-independent) → SH-LINE
   2b → [MAP-KEY if (A)] → E4 → E2 → E5
   → SH-LINE phase 2 → E4 → E2 → E5.
