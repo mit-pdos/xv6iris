@@ -330,3 +330,12 @@ E4 p3 (`-tlw`), SH-LINE 2b p1 (`-sup`); OUT-FUPD pausing (main).
 
 OUT-FUPD PAUSED with main clean and its design recorded (note "OUT-FUPD PHASE 1 --
 DESIGN"; patch `wx-briefs/out-fupd-phase1.patch`).  UNTAG LAUNCHED in main.
+
+SIBLING FOR THE OWNER'S DUAL-UART AGENT: `/shared/xv6iris-2-uart` (clone of main
+at a0d1a1834, origin = github, `mainwt` = the main checkout; the pinned
+xv6-riscv source cloned in at ded23f2a, which is ignored by the repo).  Its VM
+tree is NOT seeded yet: seed it by `cp -a _shared_xv6iris-2 _shared_xv6iris-2-uart`
+on the VM AFTER UNTAG's last build finishes (so the tree is post-UNTAG main),
+then one `vmbuild.sh xv6iris-2-uart uartseed10`.  The UART agent should start
+from post-UNTAG main (UNTAG deletes the tag column from `uart_ghosts`, which the
+second-instance change also touches).
