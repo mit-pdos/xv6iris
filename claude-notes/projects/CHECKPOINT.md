@@ -148,3 +148,9 @@ TX-RECEIPT).  Main: verify build `mainverify1` of the merged HEAD GREEN (audit =
 thirteen); LAZY-FLAG LAUNCHED in main (2026-09-12, brief `brief-lazy-flag.md`,
 based on `ed3d61934`).  Four lanes in flight: LAZY-FLAG (main), SUPPLY-SPLIT p2
 (`-sup`), DISC-RATE LANDED on main (2026-09-12; `-disc` is free), TX-TAG p1 (`-tlw`).
+
+TX-TAG phase 1 green (2026-09-12); phase 2 go-ahead given (pinned echo post;
+printk-site list requested).  RULED: TX-RECEIPT = per-pid transmit token; the K
+side = printk ledger in pr_res + PRINTK-FMT + printk-site enumeration (note
+"TX-TAG PHASE 1").  `-disc` sibling free: APP-IFACE phase 1 (statement diff
+only, for the owner's review) next there.

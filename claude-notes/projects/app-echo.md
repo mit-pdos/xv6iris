@@ -2404,6 +2404,46 @@ ORDER: GENERIC-PAY → CONS-SWALLOW → SH-LINE 2b (gets on `ush_gets_line`,
 `wp_uk_ecall_read_recv` with `upos` threaded read → gets_loop → gets → getcmd
 → main) → LAZY-FLAG (the owner's form of (A)).
 
+TX-TAG PHASE 1 (2026-09-12; sibling `-tlw`, branch `lane/tx-tag`, build
+`txtag14`, 29 files +1328/-289, green).  Landed: `txsrc := TxK | TxE h | TxW
+pid` (Xv6Cameras), `un_tag`, `uart_tags_auth`/`uart_sent_tagged`/`uart_tag_at`,
+the lockstep `uart_tagsE γ u := ∃ tg, auth tg ∗ ⌜snd <$> tg = uart_acc u⌝` inside
+`uart_ghosts` (founded EMPTY: `uart_ghosts_alloc` needs `uart_acc u = []`), the
+THR leaf `wp_uart_thr_write_s_sconf … src tg0` pushing `(src, sb)`
+(`WpSconfUartAccess`), the reader `uart_pop_tag : uart_tx_pop u = Some (b,u') ->
+uart_ghosts γ u' -∗ uart_ghosts γ u' ∗ ∃ src, uart_tag_at γ (length (u_out u))
+src b` -- INDEX = `length (u_out u)`, not the wire position: under LOOP a
+drained byte never reaches the wire, so E5 owes `u_wire u = u_out u` from
+LOOP-off (invariant; `uart_colE_loopback` gives it per state); `Htx` hands
+only `obs_wire (open_seg h) = u_wire u`.  `uart_sent_sub_at γ src bs`,
+`uart_sent_from_at`, `uart_sent_from_tag γ tr0 src bs` (joint witness tied by
+the lockstep), printk at the constant `TxK`, consoleintr's echo at `TxE hb`
+(`console_caps` carries the baseline; the four consputc sites pass it),
+consolewrite/uartwrite at `TxW pid` (`cons_sent_cnt_at`, projecting to the
+landed claim).  FACTS FOR THE NEXT LANES: (i) EXACTNESS on a pid's tag is NOT
+derivable -- the THR leaf checks the tag against nothing, two harts could push
+under one `TxW pid`; RULED for TX-RECEIPT: an EXCLUSIVE PER-PID TRANSMIT TOKEN
+(minted where the pid is, beside `SlotGen.pid_reg`; demanded by the THR leaf
+for every `TxW` push; held by the writing process) -- `tag_proj`/
+`uart_sent_exact_at` are stated without a producer; (ii) the boot's printks
+have NO trace post (`wp_printk_gen_sconf_body`, the weak corollary used by ~15
+callers) and even the full contract says only "SOME bytes cs were appended":
+pinning `cs` to the format string's rendering is a PRINTK-FMT lane; (iii)
+"each printk's message is a contiguous K run" is FALSE (tx_lock per byte;
+uartwrite takes no pr.lock) -- only the tag separates; so the K claim is about
+the K-tagged SUBSEQUENCE; (iv) the echo's post is made non-vacuous only in
+the pinned shape `⌜hh' = Some hb -> cs = [echo_of cb]⌝` (consputc's post pinned
+to its concrete bytes) -- landing in phase 2; (v) there is no `uartputc` in
+this fork (only `uartputc_sync` and `uartwrite`).
+THE K SIDE (design, pending TX-TAG p2's printk-site list): a K-message LEDGER
+in `pr_res` (pr.lock serialises printk calls, and every K push is a printk's),
+so printk's contract appends exactly its rendered message and the K-tagged
+subsequence of the accepted list is the concatenation of the ledger's
+messages; the boot's ten pinned (PRINTK-FMT for "%d" of cpuid); and an
+enumeration of every other printk site reachable in the echo run (the GEN
+callers), each either proved unreachable under the pins or ADMITTED into the
+claim as O5 admits sh's failure prints.
+
 DISC-RATE LANDED (2026-09-12; `2f3107ed0` + `340d01a3f` rebased onto main; 4
 files +1162/-136; build `disc21`, audit = the thirteen; lemma_diff = 23 names
 MOVED verbatim from AppEcho.v into the new pure `EchoDisc.v`, re-exported).
