@@ -2334,6 +2334,38 @@ DEVICE arm says the walk of THIS path ended at a device node; rows 15/17 read
 `uvis_M W` and `xk_a W 0`; the generic suppliers are `*_at_of_all` instances;
 `UkRunSys`/`UkInit` unchanged.  chdir/unlink keep `∀ pl`.
 
+OPEN-PIN PHASE 1 LANDED (2026-09-11) + FINDINGS.  Landed: the two-state console
+claim with a `mono_list` flag IN the claim (`echo_pred` is LINEAR and timeless
+now; `echo_cons_law` collapses it to the pure pin under `cons_made r i`; the
+middle "present, not yet shot" arm exists only between a mknod commit's two
+phases), `FsConsPin` (`cons_absent`/`cons_present_at i`, weaker than the design's
+by the arm-then-dirlink interleaving; `era0_cons_absent` by one root scan),
+`PinnedOpen` (`pinned_open_bundle` on `PinnedObs` at the argument's path;
+`pinned_open_dev` reads the receipt at a device pin), `UInitCons` (statements),
+`UkRunSys.wp_uk_ecall_open_recv_body`.  FINDINGS, RULED: (a) init's C never tests
+its SECOND open (`0x82 c.j 0x1e`): the dups, printf and fork run regardless, so
+"on failure init does not start sh" is false of this code -- init's head is
+CONSOLE ∨ CLOSED (the second open failed at allocation: the dups fail, fds 0-2
+stay closed, sh runs and its first read fails so it exits; nothing reaches the
+console) ∨ TAINT; sh's entry (SH-LINE) takes the closed ledger as a second arm.
+(b) init's FIRST open is pinned too, so the UNKNOWN arm disappears: `PinnedObs`
+is GENERALIZED to a pin that resolves to SOME inum (an existential `ino`, the
+node predicate) with a FREE miss arm (`Pmiss := True`-shaped: a walk that
+legitimately finds nothing is a miss, and the pin says what a miss means --
+`cons_absent`); the first open then yields miss (absent → the repair arm) ∨
+console device (present) ∨ taint; no token moves to init.  (c) TWO KERNEL
+OVER-APPROXIMATIONS no constraining application can pay, fixed in lane
+SPEC-TIGHTEN before OPEN-PIN's proofs: open's truncation commit `pf_at
+(atrunc_commit_at …) Ft` is owed at EVERY file row whatever the omode
+(`delta_trunc` at /sh's row would destroy the pins) -- guard it by `om_trunc
+vom` as `open_in` is guarded by `om_create vom`; mknod's UNARM leg
+(`aunarm_commit_at`) fires at ANY nlink-1 row -- tie its inum to the one the
+ARM produced (the design already calls them a do-then-undo pair).  (d)
+`wp_uk_ecall_read_recv_body` states its post at the RESUME key, but row 5 reads
+the fd argument and `uvis_M W`, which the resume key changes -- restate at the
+TRAPPING key (SH-LINE, when the leaf is proved).  (e) `open_fd_rcpt` does not
+name `fd_lowest_closed`; the caller's LEDGER pins the number.
+
 OPEN-PIN FINDINGS -- RULED WITH THE OWNER (2026-09-11; "both need to be fixed").
 FACT 1: THE TRACKED IMAGE HAS NO CONSOLE NODE.  mkfs creates no device inode
 (inodes 2-22 are all T_FILE, no `console` entry; `mkfs.c` never mentions it);

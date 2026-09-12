@@ -45,13 +45,14 @@ patch: `projects/wx-briefs/`.
   and that open/mknod bundles cannot name their path; `PinnedObs` (the factoring)
   LANDED; both fixes RULED with the owner (`app-echo.md` "OPEN-PIN FINDINGS"):
   PATH-ARGS LANDED (21 files + `ArgPath.v`; VM build `pathargs8` EXIT=0, audit =
-  the thirteen, lemma_diff clean; note "PATH-ARGS LANDED") → OPEN-PIN resumed
-  (`wx-briefs/brief-open-pin.md` re-issued: the two-state console claim,
-  `cons_made`, init's mknod step, the pinned second open at the argument's path,
-  init's two arms -- fail: no sh, silent console; succeed: sh with the console;
-  LAUNCHED 2026-09-11) → SH-LINE phase 2 (a
-  fresh agent on a continuation of `brief-sh-line.md`) → E4 → E2 (also threads
-  `riscv_rx_tag = app_tag` into `Hinit_boot`) → E5.
+  the thirteen, lemma_diff clean; note "PATH-ARGS LANDED") → OPEN-PIN phase 1 LANDED (the linear two-state claim with the
+  mono_list flag, FsConsPin, PinnedOpen, UInitCons statements, the open leaf;
+  note "OPEN-PIN PHASE 1 LANDED + FINDINGS") → SPEC-TIGHTEN (kernel: open's trunc
+  commit guarded by om_trunc; mknod's unarm tied to its arm;
+  `wx-briefs/brief-spec-tighten.md`, LAUNCHED 2026-09-11) → OPEN-PIN phase 2
+  (a fresh agent: PinnedObs generalized to an existential inum with a free miss;
+  BOTH of init's opens pinned; init's head CONSOLE ∨ CLOSED ∨ TAINT; the proofs)
+  → SH-LINE phase 2 → E4 → E2 → E5.
 - Standing rulings from the lanes (WX-EXIT/WX-INV build on them): rows per slot
   born at boot; the map's and the orphans' names canonical on `wchG`; ZOMBIE row
   at `∅`; the escrow keyed at the stored status via the xstate half-cell; the run
