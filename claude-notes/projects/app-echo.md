@@ -2469,7 +2469,7 @@ O1 WHO WRITES THE UART.  Three callers, one register.  (K) the kernel's
 MESSAGE (so K messages never interleave with each other, but their bytes do
 interleave with everything else); in this scenario K is exactly the boot
 banner ("\n", "xv6 kernel is booting\n", "\n" on hart 0) and one
-"hart N starting\n" per secondary hart (seven), each emitted at most once,
+"hart N starting\n" per secondary hart (seven) -- TEN messages -- each emitted at most once,
 at unconstrained times.  (E) `consoleintr`'s ECHO of every typed byte
 (`consputc` again; `\r` echoed as `\n`; BACKSPACE/^U produce "\b \b"; a
 FULL ring echoes nothing and drops the byte).  (W) `uartwrite` from
@@ -2551,7 +2551,25 @@ each complete line) "hello world\n$ "`, and the claim is
 -- the ∃ is inhabited by the kernel's real tagging (TX-TAG), never chosen
 for convenience.  (b) is withdrawn; D2 IS the per-character form the owner
 ruled on 2026-09-11, now sound because the suffix is pure.
-`AppEcho.disc` becomes D0 ∧ D1 ∧ D2 ∧ D3 (per power cycle).  It stays UPSTREAM
+`AppEcho.disc` becomes D0 ∧ D1 ∧ D2 ∧ D3 (per power cycle).
+DISC-RATE PHASE 1 CORRECTIONS (2026-09-12): there are TEN boot messages, not
+eight (hart 0 prints "\n", "xv6 kernel is booting\n", "\n"; seven hart lines);
+and D1/D2 measured against `drop k_pt` DROPPED every U byte printed before the
+last hart line, so a prologue printed early made the discipline unsatisfiable
+-- and a weak prompt test would let a hart line's SPACE complete a half-printed
+"$ " (sh's two-byte prompt write is two tx_lock-per-byte stores; the echo can
+land between them), making `good_out` false.  RULED FORM: `disc_pt cs i p :=
+k_done w ∧ ∃ t, t suffix_of u_prologue ∧ "$ " suffix_of t ∧ (t ++ drop
+(length u_prologue) (sess_n cs i)) prefix_of drop (k_pt w) w` -- the
+prologue's tail that fell after the k-point (containing the whole prompt) plus
+the expected transcript up to input i is a prefix of the pure suffix; `t` is
+unique (the prologue is border-free: `disc_pt_tail_unique`).  The theorem
+bites on every schedule where the prompt COMPLETES after the last hart line
+and is vacuous where the whole prompt preceded it (no fairness in the model;
+physically the hart lines take microseconds and the prompt follows disk I/O).
+`EchoDisc.v` (pure) holds R1-R5; `UConsLine` needed no bridge (`disc_seg`,
+D3, is kept verbatim as `disc_seg'`'s first conjunct; the three closure laws
+survive by name and statement).  It stays UPSTREAM
 of everything SH-LINE 2b proves; 2b's line lemmas need only `disc_in` (the
 projection), so the restatement is a bridge, not a re-proof.
 
