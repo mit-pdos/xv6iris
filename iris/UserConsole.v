@@ -156,7 +156,7 @@ Section UserConsole.
     (⌜dc = d⌝
      ∨ ⌜dc = (d + 1)%nat⌝ ∗
        ∃ (h : list mobs) (b : bv 8),
-         ⌜obs_ends_in h b⌝ ∗
+         ⌜obs_ends_in Uart0 h b⌝ ∗
          ucons_stored_lb cn (sl ++ [(h, b)])%list ∗
          ⌜cons_chain (sl ++ [(h, b)])%list⌝ ∗
          riscv_rx_tag h ∗

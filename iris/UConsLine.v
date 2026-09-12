@@ -212,7 +212,7 @@ Proof.
 Qed.
 
 (* THE CYCLE THE LAST INPUT BYTE IS IN.  [cycles_of] folds the history
-   into its power cycles, the open one last; an [ObsUartIn] event extends
+   into its power cycles, the open one last; an [ObsUartIn Uart0] event extends
    the most recent cycle (or starts one), so the byte's own cycle is a
    segment whose input ENDS with it.  No [trace_shape] premise: the fold
    does this whether or not the power is on. *)
@@ -223,18 +223,18 @@ Qed.
 
 Lemma ush_cycles_snoc_in (h : list mobs) (b : bv 8) :
   exists s0 : list mobs,
-    (s0 ++ [ObsUartIn b])%list ∈ cycles_of (h ++ [ObsUartIn b])%list.
+    (s0 ++ [ObsUartIn Uart0 b])%list ∈ cycles_of (h ++ [ObsUartIn Uart0 b])%list.
 Proof.
   rewrite /cycles_of cycles_rev_app.
   destruct (cycles_rev h) as [| c cs] eqn:Hc.
-  - exists []. exact (ush_elem_of_rev_head ([] ++ [ObsUartIn b])%list []).
-  - exists c. exact (ush_elem_of_rev_head (c ++ [ObsUartIn b])%list cs).
+  - exists []. exact (ush_elem_of_rev_head ([] ++ [ObsUartIn Uart0 b])%list []).
+  - exists c. exact (ush_elem_of_rev_head (c ++ [ObsUartIn Uart0 b])%list cs).
 Qed.
 
 (* THE REFUTATION ITSELF, at the shape [cons_swallow]'s arm hands it: the
    byte the history ends in translates to 0x04. *)
 Lemma disc_no_ctrl_d (h : list mobs) (b : bv 8) :
-  obs_ends_in h b -> bv_unsigned (cons_xlate b) = 4 -> disc h -> False.
+  obs_ends_in Uart0 h b -> bv_unsigned (cons_xlate b) = 4 -> disc h -> False.
 Proof.
   intros [h0 ->] Hx Hd.
   (* 0x04 is not '\r', so [cons_xlate] is the identity on it *)
