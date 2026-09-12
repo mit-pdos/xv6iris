@@ -2511,7 +2511,9 @@ phase 2 (WpUart only); the matching `Htx` premise is a later, separately
 reviewed statement change (E5's ledger).
 
 SUPPLY-SPLIT PHASE 2 GREEN ON ITS BRANCH (2026-09-12; `-sup`,
-`lane/supply-split` = `d2708e5b7`; 31 files +1163/-561; build `sup27`, audit =
+`lane/supply-split` = `d2708e5b7`; REBASED onto main as `lane/supply-split-r1` =
+`69543d942` in `-disc`, green, three conflict resolutions with TEXT-LW keeping
+both edits; 31 files +1163/-561; build `sup27`, audit =
 the thirteen; lemma_diff: 29 `Hpsok` → 24 `Hpsok_free` (five files lose the
 hypothesis outright), `xv6_free_dec` moved down as `UexecSG.free_num_dec`,
 `wp_kshr_qstub` deleted).  LANDING DEFERRED until LAZY-FLAG's main tree is in

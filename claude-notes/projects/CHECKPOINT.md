@@ -192,3 +192,13 @@ brief `brief-lazy-flag-2.md`: close the patch, sbrk's block-level arm, exec's
 domain row in `kexec_built`, the read-leaf refutation).  In flight: LAZY-FLAG-2
 (main), TX-TAG p2 (`-tlw`), SH-OPEN p1 (`-sup`), REBASE-SUPPLY-SPLIT (`-disc`,
 then E2 INIT-BOOT there).
+
+REBASE-SUPPLY-SPLIT DONE (2026-09-12): `lane/supply-split-r1` = `69543d942` in
+`-disc`, green (build `rebase10`, audit = the thirteen; three conflict
+resolutions kept both edits).  LANDING on main still deferred: LAZY-FLAG-2 has
+30 files dirty in main, four overlapping (UInitSh, UexecExecInst, UexecSG,
+UkRun) -- after LAZY-FLAG-2 lands, rebase r1 once more, then land, then rebase
+SH-OPEN (which is on the OLD supply-split d2708e5b7) onto it.  E2 INIT-BOOT
+LAUNCHED in `-disc` on `lane/init-boot` = r1 (brief `brief-init-boot.md`).  In
+flight: LAZY-FLAG-2 p1 (main), TX-TAG p2 (`-tlw`), SH-OPEN p1 (`-sup`), E2 p1
+(`-disc`).
