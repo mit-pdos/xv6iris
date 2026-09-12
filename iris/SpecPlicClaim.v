@@ -20,14 +20,20 @@
 
    THE RETURN VALUE IS THE POINT.  A claim hands back the id of the source it
    took, and the plan says a hart's context can only ever have the machine's own
-   two sources enabled -- so the id is 0, [(uart_irq_id Uart0)] or [virtio_irq_id], and
-   nothing else ([plic_claim_ret_ok]).  That is exactly what makes devintr()'s
-   three-way branch on the result exhaustive, and it is the one fact the loose
-   shared invariant is strong enough to deliver.
+   three sources enabled -- so the id is 0, [uart_irq_id Uart0],
+   [uart_irq_id Uart1] or [virtio_irq_id], and nothing else
+   ([plic_claim_ret_ok]).  That is exactly what makes devintr()'s branch on
+   the result exhaustive, and it is the one fact the loose shared invariant is
+   strong enough to deliver.
 
    The returned word is the 32-bit register value sign-extended into a0 by
-   [lw]; all three admissible ids are small and positive, so the post states
-   them as the concrete 64-bit words 0, 10 and 1.
+   [lw]; all four admissible ids are small and positive, so the post states
+   them as the concrete 64-bit words 0, 10, 12 and 1.
+
+   ONLY THE CONSOLE UART'S CLAIM HANDS OUT A PAYLOAD.  [WpUart]'s
+   [plic_payload] is [emp] at every source but [uart_irq_id Uart0], so a
+   claim that returns 12 delivers nothing -- which is what the second UART's
+   handler needs, having no receive consumer.
 
    Requires only the definitional layer + SpecCpuid -- never a whole-function
    proof file. *)
@@ -52,10 +58,13 @@ Require Import TsoCtx.
 Import Defs.
 
 
-(* the ids a claim can return, as the 64-bit words [lw] leaves in a0 *)
+(* the ids a claim can return, as the 64-bit words [lw] leaves in a0.  ONE
+   ARM PER SOURCE THE MACHINE HAS -- both UARTs and the disk -- mirroring
+   [PlicPlan.plic_claim_ret_ok] at the sign-extended width. *)
 Definition plic_claim_a0_ok (v : mword 64) : Prop :=
   v = (mword_of_int 0 : mword 64) \/
   v = (mword_of_int (Z.of_N (uart_irq_id Uart0)) : mword 64) \/
+  v = (mword_of_int (Z.of_N (uart_irq_id Uart1)) : mword 64) \/
   v = (mword_of_int (Z.of_N virtio_irq_id) : mword 64).
 
 (* INTERRUPTS MUST BE DISABLED.  plic_claim's very first instruction is an

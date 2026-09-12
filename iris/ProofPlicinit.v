@@ -2,7 +2,7 @@
    the SIE-agnostic sie_cap bundle.  plicinit() @ 0x8000547e sets the PLIC
    source priorities of the UART and VIRTIO interrupts to 1:
 
-     0x8000547e <plicinit>:
+     <plicinit>:
        +0x00  1141      c.addi   sp,sp,-16     frame alloc  (== cpuid/mycpu)
        +0x02  e406      c.sdsp   ra,8(sp)
        +0x04  e022      c.sdsp   s0,0(sp)
@@ -10,18 +10,19 @@
        +0x08  0c000737  lui      a4,0xc000     a4 = PLIC base 0x0c000000
        +0x0c  4785      c.li     a5,1
        +0x0e  d71c      c.sw     a5,40(a4)     *(PLIC+40)=1  (source 10 prio)
-       +0x10  c35c      c.sw     a5,4(a4)      *(PLIC+4)=1   (source 1  prio)
-       +0x12  60a2      c.ldsp   ra,8(sp)      frame free   (== cpuid/mycpu)
-       +0x14  6402      c.ldsp   s0,0(sp)
-       +0x16  0141      c.addi   sp,sp,16
-       +0x18  8082      c.ret
+       +0x10  db1c      c.sw     a5,48(a4)     *(PLIC+48)=1  (source 12 prio)
+       +0x12  c35c      c.sw     a5,4(a4)      *(PLIC+4)=1   (source 1  prio)
+       +0x14  60a2      c.ldsp   ra,8(sp)      frame free   (== cpuid/mycpu)
+       +0x16  6402      c.ldsp   s0,0(sp)
+       +0x18  0141      c.addi   sp,sp,16
+       +0x1a  8082      c.ret
 
    The 16-byte frame is byte-identical to cpuid (ProofCpuid.v): the prologue
    push/save and epilogue restore/pop reuse the shared KernelRvcDecode
    templates and the Proof{Mem,Ctl} frame leaves.  The middle is a small
-   value block ([lui]/[c.li]) followed by two width-4 PLIC MMIO stores.
+   value block ([lui]/[c.li]) followed by three width-4 PLIC MMIO stores.
 
-   THE TWO STORES GO THROUGH THE INVARIANT-BORROWING LEAF
+   THE THREE STORES GO THROUGH THE INVARIANT-BORROWING LEAF
    [wp_sw_plic_pinv_s_sconf] (WpPlic.v), which opens [plic_inv] across each
    (atomic) write.  This is what the re-statement of the contract over the
    time-0 device invariant bought and cost: plicinit no longer owns
@@ -236,15 +237,17 @@ Section ProofPlicinit.
     iIntros (CID7 Hs7) "Hcg Hpc _".
     assert (Hpp10 : add_vec_int (mword_of_int (KernelSyms.plicinit + 0x0e) : mword 64) 2 = mword_of_int (KernelSyms.plicinit + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp10) in "Hpc".
-    (* ---- 0x10: c.sw a5,4(a4)  -- source 1 priority ---- *)
-    iApply (wp_sw_plic_pinv_s_sconf (CID := CID7) γd (mword_of_int (KernelSyms.plicinit + 0x10)) true a5_idx a4_idx (mword_of_int 4) m4 (n - 2)%nat
+    (* ---- 0x10: c.sw a5,48(a4)  -- source 12 priority (the second UART) ----
+       The port xv6 prints on: one more source-priority write, discharged by
+       the same [plic_write_prio_ok] at [12%N]. *)
+    iApply (wp_sw_plic_pinv_s_sconf (CID := CID7) γd (mword_of_int (KernelSyms.plicinit + 0x10)) true a5_idx a4_idx (mword_of_int 48) m4 (n - 2)%nat
               emp%I emp%I
               ltac:(rewrite Ha4'; zrange_vm)
               ltac:(rewrite Ha4'; vm_compute; reflexivity)
               ltac:(rewrite Ha4'; vm_compute; reflexivity)
               ltac:(rewrite Ha4'; unfold kpt_dev_vpn; zrange_vm)
               ltac:(rewrite Ha4' Hsw; intros pq Hpq;
-                    apply (plic_write_prio_ok pq _ 1%N);
+                    apply (plic_write_prio_ok pq _ (uart_irq_id Uart1));
                     [ vm_compute; reflexivity | exact Hpq ])
               with "Hcg Hpc [] Hpinv [] []").
     { iApply (pi_10 with "Htext"). }
@@ -255,10 +258,32 @@ Section ProofPlicinit.
                 (plic_write_outside_claim _ _ _ _ Hpw
                    ltac:(rewrite Ha4'; vm_compute; reflexivity) (uart_irq_id Uart0))).
       iExact "Hslots". }
-    iIntros (CID8 Hs8) "Hcg Hpc _".
+    iIntros (CID7b Hs7b) "Hcg Hpc _".
     assert (Hpp12 : add_vec_int (mword_of_int (KernelSyms.plicinit + 0x10) : mword 64) 2 = mword_of_int (KernelSyms.plicinit + 0x12)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp12) in "Hpc".
-    (* ---- 0x12: c.ldsp ra,8(sp) ---- *)
+    (* ---- 0x12: c.sw a5,4(a4)  -- source 1 priority ---- *)
+    iApply (wp_sw_plic_pinv_s_sconf (CID := CID7b) γd (mword_of_int (KernelSyms.plicinit + 0x12)) true a5_idx a4_idx (mword_of_int 4) m4 (n - 2)%nat
+              emp%I emp%I
+              ltac:(rewrite Ha4'; zrange_vm)
+              ltac:(rewrite Ha4'; vm_compute; reflexivity)
+              ltac:(rewrite Ha4'; vm_compute; reflexivity)
+              ltac:(rewrite Ha4'; unfold kpt_dev_vpn; zrange_vm)
+              ltac:(rewrite Ha4' Hsw; intros pq Hpq;
+                    apply (plic_write_prio_ok pq _ virtio_irq_id);
+                    [ vm_compute; reflexivity | exact Hpq ])
+              with "Hcg Hpc [] Hpinv [] []").
+    { iApply (pi_12 with "Htext"). }
+    { done. }
+    { iIntros (pq pq') "%Hpw _ Hslots _".
+      iModIntro. iSplitL "Hslots"; [| done].
+      iApply (plic_slots_stable _ pq pq'
+                (plic_write_outside_claim _ _ _ _ Hpw
+                   ltac:(rewrite Ha4'; vm_compute; reflexivity) (uart_irq_id Uart0))).
+      iExact "Hslots". }
+    iIntros (CID8 Hs8) "Hcg Hpc _".
+    assert (Hpp14 : add_vec_int (mword_of_int (KernelSyms.plicinit + 0x12) : mword 64) 2 = mword_of_int (KernelSyms.plicinit + 0x14)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp14) in "Hpc".
+    (* ---- 0x14: c.ldsp ra,8(sp) ---- *)
     assert (Hm4sp : m4 !!! Regidx csp_rs1 = sp').
     { unfold m4, m3, m2. repeat (rewrite upd_ne; [| vm_compute; discriminate]).
       unfold m1. rewrite upd_eq. reflexivity. }
@@ -275,27 +300,27 @@ Section ProofPlicinit.
       by (intros CID'; rgne; unfold m1; rewrite upd_ne; [reflexivity | vm_compute; discriminate]).
     iEval (rewrite Hpa1 -Hpa1' Hra0v) in "Hbra".
     iEval (rewrite Hpa2 -Hpa2' Hs00v) in "Hbs0".
-    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.plicinit + 0x12)) (mword_of_int 1 : mword 6) ra_idx m4 (n - 2)%nat ra0 false
+    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.plicinit + 0x14)) (mword_of_int 1 : mword 6) ra_idx m4 (n - 2)%nat ra0 false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] Hbra").
-    { iApply (pi_12 with "Htext"). }
+    { iApply (pi_14 with "Htext"). }
     iIntros (CID9 Hs9) "Hcg Hpc Hbra".
-    assert (Hpp14 : add_vec_int (mword_of_int (KernelSyms.plicinit + 0x12) : mword 64) 2 = mword_of_int (KernelSyms.plicinit + 0x14)) by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpp14) in "Hpc".
+    assert (Hpp16 : add_vec_int (mword_of_int (KernelSyms.plicinit + 0x14) : mword 64) 2 = mword_of_int (KernelSyms.plicinit + 0x16)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp16) in "Hpc".
     change (<[Regidx ra_idx := regval_into_reg ra0]> m4) with m5.
-    (* ---- 0x14: c.ldsp s0,0(sp) ---- *)
+    (* ---- 0x16: c.ldsp s0,0(sp) ---- *)
     assert (Hm5sp : m5 !!! Regidx csp_rs1 = m4 !!! Regidx csp_rs1)
       by (unfold m5; rewrite upd_ne; [reflexivity | vm_compute; discriminate]).
     iEval (rewrite -Hm5sp) in "Hbs0".
-    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.plicinit + 0x14)) (mword_of_int 0 : mword 6) s0_idx m5 (n - 2)%nat s00 false
+    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.plicinit + 0x16)) (mword_of_int 0 : mword 6) s0_idx m5 (n - 2)%nat s00 false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] Hbs0").
-    { iApply (pi_14 with "Htext"). }
+    { iApply (pi_16 with "Htext"). }
     iIntros (CID10 Hs10) "Hcg Hpc Hbs0".
-    assert (Hpp16 : add_vec_int (mword_of_int (KernelSyms.plicinit + 0x14) : mword 64) 2 = mword_of_int (KernelSyms.plicinit + 0x16)) by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpp16) in "Hpc".
+    assert (Hpp18 : add_vec_int (mword_of_int (KernelSyms.plicinit + 0x16) : mword 64) 2 = mword_of_int (KernelSyms.plicinit + 0x18)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp18) in "Hpc".
     change (<[Regidx s0_idx := regval_into_reg s00]> m5) with m6.
-    (* ---- 0x16: c.addi sp,16 -- the frame pop ---- *)
+    (* ---- 0x18: c.addi sp,16 -- the frame pop ---- *)
     assert (Hm6sp : m6 !!! Regidx csp_rs1 = sp').
     { unfold m6, m5; repeat (rewrite upd_ne; [| vm_compute; discriminate]).
       exact Hm4sp. }
@@ -308,24 +333,24 @@ Section ProofPlicinit.
     iEval (rewrite Hm5sp Hpa2') in "Hbs0".
     iDestruct (stack_own_2_intro sp0 with "Hbra Hbs0") as "Hframe".
     iEval (rewrite -Hwv) in "Hframe".
-    iApply (wp_caddi_sp_pop_s_sconf (mword_of_int (KernelSyms.plicinit + 0x16)) imm_dealloc m6
+    iApply (wp_caddi_sp_pop_s_sconf (mword_of_int (KernelSyms.plicinit + 0x18)) imm_dealloc m6
               (n - 2)%nat 2 false Hpop
               with "Hcg Hpc [] Hframe").
-    { iApply (pi_16 with "Htext"). }
+    { iApply (pi_18 with "Htext"). }
     iIntros (CID11 Hs11) "Hcg Hpc".
     assert (Hnk : ((n - 2) + 2)%nat = n) by lia.
     iEval (rewrite Hnk) in "Hcg".
-    assert (Hpp18 : add_vec_int (mword_of_int (KernelSyms.plicinit + 0x16) : mword 64) 2 = mword_of_int (KernelSyms.plicinit + 0x18)) by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpp18) in "Hpc".
+    assert (Hpp1a : add_vec_int (mword_of_int (KernelSyms.plicinit + 0x18) : mword 64) 2 = mword_of_int (KernelSyms.plicinit + 0x1a)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp1a) in "Hpc".
     change (<[Regidx csp_rs1 := regval_into_reg (add_vec (m6 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_dealloc)))]> m6) with m7.
-    (* ---- 0x18: c.ret ---- *)
+    (* ---- 0x1a: c.ret ---- *)
     assert (Hm7ra : m7 !!! Regidx ra_idx = ra0).
     { unfold m7, m6; repeat (rewrite upd_ne; [| vm_compute; discriminate]).
       unfold m5. rewrite upd_eq. reflexivity. }
-    iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.plicinit + 0x18)) ra_idx m7 n false
+    iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.plicinit + 0x1a)) ra_idx m7 n false
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
-    { iApply (pi_18 with "Htext"). }
+    { iApply (pi_1a with "Htext"). }
     iIntros (CID12 Hs12) "Hcg Hpc".
     assert (Hra_final : forall (CID' : CpuId), ret_pc (rget (CID := CID') m7 ra_idx) = ret_tgt)
       by (intros CID'; rgne; rewrite Hm7ra; reflexivity).

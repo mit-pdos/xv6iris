@@ -1,16 +1,17 @@
 (* SpecPlicinithart.v -- the public interface of plicinithart, stated
    independently of its proof.  [plicinithart] (xv6-riscv/kernel/plic.c) enables
-   the UART + VIRTIO interrupts for THIS hart's S-mode context and drops its
-   priority threshold to 0:
+   BOTH UARTs' and the VIRTIO interrupt for THIS hart's S-mode context and
+   drops its priority threshold to 0:
 
-     0x80005498 <plicinithart>:
+     <plicinithart>:
        ...prologue...
        jal    cpuid            a0 = hart id
        slliw  a4,a0,0x8
        lui    a5,0xc002
        add    a5,a5,a4         a5 = PLIC + 0x2000 + hart*0x100
-       li     a4,1026
-       sw     a4,128(a5)       *PLIC_SENABLE(hart)   = (1<<10)|(1<<1) = 1026
+       c.lui  a4,0x1
+       addi   a4,a4,1026       a4 = (1<<10)|(1<<12)|(1<<1) = 0x1402
+       sw     a4,128(a5)       *PLIC_SENABLE(hart)   = 0x1402
        slliw  a0,a0,0xd
        lui    a5,0xc201
        add    a5,a5,a0         a5 = PLIC + 0x201000 + hart*0x2000
@@ -62,8 +63,12 @@ Require Import TsoCtx.
 Import Defs.
 
 
-(* the S-context enable word xv6 writes: (1 << UART0_IRQ) | (1 << VIRTIO0_IRQ)
-   = (1 << 10) | (1 << 1) = 1026 -- exactly the kernel's permitted set. *)
+(* the S-context enable word xv6 writes:
+   (1 << UART0_IRQ) | (1 << UART1_IRQ) | (1 << VIRTIO0_IRQ)
+   = (1 << 10) | (1 << 12) | (1 << 1) = 0x1402 -- exactly the kernel's
+   permitted set.  DERIVED from the plan's [plic_dev_irq_mask], never
+   transcribed: the word and the permission it must satisfy
+   ([PlicPlan.plic_senable_ok_mask]) are then the same term by construction. *)
 Definition plic_senable_word : bv 32 := Z_to_bv 32 plic_dev_irq_mask.
 
 (* INTERRUPTS MUST BE DISABLED.  plicinithart's very first instruction is an

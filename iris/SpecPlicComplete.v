@@ -75,7 +75,7 @@ Definition wp_plic_complete_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `
   bv_unsigned (rget m0 tp_idx) < Z.of_nat dev_ncpu ->
   (* THE ID BEING COMPLETED IS ONE A CLAIM HANDED BACK.  Only that makes the
      32-bit register write identify the source: a0's low word decides which
-     service bit clears, and the three admissible ids are distinct there.
+     service bit clears, and the four admissible ids are distinct there.
      Every real caller has this from [SpecPlicClaim]'s own post. *)
   plic_claim_a0_ok (rget m0 (mword_of_int 10 : mword 5)) ->
   (* plic_complete's own max depth: its 32-byte frame (4 slots) plus the two

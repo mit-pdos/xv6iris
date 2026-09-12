@@ -88,8 +88,18 @@ Section UartTxInv.
 
   (* ---- geometry.  The sleeplock's own words belong to [SleepLock.sl_res] /
      the inner spinlock's [lock_inv]; nothing here names them. *)
-  Definition a_tx_lock : mword 64 := mword_of_int KernelSyms.tx_lock.
-  Definition a_tx_chan : mword 64 := mword_of_int KernelSyms.tx_chan.
+  (* [tx_lock] and [tx_chan] LEFT THE SYMBOL TABLE at 163d39b: the kernel's
+     two UARTs share one `struct uart uarts[2]` in .data, so the lock is a
+     FIELD of the element (`&uarts[uid].tx_lock` = `uarts + 40*uid + 16`) and
+     the sleep channel is the ELEMENT ITSELF (`sleep_prepare(u)` with
+     `u = &uarts[uid]`).  The stride and the field offset are read off
+     [uartputc_sync]'s own arithmetic -- `((uid*4 + uid) << 3) + 16 + uarts`
+     for the lock, and `uartinit` passing `uarts + 0x28` for `&uarts[1]`.
+     This file is the CONSOLE port's; the second port's pair is the same
+     arithmetic at uid = 1. *)
+  Definition a_tx_lock : mword 64 :=
+    mword_of_int (KernelSyms.uarts + 16).
+  Definition a_tx_chan : mword 64 := mword_of_int KernelSyms.uarts.
 
   (* ---- the protected resource: the transmitter, at whatever trace it is at.
      The trace is EXISTENTIAL here because no reader of the lock predicts it --

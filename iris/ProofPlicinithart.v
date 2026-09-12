@@ -1,27 +1,28 @@
 (* ProofPlicinithart.v: whole-function WP for xv6's plicinithart() in S-mode,
-   over the SIE-agnostic sie_cap bundle.  plicinithart() @ 0x80005498 enables
-   the UART + VIRTIO interrupts for THIS hart's S-mode PLIC context and drops
+   over the SIE-agnostic sie_cap bundle.  plicinithart() enables BOTH UARTs'
+   and the VIRTIO interrupt for THIS hart's S-mode PLIC context and drops
    that context's priority threshold to 0:
 
-     0x80005498 <plicinithart>:
+     <plicinithart>:
        +0x00  1141      c.addi   sp,sp,-16     frame alloc  (== cpuid/plicinit)
        +0x02  e406      c.sdsp   ra,8(sp)
        +0x04  e022      c.sdsp   s0,0(sp)
        +0x06  0800      c.addi4spn s0,sp,16
-       +0x08  c30fc0ef  jal      ra,cpuid      a0 = hart id
+       +0x08  ...       jal      ra,cpuid      a0 = hart id
        +0x0c  0085171b  slliw    a4,a0,0x8
        +0x10  0c0027b7  lui      a5,0xc002
        +0x14  97ba      c.add    a5,a5,a4      a5 = PLIC+0x2000 + hart*0x100
-       +0x16  40200713  addi     a4,zero,1026
-       +0x1a  08e7a023  sw       a4,128(a5)    *PLIC_SENABLE(hart)  = 1026
-       +0x1e  00d5151b  slliw    a0,a0,0xd
-       +0x22  0c2017b7  lui      a5,0xc201
-       +0x26  97aa      c.add    a5,a5,a0      a5 = PLIC+0x201000 + hart*0x2000
-       +0x28  0007a023  sw       zero,0(a5)    *PLIC_SPRIORITY(hart) = 0
-       +0x2c  60a2      c.ldsp   ra,8(sp)      frame free   (== cpuid/plicinit)
-       +0x2e  6402      c.ldsp   s0,0(sp)
-       +0x30  0141      c.addi   sp,sp,16
-       +0x32  8082      c.ret
+       +0x16  6705      c.lui    a4,0x1        a4 = 0x1000
+       +0x18  40270713  addi     a4,a4,1026    a4 = 0x1402 = plic_dev_irq_mask
+       +0x1c  08e7a023  sw       a4,128(a5)    *PLIC_SENABLE(hart)  = 0x1402
+       +0x20  00d5151b  slliw    a0,a0,0xd
+       +0x24  0c2017b7  lui      a5,0xc201
+       +0x28  97aa      c.add    a5,a5,a0      a5 = PLIC+0x201000 + hart*0x2000
+       +0x2a  0007a023  sw       zero,0(a5)    *PLIC_SPRIORITY(hart) = 0
+       +0x2e  60a2      c.ldsp   ra,8(sp)      frame free   (== cpuid/plicinit)
+       +0x30  6402      c.ldsp   s0,0(sp)
+       +0x32  0141      c.addi   sp,sp,16
+       +0x34  8082      c.ret
 
    The 16-byte frame is byte-identical to cpuid/plicinit, so the prologue and
    epilogue reuse KernelRvcDecode's shared templates and the Proof{Mem,Ctl}
@@ -221,7 +222,8 @@ Section ProofPlicinithart.
     set (N2 := <[Regidx a4_idx := regval_into_reg (ph_shl cid_word 8)]> mo).
     set (N3 := <[Regidx a5_idx := regval_into_reg (mword_of_int 0x0c002000 : mword 64)]> N2).
     set (N4 := <[Regidx a5_idx := regval_into_reg (add_vec (rget N3 a5_idx) (rget N3 a4_idx))]> N3).
-    set (N5 := <[Regidx a4_idx := regval_into_reg (add_vec (rget N4 z_idx) (sign_extend' 64 (mword_of_int 1026 : mword 12)))]> N4).
+    set (N4b := <[Regidx a4_idx := regval_into_reg (mword_of_int 0x1000 : mword 64)]> N4).
+    set (N5 := <[Regidx a4_idx := regval_into_reg (add_vec (rget N4b a4_idx) (sign_extend' 64 (mword_of_int 1026 : mword 12)))]> N4b).
     set (N6 := <[Regidx a0_idx := regval_into_reg (ph_shl cid_word 13)]> N5).
     set (N7 := <[Regidx a5_idx := regval_into_reg (mword_of_int 0x0c201000 : mword 64)]> N6).
     set (N8 := <[Regidx a5_idx := regval_into_reg (add_vec (rget N7 a5_idx) (rget N7 a0_idx))]> N7).
@@ -262,17 +264,33 @@ Section ProofPlicinithart.
     assert (Hpp16 : add_vec_int (mword_of_int (KernelSyms.plicinithart + 0x14) : mword 64) 2 = mword_of_int (KernelSyms.plicinithart + 0x16)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp16) in "Hpc".
     change (<[Regidx a5_idx := regval_into_reg (add_vec (rget N3 a5_idx) (rget N3 a4_idx))]> N3) with N4.
-    (* ---- 0x16: addi a4,zero,1026 ---- *)
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.plicinithart + 0x16)) a4_idx z_idx
-              (mword_of_int 1026 : mword 12) N4 (n - 2)%nat false
+    (* ---- 0x16: c.lui a4,0x1 ----
+       The enable word is now [plic_dev_irq_mask] = 0x1402, which does not fit
+       [li]'s 12-bit immediate, so gcc materialises it in two instructions:
+       this [c.lui] puts 0x1000 in a4 and the [addi] below adds 0x402. *)
+    iApply (wp_clui_s_sconf (mword_of_int (KernelSyms.plicinithart + 0x16)) a4_idx
+              (sign_extend' 20 (mword_of_int 1 : mword 6)) (mword_of_int 0x1000 : mword 64)
+              N4 (n - 2)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
+              ltac:(apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (phi_16 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
-    assert (Hpp1a : add_vec_int (mword_of_int (KernelSyms.plicinithart + 0x16) : mword 64) 4 = mword_of_int (KernelSyms.plicinithart + 0x1a)) by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpp1a) in "Hpc".
-    change (<[Regidx a4_idx := regval_into_reg (add_vec (rget N4 z_idx) (sign_extend' 64 (mword_of_int 1026 : mword 12)))]> N4) with N5.
+    assert (Hpp18 : add_vec_int (mword_of_int (KernelSyms.plicinithart + 0x16) : mword 64) 2 = mword_of_int (KernelSyms.plicinithart + 0x18)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp18) in "Hpc".
+    change (<[Regidx a4_idx := regval_into_reg (mword_of_int 0x1000 : mword 64)]> N4) with N4b.
+    (* ---- 0x18: addi a4,a4,1026 ---- *)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.plicinithart + 0x18)) a4_idx a4_idx
+              (mword_of_int 1026 : mword 12) N4b (n - 2)%nat false
+              ltac:(vm_compute; discriminate) ltac:(rdok)
+              with "Hcg Hpc []").
+    { iApply (phi_18 with "Htext"). }
+    iApply wp_next_off_intro.
+    iIntros "Hcg Hpc".
+    assert (Hpp1c : add_vec_int (mword_of_int (KernelSyms.plicinithart + 0x18) : mword 64) 4 = mword_of_int (KernelSyms.plicinithart + 0x1c)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp1c) in "Hpc".
+    change (<[Regidx a4_idx := regval_into_reg (add_vec (rget N4b a4_idx) (sign_extend' 64 (mword_of_int 1026 : mword 12)))]> N4b) with N5.
     (* the two operands of the first store *)
     assert (HN3a5 : rget N3 a5_idx = (mword_of_int 0x0c002000 : mword 64))
       by (rgne; unfold N3; apply upd_eq).
@@ -282,18 +300,20 @@ Section ProofPlicinithart.
     { rgne. unfold N4. rewrite upd_eq. unfold regval_into_reg, ph_senb.
       rewrite HN3a5 HN3a4. reflexivity. }
     assert (HN5a5 : rget N5 a5_idx = ph_senb cid_word).
-    { rgne. unfold N5. rewrite upd_ne; [| vm_compute; discriminate].
+    { rgne. unfold N5, N4b. repeat (rewrite upd_ne; [| vm_compute; discriminate]).
       unfold N4. rewrite upd_eq. unfold regval_into_reg, ph_senb.
       rewrite HN3a5 HN3a4. reflexivity. }
-    assert (HN4z : rget N4 z_idx = zero_reg).
-    { rgne. unfold N4, N3, N2. repeat (rewrite upd_ne; [| vm_compute; discriminate]). exact Hz0. }
-    assert (HN5a4 : rget N5 a4_idx = (mword_of_int 1026 : mword 64)).
-    { rgne. unfold N5. rewrite upd_eq. unfold regval_into_reg. rewrite HN4z.
+    assert (HN4ba4 : rget N4b a4_idx = (mword_of_int 0x1000 : mword 64))
+      by (rgne; unfold N4b; apply upd_eq).
+    (* a4 after the [c.lui]/[addi] pair IS the kernel's permitted enable set,
+       derived from [PlicPlan.plic_dev_irq_mask] rather than transcribed. *)
+    assert (HN5a4 : rget N5 a4_idx = (Z_to_bv 64 plic_dev_irq_mask : mword 64)).
+    { rgne. unfold N5. rewrite upd_eq. unfold regval_into_reg. rewrite HN4ba4.
       apply bv_eq; vm_compute; reflexivity. }
     assert (HN5sw : (autocast (T := mword) (subrange_vec_dec (rget N5 a4_idx) (Z.sub (Z.mul 4 8) 1) 0) : mword 32) = plic_senable_word).
     { rewrite HN5a4. apply bv_eq; vm_compute; reflexivity. }
-    (* ---- 0x1a: sw a4,128(a5) -- PLIC_SENABLE(hart) = 1026 ---- *)
-    iApply (wp_sw_plic_dev_s_sconf (CID := CID) γd γv (mword_of_int (KernelSyms.plicinithart + 0x1a)) false a4_idx a5_idx
+    (* ---- 0x1c: sw a4,128(a5) -- PLIC_SENABLE(hart) = plic_dev_irq_mask ---- *)
+    iApply (wp_sw_plic_dev_s_sconf (CID := CID) γd γv (mword_of_int (KernelSyms.plicinithart + 0x1c)) false a4_idx a5_idx
               (mword_of_int 128 : mword 12) N5 (n - 2)%nat emp%I emp%I
               ltac:(rewrite HN5a5; exact (ph_geom_range _ (ph_senable_geom _ Hhart)))
               ltac:(rewrite HN5a5; exact (ph_geom_align _ (ph_senable_geom _ Hhart)))
@@ -305,7 +325,7 @@ Section ProofPlicinithart.
                     | apply plic_ok_wupd_enable;
                       [ exact Hpq | exact plic_senable_ok_mask ] ])
               with "Hcg Hpc [] Hdinv [] []").
-    { iApply (phi_1a with "Htext"). }
+    { iApply (phi_1c with "Htext"). }
     { done. }
     { (* an ENABLE write: it touches the enable bitmap and nothing else, so
          the slots come straight back *)
@@ -318,43 +338,43 @@ Section ProofPlicinithart.
       iApply (plic_slots_stable _ pq pq' Hcl). iExact "Hslots". }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc _".
-    assert (Hpp1e : add_vec_int (mword_of_int (KernelSyms.plicinithart + 0x1a) : mword 64) 4 = mword_of_int (KernelSyms.plicinithart + 0x1e)) by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpp1e) in "Hpc".
-    (* ---- 0x1e: slliw a0,a0,13 ---- *)
+    assert (Hpp20 : add_vec_int (mword_of_int (KernelSyms.plicinithart + 0x1c) : mword 64) 4 = mword_of_int (KernelSyms.plicinithart + 0x20)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp20) in "Hpc".
+    (* ---- 0x20: slliw a0,a0,13 ---- *)
     assert (HN5a0 : rget N5 a0_idx = cid_word).
-    { rgne. unfold N5, N4, N3, N2. repeat (rewrite upd_ne; [| vm_compute; discriminate]). exact Hmoa0. }
-    iApply (wp_slliw_s_sconf (mword_of_int (KernelSyms.plicinithart + 0x1e)) a0_idx a0_idx
+    { rgne. unfold N5, N4b, N4, N3, N2. repeat (rewrite upd_ne; [| vm_compute; discriminate]). exact Hmoa0. }
+    iApply (wp_slliw_s_sconf (mword_of_int (KernelSyms.plicinithart + 0x20)) a0_idx a0_idx
               (mword_of_int 13 : mword 5) (ph_shl cid_word 13) N5 (n - 2)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(rewrite HN5a0; reflexivity)
               with "Hcg Hpc []").
-    { iApply (phi_1e with "Htext"). }
+    { iApply (phi_20 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
-    assert (Hpp22 : add_vec_int (mword_of_int (KernelSyms.plicinithart + 0x1e) : mword 64) 4 = mword_of_int (KernelSyms.plicinithart + 0x22)) by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpp22) in "Hpc".
+    assert (Hpp24 : add_vec_int (mword_of_int (KernelSyms.plicinithart + 0x20) : mword 64) 4 = mword_of_int (KernelSyms.plicinithart + 0x24)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp24) in "Hpc".
     change (<[Regidx a0_idx := regval_into_reg (ph_shl cid_word 13)]> N5) with N6.
-    (* ---- 0x22: lui a5,0xc201 ---- *)
-    iApply (wp_lui_s_sconf (mword_of_int (KernelSyms.plicinithart + 0x22)) a5_idx
+    (* ---- 0x24: lui a5,0xc201 ---- *)
+    iApply (wp_lui_s_sconf (mword_of_int (KernelSyms.plicinithart + 0x24)) a5_idx
               (mword_of_int 0xc201 : mword 20) (mword_of_int 0x0c201000 : mword 64) N6 (n - 2)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc []").
-    { iApply (phi_22 with "Htext"). }
+    { iApply (phi_24 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
-    assert (Hpp26 : add_vec_int (mword_of_int (KernelSyms.plicinithart + 0x22) : mword 64) 4 = mword_of_int (KernelSyms.plicinithart + 0x26)) by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpp26) in "Hpc".
+    assert (Hpp28 : add_vec_int (mword_of_int (KernelSyms.plicinithart + 0x24) : mword 64) 4 = mword_of_int (KernelSyms.plicinithart + 0x28)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp28) in "Hpc".
     change (<[Regidx a5_idx := regval_into_reg (mword_of_int 0x0c201000 : mword 64)]> N6) with N7.
-    (* ---- 0x26: c.add a5,a5,a0 ---- *)
-    iApply (wp_cadd_s_sconf (mword_of_int (KernelSyms.plicinithart + 0x26)) a5_idx a0_idx N7 (n - 2)%nat false
+    (* ---- 0x28: c.add a5,a5,a0 ---- *)
+    iApply (wp_cadd_s_sconf (mword_of_int (KernelSyms.plicinithart + 0x28)) a5_idx a0_idx N7 (n - 2)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
-    { iApply (phi_26 with "Htext"). }
+    { iApply (phi_28 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
-    assert (Hpp28 : add_vec_int (mword_of_int (KernelSyms.plicinithart + 0x26) : mword 64) 2 = mword_of_int (KernelSyms.plicinithart + 0x28)) by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpp28) in "Hpc".
+    assert (Hpp2a : add_vec_int (mword_of_int (KernelSyms.plicinithart + 0x28) : mword 64) 2 = mword_of_int (KernelSyms.plicinithart + 0x2a)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp2a) in "Hpc".
     change (<[Regidx a5_idx := regval_into_reg (add_vec (rget N7 a5_idx) (rget N7 a0_idx))]> N7) with N8.
     (* the operands of the second store *)
     assert (HN7a5 : rget N7 a5_idx = (mword_of_int 0x0c201000 : mword 64))
@@ -366,12 +386,12 @@ Section ProofPlicinithart.
     { rgne. unfold N8. rewrite upd_eq. unfold regval_into_reg, ph_sthb.
       rewrite HN7a5 HN7a0. reflexivity. }
     assert (HN8z : rget N8 z_idx = zero_reg).
-    { rgne. unfold N8, N7, N6, N5, N4, N3, N2.
+    { rgne. unfold N8, N7, N6, N5, N4b, N4, N3, N2.
       repeat (rewrite upd_ne; [| vm_compute; discriminate]). exact Hz0. }
     assert (HN8sw : (autocast (T := mword) (subrange_vec_dec (rget N8 z_idx) (Z.sub (Z.mul 4 8) 1) 0) : mword 32) = Z_to_bv 32 0).
     { rewrite HN8z. apply bv_eq; vm_compute; reflexivity. }
-    (* ---- 0x28: sw zero,0(a5) -- PLIC_SPRIORITY(hart) = 0 ---- *)
-    iApply (wp_sw_plic_dev_s_sconf (CID := CID) γd γv (mword_of_int (KernelSyms.plicinithart + 0x28)) false z_idx a5_idx
+    (* ---- 0x2a: sw zero,0(a5) -- PLIC_SPRIORITY(hart) = 0 ---- *)
+    iApply (wp_sw_plic_dev_s_sconf (CID := CID) γd γv (mword_of_int (KernelSyms.plicinithart + 0x2a)) false z_idx a5_idx
               (mword_of_int 0 : mword 12) N8 (n - 2)%nat emp%I emp%I
               ltac:(rewrite HN8a5; exact (ph_geom_range _ (ph_sthresh_geom _ Hhart)))
               ltac:(rewrite HN8a5; exact (ph_geom_align _ (ph_sthresh_geom _ Hhart)))
@@ -382,7 +402,7 @@ Section ProofPlicinithart.
                     [ exact (ph_sthresh_write _ pq _ Hhart)
                     | apply plic_ok_hupd_thresh; exact Hpq ])
               with "Hcg Hpc [] Hdinv [] []").
-    { iApply (phi_28 with "Htext"). }
+    { iApply (phi_2a with "Htext"). }
     { done. }
     { iIntros (pq pq') "%Hpw _ Hslots _".
       rewrite HN8sw HN8a5 (ph_sthresh_write _ pq _ Hhart) in Hpw.
@@ -393,11 +413,11 @@ Section ProofPlicinithart.
       iApply (plic_slots_stable _ pq pq' Hcl). iExact "Hslots". }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc _".
-    assert (Hpp2c : add_vec_int (mword_of_int (KernelSyms.plicinithart + 0x28) : mword 64) 4 = mword_of_int (KernelSyms.plicinithart + 0x2c)) by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpp2c) in "Hpc".
-    (* ---- 0x2c: c.ldsp ra,8(sp) ---- *)
+    assert (Hpp2e : add_vec_int (mword_of_int (KernelSyms.plicinithart + 0x2a) : mword 64) 4 = mword_of_int (KernelSyms.plicinithart + 0x2e)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp2e) in "Hpc".
+    (* ---- 0x2e: c.ldsp ra,8(sp) ---- *)
     assert (HN8sp : N8 !!! Regidx csp_rs1 = sp').
-    { unfold N8, N7, N6, N5, N4, N3, N2.
+    { unfold N8, N7, N6, N5, N4b, N4, N3, N2.
       repeat (rewrite upd_ne; [| vm_compute; discriminate]). exact Hmosp. }
     assert (Hpa1' : add_vec (N8 !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) = pa_stk sp0 1).
     { rewrite HN8sp. rewrite -Hcsp1. exact Hpa1. }
@@ -409,29 +429,29 @@ Section ProofPlicinithart.
       by (rgne; unfold m1; rewrite upd_ne; [reflexivity | vm_compute; discriminate]).
     iEval (rewrite Hpa1 -Hpa1' Hra0v) in "Hbra".
     iEval (rewrite Hpa2 -Hpa2' Hs00v) in "Hbs0".
-    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.plicinithart + 0x2c)) (mword_of_int 1 : mword 6) ra_idx N8 (n - 2)%nat ra0 false
+    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.plicinithart + 0x2e)) (mword_of_int 1 : mword 6) ra_idx N8 (n - 2)%nat ra0 false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] Hbra").
-    { iApply (phi_2c with "Htext"). }
+    { iApply (phi_2e with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc Hbra".
-    assert (Hpp2e : add_vec_int (mword_of_int (KernelSyms.plicinithart + 0x2c) : mword 64) 2 = mword_of_int (KernelSyms.plicinithart + 0x2e)) by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpp2e) in "Hpc".
+    assert (Hpp30 : add_vec_int (mword_of_int (KernelSyms.plicinithart + 0x2e) : mword 64) 2 = mword_of_int (KernelSyms.plicinithart + 0x30)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp30) in "Hpc".
     change (<[Regidx ra_idx := regval_into_reg ra0]> N8) with N9.
-    (* ---- 0x2e: c.ldsp s0,0(sp) ---- *)
+    (* ---- 0x30: c.ldsp s0,0(sp) ---- *)
     assert (HN9sp : N9 !!! Regidx csp_rs1 = N8 !!! Regidx csp_rs1)
       by (unfold N9; rewrite upd_ne; [reflexivity | vm_compute; discriminate]).
     iEval (rewrite -HN9sp) in "Hbs0".
-    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.plicinithart + 0x2e)) (mword_of_int 0 : mword 6) s0_idx N9 (n - 2)%nat s00 false
+    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.plicinithart + 0x30)) (mword_of_int 0 : mword 6) s0_idx N9 (n - 2)%nat s00 false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] Hbs0").
-    { iApply (phi_2e with "Htext"). }
+    { iApply (phi_30 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc Hbs0".
-    assert (Hpp30 : add_vec_int (mword_of_int (KernelSyms.plicinithart + 0x2e) : mword 64) 2 = mword_of_int (KernelSyms.plicinithart + 0x30)) by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpp30) in "Hpc".
+    assert (Hpp32 : add_vec_int (mword_of_int (KernelSyms.plicinithart + 0x30) : mword 64) 2 = mword_of_int (KernelSyms.plicinithart + 0x32)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp32) in "Hpc".
     change (<[Regidx s0_idx := regval_into_reg s00]> N9) with N10.
-    (* ---- 0x30: c.addi sp,16 -- the frame pop ---- *)
+    (* ---- 0x32: c.addi sp,16 -- the frame pop ---- *)
     assert (HN10sp : N10 !!! Regidx csp_rs1 = sp').
     { unfold N10, N9. repeat (rewrite upd_ne; [| vm_compute; discriminate]). exact HN8sp. }
     assert (Hwv : add_vec (N10 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_dealloc)) = sp0).
@@ -443,25 +463,25 @@ Section ProofPlicinithart.
     iEval (rewrite HN9sp Hpa2') in "Hbs0".
     iDestruct (stack_own_2_intro sp0 with "Hbra Hbs0") as "Hframe".
     iEval (rewrite -Hwv) in "Hframe".
-    iApply (wp_caddi_sp_pop_s_sconf (mword_of_int (KernelSyms.plicinithart + 0x30)) imm_dealloc N10
+    iApply (wp_caddi_sp_pop_s_sconf (mword_of_int (KernelSyms.plicinithart + 0x32)) imm_dealloc N10
               (n - 2)%nat 2 false Hpop
               with "Hcg Hpc [] Hframe").
-    { iApply (phi_30 with "Htext"). }
+    { iApply (phi_32 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     assert (Hnk : ((n - 2) + 2)%nat = n) by lia.
     iEval (rewrite Hnk) in "Hcg".
-    assert (Hpp32 : add_vec_int (mword_of_int (KernelSyms.plicinithart + 0x30) : mword 64) 2 = mword_of_int (KernelSyms.plicinithart + 0x32)) by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpp32) in "Hpc".
+    assert (Hpp34 : add_vec_int (mword_of_int (KernelSyms.plicinithart + 0x32) : mword 64) 2 = mword_of_int (KernelSyms.plicinithart + 0x34)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp34) in "Hpc".
     change (<[Regidx csp_rs1 := regval_into_reg (add_vec (N10 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_dealloc)))]> N10) with N11.
-    (* ---- 0x32: c.ret ---- *)
+    (* ---- 0x34: c.ret ---- *)
     assert (HN11ra : N11 !!! Regidx ra_idx = ra0).
     { unfold N11, N10. repeat (rewrite upd_ne; [| vm_compute; discriminate]).
       unfold N9. rewrite upd_eq. reflexivity. }
-    iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.plicinithart + 0x32)) ra_idx N11 n false
+    iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.plicinithart + 0x34)) ra_idx N11 n false
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
-    { iApply (phi_32 with "Htext"). }
+    { iApply (phi_34 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     assert (Hra_final : ret_pc (rget N11 ra_idx) = ret_tgt)

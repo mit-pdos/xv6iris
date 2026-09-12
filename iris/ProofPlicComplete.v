@@ -68,7 +68,7 @@ Import Defs.
    whole-function proof already has.  Written name-free (durable-notes: an
    Ltac body cannot mention a hypothesis by literal name). *)
 (* THE ID THE STORE NAMES, back to the argument.  The 32-bit register write
-   truncates a0, and truncation is injective on the three ids a claim can
+   truncates a0, and truncation is injective on the four ids a claim can
    hand back -- which is why the contract asks for [plic_claim_a0_ok]. *)
 Lemma pc_a0_of_sw (w : mword 64) :
   plic_claim_a0_ok w ->
@@ -77,7 +77,7 @@ Lemma pc_a0_of_sw (w : mword 64) :
     = (uart_irq_id Uart0) ->
   w = (mword_of_int (Z.of_N (uart_irq_id Uart0)) : mword 64).
 Proof.
-  intros [-> | [-> | ->]] H; [ | reflexivity | ];
+  intros [-> | [-> | [-> | ->]]] H; [ | reflexivity | | ];
     exfalso; vm_compute in H; discriminate.
 Qed.
 

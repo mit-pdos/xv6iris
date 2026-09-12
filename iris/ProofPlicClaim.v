@@ -1,8 +1,8 @@
 (* ProofPlicClaim.v: whole-function WP for xv6's plic_claim() in S-mode, over
-   the SIE-agnostic sie_cap bundle.  plic_claim() @ 0x800054cc asks the PLIC
-   which interrupt this hart should serve:
+   the SIE-agnostic sie_cap bundle.  plic_claim() asks the PLIC which
+   interrupt this hart should serve:
 
-     0x800054cc <plic_claim>:
+     <plic_claim>:
        +0x00  1141      c.addi   sp,sp,-16     frame alloc (== cpuid/plicinit)
        +0x02  e406      c.sdsp   ra,8(sp)
        +0x04  e022      c.sdsp   s0,0(sp)
@@ -23,7 +23,7 @@
    every hart claims concurrently, so none may own [plic_frag] across a step.
    The mutation touches no enable word, so the kernel's plan [plic_ok]
    (PlicPlan.v) survives it, and the plan in turn is what bounds the id read
-   back to 0 / UART0_IRQ / VIRTIO0_IRQ ([plic_claim_ret]).
+   back to 0 / UART0_IRQ / UART1_IRQ / VIRTIO0_IRQ ([plic_claim_ret]).
 
    The hart-id address arithmetic is shared with plicinithart and plic_complete
    and lives in PlicHart.v. *)
@@ -58,13 +58,14 @@ Import Defs.
 
 
 (* the value a claim leaves in a0: [c.lw] sign-extends the 32-bit register, and
-   all three ids the plan admits are small and positive. *)
+   all four ids the plan admits are small and positive. *)
 Lemma pq_a0_of_claim (v : bv 32) :
   plic_claim_ret_ok v ->
   plic_claim_a0_ok (extend_value (n := 8*4) false v : mword 64).
 Proof.
-  intros [-> | [-> | ->]]; unfold plic_claim_a0_ok;
-    [ left | right; left | right; right ]; apply bv_eq; vm_compute; reflexivity.
+  intros [-> | [-> | [-> | ->]]]; unfold plic_claim_a0_ok;
+    [ left | right; left | right; right; left | right; right; right ];
+    apply bv_eq; vm_compute; reflexivity.
 Qed.
 
 (* ...and the reverse reading, which is what carries the RECEIVE TOKEN out of
@@ -76,7 +77,7 @@ Lemma pq_claim_of_a0 (v : bv 32) :
     = (mword_of_int (Z.of_N (uart_irq_id Uart0)) : mword 64) ->
   v = Z_to_bv 32 (Z.of_N (uart_irq_id Uart0)).
 Proof.
-  intros [-> | [-> | ->]] H; [ | reflexivity | ];
+  intros [-> | [-> | [-> | ->]]] H; [ | reflexivity | | ];
     exfalso; apply (f_equal bv_unsigned) in H; vm_compute in H; discriminate.
 Qed.
 
