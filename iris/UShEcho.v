@@ -1181,12 +1181,18 @@ Section UShEcho.
       kexec_sz ElfUser.echo_elf - PGSIZE + 96
         <= kxc_sp_final (kexec_sz ElfUser.echo_elf) alen na ->
       length sts = NOFILE ->
+      (* ...and the key's LAZY BIT (lane LAZY-FLAG, L6), passed straight
+         through to [UEchoKernel.echo_uexec_slot].  [kexec_image_ok] does
+         not name it yet, so it is a premise here exactly as it is on
+         [UShKernel.sh_slot_of_kexec]; the caller reads it off
+         [SpecKexec.exec_slot_pre]'s wand ([PinnedExec.pex_slot]'s row). *)
+      uvis_lazy W' = false ->
       ⊢ udepw_law 16 -∗ udep -∗
         my_pay (uvis_gen W') (fun _ => True)%I -∗ uslot W'.
 
   Lemma echo_slot_of_kexec_holds : echo_slot_of_kexec.
   Proof.
-    intros na alen afun sts W' Hok Hroom Hfdl.
+    intros na alen afun sts W' Hok Hroom Hfdl Hlzf.
     destruct (echo_kexec_pages na alen afun sts W' Hok)
       as (Hpc & Hsub & Hx & Hwr & Hrp).
     destruct (echo_kexec_entry_rows na alen afun sts W' Hok Hroom Hfdl Hwr Hrp)
@@ -1194,7 +1200,7 @@ Section UShEcho.
           & Hfdlen & Hstop).
     iIntros "#Hwr #Hdep #Hmp".
     iApply (echo_uexec_slot W' Hpc Hsub Hx Hroom96 Hal8 Hstkrow Hargsrow
-              Havd Havs Hfdlen Hstop with "Hwr Hdep Hmp").
+              Havd Havs Hfdlen Hstop Hlzf with "Hwr Hdep Hmp").
   Qed.
 
   (* =================================================================== *)
@@ -1234,19 +1240,32 @@ Section UShEcho.
     iAssert (□ (∀ (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
                   (W' : uvis),
                   ⌜kexec_image_ok ElfUser.echo_elf na alen afun fdv W'⌝ -∗
+                  (* THE TWO ROWS [SpecKexec.exec_slot_pre] carries, in
+                     [PinnedExec.pex_slot]'s own order (beside
+                     [kexec_image_ok], before the argument fact): the
+                     resumed key's working directory is the caller's -- the
+                     child sh forked is at the ROOT, which is the directory
+                     this pin resolves /echo from -- and its lazy bit is
+                     [false] because exec's image is EAGER (lane
+                     LAZY-FLAG's K4).  echo's entry needs only the second;
+                     the cwd row is read and not used, since echo opens
+                     nothing. *)
+                  ⌜uvis_cwd W' = FsImg.ROOTINO⌝ -∗
+                  ⌜uvis_lazy W' = false⌝ -∗
                   ⌜exec_args_of M (mword_of_int (t + 8) : mword 64)
                      na alen afun⌝ -∗
                   my_pay (uvis_gen W') (fun _ : Z => True)%I -∗
                   (fun _ : Z => True)%I (-1) -∗ (emp : iProp Σ) -∗
                   uslot W'))%I as "#Hcon".
-    { iModIntro. iIntros (na alen afun W') "%Hok %Hargs #Hmp _ _".
+    { iModIntro.
+      iIntros (na alen afun W') "%Hok %Hcwd0 %Hlzf %Hargs #Hmp _ _".
       destruct (echo_args_det_holds M s0 t g na alen afun Himg Hbytes Hargs)
         as (Hna & Halen & _).
       subst na.
       iApply (Hslot 3%nat alen afun fdv W' Hok
                 (echo_room alen (Halen 0%nat ltac:(lia))
                    (Halen 1%nat ltac:(lia)) (Halen 2%nat ltac:(lia)))
-                Hlen with "Hwr Hdep Hmp"). }
+                Hlen Hlzf with "Hwr Hdep Hmp"). }
     (* ---- THE TAINT ARM: the generic slot at the trivial payload ---- *)
     iAssert (□ (∀ W' : uvis, T -∗
                   my_pay (uvis_gen W') (fun _ : Z => True)%I -∗
@@ -1265,15 +1284,15 @@ Section UShEcho.
                  with "Hcl Hinv Hcon Hgen' []") as (P Pmiss Fo R) "Hb";
       [ done | ].
     assert (Ea0 : tf_w (uvis_tf (uvis_of_run m pc M pm sz fdv
-                                  FsImg.ROOTINO gn cs pidv))
+                                  FsImg.ROOTINO gn cs pidv false))
                     (tf_arg_idx 0) = (mword_of_int s0 : mword 64))
       by (etransitivity; [ exact (tf_of_arg0 m pc) | exact Ha0 ]).
     assert (Ea1 : tf_w (uvis_tf (uvis_of_run m pc M pm sz fdv
-                                  FsImg.ROOTINO gn cs pidv))
+                                  FsImg.ROOTINO gn cs pidv false))
                     (tf_arg_idx 1) = (mword_of_int (t + 8) : mword 64))
       by (etransitivity; [ exact (tf_of_arg1 m pc) | exact Ha1 ]).
     iApply (sbundle_pay_exec_intro uslot
-              (uvis_of_run m pc M pm sz fdv FsImg.ROOTINO gn cs pidv)
+              (uvis_of_run m pc M pm sz fdv FsImg.ROOTINO gn cs pidv false)
               (ukn_pay N') P Pmiss Fo R).
     { cbn [uvis_gen uvis_of_run]. iExact "Hmpay". }
     rewrite Hpeq Ea0 Ea1. iExact "Hb".
