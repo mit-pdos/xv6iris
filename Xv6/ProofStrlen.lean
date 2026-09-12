@@ -64,8 +64,28 @@ theorem subw_len (s : BitVec 64) (n : Nat) (hn : n < 2 ^ 31) :
   simp only [Bool.false_eq_true, ite_false, BitVec.toNat_setWidth, BitVec.toNat_ofNat, Nat.reducePow, Nat.add_zero]
   rw [Nat.mod_eq_of_lt (by omega : n < 4294967296), Nat.mod_eq_of_lt (by omega : n < 18446744073709551616)]
 
+/-! ## The loop invariant
+
+`cstrAt bs n` is the raw-buffer view of a C string, used only inside this
+proof: the loop walks a `byteBuf`, and the public contract's `cstr` is
+taken apart on entry and rebuilt on exit. -/
+
+/-- `bs` holds a C string of length `n`: bytes `0..n-1` nonzero, byte `n` zero. -/
+def cstrAt (bs : List (BitVec 8)) (n : Nat) : Prop :=
+  (∀ j, j < n → ∃ b, bs[j]? = some b ∧ b ≠ 0#8) ∧ bs[n]? = some 0#8
+
 theorem cstrAt_len {bs : List (BitVec 8)} {n : Nat} (h : cstrAt bs n) : n < bs.length :=
   (List.getElem?_eq_some_iff.mp h.2).1
+
+/-- The buffer under `cstr a dq s` is a C string of length `s.length`. -/
+theorem cstrAt_of_nonul (s : List (BitVec 8)) (h : nonul s) : cstrAt (s ++ [0#8]) s.length := by
+  constructor
+  · intro j hj
+    refine ⟨s[j]'hj, ?_, h _ (List.getElem_mem hj)⟩
+    rw [List.getElem?_append_left hj]
+    simp
+  · rw [List.getElem?_append_right (Nat.le_refl _)]
+    simp
 
 /-! ## The loop -/
 
@@ -157,10 +177,13 @@ theorem strlen_loop {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
 /-! ## The function -/
 
 set_option maxHeartbeats 4000000 in
-theorem strlen_proof : STRLEN := ⟨fun cpu k bs n dq hsie htier hK hcstr hn31 => by
+theorem strlen_proof : STRLEN := ⟨fun cpu k s dq hsie htier hK hn31 => by
   unfold wp_strlen_body
+  iintro ⟨Hk, Hpc, Hcstr, HΦ⟩
+  -- take the string apart: the loop runs over the raw terminated buffer
+  icases cstr_elim _ _ _ $$ Hcstr with ⟨%hnul, Hbuf⟩
+  have hcstr : cstrAt (s ++ [0#8]) s.length := cstrAt_of_nonul s hnul
   have hn := cstrAt_len hcstr
-  iintro ⟨Hk, Hpc, Hbuf, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- the spec's continuation, at this hart
   simp only [strlenAddr, KernelSyms.«strlen»]
@@ -174,12 +197,12 @@ theorem strlen_proof : STRLEN := ⟨fun cpu k bs n dq hsie htier hK hcstr hn31 =
   inext
   iintro Hk Hpc Hframe
   -- lbu a5,0(a0)
-  obtain ⟨b0, hb0, hb0ne⟩ : ∃ b0, bs[0]? = some b0 ∧ (0 < n → b0 ≠ 0#8) := by
-    by_cases h0 : 0 < n
+  obtain ⟨b0, hb0, hb0ne⟩ : ∃ b0, (s ++ [0#8])[0]? = some b0 ∧ (0 < s.length → b0 ≠ 0#8) := by
+    by_cases h0 : 0 < s.length
     · obtain ⟨b, hb, hbne⟩ := hcstr.1 0 h0; exact ⟨b, hb, fun _ => hbne⟩
-    · have : n = 0 := by omega
-      subst this; exact ⟨0#8, hcstr.2, fun h => absurd h (by omega)⟩
-  icases byteBuf_acc (k.regs 10#5) dq bs 0 b0 hb0 $$ Hbuf with ⟨Hb, Hclose⟩
+    · refine ⟨0#8, ?_, fun h => absurd h (by omega)⟩
+      have h2 := hcstr.2; rwa [show s.length = 0 by omega] at h2
+  icases byteBuf_acc (k.regs 10#5) dq (s ++ [0#8]) 0 b0 hb0 $$ Hbuf with ⟨Hb, Hclose⟩
   k_step (wp_s_lbu cpu _ ?hs ?ht 0x80000e0c#64 false 0#12 15#5 10#5 (by decide) dq b0) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc]
   k_norm
@@ -189,11 +212,10 @@ theorem strlen_proof : STRLEN := ⟨fun cpu k bs n dq hsie htier hK hcstr hn31 =
   k_step (wp_s_branch cpu _ ?hs ?ht 0x80000e10#64 true 28#13 15#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc] with [ite_beq_byte]
   iintro Hk Hpc
-  by_cases hn0 : n = 0
+  by_cases hn0 : s.length = 0
   · -- the empty string: a0 := 0, jump to the epilogue
-    subst hn0
     have hb0z : b0 = 0#8 := by
-      have := hcstr.2; rw [hb0] at this; exact (Option.some.inj this)
+      have h2 := hcstr.2; rw [hn0, hb0] at h2; exact (Option.some.inj h2)
     subst hb0z
     simp only [ite_true]
     k_step (wp_s_addi cpu _ ?hs ?ht 0x80000e2c#64 true 0#12 10#5 0#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -207,19 +229,20 @@ theorem strlen_proof : STRLEN := ⟨fun cpu k bs n dq hsie htier hK hcstr hn31 =
     iframe
     inext
     iintro Hk Hpc
-    iapply HΦ $$ %_ Hk Hpc Hbuf
+    ihave Hcstr := cstr_intro _ _ _ hnul $$ Hbuf
+    iapply HΦ $$ %_ Hk Hpc Hcstr
     ipureintro
     constructor
     · unfold calleeSaved; simp [RegMap.set_apply]
-    · simp [RegMap.set_apply]
+    · simp [RegMap.set_apply, hn0]
     case hR2 => simp [RegMap.set_apply]
   · -- a nonempty string: into the loop
     have hb0ne' : b0 ≠ 0#8 := hb0ne (by omega)
     simp only [hb0ne', ite_false]
     k_step (wp_s_addi cpu _ ?hs ?ht 0x80000e12#64 false 1#12 15#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
-    iapply (strlen_loop cpu (k.pushed 2) (by k_norm) (by k_norm) (k.regs 10#5) dq bs n hcstr (n - 1) 1
-      (by omega) (by omega) rfl _ ?h15) $$ [- $Hk $Hpc]
+    iapply (strlen_loop cpu (k.pushed 2) (by k_norm) (by k_norm) (k.regs 10#5) dq (s ++ [0#8]) s.length hcstr
+      (s.length - 1) 1 (by omega) (by omega) rfl _ ?h15) $$ [- $Hk $Hpc]
     rotate_right 1
     iframe
     case h15 => simp [RegMap.set_apply]
@@ -228,7 +251,7 @@ theorem strlen_proof : STRLEN := ⟨fun cpu k bs n dq hsie htier hK hcstr hn31 =
       rw [hother 10#5 (by decide) (by decide) (by decide)]; simp [RegMap.set_apply]
     -- subw a0,a3,a0
     k_step (wp_s_subw cpu _ ?hs ?ht 0x80000e20#64 false 10#5 13#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [h13, h10, subw_len (k.regs 10#5) n hn31]
+      with [h13, h10, subw_len (k.regs 10#5) s.length hn31]
     iintro Hk Hpc
     have hR2 : R' 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFF0#64 := by
       rw [hother 2#5 (by decide) (by decide) (by decide)]; simp [RegMap.set_apply]
@@ -239,7 +262,8 @@ theorem strlen_proof : STRLEN := ⟨fun cpu k bs n dq hsie htier hK hcstr hn31 =
     iframe
     inext
     iintro Hk Hpc
-    iapply HΦ $$ %_ Hk Hpc Hbuf
+    ihave Hcstr := cstr_intro _ _ _ hnul $$ Hbuf
+    iapply HΦ $$ %_ Hk Hpc Hcstr
     ipureintro
     have hcs : ∀ r : BitVec 5, r ≠ 13#5 → r ≠ 14#5 → r ≠ 15#5 → r ≠ 10#5 → r ≠ 2#5 → r ≠ 8#5 →
         R' r = k.regs r := by
@@ -260,7 +284,7 @@ theorem strlen_proof : STRLEN := ⟨fun cpu k bs n dq hsie htier hK hcstr hn31 =
         hcs 25#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide),
         hcs 26#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide),
         hcs 27#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)⟩
-    · simp [RegMap.set_apply, h13, h10, subw_len (k.regs 10#5) n hn31]
+    · simp [RegMap.set_apply, h13, h10, subw_len (k.regs 10#5) s.length hn31]
     case hR2 => simp [RegMap.set_apply, hR2]⟩
 
 end Xv6
