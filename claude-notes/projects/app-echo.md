@@ -2546,10 +2546,18 @@ not predict.  Two honest choices: (i) the session relation ADMITS them as
 alternative continuations ("… or 'fork\n' then a fresh banner and prompt";
 the panic arm ends the trace), which keeps the theorem hypothesis-free but
 weakens what it says; (ii) a hypothesis "no allocation failure" (a kalloc
-budget the model does not have today).  RECOMMEND (i) for exec/fork failure
-in sh (the messages are fixed strings; `session` gains two alternatives),
-and for the boot panic: the trace ends (no further U bytes), which the
-relation already tolerates as a prefix.  OWNER TO CONFIRM.
+budget the model does not have today).  O5 RULED BY THE OWNER (2026-09-12): (i) -- "'fork failure' seems like a fine
+output; we should accept it as valid."  The per-line continuations after a
+complete line's '\n' echo are: "hello world\n$ " (the good one); "exec echo
+failed\n$ " (exec failed in the child; the parent prints the prompt); "$ "
+alone (the child died before printing: e.g. malloc's sbrk returned 0 and
+parsecmd faulted); "fork\n" ++ "init: starting sh\n$ " (sh's `fork1`
+panicked: `panic` prints "%s\n" to fd 2 and exits 1, init reaps and
+restarts).  Before the first prompt: init's own "init: fork failed\n" /
+"init: exec sh failed\n" (init exits; no prompt ever; the theorem is
+vacuous by D1) and the boot's kernel panic (the trace ends).  `expected`
+is therefore a RELATION per line over this fixed alternative set, and the
+claim quantifies over it.
 
 O6 ORDER.  CONS-SWALLOW (in flight) → LAZY-FLAG; in a sibling checkout NOW:
 DISC-RATE (the restatement O3 as ruled, with `session`'s definition and `echo_phi`'s shape --
