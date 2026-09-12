@@ -331,14 +331,7 @@ E4 p3 (`-tlw`), SH-LINE 2b p1 (`-sup`); OUT-FUPD pausing (main).
 OUT-FUPD PAUSED with main clean and its design recorded (note "OUT-FUPD PHASE 1 --
 DESIGN"; patch `wx-briefs/out-fupd-phase1.patch`).  UNTAG LAUNCHED in main.
 
-SIBLING FOR THE OWNER'S DUAL-UART AGENT: `/shared/xv6iris-2-uart` (clone of main
-at a0d1a1834, origin = github, `mainwt` = the main checkout; the pinned
-xv6-riscv source cloned in at ded23f2a, which is ignored by the repo).  Its VM
-tree is NOT seeded yet: seed it by `cp -a _shared_xv6iris-2 _shared_xv6iris-2-uart`
-on the VM AFTER UNTAG's last build finishes (so the tree is post-UNTAG main),
-then one `vmbuild.sh xv6iris-2-uart uartseed10`.  The UART agent should start
-from post-UNTAG main (UNTAG deletes the tag column from `uart_ghosts`, which the
-second-instance change also touches).
+(The `-uart` sibling I had prepared for the owner's dual-UART agent is DELETED at the owner's request -- the owner sets up their own checkouts.)
 
 STATE (2026-09-12, after E4 phase 3): FOUR agents live -- UNTAG in main
 (working tree dirty with the label removal; do not stage iris/ until it
@@ -346,5 +339,4 @@ reports), E2 INIT-BOOT in -disc (`lane/init-boot`), SH-LINE 2b in -sup
 (`lane/sh-line-2b`), REBASE-SH-ECHO in -tlw (`lane/sh-echo-r2` = E4's eight
 commits rebased onto main; E4's own gate was green at c2879f176).  LANDING
 ORDER: UNTAG first (main), then sh-echo-r2 (re-rebase over UNTAG if its five
-files conflict; else ff), then 2b and E2 as they gate.  Then seed the -uart VM
-tree and hand the owner's dual-UART agent post-UNTAG main.
+files conflict; else ff), then 2b and E2 as they gate.  Tell the owner when UNTAG lands.
