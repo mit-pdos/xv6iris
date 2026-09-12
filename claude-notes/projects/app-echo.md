@@ -2404,6 +2404,42 @@ ORDER: GENERIC-PAY → CONS-SWALLOW → SH-LINE 2b (gets on `ush_gets_line`,
 `wp_uk_ecall_read_recv` with `upos` threaded read → gets_loop → gets → getcmd
 → main) → LAZY-FLAG (the owner's form of (A)).
 
+SH-OPEN PHASE 1 + TWO RULINGS (2026-09-12; `-sup`, `lane/sh-open` on the old
+supply-split, one red file `UInitSh.v` pending the cwd row).  Landed as
+statements: `UkSh.ush_fd0p l` (pure: slot 0 console ∨ slot 0 closed) as the
+preamble's LOOP INVARIANT -- `ush_loop_head`/`ush_rest`/`wp_ksh_cmd_head`
+take `⌜ush_fd0p l⌝` at the ledger the preamble LEFT (its closed arm = "the
+node is absent OR every open's allocation failed", FACT 3; the first open
+returns the lowest closed slot, not 3); `ush_open_console_leaf` (the
+resolving pin; the path literal at sh's rodata 0x1378 = "console\0",
+`ShData.v:298`, inside `UCodeShK.shk_ro`) and `ush_open_absent_leaf K` (the
+credential in and back), bundled as `ush_cons_in K := □ console-leaf ∨ (□
+absent-leaf K ∗ K) ∨ T` riding the loop's back edge; `ush_gen_slot/_run` moved
+down to the program tier (under T sh makes NO open call: it goes generic);
+`sh_deps := udepw_law 5 ∗ udepw_law 16`; `wp_ksh_ostub`/`wp_ksh_open` DELETED;
+sh's entry takes `uvis_cwd W = ROOTINO` and the leaves under `□ (∀ N, …)`
+(they name the entry-allocated record).  The miss family factors into
+`UConsOpen.v` (phase 2).
+RULING (A) THE ABSENCE CREDENTIAL: sh cannot hold `cons_key r` (Excl; and
+init's exec supply is under `□`), so init MINTS A PERSISTENT ONE when its
+mknod FAILS by spending the key INTO the claim: `cons_state` gains a
+SEALED-ABSENT arm `⌜cons_absent av⌝ ∗ cons_key r ∗ cons_shot r (-1)`,
+`cons_never r := cons_shot r (-1)` (incompatible with `cons_tok r` and every
+`cons_shot r i`, i ≥ 0), `echo_cons_never_law : cons_never r -∗ □ (∀ v,
+app_pred v -∗ app_pred v ∗ (⌜cons_absent v⌝ ∨ T))`; absence stays stable
+because law (f) demands the key for a create under `console`; a sealed era
+does not seal the next (the transport mints a fresh key at `cons_inum av =
+[]`).  Owner: E2 (AppEcho + UInitCons + init's failure arm; passed to sh
+through `init_sh_slot`'s persistent conjuncts).  SH-OPEN states its era-level
+discharge against a named hypothesis `echo_cons_never_law`.
+RULING (B) THE CWD ROW: the pinned open fixes the cwd, so sh's entry needs
+`uvis_cwd W' = ROOTINO` off exec's slot wand; TRUE of the kernel
+(`SpecKexec.exec_key_cwd`, `kexec_ok_exec_cwi`) but unstated in
+`exec_slot_pre` -- `⌜uvis_cwd W' = cw⌝` is added to both success wands (before
+`⌜uvis_lazy W' = false⌝`) by LAZY-FLAG-2, which is already editing those
+wands; SH-OPEN states its consumer with the row as the inner wand premise in
+that position (never a `∀ W'` premise, which would be false).
+
 TX-TAG LANDED (2026-09-12; `037d513fe` + rider `edaeccac4`, rebased onto
 main; 30 files +1868/-425; build `txtag25`, audit = the thirteen, lemma_diff
 CLEAN).  Every accepted UART byte is tagged with who pushed it
