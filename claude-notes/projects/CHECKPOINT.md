@@ -44,10 +44,12 @@ patch: `projects/wx-briefs/`.
   LANDED") → OPEN-PIN phase 1 found the image has NO console node (init's mknod makes it)
   and that open/mknod bundles cannot name their path; `PinnedObs` (the factoring)
   LANDED; both fixes RULED with the owner (`app-echo.md` "OPEN-PIN FINDINGS"):
-  PATH-ARGS (kernel: open/mknod at the argument's path, exec's mold;
-  `wx-briefs/brief-path-args.md`, LAUNCHED 2026-09-11) → OPEN-PIN resumed (the
-  two-state console claim, `cons_made`, init's mknod step, the pinned second
-  open; brief to re-scope) → SH-LINE phase 2 (a
+  PATH-ARGS LANDED (21 files + `ArgPath.v`; VM build `pathargs8` EXIT=0, audit =
+  the thirteen, lemma_diff clean; note "PATH-ARGS LANDED") → OPEN-PIN resumed
+  (`wx-briefs/brief-open-pin.md` re-issued: the two-state console claim,
+  `cons_made`, init's mknod step, the pinned second open at the argument's path,
+  init's two arms -- fail: no sh, silent console; succeed: sh with the console;
+  LAUNCHED 2026-09-11) → SH-LINE phase 2 (a
   fresh agent on a continuation of `brief-sh-line.md`) → E4 → E2 (also threads
   `riscv_rx_tag = app_tag` into `Hinit_boot`) → E5.
 - Standing rulings from the lanes (WX-EXIT/WX-INV build on them): rows per slot

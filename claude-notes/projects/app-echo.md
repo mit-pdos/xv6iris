@@ -2323,6 +2323,17 @@ takes; the four entry constructors (`UShKernel`, `UInitKernel`, `USyncKernel`,
 `ukn_triv` from sh's proof.  (4) forkret's boot arm hands `True` (init's bundle
 is at the trivial payload).
 
+PATH-ARGS LANDED (2026-09-11; brief `brief-path-args.md`; 21 files + `ArgPath.v`).
+`ArgPath.arg_path_of M pv pl` is the one path reading (exec's names are
+aliases); `open_au_pre_plain/_create pl …` and `mknod_au_pre pl …` carry the
+walk at that path; `open_au_plain_at`/`open_au_create_at`/`mknod_au_at` guard
+the WALK ROW with `∀ pl, ⌜arg_path_of M pv pl⌝ -∗` and keep the commits beside
+it (argstr can fail; exec's split); the receipts (`open_receipt_plain/_create`,
+`mknod_post_ok`) carry the reading inside their success existential -- the
+DEVICE arm says the walk of THIS path ended at a device node; rows 15/17 read
+`uvis_M W` and `xk_a W 0`; the generic suppliers are `*_at_of_all` instances;
+`UkRunSys`/`UkInit` unchanged.  chdir/unlink keep `∀ pl`.
+
 OPEN-PIN FINDINGS -- RULED WITH THE OWNER (2026-09-11; "both need to be fixed").
 FACT 1: THE TRACKED IMAGE HAS NO CONSOLE NODE.  mkfs creates no device inode
 (inodes 2-22 are all T_FILE, no `console` entry; `mkfs.c` never mentions it);
@@ -2357,19 +2368,13 @@ trapframe argument 0 through `SpecFetchstr.fetchstr_got`; `open_au_pre_plain`/
 and 17 of `xv6_sbundle`/`xv6_spost` stated at the argument's path; the walk
 piece at THAT path). A kernel lane (`brief-path-args.md`).  chdir/unlink stay
 `∀ pl` until a consumer needs them.
-FACT 3: init's open can FAIL for reasons unrelated to the pin (`filealloc`/
-`fdalloc` exhaustion).  RULED BY THE OWNER (2026-09-11, correcting a first
-"safety-only" ruling): init REALLY MUST START SH -- a generic-safety
-continuation may write anything to the console, so `good_out` would not
-follow; sh's proof is what says what reaches stdout.  So the second open is
-PROVED TO SUCCEED at init: `fdalloc` cannot fail (init's ledger is all-closed,
-`fd_lowest_closed fdt0 = Some 0`) and `filealloc` cannot fail at boot -- find
-the resource that says so (a free-file-struct allowance on the mold of
-`fd_slots`/`iref_slots`/`bslots`, owned by the dormant slot and carried by the
-process; `FileInv.ftable_res` has NFILE slots); if the tree has none for file
-structs, ADD it (a small kernel lane: `filealloc`'s contract takes a unit and
-its failure arm is refuted by it; the units are born at boot in the ftable
-mint and threaded like the other allowances) rather than stating a premise.
+FACT 3: init's second open can FAIL (`filealloc`/`fdalloc`).  SETTLED WITH THE
+OWNER (2026-09-11): init proves NOTHING about allocation succeeding.  Both arms
+are init's own VERIFIED code, never the generic slot: if the open FAILS, init
+does not start sh, nothing reaches the console, the prompt never appears, and
+under the discipline the user never types -- the trace theorem holds on that
+run; if the open SUCCEEDS, init runs sh with the console ledger and the reader
+token, and sh's proof is what establishes the output.
 ORDER: PATH-ARGS (kernel) → OPEN-PIN resumed (application: the two-state claim,
 `cons_made`, init's mknod step, the pinned second open on `PinnedObs`, the
 receipt-keeping open leaf, init's named ledger + tracked dups) → SH-LINE phase 2
