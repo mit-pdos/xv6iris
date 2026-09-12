@@ -208,13 +208,34 @@ Section UkShFork.
   (* ===================================================================== *)
   (* §3 THE ARM.                                                            *)
   (* ===================================================================== *)
+
+  (* THE PROCESS STATE AT A NAMED WORKING DIRECTORY (lane E4).
+     [UkSh.ush_pstate]'s second conjunct is [UserCwd.ucwd_any]; the fork
+     arm below PRESERVES the value ([UkShDiag.wp_kshr_fork1_final] is now
+     cwd-indexed), so a caller that needs to know where the child starts
+     -- the disciplined branch, whose child execs on the pin at the root
+     -- can name it.  [ushf_pstate_of_at] is the forgetful direction and
+     [wp_kshf_fork_any] the index-free arm the body takes. *)
+  Definition ushf_pstate_at (l : list fdstate) (c : Z) : iProp Σ :=
+    (ush_std l ∗ UserCwd.ucwd γcwd c ∗ UserChildren.uch_any γch
+     ∗ UkSh.ush_pos γp)%I.
+
+  Lemma ushf_pstate_of_at (l : list fdstate) (c : Z) :
+    ushf_pstate_at l c -∗ ush_pstate l.
+  Proof.
+    rewrite /ushf_pstate_at /UkSh.ush_pstate.
+    iIntros "(Hstd & Hcwd & Hch & Hpos)". iFrame "Hstd Hch Hpos".
+    iApply (UserCwd.ucwd_any_of with "Hcwd").
+  Qed.
+
   Lemma wp_kshf_fork
       (Hsbrk : forall (N' : uk_names Σ) (sz n : Z) (r : mword 64),
          UkShMalloc.ushm_sbrk_ans N' sz n r -∗
          ⌜ r = (mword_of_int sz : mword 64) ⌝ ∗
          UkShMalloc.ushm_sbrk_ans N' sz n r)
       (h : CpuId) (m : regfile) (f : nat -> bv 8) (k len : nat)
-      (toks : list (nat * nat)) (sz : Z) (l : list fdstate) (n : nat) :
+      (toks : list (nat * nat)) (sz : Z) (l : list fdstate) (n : nat)
+      (cw : Z) :
     UkSh.ush_regs m ->
     m !!! Regidx s1_idx = mword_of_int (sh_buf + Z.of_nat k) ->
     (* the line at [k] is one the LEXER accepts -- see the header *)
@@ -239,7 +260,7 @@ Section UkShFork.
        keeps its ledger across fork1 -- a REDIR runs in the child -- so the
        row goes straight back into the head *)
     ⌜ UkSh.ush_fd0p l ⌝ -∗
-    ush_pstate l -∗
+    ushf_pstate_at l cw -∗
     ushl_dat -∗ usz γs sz -∗
     ubytes γd sh_buf sh_nbuf f -∗
     urun N h m (mword_of_int 0x92c) (16 + (80 + n)) -∗
@@ -274,8 +295,8 @@ Section UkShFork.
     (* ---- fork1() ---- *)
     replace (16 + (80 + n))%nat with (2 + (UkShDiag.ush_Dg + (66 + n)))%nat
       by (unfold UkShDiag.ush_Dg; lia).
-    iApply (UkShDiag.wp_kshr_fork1_final_any N (ushf_pay f)
-              sz l ∅ h1 m1 (66 + n)
+    iApply (UkShDiag.wp_kshr_fork1_final N (ushf_pay f)
+              sz l ∅ h1 m1 (66 + n) cw
               with "Hdp Hcode Hro [Hdat Hbuf] Hsz Hustd Hcwd Hch [] Hrun").
     { rewrite /ushf_pay.
       iSplitR; [ iExact "Hcode" | ].
@@ -396,7 +417,8 @@ Section UkShFork.
                 with "[%] [%] [Hustd Hcwd Hch Hpos] Hdat Hsz Hbuf Hrun").
       + exact HregsD.
       + exact Hfd0.
-      + rewrite /UkSh.ush_pstate /UkSh.ush_std. iFrame "Hustd Hcwd Hch Hpos".
+      + iApply (ushf_pstate_of_at l cw).
+        rewrite /ushf_pstate_at /UkSh.ush_std. iFrame "Hustd Hcwd Hch Hpos".
     - (* ================= THE CHILD: parse, run, exec =================== *)
       iIntros (N' hA mA) "%Hti' %HcsA %Ha0A #Hcode' Hpay Hsz Hustd Hcwd Hch _ Hrun".
       (* THE POSITION DOES NOT CROSS sh's OWN FORK: the pair is sh's, the
@@ -446,9 +468,61 @@ Section UkShFork.
                 ltac:(unfold sh_buf, sh_nbuf, Z64 in *; lia)
                 ltac:(unfold sh_buf, sh_nbuf in *; lia)
                 Hszlo Hszal Hszok
-                with "Hdp Hcode' Hxs [] [] Hjt' Hline Hws Hsy Hustd Hcwd Hch Hfresh Hrun").
+                with "Hdp Hcode' Hxs [] [] Hjt' Hline Hws Hsy Hustd [Hcwd] Hch Hfresh Hrun").
       + iApply (ushf_code_shp with "Hcode'").
       + iApply (ushf_rodata_shp with "Hro'").
+      + iApply (UserCwd.ucwd_any_of with "Hcwd").
+  Qed.
+
+  (* ...AND THE INDEX-FREE ARM, which is what the body's three call sites
+     take: the three byte tests decide nothing about the working
+     directory. *)
+  Lemma wp_kshf_fork_any
+      (Hsbrk : forall (N' : uk_names Σ) (sz n : Z) (r : mword 64),
+         UkShMalloc.ushm_sbrk_ans N' sz n r -∗
+         ⌜ r = (mword_of_int sz : mword 64) ⌝ ∗
+         UkShMalloc.ushm_sbrk_ans N' sz n r)
+      (h : CpuId) (m : regfile) (f : nat -> bv 8) (k len : nat)
+      (toks : list (nat * nat)) (sz : Z) (l : list fdstate) (n : nat) :
+    UkSh.ush_regs m ->
+    m !!! Regidx s1_idx = mword_of_int (sh_buf + Z.of_nat k) ->
+    (* the line at [k] is one the LEXER accepts -- see the header *)
+    ushp_no_symbols len (fun j : nat => f (k + j)%nat) ->
+    ushp_tokens len (fun j : nat => f (k + j)%nat) 0 toks ->
+    (length toks < 10)%nat ->
+    (forall j : nat, (j < len)%nat -> f (k + j)%nat <> ubyte0) ->
+    f (k + len)%nat = ubyte0 ->
+    (k + len < sh_nbuf)%nat ->
+    (* the break, as [exec] leaves it *)
+    8344 <= sz ->
+    UserPtTree.pgroundup sz = sz ->
+    usz_ok (sz + 65536) ->
+    UkSh.sh_deps -∗
+    ushl_head l sz -∗
+    shk_code γt -∗
+    (* the exec deposit's supplier -- [UkRun.uxsup], see
+       [UkShRun.wp_kshr_runcmd]: this walk reaches runcmd's EXEC arm *)
+    uxsup -∗
+    shk_rodata γt -∗ ush_jtab γt -∗
+    (* the row the console preamble established (lane SH-OPEN) -- carried
+       straight through to the indexed arm *)
+    ⌜ UkSh.ush_fd0p l ⌝ -∗
+    ush_pstate l -∗
+    ushl_dat -∗ usz γs sz -∗
+    ubytes γd sh_buf sh_nbuf f -∗
+    urun N h m (mword_of_int 0x92c) (16 + (80 + n)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hregs Hs1 Hns Htoks Htlen Hnn Hnul Hkl Hszlo Hszal Hszok.
+    iIntros "#Hdp Hhead #Hcode #Hxs #Hro #Hjt %Hfd0 Hstd Hdat Hsz Hbuf Hrun".
+    iDestruct "Hstd" as "(Hustd & Hcwd & Hch & Hpos)".
+    iDestruct "Hcwd" as (cw) "Hcwd".
+    iApply (wp_kshf_fork Hsbrk h m f k len toks sz l n cw
+              Hregs Hs1 Hns Htoks Htlen Hnn Hnul Hkl Hszlo Hszal Hszok
+              with "Hdp Hhead Hcode Hxs Hro Hjt [%] [Hustd Hcwd Hch Hpos]
+                    Hdat Hsz Hbuf Hrun").
+    { exact Hfd0. }
+    rewrite /ushf_pstate_at. iFrame "Hustd Hcwd Hch Hpos".
   Qed.
 
   (* ===================================================================== *)
@@ -709,7 +783,7 @@ Section UkShFork.
                     with "[] Hrun").
           { iApply (uis_shk_98a with "Hcode"). }
           iIntros (h5) "Hrun".
-          iApply (wp_kshf_fork Hsbrk h5 m2 f k len toks sz l n
+          iApply (wp_kshf_fork_any Hsbrk h5 m2 f k len toks sz l n
                     Hregs2 Hs1_2 Hns Htoks Htlen Hnn Hnul Hkl
                     Hszlo Hszal Hszok
                     with "Hdp Hhead Hcode Hxs Hro Hjt [%] Hstd Hdat Hsz Hbuf Hrun").
@@ -730,7 +804,7 @@ Section UkShFork.
                     with "[] Hrun").
           { iApply (uis_shk_982 with "Hcode"). }
           iIntros (h3) "Hrun".
-          iApply (wp_kshf_fork Hsbrk h3 m1 f k len toks sz l n
+          iApply (wp_kshf_fork_any Hsbrk h3 m1 f k len toks sz l n
                     Hregs1 Hs1_1 Hns Htoks Htlen Hnn Hnul Hkl
                     Hszlo Hszal Hszok
                     with "Hdp Hhead Hcode Hxs Hro Hjt [%] Hstd Hdat Hsz Hbuf Hrun").
@@ -751,7 +825,7 @@ Section UkShFork.
                   with "[] Hrun").
         { iApply (uis_shk_97a with "Hcode"). }
         iIntros (h1) "Hrun".
-        iApply (wp_kshf_fork Hsbrk h1 m f k len toks sz l n
+        iApply (wp_kshf_fork_any Hsbrk h1 m f k len toks sz l n
                   Hregs Hs1 Hns Htoks Htlen Hnn Hnul Hkl
                   Hszlo Hszal Hszok
                   with "Hdp Hhead Hcode Hxs Hro Hjt [%] Hstd Hdat Hsz Hbuf Hrun").
