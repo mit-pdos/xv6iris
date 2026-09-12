@@ -273,3 +273,6 @@ load 22-40) -- builds queue.
 OWNER (2026-09-12): printk's contract takes a caller-supplied FUPD that appends
 the message to the ledger at the commit under pr.lock (note "OWNER'S RULING ON
 PRINTK'S CONTRACT"); PRINTK-LEDGER-2 told before its A commit.
+CLARIFIED: the APPLICATION owns the era's output ledger authority; printk's Ψ
+comes from `printk_env` (an abstract era appender minted at boot) for kernel
+sites; `pr_res` holds no authority.

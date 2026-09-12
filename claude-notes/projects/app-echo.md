@@ -2412,12 +2412,20 @@ ms ={E}=∗ k_ledger_auth γd (ms ++ [(f, cs)]) ∗ Φ ms cs`, which printk invo
 exactly once under pr.lock at the commit (after the last byte, before the
 release), and printk's post returns `Φ ms cs` at the lock's real ledger --
 the linearization point, so the "other harts in between" issue vanishes and
-an application-level ledger can be updated in lockstep.  The GEN corollary
-supplies the trivial shift.  Mask E chosen where the commit opens the UART
-invariant for the tie (the lane reports it).  E5 OPTION: the boot's printk
-sites are kernel proofs, so an application-chosen Ψ would ride `printk_env`
-(the way the app's `Htx` rides the ledger's permit) if the app wants a
-per-message hook beyond the per-byte tags.
+an application-level ledger can be updated in lockstep.  THE OWNER'S CLARIFICATION: "the application is going to hold ownership of
+that era's UART output resource, so the only way printk is going to work is
+by requiring a fupd to append to it."  So the ledger's AUTHORITY is NOT in
+`pr_res` (pr.lock keeps only the in-flight half, or nothing); it is owned
+outside the kernel's printk cone -- in the end state by the application (E5),
+for now by the boot's era resource the application takes over; printk never
+sees it, the caller's Ψ performs the append inside the owner's resource; the
+kernel's own call sites (the boot's four, the error sites) get Ψ from
+`printk_env`, which gains a persistent ABSTRACT appender `□ Ψ_era` (with the
+law: it appends exactly `(f, cs)` and returns `k_ledger_lb γd (ms ++ [(f,
+cs)])`), minted at boot beside the authority, so that when the application
+supplies its own Ψ in E5 nothing in the kernel is restated; the tie in
+`uart_tagsE` is stated against a persistent lower bound the commit refreshes.
+Mask E chosen where the commit opens the UART invariant (the lane reports).
 
 PRINTK-LEDGER MILESTONE A, IN PROGRESS (2026-09-12; `lane/printk-ledger`
 uncommitted, 19 files +404/-71; `pkl32`: only ProofMain + ProofPrintk red).
