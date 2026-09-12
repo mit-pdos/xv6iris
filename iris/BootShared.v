@@ -1778,9 +1778,10 @@ Section BootAlloc.
     (* ---- the device fabric ---- *)
     iMod (uart_ghosts_alloc (g.(gdev).(duart))
             ltac:(rewrite Hu0; reflexivity)
-            ltac:(rewrite Hu0; vm_compute; reflexivity)) as (γd)
-      "(Hacc & Hout & Htxa & Hdla & Htx & Hsent & Hdlab & Hcol & Htok & Hhi1 &
-        Hhi2 & Hpre)".
+            ltac:(rewrite Hu0; vm_compute; reflexivity)
+            ltac:(rewrite Hu0; reflexivity)) as (γd)
+      "(Hacc & Hout & Htxa & Hdla & Htags & Htx & Hsent & Hdlab & Hcol & Htok &
+        Hhi1 & Hhi2 & Hpre)".
     (* ---- THE CONSOLE RING'S GHOSTS, beside the UART's and not before
        them: the ring's half of the receive side's HIGH-WATER MARK is one
        of the pair [uart_ghosts_alloc] just made, and the ring's names
@@ -1810,11 +1811,11 @@ Section BootAlloc.
             ltac:(rewrite Hv0; apply virtio_reset_wce))
       as (γv) "(%Himg & Hproto & Hcfg & Hcmauth & #Hdone & Hheads & Hpbody)".
     iMod (dev_inv_alloc ⊤ γd γv
-            with "[Huf Hpf Hvf Hacc Hout Htxa Hdla Hcol Hpre Hproto] Hpbody Htok")
+            with "[Huf Hpf Hvf Hacc Hout Htxa Hdla Htags Hcol Hpre Hproto] Hpbody Htok")
       as "[#Hdev Htok]".
     { rewrite /dev_inv_body.
       iExists (g.(gdev).(duart)), (g.(gdev).(dplic)), (g.(gdev).(dvirtio)).
-      iFrame "Hacc Hout Htxa Hdla".
+      iFrame "Hacc Hout Htxa Hdla Htags".
       iSplitL "Huf"; [iExact "Huf" |].
       iSplitL "Hpf"; [iExact "Hpf" |].
       iSplitL "Hvf"; [iExact "Hvf" |].

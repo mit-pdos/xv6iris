@@ -77,6 +77,24 @@ Lemma mono_list_lb_nil_is_unit (A : ofe) :
   (◯ML ([] : list A)) ≡ (ε : mono_listUR A).
 Proof. done. Qed.
 
+(* A SUBLIST SURVIVES A MAP.  stdpp has [sublist_app]/[sublist_inserts_r] but
+   no fmap congruence for [sublist]; this is it, by induction on the
+   relation.  Used to read the BYTES of a tagged claim off the tagged
+   trace. *)
+Lemma sublist_fmap_gen {A B : Type} (f : A -> B) (l1 l2 : list A) :
+  l1 `sublist_of` l2 -> (f <$> l1) `sublist_of` (f <$> l2).
+Proof.
+  induction 1 as [| x l1' l2' _ IH | x l1' l2' _ IH]; cbn.
+  - constructor.
+  - by constructor.
+  - by constructor.
+Qed.
+
+(* tagging a byte list and then forgetting the tags is the identity *)
+Lemma fmap_snd_pair {A B : Type} (a : A) (l : list B) :
+  (snd <$> ((pair a) <$> l)) = l.
+Proof. induction l as [| b l IH]; cbn; [done | by rewrite IH]. Qed.
+
 Section UartTxInv.
   Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{XI : CurCtx}.
@@ -198,6 +216,77 @@ Section UartTxInv.
     apply stdpp.list_relations.sublist_app; [exact Hsub | reflexivity].
   Qed.
 
+  (* ===================================================================== *)
+  (*  THE TAG-AWARE CLAIM.                                                  *)
+  (*                                                                        *)
+  (*  [uart_sent_sub_at γu src bs] is [uart_sent_sub] refined by the WRITER: *)
+  (*  the bytes [bs], EACH TAGGED [src], are a sublist of the accepted       *)
+  (*  TAGGED trace ([WpUart.uart_sent_tagged]).  Persistent, for the same    *)
+  (*  reason [uart_sent_sub] is: it is a mono-list lower bound plus a pure   *)
+  (*  fact.                                                                 *)
+  (*                                                                        *)
+  (*  SUBLIST AND NOT CONTIGUOUS, exactly as in the untagged form: tx_lock   *)
+  (*  is re-acquired per byte, so another hart's bytes -- under any tag,     *)
+  (*  INCLUDING THE SAME ONE -- may be accepted in between.  What the tag    *)
+  (*  buys is the ability to say WHICH writer a byte came from at all, and   *)
+  (*  hence to project the accepted trace onto one source; it does not by    *)
+  (*  itself make a source's own run exact (UartSentLoc.v's header).         *)
+  (*                                                                        *)
+  (*  THE UNTAGGED CLAIM IS NOT BUNDLED IN.  The two ghosts are kept in      *)
+  (*  lockstep by [WpUart.uart_tagsE], a conjunct of [uart_ghosts], so       *)
+  (*  [uart_sent_sub_of_at] recovers [uart_sent_sub] through [dev_inv] for   *)
+  (*  any consumer that wants it -- and no producer pays for a claim its     *)
+  (*  caller does not read.                                                  *)
+  Definition uart_sent_sub_at (γu : uart_names) (src : txsrc)
+      (bs : list (bv 8)) : iProp Σ :=
+    (∃ tg : list (txsrc * bv 8),
+       uart_sent_tagged γu tg ∗ ⌜((pair src) <$> bs) `sublist_of` tg⌝)%I.
+
+  Global Instance uart_sent_sub_at_persistent γu src bs :
+    Persistent (uart_sent_sub_at γu src bs).
+  Proof. apply _. Qed.
+  Global Instance uart_sent_sub_at_timeless γu src bs :
+    Timeless (uart_sent_sub_at γu src bs).
+  Proof. apply _. Qed.
+
+  (* THE EMPTY CLAIM IS FREE, AND FROM NOTHING AT ALL -- [◯ML []] is the
+     unit of [mono_listUR], so [own_unit] hands it over under a plain
+     [|==>].  [UartTxInv.uart_sent_sub_nil_free]'s tagged twin. *)
+  Lemma uart_sent_sub_at_nil_free (γu : uart_names) (src : txsrc) :
+    ⊢ |==> uart_sent_sub_at γu src [].
+  Proof.
+    iMod (own_unit (mono_listUR (leibnizO (txsrc * bv 8))) γu.(un_tag)) as "H".
+    iModIntro. rewrite /uart_sent_sub_at. iExists []. iSplitL "H"; last first.
+    { iPureIntro. apply stdpp.list_relations.sublist_nil_l. }
+    rewrite /uart_sent_tagged -(mono_list_lb_nil_is_unit (leibnizO (txsrc * bv 8))).
+    done.
+  Qed.
+
+  (* ...and the empty claim at one tag IS the empty claim at any other: its
+     body does not mention [src] once [bs] is empty.  What lets a bundle
+     carry ONE baseline for a caller that picks its tag later
+     ([SpecConsoleintr.console_caps]). *)
+  Lemma uart_sent_sub_at_nil_any (γu : uart_names) (src src' : txsrc) :
+    uart_sent_sub_at γu src [] -∗ uart_sent_sub_at γu src' [].
+  Proof.
+    iIntros "H". iDestruct "H" as (tg) "[Htg _]". iExists tg. iFrame "Htg".
+    iPureIntro. apply stdpp.list_relations.sublist_nil_l.
+  Qed.
+
+  (* the step: one more byte, tagged [src], at the END of a tagged trace
+     that already contains the previous ones.  [uart_sent_sub_snoc]'s tagged
+     twin, and the shape the THR store leaf's postcondition is built for. *)
+  Lemma uart_sent_sub_at_snoc γu (src : txsrc) (bs : list (bv 8))
+      (tg0 : list (txsrc * bv 8)) (c : bv 8) :
+    ((pair src) <$> bs) `sublist_of` tg0 ->
+    uart_sent_tagged γu (tg0 ++ [(src, c)]) -∗
+    uart_sent_sub_at γu src (bs ++ [c]).
+  Proof.
+    iIntros (Hsub) "H". iExists ((tg0 ++ [(src, c)])%list). iFrame "H".
+    iPureIntro. rewrite fmap_app /=.
+    apply stdpp.list_relations.sublist_app; [exact Hsub | reflexivity].
+  Qed.
+
   (* the [un_acc] twin of [uart_out_prefix]: a persistent record is a prefix
      of the authoritative accepted trace. *)
   Lemma uart_sent_prefix (γu : uart_names) (u : uart_state) (l : list (bv 8)) :
@@ -223,10 +312,10 @@ Section UartTxInv.
     iInv "Huinv" as ">Hbody" "Hclose".
     iDestruct "Hbody" as (u) "(Hu & Hg & Hcol)".
     iEval (rewrite /uart_ghosts) in "Hg".
-    iDestruct "Hg" as "(Hs & Hout & Htx & Hdl)".
+    iDestruct "Hg" as "(Hs & Hout & Htx & Hdl & Htg)".
     iDestruct (uart_tx_own_agree with "Htx Hown") as %Hacc.
     iDestruct (uart_sent_get with "Hs") as "[Hs #Hlb]".
-    iMod ("Hclose" with "[Hu Hs Hout Htx Hdl Hcol]") as "_".
+    iMod ("Hclose" with "[Hu Hs Hout Htx Hdl Htg Hcol]") as "_".
     { iApply bi.later_intro. iExists u. rewrite /uart_ghosts. iFrame. }
     iModIntro. iFrame "Hown". rewrite -Hacc. iExact "Hlb".
   Qed.
@@ -242,10 +331,10 @@ Section UartTxInv.
     iInv "Huinv" as ">Hbody" "Hclose".
     iDestruct "Hbody" as (u) "(Hu & Hg & Hcol)".
     iEval (rewrite /uart_ghosts) in "Hg".
-    iDestruct "Hg" as "(Hs & Hout & Htx & Hdl)".
+    iDestruct "Hg" as "(Hs & Hout & Htx & Hdl & Htg)".
     iDestruct (uart_tx_own_agree with "Htx Hown") as %Hacc.
     iDestruct (uart_sent_prefix with "Hs HL") as %Hpre.
-    iMod ("Hclose" with "[Hu Hs Hout Htx Hdl Hcol]") as "_".
+    iMod ("Hclose" with "[Hu Hs Hout Htx Hdl Htg Hcol]") as "_".
     { iApply bi.later_intro. iExists u. rewrite /uart_ghosts. iFrame. }
     iModIntro. iFrame "Hown". iPureIntro. by rewrite -Hacc.
   Qed.
@@ -270,5 +359,75 @@ Section UartTxInv.
     apply (transitivity Hbs). apply stdpp.list_relations.sublist_inserts_r. reflexivity.
   Qed.
 
+
+  (* THE TAGGED TRACE, READ OUT UNDER THE TOKEN.  A writer holding the
+     transmitter at trace [l] opens the device invariant and takes the
+     CURRENT tagged trace [tg] out of it: its bytes are [l] (the lockstep
+     [WpUart.uart_tagsE], agreed against the token), and the claim the
+     writer carried in still sits inside it.  These are exactly the two
+     things [uart_sent_sub_at_snoc] and the THR store leaf want, and it is
+     [uart_tx_own_sent_sub]'s tagged twin. *)
+  Lemma uart_tx_own_sent_sub_at (γu : uart_names) (γd : disk_names)
+      (l : list (bv 8)) (src : txsrc) (bs : list (bv 8)) (E : coPset) :
+    ↑devN ⊆ E ->
+    dev_inv γu γd -∗ uart_tx_own γu l -∗ uart_sent_sub_at γu src bs ={E}=∗
+      uart_tx_own γu l ∗
+      ∃ tg : list (txsrc * bv 8),
+        uart_sent_tagged γu tg ∗ ⌜(snd <$> tg) = l⌝ ∗
+        ⌜((pair src) <$> bs) `sublist_of` tg⌝.
+  Proof.
+    iIntros (HE) "#Hinv Hown #Hsub".
+    iDestruct "Hsub" as (tg0) "[#Htg0 %Hb]".
+    iDestruct (dev_inv_uart with "Hinv") as "#Huinv".
+    iInv "Huinv" as ">Hbody" "Hclose".
+    iDestruct "Hbody" as (u) "(Hu & Hg & Hcol)".
+    iEval (rewrite /uart_ghosts) in "Hg".
+    iDestruct "Hg" as "(Hs & Hout & Htx & Hdl & Htg)".
+    iDestruct (uart_tx_own_agree with "Htx Hown") as %Hacc.
+    iDestruct "Htg" as (tgA) "[HtgA %HtgA]".
+    iDestruct (uart_tags_get with "HtgA") as "[HtgA #HlbA]".
+    iDestruct (uart_tags_prefix with "HtgA Htg0") as %Hpre0.
+    iMod ("Hclose" with "[Hu Hs Hout Htx Hdl HtgA Hcol]") as "_".
+    { iApply bi.later_intro. iExists u. rewrite /uart_ghosts.
+      iFrame "Hu Hs Hout Htx Hdl Hcol". iExists tgA. by iFrame "HtgA". }
+    iModIntro. iFrame "Hown". iExists tgA. iFrame "HlbA". iPureIntro.
+    split; [by rewrite HtgA Hacc |].
+    destruct Hpre0 as [k ->].
+    apply (transitivity Hb).
+    apply stdpp.list_relations.sublist_inserts_r. reflexivity.
+  Qed.
+
+  (* THE PROJECTION back to the untagged vocabulary, through the lockstep.
+     Not free (it opens [dev_inv]) and not needed by any producer: it is
+     here for a consumer that holds only the tagged claim and wants the
+     landed [uart_sent_sub]. *)
+  Lemma uart_sent_sub_of_at (γu : uart_names) (γd : disk_names)
+      (src : txsrc) (bs : list (bv 8)) (E : coPset) :
+    ↑devN ⊆ E ->
+    dev_inv γu γd -∗ uart_sent_sub_at γu src bs ={E}=∗ uart_sent_sub γu bs.
+  Proof.
+    iIntros (HE) "#Hinv #Hsub".
+    iDestruct "Hsub" as (tg0) "[#Htg0 %Hb]".
+    iDestruct (dev_inv_uart with "Hinv") as "#Huinv".
+    iInv "Huinv" as ">Hbody" "Hclose".
+    iDestruct "Hbody" as (u) "(Hu & Hg & Hcol)".
+    iEval (rewrite /uart_ghosts) in "Hg".
+    iDestruct "Hg" as "(Hs & Hout & Htx & Hdl & Htg)".
+    iDestruct "Htg" as (tgA) "[HtgA %HtgA]".
+    iDestruct (uart_tags_prefix with "HtgA Htg0") as %Hpre0.
+    iDestruct (uart_sent_get with "Hs") as "[Hs #Hlb]".
+    iMod ("Hclose" with "[Hu Hs Hout Htx Hdl HtgA Hcol]") as "_".
+    { iApply bi.later_intro. iExists u. rewrite /uart_ghosts.
+      iFrame "Hu Hs Hout Htx Hdl Hcol". iExists tgA. by iFrame "HtgA". }
+    iModIntro. iExists (uart_acc u). iFrame "Hlb". iPureIntro.
+    rewrite -HtgA.
+    (* the bytes of a tagged sublist are a sublist of the tagged trace's
+       bytes, and [tg0] sits inside the authoritative [tgA] *)
+    assert (Hsub : ((pair src) <$> bs) `sublist_of` tgA).
+    { destruct Hpre0 as [k ->]. apply (transitivity Hb).
+      apply stdpp.list_relations.sublist_inserts_r. reflexivity. }
+    apply (sublist_fmap_gen snd) in Hsub.
+    by rewrite fmap_snd_pair in Hsub.
+  Qed.
 
 End UartTxInv.

@@ -26,7 +26,8 @@
    - NOTHING LINEAR CROSSES THE LOOP'S BACK EDGE that the park could
      invalidate.  What rides the loop is the register/frame state, the
      read-only buffer, the caller's pid cell, and the PERSISTENT trace claim
-     [UartTxInv.uart_sent_sub] -- no [locked], no [tx_res], no [arm_pay].
+     [UartTxInv.uart_sent_sub_at], at this process's own tag [TxW pidv] --
+     no [locked], no [tx_res], no [arm_pay].
      The critical section is entirely inside one turn: acquire mints
      [arm_pay 0 eb pj], release spends it, and the level is back at 0 before
      [sleep] is even reached (which is what makes the park legal at all --
@@ -40,10 +41,11 @@
 
    - THE OUTPUT CLAIM IS A SUBLIST.  uartwrite drops the lock between bytes,
      so another hart's bytes may be accepted in between and a contiguous
-     [uart_sent] is simply false; [UartTxInv.uart_sent_sub] is the honest
-     claim, accumulated one byte at a time with [uart_tx_own_sent_sub] (a
-     plain fupd under [fupd_wp], run while the token is held) and
-     [uart_sent_sub_snoc].
+     [uart_sent] is simply false; [UartTxInv.uart_sent_sub_at] is the
+     honest claim, accumulated one byte at a time with
+     [uart_tx_own_sent_sub_at] (a plain fupd under [fupd_wp], run while the
+     token is held, which also hands out the tagged trace the store leaf
+     extends) and [uart_sent_sub_at_snoc].
 
    CONTROL FLOW.  The loop is ROTATED: the head is +0x4a and the test is at
    +0x46, reached from BOTH arms (from the park arm with [i] unchanged, from
@@ -322,20 +324,16 @@ Section UwProps.
      [uart_sent] at the CURRENT accepted trace is free for anyone holding
      [dev_inv], and [] is a sublist of anything.  Same open/close shape as
      [UartTxInv.uart_tx_own_snapshot]. *)
-  Lemma uw_sent_sub_empty (γu : uart_names) (γv : disk_names) (E : coPset) :
+  (* THE EMPTY TAGGED CLAIM, at any tag, from nothing at all: [◯ML []] is
+     the unit of the tagged mono-list, so no invariant is opened and the
+     [dev_inv] premise is kept only so call sites do not move. *)
+  Lemma uw_sent_sub_empty (γu : uart_names) (γv : disk_names)
+      (src : txsrc) (E : coPset) :
     ↑devN ⊆ E ->
-    dev_inv γu γv ={E}=∗ uart_sent_sub γu [].
+    dev_inv γu γv ={E}=∗ uart_sent_sub_at γu src [].
   Proof.
     iIntros (HE) "#Hinv".
-    iDestruct (dev_inv_uart with "Hinv") as "#Huinv".
-    iInv "Huinv" as ">Hbody" "Hclose".
-    iDestruct "Hbody" as (u) "(Hu & Hg & Hcol)".
-    iEval (rewrite /uart_ghosts) in "Hg".
-    iDestruct "Hg" as "(Hs & Hout & Htx & Hdl)".
-    iDestruct (uart_sent_get with "Hs") as "[Hs #Hlb]".
-    iMod ("Hclose" with "[Hu Hs Hout Htx Hdl Hcol]") as "_".
-    { iApply bi.later_intro. iExists u. rewrite /uart_ghosts. iFrame. }
-    iModIntro. iApply (uart_sent_sub_nil γu (uart_acc u) with "Hlb").
+    iMod (uart_sent_sub_at_nil_free γu src) as "#H". by iModIntro.
   Qed.
 
   (* ra/s0/s1/s2/s3/s4/s5/s6/s7 -- ALL NINE saved in the prologue, on the
@@ -400,7 +398,7 @@ Section UwProps.
        cpu_own 0%nat eb (proc_addr j) true lks -∗
        pc_is (mword_of_int (KernelSyms.uartwrite + 0x4a)) -∗
        p_pid (proc_addr j) ↦₄{dqp} pidv -∗
-       uart_sent_sub γu (uw_bytes f (S i)) -∗
+       uart_sent_sub_at γu (TxW pidv) (uw_bytes f (S i)) -∗
        uw_full sp0 m0 -∗ uw_buf buf dq f n -∗
        WP (Loop : expr riscv_lang)))%I.
 
@@ -416,7 +414,7 @@ Section UwProps.
        cpu_own 0%nat eb (proc_addr j) true lks -∗
        pc_is (mword_of_int (KernelSyms.uartwrite + 0x76)) -∗
        p_pid (proc_addr j) ↦₄{dqp} pidv -∗
-       uart_sent_sub γu (uw_bytes f n) -∗
+       uart_sent_sub_at γu (TxW pidv) (uw_bytes f n) -∗
        uw_full sp0 m0 -∗ uw_buf buf dq f n -∗
        WP (Loop : expr riscv_lang)))%I.
 
@@ -432,7 +430,7 @@ Section UwProps.
        cpu_own 0%nat eb (proc_addr j) true lks -∗
        pc_is (mword_of_int (KernelSyms.uartwrite + 0x4a)) -∗
        p_pid (proc_addr j) ↦₄{dqp} pidv -∗
-       uart_sent_sub γu (uw_bytes f i) -∗
+       uart_sent_sub_at γu (TxW pidv) (uw_bytes f i) -∗
        uw_full sp0 m0 -∗ uw_buf buf dq f n -∗
        uw_exit_cont (CID0 := CID0) γu j m0 av eb sp0 buf n f dq pidv dqp lks -∗
        WP (Loop : expr riscv_lang)))%I.
@@ -449,7 +447,7 @@ Section UwProps.
          pc_is (ret_pc (m0 !!! Regidx Rra)) -∗
          Rbuf -∗
          p_pid (proc_addr j) ↦₄{dqp} pidv -∗
-         uart_sent_sub γu bs -∗
+         uart_sent_sub_at γu (TxW pidv) bs -∗
          WP (Loop : expr riscv_lang)))%I.
 
 End UwProps.
@@ -495,7 +493,7 @@ Section UwBodies.
     cpu_own 0%nat eb pj true lks -∗
     pc_is (mword_of_int (KernelSyms.uartwrite + 0x76)) -∗
     p_pid pj ↦₄{dqp} pidv -∗
-    uart_sent_sub γu bs -∗
+    uart_sent_sub_at γu (TxW pidv) bs -∗
     uw_saved sp0 m0 -∗ uw_slot10 sp0 -∗
     Rbuf -∗
     uw_ret (CID0 := CID0) γu j m0 av eb bs Rbuf pidv dqp lks -∗
@@ -776,7 +774,7 @@ Section UwBodies.
     cpu_own 0%nat eb pj true lks -∗
     pc_is (mword_of_int (KernelSyms.uartwrite + 0x4a)) -∗
     p_pid pj ↦₄{dqp} pidv -∗
-    uart_sent_sub γu (uw_bytes f i) -∗
+    uart_sent_sub_at γu (TxW pidv) (uw_bytes f i) -∗
     uw_full sp0 m0 -∗ uw_buf buf dq f n -∗
     ( uw_next_cont (CID0 := CID0) γu j m0 av eb sp0 buf n f dq pidv dqp i lks
       ∧ uw_exit_cont (CID0 := CID0) γu j m0 av eb sp0 buf n f dq pidv dqp lks ) -∗
@@ -1119,8 +1117,9 @@ Section UwBodies.
         iEval (rewrite P68) in "Hpc".
         (* --- the trace re-link, before the push --- *)
         iApply fupd_wp.
-        iMod (uart_tx_own_sent_sub γu γv l (uw_bytes f i) ⊤ ltac:(solve_ndisj)
-                with "Hdinv Hown Hsub") as "[Hown %Hsublist]".
+        iMod (uart_tx_own_sent_sub_at γu γv l (TxW pidv) (uw_bytes f i) ⊤
+                ltac:(solve_ndisj) with "Hdinv Hown Hsub") as "[Hown Htgpre]".
+        iDestruct "Htgpre" as (tg0) "(#Htg0 & %Htg0l & %Hsublist)".
         iModIntro.
         (* --- +0x68  sb a5,0(s7)  -- the THR write --- *)
         assert (HG2s7 : rget G2 Rs7 = uart_pa 0).
@@ -1129,17 +1128,20 @@ Section UwBodies.
         assert (HG2a5 : G2 !!! Regidx Ra5 = zero_extend' 64 (f i : mword 8))
           by (rewrite /G2 upd_eq; reflexivity).
         iApply (UAcc.wp_uart_thr_write_s_sconf γu γv (mword_of_int (KernelSyms.uartwrite + 0x68))
-                  Ra5 Rs7 G2 (trap_res true + (av - 10))%nat l false HG2s7
-                  with "Hcg Hpc [] Hdinv Hown Hlb Hdlab").
+                  Ra5 Rs7 G2 (trap_res true + (av - 10))%nat l false (TxW pidv) tg0
+                  HG2s7 Htg0l
+                  with "Hcg Hpc [] Hdinv Hown Hlb Hdlab Htg0").
         { iApply (uwi_68 with "Ht"). }
-        iApply wp_next_off_intro. iIntros "Hcg Hpc Hown #Hsent".
+        iApply wp_next_off_intro. iIntros "Hcg Hpc Hown #Hsent #Htgout".
         assert (Hsb : (autocast (T := mword) (subrange_vec_dec (rget G2 Ra5)
                          (Z.sub (Z.mul 1 8) 1) 0) : mword 8) = f i).
         { rgne. rewrite HG2a5. apply uw_sub8_zext. }
         iEval (rewrite Hsb) in "Hown". iEval (rewrite Hsb) in "Hsent".
-        iAssert (uart_sent_sub γu (uw_bytes f (S i))) as "#Hsub'".
+        iEval (rewrite Hsb) in "Htgout".
+        iAssert (uart_sent_sub_at γu (TxW pidv) (uw_bytes f (S i))) as "#Hsub'".
         { rewrite uw_bytes_snoc.
-          iApply (uart_sent_sub_snoc γu (uw_bytes f i) l (f i) Hsublist with "Hsent"). }
+          iApply (uart_sent_sub_at_snoc γu (TxW pidv) (uw_bytes f i) tg0 (f i)
+                    Hsublist with "Htgout"). }
         iEval (rewrite P6c) in "Hpc".
         (* --- +0x6c  c.mv a0,s2 --- *)
         iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.uartwrite + 0x6c)) Ra0 Rs2
@@ -1359,7 +1361,7 @@ Section ProofUartwrite.
     (* the empty sublist claim, out of the device invariant: the n = 0 path
        never takes the lock, so it never has a token to snapshot. *)
     iApply fupd_wp.
-    iMod (uw_sent_sub_empty γu γv ⊤ ltac:(solve_ndisj) with "Hdinv") as "#Hsub0".
+    iMod (uw_sent_sub_empty γu γv (TxW pidv) ⊤ ltac:(solve_ndisj) with "Hdinv") as "#Hsub0".
     iModIntro.
     (* ============ +0x00  blez a1 ============ *)
     assert (Hcmp0 : zopz0zKzJ_s (zero_reg : mword 64) (rget m Ra1) = Z.geb 0 (Z.of_nat n)).

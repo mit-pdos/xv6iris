@@ -37,7 +37,15 @@
    [UartTxInv.is_txlock γl γd] (which carries [uart_dlab_off] with it).  And
    because the lock is re-acquired PER BYTE -- three times on the BACKSPACE arm,
    with other harts free to interleave in between -- the trace claim is the
-   sublist form [UartTxInv.uart_sent_sub], threaded [bs] in / [bs ++ cs] out. *)
+   sublist form [UartTxInv.uart_sent_sub_at], threaded [bs] in / [bs ++ cs] out,
+   with [cs] PINNED to the arm's own bytes (below).
+
+   THE TAG IS THE CALLER'S (app-echo.md, E5/O4, lane TX-TAG).  consputc is on
+   both kernel output paths -- printk's cone and consoleintr's echo -- so it
+   takes the [txsrc] rather than naming one, and hands it straight to
+   uartputc_sync; all the bytes of one call carry the SAME tag, which is what
+   makes the BACKSPACE arm's triple attributable to the erase that produced
+   it. *)
 From Stdlib Require Import ZArith Bool Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -57,6 +65,8 @@ Require Import IntrDefs WpNext.
 Require Import LockRank.
 Require Import CpuOwn.
 Require Import UartTxInv.
+Require Import SpecUartPutc.   (* [cp_byte], [cp_byte_sb]: the byte
+     uartputc_sync stores for an argument, which is what each arm pushes *)
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
@@ -65,12 +75,47 @@ Require Import TsoCtx.
 (* consputc's own frame is 2 slots ([c.addi16sp sp,-16] at 0x8000028a), over
    uartputc_sync's 14. *)
 Notation consputc_stack := (16%nat) (only parsing).
+
+(* ===================================================================== *)
+(*  WHICH BYTES (app-echo.md, E5/O4, lanes TX-TAG / ECHO-RECEIPT).        *)
+(*                                                                       *)
+(*  The post used to say only that SOME list [cs] was appended.  It says  *)
+(*  WHICH now, because the console's echo has to be matched to the byte   *)
+(*  it echoes and consputc is the only thing between the two: the arms    *)
+(*  are a two-way test on [c] and each knows its own bytes, so pinning    *)
+(*  them costs this contract one pure conjunct and its caller one         *)
+(*  intro.  Nothing above printk reads it -- printk's own post keeps its  *)
+(*  [cs] existential ([SpecPrintk.v]), which is where the format          *)
+(*  recursion would otherwise have to carry a rendering.                  *)
+(*                                                                       *)
+(*  [consputc_bs] is the BACKSPACE arm's three bytes -- backspace, space, *)
+(*  backspace, i.e. erase one glyph -- and [cp_byte] is the low byte      *)
+(*  uartputc_sync stores for an argument, which is what the other arm     *)
+(*  pushes.  BACKSPACE is 0x100 (console.c), so it is NOT a byte value    *)
+(*  and the two arms never overlap.                                       *)
+(* ===================================================================== *)
+Definition consputc_bs : list (bv 8) :=
+  [(mword_of_int 8 : mword 8); (mword_of_int 32 : mword 8);
+   (mword_of_int 8 : mword 8)].
+
+(* BACKSPACE is 0x100 (console.c), so it is not a byte value and the two
+   arms cannot both fire. *)
+Definition cp_backspace : mword 64 := mword_of_int 256.
+
+(* the three bytes of the BACKSPACE arm, at [cp_byte]'s spelling: what the
+   three [c.li a0,_ ; jal uartputc_sync] pairs store. *)
+Lemma cp_byte_bs1 : cp_byte (mword_of_int 8) = (mword_of_int 8 : mword 8).
+Proof. apply bv_eq; vm_compute; reflexivity. Qed.
+Lemma cp_byte_bs2 : cp_byte (mword_of_int 32) = (mword_of_int 32 : mword 8).
+Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 Definition wp_consputc_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (kt : ktier) (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
-    (bs : list (bv 8)) (n : nat) (eb : bool) (b : bool) (p : mword 64) (lks : gset string) :=
+    (src : txsrc) (bs : list (bv 8)) (n : nat) (eb : bool) (b : bool) (p : mword 64) (lks : gset string) :=
   let ra_idx : mword 5 := mword_of_int 1 in
+  let a0_idx : mword 5 := mword_of_int 10 in
   let pcE := mword_of_int KernelSyms.consputc in
   let ra0 := m0 !!! Regidx ra_idx in
+  let a00 := m0 !!! Regidx a0_idx in
   let ret_tgt := ret_pc ra0 in
   (consputc_stack <= K)%nat ->
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
@@ -82,14 +127,16 @@ Definition wp_consputc_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID 
   kernel_text -∗ pc_is pcE -∗
   dev_inv γd γv -∗
   is_txlock γl γd -∗
-  uart_sent_sub γd bs -∗
+  uart_sent_sub_at γd src bs -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf cs,
     sie_cap_gpr kt mf K b p -∗
     cpu_own n eb p b lks -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 mf /\ mf !!! Regidx ra_idx = ra0 ⌝ -∗
-    uart_sent_sub γd (bs ++ cs) -∗
+    (* WHICH BYTES: the BACKSPACE arm's triple, or the argument's low byte *)
+    ⌜ if eq_vec a00 cp_backspace then cs = consputc_bs else cs = [cp_byte a00] ⌝ -∗
+    uart_sent_sub_at γd src (bs ++ cs) -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -97,6 +144,6 @@ Module Type CONSPUTC.
   Parameter wp_consputc_sconf :
     forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (kt : ktier) (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
-      (bs : list (bv 8)) (n : nat) (eb : bool) (b : bool) (p : mword 64) (lks : gset string),
-      wp_consputc_sconf_body kt γl γd γv m0 K bs n eb b p lks.
+      (src : txsrc) (bs : list (bv 8)) (n : nat) (eb : bool) (b : bool) (p : mword 64) (lks : gset string),
+      wp_consputc_sconf_body kt γl γd γv m0 K src bs n eb b p lks.
 End CONSPUTC.

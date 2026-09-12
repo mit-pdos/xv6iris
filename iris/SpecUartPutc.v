@@ -28,14 +28,22 @@
    [uart_dlab_off] the THR store needs -- hence no separate [uart_dlab_off]
    premise either.
 
+   AND THE BYTE IS TAGGED (app-echo.md, E5/O4, lane TX-TAG).  uartputc_sync is
+   the THR path of BOTH kernel writers -- printk's cone and consoleintr's echo
+   -- so it cannot name the tag itself: the caller does, through [src].
+   printk's cone passes [TxK]; consoleintr's echo passes [TxE h], the receive
+   history of the byte being echoed.  The tag reaches the device at the THR
+   store ([WpSconfUartAccess.wp_uart_thr_write_s_sconf]) and nowhere else.
+
    WHAT THE CALLER GETS INSTEAD, and it is WEAKER than before: a SUBLIST claim.
    The old post handed back [uart_sent γd (l ++ [sb])], a CONTIGUOUS accepted
    prefix, which was sound only because the caller held the transmitter across
    its whole output.  The lock is re-acquired per byte now, so another hart may
    have bytes accepted between two of ours and a contiguous claim is simply
-   false.  [UartTxInv.uart_sent_sub γd bs] -- "[bs] is a sublist of the accepted
-   trace", persistent -- is the honest statement, and this function's step on it
-   is exactly [UartTxInv.uart_sent_sub_snoc]: [bs] in, [bs ++ [sb]] out. *)
+   false.  [UartTxInv.uart_sent_sub_at γd src bs] -- "[bs], each byte tagged
+   [src], is a sublist of the accepted tagged trace", persistent -- is the honest statement, and this function's step on it
+   is exactly [UartTxInv.uart_sent_sub_at_snoc]: [bs] in, [bs ++ [sb]] out, both
+   at the caller's own [src]. *)
 From Stdlib Require Import ZArith Bool Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -64,9 +72,53 @@ Require Import TsoCtx.
 (* uartputc_sync's own frame is 4 slots ([c.addi16sp sp,-32] at 0x8000094c),
    and its only callees are acquire and release, which want 10 below it. *)
 Notation uartputc_stack := (14%nat) (only parsing).
+
+(* ===================================================================== *)
+(*  THE BYTE THIS FUNCTION STORES, as a function of its argument.         *)
+(*                                                                       *)
+(*  The code reaches the THR store through [addi a0,x0,a0] / [andi        *)
+(*  a0,a0,255], and the store itself truncates to eight bits -- so what   *)
+(*  lands on the wire is exactly the argument's LOW BYTE, and the [andi]  *)
+(*  cannot change it.  [cp_byte] is that byte, spelled the way [trunc8]   *)
+(*  (WpSconfMem.v) spells a truncation so the console's own bridges       *)
+(*  ([ProofConsoleintr.ct_arg_trunc8]) apply to it by conversion.         *)
+(*                                                                       *)
+(*  The contract below still names the raw [sb] expression, because that  *)
+(*  is what the store leaf produces; [cp_byte_sb] is the one rewrite that *)
+(*  turns it into the byte, and consputc's post is stated on the byte.    *)
+(* ===================================================================== *)
+Definition cp_byte (a0 : mword 64) : mword 8 :=
+  autocast (T := mword) (subrange_vec_dec a0 (Z.sub (Z.mul 1 8) 1) 0).
+
+Lemma cp_byte_sb (a0 : mword 64) :
+  (autocast (T := mword)
+     (subrange_vec_dec (and_vec (add_vec zero_reg a0)
+        (sign_extend' 64 (mword_of_int 255 : mword 12))) 7 0) : mword 8)
+  = cp_byte a0.
+Proof.
+  apply bv_eq. unfold cp_byte.
+  rewrite !autocast_id.
+  rewrite (subrange_dec_unsigned_lo0
+             (and_vec (add_vec zero_reg a0)
+                (sign_extend' 64 (mword_of_int 255 : mword 12))) 7 256
+             ltac:(lia) ltac:(vm_compute; reflexivity)).
+  rewrite (subrange_dec_unsigned_lo0 a0 7 256
+             ltac:(lia) ltac:(vm_compute; reflexivity)).
+  rewrite and_vec64_unsigned add_vec_unsigned.
+  assert (H255 : bv_unsigned (sign_extend' 64 (mword_of_int 255 : mword 12) : mword 64)
+                 = 255%Z) by (vm_compute; reflexivity).
+  assert (Hz : bv_unsigned (zero_reg : mword 64) = 0%Z)
+    by (vm_compute; reflexivity).
+  rewrite H255 Hz Z.add_0_l.
+  rewrite bv_wrap_small; [| apply bv_unsigned_in_range].
+  assert (Ho : (255 = Z.ones 8)%Z) by (vm_compute; reflexivity).
+  rewrite Ho (Z.land_ones (bv_unsigned a0) 8 ltac:(lia)).
+  assert (E8 : (2 ^ 8 = 256)%Z) by (vm_compute; reflexivity).
+  rewrite E8. apply Zmod_mod.
+Qed.
 Definition wp_uartputc_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (kt : ktier) (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
-    (bs : list (bv 8)) (n : nat) (eb : bool) (b : bool) (p : mword 64) (lks : gset string) :=
+    (src : txsrc) (bs : list (bv 8)) (n : nat) (eb : bool) (b : bool) (p : mword 64) (lks : gset string) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let a0_idx : mword 5 := mword_of_int 10 in
   let pcE := mword_of_int KernelSyms.uartputc_sync in
@@ -89,14 +141,14 @@ Definition wp_uartputc_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID 
   kernel_text -∗ pc_is pcE -∗
   dev_inv γd γv -∗
   is_txlock γl γd -∗
-  uart_sent_sub γd bs -∗
+  uart_sent_sub_at γd src bs -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf,
     sie_cap_gpr kt mf K b p -∗
     cpu_own n eb p b lks -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 mf /\ mf !!! Regidx ra_idx = ra0 ⌝ -∗
-    uart_sent_sub γd (bs ++ [sb]) -∗
+    uart_sent_sub_at γd src (bs ++ [sb]) -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -104,6 +156,6 @@ Module Type UARTPUTC.
   Parameter wp_uartputc_sconf :
     forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (kt : ktier) (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
-      (bs : list (bv 8)) (n : nat) (eb : bool) (b : bool) (p : mword 64) (lks : gset string),
-      wp_uartputc_sconf_body kt γl γd γv m0 K bs n eb b p lks.
+      (src : txsrc) (bs : list (bv 8)) (n : nat) (eb : bool) (b : bool) (p : mword 64) (lks : gset string),
+      wp_uartputc_sconf_body kt γl γd γv m0 K src bs n eb b p lks.
 End UARTPUTC.

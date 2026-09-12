@@ -1,5 +1,5 @@
 (* ======================================================================= *)
-(*  UartNames.v -- the UART's four ghost names, and nothing else.          *)
+(*  UartNames.v -- the UART's ghost names, and nothing else.               *)
 (*                                                                        *)
 (*  Split out of WpUart.v on 2026-09-03 FOR THE BUILD DAG.  [FsCfg]'s      *)
 (*  config record has one [fsc_uart : uart_names] field and needs no other *)
@@ -21,6 +21,14 @@ From iris.base_logic.lib Require Import own.
       un_acc   mono_list over [uart_acc]  -- the persistent accepted-byte
                history.  Grows only on a THR push; a lower bound
                [uart_sent γ l] is a permanent record that [l] was accepted.
+      un_tag   mono_list over the accepted trace TAGGED BY ITS WRITER --
+               the same bytes as [un_acc], each paired with the [txsrc]
+               (Xv6Cameras.v) of the caller that pushed it.  Kept in
+               lockstep with [un_acc] by [WpUart.uart_tagsE], which is a
+               conjunct of [uart_ghosts] so that the application's transmit
+               wand can read a popped byte's tag off the bundle it is
+               handed ([WpUart.uart_pop_tag]).  Its lower bound
+               [WpUart.uart_sent_tagged] is the persistent record.
       un_out   mono_list over [u_out]     -- the transmitted prefix.  Its
                lower bound is what carries a THRE observation forward across
                later device steps (see [uart_tx_still_empty], DevModel.v).
@@ -54,6 +62,7 @@ From iris.base_logic.lib Require Import own.
                may enable the UART's interrupt source.                       *)
 Record uart_names := UartNames {
   un_acc    : gname;
+  un_tag    : gname;
   un_out    : gname;
   un_tx     : gname;
   un_dlab   : gname;

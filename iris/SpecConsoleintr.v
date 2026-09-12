@@ -28,13 +28,37 @@
    contract gains [console_caps], [SpecDevintr.devintr_caps] gains it, and
    every file that merely passes that bundle along changes by one name.
 
-   [uart_sent_sub γu []] rather than a threaded [bs]: consoleintr's echo is
-   of no interest to any caller, so there is nothing to thread -- the empty
-   claim is the baseline each [consputc] call extends and then discards.
-   Keeping it INSIDE the bundle rather than minting it from [dev_inv] is
-   deliberate: minting costs a fupd that opens the device invariant, and the
-   boot assembly that builds this bundle has the real [uart_sent] in hand
-   anyway (consoleinit hands it back).
+   [uart_sent_sub_at γu TxK []] rather than a threaded [bs]: the bundle
+   carries only the BASELINE each [consputc] call extends, and the empty
+   claim's body does not mention its tag at all, so one constant serves
+   ([UartTxInv.uart_sent_sub_at_nil_any] moves it to the tag this call
+   actually echoes under).  Keeping it INSIDE the bundle rather than minting
+   it from [dev_inv] is deliberate: minting costs a fupd that opens the
+   device invariant, and the boot assembly that builds this bundle has the
+   real [uart_sent] in hand anyway (consoleinit hands it back).
+
+   ---- THE ECHO'S BYTES ARE NOW TAGGED (app-echo.md, E5/O4, lane TX-TAG) --
+
+   Every byte this function echoes goes into the UART's accepted trace
+   tagged [TxE hb] -- the RECEIVE HISTORY of the byte in a0 -- so a reader
+   of the tagged trace ([WpUart.uart_tag_at]) can say WHICH input byte an
+   echoed byte echoes.  That is the tag this contract's [consputc] calls
+   supply, and it is carried by the trace ghost, not by this contract.
+
+   AND THE POST REPORTS IT.  The bare [∃ cs, uart_sent_sub_at γu (TxE hb)
+   cs] would be VACUOUS -- [cs = []] is a free witness
+   ([UartTxInv.uart_sent_sub_at_nil_free]) -- so the claim is keyed on the
+   HIGH-WATER MARK instead, which this contract already reports and which
+   decides the arm: the incoming mark is strictly before [hb] (the premise
+   [ohist_ext hh hb]), so [hh' = Some hb] holds exactly on the arm that
+   FILED the byte, and that arm echoed [echo_of cb] and nothing else.  The
+   other arms leave the mark alone, and what they echo is [cons_echo]'s
+   shape -- nothing, or a run of erase triples.
+
+   PINNING THE BYTES COST [SpecConsputc]'s POST ITS EXISTENTIAL: it now
+   names which bytes each of its two arms pushes, which is what lets this
+   one say [echo_of cb] rather than "something".  printk's own post is
+   unaffected -- its format recursion drops the conjunct.
 
    [dev_inv] stays OUTSIDE the bundle: uartintr already holds it (its rx poll
    reads the device), so folding it in would make the caller's own hypothesis
@@ -78,6 +102,8 @@ Require Import CpuOwn.
 Require Import SchedCtx.
 Require Import DiskPtsto WpUart.
 Require Import UartTxInv.
+Require Import SpecConsputc.   (* [consputc_bs]: the three bytes an erase
+     puts on the wire, and what this function's echo is stated against *)
 Require Import ConsoleInv.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
@@ -115,7 +141,7 @@ Section ConsoleCaps.
        is_txlock γtx γu ∗
        WpLock.is_lock γc a_cons "cons"%string (cons_res_at cn) ∗
        ⌜cn_uart cn = γu⌝ ∗
-       uart_sent_sub γu [] ∗ uart_inited γu)%I.
+       uart_sent_sub_at γu TxK [] ∗ uart_inited γu)%I.
 
   Global Instance console_caps_persistent `{XI : CurCtx} γu : Persistent (console_caps γu).
   Proof. rewrite /console_caps. apply _. Qed.
@@ -129,6 +155,28 @@ Section ConsoleCaps.
   Qed.
 
 End ConsoleCaps.
+
+(* THE ECHOED BYTES, per arm (console.c:150-183).
+   [SpecConsputc.consputc_bs] is what [consputc(BACKSPACE)] puts on the
+   wire: backspace, space, backspace -- erase one glyph. *)
+
+(* what the default arm echoes for [c]: the byte itself, except that a
+   carriage return is echoed -- and stored -- as a newline
+   ([ConsoleInv.cons_xlate] is the same translation on the ring side) *)
+Definition echo_of (c : bv 8) : bv 8 :=
+  if eq_vec (c : mword 8) (mword_of_int 13 : mword 8)
+  then (mword_of_int 10 : mword 8) else c.
+
+(* [cons_echo c cs]: the SHAPE of what one consoleintr call echoes, per arm
+   (console.c:150-183).  Nothing -- the byte is NUL, the ring is full and
+   the byte is dropped, or ^H/^U found nothing to erase.  One byte,
+   [echo_of c] -- the default arm with room, which is also the arm that
+   FILES the byte.  Or a run of erase triples -- ^H and DEL erase at most
+   one character, ^U erases back to the write mark and the count is the
+   ring's content, which this contract cannot name. *)
+Definition cons_echo (c : bv 8) (cs : list (bv 8)) : Prop :=
+  cs = [] \/ cs = [echo_of c]
+  \/ (exists n : nat, cs = mjoin (replicate n consputc_bs)).
 
 Definition wp_consoleintr_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
      (γu : uart_names) (γv : disk_names) (m : regfile) (γs : list gname)
@@ -201,8 +249,15 @@ Definition wp_consoleintr_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fds
       sie_cap_gpr KT1 Mf K b pme -∗
       cpu_own lvl eb pme b lks -∗
       kernel_text -∗ pc_is rettgt -∗
-      (∃ hh' : option (list mobs),
-         uart_rx_hi γu (1/2) hh' ∗ ⌜ohist_le hh' (Some hb)⌝) -∗
+      (* THE MARK AND THE ECHO, in one existential because the mark is what
+         makes the echo's claim say anything: [hh' = Some hb] holds exactly
+         on the arm that FILED the byte, and that arm echoed [echo_of cb]
+         and nothing else.  Every other arm leaves the mark where it was
+         and the echo claim is then only [cons_echo]'s shape. *)
+      (∃ (hh' : option (list mobs)) (cs : list (bv 8)),
+         uart_rx_hi γu (1/2) hh' ∗ ⌜ohist_le hh' (Some hb)⌝ ∗
+         uart_sent_sub_at γu (TxE hb) cs ∗ ⌜cons_echo cb cs⌝ ∗
+         ⌜hh' = Some hb -> cs = [echo_of cb]⌝) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

@@ -55,7 +55,7 @@
       for why that is what costs no call site anything.
 
       AND NOT A [uart_sent_sub].  printk threads that claim IN as well as out
-      ([SpecPrintk.v]: [uart_sent_sub γd bs] in, [uart_sent_sub γd (bs ++ cs)]
+      ([SpecPrintk.v]: [uart_sent_sub_at γd TxK bs] in, [uart_sent_sub_at γd TxK (bs ++ cs)]
       out, [bs] universally quantified), but the precondition slot is an
       ACCUMULATOR FOR THE POSTCONDITION, not a gate: [bs] is never inspected,
       it is only re-emitted with printk's own bytes appended, so a caller who
@@ -63,8 +63,8 @@
       nothing.  panic has NO POSTCONDITION -- its last instruction is a
       self-jump and the contract is a bare [WP Loop] -- so a premise whose
       only purpose is to feed a postcondition has no purpose here at all.
-      [ProofPanic] mints its own [uart_sent_sub γd []] with
-      [UartTxInv.uart_sent_sub_nil_free], which needs nothing whatsoever
+      [ProofPanic] mints its own [uart_sent_sub_at γd TxK []] with
+      [UartTxInv.uart_sent_sub_at_nil_free], which needs nothing whatsoever
       ([◯ML []] is the unit of the mono-list RA), and the [bs] parameter is
       gone from this file.
 

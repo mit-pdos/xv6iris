@@ -5,9 +5,10 @@
    Worklist: claude-notes/projects/fs-syscall-specs.md, the console-write
    lane.  What it owes the console arm above it:
 
-       premise [uart_sent γu tr0], post [uart_sent_from γu tr0
-       (f <$> seq 0 n)] in place of the landed [uart_sent_sub γu
-       (f <$> seq 0 n)].
+       premise [uart_sent γu tr0], post [uart_sent_from_tag γu tr0
+       (TxW pidv) (f <$> seq 0 n)] in place of the landed
+       [uart_sent_sub_at γu (TxW pidv) (f <$> seq 0 n)] -- the located
+       receipt on BOTH the untagged and the tagged trace.
 
    WHY THE LANDED FORM IS NOT ENOUGH, in one sentence (the spec file's item
    3 has the paragraph): two [uart_sent_sub] receipts DO NOT CONCATENATE --
@@ -110,7 +111,13 @@ Definition wp_uartwrite_loc_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !f
          byte of the buffer was accepted by the UART, IN ORDER, at positions
          after the seed.  [UartSentLoc.uart_sent_from_sub] projects it back
          to the landed vocabulary for a caller that does not chain. *)
-      uart_sent_from γu tr0 (f <$> seq 0 n) -∗
+      (* THE JOINT RECEIPT (lane TX-TAG): the located run on the untagged
+         trace -- which is what [SpecFilewrite]'s console arms are stated
+         on -- AND the same run on the TAGGED trace, at this process's own
+         tag, which is what the application's ledger reads.  ONE predicate
+         so the same [bs] carries both ([UartSentLoc.uart_sent_from_tag]);
+         [uart_sent_from_tag_plain] projects to the landed half. *)
+      uart_sent_from_tag γu tr0 (TxW pidv) (f <$> seq 0 n) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

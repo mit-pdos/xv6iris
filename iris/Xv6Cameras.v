@@ -339,11 +339,42 @@ Proof. solve_inG. Qed.
 (*  6.  THE UART DRIVER  (theory: WpUart.v)                               *)
 (* ===================================================================== *)
 
+(* THE TRANSMIT TAG.  Every byte the UART accepts for transmission is
+   accepted by exactly one caller, holding tx_lock for that byte, and the
+   tag records WHICH caller (app-echo.md, E5/O4, lane TX-TAG):
+
+     TxK      the kernel's own output -- printk's cone (consputc ->
+              uartputc_sync), the boot banners and every diagnostic;
+     TxE h    the console's ECHO of a typed byte, carrying THAT BYTE'S
+              RECEIVE HISTORY [h] -- the same history the receive column
+              files beside the byte ([WpUart.uart_col], [riscv_rx_tag]), so
+              an echo can be matched to the input byte it echoes;
+     TxW pid  a user write(2), by the process whose pid is [pid]
+              (consolewrite -> uartwrite).
+
+   The tag is CHOSEN BY THE CALLER at the THR store and is not checked
+   against anything: it is a record of who pushed, made honest by the fact
+   that only the three specs above ever supply one.  In particular nothing
+   here makes [TxW pid] exclusive to one writer -- see [UartSentLoc.v]'s
+   header for what an EXACT per-pid receipt would additionally need. *)
+Inductive txsrc :=
+| TxK
+| TxE (h : list mobs)
+| TxW (pid : Values.mword 32).
+
 (*   mono_list (bv 8)   the accepted output trace, monotone
+     mono_list (txsrc * bv 8)  the SAME trace, tagged by the caller that
+                        pushed each byte -- kept in lockstep with the one
+                        above by [WpUart.uart_tagsE]
      ghost_var  (list (bv 8))  EXCLUSIVE ownership of the transmitter
      dfrac_agree bool   DLAB -- freezable to a persistent fact              *)
 Class uartGhostG (Σ : gFunctors) := UartGhostG {
   uart_ghost_listG :: inG Σ (mono_listR (leibnizO (bv 8)));
+  (* THE TAG COLUMN of the accepted trace ([WpUart.uart_tags_auth]): the
+     accepted bytes paired with the [txsrc] that pushed each one.  A second
+     mono_list rather than a retagging of the one above, so [uart_sent] --
+     which the whole driver cone is stated on -- does not move. *)
+  uart_ghost_tagG :: inG Σ (mono_listR (leibnizO (txsrc * bv 8)));
   uart_ghost_txG :: ghost_varG Σ (list (bv 8));
   uart_ghost_dlabG :: inG Σ (dfrac_agreeR (leibnizO bool));
   (* the RECEIVE TOKEN's half ([WpUart.uart_rx_tok]): the count of bytes ever
@@ -377,6 +408,7 @@ Class uartGhostG (Σ : gFunctors) := UartGhostG {
 
 Definition uartGhostΣ : gFunctors :=
   #[ GFunctor (mono_listR (leibnizO (bv 8)));
+     GFunctor (mono_listR (leibnizO (txsrc * bv 8)));
      ghost_varΣ (list (bv 8));
      GFunctor (dfrac_agreeR (leibnizO bool));
      ghost_varΣ (nat * option (list mobs));

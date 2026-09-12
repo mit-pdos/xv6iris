@@ -582,7 +582,11 @@ Section ProofMain.
     (* promote once, so both [console_caps] and [printk_env] below can reuse
        the same persistent witness instead of re-deriving it. *)
     iDestruct "Hsent" as "#Hsent".
-    iPoseProof (uart_sent_sub_nil γd l0 with "Hsent") as "#Hsub0".
+    (* THE TAGGED BASELINE (lane TX-TAG).  Both bundles carry the empty
+       tagged claim, which is free from the mono-list unit and does not
+       depend on the tag it is spelled at
+       ([UartTxInv.uart_sent_sub_at_nil_any] moves it). *)
+    iMod (uart_sent_sub_at_nil_free γd TxK) as "#Hsub0".
     (* [newlock_at] at [fsc_printk], not [newlock] with a fresh γ *)
     rewrite /fs_kit_printk.
     (* A6.69: the honest creator deposit (A6.66) wants the running token;

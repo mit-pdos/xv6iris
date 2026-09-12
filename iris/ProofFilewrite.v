@@ -4753,9 +4753,13 @@ Section ProofFilewrite.
                     iApply (filewrite_extra_cons rd ConsoleInv.CONSOLE n (us_M U)
                               uaddr Q tr0 (mword_of_int r) eq_refl).
                     rewrite /uaddr -HE2a1 -(Htrs Hc).
+                    (* consolewrite's receipt is the TAGGED one now (lane
+                       TX-TAG); [SpecFilewrite]'s console arms are stated on
+                       the untagged half, which it carries. *)
+                    iDestruct (cons_sent_cnt_of_at with "Hrcpt") as "Hrcptp".
                     iApply (write_cons_arms_of_cnt (fsc_uart) trs (us_M U)
                               (E2 !!! Regidx Ra1 : mword 64) n r Hn0 Hrn
-                              with "Hrcpt").
+                              with "Hrcptp").
                   - iApply (filewrite_extra_dev_other rd true
                               (bv_unsigned (fc_major Cf)) n (us_M U) uaddr Q tr0
                               (mword_of_int r) Hnc). }

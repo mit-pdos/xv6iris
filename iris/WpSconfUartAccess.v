@@ -179,12 +179,12 @@ Section WpSconfUartAccess.
         as [Hrxe Hlbe].
       iDestruct (uart_colE_stable γd u u' Hrxe Hlbe with "Hcol") as "Hcol".
       rewrite uart_read_lsr in Hread. injection Hread as <- <-.
-      iDestruct "Hg" as "(Hs & Hout & Htx & Hdl)".
+      iDestruct "Hg" as "(Hs & Hout & Htx & Hdl & Htgs)".
       destruct (uart_thre u) eqn:Hthre.
       + iDestruct (uart_tx_poll_thre γd u l Hthre with "Hown Htx Hout")
           as "(Hown & Htx & Hout & #Hlb & %Hfacts)".
-        iModIntro. iFrame "Hs Hout Htx Hdl Hcol Hown". iIntros (_). iExact "Hlb".
-      + iModIntro. iFrame "Hs Hout Htx Hdl Hcol Hown".
+        iModIntro. iFrame "Hs Hout Htx Hdl Htgs Hcol Hown". iIntros (_). iExact "Hlb".
+      + iModIntro. iFrame "Hs Hout Htx Hdl Htgs Hcol Hown".
         iIntros (Hc). rewrite (uart_nothre_beqz u Hthre) in Hc. discriminate.
     - iEval (rewrite /wp_next). iIntros (CID1 Hs1 bt) "Hcg Hpc [Hown Hlb]".
       iSpecialize ("Hcont" $! CID1 with "[]"); [iPureIntro; exact Hs1|].
@@ -312,27 +312,44 @@ Section WpSconfUartAccess.
      out-bound the poll handed back, and the frozen DLAB fact;
      [uart_tx_ready_persists] turns them into [uart_write_thr_acc]'s two
      premises at the write's own state, so the byte provably lands in the FIFO.
-     Postcondition: the grown token plus a permanent [uart_sent] record. *)
+     Postcondition: the grown token plus a permanent [uart_sent] record.
+
+     AND THE BYTE IS TAGGED (app-echo.md, E5/O4, lane TX-TAG).  This is THE
+     one transition that grows the accepted trace, so it is the one place a
+     tag can be attached: the caller names the [txsrc] it is writing under
+     -- [TxK] from printk's cone, [TxE h] from consoleintr's echo of the
+     byte that arrived at [h], [TxW pid] from a user write -- and brings the
+     tagged trace [tg0] the token's own [l] pins ([UartTxInv.
+     uart_tx_own_sent_sub_at] is where a caller gets it).  Nothing checks
+     the tag: it records who pushed, and is honest because the only specs
+     that supply one are those three.  The post extends [tg0] by exactly
+     [(src, sb)], in lockstep with [uart_sent]'s own [l ++ [sb]]. *)
   Lemma wp_uart_thr_write_s_sconf (γd : uart_names) (γv : disk_names) (pc : mword 64) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2}
-      (m : regfile) (n : nat) (l : list (bv 8)) (b : bool) :
+      (m : regfile) (n : nat) (l : list (bv 8)) (b : bool)
+      (src : txsrc) (tg0 : list (txsrc * bv 8)) :
     (* the stored byte reads [rs2] at the hart we ENTER on, so it must be
        bound OUTSIDE the [wp_next] lambda (which rebinds [CID], and would
        silently re-read [rs2] -- i.e. [tp] -- at the RESUMING hart). *)
     let sb : mword 8 := autocast (T := mword) (subrange_vec_dec (rget m rs2) (Z.sub (Z.mul 1 8) 1) 0) in
     rget m rs1 = uart_pa 0 ->
+    (* the tagged trace and the accepted trace the token pins are the same
+       bytes: the lockstep clause, at the caller's own witness *)
+    (snd <$> tg0) = l ->
     sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc false (STORE (mword_of_int 0 : mword 12, Regidx rs2, Regidx rs1, 1)) -∗
     dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_out_lb γd l -∗ uart_dlab_off γd -∗
+    uart_sent_tagged γd tg0 -∗
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr kt m n b p -∗
       pc_is (add_vec_int pc 4) -∗
       uart_tx_own γd (l ++ [sb]) -∗
       uart_sent γd (l ++ [sb]) -∗
+      uart_sent_tagged γd (tg0 ++ [(src, sb)]) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros sb.
-    iIntros (Haddr) "Hcg Hpc Hinstr #Hdinv Hown #Hlb #Hoff Hcont".
+    iIntros (Haddr Htg0) "Hcg Hpc Hinstr #Hdinv Hown #Hlb #Hoff #Htg Hcont".
     (* the class, consumed at [rs1 / rs2] -- the one line the funnel change needs,
        and this leaf's wiring check.  See the family note at the head of this
        section. *)
@@ -342,7 +359,8 @@ Section WpSconfUartAccess.
       by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
     iApply (Uart.wp_sb_uart_s_sconf kt (CID:=CID) γd γv 0 pc false rs2 rs1 (mword_of_int 0 : mword 12)
               m n (uart_tx_own γd l)
-              (uart_tx_own γd (l ++ [sb]) ∗ uart_sent γd (l ++ [sb]))%I b p
+              (uart_tx_own γd (l ++ [sb]) ∗ uart_sent γd (l ++ [sb]) ∗
+               uart_sent_tagged γd (tg0 ++ [(src, sb)]))%I b p
               ltac:(unfold uart_size; lia)
               ltac:(rewrite Haddr; vm_compute; reflexivity)
               ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)
@@ -353,22 +371,38 @@ Section WpSconfUartAccess.
       destruct (uart_write_rx_stable u 0 sb u' ltac:(lia) ltac:(lia) Hwrite)
         as [Hrxe Hlbe].
       iDestruct (uart_colE_stable γd u u' Hrxe Hlbe with "Hcol") as "Hcol".
-      iDestruct "Hg" as "(Hs & Hout & Htx & Hdl)".
+      iDestruct "Hg" as "(Hs & Hout & Htx & Hdl & Htgs)".
       iDestruct (uart_tx_ready_persists γd u l with "Hown Hlb Hoff Htx Hout Hdl") as %[Hempty Hdlab].
       iDestruct (uart_tx_own_agree with "Htx Hown") as %Haccu.
       assert (Hroom : (length (u_tx u) < uart_fifo_depth)%nat).
       { rewrite Hempty. cbn [length]. unfold uart_fifo_depth. lia. }
       assert (Hacc' : uart_acc u' = l ++ [sb]).
       { rewrite (uart_write_thr_acc u sb u' Hdlab Hroom Hwrite) Haccu. reflexivity. }
+      (* THE TAG COLUMN.  The invariant's own tagged trace has the token's
+         bytes, and so does the caller's witness, so the two lower bounds
+         have equal length and are therefore the SAME list -- which is what
+         lets the push extend the caller's [tg0] rather than an unknown
+         one. *)
+      iDestruct "Htgs" as (tgA) "[HtgA %HtgA]".
+      iDestruct (uart_tags_get with "HtgA") as "[HtgA #HlbA]".
+      assert (HlenA : length tgA = length tg0).
+      { rewrite -(length_fmap snd tgA) -(length_fmap snd tg0) HtgA Htg0 Haccu.
+        reflexivity. }
+      iDestruct (uart_sent_tagged_agree_len γd tgA tg0 HlenA with "HlbA Htg")
+        as %->.
+      iMod (uart_tags_update γd tg0 (src, sb) with "HtgA") as "[HtgA #Htgout]".
       iMod (uart_tx_own_update γd u l u' with "Htx Hown") as "[Htx Hown]".
       iMod (uart_sent_update γd u u' with "Hs") as "[Hs Hsent]".
       { rewrite Haccu Hacc'. by apply prefix_app_r. }
       iDestruct (uart_out_auth_stable γd u u' (uart_write_out _ _ _ _ Hwrite) with "Hout") as "Hout".
       iDestruct (uart_dlab_auth_stable γd u u' (uart_write_dlab_0 _ _ _ Hwrite) with "Hdl") as "Hdl".
       iEval (rewrite Hacc') in "Hown". iEval (rewrite Hacc') in "Hsent".
-      iModIntro. rewrite /uart_ghosts. iFrame "Hs Hout Htx Hdl Hcol Hown Hsent".
-    - iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hcg Hpc [Hown Hsent]".
-      iApply ("Hcont" $! CID1 with "[] Hcg Hpc Hown Hsent").
+      iModIntro. rewrite /uart_ghosts.
+      iFrame "Hs Hout Htx Hdl Hcol Hown Hsent Htgout".
+      iExists ((tg0 ++ [(src, sb)])%list). iFrame "HtgA". iPureIntro.
+      rewrite fmap_app /= Htg0 Hacc'. reflexivity.
+    - iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hcg Hpc (Hown & Hsent & Htgout)".
+      iApply ("Hcont" $! CID1 with "[] Hcg Hpc Hown Hsent Htgout").
       iPureIntro. exact Hs1.
   Qed.
 

@@ -42,7 +42,7 @@
 
    THAT SIMPLIFIES THE PRINT LOOP.  Its induction used to thread the LINEAR
    [uart_tx_own γd (l ++ bs_so_far)] across the back-edge; the trace claim is
-   now [uart_sent_sub γd (bs ++ cs_so_far)], a persistent SUBLIST statement
+   now [uart_sent_sub_at γd TxK (bs ++ cs_so_far)], a persistent SUBLIST statement
    (the lock is re-acquired per byte, so another hart may interleave between
    two of our digits -- see UartTxInv.v).  So the loop hands on no trace
    resource at all, only a longer list; the one linear thing crossing the edge
@@ -638,7 +638,7 @@ Section ProofPrintint.
   (*  WHAT THE INDUCTION CARRIES ACROSS THE BACK-EDGE, now that the       *)
   (*  transmitter lives under [tx_lock] and is taken PER BYTE inside      *)
   (*  uartputc_sync: nothing that the loop has to reason about.  The      *)
-  (*  trace claim [uart_sent_sub γd (bs ++ cs)] is PERSISTENT -- it is a  *)
+  (*  trace claim [uart_sent_sub_at γd TxK (bs ++ cs)] is PERSISTENT -- it is a  *)
   (*  sublist statement, sound even though another hart may interleave    *)
   (*  its own bytes between two of ours -- so the iteration statement     *)
   (*  merely names a longer list, it does not hand a resource on.  The    *)
@@ -652,7 +652,7 @@ Section ProofPrintint.
   Hypothesis wp_consputc :
     forall `{CID0 : CpuId} `{XI0 : CurCtx} (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
       (bs : list (bv 8)) (n : nat) (eb : bool) (b : bool) (pcur : mword 64) (lks : gset string),
-      wp_consputc_sconf_body kt γl γd γv m0 K bs n eb b pcur lks.
+      wp_consputc_sconf_body kt γl γd γv m0 K TxK bs n eb b pcur lks.
 
   Lemma wp_printint_ploop (γl : gname) (γd : uart_names) (γv : disk_names) (K : nat)
       (buf : mword 64) (n : nat) (eb : bool) (b : bool) (pcur : mword 64) (lks : gset string) :
@@ -668,7 +668,7 @@ Section ProofPrintint.
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.printint + 0x74) : mword 64) -∗
     bytes_own (KTR := kt) (DfracOwn 1) buf 24 -∗
-    dev_inv γd γv -∗ is_txlock γl γd -∗ uart_sent_sub γd bs -∗
+    dev_inv γd γv -∗ is_txlock γl γd -∗ uart_sent_sub_at γd TxK bs -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (cs : list (bv 8)),
       ⌜ forall c : mword 5, is_cs_idx c = true -> c <> s1_idx ->
@@ -677,7 +677,7 @@ Section ProofPrintint.
       cpu_own n eb pcur b lks -∗
       pc_is (mword_of_int (KernelSyms.printint + 0x82) : mword 64) -∗
       bytes_own (KTR := kt) (DfracOwn 1) buf 24 -∗
-      uart_sent_sub γd (bs ++ cs) -∗
+      uart_sent_sub_at γd TxK (bs ++ cs) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -725,7 +725,7 @@ Section ProofPrintint.
       iDestruct (cpu_own_transport CID0 CIDj1 n eb pcur b ltac:(wp_next_chain) with "Hcnt") as "Hcnt";
       iApply (wp_consputc (CID0 := CIDj1) γl γd γv P2 (K - 8)%nat bs n eb b pcur lks HK16 Hn31 Hlkbelow
                 with "Hcg Hcnt Htext Hpc Hdev Htxl Hsent");
-      iIntros (CIDcp Hscp mc cs) "Hcg Hcnt Hpc %Hcs #Hsent2";
+      iIntros (CIDcp Hscp mc cs) "Hcg Hcnt Hpc %Hcs %Hcsbytes #Hsent2";
       destruct Hcs as [Hcs Hra];
       assert (Hretc : ret_pc (P2 !!! Regidx ra_idx) = mword_of_int (KernelSyms.printint + 0x7c))
         by (rewrite /P2 upd_eq; unfold ret_pc; apply bv_eq; vm_compute; reflexivity);
@@ -840,14 +840,14 @@ Section ProofPrintint.
     (∃ v : mword 64, (pa_stk sp0 3) ↦₈[kt] v) -∗
     (pa_stk sp0 4) ↦₈[kt] (m !!! Regidx s2_idx) -∗
     (∃ v : mword 64, (pa_stk sp0 8) ↦₈[kt] v) -∗
-    dev_inv γd γv -∗ is_txlock γl γd -∗ uart_sent_sub γd bs -∗
+    dev_inv γd γv -∗ is_txlock γl γd -∗ uart_sent_sub_at γd TxK bs -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (cs : list (bv 8)),
       sie_cap_gpr kt mf K b pcur -∗
       cpu_own n eb pcur b lks -∗
       pc_is (ret_pc (m !!! Regidx ra_idx)) -∗
       ⌜ callee_saved m mf /\ mf !!! Regidx ra_idx = m !!! Regidx ra_idx ⌝ -∗
-      uart_sent_sub γd (bs ++ cs) -∗
+      uart_sent_sub_at γd TxK (bs ++ cs) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1074,14 +1074,14 @@ Section ProofPrintint.
     (∃ v : mword 64, (pa_stk sp0 3) ↦₈[kt] v) -∗
     (pa_stk sp0 4) ↦₈[kt] (m !!! Regidx s2_idx) -∗
     (∃ v : mword 64, (pa_stk sp0 8) ↦₈[kt] v) -∗
-    dev_inv γd γv -∗ is_txlock γl γd -∗ uart_sent_sub γd bs -∗
+    dev_inv γd γv -∗ is_txlock γl γd -∗ uart_sent_sub_at γd TxK bs -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (cs : list (bv 8)),
       sie_cap_gpr kt mf K b pcur -∗
       cpu_own n eb pcur b lks -∗
       pc_is (ret_pc (m !!! Regidx ra_idx)) -∗
       ⌜ callee_saved m mf /\ mf !!! Regidx ra_idx = m !!! Regidx ra_idx ⌝ -∗
-      uart_sent_sub γd (bs ++ cs) -∗
+      uart_sent_sub_at γd TxK (bs ++ cs) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1609,7 +1609,7 @@ End ProofPrintint.
       : wp_printint_sconf_body kt γl γd γv m0 K bs n eb b pcur lks :=
     wp_printint_sconf_gen
       (fun `{CID0 : CpuId} `{XI : CurCtx} γl' γd' γv' m' K' bs' n' eb' b' pcur' lks' =>
-         Consputc.wp_consputc_sconf kt (CID:=CID0) γl' γd' γv' m' K' bs' n' eb' b' pcur' lks')
+         Consputc.wp_consputc_sconf kt (CID:=CID0) γl' γd' γv' m' K' TxK bs' n' eb' b' pcur' lks')
       γl γd γv m0 K bs n eb b pcur lks.
 
 End PrintintProof.

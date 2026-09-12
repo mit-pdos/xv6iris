@@ -24,13 +24,21 @@
    contiguously" -- uartwrite SLEEPS between bytes, and while it sleeps any
    other hart may push its own (uartputc_sync does not take this lock at all).
    The honest statement is the one the accepted-byte trace supports, and it is
-   [UartTxInv.uart_sent_sub]:
+   [UartTxInv.uart_sent_sub_at]:
 
-       ∃ tr, uart_sent γu tr ∗ ⌜ (f <$> seq 0 n) `sublist_of` tr ⌝
+       ∃ tg, uart_sent_tagged γu tg ∗
+             ⌜ (pair (TxW pidv) <$> (f <$> seq 0 n)) `sublist_of` tg ⌝
 
    -- every byte of the buffer was accepted by the UART, IN ORDER, possibly
-   interleaved with other harts' bytes.  [uart_sent] is persistent and
+   interleaved with other harts' bytes.  [uart_sent_tagged] is persistent and
    monotone, so this survives everything that happens afterwards.
+
+   AND EACH BYTE IS TAGGED [TxW pidv] (app-echo.md, E5/O4, lane TX-TAG): the
+   pid of the process whose write(2) this is, read off the [p_pid] cell this
+   contract already carries.  So the landed claim is the tag-aware
+   [UartTxInv.uart_sent_sub_at] at that tag.  It is still a SUBLIST and not
+   an exact per-pid run: nothing makes [TxW pidv] exclusive to one writer --
+   see [UartSentLoc.v]'s header for what exactness would need.
 
    THE BUFFER is taken at an arbitrary [dq] and handed back untouched
    (uartwrite only reads it), named by [f] in strlen's vocabulary.  [n] is a
@@ -153,7 +161,7 @@ Definition wp_uartwrite_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslo
       pc_is ret_tgt -∗
       ([∗ list] k ∈ seq 0 n, (pa_add buf k) ↦ₘ[KT1]{dq} f k) -∗
       p_pid pj ↦₄{dqp} pidv -∗
-      uart_sent_sub γu (f <$> seq 0 n) -∗
+      uart_sent_sub_at γu (TxW pidv) (f <$> seq 0 n) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

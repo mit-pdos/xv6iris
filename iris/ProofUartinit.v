@@ -104,7 +104,7 @@ Section ProofUartinit.
   Lemma ui_dlab_of_ghosts (gd : uart_names) (u : uart_state) (dq : dfrac) (b : bool) :
     uart_ghosts gd u -∗ uart_dlab_is gd dq b -∗ ⌜ uart_dlab u = b ⌝.
   Proof.
-    iIntros "(_ & _ & _ & Hdl) Hb".
+    iIntros "(_ & _ & _ & Hdl & _) Hb".
     iApply (uart_dlab_agree with "Hdl Hb").
   Qed.
 
@@ -113,7 +113,7 @@ Section ProofUartinit.
   Lemma ui_tx_empty (gd : uart_names) (u : uart_state) (l : list (bv 8)) :
     uart_ghosts gd u -∗ uart_tx_own gd l -∗ uart_out_lb gd l -∗ ⌜ u_tx u = [] ⌝.
   Proof.
-    iIntros "(_ & Ho & Ht & _) Hown Hlb".
+    iIntros "(_ & Ho & Ht & _ & _) Hown Hlb".
     iDestruct (uart_tx_own_agree with "Ht Hown") as %Hacc.
     iDestruct (uart_out_prefix with "Ho Hlb") as %Hpre.
     iPureIntro. exact (uart_tx_empty_of_out u l Hacc Hpre).
@@ -126,14 +126,15 @@ Section ProofUartinit.
     uart_ghosts gd u -∗ uart_dlab_is gd (DfracOwn (1/2)) b ==∗
     uart_ghosts gd u' ∗ uart_dlab_is gd (DfracOwn (1/2)) (uart_dlab u').
   Proof.
-    iIntros (Ha Ho) "(Hs & Hout & Ht & Hdl) Hb".
+    iIntros (Ha Ho) "(Hs & Hout & Ht & Hdl & Htg) Hb".
     iMod (uart_dlab_update gd u u' b with "Hdl Hb") as "[Hdl' Hb']".
-    iModIntro. iSplitL "Hs Hout Ht Hdl'"; [| iExact "Hb'"].
+    iModIntro. iSplitL "Hs Hout Ht Hdl' Htg"; [| iExact "Hb'"].
     rewrite /uart_ghosts.
     iDestruct (uart_sent_auth_stable _ u u' Ha with "Hs") as "$".
     iDestruct (uart_out_auth_stable _ u u' Ho with "Hout") as "$".
     iDestruct (uart_tx_auth_stable _ u u' Ha with "Ht") as "$".
-    iExact "Hdl'".
+    iDestruct (uart_tagsE_stable _ u u' Ha with "Htg") as "Htg".
+    iSplitL "Hdl'"; [iExact "Hdl'" | iExact "Htg"].
   Qed.
 
   Lemma wp_uartinit_sconf (γd : uart_names)

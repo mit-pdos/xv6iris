@@ -498,7 +498,7 @@ Section ProofUartintr.
                      ltac:(wp_next_chain) with "Hcont") as "Hcont".
         iApply ("IH" $! CIDz Mf with "[%] [%] [%] Hcg Hcnt Hpc Hfr [Htok Hhi] Hcont").
         4: { iExists (S k), (Some h). rewrite /uart_rx_writer. iFrame "Htok".
-             iDestruct "Hhi" as (hh') "[Hhi %Hle']".
+             iDestruct "Hhi" as (hh' cse) "(Hhi & %Hle' & _ & _ & _)".
              iExists hh'. iFrame "Hhi". by iPureIntro. }
         + apply (ui_regs_cs m0 M1 Mf); [exact HcsMf | exact Hregs1].
         + rewrite (callee_saved_lookup HcsMf (mword_of_int 9) ltac:(vm_compute; reflexivity)). exact Hls1.
