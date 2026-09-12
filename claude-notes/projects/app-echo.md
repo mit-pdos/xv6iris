@@ -2334,6 +2334,81 @@ DEVICE arm says the walk of THIS path ended at a device node; rows 15/17 read
 `uvis_M W` and `xk_a W 0`; the generic suppliers are `*_at_of_all` instances;
 `UkRunSys`/`UkInit` unchanged.  chdir/unlink keep `∀ pl`.
 
+SH-LINE PHASE 2 -- THE SWALLOWED BYTE (BLOCKER FOUND 2026-09-12; phase 1
+green at `shline14`, the read leaf and the `ukn_triv` split green at
+`shline22`, 21 u-tier files uncommitted, no kernel diff).
+
+THE FACT.  consoleread's window arm promises `d <= dc <= d + 1`
+(`SpecConsoleread.v:264`, relayed by `SpecFileread.console_receipt` and
+`UConsLine.ush_read_recv_leaf`).  `dc = d + 1` is a byte POPPED AND NOT
+DELIVERED, and the C has exactly two such exits: `c == C('D')` with nothing
+copied yet (`n == target`, i.e. `d = 0`; the byte is ^D), and
+`either_copyout == -1` (the byte is anything; `d < target`).  Both break with
+`n > 0`, so `d = cap -> dc = d`.  With `cap = 1` (sh's `gets` reads one byte)
+the delivered arm is contiguous; the r = 0 arm is a swallowed byte at the
+cursor, after which sh's `gets` breaks and `getcmd` either exits sh (empty
+line) or RUNS THE PARTIAL LINE -- so the arm must be refuted, not tolerated,
+and `ush_gets_line`'s taint escape has no `T` to take (ruling (d) forbids
+`ush_gen_run` off a non-taint premise; the lane stopped correctly).
+
+TWO FACES, DIFFERENT COSTS.
+(i) THE ^D SWALLOW is refutable from the tags IF the spec hands the swallowed
+    byte back: its history `h` sits in the ring's stored sequence at
+    `cur + d` (the pop read it; `cr_pop_swallow` has `st` and the cursor) and
+    `riscv_rx_tag h` is on every stored byte (`cons_tags ts`).  Under the
+    discipline `disc h` forces `ins h` into `(echo_line)*`'s prefixes, whose
+    bytes never include 0x04, so the arm yields the taint.  Kernel change,
+    option-independent: lane CONS-SWALLOW below.
+(ii) THE COPYOUT-FAULT SWALLOW cannot be refuted from tags (the byte is
+    legitimate) and cannot be refuted at the U tier AS THE MODEL STANDS:
+    `copyout_wrote` (`SpecCopyout.v:161`) fails unconditionally; the real
+    failure is walkaddr-fails-and-vmfault-fails, i.e. the page is not
+    user-mapped and `kalloc` returned 0 (this xv6 has LAZY sbrk pages:
+    `vm.c:vmfault`); `kalloc` fails unconditionally in the model
+    (`kalloc_env _ None` at every kernel spec; no budget exists); and the U
+    tier's key `uvis_perm = perm_of (ud_um pt) sz` maps a lazily-live page and
+    a mapped RW page to the SAME `uperm` (`UserPerm.perm_fill` fills
+    `uperm_rw = MkUperm false true`, `perm_bits` of a bss leaf is the same
+    record) -- `perm_of_uptd_ext_sz` is exactly the statement that the
+    projection cannot see vmfault.  So `ubytes` at the U tier proves
+    `uw_addr`, which does not exclude "lazy page, kalloc fails, byte lost".
+    sh's `buf` is `static` bss, mapped eagerly by exec: THE FACT IS TRUE and
+    the model cannot state it.
+
+THE FORK (the owner's call; both are honest):
+  (A) MAP-KEY.  `uvis` gains `uvis_map : gset (mword 27)`, a LOWER BOUND on
+      the pages user-mapped in the process's table (`urun` carries `∀ p ∈ map,
+      ∃ w, ud_um pt !! p = Some w ∧ pte_vu w`).  Because it is a lower bound
+      the rows are the identity everywhere except exec (`map' = live_pages
+      sz'`: exec maps eagerly) and sbrk-shrink (`map' = map ∖ dropped`); fork's
+      child inherits.  Row 5's receipt then says the copyout-fault swallow is
+      at a page `∉ uvis_map W`, and sh refutes it from `ubytes` + exec's row.
+      PID-KEY is the precedent (a key component, one lane).  Cost: the key
+      record, `bump`, every `usys_*_ok` row's identity clause, the trap-out
+      key former's proof of the bound (the extension facts already exist in
+      every syscall proof), exec's image builder, sbrk's row, fork's child.
+      Does NOT change the theorem's hypotheses.  RECOMMENDED.
+  (B) A GLOBAL "NO MEMORY EXHAUSTION" PREMISE: a kalloc budget threaded to
+      consoleread makes vmfault succeed and the arm vanishes.  Cheaper at the
+      console but it is a new top-level hypothesis, it needs a budget
+      mechanism the tree does not have, and sh's fork/exec failure arms
+      (`panic("fork")` PRINTS) raise the same question for E5 anyway.  Not
+      recommended as the fix for THIS arm; the E5 session should still decide
+      what the output claim says about allocation failure.
+
+WHAT PROCEEDS MEANWHILE.  SH-LINE phase 2a (S1-S3, the CLOSED arm, the
+exit/kill payments, the red files; `gets`/S5 deferred, `ushf_lexable` stays
+as a premise until 2b) -- nothing in it depends on the fork.  Then
+CONS-SWALLOW (kernel lane, option-independent: consoleread's window arm
+becomes `dc = d ∨ (dc = d+1 ∗ the swallowed byte's (h,b) at cur+d with its
+tag and the extended stored bound ∗ (⌜d = 0 ∧ cons_xlate b = 0x04⌝ ∨
+⌜¬uva_mapped P (dst + d)⌝))`; `copyout_wrote`/`either_copyout` gain the
+fault characterization `res = -1 -> ¬uva_mapped P (dstva + d)`;
+`console_receipt` takes the table and relays the arm; row 5 exposes it at an
+∃ table agreeing with the key's projection -- which is exactly what (A)
+strengthens).  Then SH-LINE 2b: `gets` refutes the ^D arm into the taint and
+takes the fault arm as the ONE named premise `ush_buf_mapped` owed by (A).
+
 OPEN-PIN COMPLETE (2026-09-12; phases 3-4 landed: `92716856c`, and the phase-4
 commit after it).  Phase 3: three receipt-keeping U-tier leaves
 (`UkRunSys.wp_uk_ecall_open_recv` at the TRAPPING key handing back `uvis_cwd W =

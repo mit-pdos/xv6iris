@@ -71,8 +71,13 @@ patch: `projects/wx-briefs/`.
   (`UkShRun/Diag/Parse*/Malloc`, whose payload IS trivial after
   `wp_uk_ecall_fork_any`), parent side moves to `ukn_const`; init's token premise
   is `UserConsole.ucons_reader cn 0` at the narrow class, held as
-  `UConsLine.uinit_tok cn T` on the restart head) → E4 → E2 →
-  E5
+  `UConsLine.uinit_tok cn T` on the restart head) → BLOCKER 2026-09-12 (note "SH-LINE PHASE 2 -- THE
+  SWALLOWED BYTE"): consoleread's `dc = d+1` arm; the ^D face is fixed by a
+  kernel lane, the copyout-fault face needs the OWNER'S CALL between (A) MAP-KEY
+  (recommended) and (B) a no-exhaustion premise. Pipeline meanwhile: SH-LINE 2a
+  (S1-S3, CLOSED arm, payments; `gets`/S5 deferred) RUNNING → CONS-SWALLOW
+  (`wx-briefs/brief-cons-swallow.md`, kernel lane, option-independent) → SH-LINE
+  2b → [MAP-KEY if (A)] → E4 → E2 → E5
   → SH-LINE phase 2 → E4 → E2 → E5.
 - Standing rulings from the lanes (WX-EXIT/WX-INV build on them): rows per slot
   born at boot; the map's and the orphans' names canonical on `wchG`; ZOMBIE row
