@@ -303,3 +303,12 @@ output opens it via a caller-supplied fupd; the sublist/prefix receipts and the
 tags are retired.  TX-RECEIPT CANCELLED (branch = history).  PRINTK-LEDGER-2
 redirected: revert the ledger, keep rendering (milestones B/C).  New lane
 OUT-FUPD (brief being written) runs in main.
+
+OUT-FUPD LAUNCHED in main (2026-09-12, `brief-out-fupd.md`; phase 1 = the
+application-fixed output predicate in the UART invariant, the store's fupd, the
+writers' contracts, the retirement list, WITH a trusted-statement diff for the
+owner).  TX-RECEIPT agent stopped (branch `lane/tx-receipt` = history).  In
+flight: OUT-FUPD p1 (main), E2 p2 (`-disc`), PRINTK-LEDGER-2 → rendering B/C
+(`-sup`), E4 p3 (`-tlw`).  COORDINATOR RULE: check `git branch --show-current` =
+main before any notes commit in the main checkout (two notes commits went onto
+lane/tx-receipt while an agent had it checked out; both cherry-picked to main).
