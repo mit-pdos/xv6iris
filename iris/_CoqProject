@@ -1756,6 +1756,12 @@ SystemUartAccepted.v
 # APPLICATIONS (claude-notes/design/applications.md): the record and the
 # whole-system theorem at one ([App.xv6_app_adequacy]).
 App.v
+
+# The echo application's console DISCIPLINE and OUTPUT CLAIM as pure
+# combinatorics over the observation trace (no Iris): the boot messages,
+# the pure-suffix point, the expected session transcript, D0-D3 and
+# [good_out].  Exported by AppEcho.v.
+EchoDisc.v
 # The ECHO application: its discipline, fixed part, ledger, tag, the
 # [taint or pins] predicate over the three era-0 pin files, the record
 # [app_echo], and every hypothesis of App.xv6_app_adequacy except

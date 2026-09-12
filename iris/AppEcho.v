@@ -126,134 +126,35 @@ Require Import RiscvPtsto.       (* [riscvGS], [obsN] *)
 Require Import WpUart.           (* [uart_ghosts], [uartN] *)
 Require Import App.              (* [xv6_app], [MkApp] and the theorem whose
                                     binders the dischargers are stated at *)
+(* THE DISCIPLINE AND THE CLAIM, as pure combinatorics.  EXPORTED: the
+   landed names ([echo_line], [star_prefix], [ins], [disc_seg], [disc]) are
+   read unqualified by [UConsLine.v], and moving them out must not move
+   them for a reader. *)
+Require Export EchoDisc.
 Local Open Scope Z_scope.
 
 (* ====================================================================== *)
-(*  1.  THE DISCIPLINE                                                     *)
+(*  1.  THE DISCIPLINE -- NOW IN [EchoDisc.v]                              *)
+(*                                                                        *)
+(*  The console discipline stopped being a predicate on the INPUT BYTES    *)
+(*  ALONE (review-echo-plan-2026-09-12.md, finding 7: the theorem is FALSE *)
+(*  at that discipline, because the 129th unconsumed byte is dropped       *)
+(*  silently) and became the owner's RATE BOUND over the interleaved       *)
+(*  trace -- D0 (wait for all seven harts) and D1/D2 (wait for the prompt, *)
+(*  then for each byte's echo) beside the old content condition D3.  The   *)
+(*  whole of it is pure combinatorics over [list mobs], so it lives in     *)
+(*  [EchoDisc.v] -- EXPORTED here, because everything stated against the   *)
+(*  landed names ([echo_line], [star_prefix], [disc_seg], [disc]) keeps    *)
+(*  naming them unqualified.                                               *)
+(*                                                                        *)
+(*  What this file uses from there: [disc] (the new discipline) and its    *)
+(*  [disc_nil] / [disc_out] / [disc_power] / [disc_in] closure laws, which *)
+(*  hold at the SAME statements they held at before, so the ledger's four  *)
+(*  steps below are unchanged; [disc_dec], which [echo_phase] decides;     *)
+(*  [disc_old] and [disc_proj], the bridge every landed consumer of the    *)
+(*  old predicate reads it through; and [disc_seg'] / [good_out], which    *)
+(*  section 5's conclusion is written in.                                  *)
 (* ====================================================================== *)
-
-(* the console line the discipline admits: "echo hello world\n" *)
-Definition echo_line : list (bv 8) :=
-  Z_to_bv 8 <$> [101; 99; 104; 111; 32; 104; 101; 108; 108; 111; 32;
-                 119; 111; 114; 108; 100; 10].
-
-Lemma echo_line_length : length echo_line = 17%nat.
-Proof. reflexivity. Qed.
-Lemma echo_line_pos : (0 < length echo_line)%nat.
-Proof. rewrite echo_line_length. lia. Qed.
-
-(* the INPUT bytes of an observation list, in order *)
-Definition ins (h : list mobs) : list (bv 8) :=
-  omap (fun e => match e with ObsUartIn b => Some b | _ => None end) h.
-
-Lemma ins_app (h κ : list mobs) : ins (h ++ κ) = ins h ++ ins κ.
-Proof. by rewrite /ins omap_app. Qed.
-
-Lemma ins_in (b : bv 8) : ins [ObsUartIn b] = [b].
-Proof. reflexivity. Qed.
-Lemma ins_out (b : bv 8) : ins [ObsUartOut b] = [].
-Proof. reflexivity. Qed.
-
-(* [l] IS A PREFIX OF [pat]^*, spelled so that it is decidable by one
-   list equality and prefix-closed by one [take]: the first [length l]
-   letters of [pat] repeated [length l] times are the first [length l]
-   letters of [pat]^ω whenever [pat] is nonempty. *)
-Definition star_prefix (pat l : list (bv 8)) : Prop :=
-  l = take (length l) (concat (replicate (length l) pat)).
-
-Global Instance star_prefix_dec pat l : Decision (star_prefix pat l).
-Proof. rewrite /star_prefix. apply _. Qed.
-
-Lemma star_prefix_nil pat : star_prefix pat [].
-Proof. reflexivity. Qed.
-
-Lemma concat_replicate_S {A} (n : nat) (pat : list A) :
-  concat (replicate (S n) pat) = concat (replicate n pat) ++ pat.
-Proof. by rewrite replicate_S_end concat_app /= app_nil_r. Qed.
-
-Lemma concat_replicate_length {A} (n : nat) (pat : list A) :
-  length (concat (replicate n pat)) = (n * length pat)%nat.
-Proof.
-  induction n as [|n IH]; [reflexivity|].
-  rewrite concat_replicate_S length_app IH. lia.
-Qed.
-
-(* the one law the rx step needs: breaking the discipline is forever.  The
-   first [length l] letters of the longer word are the first [length l]
-   letters of the shorter one, because [pat^length l] already has them. *)
-Lemma star_prefix_snoc pat l b :
-  (0 < length pat)%nat ->
-  star_prefix pat (l ++ [b]) -> star_prefix pat l.
-Proof.
-  rewrite /star_prefix. intros Hpat Hsnoc.
-  apply (f_equal (take (length l))) in Hsnoc.
-  rewrite take_app_length take_take in Hsnoc.
-  rewrite length_app /= in Hsnoc.
-  rewrite Nat.min_l in Hsnoc; [|lia].
-  rewrite Nat.add_1_r concat_replicate_S in Hsnoc.
-  rewrite take_app_le in Hsnoc; [exact Hsnoc|].
-  rewrite concat_replicate_length. nia.
-Qed.
-
-(* one power cycle's input keeps the discipline *)
-Definition disc_seg (seg : list mobs) : Prop := star_prefix echo_line (ins seg).
-
-Global Instance disc_seg_dec seg : Decision (disc_seg seg).
-Proof. rewrite /disc_seg. apply _. Qed.
-
-Lemma disc_seg_nil : disc_seg [].
-Proof. exact (star_prefix_nil _). Qed.
-
-(* THE DISCIPLINE, over the WHOLE history (uart-trace.md ruling 1): every
-   cycle's input so far is a prefix of [echo_line]^*.  [cycles_of h] lists
-   every cycle, the open one LAST while the power is on
-   ([ObsTrace.trace_shape_cycles]), so the open cycle is covered. *)
-Definition disc (h : list mobs) : Prop := Forall disc_seg (cycles_of h).
-
-Global Instance disc_dec h : Decision (disc h).
-Proof. rewrite /disc. apply _. Qed.
-
-Lemma disc_nil : disc [].
-Proof. constructor. Qed.
-
-(* ---- closure laws, one per event kind ---- *)
-
-Lemma disc_seg_out (seg : list mobs) (b : bv 8) :
-  disc_seg (seg ++ [ObsUartOut b]) <-> disc_seg seg.
-Proof. rewrite /disc_seg ins_app ins_out app_nil_r. done. Qed.
-
-Lemma disc_out (h : list mobs) (b : bv 8) :
-  trace_shape h true ->
-  disc (h ++ [ObsUartOut b]) <-> disc h.
-Proof.
-  intros Hsh.
-  destruct (cycles_of_io h [ObsUartOut b] Hsh) as (cs & Hc & Hc');
-    [by constructor|].
-  rewrite /disc Hc Hc' !Forall_app !Forall_singleton disc_seg_out. done.
-Qed.
-
-Lemma disc_power (h : list mobs) (on : bool) :
-  disc (h ++ [if on then ObsPowerOff else ObsPowerOn]) <-> disc h.
-Proof.
-  rewrite /disc. destruct on.
-  - by rewrite cycles_of_off.
-  - rewrite cycles_of_on Forall_app Forall_singleton.
-    split; [by intros [? _] | intros ?; split; [done | exact disc_seg_nil]].
-Qed.
-
-Lemma disc_in (h : list mobs) (b : bv 8) :
-  trace_shape h true ->
-  disc (h ++ [ObsUartIn b]) -> disc h.
-Proof.
-  intros Hsh.
-  destruct (cycles_of_io h [ObsUartIn b] Hsh) as (cs & Hc & Hc');
-    [by constructor|].
-  rewrite /disc Hc Hc' !Forall_app !Forall_singleton.
-  intros [Hall Hseg]. split; [exact Hall|].
-  rewrite /disc_seg ins_app ins_in in Hseg.
-  exact (star_prefix_snoc _ _ _ echo_line_pos Hseg).
-Qed.
-
 (* ====================================================================== *)
 (*  2.  THE FIXED PART AND THE LEDGER: the taint counter reads the         *)
 (*      discipline                                                         *)
@@ -1050,15 +951,37 @@ End EchoInit.
 (*  5.  THE CONCLUSION                                                     *)
 (* ====================================================================== *)
 
-(* THE CONCLUSION IS NOT WRITTEN YET, and this is the placeholder that says
-   so LOUDLY.  [App.app_phi] is read at the end of the run by [Hphi]; the
-   echo application's real one is "every power cycle's output is a prefix
-   of the console stream its input calls for" ([good_out], app-echo.md's
-   target statement), which needs the output side's located write receipts.
-   At [True] the whole theorem would say SAFETY AND NOTHING ELSE -- an
-   honest statement, but not this application's.  It is a [Definition] and
-   never a hypothesis, so nothing downstream can mistake it for a claim. *)
-Definition echo_phi : gstate -> list mobs -> Prop := fun _ _ => True.
+(* THE CONCLUSION, at last: every power cycle whose input kept the console
+   discipline emitted, on the wire, an interleaving of the kernel's ten
+   boot messages with a PREFIX of the session transcript that cycle's input
+   calls for ([EchoDisc.good_out]).  It was [True] until 2026-09-12, and at
+   [True] the whole theorem said SAFETY AND NOTHING ELSE.
+
+   [App.app_phi] takes the operational state as well; echo's conclusion
+   reads only the trace, so the state argument is dropped -- the durable
+   half of the claim is [echo_pred] in the crash slot, not here.
+
+   THE OBLIGATION IS OPEN.  [Hphi] -- the hypothesis of
+   [App.xv6_app_adequacy] that this must be proved at -- IS NOT PROVED BY
+   THIS FILE AND NOT BY THE LANE THAT WROTE THIS DEFINITION.  It needs the
+   kernel's per-byte source tagging (lane TX-TAG), the located write
+   receipts (TX-RECEIPT / ECHO-RECEIPT) and the ledger's shadow of the
+   accepted list (APP-IFACE); the proof is E5's, and it reads the ledger
+   against [echo_R_untainted] on the crash slot's taint arm.  There is
+   deliberately NO lemma here that looks like it discharges [Hphi]. *)
+Definition echo_phi : gstate -> list mobs -> Prop :=
+  fun _ h => Forall (fun seg => disc_seg' seg -> good_out seg) (cycles_of h).
+
+(* what the conclusion says once the discipline held: the claim, per cycle,
+   with no hypothesis left in front of it *)
+Lemma echo_phi_disc (g : gstate) (h : list mobs) :
+  disc h -> echo_phi g h -> Forall good_out (cycles_of h).
+Proof.
+  rewrite /disc /echo_phi. intros Hd Hphi.
+  apply Forall_lookup. intros i seg Hi.
+  eapply Forall_lookup_1 in Hphi; [|exact Hi].
+  apply Hphi. by eapply Forall_lookup_1 in Hd; [|exact Hi].
+Qed.
 
 (* ====================================================================== *)
 (*  6.  THE RECORD, AND THE OBLIGATIONS DISCHARGED AT ITS FIELDS           *)
