@@ -28,22 +28,14 @@
    [uart_dlab_off] the THR store needs -- hence no separate [uart_dlab_off]
    premise either.
 
-   AND THE BYTE IS TAGGED (app-echo.md, E5/O4, lane TX-TAG).  uartputc_sync is
-   the THR path of BOTH kernel writers -- printk's cone and consoleintr's echo
-   -- so it cannot name the tag itself: the caller does, through [src].
-   printk's cone passes [TxK]; consoleintr's echo passes [TxE h], the receive
-   history of the byte being echoed.  The tag reaches the device at the THR
-   store ([WpSconfUartAccess.wp_uart_thr_write_s_sconf]) and nowhere else.
-
    WHAT THE CALLER GETS INSTEAD, and it is WEAKER than before: a SUBLIST claim.
    The old post handed back [uart_sent γd (l ++ [sb])], a CONTIGUOUS accepted
    prefix, which was sound only because the caller held the transmitter across
    its whole output.  The lock is re-acquired per byte now, so another hart may
    have bytes accepted between two of ours and a contiguous claim is simply
-   false.  [UartTxInv.uart_sent_sub_at γd src bs] -- "[bs], each byte tagged
-   [src], is a sublist of the accepted tagged trace", persistent -- is the honest statement, and this function's step on it
-   is exactly [UartTxInv.uart_sent_sub_at_snoc]: [bs] in, [bs ++ [sb]] out, both
-   at the caller's own [src]. *)
+   false.  [UartTxInv.uart_sent_sub γd bs] -- "[bs] is a sublist of the accepted
+   trace", persistent -- is the honest statement, and this function's step on it
+   is exactly [UartTxInv.uart_sent_sub_snoc]: [bs] in, [bs ++ [sb]] out. *)
 From Stdlib Require Import ZArith Bool Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -118,7 +110,7 @@ Proof.
 Qed.
 Definition wp_uartputc_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (kt : ktier) (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
-    (src : txsrc) (bs : list (bv 8)) (n : nat) (eb : bool) (b : bool) (p : mword 64) (lks : gset string) :=
+    (bs : list (bv 8)) (n : nat) (eb : bool) (b : bool) (p : mword 64) (lks : gset string) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let a0_idx : mword 5 := mword_of_int 10 in
   let pcE := mword_of_int KernelSyms.uartputc_sync in
@@ -141,14 +133,14 @@ Definition wp_uartputc_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID 
   kernel_text -∗ pc_is pcE -∗
   dev_inv γd γv -∗
   is_txlock γl γd -∗
-  uart_sent_sub_at γd src bs -∗
+  uart_sent_sub γd bs -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf,
     sie_cap_gpr kt mf K b p -∗
     cpu_own n eb p b lks -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 mf /\ mf !!! Regidx ra_idx = ra0 ⌝ -∗
-    uart_sent_sub_at γd src (bs ++ [sb]) -∗
+    uart_sent_sub γd (bs ++ [sb]) -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -156,6 +148,6 @@ Module Type UARTPUTC.
   Parameter wp_uartputc_sconf :
     forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (kt : ktier) (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
-      (src : txsrc) (bs : list (bv 8)) (n : nat) (eb : bool) (b : bool) (p : mword 64) (lks : gset string),
-      wp_uartputc_sconf_body kt γl γd γv m0 K src bs n eb b p lks.
+      (bs : list (bv 8)) (n : nat) (eb : bool) (b : bool) (p : mword 64) (lks : gset string),
+      wp_uartputc_sconf_body kt γl γd γv m0 K bs n eb b p lks.
 End UARTPUTC.

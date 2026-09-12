@@ -28,32 +28,26 @@
    contract gains [console_caps], [SpecDevintr.devintr_caps] gains it, and
    every file that merely passes that bundle along changes by one name.
 
-   [uart_sent_sub_at γu TxK []] rather than a threaded [bs]: the bundle
-   carries only the BASELINE each [consputc] call extends, and the empty
-   claim's body does not mention its tag at all, so one constant serves
-   ([UartTxInv.uart_sent_sub_at_nil_any] moves it to the tag this call
-   actually echoes under).  Keeping it INSIDE the bundle rather than minting
-   it from [dev_inv] is deliberate: minting costs a fupd that opens the
-   device invariant, and the boot assembly that builds this bundle has the
-   real [uart_sent] in hand anyway (consoleinit hands it back).
+   [uart_sent_sub γu []] rather than a threaded [bs]: the bundle carries
+   only the BASELINE each [consputc] call extends.  Keeping it INSIDE the
+   bundle rather than minting it from [dev_inv] is deliberate: minting costs
+   a fupd that opens the device invariant, and the boot assembly that builds
+   this bundle has the real [uart_sent] in hand anyway (consoleinit hands it
+   back).
 
-   ---- THE ECHO'S BYTES ARE NOW TAGGED (app-echo.md, E5/O4, lane TX-TAG) --
+   ---- THE ECHO'S BYTES ARE REPORTED (app-echo.md, E5/O4) ----------------
 
-   Every byte this function echoes goes into the UART's accepted trace
-   tagged [TxE hb] -- the RECEIVE HISTORY of the byte in a0 -- so a reader
-   of the tagged trace ([WpUart.uart_tag_at]) can say WHICH input byte an
-   echoed byte echoes.  That is the tag this contract's [consputc] calls
-   supply, and it is carried by the trace ghost, not by this contract.
-
-   AND THE POST REPORTS IT.  The bare [∃ cs, uart_sent_sub_at γu (TxE hb)
-   cs] would be VACUOUS -- [cs = []] is a free witness
-   ([UartTxInv.uart_sent_sub_at_nil_free]) -- so the claim is keyed on the
-   HIGH-WATER MARK instead, which this contract already reports and which
-   decides the arm: the incoming mark is strictly before [hb] (the premise
-   [ohist_ext hh hb]), so [hh' = Some hb] holds exactly on the arm that
-   FILED the byte, and that arm echoed [echo_of cb] and nothing else.  The
-   other arms leave the mark alone, and what they echo is [cons_echo]'s
-   shape -- nothing, or a run of erase triples.
+   The bare [∃ cs, uart_sent_sub γu cs] would be VACUOUS -- [cs = []] is a
+   free witness ([UartTxInv.uart_sent_sub_nil_free]) -- so the claim is
+   keyed on the HIGH-WATER MARK, which this contract already reports and
+   which decides the arm: the incoming mark is strictly before [hb] (the
+   premise [ohist_ext hh hb]), so [hh' = Some hb] holds exactly on the arm
+   that FILED the byte, and that arm echoed [echo_of cb] and nothing else.
+   The other arms leave the mark alone, and what they echo is [cons_echo]'s
+   shape -- nothing, or a run of erase triples.  WHO pushed a byte is NOT
+   invariant data: attribution is the application's private knowledge,
+   established inside the view shift every UART output takes (lane
+   OUT-FUPD).
 
    PINNING THE BYTES COST [SpecConsputc]'s POST ITS EXISTENTIAL: it now
    names which bytes each of its two arms pushes, which is what lets this
@@ -141,7 +135,7 @@ Section ConsoleCaps.
        is_txlock γtx γu ∗
        WpLock.is_lock γc a_cons "cons"%string (cons_res_at cn) ∗
        ⌜cn_uart cn = γu⌝ ∗
-       uart_sent_sub_at γu TxK [] ∗ uart_inited γu)%I.
+       uart_sent_sub γu [] ∗ uart_inited γu)%I.
 
   Global Instance console_caps_persistent `{XI : CurCtx} γu : Persistent (console_caps γu).
   Proof. rewrite /console_caps. apply _. Qed.
@@ -256,7 +250,7 @@ Definition wp_consoleintr_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fds
          and the echo claim is then only [cons_echo]'s shape. *)
       (∃ (hh' : option (list mobs)) (cs : list (bv 8)),
          uart_rx_hi γu (1/2) hh' ∗ ⌜ohist_le hh' (Some hb)⌝ ∗
-         uart_sent_sub_at γu (TxE hb) cs ∗ ⌜cons_echo cb cs⌝ ∗
+         uart_sent_sub γu cs ∗ ⌜cons_echo cb cs⌝ ∗
          ⌜hh' = Some hb -> cs = [echo_of cb]⌝) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).

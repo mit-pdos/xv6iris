@@ -1817,7 +1817,7 @@ Section ProofPrintk.
   Hypothesis wp_consputc :
     forall `{CID0 : CpuId} `{XI0 : CurCtx} (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
       (l : list (bv 8)) (n : nat) (eb : bool) (b : bool) (pcur : mword 64) (lks : gset string),
-      wp_consputc_sconf_body kt γl γd γv m0 K TxK l n eb b pcur lks.
+      wp_consputc_sconf_body kt γl γd γv m0 K l n eb b pcur lks.
 
   Lemma wp_printk_char `{CID0 : CpuId} (γd : uart_names) (γv : disk_names)
       (mc : regfile) (K : nat) (l : list (bv 8)) (n : nat) (eb : bool)
@@ -1831,7 +1831,7 @@ Section ProofPrintk.
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.printk + 0x7a) : mword 64) -∗
     cpu_own n eb pcur b lks -∗
-    dev_inv γd γv -∗ uart_sent_sub_at γd TxK l -∗ is_txlock γl γd -∗
+    dev_inv γd γv -∗ uart_sent_sub γd l -∗ is_txlock γl γd -∗
     Rest -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs : list (bv 8)),
@@ -1842,7 +1842,7 @@ Section ProofPrintk.
       sie_cap_gpr kt mf K b pcur -∗
       pc_is (mword_of_int (KernelSyms.printk + 0x6c) : mword 64) -∗
       cpu_own n eb pcur b lks -∗
-      uart_sent_sub_at γd TxK (l ++ bs) -∗
+      uart_sent_sub γd (l ++ bs) -∗
       Rest -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -2104,7 +2104,7 @@ Section ProofPrintk.
     (pa_stk sp0 23) ↦₈[kt] (pk_ap s0v k) -∗
     pk_va sp0 m -∗
     cpu_own n eb pcur b lks -∗
-    dev_inv γd γv -∗ uart_sent_sub_at γd TxK l -∗ is_txlock γl γd -∗
+    dev_inv γd γv -∗ uart_sent_sub γd l -∗ is_txlock γl γd -∗
     Rest -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs : list (bv 8)),
@@ -2114,7 +2114,7 @@ Section ProofPrintk.
       (pa_stk sp0 23) ↦₈[kt] (pk_ap s0v (S k)) -∗
       pk_va sp0 m -∗
       cpu_own n eb pcur b lks -∗
-      uart_sent_sub_at γd TxK (l ++ bs) -∗
+      uart_sent_sub γd (l ++ bs) -∗
       Rest -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -2293,7 +2293,7 @@ Section ProofPrintk.
     (pa_stk sp0 23) ↦₈[kt] (pk_ap s0v k) -∗
     pk_va sp0 m -∗
     cpu_own n eb pcur b lks -∗
-    dev_inv γd γv -∗ uart_sent_sub_at γd TxK l -∗ is_txlock γl γd -∗
+    dev_inv γd γv -∗ uart_sent_sub γd l -∗ is_txlock γl γd -∗
     Rest -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs : list (bv 8)),
@@ -2305,7 +2305,7 @@ Section ProofPrintk.
       (pa_stk sp0 23) ↦₈[kt] (pk_ap s0v (S k)) -∗
       pk_va sp0 m -∗
       cpu_own n eb pcur b lks -∗
-      uart_sent_sub_at γd TxK (l ++ bs) -∗
+      uart_sent_sub γd (l ++ bs) -∗
       Rest -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -2456,7 +2456,7 @@ Section ProofPrintk.
     (pa_stk sp0 23) ↦₈[kt] (pk_ap s0v k) -∗
     pk_va sp0 m -∗
     cpu_own n eb pcur b lks -∗
-    dev_inv γd γv -∗ uart_sent_sub_at γd TxK l -∗ is_txlock γl γd -∗
+    dev_inv γd γv -∗ uart_sent_sub γd l -∗ is_txlock γl γd -∗
     Rest -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs : list (bv 8)),
@@ -2468,7 +2468,7 @@ Section ProofPrintk.
       (pa_stk sp0 23) ↦₈[kt] (pk_ap s0v (S k)) -∗
       pk_va sp0 m -∗
       cpu_own n eb pcur b lks -∗
-      uart_sent_sub_at γd TxK (l ++ bs) -∗
+      uart_sent_sub γd (l ++ bs) -∗
       Rest -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -2617,7 +2617,7 @@ Section ProofPrintk.
     (pa_stk sp0 23) ↦₈[kt] (pk_ap s0v k) -∗
     pk_va sp0 m -∗
     cpu_own n eb pcur b lks -∗
-    dev_inv γd γv -∗ uart_sent_sub_at γd TxK l -∗ is_txlock γl γd -∗
+    dev_inv γd γv -∗ uart_sent_sub γd l -∗ is_txlock γl γd -∗
     Rest -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs : list (bv 8)),
@@ -2629,7 +2629,7 @@ Section ProofPrintk.
       (pa_stk sp0 23) ↦₈[kt] (pk_ap s0v (S k)) -∗
       pk_va sp0 m -∗
       cpu_own n eb pcur b lks -∗
-      uart_sent_sub_at γd TxK (l ++ bs) -∗
+      uart_sent_sub γd (l ++ bs) -∗
       Rest -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -2780,7 +2780,7 @@ Section ProofPrintk.
     (pa_stk sp0 23) ↦₈[kt] (pk_ap s0v k) -∗
     pk_va sp0 m -∗
     cpu_own n eb pcur b lks -∗
-    dev_inv γd γv -∗ uart_sent_sub_at γd TxK l -∗ is_txlock γl γd -∗
+    dev_inv γd γv -∗ uart_sent_sub γd l -∗ is_txlock γl γd -∗
     Rest -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs : list (bv 8)),
@@ -2792,7 +2792,7 @@ Section ProofPrintk.
       (pa_stk sp0 23) ↦₈[kt] (pk_ap s0v (S k)) -∗
       pk_va sp0 m -∗
       cpu_own n eb pcur b lks -∗
-      uart_sent_sub_at γd TxK (l ++ bs) -∗
+      uart_sent_sub γd (l ++ bs) -∗
       Rest -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -2941,7 +2941,7 @@ Section ProofPrintk.
     (pa_stk sp0 23) ↦₈[kt] (pk_ap s0v k) -∗
     pk_va sp0 m -∗
     cpu_own n eb pcur b lks -∗
-    dev_inv γd γv -∗ uart_sent_sub_at γd TxK l -∗ is_txlock γl γd -∗
+    dev_inv γd γv -∗ uart_sent_sub γd l -∗ is_txlock γl γd -∗
     Rest -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs : list (bv 8)),
@@ -2953,7 +2953,7 @@ Section ProofPrintk.
       (pa_stk sp0 23) ↦₈[kt] (pk_ap s0v (S k)) -∗
       pk_va sp0 m -∗
       cpu_own n eb pcur b lks -∗
-      uart_sent_sub_at γd TxK (l ++ bs) -∗
+      uart_sent_sub γd (l ++ bs) -∗
       Rest -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -3094,7 +3094,7 @@ Section ProofPrintk.
     (pa_stk sp0 23) ↦₈[kt] (pk_ap s0v k) -∗
     pk_va sp0 m -∗
     cpu_own n eb pcur b lks -∗
-    dev_inv γd γv -∗ uart_sent_sub_at γd TxK l -∗ is_txlock γl γd -∗
+    dev_inv γd γv -∗ uart_sent_sub γd l -∗ is_txlock γl γd -∗
     Rest -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs : list (bv 8)),
@@ -3106,7 +3106,7 @@ Section ProofPrintk.
       (pa_stk sp0 23) ↦₈[kt] (pk_ap s0v (S k)) -∗
       pk_va sp0 m -∗
       cpu_own n eb pcur b lks -∗
-      uart_sent_sub_at γd TxK (l ++ bs) -∗
+      uart_sent_sub γd (l ++ bs) -∗
       Rest -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -3259,7 +3259,7 @@ Section ProofPrintk.
     (pa_stk sp0 23) ↦₈[kt] (pk_ap s0v k) -∗
     pk_va sp0 m -∗
     cpu_own n eb pcur b lks -∗
-    dev_inv γd γv -∗ uart_sent_sub_at γd TxK l -∗ is_txlock γl γd -∗
+    dev_inv γd γv -∗ uart_sent_sub γd l -∗ is_txlock γl γd -∗
     Rest -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs : list (bv 8)),
@@ -3269,7 +3269,7 @@ Section ProofPrintk.
       (pa_stk sp0 23) ↦₈[kt] (pk_ap s0v (S k)) -∗
       pk_va sp0 m -∗
       cpu_own n eb pcur b lks -∗
-      uart_sent_sub_at γd TxK (l ++ bs) -∗
+      uart_sent_sub γd (l ++ bs) -∗
       Rest -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -3400,7 +3400,7 @@ Section ProofPrintk.
     (pa_stk sp0 23) ↦₈[kt] (pk_ap s0v k) -∗
     pk_va sp0 m -∗
     cpu_own n eb pcur b lks -∗
-    dev_inv γd γv -∗ uart_sent_sub_at γd TxK l -∗ is_txlock γl γd -∗
+    dev_inv γd γv -∗ uart_sent_sub γd l -∗ is_txlock γl γd -∗
     Rest -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs : list (bv 8)),
@@ -3410,7 +3410,7 @@ Section ProofPrintk.
       (pa_stk sp0 23) ↦₈[kt] (pk_ap s0v (S k)) -∗
       pk_va sp0 m -∗
       cpu_own n eb pcur b lks -∗
-      uart_sent_sub_at γd TxK (l ++ bs) -∗
+      uart_sent_sub γd (l ++ bs) -∗
       Rest -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -3544,7 +3544,7 @@ Section ProofPrintk.
     (pa_stk sp0 23) ↦₈[kt] (pk_ap s0v k) -∗
     pk_va sp0 m -∗
     cpu_own n eb pcur b lks -∗
-    dev_inv γd γv -∗ uart_sent_sub_at γd TxK l -∗ is_txlock γl γd -∗
+    dev_inv γd γv -∗ uart_sent_sub γd l -∗ is_txlock γl γd -∗
     Rest -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs : list (bv 8)),
@@ -3554,7 +3554,7 @@ Section ProofPrintk.
       (pa_stk sp0 23) ↦₈[kt] (pk_ap s0v (S k)) -∗
       pk_va sp0 m -∗
       cpu_own n eb pcur b lks -∗
-      uart_sent_sub_at γd TxK (l ++ bs) -∗
+      uart_sent_sub γd (l ++ bs) -∗
       Rest -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -3651,7 +3651,7 @@ Section ProofPrintk.
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.printk + 0x23a) : mword 64) -∗
     cpu_own n eb pcur b lks -∗
-    dev_inv γd γv -∗ uart_sent_sub_at γd TxK l -∗ is_txlock γl γd -∗
+    dev_inv γd γv -∗ uart_sent_sub γd l -∗ is_txlock γl γd -∗
     Rest -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs : list (bv 8)),
@@ -3659,7 +3659,7 @@ Section ProofPrintk.
       sie_cap_gpr kt mf K b pcur -∗
       pc_is (mword_of_int (KernelSyms.printk + 0x6c) : mword 64) -∗
       cpu_own n eb pcur b lks -∗
-      uart_sent_sub_at γd TxK (l ++ bs) -∗
+      uart_sent_sub γd (l ++ bs) -∗
       Rest -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -3723,7 +3723,7 @@ Section ProofPrintk.
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.printk + 0x2ee) : mword 64) -∗
     cpu_own n eb pcur b lks -∗
-    dev_inv γd γv -∗ uart_sent_sub_at γd TxK l -∗ is_txlock γl γd -∗
+    dev_inv γd γv -∗ uart_sent_sub γd l -∗ is_txlock γl γd -∗
     Rest -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs : list (bv 8)),
@@ -3731,7 +3731,7 @@ Section ProofPrintk.
       sie_cap_gpr kt mf K b pcur -∗
       pc_is (mword_of_int (KernelSyms.printk + 0x6c) : mword 64) -∗
       cpu_own n eb pcur b lks -∗
-      uart_sent_sub_at γd TxK (l ++ bs) -∗
+      uart_sent_sub γd (l ++ bs) -∗
       Rest -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -3916,7 +3916,7 @@ Section ProofPrintk.
     pc_is (mword_of_int (KernelSyms.printk + 0x21e) : mword 64) -∗
     sv ↦ₛ{ dq } s -∗
     cpu_own n eb pcur b lks -∗
-    dev_inv γd γv -∗ uart_sent_sub_at γd TxK l -∗ is_txlock γl γd -∗
+    dev_inv γd γv -∗ uart_sent_sub γd l -∗ is_txlock γl γd -∗
     Rest -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs : list (bv 8)),
@@ -3926,7 +3926,7 @@ Section ProofPrintk.
       pc_is (mword_of_int (KernelSyms.printk + 0x6c) : mword 64) -∗
       sv ↦ₛ{ dq } s -∗
       cpu_own n eb pcur b lks -∗
-      uart_sent_sub_at γd TxK (l ++ bs) -∗
+      uart_sent_sub γd (l ++ bs) -∗
       Rest -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -4086,7 +4086,7 @@ Section ProofPrintk.
     pk_va sp0 m -∗
     (pk_vararg m k) ↦ₛ{ dq } s -∗
     cpu_own n eb pcur b lks -∗
-    dev_inv γd γv -∗ uart_sent_sub_at γd TxK l -∗ is_txlock γl γd -∗
+    dev_inv γd γv -∗ uart_sent_sub γd l -∗ is_txlock γl γd -∗
     Rest -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs : list (bv 8)),
@@ -4098,7 +4098,7 @@ Section ProofPrintk.
       pk_va sp0 m -∗
       (pk_vararg m k) ↦ₛ{ dq } s -∗
       cpu_own n eb pcur b lks -∗
-      uart_sent_sub_at γd TxK (l ++ bs) -∗
+      uart_sent_sub γd (l ++ bs) -∗
       Rest -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -4213,7 +4213,7 @@ Section ProofPrintk.
       iIntros (CID4b Hst4b). iApply bi.later_intro. iIntros "Hcg Hpc".
       assert (Htgt78 : add_vec (mword_of_int (KernelSyms.printk + 0x21a) : mword 64) (sign_extend' 64 (mword_of_int 7762 : mword 13)) = mword_of_int (KernelSyms.printk + 0x6c)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgt78) in "Hpc".
-      iAssert (uart_sent_sub_at γd TxK (l ++ [])) as "#Hsl'".
+      iAssert (uart_sent_sub γd (l ++ [])) as "#Hsl'".
       { rewrite app_nil_r. iApply "Hsl". }
       iDestruct (cpu_own_transport CID0 CID4b n eb pcur b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iSpecialize ("Hcont" $! CID4b with "[%]"); [wp_next_chain|].
@@ -4254,7 +4254,7 @@ Section ProofPrintk.
     (pa_stk sp0 23) ↦₈[kt] (pk_ap s0v k) -∗
     pk_va sp0 m -∗
     cpu_own n eb pcur b lks -∗
-    dev_inv γd γv -∗ uart_sent_sub_at γd TxK l -∗ is_txlock γl γd -∗
+    dev_inv γd γv -∗ uart_sent_sub γd l -∗ is_txlock γl γd -∗
     Rest -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs : list (bv 8)),
@@ -4265,7 +4265,7 @@ Section ProofPrintk.
       (pa_stk sp0 23) ↦₈[kt] (pk_ap s0v (S k)) -∗
       pk_va sp0 m -∗
       cpu_own n eb pcur b lks -∗
-      uart_sent_sub_at γd TxK (l ++ bs) -∗
+      uart_sent_sub γd (l ++ bs) -∗
       Rest -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -4457,7 +4457,7 @@ Section ProofPrintk.
     kernel_text -∗ pk_digits dg -∗
     pc_is (mword_of_int (KernelSyms.printk + 0x1d4) : mword 64) -∗
     cpu_own n eb pcur b lks -∗
-    dev_inv γd γv -∗ uart_sent_sub_at γd TxK l -∗ is_txlock γl γd -∗
+    dev_inv γd γv -∗ uart_sent_sub γd l -∗ is_txlock γl γd -∗
     Rest -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs : list (bv 8)),
@@ -4467,7 +4467,7 @@ Section ProofPrintk.
       sie_cap_gpr kt mf K b pcur -∗
       pc_is (mword_of_int (KernelSyms.printk + 0x1ea) : mword 64) -∗
       cpu_own n eb pcur b lks -∗
-      uart_sent_sub_at γd TxK (l ++ bs) -∗
+      uart_sent_sub γd (l ++ bs) -∗
       Rest -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -4671,7 +4671,7 @@ Section ProofPrintk.
     (pa_stk sp0 23) ↦₈[kt] (pk_ap s0v k) -∗
     pk_va sp0 m -∗
     cpu_own n eb pcur b lks -∗
-    dev_inv γd γv -∗ uart_sent_sub_at γd TxK l -∗ is_txlock γl γd -∗
+    dev_inv γd γv -∗ uart_sent_sub γd l -∗ is_txlock γl γd -∗
     Rest -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs : list (bv 8)),
@@ -4684,7 +4684,7 @@ Section ProofPrintk.
       (pa_stk sp0 23) ↦₈[kt] (pk_ap s0v (S k)) -∗
       pk_va sp0 m -∗
       cpu_own n eb pcur b lks -∗
-      uart_sent_sub_at γd TxK (l ++ bs) -∗
+      uart_sent_sub γd (l ++ bs) -∗
       Rest -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -7068,7 +7068,7 @@ Section ProofPrintk.
     (pa_stk sp0 23) ↦₈[kt] (pk_ap s0v k) -∗
     pk_va sp0 m -∗
     cpu_own n eb pcur b lks -∗
-    dev_inv γd γv -∗ uart_sent_sub_at γd TxK l -∗ is_txlock γl γd -∗
+    dev_inv γd γv -∗ uart_sent_sub γd l -∗ is_txlock γl γd -∗
     Rest -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs : list (bv 8)),
@@ -7083,7 +7083,7 @@ Section ProofPrintk.
       (pa_stk sp0 23) ↦₈[kt] (pk_ap s0v (S k)) -∗
       pk_va sp0 m -∗
       cpu_own n eb pcur b lks -∗
-      uart_sent_sub_at γd TxK (l ++ bs) -∗
+      uart_sent_sub γd (l ++ bs) -∗
       Rest -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -7336,7 +7336,7 @@ Section ProofPrintk.
     pk_va sp0 m -∗
     pk_desc_res (pk_vararg m k) d -∗
     cpu_own n eb pcur b lks -∗
-    dev_inv γd γv -∗ uart_sent_sub_at γd TxK l -∗ is_txlock γl γd -∗
+    dev_inv γd γv -∗ uart_sent_sub γd l -∗ is_txlock γl γd -∗
     Rest -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs : list (bv 8)),
@@ -7352,7 +7352,7 @@ Section ProofPrintk.
       pk_va sp0 m -∗
       pk_desc_res (pk_vararg m k) d -∗
       cpu_own n eb pcur b lks -∗
-      uart_sent_sub_at γd TxK (l ++ bs) -∗
+      uart_sent_sub γd (l ++ bs) -∗
       Rest -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -7439,7 +7439,7 @@ Section ProofPrintk.
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.printk + pk_entry c0 c1 c2) : mword 64) -∗
     cpu_own n eb pcur b lks -∗
-    dev_inv γd γv -∗ uart_sent_sub_at γd TxK l -∗ is_txlock γl γd -∗
+    dev_inv γd γv -∗ uart_sent_sub γd l -∗ is_txlock γl γd -∗
     Rest -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs : list (bv 8)),
@@ -7451,7 +7451,7 @@ Section ProofPrintk.
       sie_cap_gpr kt mf K b pcur -∗
       pc_is (mword_of_int (KernelSyms.printk + 0x6c) : mword 64) -∗
       cpu_own n eb pcur b lks -∗
-      uart_sent_sub_at γd TxK (l ++ bs) -∗
+      uart_sent_sub γd (l ++ bs) -∗
       Rest -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -7626,7 +7626,7 @@ Section ProofPrintk.
         fmtv ↦ₛ{ dqf } f -∗
         ([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m j) d) -∗
         cpu_own n eb pcur bo (lks ∖ {["pr"]}) -∗
-        uart_sent_sub_at γd TxK (l ++ bs) -∗
+        uart_sent_sub γd (l ++ bs) -∗
         WP (Loop : expr riscv_lang))%I.
 
     (* "go round again": what one turn from index [i] hands back to the loop
@@ -7649,7 +7649,7 @@ Section ProofPrintk.
         ([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m j) d) -∗
         cpu_own (S n) eb pcur false lks -∗
         pk_held γpr hh n eb pcur -∗
-        uart_sent_sub_at γd TxK (l ++ bs) -∗
+        uart_sent_sub γd (l ++ bs) -∗
         pk_loop_frame k' -∗
         WP (Loop : expr riscv_lang))%I.
 
@@ -7756,7 +7756,7 @@ Section ProofPrintk.
       cpu_own (S n) eb pcur false lks -∗
       is_lock γpr pk_pr_lock "pr"%string <{ emp : iProp Σ }> -∗
       pk_held γpr hh n eb pcur -∗
-      dev_inv γd γv -∗ uart_sent_sub_at γd TxK l -∗ is_txlock γl γd -∗
+      dev_inv γd γv -∗ uart_sent_sub γd l -∗ is_txlock γl γd -∗
       pk_loop_frame k -∗
       (pk_loop_head i l ∧ pk_loop_post l) -∗
       WP (Loop : expr riscv_lang).
@@ -8071,7 +8071,7 @@ Section ProofPrintk.
       cpu_own (S n) eb pcur false lks -∗
       is_lock γpr pk_pr_lock "pr"%string <{ emp : iProp Σ }> -∗
       pk_held γpr hh n eb pcur -∗
-      dev_inv γd γv -∗ uart_sent_sub_at γd TxK l -∗ is_txlock γl γd -∗
+      dev_inv γd γv -∗ uart_sent_sub γd l -∗ is_txlock γl γd -∗
       pk_loop_frame k -∗
       pk_loop_post l -∗
       WP (Loop : expr riscv_lang).
@@ -8354,7 +8354,7 @@ End ProofPrintk.
       : wp_printk_sconf_body kt γpr γl γd γv m0 K bs n eb dqf f descs b p lks :=
     wp_printk_sconf_gen
       (fun `{CID0 : CpuId} `{XI : CurCtx} γl' γd' γv' m' K' bs' n' eb' b' pcur' lks' =>
-         Consputc.wp_consputc_sconf kt (CID:=CID0) γl' γd' γv' m' K' TxK bs' n' eb' b' pcur' lks')
+         Consputc.wp_consputc_sconf kt (CID:=CID0) γl' γd' γv' m' K' bs' n' eb' b' pcur' lks')
       (fun `{CID0 : CpuId} `{XI : CurCtx} γl' γd' γv' m' K' bs' n' eb' b' pcur' lks' =>
          Printint.wp_printint_sconf kt (CID:=CID0) γl' γd' γv' m' K' bs' n' eb' b' pcur' lks')
       γpr γl γd γv m0 K bs n eb dqf f descs b p lks.

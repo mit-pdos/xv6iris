@@ -11,7 +11,7 @@
      - [n := 0], [bs := []] -- the general path always leaves the interrupt
        level net-zero and makes no trace claim, which is exactly [n]/[bs] at
        their trivial instances.
-     - [γl] and [uart_sent_sub_at γd TxK []] come out of [printk_env] itself.
+     - [γl] and [uart_sent_sub γd []] come out of [printk_env] itself.
      - there is NO panic credential to supply any more: acquire's
        [if(holding(lk)) panic] arm is refuted (SpecAcquire.v), so nothing in
        the printk cone asks for one and this file no longer reaches

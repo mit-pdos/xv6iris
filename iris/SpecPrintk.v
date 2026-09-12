@@ -41,16 +41,10 @@
        nor a postcondition.  And since that lock is re-acquired PER BYTE,
        another hart can interleave between two of printk's bytes: a CONTIGUOUS
        [uart_sent γd (l ++ bs)] would be false.  The honest claim is the
-       sublist [UartTxInv.uart_sent_sub_at], threaded [bs] in / [bs ++ cs] out.
+       sublist [UartTxInv.uart_sent_sub], threaded [bs] in / [bs ++ cs] out.
        Threading it IN is what makes the empty-format path work (a printk whose
        format string is empty prints nothing and must still return something),
-       and costs nothing: [uart_sent_sub_at] is persistent.
-
-       AND IT IS TAGGED [TxK] (app-echo.md, E5/O4, lane TX-TAG).  printk is
-       the kernel's own output path, so every byte its cone accepts carries
-       the kernel tag; the tag is a constant here rather than a parameter
-       because printk has exactly one caller class.  [pr_res] is unchanged --
-       the tag rides the trace claim, not the lock.
+       and costs nothing: [uart_sent_sub] is persistent.
 
    THE REST OF THE PRECONDITION is unchanged, and it has exactly three parts
    beyond the usual capability/config boilerplate.
@@ -155,7 +149,7 @@ Definition wp_printk_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : 
   is_lock γpr pk_pr_lock "pr"%string <{ emp : iProp Σ }> -∗
   dev_inv γd γv -∗
   is_txlock γl γd -∗
-  uart_sent_sub_at γd TxK bs -∗
+  uart_sent_sub γd bs -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf cs,
     sie_cap_gpr kt mf K b p -∗
@@ -165,7 +159,7 @@ Definition wp_printk_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : 
       /\ mf !!! Regidx a0_idx = zero_reg ⌝ -∗
     fmt ↦ₛ{ dqf } f -∗
     ([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m0 j) d) -∗
-    uart_sent_sub_at γd TxK (bs ++ cs) -∗
+    uart_sent_sub γd (bs ++ cs) -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -184,14 +178,14 @@ End PRINTK.
    contract, and it is what ~15 non-trace callers (main's boot banners,
    usertrap's unexpected-scause diagnostic, and several fs.c error arms) do
    NOT want to carry in full: threading [γl]/[bs]/a general [n] and the
-   [uart_sent_sub_at] trace postcondition through a whole proof cone just to
+   [uart_sent_sub] trace postcondition through a whole proof cone just to
    call printk once, on a path nobody reads the output of, is pure overhead.
 
    [wp_printk_gen_sconf_body] is [wp_printk_sconf_body] with [n := 0] and
    [bs := []] baked in and the trace/return-value postcondition dropped --
    the strictly weaker fact those callers actually need.  [printk_env]
    bundles exactly the extra ingredients that instantiation wants
-   ([γl]/[is_txlock] and the trivial [uart_sent_sub_at γd TxK []] witness) as ONE
+   ([γl]/[is_txlock] and the trivial [uart_sent_sub γd []] witness) as ONE
    persistent credential, and [printk_gen_contract] packages the whole thing
    as a [Prop] so a caller can carry it as a plain hypothesis instead of
    instantiating a functor -- [LinkPrintk.v] proves it once, as a corollary
@@ -217,11 +211,11 @@ Section PrintkGen.
 
   (* The whole general-path credential, and it is PERSISTENT -- which is
      what lets it cross main's [started] invariant to the other harts for
-     free (claude-notes/projects/main-boot.md). [is_txlock]/[uart_sent_sub_at]
+     free (claude-notes/projects/main-boot.md). [is_txlock]/[uart_sent_sub]
      are what [wp_printk_sconf_body] additionally wants over [is_lock]/
      [dev_inv] -- both already sitting at this credential's one construction
      site (ProofMain.v's [mn_grp_printk], right where [console_caps] is built
-     from the very same [Htxinv]/[Hdoff]/[Hsent]).  [uart_sent_sub_at γd TxK []] is
+     from the very same [Htxinv]/[Hdoff]/[Hsent]).  [uart_sent_sub γd []] is
      the trivial (any-trace) witness: gen callers make no claim about what
      has been sent, so the empty sublist is all the corollary below ever
      needs to hand [wp_printk_sconf_body]'s [bs]. *)
@@ -230,7 +224,7 @@ Section PrintkGen.
      uart_dlab_off γd ∗
      dev_inv γd γv ∗
      (∃ γl : gname, is_txlock γl γd) ∗
-     uart_sent_sub_at γd TxK [])%I.
+     uart_sent_sub γd [])%I.
 
   Global Instance printk_env_persistent γpr γd γv : Persistent (printk_env γpr γd γv).
   Proof. apply _. Qed.

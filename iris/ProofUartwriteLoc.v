@@ -23,30 +23,28 @@
        is a PURE parameter -- no resource of the walk depends on it -- so
        every register, frame, budget and lock obligation is untouched.
 
-   (2) THE CLAIM IS [UartSentLoc.uart_sent_from_tag gu tr0 (TxW pidv) bs]
-       WHERE THE FROZEN PROOF SAYS [UartTxInv.uart_sent_sub_at gu
-       (TxW pidv) bs] -- the located run on the untagged trace AND on the
-       tagged one, sharing one witness pair.  Both are persistent, so it
-       rides the park and the loop's back edge exactly as before, and the
-       [#Hsub] / [#Hsub'] hypotheses keep their names.
+   (2) THE CLAIM IS [UartSentLoc.uart_sent_from gu tr0 bs] WHERE THE
+       FROZEN PROOF SAYS [UartTxInv.uart_sent_sub gu bs].  Both are
+       persistent, so it rides the park and the loop's back edge exactly as
+       before, and the [#Hsub] / [#Hsub'] hypotheses keep their names.
 
-   (3) THE ENTRY CLAIM OPENS THE DEVICE INVARIANT, ONCE.  The located
-       claim's untagged half comes free off the contract's own
-       [uart_sent gu tr0] premise, but its TAGGED half has to name a
-       tagged trace that reaches [tr0], and only the invariant has one --
-       so the entry is [UartSentLoc.uart_sent_from_tag_entry], a fupd
-       under [fupd_wp].  The n = 0 arm is otherwise identical.
+   (3) THE ENTRY CLAIM COMES FROM THE SEED, NOT FROM THE DEVICE INVARIANT.
+       The frozen proof mints [uart_sent_sub gu []] by opening [dev_inv]
+       ([uw_sent_sub_empty], a fupd under [fupd_wp]); the located one reads
+       it off the contract's own [uart_sent gu tr0] premise with
+       [UartSentLoc.uart_sent_from_refl] -- no mask, no invariant, no
+       modality.  So [uw_sent_sub_empty] is GONE and the [iApply fupd_wp]
+       around it with it; the n = 0 arm is otherwise identical.
 
-   (4) THE PUSH SITE IS TWO LEMMAS WIDE, AS IN THE UNLOCATED PROOF.  At
-       +0x68, where that proof re-links its receipt to the token's trace
-       with [UartTxInv.uart_tx_own_sent_sub_at] and extends it with
-       [uart_sent_sub_at_snoc], this one uses the joint twins
-       [UartSentLoc.uart_tx_own_sent_from_tag] (which returns the seed's
-       prefix fact and the tagged trace the store leaf extends ALONGSIDE
-       the sublist fact -- the extra outputs are the whole point) and
-       [UartSentLoc.uart_sent_from_tag_snoc].  Same [fupd_wp], same
-       position in the instruction stream, same [Hsublist] name for the
-       sublist half.
+   (4) THE PUSH SITE IS TWO LEMMAS WIDE INSTEAD OF TWO.  At +0x68, where
+       the frozen proof re-links its receipt to the token's trace with
+       [UartTxInv.uart_tx_own_sent_sub] and extends it with
+       [uart_sent_sub_snoc], this one uses the located twins
+       [UartSentLoc.uart_tx_own_sent_from] (which returns the seed's
+       prefix fact ALONGSIDE the sublist fact -- the extra output is the
+       whole point) and [UartSentLoc.uart_sent_from_snoc].  Same [fupd_wp],
+       same position in the instruction stream, same [Hsublist] name for
+       the sublist half.
 
    There is no genuinely new proof content in this file: the two located
    ghost lemmas live in [UartSentLoc.v], beside the invariant they are
@@ -371,7 +369,7 @@ Section UwProps.
        cpu_own 0%nat eb (proc_addr j) true lks -∗
        pc_is (mword_of_int (KernelSyms.uartwrite + 0x4a)) -∗
        p_pid (proc_addr j) ↦₄{dqp} pidv -∗
-       uart_sent_from_tag γu tr0 (TxW pidv) (uw_bytes f (S i)) -∗
+       uart_sent_from γu tr0 (uw_bytes f (S i)) -∗
        uw_full sp0 m0 -∗ uw_buf buf dq f n -∗
        WP (Loop : expr riscv_lang)))%I.
 
@@ -387,7 +385,7 @@ Section UwProps.
        cpu_own 0%nat eb (proc_addr j) true lks -∗
        pc_is (mword_of_int (KernelSyms.uartwrite + 0x76)) -∗
        p_pid (proc_addr j) ↦₄{dqp} pidv -∗
-       uart_sent_from_tag γu tr0 (TxW pidv) (uw_bytes f n) -∗
+       uart_sent_from γu tr0 (uw_bytes f n) -∗
        uw_full sp0 m0 -∗ uw_buf buf dq f n -∗
        WP (Loop : expr riscv_lang)))%I.
 
@@ -403,7 +401,7 @@ Section UwProps.
        cpu_own 0%nat eb (proc_addr j) true lks -∗
        pc_is (mword_of_int (KernelSyms.uartwrite + 0x4a)) -∗
        p_pid (proc_addr j) ↦₄{dqp} pidv -∗
-       uart_sent_from_tag γu tr0 (TxW pidv) (uw_bytes f i) -∗
+       uart_sent_from γu tr0 (uw_bytes f i) -∗
        uw_full sp0 m0 -∗ uw_buf buf dq f n -∗
        uw_exit_cont (CID0 := CID0) γu j m0 av eb sp0 buf n f dq pidv dqp lks tr0 -∗
        WP (Loop : expr riscv_lang)))%I.
@@ -420,7 +418,7 @@ Section UwProps.
          pc_is (ret_pc (m0 !!! Regidx Rra)) -∗
          Rbuf -∗
          p_pid (proc_addr j) ↦₄{dqp} pidv -∗
-         uart_sent_from_tag γu tr0 (TxW pidv) bs -∗
+         uart_sent_from γu tr0 bs -∗
          WP (Loop : expr riscv_lang)))%I.
 
 End UwProps.
@@ -467,7 +465,7 @@ Section UwBodies.
     cpu_own 0%nat eb pj true lks -∗
     pc_is (mword_of_int (KernelSyms.uartwrite + 0x76)) -∗
     p_pid pj ↦₄{dqp} pidv -∗
-    uart_sent_from_tag γu tr0 (TxW pidv) bs -∗
+    uart_sent_from γu tr0 bs -∗
     uw_saved sp0 m0 -∗ uw_slot10 sp0 -∗
     Rbuf -∗
     uw_ret (CID0 := CID0) γu j m0 av eb bs Rbuf pidv dqp lks tr0 -∗
@@ -749,7 +747,7 @@ Section UwBodies.
     cpu_own 0%nat eb pj true lks -∗
     pc_is (mword_of_int (KernelSyms.uartwrite + 0x4a)) -∗
     p_pid pj ↦₄{dqp} pidv -∗
-    uart_sent_from_tag γu tr0 (TxW pidv) (uw_bytes f i) -∗
+    uart_sent_from γu tr0 (uw_bytes f i) -∗
     uw_full sp0 m0 -∗ uw_buf buf dq f n -∗
     ( uw_next_cont (CID0 := CID0) γu j m0 av eb sp0 buf n f dq pidv dqp i lks tr0
       ∧ uw_exit_cont (CID0 := CID0) γu j m0 av eb sp0 buf n f dq pidv dqp lks tr0 ) -∗
@@ -1092,10 +1090,8 @@ Section UwBodies.
         iEval (rewrite P68) in "Hpc".
         (* --- the trace re-link, before the push --- *)
         iApply fupd_wp.
-        iMod (uart_tx_own_sent_from_tag γu γv l tr0 (TxW pidv) (uw_bytes f i) ⊤
-                ltac:(solve_ndisj) with "Hdinv Hown Hsub")
-          as "(Hown & %Hprefix & %Hsublist & Htgpre)".
-        iDestruct "Htgpre" as (tg0) "(#Htg0 & %Htg0l & %Htg0sub)".
+        iMod (uart_tx_own_sent_from γu γv l tr0 (uw_bytes f i) ⊤ ltac:(solve_ndisj)
+                with "Hdinv Hown Hsub") as "(Hown & %Hprefix & %Hsublist)".
         iModIntro.
         (* --- +0x68  sb a5,0(s7)  -- the THR write --- *)
         assert (HG2s7 : rget G2 Rs7 = uart_pa 0).
@@ -1104,20 +1100,18 @@ Section UwBodies.
         assert (HG2a5 : G2 !!! Regidx Ra5 = zero_extend' 64 (f i : mword 8))
           by (rewrite /G2 upd_eq; reflexivity).
         iApply (UAcc.wp_uart_thr_write_s_sconf γu γv (mword_of_int (KernelSyms.uartwrite + 0x68))
-                  Ra5 Rs7 G2 (trap_res true + (av - 10))%nat l false (TxW pidv) tg0
-                  HG2s7 Htg0l
-                  with "Hcg Hpc [] Hdinv Hown Hlb Hdlab Htg0").
+                  Ra5 Rs7 G2 (trap_res true + (av - 10))%nat l false HG2s7
+                  with "Hcg Hpc [] Hdinv Hown Hlb Hdlab").
         { iApply (uwi_68 with "Ht"). }
-        iApply wp_next_off_intro. iIntros "Hcg Hpc Hown #Hsent #Htgout".
+        iApply wp_next_off_intro. iIntros "Hcg Hpc Hown #Hsent".
         assert (Hsb : (autocast (T := mword) (subrange_vec_dec (rget G2 Ra5)
                          (Z.sub (Z.mul 1 8) 1) 0) : mword 8) = f i).
         { rgne. rewrite HG2a5. apply uw_sub8_zext. }
         iEval (rewrite Hsb) in "Hown". iEval (rewrite Hsb) in "Hsent".
-        iEval (rewrite Hsb) in "Htgout".
-        iAssert (uart_sent_from_tag γu tr0 (TxW pidv) (uw_bytes f (S i))) as "#Hsub'".
+        iAssert (uart_sent_from γu tr0 (uw_bytes f (S i))) as "#Hsub'".
         { rewrite uw_bytes_snoc.
-          iApply (uart_sent_from_tag_snoc γu tr0 (uw_bytes f i) l (TxW pidv) tg0 (f i)
-                    Hprefix Hsublist Htg0l Htg0sub with "Hsent Htgout"). }
+          iApply (uart_sent_from_snoc γu tr0 (uw_bytes f i) l (f i) Hprefix Hsublist
+                    with "Hsent"). }
         iEval (rewrite P6c) in "Hpc".
         (* --- +0x6c  c.mv a0,s2 --- *)
         iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.uartwrite + 0x6c)) Ra0 Rs2
@@ -1337,10 +1331,7 @@ Section ProofUartwriteLoc.
     set (spd := pa_stk sp0 10%nat).
     (* the entry receipt, off the contract's own seed: nothing has been
        accepted after [tr0] yet, and the n = 0 path never pushes a byte. *)
-    iApply fupd_wp.
-    iMod (uart_sent_from_tag_entry γu γv tr0 (TxW pidv) ⊤ ltac:(solve_ndisj)
-            with "Hdinv Hseed") as "#Hsub0".
-    iModIntro.
+    iDestruct (uart_sent_from_refl γu tr0 with "Hseed") as "#Hsub0".
     (* ============ +0x00  blez a1 ============ *)
     assert (Hcmp0 : zopz0zKzJ_s (zero_reg : mword 64) (rget m Ra1) = Z.geb 0 (Z.of_nat n)).
     { rgne. rewrite Ha1. apply uw_geb_s0. lia. }

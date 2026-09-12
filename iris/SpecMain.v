@@ -208,53 +208,6 @@ Require Import TsoCtx.
 
 Notation K_main := (122%nat) (only parsing).
 Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
-
-(* ===================================================================== *)
-(*  THE BOOT'S KERNEL-TAGGED OUTPUT (app-echo.md, E5/O4, lane TX-TAG X3). *)
-(*                                                                       *)
-(*  In this run the ONLY printk call sites reached are the boot's: hart   *)
-(*  0's three banners ("\n", "xv6 kernel is booting\n", "\n", in that   *)
-(*  order, under [pr.lock] each) and one "hart N starting\n" per          *)
-(*  secondary hart, each at most once, at a time the scheduler chooses    *)
-(*  ([SpecMainSecondary]).  So the [TxK]-tagged subsequence of the        *)
-(*  accepted trace is a concatenation of those eight messages, the three  *)
-(*  banners first and in order, the seven hart lines in ANY order and     *)
-(*  each at most once.  [boot_k_shape msgs cs] says [cs] is the           *)
-(*  concatenation of a SUBSEQUENCE of [msgs], in [msgs]' own order; the   *)
-(*  hart lines' freedom of order is expressed by quantifying over the     *)
-(*  admissible orderings of [msgs], which is where the claim, not the     *)
-(*  language, puts it.                                                    *)
-(*                                                                       *)
-(*  IT HAS NO PRODUCER, AND TWO SEPARATE THINGS ARE MISSING.              *)
-(*                                                                       *)
-(*  (a) THE BOOT'S printk POST SAYS NOTHING.  main and main-secondary go  *)
-(*      through [SpecPrintk.wp_printk_gen_sconf_body], the weak corollary *)
-(*      that drops the trace claim outright (it exists precisely so the   *)
-(*      ~15 callers who do not read the output need not thread one).  So  *)
-(*      no byte list reaches this contract's post at all.                 *)
-(*  (b) EVEN THE FULL CONTRACT DOES NOT PIN THE BYTES.                    *)
-(*      [SpecPrintk.wp_printk_sconf_body]'s post is "SOME byte list [cs]  *)
-(*      was appended", by design -- a byte-accurate post would have to    *)
-(*      carry a decimal rendering of every vararg up through the format   *)
-(*      recursion.  Pinning [cs] to the format string's rendering is      *)
-(*      [PrintkFmt]'s business and is its own lane.                       *)
-(*                                                                       *)
-(*  A third fact is worth recording because it refutes the OBVIOUS weaker *)
-(*  form: a message is NOT a contiguous run of the accepted trace.        *)
-(*  [pr.lock] serialises two format walks against each other, but         *)
-(*  [tx_lock] is re-acquired PER BYTE and uartwrite does not take         *)
-(*  [pr.lock] at all, so a user write's bytes may land between two bytes  *)
-(*  of one printk message.  Only the TAG separates them, which is why     *)
-(*  this lane exists -- and why the claim is about the tagged             *)
-(*  SUBSEQUENCE, never about a contiguous window.                         *)
-(* ===================================================================== *)
-Inductive boot_k_shape : list (list (bv 8)) -> list (bv 8) -> Prop :=
-| boot_k_nil : boot_k_shape [] []
-| boot_k_skip msgs cs m :
-    boot_k_shape msgs cs -> boot_k_shape (m :: msgs) cs
-| boot_k_take msgs cs m :
-    boot_k_shape msgs cs -> boot_k_shape (m :: msgs) (m ++ cs).
-
 Section SpecMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.

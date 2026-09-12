@@ -285,7 +285,7 @@ Qed.
 (* ===================================================================== *)
 
 (* ===================================================================== *)
-(*  The accepted-byte trace ghost, and its TAG COLUMN.                      *)
+(*  The accepted-byte trace ghost.                                         *)
 (*                                                                         *)
 (*  [uart_acc u = u_out u ++ u_tx u] (DevModel.v) is every byte the UART    *)
 (*  has accepted for transmission.  It grows ONLY when a CPU pushes to THR  *)
@@ -317,47 +317,6 @@ Section DevLoops.
     own γ.(un_acc) (●ML (uart_acc u : list (leibnizO (bv 8)))).
   Definition uart_sent (γ : uart_names) (l : list (bv 8)) : iProp Σ :=
     own γ.(un_acc) (◯ML (l : list (leibnizO (bv 8)))).
-
-  (* ---- THE TAG COLUMN of the accepted trace ----
-
-     The accepted bytes AGAIN, each paired with the [txsrc] (Xv6Cameras.v)
-     of the caller that pushed it: [TxK] for the kernel's printk cone,
-     [TxE h] for the console's echo of the byte that arrived at history
-     [h], [TxW pid] for a user write(2) by that pid.  The tag is chosen by
-     whoever holds tx_lock for the byte and travels with it through the THR
-     store leaf ([WpSconfUartAccess.wp_uart_thr_write_s_sconf]).
-
-     A SECOND MONO-LIST, IN LOCKSTEP, rather than a retagging of [un_acc]:
-     [uart_sent] is what the whole driver cone is stated on, and a change of
-     its element type would move every one of those statements for nothing.
-     The lockstep is [uart_tagsE] below -- "the tagged list's bytes ARE the
-     accepted list" -- and it is a conjunct of [uart_ghosts], so it is
-     re-established at the one transition that grows either ([uart_acc]
-     grows only at a THR push) and readable wherever the bundle is. *)
-  Definition uart_tags_auth (γ : uart_names) (tg : list (txsrc * bv 8))
-      : iProp Σ :=
-    own γ.(un_tag) (●ML (tg : list (leibnizO (txsrc * bv 8)))).
-  (* the persistent lower bound: [l] is a prefix of the tagged trace *)
-  Definition uart_sent_tagged (γ : uart_names) (l : list (txsrc * bv 8))
-      : iProp Σ :=
-    own γ.(un_tag) (◯ML (l : list (leibnizO (txsrc * bv 8)))).
-
-  (* THE READER'S FORM: the byte at accepted position [i] was pushed by
-     [src] and is [b].  Persistent, and all [Htx]'s reader needs -- it names
-     one position rather than a whole prefix, so nothing about the rest of
-     the trace has to be carried to use it. *)
-  Definition uart_tag_at (γ : uart_names) (i : nat) (src : txsrc) (b : bv 8)
-      : iProp Σ :=
-    (∃ l : list (txsrc * bv 8),
-       uart_sent_tagged γ l ∗ ⌜l !! i = Some (src, b)⌝)%I.
-
-  (* THE LOCKSTEP, at a device state: the tagged trace's bytes are exactly
-     the accepted trace.  The tag list is existential because nothing
-     outside predicts it -- a reader learns a position's tag through
-     [uart_tag_at], a writer extends it at the push. *)
-  Definition uart_tagsE (γ : uart_names) (u : uart_state) : iProp Σ :=
-    (∃ tg : list (txsrc * bv 8),
-       uart_tags_auth γ tg ∗ ⌜(snd <$> tg) = uart_acc u⌝)%I.
 
   (* ---- the transmitted prefix: carries a THRE observation forward ---- *)
   Definition uart_out_auth (γ : uart_names) (u : uart_state) : iProp Σ :=
@@ -443,110 +402,6 @@ Section DevLoops.
   Lemma uart_sent_auth_stable γ u u' :
     uart_acc u' = uart_acc u -> uart_sent_auth γ u -∗ uart_sent_auth γ u'.
   Proof. iIntros (Heq) "Ha". rewrite /uart_sent_auth Heq. done. Qed.
-
-  (* -- the tag column -- *)
-  Global Instance uart_sent_tagged_persistent γ l :
-    Persistent (uart_sent_tagged γ l).
-  Proof. rewrite /uart_sent_tagged. apply _. Qed.
-  Global Instance uart_sent_tagged_timeless γ l :
-    Timeless (uart_sent_tagged γ l).
-  Proof. rewrite /uart_sent_tagged. apply _. Qed.
-  Global Instance uart_tag_at_persistent γ i src b :
-    Persistent (uart_tag_at γ i src b).
-  Proof. rewrite /uart_tag_at. apply _. Qed.
-  Global Instance uart_tag_at_timeless γ i src b :
-    Timeless (uart_tag_at γ i src b).
-  Proof. rewrite /uart_tag_at. apply _. Qed.
-  Global Instance uart_tags_auth_timeless γ tg : Timeless (uart_tags_auth γ tg).
-  Proof. rewrite /uart_tags_auth. apply _. Qed.
-  Global Instance uart_tagsE_timeless γ u : Timeless (uart_tagsE γ u).
-  Proof. rewrite /uart_tagsE. apply _. Qed.
-
-  Lemma uart_tags_get γ tg :
-    uart_tags_auth γ tg -∗ uart_tags_auth γ tg ∗ uart_sent_tagged γ tg.
-  Proof.
-    iIntros "Ha". rewrite /uart_tags_auth /uart_sent_tagged.
-    iEval (rewrite {1}mono_list_auth_lb_op) in "Ha".
-    iDestruct "Ha" as "[$ $]".
-  Qed.
-
-  Lemma uart_tags_prefix γ tg l :
-    uart_tags_auth γ tg -∗ uart_sent_tagged γ l -∗ ⌜l `prefix_of` tg⌝.
-  Proof.
-    iIntros "Ha Hl". rewrite /uart_tags_auth /uart_sent_tagged.
-    by iDestruct (own_valid_2 with "Ha Hl") as %?%mono_list_both_valid_L.
-  Qed.
-
-  (* TWO LOWER BOUNDS OF ONE MONO-LIST ARE COMPARABLE, so the shorter is a
-     prefix of the longer.  What links the tagged trace a caller read out
-     before its poll to the one the store leaf extends, and what makes two
-     located receipts chain ([UartSentLoc.uart_sent_from_at_chain]). *)
-  Lemma uart_sent_tagged_prefix (γu : uart_names)
-      (tg1 tg2 : list (txsrc * bv 8)) :
-    (length tg1 <= length tg2)%nat ->
-    uart_sent_tagged γu tg1 -∗ uart_sent_tagged γu tg2 -∗
-    ⌜tg1 `prefix_of` tg2⌝.
-  Proof.
-    iIntros (Hlen) "H1 H2". rewrite /uart_sent_tagged.
-    iDestruct (own_valid_2 with "H1 H2") as %Hv%mono_list_lb_op_valid_1_L.
-    iPureIntro. destruct Hv as [Hp | Hp]; [exact Hp |].
-    destruct Hp as [k Hk]. rewrite Hk length_app in Hlen.
-    assert (k = []) by (destruct k; [done | cbn in Hlen; lia]).
-    subst k. rewrite app_nil_r in Hk. subst tg1. reflexivity.
-  Qed.
-
-  (* ...and at EQUAL lengths they are the same list. *)
-  Lemma uart_sent_tagged_agree_len (γu : uart_names)
-      (tg1 tg2 : list (txsrc * bv 8)) :
-    length tg1 = length tg2 ->
-    uart_sent_tagged γu tg1 -∗ uart_sent_tagged γu tg2 -∗ ⌜tg1 = tg2⌝.
-  Proof.
-    iIntros (Hlen) "H1 H2".
-    iDestruct (uart_sent_tagged_prefix γu tg1 tg2 ltac:(lia) with "H1 H2")
-      as %[k Hk].
-    iPureIntro. rewrite Hk length_app in Hlen.
-    assert (k = []) by (destruct k; [done | cbn in Hlen; lia]).
-    subst k. by rewrite app_nil_r in Hk.
-  Qed.
-
-  (* the push: one more tagged byte at the end *)
-  Lemma uart_tags_update γ tg (p : txsrc * bv 8) :
-    uart_tags_auth γ tg ==∗
-      uart_tags_auth γ (tg ++ [p]) ∗ uart_sent_tagged γ (tg ++ [p]).
-  Proof.
-    iIntros "Ha". rewrite /uart_tags_auth.
-    iMod (own_update _ _ (●ML ((tg ++ [p]) : list (leibnizO (txsrc * bv 8))))
-            with "Ha") as "Ha".
-    { apply mono_list_update. by apply prefix_app_r. }
-    iDestruct (uart_tags_get with "Ha") as "[$ $]". done.
-  Qed.
-
-  (* a transition that leaves the accepted trace alone leaves the column
-     alone too: the lockstep equation is about [uart_acc] and nothing else *)
-  Lemma uart_tagsE_stable γ u u' :
-    uart_acc u' = uart_acc u -> uart_tagsE γ u -∗ uart_tagsE γ u'.
-  Proof.
-    iIntros (Heq) "H". iDestruct "H" as (tg) "[Ha %Hb]".
-    iExists tg. iFrame "Ha". iPureIntro. by rewrite Heq.
-  Qed.
-
-  (* READING A POSITION off the column, with the bundle's own authority.
-     [i] is an index into the accepted trace, so this is where a reader of
-     [uart_ghosts] learns who pushed the byte there. *)
-  Lemma uart_tagsE_lookup γ u (i : nat) (b : bv 8) :
-    uart_acc u !! i = Some b ->
-    uart_tagsE γ u -∗ uart_tagsE γ u ∗ ∃ src, uart_tag_at γ i src b.
-  Proof.
-    iIntros (Hi) "H". iDestruct "H" as (tg) "[Ha %Hb]".
-    iDestruct (uart_tags_get with "Ha") as "[Ha #Hlb]".
-    assert (Hlk : exists src, tg !! i = Some (src, b)).
-    { rewrite -Hb in Hi. rewrite list_lookup_fmap in Hi.
-      destruct (tg !! i) as [[src c]|] eqn:Hp; [| done].
-      cbn in Hi. injection Hi as <-. by exists src. }
-    destruct Hlk as [src Hsrc].
-    iSplitL "Ha"; [iExists tg; by iFrame "Ha" |].
-    iExists src, tg. by iFrame "Hlb".
-  Qed.
 
   (* -- transmitted prefix -- *)
   Lemma uart_out_get γ u :
@@ -711,7 +566,7 @@ Section DevLoops.
      open, and takes it back at the advanced state. *)
   Definition uart_ghosts (γ : uart_names) (u : uart_state) : iProp Σ :=
     (uart_sent_auth γ u ∗ uart_out_auth γ u ∗
-     uart_tx_auth γ u ∗ uart_dlab_auth γ u ∗ uart_tagsE γ u)%I.
+     uart_tx_auth γ u ∗ uart_dlab_auth γ u)%I.
 
   Global Instance uart_ghosts_timeless γ u : Timeless (uart_ghosts γ u).
   Proof. rewrite /uart_ghosts. apply _. Qed.
@@ -722,37 +577,8 @@ Section DevLoops.
   Lemma uart_ghosts_dlab_off (γ : uart_names) (u : uart_state) :
     uart_dlab_off γ -∗ uart_ghosts γ u -∗ ⌜ uart_dlab u = false ⌝.
   Proof.
-    iIntros "Hoff (_ & _ & _ & Hdl & _)".
+    iIntros "Hoff (_ & _ & _ & Hdl)".
     by iDestruct (uart_dlab_agree with "Hdl Hoff") as %Hd.
-  Qed.
-
-  (* THE APPLICATION'S READER (app-echo.md, E5/O4, lane TX-TAG X4).  At the
-     transmitter's drain the byte [b] leaves the head of the tx FIFO, so it
-     is the byte at accepted position [length (u_out u)] -- the drain moves
-     exactly one byte from [u_tx] to [u_out] ([uart_tx_pop_out]) and the
-     accepted trace is their concatenation ([uart_acc]).  The tag at that
-     position is read off the bundle the trace ledger's transmit wand is
-     handed, and comes back as a PERSISTENT fact, so the ledger keeps it.
-
-     THE INDEX IS [length (u_out u)] AND NOT [length (u_wire u)].  Those two
-     agree only while LOOP has never been set, and the pure invariant the
-     language maintains is the weaker [UartAccepted.out_wire_ok], [u_wire u]
-     `sublist_of` [u_out u] -- a byte drained under LOOP re-enters this
-     UART's own receiver and never reaches the wire.  A client that wants
-     the WIRE position owes the equality, from LOOP having been off
-     throughout; [uart_colE_loopback] gives it only at the current state. *)
-  Lemma uart_pop_tag (γ : uart_names) (u u' : uart_state) (b : bv 8) :
-    uart_tx_pop u = Some (b, u') ->
-    uart_ghosts γ u' -∗
-      uart_ghosts γ u' ∗ ∃ src, uart_tag_at γ (length (u_out u)) src b.
-  Proof.
-    iIntros (Hpop) "(Hs & Hout & Htx & Hdl & Htg)".
-    assert (Hi : uart_acc u' !! length (u_out u) = Some b).
-    { rewrite /uart_acc (uart_tx_pop_out u b u' Hpop).
-      rewrite -app_assoc lookup_app_r; [| lia].
-      by rewrite Nat.sub_diag. }
-    iDestruct (uart_tagsE_lookup γ u' _ b Hi with "Htg") as "[Htg #Hat]".
-    rewrite /uart_ghosts. iFrame "Hs Hout Htx Hdl Htg". iExact "Hat".
   Qed.
 
   (* a transition that moves no UART ghost quantity carries them all over *)
@@ -762,12 +588,11 @@ Section DevLoops.
     uart_dlab u' = uart_dlab u ->
     uart_ghosts γ u -∗ uart_ghosts γ u'.
   Proof.
-    iIntros (Ha Ho Hd) "(Hs & Hout & Htx & Hdl & Htg)". rewrite /uart_ghosts.
+    iIntros (Ha Ho Hd) "(Hs & Hout & Htx & Hdl)". rewrite /uart_ghosts.
     iDestruct (uart_sent_auth_stable _ u u' Ha with "Hs") as "$".
     iDestruct (uart_out_auth_stable _ u u' Ho with "Hout") as "$".
     iDestruct (uart_tx_auth_stable _ u u' Ha with "Htx") as "$".
     iDestruct (uart_dlab_auth_stable _ u u' Hd with "Hdl") as "$".
-    iDestruct (uart_tagsE_stable _ u u' Ha with "Htg") as "$".
   Qed.
 
   (* ==================================================================== *)
@@ -928,9 +753,9 @@ Section DevLoops.
      [UartAccepted.out_wire_ok] ([u_wire] a SUBLIST of [u_out]), which is
      what a byte drained under LOOP would leave behind.  What the equality
      buys is the INDEX: the trace ledger's transmit wand is handed
-     [obs_wire (open_seg h) = u_wire u], and [WpUart.uart_pop_tag] reads the
-     popped byte's tag at [length (u_out u)] -- the two are the same
-     position exactly because of this clause. *)
+     [obs_wire (open_seg h) = u_wire u], and a drained byte sits at accepted
+     position [length (u_out u)] -- the two are the same position exactly
+     because of this clause. *)
   Definition uart_col_ok (u : uart_state) (hs : list (list mobs))
       (np nk : nat) (hl ht : option (list mobs)) : Prop :=
     np = (nk + length (u_rx u))%nat
@@ -985,8 +810,8 @@ Section DevLoops.
 
   (* ...AND THE ONE THE LEDGER READS: the wire IS the drained sequence, so a
      client that knows [obs_wire (open_seg h) = u_wire u] knows the wire's
-     length is [length (u_out u)] -- which is the index [uart_pop_tag]
-     answers at. *)
+     length is [length (u_out u)] -- the accepted position the byte the
+     drain popped sits at. *)
   Lemma uart_colE_wire_out (γ : uart_names) (u : uart_state) :
     uart_colE γ u -∗ ⌜u_wire u = u_out u⌝.
   Proof.
@@ -1665,12 +1490,11 @@ Section DevLoops.
       iModIntro. iFrame "Hin".
   Qed.
 
-  (* Allocate the UART's ghosts from an initial device state.  Hands back
-     the invariant's halves (as [uart_inv_body]'s ghost conjuncts -- the
-     accepted trace, the transmitted prefix, the transmitter, DLAB and the
-     TAG COLUMN) together with the caller's own resources: the exclusive
-     transmitter, the opening accepted-trace bound, and the caller's HALF of
-     the DLAB agreement, at whatever the power-on DLAB happens to be.
+  (* Allocate all four UART ghosts from an initial device state.  Hands back
+     the invariant's halves (as [uart_inv_body]'s ghost conjuncts) together
+     with the caller's own resources: the exclusive transmitter, the opening
+     accepted-trace bound, and the caller's HALF of the DLAB agreement, at
+     whatever the power-on DLAB happens to be.
      NOTE (2026-07-29): this allocation used to demand [uart_dlab u = false]
      and freeze the caller's half into the persistent [uart_dlab_off] on the
      spot.  It cannot: the UART thread runs from step 0, so [uart_frag] must
@@ -1688,14 +1512,8 @@ Section DevLoops.
        power-on both lists are empty ([DevModel.uart0_state]), which is the
        base case of the column's wire/out clause. *)
     u_wire u = u_out u ->
-    (* AND NOTHING HAS BEEN ACCEPTED YET.  The tag column is founded EMPTY
-       (there is no writer to attribute a pre-existing byte to), so the
-       lockstep equation is only satisfiable at an empty accepted trace --
-       which is the power-on state ([DevModel.uart0_state]) and the only
-       state this is ever called at. *)
-    uart_acc u = [] ->
     ⊢ |==> ∃ γ, uart_sent_auth γ u ∗ uart_out_auth γ u ∗
-                uart_tx_auth γ u ∗ uart_dlab_auth γ u ∗ uart_tagsE γ u ∗
+                uart_tx_auth γ u ∗ uart_dlab_auth γ u ∗
                 uart_tx_own γ (uart_acc u) ∗ uart_sent γ (uart_acc u) ∗
                 uart_dlab_is γ (DfracOwn (1/2)) (uart_dlab u) ∗
                 (* the receive side: the column at an empty FIFO, the token
@@ -1705,10 +1523,8 @@ Section DevLoops.
                 uart_rx_hi γ (1/2) None ∗ uart_rx_hi γ (1/2) None ∗
                 uart_preinit γ.
   Proof.
-    intros Hrx Hlb Hwo Hacc0.
+    intros Hrx Hlb Hwo.
     iMod (own_alloc (●ML (uart_acc u : list (leibnizO (bv 8))))) as (γa) "Ha";
-      [apply mono_list_auth_valid|].
-    iMod (own_alloc (●ML ([] : list (leibnizO (txsrc * bv 8))))) as (γt) "Ht";
       [apply mono_list_auth_valid|].
     iMod (own_alloc (●ML (u_out u : list (leibnizO (bv 8))))) as (γb) "Hb";
       [apply mono_list_auth_valid|].
@@ -1734,14 +1550,11 @@ Section DevLoops.
     iEval (rewrite -Qp.half_half) in "Hhi".
     iDestruct (ghost_var_split with "Hhi") as "[Hhi1 Hhi2]".
     iMod (mono_nat_own_alloc 0%nat) as (γin) "[Hin _]".
-    iModIntro. iExists (UartNames γa γt γb γc γd γpu γpo γhi γin).
+    iModIntro. iExists (UartNames γa γb γc γd γpu γpo γhi γin).
     rewrite /uart_sent_auth /uart_out_auth /uart_tx_auth /uart_tx_own
             /uart_dlab_auth /uart_dlab_is /uart_sent /uart_colE /uart_col
             /uart_rx_tok /uart_rx_popped /uart_rx_hi /uart_preinit /=.
     iFrame "Ha Hb Hc1 Hd1 Hc2 Hsent Hd2".
-    iSplitL "Ht".
-    { rewrite /uart_tagsE /uart_tags_auth /=. iExists []. iFrame "Ht".
-      iPureIntro. by rewrite Hacc0. }
     (* the column's own half of the pop counter and the caller's token are
        the SAME proposition, so the rest are placed by hand *)
     iSplitR "Hpo2 Hhi1 Hhi2 Hin".
@@ -1927,11 +1740,9 @@ Section DevLoops.
       (* the accepted trace, the transmitter token and DLAB are all untouched;
          only the transmitted prefix grows, by exactly the drained byte. *)
       iEval (rewrite /uart_ghosts) in "Hg".
-      iDestruct "Hg" as "(Hacc & Hout & Htx & Hdl & Htg)".
+      iDestruct "Hg" as "(Hacc & Hout & Htx & Hdl)".
       iDestruct (uart_sent_auth_stable _ u u'
                    (uart_tx_pop_acc _ _ _ Htx0) with "Hacc") as "Hacc".
-      iDestruct (uart_tagsE_stable _ u u'
-                   (uart_tx_pop_acc _ _ _ Htx0) with "Htg") as "Htg".
       iDestruct (uart_tx_auth_stable _ u u'
                    (uart_tx_pop_acc _ _ _ Htx0) with "Htx") as "Htx".
       iDestruct (uart_dlab_auth_stable _ u u'
@@ -1940,7 +1751,7 @@ Section DevLoops.
       { rewrite (uart_tx_pop_out _ _ _ Htx0). by apply prefix_app_r. }
       (* THE TRACE STEP: the client moves the history by the output event
          (nothing under LOOP -- the arm's own [κ]) *)
-      iAssert (uart_ghosts γ u') with "[Hacc Hout Htx Hdl Htg]" as "Hg".
+      iAssert (uart_ghosts γ u') with "[Hacc Hout Htx Hdl]" as "Hg".
       { rewrite /uart_ghosts. iFrame. }
       (* the tx arm's tag output is [emp] ([uart_tag_of] mints one only for
          an rx event), so the column takes nothing here. *)

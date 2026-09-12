@@ -19,17 +19,15 @@
        frame, budget, alignment or lock obligation moves.
 
    (2) THE COUNT CARRIES A RECEIPT.  [cw_ret]'s post gains
-       [SpecConsolewrite.cons_sent_cnt_at gu tr0 (TxW pid) r] -- "[r] bytes
-       were accepted by the UART, in order, after the seed, and they are
-       tagged with this process's pid" -- and the three
+       [SpecConsolewrite.cons_sent_cnt gu tr0 r] -- "[r] bytes were
+       accepted by the UART, in order, after the seed" -- and the three
        lemmas that reach an exit ([cw_epi] and its two callers) take it as
        a premise and hand it on.  It is PERSISTENT, so it rides the
        intuitionistic context across the park and the loop's back edge and
        costs the frame discipline nothing.
 
    (3) THE LOOP INVARIANT IS THE RECEIPT AT [i].  [cw_loop] gains the
-       premise [cons_sent_cnt_at gu tr0 (TxW pid) i] beside its [cw_regs]
-       invariant --
+       premise [cons_sent_cnt gu tr0 i] beside its [cw_regs] invariant --
        the SAME [i] the register invariant pins in s1, which is what makes
        the exits' length equations immediate: the frozen walk already
        proves [i] is the returned value at all three exits, and the receipt
@@ -37,22 +35,19 @@
 
    (4) THE CHUNK STEP IS THE ONE PLACE WITH NEW CONTENT, at the
        [jal uartwrite] at +0x52.  The frozen walk calls
-       [SpecUartwrite.wp_uartwrite_sconf] and DROPS the [uart_sent_sub_at]
-       it returns (the landed contract has nowhere to put it); this one
+       [SpecUartwrite.wp_uartwrite_sconf] and DROPS the [uart_sent_sub] it
+       returns (the landed contract has nowhere to put it); this one
 
          - reads a seed off the accumulated receipt
-           ([SpecConsolewrite.cons_sent_cnt_at_seed]: its WITNESS PAIR
-           [tracc]/[tgacc] -- the untagged trace and the tagged one, tied
-           by the lockstep equation, which is what places the next chunk
-           after this one on BOTH lists -- plus the pure facts.  Persistent
-           and pure, so the receipt is NOT consumed -- the copy-failed exit
-           still has it);
+           ([SpecConsolewrite.cons_sent_cnt_seed]: its trace witness
+           [tracc], plus the two pure facts.  Persistent and pure, so the
+           receipt is NOT consumed -- the copy-failed exit still has it);
          - calls [SpecUartwriteLoc.wp_uartwrite_loc_sconf] at that seed,
-           getting back [uart_sent_from_tag gu tracc (TxW pid)
-           (fb' <$> seq 0 nnN)] -- the chunk's [nn] bytes located AFTER
-           everything already receipted, on both lists;
-         - concatenates with [cons_sent_cnt_at_chunk], giving the receipt
-           at [nn + i].
+           getting back [uart_sent_from gu tracc (fb' <$> seq 0 nnN)] --
+           the chunk's [nn] bytes located AFTER everything already
+           receipted;
+         - concatenates with [cons_sent_cnt_chunk], giving the receipt at
+           [nn + i].
 
        [i += nn] at +0x56 is the very next instruction, and it is the same
        step in the logic: the count and the receipt's length advance
@@ -62,10 +57,7 @@
        once all of it was accepted.)
 
    (5) THE ENTRY AND THE [n <= 0] EXIT read their receipt off the seed with
-       [cons_sent_cnt_at_zero] -- nothing accepted yet, count 0.  It is a
-       FUPD and not a plain destruct: an empty run still has to name a
-       tagged trace reaching the seed, and only the device invariant has
-       one.
+       [cons_sent_cnt_zero] -- nothing accepted yet, count 0.
 
    ProofConsolewrite.v's header is the design of record for the walk itself
    -- the bounce buffer in the frame's four lowest slots, the rotated loop
@@ -321,7 +313,7 @@ Section CwBodies.
          pc_is (ret_pc (m0 !!! Regidx Rra)) -∗
          proc_priv_core (proc_addr jp) pid (us_upt U P') -∗
          (* THE RECEIPT AT THE RETURNED COUNT (diff item 2) *)
-         cons_sent_cnt_at γu tr0 (TxW pid) Mu ua r -∗
+         cons_sent_cnt γu tr0 Mu ua r -∗
          WP (Loop : expr riscv_lang)))%I.
 
   (* the loop re-enters its own continuation at a MOVED descriptor; both the
@@ -368,7 +360,7 @@ Section CwBodies.
     pc_is (mword_of_int (CW + 0x96)) -∗
     proc_priv_core pj pid U -∗
     cw_saved sp0 m0 -∗ cw_rest sp0 -∗
-    cons_sent_cnt_at γu tr0 (TxW pid) Mu ua r -∗
+    cons_sent_cnt γu tr0 Mu ua r -∗
     cw_ret (CID0 := CID0) jp m0 av eb pid U n lks γu tr0 Mu ua -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -566,7 +558,7 @@ Section CwBodies.
     pc_is (mword_of_int (CW + 0x6c)) -∗
     proc_priv_core pj pid U -∗
     cw_saved sp0 m0 -∗ cw_spill sp0 m0 -∗ cw_buf sp0 -∗
-    cons_sent_cnt_at γu tr0 (TxW pid) Mu ua r -∗
+    cons_sent_cnt γu tr0 Mu ua r -∗
     cw_ret (CID0 := CID0) jp m0 av eb pid U n lks γu tr0 Mu ua -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -792,7 +784,7 @@ Section CwBodies.
     pc_is (mword_of_int (CW + 0x84)) -∗
     proc_priv_core pj pid U -∗
     cw_saved sp0 m0 -∗ cw_spill sp0 m0 -∗ cw_buf sp0 -∗
-    cons_sent_cnt_at γu tr0 (TxW pid) Mu ua r -∗
+    cons_sent_cnt γu tr0 Mu ua r -∗
     cw_ret (CID0 := CID0) jp m0 av eb pid U n lks γu tr0 Mu ua -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1038,7 +1030,7 @@ Section CwBodies.
       cw_saved sp0 m0 -∗ cw_spill sp0 m0 -∗ cw_buf sp0 -∗
       (* THE LOOP INVARIANT'S TRACE HALF (diff item 3): the receipt at the
          same [i] the register invariant pins in s1. *)
-      cons_sent_cnt_at γu tr0 (TxW pid) Mu src i -∗
+      cons_sent_cnt γu tr0 Mu src i -∗
       cw_ret (CID0 := CID0) jp m0 av eb pid U n lks γu tr0 Mu src -∗
       WP (Loop : expr riscv_lang).
   Proof.
@@ -1331,10 +1323,8 @@ Section CwBodies.
         (* THE SEED FOR THIS CHUNK (diff item 4): the accumulated receipt's
            own trace witness.  Persistent and pure throughout, so [Hrcpt]
            survives for the copy-failed exit below. *)
-        iDestruct (cons_sent_cnt_at_seed γu tr0 (TxW pid) Mu src i with "Hrcpt")
-          as (tracc tgacc bsacc)
-             "(%Hbsacc & %Hbyacc & %Heqacc & %Hpacc & %Hsacc & %Htacc &
-               #Htracc & #Htgacc)".
+        iDestruct (cons_sent_cnt_seed γu tr0 Mu src i with "Hrcpt")
+          as (tracc bsacc) "(%Hbsacc & %Hbyacc & %Hpacc & %Hsacc & #Htracc)".
         iApply (Uartwrite.wp_uartwrite_loc_sconf γu γv γs jp γlp γl D3 (av - 16)%nat
                   eb nnN fb' (DfracOwn 1) true pid (DfracOwn (1/2)) lks tracc
                   Hj Hjlp ltac:(rewrite HD3a1 HnnN; reflexivity)
@@ -1368,15 +1358,14 @@ Section CwBodies.
         { rewrite Hbsacc -add_vec_moi_comm.
           exact (ubytes_at_of_got Mu (add_vec (mword_of_int i : mword 64) src)
                    nnN fb' Hgotc). }
-        iAssert (cons_sent_cnt_at γu tr0 (TxW pid) Mu src (nn + i)) as "#Hrcpt'".
+        iAssert (cons_sent_cnt γu tr0 Mu src (nn + i)) as "#Hrcpt'".
         { assert (Hcnt : (nn + i)%Z
                          = (i + Z.of_nat (length ((fb' <$> seq 0 nnN) : list (bv 8))))%Z).
           { rewrite length_fmap length_seq. lia. }
           rewrite Hcnt.
-          iApply (cons_sent_cnt_at_chunk γu tr0 tracc tgacc (TxW pid) Mu src i
-                    bsacc (fb' <$> seq 0 nnN)
-                    Hbsacc Heqacc Hpacc Hsacc Htacc Hbyacc Hchunkb
-                    with "Htgacc Hsent"). }
+          iApply (cons_sent_cnt_chunk γu tr0 tracc Mu src i bsacc
+                    (fb' <$> seq 0 nnN)
+                    Hbsacc Hpacc Hsacc Hbyacc Hchunkb with "Hsent"). }
         iEval (rewrite HD3ra) in "Hpc".
         assert (P56 : ret_pc (add_vec_int (mword_of_int (CW + 0x52) : mword 64) 4)
                       = mword_of_int (CW + 0x56)) by pcw.
@@ -1655,14 +1644,8 @@ Section CwBodies.
     intros pcE pj ret_tgt uaddr Hj Hjlp Hlens Ha0 Ha2 Hnr Hav Heb Hbelow.
     iIntros "Hcg Hcnt #Ht Hpc Hpriv #Hkenv #Hdinv #Htxl #Hpinv #Hseed Hcont".
     (* the entry receipt: nothing accepted after the seed yet (diff item 5) *)
-    (* the entry receipt is a fupd now (lane TX-TAG): the tagged half of an
-       empty run still has to name a tagged trace reaching the seed, and
-       only the device invariant has one. *)
-    iApply fupd_wp.
-    iMod (cons_sent_cnt_at_zero γu γv tr0 (TxW pid) (us_M U)
-            (m !!! Regidx Ra1 : mword 64) ⊤ ltac:(solve_ndisj)
-            with "Hdinv Hseed") as "#Hrcpt0".
-    iModIntro.
+    iDestruct (cons_sent_cnt_zero γu tr0 (us_M U) (m !!! Regidx Ra1 : mword 64)
+                 with "Hseed") as "#Hrcpt0".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
     assert (Hbt : b = true) by (rewrite -Hbm; exact Heb).
     clear Hbm. subst b.

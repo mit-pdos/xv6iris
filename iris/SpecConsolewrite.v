@@ -52,8 +52,8 @@
    answer is 0; [PipeInvDefs.pipe_rw_ret] takes the same care, and
    [SpecFilewrite]'s [filewrite_ret] is where the two meet.)
 
-   AND THE LOCATED RECEIPT [cons_sent_cnt_at γu tr0 (TxW pid) r], which is why
-   the seed is a premise: the contract threads it through the chunk loop
+   AND THE LOCATED RECEIPT [cons_sent_cnt γu tr0 r], which is why the seed is
+   a premise: the contract threads it through the chunk loop
    ([UartSentLoc.uart_sent_from_chain] is the glue; the count bookkeeping
    [i += nn] only after a full chunk push gives the length equation).
 
@@ -136,82 +136,6 @@ Section ConsSentCnt.
     Persistent (cons_sent_cnt γu tr0 M ua r).
   Proof. apply _. Qed.
 
-  (* THE SAME RECEIPT WITH THE WRITER'S TAG (app-echo.md, E5/O4, lane
-     TX-TAG).  One existential [bs] carrying BOTH claims, so the tagged run
-     and the untagged one are provably the SAME bytes -- which is the whole
-     point: the application's ledger reads the tagged trace, and
-     [SpecFilewrite]'s console arms are stated on the untagged receipt, and
-     they have to agree.  [cons_sent_cnt_of_at] is the projection that lets
-     a caller of consolewrite feed the landed arms unchanged.
-
-     [TxW pid] IS NOT EXCLUSIVE TO THIS WRITER, so the tagged half is a
-     sublist claim on this pid's tag, not "these are exactly the bytes this
-     pid wrote".  UartSentLoc.v's header says what exactness needs. *)
-  Definition cons_sent_cnt_at (γu : uart_names) (tr0 : list (bv 8))
-      (src : txsrc) (M : gmap Z (bv 8)) (ua : mword 64) (r : Z) : iProp Σ :=
-    (∃ bs : list (bv 8),
-       ⌜Z.of_nat (length bs) = r⌝ ∗ ⌜ubytes_at M ua bs⌝ ∗
-       uart_sent_from_tag γu tr0 src bs)%I.
-
-  Global Instance cons_sent_cnt_at_persistent γu tr0 src M ua r :
-    Persistent (cons_sent_cnt_at γu tr0 src M ua r).
-  Proof. apply _. Qed.
-
-  Lemma cons_sent_cnt_of_at (γu : uart_names) (tr0 : list (bv 8))
-      (src : txsrc) (M : gmap Z (bv 8)) (ua : mword 64) (r : Z) :
-    cons_sent_cnt_at γu tr0 src M ua r -∗ cons_sent_cnt γu tr0 M ua r.
-  Proof.
-    iIntros "H". iDestruct "H" as (bs) "(%Hlen & %Hby & Hfrom)".
-    iExists bs. iSplitR; [done|]. iSplitR; [done|].
-    by iApply uart_sent_from_tag_plain.
-  Qed.
-
-  (* THE SEED FOR THE NEXT CHUNK, tagged: the WITNESS PAIR, not just the
-     byte trace.  Handing both out with the lockstep equation between them
-     is what makes the next chunk's receipt -- seeded at the byte trace --
-     land after this one on the TAGGED list too. *)
-  Lemma cons_sent_cnt_at_seed (γu : uart_names) (tr0 : list (bv 8))
-      (src : txsrc) (M : gmap Z (bv 8)) (ua : mword 64) (r : Z) :
-    cons_sent_cnt_at γu tr0 src M ua r -∗
-    ∃ (tr1 : list (bv 8)) (tg1 : list (txsrc * bv 8)) (bs1 : list (bv 8)),
-      ⌜Z.of_nat (length bs1) = r⌝ ∗ ⌜ubytes_at M ua bs1⌝ ∗
-      ⌜(snd <$> tg1) = tr1⌝ ∗ ⌜tr0 `prefix_of` tr1⌝ ∗
-      ⌜bs1 `sublist_of` drop (length tr0) tr1⌝ ∗
-      ⌜((pair src) <$> bs1) `sublist_of` drop (length tr0) tg1⌝ ∗
-      uart_sent γu tr1 ∗ uart_sent_tagged γu tg1.
-  Proof.
-    iIntros "H". iDestruct "H" as (bs1) "(%Hlen & %Hby & Hrcpt)".
-    iDestruct "Hrcpt" as (tr1 tg1) "(#Htr & #Htg & %Heq & %Hp & %Hb & %Ht)".
-    iExists tr1, tg1, bs1. by iFrame "Htr Htg".
-  Qed.
-
-  (* THE CHUNK STEP, tagged: [cons_sent_cnt_chunk] over the joint receipt.
-     The seed for the next chunk is the witness PAIR this one hands out
-     ([UartSentLoc.uart_sent_from_tag_seed]), which is why the two lists
-     stay in step across the loop. *)
-  Lemma cons_sent_cnt_at_chunk (γu : uart_names) (tr0 tr1 : list (bv 8))
-      (tg1 : list (txsrc * bv 8)) (src : txsrc)
-      (M : gmap Z (bv 8)) (ua : mword 64)
-      (r : Z) (bs1 bs2 : list (bv 8)) :
-    Z.of_nat (length bs1) = r ->
-    (snd <$> tg1) = tr1 ->
-    tr0 `prefix_of` tr1 ->
-    bs1 `sublist_of` drop (length tr0) tr1 ->
-    ((pair src) <$> bs1) `sublist_of` drop (length tr0) tg1 ->
-    ubytes_at M ua bs1 ->
-    ubytes_at M (add_vec_int ua (Z.of_nat (length bs1))) bs2 ->
-    uart_sent_tagged γu tg1 -∗
-    uart_sent_from_tag γu tr1 src bs2 -∗
-    cons_sent_cnt_at γu tr0 src M ua (r + Z.of_nat (length bs2)).
-  Proof.
-    iIntros (Hlen Heq1 Hp Hb Ht Hb1 Hb2) "#Htg1 H".
-    iExists ((bs1 ++ bs2)%list). iSplitR.
-    { iPureIntro. rewrite length_app. lia. }
-    iSplitR; [iPureIntro; exact (ubytes_at_app M ua bs1 bs2 Hb1 Hb2)|].
-    by iApply (uart_sent_from_tag_chain γu tr0 tr1 tg1 src bs1 bs2
-                 Heq1 Hp Hb Ht with "Htg1 H").
-  Qed.
-
   (* the empty call's receipt, free from the seed: the [n <= 0] exit and the
      loop's entry both start here *)
   Lemma cons_sent_cnt_zero (γu : uart_names) (tr0 : list (bv 8))
@@ -266,27 +190,6 @@ Section ConsSentCnt.
     { iPureIntro. rewrite length_app. lia. }
     iSplitR; [iPureIntro; exact (ubytes_at_app M ua bs1 bs2 Hb1 Hb2)|].
     by iApply (uart_sent_from_chain γu tr0 tr1 bs1 bs2 Hp Hb with "H").
-  Qed.
-
-  (* the device fabric's own binder ([dev_inv] is stated at a [GenId]), for
-     the one lemma below that opens it. *)
-  Context `{GEN : RiscvLang.GenId}.
-
-  (* the empty call's tagged receipt, and the loop's entry.  Unlike
-     [cons_sent_cnt_zero] it is a fupd: the tagged half of an empty run
-     still has to name a tagged trace reaching the seed
-     ([UartSentLoc.uart_sent_from_tag_entry]). *)
-  Lemma cons_sent_cnt_at_zero (γu : uart_names) (γd : disk_names)
-      (tr0 : list (bv 8)) (src : txsrc) (M : gmap Z (bv 8))
-      (ua : mword 64) (E : coPset) :
-    ↑devN ⊆ E ->
-    dev_inv γu γd -∗ uart_sent γu tr0 ={E}=∗ cons_sent_cnt_at γu tr0 src M ua 0.
-  Proof.
-    iIntros (HE) "#Hinv #Hseed".
-    iMod (uart_sent_from_tag_entry γu γd tr0 src E HE with "Hinv Hseed")
-      as "#H".
-    iModIntro. iExists []. iFrame "H". iSplitR; [done|].
-    iPureIntro. apply ubytes_at_nil.
   Qed.
 
 End ConsSentCnt.
@@ -355,7 +258,7 @@ Definition wp_consolewrite_sconf_body
          [us_M U] is the INPUT image and stays the right one to state it
          against: consolewrite only READS user memory, and the pages a copy
          faults in were already in the view. *)
-      cons_sent_cnt_at γu tr0 (TxW pid) (us_M U) uaddr r -∗
+      cons_sent_cnt γu tr0 (us_M U) uaddr r -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

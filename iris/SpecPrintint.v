@@ -44,7 +44,7 @@
    bound) and brings the persistent [UartTxInv.is_txlock] rather than
    the transmitter token, which lives under that lock.  The digit loop takes the
    lock once per digit, so the trace claim is the sublist form
-   [UartTxInv.uart_sent_sub_at], at [TxK] -- see SpecConsputc.v. *)
+   [UartTxInv.uart_sent_sub] -- see SpecConsputc.v. *)
 From Stdlib Require Import ZArith Bool Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -90,14 +90,14 @@ Definition wp_printint_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID 
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   dev_inv γd γv -∗
   is_txlock γl γd -∗
-  uart_sent_sub_at γd TxK bs -∗
+  uart_sent_sub γd bs -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf cs,
     sie_cap_gpr kt mf K b p -∗
     cpu_own n eb p b lks -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 mf /\ mf !!! Regidx ra_idx = ra0 ⌝ -∗
-    uart_sent_sub_at γd TxK (bs ++ cs) -∗
+    uart_sent_sub γd (bs ++ cs) -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
