@@ -118,3 +118,16 @@ takes it), 2 (eight harts print after `started`), 3 (Htx/Hrx at an arbitrary
 γ), 9 (sh re-opens the console until fd >= 3), 11 (`ushd_clw_text_ty`
 assumed in UkShFork). Awaiting the owner's rulings on the batch before the
 pipeline order changes; CONS-SWALLOW continues.
+
+PARALLEL LANES (2026-09-12).  Sibling checkouts `/shared/xv6iris-2-tlw` (lane
+TEXT-LW, branch `lane/text-lw`) and `/shared/xv6iris-2-sup` (lane SUPPLY-SPLIT,
+branch `lane/supply-split`), each with its own remote tree seeded by `cp -a`
+of `_shared_xv6iris-2` on the VM (then one incremental build back to HEAD;
+USE DISTINCT LOG NAMES PER TREE -- `/tmp/<log>.log` is shared).  Landing: the
+lane commits on its branch; the coordinator gates in the sibling, then
+`git fetch /shared/xv6iris-2-<l> lane/<x>` + rebase/merge onto main in the
+main checkout, rebuild, re-gate, push.  E5 design proposal written (note "E5 --
+THE OUTPUT SIDE: DESIGN PROPOSAL"); awaiting the owner on O3 (rate discipline
+(b)) and O5 (allocation failure (i)).  Main-tree pipeline unchanged:
+CONS-SWALLOW (phase 2 running) → LAZY-FLAG → DISC-RATE → TX-TAG → TX-RECEIPT
++ ECHO-RECEIPT → APP-IFACE → write leaf + cones → SH-LINE 2b → E4 → E2 → E5.
