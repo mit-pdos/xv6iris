@@ -177,3 +177,11 @@ in `-disc`.  TX-TAG phase 2 gains the rider: `uart_col_ok`'s LOOP-off clause
 APP-IFACE LANDED on main (2026-09-12).  `-disc` free → E2 INIT-BOOT next there,
 on a base = main + `lane/supply-split` (merged locally; supply-split itself
 still lands on main after LAZY-FLAG).
+
+REBASE-SUPPLY-SPLIT LAUNCHED (2026-09-12) in `-disc` (brief
+`brief-rebase-supply-split.md`): `lane/supply-split` → `lane/supply-split-r1` on
+current main (three conflicts with TEXT-LW in UkShDiag/UkShFork/UkShMain).
+E2 INIT-BOOT brief written (`brief-init-boot.md`); launches in `-disc` on
+`lane/supply-split-r1` when the rebase is green.  In flight: LAZY-FLAG p1
+(stored form, main), TX-TAG p2 + LOOP-off rider (`-tlw`), SH-OPEN p1 (`-sup`),
+REBASE-SUPPLY-SPLIT (`-disc`).
