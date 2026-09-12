@@ -773,7 +773,7 @@ Section ProofFileread.
       { by iApply fileread_env_out_of_env. }
       { iSplitR; [iPureIntro; apply fileread_ret_m1 |].
         iApply (fileread_extra_unreadable _ inumx γox Cf st n Fr Rd _
-                  (mword_of_int (-1) : mword 64) _ _ Hok Hrdz0 with "HP"). }
+                  _ _ Hok Hrdz0 with "HP"). }
     - (* ===============================================================
          READABLE: spill s1/s3, park the three arguments, dispatch on the
          file's TYPE -- which is read out of the reference's own content
@@ -1371,7 +1371,7 @@ Section ProofFileread.
         { by iApply fileread_env_out_of_env. }
         { iSplitR; [iPureIntro; exact Hretpr |].
           iApply (fileread_extra_of_pipe _ inumx γox Cf st n Fr Rd _ _ _ _ Hok Htyp
-                    with "HP"). }
+                    Hrdnz with "HP"). }
       + (* ---- +0x22 c.li a4,3 ; +0x24 beq a5,a4 -> FD_DEVICE ---- *)
         iApply (wp_beq_fall_s_sconf (mword_of_int (FR + 0x24))
                   (mword_of_int 70 : mword 13) Ra4 Ra5 B5 (K - 6)%nat b
@@ -2008,9 +2008,9 @@ Section ProofFileread.
                   destruct (decide (bv_unsigned (fc_major Cf) = CONSOLE))
                     as [Emj | Nmj]; last first.
                   { iApply (fileread_extra_of_dev_other _ inumx γox Cf st n Fr
-                              Rd _ _ _ _ Hok Htyd Nmj with "HP"). }
+                              Rd _ _ _ _ Hok Htyd Nmj Hrdnz with "HP"). }
                   iApply (fileread_extra_of_dev_console _ inumx γox Cf st n Fr
-                            Rd _ _ _ _ Hok Htyd Emj with "HP").
+                            Rd _ _ _ _ Hok Htyd Emj Hrdnz with "HP").
                   destruct (Z.le_gt_cases 0 r) as [H0 | H0]; last first.
                   { assert (Hm1 : r = (-1)%Z) by lia. rewrite Hm1.
                     iApply (console_receipt_m1 _ Rd curcr dccr with "Hrd"). }

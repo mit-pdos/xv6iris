@@ -328,7 +328,7 @@ Section SpecSysRead.
     P -∗ sys_read_arms V v sts n F Rd P r M' addr.
   Proof.
     intros Hnone Hr. rewrite /sys_read_arms /sys_fd_st Hnone. iIntros "HP".
-    iSplitR; [| iApply (fileread_extra_closed with "HP")].
+    iSplitR; [| rewrite Hr; iApply (fileread_extra_closed with "HP")].
     iPureIntro. left. split; [exact Hr | exact Hnone].
   Qed.
 
