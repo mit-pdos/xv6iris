@@ -202,3 +202,6 @@ SH-OPEN (which is on the OLD supply-split d2708e5b7) onto it.  E2 INIT-BOOT
 LAUNCHED in `-disc` on `lane/init-boot` = r1 (brief `brief-init-boot.md`).  In
 flight: LAZY-FLAG-2 p1 (main), TX-TAG p2 (`-tlw`), SH-OPEN p1 (`-sup`), E2 p1
 (`-disc`).
+
+TX-TAG LANDED on main (2026-09-12).  `-tlw` free → TX-RECEIPT (per-pid
+transmit token; exact receipts) next there.

@@ -2404,6 +2404,40 @@ ORDER: GENERIC-PAY → CONS-SWALLOW → SH-LINE 2b (gets on `ush_gets_line`,
 `wp_uk_ecall_read_recv` with `upos` threaded read → gets_loop → gets → getcmd
 → main) → LAZY-FLAG (the owner's form of (A)).
 
+TX-TAG LANDED (2026-09-12; `037d513fe` + rider `edaeccac4`, rebased onto
+main; 30 files +1868/-425; build `txtag25`, audit = the thirteen, lemma_diff
+CLEAN).  Every accepted UART byte is tagged with who pushed it
+(`Xv6Cameras.txsrc := TxK | TxE h | TxW pid`; `un_tag`; `uart_tagsE`'s
+lockstep `snd <$> tg = uart_acc u` inside `uart_ghosts`; the THR leaf takes the
+caller's tag); `uart_sent_sub_at` / `uart_sent_from_at` / `uart_sent_from_tag`
+(one shared witness pair); `cons_sent_cnt_at` (consolewrite's tagged receipt,
+projecting to the landed one); `uart_pop_tag` at accepted index `length
+(u_out u)`; THE RIDER: `uart_col_ok` carries `u_wire u = u_out u`
+(`uart_colE_wire_out`, `uart_colE_tx_pop`; six WpSconfUartAccess callers, seven
+ProofUartinit stores, the boot mint) -- so the index is the wire's;
+consputc's post PINS its bytes (`cp_byte a00`, or `consputc_bs` = "\b \b" at
+BACKSPACE), and consoleintr's echo is reported keyed on the high-water mark:
+`⌜hh' = Some hb -> cs = [echo_of cb]⌝` (non-vacuous: the mark identifies the
+filing arm; the erase arms are a lower-bound shape `cons_echo` until
+ECHO-RECEIPT adds the ring's occupancy).  Stated without a producer:
+`uart_sent_exact_at`/`tag_proj` (TX-RECEIPT: the per-pid transmit token) and
+`SpecMain.boot_k_shape` (PRINTK-FMT + a trace post for the boot's printks).
+THE PRINTK INVENTORY (all sixteen call sites at pin 06ea57f; every one through
+the GEN corollary): reachable in the echo run = hart 0's three banners + the
+seven hart lines = THE TEN, nothing else; the fs error arms are excluded by
+the image pins (`fio_nlink`, `fs_log_clean`, free inodes), the trap arms by the
+programs' behaviour, `procdump` is dead code at this pin, and the ONE K
+message a misbehaving user program could add is `syscall.c:148`'s "unknown
+sys call" (the U tier excludes it).  TWO CORRECTIONS TO O5: `panic()` PRINTS
+NOTHING at this pin (`printk.c:135-136` are commented out; panic spins), so
+the boot's exec panic contributes no bytes -- the trace simply ends; and sh's
+"fork\n" is the USER-side panic (`fprintf(2, …)`), a `TxW sh` run, not K.
+`uart_colE_loopback` has no caller now (delete when WpUart is next touched).
+E5 STILL OWES the `Htx` premise `u_wire u = u_out u` (a separately reviewed
+statement change; the equality is now inside the UART invariant).
+DURABLE: the `xv6-riscv/` worktree was at `ded23f2a` while `XV6_REV` pins
+`06ea57f8` -- read the C at the pin (`git -C xv6-riscv show 06ea57f:kernel/…`).
+
 LAZY-FLAG CORE LANDED + STORED-FORM FINDINGS (2026-09-12; the iris commit
 after `9692d108a`, 4 files +289/-11, build `lazy27`, audit = the thirteen).
 Landed: `UserPerm.lazy_free` and readings (`lazy_free_wmapped`,

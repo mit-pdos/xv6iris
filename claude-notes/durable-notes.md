@@ -1329,3 +1329,10 @@ A sweep script's global `"false false" -> "false"` substitution silently damaged
 trailing argument).  Restrict a textual substitution to the exact matched
 pattern (the lemma name and argument position), and diff every modified file
 against HEAD with a lane-content filter before building.
+
+## Read the kernel C at the pinned revision, not the worktree (2026-09-12)
+
+`xv6-riscv/` is a clone that can sit at a different revision from `XV6_REV` in
+the Makefile (it was at `ded23f2a` while the pin was `06ea57f8`; e.g. `panic()`
+prints at the newer revision and is silent at the pin).  Before citing C for a
+proof, `git -C xv6-riscv show $(grep -oP 'XV6_REV \?= \K\w+' Makefile):kernel/<file>`.
