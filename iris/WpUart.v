@@ -917,12 +917,26 @@ Section DevLoops.
      this UART's own receiver ([DevModel.uart_tx_pop]'s loopback arm) with no
      observation at all, so it would lengthen [u_rx] with no tag to file.
      The clause holds at power-on ([uart_mcr_reset] is OUT2 alone) and every
-     transition but an MCR write preserves it. *)
+     transition but an MCR write preserves it.
+
+     ...AND THE WIRE IS THE DRAINED SEQUENCE, which is the same clause read
+     forward: [u_wire u = u_out u].  It is INDUCTIVE and not derivable
+     pointwise -- the drain appends to [u_wire] only when LOOP is off
+     ([ObsTrace.uart_tx_pop_wire]), and that LOOP is off is this column's
+     own preceding clause, so the two have to be carried together.  The
+     language's own step invariant is only the weaker
+     [UartAccepted.out_wire_ok] ([u_wire] a SUBLIST of [u_out]), which is
+     what a byte drained under LOOP would leave behind.  What the equality
+     buys is the INDEX: the trace ledger's transmit wand is handed
+     [obs_wire (open_seg h) = u_wire u], and [WpUart.uart_pop_tag] reads the
+     popped byte's tag at [length (u_out u)] -- the two are the same
+     position exactly because of this clause. *)
   Definition uart_col_ok (u : uart_state) (hs : list (list mobs))
       (np nk : nat) (hl ht : option (list mobs)) : Prop :=
     np = (nk + length (u_rx u))%nat
     /\ length hs = length (u_rx u)
     /\ uart_loopback u = false
+    /\ u_wire u = u_out u
     /\ (forall (j : nat) (b : bv 8) (h : list mobs),
           u_rx u !! j = Some b -> hs !! j = Some h -> obs_ends_in h b)
     /\ (forall (i j : nat) (hi hj : list mobs),
@@ -969,17 +983,55 @@ Section DevLoops.
     iPureIntro. exact (proj1 (proj2 (proj2 Hok))).
   Qed.
 
-  (* a transition that touches neither the FIFO nor LOOP carries it over *)
+  (* ...AND THE ONE THE LEDGER READS: the wire IS the drained sequence, so a
+     client that knows [obs_wire (open_seg h) = u_wire u] knows the wire's
+     length is [length (u_out u)] -- which is the index [uart_pop_tag]
+     answers at. *)
+  Lemma uart_colE_wire_out (γ : uart_names) (u : uart_state) :
+    uart_colE γ u -∗ ⌜u_wire u = u_out u⌝.
+  Proof.
+    iIntros "H". iDestruct "H" as (hs np nk hl ht) "(_ & _ & _ & _ & %Hok)".
+    iPureIntro. exact (proj1 (proj2 (proj2 (proj2 Hok)))).
+  Qed.
+
+  (* a transition that touches neither the FIFO nor LOOP nor the transmit
+     pair carries it over.  The two transmit facts are new with the
+     wire/out clause and are a one-liner at every caller: no MMIO access
+     moves either ([ObsTrace.uart_read_wire]/[uart_write_wire],
+     [DevModel.uart_read_stable]/[uart_write_out]) and neither does an
+     arrival ([uart_rx_push_wire]/[uart_rx_push_out]). *)
   Lemma uart_colE_stable (γ : uart_names) (u u' : uart_state) :
     u_rx u' = u_rx u ->
     uart_loopback u' = uart_loopback u ->
+    u_wire u' = u_wire u ->
+    u_out u' = u_out u ->
     uart_colE γ u -∗ uart_colE γ u'.
   Proof.
-    iIntros (Hrx Hlb) "H".
+    iIntros (Hrx Hlb Hw Ho) "H".
     iDestruct "H" as (hs np nk hl ht) "(Ha & Hk & Hts & Hht & %Hok)".
     iExists hs, np, nk, hl, ht. iFrame "Ha Hk Hts Hht". iPureIntro.
-    destruct Hok as (H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8).
-    rewrite /uart_col_ok Hrx Hlb. split_and!; assumption.
+    destruct Hok as (H1 & H2 & H3 & Hwo & H4 & H5 & H6 & H7 & H8).
+    rewrite /uart_col_ok Hrx Hlb Hw Ho. split_and!; assumption.
+  Qed.
+
+  (* THE DRAIN, the one transition that moves the transmit pair: with LOOP
+     off -- which is the column's own clause, so nothing has to be supplied
+     -- the popped byte goes on the END of BOTH lists
+     ([ObsTrace.uart_tx_pop_wire], [DevModel.uart_tx_pop_out]), and the
+     receive side is untouched. *)
+  Lemma uart_colE_tx_pop (γ : uart_names) (u u' : uart_state) (b : bv 8) :
+    uart_tx_pop u = Some (b, u') ->
+    uart_colE γ u -∗ uart_colE γ u'.
+  Proof.
+    iIntros (Hpop) "H".
+    iDestruct "H" as (hs np nk hl ht) "(Ha & Hk & Hts & Hht & %Hok)".
+    pose proof Hok as Hok'.
+    destruct Hok' as (H1 & H2 & H3 & Hwo & H4 & H5 & H6 & H7 & H8).
+    destruct (uart_tx_pop_rx u b u' H3 Hpop) as [Hrxe Hlbe].
+    iExists hs, np, nk, hl, ht. iFrame "Ha Hk Hts Hht". iPureIntro.
+    rewrite /uart_col_ok Hrxe Hlbe. split_and!; try assumption.
+    rewrite (uart_tx_pop_wire u b u' Hpop) (uart_tx_pop_out u b u' Hpop) H3.
+    by rewrite Hwo.
   Qed.
 
   (* THE PUSH (the device thread's rx arm), AS AN ACCESSOR.  The order the
@@ -994,6 +1046,8 @@ Section DevLoops.
       (∀ (u' : uart_state) (b : bv 8),
          ⌜u_rx u' = (u_rx u ++ [b])%list⌝ -∗
          ⌜uart_loopback u' = uart_loopback u⌝ -∗
+         (* an arrival touches neither end of the transmit pair *)
+         ⌜u_wire u' = u_wire u⌝ -∗ ⌜u_out u' = u_out u⌝ -∗
          riscv_rx_tag (h ++ [ObsUartIn b])%list -∗
          obs_hist_lb (h ++ [ObsUartIn b])%list ==∗
          uart_colE γ u').
@@ -1006,8 +1060,8 @@ Section DevLoops.
       iDestruct (obs_hist_lb_prefix with "Hauth Hht") as %Hp.
       iPureIntro. exact Hp. }
     iFrame "Hauth".
-    iIntros (u' b) "%Hrx %Hlbk #Htg #Hlbn".
-    destruct Hok as (H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8).
+    iIntros (u' b) "%Hrx %Hlbk %Hw %Ho #Htg #Hlbn".
+    destruct Hok as (H1 & H2 & H3 & Hwo & H4 & H5 & H6 & H7 & H8).
     iMod (mono_nat_own_update (S np) with "Ha") as "[Ha _]"; [lia|].
     iModIntro.
     set (hn := (h ++ [ObsUartIn b])%list).
@@ -1026,8 +1080,8 @@ Section DevLoops.
     { rewrite big_sepL_app. iFrame "Hts". cbn [big_opL].
       iSplitL; [| done]. iSplitR; [iExact "Htg" | iExact "Hlbn"]. }
     iSplitR; [iExact "Hlbn" |].
-    iPureIntro. rewrite /uart_col_ok Hrx Hlbk !length_app H2 H3.
-    cbn [length]. split_and!; [lia | lia | reflexivity | | | | | ].
+    iPureIntro. rewrite /uart_col_ok Hrx Hlbk Hw Ho !length_app H2 H3.
+    cbn [length]. split_and!; [lia | lia | reflexivity | exact Hwo | | | | | ].
     - (* the byte and its history still belong together *)
       intros j c g Hj Hg.
       destruct (decide (j < length (u_rx u))%nat) as [Hlt|Hge].
@@ -1095,7 +1149,7 @@ Section DevLoops.
     iIntros (Hne) "H Htok".
     iDestruct "H" as (hs np nk hl0 ht) "(Ha & Hk & Hts & Hht & %Hok)".
     iDestruct (uart_rx_tok_agree with "Hk Htok") as %[<- <-].
-    destruct Hok as (H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8).
+    destruct Hok as (H1 & H2 & H3 & Hwo & H4 & H5 & H6 & H7 & H8).
     assert (Hle : (S nk <= np)%nat)
       by (destruct (u_rx u); [done | cbn [length] in H1; lia]).
     iDestruct (mono_nat_lb_own_get with "Ha") as "#Hlb".
@@ -1120,15 +1174,19 @@ Section DevLoops.
       (hl : option (list mobs)) (bt : bv 8) :
     (forall b rx', u_rx u = b :: rx' ->
        bt = b /\ u_rx u' = rx' /\ uart_loopback u' = uart_loopback u) ->
+    (* an RHR read is a [uart_read]: it moves neither end of the transmit
+       pair ([ObsTrace.uart_read_wire], [DevModel.uart_read_stable]) *)
+    u_wire u' = u_wire u ->
+    u_out u' = u_out u ->
     uart_colE γ u -∗ uart_rx_tok γ k hl -∗ uart_rx_pushed_lb γ (S k) ==∗
       uart_colE γ u' ∗
       (∃ h, ⌜obs_ends_in h bt⌝ ∗ ⌜ohist_ext hl h⌝ ∗
             riscv_rx_tag h ∗ obs_hist_lb h ∗ uart_rx_tok γ (S k) (Some h)).
   Proof.
-    iIntros (Hpop) "H Htok #Hlb".
+    iIntros (Hpop Hw Ho) "H Htok #Hlb".
     iDestruct "H" as (hs np nk hl0 ht) "(Ha & Hk & Hts & Hht & %Hok)".
     iDestruct (uart_rx_tok_agree with "Hk Htok") as %[<- <-].
-    destruct Hok as (H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8).
+    destruct Hok as (H1 & H2 & H3 & Hwo & H4 & H5 & H6 & H7 & H8).
     iDestruct (mono_nat_lb_own_valid with "Ha Hlb") as %[_ Hge].
     destruct (u_rx u) as [| b rx'] eqn:Hrx.
     { cbn [length] in H1. lia. }
@@ -1142,8 +1200,8 @@ Section DevLoops.
     iModIntro. iSplitR "Htok".
     - iExists hs', np, (S nk), (Some hh), ht. iFrame "Ha Hk Hts Hht".
       iPureIntro.
-      rewrite /uart_col_ok Hrx' Hlb'. cbn [length] in H1, H2.
-      split_and!; [lia | lia | exact H3 | | | | |].
+      rewrite /uart_col_ok Hrx' Hlb' Hw Ho. cbn [length] in H1, H2.
+      split_and!; [lia | lia | exact H3 | exact Hwo | | | | |].
       + intros j c g Hj Hg. exact (H4 (S j) c g Hj Hg).
       + intros i j gi gj Hi Hj Hij.
         exact (H5 (S i) (S j) gi gj Hi Hj ltac:(lia)).
@@ -1166,19 +1224,23 @@ Section DevLoops.
       (hl : option (list mobs)) :
     u_rx u' = [] ->
     uart_loopback u' = uart_loopback u ->
+    (* an FCR write is a [uart_write]: it moves neither end of the transmit
+       pair ([ObsTrace.uart_write_wire], [DevModel.uart_write_out]) *)
+    u_wire u' = u_wire u ->
+    u_out u' = u_out u ->
     uart_colE γ u -∗ uart_rx_tok γ k hl ==∗
       uart_colE γ u' ∗ ∃ k' hl', uart_rx_tok γ k' hl'.
   Proof.
-    iIntros (Hrx Hlb) "H Htok".
+    iIntros (Hrx Hlb Hw Ho) "H Htok".
     iDestruct "H" as (hs np nk hl0 ht) "(Ha & Hk & Hts & #Hht & %Hok)".
     iDestruct (uart_rx_tok_agree with "Hk Htok") as %[<- <-].
-    destruct Hok as (H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8).
+    destruct Hok as (H1 & H2 & H3 & Hwo & H4 & H5 & H6 & H7 & H8).
     iMod (uart_rx_tok_update γ nk np hl0 ht with "Hk Htok") as "[Hk Htok]".
     iModIntro. iSplitR "Htok"; [| iExists np, ht; iExact "Htok"].
     iExists [], np, np, ht, ht. iFrame "Ha Hk Hht".
     iSplitR; [done|].
-    iPureIntro. rewrite /uart_col_ok Hrx Hlb H3.
-    cbn [length]. split_and!; [lia | reflexivity | reflexivity | | | | |].
+    iPureIntro. rewrite /uart_col_ok Hrx Hlb Hw Ho H3.
+    cbn [length]. split_and!; [lia | reflexivity | reflexivity | exact Hwo | | | | |].
     - intros j c g Hj. done.
     - intros i j gi gj Hi. done.
     - intros j g Hj. done.
@@ -1622,6 +1684,10 @@ Section DevLoops.
   Lemma uart_ghosts_alloc (u : uart_state) :
     u_rx u = [] ->
     uart_loopback u = false ->
+    (* ...AND NOTHING HAS BEEN DRIVEN ON THE WIRE THAT IS NOT DRAINED: at
+       power-on both lists are empty ([DevModel.uart0_state]), which is the
+       base case of the column's wire/out clause. *)
+    u_wire u = u_out u ->
     (* AND NOTHING HAS BEEN ACCEPTED YET.  The tag column is founded EMPTY
        (there is no writer to attribute a pre-existing byte to), so the
        lockstep equation is only satisfiable at an empty accepted trace --
@@ -1639,7 +1705,7 @@ Section DevLoops.
                 uart_rx_hi γ (1/2) None ∗ uart_rx_hi γ (1/2) None ∗
                 uart_preinit γ.
   Proof.
-    intros Hrx Hlb Hacc0.
+    intros Hrx Hlb Hwo Hacc0.
     iMod (own_alloc (●ML (uart_acc u : list (leibnizO (bv 8))))) as (γa) "Ha";
       [apply mono_list_auth_valid|].
     iMod (own_alloc (●ML ([] : list (leibnizO (txsrc * bv 8))))) as (γt) "Ht";
@@ -1682,7 +1748,7 @@ Section DevLoops.
     { iExists [], 0%nat, 0%nat, None, None. iFrame "Hpu Hpo1".
       iSplitR; [done|]. iSplitR; [done|].
       iPureIntro. rewrite /uart_col_ok Hrx Hlb. cbn [length].
-      split_and!; [done | done | done | intros j b h Hj; done
+      split_and!; [done | done | done | exact Hwo | intros j b h Hj; done
                   | intros i j hi hj Hi; done | intros j h Hj; done
                   | exact I | intros j h Hj; done]. }
     iSplitL "Hpo2"; [iExact "Hpo2" |].
@@ -1884,9 +1950,7 @@ Section DevLoops.
          state the invariant is at) the drain does not touch [u_rx] at all;
          under LOOP it would re-enter the receiver with no observation, which
          is why the clause is there. *)
-      iDestruct (uart_colE_loopback with "Hcol") as %Hlbf.
-      destruct (uart_tx_pop_rx u _ u' Hlbf Htx0) as [Hrxe Hlbe].
-      iDestruct (uart_colE_stable γ u u' Hrxe Hlbe with "Hcol") as "Hcol".
+      iDestruct (uart_colE_tx_pop γ u u' _ Htx0 with "Hcol") as "Hcol".
       iMod ("Hclose" with "[Hu' Hg Hcol]") as "_".
       { iNext. iExists u'. iFrame. }
       iModIntro. iFrame "Hgr Hmem Hdev' Hoauth". iApply "IH".
@@ -1919,7 +1983,9 @@ Section DevLoops.
       (* THE COLUMN: the byte goes on the tail of [u_rx] and its history --
          which ends with exactly this event -- on the tail of the column. *)
       destruct (uart_rx_push_rx u b u' Hrx) as [Hrxe Hlbe].
-      iMod ("Hpush" $! u' b with "[//] [//] Htg Hlbn") as "Hcol".
+      pose proof (uart_rx_push_wire u b u' Hrx) as Hwe.
+      pose proof (uart_rx_push_out u b u' Hrx) as Hoe.
+      iMod ("Hpush" $! u' b with "[//] [//] [//] [//] Htg Hlbn") as "Hcol".
       iMod ("Hclose" with "[Hu' Hg Hcol]") as "_".
       { iNext. iExists u'. iFrame. }
       iModIntro. iFrame "Hgr Hmem Hdev' Hoauth". iApply "IH".

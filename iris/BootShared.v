@@ -1779,6 +1779,7 @@ Section BootAlloc.
     iMod (uart_ghosts_alloc (g.(gdev).(duart))
             ltac:(rewrite Hu0; reflexivity)
             ltac:(rewrite Hu0; vm_compute; reflexivity)
+            ltac:(rewrite Hu0; reflexivity)
             ltac:(rewrite Hu0; reflexivity)) as (γd)
       "(Hacc & Hout & Htxa & Hdla & Htags & Htx & Hsent & Hdlab & Hcol & Htok &
         Hhi1 & Hhi2 & Hpre)".

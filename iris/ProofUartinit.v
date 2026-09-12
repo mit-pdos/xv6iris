@@ -63,6 +63,8 @@ Require Import RiscvExtras.
 Require Import StackOwn CalleeSaved.
 Require Import KernelDataInv.
 Require Import DevModel WpUart.
+Require Import ObsTrace.   (* [uart_write_wire]: no MMIO write drives SOUT,
+     which is what the column's wire/out clause needs at every store here *)
 Require Import WpSmodeIntr.
 Require Import IntrDefs HartTp WpNext.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
@@ -260,7 +262,8 @@ Section ProofUartinit.
       iModIntro. iSplitL "Hg";
         [ iApply (uart_ghosts_stable γd uu uu' Ha Ho Hdb with "Hg") |].
       iSplitL "Hcol";
-        [ iApply (uart_colE_stable γd uu uu' Hrxe Hlbe with "Hcol")
+        [ iApply (uart_colE_stable γd uu uu' Hrxe Hlbe
+             ltac:(exact (uart_write_wire _ _ _ _ Hw)) Ho with "Hcol")
         | iFrame "Ht Hd" ]. }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc [Htx Hdlab]".
@@ -318,7 +321,8 @@ Section ProofUartinit.
       iEval (rewrite Hdt) in "Hd'".
       iModIntro. iSplitL "Hg'"; [ iExact "Hg'" |].
       iSplitL "Hcol";
-        [ iApply (uart_colE_stable γd uu uu' Hrxe Hlbe with "Hcol")
+        [ iApply (uart_colE_stable γd uu uu' Hrxe Hlbe
+             ltac:(exact (uart_write_wire _ _ _ _ Hw)) Ho with "Hcol")
         | iFrame "Ht Hd'" ]. }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc [Htx Hdlab]".
@@ -384,7 +388,8 @@ Section ProofUartinit.
       iModIntro. iSplitL "Hg";
         [ iApply (uart_ghosts_stable γd uu uu' Ha Ho Hdb with "Hg") |].
       iSplitL "Hcol";
-        [ iApply (uart_colE_stable γd uu uu' Hrxe Hlbe with "Hcol")
+        [ iApply (uart_colE_stable γd uu uu' Hrxe Hlbe
+             ltac:(exact (uart_write_wire _ _ _ _ Hw)) Ho with "Hcol")
         | iFrame "Ht Hd" ]. }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc [Htx Hdlab]".
@@ -409,7 +414,8 @@ Section ProofUartinit.
       iModIntro. iSplitL "Hg";
         [ iApply (uart_ghosts_stable γd uu uu' Ha Ho Hdb with "Hg") |].
       iSplitL "Hcol";
-        [ iApply (uart_colE_stable γd uu uu' Hrxe Hlbe with "Hcol")
+        [ iApply (uart_colE_stable γd uu uu' Hrxe Hlbe
+             ltac:(exact (uart_write_wire _ _ _ _ Hw)) Ho with "Hcol")
         | iFrame "Ht Hd" ]. }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc [Htx Hdlab]".
@@ -440,7 +446,8 @@ Section ProofUartinit.
       iEval (rewrite Hdt) in "Hd'".
       iModIntro. iSplitL "Hg'"; [ iExact "Hg'" |].
       iSplitL "Hcol";
-        [ iApply (uart_colE_stable γd uu uu' Hrxe Hlbe with "Hcol")
+        [ iApply (uart_colE_stable γd uu uu' Hrxe Hlbe
+             ltac:(exact (uart_write_wire _ _ _ _ Hw)) Ho with "Hcol")
         | iFrame "Ht Hd'" ]. }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc [Htx Hdlab]".
@@ -508,12 +515,14 @@ Section ProofUartinit.
       match type of Hrxe with
       | u_rx uu' = (if ?cl then [] else _) => destruct cl eqn:Hclr
       end.
-      + iMod (uart_colE_flush γd uu uu' k hl Hrxe Hlbe with "Hcol Htok")
+      + iMod (uart_colE_flush γd uu uu' k hl Hrxe Hlbe
+                ltac:(exact (uart_write_wire _ _ _ _ Hw)) Ho with "Hcol Htok")
           as "[Hcol Htok]".
         iModIntro. iSplitL "Hg";
           [ iApply (uart_ghosts_stable γd uu uu' Ha Ho Hdb with "Hg") |].
         iFrame "Hcol Ht Hd Htok".
-      + iDestruct (uart_colE_stable γd uu uu' Hrxe Hlbe with "Hcol") as "Hcol".
+      + iDestruct (uart_colE_stable γd uu uu' Hrxe Hlbe
+             ltac:(exact (uart_write_wire _ _ _ _ Hw)) Ho with "Hcol") as "Hcol".
         iModIntro. iSplitL "Hg";
           [ iApply (uart_ghosts_stable γd uu uu' Ha Ho Hdb with "Hg") |].
         iFrame "Hcol Ht Hd". iExists k, hl. iExact "Htok". }
@@ -541,7 +550,8 @@ Section ProofUartinit.
       iModIntro. iSplitL "Hg";
         [ iApply (uart_ghosts_stable γd uu uu' Ha Ho Hdb with "Hg") |].
       iSplitL "Hcol";
-        [ iApply (uart_colE_stable γd uu uu' Hrxe Hlbe with "Hcol")
+        [ iApply (uart_colE_stable γd uu uu' Hrxe Hlbe
+             ltac:(exact (uart_write_wire _ _ _ _ Hw)) Ho with "Hcol")
         | iFrame "Ht Hd" ]. }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc [Htx Hdlab]".

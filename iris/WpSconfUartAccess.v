@@ -177,7 +177,10 @@ Section WpSconfUartAccess.
       assert (Hne5 : (5 <> 0)%Z) by lia.
       destruct (uart_read_rx_stable u 5 bt u' (or_introl Hne5) Hread)
         as [Hrxe Hlbe].
-      iDestruct (uart_colE_stable γd u u' Hrxe Hlbe with "Hcol") as "Hcol".
+      iDestruct (uart_colE_stable γd u u' Hrxe Hlbe
+                ltac:(exact (uart_read_wire _ _ _ _ Hread))
+                ltac:(exact (proj1 (proj2 (uart_read_stable _ _ _ _ Hread))))
+                with "Hcol") as "Hcol".
       rewrite uart_read_lsr in Hread. injection Hread as <- <-.
       iDestruct "Hg" as "(Hs & Hout & Htx & Hdl & Htgs)".
       destruct (uart_thre u) eqn:Hthre.
@@ -302,7 +305,10 @@ Section WpSconfUartAccess.
       iModIntro. iSplitL "Hg".
       { iApply (uart_ghosts_stable γd u u' Ha Ho Hd with "Hg"). }
       iSplitL "Hcol"; [| done].
-      iApply (uart_colE_stable γd u u' Hrxe Hlbe with "Hcol").
+      iApply (uart_colE_stable γd u u' Hrxe Hlbe
+                ltac:(exact (uart_read_wire _ _ _ _ Hread))
+                ltac:(exact (proj1 (proj2 (uart_read_stable _ _ _ _ Hread))))
+                with "Hcol").
     - iEval (rewrite /wp_next). iIntros (CID1 Hs1 bt) "Hcg Hpc _".
       iSpecialize ("Hcont" $! CID1 with "[]"); [iPureIntro; exact Hs1|].
       iApply ("Hcont" $! bt with "Hcg Hpc").
@@ -370,7 +376,10 @@ Section WpSconfUartAccess.
       (* a THR write is offset 0, which is neither FCR nor MCR *)
       destruct (uart_write_rx_stable u 0 sb u' ltac:(lia) ltac:(lia) Hwrite)
         as [Hrxe Hlbe].
-      iDestruct (uart_colE_stable γd u u' Hrxe Hlbe with "Hcol") as "Hcol".
+      iDestruct (uart_colE_stable γd u u' Hrxe Hlbe
+                ltac:(exact (uart_write_wire _ _ _ _ Hwrite))
+                ltac:(exact (uart_write_out _ _ _ _ Hwrite))
+                with "Hcol") as "Hcol".
       iDestruct "Hg" as "(Hs & Hout & Htx & Hdl & Htgs)".
       iDestruct (uart_tx_ready_persists γd u l with "Hown Hlb Hoff Htx Hout Hdl") as %[Hempty Hdlab].
       iDestruct (uart_tx_own_agree with "Htx Hown") as %Haccu.
@@ -458,7 +467,10 @@ Section WpSconfUartAccess.
       assert (Hne5 : (5 <> 0)%Z) by lia.
       destruct (uart_read_rx_stable u 5 bt u' (or_introl Hne5) Hread)
         as [Hrxe Hlbe].
-      iDestruct (uart_colE_stable γd u u' Hrxe Hlbe with "Hcol") as "Hcol".
+      iDestruct (uart_colE_stable γd u u' Hrxe Hlbe
+                ltac:(exact (uart_read_wire _ _ _ _ Hread))
+                ltac:(exact (proj1 (proj2 (uart_read_stable _ _ _ _ Hread))))
+                with "Hcol") as "Hcol".
       rewrite uart_read_lsr in Hread. injection Hread as <- <-.
       destruct (uart_rx_ready u) eqn:Hdr.
       + assert (Hne : u_rx u <> []).
@@ -530,6 +542,8 @@ Section WpSconfUartAccess.
       iMod (uart_col_pop γd u u' k hl bt
               ltac:(intros bb rx' Hrx;
                     exact (uart_read_rhr_pop u bb rx' bt u' Hd Hrx Hread))
+              ltac:(exact (uart_read_wire _ _ _ _ Hread))
+                ltac:(exact (proj1 (proj2 (uart_read_stable _ _ _ _ Hread))))
               with "Hcol Htok Hlb") as "(Hcol & Hh)".
       (* the four transmitter ghosts are untouched by any read *)
       destruct (uart_read_stable u 0 bt u' Hread) as (Ha & Ho & Hdl).
@@ -589,10 +603,15 @@ Section WpSconfUartAccess.
       destruct (uart_write_fcr_rx u sb u' Hwrite) as [Hrxe Hlbe].
       iMod ("Hstep" $! u u' with "[//] Hg HR") as "[Hg HS]".
       destruct (uart_fcr_clr_rx u sb) eqn:Hclr.
-      + iMod (uart_colE_flush γd u u' k hl Hrxe Hlbe with "Hcol Htok")
-          as "[Hcol Htok]".
+      + iMod (uart_colE_flush γd u u' k hl Hrxe Hlbe
+                ltac:(exact (uart_write_wire _ _ _ _ Hwrite))
+                ltac:(exact (uart_write_out _ _ _ _ Hwrite))
+                with "Hcol Htok") as "[Hcol Htok]".
         iModIntro. iFrame "Hg Hcol Htok HS".
-      + iDestruct (uart_colE_stable γd u u' Hrxe Hlbe with "Hcol") as "Hcol".
+      + iDestruct (uart_colE_stable γd u u' Hrxe Hlbe
+                ltac:(exact (uart_write_wire _ _ _ _ Hwrite))
+                ltac:(exact (uart_write_out _ _ _ _ Hwrite))
+                with "Hcol") as "Hcol".
         iModIntro. iFrame "Hg Hcol HS". iExists k, hl. iExact "Htok".
     - iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hcg Hpc [Htok HS]".
       iApply ("Hcont" $! CID1 with "[] Hcg Hpc Htok HS").
