@@ -37,10 +37,13 @@ Import ListNotations.
 Local Open Scope Z_scope.
 
 (* the only enable bits the kernel ever intends to set, in the word they live
-   in: both device sources are below 32, so word 0 carries them and every
-   other word is permitted nothing at all *)
+   in: every device source is below 32, so word 0 carries them all and every
+   other word is permitted nothing at all.  BOTH UARTs: the kernel drives one
+   as the console and the other for its own diagnostics, and enables both. *)
 Definition plic_dev_irq_mask : Z :=
-  Z.lor (Z.shiftl 1 (Z.of_N (uart_irq_id Uart0))) (Z.shiftl 1 (Z.of_N virtio_irq_id)).
+  Z.lor (Z.shiftl 1 (Z.of_N (uart_irq_id Uart0)))
+        (Z.lor (Z.shiftl 1 (Z.of_N (uart_irq_id Uart1)))
+               (Z.shiftl 1 (Z.of_N virtio_irq_id))).
 
 Definition plic_dev_irq_word (w : nat) : Z :=
   if Nat.eqb w 0 then plic_dev_irq_mask else 0.
