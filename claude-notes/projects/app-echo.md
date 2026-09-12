@@ -2432,9 +2432,16 @@ no `^P` arm in consoleintr, no Rocq caller); directives used: `%d`, `%s`,
 (phase 2 threads it).  PRINTINT'S DIGITS CAN BE PINNED (the buffer is a
 content-free `bytes_own`; the fix: `bytes_own_name`, the row `x = x0 /
 base^i`, the sign store, the print loop closed by consputc's pinned post).
-PHASE-2 RULINGS: the THR leaf takes a `match src` claim (the K in-flight half
-for `TxK`) SHAPED LIKE TX-RECEIPT's `tx_claim` so the two lanes merge by
-juxtaposition; the hart lines' at-most-once via a per-hart one-shot in
+PHASE-2 RULINGS: STAGED in four green milestones -- A: the ledger threading +
+`pk_site` + the ledger-append post with `cs` still existential (green now); B:
+printint's digits pinned (the `digits[]` table's contents are in hand at
+`digits_from_data` and merely weakened; no premise); C: printk's post pinned
+(23 block lemmas with a rendering accumulator); D: the tie -- `k_flight_ok` STAYS
+in `uart_tagsE`, the THR leaf (three callers: uartputc_sync, uartwrite,
+uartwriteLoc) takes the `match src` claim AND the pure `k_push_ok src fl b`
+(the leaf cannot know which format is in flight), discharged at printk from
+its rendering -- plus the hart lines.  The `match src` claim is SHAPED LIKE
+TX-RECEIPT's `tx_claim` so the two lanes merge by juxtaposition; the hart lines' at-most-once via a per-hart one-shot in
 `boot_hart_pre`, banners-before via `k_ledger_lb [banners]` on the `started`
 invariant; `boot_k_shape` deleted.  `BACKSPACE` is the int 0x100 (not byte 8):
 the "\b \b" triple is reachable only from `%c`, unused.

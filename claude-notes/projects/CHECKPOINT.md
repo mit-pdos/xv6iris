@@ -259,3 +259,8 @@ PRINTK-LEDGER phase 1 (2026-09-12); phase 2 go-ahead (note "PRINTK-LEDGER PHASE
 1").  LANDING ORDER for the UART-side branches after LAZY-FLAG-3: supply-split-r1
 → sh-open → tx-receipt (resumed) → printk-ledger (both extend the THR leaf and
 `uart_tagsE` by juxtaposition).
+
+PRINTK-LEDGER STAGED (2026-09-12): A (ledger threading, cs existential, green) → B
+(printint digits) → C (printk's pinned post, 23 lemmas) → D (the tie with
+`k_push_ok`; hart lines); each its own commit on `lane/printk-ledger`; a fresh
+agent continues where context runs out.
