@@ -42,6 +42,5 @@ import MachCSL.WordHist
 import MachCSL.Lock
 import MachCSL.WpSmodeAtomic
 import MachCSL.WpLock
-import MachCSL.StackFrame
 import MachCSL.WpSmodeMem2
 import MachCSL.WpSmodeBits

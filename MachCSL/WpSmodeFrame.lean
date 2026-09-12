@@ -22,7 +22,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
 /-- A two-slot frame at `sp` holding `ra` and `s0`. -/
 def frame2 [CurCtx] (sp ra s0 : BitVec 64) : IProp GF := iprop%
-  ⌜stackFacts sp 2⌝ ∗ wordPointsTo (sp + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) ra ∗
+  wordPointsTo (sp + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) ra ∗
   wordPointsTo (sp + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) s0
 
 theorem KCtx.sp_eq (k : KCtx) : k.sp = k.regs 2#5 := rfl
@@ -167,7 +167,9 @@ theorem wp_prologue2 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
   iintro ⟨#Hi0, #Hi2, #Hi4, #Hi6, Hk, Hpc, HΦ⟩
   k_step (wp_s_push cpu _ ?hs ?ht pc true 4080#12 2 hK imm_m16) $$ [- $Hk $Hpc]
   iintro Hk Hpc Hframe
-  icases stackOwn_two_cases _ $$ Hframe with ⟨%hf, %w₁, %w₂, Hf8, Hf16⟩
+  irevert Hframe
+  stack_cells
+  iintro ⟨⟨%w₁, Hf8⟩, ⟨%w₂, Hf16⟩, _⟩
   k_step (wp_s_sd cpu _ ?hs ?ht (pc + 2#64) true 8#12 2#5 1#5 w₁) $$ [- $Hk $Hpc]
   iintro Hk Hpc Hf8
   k_step (wp_s_sd cpu _ ?hs ?ht (pc + 4#64) true 0#12 2#5 8#5 w₂) $$ [- $Hk $Hpc]
@@ -178,7 +180,6 @@ theorem wp_prologue2 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
   iapply HΦ $$ Hk Hpc [Hf8 Hf16]
   unfold frame2
   iframe
-  ipureintro; exact hf
 
 set_option maxHeartbeats 4000000 in
 /-- The standard epilogue at `pc`: restore `ra`/`s0`, pop, return.  The body
@@ -195,28 +196,16 @@ theorem wp_epilogue2 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
         pcIs cpu (jumpPc ra) -∗ wpLoop cpu)
     ⊢ wpLoop cpu := by
   unfold frame2
-  iintro ⟨#Hi0, #Hi2, #Hi4, #Hi6, Hk, Hpc, ⟨%hf, Hf8, Hf16⟩, HΦ⟩
-  icases kctx_stackFacts _ _ $$ Hk with ⟨%hfk, Hk⟩
+  iintro ⟨#Hi0, #Hi2, #Hi4, #Hi6, Hk, Hpc, ⟨Hf8, Hf16⟩, HΦ⟩
   k_step (wp_s_ld cpu _ ?hs ?ht pc true 8#12 1#5 2#5 (by decide) (DFrac.own 1) ra)
     $$ [- $Hk $Hpc] with [hR2]
   iintro Hk Hpc Hf8
   k_step (wp_s_ld cpu _ ?hs ?ht (pc + 2#64) true 0#12 8#5 2#5 (by decide) (DFrac.own 1) s0)
     $$ [- $Hk $Hpc] with [hR2]
   iintro Hk Hpc Hf16
-  have hf' : stackFacts ((((k.pushed 2).withRegs ((R.set 1#5 ra).set 8#5 s0)).sp + 8#64 * BitVec.ofNat 64 2))
-      (2 + (trapRes (((k.pushed 2).withRegs ((R.set 1#5 ra).set 8#5 s0)).sie) +
-        ((k.pushed 2).withRegs ((R.set 1#5 ra).set 8#5 s0)).avail)) := by
-    k_norm [hR2]
-    simp only [trapRes_off]
-    unfold stackFacts at hf hfk ⊢
-    k_norm [hR2] at hfk
-    have h16 : (k.regs 2#5 + 18446744073709551600#64).toNat = (k.regs 2#5).toNat - 16 := by
-      unfold ramBase ramEnd at hf; bv_omega
-    rw [h16] at hfk
-    omega
-  ihave Hframe := stackOwn_two_intro (k.regs 2#5) hf ra s0 $$ [Hf8 Hf16]
-  case' _ => iframe
-  k_step (wp_s_pop cpu _ ?hs ?ht (pc + 4#64) true 16#12 2 imm_p16 hf') $$ [- $Hk $Hpc]
+  ihave Hframe : stackOwn (k.regs 2#5) 2 $$ [Hf8 Hf16]
+  case' _ => stack_cells; iframe
+  k_step (wp_s_pop cpu _ ?hs ?ht (pc + 4#64) true 16#12 2 imm_p16) $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK, hR2]
   iintro Hk Hpc
   k_step (wp_s_ret cpu _ ?hs ?ht (pc + 6#64) true 1#5) $$ [- $Hk $Hpc]
@@ -227,7 +216,7 @@ theorem wp_epilogue2 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
 
 /-- A four-slot frame at `sp` holding `ra`, `s0`, `s1` (slot `0(sp)` unused). -/
 def frame4s1 [CurCtx] (sp ra s0 s1 : BitVec 64) : IProp GF := iprop%
-  ⌜stackFacts sp 4⌝ ∗ wordPointsTo (sp + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) ra ∗
+  wordPointsTo (sp + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) ra ∗
   wordPointsTo (sp + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) s0 ∗
   wordPointsTo (sp + 0xFFFFFFFFFFFFFFE8#64) 8 (DFrac.own 1) s1 ∗
   ∃ w : BitVec 64, wordPointsTo (sp + 0xFFFFFFFFFFFFFFE0#64) 8 (DFrac.own 1) w
@@ -256,7 +245,9 @@ theorem wp_prologue4s1 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : K
   iintro ⟨#Hi0, #Hi2, #Hi4, #Hi6, #Hi8, Hk, Hpc, HΦ⟩
   k_step (wp_s_push cpu _ ?hs ?ht pc true 4064#12 4 hK imm_m32) $$ [- $Hk $Hpc]
   iintro Hk Hpc Hframe
-  icases stackOwn_four_cases _ $$ Hframe with ⟨%hf, %w₁, %w₂, %w₃, %w₄, Hf8, Hf16, Hf24, Hf32⟩
+  irevert Hframe
+  stack_cells
+  iintro ⟨⟨%w₁, Hf8⟩, ⟨%w₂, Hf16⟩, ⟨%w₃, Hf24⟩, ⟨%w₄, Hf32⟩, _⟩
   k_step (wp_s_sd cpu _ ?hs ?ht (pc + 2#64) true 24#12 2#5 1#5 w₁) $$ [- $Hk $Hpc]
   iintro Hk Hpc Hf8
   k_step (wp_s_sd cpu _ ?hs ?ht (pc + 4#64) true 16#12 2#5 8#5 w₂) $$ [- $Hk $Hpc]
@@ -269,7 +260,6 @@ theorem wp_prologue4s1 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : K
   iapply HΦ $$ Hk Hpc [Hf8 Hf16 Hf24 Hf32]
   unfold frame4s1
   iframe
-  ipureintro; exact hf
 
 set_option maxHeartbeats 4000000 in
 /-- The epilogue `ld ra,24(sp); ld s0,16(sp); ld s1,8(sp); addi sp,sp,32; ret`
@@ -287,8 +277,7 @@ theorem wp_epilogue4s1 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : K
         pcIs cpu (jumpPc ra) -∗ wpLoop cpu)
     ⊢ wpLoop cpu := by
   unfold frame4s1
-  iintro ⟨#Hi0, #Hi2, #Hi4, #Hi6, #Hi8, Hk, Hpc, ⟨%hf, Hf8, Hf16, Hf24, %w₄, Hf32⟩, HΦ⟩
-  icases kctx_stackFacts _ _ $$ Hk with ⟨%hfk, Hk⟩
+  iintro ⟨#Hi0, #Hi2, #Hi4, #Hi6, #Hi8, Hk, Hpc, ⟨Hf8, Hf16, Hf24, %w₄, Hf32⟩, HΦ⟩
   k_step (wp_s_ld cpu _ ?hs ?ht pc true 24#12 1#5 2#5 (by decide) (DFrac.own 1) ra)
     $$ [- $Hk $Hpc] with [hR2]
   iintro Hk Hpc Hf8
@@ -298,21 +287,9 @@ theorem wp_epilogue4s1 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : K
   k_step (wp_s_ld cpu _ ?hs ?ht (pc + 4#64) true 8#12 9#5 2#5 (by decide) (DFrac.own 1) s1)
     $$ [- $Hk $Hpc] with [hR2]
   iintro Hk Hpc Hf24
-  have hf' : stackFacts ((((k.pushed 4).withRegs (((R.set 1#5 ra).set 8#5 s0).set 9#5 s1)).sp +
-        8#64 * BitVec.ofNat 64 4))
-      (4 + (trapRes (((k.pushed 4).withRegs (((R.set 1#5 ra).set 8#5 s0).set 9#5 s1)).sie) +
-        ((k.pushed 4).withRegs (((R.set 1#5 ra).set 8#5 s0).set 9#5 s1)).avail)) := by
-    k_norm [hR2]
-    simp only [trapRes_off]
-    unfold stackFacts at hf hfk ⊢
-    k_norm [hR2] at hfk
-    have h32 : (k.regs 2#5 + 18446744073709551584#64).toNat = (k.regs 2#5).toNat - 32 := by
-      unfold ramBase ramEnd at hf; bv_omega
-    rw [h32] at hfk
-    omega
-  ihave Hframe := stackOwn_four_intro (k.regs 2#5) hf ra s0 s1 w₄ $$ [Hf8 Hf16 Hf24 Hf32]
-  case' _ => iframe
-  k_step (wp_s_pop cpu _ ?hs ?ht (pc + 6#64) true 32#12 4 imm_p32 hf') $$ [- $Hk $Hpc]
+  ihave Hframe : stackOwn (k.regs 2#5) 4 $$ [Hf8 Hf16 Hf24 Hf32]
+  case' _ => stack_cells; iframe
+  k_step (wp_s_pop cpu _ ?hs ?ht (pc + 6#64) true 32#12 4 imm_p32) $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK, hR2]
   iintro Hk Hpc
   k_step (wp_s_ret cpu _ ?hs ?ht (pc + 8#64) true 1#5) $$ [- $Hk $Hpc]

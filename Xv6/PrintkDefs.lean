@@ -3,7 +3,6 @@ Definitions for the proof of `printk`: the frame layout, the loop's register
 constants, and pure facts about the format language.  Definitional only
 (importable by the proof and by nothing that must stay proof-free).
 -/
-import MachCSL.StackFrame
 import MachCSL.WpSmodeRules
 import MachCSL.WpSmodeBits
 import Xv6.SpecPrintk

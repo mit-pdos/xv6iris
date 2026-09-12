@@ -485,8 +485,7 @@ set_option maxHeartbeats 4000000 in
 the `avail`. -/
 theorem wp_s_pop [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (m : Nat)
-    (himm : BitVec.signExtend 64 imm = 8#64 * BitVec.ofNat 64 m)
-    (hf : stackFacts (k.sp + 8#64 * BitVec.ofNat 64 m) (m + (trapRes k.sie + k.avail))) :
+    (himm : BitVec.signExtend 64 imm = 8#64 * BitVec.ofNat 64 m) :
     instr (GF := GF) pc is_rvc (instruction.ITYPE (imm, regidx.Regidx 2#5, regidx.Regidx 2#5, iop.ADDI)) ∗
     kctx cpu k ∗ pcIs cpu pc ∗ stackOwn (k.sp + 8#64 * BitVec.ofNat 64 m) m ∗
     ▷ wpNext k.sie k.proc cpu (fun cpu' =>
@@ -503,11 +502,10 @@ theorem wp_s_pop [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (
   icases kctx_cases cpu k $$ Hk with ⟨%hwf, HConf, HF, Hstack, Htrans, Harm, Hcpu, Htok, Hclock, #Hro⟩
   icases kConf_cases cpu _ _ _ $$ HConf with ⟨%ms, %mdl, %mepc, %stc, %⟨hsm, hmdl⟩, HmConf⟩
   rw [hsie] at hsm
-  rw [hsie] at hf
-  simp only [hsie, htier, trapRes_off] at hf ⊢
+  simp only [hsie, htier, trapRes_off]
   ihave Hstack := (show stackOwn (GF := GF) k.sp k.avail ⊢
       stackOwn (k.sp + 8#64 * BitVec.ofNat 64 m - 8#64 * BitVec.ofNat 64 m) k.avail by rw [hback]) $$ Hstack
-  ihave Hstack := stackOwn_join _ m k.avail hf $$ [Hframe Hstack]
+  ihave Hstack := stackOwn_join _ m k.avail $$ [Hframe Hstack]
   case' _ => iframe
   have hok := SConfBare_sConfOf_bare (GF := GF) k.root ms mdl mepc stc hsm
   have hexec := execSpecF_addi (GF := GF) cpu (DFrac.own 1) (sConfOf KTier.bare k.root ms mdl mepc stc) pc

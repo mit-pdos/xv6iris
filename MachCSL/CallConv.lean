@@ -124,42 +124,6 @@ theorem cstr_acc [CurCtx] (a : BitVec 64) (dq : DFrac) (s : List (BitVec 8)) (j 
   ihave H := Hclose $$ Hj
   iframe H; ipureintro; exact h
 
-/-! ## Four-slot frames -/
-
-/-- A four-slot frame: the words at `sp - 8`, `sp - 16`, `sp - 24`, `sp - 32`. -/
-theorem stackOwn_four_cases [CurCtx] (sp : BitVec 64) :
-    stackOwn (GF := GF) sp 4 ⊢
-      ⌜stackFacts sp 4⌝ ∗ ∃ w₁ w₂ w₃ w₄ : BitVec 64,
-        wordPointsTo (sp + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) w₁ ∗
-        wordPointsTo (sp + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) w₂ ∗
-        wordPointsTo (sp + 0xFFFFFFFFFFFFFFE8#64) 8 (DFrac.own 1) w₃ ∗
-        wordPointsTo (sp + 0xFFFFFFFFFFFFFFE0#64) 8 (DFrac.own 1) w₄ := by
-  unfold stackOwn stackSlots
-  iintro ⟨%hf, %ws, %hlen, H⟩
-  match ws, hlen with
-  | [w₁, w₂, w₃, w₄], _ =>
-    simp only [Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil, BitVec.sub_eq_add_neg,
-      BitVec.reduceMul, BitVec.reduceNeg, Nat.reduceAdd]
-    icases H with ⟨H₁, H₂, H₃, H₄, _⟩
-    iframe H₁ H₂ H₃ H₄
-    ipureintro; exact hf
-
-theorem stackOwn_four_intro [CurCtx] (sp : BitVec 64) (hf : stackFacts sp 4) (w₁ w₂ w₃ w₄ : BitVec 64) :
-    wordPointsTo (sp + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) w₁ ∗
-    wordPointsTo (sp + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) w₂ ∗
-    wordPointsTo (sp + 0xFFFFFFFFFFFFFFE8#64) 8 (DFrac.own 1) w₃ ∗
-    wordPointsTo (sp + 0xFFFFFFFFFFFFFFE0#64) 8 (DFrac.own 1) w₄ ⊢ stackOwn (GF := GF) sp 4 := by
-  unfold stackOwn stackSlots
-  iintro ⟨H₁, H₂, H₃, H₄⟩
-  isplitr
-  · ipureintro; exact hf
-  · iexists [w₁, w₂, w₃, w₄]
-    simp only [Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil, BitVec.sub_eq_add_neg,
-      BitVec.reduceMul, BitVec.reduceNeg, Nat.reduceAdd]
-    iframe H₁ H₂ H₃ H₄
-    ipureintro; rfl
-
-
 /-! ## The calling convention -/
 
 /-- The callee-saved registers (`sp`, `s0`–`s11`) are preserved from `R` to `R'`. -/
@@ -258,18 +222,6 @@ theorem KCtx.rget_pop (cpu : CPU) (k : KCtx) (m : Nat) (j : BitVec 5) :
 /-- `sp` as a read. -/
 theorem KCtx.rget_sp (cpu : CPU) (k : KCtx) : k.rget cpu 2#5 = k.sp :=
   KCtx.rget_ne cpu k 2#5 (by decide) (by decide)
-
-/-- The stack geometry a context carries. -/
-theorem kctx_stackFacts [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) :
-    kctx (GF := GF) cpu k ⊢ ⌜stackFacts k.sp (trapRes k.sie + k.avail)⌝ ∗ kctx cpu k := by
-  unfold kctx stackOwn
-  iintro ⟨%hwf, HConf, HF, ⟨%hf, Hs⟩, Htrans, Harm, Hcpu, Htok, Hclock, Hcode⟩
-  isplitr
-  · ipureintro; exact hf
-  · iframe
-    isplitr
-    · ipureintro; exact hwf
-    · ipureintro; exact hf
 
 /-- The context after `push_off` (at `sie = false`: the depth incremented,
 `intena` untouched -- the write of `old = 0` at depth 0 agrees with `wf`'s

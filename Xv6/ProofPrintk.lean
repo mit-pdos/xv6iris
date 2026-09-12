@@ -44,7 +44,7 @@ addi sp,sp,192; ret`, from a context whose callee-saved registers other
 than `s0`/`s2` are the entry ones. -/
 theorem printk_release_tail (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr : GName) (hsie : k.sie = false) (htier : k.tier = KTier.bare) (hK : 48 ≤ k.avail)
-    (hpr : "pr" ∉ k.locks) (hwf : k.wf) (hf : stackFacts (k.regs 2#5) k.avail)
+    (hpr : "pr" ∉ k.locks) (hwf : k.wf)
     (R : RegMap) (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFF40#64)
     (hcs : R 9#5 = k.regs 9#5 ∧ R 19#5 = k.regs 19#5 ∧ R 20#5 = k.regs 20#5 ∧ R 21#5 = k.regs 21#5 ∧
       R 22#5 = k.regs 22#5 ∧ R 23#5 = k.regs 23#5 ∧ R 24#5 = k.regs 24#5 ∧ R 25#5 = k.regs 25#5 ∧
@@ -123,16 +123,10 @@ theorem printk_release_tail (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors}
     $$ [- $Hk $Hpc] with [h22]
   iintro Hk Hpc C11
   -- addi sp,sp,192
-  ihave Hframe := stackOwn_24_intro (k.regs 2#5) v0 v1 v2 v3 v4 v5 v6 v7 (k.regs 1#5) (k.regs 8#5) v10
-    (k.regs 18#5) v12 v13 v14 v15 v16 v17 v18 v19 v20 v21 v22 v23
-    $$ [C0 C1 C2 C3 C4 C5 C6 C7 C8 C9 C10 C11 C12 C13 C14 C15 C16 C17 C18 C19 C20 C21 C22 C23]
-  case' _ => iframe
-  k_step (wp_s_pop cpu _ ?hs ?ht 0x8000076a#64 true 192#12 24 imm_p192 ?hf) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
+  ihave Hframe : stackOwn (k.regs 2#5) 24 $$ [C0 C1 C2 C3 C4 C5 C6 C7 C8 C9 C10 C11 C12 C13 C14 C15 C16 C17 C18 C19 C20 C21 C22 C23]
+  case' _ => stack_cells; iframe
+  k_step (wp_s_pop cpu _ ?hs ?ht 0x8000076a#64 true 192#12 24 imm_p192) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
     with [h22, KCtx.pop_pushed _ _ _ (by omega : 24 ≤ k.avail), sp_restore]
-  case hf =>
-    k_norm [h22, trapRes_off]
-    rw [show 24 + (k.avail - 24) = k.avail by omega]
-    exact hf
   iintro Hk Hpc
   -- ret
   k_step (wp_s_ret cpu _ ?hs ?ht 0x8000076c#64 true 1#5) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
@@ -227,7 +221,7 @@ theorem printk_exit (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS
     (cpu : CPU) (k : KCtx) (γpr : GName) (γd : UartNames) (bs cs0 : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
     (hsie : k.sie = false) (htier : k.tier = KTier.bare) (hK : 48 ≤ k.avail)
-    (hpr : "pr" ∉ k.locks) (hwf : k.wf) (hf : stackFacts (k.regs 2#5) k.avail)
+    (hpr : "pr" ∉ k.locks) (hwf : k.wf)
     (pc0 : BitVec 64) (hpc : pc0 = 0x80000744#64 ∨ pc0 = 0x80000800#64)
     (R : RegMap) (hR : pkRegs k.regs R) (ap w18 : BitVec 64) :
     kctx cpu ((pkBase k).withRegs R) ∗ pcIs cpu pc0 ∗
@@ -256,7 +250,7 @@ theorem printk_exit (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS
       ⊢ wpLoop (GF := GF) cpu := by
     intro R' hR'2 hcs
     iintro ⟨Hk, Hpc, #Hlk, Hlocked, Hexit, Hbuf, Hdescs, Hsent, HΦ⟩
-    iapply (printk_release_tail RE cpu k γpr hsie htier hK hpr hwf hf R' hR'2 hcs)
+    iapply (printk_release_tail RE cpu k γpr hsie htier hK hpr hwf R' hR'2 hcs)
       $$ [- $Hk $Hpc $Hlocked $Hexit]
     iframe #
     iintro %R2 Hk Hpc %h
@@ -2786,7 +2780,7 @@ theorem printk_loop (CP : CONSPUTC) (PI : PRINTINT) (RE : RELEASE) {hlc : HasLC}
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs0 : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
     (hsie : k.sie = false) (htier : k.tier = KTier.bare) (hK : 48 ≤ k.avail) (hnoff : k.noff + 2 < 2 ^ 31)
-    (hpr : "pr" ∉ k.locks) (huart : "uart" ∉ k.locks) (hwf : k.wf) (hf : stackFacts (k.regs 2#5) k.avail)
+    (hpr : "pr" ∉ k.locks) (huart : "uart" ∉ k.locks) (hwf : k.wf)
     (hflen : f.length + 4 < 2 ^ 31) (hnonul : nonul f) (hdlen : descs.length ≤ 7)
     (n : Nat) :
     ∀ (p kk : Nat) (R : RegMap) (w18 : BitVec 64) (cs0 : List (BitVec 8)), f.length - p ≤ n → p < f.length →
@@ -2826,7 +2820,7 @@ theorem printk_loop (CP : CONSPUTC) (PI : PRINTINT) (RE : RELEASE) {hlc : HasLC}
     iintro Hk Hpc
     by_cases hz : fmtByte f (p + 1) = 0#8
     · ihave Hpc := pcIs_ite_pos _ _ _ _ hz $$ Hpc
-      iapply (printk_exit RE cpu k γpr γd bs0 cs0 dqf f descs hsie htier hK hpr hwf hf 0x80000744#64 (Or.inl rfl) _ ?HRe _ w18)
+      iapply (printk_exit RE cpu k γpr γd bs0 cs0 dqf f descs hsie htier hK hpr hwf 0x80000744#64 (Or.inl rfl) _ ?HRe _ w18)
         $$ [- $Hk $Hpc $Hlocked $Hframe $Hbuf $Hdescs $Hsent $HΦ]
       rotate_right 1
       iframe #
@@ -2850,7 +2844,7 @@ theorem printk_loop (CP : CONSPUTC) (PI : PRINTINT) (RE : RELEASE) {hlc : HasLC}
       iframe #
     · -- a `%` ended the string
       iintro %R' %w18' Hk Hpc Hbuf Hdescs Hframe Hsent Hlocked %h'
-      iapply (printk_exit RE cpu k γpr γd bs0 cs0 dqf f descs hsie htier hK hpr hwf hf 0x80000800#64 (Or.inr rfl) R' h' _ w18')
+      iapply (printk_exit RE cpu k γpr γd bs0 cs0 dqf f descs hsie htier hK hpr hwf 0x80000800#64 (Or.inr rfl) R' h' _ w18')
         $$ [- $Hk $Hpc $Hlocked $Hframe $Hbuf $Hdescs $Hsent $HΦ]
       iframe #
 
@@ -2869,16 +2863,14 @@ theorem printk_proof (AC : ACQUIRE) (RE : RELEASE) (CP : CONSPUTC) (PI : PRINTIN
   ihave HΦ := wpNext_off _ _ _ $$ Hnext
   ihave HΦ := pkPost_of_cstr cpu k γd bs dqf f descs hnonul $$ HΦ
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
-  icases kctx_stackFacts _ _ $$ Hk with ⟨%hf0, Hk⟩
-  have hf : stackFacts (k.regs 2#5) k.avail := by rw [hsie, trapRes_off] at hf0; exact hf0
   have hnoff1 : k.noff + 1 < 2 ^ 31 := by omega
   have hi0 : 0 < f.length ∨ f.length = 0 := by omega
   -- addi sp,sp,-192
   k_step (wp_s_push cpu _ ?hs ?ht 0x80000502#64 true 3904#12 24 (by omega) imm_m192) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc Hstk
-  icases stackOwn_24_cases _ $$ Hstk with ⟨%_, %w0, %w1, %w2, %w3, %w4, %w5, %w6, %w7, %w8, %w9, %w10, %w11, %w12, %w13,
-    %w14, %w15, %w16, %w17, %w18, %w19, %w20, %w21, %w22, %w23, C0, C1, C2, C3, C4, C5, C6, C7, C8, C9, C10, C11, C12,
-    C13, C14, C15, C16, C17, C18, C19, C20, C21, C22, C23⟩
+  irevert Hstk
+  stack_cells
+  iintro ⟨⟨%w0, C0⟩, ⟨%w1, C1⟩, ⟨%w2, C2⟩, ⟨%w3, C3⟩, ⟨%w4, C4⟩, ⟨%w5, C5⟩, ⟨%w6, C6⟩, ⟨%w7, C7⟩, ⟨%w8, C8⟩, ⟨%w9, C9⟩, ⟨%w10, C10⟩, ⟨%w11, C11⟩, ⟨%w12, C12⟩, ⟨%w13, C13⟩, ⟨%w14, C14⟩, ⟨%w15, C15⟩, ⟨%w16, C16⟩, ⟨%w17, C17⟩, ⟨%w18, C18⟩, ⟨%w19, C19⟩, ⟨%w20, C20⟩, ⟨%w21, C21⟩, ⟨%w22, C22⟩, ⟨%w23, C23⟩, _⟩
   k_step (wp_s_sd cpu _ ?hs ?ht 0x80000504#64 true 120#12 2#5 1#5 w8) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc C8
   k_step (wp_s_sd cpu _ ?hs ?ht 0x80000506#64 true 112#12 2#5 8#5 w9) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -2968,7 +2960,7 @@ theorem printk_proof (AC : ACQUIRE) (RE : RELEASE) (CP : CONSPUTC) (PI : PRINTIN
       w10 w12 w13 w14 w15 w16 w17 w18 w19 w20 w21 (k.regs 2#5 + 0xFFFFFFFFFFFFFFC8#64) w23
       $$ [C0 C1 C2 C3 C4 C5 C6 C7 C8 C9 C10 C11 C12 C13 C14 C15 C16 C17 C18 C19 C20 C21 C22 C23]
     case' _ => iframe
-    iapply (printk_release_tail RE cpu k γpr hsie htier hK hpr hwf hf _ ?hR2 ?hcs) $$ [- $Hk $Hpc $Hlocked $Hexit]
+    iapply (printk_release_tail RE cpu k γpr hsie htier hK hpr hwf _ ?hR2 ?hcs) $$ [- $Hk $Hpc $Hlocked $Hexit]
     rotate_right 1
     iframe #
     case hR2 => simp only [RegMap.set_apply, BitVec.reduceEq, if_false]; exact h2_2
@@ -3034,13 +3026,13 @@ theorem printk_proof (AC : ACQUIRE) (RE : RELEASE) (CP : CONSPUTC) (PI : PRINTIN
   case H10 => simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
   isplit
   · iintro %R' %p' %kk' %cs %w18' Hk Hpc Hbuf Hdescs Hframe Hsent Hlocked %h'
-    iapply (printk_loop CP PI RE cpu k γpr γl γd bs dqf f descs hsie htier hK hnoff hpr huart hwf hf hflen hnonul hdlen
+    iapply (printk_loop CP PI RE cpu k γpr γl γd bs dqf f descs hsie htier hK hnoff hpr huart hwf hflen hnonul hdlen
       f.length p' kk' R' w18' cs (by omega) h'.2.2.2.1 h'.1 h'.2.1 h'.2.2.2.2)
       $$ [- $Hk $Hpc $Hbuf $Hdescs $Hframe $Hsent $Hlocked $HΦ]
     iframe #
   · iintro %R' %w18' Hk Hpc Hbuf Hdescs Hframe Hsent Hlocked %h'
     ihave Hsent := (show uartSentSub γd bs ⊢ uartSentSub γd (bs ++ []) from by rw [List.append_nil]) $$ Hsent
-    iapply (printk_exit RE cpu k γpr γd bs [] dqf f descs hsie htier hK hpr hwf hf 0x80000800#64 (Or.inr rfl) R' h' _ w18')
+    iapply (printk_exit RE cpu k γpr γd bs [] dqf f descs hsie htier hK hpr hwf 0x80000800#64 (Or.inr rfl) R' h' _ w18')
       $$ [- $Hk $Hpc $Hlocked $Hframe $Hbuf $Hdescs $Hsent $HΦ]
     iframe #⟩
 

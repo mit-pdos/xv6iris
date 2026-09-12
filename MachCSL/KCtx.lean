@@ -288,145 +288,45 @@ theorem swp_wX_file (cpu : CPU) (m : RegMap) (rd : BitVec 5) (hrd : rd ≠ 0#5) 
 
 /-! ## The stack -/
 
-/-- The geometry of `n` slots below `sp`: `sp` 8-aligned and the region
-`[sp - 8n, sp)` inside RAM (so every slot is an aligned RAM word). -/
-def stackFacts (sp : BitVec 64) (n : Nat) : Prop :=
-  sp.toNat % 8 = 0 ∧ ramBase + 8 * n ≤ sp.toNat ∧ sp.toNat ≤ ramEnd
-
-
-/-- The slots as a list of words, slot `i` at `sp - 8 (i + 1)`. -/
-def stackSlots [CurCtx] (sp : BitVec 64) (ws : List (BitVec 64)) : IProp GF := iprop%
-  [∗list] i ↦ w ∈ ws, wordPointsTo (sp - 8#64 * BitVec.ofNat 64 (i + 1)) 8 (DFrac.own 1) w
-
-/-- Ownership of the `n` eight-byte slots just below `sp` (region
-`[sp - 8n, sp)`), with scratch contents, together with their geometry. -/
+/-- The `n` eight-byte slots just below `sp` (the region `[sp - 8n, sp)`),
+as memory: slot `i` is the word at `sp - 8 (i + 1)`, holding some value.
+`stack_cells` opens a literal-size region into its cells. -/
 def stackOwn [CurCtx] (sp : BitVec 64) (n : Nat) : IProp GF := iprop%
-  ⌜stackFacts sp n⌝ ∗ ∃ ws : List (BitVec 64), ⌜ws.length = n⌝ ∗ stackSlots sp ws
-
-theorem stackFacts_mono {sp : BitVec 64} {m n : Nat} (h : stackFacts sp n) (hmn : m ≤ n) :
-    stackFacts sp m := by
-  unfold stackFacts at *; omega
-
-theorem stackFacts_sub_toNat {sp : BitVec 64} {n : Nat} (h : stackFacts sp n) (m : Nat) (hm : m ≤ n) :
-    (sp - 8#64 * BitVec.ofNat 64 m).toNat = sp.toNat - 8 * m := by
-  unfold stackFacts ramBase ramEnd at h
-  have hm' : 8 * m < 2 ^ 64 := by omega
-  rw [BitVec.toNat_sub, BitVec.toNat_mul, BitVec.toNat_ofNat, BitVec.toNat_ofNat]
-  simp only [Nat.reducePow]
-  rw [Nat.mod_eq_of_lt (by omega : m < 18446744073709551616), Nat.mod_eq_of_lt hm']
-  have := sp.isLt
-  omega
-
-theorem stackFacts_sub {sp : BitVec 64} {m n : Nat} (h : stackFacts sp (m + n)) :
-    stackFacts (sp - 8#64 * BitVec.ofNat 64 m) n := by
-  have := stackFacts_sub_toNat h m (by omega)
-  unfold stackFacts at *
-  rw [this]; omega
+  [∗list] i ∈ List.range n, ∃ w : BitVec 64, wordPointsTo (sp - 8#64 * BitVec.ofNat 64 (i + 1)) 8 (DFrac.own 1) w
 
 /-- The slot addresses shift with the base. -/
 theorem stackSlot_addr (sp : BitVec 64) (m i : Nat) :
-    sp - 8#64 * BitVec.ofNat 64 (i + m + 1) =
+    sp - 8#64 * BitVec.ofNat 64 (m + i + 1) =
       (sp - 8#64 * BitVec.ofNat 64 m) - 8#64 * BitVec.ofNat 64 (i + 1) := by
   bv_omega
-
-theorem stackSlots_shift [CurCtx] (sp : BitVec 64) (m : Nat) (ws : List (BitVec 64)) :
-    ([∗list] i ↦ w ∈ ws, wordPointsTo (sp - 8#64 * BitVec.ofNat 64 (i + m + 1)) 8 (DFrac.own 1) w) ⊢
-      [∗list] i ↦ w ∈ ws, wordPointsTo (GF := GF) (sp - 8#64 * BitVec.ofNat 64 m - 8#64 * BitVec.ofNat 64 (i + 1))
-        8 (DFrac.own 1) w := by
-  apply BigSepL.bigSepL_mono
-  intro k x _
-  rw [stackSlot_addr]
-
-theorem stackSlots_unshift [CurCtx] (sp : BitVec 64) (m : Nat) (ws : List (BitVec 64)) :
-    ([∗list] i ↦ w ∈ ws, wordPointsTo (GF := GF) (sp - 8#64 * BitVec.ofNat 64 m - 8#64 * BitVec.ofNat 64 (i + 1))
-        8 (DFrac.own 1) w) ⊢
-      [∗list] i ↦ w ∈ ws, wordPointsTo (sp - 8#64 * BitVec.ofNat 64 (i + m + 1)) 8 (DFrac.own 1) w := by
-  apply BigSepL.bigSepL_mono
-  intro k x _
-  rw [stackSlot_addr]
-
-theorem stackSlots_append_1 [CurCtx] (sp : BitVec 64) (ws₁ ws₂ : List (BitVec 64)) :
-    stackSlots (GF := GF) sp (ws₁ ++ ws₂) ⊢
-      stackSlots sp ws₁ ∗ stackSlots (sp - 8#64 * BitVec.ofNat 64 ws₁.length) ws₂ := by
-  unfold stackSlots
-  iintro H
-  icases BigSepL.bigSepL_append.1 $$ H with ⟨H₁, H₂⟩
-  iframe H₁
-  iapply stackSlots_shift $$ H₂
-
-theorem stackSlots_append_2 [CurCtx] (sp : BitVec 64) (ws₁ ws₂ : List (BitVec 64)) :
-    stackSlots sp ws₁ ∗ stackSlots (sp - 8#64 * BitVec.ofNat 64 ws₁.length) ws₂ ⊢
-      stackSlots (GF := GF) sp (ws₁ ++ ws₂) := by
-  unfold stackSlots
-  iintro ⟨H₁, H₂⟩
-  ihave H₂' := stackSlots_unshift sp ws₁.length ws₂ $$ H₂
-  iapply BigSepL.bigSepL_append.2
-  iframe
 
 /-- Split the top `m` slots off. -/
 theorem stackOwn_split [CurCtx] (sp : BitVec 64) (m n : Nat) :
     stackOwn (GF := GF) sp (m + n) ⊢ stackOwn sp m ∗ stackOwn (sp - 8#64 * BitVec.ofNat 64 m) n := by
   unfold stackOwn
-  iintro ⟨%hf, %ws, %hlen, H⟩
-  have hsplit : ws = ws.take m ++ ws.drop m := (List.take_append_drop m ws).symm
-  have hl1 : (ws.take m).length = m := by simp; omega
-  rw [hsplit]
-  icases stackSlots_append_1 sp _ _ $$ H with ⟨H₁, H₂⟩
-  rw [hl1]
-  isplitl [H₁]
-  · isplitr
-    · ipureintro; exact stackFacts_mono hf (by omega)
-    · iexists ws.take m
-      iframe H₁
-      ipureintro; exact hl1
-  · isplitr
-    · ipureintro; exact stackFacts_sub hf
-    · iexists ws.drop m
-      iframe H₂
-      ipureintro; simp; omega
+  rw [List.range_add]
+  refine BigSepL.bigSepL_append.1.trans ?_
+  rw [BigSepL.bigSepL_map]
+  simp only [stackSlot_addr]
+  iintro H; iexact H
 
 /-- Put the top `m` slots back. -/
-theorem stackOwn_join [CurCtx] (sp : BitVec 64) (m n : Nat) (hf : stackFacts sp (m + n)) :
+theorem stackOwn_join [CurCtx] (sp : BitVec 64) (m n : Nat) :
     stackOwn (GF := GF) sp m ∗ stackOwn (sp - 8#64 * BitVec.ofNat 64 m) n ⊢ stackOwn sp (m + n) := by
   unfold stackOwn
-  iintro ⟨⟨%_, %ws₁, %hl1, H₁⟩, ⟨%_, %ws₂, %hl2, H₂⟩⟩
-  isplitr
-  · ipureintro; exact hf
-  · iexists ws₁ ++ ws₂
-    isplitr
-    · ipureintro; simp; omega
-    · rw [← hl1]
-      iapply stackSlots_append_2
-      iframe
+  rw [List.range_add]
+  refine Entails.trans ?_ BigSepL.bigSepL_append.2
+  rw [BigSepL.bigSepL_map]
+  simp only [stackSlot_addr]
+  iintro H; iexact H
 
-/-- A two-slot frame: the words at `sp - 8` and `sp - 16`. -/
-theorem stackOwn_two_cases [CurCtx] (sp : BitVec 64) :
-    stackOwn (GF := GF) sp 2 ⊢
-      ⌜stackFacts sp 2⌝ ∗ ∃ w₁ w₂ : BitVec 64,
-        wordPointsTo (sp + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) w₁ ∗
-        wordPointsTo (sp + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) w₂ := by
-  unfold stackOwn stackSlots
-  iintro ⟨%hf, %ws, %hlen, H⟩
-  match ws, hlen with
-  | [w₁, w₂], _ =>
-    simp only [Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil, BitVec.sub_eq_add_neg,
-      BitVec.reduceMul, BitVec.reduceNeg, Nat.reduceAdd]
-    icases H with ⟨H₁, H₂, _⟩
-    iframe H₁ H₂
-    ipureintro; exact hf
-
-theorem stackOwn_two_intro [CurCtx] (sp : BitVec 64) (hf : stackFacts sp 2) (w₁ w₂ : BitVec 64) :
-    wordPointsTo (sp + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) w₁ ∗
-    wordPointsTo (sp + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) w₂ ⊢ stackOwn (GF := GF) sp 2 := by
-  unfold stackOwn stackSlots
-  iintro ⟨H₁, H₂⟩
-  isplitr
-  · ipureintro; exact hf
-  · iexists [w₁, w₂]
-    simp only [Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil, BitVec.sub_eq_add_neg,
-      BitVec.reduceMul, BitVec.reduceNeg, Nat.reduceAdd]
-    iframe H₁ H₂
-    ipureintro; rfl
+/-- Open a stack region of literal size into its cells (on the goal: after
+`irevert H`, then `iintro ⟨⟨%w₀, H₀⟩, ⟨%w₁, H₁⟩, …, _⟩`; or to prove
+`stackOwn sp n` from the cells at hand, followed by `iframe`). -/
+macro "stack_cells" : tactic =>
+  `(tactic| isimp only [stackOwn, List.range_succ, List.range_zero, List.nil_append, List.cons_append,
+      Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil, BitVec.sub_eq_add_neg,
+      BitVec.reduceMul, BitVec.reduceNeg, Nat.reduceAdd])
 
 /-- The slots the trap path pushes below the interrupted thread's `sp`
 (kernelvec's 256-byte frame and kerneltrap's own frames): owed by the bundle
