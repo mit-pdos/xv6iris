@@ -312,7 +312,7 @@ Section ProofPlicinithart.
       iIntros (pq pq') "%Hpw _ Hslots _".
       rewrite HN5sw HN5a5 (ph_senable_write _ pq _ Hhart) in Hpw.
       injection Hpw as Hrec.
-      assert (Hcl : p_claimed pq' uart_irq_id = p_claimed pq uart_irq_id)
+      assert (Hcl : p_claimed pq' (uart_irq_id Uart0) = p_claimed pq (uart_irq_id Uart0))
         by (rewrite <- Hrec; reflexivity).
       iModIntro. iSplitL "Hslots"; [| done].
       iApply (plic_slots_stable _ pq pq' Hcl). iExact "Hslots". }
@@ -387,7 +387,7 @@ Section ProofPlicinithart.
     { iIntros (pq pq') "%Hpw _ Hslots _".
       rewrite HN8sw HN8a5 (ph_sthresh_write _ pq _ Hhart) in Hpw.
       injection Hpw as Hrec.
-      assert (Hcl : p_claimed pq' uart_irq_id = p_claimed pq uart_irq_id)
+      assert (Hcl : p_claimed pq' (uart_irq_id Uart0) = p_claimed pq (uart_irq_id Uart0))
         by (rewrite <- Hrec; reflexivity).
       iModIntro. iSplitL "Hslots"; [| done].
       iApply (plic_slots_stable _ pq pq' Hcl). iExact "Hslots". }

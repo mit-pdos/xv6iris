@@ -19,7 +19,7 @@
      - a per-context ENABLE word may only name interrupt sources this machine
        actually has -- the UART and the virtio disk.
 
-   [plicinithart] writes exactly [(1 << uart_irq_id) | (1 << virtio_irq_id)],
+   [plicinithart] writes exactly [(1 << (uart_irq_id Uart0)) | (1 << virtio_irq_id)],
    so its write lands inside the permitted set no matter what was there
    before.
 
@@ -40,7 +40,7 @@ Local Open Scope Z_scope.
    in: both device sources are below 32, so word 0 carries them and every
    other word is permitted nothing at all *)
 Definition plic_dev_irq_mask : Z :=
-  Z.lor (Z.shiftl 1 (Z.of_N uart_irq_id)) (Z.shiftl 1 (Z.of_N virtio_irq_id)).
+  Z.lor (Z.shiftl 1 (Z.of_N (uart_irq_id Uart0))) (Z.shiftl 1 (Z.of_N virtio_irq_id)).
 
 Definition plic_dev_irq_word (w : nat) : Z :=
   if Nat.eqb w 0 then plic_dev_irq_mask else 0.
@@ -208,7 +208,7 @@ Qed.
 (* the UART's source id is a real one, which is what makes a completion
    naming it land rather than be dropped *)
 Lemma uart_irq_id_range :
-  (1 <= Z.of_N uart_irq_id)%Z /\ (Z.of_N uart_irq_id < Z.of_nat plic_nsrc)%Z.
+  (1 <= Z.of_N (uart_irq_id Uart0))%Z /\ (Z.of_N (uart_irq_id Uart0) < Z.of_nat plic_nsrc)%Z.
 Proof. unfold uart_irq_id, plic_nsrc. cbn. lia. Qed.
 
 (* the word [plicinithart] writes is permitted in word 0 (it IS the mask) *)
@@ -232,7 +232,7 @@ Qed.
    result be exhaustive. *)
 Definition plic_claim_ret_ok (v : bv 32) : Prop :=
   v = Z_to_bv 32 0 \/
-  v = Z_to_bv 32 (Z.of_N uart_irq_id) \/
+  v = Z_to_bv 32 (Z.of_N (uart_irq_id Uart0)) \/
   v = Z_to_bv 32 (Z.of_N virtio_irq_id).
 
 (* [plic_best] is a fold that only ever returns an element of the list it
@@ -279,7 +279,7 @@ Qed.
    are therefore refuted by the same [vm_compute]. *)
 Lemma plic_enabled_srcs (p : plic_state) (c : nat) (i : N) :
   plic_ok p -> In i plic_srcs -> plic_enabled p c i = true ->
-  i = uart_irq_id \/ i = virtio_irq_id.
+  i = (uart_irq_id Uart0) \/ i = virtio_irq_id.
 Proof.
   intros Hplan Hin Hen.
   assert (Hbit : Z.testbit (plic_dev_irq_word (plic_src_word i))
@@ -336,7 +336,7 @@ Qed.
    PENDING ([plic_cand]), and the plan says a pending source is not already
    in service -- so the source the claim takes was free before and is in
    service after.  This is the pure half of the receive token's handout: the
-   PLIC invariant parks the token under [p_claimed p uart_irq_id = false],
+   PLIC invariant parks the token under [p_claimed p (uart_irq_id Uart0) = false],
    and this is what says the token is there to be taken. *)
 Lemma plic_claim_serves (p : plic_state) (c : nat) (i : N) :
   plic_ok p -> plic_best p c = Some i ->
@@ -358,8 +358,8 @@ Qed.
    admits only the machine's two, and their encodings differ. *)
 Lemma plic_claim_uart_of_ret (p : plic_state) (c : nat) (i : N) :
   plic_ok p -> plic_best p c = Some i ->
-  Z_to_bv 32 (Z.of_N i) = Z_to_bv 32 (Z.of_N uart_irq_id) ->
-  i = uart_irq_id.
+  Z_to_bv 32 (Z.of_N i) = Z_to_bv 32 (Z.of_N (uart_irq_id Uart0)) ->
+  i = (uart_irq_id Uart0).
 Proof.
   intros Hok Hbest Heq.
   destruct (plic_best_spec p c i Hbest) as [Hin Hcand].

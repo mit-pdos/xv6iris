@@ -1,6 +1,6 @@
 (* RiscvPtsto.v -- riscvGS, register/memory points-to, the regstate/heap bridge. *)
 From Stdlib Require Import Eqdep_dec ZArith.
-From stdpp Require Import gmap bitvector.definitions.
+From stdpp Require Import gmap finite bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import gen_heap ghost_map ghost_var mono_nat
      invariants.
@@ -181,7 +181,10 @@ Record riscvEraGS := RiscvEraGS {
   era_reg_name : CPU -> gname;
   era_heap_name : gname;
   era_meta_name : gname;
-  era_uart_name : gname;
+  (* ONE NAME PER PORT (DevModel.uart_id), exactly as [era_reg_name] is one
+     name per hart: the board has two 16550s and each is its own shared
+     device state. *)
+  era_uart_name : uart_id -> gname;
   era_plic_name : gname;
   era_virtio_name : gname;
   (* the kernel-mapping claim ghost (KMap.v, rwx-kmap): one global
@@ -606,7 +609,7 @@ Definition era_memGS_of `{!riscvFixedGS Σ} (E : riscvEraGS) : gen_heapGS Arch.p
 Global Instance riscv_memGS `{!riscvGS Σ} : gen_heapGS Arch.pa (bv 8) Σ :=
   era_memGS_of riscv_eraGS.
 Definition cpu_reg_name `{!riscvGS Σ} : CPU -> gname := era_reg_name riscv_eraGS.
-Definition uart_name `{!riscvGS Σ} : gname := era_uart_name riscv_eraGS.
+Definition uart_name `{!riscvGS Σ} : uart_id -> gname := era_uart_name riscv_eraGS.
 Definition plic_name `{!riscvGS Σ} : gname := era_plic_name riscv_eraGS.
 Definition virtio_name `{!riscvGS Σ} : gname := era_virtio_name riscv_eraGS.
 Definition kmap_name `{!riscvGS Σ} : gname := era_kmap_name riscv_eraGS.
@@ -1209,7 +1212,8 @@ Definition ram_size : Z := 0x8000000.        (* 134217728 = 128 MiB *)
    region ([RiscvLang.pma_boot], whose value is the compiled
    [ColdBoot.cold_boot_pma] fact), and every device window in the tree sits
    inside it -- CLINT at 0x2000000, PLIC [plic_base, +plic_size) =
-   [0xC000000, 0xC400000), UART [uart_base, +8) at 0x10000000, virtio-mmio
+   [0xC000000, 0xC400000), the two UARTs [uart_base i, +8) at 0x10000000 and
+   0x1000a000, virtio-mmio
    [virtio_base, +0x1000) at 0x10001000.  Unlike RAM it is NOT readable and
    writable by fiat: the band grants R/W but is NOT executable and does NOT
    support PTE reads/writes or atomics, which is exactly why the PMA premise
@@ -2070,10 +2074,10 @@ Definition reg_interp `{!riscvGS Σ} `{CpuId} (rs : regstate) : iProp Σ :=
 (* the two bridge lemmas, mirroring [reg_valid]/[reg_update].               *)
 (* ---------------------------------------------------------------------- *)
 
-Definition uart_auth `{!riscvGS Σ} (u : uart_state) : iProp Σ :=
-  ghost_var uart_name (1/2) u.
-Definition uart_frag `{!riscvGS Σ} (u : uart_state) : iProp Σ :=
-  ghost_var uart_name (1/2) u.
+Definition uart_auth `{!riscvGS Σ} (i : uart_id) (u : uart_state) : iProp Σ :=
+  ghost_var (uart_name i) (1/2) u.
+Definition uart_frag `{!riscvGS Σ} (i : uart_id) (u : uart_state) : iProp Σ :=
+  ghost_var (uart_name i) (1/2) u.
 Definition plic_auth `{!riscvGS Σ} (p : plic_state) : iProp Σ :=
   ghost_var plic_name (1/2) p.
 Definition plic_frag `{!riscvGS Σ} (p : plic_state) : iProp Σ :=
@@ -2084,19 +2088,41 @@ Definition virtio_frag `{!riscvGS Σ} (v : virtio_state) : iProp Σ :=
   ghost_var virtio_name (1/2) v.
 
 (* the state_interp conjunct for the shared device state *)
+(* ONE HALF PER PORT.  A big-op over [enum uart_id] rather than a pair, so
+   a third port would cost nothing here and every rule that focuses a port
+   goes through the one accessor [uarts_auth_acc] below. *)
+Definition uarts_auth `{!riscvGS Σ} (f : uart_id -> uart_state) : iProp Σ :=
+  ([∗ list] i ∈ enum uart_id, uart_auth i (f i))%I.
+
 Definition dev_interp `{!riscvGS Σ} (d : dev_state) : iProp Σ :=
-  (uart_auth d.(duart) ∗ plic_auth d.(dplic) ∗ virtio_auth d.(dvirtio))%I.
+  (uarts_auth d.(duart) ∗ plic_auth d.(dplic) ∗ virtio_auth d.(dvirtio))%I.
 
 Section DevBridge.
   Context `{!riscvGS Σ}.
 
-  Lemma uart_agree u u' : uart_auth u -∗ uart_frag u' -∗ ⌜u' = u⌝.
+  Lemma uart_agree i u u' : uart_auth i u -∗ uart_frag i u' -∗ ⌜u' = u⌝.
   Proof.
     iIntros "Ha Hf". by iDestruct (ghost_var_agree with "Ha Hf") as %->.
   Qed.
-  Lemma uart_update u u' u'' :
-    uart_auth u -∗ uart_frag u' ==∗ uart_auth u'' ∗ uart_frag u''.
+  Lemma uart_update i u u' u'' :
+    uart_auth i u -∗ uart_frag i u' ==∗ uart_auth i u'' ∗ uart_frag i u''.
   Proof. iApply ghost_var_update_halves. Qed.
+
+  (* FOCUS ONE PORT out of the fabric's bundle: its half comes out, and
+     putting a half back at a (possibly different) state rebuilds the
+     bundle at the updated function.  This is the ONLY way a rule reaches a
+     port's authority, so no proof has to know how many ports there are. *)
+  Lemma uarts_auth_acc (f : uart_id -> uart_state) (i : uart_id) :
+    uarts_auth f -∗
+      uart_auth i (f i) ∗ (∀ u, uart_auth i u -∗ uarts_auth (uupd f i u)).
+  Proof.
+    rewrite /uarts_auth /enum /uart_id_finite /=.
+    iIntros "(H0 & H1 & _)". destruct i.
+    - iFrame "H0". iIntros (u) "H0".
+      rewrite (uupd_eq f Uart0 u) (uupd_ne f Uart0 Uart1 u ltac:(done)). iFrame.
+    - iFrame "H1". iIntros (u) "H1".
+      rewrite (uupd_eq f Uart1 u) (uupd_ne f Uart1 Uart0 u ltac:(done)). iFrame.
+  Qed.
 
   Lemma plic_agree p p' : plic_auth p -∗ plic_frag p' -∗ ⌜p' = p⌝.
   Proof.
@@ -2421,7 +2447,8 @@ Definition gregs_interp_at `{!riscvFixedGS Σ} (E : riscvEraGS)
      reg_interp_at (era_reg_name E cpu) (gr cpu))%I.
 Definition dev_interp_at `{!riscvFixedGS Σ} (E : riscvEraGS)
     (d : dev_state) : iProp Σ :=
-  (ghost_var (era_uart_name E) (1/2) d.(duart) ∗
+  (([∗ list] i ∈ enum uart_id,
+      ghost_var (era_uart_name E i) (1/2) (d.(duart) i)) ∗
    ghost_var (era_plic_name E) (1/2) d.(dplic) ∗
    ghost_var (era_virtio_name E) (1/2) d.(dvirtio))%I.
 (* the era's four conjuncts.  The DISK IMAGE rides here, in LAST position,
@@ -2531,7 +2558,7 @@ Definition power_interp `{!riscvFixedGS Σ} (g : gstate) : iProp Σ :=
    trick, applied to the past: at the end of the run [κs = []] and the
    history IS the trace); the history is well-formed for the machine
    ([ObsTrace.obs_wf] -- the power alternation, the boot count, and the WIRE
-   TIE [obs_wire (open_seg h) = u_wire], a pure step invariant of the
+   TIE [obs_wire i (open_seg h) = u_wire of port i], a pure step invariant of the
    language exactly like [resv_ok]); and the machine's half of the history
    ghost.  A silent step ([κ = []]) re-packs at the same [h]
    ([obs_interp_silent]); an observed one re-packs at [h ++ κ] after the

@@ -20,7 +20,7 @@
 
    THE RETURN VALUE IS THE POINT.  A claim hands back the id of the source it
    took, and the plan says a hart's context can only ever have the machine's own
-   two sources enabled -- so the id is 0, [uart_irq_id] or [virtio_irq_id], and
+   two sources enabled -- so the id is 0, [(uart_irq_id Uart0)] or [virtio_irq_id], and
    nothing else ([plic_claim_ret_ok]).  That is exactly what makes devintr()'s
    three-way branch on the result exhaustive, and it is the one fact the loose
    shared invariant is strong enough to deliver.
@@ -55,7 +55,7 @@ Import Defs.
 (* the ids a claim can return, as the 64-bit words [lw] leaves in a0 *)
 Definition plic_claim_a0_ok (v : mword 64) : Prop :=
   v = (mword_of_int 0 : mword 64) \/
-  v = (mword_of_int (Z.of_N uart_irq_id) : mword 64) \/
+  v = (mword_of_int (Z.of_N (uart_irq_id Uart0)) : mword 64) \/
   v = (mword_of_int (Z.of_N virtio_irq_id) : mword 64).
 
 (* INTERRUPTS MUST BE DISABLED.  plic_claim's very first instruction is an
@@ -100,7 +100,7 @@ Definition wp_plic_claim_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CI
        matching plic_complete.  That is what makes exactly one hart the
        popper of the receive FIFO. *)
     (⌜ m' !!! Regidx a0_idx
-       = (mword_of_int (Z.of_N uart_irq_id) : mword 64) ⌝ -∗
+       = (mword_of_int (Z.of_N (uart_irq_id Uart0)) : mword 64) ⌝ -∗
        plic_payload_uart γd) -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).

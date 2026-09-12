@@ -65,33 +65,45 @@ Require Import ObsTrace.
 
 (* the per-register facts are DevModel's own ([uart_read_stable]'s second
    projection and [uart_write_out]); only the bus lift is new *)
+(* the setter moves ONE port, so a fact about every port follows from the
+   fact about the one that moved -- [ObsTrace.set_duart_wire]'s twin *)
+Lemma set_duart_out (d : dev_state) (i j : uart_id) (u : uart_state) :
+  u_out u = u_out (duart d i) ->
+  u_out (duart (set_duart d i u) j) = u_out (duart d j).
+Proof.
+  intro H. unfold set_duart, uupd. cbn.
+  destruct (decide (j = i)) as [->|]; done.
+Qed.
+
 Lemma dev_read_u_out (d : dev_state) (pa : Arch.pa) (n : N)
-    (w : bv (8 * n)) (d' : dev_state) :
-  dev_read d pa n = Some (w, d') -> u_out (duart d') = u_out (duart d).
+    (w : bv (8 * n)) (d' : dev_state) (j : uart_id) :
+  dev_read d pa n = Some (w, d') -> u_out (duart d' j) = u_out (duart d j).
 Proof.
   unfold dev_read, uart_dev_read. intros H.
   repeat (case_match; try discriminate); simplify_eq; cbn;
     first [ reflexivity
           | by match goal with
                | H : uart_read _ _ = Some _ |- _ =>
-                   destruct (uart_read_stable _ _ _ _ H) as (_ & ? & _)
+                   destruct (uart_read_stable _ _ _ _ H) as (_ & Ho & _);
+                   apply set_duart_out, Ho
                end ].
 Qed.
 
 Lemma dev_write_u_out (d : dev_state) (pa : Arch.pa) (n : N)
-    (v : bv (8 * n)) (d' : dev_state) :
-  dev_write d pa n v = Some d' -> u_out (duart d') = u_out (duart d).
+    (v : bv (8 * n)) (d' : dev_state) (j : uart_id) :
+  dev_write d pa n v = Some d' -> u_out (duart d' j) = u_out (duart d j).
 Proof.
   unfold dev_write, uart_dev_write. intros H.
   repeat (case_match; try discriminate); simplify_eq; cbn;
-    first [ reflexivity | by eapply uart_write_out ].
+    first [ reflexivity
+          | by apply set_duart_out, (uart_write_out _ _ _ _ ltac:(eassumption)) ].
 Qed.
 
 (* the twin of [ObsTrace.mnode_step_u_out]'s [u_wire] version: a hart node
    reaches the UART only through the bus *)
-Lemma mnode_step_u_out oth h img s log tv itv hr r m m' s' log' tv' itv' hr' r' :
+Lemma mnode_step_u_out oth h img s log tv itv hr r m m' s' log' tv' itv' hr' r' (j : uart_id) :
   mnode_step oth h img s log tv itv hr r m m' s' log' tv' itv' hr' r' ->
-  u_out (duart (mdev s')) = u_out (duart (mdev s)).
+  u_out (duart (mdev s') j) = u_out (duart (mdev s) j).
 Proof.
   rewrite /mnode_step. destruct m as [y|T oc k].
   { by intros (tick & _ & -> & _). }
@@ -100,14 +112,14 @@ Proof.
   - (* MemRead *)
     destruct (dev_addr _).
     + intros (w & d' & Hdr & _ & -> & _). cbn.
-      exact (dev_read_u_out _ _ _ _ _ Hdr).
+      exact (dev_read_u_out _ _ _ _ _ _ Hdr).
     + by intros [(_ & tvn & w & _ & _ & _ & _ & -> & _)
                 |[(_ & _ & tvn & w & _ & _ & _ & _ & _ & -> & _)
                  |(_ & [(_ & _ & -> & _) | (_ & w & _ & _ & -> & _)])]].
   - (* MemWrite *)
     destruct (dev_addr _).
     + intros (d' & Hdw & _ & -> & _). cbn.
-      exact (dev_write_u_out _ _ _ _ _ Hdw).
+      exact (dev_write_u_out _ _ _ _ _ _ Hdw).
     + by intros [(_ & _ & -> & _) | (_ & _ & -> & _)].
   - (* Choose *) by intros (ch & _ & -> & _).
 Qed.
@@ -149,12 +161,16 @@ Proof.
   by apply stdpp.list_relations.sublist_inserts_r.
 Qed.
 
-Lemma uart_step_out_wire_ok (d : dev_state) (κ : list mobs) (d' : dev_state) :
-  uart_step d κ d' -> out_wire_ok (duart d) -> out_wire_ok (duart d').
+Lemma uart_step_out_wire_ok (i : uart_id) (d : dev_state) (κ : list mobs)
+    (d' : dev_state) (j : uart_id) :
+  uart_step i d κ d' -> out_wire_ok (duart d j) -> out_wire_ok (duart d' j).
 Proof.
   intros H Hok. destruct H as [b u' Htx | b u' Hrx | p' _ _ |].
-  - cbn [duart set_duart]. exact (uart_tx_pop_out_wire_ok _ _ _ Htx Hok).
-  - cbn [duart set_duart]. rewrite /out_wire_ok.
+  - unfold set_duart, uupd. cbn [duart]. case_decide as Hji.
+    + subst j. exact (uart_tx_pop_out_wire_ok _ _ _ Htx Hok).
+    + exact Hok.
+  - unfold set_duart, uupd. cbn [duart]. case_decide as Hji; [|exact Hok].
+    subst j. rewrite /out_wire_ok.
     rewrite (uart_rx_push_wire _ _ _ Hrx).
     by rewrite (uart_rx_push_out _ _ _ Hrx).
   - by cbn [duart set_dplic].
@@ -169,7 +185,7 @@ Qed.
 (* ---------------------------------------------------------------------- *)
 
 Definition gout_wire_ok (g : gstate) : Prop :=
-  g.(gpow) = true -> out_wire_ok (duart g.(gdev)).
+  g.(gpow) = true -> forall i, out_wire_ok (duart g.(gdev) i).
 
 Lemma gout_wire_ok_off (g : gstate) : g.(gpow) = false -> gout_wire_ok g.
 Proof. intros Hpw Hon. by rewrite Hpw in Hon. Qed.
@@ -180,7 +196,7 @@ Proof.
   intros Hstep Hok.
   destruct Hstep as
     [ (gen & cpu & m & -> & -> & _ & [ (_ & Hn) | (_ & _ & ->) ])
-    | [ (gen & -> & _ & _ & [ ([Hpw Hgen] & d' & Hu & ->) | (_ & -> & ->) ])
+    | [ (gen & iu & -> & _ & _ & [ ([Hpw Hgen] & d' & Hu & ->) | (_ & -> & ->) ])
     | [ (gen & -> & _ & -> & _ & [ (_ & d' & W & log' & Hd & _ & _ & ->) | (_ & ->) ])
     | [ (gen & -> & _ & -> & _ & [ (_ & gr' & _ & ->) | (_ & ->) ])
     | (-> & _ & [ (Hpw & -> & _ & ->) | (Hpw & -> & _ & Hboot) ]) ] ] ] ];
@@ -188,21 +204,21 @@ Proof.
   - (* a hart node: it reaches the UART through the bus only, and the bus
        moves neither list *)
     destruct Hn as (m' & s' & log' & tv' & itv' & hr' & r' & Hn & _ & ->). cbn.
-    intros Hon. rewrite /out_wire_ok.
-    rewrite (mnode_step_u_wire _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Hn)
-            (mnode_step_u_out _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Hn).
-    exact (Hok Hon).
+    intros Hon i. rewrite /out_wire_ok.
+    rewrite (mnode_step_u_wire _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Hn)
+            (mnode_step_u_out _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Hn).
+    exact (Hok Hon i).
   - (* the UART thread: the one mover *)
-    cbn. intros _. exact (uart_step_out_wire_ok _ _ _ Hu (Hok Hpw)).
+    cbn. intros _ i. exact (uart_step_out_wire_ok _ _ _ _ _ Hu (Hok Hpw i)).
   - (* the disk: it never touches the UART *)
-    cbn. intros Hon. rewrite /out_wire_ok (disk_step_duart _ _ _ _ Hd).
-    exact (Hok Hon).
+    cbn. intros Hon i. rewrite /out_wire_ok (disk_step_duart _ _ _ _ Hd).
+    exact (Hok Hon i).
   - (* PowerOff: nothing is observed while the power is off *)
     by intros Hon.
   - (* PowerOn: a reset UART *)
     destruct Hboot as (_ & _ & Hbf).
     destruct Hbf as (_ & _ & _ & _ & Huart & _).
-    intros _. rewrite /out_wire_ok Huart. exact out_wire_ok_uart0.
+    intros _ i. rewrite /out_wire_ok Huart. exact out_wire_ok_uart0.
 Qed.
 
 Lemma step_gout_wire_ok (ρ1 ρ2 : cfg riscv_lang) (κ : list mobs) :
@@ -249,17 +265,17 @@ Qed.
 (* ---------------------------------------------------------------------- *)
 
 Theorem run_out_accepted (n : nat) (t t2 : list (expr riscv_lang))
-    (g g2 : gstate) (κs : list mobs) :
+    (g g2 : gstate) (κs : list mobs) (i : uart_id) :
   g.(gpow) = false -> g.(ggen) = 0%nat ->
   nsteps (Λ := riscv_lang) n (t, g) κs (t2, g2) ->
-  obs_wire (open_seg κs) `sublist_of` uart_acc (duart g2.(gdev)).
+  obs_wire i (open_seg κs) `sublist_of` uart_acc (duart g2.(gdev) i).
 Proof.
   intros Hpw Hgen Hn.
   pose proof (run_obs_wf n t t2 g g2 κs Hpw Hgen Hn) as (Hsh & _ & Hwire).
   pose proof (nsteps_gout_wire_ok n (t, g) (t2, g2) κs Hn
                 (gout_wire_ok_off g Hpw)) as Hok.
   destruct (g2.(gpow)) eqn:Hpw2.
-  - rewrite (Hwire eq_refl). exact (out_wire_ok_acc _ (Hok Hpw2)).
+  - rewrite (Hwire eq_refl i). exact (out_wire_ok_acc _ (Hok Hpw2 i)).
   - rewrite (trace_shape_off_open_seg κs Hsh) /=.
     apply stdpp.list_relations.sublist_nil_l.
 Qed.
@@ -319,20 +335,20 @@ Proof.
 Qed.
 
 Theorem run_out_accepted_from (n : nat) (t t2 : list (expr riscv_lang))
-    (g g2 : gstate) (κs : list mobs) (tr0 bs : list (bv 8)) :
+    (g g2 : gstate) (κs : list mobs) (i : uart_id) (tr0 bs : list (bv 8)) :
   g.(gpow) = false -> g.(ggen) = 0%nat ->
   nsteps (Λ := riscv_lang) n (t, g) κs (t2, g2) ->
   (* the receipt's pure residue at the reached state *)
-  tr0 `prefix_of` uart_acc (duart g2.(gdev)) ->
-  bs `sublist_of` drop (length tr0) (uart_acc (duart g2.(gdev))) ->
+  tr0 `prefix_of` uart_acc (duart g2.(gdev) i) ->
+  bs `sublist_of` drop (length tr0) (uart_acc (duart g2.(gdev) i)) ->
   exists w1 w2,
-    obs_wire (open_seg κs) = w1 ++ w2
+    obs_wire i (open_seg κs) = w1 ++ w2
     /\ w1 `sublist_of` tr0
-    /\ w2 `sublist_of` drop (length tr0) (uart_acc (duart g2.(gdev)))
-    /\ bs `sublist_of` drop (length tr0) (uart_acc (duart g2.(gdev))).
+    /\ w2 `sublist_of` drop (length tr0) (uart_acc (duart g2.(gdev) i))
+    /\ bs `sublist_of` drop (length tr0) (uart_acc (duart g2.(gdev) i)).
 Proof.
   intros Hpw Hgen Hn Hpre Hbs.
-  pose proof (run_out_accepted n t t2 g g2 κs Hpw Hgen Hn) as Hsub.
+  pose proof (run_out_accepted n t t2 g g2 κs i Hpw Hgen Hn) as Hsub.
   destruct (out_accepted_locate _ _ _ Hsub Hpre) as (w1 & w2 & Hw & Hw1 & Hw2).
   exists w1, w2. done.
 Qed.

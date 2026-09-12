@@ -71,11 +71,12 @@ Import Defs.
 Section DevGhost.
   Context `{!riscvGS Σ}.
 
-  Lemma dev_interp_agree d u p :
-    dev_interp d -∗ uart_frag u -∗ plic_frag p -∗ ⌜duart d = u /\ dplic d = p⌝.
+  Lemma dev_interp_agree d i u p :
+    dev_interp d -∗ uart_frag i u -∗ plic_frag p -∗ ⌜duart d i = u /\ dplic d = p⌝.
   Proof.
     iIntros "(Hua & Hpa & _) Hu Hp".
-    iDestruct (uart_agree with "Hua Hu") as %->.
+    iDestruct (uarts_auth_acc _ i with "Hua") as "[Hui _]".
+    iDestruct (uart_agree with "Hui Hu") as %->.
     iDestruct (plic_agree with "Hpa Hp") as %->.
     done.
   Qed.
@@ -84,11 +85,12 @@ Section DevGhost.
   (* ... and the per-device halves of that agreement, for the proofs that hold
      only ONE device's fragment (each device thread opens only its own
      invariant, so it never has the other devices' fragments to hand). *)
-  Lemma dev_interp_agree_uart d u :
-    dev_interp d -∗ uart_frag u -∗ ⌜duart d = u⌝.
+  Lemma dev_interp_agree_uart d i u :
+    dev_interp d -∗ uart_frag i u -∗ ⌜duart d i = u⌝.
   Proof.
     iIntros "(Hua & _ & _) Hu".
-    by iDestruct (uart_agree with "Hua Hu") as %->.
+    iDestruct (uarts_auth_acc _ i with "Hua") as "[Hui _]".
+    by iDestruct (uart_agree with "Hui Hu") as %->.
   Qed.
 
   Lemma dev_interp_agree_plic d p :
@@ -99,12 +101,14 @@ Section DevGhost.
   Qed.
 
   (* uart-only update (the plic component rides along) *)
-  Lemma dev_interp_update_uart d u u' :
-    dev_interp d -∗ uart_frag u ==∗ dev_interp (set_duart d u') ∗ uart_frag u'.
+  Lemma dev_interp_update_uart d i u u' :
+    dev_interp d -∗ uart_frag i u ==∗ dev_interp (set_duart d i u') ∗ uart_frag i u'.
   Proof.
     iIntros "(Hua & Hpa & Hva) Hu".
-    iMod (uart_update with "Hua Hu") as "[$ $]".
-    rewrite /set_duart /dev_interp /=. by iFrame "Hpa Hva".
+    iDestruct (uarts_auth_acc _ i with "Hua") as "[Hui Hback]".
+    iMod (uart_update with "Hui Hu") as "[Hui $]".
+    iDestruct ("Hback" with "Hui") as "Hua".
+    rewrite /set_duart /dev_interp /=. by iFrame "Hua Hpa Hva".
   Qed.
 
   Lemma dev_interp_update_plic d p p' :
@@ -120,18 +124,31 @@ End DevGhost.
 (* §2  MMIO transaction leaves.                                           *)
 (* ===================================================================== *)
 
-(* the UART registers live at [uart_base + off]; xv6 uses off 0..5 *)
-Definition uart_pa (off : Z) : Arch.pa := Z_to_bv 64 (uart_base + off).
+(* PORT [i]'s registers live at [uart_base i + off]; xv6's console driver
+   uses off 0..5 of [Uart0].  Everything in this section is stated at an
+   arbitrary port -- the leaves are the fabric's, not the console's -- and
+   the two ports' bases are literals, so a proof splits on [i] and computes.
+   [uart_base_lo]/[uart_base_hi] are the only board facts any of it needs. *)
+Definition uart_pa (i : uart_id) (off : Z) : Arch.pa :=
+  Z_to_bv 64 (uart_base i + off).
 
-Lemma uint_uart_pa off : 0 <= off < uart_size -> uint (uart_pa off) = uart_base + off.
+Lemma uart_base_lo (i : uart_id) : 0x10000000 <= uart_base i.
+Proof. destruct i; cbn; lia. Qed.
+Lemma uart_base_hi (i : uart_id) : uart_base i + uart_size <= 0x1000a008.
+Proof. destruct i; cbn; unfold uart_size; lia. Qed.
+
+Lemma uint_uart_pa i off :
+  0 <= off < uart_size -> uint (uart_pa i off) = uart_base i + off.
 Proof.
   intros Hoff. unfold uart_size in Hoff.
+  pose proof (uart_base_lo i). pose proof (uart_base_hi i).
+  unfold uart_size in *.
   unfold uart_pa, uint, MachineWord.word_to_N. unfold get_word.
   rewrite Z_to_bv_unsigned.
   rewrite bv_wrap_small.
   2:{ assert (Hm : bv_modulus 64 = 18446744073709551616) by (vm_compute; reflexivity).
-      rewrite Hm. unfold uart_base in *. lia. }
-  apply Z2N.id. unfold uart_base in *. lia.
+      rewrite Hm. lia. }
+  apply Z2N.id. lia.
 Qed.
 
 (* A UART REGISTER IS IN THE DEVICE PMA CLASS: the whole window sits inside
@@ -140,72 +157,85 @@ Qed.
    the strictly weaker "the access does not wrap", which was all the
    all-addresses [pma_allows_all] needed; the real table grants R/W here and
    nothing outside its three regions.) *)
-Lemma uart_pa_access_io off n :
+Lemma uart_pa_access_io i off n :
   0 <= off < uart_size -> 1 <= n <= 4096 ->
-  pma_io_access (uart_pa off) n.
+  pma_io_access (uart_pa i off) n.
 Proof.
   intros Hoff Hn.
-  apply (pma_access_io _ _ uart_base (uart_base + uart_size));
-    [ rewrite (uint_uart_pa off Hoff); lia
-    | rewrite (uint_uart_pa off Hoff); lia
-    | reflexivity | reflexivity | exact Hn ].
+  apply (pma_access_io _ _ (uart_base i) (uart_base i + uart_size));
+    [ rewrite (uint_uart_pa i off Hoff); lia
+    | rewrite (uint_uart_pa i off Hoff); lia
+    | destruct i; reflexivity | destruct i; reflexivity | exact Hn ].
 Qed.
 
-Lemma dev_addr_uart off : 0 <= off < uart_size -> dev_addr (uart_pa off) = true.
+Lemma dev_addr_uart i off :
+  0 <= off < uart_size -> dev_addr (uart_pa i off) = true.
 Proof.
   intros Hoff. unfold dev_addr. apply Z.ltb_lt.
-  rewrite (uint_uart_pa off Hoff). unfold uart_base, uart_size, dev_bound in *. lia.
+  rewrite (uint_uart_pa i off Hoff).
+  pose proof (uart_base_hi i). unfold uart_size, dev_bound in *. lia.
 Qed.
 
 (* one UART MMIO transaction, at the fabric level *)
-Lemma dev_read_uart (d : dev_state) (off : Z) (b : bv 8) (u' : uart_state) :
+(* the bus decodes port [i]'s window to port [i] -- what makes the leaves
+   below say which chip answered *)
+Lemma uart_decode_pa (i : uart_id) (off : Z) :
+  0 <= off < uart_size -> uart_decode (uart_base i + off) = Some i.
+Proof.
+  intro Hoff. unfold uart_size in Hoff.
+  unfold uart_decode, in_uart, uart_size.
+  destruct i; cbn;
+    repeat (rewrite (proj2 (Z.leb_le _ _)) by lia);
+    repeat (rewrite (proj2 (Z.ltb_lt _ _)) by lia);
+    try (rewrite (proj2 (Z.ltb_ge _ _)) by lia);
+    try (rewrite (proj2 (Z.leb_gt _ _)) by lia);
+    cbn; reflexivity.
+Qed.
+
+Lemma dev_read_uart (d : dev_state) (i : uart_id) (off : Z) (b : bv 8)
+    (u' : uart_state) :
   0 <= off < uart_size ->
-  uart_read (duart d) off = Some (b, u') ->
-  dev_read d (uart_pa off) 1 = Some (b, set_duart d u').
+  uart_read (duart d i) off = Some (b, u') ->
+  dev_read d (uart_pa i off) 1 = Some (b, set_duart d i u').
 Proof.
   intros Hoff Hrd. unfold dev_read.
-  rewrite (uint_uart_pa off Hoff).
-  assert (Hin : in_uart (uart_base + off) = true).
-  { unfold in_uart. apply andb_true_intro.
-    split; [apply Z.leb_le; lia | apply Z.ltb_lt; lia]. }
-  rewrite Hin.
-  replace (uart_base + off - uart_base) with off by lia.
+  rewrite (uint_uart_pa i off Hoff) (uart_decode_pa i off Hoff).
+  replace (uart_base i + off - uart_base i) with off by lia.
   rewrite Hrd. reflexivity.
 Qed.
 
-Lemma dev_write_uart (d : dev_state) (off : Z) (b : bv 8) (u' : uart_state) :
+Lemma dev_write_uart (d : dev_state) (i : uart_id) (off : Z) (b : bv 8)
+    (u' : uart_state) :
   0 <= off < uart_size ->
-  uart_write (duart d) off b = Some u' ->
-  dev_write d (uart_pa off) 1 b = Some (set_duart d u').
+  uart_write (duart d i) off b = Some u' ->
+  dev_write d (uart_pa i off) 1 b = Some (set_duart d i u').
 Proof.
   intros Hoff Hwr. unfold dev_write.
-  rewrite (uint_uart_pa off Hoff).
-  assert (Hin : in_uart (uart_base + off) = true).
-  { unfold in_uart. apply andb_true_intro.
-    split; [apply Z.leb_le; lia | apply Z.ltb_lt; lia]. }
-  rewrite Hin.
-  replace (uart_base + off - uart_base) with off by lia.
+  rewrite (uint_uart_pa i off Hoff) (uart_decode_pa i off Hoff).
+  replace (uart_base i + off - uart_base i) with off by lia.
   rewrite Hwr. reflexivity.
 Qed.
 
 (* the UART window is disjoint from the Sail-internal CLINT/SIG windows and
    (given the boot config) HTIF, so a UART access reaches the interpreter *)
-Lemma uart_pa_not_in_clint off : 0 <= off < uart_size -> not_in_clint (uart_pa off).
+Lemma uart_pa_not_in_clint i off :
+  0 <= off < uart_size -> not_in_clint (uart_pa i off).
 Proof.
   intros Hoff. right.
-  rewrite (uint_uart_pa off Hoff).
+  rewrite (uint_uart_pa i off Hoff).
   assert (uint plat_clint_base + uint plat_clint_size = 34340864) as ->
     by (vm_compute; reflexivity).
-  unfold uart_base, uart_size in *. lia.
+  pose proof (uart_base_lo i). unfold uart_size in *. lia.
 Qed.
 
-Lemma uart_pa_not_in_sig off : 0 <= off < uart_size -> not_in_sig (uart_pa off).
+Lemma uart_pa_not_in_sig i off :
+  0 <= off < uart_size -> not_in_sig (uart_pa i off).
 Proof.
   intros Hoff. right.
-  rewrite (uint_uart_pa off Hoff).
+  rewrite (uint_uart_pa i off Hoff).
   assert (uint plat_sig_base + uint plat_sig_size = 201326624) as ->
     by (vm_compute; reflexivity).
-  unfold uart_base, uart_size in *. lia.
+  pose proof (uart_base_lo i). unfold uart_size in *. lia.
 Qed.
 
 (* every address is 1-byte aligned *)

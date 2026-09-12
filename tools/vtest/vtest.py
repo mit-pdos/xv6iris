@@ -94,6 +94,20 @@ def config(name):
     captured as a SET of observations rather than one."""
     src = os.path.join(TESTDIR, name + ".S")
     cfg = {"repeat": 1, "drives": "cache=writeback", "smp": 1, "serial_in": "",
+           # HOW MANY 16550s THE MACHINE HAS.  QEMU virt instantiates its
+           # second ns16550a (0x1000a000, PLIC source 12 -- abi.h's UART1)
+           # ONLY when a second serial backend is attached, so a case that
+           # touches the second window says `uarts=2` and the runner adds
+           # one.  With `uarts=1` the command line is byte-for-byte what it
+           # always was, which is what keeps every existing capture
+           # reproducible; the second serial node is then absent from the
+           # device tree entirely and those images do not move.
+           "uarts": 1,
+           # ...and the RECEIVE side of the second port.  [serial_in] feeds
+           # port 0; this feeds port 1.  Either one turns THAT port's
+           # backend into a socket the runner can push bytes into; the other
+           # port stays a plain output file.
+           "serial1_in": "",
            # A SEPARATE REPEAT COUNT FOR THE BOARD, because a board run costs
            # ~4 s of JTAG round trips where a QEMU run costs milliseconds.
            # conc_sb wants repeat=700 on QEMU to hunt the rare (0,0); on the
@@ -174,7 +188,7 @@ def config(name):
             for kv in m.group(1).split():
                 k, _, v = kv.partition("=")
                 cfg[k] = int(v) if k in ("repeat", "smp", "budget", "tick",
-                                     "board_repeat", "selfmod",
+                                     "board_repeat", "selfmod", "uarts",
                                      "crounds", "latch") else v
     return cfg
 
@@ -228,15 +242,26 @@ class Qmp:
                 out += int(w, 16).to_bytes(4, "little")
         return out[:nbytes]
 
+def in_bytes(spec):
+    """A `serial_in=`/`serial1_in=` directive value as the bytes to push."""
+    return bytes(int(x, 0) for x in spec.split(",")) if spec else b""
+
+
 def run(name, disk_sectors=128, timeout=15.0, drive_opts="cache=writeback",
-        smp=None, serial_in=None, hart=0):
+        smp=None, serial_in=None, hart=0, serial1_in=None, uarts=None):
     # smp and serial_in default to the test's own `vtest:` directive, so a
     # direct vtest.run("conc_foo") behaves the same as the command line.
     cfg = config(name)
     if smp is None: smp = cfg["smp"]
     if serial_in is None:
-        serial_in = bytes(int(x, 0) for x in cfg["serial_in"].split(",")) \
-                    if cfg["serial_in"] else b""
+        serial_in = in_bytes(cfg["serial_in"])
+    if serial1_in is None:
+        serial1_in = in_bytes(cfg["serial1_in"])
+    if uarts is None: uarts = int(cfg["uarts"])
+    # A CASE THAT FEEDS PORT 1 HAS TWO PORTS whether or not it said so; the
+    # directive would otherwise be a silent way to push bytes at a UART the
+    # machine does not have.
+    if serial1_in: uarts = max(uarts, 2)
     # THE HART VARIANT.  hart 0 builds and runs exactly as this suite always
     # has (no -D, no tag, the test's own smp); anything else needs BOTH a
     # different image -- the prologue's primary/AP branch and its stack slot
@@ -249,25 +274,42 @@ def run(name, disk_sectors=128, timeout=15.0, drive_opts="cache=writeback",
     d = tempfile.mkdtemp(prefix="vtest-")
     qmp  = os.path.join(d, "qmp")
     disk = os.path.join(d, "disk.img")
-    ser  = os.path.join(d, "serial.out")
-    sock = os.path.join(d, "serial.sock")
+    ser  = [os.path.join(d, "serial%d.out" % p) for p in range(2)]
+    sock = [os.path.join(d, "serial%d.sock" % p) for p in range(2)]
+    # THE FIRST PORT'S FILENAMES DID NOT MOVE.  They are inside a fresh
+    # mkdtemp, so nothing outside this process can see them -- but keeping
+    # the shape identical is the cheap way to be sure that adding the second
+    # port changed nothing about the first.
+    ser[0], sock[0] = os.path.join(d, "serial.out"), os.path.join(d, "serial.sock")
+    sin = [serial_in, serial1_in]
     with open(disk, "wb") as fh: fh.write(b"\0" * (512 * disk_sectors))
     pre = open(disk, "rb").read()
+
+    # THE SERIAL CHANNEL IS CAPTURED, not discarded: it is how a `uart`
+    # test observes what the 16550 actually transmitted.  It is NOT the
+    # channel other tests report through -- printing a result costs ~10
+    # instructions per character and the model executes every one.
+    #
+    # A test that needs a UART to RECEIVE declares `serial_in=` (port 0) or
+    # `serial1_in=` (port 1) and THAT port gets a socket instead of an
+    # output file, so the runner can push bytes in.  Receiving is the only
+    # externally-driven event in the whole suite: on the model side those
+    # same bytes are a SCHEDULE choice, the [SUartRx] arm of VSched, tagged
+    # with the port they arrive at and delivered where the test says.
+    #
+    # ONE BACKEND PER PORT, IN ORDER: QEMU's virt machine instantiates its
+    # Nth ns16550a only when an Nth -serial backend is supplied, so the
+    # number of backends here IS the number of UARTs the guest sees, and a
+    # `uarts=1` case emits exactly the argument list it always did.
+    def backend(p):
+        return (["-chardev", f"socket,id=s{p},path={sock[p]},server=on,wait=off",
+                 "-serial", f"chardev:s{p}"] if sin[p] else
+                ["-serial", f"file:{ser[p]}"])
+    serial_args = [a for p in range(uarts) for a in backend(p)]
+
     q = subprocess.Popen([QEMU, "-machine", "virt", "-bios", "none",
         "-kernel", elf, "-display", "none",
-        # THE SERIAL CHANNEL IS CAPTURED, not discarded: it is how a `uart`
-        # test observes what the 16550 actually transmitted.  It is NOT the
-        # channel other tests report through -- printing a result costs ~10
-        # instructions per character and the model executes every one.
-        #
-        # A test that needs the UART to RECEIVE declares `serial_in=` and gets
-        # a socket instead of an output file, so the runner can push bytes in.
-        # Receiving is the only externally-driven event in the whole suite:
-        # on the model side those same bytes are a SCHEDULE choice, the
-        # [SUartRx] arm of VSched, delivered where the test says.
-        *(["-chardev", f"socket,id=s0,path={sock},server=on,wait=off",
-           "-serial", "chardev:s0"] if serial_in else
-          ["-serial", f"file:{ser}"]),
+        *serial_args,
         "-smp", str(smp), "-m", "128M",
         # without this QEMU is a LEGACY virtio-mmio device (Version = 1)
         "-global", "virtio-mmio.force-legacy=false",
@@ -276,29 +318,33 @@ def run(name, disk_sectors=128, timeout=15.0, drive_opts="cache=writeback",
         "-qmp", f"unix:{qmp},server,nowait"],
         stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
     deadline = time.time() + timeout
-    sc, sout = None, b""
+    sc, sout = [None, None], [b"", b""]
     try:
         m = Qmp(qmp, deadline)
-        if serial_in:
+        for p in range(uarts):
+            if not sin[p]: continue
             while time.time() < deadline:
                 try:
-                    sc = socket.socket(socket.AF_UNIX); sc.connect(sock); break
+                    c = socket.socket(socket.AF_UNIX); c.connect(sock[p])
+                    sc[p] = c; break
                 except OSError: time.sleep(0.01)
             else: raise RuntimeError("QEMU never opened its serial socket")
-            sc.setblocking(False)
-            sc.sendall(serial_in)
+            sc[p].setblocking(False)
+            sc[p].sendall(sin[p])
         t0, done = time.time(), False
         while time.time() < deadline:
-            if sc is not None:
-                try: sout += sc.recv(4096)
+            for p in range(2):
+                if sc[p] is None: continue
+                try: sout[p] += sc[p].recv(4096)
                 except BlockingIOError: pass
                 except OSError: pass
             if int.from_bytes(m.read(ABI["RESULT_BASE"], 4), "little") == ABI["DONE_MAGIC"]:
                 done = True; break
             time.sleep(0.005)
-        if sc is not None:
+        for p in range(2):
+            if sc[p] is None: continue
             for _ in range(20):
-                try: sout += sc.recv(4096)
+                try: sout[p] += sc[p].recv(4096)
                 except BlockingIOError: time.sleep(0.005)
                 except OSError: break
         result = m.read(ABI["RESULT_BASE"], ABI["RESULT_SIZE"])
@@ -311,15 +357,23 @@ def run(name, disk_sectors=128, timeout=15.0, drive_opts="cache=writeback",
         try: q.wait(timeout=5)
         except subprocess.TimeoutExpired: q.kill(); q.wait()
     post = open(disk, "rb").read()
-    serial = sout if serial_in else (open(ser, "rb").read()
-                                     if os.path.exists(ser) else b"")
+    # ONE WIRE PER PORT, and a port the machine does not have contributes an
+    # EMPTY one rather than being absent: the model's claim about the wires
+    # is total over [enum uart_id], so the capture has to be too.
+    def wire(p):
+        if p >= uarts: return b""
+        if sin[p]: return sout[p]
+        return open(ser[p], "rb").read() if os.path.exists(ser[p]) else b""
+    serials = [wire(0), wire(1)]
     changed = [(i, post[i*512:(i+1)*512]) for i in range(len(pre)//512)
                if pre[i*512:(i+1)*512] != post[i*512:(i+1)*512]]
     if not done:
         sys.exit(f"{name}: guest never set the DONE flag within {timeout}s "
                  f"(status word = 0x{int.from_bytes(result[4:8],'little'):08x})")
     return dict(name=name, text=text, result=result, disk=changed, ms=ms,
-                serial=serial)
+                # [serial] is port 0, unchanged, because board.py and every
+                # caller that predates the second port read it
+                serial=serials[0], serials=serials)
 
 # ------------------------------------------------------------------- gen ----
 
@@ -949,13 +1003,14 @@ def gen(r, alts=None, hart=0):
     low  = low if hart == 0 else "%s_hart%d" % (low, hart)
     disk = ";\n   ".join("(%d, [%s])" % (i, lit(b)) for i, b in r["disk"]) or ""
     alts = alts or [bytes(r["result"])]
-    ser = lit(r["serial"])
+    sers = [lit(s) for s in r.get("serials", [r["serial"], b""])]
     results = ";\n     ".join("[%s]" % lit(a) for a in alts)
     return emit_capture("qemu", vmod, r["name"], hart, lit(r["text"]),
-                        results, ser, disk)
+                        results, sers[0], disk, serial1=sers[1])
 
 
-def emit_capture(platform, vmod, case, hart, text, results, serial, disk):
+def emit_capture(platform, vmod, case, hart, text, results, serial, disk,
+                 serial1=""):
     """Write a capture as the TWO files it is: the TEST (the experiment --
     the image, the hart, the mapped memory, the input) and the RUN (the
     measurement -- what came back, on all three channels).
@@ -992,9 +1047,17 @@ def emit_capture(platform, vmod, case, hart, text, results, serial, disk):
     rocq_mkdirs()
     try:
         regions, cfg = regions_of(case), config(case)
+        # WHAT THE HOST TYPED, AND AT WHICH PORT.  The model's input is a
+        # list of (port, byte) pairs -- [VRun]'s [uart_input] -- because a
+        # byte arriving is a schedule choice at ONE port, and a run that
+        # delivered it to the other would otherwise satisfy the theorem.
+        # Port 0's bytes first, then port 1's: no case feeds both, and the
+        # day one does it will want to say the interleaving itself.
         uin = "[" + "; ".join(
-            "Z_to_bv 8 %s" % b.strip()
-            for b in cfg.get("serial_in", "").split(",") if b.strip()) + "]"
+            "(%s, Z_to_bv 8 %s)" % (port, b.strip())
+            for port, spec in (("Uart0", cfg.get("serial_in", "")),
+                               ("Uart1", cfg.get("serial1_in", "")))
+            for b in spec.split(",") if b.strip()) + "]"
     except Exception:
         regions, uin = "std_regions", "[]"
     open(rp(vmod + "Test.v", platform), "w").write(
@@ -1019,7 +1082,7 @@ Module {vmod} <: TEST.
   Definition platform   := "{platform}"%string.
   Definition hart       : Z := {hart}.
   Definition regions    : list region := {regions}.
-  Definition uart_input : list (bv 8) := {uin}.
+  Definition uart_input : list (uart_id * bv 8) := {uin}.
   Definition disk_init  : list (Z * list Z) := [].
 
   Definition text : list Z :=
@@ -1031,9 +1094,16 @@ f"""(* {PL}/{vmod}Run.v -- GENERATED by tools/vtest.  Do not edit: run
    `make vtest` to regenerate.
 
    THE RUN: what the platform produced, on all three channels -- the whole
-   result region untrimmed, the bytes that left the UART, and the disk it
+   result region untrimmed, the bytes that left EACH UART, and the disk it
    ended with.  More than one observation means the hardware itself has
-   more than one legal execution here, and the model must have each. *)
+   more than one legal execution here, and the model must have each.
+
+   ONE WIRE PER PORT, ALWAYS BOTH.  [o_uart] is a list indexed by
+   [enum uart_id], so the claim it feeds is TOTAL over the ports: it says
+   what BOTH wires hold, and a byte the model put on the wrong port is a
+   violation rather than something nobody looked at.  A case with one port
+   -- which is most of them -- has [o_serial1] empty, and that empty list
+   is an observation like any other. *)
 From Stdlib Require Import List ZArith.
 From stdpp Require Import base list gmap bitvector.definitions.
 Import ListNotations.
@@ -1043,13 +1113,14 @@ Local Open Scope Z_scope.
 
 Module {vmod}Run <: TEST_RUN {vmod}.
   Definition o_serial  : list Z := [{serial}].
+  Definition o_serial1 : list Z := [{serial1}].
   Definition o_sectors : list (Z * list Z) := [{disk}].
 
   Definition results : list (list Z) :=
     [{results}].
 
   Definition observed : list observation :=
-    (fun r => Obs r o_serial o_sectors) <$> results.
+    (fun r => Obs r [o_serial; o_serial1] o_sectors) <$> results.
 
   (* the run is non-empty; see TEST_RUN's [observed_ne] *)
   Lemma observed_ne : observed <> [].
@@ -1057,6 +1128,65 @@ Module {vmod}Run <: TEST_RUN {vmod}.
 End {vmod}Run.
 """)
     return rp(vmod + "Test.v", platform)
+
+
+# --------------------------------------------------------------- reshape ----
+
+def _field(body, pat):
+    """The bracketed literal of one generated definition, verbatim.
+
+    The captures are read back as SOURCE TEXT and written out again
+    unchanged, so a reshape moves the bytes and never re-formats them: a
+    Test module regenerated from its own capture must come out
+    byte-identical, which is the check that a shape change did not silently
+    perturb 200 images."""
+    m = re.search(pat + r"\s*:=\s*\[(.*?)\]\.", body, re.S)
+    return m.group(1) if m else None
+
+
+def reshape_captures():
+    """REWRITE EVERY CHECKED-IN CAPTURE IN THE CURRENT SHAPE, WITHOUT QEMU.
+
+    A capture is data -- the image, what came back on each channel -- and
+    the Test/Run modules are one RENDERING of it.  When the rendering
+    changes (a second UART wire, say) every module in the tree has to follow
+    or the build is half in each shape, and re-running QEMU to get there
+    would be re-MEASURING when nothing was measured: the old numbers are the
+    same numbers.  So this reads each pair back, pulls the data out of it,
+    and re-emits both files through [emit_capture] -- the one place that
+    knows the shape.
+
+    A field the old rendering did not have comes out EMPTY, which is the
+    honest value: a one-port machine's second wire carried nothing.
+
+    Hand-written modules are left alone, as everywhere else."""
+    made, skipped = [], []
+    for pl in PLATFORMS:
+        for f in rocq_listdir(pl):
+            if not f.endswith("Test.v"):
+                continue
+            vmod = f[:-len("Test.v")]
+            rf = rp(vmod + "Run.v", pl)
+            if not os.path.exists(rf):
+                continue
+            if hand_written(f, pl) or hand_written(vmod + "Run.v", pl):
+                skipped.append(rrel(vmod, pl)); continue
+            tb, rb = open(rp(f, pl)).read(), open(rf).read()
+            case = re.search(r'Definition name\s*:=\s*"(.*?)"', tb)
+            hart = re.search(r"Definition hart\s*: Z\s*:=\s*(-?\d+)", tb)
+            text = _field(tb, r"Definition text\s*: list Z")
+            results = _field(rb, r"Definition results\s*: list \(list Z\)")
+            if not (case and hart and text is not None and results is not None):
+                skipped.append(rrel(vmod, pl)); continue
+            ser  = _field(rb, r"Definition o_serial\s*: list Z") or ""
+            ser1 = _field(rb, r"Definition o_serial1\s*: list Z") or ""
+            disk = _field(rb, r"Definition o_sectors\s*: list \(Z \* list Z\)") or ""
+            emit_capture(pl, vmod, case.group(1), int(hart.group(1)),
+                         text, results, ser, disk, serial1=ser1)
+            made.append(rrel(vmod, pl))
+    if skipped:
+        print("left alone: %s" % " ".join(skipped))
+    return made
 
 
 # ------------------------------------------------------------------ main ----
@@ -1073,7 +1203,7 @@ def repeat(name, n, drive_opts, smp=1):
     for _ in range(n):
         r = run(name, drive_opts=drive_opts, smp=smp)
         key = (bytes(r["result"]), tuple((i, bytes(b)) for i, b in r["disk"]),
-               bytes(r["serial"]))
+               tuple(bytes(s) for s in r["serials"]))
         seen.setdefault(key, 0)
         seen[key] += 1
     return seen
@@ -1138,12 +1268,16 @@ def main():
     if a.cmd == "list":
         print("\n".join(all_tests())); return
     if a.cmd == "runs":
-        # A CAPTURE IS ALREADY ITS TEST AND ITS RUN.  There used to be a
-        # third file to re-present, and this command wrote the run module
-        # from it; now [gen] writes both directly and there is nothing to
-        # derive.  The proofs are still worth regenerating.
+        # REBUILD THE RUN MODULES FROM THE CHECKED-IN CAPTURES, and NOT from
+        # QEMU: the numbers are already in the tree, and re-running the
+        # hardware to change the SHAPE of a file would be re-measuring
+        # something nobody re-measured.  [reshape_captures] reads each
+        # Test/Run pair back and writes both out through the one emitter, so
+        # the whole tree is in whatever shape that emitter has today.
+        shaped = reshape_captures()
         made = emit_passes()
-        print("captures are self-contained; wrote %d proof(s)" % len(made))
+        print("reshaped %d capture(s) from the tree; wrote %d proof(s)"
+              % (len(shaped), len(made)))
         return
     if a.cmd == "table":
         print_table(a.format)
@@ -1239,7 +1373,8 @@ def main():
                 print(f"        +4..+64: {words}")
         else:
             r = run(n, drive_opts=a.drive_opts, smp=config(n)["smp"], hart=a.hart)
-            print(f"{n}: DONE in {r['ms']:.0f} ms, serial={len(r['serial'])}B, status="
+            print(f"{n}: DONE in {r['ms']:.0f} ms, "
+                  f"serial={'/'.join(str(len(s)) for s in r['serials'])}B, status="
                   f"0x{int.from_bytes(r['result'][4:8],'little'):08x}, "
                   f"sectors changed: {[i for i,_ in r['disk']] or 'none'}")
 

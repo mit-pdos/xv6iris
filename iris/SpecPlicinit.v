@@ -54,7 +54,7 @@ Import Defs.
 
 
 (* the two PLIC interrupt-source ids xv6 raises to priority 1,
-   [uart_irq_id] (= 10) and [virtio_irq_id] (= 1), both come from DevModel. *)
+   [(uart_irq_id Uart0)] (= 10) and [virtio_irq_id] (= 1), both come from DevModel. *)
 
 Definition wp_plicinit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (γd : uart_names) (m0 : regfile) (n : nat) (p : mword 64) :=
   let ra_idx : mword 5 := mword_of_int 1 in

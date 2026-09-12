@@ -73,8 +73,8 @@ Qed.
 Lemma pq_claim_of_a0 (v : bv 32) :
   plic_claim_ret_ok v ->
   (extend_value (n := 8*4) false v : mword 64)
-    = (mword_of_int (Z.of_N uart_irq_id) : mword 64) ->
-  v = Z_to_bv 32 (Z.of_N uart_irq_id).
+    = (mword_of_int (Z.of_N (uart_irq_id Uart0)) : mword 64) ->
+  v = Z_to_bv 32 (Z.of_N (uart_irq_id Uart0)).
 Proof.
   intros [-> | [-> | ->]] H; [ | reflexivity | ];
     exfalso; apply (f_equal bv_unsigned) in H; vm_compute in H; discriminate.
@@ -261,7 +261,7 @@ Section ProofPlicClaim.
     iApply (wp_lw_plic_dev_s_sconf (CID := CID) γd γv (mword_of_int (KernelSyms.plic_claim + 0x16)) true false
               a0_idx a5_idx (mword_of_int 4 : mword 12) N4 (n - 2)%nat plic_claim_ret_ok
               emp%I
-              (fun cv => ⌜ cv = Z_to_bv 32 (Z.of_N uart_irq_id) ⌝ -∗
+              (fun cv => ⌜ cv = Z_to_bv 32 (Z.of_N (uart_irq_id Uart0)) ⌝ -∗
                            plic_payload_uart γd)%I
               ltac:(rewrite HN4a5; exact (ph_geom_range _ (ph_sclaim_geom _ Hhart)))
               ltac:(rewrite HN4a5; exact (ph_geom_align _ (ph_sclaim_geom _ Hhart)))
@@ -281,7 +281,7 @@ Section ProofPlicClaim.
     { done. }
     { (* THE CLAIM TAKES THE PAYLOAD OUT.  The read IS [plic_claim] at this
          hart's S context, and the UART's payload is parked under
-         [p_claimed … uart_irq_id]: [plic_slots_claim] does the whole
+         [p_claimed … (uart_irq_id Uart0)]: [plic_slots_claim] does the whole
          arithmetic -- refuting the slot's pre-state against [uart_inited],
          and refuting a UART id from a claim of anything else. *)
       iIntros (pq cv pq') "%Hpr %Hpq Hslots _".

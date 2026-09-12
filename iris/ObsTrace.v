@@ -1,15 +1,21 @@
 (* ObsTrace.v -- the PURE vocabulary of the observable trace.                *)
 (*                                                                          *)
 (*  The language emits four observation events (RiscvLang.mobs, §3b'):      *)
-(*  ObsUartOut/ObsUartIn on the UART thread's drain/rx arms, ObsPowerOff/   *)
+(*  ObsUartOut/ObsUartIn on a UART thread's drain/rx arms -- EACH TAGGED    *)
+(*  WITH ITS PORT, since the board has two 16550s -- and ObsPowerOff/       *)
 (*  ObsPowerOn on the power thread.  This file says what a WELL-FORMED      *)
 (*  history of them looks like and proves it a STEP INVARIANT of the        *)
 (*  semantics, with no Iris in it:                                          *)
 (*                                                                          *)
 (*    obs_wf h g  :=  trace_shape h (gpow g)                 -- alternation  *)
 (*                 /\ obs_boots h = start_count g             -- boot count  *)
-(*                 /\ (gpow g -> obs_wire (open_seg h) = u_wire (duart g))   *)
-(*                                                            -- WIRE TIE    *)
+(*                 /\ (gpow g -> forall i,                                   *)
+(*                        obs_wire i (open_seg h) = u_wire (duart g i))      *)
+(*                                                            -- WIRE TIE,   *)
+(*                       per PORT: the board has two 16550s and each event   *)
+(*                       carries the one it happened on, so the tie is one   *)
+(*                       equation per port and a byte can never be credited  *)
+(*                       to the wrong wire.                                  *)
 (*                                                                          *)
 (*  [prim_step_obs_wf] re-establishes it across every arm of [prim_step],   *)
 (*  and [nsteps_obs_wf] lifts that to a whole run.  The Iris side           *)
@@ -44,18 +50,19 @@ Require Import RiscvLang.
 (* the OUTPUT bytes of an observation list.  A direct Fixpoint (not stdpp's
    [omap]) so [cbn] reduces it on literal lists without unfolding through
    the typeclass. *)
-Fixpoint obs_wire (κ : list mobs) : list (bv 8) :=
+Fixpoint obs_wire (i : uart_id) (κ : list mobs) : list (bv 8) :=
   match κ with
   | [] => []
-  | ObsUartOut b :: κ' => b :: obs_wire κ'
-  | _ :: κ' => obs_wire κ'
+  | ObsUartOut j b :: κ' => if decide (j = i) then b :: obs_wire i κ' else obs_wire i κ'
+  | _ :: κ' => obs_wire i κ'
   end.
 
-Lemma obs_wire_app (κ1 κ2 : list mobs) :
-  obs_wire (κ1 ++ κ2) = obs_wire κ1 ++ obs_wire κ2.
+Lemma obs_wire_app (i : uart_id) (κ1 κ2 : list mobs) :
+  obs_wire i (κ1 ++ κ2) = obs_wire i κ1 ++ obs_wire i κ2.
 Proof.
   induction κ1 as [|e κ1 IH]; [reflexivity|].
-  destruct e; cbn; by rewrite IH.
+  destruct e; cbn; try (by rewrite IH).
+  case_decide; by rewrite IH.
 Qed.
 
 (* the receiver never touches SOUT *)
@@ -107,24 +114,36 @@ Qed.
 (* the bus: an MMIO transaction of any width reaches the UART through
    [uart_read]/[uart_write] and the other two devices through setters that
    keep [duart] verbatim *)
+(* a device-fabric setter moves ONE port's state, so a fact about every
+   port's wire follows from the fact about the one that moved *)
+Lemma set_duart_wire (d : dev_state) (i j : uart_id) (u : uart_state) :
+  u_wire u = u_wire (duart d i) ->
+  u_wire (duart (set_duart d i u) j) = u_wire (duart d j).
+Proof.
+  intro H. unfold set_duart, uupd. cbn.
+  destruct (decide (j = i)) as [->|]; done.
+Qed.
+
 Lemma dev_read_u_wire (d : dev_state) (pa : Arch.pa) (n : N)
-    (w : bv (8 * n)) (d' : dev_state) :
+    (w : bv (8 * n)) (d' : dev_state) (j : uart_id) :
   dev_read d pa n = Some (w, d') ->
-  u_wire (duart d') = u_wire (duart d).
+  u_wire (duart d' j) = u_wire (duart d j).
 Proof.
   unfold dev_read, uart_dev_read. intros H.
   repeat (case_match; try discriminate); simplify_eq; cbn;
-    first [ reflexivity | by eapply uart_read_wire ].
+    first [ reflexivity
+          | by apply set_duart_wire, (uart_read_wire _ _ _ _ ltac:(eassumption)) ].
 Qed.
 
 Lemma dev_write_u_wire (d : dev_state) (pa : Arch.pa) (n : N)
-    (v : bv (8 * n)) (d' : dev_state) :
+    (v : bv (8 * n)) (d' : dev_state) (j : uart_id) :
   dev_write d pa n v = Some d' ->
-  u_wire (duart d') = u_wire (duart d).
+  u_wire (duart d' j) = u_wire (duart d j).
 Proof.
   unfold dev_write, uart_dev_write. intros H.
   repeat (case_match; try discriminate); simplify_eq; cbn;
-    first [ reflexivity | by eapply uart_write_wire ].
+    first [ reflexivity
+          | by apply set_duart_wire, (uart_write_wire _ _ _ _ ltac:(eassumption)) ].
 Qed.
 
 (* THE OBSERVATIONS ARE FAITHFUL: a UART step's output observations are
@@ -134,29 +153,43 @@ Qed.
    counterpart: an accepted byte is recorded nowhere cumulative -- the rx
    FIFO is consumed -- so [ObsUartIn] is DEFINED as the acceptance event
    rather than mirrored from state.) *)
-Lemma uart_step_wire (d : dev_state) (κ : list mobs) (d' : dev_state) :
-  uart_step d κ d' ->
-  u_wire (duart d') = u_wire (duart d) ++ obs_wire κ.
+(* STATED AT EVERY PORT, which is what makes it say the thing worth saying:
+   a step of port [i] grows port [i]'s wire by its own events and leaves
+   every OTHER port's wire alone -- so a byte cannot appear on a wire the
+   device that emitted it is not attached to. *)
+Lemma uart_step_wire (i : uart_id) (d : dev_state) (κ : list mobs)
+    (d' : dev_state) (j : uart_id) :
+  uart_step i d κ d' ->
+  u_wire (duart d' j) = u_wire (duart d j) ++ obs_wire j κ.
 Proof.
   intros H. destruct H as [b u' Htx | b u' Hrx | p' _ _ |].
-  - cbn [duart set_duart]. rewrite (uart_tx_pop_wire _ _ _ Htx).
-    destruct (uart_loopback d.(duart)); cbn [obs_wire];
-      by rewrite ?app_nil_r.
-  - cbn [duart set_duart]. rewrite (uart_rx_push_wire _ _ _ Hrx).
-    cbn [obs_wire]. by rewrite app_nil_r.
-  - cbn [duart set_dplic obs_wire]. by rewrite app_nil_r.
-  - cbn [obs_wire]. by rewrite app_nil_r.
+  - unfold set_duart, uupd. cbn [duart].
+    case_decide as Hji.
+    + subst j. rewrite (uart_tx_pop_wire _ _ _ Htx).
+      destruct (uart_loopback (duart d i)); cbn [obs_wire].
+      * by rewrite ?app_nil_r.
+      * case_decide as Hc; [by rewrite ?app_nil_r|done].
+    + destruct (uart_loopback (duart d i)); cbn [obs_wire].
+      * by rewrite ?app_nil_r.
+      * case_decide as Hc; [done|]. by rewrite ?app_nil_r.
+  - unfold set_duart, uupd. cbn [duart].
+    case_decide as Hji.
+    + subst j. rewrite (uart_rx_push_wire _ _ _ Hrx).
+      cbn [obs_wire]. by rewrite ?app_nil_r.
+    + cbn [obs_wire]. by rewrite ?app_nil_r.
+  - cbn [duart set_dplic obs_wire]. by rewrite ?app_nil_r.
+  - cbn [obs_wire]. by rewrite ?app_nil_r.
 Qed.
 
 (* a UART step's events are console I/O and nothing else *)
 Definition is_io (e : mobs) : bool :=
-  match e with ObsUartIn _ | ObsUartOut _ => true | _ => false end.
+  match e with ObsUartIn _ _ | ObsUartOut _ _ => true | _ => false end.
 
-Lemma uart_step_io (d : dev_state) (κ : list mobs) (d' : dev_state) :
-  uart_step d κ d' -> Forall (fun e => is_io e = true) κ.
+Lemma uart_step_io (i : uart_id) (d : dev_state) (κ : list mobs) (d' : dev_state) :
+  uart_step i d κ d' -> Forall (fun e => is_io e = true) κ.
 Proof.
   intros H. destruct H as [b u' _ | b u' _ | p' _ _ |].
-  - destruct (uart_loopback (duart d)); repeat constructor.
+  - destruct (uart_loopback (duart d i)); repeat constructor.
   - repeat constructor.
   - constructor.
   - constructor.
@@ -165,9 +198,9 @@ Qed.
 (* A hart node never moves the wire: register effects and RAM accesses do
    not touch the device fabric, and an MMIO transaction goes through
    [dev_read]/[dev_write].  The twin of [RiscvLang.mnode_step_v_disk]. *)
-Lemma mnode_step_u_wire oth h img s log tv itv hr r m m' s' log' tv' itv' hr' r' :
+Lemma mnode_step_u_wire oth h img s log tv itv hr r m m' s' log' tv' itv' hr' r' (j : uart_id) :
   mnode_step oth h img s log tv itv hr r m m' s' log' tv' itv' hr' r' ->
-  u_wire (duart (mdev s')) = u_wire (duart (mdev s)).
+  u_wire (duart (mdev s') j) = u_wire (duart (mdev s) j).
 Proof.
   rewrite /mnode_step. destruct m as [y|T oc k].
   { by intros (tick & _ & -> & _). }
@@ -176,14 +209,14 @@ Proof.
   - (* MemRead *)
     destruct (dev_addr _).
     + intros (w & d' & Hdr & _ & -> & _). cbn.
-      exact (dev_read_u_wire _ _ _ _ _ Hdr).
+      exact (dev_read_u_wire _ _ _ _ _ _ Hdr).
     + by intros [(_ & tvn & w & _ & _ & _ & _ & -> & _)
                 |[(_ & _ & tvn & w & _ & _ & _ & _ & _ & -> & _)
                  |(_ & [(_ & _ & -> & _) | (_ & w & _ & _ & -> & _)])]].
   - (* MemWrite *)
     destruct (dev_addr _).
     + intros (d' & Hdw & _ & -> & _). cbn.
-      exact (dev_write_u_wire _ _ _ _ _ Hdw).
+      exact (dev_write_u_wire _ _ _ _ _ _ Hdw).
     + by intros [(_ & _ & -> & _) | (_ & _ & -> & _)].
   - (* Choose *) by intros (ch & _ & -> & _).
 Qed.
@@ -210,8 +243,8 @@ Definition obs_step (s : option bool) (e : mobs) : option bool :=
   match s, e with
   | Some false, ObsPowerOn => Some true
   | Some true, ObsPowerOff => Some false
-  | Some true, ObsUartIn _ => Some true
-  | Some true, ObsUartOut _ => Some true
+  | Some true, ObsUartIn _ _ => Some true
+  | Some true, ObsUartOut _ _ => Some true
   | _, _ => None
   end.
 
@@ -222,11 +255,11 @@ Definition obs_step (s : option bool) (e : mobs) : option bool :=
    name for that tie, so the six of them spell it identically.  (Coq's
    [List.last] takes a default and stdpp's is shadowed by it here, which is
    the other reason this is a definition rather than an equation.) *)
-Definition obs_ends_in (h : list mobs) (b : bv 8) : Prop :=
-  exists h0, h = (h0 ++ [ObsUartIn b])%list.
+Definition obs_ends_in (i : uart_id) (h : list mobs) (b : bv 8) : Prop :=
+  exists h0, h = (h0 ++ [ObsUartIn i b])%list.
 
-Lemma obs_ends_in_snoc (h : list mobs) (b : bv 8) :
-  obs_ends_in (h ++ [ObsUartIn b])%list b.
+Lemma obs_ends_in_snoc (i : uart_id) (h : list mobs) (b : bv 8) :
+  obs_ends_in i (h ++ [ObsUartIn i b])%list b.
 Proof. by exists h. Qed.
 
 (* ...and a history names AT MOST ONE byte, which is what lets a reader
@@ -234,12 +267,12 @@ Proof. by exists h. Qed.
    unconditional per-byte ledger (the byte is in the caller's buffer) and
    its conditional window (the byte is the stored sequence's [cur + j]th)
    each quantify the byte for themselves, and this is why they agree. *)
-Lemma obs_ends_in_inj (h : list mobs) (b b' : bv 8) :
-  obs_ends_in h b -> obs_ends_in h b' -> b = b'.
+Lemma obs_ends_in_inj (i i' : uart_id) (h : list mobs) (b b' : bv 8) :
+  obs_ends_in i h b -> obs_ends_in i' h b' -> i = i' /\ b = b'.
 Proof.
   intros [h0 ->] [h1 He].
   apply (f_equal (@last mobs)) in He.
-  rewrite !last_snoc in He. by injection He as ->.
+  rewrite !last_snoc in He. by injection He as -> ->.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -420,7 +453,8 @@ Proof. intros He. rewrite open_seg_app. by destruct e. Qed.
 Definition obs_wf (h : list mobs) (g : gstate) : Prop :=
   trace_shape h g.(gpow)
   /\ obs_boots h = (g.(ggen) + (if g.(gpow) then 1 else 0))%nat
-  /\ (g.(gpow) = true -> obs_wire (open_seg h) = u_wire (duart g.(gdev))).
+  /\ (g.(gpow) = true ->
+      forall i, obs_wire i (open_seg h) = u_wire (duart g.(gdev) i)).
 
 (* the powered-off, never-booted machine every top-level theorem starts at *)
 Lemma obs_wf_init (g : gstate) :
@@ -438,7 +472,7 @@ Proof.
   intros Hstep (Hsh & Hbt & Hwire).
   destruct Hstep as
     [ (gen & cpu & m & -> & -> & _ & [ (_ & Hn) | (_ & _ & ->) ])
-    | [ (gen & -> & _ & _ & [ ([Hpw Hgen] & d' & Hu & ->) | (_ & -> & ->) ])
+    | [ (gen & iu & -> & _ & _ & [ ([Hpw Hgen] & d' & Hu & ->) | (_ & -> & ->) ])
     | [ (gen & -> & _ & -> & _ & [ (_ & d' & W & log' & Hd & _ & _ & ->) | (_ & ->) ])
     | [ (gen & -> & _ & -> & _ & [ (_ & gr' & _ & ->) | (_ & ->) ])
     | (-> & _ & [ (Hpw & -> & _ & ->) | (Hpw & -> & _ & Hboot) ]) ] ] ] ];
@@ -446,20 +480,20 @@ Proof.
   - (* a hart node: silent, and it never moves the wire *)
     rewrite app_nil_r. destruct Hn as (m' & s' & log' & tv' & itv' & hr' & r' & Hn & _ & ->). cbn.
     split_and!; [exact Hsh|exact Hbt|].
-    intros Hpw. rewrite (Hwire Hpw). symmetry.
-    exact (mnode_step_u_wire _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Hn).
+    intros Hpw i. rewrite (Hwire Hpw i). symmetry.
+    exact (mnode_step_u_wire _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Hn).
   - (* the UART: its events extend the open cycle, and by exactly what
        reached the wire *)
-    pose proof (uart_step_io _ _ _ Hu) as Hio. cbn.
+    pose proof (uart_step_io _ _ _ _ Hu) as Hio. cbn.
     rewrite Hpw in Hsh Hbt Hwire. cbn in Hbt.
     split_and!.
     + rewrite Hpw. by apply trace_shape_io.
     + rewrite Hpw obs_boots_app (obs_boots_io _ Hio). cbn. lia.
-    + intros _. rewrite (open_seg_io _ _ Hio) obs_wire_app (Hwire eq_refl).
-      symmetry. exact (uart_step_wire _ _ _ Hu).
+    + intros _ i. rewrite (open_seg_io _ _ Hio) obs_wire_app (Hwire eq_refl i).
+      symmetry. exact (uart_step_wire _ _ _ _ _ Hu).
   - (* the disk: silent, and it never touches the UART *)
     rewrite app_nil_r. cbn. split_and!; [exact Hsh|exact Hbt|].
-    intros Hpw. rewrite (Hwire Hpw). by rewrite (disk_step_duart _ _ _ _ Hd).
+    intros Hpw i. rewrite (Hwire Hpw i). by rewrite (disk_step_duart _ _ _ _ Hd).
   - (* PowerOff *)
     cbn. rewrite Hpw in Hsh Hbt. cbn in Hbt. split_and!.
     + eapply trace_shape_snoc; [exact Hsh|reflexivity].
@@ -471,7 +505,7 @@ Proof.
     rewrite Hpw in Hsh Hbt. cbn in Hbt. rewrite /obs_wf Hpw' Hgen. split_and!.
     + eapply trace_shape_snoc; [exact Hsh|reflexivity].
     + rewrite obs_boots_app. cbn. lia.
-    + intros _. rewrite (open_seg_power _ ObsPowerOn eq_refl) Huart.
+    + intros _ i. rewrite (open_seg_power _ ObsPowerOn eq_refl) Huart.
       reflexivity.
 Qed.
 

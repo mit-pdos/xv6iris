@@ -35,7 +35,7 @@
 (* Like RiscvModelBytes.v, this file is deliberately iris-free.            *)
 (* ====================================================================== *)
 
-From stdpp Require Import gmap.
+From stdpp Require Import gmap finite.
 From stdpp Require Import bitvector.definitions.
 
 Require Import SailStdpp.Operators_mwords.
@@ -48,7 +48,43 @@ Local Open Scope Z_scope.
 (* 0. Platform geometry (matches the QEMU virt board / xv6 memlayout.h).   *)
 (* ---------------------------------------------------------------------- *)
 
-Definition uart_base : Z := 0x10000000.
+(* THE BOARD HAS TWO 16550 PORTS, and everything about a UART below is
+   INDEXED BY WHICH.  [Uart0] is the one at 0x1000_0000 that every board
+   profile has; [Uart1] is the second port the QEMU virt machine
+   instantiates at 0x1000_a000 when a second serial backend is attached
+   (`qemu-system-riscv64 -machine virt ... -serial <a> -serial <b>`;
+   tools/vtest/vtest.py's `uarts=2` knob).  The two ports are IDENTICAL
+   CHIPS -- the same [uart_state], the same [uart_read]/[uart_write], the
+   same autonomous transitions -- and differ only in the two board facts
+   below, the window they answer and the PLIC source they drive.  So
+   nothing about the 16550 is written twice: the index is a parameter of
+   the fabric, never of the chip.
+
+   WHICH PORT PLAYS WHICH ROLE IS NOT THE MODEL'S BUSINESS.  The kernel
+   decides that (the console on one, its own diagnostics on the other),
+   and a theorem about "the console's wire" names the port it means. *)
+Inductive uart_id := Uart0 | Uart1.
+
+Global Instance uart_id_eq_dec : EqDecision uart_id.
+Proof. solve_decision. Defined.
+Global Instance uart_id_countable : Countable uart_id.
+Proof.
+  refine (inj_countable' (fun i => match i with Uart0 => 0 | Uart1 => 1 end)
+                         (fun n => match n with 0 => Uart0 | _ => Uart1 end) _).
+  by intros [].
+Qed.
+Global Program Instance uart_id_finite : Finite uart_id :=
+  {| enum := [Uart0; Uart1] |}.
+Next Obligation. repeat constructor; set_solver. Qed.
+Next Obligation. intros []; set_solver. Qed.
+
+(* THE BOARD FACTS, and the only two there are.  A window is [uart_size]
+   bytes wide at [uart_base i]; the port raises PLIC source [uart_irq_id i].
+   QEMU virt: 0x1000_0000 / source 10 and 0x1000_a000 / source 12 -- read
+   off the machine's own device tree (`serial@10000000 interrupts <0xa>`,
+   `serial@1000a000 interrupts <0xc>`). *)
+Definition uart_base (i : uart_id) : Z :=
+  match i with Uart0 => 0x10000000 | Uart1 => 0x1000a000 end.
 Definition uart_size : Z := 8.
 Definition plic_base : Z := 0xc000000.
 Definition plic_size : Z := 0x400000.
@@ -58,8 +94,22 @@ Definition plic_size : Z := 0x400000.
 Definition dev_bound : Z := 0x80000000.
 Definition dev_addr (a : Arch.pa) : bool := uint a <? dev_bound.
 
-(* The UART's interrupt source id at the PLIC (QEMU virt: 10). *)
-Definition uart_irq_id : N := 10%N.
+Definition uart_irq_id (i : uart_id) : N :=
+  match i with Uart0 => 10%N | Uart1 => 12%N end.
+
+(* ...and the INVERSE, which is what the PLIC gateway needs: a source id
+   names at most one port.  Stated as the decode rather than derived from
+   [uart_irq_id] by search, so that [dev_irq_level] reduces on a literal. *)
+Definition uart_of_irq (k : N) : option uart_id :=
+  if (k =? uart_irq_id Uart0)%N then Some Uart0
+  else if (k =? uart_irq_id Uart1)%N then Some Uart1
+  else None.
+
+Lemma uart_of_irq_id (i : uart_id) : uart_of_irq (uart_irq_id i) = Some i.
+Proof. by destruct i. Qed.
+
+Lemma uart_irq_id_inj (i j : uart_id) : uart_irq_id i = uart_irq_id j -> i = j.
+Proof. destruct i, j; by cbn. Qed.
 
 (* Number of harts the PLIC drives (must match RiscvLang.NCPU). *)
 Definition dev_ncpu : nat := 8.
@@ -877,10 +927,10 @@ Record plic_state := PlicState {
   p_thresh  : nat -> bv 32;       (* per-CONTEXT priority threshold *)
 }.
 
-(* the second interrupt source this machine has (the virtio disk); the UART is
-   [uart_irq_id] = 10.  Which device sits on which PLIC source is a property of
-   the machine, hence here; what the KERNEL intends to do with those sources
-   lives in the software layer (PlicPlan.v). *)
+(* the disk's interrupt source; the two UARTs are [uart_irq_id Uart0] = 10
+   and [uart_irq_id Uart1] = 12.  Which device sits on which PLIC source is a
+   property of the machine, hence here; what the KERNEL intends to do with
+   those sources lives in the software layer (PlicPlan.v). *)
 Definition virtio_irq_id : N := 1%N.   (* VIRTIO0_IRQ *)
 
 (* The board's source count: 96, so the enable and pending bitmaps are three
@@ -1067,31 +1117,84 @@ Definition plic_latch (p : plic_state) (i : N) : option plic_state :=
 (* 3. The device fabric: one MMIO transaction, routed by address.           *)
 (* ---------------------------------------------------------------------- *)
 
+(* THE UART FIELD IS A FUNCTION OF THE PORT, exactly as the PLIC's enable
+   bitmap is a function of the context: two ports are two states of one
+   chip, not two records, so every fact about a 16550 is stated once and
+   instantiated at [Uart0] or [Uart1]. *)
 Record dev_state := DevState {
-  duart : uart_state;
+  duart : uart_id -> uart_state;
   dplic : plic_state;
   dvirtio : virtio_state;
 }.
 
-Definition set_duart (d : dev_state) (u : uart_state) : dev_state :=
-  DevState u (dplic d) (dvirtio d).
+Definition uupd (f : uart_id -> uart_state) (i : uart_id) (u : uart_state)
+  : uart_id -> uart_state :=
+  fun j => if decide (j = i) then u else f j.
+
+Definition set_duart (d : dev_state) (i : uart_id) (u : uart_state) : dev_state :=
+  DevState (uupd (duart d) i u) (dplic d) (dvirtio d).
 Definition set_dplic (d : dev_state) (p : plic_state) : dev_state :=
   DevState (duart d) p (dvirtio d).
 Definition set_dvirtio (d : dev_state) (v : virtio_state) : dev_state :=
   DevState (duart d) (dplic d) v.
 
-Definition in_uart (a : Z) : bool := (uart_base <=? a) && (a <? uart_base + uart_size).
+Lemma uupd_eq (f : uart_id -> uart_state) (i : uart_id) (u : uart_state) :
+  uupd f i u i = u.
+Proof. unfold uupd. by rewrite decide_True. Qed.
+Lemma uupd_ne (f : uart_id -> uart_state) (i j : uart_id) (u : uart_state) :
+  j <> i -> uupd f i u j = f j.
+Proof. intro H. unfold uupd. by rewrite decide_False. Qed.
+
+Lemma set_duart_eq (d : dev_state) (i : uart_id) (u : uart_state) :
+  duart (set_duart d i u) i = u.
+Proof. apply uupd_eq. Qed.
+Lemma set_duart_ne (d : dev_state) (i j : uart_id) (u : uart_state) :
+  j <> i -> duart (set_duart d i u) j = duart d j.
+Proof. apply uupd_ne. Qed.
+
+(* Each port answers its OWN window; [uart_decode] is the bus's question,
+   and it is what the PLIC and virtio arms below have to be past.  The
+   windows are disjoint (0x1000_0000+8 vs 0x1000_a000+8), so the decode is
+   a function and not a priority. *)
+Definition in_uart (i : uart_id) (a : Z) : bool :=
+  (uart_base i <=? a) && (a <? uart_base i + uart_size).
+Definition uart_decode (a : Z) : option uart_id :=
+  if in_uart Uart0 a then Some Uart0
+  else if in_uart Uart1 a then Some Uart1
+  else None.
+
 Definition in_plic (a : Z) : bool := (plic_base <=? a) && (a <? plic_base + plic_size).
 Definition in_virtio (a : Z) : bool :=
   (virtio_base <=? a) && (a <? virtio_base + virtio_size).
 
-(* The interrupt LEVEL each of this machine's two sources is driving.  The
+Lemma uart_decode_in (i : uart_id) (a : Z) :
+  uart_decode a = Some i -> in_uart i a = true.
+Proof.
+  unfold uart_decode. destruct (in_uart Uart0 a) eqn:E0.
+  { intro H. by injection H as <-. }
+  destruct (in_uart Uart1 a) eqn:E1; [|discriminate].
+  intro H. by injection H as <-.
+Qed.
+
+Lemma uart_decode_none (a : Z) :
+  uart_decode a = None -> in_uart Uart0 a = false /\ in_uart Uart1 a = false.
+Proof.
+  unfold uart_decode. destruct (in_uart Uart0 a); [discriminate|].
+  destruct (in_uart Uart1 a); [discriminate|]. done.
+Qed.
+
+(* The interrupt LEVEL each of this machine's sources is driving.  The
    gateway ([plic_latch]) forwards exactly these; every other PLIC source id
    is permanently low, because nothing is wired to it. *)
-Definition dev_irq_level (d : dev_state) (i : N) : bool :=
-  if (i =? uart_irq_id)%N then uart_irq (duart d)
-  else if (i =? virtio_irq_id)%N then virtio_irq (dvirtio d)
-  else false.
+Definition dev_irq_level (d : dev_state) (k : N) : bool :=
+  match uart_of_irq k with
+  | Some i => uart_irq (duart d i)
+  | None => if (k =? virtio_irq_id)%N then virtio_irq (dvirtio d) else false
+  end.
+
+Lemma dev_irq_level_uart (d : dev_state) (i : uart_id) :
+  dev_irq_level d (uart_irq_id i) = uart_irq (duart d i).
+Proof. unfold dev_irq_level. by rewrite uart_of_irq_id. Qed.
 
 (* THE BUS NARROWS a wide access to the UART.  Every one of the port's
    registers is a BYTE, so a 2-, 4- or 8-byte access reads (or writes) the
@@ -1104,17 +1207,17 @@ Definition dev_irq_level (d : dev_state) (i : N) : bool :=
    which is finding 9: all eight registers sit inside one aligned doubleword,
    so `lw` of the status word is a thing real drivers do, and against the old
    model it was a STUCK machine. *)
-Definition uart_dev_read (d : dev_state) (off : Z) (k : N)
+Definition uart_dev_read (d : dev_state) (i : uart_id) (off : Z) (k : N)
   : option (bv k * dev_state) :=
-  match uart_read (duart d) off with
-  | Some (b, u') => Some (Z_to_bv k (bv_unsigned b), set_duart d u')
+  match uart_read (duart d i) off with
+  | Some (b, u') => Some (Z_to_bv k (bv_unsigned b), set_duart d i u')
   | None => None
   end.
 
-Definition uart_dev_write (d : dev_state) (off : Z) (b : bv 8)
+Definition uart_dev_write (d : dev_state) (i : uart_id) (off : Z) (b : bv 8)
   : option dev_state :=
-  match uart_write (duart d) off b with
-  | Some u' => Some (set_duart d u')
+  match uart_write (duart d i) off b with
+  | Some u' => Some (set_duart d i u')
   | None => None
   end.
 
@@ -1125,18 +1228,20 @@ Definition uart_dev_write (d : dev_state) (off : Z) (b : bv 8)
 Definition dev_read (d : dev_state) (pa : Arch.pa) (n : N)
   : option (bv (8 * n) * dev_state) :=
   let a := uint pa in
-  if in_uart a then
+  match uart_decode a with
+  | Some i =>
     match n return option (bv (8 * n) * dev_state) with
-    | 1%N => match uart_read (duart d) (a - uart_base) with
-             | Some (b, u') => Some (b, set_duart d u')
+    | 1%N => match uart_read (duart d i) (a - uart_base i) with
+             | Some (b, u') => Some (b, set_duart d i u')
              | None => None
              end
-    | 2%N => uart_dev_read d (a - uart_base) _
-    | 4%N => uart_dev_read d (a - uart_base) _
-    | 8%N => uart_dev_read d (a - uart_base) _
+    | 2%N => uart_dev_read d i (a - uart_base i) _
+    | 4%N => uart_dev_read d i (a - uart_base i) _
+    | 8%N => uart_dev_read d i (a - uart_base i) _
     | _ => None
     end
-  else if in_plic a then
+  | None =>
+  if in_plic a then
     match n return option (bv (8 * n) * dev_state) with
     | 4%N => match plic_read (dplic d) (a - plic_base) with
              | Some (w, p') => Some (w, set_dplic d p')
@@ -1160,25 +1265,28 @@ Definition dev_read (d : dev_state) (pa : Arch.pa) (n : N)
     | 2%N => Some (Z_to_bv _ 0, d)
     | _ => None
     end
-  else None.
+  else None
+  end.
 
 (* An MMIO WRITE transaction: writes are sent to the device individually
    (they do not accumulate in any cache) and take effect immediately. *)
 Definition dev_write (d : dev_state) (pa : Arch.pa) (n : N) (v : bv (8 * n))
   : option dev_state :=
   let a := uint pa in
-  if in_uart a then
+  match uart_decode a with
+  | Some i =>
     match n return bv (8 * n) -> option dev_state with
-    | 1%N => fun v => match uart_write (duart d) (a - uart_base) v with
-                      | Some u' => Some (set_duart d u')
+    | 1%N => fun v => match uart_write (duart d i) (a - uart_base i) v with
+                      | Some u' => Some (set_duart d i u')
                       | None => None
                       end
-    | 2%N => fun v => uart_dev_write d (a - uart_base) (Z_to_bv 8 (bv_unsigned v))
-    | 4%N => fun v => uart_dev_write d (a - uart_base) (Z_to_bv 8 (bv_unsigned v))
-    | 8%N => fun v => uart_dev_write d (a - uart_base) (Z_to_bv 8 (bv_unsigned v))
+    | 2%N => fun v => uart_dev_write d i (a - uart_base i) (Z_to_bv 8 (bv_unsigned v))
+    | 4%N => fun v => uart_dev_write d i (a - uart_base i) (Z_to_bv 8 (bv_unsigned v))
+    | 8%N => fun v => uart_dev_write d i (a - uart_base i) (Z_to_bv 8 (bv_unsigned v))
     | _ => fun _ => None
     end v
-  else if in_plic a then
+  | None =>
+  if in_plic a then
     match n return bv (8 * n) -> option dev_state with
     | 4%N => fun v => match plic_write (dplic d) (a - plic_base) v with
                       | Some p' => Some (set_dplic d p')
@@ -1198,7 +1306,8 @@ Definition dev_write (d : dev_state) (pa : Arch.pa) (n : N) (v : bv (8 * n))
     | 2%N => fun _ => Some d
     | _ => fun _ => None
     end v
-  else None.
+  else None
+  end.
 
 (* The levels the PLIC drives on hart [h]'s two external-interrupt pins.  Each
    is its own CONTEXT's notification, which is why the model has both: the
@@ -1253,8 +1362,11 @@ Definition uart0_state : uart_state :=
   UartState [] [] [] [] byte0 byte0 byte0
             (Z_to_bv 8 uart_divisor_reset) byte0
             (Z_to_bv 8 uart_mcr_reset) byte0 byte0 false.
+(* BOTH PORTS COME UP THE SAME WAY: they are the same chip on the same
+   board, so the power-on state is one definition read at either index. *)
+Definition uarts0_state : uart_id -> uart_state := fun _ => uart0_state.
 Definition plic0_state : plic_state :=
   PlicState (fun _ => Z_to_bv 32 0) (fun _ => false) (fun _ => false)
             (fun _ _ => Z_to_bv 32 0) (fun _ => Z_to_bv 32 0).
 Definition dev0_state : dev_state :=
-  DevState uart0_state plic0_state virtio0_state.
+  DevState uarts0_state plic0_state virtio0_state.

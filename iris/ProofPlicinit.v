@@ -231,7 +231,7 @@ Section ProofPlicinit.
       iModIntro. iSplitL "Hslots"; [| done].
       iApply (plic_slots_stable _ pq pq'
                 (plic_write_outside_claim _ _ _ _ Hpw
-                   ltac:(rewrite Ha4'; vm_compute; reflexivity) uart_irq_id)).
+                   ltac:(rewrite Ha4'; vm_compute; reflexivity) (uart_irq_id Uart0))).
       iExact "Hslots". }
     iIntros (CID7 Hs7) "Hcg Hpc _".
     assert (Hpp10 : add_vec_int (mword_of_int (KernelSyms.plicinit + 0x0e) : mword 64) 2 = mword_of_int (KernelSyms.plicinit + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
@@ -253,7 +253,7 @@ Section ProofPlicinit.
       iModIntro. iSplitL "Hslots"; [| done].
       iApply (plic_slots_stable _ pq pq'
                 (plic_write_outside_claim _ _ _ _ Hpw
-                   ltac:(rewrite Ha4'; vm_compute; reflexivity) uart_irq_id)).
+                   ltac:(rewrite Ha4'; vm_compute; reflexivity) (uart_irq_id Uart0))).
       iExact "Hslots". }
     iIntros (CID8 Hs8) "Hcg Hpc _".
     assert (Hpp12 : add_vec_int (mword_of_int (KernelSyms.plicinit + 0x10) : mword 64) 2 = mword_of_int (KernelSyms.plicinit + 0x12)) by (apply bv_eq; vm_compute; reflexivity).

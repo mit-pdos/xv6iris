@@ -61,6 +61,27 @@
 #define UART0        0x10000000
 #define VIRTIO0      0x10001000
 
+/* THE SECOND 16550, and it is not always there.  QEMU's virt machine
+   instantiates a second ns16550a only when a SECOND SERIAL BACKEND is
+   attached, so a case that touches this window declares `uarts=2` in its
+   `vtest:` directive and vtest.py adds the backend; with one backend the
+   node is absent from the device tree and every access here faults.  Read
+   off the machine's own DTB with two backends attached:
+
+     /soc/serial@10000000  reg <0x10000000 0x100>  interrupts <0xa>
+     /soc/serial@1000a000  reg <0x1000a000 0x100>  interrupts <0xc>
+
+   -- which is DevModel's [uart_base Uart1] and [uart_irq_id Uart1].  The
+   window the MODEL decodes is [uart_size] = 8 bytes wide at the base, the
+   same as port 0's; the DTB's 0x100 is the address space the board hands
+   the chip, not the register file.
+
+   NOT ON THE BOARD PROFILE.  The JH7110 has one UART in this suite's
+   reach and it is a different chip entirely (finding 30), so a `uart1_`
+   case declares `platforms=qemu`: the question cannot be ASKED there. */
+#define UART1        0x1000a000
+#define UART1_IRQ    12                /* PLIC source; UART0's is 10 */
+
 /* ======================================================================
    WHICH MACHINE THIS IMAGE IS BUILT FOR.
 

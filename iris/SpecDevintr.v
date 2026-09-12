@@ -38,7 +38,7 @@
 
    THE printk ARM IS DEAD, and that is what [PlicPlan.plic_claim_ret_ok]
    exists for: under the kernel's PLIC plan a claim can only return 0,
-   [uart_irq_id] or [virtio_irq_id], so the two [beq]s above it are exhaustive
+   [(uart_irq_id Uart0)] or [virtio_irq_id], so the two [beq]s above it are exhaustive
    on the nonzero cases and the [c.bnez a4] at +0x42 provably falls through.
    Nothing on this path calls printk -- which matters, because only printk's
    PANIC path is proved.

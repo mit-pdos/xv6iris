@@ -89,7 +89,7 @@ Definition wp_plic_complete_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `
      holds the token precisely while the source is out of service -- so the
      caller owes it here.  [SpecPlicClaim]'s post is where it came from. *)
   (⌜ rget m0 (mword_of_int 10 : mword 5)
-     = (mword_of_int (Z.of_N uart_irq_id) : mword 64) ⌝ -∗
+     = (mword_of_int (Z.of_N (uart_irq_id Uart0)) : mword 64) ⌝ -∗
      plic_payload_uart γd) -∗
   ( ∀ m' : regfile,
     sie_cap_gpr KT1 m' n false p -∗

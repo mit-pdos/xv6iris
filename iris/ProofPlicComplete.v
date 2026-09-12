@@ -74,8 +74,8 @@ Lemma pc_a0_of_sw (w : mword 64) :
   plic_claim_a0_ok w ->
   Z.to_N (bv_unsigned (autocast (T := mword)
             (subrange_vec_dec w (Z.sub (Z.mul 4 8) 1) 0) : mword 32))
-    = uart_irq_id ->
-  w = (mword_of_int (Z.of_N uart_irq_id) : mword 64).
+    = (uart_irq_id Uart0) ->
+  w = (mword_of_int (Z.of_N (uart_irq_id Uart0)) : mword 64).
 Proof.
   intros [-> | [-> | ->]] H; [ | reflexivity | ];
     exfalso; vm_compute in H; discriminate.
@@ -303,7 +303,7 @@ Section ProofPlicComplete.
     iApply (wp_sw_plic_dev_s_sconf (CID := CID) γd γv (mword_of_int (KernelSyms.plic_complete + 0x1a)) true s1_idx a5_idx
               (mword_of_int 4 : mword 12) N4 (n - 4)%nat
               (⌜ rget m0 a0_idx
-                 = (mword_of_int (Z.of_N uart_irq_id) : mword 64) ⌝ -∗
+                 = (mword_of_int (Z.of_N (uart_irq_id Uart0)) : mword 64) ⌝ -∗
                  plic_payload_uart γd)%I emp%I
               ltac:(rewrite HN4a5; exact (ph_geom_range _ (ph_sclaim_geom _ Hhart)))
               ltac:(rewrite HN4a5; exact (ph_geom_align _ (ph_sclaim_geom _ Hhart)))
@@ -316,7 +316,7 @@ Section ProofPlicComplete.
     { iApply (pci_1a with "Htext"). }
     { iExact "Htok". }
     { (* THE TOKEN GOES BACK.  The write IS [plic_complete] at the id in s1,
-         and the UART's payload is parked under [p_claimed … uart_irq_id]. *)
+         and the UART's payload is parked under [p_claimed … (uart_irq_id Uart0)]. *)
       iIntros (pq pq') "%Hpw _ Hslots Htok".
       rewrite HN4a5 (ph_sclaim_write _ pq _ Hhart) in Hpw.
       injection Hpw as <-.

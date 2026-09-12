@@ -469,8 +469,8 @@ Definition resv_ok (g : gstate) : Prop :=
 (* ---------------------------------------------------------------------- *)
 
 Inductive mobs :=
-  | ObsUartIn  (b : bv 8)
-  | ObsUartOut (b : bv 8)
+  | ObsUartIn  (i : uart_id) (b : bv 8)
+  | ObsUartOut (i : uart_id) (b : bv 8)
   | ObsPowerOn
   | ObsPowerOff.
 
@@ -492,8 +492,9 @@ Inductive mobs :=
 (*                                                                          *)
 (*   THE FACTORING.  Each device latches its OWN interrupt source into the   *)
 (*   PLIC, as part of that device's own step relation, and no relation ever  *)
-(*   reads another device's state.  The three are therefore pairwise         *)
-(*   decoupled over the [dev_state] fields:                                  *)
+(*   reads another device's state.  They are therefore pairwise decoupled    *)
+(*   over the [dev_state] fields -- the two UART threads included, since     *)
+(*   each touches only its OWN port's slot of [duart]:                       *)
 (*                                                                          *)
 (*     uart_step  reads/writes  duart, dplic                                 *)
 (*     disk_step  reads/writes  dvirtio, dplic, and the byte memory          *)
@@ -545,20 +546,20 @@ Inductive mobs :=
    INDEXED BY THE OBSERVATION LIST (§3b'): the drain arm is the machine's
    console OUTPUT event -- observed exactly when the byte reaches SOUT,
    i.e. NOT under LOOP -- and the rx arm is its console INPUT event. *)
-Inductive uart_step (d : dev_state) : list mobs -> dev_state -> Prop :=
+Inductive uart_step (i : uart_id) (d : dev_state) : list mobs -> dev_state -> Prop :=
   | UartStepTx b u' :
-      uart_tx_pop d.(duart) = Some (b, u') ->
-      uart_step d (if uart_loopback d.(duart) then [] else [ObsUartOut b])
-        (set_duart d u')
+      uart_tx_pop (d.(duart) i) = Some (b, u') ->
+      uart_step i d (if uart_loopback (d.(duart) i) then [] else [ObsUartOut i b])
+        (set_duart d i u')
   | UartStepRx b u' :
-      uart_rx_push d.(duart) b = Some u' ->
-      uart_step d [ObsUartIn b] (set_duart d u')
+      uart_rx_push (d.(duart) i) b = Some u' ->
+      uart_step i d [ObsUartIn i b] (set_duart d i u')
   | UartStepLatch p' :
-      dev_irq_level d uart_irq_id = true ->
-      plic_latch d.(dplic) uart_irq_id = Some p' ->
-      uart_step d [] (set_dplic d p')
+      dev_irq_level d (uart_irq_id i) = true ->
+      plic_latch d.(dplic) (uart_irq_id i) = Some p' ->
+      uart_step i d [] (set_dplic d p')
   (* the totality stutter -- see TOTALITY above *)
-  | UartStepIdle : uart_step d [] d.
+  | UartStepIdle : uart_step i d [] d.
 
 (* A UART step never moves the disk IMAGE either (crash.md): each arm
    rebuilds the fabric through [set_duart]/[set_dplic], which keep
@@ -566,8 +567,8 @@ Inductive uart_step (d : dev_state) : list mobs -> dev_state -> Prop :=
    [state_interp]'s durable disk conjunct.  ([plic_step] and the disk's own
    latch/idle arms need no lemma: their [d'] is syntactically [d] or
    [set_dplic d _], so the framing is by conversion.) *)
-Lemma uart_step_v_disk (d : dev_state) (κ : list mobs) (d' : dev_state) :
-  uart_step d κ d' -> v_disk (dvirtio d') = v_disk (dvirtio d).
+Lemma uart_step_v_disk (i : uart_id) (d : dev_state) (κ : list mobs) (d' : dev_state) :
+  uart_step i d κ d' -> v_disk (dvirtio d') = v_disk (dvirtio d).
 Proof. intros H. destruct H; reflexivity. Qed.
 
 (* THE OBSERVATIONS ARE FAITHFUL: a UART step's output observations are
@@ -763,7 +764,7 @@ Class GenId := gen_id : nat.
 
 Inductive mexpr :=
   | HartE (gen : nat) (cpu : CPU) (m : M unit)
-  | UartLoopE (gen : nat)
+  | UartLoopE (gen : nat) (i : uart_id)
   | DiskLoopE (gen : nat)
   | PlicLoopE (gen : nat)
   | PowerLoopE.
@@ -1552,7 +1553,7 @@ Definition boot_facts (g' : gstate) : Prop :=
         /\ g'.(gregs) c = rs1)
   (* the devices are reset: FIFOs empty, no interrupt enabled or pending,
      the disk's queue not live (its IMAGE survives -- see [boot_shape]) *)
-  /\ g'.(gdev).(duart) = uart0_state
+  /\ g'.(gdev).(duart) = uarts0_state
   /\ g'.(gdev).(dplic) = plic0_state
   /\ (exists v0, g'.(gdev).(dvirtio) = virtio_reset v0)
   (* no reservation survives a power cycle *)
@@ -1579,7 +1580,8 @@ Definition boot_shape (g g' : gstate) : Prop :=
 
 (* what a PowerOn forks: the new generation's whole thread complement *)
 Definition power_fork (gen : nat) : list mexpr :=
-  (LoopE gen <$> enum CPU) ++ [UartLoopE gen; DiskLoopE gen; PlicLoopE gen].
+  (LoopE gen <$> enum CPU) ++ (UartLoopE gen <$> enum uart_id)
+                          ++ [DiskLoopE gen; PlicLoopE gen].
 
 (* a generation-indexed thread is LIVE iff the power is on and its
    generation is current; its real arms are gated on exactly that, and the
@@ -1611,10 +1613,10 @@ Definition prim_step
   (* the UART arm carries the machine's console I/O OBSERVATIONS (§3b'):
      [κ] is the step relation's own index, so the drain and rx arms emit
      their events and the latch/idle arms stay silent *)
-  (exists gen, e = UartLoopE gen /\ e' = UartLoopE gen /\ efs = [] /\
+  (exists gen i, e = UartLoopE gen i /\ e' = UartLoopE gen i /\ efs = [] /\
     ((thread_live g gen /\
       exists d',
-        uart_step g.(gdev) κ d' /\
+        uart_step i g.(gdev) κ d' /\
         g' = GState g.(gregs) g.(gmem) d' g.(ggen) g.(gpow) g.(gresv)
                g.(gimg) g.(glog) g.(gtv) g.(gitv) g.(ghr))
      \/ (~ thread_live g gen /\ κ = [] /\ g' = g)))
@@ -1681,25 +1683,25 @@ Lemma prim_step_hart_inv gen cpu m g κ e' g' efs :
    \/ (~ thread_live g gen /\ e' = HartE gen cpu m /\ g' = g)).
 Proof.
   intros [(gen0 & cpu0 & m0 & Heq & ? & ? & Harm)
-         | [(? & Heq & _) | [(? & Heq & _) | [(? & Heq & _) | (Heq & _)]]]];
+         | [(? & ? & Heq & _) | [(? & Heq & _) | [(? & Heq & _) | (Heq & _)]]]];
     try discriminate Heq.
   injection Heq as -> -> ->. by split_and!.
 Qed.
 
-Lemma prim_step_uart_inv gen g κ e' g' efs :
-  prim_step (UartLoopE gen) g κ e' g' efs ->
-  e' = UartLoopE gen /\ efs = [] /\
+Lemma prim_step_uart_inv gen i g κ e' g' efs :
+  prim_step (UartLoopE gen i) g κ e' g' efs ->
+  e' = UartLoopE gen i /\ efs = [] /\
   ((thread_live g gen /\
-    exists d', uart_step g.(gdev) κ d' /\
+    exists d', uart_step i g.(gdev) κ d' /\
       g' = GState g.(gregs) g.(gmem) d' g.(ggen) g.(gpow) g.(gresv)
              g.(gimg) g.(glog) g.(gtv) g.(gitv) g.(ghr))
    \/ (~ thread_live g gen /\ κ = [] /\ g' = g)).
 Proof.
   intros [(? & ? & ? & Heq & _)
-         | [(gen0 & Heq & ? & ? & Harm) | [(? & Heq & _)
+         | [(gen0 & i0 & Heq & ? & ? & Harm) | [(? & Heq & _)
          | [(? & Heq & _) | (Heq & _)]]]];
     try discriminate Heq.
-  injection Heq as ->. by split_and!.
+  injection Heq as -> ->. by split_and!.
 Qed.
 
 Lemma prim_step_disk_inv gen g κ e' g' efs :
@@ -1716,7 +1718,7 @@ Lemma prim_step_disk_inv gen g κ e' g' efs :
    \/ (~ thread_live g gen /\ g' = g)).
 Proof.
   intros [(? & ? & ? & Heq & _)
-         | [(? & Heq & _) | [(gen0 & Heq & ? & ? & ? & Harm)
+         | [(? & ? & Heq & _) | [(gen0 & Heq & ? & ? & ? & Harm)
          | [(? & Heq & _) | (Heq & _)]]]];
     try discriminate Heq.
   injection Heq as ->. by split_and!.
@@ -1732,7 +1734,7 @@ Lemma prim_step_plic_inv gen g κ e' g' efs :
    \/ (~ thread_live g gen /\ g' = g)).
 Proof.
   intros [(? & ? & ? & Heq & _)
-         | [(? & Heq & _) | [(? & Heq & _)
+         | [(? & ? & Heq & _) | [(? & Heq & _)
          | [(gen0 & Heq & ? & ? & ? & Harm) | (Heq & _)]]]];
     try discriminate Heq.
   injection Heq as ->. by split_and!.
@@ -1748,7 +1750,7 @@ Lemma prim_step_power_inv g κ e' g' efs :
        boot_shape g g')).
 Proof.
   intros [(? & ? & ? & Heq & _)
-         | [(? & Heq & _) | [(? & Heq & _) | [(? & Heq & _) | (_ & -> & Harm)]]]];
+         | [(? & ? & Heq & _) | [(? & Heq & _) | [(? & Heq & _) | (_ & -> & Harm)]]]];
     try discriminate Heq.
   split; [reflexivity | exact Harm].
 Qed.
@@ -1825,7 +1827,7 @@ Proof.
   intros Hstep Hnot Hnp.
   destruct Hstep as
     [ (gen & cpu & m & -> & _ & _ & [ (_ & (m' & s' & log' & tv' & itv' & hr' & r' & _ & _ & ->)) | (_ & _ & ->) ])
-    | [ (gen & -> & _ & _ & [ (_ & d' & _ & ->) | (_ & _ & ->) ])
+    | [ (gen & i & -> & _ & _ & [ (_ & d' & _ & ->) | (_ & _ & ->) ])
     | [ (gen & -> & _ & _ & _ & [ (_ & d' & W & log' & _ & _ & _ & ->) | (_ & ->) ])
     | [ (gen & -> & _ & _ & _ & [ (_ & gr' & Hp & ->) | (_ & ->) ])
     | (-> & _) ] ] ] ];
@@ -2043,7 +2045,7 @@ Proof.
   intros Hstep Hok.
   destruct Hstep as
     [ (gen & cpu & m & -> & _ & _ & [ (_ & Hn) | (_ & _ & ->) ])
-    | [ (gen & -> & _ & _ & [ (_ & d' & _ & ->) | (_ & _ & ->) ])
+    | [ (gen & i & -> & _ & _ & [ (_ & d' & _ & ->) | (_ & _ & ->) ])
     | [ (gen & -> & _ & _ & _ & [ (_ & d' & W & log' & _ & _ & Hkeep & ->) | (_ & ->) ])
     | [ (gen & -> & _ & _ & _ & [ (_ & gr' & _ & ->) | (_ & ->) ])
     | (-> & _ & [ (_ & _ & _ & ->) | (_ & _ & _ & Hboot) ]) ] ] ] ];
@@ -2173,7 +2175,7 @@ Proof.
   intros Hstep Hok Hhr.
   destruct Hstep as
     [ (gen & cpu & m & -> & _ & _ & [ (_ & Hn) | (_ & _ & ->) ])
-    | [ (gen & -> & _ & _ & [ (_ & d' & _ & ->) | (_ & _ & ->) ])
+    | [ (gen & i & -> & _ & _ & [ (_ & d' & _ & ->) | (_ & _ & ->) ])
     | [ (gen & -> & _ & _ & _ & [ (_ & d' & W & log' & _ & Hlog & _ & ->) | (_ & ->) ])
     | [ (gen & -> & _ & _ & _ & [ (_ & gr' & _ & ->) | (_ & ->) ])
     | (-> & _ & [ (_ & _ & _ & ->) | (_ & _ & _ & Hboot) ]) ] ] ] ];
@@ -2214,7 +2216,7 @@ Proof.
   intros Hstep Hok Hhr Hitv.
   destruct Hstep as
     [ (gen & cpu & m & -> & _ & _ & [ (_ & Hn) | (_ & _ & ->) ])
-    | [ (gen & -> & _ & _ & [ (_ & d' & _ & ->) | (_ & _ & ->) ])
+    | [ (gen & i & -> & _ & _ & [ (_ & d' & _ & ->) | (_ & _ & ->) ])
     | [ (gen & -> & _ & _ & _ & [ (_ & d' & W & log' & _ & Hlog & _ & ->) | (_ & ->) ])
     | [ (gen & -> & _ & _ & _ & [ (_ & gr' & _ & ->) | (_ & ->) ])
     | (-> & _ & [ (_ & _ & _ & ->) | (_ & _ & _ & Hboot) ]) ] ] ] ];
@@ -2234,7 +2236,7 @@ Proof.
   intros Hstep Hok Hhr.
   destruct Hstep as
     [ (gen & cpu & m & -> & _ & _ & [ (_ & Hn) | (_ & _ & ->) ])
-    | [ (gen & -> & _ & _ & [ (_ & d' & _ & ->) | (_ & _ & ->) ])
+    | [ (gen & i & -> & _ & _ & [ (_ & d' & _ & ->) | (_ & _ & ->) ])
     | [ (gen & -> & _ & _ & _ & [ (_ & d' & W & log' & _ & Hlog & _ & ->) | (_ & ->) ])
     | [ (gen & -> & _ & _ & _ & [ (_ & gr' & _ & ->) | (_ & ->) ])
     | (-> & _ & [ (_ & _ & _ & ->) | (_ & _ & _ & Hboot) ]) ] ] ] ];

@@ -22,7 +22,7 @@
 
    THE printk ARM IS DEAD, AND THAT IS THE ONE INTERESTING OBLIGATION.  After
    the claim, [PlicClaim]'s postcondition gives [plic_claim_a0_ok]: the id is
-   0, [uart_irq_id] = 10 or [virtio_irq_id] = 1, and nothing else, because the
+   0, [(uart_irq_id Uart0)] = 10 or [virtio_irq_id] = 1, and nothing else, because the
    kernel's PLIC plan lets a hart's S-context enable no other source
    (PlicPlan.v).  The two [beq]s at +0x36 and +0x3c take the two nonzero cases,
    so at the [c.bnez a4] at +0x42 the id is provably 0 and the branch falls
@@ -280,7 +280,7 @@ Section ProofDevintr.
     (* THE RECEIVE TOKEN, on its way back into the PLIC invariant: the UART
        arm claimed it and uartintr returned it, and this is where the
        completion parks it again. *)
-    (⌜ irq = (mword_of_int (Z.of_N uart_irq_id) : mword 64) ⌝ -∗
+    (⌜ irq = (mword_of_int (Z.of_N (uart_irq_id Uart0)) : mword 64) ⌝ -∗
        plic_payload_uart γu) -∗
     pa_stk sp0 1 ↦₈[KT1] ra0 -∗
     pa_stk sp0 2 ↦₈[KT1] s00 -∗
@@ -858,7 +858,7 @@ Section ProofDevintr.
         iIntros (mf) "%Hf Hcg Hcnt Hsc Hpc".
         replace (av - 4 + 4)%nat with av by (lia).
         iApply ("Hcont" $! mf with "[%] Hcg Hcnt Hsc Hpc"). exact Hf.
-      + (* ---------------- irq = uart_irq_id = 10 ---------------- *)
+      + (* ---------------- irq = (uart_irq_id Uart0) = 10 ---------------- *)
         assert (Hirq10 : irq = (mword_of_int 10 : mword 64)).
         { etransitivity; [ exact Huart | apply bv_eq; vm_compute; reflexivity ]. }
         assert (Heq10 : eq_vec (rget B3 a0_idx) (rget B3 a5_idx) = true).
