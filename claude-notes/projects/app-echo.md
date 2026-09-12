@@ -2557,6 +2557,23 @@ echo's must turn `kexec_args_at` (the block kexec BUILT) into `UkAbi.uk_args_c`
 law (E2: `init_sh_slot` hands ONE `echo_fs_pure` law), `udepw_law 16` (E5),
 `recv`/`tx` (TX-RECEIPT).  Phase 2 launched.
 
+LAZY-FLAG LANDED (2026-09-12; the iris commit after `9af6a3873`; 78 files
++2910/-1045; build `lazy59`, audit = the thirteen, lemma_diff = the one
+hoist).  The stored flag with real payers everywhere (see the commit message
+for the full map): `pv_lazy` in the block and `uvis_lazy` on the key, the
+invariant in all three block shapes, dormant blocks at `true`, growproc/sbrk/
+kfork/exec re-establishing it, sbrk's LAZY arm the one write
+(`usys_sbrk_lazy` guarded by eager-or-STRICT-shrink: the C takes the lazy
+path at n = 0), the trap loop's `Rut_at` index pinning the bit, EXEC'S ROW
+CLOSED (`kexec_built`'s `lazy_free`, `upd_exec` at `false`), BOTH SLOT-WAND
+ROWS DISCHARGED by the kernel (`exec_key_cwd`, `exec_key_lazy`) -- so
+SH-OPEN's `UInitSh` seam and E2's premise #6 close on rebase; row 5's tie;
+`uk_read_nofault` (SH-LINE 2b's refutation of `cons_swallow`'s fault arm).
+`UInitKernel.init_slot_of_kexec` still takes `uvis_lazy W' = false` as a
+premise until E2's `Hinit_boot` consumer pays it (its twin in `UShKernel` is
+paid at `UInitSh.v:531`).  Review finding (the swallowed byte's copyout
+face) is now CLOSED end to end: CONS-SWALLOW + LAZY-FLAG.
+
 LAZY-FLAG-2 PHASE 1 (2026-09-12; main, 60 files dirty +1926/-815, build `lazy48`:
 506 compiled, 10 red -- all owed phase-2 sites; banked as
 `wx-briefs/lazy-flag-stored-2.patch`).  CORRECTION TO "LAZY-FLAG CORE LANDED":

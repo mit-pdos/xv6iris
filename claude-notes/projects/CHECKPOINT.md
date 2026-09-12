@@ -280,3 +280,9 @@ sites; `pr_res` holds no authority.
 E4 phase 2 GREEN on `lane/sh-echo` (`e01a8d9df`); phase 3 (echo's exec entry
 geometry, the two hanging walks, the cwd threading) to a fresh agent in `-tlw`
 (`brief-sh-echo-3.md`).
+
+LAZY-FLAG LANDED on main (2026-09-12; 78 files; build `lazy59`).  Next in main:
+REBASE-CHAIN (`brief-rebase-chain.md`): supply-split-r1 → r2 onto main, sh-open →
+sh-open-r2 on top (its cwd seam closes); then the coordinator fast-forwards main
+to sh-open-r2; then TX-RECEIPT resumes (rebase onto main) in the next free
+checkout; E2 (`-disc`, on r1) rebases onto the new main at its end.
