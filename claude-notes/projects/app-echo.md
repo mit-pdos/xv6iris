@@ -2404,6 +2404,26 @@ ORDER: GENERIC-PAY → CONS-SWALLOW → SH-LINE 2b (gets on `ush_gets_line`,
 `wp_uk_ecall_read_recv` with `upos` threaded read → gets_loop → gets → getcmd
 → main) → LAZY-FLAG (the owner's form of (A)).
 
+APP-IFACE LANDED (2026-09-12; `40988622b` rebased onto main; 3 files
++444/-79; build `iface21`, audit = the thirteen, lemma_diff CLEAN; the owner
+approved the diff).  `xv6_app.app_boot`; `Happ_boot : ⊢ app_xfer_boot_raw
+(app_pred A c) (app_boot A c)` in place of `Happ_xfer` (`app_xfer_raw_of_boot`
+derives the old; `AppInv.app_xfer_raw` byte-identical; the lend exposes the
+clone's instance, `app_dur_at`); `Hinit_boot` takes `app_boot A c r` LINEARLY
+and `riscv_rx_tag = app_tag A c` (pure; `Tg`/`HTg`/`HTgt` moved ahead in the
+binder list); `Htx`/`Hrx`/`Hperm` at the era's `fileG` with `file_app =
+MkAppcfg … r` and `FsCfg.fsc_uart = γ` (read off `fs_boot_supply`/
+`boot_shared_alloc` in `xv6_boot_era`; `fs_boot_supply_uart`).  No new
+ghost; RiscvAdequacy/WpUart/BootShared untouched; every corollary unchanged
+in statement.  echo: `echo_boot γ r := cons_key r ∨ ∃ i, cons_made r i`
+(`echo_xfer_boot`, `echo_Happ_boot`; the arm decided by the VIEW).  App.v's
+header now cites design/applications.md + app-echo.md.
+WHAT E2 RECEIVES AT `Hinit_boot`: the era's classes; `c`, `r`; PURE `file_app =
+MkAppcfg (app_names A) (app_pred A c) r` and `riscv_rx_tag = app_tag A c`;
+PERSISTENT `app_inv fsc_fs`; LINEAR `app_boot A c r`; conclusion `|==>
+init_boot_bundle ROOTINO fdt0`, itself a wand from `cons_reader fsc_cons 0`
+(the token is the BUNDLE's argument, bridged by `ucons_reader_eq`).
+
 APP-IFACE PHASE 1 -- THE STATEMENT DIFF, FOR THE OWNER'S REVIEW (2026-09-12;
 `-disc`, `lane/app-iface` uncommitted, build `iface15` green, 3 files
 +435/-76: App.v, SystemAdequacy.v, AppEcho.v; RiscvAdequacy/WpUart/BootShared
