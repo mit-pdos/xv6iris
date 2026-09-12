@@ -2404,6 +2404,48 @@ ORDER: GENERIC-PAY → CONS-SWALLOW → SH-LINE 2b (gets on `ush_gets_line`,
 `wp_uk_ecall_read_recv` with `upos` threaded read → gets_loop → gets → getcmd
 → main) → LAZY-FLAG (the owner's form of (A)).
 
+E2 INIT-BOOT PHASE 1 + RULINGS (2026-09-12; `-disc`, `lane/init-boot` on
+`lane/supply-split-r1`, build `e2boot25` green, 5 files +579/-44 + new
+`UInitBoot.v`).  Landed: THE SEAL -- `cons_seal_tok r := own r.2 (●ML [0])`,
+`cons_never r := own r.2 (◯ML [0])` (persistent, timeless; the KEY's own ghost
+advanced `[] → [0]`, not a `-1` sentinel at the flag: refuting the PRESENT
+arms is then one exclusion, `cons_key_never_False`, with no inum arithmetic),
+`cons_seal : cons_key r ==∗ cons_seal_tok r ∗ cons_never r`, the FOURTH
+`cons_state` arm `⌜cons_absent av⌝ ∗ cons_tok r ∗ cons_seal_tok r`,
+`echo_cons_never_law` (SH-OPEN's shape), `echo_cons_seal_step` (init's failed
+mknod), all seven claim laws re-proved (the sealed arm refuted by
+`cons_key_seal_False`/`cons_tok_made_False`; `echo_xfer`/`echo_xfer_boot`: the
+clone is born UNSEALED at a fresh key); THE FLAG ARM's two claim steps
+(`echo_cons_unarm_present`, `echo_cons_mknod_present` -- vacuous: the pin says
+the name resolves); `UkInit.uki_mknod_hit_leaf`, `init_cons_hit`,
+`init_cons_dance := (∃ K, init_cons_leaves T K stc ∗ K) ∨ init_cons_hit T stc`
+(the constructor loses its `K` parameter; FACT 3 at the flag arm: the first
+open can still fail at filealloc, the repair mknod then runs against a
+PRESENT view, so the flag arm needs its own credential-free mknod leaf);
+`PinnedExec.pex_slot_at` (the identifying step factored) and
+`pinned_exec_bundle_boot` (the BOOT shape: `SpecKexec.exec_au_pre` at a
+literal path/argv -- `pinned_exec_bundle` concludes the SYSCALL shape
+`sys_exec_au_pre` quantified over the caller's image, wrong for forkret's
+`kexec("/init")`); `UInitBoot.v` (`init_boot_pin_resolves` at
+`[ROOTINO; INIT_INO]`, `init_boot_bundle_of_pinned` with `Pay :=
+init_cons_dance ∗ ucons_reader fsc_cons 0`, `init_deps_of_sup`);
+`UexecExecMint.udepw_of_sup` (15/17 off `app_sup`, update-free).
+THE PREMISE TABLE of `init_slot_of_kexec` at echo's era is closed except:
+#6 `uvis_cwd W' = ROOTINO` (the kernel row, LAZY-FLAG-2), #10 (sh's supply:
+`sh_deps`, `sh_pay`'s two conjuncts -- other lanes'), #11 flag arm (phase 2).
+RULINGS: (d) `echo_adequacy_modulo_phi` carries NAMED hypotheses by owner and
+nothing else: `Hphi`; `udepw_law 16` (E5); `UkSh.sh_deps` as ONE hypothesis
+(2b/SH-OPEN/E5); `sh_pay`'s two conjuncts (E4; 2b's `ush_rest`).  (e) the cwd
+row: E2 states its consumers with the inner wand premise in LAZY-FLAG-2's
+position (red at that seam until it lands).  (h) THE CREDENTIAL TRAVELS DOWN
+INIT'S WALK: `uki_mknod_leaf`'s post becomes `(console-leaf ∗ Cns) ∨ (∃ K',
+absent-leaf K' ∗ K' ∗ Cns) ∨ T`, `init_exec_sup_pos/_lend` take `Cns` at the
+exec site, `init_sh_slot` receives it there; `Cns := □(claim → absent ∨ T) ∨
+∃ i, □(claim → present_at i ∨ T)`; SH-OPEN's consumer stays at abstract `K`,
+bridged by `ush_cons_in_of_Cns`.  (i) `□ uexec_wp` from
+`LinkUserinit.UG.uexec_wp_gen`.  (j) `init_bytes_elf` named (unification into
+`pstring_hex_bytes` overflows the stack at Qed) -- durable note.
+
 O5' RULED BY THE OWNER (2026-09-12): KERNEL DIAGNOSTICS ARE ADMITTED "as
 appropriate based on the syscalls made by the processes we're concerned
 about".  So `good_out`'s K part becomes: the ten boot messages (each once,

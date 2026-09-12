@@ -1336,3 +1336,10 @@ against HEAD with a lane-content filter before building.
 the Makefile (it was at `ded23f2a` while the pin was `06ea57f8`; e.g. `panic()`
 prints at the newer revision and is silent at the pin).  Before citing C for a
 proof, `git -C xv6-riscv show $(grep -oP 'XV6_REV \?= \K\w+' Makefile):kernel/<file>`.
+
+## Name the ELF-bytes equation; never leave it to unification (2026-09-12)
+
+`FsInitPin.init_bytes` is definitionally `ElfUser.init_elf`, but letting
+unification discover that sends conversion into `pstring_hex_bytes
+InitElfRaw.init_elf_hex` and the kernel's stack overflows at `Qed`.  Use the
+named equation (`UInitBoot.init_bytes_elf`, `FsShPin.sh_bytes_elf`) and rewrite.

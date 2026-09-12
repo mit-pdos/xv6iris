@@ -229,3 +229,7 @@ templates; the boot's ten exact); the trap-side two are not ours (note "O5'
 RULED").  In flight: LAZY-FLAG-2 p1 (main), E2 p1 (`-disc`), TX-RECEIPT p1
 (`-tlw`), PRINTK-LEDGER p1 (`-sup`); `lane/sh-open` and `lane/supply-split-r1`
 wait to land.
+
+E2 phase 1 green (2026-09-12); phase 2 go-ahead with rulings (d)(e)(h)(i) (note
+"E2 INIT-BOOT PHASE 1 + RULINGS"); E2 will be red at the cwd seam until
+LAZY-FLAG-2 lands.
