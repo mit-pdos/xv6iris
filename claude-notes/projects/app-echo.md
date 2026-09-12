@@ -2437,9 +2437,12 @@ target: a ninth clause of `WpUart.uart_col_ok` and one more pure premise on
 `Htx` (WpUart is at the bottom of the tree: a TX-TAG-phase-2 rider or a lane).
 (6) ECHO'S BOOT RESOURCE IS TWO-ARMED: `echo_boot γ r := cons_key r ∨ ∃ i,
 cons_made r i` (`echo_xfer_boot` PROVED; the arm is decided outside the ▷ by
-`cons_inum av`) -- at era ≥ 1 the console node is DURABLE, the claim sits in a
-PRESENT arm with the key inside it, and /init's FIRST open SUCCEEDS: E2 owes
-init's console dance at the FLAG arm (a pinned hit at `cons_made r i`, the
+`cons_inum av`, i.e. BY THE VIEW, NEVER BY THE ERA -- the owner's point
+2026-09-12: the node may be absent at any era, after a power cycle before the
+mknod committed or after a failed mknod; the claim's `cons_absent` arm and the
+fresh KEY cover that at every era exactly as at era 0).  When the view HAS the
+node (durable after era 0's mknod) the key is inside the PRESENT arm and
+/init's FIRST open SUCCEEDS: E2 owes init's console dance at the FLAG arm (a pinned hit at `cons_made r i`, the
 same leaf as OPEN-PIN's second open) beside the landed key arm -- new E2
 work exposed by routing the boot resource across eras.  (7) E2's premise
 audit: the token `ucons_reader cn 0` is the BUNDLE's own wand argument
