@@ -2597,6 +2597,31 @@ TX-RECEIPT's `tx_claim` so the two lanes merge by juxtaposition; the hart lines'
 invariant; `boot_k_shape` deleted.  `BACKSPACE` is the int 0x100 (not byte 8):
 the "\b \b" triple is reachable only from `%c`, unused.
 
+UNTAG LANDED (2026-09-12, iris 6397bd3e7; 29 files, -1312/+316).  TX-TAG's
+per-byte transmit labels are gone (`txsrc`, `uart_tagsE`, `uart_tag_at`, the
+`_at`/`_tag` receipt families, `tag_proj`, `cons_sent_cnt_at`, `boot_k_shape`);
+the untagged baseline receipts (`uart_sent_sub` + `_nil/_nil_free/_snoc`,
+`uart_tx_own_sent_sub`, `uart_sent_from`, `cons_sent_cnt`) are byte-identical
+to their pre-TX-TAG form.  KEPT: the rider `u_wire u = u_out u` in
+`uart_col_ok` (with `uart_colE_wire_out`; `uart_ghosts_alloc` takes it as a
+premise) -- the clause OUT-FUPD's predicate needs; consputc's pinned bytes
+(`SpecConsputc`: premise `uart_sent_sub γd bs`, post `⌜if a00 = cp_backspace
+then cs = consputc_bs else cs = [cp_byte a00]⌝ -∗ uart_sent_sub γd (bs ++
+cs)`); consoleintr's pinned echo (`SpecConsoleintr` row: `uart_sent_sub γu cs
+∗ ⌜cons_echo cb cs⌝ ∗ ⌜hh' = Some hb -> cs = [echo_of cb]⌝`), `console_caps`
+back at `uart_sent_sub γu [] ∗ uart_inited γu`.  The remaining `uart_sent_sub`
+family is the last of the prefix/sublist receipts and is retired by OUT-FUPD
+(the pinned posts then restate over the caller's view shift).  The
+`uart_tag_of` hits in WpUart are the RECEIVE-side rx tag, untouched.
+
+E4 SH-ECHO LANDED (2026-09-12; E4's eight commits + one adaptation, rebased
+over SUPPLY-SPLIT r2 / SH-OPEN / UNTAG; 6 files +2747/-31: UShEcho, UkShEcho,
+UkShRun, UkShDiag, UkShFork, _CoqProject).  Adaptation: `echo_slot_of_kexec`
+carries `uvis_lazy W' = false` (as `sh_slot_of_kexec` does) and its
+constructor wand takes the two rows `⌜uvis_cwd W' = ROOTINO⌝ -∗ ⌜uvis_lazy W'
+= false⌝ -∗` in `pex_slot`'s order; `wp_kshf_fork` keeps SH-OPEN's `ush_fd0p`
+row beside E4's cwd index.  Open premises unchanged from the phase-3 note.
+
 E4 SH-ECHO PHASE 3 DONE ON ITS BRANCH (2026-09-12; `lane/sh-echo` =
 `c2879f176` in -tlw, on the OLD base `lane/supply-split-r1`; three commits
 06ac098b2 / f87068824 / c2879f176; 6 files, +2724; log shecho64; gate green
