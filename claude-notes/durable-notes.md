@@ -1343,3 +1343,12 @@ proof, `git -C xv6-riscv show $(grep -oP 'XV6_REV \?= \K\w+' Makefile):kernel/<f
 unification discover that sends conversion into `pstring_hex_bytes
 InitElfRaw.init_elf_hex` and the kernel's stack overflows at `Qed`.  Use the
 named equation (`UInitBoot.init_bytes_elf`, `FsShPin.sh_bytes_elf`) and rewrite.
+
+## A dirty bottom-of-tree file can produce bogus "Cannot find library" failures (2026-09-12)
+
+`vmbuild.sh` deletes every dirty file's `.vo` and regenerates `CoqMakefile`; when a
+file near the bottom (`Xv6Cameras.v`) is dirty, make's first pass can schedule
+dependents before its `.vo` exists, and under VM contention this cascades into
+dozens of `Cannot find library xv6iris.Xv6Cameras` failures in files the lane never
+touched (no `Error 137`).  Re-run once for a clean signal and trust the
+filesystem's missing-`.vo` list over the log.
