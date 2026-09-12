@@ -442,34 +442,15 @@ Section UConsLine.
   Proof. rewrite /ush_tag_law. apply _. Qed.
 
   (* =================================================================== *)
-  (*  §9  THE TAINT'S GENERIC CONTINUATION                                *)
+  (*  §9  THE TAINT'S GENERIC CONTINUATION -- MOVED DOWN (lane SH-OPEN).   *)
   (*                                                                      *)
-  (*  What a program does when it learns the taint MID-WALK.  The arm an   *)
-  (*  application's claim law hands out is a SLOT at a key                 *)
-  (*  ([PinnedExec.pex_slot]'s [T]-arm), and [UkRun.urun_gen] is the step  *)
-  (*  from there to a running process: the key a [urun] is at is           *)
-  (*  [UexecSlot.uvis_of_run] of its own registers and pc.  Named here     *)
-  (*  because it is a PREMISE of three statements in this lane -- sh's     *)
-  (*  entry, the [gets] loop and [UkShFork.ushf_rest_of_body] -- and a     *)
-  (*  premise spelled once is a premise the three cannot disagree about.   *)
+  (*  It is [UkSh.ush_gen_slot] / [UkSh.ush_gen_run] now, because the      *)
+  (*  first walk that needs it is sh's CONSOLE PREAMBLE, which is below    *)
+  (*  this file: sh's open of "console" is PINNED, so under the taint      *)
+  (*  there is no bundle for row 15 and the preamble must be able to stop  *)
+  (*  walking sh's code.  The two statements were textually identical;     *)
+  (*  this file's copies are gone and its own statements take UkSh's.      *)
   (* =================================================================== *)
-  Definition ush_gen_slot (N : uk_names Σ) (T : iProp Σ) : iProp Σ :=
-    (□ (∀ W : uvis,
-          T -∗ my_pay (uvis_gen W) (ukn_pay N) -∗ ukn_pay N (-1) -∗
-          uslot W))%I.
-
-  Global Instance ush_gen_slot_persistent N T : Persistent (ush_gen_slot N T).
-  Proof. rewrite /ush_gen_slot. apply _. Qed.
-
-  Lemma ush_gen_run (N : uk_names Σ) (T : iProp Σ) (h : CpuId) (m : regfile)
-      (pc : mword 64) (avail : nat) :
-    is_aligned_vaddr (Virtaddr pc) 2 = true ->
-    ush_gen_slot N T -∗ T -∗ urun N h m pc avail -∗
-    WP (Loop : expr riscv_lang).
-  Proof.
-    intro Hal. rewrite /ush_gen_slot. iIntros "#Hg HT Hrun".
-    iApply (urun_gen N T h m pc avail Hal with "Hg HT Hrun").
-  Qed.
 
   (* =================================================================== *)
   (*  §10  WHAT REPLACES [UkShFork.ushf_lexable]                          *)
