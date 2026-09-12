@@ -62,7 +62,7 @@ theorem swp_pmpCheck_xv6_S (cpu : CPU) (dq : DFrac) (addr : BitVec 64) (width : 
   swp_run 3
   simp only [IntRange.instForIn'IntInferInstanceMembershipOfMonad, IntRange.forIn'_eq]
   rw [IntRange.loop_unfold]
-  rcases hacc with rfl | rfl | rfl | rfl
+  rcases hacc with rfl | rfl | rfl | rfl | rfl | rfl
   all_goals
     swp_run 60
     iapply HΦ $$ Hpmpcfg_n Hpmpaddr_n
@@ -83,14 +83,25 @@ theorem pmpPassesS_xv6 (cpu : CPU) (dq : DFrac) (c : MConf) (hcfg : c.pmpcfg = x
   rw [hcfg, haddr]
   exact swp_pmpCheck_xv6_S cpu dq addr width acc Φ hacc hram
 
-/-- What the supervisor-mode stage lemmas need of a configuration at the
-Bare tier: the PMP obligation, `satp.MODE = Bare`, and the `mstatus` facts.
+/-- What the supervisor-mode PHYSICAL stage lemmas need of a configuration,
+at any address-translation tier: the PMP obligation, the `mstatus` facts and
+the two `menvcfg` facts.  Nothing here mentions `satp`, so the page-walk
+tiers reuse the physical leaves unchanged.
 (Stated as facts ABOUT the fields, never as equations on them, so that the
 executor's hypothesis rewriting leaves the cells at `c.<field>`.) -/
-def SConfBare (c : MConf) (sie : Bool) : Prop :=
-  (∀ (cpu : CPU) (dq : DFrac), pmpPassesS (GF := GF) cpu dq c) ∧
-  BitVec.extractLsb' 60 4 c.satp = 0#4 ∧ smFacts c.mstatus sie ∧
+def SConfPhys (c : MConf) (sie : Bool) : Prop :=
+  (∀ (cpu : CPU) (dq : DFrac), pmpPassesS (GF := GF) cpu dq c) ∧ smFacts c.mstatus sie ∧
   BitVec.extractLsb' 32 2 c.menvcfg = 0#2 ∧ BitVec.extractLsb' 2 1 c.menvcfg = 0#1
+
+/-- What the supervisor-mode stage lemmas that TRANSLATE need of a
+configuration at the Bare tier: everything the physical leaves need, plus
+`satp.MODE = Bare` (the tier at which `translateAddr` short-circuits). -/
+def SConfBare (c : MConf) (sie : Bool) : Prop :=
+  SConfPhys (GF := GF) c sie ∧ BitVec.extractLsb' 60 4 c.satp = 0#4
+
+/-- The physical part of a Bare-tier configuration. -/
+theorem SConfBare.phys {c : MConf} {sie : Bool} (h : SConfBare (GF := GF) c sie) :
+    SConfPhys (GF := GF) c sie := h.1
 
 set_option hygiene false in
 /-- The shared script of the supervisor-mode physical reads. -/
@@ -98,7 +109,7 @@ macro "checked_mem_read_S_proof" pa:ident n:num hram:ident hal:ident : tactic =>
   `(tactic| (
     iintro ⟨HmConf, Hbytes, HΦ⟩
     conf_cases HmConf
-    obtain ⟨hpmp, hmode, hms, hpmm, hlpe⟩ := hok
+    obtain ⟨hpmp, hms, hpmm, hlpe⟩ := hok
     obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
     have hpma := matching_pma_ram $pa $n $hram (by decide) (by decide)
     have hclint := within_clint_ram $pa $n $hram
@@ -116,7 +127,7 @@ macro "checked_mem_read_S_proof" pa:ident n:num hram:ident hal:ident : tactic =>
 
 set_option maxHeartbeats 4000000 in
 theorem swp_checked_mem_read_ifetch4_S (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
-    (hok : SConfBare (GF := GF) c sie)
+    (hok : SConfPhys (GF := GF) c sie)
     (pa : BitVec 64) (w : BitVec (8 * 4)) (hram : inRam pa 4) (hal : pa.toNat % 4 = 0)
     (Φ : Result ((BitVec (8 * 4)) × Unit) (physaddr × ExceptionType) → IProp GF) :
     confCells cpu dq Privilege.Supervisor c ∗ imgBytes pa 4 w ∗
@@ -127,7 +138,7 @@ theorem swp_checked_mem_read_ifetch4_S (cpu : CPU) (dq : DFrac) (c : MConf) (sie
 
 set_option maxHeartbeats 4000000 in
 theorem swp_checked_mem_read_ifetch2_S (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
-    (hok : SConfBare (GF := GF) c sie)
+    (hok : SConfPhys (GF := GF) c sie)
     (pa : BitVec 64) (w : BitVec (8 * 2)) (hram : inRam pa 2) (hal : pa.toNat % 2 = 0)
     (Φ : Result ((BitVec (8 * 2)) × Unit) (physaddr × ExceptionType) → IProp GF) :
     confCells cpu dq Privilege.Supervisor c ∗ imgBytes pa 2 w ∗
@@ -148,7 +159,7 @@ theorem swp_fetch_s4_bare (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
     ⊢ swp cpu (fetch ()) Φ := by
   iintro ⟨HmConf, HPC, Hbytes, HΦ⟩
   conf_cases HmConf
-  obtain ⟨hpmp, hmode, hms, hpmm, hlpe⟩ := hok
+  obtain ⟨⟨hpmp, hms, hpmm, hlpe⟩, hmode⟩ := hok
   obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
   have hva := is_aligned_vaddr_of pc 4 hal
   have hb0 := bit0_clear_of_even pc (by omega)
@@ -159,7 +170,7 @@ theorem swp_fetch_s4_bare (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
     swp_run 80
     conf_intro HmConf
     iapply swp_bind
-    iapply swp_checked_mem_read_ifetch4_S (hok := ⟨hpmp, hmode, ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩, hpmm, hlpe⟩) (hram := hram) (hal := hal)
+    iapply swp_checked_mem_read_ifetch4_S (hok := ⟨hpmp, ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩, hpmm, hlpe⟩) (hram := hram) (hal := hal)
     iframe
     inext
     iintro HmConf Hbytes
@@ -178,9 +189,9 @@ theorem swp_fetch_s2_bare (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
     ⊢ swp cpu (fetch ()) Φ := by
   iintro ⟨HmConf, HPC, Hlo, Hhi, HΦ⟩
   conf_cases HmConf
-  obtain ⟨hpmp, hmode, hms, hpmm, hlpe⟩ := hok
+  obtain ⟨⟨hpmp, hms, hpmm, hlpe⟩, hmode⟩ := hok
   obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
-  have hok' : SConfBare (GF := GF) c sie := ⟨hpmp, hmode, ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩, hpmm, hlpe⟩
+  have hok' : SConfPhys (GF := GF) c sie := ⟨hpmp, ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩, hpmm, hlpe⟩
   have hva := not_is_aligned_vaddr_of pc 4 (by omega) (by omega)
   have hb0 := bit0_clear_of_even pc (by omega)
   have h2 : (pc + 2#64).toNat = pc.toNat + 2 := by
@@ -225,9 +236,9 @@ theorem swp_fetch_s2_rvc_bare (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
     ⊢ swp cpu (fetch ()) Φ := by
   iintro ⟨HmConf, HPC, Hlo, HΦ⟩
   conf_cases HmConf
-  obtain ⟨hpmp, hmode, hms, hpmm, hlpe⟩ := hok
+  obtain ⟨⟨hpmp, hms, hpmm, hlpe⟩, hmode⟩ := hok
   obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
-  have hok' : SConfBare (GF := GF) c sie := ⟨hpmp, hmode, ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩, hpmm, hlpe⟩
+  have hok' : SConfPhys (GF := GF) c sie := ⟨hpmp, ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩, hpmm, hlpe⟩
   have hva := not_is_aligned_vaddr_of pc 4 (by omega) (by omega)
   have hb0 := bit0_clear_of_even pc (by omega)
   have hal2 : pc.toNat % 2 = 0 := by omega
@@ -382,7 +393,7 @@ theorem wpLoop_s_base (cpu : CPU) (dq : DFrac) (c c' : MConf) (hok : SConfBare (
     ▷ (confCells cpu dq Privilege.Supervisor c' -∗ clockCells cpu -∗ pcIs cpu npc -∗ R -∗ Q -∗ wpLoop cpu)
     ⊢ wpLoop cpu := by
   have hsie : BitVec.extractLsb' 1 1 c.mstatus = 0#1 := by
-    have := hok.2.2.1.1; simpa using this
+    have := hok.1.2.1.1; simpa using this
   have hp' : Privilege.Supervisor = Privilege.Machine ∨ Privilege.Supervisor = Privilege.Supervisor := Or.inr rfl
   iintro ⟨HmConf, Hclock, Hpc, HR, HP, HΦ⟩
   ihave ⟨%mi, %minstret, %mcycle, %mtime, %mip, Hminstret_increment, Hminstret, Hmcycle, Hmtime, Hmip⟩ :=
@@ -439,7 +450,7 @@ theorem wpLoop_s_rvc [CurCtx] (cpu : CPU) (dq : DFrac) (c c' : MConf) (hok : SCo
     ▷ (confCells cpu dq Privilege.Supervisor c' -∗ clockCells cpu -∗ pcIs cpu npc -∗ R -∗ Q -∗ wpLoop cpu)
     ⊢ wpLoop cpu := by
   have hsie : BitVec.extractLsb' 1 1 c.mstatus = 0#1 := by
-    have := hok.2.2.1.1; simpa using this
+    have := hok.1.2.1.1; simpa using this
   have hp' : Privilege.Supervisor = Privilege.Machine ∨ Privilege.Supervisor = Privilege.Supervisor := Or.inr rfl
   iintro ⟨HmConf, Hclock, Hpc, HR, HP, HΦ⟩
   ihave ⟨%mi, %minstret, %mcycle, %mtime, %mip, Hminstret_increment, Hminstret, Hmcycle, Hmtime, Hmip⟩ :=
@@ -531,7 +542,8 @@ side conditions. -/
 theorem SConfBare_sConfOf_bare (root : BitVec 44) (ms mdl mepc stc : BitVec 64)
     (hsm : smFacts ms false) :
     SConfBare (GF := GF) (sConfOf KTier.bare root ms mdl mepc stc) false :=
-  ⟨fun cpu dq => pmpPassesS_xv6 cpu dq _ rfl rfl, by simp only [sConfOf, satpOf]; try decide, hsm, by simp only [sConfOf]; decide, by simp only [sConfOf]; decide⟩
+  ⟨⟨fun cpu dq => pmpPassesS_xv6 cpu dq _ rfl rfl, hsm, by simp only [sConfOf]; decide,
+    by simp only [sConfOf]; decide⟩, by simp only [sConfOf, satpOf]; try decide⟩
 
 
 set_option maxHeartbeats 4000000 in

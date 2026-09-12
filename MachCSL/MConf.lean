@@ -263,12 +263,15 @@ abbrev mBoot (cpu : CPU) (dq : DFrac) : IProp GF := mConf cpu dq bootConf
 
 /-! ### What the stage lemmas need of a configuration -/
 
-/-- The access kinds the kernel makes (the PMP check's RWX dispatch is only
-defined for well-formed kinds). -/
+/-- The access kinds the kernel makes, and the page walk's entry reads and
+A/D write-backs (the PMP check's RWX dispatch is only defined for
+well-formed kinds). -/
 def kernelAccess (acc : MemoryAccessType mem_payload) : Prop :=
   acc = MemoryAccessType.InstructionFetch () ∨ acc = MemoryAccessType.Load mem_payload.Data ∨
   acc = MemoryAccessType.Store mem_payload.Data ∨
-  acc = MemoryAccessType.Atomic (amoop.AMOSWAP, true, false, mem_payload.Data, mem_payload.Data)
+  acc = MemoryAccessType.Atomic (amoop.AMOSWAP, true, false, mem_payload.Data, mem_payload.Data) ∨
+  acc = MemoryAccessType.Load mem_payload.PageTableEntry ∨
+  acc = MemoryAccessType.Store mem_payload.PageTableEntry
 
 /-- The PMP check passes, in machine mode, for every kernel access inside RAM. -/
 def pmpPassesM (cpu : CPU) (dq : DFrac) (c : MConf) : Prop :=

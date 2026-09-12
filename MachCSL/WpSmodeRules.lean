@@ -584,7 +584,7 @@ theorem wp_s_csrr_sstatus [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k 
   have h := wpLoop_k_genv cpu k hsie htier pc (pc + instrLen is_rvc) is_rvc _
     (fun c => lower_mstatus c.mstatus) (sstatusAt k.sie)
     (fun c hok _ => by
-      unfold sstatusAt; rw [lower_mstatus_sie, hsie]; exact hok.2.2.1.1)
+      unfold sstatusAt; rw [lower_mstatus_sie, hsie]; exact hok.1.2.1.1)
     (fun v => k.regs.set rd v) (fun v => RegMap.set_other _ _ _ _ (Ne.symm hrd.2.1))
     (fun c hok _ => by
       have e := execSpecF_csrr_sstatus (GF := GF) cpu (DFrac.own 1) c false hok pc (pc + instrLen is_rvc) rd hrd.1
@@ -606,7 +606,7 @@ theorem wp_s_csrrci_sstatus [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (
   have h := wpLoop_k_genv cpu k hsie htier pc (pc + instrLen is_rvc) is_rvc _
     (fun c => lower_mstatus c.mstatus) (sstatusAt k.sie)
     (fun c hok _ => by
-      unfold sstatusAt; rw [lower_mstatus_sie, hsie]; exact hok.2.2.1.1)
+      unfold sstatusAt; rw [lower_mstatus_sie, hsie]; exact hok.1.2.1.1)
     (fun v => k.regs.set rd v) (fun v => RegMap.set_other _ _ _ _ (Ne.symm hrd.2.1))
     (fun c hok _ => by
       have e := execSpecF_csrrci_sstatus (GF := GF) cpu c hok pc (pc + instrLen is_rvc) rd hrd.1 (tpPin cpu k.regs)

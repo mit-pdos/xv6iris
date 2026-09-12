@@ -225,4 +225,14 @@ theorem update_PTE_Bits_kLeaf_some (ppn : BitVec 44) (perm : KPerm) (a d : BitVe
   rcases bv1_cases a with rfl | rfl <;> rcases bv1_cases d with rfl | rfl <;>
     cases hw : accWrites acc <;> simp_all
 
+/-- A leaf's page and permission are determined by its value, at any A/D. -/
+theorem kLeaf_inj {ppn ppn' : BitVec 44} {perm perm' : KPerm} {a d a' d' : BitVec 1}
+    (h : kLeaf ppn perm a d = kLeaf ppn' perm' a' d') : ppn = ppn' ∧ perm = perm' := by
+  have h1 := congrArg PPN_of_PTE h
+  rw [ppn_of_kLeaf, ppn_of_kLeaf] at h1
+  have h2 := congrArg (fun p => _get_PTE_Flags_X (Sail.BitVec.extractLsb p 7 0)) h
+  simp only [flags_of_kLeaf] at h2
+  refine ⟨h1, ?_⟩
+  cases perm <;> cases perm' <;> first | rfl | (exfalso; clear h h1; revert h2; revert a d a' d'; decide)
+
 end MachCSL

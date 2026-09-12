@@ -74,7 +74,7 @@ macro "checked_mem_read_S_load_proof" pa:ident n:num hram:ident hal:ident : tact
   `(tactic| (
     iintro ⟨HmConf, Htok, Hbytes, HΦ⟩
     conf_cases HmConf
-    obtain ⟨hpmp, hmode, hms, hpmm, hlpe⟩ := hok
+    obtain ⟨hpmp, hms, hpmm, hlpe⟩ := hok
     obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
     have hpma := matching_pma_ram $pa $n $hram (by decide) (by decide)
     have hclint := within_clint_ram $pa $n $hram
@@ -93,7 +93,7 @@ macro "checked_mem_read_S_load_proof" pa:ident n:num hram:ident hal:ident : tact
 set_option maxHeartbeats 4000000 in
 /-- A one-byte data load from RAM returns the byte owned. -/
 theorem swp_checked_mem_read_load1_S [CurCtx] (cpu : CPU) (dq dq' : DFrac) (c : MConf) (sie : Bool)
-    (hok : SConfBare (GF := GF) c sie)
+    (hok : SConfPhys (GF := GF) c sie)
     (pa : BitVec 64) (w : BitVec (8 * 1)) (hram : inRam pa 1) (hal : pa.toNat % 1 = 0)
     (Φ : Result ((BitVec (8 * 1)) × Unit) (physaddr × ExceptionType) → IProp GF) :
     confCells cpu dq Privilege.Supervisor c ∗ ctxTok cpu curCtx ∗ bytesPointsTo pa 1 dq' w ∗
@@ -106,7 +106,7 @@ theorem swp_checked_mem_read_load1_S [CurCtx] (cpu : CPU) (dq dq' : DFrac) (c : 
 set_option maxHeartbeats 4000000 in
 /-- An 8-byte aligned data load from RAM returns the bytes owned. -/
 theorem swp_checked_mem_read_load8_S [CurCtx] (cpu : CPU) (dq dq' : DFrac) (c : MConf) (sie : Bool)
-    (hok : SConfBare (GF := GF) c sie)
+    (hok : SConfPhys (GF := GF) c sie)
     (pa : BitVec 64) (w : BitVec (8 * 8)) (hram : inRam pa 8) (hal : pa.toNat % 8 = 0)
     (Φ : Result ((BitVec (8 * 8)) × Unit) (physaddr × ExceptionType) → IProp GF) :
     confCells cpu dq Privilege.Supervisor c ∗ ctxTok cpu curCtx ∗ bytesPointsTo pa 8 dq' w ∗
@@ -119,7 +119,7 @@ theorem swp_checked_mem_read_load8_S [CurCtx] (cpu : CPU) (dq dq' : DFrac) (c : 
 set_option maxHeartbeats 4000000 in
 /-- A 4-byte aligned data load from RAM returns the bytes owned. -/
 theorem swp_checked_mem_read_load4_S [CurCtx] (cpu : CPU) (dq dq' : DFrac) (c : MConf) (sie : Bool)
-    (hok : SConfBare (GF := GF) c sie)
+    (hok : SConfPhys (GF := GF) c sie)
     (pa : BitVec 64) (w : BitVec (8 * 4)) (hram : inRam pa 4) (hal : pa.toNat % 4 = 0)
     (Φ : Result ((BitVec (8 * 4)) × Unit) (physaddr × ExceptionType) → IProp GF) :
     confCells cpu dq Privilege.Supervisor c ∗ ctxTok cpu curCtx ∗ bytesPointsTo pa 4 dq' w ∗
@@ -135,7 +135,7 @@ macro "checked_mem_write_S_proof" pa:ident n:num hram:ident hal:ident : tactic =
   `(tactic| (
     iintro ⟨HmConf, Htok, Hbytes, HΦ⟩
     conf_cases HmConf
-    obtain ⟨hpmp, hmode, hms, hpmm, hlpe⟩ := hok
+    obtain ⟨hpmp, hms, hpmm, hlpe⟩ := hok
     obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
     have hpma := matching_pma_ram $pa $n $hram (by decide) (by decide)
     have hclint := within_clint_ram $pa $n $hram
@@ -155,7 +155,7 @@ set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
 /-- A one-byte data store to RAM overwrites the byte owned. -/
 theorem swp_checked_mem_write_store1_S [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
-    (hok : SConfBare (GF := GF) c sie)
+    (hok : SConfPhys (GF := GF) c sie)
     (pa : BitVec 64) (w data : BitVec (8 * 1)) (hram : inRam pa 1) (hal : pa.toNat % 1 = 0)
     (Φ : Result Bool (physaddr × ExceptionType) → IProp GF) :
     confCells cpu dq Privilege.Supervisor c ∗ ctxTok cpu curCtx ∗ bytesPointsTo pa 1 (DFrac.own 1) w ∗
@@ -170,7 +170,7 @@ set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
 /-- A 4-byte aligned data store to RAM overwrites the bytes owned. -/
 theorem swp_checked_mem_write_store4_S [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
-    (hok : SConfBare (GF := GF) c sie)
+    (hok : SConfPhys (GF := GF) c sie)
     (pa : BitVec 64) (w data : BitVec (8 * 4)) (hram : inRam pa 4) (hal : pa.toNat % 4 = 0)
     (Φ : Result Bool (physaddr × ExceptionType) → IProp GF) :
     confCells cpu dq Privilege.Supervisor c ∗ ctxTok cpu curCtx ∗ bytesPointsTo pa 4 (DFrac.own 1) w ∗
@@ -185,7 +185,7 @@ set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
 /-- An 8-byte aligned data store to RAM overwrites the bytes owned. -/
 theorem swp_checked_mem_write_store8_S [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
-    (hok : SConfBare (GF := GF) c sie)
+    (hok : SConfPhys (GF := GF) c sie)
     (pa : BitVec 64) (w data : BitVec (8 * 8)) (hram : inRam pa 8) (hal : pa.toNat % 8 = 0)
     (Φ : Result Bool (physaddr × ExceptionType) → IProp GF) :
     confCells cpu dq Privilege.Supervisor c ∗ ctxTok cpu curCtx ∗ bytesPointsTo pa 8 (DFrac.own 1) w ∗
@@ -206,9 +206,9 @@ macro "load_file_S_proof" lem:ident hrd:term : tactic =>
     intro Φ
     iintro ⟨HmConf, HPC, HnextPC, ⟨HF, Htok, Hbytes⟩, HΦ⟩
     conf_cases HmConf
-    obtain ⟨hpmp, hmode, hms, hpmm, hlpe⟩ := hok
+    obtain ⟨⟨hpmp, hms, hpmm, hlpe⟩, hmode⟩ := hok
     obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
-    have hok' : SConfBare (GF := GF) c sie := ⟨hpmp, hmode, ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩, hpmm, hlpe⟩
+    have hok' : SConfPhys (GF := GF) c sie := ⟨hpmp, ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩, hpmm, hlpe⟩
     unfold execute
     swp_run 60
     iapply swp_bind
@@ -274,9 +274,9 @@ macro "store_file_S_proof" lem:ident pa:term:max n:num : tactic =>
     intro Φ
     iintro ⟨HmConf, HPC, HnextPC, ⟨HF, Htok, Hbytes⟩, HΦ⟩
     conf_cases HmConf
-    obtain ⟨hpmp, hmode, hms, hpmm, hlpe⟩ := hok
+    obtain ⟨⟨hpmp, hms, hpmm, hlpe⟩, hmode⟩ := hok
     obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
-    have hok' : SConfBare (GF := GF) c sie := ⟨hpmp, hmode, ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩, hpmm, hlpe⟩
+    have hok' : SConfPhys (GF := GF) c sie := ⟨hpmp, ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩, hpmm, hlpe⟩
     have hpma := matching_pma_ram $pa $n hram (by decide) (by decide)
     have hclint := within_clint_ram $pa $n hram
     have halign := is_aligned_paddr_of $pa $n (by decide) hal

@@ -45,3 +45,6 @@ import MachCSL.WpLock
 import MachCSL.WpSmodeMem2
 import MachCSL.WpSmodeBits
 import MachCSL.Pte
+import MachCSL.PtTree
+import MachCSL.KptInv
+import MachCSL.WpPtWalk

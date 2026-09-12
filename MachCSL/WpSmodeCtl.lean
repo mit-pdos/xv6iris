@@ -90,7 +90,7 @@ theorem execSpecF_ret (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool) (hok : S
   intro Φ
   iintro ⟨HmConf, HPC, HnextPC, HF, HΦ⟩
   conf_cases HmConf
-  obtain ⟨hpmp, hmode, hms, hpmm, hlpe⟩ := hok
+  obtain ⟨⟨hpmp, hms, hpmm, hlpe⟩, hmode⟩ := hok
   have hupd := update_bit0_eq (RegMap.get R rs1)
   have hb0 := ofBool_bit0_and_mask (RegMap.get R rs1)
   unfold execute jumpPc

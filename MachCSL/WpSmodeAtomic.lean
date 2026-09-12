@@ -48,7 +48,7 @@ up to the memory event (`swp_run.memStop`). -/
 macro "checked_mem_S_au_prefix" pa:ident n:num hram:ident hal:ident : tactic =>
   `(tactic| (
     conf_cases HmConf
-    obtain ⟨hpmp, hmode, hms, hpmm, hlpe⟩ := hok
+    obtain ⟨hpmp, hms, hpmm, hlpe⟩ := hok
     obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
     have hpma := matching_pma_ram $pa $n $hram (by decide) (by decide)
     have hclint := within_clint_ram $pa $n $hram
@@ -65,7 +65,7 @@ set_option maxHeartbeats 4000000 in
 set_option swp_run.memStop true in
 /-- A 4-byte aligned racy load from RAM: the accessor's read. -/
 theorem swp_checked_mem_read_load4_S_au (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
-    (hok : SConfBare (GF := GF) c sie)
+    (hok : SConfPhys (GF := GF) c sie)
     (pa : BitVec 64) (hram : inRam pa 4) (hal : pa.toNat % 4 = 0) (K : Nat) (Ψ : BitVec (8 * 4) → IProp GF)
     (Φ : Result ((BitVec (8 * 4)) × Unit) (physaddr × ExceptionType) → IProp GF) :
     confCells cpu dq Privilege.Supervisor c ∗ viewLb cpu K ∗ readAU cpu pa 4 K Ψ ∗
@@ -91,7 +91,7 @@ set_option maxHeartbeats 4000000 in
 set_option swp_run.memStop true in
 /-- An 8-byte aligned racy load from RAM: the accessor's read. -/
 theorem swp_checked_mem_read_load8_S_au (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
-    (hok : SConfBare (GF := GF) c sie)
+    (hok : SConfPhys (GF := GF) c sie)
     (pa : BitVec 64) (hram : inRam pa 8) (hal : pa.toNat % 8 = 0) (K : Nat) (Ψ : BitVec (8 * 8) → IProp GF)
     (Φ : Result ((BitVec (8 * 8)) × Unit) (physaddr × ExceptionType) → IProp GF) :
     confCells cpu dq Privilege.Supervisor c ∗ viewLb cpu K ∗ readAU cpu pa 8 K Ψ ∗
@@ -117,7 +117,7 @@ set_option maxRecDepth 100000 in
 set_option swp_run.memStop true in
 /-- A 4-byte aligned store into the accessor's bytes. -/
 theorem swp_checked_mem_write_store4_S_au (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
-    (hok : SConfBare (GF := GF) c sie)
+    (hok : SConfPhys (GF := GF) c sie)
     (pa : BitVec 64) (data : BitVec (8 * 4)) (hram : inRam pa 4) (hal : pa.toNat % 4 = 0) (Ψ : IProp GF)
     (Φ : Result Bool (physaddr × ExceptionType) → IProp GF) :
     confCells cpu dq Privilege.Supervisor c ∗ resvFrag cpu none false ∗ writeAU cpu pa 4 data Ψ ∗
@@ -143,7 +143,7 @@ set_option maxRecDepth 100000 in
 set_option swp_run.memStop true in
 /-- An 8-byte aligned store into the accessor's bytes. -/
 theorem swp_checked_mem_write_store8_S_au (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
-    (hok : SConfBare (GF := GF) c sie)
+    (hok : SConfPhys (GF := GF) c sie)
     (pa : BitVec 64) (data : BitVec (8 * 8)) (hram : inRam pa 8) (hal : pa.toNat % 8 = 0) (Ψ : IProp GF)
     (Φ : Result Bool (physaddr × ExceptionType) → IProp GF) :
     confCells cpu dq Privilege.Supervisor c ∗ resvFrag cpu none false ∗ writeAU cpu pa 8 data Ψ ∗
@@ -173,7 +173,7 @@ set_option swp_run.memStop true in
 /-- The read half of `amoswap.w.aq` from RAM: an exclusive read at the top
 of the store order; the reservation is taken. -/
 theorem swp_checked_mem_read_amo4_S (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
-    (hok : SConfBare (GF := GF) c sie)
+    (hok : SConfPhys (GF := GF) c sie)
     (pa : BitVec 64) (hram : inRam pa 4) (hal : pa.toNat % 4 = 0) (Ψ : BitVec (8 * 4) → IProp GF)
     (Φ : Result ((BitVec (8 * 4)) × Unit) (physaddr × ExceptionType) → IProp GF) :
     confCells cpu dq Privilege.Supervisor c ∗ resvFrag cpu none false ∗
@@ -200,7 +200,7 @@ set_option maxRecDepth 100000 in
 set_option swp_run.memStop true in
 /-- The write half of `amoswap.w.aq` to RAM, after a read half that saw `w0`. -/
 theorem swp_checked_mem_write_amo4_S (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
-    (hok : SConfBare (GF := GF) c sie)
+    (hok : SConfPhys (GF := GF) c sie)
     (pa : BitVec 64) (w0 data : BitVec (8 * 4)) (hram : inRam pa 4) (hal : pa.toNat % 4 = 0) (Ψ : IProp GF)
     (Φ : Result Bool (physaddr × ExceptionType) → IProp GF) :
     confCells cpu dq Privilege.Supervisor c ∗ resvFrag cpu (some (snapOf pa 4 w0)) true ∗
@@ -232,9 +232,9 @@ macro "load_file_S_au_proof" lem:ident hrd:term : tactic =>
     intro Φ
     iintro ⟨HmConf, HPC, HnextPC, ⟨HF, #HK, HAU⟩, HΦ⟩
     conf_cases HmConf
-    obtain ⟨hpmp, hmode, hms, hpmm, hlpe⟩ := hok
+    obtain ⟨⟨hpmp, hms, hpmm, hlpe⟩, hmode⟩ := hok
     obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
-    have hok' : SConfBare (GF := GF) c sie := ⟨hpmp, hmode, ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩, hpmm, hlpe⟩
+    have hok' : SConfPhys (GF := GF) c sie := ⟨hpmp, ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩, hpmm, hlpe⟩
     unfold execute
     swp_run 60
     iapply swp_bind
@@ -302,9 +302,9 @@ macro "store_file_S_au_proof" lem:ident pa:term:max n:num : tactic =>
     intro Φ
     iintro ⟨HmConf, HPC, HnextPC, ⟨HF, Hfrag, HAU⟩, HΦ⟩
     conf_cases HmConf
-    obtain ⟨hpmp, hmode, hms, hpmm, hlpe⟩ := hok
+    obtain ⟨⟨hpmp, hms, hpmm, hlpe⟩, hmode⟩ := hok
     obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
-    have hok' : SConfBare (GF := GF) c sie := ⟨hpmp, hmode, ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩, hpmm, hlpe⟩
+    have hok' : SConfPhys (GF := GF) c sie := ⟨hpmp, ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩, hpmm, hlpe⟩
     have hpma := matching_pma_ram $pa $n hram (by decide) (by decide)
     have hclint := within_clint_ram $pa $n hram
     have halign := is_aligned_paddr_of $pa $n (by decide) hal
@@ -389,9 +389,9 @@ theorem execSpecF_amoswap_w_aq (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
   intro Φ
   iintro ⟨HmConf, HPC, HnextPC, ⟨HF, Hfrag, HAU⟩, HΦ⟩
   conf_cases HmConf
-  obtain ⟨hpmp, hmode, hms, hpmm, hlpe⟩ := hok
+  obtain ⟨⟨hpmp, hms, hpmm, hlpe⟩, hmode⟩ := hok
   obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
-  have hok' : SConfBare (GF := GF) c sie := ⟨hpmp, hmode, ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩, hpmm, hlpe⟩
+  have hok' : SConfPhys (GF := GF) c sie := ⟨hpmp, ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩, hpmm, hlpe⟩
   have hpma := matching_pma_ram (RegMap.get R rs1) 4 hram (by decide) (by decide)
   have hclint := within_clint_ram (RegMap.get R rs1) 4 hram
   have halign := is_aligned_paddr_of (RegMap.get R rs1) 4 (by decide) hal
@@ -468,7 +468,7 @@ theorem execSpecF_fence_rw_w (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool) (
   clear hmenv
   iintro ⟨HmConf, HPC, HnextPC, HF, HΦ⟩
   conf_cases HmConf
-  obtain ⟨hpmp, hmode, hms, hpmm, hlpe⟩ := hok
+  obtain ⟨⟨hpmp, hms, hpmm, hlpe⟩, hmode⟩ := hok
   obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
   unfold execute
   swp_run 80
@@ -487,7 +487,7 @@ theorem execSpecF_fence_rw_rw (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool) 
   clear hmenv
   iintro ⟨HmConf, HPC, HnextPC, HF, HΦ⟩
   conf_cases HmConf
-  obtain ⟨hpmp, hmode, hms, hpmm, hlpe⟩ := hok
+  obtain ⟨⟨hpmp, hms, hpmm, hlpe⟩, hmode⟩ := hok
   obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
   unfold execute
   swp_run 80

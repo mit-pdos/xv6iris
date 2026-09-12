@@ -53,7 +53,7 @@ theorem execSpecF_csrr_sstatus (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
   intro Φ
   iintro ⟨HmConf, HPC, HnextPC, HF, HΦ⟩
   conf_cases HmConf
-  obtain ⟨hpmp, hmode, hms, hpmm, hlpe⟩ := hok
+  obtain ⟨⟨hpmp, hms, hpmm, hlpe⟩, hmode⟩ := hok
   obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
   unfold execute
   swp_run 300
@@ -77,8 +77,8 @@ theorem execSpecF_csrrci_sstatus (cpu : CPU) (c : MConf) (hok : SConfBare (GF :=
   intro Φ
   iintro ⟨HmConf, HPC, HnextPC, HF, HΦ⟩
   conf_cases HmConf
-  have hsm := hok.2.2.1
-  obtain ⟨hpmp, hmode, hms, hpmm, hlpe⟩ := hok
+  have hsm := hok.1.2.1
+  obtain ⟨⟨hpmp, hms, hpmm, hlpe⟩, hmode⟩ := hok
   obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
   have hid := sstatus_clear_sie_id c.mstatus hsm
   unfold execute

@@ -76,9 +76,7 @@ set_option maxRecDepth 100000 in
 passes the PMP check. -/
 theorem swp_pmpCheck_xv6 (cpu : CPU) (dq : DFrac) (addr : BitVec 64) (width : Nat)
     (acc : MemoryAccessType mem_payload) (Φ : Option ExceptionType → IProp GF)
-    (hacc : acc = MemoryAccessType.InstructionFetch () ∨ acc = MemoryAccessType.Load mem_payload.Data ∨
-      acc = MemoryAccessType.Store mem_payload.Data ∨
-      acc = MemoryAccessType.Atomic (amoop.AMOSWAP, true, false, mem_payload.Data, mem_payload.Data))
+    (hacc : kernelAccess acc)
     (hram : inRam addr width) :
     Register.pmpcfg_n ↦ᵣ[cpu]{dq} xv6Pmpcfg ∗ Register.pmpaddr_n ↦ᵣ[cpu]{dq} xv6Pmpaddr ∗
     ▷ (Register.pmpcfg_n ↦ᵣ[cpu]{dq} xv6Pmpcfg -∗ Register.pmpaddr_n ↦ᵣ[cpu]{dq} xv6Pmpaddr -∗ Φ none)
@@ -89,7 +87,7 @@ theorem swp_pmpCheck_xv6 (cpu : CPU) (dq : DFrac) (addr : BitVec 64) (width : Na
   swp_run 3
   simp only [IntRange.instForIn'IntInferInstanceMembershipOfMonad, IntRange.forIn'_eq]
   rw [IntRange.loop_unfold]
-  rcases hacc with rfl | rfl | rfl | rfl
+  rcases hacc with rfl | rfl | rfl | rfl | rfl | rfl
   all_goals
     swp_run 60
     iapply HΦ $$ Hpmpcfg_n Hpmpaddr_n
