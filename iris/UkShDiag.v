@@ -7659,7 +7659,60 @@ Section UkShDiagLeaf.
       WP (Loop : expr riscv_lang).
   Proof. exact (wp_kshr_runcmd ush_Dg Hpsok_free ush_diag_leaf_holds c). Qed.
 
+  (* CWD-INDEXED (lane E4): [UkShRun.wp_kshr_fork1]'s value-preserving
+     form at sh's own diagnostic leaf; [wp_kshr_fork1_final_any] below is
+     the index-free corollary the body still takes. *)
   Lemma wp_kshr_fork1_final (N : uk_names Σ) `{!ukn_const N}
+      (P : gname -> gname -> gname -> iProp Σ) `{FP : !Forkable P}
+      (szv : Z) (l : list fdstate) (D : gmap nat fdstate)
+      (h : CpuId) (m : regfile) (n : nat) (cw : Z) :
+    UkSh.sh_deps -∗
+    shk_code (ukn_t N) -∗ shk_rodata (ukn_t N) -∗ P (ukn_t N) (ukn_d N) (ukn_s N) -∗ usz (ukn_s N) szv -∗
+    UserFd.ustd (ukn_fd N) l -∗
+    UserCwd.ucwd (ukn_cwd N) cw -∗
+    UserChildren.uch_any (ukn_ch N) -∗
+    ([∗ map] fd ↦ st ∈ D, UserFd.ufd (ukn_fd N) fd st) -∗
+    urun N h m (mword_of_int ShSyms.fork1) (2 + (ush_Dg + n)) -∗
+    ((∀ (h' : CpuId) (m' : regfile) (r : mword 64),
+        ⌜ r <> (mword_of_int 0 : mword 64) ⌝ -∗
+        ⌜ ucallee_saved m m' ⌝ -∗
+        ⌜ m' !!! Regidx a0_idx = r ⌝ -∗
+        P (ukn_t N) (ukn_d N) (ukn_s N) -∗ usz (ukn_s N) szv -∗
+        UserFd.ustd (ukn_fd N) l -∗
+        UserCwd.ucwd (ukn_cwd N) cw -∗
+        UserChildren.uch_any (ukn_ch N) -∗
+        ([∗ map] fd ↦ st ∈ D, UserFd.ufd (ukn_fd N) fd st) -∗
+        urun N h' m'
+          (ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)))
+          (2 + (ush_Dg + n)) -∗
+        WP (Loop : expr riscv_lang)) ∗
+     (∀ (N' : uk_names Σ) (h' : CpuId) (m' : regfile),
+        (* THE CHILD'S PAYLOAD IS TRIVIAL, and it is the one place in sh's
+           walk that is: sh FORKS at [fun _ => True]
+           ([UkFork.wp_uk_ecall_fork_any]'s child arm gives the equation),
+           because what sh's children owe it is nothing -- sh's OWN payload
+           is the console reader token and the rest of this walk is stated
+           at [UkRun.ukn_const].  The arm hands the class on and every leaf
+           below it, exit included, resolves it. *)
+        ⌜ ukn_triv N' ⌝ -∗
+        ⌜ ucallee_saved m m' ⌝ -∗
+        ⌜ m' !!! Regidx a0_idx = (mword_of_int 0 : mword 64) ⌝ -∗
+        shk_code (ukn_t N') -∗ P (ukn_t N') (ukn_d N') (ukn_s N') -∗ usz (ukn_s N') szv -∗
+        UserFd.ustd (ukn_fd N') l -∗
+        UserCwd.ucwd (ukn_cwd N') cw -∗
+        UserChildren.uch_any (ukn_ch N') -∗
+        ([∗ map] fd ↦ st ∈ D, UserFd.ufd (ukn_fd N') fd st) -∗
+        urun N' h' m'
+          (ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)))
+          (2 + (ush_Dg + n)) -∗
+        WP (Loop : expr riscv_lang))) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    exact (wp_kshr_fork1 ush_Dg ush_diag_leaf_holds
+             N P szv l D h m n cw).
+  Qed.
+
+  Lemma wp_kshr_fork1_final_any (N : uk_names Σ) `{!ukn_const N}
       (P : gname -> gname -> gname -> iProp Σ) `{FP : !Forkable P}
       (szv : Z) (l : list fdstate) (D : gmap nat fdstate)
       (h : CpuId) (m : regfile) (n : nat) :
@@ -7705,7 +7758,7 @@ Section UkShDiagLeaf.
         WP (Loop : expr riscv_lang))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    exact (wp_kshr_fork1 ush_Dg ush_diag_leaf_holds
+    exact (wp_kshr_fork1_any ush_Dg ush_diag_leaf_holds
              N P szv l D h m n).
   Qed.
 

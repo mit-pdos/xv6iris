@@ -965,12 +965,16 @@ Section UkShRun.
   (* without [shk_code] at the child's text name it cannot walk its return.  *)
   (* [D] rides through exactly as it does at the leaf: sh's descriptors are
      the point of the PIPE and REDIR arms, and both processes get them. *)
+  (* CWD-INDEXED (lane E4): the leaf already hands both processes the same
+     working directory ([UkFork.wp_uk_ecall_fork_any] at [cwv]), so the
+     VALUE crosses the fork and the arm can name it.  [wp_kshr_fork_any]
+     below is the index-free corollary every other caller still takes. *)
   Lemma wp_kshr_fork (N : uk_names Σ) `{!ukn_const N} (P : gname -> gname -> gname -> iProp Σ)
       `{FP : !Forkable P} (szv : Z) (l : list fdstate) (D : gmap nat fdstate)
-      (h : CpuId) (m : regfile) (avail : nat) :
+      (h : CpuId) (m : regfile) (avail : nat) (cw : Z) :
     shk_code (ukn_t N) -∗ P (ukn_t N) (ukn_d N) (ukn_s N) -∗ usz (ukn_s N) szv -∗
     UserFd.ustd (ukn_fd N) l -∗
-    UserCwd.ucwd_any (ukn_cwd N) -∗
+    UserCwd.ucwd (ukn_cwd N) cw -∗
     (* ...AND sh's OWN HALF OF ITS CHILDREN SET, index-free for the cwd's
        reason: fork MOVES the set and an update needs both halves, but sh
        never asks which children it has, so the token the pid arm mints is
@@ -982,7 +986,7 @@ Section UkShRun.
         ⌜ r <> (mword_of_int 0 : mword 64) ⌝ -∗
         P (ukn_t N) (ukn_d N) (ukn_s N) -∗ usz (ukn_s N) szv -∗
         UserFd.ustd (ukn_fd N) l -∗
-        UserCwd.ucwd_any (ukn_cwd N) -∗
+        UserCwd.ucwd (ukn_cwd N) cw -∗
         UserChildren.uch_any (ukn_ch N) -∗
         ([∗ map] fd ↦ st ∈ D, UserFd.ufd (ukn_fd N) fd st) -∗
         urun N h'
@@ -1001,7 +1005,7 @@ Section UkShRun.
         ⌜ ukn_triv N' ⌝ -∗
         shk_code (ukn_t N') -∗ P (ukn_t N') (ukn_d N') (ukn_s N') -∗ usz (ukn_s N') szv -∗
         UserFd.ustd (ukn_fd N') l -∗
-        UserCwd.ucwd_any (ukn_cwd N') -∗
+        UserCwd.ucwd (ukn_cwd N') cw -∗
         UserChildren.uch_any (ukn_ch N') -∗
         ([∗ map] fd ↦ st ∈ D, UserFd.ufd (ukn_fd N') fd st) -∗
         urun N' h'
@@ -1012,9 +1016,6 @@ Section UkShRun.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros "#Hcode HP Hsz Hstd Hcwd Hch HD Hrun [Hpar Hchi]".
-    (* the leaf mints the child's half at a NAMED inum, so the index-free
-       resource sh carries is opened here and closed on both arms *)
-    iDestruct "Hcwd" as (cwv) "Hcwd".
     rewrite shr_fork.
     iApply (wp_uk_cli N h m (mword_of_int 0xc7e)
               (mword_of_int 1 : mword 6) a7_idx avail
@@ -1031,7 +1032,7 @@ Section UkShRun.
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite E0 Em. iIntros (h1) "Hrun".
     set (m1 := <[Regidx a7_idx := (mword_of_int 1 : mword 64)]> m).
-    iApply (wp_uk_ecall_fork_any N h1 m1 (mword_of_int 0xc80) avail szv l D cwv
+    iApply (wp_uk_ecall_fork_any N h1 m1 (mword_of_int 0xc80) avail szv l D cw
               (fun gt gd gs => (shk_code gt ∗ P gt gd gs)%I)
               (FP := forkable_sep (fun gt _ _ => shk_code gt) P
                        forkable_shk_code FP)
@@ -1066,8 +1067,8 @@ Section UkShRun.
                 with "[] Hrun").
       { iApply (uis_shk_c84 with "Hcp"). }
       iIntros (hp2) "Hrun".
-      iApply ("Hpar" $! hp2 r with "[%] HP Hsz Hstd [Hcwd] Hch HD Hrun");
-        [ exact Hr | iApply (ucwd_any_of with "Hcwd") ].
+      iApply ("Hpar" $! hp2 r with "[%] HP Hsz Hstd Hcwd Hch HD Hrun").
+      exact Hr.
     - iIntros (N' hc) "%Hpeq [#Hck HP] Hsz Hstd HD Hcwd Hch Hrun".
       pose proof (Hpeq : UkRun.ukn_triv N') as Hti'.
       (* ...and the weaker class the rest of sh's walk is stated at *)
@@ -1081,9 +1082,59 @@ Section UkShRun.
                 with "[] Hrun").
       { iApply (uis_shk_c84 with "Hck"). }
       iIntros (hc2) "Hrun".
-      iApply ("Hchi" $! N' hc2 with "[%] Hck HP Hsz Hstd [Hcwd] Hch HD Hrun").
-      { exact Hpeq. }
-      iApply (ucwd_any_of with "Hcwd").
+      iApply ("Hchi" $! N' hc2 with "[%] Hck HP Hsz Hstd Hcwd Hch HD Hrun").
+      exact Hpeq.
+  Qed.
+
+  (* ...AND THE INDEX-FREE COROLLARY, which is what [wp_kshr_fork1] and
+     every arm that does not care where the child starts still take. *)
+  Lemma wp_kshr_fork_any (N : uk_names Σ) `{!ukn_const N}
+      (P : gname -> gname -> gname -> iProp Σ)
+      `{FP : !Forkable P} (szv : Z) (l : list fdstate) (D : gmap nat fdstate)
+      (h : CpuId) (m : regfile) (avail : nat) :
+    shk_code (ukn_t N) -∗ P (ukn_t N) (ukn_d N) (ukn_s N) -∗ usz (ukn_s N) szv -∗
+    UserFd.ustd (ukn_fd N) l -∗
+    UserCwd.ucwd_any (ukn_cwd N) -∗
+    UserChildren.uch_any (ukn_ch N) -∗
+    ([∗ map] fd ↦ st ∈ D, UserFd.ufd (ukn_fd N) fd st) -∗
+    urun N h m (mword_of_int ShSyms.fork) avail -∗
+    ((∀ (h' : CpuId) (r : mword 64),
+        ⌜ r <> (mword_of_int 0 : mword 64) ⌝ -∗
+        P (ukn_t N) (ukn_d N) (ukn_s N) -∗ usz (ukn_s N) szv -∗
+        UserFd.ustd (ukn_fd N) l -∗
+        UserCwd.ucwd_any (ukn_cwd N) -∗
+        UserChildren.uch_any (ukn_ch N) -∗
+        ([∗ map] fd ↦ st ∈ D, UserFd.ufd (ukn_fd N) fd st) -∗
+        urun N h'
+          (<[Regidx a0_idx := r]>
+             (<[Regidx a7_idx := (mword_of_int 1 : mword 64)]> m))
+          (ret_pc (m !!! Regidx ra_idx)) avail -∗
+        WP (Loop : expr riscv_lang)) ∗
+     (∀ (N' : uk_names Σ) (h' : CpuId),
+        ⌜ ukn_triv N' ⌝ -∗
+        shk_code (ukn_t N') -∗ P (ukn_t N') (ukn_d N') (ukn_s N') -∗ usz (ukn_s N') szv -∗
+        UserFd.ustd (ukn_fd N') l -∗
+        UserCwd.ucwd_any (ukn_cwd N') -∗
+        UserChildren.uch_any (ukn_ch N') -∗
+        ([∗ map] fd ↦ st ∈ D, UserFd.ufd (ukn_fd N') fd st) -∗
+        urun N' h'
+          (<[Regidx a0_idx := (mword_of_int 0 : mword 64)]>
+             (<[Regidx a7_idx := (mword_of_int 1 : mword 64)]> m))
+          (ret_pc (m !!! Regidx ra_idx)) avail -∗
+        WP (Loop : expr riscv_lang))) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    iIntros "#Hcode HP Hsz Hstd Hcwd Hch HD Hrun [Hpar Hchi]".
+    iDestruct "Hcwd" as (cw) "Hcwd".
+    iApply (wp_kshr_fork N P szv l D h m avail cw
+              with "Hcode HP Hsz Hstd Hcwd Hch HD Hrun").
+    iSplitL "Hpar".
+    - iIntros (h' r) "%Hr HP Hsz Hstd Hcwd Hch HD Hrun".
+      iApply ("Hpar" $! h' r with "[%] HP Hsz Hstd [Hcwd] Hch HD Hrun");
+        [ exact Hr | iApply (ucwd_any_of with "Hcwd") ].
+    - iIntros (N' h') "%Hpeq #Hck HP Hsz Hstd Hcwd Hch HD Hrun".
+      iApply ("Hchi" $! N' h' with "[%] Hck HP Hsz Hstd [Hcwd] Hch HD Hrun");
+        [ exact Hpeq | iApply (ucwd_any_of with "Hcwd") ].
   Qed.
 
   (* ===================================================================== *)
@@ -1407,14 +1458,16 @@ Section UkShRun.
   Qed.
 
   (* ---- fork1, whole.  DEPENDS ON [ush_diag_leaf]. --------------------- *)
+  (* CWD-INDEXED, as [wp_kshr_fork]: the value crosses, and
+     [wp_kshr_fork1_any] below is the index-free corollary. *)
   Lemma wp_kshr_fork1 (N : uk_names Σ) `{!ukn_const N}
       (P : gname -> gname -> gname -> iProp Σ) `{FP : !Forkable P}
       (szv : Z) (l : list fdstate) (D : gmap nat fdstate)
-      (h : CpuId) (m : regfile) (n : nat) :
+      (h : CpuId) (m : regfile) (n : nat) (cw : Z) :
     UkSh.sh_deps -∗
     shk_code (ukn_t N) -∗ shk_rodata (ukn_t N) -∗ P (ukn_t N) (ukn_d N) (ukn_s N) -∗ usz (ukn_s N) szv -∗
     UserFd.ustd (ukn_fd N) l -∗
-    UserCwd.ucwd_any (ukn_cwd N) -∗
+    UserCwd.ucwd (ukn_cwd N) cw -∗
     (* the caller's half of its children set, index-free -- see
        [wp_kshr_fork] *)
     UserChildren.uch_any (ukn_ch N) -∗
@@ -1429,7 +1482,7 @@ Section UkShRun.
         ⌜ m' !!! Regidx a0_idx = r ⌝ -∗
         P (ukn_t N) (ukn_d N) (ukn_s N) -∗ usz (ukn_s N) szv -∗
         UserFd.ustd (ukn_fd N) l -∗
-        UserCwd.ucwd_any (ukn_cwd N) -∗
+        UserCwd.ucwd (ukn_cwd N) cw -∗
         UserChildren.uch_any (ukn_ch N) -∗
         ([∗ map] fd ↦ st ∈ D, UserFd.ufd (ukn_fd N) fd st) -∗
         urun N h' m' (ret_pc (m !!! Regidx ra_idx)) (2 + (Dg + n)) -∗
@@ -1447,7 +1500,7 @@ Section UkShRun.
         ⌜ m' !!! Regidx a0_idx = (mword_of_int 0 : mword 64) ⌝ -∗
         shk_code (ukn_t N') -∗ P (ukn_t N') (ukn_d N') (ukn_s N') -∗ usz (ukn_s N') szv -∗
         UserFd.ustd (ukn_fd N') l -∗
-        UserCwd.ucwd_any (ukn_cwd N') -∗
+        UserCwd.ucwd (ukn_cwd N') cw -∗
         UserChildren.uch_any (ukn_ch N') -∗
         ([∗ map] fd ↦ st ∈ D, UserFd.ufd (ukn_fd N') fd st) -∗
         urun N' h' m' (ret_pc (m !!! Regidx ra_idx)) (2 + (Dg + n)) -∗
@@ -1591,7 +1644,7 @@ Section UkShRun.
                              (fun _ gd _ => uword gd (uint sp0 - 16) vs0)
                              (forkable_uword (uint sp0 - 8) vra)
                              (forkable_uword (uint sp0 - 16) vs0))))
-              szv l D h5 m3 (Dg + n)
+              szv l D h5 m3 (Dg + n) cw
               with "Hcode [HP Hw8 Hw0] Hsz Hstd Hcwd Hch HD Hrun").
     { iFrame "Hro HP Hw8 Hw0". }
     rewrite Hret3.
@@ -1681,6 +1734,72 @@ Section UkShRun.
                    ltac:(vm_compute; lia) ltac:(vm_compute; lia)).
         exact (upd_eq _ (Regidx a0_idx) (mword_of_int 0 : mword 64)).
       + iExact "Hrun".
+  Qed.
+
+  (* ...AND ITS INDEX-FREE COROLLARY: [wp_kshr_runcmd]'s LIST and BACK
+     arms fork without caring where the child starts. *)
+  Lemma wp_kshr_fork1_any (N : uk_names Σ) `{!ukn_const N}
+      (P : gname -> gname -> gname -> iProp Σ) `{FP : !Forkable P}
+      (szv : Z) (l : list fdstate) (D : gmap nat fdstate)
+      (h : CpuId) (m : regfile) (n : nat) :
+    UkSh.sh_deps -∗
+    shk_code (ukn_t N) -∗ shk_rodata (ukn_t N) -∗ P (ukn_t N) (ukn_d N) (ukn_s N) -∗ usz (ukn_s N) szv -∗
+    UserFd.ustd (ukn_fd N) l -∗
+    UserCwd.ucwd_any (ukn_cwd N) -∗
+    (* the caller's half of its children set, index-free -- see
+       [wp_kshr_fork] *)
+    UserChildren.uch_any (ukn_ch N) -∗
+    (* the caller's descriptors, which BOTH processes come back holding --
+       see [UkFork.wp_uk_ecall_fork].  This is what PIPE's six closes and
+       REDIR's close-and-reopen are paid for with. *)
+    ([∗ map] fd ↦ st ∈ D, UserFd.ufd (ukn_fd N) fd st) -∗
+    urun N h m (mword_of_int ShSyms.fork1) (2 + (Dg + n)) -∗
+    ((∀ (h' : CpuId) (m' : regfile) (r : mword 64),
+        ⌜ r <> (mword_of_int 0 : mword 64) ⌝ -∗
+        ⌜ ucallee_saved m m' ⌝ -∗
+        ⌜ m' !!! Regidx a0_idx = r ⌝ -∗
+        P (ukn_t N) (ukn_d N) (ukn_s N) -∗ usz (ukn_s N) szv -∗
+        UserFd.ustd (ukn_fd N) l -∗
+        UserCwd.ucwd_any (ukn_cwd N) -∗
+        UserChildren.uch_any (ukn_ch N) -∗
+        ([∗ map] fd ↦ st ∈ D, UserFd.ufd (ukn_fd N) fd st) -∗
+        urun N h' m' (ret_pc (m !!! Regidx ra_idx)) (2 + (Dg + n)) -∗
+        WP (Loop : expr riscv_lang)) ∗
+     (∀ (N' : uk_names Σ) (h' : CpuId) (m' : regfile),
+        (* THE CHILD'S PAYLOAD IS TRIVIAL, and it is the one place in sh's
+           walk that is: sh FORKS at [fun _ => True]
+           ([UkFork.wp_uk_ecall_fork_any]'s child arm gives the equation),
+           because what sh's children owe it is nothing -- sh's OWN payload
+           is the console reader token and the rest of this walk is stated
+           at [UkRun.ukn_const].  The arm hands the class on and every leaf
+           below it, exit included, resolves it. *)
+        ⌜ ukn_triv N' ⌝ -∗
+        ⌜ ucallee_saved m m' ⌝ -∗
+        ⌜ m' !!! Regidx a0_idx = (mword_of_int 0 : mword 64) ⌝ -∗
+        shk_code (ukn_t N') -∗ P (ukn_t N') (ukn_d N') (ukn_s N') -∗ usz (ukn_s N') szv -∗
+        UserFd.ustd (ukn_fd N') l -∗
+        UserCwd.ucwd_any (ukn_cwd N') -∗
+        UserChildren.uch_any (ukn_ch N') -∗
+        ([∗ map] fd ↦ st ∈ D, UserFd.ufd (ukn_fd N') fd st) -∗
+        urun N' h' m' (ret_pc (m !!! Regidx ra_idx)) (2 + (Dg + n)) -∗
+        WP (Loop : expr riscv_lang))) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    iIntros "#Hdp #Hcode #Hro HP Hsz Hstd Hcwd Hch HD Hrun [Hpar Hchi]".
+    iDestruct "Hcwd" as (cw) "Hcwd".
+    iApply (wp_kshr_fork1 N P szv l D h m n cw
+              with "Hdp Hcode Hro HP Hsz Hstd Hcwd Hch HD Hrun").
+    iSplitL "Hpar".
+    - iIntros (h' m' r) "%Hr %Hcs %Ha0 HP Hsz Hstd Hcwd Hch HD Hrun".
+      iApply ("Hpar" $! h' m' r
+                with "[%] [%] [%] HP Hsz Hstd [Hcwd] Hch HD Hrun");
+        [ exact Hr | exact Hcs | exact Ha0
+        | iApply (ucwd_any_of with "Hcwd") ].
+    - iIntros (N' h' m') "%Hpeq %Hcs %Ha0 #Hck HP Hsz Hstd Hcwd Hch HD Hrun".
+      iApply ("Hchi" $! N' h' m'
+                with "[%] [%] [%] Hck HP Hsz Hstd [Hcwd] Hch HD Hrun");
+        [ exact Hpeq | exact Hcs | exact Ha0
+        | iApply (ucwd_any_of with "Hcwd") ].
   Qed.
 
   (* ===================================================================== *)
@@ -2900,7 +3019,7 @@ Section UkShRun.
       assert (Hst_g1 : ush_st g1 sp0 t)
         by (apply ush_st_upd;
             [ exact Hst_m1 | vm_compute; lia | vm_compute; lia ]).
-      iApply (wp_kshr_fork1 N
+      iApply (wp_kshr_fork1_any N
                 (fun gt gd _ => (ush_jtab gt ∗ ush_cmd gd t (UList l r))%I)
                 (FP := forkable_ush_pay t (UList l r))
                 szv ld ∅ h2 g1 (6 * Nat.max (ush_ht l) (ush_ht r) + n)
@@ -3076,7 +3195,7 @@ Section UkShRun.
       assert (Hst_b1 : ush_st b1 sp0 t)
         by (apply ush_st_upd;
             [ exact Hst_m1 | vm_compute; lia | vm_compute; lia ]).
-      iApply (wp_kshr_fork1 N
+      iApply (wp_kshr_fork1_any N
                 (fun gt gd _ => (ush_jtab gt ∗ ush_cmd gd t (UBack c1))%I)
                 (FP := forkable_ush_pay t (UBack c1))
                 szv ld ∅ h2 b1 (6 * ush_ht c1 + n)

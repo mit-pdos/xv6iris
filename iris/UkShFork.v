@@ -274,7 +274,7 @@ Section UkShFork.
     (* ---- fork1() ---- *)
     replace (16 + (80 + n))%nat with (2 + (UkShDiag.ush_Dg + (66 + n)))%nat
       by (unfold UkShDiag.ush_Dg; lia).
-    iApply (UkShDiag.wp_kshr_fork1_final N (ushf_pay f)
+    iApply (UkShDiag.wp_kshr_fork1_final_any N (ushf_pay f)
               sz l ∅ h1 m1 (66 + n)
               with "Hdp Hcode Hro [Hdat Hbuf] Hsz Hustd Hcwd Hch [] Hrun").
     { rewrite /ushf_pay.
