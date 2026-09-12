@@ -22,6 +22,7 @@ ambient `MachGS` with that era and generation and discharges each hart's
 `RiscvAdequacy.wp_power_loop`.
 -/
 import MachCSL.Wp
+import MachCSL.KMap
 
 namespace MachCSL
 
@@ -258,13 +259,13 @@ def memCells (E : EraGS GF) (m : MemF Hist) : IProp GF := iprop%
 the booted machine `σ`: the generation's certificate, every hart's register
 cells, every byte's history (the image's byte at timestamp 0), and, per
 hart, a fresh running context with its memory token. -/
-def powerBootRes (E : EraGS GF) (gen : Nat) (σ : MState) : IProp GF := iprop%
+def powerBootRes [KernelMap] (E : EraGS GF) (gen : Nat) (σ : MState) : IProp GF := iprop%
   genCertAt gen E ∗
   ([∗list] cpu ∈ cpus, regCells (E.regName cpu) (σ.regs cpu)) ∗
   memCells E σ.mem ∗
   ([∗list] cpu ∈ cpus, ∃ ξ : CtxId, ctxTokAt E cpu ξ) ∗
   ([∗list] cpu ∈ cpus, lockSetAt E cpu []) ∗
-  (E.kmapName ↪●MAP (∅ : RegMapF (BitVec 64)))
+  (E.kmapName ↪●MAP KernelMap.static) ∗ kmapStaticAt E
 
 /-- A hart at its cycle boundary, as the power thread forks it. -/
 theorem hartWP_loop (gen : Nat) (cpu : CPU) :
@@ -292,7 +293,7 @@ theorem registryOk_none {R : RegMapF (EraGS GF)} {n : Nat} (h : registryOk R n) 
 /-- The power thread is safe, given the boot client: at every `PowerOn`, from
 the boot resources of the fresh era at the booted machine, the WPs of the new
 generation's harts. -/
-theorem wp_power
+theorem wp_power [KernelMap]
     (Hboot : ∀ (E : EraGS GF) (gen : Nat) (σ : MState) (image : Mem), bootFacts σ image →
       powerBootRes E gen σ ⊢@{IProp GF} |={⊤}=> [∗list] cpu ∈ cpus, hartWP gen cpu (pure ())) :
     ⊢@{IProp GF} WP Expr.power @ Stuckness.NotStuck; ⊤ {{ _v, True }} := by
@@ -337,7 +338,8 @@ theorem wp_power
     imod (ghost_map_alloc (resvMap g₂.m)) with ⟨%γresv, Hresv, Hfrags⟩
     imod (names_alloc (fun γ _ => γ ↪●MAP (∅ : StrMapF Unit))
       (fun _ => ghost_map_alloc_empty (K := String) (V := Unit) (H := StrMapF))) with ⟨%lsn, Hls⟩
-    imod (ghost_map_alloc_empty (K := Nat) (V := BitVec 64) (H := RegMapF)) with ⟨%γkmap, Hkmap⟩
+    imod (ghost_map_alloc (K := Nat) (V := BitVec 64) (H := RegMapF) KernelMap.static) with ⟨%γkmap, Hkmap, Hkfrags⟩
+    imod (kmapStatic_persist γkmap) $$ Hkfrags with Hkst
     icases BigSepL.bigSepL_sep_eqv.1 $$ Hv with ⟨Hva, Hvlb⟩
     imod (ctxs_boot ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap⟩) $$ Hvlb with Hctx
     imod registry_insert R g.gen ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap⟩ (registryOk_none Hok)
@@ -357,9 +359,9 @@ theorem wp_power
       iintro H
       iexact H
     -- the boot client
-    ihave Hres : powerBootRes ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap⟩ g.gen g₂.m $$ [Hrc Hpts Hctx Hfrags' Hls Hkmap]
-    · unfold powerBootRes genCertAt memCells
-      iframe Hrc Hpts Hkmap
+    ihave Hres : powerBootRes ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap⟩ g.gen g₂.m $$ [Hrc Hpts Hctx Hfrags' Hls Hkmap Hkst]
+    · unfold powerBootRes genCertAt memCells kmapStaticAt
+      iframe Hrc Hpts Hkmap Hkst
       isplitr [Hctx Hfrags' Hls]
       · isplit
         · iexact Hborn

@@ -657,8 +657,6 @@ def SConfKpt (c : MConf) (root : BitVec 44) (sie : Bool) : Prop :=
 theorem SConfKpt.phys {c : MConf} {root : BitVec 44} {sie : Bool} (h : SConfKpt (GF := GF) c root sie) :
     SConfPhys (GF := GF) c sie := h.1
 
-/-- The page number of a kernel virtual address. -/
-def vpnOf (va : BitVec 64) : BitVec 27 := BitVec.extractLsb' 12 27 va
 
 
 /-! ## Translation at the kernel page table -/

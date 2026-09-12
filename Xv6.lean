@@ -1,4 +1,5 @@
 import Xv6.KernelImage
+import Xv6.KernelMap
 import Xv6.KernelTree
 import Xv6.KernelText
 import Xv6.Image

@@ -150,12 +150,22 @@ structure CtxId where
   dirty : GName
   deriving DecidableEq, Inhabited
 
-/-- The ambient context of a proof (the prototype's `CurCtx`).  No default
-instance, on purpose. -/
+/-- The kernel's address-translation tier: Bare (`satp = 0`), or the kernel
+page table (Sv39 at the kernel root). -/
+inductive KTier where
+  | bare
+  | kpt
+  deriving DecidableEq, Repr
+
+/-- The ambient execution environment a proof is conducted in: the running
+context (what the memory points-to facts are justified at) and the
+translation tier (what they pin: at Bare a kernel address is its own
+physical address; the Rocq prototype's `CurKtier`). -/
 class CurCtx where
   curCtx : CtxId
+  curTier : KTier
 
-export CurCtx (curCtx)
+export CurCtx (curCtx curTier)
 
 section fixed
 variable [MachFixedGS hlc GF]

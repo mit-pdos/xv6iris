@@ -17,6 +17,7 @@ import MachCSL.PtTree
 import MachCSL.WordHist
 import MachCSL.WordPointsTo
 import MachCSL.CtxLaws
+import MachCSL.KMap
 import Iris.Instances.Lib.Invariants
 
 set_option maxRecDepth 100000
@@ -97,19 +98,6 @@ def kptBody (t : PTree) (lo : Nat) : IProp GF := iprop%
 
 instance kptBody_timeless (t : PTree) (lo : Nat) : Timeless (kptBody (GF := GF) t lo) := by
   unfold kptBody; infer_instance
-
-/-- The kernel mapping's element: `vpn` maps to the page of the canonical
-leaf `v` (persistent: the table is never unmapped). -/
-def kmapAt (vpn : BitVec 27) (v : BitVec 64) : IProp GF := iprop%
-  MachGS.kmapName (hlc := hlc) (GF := GF) ↪◯MAP[vpn.toNat]{.discard} v
-
-instance kmapAt_persistent (vpn : BitVec 27) (v : BitVec 64) : Persistent (kmapAt (GF := GF) vpn v) := by
-  unfold kmapAt; infer_instance
-
-/-- A published (discarded) mapping authority is persistent. -/
-instance kmap_auth_discard_persistent (γ : GName) (m : RegMapF (BitVec 64)) :
-    Persistent (PROP := IProp GF) (γ ↪●MAP{.discard} m) := by
-  unfold ghost_map_auth HeapView.Auth; infer_instance
 
 /-- The pure facts of an installed table `t` with mapping `M`. -/
 def kptFacts (t : PTree) (M : RegMapF (BitVec 64)) : Prop :=

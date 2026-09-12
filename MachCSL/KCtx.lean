@@ -339,12 +339,6 @@ theorem trapRes_off (avail : Nat) : trapRes false + avail = avail := by simp [tr
 
 /-! ## The S-mode configuration -/
 
-/-- The translation tier. -/
-inductive KTier where
-  | bare
-  | kpt
-  deriving DecidableEq, Repr
-
 /-- `satp` at each tier: Bare, or Sv39 at the kernel root. -/
 def satpOf : KTier → BitVec 44 → BitVec 64
   | .bare, _ => 0#64
