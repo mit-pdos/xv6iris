@@ -154,3 +154,10 @@ printk-site list requested).  RULED: TX-RECEIPT = per-pid transmit token; the K
 side = printk ledger in pr_res + PRINTK-FMT + printk-site enumeration (note
 "TX-TAG PHASE 1").  `-disc` sibling free: APP-IFACE phase 1 (statement diff
 only, for the owner's review) next there.
+
+APP-IFACE phase 1 LAUNCHED (2026-09-12) in `-disc` on `lane/app-iface` from
+`5cd2ae7e0` (brief `brief-app-iface.md`): the three trusted-statement changes
+(app_boot; the rx-tag equation in Hinit_boot; the era token for Htx/Hrx) as a
+DIFF for the owner's review -- no commit, no phase 2 without the owner.  In
+flight: LAZY-FLAG p1 (main), SUPPLY-SPLIT p2 (`-sup`), TX-TAG p2 (`-tlw`),
+APP-IFACE p1 (`-disc`).
