@@ -412,6 +412,9 @@ Section UkShCd.
     UkSh.sh_deps -∗
     ushl_head l sz -∗
     shk_code γt -∗ shk_rodata γt -∗ shp_code γt -∗
+    (* the row the console preamble established (lane SH-OPEN): [cd] does
+       not move a descriptor, so it goes straight back into the head *)
+    ⌜ UkSh.ush_fd0p l ⌝ -∗
     ush_pstate l -∗
     ushl_dat -∗ usz γs sz -∗
     ubytes γd sh_buf sh_nbuf f -∗
@@ -420,7 +423,7 @@ Section UkShCd.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hregs Hs1 Ha5 Hk2 Hi2z Hck Hck1 Hck2.
-    iIntros "#Hdp Hhead #Hcode #Hro #Hpcode Hstd Hdat Hsz Hbuf Hrun".
+    iIntros "#Hdp Hhead #Hcode #Hro #Hpcode %Hfd0 Hstd Hdat Hsz Hbuf Hrun".
     destruct Hregs as (Hs2 & Hs3 & Hs4 & Hs5 & Hs6).
     (* ---- the string the arm measures, as a number ---- *)
     set (L := ushc_len (sh_nbuf - k) k f).
@@ -934,8 +937,8 @@ Section UkShCd.
     rewrite E9aa. iIntros (h18) "Hrun".
     destruct tk.
     - (* ---- chdir SUCCEEDED: straight back to the command loop ---- *)
-      iApply ("Hhead" $! h18 mD g n with "[%] Hstd Hdat Hsz Hbuf Hrun").
-      exact HregsD.
+      iApply ("Hhead" $! h18 mD g n with "[%] [%] Hstd Hdat Hsz Hbuf Hrun");
+        [ exact HregsD | exact Hfd0 ].
     - (* ---- chdir FAILED: the one diagnostic in sh that comes back ---- *)
       (* THE PATH, as a string: what is left of the line after "cd ", cut
          off by the NUL the chop just wrote (or, when the line had no
@@ -1165,8 +1168,8 @@ Section UkShCd.
         - rewrite (HkeepJ s6_idx ltac:(vm_compute; reflexivity)
                      ltac:(vm_compute; discriminate)). exact Hs6. }
       replace (10 + (12 + (4 + (70 + n))))%nat with (16 + (80 + n))%nat by lia.
-      iApply ("Hhead" $! h25 mJ g n with "[%] Hstd Hdat Hsz Hbuf Hrun").
-      exact HregsJ.
+      iApply ("Hhead" $! h25 mJ g n with "[%] [%] Hstd Hdat Hsz Hbuf Hrun");
+        [ exact HregsJ | exact Hfd0 ].
   Qed.
 
 

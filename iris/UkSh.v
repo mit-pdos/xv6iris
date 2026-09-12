@@ -129,6 +129,66 @@ Require Import Xv6Cameras.   (* [uartGhostG] -- the console ring's cameras,
 Require Import ConsoleInv.   (* [CONSOLE] -- the major fd 0's arm is keyed by *)
 Require Import UserConsole.  (* [upos] -- sh's half of the console position
                                 pair (app-echo.md, "SH-LINE RULING") *)
+(* lane SH-OPEN: the console preamble's PINNED open.  [uvis] / [uslot] are
+   what the TAINT arm of the preamble hands the run to
+   ([UkRun.urun_gen]); [FsImg.ROOTINO] is the directory the pin resolves
+   "console" from, which is sh's own working directory at its entry. *)
+Require Import UexecSlot UexecRet.
+Require FsImg.
+
+(* ===================================================================== *)
+(* THE ROW SH'S ENTRY IS TOLD, AS A PURE PROPOSITION (lane SH-OPEN).      *)
+(*                                                                        *)
+(* [ush_fd0] below is this or the taint.  It is spelled out here, OUTSIDE *)
+(* the section and free of the taint, because it is what the COMMAND LOOP *)
+(* carries: a program that has learned the taint does not run its own     *)
+(* code any more ([ush_gen_slot]), so nothing below the preamble needs a  *)
+(* taint arm on this row -- and a pure row keeps [ush_loop_head] and      *)
+(* [ush_rest] at the arity every file that discharges them already uses.  *)
+(* ===================================================================== *)
+(* THE BASE OF SH'S OWN "console" LITERAL, NAMED ONCE (lane SH-OPEN, ruling
+   (D)).  0x8f8's [auipc s2,0x1] and 0x8fc's [addi s2,s2,-1408] compute it
+   into s2, 0x902's [c.mv a0,s2] passes it, and the eight bytes there are
+   "console\0" ([user-rocq/ShData.v], .rodata 0x1280..0x13d9, inside
+   [UCodeShK.shk_ro] since 0x1378 < 0x2000).  /init's twin is 0x970. *)
+Definition sh_cons_pv : Z := 0x1378.
+
+Definition ush_fd0p (l : list fdstate) : Prop :=
+  (exists wr : bool, l !! 0%nat = Some (FdOpen true wr (FdDevice CONSOLE)))
+  \/ l !! 0%nat = Some FdClosed.
+
+(* THE SCAN LANDS ON SLOT 0 EXACTLY WHEN SLOT 0 IS CLOSED, so the row is a
+   LOOP INVARIANT of sh's console preamble: every open the preamble makes
+   lands at [fd_lowest_closed] of the ledger it was called at
+   ([UserFd.ualloc_at]), and what the pinned open installs there is the
+   console device. *)
+Lemma ush_fd0p_scan (l : list fdstate) (k : nat) :
+  l !! 0%nat = Some FdClosed -> fd_lowest_closed l = Some k -> k = 0%nat.
+Proof.
+  intros H0 Hk.
+  destruct k as [| k']; [ reflexivity | exfalso ].
+  exact (fd_lowest_closed_below l (S k') Hk 0%nat ltac:(lia) H0).
+Qed.
+
+Lemma ush_fd0p_cons (l : list fdstate) (k : nat) :
+  length l = NSTD ->
+  fd_lowest_closed l = Some k ->
+  ush_fd0p l ->
+  ush_fd0p (<[k := FdOpen true true (FdDevice CONSOLE)]> l).
+Proof.
+  intros Hlen Hk [[wr Hc] | Hcl].
+  - (* slot 0 is the console already, so it is not the slot the scan found *)
+    left. exists wr.
+    assert (Hne : k <> 0%nat).
+    { intro Hz. subst k.
+      rewrite (fd_lowest_closed_is_closed l 0%nat Hk) in Hc. discriminate Hc. }
+    rewrite list_lookup_insert_ne; [ exact Hc | exact Hne ].
+  - (* slot 0 is closed, so it IS the slot the scan found *)
+    rewrite (ush_fd0p_scan l k Hcl Hk).
+    left. exists true.
+    rewrite list_lookup_insert;
+      [ reflexivity | rewrite Hlen; unfold NSTD; lia ].
+Qed.
 
 Section UkSh.
   Context `{!riscvGS Σ}.
@@ -198,9 +258,13 @@ Section UkSh.
   (*             ([FsAbsInvFire.fsabs_fileread_in]); a LEASE holder pays it *)
   (*             at its own claim ([UkRun.udepwf_std] is the landed shape,  *)
   (*             [UkRunSys.wp_uk_ecall_read_recv] its leaf).  SH-LINE 2b.   *)
-  (*   open(15)  sh's [open("console", O_RDWR)] at its start, before the    *)
-  (*             two dups.  The sh-open lane owes a PINNED open, exactly as *)
-  (*             UInitConsK landed /init's ([UkRun.udepwf_at]).             *)
+  (*   NOT open(15).  sh's [open("console", O_RDWR)] loop at its start    *)
+  (*             goes through a PINNED open (lane SH-OPEN), exactly as      *)
+  (*             UInitConsK landed /init's ([UkRun.udepwf_at]): the leaf    *)
+  (*             bodies [ush_open_console_leaf] / [ush_open_absent_leaf]    *)
+  (*             below carry their own supplier, and at the TAINT the       *)
+  (*             preamble does not call at all -- it hands the run to the   *)
+  (*             generic slot ([ush_gen_slot]).  So no deposit at 15.       *)
   (*   write(16) the prompt and every diagnostic.  E5's output lane.        *)
   (*                                                                        *)
   (* WHAT IS NOT HERE: [UkRun.udep] at the generic supplier.  sh's own      *)
@@ -209,7 +273,7 @@ Section UkSh.
   (* cost nothing, which is what [Hpsok_free] above says.                   *)
   (* ===================================================================== *)
   Definition sh_deps : iProp Σ :=
-    (udepw_law 5 ∗ udepw_law 15 ∗ udepw_law 16)%I.
+    (udepw_law 5 ∗ udepw_law 16)%I.
 
   Global Instance sh_deps_persistent : Persistent sh_deps.
   Proof. rewrite /sh_deps. apply _. Qed.
@@ -522,81 +586,6 @@ Section UkSh.
     iApply ("Hcont" $! h3 ret with "Hrun").
   Qed.
 
-  (* the QUIET stub's twin at OPEN.  Same three instructions; the middle
-     one is the open leaf.  THE LEDGER SAYS WHERE THE DESCRIPTOR LANDED and
-     travels inside the allocation: fdalloc returns the LOWEST free slot, so
-     [UserFd.ualloc] names the lowest closed standard stream when there is
-     one and hands back a fresh handle above them when there is not.  The
-     stub relays that disjunction verbatim; sh's console preamble is the
-     caller that cases on it. *)
-  Local Lemma wp_ksh_ostub (h : CpuId) (m : regfile) (pc0 pc1 pc2 : Z)
-      (imm : mword 6) (l : list fdstate) (avail : nat) :
-    (sign_extend' 64 imm : mword 64) = mword_of_int USYS_open ->
-    usysno (<[Regidx a7_idx := (mword_of_int USYS_open : mword 64)]> m) = USYS_open ->
-        (* the three exclusions are NOT here: this stub IS the open one. *)
-    add_vec_int (mword_of_int pc0 : mword 64) 2 = mword_of_int pc1 ->
-    add_vec_int (mword_of_int pc1 : mword 64) 4 = mword_of_int pc2 ->
-    is_aligned_vaddr (Virtaddr (mword_of_int pc2 : mword 64)) 2 = true ->
-    sh_deps -∗
-    uinstr_is γt (mword_of_int pc0) true (C_LI (imm, Regidx a7_idx)) -∗
-    uinstr_is γt (mword_of_int pc1) false (ECALL tt) -∗
-    uinstr_is γt (mword_of_int pc2) true (C_JR (Regidx ra_idx)) -∗
-    urun N h m (mword_of_int pc0) avail -∗
-    ustd γfd l -∗
-    (∀ (h' : CpuId) (ret : mword 64),
-       ((∃ (fd : nat) (rd wr : bool) (t : fdtype),
-           ⌜ret = (mword_of_int (Z.of_nat fd) : mword 64)
-            /\ (fd < NOFILE)%nat⌝ ∗ ualloc γfd l fd (FdOpen rd wr t))
-        ∨ (⌜ret = (mword_of_int (-1) : mword 64)⌝ ∗ ustd γfd l)) -∗
-       urun N h'
-         (<[Regidx a0_idx := ret]>
-            (<[Regidx a7_idx := (mword_of_int USYS_open : mword 64)]> m))
-         (ret_pc (m !!! Regidx ra_idx)) avail -∗
-       WP (Loop : expr riscv_lang)) -∗
-    WP (Loop : expr riscv_lang).
-  Proof.
-    intros Himm Hno E01 E12 Hal2.
-    iIntros "#Hdp #Ci0 #Ci1 #Ci2 Hrun Hstd Hcont".
-    (* ---- pc0  c.li a7,USYS_open ---- *)
-    iApply (wp_uk_cli N h m (mword_of_int pc0) imm a7_idx avail
-              ltac:(unfold unot_sp; vm_compute; discriminate)
-              ltac:(vm_compute; discriminate) with "Ci0 Hrun").
-    assert (Em : <[Regidx a7_idx := regval_into_reg (sign_extend' 64 imm : mword 64)]> m
-                 = <[Regidx a7_idx := (mword_of_int USYS_open : mword 64)]> m)
-      by (f_equal; exact Himm).
-    rewrite E01 Em.
-    iIntros (h1) "Hrun".
-    set (m1 := <[Regidx a7_idx := (mword_of_int USYS_open : mword 64)]> m).
-    (* ---- pc1  ecall -- OPEN, which moves the descriptor table ---- *)
-    iApply (wp_uk_ecall_open N h1 m1 (mword_of_int pc1) l avail
-              Hno ltac:(rewrite E12; exact Hal2)
-              with "Ci1 Hrun [] Hstd").
-    (* THE FLAGGED DEPOSIT: open(15), the sh-open lane's (P4) *)
-    { iApply (udepw_of_law N m1 (mword_of_int pc1) USYS_open with "[Hdp]").
-      iDestruct "Hdp" as "(_ & $ & _)". }
-    rewrite E12.
-    (* the allocation is FORWARDED whole: which descriptor came back is the
-       caller's case analysis, not this stub's *)
-    iIntros (h2 ret) "Hal Hrun".
-    set (m2 := <[Regidx a0_idx := ret]> m1).
-    (* ---- pc2  c.jr ra ---- *)
-    assert (Hra : m2 !!! Regidx ra_idx = m !!! Regidx ra_idx).
-    { unfold m2, m1.
-      exact (eq_trans
-               (upd_ne m1 (Regidx a0_idx) (Regidx ra_idx) ret
-                  ltac:(vm_compute; discriminate))
-               (upd_ne m (Regidx a7_idx) (Regidx ra_idx)
-                  (mword_of_int USYS_open : mword 64)
-                  ltac:(vm_compute; discriminate))). }
-    iApply (wp_uk_cjr N h2 m2 (mword_of_int pc2) ra_idx
-              (ret_pc (m !!! Regidx ra_idx)) avail
-              ltac:(vm_compute; discriminate)
-              ltac:(rewrite Hra; reflexivity)
-              with "Ci2 Hrun").
-    iIntros (h3) "Hrun".
-    iApply ("Hcont" $! h3 ret with "Hal Hrun").
-  Qed.
-
   (* ...and the twin at CLOSE.  Same three instructions; the middle one is
      the close leaf, which SPENDS the caller's handle for the descriptor a0
      names.  sh's handles come from its own entry precondition (fds 0 and 1,
@@ -667,45 +656,6 @@ Section UkSh.
               with "Ci2 Hrun").
     iIntros (h3) "Hrun".
     iApply ("Hcont" $! h3 ret with "Hrun").
-  Qed.
-
-  (* ---- open @0xcc6, SYS_open = 15 ------------------------------------- *)
-  Lemma wp_ksh_open (h : CpuId) (m : regfile) (l : list fdstate)
-      (avail : nat) :
-    sh_deps -∗
-    shk_code γt -∗
-    urun N h m (mword_of_int ShSyms.open) avail -∗
-    ustd γfd l -∗
-    (∀ (h' : CpuId) (ret : mword 64),
-       (* what came back, at the ledger it was allocated from: the number
-          when it landed on a closed standard stream, a handle when it
-          landed above them -- sh's console loop closes the latter *)
-       ((∃ (fd : nat) (rd wr : bool) (t : fdtype),
-           ⌜ret = (mword_of_int (Z.of_nat fd) : mword 64)
-            /\ (fd < NOFILE)%nat⌝ ∗ ualloc γfd l fd (FdOpen rd wr t))
-        ∨ (⌜ret = (mword_of_int (-1) : mword 64)⌝ ∗ ustd γfd l)) -∗
-       urun N h'
-         (<[Regidx a0_idx := ret]>
-            (<[Regidx a7_idx := (mword_of_int 15 : mword 64)]> m))
-         (ret_pc (m !!! Regidx ra_idx)) avail -∗
-       WP (Loop : expr riscv_lang)) -∗
-    WP (Loop : expr riscv_lang).
-  Proof.
-    iIntros "#Hdp #Hcode Hrun Hstd Hcont".
-    rewrite shp_open.
-    iApply (wp_ksh_ostub h m 0xcc6 0xcc8 0xccc
-              (mword_of_int 15 : mword 6) l avail
-              ltac:(apply bv_eq; vm_compute; reflexivity)
-              ltac:(unfold usysno;
-                    rewrite (upd_eq m (Regidx a7_idx) (mword_of_int 15 : mword 64));
-                    vm_compute; reflexivity)
-              ltac:(apply bv_eq; vm_compute; reflexivity)
-              ltac:(apply bv_eq; vm_compute; reflexivity)
-              ltac:(vm_compute; reflexivity)
-              with "Hdp [] [] [] Hrun Hstd Hcont").
-    { iApply (uis_shk_cc6 with "Hcode"). }
-    { iApply (uis_shk_cc8 with "Hcode"). }
-    { iApply (uis_shk_ccc with "Hcode"). }
   Qed.
 
   (* ---- close @0xcae, SYS_close = 21 ----------------------------------- *)
@@ -820,7 +770,7 @@ Section UkSh.
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               with "[Hdp] [] [] [] Hrun Hcont").
-    { iDestruct "Hdp" as "(_ & _ & $)". }
+    { iDestruct "Hdp" as "(_ & $)". }
     { iApply (uis_shk_ca6 with "Hcode"). }
     { iApply (uis_shk_ca8 with "Hcode"). }
     { iApply (uis_shk_cac with "Hcode"). }
@@ -4225,12 +4175,223 @@ Section UkSh.
      only slot 0 -- that is all the arm is for, and it is what init's
      all-closed head ([UInitFd.ufd_l0]) weakens to. *)
   Definition ush_fd0 (l : list fdstate) : iProp Σ :=
-    (⌜exists wr : bool, l !! 0%nat = Some (FdOpen true wr (FdDevice CONSOLE))⌝
-     ∨ ⌜l !! 0%nat = Some FdClosed⌝
-     ∨ T)%I.
+    (⌜ush_fd0p l⌝ ∨ T)%I.
 
   Global Instance ush_fd0_persistent l : Persistent (ush_fd0 l).
   Proof. rewrite /ush_fd0. apply _. Qed.
+
+  (* ===================================================================== *)
+  (* THE ROW IS A LOOP INVARIANT OF THE CONSOLE PREAMBLE (lane SH-OPEN).    *)
+  (*                                                                        *)
+  (* sh's preamble reopens "console" until the descriptor comes back at 3   *)
+  (* or above, and every open it makes lands at [fd_lowest_closed] of the   *)
+  (* ledger it was called at ([UserFd.ualloc_at]).  So the row survives     *)
+  (* both ways: if slot 0 is ALREADY the console it is not closed, the      *)
+  (* scan lands somewhere else and slot 0 does not move; if slot 0 is       *)
+  (* CLOSED it is the LOWEST closed slot, the scan lands exactly there, and *)
+  (* what it installs is the console device (the pinned open's receipt      *)
+  (* names the type).  That is why the preamble's post is [ush_fd0] again,  *)
+  (* at the ledger the loop LEFT -- and why "init's open failed" is not     *)
+  (* what the CLOSED arm means any more: it means every open sh itself made *)
+  (* failed too.                                                            *)
+  (* ===================================================================== *)
+  (* ===================================================================== *)
+  (* THE TAINT'S GENERIC CONTINUATION, as a premise of the preamble.        *)
+  (*                                                                       *)
+  (* [UConsLine.ush_gen_slot]'s definition, moved DOWN to the program tier  *)
+  (* because the preamble is the first walk that needs it: sh's console     *)
+  (* open is PINNED, and at the taint there is no pin -- so the preamble    *)
+  (* does not make the call at all, it hands the run to the generic slot    *)
+  (* ([UkRun.urun_gen]).  That is also why no [udepw_law 15] remains in     *)
+  (* this file: nothing here ever routes open through the key-free law.     *)
+  (* ===================================================================== *)
+  Definition ush_gen_slot : iProp Σ :=
+    (□ (∀ W : uvis,
+          T -∗ my_pay (uvis_gen W) (ukn_pay N) -∗ ukn_pay N (-1) -∗
+          uslot W))%I.
+
+  Global Instance ush_gen_slot_persistent : Persistent ush_gen_slot.
+  Proof. rewrite /ush_gen_slot. apply _. Qed.
+
+  Lemma ush_gen_run (h : CpuId) (m : regfile) (pc : mword 64) (avail : nat) :
+    is_aligned_vaddr (Virtaddr pc) 2 = true ->
+    ush_gen_slot -∗ T -∗ urun N h m pc avail -∗ WP (Loop : expr riscv_lang).
+  Proof.
+    intro Hal. rewrite /ush_gen_slot. iIntros "#Hg HT Hrun".
+    iApply (urun_gen N T h m pc avail Hal with "Hg HT Hrun").
+  Qed.
+
+  (* ===================================================================== *)
+  (* SH'S CONSOLE OPEN, AS TWO LEAF BODIES (lane SH-OPEN, H2).              *)
+  (*                                                                       *)
+  (* [UkInit.uki_open_console_leaf] / [uki_open_absent_leaf] are the mould, *)
+  (* one syscall stub over: the program tier names no application           *)
+  (* ([UConsLine.v:202]), so the two calls are stated HERE as leaf BODIES   *)
+  (* over the abstract pieces and DISCHARGED at the era, where the pin      *)
+  (* lives.  The difference from /init's is only in the ADDRESSES: sh's     *)
+  (* stub is at [ShSyms.open] (0xcc6) and its "console" literal is the      *)
+  (* eight bytes at 0x1378 in its own .rodata ([UCodeShK.shk_ro]), which    *)
+  (* 0x8f8/0x8fc compute into s2 and 0x902 moves into a0.                   *)
+  (*                                                                       *)
+  (*   [T]  THE TAINT, exactly [ush_fd0]'s third arm.                       *)
+  (*   [K]  THE ABSENCE CREDENTIAL.  What makes the FIRST open's SUCCESS    *)
+  (*        arm REFUTABLE at a view with no console node, rather than an    *)
+  (*        arm sh has to carry.  It is a PARAMETER here for [T]'s reason;  *)
+  (*        which resource the era supplies is the application's business   *)
+  (*        (app-echo.md, SH-OPEN H3).                                      *)
+  (*                                                                       *)
+  (* THE WORKING DIRECTORY IS NAMED, and that is new for sh: a pinned open  *)
+  (* is about a PATH, "console" names a file only relative to the directory *)
+  (* it is resolved from, and the pin resolves it from the ROOT             *)
+  (* ([UkRun.udepwf_at] fixes the cwd for exactly this reason).  sh does    *)
+  (* not chdir before the preamble, so the row is its entry's -- and after  *)
+  (* the preamble it is weakened to [UserCwd.ucwd_any] again, which is all  *)
+  (* the command loop's [cd] needs.                                         *)
+  (* ===================================================================== *)
+
+  (* THE OPEN AT THE RESOLVING PIN: three arms.  The descriptor the ledger
+     decided, open at the console DEVICE and readable and writable (O_RDWR
+     is [om_readable]/[om_writable] both true); or the call failed at
+     allocation ([filealloc] / [fdalloc], about which sh proves NOTHING,
+     exactly as /init proves nothing -- app-echo.md, "OPEN-PIN FINDINGS",
+     FACT 3) and the ledger did not move; or the taint.  The TYPE is what
+     the pin buys; the NUMBER is the caller's own ledger's answer. *)
+  Definition ush_open_console_leaf : iProp Σ :=
+    (∀ (h : CpuId) (m : regfile) (l : list fdstate) (avail : nat),
+       shk_code γt -∗
+       (* the read-only image and the two argument words: a0 = "console" at
+          0x1378, a1 = O_RDWR.  The preamble holds both at 0x904
+          ([wp_ksh_console]'s walk from 0x900). *)
+       shk_rodata γt -∗
+       ⌜ m !!! Regidx a0_idx = (mword_of_int sh_cons_pv : mword 64)
+         /\ m !!! Regidx a1_idx = (mword_of_int 2 : mword 64) ⌝ -∗
+       urun N h m (mword_of_int ShSyms.open) avail -∗
+       UserCwd.ucwd γcwd FsImg.ROOTINO -∗
+       ustd γfd l -∗
+       (∀ (h' : CpuId) (ret : mword 64),
+          ((∃ fd : nat,
+              ⌜ret = (mword_of_int (Z.of_nat fd) : mword 64)
+               /\ (fd < NOFILE)%nat⌝ ∗
+              ualloc γfd l fd (FdOpen true true (FdDevice CONSOLE)))
+           ∨ (⌜ret = (mword_of_int (-1) : mword 64)⌝ ∗ ustd γfd l)
+           ∨ T) -∗
+          UserCwd.ucwd γcwd FsImg.ROOTINO -∗
+          urun N h'
+            (<[Regidx a0_idx := ret]>
+               (<[Regidx a7_idx := (mword_of_int 15 : mword 64)]> m))
+            (ret_pc (m !!! Regidx ra_idx)) avail -∗
+          WP (Loop : expr riscv_lang)) -∗
+       WP (Loop : expr riscv_lang))%I.
+
+  (* THE OPEN AT THE PIN THAT MISSES: TWO arms, and there is no third.  At
+     a view the credential holds of, the walk dies at hop 0
+     ([PinnedObs.pobs_walk_dead]), so the success arm is REFUTED rather
+     than carried -- which is what makes the [bltz a0] at 0x908 provably
+     leave the loop, at the ledger sh came in with.  The credential goes in
+     and comes back, as /init's does. *)
+  Definition ush_open_absent_leaf (K : iProp Σ) : iProp Σ :=
+    (∀ (h : CpuId) (m : regfile) (l : list fdstate) (avail : nat),
+       shk_code γt -∗
+       shk_rodata γt -∗
+       ⌜ m !!! Regidx a0_idx = (mword_of_int sh_cons_pv : mword 64)
+         /\ m !!! Regidx a1_idx = (mword_of_int 2 : mword 64) ⌝ -∗
+       urun N h m (mword_of_int ShSyms.open) avail -∗
+       UserCwd.ucwd γcwd FsImg.ROOTINO -∗
+       ustd γfd l -∗
+       K -∗
+       (∀ (h' : CpuId) (ret : mword 64),
+          ((⌜ret = (mword_of_int (-1) : mword 64)⌝ ∗ ustd γfd l ∗ K)
+           ∨ T) -∗
+          UserCwd.ucwd γcwd FsImg.ROOTINO -∗
+          urun N h'
+            (<[Regidx a0_idx := ret]>
+               (<[Regidx a7_idx := (mword_of_int 15 : mword 64)]> m))
+            (ret_pc (m !!! Regidx ra_idx)) avail -∗
+          WP (Loop : expr riscv_lang)) -∗
+       WP (Loop : expr riscv_lang))%I.
+
+  (* ...AND WHAT SH'S ENTRY IS TOLD ABOUT THE CONSOLE NODE, as ONE
+     resource: the node is THERE (and then every open sh makes either
+     installs the console device at the lowest closed standard stream or
+     fails at allocation), or it is NOT (and then every open returns [-1]
+     and nothing moves), or the application is tainted and sh's walk stops
+     being sh's ([ush_gen_slot]).
+
+     THE PRESENT ARM IS PERSISTENT and the ABSENT one is not: "the console
+     resolves to inode i" is a consequence of a persistent flag
+     ([AppEcho.cons_made]), while "the console is absent" is the refutation
+     of the claim's own PRESENT arms and needs a CREDENTIAL
+     ([UInitCons.init_cons_abs_law]'s [K]).  That asymmetry is the lane's
+     one open design question -- app-echo.md, SH-OPEN H3. *)
+  Definition ush_cons_in (K : iProp Σ) : iProp Σ :=
+    (□ ush_open_console_leaf ∨ (□ ush_open_absent_leaf K ∗ K) ∨ T)%I.
+
+  (* ...AND THE ONE CALL THE PREAMBLE MAKES, whichever state the node is
+     in.  This is what makes the preamble's loop ONE walk rather than three:
+     the state goes in, the ledger's own answer and THE STATE AGAIN come
+     back, so [ush_cons_in] rides the loop's back edge.  The two ways the
+     walk can stop being sh's are absorbed here -- the taint at the entry
+     (the call is not made at all) and the taint out of either leaf -- and
+     both go to [ush_gen_slot].
+
+     THE ABSENT ARM NEVER REACHES THE BACK EDGE, and nothing here says so:
+     it hands back [-1], the [bltz] at 0x908 is taken, and the loop is left
+     at the ledger sh came in with.  The credential is simply carried in
+     the rebuilt [ush_cons_in]. *)
+  Lemma ush_cons_open (K : iProp Σ) (h : CpuId) (m : regfile)
+      (l : list fdstate) (avail : nat) :
+    m !!! Regidx a0_idx = (mword_of_int sh_cons_pv : mword 64) ->
+    m !!! Regidx a1_idx = (mword_of_int 2 : mword 64) ->
+    is_aligned_vaddr (Virtaddr (ret_pc (m !!! Regidx ra_idx))) 2 = true ->
+    shk_code γt -∗
+    shk_rodata γt -∗
+    ush_gen_slot -∗
+    urun N h m (mword_of_int ShSyms.open) avail -∗
+    UserCwd.ucwd γcwd FsImg.ROOTINO -∗
+    ustd γfd l -∗
+    ush_cons_in K -∗
+    (∀ (h' : CpuId) (ret : mword 64),
+       ((∃ fd : nat,
+           ⌜ret = (mword_of_int (Z.of_nat fd) : mword 64)
+            /\ (fd < NOFILE)%nat⌝ ∗
+           ualloc γfd l fd (FdOpen true true (FdDevice CONSOLE)))
+        ∨ (⌜ret = (mword_of_int (-1) : mword 64)⌝ ∗ ustd γfd l)) -∗
+       ush_cons_in K -∗
+       UserCwd.ucwd γcwd FsImg.ROOTINO -∗
+       urun N h'
+         (<[Regidx a0_idx := ret]>
+            (<[Regidx a7_idx := (mword_of_int 15 : mword 64)]> m))
+         (ret_pc (m !!! Regidx ra_idx)) avail -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Ha0 Ha1 Hal.
+    iIntros "#Hcode #Hro #Hgen Hrun Hcwd Hstd Hin Hcont".
+    iDestruct "Hin" as "[#Hlf | [[#Hlf HK] | #HT]]".
+    - (* THE NODE IS THERE: the pinned open resolves *)
+      iApply ("Hlf" $! h m l avail with "Hcode Hro [%] Hrun Hcwd Hstd").
+      { split; [ exact Ha0 | exact Ha1 ]. }
+      iIntros (h' ret) "[Hal | [Hm1 | #HT]] Hcwd Hrun".
+      + iApply ("Hcont" $! h' ret with "[Hal] [] Hcwd Hrun");
+          [ iLeft; iExact "Hal" | iLeft; iExact "Hlf" ].
+      + iApply ("Hcont" $! h' ret with "[Hm1] [] Hcwd Hrun");
+          [ iRight; iExact "Hm1" | iLeft; iExact "Hlf" ].
+      + iApply (ush_gen_run h' _ _ avail Hal with "Hgen HT Hrun").
+    - (* THE NODE IS NOT THERE: the pinned open MISSES, provably *)
+      iApply ("Hlf" $! h m l avail with "Hcode Hro [%] Hrun Hcwd Hstd HK").
+      { split; [ exact Ha0 | exact Ha1 ]. }
+      iIntros (h' ret) "[(%Hrm & Hstd & HK) | #HT] Hcwd Hrun".
+      + iApply ("Hcont" $! h' ret with "[Hstd] [HK] Hcwd Hrun").
+        * iRight. iSplitR; [ by iPureIntro | iExact "Hstd" ].
+        * iRight. iLeft. iFrame "Hlf HK".
+      + iApply (ush_gen_run h' _ _ avail Hal with "Hgen HT Hrun").
+    - (* THE TAINT: sh's walk stops being sh's before the call *)
+      assert (Halo : is_aligned_vaddr
+                       (Virtaddr (mword_of_int ShSyms.open : mword 64)) 2
+                     = true)
+        by (rewrite shp_open; vm_compute; reflexivity).
+      iApply (ush_gen_run h m _ avail Halo with "Hgen HT Hrun").
+  Qed.
 
   (* ...AND THE PROGRAM'S HALF OF THE CONSOLE POSITION PAIR
      ([UserConsole.upos]).  EXISTENTIAL here and named inside [gets]: a
@@ -4295,9 +4456,19 @@ Section UkSh.
      and naming any of those would drag the parser's and the allocator's
      files into this one.  So the loop carries an OPAQUE [R] round its
      cycle, and iris/UkShLoop.v is where it is said what [R] is. *)
+  (* ...AND THE ROW THE PREAMBLE ESTABLISHED (lane SH-OPEN).  It enters the
+     command loop HERE, at the ledger the preamble's opens LEFT -- which is
+     the whole point of pinning them: [wp_ksh_start] used to be handed
+     [ush_fd0] at its ENTRY ledger and the preamble then moved that ledger,
+     so the row the read of fd 0 needs (SH-LINE 2b) was about a list no
+     lemma below could name.  It is a PREMISE of the head rather than a
+     conjunct of [ush_pstate] because it is NOT preserved by everything a
+     turn does: a REDIR reopens fd 0 onto a file, and it does so in the
+     forked CHILD, which takes [ush_pstate] and not this. *)
   Definition ush_loop_head (R : iProp Σ) (l : list fdstate) : iProp Σ :=
     (∀ (h : CpuId) (m : regfile) (f : nat -> bv 8) (n : nat),
        ⌜ ush_regs m ⌝ -∗
+       ⌜ ush_fd0p l ⌝ -∗
        ush_pstate l -∗
        R -∗
        ubytes γd sh_buf sh_nbuf f -∗
@@ -4312,6 +4483,7 @@ Section UkSh.
           ⌜ m !!! Regidx s1_idx = mword_of_int (sh_buf + Z.of_nat k) ⌝ -∗
           ⌜ m !!! Regidx a5_idx = mword_of_int (bv_unsigned (f k)) ⌝ -∗
           ⌜ (k <= i2 < sh_nbuf)%nat /\ f i2 = ubyte0 ⌝ -∗
+          ⌜ ush_fd0p l ⌝ -∗
           ush_pstate l -∗
           R -∗
           ubytes γd sh_buf sh_nbuf f -∗
@@ -4715,7 +4887,7 @@ Section UkSh.
     assert (Hnbz : Z.of_nat sh_nbuf = 100) by (vm_compute; reflexivity).
     iIntros "#Hdp #Hrest #Hcode".
     iLöb as "IH".
-    iIntros (h m f n0) "%Hregs Hstd HR Hbs Hrun".
+    iIntros (h m f n0) "%Hregs %Hfd0 Hstd HR Hbs Hrun".
     set (n := (ush_Dbody + n0)%nat).
     pose proof Hregs as (Hs2 & Hs3 & Hs4 & Hs5 & Hs6).
     (* ---- 0x938  c.mv a1,s3 ---- *)
@@ -4922,8 +5094,8 @@ Section UkSh.
       destruct tk76.
       { (* a blank line: round the command loop again *)
         iNext. iIntros (hh1) "Hrun".
-        iApply ("IH" $! hh1 mm g n0 with "[] Hstd HR Hbs Hrun").
-        iPureIntro. exact Hrm. }
+        iApply ("IH" $! hh1 mm g n0 with "[] [] Hstd HR Hbs Hrun");
+          iPureIntro; [ exact Hrm | exact Hfd0 ]. }
       iNext.
       assert (E976 : add_vec_int (mword_of_int 0x976 : mword 64) 4
                      = mword_of_int 0x97a)
@@ -4931,9 +5103,9 @@ Section UkSh.
       rewrite E976. iIntros (hh1) "Hrun".
       iDestruct ("Hrest" $! l with "IH") as "Hbody".
       iApply ("Hbody" $! hh1 mm g kk i2 n0
-                with "[] [] [] [] Hstd HR Hbs Hrun");
+                with "[] [] [] [] [] Hstd HR Hbs Hrun");
         iPureIntro; [ exact Hrm | exact Hsm | exact Ham
-                    | split; [ lia | exact Hnul ] ]. }
+                    | split; [ lia | exact Hnul ] | exact Hfd0 ]. }
     (* the two auipc/addi pairs that both land s1 on the buffer *)
     destruct (Z.eqb_spec bz0 32) as [Hb32 | Hb32].
     { (* leading space: straight to 0x95c *)
@@ -5079,13 +5251,14 @@ Section UkSh.
     sh_deps -∗
     ush_rest R -∗
     shk_code γt -∗
+    ⌜ ush_fd0p l ⌝ -∗
     ush_pstate l -∗
     R -∗
     ubytes γd sh_buf sh_nbuf f -∗
     urun N h m (mword_of_int 0x914) (16 + (ush_Dbody + n0)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hdp #Hrest #Hcode Hstd HR Hbs Hrun".
+    iIntros "#Hdp #Hrest #Hcode %Hfd0 Hstd HR Hbs Hrun".
     set (n := (ush_Dbody + n0)%nat).
     (* ---- 0x914  li s3,100 ---- *)
     iApply (wp_uk_li N h m (mword_of_int 0x914)
@@ -5235,8 +5408,8 @@ Section UkSh.
       - exact (upd_eq m5 (Regidx s6_idx)
                  (regval_into_reg (mword_of_int 32 : mword 64))). }
     iDestruct (wp_ksh_loop R l with "Hdp Hrest Hcode") as "Hhead".
-    iApply ("Hhead" $! h7 m6 f n0 with "[] Hstd HR Hbs Hrun").
-    iPureIntro. exact Hregs.
+    iApply ("Hhead" $! h7 m6 f n0 with "[] [] Hstd HR Hbs Hrun");
+      iPureIntro; [ exact Hregs | exact Hfd0 ].
   Qed.
 
   (* THE BRANCH THAT SAYS THE DESCRIPTOR IS NOT A STANDARD STREAM.  s1
@@ -5280,22 +5453,35 @@ Section UkSh.
   (* s1's value is a premise here: the walk decides the branch rather than  *)
   (* carrying a resource for every way it could go.                         *)
   (* ===================================================================== *)
-  Local Lemma wp_ksh_console (R : iProp Σ) (h : CpuId) (m : regfile)
+  (* THE STATE OF THE CONSOLE NODE RIDES THE BACK EDGE, and the row the
+     entry was told rides it beside: [ush_fd0] is a LOOP INVARIANT here
+     ([ush_fd0_cons]), which is what lets the command loop be entered with
+     the row at the ledger the preamble LEFT rather than at the one it
+     started from. *)
+  Local Lemma wp_ksh_console (R K : iProp Σ) (h : CpuId) (m : regfile)
       (f : nat -> bv 8) (n0 : nat) (l : list fdstate) :
     sh_deps -∗
     ush_rest R -∗
     shk_code γt -∗
+    shk_rodata γt -∗
+    ush_gen_slot -∗
     ⌜m !!! Regidx s1_idx = (mword_of_int 2 : mword 64)⌝ -∗
-    ush_pstate l -∗
+    ⌜m !!! Regidx s2_idx = (mword_of_int sh_cons_pv : mword 64)⌝ -∗
+    ⌜ ush_fd0p l ⌝ -∗
+    ush_cons_in K -∗
+    ush_std l -∗
+    UserCwd.ucwd γcwd FsImg.ROOTINO -∗
+    UserChildren.uch_any γch -∗
+    ush_pos -∗
     R -∗
     ubytes γd sh_buf sh_nbuf f -∗
     urun N h m (mword_of_int 0x900) (16 + (ush_Dbody + n0)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hdp #Hrest #Hcode".
+    iIntros "#Hdp #Hrest #Hcode #Hro #Hgen".
     set (n := (16 + (ush_Dbody + n0))%nat).
     iLöb as "IH" forall (h m l).
-    iIntros "%Hs1 Hstd HR Hbs Hrun".
+    iIntros "%Hs1 %Hs2 %Hfd0 Hin Hstd Hcwd Hch Hpos HR Hbs Hrun".
     (* ---- 0x900  c.mv a1,s1 ---- *)
     iApply (wp_uk_cmv N h m (mword_of_int 0x900) a1_idx s1_idx
               (add_vec zero_reg (m !!! Regidx s1_idx)) n
@@ -5338,56 +5524,79 @@ Section UkSh.
                  := regval_into_reg (mword_of_int 0x908 : mword 64)]> mB).
     assert (HraC : mC !!! Regidx ra_idx = mword_of_int 0x908)
       by exact (upd_eq mB (Regidx ra_idx) (mword_of_int 0x908 : mword 64)).
-    iDestruct "Hstd" as "(Hstd & Hcwd & Hch & Hpos)".
-    iApply (wp_ksh_open h3 mC l n with "Hdp Hcode Hrun Hstd").
+    (* THE TWO ARGUMENT WORDS THE PINNED OPEN IS ABOUT: a0 is the address
+       of sh's own "console" literal (0x1378, [UCodeShK.shk_ro]) and a1 is
+       O_RDWR.  Both are read off the two [c.mv]s just walked. *)
+    assert (Hs2A : mA !!! Regidx s2_idx = (mword_of_int sh_cons_pv : mword 64)).
+    { rewrite /mA (upd_ne m (Regidx a1_idx) (Regidx s2_idx) _
+                     ltac:(vm_compute; discriminate)). exact Hs2. }
+    assert (Ha0C : mC !!! Regidx a0_idx = (mword_of_int sh_cons_pv : mword 64)).
+    { rewrite /mC (upd_ne mB (Regidx ra_idx) (Regidx a0_idx) _
+                     ltac:(vm_compute; discriminate)).
+      rewrite /mB (upd_eq mA (Regidx a0_idx) _) Hs2A.
+      apply bv_eq; vm_compute; reflexivity. }
+    assert (Ha1C : mC !!! Regidx a1_idx = (mword_of_int 2 : mword 64)).
+    { rewrite /mC (upd_ne mB (Regidx ra_idx) (Regidx a1_idx) _
+                     ltac:(vm_compute; discriminate)).
+      rewrite /mB (upd_ne mA (Regidx a0_idx) (Regidx a1_idx) _
+                     ltac:(vm_compute; discriminate)).
+      rewrite /mA (upd_eq m (Regidx a1_idx) _) Hs1.
+      apply bv_eq; vm_compute; reflexivity. }
+    assert (HalC : is_aligned_vaddr
+                     (Virtaddr (ret_pc (mC !!! Regidx ra_idx))) 2 = true)
+      by (rewrite HraC; vm_compute; reflexivity).
+    iApply (ush_cons_open K h3 mC l n Ha0C Ha1C HalC
+              with "Hcode Hro Hgen Hrun Hcwd Hstd Hin").
     (* WHAT CAME BACK, PUT IN THE FORM THE TWO BRANCHES CONSUME: the ledger
-       the open left, and then either the handle (the descriptor landed
-       above the standard streams, [UserFd.ualloc_at]'s [None] arm) or a
-       pure fact about a0 that refutes the fall-through of one of the two
-       branches.  On the [Some k] arm that fact is [k < NSTD], and it comes
-       from the LEDGER'S OWN LENGTH -- [UserFd.ustd] carries [length l =
-       NSTD], so the slot [fd_lowest_closed] found is below the standard
-       streams by construction.  Everything the walk needs about the
-       allocation is here; nothing below this point cases on the ledger
-       again. *)
-    iIntros (h4 ret) "Hal Hrun".
+       the open left -- AND THE ROW, which is the pin's work: an allocation
+       lands at [fd_lowest_closed], so a closed slot 0 IS where it lands and
+       what it installs is the console device ([ush_fd0_cons]).  Then either
+       the handle (the descriptor landed above the standard streams,
+       [UserFd.ualloc_at]'s [None] arm) or a pure fact about a0 that refutes
+       the fall-through of one of the two branches. *)
+    iIntros (h4 ret) "Hal Hin Hcwd Hrun".
     iAssert (∃ l' : list fdstate,
-               ustd γfd l' ∗
-               ((∃ (fd : nat) (rd wr : bool) (t : fdtype),
+               ustd γfd l' ∗ ⌜ush_fd0p l'⌝ ∗
+               ((∃ fd : nat,
                    ⌜ret = (mword_of_int (Z.of_nat fd) : mword 64)
-                    /\ (fd < NOFILE)%nat⌝ ∗ ufd γfd fd (FdOpen rd wr t))
+                    /\ (fd < NOFILE)%nat⌝ ∗
+                   ufd γfd fd (FdOpen true true (FdDevice CONSOLE)))
                 ∨ ⌜ret = (mword_of_int (-1) : mword 64)
                    \/ (exists k : nat,
                          ret = (mword_of_int (Z.of_nat k) : mword 64)
                          /\ (k < NSTD)%nat)⌝))%I
-      with "[Hal]" as "(%l' & Hstd & Hfdh)".
+      with "[Hal]" as "(%l' & Hstd & %Hfd0' & Hfdh)".
     { iDestruct "Hal" as "[Hal | [%Hrm Hstd]]".
-      - iDestruct "Hal" as (fd rd wr t) "[%Hr Hal]".
+      - iDestruct "Hal" as (fd) "[%Hr Hal]".
         destruct (fd_lowest_closed l) as [k |] eqn:Hk.
-        + iDestruct (ualloc_std γfd l fd k (FdOpen rd wr t) Hk with "Hal")
+        + iDestruct (ualloc_std γfd l fd k
+                       (FdOpen true true (FdDevice CONSOLE)) Hk with "Hal")
             as "[%Hfk Hstd]".
           iDestruct (ustd_len with "Hstd") as %Hlen.
           rewrite length_insert in Hlen.
-          iExists (<[k := FdOpen rd wr t]> l). iFrame "Hstd".
+          iExists (<[k := FdOpen true true (FdDevice CONSOLE)]> l).
+          iFrame "Hstd".
+          iSplitR; [ iPureIntro; exact (ush_fd0p_cons l k Hlen Hk Hfd0) | ].
           iRight. iPureIntro. right. exists k.
           split; [ rewrite <- Hfk; exact (proj1 Hr) | ].
           rewrite <- Hlen. exact (fd_lowest_closed_bound l k Hk).
-        + iDestruct (ualloc_hi γfd l fd (FdOpen rd wr t) Hk with "Hal")
+        + iDestruct (ualloc_hi γfd l fd
+                       (FdOpen true true (FdDevice CONSOLE)) Hk with "Hal")
             as "(_ & Hstd & Hh)".
           iExists l. iFrame "Hstd".
-          iLeft. iExists fd, rd, wr, t. iFrame "Hh". iPureIntro. exact Hr.
-      - iExists l. iFrame "Hstd". iRight. iPureIntro. left. exact Hrm. }
-    iAssert (ush_pstate l') with "[Hstd Hcwd Hch Hpos]" as "Hstd";
-      [ rewrite /ush_pstate /ush_std; iFrame "Hstd Hcwd Hch Hpos" |].
+          iSplitR; [ by iPureIntro | ].
+          iLeft. iExists fd. iFrame "Hh". iPureIntro. exact Hr.
+      - iExists l. iFrame "Hstd". iSplitR; [ by iPureIntro | ].
+        iRight. iPureIntro. left. exact Hrm. }
     rewrite HraC.
     assert (Eret : ret_pc (mword_of_int 0x908 : mword 64) = mword_of_int 0x908)
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite Eret.
     set (mD := <[Regidx a0_idx := ret]>
                  (<[Regidx a7_idx := (mword_of_int 15 : mword 64)]> mC)).
-    (* s1 survives the round: the preamble writes a1, a0, ra and a7 and
-       nothing else, so O_RDWR is still there at the 0x90c test and at
-       0x900 on the next turn. *)
+    (* s1 and s2 survive the round: the preamble writes a1, a0, ra and a7
+       and nothing else, so O_RDWR is still there at the 0x90c test and the
+       literal's address is still there at 0x902 on the next turn. *)
     assert (Hs1D : mD !!! Regidx s1_idx = (mword_of_int 2 : mword 64)).
     { rewrite /mD (upd_ne (<[Regidx a7_idx := (mword_of_int 15 : mword 64)]> mC)
                      (Regidx a0_idx) (Regidx s1_idx) _
@@ -5401,6 +5610,17 @@ Section UkSh.
       rewrite /mA (upd_ne m (Regidx a1_idx) (Regidx s1_idx) _
                      ltac:(vm_compute; discriminate)).
       exact Hs1. }
+    assert (Hs2D : mD !!! Regidx s2_idx = (mword_of_int sh_cons_pv : mword 64)).
+    { rewrite /mD (upd_ne (<[Regidx a7_idx := (mword_of_int 15 : mword 64)]> mC)
+                     (Regidx a0_idx) (Regidx s2_idx) _
+                     ltac:(vm_compute; discriminate)).
+      rewrite (upd_ne mC (Regidx a7_idx) (Regidx s2_idx) _
+                 ltac:(vm_compute; discriminate)).
+      rewrite /mC (upd_ne mB (Regidx ra_idx) (Regidx s2_idx) _
+                     ltac:(vm_compute; discriminate)).
+      rewrite /mB (upd_ne mA (Regidx a0_idx) (Regidx s2_idx) _
+                     ltac:(vm_compute; discriminate)).
+      exact Hs2A. }
     (* ---- 0x908  bltz a0,0x914 ---- *)
     remember (uv_btaken BLT (mD !!! Regidx a0_idx) zero_reg) as t1 eqn:Ht1.
     iApply (wp_uk_btype0 N h4 mD (mword_of_int 0x908)
@@ -5411,10 +5631,15 @@ Section UkSh.
               with "[] Hrun").
     { iApply (uis_shk_908 with "Hcode"). }
     destruct t1.
-    { (* the loop is left, at whatever ledger the open left behind *)
+    { (* the loop is left, at whatever ledger the open left behind -- and at
+         the row that ledger satisfies *)
       iIntros (h5) "Hrun".
       iApply (wp_ksh_cmd_head R h5 mD f n0 l'
-                with "Hdp Hrest Hcode Hstd HR Hbs Hrun"). }
+                with "Hdp Hrest Hcode [%] [Hstd Hcwd Hch Hpos] HR Hbs Hrun");
+        [ exact Hfd0' | ].
+      rewrite /ush_pstate /ush_std. iFrame "Hstd".
+      iSplitL "Hcwd"; [ iApply (ucwd_any_of with "Hcwd") | ].
+      iFrame "Hch Hpos". }
     assert (E908 : add_vec_int (mword_of_int 0x908 : mword 64) 4
                    = mword_of_int 0x90c)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -5431,10 +5656,12 @@ Section UkSh.
               with "[] Hrun").
     { iApply (uis_shk_90c with "Hcode"). }
     destruct t2.
-    { (* fd <= 2 -- round again, on the Löb hypothesis, at the new ledger *)
+    { (* fd <= 2 -- round again, on the Löb hypothesis, at the new ledger,
+         the new row and the console state that came back *)
       iNext. iIntros (h6) "Hrun".
-      iApply ("IH" $! h6 mD l' with "[] Hstd HR Hbs Hrun").
-      iPureIntro. exact Hs1D. }
+      iApply ("IH" $! h6 mD l' with "[] [] [] Hin Hstd Hcwd Hch Hpos
+                                      HR Hbs Hrun");
+        iPureIntro; [ exact Hs1D | exact Hs2D | exact Hfd0' ]. }
     iNext.
     assert (E90c : add_vec_int (mword_of_int 0x90c : mword 64) 4
                    = mword_of_int 0x910)
@@ -5462,12 +5689,10 @@ Section UkSh.
        and a descriptor at or below 2 would have taken the [bge] against
        s1 = O_RDWR at 0x90c.  What is left is the descriptor that landed
        above the standard streams, and a0 still holds it ([ra] is the only
-       register written since).  This is the one place sh closes a
-       descriptor it opened itself. *)
+       register written since). *)
     assert (Ha0D : mD !!! Regidx a0_idx = ret)
       by exact (upd_eq _ (Regidx a0_idx) ret).
-    iDestruct "Hfdh" as
-      "[(%fd & %rd & %wr & %t & [%Hretfd %Hfdlt] & Hh) | %Hbad]";
+    iDestruct "Hfdh" as "[(%fd & [%Hretfd %Hfdlt] & Hh) | %Hbad]";
       [ | exfalso; destruct Hbad as [Hretm1 | (k & Hretk & Hklt)];
           [ rewrite Ha0D Hretm1 in Ht1; vm_compute in Ht1; discriminate Ht1
           | rewrite Hs1D Ha0D Hretk (ush_bge_std k Hklt) in Ht2;
@@ -5483,7 +5708,7 @@ Section UkSh.
       assert (Hh32 : bv_half_modulus 32 = 2147483648%Z)
         by (vm_compute; reflexivity).
       rewrite Hh32. unfold NOFILE in Hfdlt. lia. }
-    iApply (wp_ksh_close h7 mE fd (FdOpen rd wr t) n Ha0E
+    iApply (wp_ksh_close h7 mE fd (FdOpen true true (FdDevice CONSOLE)) n Ha0E
               with "Hcode Hrun Hh").
     iIntros (h8 ret2) "Hrun".
     rewrite HraE.
@@ -5491,7 +5716,11 @@ Section UkSh.
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite Eret2.
     iApply (wp_ksh_cmd_head R h8 _ f n0 l'
-              with "Hdp Hrest Hcode Hstd HR Hbs Hrun").
+              with "Hdp Hrest Hcode [%] [Hstd Hcwd Hch Hpos] HR Hbs Hrun");
+      [ exact Hfd0' | ].
+    rewrite /ush_pstate /ush_std. iFrame "Hstd".
+    iSplitL "Hcwd"; [ iApply (ucwd_any_of with "Hcwd") | ].
+    iFrame "Hch Hpos".
   Qed.
 
 
@@ -5502,19 +5731,30 @@ Section UkSh.
   (* main never returns.  0x8f6..0x8fc load O_RDWR and the address of the   *)
   (* "console" literal, and 0x900 is the loop above.                        *)
   (* ===================================================================== *)
-  Lemma wp_ksh_main (R : iProp Σ) (h : CpuId) (m : regfile)
+  Lemma wp_ksh_main (R K : iProp Σ) (h : CpuId) (m : regfile)
       (f : nat -> bv 8) (n0 : nat) (l : list fdstate) :
     sh_deps -∗
     ush_rest R -∗
     shk_code γt -∗
-    ush_pstate l -∗
+    shk_rodata γt -∗
+    ush_gen_slot -∗
+    ⌜ ush_fd0p l ⌝ -∗
+    ush_cons_in K -∗
+    (* THE PROCESS STATE, SPLIT: the console preamble is the one walk in sh
+       that needs the WORKING DIRECTORY AT A NAMED INUM (a pin is about a
+       path), so the cwd comes in at [FsImg.ROOTINO] here and is weakened to
+       [UserCwd.ucwd_any] at the command loop, which is all [cd] needs. *)
+    ush_std l -∗
+    UserCwd.ucwd γcwd FsImg.ROOTINO -∗
+    UserChildren.uch_any γch -∗
+    ush_pos -∗
     R -∗
     ubytes γd sh_buf sh_nbuf f -∗
     urun N h m (mword_of_int ShSyms.main)
       (8 + (16 + (ush_Dbody + n0))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hdp #Hrest #Hcode Hstd HR Hbs Hrun".
+    iIntros "#Hdp #Hrest #Hcode #Hro #Hgen %Hfd0 Hin Hstd Hcwd Hch Hpos HR Hbs Hrun".
     set (n := (16 + (ush_Dbody + n0))%nat).
     rewrite shp_main.
     iDestruct (urun_stack with "Hrun") as %[Hal8' Hroom].
@@ -5728,15 +5968,26 @@ Section UkSh.
     (* s1 is O_RDWR from the [c.li] at 0x8f6, and the loop needs it: the
        [bge s1,a0] at 0x90c is what tells a descriptor above the standard
        streams from one that landed on a closed standard stream. *)
-    iApply (wp_ksh_console R he _ f n0 l
-              with "Hdp Hrest Hcode [] Hstd HR Hbs Hrun").
-    iPureIntro.
-    rewrite (upd_ne mD (Regidx s2_idx) (Regidx s1_idx) _
-               ltac:(vm_compute; discriminate)).
-    rewrite /mD (upd_ne mC (Regidx s2_idx) (Regidx s1_idx) _
-                   ltac:(vm_compute; discriminate)).
-    rewrite /mC (upd_eq mB (Regidx s1_idx) _).
-    apply bv_eq; vm_compute; reflexivity.
+    iApply (wp_ksh_console R K he _ f n0 l
+              with "Hdp Hrest Hcode Hro Hgen [] [] [%] Hin Hstd Hcwd Hch Hpos
+                    HR Hbs Hrun");
+      [ | | exact Hfd0 ].
+    - (* s1 is O_RDWR, off the [c.li] at 0x8f6 *)
+      iPureIntro.
+      rewrite (upd_ne mD (Regidx s2_idx) (Regidx s1_idx) _
+                 ltac:(vm_compute; discriminate)).
+      rewrite /mD (upd_ne mC (Regidx s2_idx) (Regidx s1_idx) _
+                     ltac:(vm_compute; discriminate)).
+      rewrite /mC (upd_eq mB (Regidx s1_idx) _).
+      apply bv_eq; vm_compute; reflexivity.
+    - (* ...and s2 is the address of sh's own "console" literal, off the
+         auipc/addi pair at 0x8f8/0x8fc: 0x8f8 + 0x1000 - 1408 = 0x1378
+         ([ShData.sh_data] has "console\0" there, inside [UCodeShK.shk_ro]
+         since 0x1378 < 0x2000). *)
+      iPureIntro.
+      rewrite (upd_eq mD (Regidx s2_idx) _).
+      rewrite /mD (upd_eq mC (Regidx s2_idx) _).
+      apply bv_eq; vm_compute; reflexivity.
   Qed.
 
 
@@ -5747,25 +5998,51 @@ Section UkSh.
   (* appears here.  The [avail] arithmetic is the call chain spelled out:   *)
   (* start's two words and main's eight.                                    *)
   (* ===================================================================== *)
-  Lemma wp_ksh_start (R : iProp Σ) (h : CpuId) (m : regfile)
+  Lemma wp_ksh_start (R K : iProp Σ) (h : CpuId) (m : regfile)
       (f : nat -> bv 8) (n0 : nat) (l : list fdstate) :
     sh_deps -∗
     ush_rest R -∗
     shk_code γt -∗
+    (* sh's own READ-ONLY IMAGE, which the pinned open needs: the path is a
+       string in it ([UCodeShK.shk_ro] at 0x1378). *)
+    shk_rodata γt -∗
+    (* ...AND THE TAINT'S CONTINUATION.  sh's console open is PINNED, so at
+       the taint there is no bundle to pay it with -- the preamble does not
+       make the call, it hands the run to the generic slot. *)
+    ush_gen_slot -∗
     (* THE ONE ROW THE ENTRY IS TOLD ABOUT, at its three arms ([ush_fd0]'s
-       header).  It enters HERE and nowhere else: the walk below is the
-       same on all three, so the CLOSED arm is this application of the same
-       lemma and not a second proof.  SH-LINE's next phase is what reads
-       it, at the read of fd 0. *)
+       header).  It enters HERE, and the preamble PRESERVES it
+       ([ush_fd0_cons]) so that the command loop is entered with the row at
+       the ledger the preamble's own opens left.  Under the CONSOLE arm fd 0
+       is the console device whether init's open succeeded or sh's did. *)
     ush_fd0 l -∗
-    ush_pstate l -∗
+    (* ...AND THE STATE OF THE CONSOLE NODE, which is what decides which of
+       the two pinned opens the preamble makes (lane SH-OPEN, H1/H3). *)
+    ush_cons_in K -∗
+    ush_std l -∗
+    UserCwd.ucwd γcwd FsImg.ROOTINO -∗
+    UserChildren.uch_any γch -∗
+    ush_pos -∗
     R -∗
     ubytes γd sh_buf sh_nbuf f -∗
     urun N h m (mword_of_int ShSyms.start)
       (2 + (8 + (16 + (ush_Dbody + n0)))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hdp #Hrest #Hcode #Hfd0 Hstd HR Hbs Hrun".
+    iIntros "#Hdp #Hrest #Hcode #Hro #Hgen #Hfd0 Hin Hstd Hcwd Hch Hpos HR Hbs Hrun".
+    (* THE TAINT ARM GOES GENERIC AT ONCE, and this is the ONE place it can:
+       every walk below is sh's own code, and sh's console open is PINNED --
+       under the taint there is no pin and no bundle to pay row 15 with.  So
+       the row the command loop carries is the PURE one ([ush_fd0p]) and no
+       statement below this line names the application at all. *)
+    iDestruct "Hfd0" as "[%Hfd0 | #HT]"; last first.
+    { assert (Halo : is_aligned_vaddr
+                       (Virtaddr (mword_of_int ShSyms.start : mword 64)) 2
+                     = true)
+        by (rewrite shp_start; vm_compute; reflexivity).
+      iApply (ush_gen_run h m (mword_of_int ShSyms.start)
+                (2 + (8 + (16 + (ush_Dbody + n0)))) Halo
+                with "Hgen HT Hrun"). }
     set (n := (16 + (ush_Dbody + n0))%nat).
     rewrite shp_start.
     iDestruct (urun_stack with "Hrun") as %[Hal8' Hroom].
@@ -5864,7 +6141,10 @@ Section UkSh.
        had work to do while the wide catalog destruct was dumping unused
        [uinstr_is] hypotheses holding the literal into the context. *)
     rewrite <- ?shp_main.
-    iApply (wp_ksh_main R h5 _ f n0 l with "Hdp Hrest Hcode Hstd HR Hbs Hrun").
+    iApply (wp_ksh_main R K h5 _ f n0 l
+              with "Hdp Hrest Hcode Hro Hgen [%] Hin Hstd Hcwd Hch Hpos
+                    HR Hbs Hrun").
+    exact Hfd0.
   Qed.
 
 End UkSh.
@@ -5970,7 +6250,7 @@ Section UkShLeaf.
               k f avail Hn eq_refl Hbound Hal with "Hi Hrun [] Hbuf").
     (* THE FLAGGED DEPOSIT: read(5), SH-LINE 2b's (P4) *)
     { iApply (udepw_of_law N m pc USYS_read with "[Hdp]").
-      iDestruct "Hdp" as "($ & _ & _)". }
+      iDestruct "Hdp" as "($ & _)". }
     iIntros (h' r d g) "%Hd %Hgf Hrun Hbuf".
     iApply ("Hcont" $! h' r d g with "[%] [%] Hbuf Hrun");
       [ lia | exact Hgf ].

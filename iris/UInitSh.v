@@ -443,7 +443,7 @@ Section UInitSh.
   (* THE ASSEMBLY: init's pinned bundle pays its exec supply.              *)
   (* ------------------------------------------------------------------- *)
   Lemma init_exec_sup_of_sh_slot (T : iProp Σ) `{!Persistent T} `{!Timeless T}
-      (cn : cons_names) (st : fdstate)
+      (cn : cons_names) (st : fdstate) (K : iProp Σ) `{!Persistent K}
       (Rsh : gname -> gname -> gname -> iProp Σ) (n0 : nat) :
     (* the numbers sh admits -- THE FREE ONES (lane SUPPLY-SPLIT) *)
     (forall k : Z, free_num k -> psok k) ->
@@ -462,11 +462,24 @@ Section UInitSh.
        CLAIM numbers sh calls ([UkSh.sh_deps]).  They cross the exec with
        the slot, because the slot they build IS sh's. *)
     UkSh.sh_deps -∗
+    (* ...AND WHAT SH'S CONSOLE PREAMBLE IS TOLD (lane SH-OPEN, H3).  sh's
+       open of "console" is PINNED, so which of the two pinned leaves it
+       makes is decided here.  PERSISTENT, AND THAT IS FORCED: this
+       constructor's body is under a [□] -- /init execs sh inside the
+       restart loop's [iLob] -- so the only LINEAR resource that can cross
+       into sh is the one /init hands per round ([UserConsole.upos], through
+       [PinnedExec]'s single [Pay]).  An EXCLUSIVE absence credential
+       ([AppEcho.cons_key]) therefore cannot reach sh at all; the
+       credential is [AppEcho.cons_never] (the owner's ruling (A), E2's to
+       mint) and [UShConsK] states the two leaves against it. *)
+    (□ (∀ N : uk_names Σ, UkSh.ush_open_console_leaf N T)
+     ∨ (□ (∀ N : uk_names Σ, UkSh.ush_open_absent_leaf N T K) ∗ K)
+     ∨ T) -∗
     init_sh_slot T (sh_pay Rsh n0) -∗
     UkInit.init_exec_sup_lend cn T st.
   Proof.
     intros Hpsok_free Hn0 Hst.
-    iIntros "#Hdep #Hdp (#Hinv & #Hcl & #Hgen & #Hpay)".
+    iIntros "#Hdep #Hdp #Hcons (#Hinv & #Hcl & #Hgen & #Hpay)".
     (* THE LEDGER IS TAKEN AND NOT READ: sh's entry says nothing about its
        standard streams, and the only descriptor fact this constructor
        needs is [length fdv = NOFILE], which comes off the LENT authority
@@ -496,9 +509,9 @@ Section UInitSh.
       as "[Hufd #Hrow]".
     iAssert (UkSh.ush_fd0 T (take NSTD fdv)) as "#Hfd0".
     { iDestruct "Hrow" as "[%Hr1 | [%Hr2 | HT]]".
-      - destruct Hst as [wr ->]. iLeft. iPureIntro. exists wr. exact Hr1.
-      - iRight. iLeft. iPureIntro. exact Hr2.
-      - iRight. iRight. iExact "HT". }
+      - destruct Hst as [wr ->]. iLeft. iPureIntro. left. exists wr. exact Hr1.
+      - iLeft. iPureIntro. right. exact Hr2.
+      - iRight. iExact "HT". }
     iFrame "Hheap Hufd". iRight.
     (* ---- sh's constructor, at every key the image fact admits ---- *)
     (* THE PAYLOAD RIDES WITH THE PAY FACT ([SpecKexec.exec_slot_pre]): the
@@ -506,40 +519,6 @@ Section UInitSh.
        hands it to whatever slot answers, so sh's entry gets its exit
        payload -- the console reader token -- from here and from nowhere
        else (EXEC-PAY, GENERIC-PAY). *)
-    (* THE LINEAR HALF OF [Pay] IS THE POSITION: [UInitSh.sh_pay] is
-       persistent, so what actually crosses [PinnedExec]'s one linear slot
-       is [UserConsole.upos] at the pair init minted for this round.  The
-       exit payload is NOT there -- it arrives at the constructor wand from
-       the kernel's own payment. *)
-    iAssert (□ (∀ (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
-                  (W' : uvis),
-                  ⌜kexec_image_ok ElfUser.sh_elf na alen afun fdv W'⌝ -∗
-                  (* ...AND THE TWO ROWS [SpecKexec.exec_slot_pre] carries,
-                     in [PinnedExec.pinned_exec_bundle]'s own order: the
-                     resumed key's working directory is the exec'ing
-                     process's, and its lazy bit is [false] because exec's
-                     image is EAGER (lane LAZY-FLAG's K4).  sh's own
-                     constructor spends the second and drops the first. *)
-                  ⌜uvis_cwd W' = FsImg.ROOTINO⌝ -∗
-                  ⌜uvis_lazy W' = false⌝ -∗
-                  ⌜exec_args_of M (mword_of_int 0x1000 : mword 64)
-                     na alen afun⌝ -∗
-                  my_pay (uvis_gen W') (ucons_pay cn γp T) -∗
-                  ucons_pay cn γp T (-1) -∗
-                  (sh_pay Rsh n0 ∗ upos γp np) -∗ uslot W'))%I as "#Hcon".
-    { iModIntro.
-      iIntros (na alen afun W') "%Hok %Hcw %Hlzf %Hargs #Hmp HQ [[#Hp1 #Hp2] Hps]".
-      destruct (init_args_det M na alen afun Hsav Hsro Hargs) as [-> Halen].
-      iApply (sh_slot_of_kexec Hpsok_free Rsh γp T (ucons_pay cn γp T)
-                1%nat alen afun fdv W' n0 np
-                (ucons_pay_const cn γp T) Hok
-                (init_sh_room alen n0 Halen Hn0) Hlen Hlzf
-                with "[] Hdep Hdp [] [] Hmp HQ Hps").
-      - iModIntro. iIntros (γt γd γs) "Hsz Hlo".
-        iApply ("Hp1" $! W' γt γd γs with "Hsz Hlo").
-      - iIntros (N0). iApply ("Hp2" $! γp N0).
-      - iExact "Hfd0". }
-    (* ---- the bundle ---- *)
     (* ...and the taint arm at the SAME payload: a tainted process runs on
        the generic family, which exists at any constant payload and HOLDS
        the resource it names ([UexecExecMint.uslot_mint_pay]).  The payload
@@ -550,6 +529,44 @@ Section UInitSh.
     { iModIntro. iIntros (W') "#HT #Hmp HQ".
       iApply ("Hgen" $! (ucons_pay cn γp T (-1)) W' with "HT [Hmp] HQ").
       rewrite ucons_pay_eta. iExact "Hmp". }
+    (* THE LINEAR HALF OF [Pay] IS THE POSITION: [UInitSh.sh_pay] is
+       persistent, so what actually crosses [PinnedExec]'s one linear slot
+       is [UserConsole.upos] at the pair init minted for this round.  The
+       exit payload is NOT there -- it arrives at the constructor wand from
+       the kernel's own payment. *)
+    iAssert (□ (∀ (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
+                  (W' : uvis),
+                  ⌜kexec_image_ok ElfUser.sh_elf na alen afun fdv W'⌝ -∗
+                  (* THE TWO ROWS [SpecKexec.exec_slot_pre] carries, in
+                     [PinnedExec.pex_slot]'s own order (beside
+                     [kexec_image_ok], before the pay fact).  THE CWD ROW
+                     is proved there from [SpecKexec.kexec_ok_exec_cwi]:
+                     exec INHERITS the working directory, and /init's is
+                     the root -- sh's console preamble needs it because a
+                     pinned open is about a PATH ([UkRun.udepwf_at] fixes
+                     the cwd).  THE LAZY ROW is [false] because exec's
+                     image is EAGER (lane LAZY-FLAG's K4).  Both are read
+                     off the wand here and restated nowhere. *)
+                  ⌜uvis_cwd W' = FsImg.ROOTINO⌝ -∗
+                  ⌜uvis_lazy W' = false⌝ -∗
+                  ⌜exec_args_of M (mword_of_int 0x1000 : mword 64)
+                     na alen afun⌝ -∗
+                  my_pay (uvis_gen W') (ucons_pay cn γp T) -∗
+                  ucons_pay cn γp T (-1) -∗
+                  (sh_pay Rsh n0 ∗ upos γp np) -∗ uslot W'))%I as "#Hcon".
+    { iModIntro.
+      iIntros (na alen afun W')
+        "%Hok %Hcwd0 %Hlzf %Hargs #Hmp HQ [[#Hp1 #Hp2] Hps]".
+      destruct (init_args_det M na alen afun Hsav Hsro Hargs) as [-> Halen].
+      iApply (sh_slot_of_kexec Hpsok_free Rsh γp T K (ucons_pay cn γp T)
+                1%nat alen afun fdv W' n0 np
+                (ucons_pay_const cn γp T) Hok Hcwd0
+                (init_sh_room alen n0 Halen Hn0) Hlen Hlzf
+                with "[] Hdep Hdp [] [] Hcons Hgen' Hmp HQ Hps").
+      - iModIntro. iIntros (γt γd γs) "Hsz Hlo".
+        iApply ("Hp1" $! W' γt γd γs with "Hsz Hlo").
+      - iIntros (N0). iApply ("Hp2" $! γp N0).
+      - iExact "Hfd0". }
     iDestruct (pinned_exec_bundle fsc_fs uslot FsShPin.era0_sh_pins T
                  FsImg.ROOTINO init_sh_pl [FsImg.ROOTINO; FsShPin.SH_INO]
                  FsShPin.SH_INO ElfUser.sh_elf 1%nat

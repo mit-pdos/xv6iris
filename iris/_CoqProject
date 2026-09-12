@@ -2057,6 +2057,13 @@ UConsLine.v
 # step's families are stated.  On UConsLine's mold; above AppEcho and
 # PinnedOpen, whose claim law and bundle it instantiates.
 UInitCons.v
+# UConsOpen = THE CONSOLE OPEN, FACTORED (lane SH-OPEN): everything about
+# the two pinned open bundles at "console" that is not the CALLER's -- the
+# dead walk that gives the absence credential back, the two udepwf_at
+# suppliers over an arbitrary read-only image and literal base, the two
+# key-level open rows, and the receipt's ledger arm.  /init (UInitConsK)
+# and /sh (UShConsK) are two instantiations.
+UConsOpen.v
 # UInitConsK = OPEN-PIN'S LAST STEP: /init's three console leaf BODIES
 # (UkInit.uki_open_absent_leaf / uki_open_console_leaf / uki_mknod_leaf)
 # DISCHARGED at echo's era -- the three udepwf_at suppliers at the pinned
@@ -2065,3 +2072,10 @@ UInitCons.v
 # sibling one syscall over; needs both UkInit and UInitCons, which cannot
 # see each other.
 UInitConsK.v
+# UShConsK = SH-OPEN'S LAST STEP: sh's TWO console leaf BODIES
+# (UkSh.ush_open_console_leaf / ush_open_absent_leaf) DISCHARGED at echo's
+# era, on UConsOpen's two suppliers at sh's own literal (UkSh.sh_cons_pv =
+# 0x1378 in UCodeShK.shk_ro) and its own three-instruction stub at
+# ShSyms.open.  UInitConsK's twin one program over; the ABSENT arm runs on
+# a PERSISTENT absence law, which E2 owes (AppEcho.cons_never).
+UShConsK.v

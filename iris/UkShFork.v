@@ -235,6 +235,10 @@ Section UkShFork.
        [UkShRun.wp_kshr_runcmd]: this walk reaches runcmd's EXEC arm *)
     uxsup -∗
     shk_rodata γt -∗ ush_jtab γt -∗
+    (* the row the console preamble established (lane SH-OPEN): the PARENT
+       keeps its ledger across fork1 -- a REDIR runs in the child -- so the
+       row goes straight back into the head *)
+    ⌜ UkSh.ush_fd0p l ⌝ -∗
     ush_pstate l -∗
     ushl_dat -∗ usz γs sz -∗
     ubytes γd sh_buf sh_nbuf f -∗
@@ -242,7 +246,7 @@ Section UkShFork.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hregs Hs1 Hns Htoks Htlen Hnn Hnul Hkl Hszlo Hszal Hszok.
-    iIntros "#Hdp Hhead #Hcode #Hxs #Hro #Hjt Hstd Hdat Hsz Hbuf Hrun".
+    iIntros "#Hdp Hhead #Hcode #Hxs #Hro #Hjt %Hfd0 Hstd Hdat Hsz Hbuf Hrun".
     destruct Hregs as (Hs2 & Hs3 & Hs4 & Hs5 & Hs6).
     iDestruct "Hstd" as "(Hustd & Hcwd & Hch & Hpos)".
     assert (Hlen31 : Z.of_nat len < 2 ^ 31)
@@ -389,8 +393,9 @@ Section UkShFork.
       replace (2 + (UkShDiag.ush_Dg + (66 + n)))%nat
         with (16 + (80 + n))%nat by (unfold UkShDiag.ush_Dg; lia).
       iApply ("Hhead" $! hE mD f n
-                with "[%] [Hustd Hcwd Hch Hpos] Hdat Hsz Hbuf Hrun").
+                with "[%] [%] [Hustd Hcwd Hch Hpos] Hdat Hsz Hbuf Hrun").
       + exact HregsD.
+      + exact Hfd0.
       + rewrite /UkSh.ush_pstate /UkSh.ush_std. iFrame "Hustd Hcwd Hch Hpos".
     - (* ================= THE CHILD: parse, run, exec =================== *)
       iIntros (N' hA mA) "%Hti' %HcsA %Ha0A #Hcode' Hpay Hsz Hustd Hcwd Hch _ Hrun".
@@ -495,6 +500,7 @@ Section UkShFork.
        [UkShRun.wp_kshr_runcmd]: this walk reaches runcmd's EXEC arm *)
     uxsup -∗
     shk_rodata γt -∗ shp_code γt -∗ ush_jtab γt -∗
+    ⌜ UkSh.ush_fd0p l ⌝ -∗
     ush_pstate l -∗
     ushl_dat -∗ usz γs sz -∗
     ubytes γd sh_buf sh_nbuf f -∗
@@ -502,7 +508,7 @@ Section UkShFork.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hregs Hs1 Ha5 Hnn Hnul Hkl Hns Htoks Htlen Hszlo Hszal Hszok.
-    iIntros "#Hdp Hhead #Hcode #Hxs #Hro #Hpcode #Hjt Hstd Hdat Hsz Hbuf Hrun".
+    iIntros "#Hdp Hhead #Hcode #Hxs #Hro #Hpcode #Hjt %Hfd0 Hstd Hdat Hsz Hbuf Hrun".
     assert (Hz0 : bv_unsigned ubyte0 = 0) by (vm_compute; reflexivity).
     assert (Hbr : forall j : nat, 0 <= bv_unsigned (f j) < Z64).
     { intros j. pose proof (bv_unsigned_in_range 8 (f j)) as H0.
@@ -518,7 +524,8 @@ Section UkShFork.
     - (* ================= the line is a [cd] command =================== *)
       iApply (UkShCd.wp_kshc_cd N γp Hpsok_free h m f k (k + len)%nat l sz n
                 Hregs Hs1 Ha5 ltac:(lia) Hnul Hck Hck1 Hck2
-                with "Hdp Hhead Hcode Hro Hpcode Hstd Hdat Hsz Hbuf Hrun").
+                with "Hdp Hhead Hcode Hro Hpcode [%] Hstd Hdat Hsz Hbuf Hrun").
+      exact Hfd0.
     - (* ================= it is not: fall through to the fork ========== *)
       pose proof Hregs as Hregs'.
       destruct Hregs' as (Hs2 & Hs3 & Hs4 & Hs5 & Hs6).
@@ -705,7 +712,8 @@ Section UkShFork.
           iApply (wp_kshf_fork Hsbrk h5 m2 f k len toks sz l n
                     Hregs2 Hs1_2 Hns Htoks Htlen Hnn Hnul Hkl
                     Hszlo Hszal Hszok
-                    with "Hdp Hhead Hcode Hxs Hro Hjt Hstd Hdat Hsz Hbuf Hrun").
+                    with "Hdp Hhead Hcode Hxs Hro Hjt [%] Hstd Hdat Hsz Hbuf Hrun").
+          exact Hfd0.
         * (* ---- 0x982  bne a5,s3 -- TAKEN ---- *)
           assert (Htk82 : true = uv_btaken BNE (m1 !!! Regidx a5_idx)
                                    (m1 !!! Regidx s3_idx)).
@@ -725,7 +733,8 @@ Section UkShFork.
           iApply (wp_kshf_fork Hsbrk h3 m1 f k len toks sz l n
                     Hregs1 Hs1_1 Hns Htoks Htlen Hnn Hnul Hkl
                     Hszlo Hszal Hszok
-                    with "Hdp Hhead Hcode Hxs Hro Hjt Hstd Hdat Hsz Hbuf Hrun").
+                    with "Hdp Hhead Hcode Hxs Hro Hjt [%] Hstd Hdat Hsz Hbuf Hrun").
+          exact Hfd0.
       + (* ---- 0x97a  bne a5,s5 -- TAKEN ---- *)
         assert (Htk7a : true = uv_btaken BNE (m !!! Regidx a5_idx)
                                  (m !!! Regidx s5_idx)).
@@ -745,7 +754,8 @@ Section UkShFork.
         iApply (wp_kshf_fork Hsbrk h1 m f k len toks sz l n
                   Hregs Hs1 Hns Htoks Htlen Hnn Hnul Hkl
                   Hszlo Hszal Hszok
-                  with "Hdp Hhead Hcode Hxs Hro Hjt Hstd Hdat Hsz Hbuf Hrun").
+                  with "Hdp Hhead Hcode Hxs Hro Hjt [%] Hstd Hdat Hsz Hbuf Hrun").
+        exact Hfd0.
   Qed.
 
   (* ===================================================================== *)
@@ -844,16 +854,17 @@ Section UkShFork.
     intros Hlex Hszlo Hszal Hszok.
     iIntros "#Hdp #Hcode #Hxs #Hro #Hjt".
     iModIntro. iIntros (l) "Hhead".
-    iIntros (h m f k i2 n) "%Hregs %Hs1 %Ha5 %Hi2 Hstd [Hdat Hsz] Hbuf Hrun".
+    iIntros (h m f k i2 n) "%Hregs %Hs1 %Ha5 %Hi2 %Hfd0 Hstd [Hdat Hsz] Hbuf Hrun".
     destruct Hi2 as [[Hki2 Hi2n] Hnul2].
     destruct (ushf_first_nul f k i2 Hki2 Hnul2) as (len & Hle & Hnn & Hnul).
     destruct (Hlex f k len Hnn Hnul) as (Hns & toks & Htoks & Htlen).
     iApply (wp_kshm_body Hsbrk h m f k len toks sz l n
               Hregs Hs1 Ha5 Hnn Hnul ltac:(lia) Hns Htoks Htlen
               Hszlo Hszal Hszok
-              with "Hdp [Hhead] Hcode Hxs Hro [] Hjt Hstd Hdat Hsz Hbuf Hrun").
+              with "Hdp [Hhead] Hcode Hxs Hro [] Hjt [%] Hstd Hdat Hsz Hbuf Hrun").
     - iApply (UkShLoop.ushl_head_of_R N γp with "Hhead").
     - iApply (ushf_code_shp with "Hcode").
+    - exact Hfd0.
   Qed.
 
 End UkShFork.

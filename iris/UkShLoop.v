@@ -109,6 +109,10 @@ Section UkShLoop.
   Definition ushl_head (l : list fdstate) (sz : Z) : iProp Σ :=
     (∀ (h : CpuId) (m : regfile) (f : nat -> bv 8) (n : nat),
        ⌜ UkSh.ush_regs m ⌝ -∗
+       (* ...and the row the console preamble established (lane SH-OPEN):
+          fd 0 is the console device, or it is closed.  PURE, and carried
+          unchanged by the whole of the command loop. *)
+       ⌜ UkSh.ush_fd0p l ⌝ -∗
        UkSh.ush_pstate N γp l -∗
        ushl_dat γd -∗ usz γs sz -∗
        ubytes γd sh_buf sh_nbuf f -∗
@@ -128,8 +132,8 @@ Section UkShLoop.
   Lemma ushl_head_of_R (l : list fdstate) (sz : Z) :
     UkSh.ush_loop_head N γp (ushl_R sz) l -∗ ushl_head l sz.
   Proof.
-    iIntros "H" (h m f n) "%Hregs Hstd Hdat Hsz Hbuf Hrun".
-    iApply ("H" $! h m f n with "[%//] Hstd [$Hdat $Hsz] Hbuf Hrun").
+    iIntros "H" (h m f n) "%Hregs %Hfd0 Hstd Hdat Hsz Hbuf Hrun".
+    iApply ("H" $! h m f n with "[%//] [%//] Hstd [$Hdat $Hsz] Hbuf Hrun").
   Qed.
 
 End UkShLoop.

@@ -78,6 +78,8 @@ Require Import ElfFile.
 Require Import KexecDefs.      (* [kxc_sp_final] / [kxc_round16] *)
 Require Import KexecBuilt.     (* [kxb_perm_ok] / [kexec_pg] / [kexec_seg_perm] *)
 Require Import SpecKexec.    (* [kexec_image_ok] *)
+Require FsImg.               (* [ROOTINO] -- the directory the console pin
+                                resolves "console" from (lane SH-OPEN) *)
 Require Import UmodeAbi.       (* [uimg_sub] -- the image inclusion *)
 Require Import ElfUser.        (* [sh_elf] and its reduced facts (leaf, see header) *)
 Require User.ShSyms User.ShData User.ShInstrs.
@@ -306,7 +308,7 @@ Section UShKernel.
     iApply (wp_uk_ecall_read_win N h m pc _ k f avail Hn eq_refl
               Hcnt Hal4 with "Hi Hrun [] Hbuf").
     { iApply (udepw_of_law N m pc USYS_read with "[Hdp]").
-      iDestruct "Hdp" as "($ & _ & _)". }
+      iDestruct "Hdp" as "($ & _)". }
     iIntros (h' r d g) "%Hd %Hgf Hrun Hbuf".
     iApply ("Hcont" $! h' r d g with "[%] [%] Hbuf Hrun");
       [ lia | exact Hgf ].
@@ -316,7 +318,7 @@ Section UShKernel.
   (* SS2 THE DEPOSIT (header (1), (2)).                                   *)
   (* ------------------------------------------------------------------- *)
   Lemma sh_uexec_slot (R : gname -> gname -> gname -> iProp Σ)
-      (γp : gname) (T : iProp Σ) `{!Persistent T}
+      (γp : gname) (T K : iProp Σ) `{!Persistent T}
       (* SH'S EXIT PAYLOAD, a parameter (GENERIC-PAY).  It is where the
          console reader token lives, because only [UkRun.ukn_pay N (-1)]
          survives a kill: if the shell is killed, init has to get the
@@ -349,13 +351,21 @@ Section UShKernel.
        below reads it off [kexec_image_ok]'s own row. *)
     (forall (p : mword 27) (q : uperm), uvis_perm W !! p = Some q ->
        bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W)) ->
+    (* ...AND THE WORKING DIRECTORY, AT A NAMED INUM (lane SH-OPEN).  sh's
+       console preamble makes a PINNED open of "console", and a pin is
+       about a PATH: "console" names a file only relative to the directory
+       it is resolved from ([UkRun.udepwf_at] fixes the cwd for exactly
+       this reason).  The exec'ing process's cwd is the root and exec
+       inherits it ([SpecKexec.exec_key_cwd] / [kexec_ok_exec_cwi]), and
+       [SpecKexec.exec_slot_pre]'s wands now CARRY the row (lane
+       LAZY-FLAG), so the caller reads it off the wand and hands it here. *)
+    uvis_cwd W = FsImg.ROOTINO ->
     (* ...AND THE KEY'S LAZY BIT IS [false] (lane LAZY-FLAG, L6).  The U
        tier's run is at an EMPTY FILL ([UexecRet.ukcq] is hardwired at
        [false]), so a constructor can only build a slot for a key that says
        so.  WHO SUPPLIES IT: exec, whose fresh image is eager -- lane
        LAZY-FLAG's K4 puts [uvis_lazy W' = false] on
-       [SpecKexec.kexec_image_ok] and on [exec_slot_pre]'s two wands, and
-       until it lands this is a premise the caller carries. *)
+       [SpecKexec.kexec_image_ok] and on [exec_slot_pre]'s two wands. *)
     uvis_lazy W = false ->
     (* THE PAYLOAD.  The data below the frame is handed over whole, and it
        is here that it is spent: on the line buffer, which every stage has
@@ -396,6 +406,22 @@ Section UShKernel.
        ([UkSh.ush_fd0]).  Persistent, and the walk reads none of the three
        -- which is what makes the CLOSED arm this same application. *)
     UkSh.ush_fd0 T (take NSTD (uvis_fd W)) -∗
+    (* ...AND THE STATE OF THE CONSOLE NODE (lane SH-OPEN, H3).  Which of
+       the two PINNED opens sh's preamble makes is decided here: the node
+       is there (and the leaf is a consequence of the persistent flag
+       [AppEcho.cons_made], hence a [□] over every name record), or it is
+       not (and the leaf runs on an EXCLUSIVE absence credential [K], which
+       is why the two halves are separated -- the leaf is quantified over
+       the record the entry allocates and [K] is not), or the taint.  *)
+    (□ (∀ N : uk_names Σ, UkSh.ush_open_console_leaf N T)
+     ∨ (□ (∀ N : uk_names Σ, UkSh.ush_open_absent_leaf N T K) ∗ K)
+     ∨ T) -∗
+    (* ...AND THE TAINT'S CONTINUATION, at sh's own constant payload: a
+       tainted process runs on the generic family ([UexecExecMint.
+       uslot_mint_all]).  sh's console open is PINNED, so the taint has no
+       bundle for row 15 and the preamble must be able to stop walking sh's
+       code.  This is [UInitSh.init_sh_slot]'s third conjunct at [Q]. *)
+    □ (∀ W' : uvis, T -∗ my_pay (uvis_gen W') Q -∗ Q (-1) -∗ uslot W') -∗
     (* THE PAY FACT, at sh's own payload, and THE PAYLOAD ITSELF beside
        it: the run carries [Q (-1)] between traps, hands it to the kernel
        at every entry and is handed it back at every resume
@@ -410,8 +436,8 @@ Section UShKernel.
     upos γp n -∗
     uslot W.
   Proof.
-    intros HQc Hpc Hsub Hx Hal8 Hroom Hstk Hfdlen Hstop Hlzf.
-    iIntros "#Hpay #Hdep #Hdp #Hrest #Hfd0 #Hmp HQ Hpos".
+    intros HQc Hpc Hsub Hx Hal8 Hroom Hstk Hfdlen Hstop Hcwd0 Hlzf.
+    iIntros "#Hpay #Hdep #Hdp #Hrest #Hfd0 Hin #Hgen #Hmp HQ Hpos".
     iApply (uslot_of_urun_all W (2 + (8 + (16 + (ush_Dbody + n0)))) Q
               Hal8 Hroom Hstk Hfdlen Hstop Hlzf with "Hdep Hmp HQ").
     (* sh's own half of its children set travels in [UkSh.ush_pstate]
@@ -426,15 +452,30 @@ Section UShKernel.
     iDestruct ("Hpay" $! (ukn_t N) (ukn_d N) (ukn_s N) with "Hszf Dlo")
       as (f) "[HR Hbs]".
     iPoseProof ("Hrest" $! N) as "#Hr".
+    (* THE CONSOLE STATE AT THIS RECORD: the two leaves are [□]-quantified
+       over the record precisely because the entry ALLOCATES it, and the
+       credential is not. *)
+    iAssert (UkSh.ush_cons_in N T K) with "[Hin]" as "Hin".
+    { iDestruct "Hin" as "[#Hc | [[#Hc HK] | #HT]]".
+      - iLeft. iModIntro. iApply "Hc".
+      - iRight. iLeft. iFrame "HK". iModIntro. iApply "Hc".
+      - iRight. iRight. iExact "HT". }
+    (* ...and the taint's continuation at this record's own payload *)
+    iAssert (UkSh.ush_gen_slot N T) as "#Hgen'".
+    { rewrite /UkSh.ush_gen_slot Hpayeq. iExact "Hgen". }
     iApply (wp_ksh_start N γp T Hpsok_free (ush_read_leaf_of_win N)
-              (R (ukn_t N) (ukn_d N) (ukn_s N)) h _ f n0 (take NSTD (uvis_fd W))
-              with "Hdp Hr [] Hfd0 [Hstd Hcwf Hchf Hpos] HR Hbs [Hrun]").
+              (R (ukn_t N) (ukn_d N) (ukn_s N)) K h _ f n0
+              (take NSTD (uvis_fd W))
+              with "Hdp Hr [] [] Hgen' Hfd0 Hin [Hstd] [Hcwf] [Hchf] [Hpos]
+                    HR Hbs [Hrun]").
     - iApply (shk_code_of_text (ukn_t N) (uvis_M W) (uvis_perm W)
                 (shk_img_text _ Hsub) Hx with "Ht").
-    - rewrite /UkSh.ush_pstate /UkSh.ush_std /UkSh.ush_pos. iFrame "Hstd".
-      iSplitL "Hcwf"; [ iApply (ucwd_any_of with "Hcwf") | ].
-      iSplitL "Hchf"; [ iApply (uch_any_of with "Hchf") | ].
-      iExists n. iExact "Hpos".
+    - iApply (shk_rodata_of_text (ukn_t N) (uvis_M W) (uvis_perm W)
+                (shk_img_data _ Hsub) Hx with "Ht").
+    - rewrite /UkSh.ush_std. iExact "Hstd".
+    - rewrite <- Hcwd0. iExact "Hcwf".
+    - iApply (uch_any_of with "Hchf").
+    - rewrite /UkSh.ush_pos. iExists n. iExact "Hpos".
     - iExact "Hrun".
   Qed.
 
@@ -442,7 +483,7 @@ Section UShKernel.
   (* SS3 THE BRIDGE from the kernel's image fact (header).                *)
   (* ------------------------------------------------------------------- *)
   Lemma sh_slot_of_kexec (R : gname -> gname -> gname -> iProp Σ)
-      (γp : gname) (T : iProp Σ) `{!Persistent T}
+      (γp : gname) (T K : iProp Σ) `{!Persistent T}
       (* sh's exit payload, passed straight through: see [sh_uexec_slot] *)
       (Q : Z -> iProp Σ)
       (na : nat)
@@ -450,6 +491,11 @@ Section UShKernel.
       (W' : uvis) (n0 n : nat) :
     (forall x y : Z, Q x = Q y) ->
     kexec_image_ok sh_elf na alen afun sts W' ->
+    (* THE WORKING DIRECTORY, passed straight through: see
+       [sh_uexec_slot].  [kexec_image_ok] does NOT name it -- exec inherits
+       the cwd ([SpecKexec.exec_key_cwd]) and [exec_slot_pre]'s wands carry
+       the row since lane LAZY-FLAG, so the caller reads it off there. *)
+    uvis_cwd W' = FsImg.ROOTINO ->
     (* room for sh's frames on the stack page, below the argument block *)
     kexec_sz sh_elf - PGSIZE + 8 * Z.of_nat (2 + (8 + (16 + (ush_Dbody + n0))))
       <= kxc_sp_final (kexec_sz sh_elf) alen na ->
@@ -477,12 +523,18 @@ Section UShKernel.
     (* the entry row, the pay fact, the payload and the position, all four
        passed straight through: see [sh_uexec_slot] *)
     UkSh.ush_fd0 T (take NSTD sts) -∗
+    (* the console node's state and the taint's continuation, both passed
+       straight through: see [sh_uexec_slot] *)
+    (□ (∀ N : uk_names Σ, UkSh.ush_open_console_leaf N T)
+     ∨ (□ (∀ N : uk_names Σ, UkSh.ush_open_absent_leaf N T K) ∗ K)
+     ∨ T) -∗
+    □ (∀ W : uvis, T -∗ my_pay (uvis_gen W) Q -∗ Q (-1) -∗ uslot W) -∗
     my_pay (uvis_gen W') Q -∗
     Q (-1) -∗
     upos γp n -∗
     uslot W'.
   Proof.
-    intros HQc Hok Hroom Hlen Hlzf.
+    intros HQc Hok Hcwd0 Hroom Hlen Hlzf.
     (* THE MAP STOPS AT THE BREAK, off the image fact's own row: exec built
        a fresh address space, so [KexecBuilt.kxb_perm_below] says it maps
        nothing above the break, which is what lets sh's later [sbrk] see
@@ -570,7 +622,7 @@ Section UShKernel.
     (* the entry row is stated at the EXEC'ING process's table, which is
        the one the image fact says the new key carries *)
     rewrite <- Hfd.
-    iApply (sh_uexec_slot R γp T Q W' n0 n).
+    iApply (sh_uexec_slot R γp T K Q W' n0 n).
     - exact HQc.
     - rewrite Hpc. exact sh_start_pc.
     - exact (shk_img_sub_of_elf M Himg).
@@ -584,6 +636,7 @@ Section UShKernel.
       + rewrite Hszv. clear -Hj1 Hspv; lia.
     - rewrite Hfd. exact Hlen.
     - exact Hstop.
+    - exact Hcwd0.
     - exact Hlzf.
   Qed.
 
