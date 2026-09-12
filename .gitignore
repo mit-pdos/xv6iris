@@ -1,0 +1,5 @@
+# cache and other artifacts produced by Lean's Lake build tool
+.lake/
+# sail-riscv checkout used by tools/regen_sail_model.sh
+/sail-riscv/
+.claude/worktrees/

@@ -1,0 +1,26 @@
+name = "machcsl"
+defaultTargets = ["MachCSL", "Xv6"]
+
+# iris-lean lives in the `Iris/` subdirectory of the upstream monorepo.
+[[require]]
+name = "iris"
+git = "https://github.com/leanprover-community/iris-lean"
+rev = "728a17140939e49af9236f7cb0d037da9ec52435"
+subDir = "Iris"
+
+# lean-sail with the free-monad concurrency interface (see vendor/lean-sail/README.md).
+[[require]]
+name = "Sail"
+path = "vendor/lean-sail"
+
+# The Sail RISC-V model compiled to Lean (generated; see tools/regen_sail_model.sh).
+[[require]]
+name = "Lean_RV64D"
+path = "model/Lean_RV64D"
+
+[[lean_lib]]
+name = "MachCSL"
+
+# The xv6 kernel proofs, kept separate from the MachCSL framework.
+[[lean_lib]]
+name = "Xv6"

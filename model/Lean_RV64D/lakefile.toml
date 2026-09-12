@@ -1,0 +1,12 @@
+name = "Lean_RV64D"
+defaultTargets = ["LeanRV64D"]
+moreLeanArgs = ["--tstack=400000"]
+
+[[lean_lib]]
+name = "LeanRV64D"
+leanOptions.weak.linter.style.nameCheck = false
+moreLeancArgs= ["-fbracket-depth=500"]
+
+[[require]]
+name = "Sail"
+path = "../../vendor/lean-sail"

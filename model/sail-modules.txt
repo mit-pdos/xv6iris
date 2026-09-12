@@ -1,0 +1,44 @@
+# The Sail modules model-xv6iris/{rv64d.v,rv64d_types.v} are generated from.
+#
+# This is sail-riscv's own SAIL_MODULES list for the rv64d build -- a curated
+# subset of riscv.sail_project's modules, NOT `--all-modules`.  It is recorded
+# here because it is a build input for the generated model: change it and the
+# model gains or loses whole instruction families.  tools/regen_sail_model.sh
+# reads this file (comments and blank lines ignored; whitespace-separated
+# module names), so a regen no longer depends on a cmake cache sitting in
+# somebody's sail-riscv build directory.
+#
+# Note what is here and what these flags are NOT: Zba/Zbb/Zbc/Zbs/B_types and
+# V_core/V_types ARE compiled into the model, and are then disabled by
+# `sail-config-rv64d.json` (see its header).  Whether an extension is compiled
+# and whether `hartSupports` answers true for it are independent axes.
+
+prelude core exceptions pmp sys postlude
+
+I_insts I_types
+M_insts M_types
+Zaamo Zalrsc
+Zba Zbb Zbc Zbs B_types
+Zca Zcb
+Zicsr_insts Zicsr_types
+Zifencei
+Zicntr Zihpm Smcntrpmf Sscofpmf
+Zicbom_insts Zicbom_types
+Zicbop_insts Zicbop_types
+Zicboz
+Zicond_insts Zicond_types
+Zicfilp_insts Zicfilp_regs
+Zicfiss_insts Zicfiss_regs
+CFI_types
+Zihintntl_insts Zihintntl_types
+Zihintpause
+Zimop Zcmop
+Zawrs_insts Zawrs_types
+Svinval Sstc
+Stateen_csrs Stateen_regs
+Ssqosid
+PM_types PM_utils
+H
+FD_core
+V_core V_types
+K_core
