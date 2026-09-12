@@ -238,3 +238,8 @@ TX-RECEIPT phase 1: design blocker at the mint (pid reuse) RULED (pid_reg slice
 in the UART invariant); `uvis_tx` key component ruled; PAUSED at a milestone
 commit until LAZY-FLAG-2 lands (shared sweep).  `-tlw` to host E4 SH-ECHO on
 `lane/supply-split-r1` meanwhile.
+
+TX-RECEIPT milestone committed (`6ac4b8626` on `lane/tx-receipt`, red only at
+ProofFilewrite:4675 pending the block conjunct); the agent stands by for a ping
+after LAZY-FLAG-2 lands.  `-tlw` switched to `lane/supply-split-r1`; E4 SH-ECHO
+launching there (brief `brief-sh-echo.md`).
