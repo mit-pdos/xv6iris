@@ -630,7 +630,7 @@ Section BootBssChain.
     iDestruct (bss_cut g (KernelSyms.pid_lock + 24) KernelSyms.wait_lock
                  (KernelSyms.wait_lock + 24) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hlk6 H]".
-    (* ---- 0x80012368 cpus[8]: the per-hart cell family ---- *)
+    (* ---- 0x80012420 cpus[8]: the per-hart cell family ---- *)
     iDestruct (bss_cut g (KernelSyms.wait_lock + 24) KernelSyms.cpus
                  (KernelSyms.cpus + 128 * Z.of_nat NCPU) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hcpus H]".
@@ -645,7 +645,7 @@ Section BootBssChain.
                                  (z_lo_trans text_end img_end A
                                     ltac:(zlit) Q1) Q1 Q2 Q3))
                  with "Hcl Hcpus") as "Hcpus".
-    (* ---- 0x80012768 proc[64] ---- *)
+    (* ---- 0x80012820 proc[64] ---- *)
     iDestruct (bss_cut g (KernelSyms.cpus + 128 * Z.of_nat NCPU) KernelSyms.proc
                  (KernelSyms.proc + proc_size * Z.of_nat NPROC) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hprocs H]".
@@ -699,7 +699,7 @@ Section BootBssChain.
     (* ---- ROWS (A), part 2: the whole static [struct log], likewise a
            dropped gap before stage (f).  It sits BETWEEN the itable entries
            and &devsw -- [KernelSyms.log + 168] IS [KernelSyms.devsw]
-           (0x80022388 + 0xa8 = 0x80022430) -- so the devsw walk below now
+           (0x80022440 + 0xa8 = 0x800224e8) -- so the devsw walk below now
            starts from the log's end rather than from the inode array's. ---- *)
     iDestruct (bss_cut g (inode_entry_base + inode_stride * Z.of_nat NINODE)
                  KernelSyms.log (KernelSyms.log + 168) ram_hi

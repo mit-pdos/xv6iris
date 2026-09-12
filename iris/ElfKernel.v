@@ -149,13 +149,13 @@ Qed.
 (*  The zero part (.bss), and the full loaded image                       *)
 (* ====================================================================== *)
 
-(* The single PT_LOAD is (vaddr 0x80000000, filesz 0xa270, memsz 0x23598),
-   so the zero window is [vaddr+filesz, vaddr+memsz) = [0x8000a260,
-   0x80023598), i.e. 0x23598 - 0xa270 = 103208 bytes.  Both literals are
+(* The single PT_LOAD is (vaddr 0x80000000, filesz 0xa330, memsz 0x23640),
+   so the zero window is [vaddr+filesz, vaddr+memsz) = [0x8000a330,
+   0x80023640), i.e. 0x23640 - 0xa330 = 103184 bytes.  Both literals are
    [Z]: [replicate] wants a [nat], but a [nat] LITERAL of 103208 is the
    successor-chain trap, so it is written [Z.to_nat kernel_bss_size]. *)
-Definition kernel_bss_lo : Z := 0x8000a260.
-Definition kernel_bss_size : Z := 103208.
+Definition kernel_bss_lo : Z := 0x8000a330.
+Definition kernel_bss_size : Z := 103184.
 
 Lemma kernel_elf_zero_image_bool :
   bool_decide (elf_zero_image kernel_elf
@@ -177,7 +177,7 @@ Qed.
 Lemma kernel_bss_top : kernel_bss_lo + kernel_bss_size = KernelData.kernelMemEnd.
 Proof. vm_compute. reflexivity. Qed.
 
-Lemma kernel_bss_bot : KernelData.kernelMemBase + 0xa260 = kernel_bss_lo.
+Lemma kernel_bss_bot : KernelData.kernelMemBase + 0xa330 = kernel_bss_lo.
 Proof. vm_compute. reflexivity. Qed.
 
 (* The FULL loaded image.  Not a third giant [vm_compute]: [elf_image_split]

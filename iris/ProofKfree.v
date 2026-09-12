@@ -161,7 +161,7 @@ Section ProofKfree.
     set (R3 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (add_vec (mword_of_int (KernelSyms.kfree + 0x0c) : mword 64) (auipc_off (mword_of_int 0x23 : mword 20)))]> R2).
     assert (Hpp10 : add_vec_int (mword_of_int (KernelSyms.kfree + 0x0c) : mword 64) 4 = mword_of_int (KernelSyms.kfree + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp10) in "Hpc".
-    (* +0x10 addi a5,a5,-1086  (a5 := <end> = KernelSyms.end_ = 0x800235e0) *)
+    (* +0x10 addi a5,a5,-1086  (a5 := <end> = KernelSyms.end_ = 0x80023640) *)
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.kfree + 0x10)) (mword_of_int 15 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 0xb9e : mword 12)
               R3 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").

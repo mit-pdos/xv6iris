@@ -352,7 +352,7 @@ Proof. exact (bnode_of_z NBUF). Qed.
 
    ALL ELEVEN WINDOWS ARE 24 BYTES, [tx_lock] included: it is a [struct
    spinlock], which the layout confirms exactly -- [pr] = 0x80012348,
-   [tx_lock] = 0x80012360 and [kmem] = 0x80012378, so the linker left 24
+   [tx_lock] = 0x80012418 and [kmem] = 0x80012430, so the linker left 24
    bytes on each side of it and there is no slack in either direction. *)
 Lemma main_lock_windows :
   img_end <= KernelSyms.cons /\

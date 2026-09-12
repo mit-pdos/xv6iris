@@ -275,7 +275,7 @@ Lemma il_align_arith (kk : Z) :
 Proof.
   intros H1 H2. split_and!; [| lia | lia].
   replace (2147582608 + 1112 * kk + 88)
-    with ((536895628 + 278 * kk) * 4) by lia.
+    with ((536895674 + 278 * kk) * 4) by lia.
   apply Z_mod_mult.
 Qed.
 
@@ -297,10 +297,10 @@ Proof.
   { unfold NBUF in Hk. unfold LOGBLOCKS in Hm.
     split_and!; [| lia | lia].
     replace (2147582608 + 1112 * Z.of_nat k + Z.of_nat (88 + 4 * mm))
-      with ((536895628 + 278 * Z.of_nat k + Z.of_nat mm) * 4) by lia.
+      with ((536895674 + 278 * Z.of_nat k + Z.of_nat mm) * 4) by lia.
     apply Z_mod_mult. }
   destruct Harith as (Hm4 & Hlo & Hhi).
-  replace (0x800181c0 + 24 + 1112 * Z.of_nat k + Z.of_nat (88 + 4 * mm))
+  replace (0x80018278 + 24 + 1112 * Z.of_nat k + Z.of_nat (88 + 4 * mm))
     with (2147582608 + 1112 * Z.of_nat k + Z.of_nat (88 + 4 * mm)) by lia.
   apply bb_align_z; assumption.
 Qed.
@@ -318,7 +318,7 @@ Proof.
   destruct (il_align_arith (Z.of_nat k)
               ltac:(lia) ltac:(unfold NBUF in Hk; lia))
     as (Hm & Hlo & Hhi).
-  replace (0x800181c0 + 24 + 1112 * Z.of_nat k + Z.of_nat 88)
+  replace (0x80018278 + 24 + 1112 * Z.of_nat k + Z.of_nat 88)
     with (2147582608 + 1112 * Z.of_nat k + 88) by lia.
   apply bb_align_z; assumption.
 Qed.

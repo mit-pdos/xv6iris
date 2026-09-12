@@ -117,7 +117,7 @@ Lemma wh_align_arith (kk qq : Z) :
 Proof.
   intros H1 H2 H3 H4. split_and!; [| lia | lia].
   replace (2147582608 + 1112 * kk + (88 + 4 * qq))
-    with ((536895628 + 278 * kk + qq) * 4) by lia.
+    with ((536895674 + 278 * kk + qq) * 4) by lia.
   apply Z_mod_mult.
 Qed.
 
@@ -134,7 +134,7 @@ Proof.
   destruct (wh_align_arith (Z.of_nat k) (Z.of_nat q)
               ltac:(lia) ltac:(unfold NBUF in Hk; lia) ltac:(lia) ltac:(lia))
     as (Hm & Hlo & Hhi).
-  replace (0x800181c0 + 24 + 1112 * Z.of_nat k + Z.of_nat (88 + 4 * q))
+  replace (0x80018278 + 24 + 1112 * Z.of_nat k + Z.of_nat (88 + 4 * q))
     with (2147582608 + 1112 * Z.of_nat k + (88 + 4 * Z.of_nat q)) by lia.
   apply bb_align_z; assumption.
 Qed.

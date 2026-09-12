@@ -294,7 +294,7 @@ Proof. rewrite /log_addr. apply bv_eq; vm_compute; reflexivity. Qed.
 Lemma bo_reloc_out_50 :
   add_vec (add_vec (mword_of_int (KernelSyms.begin_op + 0x6c) : mword 64)
                    (auipc_off (mword_of_int 30 : mword 20)))
-          (sign_extend' 64 (mword_of_int 1578 : mword 12)) = l_out.
+          (sign_extend' 64 (mword_of_int 1614 : mword 12)) = l_out.
 Proof.
   rewrite /l_out /log_pa /log_addr /pa_add /add_vec_int.
   apply bv_eq; vm_compute; reflexivity.

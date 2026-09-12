@@ -87,8 +87,8 @@ Section ProofTrapinit.
                                                                             ltac:(vm_compute; discriminate) Htime
                   with "Hkdata") as "#Hstr".
     iApply (ILW.wp_initlock_wrapper_sconf KT1 m K KernelSyms.trapinit
-              (mword_of_int 5) (mword_of_int 22) (mword_of_int 3604) (mword_of_int 3420)
-              (mword_of_int 2090696) lk name "time"%string vlock vname vcpu b p HK
+              (mword_of_int 5) (mword_of_int 22) (mword_of_int 3424) (mword_of_int 3400)
+              (mword_of_int 2090680) lk name "time"%string vlock vname vcpu b p HK
               ltac:(vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)

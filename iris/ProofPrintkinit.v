@@ -88,8 +88,8 @@ Section ProofPrintkinit.
                                                                         ltac:(vm_compute; discriminate) Hpr
                   with "Hkdata") as "#Hstr".
     iApply (ILW.wp_initlock_wrapper_sconf KT0 m K KernelSyms.printkinit
-              (mword_of_int 6) (mword_of_int 18) (mword_of_int 2016) (mword_of_int 2792)
-              (mword_of_int 724) lk name "pr"%string vlock vname vcpu b p HK
+              (mword_of_int 6) (mword_of_int 18) (mword_of_int 1966) (mword_of_int 2934)
+              (mword_of_int 846) lk name "pr"%string vlock vname vcpu b p HK
               ltac:(vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)

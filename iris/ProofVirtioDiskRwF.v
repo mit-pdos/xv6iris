@@ -95,7 +95,7 @@ Ltac rgall := repeat (rewrite rget_ne; [| vm_compute; discriminate]).
    multiple of 2/4/8 is aligned at that width. ------------------------- *)
 
 (* Stated over [KernelSyms.disk] rather than the literal: [disk] is a DATA
-   symbol and it moves on most image bumps (0x80023470 -> 0x800234b0 this
+   symbol and it moves on most image bumps (0x80023528 -> 0x80023568 this
    time).  Through the symbol this cannot go stale again. *)
 Lemma vdrwf_disk_val :
   bv_unsigned (disk_base : SailStdpp.Values.mword 64) = KernelSyms.disk.
@@ -112,7 +112,7 @@ Proof.
   apply Z.mod_divide in Hd8; [| lia].
   apply Z.mod_divide in Hkd; [| lia].
   apply Z.divide_add_r; [| exact Hkd].
-  apply (Z.divide_trans d 8 2147628288 Hd8). exists 268453513%Z. reflexivity.
+  apply (Z.divide_trans d 8 2147628288 Hd8). exists 268453536%Z. reflexivity.
 Qed.
 
 Lemma vdrwf_disk_aligned (k : nat) (d : Z) :

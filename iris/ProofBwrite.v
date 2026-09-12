@@ -29,7 +29,7 @@
 
    * rw's [addr_is_kdata] premise on [b->data].  [b] is [bnode k] for
      k < NBUF, i.e. an element of bio.c's static [bcache] object at
-     0x80018180, which lies well above [text_end] and well below PHYSTOP --
+     0x80018238, which lies well above [text_end] and well below PHYSTOP --
      [BcacheInv.bnode_data_kdata] is that one arithmetic fact.
 
    The buffer's [valid] cell and its half of [dev] are untouched by both
