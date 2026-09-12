@@ -49,9 +49,13 @@ patch: `projects/wx-briefs/`.
   mono_list flag, FsConsPin, PinnedOpen, UInitCons statements, the open leaf;
   note "OPEN-PIN PHASE 1 LANDED + FINDINGS") → SPEC-TIGHTEN LANDED (19 files; VM build
   `tighten7` EXIT=0, audit = the thirteen, lemma_diff clean; note "SPEC-TIGHTEN
-  LANDED") → OPEN-PIN phase 2 (`wx-briefs/brief-open-pin-2.md`: PinnedObs with a
-  free miss and an existential inum; BOTH of init's opens pinned; the mknod step;
-  init's head CONSOLE ∨ CLOSED ∨ TAINT; the proofs; LAUNCHED 2026-09-11)
+  LANDED") → OPEN-PIN phase 2 MILESTONE LANDED (2026-09-12; 20 files; VM build
+  `openpin54` EXIT=0, audit = the thirteen, lemma_diff = one justified GONE;
+  the create leg spends the arm's permit; the console KEY; init's mknod bundle
+  PROVED; the first open pinned as a MISS; note "OPEN-PIN PHASE 2 MILESTONE
+  LANDED") → OPEN-PIN phase 3 (`wx-briefs/brief-open-pin-3.md`: the two U-tier
+  leaves, init's open/mknod/dups at the named ledger, the three-arm head through
+  UkInitMain and the fork's child arm; LAUNCHED 2026-09-12)
   → SH-LINE phase 2 → E4 → E2 → E5.
 - Standing rulings from the lanes (WX-EXIT/WX-INV build on them): rows per slot
   born at boot; the map's and the orphans' names canonical on `wchG`; ZOMBIE row

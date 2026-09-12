@@ -2334,6 +2334,32 @@ DEVICE arm says the walk of THIS path ended at a device node; rows 15/17 read
 `uvis_M W` and `xk_a W 0`; the generic suppliers are `*_at_of_all` instances;
 `UkRunSys`/`UkInit` unchanged.  chdir/unlink keep `∀ pl`.
 
+OPEN-PIN PHASE 2 MILESTONE LANDED (2026-09-12; 20 files).  THE CREATE LEG SPENDS
+THE ARM'S PERMIT: `FsAbsCreateFire.acre_commit_at_gen` takes `cre_arm_fired Farm i`
+as the unarm does; one permit per armed inode makes the create/unarm legs
+exclusive IN THE LOGIC (an exclusive credential can sit in only one of two
+`∗`-joined pieces); the permit parks in `Farm`'s receipt and returns through the
+leg that fired; sharers create/mknod/open(O_CREATE)/mkdir; sealed types
+unchanged.  `PinnedObs`: the miss arm is a parameter; `pin_misses_at`/
+`pobs_P_dead`/`pobs_walk_dead` let a walk die provably at hop 0 (the existential
+-inum pin does NOT work: cursor and observation fire at different views).
+`AppEcho.echo_names := gname * gname` (flag, KEY): `cons_key r` (Excl, in the two
+PRESENT arms) -- a holder knows the console is absent at every view
+(`echo_cons_abs_law`), which is what init's FIRST open runs on; `echo_init_key`
+is the era-0 claim WITH the key beside it -- E2'S BOOT ARM HANDS THE KEY TO INIT
+through the boot bundle (record this in E2's brief); seven claim laws.
+`UInitCons`: `init_cons_mknod_bundle` PROVED (Farm mints the permit with the pure
+half and the key; Fok spends it: phase 1 ABSENT → PRESENT, phase 2 shoots
+`cons_made r i`; Fun spends it where the unarm owes nothing); a failed mknod
+returns the key → second open at the MISS pin → CLOSED; the first open's
+receipt at the miss pin is `-1 ∨ taint` (two arms, so `blt` at 0x1a provably
+takes the repair arm); the ledger is `take NSTD fdt0` (`ustd` carries length
+NSTD = 3 -- a `fdt0`-length ledger was vacuous); the three-arm head with the
+per-call `fd_lowest_closed` lemmas.  REMAINING (a fresh agent, `brief-open-pin-
+3.md`): the open leaf as a Lemma, `wp_uk_ecall_dup_closed`, `wp_kinit_open`/
+`wp_kinit_dup` rewired, init's head through `UkInitMain` and the fork's child
+arm, the eight application laws wired at echo's era.
+
 SPEC-TIGHTEN LANDED (2026-09-11; brief `brief-spec-tighten.md`; 19 files).
 `SysOpenDefs.open_trunc_piece Γ vom Ft := if om_trunc vom then pf_at
 (atrunc_commit_at Γ appE) Ft else emp` on the four open bundles, arms and
