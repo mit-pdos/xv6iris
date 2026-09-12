@@ -32,3 +32,7 @@ tools/tcb/TcbSeed.v
 
 # rocq-warm daemon sockets and logs (claude-notes/rocq-warm.md)
 .rocq-warm/
+
+# coordinator state lives outside the repo (machine-local)
+/claude-notes/projects/wx-briefs/
+/claude-notes/projects/CHECKPOINT.md
