@@ -2493,6 +2493,35 @@ TX-RECEIPT's `tx_claim` so the two lanes merge by juxtaposition; the hart lines'
 invariant; `boot_k_shape` deleted.  `BACKSPACE` is the int 0x100 (not byte 8):
 the "\b \b" triple is reachable only from `%c`, unused.
 
+E4 SH-ECHO PHASE 2 ON ITS BRANCH (2026-09-12; `lane/sh-echo` = `e01a8d9df` on
+r1; 4 files +1461/-2; build `shecho34` green, audit = the thirteen; lemma_diff:
+one `Hpsok_free` section hypothesis, the lane's usual).  PROVED: the pinned
+exec bundle for /echo is BUILT AND PAID END-TO-END
+(`sh_exec_sup_of_echo_slot_holds` assembles `pinned_exec_bundle` at
+`era0_echo_pins` / ROOTINO / `echo_pl` / `[ROOTINO; ECHO_INO]` / `echo_elf` /
+`Pay := emp` / `Q := fun _ => True` and introduces it at the key), the pin
+resolves, `echo_elf` is loadable, `echo_node_img` (the child's node read ONCE
+into a pure summary -- PinnedExec's constructor wand is □ and cannot hold the
+heap), `sh_echo_path_of` and `echo_args_det` PURE over it (na = 3, alen 4/5/5,
+every argument byte), `ush_echo_tokens_holds`, `ush_line_toks_holds`,
+`echo_argv_bytes_of_line_holds`, `wp_kshr_exec_at_cwd_holds` (the cwd-indexed
+exec stub), `ush_pstate_at`; `UkShRun.wp_kshr_jal`/`wp_kshr_entry` made
+non-Local.  OWED TO E4 PHASE 3: `echo_slot_of_kexec` (`UShEcho.v:589`, the
+single open premise of the assembly: `kexec_args_at` → `uk_args_c` + presence
+rows; `echo_kexec_sz = 0x4000`, `kxc_sp_final … = 0x3FB0`, `echo_room` proved),
+`echo_key_args` (`:708`), and THE TWO WALKS `wp_kshr_exec_echo` (`UkShEcho.v:504`)
+/ `wp_kshm_child_echo` (`:597`) -- written (backup
+`scratchpad/e4/UkShEcho-with-walks.v`, `PHASE 3:` markers at :575/:627) but
+they HANG the proofmode (12-15 min, killed by PID); suspects in order: (1)
+`iIntros "#Hexs"` on the `sh_exec_sup_echo` bundle (the bundle-intro hang; it
+has a Persistent instance but that is the first thing to debug), (2)
+unifying `mword_of_int (ush_jarm (echo_cmd s0 g))` with `0xce` through
+`echo_cmd`'s delta (`Global Opaque echo_cmd` + an explicit rewrite), (3) a
+`replace … by lia` on `ush_Dg` in a proofmode goal; plus the cwd VALUE
+threading through sh's fork arm (`wp_kshr_fork1_final`/`wp_kshf_fork`).  Other
+seams unchanged (2b's line fact; SH-OPEN's entry cwd; E2's one `echo_fs_pure`
+law via `sh_echo_slot_of_fs_pure_holds`; E5's `recv`/`tx` and `udepw_law 16`).
+
 E4 SH-ECHO PHASE 1 (2026-09-12; `-tlw`, `lane/sh-echo` = `5b4c88ef8` on
 `lane/supply-split-r1`; two NEW files `UkShEcho.v` (u-tier) + `UShEcho.v`
 (application), no existing .v edited, build `shecho14` green).  THE PARSER IS

@@ -276,3 +276,7 @@ PRINTK'S CONTRACT"); PRINTK-LEDGER-2 told before its A commit.
 CLARIFIED: the APPLICATION owns the era's output ledger authority; printk's Ψ
 comes from `printk_env` (an abstract era appender minted at boot) for kernel
 sites; `pr_res` holds no authority.
+
+E4 phase 2 GREEN on `lane/sh-echo` (`e01a8d9df`); phase 3 (echo's exec entry
+geometry, the two hanging walks, the cwd threading) to a fresh agent in `-tlw`
+(`brief-sh-echo-3.md`).
