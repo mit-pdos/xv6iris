@@ -36,6 +36,26 @@ The redo is cheap: `git checkout main -- iris/`, then gen-code, relayout
 `.data`.  The `.data` remap is likewise one-shot -- re-running it moves
 everything a second symbol-width.
 
+## ALSO DONE
+
+- **panic prints again.**  06ea57f's proof-side change reverted onto the new
+  image; `panic_env` REFILLED (pr.lock's `is_lock`, `dev_inv`, `is_txlock`)
+  rather than left `emp` -- an `is_lock` and a `dev_inv` come down from the
+  boot chain and nothing below can conjure one, and refilling costs zero call
+  sites because the premise never left the contract.  `panic_stack` stays 52.
+  Two immediates moved; both `jal printk` displacements did not (panic and
+  printk moved together), and the two `.rodata` addresses are numerically
+  unchanged, now spelled `KernelSyms.etext + 0x18` / `+ 0x20`.
+- **`plicinit`/`plicinithart`/`plic_claim`/`plic_complete`.**  Neither contract
+  changed shape: `plic_senable_word` was already
+  `Z_to_bv 32 PlicPlan.plic_dev_irq_mask`, so it denotes 0x1402 by derivation.
+  No payload for source 12 -- every source but the console's has an `emp`
+  payload, so a claim returning 12 hands out nothing, which is what the second
+  port's handler needs.  `plic_claim_a0_ok` is a POSTCONDITION, so its third
+  arm is a weakening `ProofDevintr` must absorb.
+- **`UartTxInv`.**  `tx_lock`/`tx_chan` left the symbol table; the lock is the
+  field `uarts + 16` and the sleep channel the element `&uarts[0]`.
+
 ## WHAT IS LEFT
 
 Eleven functions changed SHAPE.  `plicinit` (+1 store), `plicinithart` (the
@@ -43,7 +63,8 @@ enable word), `consputc` and `consolewrite` (a `0` argument), `panic` (its
 printks are back) and `kvmmake` (+1 `kvmmap`) are ordinary proof work.  The
 rest is where the design sits:
 
-- **`uarts[]` REPLACES TWO STATICS.**  `struct uart { uint64 base; void
+- **`uarts[]` REPLACES TWO STATICS** (`UartTxInv` is done at the console
+  port; everything below is still open).  `struct uart { uint64 base; void
   (*rx)(int); struct spinlock tx_lock; }`, `sizeof` = 0x28, the array at
   `uarts` (0x8000a2c0, `.data`), `tx_lock` at +16.  `tx_chan` and `tx_lock`
   are gone from the symbol table, so `UartTxInv` names a symbol that no
@@ -80,5 +101,12 @@ rest is where the design sits:
   cone needs `uart_inv Uart1 γ1`, UART1's tx lock and the UART1 mapping, and
   owes nothing about the bytes.
 
-Fourteen files still fail in the first `-k` layer; the cones behind the
-reshaped functions have not been attempted yet.
+The `.data` carve has room for the `base`/`rx` snapshot: the boot chain
+already cuts `[nextpid+4, entry_got)` and DROPS it, and `uarts` sits inside
+that gap, so claiming those two words per port is additive -- the GOT slot's
+`boot_ran_phys_word` at `DfracDiscarded` is the idiom to copy.
+
+And the S-mode UART leaves (`WpSconfUartAccess`) take the whole `dev_inv`
+bundle where they open only `uartN`: at the second port they want
+`uart_inv i γ` instead, which is also strictly easier for a console caller
+(`dev_inv_uart` projects it).
