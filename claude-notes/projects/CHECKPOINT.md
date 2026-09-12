@@ -111,3 +111,10 @@ patch: `projects/wx-briefs/`.
    PLIC-claim-is-the-lock; kernel defects go to `kernel-defects.md`; wait/exit =
    escrow tokens by generation, every process tracked, `uvis_ch` as the completeness
    device (see the design of record).  Subagents never commit/stage/edit claude-notes.
+
+PRE-MORTEM REVIEW (2026-09-12): `projects/review-echo-plan-2026-09-12.md`, sixteen
+findings; the coordinator verified 1 (udep = □ app_sup = the taint; init's slot
+takes it), 2 (eight harts print after `started`), 3 (Htx/Hrx at an arbitrary
+γ), 9 (sh re-opens the console until fd >= 3), 11 (`ushd_clw_text_ty`
+assumed in UkShFork). Awaiting the owner's rulings on the batch before the
+pipeline order changes; CONS-SWALLOW continues.
