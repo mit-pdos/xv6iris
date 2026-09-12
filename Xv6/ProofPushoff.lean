@@ -114,11 +114,6 @@ theorem push_off_tail {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Cur
       ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨#HT, Hk, Hpc, Hframe, HΦ⟩
-  ihave #Hi_ba2 := text_instr 0x80000ba2#64 true (instruction.LOAD (24#12, regidx.Regidx 2#5, regidx.Regidx 1#5, false, 8)) _ rfl rfl $$ HT
-  ihave #Hi_ba4 := text_instr 0x80000ba4#64 true (instruction.LOAD (16#12, regidx.Regidx 2#5, regidx.Regidx 8#5, false, 8)) _ rfl rfl $$ HT
-  ihave #Hi_ba6 := text_instr 0x80000ba6#64 true (instruction.LOAD (8#12, regidx.Regidx 2#5, regidx.Regidx 9#5, false, 8)) _ rfl rfl $$ HT
-  ihave #Hi_ba8 := text_instr 0x80000ba8#64 true (instruction.ITYPE (32#12, regidx.Regidx 2#5, regidx.Regidx 2#5, iop.ADDI)) _ rfl rfl $$ HT
-  ihave #Hi_baa := text_instr 0x80000baa#64 true (instruction.JALR (0#12, regidx.Regidx 1#5, regidx.Regidx 0#5)) _ rfl rfl $$ HT
   -- jal mycpu
   k_step (wp_s_jal cpu _ ?hs ?ht 0x80000b98#64 false 3362#21 1#5 (by decide) ?htgt) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   case htgt => k_tgt
@@ -160,9 +155,9 @@ theorem push_off_tail {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Cur
   iapply (wp_epilogue4s1 cpu k.pushOff (by k_norm) (by k_norm) 0x80000ba2#64 (by k_norm; omega) _ ?hR2
     (k.regs 1#5) (k.regs 8#5) (k.regs 9#5)) $$ [- $Hk $Hpc]
   rotate_right 1
+  k_code (text_instr _ _ _ _ rfl rfl) HT
   k_norm
   iframe
-  iframe #
   inext
   iintro Hk Hpc
   iapply HΦ $$ %_ Hk Hpc
@@ -181,23 +176,13 @@ theorem push_off_proof (M : MYCPU) : PUSHOFF := ⟨fun {hlc GF} _ _ cpu k hsie h
   iintro ⟨Hk, #Htext, Hpc, HΦ⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   have hn31 : k.noff < 2 ^ 31 := hwf.2.2.2.2
-  ihave #Hi_b80 := text_instr 0x80000b80#64 true (instruction.ITYPE (4064#12, regidx.Regidx 2#5, regidx.Regidx 2#5, iop.ADDI)) _ rfl rfl $$ Htext
-  ihave #Hi_b82 := text_instr 0x80000b82#64 true (instruction.STORE (24#12, regidx.Regidx 1#5, regidx.Regidx 2#5, 8)) _ rfl rfl $$ Htext
-  ihave #Hi_b84 := text_instr 0x80000b84#64 true (instruction.STORE (16#12, regidx.Regidx 8#5, regidx.Regidx 2#5, 8)) _ rfl rfl $$ Htext
-  ihave #Hi_b86 := text_instr 0x80000b86#64 true (instruction.STORE (8#12, regidx.Regidx 9#5, regidx.Regidx 2#5, 8)) _ rfl rfl $$ Htext
-  ihave #Hi_b88 := text_instr 0x80000b88#64 true (instruction.ITYPE (32#12, regidx.Regidx 2#5, regidx.Regidx 8#5, iop.ADDI)) _ rfl rfl $$ Htext
-  ihave #Hi_ba2 := text_instr 0x80000ba2#64 true (instruction.LOAD (24#12, regidx.Regidx 2#5, regidx.Regidx 1#5, false, 8)) _ rfl rfl $$ Htext
-  ihave #Hi_ba4 := text_instr 0x80000ba4#64 true (instruction.LOAD (16#12, regidx.Regidx 2#5, regidx.Regidx 8#5, false, 8)) _ rfl rfl $$ Htext
-  ihave #Hi_ba6 := text_instr 0x80000ba6#64 true (instruction.LOAD (8#12, regidx.Regidx 2#5, regidx.Regidx 9#5, false, 8)) _ rfl rfl $$ Htext
-  ihave #Hi_ba8 := text_instr 0x80000ba8#64 true (instruction.ITYPE (32#12, regidx.Regidx 2#5, regidx.Regidx 2#5, iop.ADDI)) _ rfl rfl $$ Htext
-  ihave #Hi_baa := text_instr 0x80000baa#64 true (instruction.JALR (0#12, regidx.Regidx 1#5, regidx.Regidx 0#5)) _ rfl rfl $$ Htext
   simp only [pushOffAddr, KernelSyms.«push_off»]
   k_norm
   -- prologue
   iapply (wp_prologue4s1 cpu k hsie htier 0x80000b80#64 (by omega))
+  k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm
   iframe
-  iframe #
   inext
   iintro Hk Hpc Hframe
   -- csrrci a5,sstatus,2

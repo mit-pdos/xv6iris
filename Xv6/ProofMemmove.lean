@@ -427,14 +427,10 @@ theorem memmove_finish {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Cu
       ⌜calleeSaved k.regs R'' ∧ R'' 10#5 = k.regs 10#5⌝ -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨#HT, Hk, Hpc, Hframe, Hsrc, Hdst, HΦ⟩
-  ihave #Hi_d02 := text_instr 0x80000d02#64 true (instruction.LOAD (8#12, regidx.Regidx 2#5, regidx.Regidx 1#5, false, 8)) _ rfl rfl $$ HT
-  ihave #Hi_d04 := text_instr 0x80000d04#64 true (instruction.LOAD (0#12, regidx.Regidx 2#5, regidx.Regidx 8#5, false, 8)) _ rfl rfl $$ HT
-  ihave #Hi_d06 := text_instr 0x80000d06#64 true (instruction.ITYPE (16#12, regidx.Regidx 2#5, regidx.Regidx 2#5, iop.ADDI)) _ rfl rfl $$ HT
-  ihave #Hi_d08 := text_instr 0x80000d08#64 true (instruction.JALR (0#12, regidx.Regidx 1#5, regidx.Regidx 0#5)) _ rfl rfl $$ HT
   iapply (wp_epilogue2 cpu k hsie htier 0x80000d02#64 hK R' hR2 (k.regs 1#5) (k.regs 8#5))
+  k_code (text_instr _ _ _ _ rfl rfl) HT
   k_norm
   iframe
-  iframe #
   inext
   iintro Hk Hpc
   iapply HΦ $$ %_ Hk Hpc Hsrc Hdst
@@ -517,19 +513,15 @@ set_option maxHeartbeats 4000000 in
 theorem memmove_proof : MEMMOVE := ⟨fun cpu k bs olds n dqs hsie htier hK hn hn32 hls hld hsrc hdst => by
   unfold wp_memmove_body
   iintro ⟨Hk, #Htext, Hpc, Hsrc, Hdst, HΦ⟩
-  ihave #Hi_cda := text_instr 0x80000cda#64 true (instruction.ITYPE (4080#12, regidx.Regidx 2#5, regidx.Regidx 2#5, iop.ADDI)) _ rfl rfl $$ Htext
-  ihave #Hi_cdc := text_instr 0x80000cdc#64 true (instruction.STORE (8#12, regidx.Regidx 1#5, regidx.Regidx 2#5, 8)) _ rfl rfl $$ Htext
-  ihave #Hi_cde := text_instr 0x80000cde#64 true (instruction.STORE (0#12, regidx.Regidx 8#5, regidx.Regidx 2#5, 8)) _ rfl rfl $$ Htext
-  ihave #Hi_ce0 := text_instr 0x80000ce0#64 true (instruction.ITYPE (16#12, regidx.Regidx 2#5, regidx.Regidx 8#5, iop.ADDI)) _ rfl rfl $$ Htext
   -- the spec's continuation, at this hart
   simp only [memmoveAddr, KernelSyms.«memmove»]
   k_norm
   ihave HΦ := wpNext_off _ _ _ $$ HΦ
   -- prologue
   iapply (wp_prologue2 cpu k hsie htier 0x80000cda#64 hK)
+  k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm
   iframe
-  iframe #
   inext
   iintro Hk Hpc Hframe
   -- beqz a2,d02

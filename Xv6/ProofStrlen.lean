@@ -165,23 +165,15 @@ theorem strlen_proof : STRLEN := ⟨fun cpu k bs n dq hsie htier hK hcstr hn31 h
   unfold wp_strlen_body
   have hn := cstrAt_len hcstr
   iintro ⟨Hk, #Htext, Hpc, Hbuf, HΦ⟩
-  ihave #Hi_e04 := text_instr 0x80000e04#64 true (instruction.ITYPE (4080#12, regidx.Regidx 2#5, regidx.Regidx 2#5, iop.ADDI)) _ rfl rfl $$ Htext
-  ihave #Hi_e06 := text_instr 0x80000e06#64 true (instruction.STORE (8#12, regidx.Regidx 1#5, regidx.Regidx 2#5, 8)) _ rfl rfl $$ Htext
-  ihave #Hi_e08 := text_instr 0x80000e08#64 true (instruction.STORE (0#12, regidx.Regidx 8#5, regidx.Regidx 2#5, 8)) _ rfl rfl $$ Htext
-  ihave #Hi_e0a := text_instr 0x80000e0a#64 true (instruction.ITYPE (16#12, regidx.Regidx 2#5, regidx.Regidx 8#5, iop.ADDI)) _ rfl rfl $$ Htext
-  ihave #Hi_e24 := text_instr 0x80000e24#64 true (instruction.LOAD (8#12, regidx.Regidx 2#5, regidx.Regidx 1#5, false, 8)) _ rfl rfl $$ Htext
-  ihave #Hi_e26 := text_instr 0x80000e26#64 true (instruction.LOAD (0#12, regidx.Regidx 2#5, regidx.Regidx 8#5, false, 8)) _ rfl rfl $$ Htext
-  ihave #Hi_e28 := text_instr 0x80000e28#64 true (instruction.ITYPE (16#12, regidx.Regidx 2#5, regidx.Regidx 2#5, iop.ADDI)) _ rfl rfl $$ Htext
-  ihave #Hi_e2a := text_instr 0x80000e2a#64 true (instruction.JALR (0#12, regidx.Regidx 1#5, regidx.Regidx 0#5)) _ rfl rfl $$ Htext
   -- the spec's continuation, at this hart
   simp only [strlenAddr, KernelSyms.«strlen»]
   k_norm
   ihave HΦ := wpNext_off _ _ _ $$ HΦ
   -- prologue
   iapply (wp_prologue2 cpu k hsie htier 0x80000e04#64 hK)
+  k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm
   iframe
-  iframe #
   inext
   iintro Hk Hpc Hframe
   -- lbu a5,0(a0)
@@ -216,9 +208,9 @@ theorem strlen_proof : STRLEN := ⟨fun cpu k bs n dq hsie htier hK hcstr hn31 h
     iintro Hk Hpc
     iapply (wp_epilogue2 cpu k hsie htier 0x80000e24#64 hK _ ?hR2 (k.regs 1#5) (k.regs 8#5)) $$ [- $Hk $Hpc]
     rotate_right 1
+    k_code (text_instr _ _ _ _ rfl rfl) Htext
     k_norm
     iframe
-    iframe #
     inext
     iintro Hk Hpc
     iapply HΦ $$ %_ Hk Hpc Hbuf
@@ -249,9 +241,9 @@ theorem strlen_proof : STRLEN := ⟨fun cpu k bs n dq hsie htier hK hcstr hn31 h
       rw [hother 2#5 (by decide) (by decide) (by decide)]; simp [RegMap.set_apply]
     iapply (wp_epilogue2 cpu k hsie htier 0x80000e24#64 hK _ ?hR2 (k.regs 1#5) (k.regs 8#5)) $$ [- $Hk $Hpc]
     rotate_right 1
+    k_code (text_instr _ _ _ _ rfl rfl) Htext
     k_norm
     iframe
-    iframe #
     inext
     iintro Hk Hpc
     iapply HΦ $$ %_ Hk Hpc Hbuf

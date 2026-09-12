@@ -50,12 +50,6 @@ theorem bigSepL_drop_take {A : Type} (Φ : A → IProp GF) (l : List A) (i n : N
   icases BigSepL.bigSepL_append.1 $$ H with ⟨H, _⟩
   iexact H
 
-/-- A function's text: a contiguous run of the kernel's instructions. -/
-theorem kernelText_sub (i n : Nat) :
-    kernelText (GF := GF) ⊢ [∗list] k ∈ (Kernel.text.drop i).take n, instrBytes k := by
-  unfold kernelText
-  exact bigSepL_drop_take _ _ i n
-
 /-- Whatever the search tree finds is in its traversal. -/
 theorem TextTree.find?_mem : ∀ (t : Kernel.TextTree) (a : Nat) (k : Kernel.KInstr),
     t.find? a = some k → k ∈ t.toList

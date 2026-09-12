@@ -45,21 +45,13 @@ set_option maxHeartbeats 4000000 in
 theorem mycpu_proof : MYCPU := ⟨fun {hlc GF} _ _ cpu k hsie htier hK => by
   unfold wp_mycpu_body
   iintro ⟨Hk, #Htext, Hpc, HΦ⟩
-  ihave #Hi_8ba := text_instr 0x800018ba#64 true (instruction.ITYPE (4080#12, regidx.Regidx 2#5, regidx.Regidx 2#5, iop.ADDI)) _ rfl rfl $$ Htext
-  ihave #Hi_8bc := text_instr 0x800018bc#64 true (instruction.STORE (8#12, regidx.Regidx 1#5, regidx.Regidx 2#5, 8)) _ rfl rfl $$ Htext
-  ihave #Hi_8be := text_instr 0x800018be#64 true (instruction.STORE (0#12, regidx.Regidx 8#5, regidx.Regidx 2#5, 8)) _ rfl rfl $$ Htext
-  ihave #Hi_8c0 := text_instr 0x800018c0#64 true (instruction.ITYPE (16#12, regidx.Regidx 2#5, regidx.Regidx 8#5, iop.ADDI)) _ rfl rfl $$ Htext
-  ihave #Hi_8d2 := text_instr 0x800018d2#64 true (instruction.LOAD (8#12, regidx.Regidx 2#5, regidx.Regidx 1#5, false, 8)) _ rfl rfl $$ Htext
-  ihave #Hi_8d4 := text_instr 0x800018d4#64 true (instruction.LOAD (0#12, regidx.Regidx 2#5, regidx.Regidx 8#5, false, 8)) _ rfl rfl $$ Htext
-  ihave #Hi_8d6 := text_instr 0x800018d6#64 true (instruction.ITYPE (16#12, regidx.Regidx 2#5, regidx.Regidx 2#5, iop.ADDI)) _ rfl rfl $$ Htext
-  ihave #Hi_8d8 := text_instr 0x800018d8#64 true (instruction.JALR (0#12, regidx.Regidx 1#5, regidx.Regidx 0#5)) _ rfl rfl $$ Htext
   simp only [mycpuAddr, KernelSyms.«mycpu»]
   k_norm
   -- prologue
   iapply (wp_prologue2 cpu k hsie htier 0x800018ba#64 hK)
+  k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm
   iframe
-  iframe #
   inext
   iintro Hk Hpc Hframe
   -- mv a5,tp
@@ -85,9 +77,9 @@ theorem mycpu_proof : MYCPU := ⟨fun {hlc GF} _ _ cpu k hsie htier hK => by
   -- epilogue
   iapply (wp_epilogue2 cpu k hsie htier 0x800018d2#64 hK _ ?hR2 (k.regs 1#5) (k.regs 8#5)) $$ [- $Hk $Hpc]
   rotate_right 1
+  k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm
   iframe
-  iframe #
   inext
   iintro Hk Hpc
   iapply HΦ $$ %_ Hk Hpc

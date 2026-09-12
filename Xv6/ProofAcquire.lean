@@ -88,24 +88,14 @@ theorem acquire_proof (PU : PUSHOFF) (HO : HOLDING) (MC : MYCPU) : ACQUIRE := �
   unfold wp_acquire_body
   iintro ⟨Hk, #Htext, Hpc, #Hlk, HΦ⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
-  ihave #Hi_bba := text_instr 0x80000bba#64 true (instruction.ITYPE (4064#12, regidx.Regidx 2#5, regidx.Regidx 2#5, iop.ADDI)) _ rfl rfl $$ Htext
-  ihave #Hi_bbc := text_instr 0x80000bbc#64 true (instruction.STORE (24#12, regidx.Regidx 1#5, regidx.Regidx 2#5, 8)) _ rfl rfl $$ Htext
-  ihave #Hi_bbe := text_instr 0x80000bbe#64 true (instruction.STORE (16#12, regidx.Regidx 8#5, regidx.Regidx 2#5, 8)) _ rfl rfl $$ Htext
-  ihave #Hi_bc0 := text_instr 0x80000bc0#64 true (instruction.STORE (8#12, regidx.Regidx 9#5, regidx.Regidx 2#5, 8)) _ rfl rfl $$ Htext
-  ihave #Hi_bc2 := text_instr 0x80000bc2#64 true (instruction.ITYPE (32#12, regidx.Regidx 2#5, regidx.Regidx 8#5, iop.ADDI)) _ rfl rfl $$ Htext
-  ihave #Hi_be4 := text_instr 0x80000be4#64 true (instruction.LOAD (24#12, regidx.Regidx 2#5, regidx.Regidx 1#5, false, 8)) _ rfl rfl $$ Htext
-  ihave #Hi_be6 := text_instr 0x80000be6#64 true (instruction.LOAD (16#12, regidx.Regidx 2#5, regidx.Regidx 8#5, false, 8)) _ rfl rfl $$ Htext
-  ihave #Hi_be8 := text_instr 0x80000be8#64 true (instruction.LOAD (8#12, regidx.Regidx 2#5, regidx.Regidx 9#5, false, 8)) _ rfl rfl $$ Htext
-  ihave #Hi_bea := text_instr 0x80000bea#64 true (instruction.ITYPE (32#12, regidx.Regidx 2#5, regidx.Regidx 2#5, iop.ADDI)) _ rfl rfl $$ Htext
-  ihave #Hi_bec := text_instr 0x80000bec#64 true (instruction.JALR (0#12, regidx.Regidx 1#5, regidx.Regidx 0#5)) _ rfl rfl $$ Htext
   simp only [acquireAddr, KernelSyms.«acquire»]
   k_norm
   ihave HΦ := wpNext_off _ _ _ $$ HΦ
   -- prologue
   iapply (wp_prologue4s1 cpu k hsie htier 0x80000bba#64 (by omega))
+  k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm
   iframe
-  iframe #
   inext
   iintro Hk Hpc Hframe
   -- mv s1,a0
@@ -239,9 +229,9 @@ theorem acquire_proof (PU : PUSHOFF) (HO : HOLDING) (MC : MYCPU) : ACQUIRE := �
     exact h22
   iapply (wp_epilogue4s1 cpu ((k.withLocks (s :: k.locks)).pushOff) (by k_norm) (by k_norm) 0x80000be4#64
     (by k_norm; omega) R4 (by k_norm; exact h42) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5)) $$ [- $Hk $Hpc]
+  k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm
   iframe
-  iframe #
   inext
   iintro Hk Hpc
   k_norm

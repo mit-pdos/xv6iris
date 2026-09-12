@@ -125,19 +125,6 @@ theorem fetchSpec_rvc2 (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF 
 
 /-! ### Decode facts -/
 
-/-- Prove `decodes32 cpu dq c w ast` / `decodes16 cpu dq c h ast` for a literal
-word by running the decoder (the decoder only reads frozen registers, so the
-configuration `c` may be symbolic). -/
-macro "decode_fact" : tactic =>
-  `(tactic| (intro Φ
-             iintro ⟨HmConf, HΦ⟩
-             mconf_cases HmConf
-             first | unfold ext_decode | unfold ext_decode_compressed
-             set_option maxRecDepth 100000 in swp_run 300
-             set_option maxRecDepth 100000 in sail_eval
-             mconf_intro HmConf
-             iapply HΦ $$ HmConf))
-
 /-! ### The cycle -/
 
 theorem clockCells_cases (cpu : CPU) :

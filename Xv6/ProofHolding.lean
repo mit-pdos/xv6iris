@@ -74,27 +74,16 @@ theorem holding_tail (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors} [MachGS 
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨#HT, Hk, Hpc, HP, HΦ⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
-  ihave #Hi_b5c := text_instr 0x80000b5c#64 true (instruction.ITYPE (4064#12, regidx.Regidx 2#5, regidx.Regidx 2#5, iop.ADDI)) _ rfl rfl $$ HT
-  ihave #Hi_b5e := text_instr 0x80000b5e#64 true (instruction.STORE (24#12, regidx.Regidx 1#5, regidx.Regidx 2#5, 8)) _ rfl rfl $$ HT
-  ihave #Hi_b60 := text_instr 0x80000b60#64 true (instruction.STORE (16#12, regidx.Regidx 8#5, regidx.Regidx 2#5, 8)) _ rfl rfl $$ HT
-  ihave #Hi_b62 := text_instr 0x80000b62#64 true (instruction.STORE (8#12, regidx.Regidx 9#5, regidx.Regidx 2#5, 8)) _ rfl rfl $$ HT
-  ihave #Hi_b64 := text_instr 0x80000b64#64 true (instruction.ITYPE (32#12, regidx.Regidx 2#5, regidx.Regidx 8#5, iop.ADDI)) _ rfl rfl $$ HT
-  ihave #Hi_b66 := text_instr 0x80000b66#64 true (instruction.LOAD (16#12, regidx.Regidx 10#5, regidx.Regidx 15#5, false, 8)) _ rfl rfl $$ HT
-  ihave #Hi_b76 := text_instr 0x80000b76#64 true (instruction.LOAD (24#12, regidx.Regidx 2#5, regidx.Regidx 1#5, false, 8)) _ rfl rfl $$ HT
-  ihave #Hi_b78 := text_instr 0x80000b78#64 true (instruction.LOAD (16#12, regidx.Regidx 2#5, regidx.Regidx 8#5, false, 8)) _ rfl rfl $$ HT
-  ihave #Hi_b7a := text_instr 0x80000b7a#64 true (instruction.LOAD (8#12, regidx.Regidx 2#5, regidx.Regidx 9#5, false, 8)) _ rfl rfl $$ HT
-  ihave #Hi_b7c := text_instr 0x80000b7c#64 true (instruction.ITYPE (32#12, regidx.Regidx 2#5, regidx.Regidx 2#5, iop.ADDI)) _ rfl rfl $$ HT
-  ihave #Hi_b7e := text_instr 0x80000b7e#64 true (instruction.JALR (0#12, regidx.Regidx 1#5, regidx.Regidx 0#5)) _ rfl rfl $$ HT
   -- prologue
   iapply (wp_prologue4s1 cpu k hsie htier 0x80000b5c#64 (by omega))
+  k_code (text_instr _ _ _ _ rfl rfl) HT
   k_norm
   iframe
-  iframe #
   inext
   iintro Hk Hpc Hframe
   -- ld a5,16(a0): the owner word
   iapply hld $$ [- $Hk $Hpc $HP]
-  iframe #
+  k_code (text_instr _ _ _ _ rfl rfl) HT
   inext
   k_norm
   iapply wpNext_off_intro
@@ -142,9 +131,9 @@ theorem holding_tail (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors} [MachGS 
     exact h2
   iapply (wp_epilogue4s1 cpu k hsie htier 0x80000b76#64 (by omega) _ hR2 (k.regs 1#5) (k.regs 8#5) (k.regs 9#5))
     $$ [- $Hk $Hpc]
+  k_code (text_instr _ _ _ _ rfl rfl) HT
   k_norm
   iframe
-  iframe #
   inext
   iintro Hk Hpc
   iapply HΦ $$ %_ %w Hk Hpc [] HQ

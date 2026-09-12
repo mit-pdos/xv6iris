@@ -263,18 +263,10 @@ theorem printk_exit (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS
     iintro %R2 Hk Hpc %h
     iapply HΦ $$ %_ %cs0 Hk Hpc %h Hbuf Hdescs Hsent
   rcases hpc with rfl | rfl
-  · ihave #Hi0 := text_instr 0x80000744#64 true (instruction.LOAD (104#12, regidx.Regidx 2#5, regidx.Regidx 9#5, false, 8)) _ rfl rfl $$ HT
-    ihave #Hi1 := text_instr 0x80000746#64 true (instruction.LOAD (88#12, regidx.Regidx 2#5, regidx.Regidx 19#5, false, 8)) _ rfl rfl $$ HT
-    ihave #Hi2 := text_instr 0x80000748#64 true (instruction.LOAD (80#12, regidx.Regidx 2#5, regidx.Regidx 20#5, false, 8)) _ rfl rfl $$ HT
-    ihave #Hi3 := text_instr 0x8000074a#64 true (instruction.LOAD (72#12, regidx.Regidx 2#5, regidx.Regidx 21#5, false, 8)) _ rfl rfl $$ HT
-    ihave #Hi4 := text_instr 0x8000074c#64 true (instruction.LOAD (64#12, regidx.Regidx 2#5, regidx.Regidx 22#5, false, 8)) _ rfl rfl $$ HT
-    ihave #Hi5 := text_instr 0x8000074e#64 true (instruction.LOAD (56#12, regidx.Regidx 2#5, regidx.Regidx 23#5, false, 8)) _ rfl rfl $$ HT
-    ihave #Hi6 := text_instr 0x80000750#64 true (instruction.LOAD (48#12, regidx.Regidx 2#5, regidx.Regidx 24#5, false, 8)) _ rfl rfl $$ HT
-    ihave #Hi7 := text_instr 0x80000752#64 true (instruction.LOAD (32#12, regidx.Regidx 2#5, regidx.Regidx 26#5, false, 8)) _ rfl rfl $$ HT
-    ihave #Hi8 := text_instr 0x80000754#64 true (instruction.LOAD (24#12, regidx.Regidx 2#5, regidx.Regidx 27#5, false, 8)) _ rfl rfl $$ HT
-    iapply (printk_restore cpu k hsie htier hf24 0x80000744#64 0x80000746#64 0x80000748#64 0x8000074a#64
+  · iapply (printk_restore cpu k hsie htier hf24 0x80000744#64 0x80000746#64 0x80000748#64 0x8000074a#64
       0x8000074c#64 0x8000074e#64 0x80000750#64 0x80000752#64 0x80000754#64 (by decide) (by decide) (by decide)
       (by decide) (by decide) (by decide) (by decide) (by decide) R hR2 ap w18) $$ [- $Hk $Hpc $Hframe]
+    k_code (text_instr _ _ _ _ rfl rfl) HT
     iframe #
     iintro %R' Hk Hpc Hexit %hR'
     k_norm
@@ -282,18 +274,10 @@ theorem printk_exit (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS
       hR'.2.2.2.2.2.2.1, hR'.2.2.2.2.2.2.2.1, hR'.2.2.2.2.2.2.2.2.1.trans hR.2, hR'.2.2.2.2.2.2.2.2.2.1,
       hR'.2.2.2.2.2.2.2.2.2.2⟩) $$ [- $Hk $Hpc $Hlocked $Hexit $Hbuf $Hdescs $Hsent $HΦ]
     iframe #
-  · ihave #Hi0 := text_instr 0x80000800#64 true (instruction.LOAD (104#12, regidx.Regidx 2#5, regidx.Regidx 9#5, false, 8)) _ rfl rfl $$ HT
-    ihave #Hi1 := text_instr 0x80000802#64 true (instruction.LOAD (88#12, regidx.Regidx 2#5, regidx.Regidx 19#5, false, 8)) _ rfl rfl $$ HT
-    ihave #Hi2 := text_instr 0x80000804#64 true (instruction.LOAD (80#12, regidx.Regidx 2#5, regidx.Regidx 20#5, false, 8)) _ rfl rfl $$ HT
-    ihave #Hi3 := text_instr 0x80000806#64 true (instruction.LOAD (72#12, regidx.Regidx 2#5, regidx.Regidx 21#5, false, 8)) _ rfl rfl $$ HT
-    ihave #Hi4 := text_instr 0x80000808#64 true (instruction.LOAD (64#12, regidx.Regidx 2#5, regidx.Regidx 22#5, false, 8)) _ rfl rfl $$ HT
-    ihave #Hi5 := text_instr 0x8000080a#64 true (instruction.LOAD (56#12, regidx.Regidx 2#5, regidx.Regidx 23#5, false, 8)) _ rfl rfl $$ HT
-    ihave #Hi6 := text_instr 0x8000080c#64 true (instruction.LOAD (48#12, regidx.Regidx 2#5, regidx.Regidx 24#5, false, 8)) _ rfl rfl $$ HT
-    ihave #Hi7 := text_instr 0x8000080e#64 true (instruction.LOAD (32#12, regidx.Regidx 2#5, regidx.Regidx 26#5, false, 8)) _ rfl rfl $$ HT
-    ihave #Hi8 := text_instr 0x80000810#64 true (instruction.LOAD (24#12, regidx.Regidx 2#5, regidx.Regidx 27#5, false, 8)) _ rfl rfl $$ HT
-    iapply (printk_restore cpu k hsie htier hf24 0x80000800#64 0x80000802#64 0x80000804#64 0x80000806#64
+  · iapply (printk_restore cpu k hsie htier hf24 0x80000800#64 0x80000802#64 0x80000804#64 0x80000806#64
       0x80000808#64 0x8000080a#64 0x8000080c#64 0x8000080e#64 0x80000810#64 (by decide) (by decide) (by decide)
       (by decide) (by decide) (by decide) (by decide) (by decide) R hR2 ap w18) $$ [- $Hk $Hpc $Hframe]
+    k_code (text_instr _ _ _ _ rfl rfl) HT
     iframe #
     iintro %R' Hk Hpc Hexit %hR'
     k_norm
@@ -427,9 +411,7 @@ theorem printk_arm_d (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [Mach
   iapply (printk_printint PI cpu (pkBase k) _ γl γd bs ?hs ?ht ?hK ?hb ?hn ?hu 0x800005dc#64 2096784#21 (by decide) (by decide))
     $$ [- $Hk $Hpc $Hsent]
   rotate_right 1
-  isplitr
-  · iapply (text_instr _ _ _ _ rfl rfl)
-    iexact HT
+  k_code (text_instr _ _ _ _ rfl rfl) HT
   iframe #
   case hs => k_norm
   case ht => k_norm
@@ -507,9 +489,7 @@ theorem printk_arm_ld (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [Mac
   iapply (printk_printint PI cpu (pkBase k) _ γl γd bs ?hs ?ht ?hK ?hb ?hn ?hu 0x800005c0#64 2096812#21 (by decide) (by decide))
     $$ [- $Hk $Hpc $Hsent]
   rotate_right 1
-  isplitr
-  · iapply (text_instr _ _ _ _ rfl rfl)
-    iexact HT
+  k_code (text_instr _ _ _ _ rfl rfl) HT
   iframe #
   case hs => k_norm
   case ht => k_norm
@@ -592,9 +572,7 @@ theorem printk_arm_lld (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [Ma
   iapply (printk_printint PI cpu (pkBase k) _ γl γd bs ?hs ?ht ?hK ?hb ?hn ?hu 0x800005fe#64 2096750#21 (by decide) (by decide))
     $$ [- $Hk $Hpc $Hsent]
   rotate_right 1
-  isplitr
-  · iapply (text_instr _ _ _ _ rfl rfl)
-    iexact HT
+  k_code (text_instr _ _ _ _ rfl rfl) HT
   iframe #
   case hs => k_norm
   case ht => k_norm
@@ -679,9 +657,7 @@ theorem printk_arm_u (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [Mach
   iapply (printk_printint PI cpu (pkBase k) _ γl γd bs ?hs ?ht ?hK ?hb ?hn ?hu 0x8000061c#64 2096720#21 (by decide) (by decide))
     $$ [- $Hk $Hpc $Hsent]
   rotate_right 1
-  isplitr
-  · iapply (text_instr _ _ _ _ rfl rfl)
-    iexact HT
+  k_code (text_instr _ _ _ _ rfl rfl) HT
   iframe #
   case hs => k_norm
   case ht => k_norm
@@ -759,9 +735,7 @@ theorem printk_arm_lu (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [Mac
   iapply (printk_printint PI cpu (pkBase k) _ γl γd bs ?hs ?ht ?hK ?hb ?hn ?hu 0x80000634#64 2096696#21 (by decide) (by decide))
     $$ [- $Hk $Hpc $Hsent]
   rotate_right 1
-  isplitr
-  · iapply (text_instr _ _ _ _ rfl rfl)
-    iexact HT
+  k_code (text_instr _ _ _ _ rfl rfl) HT
   iframe #
   case hs => k_norm
   case ht => k_norm
@@ -844,9 +818,7 @@ theorem printk_arm_llu (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [Ma
   iapply (printk_printint PI cpu (pkBase k) _ γl γd bs ?hs ?ht ?hK ?hb ?hn ?hu 0x80000650#64 2096668#21 (by decide) (by decide))
     $$ [- $Hk $Hpc $Hsent]
   rotate_right 1
-  isplitr
-  · iapply (text_instr _ _ _ _ rfl rfl)
-    iexact HT
+  k_code (text_instr _ _ _ _ rfl rfl) HT
   iframe #
   case hs => k_norm
   case ht => k_norm
@@ -931,9 +903,7 @@ theorem printk_arm_x (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [Mach
   iapply (printk_printint PI cpu (pkBase k) _ γl γd bs ?hs ?ht ?hK ?hb ?hn ?hu 0x8000066e#64 2096638#21 (by decide) (by decide))
     $$ [- $Hk $Hpc $Hsent]
   rotate_right 1
-  isplitr
-  · iapply (text_instr _ _ _ _ rfl rfl)
-    iexact HT
+  k_code (text_instr _ _ _ _ rfl rfl) HT
   iframe #
   case hs => k_norm
   case ht => k_norm
@@ -1008,9 +978,7 @@ theorem printk_arm_lx (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [Mac
   iapply (printk_printint PI cpu (pkBase k) _ γl γd bs ?hs ?ht ?hK ?hb ?hn ?hu 0x80000684#64 2096616#21 (by decide) (by decide))
     $$ [- $Hk $Hpc $Hsent]
   rotate_right 1
-  isplitr
-  · iapply (text_instr _ _ _ _ rfl rfl)
-    iexact HT
+  k_code (text_instr _ _ _ _ rfl rfl) HT
   iframe #
   case hs => k_norm
   case ht => k_norm
@@ -1093,9 +1061,7 @@ theorem printk_arm_llx (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [Ma
   iapply (printk_printint PI cpu (pkBase k) _ γl γd bs ?hs ?ht ?hK ?hb ?hn ?hu 0x800006a0#64 2096588#21 (by decide) (by decide))
     $$ [- $Hk $Hpc $Hsent]
   rotate_right 1
-  isplitr
-  · iapply (text_instr _ _ _ _ rfl rfl)
-    iexact HT
+  k_code (text_instr _ _ _ _ rfl rfl) HT
   iframe #
   case hs => k_norm
   case ht => k_norm
@@ -1174,9 +1140,7 @@ theorem printk_arm_c (CP : CONSPUTC) {hlc : HasLC} {GF : BundledGFunctors} [Mach
   iapply (printk_consputc CP cpu (pkBase k) _ γl γd _ ?hs ?ht ?hK ?hn ?hu 0x800006fe#64 2096012#21 (by decide) (by decide))
     $$ [- $Hk $Hpc $Hsent]
   rotate_right 1
-  isplitr
-  · iapply (text_instr _ _ _ _ rfl rfl)
-    iexact HT
+  k_code (text_instr _ _ _ _ rfl rfl) HT
   iframe #
   case hs => k_norm
   case ht => k_norm
@@ -1230,9 +1194,7 @@ theorem printk_arm_pct (CP : CONSPUTC) {hlc : HasLC} {GF : BundledGFunctors} [Ma
   iapply (printk_consputc CP cpu (pkBase k) _ γl γd _ ?hs ?ht ?hK ?hn ?hu 0x8000073e#64 2095948#21 (by decide) (by decide))
     $$ [- $Hk $Hpc $Hsent]
   rotate_right 1
-  isplitr
-  · iapply (text_instr _ _ _ _ rfl rfl)
-    iexact HT
+  k_code (text_instr _ _ _ _ rfl rfl) HT
   iframe #
   case hs => k_norm
   case ht => k_norm
@@ -1286,9 +1248,7 @@ theorem printk_arm_default (CP : CONSPUTC) {hlc : HasLC} {GF : BundledGFunctors}
   iapply (printk_consputc CP cpu (pkBase k) _ γl γd _ ?hs ?ht ?hK ?hn ?hu 0x800007f4#64 2095766#21 (by decide) (by decide))
     $$ [- $Hk $Hpc $Hsent]
   rotate_right 1
-  isplitr
-  · iapply (text_instr _ _ _ _ rfl rfl)
-    iexact HT
+  k_code (text_instr _ _ _ _ rfl rfl) HT
   iframe #
   case hs => k_norm
   case ht => k_norm
@@ -1306,9 +1266,7 @@ theorem printk_arm_default (CP : CONSPUTC) {hlc : HasLC} {GF : BundledGFunctors}
   iapply (printk_consputc CP cpu (pkBase k) _ γl γd _ ?hs ?ht ?hK ?hn ?hu 0x800007fa#64 2095760#21 (by decide) (by decide))
     $$ [- $Hk $Hpc $Hsent]
   rotate_right 1
-  isplitr
-  · iapply (text_instr _ _ _ _ rfl rfl)
-    iexact HT
+  k_code (text_instr _ _ _ _ rfl rfl) HT
   iframe #
   case hs => k_norm
   case ht => k_norm
@@ -1366,9 +1324,7 @@ theorem printk_arm_plain (CP : CONSPUTC) {hlc : HasLC} {GF : BundledGFunctors} [
   iapply (printk_consputc CP cpu (pkBase k) _ γl γd _ ?hs ?ht ?hK ?hn ?hu 0x80000568#64 2096418#21 (by decide) (by decide))
     $$ [- $Hk $Hpc $Hsent]
   rotate_right 1
-  isplitr
-  · iapply (text_instr _ _ _ _ rfl rfl)
-    iexact HT
+  k_code (text_instr _ _ _ _ rfl rfl) HT
   iframe #
   case hs => k_norm
   case ht => k_norm
@@ -1419,9 +1375,7 @@ theorem printk_str_loop (CP : CONSPUTC) {hlc : HasLC} {GF : BundledGFunctors} [M
     iapply (printk_consputc CP cpu (pkBase k) _ γl γd _ ?hs ?ht ?hK ?hn ?hu 0x80000720#64 2095978#21 (by decide)
       (by decide)) $$ [- $Hk $Hpc $Hsent]
     rotate_right 1
-    isplitr
-    · iapply (text_instr _ _ _ _ rfl rfl)
-      iexact HT
+    k_code (text_instr _ _ _ _ rfl rfl) HT
     iframe #
     case hs => k_norm
     case ht => k_norm
@@ -1471,9 +1425,7 @@ theorem printk_str_loop (CP : CONSPUTC) {hlc : HasLC} {GF : BundledGFunctors} [M
     iapply (printk_consputc CP cpu (pkBase k) _ γl γd _ ?hs ?ht ?hK ?hn ?hu 0x80000720#64 2095978#21 (by decide)
       (by decide)) $$ [- $Hk $Hpc $Hsent]
     rotate_right 1
-    isplitr
-    · iapply (text_instr _ _ _ _ rfl rfl)
-      iexact HT
+    k_code (text_instr _ _ _ _ rfl rfl) HT
     iframe #
     case hs => k_norm
     case ht => k_norm
@@ -1562,9 +1514,7 @@ theorem printk_hex_iter (CP : CONSPUTC) {hlc : HasLC} {GF : BundledGFunctors} [M
   case hs => k_norm
   case ht => k_norm
   case hram => k_norm; rw [shr60_ofNat]; exact inRam_byte inRam_digits _ (shr60_lt _)
-  isplitr
-  · iapply (text_instr _ _ _ _ rfl rfl)
-    iexact HT
+  k_code (text_instr _ _ _ _ rfl rfl) HT
   iframe #
   k_norm
   isplitr
@@ -1577,9 +1527,7 @@ theorem printk_hex_iter (CP : CONSPUTC) {hlc : HasLC} {GF : BundledGFunctors} [M
   iapply (printk_consputc CP cpu (pkBase k) _ γl γd _ ?hs ?ht ?hK ?hn ?hu 0x800006e0#64 2096042#21 (by decide) (by decide))
     $$ [- $Hk $Hpc $Hsent]
   rotate_right 1
-  isplitr
-  · iapply (text_instr _ _ _ _ rfl rfl)
-    iexact HT
+  k_code (text_instr _ _ _ _ rfl rfl) HT
   iframe #
   case hs => k_norm
   case ht => k_norm
@@ -2048,9 +1996,7 @@ theorem printk_arm_p (CP : CONSPUTC) {hlc : HasLC} {GF : BundledGFunctors} [Mach
   iapply (printk_consputc CP cpu (pkBase k) _ γl γd _ ?hs ?ht ?hK ?hn ?hu 0x800006c0#64 2096074#21 (by decide) (by decide))
     $$ [- $Hk $Hpc $Hsent]
   rotate_right 1
-  isplitr
-  · iapply (text_instr _ _ _ _ rfl rfl)
-    iexact HT
+  k_code (text_instr _ _ _ _ rfl rfl) HT
   iframe #
   case hs => k_norm
   case ht => k_norm
@@ -2067,9 +2013,7 @@ theorem printk_arm_p (CP : CONSPUTC) {hlc : HasLC} {GF : BundledGFunctors} [Mach
   iapply (printk_consputc CP cpu (pkBase k) _ γl γd _ ?hs ?ht ?hK ?hn ?hu 0x800006c8#64 2096066#21 (by decide) (by decide))
     $$ [- $Hk $Hpc $Hsent]
   rotate_right 1
-  isplitr
-  · iapply (text_instr _ _ _ _ rfl rfl)
-    iexact HT
+  k_code (text_instr _ _ _ _ rfl rfl) HT
   iframe #
   case hs => k_norm
   case ht => k_norm

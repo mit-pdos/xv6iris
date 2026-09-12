@@ -265,23 +265,15 @@ set_option maxHeartbeats 4000000 in
 theorem memcmp_proof : MEMCMP := ⟨fun cpu k bs1 bs2 n dq1 dq2 hsie htier hK hn hn32 hl1 hl2 hbuf1 hbuf2 => by
   unfold wp_memcmp_body
   iintro ⟨Hk, #Htext, Hpc, Hbuf1, Hbuf2, HΦ⟩
-  ihave #Hi_ca0 := text_instr 0x80000ca0#64 true (instruction.ITYPE (4080#12, regidx.Regidx 2#5, regidx.Regidx 2#5, iop.ADDI)) _ rfl rfl $$ Htext
-  ihave #Hi_ca2 := text_instr 0x80000ca2#64 true (instruction.STORE (8#12, regidx.Regidx 1#5, regidx.Regidx 2#5, 8)) _ rfl rfl $$ Htext
-  ihave #Hi_ca4 := text_instr 0x80000ca4#64 true (instruction.STORE (0#12, regidx.Regidx 8#5, regidx.Regidx 2#5, 8)) _ rfl rfl $$ Htext
-  ihave #Hi_ca6 := text_instr 0x80000ca6#64 true (instruction.ITYPE (16#12, regidx.Regidx 2#5, regidx.Regidx 8#5, iop.ADDI)) _ rfl rfl $$ Htext
-  ihave #Hi_cce := text_instr 0x80000cce#64 true (instruction.LOAD (8#12, regidx.Regidx 2#5, regidx.Regidx 1#5, false, 8)) _ rfl rfl $$ Htext
-  ihave #Hi_cd0 := text_instr 0x80000cd0#64 true (instruction.LOAD (0#12, regidx.Regidx 2#5, regidx.Regidx 8#5, false, 8)) _ rfl rfl $$ Htext
-  ihave #Hi_cd2 := text_instr 0x80000cd2#64 true (instruction.ITYPE (16#12, regidx.Regidx 2#5, regidx.Regidx 2#5, iop.ADDI)) _ rfl rfl $$ Htext
-  ihave #Hi_cd4 := text_instr 0x80000cd4#64 true (instruction.JALR (0#12, regidx.Regidx 1#5, regidx.Regidx 0#5)) _ rfl rfl $$ Htext
   -- the spec's continuation, at this hart
   simp only [memcmpAddr, KernelSyms.«memcmp»]
   k_norm
   ihave HΦ := wpNext_off _ _ _ $$ HΦ
   -- prologue
   iapply (wp_prologue2 cpu k hsie htier 0x80000ca0#64 hK)
+  k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm
   iframe
-  iframe #
   inext
   iintro Hk Hpc Hframe
   -- beqz a2,cd6
@@ -299,9 +291,9 @@ theorem memcmp_proof : MEMCMP := ⟨fun cpu k bs1 bs2 n dq1 dq2 hsie htier hK hn
     iintro Hk Hpc
     iapply (wp_epilogue2 cpu k hsie htier 0x80000cce#64 hK _ ?hR2 (k.regs 1#5) (k.regs 8#5)) $$ [- $Hk $Hpc]
     rotate_right 1
+    k_code (text_instr _ _ _ _ rfl rfl) Htext
     k_norm
     iframe
-    iframe #
     inext
     iintro Hk Hpc
     iapply HΦ $$ %_ Hk Hpc Hbuf1 Hbuf2
@@ -347,9 +339,9 @@ theorem memcmp_proof : MEMCMP := ⟨fun cpu k bs1 bs2 n dq1 dq2 hsie htier hK hn
       iintro Hk Hpc
       iapply (wp_epilogue2 cpu k hsie htier 0x80000cce#64 hK _ ?hR2 (k.regs 1#5) (k.regs 8#5)) $$ [- $Hk $Hpc]
       rotate_right 1
+      k_code (text_instr _ _ _ _ rfl rfl) Htext
       k_norm
       iframe
-      iframe #
       inext
       iintro Hk Hpc
       iapply HΦ $$ %_ Hk Hpc Hbuf1 Hbuf2
@@ -379,9 +371,9 @@ theorem memcmp_proof : MEMCMP := ⟨fun cpu k bs1 bs2 n dq1 dq2 hsie htier hK hn
       iintro Hk Hpc
       iapply (wp_epilogue2 cpu k hsie htier 0x80000cce#64 hK _ ?hR2 (k.regs 1#5) (k.regs 8#5)) $$ [- $Hk $Hpc]
       rotate_right 1
+      k_code (text_instr _ _ _ _ rfl rfl) Htext
       k_norm
       iframe
-      iframe #
       inext
       iintro Hk Hpc
       iapply HΦ $$ %_ Hk Hpc Hbuf1 Hbuf2

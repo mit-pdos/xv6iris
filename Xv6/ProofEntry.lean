@@ -25,13 +25,17 @@ macro "entry_norm" : tactic =>
       BitVec.reduceSignExtend, BitVec.reduceAppend, BitVec.reduceMul, KernelSyms.«_entry», startAddr,
       KernelSyms.«start», stack0Slot, BitVec.reduceOfNat])
 
-/-- One instruction: apply its rule, frame the resources (the instruction
-itself from the persistent context), step into the continuation. -/
+set_option hygiene false in
+/-- One instruction: apply its rule, frame the resources, prove the rule's
+`instr` premise from the kernel text (`Htext`) in a subgoal, step into the
+continuation. -/
 macro "entry_step" rule:term : tactic =>
   `(tactic| (iapply $rule:term
              entry_norm
              iframe
              iframe #
+             (isplitr; · iapply (text_instr _ _ _ _ rfl rfl); iexact Htext)
+             entry_norm
              inext))
 
 set_option maxHeartbeats 4000000 in
@@ -39,14 +43,6 @@ theorem EntryProof : ENTRY where
   wp_entry cpu dq hartid s0 v1 v2 v10 v11 := by
     unfold wp_entry_body
     iintro ⟨HmBoot, Hmhartid, Hclock, Htok, #Htext, Hslot, Hpc, Hx1, Hx2, Hx10, Hx11, HΦ⟩
-    ihave #Hi00 := text_instr 0x80000000#64 false (instruction.UTYPE (0xa#20, regidx.Regidx 2#5, uop.AUIPC)) _ rfl rfl $$ Htext
-    ihave #Hi04 := text_instr 0x80000004#64 false (instruction.LOAD (600#12, regidx.Regidx 2#5, regidx.Regidx 2#5, false, 8)) _ rfl rfl $$ Htext
-    ihave #Hi08 := text_instr 0x80000008#64 true (instruction.UTYPE (BitVec.signExtend 20 1#6, regidx.Regidx 10#5, uop.LUI)) _ rfl rfl $$ Htext
-    ihave #Hi0a := text_instr 0x8000000a#64 false (instruction.CSRReg (0xF14#12, regidx.Regidx 0#5, regidx.Regidx 11#5, csrop.CSRRS)) _ rfl rfl $$ Htext
-    ihave #Hi0e := text_instr 0x8000000e#64 true (instruction.ITYPE (BitVec.signExtend 12 1#6, regidx.Regidx 11#5, regidx.Regidx 11#5, iop.ADDI)) _ rfl rfl $$ Htext
-    ihave #Hi10 := text_instr 0x80000010#64 false (instruction.MUL (regidx.Regidx 11#5, regidx.Regidx 10#5, regidx.Regidx 10#5, { signed_rs1 := Signedness.Signed, signed_rs2 := Signedness.Signed, result_part := VectorHalf.Low })) _ rfl rfl $$ Htext
-    ihave #Hi14 := text_instr 0x80000014#64 true (instruction.RTYPE (regidx.Regidx 10#5, regidx.Regidx 2#5, regidx.Regidx 2#5, rop.ADD)) _ rfl rfl $$ Htext
-    ihave #Hi16 := text_instr 0x80000016#64 false (instruction.JAL (66#21, regidx.Regidx 1#5)) _ rfl rfl $$ Htext
     entry_norm
     -- 80000000: auipc sp, 0xa
     entry_step wp_m_auipc cpu dq bootConf bootConf_ok _ false 0xa#20 2#5 (by decide) v2

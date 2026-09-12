@@ -19,22 +19,14 @@ set_option maxHeartbeats 4000000 in
 theorem memcpy_proof (M : MEMMOVE) : MEMCPY := ⟨fun {hlc GF} _ _ cpu k bs olds n dqs hsie htier hK hn hn32 hls hld hsrc hdst => by
   unfold wp_memcpy_body
   iintro ⟨Hk, #Htext, Hpc, Hsrc, Hdst, HΦ⟩
-  ihave #Hi_d3a := text_instr 0x80000d3a#64 true (instruction.ITYPE (4080#12, regidx.Regidx 2#5, regidx.Regidx 2#5, iop.ADDI)) _ rfl rfl $$ Htext
-  ihave #Hi_d3c := text_instr 0x80000d3c#64 true (instruction.STORE (8#12, regidx.Regidx 1#5, regidx.Regidx 2#5, 8)) _ rfl rfl $$ Htext
-  ihave #Hi_d3e := text_instr 0x80000d3e#64 true (instruction.STORE (0#12, regidx.Regidx 8#5, regidx.Regidx 2#5, 8)) _ rfl rfl $$ Htext
-  ihave #Hi_d40 := text_instr 0x80000d40#64 true (instruction.ITYPE (16#12, regidx.Regidx 2#5, regidx.Regidx 8#5, iop.ADDI)) _ rfl rfl $$ Htext
-  ihave #Hi_d46 := text_instr 0x80000d46#64 true (instruction.LOAD (8#12, regidx.Regidx 2#5, regidx.Regidx 1#5, false, 8)) _ rfl rfl $$ Htext
-  ihave #Hi_d48 := text_instr 0x80000d48#64 true (instruction.LOAD (0#12, regidx.Regidx 2#5, regidx.Regidx 8#5, false, 8)) _ rfl rfl $$ Htext
-  ihave #Hi_d4a := text_instr 0x80000d4a#64 true (instruction.ITYPE (16#12, regidx.Regidx 2#5, regidx.Regidx 2#5, iop.ADDI)) _ rfl rfl $$ Htext
-  ihave #Hi_d4c := text_instr 0x80000d4c#64 true (instruction.JALR (0#12, regidx.Regidx 1#5, regidx.Regidx 0#5)) _ rfl rfl $$ Htext
   simp only [memcpyAddr, KernelSyms.«memcpy»]
   k_norm
   ihave HΦ := wpNext_off _ _ _ $$ HΦ
   -- prologue
   iapply (wp_prologue2 cpu k hsie htier 0x80000d3a#64 (by omega))
+  k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm
   iframe
-  iframe #
   inext
   iintro Hk Hpc Hframe
   -- jal ra, memmove
@@ -60,9 +52,9 @@ theorem memcpy_proof (M : MEMMOVE) : MEMCPY := ⟨fun {hlc GF} _ _ cpu k bs olds
     rw [hcs.1]; simp [RegMap.set_apply]
   -- epilogue
   iapply (wp_epilogue2 cpu k hsie htier 0x80000d46#64 (by omega) R' hR2 (k.regs 1#5) (k.regs 8#5))
+  k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm
   iframe
-  iframe #
   inext
   iintro Hk Hpc
   iapply HΦ $$ %_ Hk Hpc Hsrc Hdst

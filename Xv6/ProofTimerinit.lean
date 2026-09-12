@@ -27,11 +27,16 @@ macro "ti_norm" : tactic =>
       BitVec.toNat_ofNat, Nat.reducePow, Nat.reduceMod,
       timerinitAddr, KernelSyms.«timerinit», BitVec.reduceOfNat])
 
+set_option hygiene false in
+/-- One instruction: apply its rule, frame the resources, prove the rule's
+`instr` premise from the kernel text (`Htext`) in a subgoal, step into the
+continuation. -/
 macro "ti_step" rule:term : tactic =>
   `(tactic| (iapply $rule:term
              ti_norm
              iframe
              iframe #
+             (isplitr; · iapply (text_instr _ _ _ _ rfl rfl); iexact Htext)
              ti_norm
              inext))
 
@@ -40,27 +45,6 @@ theorem TimerinitProof : TIMERINIT where
   wp_timerinit cpu c hok hcbie hpmm hstce ret sp₀ v8 v14 v15 f0 f8 := by
     unfold wp_timerinit_body
     iintro ⟨HmConf, Hclock, Htok, #Htext, Hpc, Hx1, Hx2, Hx8, Hx14, Hx15, Hf0, Hf8, HΦ⟩
-    ihave #Hi01c := text_instr 0x8000001c#64 true (instruction.ITYPE (BitVec.signExtend 12 48#6, regidx.Regidx 2#5, regidx.Regidx 2#5, iop.ADDI)) _ rfl rfl $$ Htext
-    ihave #Hi01e := text_instr 0x8000001e#64 true (instruction.STORE (8#12, regidx.Regidx 1#5, regidx.Regidx 2#5, 8)) _ rfl rfl $$ Htext
-    ihave #Hi020 := text_instr 0x80000020#64 true (instruction.STORE (0#12, regidx.Regidx 8#5, regidx.Regidx 2#5, 8)) _ rfl rfl $$ Htext
-    ihave #Hi022 := text_instr 0x80000022#64 true (instruction.ITYPE (16#12, regidx.Regidx 2#5, regidx.Regidx 8#5, iop.ADDI)) _ rfl rfl $$ Htext
-    ihave #Hi024 := text_instr 0x80000024#64 false (instruction.CSRReg (0x30A#12, regidx.Regidx 0#5, regidx.Regidx 15#5, csrop.CSRRS)) _ rfl rfl $$ Htext
-    ihave #Hi028 := text_instr 0x80000028#64 true (instruction.ITYPE (BitVec.signExtend 12 63#6, regidx.Regidx 0#5, regidx.Regidx 14#5, iop.ADDI)) _ rfl rfl $$ Htext
-    ihave #Hi02a := text_instr 0x8000002a#64 true (instruction.SHIFTIOP (63#6, regidx.Regidx 14#5, regidx.Regidx 14#5, sop.SLLI)) _ rfl rfl $$ Htext
-    ihave #Hi02c := text_instr 0x8000002c#64 true (instruction.RTYPE (regidx.Regidx 14#5, regidx.Regidx 15#5, regidx.Regidx 15#5, rop.OR)) _ rfl rfl $$ Htext
-    ihave #Hi02e := text_instr 0x8000002e#64 false (instruction.CSRReg (0x30A#12, regidx.Regidx 15#5, regidx.Regidx 0#5, csrop.CSRRW)) _ rfl rfl $$ Htext
-    ihave #Hi032 := text_instr 0x80000032#64 false (instruction.CSRReg (0x306#12, regidx.Regidx 0#5, regidx.Regidx 15#5, csrop.CSRRS)) _ rfl rfl $$ Htext
-    ihave #Hi036 := text_instr 0x80000036#64 false (instruction.ITYPE (2#12, regidx.Regidx 15#5, regidx.Regidx 15#5, iop.ORI)) _ rfl rfl $$ Htext
-    ihave #Hi03a := text_instr 0x8000003a#64 false (instruction.CSRReg (0x306#12, regidx.Regidx 15#5, regidx.Regidx 0#5, csrop.CSRRW)) _ rfl rfl $$ Htext
-    ihave #Hi03e := text_instr 0x8000003e#64 false (instruction.CSRReg (0xC01#12, regidx.Regidx 0#5, regidx.Regidx 15#5, csrop.CSRRS)) _ rfl rfl $$ Htext
-    ihave #Hi042 := text_instr 0x80000042#64 false (instruction.UTYPE (244#20, regidx.Regidx 14#5, uop.LUI)) _ rfl rfl $$ Htext
-    ihave #Hi046 := text_instr 0x80000046#64 false (instruction.ITYPE (576#12, regidx.Regidx 14#5, regidx.Regidx 14#5, iop.ADDI)) _ rfl rfl $$ Htext
-    ihave #Hi04a := text_instr 0x8000004a#64 true (instruction.RTYPE (regidx.Regidx 14#5, regidx.Regidx 15#5, regidx.Regidx 15#5, rop.ADD)) _ rfl rfl $$ Htext
-    ihave #Hi04c := text_instr 0x8000004c#64 false (instruction.CSRReg (0x14D#12, regidx.Regidx 15#5, regidx.Regidx 0#5, csrop.CSRRW)) _ rfl rfl $$ Htext
-    ihave #Hi050 := text_instr 0x80000050#64 true (instruction.LOAD (8#12, regidx.Regidx 2#5, regidx.Regidx 1#5, false, 8)) _ rfl rfl $$ Htext
-    ihave #Hi052 := text_instr 0x80000052#64 true (instruction.LOAD (0#12, regidx.Regidx 2#5, regidx.Regidx 8#5, false, 8)) _ rfl rfl $$ Htext
-    ihave #Hi054 := text_instr 0x80000054#64 true (instruction.ITYPE (BitVec.signExtend 12 16#6, regidx.Regidx 2#5, regidx.Regidx 2#5, iop.ADDI)) _ rfl rfl $$ Htext
-    ihave #Hi056 := text_instr 0x80000056#64 true (instruction.JALR (0#12, regidx.Regidx 1#5, regidx.Regidx 0#5)) _ rfl rfl $$ Htext
     ti_norm
     -- 8000001c: addi sp,sp,-16
     ti_step wp_m_addi_same cpu (DFrac.own 1) c hok _ true (BitVec.signExtend 12 48#6) 2#5 (by decide) sp₀

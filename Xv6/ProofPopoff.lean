@@ -113,21 +113,13 @@ theorem pop_off_proof (M : MYCPU) : POPOFF := ⟨fun {hlc GF} _ _ cpu k hsie hti
   iintro ⟨Hk, #Htext, Hpc, HΦ⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   have hn31 : k.noff < 2 ^ 31 := hwf.2.2.2.2
-  ihave #Hi_bfa := text_instr 0x80000bfa#64 true (instruction.ITYPE (4080#12, regidx.Regidx 2#5, regidx.Regidx 2#5, iop.ADDI)) _ rfl rfl $$ Htext
-  ihave #Hi_bfc := text_instr 0x80000bfc#64 true (instruction.STORE (8#12, regidx.Regidx 1#5, regidx.Regidx 2#5, 8)) _ rfl rfl $$ Htext
-  ihave #Hi_bfe := text_instr 0x80000bfe#64 true (instruction.STORE (0#12, regidx.Regidx 8#5, regidx.Regidx 2#5, 8)) _ rfl rfl $$ Htext
-  ihave #Hi_c00 := text_instr 0x80000c00#64 true (instruction.ITYPE (16#12, regidx.Regidx 2#5, regidx.Regidx 8#5, iop.ADDI)) _ rfl rfl $$ Htext
-  ihave #Hi_c22 := text_instr 0x80000c22#64 true (instruction.LOAD (8#12, regidx.Regidx 2#5, regidx.Regidx 1#5, false, 8)) _ rfl rfl $$ Htext
-  ihave #Hi_c24 := text_instr 0x80000c24#64 true (instruction.LOAD (0#12, regidx.Regidx 2#5, regidx.Regidx 8#5, false, 8)) _ rfl rfl $$ Htext
-  ihave #Hi_c26 := text_instr 0x80000c26#64 true (instruction.ITYPE (16#12, regidx.Regidx 2#5, regidx.Regidx 2#5, iop.ADDI)) _ rfl rfl $$ Htext
-  ihave #Hi_c28 := text_instr 0x80000c28#64 true (instruction.JALR (0#12, regidx.Regidx 1#5, regidx.Regidx 0#5)) _ rfl rfl $$ Htext
   simp only [popOffAddr, KernelSyms.«pop_off»]
   k_norm
   -- prologue
   iapply (wp_prologue2 cpu k hsie htier 0x80000bfa#64 (by omega))
+  k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm
   iframe
-  iframe #
   inext
   iintro Hk Hpc Hframe
   -- jal mycpu
@@ -208,9 +200,9 @@ theorem pop_off_proof (M : MYCPU) : POPOFF := ⟨fun {hlc GF} _ _ cpu k hsie hti
     iapply (wp_epilogue2 cpu k.popOff (by k_norm) (by k_norm) 0x80000c22#64 (by k_norm; omega) _ ?hR2
       (k.regs 1#5) (k.regs 8#5)) $$ [- $Hk $Hpc]
     rotate_right 1
+    k_code (text_instr _ _ _ _ rfl rfl) Htext
     k_norm
     iframe
-    iframe #
     inext
     iintro Hk Hpc
     iapply HΦ $$ %_ Hk Hpc
@@ -230,9 +222,9 @@ theorem pop_off_proof (M : MYCPU) : POPOFF := ⟨fun {hlc GF} _ _ cpu k hsie hti
     iapply (wp_epilogue2 cpu k.popOff (by k_norm) (by k_norm) 0x80000c22#64 (by k_norm; omega) _ ?hR2
       (k.regs 1#5) (k.regs 8#5)) $$ [- $Hk $Hpc]
     rotate_right 1
+    k_code (text_instr _ _ _ _ rfl rfl) Htext
     k_norm
     iframe
-    iframe #
     inext
     iintro Hk Hpc
     iapply HΦ $$ %_ Hk Hpc

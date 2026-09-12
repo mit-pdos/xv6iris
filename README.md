@@ -77,7 +77,7 @@ MachCSL/                          the framework (nothing xv6-specific)
                    fact by kernel evaluation (`rfl`), ~30 ms per word
   WpCycle.lean     the cycle lemmas (one `riscvStep` = dispatch, fetch,
                    decode, execute, retire, optional tick), `fetchSpec`/
-                   `execSpec`, `decode_fact`; `wpLoop_m_instr` over `instr`
+                   `execSpec`; `wpLoop_m_instr` over `instr`
   WpMmode.lean     per-instruction M-mode rules `wp_m_<instr>` (auipc, lui,
                    addi, add, mul, csrr mhartid, jal, ld), each covering the
                    compressed encoding too

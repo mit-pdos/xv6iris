@@ -25,23 +25,13 @@ theorem release_proof (HO : HOLDING) (PO : POPOFF) : RELEASE := ⟨
   unfold wp_release_body
   iintro ⟨Hk, #Htext, Hpc, #Hlk, Hlocked, HR, HΦ⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
-  ihave #Hi_c42 := text_instr 0x80000c42#64 true (instruction.ITYPE (4064#12, regidx.Regidx 2#5, regidx.Regidx 2#5, iop.ADDI)) _ rfl rfl $$ Htext
-  ihave #Hi_c44 := text_instr 0x80000c44#64 true (instruction.STORE (24#12, regidx.Regidx 1#5, regidx.Regidx 2#5, 8)) _ rfl rfl $$ Htext
-  ihave #Hi_c46 := text_instr 0x80000c46#64 true (instruction.STORE (16#12, regidx.Regidx 8#5, regidx.Regidx 2#5, 8)) _ rfl rfl $$ Htext
-  ihave #Hi_c48 := text_instr 0x80000c48#64 true (instruction.STORE (8#12, regidx.Regidx 9#5, regidx.Regidx 2#5, 8)) _ rfl rfl $$ Htext
-  ihave #Hi_c4a := text_instr 0x80000c4a#64 true (instruction.ITYPE (32#12, regidx.Regidx 2#5, regidx.Regidx 8#5, iop.ADDI)) _ rfl rfl $$ Htext
-  ihave #Hi_c64 := text_instr 0x80000c64#64 true (instruction.LOAD (24#12, regidx.Regidx 2#5, regidx.Regidx 1#5, false, 8)) _ rfl rfl $$ Htext
-  ihave #Hi_c66 := text_instr 0x80000c66#64 true (instruction.LOAD (16#12, regidx.Regidx 2#5, regidx.Regidx 8#5, false, 8)) _ rfl rfl $$ Htext
-  ihave #Hi_c68 := text_instr 0x80000c68#64 true (instruction.LOAD (8#12, regidx.Regidx 2#5, regidx.Regidx 9#5, false, 8)) _ rfl rfl $$ Htext
-  ihave #Hi_c6a := text_instr 0x80000c6a#64 true (instruction.ITYPE (32#12, regidx.Regidx 2#5, regidx.Regidx 2#5, iop.ADDI)) _ rfl rfl $$ Htext
-  ihave #Hi_c6c := text_instr 0x80000c6c#64 true (instruction.JALR (0#12, regidx.Regidx 1#5, regidx.Regidx 0#5)) _ rfl rfl $$ Htext
   simp only [releaseAddr, KernelSyms.«release»]
   k_norm
   -- prologue
   iapply (wp_prologue4s1 cpu k hsie htier 0x80000c42#64 (by omega))
+  k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm
   iframe
-  iframe #
   inext
   iintro Hk Hpc Hframe
   -- mv s1,a0
@@ -136,9 +126,9 @@ theorem release_proof (HO : HOLDING) (PO : POPOFF) : RELEASE := ⟨
   iapply (wp_epilogue4s1 cpu ((k.withLocks (k.locks.filter (fun x => x ≠ s))).popOff) (by k_norm) (by k_norm)
     0x80000c64#64 (by k_norm; omega) R3 (by k_norm; exact h32) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5))
     $$ [- $Hk $Hpc]
+  k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm
   iframe
-  iframe #
   inext
   iintro Hk Hpc
   k_norm

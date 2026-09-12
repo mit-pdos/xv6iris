@@ -1,7 +1,7 @@
 /-
-Shared by the `Code<F>.lean` files (the instruction tables) and the proofs:
-literal byte windows as byte cells, and `instr pc is_rvc i` facts computed
-from a function's table (`text_instr`).
+`instr pc is_rvc i` facts computed from the kernel text (`text_instr`): a
+search-tree lookup of `pc` plus the read-only decode walk, both evaluated by
+`rfl` at the point a proof applies an instruction rule.
 -/
 import MachCSL.WpCycle
 import MachCSL.DecodeBridge
@@ -14,19 +14,6 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
-
-/-- A read-only byte of kernel text: the boot image's. -/
-def textByte (a : BitVec 64) (b : BitVec 8) : IProp GF := imgByte a b
-
-/-- Byte windows of literal address, width and contents unfold to byte cells. -/
-macro "byte_cells" : tactic =>
-  `(tactic| simp only [instrBytes, imgBytes, List.range, List.range.loop,
-      Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil, nthByte,
-      BitVec.reduceExtractLsb', BitVec.reduceAdd, BitVec.reduceOfNat, Nat.reduceMul])
-
-/-- The geometry facts of `instrBytes`, all decidable at literal addresses. -/
-macro "code_geometry" : tactic =>
-  `(tactic| (ipureintro; refine ⟨by simp [inRam, ramBase, ramEnd], by decide, by decide⟩))
 
 /-! ## Instruction facts straight from the kernel text
 
@@ -84,10 +71,6 @@ theorem ofNat_toNat_pc (pc : BitVec 64) : BitVec.ofNat 64 pc.toNat = pc :=
 
 theorem ofNat_toNat_pc2 (pc : BitVec 64) : BitVec.ofNat 64 (pc.toNat + 2) = pc + 2#64 := by
   rw [BitVec.ofNat_add, ofNat_toNat_pc]
-
-instance (L : List Kernel.KInstr) : Persistent (PROP := IProp GF) ([∗list] k ∈ L, instrBytes k) := by
-  unfold instrBytes imgBytes
-  infer_instance
 
 /-- `instr pc rvc i` from the kernel text: the two walks (machine and
 supervisor reference maps) agree on the encoding's AST `i₀`. -/

@@ -37,11 +37,16 @@ macro "st_norm" : tactic =>
       lower_mie_xv6, menvcfgWrite_adue, menvcfgWrite_stce, legalize_mcounteren_xv6, mretMstatus_xv6,
       timerinitConf, startConf])
 
+set_option hygiene false in
+/-- One instruction: apply its rule, frame the resources, prove the rule's
+`instr` premise from the kernel text (`Htext`) in a subgoal, step into the
+continuation. -/
 macro "st_step" rule:term : tactic =>
   `(tactic| (iapply $rule:term
              st_norm
              iframe
              iframe #
+             (isplitr; · iapply (text_instr _ _ _ _ rfl rfl); iexact Htext)
              st_norm
              inext))
 
@@ -70,18 +75,6 @@ theorem start_seg1 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx
      wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨HmConf, Hclock, Htok, #Htext, Hpc, Hx1, Hx2, Hx8, Hx14, Hx15, Hf0, Hf8, HΦ⟩
-  ihave #Hi058 := text_instr 0x80000058#64 true (instruction.ITYPE (BitVec.signExtend 12 48#6, regidx.Regidx 2#5, regidx.Regidx 2#5, iop.ADDI)) _ rfl rfl $$ Htext
-  ihave #Hi05a := text_instr 0x8000005a#64 true (instruction.STORE (8#12, regidx.Regidx 1#5, regidx.Regidx 2#5, 8)) _ rfl rfl $$ Htext
-  ihave #Hi05c := text_instr 0x8000005c#64 true (instruction.STORE (0#12, regidx.Regidx 8#5, regidx.Regidx 2#5, 8)) _ rfl rfl $$ Htext
-  ihave #Hi05e := text_instr 0x8000005e#64 true (instruction.ITYPE (16#12, regidx.Regidx 2#5, regidx.Regidx 8#5, iop.ADDI)) _ rfl rfl $$ Htext
-  ihave #Hi060 := text_instr 0x80000060#64 false (instruction.CSRReg (0x300#12, regidx.Regidx 0#5, regidx.Regidx 15#5, csrop.CSRRS)) _ rfl rfl $$ Htext
-  ihave #Hi064 := text_instr 0x80000064#64 true (instruction.UTYPE (BitVec.signExtend 20 62#6, regidx.Regidx 14#5, uop.LUI)) _ rfl rfl $$ Htext
-  ihave #Hi066 := text_instr 0x80000066#64 false (instruction.ITYPE (2047#12, regidx.Regidx 14#5, regidx.Regidx 14#5, iop.ADDI)) _ rfl rfl $$ Htext
-  ihave #Hi06a := text_instr 0x8000006a#64 true (instruction.RTYPE (regidx.Regidx 14#5, regidx.Regidx 15#5, regidx.Regidx 15#5, rop.AND)) _ rfl rfl $$ Htext
-  ihave #Hi06c := text_instr 0x8000006c#64 true (instruction.UTYPE (BitVec.signExtend 20 1#6, regidx.Regidx 14#5, uop.LUI)) _ rfl rfl $$ Htext
-  ihave #Hi06e := text_instr 0x8000006e#64 false (instruction.ITYPE (2048#12, regidx.Regidx 14#5, regidx.Regidx 14#5, iop.ADDI)) _ rfl rfl $$ Htext
-  ihave #Hi072 := text_instr 0x80000072#64 true (instruction.RTYPE (regidx.Regidx 14#5, regidx.Regidx 15#5, regidx.Regidx 15#5, rop.OR)) _ rfl rfl $$ Htext
-  ihave #Hi074 := text_instr 0x80000074#64 false (instruction.CSRReg (0x300#12, regidx.Regidx 15#5, regidx.Regidx 0#5, csrop.CSRRW)) _ rfl rfl $$ Htext
   st_norm
   -- 80000058: addi sp,sp,-16
   st_step wp_m_addi_same cpu (DFrac.own 1) bootConf bootConf_ok _ true (BitVec.signExtend 12 48#6) 2#5 (by decide) sp₀
@@ -148,28 +141,6 @@ theorem start_seg2 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx
      wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨HmConf, Hclock, #Htext, Hpc, Hx14, Hx15, HΦ⟩
-  ihave #Hi078 := text_instr 0x80000078#64 false (instruction.UTYPE (1#20, regidx.Regidx 15#5, uop.AUIPC)) _ rfl rfl $$ Htext
-  ihave #Hi07c := text_instr 0x8000007c#64 false (instruction.ITYPE (3512#12, regidx.Regidx 15#5, regidx.Regidx 15#5, iop.ADDI)) _ rfl rfl $$ Htext
-  ihave #Hi080 := text_instr 0x80000080#64 false (instruction.CSRReg (0x341#12, regidx.Regidx 15#5, regidx.Regidx 0#5, csrop.CSRRW)) _ rfl rfl $$ Htext
-  ihave #Hi084 := text_instr 0x80000084#64 true (instruction.ITYPE (BitVec.signExtend 12 0#6, regidx.Regidx 0#5, regidx.Regidx 15#5, iop.ADDI)) _ rfl rfl $$ Htext
-  ihave #Hi086 := text_instr 0x80000086#64 false (instruction.CSRReg (0x180#12, regidx.Regidx 15#5, regidx.Regidx 0#5, csrop.CSRRW)) _ rfl rfl $$ Htext
-  ihave #Hi08a := text_instr 0x8000008a#64 true (instruction.UTYPE (BitVec.signExtend 20 16#6, regidx.Regidx 15#5, uop.LUI)) _ rfl rfl $$ Htext
-  ihave #Hi08c := text_instr 0x8000008c#64 true (instruction.ITYPE (BitVec.signExtend 12 63#6, regidx.Regidx 15#5, regidx.Regidx 15#5, iop.ADDI)) _ rfl rfl $$ Htext
-  ihave #Hi08e := text_instr 0x8000008e#64 false (instruction.CSRReg (0x302#12, regidx.Regidx 15#5, regidx.Regidx 0#5, csrop.CSRRW)) _ rfl rfl $$ Htext
-  ihave #Hi092 := text_instr 0x80000092#64 false (instruction.CSRReg (0x303#12, regidx.Regidx 15#5, regidx.Regidx 0#5, csrop.CSRRW)) _ rfl rfl $$ Htext
-  ihave #Hi096 := text_instr 0x80000096#64 false (instruction.CSRReg (0x104#12, regidx.Regidx 0#5, regidx.Regidx 15#5, csrop.CSRRS)) _ rfl rfl $$ Htext
-  ihave #Hi09a := text_instr 0x8000009a#64 false (instruction.ITYPE (544#12, regidx.Regidx 15#5, regidx.Regidx 15#5, iop.ORI)) _ rfl rfl $$ Htext
-  ihave #Hi09e := text_instr 0x8000009e#64 false (instruction.CSRReg (0x104#12, regidx.Regidx 15#5, regidx.Regidx 0#5, csrop.CSRRW)) _ rfl rfl $$ Htext
-  ihave #Hi0a2 := text_instr 0x800000a2#64 true (instruction.ITYPE (BitVec.signExtend 12 63#6, regidx.Regidx 0#5, regidx.Regidx 15#5, iop.ADDI)) _ rfl rfl $$ Htext
-  ihave #Hi0a4 := text_instr 0x800000a4#64 true (instruction.SHIFTIOP (10#6, regidx.Regidx 15#5, regidx.Regidx 15#5, sop.SRLI)) _ rfl rfl $$ Htext
-  ihave #Hi0a6 := text_instr 0x800000a6#64 false (instruction.CSRReg (0x3B0#12, regidx.Regidx 15#5, regidx.Regidx 0#5, csrop.CSRRW)) _ rfl rfl $$ Htext
-  ihave #Hi0aa := text_instr 0x800000aa#64 true (instruction.ITYPE (BitVec.signExtend 12 15#6, regidx.Regidx 0#5, regidx.Regidx 15#5, iop.ADDI)) _ rfl rfl $$ Htext
-  ihave #Hi0ac := text_instr 0x800000ac#64 false (instruction.CSRReg (0x3A0#12, regidx.Regidx 15#5, regidx.Regidx 0#5, csrop.CSRRW)) _ rfl rfl $$ Htext
-  ihave #Hi0b0 := text_instr 0x800000b0#64 false (instruction.CSRReg (0x30A#12, regidx.Regidx 0#5, regidx.Regidx 15#5, csrop.CSRRS)) _ rfl rfl $$ Htext
-  ihave #Hi0b4 := text_instr 0x800000b4#64 true (instruction.ITYPE (BitVec.signExtend 12 1#6, regidx.Regidx 0#5, regidx.Regidx 14#5, iop.ADDI)) _ rfl rfl $$ Htext
-  ihave #Hi0b6 := text_instr 0x800000b6#64 true (instruction.SHIFTIOP (61#6, regidx.Regidx 14#5, regidx.Regidx 14#5, sop.SLLI)) _ rfl rfl $$ Htext
-  ihave #Hi0b8 := text_instr 0x800000b8#64 true (instruction.RTYPE (regidx.Regidx 14#5, regidx.Regidx 15#5, regidx.Regidx 15#5, rop.OR)) _ rfl rfl $$ Htext
-  ihave #Hi0ba := text_instr 0x800000ba#64 false (instruction.CSRReg (0x30A#12, regidx.Regidx 15#5, regidx.Regidx 0#5, csrop.CSRRW)) _ rfl rfl $$ Htext
   simp only [startConf1]
   st_norm
   have ok1 : MConf.ok (GF := GF) { mstatus := 0xA00000800#64, mie := 0#64, mideleg := 0#64, medeleg := 0#64, mepc := 0#64, satp := 0#64, menvcfg := 0#64, mcounteren := 0#32, mtimecmp := 0xFFFFFFFFFFFFFFFF#64, stimecmp := 0xFFFFFFFFFFFFFFFF#64, pmpcfg := bootPmpcfg, pmpaddr := bootPmpaddr } :=
@@ -296,11 +267,6 @@ theorem StartProof (T : TIMERINIT) : START where
     iframe
     iframe #
     iintro HmConf Hclock Hpc Hx14 Hx15
-    ihave #Hi0be := text_instr 0x800000be#64 false (instruction.JAL (2096990#21, regidx.Regidx 1#5)) _ rfl rfl $$ Htext
-    ihave #Hi0c2 := text_instr 0x800000c2#64 false (instruction.CSRReg (0xF14#12, regidx.Regidx 0#5, regidx.Regidx 15#5, csrop.CSRRS)) _ rfl rfl $$ Htext
-    ihave #Hi0c6 := text_instr 0x800000c6#64 true (instruction.ADDIW (BitVec.signExtend 12 0#6, regidx.Regidx 15#5, regidx.Regidx 15#5)) _ rfl rfl $$ Htext
-    ihave #Hi0c8 := text_instr 0x800000c8#64 true (instruction.RTYPE (regidx.Regidx 15#5, regidx.Regidx 0#5, regidx.Regidx 4#5, rop.ADD)) _ rfl rfl $$ Htext
-    ihave #Hi0ca := text_instr 0x800000ca#64 false (instruction.MRET ()) _ rfl rfl $$ Htext
     simp only [startConf8]
     have ok8 : MConf.ok (GF := GF) { mstatus := 0xA00000800#64, mie := 0x220#64, mideleg := 0x2222#64, medeleg := 0xb3ff#64, mepc := 0x80000e30#64, satp := 0#64, menvcfg := 0x2000000000000000#64, mcounteren := 0#32, mtimecmp := 0xFFFFFFFFFFFFFFFF#64, stimecmp := 0xFFFFFFFFFFFFFFFF#64, pmpcfg := xv6Pmpcfg, pmpaddr := xv6Pmpaddr } :=
       MConf.ok_xv6 _ ⟨by decide, by decide⟩ rfl rfl
@@ -346,6 +312,7 @@ theorem StartProof (T : TIMERINIT) : START where
     st_norm
     iframe
     iframe #
+    (isplitr; · iapply (text_instr _ _ _ _ rfl rfl); iexact Htext)
     st_norm
     inext
     iintro HS Hclock Hpc
