@@ -45,6 +45,7 @@ Require Import UexecCond.       (* [cond_entry_slot] -- the plain generic slot *
 Require Import FirstTok.        (* in the require block for FsAbsInvFire's
                                    sake; nothing here names its [fsabs_env] *)
 Require Import UexecExecInst.   (* the class INSTANCE: [uexecSG_xv6] / [uprogSG_gen] *)
+Require Import RegFile.         (* [regfile] -- [udepw]'s register argument *)
 Require Import UkRun.           (* [udep] -- the supplier and its key-free law *)
 Require Import AppInv.          (* [app_sup] -- the credential both mints take *)
 From Kernel Require KernelSyms.
@@ -74,6 +75,40 @@ Section UexecExecMint.
     iIntros "#Hsup". iSplitR; [ iModIntro; iExact "Hsup" | ].
     iPureIntro. intros n W Q _ Hne.
     exact (sbundle_of_supply_ne uslot n W Q Hne).
+  Qed.
+
+  (* ===================================================================== *)
+  (* ...AND THE VERIFIED PROGRAM'S SUPPLY, WHICH IS NOTHING (lane            *)
+  (* SUPPLY-SPLIT, P2).  At [UexecExecInst.uprogSG_free] the supplier is     *)
+  (* [True] and the admitted numbers are [xv6_free] -- every number whose    *)
+  (* branch of [xv6_sbundle] is [emp], plus 9 (chdir), whose branch is       *)
+  (* discharged by a closed fact.  So a program that calls only those        *)
+  (* numbers builds its [udep] from nothing, and its entry slot is no        *)
+  (* longer a function of [AppInv.app_sup] -- which for the echo application *)
+  (* IS the taint ([AppEcho.echo_taint_of_sup]).                             *)
+  (*                                                                        *)
+  (* THE LAW'S OWN PREMISES DO THE WORK: it is guarded on [psok n] and       *)
+  (* [n <> USYS_exec], and [xv6_free n] is the former.                       *)
+  (* ===================================================================== *)
+  Lemma udep_free : ⊢ udep (PS := uprogSG_free).
+  Proof.
+    rewrite /udep /Dsup /=.
+    iSplit; [ iModIntro; done | ].
+    iPureIntro. intros n W Q Hok _.
+    iIntros "_".
+    rewrite /sbundle_pay /sbundle_at /sexit_pay /=.
+    iApply (xv6_sbundle_free uslot n W Q Hok).
+  Qed.
+
+  (* ...and what a generic-route LEAF takes, at the free instance: the
+     program-side premise every [udepw_of_psok] site becomes under the
+     sweep ([UkRun.udepw_of_psok] at [psok := xv6_free]). *)
+  Lemma udepw_free (N : uk_names Σ) (m : regfile) (pc : mword 64) (n : Z) :
+    xv6_free n -> ⊢ udepw (PS := uprogSG_free) N m pc n.
+  Proof.
+    intros Hn.
+    exact (udepw_of_psok (PS := uprogSG_free) N m pc n Hn
+             (proj1 Hn)).
   Qed.
 
   (* the loop's mint: the generic slot at every key, out of the supply.

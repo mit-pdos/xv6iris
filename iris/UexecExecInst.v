@@ -917,6 +917,76 @@ Section UexecExecInst.
     {| Dsup := xv6_ssupply;
        psok := fun _ : Z => True |}.
 
+  (* ===================================================================== *)
+  (* THE FREE SUPPLY (lane SUPPLY-SPLIT, P2).                               *)
+  (*                                                                        *)
+  (* [xv6_sbundle] is ONE MATCH ON THE NUMBER and eight of its branches      *)
+  (* read the application's abstract state; every OTHER number's branch is   *)
+  (* [emp], and 9 (chdir) -- whose branch is a walk premise and a READ-kind  *)
+  (* commit -- is discharged by a closed fact                                *)
+  (* ([FsAbsInvFire.fsabs_chdir_pre] takes no [app_sup]).  So a program that *)
+  (* calls only those numbers owes NOTHING for its deposits, and that is     *)
+  (* what this predicate names.                                             *)
+  (*                                                                        *)
+  (* THE EIGHT EXCLUDED are exactly the branches whose discharge consumes    *)
+  (* the supply:                                                            *)
+  (*   7  exec   -- the law never admits it (its bundle reads the key); the  *)
+  (*                deposit goes the EXPLICIT route ([UkRun.uxsup]).         *)
+  (*   5  read   -- the CONSOLE arm ([ConsoleInv.cons_acc]'s tainted         *)
+  (*                disjunct); the inode arm is free.  A LEASE holder pays   *)
+  (*                it at its own claim ([UkRun.udepwf_std]).                *)
+  (*   15 open   -- create / trunc / child are write-kind [AppInv.app_step]s.*)
+  (*                A PINNED open pays them ([UkRun.udepwf_at]).             *)
+  (*   16 write  -- the INODE arm is the write chain.  The law is KEY-FREE,  *)
+  (*                so admitting 16 means paying it at a key whose fd is an  *)
+  (*                inode; the console arm alone is free                     *)
+  (*                ([FsAbsInvFire.fsabs_filewrite_in]'s device leg mints    *)
+  (*                only the trace seed), so 16's honest supplier is         *)
+  (*                LEDGER-FIXED, not key-free.                              *)
+  (*   17 mknod, 18 unlink, 19 link, 20 mkdir -- write-kind commits.          *)
+  (* ===================================================================== *)
+  Definition xv6_free (n : Z) : Prop :=
+    n <> USYS_exec /\ n <> 5 /\ n <> 15 /\ n <> 16 /\ n <> 17 /\
+    n <> 18 /\ n <> 19 /\ n <> 20.
+
+  Global Instance xv6_free_dec (n : Z) : Decision (xv6_free n).
+  Proof. rewrite /xv6_free. apply _. Defined.
+
+  (* the FREE column of the classification, as one lemma: at a free number
+     the deposit is minted from nothing, at whatever payload the leaf names *)
+  Lemma xv6_sbundle_free (X : uvis -d> iPropO Σ) (n : Z) (W : uvis)
+      (Q : Z -> iProp Σ) :
+    xv6_free n ->
+    ⊢ |==> ∃ f : xfam, ⌜kf_xpay f = Q⌝ ∗ xv6_sbundle X n f W.
+  Proof.
+    intros (Hx & H5 & H15 & H16 & H17 & H18 & H19 & H20).
+    iAssert (|==> xv6_sbundle X n (xfam_at Q xfam_pt) W)%I with "[]" as "Hb";
+      [ | iMod "Hb" as "Hb"; iModIntro; iExists (xfam_at Q xfam_pt);
+          iSplitR; [ done | iExact "Hb" ] ].
+    rewrite /xv6_sbundle /xfam_at /xfam_pt /xfam_exec /=.
+    destruct (decide (n = USYS_exec)) as [He | _]; [ exfalso; exact (Hx He) | ].
+    destruct (decide (n = 5)) as [He | _]; [ exfalso; exact (H5 He) | ].
+    (* 9 -- chdir: open's walk premise and open's PLAIN commit, both closed *)
+    destruct (decide (n = 9)) as [_ | _];
+      [ iModIntro; iApply fsabs_chdir_pre | ].
+    destruct (decide (n = 15)) as [He | _]; [ exfalso; exact (H15 He) | ].
+    destruct (decide (n = 16)) as [He | _]; [ exfalso; exact (H16 He) | ].
+    destruct (decide (n = 17)) as [He | _]; [ exfalso; exact (H17 He) | ].
+    destruct (decide (n = 18)) as [He | _]; [ exfalso; exact (H18 He) | ].
+    destruct (decide (n = 19)) as [He | _]; [ exfalso; exact (H19 He) | ].
+    destruct (decide (n = 20)) as [He | _]; [ exfalso; exact (H20 He) | ].
+    by iModIntro.
+  Qed.
+
+  (* ...AND THE VERIFIED PROGRAM'S OWN DEPOSIT DATA: NO SUPPLIER AT ALL and
+     the free numbers.  NOT a [Global Instance] -- [uprogSG_gen] is the one
+     instance typeclass resolution may find, and a second one would make
+     every [udep] in the tree ambiguous.  A caller names this one
+     explicitly ([UexecExecMint.udep_free] is its law). *)
+  Definition uprogSG_free : uprogSG Σ :=
+    {| Dsup := True%I;
+       psok := xv6_free |}.
+
   (* ...and the two at the class field, which is [exec_sbundle] at 7: what
      a consumer that speaks [UexecSG.sbundle_at] reads it back at.  The
      INTRO is at the families the caller chose (packed into the record);
