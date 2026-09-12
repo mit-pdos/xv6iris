@@ -77,9 +77,9 @@ patch: `projects/wx-briefs/`.
   (recommended) and (B) a no-exhaustion premise. Pipeline meanwhile: SH-LINE 2a
   LANDED (`69e38c9f0`, build `shline37`; the payload half blocked by a SECOND
   seam: the generic slot exists only at the trivial payload -- note "SECOND SEAM
-  FOUND") → GENERIC-PAY (`wx-briefs/brief-generic-pay.md`, fresh agent,
-  LAUNCHED 2026-09-12: the generic slot at a constant payload, then sh's real
-  payload) → CONS-SWALLOW
+  FOUND") → GENERIC-PAY LANDED (2026-09-12, build `gpay28`; note "GENERIC-PAY
+  LANDED") → CONS-SWALLOW (`wx-briefs/brief-cons-swallow.md`, kernel lane, fresh
+  agent, LAUNCHED 2026-09-12)
   (`wx-briefs/brief-cons-swallow.md`, kernel lane, option-independent) → SH-LINE
   2b → [MAP-KEY if (A)] → E4 → E2 → E5
   → SH-LINE phase 2 → E4 → E2 → E5.

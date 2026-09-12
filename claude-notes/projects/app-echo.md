@@ -2334,6 +2334,34 @@ DEVICE arm says the walk of THIS path ended at a device node; rows 15/17 read
 `uvis_M W` and `xk_a W 0`; the generic suppliers are `*_at_of_all` instances;
 `UkRunSys`/`UkInit` unchanged.  chdir/unlink keep `∀ pl`.
 
+GENERIC-PAY LANDED (2026-09-12; the commit after `4686335f2`; 16 u-tier files,
++759/-329; VM build `gpay28`, audit = the thirteen, lemma_diff CLEAN).  The
+generic slot exists at any CONSTANT payload: `UexecRet.uexec_wp_uslot R W`
+takes `my_pay _ (fun _ => R)` and `R`; the deposit pays `R` at every cause
+(`uexec_pay_dep_const`; exit's `R ∧ R` from one copy), exec relays it
+(`xv6_sbundle_of_supply` at `kf_xpay f = fun _ => R`), every resume hands it
+back; fork's child stays trivial (two credentials in the Löb:
+`uslot_of_creds`).  `uslot_mint` stays the gated entry decider (the verified
+gates hold only at the trivial payload); `uslot_mint_pay`/`uslot_mint_all` are
+the ungated siblings for the tainted process -- THE LEASE's generic side.
+`UkRun.uxsup_at Q`; `ukn_pay_const`.  sh's entry at `Q` (`sh_uexec_slot`/
+`sh_slot_of_kexec` take `my_pay _ Q ∗ Q (-1)` + constancy); runcmd takes both
+supplies (EXEC arm at its payload, LIST/BACK forks trivial).  init lends the
+reader per round (`uinit_tok` restart head / `uinit_lend` + `Rc := upos` at
+the fork / `child_tok _ _ (ucons_pay cn γ T)` wait head / `uinit_redeem` at
+the reap; `⌜pidsh ≠ -1⌝` on the wait head, proved at the only entry); init's
+own payload trivial, `UkInit`/`UkInitMain` at `ukn_const`.
+`UInitKernel.init_uexec_slot`/`init_slot_of_kexec` take the narrow-class
+`ucons_reader cn 0` beside `cons_key` (E2 discharges it through `Pay`;
+`ucons_reader_eq` bridges).  `init_exec_sup_pos` carries `ufd_head`
+(`ufd_head_row`); `init_exec_sup_of_sh_slot`'s bad premise is gone, replaced
+by `⌜∃ wr, st = FdOpen true wr (FdDevice CONSOLE)⌝` (the pinned open's
+receipt supplies it).  `init_sh_slot`'s taint arm = `uslot_mint_all`.
+E2 OWES additionally: `init_sh_slot T (sh_pay Rsh n0)` built from `app_inv`,
+the claim law, `uslot_mint_all`, `sh_pay`, at `T := echo_taint γcl`,
+`st := FdOpen true true (FdDevice CONSOLE)`; and the token premise.
+`UkSh.ush_rest` is still the sh-walk wiring (SH-LINE 2b).
+
 SH-LINE PHASE 2a LANDED (2026-09-12; `69e38c9f0`; 25 u-tier files, +1043/-263;
 VM build `shline37`, audit = the thirteen).  `UkRunSys.wp_uk_ecall_read_recv`
 PROVED at the trapping key on `UkRun.udepwf_std`; `UkRun.urun_gen` (the taint's
