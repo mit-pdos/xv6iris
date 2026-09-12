@@ -53,9 +53,12 @@ patch: `projects/wx-briefs/`.
   `openpin54` EXIT=0, audit = the thirteen, lemma_diff = one justified GONE;
   the create leg spends the arm's permit; the console KEY; init's mknod bundle
   PROVED; the first open pinned as a MISS; note "OPEN-PIN PHASE 2 MILESTONE
-  LANDED") → OPEN-PIN phase 3 (`wx-briefs/brief-open-pin-3.md`: the two U-tier
-  leaves, init's open/mknod/dups at the named ledger, the three-arm head through
-  UkInitMain and the fork's child arm; LAUNCHED 2026-09-12)
+  LANDED") → OPEN-PIN phase 3 LANDED (2026-09-12; 7 files + `UInitFd.v`; VM build
+  `openpin68` EXIT=0, audit = the thirteen, lemma_diff = one justified GONE; the
+  three receipt-keeping leaves, init's console calls as leaf bodies, one head
+  from the second open to the fork; see the commit message) → OPEN-PIN phase 4
+  (`wx-briefs/brief-open-pin-4.md`: the era-level discharge of
+  `UkInit.init_cons_leaves` in a new `UInitConsK.v`; LAUNCHED 2026-09-12)
   → SH-LINE phase 2 → E4 → E2 → E5.
 - Standing rulings from the lanes (WX-EXIT/WX-INV build on them): rows per slot
   born at boot; the map's and the orphans' names canonical on `wchG`; ZOMBIE row
