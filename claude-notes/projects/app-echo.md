@@ -2404,6 +2404,41 @@ ORDER: GENERIC-PAY → CONS-SWALLOW → SH-LINE 2b (gets on `ush_gets_line`,
 `wp_uk_ecall_read_recv` with `upos` threaded read → gets_loop → gets → getcmd
 → main) → LAZY-FLAG (the owner's form of (A)).
 
+PRINTK-LEDGER PHASE 1 (2026-09-12; `-sup`, `lane/printk-ledger` on main
+`b0cc198c6`, build `pkl26`: 968 compiled, 2 red -- ProofPrintk's pinned post,
+ProofMain's newlock).  Landed: `un_kled`/`un_kfl` in `uart_names` (so
+`pr_res`/`printk_env`/`printk_gen_contract` keep their arity and the ~50 files
+threading the contract as a Prop do not move); `k_ledger_auth/_lb`, `k_flight`;
+A LEDGER ENTRY IS `(format string, rendered bytes)` -- the APPLICATION picks the
+admitted templates, the kernel names no admission set; `pr_res γd := ∃ ms,
+k_ledger_auth γd ms ∗ ⌜k_ledger_ok ms⌝ ∗ k_flight γd (1/2) []` (pr.lock's
+resource, was `emp`); `k_ledger_tie tg ms fl := tag_proj TxK tg (k_bytes ms ++
+fl)`, `k_tags_ledger` (stated without a producer until the THR leaf takes the
+in-flight half for `TxK`); `PrintkRender.v` (pure, proved): `pk_render` mirrors
+`PrintkFmt.pk_kinds`, `printint_bytes`, `template_match f m := ∃ vs, pk_kinds f
+= map pk_val_kind vs ∧ m = pk_render f vs`, `pk_site`; the full contract's post
+`⌜cs = pk_render f (pk_vals m0 descs)⌝ ∗ k_ledger_lb γd (ms ++ [(f, cs)])`; the
+GEN corollary gains ONE pure premise `pk_site f` (14 application sites);
+`kernel_msgs adm ms := ∃ bs es, k_split bs es ms ∧ k_boot_ledger bs ∧ Forall
+(k_entry adm) es` with `k_boot_ledger bs := ∃ hl ≡ₚ k_hart_lines, bs prefix_of
+[nl; booting; nl] ++ hl`, the constants `kernel_msgs_fs = [balloc; ialloc;
+ireclaim; recover]`, `kernel_msgs_trap = [unknown; usertrap1; usertrap2]`,
+`kernel_msgs_procdump`, and `kernel_msgs_mono` (admitting more only weakens).
+THE SIXTEEN SITES: four boot call sites (ten messages), fs×3, log×1,
+syscall×1, trap×4 (two REFUTED in the proofs: kerneltrap's `Hsc`, devintr's
+`plic_claim_ret_ok` -- so no template needed), procdump×3 (DEAD at the pin:
+no `^P` arm in consoleintr, no Rocq caller); directives used: `%d`, `%s`,
+`%lx` only; "hart %d"'s value is DERIVABLE from `SpecCpuid`'s pinned post
+(phase 2 threads it).  PRINTINT'S DIGITS CAN BE PINNED (the buffer is a
+content-free `bytes_own`; the fix: `bytes_own_name`, the row `x = x0 /
+base^i`, the sign store, the print loop closed by consputc's pinned post).
+PHASE-2 RULINGS: the THR leaf takes a `match src` claim (the K in-flight half
+for `TxK`) SHAPED LIKE TX-RECEIPT's `tx_claim` so the two lanes merge by
+juxtaposition; the hart lines' at-most-once via a per-hart one-shot in
+`boot_hart_pre`, banners-before via `k_ledger_lb [banners]` on the `started`
+invariant; `boot_k_shape` deleted.  `BACKSPACE` is the int 0x100 (not byte 8):
+the "\b \b" triple is reachable only from `%c`, unused.
+
 E4 SH-ECHO PHASE 1 (2026-09-12; `-tlw`, `lane/sh-echo` = `5b4c88ef8` on
 `lane/supply-split-r1`; two NEW files `UkShEcho.v` (u-tier) + `UShEcho.v`
 (application), no existing .v edited, build `shecho14` green).  THE PARSER IS
