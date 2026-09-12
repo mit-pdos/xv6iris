@@ -501,6 +501,11 @@ Section ProofCreateFail.
                   (cr_setf dnc major minor (mword_of_int 0 : mword 16)) bmc datc
                   ltac:(rewrite cr_setf_nlink; vm_compute; reflexivity)).
     iApply fupd_wp.
+    (* THE UNARM IS THE UNDO OF THIS ARM: the tied piece is opened at the
+       inum the arm's receipt names ([FsAbsCreateFire.aunarm_of_arm]), which
+       hands the receipt straight back. *)
+    iDestruct (aunarm_of_arm_open (fs_gamma_L fsc_fs) _ Farm Fun
+                 (bv_unsigned cinum) with "Harmr Hun") as "[Harmr Hun]".
     iMod (caf_unarm_fire fsc_fs ⊤ (bv_unsigned cinum) _ Fun
             (era_node (cr_setf dnc major minor (mword_of_int 1 : mword 16))
                       bmc datc)

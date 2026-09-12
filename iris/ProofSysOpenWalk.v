@@ -303,7 +303,7 @@ Section ProofSysOpenWalk.
        block is already [FsAbsEra.ex_start] at the one path. *)
     ex_start fsc_fs (pv_cwi (us_V U)) P Pmiss (bview plen bp) -∗
     pf_at (aopen_commit_at (fs_gamma_L fsc_fs) appE) Fo -∗
-    pf_at (atrunc_commit_at (fs_gamma_L fsc_fs) appE) Ft -∗
+    open_trunc_piece (fs_gamma_L fsc_fs) vom Ft -∗
     wp_next true (proc_addr jx)
       (so_cont0_au gf ns
                 dqb dqs dqbs dqn (proc_addr jx) pidv Mim pvv vom U sts

@@ -274,7 +274,7 @@ Section ProofSysOpenJoin.
     (* ---- THE AU RESIDUE, inert across this block ---- *)
     P (length (path_elems pl)) (bv_unsigned inum) -∗
     so_obs Fo (bv_unsigned inum) (era_node dn bm data) -∗
-    pf_at (atrunc_commit_at (fs_gamma_L fsc_fs) appE) Ft -∗
+    open_trunc_piece (fs_gamma_L fsc_fs) vom Ft -∗
     wp_next true (proc_addr jx)
       (so_cont_au gf nsj
                dqb dqs (proc_addr jx) pidv Mim pvv vom U sts P Pmiss Fo Ft m K eb b lks) -∗

@@ -99,10 +99,17 @@
    tests ... filealloc/fdalloc ... itrunc ... iunlock; filealloc's ftable
    lock is a spinlock, nothing sleeps holding the inode unlocked), and the
    prover's payload custody ([IcacheEscrow.ic_loaded]'s whole [top_frag])
-   pins the authority's row across the window.  On the CREATE-fresh arm
-   the child is [AFile []] and itrunc's delta is the IDENTITY
-   ([delta_trunc_nil]); the commit is REFUNDED there rather than fired
-   vacuously.
+   pins the authority's row across the window.  On the CREATE-fresh arm the
+   child is [AFile []] and itrunc's delta is the IDENTITY
+   ([delta_trunc_nil]), so the caller's own piece fires there and its
+   receipt comes back at the empty byte list.
+
+   AND THE PIECE IS OWED ONLY WHEN THE CODE TRUNCATES.  The mode half of
+   the C test is decided before the walk runs, so the bundles carry the
+   commit under [open_trunc_piece], the guard [if om_trunc vom then ...
+   else emp] -- the same shape [SpecSysOpen.open_in] gives [om_create vom].
+   An open without O_TRUNC hands in nothing for it, and the arms give
+   nothing back.
 
    ==== WHAT IT DELIBERATELY DOES NOT SAY ==============================
 
@@ -367,6 +374,63 @@ Section OpenDefs.
   Qed.
 
   (* ------------------------------------------------------------------ *)
+  (*  2b'.  THE TRUNC PIECE IS OWED ONLY WHEN THE CODE TRUNCATES          *)
+  (* ------------------------------------------------------------------ *)
+
+  (* sys_open truncates iff [(omode & O_TRUNC) && ip->type == T_FILE], and
+     the mode half of that test is decided by the caller's own omode before
+     the walk runs.  So the trunc commit rides the guard [om_trunc vom],
+     exactly as [SpecSysOpen.open_in] rides [om_create vom]: an open without
+     O_TRUNC owes NOTHING here, and the kernel promises more by demanding
+     less.  (The type half is not the caller's to decide, which is why the
+     guard is the mode bit alone and the FILE arm is where the receipt
+     appears.)
+
+     Written as an [if] rather than as a hypothesis so the parameter lists
+     of the bundles, the arms and the receipts stay the length they have:
+     [Ft] is still named at [om_trunc vom = false], and what it is worth
+     there is [emp].
+
+     THE COMMIT IS NOT KEYED AT THE OPENED INUM, and that is forced rather
+     than chosen.  The bundle is handed in BEFORE [argstr] runs: the walk
+     sits under [∀ pl, ⌜arg_path_of M pv pl⌝ -∗ …] and the commits sit
+     OUTSIDE that wand (the note at [open_au_plain_at] says why -- argstr
+     can fail, and then no [pl] satisfies the reading, so a failure-fold
+     consumer must get the commits back on the nose).  So no inum exists to
+     name at supply time, and an [i]-indexed [atrunc_commit_at] would have
+     to be handed in as [∀ i, …], which is the obligation the unguarded
+     shape already has.  The walk's terminal cursor is no tie either: the
+     O_CREATE FRESH arm fires this piece at the child CREATE just made
+     ([SpecSysOpen.open_post_ok_create]), which went through no hop.  The
+     guard is what a constraining application needs anyway -- with the bit
+     clear it owes nothing, so [FsConsPin.file_pin_trunc]'s [i <> ino] is
+     never demanded of it. *)
+  Definition open_trunc_piece Γ (vom : mword 64)
+      (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) : iProp Σ :=
+    (if om_trunc vom then pf_at (atrunc_commit_at Γ appE) Ft else emp)%I.
+
+  (* the two readings, so no consumer destructs the [if] by hand *)
+  Lemma open_trunc_piece_true Γ (vom : mword 64)
+      (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) :
+    om_trunc vom = true ->
+    open_trunc_piece Γ vom Ft ⊣⊢ pf_at (atrunc_commit_at Γ appE) Ft.
+  Proof. intros Hv. rewrite /open_trunc_piece Hv. reflexivity. Qed.
+
+  Lemma open_trunc_piece_false Γ (vom : mword 64)
+      (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) :
+    om_trunc vom = false -> open_trunc_piece Γ vom Ft ⊣⊢ emp.
+  Proof. intros Hv. rewrite /open_trunc_piece Hv. reflexivity. Qed.
+
+  (* ...and the free one: at [om_trunc vom = false] nothing is owed, so the
+     piece is available out of thin air.  This is the whole content of the
+     tightening for a caller like init, whose [open("console", O_RDWR)] has
+     the bit clear ([om_arg_two_flags]). *)
+  Lemma open_trunc_piece_none Γ (vom : mword 64)
+      (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) :
+    om_trunc vom = false -> ⊢ open_trunc_piece Γ vom Ft.
+  Proof. intros Hv. rewrite /open_trunc_piece Hv. done. Qed.
+
+  (* ------------------------------------------------------------------ *)
   (*  2c.  The walk package (full path; the era hops; quantified start)   *)
   (* ------------------------------------------------------------------ *)
 
@@ -427,20 +491,20 @@ Section OpenDefs.
      syscall tier's ([open_au_plain_at] below, [ArgPath.arg_path_of] at
      trapframe argument 0), exactly as sys_exec's is. *)
   Definition open_au_pre_plain Γ (γfs : fs_names) (cw : Z)
-      (pl : list (bv 8))
+      (pl : list (bv 8)) (vom : mword 64)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) : iProp Σ :=
     (ex_start γfs cw P Pmiss pl
      ∗ pf_at (aopen_commit_at Γ appE) Fo
-     ∗ pf_at (atrunc_commit_at Γ appE) Ft)%I.
+     ∗ open_trunc_piece Γ vom Ft)%I.
 
   (* ...and the O_CREATE caller: the parent-prefix one-shot REUSED from
      the mknod era file at that same path ([FsAbsEra.ep_start]), create's
      fused delta at the child [AFile []], the exists observation, and
      open's own two commits *)
   Definition open_au_pre_create Γ (γfs : fs_names) (cw : Z)
-      (pl : list (bv 8))
+      (pl : list (bv 8)) (vom : mword 64)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
       (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
@@ -450,7 +514,7 @@ Section OpenDefs.
      ∗ pf_at (acre_commit_at Γ appE (AFile [])) Fok
      ∗ pf_at (dlookup_commit_at Γ appE) Fex
      ∗ pf_at (aopen_commit_at Γ appE) Fo
-     ∗ pf_at (atrunc_commit_at Γ appE) Ft
+     ∗ open_trunc_piece Γ vom Ft
      (* ...and create's CHILD legs (round E2, lane E2-C) *)
      ∗ cre_child_unfired Γ (AFile []) Farm Fun)%I.
 
@@ -479,16 +543,16 @@ Section OpenDefs.
   (*  a commit is keyed by an inum and a view, never by a string.          *)
   (* ------------------------------------------------------------------ *)
   Definition open_au_plain_at Γ (γfs : fs_names) (cw : Z)
-      (M : gmap Z (bv 8)) (pv : mword 64)
+      (M : gmap Z (bv 8)) (pv vom : mword 64)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) : iProp Σ :=
     ((∀ pl : list (bv 8), ⌜arg_path_of M pv pl⌝ -∗ ex_start γfs cw P Pmiss pl)
      ∗ pf_at (aopen_commit_at Γ appE) Fo
-     ∗ pf_at (atrunc_commit_at Γ appE) Ft)%I.
+     ∗ open_trunc_piece Γ vom Ft)%I.
 
   Definition open_au_create_at Γ (γfs : fs_names) (cw : Z)
-      (M : gmap Z (bv 8)) (pv : mword 64)
+      (M : gmap Z (bv 8)) (pv vom : mword 64)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
       (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
@@ -498,35 +562,35 @@ Section OpenDefs.
      ∗ pf_at (acre_commit_at Γ appE (AFile [])) Fok
      ∗ pf_at (dlookup_commit_at Γ appE) Fex
      ∗ pf_at (aopen_commit_at Γ appE) Fo
-     ∗ pf_at (atrunc_commit_at Γ appE) Ft
+     ∗ open_trunc_piece Γ vom Ft
      ∗ cre_child_unfired Γ (AFile []) Farm Fun)%I.
 
   (* ...and the INSTANCE: at the path the syscall actually read, the walk
      wand fires and the bundle is the one-path one above.  This is the step
      sys_open's proof takes once argstr has answered. *)
   Lemma open_au_plain_at_inst Γ (γfs : fs_names) (cw : Z)
-      (M : gmap Z (bv 8)) (pv : mword 64) (pl : list (bv 8))
+      (M : gmap Z (bv 8)) (pv vom : mword 64) (pl : list (bv 8))
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) :
     arg_path_of M pv pl ->
-    open_au_plain_at Γ γfs cw M pv P Pmiss Fo Ft -∗
-    open_au_pre_plain Γ γfs cw pl P Pmiss Fo Ft.
+    open_au_plain_at Γ γfs cw M pv vom P Pmiss Fo Ft -∗
+    open_au_pre_plain Γ γfs cw pl vom P Pmiss Fo Ft.
   Proof.
     iIntros (Hpl) "(Hw & Ho & Ht)". rewrite /open_au_pre_plain. iFrame "Ho Ht".
     iApply ("Hw" $! pl with "[%]"). exact Hpl.
   Qed.
 
   Lemma open_au_create_at_inst Γ (γfs : fs_names) (cw : Z)
-      (M : gmap Z (bv 8)) (pv : mword 64) (pl : list (bv 8))
+      (M : gmap Z (bv 8)) (pv vom : mword 64) (pl : list (bv 8))
       (P Pmiss : nat -> Z -> iProp Σ)
       (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
       (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) :
     arg_path_of M pv pl ->
-    open_au_create_at Γ γfs cw M pv P Pmiss Farm Fun Fok Fex Fo Ft -∗
-    open_au_pre_create Γ γfs cw pl P Pmiss Farm Fun Fok Fex Fo Ft.
+    open_au_create_at Γ γfs cw M pv vom P Pmiss Farm Fun Fok Fex Fo Ft -∗
+    open_au_pre_create Γ γfs cw pl vom P Pmiss Farm Fun Fok Fex Fo Ft.
   Proof.
     iIntros (Hpl) "(Hw & Hok & Hex & Ho & Ht & Hch)".
     rewrite /open_au_pre_create. iFrame "Hok Hex Ho Ht Hch".
@@ -539,14 +603,14 @@ Section OpenDefs.
      one-path bundle -- the direction that matters, since the bundle is
      the weaker thing to supply. *)
   Lemma open_au_plain_at_of_all Γ (γfs : fs_names) (cw : Z)
-      (M : gmap Z (bv 8)) (pv : mword 64)
+      (M : gmap Z (bv 8)) (pv vom : mword 64)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) :
     namei_walk_pre_era γfs cw P Pmiss -∗
     pf_at (aopen_commit_at Γ appE) Fo -∗
-    pf_at (atrunc_commit_at Γ appE) Ft -∗
-    open_au_plain_at Γ γfs cw M pv P Pmiss Fo Ft.
+    open_trunc_piece Γ vom Ft -∗
+    open_au_plain_at Γ γfs cw M pv vom P Pmiss Fo Ft.
   Proof.
     iIntros "Hw Ho Ht". rewrite /open_au_plain_at. iFrame "Ho Ht".
     iIntros (pl) "_". rewrite /ex_start /namei_walk_pre_era. iIntros (r Hr).
@@ -554,7 +618,7 @@ Section OpenDefs.
   Qed.
 
   Lemma open_au_create_at_of_all Γ (γfs : fs_names) (cw : Z)
-      (M : gmap Z (bv 8)) (pv : mword 64)
+      (M : gmap Z (bv 8)) (pv vom : mword 64)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
       (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
@@ -564,9 +628,9 @@ Section OpenDefs.
     pf_at (acre_commit_at Γ appE (AFile [])) Fok -∗
     pf_at (dlookup_commit_at Γ appE) Fex -∗
     pf_at (aopen_commit_at Γ appE) Fo -∗
-    pf_at (atrunc_commit_at Γ appE) Ft -∗
+    open_trunc_piece Γ vom Ft -∗
     cre_child_unfired Γ (AFile []) Farm Fun -∗
-    open_au_create_at Γ γfs cw M pv P Pmiss Farm Fun Fok Fex Fo Ft.
+    open_au_create_at Γ γfs cw M pv vom P Pmiss Farm Fun Fok Fex Fo Ft.
   Proof.
     iIntros "Hw Hok Hex Ho Ht Hch". rewrite /open_au_create_at.
     iFrame "Hok Hex Ho Ht Hch".
@@ -575,14 +639,14 @@ Section OpenDefs.
   Qed.
 
   Lemma open_au_pre_plain_of_all Γ (γfs : fs_names) (cw : Z)
-      (pl : list (bv 8))
+      (pl : list (bv 8)) (vom : mword 64)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) :
     namei_walk_pre_era γfs cw P Pmiss -∗
     pf_at (aopen_commit_at Γ appE) Fo -∗
-    pf_at (atrunc_commit_at Γ appE) Ft -∗
-    open_au_pre_plain Γ γfs cw pl P Pmiss Fo Ft.
+    open_trunc_piece Γ vom Ft -∗
+    open_au_pre_plain Γ γfs cw pl vom P Pmiss Fo Ft.
   Proof.
     iIntros "Hw Ho Ht". rewrite /open_au_pre_plain. iFrame "Ho Ht".
     rewrite /ex_start /namei_walk_pre_era. iIntros (r Hr).
@@ -590,7 +654,7 @@ Section OpenDefs.
   Qed.
 
   Lemma open_au_pre_create_of_all Γ (γfs : fs_names) (cw : Z)
-      (pl : list (bv 8))
+      (pl : list (bv 8)) (vom : mword 64)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
       (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
@@ -600,9 +664,9 @@ Section OpenDefs.
     pf_at (acre_commit_at Γ appE (AFile [])) Fok -∗
     pf_at (dlookup_commit_at Γ appE) Fex -∗
     pf_at (aopen_commit_at Γ appE) Fo -∗
-    pf_at (atrunc_commit_at Γ appE) Ft -∗
+    open_trunc_piece Γ vom Ft -∗
     cre_child_unfired Γ (AFile []) Farm Fun -∗
-    open_au_pre_create Γ γfs cw pl P Pmiss Farm Fun Fok Fex Fo Ft.
+    open_au_pre_create Γ γfs cw pl vom P Pmiss Farm Fun Fok Fex Fo Ft.
   Proof.
     iIntros "Hw Hok Hex Ho Ht Hch". rewrite /open_au_pre_create.
     iFrame "Hok Hex Ho Ht Hch".

@@ -327,7 +327,7 @@ Section ProofSysOpenStores.
        terminal observation, and the trunc commit still in hand ---- *)
     P (length (path_elems pl)) (bv_unsigned inum) -∗
     so_obs Fo (bv_unsigned inum) (era_node dn bm data) -∗
-    pf_at (atrunc_commit_at (fs_gamma_L fsc_fs) appE) Ft -∗
+    open_trunc_piece (fs_gamma_L fsc_fs) vom Ft -∗
     wp_next true (proc_addr jx)
       (so_cont_au gf nsj
                dqb dqs (proc_addr jx) pidv Mim pvv vom U sts P Pmiss Fo Ft m K eb b lks) -∗
@@ -886,6 +886,16 @@ Section ProofSysOpenStores.
        pre-row is the OBSERVED one -- same fragment, same [data]. ---- *)
     assert (Htyfz : bv_unsigned (di_type dn) = FsImg.T_FILE_z)
       by (rewrite Hfile; vm_compute; reflexivity).
+    (* THE PIECE IS OWED HERE, and the branch is what says so: this is the
+       arm the [andi a5,a5,1024] / [c.beqz] pair fell through, so the
+       caller's omode has O_TRUNC and [open_trunc_piece] is the commit
+       ([SysOpenDefs.open_trunc_piece_true]). *)
+    assert (Htrue : om_trunc vom = true).
+    { destruct (om_trunc vom) eqn:Hot; [reflexivity |]. exfalso.
+      assert (Hz : so_and om 1024 = (mword_of_int 0 : mword 64))
+        by (rewrite Hom; apply (proj2 (soau_trunc_zero_iff vom)); exact Hot).
+      rewrite Hz so_eqz_zero in Htr. discriminate. }
+    iEval (rewrite (open_trunc_piece_true _ vom Ft Htrue)) in "Htc".
     iApply fupd_wp.
     iMod (opf_atrunc_fire fsc_fs ⊤ Ft (bv_unsigned inum)
             (fn_file_bytes (era_node dn bm data))
@@ -929,11 +939,6 @@ Section ProofSysOpenStores.
        function context. *)
     (* the O_TRUNC file arm: the ONE arm of this surface that spends the
        trunc commit, at the row the observation read *)
-    assert (Htrue : om_trunc vom = true).
-    { destruct (om_trunc vom) eqn:Hot; [reflexivity |]. exfalso.
-      assert (Hz : so_and om 1024 = (mword_of_int 0 : mword 64))
-        by (rewrite Hom; apply (proj2 (soau_trunc_zero_iff vom)); exact Hot).
-      rewrite Hz so_eqz_zero in Htr. discriminate. }
     assert (Htis : t = FdInode (bv_unsigned inum) g).
     { destruct (Hti ltac:(rewrite Htyfz; vm_compute; discriminate)) as [_ Hq].
       exact Hq. }

@@ -163,7 +163,7 @@ Section ProofSysOpenCreArm.
        (* ...and create's CHILD leg (round E2, lane E2-C): the row APPEARED
           at this inum, the unarm comes home *)
        cre_arm_fired Phiarm i0 ∗
-       pf_at (aunarm_commit_at (fs_gamma_L fsc_fs) appE) Phiun)%I.
+       pf_at (aunarm_of_arm (fs_gamma_L fsc_fs) appE Phiarm) Phiun)%I.
 
   (* ARM F-OK's payout: the exists observation fired, the create commit
      refunded.  Both of open's own commits are SPENT by the tail on this
@@ -220,17 +220,17 @@ Section ProofSysOpenCreArm.
      already answered by the time this conversion runs.  Which path it is
      does not matter here -- only [R] is wanted of the cursor. *)
   Lemma socr_res_of_fail (cw : Z) (R : iProp Σ) (i0 : Z)
-      (Mim : gmap Z (bv 8)) (pvv : mword 64) (pl0 : list (bv 8))
+      (Mim : gmap Z (bv 8)) (pvv vom : mword 64) (pl0 : list (bv 8))
       (Phio : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (Phit : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) :
     arg_path_of Mim pvv pl0 ->
-    open_post_fail_plain (fs_gamma_L fsc_fs) fsc_fs cw Mim pvv
+    open_post_fail_plain (fs_gamma_L fsc_fs) fsc_fs cw Mim pvv vom
       (socr_P R i0) (socr_Pm R) Phio Phit
     ={⊤}=∗ R
            ∗ (pf_at (aopen_commit_at (fs_gamma_L fsc_fs) appE) Phio
               ∨ (∃ (i : Z) (av : aview) (a : anode),
                    ⌜arow_at av i a⌝ ∗ Phio.(pf_recv) av i a))
-           ∗ pf_at (atrunc_commit_at (fs_gamma_L fsc_fs) appE) Phit.
+           ∗ open_trunc_piece (fs_gamma_L fsc_fs) vom Phit.
   Proof.
     intros Hpl0.
     rewrite /open_post_fail_plain /socr_P /socr_Pm.
@@ -282,7 +282,7 @@ Section ProofSysOpenCreArm.
          then ∃ (av' : aview) (nl' : nat),
                 ⌜arow_at av' i0 (MkAnode (AFile bs) nl')⌝ ∗
                 Phit.(pf_recv) av' i0 bs
-         else pf_at (atrunc_commit_at (fs_gamma_L fsc_fs) appE) Phit)
+         else emp)
       ∗ ∃ γo : gname,
             open_fd_ok gf pj pidv U (om_readable vom) (om_writable vom)
               (FdInode i0 γo) sts r.
@@ -327,7 +327,7 @@ Section ProofSysOpenCreArm.
              then ∃ av' : aview,
                     ⌜arow_at av' i0 (MkAnode (AFile bs0) nl)⌝ ∗
                     Phit.(pf_recv) av' i0 bs0
-             else pf_at (atrunc_commit_at (fs_gamma_L fsc_fs) appE) Phit) ∗
+             else emp) ∗
             ∃ γo : gname,
               open_fd_ok gf pj pidv U (om_readable vom) (om_writable vom)
                 (FdInode i0 γo) sts r)
@@ -335,7 +335,7 @@ Section ProofSysOpenCreArm.
               ⌜arow_at av i0 (MkAnode (ADev ma mi) nl)⌝ ∗
               ⌜0 <= ma <= NDEV_max⌝ ∗
               Phio.(pf_recv) av i0 (MkAnode (ADev ma mi) nl) ∗
-              pf_at (atrunc_commit_at (fs_gamma_L fsc_fs) appE) Phit ∗
+              open_trunc_piece (fs_gamma_L fsc_fs) vom Phit ∗
               open_fd_ok gf pj pidv U (om_readable vom) (om_writable vom)
                 (FdDevice ma) sts r)).
   Proof.
@@ -390,7 +390,7 @@ Section ProofSysOpenCreArm.
          BEFORE the [itrunc] (the two table-full arms return at +0x...,
          above it), so the caller's trunc piece comes home unfired and arm
          (a) is stated at the piece exactly as it was. *)
-      iMod (socr_res_of_fail _ _ _ _ _ pl _ _ Hpl with "Hf") as "(HR & _ & Htc)".
+      iMod (socr_res_of_fail _ _ _ _ _ _ pl _ _ Hpl with "Hf") as "(HR & _ & Htc)".
       iModIntro. iLeft. iSplitR; [by iPureIntro |]. iFrame "Hpriv Hfrag".
       rewrite /open_post_fail_create /socr_fresh.
       iDestruct "HR" as (d nm av ents nl)
@@ -437,7 +437,7 @@ Section ProofSysOpenCreArm.
     iIntros "[Harms $]".
     iDestruct "Harms" as "[Hfail | Hok]".
     - iDestruct "Hfail" as "(%Hr & Hpriv & Hfrag & Hf)".
-      iMod (socr_res_of_fail _ _ _ _ _ pl _ _ Hpl with "Hf") as "(HR & Hob & Htc)".
+      iMod (socr_res_of_fail _ _ _ _ _ _ pl _ _ Hpl with "Hf") as "(HR & Hob & Htc)".
       iModIntro. iLeft. iSplitR; [by iPureIntro |]. iFrame "Hpriv Hfrag".
       rewrite /open_post_fail_create /socr_exists.
       iDestruct "HR" as (d nm av ents nl)

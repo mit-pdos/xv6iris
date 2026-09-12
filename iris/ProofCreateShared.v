@@ -1718,7 +1718,7 @@ Section ProofCreateMain.
     abs_of n = Some (MkAnode c 1%nat) ->
     abs_of n' = None ->
     ftop_inv fsc_fs -∗ app_inv fsc_fs -∗ cr_dirty t i -∗
-    pf_at (aunarm_commit_at (fs_gamma_L fsc_fs) appE) Fun -∗
+    aunarm_commit_at (fs_gamma_L fsc_fs) appE i Fun.(pf_recv) -∗
     top_frag (fs_gamma_L fsc_fs) i n ={E}=∗
       t ↪[ln_tx icfg_log]{#(1/2)} tt ∗ top_frag (fs_gamma_L fsc_fs) i n'
       ∗ cre_unarm_fired Fun i.
@@ -1915,7 +1915,7 @@ Section ProofCreateMain.
     (cre_dots_fired Fdots i d true
      ∨ cre_dots_leg (fs_gamma_L fsc_fs) tyz Fdots) -∗
     cre_acre_fired Fok d nm i (cre_child tyz ma mi d i) -∗
-    pf_at (aunarm_commit_at (fs_gamma_L fsc_fs) appE) Fun -∗
+    pf_at (aunarm_of_arm (fs_gamma_L fsc_fs) appE Farm) Fun -∗
     pf_at (dlookup_commit_at (fs_gamma_L fsc_fs) appE) Fex -∗
     cre_ok_arms (fs_gamma_L fsc_fs) tyz ma mi P Farm Fdots Fun Fok Fex
       pl true i.
@@ -2643,7 +2643,7 @@ Section ProofCreateMain.
        pf_at (dlookup_commit_at (fs_gamma_L fsc_fs) appE) Fex -∗
        cre_arm_fired Farm (bv_unsigned cinum) -∗
        pf_at (adots_commit_at (fs_gamma_L fsc_fs) appE) Fdots -∗
-       pf_at (aunarm_commit_at (fs_gamma_L fsc_fs) appE) Fun -∗
+       pf_at (aunarm_of_arm (fs_gamma_L fsc_fs) appE Farm) Fun -∗
        pf_at (acre_commit_at_gen (fs_gamma_L fsc_fs) appE
                 (cre_child (bv_unsigned ty) (bv_unsigned major)
                            (bv_unsigned minor))) Fok -∗
@@ -2871,7 +2871,7 @@ Section ProofCreateMain.
        pf_at (dlookup_commit_at (fs_gamma_L fsc_fs) appE) Fex -∗
        cre_arm_fired Farm (bv_unsigned cinum) -∗
        cre_dots_leg (fs_gamma_L fsc_fs) (bv_unsigned ty) Fdots -∗
-       pf_at (aunarm_commit_at (fs_gamma_L fsc_fs) appE) Fun -∗
+       pf_at (aunarm_of_arm (fs_gamma_L fsc_fs) appE Farm) Fun -∗
        pf_at (acre_commit_at_gen (fs_gamma_L fsc_fs) appE
                 (cre_child (bv_unsigned ty) (bv_unsigned major)
                            (bv_unsigned minor))) Fok -∗
@@ -3150,7 +3150,7 @@ Section ProofCreateMain.
        cre_arm_fired Farm (bv_unsigned cinum) -∗
        ((∃ full : bool, cre_dots_fired Fdots (bv_unsigned cinum) (bv_unsigned dind) full)
         ∨ cre_dots_leg (fs_gamma_L fsc_fs) (bv_unsigned ty) Fdots) -∗
-       pf_at (aunarm_commit_at (fs_gamma_L fsc_fs) appE) Fun -∗
+       pf_at (aunarm_of_arm (fs_gamma_L fsc_fs) appE Farm) Fun -∗
        pf_at (acre_commit_at_gen (fs_gamma_L fsc_fs) appE
                 (cre_child (bv_unsigned ty) (bv_unsigned major)
                            (bv_unsigned minor))) Fok -∗

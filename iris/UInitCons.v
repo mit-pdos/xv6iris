@@ -158,9 +158,10 @@ Section UInitCons.
   (*  at an era whose record is echo's is [AppEcho.echo_cons_law] applied  *)
   (*  to the flag init's own mknod minted (§6).                            *)
   (*                                                                      *)
-  (*  THE TRUNCATION PIECE IS A PREMISE TOO, and that is the lane's        *)
-  (*  friction: see [PinnedOpen.v]'s header.  It is threaded rather than   *)
-  (*  built.                                                               *)
+  (*  THE TRUNCATION PIECE RIDES [om_trunc vom] ([SysOpenDefs.             *)
+  (*  open_trunc_piece]).  init's opens are [O_RDWR] with the bit clear, so *)
+  (*  [init_cons_open_bundle_rdwr] below owes NOTHING for it; the general   *)
+  (*  form keeps the guarded piece as a premise.                            *)
   (* =================================================================== *)
   Lemma init_cons_open_bundle (γfs : fs_names) (T : iProp Σ)
       `{!Persistent T} `{!Timeless T} (i : Z)
@@ -173,7 +174,7 @@ Section UInitCons.
     □ (∀ v : aview, app_pred app_run v -∗
                       app_pred app_run v ∗ (⌜cons_present_at i v⌝ ∨ T)) -∗
     app_inv γfs -∗
-    pf_at (atrunc_commit_at (fs_gamma_L γfs) appE) Ft -∗
+    open_trunc_piece (fs_gamma_L γfs) vom Ft -∗
     open_in (fs_gamma_L γfs) γfs FsImg.ROOTINO M pv vom
       (pobs_P T [FsImg.ROOTINO; i]) (pobs_Pmiss T) Farm Fun Fok Fex
       (pobs_Fo (cons_present_at i) T) Ft.
@@ -183,6 +184,33 @@ Section UInitCons.
               init_cons_pl [FsImg.ROOTINO; i] i cons_dev M pv vom Ft
               Farm Fun Fok Fex Hcr (cons_pin_resolves_at i) Hpath
               with "Hcl Hinv Ht").
+  Qed.
+
+  (* ...AT INIT'S OWN OMODE.  [open("console", O_RDWR)] is [vom = 2]:
+     [SysOpenDefs.om_rdwr_plain] reads both [om_create] and [om_trunc] off
+     it as false, so the bundle is the pin and nothing else -- no trunc
+     piece, and hence no [AppInv.app_step] at a row the console claim
+     pins. *)
+  Lemma init_cons_open_bundle_rdwr (γfs : fs_names) (T : iProp Σ)
+      `{!Persistent T} `{!Timeless T} (i : Z)
+      (M : gmap Z (bv 8)) (pv vom : mword 64)
+      (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
+      (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) :
+    om_arg vom = 2 ->
+    arg_path_of M pv init_cons_pl ->
+    □ (∀ v : aview, app_pred app_run v -∗
+                      app_pred app_run v ∗ (⌜cons_present_at i v⌝ ∨ T)) -∗
+    app_inv γfs -∗
+    open_in (fs_gamma_L γfs) γfs FsImg.ROOTINO M pv vom
+      (pobs_P T [FsImg.ROOTINO; i]) (pobs_Pmiss T) Farm Fun Fok Fex
+      (pobs_Fo (cons_present_at i) T) Ft.
+  Proof.
+    intros Hom Hpath. iIntros "#Hcl #Hinv".
+    destruct (om_rdwr_plain vom Hom) as [Hcr Htr].
+    iApply (init_cons_open_bundle γfs T i M pv vom Ft Farm Fun Fok Fex
+              Hcr Hpath with "Hcl Hinv []").
+    iApply (open_trunc_piece_none _ vom Ft Htr).
   Qed.
 
   (* =================================================================== *)
@@ -205,7 +233,7 @@ Section UInitCons.
       ((⌜r = (mword_of_int (-1) : mword 64)⌝ ∗ ⌜fdv' = sts⌝)
        ∨ (⌜open_fd_rcpt (om_readable vom) (om_writable vom)
               (FdDevice CONSOLE) sts r fdv'⌝
-          ∗ pf_at (atrunc_commit_at (fs_gamma_L γfs) appE) Ft)
+          ∗ open_trunc_piece (fs_gamma_L γfs) vom Ft)
        ∨ T).
   Proof.
     intros Hpath. iIntros "Hrc".

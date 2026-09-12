@@ -120,7 +120,10 @@
 
    [SysOpenDefs]'s two bundles -- see that file's header for the walk
    premise's era shape, the two commits, and the ONE delta the no-O_CREATE
-   surface has (O_TRUNC's).  The caller's predicates are the walk cursor
+   surface has (O_TRUNC's).  THE TRUNC PIECE RIDES [om_trunc vom]
+   ([SysOpenDefs.open_trunc_piece]), the second key this contract is stated
+   at: an open without O_TRUNC owes it nothing and gets nothing back for
+   it, because the code does not truncate.  The caller's predicates are the walk cursor
    [P]/[Pmiss], create's child legs [Farm]/[Fun], create's two receipts
    [Fok]/[Fex], the terminal observation [Fo] and the trunc receipt [Ft];
    the plain side ignores the create four, which is what its bundle and
@@ -162,9 +165,11 @@
    ret = fd (the least free descriptor, [fd_frees]'s head, a0 = its
    zero-extension) -- PLAIN side, keyed by the observed [anode]:
      DEVICE  the row is [ADev ma mi], [0 <= ma <= NDEV_max] ASSERTED,
-             fragment typed [FdDevice ma], trunc commit refunded.
+             fragment typed [FdDevice ma], the trunc piece refunded (which
+             is nothing at all unless the caller passed O_TRUNC).
      FILE    the row is [AFile bs0]; fragment [FdInode i]; the trunc
-             receipt iff [om_trunc vom], the commit back otherwise.
+             receipt iff [om_trunc vom], and [emp] otherwise -- nothing
+             was owed, so nothing comes back.
      DIR     ONLY at [om_arg vom = 0] -- the C compares the WHOLE omode
              int against O_RDONLY, not a bit -- so the fragment is
              [FdOpen true false (FdInode i)].
@@ -523,7 +528,7 @@ Section SysOpenArms.
            ⌜arow_at av i (MkAnode (ADev ma mi) nl)⌝ ∗
            ⌜0 <= ma <= NDEV_max⌝ ∗
            Fo.(pf_recv) av i (MkAnode (ADev ma mi) nl) ∗
-           pf_at (atrunc_commit_at Γ appE) Ft ∗
+           open_trunc_piece Γ vom Ft ∗
            open_fd_ok γf p pid UW (om_readable vom) (om_writable vom)
              (FdDevice ma) sts r)
         ∨ (* FILE: the ONE delta of this surface, iff O_TRUNC -- the trunc
@@ -536,7 +541,7 @@ Section SysOpenArms.
             then ∃ av' : aview,
                    ⌜arow_at av' i (MkAnode (AFile bs0) nl)⌝ ∗
                    Ft.(pf_recv) av' i bs0
-            else pf_at (atrunc_commit_at Γ appE) Ft) ∗
+            else emp) ∗
            ∃ γo : gname,
              open_fd_ok γf p pid UW (om_readable vom) (om_writable vom)
                (FdInode i γo) sts r)
@@ -547,7 +552,7 @@ Section SysOpenArms.
            ⌜arow_at av i (MkAnode (ADir ents) nl)⌝ ∗
            ⌜om_arg vom = 0⌝ ∗
            Fo.(pf_recv) av i (MkAnode (ADir ents) nl) ∗
-           pf_at (atrunc_commit_at Γ appE) Ft ∗
+           open_trunc_piece Γ vom Ft ∗
            ∃ γo : gname,
              open_fd_ok γf p pid UW true false (FdInode i γo) sts r)))%I.
 
@@ -563,21 +568,21 @@ Section SysOpenArms.
      ran the walk, so they name the path AND tie it to argument 0 --
      [SpecSysExec.sys_exec_post_fail] folds exec's the same way. *)
   Definition open_post_fail_plain Γ (γfs : fs_names) (cw : Z)
-      (M : gmap Z (bv 8)) (pv : mword 64)
+      (M : gmap Z (bv 8)) (pv vom : mword 64)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) : iProp Σ :=
-    (open_au_plain_at Γ γfs cw M pv P Pmiss Fo Ft
+    (open_au_plain_at Γ γfs cw M pv vom P Pmiss Fo Ft
      ∨ (∃ pl : list (bv 8),
           ⌜arg_path_of M pv pl⌝ ∗
           ((namei_walk_dead_era γfs P Pmiss pl
               ∗ pf_at (aopen_commit_at Γ appE) Fo
-              ∗ pf_at (atrunc_commit_at Γ appE) Ft)
+              ∗ open_trunc_piece Γ vom Ft)
            ∨ (∃ i : Z,
                 P (length (path_elems pl)) i
                 ∗ (∃ (av : aview) (a : anode),
                      ⌜arow_at av i a⌝ ∗ Fo.(pf_recv) av i a)
-                ∗ pf_at (atrunc_commit_at Γ appE) Ft))))%I.
+                ∗ open_trunc_piece Γ vom Ft))))%I.
 
   (* the armed disjunction the continuation receives, keyed on a0, with
      the landed post's fd-side bundle folded in per arm (the caller's
@@ -595,7 +600,7 @@ Section SysOpenArms.
        (* the failure arms hand the caller's table back ON THE NOSE: no
           arm that installed a descriptor can fail after doing so *)
        ∗ fd_frags (pv_fdg (us_V UW)) sts
-       ∗ open_post_fail_plain Γ γfs cw M pv P Pmiss Fo Ft)
+       ∗ open_post_fail_plain Γ γfs cw M pv vom P Pmiss Fo Ft)
       ∨ open_post_ok_plain Γ γf p pid M pv vom P Fo Ft sts UW r)
      ∗ fd_slot)%I.
 
@@ -645,11 +650,11 @@ Section SysOpenArms.
             then ∃ (av' : aview) (nl' : nat),
                    ⌜arow_at av' i (MkAnode (AFile []) nl')⌝ ∗
                    Ft.(pf_recv) av' i []
-            else pf_at (atrunc_commit_at Γ appE) Ft) ∗
+            else emp) ∗
            (* the child's row APPEARED at this inum; the unarm comes home
               (round E2, lane E2-C) *)
            cre_arm_fired Farm i
-           ∗ pf_at (aunarm_commit_at Γ appE) Fun ∗
+           ∗ pf_at (aunarm_of_arm Γ appE Farm) Fun ∗
            ∃ γo : gname,
              open_fd_ok γf p pid UW (om_readable vom) (om_writable vom)
                (FdInode i γo) sts r)
@@ -670,7 +675,7 @@ Section SysOpenArms.
                    then ∃ av' : aview,
                           ⌜arow_at av' i (MkAnode (AFile bs0) nl)⌝ ∗
                           Ft.(pf_recv) av' i bs0
-                   else pf_at (atrunc_commit_at Γ appE) Ft) ∗
+                   else emp) ∗
                   ∃ γo : gname,
                     open_fd_ok γf p pid UW (om_readable vom)
                       (om_writable vom) (FdInode i γo) sts r)
@@ -680,7 +685,7 @@ Section SysOpenArms.
                   ⌜arow_at av i (MkAnode (ADev ma mi) nl)⌝ ∗
                   ⌜0 <= ma <= NDEV_max⌝ ∗
                   Fo.(pf_recv) av i (MkAnode (ADev ma mi) nl) ∗
-                  pf_at (atrunc_commit_at Γ appE) Ft ∗
+                  open_trunc_piece Γ vom Ft ∗
                   open_fd_ok γf p pid UW (om_readable vom)
                     (om_writable vom) (FdDevice ma) sts r))))))%I.
 
@@ -689,24 +694,24 @@ Section SysOpenArms.
      receipt is delivered -- the fs mutation of a failed open is real. *)
   (* ...and the create side's, context-free for the same reason *)
   Definition open_post_fail_create Γ (γfs : fs_names) (cw : Z)
-      (M : gmap Z (bv 8)) (pv : mword 64)
+      (M : gmap Z (bv 8)) (pv vom : mword 64)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
       (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) : iProp Σ :=
-    (open_au_create_at Γ γfs cw M pv P Pmiss Farm Fun Fok Fex Fo Ft
+    (open_au_create_at Γ γfs cw M pv vom P Pmiss Farm Fun Fok Fex Fo Ft
      ∨ (∃ pl : list (bv 8),
           ⌜arg_path_of M pv pl⌝ ∗
           ((npar_walk_dead_era γfs P Pmiss pl
              ∗ pf_at (acre_commit_at Γ appE (AFile [])) Fok
              ∗ pf_at (dlookup_commit_at Γ appE) Fex
              ∗ pf_at (aopen_commit_at Γ appE) Fo
-             ∗ pf_at (atrunc_commit_at Γ appE) Ft
+             ∗ open_trunc_piece Γ vom Ft
              ∗ cre_child_unfired Γ (AFile []) Farm Fun)
           ∨ (∃ d : Z,
                P (length (npar_elems pl)) d
-               ∗ pf_at (atrunc_commit_at Γ appE) Ft
+               ∗ open_trunc_piece Γ vom Ft
                ∗ ((* (a) create succeeded FRESH; open failed past it *)
                   (∃ (av : aview) (i : Z) (nm : fname)
                      (ents : gmap fname Z) (nl : nat),
@@ -718,7 +723,7 @@ Section SysOpenArms.
                      ∗ pf_at (aopen_commit_at Γ appE) Fo
                      (* the child's row APPEARED and STANDS *)
                      ∗ cre_arm_fired Farm i
-                     ∗ pf_at (aunarm_commit_at Γ appE) Fun)
+                     ∗ pf_at (aunarm_of_arm Γ appE Farm) Fun)
                   ∨ (* (b) the name existed: found DIR (F-BAD), a bad
                        found-device major, or table full past a good
                        found node; -1 does not say which *)
@@ -758,7 +763,7 @@ Section SysOpenArms.
     (((⌜r = (mword_of_int (-1) : mword 64)⌝
        ∗ proc_priv γf p pid UW
        ∗ fd_frags (pv_fdg (us_V UW)) sts
-       ∗ open_post_fail_create Γ γfs cw M pv P Pmiss Farm Fun Fok Fex Fo Ft)
+       ∗ open_post_fail_create Γ γfs cw M pv vom P Pmiss Farm Fun Fok Fex Fo Ft)
       ∨ open_post_ok_create Γ γf p pid M pv vom P Farm Fun Fok Fex Fo Ft sts UW r)
      ∗ fd_slot)%I.
 
@@ -908,8 +913,8 @@ Section SysOpenArms.
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) : iProp Σ :=
     if om_create vom
-    then open_au_create_at Γ γfs cw M pv P Pmiss Farm Fun Fok Fex Fo Ft
-    else open_au_plain_at Γ γfs cw M pv P Pmiss Fo Ft.
+    then open_au_create_at Γ γfs cw M pv vom P Pmiss Farm Fun Fok Fex Fo Ft
+    else open_au_plain_at Γ γfs cw M pv vom P Pmiss Fo Ft.
 
   Definition open_arms `{XI : CurCtx} Γ (γfs : fs_names) (cw : Z)
       (γf : gname) (p : mword 64) (pid : mword 32)
@@ -954,7 +959,7 @@ Section SysOpenArms.
       (sts : list fdstate) (r : mword 64) (fdv' : list fdstate) : iProp Σ :=
     ((* FAILURE: the table did not move, and the whole bundle is back *)
      (⌜r = (mword_of_int (-1) : mword 64)⌝ ∗ ⌜fdv' = sts⌝
-      ∗ open_post_fail_plain Γ γfs cw M pv P Pmiss Fo Ft)
+      ∗ open_post_fail_plain Γ γfs cw M pv vom P Pmiss Fo Ft)
      ∨ (∃ (pl : list (bv 8)) (av : aview) (i : Z),
           (* THE PATH IS THE ONE THE CALLER PASSED: byte for byte the
              string its image holds at argument 0.  That is what makes
@@ -967,7 +972,7 @@ Section SysOpenArms.
               ⌜arow_at av i (MkAnode (ADev ma mi) nl)⌝ ∗
               ⌜0 <= ma <= NDEV_max⌝ ∗
               Fo.(pf_recv) av i (MkAnode (ADev ma mi) nl) ∗
-              pf_at (atrunc_commit_at Γ appE) Ft ∗
+              open_trunc_piece Γ vom Ft ∗
               ⌜open_fd_rcpt (om_readable vom) (om_writable vom)
                  (FdDevice ma) sts r fdv'⌝)
            ∨ (* FILE, with the trunc leg *)
@@ -978,7 +983,7 @@ Section SysOpenArms.
                then ∃ av' : aview,
                       ⌜arow_at av' i (MkAnode (AFile bs0) nl)⌝ ∗
                       Ft.(pf_recv) av' i bs0
-               else pf_at (atrunc_commit_at Γ appE) Ft) ∗
+               else emp) ∗
               ∃ γo : gname,
                 ⌜open_fd_rcpt (om_readable vom) (om_writable vom)
                    (FdInode i γo) sts r fdv'⌝)
@@ -987,7 +992,7 @@ Section SysOpenArms.
               ⌜arow_at av i (MkAnode (ADir ents) nl)⌝ ∗
               ⌜om_arg vom = 0⌝ ∗
               Fo.(pf_recv) av i (MkAnode (ADir ents) nl) ∗
-              pf_at (atrunc_commit_at Γ appE) Ft ∗
+              open_trunc_piece Γ vom Ft ∗
               ∃ γo : gname,
                 ⌜open_fd_rcpt true false (FdInode i γo) sts r fdv'⌝))))%I.
 
@@ -1000,7 +1005,7 @@ Section SysOpenArms.
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
       (sts : list fdstate) (r : mword 64) (fdv' : list fdstate) : iProp Σ :=
     ((⌜r = (mword_of_int (-1) : mword 64)⌝ ∗ ⌜fdv' = sts⌝
-      ∗ open_post_fail_create Γ γfs cw M pv P Pmiss Farm Fun Fok Fex Fo Ft)
+      ∗ open_post_fail_create Γ γfs cw M pv vom P Pmiss Farm Fun Fok Fex Fo Ft)
      ∨ (∃ (pl : list (bv 8)) (d i : Z) (nm : fname),
           ⌜arg_path_of M pv pl⌝ ∗
           ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
@@ -1016,9 +1021,9 @@ Section SysOpenArms.
                then ∃ (av' : aview) (nl' : nat),
                       ⌜arow_at av' i (MkAnode (AFile []) nl')⌝ ∗
                       Ft.(pf_recv) av' i []
-               else pf_at (atrunc_commit_at Γ appE) Ft) ∗
+               else emp) ∗
               cre_arm_fired Farm i
-              ∗ pf_at (aunarm_commit_at Γ appE) Fun ∗
+              ∗ pf_at (aunarm_of_arm Γ appE Farm) Fun ∗
               ∃ γo : gname,
                 ⌜open_fd_rcpt (om_readable vom) (om_writable vom)
                    (FdInode i γo) sts r fdv'⌝)
@@ -1037,7 +1042,7 @@ Section SysOpenArms.
                       then ∃ av' : aview,
                              ⌜arow_at av' i (MkAnode (AFile bs0) nl)⌝ ∗
                              Ft.(pf_recv) av' i bs0
-                      else pf_at (atrunc_commit_at Γ appE) Ft) ∗
+                      else emp) ∗
                      ∃ γo : gname,
                        ⌜open_fd_rcpt (om_readable vom) (om_writable vom)
                           (FdInode i γo) sts r fdv'⌝)
@@ -1045,7 +1050,7 @@ Section SysOpenArms.
                        ⌜arow_at av i (MkAnode (ADev ma mi) nl)⌝ ∗
                        ⌜0 <= ma <= NDEV_max⌝ ∗
                        Fo.(pf_recv) av i (MkAnode (ADev ma mi) nl) ∗
-                       pf_at (atrunc_commit_at Γ appE) Ft ∗
+                       open_trunc_piece Γ vom Ft ∗
                        ⌜open_fd_rcpt (om_readable vom) (om_writable vom)
                           (FdDevice ma) sts r fdv'⌝)))))))%I.
 
@@ -1379,7 +1384,7 @@ Section SysOpenArms.
   (*  [open_fd_ok], which create never sees.                              *)
   (* ------------------------------------------------------------------ *)
   Lemma cre_fail_to_open `{XI : CurCtx} Γ (γfs : fs_names) (cw : Z)
-      (M : gmap Z (bv 8)) (pv : mword 64)
+      (M : gmap Z (bv 8)) (pv vom : mword 64)
       (ma mi : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Farm : pfam Σ (aview -> Z -> iProp Σ))
@@ -1394,8 +1399,8 @@ Section SysOpenArms.
     cre_fail_arms Γ γfs (bv_unsigned T_FILE) ma mi P Pmiss
       Farm Fdots Fun Fok Fex pl -∗
     pf_at (aopen_commit_at Γ appE) Fo -∗
-    pf_at (atrunc_commit_at Γ appE) Ft -∗
-    open_post_fail_create Γ γfs cw M pv P Pmiss Farm Fun Fok Fex Fo Ft.
+    open_trunc_piece Γ vom Ft -∗
+    open_post_fail_create Γ γfs cw M pv vom P Pmiss Farm Fun Fok Fex Fo Ft.
   Proof.
     intros Hpl. iIntros "Hcf Ho Ht".
     iDestruct (cre_fail_arms_file with "Hcf") as "Hcf".
@@ -1600,7 +1605,7 @@ Definition wp_sys_open_plain_body
   om_create vom = false ->
   wp_sys_open_frame γfl γf gs j gl pd pav pu ns dqb dqs dqbs dqn
     v vom pid U sts m K eb b lks
-    (open_au_plain_at Γfs fsc_fs (pv_cwi (us_V U)) (us_M U) v P Pmiss Fo Ft)
+    (open_au_plain_at Γfs fsc_fs (pv_cwi (us_V U)) (us_M U) v vom P Pmiss Fo Ft)
     (open_arms_plain Γfs fsc_fs (pv_cwi (us_V U)) γf (proc_addr j) pid
        (us_M U) v vom P Pmiss Fo Ft sts).
 
@@ -1626,7 +1631,7 @@ Definition wp_sys_open_create_body
   om_create vom = true ->
   wp_sys_open_frame γfl γf gs j gl pd pav pu ns dqb dqs dqbs dqn
     v vom pid U sts m K eb b lks
-    (open_au_create_at Γfs fsc_fs (pv_cwi (us_V U)) (us_M U) v
+    (open_au_create_at Γfs fsc_fs (pv_cwi (us_V U)) (us_M U) v vom
        P Pmiss Farm Fun Fok Fex Fo Ft)
     (open_arms_create Γfs fsc_fs (pv_cwi (us_V U)) γf (proc_addr j) pid
        (us_M U) v vom P Pmiss Farm Fun Fok Fex Fo Ft sts).

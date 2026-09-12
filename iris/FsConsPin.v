@@ -28,12 +28,13 @@
 (*                                                                        *)
 (*  WHAT §5 FOUND, and it is the lane's central finding: the ARM and the   *)
 (*  CREATE legs preserve every pin with NO side condition the commit does  *)
-(*  not already carry, while the UNARM and the TRUNC legs need [i <> ino]  *)
-(*  -- and [FsAbsCreateFire.aunarm_commit_at] / [SysOpenDefs.              *)
-(*  atrunc_commit_at] quantify [i] over EVERY row at nlink 1 / EVERY file  *)
-(*  row, which is exactly the shape /sh's row has.  The side conditions    *)
-(*  are stated as premises here and the friction is reported rather than   *)
-(*  papered over.                                                          *)
+(*  not already carry, while the UNARM and the TRUNC legs need [i <> ino]. *)
+(*  The two contracts now supply exactly that.  The unarm is the undo of   *)
+(*  its own arm ([FsAbsCreateFire.aunarm_of_arm]): its inum is the one the *)
+(*  arm's receipt names, and an armed inum was ABSENT from the view, so it *)
+(*  is neither a pin's inum nor the root.  The trunc commit is owed only   *)
+(*  under [om_trunc vom] ([SysOpenDefs.open_trunc_piece]), which init's    *)
+(*  [O_RDWR] opens have clear, so no pin-carrying open pays it at all.     *)
 (* ====================================================================== *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
@@ -332,8 +333,9 @@ Qed.
 (*  pin and against the console's two states.  The premises are the ones   *)
 (*  the corresponding COMMIT carries ([FsAbsCreateFire.aarm_commit_at] /   *)
 (*  [acre_commit_at_gen] / [aunarm_commit_at], [SysOpenDefs.               *)
-(*  atrunc_commit_at]) -- except where they are NOT, which is the point:   *)
-(*  [i <> ino] on the unarm and the trunc is a premise no commit supplies. *)
+(*  atrunc_commit_at]).  [i <> ino] on the unarm comes from the ARM's own  *)
+(*  freshness, which [FsAbsCreateFire.aunarm_of_arm] ties to the unarm's   *)
+(*  inum; on the trunc it is owed only when the caller passed O_TRUNC.     *)
 (* ====================================================================== *)
 
 (* ---- 5a.  THE ARM: a DEVICE row appears at a fresh inum -------------- *)
@@ -488,15 +490,15 @@ Qed.
    commit does not carry.
 
    [delta_unarm i] DELETES the row at [i] and [delta_trunc i] empties the
-   file at [i].  A pin at [ino] survives either exactly when [i <> ino] --
-   and the two commits quantify [i] over EVERY view row at nlink 1
-   ([FsAbsCreateFire.aunarm_commit_at]) and EVERY view row that is a file
-   ([SysOpenDefs.atrunc_commit_at]).  /sh's row is a file at nlink 1.  So
-   the premises below are honest and neither commit supplies them: that is
-   this lane's friction, reported rather than hidden.  A caller holding
-   [AppInv.app_sup] -- the credential that says its claim holds of EVERY
-   view -- pays both steps without them, which is why no landed proof has
-   met this.
+   file at [i].  A pin at [ino] survives either exactly when [i <> ino], and
+   that is what the two contracts now hand their caller: the unarm's inum is
+   the one its own ARM produced, and an armed inum was absent from the view
+   ([FsAbsCreateFire.aunarm_of_arm], [cre_arm_fired]'s [av !! i = None]), so
+   it is neither a pinned inum nor the root; the trunc commit is owed only
+   under [om_trunc vom] ([SysOpenDefs.open_trunc_piece]).  The premises
+   below are therefore dischargeable from the contracts alone.  A caller
+   holding [AppInv.app_sup] -- the credential that says its claim holds of
+   EVERY view -- pays both steps without them either way.
 
    THE TWO ROW LEMMAS FIRST: a row the delta does not touch is the row it
    was.  The console's row is a DEVICE and the root's is a DIRECTORY, so
@@ -564,6 +566,54 @@ Proof.
                              ltac:(congruence)).
     rewrite Hr /= /anode_ents /=. exact Hnm.
   - rewrite (delta_unarm_lookup_ne av i j ltac:(congruence)). exact Hrow.
+Qed.
+
+(* ---- 5c'.  THE TWO PREMISES, DISCHARGED FROM THE CONTRACTS ALONE ----
+
+   [file_pin_unarm] and [cons_present_unarm] each ask for [i <> ino] and
+   [i <> ROOTINO], and the unarm contract now supplies both.  Its inum is
+   the one its own ARM produced ([FsAbsCreateFire.aunarm_of_arm]), and the
+   arm's receipt [FsAbsCreateFire.cre_arm_fired] carries [av0 !! i = None]
+   at the arm's own view: an inum the view did not have is neither the
+   pin's nor the root, and those are inum inequalities, so they travel from
+   [av0] to the later view the unarm fires at.  The two corollaries below
+   are that step, taken once each.
+
+   [file_pin_trunc]'s [i <> ino] is discharged one level up instead, by the
+   GUARD: [SysOpenDefs.open_trunc_piece] is the commit only under
+   [om_trunc vom], so an application whose opens have the bit clear owes no
+   [delta_trunc] at all ([SysOpenDefs.open_trunc_piece_none]) and the
+   premise never arises.  There is no pure corollary to state for it -- the
+   truncation is not keyed at an inum the bundle could name (that file's
+   note at [open_trunc_piece] says why).  The console's own state needs
+   nothing either way: [cons_present_trunc] below has no side condition,
+   because a truncation moves a FILE row and the console's is a device. *)
+
+Lemma file_pin_unarm_fresh (nm : fname) (ino : Z) (bs : list (bv 8))
+    (i : Z) (av0 av : aview) :
+  av0 !! i = None ->
+  file_pin nm ino bs av0 ->
+  file_pin nm ino bs av -> file_pin nm ino bs (delta_unarm i av).
+Proof.
+  intros Hfree Hp0 Hp.
+  destruct (file_pin_root_dir nm ino bs av0 Hp0) as (ents & nl & Hroot & _).
+  destruct Hp0 as (_ & Hrow0 & _).
+  assert (Hne_root : i <> FsImg.ROOTINO) by (intros ->; by rewrite Hroot in Hfree).
+  assert (Hne_ino : i <> ino) by (intros ->; by rewrite Hrow0 in Hfree).
+  exact (file_pin_unarm nm ino bs i av Hne_ino Hne_root Hp).
+Qed.
+
+Lemma cons_present_unarm_fresh (j : Z) (i : Z) (av0 av : aview) :
+  av0 !! i = None ->
+  cons_present_at j av0 ->
+  cons_present_at j av -> cons_present_at j (delta_unarm i av).
+Proof.
+  intros Hfree Hp0 Hp.
+  destruct (cons_present_root_dir j av0 Hp0) as (ents & nl & Hroot & _).
+  destruct Hp0 as (_ & Hrow0 & _).
+  assert (Hne_root : i <> FsImg.ROOTINO) by (intros ->; by rewrite Hroot in Hfree).
+  assert (Hne_j : i <> j) by (intros ->; by rewrite Hrow0 in Hfree).
+  exact (cons_present_unarm j i av Hne_j Hne_root Hp).
 Qed.
 
 Lemma file_pin_trunc (nm : fname) (ino : Z) (bs : list (bv 8))

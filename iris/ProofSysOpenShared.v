@@ -374,7 +374,7 @@ Section ProofSysOpenShared.
     fd_slot -∗
     P (length (path_elems pl)) i -∗
     so_obs Fo i n -∗
-    pf_at (atrunc_commit_at (fs_gamma_L fsc_fs) appE) Ft -∗
+    open_trunc_piece (fs_gamma_L fsc_fs) vom Ft -∗
     open_arms_plain (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) gf pj pidv
            Mim pvv vom
       P Pmiss Fo Ft sts U r.
@@ -405,7 +405,7 @@ Section ProofSysOpenShared.
     fd_slot -∗
     namei_walk_dead_era fsc_fs P Pmiss pl -∗
     pf_at (aopen_commit_at (fs_gamma_L fsc_fs) appE) Fo -∗
-    pf_at (atrunc_commit_at (fs_gamma_L fsc_fs) appE) Ft -∗
+    open_trunc_piece (fs_gamma_L fsc_fs) vom Ft -∗
     open_arms_plain (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) gf pj pidv
            Mim pvv vom
       P Pmiss Fo Ft sts U r.
@@ -430,7 +430,7 @@ Section ProofSysOpenShared.
     proc_priv gf pj pidv U -∗
     fd_frags (pv_fdg (us_V U)) sts -∗
     fd_slot -∗
-    open_au_plain_at (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) Mim pvv
+    open_au_plain_at (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) Mim pvv vom
       P Pmiss Fo Ft -∗
     open_arms_plain (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) gf pj pidv
            Mim pvv vom
@@ -463,7 +463,7 @@ Section ProofSysOpenShared.
     P (length (path_elems pl)) i -∗
     (∃ av : aview, ⌜arow_at av i (MkAnode (ADev ma mi) nl)⌝
                    ∗ Fo.(pf_recv) av i (MkAnode (ADev ma mi) nl)) -∗
-    pf_at (atrunc_commit_at (fs_gamma_L fsc_fs) appE) Ft -∗
+    open_trunc_piece (fs_gamma_L fsc_fs) vom Ft -∗
     (∀ r : mword 64,
        open_fd_ok gf pj pidv U (om_readable vom) (om_writable vom)
          (FdDevice ma) sts r -∗
@@ -490,18 +490,20 @@ Section ProofSysOpenShared.
     P (length (path_elems pl)) i -∗
     (∃ av : aview, ⌜arow_at av i (MkAnode (AFile bs0) nl)⌝
                    ∗ Fo.(pf_recv) av i (MkAnode (AFile bs0) nl)) -∗
-    pf_at (atrunc_commit_at (fs_gamma_L fsc_fs) appE) Ft -∗
+    (* NO TRUNC PIECE.  At [om_trunc vom = false] the caller owed none
+       ([SysOpenDefs.open_trunc_piece]) and the arm returns none: the slot
+       on this arm is [emp]. *)
     (∀ r : mword 64,
        open_fd_ok gf pj pidv U (om_readable vom) (om_writable vom)
          (FdInode i γo) sts r -∗
        open_post_ok_plain (fs_gamma_L fsc_fs) gf pj pidv Mim pvv vom P Fo Ft sts U r).
   Proof.
-    intros Hpl Hnt. iIntros "HP Hobs Htc".
+    intros Hpl Hnt. iIntros "HP Hobs".
     iDestruct "Hobs" as (av) "[%Hav HΦ]".
     iIntros (r) "Hfd". rewrite /open_post_ok_plain.
     iExists pl, av, i. iSplitR; [by iPureIntro |]. iFrame "HP". iRight. iLeft.
     iExists bs0, nl. iSplitR; [by iPureIntro |]. iFrame "HΦ".
-    rewrite Hnt. iFrame "Htc". iExists γo. iFrame "Hfd".
+    rewrite Hnt. iSplitR; [done |]. iExists γo. iFrame "Hfd".
   Qed.
 
   (* ...and the ONE arm that spends the trunc commit: the O_TRUNC file. *)
@@ -548,7 +550,7 @@ Section ProofSysOpenShared.
     P (length (path_elems pl)) i -∗
     (∃ av : aview, ⌜arow_at av i (MkAnode (ADir ents) nl)⌝
                    ∗ Fo.(pf_recv) av i (MkAnode (ADir ents) nl)) -∗
-    pf_at (atrunc_commit_at (fs_gamma_L fsc_fs) appE) Ft -∗
+    open_trunc_piece (fs_gamma_L fsc_fs) vom Ft -∗
     (∀ r : mword 64,
        open_fd_ok gf pj pidv U (om_readable vom) (om_writable vom)
          (FdInode i γo) sts r -∗
@@ -589,7 +591,7 @@ Section ProofSysOpenShared.
      \/ bv_unsigned (di_type dn) = FsImg.T_DEVICE_z) ->
     P (length (path_elems pl)) i -∗
     so_obs Fo i (era_node dn bm data) -∗
-    pf_at (atrunc_commit_at (fs_gamma_L fsc_fs) appE) Ft -∗
+    open_trunc_piece (fs_gamma_L fsc_fs) vom Ft -∗
     (∀ r : mword 64,
        open_fd_ok gf pj pidv U (om_readable vom) (om_writable vom) t sts r -∗
        open_post_ok_plain (fs_gamma_L fsc_fs) gf pj pidv Mim pvv vom P Fo Ft sts U r).
@@ -610,7 +612,7 @@ Section ProofSysOpenShared.
       iIntros "HP Hobs Htc".
       iApply (so_arm_file gf pj pidv Mim pvv vom P Fo Ft U sts pl i
                 (fn_file_bytes (era_node dn bm data))
-                (fn_nlink (era_node dn bm data)) γo Hpl Hntf with "HP Hobs Htc").
+                (fn_nlink (era_node dn bm data)) γo Hpl Hntf with "HP Hobs").
     - destruct (Hdev Hv) as [Hmb Ht].
       rewrite (opf_era_dev_row dn bm data
                  ltac:(rewrite Hv; vm_compute; discriminate)

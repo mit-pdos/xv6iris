@@ -352,13 +352,21 @@ Section CreateFire.
             ghost_map_auth (γtop Γ) (1/2) I' ={E}=∗
             ghost_map_auth (γtop Γ) (1/2) I' ∗ Φ (abs_view I) i d full))%I.
 
-  (* THE UNARM (ruling Q-h): a row at count 1 -- whatever its content --
-     DISAPPEARS.  The content is quantified inside: the failure arms reach
-     it with an empty file, a device, or a directory holding no, one or
-     two dots. *)
-  Definition aunarm_commit_at Γ (E : coPset)
+  (* THE UNARM (ruling Q-h): the row AT [i] at count 1 -- whatever its
+     content -- DISAPPEARS.  The content is quantified inside: the failure
+     arms reach it with an empty file, a device, or a directory holding no,
+     one or two dots.
+
+     THE INUM IS AN INDEX, not quantified inside.  The unarm is the UNDO of
+     an arm, and the code only ever unarms the inode [ialloc] just returned;
+     a piece quantified over every nlink-1 row would owe a delta at rows the
+     syscall never touches (/sh's row is a file at nlink 1).  [aunarm_of_arm]
+     below is how a caller hands the piece in without naming the inum in
+     advance: it produces this AU at the inum the ARM's receipt names, and at
+     no other. *)
+  Definition aunarm_commit_at Γ (E : coPset) (i : Z)
       (Φ : aview -> Z -> iProp Σ) : iProp Σ :=
-    (∀ (I : gmap Z fs_node) (i : Z) (c : absnode),
+    (∀ (I : gmap Z fs_node) (c : absnode),
        ⌜abs_view I !! i = Some (MkAnode c 1%nat)⌝ -∗
        ghost_map_auth (γtop Γ) (1/2) I ={E}=∗
        ghost_map_auth (γtop Γ) (1/2) I ∗
@@ -404,6 +412,24 @@ Section CreateFire.
        ⌜av !! d = Some (MkAnode (ADir ents) nl)⌝ ∗ ⌜ents !! nm = Some i⌝ ∗
        Fex.(pf_recv) av d nm i)%I.
 
+  (* THE UNARM, TIED TO ITS OWN ARM.  The unarm is the undo of the arm
+     [ialloc] just made, and that is what the caller hands in: a piece that
+     yields the unarm's AU AT THE INUM THE ARM'S RECEIPT NAMES, and at no
+     other.  The arm receipt goes in and comes back out -- the kernel holds
+     it on the [dirlink] failure path, which is the only path that unarms --
+     so the piece costs the caller nothing it did not already have, and it
+     owes a delta at ONE inum: a fresh one, which is neither a pinned inum
+     nor the root ([FsConsPin.file_pin_unarm]'s two premises).
+
+     Stated as a family so it sits under [pf_at] like every other piece: the
+     refund stays outside the wand and a caller whose arm never fired still
+     eliminates to its own [pf_refund]. *)
+  Definition aunarm_of_arm Γ (E : coPset)
+      (Farm : pfam Σ (aview -> Z -> iProp Σ))
+      (Φ : aview -> Z -> iProp Σ) : iProp Σ :=
+    (∀ i : Z, cre_arm_fired Farm i -∗
+       cre_arm_fired Farm i ∗ aunarm_commit_at Γ E i Φ)%I.
+
   (* The child's two legs, as the AU twins' arms carry them: both commits
      back UNFIRED, or the do-then-undo PAIR (ruling Q-h).  UNFIRED means
      the whole pair the caller handed in -- the commit CONJOINED with its
@@ -412,7 +438,7 @@ Section CreateFire.
   Definition cre_child_unfired Γ (c : absnode)
       (Farm Fun : pfam Σ (aview -> Z -> iProp Σ)) : iProp Σ :=
     (pf_at (aarm_commit_at Γ appE c) Farm
-     ∗ pf_at (aunarm_commit_at Γ appE) Fun)%I.
+     ∗ pf_at (aunarm_of_arm Γ appE Farm) Fun)%I.
 
   Definition cre_child_pair (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
       (i : Z) : iProp Σ :=
@@ -468,13 +494,47 @@ Section CreateFire.
     by iFrame "Ha'".
   Qed.
 
-  Lemma aunarm_commit_at_unit (γfs : fs_names) E :
-    app_sup -∗ aunarm_commit_at (fs_gamma_L γfs) E (fun _ _ => True%I).
+  Lemma aunarm_commit_at_unit (γfs : fs_names) E (i : Z) :
+    app_sup -∗ aunarm_commit_at (fs_gamma_L γfs) E i (fun _ _ => True%I).
   Proof.
-    iIntros "#Hsup". rewrite /aunarm_commit_at. iIntros (I i c) "%Hrow Ha".
+    iIntros "#Hsup". rewrite /aunarm_commit_at. iIntros (I c) "%Hrow Ha".
     iDestruct (app_step_acc i I _ with "Hsup") as "Hstep".
     iModIntro. iFrame "Ha Hstep". iIntros (I') "%Heq Ha'". iModIntro.
     by iFrame "Ha'".
+  Qed.
+
+  (* ...and the TIED piece at the trivial family: the supply holds of every
+     view, so the arm receipt goes straight back out unread. *)
+  Lemma aunarm_of_arm_unit (γfs : fs_names) E
+      (Farm : pfam Σ (aview -> Z -> iProp Σ)) :
+    app_sup -∗ aunarm_of_arm (fs_gamma_L γfs) E Farm (fun _ _ => True%I).
+  Proof.
+    iIntros "#Hsup". rewrite /aunarm_of_arm. iIntros (i) "$".
+    iApply (aunarm_commit_at_unit γfs E i with "Hsup").
+  Qed.
+
+  (* THE BRIDGE: a caller that can answer at EVERY nlink-1 row can answer at
+     the armed one.  The direction that matters -- the tied piece is the
+     weaker thing to supply -- and the one line every generic supplier takes. *)
+  Lemma aunarm_of_arm_of_all Γ E (Farm : pfam Σ (aview -> Z -> iProp Σ))
+      (Φ : aview -> Z -> iProp Σ) :
+    (∀ i : Z, aunarm_commit_at Γ E i Φ) -∗ aunarm_of_arm Γ E Farm Φ.
+  Proof.
+    iIntros "H". rewrite /aunarm_of_arm. iIntros (i) "$". iApply "H".
+  Qed.
+
+  (* THE OPEN: the one move an unarm fire site takes.  It holds the arm's
+     receipt -- the unarm runs only on the [dirlink] failure path, past the
+     arm -- and spends the tied piece's AU side for the unarm's AU AT THAT
+     INUM.  The refund goes with the unarm that is about to happen, exactly
+     as [pf_at_au] does at every other fire. *)
+  Lemma aunarm_of_arm_open Γ E (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (i : Z) :
+    cre_arm_fired Farm i -∗ pf_at (aunarm_of_arm Γ E Farm) Fun -∗
+      cre_arm_fired Farm i ∗ aunarm_commit_at Γ E i Fun.(pf_recv).
+  Proof.
+    iIntros "Ha Hp". iDestruct (pf_at_au with "Hp") as "Hp".
+    rewrite /aunarm_of_arm. iApply ("Hp" $! i with "Ha").
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -579,16 +639,16 @@ Section CreateFire.
     iFrame "Ha'". iApply ("HΦ" $! (abs_view I) i d full with "[%] Hn"). done.
   Qed.
 
-  Lemma aunarm_commit_at_pinned (γfs : fs_names) E (q : Qp) (jpin : Z)
+  Lemma aunarm_commit_at_pinned (γfs : fs_names) E (i : Z) (q : Qp) (jpin : Z)
       (a : anode) (Φ : aview -> Z -> iProp Σ) :
     app_sup -∗
     nview (fs_gamma_L γfs) q jpin a -∗
     (∀ (av : aview) (i : Z),
        ⌜av !! jpin = Some a⌝ -∗ nview (fs_gamma_L γfs) q jpin a -∗ Φ av i) -∗
-    aunarm_commit_at (fs_gamma_L γfs) E Φ.
+    aunarm_commit_at (fs_gamma_L γfs) E i Φ.
   Proof.
     iIntros "#Hsup Hn HΦ". rewrite /aunarm_commit_at.
-    iIntros (I i c) "%Hrow Ha".
+    iIntros (I c) "%Hrow Ha".
     iDestruct (mkf_auth_nview with "Ha Hn") as %Hav.
     iDestruct (app_step_acc i I _ with "Hsup") as "Hstep".
     iModIntro. iFrame "Ha Hstep". iIntros (I') "%Heq Ha'". iModIntro.
@@ -773,12 +833,11 @@ Section CreateFire.
     abs_of n = Some (MkAnode c 1%nat) ->
     abs_of n' = None ->
     ftop_inv γfs -∗ app_inv γfs -∗ ireg_armed k t q S -∗
-    pf_at (aunarm_commit_at (fs_gamma_L γfs) appE) Fun -∗
+    aunarm_commit_at (fs_gamma_L γfs) appE i Fun.(pf_recv) -∗
     top_frag (fs_gamma_L γfs) i n ={E}=∗
       ireg_armed k t q S ∗ top_frag (fs_gamma_L γfs) i n' ∗ cre_unarm_fired Fun i.
   Proof.
     iIntros (HE Hin Hrow Hnone) "#Hi #Hai Hrec Hcm Hf".
-    iDestruct (pf_at_au with "Hcm") as "Hcm".
     iApply (caf_armed_retag γfs E k t q S i n n' _ HE Hin
               with "Hi Hai Hrec [Hcm] Hf").
     iIntros (I Hlk) "Hta".
@@ -786,7 +845,7 @@ Section CreateFire.
       by (rewrite (abs_view_lookup_of I i n Hlk); exact Hrow).
     assert (Hdelta : abs_view (<[i := n']> I) = delta_unarm i (abs_view I))
       by exact (abs_view_insert_None I i n' Hnone).
-    iMod ("Hcm" $! I i c with "[//] Hta") as "(Hta & Hstep & Hph2)".
+    iMod ("Hcm" $! I c with "[//] Hta") as "(Hta & Hstep & Hph2)".
     iModIntro. iEval (rewrite -Hdelta) in "Hstep". iFrame "Hta Hstep".
     iIntros "Hta".
     iMod ("Hph2" $! (<[i := n']> I) with "[//] Hta") as "[Hta HΦ]".
@@ -804,19 +863,18 @@ Section CreateFire.
     abs_of n = Some (MkAnode c 1%nat) ->
     abs_of n' = None ->
     ftop_inv γfs -∗ app_inv γfs -∗
-    pf_at (aunarm_commit_at (fs_gamma_L γfs) appE) Fun -∗
+    aunarm_commit_at (fs_gamma_L γfs) appE i Fun.(pf_recv) -∗
     top_frag (fs_gamma_L γfs) i n ={E}=∗
       top_frag (fs_gamma_L γfs) i n' ∗ cre_unarm_fired Fun i.
   Proof.
     iIntros (HE Hloc Hrow Hnone) "#Hi #Hai Hcm Hf".
-    iDestruct (pf_at_au with "Hcm") as "Hcm".
     iApply (caf_retag γfs E i n n' _ HE Hloc with "Hi Hai [Hcm] Hf").
     iIntros (I Hlk) "Hta".
     assert (Hav : abs_view I !! i = Some (MkAnode c 1%nat))
       by (rewrite (abs_view_lookup_of I i n Hlk); exact Hrow).
     assert (Hdelta : abs_view (<[i := n']> I) = delta_unarm i (abs_view I))
       by exact (abs_view_insert_None I i n' Hnone).
-    iMod ("Hcm" $! I i c with "[//] Hta") as "(Hta & Hstep & Hph2)".
+    iMod ("Hcm" $! I c with "[//] Hta") as "(Hta & Hstep & Hph2)".
     iModIntro. iEval (rewrite -Hdelta) in "Hstep". iFrame "Hta Hstep".
     iIntros "Hta".
     iMod ("Hph2" $! (<[i := n']> I) with "[//] Hta") as "[Hta HΦ]".

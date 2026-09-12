@@ -67,7 +67,10 @@
        own exists-lookup when the name is already there.
      - [cre_child_unfired] -- the child's two legs: the row APPEARS at
        nlink 1, and the unarm fires instead if the parent's entry write
-       fails.
+       fails.  THE UNARM IS THE UNDO OF THAT ARM: its inum is the one the
+       arm's receipt names ([FsAbsCreateFire.aunarm_of_arm]), which is the
+       inum [ialloc] just returned and hence one the view did not have.
+       The code never unarms anything else.
 
    All four are shaped at the AUTHORITY ([FsAbsMknodFire]'s header says why
    an [astate]-shaped commit cannot be discharged against
@@ -368,7 +371,7 @@ Section SysMknod.
          (* ...AND THE CHILD'S OWN LEG: the row APPEARED at this inum before
             the parent's entry went in, so the ARM's receipt rides beside
             [cre_pre]; the UNARM comes home unfired. *)
-         cre_arm_fired Farm i ∗ pf_at (aunarm_commit_at Γ appE) Fun)%I.
+         cre_arm_fired Farm i ∗ pf_at (aunarm_of_arm Γ appE Farm) Fun)%I.
 
   (* ret -1's two-way fold: nothing fs-visible happened (argstr failed)
      and the whole bundle comes back, or create's own failure fold (the
@@ -506,7 +509,7 @@ Section SysMknod.
        pf_at (dlookup_commit_at Γ appE) Fex ∗
        Fok.(pf_recv) av d nm i ∗
        (* the child's row APPEARED at this inum *)
-       cre_arm_fired Farm i ∗ pf_at (aunarm_commit_at Γ appE) Fun)%I.
+       cre_arm_fired Farm i ∗ pf_at (aunarm_of_arm Γ appE Farm) Fun)%I.
 
   (* ret -1: TWO arms where the AU form has three folds, and the collapse
      is the cursor's disappearance -- "the walk died at hop k" and "nothing

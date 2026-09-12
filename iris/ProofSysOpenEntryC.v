@@ -327,7 +327,7 @@ Section ProofSysOpenEntryC.
     pf_at (acre_commit_at (fs_gamma_L fsc_fs) appE (AFile [])) Phiok -∗
     pf_at (dlookup_commit_at (fs_gamma_L fsc_fs) appE) Phiex -∗
     pf_at (aopen_commit_at (fs_gamma_L fsc_fs) appE) Phio -∗
-    pf_at (atrunc_commit_at (fs_gamma_L fsc_fs) appE) Phit -∗
+    open_trunc_piece (fs_gamma_L fsc_fs) vom Phit -∗
     (* ...and create's CHILD legs (round E2, lane E2-C) *)
     cre_child_unfired (fs_gamma_L fsc_fs) (AFile []) Phiarm Phiun -∗
     wp_next true (proc_addr jx)
@@ -612,7 +612,7 @@ Section ProofSysOpenEntryC.
       { cbn in Hns1. unfold sys_open_slots, create_slots in *. lia. }
       { rewrite /open_arms_create. iFrame "Hfds". iLeft.
         iSplitR; [iPureIntro; exact Ha0f |]. iFrame "Hpriv Hfrag".
-        iApply (cre_fail_to_open _ _ _ Mim pvv _ _ _ _ _ _ _ _ _ _ _ _ Hpof
+        iApply (cre_fail_to_open _ _ _ Mim pvv _ _ _ _ _ _ _ _ _ _ _ _ _ Hpof
                   with "Hcf Hoc Htc"). } }
     (* ---- create SUCCEEDED: the locked inode, straight to the join ---- *)
     iDestruct "Hok" as "(%Hokf & Hlocked & Hcauf)".

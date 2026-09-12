@@ -20,17 +20,15 @@
 (* step, so the receipt collapses to `the console, or the walk missed and *)
 (* [r = -1], or the taint`.                                              *)
 (*                                                                       *)
-(* WHAT THIS FILE DOES *NOT* SUPPLY, and it is a finding rather than an   *)
-(* omission: open's bundle carries a TRUNCATION commit                    *)
-(* ([SysOpenDefs.atrunc_commit_at]) whatever the caller's omode is, and   *)
-(* that commit's [AppInv.app_step] is owed at EVERY view row that is a    *)
-(* file -- including the rows a pin-carrying application pins (/sh's row  *)
-(* is a file at nlink 1).  No application whose claim constrains any file *)
-(* can pay it; every landed supplier pays it out of [AppInv.app_sup], the *)
-(* credential that says the claim holds of every view, which for a        *)
-(* constraining application is available only under the taint             *)
-(* ([AppEcho.echo_sup_of_taint]).  So the piece is a PREMISE of the       *)
-(* bundle below, at the caller's own family, and the lane reports it.     *)
+(* THE TRUNCATION PIECE RIDES THE OMODE.  open's bundle owes               *)
+(* [SysOpenDefs.atrunc_commit_at] only under [om_trunc vom]                *)
+(* ([SysOpenDefs.open_trunc_piece]), because that is when the code runs    *)
+(* [itrunc].  A pin-carrying application opening WITHOUT O_TRUNC -- /init's *)
+(* [open("console", O_RDWR)] -- therefore owes nothing at all, which is    *)
+(* [pinned_open_bundle_notrunc] below: no [Ft] premise, no                 *)
+(* [AppInv.app_step] at a row the application pins.  At [om_trunc vom =    *)
+(* true] the piece is still the caller's, and it is a premise of the       *)
+(* general form.                                                           *)
 (* ===================================================================== *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
@@ -59,8 +57,8 @@ Require Import PieceFam.        (* [pfam] / [pf_at] *)
 Require Import FsAbsEra.        (* [ex_start], [um_start_of] *)
 Require Import FsAbsDefs.       (* [arow_at], [abs_view], [anode] *)
 Require Import SysOpenDefs.     (* [open_au_plain_at], [aopen_commit_at],
-                                   [atrunc_commit_at], [open_fd_rcpt],
-                                   [om_readable] / [om_writable] *)
+                                   [open_trunc_piece], [open_fd_rcpt],
+                                   [om_readable] / [om_writable] / [om_trunc] *)
 Require Import SpecSysOpen.     (* [open_receipt_plain], [open_in] *)
 Require Import PinnedObs.       (* [pin_resolves_at], [pobs_P]/[pobs_Pmiss],
                                    [pobs_Fo], [pobs_node], [pinned_obs] *)
@@ -90,15 +88,15 @@ Section PinnedOpen.
   Lemma pinned_open_bundle_at (γfs : fs_names)
       (Pin : aview -> Prop) (T : iProp Σ) `{!Persistent T} `{!Timeless T}
       (cw : Z) (pl : list (bv 8)) (hops : list Z) (ino : Z) (a : anode)
-      (M : gmap Z (bv 8)) (pv : mword 64)
+      (M : gmap Z (bv 8)) (pv vom : mword 64)
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) :
     pin_resolves_at Pin cw pl hops ino a ->
     arg_path_of M pv pl ->
     □ (∀ v : aview, app_pred app_run v -∗
                       app_pred app_run v ∗ (⌜Pin v⌝ ∨ T)) -∗
     app_inv γfs -∗
-    pf_at (atrunc_commit_at (fs_gamma_L γfs) appE) Ft -∗
-    open_au_plain_at (fs_gamma_L γfs) γfs cw M pv
+    open_trunc_piece (fs_gamma_L γfs) vom Ft -∗
+    open_au_plain_at (fs_gamma_L γfs) γfs cw M pv vom
       (pobs_P T hops) (pobs_Pmiss T) (pobs_Fo Pin T) Ft.
   Proof.
     intros Hres Hpath. iIntros "#Hcl #Hinv Ht".
@@ -126,14 +124,41 @@ Section PinnedOpen.
     □ (∀ v : aview, app_pred app_run v -∗
                       app_pred app_run v ∗ (⌜Pin v⌝ ∨ T)) -∗
     app_inv γfs -∗
-    pf_at (atrunc_commit_at (fs_gamma_L γfs) appE) Ft -∗
+    open_trunc_piece (fs_gamma_L γfs) vom Ft -∗
     open_in (fs_gamma_L γfs) γfs cw M pv vom
       (pobs_P T hops) (pobs_Pmiss T) Farm Fun Fok Fex (pobs_Fo Pin T) Ft.
   Proof.
     intros Hcr Hres Hpath. iIntros "#Hcl #Hinv Ht".
     rewrite /open_in Hcr.
-    iApply (pinned_open_bundle_at γfs Pin T cw pl hops ino a M pv Ft
+    iApply (pinned_open_bundle_at γfs Pin T cw pl hops ino a M pv vom Ft
               Hres Hpath with "Hcl Hinv Ht").
+  Qed.
+
+  (* ...AND THE FORM INIT TAKES IT AT: no O_TRUNC, so the trunc piece is
+     not owed and the bundle costs the pin and nothing else.  This is the
+     whole point of the tightening at the application boundary -- there is
+     no [Ft] premise to supply and no [AppInv.app_step] at a pinned row. *)
+  Lemma pinned_open_bundle_notrunc (γfs : fs_names)
+      (Pin : aview -> Prop) (T : iProp Σ) `{!Persistent T} `{!Timeless T}
+      (cw : Z) (pl : list (bv 8)) (hops : list Z) (ino : Z) (a : anode)
+      (M : gmap Z (bv 8)) (pv vom : mword 64)
+      (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
+      (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) :
+    om_create vom = false ->
+    om_trunc vom = false ->
+    pin_resolves_at Pin cw pl hops ino a ->
+    arg_path_of M pv pl ->
+    □ (∀ v : aview, app_pred app_run v -∗
+                      app_pred app_run v ∗ (⌜Pin v⌝ ∨ T)) -∗
+    app_inv γfs -∗
+    open_in (fs_gamma_L γfs) γfs cw M pv vom
+      (pobs_P T hops) (pobs_Pmiss T) Farm Fun Fok Fex (pobs_Fo Pin T) Ft.
+  Proof.
+    intros Hcr Htr Hres Hpath. iIntros "#Hcl #Hinv".
+    iApply (pinned_open_bundle γfs Pin T cw pl hops ino a M pv vom Ft
+              Farm Fun Fok Fex Hcr Hres Hpath with "Hcl Hinv []").
+    iApply (open_trunc_piece_none _ vom Ft Htr).
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -166,7 +191,7 @@ Section PinnedOpen.
        (* THE CONSOLE: the descriptor is the PINNED device's *)
        ∨ (⌜open_fd_rcpt (om_readable vom) (om_writable vom) (FdDevice ma)
              sts r fdv'⌝
-          ∗ pf_at (atrunc_commit_at (fs_gamma_L γfs) appE) Ft)
+          ∗ open_trunc_piece (fs_gamma_L γfs) vom Ft)
        (* ...or the application is tainted *)
        ∨ T).
   Proof.

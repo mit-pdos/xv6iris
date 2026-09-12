@@ -167,6 +167,19 @@ Section FsAbsInvFire.
     iApply (atrunc_commit_at_unit γfs appE with "Hsup").
   Qed.
 
+  (* ...and the GUARDED trunc piece open's bundles actually take: at
+     [om_trunc vom = false] nothing is owed and the supply is not even
+     read.  This is the tightening's payoff on the generic side -- the
+     piece is now payable more easily, never less. *)
+  Lemma fsabs_trunc_piece (γfs : fs_names) (vom : mword 64) :
+    app_sup -∗
+    open_trunc_piece (fs_gamma_L γfs) vom (pfam_triv (fun _ _ _ => True%I)).
+  Proof.
+    iIntros "#Hsup". rewrite /open_trunc_piece. destruct (om_trunc vom).
+    - iApply (fsabs_atrunc with "Hsup").
+    - done.
+  Qed.
+
   Lemma fsabs_acre (γfs : fs_names) (c : absnode) :
     app_sup -∗
     pf_at (acre_commit_at (fs_gamma_L γfs) appE c) (pfam_triv (fun _ _ _ _ => True%I)).
@@ -187,7 +200,7 @@ Section FsAbsInvFire.
     { iApply pf_at_triv.
       iApply (aarm_commit_at_unit γfs appE c with "Hsup"). }
     iApply pf_at_triv.
-    iApply (aunarm_commit_at_unit γfs appE with "Hsup").
+    iApply (aunarm_of_arm_unit γfs appE _ with "Hsup").
   Qed.
 
   Lemma fsabs_uent (γfs : fs_names) :
@@ -334,15 +347,16 @@ Section FsAbsInvFire.
      EVERY string ([fsabs_open_walk]), which is strictly more than the
      one-path bundle asks for, so the instance is
      [SysOpenDefs.open_au_pre_plain_of_all] and nothing else. *)
-  Lemma fsabs_open_pre_plain (γfs : fs_names) (cw : Z) (pl : list (bv 8)) :
+  Lemma fsabs_open_pre_plain (γfs : fs_names) (cw : Z) (pl : list (bv 8))
+      (vom : mword 64) :
     app_sup -∗
-    open_au_pre_plain (fs_gamma_L γfs) γfs cw pl (fun _ _ => True%I)
+    open_au_pre_plain (fs_gamma_L γfs) γfs cw pl vom (fun _ _ => True%I)
       (fun _ _ => True%I) (pfam_triv (fun _ _ _ => True%I)) (pfam_triv (fun _ _ _ => True%I)).
   Proof.
     iIntros "#Hsup".
     iApply (open_au_pre_plain_of_all with "[] [] []");
       [ iApply fsabs_open_walk | iApply fsabs_aopen
-      | iApply (fsabs_atrunc with "Hsup") ].
+      | iApply (fsabs_trunc_piece with "Hsup") ].
   Qed.
 
   (* ...and the fs-facing half of exec's AU bundle
@@ -357,9 +371,10 @@ Section FsAbsInvFire.
     iSplitR; [iApply fsabs_open_walk | iApply fsabs_aopen].
   Qed.
 
-  Lemma fsabs_open_pre_create (γfs : fs_names) (cw : Z) (pl : list (bv 8)) :
+  Lemma fsabs_open_pre_create (γfs : fs_names) (cw : Z) (pl : list (bv 8))
+      (vom : mword 64) :
     app_sup -∗
-    open_au_pre_create (fs_gamma_L γfs) γfs cw pl (fun _ _ => True%I)
+    open_au_pre_create (fs_gamma_L γfs) γfs cw pl vom (fun _ _ => True%I)
       (fun _ _ => True%I) (pfam_triv (fun _ _ => True%I)) (pfam_triv (fun _ _ => True%I)) (pfam_triv (fun _ _ _ _ => True%I)) (pfam_triv (fun _ _ _ _ => True%I))
       (pfam_triv (fun _ _ _ => True%I)) (pfam_triv (fun _ _ _ => True%I)).
   Proof.
@@ -367,7 +382,7 @@ Section FsAbsInvFire.
     iApply (open_au_pre_create_of_all with "[] [] [] [] [] []");
       [ iApply fsabs_mknod_walk | iApply (fsabs_acre with "Hsup")
       | iApply fsabs_dlookup | iApply fsabs_aopen
-      | iApply (fsabs_atrunc with "Hsup") | iApply (fsabs_child with "Hsup") ].
+      | iApply (fsabs_trunc_piece with "Hsup") | iApply (fsabs_child with "Hsup") ].
   Qed.
 
   (* ...AND THE ONE INPUT sys_open's contract takes, at the key the code
@@ -387,10 +402,10 @@ Section FsAbsInvFire.
     - iApply (open_au_create_at_of_all with "[] [] [] [] [] []");
         [ iApply fsabs_mknod_walk | iApply (fsabs_acre with "Hsup")
         | iApply fsabs_dlookup | iApply fsabs_aopen
-        | iApply (fsabs_atrunc with "Hsup") | iApply (fsabs_child with "Hsup") ].
+        | iApply (fsabs_trunc_piece with "Hsup") | iApply (fsabs_child with "Hsup") ].
     - iApply (open_au_plain_at_of_all with "[] [] []");
         [ iApply fsabs_open_walk | iApply fsabs_aopen
-        | iApply (fsabs_atrunc with "Hsup") ].
+        | iApply (fsabs_trunc_piece with "Hsup") ].
   Qed.
 
   Lemma fsabs_mknod_pre (γfs : fs_names) (cw : Z)

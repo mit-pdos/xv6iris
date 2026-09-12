@@ -593,7 +593,7 @@ Section CreateSpec.
       (Fok : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) : iProp Σ :=
     (pf_at (aarm_commit_at Γ appE (cre_c0 tyz ma mi)) Farm
      ∗ cre_dots_leg Γ tyz Fdots
-     ∗ pf_at (aunarm_commit_at Γ appE) Fun
+     ∗ pf_at (aunarm_of_arm Γ appE Farm) Fun
      ∗ pf_at (acre_commit_at_gen Γ appE (cre_child tyz ma mi)) Fok)%I.
 
   (* SATISFIABILITY, and the discharger every caller of the landed create
@@ -617,7 +617,7 @@ Section CreateSpec.
       iApply (adots_commit_at_unit γfs appE with "Hsup"). }
     iSplitR.
     { iApply pf_at_triv.
-      iApply (aunarm_commit_at_unit γfs appE with "Hsup"). }
+      iApply (aunarm_of_arm_unit γfs appE _ with "Hsup"). }
     iApply pf_at_triv.
     iApply (acre_commit_at_gen_unit γfs appE _ with "Hsup").
   Qed.
@@ -644,7 +644,7 @@ Section CreateSpec.
           then cre_arm_fired Farm i
                ∗ (cre_dots_fired Fdots i d true ∨ cre_dots_leg Γ tyz Fdots)
                ∗ cre_acre_fired Fok d nm i (cre_child tyz ma mi d i)
-               ∗ pf_at (aunarm_commit_at Γ appE) Fun
+               ∗ pf_at (aunarm_of_arm Γ appE Farm) Fun
                ∗ pf_at (dlookup_commit_at Γ appE) Fex
           else cre_ex_fired Fex d nm i
                ∗ cre_commits Γ tyz ma mi Farm Fdots Fun Fok))%I.
@@ -677,7 +677,7 @@ Section CreateSpec.
           ∗ pf_at (acre_commit_at_gen Γ appE (cre_child tyz ma mi)) Fok
           ∗ ((pf_at (aarm_commit_at Γ appE (cre_c0 tyz ma mi)) Farm
                 ∗ cre_dots_leg Γ tyz Fdots
-                ∗ pf_at (aunarm_commit_at Γ appE) Fun)
+                ∗ pf_at (aunarm_of_arm Γ appE Farm) Fun)
              ∨ (∃ i : Z,
                   cre_arm_fired Farm i
                   ∗ ((∃ full : bool, cre_dots_fired Fdots i d full)
@@ -840,7 +840,7 @@ Section CreateSpec.
         P (length (npar_elems pl)) d ∗
         pf_at (dlookup_commit_at Γ appE) Fex ∗
         Fok.(pf_recv) av d nm i ∗
-        cre_arm_fired Farm i ∗ pf_at (aunarm_commit_at Γ appE) Fun.
+        cre_arm_fired Farm i ∗ pf_at (aunarm_of_arm Γ appE Farm) Fun.
   Proof.
     rewrite /cre_ok_arms. iIntros "H".
     iDestruct "H" as (d nm) "(%Hlast & HP & Harm & _ & Hacre & Hun & Hdl)".
@@ -917,7 +917,7 @@ Section CreateSpec.
             ⌜cre_pre av d nm ents nl i (AFile [])⌝ ∗
             Fok.(pf_recv) av d nm i ∗
             pf_at (dlookup_commit_at Γ appE) Fex ∗
-            cre_arm_fired Farm i ∗ pf_at (aunarm_commit_at Γ appE) Fun)
+            cre_arm_fired Farm i ∗ pf_at (aunarm_of_arm Γ appE Farm) Fun)
          ∨ (∃ (av : aview) (ents : gmap fname Z) (nl : nat),
             ⌜av !! d = Some (MkAnode (ADir ents) nl)⌝ ∗
             ⌜ents !! nm = Some i⌝ ∗
@@ -961,7 +961,7 @@ Section CreateSpec.
         P (length (npar_elems pl)) d ∗
         Fok.(pf_recv) av d nm i ∗
         pf_at (dlookup_commit_at Γ appE) Fex ∗
-        cre_arm_fired Farm i ∗ pf_at (aunarm_commit_at Γ appE) Fun.
+        cre_arm_fired Farm i ∗ pf_at (aunarm_of_arm Γ appE Farm) Fun.
   Proof.
     rewrite /cre_ok_arms /cre_acre_fired. iIntros "H".
     iDestruct "H" as (d nm) "(%Hl & HP & Ha & _ & Hac & Hu & Hdl)".

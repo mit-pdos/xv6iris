@@ -514,6 +514,9 @@ Section ProofCreateFailMkdir.
                                (mword_of_int 0 : mword 16)) bmc datc) = None)
       by exact (caf_era_none_nl0 _ bmc datc Hznl).
     iApply fupd_wp.
+    (* THE UNARM IS THE UNDO OF THIS ARM (see [ProofCreateFail]'s note). *)
+    iDestruct (aunarm_of_arm_open (fs_gamma_L fsc_fs) _ Farm Fun
+                 (bv_unsigned cinum) with "Harmr Hun") as "[Harmr Hun]".
     iMod (cr_dirty_clear_unarm ⊤ t (bv_unsigned cinum) _ Fun
             (era_node dc bmc datc)
             (era_node (cr_setf dc major minor (mword_of_int 0 : mword 16))
