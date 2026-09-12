@@ -36,7 +36,7 @@ def cstrAt (bs : List (BitVec 8)) (n : Nat) : Prop :=
 def wp_strlen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (bs : List (BitVec 8)) (n : Nat) (dq : DFrac)
     (hsie : k.sie = false) (htier : k.tier = KTier.bare) (hK : 2 ≤ k.avail)
-    (hcstr : cstrAt bs n) (hn31 : n < 2 ^ 31) (hbuf : inRam (k.regs 10#5) bs.length) : Prop :=
+    (hcstr : cstrAt bs n) (hn31 : n < 2 ^ 31) : Prop :=
   kctx cpu k ∗ kernelText ∗ pcIs cpu strlenAddr ∗ byteBuf (k.regs 10#5) dq bs ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ R' : RegMap,
     kctx cpu' (k.withRegs R') -∗ pcIs cpu' (retPc (k.regs 1#5)) -∗
@@ -47,7 +47,7 @@ def wp_strlen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx
 /-- The interface of `strlen`. -/
 structure STRLEN : Prop where
   wp_strlen : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
-    (cpu : CPU) (k : KCtx) (bs : List (BitVec 8)) (n : Nat) (dq : DFrac) hsie htier hK hcstr hn31 hbuf,
-    wp_strlen_body (hlc := hlc) (GF := GF) cpu k bs n dq hsie htier hK hcstr hn31 hbuf
+    (cpu : CPU) (k : KCtx) (bs : List (BitVec 8)) (n : Nat) (dq : DFrac) hsie htier hK hcstr hn31,
+    wp_strlen_body (hlc := hlc) (GF := GF) cpu k bs n dq hsie htier hK hcstr hn31
 
 end Xv6

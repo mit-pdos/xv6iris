@@ -16,7 +16,7 @@ open LeanRV64D
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 set_option maxHeartbeats 4000000 in
-theorem memcpy_proof (M : MEMMOVE) : MEMCPY := ⟨fun {hlc GF} _ _ cpu k bs olds n dqs hsie htier hK hn hn32 hls hld hsrc hdst => by
+theorem memcpy_proof (M : MEMMOVE) : MEMCPY := ⟨fun {hlc GF} _ _ cpu k bs olds n dqs hsie htier hK hn hn32 hls hld => by
   unfold wp_memcpy_body
   iintro ⟨Hk, #Htext, Hpc, Hsrc, Hdst, HΦ⟩
   simp only [memcpyAddr, KernelSyms.«memcpy»]
@@ -37,7 +37,6 @@ theorem memcpy_proof (M : MEMMOVE) : MEMCPY := ⟨fun {hlc GF} _ _ cpu k bs olds
   have hm := M.wp_memmove (hlc := hlc) (GF := GF) cpu ((k.pushed 2).withRegs
       ((((k.regs.set 2#5 (k.regs 2#5 + 0xFFFFFFFFFFFFFFF0#64)).set 8#5 (k.regs 2#5)).set 1#5 0x80000d46#64)))
     bs olds n dqs (by k_norm) (by k_norm) (by k_norm; omega) (by k_norm; exact hn) hn32 hls hld
-    (by k_norm; exact hsrc) (by k_norm; exact hdst)
   unfold wp_memmove_body at hm
   simp only [memmoveAddr, KernelSyms.«memmove»] at hm
   k_norm at hm

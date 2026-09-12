@@ -1353,7 +1353,7 @@ theorem printk_str_loop (CP : CONSPUTC) {hlc : HasLC} {GF : BundledGFunctors} [M
     (cpu : CPU) (k : KCtx) (γl : GName) (γd : UartNames)
     (hsie : k.sie = false) (htier : k.tier = KTier.bare) (hK : 48 ≤ k.avail) (hnoff : k.noff + 2 < 2 ^ 31)
     (huart : "uart" ∉ k.locks) (v : BitVec 64) (dq : DFrac) (s : List (BitVec 8)) (hs : nonul s)
-    (hram : inRam v (s.length + 1)) (n : Nat) :
+    (n : Nat) :
     ∀ (j : Nat) (R : RegMap) (bs : List (BitVec 8)), j + n + 1 = s.length → pkRegs k.regs R →
     R 20#5 = v + BitVec.ofNat 64 j → R 10#5 = BitVec.setWidth 64 (fmtByte s j) →
     kernelText ∗ isTxLock γl γd ∗
@@ -1395,9 +1395,8 @@ theorem printk_str_loop (CP : CONSPUTC) {hlc : HasLC} {GF : BundledGFunctors} [M
     have hb : (s ++ [0#8])[j + 1]? = some (fmtByte s (j + 1)) := fmtByte_get s (j + 1) (by omega)
     have hz : fmtByte s (j + 1) = 0#8 := by rw [show j + 1 = s.length by omega]; exact fmtByte_end s
     icases byteBuf_acc v dq (s ++ [0#8]) (j + 1) _ hb $$ Hbuf with ⟨Hb, Hclose⟩
-    k_step (wp_s_lbu cpu _ ?hs ?ht 0x80000726#64 false 0#12 10#5 20#5 (by decide) dq (fmtByte s (j + 1)) ?hram) from (text_instr _ _ _ _ rfl rfl) HT
+    k_step (wp_s_lbu cpu _ ?hs ?ht 0x80000726#64 false 0#12 10#5 20#5 (by decide) dq (fmtByte s (j + 1))) from (text_instr _ _ _ _ rfl rfl) HT
       $$ [- $Hk $Hpc]
-    case hram => k_norm; exact inRam_byte hram (j + 1) (by omega)
     iintro Hk Hpc Hb
     ihave Hbuf := Hclose $$ Hb
     -- bnez a0 → 0x720: not taken
@@ -1445,9 +1444,8 @@ theorem printk_str_loop (CP : CONSPUTC) {hlc : HasLC} {GF : BundledGFunctors} [M
     have hb : (s ++ [0#8])[j + 1]? = some (fmtByte s (j + 1)) := fmtByte_get s (j + 1) (by omega)
     have hnz : fmtByte s (j + 1) ≠ 0#8 := fmtByte_ne_zero s hs (j + 1) (by omega)
     icases byteBuf_acc v dq (s ++ [0#8]) (j + 1) _ hb $$ Hbuf with ⟨Hb, Hclose⟩
-    k_step (wp_s_lbu cpu _ ?hs ?ht 0x80000726#64 false 0#12 10#5 20#5 (by decide) dq (fmtByte s (j + 1)) ?hram) from (text_instr _ _ _ _ rfl rfl) HT
+    k_step (wp_s_lbu cpu _ ?hs ?ht 0x80000726#64 false 0#12 10#5 20#5 (by decide) dq (fmtByte s (j + 1))) from (text_instr _ _ _ _ rfl rfl) HT
       $$ [- $Hk $Hpc]
-    case hram => k_norm; exact inRam_byte hram (j + 1) (by omega)
     iintro Hk Hpc Hb
     ihave Hbuf := Hclose $$ Hb
     -- bnez a0 → 0x720: taken
@@ -1505,15 +1503,14 @@ theorem printk_hex_iter (CP : CONSPUTC) {hlc : HasLC} {GF : BundledGFunctors} [M
   -- lbu a0,0(a5)
   ihave Hdig := kernelData_digits $$ HD
   icases byteBuf_acc _ _ _ _ _ hdig $$ Hdig with ⟨Hb, _⟩
-  ihave Hb := (show bytesPointsTo (0x80007730#64 + BitVec.ofNat 64 (R 21#5 >>> 60).toNat) 1 DFrac.discard
+  ihave Hb := (show wordPointsTo (0x80007730#64 + BitVec.ofNat 64 (R 21#5 >>> 60).toNat) 1 DFrac.discard
       (digitsStr[(R 21#5 >>> 60).toNat]'h16) ⊢
-      bytesPointsTo (GF := GF) (0x80007730#64 + R 21#5 >>> 60) 1 DFrac.discard (digitsStr[(R 21#5 >>> 60).toNat]'h16)
+      wordPointsTo (GF := GF) (0x80007730#64 + R 21#5 >>> 60) 1 DFrac.discard (digitsStr[(R 21#5 >>> 60).toNat]'h16)
       from by rw [← shr60_ofNat]) $$ Hb
   iapply (wp_s_lbu cpu _ ?hs ?ht 0x800006dc#64 false 0#12 10#5 15#5 (by decide) DFrac.discard
-    (digitsStr[(R 21#5 >>> 60).toNat]'h16) ?hram) $$ [- $Hk $Hpc]
+    (digitsStr[(R 21#5 >>> 60).toNat]'h16)) $$ [- $Hk $Hpc]
   case hs => k_norm
   case ht => k_norm
-  case hram => k_norm; rw [shr60_ofNat]; exact inRam_byte inRam_digits _ (shr60_lt _)
   k_code (text_instr _ _ _ _ rfl rfl) HT
   iframe #
   k_norm
@@ -2132,7 +2129,7 @@ theorem printk_arm_s (CP : CONSPUTC) {hlc : HasLC} {GF : BundledGFunctors} [Mach
     ihave Hnull := (show byteBuf 0x80007008#64 DFrac.discard nullStr ⊢
       byteBuf (GF := GF) 0x80007008#64 DFrac.discard (nullBody ++ [0#8]) from by rw [nullStr_eq]) $$ Hnull
     iapply (printk_str_loop CP cpu k γl γd hsie htier hK hnoff huart 0x80007008#64 DFrac.discard nullBody nullBody_nonul
-      inRam_null 5 0 _ bs (by decide) ?hRn ?h20n ?h10n) $$ [- $Hk $Hpc $Hsent]
+      5 0 _ bs (by decide) ?hRn ?h20n ?h10n) $$ [- $Hk $Hpc $Hsent]
     rotate_right 1
     iframe #
     first | (isplitr; · iexact Hnull) | skip
@@ -2147,20 +2144,19 @@ theorem printk_arm_s (CP : CONSPUTC) {hlc : HasLC} {GF : BundledGFunctors} [Mach
     refine ⟨h'.1, ?_, by omega, hp, hkinds⟩
     rw [h'.2]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hR9
   · -- a string
-    icases pkDescRes_str_acc _ _ _ $$ Hd with ⟨%⟨hs, hv, hram⟩, Hbs, Hdcl'⟩
+    icases pkDescRes_str_acc _ _ _ $$ Hd with ⟨%⟨hs, hv⟩, Hbs, Hdcl'⟩
     have hv' : k.regs (BitVec.ofNat 5 (11 + kk)) ≠ 0#64 := hv
     k_step (wp_s_branch cpu _ ?hs ?ht 0x80000714#64 false 26#13 20#5 0#5 (by decide) bop.BEQ ?htgt) from (text_instr _ _ _ _ rfl rfl) HT
       $$ [- $Hk $Hpc] with [ite_beq_zero, if_neg hv']
     case htgt => k_tgt
     iintro Hk Hpc
     -- lbu a0,0(s4): the first character
-    simp only [pkVararg] at hv hram
+    simp only [pkVararg] at hv
     simp only [pkVararg]
     have hb0 : (s ++ [0#8])[0]? = some (fmtByte s 0) := fmtByte_get s 0 (Nat.zero_le _)
     icases byteBuf_acc0 _ dq (s ++ [0#8]) _ hb0 $$ Hbs with ⟨Hb, Hclose⟩
-    k_step (wp_s_lbu cpu _ ?hs ?ht 0x80000718#64 false 0#12 10#5 20#5 (by decide) dq (fmtByte s 0) ?hram) from (text_instr _ _ _ _ rfl rfl) HT
+    k_step (wp_s_lbu cpu _ ?hs ?ht 0x80000718#64 false 0#12 10#5 20#5 (by decide) dq (fmtByte s 0)) from (text_instr _ _ _ _ rfl rfl) HT
       $$ [- $Hk $Hpc]
-    case hram => k_norm; simpa using inRam_byte hram 0 (by omega)
     iintro Hk Hpc Hb
     ihave Hbs := Hclose $$ Hb
     k_step (wp_s_branch cpu _ ?hs ?ht 0x8000071c#64 false 7762#13 10#5 0#5 (by decide) bop.BEQ ?htgt) from (text_instr _ _ _ _ rfl rfl) HT
@@ -2181,7 +2177,7 @@ theorem printk_arm_s (CP : CONSPUTC) {hlc : HasLC} {GF : BundledGFunctors} [Mach
       · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hR9
     · have hnz : fmtByte s 0 ≠ 0#8 := fmtByte_ne_zero s hs 0 hspos
       ihave Hpc := pcIs_ite_neg _ _ _ _ hnz $$ Hpc
-      iapply (printk_str_loop CP cpu k γl γd hsie htier hK hnoff huart (k.regs (BitVec.ofNat 5 (11 + kk))) dq s hs hram
+      iapply (printk_str_loop CP cpu k γl γd hsie htier hK hnoff huart (k.regs (BitVec.ofNat 5 (11 + kk))) dq s hs
         (s.length - 1) 0 _ bs (by omega) ?hRs ?h20s ?h10s) $$ [- $Hk $Hpc $Hbs $Hsent]
       rotate_right 1
       iframe #
@@ -2203,7 +2199,7 @@ theorem printk_pct_tail (CP : CONSPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : Bund
     (f : List (BitVec 8)) (descs : List PkArgDesc)
     (hsie : k.sie = false) (htier : k.tier = KTier.bare) (hK : 48 ≤ k.avail) (hnoff : k.noff + 2 < 2 ^ 31)
     (huart : "uart" ∉ k.locks) (hf : stackFacts (k.regs 2#5) 24) (hflen : f.length + 4 < 2 ^ 31)
-    (hnonul : nonul f) (hdlen : descs.length ≤ 7) (hfmt : inRam (k.regs 10#5) (f.length + 1))
+    (hnonul : nonul f) (hdlen : descs.length ≤ 7)
     (i kk : Nat) (R : RegMap) (w18 : BitVec 64) (hR : pkRegs k.regs R) (hR20 : R 20#5 = BitVec.ofNat 64 i)
     (hR9 : R 9#5 = BitVec.ofNat 64 (i + 1))
     (c0 c1 c2 : BitVec 8) (hc0 : c0 = fmtByte f (i + 1)) (hc1 : c1 = fmtByte f (i + 2)) (hc2 : c2 = fmtByte f (i + 3))
@@ -2415,7 +2411,7 @@ theorem printk_pct_5e2 (CP : CONSPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : Bundl
     (f : List (BitVec 8)) (descs : List PkArgDesc)
     (hsie : k.sie = false) (htier : k.tier = KTier.bare) (hK : 48 ≤ k.avail) (hnoff : k.noff + 2 < 2 ^ 31)
     (huart : "uart" ∉ k.locks) (hf : stackFacts (k.regs 2#5) 24) (hflen : f.length + 4 < 2 ^ 31)
-    (hnonul : nonul f) (hdlen : descs.length ≤ 7) (hfmt : inRam (k.regs 10#5) (f.length + 1))
+    (hnonul : nonul f) (hdlen : descs.length ≤ 7)
     (i kk : Nat) (R : RegMap) (w18 : BitVec 64) (hR : pkRegs k.regs R) (hR20 : R 20#5 = BitVec.ofNat 64 i)
     (hR9 : R 9#5 = BitVec.ofNat 64 (i + 1)) (hR15 : R 15#5 = BitVec.ofNat 64 (i + 1))
     (c0 c1 : BitVec 8) (hc0 : c0 = fmtByte f (i + 1)) (hc1 : c1 = fmtByte f (i + 2))
@@ -2441,9 +2437,8 @@ theorem printk_pct_5e2 (CP : CONSPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : Bundl
   obtain ⟨c2, hc2⟩ : ∃ c, c = fmtByte f (i + 3) := ⟨_, rfl⟩
   have hb3 : (f ++ [0#8])[i + 3]? = some c2 := by rw [hc2]; exact fmtByte_get f (i + 3) (by omega)
   icases byteBuf_acc _ dqf _ (i + 3) c2 hb3 $$ Hbuf with ⟨Hb, Hclose⟩
-  k_step_noite (wp_s_lbu cpu _ ?hs ?ht 0x800005e6#64 false 2#12 13#5 15#5 (by decide) dqf c2 ?hram) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
+  k_step_noite (wp_s_lbu cpu _ ?hs ?ht 0x800005e6#64 false 2#12 13#5 15#5 (by decide) dqf c2) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
     with [fmt_i3]
-  case hram => k_norm [fmt_i3]; exact inRam_byte hfmt (i + 3) (by omega)
   iintro Hk Hpc Hb
   ihave Hbuf := Hclose $$ Hb
   k_step_noite (wp_s_j cpu _ ?hs ?ht 0x800005ea#64 true 418#21 ?htgt) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
@@ -2502,7 +2497,7 @@ theorem printk_pct_5e2 (CP : CONSPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : Bundl
     case H14a => simp only [KCtx.rget_withRegs', KCtx.setReg_withRegs, RegMap.set_apply, BitVec.reduceEq]; exact hR14
     case H15a => simp only [KCtx.rget_withRegs', KCtx.setReg_withRegs, RegMap.set_apply, BitVec.reduceEq]; exact hb15'
     iintro %R' Hk Hpc %h'
-    iapply (printk_pct_tail CP PI cpu k γpr γl γd bs dqf f descs hsie htier hK hnoff huart hf hflen hnonul hdlen hfmt i kk R' w18
+    iapply (printk_pct_tail CP PI cpu k γpr γl γd bs dqf f descs hsie htier hK hnoff huart hf hflen hnonul hdlen i kk R' w18
       h'.1 ?HAa ?HBa c0 c1 c2 hc0 hc1 hc2 ?HCa hd hld (fun h => hll h.2) hi hp hkinds) $$ [- $Hk $Hpc $Hbuf $Hdescs $Hframe $Hsent $Hlocked $Hcont]
     rotate_right 1
     iframe #
@@ -2521,7 +2516,7 @@ theorem printk_pct_5e2 (CP : CONSPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : Bundl
   case H14b => simp only [KCtx.rget_withRegs', KCtx.setReg_withRegs, RegMap.set_apply, BitVec.reduceEq]; exact hR14
   case H15b => simp only [KCtx.rget_withRegs', KCtx.setReg_withRegs, RegMap.set_apply, BitVec.reduceEq]; exact hb15'
   iintro %R' Hk Hpc %h'
-  iapply (printk_pct_tail CP PI cpu k γpr γl γd bs dqf f descs hsie htier hK hnoff huart hf hflen hnonul hdlen hfmt i kk R' w18
+  iapply (printk_pct_tail CP PI cpu k γpr γl γd bs dqf f descs hsie htier hK hnoff huart hf hflen hnonul hdlen i kk R' w18
     h'.1 ?HAb ?HBb c0 c1 c2 hc0 hc1 hc2 ?HCb hd hld (fun h => hc2d h.1) hi hp hkinds) $$ [- $Hk $Hpc $Hbuf $Hdescs $Hframe $Hsent $Hlocked $Hcont]
   rotate_right 1
   iframe #
@@ -2536,7 +2531,7 @@ theorem printk_pct (CP : CONSPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : BundledGF
     (f : List (BitVec 8)) (descs : List PkArgDesc)
     (hsie : k.sie = false) (htier : k.tier = KTier.bare) (hK : 48 ≤ k.avail) (hnoff : k.noff + 2 < 2 ^ 31)
     (huart : "uart" ∉ k.locks) (hf : stackFacts (k.regs 2#5) 24) (hflen : f.length + 4 < 2 ^ 31)
-    (hnonul : nonul f) (hdlen : descs.length ≤ 7) (hfmt : inRam (k.regs 10#5) (f.length + 1))
+    (hnonul : nonul f) (hdlen : descs.length ≤ 7)
     (i kk : Nat) (R : RegMap) (w18 : BitVec 64) (hR : pkRegs k.regs R) (hR20 : R 20#5 = BitVec.ofNat 64 i)
     (hR10 : R 10#5 = BitVec.setWidth 64 (fmtByte f i))
     (hi : i < f.length) (hp : fmtByte f i = chPct)
@@ -2567,8 +2562,7 @@ theorem printk_pct (CP : CONSPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : BundledGF
   obtain ⟨c0, hc0⟩ : ∃ c, c = fmtByte f (i + 1) := ⟨_, rfl⟩
   have hb1 : (f ++ [0#8])[i + 1]? = some c0 := by rw [hc0]; exact fmtByte_get f (i + 1) (by omega)
   icases byteBuf_acc _ dqf _ (i + 1) c0 hb1 $$ Hbuf with ⟨Hb, Hclose⟩
-  k_step_noite (wp_s_lbu cpu _ ?hs ?ht 0x8000058a#64 false 0#12 21#5 14#5 (by decide) dqf c0 ?hram) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
-  case hram => k_norm; exact inRam_byte hfmt (i + 1) (by omega)
+  k_step_noite (wp_s_lbu cpu _ ?hs ?ht 0x8000058a#64 false 0#12 21#5 14#5 (by decide) dqf c0) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc Hb
   ihave Hbuf := Hclose $$ Hb
   k_step_noite (wp_s_branch cpu _ ?hs ?ht 0x8000058e#64 false 498#13 21#5 0#5 (by decide) bop.BEQ ?htgt) from (text_instr _ _ _ _ rfl rfl) HT
@@ -2621,7 +2615,7 @@ theorem printk_pct (CP : CONSPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : BundledGF
     case H14z => simp only [KCtx.rget_withRegs', KCtx.setReg_withRegs, RegMap.set_apply, BitVec.reduceEq]; exact hb14
     case H15z => exact hb15'.trans (by rw [hc1z, hc00])
     iintro %R' Hk Hpc %h'
-    iapply (printk_pct_tail CP PI cpu k γpr γl γd bs dqf f descs hsie htier hK hnoff huart hf hflen hnonul hdlen hfmt i kk R' w18
+    iapply (printk_pct_tail CP PI cpu k γpr γl γd bs dqf f descs hsie htier hK hnoff huart hf hflen hnonul hdlen i kk R' w18
       h'.1 ?HAz ?HBz c0 (fmtByte f (i + 2)) (fmtByte f (i + 3)) hc0 rfl rfl ?HCz (by rw [hc00]; decide)
       (fun h => by rw [hc1z] at h; exact absurd h.1 (by decide)) (fun h => by rw [hc2z] at h; exact absurd h.1 (by decide))
       hi hp hkinds) $$ [- $Hk $Hpc $Hbuf $Hdescs $Hframe $Hsent $Hlocked $Hcont]
@@ -2636,9 +2630,8 @@ theorem printk_pct (CP : CONSPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : BundledGF
     obtain ⟨c1, hc1⟩ : ∃ c, c = fmtByte f (i + 2) := ⟨_, rfl⟩
     have hb2 : (f ++ [0#8])[i + 2]? = some c1 := by rw [hc1]; exact fmtByte_get f (i + 2) (by omega)
     icases byteBuf_acc _ dqf _ (i + 2) c1 hb2 $$ Hbuf with ⟨Hb, Hclose⟩
-    k_step_noite (wp_s_lbu cpu _ ?hs ?ht 0x80000592#64 false 1#12 13#5 14#5 (by decide) dqf c1 ?hram) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
+    k_step_noite (wp_s_lbu cpu _ ?hs ?ht 0x80000592#64 false 1#12 13#5 14#5 (by decide) dqf c1) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
       with [ofNat_succ', Nat.add_assoc, Nat.reduceAdd]
-    case hram => k_norm [ofNat_succ', Nat.add_assoc, Nat.reduceAdd]; exact inRam_byte hfmt (i + 2) (by omega)
     iintro Hk Hpc Hb
     ihave Hbuf := Hclose $$ Hb
     k_step_noite (wp_s_branch cpu _ ?hs ?ht 0x80000596#64 false 472#13 13#5 0#5 (by decide) bop.BEQ ?htgt) from (text_instr _ _ _ _ rfl rfl) HT
@@ -2694,7 +2687,7 @@ theorem printk_pct (CP : CONSPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : BundledGF
           refine Eq.trans (b := 0#64) rfl ?_
           rw [if_neg]; intro h; rw [hc10] at h; exact absurd h.1 (by decide)
         iintro %R' Hk Hpc %h'
-        iapply (printk_pct_tail CP PI cpu k γpr γl γd bs dqf f descs hsie htier hK hnoff huart hf hflen hnonul hdlen hfmt i kk R' w18
+        iapply (printk_pct_tail CP PI cpu k γpr γl γd bs dqf f descs hsie htier hK hnoff huart hf hflen hnonul hdlen i kk R' w18
           h'.1 ?HAy ?HBy c0 c1 (fmtByte f (i + 3)) hc0 hc1 rfl ?HCy hd
           (fun h => by rw [hc10] at h; exact absurd h.1 (by decide)) (fun h => by rw [hc2z] at h; exact absurd h.1 (by decide))
           hi hp hkinds) $$ [- $Hk $Hpc $Hbuf $Hdescs $Hframe $Hsent $Hlocked $Hcont]
@@ -2758,7 +2751,7 @@ theorem printk_pct (CP : CONSPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : BundledGF
             case H20ld => first | (rw [h'.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, hR20]) | simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, hR20]
             case H9ld => first | (rw [h'.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, hR9]) | simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, hR9] | simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
           · ihave Hpc := pcIs_ite_neg _ _ _ _ hl $$ Hpc
-            iapply (printk_pct_5e2 CP PI cpu k γpr γl γd bs dqf f descs hsie htier hK hnoff huart hf hflen hnonul hdlen hfmt i kk _ w18
+            iapply (printk_pct_5e2 CP PI cpu k γpr γl γd bs dqf f descs hsie htier hK hnoff huart hf hflen hnonul hdlen i kk _ w18
               ?HRa ?H20a ?H9a ?H15a c0 c1 hc0 hc1 hp1 hc00 hc10 hd (fun h => hl h.2) ?H13a ?H14a ?H21a hi hp hkinds)
               $$ [- $Hk $Hpc $Hbuf $Hdescs $Hframe $Hsent $Hlocked $Hcont]
             rotate_right 1
@@ -2771,7 +2764,7 @@ theorem printk_pct (CP : CONSPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : BundledGF
             case H14a => simp only [KCtx.rget_withRegs', KCtx.setReg_withRegs, RegMap.set_apply, BitVec.reduceEq]; exact hb14
             case H21a => simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
         · ihave Hpc := pcIs_ite_neg _ _ _ _ hc1d $$ Hpc
-          iapply (printk_pct_5e2 CP PI cpu k γpr γl γd bs dqf f descs hsie htier hK hnoff huart hf hflen hnonul hdlen hfmt i kk _ w18
+          iapply (printk_pct_5e2 CP PI cpu k γpr γl γd bs dqf f descs hsie htier hK hnoff huart hf hflen hnonul hdlen i kk _ w18
             ?HRb ?H20b ?H9b ?H15b c0 c1 hc0 hc1 hp1 hc00 hc10 hd (fun h => hc1d h.1) ?H13b ?H14b ?H21b hi hp hkinds)
             $$ [- $Hk $Hpc $Hbuf $Hdescs $Hframe $Hsent $Hlocked $Hcont]
           rotate_right 1
@@ -2791,7 +2784,7 @@ theorem printk_turn (CP : CONSPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : BundledG
     (f : List (BitVec 8)) (descs : List PkArgDesc)
     (hsie : k.sie = false) (htier : k.tier = KTier.bare) (hK : 48 ≤ k.avail) (hnoff : k.noff + 2 < 2 ^ 31)
     (huart : "uart" ∉ k.locks) (hf : stackFacts (k.regs 2#5) 24) (hflen : f.length + 4 < 2 ^ 31)
-    (hnonul : nonul f) (hdlen : descs.length ≤ 7) (hfmt : inRam (k.regs 10#5) (f.length + 1))
+    (hnonul : nonul f) (hdlen : descs.length ≤ 7)
     (i kk : Nat) (R : RegMap) (w18 : BitVec 64) (hR : pkRegs k.regs R) (hR20 : R 20#5 = BitVec.ofNat 64 i)
     (hR10 : R 10#5 = BitVec.setWidth 64 (fmtByte f i))
     (hi : i < f.length)
@@ -2804,7 +2797,7 @@ theorem printk_turn (CP : CONSPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : BundledG
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨#HT, #HD, #Htx, Hk, Hpc, Hbuf, Hdescs, Hframe, Hsent, Hlocked, Hcont⟩
   by_cases hp : fmtByte f i = chPct
-  · iapply (printk_pct CP PI cpu k γpr γl γd bs dqf f descs hsie htier hK hnoff huart hf hflen hnonul hdlen hfmt i kk R w18
+  · iapply (printk_pct CP PI cpu k γpr γl γd bs dqf f descs hsie htier hK hnoff huart hf hflen hnonul hdlen i kk R w18
       hR hR20 hR10 hi hp hkinds) $$ [- $Hk $Hpc $Hbuf $Hdescs $Hframe $Hsent $Hlocked $Hcont]
     iframe #
   · ihave Hnext := pkCont_next _ _ _ _ _ _ _ _ _ _ $$ Hcont
@@ -2822,7 +2815,7 @@ theorem printk_loop (CP : CONSPUTC) (PI : PRINTINT) (RE : RELEASE) {hlc : HasLC}
     (hsie : k.sie = false) (htier : k.tier = KTier.bare) (hK : 48 ≤ k.avail) (hnoff : k.noff + 2 < 2 ^ 31)
     (hpr : "pr" ∉ k.locks) (huart : "uart" ∉ k.locks) (hwf : k.wf) (hf : stackFacts (k.regs 2#5) k.avail)
     (hflen : f.length + 4 < 2 ^ 31) (hnonul : nonul f) (hdlen : descs.length ≤ 7)
-    (hfmt : inRam (k.regs 10#5) (f.length + 1)) (n : Nat) :
+    (n : Nat) :
     ∀ (p kk : Nat) (R : RegMap) (w18 : BitVec 64) (cs0 : List (BitVec 8)), f.length - p ≤ n → p < f.length →
     pkRegs k.regs R → R 9#5 = BitVec.ofNat 64 p → pkKinds (f.drop (p + 1)) = (descs.drop kk).map PkArgDesc.kind →
     kernelText ∗ kernelData ∗ isTxLock γl γd ∗ isLock γpr prLock "pr" (fun _ => emp) ∗
@@ -2851,9 +2844,8 @@ theorem printk_loop (CP : CONSPUTC) (PI : PRINTINT) (RE : RELEASE) {hlc : HasLC}
     -- lbu a0,0(s1)
     have hb : (f ++ [0#8])[p + 1]? = some (fmtByte f (p + 1)) := fmtByte_get f (p + 1) (by omega)
     icases byteBuf_acc _ dqf _ (p + 1) _ hb $$ Hbuf with ⟨Hb, Hclose⟩
-    k_step (wp_s_lbu cpu _ ?hs ?ht 0x80000574#64 false 0#12 10#5 9#5 (by decide) dqf (fmtByte f (p + 1)) ?hram) from (text_instr _ _ _ _ rfl rfl) HT
+    k_step (wp_s_lbu cpu _ ?hs ?ht 0x80000574#64 false 0#12 10#5 9#5 (by decide) dqf (fmtByte f (p + 1))) from (text_instr _ _ _ _ rfl rfl) HT
       $$ [- $Hk $Hpc]
-    case hram => k_norm; exact inRam_byte hfmt (p + 1) (by omega)
     iintro Hk Hpc Hb
     ihave Hbuf := Hclose $$ Hb
     k_step (wp_s_branch cpu _ ?hs ?ht 0x80000578#64 false 460#13 10#5 0#5 (by decide) bop.BEQ ?htgt) from (text_instr _ _ _ _ rfl rfl) HT
@@ -2869,7 +2861,7 @@ theorem printk_loop (CP : CONSPUTC) (PI : PRINTINT) (RE : RELEASE) {hlc : HasLC}
       case HRe => repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
     ihave Hpc := pcIs_ite_neg _ _ _ _ hz $$ Hpc
     have hlt : p + 1 < f.length := fmt_lt_of_ne f (p + 1) (by omega) hz
-    iapply (printk_turn CP PI cpu k γpr γl γd (bs0 ++ cs0) dqf f descs hsie htier hK hnoff huart hf24 hflen hnonul hdlen hfmt
+    iapply (printk_turn CP PI cpu k γpr γl γd (bs0 ++ cs0) dqf f descs hsie htier hK hnoff huart hf24 hflen hnonul hdlen
       (p + 1) kk _ w18 ?HRt ?H20t ?H10t hlt hkinds) $$ [- $Hk $Hpc $Hbuf $Hdescs $Hframe $Hsent $Hlocked]
     rotate_right 1
     iframe #
@@ -2899,9 +2891,9 @@ theorem printk_proof (AC : ACQUIRE) (RE : RELEASE) (CP : CONSPUTC) (PI : PRINTIN
   simp only [printkAddr, KernelSyms.«printk»]
   rw [hsie]
   iintro ⟨Hk, #Htext, #HD, Hpc, Hstr, Hdescs, #Hlk, #Htx, Hsent, Hnext⟩
-  icases cstr_elim _ _ _ $$ Hstr with ⟨%⟨hnonul, hfmt⟩, Hbuf⟩
+  icases cstr_elim _ _ _ $$ Hstr with ⟨%hnonul, Hbuf⟩
   ihave HΦ := wpNext_off _ _ _ $$ Hnext
-  ihave HΦ := pkPost_of_cstr cpu k γd bs dqf f descs hnonul hfmt $$ HΦ
+  ihave HΦ := pkPost_of_cstr cpu k γd bs dqf f descs hnonul $$ HΦ
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   icases kctx_stackFacts _ _ $$ Hk with ⟨%hf0, Hk⟩
   have hf : stackFacts (k.regs 2#5) k.avail := by rw [hsie, trapRes_off] at hf0; exact hf0
@@ -2989,9 +2981,8 @@ theorem printk_proof (AC : ACQUIRE) (RE : RELEASE) (CP : CONSPUTC) (PI : PRINTIN
   -- lbu a0,0(s2): the first byte
   have hb0 : (f ++ [0#8])[0]? = some (fmtByte f 0) := fmtByte_get f 0 (Nat.zero_le _)
   icases byteBuf_acc0 _ dqf _ _ hb0 $$ Hbuf with ⟨Hb, Hclose⟩
-  k_step (wp_s_lbu cpu _ ?hs ?ht 0x80000534#64 false 0#12 10#5 18#5 (by decide) dqf (fmtByte f 0) ?hram) from (text_instr _ _ _ _ rfl rfl) Htext
+  k_step (wp_s_lbu cpu _ ?hs ?ht 0x80000534#64 false 0#12 10#5 18#5 (by decide) dqf (fmtByte f 0)) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc] with [h2_18]
-  case hram => k_norm [h2_18]; simpa using inRam_byte hfmt 0 (by omega)
   iintro Hk Hpc Hb
   ihave Hbuf := Hclose $$ Hb
   k_step (wp_s_branch cpu _ ?hs ?ht 0x80000538#64 false 542#13 10#5 0#5 (by decide) bop.BEQ ?htgt) from (text_instr _ _ _ _ rfl rfl) Htext
@@ -3061,7 +3052,7 @@ theorem printk_proof (AC : ACQUIRE) (RE : RELEASE) (CP : CONSPUTC) (PI : PRINTIN
     pkFrame (GF := GF) (k.regs 2#5) k.regs (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 0) w18 from
     by simp [pkApBase]) $$ Hframe
   -- the walk
-  iapply (printk_turn CP PI cpu k γpr γl γd bs dqf f descs hsie htier hK hnoff huart hf24 hflen hnonul hdlen hfmt 0 0 _ w18
+  iapply (printk_turn CP PI cpu k γpr γl γd bs dqf f descs hsie htier hK hnoff huart hf24 hflen hnonul hdlen 0 0 _ w18
     ?HR ?H20 ?H10 hi (by simpa using hkinds)) $$ [- $Hk $Hpc $Hbuf $Hdescs $Hframe $Hsent $Hlocked]
   rotate_right 1
   iframe #
@@ -3073,7 +3064,7 @@ theorem printk_proof (AC : ACQUIRE) (RE : RELEASE) (CP : CONSPUTC) (PI : PRINTIN
   case H10 => simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
   isplit
   · iintro %R' %p' %kk' %cs %w18' Hk Hpc Hbuf Hdescs Hframe Hsent Hlocked %h'
-    iapply (printk_loop CP PI RE cpu k γpr γl γd bs dqf f descs hsie htier hK hnoff hpr huart hwf hf hflen hnonul hdlen hfmt
+    iapply (printk_loop CP PI RE cpu k γpr γl γd bs dqf f descs hsie htier hK hnoff hpr huart hwf hf hflen hnonul hdlen
       f.length p' kk' R' w18' cs (by omega) h'.2.2.2.1 h'.1 h'.2.1 h'.2.2.2.2)
       $$ [- $Hk $Hpc $Hbuf $Hdescs $Hframe $Hsent $Hlocked $HΦ]
     iframe #

@@ -829,9 +829,6 @@ theorem ite_decide_ne {α : Type} (n : Nat) (x y : α) :
     (if decide (n ≠ 0) = true then x else y) = if n = 0 then y else x := by
   by_cases h : n = 0 <;> simp [h]
 
-theorem inRam_null : inRam 0x80007008#64 7 := by unfold inRam ramBase ramEnd; decide
-
-theorem inRam_digits : inRam 0x80007730#64 16 := by unfold inRam ramBase ramEnd; decide
 
 /-! ## The continuations of the walk -/
 
@@ -932,21 +929,22 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
 
 theorem pkDescRes_str_acc (v : BitVec 64) (dq : DFrac) (s : List (BitVec 8)) :
     pkDescRes (GF := GF) v (.str dq s) ⊢
-      ⌜nonul s ∧ v ≠ 0#64 ∧ inRam v (s.length + 1)⌝ ∗ byteBuf v dq (s ++ [0#8]) ∗
+      ⌜nonul s ∧ v ≠ 0#64⌝ ∗ byteBuf v dq (s ++ [0#8]) ∗
       (byteBuf v dq (s ++ [0#8]) -∗ pkDescRes v (.str dq s)) := by
   simp only [pkDescRes]
   iintro H
-  icases cstr_elim _ _ _ $$ H with ⟨%h, Hb⟩
+  icases cstr_pure _ _ _ $$ H with ⟨%h, H⟩
+  icases cstr_elim _ _ _ $$ H with ⟨%_, Hb⟩
   isplitr
-  · ipureintro; exact ⟨h.1, inRam_ne_zero h.2, h.2⟩
+  · ipureintro; exact h
   · iframe Hb
     iintro Hb
-    iapply cstr_intro _ _ _ h.1 h.2 $$ Hb
+    iapply cstr_intro _ _ _ h.1 $$ Hb
 
 /-- `printk`'s postcondition as the contract states it (the format as a
 `cstr`) implies the walk's form (the terminated buffer). -/
 theorem pkPost_of_cstr [Xv6G GF] (cpu : CPU) (k : KCtx) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
-    (f : List (BitVec 8)) (descs : List PkArgDesc) (hnonul : nonul f) (hfmt : inRam (k.regs 10#5) (f.length + 1)) :
+    (f : List (BitVec 8)) (descs : List PkArgDesc) (hnonul : nonul f) :
     (∀ (R' : RegMap) (cs : List (BitVec 8)),
       kctx cpu (k.withRegs R') -∗ pcIs cpu (retPc (k.regs 1#5)) -∗
       ⌜calleeSaved k.regs R' ∧ R' 10#5 = 0#64⌝ -∗
@@ -954,7 +952,7 @@ theorem pkPost_of_cstr [Xv6G GF] (cpu : CPU) (k : KCtx) (γd : UartNames) (bs : 
       uartSentSub γd (bs ++ cs) -∗ wpLoop cpu)
     ⊢ pkPost (GF := GF) cpu k γd bs dqf f descs := by
   iintro HΦ %R' %cs Hk Hpc %h Hbuf Hdescs Hsent
-  ihave Hstr := cstr_intro _ _ _ hnonul hfmt $$ Hbuf
+  ihave Hstr := cstr_intro _ _ _ hnonul $$ Hbuf
   iapply HΦ $$ %R' %cs Hk Hpc %h Hstr Hdescs Hsent
 
 theorem pkDescRes_null_pure (v : BitVec 64) : pkDescRes (GF := GF) v .null ⊢ ⌜v = 0#64⌝ := by
@@ -1043,14 +1041,6 @@ theorem pkRegsN_of_cs (R0 R R' : RegMap) (h : pkRegsN R0 R)
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
 
-theorem cell_add_zero (a : BitVec 64) (n : Nat) (dq : DFrac) (w : BitVec (8 * n)) :
-    bytesPointsTo (GF := GF) (a + BitVec.ofNat 64 0) n dq w ⊢ bytesPointsTo a n dq w := by
-  rw [show a + BitVec.ofNat 64 0 = a by simp]
-
-theorem cell_add_zero' (a : BitVec 64) (n : Nat) (dq : DFrac) (w : BitVec (8 * n)) :
-    bytesPointsTo (GF := GF) a n dq w ⊢ bytesPointsTo (a + BitVec.ofNat 64 0) n dq w := by
-  rw [show a + BitVec.ofNat 64 0 = a by simp]
-
 end
 
 
@@ -1059,7 +1049,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
 
 /-- The first byte of a buffer. -/
 theorem byteBuf_acc0 (a : BitVec 64) (dq : DFrac) (bs : List (BitVec 8)) (b : BitVec 8) (hb : bs[0]? = some b) :
-    byteBuf (GF := GF) a dq bs ⊢ bytesPointsTo a 1 dq b ∗ (bytesPointsTo a 1 dq b -∗ byteBuf a dq bs) := by
+    byteBuf (GF := GF) a dq bs ⊢ wordPointsTo a 1 dq b ∗ (wordPointsTo a 1 dq b -∗ byteBuf a dq bs) := by
   have h := byteBuf_acc (GF := GF) a dq bs 0 b hb
   rwa [show a + BitVec.ofNat 64 0 = a by simp] at h
 

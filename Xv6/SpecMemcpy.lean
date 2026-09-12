@@ -23,8 +23,7 @@ def wp_memcpy_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx
     (cpu : CPU) (k : KCtx) (bs olds : List (BitVec 8)) (n : Nat) (dqs : DFrac)
     (hsie : k.sie = false) (htier : k.tier = KTier.bare) (hK : 4 ≤ k.avail)
     (hn : k.regs 12#5 = BitVec.ofNat 64 n) (hn32 : n < 2 ^ 32)
-    (hls : bs.length = n) (hld : olds.length = n)
-    (hsrc : inRam (k.regs 11#5) n) (hdst : inRam (k.regs 10#5) n) : Prop :=
+    (hls : bs.length = n) (hld : olds.length = n) : Prop :=
   kctx cpu k ∗ kernelText ∗ pcIs cpu memcpyAddr ∗
   byteBuf (k.regs 11#5) dqs bs ∗ byteBuf (k.regs 10#5) (DFrac.own 1) olds ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ R' : RegMap,
@@ -37,7 +36,7 @@ def wp_memcpy_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx
 structure MEMCPY : Prop where
   wp_memcpy : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (bs olds : List (BitVec 8)) (n : Nat) (dqs : DFrac)
-    hsie htier hK hn hn32 hls hld hsrc hdst,
-    wp_memcpy_body (hlc := hlc) (GF := GF) cpu k bs olds n dqs hsie htier hK hn hn32 hls hld hsrc hdst
+    hsie htier hK hn hn32 hls hld,
+    wp_memcpy_body (hlc := hlc) (GF := GF) cpu k bs olds n dqs hsie htier hK hn hn32 hls hld
 
 end Xv6

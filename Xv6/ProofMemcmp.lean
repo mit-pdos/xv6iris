@@ -98,7 +98,6 @@ theorem memcmp_iter {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
     (cpu : CPU) (kb : KCtx) (hsie : kb.sie = false) (htier : kb.tier = KTier.bare)
     (s1 s2 : BitVec 64) (dq1 dq2 : DFrac) (bs1 bs2 : List (BitVec 8)) (i : Nat) (a b : BitVec 8)
     (ha : bs1[i]? = some a) (hb : bs2[i]? = some b)
-    (hram1 : inRam (s1 + BitVec.ofNat 64 i) 1) (hram2 : inRam (s2 + BitVec.ofNat 64 i) 1)
     (R : RegMap) (h10 : R 10#5 = s1 + BitVec.ofNat 64 i) (h11 : R 11#5 = s2 + BitVec.ofNat 64 i) :
     kernelText ∗ kctx cpu (kb.withRegs R) ∗ pcIs cpu 0x80000cb2#64 ∗
     byteBuf s1 dq1 bs1 ∗ byteBuf s2 dq2 bs2 ∗
@@ -109,16 +108,14 @@ theorem memcmp_iter {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
   iintro ⟨#HT, Hk, Hpc, Hbuf1, Hbuf2, HΦ⟩
   -- lbu a5,0(a0)
   icases byteBuf_acc s1 dq1 bs1 i a ha $$ Hbuf1 with ⟨Hb1, Hclose1⟩
-  k_step (wp_s_lbu cpu _ ?hs ?ht 0x80000cb2#64 false 0#12 15#5 10#5 (by decide) dq1 a ?hram) from (text_instr _ _ _ _ rfl rfl) HT
+  k_step (wp_s_lbu cpu _ ?hs ?ht 0x80000cb2#64 false 0#12 15#5 10#5 (by decide) dq1 a) from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc] with [h10]
-  case hram => k_norm [h10]; exact hram1
   iintro Hk Hpc Hb1
   ihave Hbuf1 := Hclose1 $$ Hb1
   -- lbu a4,0(a1)
   icases byteBuf_acc s2 dq2 bs2 i b hb $$ Hbuf2 with ⟨Hb2, Hclose2⟩
-  k_step (wp_s_lbu cpu _ ?hs ?ht 0x80000cb6#64 false 0#12 14#5 11#5 (by decide) dq2 b ?hram) from (text_instr _ _ _ _ rfl rfl) HT
+  k_step (wp_s_lbu cpu _ ?hs ?ht 0x80000cb6#64 false 0#12 14#5 11#5 (by decide) dq2 b) from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc] with [h11]
-  case hram => k_norm [h11]; exact hram2
   iintro Hk Hpc Hb2
   ihave Hbuf2 := Hclose2 $$ Hb2
   -- bne a5,a4,cca
@@ -145,7 +142,7 @@ theorem memcmp_loop {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
     (cpu : CPU) (kb : KCtx) (hsie : kb.sie = false) (htier : kb.tier = KTier.bare)
     (s1 s2 : BitVec 64) (dq1 dq2 : DFrac) (bs1 bs2 : List (BitVec 8)) (n : Nat) (hn32 : n < 2 ^ 32)
     (hl1 : n ≤ bs1.length) (hl2 : n ≤ bs2.length)
-    (hbuf1 : inRam s1 bs1.length) (hbuf2 : inRam s2 bs2.length) (d : Nat) :
+    (d : Nat) :
     ∀ (i : Nat) (_ : i < n) (_ : n - i = d + 1) (_ : ∀ j, j < i → bs1[j]? = bs2[j]?) (R : RegMap)
       (_ : R 10#5 = s1 + BitVec.ofNat 64 i) (_ : R 11#5 = s2 + BitVec.ofNat 64 i)
       (_ : R 13#5 = s1 + BitVec.ofNat 64 n),
@@ -162,8 +159,7 @@ theorem memcmp_loop {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
     have ha : bs1[i]? = some bs1[i] := List.getElem?_eq_getElem (by omega)
     have hb : bs2[i]? = some bs2[i] := List.getElem?_eq_getElem (by omega)
     iintro ⟨#HT, Hk, Hpc, Hbuf1, Hbuf2, HΦ⟩
-    iapply (memcmp_iter cpu kb hsie htier s1 s2 dq1 dq2 bs1 bs2 i bs1[i] bs2[i] ha hb
-      (inRam_byte hbuf1 i (by omega)) (inRam_byte hbuf2 i (by omega)) R h10 h11)
+    iapply (memcmp_iter cpu kb hsie htier s1 s2 dq1 dq2 bs1 bs2 i bs1[i] bs2[i] ha hb R h10 h11)
     iframe
     iframe #
     iintro Hk Hpc Hbuf1 Hbuf2
@@ -210,8 +206,7 @@ theorem memcmp_loop {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
     have ha : bs1[i]? = some bs1[i] := List.getElem?_eq_getElem (by omega)
     have hb : bs2[i]? = some bs2[i] := List.getElem?_eq_getElem (by omega)
     iintro ⟨#HT, Hk, Hpc, Hbuf1, Hbuf2, HΦ⟩
-    iapply (memcmp_iter cpu kb hsie htier s1 s2 dq1 dq2 bs1 bs2 i bs1[i] bs2[i] ha hb
-      (inRam_byte hbuf1 i (by omega)) (inRam_byte hbuf2 i (by omega)) R h10 h11)
+    iapply (memcmp_iter cpu kb hsie htier s1 s2 dq1 dq2 bs1 bs2 i bs1[i] bs2[i] ha hb R h10 h11)
     iframe
     iframe #
     iintro Hk Hpc Hbuf1 Hbuf2
@@ -262,7 +257,7 @@ theorem memcmp_loop {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
 /-! ## The function -/
 
 set_option maxHeartbeats 4000000 in
-theorem memcmp_proof : MEMCMP := ⟨fun cpu k bs1 bs2 n dq1 dq2 hsie htier hK hn hn32 hl1 hl2 hbuf1 hbuf2 => by
+theorem memcmp_proof : MEMCMP := ⟨fun cpu k bs1 bs2 n dq1 dq2 hsie htier hK hn hn32 hl1 hl2 => by
   unfold wp_memcmp_body
   iintro ⟨Hk, #Htext, Hpc, Hbuf1, Hbuf2, HΦ⟩
   -- the spec's continuation, at this hart
@@ -314,7 +309,7 @@ theorem memcmp_proof : MEMCMP := ⟨fun cpu k bs1 bs2 n dq1 dq2 hsie htier hK hn
     k_step (wp_s_add cpu _ ?hs ?ht 0x80000cae#64 false 13#5 10#5 12#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
     iapply (memcmp_loop cpu (k.pushed 2) (by k_norm) (by k_norm) (k.regs 10#5) (k.regs 11#5) dq1 dq2 bs1 bs2 n
-      hn32 hl1 hl2 hbuf1 hbuf2 (n - 1) 0 (by omega) (by omega) (fun j hj => absurd hj (by omega)) _ ?h10 ?h11 ?h13)
+      hn32 hl1 hl2 (n - 1) 0 (by omega) (by omega) (fun j hj => absurd hj (by omega)) _ ?h10 ?h11 ?h13)
       $$ [- $Hk $Hpc]
     rotate_right 1
     iframe

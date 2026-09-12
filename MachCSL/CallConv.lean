@@ -16,30 +16,20 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
 /-! ## Byte buffers -/
 
-/-- The bytes `bs` at `a`, byte `j` at `a + j`. -/
+/-- The bytes `bs` at `a`, byte `j` at `a + j` (each a `wordPointsTo` of
+width 1: in RAM, so a byte access needs no side condition). -/
 def byteBuf [CurCtx] (a : BitVec 64) (dq : DFrac) (bs : List (BitVec 8)) : IProp GF := iprop%
-  [∗list] j ↦ b ∈ bs, bytesPointsTo (a + BitVec.ofNat 64 j) 1 dq b
-
-/-- Byte `j` of a buffer in RAM is in RAM. -/
-theorem inRam_byte {a : BitVec 64} {n : Nat} (h : inRam a n) (j : Nat) (hj : j < n) :
-    inRam (a + BitVec.ofNat 64 j) 1 := by
-  unfold inRam ramBase ramEnd at *
-  have : (a + BitVec.ofNat 64 j).toNat = a.toNat + j := by
-    rw [BitVec.toNat_add, BitVec.toNat_ofNat]
-    have := a.isLt
-    rw [Nat.mod_eq_of_lt (by omega : j < 2 ^ 64)]
-    exact Nat.mod_eq_of_lt (by omega)
-  omega
+  [∗list] j ↦ b ∈ bs, wordPointsTo (a + BitVec.ofNat 64 j) 1 dq b
 
 /-- Read one byte of a buffer. -/
 theorem byteBuf_acc [CurCtx] (a : BitVec 64) (dq : DFrac) (bs : List (BitVec 8)) (j : Nat) (b : BitVec 8)
     (hj : bs[j]? = some b) :
     byteBuf (GF := GF) a dq bs ⊢
-      bytesPointsTo (a + BitVec.ofNat 64 j) 1 dq b ∗
-      (bytesPointsTo (a + BitVec.ofNat 64 j) 1 dq b -∗ byteBuf a dq bs) := by
+      wordPointsTo (a + BitVec.ofNat 64 j) 1 dq b ∗
+      (wordPointsTo (a + BitVec.ofNat 64 j) 1 dq b -∗ byteBuf a dq bs) := by
   unfold byteBuf
   iintro H
-  icases BigSepL.bigSepL_insert_acc (Φ := fun j b => bytesPointsTo (a + BitVec.ofNat 64 j) 1 dq b) hj $$ H
+  icases BigSepL.bigSepL_insert_acc (Φ := fun j b => wordPointsTo (a + BitVec.ofNat 64 j) 1 dq b) hj $$ H
     with ⟨Hj, Hclose⟩
   iframe Hj
   iintro Hj
@@ -47,20 +37,20 @@ theorem byteBuf_acc [CurCtx] (a : BitVec 64) (dq : DFrac) (bs : List (BitVec 8))
   have hb : bs[j] = b := by
     have := List.getElem?_eq_some_iff.mp hj |>.2; simpa using this
   have hset : bs.set j b = bs := by rw [← hb]; exact List.set_getElem_self hlt
-  iapply (show ([∗list] k ↦ z ∈ bs.set j b, bytesPointsTo (GF := GF) (a + BitVec.ofNat 64 k) 1 dq z) ⊢
-      [∗list] k ↦ z ∈ bs, bytesPointsTo (a + BitVec.ofNat 64 k) 1 dq z by rw [hset])
+  iapply (show ([∗list] k ↦ z ∈ bs.set j b, wordPointsTo (GF := GF) (a + BitVec.ofNat 64 k) 1 dq z) ⊢
+      [∗list] k ↦ z ∈ bs, wordPointsTo (a + BitVec.ofNat 64 k) 1 dq z by rw [hset])
   iapply Hclose $$ %b Hj
 
 /-- Write one byte of a (fully owned) buffer. -/
 theorem byteBuf_upd [CurCtx] (a : BitVec 64) (bs : List (BitVec 8)) (j : Nat) (b : BitVec 8)
     (hj : bs[j]? = some b) :
     byteBuf (GF := GF) a (DFrac.own 1) bs ⊢
-      bytesPointsTo (a + BitVec.ofNat 64 j) 1 (DFrac.own 1) b ∗
-      (∀ b' : BitVec 8, bytesPointsTo (a + BitVec.ofNat 64 j) 1 (DFrac.own 1) b' -∗
+      wordPointsTo (a + BitVec.ofNat 64 j) 1 (DFrac.own 1) b ∗
+      (∀ b' : BitVec 8, wordPointsTo (a + BitVec.ofNat 64 j) 1 (DFrac.own 1) b' -∗
         byteBuf a (DFrac.own 1) (bs.set j b')) := by
   unfold byteBuf
   iintro H
-  icases BigSepL.bigSepL_insert_acc (Φ := fun j b => bytesPointsTo (a + BitVec.ofNat 64 j) 1 (DFrac.own 1) b) hj $$ H
+  icases BigSepL.bigSepL_insert_acc (Φ := fun j b => wordPointsTo (a + BitVec.ofNat 64 j) 1 (DFrac.own 1) b) hj $$ H
     with ⟨Hj, Hclose⟩
   iframe Hj
   iexact Hclose
@@ -70,46 +60,62 @@ theorem byteBuf_upd [CurCtx] (a : BitVec 64) (bs : List (BitVec 8)) (j : Nat) (b
 /-- No NUL byte inside. -/
 def nonul (s : List (BitVec 8)) : Prop := ∀ b ∈ s, b ≠ 0#8
 
-/-- **The C string `s` at `a`**, owned at `dq`: the bytes of `s` followed by
-the terminating NUL, no NUL inside `s`, all of it in RAM.  What a `char *`
-argument points to: the points-to of a string. -/
-def cstr [CurCtx] (a : BitVec 64) (dq : DFrac) (s : List (BitVec 8)) : IProp GF := iprop%
-  ⌜nonul s ∧ inRam a (s.length + 1)⌝ ∗ byteBuf a dq (s ++ [0#8])
-
-/-- A terminated buffer with no NUL inside, in RAM, is a C string. -/
-theorem cstr_intro [CurCtx] (a : BitVec 64) (dq : DFrac) (s : List (BitVec 8))
-    (hnul : nonul s) (hram : inRam a (s.length + 1)) :
-    byteBuf (GF := GF) a dq (s ++ [0#8]) ⊢ cstr a dq s := by
-  unfold cstr
-  iintro H; iframe H; ipureintro; exact ⟨hnul, hram⟩
-
-/-- A C string is its terminated buffer, with the facts. -/
-theorem cstr_elim [CurCtx] (a : BitVec 64) (dq : DFrac) (s : List (BitVec 8)) :
-    cstr (GF := GF) a dq s ⊢ ⌜nonul s ∧ inRam a (s.length + 1)⌝ ∗ byteBuf a dq (s ++ [0#8]) := by
-  unfold cstr
-  iintro H; iexact H
-
-/-- The facts of a C string. -/
-theorem cstr_pure [CurCtx] (a : BitVec 64) (dq : DFrac) (s : List (BitVec 8)) :
-    cstr (GF := GF) a dq s ⊢ ⌜nonul s ∧ inRam a (s.length + 1)⌝ ∗ cstr a dq s := by
-  unfold cstr
-  iintro ⟨%h, H⟩; iframe H; ipureintro; exact ⟨h, h⟩
-
-/-- RAM starts above 0: a C string's pointer is not null. -/
+/-- RAM starts above 0: a pointer into RAM is not null. -/
 theorem inRam_ne_zero {a : BitVec 64} {n : Nat} (h : inRam a n) : a ≠ 0#64 := by
   intro h0; subst h0; unfold inRam ramBase at h; simp at h
 
+/-- A non-empty buffer's pointer is not null (its first byte is in RAM). -/
+theorem byteBuf_ne_zero [CurCtx] (a : BitVec 64) (dq : DFrac) (bs : List (BitVec 8)) (b : BitVec 8)
+    (hb : bs[0]? = some b) :
+    byteBuf (GF := GF) a dq bs ⊢ ⌜a ≠ 0#64⌝ ∗ byteBuf a dq bs := by
+  iintro H
+  icases byteBuf_acc a dq bs 0 b hb $$ H with ⟨H0, Hclose⟩
+  icases wordPointsTo_facts _ _ _ _ $$ H0 with ⟨%h, H0⟩
+  ihave H := Hclose $$ H0
+  iframe H
+  ipureintro
+  have := inRam_ne_zero h.1
+  simpa using this
+
+/-- **The C string `s` at `a`**, owned at `dq`: the bytes of `s` followed by
+the terminating NUL, with no NUL inside `s`.  What a `char *` argument
+points to: the points-to of a string. -/
+def cstr [CurCtx] (a : BitVec 64) (dq : DFrac) (s : List (BitVec 8)) : IProp GF := iprop%
+  ⌜nonul s⌝ ∗ byteBuf a dq (s ++ [0#8])
+
+/-- A terminated buffer with no NUL inside is a C string. -/
+theorem cstr_intro [CurCtx] (a : BitVec 64) (dq : DFrac) (s : List (BitVec 8)) (hnul : nonul s) :
+    byteBuf (GF := GF) a dq (s ++ [0#8]) ⊢ cstr a dq s := by
+  unfold cstr
+  iintro H; iframe H; ipureintro; exact hnul
+
+/-- A C string is its terminated buffer, with no NUL inside. -/
+theorem cstr_elim [CurCtx] (a : BitVec 64) (dq : DFrac) (s : List (BitVec 8)) :
+    cstr (GF := GF) a dq s ⊢ ⌜nonul s⌝ ∗ byteBuf a dq (s ++ [0#8]) := by
+  unfold cstr
+  iintro H; iexact H
+
+/-- The facts of a C string: no NUL inside, and the pointer is not null. -/
+theorem cstr_pure [CurCtx] (a : BitVec 64) (dq : DFrac) (s : List (BitVec 8)) :
+    cstr (GF := GF) a dq s ⊢ ⌜nonul s ∧ a ≠ 0#64⌝ ∗ cstr a dq s := by
+  unfold cstr
+  iintro ⟨%h, H⟩
+  icases byteBuf_ne_zero a dq (s ++ [0#8]) ((s ++ [0#8]).getD 0 0#8)
+    (by cases s <;> simp) $$ H with ⟨%h0, H⟩
+  iframe H; ipureintro; exact ⟨⟨h, h0⟩, h⟩
+
 theorem cstr_ne_zero [CurCtx] (a : BitVec 64) (dq : DFrac) (s : List (BitVec 8)) :
     cstr (GF := GF) a dq s ⊢ ⌜a ≠ 0#64⌝ := by
-  unfold cstr
-  iintro ⟨%h, _⟩; ipureintro; exact inRam_ne_zero h.2
+  iintro H
+  icases cstr_pure _ _ _ $$ H with ⟨%h, _⟩
+  ipureintro; exact h.2
 
 /-- Read byte `j` of a C string (`j ≤ s.length`: the terminator is byte `s.length`). -/
 theorem cstr_acc [CurCtx] (a : BitVec 64) (dq : DFrac) (s : List (BitVec 8)) (j : Nat) (b : BitVec 8)
     (hj : (s ++ [0#8])[j]? = some b) :
     cstr (GF := GF) a dq s ⊢
-      bytesPointsTo (a + BitVec.ofNat 64 j) 1 dq b ∗
-      (bytesPointsTo (a + BitVec.ofNat 64 j) 1 dq b -∗ cstr a dq s) := by
+      wordPointsTo (a + BitVec.ofNat 64 j) 1 dq b ∗
+      (wordPointsTo (a + BitVec.ofNat 64 j) 1 dq b -∗ cstr a dq s) := by
   unfold cstr
   iintro ⟨%h, H⟩
   icases byteBuf_acc a dq (s ++ [0#8]) j b hj $$ H with ⟨Hj, Hclose⟩

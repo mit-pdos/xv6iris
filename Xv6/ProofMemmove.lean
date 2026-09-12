@@ -205,7 +205,7 @@ set_option maxHeartbeats 4000000 in
 theorem memmove_fwd_iter {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (kb : KCtx) (hsie : kb.sie = false) (htier : kb.tier = KTier.bare)
     (s d : BitVec 64) (dqs : DFrac) (bs olds : List (BitVec 8)) (n : Nat)
-    (hls : bs.length = n) (hld : olds.length = n) (hn32 : n < 2 ^ 32) (hsrc : inRam s n) (hdst : inRam d n)
+    (hls : bs.length = n) (hld : olds.length = n) (hn32 : n < 2 ^ 32)
     (i : Nat) (hi : i < n) (b : BitVec 8) (hb : bs[i]? = some b) (R : RegMap)
     (h11 : R 11#5 = s + BitVec.ofNat 64 i) (h14 : R 14#5 = d + BitVec.ofNat 64 i)
     (h15 : R 15#5 = s + BitVec.ofNat 64 n) :
@@ -228,16 +228,14 @@ theorem memmove_fwd_iter {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
   iintro Hk Hpc
   -- lbu a3,-1(a1)
   icases byteBuf_acc s dqs bs i b hb $$ Hsrc with ⟨Hb, Hclose⟩
-  k_step (wp_s_lbu cpu _ ?hs ?ht 0x80000cf6#64 false 4095#12 13#5 11#5 (by decide) dqs b ?hram) from (text_instr _ _ _ _ rfl rfl) HT
+  k_step (wp_s_lbu cpu _ ?hs ?ht 0x80000cf6#64 false 4095#12 13#5 11#5 (by decide) dqs b) from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc]
-  case hram => k_norm; exact inRam_byte hsrc i hi
   iintro Hk Hpc Hb
   ihave Hsrc := Hclose $$ Hb
   -- sb a3,-1(a4)
   icases byteBuf_upd d (mixF bs olds i) i o ho $$ Hdst with ⟨Ho, Hclose⟩
-  k_step (wp_s_sb cpu _ ?hs ?ht 0x80000cfa#64 false 4095#12 14#5 13#5 o ?hram) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
+  k_step (wp_s_sb cpu _ ?hs ?ht 0x80000cfa#64 false 4095#12 14#5 13#5 o) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
     with [extractLsb'_setWidth8]
-  case hram => k_norm; exact inRam_byte hdst i hi
   iintro Hk Hpc Ho
   ihave Hdst := Hclose $$ %b Ho
   ihave Hdst := (show byteBuf (GF := GF) d (DFrac.own 1) ((mixF bs olds i).set i b) ⊢
@@ -256,7 +254,7 @@ change. -/
 theorem memmove_fwd_loop {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (kb : KCtx) (hsie : kb.sie = false) (htier : kb.tier = KTier.bare)
     (s d : BitVec 64) (dqs : DFrac) (bs olds : List (BitVec 8)) (n : Nat)
-    (hls : bs.length = n) (hld : olds.length = n) (hn32 : n < 2 ^ 32) (hsrc : inRam s n) (hdst : inRam d n)
+    (hls : bs.length = n) (hld : olds.length = n) (hn32 : n < 2 ^ 32)
     (c : Nat) :
     ∀ (i : Nat) (_ : n - i = c + 1) (R : RegMap)
       (_ : R 11#5 = s + BitVec.ofNat 64 i) (_ : R 14#5 = d + BitVec.ofNat 64 i) (_ : R 15#5 = s + BitVec.ofNat 64 n),
@@ -272,7 +270,7 @@ theorem memmove_fwd_loop {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     have hi : i < n := by omega
     obtain ⟨b, hb⟩ : ∃ b, bs[i]? = some b := ⟨_, List.getElem?_eq_getElem (by omega)⟩
     iintro ⟨#HT, Hk, Hpc, Hsrc, Hdst, HΦ⟩
-    iapply (memmove_fwd_iter cpu kb hsie htier s d dqs bs olds n hls hld hn32 hsrc hdst i hi b hb R h11 h14 h15)
+    iapply (memmove_fwd_iter cpu kb hsie htier s d dqs bs olds n hls hld hn32 i hi b hb R h11 h14 h15)
     iframe
     iframe #
     simp only [show n = i + 1 by omega, ite_true]
@@ -287,7 +285,7 @@ theorem memmove_fwd_loop {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     have hi : i < n := by omega
     obtain ⟨b, hb⟩ : ∃ b, bs[i]? = some b := ⟨_, List.getElem?_eq_getElem (by omega)⟩
     iintro ⟨#HT, Hk, Hpc, Hsrc, Hdst, HΦ⟩
-    iapply (memmove_fwd_iter cpu kb hsie htier s d dqs bs olds n hls hld hn32 hsrc hdst i hi b hb R h11 h14 h15)
+    iapply (memmove_fwd_iter cpu kb hsie htier s d dqs bs olds n hls hld hn32 i hi b hb R h11 h14 h15)
     iframe
     iframe #
     simp only [show ¬ n = i + 1 by omega, ite_false]
@@ -313,7 +311,7 @@ set_option maxHeartbeats 4000000 in
 theorem memmove_bwd_iter {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (kb : KCtx) (hsie : kb.sie = false) (htier : kb.tier = KTier.bare)
     (s d : BitVec 64) (dqs : DFrac) (bs olds : List (BitVec 8)) (n : Nat)
-    (hls : bs.length = n) (hld : olds.length = n) (hn32 : n < 2 ^ 32) (hsrc : inRam s n) (hdst : inRam d n)
+    (hls : bs.length = n) (hld : olds.length = n) (hn32 : n < 2 ^ 32)
     (i : Nat) (hi1 : 1 ≤ i) (hin : i ≤ n) (b : BitVec 8) (hb : bs[i - 1]? = some b) (R : RegMap)
     (h14 : R 14#5 = s + BitVec.ofNat 64 i) (h13 : R 13#5 = d + BitVec.ofNat 64 i) (h15 : R 15#5 = s) :
     kernelText ∗ kctx cpu (kb.withRegs R) ∗ pcIs cpu 0x80000d28#64 ∗
@@ -336,16 +334,14 @@ theorem memmove_bwd_iter {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
   iintro Hk Hpc
   -- lbu a2,0(a4)
   icases byteBuf_acc s dqs bs (i - 1) b hb $$ Hsrc with ⟨Hb, Hclose⟩
-  k_step (wp_s_lbu cpu _ ?hs ?ht 0x80000d2c#64 false 0#12 12#5 14#5 (by decide) dqs b ?hram) from (text_instr _ _ _ _ rfl rfl) HT
+  k_step (wp_s_lbu cpu _ ?hs ?ht 0x80000d2c#64 false 0#12 12#5 14#5 (by decide) dqs b) from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc]
-  case hram => k_norm; exact inRam_byte hsrc (i - 1) (by omega)
   iintro Hk Hpc Hb
   ihave Hsrc := Hclose $$ Hb
   -- sb a2,0(a3)
   icases byteBuf_upd d (mixB bs olds i) (i - 1) o ho $$ Hdst with ⟨Ho, Hclose⟩
-  k_step (wp_s_sb cpu _ ?hs ?ht 0x80000d30#64 false 0#12 13#5 12#5 o ?hram) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
+  k_step (wp_s_sb cpu _ ?hs ?ht 0x80000d30#64 false 0#12 13#5 12#5 o) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
     with [extractLsb'_setWidth8]
-  case hram => k_norm; exact inRam_byte hdst (i - 1) (by omega)
   iintro Hk Hpc Ho
   ihave Hdst := Hclose $$ %b Ho
   ihave Hdst := (show byteBuf (GF := GF) d (DFrac.own 1) ((mixB bs olds i).set (i - 1) b) ⊢
@@ -364,7 +360,7 @@ runs to `d38` with the destination holding the source; only `a2`, `a3`,
 theorem memmove_bwd_loop {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (kb : KCtx) (hsie : kb.sie = false) (htier : kb.tier = KTier.bare)
     (s d : BitVec 64) (dqs : DFrac) (bs olds : List (BitVec 8)) (n : Nat)
-    (hls : bs.length = n) (hld : olds.length = n) (hn32 : n < 2 ^ 32) (hsrc : inRam s n) (hdst : inRam d n)
+    (hls : bs.length = n) (hld : olds.length = n) (hn32 : n < 2 ^ 32)
     (i : Nat) :
     ∀ (_ : 1 ≤ i) (_ : i ≤ n) (R : RegMap)
       (_ : R 14#5 = s + BitVec.ofNat 64 i) (_ : R 13#5 = d + BitVec.ofNat 64 i) (_ : R 15#5 = s),
@@ -380,7 +376,7 @@ theorem memmove_bwd_loop {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     intro hi1 hin R h14 h13 h15
     obtain ⟨b, hb⟩ : ∃ b, bs[i + 1 - 1]? = some b := ⟨_, List.getElem?_eq_getElem (by omega)⟩
     iintro ⟨#HT, Hk, Hpc, Hsrc, Hdst, HΦ⟩
-    iapply (memmove_bwd_iter cpu kb hsie htier s d dqs bs olds n hls hld hn32 hsrc hdst (i + 1) hi1 hin b hb R
+    iapply (memmove_bwd_iter cpu kb hsie htier s d dqs bs olds n hls hld hn32 (i + 1) hi1 hin b hb R
       h14 h13 h15)
     iframe
     iframe #
@@ -457,7 +453,7 @@ the loop) to the caller's continuation.  `n ≥ 1`. -/
 theorem memmove_fwd_seg {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare) (hK : 2 ≤ k.avail)
     (bs olds : List (BitVec 8)) (n : Nat) (dqs : DFrac) (hn32 : n < 2 ^ 32)
-    (hls : bs.length = n) (hld : olds.length = n) (hsrc : inRam (k.regs 11#5) n) (hdst : inRam (k.regs 10#5) n)
+    (hls : bs.length = n) (hld : olds.length = n)
     (hn1 : 1 ≤ n) (R : RegMap) (h10 : R 10#5 = k.regs 10#5) (h11 : R 11#5 = k.regs 11#5)
     (h12 : R 12#5 = BitVec.ofNat 64 n) (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFF0#64)
     (hRk : ∀ r : BitVec 5, r ≠ 2#5 → r ≠ 8#5 → r ≠ 13#5 → r ≠ 14#5 → R r = k.regs r) :
@@ -486,7 +482,7 @@ theorem memmove_fwd_seg {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [C
   iintro Hk Hpc
   -- the loop
   iapply (memmove_fwd_loop cpu (k.pushed 2) (by k_norm) (by k_norm) (k.regs 11#5) (k.regs 10#5) dqs bs olds n
-    hls hld hn32 hsrc hdst (n - 1) 0 (by omega) _ ?h11 ?h14 ?h15) $$ [- $Hk $Hpc]
+    hls hld hn32 (n - 1) 0 (by omega) _ ?h11 ?h14 ?h15) $$ [- $Hk $Hpc]
   rotate_right 1
   rw [mixF_zero]
   iframe
@@ -510,7 +506,7 @@ theorem memmove_fwd_seg {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [C
 /-! ## The function -/
 
 set_option maxHeartbeats 4000000 in
-theorem memmove_proof : MEMMOVE := ⟨fun cpu k bs olds n dqs hsie htier hK hn hn32 hls hld hsrc hdst => by
+theorem memmove_proof : MEMMOVE := ⟨fun cpu k bs olds n dqs hsie htier hK hn hn32 hls hld => by
   unfold wp_memmove_body
   iintro ⟨Hk, #Htext, Hpc, Hsrc, Hdst, HΦ⟩
   -- the spec's continuation, at this hart
@@ -570,7 +566,7 @@ theorem memmove_proof : MEMMOVE := ⟨fun cpu k bs olds n dqs hsie htier hK hn h
       rcases Bool.eq_false_or_eq_true (bcond bop.BGEU (k.regs 10#5) (k.regs 11#5 + BitVec.ofNat 64 n)) with hge | hge
       · -- dst ≥ src + n: forward after all
         simp only [hge, ↓reduceIte]
-        iapply (memmove_fwd_seg cpu k hsie htier hK bs olds n dqs hn32 hls hld hsrc hdst hn1 _ ?h10 ?h11 ?h12 ?hR2 ?hRk)
+        iapply (memmove_fwd_seg cpu k hsie htier hK bs olds n dqs hn32 hls hld hn1 _ ?h10 ?h11 ?h12 ?hR2 ?hRk)
           $$ [- $Hk $Hpc]
         rotate_right 1
         iframe
@@ -600,7 +596,7 @@ theorem memmove_proof : MEMMOVE := ⟨fun cpu k bs olds n dqs hsie htier hK hn h
         iintro Hk Hpc
         -- the loop
         iapply (memmove_bwd_loop cpu (k.pushed 2) (by k_norm) (by k_norm) (k.regs 11#5) (k.regs 10#5) dqs bs olds n
-          hls hld hn32 hsrc hdst n hn1 (le_refl n) _ ?h14 ?h13 ?h15) $$ [- $Hk $Hpc]
+          hls hld hn32 n hn1 (le_refl n) _ ?h14 ?h13 ?h15) $$ [- $Hk $Hpc]
         rotate_right 1
         rw [mixB_full bs olds n hls hld]
         iframe
@@ -625,7 +621,7 @@ theorem memmove_proof : MEMMOVE := ⟨fun cpu k bs olds n dqs hsie htier hK hn h
           simp [RegMap.set_apply, h2, h8, h13', h14', h15']
     · -- src ≥ dst: forward
       simp only [hlt, Bool.false_eq_true, ↓reduceIte]
-      iapply (memmove_fwd_seg cpu k hsie htier hK bs olds n dqs hn32 hls hld hsrc hdst hn1 _ ?h10 ?h11 ?h12 ?hR2 ?hRk)
+      iapply (memmove_fwd_seg cpu k hsie htier hK bs olds n dqs hn32 hls hld hn1 _ ?h10 ?h11 ?h12 ?hR2 ?hRk)
         $$ [- $Hk $Hpc]
       rotate_right 1
       iframe

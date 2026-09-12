@@ -76,7 +76,7 @@ lbu a4,-1(a5); bnez a4,e16`): with `a5 = s + i`, reads byte `i`, lands at
 theorem strlen_iter {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (kb : KCtx) (hsie : kb.sie = false) (htier : kb.tier = KTier.bare)
     (s : BitVec 64) (dq : DFrac) (bs : List (BitVec 8)) (i : Nat) (b : BitVec 8) (hb : bs[i]? = some b)
-    (hram : inRam (s + BitVec.ofNat 64 i) 1) (R : RegMap) (h15 : R 15#5 = s + BitVec.ofNat 64 i) :
+    (R : RegMap) (h15 : R 15#5 = s + BitVec.ofNat 64 i) :
     kernelText ∗ kctx cpu (kb.withRegs R) ∗ pcIs cpu 0x80000e16#64 ∗ byteBuf s dq bs ∗
     (kctx cpu (kb.withRegs (((R.set 13#5 (s + BitVec.ofNat 64 i)).set 15#5 (s + BitVec.ofNat 64 i + 1#64)).set 14#5
         (BitVec.setWidth 64 b))) -∗
@@ -94,9 +94,8 @@ theorem strlen_iter {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
   iintro Hk Hpc
   -- lbu a4,-1(a5)
   icases byteBuf_acc s dq bs i b hb $$ Hbuf with ⟨Hb, Hclose⟩
-  k_step (wp_s_lbu cpu _ ?hs ?ht 0x80000e1a#64 false 4095#12 14#5 15#5 (by decide) dq b ?hram) from (text_instr _ _ _ _ rfl rfl) HT
+  k_step (wp_s_lbu cpu _ ?hs ?ht 0x80000e1a#64 false 4095#12 14#5 15#5 (by decide) dq b) from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc] with [h15]
-  case hram => k_norm [h15]; exact hram
   iintro Hk Hpc Hb
   ihave Hbuf := Hclose $$ Hb
   -- bnez a4,e16
@@ -112,7 +111,7 @@ set_option maxHeartbeats 4000000 in
 theorem strlen_loop {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (kb : KCtx) (hsie : kb.sie = false) (htier : kb.tier = KTier.bare)
     (s : BitVec 64) (dq : DFrac) (bs : List (BitVec 8)) (n : Nat) (hcstr : cstrAt bs n)
-    (hbuf : inRam s bs.length) (d : Nat) :
+    (d : Nat) :
     ∀ (i : Nat) (_ : 1 ≤ i) (_ : i ≤ n) (_ : n - i = d) (R : RegMap) (_ : R 15#5 = s + BitVec.ofNat 64 i),
     kernelText ∗ kctx cpu (kb.withRegs R) ∗ pcIs cpu 0x80000e16#64 ∗ byteBuf s dq bs ∗
     (∀ R' : RegMap, kctx cpu (kb.withRegs R') -∗ pcIs cpu 0x80000e20#64 -∗ byteBuf s dq bs -∗
@@ -125,7 +124,7 @@ theorem strlen_loop {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
     have hi : i = n := by omega
     subst hi
     iintro ⟨#HT, Hk, Hpc, Hbuf, HΦ⟩
-    iapply (strlen_iter cpu kb hsie htier s dq bs i 0#8 hcstr.2 (inRam_byte hbuf i hn) R h15)
+    iapply (strlen_iter cpu kb hsie htier s dq bs i 0#8 hcstr.2 R h15)
     iframe
     iframe #
     simp only [ite_true]
@@ -140,7 +139,7 @@ theorem strlen_loop {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
     have hlt : i < n := by omega
     obtain ⟨b, hb, hb0⟩ := hcstr.1 i hlt
     iintro ⟨#HT, Hk, Hpc, Hbuf, HΦ⟩
-    iapply (strlen_iter cpu kb hsie htier s dq bs i b hb (inRam_byte hbuf i (by omega)) R h15)
+    iapply (strlen_iter cpu kb hsie htier s dq bs i b hb R h15)
     iframe
     iframe #
     simp only [hb0, ite_false]
@@ -161,7 +160,7 @@ theorem strlen_loop {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
 /-! ## The function -/
 
 set_option maxHeartbeats 4000000 in
-theorem strlen_proof : STRLEN := ⟨fun cpu k bs n dq hsie htier hK hcstr hn31 hbuf => by
+theorem strlen_proof : STRLEN := ⟨fun cpu k bs n dq hsie htier hK hcstr hn31 => by
   unfold wp_strlen_body
   have hn := cstrAt_len hcstr
   iintro ⟨Hk, #Htext, Hpc, Hbuf, HΦ⟩
@@ -183,9 +182,8 @@ theorem strlen_proof : STRLEN := ⟨fun cpu k bs n dq hsie htier hK hcstr hn31 h
     · have : n = 0 := by omega
       subst this; exact ⟨0#8, hcstr.2, fun h => absurd h (by omega)⟩
   icases byteBuf_acc (k.regs 10#5) dq bs 0 b0 hb0 $$ Hbuf with ⟨Hb, Hclose⟩
-  k_step (wp_s_lbu cpu _ ?hs ?ht 0x80000e0c#64 false 0#12 15#5 10#5 (by decide) dq b0 ?hram) from (text_instr _ _ _ _ rfl rfl) Htext
+  k_step (wp_s_lbu cpu _ ?hs ?ht 0x80000e0c#64 false 0#12 15#5 10#5 (by decide) dq b0) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc]
-  case hram => k_norm; simpa using inRam_byte hbuf 0 (by omega)
   k_norm
   iintro Hk Hpc Hb
   ihave Hbuf := Hclose $$ Hb
@@ -224,7 +222,7 @@ theorem strlen_proof : STRLEN := ⟨fun cpu k bs n dq hsie htier hK hcstr hn31 h
     simp only [hb0ne', ite_false]
     k_step (wp_s_addi cpu _ ?hs ?ht 0x80000e12#64 false 1#12 15#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
-    iapply (strlen_loop cpu (k.pushed 2) (by k_norm) (by k_norm) (k.regs 10#5) dq bs n hcstr hbuf (n - 1) 1
+    iapply (strlen_loop cpu (k.pushed 2) (by k_norm) (by k_norm) (k.regs 10#5) dq bs n hcstr (n - 1) 1
       (by omega) (by omega) rfl _ ?h15) $$ [- $Hk $Hpc]
     rotate_right 1
     iframe
