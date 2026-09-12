@@ -79,11 +79,11 @@ Section UartSentResidue.
      there.  Given both, a receipt LOCATES the observable output. *)
   Lemma uart_sent_from_obs (γu : uart_names) (u : uart_state)
       (h : list RiscvLang.mobs) (tr0 bs : list (bv 8)) :
-    obs_wire (open_seg h) = u_wire u ->
+    obs_wire Uart0 (open_seg h) = u_wire u ->
     out_wire_ok u ->
     uart_sent_auth γu u -∗ uart_sent_from γu tr0 bs -∗
       ⌜exists w1 w2 : list (bv 8),
-         obs_wire (open_seg h) = (w1 ++ w2)%list
+         obs_wire Uart0 (open_seg h) = (w1 ++ w2)%list
          /\ w1 `sublist_of` tr0
          /\ w2 `sublist_of` drop (length tr0) (uart_acc u)
          /\ bs `sublist_of` drop (length tr0) (uart_acc u)⌝.
@@ -91,7 +91,7 @@ Section UartSentResidue.
     iIntros (Hwire Hok) "Ha #Hfrom".
     iDestruct (uart_sent_from_acc with "Ha Hfrom") as %[Hpre Hbs].
     iPureIntro.
-    assert (Hsub : obs_wire (open_seg h) `sublist_of` uart_acc u).
+    assert (Hsub : obs_wire Uart0 (open_seg h) `sublist_of` uart_acc u).
     { rewrite Hwire. exact (out_wire_ok_acc _ Hok). }
     destruct (out_accepted_locate _ _ _ Hsub Hpre) as (w1 & w2 & Hw & Hw1 & Hw2).
     exists w1, w2. done.

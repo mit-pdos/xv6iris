@@ -144,7 +144,7 @@ From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
-Require Import ObsTrace.   (* [mobs] / [obs_ends_in]: the console receipt's tags *)
+Require Import ObsTrace.   (* [mobs] / [obs_ends_in Uart0]: the console receipt's tags *)
 Require Import InstrBytes.
 Require Import RegFile.
 Require Import RiscvExtras.
@@ -991,7 +991,7 @@ Section SpecFileread.
              = (uint addr + Z.of_nat i)%Z) ->
            forall j : nat, (j < d)%nat ->
              exists (h : list mobs) (b : bv 8),
-               hs !! j = Some h /\ obs_ends_in h b
+               hs !! j = Some h /\ obs_ends_in Uart0 h b
                /\ M' !! uint (add_vec_int addr (Z.of_nat j))
                   = Some (cons_xlate b)⌝ ∗
          ([∗ list] h ∈ hs, riscv_rx_tag h) ∗
@@ -1013,7 +1013,7 @@ Section SpecFileread.
             two, a history naming at most one byte. *)
          (⌜forall j : nat, (j < d)%nat ->
              exists (h : list mobs) (b : bv 8),
-               hs !! j = Some h /\ obs_ends_in h b
+               hs !! j = Some h /\ obs_ends_in Uart0 h b
                /\ sl !! (cur + j)%nat = Some (h, b)⌝ ∗
            ⌜length sl = (cur + d)%nat⌝ ∗ ⌜cons_chain sl⌝ ∗
            (* ...AND THE CURSOR'S EXTRA STEP IS ACCOUNTED FOR

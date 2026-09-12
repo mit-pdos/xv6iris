@@ -26,7 +26,7 @@
 (* THE ABI IS tools/vtest/abi.h.  The constants below must match it, and    *)
 (* so must tools/vtest/vtest.py's.                                          *)
 (* ====================================================================== *)
-From stdpp Require Import gmap bitvector.definitions list.
+From stdpp Require Import gmap bitvector.definitions list finite.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes RiscvExec VirtioModel DevModel ColdBoot.
@@ -361,18 +361,25 @@ Definition result_of (o : option mstate) : list Z :=
   | Some s => peek_mem (mem s) result_base result_size
   end.
 
-(* WHAT THE HOST RECEIVED, in the same currency vtest.py captures from QEMU's
-   serial file: [u_wire], the bytes that actually left the port on SOUT.
-   NOT [uart_acc] ([u_out ++ u_tx], every byte the device has ACCEPTED),
-   which is the transmitter's business and not the host's -- under LOOPBACK
-   an accepted byte goes to this UART's own receiver and the host never sees
-   it, which is exactly what UartLoop.v checks.  The two agree on every
-   other test: [VSched.settle] drains the FIFO after every instruction, so
-   nothing is left in flight when the guest publishes its result. *)
-Definition serial_of (o : option mstate) : list Z :=
+(* WHAT THE HOST RECEIVED ON EACH PORT, in the same currency vtest.py
+   captures from QEMU's serial backends: [u_wire], the bytes that actually
+   left that port on SOUT.  NOT [uart_acc] ([u_out ++ u_tx], every byte the
+   device has ACCEPTED), which is the transmitter's business and not the
+   host's -- under LOOPBACK an accepted byte goes to this UART's own
+   receiver and the host never sees it, which is exactly what UartLoop.v
+   checks.  The two agree on every other test: [VSched.settle] drains every
+   port's FIFO after every instruction, so nothing is left in flight when
+   the guest publishes its result.
+
+   ONE ENTRY PER PORT, IN [enum uart_id] ORDER, AND ALWAYS ALL OF THEM.
+   The machine has two 16550s, the runner captures both backends, and this
+   says what BOTH wires hold -- so a byte the model put on the wrong port
+   makes the comparison FAIL rather than going unlooked-at.  A test that
+   drives one port still pins the other's wire as empty. *)
+Definition serial_of (o : option mstate) : list (list Z) :=
   match o with
   | None => []
-  | Some s => bv_unsigned <$> u_wire (duart (mdev s))
+  | Some s => (fun i => bv_unsigned <$> u_wire (duart (mdev s) i)) <$> enum uart_id
   end.
 
 (* the disk, per 512-byte sector, in the shape [<name>_qemu_disk] carries *)

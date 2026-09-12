@@ -160,7 +160,7 @@ Qed.
    argument about the log. *)
 Definition boot_gstate (g : gstate) : gstate :=
   GState (fun c => boot_regs c) boot_mem
-         (DevState uart0_state plic0_state (virtio_reset g.(gdev).(dvirtio)))
+         (DevState uarts0_state plic0_state (virtio_reset g.(gdev).(dvirtio)))
          g.(ggen) true (fun _ => None)
          boot_mem [] (fun _ => 0%nat) (fun _ => 0%nat) (fun _ => hread0).
 

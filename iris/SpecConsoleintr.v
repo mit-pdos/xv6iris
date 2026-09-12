@@ -186,7 +186,7 @@ Definition wp_consoleintr_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fds
   m !!! Regidx (mword_of_int 10 : mword 5)
     = (extend_value (n := 8) true (cb : mword 8) : mword 64) ->
   (* ...at the history [hb], which ends with exactly that arrival *)
-  obs_ends_in hb cb ->
+  obs_ends_in Uart0 hb cb ->
   (* ...and which is strictly newer than everything the ring holds *)
   ohist_ext hh hb ->
   length γs = NPROC ->

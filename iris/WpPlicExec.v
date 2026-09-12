@@ -390,9 +390,8 @@ Lemma dev_write_plic (d : dev_state) (pa : mword 64) (v : bv 32) (p' : plic_stat
   dev_write d pa 4 v = Some (set_dplic d p').
 Proof.
   intros Hrange Hwr. unfold dev_write.
-  assert (Hnu : in_uart (uint pa) = false).
-  { unfold in_uart. apply andb_false_intro1. apply Z.leb_gt.
-    unfold uart_base, plic_base, plic_size in *. lia. }
+  assert (Hnu : uart_decode (uint pa) = None).
+  { apply uart_decode_below. cbn. unfold plic_base, plic_size in *. lia. }
   rewrite Hnu.
   assert (Hin : in_plic (uint pa) = true).
   { unfold in_plic. apply andb_true_intro.
@@ -801,9 +800,8 @@ Lemma dev_read_plic (d : dev_state) (pa : mword 64) (v : bv 32) (p' : plic_state
   dev_read d pa 4 = Some (v, set_dplic d p').
 Proof.
   intros Hrange Hrd. unfold dev_read.
-  assert (Hnu : in_uart (uint pa) = false).
-  { unfold in_uart. apply andb_false_intro1. apply Z.leb_gt.
-    unfold uart_base, plic_base, plic_size in *. lia. }
+  assert (Hnu : uart_decode (uint pa) = None).
+  { apply uart_decode_below. cbn. unfold plic_base, plic_size in *. lia. }
   rewrite Hnu.
   assert (Hin : in_plic (uint pa) = true).
   { unfold in_plic. apply andb_true_intro.

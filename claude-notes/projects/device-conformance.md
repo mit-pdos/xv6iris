@@ -457,6 +457,25 @@ the board's serial line is not exposed to the runner yet (so
 because the JH7110 has no virtio-mmio device.
 
 
+## THE SECOND UART
+
+The `uart1_` area (`uart1_tx`, `uart1_regs`, `uart1_rx`, `uart1_both`,
+`uart1_irq`) puts the board's SECOND 16550 -- 0x1000_a000, PLIC source 12 --
+through the same questions as the first, and two that only a two-port
+machine can ask: `uart1_both` interleaves writes to both ports and checks
+each wire carries its own bytes and nothing of the other's (and that a
+register write to one port does not disturb the other's registers), and
+`uart1_irq` checks the interrupt arrives on source 12, that a context with
+only source 10 enabled does NOT see it, and that the claim returns 12.
+
+QEMU's virt machine only instantiates the second port when a SECOND SERIAL
+BACKEND is attached, so these cases declare `uarts=2` (`vtest.py` adds the
+backend and captures both ports; `serial1_in=` is the second port's input)
+and `platforms=qemu` -- the board profile's one UART is a different chip
+entirely (finding 30).  With `uarts=1` the command line is byte-for-byte
+what it always was, which is what keeps every existing capture reproducible.
+
+
 ## STATUS (2026-08-24)
 
 LANDED and green: `make vtest`, **56 test programs** across six areas (`core`,

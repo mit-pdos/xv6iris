@@ -14,7 +14,7 @@
    its contract is exactly initlock's on [cons.lock] (which sits at offset 0 of
    the [cons] global, so [&cons.lock = &cons]) + uartinit's, plus the two
    function-pointer stores.  So it carries uartinit's DEVICE transit one level
-   up, verbatim: in come [WpUart.uart_inv], the "everything accepted has been
+   up, verbatim: in come [WpUart.uart_inv Uart0], the "everything accepted has been
    transmitted / the transmitter is mine" pair at [l], and the UNFROZEN DLAB
    half at an arbitrary [b0]; out come the tokens at the same [l] (uartinit
    writes no THR) and the frozen [uart_dlab_off].  See SpecUartinit.v for why a
@@ -116,7 +116,7 @@ Definition wp_consoleinit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{C
      seven writes; the token/receipt pair is what makes the FCR FIFO-clear
      shrink nothing, and the unfrozen DLAB half is what survives the
      divisor-latch dance (SpecUartinit.v). *)
-  uart_inv γd -∗
+  uart_inv Uart0 γd -∗
   uart_tx_own γd l -∗ uart_out_lb γd l -∗ uart_sent γd l -∗
   (* the receive token, straight through to uartinit's FCR flush
      (SpecUartinit.v) and back *)

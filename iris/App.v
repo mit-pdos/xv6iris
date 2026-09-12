@@ -206,25 +206,35 @@ Theorem xv6_app_adequacy Σ
        assumption about the world: it NARROWS the wands' domain from every
        [γ] to the era's. *)
     (Htx : forall (HR : riscvGS Σ) `{HF : !fileG Σ}
-                  (c : app_fixed A) (r : app_names A) (γ : uart_names),
+                  (c : app_fixed A) (r : app_names A)
+                  (i : uart_id) (γ : uart_names),
        @file_app Σ HF = MkAppcfg (app_names A) (app_pred A c) r ->
-       FsCfg.fsc_uart = γ ->
+       (* THE ERA IDENTIFICATION IS THE CONSOLE'S.  Only that port's ghosts
+          are the era's [fsc_uart]; the other port has its own bundle and no
+          kernel fact is stated at it, so the tie is conditional on which
+          port the arm belongs to. *)
+       (i = Uart0 -> FsCfg.fsc_uart = γ) ->
+       (* AT EVERY PORT.  The board has two 16550s and either may step, so
+          the ledger owes an account of an event on EITHER -- an untagged
+          obligation would let a byte on the kernel's port slip past the
+          claim about the console's. *)
        ⊢ □ (∀ (h : list mobs) (b : bv 8) (u u' : uart_state),
               ⌜uart_tx_pop u = Some (b, u')⌝ -∗ ⌜uart_loopback u = false⌝ -∗
-              ⌜trace_shape h true⌝ -∗ ⌜obs_wire (open_seg h) = u_wire u⌝ -∗
+              ⌜trace_shape h true⌝ -∗ ⌜obs_wire i (open_seg h) = u_wire u⌝ -∗
               uart_ghosts γ u' -∗ app_R A c h
-                ={⊤ ∖ ↑uartN ∖ ↑obsN}=∗
-              uart_ghosts γ u' ∗ app_R A c (h ++ [ObsUartOut b])%list))
+                ={⊤ ∖ ↑uartN i ∖ ↑obsN}=∗
+              uart_ghosts γ u' ∗ app_R A c (h ++ [ObsUartOut i b])%list))
     (Hrx : forall (HR : riscvGS Σ) `{HF : !fileG Σ}
-                  (c : app_fixed A) (r : app_names A) (γ : uart_names),
+                  (c : app_fixed A) (r : app_names A)
+                  (i : uart_id) (γ : uart_names),
        @file_app Σ HF = MkAppcfg (app_names A) (app_pred A c) r ->
-       FsCfg.fsc_uart = γ ->
+       (i = Uart0 -> FsCfg.fsc_uart = γ) ->
        ⊢ □ (∀ (h : list mobs) (b : bv 8) (u u' : uart_state),
               ⌜uart_rx_push u b = Some u'⌝ -∗ ⌜trace_shape h true⌝ -∗
               uart_ghosts γ u' -∗ app_R A c h
-                ={⊤ ∖ ↑uartN ∖ ↑obsN}=∗
-              uart_ghosts γ u' ∗ app_R A c (h ++ [ObsUartIn b])%list ∗
-              app_tag A c (h ++ [ObsUartIn b])%list))
+                ={⊤ ∖ ↑uartN i ∖ ↑obsN}=∗
+              uart_ghosts γ u' ∗ app_R A c (h ++ [ObsUartIn i b])%list ∗
+              app_tag A c (h ++ [ObsUartIn i b])%list))
     (* ---- the application's three obligations on its predicate
        (app-instances.md sections 1-3, round C): the TRANSPORT (its one
        durability obligation -- a copy of the claim at fresh instance names,
@@ -295,7 +305,7 @@ Proof.
      the era boots over -- where [riscv_client] IS the fixed part the
      ledger was born with, by iota once the record's shape is destructed *)
   assert (Hperm : forall (HR : riscvGS Σ) (GEN : GenId) (HF : fileG Σ)
-                         (r : app_names A) (γ : uart_names),
+                         (r : app_names A) (i : uart_id) (γ : uart_names),
       (exists (Hinv : invGS Σ) (γgen γstart γreg γd γsw γobs γhist : gname)
               (c : app_fixed A) (T : list mobs),
          riscv_fixedGS =
@@ -305,13 +315,13 @@ Proof.
              γobs T (obs_ledger_at (app_R A c) γobs) γhist
              (app_tag A c) (Htagp c) (Htagt c) (app_fixed A) c
          /\ @file_app Σ HF = MkAppcfg (app_names A) (app_pred A c) r
-         /\ FsCfg.fsc_uart = γ) ->
-      ⊢ obs_inv -∗ uart_obs_permit γ).
-  { intros HRg GEN HFi ri γ
+         /\ (i = Uart0 -> FsCfg.fsc_uart = γ)) ->
+      ⊢ obs_inv -∗ uart_obs_permit i γ).
+  { intros HRg GEN HFi ri i γ
       (Hi & Gg & Gs & Gr & Gt & Gsw & Gob & Ghist & Gcl & GT & Heq & Happ & Huart).
-    refine (uart_obs_permit_ledger (app_R A Gcl) (app_tag A Gcl) γ (HRt Gcl)
-              _ _ (Htx HRg HFi Gcl ri γ Happ Huart)
-                  (Hrx HRg HFi Gcl ri γ Happ Huart));
+    refine (uart_obs_permit_ledger i (app_R A Gcl) (app_tag A Gcl) γ (HRt Gcl)
+              _ _ (Htx HRg HFi Gcl ri i γ Happ Huart)
+                  (Hrx HRg HFi Gcl ri i γ Happ Huart));
       rewrite Heq; reflexivity. }
   exact (xv6_power_adequacy_gen Σ g sb nib cov
            (app_fixed A) (app_cl A) Hbirth
@@ -419,9 +429,9 @@ Proof.
            ltac:(intros c h; cbn [app_triv app_tag]; apply _)
            app_triv_R0
            ltac:(intros c h on dk _; cbn [app_triv app_R]; iIntros "_"; by iModIntro)
-           ltac:(intros HR HFi c r γ _ _; cbn [app_triv app_R];
+           ltac:(intros HR HFi c r i γ _ _; cbn [app_triv app_R];
                  iIntros "!>" (h b u u') "_ _ _ _ Hg _"; iModIntro; by iFrame "Hg")
-           ltac:(intros HR HFi c r γ _ _; cbn [app_triv app_R app_tag];
+           ltac:(intros HR HFi c r i γ _ _; cbn [app_triv app_R app_tag];
                  iIntros "!>" (h b u u') "_ _ Hg _"; iModIntro;
                  iFrame "Hg"; auto)
            app_triv_xfer

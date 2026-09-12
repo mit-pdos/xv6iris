@@ -199,7 +199,7 @@ Qed.
 Definition thread_gen (e : mexpr) : option nat :=
   match e with
   | HartE gen _ _ => Some gen
-  | UartLoopE gen => Some gen
+  | UartLoopE gen _ => Some gen
   | DiskLoopE gen => Some gen
   | PlicLoopE gen => Some gen
   | PowerLoopE => None
@@ -229,8 +229,8 @@ Section WPDead.
     { iPureIntro. destruct e; simplify_eq/=.
       - exists [], (HartE gen cpu m), g, [].
         by apply prim_step_hart_dead.
-      - exists [], (UartLoopE gen), g, [].
-        right; left. exists gen. split_and!; [done|done|done|].
+      - exists [], (UartLoopE gen i), g, [].
+        right; left. exists gen, i. split_and!; [done|done|done|].
         by right; split_and!.
       - exists [], (DiskLoopE gen), g, [].
         right; right; left. exists gen. split_and!; auto.
@@ -243,7 +243,7 @@ Section WPDead.
       - destruct (prim_step_hart_inv _ _ _ _ _ _ _ _ Hstep)
           as (-> & -> & [(Hlive & _) | (_ & -> & ->)]);
           [exfalso; by apply Hnl|done].
-      - destruct (prim_step_uart_inv _ _ _ _ _ _ Hstep)
+      - destruct (prim_step_uart_inv _ _ _ _ _ _ _ Hstep)
           as (-> & -> & [(Hlive & _) | (_ & -> & ->)]);
           [exfalso; by apply Hnl|done].
       - destruct (prim_step_disk_inv _ _ _ _ _ _ Hstep)
@@ -1102,16 +1102,16 @@ Section WPDev.
      ([obs_inv]): that is how every observation is authorised by the client
      ([WpUart.uart_obs_permit]).  A client that states no trace property
      moves the ghost and ignores [κ]. *)
-  Lemma wp_uart_step :
+  Lemma wp_uart_step (i : uart_id) :
     gen_cert -∗
     (∀ gr m d (h : list mobs),
-       ⌜trace_shape h true⌝ -∗ ⌜obs_wire (open_seg h) = u_wire (duart d)⌝ -∗
+       ⌜trace_shape h true⌝ -∗ ⌜obs_wire i (open_seg h) = u_wire (duart d i)⌝ -∗
        gregs_interp gr ∗ gen_heap_interp m ∗ dev_interp d ∗ obs_auth h ={⊤,∅}=∗
-       ▷ (∀ κ d', ⌜uart_step d κ d'⌝ ={∅,⊤}=∗
+       ▷ (∀ κ d', ⌜uart_step i d κ d'⌝ ={∅,⊤}=∗
             gregs_interp gr ∗ gen_heap_interp m ∗ dev_interp d' ∗
             obs_auth (h ++ κ)%list ∗
-            WP (UartLoop : expr riscv_lang))) -∗
-    WP (UartLoop : expr riscv_lang).
+            WP (UartLoop i : expr riscv_lang))) -∗
+    WP (UartLoop i : expr riscv_lang).
   Proof.
     iIntros "#(Hborn & Hstarted & Hrege) H".
     iApply wp_lift_step; first done.
@@ -1126,11 +1126,11 @@ Section WPDev.
         as "#Hdead"; [lia|].
       iApply fupd_mask_intro; [set_solver|]. iIntros "Hback".
       iSplitR.
-      { iPureIntro. exists [], (UartLoopE gen_id), g, [].
-        right; left. exists gen_id. split_and!; auto.
+      { iPureIntro. exists [], (UartLoopE gen_id i), g, [].
+        right; left. exists gen_id, i. split_and!; auto.
         right. split_and!; [intros [_ Hgg]; lia|done|done]. }
       iIntros (e2 g2 efs Hstep) "!>".
-      destruct (prim_step_uart_inv _ _ _ _ _ _ Hstep)
+      destruct (prim_step_uart_inv _ _ _ _ _ _ _ Hstep)
         as (-> & -> & [ ([_ Hgg] & _) | (_ & -> & ->) ]); [exfalso; lia|].
       iIntros "_". iMod "Hback" as "_". iModIntro.
       iEval (cbn [app]) in "Hobs".
@@ -1151,23 +1151,23 @@ Section WPDev.
     (* the history so far, and what the callback may know about it *)
     iDestruct "Hobs" as (h) "(%Htot & %Hwf & Hoauth)".
     pose proof Hwf as (Hsh & _ & Hwire). rewrite Hpw in Hsh Hwire.
-    specialize (Hwire eq_refl).
+    specialize (Hwire eq_refl i).
     iMod ("H" $! g.(gregs) g.(gmem) g.(gdev) h
             with "[//] [//] [$Hgr $Hmem $Hdev $Hoauth]") as "Hk".
     iModIntro. iSplitR.
-    { iPureIntro. exists [], (UartLoopE gen_id),
+    { iPureIntro. exists [], (UartLoopE gen_id i),
         (GState g.(gregs) g.(gmem) g.(gdev) g.(ggen) g.(gpow) g.(gresv)
            g.(gimg) g.(glog) g.(gtv) g.(gitv) g.(ghr)), [].
-      right; left. exists gen_id. split_and!; auto.
+      right; left. exists gen_id, i. split_and!; auto.
       left. split; [split; congruence|].
       eexists. split; [apply UartStepIdle|]. rewrite Hpw. done. }
     iIntros (e2 g2 efs Hstep) "!>".
-    destruct (prim_step_uart_inv _ _ _ _ _ _ Hstep)
+    destruct (prim_step_uart_inv _ _ _ _ _ _ _ Hstep)
       as (-> & -> & [ (Hlive & d' & Hdstep & ->) | (Hnl & _) ]);
       last by (exfalso; apply Hnl; split; congruence).
     iMod ("Hk" $! κ d' with "[//]") as "(Hgr' & Hmem' & Hdev' & Hoauth' & HWP)".
     (* a UART step moves no disk byte, so the durable conjunct is FRAMED *)
-    pose proof (uart_step_v_disk _ _ _ Hdstep) as Hvd.
+    pose proof (uart_step_v_disk _ _ _ _ Hdstep) as Hvd.
     assert (Hdview2 : disk_view dmap (v_disk (dvirtio d')))
       by (rewrite Hvd; exact Hdview).
     assert (Hvd2 : v_disk (dvirtio (gdev g)) = v_disk (dvirtio d'))

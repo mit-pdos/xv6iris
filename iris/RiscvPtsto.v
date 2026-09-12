@@ -2074,6 +2074,35 @@ Definition reg_interp `{!riscvGS Σ} `{CpuId} (rs : regstate) : iProp Σ :=
 (* the two bridge lemmas, mirroring [reg_valid]/[reg_update].               *)
 (* ---------------------------------------------------------------------- *)
 
+(* THE PORTS' HALVES, at an explicit name FUNCTION.  A named wrapper rather
+   than the big-op written out at each site: the two ends (this conjunct and
+   the boot resource) then agree on the HEAD symbol, so the era's name
+   function unifies as an ARGUMENT instead of under the big-op's binder --
+   which is where [iFrame] and [iExact] give up. *)
+Definition era_uarts_half `{!riscvFixedGS Σ} (γf : uart_id -> gname)
+    (f : uart_id -> uart_state) : iProp Σ :=
+  ([∗ list] i ∈ enum uart_id, ghost_var (γf i) (1/2) (f i))%I.
+
+(* ALLOCATE ONE HALVES PAIR PER PORT, and hand back the name FUNCTION the
+   era record carries.  Spelled at the two ports rather than folded over
+   [enum], because the function it returns has to be a [match] the era
+   record can store. *)
+Lemma uarts_alloc `{!riscvFixedGS Σ} (f : uart_id -> uart_state) :
+  ⊢ |==> ∃ γf : uart_id -> gname, era_uarts_half γf f ∗ era_uarts_half γf f.
+Proof.
+  rewrite /era_uarts_half.
+  iMod (ghost_var_alloc (f Uart0)) as (γ0) "H0".
+  iMod (ghost_var_alloc (f Uart1)) as (γ1) "H1".
+  iEval (rewrite -Qp.half_half) in "H0".
+  iEval (rewrite -Qp.half_half) in "H1".
+  iDestruct (ghost_var_split with "H0") as "[H0a H0b]".
+  iDestruct (ghost_var_split with "H1") as "[H1a H1b]".
+  iModIntro.
+  iExists (fun i => match i with Uart0 => γ0 | Uart1 => γ1 end).
+  rewrite /enum /uart_id_finite /=. iFrame.
+Qed.
+
+
 Definition uart_auth `{!riscvGS Σ} (i : uart_id) (u : uart_state) : iProp Σ :=
   ghost_var (uart_name i) (1/2) u.
 Definition uart_frag `{!riscvGS Σ} (i : uart_id) (u : uart_state) : iProp Σ :=
@@ -2092,7 +2121,7 @@ Definition virtio_frag `{!riscvGS Σ} (v : virtio_state) : iProp Σ :=
    a third port would cost nothing here and every rule that focuses a port
    goes through the one accessor [uarts_auth_acc] below. *)
 Definition uarts_auth `{!riscvGS Σ} (f : uart_id -> uart_state) : iProp Σ :=
-  ([∗ list] i ∈ enum uart_id, uart_auth i (f i))%I.
+  era_uarts_half uart_name f.
 
 Definition dev_interp `{!riscvGS Σ} (d : dev_state) : iProp Σ :=
   (uarts_auth d.(duart) ∗ plic_auth d.(dplic) ∗ virtio_auth d.(dvirtio))%I.
@@ -2116,13 +2145,23 @@ Section DevBridge.
     uarts_auth f -∗
       uart_auth i (f i) ∗ (∀ u, uart_auth i u -∗ uarts_auth (uupd f i u)).
   Proof.
-    rewrite /uarts_auth /enum /uart_id_finite /=.
+    rewrite /uarts_auth /era_uarts_half /enum /uart_id_finite /=.
     iIntros "(H0 & H1 & _)". destruct i.
     - iFrame "H0". iIntros (u) "H0".
       rewrite (uupd_eq f Uart0 u) (uupd_ne f Uart0 Uart1 u ltac:(done)). iFrame.
     - iFrame "H1". iIntros (u) "H1".
       rewrite (uupd_eq f Uart1 u) (uupd_ne f Uart1 Uart0 u ltac:(done)). iFrame.
   Qed.
+
+  (* agreement straight out of the bundle, so a client that holds the whole
+     fabric's authority never has to focus a port by hand *)
+  Lemma uarts_agree (f : uart_id -> uart_state) (i : uart_id) (u : uart_state) :
+    uarts_auth f -∗ uart_frag i u -∗ ⌜u = f i⌝.
+  Proof.
+    iIntros "Ha Hf". iDestruct (uarts_auth_acc _ i with "Ha") as "[Hi _]".
+    by iDestruct (uart_agree with "Hi Hf") as %->.
+  Qed.
+
 
   Lemma plic_agree p p' : plic_auth p -∗ plic_frag p' -∗ ⌜p' = p⌝.
   Proof.
@@ -2447,8 +2486,7 @@ Definition gregs_interp_at `{!riscvFixedGS Σ} (E : riscvEraGS)
      reg_interp_at (era_reg_name E cpu) (gr cpu))%I.
 Definition dev_interp_at `{!riscvFixedGS Σ} (E : riscvEraGS)
     (d : dev_state) : iProp Σ :=
-  (([∗ list] i ∈ enum uart_id,
-      ghost_var (era_uart_name E i) (1/2) (d.(duart) i)) ∗
+  (era_uarts_half (era_uart_name E) d.(duart) ∗
    ghost_var (era_plic_name E) (1/2) d.(dplic) ∗
    ghost_var (era_virtio_name E) (1/2) d.(dvirtio))%I.
 (* the era's four conjuncts.  The DISK IMAGE rides here, in LAST position,

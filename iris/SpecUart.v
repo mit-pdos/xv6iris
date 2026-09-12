@@ -30,22 +30,22 @@ let lppn := kpt_leaf_ppn uart_vpn in
 uint rd <> 0 ->
 rd_ok rd ->
 (* geometry: [a8] is canonical, its Sv39 vpn is [uart_vpn], and the leaf
-   ppn composes back to [uart_pa off] = [a8] (the UART identity mapping) *)
+   ppn composes back to [uart_pa Uart0 off] = [a8] (the UART identity mapping) *)
 neq_vec (bits_of_virtaddr (Virtaddr a8)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false ->
 autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = uart_vpn ->
-zero_extend' 64 (add_vec_int a8 (0 * 1)) = uart_pa off ->
+zero_extend' 64 (add_vec_int a8 (0 * 1)) = uart_pa Uart0 off ->
 sie_cap_gpr kt m n b p -∗
 pc_is pc -∗ instr pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 1)) -∗
 dev_inv γd γv -∗
 R -∗
 (* THE GHOST STEP, run with the UART invariant open.  The RECEIVE COLUMN
-   travels beside the four ghosts as its own leg (WpUart.uart_colE): a read
+   travels beside the four ghosts as its own leg (WpUart.uart_colE Uart0): a read
    at offset 0 with DLAB clear POPS the FIFO, and what the column carries --
    one application tag per queued byte, aligned with [u_rx] -- has to move
    with it.  Every other read leaves both alone. *)
 (∀ u bt u', ⌜ uart_read u off = Some (bt, u') ⌝ -∗
-   uart_ghosts γd u -∗ uart_colE γd u -∗ R ==∗
-   uart_ghosts γd u' ∗ uart_colE γd u' ∗ S bt) -∗
+   uart_ghosts γd u -∗ uart_colE Uart0 γd u -∗ R ==∗
+   uart_ghosts γd u' ∗ uart_colE Uart0 γd u' ∗ S bt) -∗
 wp_next b p (fun (CID : CpuId) =>
   ∀ bt : bv 8,
   sie_cap_gpr kt (<[Regidx rd := regval_into_reg (ldval bt)]> m) n b p -∗
@@ -62,18 +62,18 @@ let storebyte : mword 8 := autocast (T := mword) (subrange_vec_dec (rget m rs2) 
 let lppn := kpt_leaf_ppn uart_vpn in
 (0 <= off < uart_size)%Z ->
 (* geometry: [a8] is canonical, its Sv39 vpn is [uart_vpn], and the leaf
-   ppn composes back to [uart_pa off] = [a8] (the UART identity mapping) *)
+   ppn composes back to [uart_pa Uart0 off] = [a8] (the UART identity mapping) *)
 neq_vec (bits_of_virtaddr (Virtaddr a8)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false ->
 autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = uart_vpn ->
-zero_extend' 64 (add_vec_int a8 (0 * 1)) = uart_pa off ->
+zero_extend' 64 (add_vec_int a8 (0 * 1)) = uart_pa Uart0 off ->
 sie_cap_gpr kt m n b p -∗
 pc_is pc -∗ instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 1)) -∗
 dev_inv γd γv -∗
 R -∗
 (* the column travels here too: an FCR write may clear the receive FIFO *)
 (∀ u u', ⌜ uart_write u off storebyte = Some u' ⌝ -∗
-   uart_ghosts γd u -∗ uart_colE γd u -∗ R ==∗
-   uart_ghosts γd u' ∗ uart_colE γd u' ∗ S) -∗
+   uart_ghosts γd u -∗ uart_colE Uart0 γd u -∗ R ==∗
+   uart_ghosts γd u' ∗ uart_colE Uart0 γd u' ∗ S) -∗
 wp_next b p (fun (CID : CpuId) =>
   sie_cap_gpr kt m n b p -∗
   pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
@@ -81,7 +81,7 @@ wp_next b p (fun (CID : CpuId) =>
   WP (Loop : expr riscv_lang)) -∗
 WP (Loop : expr riscv_lang).
 
-(* The SAME accessor-form store leaf, taking the BARE [uart_inv] rather than
+(* The SAME accessor-form store leaf, taking the BARE [uart_inv Uart0] rather than
    the [dev_inv] bundle.  This is the general form -- the store touches no PLIC
    and no disk resource, and since the invariant split the proof only ever
    opened [uartN] -- so a function whose contract mentions only the UART
@@ -96,18 +96,18 @@ let storebyte : mword 8 := autocast (T := mword) (subrange_vec_dec (rget m rs2) 
 let lppn := kpt_leaf_ppn uart_vpn in
 (0 <= off < uart_size)%Z ->
 (* geometry: [a8] is canonical, its Sv39 vpn is [uart_vpn], and the leaf
-   ppn composes back to [uart_pa off] = [a8] (the UART identity mapping) *)
+   ppn composes back to [uart_pa Uart0 off] = [a8] (the UART identity mapping) *)
 neq_vec (bits_of_virtaddr (Virtaddr a8)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false ->
 autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = uart_vpn ->
-zero_extend' 64 (add_vec_int a8 (0 * 1)) = uart_pa off ->
+zero_extend' 64 (add_vec_int a8 (0 * 1)) = uart_pa Uart0 off ->
 sie_cap_gpr kt m n b p -∗
 pc_is pc -∗ instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 1)) -∗
-uart_inv γd -∗
+uart_inv Uart0 γd -∗
 R -∗
 (* the column travels here too: an FCR write may clear the receive FIFO *)
 (∀ u u', ⌜ uart_write u off storebyte = Some u' ⌝ -∗
-   uart_ghosts γd u -∗ uart_colE γd u -∗ R ==∗
-   uart_ghosts γd u' ∗ uart_colE γd u' ∗ S) -∗
+   uart_ghosts γd u -∗ uart_colE Uart0 γd u -∗ R ==∗
+   uart_ghosts γd u' ∗ uart_colE Uart0 γd u' ∗ S) -∗
 wp_next b p (fun (CID : CpuId) =>
   sie_cap_gpr kt m n b p -∗
   pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗

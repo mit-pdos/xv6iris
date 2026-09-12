@@ -33,7 +33,7 @@
 (* that misconfigures the queue and then finds QEMU scribbling is matched   *)
 (* by this arm and by nothing else, so it is here.                          *)
 (* ====================================================================== *)
-From stdpp Require Import gmap bitvector.definitions list.
+From stdpp Require Import gmap finite bitvector.definitions list.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d.
 Require Import RiscvModelBytes RiscvExec DevModel.
@@ -86,7 +86,7 @@ Definition disk_of (img : gmap Z (bv 8)) : Z -> bv 8 :=
   fun a => default byte_zero (img !! a).
 
 Definition dev_of (img : gmap Z (bv 8)) : dev_state :=
-  DevState uart0_state plic0_state (set_vdisk virtio0_state (disk_of img)).
+  DevState uarts0_state plic0_state (set_vdisk virtio0_state (disk_of img)).
 
 Lemma dev_of_empty : dev_of ∅ = dev0_state.
 Proof. reflexivity. Qed.
@@ -100,9 +100,13 @@ Inductive sitem : Type :=
      which [prim_step] chooses nondeterministically at each boundary. *)
   | SCpu (n : nat)
   | SCpuTick (n : nat)
-  (* the UART ([uart_step]) *)
-  | SUartTx                       (* drain one byte of the transmit FIFO *)
-  | SUartRx (b : Z)               (* the host types a byte *)
+  (* the UART ([uart_step]), AT ONE PORT.  There are two 16550s and the
+     relation is indexed by which ([DevModel.uart_id]), so a schedule item
+     has to say: draining port 0 and draining port 1 are different steps of
+     different threads, and a byte arriving at the wrong one is a different
+     execution and not a detail. *)
+  | SUartTx (i : uart_id)         (* drain one byte of port [i]'s tx FIFO *)
+  | SUartRx (i : uart_id) (b : Z) (* the host types a byte at port [i] *)
   (* the disk ([disk_step]).  ONE BUS TRANSACTION PER ITEM, and the wild
      one (VirtioModel's [virtio_state]): the POP takes available-ring
      entries strictly in order, one per item, and needs no parameter;
@@ -164,14 +168,14 @@ Definition sapply_w (i : sitem) (s : mstate)
       match cpu_steps false n s with Some s' => Some (s', ∅) | None => None end
   | SCpuTick n =>
       match cpu_steps true n s with Some s' => Some (s', ∅) | None => None end
-  | SUartTx =>
-      match uart_tx_pop (duart d) with
-      | Some (_, u') => Some (with_dev s (set_duart d u'), ∅)
+  | SUartTx i =>
+      match uart_tx_pop (duart d i) with
+      | Some (_, u') => Some (with_dev s (set_duart d i u'), ∅)
       | None => None
       end
-  | SUartRx b =>
-      match uart_rx_push (duart d) (Z_to_bv 8 b) with
-      | Some u' => Some (with_dev s (set_duart d u'), ∅)
+  | SUartRx i b =>
+      match uart_rx_push (duart d i) (Z_to_bv 8 b) with
+      | Some u' => Some (with_dev s (set_duart d i u'), ∅)
       | None => None
       end
   | SDiskPop =>
@@ -312,6 +316,60 @@ Definition pick_at_w (pick : virtio_state -> option Z)
   end.
 
 
+(* ---------------------------------------------------------------------- *)
+(* 4b. THE ARMS THAT ARE PER PORT.                                         *)
+(*                                                                         *)
+(*     [SUartTx] and the UART's [SLatch] are one arm PER 16550, and the    *)
+(*     eager schedule has to offer every one of them: a program that       *)
+(*     leaves a byte in port 1's FIFO must see it drain even though the    *)
+(*     round tried port 0 first.  Folding over [enum uart_id] rather than  *)
+(*     spelling the two ports is what makes a third port cost nothing here *)
+(*     -- and [first_ok] short-circuits, so a round still stops at the     *)
+(*     first arm that fires and the ports after it are never evaluated.    *)
+(*                                                                         *)
+(*     THE ORDER WITHIN THE FOLD IS [enum uart_id]'s, which is the same    *)
+(*     order the capture's [o_uart] is indexed in.  Nothing depends on it  *)
+(*     -- the two ports' arms commute, since each touches only its own     *)
+(*     slot of [duart] -- but it is the order a reader will assume.        *)
+(* ---------------------------------------------------------------------- *)
+
+Fixpoint first_ok {A B} (f : A -> option B) (xs : list A) : option B :=
+  match xs with
+  | [] => None
+  | x :: xs' => match f x with Some y => Some y | None => first_ok f xs' end
+  end.
+
+Lemma first_ok_some {A B} (f : A -> option B) (xs : list A) (y : B) :
+  first_ok f xs = Some y -> exists x, f x = Some y.
+Proof.
+  induction xs as [|x xs' IH]; cbn [first_ok].
+  - intros H. discriminate H.
+  - destruct (f x) as [y0|] eqn:E.
+    + intros H. injection H as <-. exists x. exact E.
+    + exact IH.
+Qed.
+
+Definition uart_tx_any_w (s : mstate)
+    : option (mstate * gmap Arch.pa (bv 8)) :=
+  first_ok (fun i => sapply_w (SUartTx i) s) (enum uart_id).
+
+Definition uart_latch_any_w (s : mstate)
+    : option (mstate * gmap Arch.pa (bv 8)) :=
+  first_ok (fun i => sapply_w (SLatch (uart_irq_id i)) s) (enum uart_id).
+
+(* ...and the item the fold stopped at, handed back.  A round that took a
+   UART arm no longer has the item SYNTACTICALLY in its term -- it is
+   whichever port [first_ok] got to -- so the bridge to [prim_step] asks
+   for it here. *)
+Lemma uart_tx_any_item (s : mstate) (r : mstate * gmap Arch.pa (bv 8)) :
+  uart_tx_any_w s = Some r -> exists i, sapply_w (SUartTx i) s = Some r.
+Proof. unfold uart_tx_any_w. intros H. exact (first_ok_some _ _ _ H). Qed.
+
+Lemma uart_latch_any_item (s : mstate) (r : mstate * gmap Arch.pa (bv 8)) :
+  uart_latch_any_w s = Some r ->
+  exists i, sapply_w (SLatch (uart_irq_id i)) s = Some r.
+Proof. unfold uart_latch_any_w. intros H. exact (first_ok_some _ _ _ H). Qed.
+
 (* first enabled arm wins.  Nested rather than a list, so a later arm is not
    even evaluated once an earlier one fires -- [settle] runs after EVERY
    instruction, so this is the harness's hot path. *)
@@ -336,19 +394,22 @@ Definition pick_at_w (pick : virtio_state -> option Z)
    [true], which is the body this had before. *)
 Definition settle1_gated_w (pick : virtio_state -> option Z) (latch : bool)
     (s : mstate) : option (mstate * gmap Arch.pa (bv 8)) :=
-  match sapply_w SUartTx s with Some r => Some r | None =>
+  match uart_tx_any_w s with Some r => Some r | None =>
   match sapply_w SDiskPop s with Some r => Some r | None =>
   match pick_at_w pick SDiskFetch s with Some r => Some r | None =>
   match pick_at_w pick SDiskCapture s with Some r => Some r | None =>
   match drain_one_w s with Some r => Some r | None =>
   match pick_at_w pick SDiskWrite s with Some r => Some r | None =>
   match pick_at_w pick SDiskDma s with Some r => Some r | None =>
-  (* the two interrupt gateways, then the wire.  [plic_latch] is itself
-     guarded -- a level source is forwarded only when it is neither already
-     pending nor claimed -- so these stop on their own. *)
+  (* the interrupt gateways -- the disk's, then EVERY port's -- and then
+     the wire.  [plic_latch] is itself guarded (a level source is forwarded
+     only when it is neither already pending nor claimed), so these stop on
+     their own.  Each port latches its OWN source, [uart_irq_id i], which
+     is the whole of the routing: nothing else puts a UART's level on the
+     controller. *)
   match (if latch then sapply_w (SLatch virtio_irq_id) s else None) with
   | Some r => Some r | None =>
-  match (if latch then sapply_w (SLatch uart_irq_id) s else None) with
+  match (if latch then uart_latch_any_w s else None) with
   | Some r => Some r | None =>
   settle_wire_w s
   end end end end end end end end end.

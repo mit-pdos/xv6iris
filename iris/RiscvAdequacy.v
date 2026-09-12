@@ -544,7 +544,7 @@ Section power.
         it (relaxed-rr.md, the .aq knob: the machine's is [false]) *)
      ([∗ set] c ∈ (fin_to_set CPU : gset CPU),
         ∃ b : bool, c ↪[era_resv_name HE] (None, b)) ∗
-     ghost_var (era_uart_name HE) (1/2)%Qp (g'.(gdev).(duart)) ∗
+     era_uarts_half (era_uart_name HE) g'.(gdev).(duart) ∗
      ghost_var (era_plic_name HE) (1/2)%Qp (g'.(gdev).(dplic)) ∗
      ghost_var (era_virtio_name HE) (1/2)%Qp (g'.(gdev).(dvirtio)) ∗
      (* THE BOOT MINT (claude-notes/design/fs-log.md, stage 4): this era's
@@ -749,7 +749,7 @@ Section power.
          ⊢ obs_inv -∗ power_boot_res HE gen D nproc ndisk Mof Rb g' ={⊤}=∗
             ([∗ list] c ∈ enum CPU,
                WP (LoopE gen c : expr riscv_lang) @ ⊤) ∗
-            WP (UartLoopE gen : expr riscv_lang) @ ⊤ ∗
+            ([∗ list] i ∈ enum uart_id, WP (UartLoopE gen i : expr riscv_lang) @ ⊤) ∗
             WP (DiskLoopE gen : expr riscv_lang) @ ⊤ ∗
             WP (PlicLoopE gen : expr riscv_lang) @ ⊤) :
     crash_inv -∗ obs_inv -∗ WP (PowerLoopE : expr riscv_lang).
@@ -794,7 +794,7 @@ Section power.
       pose proof Hstep as Hstep0.
       destruct Hstep as
         [ (gen2 & cpu2 & m2 & Hc & _)
-        | [ (gen2 & Hc & _) | [ (gen2 & Hc & _) | [ (gen2 & Hc & _)
+        | [ (gen2 & iu2 & Hc & _) | [ (gen2 & Hc & _) | [ (gen2 & Hc & _)
         | (_ & -> & [ (_ & -> & -> & ->) | (Hpw' & _) ]) ] ] ] ];
         [ discriminate Hc | discriminate Hc | discriminate Hc | discriminate Hc
         | | congruence ].
@@ -872,7 +872,7 @@ Section power.
       pose proof Hstep as Hstep0.
       destruct Hstep as
         [ (gen2 & cpu2 & m2 & Hc & _)
-        | [ (gen2 & Hc & _) | [ (gen2 & Hc & _) | [ (gen2 & Hc & _)
+        | [ (gen2 & iu2 & Hc & _) | [ (gen2 & Hc & _) | [ (gen2 & Hc & _)
         | (_ & -> & [ (Hpw' & _) | (_ & -> & -> & Hbs) ]) ] ] ] ];
         [ discriminate Hc | discriminate Hc | discriminate Hc | discriminate Hc
         | congruence | ].
@@ -898,9 +898,7 @@ Section power.
       iDestruct (big_sepL_sep with "Hcpus") as "[Hauths Helems]".
       iMod (gen_heap_init_names (L := Arch.pa) (V := bv 8) g2.(gmem))
         as (γh γm) "(Hh & Hbytes & _)".
-      iMod (ghost_var_alloc g2.(gdev).(duart)) as (γu) "Hu".
-      iEval (rewrite -Qp.half_half) in "Hu".
-      iDestruct (ghost_var_split with "Hu") as "[HuA HuF]".
+      iMod (uarts_alloc g2.(gdev).(duart)) as (γu) "[HuA HuF]".
       iMod (ghost_var_alloc g2.(gdev).(dplic)) as (γp) "Hp".
       iEval (rewrite -Qp.half_half) in "Hp".
       iDestruct (ghost_var_split with "Hp") as "[HpA HpF]".
@@ -988,6 +986,9 @@ Section power.
                 Hdfrags Hmir Hresvfrags HRb Htsfrags2]")
         as "(Hwps & Hwpu & Hwpd & Hwpp)".
       { rewrite /power_boot_res.
+        (* the era's UART-name FUNCTION is [γu]; say so, or the framing has
+           to unify a projection of a local record definition *)
+        replace (era_uart_name HE) with γu by reflexivity.
         iFrame "Hbytes Hkauth Hkfrags Hkpt Hkptb2 Hs Hsie Hspp Hspie Hlks Hpark Hpst HuF HpF HvF Hdfrags Hmir Hswlb".
         iFrame "Helems".
         iSplitL "Hresvfrags".
@@ -1036,7 +1037,9 @@ Section power.
         iExists HE.
         iSplitR.
         { iPureIntro. by rewrite lookup_insert. }
-        rewrite /era_interp /disk_dur_interp. iSplitL "Hauths".
+        rewrite /era_interp /disk_dur_interp.
+        replace (era_uart_name HE) with γu by reflexivity.
+        iSplitL "Hauths".
         { rewrite /gregs_interp_at. iApply big_sepL_enum_to_set.
           iExact "Hauths". }
         iFrame "Hh".
@@ -1117,7 +1120,7 @@ Section power.
         split; [exact (Nat.le_0_l _)|]. intros a. exact (Nat.le_0_l _). }
       iSplitR; [iApply "IH"|].
       (* the fork obligations: the new generation's whole complement *)
-      rewrite /power_fork big_sepL_app big_sepL_fmap /=.
+      rewrite /power_fork !big_sepL_app !big_sepL_fmap /=.
       iSplitL "Hwps"; [iExact "Hwps"|].
       iSplitL "Hwpu"; [iExact "Hwpu"|].
       iSplitL "Hwpd"; [iExact "Hwpd"|].
@@ -1637,7 +1640,7 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
        ⊢ obs_inv -∗ power_boot_res HE gen D nproc ndisk Mof (Rb c) g' ={⊤}=∗
           ([∗ list] c ∈ enum CPU,
              WP (LoopE gen c : expr riscv_lang) @ ⊤) ∗
-          WP (UartLoopE gen : expr riscv_lang) @ ⊤ ∗
+          ([∗ list] i ∈ enum uart_id, WP (UartLoopE gen i : expr riscv_lang) @ ⊤) ∗
           WP (DiskLoopE gen : expr riscv_lang) @ ⊤ ∗
           WP (PlicLoopE gen : expr riscv_lang) @ ⊤) :
   (* EVERY configuration the CSL-free semantics can reach, under any
@@ -1851,7 +1854,7 @@ Corollary riscv_trace_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
        ⊢ obs_inv -∗ power_boot_res HE gen D nproc ndisk Mof Rb g' ={⊤}=∗
           ([∗ list] c ∈ enum CPU,
              WP (LoopE gen c : expr riscv_lang) @ ⊤) ∗
-          WP (UartLoopE gen : expr riscv_lang) @ ⊤ ∗
+          ([∗ list] i ∈ enum uart_id, WP (UartLoopE gen i : expr riscv_lang) @ ⊤) ∗
           WP (DiskLoopE gen : expr riscv_lang) @ ⊤ ∗
           WP (PlicLoopE gen : expr riscv_lang) @ ⊤) :
   forall (n : nat) (κs : list mobs) t2 g2,

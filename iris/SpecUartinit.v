@@ -4,7 +4,7 @@
 
    [uartinit] is the 16550 device-init routine (kernel/uart.c).  It runs in
    S-mode during boot.  The seven MMIO byte writes are, in order (all to
-   UART0 = [uart_pa off]):
+   UART0 = [uart_pa Uart0 off]):
      off 1 = 0x00   disable interrupts (IER)
      off 3 = 0x80   set DLAB (LCR_BAUD_LATCH)
      off 0 = 0x03   LSB divisor       (DLL, DLAB set)
@@ -18,7 +18,7 @@
    [dev_inv] is allocated: the UART thread is a top-level thread from step 0 and
    every one of its steps needs the fragment, so [uart_frag] can never sit raw
    in a CPU's precondition while the system runs.  The contract is therefore
-   stated over [WpUart.uart_inv], and the two writes that look incompatible with
+   stated over [WpUart.uart_inv Uart0], and the two writes that look incompatible with
    an invariant are both discharged by ghost arithmetic rather than by running
    early:
 
@@ -32,7 +32,7 @@
      - the DLAB SET (off 3 = 0x80) is why the caller threads the UNFROZEN
        half [uart_dlab_is γ (DfracOwn (1/2)) b0] at an ARBITRARY [b0] rather
        than the persistent [uart_dlab_off]: the freeze moved out of
-       [uart_ghosts_alloc] into this function's tail, where the final LCR write
+       [uart_ghosts_alloc Uart0] into this function's tail, where the final LCR write
        has just cleared DLAB.  So [uart_dlab_off] is uartinit's OUTPUT.
 
    uartinit writes no THR, so the accepted trace is unchanged and the token and
@@ -83,7 +83,7 @@ Require Import TsoCtx.
 
 
 (* NOTE: there is deliberately no [uartinit_post] naming the concrete UART state
-   the seven writes produce.  The state lives inside [uart_inv], the contract
+   the seven writes produce.  The state lives inside [uart_inv Uart0], the contract
    talks only about the four ghosts, and the proof goes write-by-write through
    the accessor leaf rather than composing a closed-form successor, so nothing
    would consume it. *)
@@ -113,7 +113,7 @@ Definition wp_uartinit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID 
      writes, which are stated over the same image resources. *)
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* the UART fabric, borrowed from the invariant around each write *)
-  uart_inv γd -∗
+  uart_inv Uart0 γd -∗
   (* "everything accepted has been transmitted, and the transmitter is mine":
      the pair that makes the FCR FIFO-clear shrink nothing *)
   uart_tx_own γd l -∗ uart_out_lb γd l -∗ uart_sent γd l -∗

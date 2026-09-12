@@ -89,6 +89,11 @@ QEMU/PtResvTest.v
 QEMU/PtSuperTest.v
 QEMU/PtTlbSet0Test.v
 QEMU/PtTlbTest.v
+QEMU/Uart1BothTest.v
+QEMU/Uart1IrqTest.v
+QEMU/Uart1RegsTest.v
+QEMU/Uart1RxTest.v
+QEMU/Uart1TxTest.v
 QEMU/UartDlabTest.v
 QEMU/UartIrqRxTest.v
 QEMU/UartIrqTxTest.v
@@ -169,6 +174,11 @@ QEMU/PtResvRun.v
 QEMU/PtSuperRun.v
 QEMU/PtTlbRun.v
 QEMU/PtTlbSet0Run.v
+QEMU/Uart1BothRun.v
+QEMU/Uart1IrqRun.v
+QEMU/Uart1RegsRun.v
+QEMU/Uart1RxRun.v
+QEMU/Uart1TxRun.v
 QEMU/UartDlabRun.v
 QEMU/UartIrqRxRun.v
 QEMU/UartIrqTxRun.v
@@ -228,6 +238,11 @@ QEMU/PtLevelsPass.v
 QEMU/PtResvPass.v
 QEMU/PtSuperPass.v
 QEMU/PtTlbPass.v
+QEMU/Uart1BothPass.v
+QEMU/Uart1IrqPass.v
+QEMU/Uart1RegsPass.v
+QEMU/Uart1RxPass.v
+QEMU/Uart1TxPass.v
 QEMU/UartDlabPass.v
 QEMU/UartIrqRxPass.v
 QEMU/UartIrqTxPass.v

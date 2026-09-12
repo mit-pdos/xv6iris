@@ -2,9 +2,16 @@
    `make vtest` to regenerate.
 
    THE RUN: what the platform produced, on all three channels -- the whole
-   result region untrimmed, the bytes that left the UART, and the disk it
+   result region untrimmed, the bytes that left EACH UART, and the disk it
    ended with.  More than one observation means the hardware itself has
-   more than one legal execution here, and the model must have each. *)
+   more than one legal execution here, and the model must have each.
+
+   ONE WIRE PER PORT, ALWAYS BOTH.  [o_uart] is a list indexed by
+   [enum uart_id], so the claim it feeds is TOTAL over the ports: it says
+   what BOTH wires hold, and a byte the model put on the wrong port is a
+   violation rather than something nobody looked at.  A case with one port
+   -- which is most of them -- has [o_serial1] empty, and that empty list
+   is an observation like any other. *)
 From Stdlib Require Import List ZArith.
 From stdpp Require Import base list gmap bitvector.definitions.
 Import ListNotations.
@@ -14,6 +21,7 @@ Local Open Scope Z_scope.
 
 Module ConcAmoRun <: TEST_RUN ConcAmo.
   Definition o_serial  : list Z := [].
+  Definition o_serial1 : list Z := [].
   Definition o_sectors : list (Z * list Z) := [].
 
   Definition results : list (list Z) :=
@@ -224,7 +232,7 @@ Module ConcAmoRun <: TEST_RUN ConcAmo.
    0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0]].
 
   Definition observed : list observation :=
-    (fun r => Obs r o_serial o_sectors) <$> results.
+    (fun r => Obs r [o_serial; o_serial1] o_sectors) <$> results.
 
   (* the run is non-empty; see TEST_RUN's [observed_ne] *)
   Lemma observed_ne : observed <> [].

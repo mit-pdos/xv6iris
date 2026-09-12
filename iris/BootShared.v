@@ -1243,7 +1243,8 @@ Section BootAlloc.
       ([∗ list] j ∈ seq 0 NPROC, pstate_full j UNUSED) ∗
       (* every hart's reservation mirror at [None] (design §3a) *)
       ([∗ set] c ∈ (fin_to_set CPU : gset CPU), resv_frag c None) ∗
-      uart_frag (g.(gdev).(duart)) ∗ plic_frag (g.(gdev).(dplic)) ∗
+      era_uarts_half uart_name g.(gdev).(duart) ∗
+      plic_frag (g.(gdev).(dplic)) ∗
       virtio_frag (g.(gdev).(dvirtio)) ∗
       (* the BOOT MINT: this era's whole disk image, in fragments
          (claude-notes/design/fs-log.md, stage 4).  [disk_img_name] is the
@@ -1495,7 +1496,8 @@ Section BootAlloc.
       (fun dk => FsCrash.mirror_of (FsCrash.fs_blocks dk)) Rb g
     ={⊤}=∗ ∃ (HFd : fdslotG Σ) (HIr : irefslotG Σ) (HPav : pavG Σ)
              (HBs : bioslotG Σ) (HWch : wchG Σ)
-             (HF : fileG Σ) (γd : uart_names) (γv : disk_names)
+             (HF : fileG Σ) (γd : uart_names) (γd1 : uart_names)
+             (γv : disk_names)
              (* THE CONSOLE RING'S GHOST NAMES (app-echo.md, lane
                 CONS-CURSOR, C2), minted here beside the UART's and REUSED
                 by the era mint -- so the ring main locks up IS the one
@@ -1517,7 +1519,12 @@ Section BootAlloc.
       (* --- the shared persistents --- *)
       kernel_text ∗ kernel_data ∗
       started_inv γi ξd (main_dep γd γv) ∗ started_prim γi ∗
-      dev_inv γd γv ∗ wire_inv ∗ crash_inv ∗ gen_cert ∗
+      dev_inv γd γv ∗
+      (* THE SECOND PORT'S invariant, beside the console bundle rather than
+         inside it: nothing in the kernel names this UART, so no client spec
+         takes it -- only adequacy, which owes its device thread a WP. *)
+      uart_inv Uart1 γd1 ∗
+      wire_inv ∗ crash_inv ∗ gen_cert ∗
       (* --- one bundle per hart --- *)
       ([∗ list] c ∈ enum CPU,
          ∃ iv : mword 32,
@@ -1776,7 +1783,11 @@ Section BootAlloc.
       as "[Hirslots Hirfile]".
     iEval (rewrite /IREFBOOT) in "Hirslot".
     (* ---- the device fabric ---- *)
-    iMod (uart_ghosts_alloc (g.(gdev).(duart))
+    (* the boot resource hands out ONE half per PORT; the console's goes
+       into [dev_inv] below and the other port's into its own invariant. *)
+    iEval (rewrite /era_uarts_half /enum /uart_id_finite /=) in "Huf".
+    iDestruct "Huf" as "(Huf & Huf1 & _)".
+    iMod (uart_ghosts_alloc Uart0 (g.(gdev).(duart) Uart0)
             ltac:(rewrite Hu0; reflexivity)
             ltac:(rewrite Hu0; vm_compute; reflexivity)
             ltac:(rewrite Hu0; reflexivity)) as (γd)
@@ -1796,9 +1807,10 @@ Section BootAlloc.
     iDestruct (boot_bss_carve g cnm Hbf
                  with "Hcl Hfdslots Hirslots Hirfile Hfdauth Hbsproc Hcgb Hbss") as
       "(#Hstcl & Hstw & Hlocks & Hglobals & Hharts & Hpages)".
-    iDestruct (uart_out_auth_lb γd (g.(gdev).(duart)) with "Hout")
+    iDestruct (uart_out_auth_lb γd (g.(gdev).(duart) Uart0) with "Hout")
       as "[Hout #Hlb]".
-    assert (Hacceq : uart_acc (g.(gdev).(duart)) = u_out (g.(gdev).(duart)))
+    assert (Hacceq : uart_acc (g.(gdev).(duart) Uart0)
+                     = u_out (g.(gdev).(duart) Uart0))
       by (rewrite Hu0; reflexivity).
     iEval (rewrite -Hacceq) in "Hlb".
     iMod (disk_ghosts_alloc gen_id (g.(gdev).(dvirtio))
@@ -1814,7 +1826,7 @@ Section BootAlloc.
             with "[Huf Hpf Hvf Hacc Hout Htxa Hdla Hcol Hpre Hproto] Hpbody Htok")
       as "[#Hdev Htok]".
     { rewrite /dev_inv_body.
-      iExists (g.(gdev).(duart)), (g.(gdev).(dplic)), (g.(gdev).(dvirtio)).
+      iExists (g.(gdev).(duart) Uart0), (g.(gdev).(dplic)), (g.(gdev).(dvirtio)).
       iFrame "Hacc Hout Htxa Hdla".
       iSplitL "Huf"; [iExact "Huf" |].
       iSplitL "Hpf"; [iExact "Hpf" |].
@@ -1824,6 +1836,20 @@ Section BootAlloc.
       iSplitL "Hproto"; [iExact "Hproto" |].
       iSplit; [iPureIntro; rewrite Hp0; exact plic_ok_plic0
               | iPureIntro; rewrite Hv0; exact (virtio_isr_ok_reset v0)]. }
+    (* ---- THE SECOND PORT.  The same chip, so the same allocation, at the
+       same power-on state; its ghosts go straight into its own invariant
+       and nothing else in the tree ever asks for them. ---- *)
+    iMod (uart_ghosts_alloc Uart1 (g.(gdev).(duart) Uart1)
+            ltac:(rewrite Hu0; reflexivity)
+            ltac:(rewrite Hu0; vm_compute; reflexivity)
+            ltac:(rewrite Hu0; reflexivity)) as (γd1)
+      "(Hacc1 & Hout1 & Htxa1 & Hdla1 & _ & _ & _ & Hcol1 & _ & _ & _ & _)".
+    iMod (uart_inv_alloc ⊤ Uart1 γd1 with "[Huf1 Hacc1 Hout1 Htxa1 Hdla1 Hcol1]")
+      as "#Hdev1".
+    { iExists (g.(gdev).(duart) Uart1).
+      iSplitL "Huf1"; [iExact "Huf1"|].
+      iSplitR "Hcol1"; [| iExact "Hcol1"].
+      rewrite /uart_ghosts. iFrame "Hacc1 Hout1 Htxa1 Hdla1". }
     (* ================================================================ *)
     (* ---- THE FILE SYSTEM'S BOOT-ERA MINT (fs-cfg-boot.md (d2b)) ---- *)
     (* It runs HERE, after the device ghosts: [fs_cfg_alloc] REUSES [γd] and
@@ -1931,7 +1957,8 @@ Section BootAlloc.
     (* [Hprocsavail] -- [procs_avail (Some NPROC)] -- now leaves in the
        postcondition: userinit is proven and its contract
        ([SpecUserinit.v]) takes exactly this. *)
-    iModIntro. iExists Hfd, Hir, Hpav, Hbs, Hwch, (fileG_of FGP ICFG FSC APP), γd, γv,
+    iModIntro. iExists Hfd, Hir, Hpav, Hbs, Hwch, (fileG_of FGP ICFG FSC APP),
+                       γd, γd1, γv,
                        cnm, (snap_spent S nib), γi, ξd.
     iSplitR; [iPureIntro; exact Himg |].
     iSplitR; [iPureIntro; exact Hcnu |].
@@ -1941,6 +1968,7 @@ Section BootAlloc.
     iSplitR; [iExact "Hstarted" |].
     iSplitL "Hprim"; [iExact "Hprim" |].
     iSplitR; [iExact "Hdev" |].
+    iSplitR; [iExact "Hdev1" |].
     iSplitR; [iExact "Hwinv" |].
     iSplitR; [iExact "Hcinv" |].
     iSplitR; [iExact "Hcert" |].
@@ -1954,10 +1982,11 @@ Section BootAlloc.
     iSplitL "Hprocsavail"; [iExact "Hprocsavail" |].
     iSplitL "Hchb"; [iExact "Hchb" |].
     iSplitL "Htx Hsent".
-    { iExists (uart_acc (g.(gdev).(duart))). iFrame "Htx Hsent Hlb". }
+    { iExists (uart_acc (g.(gdev).(duart) Uart0)). iFrame "Htx Hsent Hlb". }
     iSplitL "Htok"; [iExact "Htok" |].
     iSplitL "Hhi2"; [iExact "Hhi2" |].
-    iSplitL "Hdlab"; [iExists (uart_dlab (g.(gdev).(duart))); iExact "Hdlab" |].
+    iSplitL "Hdlab";
+      [iExists (uart_dlab (g.(gdev).(duart) Uart0)); iExact "Hdlab" |].
     iSplitL "Hcfg".
     { iExists (v_cfg (g.(gdev).(dvirtio))).
       iSplitR; [iPureIntro; rewrite Hv0; apply virtio_reset_not_live |].

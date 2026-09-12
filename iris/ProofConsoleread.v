@@ -65,7 +65,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto.
-Require Import ObsTrace.   (* [mobs] / [obs_ends_in]: the ledger's tags *)
+Require Import ObsTrace.   (* [mobs] / [obs_ends_in Uart0]: the ledger's tags *)
 Require Import RegFile.
 Require Import InstrBytes WpMmodeLeafBase.
 Require Import RiscvExtras.
@@ -444,7 +444,7 @@ Section CrBodies.
       (hs : list (list mobs)) (h : list mobs) (b : bv 8) :
     (1 <= bv_unsigned (sub_vec ww rr))%Z ->
     ts !! cons_slot rr 0 = Some (Some h) ->
-    obs_ends_in h b ->
+    obs_ends_in Uart0 h b ->
     (forall i : nat, (i < d)%nat -> src' i = src i) ->
     src' d = cons_xlate b ->
     is_conslock cn Wd γc -∗ cr_price cn Wd ord -∗
@@ -463,7 +463,7 @@ Section CrBodies.
     destruct (Hstk 0%Z ltac:(lia)) as (h' & b' & Hs0 & Ht0 & He0 & Hb0).
     replace (cur + Z.to_nat 0)%nat with cur in Hs0 by lia.
     rewrite Hts in Ht0. injection Ht0 as <-.
-    pose proof (obs_ends_in_inj h b' b He0 Hends) as ->.
+    pose proof (obs_ends_in_inj _ _ h b' b He0 Hends) as [_ ->].
     pose proof (cons_stored_pop rr ww cur st bs ts Hge Hst) as Hst'.
     pose proof (cons_pend_shift rr ww ee pd bs ts Hge Hpd) as Hpd'.
     assert (Hstpd : st `prefix_of` (st ++ pd)%list) by (by exists pd).
@@ -588,7 +588,7 @@ Section CrBodies.
     (* the entry the [cons.r++] took, read off the ring exactly as the
        delivering round reads it *)
     ts !! cons_slot rr 0 = Some (Some h) ->
-    obs_ends_in h b ->
+    obs_ends_in Uart0 h b ->
     (* ...and WHY it was not delivered: the two the code has *)
     ((d = 0%nat /\ bv_unsigned (cons_xlate b) = 4) \/ fault d) ->
     is_conslock cn Wd γc -∗ cr_price cn Wd ord -∗ riscv_rx_tag h -∗
@@ -622,7 +622,7 @@ Section CrBodies.
           destruct (Hstk 0%Z ltac:(lia)) as (h' & b' & Hs0 & Ht0 & He0 & Hb0).
           replace (cur + Z.to_nat 0)%nat with cur in Hs0 by lia.
           rewrite Hts in Ht0. injection Ht0 as <-.
-          pose proof (obs_ends_in_inj h b' b He0 Hends) as ->.
+          pose proof (obs_ends_in_inj _ _ h b' b He0 Hends) as [_ ->].
           assert (Hsnoc : (sl ++ [(h, b)])%list `prefix_of` st).
           { apply (cons_prefix_snoc sl st (h, b) Hpfx).
             rewrite (proj1 Hwin) -Hcur. exact Hs0. }
@@ -823,7 +823,7 @@ Section CrBodies.
   Lemma cr_tagged_glue (d dwr : nat) (bs g : nat -> bv 8)
       (hs : list (list mobs)) (h : list mobs) (b : bv 8) :
     (dwr <= 1)%nat ->
-    cons_tagged bs hs d -> obs_ends_in h b -> g 0%nat = cons_xlate b ->
+    cons_tagged bs hs d -> obs_ends_in Uart0 h b -> g 0%nat = cons_xlate b ->
     cons_tagged (cr_glue d bs g) (hs ++ cr_tail dwr h)%list (d + dwr)%nat.
   Proof.
     intros Hdw [Hlen Htie] Hends Hg.

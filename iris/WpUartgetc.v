@@ -77,7 +77,7 @@ Section WpUartgetc.
      Rtp], on the raw [mword 5]) -- and [IntrDefs.srcok_solve]'s injection arm
      is exactly what turns that spelling into the class, so that premise stays
      put and nothing about it moves.  [rs_lsr] carried NO such fact: its only
-     premise was the value fact [rget m rs_lsr = uart_pa 5], which says nothing
+     premise was the value fact [rget m rs_lsr = uart_pa Uart0 5], which says nothing
      about tp.  Since [wp_uart_read_free_s_sconf] now takes [SrcOk rs1], an
      application at [rs_lsr] would have had NOTHING to resolve against -- and
      the resulting failure is the silent one, an instance SHELVED inside
@@ -100,8 +100,8 @@ Section WpUartgetc.
     (* the two bases: the LSR and the RHR, each already in a register --
        [rs_lsr]/[rs_rhr] are register-index VARIABLES, so the read has to go
        through [rget] (either could in principle be tp). *)
-    rget m rs_lsr = uart_pa 5 ->
-    rget m rs_rhr = uart_pa 0 ->
+    rget m rs_lsr = uart_pa Uart0 5 ->
+    rget m rs_rhr = uart_pa Uart0 0 ->
     (* the RHR base must survive the [andi] that clobbers a5 *)
     rs_rhr <> Ra5 ->
     (* the RHR base is read again after the block's possible migrations
@@ -147,7 +147,7 @@ Section WpUartgetc.
                lower bound -- with the token itself at its NEW anchor
                (app-echo.md, lane CONS-CURSOR, C1) *)
             (∃ h : list mobs,
-               ⌜ obs_ends_in h c ⌝ ∗ ⌜ ohist_ext hl h ⌝ ∗
+               ⌜ obs_ends_in Uart0 h c ⌝ ∗ ⌜ ohist_ext hl h ⌝ ∗
                riscv_rx_tag h ∗ obs_hist_lb h ∗
                uart_rx_tok γd (S k) (Some h)) -∗
             WP (Loop : expr riscv_lang)) )) -∗
@@ -159,7 +159,7 @@ Section WpUartgetc.
        every hart, so the premise stated at the entry hart still holds at the
        hart the poll's [wp_next] lands on.  Also the wiring check -- attach the
        class to any other parameter and this line stops typechecking. *)
-    assert (Hlsr_all : forall hh : CpuId, rget (CID := hh) m rs_lsr = uart_pa 5)
+    assert (Hlsr_all : forall hh : CpuId, rget (CID := hh) m rs_lsr = uart_pa Uart0 5)
       by (intros hh; rewrite (src_ok_rget_indep m rs_lsr hh CID); exact Hlsr).
     (* Ra5 (x15) is never tp (x4): the one register-index fact the a5-side
        reasoning below needs to peel [rget] back to a raw map lookup. *)
@@ -169,7 +169,7 @@ Section WpUartgetc.
        all: [rget] at a non-tp index is the plain lookup ([rget_ne]), so this
        survives every later hart change unlike [Hrhr] itself (whose [rget] is
        pinned at the ENTRY hart). *)
-    assert (Hrhr0 : m !!! Regidx rs_rhr = uart_pa 0).
+    assert (Hrhr0 : m !!! Regidx rs_rhr = uart_pa Uart0 0).
     { rewrite -(rget_ne m rs_rhr ltac:(congruence)). exact Hrhr. }
     (* --- the rx-ready poll: [lbu a5,0(s1)] --- *)
     iApply (UAcc.wp_uart_lsr_read_rx_s_sconf γd γv pcL Ra5 rs_lsr (mword_of_int 0 : mword 12)

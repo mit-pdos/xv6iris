@@ -254,26 +254,32 @@ Section EchoLedger.
   Qed.
 
   (* an output byte moves nothing *)
-  Lemma echo_R_tx γcl h b :
+  Lemma echo_R_tx γcl h i b :
     trace_shape h true ->
-    echo_R γcl h ==∗ echo_R γcl (h ++ [ObsUartOut b]).
+    echo_R γcl h ==∗ echo_R γcl (h ++ [ObsUartOut i b]).
   Proof.
     intros Hsh. iIntros "H". rewrite /echo_R /echo_phase.
-    rewrite (decide_ext _ (disc h) 0%nat 1%nat (disc_out h b Hsh)). by iModIntro.
+    rewrite (decide_ext _ (disc h) 0%nat 1%nat (disc_out h i b Hsh)).
+    by iModIntro.
   Qed.
 
   (* an input byte: still disciplined (0 stays), the first bad byte (0 -> 1),
      or already tainted (1 stays) -- monotone in every case.  It also mints
      THE BYTE'S TAG: the left arm when the history is still disciplined, the
      counter's lower bound otherwise, which is exactly [echo_tag]. *)
-  Lemma echo_R_rx γcl h b :
+  Lemma echo_R_rx γcl h i b :
     trace_shape h true ->
     echo_R γcl h ==∗
-      echo_R γcl (h ++ [ObsUartIn b]) ∗ echo_tag γcl (h ++ [ObsUartIn b]).
+      echo_R γcl (h ++ [ObsUartIn i b]) ∗ echo_tag γcl (h ++ [ObsUartIn i b]).
   Proof.
     intros Hsh. iIntros "H". rewrite /echo_R /echo_tag /echo_taint /echo_phase.
-    destruct (decide (disc (h ++ [ObsUartIn b]))) as [Hd'|Hd'].
-    - rewrite decide_True; last exact (disc_in h b Hsh Hd').
+    destruct (decide (disc (h ++ [ObsUartIn i b]))) as [Hd'|Hd'].
+    - rewrite decide_True; last first.
+      { (* the console's byte can break the discipline; the OTHER port's
+           cannot be seen by it at all *)
+        destruct i;
+          [ exact (disc_in h b Hsh Hd')
+          | exact (proj1 (disc_other h (ObsUartIn Uart1 b) eq_refl I Hsh) Hd') ]. }
       iModIntro. iFrame "H". iLeft. iPureIntro. exact Hd'.
     - (* off the discipline: the counter is at 1 either way, and its lower
          bound is the taint *)
@@ -1136,39 +1142,39 @@ Section EchoApp.
      theorem's own context supplies at the application site. *)
   Lemma echo_Htx `{!uartGhostG Σ} `{HF : !fileG Σ}
       (HR : riscvGS Σ) (c : app_fixed app_echo) (r : app_names app_echo)
-      (γ : uart_names) :
+      (i : uart_id) (γ : uart_names) :
     @file_app Σ HF = MkAppcfg (app_names app_echo) (app_pred app_echo c) r ->
-    FsCfg.fsc_uart = γ ->
+    (i = Uart0 -> FsCfg.fsc_uart = γ) ->
     ⊢ □ (∀ (h : list mobs) (b : bv 8) (u u' : uart_state),
            ⌜uart_tx_pop u = Some (b, u')⌝ -∗ ⌜uart_loopback u = false⌝ -∗
-           ⌜trace_shape h true⌝ -∗ ⌜obs_wire (open_seg h) = u_wire u⌝ -∗
+           ⌜trace_shape h true⌝ -∗ ⌜obs_wire i (open_seg h) = u_wire u⌝ -∗
            uart_ghosts γ u' -∗ app_R app_echo c h
-             ={⊤ ∖ ↑uartN ∖ ↑obsN}=∗
-           uart_ghosts γ u' ∗ app_R app_echo c (h ++ [ObsUartOut b])%list).
+             ={⊤ ∖ ↑uartN i ∖ ↑obsN}=∗
+           uart_ghosts γ u' ∗ app_R app_echo c (h ++ [ObsUartOut i b])%list).
   Proof.
     intros _ _.
     cbn [app_echo app_fixed app_R] in c |- *.
     iIntros "!>" (h b u u') "_ _ %Hsh _ Hg Hled".
-    iMod (echo_R_tx c h b Hsh with "Hled") as "Hled".
+    iMod (echo_R_tx c h i b Hsh with "Hled") as "Hled".
     iModIntro. iFrame "Hg Hled".
   Qed.
 
   Lemma echo_Hrx `{!uartGhostG Σ} `{HF : !fileG Σ}
       (HR : riscvGS Σ) (c : app_fixed app_echo) (r : app_names app_echo)
-      (γ : uart_names) :
+      (i : uart_id) (γ : uart_names) :
     @file_app Σ HF = MkAppcfg (app_names app_echo) (app_pred app_echo c) r ->
-    FsCfg.fsc_uart = γ ->
+    (i = Uart0 -> FsCfg.fsc_uart = γ) ->
     ⊢ □ (∀ (h : list mobs) (b : bv 8) (u u' : uart_state),
            ⌜uart_rx_push u b = Some u'⌝ -∗ ⌜trace_shape h true⌝ -∗
            uart_ghosts γ u' -∗ app_R app_echo c h
-             ={⊤ ∖ ↑uartN ∖ ↑obsN}=∗
-           uart_ghosts γ u' ∗ app_R app_echo c (h ++ [ObsUartIn b])%list ∗
-           app_tag app_echo c (h ++ [ObsUartIn b])%list).
+             ={⊤ ∖ ↑uartN i ∖ ↑obsN}=∗
+           uart_ghosts γ u' ∗ app_R app_echo c (h ++ [ObsUartIn i b])%list ∗
+           app_tag app_echo c (h ++ [ObsUartIn i b])%list).
   Proof.
     intros _ _.
     cbn [app_echo app_fixed app_R app_tag] in c |- *.
     iIntros "!>" (h b u u') "_ %Hsh Hg Hled".
-    iMod (echo_R_rx c h b Hsh with "Hled") as "[Hled Htag]".
+    iMod (echo_R_rx c h i b Hsh with "Hled") as "[Hled Htag]".
     iModIntro. iFrame "Hg Hled Htag".
   Qed.
 

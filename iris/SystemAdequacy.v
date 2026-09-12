@@ -575,10 +575,10 @@ Section SystemBoot.
        same reason -- with the two equations the boot HAS: the era's
        application record, and [fsc_uart], which is the [γ] every kernel-side
        UART fact in this era is stated at. *)
-    (forall `{HF : !fileG Σ} (r : N) (γ : uart_names),
+    (forall `{HF : !fileG Σ} (r : N) (i : uart_id) (γ : uart_names),
        @file_app Σ HF = MkAppcfg N A r ->
-       FsCfg.fsc_uart = γ ->
-       ⊢ obs_inv -∗ uart_obs_permit γ) ->
+       (i = Uart0 -> FsCfg.fsc_uart = γ) ->
+       ⊢ obs_inv -∗ uart_obs_permit i γ) ->
     obs_inv -∗
     power_boot_res riscv_eraGS gen_id boot_D NPROC XV6_DISK_BYTES
       (fun dk => mirror_of (fs_blocks dk))
@@ -597,7 +597,7 @@ Section SystemBoot.
     ={⊤}=∗
       ([∗ list] c ∈ enum CPU,
          WP (LoopE gen_id c : expr riscv_lang) @ ⊤) ∗
-      WP (UartLoopE gen_id : expr riscv_lang) @ ⊤ ∗
+      ([∗ list] i ∈ enum uart_id, WP (UartLoopE gen_id i : expr riscv_lang) @ ⊤) ∗
       WP (DiskLoopE gen_id : expr riscv_lang) @ ⊤ ∗
       WP (PlicLoopE gen_id : expr riscv_lang) @ ⊤.
   Proof.
@@ -712,8 +712,8 @@ Section SystemBoot.
     iMod (boot_shared_alloc (XI := ξ0) g XV6_DISK_BYTES (fss_sb S) (fs_nib S) cov
             S Pb (MkAppcfg N A rap) (fun _ => emp)%I gsn gln gtn Hbf Hbundle
             with "Hok Hxfer Hseamg Hdursnap Hres")
-      as (Hfd Hir Hpav Hbs Hwch HF γd γv cnm Rspent γi ξd)
-      "(%Hdimg & %Hcnu & %Happ & #Htext & #Hdata & #Hstarted & Hprim & #Hdev & #Hwinv &
+      as (Hfd Hir Hpav Hbs Hwch HF γd γd1 γv cnm Rspent γi ξd)
+      "(%Hdimg & %Hcnu & %Happ & #Htext & #Hdata & #Hstarted & Hprim & #Hdev & #Hdev1 & #Hwinv &
         #Hcinv & #Hcert & Hharts & Hlk & Hgl & Hmdata & Hpark & Hpst & Hpavail & Hchb & Huart &
         Htok & Hhi & Hdlab & Hcfg & Hclaim & Hcmauth & #Hdone & Hkpt & Hkptb & Hkmap & Hmir & Hpages & Hirauth &
         Hirslot & Hfs)".
@@ -872,8 +872,20 @@ Section SystemBoot.
                 (g.(gregs) (FS c)) iv DfracDiscarded γd γv γi ξd
                 (boot_regs_of_facts g Hbf (FS c)) (fin_FS_nz c)
                 with "Htext Hdata Hh Hthrc Hstarted"). }
-    iDestruct (Hperm HF rap γd Happ Huart with "Hoinv") as "#Hperm".
-    iSplitR; [iApply (wp_uart_loop γd with "Hcert Huinv Hpinv Hperm") |].
+    (* ONE THREAD PER PORT.  The console's runs under the bundle's
+       invariant; the second port's under its own, at its own ghosts -- and
+       both take a permit from the SAME application ledger, which is why
+       [Hperm] is quantified over the port. *)
+    iDestruct (Hperm HF rap Uart0 γd Happ (fun _ => Huart) with "Hoinv")
+      as "#Hperm".
+    iDestruct (Hperm HF rap Uart1 γd1 Happ ltac:(intros Hc; discriminate Hc)
+                 with "Hoinv") as "#Hperm1".
+    iSplitR.
+    { rewrite /enum /uart_id_finite /=.
+      iSplitR;
+        [iApply (wp_uart_loop Uart0 γd γd with "Hcert Huinv Hpinv Hperm")|].
+      iSplitR; [|done].
+      iApply (wp_uart_loop Uart1 γd1 γd with "Hcert Hdev1 Hpinv Hperm1"). }
     iSplitR;
       [iApply (wp_disk_loop γd γv Hdimg with "Hcert Hcinv Hqinv Hvinv Hpinv") |].
     iApply (wp_plic_loop γd with "Hcert Hpinv Hwinv").
@@ -1058,7 +1070,7 @@ Theorem xv6_power_adequacy_gen Σ
        record, and [fsc_uart], which is the [γ] every kernel-side UART fact
        in the era is stated at -- are exactly [Hinit_boot]'s shape. *)
     (Hperm : forall (HR : riscvGS Σ) (GEN : GenId) `{HF : !fileG Σ}
-                    (r : app_names) (γ : uart_names),
+                    (r : app_names) (i : uart_id) (γ : uart_names),
        (exists (Hinv : invGS Σ) (γgen γstart γreg γd γsw γobs γhist : gname)
                (c : CT) (T : list mobs),
           riscv_fixedGS =
@@ -1067,8 +1079,8 @@ Theorem xv6_power_adequacy_gen Σ
                  γd γsw γreg γstart c)
               γobs T (Pt γobs c) γhist (Tg c) (HTg c) (HTgt c) CT c
           /\ @file_app Σ HF = MkAppcfg app_names (app_fs c) r
-          /\ FsCfg.fsc_uart = γ) ->
-       ⊢ obs_inv -∗ uart_obs_permit γ)
+          /\ (i = Uart0 -> FsCfg.fsc_uart = γ)) ->
+       ⊢ obs_inv -∗ uart_obs_permit i γ)
     (phi : gstate -> list mobs -> Prop)
     (* ...the slot [Hphi] holds at the end of the run is the COMPOSITE
        (round C): the application reads its durable claim off it beside the
@@ -1320,8 +1332,8 @@ Proof.
      own instance. *)
   { reflexivity. }
   (* the UART thread's permit, at the record the era boots over *)
-  intros HF r γ Happ Huart.
-  apply (Hperm _ gen HF r γ).
+  intros HF r i γ Happ Huart.
+  apply (Hperm _ gen HF r i γ).
   exists Hi, Gg, Gs, Gr, Gt, Gsw, Gob, Ghist, Gcl, GT.
   split_and!; [reflexivity | exact Happ | exact Huart].
 Qed.
@@ -1392,9 +1404,9 @@ Proof.
                             with "Hsi HP"))
             Hgen0 Hpow Himg n κs t2 g2 Hn).
   (* the permit at the trivial slot *)
-  intros HR GEN HFi ri γ
+  intros HR GEN HFi ri i γ
          (Hi & Gg & Gs & Gr & Gt & Gsw & Gob & Ghist & Gcl & GT & Heq & _ & _).
-  apply (uart_obs_permit_triv γ); rewrite Heq; reflexivity.
+  apply (uart_obs_permit_triv i γ); rewrite Heq; reflexivity.
 Qed.
 
 Theorem xv6_trace_adequacy Σ
@@ -1417,18 +1429,21 @@ Theorem xv6_trace_adequacy Σ
        the byte's tag.  Quantified over the era instance because the fancy
        update needs its [invGS]; the wands themselves mention nothing
        era-specific. *)
-    (Htx : forall (HR : riscvGS Σ) (γ : uart_names),
+    (* AT EVERY PORT: either 16550 may step, and the environment may type
+       on the kernel's port at any moment, so the ledger owes an account of
+       an event on either wire. *)
+    (Htx : forall (HR : riscvGS Σ) (i : uart_id) (γ : uart_names),
        ⊢ □ (∀ (h : list mobs) (b : bv 8) (u u' : uart_state),
               ⌜uart_tx_pop u = Some (b, u')⌝ -∗ ⌜uart_loopback u = false⌝ -∗
-              ⌜trace_shape h true⌝ -∗ ⌜obs_wire (open_seg h) = u_wire u⌝ -∗
-              uart_ghosts γ u' -∗ R h ={⊤ ∖ ↑uartN ∖ ↑obsN}=∗
-              uart_ghosts γ u' ∗ R (h ++ [ObsUartOut b])%list))
-    (Hrx : forall (HR : riscvGS Σ) (γ : uart_names),
+              ⌜trace_shape h true⌝ -∗ ⌜obs_wire i (open_seg h) = u_wire u⌝ -∗
+              uart_ghosts γ u' -∗ R h ={⊤ ∖ ↑uartN i ∖ ↑obsN}=∗
+              uart_ghosts γ u' ∗ R (h ++ [ObsUartOut i b])%list))
+    (Hrx : forall (HR : riscvGS Σ) (i : uart_id) (γ : uart_names),
        ⊢ □ (∀ (h : list mobs) (b : bv 8) (u u' : uart_state),
               ⌜uart_rx_push u b = Some u'⌝ -∗ ⌜trace_shape h true⌝ -∗
-              uart_ghosts γ u' -∗ R h ={⊤ ∖ ↑uartN ∖ ↑obsN}=∗
-              uart_ghosts γ u' ∗ R (h ++ [ObsUartIn b])%list ∗
-              Tg (h ++ [ObsUartIn b])%list))
+              uart_ghosts γ u' -∗ R h ={⊤ ∖ ↑uartN i ∖ ↑obsN}=∗
+              uart_ghosts γ u' ∗ R (h ++ [ObsUartIn i b])%list ∗
+              Tg (h ++ [ObsUartIn i b])%list))
     (P : list mobs -> Prop) (HR : forall h, R h ⊢ ⌜P h⌝)
     (Hgen0 : g.(ggen) = 0%nat) (Hpow0 : g.(gpow) = false)
     (Himg : fs_boot_image_wf (v_disk (g.(gdev).(dvirtio))) XV6_DISK_BYTES
@@ -1463,9 +1478,9 @@ Proof.
                   iApply (obs_ledger_at_phi R HRt P HR γobs h with "Hauth HPt"))
             Hgen0 Hpow0 Himg).
   (* the permit at the ledger: the client's two wands *)
-  intros HRg GEN HFi ri γ
+  intros HRg GEN HFi ri i γ
          (Hi & Gg & Gs & Gr & Gt & Gsw & Gob & Ghist & Gcl & GT & Heq & _ & _).
-  refine (uart_obs_permit_ledger R Tg γ HRt _ _ (Htx HRg γ) (Hrx HRg γ));
+  refine (uart_obs_permit_ledger i R Tg γ HRt _ _ (Htx HRg i γ) (Hrx HRg i γ));
     rewrite Heq; reflexivity.
 Qed.
 
@@ -1808,18 +1823,18 @@ Corollary xv6_trace_adequacy_xv6Σ (g : gstate)
     (Hpow : forall (h : list mobs) (on : bool) (dk : Z -> bv 8),
        trace_shape h on ->
        ⊢ R h ==∗ R (h ++ [if on then ObsPowerOff else ObsPowerOn])%list)
-    (Htx : forall (HR : riscvGS xv6Σ) (γ : uart_names),
+    (Htx : forall (HR : riscvGS xv6Σ) (i : uart_id) (γ : uart_names),
        ⊢ □ (∀ (h : list mobs) (b : bv 8) (u u' : uart_state),
               ⌜uart_tx_pop u = Some (b, u')⌝ -∗ ⌜uart_loopback u = false⌝ -∗
-              ⌜trace_shape h true⌝ -∗ ⌜obs_wire (open_seg h) = u_wire u⌝ -∗
-              uart_ghosts γ u' -∗ R h ={⊤ ∖ ↑uartN ∖ ↑obsN}=∗
-              uart_ghosts γ u' ∗ R (h ++ [ObsUartOut b])%list))
-    (Hrx : forall (HR : riscvGS xv6Σ) (γ : uart_names),
+              ⌜trace_shape h true⌝ -∗ ⌜obs_wire i (open_seg h) = u_wire u⌝ -∗
+              uart_ghosts γ u' -∗ R h ={⊤ ∖ ↑uartN i ∖ ↑obsN}=∗
+              uart_ghosts γ u' ∗ R (h ++ [ObsUartOut i b])%list))
+    (Hrx : forall (HR : riscvGS xv6Σ) (i : uart_id) (γ : uart_names),
        ⊢ □ (∀ (h : list mobs) (b : bv 8) (u u' : uart_state),
               ⌜uart_rx_push u b = Some u'⌝ -∗ ⌜trace_shape h true⌝ -∗
-              uart_ghosts γ u' -∗ R h ={⊤ ∖ ↑uartN ∖ ↑obsN}=∗
-              uart_ghosts γ u' ∗ R (h ++ [ObsUartIn b])%list ∗
-              Tg (h ++ [ObsUartIn b])%list))
+              uart_ghosts γ u' -∗ R h ={⊤ ∖ ↑uartN i ∖ ↑obsN}=∗
+              uart_ghosts γ u' ∗ R (h ++ [ObsUartIn i b])%list ∗
+              Tg (h ++ [ObsUartIn i b])%list))
     (P : list mobs -> Prop) (HR : forall h, R h ⊢ ⌜P h⌝)
     (Hgen0 : g.(ggen) = 0%nat) (Hpow0 : g.(gpow) = false)
     (Hdisk : v_disk (g.(gdev).(dvirtio)) = FsImgDisk.fsimg_dk) :
@@ -1863,8 +1878,8 @@ Proof.
             ltac:(intros Hinv γgen γstart γreg γd γsw γobs γhist c T g' h;
                   iIntros "_ _ %Hwf _ _"; iModIntro; iPureIntro; exact Hwf)
             Hgen0 Hpow0 _).
-  { intros HR GEN HFi ri γ
+  { intros HR GEN HFi ri i γ
            (Hi & Gg & Gs & Gr & Gt & Gsw & Gob & Ghist & Gcl & GT & Heq & _ & _).
-    apply (uart_obs_permit_triv γ); rewrite Heq; reflexivity. }
+    apply (uart_obs_permit_triv i γ); rewrite Heq; reflexivity. }
   rewrite Hdisk. exact fsimg_image_wf.
 Qed.

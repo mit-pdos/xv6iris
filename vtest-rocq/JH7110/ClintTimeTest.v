@@ -19,7 +19,7 @@ Module ClintTime <: TEST.
   Definition platform   := "jh7110"%string.
   Definition hart       : Z := 2.
   Definition regions    : list region := std_regions.
-  Definition uart_input : list (bv 8) := [].
+  Definition uart_input : list (uart_id * bv 8) := [].
   Definition disk_init  : list (Z * list Z) := [].
 
   Definition text : list Z :=

@@ -4,7 +4,7 @@
    These are single-instruction leaf WPs built on the general UART device leaves
    [Uart.wp_lb_uart_s_sconf] / [Uart.wp_sb_uart_s_sconf]: they pre-discharge the
    constant PTE/geometry premises (the caller supplies only that the base
-   register already holds the concrete UART register address [uart_pa off]) and
+   register already holds the concrete UART register address [uart_pa Uart0 off]) and
    package the transmitter-token protocol.  The reuse pattern for any device-MMIO
    S-mode instruction while holding [dev_inv] + the transmitter token:
      - [wp_uart_lsr_read_s_sconf]  : LSR poll load (offset 5)
@@ -143,7 +143,7 @@ Section WpSconfUartAccess.
       (m : regfile) (n : nat) (l : list (bv 8)) (b : bool) :
     uint rd <> 0 ->
     rd_ok rd ->
-    add_vec (rget m rs1) (sign_extend' 64 imm) = uart_pa 5 ->
+    add_vec (rget m rs1) (sign_extend' 64 imm) = uart_pa Uart0 5 ->
     sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 1)) -∗
     dev_inv γd γv -∗ uart_tx_own γd l -∗
@@ -161,7 +161,7 @@ Section WpSconfUartAccess.
        and this leaf's wiring check.  See the family note at the head of this
        section. *)
     assert (Haddr_all : forall hh : CpuId,
-              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = uart_pa 5)
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = uart_pa Uart0 5)
       by (intros hh; rewrite (src_ok_rget_indep m rs1 hh CID); exact Haddr).
     iApply (Uart.wp_lb_uart_s_sconf kt (CID:=CID) γd γv 5 pc false true rd rs1 imm
               m n (uart_tx_own γd l)
@@ -177,7 +177,7 @@ Section WpSconfUartAccess.
       assert (Hne5 : (5 <> 0)%Z) by lia.
       destruct (uart_read_rx_stable u 5 bt u' (or_introl Hne5) Hread)
         as [Hrxe Hlbe].
-      iDestruct (uart_colE_stable γd u u' Hrxe Hlbe
+      iDestruct (uart_colE_stable Uart0 γd u u' Hrxe Hlbe
                 ltac:(exact (uart_read_wire _ _ _ _ Hread))
                 ltac:(exact (proj1 (proj2 (uart_read_stable _ _ _ _ Hread))))
                 with "Hcol") as "Hcol".
@@ -203,7 +203,7 @@ Section WpSconfUartAccess.
       (m : regfile) (n : nat) (l : list (bv 8)) (b : bool) :
     uint rd <> 0 ->
     rd_ok rd ->
-    rget m rs1 = uart_pa 5 ->
+    rget m rs1 = uart_pa Uart0 5 ->
     sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc false (LOAD (mword_of_int 0 : mword 12, Regidx rs1, Regidx rd, true, 1)) -∗
     dev_inv γd γv -∗ uart_tx_own γd l -∗
@@ -241,13 +241,13 @@ Section WpSconfUartAccess.
      each offset is then a closed term. *)
   Local Lemma uart_geom_ok (off : Z) :
     (0 <= off < uart_size)%Z ->
-    let a8 := sign_extend' 64 (subrange_vec_dec (uart_pa off) (xlen - 0 - 1) 0) in
+    let a8 := sign_extend' 64 (subrange_vec_dec (uart_pa Uart0 off) (xlen - 0 - 1) 0) in
     neq_vec (bits_of_virtaddr (Virtaddr a8))
       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false
     /\ autocast (T := mword) (subrange_vec_dec
          (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)
          (Z.sub 39 1) pagesize_bits) = uart_vpn
-    /\ zero_extend' 64 (add_vec_int a8 (0 * 1)) = uart_pa off.
+    /\ zero_extend' 64 (add_vec_int a8 (0 * 1)) = uart_pa Uart0 off.
   Proof.
     unfold uart_size. intro Hoff.
     assert (Hc : off = 0 \/ off = 1 \/ off = 2 \/ off = 3 \/
@@ -271,7 +271,7 @@ Section WpSconfUartAccess.
     off <> 0 ->
     uint rd <> 0 ->
     rd_ok rd ->
-    add_vec (rget m rs1) (sign_extend' 64 imm) = uart_pa off ->
+    add_vec (rget m rs1) (sign_extend' 64 imm) = uart_pa Uart0 off ->
     sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 1)) -∗
     dev_inv γd γv -∗
@@ -287,7 +287,7 @@ Section WpSconfUartAccess.
        and this leaf's wiring check.  See the family note at the head of this
        section. *)
     assert (Haddr_all : forall hh : CpuId,
-              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = uart_pa off)
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = uart_pa Uart0 off)
       by (intros hh; rewrite (src_ok_rget_indep m rs1 hh CID); exact Haddr).
     destruct (uart_geom_ok off Hoff) as (Hg1 & Hg2 & Hg3).
     iApply (Uart.wp_lb_uart_s_sconf kt (CID:=CID) γd γv off pc false true rd rs1 imm
@@ -305,7 +305,7 @@ Section WpSconfUartAccess.
       iModIntro. iSplitL "Hg".
       { iApply (uart_ghosts_stable γd u u' Ha Ho Hd with "Hg"). }
       iSplitL "Hcol"; [| done].
-      iApply (uart_colE_stable γd u u' Hrxe Hlbe
+      iApply (uart_colE_stable Uart0 γd u u' Hrxe Hlbe
                 ltac:(exact (uart_read_wire _ _ _ _ Hread))
                 ltac:(exact (proj1 (proj2 (uart_read_stable _ _ _ _ Hread))))
                 with "Hcol").
@@ -325,7 +325,7 @@ Section WpSconfUartAccess.
        bound OUTSIDE the [wp_next] lambda (which rebinds [CID], and would
        silently re-read [rs2] -- i.e. [tp] -- at the RESUMING hart). *)
     let sb : mword 8 := autocast (T := mword) (subrange_vec_dec (rget m rs2) (Z.sub (Z.mul 1 8) 1) 0) in
-    rget m rs1 = uart_pa 0 ->
+    rget m rs1 = uart_pa Uart0 0 ->
     sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc false (STORE (mword_of_int 0 : mword 12, Regidx rs2, Regidx rs1, 1)) -∗
     dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_out_lb γd l -∗ uart_dlab_off γd -∗
@@ -342,7 +342,7 @@ Section WpSconfUartAccess.
     (* the class, consumed at [rs1 / rs2] -- the one line the funnel change needs,
        and this leaf's wiring check.  See the family note at the head of this
        section. *)
-    assert (Haddr_all : forall hh : CpuId, rget (CID := hh) m rs1 = uart_pa 0)
+    assert (Haddr_all : forall hh : CpuId, rget (CID := hh) m rs1 = uart_pa Uart0 0)
       by (intros hh; rewrite (src_ok_rget_indep m rs1 hh CID); exact Haddr).
     assert (Hsb_all : forall hh : CpuId, rget (CID := hh) m rs2 = rget (CID := CID) m rs2)
       by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
@@ -358,7 +358,7 @@ Section WpSconfUartAccess.
       (* a THR write is offset 0, which is neither FCR nor MCR *)
       destruct (uart_write_rx_stable u 0 sb u' ltac:(lia) ltac:(lia) Hwrite)
         as [Hrxe Hlbe].
-      iDestruct (uart_colE_stable γd u u' Hrxe Hlbe
+      iDestruct (uart_colE_stable Uart0 γd u u' Hrxe Hlbe
                 ltac:(exact (uart_write_wire _ _ _ _ Hwrite))
                 ltac:(exact (uart_write_out _ _ _ _ Hwrite))
                 with "Hcol") as "Hcol".
@@ -401,7 +401,7 @@ Section WpSconfUartAccess.
       (b : bool) :
     uint rd <> 0 ->
     rd_ok rd ->
-    add_vec (rget m rs1) (sign_extend' 64 imm) = uart_pa 5 ->
+    add_vec (rget m rs1) (sign_extend' 64 imm) = uart_pa Uart0 5 ->
     sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 1)) -∗
     dev_inv γd γv -∗ uart_rx_tok γd k hl -∗
@@ -418,7 +418,7 @@ Section WpSconfUartAccess.
   Proof.
     iIntros (Hrd Hrdok Haddr) "Hcg Hpc Hinstr #Hdinv Htok Hcont".
     assert (Haddr_all : forall hh : CpuId,
-              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = uart_pa 5)
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = uart_pa Uart0 5)
       by (intros hh; rewrite (src_ok_rget_indep m rs1 hh CID); exact Haddr).
     iApply (Uart.wp_lb_uart_s_sconf kt (CID:=CID) γd γv 5 pc false true rd rs1 imm
               m n (uart_rx_tok γd k hl)
@@ -433,7 +433,7 @@ Section WpSconfUartAccess.
       assert (Hne5 : (5 <> 0)%Z) by lia.
       destruct (uart_read_rx_stable u 5 bt u' (or_introl Hne5) Hread)
         as [Hrxe Hlbe].
-      iDestruct (uart_colE_stable γd u u' Hrxe Hlbe
+      iDestruct (uart_colE_stable Uart0 γd u u' Hrxe Hlbe
                 ltac:(exact (uart_read_wire _ _ _ _ Hread))
                 ltac:(exact (proj1 (proj2 (uart_read_stable _ _ _ _ Hread))))
                 with "Hcol") as "Hcol".
@@ -441,7 +441,7 @@ Section WpSconfUartAccess.
       destruct (uart_rx_ready u) eqn:Hdr.
       + assert (Hne : u_rx u <> []).
         { intro Hnil. rewrite /uart_rx_ready Hnil in Hdr. discriminate. }
-        iDestruct (uart_col_poll γd u k hl Hne with "Hcol Htok")
+        iDestruct (uart_col_poll Uart0 γd u k hl Hne with "Hcol Htok")
           as "(Hcol & Htok & #Hlb)".
         iModIntro. iSplitL "Hg"; [iExact "Hg"|].
         iSplitL "Hcol"; [iExact "Hcol"|].
@@ -467,7 +467,7 @@ Section WpSconfUartAccess.
       (b : bool) :
     uint rd <> 0 ->
     rd_ok rd ->
-    add_vec (rget m rs1) (sign_extend' 64 imm) = uart_pa 0 ->
+    add_vec (rget m rs1) (sign_extend' 64 imm) = uart_pa Uart0 0 ->
     sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 1)) -∗
     dev_inv γd γv -∗ uart_dlab_off γd -∗
@@ -483,19 +483,19 @@ Section WpSconfUartAccess.
          it filed before.  The token rides INSIDE the existential because
          its new anchor IS the popped history. *)
       (∃ h : list mobs,
-         ⌜ obs_ends_in h c ⌝ ∗ ⌜ ohist_ext hl h ⌝ ∗
+         ⌜ obs_ends_in Uart0 h c ⌝ ∗ ⌜ ohist_ext hl h ⌝ ∗
          riscv_rx_tag h ∗ obs_hist_lb h ∗ uart_rx_tok γd (S k) (Some h)) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hrdok Haddr) "Hcg Hpc Hinstr #Hdinv #Hdlab Htok #Hlb Hcont".
     assert (Haddr_all : forall hh : CpuId,
-              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = uart_pa 0)
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = uart_pa Uart0 0)
       by (intros hh; rewrite (src_ok_rget_indep m rs1 hh CID); exact Haddr).
     iApply (Uart.wp_lb_uart_s_sconf kt (CID:=CID) γd γv 0 pc false true rd rs1 imm
               m n (uart_rx_tok γd k hl)
               (fun c => ∃ h : list mobs,
-                 ⌜ obs_ends_in h c ⌝ ∗ ⌜ ohist_ext hl h ⌝ ∗
+                 ⌜ obs_ends_in Uart0 h c ⌝ ∗ ⌜ ohist_ext hl h ⌝ ∗
                  riscv_rx_tag h ∗ obs_hist_lb h ∗
                  uart_rx_tok γd (S k) (Some h))%I b p
               ltac:(unfold uart_size; lia) Hrd Hrdok
@@ -505,7 +505,7 @@ Section WpSconfUartAccess.
               with "Hcg Hpc Hinstr Hdinv Htok [] [Hcont]").
     - iIntros (u bt u') "%Hread Hg Hcol Htok".
       iDestruct (uart_ghosts_dlab_off with "Hdlab Hg") as %Hd.
-      iMod (uart_col_pop γd u u' k hl bt
+      iMod (uart_col_pop Uart0 γd u u' k hl bt
               ltac:(intros bb rx' Hrx;
                     exact (uart_read_rhr_pop u bb rx' bt u' Hd Hrx Hread))
               ltac:(exact (uart_read_wire _ _ _ _ Hread))
@@ -530,7 +530,7 @@ Section WpSconfUartAccess.
       (hl : option (list mobs)) (R S : iProp Σ)
       (b : bool) :
     let sb : mword 8 := autocast (T := mword) (subrange_vec_dec (rget m rs2) (Z.sub (Z.mul 1 8) 1) 0) in
-    add_vec (rget m rs1) (sign_extend' 64 imm) = uart_pa 2 ->
+    add_vec (rget m rs1) (sign_extend' 64 imm) = uart_pa Uart0 2 ->
     sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc false (STORE (imm, Regidx rs2, Regidx rs1, 1)) -∗
     dev_inv γd γv -∗ uart_rx_tok γd k hl -∗ R -∗
@@ -550,7 +550,7 @@ Section WpSconfUartAccess.
     intros sb.
     iIntros (Haddr) "Hcg Hpc Hinstr #Hdinv Htok HR Hstep Hcont".
     assert (Haddr_all : forall hh : CpuId,
-              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = uart_pa 2)
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = uart_pa Uart0 2)
       by (intros hh; rewrite (src_ok_rget_indep m rs1 hh CID); exact Haddr).
     assert (Hsb_all : forall hh : CpuId, rget (CID := hh) m rs2 = rget (CID := CID) m rs2)
       by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
@@ -569,12 +569,12 @@ Section WpSconfUartAccess.
       destruct (uart_write_fcr_rx u sb u' Hwrite) as [Hrxe Hlbe].
       iMod ("Hstep" $! u u' with "[//] Hg HR") as "[Hg HS]".
       destruct (uart_fcr_clr_rx u sb) eqn:Hclr.
-      + iMod (uart_colE_flush γd u u' k hl Hrxe Hlbe
+      + iMod (uart_colE_flush Uart0 γd u u' k hl Hrxe Hlbe
                 ltac:(exact (uart_write_wire _ _ _ _ Hwrite))
                 ltac:(exact (uart_write_out _ _ _ _ Hwrite))
                 with "Hcol Htok") as "[Hcol Htok]".
         iModIntro. iFrame "Hg Hcol Htok HS".
-      + iDestruct (uart_colE_stable γd u u' Hrxe Hlbe
+      + iDestruct (uart_colE_stable Uart0 γd u u' Hrxe Hlbe
                 ltac:(exact (uart_write_wire _ _ _ _ Hwrite))
                 ltac:(exact (uart_write_out _ _ _ _ Hwrite))
                 with "Hcol") as "Hcol".

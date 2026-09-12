@@ -43,7 +43,7 @@
      [0 <= k < uint (e - r)], the slot [cons_slot r k] (the ring index of
      the byte at logical position [r + k], which is [(r + k) mod 128]
      because 128 divides 2^32) holds a tagged byte: [ts] has a [Some h]
-     there, [h] ends in an [ObsUartIn b], and [bs] has [cons_xlate b].
+     there, [h] ends in an [ObsUartIn Uart0 b], and [bs] has [cons_xlate b].
      [cons_xlate] is the ONE translation consoleintr applies before the
      store ([c = (c == '\r') ? '\n' : c]).  Slots outside the live range
      carry [None] or a stale [Some]; the row says nothing about them, and
@@ -99,7 +99,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes.
 Require Import RiscvPtsto RiscvExtras.
-Require Import RiscvLang ObsTrace.   (* [mobs], [obs_ends_in]: the tag column's vocabulary *)
+Require Import RiscvLang ObsTrace.   (* [mobs], [obs_ends_in Uart0]: the tag column's vocabulary *)
 Require Import VcGen.   (* [trunc32_unsigned]/[trunc32_sext]: the ring index's wrap *)
 Require Import WpLock.
 Require Export UartNames.   (* [uart_names]: the receive side's ghost names;
@@ -195,7 +195,7 @@ Definition cons_row (r e : mword 32) (bs : list (bv 8))
   forall k : Z, (0 <= k < bv_unsigned (sub_vec e r))%Z ->
     exists (h : list mobs) (b : bv 8),
       ts !! cons_slot r k = Some (Some h)
-      /\ obs_ends_in h b
+      /\ obs_ends_in Uart0 h b
       /\ bs !! cons_slot r k = Some (cons_xlate b).
 
 (* WHAT A CONSUMER OF THE RING CARRIES AWAY.  A copy-out run is keyed by a
@@ -209,7 +209,7 @@ Definition cons_tagged (bs : nat -> bv 8) (hs : list (list mobs)) (d : nat)
   length hs = d
   /\ forall j : nat, (j < d)%nat ->
        exists (h : list mobs) (b : bv 8),
-         hs !! j = Some h /\ obs_ends_in h b /\ bs j = cons_xlate b.
+         hs !! j = Some h /\ obs_ends_in Uart0 h b /\ bs j = cons_xlate b.
 
 Lemma cons_tagged_0 (bs : nat -> bv 8) : cons_tagged bs [] 0.
 Proof. split; [reflexivity | intros j Hj; exfalso; lia]. Qed.
@@ -267,7 +267,7 @@ Definition cons_stored (r w : mword 32) (n : nat)
        exists (h : list mobs) (b : bv 8),
          st !! (n + Z.to_nat k)%nat = Some (h, b)
          /\ ts !! cons_slot r k = Some (Some h)
-         /\ obs_ends_in h b
+         /\ obs_ends_in Uart0 h b
          /\ bs !! cons_slot r k = Some (cons_xlate b).
 
 Definition cons_pend (r w e : mword 32)
@@ -279,7 +279,7 @@ Definition cons_pend (r w e : mword 32)
          pd !! j = Some (h, b)
          /\ ts !! cons_slot r (bv_unsigned (sub_vec w r) + Z.of_nat j)
             = Some (Some h)
-         /\ obs_ends_in h b
+         /\ obs_ends_in Uart0 h b
          /\ bs !! cons_slot r (bv_unsigned (sub_vec w r) + Z.of_nat j)
             = Some (cons_xlate b).
 
@@ -307,7 +307,7 @@ Definition cons_window (l : list (list mobs * bv 8)) (n d : nat)
        exists (h : list mobs) (b : bv 8),
          l !! (n + j)%nat = Some (h, b)
          /\ hs !! j = Some h
-         /\ obs_ends_in h b
+         /\ obs_ends_in Uart0 h b
          /\ bs j = cons_xlate b.
 
 Lemma cons_window_0 (l : list (list mobs * bv 8)) (n : nat)
@@ -653,7 +653,7 @@ Lemma cons_row_push (r e : mword 32) (i : nat) (bs : list (bv 8))
      got its index out of [ct_ring_idx] never has to [subst] it through an
      Iris context *)
   i = cons_slot e 0 ->
-  obs_ends_in h b ->
+  obs_ends_in Uart0 h b ->
   cons_row r e bs ts ->
   cons_row r (add_vec e (mword_of_int 1 : mword 32))
     (<[i := cons_xlate b]> bs) (<[i := Some h]> ts).
@@ -787,7 +787,7 @@ Lemma cons_pend_push (r w e : mword 32) (pd : list (list mobs * bv 8))
   cons_ok r w e ->
   (bv_unsigned (sub_vec e r) < Z.of_nat INPUT_BUF_SIZE)%Z ->
   i = cons_slot e 0 ->
-  obs_ends_in h b ->
+  obs_ends_in Uart0 h b ->
   cons_pend r w e pd bs ts ->
   cons_pend r w (add_vec e (mword_of_int 1 : mword 32)) (pd ++ [(h, b)])
     (<[i := cons_xlate b]> bs) (<[i := Some h]> ts).
@@ -954,7 +954,7 @@ Lemma cons_window_snoc (l : list (list mobs * bv 8)) (n d : nat)
     (bs bs' : nat -> bv 8) (hs : list (list mobs))
     (h : list mobs) (b : bv 8) :
   cons_window l n d bs hs ->
-  obs_ends_in h b ->
+  obs_ends_in Uart0 h b ->
   (forall i : nat, (i < d)%nat -> bs' i = bs i) ->
   bs' d = cons_xlate b ->
   cons_window (l ++ [(h, b)])%list n (S d) bs' (hs ++ [h])%list.
@@ -1262,7 +1262,7 @@ Section ConsoleInv.
     (⌜dc = d⌝
      ∨ ⌜dc = (d + 1)%nat⌝ ∗
        ∃ (h : list mobs) (b : bv 8),
-         ⌜obs_ends_in h b⌝ ∗
+         ⌜obs_ends_in Uart0 h b⌝ ∗
          cons_stored_lb cn (sl ++ [(h, b)])%list ∗
          ⌜cons_chain (sl ++ [(h, b)])%list⌝ ∗
          riscv_rx_tag h ∗
@@ -1623,7 +1623,7 @@ Section ConsoleInv.
      main spends on [cons_cred_inv_alloc]).
 
      [cn_uart] is NOT allocated here.  Its [un_rxhi] pair is minted with the
-     UART's ghosts ([WpUart.uart_ghosts_alloc]), one half for the PLIC
+     UART's ghosts ([WpUart.uart_ghosts_alloc Uart0]), one half for the PLIC
      payload beside the receive token and one for the ring, and this
      allocation takes the ring's half as its input -- which is exactly why
      the ring's names record carries the uart's rather than a copy. *)

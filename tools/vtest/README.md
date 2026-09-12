@@ -32,6 +32,8 @@ Every knob defaults, so most cases declare nothing:
 | `tick=` | `0` | step the CLOCK-TICKING branch of the boundary's `exists tick : bool` |
 | `selfmod=` | `0` | the program writes its OWN TEXT.  A board repeat reloads the image only when it changes (`board.py`), so without this a repeat of a self-modifying program observes the previous run's patched code -- measured on `core_icache`: repeats 2 and 3 warmed up on the already-patched probe and looked like a coherent fetch.  QEMU starts afresh every run. |
 | `proj=` | `whole` | what is compared.  `fields:o1,o2,…` for a case some of whose fields legitimately differ between two runs of the SAME machine -- counters, a raw `mtime`, an image-dependent `mtvec`, the hart id. |
+| `uarts=` | `1` | HOW MANY 16550s THE MACHINE HAS.  QEMU virt instantiates its second ns16550a -- `abi.h`'s `UART1`, 0x1000a000, PLIC source 12 -- only when a SECOND `-serial` backend is attached, so a case that touches the second window has to ask for it.  With `uarts=1` the command line is byte-for-byte what it always was and the second node is absent from the device tree, which is why no existing capture moved. |
+| `serial_in=` / `serial1_in=` | empty | the bytes the host types, at port 0 and at port 1.  Either one turns THAT port's backend into a socket the runner pushes into; the other stays an output file.  On the model side these are `VSched.SUartRx i b` items, TAGGED WITH THE PORT, and the run's `uart_input` is the list of `(port, byte)` pairs the theorem pins the trace against. |
 
 **There is no runner-side skip list.**  A profile that excluded an area
 would be hiding a fact about a case inside a fact about a machine, and the
@@ -264,6 +266,35 @@ entry would be 0 either way.  It is also the only place the MODEL's trap
 machinery runs in `core_csrprobe`, since the model refuses none of the 36,
 so it is what establishes that the model takes the trap, runs the handler and
 returns through `mret` correctly.
+
+## Two UARTs
+
+The machine has two 16550s (`DevModel.uart_id`), and every observation
+channel is indexed by port: `serial_of` and a run's `o_uart` are one wire
+per port in `enum uart_id` order, and **the wire claim is TOTAL** -- it says
+what BOTH wires hold, so a byte the model puts on the wrong port is a
+violation and not something nobody looked at.  A one-port case therefore
+still pins port 1's wire as empty, and `o_serial1` is emitted for every run.
+
+The second port exists on QEMU virt **only with a second `-serial`
+backend**, so a `uart1_` case declares `platforms=qemu uarts=2`.  THE MODEL
+ALWAYS HAS BOTH -- `uarts=` is a fact about the machine QEMU builds, not
+about `DevModel` -- so a one-port case runs against a model whose second
+port simply never moves, and the only thing that would diverge is a
+`uarts=1` program that touched `0x1000a000`: the model would answer it and
+the machine would fault.  Nothing does.  It is not
+on the board profile at all (finding 30: that machine's UART is a different
+chip), and `platforms=qemu` there is the usual statement that the question
+cannot be ASKED on the other machine, not that it fails.
+
+`uart1_both` is the case only a two-port machine can ask: it transmits two
+different strings byte-by-byte alternating between the ports, gives the two
+ports different scratch bytes and different MCRs, enables the FIFOs on one
+and reads the other's ISR, and enables the THRE interrupt in one IER and
+reads both ISRs.  Every other `uart` case would pass against a model with
+ONE `uart_state` aliased at both windows.  `uart1_irq` is the routing:
+port 1's line reaches the PLIC on **source 12**, is not delivered while only
+source 10 is enabled, and the claim hands back 12.
 
 ## Observation channels
 
@@ -895,6 +926,15 @@ have been wrong and is not.
   backing file by the time its process exits, so the raw-file diff is a sound
   channel -- and the model's `v_disk` agrees with it byte for byte, including
   on a multi-sector (8-sector) request.
+- **THE TWO PORTS ARE TWO DEVICES** (`uart1_both`, `uart1_tx`, `uart1_regs`,
+  `uart1_rx`, `uart1_irq`): the second window has its own register file
+  (scratch, MCR, IER, FCR/ISR and the THRE latch all answer per port), its
+  own transmit and receive FIFOs, its own wire -- two interleaved strings
+  came back on the two backends with nothing crossed -- and its own PLIC
+  source.  `uart1_irq` pins the routing in both directions: with only
+  source 10 enabled port 1's still-asserted level is NOT delivered (SEIP
+  stays clear, the claim returns 0, the source stays pending), and enabling
+  source 12 delivers the same request and the claim returns **12**.
 - **The UART transmit path end to end** (`uart_tx`, `uart_dlab`, `uart_regs`):
   `uart_write` at offset 0 -> `uart_tx_pop` -> `u_wire` is exactly the byte
   sequence the host received, in order, nothing lost or duplicated; `uart_lsr`

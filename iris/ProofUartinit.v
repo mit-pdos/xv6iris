@@ -17,7 +17,7 @@
    THE SEVEN STORES RUN UNDER THE TIME-0 UART INVARIANT.  The UART thread is a
    top-level thread from step 0, so [uart_frag] can never sit raw in a CPU's
    precondition; each store therefore goes through the invariant-borrowing
-   accessor leaf [Uart.wp_sb_uart_uinv_s_sconf], which opens [uart_inv] across
+   accessor leaf [Uart.wp_sb_uart_uinv_s_sconf], which opens [uart_inv Uart0] across
    its own step and asks the caller for a GHOST STEP -- a wand that, given the
    [uart_write] equation and the invariant's four ghost halves at [u], returns
    them at [u'].  What travels through those wands is the pair the caller
@@ -40,7 +40,7 @@
    After the final LCR write the caller half is at [false], so
    [uart_dlab_freeze] mints the persistent [uart_dlab_off] -- uartinit's
    output, and the reason the freeze no longer lives in
-   [uart_ghosts_alloc].
+   [uart_ghosts_alloc Uart0].
 
    The call itself is ProofConsoleinit's idiom for [cons.lock]: the "uart"
    string resource comes out of [kernel_data] with [kernel_data_string], the
@@ -233,7 +233,7 @@ Section ProofUartinit.
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     set (R3 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (luival (mword_of_int 0x10000 : mword 20))]> R2).
-    assert (HR3a5 : R3 !!! Regidx (mword_of_int 15 : mword 5) = uart_pa 0)
+    assert (HR3a5 : R3 !!! Regidx (mword_of_int 15 : mword 5) = uart_pa Uart0 0)
       by (rewrite /R3 upd_eq; unfold uart_pa, uart_base; apply bv_eq; vm_compute; reflexivity).
     assert (HR3x0 : R3 !!! Regidx (mword_of_int 0 : mword 5) = zero_reg).
     { rewrite /R3 upd_ne; [| vm_compute; discriminate].
@@ -261,7 +261,7 @@ Section ProofUartinit.
       iModIntro. iSplitL "Hg";
         [ iApply (uart_ghosts_stable γd uu uu' Ha Ho Hdb with "Hg") |].
       iSplitL "Hcol";
-        [ iApply (uart_colE_stable γd uu uu' Hrxe Hlbe
+        [ iApply (uart_colE_stable Uart0 γd uu uu' Hrxe Hlbe
              ltac:(exact (uart_write_wire _ _ _ _ Hw)) Ho with "Hcol")
         | iFrame "Ht Hd" ]. }
     iApply wp_next_off_intro.
@@ -276,7 +276,7 @@ Section ProofUartinit.
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     set (R4 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (luival (mword_of_int 0x10000 : mword 20))]> R3).
-    assert (HR4a4 : R4 !!! Regidx (mword_of_int 14 : mword 5) = uart_pa 0)
+    assert (HR4a4 : R4 !!! Regidx (mword_of_int 14 : mword 5) = uart_pa Uart0 0)
       by (rewrite /R4 upd_eq; unfold uart_pa, uart_base; apply bv_eq; vm_compute; reflexivity).
     assert (HR4x0 : R4 !!! Regidx (mword_of_int 0 : mword 5) = zero_reg)
       by (rewrite /R4 upd_ne; [exact HR3x0 | vm_compute; discriminate]).
@@ -290,7 +290,7 @@ Section ProofUartinit.
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     set (R5 := <[Regidx (mword_of_int 13 : mword 5) := regval_into_reg (add_vec (rget R4 (mword_of_int 0 : mword 5)) (sign_extend' 64 (mword_of_int 3968 : mword 12)))]> R4).
-    assert (HR5a4 : R5 !!! Regidx (mword_of_int 14 : mword 5) = uart_pa 0)
+    assert (HR5a4 : R5 !!! Regidx (mword_of_int 14 : mword 5) = uart_pa Uart0 0)
       by (rewrite /R5 upd_ne; [exact HR4a4 | vm_compute; discriminate]).
     assert (Hpp18 : add_vec_int (mword_of_int (KernelSyms.uartinit + 0x14) : mword 64) 4 = mword_of_int (KernelSyms.uartinit + 0x18)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp18) in "Hpc".
@@ -320,7 +320,7 @@ Section ProofUartinit.
       iEval (rewrite Hdt) in "Hd'".
       iModIntro. iSplitL "Hg'"; [ iExact "Hg'" |].
       iSplitL "Hcol";
-        [ iApply (uart_colE_stable γd uu uu' Hrxe Hlbe
+        [ iApply (uart_colE_stable Uart0 γd uu uu' Hrxe Hlbe
              ltac:(exact (uart_write_wire _ _ _ _ Hw)) Ho with "Hcol")
         | iFrame "Ht Hd'" ]. }
     iApply wp_next_off_intro.
@@ -345,14 +345,14 @@ Section ProofUartinit.
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     set (R7 := <[Regidx (mword_of_int 12 : mword 5) := regval_into_reg (luival (mword_of_int 0x10000 : mword 20))]> R6).
-    assert (HR7a2 : R7 !!! Regidx (mword_of_int 12 : mword 5) = uart_pa 0)
+    assert (HR7a2 : R7 !!! Regidx (mword_of_int 12 : mword 5) = uart_pa Uart0 0)
       by (rewrite /R7 upd_eq; unfold uart_pa, uart_base; apply bv_eq; vm_compute; reflexivity).
-    assert (HR7a5 : R7 !!! Regidx (mword_of_int 15 : mword 5) = uart_pa 0).
+    assert (HR7a5 : R7 !!! Regidx (mword_of_int 15 : mword 5) = uart_pa Uart0 0).
     { rewrite /R7 upd_ne; [| vm_compute; discriminate].
       rewrite /R6 upd_ne; [| vm_compute; discriminate].
       rewrite /R5 upd_ne; [| vm_compute; discriminate].
       rewrite /R4 upd_ne; [exact HR3a5 | vm_compute; discriminate]. }
-    assert (HR7a4 : R7 !!! Regidx (mword_of_int 14 : mword 5) = uart_pa 0).
+    assert (HR7a4 : R7 !!! Regidx (mword_of_int 14 : mword 5) = uart_pa Uart0 0).
     { rewrite /R7 upd_ne; [| vm_compute; discriminate].
       rewrite /R6 upd_ne; [| vm_compute; discriminate].
       rewrite /R5 upd_ne; [exact HR4a4 | vm_compute; discriminate]. }
@@ -387,7 +387,7 @@ Section ProofUartinit.
       iModIntro. iSplitL "Hg";
         [ iApply (uart_ghosts_stable γd uu uu' Ha Ho Hdb with "Hg") |].
       iSplitL "Hcol";
-        [ iApply (uart_colE_stable γd uu uu' Hrxe Hlbe
+        [ iApply (uart_colE_stable Uart0 γd uu uu' Hrxe Hlbe
              ltac:(exact (uart_write_wire _ _ _ _ Hw)) Ho with "Hcol")
         | iFrame "Ht Hd" ]. }
     iApply wp_next_off_intro.
@@ -413,7 +413,7 @@ Section ProofUartinit.
       iModIntro. iSplitL "Hg";
         [ iApply (uart_ghosts_stable γd uu uu' Ha Ho Hdb with "Hg") |].
       iSplitL "Hcol";
-        [ iApply (uart_colE_stable γd uu uu' Hrxe Hlbe
+        [ iApply (uart_colE_stable Uart0 γd uu uu' Hrxe Hlbe
              ltac:(exact (uart_write_wire _ _ _ _ Hw)) Ho with "Hcol")
         | iFrame "Ht Hd" ]. }
     iApply wp_next_off_intro.
@@ -445,7 +445,7 @@ Section ProofUartinit.
       iEval (rewrite Hdt) in "Hd'".
       iModIntro. iSplitL "Hg'"; [ iExact "Hg'" |].
       iSplitL "Hcol";
-        [ iApply (uart_colE_stable γd uu uu' Hrxe Hlbe
+        [ iApply (uart_colE_stable Uart0 γd uu uu' Hrxe Hlbe
              ltac:(exact (uart_write_wire _ _ _ _ Hw)) Ho with "Hcol")
         | iFrame "Ht Hd'" ]. }
     iApply wp_next_off_intro.
@@ -460,7 +460,7 @@ Section ProofUartinit.
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     set (R8 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (add_vec zero_reg (rget R7 (mword_of_int 12 : mword 5)))]> R7).
-    assert (HR8a4 : R8 !!! Regidx (mword_of_int 14 : mword 5) = uart_pa 0).
+    assert (HR8a4 : R8 !!! Regidx (mword_of_int 14 : mword 5) = uart_pa Uart0 0).
     { rewrite /R8 upd_eq. rgne. rewrite HR7a2. apply bv_eq; vm_compute; reflexivity. }
     assert (Hpp30 : add_vec_int (mword_of_int (KernelSyms.uartinit + 0x2e) : mword 64) 2 = mword_of_int (KernelSyms.uartinit + 0x30)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp30) in "Hpc".
@@ -472,9 +472,9 @@ Section ProofUartinit.
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     set (R9 := <[Regidx (mword_of_int 12 : mword 5) := regval_into_reg (mword_of_int 7 : mword 64)]> R8).
-    assert (HR9a4 : R9 !!! Regidx (mword_of_int 14 : mword 5) = uart_pa 0)
+    assert (HR9a4 : R9 !!! Regidx (mword_of_int 14 : mword 5) = uart_pa Uart0 0)
       by (rewrite /R9 upd_ne; [exact HR8a4 | vm_compute; discriminate]).
-    assert (HR9a5 : R9 !!! Regidx (mword_of_int 15 : mword 5) = uart_pa 0).
+    assert (HR9a5 : R9 !!! Regidx (mword_of_int 15 : mword 5) = uart_pa Uart0 0).
     { rewrite /R9 upd_ne; [| vm_compute; discriminate].
       rewrite /R8 upd_ne; [exact HR7a5 | vm_compute; discriminate]. }
     assert (HR9a2 : R9 !!! Regidx (mword_of_int 12 : mword 5) = mword_of_int 7)
@@ -514,13 +514,13 @@ Section ProofUartinit.
       match type of Hrxe with
       | u_rx uu' = (if ?cl then [] else _) => destruct cl eqn:Hclr
       end.
-      + iMod (uart_colE_flush γd uu uu' k hl Hrxe Hlbe
+      + iMod (uart_colE_flush Uart0 γd uu uu' k hl Hrxe Hlbe
                 ltac:(exact (uart_write_wire _ _ _ _ Hw)) Ho with "Hcol Htok")
           as "[Hcol Htok]".
         iModIntro. iSplitL "Hg";
           [ iApply (uart_ghosts_stable γd uu uu' Ha Ho Hdb with "Hg") |].
         iFrame "Hcol Ht Hd Htok".
-      + iDestruct (uart_colE_stable γd uu uu' Hrxe Hlbe
+      + iDestruct (uart_colE_stable Uart0 γd uu uu' Hrxe Hlbe
              ltac:(exact (uart_write_wire _ _ _ _ Hw)) Ho with "Hcol") as "Hcol".
         iModIntro. iSplitL "Hg";
           [ iApply (uart_ghosts_stable γd uu uu' Ha Ho Hdb with "Hg") |].
@@ -549,7 +549,7 @@ Section ProofUartinit.
       iModIntro. iSplitL "Hg";
         [ iApply (uart_ghosts_stable γd uu uu' Ha Ho Hdb with "Hg") |].
       iSplitL "Hcol";
-        [ iApply (uart_colE_stable γd uu uu' Hrxe Hlbe
+        [ iApply (uart_colE_stable Uart0 γd uu uu' Hrxe Hlbe
              ltac:(exact (uart_write_wire _ _ _ _ Hw)) Ho with "Hcol")
         | iFrame "Ht Hd" ]. }
     iApply wp_next_off_intro.

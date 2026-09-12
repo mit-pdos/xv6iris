@@ -62,7 +62,7 @@
 From Stdlib Require Import ZArith Lia List String.
 From stdpp Require Import list bitvector.definitions.
 Require Import RiscvLang.        (* [mobs] *)
-Require Import ObsTrace.         (* [obs_wire], [cycles_of], [trace_shape] *)
+Require Import ObsTrace.         (* [obs_wire Uart0], [cycles_of], [trace_shape] *)
 Require Import RiscvPtsto.       (* [string_bytes] *)
 (* ssreflect's [rewrite] (the [/def] fold, the multi-rule form) is what this
    file's proofs are written in; a pure file does not get it from the
@@ -266,14 +266,14 @@ Proof. apply (bool_decide_unpack _). vm_compute. exact I. Qed.
 
 (* the INPUT bytes of an observation list, in order *)
 Definition ins (h : list mobs) : list (bv 8) :=
-  omap (fun e => match e with ObsUartIn b => Some b | _ => None end) h.
+  omap (fun e => match e with ObsUartIn Uart0 b => Some b | _ => None end) h.
 
 Lemma ins_app (h k : list mobs) : ins (h ++ k) = ins h ++ ins k.
 Proof. by rewrite /ins omap_app. Qed.
 
-Lemma ins_in (b : bv 8) : ins [ObsUartIn b] = [b].
+Lemma ins_in (b : bv 8) : ins [ObsUartIn Uart0 b] = [b].
 Proof. reflexivity. Qed.
-Lemma ins_out (b : bv 8) : ins [ObsUartOut b] = [].
+Lemma ins_out (b : bv 8) : ins [ObsUartOut Uart0 b] = [].
 Proof. reflexivity. Qed.
 
 (* [l] IS A PREFIX OF [pat]^*, spelled so that it is decidable by one
@@ -327,7 +327,7 @@ Lemma disc_seg_nil : disc_seg [].
 Proof. exact (star_prefix_nil _). Qed.
 
 Lemma disc_seg_out (seg : list mobs) (b : bv 8) :
-  disc_seg (seg ++ [ObsUartOut b]) <-> disc_seg seg.
+  disc_seg (seg ++ [ObsUartOut Uart0 b]) <-> disc_seg seg.
 Proof. rewrite /disc_seg ins_app ins_out app_nil_r. done. Qed.
 
 (* THE LANDED WHOLE-HISTORY PREDICATE, kept under its own name: everything
@@ -664,27 +664,47 @@ Qed.
 
 (* the wire the user had seen when each input byte was typed: [in_pres seg]
    lists, in order, the prefix of [seg] STRICTLY BEFORE its i-th
-   [ObsUartIn]. *)
+   [ObsUartIn Uart0]. *)
 Fixpoint in_pres (seg : list mobs) : list (list mobs) :=
   match seg with
   | [] => []
-  | ObsUartIn b :: seg' => [] :: ((fun p => ObsUartIn b :: p) <$> in_pres seg')
+  | ObsUartIn Uart0 b :: seg' => [] :: ((fun p => ObsUartIn Uart0 b :: p) <$> in_pres seg')
   | e :: seg' => (fun p => e :: p) <$> in_pres seg'
   end.
 
 Lemma in_pres_length seg : length (in_pres seg) = length (ins seg).
 Proof.
   induction seg as [|e seg IH]; [done|].
-  destruct e; cbn; rewrite ?length_fmap IH //.
+  destruct e as [[] ?|[] ?| |]; cbn; rewrite ?length_fmap IH //.
 Qed.
 
-Lemma in_pres_out seg b : in_pres (seg ++ [ObsUartOut b]) = in_pres seg.
-Proof. induction seg as [|e seg IH]; [done|]. destruct e; cbn; rewrite IH //. Qed.
+(* AN EVENT THAT IS NOT A CONSOLE INPUT IS INVISIBLE TO THE DISCIPLINE.
+   The machine has two 16550s and the discipline reads ONE of them -- the
+   console's input side and the console's wire -- so an output byte, and
+   ANY event of the other port, leaves both [ins] and [in_pres] alone.
+   Before the second port existed this was only "an output byte"; it is the
+   same fact with the same proof, at the right generality. *)
+Definition not_cons_in (e : mobs) : Prop :=
+  match e with ObsUartIn Uart0 _ => False | _ => True end.
 
-Lemma in_pres_in seg b : in_pres (seg ++ [ObsUartIn b]) = in_pres seg ++ [seg].
+Lemma ins_snoc_other e : not_cons_in e -> ins [e] = [].
+Proof. destruct e as [[] ?|[] ?| |]; cbn; done. Qed.
+
+Lemma in_pres_snoc_other seg e :
+  not_cons_in e -> in_pres (seg ++ [e]) = in_pres seg.
+Proof.
+  intro He. induction seg as [|x seg IH].
+  - destruct e as [[] ?|[] ?| |]; cbn in He |- *; done.
+  - destruct x as [[] ?|[] ?| |]; cbn; rewrite IH //.
+Qed.
+
+Lemma in_pres_out seg i b : in_pres (seg ++ [ObsUartOut i b]) = in_pres seg.
+Proof. apply in_pres_snoc_other. by destruct i. Qed.
+
+Lemma in_pres_in seg b : in_pres (seg ++ [ObsUartIn Uart0 b]) = in_pres seg ++ [seg].
 Proof.
   induction seg as [|e seg IH]; [done|].
-  destruct e; cbn; rewrite IH ?fmap_app //.
+  destruct e as [[] ?|[] ?| |]; cbn; rewrite IH ?fmap_app //.
 Qed.
 
 (* ---- THE PROLOGUE'S TAIL.  [init]'s banner and sh's first prompt are U
@@ -784,19 +804,19 @@ Qed.
    microseconds while sh's prompt follows the disk I/O of two [exec]s, so
    the first is the real case. *)
 Definition disc_pt (cs : list nat) (i : nat) (p : list mobs) : Prop :=
-  k_done (obs_wire p)
+  k_done (obs_wire Uart0 p)
   /\ exists t : list (bv 8),
        t `suffix_of` u_prologue /\ sb "$ "%string `suffix_of` t
        /\ (t ++ drop (length u_prologue) (sess_n cs i))
-            `prefix_of` drop (k_pt (obs_wire p)) (obs_wire p).
+            `prefix_of` drop (k_pt (obs_wire Uart0 p)) (obs_wire Uart0 p).
 
 Global Instance disc_pt_dec cs i p : Decision (disc_pt cs i p).
 Proof.
   rewrite /disc_pt.
-  destruct (decide (k_done (obs_wire p))) as [Hk|Hk]; [|right; by intros [? _]].
+  destruct (decide (k_done (obs_wire Uart0 p))) as [Hk|Hk]; [|right; by intros [? _]].
   destruct (decide (Exists
               (fun t => (t ++ drop (length u_prologue) (sess_n cs i))
-                          `prefix_of` drop (k_pt (obs_wire p)) (obs_wire p))
+                          `prefix_of` drop (k_pt (obs_wire Uart0 p)) (obs_wire Uart0 p))
               prompt_tails)) as [HE|HE].
   - left. split; [exact Hk|].
     apply Exists_exists in HE as (t & Ht & Hp).
@@ -931,7 +951,7 @@ Definition demo_wire : list (bv 8) :=
   msg_nl ++ msg_booting ++ msg_nl ++ concat hart_lines ++ u_prologue.
 
 Definition demo_seg : list mobs :=
-  ((fun b => ObsUartOut b) <$> demo_wire) ++ [ObsUartIn (Z_to_bv 8 101%Z)].
+  ((fun b => ObsUartOut Uart0 b) <$> demo_wire) ++ [ObsUartIn Uart0 (Z_to_bv 8 101%Z)].
 
 Lemma demo_disc_seg' : disc_seg' demo_seg.
 Proof. apply (bool_decide_unpack _). vm_compute. exact I. Qed.
@@ -956,25 +976,41 @@ Qed.
 
 (* ---- the three closure laws, at the SAME statements they had ---- *)
 
-Lemma disc_seg'_out (seg : list mobs) (b : bv 8) :
-  disc_seg' (seg ++ [ObsUartOut b]) <-> disc_seg' seg.
+Lemma disc_seg'_other (seg : list mobs) (e : mobs) :
+  not_cons_in e -> disc_seg' (seg ++ [e]) <-> disc_seg' seg.
 Proof.
-  assert (Hi : in_pres (seg ++ [ObsUartOut b]) = in_pres seg)
-    by apply in_pres_out.
-  assert (Hn : ins (seg ++ [ObsUartOut b]) = ins seg)
-    by (rewrite ins_app ins_out app_nil_r; reflexivity).
+  intro He.
+  assert (Hi : in_pres (seg ++ [e]) = in_pres seg)
+    by (by apply in_pres_snoc_other).
+  assert (Hn : ins (seg ++ [e]) = ins seg)
+    by (rewrite ins_app (ins_snoc_other e He) app_nil_r; reflexivity).
   rewrite /disc_seg' /disc_seg Hi Hn. done.
 Qed.
 
-Lemma disc_out (h : list mobs) (b : bv 8) :
+(* ...hence the closure law, at every I/O event the discipline cannot see:
+   an output on either port, and an INPUT ON THE OTHER PORT.  The second is
+   what a two-UART machine forces -- the environment may type on the
+   kernel's port at any moment and the echo claim has to survive it. *)
+Lemma disc_other (h : list mobs) (e : mobs) :
+  is_io e = true -> not_cons_in e ->
   trace_shape h true ->
-  disc (h ++ [ObsUartOut b]) <-> disc h.
+  disc (h ++ [e]) <-> disc h.
 Proof.
-  intros Hsh.
-  destruct (cycles_of_io h [ObsUartOut b] Hsh) as (cs & Hc & Hc');
+  intros Hio He Hsh.
+  destruct (cycles_of_io h [e] Hsh) as (cs & Hc & Hc');
     [by constructor|].
-  rewrite /disc Hc Hc' !Forall_app !Forall_singleton disc_seg'_out. done.
+  rewrite /disc Hc Hc' !Forall_app !Forall_singleton
+          (disc_seg'_other _ _ He). done.
 Qed.
+
+Lemma disc_seg'_out (seg : list mobs) (i : uart_id) (b : bv 8) :
+  disc_seg' (seg ++ [ObsUartOut i b]) <-> disc_seg' seg.
+Proof. apply disc_seg'_other. by destruct i. Qed.
+
+Lemma disc_out (h : list mobs) (i : uart_id) (b : bv 8) :
+  trace_shape h true ->
+  disc (h ++ [ObsUartOut i b]) <-> disc h.
+Proof. intro Hsh. apply disc_other; [by destruct i|by destruct i|exact Hsh]. Qed.
 
 Lemma disc_power (h : list mobs) (on : bool) :
   disc (h ++ [if on then ObsPowerOff else ObsPowerOn]) <-> disc h.
@@ -1006,7 +1042,7 @@ Proof.
 Qed.
 
 Lemma disc_seg'_in (seg : list mobs) (b : bv 8) :
-  disc_seg' (seg ++ [ObsUartIn b]) -> disc_seg' seg.
+  disc_seg' (seg ++ [ObsUartIn Uart0 b]) -> disc_seg' seg.
 Proof.
   intros [Hd (cs & Hl & Hf & Hall)].
   rewrite /disc_seg ins_app ins_in in Hd.
@@ -1022,7 +1058,7 @@ Proof.
   intros i p Hi.
   assert (Hlt : i < length (ins seg)).
   { apply lookup_lt_Some in Hi. by rewrite in_pres_length in Hi. }
-  assert (Hi' : in_pres (seg ++ [ObsUartIn b]) !! i = Some p).
+  assert (Hi' : in_pres (seg ++ [ObsUartIn Uart0 b]) !! i = Some p).
   { rewrite in_pres_in lookup_app_l; [exact Hi|].
     rewrite in_pres_length. lia. }
   destruct (Hall i p Hi') as [Hk Hpre].
@@ -1033,10 +1069,10 @@ Qed.
 
 Lemma disc_in (h : list mobs) (b : bv 8) :
   trace_shape h true ->
-  disc (h ++ [ObsUartIn b]) -> disc h.
+  disc (h ++ [ObsUartIn Uart0 b]) -> disc h.
 Proof.
   intros Hsh.
-  destruct (cycles_of_io h [ObsUartIn b] Hsh) as (cs & Hc & Hc');
+  destruct (cycles_of_io h [ObsUartIn Uart0 b] Hsh) as (cs & Hc & Hc');
     [by constructor|].
   rewrite /disc Hc Hc' !Forall_app !Forall_singleton.
   intros [Hall Hseg]. split; [exact Hall|]. exact (disc_seg'_in _ _ Hseg).
@@ -1080,7 +1116,7 @@ Definition boot_stream (ks : list (bv 8)) : Prop :=
    calls for. *)
 Definition good_out (seg : list mobs) : Prop :=
   exists (cs : list nat) (ks us : list (bv 8)),
-    shuffle ks us (obs_wire seg)
+    shuffle ks us (obs_wire Uart0 seg)
     /\ boot_stream ks
     /\ us `prefix_of` sess cs (ins seg).
 

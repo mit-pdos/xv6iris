@@ -43,7 +43,7 @@
    neither a hart nor a per-hart SIE ghost, it is persistent, and it is
    exactly what the [started] payload can carry to every secondary.
 
-   THE DEVICES.  The three device invariants ([WpUart.uart_inv] /
+   THE DEVICES.  The three device invariants ([WpUart.uart_inv Uart0] /
    [plic_inv] / [disk_inv], bundled as [dev_inv]) exist FROM TIME 0: they are
    allocated in adequacy, before any thread runs.  They have to be -- the UART,
    disk and PLIC threads are top-level threads of the system and each needs its

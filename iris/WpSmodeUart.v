@@ -458,11 +458,11 @@ Lemma uart_pmp_match1 (pmpaddr0 : mword 64) (off : Z) :
   (0 <= off < uart_size)%Z ->
   ram_base + ram_size <= uint pmpaddr0 * 4 ->
   pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint pmpaddr0) 4)
-    (uint (uart_pa off)) (uint (to_bits 64 1)) = PMP_Match.
+    (uint (uart_pa Uart0 off)) (uint (to_bits 64 1)) = PMP_Match.
 Proof.
   intros Hoff Hcov.
   assert (Hz : uint (zeros' 64 : mword 64) = 0) by (vm_compute; reflexivity).
   assert (Hw1 : uint (to_bits 64 1 : mword 64) = 1) by (vm_compute; reflexivity).
-  rewrite Hz Hw1. rewrite Z.mul_0_l. rewrite (uint_uart_pa off Hoff).
+  rewrite Hz Hw1. rewrite Z.mul_0_l. rewrite (uint_uart_pa Uart0 off Hoff).
   apply pmpRangeMatch_full; unfold ram_base, ram_size, uart_base, uart_size in *; lia.
 Qed.

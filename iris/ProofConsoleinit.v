@@ -19,7 +19,7 @@
    once and discharges eleven of the fourteen conjuncts.
 
    The device side is pure TRANSIT: consoleinit touches no MMIO itself, so
-   [uart_inv], the transmitter token/receipt pair at [l], the carried
+   [uart_inv Uart0], the transmitter token/receipt pair at [l], the carried
    [uart_out_lb], and the unfrozen DLAB half go straight into the uartinit
    call and its outputs (tokens at the same [l], plus the frozen
    [uart_dlab_off]) straight into consoleinit's own postcondition.

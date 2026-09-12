@@ -2465,15 +2465,28 @@ needed for the theorem (stopped; its pure rendering model may be kept on its
 branch); OUT-FUPD narrows to the CONSOLE UART: the application-fixed `out_ok`
 in the console UART's invariant, the store's view shift, the echo's Ψ fixed
 at boot through the console environment, the write path's Ψ from the process;
-printk stores to the kernel UART with no application justification.  NEEDS: a
-machine-model lane (second UART instance in DevModel/RiscvLang at its MMIO
-address, per-UART trace events or a per-UART wire, the device threads and
-adequacy), the kernel's own split (printk/panic → kernel UART; consputc/
-consoleintr/uartwrite → console UART), the re-dumped ELF/symbols and the
-re-proved touched functions, then a DISC-SIMPLIFY lane in EchoDisc.
-OPEN QUESTIONS for the owner: (a) who does the Rocq machine-model change and
-when; (b) which UART gets which role and MMIO address; (c) confirm the kernel
-UART is unconstrained by the theorem.
+printk stores to the kernel UART with no application justification.
+
+THE MACHINE-MODEL LANE IS DONE (`design/device.md`): the model has two 16550s
+indexed by `DevModel.uart_id`, `Uart0` at 0x1000_0000 / PLIC source 10 and
+`Uart1` at 0x1000_a000 / source 12 (QEMU virt's own second serial port);
+`duart` is a function of the port, the I/O observations carry it
+(`ObsUartIn i b` / `ObsUartOut i b`), `obs_wf`'s wire tie is one equation per
+port, `power_fork` runs one UART thread per port, and adequacy allocates both
+ports' ghosts and invariants.  `App`'s `Htx`/`Hrx` are quantified over the
+port (the environment may type on either), with the era tie `fsc_uart = γ`
+conditional on `i = Uart0`; echo's other-port arms are `EchoDisc.disc_other`.
+The conformance suite covers the second port (`tools/vtest/tests/uart1_*.S`,
+`uarts=2`).
+
+STILL NEEDED for the owner's plan: the KERNEL's own split (printk/panic →
+kernel UART; consputc/consoleintr/uartwrite → console UART) with the
+`kvmmap` of the second port, the re-dumped ELF/symbols and the re-proved
+touched functions, then a DISC-SIMPLIFY lane in EchoDisc.  Note the S-mode
+UART access layer and every driver proof are at `Uart0` today because that
+is the only port `kvmmake` maps; UART1's vpn (`0x1000a`) shares the l1 slot
+and differs only in the l0 index and ppn, so that layer generalises over
+those two the day the kernel maps it.
 
 THE OWNER'S REDESIGN OF THE UART OUTPUT SIDE (2026-09-12).  "There will be
 some pure theorem about the raw bytes, tagless.  That theorem will apply to

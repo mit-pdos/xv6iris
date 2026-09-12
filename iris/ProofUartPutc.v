@@ -97,7 +97,7 @@ Section UartPutcMaps.
 
   (* the call-site register lookup the LSR-read leaf needs. *)
   Lemma ppc_f2_a4 (m : regfile) :
-    ppc_f2 m !!! Regidx (mword_of_int 14) = uart_pa 5.
+    ppc_f2 m !!! Regidx (mword_of_int 14) = uart_pa Uart0 5.
   Proof.
     unfold ppc_f2, ppc_f1. rewrite !upd_eq.
     apply bv_eq; vm_compute; reflexivity.
@@ -125,7 +125,7 @@ Section UartPutcMaps.
   Qed.
 
   Lemma ppc_f6'_a5 (m : regfile) (b : bv 8) :
-    ppc_f6' m b !!! Regidx (mword_of_int 15) = uart_pa 0.
+    ppc_f6' m b !!! Regidx (mword_of_int 15) = uart_pa Uart0 0.
   Proof.
     unfold ppc_f6'. rewrite upd_eq.
     apply bv_eq; vm_compute; reflexivity.
@@ -185,7 +185,7 @@ Section ProofUartPutc.
   (*  THE THRE POLL LOOP: 0x1e -> 0x28, run under [dev_inv] (Löb).        *)
   (* =================================================================== *)
   Lemma wp_uartputc_poll_sconf `{CID0 : CpuId} (γd : uart_names) (γv : disk_names) (mentry : regfile) (n : nat) (l : list (bv 8)) (b : bool) (p : mword 64) :
-    mentry !!! Regidx (mword_of_int 14) = uart_pa 5 ->
+    mentry !!! Regidx (mword_of_int 14) = uart_pa Uart0 5 ->
     sie_cap_gpr kt mentry n b p -∗ kernel_text -∗
     pc_is (mword_of_int (KernelSyms.uartputc_sync + 0x1e)) -∗
     dev_inv γd γv -∗ uart_tx_own γd l -∗
@@ -206,7 +206,7 @@ Section ProofUartPutc.
                      (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 252 : mword 8) ('b"0"))))
                    = mword_of_int (KernelSyms.uartputc_sync + 0x1e)) by (apply bv_eq; vm_compute; reflexivity).
     iAssert (∀ (CID1 : CpuId) (m : regfile),
-      ⌜ m !!! Regidx (mword_of_int 14) = uart_pa 5 ⌝ -∗
+      ⌜ m !!! Regidx (mword_of_int 14) = uart_pa Uart0 5 ⌝ -∗
       ⌜ forall Y, <[Regidx (mword_of_int 15) := Y]> m
                 = <[Regidx (mword_of_int 15) := Y]> mentry ⌝ -∗
       sie_cap_gpr kt m n b p -∗ pc_is (mword_of_int (KernelSyms.uartputc_sync + 0x1e)) -∗ uart_tx_own γd l -∗

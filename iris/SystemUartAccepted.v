@@ -2,8 +2,10 @@
 
    [UartAccepted.run_out_accepted] is the pure tie: for every run of the
    machine from a powered-off, never-booted state, the current power
-   cycle's [ObsUartOut] projection is a SUBLIST of [uart_acc] -- the bytes
-   the kernel accepted into the UART.  This file states it beside the
+   cycle's [ObsUartOut Uart0] projection is a SUBLIST of the CONSOLE port's
+   [uart_acc] -- the bytes the kernel accepted into that UART.  The tie is
+   per PORT (the board has two 16550s); this file takes it at [Uart0],
+   which is the one xv6 drives.  This file states it beside the
    adequacy theorem's own conclusion at the xv6 image, which is where a
    reader of [claude-notes/completed/uart-trace.md] expects a trace property
    to be delivered: reducibility, the trace's shape ([ObsTrace.obs_wf]),
@@ -72,12 +74,12 @@ Corollary xv6_out_accepted_xv6Σ (g : gstate)
        KERNEL, IN ORDER.  [uart_acc] is exactly the list the campaign's
        receipts ([WpUart.uart_sent], [UartSentLoc.uart_sent_from]) are
        lower bounds of. *)
-    /\ obs_wire (open_seg κs) `sublist_of` uart_acc (duart g2.(gdev)).
+    /\ obs_wire Uart0 (open_seg κs) `sublist_of` uart_acc (duart g2.(gdev) Uart0).
 Proof.
   intros n κs t2 g2 Hns.
   destruct (xv6_obs_wf_xv6Σ g Hgen0 Hpow0 Hdisk n κs t2 g2 Hns) as [Hred Hwf].
   split_and!; [exact Hred | exact Hwf |].
-  exact (run_out_accepted n _ t2 g g2 κs Hpow0 Hgen0 Hns).
+  exact (run_out_accepted n _ t2 g g2 κs Uart0 Hpow0 Hgen0 Hns).
 Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -111,17 +113,17 @@ Corollary xv6_out_accepted_from_xv6Σ (g : gstate)
   forall (n : nat) (κs : list mobs) t2 g2,
     nsteps (Λ := riscv_lang) n ([PowerLoopE : expr riscv_lang], g) κs (t2, g2) ->
     forall tr0 bs : list (bv 8),
-      tr0 `prefix_of` uart_acc (duart g2.(gdev)) ->
-      bs `sublist_of` drop (length tr0) (uart_acc (duart g2.(gdev))) ->
+      tr0 `prefix_of` uart_acc (duart g2.(gdev) Uart0) ->
+      bs `sublist_of` drop (length tr0) (uart_acc (duart g2.(gdev) Uart0)) ->
       (forall e2, e2 ∈ t2 -> reducible (Λ := riscv_lang) e2 g2)
       /\ exists w1 w2,
-           obs_wire (open_seg κs) = w1 ++ w2
+           obs_wire Uart0 (open_seg κs) = w1 ++ w2
            /\ w1 `sublist_of` tr0
-           /\ w2 `sublist_of` drop (length tr0) (uart_acc (duart g2.(gdev)))
-           /\ bs `sublist_of` drop (length tr0) (uart_acc (duart g2.(gdev))).
+           /\ w2 `sublist_of` drop (length tr0) (uart_acc (duart g2.(gdev) Uart0))
+           /\ bs `sublist_of` drop (length tr0) (uart_acc (duart g2.(gdev) Uart0)).
 Proof.
   intros n κs t2 g2 Hns tr0 bs Hpre Hbs.
   destruct (xv6_obs_wf_xv6Σ g Hgen0 Hpow0 Hdisk n κs t2 g2 Hns) as [Hred _].
   split; [exact Hred|].
-  exact (run_out_accepted_from n _ t2 g g2 κs tr0 bs Hpow0 Hgen0 Hns Hpre Hbs).
+  exact (run_out_accepted_from n _ t2 g g2 κs Uart0 tr0 bs Hpow0 Hgen0 Hns Hpre Hbs).
 Qed.

@@ -64,7 +64,7 @@
    UART really delivered, in copy order, each with the application's
    persistent claim about the history it arrived at.
    [ConsoleInv.cons_tagged bs hs d] is the tie -- [hs !! j] ends in an
-   [ObsUartIn b] whose [ConsoleInv.cons_xlate b] IS the [j]th byte of the
+   [ObsUartIn Uart0 b] whose [ConsoleInv.cons_xlate b] IS the [j]th byte of the
    run -- and [[∗ list] h ∈ hs, riscv_rx_tag h] is the claim.  It comes
    out of the ring's coupling (ConsoleInv.v's header): the loop pops at
    [cons.r] while [cons.r != cons.w], so every byte it copies is inside

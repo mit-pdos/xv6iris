@@ -46,16 +46,17 @@ Import Defs.
 (* ===================================================================== *)
 
 (* The window order inside [dev_read]/[dev_write] is uart -> plic -> virtio,
-   so every virtio routing lemma has to step past the two earlier windows.
-   Both are refuted by the UPPER bound of the earlier window:
-     uart  = [0x10000000, 0x10000008)
-     plic  = [0x0c000000, 0x10000000)
-   and virtio starts at 0x10001000, above both. *)
+   so every virtio routing lemma has to step past the two earlier windows:
+     uart 0 = [0x10000000, 0x10000008)
+     plic   = [0x0c000000, 0x10000000)
+     uart 1 = [0x1000a000, 0x1000a008)
+   and virtio is [0x10001000, 0x10002000) -- in the GAP between the two
+   16550s, above the first port's eight bytes and below the second's base. *)
 Lemma in_uart_virtio_false (a : Z) :
-  virtio_base <= a < virtio_base + virtio_size -> in_uart a = false.
+  virtio_base <= a < virtio_base + virtio_size -> uart_decode a = None.
 Proof.
-  intros Hrange. unfold in_uart. apply andb_false_intro2. apply Z.ltb_ge.
-  unfold uart_base, uart_size, virtio_base, virtio_size in *. lia.
+  intros Hrange. unfold virtio_base, virtio_size in Hrange.
+  apply uart_decode_between; cbn [uart_base]; unfold uart_size; lia.
 Qed.
 
 Lemma in_plic_virtio_false (a : Z) :

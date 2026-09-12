@@ -61,7 +61,7 @@ Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
     assert (Ha8ea : a8 = ea)
       by (unfold a8; rewrite subrange_id sign_extend'_id; reflexivity).
     rewrite Ha8ea in Hcanon, Hvpn_def, Hpa.
-    assert (Heapa : ea = uart_pa off).
+    assert (Heapa : ea = uart_pa Uart0 off).
     { rewrite <- Hpa. change (0 * 1) with 0. rewrite avi0. symmetry.
       apply zero_extend'_id. }
     assert (Hdevvpn : kpt_dev_vpn (svpn_of ea)).
@@ -82,9 +82,9 @@ Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
       by (rewrite <- is_aligned_vaddr_paddr; unfold is_aligned_vaddr;
           rewrite Z.rem_1_r; reflexivity).
     assert (Hdcls : dev_cls 1 (pa_of (kpt_leaf_ppn (svpn_of ea)) ea)).
-    { rewrite Hpaid Heapa. split; [ exact (dev_addr_uart off Hoff) | ].
-      split; [ exact (uart_pa_not_in_clint off Hoff) | ].
-      exact (uart_pa_access_io off 1 Hoff (pma_width_ok 1 eq_refl eq_refl)). }
+    { rewrite Hpaid Heapa. split; [ exact (dev_addr_uart Uart0 off Hoff) | ].
+      split; [ exact (uart_pa_not_in_clint Uart0 off Hoff) | ].
+      exact (uart_pa_access_io Uart0 off 1 Hoff (pma_width_ok 1 eq_refl eq_refl)). }
     iIntros "Hcg Hpc #Hinstr #Huinv HR Hacc Hcont".
     iApply (wp_instr_s_sconf m n b b pc is_rvc
               (STORE (imm, Regidx rs2, Regidx rs1, 1))
@@ -221,18 +221,18 @@ Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
             iDestruct "Hdev" as "(Hua & Hpldev & Hvdev)".
             iInv "Huinv" as ">Hdbody" "Hdclose".
             iDestruct "Hdbody" as (u) "(Huf & Hg & Hcol)".
-            iDestruct (uart_agree with "Hua Huf") as %Hduart.
+            iDestruct (uarts_agree with "Hua Huf") as %Hduart.
             destruct (uart_write_total u off storebyte Hoff) as [u' Hwrite_u].
-            iMod (dev_interp_update_uart sigma.(mdev) u u'
+            iMod (dev_interp_update_uart sigma.(mdev) Uart0 u u'
                     with "[$Hua $Hpldev $Hvdev] Huf") as "[Hdev' Huf']".
             iMod ("Hacc" $! u u' with "[//] Hg Hcol HR") as "(Hg' & Hcol' & HS)".
             iMod ("Hdclose" with "[Huf' Hg' Hcol']") as "_".
             { iApply bi.later_intro. iExists u'. iFrame. }
             iMod (fupd_mask_subseteq ∅) as "Hb2"; [set_solver|].
-            iModIntro. iExists (set_duart sigma.(mdev) u').
+            iModIntro. iExists (set_duart sigma.(mdev) Uart0 u').
             iSplitR.
             { iPureIntro. rewrite Hpaid Heapa.
-              apply (dev_write_uart sigma.(mdev) off storebyte u' Hoff).
+              apply (dev_write_uart Uart0 sigma.(mdev) off storebyte u' Hoff).
               rewrite <- Hduart. exact Hwrite_u. }
             iApply bi.later_intro. iMod "Hb2" as "_". iModIntro.
             iFrame "Hreg Hmem Hdev' HS". }
@@ -314,7 +314,7 @@ Qed.
     assert (Ha8ea : a8 = ea)
       by (unfold a8; rewrite subrange_id sign_extend'_id; reflexivity).
     rewrite Ha8ea in Hcanon, Hvpn_def, Hpa.
-    assert (Heapa : ea = uart_pa off).
+    assert (Heapa : ea = uart_pa Uart0 off).
     { rewrite <- Hpa. change (0 * 1) with 0. rewrite avi0. symmetry.
       apply zero_extend'_id. }
     assert (Hdevvpn : kpt_dev_vpn (svpn_of ea)).
@@ -332,9 +332,9 @@ Qed.
       by (rewrite <- is_aligned_vaddr_paddr; unfold is_aligned_vaddr;
           rewrite Z.rem_1_r; reflexivity).
     assert (Hdcls : dev_cls 1 (pa_of (kpt_leaf_ppn (svpn_of ea)) ea)).
-    { rewrite Hpaid Heapa. split; [ exact (dev_addr_uart off Hoff) | ].
-      split; [ exact (uart_pa_not_in_clint off Hoff) | ].
-      exact (uart_pa_access_io off 1 Hoff (pma_width_ok 1 eq_refl eq_refl)). }
+    { rewrite Hpaid Heapa. split; [ exact (dev_addr_uart Uart0 off Hoff) | ].
+      split; [ exact (uart_pa_not_in_clint Uart0 off Hoff) | ].
+      exact (uart_pa_access_io Uart0 off 1 Hoff (pma_width_ok 1 eq_refl eq_refl)). }
     iIntros "Hcg Hpc #Hinstr #Hdinv HR Hacc Hcont".
     iDestruct (dev_inv_uart with "Hdinv") as "#Huinv".
     iApply (wp_instr_s_sconf m n b b pc is_rvc
@@ -472,19 +472,19 @@ Qed.
             iDestruct "Hdev" as "(Hua & Hpldev & Hvdev)".
             iInv "Huinv" as ">Hdbody" "Hdclose".
             iDestruct "Hdbody" as (u) "(Huf & Hg & Hcol)".
-            iDestruct (uart_agree with "Hua Huf") as %Hduart.
+            iDestruct (uarts_agree with "Hua Huf") as %Hduart.
             destruct (uart_read_total u off Hoff) as (bt & u' & Hread_u).
-            iMod (dev_interp_update_uart sigma.(mdev) u u'
+            iMod (dev_interp_update_uart sigma.(mdev) Uart0 u u'
                     with "[$Hua $Hpldev $Hvdev] Huf") as "[Hdev' Huf']".
             iMod ("Hacc" $! u bt u' with "[//] Hg Hcol HR")
               as "(Hg' & Hcol' & HS)".
             iMod ("Hdclose" with "[Huf' Hg' Hcol']") as "_".
             { iApply bi.later_intro. iExists u'. iFrame. }
             iMod (fupd_mask_subseteq ∅) as "Hb2"; [set_solver|].
-            iModIntro. iExists bt, (set_duart sigma.(mdev) u').
+            iModIntro. iExists bt, (set_duart sigma.(mdev) Uart0 u').
             iSplitR.
             { iPureIntro. rewrite Hpaid Heapa.
-              apply (dev_read_uart sigma.(mdev) off bt u' Hoff).
+              apply (dev_read_uart Uart0 sigma.(mdev) off bt u' Hoff).
               rewrite <- Hduart. exact Hread_u. }
             iApply bi.later_intro. iMod "Hb2" as "_". iModIntro.
             iFrame "Hreg Hmem Hdev' HS". }

@@ -246,10 +246,10 @@ Definition uw_loop_regs (m0 M : regfile) (spd buf : mword 64) (n i : nat) : Prop
   M !!! Regidx Rs1 = (mword_of_int (Z.of_nat i) : mword 64) /\
   M !!! Regidx Rs2 = a_tx_lock /\
   M !!! Regidx Rs3 = (mword_of_int (Z.of_nat n) : mword 64) /\
-  M !!! Regidx Rs4 = uart_pa 5 /\
+  M !!! Regidx Rs4 = uart_pa Uart0 5 /\
   M !!! Regidx Rs5 = a_tx_chan /\
   M !!! Regidx Rs6 = buf /\
-  M !!! Regidx Rs7 = uart_pa 0 /\
+  M !!! Regidx Rs7 = uart_pa Uart0 0 /\
   M !!! Regidx Rs8 = m0 !!! Regidx Rs8 /\
   M !!! Regidx Rs9 = m0 !!! Regidx Rs9 /\
   M !!! Regidx Rs10 = m0 !!! Regidx Rs10 /\
@@ -1094,7 +1094,7 @@ Section UwBodies.
                 with "Hdinv Hown Hsub") as "(Hown & %Hprefix & %Hsublist)".
         iModIntro.
         (* --- +0x68  sb a5,0(s7)  -- the THR write --- *)
-        assert (HG2s7 : rget G2 Rs7 = uart_pa 0).
+        assert (HG2s7 : rget G2 Rs7 = uart_pa Uart0 0).
         { rgne. rewrite /G2 upd_ne; [| reg_neq]. rewrite /G1 upd_ne; [| reg_neq].
           rewrite /D2 upd_ne; [| reg_neq]. rewrite /D1 upd_ne; [| reg_neq]. exact As7. }
         assert (HG2a5 : G2 !!! Regidx Ra5 = zero_extend' 64 (f i : mword 8))
@@ -1619,12 +1619,12 @@ Section ProofUartwriteLoc.
       iEval (rewrite P36) in "Hpc".
       (* ---- +0x36  lui s7,0x10000 : &THR ---- *)
       iApply (wp_lui_s_sconf (mword_of_int (KernelSyms.uartwrite + 0x36)) Rs7 (mword_of_int 65536 : mword 20)
-                (uart_pa 0) A10 (av - 10)%nat true ltac:(nz) ltac:(rdok)
+                (uart_pa Uart0 0) A10 (av - 10)%nat true ltac:(nz) ltac:(rdok)
                 ltac:(apply bv_eq; vm_compute; reflexivity) with "Hcg Hpc []").
       { iApply (uwi_36 with "Ht"). }
       iIntros (CID22 Hs22) "Hcg Hpc".
-      set (A11 := <[Regidx Rs7 := regval_into_reg (uart_pa 0)]> A10).
-      change (<[Regidx Rs7 := regval_into_reg (uart_pa 0)]> A10) with A11.
+      set (A11 := <[Regidx Rs7 := regval_into_reg (uart_pa Uart0 0)]> A10).
+      change (<[Regidx Rs7 := regval_into_reg (uart_pa Uart0 0)]> A10) with A11.
       iEval (rewrite P3a) in "Hpc".
       (* ---- the loop's register invariant at entry ---- *)
       assert (HA11regs : uw_loop_regs m A11 spd buf n 0%nat).

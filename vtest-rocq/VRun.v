@@ -44,7 +44,7 @@
 (* A fact about [exec] is a fact about the interpreter until then.         *)
 (* ====================================================================== *)
 From Stdlib Require Import List ZArith String Bool.
-From stdpp Require Import base list gmap bitvector.definitions.
+From stdpp Require Import base list gmap bitvector.definitions finite.
 Import ListNotations.
 From iris.program_logic Require Import language.
 From VTest Require Import VTest.
@@ -89,7 +89,14 @@ Local Open Scope Z_scope.
 
 Record observation := Obs {
   o_result : list Z;              (* the whole result region, untrimmed   *)
-  o_uart   : list Z;              (* the bytes that left the port on SOUT *)
+  (* THE WIRES, ONE PER PORT, in [enum uart_id] order -- the bytes that
+     left each 16550 on SOUT.  A LIST OVER THE PORTS and not one wire:
+     the machine has two, the runner captures both backends, and the claim
+     below is TOTAL over this list, so it says what BOTH wires hold.  A
+     model that put a byte on the wrong port is then a VIOLATION rather
+     than something nobody looked at -- which is the whole reason a
+     two-port case can check the routing at all. *)
+  o_uart   : list (list Z);
   o_disk   : list (Z * list Z);   (* the disk it ended with, by sector    *)
 }.
 
@@ -187,8 +194,13 @@ Module Type TEST.
      makes [obs_in] of a delivered input the identity rather than the
      identity-on-values-that-happen-to-fit; the alternative is a range side
      condition on the theorem, which would be the same fact written where
-     it cannot be checked. *)
-  Parameter uart_input : list (bv 8).
+     it cannot be checked.
+
+     TAGGED WITH THE PORT, because there are two of them and a byte
+     arriving at the other one is a DIFFERENT input.  [ObsUartIn] carries
+     the port for the same reason, so [obs_in] still reads the trace back
+     exactly and the theorem still pins what was typed and where. *)
+  Parameter uart_input : list (uart_id * bv 8).
   (* ...AND THE DISK IT STARTS FROM, by absolute sector number.  Blank for
      every test written so far, and unrepresentable until now: a test that
      reads a sector it did not itself write could not be stated at all. *)
@@ -238,17 +250,23 @@ Definition test_config (hart : Z) (text : list Z) (rs : list region)
    theorem below is over [nsteps], where the trace survives, and not over
    [erased_step], where it does not.  ([ObsTrace.obs_wire] is the output
    half of the same idea, and equals the [u_wire] read below.) *)
-Fixpoint obs_in (l : list mobs) : list (bv 8) :=
+Fixpoint obs_in (l : list mobs) : list (uart_id * bv 8) :=
   match l with
   | [] => []
-  | ObsUartIn b :: l' => b :: obs_in l'
+  | ObsUartIn i b :: l' => (i, b) :: obs_in l'
   | _ :: l' => obs_in l'
   end.
 
 (* WHAT A CONFIGURATION SHOWS, on the three channels a platform has. *)
+(* THE WIRE CLAIM IS TOTAL OVER THE PORTS.  It is not "port 0 carried
+   this" but "the ports carried EXACTLY these, in [enum uart_id] order", so
+   a byte the model put on a port the capture says was silent is a
+   violation of this conjunct -- which is what makes a two-port case able
+   to check the routing rather than merely the content. *)
 Definition observed_at (g : gstate) (o : observation) : Prop :=
   peek_mem (gmem g) result_base result_size = o.(o_result)
-  /\ (bv_unsigned <$> u_wire (duart (gdev g))) = o.(o_uart)
+  /\ ((fun i => bv_unsigned <$> u_wire (duart (gdev g) i)) <$> enum uart_id)
+     = o.(o_uart)
   /\ disk_at (v_disk (dvirtio (gdev g))) o.(o_disk).
 
 (* ...AND WHAT IT MEANS FOR THE MODEL TO BE STUCK THERE.  Not the whole
@@ -319,7 +337,7 @@ End TEST_RUN.
    passing one in would be the misleading part. *)
 
 Definition run_agrees (hart : Z) (text : list Z) (rs : list region)
-    (uart_input : list (bv 8)) (disk_init : list (Z * list Z))
+    (uart_input : list (uart_id * bv 8)) (disk_init : list (Z * list Z))
     (observed : list observation) : Prop :=
   let c0 := test_config hart text rs disk_init in
   forall o, In o observed ->
@@ -329,7 +347,7 @@ Definition run_agrees (hart : Z) (text : list Z) (rs : list region)
       /\ observed_at g o.
 
 Definition run_no_step_at (hart : Z) (text : list Z) (rs : list region)
-    (uart_input : list (bv 8)) (disk_init : list (Z * list Z)) : Prop :=
+    (uart_input : list (uart_id * bv 8)) (disk_init : list (Z * list Z)) : Prop :=
   let c0 := test_config hart text rs disk_init in
   exists n l ts g e,
     nsteps n c0 l (ts, g)

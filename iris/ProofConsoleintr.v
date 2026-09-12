@@ -72,7 +72,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto.
-Require Import ObsTrace.   (* [obs_ends_in]: the tag premise's byte *)
+Require Import ObsTrace.   (* [obs_ends_in Uart0]: the tag premise's byte *)
 Require Import RegFile.
 Require Import InstrBytes WpMmodeLeafBase.
 Require Import RiscvExtras.
@@ -638,7 +638,7 @@ Section CtBodies.
     cons_ok rr ww ee ->
     (bv_unsigned (sub_vec ee rr) < Z.of_nat INPUT_BUF_SIZE)%Z ->
     i = cons_slot ee 0 ->
-    obs_ends_in h c ->
+    obs_ends_in Uart0 h c ->
     ohist_ext hh h ->
     uart_rx_hi (cn_uart cn) (1/2) hh -∗
     ct_gh cn rr ww ee bs ts ==∗
@@ -1701,7 +1701,7 @@ Section ProofConsoleintr.
     (* the byte and its tag.  This is the arm the '\r' test TOOK, so the
        byte is the carriage return and [ConsoleInv.cons_xlate] of it is the
        newline the code stores. *)
-    obs_ends_in h c ->
+    obs_ends_in Uart0 h c ->
     c = (mword_of_int 13 : mword 8) ->
     kernel_text -∗
     dev_inv γu γv -∗ is_txlock γtx γu -∗ uart_sent_sub γu [] -∗
@@ -2509,7 +2509,7 @@ Section ProofConsoleintr.
     (bv_unsigned (sub_vec ee rr) < Z.of_nat INPUT_BUF_SIZE)%Z ->
     (* the byte and its tag.  This is the arm the '\r' test did NOT take,
        so [ConsoleInv.cons_xlate] is the identity on the byte. *)
-    obs_ends_in h c ->
+    obs_ends_in Uart0 h c ->
     cv = (extend_value (n := 8) true (c : mword 8) : mword 64) ->
     c <> (mword_of_int 13 : mword 8) ->
     kernel_text -∗
@@ -3042,7 +3042,7 @@ Section ProofConsoleintr.
        block is where the tag stops being carried and starts being used --
        the guard at +0x044 below is what makes the append legal, so the
        two travel down to [ct_store]/[ct_cr] together. *)
-    obs_ends_in h c ->
+    obs_ends_in Uart0 h c ->
     cv = (extend_value (n := 8) true (c : mword 8) : mword 64) ->
     kernel_text -∗
     dev_inv γu γv -∗ is_txlock γtx γu -∗ uart_sent_sub γu [] -∗

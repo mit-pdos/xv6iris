@@ -1,14 +1,17 @@
 (* ====================================================================== *)
 (* DevModel.v                                                             *)
 (*                                                                        *)
-(* Memory-mapped devices: a 16550-style UART, a (S-context) PLIC, and a   *)
+(* Memory-mapped devices: TWO 16550-style UARTs, a (S-context) PLIC and a *)
 (* virtio-mmio block device (the latter modelled in VirtioModel.v, which   *)
 (* this file re-exports and wires into the bus decode).                    *)
 (*                                                                        *)
 (* This file is the OPERATIONAL device model, imported by RiscvLang.v:    *)
 (*                                                                        *)
 (*   - [uart_state] / [plic_state] / [dev_state]: the device-fabric state, *)
-(*     stored alongside the byte memory in [mstate]/[gstate].              *)
+(*     stored alongside the byte memory in [mstate]/[gstate].  The board   *)
+(*     has TWO 16550s, so everything about a UART is indexed by [uart_id]  *)
+(*     -- the window, the PLIC source, and [dev_state]'s [duart] field,    *)
+(*     which is a FUNCTION of the port.                                    *)
 (*   - [dev_addr]: the bus address decode.  Every physical address BELOW   *)
 (*     the DRAM bank (0x8000_0000) that reaches the interpreter's          *)
 (*     MemRead/MemWrite outcomes is routed to the device fabric.  (The     *)
@@ -25,9 +28,10 @@
 (*     [plic_latch], [plic_eip], and the disk's per-transaction steps of   *)
 (*     VirtioModel section 6): the                                         *)
 (*     devices also run CONCURRENTLY with the harts.  RiscvLang.v exposes  *)
-(*     these as the step relations of THREE separate device execution      *)
-(*     contexts (the [UartLoop]/[DiskLoop]/[PlicLoop] "threads" -- one per *)
-(*     device, each latching its own interrupt source), interleaved with   *)
+(*     these as the step relations of separate device execution contexts   *)
+(*     ([UartLoop i]/[DiskLoop]/[PlicLoop] -- ONE THREAD PER DEVICE, so    *)
+(*     two UART threads here, each latching its own interrupt source),     *)
+(*     interleaved with                                                    *)
 (*     the CPU steps at instruction granularity.  The disk is a BUS        *)
 (*     MASTER, so its step -- alone among these -- is a function of, and   *)
 (*     changes, the harts' byte memory; that is why [disk_step] carries it.*)
@@ -107,6 +111,20 @@ Definition uart_of_irq (k : N) : option uart_id :=
 
 Lemma uart_of_irq_id (i : uart_id) : uart_of_irq (uart_irq_id i) = Some i.
 Proof. by destruct i. Qed.
+
+(* ...and its converse: a source id the decode accepts really is that
+   port's.  What a dispatcher on [uart_of_irq] needs to get back to the
+   source the caller named. *)
+Lemma uart_of_irq_eq (k : N) (i : uart_id) :
+  uart_of_irq k = Some i -> k = uart_irq_id i.
+Proof.
+  unfold uart_of_irq.
+  destruct ((k =? uart_irq_id Uart0)%N) eqn:E0.
+  { intros [= <-]. by apply N.eqb_eq in E0. }
+  destruct ((k =? uart_irq_id Uart1)%N) eqn:E1.
+  { intros [= <-]. by apply N.eqb_eq in E1. }
+  intros H. discriminate H.
+Qed.
 
 Lemma uart_irq_id_inj (i j : uart_id) : uart_irq_id i = uart_irq_id j -> i = j.
 Proof. destruct i, j; by cbn. Qed.
@@ -1174,6 +1192,32 @@ Proof.
   { intro H. by injection H as <-. }
   destruct (in_uart Uart1 a) eqn:E1; [|discriminate].
   intro H. by injection H as <-.
+Qed.
+
+(* THE TWO SHAPES A NON-UART WINDOW NEEDS.  The PLIC lies wholly below the
+   first port; the virtio-mmio window lies in the GAP between the two ports.
+   Every leaf about those devices discharges its "not a UART access" side
+   condition through one of these. *)
+Lemma uart_decode_below (a : Z) : a < uart_base Uart0 -> uart_decode a = None.
+Proof.
+  intro H. cbn in H.
+  assert (E0 : in_uart Uart0 a = false).
+  { unfold in_uart. apply andb_false_intro1, Z.leb_gt. cbn. lia. }
+  assert (E1 : in_uart Uart1 a = false).
+  { unfold in_uart. apply andb_false_intro1, Z.leb_gt. cbn. lia. }
+  unfold uart_decode. rewrite E0. rewrite E1. reflexivity.
+Qed.
+
+Lemma uart_decode_between (a : Z) :
+  uart_base Uart0 + uart_size <= a -> a < uart_base Uart1 ->
+  uart_decode a = None.
+Proof.
+  intros H0 H1. cbn in H0, H1. unfold uart_size in H0.
+  assert (E0 : in_uart Uart0 a = false).
+  { unfold in_uart, uart_size. apply andb_false_intro2, Z.ltb_ge. cbn. lia. }
+  assert (E1 : in_uart Uart1 a = false).
+  { unfold in_uart. apply andb_false_intro1, Z.leb_gt. cbn. lia. }
+  unfold uart_decode. rewrite E0. rewrite E1. reflexivity.
 Qed.
 
 Lemma uart_decode_none (a : Z) :
