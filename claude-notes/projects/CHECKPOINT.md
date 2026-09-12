@@ -220,3 +220,12 @@ rulings (A) `cons_never` sealed-absent state → E2; (B) the cwd row on
 SH-OPEN phase 2 committed on `lane/sh-open` (`ba3249c96`), one seam red until
 LAZY-FLAG-2's cwd row; lands after supply-split-r1.  `-sup` idle → the K-side
 ledger lane (PRINTK-LEDGER) next there, on main.
+
+PRINTK-LEDGER LAUNCHED (2026-09-12) in `-sup` on `lane/printk-ledger` from main
+`b0cc198c6` (brief `brief-printk-ledger.md`: the K ledger under pr.lock, rendered
+messages pinned, `kernel_msgs`).  DESIGN POINT FOR THE OWNER: the output claim
+will ADMIT kernel error messages (e.g. "ialloc: no inodes\n" after enough
+crash-leaked inodes) as it admits sh's failure prints; the boot's ten stay
+exact.  In flight: LAZY-FLAG-2 p1 (main), E2 p1 (`-disc`), TX-RECEIPT p1
+(`-tlw`), PRINTK-LEDGER p1 (`-sup`); `lane/sh-open` and `lane/supply-split-r1`
+wait to land.
