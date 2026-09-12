@@ -160,17 +160,7 @@ Qed.
 (* newly-live pages at RW -- the [usys_sbrk_perm] grow disjunct.           *)
 (* ===================================================================== *)
 
-Lemma live_pages_mono (sz sz' : Z) :
-  sz <= sz' -> live_pages sz ⊆ live_pages sz'.
-Proof.
-  intros Hle p. unfold live_pages. rewrite !elem_of_list_to_set, !elem_of_list_fmap.
-  intros (k & -> & Hk). exists k. split; [ reflexivity | ].
-  apply elem_of_seqZ in Hk. apply elem_of_seqZ.
-  pose proof (UserPtTree.pgroundup_mono sz sz' Hle) as Hm.
-  split; [ lia | ].
-  apply Z.lt_le_trans with (UserPtTree.pgroundup sz / 4096); [ lia | ].
-  apply Z.div_le_mono; lia.
-Qed.
+(* [live_pages_mono] is [UserPerm]'s, hoisted there by lane LAZY-FLAG. *)
 
 (* [UserPtTree.gset_to_gmap_union_Z] at the page type *)
 Lemma gset_to_gmap_union_p {A : Type} (c : A) (X Y : gset (mword 27)) :

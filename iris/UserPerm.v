@@ -1079,3 +1079,198 @@ Proof.
     apply map_lookup_filter_None. right. intros q _ Hg. cbn in Hg.
     exact (Hout Hg).
 Qed.
+
+(* ===================================================================== *)
+(* §10 LAZY-FREE: the projection with an EMPTY FILL.                      *)
+(*                                                                        *)
+(* [perm_of] shows a live-but-unmapped page at [uperm_rw] (§1's decision), *)
+(* so the projection alone cannot tell a page [vmfault] has yet to serve   *)
+(* from a page the table really maps RW -- and copyout can write only the  *)
+(* second kind ([UserPtTree.uva_wmapped]: a leaf with V, U AND W).  The    *)
+(* predicate below is exactly "the fill is empty": every live page is      *)
+(* already in the table.                                                   *)
+(*                                                                        *)
+(* IT IS DECIDABLE, which is what lets the slot's key carry it as a BOOL   *)
+(* computed at the trap boundary ([UexecSlot.uvis_lazy], via [uvis_of])    *)
+(* rather than as a stored invariant: there is no new kernel state.        *)
+(*                                                                        *)
+(* WHAT IT BUYS: under it, every W entry of the projection is a real user  *)
+(* leaf with the W bit set, so a process that owns a byte                  *)
+(* ([UserHeap.ubytes], which yields [UserHeap.uw_addr]) refutes a copyout  *)
+(* fault at that byte ([UserHeap.lazy_free_uw_addr]).                      *)
+(* ===================================================================== *)
+
+Definition lazy_free (um : gmap (mword 27) (mword 64)) (sz : Z) : Prop :=
+  live_pages sz ⊆ dom um.
+
+Global Instance lazy_free_dec (um : gmap (mword 27) (mword 64)) (sz : Z) :
+  Decision (lazy_free um sz).
+Proof. unfold lazy_free. apply _. Defined.
+
+(* ---------------------------------------------------------------------- *)
+(* The two PTE-word bridges the reading needs.  [perm_leaf] tests U        *)
+(* (bit 4) and R (bit 1) and [up_W] IS bit 2, while [PtTree.pte_vu] /      *)
+(* [PtTree.pte_w] are stated over the model's flag accessors.  U and W     *)
+(* come off the bits; V comes off [proc_pt_wf]'s [pte_valid] clause        *)
+(* ([UptTree.upt_map_wf], read through [uleaf_wf_lt]).  Same family as     *)
+(* [PtBuild.pte_vu_bits] / [PtBuild.pte_not_w_bits], one direction over.   *)
+(* ---------------------------------------------------------------------- *)
+
+Local Lemma lf_sub_7_0 (v : mword 64) :
+  bv_unsigned (subrange_vec_dec v 7 0 : mword 8) = bv_unsigned v mod 256.
+Proof. apply (subrange_dec_unsigned_lo0 v 7 256); [lia | reflexivity]. Qed.
+
+Local Lemma lf_sub_0_0 (v : mword 8) :
+  bv_unsigned (subrange_vec_dec v 0 0 : mword 1) = bv_unsigned v mod 2.
+Proof. apply (subrange_dec_unsigned_lo0 v 0 2); [lia | reflexivity]. Qed.
+
+Local Lemma lf_sub_2_2 (v : mword 8) :
+  bv_unsigned (subrange_vec_dec v 2 2 : mword 1) = bv_unsigned v / 2 ^ 2 mod 2.
+Proof. apply (subrange_dec_unsigned v 2 2 (2 ^ 2) 2); [lia | lia | reflexivity | reflexivity]. Qed.
+
+Local Lemma lf_sub_4_4 (v : mword 8) :
+  bv_unsigned (subrange_vec_dec v 4 4 : mword 1) = bv_unsigned v / 16 mod 2.
+Proof. apply (subrange_dec_unsigned v 4 4 16 2); [lia | lia | reflexivity | reflexivity]. Qed.
+
+(* a low flag bit of the byte, read back as a bit of the whole word *)
+Local Lemma lf_bit_low (x n : Z) :
+  0 <= n -> n < 8 -> Z.odd ((x mod 256) / 2 ^ n) = Z.testbit x n.
+Proof.
+  intros H0 H8.
+  change 256 with (2 ^ 8).
+  rewrite <- Z.bit0_odd.
+  rewrite (Z.div_pow2_bits (x mod 2 ^ 8) n 0 H0 ltac:(lia)).
+  replace (0 + n) with n by lia.
+  rewrite (Z.mod_pow2_bits_low x 8 n ltac:(lia)).
+  reflexivity.
+Qed.
+
+Local Lemma lf_bitn_one (x n : Z) :
+  0 <= n -> n < 8 -> Z.testbit x n = true -> (x mod 256) / 2 ^ n mod 2 = 1.
+Proof.
+  intros H0 H8 Hb. rewrite Zmod_odd.
+  rewrite (lf_bit_low x n H0 H8), Hb. reflexivity.
+Qed.
+
+(* V comes from validity, U from bit 4 *)
+Lemma pte_vu_of_valid_u (w : mword 64) :
+  pte_valid w -> pte_bit w 4 = true -> pte_vu w.
+Proof.
+  intros Hv Hu.
+  assert (Hb0 : Z.testbit (bv_unsigned w) 0 = true).
+  { destruct (Z.testbit (bv_unsigned w) 0) eqn:E; [reflexivity | exfalso].
+    exact (pte_valid_invalid_excl w Hv (pte_invalid_bit0 w E)). }
+  unfold pte_vu, _get_PTE_Flags_V, _get_PTE_Flags_U, Mk_PTE_Flags.
+  assert (H1 : bv_unsigned ('b"1" : mword 1) = 1) by (vm_compute; reflexivity).
+  split; apply bv_eq; rewrite H1.
+  - rewrite lf_sub_0_0, lf_sub_7_0.
+    replace (bv_unsigned w mod 256 mod 2)
+      with (bv_unsigned w mod 256 / 2 ^ 0 mod 2)
+      by (rewrite Z.pow_0_r, Z.div_1_r; reflexivity).
+    exact (lf_bitn_one (bv_unsigned w) 0 ltac:(lia) ltac:(lia) Hb0).
+  - rewrite lf_sub_4_4, lf_sub_7_0.
+    replace (bv_unsigned w mod 256 / 16 mod 2)
+      with (bv_unsigned w mod 256 / 2 ^ 4 mod 2)
+      by (change (2 ^ 4) with 16; reflexivity).
+    exact (lf_bitn_one (bv_unsigned w) 4 ltac:(lia) ltac:(lia) Hu).
+Qed.
+
+(* ...and W is bit 2 *)
+Lemma pte_w_of_bit (w : mword 64) : pte_bit w 2 = true -> pte_w w.
+Proof.
+  intros Hb.
+  unfold pte_w, _get_PTE_Flags_W, Mk_PTE_Flags.
+  assert (H1 : bv_unsigned ('b"1" : mword 1) = 1) by (vm_compute; reflexivity).
+  apply bv_eq. rewrite H1. rewrite lf_sub_2_2, lf_sub_7_0.
+  exact (lf_bitn_one (bv_unsigned w) 2 ltac:(lia) ltac:(lia) Hb).
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* THE READING.  Under [lazy_free] a W page of the projection is a real    *)
+(* user leaf the kernel can copy to: the fill cannot have supplied it      *)
+(* (every live page is mapped), so the entry is a leaf's own bits.         *)
+(* ---------------------------------------------------------------------- *)
+Lemma lazy_free_wmapped (P : uptd) (sz : Z) (p : mword 27) (q : uperm) :
+  proc_pt_wf P -> lazy_free (ud_um P) sz ->
+  perm_of (ud_um P) sz !! p = Some q -> up_W q = true ->
+  exists w : mword 64, ud_um P !! p = Some w /\ pte_vu w /\ pte_w w.
+Proof.
+  intros Hwf Hlf Hq Hw.
+  destruct (ud_um P !! p) as [w |] eqn:Hp.
+  - exists w. split; [ reflexivity | ].
+    destruct (perm_of_W_mapped (ud_um P) sz p q w Hq Hw Hp) as (Hu & _ & H2).
+    destruct (uleaf_wf_lt w (proc_pt_wf_uleaf_wf P p w Hwf Hp)) as [_ Hv].
+    split; [ exact (pte_vu_of_valid_u w Hv Hu) | exact (pte_w_of_bit w H2) ].
+  - exfalso.
+    rewrite perm_of_lookup, Hp in Hq.
+    destruct (bool_decide (p ∈ live_pages sz)) eqn:Hb; [ | discriminate Hq ].
+    apply bool_decide_eq_true in Hb.
+    apply Hlf, elem_of_dom in Hb.
+    destruct Hb as [x Hx]. rewrite Hp in Hx. discriminate Hx.
+Qed.
+
+(* MONOTONE IN THE TABLE, ANTITONE IN THE BREAK: the two directions every
+   syscall row moves in.  A table that only gained leaves (vmfault, and
+   every buffer-touching arm) and a break that did not rise keep the fill
+   empty. *)
+(* HOISTED from UsysMemOkSpec.v, which had it verbatim: the fill's index set
+   only grows with the break. *)
+Lemma live_pages_mono (sz sz' : Z) :
+  sz <= sz' -> live_pages sz ⊆ live_pages sz'.
+Proof.
+  intros Hle p. unfold live_pages. rewrite !elem_of_list_to_set, !elem_of_list_fmap.
+  intros (k & -> & Hk). exists k. split; [ reflexivity | ].
+  apply elem_of_seqZ in Hk. apply elem_of_seqZ.
+  pose proof (UserPtTree.pgroundup_mono sz sz' Hle) as Hm.
+  split; [ lia | ].
+  apply Z.lt_le_trans with (UserPtTree.pgroundup sz / 4096); [ lia | ].
+  apply Z.div_le_mono; lia.
+Qed.
+
+Lemma lazy_free_mono (um um' : gmap (mword 27) (mword 64)) (sz sz' : Z) :
+  um ⊆ um' -> sz' <= sz -> lazy_free um sz -> lazy_free um' sz'.
+Proof.
+  intros Hsub Hle Hlf p Hin.
+  pose proof (Hlf p (live_pages_mono sz' sz Hle p Hin)) as Hd.
+  apply elem_of_dom in Hd as [w Hw].
+  apply elem_of_dom. exists w. exact (lookup_weaken _ _ _ _ Hw Hsub).
+Qed.
+
+(* ...and it reads the table only through its DOMAIN, which is what makes
+   fork's child inherit it: uvmcopy gives the child the parent's vpns at
+   FRESH pages, so the two tables agree nowhere except where it counts. *)
+Lemma lazy_free_dom (um um' : gmap (mword 27) (mword 64)) (sz : Z) :
+  dom um = dom um' -> (lazy_free um sz <-> lazy_free um' sz).
+Proof. intros Hd. unfold lazy_free. rewrite Hd. reflexivity. Qed.
+
+Lemma lazy_flag_dom (um um' : gmap (mword 27) (mword 64)) (sz : Z) :
+  dom um = dom um' ->
+  bool_decide (~ lazy_free um sz) = bool_decide (~ lazy_free um' sz).
+Proof.
+  intros Hd. apply bool_decide_ext.
+  pose proof (lazy_free_dom um um' sz Hd) as H. tauto.
+Qed.
+
+(* ...and the row EVERY QUIET SYSCALL pays, in the form its discharge site
+   has it: the table only gained leaves (the arm's [ProcPtOwn.uptd_ext_sz])
+   and the break did not rise, so a process whose fill was empty still has
+   an empty one.  Stated on the BOOLS, because that is what the slot's key
+   carries ([UexecSlot.uvis_lazy]) and what [UsysMemOk.usys_lazy_keep]
+   relates. *)
+Lemma lazy_flag_keep (um um' : gmap (mword 27) (mword 64)) (sz sz' : Z) :
+  um ⊆ um' -> sz' <= sz ->
+  bool_decide (~ lazy_free um sz) = false ->
+  bool_decide (~ lazy_free um' sz') = false.
+Proof.
+  intros Hsub Hle Hf.
+  apply bool_decide_eq_false in Hf. apply dec_stable in Hf.
+  apply bool_decide_eq_false_2. intros Hn.
+  exact (Hn (lazy_free_mono um um' sz sz' Hsub Hle Hf)).
+Qed.
+
+(* the flag READ: at [false] the fill really is empty *)
+Lemma lazy_flag_false (um : gmap (mword 27) (mword 64)) (sz : Z) :
+  bool_decide (~ lazy_free um sz) = false -> lazy_free um sz.
+Proof.
+  intros Hf. apply bool_decide_eq_false in Hf. exact (dec_stable Hf).
+Qed.

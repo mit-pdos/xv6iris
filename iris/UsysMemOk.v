@@ -210,6 +210,58 @@ Definition usys_sbrk_perm (π π' : gmap (mword 27) uperm)
   else π' = base.filter
               (fun kv : mword 27 * uperm => kv.1 ∈ live_pages (uint szv')) π.
 
+(* ===================================================================== *)
+(* THE LAZY FLAG'S ROW (app-echo.md, lane LAZY-FLAG, L3).                 *)
+(*                                                                        *)
+(* [UexecSlot.uvis_lazy] is "this process MAY have pages the kernel has    *)
+(* promised and not yet mapped", i.e. [UserPerm.perm_of]'s fill is not     *)
+(* known to be empty.  ONE DIRECTION IS ALL ANY ENTRY OWES: a process      *)
+(* whose fill was empty still has an empty one.  It is an IMPLICATION and  *)
+(* not an equation because nothing needs the other direction -- a process  *)
+(* at [true] learns nothing from any call but exec -- and because the      *)
+(* equation is FALSE at the one entry that can fill a hole (vmfault, which *)
+(* the transparent arm folds into every row).                             *)
+(*                                                                        *)
+(* WHY EVERY QUIET ENTRY PAYS IT: the only thing a quiet syscall does to   *)
+(* the table is what its copyin/copyout did, which is to take page faults  *)
+(* -- and [ProcPtOwn.uptd_ext_sz] says that ADDS leaves inside the live    *)
+(* region.  [UserPerm.lazy_free] is monotone in the table's domain and     *)
+(* antitone in the break ([UserPerm.lazy_free_mono]), so both halves go    *)
+(* the right way.                                                          *)
+(* ===================================================================== *)
+Definition usys_lazy_keep (lz lz' : bool) : Prop := lz = false -> lz' = false.
+
+Lemma usys_lazy_keep_refl (lz : bool) : usys_lazy_keep lz lz.
+Proof. unfold usys_lazy_keep. exact (fun H => H). Qed.
+
+Lemma usys_lazy_keep_false (lz : bool) : usys_lazy_keep lz false.
+Proof. unfold usys_lazy_keep. exact (fun _ => eq_refl). Qed.
+
+(* SBRK'S SECOND ARGUMENT, as the kernel reads it back -- [usys_sbrk_arg]'s
+   twin one slot over.  Definitionally [SpecSysSbrk.sbrk_arg] at
+   [tf !!! tf_arg_idx 1], and SBRK_EAGER is 1 (kernel/riscv.h). *)
+Definition usys_sbrk_eager (tf : list (mword 64)) : Prop :=
+  sign_extend' 64 (trunc32 (tf !!! tf_arg_idx 1)) = (mword_of_int 1 : mword 64).
+
+(* SBRK'S OWN ROW ON THE FLAG, and it is the ONE row that is not the plain
+   keep.  sys_sbrk has three paths (SpecSysSbrk.sys_sbrk_ok):
+
+     FAILED           nothing moved, so the flag does not move;
+     EAGER (t == SBRK_EAGER, or n < 0)  growproc ran -- a grow MAPS the run
+                      of pages that just became live, a shrink lowers the
+                      break BELOW everything uvmdealloc unmapped -- so an
+                      empty fill stays empty;
+     LAZY (n > 0, t != SBRK_EAGER)      [p->sz] rises with the table
+                      untouched, which is exactly how a hole is made.
+
+   So the row PROMISES NOTHING on the lazy-grow arm and the plain keep on
+   the other two.  The guard is the disjunction the C branches on, read off
+   the trapframe and the two breaks; a process whose own call passed
+   SBRK_EAGER therefore learns it kept the flag. *)
+Definition usys_sbrk_lazy (lz lz' : bool) (tf : list (mword 64))
+    (szv szv' : Z) : Prop :=
+  (usys_sbrk_eager tf \/ (szv' <= szv)%Z) -> usys_lazy_keep lz lz'.
+
 (* THE TABLE: syscall [n], entered with trapframe words [tf], returned
    [r], may take the image from [M] to [M'] and the permission map from
    [π] to [π']. *)
