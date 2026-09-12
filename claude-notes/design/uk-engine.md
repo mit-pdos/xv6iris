@@ -316,3 +316,19 @@ engine's own precedent argues the ambient reading is right —
 `WpUmodeStep`'s `UvStepEngine` binds `CurCtx` with NO `CpuId` and says
 why: "a user excursion is not a change of thread, so the hart may migrate
 under the engine while `cur_ctx` does not move".
+
+## Text-segment loads are width-generic (lane TEXT-LW, 2026-09-12)
+
+`WpUmodeTextLoad.v` states the stamped-half node route once at a section
+`width` (HartSMem's `smem` split at User; the RAM node is HartSMem's own
+width-generic one, paid by `Mobl_ram`); `uv_swp_load_text` takes the file
+the frames are AT apart from the one the pins and the effective address are
+read off, so a COMPRESSED load reaches the node after its `ExecuteAs`
+redirect.  `UkLoadText.v` is `UkLoad.v`'s twin (width-, signedness- and
+geometry-generic, `uk_text_ok`, no fault arm: a text page is mapped by
+construction).  Run-level leaves: `UkRunMem.wp_uk_clw_text` and
+`wp_uk_lw_text` over `uheap_text_access`.  sh's jump tables (runcmd's at
+0x1398, nulterminate's at 0x13b4) are read by that leaf; the six sh theorems
+that carried the `Hclw` hypothesis are unconditional.  Declined for now: a
+privilege-parametric hoist of `hfrun_check_pma_load_U`/`_S` into HartSMem
+(its cone is the whole tree).

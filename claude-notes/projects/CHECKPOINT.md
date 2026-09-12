@@ -134,7 +134,7 @@ CONS-SWALLOW (phase 2 running) → LAZY-FLAG → DISC-RATE → TX-TAG → TX-REC
 
 LANES RUNNING (2026-09-12, later): main tree CONS-SWALLOW phase 2; siblings
 SUPPLY-SPLIT phase 2 (`-sup`, rulings (a)-(f) in the note "SUPPLY-SPLIT PHASE
-1"), TEXT-LW phase 1 (`-tlw`), DISC-RATE phase 1 (`-disc`, brief
+1"), TEXT-LW LANDED on main (2026-09-12), DISC-RATE phase 1 (`-disc`, brief
 `brief-disc-rate.md`; O3/O5 RULED: wait for the harts; failure outputs valid).
 Landing order when green: CONS-SWALLOW (main) → fetch the sibling branches one
 at a time (rebase on main, rebuild, re-gate) → LAZY-FLAG in main.

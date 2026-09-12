@@ -2404,6 +2404,12 @@ ORDER: GENERIC-PAY → CONS-SWALLOW → SH-LINE 2b (gets on `ush_gets_line`,
 `wp_uk_ecall_read_recv` with `upos` threaded read → gets_loop → gets → getcmd
 → main) → LAZY-FLAG (the owner's form of (A)).
 
+TEXT-LW LANDED (2026-09-12; `c3775524d` rebased onto main; 9 files +898/-420;
+build `tlw20`, audit = the thirteen).  Review finding 11 closed: the four-byte
+load from the text segment is a proved engine leaf (`UkRunMem.wp_uk_clw_text`)
+and sh's six theorems that assumed it are unconditional.  Note in
+`design/uk-engine.md`.
+
 SUPPLY-SPLIT PHASE 1 (2026-09-12; sibling `/shared/xv6iris-2-sup`, branch
 `lane/supply-split`, `0411ea97b`, build `sup11`).  THE CLASSIFICATION of every
 syscall bundle (`UexecExecInst.xv6_sbundle`): FREE (no application resource at
