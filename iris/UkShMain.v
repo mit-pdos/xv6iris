@@ -93,8 +93,8 @@ Section UkShMain.
   Context `{Hpay : !ukn_const N}.
   (* ...AND THE CHILD'S PAYLOAD IS TRIVIAL, which is a strictly stronger
      fact and the one [UkShRun.wp_kshr_runcmd]'s exec arm needs: the
-     generic exec supply [UkRun.uxsup] is minted at the trivial payload
-     alone ([UexecExecInst.xv6_sbundle_of_supply]), and this file walks
+     generic exec supply [UkRun.uxsup] is the exec bundle at the trivial
+     payload ([UkRun.uxsup_at] is the payload-general form), and this file walks
      the process sh FORKED -- [UkFork.wp_uk_ecall_fork_any]'s child arm
      gives the equation.  sh's OWN payload is not trivial (it holds the
      console reader token), which is why the two classes are both here
@@ -631,11 +631,14 @@ Section UkShMain.
                                 (ushp_nulfold toks (ushp_ext len f)) toks))
             + (2 + (UkShDiag.ush_Dg + (60 + n))))%nat
       by (cbn [ush_ht]; lia).
+    (* runcmd is stated at the record's OWN exec payload now; this file's
+       record is the forked child's, which pays nothing. *)
+    iDestruct (uxsup_at_triv N with "Hxs") as "#Hxs'".
     iApply (UkShDiag.wp_kshr_runcmd_final Hpsok Hclw
               (UExec (ush_args s0 (ushp_nulfold toks (ushp_ext len f)) toks))
               ltac:(cbn [ush_simple]; exact I)
               N h4 m4 p szv ld (60 + n) Ha0_4
-              with "Hcode Hxs Hjt Htree Hsz Hstd Hcwd Hch Hrun").
+              with "Hcode Hxs' Hxs Hjt Htree Hsz Hstd Hcwd Hch Hrun").
   Qed.
 
   (* ===================================================================== *)

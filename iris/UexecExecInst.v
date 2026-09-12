@@ -768,21 +768,25 @@ Section UexecExecInst.
      whose slot wand a generic family answers at every key. *)
   (* THE FAMILY IS INDEXED BY THE PAY FACT ([UexecSG]'s own law): a slot
      that is safe at every key has to be able to pay exit's deposit, and
-     the credential for that is the trivial payload at the key's own
-     generation.  The exec branch RELAYS it -- both slot wands hand one in
-     at the resume key, at this family's payload, which for the generic
-     record is exactly [fun _ => True]. *)
-  Lemma xv6_sbundle_of_supply (X : uvis -d> iPropO Σ) (n : Z) (W : uvis) :
-    ⊢ my_pay (uvis_gen W) (fun _ => True)%I -∗ □ xv6_ssupply -∗
-      □ (∀ W' : uvis, my_pay (uvis_gen W') (fun _ => True)%I -∗ X W') ==∗
-      ∃ f : xfam, ⌜kf_xpay f = (fun _ => True)%I⌝ ∗ xv6_sbundle X n f W.
+     the credential for that is the key's own generation at the payload
+     the slot runs at.  AT A CONSTANT PAYLOAD [fun _ => R] (GENERIC-PAY):
+     the generic slot HOLDS one [R] and pays exit's additive
+     [R ∧ R] out of it.  The exec branch RELAYS it -- both slot wands hand
+     the pay fact AND [kf_xpay f (-1)] in at the resume key, and at a
+     constant payload that resource is the [R] the next image's slot is
+     minted from.  [R := True] is the trivial instance. *)
+  Lemma xv6_sbundle_of_supply (X : uvis -d> iPropO Σ) (n : Z) (W : uvis)
+      (R : iProp Σ) :
+    ⊢ my_pay (uvis_gen W) (fun _ => R)%I -∗ □ xv6_ssupply -∗
+      □ (∀ W' : uvis, my_pay (uvis_gen W') (fun _ => R)%I -∗ R -∗ X W') ==∗
+      ∃ f : xfam, ⌜kf_xpay f = (fun _ => R)%I⌝ ∗ xv6_sbundle X n f W.
   Proof.
     rewrite /xv6_ssupply. iIntros "#Hpay #Hsup #Hs".
     destruct (decide (n = USYS_exec)) as [He | Hne].
-    - iModIntro. iExists xfam_pt. iSplitR; [done |].
+    - iModIntro. iExists (xfam_at (fun _ => R)%I xfam_pt). iSplitR; [done |].
       rewrite /xv6_sbundle. destruct (decide (n = USYS_exec)) as [_ | Hc];
         [ | exfalso; exact (Hc He) ].
-      rewrite /exec_sbundle /xfam_pt /xfam_exec /=.
+      rewrite /exec_sbundle /xfam_at /xfam_pt /xfam_exec /xfam_exec_at /=.
       (* the bundle's own pay row, which the exec'ing process hands the
          kernel so that the kernel can hand it to the new image's slot *)
       iSplitR; [ iExact "Hpay" | ].
@@ -805,12 +809,13 @@ Section UexecExecInst.
       rewrite /pf_at. cbn [pf_recv pf_refund]. iSplit; [| done].
       rewrite /sys_exec_slot_pre. iIntros (pl na alen afun) "_ _".
       (* the generic family answers BOTH success arms' wands; the payload
-         at this record is the trivial one, so the [Q (-1)] each wand takes
-         is [True] and is dropped. *)
+         at this record is the constant [fun _ => R], so the [Q (-1)] each
+         wand takes is the [R] the new image's slot runs on and is handed
+         straight to the credential. *)
       rewrite /exec_slot_pre. iSplitR.
-      + iIntros (av' i ff nl W') "_ _ _ _ Hp _". iApply ("Hs" with "Hp").
-      + iIntros (av' i a W') "_ _ _ _ Hp _". iApply ("Hs" with "Hp").
-    - iApply (xv6_sbundle_of_supply_ne X n W (fun _ => True)%I Hne).
+      + iIntros (av' i ff nl W') "_ _ _ _ Hp HQ". iApply ("Hs" with "Hp HQ").
+      + iIntros (av' i a W') "_ _ _ _ Hp HQ". iApply ("Hs" with "Hp HQ").
+    - iApply (xv6_sbundle_of_supply_ne X n W (fun _ => R)%I Hne).
       iExact "Hsup".
   Qed.
 

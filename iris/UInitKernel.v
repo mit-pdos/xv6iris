@@ -200,7 +200,8 @@ Section UInitKernel.
   (* ------------------------------------------------------------------- *)
   (* SS1 THE DEPOSIT: init's entry conditions on a key.                    *)
   (* ------------------------------------------------------------------- *)
-  Lemma init_uexec_slot (T K : iProp Σ) `{!Persistent T} (stc : fdstate)
+  Lemma init_uexec_slot (T K : iProp Σ) `{!Persistent T} `{!Timeless T}
+      (stc : fdstate) (cn : cons_names)
       (W : uvis) (n0 : nat) :
     stc <> FdClosed ->
     tf_resume_pc (uvis_tf W) = (mword_of_int InitSyms.start : mword 64) ->
@@ -250,27 +251,35 @@ Section UInitKernel.
     (* ...and the EXEC supplier, which init's child arm spends on
        exec("sh", argv): its OWN, at its own two argument registers and at
        the root, not the generic bundle at every key. *)
-    UkInit.init_exec_sup_lend -∗
+    UkInit.init_exec_sup_lend cn T stc -∗
     (* ...AND THE TWO PINNED CONSOLE LEAVES, at whatever record the entry
        carve mints, beside the ABSENCE CREDENTIAL /init's first open runs
        on ([AppEcho.cons_key] at echo's era, handed over by E2's boot arm
        with the era-0 claim -- [AppEcho.echo_init_key]). *)
     □ (∀ N : uk_names Σ, UkInit.init_cons_leaves N T K stc) -∗
     K -∗
+    (* ...AND THE CONSOLE READER TOKEN AT POSITION 0, which is what makes
+       <init> the process that owns the console input: it lends it to each
+       shell it forks and gets it back at the reap
+       ([UserConsole.uinit_lend] / [uinit_redeem]).  A PLAIN LINEAR
+       premise beside the credential -- the boot bundle's builder is what
+       hands it over (E2, through [PinnedExec]'s [Pay]) -- and at the
+       NARROW class, because this section binds [ctokG] without [xv6G]
+       ([UserConsole.ucons_reader_eq] is the bridge). *)
+    ucons_reader cn 0%nat -∗
     (* THE PAY FACT, at the trivial payload: <init> has no parent, so its
        exit owes nobody anything -- userinit's choice, which the entry
        constructor writes into the record ([UkRun.ukn_pay]) and which
        init's own exit stub reads back.
-       NO CONSOLE READER TOKEN HERE YET (app-echo.md, "SH-LINE RULING",
-       R3): the token has to reach SH's exit payload to survive a kill,
-       and that payload is blocked one seam away
-       ([UkInit.init_exec_sup_pos]'s note).  What init does lend its child
-       today is the POSITION, which it mints itself. *)
+       THE CONSOLE READER TOKEN IS NOT IN IT: <init> is never reaped, so
+       its own payload can say nothing.  The token is a resource it HOLDS
+       (the premise above) and lends to each shell inside THAT shell's
+       payload, which is the only place a kill gives it back. *)
     my_pay (uvis_gen W) (fun _ => True)%I -∗
     uslot W.
   Proof.
     intros Hne Hpc Hsub Hx Hwd Hszd Hbase Hal8 Hroom Hstk Hfdlen Hl0 Hstop Hcw Hpsok.
-    iIntros "#Hdep #Hxs #Hcl HK #Hmp".
+    iIntros "#Hdep #Hxs #Hcl HK Hrd #Hmp".
     iApply (uslot_of_urun_all W (2 + (4 + (12 + (12 + (4 + n0))))) (fun _ => True)%I
               Hal8 Hroom Hstk Hfdlen Hstop with "Hdep Hmp []").
     (* the payload at the trivial one -- <init> has no parent *)
@@ -279,7 +288,7 @@ Section UInitKernel.
        on init's walk READS it, but fork MOVES it, so the fragment goes
        down the chain index-free ([UserChildren.uch_any]). *)
     iIntros (N h) "%Hpayeq %Hsz Hszf #Ht Hstd Hcwf Hchf Dlo _ Hrun".
-    pose proof (Hpayeq : UkRun.ukn_triv N) as Hti.
+    pose proof (ukn_const_of_triv N (Hpayeq : UkRun.ukn_triv N)) as Hti.
     (* ---- the argument vector, out of the data below the frame ---- *)
     assert (Hsub16 :
               init_argv_map
@@ -301,9 +310,9 @@ Section UInitKernel.
       as "Dargv".
     iMod (uarea_persist (ukn_d N) init_argv_map with "Dargv") as "#Hargv".
     rewrite Hpc.
-    iApply (wp_kinit_start N Hpsok T K stc (uvis_sz W) h
+    iApply (wp_kinit_start N Hpsok T K stc cn (uvis_sz W) h
               (tf_resume_gpr0 (uvis_tf W)) n0 Hne
-              with "[] Hxs [] [] [] Hszf [Hstd] HK [Hcwf] [Hchf] Hrun").
+              with "[] Hxs [] [] [] Hszf [Hstd] HK [Hcwf] [Hchf] [Hrd] Hrun").
     - iApply (init_code_of_text (ukn_t N) (uvis_M W) (uvis_perm W)
                 (init_img_text _ Hsub) Hx with "Ht").
     - iApply ("Hcl" $! N).
@@ -313,12 +322,16 @@ Section UInitKernel.
     - rewrite <- Hl0. iExact "Hstd".
     - rewrite <- Hcw. iExact "Hcwf".
     - iApply (uch_any_of with "Hchf").
+    (* init's round starts at the token's own position, which at boot is
+       the empty prefix ([UserConsole.uinit_tok_0]) *)
+    - iApply (uinit_tok_0 cn T with "Hrd").
   Qed.
 
   (* ------------------------------------------------------------------- *)
   (* SS2 THE BRIDGE from the kernel's image fact.                          *)
   (* ------------------------------------------------------------------- *)
-  Lemma init_slot_of_kexec (T K : iProp Σ) `{!Persistent T} (stc : fdstate)
+  Lemma init_slot_of_kexec (T K : iProp Σ) `{!Persistent T} `{!Timeless T}
+      (stc : fdstate) (cn : cons_names)
       (na : nat) (alen : nat -> nat)
       (afun : nat -> nat -> bv 8) (sts : list fdstate)
       (W' : uvis) (n0 : nat) :
@@ -338,9 +351,12 @@ Section UInitKernel.
     uvis_cwd W' = FsImg.ROOTINO ->
     (forall k : Z, k <> USYS_exec -> psok k) ->
     (* the pay fact, passed straight through: see [init_uexec_slot] *)
-    udep -∗ UkInit.init_exec_sup_lend -∗
+    udep -∗ UkInit.init_exec_sup_lend cn T stc -∗
     □ (∀ N : uk_names Σ, UkInit.init_cons_leaves N T K stc) -∗
     K -∗
+    (* the console reader token, passed straight through: see
+       [init_uexec_slot] *)
+    ucons_reader cn 0%nat -∗
     my_pay (uvis_gen W') (fun _ => True)%I -∗ uslot W'.
   Proof.
     intros Hne Hok Hroom Hlen Hl0 Hcw Hpsok.
@@ -419,7 +435,7 @@ Section UInitKernel.
               0x3000 <= spv - 8 * Z.of_nat (2 + (4 + (12 + (12 + (4 + n0)))))
                         + Z.of_nat j < spv)
       by (intros j Hj; clear -Hj Hroom; lia).
-    iApply (init_uexec_slot T K stc W' n0 Hne).
+    iApply (init_uexec_slot T K stc cn W' n0 Hne).
     - rewrite Hpc. exact init_start_pc.
     - exact (init_img_sub_of_elf M Himg).
     - exact Hx.

@@ -76,14 +76,20 @@ Section UkInit.
      carries beside the cwd's *)
   Context `{!ghost_varG Σ (gset gname)}.
   Context (N : uk_names Σ).
-  (* THE PROGRAM'S PAYLOAD, as a section hypothesis: this program's exit
-     owes its parent nothing at this lane, and the entry constructor is
-     what fixes it ([UkRun.uslot_of_urun*] mint the record at the payload
-     the kernel handed them).  A SECTION hypothesis rather than a premise
-     on the exit stub, so that every lemma between the entry and the ecall
-     is generalized over it automatically and no intermediate statement has
-     to carry it by hand. *)
-  Context `{Hpay : !ukn_triv N}.
+  (* THE PROGRAM'S PAYLOAD, as a section hypothesis: all this walk needs
+     of it is that it does not read the exit status ([UkRun.ukn_const]),
+     which is what lets the exit stub answer the additive pair out of the
+     one resource the run keeps.  A SECTION hypothesis rather than a
+     premise on the exit stub, so that every lemma between the entry and
+     the ecall is generalized over it automatically and no intermediate
+     statement has to carry it by hand.
+     AT THE CLASS AND NOT AT [ukn_triv], because these lemmas are walked
+     by TWO records: /init's own, whose payload is trivial
+     ([UInitKernel.init_uexec_slot], through [UkRun.ukn_const_of_triv]),
+     and the CHILD it forks to exec sh, whose payload is the console
+     reader token ([UserConsole.ucons_pay], constant by
+     [UserConsole.ucons_pay_const]). *)
+  Context `{Hpay : !ukn_const N}.
   (* the fields, under the names the engine has always used *)
   Local Notation γt := (ukn_t N).
   Local Notation γd := (ukn_d N).
@@ -991,10 +997,11 @@ Section UkInit.
                     vm_compute; reflexivity)
               with "[] [] Hrun").
     { iApply (uis_init_374 with "Hcode"). }
-    (* AT THE TRIVIAL PAYLOAD BOTH CONJUNCTS ARE FREE: this program owes
-       its parent nothing, at its own status and at the kill status alike
-       ([UkRun.ukn_triv]). *)
-    { rewrite (ukn_triv_eq (N := N)). iIntros "_". iSplit; done. }
+    (* AT A CONSTANT PAYLOAD THE TWO CONJUNCTS ARE ONE PROPOSITION, so the
+       resource the run keeps answers both ([UkRun.ukn_const]). *)
+    { iIntros "HQ".
+      rewrite (ukn_const_eq (N := N) (uexitst m1) (-1)).
+      iSplit; iExact "HQ". }
   Qed.
 
   (* ===================================================================== *)
@@ -1081,32 +1088,42 @@ Section UkInit.
   (*  restart loop -- the loop mints a FRESH pair per child and applies    *)
   (*  the box at it ([UserConsole.upos_alloc]).                            *)
   (*                                                                       *)
-  (*  THE PAYLOAD IS STILL THE TRIVIAL ONE.  Putting the console reader    *)
-  (*  TOKEN in the child's exit payload is what makes a KILLED shell give  *)
-  (*  it back, and it is blocked one seam away: a tainted process runs on  *)
-  (*  the generic slot, which exists only at the trivial payload           *)
-  (*  ([UexecExecInst.xv6_sbundle_of_supply] mints exec's bundle at        *)
-  (*  [kf_xpay f = fun _ => True] and nothing else), so                    *)
-  (*  [PinnedExec.pex_slot]'s taint arm cannot be paid at a non-trivial    *)
-  (*  [Q].  The position crosses at either payload, which is why it        *)
-  (*  crosses now.                                                         *)
+  (*  THE PAYLOAD IS STILL THE TRIVIAL ONE HERE, and the seam that used   *)
+  (*  to block the other one is open: the generic slot exists at any       *)
+  (*  CONSTANT payload now ([UexecRet.uexec_wp_uslot],                     *)
+  (*  [UexecExecMint.uslot_mint_pay], and                                  *)
+  (*  [UexecExecInst.xv6_sbundle_of_supply] at [kf_xpay f = fun _ => R]),  *)
+  (*  so [PinnedExec.pex_slot]'s taint arm is payable at a non-trivial     *)
+  (*  [Q].  What is left to move is this box and its suppliers: the        *)
+  (*  equation above becomes [ukn_pay N' = Qsh γ] and the supplier         *)
+  (*  [UkRun.uxsup_at (ukn_pay N')].  The position crosses at either       *)
+  (*  payload, which is why it crossed first.                              *)
   (* =================================================================== *)
-  Definition init_exec_sup_pos (γ : gname) (n : nat) : iProp Σ :=
+  (*  THE DESCRIPTOR ROW IS THE HEAD ITSELF, not a bare ledger.  sh's
+      entry is told one thing about its table -- fd 0 is the console, or
+      slot 0 is closed, or the taint ([UkSh.ush_fd0]) -- and that is
+      exactly /init's own head ([UInitFd.ufd_head]), whose three arms are
+      the same three.  So the head is what crosses here: the supply reads
+      the row off it against the lent authority and spends the ledger,
+      which is right -- the process that execs is replaced. *)
+  Definition init_exec_sup_pos (cn : cons_names) (T : iProp Σ) (st : fdstate)
+      (γ : gname) (n : nat) : iProp Σ :=
     (∀ (N' : uk_names Σ) (m : regfile) (pc : mword 64),
-       ⌜ ukn_pay N' = (fun _ => True)%I ⌝ -∗
+       ⌜ ukn_pay N' = ucons_pay cn γ T ⌝ -∗
        ⌜ m !!! Regidx a0_idx = (mword_of_int 0x9a8 : mword 64) ⌝ -∗
        ⌜ m !!! Regidx a1_idx = (mword_of_int 0x1000 : mword 64) ⌝ -∗
        init_rodata (ukn_t N') -∗
        init_argv (ukn_d N') -∗
-       ustd_any (ukn_fd N') -∗
+       UInitFd.ufd_head T st (ukn_fd N') -∗
        upos γ n -∗
        udepw_at N' m pc USYS_exec FsImg.ROOTINO)%I.
 
-  Definition init_exec_sup_lend : iProp Σ :=
-    (□ (∀ (γ : gname) (n : nat), init_exec_sup_pos γ n))%I.
+  Definition init_exec_sup_lend (cn : cons_names) (T : iProp Σ)
+      (st : fdstate) : iProp Σ :=
+    (□ (∀ (γ : gname) (n : nat), init_exec_sup_pos cn T st γ n))%I.
 
-  Global Instance init_exec_sup_lend_persistent :
-    Persistent init_exec_sup_lend.
+  Global Instance init_exec_sup_lend_persistent cn T st :
+    Persistent (init_exec_sup_lend cn T st).
   Proof. rewrite /init_exec_sup_lend. apply _. Qed.
 
   (* ...AND THE LEAF IS CWD-INDEXED.  [UkRunSys.wp_uk_ecall_exec_at_cwd]

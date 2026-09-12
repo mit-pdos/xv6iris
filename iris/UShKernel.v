@@ -308,7 +308,16 @@ Section UShKernel.
   (* ------------------------------------------------------------------- *)
   Lemma sh_uexec_slot (R : gname -> gname -> gname -> iProp Σ)
       (γp : gname) (T : iProp Σ) `{!Persistent T}
+      (* SH'S EXIT PAYLOAD, a parameter (GENERIC-PAY).  It is where the
+         console reader token lives, because only [UkRun.ukn_pay N (-1)]
+         survives a kill: if the shell is killed, init has to get the
+         input back to respawn it.  CONSTANT IN THE STATUS, because the
+         exit stub answers [ukn_pay N xs ∧ ukn_pay N (-1)] out of the one
+         resource the run carries; [UserConsole.ucons_pay_const] is the
+         witness the application supplies. *)
+      (Q : Z -> iProp Σ)
       (W : uvis) (n0 n : nat) :
+    (forall x y : Z, Q x = Q y) ->
     tf_resume_pc (uvis_tf W) = (mword_of_int ShSyms.start : mword 64) ->
     shk_img_sub (uvis_M W) ->
     (forall a : Z, 0 <= a < 8192 ->
@@ -362,30 +371,31 @@ Section UShKernel.
        ([UkSh.ush_fd0]).  Persistent, and the walk reads none of the three
        -- which is what makes the CLOSED arm this same application. *)
     UkSh.ush_fd0 T (take NSTD (uvis_fd W)) -∗
-    (* THE PAY FACT, at the trivial payload.  SH'S EXIT PAYLOAD IS WHERE
-       THE CONSOLE READER TOKEN HAS TO GO -- only [UkRun.ukn_pay N (-1)]
-       survives a kill -- and it is blocked one seam away
-       ([UkInit.init_exec_sup_pos]'s note: a tainted process runs on the
-       generic slot, which [UexecExecInst.xv6_sbundle_of_supply] mints at
-       the trivial payload alone). *)
-    my_pay (uvis_gen W) (fun _ => True)%I -∗
+    (* THE PAY FACT, at sh's own payload, and THE PAYLOAD ITSELF beside
+       it: the run carries [Q (-1)] between traps, hands it to the kernel
+       at every entry and is handed it back at every resume
+       ([UkRun.uslot_of_urun_all]'s two rows).  The kernel is what puts it
+       here -- [SpecKexec.exec_slot_pre]'s wands at the exec init's pinned
+       bundle answers ([PinnedExec.pex_slot]). *)
+    my_pay (uvis_gen W) Q -∗
+    Q (-1) -∗
     (* ...AND THE POSITION, the ONE linear resource init's pinned exec
        bundle hands sh through [PinnedExec]'s [Pay].  It goes into
        [UkSh.ush_pstate] and is what the read will move. *)
     upos γp n -∗
     uslot W.
   Proof.
-    intros Hpc Hsub Hx Hal8 Hroom Hstk Hfdlen Hstop.
-    iIntros "#Hpay #Hdep #Hrest #Hfd0 #Hmp Hpos".
-    iApply (uslot_of_urun_all W (2 + (8 + (16 + (ush_Dbody + n0))))
-              (fun _ => True)%I
-              Hal8 Hroom Hstk Hfdlen Hstop with "Hdep Hmp []").
-    { done. }
+    intros HQc Hpc Hsub Hx Hal8 Hroom Hstk Hfdlen Hstop.
+    iIntros "#Hpay #Hdep #Hrest #Hfd0 #Hmp HQ Hpos".
+    iApply (uslot_of_urun_all W (2 + (8 + (16 + (ush_Dbody + n0)))) Q
+              Hal8 Hroom Hstk Hfdlen Hstop with "Hdep Hmp HQ").
     (* sh's own half of its children set travels in [UkSh.ush_pstate]
        beside the ledger and the cwd: fork1 MOVES the set, so the fragment
        goes down the chain index-free ([UserChildren.uch_any]). *)
     iIntros (N h) "%Hpayeq %Hsz Hszf #Ht Hstd Hcwf Hchf Dlo _ Hrun".
-    pose proof (ukn_const_of_triv N (Hpayeq : UkRun.ukn_triv N)) as Hti.
+    (* THE RECORD'S PAYLOAD IS SH'S, and it is CONSTANT: that is the whole
+       of what the walk below needs of it ([UkRun.ukn_const]). *)
+    pose proof (ukn_const_of_eq N Q Hpayeq HQc) as Hti.
     rewrite Hpc.
     (* [R] and the line buffer, out of the data below the frame *)
     iDestruct ("Hpay" $! (ukn_t N) (ukn_d N) (ukn_s N) with "Hszf Dlo")
@@ -408,9 +418,12 @@ Section UShKernel.
   (* ------------------------------------------------------------------- *)
   Lemma sh_slot_of_kexec (R : gname -> gname -> gname -> iProp Σ)
       (γp : gname) (T : iProp Σ) `{!Persistent T}
+      (* sh's exit payload, passed straight through: see [sh_uexec_slot] *)
+      (Q : Z -> iProp Σ)
       (na : nat)
       (alen : nat -> nat) (afun : nat -> nat -> bv 8) (sts : list fdstate)
       (W' : uvis) (n0 n : nat) :
+    (forall x y : Z, Q x = Q y) ->
     kexec_image_ok sh_elf na alen afun sts W' ->
     (* room for sh's frames on the stack page, below the argument block *)
     kexec_sz sh_elf - PGSIZE + 8 * Z.of_nat (2 + (8 + (16 + (ush_Dbody + n0))))
@@ -433,11 +446,12 @@ Section UShKernel.
     (* the entry row, the pay fact, the payload and the position, all four
        passed straight through: see [sh_uexec_slot] *)
     UkSh.ush_fd0 T (take NSTD sts) -∗
-    my_pay (uvis_gen W') (fun _ => True)%I -∗
+    my_pay (uvis_gen W') Q -∗
+    Q (-1) -∗
     upos γp n -∗
     uslot W'.
   Proof.
-    intros Hok Hroom Hlen.
+    intros HQc Hok Hroom Hlen.
     (* THE MAP STOPS AT THE BREAK, off the image fact's own row: exec built
        a fresh address space, so [KexecBuilt.kxb_perm_below] says it maps
        nothing above the break, which is what lets sh's later [sbrk] see
@@ -525,7 +539,8 @@ Section UShKernel.
     (* the entry row is stated at the EXEC'ING process's table, which is
        the one the image fact says the new key carries *)
     rewrite <- Hfd.
-    iApply (sh_uexec_slot R γp T W' n0 n).
+    iApply (sh_uexec_slot R γp T Q W' n0 n).
+    - exact HQc.
     - rewrite Hpc. exact sh_start_pc.
     - exact (shk_img_sub_of_elf M Himg).
     - exact Hx.

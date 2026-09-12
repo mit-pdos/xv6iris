@@ -94,4 +94,42 @@ Section UexecExecMint.
               with "Hdep [] Hgen Hpay").
     rewrite /ssupply /= /xv6_ssupply. iModIntro. iExact "Hsup".
   Qed.
+
+  (* ...AND THE MINT AT A CONSTANT PAYLOAD (GENERIC-PAY): the same generic
+     slot, at a process that HOLDS one resource [R] between its traps and
+     pays it at exit and at every kill check.  It is what a TAINTED
+     process runs on -- the reclaimed lease is its [R] -- and what
+     [PinnedExec.pex_slot]'s taint arm is discharged from.
+     UNGATED, and that is the difference from [uslot_mint]: a process
+     carrying a real payload is the TAINTED one, and the two verified
+     gates [UexecCond.cond_entry_slot] tries hold only at the trivial
+     payload ([USyncKernel.sync_uexec_slot], [UEchoKernel.echo_uexec_slot]),
+     so [uslot_mint] stays THE entry decider and this is its sibling. *)
+  Lemma uslot_mint_pay (R : iProp Σ) :
+    app_sup -∗ □ uexec_wp -∗
+    □ (∀ W : uvis, my_pay (uvis_gen W) (fun _ => R)%I -∗ R -∗ uslot W).
+  Proof.
+    iIntros "#Hsup #Hgen".
+    iIntros "!>" (W) "#Hpay HR".
+    iApply (UexecCond.cond_entry_slot_pay R W with "[] Hgen Hpay HR").
+    rewrite /ssupply /= /xv6_ssupply. iModIntro. iExact "Hsup".
+  Qed.
+
+  (* ...AND THE SAME WITH THE PAYLOAD UNDER THE BOX.  An application that
+     hands a constraining entry constructor its TAINT ARM cannot fix the
+     payload first: the arm is persistent and is spent at whatever payload
+     the round chose ([UInitSh.init_sh_slot]'s third conjunct, at the
+     console reader token of the round's own position pair), so the
+     resource has to be bound inside the [□].  Nothing about the proof
+     changes -- the generic slot is built per call. *)
+  Lemma uslot_mint_all :
+    app_sup -∗ □ uexec_wp -∗
+    □ (∀ (R : iProp Σ) (W : uvis),
+         my_pay (uvis_gen W) (fun _ => R)%I -∗ R -∗ uslot W).
+  Proof.
+    iIntros "#Hsup #Hgen".
+    iIntros "!>" (R W) "#Hpay HR".
+    iApply (UexecCond.cond_entry_slot_pay R W with "[] Hgen Hpay HR").
+    rewrite /ssupply /= /xv6_ssupply. iModIntro. iExact "Hsup".
+  Qed.
 End UexecExecMint.

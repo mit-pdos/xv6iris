@@ -162,6 +162,14 @@ Section UserConsole.
     ucons_pay cn γ T x = ucons_pay cn γ T y.
   Proof. reflexivity. Qed.
 
+  (* ...AND THE SAME FACT IN THE FORM THE GENERIC SLOT IS STATED AT: the
+     payload IS the constant function at the resource it names, so a lemma
+     indexed by [fun _ => R] applies here at [R] read off the kill status
+     ([UexecExecMint.uslot_mint_pay], [UexecRet.uexec_wp_uslot]). *)
+  Lemma ucons_pay_eta (cn : cons_names) (γ : gname) (T : iProp Σ) :
+    (fun _ : Z => ucons_pay cn γ T (-1)) = ucons_pay cn γ T.
+  Proof. reflexivity. Qed.
+
   (* the two constructors: the lender's, at the position it minted the
      pair at, and the tainted one's *)
   Lemma ucons_pay_tok (cn : cons_names) (γ : gname) (T : iProp Σ)

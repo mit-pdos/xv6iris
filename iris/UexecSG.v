@@ -67,7 +67,9 @@
 (*        to answer exec's wand with.  This is the half the GENERIC       *)
 (*        inhabitants use ([UexecRet.uexec_wp_uslot],                     *)
 (*        [UexecCond.cond_entry_slot]), where the family is the Löb       *)
-(*        hypothesis.                                                     *)
+(*        hypothesis.  AT A CONSTANT PAYLOAD [fun _ => R]: the generic    *)
+(*        slot HOLDS [R] and pays it at exit and at the kill status, and  *)
+(*        exec relays it to the next image's slot (GENERIC-PAY).          *)
 (*                                                                        *)
 (* BOTH LAWS ARE BUPD-SHAPED, and that is not a convenience.  A bundle    *)
 (* can contain a resource that is FREE but not derivable from [emp]:      *)
@@ -408,14 +410,23 @@ Class uexecSG (Σ : gFunctors) {sg_ctok : ctokG Σ} := {
     n <> USYS_exec ->
     ⊢ □ ssupply ==∗ ∃ f : sfam, ⌜sexit_pay f = Q⌝ ∗ sbundle_at X n f W;
   (* ...and the half the generic inhabitants use *)
-  sbundle_of_supply : forall (X : uvis -d> iPropO Σ) (n : Z) (W : uvis),
-    ⊢ my_pay (uvis_gen W) (fun _ => True)%I -∗ □ ssupply -∗
-      □ (∀ W' : uvis, my_pay (uvis_gen W') (fun _ => True)%I -∗ X W') ==∗
-      (* AT THE TRIVIAL PAYLOAD, and it says so: this half is the GENERIC
-         inhabitant's, whose slot family is indexed by the trivial payload
-         and whose deposit must therefore be at it too (R1 -- read's
-         branch reads the payload). *)
-      ∃ f : sfam, ⌜sexit_pay f = (fun _ => True)%I⌝ ∗ sbundle_at X n f W;
+  (* AT A CONSTANT PAYLOAD [fun _ => R] (GENERIC-PAY).  The generic slot is
+     a slot at every key, so it may trap at exit at every key, and exit's
+     deposit is a PAYMENT -- which is why this law is indexed by the pay
+     fact.  The payload is CONSTANT because the one resource the slot
+     holds has to answer exit's additive [Q xs ∧ Q (-1)] from a single
+     copy: at a constant predicate both conjuncts are the same [R].  The
+     credential the law takes is therefore the R-carrying one -- a slot at
+     any key GIVEN the payload back -- because that is the shape exec's
+     wands are answered at: the kernel relays [Q (-1)] to the new image
+     ([SpecKexec.exec_slot_pre], the EXEC-PAY row) and the new image's
+     generic slot is minted from it.  [R := True] is the trivial instance
+     and every existing caller takes it. *)
+  sbundle_of_supply : forall (X : uvis -d> iPropO Σ) (n : Z) (W : uvis)
+      (R : iProp Σ),
+    ⊢ my_pay (uvis_gen W) (fun _ => R)%I -∗ □ ssupply -∗
+      □ (∀ W' : uvis, my_pay (uvis_gen W') (fun _ => R)%I -∗ R -∗ X W') ==∗
+      ∃ f : sfam, ⌜sexit_pay f = (fun _ => R)%I⌝ ∗ sbundle_at X n f W;
 }.
 
 Global Existing Instance sbundle_at_ne.

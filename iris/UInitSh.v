@@ -32,7 +32,7 @@
 (* stated over the CLASS, with the instance a section variable.  Importing *)
 (* the instance into either of them would put two [sbundle]s that print    *)
 (* identically in scope, and would make [UexecSG.psok] resolve to          *)
-(* [uprogSG_gen]'s [fun _ => True] -- every [psok] premise vacuously true. *)
+(* [uprogSG_gen]'s trivial one -- every [psok] premise vacuously true.     *)
 (* So the u-tier speaks [UkInit.init_exec_sup] and this file, above the    *)
 (* instance, is what pays it.                                             *)
 (* ===================================================================== *)
@@ -63,6 +63,9 @@ Require Import UserFd.
 Require Import UserHeap.
 Require Import ChildTok.  (* [my_pay]: the exec wands' pay fact *)
 Require Import UexecSlot UexecRet UsysMemOk UexecSG.
+Require Import UInitFd.  (* [ufd_head] / [ufd_head_row] -- init's own
+                            descriptor head, and the row sh's entry reads
+                            off it against the lent authority *)
 Require Import UkRun.
 Require Import UCodeInit UkInit.
 Require Import UkSh UShKernel.
@@ -363,16 +366,24 @@ Section UInitSh.
   (* Timeless because the claim sits under [AppInv.app_body]'s later and   *)
   (* each fire strips it ([PinnedExec]'s header).                          *)
   (* ------------------------------------------------------------------- *)
-  (* THE TAINT ARM IS INDEXED BY THE PAY FACT, at the TRIVIAL payload: a
-     tainted process runs on the generic family, which is itself indexed by
-     it ([UexecExecMint.uslot_mint]), and the payload of the process init
-     execs sh into is the one init chose at the fork that made it -- trivial
-     at this lane (L7 is what makes it the console-input resource). *)
+  (* THE TAINT ARM IS INDEXED BY THE PAY FACT, AT EVERY CONSTANT PAYLOAD:
+     a tainted process runs arbitrary code on the generic family, which is
+     indexed by the pay fact ([UexecExecMint.uslot_mint_pay]) -- and the
+     payload of the process init execs sh into is the one init chose at the
+     fork that made it, which is the console reader token
+     ([UserConsole.ucons_pay]) and not the trivial one.  So the arm is
+     ∀-bound over the resource [R] the payload names: the tainted slot
+     HOLDS it, pays it at exit and at every kill check, and hands it on
+     across an exec (GENERIC-PAY).  Under the [□] and not outside it,
+     because the arm is persistent and is spent at whatever payload the
+     ROUND chose -- the console token of that round's own position pair.
+     [UexecExecMint.uslot_mint_all] is exactly this proposition. *)
   Definition init_sh_slot (T : iProp Σ) (Pay : iProp Σ) : iProp Σ :=
     (app_inv fsc_fs
      ∗ □ (∀ v : aview, app_pred app_run v -∗
                          app_pred app_run v ∗ (⌜FsShPin.era0_sh_pins v⌝ ∨ T))
-     ∗ □ (∀ W : uvis, T -∗ my_pay (uvis_gen W) (fun _ => True)%I -∗ uslot W)
+     ∗ □ (∀ (R : iProp Σ) (W : uvis),
+            T -∗ my_pay (uvis_gen W) (fun _ => R)%I -∗ R -∗ uslot W)
      ∗ Pay)%I.
 
   Global Instance init_sh_slot_persistent T Pay `{!Persistent Pay} :
@@ -432,33 +443,30 @@ Section UInitSh.
   (* THE ASSEMBLY: init's pinned bundle pays its exec supply.              *)
   (* ------------------------------------------------------------------- *)
   Lemma init_exec_sup_of_sh_slot (T : iProp Σ) `{!Persistent T} `{!Timeless T}
+      (cn : cons_names) (st : fdstate)
       (Rsh : gname -> gname -> gname -> iProp Σ) (n0 : nat) :
     (forall k : Z, k <> USYS_exec -> psok k) ->
     8 * Z.of_nat (2 + (8 + (16 + (ush_Dbody + n0)))) <= 0xFE0 ->
-    (* THE ENTRY'S DESCRIPTOR ROW, at its three arms ([UkSh.ush_fd0]): what
-       init can hand sh on fd 0 is the console, an all-closed table, or
-       nothing beyond the taint.
-       STATED AT EVERY TABLE, WHICH IS TOO STRONG, and is this lane's one
-       open obligation: the row is really a consequence of INIT'S OWN HEAD
-       ([UInitFd.ufd_head], whose three arms are the same three), and the
-       route is to thread the head into [UkInit.init_exec_sup_pos] in place
-       of the bare [UserFd.ustd_any] it takes today and read the row off it
-       there ([UInitFd.ufd_head_open] is the shape).  Left as a premise
-       rather than derived because the supply's own ledger premise is the
-       weakened one; nothing in the tree applies this lemma yet, so the
-       obligation is recorded and not discharged. *)
-    (∀ sts : list fdstate, ⊢ UkSh.ush_fd0 T (take NSTD sts)) ->
+    (* WHAT INIT'S OWN OPEN INSTALLED ON SLOT 0.  sh's entry is told one
+       row about its table -- fd 0 is the console, slot 0 is closed, or the
+       taint ([UkSh.ush_fd0]) -- and those are exactly the three arms of
+       init's head ([UInitFd.ufd_head]), which the exec supply now carries
+       ([UkInit.init_exec_sup_pos]) and reads against the lent authority
+       ([UInitFd.ufd_head_row]).  The only thing left for the caller to say
+       is that the head's OWN state is the console one, which is what the
+       pinned open's receipt gives it. *)
+    (exists wr : bool, st = FdOpen true wr (FdDevice ConsoleInv.CONSOLE)) ->
     udep -∗
     init_sh_slot T (sh_pay Rsh n0) -∗
-    UkInit.init_exec_sup_lend.
+    UkInit.init_exec_sup_lend cn T st.
   Proof.
-    intros Hpsok Hn0 Hfd0.
+    intros Hpsok Hn0 Hst.
     iIntros "#Hdep (#Hinv & #Hcl & #Hgen & #Hpay)".
     (* THE LEDGER IS TAKEN AND NOT READ: sh's entry says nothing about its
        standard streams, and the only descriptor fact this constructor
        needs is [length fdv = NOFILE], which comes off the LENT authority
        ([UserFd.ufd_auth_len]) rather than off the ledger. *)
-    iModIntro. iIntros (γp np N m pc) "%Hpeq %Ha0 %Ha1 #Hro #Hargv _ Hpos".
+    iModIntro. iIntros (γp np N m pc) "%Hpeq %Ha0 %Ha1 #Hro #Hargv Hhd Hpos".
     rewrite /udepw_at. iIntros (M pm sz fdv gn cs pidv) "#Hmpay Hheap Hufd".
     (* ---- the two image readings, off the lent heap ---- *)
     iAssert (⌜uimg_sub UCodeInit.init_ro M⌝)%I as %Hsro.
@@ -475,46 +483,64 @@ Section UInitSh.
       iPureIntro. exact HM. }
     (* ---- the descriptor list, off the lent authority ---- *)
     iDestruct (ufd_auth_len with "Hufd") as %Hlen.
+    (* ...AND THE ROW SH'S ENTRY IS TOLD, read off INIT'S OWN HEAD against
+       that same authority ([UInitFd.ufd_head_row]).  The head is spent
+       here: the process that execs is replaced, and the new image gets its
+       ledger from its own run. *)
+    iDestruct (ufd_head_row T st (ukn_fd N) fdv with "Hufd Hhd")
+      as "[Hufd #Hrow]".
+    iAssert (UkSh.ush_fd0 T (take NSTD fdv)) as "#Hfd0".
+    { iDestruct "Hrow" as "[%Hr1 | [%Hr2 | HT]]".
+      - destruct Hst as [wr ->]. iLeft. iPureIntro. exists wr. exact Hr1.
+      - iRight. iLeft. iPureIntro. exact Hr2.
+      - iRight. iRight. iExact "HT". }
     iFrame "Hheap Hufd". iRight.
     (* ---- sh's constructor, at every key the image fact admits ---- *)
-    (* THE PAYLOAD RIDES WITH THE PAY FACT ([SpecKexec.exec_slot_pre]), and
-       at this lane it is the trivial one -- init's child owes nothing --
-       so what the constructor takes beside [my_pay] is [True] and sh's
-       entry is answered without it. *)
+    (* THE PAYLOAD RIDES WITH THE PAY FACT ([SpecKexec.exec_slot_pre]): the
+       kernel holds the exec'ing process's own payment across this call and
+       hands it to whatever slot answers, so sh's entry gets its exit
+       payload -- the console reader token -- from here and from nowhere
+       else (EXEC-PAY, GENERIC-PAY). *)
     (* THE LINEAR HALF OF [Pay] IS THE POSITION: [UInitSh.sh_pay] is
        persistent, so what actually crosses [PinnedExec]'s one linear slot
        is [UserConsole.upos] at the pair init minted for this round.  The
-       exit payload is NOT here -- it arrives at the constructor wand from
-       the kernel's own payment (EXEC-PAY) -- and at this lane it is the
-       trivial one. *)
+       exit payload is NOT there -- it arrives at the constructor wand from
+       the kernel's own payment. *)
     iAssert (□ (∀ (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
                   (W' : uvis),
                   ⌜kexec_image_ok ElfUser.sh_elf na alen afun fdv W'⌝ -∗
                   ⌜exec_args_of M (mword_of_int 0x1000 : mword 64)
                      na alen afun⌝ -∗
-                  my_pay (uvis_gen W') (fun _ => True)%I -∗
-                  (fun _ : Z => True)%I (-1) -∗
+                  my_pay (uvis_gen W') (ucons_pay cn γp T) -∗
+                  ucons_pay cn γp T (-1) -∗
                   (sh_pay Rsh n0 ∗ upos γp np) -∗ uslot W'))%I as "#Hcon".
-    { iModIntro. iIntros (na alen afun W') "%Hok %Hargs #Hmp _ [[#Hp1 #Hp2] Hps]".
+    { iModIntro. iIntros (na alen afun W') "%Hok %Hargs #Hmp HQ [[#Hp1 #Hp2] Hps]".
       destruct (init_args_det M na alen afun Hsav Hsro Hargs) as [-> Halen].
-      iApply (sh_slot_of_kexec Hpsok Rsh γp T 1%nat alen afun fdv W' n0 np Hok
+      iApply (sh_slot_of_kexec Hpsok Rsh γp T (ucons_pay cn γp T)
+                1%nat alen afun fdv W' n0 np
+                (ucons_pay_const cn γp T) Hok
                 (init_sh_room alen n0 Halen Hn0) Hlen
-                with "[] Hdep [] [] Hmp Hps").
+                with "[] Hdep [] [] Hmp HQ Hps").
       - iModIntro. iIntros (γt γd γs) "Hsz Hlo".
         iApply ("Hp1" $! W' γt γd γs with "Hsz Hlo").
       - iIntros (N0). iApply ("Hp2" $! γp N0).
-      - iApply (Hfd0 fdv). }
+      - iExact "Hfd0". }
     (* ---- the bundle ---- *)
-    (* ...and the taint arm on the same terms: the generic family is at the
-       trivial payload, so the [Q (-1)] it is handed is [True]. *)
-    iAssert (□ (∀ W' : uvis, T -∗ my_pay (uvis_gen W') (fun _ => True)%I -∗
-                  (fun _ : Z => True)%I (-1) -∗ uslot W'))%I as "#Hgen'".
-    { iModIntro. iIntros (W') "#HT #Hmp _". iApply ("Hgen" with "HT Hmp"). }
+    (* ...and the taint arm at the SAME payload: a tainted process runs on
+       the generic family, which exists at any constant payload and HOLDS
+       the resource it names ([UexecExecMint.uslot_mint_pay]).  The payload
+       is literally the constant function at what the kill status names
+       ([UserConsole.ucons_pay_eta]). *)
+    iAssert (□ (∀ W' : uvis, T -∗ my_pay (uvis_gen W') (ucons_pay cn γp T) -∗
+                  ucons_pay cn γp T (-1) -∗ uslot W'))%I as "#Hgen'".
+    { iModIntro. iIntros (W') "#HT #Hmp HQ".
+      iApply ("Hgen" $! (ucons_pay cn γp T (-1)) W' with "HT [Hmp] HQ").
+      rewrite ucons_pay_eta. iExact "Hmp". }
     iDestruct (pinned_exec_bundle fsc_fs uslot FsShPin.era0_sh_pins T
                  FsImg.ROOTINO init_sh_pl [FsImg.ROOTINO; FsShPin.SH_INO]
                  FsShPin.SH_INO ElfUser.sh_elf 1%nat
                  (sh_pay Rsh n0 ∗ upos γp np)%I
-                 (fun _ => True)%I
+                 (ucons_pay cn γp T)
                  M (mword_of_int 0x9a8) (mword_of_int 0x1000) fdv
                  init_sh_pin_resolves sh_elf_loadable
                  (init_sh_path_of M Hsro)

@@ -7585,20 +7585,20 @@ Section UkShDiagLeaf.
          WP (Loop : expr riscv_lang)) -∗
       WP (Loop : expr riscv_lang).
 
-  (* AT BOTH CLASSES, and the second is what runcmd's EXEC arm needs: the
-     generic exec supply [UkRun.uxsup] is minted at the TRIVIAL payload
-     alone ([UexecExecInst.xv6_sbundle_of_supply]), and runcmd runs in the
-     process sh forked, whose payload is trivial by
-     [UkFork.wp_uk_ecall_fork_any]'s child arm.  Every other lemma of sh's
-     walk is at [ukn_const], which is all sh's own non-trivial payload
-     ([UserConsole.ucons_pay]) supports. *)
+  (* AT ONE CLASS ([ukn_const]), like every other lemma of sh's walk: the
+     exec supply names THIS record's own payload ([UkRun.uxsup_at]), so
+     runcmd no longer asks its caller to be trivial.  A caller whose
+     record is trivial -- sh's forked child is, by
+     [UkFork.wp_uk_ecall_fork_any]'s arm -- passes [UkRun.uxsup]. *)
   Lemma wp_kshr_runcmd_final (Hclw : ushd_clw_text_ty) (c : ushcmd) :
     ush_simple c ->
-    forall (N : uk_names Σ) `{!ukn_const N} `{!ukn_triv N} (h : CpuId) (m : regfile) (t szv : Z)
+    forall (N : uk_names Σ) `{!ukn_const N} (h : CpuId) (m : regfile) (t szv : Z)
            (ld : list fdstate) (n : nat),
       m !!! Regidx a0_idx = (mword_of_int t : mword 64) ->
       shk_code (ukn_t N) -∗
-      (* the exec deposit's supplier -- [UkRun.uxsup], see [wp_kshr_runcmd] *)
+      (* the exec deposit's two suppliers -- see [wp_kshr_runcmd]: this
+         record's own payload, and the trivial one its forks run at *)
+      uxsup_at (ukn_pay N) -∗
       uxsup -∗
       ush_jtab (ukn_t N) -∗ ush_cmd (ukn_d N) t c -∗ usz (ukn_s N) szv -∗
       UserFd.ustd (ukn_fd N) ld -∗
@@ -7633,11 +7633,13 @@ Section UkShDiagLeaf.
           (2 + (ush_Dg + n)) -∗
         WP (Loop : expr riscv_lang)) ∗
      (∀ (N' : uk_names Σ) (h' : CpuId) (m' : regfile),
-        (* THE CHILD'S RECORD PAYS THE SAME NOTHING ITS PARENT DOES: the
-           payload the fork's split put on the child's generation is the
-           parent's ([UkFork]'s child arm gives the equation), and this
-           program's is trivial -- so the arm hands the class on and every
-           leaf below it, exit included, resolves it. *)
+        (* THE CHILD'S PAYLOAD IS TRIVIAL, and it is the one place in sh's
+           walk that is: sh FORKS at [fun _ => True]
+           ([UkFork.wp_uk_ecall_fork_any]'s child arm gives the equation),
+           because what sh's children owe it is nothing -- sh's OWN payload
+           is the console reader token and the rest of this walk is stated
+           at [UkRun.ukn_const].  The arm hands the class on and every leaf
+           below it, exit included, resolves it. *)
         ⌜ ukn_triv N' ⌝ -∗
         ⌜ ucallee_saved m m' ⌝ -∗
         ⌜ m' !!! Regidx a0_idx = (mword_of_int 0 : mword 64) ⌝ -∗

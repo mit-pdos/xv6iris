@@ -1080,11 +1080,13 @@ Section UkShRun.
           (ret_pc (m !!! Regidx ra_idx)) avail -∗
         WP (Loop : expr riscv_lang)) ∗
      (∀ (N' : uk_names Σ) (h' : CpuId),
-        (* THE CHILD'S RECORD PAYS THE SAME NOTHING ITS PARENT DOES: the
-           payload the fork's split put on the child's generation is the
-           parent's ([UkFork]'s child arm gives the equation), and this
-           program's is trivial -- so the arm hands the class on and every
-           leaf below it, exit included, resolves it. *)
+        (* THE CHILD'S PAYLOAD IS TRIVIAL, and it is the one place in sh's
+           walk that is: sh FORKS at [fun _ => True]
+           ([UkFork.wp_uk_ecall_fork_any]'s child arm gives the equation),
+           because what sh's children owe it is nothing -- sh's OWN payload
+           is the console reader token and the rest of this walk is stated
+           at [UkRun.ukn_const].  The arm hands the class on and every leaf
+           below it, exit included, resolves it. *)
         ⌜ ukn_triv N' ⌝ -∗
         shk_code (ukn_t N') -∗ P (ukn_t N') (ukn_d N') (ukn_s N') -∗ usz (ukn_s N') szv -∗
         UserFd.ustd (ukn_fd N') l -∗
@@ -1519,11 +1521,13 @@ Section UkShRun.
         urun N h' m' (ret_pc (m !!! Regidx ra_idx)) (2 + (Dg + n)) -∗
         WP (Loop : expr riscv_lang)) ∗
      (∀ (N' : uk_names Σ) (h' : CpuId) (m' : regfile),
-        (* THE CHILD'S RECORD PAYS THE SAME NOTHING ITS PARENT DOES: the
-           payload the fork's split put on the child's generation is the
-           parent's ([UkFork]'s child arm gives the equation), and this
-           program's is trivial -- so the arm hands the class on and every
-           leaf below it, exit included, resolves it. *)
+        (* THE CHILD'S PAYLOAD IS TRIVIAL, and it is the one place in sh's
+           walk that is: sh FORKS at [fun _ => True]
+           ([UkFork.wp_uk_ecall_fork_any]'s child arm gives the equation),
+           because what sh's children owe it is nothing -- sh's OWN payload
+           is the console reader token and the rest of this walk is stated
+           at [UkRun.ukn_const].  The arm hands the class on and every leaf
+           below it, exit included, resolves it. *)
         ⌜ ukn_triv N' ⌝ -∗
         ⌜ ucallee_saved m m' ⌝ -∗
         ⌜ m' !!! Regidx a0_idx = (mword_of_int 0 : mword 64) ⌝ -∗
@@ -2738,18 +2742,29 @@ Section UkShRun.
   (* DEPENDS ON [ush_diag_leaf]: EXEC's returning exec, REDIR's failing     *)
   (* open, PIPE's failing pipe, and fork1's -1 all end in the printer.      *)
   (* ===================================================================== *)
-  (* AT BOTH CLASSES -- see [UkShDiag.wp_kshr_runcmd_final]: the EXEC arm
-     pays its deposit out of [UkRun.uxsup], which exists only at the
-     trivial payload, and runcmd is the process sh FORKED. *)
+  (* AT ONE CLASS NOW ([ukn_const]).  The EXEC arm pays its deposit out of
+     the exec supply AT THIS RECORD'S OWN PAYLOAD ([UkRun.uxsup_at]), which
+     is what the supplier names, so nothing here reads whether that payload
+     is trivial -- and runcmd becomes usable by a process that owes its
+     parent something.  A caller whose record IS trivial passes
+     [UkRun.uxsup] and rewrites by its own equation. *)
   Lemma wp_kshr_runcmd (c : ushcmd) :
     ush_simple c ->
-    forall (N : uk_names Σ) `{!ukn_const N} `{!ukn_triv N} (h : CpuId) (m : regfile) (t szv : Z)
+    forall (N : uk_names Σ) `{!ukn_const N} (h : CpuId) (m : regfile) (t szv : Z)
            (ld : list fdstate) (n : nat),
       m !!! Regidx a0_idx = (mword_of_int t : mword 64) ->
       shk_code (ukn_t N) -∗
       (* THE EXEC DEPOSIT'S SUPPLIER.  runcmd's EXEC arm ecalls exec, whose
-         bundle the key-free minting law cannot pay ([UkRun.uxsup]); sh takes
-         it as an explicit premise and its kernel-side constructor pays it. *)
+         bundle the key-free minting law cannot pay ([UkRun.uxsup_at]); sh
+         takes it as an explicit premise and its kernel-side constructor
+         pays it.  AT THIS RECORD'S OWN PAYLOAD, which is what exec's
+         bundle reads ([UexecExecInst.exec_sbundle]). *)
+      uxsup_at (ukn_pay N) -∗
+      (* ...AND AT THE TRIVIAL ONE, which is a DIFFERENT bundle and is
+         needed for a different process: the LIST and BACK arms FORK, the
+         child's record pays nothing ([UkFork.wp_uk_ecall_fork_any]'s arm),
+         and runcmd runs again in it.  At a trivial [N] the two premises
+         are one proposition and a caller passes [UkRun.uxsup] twice. *)
       uxsup -∗
       ush_jtab (ukn_t N) -∗ ush_cmd (ukn_d N) t c -∗ usz (ukn_s N) szv -∗
       UserFd.ustd (ukn_fd N) ld -∗
@@ -2763,8 +2778,8 @@ Section UkShRun.
   Proof.
     induction c as [ args | c1 IH file mode fd | l IHl r IHr
                    | l IHl r IHr | c1 IH ];
-      intros Hs N Hcst Hti h m t szv ld n Ha0;
-      iIntros "#Hcode #Hexs #Hjt #Htree Hsz Hstd Hcwd Hch Hrun";
+      intros Hs N Hcst h m t szv ld n Ha0;
+      iIntros "#Hcode #Hexs #Hexs0 #Hjt #Htree Hsz Hstd Hcwd Hch Hrun";
       iDestruct (ush_jtab_ro with "Hjt") as "#Hro";
       iDestruct (ush_cmd_addr with "Htree") as %[Htr Ht8];
       assert (Ht4 : t mod 4 = 0)
@@ -2900,7 +2915,7 @@ Section UkShRun.
               apply bv_eq; vm_compute; reflexivity).
         iApply (wp_kshr_exec N h5 k3 (2 + (Dg + n))
                   with "Hcode Hrun []").
-        { iApply (udepw_of_uxsup with "Hexs"). }
+        { iApply (udepw_of_uxsup_at with "Hexs"). }
         rewrite Hrk3. iIntros (h6) "Hrun".
         (* ---- 0xda: "exec %s failed" -- THE DIAGNOSTIC CUT ---- *)
         set (k4 := <[Regidx a0_idx := (mword_of_int (-1) : mword 64)]>
@@ -3045,9 +3060,9 @@ Section UkShRun.
           with (6 * ush_ht r
                 + (2 + (Dg + (6 * (Nat.max (ush_ht l) (ush_ht r)
                                    - ush_ht r) + n))))%nat by lia.
-        iApply (IHr (proj2 Hs) N Hcst Hti hE g3 qr szv ld
+        iApply (IHr (proj2 Hs) N Hcst hE g3 qr szv ld
                   ((6 * (Nat.max (ush_ht l) (ush_ht r) - ush_ht r) + n)%nat)
-                  Ha0_g3 with "Hcode Hexs Hjt2 Hqrc Hsz Hstd Hcwd Hch Hrun").
+                  Ha0_g3 with "Hcode Hexs Hexs0 Hjt2 Hqrc Hsz Hstd Hcwd Hch Hrun").
       + (* ---- the CHILD: runcmd(lcmd->left) ---- *)
         iIntros (N' hA mA) "%Hti' %HcsA %Ha0A #Hck (#Hjt2 & #Ht2) Hsz Hstd Hcwd Hch _ Hrun".
         pose proof (ukn_const_of_triv N' Hti') as Hcst'.
@@ -3108,9 +3123,12 @@ Section UkShRun.
           with (6 * ush_ht l
                 + (2 + (Dg + (6 * (Nat.max (ush_ht l) (ush_ht r)
                                    - ush_ht l) + n))))%nat by lia.
-        iApply (IHl (proj1 Hs) N' Hcst' Hti' hD g3 ql2 szv ld
+        (* the child's record pays nothing ([UkFork]'s arm), so the
+           trivial exec supply is its own ([UkRun.uxsup_at_triv]) *)
+        iDestruct (uxsup_at_triv N' with "Hexs0") as "#Hexs'".
+        iApply (IHl (proj1 Hs) N' Hcst' hD g3 ql2 szv ld
                   ((6 * (Nat.max (ush_ht l) (ush_ht r) - ush_ht l) + n)%nat)
-                  Ha0_g3 with "Hck Hexs Hjt2 Hqlc2 Hsz Hstd Hcwd Hch Hrun").
+                  Ha0_g3 with "Hck Hexs' Hexs0 Hjt2 Hqlc2 Hsz Hstd Hcwd Hch Hrun").
 
     - (* =================== BACK =================== *)
       iDestruct (ush_cmd_back with "Htree") as (q) "[#Hqp #Hqc]".
@@ -3230,8 +3248,9 @@ Section UkShRun.
           exact (upd_eq mA (Regidx a0_idx) (mword_of_int q2 : mword 64)). }
         replace (2 + (Dg + (6 * ush_ht c1 + n)))%nat
           with (6 * ush_ht c1 + (2 + (Dg + n)))%nat by lia.
-        iApply (IH Hs N' Hcst' Hti' hD b3 q2 szv ld n Ha0_b3
-                  with "Hck Hexs Hjt2 Hqc2 Hsz Hstd Hcwd Hch Hrun").
+        iDestruct (uxsup_at_triv N' with "Hexs0") as "#Hexs'".
+        iApply (IH Hs N' Hcst' hD b3 q2 szv ld n Ha0_b3
+                  with "Hck Hexs' Hexs0 Hjt2 Hqc2 Hsz Hstd Hcwd Hch Hrun").
   Qed.
 
 End UkShRun.

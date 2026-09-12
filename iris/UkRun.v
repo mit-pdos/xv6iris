@@ -31,7 +31,7 @@
 (* them anyway.  Memory is the opposite: fragments live OUTSIDE [urun] and *)
 (* a leaf names exactly the bytes it touches, so everything else frames.   *)
 (* ===================================================================== *)
-From Stdlib Require Import ZArith Bool Lia List.
+From Stdlib Require Import ZArith Bool Lia List FunctionalExtensionality.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import ghost_map ghost_var invariants.
@@ -202,6 +202,19 @@ Proof. intros Ht x y. by rewrite Ht. Qed.
 Lemma ukn_const_of_eq {Σ : gFunctors} (N : uk_names Σ) (Q : Z -> iProp Σ) :
   ukn_pay N = Q -> (forall x y : Z, Q x = Q y) -> ukn_const N.
 Proof. intros Heq HQ x y. rewrite Heq. exact (HQ x y). Qed.
+
+(* ...AND THE BRIDGE TO THE FORM THE GENERIC SLOT IS STATED AT
+   (GENERIC-PAY).  [UexecRet.uexec_wp_uslot] and the two supply laws are
+   indexed by a payload of the shape [fun _ => R] -- a literal constant
+   function -- while [ukn_const] is the pointwise statement.  The witness
+   is the payload at the kill status, which is the resource the run
+   carries ([urun]'s [ukn_pay N (-1)] conjunct), so the two readings of
+   "what this process owes" are one resource by construction. *)
+Lemma ukn_pay_const {Σ : gFunctors} (N : uk_names Σ) `{!ukn_const N} :
+  ukn_pay N = (fun _ => ukn_pay N (-1)).
+Proof.
+  apply functional_extensionality. intros x. exact (ukn_const_eq x (-1)).
+Qed.
 
 Section UkRun.
   Context `{!riscvGS Σ}.
@@ -444,8 +457,20 @@ Section UkRun.
      [ukn_triv].  A process whose exit owes something real (sh, once it
      holds the console reader) execs on a PINNED supply instead
      ([UkInit.init_exec_sup]'s shape), which names its own payload. *)
-  Definition uxsup : iProp Σ :=
-    (□ ∀ W : uvis, sbundle_pay uslot USYS_exec (fun _ => True)%I W)%I.
+  (* ...AT A CHOSEN PAYLOAD (GENERIC-PAY).  Once the generic slot exists at
+     a CONSTANT payload, a program whose exit owes a real resource can
+     take this supplier too: the bundle names the payload the exec'ing
+     process pays the trap's payment row at, and the kernel relays that
+     resource to the new image's slot ([SpecKexec.exec_slot_pre]).  [uxsup]
+     is this at the trivial payload, which is what a program answering for
+     NOTHING carries. *)
+  Definition uxsup_at (Q : Z -> iProp Σ) : iProp Σ :=
+    (□ ∀ W : uvis, sbundle_pay uslot USYS_exec Q W)%I.
+
+  Global Instance uxsup_at_persistent Q : Persistent (uxsup_at Q).
+  Proof. rewrite /uxsup_at. apply _. Qed.
+
+  Definition uxsup : iProp Σ := uxsup_at (fun _ => True)%I.
 
   Global Instance uxsup_persistent : Persistent uxsup.
   Proof. rewrite /uxsup. apply _. Qed.
@@ -458,6 +483,17 @@ Section UkRun.
   Proof.
     iIntros "#Hx" (M pm sz fdv cw gn cs pidv) "_ Hh Hf". iFrame "Hh Hf". iRight.
     rewrite (ukn_triv_eq (N := N)). iApply "Hx".
+  Qed.
+
+  (* ...AND THE SAME AT THE RECORD'S OWN PAYLOAD, which is what a program
+     at [ukn_const] takes in place of [ukn_triv] (GENERIC-PAY).  Nothing
+     about the payload is read here: the supplier already names it. *)
+  Lemma udepw_of_uxsup_at (N : uk_names Σ)
+      (m : regfile) (pc : mword 64) :
+    uxsup_at (ukn_pay N) -∗ udepw N m pc USYS_exec.
+  Proof.
+    iIntros "#Hx" (M pm sz fdv cw gn cs pidv) "_ Hh Hf". iFrame "Hh Hf". iRight.
+    iApply "Hx".
   Qed.
 
   (* ...AND WHAT A SUPPLIER THAT ONLY HAS THE BUNDLE AT ONE WORKING
@@ -538,6 +574,23 @@ Section UkRun.
   Proof.
     iIntros "#Hx" (M pm sz fdv gn cs pidv) "_ Hh Hf".
     iFrame "Hh Hf". iRight. rewrite (ukn_triv_eq (N := N)). iApply "Hx".
+  Qed.
+
+  (* ...AND THE TRIVIAL SUPPLIER READ AT A TRIVIAL RECORD'S OWN PAYLOAD:
+     what a caller holding [uxsup] hands a lemma stated at [uxsup_at
+     (ukn_pay N)] when its own record pays nothing (sh's forked child,
+     [UkFork.wp_uk_ecall_fork_any]'s arm). *)
+  Lemma uxsup_at_triv (N : uk_names Σ) `{!ukn_triv N} :
+    uxsup -∗ uxsup_at (ukn_pay N).
+  Proof. rewrite (ukn_triv_eq (N := N)). iIntros "H". iExact "H". Qed.
+
+  (* ...and the same at the record's own payload (GENERIC-PAY) *)
+  Lemma udepw_at_of_uxsup_at (N : uk_names Σ)
+      (m : regfile) (pc : mword 64) (c : Z) :
+    uxsup_at (ukn_pay N) -∗ udepw_at N m pc USYS_exec c.
+  Proof.
+    iIntros "#Hx" (M pm sz fdv gn cs pidv) "_ Hh Hf".
+    iFrame "Hh Hf". iRight. iApply "Hx".
   Qed.
 
   (* THE LEAF'S USE OF IT, [udepw_mint]'s shape at the fixed cwd *)

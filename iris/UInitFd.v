@@ -239,6 +239,31 @@ Section UInitFd.
       | by iExists _ | iExact "H" ].
   Qed.
 
+  (* ...AND THE ROW THE HEAD CARRIES, READ AGAINST THE PROCESS'S OWN
+     AUTHORITY.  A consumer that holds the descriptor AUTHORITY (the exec
+     supply does: [UkRun.udepw_at] lends it so a pinned bundle can read
+     the table) turns the head into a fact about slot 0 of that authority's
+     own list, which is what the exec'd program's entry is told
+     ([UkSh.ush_fd0]'s three arms are these three).  The authority goes
+     back untouched; the LEDGER is spent, which is right -- the process
+     that execs is replaced. *)
+  Lemma ufd_head_row (T : iProp Σ) (st : fdstate) (γfd : gname)
+      (fdv : list fdstate) :
+    ufd_auth γfd fdv -∗ ufd_head T st γfd -∗
+    ufd_auth γfd fdv ∗
+    (⌜take NSTD fdv !! 0%nat = Some st⌝
+     ∨ ⌜take NSTD fdv !! 0%nat = Some FdClosed⌝ ∨ T).
+  Proof.
+    rewrite /ufd_head /ufd_std_at.
+    iIntros "Ha [H | [H | [_ HT]]]".
+    - iDestruct "H" as (l) "[Hl %Hrow]".
+      iDestruct (ustd_agree with "Ha Hl") as %->.
+      iFrame "Ha". iLeft. by iPureIntro.
+    - iDestruct (ustd_agree with "Ha H") as %->.
+      iFrame "Ha". iRight. iLeft. iPureIntro. exact ufd_l0_row0.
+    - iFrame "Ha". iRight. iRight. iExact "HT".
+  Qed.
+
   (* ...AND THE LEDGER THE HEAD IS AT, WITH THE ARM'S WAY BACK.  fork hands
      the child a ledger at the PARENT's own list under the child's ghost
      name (design/user-fd.md SS5), so what the fork needs is the list and a

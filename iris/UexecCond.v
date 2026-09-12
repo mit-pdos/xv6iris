@@ -306,7 +306,25 @@ Section UexecCond.
     { iApply (sync_gate_slot W Hpsok Hgate with "Hdep Hpay"). }
     destruct (decide (echo_gate W)) as [Hgate | _].
     { iApply (echo_gate_slot W Hpsok Hgate with "Hdep Hpay"). }
-    iApply (uexec_wp_uslot W with "Hsup Hgen Hpay").
+    iApply (uexec_wp_uslot_triv W with "Hsup Hgen Hpay").
+  Qed.
+
+  (* ...AND THE ENTRY AT A CONSTANT PAYLOAD (GENERIC-PAY).  A process whose
+     exit owes a real resource -- the console reader token sh runs on, or
+     the taint it becomes -- enters on the GENERIC tail and nothing else:
+     the two verified branches above are constructors for programs whose
+     payload is the trivial one ([USyncKernel.sync_uexec_slot],
+     [UEchoKernel.echo_uexec_slot] both take [my_pay _ (fun _ => True)]),
+     so there is no gate to try at a payload they cannot hold.  This is
+     the slot [PinnedExec.pex_slot]'s taint arm is answered by.
+     [udep] is not needed: the generic tail pays every deposit out of
+     [ssupply] alone ([UexecRet.uexec_wp_uslot]). *)
+  Lemma cond_entry_slot_pay (R : iProp Σ) (W : uvis) :
+    □ ssupply -∗ □ uexec_wp -∗
+    my_pay (uvis_gen W) (fun _ => R)%I -∗ R -∗ uslot W.
+  Proof.
+    iIntros "#Hsup #Hgen #Hpay HR".
+    iApply (uexec_wp_uslot R W with "Hsup Hgen Hpay HR").
   Qed.
 
 End UexecCond.
