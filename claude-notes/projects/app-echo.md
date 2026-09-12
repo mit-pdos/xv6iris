@@ -2404,6 +2404,33 @@ ORDER: GENERIC-PAY → CONS-SWALLOW → SH-LINE 2b (gets on `ush_gets_line`,
 `wp_uk_ecall_read_recv` with `upos` threaded read → gets_loop → gets → getcmd
 → main) → LAZY-FLAG (the owner's form of (A)).
 
+DISC-RATE LANDED (2026-09-12; `2f3107ed0` + `340d01a3f` rebased onto main; 4
+files +1162/-136; build `disc21`, audit = the thirteen; lemma_diff = 23 names
+MOVED verbatim from AppEcho.v into the new pure `EchoDisc.v`, re-exported).
+`disc h := Forall disc_seg' (cycles_of h)`; `disc_seg' seg := disc_seg seg (D3,
+verbatim) ∧ ∃ cs (one continuation choice per completed line, < 4), ∀ input
+position i, disc_pt cs i (the wire before input i)`; `disc_pt cs i p := k_done
+w ∧ ∃ t ∈ prompt_tails, (t ++ sess_tail cs i) prefix_of drop (k_pt w) w` (D0 +
+D1/D2 as ruled; `t` unique: `disc_pt_tail_unique`, the nineteen prompt-bearing
+suffixes of the prologue are an antichain).  `boot_msgs` (ten), `hart_lines`,
+`k_done`/`k_point`/`k_pt` (decidable via `subseqb`), `u_prologue`, `line_alts`
+(O5's four), `sess_n`/`sess`/`sess_tail`, `expected_rel`, `shuffle`,
+`boot_stream`, `good_out`, `echo_phi := Forall (fun seg => disc_seg' seg ->
+good_out seg) (cycles_of h)` (no longer True).  D0 unambiguous by DIGITS
+(`k_point_sess_n`: no prefix of the session reaches the k-point).  The three
+closure laws hold at their old statements; `disc_old`/`disc_proj` bridge.
+Anti-vacuity: `demo_disc_seg'` by vm_compute on the literal ten-messages +
+prologue + first byte trace.  `Hphi` IS OPEN (E5 proves it).
+THE E5 INVARIANT (from the lane): with `w := obs_wire seg`, `k := k_pt w`,
+`INV := ∃ cs t U_pre ks, u_prologue = U_pre ++ t ∧ t ∈ prompt_tails ∧ every K
+byte in take k w ∧ shuffle ks (U_pre ++ drop k w) w ∧ boot_stream ks ∧ drop k
+w prefix_of t ++ sess_tail cs (length (ins seg))`; steps: a K byte extends ks
+(before the k-point); an out byte after the k-point extends the pure suffix
+along `t ++ sess_tail` (next byte determined by `sess_n_step`); an in byte is
+admitted only where `disc_pt` makes the lower bound meet the upper one, i.e.
+`drop k w = t ++ sess_tail cs i` exactly -- sh has consumed the previous line,
+the ring holds at most one line, consoleintr drops nothing.
+
 CONS-SWALLOW LANDED (2026-09-12; the iris commit after `2c0d32048`; 28 kernel
 and tier files, +883/-208; build `swallow26`, audit = the thirteen, lemma_diff
 CLEAN).  `SpecCopyout.copyout_wrote P …`'s -1 arm carries `~ uva_wmapped P

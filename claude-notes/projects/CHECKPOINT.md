@@ -147,4 +147,4 @@ console/printk layer + boot; the filewrite/row-16 relay is the next lane
 TX-RECEIPT).  Main: verify build `mainverify1` of the merged HEAD GREEN (audit = the
 thirteen); LAZY-FLAG LAUNCHED in main (2026-09-12, brief `brief-lazy-flag.md`,
 based on `ed3d61934`).  Four lanes in flight: LAZY-FLAG (main), SUPPLY-SPLIT p2
-(`-sup`), DISC-RATE p1 (`-disc`), TX-TAG p1 (`-tlw`).
+(`-sup`), DISC-RATE LANDED on main (2026-09-12; `-disc` is free), TX-TAG p1 (`-tlw`).
