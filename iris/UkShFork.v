@@ -86,6 +86,8 @@ Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
 Require Import UserCwd.  (* [ucwd] / [ucwd_any] -- the process's own view of its working directory *)
 Require Import UserChildren.  (* [uch_any] -- the process's own half of its children set *)
 
+Require Import Xv6Cameras.   (* [uartGhostG] -- the console ring's cameras *)
+Require Import UserConsole.  (* [upos] -- sh's half of the console position pair *)
 Section UkShFork.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
@@ -97,8 +99,14 @@ Section UkShFork.
   Context (N : uk_names Σ).
   (* THIS PROGRAM'S EXIT OWES ITS PARENT NOTHING at this lane, as a
      CLASS so that it reaches the exit ecall without an argument at every
-     call site ([UkRun.ukn_triv]). *)
-  Context `{Hpay : !ukn_triv N}.
+     call site ([UkRun.ukn_const]). *)
+  Context `{Hpay : !ukn_const N}.
+  (* [Xv6Cameras.uartGhostG] and the POSITION's ghost name, which
+     [UkSh.ush_pstate] carries as its fourth conjunct (app-echo.md,
+     "SH-LINE RULING"): this walk never reads the number, but the resource
+     travels through every lemma that carries the process state. *)
+  Context `{!uartGhostG Σ}.
+  Context (γp : gname).
   (* the fields, under the names the engine has always used *)
   Local Notation γt := (ukn_t N).
   Local Notation γd := (ukn_d N).
@@ -131,9 +139,9 @@ Section UkShFork.
   Local Notation s6_idx := (mword_of_int 22 : mword 5).
 
   Local Notation ush_std := (UkSh.ush_std N).
-  Local Notation ush_pstate := (UkSh.ush_pstate N).
+  Local Notation ush_pstate := (UkSh.ush_pstate N γp).
   Local Notation ushl_dat := (UkShLoop.ushl_dat γd).
-  Local Notation ushl_head := (UkShLoop.ushl_head N).
+  Local Notation ushl_head := (UkShLoop.ushl_head N γp).
 
   (* ===================================================================== *)
   (* §1 THE TWO CATALOG BRIDGES THE CHILD NEEDS.                            *)
@@ -228,7 +236,7 @@ Section UkShFork.
     intros Hregs Hs1 Hns Htoks Htlen Hnn Hnul Hkl Hszlo Hszal Hszok.
     iIntros "Hhead #Hcode #Hxs #Hro #Hjt Hstd Hdat Hsz Hbuf Hrun".
     destruct Hregs as (Hs2 & Hs3 & Hs4 & Hs5 & Hs6).
-    iDestruct "Hstd" as "(Hustd & Hcwd & Hch)".
+    iDestruct "Hstd" as "(Hustd & Hcwd & Hch & Hpos)".
     assert (Hlen31 : Z.of_nat len < 2 ^ 31)
       by (unfold sh_nbuf in Hkl; lia).
     (* ---- 0x92c  jal ra,fork1 ---- *)
@@ -268,7 +276,9 @@ Section UkShFork.
                    = mword_of_int 0x930)
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite Eret.
-    iSplitL "Hhead".
+    (* THE POSITION STAYS WITH THE PARENT: the pair is sh's own, and the
+       child it forks runs [runcmd] under fresh ghost names. *)
+    iSplitL "Hhead Hpos".
     - (* ================= THE PARENT: reap, and round again ============= *)
       iIntros (hA mA rA) "%HrA %HcsA %Ha0A Hpay Hsz Hustd Hcwd Hch _ Hrun".
       iDestruct "Hpay" as "(_ & _ & _ & Hdat & Hbuf)".
@@ -371,11 +381,19 @@ Section UkShFork.
       replace (2 + (UkShDiag.ush_Dg + (66 + n)))%nat
         with (16 + (80 + n))%nat by (unfold UkShDiag.ush_Dg; lia).
       iApply ("Hhead" $! hE mD f n
-                with "[%] [Hustd Hcwd Hch] Hdat Hsz Hbuf Hrun").
+                with "[%] [Hustd Hcwd Hch Hpos] Hdat Hsz Hbuf Hrun").
       + exact HregsD.
-      + rewrite /UkSh.ush_pstate /UkSh.ush_std. iFrame "Hustd Hcwd Hch".
+      + rewrite /UkSh.ush_pstate /UkSh.ush_std. iFrame "Hustd Hcwd Hch Hpos".
     - (* ================= THE CHILD: parse, run, exec =================== *)
       iIntros (N' hA mA) "%Hti' %HcsA %Ha0A #Hcode' Hpay Hsz Hustd Hcwd Hch _ Hrun".
+      (* THE POSITION DOES NOT CROSS sh's OWN FORK: the pair is sh's, the
+         child runs [runcmd] and never reads the console at a named
+         position, and a ghost half cannot be copied.  The parent keeps it
+         ([UkSh.ush_pstate]'s fourth conjunct is on the parent's arm
+         above). *)
+      (* the child's payload is TRIVIAL ([UkFork.wp_uk_ecall_fork_any]'s
+         arm); sh's own walk is at the weaker class either way *)
+      pose proof (ukn_const_of_triv N' Hti') as Hcst'.
       iDestruct "Hpay" as "(_ & #Hro' & #Hjt' & Hdat & Hbuf)".
       (* ---- 0x930  c.beqz a0,0x9c0 -- TAKEN: this is the child ---- *)
       iApply (wp_uk_cbeqz N' hA mA (mword_of_int 0x930)
@@ -490,7 +508,7 @@ Section UkShFork.
                       bv_unsigned (f (S (S k))) = 32))
       as [(Hck & Hck1 & Hck2) | Hne].
     - (* ================= the line is a [cd] command =================== *)
-      iApply (UkShCd.wp_kshc_cd N Hpsok h m f k (k + len)%nat l sz n
+      iApply (UkShCd.wp_kshc_cd N γp Hpsok h m f k (k + len)%nat l sz n
                 Hregs Hs1 Ha5 ltac:(lia) Hnul Hck Hck1 Hck2
                 with "Hhead Hcode Hro Hpcode Hstd Hdat Hsz Hbuf Hrun").
     - (* ================= it is not: fall through to the fork ========== *)
@@ -812,7 +830,7 @@ Section UkShFork.
        [UkShRun.wp_kshr_runcmd]: this walk reaches runcmd's EXEC arm *)
     uxsup -∗
     shk_rodata γt -∗ ush_jtab γt -∗
-    UkSh.ush_rest N (UkShLoop.ushl_R N sz).
+    UkSh.ush_rest N γp (UkShLoop.ushl_R N sz).
   Proof.
     intros Hlex Hszlo Hszal Hszok.
     iIntros "#Hcode #Hxs #Hro #Hjt".
@@ -825,7 +843,7 @@ Section UkShFork.
               Hregs Hs1 Ha5 Hnn Hnul ltac:(lia) Hns Htoks Htlen
               Hszlo Hszal Hszok
               with "[Hhead] Hcode Hxs Hro [] Hjt Hstd Hdat Hsz Hbuf Hrun").
-    - iApply (UkShLoop.ushl_head_of_R N with "Hhead").
+    - iApply (UkShLoop.ushl_head_of_R N γp with "Hhead").
     - iApply (ushf_code_shp with "Hcode").
   Qed.
 

@@ -792,6 +792,17 @@ Section UkFork.
          parent is the party that decides what it wants back -- a program
          that wants nothing passes [fun _ => True]. *)
       (Sc : gset gname) (Q : Z -> iProp Σ)
+      (* ...AND WHATEVER ELSE THE PARENT LENDS THE CHILD.  The payload [Q]
+         is what the child's EXIT owes back; [Rc] is what the child is
+         handed to run WITH, and it cannot ride in [P]: [Forkable] is by
+         construction a family of ADDRESS-SPACE views re-minted at the
+         child's fresh ghost names (its header: "a constant family that
+         smuggles a non-heap resource has no instance"), while what a
+         parent lends here is a protocol token at a FIXED name -- init
+         lends the shell its half of the console position pair
+         ([UserConsole.upos], app-echo.md "SH-LINE RULING").  A caller
+         that lends nothing passes [emp]. *)
+      (Rc : iProp Σ)
       (P : gname -> gname -> gname -> iProp Σ) `{FP : !Forkable P} :
     usysno m = USYS_fork ->
     is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
@@ -804,6 +815,8 @@ Section UkFork.
        that lends its child a resource lends it at the fork.  At
        [fun _ => True] it costs nothing. *)
     Q (-1) -∗
+    (* ...and the lend itself, which crosses on the same terms *)
+    Rc -∗
     P (ukn_t N) (ukn_d N) (ukn_s N) -∗
     usz (ukn_s N) szv -∗
     UserFd.ustd (ukn_fd N) l -∗
@@ -867,6 +880,8 @@ Section UkFork.
            is, exactly as an entry constructor does. *)
         ⌜ ukn_pay N' = Q ⌝ -∗
         my_pay γ' Q -∗
+        (* ...AND WHAT THE PARENT LENT IT, verbatim *)
+        Rc -∗
         P (ukn_t N') (ukn_d N') (ukn_s N') -∗ usz (ukn_s N') szv -∗
         (* ...and the child gets the same descriptors at its OWN name --
            INCLUDING THE LEDGER, at the parent's own states: fork copies the
@@ -888,7 +903,7 @@ Section UkFork.
         WP (Loop : expr riscv_lang))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hn Hal4. iIntros "#Hi Hpayc HP Hsz Hstd HD Hcwd Hchf Hrun [Hpar Hchild]".
+    intros Hn Hal4. iIntros "#Hi Hpayc HRc HP Hsz Hstd HD Hcwd Hchf Hrun [Hpar Hchild]".
     iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs pidv) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & Hcha & #Hmy & Hpayv & #Hdep & Hb)".
     (* the caller's half pins the key's working directory *)
     iDestruct (ucwd_agree with "Hcwda Hcwd") as %->.
@@ -1044,7 +1059,7 @@ Section UkFork.
                 with "Hheap' Hstk' Hufd' Hcwa' Hcha' Hmp Hpayc Hdep").
       iIntros (h') "Hrun".
       iApply ("Hchild" $! (MkUkNames γt' γd' γs' γfd' γc' γch' Q) h' g'
-                with "[%] Hmp HP' Hsz' Hstd' Hfrag' Hcwf' Hchf' Hrun").
+                with "[%] Hmp HRc HP' Hsz' Hstd' Hfrag' Hcwf' Hchf' Hrun").
       reflexivity.
   Qed.
 
@@ -1111,9 +1126,10 @@ Section UkFork.
        the leaf below mints the child's half at a NAMED set and moves the
        parent's, so the set has to be a name for the length of the call *)
     iDestruct "Hch" as (Sc) "Hchf".
-    iApply (wp_uk_ecall_fork N h m pc avail szv l D c Sc (fun _ => True%I) P
-              Hn Hal4 with "Hi [] HP Hsz Hstd HD Hcwd Hchf Hrun [Hpar Hchild]");
-      [ done | ].
+    iApply (wp_uk_ecall_fork N h m pc avail szv l D c Sc (fun _ => True%I)
+              emp%I P
+              Hn Hal4 with "Hi [] [] HP Hsz Hstd HD Hcwd Hchf Hrun [Hpar Hchild]");
+      [ done | done | ].
     iSplitL "Hpar".
     - iIntros (h' r) "%Hr Hans HP Hsz Hstd HD Hcwd Hrun".
       (* BOTH ARMS GIVE THE FRAGMENT BACK, and the token the pid arm mints
@@ -1126,7 +1142,7 @@ Section UkFork.
           iApply (uch_any_of with "Hf"). }
       iApply ("Hpar" $! h' r with "[%] HP Hsz Hstd HD Hcwd Hch Hrun").
       exact Hr.
-    - iIntros (N' h' γ') "%Hpeq _ HP Hsz Hstd HD Hcwd Hchf' Hrun".
+    - iIntros (N' h' γ') "%Hpeq _ _ HP Hsz Hstd HD Hcwd Hchf' Hrun".
       iApply ("Hchild" $! N' h' with "[%] HP Hsz Hstd HD Hcwd [Hchf'] Hrun");
         [ exact Hpeq | ].
       iApply (uch_any_of with "Hchf'").
@@ -1155,12 +1171,14 @@ Section UkFork.
       (pc : mword 64) (avail : nat) (szv : Z)
       (M0 : gmap Z (bv 8)) (pm0 : gmap (mword 27) uperm)
       (av : Z) (args : list uarg) (l : list fdstate) (D : gmap nat fdstate)
-      (c : Z) (Sc : gset gname) (Q : Z -> iProp Σ) :
+      (c : Z) (Sc : gset gname) (Q : Z -> iProp Σ) (Rc : iProp Σ) :
     usysno m = USYS_fork ->
     is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
     uinstr_is (ukn_t N) pc false (ECALL tt) -∗
     (* the child's payload, relayed -- see [wp_uk_ecall_fork] *)
     Q (-1) -∗
+    (* ...and the parent's lend, relayed with it *)
+    Rc -∗
     utext_all (ukn_t N) M0 pm0 -∗
     uargv (ukn_d N) av args -∗
     usz (ukn_s N) szv -∗
@@ -1197,6 +1215,7 @@ Section UkFork.
      (∀ (N' : uk_names Σ) (h' : CpuId) (γ' : gname),
         ⌜ ukn_pay N' = Q ⌝ -∗
         my_pay γ' Q -∗
+        Rc -∗
         utext_all (ukn_t N') M0 pm0 -∗
         uargv (ukn_d N') av args -∗
         usz (ukn_s N') szv -∗
@@ -1218,17 +1237,17 @@ Section UkFork.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hn Hal4.
-    iIntros "#Hi Hpayc #Htext #Hargv Hsz Hstd HD Hcwd Hchf Hrun [Hpar Hchild]".
-    iApply (wp_uk_ecall_fork N h m pc avail szv l D c Sc Q
+    iIntros "#Hi Hpayc HRc #Htext #Hargv Hsz Hstd HD Hcwd Hchf Hrun [Hpar Hchild]".
+    iApply (wp_uk_ecall_fork N h m pc avail szv l D c Sc Q Rc
               (fun γt0 γd0 γs0 => (utext_all γt0 M0 pm0 ∗ uargv γd0 av args)%I)
-              Hn Hal4 with "Hi Hpayc [] Hsz Hstd HD Hcwd Hchf Hrun [Hpar Hchild]").
+              Hn Hal4 with "Hi Hpayc HRc [] Hsz Hstd HD Hcwd Hchf Hrun [Hpar Hchild]").
     { iSplitR; [ iExact "Htext" | iExact "Hargv" ]. }
     iSplitL "Hpar".
     - iIntros (h' r) "%Hr Harm _ Hsz Hstd HD Hcwd Hrun".
       iApply ("Hpar" $! h' r with "[%] Harm Hsz Hstd HD Hcwd Hrun"). exact Hr.
-    - iIntros (N' h' γ') "%Hpeq Hmp [Ht' Ha'] Hsz' Hstd' Hfrag' Hcwd' Hch' Hrun".
+    - iIntros (N' h' γ') "%Hpeq Hmp HRc' [Ht' Ha'] Hsz' Hstd' Hfrag' Hcwd' Hch' Hrun".
       iApply ("Hchild" $! N' h' γ'
-                with "[%] Hmp Ht' Ha' Hsz' Hstd' Hfrag' Hcwd' Hch' Hrun").
+                with "[%] Hmp HRc' Ht' Ha' Hsz' Hstd' Hfrag' Hcwd' Hch' Hrun").
       exact Hpeq.
   Qed.
 

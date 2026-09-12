@@ -187,6 +187,65 @@ Section UserConsole.
     rewrite /ucons_pay. iIntros "[Hl | HT]"; [| by iRight ].
     iDestruct "Hl" as (n) "[Hr _]". iLeft. iExists n. iExact "Hr".
   Qed.
+
+  (* =================================================================== *)
+  (*  §12  INIT'S ROUND: THE MINT BEFORE THE FORK, THE REDEEM AT WAIT     *)
+  (*                                                                      *)
+  (*  What init holds between two shells is the TOKEN or the taint --      *)
+  (*  [ucons_pay]'s own body with the payload half of the position pair    *)
+  (*  dropped, which is what [UserConsole.ucons_pay_redeem] hands back at  *)
+  (*  the reap.  The restart head of init's loop carries exactly this, and *)
+  (*  it is what makes the loop close: the shell that died gave it back.   *)
+  (*                                                                      *)
+  (*  THE PAIR IS MINTED PER CHILD.  Two shells must not share a [γ] --    *)
+  (*  the dead one's half would still agree against the live one's -- so   *)
+  (*  init allocates a fresh pair at the token's CURRENT position          *)
+  (*  immediately before each fork ([UserConsole.upos_alloc]), pays        *)
+  (*  [ucons_pay cn γ T (-1)] into [UkFork.wp_uk_ecall_fork]'s [Q (-1)]    *)
+  (*  and lends [upos γ n] through its [Rc].                               *)
+  (*                                                                      *)
+  (*  THE TAINT ARM MINTS A PAIR TOO, at 0 and meaning nothing: sh's       *)
+  (*  entry takes a position unconditionally ([ush_pstate_line]'s fourth   *)
+  (*  conjunct), and a pair whose token is gone is exactly what a tainted  *)
+  (*  process holds -- the number is still there and no longer says        *)
+  (*  anything ([ush_read_recv_leaf]'s taint disjunct).                     *)
+  (* =================================================================== *)
+  Definition uinit_tok (cn : cons_names) (T : iProp Σ) : iProp Σ :=
+    ((∃ n : nat, ucons_reader cn n) ∨ T)%I.
+
+  (* the boot's own shape: init's entry is handed the token at position 0
+     ([InitBoot.init_boot_bundle]'s input, threaded to init's run through
+     [PinnedExec.pinned_exec_bundle]'s linear [Pay]) *)
+  Lemma uinit_tok_0 (cn : cons_names) (T : iProp Σ) :
+    ucons_reader cn 0%nat -∗ uinit_tok cn T.
+  Proof.
+    iIntros "Hr". rewrite /uinit_tok. iLeft. iExists 0%nat. iExact "Hr".
+  Qed.
+
+  (* THE MINT, once per round, immediately before the fork *)
+  Lemma uinit_lend (cn : cons_names) (T : iProp Σ) (xs : Z) :
+    uinit_tok cn T ==∗
+    ∃ (γ : gname) (n : nat), ucons_pay cn γ T xs ∗ upos γ n.
+  Proof.
+    rewrite /uinit_tok. iIntros "[Hl | HT]".
+    - iDestruct "Hl" as (n) "Hr".
+      iMod (upos_alloc n) as (γ) "[Hp Hpa]".
+      iModIntro. iExists γ, n. iFrame "Hp".
+      iApply (ucons_pay_tok cn γ T n xs with "Hr Hpa").
+    - iMod (upos_alloc 0%nat) as (γ) "[Hp _]".
+      iModIntro. iExists γ, 0%nat. iFrame "Hp".
+      iApply (ucons_pay_taint cn γ T xs with "HT").
+  Qed.
+
+  (* ...AND THE REDEEM, at the wait that reaps the shell: the escrow's
+     payload comes back at the status the child exited with
+     ([ChildTok.gen_pay]), and what init reads off it is the token again --
+     at a position it does not know, which is why the next round's mint
+     takes one from the token itself. *)
+  Lemma uinit_redeem (cn : cons_names) (γ : gname) (T : iProp Σ) (xs : Z) :
+    ucons_pay cn γ T xs -∗ uinit_tok cn T.
+  Proof. rewrite /uinit_tok. iApply (ucons_pay_redeem cn γ T xs). Qed.
+
 End UserConsole.
 
 (* ===================================================================== *)

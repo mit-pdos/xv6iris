@@ -88,6 +88,10 @@ Require Import UserChildren.  (* [uch_any_of] -- the entry's children fragment,
 Require FsImg.           (* [FsImg.ROOTINO] -- the inum init is born at *)
 
 Require Import ChildTok.  (* [genF] -- the capacity the slot's fork arms name *)
+Require Import Xv6Cameras.   (* [uartGhostG] -- the console ring's cameras *)
+Require Import UartNames.    (* [cons_names] *)
+Require Import UserConsole.  (* [ucons_reader] / [uinit_tok] -- the console
+                                reader token at the narrow class *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -172,6 +176,9 @@ Section UInitKernel.
   (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
      and this file binds no whole-system bundle. *)
   Context `{!ctokG Σ}.
+  (* the console ring's cameras, at the narrow class: this section binds no
+     whole-system bundle ([UserConsole.v]'s header). *)
+  Context `{!uartGhostG Σ}.
   Context {SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
 
@@ -243,7 +250,7 @@ Section UInitKernel.
     (* ...and the EXEC supplier, which init's child arm spends on
        exec("sh", argv): its OWN, at its own two argument registers and at
        the root, not the generic bundle at every key. *)
-    UkInit.init_exec_sup -∗
+    UkInit.init_exec_sup_lend -∗
     (* ...AND THE TWO PINNED CONSOLE LEAVES, at whatever record the entry
        carve mints, beside the ABSENCE CREDENTIAL /init's first open runs
        on ([AppEcho.cons_key] at echo's era, handed over by E2's boot arm
@@ -253,15 +260,12 @@ Section UInitKernel.
     (* THE PAY FACT, at the trivial payload: <init> has no parent, so its
        exit owes nobody anything -- userinit's choice, which the entry
        constructor writes into the record ([UkRun.ukn_pay]) and which
-       init's own exit stub reads back. *)
-    (* NO CONSOLE READER TOKEN HERE (app-echo.md, "SH-LINE RULING", R3).
-       [InitBoot.init_boot_bundle] takes the token as its input and the
-       party that spends it is the bundle's BUILDER
-       ([PinnedExec.pinned_exec_bundle]'s linear [Pay], E2's), which is
-       where a premise for it belongs: this section deliberately binds
-       [ctokG] WITHOUT [xv6G] ([UexecSG]'s "prints alike, does not match"
-       note), so it cannot name [ConsoleInv.cons_reader] at all.  SH-LINE
-       is what gives init's run somewhere to put the token. *)
+       init's own exit stub reads back.
+       NO CONSOLE READER TOKEN HERE YET (app-echo.md, "SH-LINE RULING",
+       R3): the token has to reach SH's exit payload to survive a kill,
+       and that payload is blocked one seam away
+       ([UkInit.init_exec_sup_pos]'s note).  What init does lend its child
+       today is the POSITION, which it mints itself. *)
     my_pay (uvis_gen W) (fun _ => True)%I -∗
     uslot W.
   Proof.
@@ -334,7 +338,7 @@ Section UInitKernel.
     uvis_cwd W' = FsImg.ROOTINO ->
     (forall k : Z, k <> USYS_exec -> psok k) ->
     (* the pay fact, passed straight through: see [init_uexec_slot] *)
-    udep -∗ UkInit.init_exec_sup -∗
+    udep -∗ UkInit.init_exec_sup_lend -∗
     □ (∀ N : uk_names Σ, UkInit.init_cons_leaves N T K stc) -∗
     K -∗
     my_pay (uvis_gen W') (fun _ => True)%I -∗ uslot W'.

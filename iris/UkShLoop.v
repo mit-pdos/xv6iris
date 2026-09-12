@@ -48,6 +48,8 @@ Import Defs.
 
 Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
 
+Require Import Xv6Cameras.   (* [uartGhostG] -- the console ring's cameras *)
+Require Import UserConsole.  (* [upos] -- sh's half of the console position pair *)
 Section UkShLoop.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
@@ -59,8 +61,14 @@ Section UkShLoop.
   Context (N : uk_names Σ).
   (* THIS PROGRAM'S EXIT OWES ITS PARENT NOTHING at this lane, as a
      CLASS so that it reaches the exit ecall without an argument at every
-     call site ([UkRun.ukn_triv]). *)
-  Context `{Hpay : !ukn_triv N}.
+     call site ([UkRun.ukn_const]). *)
+  Context `{Hpay : !ukn_const N}.
+  (* [Xv6Cameras.uartGhostG] and the POSITION's ghost name, which
+     [UkSh.ush_pstate] carries as its fourth conjunct (app-echo.md,
+     "SH-LINE RULING"): this walk never reads the number, but the resource
+     travels through every lemma that carries the process state. *)
+  Context `{!uartGhostG Σ}.
+  Context (γp : gname).
   (* the fields, under the names the engine has always used *)
   Local Notation γt := (ukn_t N).
   Local Notation γd := (ukn_d N).
@@ -101,7 +109,7 @@ Section UkShLoop.
   Definition ushl_head (l : list fdstate) (sz : Z) : iProp Σ :=
     (∀ (h : CpuId) (m : regfile) (f : nat -> bv 8) (n : nat),
        ⌜ UkSh.ush_regs m ⌝ -∗
-       UkSh.ush_pstate N l -∗
+       UkSh.ush_pstate N γp l -∗
        ushl_dat γd -∗ usz γs sz -∗
        ubytes γd sh_buf sh_nbuf f -∗
        urun N h m (mword_of_int 0x938) (16 + (80 + n)) -∗
@@ -118,7 +126,7 @@ Section UkShLoop.
      four binders, the same budget ([UkSh.ush_Dbody] is 80), and the two
      halves of [ushl_R] uncurried. *)
   Lemma ushl_head_of_R (l : list fdstate) (sz : Z) :
-    UkSh.ush_loop_head N (ushl_R sz) l -∗ ushl_head l sz.
+    UkSh.ush_loop_head N γp (ushl_R sz) l -∗ ushl_head l sz.
   Proof.
     iIntros "H" (h m f n) "%Hregs Hstd Hdat Hsz Hbuf Hrun".
     iApply ("H" $! h m f n with "[%//] Hstd [$Hdat $Hsz] Hbuf Hrun").

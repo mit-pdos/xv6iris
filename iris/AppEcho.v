@@ -920,6 +920,29 @@ Section EchoPred.
     iIntros "#Ht". rewrite /app_sup_raw. iIntros "!>" (av).
     rewrite /echo_pred. iLeft. iExact "Ht".
   Qed.
+
+  (* ...AND THE CONVERSE, which is what makes the credential a tokenless
+     console read leaves ([ConsoleInv.cons_dirty_cred app_sup]) READ AS THE
+     TAINT (app-echo.md, lane SH-LINE, S4).  The claim is about EVERY view,
+     and the empty view is a view: it satisfies none of the three pins, so
+     the only disjunct that can hold at it is the taint.  That is the step
+     sh's read takes when its window comes back under the dirty
+     disjunction -- somebody consumed console input behind its back, and
+     what it is handed instead of the window is exactly this credential. *)
+  Lemma echo_taint_of_sup (γ : echo_fixed) (r : echo_names) :
+    app_sup_raw (echo_pred γ) r -∗ echo_taint γ.
+  Proof.
+    rewrite /app_sup_raw. iIntros "#Hs".
+    iSpecialize ("Hs" $! (∅ : aview)).
+    rewrite /echo_pred.
+    iDestruct "Hs" as "[Ht | [%Hp _]]"; [ iExact "Ht" | ].
+    exfalso. destruct Hp as (_ & (_ & Hc & _) & _).
+    (* [lookup_empty] is a FIELD of stdpp's [FinMap] class, so the [∅] in
+       its statement is that class's projection and does not match the
+       [gmap] instance SYNTACTICALLY -- [rewrite] fails on it where
+       [apply], which unifies up to conversion, goes through. *)
+    by apply lookup_empty_Some in Hc.
+  Qed.
 End EchoPred.
 
 (* ====================================================================== *)

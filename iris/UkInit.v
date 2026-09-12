@@ -56,6 +56,10 @@ Require Import UserChildren. (* [uch] -- init's own half of its children set,
                                 at the very set wait() moves and redeems
                                 through *)
 Require Import UexecRet.     (* [uwait_ans] -- what the wait leaf answers *)
+Require Import Xv6Cameras.   (* [uartGhostG] -- the console ring's cameras *)
+Require Import UartNames.    (* [cons_names] *)
+Require Import UserConsole.  (* [ucons_pay] / [upos] -- sh's exit payload
+                                and its half of the position pair *)
 Require Import UserCwd.  (* [ucwd]: the process's own half of its cwd -- the
                             exec leaf is indexed by it *)
 Require FsImg.           (* [FsImg.ROOTINO]: init never chdirs, so its
@@ -89,6 +93,9 @@ Section UkInit.
   (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
      and this file binds no whole-system bundle. *)
   Context `{!ctokG Σ}.
+  (* the console ring's cameras, at the narrow class ([UserConsole.v]'s
+     header): the POSITION init lends its child is stated over them. *)
+  Context `{!uartGhostG Σ}.
   Context {SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
@@ -1058,6 +1065,49 @@ Section UkInit.
     pose proof (Hpeq : UkRun.ukn_triv N') as Hti.
     iApply (udepw_at_of_uxsup with "Hx").
   Qed.
+
+  (* =================================================================== *)
+  (*  THE SAME SUPPLY, PLUS THE POSITION IT LENDS THE CHILD                *)
+  (*                                                                       *)
+  (*  init's child is the process that execs sh, and what init lends it at *)
+  (*  the fork ([UkFork.wp_uk_ecall_fork]'s [Rc]) is the PROGRAM HALF of   *)
+  (*  the console position pair ([UserConsole.upos]).  The child carries   *)
+  (*  it to its one exec and spends it there: it is the linear half of     *)
+  (*  [PinnedExec.pinned_exec_bundle]'s [Pay], and it is what sh holds in  *)
+  (*  [UkSh.ush_pstate] afterwards.                                        *)
+  (*                                                                       *)
+  (*  NOTHING LINEAR IS INSIDE THE BOX: the supply is a WAND from the      *)
+  (*  position, which is exactly why ONE box serves every round of init's  *)
+  (*  restart loop -- the loop mints a FRESH pair per child and applies    *)
+  (*  the box at it ([UserConsole.upos_alloc]).                            *)
+  (*                                                                       *)
+  (*  THE PAYLOAD IS STILL THE TRIVIAL ONE.  Putting the console reader    *)
+  (*  TOKEN in the child's exit payload is what makes a KILLED shell give  *)
+  (*  it back, and it is blocked one seam away: a tainted process runs on  *)
+  (*  the generic slot, which exists only at the trivial payload           *)
+  (*  ([UexecExecInst.xv6_sbundle_of_supply] mints exec's bundle at        *)
+  (*  [kf_xpay f = fun _ => True] and nothing else), so                    *)
+  (*  [PinnedExec.pex_slot]'s taint arm cannot be paid at a non-trivial    *)
+  (*  [Q].  The position crosses at either payload, which is why it        *)
+  (*  crosses now.                                                         *)
+  (* =================================================================== *)
+  Definition init_exec_sup_pos (γ : gname) (n : nat) : iProp Σ :=
+    (∀ (N' : uk_names Σ) (m : regfile) (pc : mword 64),
+       ⌜ ukn_pay N' = (fun _ => True)%I ⌝ -∗
+       ⌜ m !!! Regidx a0_idx = (mword_of_int 0x9a8 : mword 64) ⌝ -∗
+       ⌜ m !!! Regidx a1_idx = (mword_of_int 0x1000 : mword 64) ⌝ -∗
+       init_rodata (ukn_t N') -∗
+       init_argv (ukn_d N') -∗
+       ustd_any (ukn_fd N') -∗
+       upos γ n -∗
+       udepw_at N' m pc USYS_exec FsImg.ROOTINO)%I.
+
+  Definition init_exec_sup_lend : iProp Σ :=
+    (□ (∀ (γ : gname) (n : nat), init_exec_sup_pos γ n))%I.
+
+  Global Instance init_exec_sup_lend_persistent :
+    Persistent init_exec_sup_lend.
+  Proof. rewrite /init_exec_sup_lend. apply _. Qed.
 
   (* ...AND THE LEAF IS CWD-INDEXED.  [UkRunSys.wp_uk_ecall_exec_at_cwd]
      takes the program's own half of its working directory beside the

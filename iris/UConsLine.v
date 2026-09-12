@@ -54,6 +54,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExtras RiscvModelBytes ObsTrace.
 Require Import RegFile.
 Require Import UmodeArith.
+Require Import UmodeAbi.       (* [ubyte0] -- the NUL [gets] plants *)
 Require Import UsysMemOk.
 Require Import UserHeap UkRun UkRunSys.
 (* THE GHOST-CLASS BINDERS' DEFINING MODULES, each IMPORTED and not merely
@@ -64,6 +65,13 @@ Require Import Xv6Cameras.     (* [uartGhostG]: the console ring's cameras *)
 Require Import ChildTok.       (* [ctokG]: the slot's fork arms' capacity *)
 Require Import VcGen.          (* [trunc32]: how [argfd] reads a descriptor *)
 Require Import FdSlots UserFd ProcGeom.
+Require Import UInitFd.      (* [ufd_l0] -- the all-closed low ledger the
+                               CLOSED arm of sh's entry is at *)
+Require Import UserCwd UserChildren.  (* [ucwd_any] / [uch_any] -- the two
+                               ghosts [UkSh.ush_pstate] carries beside the
+                               ledger *)
+Require Import UexecSlot UexecRet.  (* [uvis] / [uslot] -- the taint's
+                               generic slot, [UkRun.urun_gen]'s premise *)
 Require Import ConsoleInv.     (* [cons_window] / [cons_chain] / [CONSOLE] *)
 Require Import UserConsole.    (* [upos] / [ucons_stored_lb] / [ucons_pay] *)
 Require Import UCodeInit UkInit.  (* init's catalogs and its exec supply's shape *)
@@ -128,6 +136,31 @@ Definition ush_echo_tokens : Prop :=
        [(0, 4); (5, 10); (11, 16)]%nat
   /\ (length [(0, 4); (5, 10); (11, 16)]%nat < 10)%nat.
 
+(* (4) ...AND THE SHAPE THE BUFFER'S LINE IS IN WHEN IT IS DISCIPLINED.
+   (1)-(3) above are about the ring's stored sequence and about
+   [echo_line]; this is the same fact at the shape sh's command loop hands
+   its body: the [len] bytes at [k] in the LINE BUFFER are [echo_line]'s,
+   in order, and there are exactly [length echo_line] of them.  It is the
+   whole of what [UkShFork.ushf_lexable] is replaced by (S5). *)
+Definition ush_line_is (f : nat -> bv 8) (k len : nat) : Prop :=
+  len = length echo_line
+  /\ forall j : nat, (j < len)%nat -> f (k + j)%nat = echo_line !!! j.
+
+(* ...AND THE DISCHARGE ITSELF.  [ushf_lexable] quantifies over EVERY line
+   the user could type, which is why it is false; this quantifies over the
+   ONE line the receipt says sh read, and [ush_echo_tokens] above is the
+   closed computation that answers it.  What stands between the two is that
+   [ushp_no_symbols] and [ushp_tokens] read their bytes through a function,
+   so the instance at [fun j => f (k + j)] is the instance at
+   [fun j => echo_line !!! j] under [ush_line_is]'s pointwise equality. *)
+Definition ush_line_lexable : Prop :=
+  forall (f : nat -> bv 8) (k len : nat),
+    ush_line_is f k len ->
+    ushp_no_symbols len (fun j : nat => f (k + j)%nat)
+    /\ exists toks : list (nat * nat),
+         ushp_tokens len (fun j : nat => f (k + j)%nat) 0 toks
+         /\ (length toks < 10)%nat.
+
 Section UConsLine.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
@@ -178,7 +211,7 @@ Section UConsLine.
   (*  today by [UShKernel.ush_read_leaf_of_win] out of                     *)
   (*  [UkRunSys.wp_uk_ecall_read_win]) throws the process's post away.     *)
   (*  This is the same leaf with the post KEPT, which is what              *)
-  (*  [UkRunSys.wp_uk_ecall_read_recv_body] exists to deliver.             *)
+  (*  [UkRunSys.wp_uk_ecall_read_recv] exists to deliver.             *)
   (*                                                                      *)
   (*  WHAT IT COSTS THE CALLER: its POSITION ([UserConsole.upos] at the    *)
   (*  cursor it believes the token stands at).  What it hands back is one  *)
@@ -209,7 +242,7 @@ Section UConsLine.
   (*  and not [UShKernel.v]'s.                                            *)
   (* =================================================================== *)
   Definition ush_read_recv_leaf (N : uk_names Σ) (cn : cons_names)
-      (γp : gname) (T : iProp Σ) : iProp Σ :=
+      (γp : gname) (T : iProp Σ) (l : list fdstate) : iProp Σ :=
     (∀ (h : CpuId) (m : regfile) (pc : mword 64) (a : Z) (k n : nat)
        (f : nat -> bv 8) (avail : nat),
        ⌜usysno m = USYS_read⌝ -∗
@@ -220,12 +253,20 @@ Section UConsLine.
        ⌜is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true⌝ -∗
        uinstr_is (ukn_t N) pc false (ECALL tt) -∗
        ubytes (ukn_d N) a k f -∗
+       (* THE LEDGER, which is what SELECTS the console arm: row 5's
+          bundle is [SpecFileread.fileread_in] at [SpecArgfd.fd_st_of_key]
+          of the key's own table, and this is the caller's claim on it
+          ([UkRunSys.wp_uk_ecall_read_recv] hands back the agreement
+          [take NSTD (uvis_fd W) = l]).  read moves no descriptor, so it
+          comes straight back. *)
+       ush_std_cons (ukn_fd N) l -∗
        (* THE CALLER'S POSITION, which is what makes the window its own *)
        upos γp n -∗
        urun N h m pc avail -∗
        (∀ (h' : CpuId) (r : mword 64) (d : nat) (g : nat -> bv 8),
           ⌜(d <= k)%nat⌝ -∗
           ⌜forall j : nat, (d <= j < k)%nat -> g j = f j⌝ -∗
+          ush_std_cons (ukn_fd N) l -∗
           ((∃ (dc : nat) (hs : list (list mobs))
               (sl : list (list mobs * bv 8)),
               ⌜cons_window sl n d g hs⌝ ∗ ⌜cons_chain sl⌝ ∗
@@ -288,41 +329,184 @@ Section UConsLine.
   Qed.
 
   (* =================================================================== *)
-  (*  §5  INIT'S LINEAR EXEC SUPPLY                                       *)
+  (*  §6  THE THREE-ARM LEDGER SH'S ENTRY TAKES                           *)
   (*                                                                      *)
-  (*  [UkInit.init_exec_sup] is persistent and stated at the TRIVIAL       *)
-  (*  payload ([UkInit.v:518]).  The child init lends the console to execs *)
-  (*  ONCE, at a payload that is not trivial, and carries a LINEAR         *)
-  (*  resource across that exec ([PinnedExec.pinned_exec_bundle]'s [Pay]   *)
-  (*  is linear, and [PinnedExec.pex_slot]'s [∧] is what lets the same     *)
-  (*  payload answer the slot arm and the refund) -- so the supply the     *)
-  (*  child holds is this one: no [□], the payload named, and the          *)
-  (*  POSITION handed over with it.                                       *)
+  (*  §1 above is the arm sh's read RUNS ON.  What init can actually       *)
+  (*  hand over is one of three, and which one is not init's choice        *)
+  (*  (app-echo.md, "OPEN-PIN PHASE 1 LANDED", finding (a); the head is    *)
+  (*  [UInitFd.ufd_head] at the fork):                                     *)
   (*                                                                      *)
-  (*  THE EXIT PAYLOAD IS NOT A PREMISE: IT ARRIVES THROUGH THE SEAM.      *)
-  (*  [SpecKexec.exec_slot_pre]'s two wands take [Q (-1)] beside the pay   *)
-  (*  fact, the dispatcher feeds it from the payment it holds across the   *)
-  (*  exec trap ([SpecSyscall.sysc_exec_out]'s success arm), and           *)
-  (*  [PinnedExec.pex_slot]'s constructor wand relays it -- so the party   *)
-  (*  that builds sh's entry is handed the payload at the key it is        *)
-  (*  building for, and this supply neither holds nor asks for it.  What   *)
-  (*  it still names is the POSITION, which is sh's own and crosses in     *)
-  (*  the slot piece's linear [Pay].                                       *)
+  (*   CONSOLE -- init's repair worked and fd 0 is the console device.     *)
+  (*     This is the arm the line is disciplined on.                       *)
+  (*                                                                      *)
+  (*   CLOSED -- init's second open failed at allocation, so the two dups  *)
+  (*     failed too and fds 0-2 are all closed ([UInitFd.ufd_l0]).  sh     *)
+  (*     runs: its first [read(0, ..)] returns -1, [gets] breaks on        *)
+  (*     [r < 1], [getcmd] returns -1 and sh exits.  Nothing reaches the   *)
+  (*     console, and the arm is a SHORT walk rather than a missing one.   *)
+  (*                                                                      *)
+  (*   THE TAINT -- the claim's pins may be broken, and the continuation   *)
+  (*     is the generic one (§9).                                          *)
+  (*                                                                      *)
+  (*  ONE PREDICATE at three arms rather than three premises, so that      *)
+  (*  every lemma between sh's entry and its read is unchanged by which    *)
+  (*  arm it is at: [UkSh.ush_std] is this one with the disjunction        *)
+  (*  dropped.                                                             *)
   (* =================================================================== *)
-  Definition init_exec_sup_lin (cn : cons_names) (γp : gname) (T : iProp Σ)
+  Definition ush_std3 (γfd : gname) (T : iProp Σ) (l : list fdstate)
+    : iProp Σ :=
+    (ustd γfd l ∗
+     (⌜exists wr : bool, l !! 0%nat = Some (FdOpen true wr (FdDevice CONSOLE))⌝
+      ∨ ⌜l = ufd_l0⌝
+      ∨ T))%I.
+
+  (* the bare ledger, which is what every lemma that does not read the arm
+     wants -- [ush_std_cons_ledger]'s twin *)
+  Lemma ush_std3_ledger (γfd : gname) (T : iProp Σ) (l : list fdstate) :
+    ush_std3 γfd T l -∗ ustd γfd l.
+  Proof. iIntros "[$ _]". Qed.
+
+  (* the three constructors, one per arm *)
+  Lemma ush_std3_cons (γfd : gname) (T : iProp Σ) (l : list fdstate) :
+    ush_std_cons γfd l -∗ ush_std3 γfd T l.
+  Proof.
+    iIntros "[Hl %Hrow]". rewrite /ush_std3. iFrame "Hl".
+    iLeft. by iPureIntro.
+  Qed.
+
+  Lemma ush_std3_closed (γfd : gname) (T : iProp Σ) :
+    ustd γfd ufd_l0 -∗ ush_std3 γfd T ufd_l0.
+  Proof.
+    iIntros "Hl". rewrite /ush_std3. iFrame "Hl". iRight. iLeft.
+    by iPureIntro.
+  Qed.
+
+  Lemma ush_std3_taint (γfd : gname) (T : iProp Σ) (l : list fdstate) :
+    T -∗ ustd γfd l -∗ ush_std3 γfd T l.
+  Proof.
+    iIntros "HT Hl". rewrite /ush_std3. iFrame "Hl". iRight. iRight.
+    iExact "HT".
+  Qed.
+
+  (* =================================================================== *)
+  (*  §7  SH'S PER-TURN STATE, WITH THE POSITION                          *)
+  (*                                                                      *)
+  (*  [UkSh.ush_pstate] is the three ghosts a turn of sh's command loop    *)
+  (*  cannot escape carrying (the ledger, the cwd, the children set).      *)
+  (*  SH-LINE adds a FOURTH -- the program's half of the console position  *)
+  (*  pair ([UserConsole.upos]) -- and it goes LAST, so every existing     *)
+  (*  destructuring pattern keeps working (durable-notes, "Shaping a       *)
+  (*  change so the sweep is small").                                      *)
+  (*                                                                      *)
+  (*  THE POSITION IS EXISTENTIAL HERE AND NAMED INSIDE [gets].  A turn of *)
+  (*  the loop begins wherever the previous line ended, and no lemma       *)
+  (*  between the loop head and the read needs the number; [gets] opens    *)
+  (*  the existential once, calls it [n0], and its own invariant           *)
+  (*  ([ush_gets_line]) is what carries it byte by byte.                   *)
+  (*                                                                      *)
+  (*  IT IS HELD ON BOTH ARMS, tainted or not: the pair is still the pair  *)
+  (*  after a tokenless reader has moved the ring, only its number no      *)
+  (*  longer means anything ([ush_read_recv_leaf]'s taint disjunct hands   *)
+  (*  it back at SOME value).                                              *)
+  (* =================================================================== *)
+  Definition ush_pos (γp : gname) : iProp Σ := (∃ n : nat, upos γp n)%I.
+
+  Definition ush_pstate_line (γfd γcwd γch γp : gname) (T : iProp Σ)
+      (l : list fdstate) : iProp Σ :=
+    (ush_std3 γfd T l ∗ UserCwd.ucwd_any γcwd ∗ UserChildren.uch_any γch
+     ∗ ush_pos γp)%I.
+
+  (* =================================================================== *)
+  (*  §8  THE TAG'S READING, AS A PERSISTENT LAW SH'S ENTRY TAKES         *)
+  (*                                                                      *)
+  (*  [RiscvPtsto.riscv_rx_tag] is a field of the machine's fixed ghost    *)
+  (*  state, tied to the application's own tag ([App.app_tag]) only by an  *)
+  (*  equation in the top theorem's [boot_fixedGS] -- nothing below reads  *)
+  (*  it (app-echo.md, "SH-LINE PHASE 1 LANDED", ruling (3)).  So the      *)
+  (*  reading is a PREMISE, threaded from [SystemAdequacy]'s [Hinit_boot]  *)
+  (*  through init's pinned builder to sh's entry, exactly as              *)
+  (*  [UInitSh.init_sh_slot] takes its claim law.                          *)
+  (*                                                                      *)
+  (*  Persistent, which it must be: sh's entry is built inside init's      *)
+  (*  fork child, inside an [iLob] the parent re-enters.                   *)
+  (* =================================================================== *)
+  Definition ush_tag_law (T : iProp Σ) : iProp Σ :=
+    (□ (∀ h : list mobs, riscv_rx_tag h -∗ ⌜disc h⌝ ∨ T))%I.
+
+  Global Instance ush_tag_law_persistent T : Persistent (ush_tag_law T).
+  Proof. rewrite /ush_tag_law. apply _. Qed.
+
+  (* =================================================================== *)
+  (*  §9  THE TAINT'S GENERIC CONTINUATION                                *)
+  (*                                                                      *)
+  (*  What a program does when it learns the taint MID-WALK.  The arm an   *)
+  (*  application's claim law hands out is a SLOT at a key                 *)
+  (*  ([PinnedExec.pex_slot]'s [T]-arm), and [UkRun.urun_gen] is the step  *)
+  (*  from there to a running process: the key a [urun] is at is           *)
+  (*  [UexecSlot.uvis_of_run] of its own registers and pc.  Named here     *)
+  (*  because it is a PREMISE of three statements in this lane -- sh's     *)
+  (*  entry, the [gets] loop and [UkShFork.ushf_rest_of_body] -- and a     *)
+  (*  premise spelled once is a premise the three cannot disagree about.   *)
+  (* =================================================================== *)
+  Definition ush_gen_slot (N : uk_names Σ) (T : iProp Σ) : iProp Σ :=
+    (□ (∀ W : uvis,
+          T -∗ my_pay (uvis_gen W) (ukn_pay N) -∗ ukn_pay N (-1) -∗
+          uslot W))%I.
+
+  Global Instance ush_gen_slot_persistent N T : Persistent (ush_gen_slot N T).
+  Proof. rewrite /ush_gen_slot. apply _. Qed.
+
+  Lemma ush_gen_run (N : uk_names Σ) (T : iProp Σ) (h : CpuId) (m : regfile)
+      (pc : mword 64) (avail : nat) :
+    is_aligned_vaddr (Virtaddr pc) 2 = true ->
+    ush_gen_slot N T -∗ T -∗ urun N h m pc avail -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intro Hal. rewrite /ush_gen_slot. iIntros "#Hg HT Hrun".
+    iApply (urun_gen N T h m pc avail Hal with "Hg HT Hrun").
+  Qed.
+
+  (* =================================================================== *)
+  (*  §10  WHAT REPLACES [UkShFork.ushf_lexable]                          *)
+  (*                                                                      *)
+  (*  [ushf_lexable] is "every line the user could type lexes", which is   *)
+  (*  false.  What the command loop hands its body instead is this: for    *)
+  (*  the line in the buffer at [k], either the FIRST NUL at or after [k]  *)
+  (*  ends a line that is exactly [echo_line] ([ush_line_is], hence        *)
+  (*  [ush_line_lexable]), or the taint -- and on the taint the body's     *)
+  (*  continuation is §9's.                                               *)
+  (*                                                                      *)
+  (*  STATED OVER THE FIRST NUL rather than over a given [len] because     *)
+  (*  that is what [UkShFork.ushf_first_nul] produces: the body derives    *)
+  (*  its own [len] from the loop's "some byte at or after [k] is NUL",    *)
+  (*  and the line fact has to hold at the [len] it derived.               *)
+  (* =================================================================== *)
+  Definition ush_rest_line (T : iProp Σ) (f : nat -> bv 8) (k : nat)
+    : iProp Σ :=
+    ((∀ len : nat,
+        ⌜forall j : nat, (j < len)%nat -> f (k + j)%nat <> ubyte0⌝ -∗
+        ⌜f (k + len)%nat = ubyte0⌝ -∗ ⌜ush_line_is f k len⌝)
+     ∨ T)%I.
+
+  (* =================================================================== *)
+  (*  §11  THE LINEAR [Pay] THAT CROSSES THE EXEC                         *)
+  (*                                                                      *)
+  (*  [PinnedExec.pinned_exec_bundle]'s [Pay] is the ONE linear resource   *)
+  (*  an exec'ing process can put in the exec'd image's slot, and this is  *)
+  (*  what init puts there for sh: sh's own entry payload                  *)
+  (*  ([UInitSh.sh_pay], persistent), the tag's reading (§8, persistent)   *)
+  (*  and the POSITION (linear, minted fresh per child just before the     *)
+  (*  fork).  The exit payload is NOT here -- it arrives at the            *)
+  (*  constructor wand from the kernel's own payment (EXEC-PAY; §5's       *)
+  (*  note).                                                              *)
+  (*                                                                      *)
+  (*  [Pay] is a parameter because [UInitSh.sh_pay] is stated above this   *)
+  (*  file's altitude; what this names is the SHAPE the two extra          *)
+  (*  conjuncts ride in.                                                   *)
+  (* =================================================================== *)
+  Definition ush_exec_pay (Pay : iProp Σ) (T : iProp Σ) (γp : gname)
       (n : nat) : iProp Σ :=
-    (∀ (N' : uk_names Σ) (m : regfile) (pc : mword 64),
-       (* THE CHILD'S RECORD IS AT THE CONSOLE PAYLOAD, not at the trivial
-          one: exec keeps the generation, so the exec'd image's payload IS
-          the exec'ing process's ([ChildTok.my_pay] pins it). *)
-       ⌜ukn_pay N' = ucons_pay cn γp T⌝ -∗
-       ⌜m !!! Regidx a0_idx = (mword_of_int 0x9a8 : mword 64)⌝ -∗
-       ⌜m !!! Regidx a1_idx = (mword_of_int 0x1000 : mword 64)⌝ -∗
-       init_rodata (ukn_t N') -∗
-       init_argv (ukn_d N') -∗
-       ustd_any (ukn_fd N') -∗
-       (* the position, which sh holds across [gets] *)
-       upos γp n -∗
-       udepw_at N' m pc USYS_exec FsImg.ROOTINO)%I.
+    (Pay ∗ ush_tag_law T ∗ upos γp n)%I.
+
 
 End UConsLine.

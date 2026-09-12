@@ -192,6 +192,17 @@ Lemma ukn_const_of_triv {Σ : gFunctors} (N : uk_names Σ) :
   ukn_triv N -> ukn_const N.
 Proof. intros Ht x y. by rewrite Ht. Qed.
 
+(* ...AND THE ROUTE AN ENTRY CONSTRUCTOR TAKES.  What a constructor is
+   handed is the EQUATION [ukn_pay N = Q] (the record it mints is keyed at
+   the payload the kernel gave it -- [uslot_of_urun_all]'s row), and what
+   the program's own leaves want is the CLASS.  At a payload that does not
+   read the status -- which is every payload a program can pay an exit with
+   out of one resource -- the two are one step apart.  [UserConsole.
+   ucons_pay_const] is the witness sh's entry supplies. *)
+Lemma ukn_const_of_eq {Σ : gFunctors} (N : uk_names Σ) (Q : Z -> iProp Σ) :
+  ukn_pay N = Q -> (forall x y : Z, Q x = Q y) -> ukn_const N.
+Proof. intros Heq HQ x y. rewrite Heq. exact (HQ x y). Qed.
+
 Section UkRun.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
@@ -604,6 +615,44 @@ Section UkRun.
     iSplitR; [ done | iExact "Hb" ].
   Qed.
 
+  (* THE LEDGER-FIXED EXPLICIT DEPOSIT (app-echo.md, lane SH-LINE, S4).
+     [udepwf_at] fixes the working directory because a PINNED OPEN is about
+     a path; this one fixes the low [NSTD] descriptor states because a
+     CONSOLE READ is about a descriptor.  Row 5's bundle is
+     [SpecFileread.fileread_in] at [SpecArgfd.fd_st_of_key (xk_a W 0)
+     (uvis_fd W)], so which ARM the supplier has to answer is decided by
+     the key's own descriptor table -- and a supplier holding the reader
+     token has to answer the CONSOLE arm and no other, because that is the
+     only arm the token is spent on.  [udepwf]'s own ∀ binds [fdv], so it
+     cannot be told; the leaf, which has destructed [urun] and holds both
+     the authority and the caller's ledger, can ([UserFd.ustd_agree]), and
+     that is why the fact enters as a premise INSIDE the ∀ here.
+
+     THE CWD IS STILL ∀-BOUND: a read's bundle reads no path. *)
+  Definition udepwf_std (N : uk_names Σ) (m : regfile) (pc : mword 64)
+      (n : Z) (fdep : sfam) (l : list fdstate) : iProp Σ :=
+    (⌜sexit_pay fdep = ukn_pay N⌝ ∗
+     ∀ (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (sz : Z)
+       (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname)
+       (pidv : mword 32),
+       ⌜take NSTD fdv = l⌝ -∗
+       my_pay gn (ukn_pay N) -∗
+       uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗ ufd_auth (ukn_fd N) fdv -∗
+       uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz ∗ ufd_auth (ukn_fd N) fdv ∗
+       sbundle_at uslot n fdep (uvis_of_run m pc M pm sz fdv cw gn cs pidv))%I.
+
+  (* [udepwf] IS THE ∀-LEDGER FORM, in the direction a caller that has one
+     needs -- [udepwf_at_of_udepwf]'s twin. *)
+  Lemma udepwf_std_of_udepwf (N : uk_names Σ) (m : regfile) (pc : mword 64)
+      (n : Z) (fdep : sfam) (l : list fdstate) :
+    udepwf N m pc n fdep -∗ udepwf_std N m pc n fdep l.
+  Proof.
+    rewrite /udepwf /udepwf_std. iIntros "[%Hpay Hd]".
+    iSplitR; [ done |].
+    iIntros (M pm sz fdv cw gn cs pidv) "_ Hmp Hh Hf".
+    iApply ("Hd" $! M pm sz fdv cw gn cs pidv with "Hmp Hh Hf").
+  Qed.
+
   Definition urun (N : uk_names Σ) (h : CpuId) (m : regfile) (pc : mword 64)
       (avail : nat) : iProp Σ :=
     (∃ (xi : TsoCtx.CurCtx) (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
@@ -798,6 +847,46 @@ Section UkRun.
     intros Hns. iIntros "Hheap Hstk Hufd Hcwd Hch #Hmy Hpay #Hdep Hcont".
     iApply (urun_close with "Hheap [Hstk] Hufd Hcwd Hch Hmy Hpay Hdep Hcont").
     rewrite (unot_sp_upd rd v m Hns). iExact "Hstk".
+  Qed.
+
+  (* ===================================================================== *)
+  (* THE GENERIC CONTINUATION FOR A RUNNING PROCESS (app-echo.md, lane      *)
+  (* SH-LINE, S4/S5: "sh's continuation goes generic").                     *)
+  (*                                                                        *)
+  (* An application's taint arm hands out a SLOT at a key                    *)
+  (* ([PinnedExec.pex_slot]'s [T]-arm, [UexecExecMint.uslot_mint]), and      *)
+  (* every consumer of one so far has been at a key -- an exec, a boot.  A   *)
+  (* program that learns the taint MID-WALK holds a [urun] and no key, and   *)
+  (* this is the step that closes that gap: the key a running process is at  *)
+  (* is [UexecSlot.uvis_of_run] of its own registers and pc, the slot there  *)
+  (* IS the U-mode continuation ([UexecRet.uslot_run]), and a [urun] carries *)
+  (* exactly the residue that continuation takes.  Everything else the run   *)
+  (* holds -- its heap, its stack, its ledger -- is DROPPED, which is what   *)
+  (* "generic" means: the process goes on running, and nothing is promised   *)
+  (* about it any more.                                                      *)
+  (*                                                                        *)
+  (* THE ALIGNMENT PREMISE is the one thing the run does not carry: a slot   *)
+  (* is stated at a RESUME pc, and [uslot_run] is the round trip only at a   *)
+  (* 2-aligned one.  Every pc a program names is a literal, so it is         *)
+  (* [vm_compute] at the call site.                                          *)
+  (* ===================================================================== *)
+  Lemma urun_gen (N : uk_names Σ) (T : iProp Σ) (h : CpuId) (m : regfile)
+      (pc : mword 64) (avail : nat) :
+    is_aligned_vaddr (Virtaddr pc) 2 = true ->
+    □ (∀ W : uvis,
+         T -∗ my_pay (uvis_gen W) (ukn_pay N) -∗ ukn_pay N (-1) -∗ uslot W) -∗
+    T -∗ urun N h m pc avail -∗ WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hal. iIntros "#Hgen HT Hrun".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs pidv)
+      "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & Hcha & #Hmy & Hpayv & #Hdep & Hb)".
+    iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
+    iDestruct ("Hgen" $! (uvis_of_run m pc M pm sz fdv cw gn cs pidv)
+                 with "HT [] Hpayv") as "Hslot".
+    { cbn [uvis_gen uvis_of_run]. iExact "Hmy". }
+    rewrite (uslot_run m pc M pm sz fdv cw gn cs pidv Hx0 Hal).
+    iApply ("Hslot" $! h xi C pt Rfd Rut HRut with "[%] [%] Hb");
+      [ exact Hlo | exact Hpm ].
   Qed.
 
   (* ===================================================================== *)

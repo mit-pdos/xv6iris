@@ -61,6 +61,10 @@ Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
 Require Import UsysMemOk. (* [USYS_exec] -- excluded by the minting law *)
 Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
 
+Require Import Xv6Cameras.   (* [uartGhostG] -- the console ring's cameras *)
+Require Import UartNames.    (* [cons_names] *)
+Require Import UserConsole.  (* [upos] / [upos_alloc] -- the console position
+                                pair init mints per child *)
 Section UkInitMain.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
@@ -74,6 +78,9 @@ Section UkInitMain.
      CLASS so that it reaches the exit ecall without an argument at every
      call site ([UkRun.ukn_triv]). *)
   Context `{Hpay : !ukn_triv N}.
+  (* the console ring's cameras: init mints the POSITION PAIR it lends each
+     child out of them ([UserConsole.upos_alloc]) *)
+  Context `{!uartGhostG Σ}.
   (* the fields, under the names the engine has always used *)
   Local Notation γt := (ukn_t N).
   Local Notation γd := (ukn_d N).
@@ -477,6 +484,7 @@ Section UkInitMain.
   (* neither.                                                                *)
   (* --------------------------------------------------------------------- *)
   Lemma wp_kinit_main_child (T : iProp Σ) (stc : fdstate)
+      (γ : gname) (np : nat)
       (N' : uk_names Σ) `{!ukn_triv N'} (h : CpuId) (m : regfile) (n : nat) :
     init_code (ukn_t N') -∗
     (* the exec deposit's supplier -- [UkInit.init_exec_sup]: init's child
@@ -486,7 +494,7 @@ Section UkInitMain.
        supply, at its own two argument registers and at the one working
        directory it ever has, and it is LENT the heap and the fd authority
        so a pinned bundle can read them. *)
-    init_exec_sup -∗
+    init_exec_sup_lend -∗
     init_rodata (ukn_t N') -∗
     (* ...AND THE ARGUMENT VECTOR, at the child's own data name: the
        supplier reads init's sixteen persisted .data bytes back into facts
@@ -506,10 +514,15 @@ Section UkInitMain.
        states, so the bare ledger is what travels.  It is SPENT here --
        the one path past a returning exec is the diagnostic and exit(1). *)
     ufd_head T stc (ukn_fd N') -∗
+    (* ...AND THE POSITION ITS PARENT LENT IT at the fork
+       ([UkFork.wp_uk_ecall_fork]'s [Rc]).  It is SPENT here: the exec
+       supply is a wand from it, and what crosses into sh's own run is
+       [PinnedExec]'s linear [Pay]. *)
+    upos γ np -∗
     urun N' h m (mword_of_int 0x96) (12 + (12 + (4 + n))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcode #Hxs #Hro #Hargv Hcwd Hstd Hrun".
+    iIntros "#Hcode #Hxs #Hro #Hargv Hcwd Hstd Hpos Hrun".
     (* THE HEAD IS SPENT AS A BARE LEDGER TODAY: sh's entry asks nothing
        about its standard streams yet, so [UkInit.init_exec_sup] reads only
        [UInitFd.ufd_head_ledger] out of it.  SH-LINE's own supply is what
@@ -615,9 +628,9 @@ Section UkInitMain.
        are pinned by the four instructions above, and the working
        directory is the one the fragment names. *)
     iApply (wp_kinit_exec N' hc5 mc5 (12 + (12 + (4 + n))) FsImg.ROOTINO
-              with "Hcode Hrun Hcwd [Hstd]").
-    { iApply ("Hxs" $! N' (<[Regidx a7_idx := (mword_of_int 7 : mword 64)]> mc5)
-                (mword_of_int 0x3ac) with "[%] [%] [%] Hro Hargv Hstd").
+              with "Hcode Hrun Hcwd [Hstd Hpos]").
+    { iApply ("Hxs" $! γ np N' (<[Regidx a7_idx := (mword_of_int 7 : mword 64)]> mc5)
+                (mword_of_int 0x3ac) with "[%] [%] [%] Hro Hargv Hstd Hpos").
       - exact (ukn_triv_eq (N := N')).
       - rewrite (upd_ne mc5 (Regidx a7_idx) (Regidx a0_idx)
                    (mword_of_int 7 : mword 64)
@@ -683,9 +696,17 @@ Section UkInitMain.
 (* even walk its return.                                                   *)
   (* --------------------------------------------------------------------- *)
   Lemma wp_kinit_fork (T : iProp Σ) `{!Persistent T} (stc : fdstate)
+      (γ : gname) (np : nat)
       (szv : Z) (h : CpuId) (m : regfile) (avail : nat)
       (Sc : gset gname) :
     init_code γt -∗ init_rodata γt -∗ init_argv γd -∗ usz γs szv -∗
+    (* WHAT INIT LENDS THE CHILD: the program half of the console position
+       pair ([UserConsole.upos]), which the child carries to its exec and
+       sh holds in [UkSh.ush_pstate] thereafter.  It crosses on
+       [UkFork.wp_uk_ecall_fork]'s [Rc] -- NOT in the payload, which is
+       where the reader TOKEN will have to go and where
+       [UkInit.init_exec_sup_pos]'s note says it cannot go yet. *)
+    upos γ np -∗
     (* THE LEDGER.  fork copies the descriptor table, so the child wakes
        on the parent's, and the child is the arm that execs sh -- which
        needs a ledger of its own to hand on.  [UkFork.wp_uk_ecall_fork]
@@ -711,10 +732,10 @@ Section UkInitMain.
            it returned the child's pid with the quarter of that child's
            generation a later wait() redeems. *)
         ((⌜r = (mword_of_int (-1) : mword 64)⌝ ∗ UserChildren.uch γch Sc)
-         ∨ ∃ (γ : gname) (pidv : mword 32),
+         ∨ ∃ (γc : gname) (pidv : mword 32),
              ⌜r = (sign_extend' 64 pidv : mword 64)⌝ ∗
-             child_tok γ pidv (fun _ => True)%I ∗
-             UserChildren.uch γch (Sc ∪ {[γ]})) -∗
+             child_tok γc pidv (fun _ => True)%I ∗
+             UserChildren.uch γch (Sc ∪ {[γc]})) -∗
         (init_code γt ∗ init_rodata γt ∗ init_argv γd) -∗ usz γs szv -∗
         ufd_head T stc γfd -∗
         UserCwd.ucwd γcwd FsImg.ROOTINO -∗
@@ -724,15 +745,14 @@ Section UkInitMain.
           (ret_pc (m !!! Regidx ra_idx)) avail -∗
         WP (Loop : expr riscv_lang)) ∗
      (∀ (N' : uk_names Σ) (h' : CpuId),
-        (* THE CHILD'S RECORD PAYS THE SAME NOTHING ITS PARENT DOES: the
-           payload the fork's split put on the child's generation is the
-           parent's ([UkFork]'s child arm gives the equation), and this
-           program's is trivial -- so the arm hands the class on and every
-           leaf below it, exit included, resolves it. *)
+        (* THE CHILD'S RECORD PAYS THE SAME NOTHING ITS PARENT DOES
+           ([UkFork]'s child arm gives the equation). *)
         ⌜ ukn_triv N' ⌝ -∗
         (init_code (ukn_t N') ∗ init_rodata (ukn_t N') ∗ init_argv (ukn_d N'))
           -∗ usz (ukn_s N') szv -∗
         ufd_head T stc (ukn_fd N') -∗
+        (* ...AND THE POSITION IT WAS LENT *)
+        upos γ np -∗
         UserCwd.ucwd (ukn_cwd N') FsImg.ROOTINO -∗
         urun N' h'
           (<[Regidx a0_idx := (mword_of_int 0 : mword 64)]>
@@ -741,7 +761,7 @@ Section UkInitMain.
         WP (Loop : expr riscv_lang))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcode #Hro #Hargv Hsz Hstd Hcwd Hch Hrun [Hpar Hchi]".
+    iIntros "#Hcode #Hro #Hargv Hsz Hpos Hstd Hcwd Hch Hrun [Hpar Hchi]".
     (* the list the head is at, and the arm's way back -- usable at EITHER
        ghost name, which is what the child's half needs *)
     iDestruct (ufd_head_open with "Hstd") as (l) "[Hstd #Hback]".
@@ -776,7 +796,7 @@ Section UkInitMain.
        handle set fork carries across is empty and both extra premises are
        [emp]. *)
     iApply (wp_uk_ecall_fork N h1 mf1 (mword_of_int 0x36c) avail szv
-              l ∅ FsImg.ROOTINO Sc (fun _ => True)%I
+              l ∅ FsImg.ROOTINO Sc (fun _ => True)%I (upos γ np)
               (fun gt gd _ =>
                  (init_code gt ∗ init_rodata gt ∗ init_argv gd)%I)
               ltac:(unfold mf1, usysno;
@@ -784,10 +804,8 @@ Section UkInitMain.
                                (mword_of_int 1 : mword 64));
                     vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "[] [] [] Hsz Hstd [] Hcwd Hch Hrun").
+              with "[] [] Hpos [] Hsz Hstd [] Hcwd Hch Hrun").
     { iApply (uis_init_36c with "Hcode"). }
-    (* the payload the child's run carries from its first instruction, at
-       this program's trivial choice *)
     { done. }
     { iFrame "Hcode Hro Hargv". }
     { rewrite big_sepM_empty. done. }
@@ -825,7 +843,7 @@ Section UkInitMain.
          child execs, and nothing before the exec allocates. *)
       (* the child's own children fragment is [∅] and init's child execs
          before it forks, so nothing here reads it *)
-      iIntros (N' hc γ') "%Hpeq _ Hpay Hsz Hstd _ Hcwd _ Hrun".
+      iIntros (N' hc γ') "%Hpeq _ Hpos Hpay Hsz Hstd _ Hcwd _ Hrun".
       pose proof (Hpeq : UkRun.ukn_triv N') as Hti'.
       set (mk := <[Regidx a0_idx := (mword_of_int 0 : mword 64)]> mf1).
       assert (Hrak : mk !!! Regidx ra_idx = m !!! Regidx ra_idx).
@@ -840,7 +858,7 @@ Section UkInitMain.
                 with "[] Hrun").
       { iApply (uis_init_370 with "Hck"). }
       iIntros (hc2) "Hrun".
-      iApply ("Hchi" $! N' hc2 with "[%] [] Hsz [Hstd] Hcwd Hrun").
+      iApply ("Hchi" $! N' hc2 with "[%] [] Hsz [Hstd] Hpos Hcwd Hrun").
       { exact Hpeq. }
       { iFrame "Hck Hrk Hak". }
       { iApply ("Hback" with "Hstd"). }
@@ -886,7 +904,7 @@ Section UkInitMain.
        supply, at its own two argument registers and at the one working
        directory it ever has, and it is LENT the heap and the fd authority
        so a pinned bundle can read them. *)
-    init_exec_sup -∗
+    init_exec_sup_lend -∗
     init_rodata γt -∗
     init_argv γd -∗
     ((∀ (h : CpuId) (m : regfile),
@@ -1003,8 +1021,15 @@ Section UkInitMain.
       (* the set the fork moves has to be NAMED, because the answer says
          what it became and the wait head is indexed by it *)
       iDestruct "Hch" as (Sc) "Hch".
-      iApply (wp_kinit_fork T stc szv hl4 ml4 (12 + (12 + (4 + n))) Sc
-                with "Hcode Hro Hargv Hsz Hstd Hcwd Hch Hrun").
+      (* THE MINT, once per round: a FRESH pair per child, because the
+         dead shell's half would otherwise still agree against the live
+         one's ([UserConsole.upos_alloc]).  init keeps the payload half --
+         the arm that hands it to the shell's ESCROW instead is what the
+         reader token needs and what [UkInit.init_exec_sup_pos]'s note
+         says is blocked one seam away. *)
+      iMod (upos_alloc 0%nat) as (γ) "[Hpos _]".
+      iApply (wp_kinit_fork T stc γ 0%nat szv hl4 ml4 (12 + (12 + (4 + n))) Sc
+                with "Hcode Hro Hargv Hsz Hpos Hstd Hcwd Hch Hrun").
       rewrite Eretf.
       iSplitR "".
       + (* ------------- the PARENT: r <> 0 ------------- *)
@@ -1114,7 +1139,7 @@ Section UkInitMain.
           { iPureIntro. exact Hs1p1. }
           { iPureIntro. set_solver. }
       + (* ------------- the CHILD: r = 0 ------------- *)
-        iIntros (N' hc) "%Hpeq (#Hck & #Hrk & #Hak) Hsz Hstd Hcwd Hrun".
+        iIntros (N' hc) "%Hpeq (#Hck & #Hrk & #Hak) Hsz Hstd Hpos Hcwd Hrun".
         pose proof (Hpeq : UkRun.ukn_triv N') as Hti'.
         set (mc0 := <[Regidx a0_idx := (mword_of_int 0 : mword 64)]>
                       (<[Regidx a7_idx := (mword_of_int 1 : mword 64)]> ml4)).
@@ -1176,8 +1201,8 @@ Section UkInitMain.
                   with "[] Hrun").
         { iApply (uis_init_42 with "Hck"). }
         iIntros (hc3) "Hrun".
-        iApply (wp_kinit_main_child T stc N' hc3 mc1 n
-                  with "Hck Hxs Hrk Hak Hcwd Hstd Hrun").
+        iApply (wp_kinit_main_child T stc γ 0%nat N' hc3 mc1 n
+                  with "Hck Hxs Hrk Hak Hcwd Hstd Hpos Hrun").
     - (* ==================== the WAIT head @0x44 ==================== *)
       iIntros (h m cs γsh pidsh) "%Hs2 %Hs1 %Hin Hsz Hstd Hcwd Hch Htok Hrun".
       (* ---- 0x44  c.li a0,0 -- the NULL status pointer ---- *)
@@ -1390,7 +1415,7 @@ Section UkInitMain.
        supply, at its own two argument registers and at the one working
        directory it ever has, and it is LENT the heap and the fd authority
        so a pinned bundle can read them. *)
-    init_exec_sup -∗
+    init_exec_sup_lend -∗
     init_rodata γt -∗ init_argv γd -∗ usz γs szv -∗
     (* THE HEAD, as the console test left it; the two dups below keep it *)
     ufd_head T stc γfd -∗
@@ -1562,7 +1587,7 @@ Section UkInitMain.
       (stc : fdstate) (szv : Z) (h : CpuId) (m : regfile) (n : nat) :
     stc <> FdClosed ->
     init_code γt -∗
-    init_exec_sup -∗
+    init_exec_sup_lend -∗
     init_rodata γt -∗ init_argv γd -∗ usz γs szv -∗
     uki_open2 N T stc -∗
     uki_open2_in N T -∗
@@ -1683,7 +1708,7 @@ Section UkInitMain.
     stc <> FdClosed ->
     init_code γt -∗
     (* the exec deposit's supplier -- [UkInit.init_exec_sup] *)
-    init_exec_sup -∗
+    init_exec_sup_lend -∗
     (* ...and the two PINNED console leaves, persistently *)
     init_cons_leaves N T K stc -∗
     init_rodata γt -∗ init_argv γd -∗ usz γs szv -∗
@@ -1843,7 +1868,7 @@ Section UkInitMain.
        supply, at its own two argument registers and at the one working
        directory it ever has, and it is LENT the heap and the fd authority
        so a pinned bundle can read them. *)
-    init_exec_sup -∗
+    init_exec_sup_lend -∗
     (* the two PINNED console leaves, persistently *)
     init_cons_leaves N T K stc -∗
     init_rodata γt -∗ init_argv γd -∗ usz γs szv -∗
@@ -2153,7 +2178,7 @@ Section UkInitMain.
        supply, at its own two argument registers and at the one working
        directory it ever has, and it is LENT the heap and the fd authority
        so a pinned bundle can read them. *)
-    init_exec_sup -∗
+    init_exec_sup_lend -∗
     init_cons_leaves N T K stc -∗
     init_rodata γt -∗ init_argv γd -∗ usz γs szv -∗
     ustd γfd ufd_l0 -∗

@@ -132,6 +132,8 @@ Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
 Require Import UserCwd.  (* [ucwd] / [ucwd_any] -- the process's own view of its working directory *)
 Require Import UserChildren.  (* [uch_any] -- the process's own half of its children set *)
 
+Require Import Xv6Cameras.   (* [uartGhostG] -- the console ring's cameras *)
+Require Import UserConsole.  (* [upos] -- sh's half of the console position pair *)
 Section UkShCd.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
@@ -143,8 +145,14 @@ Section UkShCd.
   Context (N : uk_names Σ).
   (* THIS PROGRAM'S EXIT OWES ITS PARENT NOTHING at this lane, as a
      CLASS so that it reaches the exit ecall without an argument at every
-     call site ([UkRun.ukn_triv]). *)
-  Context `{Hpay : !ukn_triv N}.
+     call site ([UkRun.ukn_const]). *)
+  Context `{Hpay : !ukn_const N}.
+  (* [Xv6Cameras.uartGhostG] and the POSITION's ghost name, which
+     [UkSh.ush_pstate] carries as its fourth conjunct (app-echo.md,
+     "SH-LINE RULING"): this walk never reads the number, but the resource
+     travels through every lemma that carries the process state. *)
+  Context `{!uartGhostG Σ}.
+  Context (γp : gname).
   (* the fields, under the names the engine has always used *)
   Local Notation γt := (ukn_t N).
   Local Notation γd := (ukn_d N).
@@ -184,15 +192,15 @@ Section UkShCd.
   (* ---- what the other files of the lane define, at this file's own
          ghost names ---- *)
   Local Notation ush_std := (UkSh.ush_std N).
-  Local Notation ush_pstate := (UkSh.ush_pstate N).
-  Local Notation ush_loop_head := (UkSh.ush_loop_head N).
+  Local Notation ush_pstate := (UkSh.ush_pstate N γp).
+  Local Notation ush_loop_head := (UkSh.ush_loop_head N γp).
   Local Notation urun_x0 := (UkShParse.urun_x0 N).
   Local Notation wp_kshp_strlen := (UkShParse.wp_kshp_strlen N).
   Local Notation shd_str := (UkShDiag.shd_str γt γd).
   Local Notation shd_str_of_ustr := (UkShDiag.shd_str_of_ustr γt γd).
   Local Notation shd_str_to_ustr := (UkShDiag.shd_str_to_ustr γt γd).
   Local Notation ushl_dat := (UkShLoop.ushl_dat γd).
-  Local Notation ushl_head := (UkShLoop.ushl_head N).
+  Local Notation ushl_head := (UkShLoop.ushl_head N γp).
 (*ALIASES-END*)
 
   (* ===================================================================== *)
@@ -830,11 +838,11 @@ Section UkShCd.
       by exact (upd_eq mB (Regidx ra_idx) _).
     (* THE ONE PLACE sh SPENDS ITS WORKING DIRECTORY: out of the process
        state, into the chdir row, and back in a turn later. *)
-    iDestruct "Hstd" as "(Hstd & Hcwd & Hch)".
+    iDestruct "Hstd" as "(Hstd & Hcwd & Hch & Hpos)".
     iApply (wp_kshc_chdir h16 mC (16 + (80 + n))
               with "Hcode Hcwd Hrun").
     iIntros (h17 ret) "Hcwd Hrun".
-    iCombine "Hstd Hcwd Hch" as "Hstd".
+    iCombine "Hstd Hcwd Hch Hpos" as "Hstd".
     rewrite Hra_C.
     assert (Eret2 : ret_pc (mword_of_int 0x9aa : mword 64)
                     = mword_of_int 0x9aa)

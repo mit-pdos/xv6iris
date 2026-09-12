@@ -81,6 +81,9 @@ Require Import FsShPin.            (* [era0_sh_pins] / [sh_path] / [SH_INO] *)
 Require Import FsAbsDefs.          (* [aview] / [arun] / [AFile] *)
 Require Import PinnedExec.
 Require Import UexecExecInst.      (* [sbundle_exec_intro] -- THE INSTANCE *)
+Require Import Xv6Cameras.         (* [uartGhostG] *)
+Require Import UartNames.          (* [cons_names] *)
+Require Import UserConsole.        (* [ucons_pay] / [upos] *)
 Require Import TsoCtx.
 Require User.InitData.
 Import Defs.
@@ -312,6 +315,9 @@ Section UInitSh.
             !irefslotG Σ, !pavG Σ, !wchG Σ, !ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
+  (* the console ring's cameras: the POSITION init lends sh across the exec
+     is stated over them ([UserConsole.upos]) *)
+  Context `{!uartGhostG Σ}.
 
   (* ------------------------------------------------------------------- *)
   (* sh's ENTRY PAYLOAD, as init holds it.                                 *)
@@ -328,8 +334,8 @@ Section UInitSh.
   (* [n0] is the slack sh's entry is priced at.  Any [n0] under 402 fits   *)
   (* ([init_sh_room] below); the caller picks one.                         *)
   (* ------------------------------------------------------------------- *)
-  Definition sh_pay (Rsh : gname -> gname -> gname -> iProp Σ) (n0 : nat)
-    : iProp Σ :=
+  Definition sh_pay (Rsh : gname -> gname -> gname -> iProp Σ)
+      (n0 : nat) : iProp Σ :=
     (□ (∀ (W' : uvis) (γt γd γs : gname),
           usz γs (uvis_sz W') -∗
           ([∗ map] k ↦ b ∈ base.filter
@@ -340,8 +346,11 @@ Section UInitSh.
                 (udata_lo (uvis_M W') (uvis_perm W') (uvis_sz W')),
              ubyte γd k b) -∗
           ∃ f : nat -> bv 8, Rsh γt γd γs ∗ ubytes γd sh_buf sh_nbuf f)
-     ∗ (∀ N : uk_names Σ,
-          ush_rest N (Rsh (ukn_t N) (ukn_d N) (ukn_s N))))%I.
+     (* ...AND THE TAIL AT EVERY POSITION GHOST: init mints a FRESH pair
+        per child ([UserConsole.upos_alloc]), so what the application owes
+        is sh's body at whichever name this round's pair got. *)
+     ∗ (∀ (γp : gname) (N : uk_names Σ),
+          ush_rest N γp (Rsh (ukn_t N) (ukn_d N) (ukn_s N))))%I.
 
   Global Instance sh_pay_persistent Rsh n0 : Persistent (sh_pay Rsh n0).
   Proof. rewrite /sh_pay. apply _. Qed.
@@ -426,17 +435,30 @@ Section UInitSh.
       (Rsh : gname -> gname -> gname -> iProp Σ) (n0 : nat) :
     (forall k : Z, k <> USYS_exec -> psok k) ->
     8 * Z.of_nat (2 + (8 + (16 + (ush_Dbody + n0)))) <= 0xFE0 ->
+    (* THE ENTRY'S DESCRIPTOR ROW, at its three arms ([UkSh.ush_fd0]): what
+       init can hand sh on fd 0 is the console, an all-closed table, or
+       nothing beyond the taint.
+       STATED AT EVERY TABLE, WHICH IS TOO STRONG, and is this lane's one
+       open obligation: the row is really a consequence of INIT'S OWN HEAD
+       ([UInitFd.ufd_head], whose three arms are the same three), and the
+       route is to thread the head into [UkInit.init_exec_sup_pos] in place
+       of the bare [UserFd.ustd_any] it takes today and read the row off it
+       there ([UInitFd.ufd_head_open] is the shape).  Left as a premise
+       rather than derived because the supply's own ledger premise is the
+       weakened one; nothing in the tree applies this lemma yet, so the
+       obligation is recorded and not discharged. *)
+    (∀ sts : list fdstate, ⊢ UkSh.ush_fd0 T (take NSTD sts)) ->
     udep -∗
     init_sh_slot T (sh_pay Rsh n0) -∗
-    UkInit.init_exec_sup.
+    UkInit.init_exec_sup_lend.
   Proof.
-    intros Hpsok Hn0.
+    intros Hpsok Hn0 Hfd0.
     iIntros "#Hdep (#Hinv & #Hcl & #Hgen & #Hpay)".
     (* THE LEDGER IS TAKEN AND NOT READ: sh's entry says nothing about its
        standard streams, and the only descriptor fact this constructor
        needs is [length fdv = NOFILE], which comes off the LENT authority
        ([UserFd.ufd_auth_len]) rather than off the ledger. *)
-    iModIntro. iIntros (N m pc) "%Hpeq %Ha0 %Ha1 #Hro #Hargv _".
+    iModIntro. iIntros (γp np N m pc) "%Hpeq %Ha0 %Ha1 #Hro #Hargv _ Hpos".
     rewrite /udepw_at. iIntros (M pm sz fdv gn cs pidv) "#Hmpay Hheap Hufd".
     (* ---- the two image readings, off the lent heap ---- *)
     iAssert (⌜uimg_sub UCodeInit.init_ro M⌝)%I as %Hsro.
@@ -459,6 +481,12 @@ Section UInitSh.
        at this lane it is the trivial one -- init's child owes nothing --
        so what the constructor takes beside [my_pay] is [True] and sh's
        entry is answered without it. *)
+    (* THE LINEAR HALF OF [Pay] IS THE POSITION: [UInitSh.sh_pay] is
+       persistent, so what actually crosses [PinnedExec]'s one linear slot
+       is [UserConsole.upos] at the pair init minted for this round.  The
+       exit payload is NOT here -- it arrives at the constructor wand from
+       the kernel's own payment (EXEC-PAY) -- and at this lane it is the
+       trivial one. *)
     iAssert (□ (∀ (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
                   (W' : uvis),
                   ⌜kexec_image_ok ElfUser.sh_elf na alen afun fdv W'⌝ -∗
@@ -466,13 +494,16 @@ Section UInitSh.
                      na alen afun⌝ -∗
                   my_pay (uvis_gen W') (fun _ => True)%I -∗
                   (fun _ : Z => True)%I (-1) -∗
-                  sh_pay Rsh n0 -∗ uslot W'))%I as "#Hcon".
-    { iModIntro. iIntros (na alen afun W') "%Hok %Hargs #Hmp _ [#Hp1 #Hp2]".
+                  (sh_pay Rsh n0 ∗ upos γp np) -∗ uslot W'))%I as "#Hcon".
+    { iModIntro. iIntros (na alen afun W') "%Hok %Hargs #Hmp _ [[#Hp1 #Hp2] Hps]".
       destruct (init_args_det M na alen afun Hsav Hsro Hargs) as [-> Halen].
-      iApply (sh_slot_of_kexec Hpsok Rsh 1%nat alen afun fdv W' n0 Hok
-                (init_sh_room alen n0 Halen Hn0) Hlen with "[] Hdep Hp2 Hmp").
-      iModIntro. iIntros (γt γd γs) "Hsz Hlo".
-      iApply ("Hp1" $! W' γt γd γs with "Hsz Hlo"). }
+      iApply (sh_slot_of_kexec Hpsok Rsh γp T 1%nat alen afun fdv W' n0 np Hok
+                (init_sh_room alen n0 Halen Hn0) Hlen
+                with "[] Hdep [] [] Hmp Hps").
+      - iModIntro. iIntros (γt γd γs) "Hsz Hlo".
+        iApply ("Hp1" $! W' γt γd γs with "Hsz Hlo").
+      - iIntros (N0). iApply ("Hp2" $! γp N0).
+      - iApply (Hfd0 fdv). }
     (* ---- the bundle ---- *)
     (* ...and the taint arm on the same terms: the generic family is at the
        trivial payload, so the [Q (-1)] it is handed is [True]. *)
@@ -481,12 +512,14 @@ Section UInitSh.
     { iModIntro. iIntros (W') "#HT #Hmp _". iApply ("Hgen" with "HT Hmp"). }
     iDestruct (pinned_exec_bundle fsc_fs uslot FsShPin.era0_sh_pins T
                  FsImg.ROOTINO init_sh_pl [FsImg.ROOTINO; FsShPin.SH_INO]
-                 FsShPin.SH_INO ElfUser.sh_elf 1%nat (sh_pay Rsh n0)
+                 FsShPin.SH_INO ElfUser.sh_elf 1%nat
+                 (sh_pay Rsh n0 ∗ upos γp np)%I
                  (fun _ => True)%I
                  M (mword_of_int 0x9a8) (mword_of_int 0x1000) fdv
                  init_sh_pin_resolves sh_elf_loadable
                  (init_sh_path_of M Hsro)
-                 with "Hcl Hinv Hcon Hgen' Hpay") as (P Pmiss Fo R) "Hb".
+                 with "Hcl Hinv Hcon Hgen' [Hpos]") as (P Pmiss Fo R) "Hb".
+    { iFrame "Hpay Hpos". }
     assert (Ea0 : tf_w (uvis_tf (uvis_of_run m pc M pm sz fdv FsImg.ROOTINO gn cs pidv))
                     (tf_arg_idx 0) = (mword_of_int 0x9a8 : mword 64))
       by (etransitivity; [ exact (tf_of_arg0 m pc) | exact Ha0 ]).

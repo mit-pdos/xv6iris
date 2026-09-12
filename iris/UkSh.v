@@ -121,6 +121,11 @@ Require Import UserCwd.  (* [ucwd_any] -- sh's own working directory, which
 Require Import UserChildren.  (* [uch_any] -- sh's own half of its children
                                  set, which its fork1 spends *)
 Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+Require Import Xv6Cameras.   (* [uartGhostG] -- the console ring's cameras,
+                                at the narrow class a program binds *)
+Require Import ConsoleInv.   (* [CONSOLE] -- the major fd 0's arm is keyed by *)
+Require Import UserConsole.  (* [upos] -- sh's half of the console position
+                                pair (app-echo.md, "SH-LINE RULING") *)
 
 Section UkSh.
   Context `{!riscvGS Σ}.
@@ -138,7 +143,21 @@ Section UkSh.
      on the exit stub, so that every lemma between the entry and the ecall
      is generalized over it automatically and no intermediate statement has
      to carry it by hand. *)
-  Context `{Hpay : !ukn_triv N}.
+  Context `{Hpay : !ukn_const N}.
+  (* [Xv6Cameras.uartGhostG]: the console ring's own cameras, which is the
+     class [UserConsole.upos] is stated over -- a program binds the narrow
+     classes and never [Xv6G.xv6G] ([UserConsole.v]'s header). *)
+  Context `{!uartGhostG Σ}.
+  (* THE PROGRAM'S HALF OF THE CONSOLE POSITION PAIR, as a section variable
+     for [Hpay]'s reason: it travels in [ush_pstate] from sh's entry to its
+     read and back, and no lemma between the two says anything about it. *)
+  Context (γp : gname).
+  (* ...AND THE APPLICATION'S TAINT, which sh's entry ledger's third arm is.
+     A PARAMETER: the program tier names no application
+     ([UserConsole.ucons_pay]'s note).  Persistent, which is what lets the
+     arm be a side fact rather than a resource the walk has to thread. *)
+  Context (T : iProp Σ).
+  Context `{HT : !Persistent T}.
   (* the fields, under the names the engine has always used *)
   Local Notation γt := (ukn_t N).
   Local Notation γd := (ukn_d N).
@@ -712,10 +731,13 @@ Section UkSh.
                     vm_compute; reflexivity)
               with "[] [] Hrun").
     { iApply (uis_shk_c88 with "Hcode"). }
-    (* AT THE TRIVIAL PAYLOAD BOTH CONJUNCTS ARE FREE: this program owes
-       its parent nothing, at its own status and at the kill status alike
-       ([UkRun.ukn_triv]). *)
-    { rewrite (ukn_triv_eq (N := N)). iIntros "_". iSplit; done. }
+    (* AT A PAYLOAD THAT DOES NOT READ THE STATUS ONE RESOURCE ANSWERS
+       BOTH CONJUNCTS: sh's exit owes its parent the console reader token
+       ([UserConsole.ucons_pay]) and owes it at the kill status just the
+       same, so the additive [∧] is paid from the run's own copy
+       ([UkRun.ukn_const]). *)
+    { rewrite (ukn_const_eq (N := N) (uexitst m1) (-1)).
+      iIntros "Hp". iSplit; iExact "Hp". }
   Qed.
 
 
@@ -4118,13 +4140,22 @@ Section UkSh.
   (* to delete.  A process with no ledger cannot close fd 0 at all, no      *)
   (* matter what the kernel would do, because it has nothing to spend.      *)
   (*                                                                       *)
-  (* SH ASSUMES NOTHING ABOUT WHICH OF THE THREE ARE OPEN, and it cannot:   *)
-  (* init's dups go through the untracked leaf and init never tests its     *)
-  (* repair open, so a real sh can start with a closed standard stream.     *)
-  (* xv6's sh is written for exactly that -- main()'s console loop reopens  *)
-  (* "console" until the descriptor comes back at 3 or above -- and that    *)
-  (* preamble ([wp_ksh_console]) is the ONE program point in the whole of   *)
-  (* sh that looks at the ledger's shape.                                   *)
+  (* THE WALK ASSUMES NOTHING ABOUT WHICH OF THE THREE ARE OPEN, and that  *)
+  (* is what makes sh's entry cost THREE ARMS rather than one.  init can    *)
+  (* hand over a console on fd 0, or an all-closed table (its second open   *)
+  (* failed at allocation, so the two dups failed too -- app-echo.md,       *)
+  (* "OPEN-PIN PHASE 1 LANDED", finding (a)), or nothing at all beyond the  *)
+  (* taint; [ush_fd0] below is that disjunction and [wp_ksh_start] is where *)
+  (* it enters.  NO LEMMA BELOW READS IT: sh's walk is the same on all      *)
+  (* three arms -- a closed fd 0 makes its first read return -1, [gets]     *)
+  (* break at once, [getcmd] return -1 and main exit, and that arm is       *)
+  (* already inside the abstract walk -- which is exactly why the CLOSED    *)
+  (* arm costs no second proof.  What reads the arm is the DISCIPLINED      *)
+  (* LINE (app-echo.md, SH-LINE S4), and that is the console arm's job.     *)
+  (*                                                                       *)
+  (* xv6's sh reopens "console" until the descriptor comes back at 3 or     *)
+  (* above, and that preamble ([wp_ksh_console]) is the ONE program point   *)
+  (* in the whole of sh that looks at the ledger's shape.                   *)
   (*                                                                       *)
   (* THE STATES ARE PARAMETERS, not existentials, and nothing here says     *)
   (* what they are.  sh reads from 0 and writes to 1, but the walk never    *)
@@ -4133,6 +4164,26 @@ Section UkSh.
   (* a promise no caller could use and every caller would have to make.     *)
   (* ===================================================================== *)
   Definition ush_std (l : list fdstate) : iProp Σ := ustd γfd l.
+
+  (* ...AND THE ONE ROW SH'S ENTRY IS TOLD ABOUT, at three arms (header).
+     PERSISTENT, which is what makes it a side fact: it is delivered once,
+     at the entry, and no resource has to carry it.  The CLOSED arm names
+     only slot 0 -- that is all the arm is for, and it is what init's
+     all-closed head ([UInitFd.ufd_l0]) weakens to. *)
+  Definition ush_fd0 (l : list fdstate) : iProp Σ :=
+    (⌜exists wr : bool, l !! 0%nat = Some (FdOpen true wr (FdDevice CONSOLE))⌝
+     ∨ ⌜l !! 0%nat = Some FdClosed⌝
+     ∨ T)%I.
+
+  Global Instance ush_fd0_persistent l : Persistent (ush_fd0 l).
+  Proof. rewrite /ush_fd0. apply _. Qed.
+
+  (* ...AND THE PROGRAM'S HALF OF THE CONSOLE POSITION PAIR
+     ([UserConsole.upos]).  EXISTENTIAL here and named inside [gets]: a
+     turn of the command loop begins wherever the previous line ended, no
+     lemma between the loop head and the read needs the number, and the
+     read is what moves it. *)
+  Definition ush_pos : iProp Σ := (∃ n : nat, upos γp n)%I.
 
   (* ===================================================================== *)
   (* ...AND THE OTHER GHOST A TURN CANNOT ESCAPE CARRYING: THE CWD.        *)
@@ -4159,8 +4210,16 @@ Section UkSh.
   (* then unchanged by the others' arrival.  [UserFd.ufd_state] is the     *)
   (* same move one tier down.                                             *)
   (* ===================================================================== *)
+  (* ...AND THE FOURTH, WHICH GOES LAST (durable-notes, "Shaping a change
+     so the sweep is small"): the console POSITION.  sh was lent the
+     console reader token inside its exit payload ([UserConsole.ucons_pay],
+     which is linear in [UkRun.urun] and abstract to the program), and the
+     half of the position pair it holds in its hand is what turns a read's
+     receipt into a receipt AT ITS OWN CURSOR.  It travels with the other
+     three for their reason: fork does not move it, the read does. *)
   Definition ush_pstate (l : list fdstate) : iProp Σ :=
-    (ush_std l ∗ UserCwd.ucwd_any γcwd ∗ UserChildren.uch_any γch)%I.
+    (ush_std l ∗ UserCwd.ucwd_any γcwd ∗ UserChildren.uch_any γch
+     ∗ ush_pos)%I.
 
   (* the loop head, and the abstract rest of main's body ------------------ *)
   (* Both are indexed by the two states, because both are re-entered: the
@@ -5222,7 +5281,7 @@ Section UkSh.
                  := regval_into_reg (mword_of_int 0x908 : mword 64)]> mB).
     assert (HraC : mC !!! Regidx ra_idx = mword_of_int 0x908)
       by exact (upd_eq mB (Regidx ra_idx) (mword_of_int 0x908 : mword 64)).
-    iDestruct "Hstd" as "(Hstd & Hcwd & Hch)".
+    iDestruct "Hstd" as "(Hstd & Hcwd & Hch & Hpos)".
     iApply (wp_ksh_open h3 mC l n with "Hcode Hrun Hstd").
     (* WHAT CAME BACK, PUT IN THE FORM THE TWO BRANCHES CONSUME: the ledger
        the open left, and then either the handle (the descriptor landed
@@ -5261,8 +5320,8 @@ Section UkSh.
           iExists l. iFrame "Hstd".
           iLeft. iExists fd, rd, wr, t. iFrame "Hh". iPureIntro. exact Hr.
       - iExists l. iFrame "Hstd". iRight. iPureIntro. left. exact Hrm. }
-    iAssert (ush_pstate l') with "[Hstd Hcwd Hch]" as "Hstd";
-      [ rewrite /ush_pstate /ush_std; iFrame "Hstd Hcwd Hch" |].
+    iAssert (ush_pstate l') with "[Hstd Hcwd Hch Hpos]" as "Hstd";
+      [ rewrite /ush_pstate /ush_std; iFrame "Hstd Hcwd Hch Hpos" |].
     rewrite HraC.
     assert (Eret : ret_pc (mword_of_int 0x908 : mword 64) = mword_of_int 0x908)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -5634,6 +5693,12 @@ Section UkSh.
       (f : nat -> bv 8) (n0 : nat) (l : list fdstate) :
     ush_rest R -∗
     shk_code γt -∗
+    (* THE ONE ROW THE ENTRY IS TOLD ABOUT, at its three arms ([ush_fd0]'s
+       header).  It enters HERE and nowhere else: the walk below is the
+       same on all three, so the CLOSED arm is this application of the same
+       lemma and not a second proof.  SH-LINE's next phase is what reads
+       it, at the read of fd 0. *)
+    ush_fd0 l -∗
     ush_pstate l -∗
     R -∗
     ubytes γd sh_buf sh_nbuf f -∗
@@ -5641,7 +5706,7 @@ Section UkSh.
       (2 + (8 + (16 + (ush_Dbody + n0)))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hrest #Hcode Hstd HR Hbs Hrun".
+    iIntros "#Hrest #Hcode #Hfd0 Hstd HR Hbs Hrun".
     set (n := (16 + (ush_Dbody + n0))%nat).
     rewrite shp_start.
     iDestruct (urun_stack with "Hrun") as %[Hal8' Hroom].
@@ -5794,8 +5859,8 @@ Section UkShLeaf.
   Context (N : uk_names Σ).
   (* THIS PROGRAM'S EXIT OWES ITS PARENT NOTHING at this lane, as a
      CLASS so that it reaches the exit ecall without an argument at every
-     call site ([UkRun.ukn_triv]). *)
-  Context `{Hpay : !ukn_triv N}.
+     call site ([UkRun.ukn_const]). *)
+  Context `{Hpay : !ukn_const N}.
   (* the fields, under the names the engine has always used *)
   Local Notation γt := (ukn_t N).
   Local Notation γd := (ukn_d N).

@@ -240,6 +240,9 @@ Qed.
 Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
 Require Import UserCwd.  (* [ucwd] / [ucwd_any] -- the process's own view of its working directory *)
 Require Import UserChildren.  (* [uch_any] -- the process's own half of its children set *)
+Require Import Xv6Cameras.    (* [uartGhostG] -- the console ring's cameras *)
+Require Import UserConsole.   (* [ucons_pay] / [upos] -- sh's exit payload and
+                                 its half of the console position pair *)
 
 Section UShKernel.
   Context `{!riscvGS Σ}.
@@ -252,6 +255,9 @@ Section UShKernel.
   (* [ChildTok.ctokG]: the slot's fork arms name the generation's pieces,
      and this file binds no whole-system bundle. *)
   Context `{!ctokG Σ}.
+  (* the console ring's cameras, at the narrow class ([UserConsole.v]'s
+     header): this file binds no whole-system bundle either *)
+  Context `{!uartGhostG Σ}.
   Context {SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
   (* THE NUMBERS SH ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
@@ -301,7 +307,8 @@ Section UShKernel.
   (* SS2 THE DEPOSIT (header (1), (2)).                                   *)
   (* ------------------------------------------------------------------- *)
   Lemma sh_uexec_slot (R : gname -> gname -> gname -> iProp Σ)
-      (W : uvis) (n0 : nat) :
+      (γp : gname) (T : iProp Σ) `{!Persistent T}
+      (W : uvis) (n0 n : nat) :
     tf_resume_pc (uvis_tf W) = (mword_of_int ShSyms.start : mword 64) ->
     shk_img_sub (uvis_M W) ->
     (forall a : Z, 0 <= a < 8192 ->
@@ -350,47 +357,60 @@ Section UShKernel.
        discharge takes [UkRun.uxsup].) *)
     udep -∗
     (∀ N : uk_names Σ,
-       ush_rest N (R (ukn_t N) (ukn_d N) (ukn_s N))) -∗
-    (* THE PAY FACT, at the trivial payload: sh's exit owes its parent
-       nothing this lane (L7 is what changes it), and the entry constructor
-       is what writes it into the record ([UkRun.ukn_pay]). *)
+       ush_rest N γp (R (ukn_t N) (ukn_d N) (ukn_s N))) -∗
+    (* THE ENTRY'S ONE DESCRIPTOR ROW, at its three arms
+       ([UkSh.ush_fd0]).  Persistent, and the walk reads none of the three
+       -- which is what makes the CLOSED arm this same application. *)
+    UkSh.ush_fd0 T (take NSTD (uvis_fd W)) -∗
+    (* THE PAY FACT, at the trivial payload.  SH'S EXIT PAYLOAD IS WHERE
+       THE CONSOLE READER TOKEN HAS TO GO -- only [UkRun.ukn_pay N (-1)]
+       survives a kill -- and it is blocked one seam away
+       ([UkInit.init_exec_sup_pos]'s note: a tainted process runs on the
+       generic slot, which [UexecExecInst.xv6_sbundle_of_supply] mints at
+       the trivial payload alone). *)
     my_pay (uvis_gen W) (fun _ => True)%I -∗
+    (* ...AND THE POSITION, the ONE linear resource init's pinned exec
+       bundle hands sh through [PinnedExec]'s [Pay].  It goes into
+       [UkSh.ush_pstate] and is what the read will move. *)
+    upos γp n -∗
     uslot W.
   Proof.
     intros Hpc Hsub Hx Hal8 Hroom Hstk Hfdlen Hstop.
-    iIntros "#Hpay #Hdep #Hrest #Hmp".
-    iApply (uslot_of_urun_all W (2 + (8 + (16 + (ush_Dbody + n0)))) (fun _ => True)%I
+    iIntros "#Hpay #Hdep #Hrest #Hfd0 #Hmp Hpos".
+    iApply (uslot_of_urun_all W (2 + (8 + (16 + (ush_Dbody + n0))))
+              (fun _ => True)%I
               Hal8 Hroom Hstk Hfdlen Hstop with "Hdep Hmp []").
-    (* the payload at the trivial one: this process owes its parent
-       nothing, so what its run carries between traps is [True] *)
     { done. }
     (* sh's own half of its children set travels in [UkSh.ush_pstate]
        beside the ledger and the cwd: fork1 MOVES the set, so the fragment
        goes down the chain index-free ([UserChildren.uch_any]). *)
     iIntros (N h) "%Hpayeq %Hsz Hszf #Ht Hstd Hcwf Hchf Dlo _ Hrun".
-    pose proof (Hpayeq : UkRun.ukn_triv N) as Hti.
+    pose proof (ukn_const_of_triv N (Hpayeq : UkRun.ukn_triv N)) as Hti.
     rewrite Hpc.
     (* [R] and the line buffer, out of the data below the frame *)
     iDestruct ("Hpay" $! (ukn_t N) (ukn_d N) (ukn_s N) with "Hszf Dlo")
       as (f) "[HR Hbs]".
     iPoseProof ("Hrest" $! N) as "#Hr".
-    iApply (wp_ksh_start N Hpsok (ush_read_leaf_of_win N)
+    iApply (wp_ksh_start N γp T Hpsok (ush_read_leaf_of_win N)
               (R (ukn_t N) (ukn_d N) (ukn_s N)) h _ f n0 (take NSTD (uvis_fd W))
-              with "Hr [] [Hstd Hcwf Hchf] HR Hbs [Hrun]").
+              with "Hr [] Hfd0 [Hstd Hcwf Hchf Hpos] HR Hbs [Hrun]").
     - iApply (shk_code_of_text (ukn_t N) (uvis_M W) (uvis_perm W)
                 (shk_img_text _ Hsub) Hx with "Ht").
-    - rewrite /UkSh.ush_pstate /UkSh.ush_std. iFrame "Hstd".
-      iSplitL "Hcwf"; [ iApply (ucwd_any_of with "Hcwf")
-                      | iApply (uch_any_of with "Hchf") ].
+    - rewrite /UkSh.ush_pstate /UkSh.ush_std /UkSh.ush_pos. iFrame "Hstd".
+      iSplitL "Hcwf"; [ iApply (ucwd_any_of with "Hcwf") | ].
+      iSplitL "Hchf"; [ iApply (uch_any_of with "Hchf") | ].
+      iExists n. iExact "Hpos".
     - iExact "Hrun".
   Qed.
 
   (* ------------------------------------------------------------------- *)
   (* SS3 THE BRIDGE from the kernel's image fact (header).                *)
   (* ------------------------------------------------------------------- *)
-  Lemma sh_slot_of_kexec (R : gname -> gname -> gname -> iProp Σ) (na : nat)
+  Lemma sh_slot_of_kexec (R : gname -> gname -> gname -> iProp Σ)
+      (γp : gname) (T : iProp Σ) `{!Persistent T}
+      (na : nat)
       (alen : nat -> nat) (afun : nat -> nat -> bv 8) (sts : list fdstate)
-      (W' : uvis) (n0 : nat) :
+      (W' : uvis) (n0 n : nat) :
     kexec_image_ok sh_elf na alen afun sts W' ->
     (* room for sh's frames on the stack page, below the argument block *)
     kexec_sz sh_elf - PGSIZE + 8 * Z.of_nat (2 + (8 + (16 + (ush_Dbody + n0))))
@@ -409,9 +429,12 @@ Section UShKernel.
     (* the deposit supplier, passed straight through *)
     udep -∗
     (∀ N : uk_names Σ,
-       ush_rest N (R (ukn_t N) (ukn_d N) (ukn_s N))) -∗
-    (* the pay fact, passed straight through: see [sh_uexec_slot] *)
+       ush_rest N γp (R (ukn_t N) (ukn_d N) (ukn_s N))) -∗
+    (* the entry row, the pay fact, the payload and the position, all four
+       passed straight through: see [sh_uexec_slot] *)
+    UkSh.ush_fd0 T (take NSTD sts) -∗
     my_pay (uvis_gen W') (fun _ => True)%I -∗
+    upos γp n -∗
     uslot W'.
   Proof.
     intros Hok Hroom Hlen.
@@ -499,7 +522,10 @@ Section UShKernel.
               0x4000 <= spv - 8 * Z.of_nat (2 + (8 + (16 + (ush_Dbody + n0))))
                         + Z.of_nat j < spv)
       by (intros j Hj; clear -Hj Hroom; lia).
-    iApply (sh_uexec_slot R W' n0).
+    (* the entry row is stated at the EXEC'ING process's table, which is
+       the one the image fact says the new key carries *)
+    rewrite <- Hfd.
+    iApply (sh_uexec_slot R γp T W' n0 n).
     - rewrite Hpc. exact sh_start_pc.
     - exact (shk_img_sub_of_elf M Himg).
     - exact Hx.

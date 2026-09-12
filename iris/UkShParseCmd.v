@@ -59,8 +59,8 @@ Section UkShParseCmd.
   Context (N : uk_names Σ).
   (* THIS PROGRAM'S EXIT OWES ITS PARENT NOTHING at this lane, as a
      CLASS so that it reaches the exit ecall without an argument at every
-     call site ([UkRun.ukn_triv]). *)
-  Context `{Hpay : !ukn_triv N}.
+     call site ([UkRun.ukn_const]). *)
+  Context `{Hpay : !ukn_const N}.
   (* the fields, under the names the engine has always used *)
   Local Notation γt := (ukn_t N).
   Local Notation γd := (ukn_d N).

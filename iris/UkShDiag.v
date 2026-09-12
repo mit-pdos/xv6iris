@@ -420,8 +420,8 @@ Section UkShDiagPutc.
   Context (N : uk_names Σ).
   (* THIS PROGRAM'S EXIT OWES ITS PARENT NOTHING at this lane, as a
      CLASS so that it reaches the exit ecall without an argument at every
-     call site ([UkRun.ukn_triv]). *)
-  Context `{Hpay : !ukn_triv N}.
+     call site ([UkRun.ukn_const]). *)
+  Context `{Hpay : !ukn_const N}.
   (* the fields, under the names the engine has always used *)
   Local Notation γt := (ukn_t N).
   Local Notation γd := (ukn_d N).
@@ -878,8 +878,8 @@ Section UkShDiagVprintf.
   Context (N : uk_names Σ).
   (* THIS PROGRAM'S EXIT OWES ITS PARENT NOTHING at this lane, as a
      CLASS so that it reaches the exit ecall without an argument at every
-     call site ([UkRun.ukn_triv]). *)
-  Context `{Hpay : !ukn_triv N}.
+     call site ([UkRun.ukn_const]). *)
+  Context `{Hpay : !ukn_const N}.
   (* the fields, under the names the engine has always used *)
   Local Notation γt := (ukn_t N).
   Local Notation γd := (ukn_d N).
@@ -2993,8 +2993,8 @@ Section UkShDiagVprintfS.
   Context (N : uk_names Σ).
   (* THIS PROGRAM'S EXIT OWES ITS PARENT NOTHING at this lane, as a
      CLASS so that it reaches the exit ecall without an argument at every
-     call site ([UkRun.ukn_triv]). *)
-  Context `{Hpay : !ukn_triv N}.
+     call site ([UkRun.ukn_const]). *)
+  Context `{Hpay : !ukn_const N}.
   (* the fields, under the names the engine has always used *)
   Local Notation γt := (ukn_t N).
   Local Notation γd := (ukn_d N).
@@ -5575,8 +5575,8 @@ Section UkShDiagFprintf.
   Context (N : uk_names Σ).
   (* THIS PROGRAM'S EXIT OWES ITS PARENT NOTHING at this lane, as a
      CLASS so that it reaches the exit ecall without an argument at every
-     call site ([UkRun.ukn_triv]). *)
-  Context `{Hpay : !ukn_triv N}.
+     call site ([UkRun.ukn_const]). *)
+  Context `{Hpay : !ukn_const N}.
   (* the fields, under the names the engine has always used *)
   Local Notation γt := (ukn_t N).
   Local Notation γd := (ukn_d N).
@@ -6964,8 +6964,8 @@ Section UkShDiagRun.
   Context (N : uk_names Σ).
   (* THIS PROGRAM'S EXIT OWES ITS PARENT NOTHING at this lane, as a
      CLASS so that it reaches the exit ecall without an argument at every
-     call site ([UkRun.ukn_triv]). *)
-  Context `{Hpay : !ukn_triv N}.
+     call site ([UkRun.ukn_const]). *)
+  Context `{Hpay : !ukn_const N}.
   (* the fields, under the names the engine has always used *)
   Local Notation γt := (ukn_t N).
   Local Notation γd := (ukn_d N).
@@ -7376,7 +7376,7 @@ Section UkShDiagLeaf.
   Qed.
 
   Lemma ush_diag_leaf_holds :
-    forall (N : uk_names Σ) `{!ukn_triv N} (h : CpuId) (m : regfile) (pc : Z) (n : nat),
+    forall (N : uk_names Σ) `{!ukn_const N} (h : CpuId) (m : regfile) (pc : Z) (n : nat),
       ush_diag_at pc m ->
       shk_code (ukn_t N) -∗
       shk_rodata (ukn_t N) -∗
@@ -7585,9 +7585,16 @@ Section UkShDiagLeaf.
          WP (Loop : expr riscv_lang)) -∗
       WP (Loop : expr riscv_lang).
 
+  (* AT BOTH CLASSES, and the second is what runcmd's EXEC arm needs: the
+     generic exec supply [UkRun.uxsup] is minted at the TRIVIAL payload
+     alone ([UexecExecInst.xv6_sbundle_of_supply]), and runcmd runs in the
+     process sh forked, whose payload is trivial by
+     [UkFork.wp_uk_ecall_fork_any]'s child arm.  Every other lemma of sh's
+     walk is at [ukn_const], which is all sh's own non-trivial payload
+     ([UserConsole.ucons_pay]) supports. *)
   Lemma wp_kshr_runcmd_final (Hclw : ushd_clw_text_ty) (c : ushcmd) :
     ush_simple c ->
-    forall (N : uk_names Σ) `{!ukn_triv N} (h : CpuId) (m : regfile) (t szv : Z)
+    forall (N : uk_names Σ) `{!ukn_const N} `{!ukn_triv N} (h : CpuId) (m : regfile) (t szv : Z)
            (ld : list fdstate) (n : nat),
       m !!! Regidx a0_idx = (mword_of_int t : mword 64) ->
       shk_code (ukn_t N) -∗
@@ -7602,7 +7609,7 @@ Section UkShDiagLeaf.
       WP (Loop : expr riscv_lang).
   Proof. exact (wp_kshr_runcmd ush_Dg Hpsok Hclw ush_diag_leaf_holds c). Qed.
 
-  Lemma wp_kshr_fork1_final (N : uk_names Σ) `{!ukn_triv N}
+  Lemma wp_kshr_fork1_final (N : uk_names Σ) `{!ukn_const N}
       (P : gname -> gname -> gname -> iProp Σ) `{FP : !Forkable P}
       (szv : Z) (l : list fdstate) (D : gmap nat fdstate)
       (h : CpuId) (m : regfile) (n : nat) :

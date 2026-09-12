@@ -90,7 +90,16 @@ Section UkShMain.
   (* THIS PROGRAM'S EXIT OWES ITS PARENT NOTHING at this lane, as a
      CLASS so that it reaches the exit ecall without an argument at every
      call site ([UkRun.ukn_triv]). *)
-  Context `{Hpay : !ukn_triv N}.
+  Context `{Hpay : !ukn_const N}.
+  (* ...AND THE CHILD'S PAYLOAD IS TRIVIAL, which is a strictly stronger
+     fact and the one [UkShRun.wp_kshr_runcmd]'s exec arm needs: the
+     generic exec supply [UkRun.uxsup] is minted at the trivial payload
+     alone ([UexecExecInst.xv6_sbundle_of_supply]), and this file walks
+     the process sh FORKED -- [UkFork.wp_uk_ecall_fork_any]'s child arm
+     gives the equation.  sh's OWN payload is not trivial (it holds the
+     console reader token), which is why the two classes are both here
+     and only this side has the second. *)
+  Context `{Htriv : !ukn_triv N}.
   (* the fields, under the names the engine has always used *)
   Local Notation γt := (ukn_t N).
   Local Notation γd := (ukn_d N).
