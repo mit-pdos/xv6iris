@@ -268,4 +268,20 @@ theorem kpt_exclWriteAU [CurCtx] (cpu : CPU) (t : PTree) (M : RegMapF (BitVec 64
   imodintro
   iempintro
 
+
+/-! ## The translation slot -/
+
+/-- The kernel page table installed at `root`, as a hart holds it (the
+prototype's `tlb_res_pt`): the shared table and its published mapping,
+and the hart's own TLB, sound for the table. -/
+def kptSlot [CurCtx] (cpu : CPU) (root : BitVec 44) : IProp GF := iprop%
+  ∃ (t : PTree) (M : RegMapF (BitVec 64)), kptOn t M ∗ ⌜t.base = root⌝ ∗
+    ∃ tlb : Tlb, Register.tlb ↦ᵣ[cpu] tlb ∗ ⌜tlbOk t tlb⌝
+
+/-- The translation slot at each tier.  Bare: `stvec` is still owned here
+(no handler installed).  Kpt: the kernel page table at `root`. -/
+def transSlotAt [CurCtx] (cpu : CPU) : KTier → BitVec 44 → IProp GF
+  | .bare, _ => iprop(∃ v : BitVec 64, Register.stvec ↦ᵣ[cpu] v)
+  | .kpt, root => kptSlot cpu root
+
 end MachCSL

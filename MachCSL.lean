@@ -49,3 +49,4 @@ import MachCSL.KMap
 import MachCSL.PtTree
 import MachCSL.KptInv
 import MachCSL.WpPtWalk
+import MachCSL.Translate

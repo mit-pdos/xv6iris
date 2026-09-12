@@ -30,7 +30,7 @@ travel with the ownership, so an instruction rule takes the cell and nothing
 else. -/
 def wordPointsTo [CurCtx] (va : PAddr) (n : Nat) (dq : DFrac) (w : BitVec (8 * n)) : IProp GF := iprop%
   ∃ ppn : BitVec 44, kmapAt (vpnOf va) (kLeaf ppn .rw 0#1 0#1) ∗
-    ⌜tierPin curTier ppn va ∧ inRam (paOf ppn va) n ∧ va.toNat % n = 0⌝ ∗
+    ⌜tierPin curTier ppn va ∧ va.toNat < 2 ^ 38 ∧ inRam (paOf ppn va) n ∧ va.toNat % n = 0⌝ ∗
     bytesPointsTo (paOf ppn va) n dq w
 
 /-- A pinned identity mapping at Bare is the identity page. -/
@@ -56,7 +56,7 @@ theorem wordPointsTo_intro_id [CurCtx] (va : PAddr) (n : Nat) (dq : DFrac) (w : 
   isplit
   · iexact Hcl
   · ipureintro
-    exact ⟨tierPin_id _ va (inRam_lt va n hram), hram, hal⟩
+    exact ⟨tierPin_id _ va (inRam_lt va n hram), inRam_lt38 va n hram, hram, hal⟩
 
 /-- At the Bare tier a word is its byte window at `va` itself, with the
 facts and the identity claim. -/
@@ -65,7 +65,7 @@ theorem wordPointsTo_bare_acc [CurCtx] (va : PAddr) (n : Nat) (dq : DFrac) (w : 
     wordPointsTo (GF := GF) va n dq w ⊢
       ⌜inRam va n ∧ va.toNat % n = 0⌝ ∗ kmapId va ∗ bytesPointsTo va n dq w := by
   unfold wordPointsTo
-  iintro ⟨%ppn, #Hcl, %⟨hpin, hram, hal⟩, Hb⟩
+  iintro ⟨%ppn, #Hcl, %⟨hpin, -, hram, hal⟩, Hb⟩
   rw [hct] at hpin
   simp only [tierPin] at hpin
   have hlt : va.toNat < 2 ^ 39 := by rw [hpin] at hram; exact inRam_lt va n hram
@@ -116,7 +116,7 @@ theorem wordPointsTo_lo4_acc [CurCtx] (a : BitVec 64) (dq : DFrac) (w : BitVec 6
       wordPointsTo a 4 dq (BitVec.extractLsb' 0 32 w) ∗
       (wordPointsTo a 4 dq (BitVec.extractLsb' 0 32 w) -∗ wordPointsTo a 8 dq w) := by
   unfold wordPointsTo
-  iintro ⟨%ppn, #Hcl, %⟨hpin, hram, hal⟩, H⟩
+  iintro ⟨%ppn, #Hcl, %⟨hpin, hlt, hram, hal⟩, H⟩
   have hram4 : inRam (paOf ppn a) 4 := by unfold inRam at *; omega
   have hal4 : a.toNat % 4 = 0 := by omega
   icases bytesPointsTo_lo4_acc (paOf ppn a) dq w $$ H with ⟨Hlo, Hclose⟩
@@ -125,7 +125,7 @@ theorem wordPointsTo_lo4_acc [CurCtx] (a : BitVec 64) (dq : DFrac) (w : BitVec 6
     iframe Hlo
     isplit
     · iexact Hcl
-    · ipureintro; exact ⟨hpin, hram4, hal4⟩
+    · ipureintro; exact ⟨hpin, hlt, hram4, hal4⟩
   · iintro ⟨%ppn', #Hcl', %_, Hlo⟩
     icases kmapAt_agree (vpnOf a) (kLeaf ppn .rw 0#1 0#1) (kLeaf ppn' .rw 0#1 0#1) $$ [Hcl Hcl'] with %heq
     · isplit
@@ -138,6 +138,6 @@ theorem wordPointsTo_lo4_acc [CurCtx] (a : BitVec 64) (dq : DFrac) (w : BitVec 6
     iframe H
     isplit
     · iexact Hcl
-    · ipureintro; exact ⟨hpin, hram, hal⟩
+    · ipureintro; exact ⟨hpin, hlt, hram, hal⟩
 
 end MachCSL

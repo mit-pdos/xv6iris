@@ -46,6 +46,10 @@ theorem paOf_id (va : BitVec 64) (h : va.toNat < 2 ^ 39) : paOf (idPpn (vpnOf va
   revert h'
   bv_decide
 
+/-- A RAM address is below `2^38` (a canonical kernel address). -/
+theorem inRam_lt38 (va : BitVec 64) (n : Nat) (h : inRam va n) : va.toNat < 2 ^ 38 := by
+  unfold inRam ramEnd at h; omega
+
 /-- A RAM address is below `2^39`. -/
 theorem inRam_lt (va : BitVec 64) (n : Nat) (h : inRam va n) : va.toNat < 2 ^ 39 := by
   unfold inRam ramEnd at h; omega
@@ -141,15 +145,15 @@ theorem kmapStatic_persist (E : EraGS GF) [KernelMap] :
 
 end fixed
 
+/-- The iris lookup on a register map is the map's own. -/
+theorem regmap_get?_eq {V : Type} (m : RegMapF V) (k : Nat) :
+    Iris.Std.PartialMap.get? (M := RegMapF) m k = m[k]? := rfl
+
 section ambient
 variable [MachGS hlc GF] [KernelMap]
 
 /-- The static claims at the ambient era. -/
 abbrev kmapStatic : IProp GF := kmapStaticAt (MachGS.era (hlc := hlc) (GF := GF))
-
-/-- The iris lookup on a register map is the map's own. -/
-theorem regmap_get?_eq {V : Type} (m : RegMapF V) (k : Nat) :
-    Iris.Std.PartialMap.get? (M := RegMapF) m k = m[k]? := rfl
 
 /-- A static entry's claim. -/
 theorem kmapStatic_at (vpn : BitVec 27) (v : BitVec 64)

@@ -90,6 +90,7 @@ import MachCSL.WpGpr
 import MachCSL.GprLit
 import MachCSL.Boot
 import MachCSL.WordPointsTo
+import MachCSL.KptInv
 
 
 namespace MachCSL
@@ -410,10 +411,6 @@ theorem kConf_intro (cpu : CPU) (tier : KTier) (root : BitVec 44) (sie : Bool)
 
 /-! ## Placeholders (named, to be filled in) -/
 
-/-- The kernel page table installed at `root` (the prototype's
-`tlb_res_pt`): not ported yet. -/
-def kptSlot (cpu : CPU) (root : BitVec 44) : IProp GF := iprop(⌜cpu = cpu ∧ root = root⌝)
-
 /-- The running proc claim at `p` (`0`: no current proc, the scheduler): the
 proc table's `RUNNING` state half and the hart tag, once the table is
 ported. -/
@@ -430,12 +427,6 @@ kernel threads (`MachCSL.Ctx`). -/
 abbrev ctxToken [CurCtx] (cpu : CPU) : IProp GF := ctxTok cpu curCtx
 
 /-! ## The translation slot and the interrupt arm -/
-
-/-- The translation slot at each tier.  Bare: `stvec` is still owned here
-(no handler installed).  Kpt: the kernel page table at `root`. -/
-def transSlotAt (cpu : CPU) : KTier → BitVec 44 → IProp GF
-  | .bare, _ => iprop(∃ v : BitVec 64, Register.stvec ↦ᵣ[cpu] v)
-  | .kpt, root => kptSlot cpu root
 
 /-- The translation slot, tied to the ambient tier: a context at tier
 `tier` is used by proofs conducted at that tier (whose points-to facts are
