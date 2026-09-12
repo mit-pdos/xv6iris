@@ -112,7 +112,7 @@ Local Ltac nz := vm_compute; discriminate.
 (*  THE THREE PANIC MESSAGES.  Named pure lemmas, never inline [ltac:]     *)
 (*  (optimization.md).  Addresses and byte counts measured off the image.  *)
 (* ===================================================================== *)
-Definition su_nlink_a : Z := 0x80007610.
+Definition su_nlink_a : Z := 0x800075f8.
 Definition su_nlink_s : string := "unlink: nlink < 1".
 
 Lemma su_nlink_nonul : PrintkFmt.nonul su_nlink_s = true.

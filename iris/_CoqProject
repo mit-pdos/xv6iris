@@ -1074,6 +1074,7 @@ CodeEitherCopy.v
 ProofEitherCopy.v
 LinkEitherCopyout.v
 LinkEitherCopyin.v
+UartsFields.v
 UartTxInv.v
 SpecUartwrite.v
 CodeUartwrite.v
