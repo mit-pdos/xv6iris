@@ -2540,6 +2540,80 @@ Section UkRunSys.
         WP (Loop : expr riscv_lang)) -∗
      WP (Loop : expr riscv_lang))%I.
 
+  (* ------------------------------------------------------------------- *)
+  (* ecall, at OPEN -- THE LEAF THAT HANDS THE PROCESS ITS RECEIPT          *)
+  (* (app-echo.md, lane OPEN-PIN, O4').                                     *)
+  (*                                                                       *)
+  (* [wp_uk_ecall_open] above is this walk with the post THROWN AWAY (it    *)
+  (* binds [spost_at] as [_] at :785), which is why no program has ever     *)
+  (* learned WHICH FILE its descriptor is on.  This is the same walk with   *)
+  (* the post KEPT, and it costs the two things the read leaf's twin        *)
+  (* ([wp_uk_ecall_read_recv_body]) costs plus one open owes and read does  *)
+  (* not:                                                                   *)
+  (*                                                                       *)
+  (*  - THE DEPOSIT MUST NAME ITS FAMILY, so the premise is [UkRun.udepwf]  *)
+  (*    at the program's own [fdep] -- at an [xfam] whose open families are *)
+  (*    the PINNED ones ([PinnedOpen.pinned_open_bundle]).                  *)
+  (*  - THE KEY MUST BE EXPOSED.  Row 15's post                             *)
+  (*    ([UexecExecInst.xv6_spost], [SpecSysOpen.open_receipt]) reads FIVE  *)
+  (*    things off the TRAPPING key -- the image [uvis_M W], the path       *)
+  (*    pointer and the omode ([xk_a W 0] / [xk_a W 1]), the cwd, and the   *)
+  (*    ENTRY descriptor table [uvis_fd W], which is the [sts] its          *)
+  (*    [open_fd_rcpt] is stated over -- and the RESUME table [fdv'] beside *)
+  (*    them.  So this body binds the trapping key [W] itself, with the two *)
+  (*    argument words tied to the caller's own register file, and the      *)
+  (*    resume components beside it.                                        *)
+  (*  - AND THAT IS WHY THE POST IS AT [W] AND NOT AT THE RESUME KEY.       *)
+  (*    [UexecSG.spost_at_cong] re-keys only across [UexecSG.skey_eq],      *)
+  (*    whose five rows include [uvis_fd] and argument 0 -- and open moves  *)
+  (*    the table and the returning bump overwrites a0 -- so the two keys   *)
+  (*    are NOT congruent and the post cannot be restated at the resume     *)
+  (*    key.  ([wp_uk_ecall_read_recv_body] above states its post at the    *)
+  (*    resume key; read moves no descriptor, but its row reads             *)
+  (*    [xk_a W 0] -- the descriptor argument -- and [uvis_M W], and the    *)
+  (*    resume key carries the returned a0 and the WRITTEN image, so that   *)
+  (*    statement needs the same correction.  Both are bodies, not proofs;  *)
+  (*    this is the lane's finding, not a regression.)                      *)
+  (*                                                                       *)
+  (* THE LEDGER moves exactly as [wp_uk_ecall_open]'s does: the caller      *)
+  (* hands its named ledger in and gets [UserFd.ualloc] at the descriptor   *)
+  (* the ledger DECIDES, or the ledger back at [-1].  What the receipt adds *)
+  (* is the descriptor's TYPE, which is the whole point.                    *)
+  (*                                                                       *)
+  (* STATED AS A BODY, not yet as a [Lemma]: the walk is                    *)
+  (* [wp_uk_ecall_open]'s and the proof is this lane's phase 2.             *)
+  (* ------------------------------------------------------------------- *)
+  Definition wp_uk_ecall_open_recv_body (N : uk_names Σ) (h : CpuId)
+      (m : regfile) (pc : mword 64) (l : list fdstate) (avail : nat)
+      (fdep : sfam) : iProp Σ :=
+    (⌜usysno m = USYS_open⌝ -∗
+     ⌜is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true⌝ -∗
+     uinstr_is (ukn_t N) pc false (ECALL tt) -∗
+     urun N h m pc avail -∗
+     udepwf N m pc USYS_open fdep -∗
+     ustd (ukn_fd N) l -∗
+     (∀ (h' : CpuId) (r : mword 64) (W : uvis)
+        (M' : gmap Z (bv 8)) (fdv' : list fdstate) (cw' : Z)
+        (cs' : gset gname),
+        (* THE TRAPPING KEY'S TWO ARGUMENT WORDS ARE THE CALLER'S OWN, which
+           is what lets a program that knows its image read its own path
+           argument off the receipt ([ArgPath.arg_path_of] at [uvis_M W] and
+           [tf_arg_idx 0]). *)
+        ⌜tf_w (uvis_tf W) (tf_arg_idx 0) = m !!! Regidx (mword_of_int 10)⌝ -∗
+        ⌜tf_w (uvis_tf W) (tf_arg_idx 1) = m !!! Regidx (mword_of_int 11)⌝ -∗
+        (* the ledger, exactly [wp_uk_ecall_open]'s two arms *)
+        ((∃ (fd : nat) (rd wr : bool) (t : fdtype),
+            ⌜r = (mword_of_int (Z.of_nat fd) : mword 64)
+             /\ (fd < NOFILE)%nat⌝ ∗
+            ualloc (ukn_fd N) l fd (FdOpen rd wr t))
+         ∨ (⌜r = (mword_of_int (-1) : mword 64)⌝ ∗ ustd (ukn_fd N) l)) -∗
+        (* ...AND THE POST, at the TRAPPING key and the resume view *)
+        spost_at uslot USYS_open fdep W r M' fdv' cw' cs' -∗
+        urun N h' (<[Regidx (mword_of_int 10) := r]> m)
+          (add_vec_int pc 4) avail -∗
+        WP (Loop : expr riscv_lang)) -∗
+     WP (Loop : expr riscv_lang))%I.
+
   (* THE PAGE FLOOR OF AN ADDRESS AT OR ABOVE A PAGE BOUNDARY is itself at
      or above it -- the one arithmetic fact the sbrk leaf's two page-set
      arguments turn on. *)

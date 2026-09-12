@@ -86,7 +86,8 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import mono_nat.
+From iris.base_logic.lib Require Import mono_nat own.
+From iris.algebra.lib Require Import mono_list.
 Require Import RiscvLang.        (* [mobs] *)
 Require Import ObsTrace.         (* [cycles_of], [open_seg], [trace_shape] *)
 (* the vocabulary of the era-0 pin theorems, imported by name: Import is
@@ -104,6 +105,8 @@ Require Import FsInitPinBoot.    (* [era0_pins], [era0_recovery_pins],
                                     [era0_recovery] *)
 Require Import FsShPin.          (* [era0_sh_pins], [era0_recovery_sh_pins] *)
 Require Import FsEchoPin.        (* [era0_echo_pins], [era0_recovery_echo_pins] *)
+Require Import FsConsPin.        (* [cons_absent] / [cons_present_at], the
+                                    era-0 console state and its transport *)
 Require Import FsCfgBoot.        (* [fs_boot_image_wf]: the theorem's [Himg] *)
 Require Import FsDurImg.         (* [img_state], [img_snap_ok]: era 0's snapshot *)
 Require Import AppInv.           (* [app_xfer_raw], [app_xfer_raw_pers_or_pure],
@@ -385,33 +388,196 @@ End EchoLedger.
 Definition echo_fs_pure (av : aview) : Prop :=
   era0_pins av /\ era0_sh_pins av /\ era0_echo_pins av.
 
-(* the application's instance names.  Echo's claim owns no per-instance
-   ghost, so there is exactly one instance and nothing indexes it. *)
-Definition echo_names : Type := unit.
+(* THE APPLICATION'S INSTANCE NAMES: the console one-shot's ghost name,
+   one per instance of the claim (the running one, and one per durable
+   copy the transport mints).  Echo's claim owned no per-instance ghost
+   while it was three pins about the IMAGE; the console is the first thing
+   it says that /init's own write establishes, and a monotone flag is what
+   carries "established" across the views a later syscall observes. *)
+Definition echo_names : Type := gname.
 
 Section EchoPred.
-  Context `{!mono_natG Σ}.
+  (* the console flag's camera: a [mono_list] over inums, at [] before the
+     console is made and at [[i]] after -- so the AUTHORITY is the
+     exclusive "not yet / made at [i]" token and the LOWER BOUND is the
+     persistent "made at [i]".  ([mono_nat] cannot carry the inum, and the
+     inum is the whole point: it is what ties the walk's terminal cursor
+     at one view to the observation's row at another.) *)
+  Context `{!mono_natG Σ, !inG Σ (mono_listR (leibnizO Z))}.
+
+  (* ---------------------------------------------------------------- *)
+  (*  3a.  THE CONSOLE FLAG                                             *)
+  (* ---------------------------------------------------------------- *)
+
+  (* THE TOKEN: exclusive, born with the instance, spent by the mknod that
+     creates the console. *)
+  Definition cons_tok (r : echo_names) : iProp Σ :=
+    own r (●ML ([] : list (leibnizO Z))).
+
+  (* ...and what it becomes: the authority at the inum the mknod chose *)
+  Definition cons_shot (r : echo_names) (i : Z) : iProp Σ :=
+    own r (●ML ([i] : list (leibnizO Z))).
+
+  (* THE FLAG, PERSISTENT: "the console was made, at inum [i]".  This is
+     the fact /init carries from its mknod to its open, and it is the ONE
+     thing that makes the claim's console conjunct a PIN at a fixed inum
+     rather than an existential a walk cannot follow. *)
+  Definition cons_made (r : echo_names) (i : Z) : iProp Σ :=
+    own r (◯ML ([i] : list (leibnizO Z))).
+
+  Global Instance cons_made_persistent r i : Persistent (cons_made r i).
+  Proof. rewrite /cons_made. apply _. Qed.
+  Global Instance cons_made_timeless r i : Timeless (cons_made r i).
+  Proof. rewrite /cons_made. apply _. Qed.
+  Global Instance cons_tok_timeless r : Timeless (cons_tok r).
+  Proof. rewrite /cons_tok. apply _. Qed.
+  Global Instance cons_shot_timeless r i : Timeless (cons_shot r i).
+  Proof. rewrite /cons_shot. apply _. Qed.
+
+  (* THE EXCLUSION, which is what a holder of the flag refutes the
+     unmade states with: a lower bound at [[i]] and an authority at [[]]
+     do not compose ([[i]] is not a prefix of [[]]). *)
+  Lemma cons_tok_made_False (r : echo_names) (i : Z) :
+    cons_tok r -∗ cons_made r i -∗ False.
+  Proof.
+    rewrite /cons_tok /cons_made. iIntros "Ha Hb".
+    iDestruct (own_valid_2 with "Ha Hb") as %Hv%mono_list_both_valid_L.
+    iPureIntro. destruct Hv as [k Hk]. by destruct k; simplify_eq/=.
+  Qed.
+
+  (* THE AGREEMENT: the flag names ONE inum *)
+  Lemma cons_shot_made_agree (r : echo_names) (i j : Z) :
+    cons_shot r i -∗ cons_made r j -∗ ⌜j = i⌝.
+  Proof.
+    rewrite /cons_shot /cons_made. iIntros "Ha Hb".
+    iDestruct (own_valid_2 with "Ha Hb") as %Hv%mono_list_both_valid_L.
+    iPureIntro. destruct Hv as [k Hk]. by simplify_eq/=.
+  Qed.
+
+  Lemma cons_made_agree (r : echo_names) (i j : Z) :
+    cons_made r i -∗ cons_made r j -∗ ⌜j = i⌝.
+  Proof.
+    rewrite /cons_made. iIntros "Ha Hb".
+    iDestruct (own_valid_2 with "Ha Hb") as %Hv%mono_list_lb_op_valid_L.
+    iPureIntro. destruct Hv as [[k Hk] | [k Hk]]; by simplify_eq/=.
+  Qed.
+
+  (* THE SNAPSHOT: the authority yields its own lower bound and stays *)
+  Lemma cons_shot_made (r : echo_names) (i : Z) :
+    cons_shot r i -∗ cons_shot r i ∗ cons_made r i.
+  Proof.
+    rewrite /cons_shot /cons_made. iIntros "Ha".
+    iDestruct (own_mono _ _ (◯ML ([i] : list (leibnizO Z)))
+                 with "Ha") as "#Hb"; [ apply mono_list_included |].
+    iFrame "Ha Hb".
+  Qed.
+
+  (* THE ONE UPDATE, and it happens inside /init's mknod commit *)
+  Lemma cons_shoot (r : echo_names) (i : Z) :
+    cons_tok r ==∗ cons_shot r i ∗ cons_made r i.
+  Proof.
+    rewrite /cons_tok /cons_shot. iIntros "Ha".
+    iMod (own_update _ _ (●ML ([i] : list (leibnizO Z))) with "Ha") as "Ha".
+    { apply mono_list_update. apply prefix_nil. }
+    iModIntro. iApply (cons_shot_made r i with "Ha").
+  Qed.
+
+  Lemma cons_tok_alloc : ⊢ |==> ∃ r : echo_names, cons_tok r.
+  Proof.
+    iMod (own_alloc (●ML ([] : list (leibnizO Z)))) as (r) "Ha";
+      [ apply mono_list_auth_valid |].
+    iModIntro. iExists r. iExact "Ha".
+  Qed.
+
+  Lemma cons_shot_alloc (i : Z) : ⊢ |==> ∃ r : echo_names, cons_shot r i.
+  Proof.
+    iMod (own_alloc (●ML ([i] : list (leibnizO Z)))) as (r) "Ha";
+      [ apply mono_list_auth_valid |].
+    iModIntro. iExists r. iExact "Ha".
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (*  3b.  THE CONSOLE'S STATE, AS THE CLAIM CARRIES IT                 *)
+  (* ---------------------------------------------------------------- *)
+
+  (* THREE ARMS, and the middle one is a WINDOW rather than a state the
+     system rests in: the console is not there and nobody has made it; it
+     is there and the flag has not been raised yet (the instant between
+     the mknod commit's two phases); it is there and the flag names its
+     inum.
+
+     WHAT IS NOT HERE, deliberately: an "it was made and is gone again"
+     arm.  The claim promises the console STAYS, exactly as it promises
+     /sh's row stays -- an unlink of either is a view move no verified
+     program of this application pays for, and the generic slot's payer
+     ([AppInv.app_sup]) is tainted by construction. *)
+  Definition cons_state (r : echo_names) (av : aview) : iProp Σ :=
+    ((⌜cons_absent av⌝ ∗ cons_tok r)
+     ∨ (∃ i : Z, ⌜cons_present_at i av⌝ ∗ cons_tok r)
+     ∨ (∃ i : Z, ⌜cons_present_at i av⌝ ∗ cons_shot r i))%I.
+
+  Global Instance cons_state_timeless r av : Timeless (cons_state r av).
+  Proof. rewrite /cons_state. apply _. Qed.
 
   (* THE APPLICATION'S PREDICATE ([App.app_pred], app-instances.md section
-     1 and app-echo.md "ARM-c"): TAINTED OR PINNED.  The left arm is the
-     permanent fact that the console input has broken the discipline; the
-     right arm is the three pins.  Both arms are persistent, which is the
-     whole of the transport ([echo_xfer]), and the left arm alone proves
-     the claim of EVERY view, which is the whole of the supply
-     ([echo_sup_of_taint]) -- the credential a process that answers for
-     nothing runs on.  The instance argument is ignored: there is one. *)
-  Definition echo_pred (γ : echo_fixed) (_ : echo_names) (av : aview)
-      : iProp Σ :=
-    (echo_taint γ ∨ ⌜echo_fs_pure av⌝)%I.
+     1 and app-echo.md "ARM-c"): TAINTED, or the three binaries are the
+     image's AND the console is in one of its three states.  The left arm
+     is the permanent fact that the console input has broken the
+     discipline.
 
-  Global Instance echo_pred_persistent γ r av : Persistent (echo_pred γ r av).
-  Proof. rewrite /echo_pred. apply _. Qed.
+     IT IS NO LONGER PERSISTENT, and that is the ghost shape's one cost:
+     the console conjunct owns the flag's authority, which is exclusive by
+     construction (it is what makes "made" a fact a holder can rely on).
+     It is still TIMELESS, which is what every fire strips it under, and
+     the transport pays by ALLOCATING a fresh flag for the copy
+     ([echo_xfer] below) rather than by duplicating. *)
+  Definition echo_pred (γ : echo_fixed) (r : echo_names) (av : aview)
+      : iProp Σ :=
+    (echo_taint γ ∨ (⌜echo_fs_pure av⌝ ∗ cons_state r av))%I.
+
   Global Instance echo_pred_timeless γ r av : Timeless (echo_pred γ r av).
   Proof. rewrite /echo_pred. apply _. Qed.
 
-  Lemma echo_pred_pins (γ : echo_fixed) (r : echo_names) (av : aview) :
-    echo_fs_pure av -> ⊢ echo_pred γ r av.
-  Proof. intros H. rewrite /echo_pred. iRight. iPureIntro. exact H. Qed.
+  (* the era-0 shape: the pins, the console absent, the flag unraised *)
+  Lemma echo_pred_absent (γ : echo_fixed) (r : echo_names) (av : aview) :
+    echo_fs_pure av -> cons_absent av -> cons_tok r -∗ echo_pred γ r av.
+  Proof.
+    intros Hp Hc. iIntros "Ht". rewrite /echo_pred. iRight.
+    iSplitR; [ by iPureIntro |]. rewrite /cons_state. iLeft.
+    iSplitR; [ by iPureIntro | iExact "Ht" ].
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (*  3c.  THE CLAIM LAW THE PINNED OPEN RUNS ON                        *)
+  (*                                                                    *)
+  (*  [PinnedObs.pinned_obs] takes exactly this: a DUPLICATING law that  *)
+  (*  hands the claim back and yields a PURE pin of the view it was      *)
+  (*  read at, or the taint.  A holder of the flag at [i] refutes both   *)
+  (*  unmade arms -- each carries the authority at [[]] -- and reads the *)
+  (*  third at its own inum by the flag's agreement.  This is why the    *)
+  (*  flag is what /init carries from its mknod to its open.            *)
+  (* ---------------------------------------------------------------- *)
+  Lemma echo_cons_law (γ : echo_fixed) (r : echo_names) (i : Z) :
+    cons_made r i -∗
+    □ (∀ v : aview, echo_pred γ r v -∗
+         echo_pred γ r v ∗ (⌜cons_present_at i v⌝ ∨ echo_taint γ)).
+  Proof.
+    iIntros "#Hm !>" (v) "Hp". rewrite /echo_pred.
+    iDestruct "Hp" as "[#Ht | [%Hpins Hcs]]".
+    { iSplitR; [ iLeft; iExact "Ht" |]. iRight. iExact "Ht". }
+    rewrite /cons_state.
+    iDestruct "Hcs" as "[[%Hab Htok] | [Hc | Hc]]".
+    - iDestruct (cons_tok_made_False r i with "Htok Hm") as %[].
+    - iDestruct "Hc" as (j) "[%Hpr Htok]".
+      iDestruct (cons_tok_made_False r i with "Htok Hm") as %[].
+    - iDestruct "Hc" as (j) "[%Hpr Hsh]".
+      iDestruct (cons_shot_made_agree r j i with "Hsh Hm") as %Heq.
+      subst i.
+      iSplitL "Hsh".
+      + iRight. iSplitR; [ by iPureIntro |]. rewrite /cons_state.
+        iRight. iRight. iExists j. iSplitR; [ by iPureIntro | iExact "Hsh" ].
+      + iLeft. by iPureIntro.
+  Qed.
 
   (* ---------------------------------------------------------------- *)
   (*  3a.  THE TRANSPORT ([Happ_xfer])                                  *)
@@ -421,7 +587,48 @@ Section EchoPred.
      instance names without spending the original.  Both arms of
      [echo_pred] are persistent, so the general law does it. *)
   Lemma echo_xfer (γ : echo_fixed) : ⊢ app_xfer_raw (echo_pred γ).
-  Proof. apply app_xfer_raw_pers_or_pure. intros r av. apply _. Qed.
+  Proof.
+    rewrite /app_xfer_raw. iIntros "!>" (r av) "H".
+    (* THE FRESH FLAG IS ALLOCATED AT THE VIEW'S OWN VALUE
+       ([FsConsPin.cons_inum]) and not at the arm's: the allocation is an
+       update and the claim is under a later, so the value has to be chosen
+       BEFORE the arm is read.  The view decides it -- that is what
+       [cons_inum_absent] / [cons_inum_present] say -- so each arm then
+       finds the flag it needs. *)
+    iMod (own_alloc (●ML (cons_inum av : list (leibnizO Z)))) as (r') "Ha";
+      [ apply mono_list_auth_valid |].
+    (* both halves are [▷]-shaped, so the rest of the proof runs under ONE
+       later, with the original claim stripped by it *)
+    iAssert (▷ (echo_pred γ r av ∗ echo_pred γ r' av))%I with "[H Ha]" as "HH";
+      last first.
+    { iDestruct "HH" as "[H1 H2]". iModIntro. iFrame "H1". iExists r'.
+      iExact "H2". }
+    iNext. rewrite /echo_pred.
+    iDestruct "H" as "[#Ht | [%Hpins Hcs]]".
+    { iSplitR; [ by iLeft | by iLeft ]. }
+    rewrite /cons_state.
+    iDestruct "Hcs" as "[[%Hab Htok] | [Hc | Hc]]".
+    - rewrite (cons_inum_absent av Hab).
+      iSplitL "Htok".
+      + iRight. iSplitR; [ by iPureIntro |]. iLeft.
+        iSplitR; [ by iPureIntro | iExact "Htok" ].
+      + iRight. iSplitR; [ by iPureIntro |]. iLeft.
+        iSplitR; [ by iPureIntro | iExact "Ha" ].
+    - iDestruct "Hc" as (i) "[%Hpr Htok]".
+      rewrite (cons_inum_present i av Hpr).
+      iSplitL "Htok".
+      + iRight. iSplitR; [ by iPureIntro |]. iRight. iLeft.
+        iExists i. iSplitR; [ by iPureIntro | iExact "Htok" ].
+      + iRight. iSplitR; [ by iPureIntro |]. iRight. iRight.
+        iExists i. iSplitR; [ by iPureIntro | iExact "Ha" ].
+    - iDestruct "Hc" as (i) "[%Hpr Hsh]".
+      rewrite (cons_inum_present i av Hpr).
+      iSplitL "Hsh".
+      + iRight. iSplitR; [ by iPureIntro |]. iRight. iRight.
+        iExists i. iSplitR; [ by iPureIntro | iExact "Hsh" ].
+      + iRight. iSplitR; [ by iPureIntro |]. iRight. iRight.
+        iExists i. iSplitR; [ by iPureIntro | iExact "Ha" ].
+  Qed.
 
   (* ---------------------------------------------------------------- *)
   (*  3b.  THE SUPPLY, OFF THE TAINT (app-echo.md "ARM-c")              *)
@@ -463,7 +670,7 @@ Proof.
 Qed.
 
 Section EchoInit.
-  Context `{!mono_natG Σ}.
+  Context `{!mono_natG Σ, !inG Σ (mono_listR (leibnizO Z))}.
 
   (* ...as the era-0 obligation's shape: the claim at the founded state's
      view, at the one instance, under the update.  It takes the RIGHT
@@ -475,8 +682,13 @@ Section EchoInit.
     snap_ok S D ->
     ⊢ |==> ∃ r : echo_names, echo_pred γ r (abs_view (fss_inodes S)).
   Proof.
-    intros Hdk Hrec HS. iModIntro. iExists ().
-    iApply (echo_pred_pins γ () _ (echo_fs_era0 dk D S Hdk Hrec HS)).
+    intros Hdk Hrec HS.
+    (* the instance IS the console flag, so the era-0 claim is where it is
+       born -- unraised, beside the three pins and the absent console *)
+    iMod cons_tok_alloc as (r) "Htok".
+    iModIntro. iExists r.
+    iApply (echo_pred_absent γ r _ (echo_fs_era0 dk D S Hdk Hrec HS)
+              (era0_recovery_cons_absent dk D S Hdk Hrec HS) with "Htok").
   Qed.
 
   (* ...AND AT THE THEOREM'S OWN LITERAL SHAPE ([App.xv6_app_adequacy]'s
@@ -543,7 +755,7 @@ Definition echo_phi : gstate -> list mobs -> Prop := fun _ _ => True.
 (* ====================================================================== *)
 
 Section EchoApp.
-  Context `{!mono_natG Σ}.
+  Context `{!mono_natG Σ, !inG Σ (mono_listR (leibnizO Z))}.
 
   Definition app_echo : xv6_app Σ :=
     MkApp echo_fixed echo_cl echo_names echo_pred echo_R echo_tag echo_phi.

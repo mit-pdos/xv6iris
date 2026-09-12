@@ -1621,6 +1621,13 @@ FsShPin.v
 # line "echo hello world", and the third pin of the echo application's claim.
 # A FOURTH LEAF over the same cone, on FsShPin's mold.
 FsEchoPin.v
+# FsConsPin = THE CONSOLE DEVICE NODE, which is NOT in the tracked image:
+# the two states its inum can be in (ABSENT -- no "console" entry in the
+# root, which is what era 0 is -- and PRESENT AT AN INUM), the boot
+# transport of the era-0 state, the file pin GENERALISED over the three
+# binaries, and the pure delta algebra an arm / create / unarm / trunc
+# moves both by.  A FIFTH LEAF over the same cone; nothing in iProp.
+FsConsPin.v
 # kexec's ONE contract: the walk, one observation of the file, and the
 # caller's own u-mode WP for the program observed (SpecKexec.v's header).
 # KexecDefs.v, far below, is the vocabulary leaf it is stated over.
@@ -1659,6 +1666,13 @@ PinnedObs.v
 # Generic in the pin, the taint, the payload and the slot predicate; init's
 # exec of /sh and sh's of /echo are its instances.
 PinnedExec.v
+# PinnedOpen = the SECOND instantiation of PinnedObs, at open's two pieces:
+# the bundle at the argument's path (PATH-ARGS) and the reading of open's
+# receipt at a DEVICE pin -- the descriptor is the pinned device's major,
+# the file and directory arms are refuted, and the walk may still miss.
+# What it does NOT supply is open's TRUNCATION commit: that piece's step is
+# owed at every file row in the view, which no pin-carrying claim can pay.
+PinnedOpen.v
 # UexecExecInst = the kernel-side instance of UexecSG's [uexecSG] and
 # [uprogSG]: [sbundle X 7 W] := some [sys_exec_au_pre] at the trapping key's
 # image, argv pointer (trapframe argument 1) and descriptor view, [emp] at
@@ -2022,3 +2036,10 @@ UkShFork.v
 # Its header records the two things the tree does not have yet: a payload
 # that crosses exec, and a pinned open that says fd 0 is the console.
 UConsLine.v
+# UInitCons = OPEN-PIN'S STATEMENTS: init's console prologue.  The pin
+# resolves at the console's PRESENT state, the pinned open bundle at init's
+# own path argument and the reading of open's receipt (fd 0 is the CONSOLE
+# device) are PROVED; the ledger rows, init's four-armed head and the mknod
+# step's families are stated.  On UConsLine's mold; above AppEcho and
+# PinnedOpen, whose claim law and bundle it instantiates.
+UInitCons.v
