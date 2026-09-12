@@ -25,8 +25,10 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
 
 
-(* kvmmake(): kalloc a fresh root page, memset it, run the six kvmmap regions
-   (UART/VIRTIO/PLIC RW, text RX, data RW, trampoline RX) then proc_mapstacks.
+(* kvmmake(): kalloc a fresh root page, memset it, run the seven kvmmap regions
+   (UART0/UART1/VIRTIO/PLIC RW, text RX, data RW, trampoline RX) then
+   proc_mapstacks.  UART1's leaf shares UART0's level-0 page, so the node
+   count is unchanged.
    Returns (a0) the root page's byte address.  The result table represents
    [kvm_map_full pas] and has exactly 102 table nodes.  COUNTED-ONLY (premise
    ⌜on = Some nb ∧ 166 < nb⌝): kvmmake is boot-only (kvminit its sole caller),

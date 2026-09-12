@@ -1,5 +1,5 @@
 (* KvmMap.v -- the CONCRETE kernel map kvmmake builds:
-   the xv6 memory-layout constants, the six-region [kvm_map] gmap literal
+   the xv6 memory-layout constants, the seven-region [kvm_map] gmap literal
    (chained [pt_insert_run]s in kvmmake's call order) + the 64 kstack
    entries, and THE BRIDGE: a table representing [kvm_map_full pas]
    satisfies the kpt mapping invariants ([kpt_tree_spec_gen] at the
@@ -48,6 +48,7 @@ Global Typeclasses Opaque pt_insert_run.
 (* ===================================================================== *)
 
 Definition uart_vpn   : mword 27 := mword_of_int 0x10000.
+Definition uart1_vpn  : mword 27 := mword_of_int 0x1000A.
 Definition virtio_vpn : mword 27 := mword_of_int 0x10001.
 Definition plic_vpn   : mword 27 := mword_of_int 0xC000.
 Definition text_vpn0  : mword 27 := mword_of_int 0x80000.
@@ -63,6 +64,7 @@ Definition data_npages : nat := 32761%nat.  (* 0x7FF9 = [etext, PHYSTOP);
 
 (* the identity regions' pa = va, so ppn0 = zero-extended vpn0 *)
 Definition uart_ppn   : mword 44 := kpt_leaf_ppn uart_vpn.
+Definition uart1_ppn  : mword 44 := kpt_leaf_ppn uart1_vpn.
 Definition virtio_ppn : mword 44 := kpt_leaf_ppn virtio_vpn.
 Definition plic_ppn   : mword 44 := kpt_leaf_ppn plic_vpn.
 Definition text_ppn0  : mword 44 := kpt_leaf_ppn text_vpn0.
@@ -89,15 +91,17 @@ Definition kperm_vperm (pc : kperm) : Z :=
 Definition kvm_m1 : gmap (mword 27) (mword 64) :=
   pt_insert_run ∅ uart_vpn uart_ppn 6 1.
 Definition kvm_m2 : gmap (mword 27) (mword 64) :=
-  pt_insert_run kvm_m1 virtio_vpn virtio_ppn 6 1.
+  pt_insert_run kvm_m1 uart1_vpn uart1_ppn 6 1.
 Definition kvm_m3 : gmap (mword 27) (mword 64) :=
-  pt_insert_run kvm_m2 plic_vpn plic_ppn 6 plic_npages.
+  pt_insert_run kvm_m2 virtio_vpn virtio_ppn 6 1.
 Definition kvm_m4 : gmap (mword 27) (mword 64) :=
-  pt_insert_run kvm_m3 text_vpn0 text_ppn0 10 text_npages.
+  pt_insert_run kvm_m3 plic_vpn plic_ppn 6 plic_npages.
 Definition kvm_m5 : gmap (mword 27) (mword 64) :=
-  pt_insert_run kvm_m4 data_vpn0 data_ppn0 6 data_npages.
+  pt_insert_run kvm_m4 text_vpn0 text_ppn0 10 text_npages.
+Definition kvm_m6 : gmap (mword 27) (mword 64) :=
+  pt_insert_run kvm_m5 data_vpn0 data_ppn0 6 data_npages.
 Definition kvm_map : gmap (mword 27) (mword 64) :=
-  pt_insert_run kvm_m5 tramp_vpn tramp_ppn 10 1.
+  pt_insert_run kvm_m6 tramp_vpn tramp_ppn 10 1.
 
 (* proc_mapstacks' 64 kstack pages at kalloc-chosen pas *)
 Fixpoint kvm_stacks (pas : nat -> mword 44) (k : nat)
@@ -512,6 +516,8 @@ Qed.
 (* ---- region base unsigned values / bounds (never normalize the maps) ---- *)
 Lemma uart_vpn_uns   : bv_unsigned uart_vpn   = 0x10000.
 Proof. unfold uart_vpn.   apply mword27_unsigned. lia. Qed.
+Lemma uart1_vpn_uns  : bv_unsigned uart1_vpn  = 0x1000A.
+Proof. unfold uart1_vpn.  apply mword27_unsigned. lia. Qed.
 Lemma virtio_vpn_uns : bv_unsigned virtio_vpn = 0x10001.
 Proof. unfold virtio_vpn. apply mword27_unsigned. lia. Qed.
 Lemma plic_vpn_uns   : bv_unsigned plic_vpn   = 0xC000.
@@ -546,100 +552,90 @@ Ltac lebF := apply (proj2 (Z.leb_gt _ _)); lia.
 Ltac ltbT := apply (proj2 (Z.ltb_lt _ _)); lia.
 Ltac ltbF := apply (proj2 (Z.ltb_ge _ _)); lia.
 
-(* kmap_class range inversions *)
+(* kmap_class range inversions (from KptPt's [kmap_class_cases], so the
+   device band and the separate UART1 page stay in one place) *)
 Local Lemma kmap_class_rx_range (vpn : mword 27) :
   kmap_class vpn = Some KP_rx -> 0x80000 <= bv_unsigned vpn < 0x80007.
 Proof.
-  unfold kmap_class.
-  destruct (0x80000 <=? bv_unsigned vpn) eqn:E1;
-  destruct (bv_unsigned vpn <? 0x80007) eqn:E2; cbn [andb]; intro H;
-    try (exfalso; destruct (orb _ _) in H; discriminate).
-  apply Z.leb_le in E1. apply Z.ltb_lt in E2. lia.
+  intro H. destruct (kmap_class_cases vpn KP_rx H) as [[Ht _] | [_ Hc]];
+    [exact Ht | discriminate Hc].
 Qed.
 
 Local Lemma kmap_class_rw_range (vpn : mword 27) :
   kmap_class vpn = Some KP_rw ->
-  (0x80007 <= bv_unsigned vpn < 0x88000) \/ (0xC000 <= bv_unsigned vpn < 0x10002).
+  (0x80007 <= bv_unsigned vpn < 0x88000) \/ (0xC000 <= bv_unsigned vpn < 0x10002)
+  \/ (0x1000A <= bv_unsigned vpn < 0x1000B).
 Proof.
-  unfold kmap_class.
-  destruct (0x80000 <=? bv_unsigned vpn) eqn:E1;
-  destruct (bv_unsigned vpn <? 0x80007) eqn:E2; cbn [andb]; intro H;
-    try discriminate;
-  (destruct (0x80007 <=? bv_unsigned vpn) eqn:E3;
-   destruct (bv_unsigned vpn <? 0x88000) eqn:E4;
-   destruct (0xC000 <=? bv_unsigned vpn) eqn:E5;
-   destruct (bv_unsigned vpn <? 0x10002) eqn:E6; cbn [andb orb] in H;
-   try discriminate;
-   repeat match goal with
-     | E : (_ <=? _) = true |- _ => apply Z.leb_le in E
-     | E : (_ <? _) = true |- _ => apply Z.ltb_lt in E
-     end; first [ left; lia | right; lia ]).
+  intro H. destruct (kmap_class_cases vpn KP_rw H) as [[_ Hc] | [Hd _]];
+    [discriminate Hc | exact Hd].
 Qed.
 
 Local Lemma kmap_class_none_range (vpn : mword 27) :
   kmap_class vpn = None ->
   ~ (0x80000 <= bv_unsigned vpn < 0x80007) /\
   ~ (0x80007 <= bv_unsigned vpn < 0x88000) /\
-  ~ (0xC000 <= bv_unsigned vpn < 0x10002).
+  ~ (0xC000 <= bv_unsigned vpn < 0x10002) /\
+  ~ (0x1000A <= bv_unsigned vpn < 0x1000B).
 Proof.
-  unfold kmap_class.
-  destruct (0x80000 <=? bv_unsigned vpn) eqn:E1;
-  destruct (bv_unsigned vpn <? 0x80007) eqn:E2; cbn [andb]; intro H;
-    try discriminate;
-  (destruct (0x80007 <=? bv_unsigned vpn) eqn:E3;
-   destruct (bv_unsigned vpn <? 0x88000) eqn:E4;
-   destruct (0xC000 <=? bv_unsigned vpn) eqn:E5;
-   destruct (bv_unsigned vpn <? 0x10002) eqn:E6; cbn [andb orb] in H;
-   try discriminate;
-   repeat match goal with
-     | E : (_ <=? _) = true  |- _ => apply Z.leb_le in E
-     | E : (_ <=? _) = false |- _ => apply Z.leb_gt in E
-     | E : (_ <? _) = true   |- _ => apply Z.ltb_lt in E
-     | E : (_ <? _) = false  |- _ => apply Z.ltb_ge in E
-     end; repeat split; lia).
+  intro H. split_and!; intro Hr.
+  - rewrite (kmap_class_text vpn Hr) in H. discriminate.
+  - rewrite (kmap_class_rw vpn (or_introl Hr)) in H. discriminate.
+  - rewrite (kmap_class_rw vpn (or_intror Hr)) in H. discriminate.
+  - rewrite (kmap_class_uart1 vpn Hr) in H. discriminate.
 Qed.
 
 Local Lemma virtio_end : bv_unsigned virtio_vpn + Z.of_nat 1 = 0x10002.
 Proof. rewrite virtio_vpn_uns. reflexivity. Qed.
 Local Lemma uart_end : bv_unsigned uart_vpn + Z.of_nat 1 = 0x10001.
 Proof. rewrite uart_vpn_uns. reflexivity. Qed.
+Local Lemma uart1_end : bv_unsigned uart1_vpn + Z.of_nat 1 = 0x1000B.
+Proof. rewrite uart1_vpn_uns. reflexivity. Qed.
 
-(* the five identity runs, peeled ONE layer at a time with the accumulator
-   [kvm_m{k-1}] kept FOLDED -- crucial for speed: unfolding all five runs at
+(* the six identity runs, peeled ONE layer at a time with the accumulator
+   [kvm_m{k-1}] kept FOLDED -- crucial for speed: unfolding all six runs at
    once builds a giant nested [pt_insert_run] term (with the 16384/32761 page
    counts) that makes every rewrite's traversal ~seconds.  Each peel's own
    [id_run_lookup] rewrite is then instant (the term stays small). *)
-Lemma kvm_m5_peel (vpn : mword 27) :
-  kvm_m5 !! vpn = if (0x80007 <=? bv_unsigned vpn) && (bv_unsigned vpn <? 0x88000)
-    then Some (mk_pte (kpt_leaf_ppn vpn) (Z.lor 6 1)) else kvm_m4 !! vpn.
+Lemma kvm_m6_peel (vpn : mword 27) :
+  kvm_m6 !! vpn = if (0x80007 <=? bv_unsigned vpn) && (bv_unsigned vpn <? 0x88000)
+    then Some (mk_pte (kpt_leaf_ppn vpn) (Z.lor 6 1)) else kvm_m5 !! vpn.
 Proof.
-  unfold kvm_m5, data_ppn0.
-  rewrite (id_run_lookup kvm_m4 data_vpn0 6 data_npages vpn data_ok), data_end, data_vpn_uns.
+  unfold kvm_m6, data_ppn0.
+  rewrite (id_run_lookup kvm_m5 data_vpn0 6 data_npages vpn data_ok), data_end, data_vpn_uns.
+  reflexivity.
+Qed.
+Lemma kvm_m5_peel (vpn : mword 27) :
+  kvm_m5 !! vpn = if (0x80000 <=? bv_unsigned vpn) && (bv_unsigned vpn <? 0x80007)
+    then Some (mk_pte (kpt_leaf_ppn vpn) (Z.lor 10 1)) else kvm_m4 !! vpn.
+Proof.
+  unfold kvm_m5, text_ppn0.
+  rewrite (id_run_lookup kvm_m4 text_vpn0 10 text_npages vpn text_ok), text_end, text_vpn_uns.
   reflexivity.
 Qed.
 Lemma kvm_m4_peel (vpn : mword 27) :
-  kvm_m4 !! vpn = if (0x80000 <=? bv_unsigned vpn) && (bv_unsigned vpn <? 0x80007)
-    then Some (mk_pte (kpt_leaf_ppn vpn) (Z.lor 10 1)) else kvm_m3 !! vpn.
+  kvm_m4 !! vpn = if (0xC000 <=? bv_unsigned vpn) && (bv_unsigned vpn <? 0x10000)
+    then Some (mk_pte (kpt_leaf_ppn vpn) (Z.lor 6 1)) else kvm_m3 !! vpn.
 Proof.
-  unfold kvm_m4, text_ppn0.
-  rewrite (id_run_lookup kvm_m3 text_vpn0 10 text_npages vpn text_ok), text_end, text_vpn_uns.
+  unfold kvm_m4, plic_ppn.
+  rewrite (id_run_lookup kvm_m3 plic_vpn 6 plic_npages vpn plic_ok), plic_end, plic_vpn_uns.
   reflexivity.
 Qed.
 Lemma kvm_m3_peel (vpn : mword 27) :
-  kvm_m3 !! vpn = if (0xC000 <=? bv_unsigned vpn) && (bv_unsigned vpn <? 0x10000)
+  kvm_m3 !! vpn = if (0x10001 <=? bv_unsigned vpn) && (bv_unsigned vpn <? 0x10002)
     then Some (mk_pte (kpt_leaf_ppn vpn) (Z.lor 6 1)) else kvm_m2 !! vpn.
 Proof.
-  unfold kvm_m3, plic_ppn.
-  rewrite (id_run_lookup kvm_m2 plic_vpn 6 plic_npages vpn plic_ok), plic_end, plic_vpn_uns.
+  unfold kvm_m3, virtio_ppn.
+  rewrite (id_run_lookup kvm_m2 virtio_vpn 6 1 vpn ltac:(rewrite virtio_vpn_uns; lia)),
+    virtio_end, virtio_vpn_uns.
   reflexivity.
 Qed.
 Lemma kvm_m2_peel (vpn : mword 27) :
-  kvm_m2 !! vpn = if (0x10001 <=? bv_unsigned vpn) && (bv_unsigned vpn <? 0x10002)
+  kvm_m2 !! vpn = if (0x1000A <=? bv_unsigned vpn) && (bv_unsigned vpn <? 0x1000B)
     then Some (mk_pte (kpt_leaf_ppn vpn) (Z.lor 6 1)) else kvm_m1 !! vpn.
 Proof.
-  unfold kvm_m2, virtio_ppn.
-  rewrite (id_run_lookup kvm_m1 virtio_vpn 6 1 vpn ltac:(rewrite virtio_vpn_uns; lia)),
-    virtio_end, virtio_vpn_uns.
+  unfold kvm_m2, uart1_ppn.
+  rewrite (id_run_lookup kvm_m1 uart1_vpn 6 1 vpn ltac:(rewrite uart1_vpn_uns; lia)),
+    uart1_end, uart1_vpn_uns.
   reflexivity.
 Qed.
 Lemma kvm_m1_peel (vpn : mword 27) :
@@ -652,13 +648,13 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma kvm_m5_lookup (vpn : mword 27) :
-  kvm_m5 !! vpn = match kmap_class vpn with
+Lemma kvm_m6_lookup (vpn : mword 27) :
+  kvm_m6 !! vpn = match kmap_class vpn with
     | Some pc => Some (mk_pte (kpt_leaf_ppn vpn) (Z.lor (kperm_vperm pc) 1))
     | None => None end.
 Proof.
   pose proof (vpn27_bound vpn) as Hvb.
-  rewrite kvm_m5_peel, kvm_m4_peel, kvm_m3_peel, kvm_m2_peel, kvm_m1_peel.
+  rewrite kvm_m6_peel, kvm_m5_peel, kvm_m4_peel, kvm_m3_peel, kvm_m2_peel, kvm_m1_peel.
   set (z := bv_unsigned vpn) in *.
   destruct (kmap_class vpn) as [[|]|] eqn:Hc.
   - (* KP_rx : z ∈ [0x80000, 0x80007) *)
@@ -667,14 +663,14 @@ Proof.
     assert ((0x80000 <=? z) = true) as -> by lebT.
     assert ((z <? 0x80007) = true) as -> by ltbT.
     reflexivity.
-  - (* KP_rw : z in the data range or the (lower) device range, both -> R|W *)
+  - (* KP_rw : the data range, the device band, or the UART1 page *)
     pose proof (kmap_class_rw_range vpn Hc) as Hr. fold z in Hr.
-    destruct Hr as [Hd | Hv].
+    destruct Hr as [Hd | [Hv | Hu1]].
     + (* data: z ∈ [0x80007, 0x88000) *)
       assert ((0x80007 <=? z) = true) as -> by lebT.
       assert ((z <? 0x88000) = true) as -> by ltbT.
       reflexivity.
-    + (* dev: z ∈ [0xC000, 0x10002), strictly below the text/data ranges *)
+    + (* dev band: z ∈ [0xC000, 0x10002), strictly below the text/data ranges *)
       assert (Cd : (0x80007 <=? z) && (z <? 0x88000) = false)
         by (apply andb_false_iff; left; lebF).
       assert (Ct : (0x80000 <=? z) && (z <? 0x80007) = false)
@@ -693,12 +689,28 @@ Proof.
            reflexivity.
         -- assert (Cvi : (0x10001 <=? z) && (z <? 0x10002) = false)
              by (apply andb_false_iff; left; lebF).
-           rewrite Cvi.
+           assert (Cu : (0x1000A <=? z) && (z <? 0x1000B) = false)
+             by (apply andb_false_iff; left; lebF).
+           rewrite Cvi, Cu.
            assert ((0x10000 <=? z) = true) as -> by lebT.
            assert ((z <? 0x10001) = true) as -> by ltbT.
            reflexivity.
+    + (* UART1: z = 0x1000A, above the whole device band *)
+      assert (Cd : (0x80007 <=? z) && (z <? 0x88000) = false)
+        by (apply andb_false_iff; left; lebF).
+      assert (Ct : (0x80000 <=? z) && (z <? 0x80007) = false)
+        by (apply andb_false_iff; left; lebF).
+      assert (Cp : (0xC000 <=? z) && (z <? 0x10000) = false)
+        by (apply andb_false_iff; right; ltbF).
+      assert (Cvi : (0x10001 <=? z) && (z <? 0x10002) = false)
+        by (apply andb_false_iff; right; ltbF).
+      rewrite Cd, Ct, Cp, Cvi.
+      assert ((0x1000A <=? z) = true) as -> by lebT.
+      assert ((z <? 0x1000B) = true) as -> by ltbT.
+      reflexivity.
   - (* None : each run's whole condition is false *)
-    pose proof (kmap_class_none_range vpn Hc) as (Hnt & Hnd & Hnv). fold z in Hnt, Hnd, Hnv.
+    pose proof (kmap_class_none_range vpn Hc) as (Hnt & Hnd & Hnv & Hnu).
+    fold z in Hnt, Hnd, Hnv, Hnu.
     assert (Cd : (0x80007 <=? z) && (z <? 0x88000) = false)
       by (apply andb_false_iff; destruct (Z_lt_le_dec z 0x80007); [left; lebF | right; ltbF]).
     assert (Ct : (0x80000 <=? z) && (z <? 0x80007) = false)
@@ -707,9 +719,11 @@ Proof.
       by (apply andb_false_iff; destruct (Z_lt_le_dec z 0xC000); [left; lebF | right; ltbF]).
     assert (Cvi : (0x10001 <=? z) && (z <? 0x10002) = false)
       by (apply andb_false_iff; destruct (Z_lt_le_dec z 0x10001); [left; lebF | right; ltbF]).
+    assert (Cu1 : (0x1000A <=? z) && (z <? 0x1000B) = false)
+      by (apply andb_false_iff; destruct (Z_lt_le_dec z 0x1000A); [left; lebF | right; ltbF]).
     assert (Cu : (0x10000 <=? z) && (z <? 0x10001) = false)
       by (apply andb_false_iff; destruct (Z_lt_le_dec z 0x10000); [left; lebF | right; ltbF]).
-    rewrite Cd, Ct, Cp, Cvi, Cu. reflexivity.
+    rewrite Cd, Ct, Cp, Cvi, Cu1, Cu. reflexivity.
 Qed.
 
 Lemma kvm_map_lookup (vpn : mword 27) :
@@ -722,7 +736,7 @@ Proof.
   unfold kvm_map. rewrite one_run_lookup.
   destruct (decide (vpn = tramp_vpn)) as [->|Hnt].
   - rewrite kmap_class_tramp_None. reflexivity.
-  - rewrite kvm_m5_lookup. destruct (kmap_class vpn); reflexivity.
+  - rewrite kvm_m6_lookup. destruct (kmap_class vpn); reflexivity.
 Qed.
 
 (* kstack vpns are disjoint from the static class ranges and from tramp *)
@@ -735,6 +749,7 @@ Proof.
   assert ((z <? 0x80007) = false) as -> by ltbF.
   assert ((z <? 0x88000) = false) as -> by ltbF.
   assert ((z <? 0x10002) = false) as -> by ltbF.
+  assert ((z <? 0x1000B) = false) as -> by ltbF.
   rewrite !andb_false_r. reflexivity.
 Qed.
 

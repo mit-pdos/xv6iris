@@ -1,7 +1,8 @@
 (* KptPt.v -- the faithful xv6 KERNEL PAGE TABLE (the shape [kvmmake]
    builds, xv6-riscv/kernel/vm.c): a 3-level Sv39 table whose leaves are
    all 4KB pages, providing IDENTITY mappings for
-     - the UART   (va = pa = 0x10000000, R|W, one page),
+     - the UART0  (va = pa = 0x10000000, R|W, one page),
+     - the UART1  (va = pa = 0x1000a000, R|W, one page),
      - the VIRTIO (va = pa = 0x10001000, R|W, one page),
      - the PLIC   (va = pa = [0x0c000000, 0x10000000), R|W, 64 MB), and
      - all of DRAM (va = pa = [0x80000000, 0x88000000) = the model's whole
@@ -16,7 +17,8 @@
      root+0   = the root (level-2) table:   [0] -> l1_dev, [2] -> l1_dram
      root+1   = l1_dev  (level-1, vpn2=0):  [96+k] -> l0_dev k, k in [0,33)
      root+2+k = l0_dev k (level-0):         PLIC leaves (k<32); k=32 holds
-                the UART leaf (slot 0) and the VIRTIO leaf (slot 1)
+                the UART0 leaf (slot 0), the VIRTIO leaf (slot 1) and the
+                UART1 leaf (slot 10 -- vpn 0x1000a = (0, 96+32, 10))
      root+35  = l1_dram (level-1, vpn2=2):  [j] -> l0_dram j, j in [0,64)
      root+36+j = l0_dram j (level-0):       512 identity DRAM leaves each.
    Deliberate DEVIATIONS from kvmmake, all confined to the byte-level
@@ -79,8 +81,15 @@ Definition vpn1_of (vpn : mword 27) : mword 9 := subrange_vec_dec vpn 17 9.
 Definition vpn0_of (vpn : mword 27) : mword 9 := subrange_vec_dec vpn 8 0.
 
 Definition kpt_dram_vpn (vpn : mword 27) : Prop := 0x80000 <= bv_unsigned vpn < 0x88000.
-Definition kpt_dev_vpn  (vpn : mword 27) : Prop := 0xC000 <= bv_unsigned vpn < 0x10002.
-Definition kpt_mapped (vpn : mword 27) : Prop := kpt_dram_vpn vpn \/ kpt_dev_vpn vpn.
+(* the PLIC/UART0/VIRTIO band is contiguous; UART1 (0x1000a000) sits eight
+   pages above it, so it is its OWN disjunct rather than a widening of
+   [kpt_dev_vpn] -- every device leaf's callers prove [kpt_dev_vpn] as a
+   two-bound goal, and the second UART must not turn that into a case
+   split.  Both are spelled as half-open ranges for the same reason. *)
+Definition kpt_dev_vpn   (vpn : mword 27) : Prop := 0xC000 <= bv_unsigned vpn < 0x10002.
+Definition kpt_uart1_vpn (vpn : mword 27) : Prop := 0x1000A <= bv_unsigned vpn < 0x1000B.
+Definition kpt_mapped (vpn : mword 27) : Prop :=
+  kpt_dram_vpn vpn \/ kpt_dev_vpn vpn \/ kpt_uart1_vpn vpn.
 
 (* rwx-kmap: the DRAM range split at etext = 0x80007000 -- text pages
    [0x80000, 0x80007), data pages [0x80007, 0x88000).  (Cross-checked
@@ -460,8 +469,9 @@ Definition ad_of (a d : mword 1) : bool * bool :=
 Definition kmap_class (vpn : mword 27) : option kperm :=
   if andb (Z.leb 0x80000 (bv_unsigned vpn)) (Z.ltb (bv_unsigned vpn) 0x80007)
   then Some KP_rx
-  else if orb (andb (Z.leb 0x80007 (bv_unsigned vpn)) (Z.ltb (bv_unsigned vpn) 0x88000))
-              (andb (Z.leb 0xC000 (bv_unsigned vpn)) (Z.ltb (bv_unsigned vpn) 0x10002))
+  else if orb (orb (andb (Z.leb 0x80007 (bv_unsigned vpn)) (Z.ltb (bv_unsigned vpn) 0x88000))
+                   (andb (Z.leb 0xC000 (bv_unsigned vpn)) (Z.ltb (bv_unsigned vpn) 0x10002)))
+              (andb (Z.leb 0x1000A (bv_unsigned vpn)) (Z.ltb (bv_unsigned vpn) 0x1000B))
   then Some KP_rw
   else None.
 
@@ -476,6 +486,9 @@ Proof.
   reflexivity.
 Qed.
 
+(* the R|W hypothesis stays the TWO-way disjunction every device leaf's
+   caller supplies ([right; exact Hdevvpn]); UART1 gets its own lemma
+   below rather than a third disjunct here. *)
 Lemma kmap_class_rw (vpn : mword 27) :
   kpt_data_vpn vpn \/ kpt_dev_vpn vpn -> kmap_class vpn = Some KP_rw.
 Proof.
@@ -484,29 +497,55 @@ Proof.
   destruct (andb (Z.leb 0x80000 (bv_unsigned vpn)) (Z.ltb (bv_unsigned vpn) 0x80007)) eqn:Ht.
   { apply andb_prop in Ht. destruct Ht as [Ht1 Ht2].
     apply Z.leb_le in Ht1. apply Z.ltb_lt in Ht2. lia. }
-  destruct Hd as [[Hlo Hhi] | [Hlo Hhi]];
-    rewrite (proj2 (Z.leb_le _ _) Hlo), (proj2 (Z.ltb_lt _ _) Hhi);
-    [rewrite Bool.andb_true_l, Bool.orb_true_l | rewrite Bool.andb_true_l, Bool.orb_true_r];
-    reflexivity.
+  assert (Hc : orb (orb (andb (Z.leb 0x80007 (bv_unsigned vpn)) (Z.ltb (bv_unsigned vpn) 0x88000))
+                        (andb (Z.leb 0xC000 (bv_unsigned vpn)) (Z.ltb (bv_unsigned vpn) 0x10002)))
+                   (andb (Z.leb 0x1000A (bv_unsigned vpn)) (Z.ltb (bv_unsigned vpn) 0x1000B))
+               = true).
+  { apply Bool.orb_true_iff. left. apply Bool.orb_true_iff.
+    destruct Hd as [[Hlo Hhi] | [Hlo Hhi]]; [left | right];
+      (apply Bool.andb_true_iff; split;
+       [apply Z.leb_le; lia | apply Z.ltb_lt; lia]). }
+  rewrite Hc. reflexivity.
+Qed.
+
+Lemma kmap_class_uart1 (vpn : mword 27) :
+  kpt_uart1_vpn vpn -> kmap_class vpn = Some KP_rw.
+Proof.
+  intros [Hlo Hhi]. unfold kmap_class.
+  destruct (andb (Z.leb 0x80000 (bv_unsigned vpn)) (Z.ltb (bv_unsigned vpn) 0x80007)) eqn:Ht.
+  { apply andb_prop in Ht. destruct Ht as [Ht1 Ht2].
+    apply Z.leb_le in Ht1. apply Z.ltb_lt in Ht2. lia. }
+  assert (Hc : orb (orb (andb (Z.leb 0x80007 (bv_unsigned vpn)) (Z.ltb (bv_unsigned vpn) 0x88000))
+                        (andb (Z.leb 0xC000 (bv_unsigned vpn)) (Z.ltb (bv_unsigned vpn) 0x10002)))
+                   (andb (Z.leb 0x1000A (bv_unsigned vpn)) (Z.ltb (bv_unsigned vpn) 0x1000B))
+               = true).
+  { apply Bool.orb_true_iff. right.
+    apply Bool.andb_true_iff; split; [apply Z.leb_le; lia | apply Z.ltb_lt; lia]. }
+  rewrite Hc. reflexivity.
 Qed.
 
 Lemma kmap_class_cases (vpn : mword 27) (pc : kperm) :
   kmap_class vpn = Some pc ->
   (kpt_text_vpn vpn /\ pc = KP_rx) \/
-  ((kpt_data_vpn vpn \/ kpt_dev_vpn vpn) /\ pc = KP_rw).
+  ((kpt_data_vpn vpn \/ kpt_dev_vpn vpn \/ kpt_uart1_vpn vpn) /\ pc = KP_rw).
 Proof.
-  unfold kmap_class, kpt_text_vpn, kpt_data_vpn, kpt_dev_vpn.
+  unfold kmap_class, kpt_text_vpn, kpt_data_vpn, kpt_dev_vpn, kpt_uart1_vpn.
   destruct (andb (Z.leb 0x80000 (bv_unsigned vpn)) (Z.ltb (bv_unsigned vpn) 0x80007)) eqn:Ht.
   { apply andb_prop in Ht. destruct Ht as [Ht1 Ht2].
     apply Z.leb_le in Ht1. apply Z.ltb_lt in Ht2.
     intros [= <-]. left. split; [lia | reflexivity]. }
-  destruct (orb (andb (Z.leb 0x80007 (bv_unsigned vpn)) (Z.ltb (bv_unsigned vpn) 0x88000))
-                (andb (Z.leb 0xC000 (bv_unsigned vpn)) (Z.ltb (bv_unsigned vpn) 0x10002))) eqn:Hr;
+  destruct (orb (orb (andb (Z.leb 0x80007 (bv_unsigned vpn)) (Z.ltb (bv_unsigned vpn) 0x88000))
+                     (andb (Z.leb 0xC000 (bv_unsigned vpn)) (Z.ltb (bv_unsigned vpn) 0x10002)))
+                (andb (Z.leb 0x1000A (bv_unsigned vpn)) (Z.ltb (bv_unsigned vpn) 0x1000B))) eqn:Hr;
     [| discriminate].
   apply Bool.orb_prop in Hr.
   intros [= <-]. right. split; [| reflexivity].
-  destruct Hr as [Hr | Hr]; apply andb_prop in Hr; destruct Hr as [Hr1 Hr2];
-    apply Z.leb_le in Hr1; apply Z.ltb_lt in Hr2; [left | right]; lia.
+  destruct Hr as [Hr | Hr].
+  - apply Bool.orb_prop in Hr.
+    destruct Hr as [Hr | Hr]; apply andb_prop in Hr; destruct Hr as [Hr1 Hr2];
+      apply Z.leb_le in Hr1; apply Z.ltb_lt in Hr2; [left | right; left]; lia.
+  - apply andb_prop in Hr. destruct Hr as [Hr1 Hr2].
+    apply Z.leb_le in Hr1. apply Z.ltb_lt in Hr2. right; right; lia.
 Qed.
 
 Lemma kmap_static_mapped (vpn : mword 27) (pc : kperm) :
@@ -514,18 +553,20 @@ Lemma kmap_static_mapped (vpn : mword 27) (pc : kperm) :
 Proof.
   intros Hc. destruct (kmap_class_cases vpn pc Hc) as [[Ht _] | [Hd _]].
   - left. apply kpt_dram_vpn_split. left. exact Ht.
-  - destruct Hd as [Hd | Hd]; [left | right; exact Hd].
-    apply kpt_dram_vpn_split. right. exact Hd.
+  - destruct Hd as [Hd | Hd].
+    + left. apply kpt_dram_vpn_split. right. exact Hd.
+    + right. exact Hd.
 Qed.
 
 Lemma kpt_mapped_static (vpn : mword 27) :
   kpt_mapped vpn -> exists pc, kmap_static vpn pc.
 Proof.
-  intros [Hd | Hd].
+  intros [Hd | [Hd | Hd]].
   - apply kpt_dram_vpn_split in Hd. destruct Hd as [Hd | Hd].
     + exists KP_rx. apply kmap_class_text. exact Hd.
     + exists KP_rw. apply kmap_class_rw. left. exact Hd.
   - exists KP_rw. apply kmap_class_rw. right. exact Hd.
+  - exists KP_rw. apply kmap_class_uart1. exact Hd.
 Qed.
 
 (* an owned RAM va's vpn is statically classified (text or data) *)
@@ -599,7 +640,8 @@ Lemma static_svpn_bound (a : mword 64) (pc : kperm) :
 Proof.
   intro Hs. destruct (kmap_class_cases (svpn_of a) pc Hs) as [[Ht _] | [Hd _]].
   - unfold kpt_text_vpn in Ht. lia.
-  - destruct Hd as [Hd | Hd]; unfold kpt_data_vpn, kpt_dev_vpn in Hd; lia.
+  - destruct Hd as [Hd | [Hd | Hd]];
+      unfold kpt_data_vpn, kpt_dev_vpn, kpt_uart1_vpn in Hd; lia.
 Qed.
 
 (* canonical + a static (hence < 2^20) vpn ⟹ va sits in the positive half:
@@ -801,11 +843,13 @@ Definition kmap_seq (lo len : Z) (pc : kperm) : list (mword 27 * (mword 44 * kpe
              (kpt_leaf_ppn (mword_of_int z), pc))) <$> seqZ lo len.
 
 (* text [0x80000, 0x80007) RX; data [0x80007, 0x88000) RW;
-   devices [0xC000, 0x10002) RW *)
+   devices [0xC000, 0x10002) RW (PLIC + UART0 + VIRTIO) and the single
+   UART1 page 0x1000A RW *)
 Definition kmap_M0 : gmap (mword 27) (mword 44 * kperm) :=
   list_to_map (kmap_seq 0x80000 0x7 KP_rx
                ++ kmap_seq 0x80007 0x7FF9 KP_rw
-               ++ kmap_seq 0xC000 0x4002 KP_rw).
+               ++ kmap_seq 0xC000 0x4002 KP_rw
+               ++ kmap_seq 0x1000A 0x1 KP_rw).
 
 (* Keep typeclass search from unfolding the ~49k-entry comprehension: the only
    place that ever looks inside is [kmap_M0_lookup] (via [unfold], unaffected by
@@ -885,18 +929,21 @@ Lemma kmap_M0_lookup (vpn : mword 27) :
   kmap_M0 !! vpn = (fun pc => (kpt_leaf_ppn vpn, pc)) <$> kmap_class vpn.
 Proof.
   unfold kmap_M0.
-  rewrite list_to_map_app, list_to_map_app.
+  rewrite list_to_map_app, list_to_map_app, list_to_map_app.
   rewrite !lookup_union.
   rewrite (kmap_seq_lookup 0x80000 0x7 KP_rx vpn ltac:(lia) ltac:(lia)).
   rewrite (kmap_seq_lookup 0x80007 0x7FF9 KP_rw vpn ltac:(lia) ltac:(lia)).
   rewrite (kmap_seq_lookup 0xC000 0x4002 KP_rw vpn ltac:(lia) ltac:(lia)).
+  rewrite (kmap_seq_lookup 0x1000A 0x1 KP_rw vpn ltac:(lia) ltac:(lia)).
   change (0x80000 + 0x7) with 0x80007.
   change (0x80007 + 0x7FF9) with 0x88000.
   change (0xC000 + 0x4002) with 0x10002.
+  change (0x1000A + 0x1) with 0x1000B.
   unfold kmap_class.
   destruct (andb (Z.leb 0x80000 (bv_unsigned vpn)) (Z.ltb (bv_unsigned vpn) 0x80007));
   destruct (andb (Z.leb 0x80007 (bv_unsigned vpn)) (Z.ltb (bv_unsigned vpn) 0x88000));
   destruct (andb (Z.leb 0xC000 (bv_unsigned vpn)) (Z.ltb (bv_unsigned vpn) 0x10002));
+  destruct (andb (Z.leb 0x1000A (bv_unsigned vpn)) (Z.ltb (bv_unsigned vpn) 0x1000B));
   reflexivity.
 Qed.
 

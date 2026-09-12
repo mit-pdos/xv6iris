@@ -892,9 +892,9 @@ Section ProofVirtioDiskInit.
     set (spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     iIntros "Hcg Hcpu #Htext #Hkdata Hpc Henv #Hdinv Hvc Hlk Hnm Hcp Hdesc Havail Hused Hfree Hcont".
     (* the "virtio_disk" string literal, read out of the data image *)
-    pose (nmv := (mword_of_int (KernelSyms.etext + 0x640) : mword 64)).
+    pose (nmv := (mword_of_int (KernelSyms.etext + 0x658) : mword 64)).
     assert (Hstrb : forall j b, cstring_bytes "virtio_disk"%string !! j = Some b ->
-                    KernelData.kernel_data !! (KernelSyms.etext + 0x640 + Z.of_nat j)%Z = Some b).
+                    KernelData.kernel_data !! (KernelSyms.etext + 0x658 + Z.of_nat j)%Z = Some b).
     { intros j b Hj.
       do 12 (destruct j as [|j];
              [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
