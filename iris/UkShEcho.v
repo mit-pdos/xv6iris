@@ -345,6 +345,54 @@ Section UkShEcho.
   Local Notation s1_idx := (mword_of_int 9 : mword 5).
 
   (* =================================================================== *)
+  (*  THE NODE, ADDRESSED.  Three accessors so that no consumer of the     *)
+  (*  tree has to fight [UkShMain.ush_args]'s [map] again: argument [i]'s  *)
+  (*  pointer word, its string, and the NULL cap.  Everything is           *)
+  (*  [DfracDiscarded], so every one of them is free to take.              *)
+  (* =================================================================== *)
+  Lemma echo_cmd_str (gd : gname) (t s0 : Z) (g : nat -> bv 8) (i : nat) :
+    (i < 3)%nat ->
+    ush_cmd gd t (echo_cmd s0 g) -∗
+    ⌜ 0 < s0 + Z.of_nat (echo_off i) < 2 ^ 38 ⌝ ∗
+    ustr gd DfracDiscarded (s0 + Z.of_nat (echo_off i)) (echo_alen i)
+      (fun j : nat => g (echo_off i + j)%nat).
+  Proof.
+    intro Hi. iIntros "#Hc".
+    iDestruct (ush_cmd_exec with "Hc") as "(_ & _ & #Hs)".
+    iDestruct (big_sepL_lookup _ (UkShMain.ush_args s0 g echo_toks) i _
+                 (echo_cmd_args_lookup s0 g i Hi) with "Hs") as "#Hx".
+    rewrite /ush_str. cbn [ua_ptr ua_len ua_bytes].
+    iDestruct "Hx" as "[%Hr #Hstr]".
+    iSplit; [ iPureIntro; exact Hr | iExact "Hstr" ].
+  Qed.
+
+  Lemma echo_cmd_word (gd : gname) (t s0 : Z) (g : nat -> bv 8) (i : nat) :
+    (i < 3)%nat ->
+    ush_cmd gd t (echo_cmd s0 g) -∗
+    uwordq gd DfracDiscarded (t + 8 + 8 * Z.of_nat i)
+      (mword_of_int (s0 + Z.of_nat (echo_off i))).
+  Proof.
+    intro Hi. iIntros "#Hc".
+    iDestruct (ush_cmd_exec with "Hc") as "(#Hv & _ & _)".
+    iDestruct (uargv_acc gd (t + 8) (UkShMain.ush_args s0 g echo_toks) i _
+                 (echo_cmd_args_lookup s0 g i Hi) with "Hv") as "[[#Hw _] _]".
+    cbn [ua_ptr]. iExact "Hw".
+  Qed.
+
+  Lemma echo_cmd_cap (gd : gname) (t s0 : Z) (g : nat -> bv 8) :
+    ush_cmd gd t (echo_cmd s0 g) -∗
+    uwordq gd DfracDiscarded (t + 8 + 8 * Z.of_nat 3%nat) (mword_of_int 0).
+  Proof.
+    iIntros "#Hc".
+    iDestruct (ush_cmd_exec with "Hc") as "(_ & #Hn & _)".
+    rewrite /ush_ptr echo_cmd_args_length. iExact "Hn".
+  Qed.
+
+  Lemma echo_cmd_addr (gd : gname) (t s0 : Z) (g : nat -> bv 8) :
+    ush_cmd gd t (echo_cmd s0 g) -∗ ⌜ 0 < t < 2 ^ 38 /\ t mod 8 = 0 ⌝.
+  Proof. iIntros "#Hc". iApply (ush_cmd_addr with "Hc"). Qed.
+
+  (* =================================================================== *)
   (* S2  THE PINNED EXEC SUPPLY, at sh's own key.                         *)
   (*                                                                      *)
   (* [UkRun.uxsup_at] is the exec bundle at EVERY key; a PINNED bundle is  *)
