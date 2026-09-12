@@ -2448,8 +2448,10 @@ audit: the token `ucons_reader cn 0` is the BUNDLE's own wand argument
 `▷ app_R A c h` at the run's FINAL `h`, so a per-cycle tagged shadow for
 EVERY cycle is readable; DISC-RATE's per-cycle `echo_phi` is compatible.
 Corrections: `design/app-instances.md` does not exist (App.v's headers cite
-it); `uart-trace.md` is under `completed/`.  AWAITING THE OWNER'S GO-AHEAD
-before phase 2 (proofs + commit).
+it); `uart-trace.md` is under `completed/`.  OWNER APPROVED THE DIFF (2026-09-12: "that seems ok"); phase 2 (proofs +
+commit on `lane/app-iface`) launched.  The LOOP-off clause rides on TX-TAG
+phase 2 (WpUart only); the matching `Htx` premise is a later, separately
+reviewed statement change (E5's ledger).
 
 SUPPLY-SPLIT PHASE 2 GREEN ON ITS BRANCH (2026-09-12; `-sup`,
 `lane/supply-split` = `d2708e5b7`; 31 files +1163/-561; build `sup27`, audit =

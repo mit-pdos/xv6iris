@@ -169,3 +169,7 @@ LAZY-FLAG p1 continued in the STORED form (main; the computed refinement is
 withdrawn), TX-TAG p2 (`-tlw`), APP-IFACE p1 (`-disc`), SH-OPEN p1 (`-sup`).
 Landing order: LAZY-FLAG (main) → SUPPLY-SPLIT (rebase) → SH-OPEN → TX-TAG →
 APP-IFACE after the owner's review.
+
+APP-IFACE: the owner approved the statement diff (2026-09-12); phase 2 running
+in `-disc`.  TX-TAG phase 2 gains the rider: `uart_col_ok`'s LOOP-off clause
+`u_wire u = u_out u`.
