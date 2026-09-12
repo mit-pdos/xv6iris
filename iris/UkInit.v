@@ -40,6 +40,13 @@ Require Import ChildTok.  (* [genF] -- the capacity the slot's fork arms name *)
 Local Open Scope Z_scope.
 Import Defs.
 
+Require Import FdSlots.  (* [fdstate] / [FdClosed] -- the console prologue's
+                            rows name the descriptor states themselves *)
+Require Import ProcGeom. (* [NOFILE] -- the bound the tracked dup's number
+                            comes back with *)
+Require Import UInitFd.  (* the console prologue's ledger rows, at an
+                            ABSTRACT descriptor state: [ufd_l0] .. [ufd_l3],
+                            the three scans, and init's head *)
 Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             its descriptor table, the authority for
                             which rides inside [urun] *)
@@ -210,6 +217,165 @@ Section UkInit.
     iApply ("Hcont" $! h3 ret with "Hstd Hrun").
   Qed.
 
+  (* ===================================================================== *)
+  (* INIT'S CONSOLE PROLOGUE, AS THREE LEAVES (lane OPEN-PIN, phase 3).      *)
+  (*                                                                        *)
+  (* [wp_kinit_open] above DROPS the descriptor and [wp_kinit_mknod] goes    *)
+  (* through the QUIET leaf, so neither says anything about the console.     *)
+  (* What says something is a PINNED bundle at the path "console", and a     *)
+  (* pin is a fact about the abstract file-system view -- which this file    *)
+  (* may not name: it sits below the file-system tower, and the rule is the  *)
+  (* one [UConsLine.v:202] states for the read leaf's taint (THE PROGRAM     *)
+  (* TIER NAMES NO APPLICATION).                                            *)
+  (*                                                                        *)
+  (* So the three calls are stated HERE, as leaf BODIES in program-tier      *)
+  (* vocabulary over three abstract pieces, and DISCHARGED at the era, where *)
+  (* the pin lives -- [UkSh.ush_read_leaf] / [UkSh.ush_read_leaf_holds] is   *)
+  (* the mould, and the discharge walks the same three instructions each     *)
+  (* stub above walks, with [UkRunSys.wp_uk_ecall_open_recv_body] /          *)
+  (* [wp_uk_ecall_quiet_recv_body] in place of the post-dropping leaves.     *)
+  (*                                                                        *)
+  (*   [T]   THE TAINT.  The application is off its discipline; the ledger   *)
+  (*         is at a state nobody named and nothing is claimed.              *)
+  (*   [K]   THE ABSENCE CREDENTIAL ([AppEcho.cons_key] at echo's era).  An  *)
+  (*         EXCLUSIVE token whose holder knows the console node does not    *)
+  (*         exist, which is what makes the FIRST open's success arm         *)
+  (*         REFUTABLE rather than an arm init has to carry.  It goes in and *)
+  (*         comes back: one credential answers the first open, the mknod    *)
+  (*         and -- if the mknod failed -- the second open in turn.          *)
+  (*   [stc] THE DESCRIPTOR THE CONSOLE OPEN INSTALLS                        *)
+  (*         ([UInitCons.init_cons_fd] at echo's era).                       *)
+  (*                                                                        *)
+  (* AND THE MKNOD'S SUCCESS ARM HANDS BACK THE SECOND OPEN'S LEAF.  That is *)
+  (* how "the node exists now" crosses from the application tier to this     *)
+  (* one without being nameable here: the era's flag                         *)
+  (* ([AppEcho.cons_made]) is what the resolving pin runs on, and what a     *)
+  (* program-tier statement can carry instead of the flag is the leaf the    *)
+  (* flag proves.                                                            *)
+  (* ===================================================================== *)
+
+  (* THE SECOND open, AT THE RESOLVING PIN: three arms and no more.  fd 0
+     is the console; or the allocation failed ([filealloc] / [fdalloc],
+     about which /init proves NOTHING -- app-echo.md, "OPEN-PIN FINDINGS",
+     FACT 3) and the ledger did not move; or the taint.  The number 0 is
+     the LEDGER's answer and not the kernel's ([UInitFd.ufd_alloc0]). *)
+  Definition uki_open_console_leaf (T : iProp Σ) (stc : fdstate) : iProp Σ :=
+    (∀ (h : CpuId) (m : regfile) (avail : nat),
+       init_code γt -∗
+       urun N h m (mword_of_int InitSyms.open) avail -∗
+       UserCwd.ucwd γcwd FsImg.ROOTINO -∗
+       ustd γfd ufd_l0 -∗
+       (∀ (h' : CpuId) (ret : mword 64),
+          ((⌜ret = (mword_of_int 0 : mword 64)⌝ ∗ ustd γfd (ufd_l1 stc))
+           ∨ (⌜ret = (mword_of_int (-1) : mword 64)⌝ ∗ ustd γfd ufd_l0)
+           ∨ (ustd_any γfd ∗ T)) -∗
+          UserCwd.ucwd γcwd FsImg.ROOTINO -∗
+          urun N h'
+            (<[Regidx a0_idx := ret]>
+               (<[Regidx a7_idx := (mword_of_int 15 : mword 64)]> m))
+            (ret_pc (m !!! Regidx ra_idx)) avail -∗
+          WP (Loop : expr riscv_lang)) -∗
+       WP (Loop : expr riscv_lang))%I.
+
+  (* THE FIRST open, AT THE PIN THAT MISSES -- and the repair arm's second
+     open when the mknod failed.  TWO arms: the call returned [-1] and
+     nothing moved, or the taint.  There is no third: at a view the
+     credential holds of, the walk dies at hop 0, so the success arm is
+     refuted rather than carried -- which is what makes the [blt a0,x0] at
+     0x1a provably take the repair arm.
+
+     THE LEDGER IS ARBITRARY because both callers are: the first open runs
+     at [UInitFd.ufd_l0] and the repair arm's second open at whatever the
+     failed mknod left, which is the same list -- but nothing here needs to
+     know that. *)
+  Definition uki_open_absent_leaf (T K : iProp Σ) : iProp Σ :=
+    (∀ (h : CpuId) (m : regfile) (l : list fdstate) (avail : nat),
+       init_code γt -∗
+       urun N h m (mword_of_int InitSyms.open) avail -∗
+       UserCwd.ucwd γcwd FsImg.ROOTINO -∗
+       ustd γfd l -∗
+       K -∗
+       (∀ (h' : CpuId) (ret : mword 64),
+          ((⌜ret = (mword_of_int (-1) : mword 64)⌝ ∗ ustd γfd l ∗ K)
+           ∨ (ustd_any γfd ∗ T)) -∗
+          UserCwd.ucwd γcwd FsImg.ROOTINO -∗
+          urun N h'
+            (<[Regidx a0_idx := ret]>
+               (<[Regidx a7_idx := (mword_of_int 15 : mword 64)]> m))
+            (ret_pc (m !!! Regidx ra_idx)) avail -∗
+          WP (Loop : expr riscv_lang)) -∗
+       WP (Loop : expr riscv_lang))%I.
+
+  (* THE MKNOD, which is where the console node comes into existence and the
+     one place /init's own WRITE pays a step of the application's claim
+     rather than reading one out of its supply.  Three arms, and the first
+     is what the whole lane is for: the node exists, so the SECOND open's
+     leaf is available.  On failure the credential comes back -- and then
+     the second open is the MISS leaf again, and fd 0 stays closed. *)
+  Definition uki_mknod_leaf (T K : iProp Σ) (stc : fdstate) : iProp Σ :=
+    (∀ (h : CpuId) (m : regfile) (avail : nat),
+       init_code γt -∗
+       urun N h m (mword_of_int InitSyms.mknod) avail -∗
+       UserCwd.ucwd γcwd FsImg.ROOTINO -∗
+       K -∗
+       (∀ (h' : CpuId) (ret : mword 64),
+          (uki_open_console_leaf T stc ∨ K ∨ T) -∗
+          UserCwd.ucwd γcwd FsImg.ROOTINO -∗
+          urun N h'
+            (<[Regidx a0_idx := ret]>
+               (<[Regidx a7_idx := (mword_of_int 17 : mword 64)]> m))
+            (ret_pc (m !!! Regidx ra_idx)) avail -∗
+          WP (Loop : expr riscv_lang)) -∗
+       WP (Loop : expr riscv_lang))%I.
+
+  (* ...AND THE PAIR /init CARRIES FROM ITS ENTRY, persistently: the miss
+     leaf is used TWICE (0x16 and, on the repair arm, 0x7e) and the mknod
+     leaf once, and both are entailed by persistent ingredients at the era
+     -- [AppInv.app_inv], the [□] claim law and
+     [UInitCons.init_cons_abs_law] -- so the bundle is a [□] and threads
+     through the restart loop's [iLöb] the way [init_exec_sup] does. *)
+  Definition init_cons_leaves (T K : iProp Σ) (stc : fdstate) : iProp Σ :=
+    (□ uki_open_absent_leaf T K ∗ □ uki_mknod_leaf T K stc)%I.
+
+  (* WHAT THE FIRST OPEN LEAVES, as ONE resource: the call returned [-1]
+     (the pure half is read at the [blt] and dropped), so the ledger and the
+     credential are back -- or the application is tainted and the ledger is
+     at a state nobody named.  Both of /init's console arms are walked from
+     this, which is why the repair arm takes it rather than the credential:
+     under the taint the credential is gone and the mknod and the second
+     open still have to be walked. *)
+  Definition uki_cons_in (T K : iProp Σ) : iProp Σ :=
+    ((ustd γfd ufd_l0 ∗ K) ∨ (ustd_any γfd ∗ T))%I.
+
+  (* ...AND WHAT THE REPAIR ARM'S SECOND OPEN IS, whichever of the three
+     things the mknod left: a call at the all-closed ledger that lands
+     /init's head.  ONE shape, so the 0x74..0x82 tail is walked ONCE. *)
+  (* ...and what it is CALLED at: the ledger the first open left, or the
+     taint.  Both arms reach the repair arm, because /init's C tests
+     neither the mknod's result nor the second open's. *)
+  Definition uki_open2_in (T : iProp Σ) : iProp Σ :=
+    (ustd γfd ufd_l0 ∨ (ustd_any γfd ∗ T))%I.
+
+  Definition uki_open2 (T : iProp Σ) (stc : fdstate) : iProp Σ :=
+    (∀ (h : CpuId) (m : regfile) (avail : nat),
+       init_code γt -∗
+       urun N h m (mword_of_int InitSyms.open) avail -∗
+       UserCwd.ucwd γcwd FsImg.ROOTINO -∗
+       uki_open2_in T -∗
+       (∀ (h' : CpuId) (ret : mword 64),
+          ufd_head T stc γfd -∗
+          UserCwd.ucwd γcwd FsImg.ROOTINO -∗
+          urun N h'
+            (<[Regidx a0_idx := ret]>
+               (<[Regidx a7_idx := (mword_of_int 15 : mword 64)]> m))
+            (ret_pc (m !!! Regidx ra_idx)) avail -∗
+          WP (Loop : expr riscv_lang)) -∗
+       WP (Loop : expr riscv_lang))%I.
+
+  Global Instance init_cons_leaves_persistent T K stc :
+    Persistent (init_cons_leaves T K stc).
+  Proof. rewrite /init_cons_leaves. apply _. Qed.
+
   Lemma wp_kinit_mknod (h : CpuId) (m : regfile) (avail : nat) :
     init_code γt -∗
     urun N h m (mword_of_int InitSyms.mknod) avail -∗
@@ -356,6 +522,327 @@ Section UkInit.
     { iApply (uis_init_3f0 with "Hcode"). }
     iIntros (h3) "Hrun".
     iApply ("Hcont" $! h3 ret with "[Hstd] Hrun"). by iExists l'.
+  Qed.
+
+  (* --------------------------------------------------------------------- *)
+  (* dup @0x3ea, ON AN OPEN STANDARD STREAM -- the TRACKED leaf.             *)
+  (*                                                                        *)
+  (* [wp_kinit_dup] above goes through [UkRunSys.wp_uk_ecall_dup_untracked], *)
+  (* which moves the authority and hands the ledger back at a state it does  *)
+  (* not name.  That is why /init has never been able to say its console is  *)
+  (* on fds 1 and 2.  This is the same three instructions through the        *)
+  (* TRACKED leaf: the caller hands in a claim on the SOURCE -- which for a  *)
+  (* standard stream is the ledger's own row ([UInitFd.ufd_dup_src]) -- and  *)
+  (* gets [UserFd.ualloc] back, so the DESTINATION is decided by its own     *)
+  (* ledger.                                                                 *)
+  (*                                                                        *)
+  (* The source claim is NOT handed back: both arms of [UserFd.ufd_own] at a *)
+  (* standard stream are PURE, so it is re-derivable from the ledger the     *)
+  (* call returns and carrying it would only make the two call sites split   *)
+  (* a resource they can rebuild.                                            *)
+  (* --------------------------------------------------------------------- *)
+  Lemma wp_kinit_dup_cons (h : CpuId) (m : regfile) (avail : nat)
+      (l : list fdstate) (fd0 : nat) (st : fdstate) :
+    bv_signed (trunc32 (m !!! Regidx a0_idx)) = Z.of_nat fd0 ->
+    st <> FdClosed ->
+    (fd0 < NSTD)%nat ->
+    l !! fd0 = Some st ->
+    init_code γt -∗
+    urun N h m (mword_of_int InitSyms.dup) avail -∗
+    ustd γfd l -∗
+    (∀ (h' : CpuId) (ret : mword 64),
+       ((∃ fd1 : nat,
+           ⌜ret = (mword_of_int (Z.of_nat fd1) : mword 64)
+            /\ (fd1 < NOFILE)%nat⌝ ∗ ualloc γfd l fd1 st)
+        ∨ (⌜ret = (mword_of_int (-1) : mword 64)⌝ ∗ ustd γfd l)) -∗
+       urun N h'
+         (<[Regidx a0_idx := ret]>
+            (<[Regidx a7_idx := (mword_of_int 10 : mword 64)]> m))
+         (ret_pc (m !!! Regidx ra_idx)) avail -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Harg Hne Hlt Hrow.
+    iIntros "#Hcode Hrun Hstd Hcont".
+    destruct init_syms_pins as (Hstart & Hmain & Hprintf & Hvprintf & Hputc & Hopen & Hmknod & Hdup & Hfork & Hwait & Hexec & Hwrite & Hexit). rewrite Hdup.
+    (* ---- 0x3ea  c.li a7,10 ---- *)
+    iApply (wp_uk_cli N h m (mword_of_int 0x3ea)
+              (mword_of_int 10 : mword 6) a7_idx avail
+              ltac:(unfold unot_sp; vm_compute; discriminate)
+              ltac:(vm_compute; discriminate) with "[] Hrun").
+    { iApply (uis_init_3ea with "Hcode"). }
+    assert (E0 : add_vec_int (mword_of_int 0x3ea : mword 64) 2
+                 = mword_of_int 0x3ec)
+      by (apply bv_eq; vm_compute; reflexivity).
+    assert (Em : <[Regidx a7_idx
+                   := regval_into_reg (sign_extend' 64 (mword_of_int 10 : mword 6)
+                                       : mword 64)]> m
+                 = <[Regidx a7_idx := (mword_of_int 10 : mword 64)]> m)
+      by (f_equal; apply bv_eq; vm_compute; reflexivity).
+    rewrite E0 Em.
+    iIntros (h1) "Hrun".
+    set (m1 := <[Regidx a7_idx := (mword_of_int 10 : mword 64)]> m).
+    assert (Harg1 : bv_signed (trunc32 (m1 !!! Regidx a0_idx)) = Z.of_nat fd0).
+    { unfold m1.
+      rewrite (upd_ne m (Regidx a7_idx) (Regidx a0_idx)
+                 (mword_of_int 10 : mword 64) ltac:(vm_compute; discriminate)).
+      exact Harg. }
+    (* ---- 0x3ec  ecall -- the TRACKED dup leaf ---- *)
+    iApply (wp_uk_ecall_dup N h1 m1 (mword_of_int 0x3ec) l fd0 st avail
+              ltac:(unfold m1, usysno;
+                    rewrite (upd_eq m (Regidx a7_idx)
+                               (mword_of_int 10 : mword 64));
+                    vm_compute; reflexivity)
+              Harg1 Hne
+              ltac:(vm_compute; reflexivity)
+              with "[] Hrun [] Hstd []").
+    { iApply (uis_init_3ec with "Hcode"). }
+    { iApply udepw_of_psok; [ apply Hpsok | ];
+      (discriminate || assumption || (vm_compute; discriminate)). }
+    { iApply (ufd_dup_src γfd l fd0 st); [ exact Hlt | exact Hrow ]. }
+    assert (E1 : add_vec_int (mword_of_int 0x3ec : mword 64) 4
+                 = mword_of_int 0x3f0)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite E1.
+    iIntros (h2 ret) "Hal Hrun".
+    iAssert (((∃ fd1 : nat,
+                 ⌜ret = (mword_of_int (Z.of_nat fd1) : mword 64)
+                  /\ (fd1 < NOFILE)%nat⌝ ∗ ualloc γfd l fd1 st)
+              ∨ (⌜ret = (mword_of_int (-1) : mword 64)⌝ ∗ ustd γfd l)))%I
+      with "[Hal]" as "Hans".
+    { iDestruct "Hal" as "[Hs | Hf]".
+      - iDestruct "Hs" as (fd1) "(%Hr & Ha & _)".
+        iLeft. iExists fd1. iFrame "Ha". by iPureIntro.
+      - iDestruct "Hf" as "(%Hr & Hl & _)".
+        iRight. iFrame "Hl". by iPureIntro. }
+    set (m2 := <[Regidx a0_idx := ret]> m1).
+    (* ---- 0x3f0  c.jr ra ---- *)
+    assert (Hra : m2 !!! Regidx ra_idx = m !!! Regidx ra_idx).
+    { unfold m2, m1.
+      exact (eq_trans
+               (upd_ne m1 (Regidx a0_idx) (Regidx ra_idx) ret
+                  ltac:(vm_compute; discriminate))
+               (upd_ne m (Regidx a7_idx) (Regidx ra_idx)
+                  (mword_of_int 10 : mword 64)
+                  ltac:(vm_compute; discriminate))). }
+    iApply (wp_uk_cjr N h2 m2 (mword_of_int 0x3f0) ra_idx
+              (ret_pc (m !!! Regidx ra_idx)) avail
+              ltac:(vm_compute; discriminate)
+              ltac:(rewrite Hra; reflexivity)
+              with "[] Hrun").
+    { iApply (uis_init_3f0 with "Hcode"). }
+    iIntros (h3) "Hrun".
+    iApply ("Hcont" $! h3 ret with "Hans Hrun").
+  Qed.
+
+  (* --------------------------------------------------------------------- *)
+  (* dup @0x3ea, ON A CLOSED STANDARD STREAM -- the arm where /init's        *)
+  (* console never opened.  Its C runs the two dups WHATEVER the second open *)
+  (* returned ([UInitCons.v]'s finding (a)), so this arm is walked, and what *)
+  (* it has to establish is that the LEDGER DID NOT MOVE.                    *)
+  (*                                                                        *)
+  (* WHAT THE ROW GIVES AND WHAT IT DOES NOT: the LEDGER comes back at the   *)
+  (* very list it went in at, and nothing is claimed about the return value  *)
+  (* ([UkRunSys.wp_uk_ecall_dup_closed]'s note -- the dup row carries no     *)
+  (* guard for a closed source).  That is all /init needs: its C reads       *)
+  (* neither dup result.                                                     *)
+  (* --------------------------------------------------------------------- *)
+  Lemma wp_kinit_dup_closed (h : CpuId) (m : regfile) (avail : nat)
+      (l : list fdstate) (fd0 : nat) :
+    bv_signed (trunc32 (m !!! Regidx a0_idx)) = Z.of_nat fd0 ->
+    (fd0 < NSTD)%nat ->
+    l !! fd0 = Some FdClosed ->
+    init_code γt -∗
+    urun N h m (mword_of_int InitSyms.dup) avail -∗
+    ustd γfd l -∗
+    (∀ (h' : CpuId) (ret : mword 64),
+       ustd γfd l -∗
+       urun N h'
+         (<[Regidx a0_idx := ret]>
+            (<[Regidx a7_idx := (mword_of_int 10 : mword 64)]> m))
+         (ret_pc (m !!! Regidx ra_idx)) avail -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Harg Hlt Hrow.
+    iIntros "#Hcode Hrun Hstd Hcont".
+    destruct init_syms_pins as (Hstart & Hmain & Hprintf & Hvprintf & Hputc & Hopen & Hmknod & Hdup & Hfork & Hwait & Hexec & Hwrite & Hexit). rewrite Hdup.
+    (* ---- 0x3ea  c.li a7,10 ---- *)
+    iApply (wp_uk_cli N h m (mword_of_int 0x3ea)
+              (mword_of_int 10 : mword 6) a7_idx avail
+              ltac:(unfold unot_sp; vm_compute; discriminate)
+              ltac:(vm_compute; discriminate) with "[] Hrun").
+    { iApply (uis_init_3ea with "Hcode"). }
+    assert (E0 : add_vec_int (mword_of_int 0x3ea : mword 64) 2
+                 = mword_of_int 0x3ec)
+      by (apply bv_eq; vm_compute; reflexivity).
+    assert (Em : <[Regidx a7_idx
+                   := regval_into_reg (sign_extend' 64 (mword_of_int 10 : mword 6)
+                                       : mword 64)]> m
+                 = <[Regidx a7_idx := (mword_of_int 10 : mword 64)]> m)
+      by (f_equal; apply bv_eq; vm_compute; reflexivity).
+    rewrite E0 Em.
+    iIntros (h1) "Hrun".
+    set (m1 := <[Regidx a7_idx := (mword_of_int 10 : mword 64)]> m).
+    assert (Harg1 : bv_signed (trunc32 (m1 !!! Regidx a0_idx)) = Z.of_nat fd0).
+    { unfold m1.
+      rewrite (upd_ne m (Regidx a7_idx) (Regidx a0_idx)
+                 (mword_of_int 10 : mword 64) ltac:(vm_compute; discriminate)).
+      exact Harg. }
+    assert (Hno : usysno m1 = USYS_dup).
+    { unfold m1, usysno.
+      rewrite (upd_eq m (Regidx a7_idx) (mword_of_int 10 : mword 64)).
+      vm_compute; reflexivity. }
+    (* ---- 0x3ec  ecall -- the CLOSED-source dup leaf ---- *)
+    iApply (wp_uk_ecall_dup_closed N h1 m1 (mword_of_int 0x3ec) l fd0 avail
+              Hno Harg1 Hlt Hrow
+              ltac:(vm_compute; reflexivity)
+              with "[] Hrun [] Hstd").
+    { iApply (uis_init_3ec with "Hcode"). }
+    { iApply udepw_of_psok; [ apply Hpsok | ];
+      (discriminate || assumption || (vm_compute; discriminate)). }
+    assert (E1 : add_vec_int (mword_of_int 0x3ec : mword 64) 4
+                 = mword_of_int 0x3f0)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite E1.
+    iIntros (h2 ret) "Hstd Hrun".
+    set (m2 := <[Regidx a0_idx := ret]> m1).
+    (* ---- 0x3f0  c.jr ra ---- *)
+    assert (Hra : m2 !!! Regidx ra_idx = m !!! Regidx ra_idx).
+    { unfold m2, m1.
+      exact (eq_trans
+               (upd_ne m1 (Regidx a0_idx) (Regidx ra_idx) ret
+                  ltac:(vm_compute; discriminate))
+               (upd_ne m (Regidx a7_idx) (Regidx ra_idx)
+                  (mword_of_int 10 : mword 64)
+                  ltac:(vm_compute; discriminate))). }
+    iApply (wp_uk_cjr N h2 m2 (mword_of_int 0x3f0) ra_idx
+              (ret_pc (m !!! Regidx ra_idx)) avail
+              ltac:(vm_compute; discriminate)
+              ltac:(rewrite Hra; reflexivity)
+              with "[] Hrun").
+    { iApply (uis_init_3f0 with "Hcode"). }
+    iIntros (h3) "Hrun".
+    iApply ("Hcont" $! h3 ret with "Hstd Hrun").
+  Qed.
+
+  (* --------------------------------------------------------------------- *)
+  (* THE SECOND OPEN, AT WHICHEVER OF THE MKNOD'S THREE ANSWERS CAME BACK.   *)
+  (* Three constructors for one shape, so the repair arm walks 0x74..0x82    *)
+  (* once instead of three times.                                            *)
+  (* --------------------------------------------------------------------- *)
+
+  (* the node exists: the PINNED open at the resolving pin *)
+  (* THE TAINT ARM IS THE SAME ON ALL THREE, so it is proved once: there is
+     no pin to run on, the generic stub walks the call, and the head's
+     third arm is what comes out. *)
+  Lemma uki_open2_taint_arm (T : iProp Σ) `{!Persistent T} (stc : fdstate) :
+    T -∗ uki_open2 T stc.
+  Proof.
+    rewrite /uki_open2 /uki_open2_in.
+    iIntros "#Ht" (h m avail) "#Hcode Hrun Hcwd Hin Hcont".
+    iApply (wp_kinit_open h m avail with "Hcode Hrun [Hin]").
+    { iDestruct "Hin" as "[H | [H _]]"; [ by iExists ufd_l0 | iExact "H" ]. }
+    iIntros (h' ret) "Hstd Hrun".
+    iApply ("Hcont" $! h' ret with "[Hstd] Hcwd Hrun").
+    iDestruct "Hstd" as (l) "H". iApply (ufd_head_taint with "Ht H").
+  Qed.
+
+  (* the node exists: the PINNED open at the resolving pin.  Its taint arm
+     is the lemma above, because under the taint there is no pin. *)
+  Lemma uki_open2_of_console (T : iProp Σ) `{!Persistent T} (stc : fdstate) :
+    uki_open_console_leaf T stc -∗ uki_open2 T stc.
+  Proof.
+    iIntros "Hlf".
+    rewrite /uki_open2 /uki_open2_in.
+    iIntros (h m avail) "#Hcode Hrun Hcwd Hin Hcont".
+    iDestruct "Hin" as "[Hstd | [Hstd #Ht]]"; last first.
+    { iDestruct (uki_open2_taint_arm T stc with "Ht") as "Hop".
+      rewrite /uki_open2 /uki_open2_in.
+      iApply ("Hop" $! h m avail with "Hcode Hrun Hcwd [Hstd] Hcont").
+      iRight. iFrame "Hstd Ht". }
+    iApply ("Hlf" $! h m avail with "Hcode Hrun Hcwd Hstd").
+    iIntros (h' ret) "Hans Hcwd Hrun".
+    iApply ("Hcont" $! h' ret with "[Hans] Hcwd Hrun").
+    iDestruct "Hans" as "[[_ H] | [[_ H] | [H Ht]]]".
+    - iApply (ufd_head_l1 with "H").
+    - iApply (ufd_head_closed with "H").
+    - iDestruct "H" as (l) "H". iApply (ufd_head_taint with "Ht H").
+  Qed.
+
+  (* the mknod failed and handed the credential back: the MISS pin again,
+     and fd 0 stays closed *)
+  Lemma uki_open2_of_absent (T K : iProp Σ) `{!Persistent T} (stc : fdstate) :
+    uki_open_absent_leaf T K -∗ K -∗ uki_open2 T stc.
+  Proof.
+    iIntros "Hlf HK".
+    rewrite /uki_open2 /uki_open2_in.
+    iIntros (h m avail) "#Hcode Hrun Hcwd Hin Hcont".
+    iDestruct "Hin" as "[Hstd | [Hstd #Ht]]"; last first.
+    { iDestruct (uki_open2_taint_arm T stc with "Ht") as "Hop".
+      rewrite /uki_open2 /uki_open2_in.
+      iApply ("Hop" $! h m avail with "Hcode Hrun Hcwd [Hstd] Hcont").
+      iRight. iFrame "Hstd Ht". }
+    iApply ("Hlf" $! h m ufd_l0 avail with "Hcode Hrun Hcwd Hstd HK").
+    iIntros (h' ret) "Hans Hcwd Hrun".
+    iApply ("Hcont" $! h' ret with "[Hans] Hcwd Hrun").
+    iDestruct "Hans" as "[(_ & H & _) | [H Ht]]".
+    - iApply (ufd_head_closed with "H").
+    - iDestruct "H" as (l) "H". iApply (ufd_head_taint with "Ht H").
+  Qed.
+
+  (* --------------------------------------------------------------------- *)
+  (* dup(0), ON THE HEAD -- ONE lemma for both of /init's dups and all three *)
+  (* arms.  The head is CLOSED under it: on the console arm the copy lands   *)
+  (* on the lowest CLOSED slot, which is never slot 0                        *)
+  (* ([UInitFd.ufd_after_row0]), and a dup that FAILS moves nothing; on the  *)
+  (* closed arm both dups fail on a closed descriptor and the ledger does    *)
+  (* not move; on the taint arm the untracked leaf moves the authority and   *)
+  (* names nothing.                                                          *)
+  (* --------------------------------------------------------------------- *)
+  Lemma wp_kinit_dup_head (T : iProp Σ) (stc : fdstate)
+      (h : CpuId) (m : regfile) (avail : nat) :
+    stc <> FdClosed ->
+    bv_signed (trunc32 (m !!! Regidx a0_idx)) = Z.of_nat 0 ->
+    init_code γt -∗
+    urun N h m (mword_of_int InitSyms.dup) avail -∗
+    ufd_head T stc γfd -∗
+    (∀ (h' : CpuId) (ret : mword 64),
+       ufd_head T stc γfd -∗
+       urun N h'
+         (<[Regidx a0_idx := ret]>
+            (<[Regidx a7_idx := (mword_of_int 10 : mword 64)]> m))
+         (ret_pc (m !!! Regidx ra_idx)) avail -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hne Harg.
+    iIntros "#Hcode Hrun Hhd Hcont".
+    rewrite /ufd_head /ufd_std_at.
+    iDestruct "Hhd" as "[H | [H | [H Ht]]]".
+    - (* CONSOLE: the TRACKED leaf, and the ledger decides where it lands *)
+      iDestruct "H" as (l) "[Hstd %Hrow]".
+      iApply (wp_kinit_dup_cons h m avail l 0%nat stc Harg Hne
+                ltac:(unfold NSTD; lia) Hrow with "Hcode Hrun Hstd").
+      iIntros (h' ret) "Hal Hrun".
+      iApply ("Hcont" $! h' ret with "[Hal] Hrun").
+      iDestruct "Hal" as "[Hs | [_ Hl]]".
+      + iDestruct "Hs" as (fd1) "[_ Ha]".
+        iDestruct (ualloc_ledger with "Ha") as "Hl".
+        iApply (ufd_head_at T stc γfd (ustd_after l stc)
+                  (ufd_after_row0 l stc Hne Hrow) with "Hl").
+      + iApply (ufd_head_at T stc γfd l Hrow with "Hl").
+    - (* CLOSED: the source is a closed standard stream *)
+      iApply (wp_kinit_dup_closed h m avail ufd_l0 0%nat Harg
+                ltac:(unfold NSTD; lia) ufd_l0_row0 with "Hcode Hrun H").
+      iIntros (h' ret) "Hstd Hrun".
+      iApply ("Hcont" $! h' ret with "[Hstd] Hrun").
+      iApply (ufd_head_closed with "Hstd").
+    - (* TAINT: nothing is named, so the untracked leaf is the honest one *)
+      iApply (wp_kinit_dup h m avail with "Hcode Hrun H").
+      iIntros (h' ret) "Hstd Hrun".
+      iApply ("Hcont" $! h' ret with "[Ht Hstd] Hrun").
+      iDestruct "Hstd" as (l) "Hstd". iApply (ufd_head_taint with "Ht Hstd").
   Qed.
 
   Lemma wp_kinit_write (h : CpuId) (m : regfile) (avail : nat) :

@@ -73,6 +73,11 @@ Require Import IrefSlots.
 Require Import ProcAvail.
 Require Import FileInvDefs.
 Require Import UserFd.             (* [ustd], [ualloc], [fd_lowest_closed] *)
+Require Import UInitFd.            (* the prologue's ledger rows and INIT'S
+                                      HEAD, at an ABSTRACT descriptor -- the
+                                      program tier ([UkInit], [UkInitMain])
+                                      names the same rows at a section
+                                      variable *)
 Require Import PathElems.          (* [path_elems] *)
 Require Import FsTree.             (* [fname] *)
 Require Import FsBlocks.
@@ -714,10 +719,10 @@ Section UInitCons.
      and nothing else, so the ledger is [take NSTD fdt0] -- THREE closed
      descriptors -- and NOT [FdSlots.fdt0], which is [NOFILE] of them and
      which [ustd] refutes by length -- see the header's finding (d). *)
-  Definition init_cons_l0 : list fdstate := take NSTD fdt0.
+  Definition init_cons_l0 : list fdstate := ufd_l0.
 
   Lemma init_cons_l0_len : length init_cons_l0 = NSTD.
-  Proof. reflexivity. Qed.
+  Proof. exact ufd_l0_len. Qed.
 
   (* the console descriptor /init's open and its two dups install *)
   Definition init_cons_fd : fdstate := FdOpen true true (FdDevice CONSOLE).
@@ -725,10 +730,7 @@ Section UInitCons.
   (* THE LEDGER THE PROLOGUE LEAVES ON THE GOOD PATH: the open lands at 0
      and the two dups at 1 and 2, each decided by the ledger itself
      ([UserFd.ualloc]'s lowest-free discipline) and not by the kernel. *)
-  Definition init_cons_l3 : list fdstate :=
-    <[2%nat := init_cons_fd]>
-      (<[1%nat := init_cons_fd]>
-         (<[0%nat := init_cons_fd]> init_cons_l0)).
+  Definition init_cons_l3 : list fdstate := ufd_l3 init_cons_fd.
 
   (* the three scans, by computation: this is what turns
      [UserFd.ualloc]'s two arms into ONE at each of init's three calls. *)
@@ -855,37 +857,51 @@ Section UInitCons.
      init's FIRST open went through the generic leaf and its success arm
      was not refutable; §5 refutes it -- at era 0 that open's walk provably
      misses, so it returns [-1] and the repair arm runs. *)
+  (* ...AND IT IS [UInitFd.ufd_head] AT THIS ERA'S TWO CHOICES: the taint is
+     echo's ([AppEcho.echo_taint]) and the descriptor is the console device
+     the pinned open installed.  The rows themselves are stated at an
+     ABSTRACT descriptor one file down, because /init's own WALK
+     ([UkInit], [UkInitMain]) has to name them too and the program tier
+     names no application ([UConsLine.v:202]). *)
   Definition init_cons_head (γcl : echo_fixed) (γfd : gname) : iProp Σ :=
-    (init_std_cons γfd init_cons_l3
-     ∨ ustd γfd init_cons_l0
-     ∨ ((∃ l : list fdstate, ustd γfd l) ∗ echo_taint γcl))%I.
+    ufd_head (echo_taint γcl) init_cons_fd γfd.
 
-  (* the two readings the callers take: sh's entry consumes either of the
+  (* the three readings the callers take: sh's entry consumes either of the
      first two ([UConsLine.ush_std_cons] is the CONSOLE one), and the fork
      hands the child the same list at a fresh name. *)
   Lemma init_cons_head_console (γcl : echo_fixed) (γfd : gname) :
-    init_std_cons γfd init_cons_l3 -∗ init_cons_head γcl γfd.
-  Proof. iIntros "H". rewrite /init_cons_head. by iLeft. Qed.
+    ustd γfd init_cons_l3 -∗ init_cons_head γcl γfd.
+  Proof. iIntros "H". iApply (ufd_head_l3 with "H"). Qed.
 
   Lemma init_cons_head_closed (γcl : echo_fixed) (γfd : gname) :
     ustd γfd init_cons_l0 -∗ init_cons_head γcl γfd.
-  Proof. iIntros "H". rewrite /init_cons_head. iRight. by iLeft. Qed.
+  Proof. iIntros "H". iApply (ufd_head_closed with "H"). Qed.
 
   Lemma init_cons_head_taint (γcl : echo_fixed) (γfd : gname)
       (l : list fdstate) :
     echo_taint γcl -∗ ustd γfd l -∗ init_cons_head γcl γfd.
-  Proof.
-    iIntros "#Ht H". rewrite /init_cons_head. iRight. iRight.
-    iSplitL "H"; [ by iExists l | iExact "Ht" ].
-  Qed.
+  Proof. iIntros "#Ht H". iApply (ufd_head_taint with "Ht H"). Qed.
 
   (* ...and the ledger every arm carries, which is what the two [dup]
      leaves and the fork are stated over. *)
   Lemma init_cons_head_ledger (γcl : echo_fixed) (γfd : gname) :
     init_cons_head γcl γfd -∗ ∃ l : list fdstate, ustd γfd l.
+  Proof. iIntros "H". iApply (ufd_head_ledger with "H"). Qed.
+
+  (* ...AND WHAT SH-LINE READS OFF THE CONSOLE ARM: row 0 is an OPEN
+     READABLE CONSOLE DEVICE ([UConsLine.ush_std_cons]'s own shape).  The
+     ledger is EXISTENTIAL because /init cannot rule out a failing dup
+     ([UInitFd.ufd_head]'s note); what it CAN say is the row sh reads its
+     line from. *)
+  Lemma init_std_cons_of_head (γcl : echo_fixed) (γfd : gname) :
+    init_cons_head γcl γfd -∗
+    (∃ l : list fdstate, init_std_cons γfd l)
+    ∨ ustd γfd init_cons_l0 ∨ (ustd_any γfd ∗ echo_taint γcl).
   Proof.
-    rewrite /init_cons_head /init_std_cons.
-    iIntros "[[H _] | [H | [H _]]]"; [ by iExists _ | by iExists _ | iExact "H" ].
+    rewrite /init_cons_head /ufd_head /ufd_std_at /init_std_cons.
+    iIntros "[H | H]"; [| by iRight ].
+    iDestruct "H" as (l) "[H %Hr]". iLeft. iExists l. iFrame "H".
+    iPureIntro. exists true. exact Hr.
   Qed.
 
   (* =================================================================== *)
@@ -912,5 +928,173 @@ Section UInitCons.
   (*  UNARM leg is not, and cannot be at this bundle shape -- see the      *)
   (*  note at [init_cons_mknod_bundle].                                    *)
   (* =================================================================== *)
+
+  (* =================================================================== *)
+  (*  9.  THE LAWS, AS ONE BUNDLE -- AND ECHO'S DISCHARGE                 *)
+  (*                                                                      *)
+  (*  Every lemma in SS3, SS5 and SS6 takes the application's laws as        *)
+  (*  PREMISES, because this file is stated over the AMBIENT [appcfg] and  *)
+  (*  only an era whose record is echo's can name [AppEcho]'s.  There are  *)
+  (*  eight of them for the mknod step plus the PRESENT claim law the      *)
+  (*  second open runs on, and passing nine wands at three call sites is   *)
+  (*  how a premise list rots -- so they are bundled here, ONCE, and the   *)
+  (*  three bundles above are restated against the bundle.                 *)
+  (*                                                                      *)
+  (*  ALL NINE ARE [□], so the bundle is PERSISTENT: it is a constant of   *)
+  (*  the era, not a resource /init spends.  What /init spends is the KEY  *)
+  (*  ([AppEcho.cons_key]), which enters beside it.                        *)
+  (*                                                                      *)
+  (*  WHERE THEY COME FROM: [init_cons_laws_echo] below, out of the nine   *)
+  (*  named [AppEcho] lemmas, under the era's record equation -- the       *)
+  (*  [file_app = MkAppcfg …] premise [App.xv6_app_adequacy]'s             *)
+  (*  [Hinit_boot] already carries and E2's boot arm supplies.  THE KEY    *)
+  (*  ENTERS THE SAME WAY: [AppEcho.echo_init_key] is the era-0 claim WITH *)
+  (*  the key beside it, and E2's boot arm routes it into /init's entry    *)
+  (*  ([UkInitMain.wp_kinit_start_body]'s [K] premise).                    *)
+  (* =================================================================== *)
+  Definition init_cons_laws (T K : iProp Σ) (r : echo_names) : iProp Σ :=
+    ((* (a) the supply, off the taint *)
+     □ (T -∗ app_sup)
+     (* (b) the claim's PURE half, read off without spending it *)
+     ∗ □ (∀ v : aview, app_pred app_run v -∗
+            app_pred app_run v ∗ (⌜echo_fs_pure v⌝ ∨ T))
+     (* (c) the ABSENCE law at the key -- what the FIRST open runs on *)
+     ∗ init_cons_abs_law T K
+     (* (d) the arm leg *)
+     ∗ □ (∀ (av : aview) (i : Z), ⌜av !! i = None⌝ -∗
+            app_pred app_run av -∗
+            app_pred app_run (delta_arm i (ADev CONSOLE 0) av))
+     (* (e) the unarm leg *)
+     ∗ □ (∀ (av0 av : aview) (i : Z),
+            ⌜av0 !! i = None⌝ -∗ ⌜echo_fs_pure av0⌝ -∗ ⌜cons_absent av⌝ -∗
+            app_pred app_run av -∗
+            app_pred app_run (delta_unarm i av))
+     (* (f) the console's OWN create: the key goes in, the state moves *)
+     ∗ □ (∀ (av : aview) (ents : gmap fname Z) (nl : nat) (i : Z),
+            ⌜cre_pre av FsImg.ROOTINO fname_console ents nl i (ADev CONSOLE 0)⌝ -∗
+            K -∗ app_pred app_run av -∗
+            app_pred app_run (delta_create FsImg.ROOTINO fname_console i
+                                (ADev CONSOLE 0) av))
+     (* (g) any other create the call could have reached *)
+     ∗ □ (∀ (av : aview) (d : Z) (nmn : fname) (ents : gmap fname Z)
+            (nl : nat) (i : Z),
+            ⌜cre_pre av d nmn ents nl i (ADev CONSOLE 0)⌝ -∗
+            ⌜d <> FsImg.ROOTINO \/ nmn <> fname_console⌝ -∗
+            app_pred app_run av -∗
+            app_pred app_run (delta_create d nmn i (ADev CONSOLE 0) av))
+     (* (h) the SHOOT: phase 2 of the commit, and the flag out *)
+     ∗ □ (∀ (av : aview) (i : Z), ⌜cons_present_at i av⌝ -∗
+            app_pred app_run av ==∗
+            app_pred app_run av ∗ (cons_made r i ∨ T))
+     (* (i) ...AND THE PRESENT LAW THE SECOND OPEN RUNS ON.  Not one of the
+        mknod step's eight: it is a CONSEQUENCE of the flag the step mints,
+        and it is what turns the flag into the pin the resolving open is
+        stated at. *)
+     ∗ □ (∀ i : Z, cons_made r i -∗
+            □ (∀ v : aview, app_pred app_run v -∗
+                 app_pred app_run v ∗ (⌜cons_present_at i v⌝ ∨ T))))%I.
+
+  Global Instance init_cons_laws_persistent (T K : iProp Σ) (r : echo_names) :
+    Persistent (init_cons_laws T K r).
+  Proof. rewrite /init_cons_laws. apply _. Qed.
+
+  (* ---- the three bundles, restated against the bundle ---- *)
+
+  Lemma init_cons_laws_mknod_bundle (γfs : fs_names) (r : echo_names)
+      (T K : iProp Σ) `{!Persistent T} `{!Timeless T} `{!Timeless K}
+      `{HTL : forall v : aview, Timeless (app_pred app_run v)}
+      (M : gmap Z (bv 8)) (pv : mword 64) :
+    arg_path_of M pv init_cons_pl ->
+    init_cons_laws T K r -∗
+    app_inv γfs -∗
+    K -∗
+    mknod_au_at (fs_gamma_L γfs) γfs FsImg.ROOTINO M pv CONSOLE 0
+      (init_mk_P T) (fun _ _ => True%I)
+      (init_mk_Farm T K) (init_mk_Fun T K) (init_mk_Fok r T K) init_mk_Fex.
+  Proof.
+    intros Hpath. rewrite /init_cons_laws.
+    iIntros "(#Ha & #Hb & #Hc & #Hd & #He & #Hf & #Hg & #Hh & _) #Hinv HK".
+    iApply (init_cons_mknod_bundle γfs r T K M pv Hpath
+              with "Ha Hb Hc Hd He Hf Hg Hh Hinv HK").
+  Qed.
+
+  Lemma init_cons_laws_open_absent (γfs : fs_names) (r : echo_names)
+      (T K : iProp Σ) `{!Persistent T} `{!Timeless T}
+      (Pmiss : nat -> Z -> iProp Σ)
+      (M : gmap Z (bv 8)) (pv vom : mword 64)
+      (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
+      (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) :
+    om_arg vom = 2 ->
+    arg_path_of M pv init_cons_pl ->
+    init_cons_laws T K r -∗
+    pobs_miss_free Pmiss -∗
+    app_inv γfs -∗
+    K -∗
+    open_in (fs_gamma_L γfs) γfs FsImg.ROOTINO M pv vom
+      (pobs_P_dead T FsImg.ROOTINO) Pmiss Farm Fun Fok Fex
+      (pfam_triv (fun (_ : aview) (_ : Z) (_ : anode) => True%I)) Ft.
+  Proof.
+    intros Hom Hpath. rewrite /init_cons_laws.
+    iIntros "(_ & _ & #Hc & _) #Hfree #Hinv HK".
+    iApply (init_cons_open_bundle_absent γfs T K Pmiss M pv vom Ft
+              Farm Fun Fok Fex Hom Hpath with "Hc Hfree Hinv HK").
+  Qed.
+
+  Lemma init_cons_laws_open_console (γfs : fs_names) (r : echo_names)
+      (T K : iProp Σ) `{!Persistent T} `{!Timeless T} (i : Z)
+      (M : gmap Z (bv 8)) (pv vom : mword 64)
+      (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
+      (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) :
+    om_arg vom = 2 ->
+    arg_path_of M pv init_cons_pl ->
+    init_cons_laws T K r -∗
+    cons_made r i -∗
+    app_inv γfs -∗
+    open_in (fs_gamma_L γfs) γfs FsImg.ROOTINO M pv vom
+      (pobs_P T [FsImg.ROOTINO; i]) (pobs_Pmiss T) Farm Fun Fok Fex
+      (pobs_Fo (cons_present_at i) T) Ft.
+  Proof.
+    intros Hom Hpath. rewrite /init_cons_laws.
+    iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & #Hi) #Hm #Hinv".
+    iDestruct ("Hi" $! i with "Hm") as "#Hcl".
+    iApply (init_cons_open_bundle_rdwr γfs T i M pv vom Ft
+              Farm Fun Fok Fex Hom Hpath with "Hcl Hinv").
+  Qed.
+
+  (* ---- AND THE DISCHARGE, at an era whose record is echo's ---- *)
+  (*
+     THE RECORD EQUATION IS THE PREMISE, and the rewrite goes FIRST, before
+     anything typed at [app_names file_app] is introduced -- [App.
+     app_triv_init_boot] is the precedent and its note says why (the names
+     are a FIELD of the record, so rewriting under a term of that type is a
+     dependent rewrite).  After it every conjunct is one of [AppEcho]'s
+     nine lemmas at [echo_pred γ] and the era's own instance [r].
+  *)
+  Lemma init_cons_laws_echo (γ : echo_fixed) (r : echo_names) :
+    file_app = MkAppcfg echo_names (echo_pred γ) r ->
+    ⊢ init_cons_laws (echo_taint γ) (cons_key r) r.
+  Proof.
+    intros Heq. rewrite /init_cons_laws /init_cons_abs_law.
+    rewrite Heq. rewrite /app_sup. cbn [app_pred app_run app_names].
+    iSplit; [| iSplit; [| iSplit; [| iSplit; [| iSplit; [| iSplit;
+      [| iSplit; [| iSplit ]]]]]]].
+    - iIntros "!> #Ht". iApply (echo_sup_of_taint γ r with "Ht").
+    - iIntros "!>" (v) "Hp". iApply (echo_fs_pure_acc γ r v with "Hp").
+    - iApply (echo_cons_abs_law γ r).
+    - iIntros "!>" (av i) "%Hfree Hp".
+      iApply (echo_cons_arm γ r av i CONSOLE 0 Hfree with "Hp").
+    - iIntros "!>" (av0 av i) "%Hfree %Hp0 %Hab Hp".
+      iApply (echo_cons_unarm γ r av0 av i Hfree Hp0 Hab with "Hp").
+    - iIntros "!>" (av ents nl i) "%Hpre Hk Hp".
+      iApply (echo_cons_mknod γ r av ents nl i Hpre with "Hk Hp").
+    - iIntros "!>" (av d nmn ents nl i) "%Hpre %Hne Hp".
+      iApply (echo_cons_create_other γ r av d nmn ents nl i CONSOLE 0
+                Hpre Hne with "Hp").
+    - iIntros "!>" (av i) "%Hpr Hp".
+      iApply (echo_cons_shoot γ r av i Hpr with "Hp").
+    - iIntros "!>" (i) "#Hm". iApply (echo_cons_law γ r i with "Hm").
+  Qed.
 
 End UInitCons.

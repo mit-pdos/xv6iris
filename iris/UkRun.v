@@ -545,6 +545,65 @@ Section UkRun.
       | by iModIntro ].
   Qed.
 
+
+  (* THE FAMILY-NAMED DEPOSIT AT A FIXED WORKING DIRECTORY.
+     [udepwf] is to [udepw] what this is to [udepw_at]: the two axes are
+     INDEPENDENT and a PINNED OPEN needs both at once.
+
+       NAMING THE FAMILY is what a leaf that HANDS THE POST BACK needs --
+         the program reads its receipt at the family it deposited, and
+         [udepw]'s existential loses it ([udepwf]'s note).
+       FIXING THE CWD is what a PINNED bundle needs -- a pin is about a
+         PATH, and "console" names a file only relative to the directory it
+         is resolved from, so a supplier built out of
+         [PinnedOpen.pinned_open_bundle] can answer at ONE [cw] and no
+         other.  [udepwf]'s own ∀ binds [cw], so it cannot be supplied.
+
+     THE LOAN IS [udepw_at]'s, for its reason: a pinned open owes
+     [ArgPath.arg_path_of M pv pl] -- the path string read out of the
+     program's own rodata through [UserHeap.uheap_text] -- which is a fact
+     about the very key the bundle is stated at.  The agreement between the
+     [c] here and the key's own cwd happens in the LEAF, which has
+     destructed [urun] and holds both halves ([UkRunSys.
+     wp_uk_ecall_exec_at_cwd] is the landed instance of that move). *)
+  Definition udepwf_at (N : uk_names Σ) (m : regfile) (pc : mword 64)
+      (n : Z) (fdep : sfam) (c : Z) : iProp Σ :=
+    (⌜sexit_pay fdep = ukn_pay N⌝ ∗
+     ∀ (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (sz : Z)
+       (fdv : list fdstate) (gn : gname) (cs : gset gname) (pidv : mword 32),
+       my_pay gn (ukn_pay N) -∗
+       uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗ ufd_auth (ukn_fd N) fdv -∗
+       uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz ∗ ufd_auth (ukn_fd N) fdv ∗
+       sbundle_at uslot n fdep (uvis_of_run m pc M pm sz fdv c gn cs pidv))%I.
+
+  (* [udepwf] IS THE ∀-CWD FORM, in the direction a caller that has one
+     needs -- [udepw_at_of_udepw]'s twin, and stated rather than made the
+     definition for the same reason: the ∀-ORDER at [udepwf]'s use sites
+     stays put. *)
+  Lemma udepwf_at_of_udepwf (N : uk_names Σ) (m : regfile) (pc : mword 64)
+      (n : Z) (fdep : sfam) (c : Z) :
+    udepwf N m pc n fdep -∗ udepwf_at N m pc n fdep c.
+  Proof.
+    rewrite /udepwf /udepwf_at. iIntros "[%Hpay Hd]".
+    iSplitR; [ done |].
+    iIntros (M pm sz fdv gn cs pidv) "Hmp Hh Hf".
+    iApply ("Hd" $! M pm sz fdv c gn cs pidv with "Hmp Hh Hf").
+  Qed.
+
+  (* ...AND THE FORGETFUL DIRECTION, which is what a leaf that DISCARDS its
+     post takes: [udepw_at]'s explicit disjunct at the named family. *)
+  Lemma udepwf_at_udepw_at (N : uk_names Σ) (m : regfile) (pc : mword 64)
+      (n : Z) (fdep : sfam) (c : Z) :
+    udepwf_at N m pc n fdep c -∗ udepw_at N m pc n c.
+  Proof.
+    rewrite /udepwf_at /udepw_at. iIntros "[%Hpay Hd]".
+    iIntros (M pm sz fdv gn cs pidv) "Hmp Hh Hf".
+    iDestruct ("Hd" $! M pm sz fdv gn cs pidv with "Hmp Hh Hf")
+      as "(Hh & Hf & Hb)".
+    iFrame "Hh Hf". iRight. iExists fdep.
+    iSplitR; [ done | iExact "Hb" ].
+  Qed.
+
   Definition urun (N : uk_names Σ) (h : CpuId) (m : regfile) (pc : mword 64)
       (avail : nat) : iProp Σ :=
     (∃ (xi : TsoCtx.CurCtx) (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)

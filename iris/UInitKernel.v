@@ -68,6 +68,7 @@ Require Import UserHeap.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Import UserFd.
+Require Import UInitFd.    (* [ufd_l0] -- /init's all-closed entry ledger *)
 Require Import UCodeInit UkInit UkInitMain.
 Require Import UkRun.          (* [udep] / [uslot_of_urun_all] / [urun] *)
 Require Import PageGeom.       (* [PGSIZE] *)
@@ -192,7 +193,9 @@ Section UInitKernel.
   (* ------------------------------------------------------------------- *)
   (* SS1 THE DEPOSIT: init's entry conditions on a key.                    *)
   (* ------------------------------------------------------------------- *)
-  Lemma init_uexec_slot (W : uvis) (n0 : nat) :
+  Lemma init_uexec_slot (T K : iProp Σ) `{!Persistent T} (stc : fdstate)
+      (W : uvis) (n0 : nat) :
+    stc <> FdClosed ->
     tf_resume_pc (uvis_tf W) = (mword_of_int InitSyms.start : mword 64) ->
     init_img_sub (uvis_M W) ->
     (* init's whole image is one executable page *)
@@ -219,6 +222,12 @@ Section UInitKernel.
                      - 8 * Z.of_nat (2 + (4 + (12 + (12 + (4 + n0)))))
                      + Z.of_nat j)%Z)) ->
     length (uvis_fd W) = NOFILE ->
+    (* THE ENTRY LEDGER IS ALL-CLOSED.  <init> is userinit's process and
+       userinit parks it at [FdSlots.fdt0], whose low [NSTD] slots are
+       [UInitFd.ufd_l0] -- but no lemma below this constructor states it,
+       so it is an obligation HERE, on [uvis_cwd W = ROOTINO]'s footing,
+       and ARM-c / E2 discharges it from userinit's own table. *)
+    take NSTD (uvis_fd W) = ufd_l0 ->
     (* the map stops at the break -- [UkRun.uslot_of_urun_all]'s own premise *)
     (forall (p : mword 27) (q : uperm), uvis_perm W !! p = Some q ->
        bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W)) ->
@@ -235,6 +244,12 @@ Section UInitKernel.
        exec("sh", argv): its OWN, at its own two argument registers and at
        the root, not the generic bundle at every key. *)
     UkInit.init_exec_sup -∗
+    (* ...AND THE TWO PINNED CONSOLE LEAVES, at whatever record the entry
+       carve mints, beside the ABSENCE CREDENTIAL /init's first open runs
+       on ([AppEcho.cons_key] at echo's era, handed over by E2's boot arm
+       with the era-0 claim -- [AppEcho.echo_init_key]). *)
+    □ (∀ N : uk_names Σ, UkInit.init_cons_leaves N T K stc) -∗
+    K -∗
     (* THE PAY FACT, at the trivial payload: <init> has no parent, so its
        exit owes nobody anything -- userinit's choice, which the entry
        constructor writes into the record ([UkRun.ukn_pay]) and which
@@ -250,8 +265,8 @@ Section UInitKernel.
     my_pay (uvis_gen W) (fun _ => True)%I -∗
     uslot W.
   Proof.
-    intros Hpc Hsub Hx Hwd Hszd Hbase Hal8 Hroom Hstk Hfdlen Hstop Hcw Hpsok.
-    iIntros "#Hdep #Hxs #Hmp".
+    intros Hne Hpc Hsub Hx Hwd Hszd Hbase Hal8 Hroom Hstk Hfdlen Hl0 Hstop Hcw Hpsok.
+    iIntros "#Hdep #Hxs #Hcl HK #Hmp".
     iApply (uslot_of_urun_all W (2 + (4 + (12 + (12 + (4 + n0))))) (fun _ => True)%I
               Hal8 Hroom Hstk Hfdlen Hstop with "Hdep Hmp []").
     (* the payload at the trivial one -- <init> has no parent *)
@@ -282,15 +297,16 @@ Section UInitKernel.
       as "Dargv".
     iMod (uarea_persist (ukn_d N) init_argv_map with "Dargv") as "#Hargv".
     rewrite Hpc.
-    iApply (wp_kinit_start N Hpsok (uvis_sz W) h
-              (tf_resume_gpr0 (uvis_tf W)) n0
-              with "[] Hxs [] [] Hszf [Hstd] [Hcwf] [Hchf] Hrun").
+    iApply (wp_kinit_start N Hpsok T K stc (uvis_sz W) h
+              (tf_resume_gpr0 (uvis_tf W)) n0 Hne
+              with "[] Hxs [] [] [] Hszf [Hstd] HK [Hcwf] [Hchf] Hrun").
     - iApply (init_code_of_text (ukn_t N) (uvis_M W) (uvis_perm W)
                 (init_img_text _ Hsub) Hx with "Ht").
+    - iApply ("Hcl" $! N).
     - iApply (init_rodata_of_text (ukn_t N) (uvis_M W) (uvis_perm W)
                 (init_img_data _ Hsub) Hx with "Ht").
     - rewrite /init_argv. iExact "Hargv".
-    - iExists (take NSTD (uvis_fd W)). iExact "Hstd".
+    - rewrite <- Hl0. iExact "Hstd".
     - rewrite <- Hcw. iExact "Hcwf".
     - iApply (uch_any_of with "Hchf").
   Qed.
@@ -298,15 +314,19 @@ Section UInitKernel.
   (* ------------------------------------------------------------------- *)
   (* SS2 THE BRIDGE from the kernel's image fact.                          *)
   (* ------------------------------------------------------------------- *)
-  Lemma init_slot_of_kexec (na : nat) (alen : nat -> nat)
+  Lemma init_slot_of_kexec (T K : iProp Σ) `{!Persistent T} (stc : fdstate)
+      (na : nat) (alen : nat -> nat)
       (afun : nat -> nat -> bv 8) (sts : list fdstate)
       (W' : uvis) (n0 : nat) :
+    stc <> FdClosed ->
     kexec_image_ok ElfUser.init_elf na alen afun sts W' ->
     (* room for init's frames on the stack page, below the argument block *)
     kexec_sz ElfUser.init_elf - PGSIZE
       + 8 * Z.of_nat (2 + (4 + (12 + (12 + (4 + n0)))))
       <= kxc_sp_final (kexec_sz ElfUser.init_elf) alen na ->
     length sts = NOFILE ->
+    (* the entry ledger is all-closed: see [init_uexec_slot] *)
+    take NSTD sts = ufd_l0 ->
     (* THE PROCESS IS AT THE ROOT.  userinit's [namei("/")] is what put it
        there, and this is the one entry premise the image fact does not
        carry -- exec does not chdir, so the key's [uvis_cwd] is whatever
@@ -315,9 +335,11 @@ Section UInitKernel.
     (forall k : Z, k <> USYS_exec -> psok k) ->
     (* the pay fact, passed straight through: see [init_uexec_slot] *)
     udep -∗ UkInit.init_exec_sup -∗
+    □ (∀ N : uk_names Σ, UkInit.init_cons_leaves N T K stc) -∗
+    K -∗
     my_pay (uvis_gen W') (fun _ => True)%I -∗ uslot W'.
   Proof.
-    intros Hok Hroom Hlen Hcw Hpsok.
+    intros Hne Hok Hroom Hlen Hl0 Hcw Hpsok.
     (* THE MAP STOPS AT THE BREAK, off the image fact's own row --
        [UShKernel.sh_slot_of_kexec]'s note is the reasoning. *)
     pose proof (kexec_image_ok_below _ _ _ _ _ _ Hok) as Hstop.
@@ -393,7 +415,7 @@ Section UInitKernel.
               0x3000 <= spv - 8 * Z.of_nat (2 + (4 + (12 + (12 + (4 + n0)))))
                         + Z.of_nat j < spv)
       by (intros j Hj; clear -Hj Hroom; lia).
-    iApply (init_uexec_slot W' n0).
+    iApply (init_uexec_slot T K stc W' n0 Hne).
     - rewrite Hpc. exact init_start_pc.
     - exact (init_img_sub_of_elf M Himg).
     - exact Hx.
@@ -408,6 +430,7 @@ Section UInitKernel.
       + apply Hwstk. split; [ exact Hj0 | clear -Hj1 Hspv; lia ].
       + rewrite Hszv. clear -Hj1 Hspv; lia.
     - rewrite Hfd. exact Hlen.
+    - rewrite Hfd. exact Hl0.
     - exact Hstop.
     - exact Hcw.
     - exact Hpsok.

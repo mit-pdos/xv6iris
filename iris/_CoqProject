@@ -538,6 +538,14 @@ FdSlots.v
 # rides inside [UkRun.urun], the handles are what a user-level proof carries.
 # Distinct from FdSlots' kernel/process split -- see UserFd.v's header.
 UserFd.v
+# UInitFd = /init's console ledger rows, at an ABSTRACT descriptor state:
+# the four ledgers its prologue passes through, the three [fdalloc] scans
+# that decide which descriptor each call returns, the source claim its two
+# dups hand in, and INIT'S HEAD -- the three arms (CONSOLE / CLOSED /
+# TAINT) its fork hands the shell.  Below both tiers that name them: the
+# program walk (UkInit, UkInitMain) instantiates the descriptor at a
+# section variable, the application (UInitCons) at the console device.
+UInitFd.v
 # ...and the PROGRAM's own working directory (the cwd), one ghost variable
 # split in half: the engine's half rides inside [UkRun.urun] at the key's
 # [uvis_cwd], the program's half is what a proof carries and hands to the
