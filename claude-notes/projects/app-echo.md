@@ -2597,6 +2597,39 @@ TX-RECEIPT's `tx_claim` so the two lanes merge by juxtaposition; the hart lines'
 invariant; `boot_k_shape` deleted.  `BACKSPACE` is the int 0x100 (not byte 8):
 the "\b \b" triple is reachable only from `%c`, unused.
 
+E4 SH-ECHO PHASE 3 DONE ON ITS BRANCH (2026-09-12; `lane/sh-echo` =
+`c2879f176` in -tlw, on the OLD base `lane/supply-split-r1`; three commits
+06ac098b2 / f87068824 / c2879f176; 6 files, +2724; log shecho64; gate green
+by the agent, audit the thirteen, lemma_diff = the known `Hpsok_free` section
+hypothesis).  THE HANG: none of the three suspects -- it was `iIntros "#Hdp"`
+on `UkSh.sh_deps` (the bundle-intro hang at a different bundle; the same
+tactic is fine in UkShRun whose cone carries fewer instances); both walks
+spend `sh_deps` once, so a LINEAR intro fixes it; `sh_exec_sup_echo` is
+introduced linearly too.  Locator: wrap each top-level tactic in `timeout N
+(...)` -- turns a 12-min wedge into `Tactic failure: Timeout!` at the line
+(breaks on tactics carrying `ltac:(...)` holes; a locator, not a keeper).
+AS LANDED: `wp_kshr_exec_echo_holds` (runcmd's EXEC arm at `echo_cmd`, no
+generic supply), `wp_kshm_child_echo_holds` (the dispatch), the exec deposit
+built EXPLICITLY at the key before `iApply` (an evar does not terminate);
+`echo_slot_of_kexec_holds` (`kexec_args_at` → `uk_args_c` + two presence
+rows) via five pure lemmas (`echo_kexec_geom/_pages/_argsc/_avd/_avs/
+_stkrow`; one Qed overflows the stack; convert `Z.to_nat (uk_slens …)` up
+front); `uscan_nul`/`uk_slen_nul` (length from a TERMINATOR alone);
+`uk_argv_p_of_bytes`; `sh_exec_sup_of_echo_slot_closed` (nothing open);
+`echo_key_args_holds` (argc 3, lengths 4/5/5, the disciplined bytes); the
+fork chain `wp_kshr_fork`/`wp_kshr_fork1`/`wp_kshr_fork1_final`/`wp_kshf_fork`
+cwd-INDEXED (on `ushf_pstate_at`) with index-free `_any` corollaries (no
+proof content moves).  NAMED PREMISES LEFT: `udepw_law 16` (E5),
+`echo_writes_out recv tx` (E5/OUT-FUPD -- restated over the untagged, fupd
+leaf when OUT-FUPD lands), `ush_line_is f 0 len` (SH-LINE 2b), `ucwd
+(ukn_cwd N) ROOTINO` at sh's entry (SH-OPEN's row exists; `sh_uexec_slot`
+still starts at `ucwd_any` -- E2/2b produce it), `sh_echo_slot T`'s
+`echo_fs_pure` law (E2).  NOT REACHED: nothing CALLS `wp_kshm_child_echo` --
+the dispatch belongs in `wp_kshf_fork`'s child arm, which cannot see UkShEcho
+(dependency runs the other way): SH-LINE 2b builds it in a file above
+UkShEcho.v.  NEXT: REBASE-SH-ECHO (`brief-rebase-sh-echo.md`, in -tlw) onto
+main (SUPPLY-SPLIT r2 + SH-OPEN), landed after UNTAG.
+
 E4 SH-ECHO PHASE 2 ON ITS BRANCH (2026-09-12; `lane/sh-echo` = `e01a8d9df` on
 r1; 4 files +1461/-2; build `shecho34` green, audit = the thirteen; lemma_diff:
 one `Hpsok_free` section hypothesis, the lane's usual).  PROVED: the pinned

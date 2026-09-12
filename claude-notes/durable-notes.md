@@ -1322,6 +1322,14 @@ return -- `UInitKernel.v` sat 40 minutes at flat 1.1 GB RSS on that one tactic.
 Intro such a bundle LINEARLY (`iIntros "Hdp"`) or destructure it per conjunct
 (`iIntros "#(Hwr & Hwl15 & Hwl17)"`) so each piece answers on its own.
 
+**Locating such a hang (E4 phase 3):** wrap every top-level tactic of the
+suspect proof in `timeout 120 (...)` with an `idtac "mark N"` between them; the
+wedge becomes `Error: Tactic failure: Timeout!` at the offending line in one
+build. The instrument breaks on tactics carrying `ltac:(...)` holes ("variable
+not found"), so it is a locator only -- remove it once the linear intro is in.
+The same `iIntros "#H"` can be fine in one file and hang in another whose cone
+carries more `Persistent` instances (UkShRun vs UkShEcho on `sh_deps`).
+
 ## Never collapse a literal token sequence tree-wide (2026-09-12)
 
 A sweep script's global `"false false" -> "false"` substitution silently damaged
