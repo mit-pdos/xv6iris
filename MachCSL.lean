@@ -44,3 +44,4 @@ import MachCSL.WpSmodeAtomic
 import MachCSL.WpLock
 import MachCSL.WpSmodeMem2
 import MachCSL.WpSmodeBits
+import MachCSL.Pte

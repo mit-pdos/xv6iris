@@ -263,7 +263,8 @@ def powerBootRes (E : EraGS GF) (gen : Nat) (σ : MState) : IProp GF := iprop%
   ([∗list] cpu ∈ cpus, regCells (E.regName cpu) (σ.regs cpu)) ∗
   memCells E σ.mem ∗
   ([∗list] cpu ∈ cpus, ∃ ξ : CtxId, ctxTokAt E cpu ξ) ∗
-  ([∗list] cpu ∈ cpus, lockSetAt E cpu [])
+  ([∗list] cpu ∈ cpus, lockSetAt E cpu []) ∗
+  (E.kmapName ↪●MAP (∅ : RegMapF (BitVec 64)))
 
 /-- A hart at its cycle boundary, as the power thread forks it. -/
 theorem hartWP_loop (gen : Nat) (cpu : CPU) :
@@ -336,9 +337,10 @@ theorem wp_power
     imod (ghost_map_alloc (resvMap g₂.m)) with ⟨%γresv, Hresv, Hfrags⟩
     imod (names_alloc (fun γ _ => γ ↪●MAP (∅ : StrMapF Unit))
       (fun _ => ghost_map_alloc_empty (K := String) (V := Unit) (H := StrMapF))) with ⟨%lsn, Hls⟩
+    imod (ghost_map_alloc_empty (K := Nat) (V := BitVec 64) (H := RegMapF)) with ⟨%γkmap, Hkmap⟩
     icases BigSepL.bigSepL_sep_eqv.1 $$ Hv with ⟨Hva, Hvlb⟩
-    imod (ctxs_boot ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn⟩) $$ Hvlb with Hctx
-    imod registry_insert R g.gen ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn⟩ (registryOk_none Hok)
+    imod (ctxs_boot ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap⟩) $$ Hvlb with Hctx
+    imod registry_insert R g.gen ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap⟩ (registryOk_none Hok)
       $$ HR with ⟨HR, #Hreg⟩
     imod startAuth_bump _ $$ Hstart with ⟨Hstart, #Hstarted⟩
     ihave #Hborn := genAuth_get_born _ $$ Hgen
@@ -347,7 +349,7 @@ theorem wp_power
       (fun c => (g₂.m.resv c, (g₂.m.hr c).acq)) cpus (resvMap g₂.m) (List.nodup_finRange NCPU)
       (fun c _ => resvMap_get? g₂.m c) $$ Hfrags
     have hfrag : ∀ c : CPU, (γresv ↪◯MAP[c.val] ((g₂.m.resv c, (g₂.m.hr c).acq) : ResvVal)) ⊢@{IProp GF}
-        resvFragAt ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn⟩ c none false := by
+        resvFragAt ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap⟩ c none false := by
       intro c
       unfold resvFragAt
       rw [(hhart0 c).2.2.2, (hhart0 c).2.2.1]
@@ -355,9 +357,9 @@ theorem wp_power
       iintro H
       iexact H
     -- the boot client
-    ihave Hres : powerBootRes ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn⟩ g.gen g₂.m $$ [Hrc Hpts Hctx Hfrags' Hls]
+    ihave Hres : powerBootRes ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap⟩ g.gen g₂.m $$ [Hrc Hpts Hctx Hfrags' Hls Hkmap]
     · unfold powerBootRes genCertAt memCells
-      iframe Hrc Hpts
+      iframe Hrc Hpts Hkmap
       isplitr [Hctx Hfrags' Hls]
       · isplit
         · iexact Hborn
@@ -371,7 +373,7 @@ theorem wp_power
           iapply BigSepL.bigSepL_mono (fun {_ c} _ => hfrag c) $$ Hfrags'
         · unfold lockSetAt locksMap
           iexact Hls
-    imod (Hboot ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn⟩ g.gen g₂.m g.image hbf) $$ Hres with Hwps
+    imod (Hboot ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap⟩ g.gen g₂.m g.image hbf) $$ Hres with Hwps
     imodintro
     -- the state interpretation at the booted state
     rw [stateInterp_eq]
@@ -379,13 +381,13 @@ theorem wp_power
     rw [hgen, show startCount g₂ = g.gen + 1 by simp [startCount, hgen, hpow']]
     iframe Hgen Hstart
     isplitl [HR Hheap Hri Hva Hiv Hrv Htop Hauth Hresv]
-    · iexists (insert R g.gen ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn⟩)
+    · iexists (insert R g.gen ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap⟩)
       iframe HR
       isplit
       · ipureintro
         exact registryOk_insert Hok _
       rw [eraCur_true hpow', hgen]
-      iexists ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn⟩
+      iexists ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap⟩
       isplit
       · ipureintro
         exact get?_insert_eq rfl
@@ -394,7 +396,7 @@ theorem wp_power
       rw [show g₂.m.top = 0 by simp [MState.top, hlog0], hlog0, authMap_nil]
       iframe Htop Hauth
       isplitl [Hva Hiv Hrv]
-      · rw [BigSepL.bigSepL_eq (Φ := fun _ c => hartViewsAt ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn⟩ g₂.m c)
+      · rw [BigSepL.bigSepL_eq (Φ := fun _ c => hartViewsAt ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap⟩ g₂.m c)
           (Ψ := fun _ c => iprop(MonoNat.auth_own (vn c) (DFrac.own 1) (.ofNat 0) ∗
             MonoNat.auth_own (ivn c) (DFrac.own 1) (.ofNat 0) ∗
             MonoNat.auth_own (rvn c) (DFrac.own 1) (.ofNat 0)))
@@ -467,7 +469,7 @@ is the ambient instance at those, and `wpLoop_ofEra` turns the client's
 @[reducible] def MachGS.ofEra (E : EraGS GF) (gen : Nat) : MachGS hlc GF :=
   { regName := E.regName, mem := E.mem, viewName := E.viewName, iviewName := E.iviewName,
     rviewName := E.rviewName, topName := E.topName, authName := E.authName, resvName := E.resvName,
-    lockSetName := E.lockSetName, gen := gen }
+    lockSetName := E.lockSetName, kmapName := E.kmapName, gen := gen }
 
 theorem wpLoop_ofEra (E : EraGS GF) (gen : Nat) (cpu : CPU) :
     genCertAt gen E ∗ @wpLoop hlc GF (MachGS.ofEra E gen) cpu ⊢@{IProp GF}
