@@ -2597,6 +2597,36 @@ TX-RECEIPT's `tx_claim` so the two lanes merge by juxtaposition; the hart lines'
 invariant; `boot_k_shape` deleted.  `BACKSPACE` is the int 0x100 (not byte 8):
 the "\b \b" triple is reachable only from `%c`, unused.
 
+SH-LINE 2b PHASE 1 LANDED (2026-09-12, iris 798a59476; 7 files: UConsLine,
+UInitSh, UShKernel, UkSh, UkShFork, UkShLoop, UserConsole).  L1: the U-tier
+read leaf's window arm is `ucons_swallow cn False sl d dc` (the program's
+spelling of `ConsoleInv.cons_swallow`, `ucons_swallow_eq` by reflexivity) --
+`d <= dc <= d+1` is gone; `ush_swallow_nofault` turns the copy-out fault arm
+into `False` from `uheap`/`ubytes`/`proc_pt_wf`/`perm_of`/`lazy_free` (row 5's
+three conjuncts with `uvis_lazy W = false`); `ush_swallow_taint`: at `d = 0`
+either `dc = 0` or the swallowed byte is ^D, `ush_tag_law` gives `disc h ∨ T`,
+and `disc_no_ctrl_d` refutes the left (0x04 is not a byte of `echo_line`) --
+the taint.  L3: `ushf_lexable` DELETED; `UkSh.ush_line_is f k len` (the buffer
+holds `echo_line`), `ush_rest_line`, `ush_rest_l` (= `ush_rest` + the line
+premise; `ush_rest` is deleted once getcmd produces the fact),
+`UkShLoop.ush_line_lexable`, `UkShFork.ushf_rest_of_body` proves `ush_rest_l`
+from it and `ush_gen_slot`.  L4: `ush_std3` and friends deleted (no consumer);
+`UkSh.ush_tag_law T := □ ∀ h, riscv_rx_tag h -∗ ⌜disc h⌝ ∨ T` rides in
+`UInitSh.sh_pay`'s LAST conjunct (E2 pays it at boot from `riscv_rx_tag =
+app_tag A c`).  FINDING (design-bearing): `sh_deps`' `□` read law can only
+answer the credential arm -- `wp_uk_ecall_read_recv` demands the LINEAR
+`udepwf_std` (it carries the exclusive reader token), so both current
+dischargers of `ush_read_leaf` (via `udepw_of_law`) are wrong for the console
+arm.  RULED for phase 2: the console arm's read supply is linear, per call,
+built from the program's `upos γp n` + `my_pay` by leasing the reader token
+out of the child escrow's `ucons_pay`, stated at the concrete bundle; one
+discharger of `ush_read_leaf` (with the position), the other deleted.  ALSO:
+`Require Import UConsLine` inside a walk file (UkShFork) made its compile run
+> 40 min; keep the line predicates low (UkSh/UkShLoop).  Phase 2 = the
+supply (R1), the line fact's producer through getcmd (R2), the composer
+`UShLine.v` above UkShEcho that also builds E4's unreached dispatch to
+`wp_kshm_child_echo` (R3), yielding `sh_pay`'s `ush_rest` conjunct.
+
 UNTAG LANDED (2026-09-12, iris 6397bd3e7; 29 files, -1312/+316).  TX-TAG's
 per-byte transmit labels are gone (`txsrc`, `uart_tagsE`, `uart_tag_at`, the
 `_at`/`_tag` receipt families, `tag_proj`, `cons_sent_cnt_at`, `boot_k_shape`);

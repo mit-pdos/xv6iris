@@ -1313,6 +1313,17 @@ defining one as the symbol directly compiles, but `unfold` then leaves something
 - Avoid ad-hoc argument couplings in preconditions; prefer deriving branch
   conditions internally.
 
+## A heavy `Require Import` in a walk-heavy file can wedge its compile (2026-09-12)
+
+`UkShFork.v` sat more than 40 minutes (RSS climbing) after gaining `Require
+Import UConsLine` (init's catalogs and the application invariant); moving the
+one needed predicate down into `UkShLoop.v` and dropping the import brought
+the file back to minutes. Keep pure predicates a walk file needs in the lowest
+file that can state them; do not import application-level files into the
+proofmode-heavy walks. (Not bisected against a second change made at the same
+time -- unfolding a `□` bundle before its intro -- but the import is the prime
+suspect.)
+
 ## `iIntros "#H"` on a bundle of wands can hang the Persistent search (2026-09-12)
 
 Introducing a whole conjunction of persistent wands with `iIntros "#Hdp"` (e.g.
