@@ -54,8 +54,8 @@ Notation FR := KernelSyms.forkret.
    is stated against the name rather than against a bare hex constant.  The
    dump agrees: [kernel.asm] annotates the two auipc/addi pairs with
    [# 80007180 <etext+0x180>] and [# 80007188 <etext+0x188>] respectively. *)
-Definition fkr_init_path : Z := 0x80007170.   (* the string "/init" *)
-Definition fkr_exec_msg  : Z := 0x80007178.   (* the string "exec"  *)
+Definition fkr_init_path : Z := 0x80007188.   (* the string "/init" *)
+Definition fkr_exec_msg  : Z := 0x80007190.   (* the string "exec"  *)
 
 (* ---- +0x14 auipc a5,0x9 / +0x18 addi a5,a5,-1712 : &first ---- *)
 (* the immediate READS as 2384 and SIGN-EXTENDS to -1712; read as positive
@@ -258,8 +258,8 @@ Proof. vm_compute. reflexivity. Qed.
 (*  file -- that the six bytes at [fkr_init_path] really spell "/init"    *)
 (*  and the five at [fkr_exec_msg] really spell "exec" -- read off        *)
 (*  [KernelData.kernel_data] and pinned here rather than in the walk.     *)
-(*  (Checked: 0x80007170..85 = 47 105 110 105 116 0, and                  *)
-(*  0x80007178..8c = 101 120 101 99 0.)                                   *)
+(*  (Checked: 0x80007188..85 = 47 105 110 105 116 0, and                  *)
+(*  0x80007190..8c = 101 120 101 99 0.)                                   *)
 (* ===================================================================== *)
 
 (* The path bytes are [InitBoot.init_boot_bytes] -- the naming FUNCTION

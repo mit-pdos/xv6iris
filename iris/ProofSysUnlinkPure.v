@@ -151,7 +151,7 @@ Qed.
 (*  THE TWO NAME LITERALS the two [namecmp] refusals compare against.     *)
 (*                                                                        *)
 (*  The [auipc a1,2] / [addi a1,a1,1656] pair at +0x34..+0x38 computes    *)
-(*  0x800075d0 and the pair at +0x48..+0x4c computes 0x800075d8 -- the    *)
+(*  0x800075e8 and the pair at +0x48..+0x4c computes 0x800075f0 -- the    *)
 (*  SAME two .rodata addresses create's [dirlink(ip,".")] /               *)
 (*  [dirlink(ip,"..")] use, which is why the byte lists below are         *)
 (*  [ProofCreateParts]'s verbatim.  RESTATED rather than imported: a      *)

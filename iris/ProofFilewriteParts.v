@@ -98,7 +98,7 @@ Notation FW := KernelSyms.filewrite (only parsing).
 (* ===================================================================== *)
 (*  THE PANIC MESSAGE.  filewrite's one live arm is [panic("filewrite")]  *)
 (*  at +0x11e -- the ELSE of the type dispatch; the literal sits at       *)
-(*  0x80007598 in .rodata, nine characters and a NUL.  Hoisted as NAMED   *)
+(*  0x800075b0 in .rodata, nine characters and a NUL.  Hoisted as NAMED   *)
 (*  pure lemmas rather than inline [ltac:] -- see optimization.md, and    *)
 (*  the panic recipe's third trap ([lia]/[lkbelow] against an evar).      *)
 (* ===================================================================== *)

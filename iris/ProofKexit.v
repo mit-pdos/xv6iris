@@ -307,11 +307,11 @@ Definition kxt_regs `{XI : CurCtx} (M : regfile) (pj sv spF : mword 64) : Prop :
 
 (* ===================================================================== *)
 (*  THE PANIC MESSAGE.  kexit's live arm is [panic("init exiting")] at    *)
-(*  +0x34 -- initproc calling exit(); the literal sits at 0x800071f0 in   *)
+(*  +0x34 -- initproc calling exit(); the literal sits at 0x80007208 in   *)
 (*  .rodata, twelve characters and a NUL.  NAMED pure lemmas, not inline  *)
 (*  [ltac:] -- see optimization.md and the panic recipe.                  *)
 (* ===================================================================== *)
-Definition kx_msg_a `{XI : CurCtx} : Z := 0x800071f0.
+Definition kx_msg_a `{XI : CurCtx} : Z := 0x80007208.
 Definition kx_msg `{XI : CurCtx} : string := "init exiting".
 
 Lemma kx_panic_K `{XI : CurCtx} (av : nat) : (K_kexit <= av)%nat -> (panic_stack <= av - 6)%nat.

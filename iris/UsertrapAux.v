@@ -45,7 +45,7 @@ Import Defs.
 (* ===================================================================== *)
 
 (* the addresses the two auipc/addi pairs compute: +0x5c/+0x60 lands on
-   0x800072a0 and +0x70/+0x74 on 0x800072d0.  (0x80007280, the panic string,
+   0x800072b8 and +0x70/+0x74 on 0x800072e8.  (0x80007298, the panic string,
    is deliberately absent: its arm is REFUTED -- ProofUsertrapParts.v.)
    THESE MOVE WITH EVERY IMAGE RELAYOUT and nothing but this file's own
    [kernel_data_string] obligations will notice, so they are the first thing to
@@ -55,7 +55,7 @@ Import Defs.
    it silently prints the OLD pair.  Deriving them from the tracked image
    instead needs no toolchain: the auipc is `mword_of_int 5` in CodeUsertrap.v,
    so the address is (usertrap + off - 4) + (5 << 12) + sext12(imm).
-   (xv6 9dd28f5e had them at 0x80007280 / 0x800072b0, 0024d4b at
+   (xv6 9dd28f5e had them at 0x80007298 / 0x800072b0, 0024d4b at
    0x80007298 / 0x800072c8.) *)
 Definition ut_fmt1_a : Z := 0x800072b8.
 Definition ut_fmt2_a : Z := 0x800072e8.

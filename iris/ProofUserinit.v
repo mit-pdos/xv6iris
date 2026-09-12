@@ -17,7 +17,7 @@
      +0x0a            jal ra,allocproc           (0x80001b06)
      +0x0e            c.mv s1,a0                 s1 = p
      +0x10 .. +0x14   auipc a5,0x8; sd a0,1796(a5)     initproc = p
-     +0x18 .. +0x1c   auipc a0,0x5; addi a0,a0,1484    a0 = "/" (0x80007180)
+     +0x18 .. +0x1c   auipc a0,0x5; addi a0,a0,1484    a0 = "/" (0x80007198)
      +0x20            jal ra,namei               (0x80003a92)
      +0x24            sd a0,336(s1)              p->cwd = ip
      +0x28            c.li a5,3                  RUNNABLE
@@ -30,7 +30,7 @@
 
    Every [jal] target was resolved numerically against KernelSyms; so was
    [initproc] (0x8000a380, the auipc/sd pair) and the "/" literal
-   (0x80007180, the auipc/addi pair).  THIS KERNEL'S userinit is SHORTER
+   (0x80007198, the auipc/addi pair).  THIS KERNEL'S userinit is SHORTER
    than upstream's -- no uvmfirst, no trapframe writes, no safestrcpy --
    and the decode is what says so: three calls, two stores, nothing else.
 
@@ -174,7 +174,7 @@ Lemma uin_frm3 (X : mword 64) :
   = pa_stk X 3.
 Proof. apply uin_frm. apply bv_eq; vm_compute; reflexivity. Qed.
 
-(* THE "/" LITERAL.  Two bytes of .rodata at 0x80007180, which is what the
+(* THE "/" LITERAL.  Two bytes of .rodata at 0x80007198, which is what the
    [auipc a0,0x5] / [addi a0,a0,1484] pair at +0x18/+0x1c computes.  Named
    (never an inline [ltac:] argument to [kernel_data_window] --
    claude-notes/optimization.md). *)

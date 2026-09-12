@@ -230,12 +230,13 @@ Qed.
 
 (* A claim read returns the id of the source it took, or 0 for "nothing to
    serve".  Under the plan the only source a hart's context can ever have
-   enabled is one of the machine's two, so those are the only ids a claim can
-   hand back -- which is exactly what lets [devintr]'s three-way branch on the
+   enabled is one of the machine's three, so those are the only ids a claim
+   can hand back -- which is exactly what lets [devintr]'s branch on the
    result be exhaustive. *)
 Definition plic_claim_ret_ok (v : bv 32) : Prop :=
   v = Z_to_bv 32 0 \/
   v = Z_to_bv 32 (Z.of_N (uart_irq_id Uart0)) \/
+  v = Z_to_bv 32 (Z.of_N (uart_irq_id Uart1)) \/
   v = Z_to_bv 32 (Z.of_N virtio_irq_id).
 
 (* [plic_best] is a fold that only ever returns an element of the list it
@@ -275,14 +276,14 @@ Proof.
 Qed.
 
 (* the plan, read off one enabled source: an enabled real source IS one of the
-   machine's two.  [i] ranges over [plic_srcs] (1..95), and for each of those
+   machine's three.  [i] ranges over [plic_srcs] (1..95), and for each of those
    ids the WORD it lives in and the BIT within that word are concrete, so the
    bit test is decided by case analysis on the ninety-five ids -- including
    the sources in words 1 and 2, which the plan permits nothing in and which
    are therefore refuted by the same [vm_compute]. *)
 Lemma plic_enabled_srcs (p : plic_state) (c : nat) (i : N) :
   plic_ok p -> In i plic_srcs -> plic_enabled p c i = true ->
-  i = (uart_irq_id Uart0) \/ i = virtio_irq_id.
+  i = (uart_irq_id Uart0) \/ i = (uart_irq_id Uart1) \/ i = virtio_irq_id.
 Proof.
   intros Hplan Hin Hen.
   assert (Hbit : Z.testbit (plic_dev_irq_word (plic_src_word i))
@@ -294,7 +295,8 @@ Proof.
   vm_compute in Hin.
   repeat (destruct Hin as [Hin|Hin]); try (exfalso; exact Hin);
     subst i; vm_compute in Hbit;
-    first [ discriminate Hbit | left; reflexivity | right; reflexivity ].
+    first [ discriminate Hbit | left; reflexivity
+          | right; left; reflexivity | right; right; reflexivity ].
 Qed.
 
 Lemma plic_claim_ret (p : plic_state) (c : nat) :
@@ -306,8 +308,10 @@ Proof.
   assert (Hen : plic_enabled p c i = true).
   { unfold plic_cand in Hcand.
     apply andb_prop in Hcand as [Hc _]. apply andb_prop in Hc as [_ Hc]. exact Hc. }
-  destruct (plic_enabled_srcs p c i Hplan Hin Hen) as [-> | ->];
-    [ right; left; reflexivity | right; right; reflexivity ].
+  destruct (plic_enabled_srcs p c i Hplan Hin Hen) as [-> | [-> | ->]];
+    [ right; left; reflexivity
+    | right; right; left; reflexivity
+    | right; right; right; reflexivity ].
 Qed.
 
 (* Claiming touches only pending/claimed, so the plan survives it. *)
@@ -358,7 +362,7 @@ Proof.
 Qed.
 
 (* ...and the id a claim returns identifies the source it took: the plan
-   admits only the machine's two, and their encodings differ. *)
+   admits only the machine's three, and their encodings differ. *)
 Lemma plic_claim_uart_of_ret (p : plic_state) (c : nat) (i : N) :
   plic_ok p -> plic_best p c = Some i ->
   Z_to_bv 32 (Z.of_N i) = Z_to_bv 32 (Z.of_N (uart_irq_id Uart0)) ->
@@ -369,9 +373,9 @@ Proof.
   assert (Hen : plic_enabled p c i = true).
   { unfold plic_cand in Hcand.
     apply andb_prop in Hcand as [Hc _]. apply andb_prop in Hc as [_ Hc]. exact Hc. }
-  destruct (plic_enabled_srcs p c i Hok Hin Hen) as [E | E]; [ exact E | ].
-  exfalso. rewrite E in Heq.
-  apply (f_equal bv_unsigned) in Heq. vm_compute in Heq. discriminate.
+  destruct (plic_enabled_srcs p c i Hok Hin Hen) as [E | [E | E]]; [ exact E | | ];
+    exfalso; rewrite E in Heq;
+    apply (f_equal bv_unsigned) in Heq; vm_compute in Heq; discriminate.
 Qed.
 
 (* Completing touches only claimed, so it is a no-op as far as the plan is

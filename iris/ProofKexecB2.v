@@ -163,7 +163,7 @@ Notation KXB := KernelSyms.kexec (only parsing).
 (* ===================================================================== *)
 (*  THE PANIC MESSAGE.  kexec's one live arm is loadseg's                 *)
 (*  [panic("loadseg: address should exist")] at +0xd6 -- walkaddr came    *)
-(*  back null for a segment page; the literal sits at 0x800075b0 in       *)
+(*  back null for a segment page; the literal sits at 0x800075c8 in       *)
 (*  .rodata, twenty-nine characters and a NUL.  NAMED pure lemmas, not    *)
 (*  inline [ltac:] -- see optimization.md and the panic recipe.           *)
 (* ===================================================================== *)

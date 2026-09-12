@@ -25,7 +25,7 @@
    (2) THE TWO NAME LITERALS.  dirlink wants FOURTEEN bytes of name
        buffer; the "." and ".." arguments the auipc/addi pairs at
        +0xfc/+0x100 and +0x110/+0x114 compute are the rodata
-       addresses 0x800075d0 and 0x800075d8, whose fourteen-byte windows
+       addresses 0x800075e8 and 0x800075f0, whose fourteen-byte windows
        run into their neighbours ("." 's window contains the ".." two
        bytes further on, and ".." 's contains the head of "unlink").
        [DirentEnc.bname] cuts at the first NUL, so both windows name the
@@ -205,7 +205,7 @@ Section CreateParts.
   (* the two instances, at the two rodata addresses the auipc/addi pairs
      at +0xfc..+0x100 and +0x110..+0x114 compute.  Both re-checked against
      CodeCreate.v after the bump: create + 0xe4 + 0x3000 - 1622
-     = 0x800075d0 and create + 0xf8 + 0x3000 - 1634 = 0x800075d8.  THE TWO
+     = 0x800075e8 and create + 0xf8 + 0x3000 - 1634 = 0x800075f0.  THE TWO
      ADDRESSES DID NOT MOVE -- create itself shifted +14 and the two addi
      immediates shifted -14 (2488 -> 2474, 2476 -> 2462), which cancels
      exactly; .rodata stayed put. *)

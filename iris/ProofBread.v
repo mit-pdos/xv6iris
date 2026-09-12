@@ -219,7 +219,7 @@ Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 (* ===================================================================== *)
 (*  THE PANIC MESSAGE.  bread's one live arm is bget's                    *)
 (*  [panic("bget: no buffers")] at +0x8c -- the backward scan ran off the *)
-(*  end with every buffer pinned; the literal sits at 0x800073b0 in       *)
+(*  end with every buffer pinned; the literal sits at 0x800073c8 in       *)
 (*  .rodata, sixteen characters and a NUL.  NAMED pure lemmas, not inline *)
 (*  [ltac:] -- see optimization.md and the panic recipe.                  *)
 (* ===================================================================== *)

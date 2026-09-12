@@ -256,7 +256,7 @@ Proof. destruct V; reflexivity. Qed.
 (* ===================================================================== *)
 (*  THE PANIC MESSAGE.  fileread's one live arm is [panic("fileread")] at  *)
 (*  +0xa6 -- the default of the type dispatch; the literal sits at         *)
-(*  0x80007588 in .rodata, eight characters and a NUL.  Hoisted as NAMED   *)
+(*  0x800075a0 in .rodata, eight characters and a NUL.  Hoisted as NAMED   *)
 (*  pure lemmas rather than inline [ltac:] -- see optimization.md, and the *)
 (*  panic recipe's third trap ([lia]/[lkbelow] against an evar).           *)
 (* ===================================================================== *)

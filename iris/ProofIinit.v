@@ -554,12 +554,12 @@ Section ProofIinit.
                                                                                     ltac:(vm_compute; discriminate) Hinode
                   with "Hkdata") as "#Hstr_inode".
     assert (Hslstr : forall j bt, cstring_bytes "sleep lock"%string !! j = Some bt ->
-                      KernelData.kernel_data !! (0x80007558 + Z.of_nat j)%Z = Some bt).
+                      KernelData.kernel_data !! (0x80007570 + Z.of_nat j)%Z = Some bt).
     { intros j bt Hj.
       do 11 (destruct j as [|j];
              [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
       vm_compute in Hj; discriminate. }
-    iPoseProof (kernel_data_string_all 0x80007558 "sleep lock"%string sl_str_addr eq_refl ltac:(unfold text_end; lia)
+    iPoseProof (kernel_data_string_all 0x80007570 "sleep lock"%string sl_str_addr eq_refl ltac:(unfold text_end; lia)
                                                                                       ltac:(vm_compute; discriminate) Hslstr
                   with "Hkdata") as "#Hstr_sl".
     (* ---- the frame geometry ---- *)

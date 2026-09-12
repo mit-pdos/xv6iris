@@ -332,7 +332,7 @@ Proof. set_solver. Qed.
 
 (* ===================================================================== *)
 (*  THE PANIC MESSAGE.  iget's one live arm is [panic("iget: no inodes")] *)
-(*  at +0xa6 -- the full-table scan; the literal sits at 0x800073f0 in    *)
+(*  at +0xa6 -- the full-table scan; the literal sits at 0x80007408 in    *)
 (*  .rodata, fifteen characters and a NUL.  NAMED pure lemmas, not inline *)
 (*  [ltac:] -- see optimization.md and the panic recipe.                  *)
 (* ===================================================================== *)

@@ -133,7 +133,7 @@ Set Printing Depth 40.
 
 (* ===================================================================== *)
 (*  THE FORMATTED MESSAGE.  [auipc s6,0x4 / addi s6,s6,50] at +0x2e/+0x32 *)
-(*  off [ireclaim = 0x80003408] resolves to 0x80007478, and -- unlike     *)
+(*  off [ireclaim = 0x80003408] resolves to 0x80007490, and -- unlike     *)
 (*  balloc's and ialloc's -- this string CARRIES A CONVERSION, so its     *)
 (*  [pk_kinds] is [[PkNum]] and printk is called with one vararg          *)
 (*  ([a1 = s3 = inum] at +0x38).                                          *)

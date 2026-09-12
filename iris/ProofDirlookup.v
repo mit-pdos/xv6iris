@@ -117,7 +117,7 @@ Set Printing Depth 40.
 
 (* ===================================================================== *)
 (*  THE PANIC MESSAGE.  dirlookup's one live arm is the SHORT READ,       *)
-(*  [panic("dirlookup read")] at +0x4e; the literal sits at 0x800074c8    *)
+(*  [panic("dirlookup read")] at +0x4e; the literal sits at 0x800074e0    *)
 (*  in .rodata, fourteen characters and a NUL.  NAMED pure lemmas, not    *)
 (*  inline [ltac:] -- see optimization.md and the panic recipe.           *)
 (* ===================================================================== *)

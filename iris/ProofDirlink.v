@@ -119,7 +119,7 @@ Set Printing Depth 40.
 
 (* ===================================================================== *)
 (*  THE PANIC MESSAGE.  dirlink's one live arm is [panic("dirlink read")] *)
-(*  at +0x68; the literal sits at 0x800074d8 in .rodata.  Hoisted as      *)
+(*  at +0x68; the literal sits at 0x800074f0 in .rodata.  Hoisted as      *)
 (*  NAMED pure lemmas rather than inline [ltac:] -- see optimization.md.  *)
 (* ===================================================================== *)
 Definition dl_msg_a : Z := 0x800074f0.

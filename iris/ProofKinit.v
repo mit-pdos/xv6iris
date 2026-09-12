@@ -67,12 +67,12 @@ Section ProofKinit.
              Hlkfree Havail Hauth Hcont".
     (* the "kmem" string literal, read out of the kernel's data image *)
     assert (Hkmem : forall j bt, cstring_bytes "kmem"%string !! j = Some bt ->
-                      KernelData.kernel_data !! (0x80007030 + Z.of_nat j)%Z = Some bt).
+                      KernelData.kernel_data !! (0x80007048 + Z.of_nat j)%Z = Some bt).
     { intros j bt Hj.
       do 5 (destruct j as [|j];
             [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
       vm_compute in Hj; discriminate. }
-    iPoseProof (kernel_data_string_all 0x80007030 "kmem"%string _ eq_refl ltac:(unfold text_end; lia)
+    iPoseProof (kernel_data_string_all 0x80007048 "kmem"%string _ eq_refl ltac:(unfold text_end; lia)
                                                                       ltac:(vm_compute; discriminate) Hkmem
                   with "Hkdata") as "#Hstr".
     assert (Hspr2 : spr = pa_stk sp0 2).
@@ -151,7 +151,7 @@ Section ProofKinit.
     iIntros (CID6 Hs6) "Hcg Hpc".
     set (R4 := <[Regidx (mword_of_int 11 : mword 5) := regval_into_reg (add_vec (R3 !!! Regidx (mword_of_int 11 : mword 5)) (sign_extend' 64 (mword_of_int 1270 : mword 12)))]> R3).
     (* a1 now holds &"kmem" -- the string initlock is about to store *)
-    assert (HR4a1 : R4 !!! Regidx (mword_of_int 11 : mword 5) = (mword_of_int 0x80007030 : mword 64)).
+    assert (HR4a1 : R4 !!! Regidx (mword_of_int 11 : mword 5) = (mword_of_int 0x80007048 : mword 64)).
     { rewrite /R4 upd_eq. rewrite /R3 upd_eq. apply bv_eq; vm_compute; reflexivity. }
     assert (Hpp10 : add_vec_int (mword_of_int (KernelSyms.kinit + 0x0c) : mword 64) 4 = mword_of_int (KernelSyms.kinit + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp10) in "Hpc".
@@ -194,7 +194,7 @@ Section ProofKinit.
     iEval (rewrite Htgtil) in "Hpc".
     assert (HR7a0 : R7 !!! Regidx (mword_of_int 10 : mword 5) = lk)
       by (rewrite /R7 upd_ne; [exact HR6a0 | vm_compute; discriminate]).
-    assert (HR7a1 : R7 !!! Regidx (mword_of_int 11 : mword 5) = (mword_of_int 0x80007030 : mword 64)).
+    assert (HR7a1 : R7 !!! Regidx (mword_of_int 11 : mword 5) = (mword_of_int 0x80007048 : mword 64)).
     { rewrite /R7 upd_ne; [| vm_compute; discriminate].
       rewrite /R6 upd_ne; [| vm_compute; discriminate].
       rewrite /R5 upd_ne; [exact HR4a1 | vm_compute; discriminate]. }

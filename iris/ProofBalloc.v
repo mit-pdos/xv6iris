@@ -150,7 +150,7 @@ Set Printing Depth 40.
 Definition ba_msg : string :=
   ("balloc: out of blocks" ++ String (Ascii.ascii_of_nat 10) EmptyString)%string.
 Definition ba_msg_addr : Z :=
-  ltac:(let x := eval vm_compute in (KernelSyms.etext + 0x3f0)%Z in exact x).
+  ltac:(let x := eval vm_compute in (KernelSyms.etext + 0x3d8)%Z in exact x).
 
 Lemma ba_msg_bytes : forall j b, cstring_bytes ba_msg !! j = Some b ->
   KernelData.kernel_data !! (ba_msg_addr + Z.of_nat j)%Z = Some b.

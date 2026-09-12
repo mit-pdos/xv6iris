@@ -254,7 +254,7 @@ End IlockParts.
 (* ===================================================================== *)
 (*  THE PANIC MESSAGE.  ilock's one LIVE arm is [panic("ilock: no type")] *)
 (*  at +0xaa -- a FREE inode read off the disk; the literal sits at       *)
-(*  0x80007460 in .rodata, fourteen characters and a NUL.  (The OTHER     *)
+(*  0x80007478 in .rodata, fourteen characters and a NUL.  (The OTHER     *)
 (*  panic, "ilock" at +0x22, is refuted from [ip <> 0] and needs nothing.) *)
 (*  NAMED pure lemmas, not inline [ltac:] -- see optimization.md.         *)
 (* ===================================================================== *)
