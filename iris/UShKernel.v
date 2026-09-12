@@ -400,6 +400,18 @@ Section UShKernel.
        supplier: [udep] above is at the program's OWN instance, where the
        admitted numbers are [UexecSG.free_num] and nothing more. *)
     UkSh.sh_deps -∗
+    (* ...AND THE TAG'S READING (lane SH-LINE 2b, L4; app-echo.md,
+       "SH-LINE PHASE 1 LANDED", ruling (3)).  [RiscvPtsto.riscv_rx_tag] is
+       a field of the machine's FIXED ghost state and nothing below the top
+       theorem reads it, so how a tagged history is to be READ -- as the
+       discipline, or as the taint -- enters sh HERE, as a persistent
+       premise threaded from [SystemAdequacy]'s [Hinit_boot] through init's
+       pinned builder ([UInitSh.sh_pay]).  IT IS SPENT INSIDE [gets]
+       (SH-LINE 2b phase 2): the read's receipt hands back the tag of every
+       byte it delivered and of the one it swallowed, and the law is what
+       turns those into [⌜disc h⌝] -- which refutes the ^D swallow
+       ([UConsLine.disc_no_ctrl_d]) and gives the line its content. *)
+    UkSh.ush_tag_law T -∗
     (∀ N : uk_names Σ,
        ush_rest N γp (R (ukn_t N) (ukn_d N) (ukn_s N))) -∗
     (* THE ENTRY'S ONE DESCRIPTOR ROW, at its three arms
@@ -437,7 +449,7 @@ Section UShKernel.
     uslot W.
   Proof.
     intros HQc Hpc Hsub Hx Hal8 Hroom Hstk Hfdlen Hstop Hcwd0 Hlzf.
-    iIntros "#Hpay #Hdep #Hdp #Hrest #Hfd0 Hin #Hgen #Hmp HQ Hpos".
+    iIntros "#Hpay #Hdep #Hdp #Htag #Hrest #Hfd0 Hin #Hgen #Hmp HQ Hpos".
     iApply (uslot_of_urun_all W (2 + (8 + (16 + (ush_Dbody + n0)))) Q
               Hal8 Hroom Hstk Hfdlen Hstop Hlzf with "Hdep Hmp HQ").
     (* sh's own half of its children set travels in [UkSh.ush_pstate]
@@ -518,6 +530,8 @@ Section UShKernel.
        through: see [sh_uexec_slot] and [UkSh.sh_deps] *)
     udep -∗
     UkSh.sh_deps -∗
+    (* the tag's reading, passed straight through: see [sh_uexec_slot] *)
+    UkSh.ush_tag_law T -∗
     (∀ N : uk_names Σ,
        ush_rest N γp (R (ukn_t N) (ukn_d N) (ukn_s N))) -∗
     (* the entry row, the pay fact, the payload and the position, all four

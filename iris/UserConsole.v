@@ -48,6 +48,8 @@ From iris.base_logic.lib Require Import ghost_var own.
 From iris.algebra.lib Require Import mono_list.
 Require Import SailStdpp.Base SailStdpp.Values.
 Require Import RiscvLang ObsTrace.   (* [mobs] -- what a tag's history is made of *)
+Require Import RiscvPtsto.           (* [riscv_rx_tag] -- the application's tag on
+                                        the history an input byte arrived at *)
 Require Import Xv6Cameras.           (* [uartGhostG]: the ring's two cameras *)
 Require Import Xv6G.                 (* [xv6G] -- §3's bridge only *)
 Require Export UartNames.            (* [cons_names] / [cn_rd] / [cn_log] *)
@@ -63,6 +65,10 @@ Section UserConsole.
      ([UkRun.v]'s note).  [cons_ghost_rdG] and [cons_ghost_logG] are its
      two members the console's cursor and stored sequence are built on. *)
   Context `{!uartGhostG Σ}.
+  (* ...and the machine's fixed ghost state, for [RiscvPtsto.riscv_rx_tag]
+     alone: [ucons_swallow] below is the only definition here that names a
+     tag, and the rest of the section does not see this binder. *)
+  Context `{!riscvGS Σ}.
 
   (* ---- the pair ---- *)
   (* the PROGRAM's half: a separable resource sh carries round [gets],
@@ -130,6 +136,82 @@ Section UserConsole.
   Global Instance ucons_stored_lb_timeless cn st :
     Timeless (ucons_stored_lb cn st).
   Proof. rewrite /ucons_stored_lb. apply _. Qed.
+
+  (* ...AND THE SWALLOWED BYTE, at the narrow class too
+     ([ConsoleInv.cons_swallow]).  consoleread's cursor moves by [d] or by
+     [d + 1], and at [d + 1] the call popped a byte it did not deliver;
+     the arm NAMES that byte, so a program reading one byte at a time can
+     tell a delivered line from a line with a hole in it.  Spelled here
+     for [ucons_reader]'s reason -- the ring's own copy is discharged over
+     [Xv6G.xv6G], which a program file must not bind -- and section 3
+     proves the two equal.
+
+     [fault] IS A PARAMETER, as it is in the ring's copy: it is a statement
+     about the READER's own address space, and a verified program
+     ELIMINATES it ([UkRunSys.uk_read_nofault] under the lazy flag), so the
+     program-tier leaf is stated at [False] and the discharge weakens the
+     kernel's arm to it ([cons_swallow_mono]). *)
+  Definition ucons_swallow (cn : cons_names) (fault : Prop)
+      (sl : list (list mobs * bv 8)) (d dc : nat) : iProp Σ :=
+    (⌜dc = d⌝
+     ∨ ⌜dc = (d + 1)%nat⌝ ∗
+       ∃ (h : list mobs) (b : bv 8),
+         ⌜obs_ends_in h b⌝ ∗
+         ucons_stored_lb cn (sl ++ [(h, b)])%list ∗
+         ⌜cons_chain (sl ++ [(h, b)])%list⌝ ∗
+         riscv_rx_tag h ∗
+         (⌜d = 0%nat /\ bv_unsigned (cons_xlate b) = 4⌝ ∨ ⌜fault⌝))%I.
+
+  Global Instance ucons_swallow_persistent cn fault sl d dc :
+    Persistent (ucons_swallow cn fault sl d dc).
+  Proof. rewrite /ucons_swallow. apply _. Qed.
+
+  (* THE REASON WEAKENS ([ConsoleInv.cons_swallow_mono]'s twin).  [fault]
+     is a statement about the reader's own address space, and the verified
+     reader's use of it is the DEGENERATE weakening: it proves the fault
+     impossible and moves the arm to [False]. *)
+  Lemma ucons_swallow_mono (cn : cons_names) (f1 f2 : Prop)
+      (sl : list (list mobs * bv 8)) (d dc : nat) :
+    (f1 -> f2) ->
+    ucons_swallow cn f1 sl d dc -∗ ucons_swallow cn f2 sl d dc.
+  Proof.
+    intros Himp. rewrite /ucons_swallow.
+    iIntros "[%He | [%He H]]"; [ iLeft; by iPureIntro | ].
+    iRight. iSplitR; [ by iPureIntro | ].
+    iDestruct "H" as (h b) "(%Hen & #Hlb & %Hch & #Htg & Hwhy)".
+    iExists h, b. iFrame "Hlb Htg".
+    iSplitR; [ by iPureIntro | ]. iSplitR; [ by iPureIntro | ].
+    iDestruct "Hwhy" as "[%Hd | %Hf]";
+      [ iLeft; by iPureIntro | iRight; iPureIntro; exact (Himp Hf) ].
+  Qed.
+
+  (* the arm every exit but the two takes: the cursor moved by exactly the
+     run ([ConsoleInv.cons_swallow_eq]'s twin) *)
+  Lemma ucons_swallow_refl (cn : cons_names) (fault : Prop)
+      (sl : list (list mobs * bv 8)) (d : nat) :
+    ⊢ ucons_swallow cn fault sl d d.
+  Proof. rewrite /ucons_swallow. iLeft. by iPureIntro. Qed.
+
+  (* ...and the bound it carries, which is what the landed callers read *)
+  Lemma ucons_swallow_range (cn : cons_names) (fault : Prop)
+      (sl : list (list mobs * bv 8)) (d dc : nat) :
+    ucons_swallow cn fault sl d dc -∗ ⌜(d <= dc <= d + 1)%nat⌝.
+  Proof.
+    rewrite /ucons_swallow. iIntros "[%He | [%He _]]"; iPureIntro; lia.
+  Qed.
+
+  (* THE ONE ARM A ONE-BYTE READ THAT RETURNED A BYTE CAN BE AT.  [gets]
+     asks for one byte and continues only on [r = 1], so [d = 1] there --
+     and the swallowing arm needs [d = 0] once the fault is eliminated.
+     So at [d = 1] and [fault := False] the cursor moved by exactly one. *)
+  Lemma ucons_swallow_nofault_1 (cn : cons_names)
+      (sl : list (list mobs * bv 8)) (dc : nat) :
+    ucons_swallow cn False sl 1%nat dc -∗ ⌜dc = 1%nat⌝.
+  Proof.
+    rewrite /ucons_swallow. iIntros "[%He | [%He H]]"; [ by iPureIntro | ].
+    iDestruct "H" as (h b) "(_ & _ & _ & _ & [%Hd | %Hf])";
+      [ iPureIntro; lia | done ].
+  Qed.
 
   (* =================================================================== *)
   (*  2.  THE PAYLOAD THE SHELL'S EXIT OWES ITS PARENT                    *)
@@ -269,7 +351,7 @@ End UserConsole.
 (*  identically.                                                          *)
 (* ===================================================================== *)
 Section UserConsoleBridge.
-  Context `{!xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
 
   Lemma ucons_reader_eq (cn : cons_names) (n : nat) :
     ucons_reader cn n = ConsoleInv.cons_reader cn n.
@@ -278,5 +360,10 @@ Section UserConsoleBridge.
   Lemma ucons_stored_lb_eq (cn : cons_names)
       (st : list (list mobs * bv 8)) :
     ucons_stored_lb cn st = ConsoleInv.cons_stored_lb cn st.
+  Proof. reflexivity. Qed.
+
+  Lemma ucons_swallow_eq (cn : cons_names) (fault : Prop)
+      (sl : list (list mobs * bv 8)) (d dc : nat) :
+    ucons_swallow cn fault sl d dc = ConsoleInv.cons_swallow cn fault sl d dc.
   Proof. reflexivity. Qed.
 End UserConsoleBridge.

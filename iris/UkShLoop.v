@@ -50,6 +50,32 @@ Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
 
 Require Import Xv6Cameras.   (* [uartGhostG] -- the console ring's cameras *)
 Require Import UserConsole.  (* [upos] -- sh's half of the console position pair *)
+(* ===================================================================== *)
+(* THE DISCIPLINED LINE LEXES (lane SH-LINE 2b, L3).                      *)
+(*                                                                        *)
+(* [UkShFork.ushf_lexable] was "every line the user could type lexes",     *)
+(* which is false.  This is the true replacement: the ONE line the read's  *)
+(* receipt delivers ([UkSh.ush_line_is] -- the buffer at [k] holds         *)
+(* [EchoDisc.echo_line]) has no symbol byte and tokenises into fewer than  *)
+(* ten tokens.  A CLOSED computation at the literal, so no assumption      *)
+(* about user input survives it; [UConsLine.ush_echo_tokens] is the        *)
+(* computation and E4 ([UkShEcho.ush_line_toks_holds]) is the stronger     *)
+(* form with the token list named.                                        *)
+(*                                                                        *)
+(* IT LIVES HERE because it is the LOWEST file that sees both halves:      *)
+(* [UkSh.ush_line_is] (the line) and [UkShParse.ushp_*] (the lexer).       *)
+(* [UkShFork] takes it as a premise and must not reach for [UConsLine],    *)
+(* whose cone (init's catalogs, the application's invariant) has no        *)
+(* business in a proofmode-heavy walk file. *)
+(* ===================================================================== *)
+Definition ush_line_lexable : Prop :=
+  forall (f : nat -> bv 8) (k len : nat),
+    UkSh.ush_line_is f k len ->
+    ushp_no_symbols len (fun j : nat => f (k + j)%nat)
+    /\ exists toks : list (nat * nat),
+         ushp_tokens len (fun j : nat => f (k + j)%nat) 0 toks
+         /\ (length toks < 10)%nat.
+
 Section UkShLoop.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.

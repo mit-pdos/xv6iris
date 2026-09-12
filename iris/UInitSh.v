@@ -337,7 +337,7 @@ Section UInitSh.
   (* [n0] is the slack sh's entry is priced at.  Any [n0] under 402 fits   *)
   (* ([init_sh_room] below); the caller picks one.                         *)
   (* ------------------------------------------------------------------- *)
-  Definition sh_pay (Rsh : gname -> gname -> gname -> iProp Σ)
+  Definition sh_pay (T : iProp Σ) (Rsh : gname -> gname -> gname -> iProp Σ)
       (n0 : nat) : iProp Σ :=
     (□ (∀ (W' : uvis) (γt γd γs : gname),
           usz γs (uvis_sz W') -∗
@@ -353,9 +353,18 @@ Section UInitSh.
         per child ([UserConsole.upos_alloc]), so what the application owes
         is sh's body at whichever name this round's pair got. *)
      ∗ (∀ (γp : gname) (N : uk_names Σ),
-          ush_rest N γp (Rsh (ukn_t N) (ukn_d N) (ukn_s N))))%I.
+          ush_rest N γp (Rsh (ukn_t N) (ukn_d N) (ukn_s N)))
+     (* ...AND THE TAG'S READING (lane SH-LINE 2b, L4).  How a tagged input
+        history is READ -- as the discipline or as the taint -- is a fact
+        about the TOP theorem's [boot_fixedGS] equation [riscv_rx_tag =
+        app_tag] and nothing below it, so it reaches sh as a premise, and
+        this is the slot it rides in ([UConsLine.ush_exec_pay] is the
+        shape).  E2 discharges it from that equation, beside init's claim
+        law.  LAST, so every existing destructuring of this payload keeps
+        working (durable-notes, "Shaping a change so the sweep is small"). *)
+     ∗ UkSh.ush_tag_law T)%I.
 
-  Global Instance sh_pay_persistent Rsh n0 : Persistent (sh_pay Rsh n0).
+  Global Instance sh_pay_persistent T Rsh n0 : Persistent (sh_pay T Rsh n0).
   Proof. rewrite /sh_pay. apply _. Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -475,7 +484,7 @@ Section UInitSh.
     (□ (∀ N : uk_names Σ, UkSh.ush_open_console_leaf N T)
      ∨ (□ (∀ N : uk_names Σ, UkSh.ush_open_absent_leaf N T K) ∗ K)
      ∨ T) -∗
-    init_sh_slot T (sh_pay Rsh n0) -∗
+    init_sh_slot T (sh_pay T Rsh n0) -∗
     UkInit.init_exec_sup_lend cn T st.
   Proof.
     intros Hpsok_free Hn0 Hst.
@@ -553,16 +562,16 @@ Section UInitSh.
                      na alen afun⌝ -∗
                   my_pay (uvis_gen W') (ucons_pay cn γp T) -∗
                   ucons_pay cn γp T (-1) -∗
-                  (sh_pay Rsh n0 ∗ upos γp np) -∗ uslot W'))%I as "#Hcon".
+                  (sh_pay T Rsh n0 ∗ upos γp np) -∗ uslot W'))%I as "#Hcon".
     { iModIntro.
       iIntros (na alen afun W')
-        "%Hok %Hcwd0 %Hlzf %Hargs #Hmp HQ [[#Hp1 #Hp2] Hps]".
+        "%Hok %Hcwd0 %Hlzf %Hargs #Hmp HQ [[#Hp1 [#Hp2 #Htag]] Hps]".
       destruct (init_args_det M na alen afun Hsav Hsro Hargs) as [-> Halen].
       iApply (sh_slot_of_kexec Hpsok_free Rsh γp T K (ucons_pay cn γp T)
                 1%nat alen afun fdv W' n0 np
                 (ucons_pay_const cn γp T) Hok Hcwd0
                 (init_sh_room alen n0 Halen Hn0) Hlen Hlzf
-                with "[] Hdep Hdp [] [] Hcons Hgen' Hmp HQ Hps").
+                with "[] Hdep Hdp Htag [] [] Hcons Hgen' Hmp HQ Hps").
       - iModIntro. iIntros (γt γd γs) "Hsz Hlo".
         iApply ("Hp1" $! W' γt γd γs with "Hsz Hlo").
       - iIntros (N0). iApply ("Hp2" $! γp N0).
@@ -570,7 +579,7 @@ Section UInitSh.
     iDestruct (pinned_exec_bundle fsc_fs uslot FsShPin.era0_sh_pins T
                  FsImg.ROOTINO init_sh_pl [FsImg.ROOTINO; FsShPin.SH_INO]
                  FsShPin.SH_INO ElfUser.sh_elf 1%nat
-                 (sh_pay Rsh n0 ∗ upos γp np)%I
+                 (sh_pay T Rsh n0 ∗ upos γp np)%I
                  (ucons_pay cn γp T)
                  M (mword_of_int 0x9a8) (mword_of_int 0x1000) fdv
                  init_sh_pin_resolves sh_elf_loadable

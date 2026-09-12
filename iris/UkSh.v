@@ -127,6 +127,10 @@ Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
 Require Import Xv6Cameras.   (* [uartGhostG] -- the console ring's cameras,
                                 at the narrow class a program binds *)
 Require Import ConsoleInv.   (* [CONSOLE] -- the major fd 0's arm is keyed by *)
+Require Import EchoDisc.     (* [echo_line] / [disc] -- the ONE line the
+                                discipline admits, and the discipline the
+                                input tag is read as (lane SH-LINE 2b).
+                                A PURE file: no ghost class comes with it. *)
 Require Import UserConsole.  (* [upos] -- sh's half of the console position
                                 pair (app-echo.md, "SH-LINE RULING") *)
 (* lane SH-OPEN: the console preamble's PINNED open.  [uvis] / [uslot] are
@@ -189,6 +193,24 @@ Proof.
     rewrite list_lookup_insert;
       [ reflexivity | rewrite Hlen; unfold NSTD; lia ].
 Qed.
+
+(* ===================================================================== *)
+(* WHAT SH'S LINE IS, AS A PURE PROPOSITION (lane SH-LINE 2b, L3).        *)
+(*                                                                        *)
+(* [UkShFork.ushf_lexable] was "every line the user could type lexes",     *)
+(* which is false and was the last thing sh rested on.  What replaces it   *)
+(* is this, applied to the ONE line the read's receipt says sh read: the   *)
+(* [len] bytes at [k] in the line buffer are [EchoDisc.echo_line]'s, in    *)
+(* order, and there are exactly [length echo_line] of them.                *)
+(*                                                                        *)
+(* PURE AND OUTSIDE THE SECTION for [ush_fd0p]'s reason: the command loop  *)
+(* carries it, no resource does, and the file that turns it into           *)
+(* "the lexer accepts this line" ([UkShParse.ush_line_lexable]) is above   *)
+(* this one.                                                              *)
+(* ===================================================================== *)
+Definition ush_line_is (f : nat -> bv 8) (k len : nat) : Prop :=
+  len = length echo_line
+  /\ forall j : nat, (j < len)%nat -> f (k + j)%nat = echo_line !!! j.
 
 Section UkSh.
   Context `{!riscvGS Σ}.
@@ -4222,6 +4244,30 @@ Section UkSh.
   Qed.
 
   (* ===================================================================== *)
+  (* THE TAG'S READING, AS A PERSISTENT LAW SH'S ENTRY TAKES                *)
+  (* (lane SH-LINE 2b, L4; app-echo.md, "SH-LINE PHASE 1 LANDED",           *)
+  (* ruling (3)).                                                          *)
+  (*                                                                       *)
+  (* [RiscvPtsto.riscv_rx_tag] is a field of the machine's FIXED ghost      *)
+  (* state, tied to the application's own tag ([App.app_tag]) only by an    *)
+  (* equation in the top theorem's [boot_fixedGS] -- nothing below reads    *)
+  (* it.  So the reading is a PREMISE, threaded from [SystemAdequacy]'s     *)
+  (* [Hinit_boot] through init's pinned builder to sh's entry, exactly as   *)
+  (* [UInitSh.init_sh_slot] takes its claim law.                           *)
+  (*                                                                       *)
+  (* PERSISTENT, which it must be: sh's entry is built inside init's fork   *)
+  (* child, inside an [iLob] the parent re-enters.                         *)
+  (*                                                                       *)
+  (* STATED HERE rather than in [UConsLine.v] because [ush_rest] below      *)
+  (* consumes what it produces and this file is under that one.            *)
+  (* ===================================================================== *)
+  Definition ush_tag_law : iProp Σ :=
+    (□ (∀ h : list mobs, riscv_rx_tag h -∗ ⌜disc h⌝ ∨ T))%I.
+
+  Global Instance ush_tag_law_persistent : Persistent ush_tag_law.
+  Proof. rewrite /ush_tag_law. apply _. Qed.
+
+  (* ===================================================================== *)
   (* SH'S CONSOLE OPEN, AS TWO LEAF BODIES (lane SH-OPEN, H2).              *)
   (*                                                                       *)
   (* [UkInit.uki_open_console_leaf] / [uki_open_absent_leaf] are the mould, *)
@@ -4475,6 +4521,38 @@ Section UkSh.
        urun N h m (mword_of_int 0x938) (16 + (ush_Dbody + n)) -∗
        WP (Loop : expr riscv_lang))%I.
 
+  (* ===================================================================== *)
+  (* WHAT REPLACES [UkShFork.ushf_lexable] (lane SH-LINE 2b, L3).            *)
+  (*                                                                        *)
+  (* [ushf_lexable] quantified over EVERY line the user could type, which   *)
+  (* is why it is false.  What the command loop hands its body instead is   *)
+  (* this, about the ONE line the read's receipt says sh read: either the   *)
+  (* FIRST NUL at or after [k] ends a line that is exactly [echo_line]      *)
+  (* ([ush_line_is], hence [UkShParse.ush_line_lexable]), or the TAINT --   *)
+  (* and on the taint the body's continuation is the generic one            *)
+  (* ([ush_gen_run] above).                                                 *)
+  (*                                                                        *)
+  (* STATED OVER THE FIRST NUL rather than over a given [len] because that  *)
+  (* is what [UkShFork.ushf_first_nul] produces: the body derives its own   *)
+  (* [len] from the loop's "some byte at or after [k] is NUL", and the line *)
+  (* fact has to hold at the [len] it derived.                              *)
+  (* ===================================================================== *)
+  Definition ush_rest_line (f : nat -> bv 8) (k : nat) : iProp Σ :=
+    ((∀ len : nat,
+        ⌜forall j : nat, (j < len)%nat -> f (k + j)%nat <> ubyte0⌝ -∗
+        ⌜f (k + len)%nat = ubyte0⌝ -∗ ⌜ush_line_is f k len⌝)
+     ∨ T)%I.
+
+  Global Instance ush_rest_line_persistent f k :
+    Persistent (ush_rest_line f k).
+  Proof. rewrite /ush_rest_line. apply _. Qed.
+
+  (* ...AND THE ARM A TAINTED TURN IS AT, as a constructor, so a walk that
+     has learned the taint does not have to spell the disjunction. *)
+  Lemma ush_rest_line_taint (f : nat -> bv 8) (k : nat) :
+    T -∗ ush_rest_line f k.
+  Proof. iIntros "HT". rewrite /ush_rest_line. by iRight. Qed.
+
   Definition ush_rest (R : iProp Σ) : iProp Σ :=
     (□ (∀ (l : list fdstate),
         ush_loop_head R l -∗
@@ -4489,6 +4567,47 @@ Section UkSh.
           ubytes γd sh_buf sh_nbuf f -∗
           urun N h m (mword_of_int 0x97a) (16 + (ush_Dbody + n)) -∗
           WP (Loop : expr riscv_lang)))%I.
+
+  (* ...AND THE SAME OBLIGATION WITH THE LINE FACT IN IT (lane SH-LINE 2b,
+     L3).  The body is where the buffer is LEXED, so that is where "this
+     line is [echo_line], or the taint" has to arrive: it rides beside
+     [ush_fd0p] and before the process state, so the rows the walk reads
+     stay together.
+
+     THIS IS THE WEAKER OBLIGATION, and that is the direction the rewiring
+     goes: a body that needs no line fact serves one that is handed one
+     ([ush_rest_l_of_rest] below), so moving a consumer from [ush_rest] to
+     this one only makes its own proof easier.  [UkShFork.ushf_rest_of_body]
+     proves THIS one -- it is what [UkShFork.ushf_lexable] is replaced by --
+     and [wp_ksh_loop] below still consumes [ush_rest], because the line
+     fact is produced by [wp_ksh_getcmd], which does not produce it yet
+     (SH-LINE 2b phase 2: [UConsLine.ush_gets_line] through gets).  When it
+     does, the loop takes this one and [ush_rest] above is deleted. *)
+  Definition ush_rest_l (R : iProp Σ) : iProp Σ :=
+    (□ (∀ (l : list fdstate),
+        ush_loop_head R l -∗
+        ∀ (h : CpuId) (m : regfile) (f : nat -> bv 8) (k i2 : nat) (n : nat),
+          ⌜ ush_regs m ⌝ -∗
+          ⌜ m !!! Regidx s1_idx = mword_of_int (sh_buf + Z.of_nat k) ⌝ -∗
+          ⌜ m !!! Regidx a5_idx = mword_of_int (bv_unsigned (f k)) ⌝ -∗
+          ⌜ (k <= i2 < sh_nbuf)%nat /\ f i2 = ubyte0 ⌝ -∗
+          ⌜ ush_fd0p l ⌝ -∗
+          ush_rest_line f k -∗
+          ush_pstate l -∗
+          R -∗
+          ubytes γd sh_buf sh_nbuf f -∗
+          urun N h m (mword_of_int 0x97a) (16 + (ush_Dbody + n)) -∗
+          WP (Loop : expr riscv_lang)))%I.
+
+  Global Instance ush_rest_l_persistent R : Persistent (ush_rest_l R).
+  Proof. apply _. Qed.
+
+  Lemma ush_rest_l_of_rest (R : iProp Σ) : ush_rest R -∗ ush_rest_l R.
+  Proof.
+    rewrite /ush_rest /ush_rest_l. iIntros "#H". iModIntro.
+    iIntros (l) "Hhd". iIntros (h m f k i2 n) "%H1 %H2 %H3 %H4 %H5 _".
+    iApply ("H" $! l with "Hhd"); by iPureIntro.
+  Qed.
 
   Global Instance ush_rest_persistent R : Persistent (ush_rest R).
   Proof. apply _. Qed.

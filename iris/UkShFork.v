@@ -107,6 +107,12 @@ Section UkShFork.
      travels through every lemma that carries the process state. *)
   Context `{!uartGhostG Σ}.
   Context (γp : gname).
+  (* ...AND THE APPLICATION'S TAINT, which the line fact's second arm is
+     (lane SH-LINE 2b, L3).  A PARAMETER, for [UkSh.v]'s reason: the
+     program tier names no application.  Persistent, which is what lets
+     the arm be read without threading a resource. *)
+  Context (T : iProp Σ).
+  Context `{HT : !Persistent T}.
   (* the fields, under the names the engine has always used *)
   Local Notation γt := (ukn_t N).
   Local Notation γd := (ukn_d N).
@@ -894,17 +900,17 @@ Section UkShFork.
     exists len. split; [ lia | exact (conj Hnn Hnul) ].
   Qed.
 
-  (* THE ONE THING THE COMMAND LOOP CANNOT PROMISE about a line the user
-     typed.  Stated over an arbitrary [f] and [k] because that is how the
-     loop hands it over: the line is whatever is in the buffer. *)
-  Definition ushf_lexable : Prop :=
-    forall (f : nat -> bv 8) (k len : nat),
-      (forall j : nat, (j < len)%nat -> f (k + j)%nat <> ubyte0) ->
-      f (k + len)%nat = ubyte0 ->
-      ushp_no_symbols len (fun j : nat => f (k + j)%nat) /\
-      exists toks : list (nat * nat),
-        ushp_tokens len (fun j : nat => f (k + j)%nat) 0 toks /\
-        (length toks < 10)%nat.
+  (* [ushf_lexable] IS GONE (lane SH-LINE 2b, L3).  It said "every line the
+     user could type lexes", quantified over an arbitrary [f] and [k]
+     because that is how the loop hands the buffer over -- and it is FALSE:
+     the user may type a symbol byte or eleven words.  What stands in its
+     place is two things that are both true.  The LINE FACT
+     ([UkSh.ush_rest_line], a premise of [UkSh.ush_rest_l] below) says the
+     ONE line the read's receipt delivered is exactly [EchoDisc.echo_line],
+     or else the application is tainted; and [UkShLoop.ush_line_lexable]
+     -- a CLOSED computation on that literal line, owed by E4 -- says that
+     line lexes into three tokens with no symbol byte.  Under the taint the
+     walk does not continue in sh's code at all ([UkSh.ush_gen_run]). *)
 
   Lemma ushf_rest_of_body
       (Hsbrk : forall (N' : uk_names Σ) (sz n : Z) (r : mword 64),
@@ -912,7 +918,11 @@ Section UkShFork.
          ⌜ r = (mword_of_int sz : mword 64) ⌝ ∗
          UkShMalloc.ushm_sbrk_ans N' sz n r)
       (sz : Z) :
-    ushf_lexable ->
+    (* THE LINE THE DISCIPLINE ADMITS LEXES.  Closed at the literal
+       ([UConsLine.ush_echo_tokens] is the computation); E4's
+       [UkShEcho.ush_line_toks_holds] is the stronger form that discharges
+       it, one file above this one. *)
+    UkShLoop.ush_line_lexable ->
     (* the break, as [exec] leaves it *)
     8344 <= sz ->
     UserPtTree.pgroundup sz = sz ->
@@ -923,15 +933,34 @@ Section UkShFork.
        [UkShRun.wp_kshr_runcmd]: this walk reaches runcmd's EXEC arm *)
     uxsup -∗
     shk_rodata γt -∗ ush_jtab γt -∗
-    UkSh.ush_rest N γp (UkShLoop.ushl_R N sz).
+    (* ...AND THE TAINT'S CONTINUATION.  The line fact's second arm is the
+       taint, and a tainted process does not run sh's code any more: the
+       body hands its run to the generic slot. *)
+    UkSh.ush_gen_slot N T -∗
+    UkSh.ush_rest_l N γp T (UkShLoop.ushl_R N sz).
   Proof.
     intros Hlex Hszlo Hszal Hszok.
-    iIntros "#Hdp #Hcode #Hxs #Hro #Hjt".
+    (* the generic slot is a [□] behind a definition; unfolding it before
+       the [#] intro keeps the [Persistent] search off its wand chain
+       (durable-notes, "[iIntros "#H"] on a bundle of wands"). *)
+    rewrite /UkSh.ush_gen_slot.
+    iIntros "#Hdp #Hcode #Hxs #Hro #Hjt #Hgen".
     iModIntro. iIntros (l) "Hhead".
-    iIntros (h m f k i2 n) "%Hregs %Hs1 %Ha5 %Hi2 %Hfd0 Hstd [Hdat Hsz] Hbuf Hrun".
+    iIntros (h m f k i2 n) "%Hregs %Hs1 %Ha5 %Hi2 %Hfd0 Hline Hstd [Hdat Hsz] Hbuf Hrun".
     destruct Hi2 as [[Hki2 Hi2n] Hnul2].
     destruct (ushf_first_nul f k i2 Hki2 Hnul2) as (len & Hle & Hnn & Hnul).
-    destruct (Hlex f k len Hnn Hnul) as (Hns & toks & Htoks & Htlen).
+    (* THE LINE, OR THE TAINT *)
+    iEval (rewrite /UkSh.ush_rest_line) in "Hline".
+    iDestruct "Hline" as "[Hl | HT]"; last first.
+    { assert (Halo : is_aligned_vaddr
+                       (Virtaddr (mword_of_int 0x97a : mword 64)) 2 = true)
+        by (vm_compute; reflexivity).
+      iApply (UkSh.ush_gen_run N T h m (mword_of_int 0x97a)
+                (16 + (UkSh.ush_Dbody + n)) Halo with "[] HT Hrun").
+      rewrite /UkSh.ush_gen_slot. iExact "Hgen". }
+    iDestruct ("Hl" $! len with "[%] [%]") as %Hline;
+      [ exact Hnn | exact Hnul | ].
+    destruct (Hlex f k len Hline) as (Hns & toks & Htoks & Htlen).
     iApply (wp_kshm_body Hsbrk h m f k len toks sz l n
               Hregs Hs1 Ha5 Hnn Hnul ltac:(lia) Hns Htoks Htlen
               Hszlo Hszal Hszok
