@@ -327,3 +327,6 @@ touches the UART layer; SH-LINE 2b LAUNCHED in `-sup` (`brief-sh-line-2b.md`);
 PRINTK-RENDER parked (`lane/printk-ledger`, pure files; the printint-digits WIP
 banked as `wx-briefs/printint-digits-wip.patch`).  In flight: E2 p2 (`-disc`),
 E4 p3 (`-tlw`), SH-LINE 2b p1 (`-sup`); OUT-FUPD pausing (main).
+
+OUT-FUPD PAUSED with main clean and its design recorded (note "OUT-FUPD PHASE 1 --
+DESIGN"; patch `wx-briefs/out-fupd-phase1.patch`).  UNTAG LAUNCHED in main.

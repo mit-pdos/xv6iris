@@ -2404,6 +2404,54 @@ ORDER: GENERIC-PAY → CONS-SWALLOW → SH-LINE 2b (gets on `ush_gets_line`,
 `wp_uk_ecall_read_recv` with `upos` threaded read → gets_loop → gets → getcmd
 → main) → LAZY-FLAG (the owner's form of (A)).
 
+OUT-FUPD PHASE 1 -- DESIGN (2026-09-12; PAUSED before any build, pending the
+two-UART model; the F1 diff banked as `wx-briefs/out-fupd-phase1.patch` against
+`40987e191`, 4 files: RiscvPtsto/RiscvAdequacy/SystemAdequacy/App).  F1: the
+predicate is a FIXED-layer field on `riscv_rx_tag`'s mould, `riscv_out_ok :
+uart_names -> <input> -> list (bv 8) -> Prop` (INDEXED BY THE UART INSTANCE: the
+application says what it claims of the CONSOLE's accepted bytes and `True` of
+the kernel's; nothing moves when the second UART lands) with the founding fact
+as a FIELD `riscv_out_ok_nil` (so BootShared is untouched); `boot_fixedGS`/
+`riscv_power_adequacy`/`xv6_power_adequacy_gen`/the trace hooks thread it like
+`Tg`; `xv6_app.app_out`, `Hout0`; `Htx` gains `⌜u_wire u = u_out u⌝` (the
+rider's clause, the owed premise) and `⌜app_out A c γ … (uart_acc u)⌝` -- the
+ONLY channel to `Hphi` (the UART invariant is not nameable there); the
+equation `riscv_out_ok = app_out A c` is a reading of the theorem's own
+record.  CORRECTION (§1f): the input argument must NOT be the column's `hs`
+(`length hs = length (u_rx u)`: only the QUEUED bytes; shrinks at pop, cleared
+by flush; the echo's byte is already popped) but the column's TOP history `ht`
+(`obs_hist_lb_o ht`, a real trace prefix containing every input so far,
+monotone): `riscv_out_ok : uart_names -> list mobs -> list (bv 8) -> Prop`,
+clause `⌜riscv_out_ok γ (default [] ht) (uart_acc u)⌝` BESIDE `uart_col_ok`,
+with ONE obligation `Hout_mono` (prefix-monotone in the input; `good_out` is).
+F2: the mask is FORCED to `⊤ ∖ ↑uartN` (`HartSMem.Wobl_dev1` at ⊤, `iInv` in
+`ProofUart.v:222`), so `SpecUart.v`'s two STORE bodies' ghost step becomes a
+fupd at that mask (outside the brief's list); the leaf takes `out_shift γd (⊤
+∖ ↑uartN) [sb] Φ := ∀ h acc, ⌜out_ok γ h acc⌝ ={E}=∗ ⌜out_ok γ h (acc ++ [sb])⌝
+∗ Φ` and returns `Φ`; `out_chain` (the per-byte Fixpoint over the run) is the
+PRIMITIVE, `out_chain_shift` derives the message shape ONE WAY ONLY (tx_lock
+is per byte: another hart's bytes can land inside a message).  F3 (console
+side): uartputc_sync takes one link; consputc COMPUTES its bytes
+(`consputc_cs a0`) and takes the chain; the echo's Ψ rides `console_caps`
+(no arity change to consoleintr); uartwrite/uartwriteLoc take one chain over
+the run with `drop i bs` as the loop invariant; consolewrite/filewrite/row 16:
+`wf_Q`/`wf_tr0` become the Ψ/Φ pair (`wf_Psi`/`wf_Phi`); the U-tier write leaf
+passes the PROGRAM's chain (this is where the supply split's write(16)
+premise is discharged).  THE PRINTK SPLIT (§3a): NEVER a blanket `□ Ψ_era`
+appender (false for a constraining application); once the kernel UART `γk`
+exists, the SAME uartputc_sync/consputc contracts are instantiated at `γk`
+with `out_shift_triv` (from `riscv_out_ok γk = fun _ _ => True`), so printk's
+contract, `printk_env`, `pr_res`, `printk_gen_contract` keep their arity and
+the ~50 threading files never move; `panic_env` re-pointed at `γk`.  F4: the
+retirement list (uart_sent_sub*, uart_sent_from*, uart_sent_exact_at,
+tag_proj, cons_sent_cnt*, txsrc, un_tag, the tag column, `uart_colE_loopback`,
+`wf_tr0`); STAYS: `uart_sent`/`uart_tx_own`/`uart_out_lb` (the device's own
+poll/store protocol), the receive column, the pop right, `UartAccepted`.
+ORDERING: `uart_tagsE` is a conjunct of `uart_ghosts`, so the tag removal and
+the leaf's new shape must be one change -- UNTAG does the removal first (with
+the untagged baseline receipts kept), the two-UART model lands, then OUT-FUPD
+resumes on top.
+
 TWO UARTS (the owner's plan, 2026-09-12): xv6 and QEMU change to use two
 UARTs -- one for kernel messages (printk), one for the console, entirely under
 user-process control; NO mixing of kernel and user output.  CONSEQUENCES:
