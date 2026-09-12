@@ -2485,7 +2485,20 @@ live (`uw_addr`), and the flag turns live into mapped.  Row 5's receipt
 (CONS-SWALLOW's `∃ P, perm_of (ud_um P) sz = uvis_perm W ∗ receipt P …`)
 gains `⌜uvis_lazy W = false -> live_pages (uvis_sz W) ⊆ dom (ud_um P)⌝`, and
 sh refutes the copyout-fault swallow from that.  Lane LAZY-FLAG, after
-CONS-SWALLOW (the set form `uvis_map` is withdrawn).  TWO CORRECTIONS FROM
+CONS-SWALLOW (the set form `uvis_map` is withdrawn).  REFINEMENT (coordinator,
+2026-09-12): the flag is COMPUTED at the trap boundary, not stored --
+`uvis_lazy := bool_decide (¬ live_pages sz ⊆ dom (ud_um pt))` in `uvis_of` --
+so there is no new kernel state and no new invariant; the rows are the
+implication `uvis_lazy W = false -> uvis_lazy W' = false` everywhere except
+sbrk's LAZY-grow arm (vmfault can only shrink the fill; exec's fresh image
+covers [0, sz); eager grow maps its run; shrink lowers sz below what it
+unmaps; the fork child's leaves are the parent's), and exec's slot key
+carries `uvis_lazy W' = false`.  The U tier's `urun` is AT `false` (the
+verified-program tier does not support sbrklazy; a restriction of that tier,
+not of the model), so `uvis_of_run` takes the literal and every leaf re-closes
+at `false` from the row.  Deliverable consumed by SH-LINE 2b:
+`wp_uk_ecall_read_recv` hands back `⌜uvis_lazy W = false⌝` and a U-tier lemma
+refutes the receipt's fault disjunct from `ubytes` + row 5's tie.  TWO CORRECTIONS FROM
 CONS-SWALLOW PHASE 1 (2026-09-12): (i) copyout fails on a MAPPED page too --
 a text page (R|X|U, no W) at the re-walk's `PTE_W` test, a `uvmclear`'d guard
 page (no U) at walkaddr -- so the predicate is `uva_wmapped` (leaf with V, U
