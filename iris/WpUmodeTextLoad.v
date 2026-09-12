@@ -19,8 +19,15 @@
    [HartEvents.swp_hart_ram_read_plain] paid by [TsoCtx.ctx_phys_xload_ok]
    ([uv_load_pay]).  The chain is [HartSMem]'s S-mode load chain at User and
    width 1, with the landing file threaded as a PREDICATE ([uv_ld_post])
-   instead of the S-mode "rs or tlb-set rs" disjunction.  Only [lbu] is
-   served: the engine's text loads are byte loads ([UkRunMem.wp_uk_lbu_text]). *)
+   instead of the S-mode "rs or tlb-set rs" disjunction.
+
+   THE WIDTH IS A SECTION VARIABLE.  Two text loads exist: vprintf's format
+   string is read a byte at a time, and sh's jump table lives in .rodata --
+   which shares the executable segment's pages -- and is read by a FOUR-byte
+   [c.lw].  The node route does not care how wide the access is (the RAM node
+   it bottoms out in is already width-generic, [HartSMem.swp_read_ram_node_w]),
+   so the chain is stated ONCE at a symbolic [width] and the two instances are
+   [UkLoadText]'s.  That is [HartSMem]'s [smem] split, at User. *)
 
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.
@@ -40,6 +47,7 @@ Require Import HartSwp HartLift HartSpan HartSpanChar HartGoodb HartMemRun HartM
         HartEvents HartMFetch HartMFrame.
 Require Import PtTreeAdue HartSMem.
 Require Import WpMmodeLeafBase.
+Require Import UserBits.
 Require Import PtBytes UserBytes UserFrame UserClassifyAsm.
 Require Import UserExecFacts.
 Require Import UserMemPt UserMemAccess UserMemClassify UserMemCert UserMemArmsBase.
@@ -94,52 +102,57 @@ Local Ltac sm_read :=
 Lemma is_aligned_paddr_1 (pa : mword 64) : is_aligned_paddr (Physaddr pa) 1 = true.
 Proof. unfold is_aligned_paddr. rewrite Z.rem_1_r. reflexivity. Qed.
 
-(* [HartSMem.hfrun_check_pma_load_S] at User and width 1: the PMA walk never
-   looks at the privilege on the RAM path *)
+(* [HartSMem.hfrun_check_pma_load_S] at User: the PMA walk never looks at the
+   privilege on the RAM path, so this is that lemma's proof with [User] in
+   place of [Supervisor].  RELOCATION ASK: the two differ in one term, and
+   one lemma taking the privilege as a parameter would serve both -- the
+   hoist belongs in [HartSMem.v], whose cone is the whole tree. *)
 Lemma hfrun_check_pma_load_U (D Drw : gset register) (rs : regstate)
-    (pa : mword 64) (pmar0 : list PMA_Region) :
+    (pa : mword 64) (pmar0 : list PMA_Region) (width : Z) :
+  0 < width -> width <= 4096 -> (width | 4096) ->
   (pma_regions : register) ∈ D ->
   register_lookup pma_regions rs = pmar0 ->
   pma_allows_ram pmar0 ->
   addr_is_ram pa ->
+  is_aligned_paddr (Physaddr pa) width = true ->
   hfrun 6 D Drw rs
-    (check_pma_with_pmp_priority (Load Data) PBMT_PMA User (Physaddr pa) 1 false)
+    (check_pma_with_pmp_priority (Load Data) PBMT_PMA User
+       (Physaddr pa) width false)
   = Some (Values.Ok
             {| Phys_Mem_Access_Info_splittable := CannotSplit;
                Phys_Mem_Access_Info_granule_size_exp := 0 |}, rs).
 Proof.
-  intros HD Hpma Hpallow Hram.
+  intros Hpos Hle Hdvd HD Hpma Hpallow Hram Hpa.
   unfold check_pma_with_pmp_priority. sm_cbn.
   sm_read. rewrite Hpma. sm_cbn.
-  destruct (Hpallow pa 1 (pma_ram_access_w pa 1 ltac:(lia) ltac:(lia)
-                            (Z.divide_1_l 4096) Hram (is_aligned_paddr_1 pa)))
+  destruct (Hpallow pa width (pma_ram_access_w pa width Hpos Hle Hdvd Hram Hpa))
     as (region & Hmatch & Hgrant).
   destruct region as [rbase rsize rattr rdtree].
   destruct Hgrant as (_ & Hx & _).
   cbn [PMA_Region_attributes] in Hx.
   rewrite Hmatch. sm_cbn.
   rewrite Hx. sm_cbn.
-  rewrite (is_aligned_paddr_1 pa). sm_cbn.
+  rewrite Hpa. sm_cbn.
   apply hfrun_ret.
-Qed.
-
-(* the PMP range test at a RAM byte: entry 0 is TOR from 0 to past RAM *)
-Lemma ram_load1_pmp (pa paddr0 : mword 64) :
-  addr_is_ram pa ->
-  (ram_base + ram_size <= uint paddr0 * 4)%Z ->
-  pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-    (Z.mul (uint paddr0) 4) (uint pa) (uint (to_bits 64 1)) = PMP_Match.
-Proof.
-  intros (Hlo & Hhi) Hcov.
-  assert (Hz : uint (zeros' 64 : mword 64) = 0) by (vm_compute; reflexivity).
-  assert (H1 : uint (to_bits 64 1 : mword 64) = 1) by (vm_compute; reflexivity).
-  rewrite Hz H1 Z.mul_0_l.
-  apply pmpRangeMatch_full; unfold ram_base, ram_size in *; lia.
 Qed.
 
 Section UmodeTextLoad.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
+
+  (* THE ACCESS WIDTH.  One of the four ISA widths, with the two derived
+     facts every step of the chain needs: the page-split test ([Hdvd]) and
+     the PMP range test ([Huintw]).  [HartSMem]'s [ram_class] carries the
+     same three for the Supervisor tower. *)
+  Variable width : Z.
+  Hypothesis Hvw : vmem_width width.
+  Hypothesis Hdvd : (width | 4096).
+  Hypothesis Huintw : uint (to_bits 64 width) = width.
+
+  Local Lemma wtl_pos : 0 < width.
+  Proof. exact (vmem_width_pos width Hvw). Qed.
+  Local Lemma wtl_le8 : width <= 8.
+  Proof. exact (vmem_width_le width Hvw). Qed.
 
   (* =================================================================== *)
   (* 2. THE STAMPED BYTE AS A PLAIN-LOAD PAYER.                            *)
@@ -150,7 +163,7 @@ Section UmodeTextLoad.
   Lemma bytes_own_p_load_of (img mem : PtBytes.pamap)
       (log : list pwmsg) (V : agent -> nat) (rs : regstate) (d : dev_state)
       (F : Arch.pa -> option nat) (mm : PtBytes.pamap) (IK : nat)
-      (pa : Arch.pa) (n : N) (w : bv (8 * n)) :
+      (pa : Arch.pa) (n : N) {nw : N} (w : bv nw) :
     (forall j : nat, (N.of_nat j < n)%N ->
        mm !! pa_add pa j = Some (nth_byte w j) /\ F (pa_add pa j) = Some IK) ->
     gen_heap_interp (hG := riscv_memGS) mem -∗
@@ -181,49 +194,46 @@ Section UmodeTextLoad.
     iPureIntro. intros tv' Htv j Hj. exact (HH j Hj tv' Htv).
   Qed.
 
-  (* the tier's text byte, as the interp wand the read node wants *)
+  (* THE TIER'S TEXT BYTES, as the RAM node's obligation.  [Mobl_ram] is the
+     Ztso arm ([HartSMem]): a [tso_read_bytes] fact at EVERY view the
+     machine's drain may choose, which a STAMPED byte answers at every view
+     at or after the hart's own ([TsoCtx.ctx_phys_xload_ok]). *)
   Lemma uv_load_pay (pt : uptd) (M : gmap Z (bv 8)) (t : ptree) (IK : nat)
-      (w_leaf va : mword 64) (b : bv 8) :
+      (w_leaf va : mword 64) (wb : mword (8 * width)) :
     uva_inj pt M ->
     uv_tree_ok pt (upa_map pt M) t ->
     ud_um pt !! svpn_of va = Some w_leaf ->
-    uM_bytes M (uint va) 1 b ->
+    (forall j : nat, (j < Z.to_nat width)%nat ->
+       bv_unsigned va mod 4096 + Z.of_nat j < 4096) ->
+    uM_bytes M (uint va) (Z.to_nat width) wb ->
     uva_text pt (uint va) ->
-    ⊢ (∀ σ img log tv V,
-         ⌜V (hart_agent cpu_id) = tv⌝ -∗
-         mstate_interp σ -∗
-         tso_interp_of riscv_eraGS img σ.(mem) log V -∗
-         (TsoCtx.own_context XI ∗
-          bytes_own_p (uv_F pt M IK) (uv_mm t (upa_map pt M)) ∗
-          resv_any cpu_id) ={⊤,∅}=∗
-         ⌜forall tv' : nat, (tv <= tv')%nat -> (tv' <= length log)%nat ->
-            tso_read_bytes img log (hart_agent cpu_id) tv'
-              (u_walk_pa w_leaf va) 1 b⌝ ∗
-         ▷ (|={∅,⊤}=> mstate_interp σ ∗
-              tso_interp_of riscv_eraGS img σ.(mem) log V ∗
-              (TsoCtx.own_context XI ∗
-               bytes_own_p (uv_F pt M IK) (uv_mm t (upa_map pt M)) ∗
-               resv_any cpu_id))).
+    (TsoCtx.own_context XI ∗
+     bytes_own_p (uv_F pt M IK) (uv_mm t (upa_map pt M)) ∗
+     resv_any cpu_id) -∗
+    Mobl_ram width (u_walk_pa w_leaf va) wb
+      (TsoCtx.own_context XI ∗
+       bytes_own_p (uv_F pt M IK) (uv_mm t (upa_map pt M)) ∗
+       resv_any cpu_id).
   Proof.
-    intros Hinj Htok Hl Hb Htx.
-    assert (Hnc : forall j : nat, (j < 1)%nat ->
-              bv_unsigned va mod 4096 + Z.of_nat j < 4096).
-    { intros j Hj. assert (Hj0 : j = 0%nat) by lia. subst j.
-      pose proof (Z.mod_pos_bound (bv_unsigned va) 4096 ltac:(lia)). lia. }
-    assert (Hwin : forall j : nat, (N.of_nat j < 1)%N ->
+    intros Hinj Htok Hl Hnc Hb Htx.
+    pose proof wtl_pos as Hw0.
+    assert (Hwin : forall j : nat, (N.of_nat j < Z.to_N width)%N ->
               uv_mm t (upa_map pt M) !! pa_add (u_walk_pa w_leaf va) j
-                = Some (nth_byte b j) /\
+                = Some (nth_byte wb j) /\
               uv_F pt M IK (pa_add (u_walk_pa w_leaf va) j) = Some IK).
-    { intros j Hj. split.
-      - exact (uv_win_bytes pt M t w_leaf va 1 _ b Hinj (proj1 (proj2 Htok))
-                 Hl Hnc Hb j ltac:(lia)).
-      - exact (uv_win_text pt M IK w_leaf va 1 _ b Hinj Hl Hnc Hb Htx j
-                 ltac:(lia)). }
-    iIntros (σ img log tv V) "%Htv Hσ Htso (Hrun & Hown & Hany)".
+    { intros j Hj.
+      assert (Hj' : (j < Z.to_nat width)%nat) by lia.
+      split.
+      - exact (uv_win_bytes pt M t w_leaf va (Z.to_nat width) _ wb Hinj
+                 (proj1 (proj2 Htok)) Hl Hnc Hb j Hj').
+      - exact (uv_win_text pt M IK w_leaf va (Z.to_nat width) _ wb Hinj Hl
+                 Hnc Hb Htx j Hj'). }
+    rewrite /Mobl_ram. iIntros "(Hrun & Hown & Hany)".
+    iIntros (σ img log tv V) "%Htv Hσ Htso".
     rewrite /mstate_interp. iDestruct "Hσ" as "(Hri & Hmem & Hdev)".
     iDestruct (bytes_own_p_load_of img σ.(mem) log V σ.(sregs) σ.(mdev)
                  (uv_F pt M IK) (uv_mm t (upa_map pt M)) IK
-                 (u_walk_pa w_leaf va) 1 b Hwin
+                 (u_walk_pa w_leaf va) (Z.to_N width) wb Hwin
                  with "Hmem Htso Hrun Hown") as %Hok.
     iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hmask".
     iSplitR.
@@ -233,15 +243,17 @@ Section UmodeTextLoad.
   Qed.
 
   (* =================================================================== *)
-  (* 3. THE NODE.  [HartSMem.swp_checked_mem_read_S] at User, width 1,     *)
-  (* RAM, with the obligation in the interp-wand form and a resource [R]   *)
-  (* threaded through the node (the [_UR] shape of UmodeFetchX).           *)
+  (* 3. THE NODE.  [HartSMem.swp_checked_mem_read_S] at User, RAM, with a   *)
+  (* resource [R] threaded through the node (the [_UR] shape of             *)
+  (* UmodeFetchX).  The memory obligation is [HartSMem.Mobl_ram] itself, so *)
+  (* the RAM node below is that file's width-generic one.                   *)
   (* =================================================================== *)
-  Lemma swp_checked_mem_read_load1_UR (Drw Dro : gset register)
+  Lemma swp_checked_mem_read_loadw_UR (Drw Dro : gset register)
       (Df : register -> dfrac) (rs : regstate)
       (pa : mword 64)
       (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
-      (paddr : type_of_register pmpaddr_n) (b : bv 8) (R : iProp Σ) :
+      (paddr : type_of_register pmpaddr_n) (wb : mword (8 * width))
+      (R : iProp Σ) :
     Drw ## Dro ->
     (pma_regions : register) ∈ Drw ∪ Dro ->
     (pmpcfg_n : register) ∈ Drw ∪ Dro ->
@@ -258,37 +270,31 @@ Section UmodeTextLoad.
     (ram_base + ram_size <= uint (vec_access_dec paddr 0) * 4)%Z ->
     pma_allows_ram pmar0 ->
     addr_is_ram pa ->
+    is_aligned_paddr (Physaddr pa) width = true ->
     gen_cert -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
-    (∀ σ img log tv V,
-        ⌜V (hart_agent cpu_id) = tv⌝ -∗
-        mstate_interp σ -∗
-        tso_interp_of riscv_eraGS img σ.(mem) log V -∗
-        R ={⊤,∅}=∗
-        ⌜forall tv' : nat, (tv <= tv')%nat -> (tv' <= length log)%nat ->
-           tso_read_bytes img log (hart_agent cpu_id) tv' pa 1 b⌝ ∗
-        ▷ (|={∅,⊤}=> mstate_interp σ ∗
-             tso_interp_of riscv_eraGS img σ.(mem) log V ∗ R)) -∗
-    R -∗
+    Mobl_ram width pa wb R -∗
     swp (checked_mem_read (Load Data) PBMT_PMA User
-           (Physaddr pa) 1 false false false false)
-      (fun r => ⌜r = Values.Ok (b, tt)⌝ ∗
+           (Physaddr pa) width false false false false)
+      (fun r => ⌜r = Values.Ok (wb, tt)⌝ ∗
                 hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R).
   Proof.
     intros Hdisj HDpma HDcfg HDaddr HDhtif Hhtif Hpma Hpcfg Hpaddr
-      HA Hord HR Hcov Hpallow Hram.
-    pose proof (ram_load1_pmp pa (vec_access_dec paddr 0) Hram Hcov) as Hrange.
-    iIntros "#Hcert Hrw Hro Hmem HR".
+      HA Hord HR Hcov Hpallow Hram Hpa.
+    pose proof wtl_pos as Hw0. pose proof wtl_le8 as Hw8.
+    pose proof (ram_pmprange width Hvw Hdvd Huintw pa (vec_access_dec paddr 0)
+                  Hram Hpa Hcov) as Hrange.
+    iIntros "#Hcert Hrw Hro Hmem".
     rewrite /swp. iIntros (C) "%HC Hcont".
     unfold checked_mem_read.
     iApply (swp_use_cer
               (check_pma_with_pmp_priority (Load Data) PBMT_PMA
-                 User (Physaddr pa) 1 false) _ _ C HC
+                 User (Physaddr pa) width false) _ _ C HC
               with "[Hrw Hro] [-]").
     { iApply (swp_hfrun 6 Drw Dro Df rs rs _ _ Hdisj
-                (hfrun_check_pma_load_U (Drw ∪ Dro) Drw rs pa pmar0
-                   HDpma Hpma Hpallow Hram)
+                (hfrun_check_pma_load_U (Drw ∪ Dro) Drw rs pa pmar0 width
+                   Hw0 ltac:(lia) Hdvd HDpma Hpma Hpallow Hram Hpa)
                 with "Hcert Hrw Hro"). }
     iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
     rewrite mbind_ret. cbn beta iota zeta.
@@ -303,48 +309,52 @@ Section UmodeTextLoad.
       Z_ge_dec Z_ge_lt_dec Zcompare_rec Z.compare].
     cbn beta iota zeta delta [Defs.assert_exp' bits_of_physaddr].
     rewrite mliftR_ret mbind_ret. cbn beta iota.
-    replace (0 * 1)%Z with 0%Z by lia. rewrite avi0.
+    replace (0 * width)%Z with 0%Z by lia. rewrite avi0.
     iApply (swp_use_cer3
-              (pmpCheck (Physaddr pa) 1 (Load Data) User)
+              (pmpCheck (Physaddr pa) width (Load Data) User)
               _ _ _ _ C HC with "[Hrw Hro] [-]").
     { iApply (swp_pmpCheck_U (Load Data) Drw Dro Df rs pcfg paddr
-                pa 1 Hdisj HDcfg HDaddr Hpcfg Hpaddr HA Hord Hrange
+                pa width Hdisj HDcfg HDaddr Hpcfg Hpaddr HA Hord Hrange
                 ltac:(unfold pmpCheckRWX; cbn match; rewrite HR; reflexivity)
                 with "Hcert Hrw Hro"). }
     iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
     rewrite mbind0_ret.
-    iApply (swp_use_cer3 (within_mmio_readable (Physaddr pa) 1)
+    iApply (swp_use_cer3 (within_mmio_readable (Physaddr pa) width)
               _ _ _ _ C HC with "[Hrw Hro] [-]").
     { iApply (swp_hfrun 12 Drw Dro Df rs rs _ _ Hdisj
-                (hfrun_within_mmio_ram (Drw ∪ Dro) Drw rs pa 1
+                (hfrun_within_mmio_ram (Drw ∪ Dro) Drw rs pa width
                    ltac:(lia) HDhtif Hhtif Hram)
                 with "Hcert Hrw Hro"). }
     iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
-    iApply (swp_use_cer4 (read_ram Riscv.rv64d_types.Read_plain (Physaddr pa) 1 false)
-              (fun r => (⌜r = (b, default_meta)⌝ ∗
+    iApply (swp_use_cer4 (read_ram Riscv.rv64d_types.Read_plain (Physaddr pa) width false)
+              (fun r => (⌜r = (wb, default_meta)⌝ ∗
                          hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R)%I)
-              _ _ _ _ C HC with "[Hrw Hro Hmem HR] [-]").
-    { iApply (swp_hart_ram_read_plain 1 (mread_req1 pa) _ _
-                (hread_req_at_read_ram1 pa) (addr_is_ram_not_dev pa Hram)
-                ltac:(reflexivity) ltac:(reflexivity)
-                with "Hcert [Hrw Hro Hmem HR]").
-      iIntros (σ img log tv V) "%Htv Hσ Htso".
-      iMod ("Hmem" $! σ img log tv V with "[//] Hσ Htso HR") as "[%Hrd Hclose]".
-      iModIntro. iExists b. iSplitR; [iPureIntro; exact Hrd|]. iNext.
-      iMod "Hclose" as "(Hσ & Htso & HR)". iModIntro. iFrame "Hσ Htso".
-      iIntros (tvn Hlo Hhi) "_".
-      rewrite (hread_resume_read_ram1 pa b). iApply swp_ret. by iFrame. }
+              _ _ _ _ C HC with "[Hrw Hro Hmem] [-]").
+    { iApply (swp_mono (read_ram Riscv.rv64d_types.Read_plain (Physaddr pa) width false)
+                (fun r => (⌜r = (wb, default_meta)⌝ ∗ R)%I)
+                with "[Hrw Hro] [Hmem]").
+      - iIntros (r) "(-> & HR)". by iFrame.
+      - iApply (swp_read_ram_node_w width pa wb R Hvw
+                  (addr_is_ram_not_dev pa Hram) with "Hcert Hmem"). }
     iIntros (v) "(-> & Hrw & Hro & HR)". cbn beta iota zeta.
     rewrite mbind_ret. cbn beta.
     change (0 =? 1 - 1) with true. cbn beta iota zeta.
-    rewrite !autocast_id usvd_zeros_full_8 mcer_ret.
-    iApply ("Hcont" $! (Values.Ok (b, tt))). by iFrame.
+    replace (update_subrange_vec_dec (zeros' (8 * 1 * width))
+               (8 * (0 + 1) * width - 1) (8 * 0 * width)
+               (autocast (T := mword) wb))
+      with (update_subrange_vec_dec (zeros' (8 * width)) (8 * width - 1) 0
+              (autocast (T := mword) wb))
+      by (f_equal; lia).
+    rewrite (usvd_zeros_full_gen (8 * width) wb ltac:(lia)).
+    kill_autocast.
+    rewrite mcer_ret.
+    iApply ("Hcont" $! (Values.Ok (wb, tt))). by iFrame.
   Qed.
 
   (* [HartSMem.swp_mem_read_S] at User: the effective privilege is handed
      in as a term equation, which at User is MPRV = 0 *)
-  Lemma swp_mem_read_load1_UR (Drw Dro : gset register) (Df : register -> dfrac)
-      (rs : regstate) (pa : physaddr) (b : bv 8) (R : iProp Σ) :
+  Lemma swp_mem_read_loadw_UR (Drw Dro : gset register) (Df : register -> dfrac)
+      (rs : regstate) (pa : physaddr) (wb : mword (8 * width)) (R : iProp Σ) :
     Drw ## Dro ->
     (mstatus : register) ∈ Drw ∪ Dro ->
     (cur_privilege : register) ∈ Drw ∪ Dro ->
@@ -355,12 +365,12 @@ Section UmodeTextLoad.
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
     (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
-       swp (checked_mem_read (Load Data) PBMT_PMA User pa 1
+       swp (checked_mem_read (Load Data) PBMT_PMA User pa width
               false false false false)
-         (fun r => ⌜r = Values.Ok (b, tt)⌝ ∗
+         (fun r => ⌜r = Values.Ok (wb, tt)⌝ ∗
                    hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R)) -∗
-    swp (mem_read (Load Data) PBMT_PMA pa 1 false false false)
-      (fun r => ⌜r = Values.Ok b⌝ ∗
+    swp (mem_read (Load Data) PBMT_PMA pa width false false false)
+      (fun r => ⌜r = Values.Ok wb⌝ ∗
                 hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R).
   Proof.
     intros Hdisj HDmst HDpriv Hpriv Hep.
@@ -379,11 +389,11 @@ Section UmodeTextLoad.
     unfold mem_read_priv, mem_read_priv_meta.
     cbn beta iota.
     iApply (swp_bind_use _ _
-              (fun r => (⌜r = Values.Ok (b, tt)⌝ ∗
+              (fun r => (⌜r = Values.Ok (wb, tt)⌝ ∗
                          hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R)%I) _
               with "[Hrw Hro Hcmr] [-]").
     { iApply (swp_bind_use _ _
-                (fun r => (⌜r = Values.Ok (b, tt)⌝ ∗
+                (fun r => (⌜r = Values.Ok (wb, tt)⌝ ∗
                            hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R)%I) _
                 with "[Hrw Hro Hcmr] [-]").
       - iApply ("Hcmr" with "Hrw Hro").
@@ -449,12 +459,15 @@ Section UmodeTextLoad.
 
   (* ---- (b) the node: [mem_read] of the text byte, off a file that agrees
      with the entry file everywhere but the TLB *)
-  Lemma uv_swp_mem_read_ld1 (pt : uptd) (M : gmap Z (bv 8)) (t : ptree)
-      (dq : dfrac) (rs rsA : regstate) (w_leaf va : mword 64) (b : bv 8) :
+  Lemma uv_swp_mem_read_ldw (pt : uptd) (M : gmap Z (bv 8)) (t : ptree)
+      (dq : dfrac) (rs rsA : regstate) (w_leaf va : mword 64)
+      (wb : mword (8 * width)) :
     uva_inj pt M ->
     uv_tree_ok pt (upa_map pt M) t ->
     ud_um pt !! svpn_of va = Some w_leaf ->
-    uM_bytes M (uint va) 1 b ->
+    Z.rem (uint va) 4096 <= 4096 - width ->
+    is_aligned_vaddr (Virtaddr va) width = true ->
+    uM_bytes M (uint va) (Z.to_nat width) wb ->
     uva_text pt (uint va) ->
     u_hw_pins rsA ->
     u_pt_pins pt rsA ->
@@ -466,24 +479,26 @@ Section UmodeTextLoad.
     gen_cert -∗
     hreg_frame rs u_Drw -∗ hreg_frame_ro (u_Df dq) rs u_Dro -∗
     (TsoCtx.own_context XI ∗ uv_bytes pt M t ∗ resv_any cpu_id) -∗
-    swp (mem_read (Load Data) PBMT_PMA (Physaddr (u_walk_pa w_leaf va)) 1
+    swp (mem_read (Load Data) PBMT_PMA (Physaddr (u_walk_pa w_leaf va)) width
            false false false)
-      (fun r => ⌜r = Values.Ok b⌝ ∗
+      (fun r => ⌜r = Values.Ok wb⌝ ∗
                 hreg_frame rs u_Drw ∗ hreg_frame_ro (u_Df dq) rs u_Dro ∗
                 (TsoCtx.own_context XI ∗ uv_bytes pt M t ∗ resv_any cpu_id)).
   Proof.
-    intros Hinj Htok Hl Hb Htx Hhw Hpt Lcp Hmprv Hmv.
+    intros Hinj Htok Hl Hpg Hal Hb Htx Hhw Hpt Lcp Hmprv Hmv.
+    pose proof wtl_pos as Hw0. pose proof wtl_le8 as Hw8.
     destruct Hhw as (_ & _ & _ & Hhtif & Hall & _).
     destruct Hpt as (_ & HA & Hord & _ & _ & HRp & Hcov).
-    assert (Hnc : forall j : nat, (j < 1)%nat ->
-              bv_unsigned va mod 4096 + Z.of_nat j < 4096).
-    { intros j Hj. assert (Hj0 : j = 0%nat) by lia. subst j.
-      pose proof (Z.mod_pos_bound (bv_unsigned va) 4096 ltac:(lia)). lia. }
+    assert (Hnc : forall j : nat, (j < Z.to_nat width)%nat ->
+              bv_unsigned va mod 4096 + Z.of_nat j < 4096)
+      by (intros j Hj; exact (uinpage_nck va width j Hpg ltac:(lia))).
+    assert (Halp : is_aligned_paddr (Physaddr (u_walk_pa w_leaf va)) width = true)
+      by exact (pa_aligned_div _ va width Hw0 Hdvd Hal).
     pose proof (proj1 (proj2 (proj2 Htok))) as Hram.
     assert (Hram0 : addr_is_ram (u_walk_pa w_leaf va)).
     { rewrite <- (pa_add_0 (u_walk_pa w_leaf va)). apply Hram. apply elem_of_dom.
-      exact (uv_win_some pt M t w_leaf va 1 _ b Hinj (proj1 (proj2 Htok)) Hl
-               Hnc Hb 0%nat ltac:(lia)). }
+      exact (uv_win_some pt M t w_leaf va (Z.to_nat width) _ wb Hinj
+               (proj1 (proj2 Htok)) Hl Hnc Hb 0%nat ltac:(lia)). }
     assert (Lcp' : register_lookup cur_privilege rs = User)
       by (rewrite (Hmv _ u_in_priv ltac:(vm_compute; reflexivity)); exact Lcp).
     assert (Hmst : register_lookup mstatus rs = register_lookup mstatus rsA)
@@ -494,19 +509,19 @@ Section UmodeTextLoad.
     iIntros "#Hcert Hrw Hro (Hrun & Hown & Hany)".
     iDestruct "Hown" as (IK) "[#Hlb Hown]".
     iApply (swp_mono with "[] [Hrw Hro Hrun Hown Hany]").
-    2:{ iApply (swp_mem_read_load1_UR u_Drw u_Dro (u_Df dq) rs
-                  (Physaddr (u_walk_pa w_leaf va)) b
+    2:{ iApply (swp_mem_read_loadw_UR u_Drw u_Dro (u_Df dq) rs
+                  (Physaddr (u_walk_pa w_leaf va)) wb
                   (TsoCtx.own_context XI ∗
                    bytes_own_p (uv_F pt M IK) (uv_mm t (upa_map pt M)) ∗
                    resv_any cpu_id)%I
                   u_disj u_in_mst u_in_priv Lcp' Hep
                   with "Hcert Hrw Hro [Hrun Hown Hany]").
         iIntros "Hrw Hro".
-        iApply (swp_checked_mem_read_load1_UR u_Drw u_Dro (u_Df dq) rs
+        iApply (swp_checked_mem_read_loadw_UR u_Drw u_Dro (u_Df dq) rs
                   (u_walk_pa w_leaf va)
                   (register_lookup pma_regions rsA)
                   (register_lookup pmpcfg_n rsA)
-                  (register_lookup pmpaddr_n rsA) b
+                  (register_lookup pmpaddr_n rsA) wb
                   (TsoCtx.own_context XI ∗
                    bytes_own_p (uv_F pt M IK) (uv_mm t (upa_map pt M)) ∗
                    resv_any cpu_id)%I
@@ -515,22 +530,25 @@ Section UmodeTextLoad.
                   (Hmv _ u_in_pma ltac:(vm_compute; reflexivity))
                   (Hmv _ u_in_pcfg ltac:(vm_compute; reflexivity))
                   (Hmv _ u_in_paddr ltac:(vm_compute; reflexivity))
-                  HA Hord HRp Hcov (pma_all_ram Hall) Hram0
-                  with "Hcert Hrw Hro [] [$Hrun $Hown $Hany]").
-        iApply (uv_load_pay pt M t IK w_leaf va b Hinj Htok Hl Hb Htx). }
+                  HA Hord HRp Hcov (pma_all_ram Hall) Hram0 Halp
+                  with "Hcert Hrw Hro [Hrun Hown Hany]").
+        iApply (uv_load_pay pt M t IK w_leaf va wb Hinj Htok Hl Hnc Hb Htx
+                  with "[$Hrun $Hown $Hany]"). }
     iIntros (r) "(-> & Hrw & Hro & (Hrun & Hown & Hany))".
     iSplitR; [done|]. iFrame "Hrw Hro Hrun Hany". iExists IK. iFrame "Hlb Hown".
   Qed.
 
   (* ---- (c) [translate_and_read_value]: the walk, then the node *)
-  Lemma uv_swp_translate_and_read_ld1 (pt : uptd) (M : gmap Z (bv 8))
+  Lemma uv_swp_translate_and_read_ldw (pt : uptd) (M : gmap Z (bv 8))
       (t : ptree) (dq : dfrac) (rs rsA : regstate) (w_leaf va : mword 64)
-      (b : bv 8) :
+      (wb : mword (8 * width)) :
     uva_inj pt M ->
     ud_um pt !! svpn_of va = Some w_leaf ->
     uleaf_ok (Load Data) w_leaf ->
     uva_canon va ->
-    uM_bytes M (uint va) 1 b ->
+    Z.rem (uint va) 4096 <= 4096 - width ->
+    is_aligned_vaddr (Virtaddr va) width = true ->
+    uM_bytes M (uint va) (Z.to_nat width) wb ->
     uva_text pt (uint va) ->
     u_data_cfg rsA ->
     u_exec_pins pt t rsA ->
@@ -539,10 +557,10 @@ Section UmodeTextLoad.
     gen_cert -∗ resv_any cpu_id -∗
     hreg_frame rs u_Drw -∗ hreg_frame_ro (u_Df dq) rs u_Dro -∗
     TsoCtx.own_context XI -∗ uv_bytes pt M t -∗
-    swp (translate_and_read_value (Virtaddr va) 1 (Load Data) false false false)
-      (uv_ld_post dq pt M rsA t (Values.Ok (Physaddr (u_walk_pa w_leaf va), b))).
+    swp (translate_and_read_value (Virtaddr va) width (Load Data) false false false)
+      (uv_ld_post dq pt M rsA t (Values.Ok (Physaddr (u_walk_pa w_leaf va), wb))).
   Proof.
-    intros Hinj Hl Hlok Hcanon Hb Htx Hcfg Hpins Htok Hag.
+    intros Hinj Hl Hlok Hcanon Hpg Hal Hb Htx Hcfg Hpins Htok Hag.
     pose proof Hcfg as (Lcp & Hms & _).
     pose proof Hpins as (Hhw & _ & Hpt & _).
     iIntros "#Hcert Hany Hrw Hro Hrun Hown".
@@ -556,13 +574,13 @@ Section UmodeTextLoad.
       "(%Tr & %Hag2 & %Htlbok' & %Htok' & %Hshape & Hrw & Hro & Hrun & Hown & Hany)".
     pose proof (u_bridge_mv rsA rsf rs2 Tr Hag2) as Hmv2.
     iApply (swp_bind_use _ _
-              (fun r => (⌜r = Values.Ok b⌝ ∗
+              (fun r => (⌜r = Values.Ok wb⌝ ∗
                          hreg_frame rs2 u_Drw ∗ hreg_frame_ro (u_Df dq) rs2 u_Dro ∗
                          (TsoCtx.own_context XI ∗ uv_bytes pt M t' ∗
                           resv_any cpu_id))%I) _
               with "[Hrw Hro Hrun Hown Hany] []").
-    { iApply (uv_swp_mem_read_ld1 pt M t' dq rs2 rsA w_leaf va b Hinj Htok' Hl
-                Hb Htx Hhw Hpt Lcp (proj1 (proj2 Hms)) Hmv2
+    { iApply (uv_swp_mem_read_ldw pt M t' dq rs2 rsA w_leaf va wb Hinj Htok' Hl
+                Hpg Hal Hb Htx Hhw Hpt Lcp (proj1 (proj2 Hms)) Hmv2
                 with "Hcert Hrw Hro [$Hrun $Hown $Hany]"). }
     iIntros (v) "(-> & Hrw & Hro & (Hrun & Hown & Hany))". cbn beta iota.
     iApply swp_ret. rewrite /uv_ld_post. iSplitR; [done|].
@@ -573,14 +591,16 @@ Section UmodeTextLoad.
 
   (* ---- (d) [vmem_read_addr]: the two config reads, the translation mode
      (a walk of its own), then (c).  [HartSMem.swp_vmem_read_addr_S_gen]. *)
-  Lemma uv_swp_vmem_read_addr_ld1 (pt : uptd) (M : gmap Z (bv 8))
+  Lemma uv_swp_vmem_read_addr_ldw (pt : uptd) (M : gmap Z (bv 8))
       (t : ptree) (dq : dfrac) (rs rsA : regstate) (w_leaf va : mword 64)
-      (b : bv 8) :
+      (wb : mword (8 * width)) :
     uva_inj pt M ->
     ud_um pt !! svpn_of va = Some w_leaf ->
     uleaf_ok (Load Data) w_leaf ->
     uva_canon va ->
-    uM_bytes M (uint va) 1 b ->
+    Z.rem (uint va) 4096 <= 4096 - width ->
+    is_aligned_vaddr (Virtaddr va) width = true ->
+    uM_bytes M (uint va) (Z.to_nat width) wb ->
     uva_text pt (uint va) ->
     u_data_cfg rsA ->
     u_exec_pins pt t rsA ->
@@ -589,10 +609,11 @@ Section UmodeTextLoad.
     gen_cert -∗ resv_any cpu_id -∗
     hreg_frame rs u_Drw -∗ hreg_frame_ro (u_Df dq) rs u_Dro -∗
     TsoCtx.own_context XI -∗ uv_bytes pt M t -∗
-    swp (vmem_read_addr (Virtaddr va) 1 (Load Data) false false false)
-      (uv_ld_post dq pt M rsA t (Values.Ok b)).
+    swp (vmem_read_addr (Virtaddr va) width (Load Data) false false false)
+      (uv_ld_post dq pt M rsA t (Values.Ok wb)).
   Proof.
-    intros Hinj Hl Hlok Hcanon Hb Htx Hcfg Hpins Htok Hag.
+    intros Hinj Hl Hlok Hcanon Hpg Hal Hb Htx Hcfg Hpins Htok Hag.
+    pose proof wtl_pos as Hw0. pose proof wtl_le8 as Hw8.
     pose proof Hcfg as (Lcp & Hms & _).
     assert (Lcp' : register_lookup cur_privilege rs = User)
       by (rewrite (Hag _ u_in_priv); exact Lcp).
@@ -607,10 +628,9 @@ Section UmodeTextLoad.
     iIntros "#Hcert Hany Hrw Hro Hrun Hown".
     rewrite /swp. iIntros (C) "%HC Hcont".
     unfold vmem_read_addr.
-    rewrite (is_aligned_vaddr_1 va). sm_glue.
+    rewrite Hal. sm_glue.
     rewrite mbind0_ret.
-    rewrite (split_on_page_boundary_aligned_w va 1 (proj1 uload_width_1)
-               (is_aligned_vaddr_1 va)).
+    rewrite (split_on_page_boundary_aligned_w va width Hvw Hal).
     rewrite /returnM mliftR_ret mbind_ret. sm_glue.
     iApply (swp_use_cer (Defs.read_reg mstatus) _ _ C HC
               with "[Hrw Hro] [-]").
@@ -652,27 +672,27 @@ Section UmodeTextLoad.
     change (sys_misaligned_order_decreasing && false) with false. sm_glue.
     rewrite mbindR_ret. sm_glue.
     iApply (swp_use_cer
-              (translate_and_read_value (Virtaddr va) 1 (Load Data)
+              (translate_and_read_value (Virtaddr va) width (Load Data)
                  false false false) _ _ C HC
               with "[Hany Hrw Hro Hrun Hown] [-]").
-    { iApply (uv_swp_translate_and_read_ld1 pt M t dq rs2 rsA w_leaf va b
-                Hinj Hl Hlok Hcanon Hb Htx Hcfg Hpins Htok Hag2
+    { iApply (uv_swp_translate_and_read_ldw pt M t dq rs2 rsA w_leaf va wb
+                Hinj Hl Hlok Hcanon Hpg Hal Hb Htx Hcfg Hpins Htok Hag2
                 with "Hcert Hany Hrw Hro Hrun Hown"). }
     iIntros (v0) "(-> & Hland)". cbn beta iota. sm_glue.
     rewrite mbind0R_ret. sm_glue.
     rewrite mbindR_ret. sm_glue.
     change (not sys_misaligned_order_decreasing && false) with false. sm_glue.
     rewrite mbindR_ret. sm_glue.
-    rewrite (usvd_zeros_full_gen (8 * 1) b ltac:(lia)).
+    rewrite (usvd_zeros_full_gen (8 * width) wb ltac:(lia)).
     rewrite mcer_ret.
-    iApply ("Hcont" $! (Values.Ok b)). iSplitR; [done|]. iExact "Hland".
+    iApply ("Hcont" $! (Values.Ok wb)). iSplitR; [done|]. iExact "Hland".
   Qed.
 
   (* ---- (e) [vmem_read]: the effective address (a walk over the register
      reads), then (d) *)
-  Lemma uv_swp_vmem_read_ld1 (pt : uptd) (M : gmap Z (bv 8))
+  Lemma uv_swp_vmem_read_ldw (pt : uptd) (M : gmap Z (bv 8))
       (t : ptree) (dq : dfrac) (rs rsA : regstate) (w_leaf va : mword 64)
-      (b : bv 8) (rs1 : mword 5) (imm : mword 12) :
+      (wb : mword (8 * width)) (rs1 : mword 5) (imm : mword 12) :
     va = add_vec (if Z.eqb (uint rs1) 0 then zero_reg
                   else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) rsA)
            (sign_extend' 64 imm) ->
@@ -680,7 +700,9 @@ Section UmodeTextLoad.
     ud_um pt !! svpn_of va = Some w_leaf ->
     uleaf_ok (Load Data) w_leaf ->
     uva_canon va ->
-    uM_bytes M (uint va) 1 b ->
+    Z.rem (uint va) 4096 <= 4096 - width ->
+    is_aligned_vaddr (Virtaddr va) width = true ->
+    uM_bytes M (uint va) (Z.to_nat width) wb ->
     uva_text pt (uint va) ->
     u_data_cfg rsA ->
     u_exec_pins pt t rsA ->
@@ -689,11 +711,11 @@ Section UmodeTextLoad.
     gen_cert -∗ resv_any cpu_id -∗
     hreg_frame rs u_Drw -∗ hreg_frame_ro (u_Df dq) rs u_Dro -∗
     TsoCtx.own_context XI -∗ uv_bytes pt M t -∗
-    swp (vmem_read (Regidx rs1) (sign_extend' 64 imm) 1 (Load Data)
+    swp (vmem_read (Regidx rs1) (sign_extend' 64 imm) width (Load Data)
            false false false)
-      (uv_ld_post dq pt M rsA t (Values.Ok b)).
+      (uv_ld_post dq pt M rsA t (Values.Ok wb)).
   Proof.
-    intros Hva Hinj Hl Hlok Hcanon Hb Htx Hcfg Hpins Htok Hag.
+    intros Hva Hinj Hl Hlok Hcanon Hpg Hal Hb Htx Hcfg Hpins Htok Hag.
     pose proof Hcfg as (Lcp & Hms & Lmenv).
     pose proof Hpins as (Hhw & _ & _ & _).
     destruct Hhw as (Lmisa & _ & Lsenv & _ & _ & _).
@@ -727,14 +749,14 @@ Section UmodeTextLoad.
     set (base := if Z.eqb (uint rs1) 0 then zero_reg
                  else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) rsA).
     assert (Hedga : exec (ext_data_get_addr (Regidx rs1) (sign_extend' 64 imm)
-                            (Load Data) 1) s
+                            (Load Data) width) s
                     = Some (Ext_DataAddr_OK
                               (Virtaddr (add_vec base (sign_extend' 64 imm))), s)).
     { unfold ext_data_get_addr.
       rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
       apply exec_returnM. }
     assert (Hgtda : exec (get_transformed_data_addr (Regidx rs1) (sign_extend' 64 imm)
-                            (Load Data) 1) s
+                            (Load Data) width) s
                     = Some (Ext_DataAddr_OK
                               (Virtaddr (add_vec base (sign_extend' 64 imm))), s)).
     { unfold get_transformed_data_addr.
@@ -745,11 +767,11 @@ Section UmodeTextLoad.
       apply exec_returnM. }
     assert (Hgtdag : goodmb Du_r Du_w
                        (get_transformed_data_addr (Regidx rs1) (sign_extend' 64 imm)
-                          (Load Data) 1) s (uv_mmd pt M t) = true).
+                          (Load Data) width) s (uv_mmd pt M t) = true).
     { unfold get_transformed_data_addr.
       assert (Hgedga : goodmb Du_r Du_w
                          (ext_data_get_addr (Regidx rs1) (sign_extend' 64 imm)
-                            (Load Data) 1) s (uv_mmd pt M t) = true).
+                            (Load Data) width) s (uv_mmd pt M t) = true).
       { unfold ext_data_get_addr.
         erewrite gm_bind;
           [ | apply goodmb_rX_bits_gpr, Du_gpr_of_Z_r
@@ -769,7 +791,7 @@ Section UmodeTextLoad.
     unfold vmem_read.
     iApply (swp_use_cer
               (get_transformed_data_addr (Regidx rs1) (sign_extend' 64 imm)
-                 (Load Data) 1) _ _ C HC
+                 (Load Data) width) _ _ C HC
               with "[Hany Hrw Hro Hrun Hown] [-]").
     { iApply (uv_swp_walk pt M M t t dq rs rsA rsA _ _
                 (fun v => (⌜v = Ext_DataAddr_OK (Virtaddr va)⌝ ∗
@@ -788,17 +810,17 @@ Section UmodeTextLoad.
     cbn beta iota. sm_glue.
     rewrite mbindR_ret. sm_glue.
     iApply (swp_use_cer0
-              (vmem_read_addr (Virtaddr va) 1 (Load Data) false false false)
+              (vmem_read_addr (Virtaddr va) width (Load Data) false false false)
               _ C HC with "[Hany Hrw Hro Hrun Hown] [-]").
-    { iApply (uv_swp_vmem_read_addr_ld1 pt M t dq rs2 rsA w_leaf va b
-                Hinj Hl Hlok Hcanon Hb Htx Hcfg Hpins Htok Hag2
+    { iApply (uv_swp_vmem_read_addr_ldw pt M t dq rs2 rsA w_leaf va wb
+                Hinj Hl Hlok Hcanon Hpg Hal Hb Htx Hcfg Hpins Htok Hag2
                 with "Hcert Hany Hrw Hro Hrun Hown"). }
     iIntros (v0) "(-> & Hland)".
-    iApply ("Hcont" $! (Values.Ok b)). iSplitR; [done|]. iExact "Hland".
+    iApply ("Hcont" $! (Values.Ok wb)). iSplitR; [done|]. iExact "Hland".
   Qed.
 
-  (* ---- (f) THE INSTRUCTION.  [lbu rd, imm(rs1)] at User: (e), then the
-     register write (a walk), then the retire. *)
+  (* ---- (f) THE INSTRUCTION.  [LOAD] at User, any width and either
+     signedness: (e), then the register write (a walk), then the retire. *)
   Definition uv_lbu_post (dq : dfrac) (pt : uptd) (M : gmap Z (bv 8))
       (rsA : regstate) (t : ptree) (rd : mword 5) (wval : mword 64)
       : ExecutionResult -> iProp Σ :=
@@ -813,9 +835,16 @@ Section UmodeTextLoad.
          hreg_frame rs3 u_Drw ∗ hreg_frame_ro (u_Df dq) rs3 u_Dro ∗
          TsoCtx.own_context XI ∗ uv_bytes pt M t' ∗ resv_any cpu_id)%I.
 
-  Lemma uv_swp_lbu_text (pt : uptd) (M : gmap Z (bv 8)) (t : ptree)
-      (dq : dfrac) (rsA : regstate) (w_leaf va : mword 64) (b : mword 8)
+  (* [rsm] is the file the frames are AT and [rsA] the one the pins and the
+     effective address are read off: the two differ when a COMPRESSED load
+     has already run its [ExecuteAs] redirect, which is a register-only
+     stretch and so lands on an agreeing file. *)
+  Lemma uv_swp_load_text (is_unsigned : bool)
+      (pt : uptd) (M : gmap Z (bv 8)) (t : ptree)
+      (dq : dfrac) (rsm rsA : regstate) (w_leaf va : mword 64)
+      (wb : mword (8 * width))
       (imm : mword 12) (rs1 rd : mword 5) :
+    reg_agree_on (u_Drw ∪ u_Dro) rsm rsA ->
     uint rd <> 0 ->
     va = add_vec (if Z.eqb (uint rs1) 0 then zero_reg
                   else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) rsA)
@@ -824,35 +853,38 @@ Section UmodeTextLoad.
     ud_um pt !! svpn_of va = Some w_leaf ->
     uleaf_ok (Load Data) w_leaf ->
     uva_canon va ->
-    uM_bytes M (uint va) 1 b ->
+    Z.rem (uint va) 4096 <= 4096 - width ->
+    is_aligned_vaddr (Virtaddr va) width = true ->
+    uM_bytes M (uint va) (Z.to_nat width) wb ->
     uva_text pt (uint va) ->
     u_data_cfg rsA ->
     u_exec_pins pt t rsA ->
     uv_tree_ok pt (upa_map pt M) t ->
     gen_cert -∗ resv_any cpu_id -∗
-    hreg_frame rsA u_Drw -∗ hreg_frame_ro (u_Df dq) rsA u_Dro -∗
+    hreg_frame rsm u_Drw -∗ hreg_frame_ro (u_Df dq) rsm u_Dro -∗
     TsoCtx.own_context XI -∗ uv_bytes pt M t -∗
-    swp (execute (LOAD (imm, Regidx rs1, Regidx rd, true, 1)))
-      (uv_lbu_post dq pt M rsA t rd (extend_value true b)).
+    swp (execute (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, width)))
+      (uv_lbu_post dq pt M rsA t rd (extend_value is_unsigned wb)).
   Proof.
-    intros Hrd Hva Hinj Hl Hlok Hcanon Hb Htx Hcfg Hpins Htok.
+    intros Hag Hrd Hva Hinj Hl Hlok Hcanon Hpg Hal Hb Htx Hcfg Hpins Htok.
+    pose proof wtl_pos as Hw0. pose proof wtl_le8 as Hw8.
     iIntros "#Hcert Hany Hrw Hro Hrun Hown".
-    change (execute (LOAD (imm, Regidx rs1, Regidx rd, true, 1)))
-      with (execute_LOAD imm (Regidx rs1) (Regidx rd) true 1).
+    change (execute (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, width)))
+      with (execute_LOAD imm (Regidx rs1) (Regidx rd) is_unsigned width).
     unfold execute_LOAD.
-    change (Z.leb 1 xlen_bytes) with true.
+    replace (Z.leb width xlen_bytes) with true
+      by (symmetry; apply Z.leb_le; change xlen_bytes with 8; lia).
     cbn beta iota zeta delta [Defs.assert_exp'].
     rewrite /returnM mbind_ret. sm_glue.
-    iApply (swp_bind_use _ _ (uv_ld_post dq pt M rsA t (Values.Ok b)) _
+    iApply (swp_bind_use _ _ (uv_ld_post dq pt M rsA t (Values.Ok wb)) _
               with "[Hany Hrw Hro Hrun Hown] [-]").
-    { iApply (uv_swp_vmem_read_ld1 pt M t dq rsA rsA w_leaf va b rs1 imm Hva
-                Hinj Hl Hlok Hcanon Hb Htx Hcfg Hpins Htok
-                ltac:(intros r _; reflexivity)
+    { iApply (uv_swp_vmem_read_ldw pt M t dq rsm rsA w_leaf va wb rs1 imm Hva
+                Hinj Hl Hlok Hcanon Hpg Hal Hb Htx Hcfg Hpins Htok Hag
                 with "Hcert Hany Hrw Hro Hrun Hown"). }
     iIntros (v0) "(-> & Hland)". cbn beta iota.
     iDestruct "Hland" as (rs2 rsf t')
       "(%Tr & %Hag2 & %Htlbok' & %Htok' & %Hshape & Hrw & Hro & Hrun & Hown & Hany)".
-    set (wval := extend_value true b).
+    set (wval := extend_value is_unsigned wb).
     assert (Hex : exec (wX_bits (Regidx rd) wval) (u_state rsf (uv_mmd pt M t'))
                   = Some (tt, u_state (uv_post_rs rsf None (Some (rd, wval)))
                                 (uv_mmd pt M t'))).

@@ -7555,42 +7555,17 @@ Section UkShDiagLeaf.
 
   (* --------------------------------------------------------------------- *)
   (* AND THE TWO STAGE-5 THEOREMS, UNCONDITIONAL.  Both are the landed      *)
-  (* lemma applied to [ush_Dg] and to the discharge above; nothing else in  *)
-  (* [UkShRun.v] ever carried the Hypothesis.                              *)
+  (* lemma applied to [ush_Dg] and to the discharge above.  Nothing else    *)
+  (* reaches them: runcmd's jump table is read out of the TEXT half by an   *)
+  (* ENGINE LEAF ([UkRunMem.wp_uk_clw_text]), so [UkShRun.v] carries no     *)
+  (* hypothesis of its own for it and neither does this file.               *)
   (* --------------------------------------------------------------------- *)
-  (* THE ONE HYPOTHESIS THAT IS NOT THIS FILE'S: the four-byte load out of
-     the TEXT half that runcmd's jump table (and nulterminate's) needs.
-     [UkShRun.v] carries it as a section variable, so the two theorems
-     below carry it too, spelled here once and passed on.  See
-     [UkShRun.v]'s header: the engine's text reader is width-1 all the way
-     down (WpUmodeTextLoad.v), so this is a genuine gap and one engine leaf
-     discharges it here and in [UkShParse.v]. *)
-  Definition ushd_clw_text_ty : Prop :=
-    forall (N : uk_names Σ) (h : CpuId) (m : regfile) (pc : mword 64)
-           (uimm : mword 5) (crs1 crd : mword 3) (rs1 rd : mword 5) (a : Z)
-           (wv : mword 32) (avail : nat),
-      unot_sp rd ->
-      creg2reg_idx (Cregidx crs1) = Regidx rs1 ->
-      creg2reg_idx (Cregidx crd) = Regidx rd ->
-      a = uint (m !!! Regidx rs1) + uoff_c4 uimm ->
-      a mod 4 = 0 ->
-      uint rd <> 0 ->
-      uinstr_is (ukn_t N) pc true (C_LW (uimm, Cregidx crs1, Cregidx crd)) -∗
-      ([∗ list] j ∈ seq 0 4, utext (ukn_t N) (a + Z.of_nat j) (nth_byte wv j)) -∗
-      urun N h m pc avail -∗
-      (∀ h' : CpuId,
-         urun N h'
-           (<[Regidx rd := regval_into_reg (sign_extend' 64 wv)]> m)
-           (add_vec_int pc 2) avail -∗
-         WP (Loop : expr riscv_lang)) -∗
-      WP (Loop : expr riscv_lang).
-
   (* AT ONE CLASS ([ukn_const]), like every other lemma of sh's walk: the
      exec supply names THIS record's own payload ([UkRun.uxsup_at]), so
      runcmd no longer asks its caller to be trivial.  A caller whose
      record is trivial -- sh's forked child is, by
      [UkFork.wp_uk_ecall_fork_any]'s arm -- passes [UkRun.uxsup]. *)
-  Lemma wp_kshr_runcmd_final (Hclw : ushd_clw_text_ty) (c : ushcmd) :
+  Lemma wp_kshr_runcmd_final (c : ushcmd) :
     ush_simple c ->
     forall (N : uk_names Σ) `{!ukn_const N} (h : CpuId) (m : regfile) (t szv : Z)
            (ld : list fdstate) (n : nat),
@@ -7607,7 +7582,7 @@ Section UkShDiagLeaf.
       urun N h m (mword_of_int ShSyms.runcmd)
         (6 * ush_ht c + (2 + (ush_Dg + n))) -∗
       WP (Loop : expr riscv_lang).
-  Proof. exact (wp_kshr_runcmd ush_Dg Hpsok Hclw ush_diag_leaf_holds c). Qed.
+  Proof. exact (wp_kshr_runcmd ush_Dg Hpsok ush_diag_leaf_holds c). Qed.
 
   Lemma wp_kshr_fork1_final (N : uk_names Σ) `{!ukn_const N}
       (P : gname -> gname -> gname -> iProp Σ) `{FP : !Forkable P}

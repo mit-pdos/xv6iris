@@ -689,4 +689,143 @@ Section UkRunMem.
     iApply "Hcont".
   Qed.
 
+  (* THE TEXT ACCESS BRIDGE.  [uheap_access]'s twin for the STAMPED half: the
+     k stamped bytes name the image's bytes, and the base page is X and -- by
+     the heap's own invariant -- NOT W, which is what puts the read on the
+     node ([UkLoadText]) instead of the walker. *)
+  Lemma uheap_text_access (γt γd γs : gname) (M : gmap Z (bv 8))
+      (pm : gmap (mword 27) uperm) (sz : Z) (a : Z) (k : nat)
+      (f : nat -> bv 8) :
+    (0 < k)%nat -> uwidth (Z.of_nat k) -> a mod Z.of_nat k = 0 ->
+    uheap γt γd γs M pm sz -∗
+    ([∗ list] j ∈ seq 0 k, utext γt (a + Z.of_nat j) (f j)) -∗
+    ⌜ uint (mword_of_int a : mword 64) = a /\
+      uva_canon (mword_of_int a : mword 64) /\
+      (exists q : uperm, uperm_at pm (mword_of_int a : mword 64) = Some q /\
+                         up_X q = true /\ up_W q = false) /\
+      Z.rem (uint (mword_of_int a : mword 64)) 4096 <= 4096 - Z.of_nat k /\
+      is_aligned_vaddr (Virtaddr (mword_of_int a : mword 64)) (Z.of_nat k) = true /\
+      (forall j : nat, (j < k)%nat -> M !! (a + Z.of_nat j)%Z = Some (f j)) ⌝.
+  Proof.
+    intros Hk Hw Hm. iIntros "Hheap #Hbs".
+    iAssert (⌜forall j : nat, (j < k)%nat ->
+               M !! (a + Z.of_nat j)%Z = Some (f j) /\
+               ux_addr pm (a + Z.of_nat j)%Z /\
+               ~ uw_addr pm (a + Z.of_nat j)%Z /\
+               0 <= a + Z.of_nat j < 2 ^ 38⌝)%I with "[Hheap]" as %Hall.
+    { rewrite bi.pure_forall. iIntros (j). rewrite bi.pure_impl. iIntros (Hj).
+      assert (Hjs : seq 0 k !! j = Some j) by (apply lookup_seq; lia).
+      iDestruct (big_sepL_lookup _ (seq 0 k) j j Hjs with "Hbs") as "Hj".
+      iDestruct (uheap_text γt γd γs M pm sz (a + Z.of_nat j) (f j)
+                   with "Hheap Hj") as %(HM & Hx & Hbnd).
+      iDestruct (uheap_text_nw γt γd γs M pm sz (a + Z.of_nat j) (f j)
+                   with "Hheap Hj") as %Hnw.
+      iPureIntro. split; [ exact HM | ]. split; [ exact Hx | ].
+      split; [ exact Hnw | exact Hbnd ]. }
+    iPureIntro.
+    destruct (Hall 0%nat Hk) as (_ & Hx0 & Hnw0 & Hbnd0).
+    change (Z.of_nat 0) with 0 in Hx0, Hnw0, Hbnd0.
+    rewrite Z.add_0_r in Hx0, Hnw0, Hbnd0.
+    destruct (ucanon_of_bound a Hbnd0) as [Hua Hcan].
+    destruct (uaccess_arith a (Z.of_nat k) ltac:(lia) Hw Hm) as [Hpg Hrm].
+    split_and!.
+    - exact Hua.
+    - exact Hcan.
+    - destruct Hx0 as (q & Hq & Hqx). exists q. split; [ exact Hq | ].
+      split; [ exact Hqx | ].
+      destruct (up_W q) eqn:E; [ | reflexivity ].
+      exfalso. apply Hnw0. exists q. exact (conj Hq E).
+    - rewrite Hua. exact Hpg.
+    - unfold is_aligned_vaddr. apply Z.eqb_eq. rewrite Hua. exact Hrm.
+    - intros j Hj. exact (proj1 (Hall j Hj)).
+  Qed.
+
+  (* c.lw rd', uimm(rs1') OUT OF THE TEXT HALF -- sh's jump table at 0x1398.
+     .rodata shares the executable segment's pages, so the table's words are
+     [utext]; the compressed form redirects to the uncompressed [lw], which
+     is width 4 and SIGNED.  [utext] is persistent, so -- as in
+     [wp_uk_lbu_text] -- there is no give-back wand in the continuation. *)
+  Lemma wp_uk_clw_text (N : uk_names Σ) (h : CpuId) (m : regfile) (pc : mword 64)
+      (uimm : mword 5) (crs1 crd : mword 3) (rs1 rd : mword 5) (a : Z)
+      (wv : mword 32) (avail : nat) :
+    unot_sp rd ->
+    creg2reg_idx (Cregidx crs1) = Regidx rs1 ->
+    creg2reg_idx (Cregidx crd) = Regidx rd ->
+    a = uint (m !!! Regidx rs1) + uoff_c4 uimm ->
+    a mod 4 = 0 ->
+    uint rd <> 0 ->
+    uinstr_is (ukn_t N) pc true (C_LW (uimm, Cregidx crs1, Cregidx crd)) -∗
+    ([∗ list] j ∈ seq 0 4, utext (ukn_t N) (a + Z.of_nat j) (nth_byte wv j)) -∗
+    urun N h m pc avail -∗
+    (∀ h' : CpuId,
+       urun N h'
+         (<[Regidx rd := regval_into_reg (sign_extend' 64 wv)]> m)
+         (add_vec_int pc 2) avail -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hns He1 He2 Ha Hal Hrd. iIntros "#Hi #Hw Hrun Hcont".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs pidv) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & Hcha & #Hmy & Hpayv & #Hdep & Hb)".
+    iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
+    iDestruct (uheap_text_access (ukn_t N) (ukn_d N) (ukn_s N) M pm sz a 4
+                 (nth_byte wv) ltac:(lia)
+                 ltac:(right; right; left; reflexivity) Hal with "Hheap Hw")
+      as %(Hua & Hcan & Hok & Hpg & Hal4 & Hmap).
+    assert (Htgt : (mword_of_int a : mword 64)
+                   = add_vec (m !!! Regidx rs1)
+                       (sign_extend' 64 (zero_extend' 12 (concat_vec uimm ('b"00"))))).
+    { rewrite Ha /uoff_c4. rewrite <- moi_add. rewrite !moi_of_uint.
+      reflexivity. }
+    iApply (UkLoadText.wp_uk_clw_text_x C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw gn cs pidv uimm crs1 crd rs1 rd
+              (mword_of_int a) (sign_extend' 64 wv) wv Hui He1 He2 Hrd Htgt
+              Hok Hcan Hpg Hal4
+              ltac:(rewrite Hua; exact Hmap) eq_refl
+              with "Hb [Hheap Hstk Hufd Hcwda Hcha Hpayv Hcont]").
+    iApply (urun_close_upd _ _ _ m rd _ _ _ _ _ _ _ _ _ Hns with "Hheap Hstk Hufd Hcwda Hcha Hmy Hpayv Hdep").
+    iApply "Hcont".
+  Qed.
+
+  (* lw rd, imm(rs1) out of the text half -- the UNCOMPRESSED form of the
+     same read, beside [wp_uk_clw_text] because the leaf below is one
+     lemma ([UkLoadText.wp_uk_load_text]) and this instance is free. *)
+  Lemma wp_uk_lw_text (N : uk_names Σ) (h : CpuId) (m : regfile) (pc : mword 64)
+      (imm : mword 12) (rs1 rd : mword 5) (a : Z) (wv : mword 32) (avail : nat) :
+    unot_sp rd ->
+    a = uint (m !!! Regidx rs1) + uoff_i12 imm ->
+    a mod 4 = 0 ->
+    uint rd <> 0 ->
+    uinstr_is (ukn_t N) pc false (LOAD (imm, Regidx rs1, Regidx rd, false, 4)) -∗
+    ([∗ list] j ∈ seq 0 4, utext (ukn_t N) (a + Z.of_nat j) (nth_byte wv j)) -∗
+    urun N h m pc avail -∗
+    (∀ h' : CpuId,
+       urun N h'
+         (<[Regidx rd := regval_into_reg (sign_extend' 64 wv)]> m)
+         (add_vec_int pc 4) avail -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hns Ha Hal Hrd. iIntros "#Hi #Hw Hrun Hcont".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs pidv) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & Hcha & #Hmy & Hpayv & #Hdep & Hb)".
+    iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
+    iDestruct (uheap_text_access (ukn_t N) (ukn_d N) (ukn_s N) M pm sz a 4
+                 (nth_byte wv) ltac:(lia)
+                 ltac:(right; right; left; reflexivity) Hal with "Hheap Hw")
+      as %(Hua & Hcan & Hok & Hpg & Hal4 & Hmap).
+    assert (Htgt : (mword_of_int a : mword 64)
+                   = add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)).
+    { exact (umoi_add_i12 _ imm a Ha). }
+    iApply (UkLoadText.wp_uk_load_text C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw gn cs pidv false
+              (LOAD (imm, Regidx rs1, Regidx rd, false, 4)) None
+              imm rs1 rd false 4 (mword_of_int a) (sign_extend' 64 wv)
+              uload_width_4 Hui ltac:(intro s; exact I) I eq_refl Hrd Htgt
+              Hok Hcan Hpg Hal4
+              (uM_bytes_exists M (uint (mword_of_int a : mword 64)) 4 wv
+                 ltac:(rewrite Hua; exact Hmap))
+              ltac:(rewrite (uM_word_w4_val_s M (uint (mword_of_int a : mword 64)) wv
+                              ltac:(rewrite Hua; exact Hmap)); reflexivity)
+              with "Hb [Hheap Hstk Hufd Hcwda Hcha Hpayv Hcont]").
+    iApply (urun_close_upd _ _ _ m rd _ _ _ _ _ _ _ _ _ Hns with "Hheap Hstk Hufd Hcwda Hcha Hmy Hpayv Hdep").
+    iApply "Hcont".
+  Qed.
+
 End UkRunMem.

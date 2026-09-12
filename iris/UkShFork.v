@@ -205,7 +205,6 @@ Section UkShFork.
          UkShMalloc.ushm_sbrk_ans N' sz n r -∗
          ⌜ r = (mword_of_int sz : mword 64) ⌝ ∗
          UkShMalloc.ushm_sbrk_ans N' sz n r)
-      (Hclw : UkShDiag.ushd_clw_text_ty)
       (h : CpuId) (m : regfile) (f : nat -> bv 8) (k len : nat)
       (toks : list (nat * nat)) (sz : Z) (l : list fdstate) (n : nat) :
     UkSh.ush_regs m ->
@@ -424,7 +423,7 @@ Section UkShFork.
       replace (2 + (UkShDiag.ush_Dg + (66 + n)))%nat
         with (60 + (8 + (UkShDiag.ush_Dg + n)))%nat
         by (unfold UkShDiag.ush_Dg; lia).
-      iApply (UkShMain.wp_kshm_child_alloc N' Hpsok (Hsbrk N') Hclw
+      iApply (UkShMain.wp_kshm_child_alloc N' Hpsok (Hsbrk N')
                 hB mA DfracDiscarded DfracDiscarded
                 (sh_buf + Z.of_nat k) len (fun j : nat => f (k + j)%nat)
                 toks sz l n
@@ -463,7 +462,6 @@ Section UkShFork.
          UkShMalloc.ushm_sbrk_ans N' sz n r -∗
          ⌜ r = (mword_of_int sz : mword 64) ⌝ ∗
          UkShMalloc.ushm_sbrk_ans N' sz n r)
-      (Hclw : UkShDiag.ushd_clw_text_ty)
       (h : CpuId) (m : regfile) (f : nat -> bv 8) (k len : nat)
       (toks : list (nat * nat)) (sz : Z) (l : list fdstate) (n : nat) :
     UkSh.ush_regs m ->
@@ -694,7 +692,7 @@ Section UkShFork.
                     with "[] Hrun").
           { iApply (uis_shk_98a with "Hcode"). }
           iIntros (h5) "Hrun".
-          iApply (wp_kshf_fork Hsbrk Hclw h5 m2 f k len toks sz l n
+          iApply (wp_kshf_fork Hsbrk h5 m2 f k len toks sz l n
                     Hregs2 Hs1_2 Hns Htoks Htlen Hnn Hnul Hkl
                     Hszlo Hszal Hszok
                     with "Hhead Hcode Hxs Hro Hjt Hstd Hdat Hsz Hbuf Hrun").
@@ -714,7 +712,7 @@ Section UkShFork.
                     with "[] Hrun").
           { iApply (uis_shk_982 with "Hcode"). }
           iIntros (h3) "Hrun".
-          iApply (wp_kshf_fork Hsbrk Hclw h3 m1 f k len toks sz l n
+          iApply (wp_kshf_fork Hsbrk h3 m1 f k len toks sz l n
                     Hregs1 Hs1_1 Hns Htoks Htlen Hnn Hnul Hkl
                     Hszlo Hszal Hszok
                     with "Hhead Hcode Hxs Hro Hjt Hstd Hdat Hsz Hbuf Hrun").
@@ -734,7 +732,7 @@ Section UkShFork.
                   with "[] Hrun").
         { iApply (uis_shk_97a with "Hcode"). }
         iIntros (h1) "Hrun".
-        iApply (wp_kshf_fork Hsbrk Hclw h1 m f k len toks sz l n
+        iApply (wp_kshf_fork Hsbrk h1 m f k len toks sz l n
                   Hregs Hs1 Hns Htoks Htlen Hnn Hnul Hkl
                   Hszlo Hszal Hszok
                   with "Hhead Hcode Hxs Hro Hjt Hstd Hdat Hsz Hbuf Hrun").
@@ -819,7 +817,7 @@ Section UkShFork.
          UkShMalloc.ushm_sbrk_ans N' sz n r -∗
          ⌜ r = (mword_of_int sz : mword 64) ⌝ ∗
          UkShMalloc.ushm_sbrk_ans N' sz n r)
-      (Hclw : UkShDiag.ushd_clw_text_ty) (sz : Z) :
+      (sz : Z) :
     ushf_lexable ->
     (* the break, as [exec] leaves it *)
     8344 <= sz ->
@@ -839,7 +837,7 @@ Section UkShFork.
     destruct Hi2 as [[Hki2 Hi2n] Hnul2].
     destruct (ushf_first_nul f k i2 Hki2 Hnul2) as (len & Hle & Hnn & Hnul).
     destruct (Hlex f k len Hnn Hnul) as (Hns & toks & Htoks & Htlen).
-    iApply (wp_kshm_body Hsbrk Hclw h m f k len toks sz l n
+    iApply (wp_kshm_body Hsbrk h m f k len toks sz l n
               Hregs Hs1 Ha5 Hnn Hnul ltac:(lia) Hns Htoks Htlen
               Hszlo Hszal Hszok
               with "[Hhead] Hcode Hxs Hro [] Hjt Hstd Hdat Hsz Hbuf Hrun").

@@ -68,21 +68,20 @@
 (* is not a step at all -- so [ush_diag_at] now names the node's alignment *)
 (* alongside the pc, which both sites read off [ush_cmd].                  *)
 (*                                                                        *)
-(* THREE LANE LEAVES AND ONE HYPOTHESIS.  [wp_uk_cldq]/[wp_uk_clwq]/       *)
+(* THREE LANE LEAVES.  [wp_uk_cldq]/[wp_uk_clwq]/                          *)
 (* [wp_uk_lwuq] are UkRunMem's [wp_uk_cld]/[wp_uk_clw]/[wp_uk_lwu] at a    *)
 (* DFRAC: those three are stated at [DfracOwn 1] though their proofs are   *)
 (* dfrac-generic ([uheap_access] already takes a [dq], and [wp_uk_ld]/     *)
 (* [wp_uk_lbu] already expose it), and a persistent tree cannot be read    *)
 (* without them.  RELOCATION ASK, beside [UkRunBr.wp_uk_btype0]'s.         *)
 (*                                                                        *)
-(* [wp_uk_clw_text] -- the FOUR-BYTE load out of the TEXT half that the    *)
-(* jump table at 0x1398 needs -- is a HYPOTHESIS here, with the statement  *)
-(* [UkShParse.ushp_clw_text_ok] carries verbatim.  It is a genuine gap in  *)
-(* the engine, not a spelling: [UkLoad.uk_load_ok] demands a WRITABLE      *)
-(* target page (text bytes are stamped and outside the walker's map,       *)
-(* claude-notes/design/icache.md) and the tier's one text reader,          *)
-(* [UkRunMem.wp_uk_lbu_text], is width-1 all the way down                  *)
-(* (WpUmodeTextLoad.v).  One engine leaf discharges both files.            *)
+(* THE JUMP TABLE'S READ IS AN ENGINE LEAF.  The table at 0x1398 lives in  *)
+(* .rodata, which shares the executable segment's pages, so the heap files *)
+(* its words under [utext] as X-and-not-W and [UkLoad.uk_load_ok]'s        *)
+(* WRITABLE target page is not available: the read is driven at the memory *)
+(* node instead of through the walker (claude-notes/design/icache.md).     *)
+(* [UkRunMem.wp_uk_clw_text] is that leaf -- the engine's text reader is   *)
+(* width-generic (WpUmodeTextLoad.v) -- and this file just calls it.       *)
 (* ===================================================================== *)
 From Stdlib Require Import ZArith Bool Lia List.
 From stdpp Require Import gmap bitvector.definitions.
@@ -597,42 +596,6 @@ Section UkShRun.
     iApply (urun_close_upd _ _ _ m rd _ _ _ _ _ _ _ _ _ Hns with "Hheap Hstk Hufd Hcwda Hcha Hmy Hpayv Hdep").
     iApply ("Hcont" with "Hw").
   Qed.
-
-  (* ...and the FOURTH, which is not a spelling but a gap: a FOUR-byte load
-     out of the TEXT half.  .rodata shares the executable segment's pages,
-     so the heap files it under [utext] as X-and-not-W, and the tier's only
-     text reader is [UkRunMem.wp_uk_lbu_text] -- ONE BYTE, and its whole
-     chain (WpUmodeTextLoad.v) is width-1 by construction.  runcmd's jump
-     table at 0x1398 is four bytes wide and is read by a COMPRESSED lw, so
-     this leaf is a genuine gap in the engine rather than a spelling of an
-     existing one: [UkLoad.uk_load_ok] demands a WRITABLE target page (the
-     walker owns data bytes; text bytes are stamped and outside its map --
-     claude-notes/design/icache.md), which a .rodata address is not.
-
-     IT IS A HYPOTHESIS UNTIL THE ENGINE HAS THE WIDTH-4 TEXT LOAD, and
-     the statement below is [UkShParse.ushp_clw_text_ok] VERBATIM, so the
-     one leaf discharges both files by [exact].  Nothing else in this file
-     is conditional: every lemma that reaches the jump table says so in its
-     own type. *)
-  Hypothesis wp_uk_clw_text :
-    forall (N : uk_names Σ) (h : CpuId) (m : regfile) (pc : mword 64)
-           (uimm : mword 5) (crs1 crd : mword 3) (rs1 rd : mword 5) (a : Z)
-           (wv : mword 32) (avail : nat),
-      unot_sp rd ->
-      creg2reg_idx (Cregidx crs1) = Regidx rs1 ->
-      creg2reg_idx (Cregidx crd) = Regidx rd ->
-      a = uint (m !!! Regidx rs1) + uoff_c4 uimm ->
-      a mod 4 = 0 ->
-      uint rd <> 0 ->
-      uinstr_is (ukn_t N) pc true (C_LW (uimm, Cregidx crs1, Cregidx crd)) -∗
-      ([∗ list] j ∈ seq 0 4, utext (ukn_t N) (a + Z.of_nat j) (nth_byte wv j)) -∗
-      urun N h m pc avail -∗
-      (∀ h' : CpuId,
-         urun N h'
-           (<[Regidx rd := regval_into_reg (sign_extend' 64 wv)]> m)
-           (add_vec_int pc 2) avail -∗
-         WP (Loop : expr riscv_lang)) -∗
-      WP (Loop : expr riscv_lang).
 
   (* ===================================================================== *)
   (* §4 CALLS.  Every call in runcmd and fork1 is [jal ra,<sym>] followed   *)
@@ -1784,8 +1747,9 @@ Section UkShRun.
   (* [exit(1)] at 0xba, which is [wp_kshr_runcmd_null]'s subject instead.   *)
   (*                                                                       *)
   (* THE JUMP TABLE IS A TEXT READ.  .rodata shares the executable          *)
-  (* segment, so the [c.lw a5,0(a5)] at 0xb4 goes through [wp_uk_clw_text]  *)
-  (* and the row comes out of [ush_jtab], not out of the data heap.         *)
+  (* segment, so the [c.lw a5,0(a5)] at 0xb4 goes through the engine leaf   *)
+  (* [UkRunMem.wp_uk_clw_text], and the row comes out of [ush_jtab], not     *)
+  (* out of the data heap.                                                  *)
   (* ===================================================================== *)
 
   (* the four closed identities the dispatch needs, one per node kind *)

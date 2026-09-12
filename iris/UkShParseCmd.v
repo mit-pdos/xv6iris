@@ -12,12 +12,11 @@
 (*                        stage 6's seam is built on.                      *)
 (*   parsecmd     @0x86e  the front door: [strlen] the line, run the       *)
 (*                        descent, [nulterminate], return the node.        *)
-(*   wp_kshp_parser       THE THEOREM, and the two Hypotheses that reach   *)
+(*   wp_kshp_parser       THE THEOREM, and the ONE Hypothesis that reaches *)
 (*                        it -- [ushp_malloc_ok] (through execcmd, now     *)
-(*                        discharged by iris/UkShMalloc.v) and            *)
-(*                        [ushp_clw_text_ok] (the engine's width-4 text    *)
-(*                        load, declared here because nulterminate's jump  *)
-(*                        table is the only thing that needs it).          *)
+(*                        discharged by iris/UkShMalloc.v).  The width-4   *)
+(*                        text load nulterminate's jump table needs is an  *)
+(*                        engine leaf, [UkRunMem.wp_uk_clw_text].          *)
 (*                                                                        *)
 (* See iris/UkShParse.v's header for why stage 4 is six files.            *)
 (* ===================================================================== *)
@@ -1316,38 +1315,16 @@ Section UkShParseCmd.
   (* back as [ushp_nulfold toks], the original bytes with a zero at each    *)
   (* token's END INDEX.                                                     *)
   (*                                                                       *)
-  (* THE ONE HYPOTHESIS THIS FUNCTION FORCES.  The switch is a genuine      *)
+  (* THE TEXT-HALF LOAD THIS FUNCTION FORCES.  The switch is a genuine      *)
   (* computed transfer through a table in .rodata, and .rodata is the TEXT  *)
   (* half, so the [c.lw a5,0(a5)] at 0x814 is a FOUR-BYTE LOAD OUT OF THE   *)
-  (* TEXT HALF.  [UkRunMem.wp_uk_lbu_text] is one byte and                  *)
-  (* [UkRunMem.wp_uk_clw] takes [ubytes γd].  The leaf EXISTS -- it is      *)
-  (* [UkShRun.wp_uk_clw_text], built for runcmd's own jump table -- but it  *)
-  (* is [Local] to that file, so this walk cannot name it.                  *)
-  (* [ushp_clw_text_ok] below is its statement, VERBATIM, and the discharge *)
-  (* is one [exact] the moment relocation ask 3 lands it in [UkRunMem.v].   *)
-  (* Round 3 recorded this leaf as a BASE-encoding [lw]; the catalog says   *)
-  (* [c.lw], so the ask is the compressed one and it is already written.    *)
+  (* TEXT HALF -- which the walker cannot serve, because a text page is X   *)
+  (* and not W and its bytes are stamped and outside the walker's map       *)
+  (* (claude-notes/design/icache.md).  The engine's text reader is          *)
+  (* width-generic (WpUmodeTextLoad.v) and the leaf is                      *)
+  (* [UkRunMem.wp_uk_clw_text]; this walk just calls it, and runcmd's own   *)
+  (* jump table calls the same one.                                        *)
   (* ===================================================================== *)
-
-  Hypothesis ushp_clw_text_ok :
-    forall (h : CpuId) (m : regfile) (pc : mword 64)
-           (uimm : mword 5) (crs1 crd : mword 3) (rs1 rd : mword 5) (a : Z)
-           (wv : mword 32) (avail : nat),
-      unot_sp rd ->
-      creg2reg_idx (Cregidx crs1) = Regidx rs1 ->
-      creg2reg_idx (Cregidx crd) = Regidx rd ->
-      a = uint (m !!! Regidx rs1) + uoff_c4 uimm ->
-      a mod 4 = 0 ->
-      uint rd <> 0 ->
-      uinstr_is γt pc true (C_LW (uimm, Cregidx crs1, Cregidx crd)) -∗
-      ([∗ list] j ∈ seq 0 4, utext γt (a + Z.of_nat j) (nth_byte wv j)) -∗
-      urun N h m pc avail -∗
-      (∀ h' : CpuId,
-         urun N h'
-           (<[Regidx rd := regval_into_reg (sign_extend' 64 wv)]> m)
-           (add_vec_int pc 2) avail -∗
-         WP (Loop : expr riscv_lang)) -∗
-      WP (Loop : expr riscv_lang).
 
   (* ---- the line, and what the loop does to it ------------------------- *)
   Definition ushp_setb (g : nat -> bv 8) (j : nat) (b : bv 8) : nat -> bv 8 :=
@@ -1802,7 +1779,8 @@ Section UkShParseCmd.
   Qed.
 
   (* ---- nulterminate, the whole function -------------------------------- *)
-  (* TAINT: [ushp_clw_text_ok], and nothing else -- it allocates nothing. *)
+  (* TAINT: none -- it allocates nothing, and its jump-table read is an
+     engine leaf ([UkRunMem.wp_uk_clw_text]). *)
   Lemma wp_kshp_nulterminate (h : CpuId) (m : regfile) (s0 p : Z) (len : nat)
       (g : nat -> bv 8) (toks : list (nat * nat)) (nn : nat) :
     m !!! Regidx a0_idx = mword_of_int p ->
@@ -2117,8 +2095,8 @@ Section UkShParseCmd.
     assert (Ha5_10 : m10 !!! Regidx a5_idx = mword_of_int 0x13b4)
       by exact (upd_eq m9 (Regidx a5_idx)
                   (regval_into_reg (mword_of_int 0x13b4 : mword 64))).
-    (* ---- 0x814  c.lw a5,0(a5) -- THE TEXT-HALF LOAD (the Hypothesis) ---- *)
-    iApply (ushp_clw_text_ok h13 m10 (mword_of_int 0x814)
+    (* ---- 0x814  c.lw a5,0(a5) -- THE TEXT-HALF LOAD ---- *)
+    iApply (wp_uk_clw_text N h13 m10 (mword_of_int 0x814)
               (mword_of_int 0 : mword 5) (mword_of_int 7 : mword 3)
               (mword_of_int 7 : mword 3) a5_idx a5_idx 0x13b4
               (mword_of_int 4294964330 : mword 32) nn
@@ -2504,8 +2482,7 @@ Section UkShParseCmd.
   Qed.
 
   (* ---- parsecmd, the whole function ------------------------------------ *)
-  (* TAINT: [ushp_malloc_ok] (through execcmd) and [ushp_clw_text_ok]
-     (through nulterminate).  Nothing else. *)
+  (* TAINT: [ushp_malloc_ok] (through execcmd).  Nothing else. *)
   Lemma wp_kshp_parsecmd (h : CpuId) (m : regfile) (dw dv : dfrac)
       (s0 : Z) (len : nat) (f : nat -> bv 8) (toks : list (nat * nat))
       (nn : nat) :
@@ -3372,11 +3349,10 @@ Section UkShParseCmd.
   (* are refuted only under [ushp_no_symbols].  That premise is the scope   *)
   (* stage 4 was given and it is the scope this theorem keeps.              *)
   (*                                                                       *)
-  (* AUDIT.  Two Hypotheses reach it and no others: [ushp_malloc_ok]        *)
-  (* (stage 3's allocator, through execcmd) and [ushp_clw_text_ok]          *)
-  (* (the four-byte TEXT-half load, through nulterminate's jump table --    *)
-  (* which is [UkShRun.wp_uk_clw_text] and needs only to be un-Local'd).    *)
-  (* Everything else is the standing three.                                 *)
+  (* AUDIT.  ONE Hypothesis reaches it and no others: [ushp_malloc_ok]      *)
+  (* (stage 3's allocator, through execcmd).  nulterminate's four-byte      *)
+  (* TEXT-half read is an engine leaf ([UkRunMem.wp_uk_clw_text]), not a    *)
+  (* premise.  Everything else is the standing three.                       *)
   (* ===================================================================== *)
 
   (* the NUL-cut, as a fact about the bytes: every write the loop makes is a

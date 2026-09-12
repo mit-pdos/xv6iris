@@ -511,7 +511,6 @@ Section UkShMain.
               (10 + avail) -∗
             WP (Loop : expr riscv_lang)) -∗
          WP (Loop : expr riscv_lang))
-      (Hclw : UkShDiag.ushd_clw_text_ty)
       (h : CpuId) (m : regfile) (dw dv : dfrac)
       (s0 : Z) (len : nat) (f : nat -> bv 8) (toks : list (nat * nat))
       (ld : list fdstate) (n : nat) :
@@ -593,7 +592,7 @@ Section UkShMain.
           apply bv_eq; vm_compute; reflexivity).
     (* ---- parsecmd ---- *)
     iApply (UkShParseCmd.wp_kshp_parser N UMalloc (usz γs szv)
-              Hmalloc (Hclw N)
+              Hmalloc
               h2 m2 dw dv s0 len f toks
               (8 + (UkShDiag.ush_Dg + n))
               Ha0_2 Hns Htoks Htlen Hs0 Hs64
@@ -634,7 +633,7 @@ Section UkShMain.
     (* runcmd is stated at the record's OWN exec payload now; this file's
        record is the forked child's, which pays nothing. *)
     iDestruct (uxsup_at_triv N with "Hxs") as "#Hxs'".
-    iApply (UkShDiag.wp_kshr_runcmd_final Hpsok Hclw
+    iApply (UkShDiag.wp_kshr_runcmd_final Hpsok
               (UExec (ush_args s0 (ushp_nulfold toks (ushp_ext len f)) toks))
               ltac:(cbn [ush_simple]; exact I)
               N h4 m4 p szv ld (60 + n) Ha0_4
@@ -648,10 +647,10 @@ Section UkShMain.
   (* what stage 4's contract is cut at; this is it at the CONCRETE one --   *)
   (* [UkShMalloc.ushm_fresh], the [freep] cell holding zero, the sixteen    *)
   (* bytes of [base] and the break -- so the only thing left on the far     *)
-  (* side of the seam is the engine's width-4 text load ([Hclw]) and the    *)
-  (* one place stage 3 had to name an assumption ([Hsbrk]: the 64 KiB       *)
-  (* [sbrk] that [morecore] issues succeeds; sh does not test malloc, so    *)
-  (* nothing below this line can branch on the failure).                    *)
+  (* side of the seam is the one place stage 3 had to name an assumption    *)
+  (* ([Hsbrk]: the 64 KiB [sbrk] that [morecore] issues succeeds; sh does    *)
+  (* not test malloc, so nothing below this line can branch on the           *)
+  (* failure).                                                               *)
   (*                                                                        *)
   (* THE BREAK MOVES ACROSS THE PARSE, and the statement says where to:     *)
   (* the run [runcmd] and [exec] see is at [sz + 65536], because the        *)
@@ -662,7 +661,6 @@ Section UkShMain.
          UkShMalloc.ushm_sbrk_ans N sz n r -∗
          ⌜ r = (mword_of_int sz : mword 64) ⌝ ∗
          UkShMalloc.ushm_sbrk_ans N sz n r)
-      (Hclw : UkShDiag.ushd_clw_text_ty)
       (h : CpuId) (m : regfile) (dw dv : dfrac)
       (s0 : Z) (len : nat) (f : nat -> bv 8) (toks : list (nat * nat))
       (sz : Z) (ld : list fdstate) (n : nat) :
@@ -697,7 +695,7 @@ Section UkShMain.
     iApply (wp_kshm_child (UkShMalloc.ushm_fresh N sz) (sz + 65536)
               (UkShMalloc.ushm_malloc_ok_holds N Hpsok Hsbrk sz
                  Hszlo Hszal Hszok)
-              Hclw h m dw dv s0 len f toks ld n
+              h m dw dv s0 len f toks ld n
               Hs1 Hns Htoks Htlen Hs0 Hs64 Hs38
               with "Hcode Hxs Hpcode Hpro Hjt Hline Hws Hsy Hstd Hcwd Hch HM Hrun").
   Qed.
