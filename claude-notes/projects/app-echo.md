@@ -2468,8 +2468,35 @@ byte, and neither can a predicate on `h`.  Options:
       per-character form becomes exact, but the CONCLUSION must still be a
       predicate on untagged `h`, so the tags help the PROOF, not the
       statement.  Keep as the proof device (O4), not the hypothesis.
-`AppEcho.disc` (today: inputs are a prefix of `(echo_line)*`, per power
-cycle) becomes `disc_in h ∧ rate h` with `rate` = (b).  It stays UPSTREAM
+O3 RULED BY THE OWNER (2026-09-12): (d) THE USER WAITS FOR THE HARTS.  "We
+can even wait for all the harts to first print their booting messages before
+we start typing console input, so we don't have weird things like not knowing
+if what we saw was an echo-back of our input bytes or some hart's bootup
+message."  So the discipline is:
+  D0  no input byte until the wire contains, as subsequences, all seven
+      "hart i starting\n" lines (i = 1..7; the three hart-0 banners precede
+      `userinit` and so every U byte).  The U prefix "init: starting sh\n$ "
+      cannot fake "hart" (no 'a','r','t' after its only 'h'), so D0 is
+      unambiguous on the raw wire.  After D0's point NO K byte is ever
+      accepted again (the kernel's printk sites in this run are the boot's;
+      panics the proofs reach are only the boot's `forkret` panic, before any
+      prompt), so the wire's suffix is PURE U -- which is what makes D1-D2
+      unambiguous and the claim a STRING, not a shuffle.
+  D1  each line's first byte only after a "$ " prompt has appeared on the
+      pure suffix since the previous line's '\n' echo (for the first line:
+      since D0's point).
+  D2  each later byte of a line only after the previous byte's echo (the
+      same byte value, on the pure suffix, after the input).
+  D3  the input bytes are a prefix of `(echo_line)*` (today's `disc`).
+Under D0-D3 the session output is DETERMINISTIC in the count of input bytes:
+`expected n := "init: starting sh\n$ " ++ (per typed byte its echo) ++ (after
+each complete line) "hello world\n$ "`, and the claim is
+  `echo_phi g h := disc h -> ∃ p, wire h = pre ++ suf ∧ pre ∈ shuffle
+   (bootmsgs) (take k (expected …)) ∧ suf = drop k (expected …)`
+-- the ∃ is inhabited by the kernel's real tagging (TX-TAG), never chosen
+for convenience.  (b) is withdrawn; D2 IS the per-character form the owner
+ruled on 2026-09-11, now sound because the suffix is pure.
+`AppEcho.disc` becomes D0 ∧ D1 ∧ D2 ∧ D3 (per power cycle).  It stays UPSTREAM
 of everything SH-LINE 2b proves; 2b's line lemmas need only `disc_in` (the
 projection), so the restatement is a bridge, not a re-proof.
 
@@ -2524,8 +2551,8 @@ in sh (the messages are fixed strings; `session` gains two alternatives),
 and for the boot panic: the trace ends (no further U bytes), which the
 relation already tolerates as a prefix.  OWNER TO CONFIRM.
 
-O6 ORDER.  CONS-SWALLOW (in flight) → LAZY-FLAG → DISC-RATE (the
-restatement O3, with `session`'s definition and `echo_phi`'s shape --
+O6 ORDER.  CONS-SWALLOW (in flight) → LAZY-FLAG; in a sibling checkout NOW:
+DISC-RATE (the restatement O3 as ruled, with `session`'s definition and `echo_phi`'s shape --
 application-side, small) → TX-TAG → TX-RECEIPT + ECHO-RECEIPT → APP-IFACE
 (three statement changes: `app_boot` key handoff, the rx-tag equation, the
 era identification) → the U-tier write leaf and the three write cones →
