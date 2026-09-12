@@ -332,7 +332,16 @@ Definition kexec_ok (V V' : pprivate) (r : mword 64)
    (* the stack geometry: [sp] sits in the top page of the image, above the
       guard page uvmclear turned unusable *)
    (uint szv' - 4096 <= uint spv)%Z /\
-   (uint spv <= uint szv')%Z).
+   (uint spv <= uint szv')%Z /\
+   (* ...AND THE LAZY BIT IS CLEAR (lane LAZY-FLAG, K4).  Exec's image is
+      EAGER -- uvmalloc fills every page from 0 to the size it settles on --
+      so the new block's projection has an empty fill and
+      [ProcDefs.pv_lazy] says so.  The fact itself is
+      [KexecBuilt.kexec_built]'s coverage row, spent at the commit's close
+      ([ProcInv.upd_exec] writes the literal); this is the row that carries
+      it OUT, and [SpecKexec.exec_slot_pre]'s [uvis_lazy W' = false] is
+      read off it. *)
+   pv_lazy V' = false).
 
 (* ===================================================================== *)
 (*  THE FILE SYSTEM FABRIC, as one bundle.                                *)

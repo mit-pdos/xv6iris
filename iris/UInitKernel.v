@@ -246,6 +246,15 @@ Section UInitKernel.
     uvis_cwd W = FsImg.ROOTINO ->
     (* the numbers init admits ([UexecSG.uprogSG]'s [psok]) *)
     (forall k : Z, k <> USYS_exec -> psok k) ->
+    (* ...AND THE KEY'S LAZY BIT IS [false] (lane LAZY-FLAG, L6).  The U
+       tier's run is at an EMPTY FILL ([UexecRet.ukcq] is hardwired at
+       [false]), so a constructor can only build a slot for a key that says
+       so.  WHO SUPPLIES IT: exec, whose fresh image is eager -- lane
+       LAZY-FLAG's K4 puts [uvis_lazy W' = false] on
+       [SpecKexec.kexec_image_ok] and on [exec_slot_pre]'s two wands, and
+       until it lands this is a premise the caller carries. *)
+    uvis_lazy W = false ->
+
     (* the ordinary deposit supplier... *)
     udep -∗
     (* ...and the EXEC supplier, which init's child arm spends on
@@ -278,10 +287,11 @@ Section UInitKernel.
     my_pay (uvis_gen W) (fun _ => True)%I -∗
     uslot W.
   Proof.
-    intros Hne Hpc Hsub Hx Hwd Hszd Hbase Hal8 Hroom Hstk Hfdlen Hl0 Hstop Hcw Hpsok.
+    intros Hne Hpc Hsub Hx Hwd Hszd Hbase Hal8 Hroom Hstk Hfdlen Hl0 Hstop Hcw
+           Hpsok Hlzf.
     iIntros "#Hdep #Hxs #Hcl HK Hrd #Hmp".
     iApply (uslot_of_urun_all W (2 + (4 + (12 + (12 + (4 + n0))))) (fun _ => True)%I
-              Hal8 Hroom Hstk Hfdlen Hstop with "Hdep Hmp []").
+              Hal8 Hroom Hstk Hfdlen Hstop Hlzf with "Hdep Hmp []").
     (* the payload at the trivial one -- <init> has no parent *)
     { done. }
     (* init's own half of its children set travels with its cwd: nothing
@@ -350,6 +360,9 @@ Section UInitKernel.
        the caller's block held.  ARM-c (1) discharges it. *)
     uvis_cwd W' = FsImg.ROOTINO ->
     (forall k : Z, k <> USYS_exec -> psok k) ->
+    (* ...and the lazy bit, passed straight through: see [init_uexec_slot].
+       Lane LAZY-FLAG's K4 turns it into a reading of [kexec_image_ok]. *)
+    uvis_lazy W' = false ->
     (* the pay fact, passed straight through: see [init_uexec_slot] *)
     udep -∗ UkInit.init_exec_sup_lend cn T stc -∗
     □ (∀ N : uk_names Σ, UkInit.init_cons_leaves N T K stc) -∗
@@ -359,7 +372,7 @@ Section UInitKernel.
     ucons_reader cn 0%nat -∗
     my_pay (uvis_gen W') (fun _ => True)%I -∗ uslot W'.
   Proof.
-    intros Hne Hok Hroom Hlen Hl0 Hcw Hpsok.
+    intros Hne Hok Hroom Hlen Hl0 Hcw Hpsok Hlzf.
     (* THE MAP STOPS AT THE BREAK, off the image fact's own row --
        [UShKernel.sh_slot_of_kexec]'s note is the reasoning. *)
     pose proof (kexec_image_ok_below _ _ _ _ _ _ Hok) as Hstop.
@@ -454,6 +467,7 @@ Section UInitKernel.
     - exact Hstop.
     - exact Hcw.
     - exact Hpsok.
+    - exact Hlzf.
   Qed.
 
 End UInitKernel.

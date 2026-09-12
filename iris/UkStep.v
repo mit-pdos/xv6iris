@@ -323,7 +323,7 @@ Section UkBundle.
   Lemma uvb_elim (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ)
       (sz : Z)
       (π : gmap (mword 27) uperm) (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (pidv : mword 32) :
-    uvb C pt Rfd Rut sz π fdv cw gn cs pidv M m pc -∗
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false M m pc -∗
     ∃ Mp : gmap Z (bv 8),
     ⌜uk_pt_pure pt sz M Mp⌝ ∗
     uv_amb ∗ uv_regs ∗
@@ -332,7 +332,7 @@ Section UkBundle.
        beside it ([uvb_intro]): the engine threads them unchanged, exactly
        as it threads [umem] *)
     Rfd fdv ∗
-    user_cfg C ∗ gpr_file m ∗ pc_is pc ∗ Rut pt ∗ ▷ ukb C pt Rfd Rut sz π fdv cw gn cs pidv.
+    user_cfg C ∗ gpr_file m ∗ pc_is pc ∗ Rut pt ∗ ▷ ukb C pt Rfd Rut sz π fdv cw gn cs pidv false.
   Proof.
     rewrite /uvb /uvb_F /user_ptm_inv_x /umem_lazy_x /umem_own_x.
     iIntros "(Hamb & Hur & %Hsz & Hpt & Hfrag & Hcfg & Hg & Hpc & Hrut & Hk)".
@@ -351,8 +351,8 @@ Section UkBundle.
     uv_amb -∗ uv_regs -∗
     utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) -∗ umem_x pt Mp -∗
     Rfd fdv -∗
-    user_cfg C -∗ gpr_file m -∗ pc_is pc -∗ Rut pt -∗ ukb C pt Rfd Rut sz π fdv cw gn cs pidv -∗
-    uvb C pt Rfd Rut sz π fdv cw gn cs pidv M m pc.
+    user_cfg C -∗ gpr_file m -∗ pc_is pc -∗ Rut pt -∗ ukb C pt Rfd Rut sz π fdv cw gn cs pidv false -∗
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false M m pc.
   Proof.
     intros (Hsub & Himg & Hz & Hdom & Hinj & Hacc & Hsz).
     iIntros "Hamb Hur Htlb Hmem Hfrag Hcfg Hg Hpc Hrut Hk".
@@ -374,8 +374,8 @@ Section UkBundle.
   (* the pure half, for program proofs that need the key's image law *)
   Lemma uvb_pure (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ) (sz : Z)
       (π : gmap (mword 27) uperm) (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (pidv : mword 32) :
-    uvb C pt Rfd Rut sz π fdv cw gn cs pidv M m pc -∗
-    ⌜exists Mp : gmap Z (bv 8), uk_pt_pure pt sz M Mp⌝ ∗ uvb C pt Rfd Rut sz π fdv cw gn cs pidv M m pc.
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false M m pc -∗
+    ⌜exists Mp : gmap Z (bv 8), uk_pt_pure pt sz M Mp⌝ ∗ uvb C pt Rfd Rut sz π fdv cw gn cs pidv false M m pc.
   Proof.
     rewrite /uvb /uvb_F.
     iIntros "(Hamb & Hur & %Hsz & Hpt & Hfrag & Hcfg & Hg & Hpc & Hrut & Hk)".
@@ -403,8 +403,8 @@ Section UkBundle.
   (* x0 is pinned inside the bundle *)
   Lemma uvb_x0 (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ) (sz : Z)
       (π : gmap (mword 27) uperm) (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (pidv : mword 32) :
-    uvb C pt Rfd Rut sz π fdv cw gn cs pidv M m pc -∗
-    ⌜m !!! Regidx (mword_of_int 0) = zero_reg⌝ ∗ uvb C pt Rfd Rut sz π fdv cw gn cs pidv M m pc.
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false M m pc -∗
+    ⌜m !!! Regidx (mword_of_int 0) = zero_reg⌝ ∗ uvb C pt Rfd Rut sz π fdv cw gn cs pidv false M m pc.
   Proof.
     rewrite /uvb /uvb_F.
     iIntros "(Hamb & Hur & %Hsz & Hpt & Hfrag & Hcfg & Hg & Hpc & Hrut & Hk)".
@@ -423,7 +423,7 @@ Section UkBundle.
     uk_pt_pure pt sz M Mp ->
     m !!! Regidx (mword_of_int 0) = zero_reg ->
     uv_trap_frame C pt sc stv pc m Mp -∗ Rut pt -∗
-    trapped_machine C pt Rut sz sc stv (uvis_of_run m pc M π sz fdv cw gn cs pidv).
+    trapped_machine C pt Rut sz sc stv (uvis_of_run m pc M π sz fdv cw gn cs pidv false).
   Proof.
     intros (Hsub & Himg & Hz & Hdom & Hinj & Hacc & Hsz) Hx0.
     iIntros "Hf Hrut".
@@ -502,7 +502,7 @@ Section UkObl.
        (* the residue slot carries the BORROW WAND, not [Rut pt]: the loop
           body took the running token out of the residue at the cycle's
           head (A6.140), and whichever arm ends the step restores it *)
-       (R -∗ (TsoCtx.own_context (CID := CIDo) XIo -∗ Rut pt) ∗ Rfd fdv ∗ ukb (CID := CIDo) C pt Rfd Rut sz π fdv cw gn cs pidv ∗ uk_paycont Q gn (Kc ∧ ukc π M sz fdv cw gn cs pidv m pc)) -∗
+       (R -∗ (TsoCtx.own_context (CID := CIDo) XIo -∗ Rut pt) ∗ Rfd fdv ∗ ukb (CID := CIDo) C pt Rfd Rut sz π fdv cw gn cs pidv false ∗ uk_paycont Q gn (Kc ∧ ukc π M sz fdv cw gn cs pidv false m pc)) -∗
        resv_any cpu_id -∗
        hreg_frame rsA u_Drw -∗
        hreg_frame_ro (u_Df (uc_dqc C)) rsA u_Dro -∗
@@ -530,7 +530,7 @@ Section UkObl.
                               (TsoCtx.own_context (CID := h) (cur_ctx (CurCtx := xi)) -∗ Rut pt'))
        (sz : Z),
        ⌜loop_ok C pt⌝ -∗ ⌜perm_of (ud_um pt) sz = π⌝ -∗
-       uvb (CID := h) (XI := xi) C pt Rfd Rut sz π fdv cw gn cs pidv M m pc -∗
+       uvb (CID := h) (XI := xi) C pt Rfd Rut sz π fdv cw gn cs pidv false M m pc -∗
        □ uk_step_obl π Kc Q sz fdv cw gn cs pidv M m pc -∗
        (* THE PAYMENT RIDES THE STEP'S OWN LATER, with the continuation it
           is handed back into: the payload this builds is proved under the
@@ -547,9 +547,9 @@ Section UkObl.
       (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64)
       (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
       (Rut : uptd -> iProp Σ) : iProp Σ :=
-    (uk_paycont Q gn (Kc ∧ ukc π M sz fdv cw gn cs pidv m pc) ∗
+    (uk_paycont Q gn (Kc ∧ ukc π M sz fdv cw gn cs pidv false m pc) ∗
      (TsoCtx.own_context TsoCtx.cur_ctx -∗ Rut pt) ∗
-     Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw gn cs pidv)%I.
+     Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw gn cs pidv false)%I.
 
 End UkObl.
 
@@ -597,8 +597,8 @@ Section UkArms.
     uv_bytes pt Mp t -∗
     uv_res pt Mp t usatp pcfg paddr -∗
     TsoCtx.own_context XI -∗
-    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw gn cs pidv ∗
-          (uvb C pt Rfd Rut sz π fdv cw gn cs pidv M m' npc -∗ WP (Loop : expr riscv_lang))) -∗
+    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw gn cs pidv false ∗
+          (uvb C pt Rfd Rut sz π fdv cw gn cs pidv false M m' npc -∗ WP (Loop : expr riscv_lang))) -∗
     uv_psi C R rs2.
   Proof.
     intros Lhs Lpriv Hmsok Lnpc Hgag Hx0 Lstvec Lmie Lmdl Lmedl Lmenv Lmste
@@ -720,11 +720,11 @@ Section UkArms.
               with "Hany Hmm Hres Hctx []").
     iIntros "Hframe Hctx ((#Hmyp & Hpayv & Hkc) & Hbak & Hfdr & Hkb)".
     iDestruct ("Hbak" with "Hctx") as "Hrut".
-    iApply ("Hkb" $! (uvis_of_run m pc M π sz fdv cw gn cs pidv)
+    iApply ("Hkb" $! (uvis_of_run m pc M π sz fdv cw gn cs pidv false)
               (utrap_scause (Interrupt i) (register_lookup (R_bitvector_64 scause) rsA))
-              (tval None) with "[%] [%] [%] [%] [%] [%] [%] [Hframe Hrut Hfdr Hkc Hpayv]");
+              (tval None) with "[%] [%] [%] [%] [%] [%] [%] [%] [Hframe Hrut Hfdr Hkc Hpayv]");
       [ reflexivity | reflexivity | reflexivity | reflexivity
-      | reflexivity | reflexivity | reflexivity | ].
+      | reflexivity | reflexivity | reflexivity | reflexivity | ].
     iSplitL "Hframe Hrut".
     { iApply (trapped_of_uv_trap_frame C pt Rut _ _ m pc M Mp sz π fdv cw gn cs pidv Hpure Hx0
                 with "Hframe Hrut"). }
@@ -735,7 +735,7 @@ Section UkArms.
        [rewrite] cannot see [uexec_ret] in it, but [iApply] unifies up to
        the (delta-)conversion [uexec_ret = uexec_ret_F uslot] *)
     iApply (bi.equiv_entails_1_2 _ _
-              (uexec_ret_transparent _ (uvis_of_run m pc M π sz fdv cw gn cs pidv)
+              (uexec_ret_transparent _ (uvis_of_run m pc M π sz fdv cw gn cs pidv false)
                  (utrap_scause_intr_ne i (register_lookup (R_bitvector_64 scause) rsA)))).
     (* THE PAYMENT AT THE TRANSPARENT ARM: the deposit is paid out of the
        copy the payload carries, and the arm gives it back -- so the wand
@@ -746,7 +746,7 @@ Section UkArms.
     iExists (sfam_at Q sfam_pt).
     rewrite /uexec_pay_arm (sexit_pay_at Q sfam_pt).
     iSplitL "Hpayv";
-      [ iApply (uexec_pay_dep_ne _ (uvis_of_run m pc M π sz fdv cw gn cs pidv) _ (sfam_at Q sfam_pt)
+      [ iApply (uexec_pay_dep_ne _ (uvis_of_run m pc M π sz fdv cw gn cs pidv false) _ (sfam_at Q sfam_pt)
                   (utrap_scause_intr_ne i
                      (register_lookup (R_bitvector_64 scause) rsA))
                   (sexit_pay_at Q sfam_pt) with "Hmyp Hpayv") | ].
@@ -1018,7 +1018,7 @@ Section UkFunnel.
   (* the engine at the ambient hart and table *)
   Lemma wp_uk_step (Kc : iProp Σ) (Q : Z -> iProp Σ) (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (pidv : mword 32) :
     is_aligned_vaddr (Virtaddr pc) 2 = true ->
-    uvb C pt Rfd Rut sz π fdv cw gn cs pidv M m pc -∗ □ uk_step_obl π Kc Q sz fdv cw gn cs pidv M m pc -∗
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false M m pc -∗ □ uk_step_obl π Kc Q sz fdv cw gn cs pidv M m pc -∗
     ▷ (my_pay gn Q ∗ Q (-1) ∗ (Q (-1) -∗ Kc)) -∗ WP (Loop : expr riscv_lang).
   Proof.
     intros Hal2.
@@ -1107,8 +1107,8 @@ Section UkPostFetch.
     uv_tree_ok pt (upa_map pt Mp) t' ->
     uk_pt_pure pt sz M Mp ->
     gen_cert -∗ uv_amb -∗
-    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw gn cs pidv ∗
-          (uvb C pt Rfd Rut sz π fdv cw gn cs pidv M (uv_upd m wr) (uv_next jt (add_vec_int pc k)) -∗
+    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw gn cs pidv false ∗
+          (uvb C pt Rfd Rut sz π fdv cw gn cs pidv false M (uv_upd m wr) (uv_next jt (add_vec_int pc k)) -∗
            WP (Loop : expr riscv_lang))) -∗
     resv_any cpu_id -∗
     TsoCtx.own_context XI -∗
@@ -1276,8 +1276,8 @@ Section UkObligation.
          = Some (RETIRE_SUCCESS, uv_post s_pc jt wr)) ->
     gen_cert -∗ uv_amb -∗
     uv_fetch_bridge (uc_dqc C) pt Mp rsA t (F_Base w) -∗
-    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw gn cs pidv ∗
-          (uvb C pt Rfd Rut sz π fdv cw gn cs pidv M (uv_upd m wr) (uv_next jt (add_vec_int pc 4)) -∗
+    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw gn cs pidv false ∗
+          (uvb C pt Rfd Rut sz π fdv cw gn cs pidv false M (uv_upd m wr) (uv_next jt (add_vec_int pc 4)) -∗
            WP (Loop : expr riscv_lang))) -∗
     resv_any cpu_id -∗
     hreg_frame rsA u_Drw -∗ hreg_frame_ro (u_Df (uc_dqc C)) rsA u_Dro -∗
@@ -1409,8 +1409,8 @@ Section UkObligation.
          = Some (RETIRE_SUCCESS, uv_post s_pc jt wr)) ->
     gen_cert -∗ uv_amb -∗
     uv_fetch_bridge (uc_dqc C) pt Mp rsA t (F_RVC h) -∗
-    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw gn cs pidv ∗
-          (uvb C pt Rfd Rut sz π fdv cw gn cs pidv M (uv_upd m wr) (uv_next jt (add_vec_int pc 2)) -∗
+    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw gn cs pidv false ∗
+          (uvb C pt Rfd Rut sz π fdv cw gn cs pidv false M (uv_upd m wr) (uv_next jt (add_vec_int pc 2)) -∗
            WP (Loop : expr riscv_lang))) -∗
     resv_any cpu_id -∗
     hreg_frame rsA u_Drw -∗ hreg_frame_ro (u_Df (uc_dqc C)) rsA u_Dro -∗
@@ -1574,7 +1574,7 @@ Section UkRetire.
           = m !!! Regidx r) ->
        exec (execute (uv_exp i o)) s_pc
          = Some (RETIRE_SUCCESS, uv_post s_pc jt wr)) ->
-    uvb C pt Rfd Rut sz π fdv cw gn cs pidv M m pc -∗
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false M m pc -∗
     ▷ ukcq Qp π M sz fdv cw gn cs pidv (uv_upd m wr) (uv_next jt (add_vec_int pc (if is_rvc then 2 else 4))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1602,8 +1602,8 @@ Section UkRetire.
                         LsatpA & LpcfgA & LpaddrA & LmiA & Hx0).
     (* the continuation at THIS table, out of the table-generic one *)
     iAssert (R -∗ (TsoCtx.own_context (CID := CIDo) XIo -∗ Rut' pt') ∗ Rfd' fdv ∗
-             ukb C' pt' Rfd' Rut' sz π fdv cw gn cs pidv ∗
-             (uvb (CID := CIDo) C' pt' Rfd' Rut' sz π fdv cw gn cs pidv M (uv_upd m wr)
+             ukb C' pt' Rfd' Rut' sz π fdv cw gn cs pidv false ∗
+             (uvb (CID := CIDo) C' pt' Rfd' Rut' sz π fdv cw gn cs pidv false M (uv_upd m wr)
                 (uv_next jt (add_vec_int pc (if is_rvc then 2 else 4))) -∗
               WP (Loop : expr riscv_lang)))%I with "[Hk]" as "Hk".
     { iIntros "HR". iDestruct ("Hk" with "HR") as "(Hbak & Hfdr & Hkb & Hkc)".
@@ -1673,7 +1673,7 @@ Section UkRetire.
           = m !!! Regidx r) ->
        exec (execute (uv_exp i o)) s_pc
          = Some (RETIRE_SUCCESS, uv_post s_pc jt wr)) ->
-    uvb C pt Rfd Rut sz π fdv cw gn cs pidv M m pc -∗
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false M m pc -∗
     ukcq Qp π M sz fdv cw gn cs pidv (uv_upd m wr) (uv_next jt (add_vec_int pc (if is_rvc then 2 else 4))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1736,7 +1736,7 @@ Section UkEcallPost.
     uv_tree_ok pt (upa_map pt Mp) t' ->
     uk_pt_pure pt sz M Mp ->
     gen_cert -∗
-    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw gn cs pidv ∗ uexec_ret uecall_scause (uvis_of_run m pc M π sz fdv cw gn cs pidv)) -∗
+    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw gn cs pidv false ∗ uexec_ret uecall_scause (uvis_of_run m pc M π sz fdv cw gn cs pidv false)) -∗
     resv_any cpu_id -∗
     TsoCtx.own_context XI -∗
     uv_bytes pt Mp t' -∗
@@ -1920,13 +1920,13 @@ Section UkEcallPost.
     iIntros "Hframe Hrun HR".
     iDestruct ("Hk" with "HR") as "(Hbak & Hfdr & Hkb & Hret)".
     iDestruct ("Hbak" with "Hrun") as "Hrut".
-    iApply ("Hkb" $! (uvis_of_run m pc M π sz fdv cw gn cs pidv)
+    iApply ("Hkb" $! (uvis_of_run m pc M π sz fdv cw gn cs pidv false)
               (utrap_scause (rv64d_types.Exception (E_U_EnvCall tt))
                  (register_lookup (R_bitvector_64 scause) rsx))
               (tval (xtval_exception_value (E_U_EnvCall tt) (zeros' 64)))
-              with "[%] [%] [%] [%] [%] [%] [%] [Hframe Hrut Hfdr Hret]");
+              with "[%] [%] [%] [%] [%] [%] [%] [%] [Hframe Hrut Hfdr Hret]");
       [ reflexivity | reflexivity | reflexivity | reflexivity
-      | reflexivity | reflexivity | reflexivity | ].
+      | reflexivity | reflexivity | reflexivity | reflexivity | ].
     iSplitL "Hframe Hrut".
     { iApply (trapped_of_uv_trap_frame C pt Rut _ _ m pc M Mp sz π fdv cw gn cs pidv Hpure Hx0
                 with "Hframe Hrut"). }
@@ -1964,13 +1964,13 @@ Section UkEcall.
        register_lookup cur_privilege s.(sregs) = User ->
        register_lookup (R_bitvector_64 PC) s.(sregs) = pc ->
        goodmb Du_r Du_w (execute (ECALL tt)) s ∅ = true) ->
-    uvb C pt Rfd Rut sz π fdv cw gn cs pidv M m pc -∗
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false M m pc -∗
     (* THE PAYMENT ENTERS HERE AND THE RETURN IS BEHIND IT: an ecall traps
        at once, so what the leaf owes is its return AT the payload -- the
        deposit inside it is paid out of this very copy
        ([UexecRet.uexec_pay_dep]). *)
     my_pay gn Qp -∗ Qp (-1) -∗
-    (Qp (-1) -∗ uexec_ret uecall_scause (uvis_of_run m pc M π sz fdv cw gn cs pidv)) -∗
+    (Qp (-1) -∗ uexec_ret uecall_scause (uvis_of_run m pc M π sz fdv cw gn cs pidv false)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hg.
@@ -1985,8 +1985,8 @@ Section UkEcall.
     iIntros (R CIDo XIo C' pt' Rfd' Rut' HRut' Mp' t rs1 rsA usatp pcfg paddr)
       "%Hlo' %Hpm' %Hpure %Hpre #Hamb Hk Hany Hrw Hro Hctx Hmm Hres".
     iAssert (R -∗ (TsoCtx.own_context (CID := CIDo) XIo -∗ Rut' pt') ∗ Rfd' fdv ∗
-             ukb (CID := CIDo) C' pt' Rfd' Rut' sz π fdv cw gn cs pidv ∗
-             uexec_ret uecall_scause (uvis_of_run m pc M π sz fdv cw gn cs pidv))%I with "[Hk]" as "Hk".
+             ukb (CID := CIDo) C' pt' Rfd' Rut' sz π fdv cw gn cs pidv false ∗
+             uexec_ret uecall_scause (uvis_of_run m pc M π sz fdv cw gn cs pidv false))%I with "[Hk]" as "Hk".
     { iIntros "HR". iDestruct ("Hk" with "HR") as "(Hbak & Hfdr & Hkb & Hkc)".
       iDestruct "Hkc" as "(_ & Hpayv & Hkc)".
       iDestruct ("Hkc" with "Hpayv") as "Hkc".

@@ -390,7 +390,10 @@ Section ProofSysOpenWalk.
     (* three-way now: [FirstTok.first_tok] parks beside the reference. *)
     iDestruct (proc_priv_split_cwd gf (proc_addr jx) pidv U with "Hpriv")
       as "[Hpnc [Href Hftok]]".
-    iEval (rewrite proc_priv_nocwd_bare) in "Hpnc".
+    (* the lazy bit's claim, read off the block before the regrouping
+       drops it (lane LAZY-FLAG): it is pure, so holding it is free. *)
+    iDestruct (proc_priv_nocwd_lazy with "Hpnc") as %Hlzq.
+    iEval (rewrite (proc_priv_nocwd_bare _ _ _ _ Hlzq)) in "Hpnc".
     iDestruct "Hpnc" as "[Hpbare Hofiles]".
     iDestruct (cwd_ref_at_held_at with "Href") as "Hcwdref".
     iDestruct (iref_slots_split 2 (ns - 2) with "[Hisl]") as "[Hir2 Hirr]".
@@ -493,7 +496,7 @@ Section ProofSysOpenWalk.
       (* the process, put back whole and then re-carved for the tail's pid *)
       iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
       iCombine "Hpbare Hofiles" as "Hpnc".
-    iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
+    iEval (rewrite -(proc_priv_nocwd_bare _ _ _ _ Hlzq)) in "Hpnc".
       iDestruct (proc_priv_split_cwd gf (proc_addr jx) pidv U
                    with "[Hpnc Href Hftok]") as "Hpriv";
         [iSplitL "Hpnc"; [iExact "Hpnc" | iFrame "Href Hftok"] |].
@@ -671,7 +674,7 @@ Section ProofSysOpenWalk.
     (* the process, put back whole: everything below wants [proc_priv] *)
     iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
     iCombine "Hpbare Hofiles" as "Hpnc".
-    iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
+    iEval (rewrite -(proc_priv_nocwd_bare _ _ _ _ Hlzq)) in "Hpnc".
     iDestruct (proc_priv_split_cwd gf (proc_addr jx) pidv U
                  with "[Hpnc Href Hftok]") as "Hpriv";
       [iSplitL "Hpnc"; [iExact "Hpnc" | iFrame "Href Hftok"] |].

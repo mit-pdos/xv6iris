@@ -161,15 +161,20 @@ Section USyncKernel.
     (forall (p : mword 27) (q : uperm), uvis_perm W !! p = Some q ->
        bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W)) ->
     (forall k : Z, k <> USYS_exec -> psok k) ->
+    (* ...AND THE KEY'S LAZY BIT IS [false] (lane LAZY-FLAG, L6): the U
+       tier's run is at an empty fill, so an entry constructor can only
+       build a slot for a key that says so.  exec's slot post is what will
+       supply it ([SpecKexec.exec_slot_pre], lane LAZY-FLAG's K4). *)
+    uvis_lazy W = false ->
     (* THE PAY FACT, at the trivial payload: sync's exit owes its parent
        nothing this lane, and the entry constructor is what puts it in the
        record ([UkRun.ukn_pay]). *)
     udep -∗ my_pay (uvis_gen W) (fun _ => True)%I -∗ uslot W.
   Proof.
-    intros Hpc Hsub Hx Hroom Hal8 Hdata Hfdlen Hstop Hpsok.
+    intros Hpc Hsub Hx Hroom Hal8 Hdata Hfdlen Hstop Hpsok Hlzf.
     iIntros "#Hdep #Hpay".
-    iApply (uslot_of_urun W 4 (fun _ => True)%I Hal8 ltac:(lia) Hdata Hfdlen Hstop
-              with "Hdep Hpay []").
+    iApply (uslot_of_urun W 4 (fun _ => True)%I Hal8 ltac:(lia) Hdata Hfdlen
+              Hstop Hlzf with "Hdep Hpay []").
     (* the payload at the trivial one *)
     { done. }
     (* sync makes no descriptor call, so its ledger is dropped here *)

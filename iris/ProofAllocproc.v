@@ -1856,7 +1856,7 @@ Section ProofAllocproc.
           as "(Hctx & Hpgcell & Htfcell & Hspare & Hirsp & Hbsp & Hkst & Hxb & Hrest)".
         iModIntro.
         iDestruct "Hrest" as (V pid0)
-          "([%Hof [%Hcwd [%Hszb %Hpid00]]] & Hpidhalf & Hfields & Hofiles & Hrow & Hsg & Hfrag)".
+          "([%Hof [%Hcwd [%Hszb [%Hpid00 %Hlzv]]]] & Hpidhalf & Hfields & Hofiles & Hrow & Hsg & Hfrag)".
         iDestruct "Hpub" as (kl xs pid1) "(Hkilled & Hxstate & Hpidinv)".
         (* +0x38 .. +0xee: THE INLINED allocpid -- acquire(&pid_lock), the
            retry scan for a pid no slot holds, [p->pid = pid], release.  One
@@ -2911,6 +2911,14 @@ Section ProofAllocproc.
         iDestruct (proc_priv_nocwd_intro γf (proc_addr k) pidn
                      (MkUstate (upd_gen V γg) M0) (upt_desc (pt_base t) tfp) tfws
                      Hszb (um_below_empty (pv_sz V))
+                     (* WHAT THE LAZY BIT CLAIMS OF THE FRESH TABLE, and it
+                        claims nothing: the dormant block this one is built
+                        from is at [ProcDefs.pv_lazy = true] (lane
+                        LAZY-FLAG, K2), so the invariant's implication is
+                        vacuous -- which is what lets allocproc install an
+                        empty user map. *)
+                     ltac:(cbn [us_V upd_gen pv_lazy]; rewrite Hlzv;
+                           intro Hc; discriminate Hc)
                      with "Hpidown Hfields Hptat [Htfpage] Hofiles") as "Hpriv".
         { cbn [ud_tfp]. iExact "Htfpage". }
         iEval (rewrite /ap_tail) in "Htl".

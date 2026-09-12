@@ -654,7 +654,10 @@ Section ProofSysUnlinkW2.
     (* the process block, opened for the callees' pid fraction *)
     iDestruct (proc_priv_split_cwd gf (proc_addr jx) pid (us_upt U P1)
                  with "Hpriv") as "[Hpnc Href]".
-    iEval (rewrite proc_priv_nocwd_bare) in "Hpnc".
+    (* the lazy bit's claim, read off the block before the regrouping
+       drops it (lane LAZY-FLAG): it is pure, so holding it is free. *)
+    iDestruct (proc_priv_nocwd_lazy with "Hpnc") as %Hlzq.
+    iEval (rewrite (proc_priv_nocwd_bare _ _ _ _ Hlzq)) in "Hpnc".
     iDestruct "Hpnc" as "[Hpidq Hofiles]".
     (* THE CLOSER, built once: every arm below hands the BLOCK back and wants
        [proc_priv] whole, and nothing between here and the seam touches the
@@ -664,7 +667,7 @@ Section ProofSysUnlinkW2.
       with "[Hofiles Href]" as "Hpre".
     { iIntros "Hpidq".
       iApply (proc_priv_split_cwd gf (proc_addr jx) pid (us_upt U P1)).
-      rewrite proc_priv_nocwd_bare.
+      rewrite (proc_priv_nocwd_bare _ _ _ _ Hlzq).
       iSplitR "Href"; [| iExact "Href"].
       iSplitL "Hpidq"; [iExact "Hpidq" | iExact "Hofiles"]. }
     (* the register facts the whole block rides on *)

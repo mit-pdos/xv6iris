@@ -181,6 +181,13 @@ Definition sync_gate (W : uvis) : Prop :=
      what the process's own fd authority is minted at
      ([UserFd.ufd_auth] carries the length). *)
   length (uvis_fd W) = NOFILE /\
+  (* ...AND THE KEY'S LAZY BIT IS [false] (lane LAZY-FLAG, L6).  The U
+     tier's run is at an EMPTY FILL ([UexecRet.ukcq] is hardwired at
+     [false]), so a verified program's slot exists only at such a key; a
+     process that called [sbrklazy] falls through to the generic branch,
+     which is the honest reading of a tier that does not support it.
+     Decidable like every other conjunct here. *)
+  uvis_lazy W = false /\
   (* ...and the map stops at the break *)
   ustop_gate W.
 
@@ -215,6 +222,8 @@ Definition echo_gate (W : uvis) : Prop :=
   echo_avd_str W /\
   (* ...and the descriptor table is a table -- see [sync_gate] *)
   length (uvis_fd W) = NOFILE /\
+  (* ...and the lazy bit is [false] -- see [sync_gate] *)
+  uvis_lazy W = false /\
   (* ...and the map stops at the break -- see [sync_gate] *)
   ustop_gate W.
 
@@ -256,12 +265,13 @@ Section UexecCond.
     (forall k : Z, k <> USYS_exec -> psok k) ->
     sync_gate W -> udep -∗ my_pay (uvis_gen W) (fun _ => True)%I -∗ uslot W.
   Proof.
-    intros Hpsok (Hteq & Hpc & Hxo & Hroom & Hal8 & Hstk & Hfdlen & Hstop).
+    intros Hpsok (Hteq & Hpc & Hxo & Hroom & Hal8 & Hstk & Hfdlen & Hlzf
+                  & Hstop).
     exact (sync_uexec_slot W Hpc
              (text_region_eq_uimg_sub (uvis_M W) Hteq)
              (sync_xopage_addrs (uvis_perm W) Hxo)
              Hroom Hal8 (sync_stkdata_all W Hstk) Hfdlen
-             (ustop_gate_at W Hstop) Hpsok).
+             (ustop_gate_at W Hstop) Hpsok Hlzf).
   Qed.
 
   (* ...and echo's *)
@@ -270,13 +280,13 @@ Section UexecCond.
     echo_gate W -> udep -∗ my_pay (uvis_gen W) (fun _ => True)%I -∗ uslot W.
   Proof.
     intros Hpsok (Hteq & Hpc & Hxo & Hroom & Hal8 & Hstk & Hargs & Havd & Havs
-            & Hfdlen & Hstop).
+            & Hfdlen & Hlzf & Hstop).
     exact (echo_uexec_slot W Hpc
              (text_region_eq_of_uimg_sub EchoInstrs.echo_bytes (uvis_M W) Hteq)
              (sync_xopage_addrs (uvis_perm W) Hxo)
              Hroom Hal8 (echo_stkdata_all W Hstk) Hargs
              (echo_avd_arr_all W Havd) (echo_avd_str_all W Havs) Hfdlen
-             (ustop_gate_at W Hstop) Hpsok).
+             (ustop_gate_at W Hstop) Hpsok Hlzf).
   Qed.
 
   (* THE SUPPLY REACHES EVERY BRANCH, not only the generic tail: sync and

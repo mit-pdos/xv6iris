@@ -258,18 +258,32 @@ Definition usys_sbrk_eager (tf : list (mword 64)) : Prop :=
    the other two.  The guard is the disjunction the C branches on, read off
    the trapframe and the two breaks; a process whose own call passed
    SBRK_EAGER therefore learns it kept the flag. *)
+(* THE GUARD IS A STRICT SHRINK, not [<=].  sbrk's LAZY path runs whenever
+   [t != SBRK_EAGER && n >= 0], and that includes [n = 0] -- which moves
+   nothing, but which the block-level arm ([SpecSysSbrk.sys_sbrk_ok]) still
+   files as the lazy write.  At a strict shrink the EAGER path is the one
+   that ran (the C branches on [t == SBRK_EAGER || n < 0]), and that path
+   keeps the bit.  A caller that passed SBRK_EAGER reads its bit back off
+   the left disjunct either way. *)
 Definition usys_sbrk_lazy (lz lz' : bool) (tf : list (mword 64))
     (szv szv' : Z) : Prop :=
-  (usys_sbrk_eager tf \/ (szv' <= szv)%Z) -> usys_lazy_keep lz lz'.
+  (usys_sbrk_eager tf \/ (szv' < szv)%Z) -> usys_lazy_keep lz lz'.
 
 (* THE TABLE: syscall [n], entered with trapframe words [tf], returned
    [r], may take the image from [M] to [M'] and the permission map from
    [π] to [π']. *)
 Definition usys_mem_ok (n : Z) (tf : list (mword 64)) (r : mword 64)
-    (M : gmap Z (bv 8)) (π : gmap (mword 27) uperm) (szv : Z)
-    (M' : gmap Z (bv 8)) (π' : gmap (mword 27) uperm) (szv' : Z) : Prop :=
+    (M : gmap Z (bv 8)) (π : gmap (mword 27) uperm) (szv : Z) (lz : bool)
+    (M' : gmap Z (bv 8)) (π' : gmap (mword 27) uperm) (szv' : Z) (lz' : bool)
+    : Prop :=
   if decide (n = USYS_exec) then
     r = (mword_of_int (-1) : mword 64) /\ M' = M /\ π' = π /\ szv' = szv
+    (* exec's FAILURE row keeps the bit on the nose: a failed exec writes no
+       field.  Exec's SUCCESS does not return through this table at all --
+       the process resumes on the new image's slot, whose key
+       [SpecKexec] builds at [false] ([ProcInv.upd_exec] clears
+       [ProcDefs.pv_lazy]). *)
+    /\ lz' = lz
   else if decide (n = USYS_sbrk) then
     (* THE TWO SIZES ARE NAMED.  They used to be existential, because the
        trapframe word list does not carry [p->sz]; now the KEY does, so the
@@ -280,6 +294,15 @@ Definition usys_mem_ok (n : Z) (tf : list (mword 64)) (r : mword 64)
     usys_sbrk_img M M' (mword_of_int szv) (mword_of_int szv') /\
     usys_sbrk_perm π π' (mword_of_int szv) (mword_of_int szv') /\
     usys_sbrk_ret tf r szv szv'
+    (* ...AND THE LAZY BIT (lane LAZY-FLAG, K3).  sbrk is the ONE entry that
+       writes [ProcDefs.pv_lazy]: its LAZY-grow arm raises the bit (a ghost
+       write of the block, no C variable behind it), its EAGER and shrink
+       arms keep it.  So the row promises nothing on the lazy-grow arm and
+       the plain keep on the other two, and a caller that passed SBRK_EAGER
+       reads its own bit back.  WHAT PAYS IT: [SpecSysSbrk.sys_sbrk_ok]
+       says which arm ran at the BLOCK level and [SpecSyscall.sysc_sbrk_ok]
+       relays it. *)
+    /\ usys_sbrk_lazy lz lz' tf szv szv'
   else if decide (n = USYS_wait) then
     (* copyout of the zombie's four-byte [xstate] at argument 0 -- and a
        NULL destination is not a destination, so a caller passing a null
@@ -288,23 +311,23 @@ Definition usys_mem_ok (n : Z) (tf : list (mword 64)) (r : mword 64)
        (d <= 4)%nat /\
        (uint (tf !!! tf_arg_idx 0) = 0 -> d = 0%nat) /\
        M' = umem_wr M (tf !!! tf_arg_idx 0) d bs)
-    /\ π' = π /\ szv' = szv
+    /\ π' = π /\ szv' = szv /\ lz' = lz
   else if decide (n = USYS_pipe) then
     (* two four-byte fds, back to back at argument 0 *)
     (exists (d : nat) (bs : nat -> bv 8),
        (d <= 8)%nat /\ M' = umem_wr M (tf !!! tf_arg_idx 0) d bs)
-    /\ π' = π /\ szv' = szv
+    /\ π' = π /\ szv' = szv /\ lz' = lz
   else if decide (n = USYS_read) then
     (* at most the caller's own count, at argument 1 *)
     (exists (d : nat) (bs : nat -> bv 8),
        (Z.of_nat d <= Z.max 0 (usys_rdcount tf))%Z /\
        M' = umem_wr M (tf !!! tf_arg_idx 1) d bs)
-    /\ π' = π /\ szv' = szv
+    /\ π' = π /\ szv' = szv /\ lz' = lz
   else if decide (n = USYS_fstat) then
     (* one [struct stat]: dev@0 ino@4 type@8 nlink@10 size@16, so 24 *)
     (exists (d : nat) (bs : nat -> bv 8),
        (d <= 24)%nat /\ M' = umem_wr M (tf !!! tf_arg_idx 1) d bs)
-    /\ π' = π /\ szv' = szv
+    /\ π' = π /\ szv' = szv /\ lz' = lz
   else if decide (n = USYS_fork) then
     (* fork (1) MOVES NO BYTE -- the child gets a copy of the image, the
        caller's own is untouched -- but its RETURN VALUE is the one thing
@@ -319,8 +342,8 @@ Definition usys_mem_ok (n : Z) (tf : list (mword 64)) (r : mword 64)
        dispatcher's own clause is [SpecSyscall]'s fork row, bridged by
        [UsysMemOkSpec.sysc_mem_ok_usys]. *)
     (r = (mword_of_int (-1) : mword 64) \/ (1 <= sint r <= PIDMAX)%Z)
-    /\ M' = M /\ π' = π /\ szv' = szv
-  else M' = M /\ π' = π /\ szv' = szv.
+    /\ M' = M /\ π' = π /\ szv' = szv /\ lz' = lz
+  else M' = M /\ π' = π /\ szv' = szv /\ lz' = lz.
 
 (* ===================================================================== *)
 (* SS2b THE DESCRIPTOR TABLE'S OWN ROWS.                                   *)
@@ -808,10 +831,11 @@ Proof. intros H. exact (H eq_refl). Qed.
    learns.  Stated for the row shape rather than per number so a program
    proof picks it up with one [apply] after [vm_compute]-ing the number. *)
 Lemma usys_mem_ok_quiet (n : Z) (tf : list (mword 64)) (r : mword 64)
-    (M M' : gmap Z (bv 8)) (π π' : gmap (mword 27) uperm) (szv szv' : Z) :
+    (M M' : gmap Z (bv 8)) (π π' : gmap (mword 27) uperm) (szv szv' : Z)
+    (lz lz' : bool) :
   n <> USYS_exec -> n <> USYS_sbrk ->
   n <> USYS_wait -> n <> USYS_pipe -> n <> USYS_read -> n <> USYS_fstat ->
-  usys_mem_ok n tf r M π szv M' π' szv' -> M' = M /\ π' = π /\ szv' = szv.
+  usys_mem_ok n tf r M π szv lz M' π' szv' lz' -> M' = M /\ π' = π /\ szv' = szv.
 Proof.
   intros Hne Hns H3 H4 H5 H8 H. unfold usys_mem_ok in H.
   destruct (decide (n = USYS_exec)); [contradiction |].
@@ -822,32 +846,66 @@ Proof.
   destruct (decide (n = USYS_fstat)); [contradiction |].
   (* fork's row is the quiet one with the return-value clause in front, so
      the conclusion is unchanged and no caller of this reader moves *)
-  destruct (decide (n = USYS_fork)); [exact (proj2 H) |].
-  exact H.
+  destruct (decide (n = USYS_fork));
+    [ exact (conj (proj1 (proj2 H))
+               (conj (proj1 (proj2 (proj2 H)))
+                  (proj1 (proj2 (proj2 (proj2 H)))))) |].
+  exact (conj (proj1 H) (conj (proj1 (proj2 H)) (proj1 (proj2 (proj2 H))))).
 Qed.
+
+(* ...AND THE LAZY BIT, at every entry but sbrk: the bit is a stored field
+   ([ProcDefs.pv_lazy]) and only sbrklazy's grow writes it, so every other
+   row is the equation.  Stated apart from [usys_mem_ok_quiet] because the
+   entries it covers are not the same six -- exec, wait, pipe, read, fstat
+   and fork all keep the bit while moving bytes. *)
+Lemma usys_mem_ok_lazy (n : Z) (tf : list (mword 64)) (r : mword 64)
+    (M M' : gmap Z (bv 8)) (π π' : gmap (mword 27) uperm) (szv szv' : Z)
+    (lz lz' : bool) :
+  n <> USYS_sbrk ->
+  usys_mem_ok n tf r M π szv lz M' π' szv' lz' -> lz' = lz.
+Proof.
+  intros Hns H. unfold usys_mem_ok in H.
+  destruct (decide (n = USYS_exec));
+    [ exact (proj2 (proj2 (proj2 (proj2 H)))) |].
+  destruct (decide (n = USYS_sbrk)); [contradiction |].
+  destruct (decide (n = USYS_wait)); [exact (proj2 (proj2 (proj2 H))) |].
+  destruct (decide (n = USYS_pipe)); [exact (proj2 (proj2 (proj2 H))) |].
+  destruct (decide (n = USYS_read)); [exact (proj2 (proj2 (proj2 H))) |].
+  destruct (decide (n = USYS_fstat)); [exact (proj2 (proj2 (proj2 H))) |].
+  destruct (decide (n = USYS_fork));
+    [exact (proj2 (proj2 (proj2 (proj2 H)))) |].
+  exact (proj2 (proj2 (proj2 H))).
+Qed.
+
+
 
 (* EXEC's row pins everything: the failure arm is the only one that returns
    here at all, and it says so.  (A successful exec never comes back to this
    WP -- the new program's is MINTED by exec from the new trapframe and
    image.) *)
 Lemma usys_mem_ok_exec_row (n : Z) (tf : list (mword 64)) (r : mword 64)
-    (M M' : gmap Z (bv 8)) (π π' : gmap (mword 27) uperm) (szv szv' : Z) :
+    (M M' : gmap Z (bv 8)) (π π' : gmap (mword 27) uperm) (szv szv' : Z)
+    (lz lz' : bool) :
   n = USYS_exec ->
-  usys_mem_ok n tf r M π szv M' π' szv' ->
+  usys_mem_ok n tf r M π szv lz M' π' szv' lz' ->
   r = (mword_of_int (-1) : mword 64) /\ M' = M /\ π' = π /\ szv' = szv.
 Proof.
   intros -> H. unfold usys_mem_ok in H.
   destruct (decide (USYS_exec = USYS_exec)) as [_ | Hc];
-    [ exact H | exfalso; exact (Hc eq_refl) ].
+    [ exact (conj (proj1 H) (conj (proj1 (proj2 H))
+                     (conj (proj1 (proj2 (proj2 H)))
+                        (proj1 (proj2 (proj2 (proj2 H)))))))
+    | exfalso; exact (Hc eq_refl) ].
 Qed.
 
 (* WAIT AT A NULL STATUS POINTER moves nothing -- which is what a program
    passing a null status pointer to wait needs, and what the row now
    says. *)
 Lemma usys_mem_ok_wait_null (n : Z) (tf : list (mword 64)) (r : mword 64)
-    (M M' : gmap Z (bv 8)) (π π' : gmap (mword 27) uperm) (szv szv' : Z) :
+    (M M' : gmap Z (bv 8)) (π π' : gmap (mword 27) uperm) (szv szv' : Z)
+    (lz lz' : bool) :
   n = USYS_wait -> uint (tf !!! tf_arg_idx 0) = 0 ->
-  usys_mem_ok n tf r M π szv M' π' szv' ->
+  usys_mem_ok n tf r M π szv lz M' π' szv' lz' ->
   M' = M /\ π' = π /\ szv' = szv.
 Proof.
   intros -> Hz H. unfold usys_mem_ok in H.
@@ -855,7 +913,7 @@ Proof.
   destruct (decide (USYS_wait = USYS_sbrk)) as [Hc | _]; [ discriminate Hc | ].
   destruct (decide (USYS_wait = USYS_wait)) as [_ | Hc];
     [ | exfalso; exact (Hc eq_refl) ].
-  destruct H as ((d & bs & Hd & Hnull & Hm) & Hp & Hs).
+  destruct H as ((d & bs & Hd & Hnull & Hm) & Hp & Hs & _).
   rewrite (Hnull Hz) in Hm. exact (conj Hm (conj Hp Hs)).
 Qed.
 
@@ -865,9 +923,10 @@ Qed.
    return) is the arm the round instantiates, unconditionally.  The child
    resumes on fork's DEPOSIT and never comes back through this round. *)
 Lemma usys_mem_ok_fork_ret (n : Z) (tf : list (mword 64)) (r : mword 64)
-    (M M' : gmap Z (bv 8)) (π π' : gmap (mword 27) uperm) (szv szv' : Z) :
+    (M M' : gmap Z (bv 8)) (π π' : gmap (mword 27) uperm) (szv szv' : Z)
+    (lz lz' : bool) :
   n = USYS_fork ->
-  usys_mem_ok n tf r M π szv M' π' szv' ->
+  usys_mem_ok n tf r M π szv lz M' π' szv' lz' ->
   r = (mword_of_int (-1) : mword 64) \/ (1 <= sint r <= PIDMAX)%Z.
 Proof.
   intros -> H. unfold usys_mem_ok in H.
@@ -882,13 +941,14 @@ Proof.
 Qed.
 
 Lemma usys_mem_ok_fork_nz (n : Z) (tf : list (mword 64)) (r : mword 64)
-    (M M' : gmap Z (bv 8)) (π π' : gmap (mword 27) uperm) (szv szv' : Z) :
+    (M M' : gmap Z (bv 8)) (π π' : gmap (mword 27) uperm) (szv szv' : Z)
+    (lz lz' : bool) :
   n = USYS_fork ->
-  usys_mem_ok n tf r M π szv M' π' szv' ->
+  usys_mem_ok n tf r M π szv lz M' π' szv' lz' ->
   r <> (mword_of_int 0 : mword 64).
 Proof.
   intros Hn H.
-  destruct (usys_mem_ok_fork_ret n tf r M M' π π' szv szv' Hn H) as [Hf | Hb];
+  destruct (usys_mem_ok_fork_ret n tf r M M' π π' szv szv' lz lz' Hn H) as [Hf | Hb];
     intros Hc.
   - rewrite Hc in Hf.
     assert (Hne : bv_unsigned (mword_of_int 0 : mword 64)
@@ -903,9 +963,10 @@ Qed.
 
 (* the permission map is untouched by every entry but sbrk *)
 Lemma usys_mem_ok_perm (n : Z) (tf : list (mword 64)) (r : mword 64)
-    (M M' : gmap Z (bv 8)) (π π' : gmap (mword 27) uperm) (szv szv' : Z) :
+    (M M' : gmap Z (bv 8)) (π π' : gmap (mword 27) uperm) (szv szv' : Z)
+    (lz lz' : bool) :
   n <> USYS_sbrk ->
-  usys_mem_ok n tf r M π szv M' π' szv' -> π' = π.
+  usys_mem_ok n tf r M π szv lz M' π' szv' lz' -> π' = π.
 Proof.
   intros Hns H. unfold usys_mem_ok in H.
   destruct (decide (n = USYS_exec)); [exact (proj1 (proj2 (proj2 H))) |].
@@ -1002,9 +1063,11 @@ Qed.
    destination pointers (arguments 0 and 1) and read's count (argument 2).
    Everything below is "the table is blind to every other word". *)
 Lemma usys_mem_ok_ueq (n : Z) (tf tf' : list (mword 64)) (r : mword 64)
-    (M M' : gmap Z (bv 8)) (π π' : gmap (mword 27) uperm) (szv szv' : Z) :
+    (M M' : gmap Z (bv 8)) (π π' : gmap (mword 27) uperm) (szv szv' : Z)
+    (lz lz' : bool) :
   tf_ueq tf tf' ->
-  usys_mem_ok n tf r M π szv M' π' szv' -> usys_mem_ok n tf' r M π szv M' π' szv'.
+  usys_mem_ok n tf r M π szv lz M' π' szv' lz'
+  -> usys_mem_ok n tf' r M π szv lz M' π' szv' lz'.
 Proof.
   intros Hu H.
   assert (H0 : tf !!! tf_arg_idx 0 = tf' !!! tf_arg_idx 0)
@@ -1018,7 +1081,9 @@ Proof.
   (* sbrk's row now reads argument 0 too -- its ANSWER is stated at the
      step the break moved by, which the C reads out of a0 *)
   destruct (decide (n = USYS_sbrk));
-    [ unfold usys_sbrk_ret, usys_sbrk_arg in H |- *; rewrite <- H0; exact H | ].
+    [ unfold usys_sbrk_ret, usys_sbrk_arg, usys_sbrk_lazy, usys_sbrk_eager
+        in H |- *;
+      rewrite <- H0, <- H1; exact H | ].
   destruct (decide (n = USYS_wait)); [ rewrite <- H0; exact H | ].
   destruct (decide (n = USYS_pipe)); [ rewrite <- H0; exact H | ].
   destruct (decide (n = USYS_read)); [ rewrite <- H1; rewrite <- H2; exact H | ].
@@ -1035,9 +1100,9 @@ Qed.
    in.) *)
 Lemma usys_mem_ok_epc (n : Z) (tf : list (mword 64)) (v r : mword 64)
     (szv szv' : Z)
-    (M M' : gmap Z (bv 8)) (pi pi' : gmap (mword 27) uperm) :
-  usys_mem_ok n (<[tf_epc_idx := v]> tf) r M pi szv M' pi' szv' ->
-  usys_mem_ok n tf r M pi szv M' pi' szv'.
+    (M M' : gmap Z (bv 8)) (pi pi' : gmap (mword 27) uperm) (lz lz' : bool) :
+  usys_mem_ok n (<[tf_epc_idx := v]> tf) r M pi szv lz M' pi' szv' lz' ->
+  usys_mem_ok n tf r M pi szv lz M' pi' szv' lz'.
 Proof.
   assert (E0 : (<[tf_epc_idx := v]> tf) !!! tf_arg_idx 0 = tf !!! tf_arg_idx 0)
     by (apply list_lookup_total_insert_ne; unfold tf_arg_idx, tf_epc_idx; lia).
@@ -1045,7 +1110,8 @@ Proof.
     by (apply list_lookup_total_insert_ne; unfold tf_arg_idx, tf_epc_idx; lia).
   assert (E2 : (<[tf_epc_idx := v]> tf) !!! tf_arg_idx 2 = tf !!! tf_arg_idx 2)
     by (apply list_lookup_total_insert_ne; unfold tf_arg_idx, tf_epc_idx; lia).
-  unfold usys_mem_ok, usys_rdcount, usys_sbrk_ret, usys_sbrk_arg.
+  unfold usys_mem_ok, usys_rdcount, usys_sbrk_ret, usys_sbrk_arg,
+         usys_sbrk_lazy, usys_sbrk_eager.
   rewrite E0; rewrite E1; rewrite E2.
   intros H; exact H.
 Qed.

@@ -340,6 +340,14 @@ Section UShKernel.
        below reads it off [kexec_image_ok]'s own row. *)
     (forall (p : mword 27) (q : uperm), uvis_perm W !! p = Some q ->
        bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W)) ->
+    (* ...AND THE KEY'S LAZY BIT IS [false] (lane LAZY-FLAG, L6).  The U
+       tier's run is at an EMPTY FILL ([UexecRet.ukcq] is hardwired at
+       [false]), so a constructor can only build a slot for a key that says
+       so.  WHO SUPPLIES IT: exec, whose fresh image is eager -- lane
+       LAZY-FLAG's K4 puts [uvis_lazy W' = false] on
+       [SpecKexec.kexec_image_ok] and on [exec_slot_pre]'s two wands, and
+       until it lands this is a premise the caller carries. *)
+    uvis_lazy W = false ->
     (* THE PAYLOAD.  The data below the frame is handed over whole, and it
        is here that it is spent: on the line buffer, which every stage has
        needed, AND on [R] -- the two static lexer tables, the allocator's
@@ -385,10 +393,10 @@ Section UShKernel.
     upos γp n -∗
     uslot W.
   Proof.
-    intros HQc Hpc Hsub Hx Hal8 Hroom Hstk Hfdlen Hstop.
+    intros HQc Hpc Hsub Hx Hal8 Hroom Hstk Hfdlen Hstop Hlzf.
     iIntros "#Hpay #Hdep #Hrest #Hfd0 #Hmp HQ Hpos".
     iApply (uslot_of_urun_all W (2 + (8 + (16 + (ush_Dbody + n0)))) Q
-              Hal8 Hroom Hstk Hfdlen Hstop with "Hdep Hmp HQ").
+              Hal8 Hroom Hstk Hfdlen Hstop Hlzf with "Hdep Hmp HQ").
     (* sh's own half of its children set travels in [UkSh.ush_pstate]
        beside the ledger and the cwd: fork1 MOVES the set, so the fragment
        goes down the chain index-free ([UserChildren.uch_any]). *)
@@ -429,6 +437,10 @@ Section UShKernel.
     kexec_sz sh_elf - PGSIZE + 8 * Z.of_nat (2 + (8 + (16 + (ush_Dbody + n0))))
       <= kxc_sp_final (kexec_sz sh_elf) alen na ->
     length sts = NOFILE ->
+    (* ...and the lazy bit, passed straight through: see [sh_uexec_slot].
+       [KexecBuilt]'s coverage row is what will make this a READING of
+       [kexec_image_ok] instead of a premise (lane LAZY-FLAG, K4). *)
+    uvis_lazy W' = false ->
     (* the payload, passed straight through: see [sh_uexec_slot] *)
     □ (∀ γt γd γs : gname,
         usz γs (uvis_sz W') -∗
@@ -451,7 +463,7 @@ Section UShKernel.
     upos γp n -∗
     uslot W'.
   Proof.
-    intros HQc Hok Hroom Hlen.
+    intros HQc Hok Hroom Hlen Hlzf.
     (* THE MAP STOPS AT THE BREAK, off the image fact's own row: exec built
        a fresh address space, so [KexecBuilt.kxb_perm_below] says it maps
        nothing above the break, which is what lets sh's later [sbrk] see
@@ -553,6 +565,7 @@ Section UShKernel.
       + rewrite Hszv. clear -Hj1 Hspv; lia.
     - rewrite Hfd. exact Hlen.
     - exact Hstop.
+    - exact Hlzf.
   Qed.
 
 End UShKernel.

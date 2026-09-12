@@ -82,29 +82,68 @@ Record pprivate := MkPPriv {
      ([SpecKfork] for a forked child, main for the first process), which
      is why it is not allocproc's to mint. *)
   pv_chg   : gname;
+  (* THE LAZY-PAGE BIT (lane LAZY-FLAG; app-echo.md, "THE OWNER'S RULING ON
+     THE FORK").  "This process MAY have pages the kernel has promised and
+     not yet mapped."  It is process-visible -- the key carries it as
+     [UexecSlot.uvis_lazy] and a verified program reads it off its own key
+     the way it reads its pid -- and what it MEANS is the invariant
+     [ProcInv.proc_priv_core] carries beside [ProcPtOwn.um_below]:
+
+       pv_lazy V = false -> lazy_free (ud_um (pv_upt V)) (uint (pv_sz V))
+
+     i.e. at [false] the projection's fill is EMPTY ([UserPerm.lazy_free])
+     and every page [UserPerm.perm_of] shows writable is a real user leaf
+     the kernel can copy to.
+
+     STORED AND NOT COMPUTED, and that is the whole reason it is a field:
+     vmfault MAPS a page, so the table's own verdict moves across a trap
+     the process cannot see, while the trap loop's TRANSPARENT arm hands
+     the process's continuation back AT THE SAME KEY
+     ([UexecRet.uexec_ret_F]'s non-ecall branch).  A stored bit does not
+     move there; a computed one would, and the arm would be false.  The bit
+     is a CLAIM, monotone the safe way: [true] promises nothing, so no
+     table change can falsify it, and only [sbrklazy]'s grow has to raise
+     it ([SpecSysSbrk]'s LAZY arm, a ghost write of this field -- there is
+     no C variable behind it).
+
+     NOT A CELL, exactly like [pv_cwi]: nothing in [struct proc] stores it,
+     and [ProcInv.proc_fields] does not mention it.  LAST in the record, so
+     every positional [MkPPriv] only gained a trailing argument. *)
+  pv_lazy  : bool;
 }.
 
 Definition upd_cwd (V : pprivate) (v : mword 64) : pprivate :=
   MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) (pv_fdg V) v (pv_name V)
-          (pv_cwi V) (pv_gen V) (pv_chg V).
+          (pv_cwi V) (pv_gen V) (pv_chg V) (pv_lazy V).
 
 (* the inum alone -- chdir's second write, beside the pointer's *)
 Definition upd_cwi (V : pprivate) (z : Z) : pprivate :=
   MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) (pv_fdg V) (pv_cwd V)
-          (pv_name V) z (pv_gen V) (pv_chg V).
+          (pv_name V) z (pv_gen V) (pv_chg V) (pv_lazy V).
 
 (* THE GENERATION, INSTALLED: allocproc's mint of a fresh incarnation
    ([ChildTok.gen_alloc]) writes the name it chose into the block. *)
 Definition upd_gen (V : pprivate) (g : gname) : pprivate :=
   MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) (pv_fdg V) (pv_cwd V)
-          (pv_name V) (pv_cwi V) g (pv_chg V).
+          (pv_name V) (pv_cwi V) g (pv_chg V) (pv_lazy V).
 
 (* ...AND THE CHILDREN ROW'S NAME, installed by whoever creates the process
    at the moment it holds <wait_lock> and can put the row in the map
    ([SpecKfork]'s [acquire(&wait_lock); np->parent = p]). *)
 Definition upd_chg (V : pprivate) (g : gname) : pprivate :=
   MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) (pv_fdg V) (pv_cwd V)
-          (pv_name V) (pv_cwi V) (pv_gen V) g.
+          (pv_name V) (pv_cwi V) (pv_gen V) g (pv_lazy V).
+
+(* ...AND THE LAZY BIT, the one field a SYSCALL writes without any C store
+   behind it: sbrk's LAZY arm raises [p->sz] with the table untouched, which
+   is exactly how a hole is made, so the arm sets this to [true]
+   ([SpecSysSbrk]'s own row).  exec's success clears it ([upd_exec]). *)
+Definition upd_lazy (V : pprivate) (b : bool) : pprivate :=
+  MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) (pv_fdg V) (pv_cwd V)
+          (pv_name V) (pv_cwi V) (pv_gen V) (pv_chg V) b.
+
+Lemma upd_lazy_id (V : pprivate) : upd_lazy V (pv_lazy V) = V.
+Proof. destruct V; reflexivity. Qed.
 
 Lemma upd_gen_id (V : pprivate) : upd_gen V (pv_gen V) = V.
 Proof. destruct V; reflexivity. Qed.
@@ -177,6 +216,12 @@ Proof. destruct U as [V M]. rewrite /us_cwd /upd_usV /=. by rewrite upd_cwd_id. 
 
 Definition us_cwi (U : ustate) (z : Z) : ustate :=
   upd_usV U (upd_cwi (us_V U) z).
+
+Definition us_lazy (U : ustate) (b : bool) : ustate :=
+  upd_usV U (upd_lazy (us_V U) b).
+
+Lemma us_lazy_id (U : ustate) : us_lazy U (pv_lazy (us_V U)) = U.
+Proof. destruct U as [V M]. rewrite /us_lazy /upd_usV /=. by rewrite upd_lazy_id. Qed.
 
 Lemma us_cwi_id (U : ustate) : us_cwi U (pv_cwi (us_V U)) = U.
 Proof. destruct U as [V M]. rewrite /us_cwi /upd_usV /=. by rewrite upd_cwi_id. Qed.
@@ -579,7 +624,15 @@ Section ProcDefs.
     (∃ (V : pprivate) (pid : mword 32),
        ⌜pv_ofile V = replicate NOFILE (zero_reg : mword 64) /\
         pv_cwd V = (zero_reg : mword 64) /\
-        uint (pv_sz V) <= uvm_maxsz⌝ ∗
+        uint (pv_sz V) <= uvm_maxsz /\
+        (* ...AND THE LAZY BIT IS SET (lane LAZY-FLAG, K2).  A dormant slot
+           is at [ProcDefs.pv_lazy = true], where the block invariant's
+           claim is VACUOUS -- which is what lets allocproc install an empty
+           user map with nothing to prove ([ProcInv.proc_priv_nocwd_intro]'s
+           third premise) and what kfork's child is re-branded from
+           ([ProofKforkB6]'s close).  Both producers build the literal: the
+           boot carve's fresh block and freeproc's zeroed one. *)
+        pv_lazy V = true⌝ ∗
        p_pid pa ↦₄{DfracOwn (1/2)} pid ∗
        proc_fields pa (DfracOwn 1) V ∗
        ofile_cells pa (pv_ofile V) ∗
@@ -685,7 +738,15 @@ Section ProcDefs.
     (∃ (V : pprivate) (pid : mword 32),
        ⌜pv_ofile V = replicate NOFILE (zero_reg : mword 64) /\
         pv_cwd V = (zero_reg : mword 64) /\
-        uint (pv_sz V) <= uvm_maxsz⌝ ∗
+        uint (pv_sz V) <= uvm_maxsz /\
+        (* ...AND THE LAZY BIT IS SET (lane LAZY-FLAG, K2).  A dormant slot
+           is at [ProcDefs.pv_lazy = true], where the block invariant's
+           claim is VACUOUS -- which is what lets allocproc install an empty
+           user map with nothing to prove ([ProcInv.proc_priv_nocwd_intro]'s
+           third premise) and what kfork's child is re-branded from
+           ([ProofKforkB6]'s close).  Both producers build the literal: the
+           boot carve's fresh block and freeproc's zeroed one. *)
+        pv_lazy V = true⌝ ∗
        p_pid pa ↦₄{DfracOwn (1/2)} pid ∗
        proc_fields pa (DfracOwn 1) V ∗
        ofile_cells pa (pv_ofile V) ∗

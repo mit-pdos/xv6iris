@@ -528,6 +528,50 @@ Proof.
   destruct Hs as (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Hcwi & _). exact Hcwi.
 Qed.
 
+(* ...AND ITS LAZY BIT IS CLEAR, read off the same arm (lane LAZY-FLAG, K4):
+   exec's image is eager, so the block the swap installs is at
+   [ProcDefs.pv_lazy = false] ([ProcInv.upd_exec]) and the resume key
+   carries it ([exec_key_lazy]).  This is what pays [exec_slot_pre]'s
+   second new row. *)
+Lemma kexec_ok_lazy (V V' : pprivate) (r entry spv szv' : mword 64)
+    (na : nat) (alen : nat -> nat) :
+  r <> (mword_of_int (-1) : mword 64) ->
+  kexec_ok V V' r entry spv szv' na alen -> pv_lazy V' = false.
+Proof.
+  intros Hne Hok.
+  destruct Hok as [[Hr _] | Hs]; [ contradiction (Hne Hr) | ].
+  destruct Hs as (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _
+                  & _ & Hlz). exact Hlz.
+Qed.
+
+(* ...and the cwd's inum off the same arm, for the callers that hold
+   [kexec_ok] rather than [kexec_ok_exec] (the node that is NOT a loadable
+   file has no ELF entry to exhibit). *)
+Lemma kexec_ok_cwi (V V' : pprivate) (r entry spv szv' : mword 64)
+    (na : nat) (alen : nat -> nat) :
+  r <> (mword_of_int (-1) : mword 64) ->
+  kexec_ok V V' r entry spv szv' na alen -> pv_cwi V' = pv_cwi V.
+Proof.
+  intros Hne Hok.
+  destruct Hok as [[Hr _] | Hs]; [ contradiction (Hne Hr) | ].
+  destruct Hs as (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Hcwi & _). exact Hcwi.
+Qed.
+
+Lemma kexec_ok_exec_lazy (f : elf_bytes) (V V' : pprivate) (r : mword 64)
+    (na : nat) (alen : nat -> nat) :
+  kexec_ok_exec f V V' r na alen -> pv_lazy V' = false.
+Proof.
+  intros (e & spv & szv' & _ & Hne & Hok).
+  exact (kexec_ok_lazy V V' r _ spv szv' na alen Hne Hok).
+Qed.
+
+(* the key's eleventh reading, beside [exec_key_cwd]: the resume key carries
+   the block's bit, and exec's block is at [false]. *)
+Lemma exec_key_lazy (U' : ustate) (sts : list fdstate) (gn : gname)
+    (cs : gset gname) (pidv : mword 32) (na : nat) :
+  uvis_lazy (exec_key U' sts gn cs pidv na) = pv_lazy (us_V U').
+Proof. destruct U' as [V' M']. destruct V'. reflexivity. Qed.
+
 (* THE KEY'S THREE OTHER READINGS, beside [exec_key_cwd]: the trapframe is
    the post-exec frame with argc inserted, the size and the descriptor view
    are the block's. *)
@@ -565,7 +609,8 @@ Proof.
   intros Hlen Hne Hok.
   destruct Hok as [(Hr & _) | Hok]; [ contradiction (Hne Hr) | ].
   destruct Hok as (Hr & Hna & Hstok & Hpsz & Hspv & Htfp & Htf
-                   & Hof & Hfdg & Hcwd & Hcwi & Hgenp & Hchgp & Hnm & Hlo & Hhi).
+                   & Hof & Hfdg & Hcwd & Hcwi & Hgenp & Hchgp & Hnm & Hlo & Hhi
+                   & Hlzp).
   assert (Hlt6 : (kxc_tf_sp_idx < length (pv_tf (us_V U)))%nat)
     by (rewrite Hlen; unfold TFWORDS, kxc_tf_sp_idx; lia).
   assert (Hlt15 : (tf_arg_idx 1 < length (pv_tf (us_V U)))%nat)
@@ -736,9 +781,32 @@ Section KexecAU.
      waiting on it.  The kernel mints nothing: the resource that reaches
      the new image is the one the old image gave up.  At the trivial
      payload the premise is [True] and every generic supplier drops it. *)
+  (* THE TWO ROWS THE KERNEL PROVES AND THE PROGRAM READS (2026-09-12, the
+     coordinator; lanes SH-OPEN and LAZY-FLAG).  Both wands resume a
+     process, so both say what the key they resume at reads:
+
+     - ITS WORKING DIRECTORY IS THE CALLER'S.  exec inherits the cwd
+       ([exec_key_cwd] off [kexec_ok_exec_cwi]) and the FAILED arm resumes
+       the caller itself, so [cw] -- the [cw] both bundle shapes are
+       already stated at ([exec_au_pre], [SpecSysExec.sys_exec_au_pre]) --
+       is the inum on either side.  [kexec_image_ok] cannot carry it: it is
+       a fact about the CALLER's block, not about the file.  sh's entry
+       needs it, because sh's pinned open of "console" is at ROOTINO.
+
+     - AND ITS LAZY BIT IS [false] ([UexecSlot.uvis_lazy]).  The image exec
+       loads is EAGER -- every segment's uvmalloc runs from the CURRENT
+       size, so no gap is left, and the guard+stack pair closes the top --
+       so the new space's projection has an empty fill, which is what a
+       verified program's run is keyed at ([UexecRet.ukcq]).  On the failed
+       arm it is the caller's own bit, and the caller is a verified program
+       running at [false].  WHAT PAYS IT: lane LAZY-FLAG's K4 --
+       [KexecBuilt.kexec_built] gains the fresh table's coverage row,
+       [ProcInv.upd_exec] clears [ProcDefs.pv_lazy], and
+       [KexecBridge.exec_image_ok_of_built] relays it. *)
   Definition exec_slot_pre (S : uvis -> iProp Σ) (Q : Z -> iProp Σ)
       (Pfin : Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
+      (cw : Z)
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) : iProp Σ :=
     ((∀ (av : aview) (i : Z) (f : elf_bytes) (nl : nat) (W' : uvis),
@@ -746,6 +814,8 @@ Section KexecAU.
         Φo av i (MkAnode (AFile f) nl) -∗
         ⌜kexec_loadable f⌝ -∗
         ⌜kexec_image_ok f na alen afun sts W'⌝ -∗
+        ⌜uvis_cwd W' = cw⌝ -∗
+        ⌜uvis_lazy W' = false⌝ -∗
         my_pay (uvis_gen W') Q -∗
         Q (-1) -∗
         S W')
@@ -754,6 +824,8 @@ Section KexecAU.
           Φo av i a -∗
           ⌜~ anode_loadable a⌝ -∗
           ⌜exec_key_ok na alen sts W'⌝ -∗
+          ⌜uvis_cwd W' = cw⌝ -∗
+          ⌜uvis_lazy W' = false⌝ -∗
           my_pay (uvis_gen W') Q -∗
           Q (-1) -∗
           S W'))%I.
@@ -782,7 +854,7 @@ Section KexecAU.
     (ex_start γfs cw P Pmiss pl
      ∗ pf_at (aopen_commit_at Γ appE) Fo
      ∗ pf_at (fun S => exec_slot_pre S Q (P (length (path_elems pl)))
-                         Fo.(pf_recv) na alen afun sts) Fs)%I.
+                         Fo.(pf_recv) cw na alen afun sts) Fs)%I.
 
   (* THE BUNDLE A CALLER THAT TRACKS NOTHING HANDS IN, and it is free
      wherever it has a slot at every key: every hop says yes at a [True]
@@ -817,8 +889,8 @@ Section KexecAU.
        [pf_at_triv]. *)
     rewrite /pf_at /=. iSplit; [| done].
     rewrite /exec_slot_pre. iSplitR.
-    - iIntros (av i f nl W') "_ _ _ _ Hp _". iApply ("HS" with "Hp").
-    - iIntros (av i a W') "_ _ _ _ Hp _". iApply ("HS" with "Hp").
+    - iIntros (av i f nl W') "_ _ _ _ _ _ Hp _". iApply ("HS" with "Hp").
+    - iIntros (av i a W') "_ _ _ _ _ _ Hp _". iApply ("HS" with "Hp").
   Qed.
 
   (* ...and the one a caller that wants nothing back hands in: the slot
@@ -841,11 +913,12 @@ Section KexecAU.
   Lemma exec_slot_pre_ne (n : nat) (S S' : uvis -d> iPropO Σ)
       (Q : Z -> iProp Σ) (Pfin : Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
+      (cw : Z)
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) :
     S ≡{n}≡ S' ->
-    exec_slot_pre S Q Pfin Φo na alen afun sts
-    ≡{n}≡ exec_slot_pre S' Q Pfin Φo na alen afun sts.
+    exec_slot_pre S Q Pfin Φo cw na alen afun sts
+    ≡{n}≡ exec_slot_pre S' Q Pfin Φo cw na alen afun sts.
   Proof. intros HS. rewrite /exec_slot_pre. solve_proper. Qed.
 
   (* ...and at the PAIR the bundle takes: the refund does not move with the
@@ -863,7 +936,7 @@ Section KexecAU.
   Proof.
     intros HS. rewrite /exec_au_pre /pf_at. cbn [pf_recv pf_refund].
     by rewrite (exec_slot_pre_ne n S S' Q (P (length (path_elems pl)))
-                  Fo.(pf_recv) na alen afun sts HS).
+                  Fo.(pf_recv) cw na alen afun sts HS).
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -932,7 +1005,7 @@ Section KexecAU.
           (namei_walk_dead_era γfs P Pmiss pl
              ∗ pf_at (aopen_commit_at Γ appE) Fo
              ∗ pf_at (fun S => exec_slot_pre S Q (P (length (path_elems pl)))
-                                 Fo.(pf_recv) na alen afun sts)
+                                 Fo.(pf_recv) cw na alen afun sts)
                  Fs)
           ∨ (* (iii) the walk completed and the node was observed; exec
                failed past the lock, and the arm says WHY (header,
@@ -943,7 +1016,7 @@ Section KexecAU.
              ∗ ⌜arow_at av i a⌝ ∗ Fo.(pf_recv) av i a
              ∗ ⌜exec_fail_ok a na alen c⌝
              ∗ pf_at (fun S => exec_slot_pre S Q (P (length (path_elems pl)))
-                                 Fo.(pf_recv) na alen afun sts)
+                                 Fo.(pf_recv) cw na alen afun sts)
                  Fs)))%I.
 
   (* the armed disjunction the continuation receives, keyed on a0, beside

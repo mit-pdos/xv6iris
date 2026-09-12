@@ -159,18 +159,8 @@ Section KexecCSetup.
      [um_covered_z_mono] only shrinks it -- so this direction needs its own
      one-liner, off the same [pgroundup_unsigned] bound
      [UmCovered.um_covered_run] already uses. *)
-  Local Lemma um_covered_pground (x : mword 64) (um : gmap (mword 27) (mword 64)) :
-    (bv_unsigned x <= uvm_maxsz)%Z -> um_covered x um -> um_covered (pgroundup x) um.
-  Proof.
-    intros Hb Hc vpn Hlt. apply Hc.
-    pose proof (bv_unsigned_in_range _ x) as [Hx0 _].
-    assert (Hnw64 : (bv_unsigned x + 4095 < 2 ^ 64)%Z).
-    { unfold uvm_maxsz in Hb. change (2 ^ 64)%Z with 18446744073709551616%Z. lia. }
-    rewrite (pgroundup_unsigned x Hnw64) in Hlt.
-    pose proof (Z_div_mod_eq_full (bv_unsigned x + 4095) 4096) as Hdm.
-    pose proof (Z.mod_pos_bound (bv_unsigned x + 4095) 4096 ltac:(lia)) as Hmodb.
-    lia.
-  Qed.
+  (* [um_covered_pground] is [UmCovered]'s now (lane LAZY-FLAG hoisted it:
+     the lazy flag's own bridge reads coverage at the ROUNDED-UP break). *)
 
   (* [uvmclear] overwrites exactly ONE existing leaf (the stack guard page) --
      these two are what let [um_below]/[um_covered] survive that edit onto

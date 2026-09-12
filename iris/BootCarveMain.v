@@ -2169,12 +2169,18 @@ Section BootCarveMain.
                  (* the fd-state name is JUNK on a dormant slot: it has no
                     descriptors, and allocproc mints the real one. *)
                  1%positive
-                 (zero_reg : mword 64) bs 0 1%positive 1%positive),
+                 (zero_reg : mword 64) bs 0 1%positive 1%positive
+                 (* the lazy bit on a DORMANT slot (lane LAZY-FLAG): [true],
+                    where [ProcInv.proc_priv_core]'s claim is vacuous. *)
+                 true),
         (mword_of_int 0 : mword 32).
-      cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_cwi pv_gen pv_chg].
+      cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_cwi pv_gen pv_chg
+           pv_lazy].
       iSplitR; [iPureIntro; split_and!;
                 [reflexivity | reflexivity | vm_compute; discriminate
-                 | vm_compute; reflexivity] |].
+                 | vm_compute; reflexivity
+                 (* the dormant slot's lazy bit (lane LAZY-FLAG, K2) *)
+                 | reflexivity] |].
       iSplitL "Hpid1"; [iExact "Hpid1" |].
       iSplitL "Hsz Hcwd Hnm".
       { iSplitL "Hsz"; [iExact "Hsz" |]. iSplitL "Hcwd"; [iExact "Hcwd" |].

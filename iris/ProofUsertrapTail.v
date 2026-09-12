@@ -309,7 +309,7 @@ Section UtRet2.
        this tail moves nothing the row reads -- [SpecUsertrap.ut_exec_out] *)
     ut_exec_out fdep scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) (us_M U0)
       (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
-      (uint (pv_sz (us_V U0))) U sts0 sts gn cs pid -∗
+      (uint (pv_sz (us_V U0))) (pv_lazy (us_V U0)) U sts0 sts gn cs pid -∗
     (* ...and FORK'S, relayed the same way -- [SpecUsertrap.ut_fork_out] *)
     ut_fork_out fdep scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0)))
       (pv_tf (us_V U) !!! tf_arg_idx 0) cs cs2 -∗
@@ -853,7 +853,7 @@ Section UtRet.
        this tail moves nothing the row reads -- [SpecUsertrap.ut_exec_out] *)
     ut_exec_out fdep scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) (us_M U0)
       (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
-      (uint (pv_sz (us_V U0))) U sts0 sts gn cs pid -∗
+      (uint (pv_sz (us_V U0))) (pv_lazy (us_V U0)) U sts0 sts gn cs pid -∗
     (* ...and FORK'S, relayed the same way -- [SpecUsertrap.ut_fork_out] *)
     ut_fork_out fdep scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0)))
       (pv_tf (us_V U) !!! tf_arg_idx 0) cs cs2 -∗
@@ -963,10 +963,14 @@ Section UtRet.
                       (add_vec (un_ks N) (mword_of_int 4096)) (cid_word (CID := CIDp)))
       by (rewrite /Vr; destruct (us_V U); reflexivity).
     assert (Hrdr : ut_round epw scw U0 (MkUstate Vr (us_M U))).
-    { refine (ut_round_ueq epw scw U0 U (MkUstate Vr (us_M U)) _ _ eq_refl _ _ Hrd).
+    { refine (ut_round_ueq epw scw U0 U (MkUstate Vr (us_M U)) _ _ eq_refl _ _ _
+                Hrd).
       - cbn [us_V]. rewrite HVrtf. apply prepare_return_tf_ueq.
       - cbn [us_V]. rewrite HVrupt HVrsz. reflexivity.
       - cbn [us_V]. exact HVrsz.
+      - cbn [us_V]. rewrite /Vr; destruct (us_V U); reflexivity.
+      (* the lazy bit: prepare_return writes trapframe words and no block
+         field ([ProcDefs.pv_lazy]) -- lane LAZY-FLAG *)
       - cbn [us_V]. rewrite /Vr; destruct (us_V U); reflexivity. }
     (* ...and the cwd's inum, which prepare_return's four stores leave alone *)
     assert (HVrcwi : pv_cwi (us_V (MkUstate Vr (us_M U))) = pv_cwi (us_V U))
@@ -980,9 +984,13 @@ Section UtRet.
                       (uint (pv_sz (us_V (MkUstate Vr (us_M U)))))
                     = perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U)))).
     { cbn [us_V]. rewrite HVrupt HVrsz. reflexivity. }
-    iDestruct (ut_exec_out_ueq fdep scw _ _ _ _ _ U (MkUstate Vr (us_M U)) sts0 sts
-                 gn cs pid
-                 (tf_ueq_refl _) HVru eq_refl HVrpi HVrsz HVrcwi with "Hxo") as "Hxo".
+    iDestruct (ut_exec_out_ueq fdep scw _ _ _ _ _ _ U (MkUstate Vr (us_M U))
+                 sts0 sts gn cs pid
+                 (tf_ueq_refl _) HVru eq_refl HVrpi HVrsz HVrcwi
+                 (* the lazy bit across the re-arming: prepare_return writes
+                    no block field (lane LAZY-FLAG) *)
+                 ltac:(cbn [us_V]; rewrite /Vr; destruct (us_V U); reflexivity)
+                 with "Hxo") as "Hxo".
     (* ...and the syscall channel's row across the same re-arming.  It reads
        the parked frame at a0 alone, which is what [tf_ueq] is blind to --
        the same word the descriptor row below crosses by. *)
@@ -1134,7 +1142,7 @@ Section UtA6.
        this tail moves nothing the row reads -- [SpecUsertrap.ut_exec_out] *)
     ut_exec_out fdep scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) (us_M U0)
       (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
-      (uint (pv_sz (us_V U0))) U sts0 sts gn cs pid -∗
+      (uint (pv_sz (us_V U0))) (pv_lazy (us_V U0)) U sts0 sts gn cs pid -∗
     (* ...and FORK'S, relayed the same way -- [SpecUsertrap.ut_fork_out] *)
     ut_fork_out fdep scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0)))
       (pv_tf (us_V U) !!! tf_arg_idx 0) cs cs2 -∗
@@ -1474,7 +1482,7 @@ Section UtFa.
        this tail moves nothing the row reads -- [SpecUsertrap.ut_exec_out] *)
     ut_exec_out fdep scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) (us_M U0)
       (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
-      (uint (pv_sz (us_V U0))) U sts0 sts gn cs pid -∗
+      (uint (pv_sz (us_V U0))) (pv_lazy (us_V U0)) U sts0 sts gn cs pid -∗
     (* ...and FORK'S, relayed the same way -- [SpecUsertrap.ut_fork_out] *)
     ut_fork_out fdep scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0)))
       (pv_tf (us_V U) !!! tf_arg_idx 0) cs cs2 -∗

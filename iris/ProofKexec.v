@@ -663,7 +663,8 @@ Section KexecAUExit.
          pl na alen afun sts gn cs pidv U)
       gf fsc_kalloc pj pidv m ret_tgt K b eb lks dqb dqs fsc_bmapstart
       na plen pv dqpv pfun av dqa avf aslen dqas afun -∗
-    PA.kxa_receipt Fs P Fo Qpay (length (path_elems pl)) zi na alen afun sts dn bm datl -∗
+    PA.kxa_receipt Fs P Fo Qpay (pv_cwi (us_V U)) (length (path_elems pl)) zi
+                   na alen afun sts dn bm datl -∗
     KexecOkQ.kexec_closer (CID := CIDx)
       (KexecBridge.exec_built_Q (kxc_fb datl dn) ef na alen afun)
       (kxau_QFp (kxc_fb datl dn) na alen)
@@ -728,8 +729,17 @@ Section KexecAUExit.
         iDestruct (pf_at_au with "Hsl") as "[Hsl _]".
         iApply ("Hsl" $! av0 zi (kxc_fb datl dn) nl
                   (SpecKexec.exec_key U' sts gn cs pidv na)
-                  with "HP HΦ [%] [%] Hmp");
-          [exact Hload | exact Himg].
+                  with "HP HΦ [%] [%] [%] [%] Hmp");
+          [ exact Hload | exact Himg
+          (* THE KEY'S CWD is the caller's: exec does not chdir, so the
+             post-exec block's inum is the entry block's
+             ([SpecKexec.exec_key_cwd] + [kexec_ok_exec_cwi]) *)
+          | rewrite SpecKexec.exec_key_cwd;
+            exact (SpecKexec.kexec_ok_exec_cwi _ _ _ _ _ _ Hokx)
+          (* ...AND ITS LAZY BIT IS CLEAR (lane LAZY-FLAG, K4): exec's image
+             is eager, and [KexecDefs.kexec_ok]'s own row says so *)
+          | rewrite SpecKexec.exec_key_lazy;
+            exact (SpecKexec.kexec_ok_exec_lazy _ _ _ _ _ _ Hokx) ].
     - (* NOT A LOADABLE FILE.  Arm (b) on success, [EfNotLoadable] on a
          failure past the lock. *)
       destruct Hq as [(Hr & HV & (_ & _ & HM)) | Hsucc].
@@ -770,11 +780,16 @@ Section KexecAUExit.
         iDestruct (pf_at_au with "Hsl") as "[_ Hsl]".
         iApply ("Hsl" $! av0 zi (abs_row (FsStateEra.era_node dn bm datl))
                   (SpecKexec.exec_key U' sts gn cs pidv na)
-                  with "HP HΦ [%] [%] Hmp").
+                  with "HP HΦ [%] [%] [%] [%] Hmp").
         { exact Hnl. }
         { exact (SpecKexec.kexec_ok_exec_key_ok U U' sts gn cs pidv
                    (mf !!! Regidx Ra0)
                    entry spv szv' na alen Htflen Hne Hkok). }
+        (* the two rows of the same arm, off [kexec_ok]'s own conjuncts *)
+        { rewrite SpecKexec.exec_key_cwd.
+          exact (SpecKexec.kexec_ok_cwi _ _ _ _ _ _ _ _ Hne Hkok). }
+        { rewrite SpecKexec.exec_key_lazy.
+          exact (SpecKexec.kexec_ok_lazy _ _ _ _ _ _ _ _ Hne Hkok). }
   Qed.
 
 End KexecAUExit.

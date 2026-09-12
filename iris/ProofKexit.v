@@ -1798,7 +1798,9 @@ Section KexitRest.
        take [proc_priv_bare] now, and [p->cwd] lives INSIDE it -- so the cell
        is borrowed for the two instructions that touch it (+0x50's load and
        +0x5c's store) and stays in the block for everything between. *)
-    rewrite proc_priv_nocwd_bare. iDestruct "Hpriv" as "[Hpbare Hofiles]".
+    iDestruct (proc_priv_nocwd_lazy with "Hpriv") as %Hlzq.
+    rewrite (proc_priv_nocwd_bare _ _ _ _ Hlzq).
+    iDestruct "Hpriv" as "[Hpbare Hofiles]".
     iDestruct (cwd_ref_at_held (pv_cwd (us_V U)) (pv_cwi (us_V U)) with "Href") as "Href".
     iDestruct "Href" as (kk qq inum) "(%Hipe & %Hkk & %Hinumb & %Hipos & Href & Hru)".
     iDestruct (ic_escrows_acc kk Hkk with "Hescrows") as "#Hescrow".
@@ -2017,7 +2019,8 @@ Section KexitRest.
     iDestruct (iref_slots_combine 1 IREFSPARE with "Hislot Hir") as "Hir".
     iAssert (proc_priv_nocwd γf pj pid (us_cwd U (zero_reg : mword 64)))
       with "[Hpbare Hofiles]" as "Hpriv".
-    { rewrite proc_priv_nocwd_bare.
+    { rewrite (proc_priv_nocwd_bare _ _ _
+                 (us_cwd U (zero_reg : mword 64)) Hlzq).
       cbn [upd_cwd pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
       iSplitL "Hpbare"; [iExact "Hpbare" | iExact "Hofiles"]. }
     iDestruct (cpu_own_transport CID7 CID8 0 eb pj b ltac:(wp_next_chain)

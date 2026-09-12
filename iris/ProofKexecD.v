@@ -74,6 +74,8 @@ Require Import IrefSlots.
 Require Import DiskInv.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
+Require Import UserPerm.   (* [lazy_free] and its two coverage bridges:
+                              what [ProcDefs.pv_lazy] claims *)
 Require Import UmCovered.
 Require Import FileInvDefs.
 Require Import KexecDefs.
@@ -679,7 +681,7 @@ Section KexecDCommit.
      composed into the contract's own one-shot [upd_exec]. *)
   Lemma kxd_upd_compose (V : pprivate) (ws1 ws3 : list (mword 64))
       (ns : list (bv 8)) (P' : uptd) (szv : mword 64) :
-    upd_sz (upd_pt (upd_name (upd_tf V ws1) ns) P' ws3) szv
+    upd_lazy (upd_sz (upd_pt (upd_name (upd_tf V ws1) ns) P' ws3) szv) false
     = upd_exec V szv P' ws3 ns.
   Proof. by destruct V. Qed.
 
@@ -692,9 +694,17 @@ Section KexecDCommit.
   Lemma kxd_priv_exec (gf : gname) (pa : mword 64) (pid : mword 32)
       (U : ustate) (ws1 ws3 : list (mword 64)) (ns : list (bv 8))
       (P' : uptd) (szv : mword 64) (Mx : gmap Z (bv 8)) :
+    (* ...AND THE LAZY BIT IS WRITTEN BY THE SWAP (lane LAZY-FLAG, K4): the
+       address-space close re-sets it ([ProcInv.proc_priv_newspace]) and
+       exec's image is EAGER, so what it writes is [false] -- which is
+       exactly what [ProcInv.upd_exec] records, paid out of
+       [KexecBuilt.kexec_built]'s coverage row. *)
     proc_priv gf pa pid
       (upd_usM (upd_usV (us_name (us_tf U ws1) ns)
-                  (upd_sz (upd_pt (us_V (us_name (us_tf U ws1) ns)) P' ws3) szv))
+                  (upd_lazy
+                     (upd_sz (upd_pt (us_V (us_name (us_tf U ws1) ns)) P' ws3)
+                        szv)
+                     false))
                Mx) -∗
     proc_priv gf pa pid (upd_usM (us_exec U szv P' ws3 ns) Mx).
   Proof. destruct U as [V M]; destruct V. iIntros "H". iExact "H". Qed.
@@ -1249,6 +1259,7 @@ Section KexecDCommit.
         %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb & _)".
     iPoseProof (pt_node_claim_from_static (ud_tfp (pv_upt (us_V U))) Hpv_valid with "Hkmapb") as "#Hptc".
     (* ---- the process block, opened for the COMMIT's own three writes ---- *)
+    iDestruct (proc_priv_lazy with "Hpriv") as "%Hlzold".
     iDestruct (proc_priv_newspace with "Hpriv")
       as "(%Hszmax & %Hbelold & Hpsz & Hppt & Hptf & Hptold & Htfp & Hprivback)".
     iDestruct (kxd_tf_len with "Htfp") as "[%Htflen Htfp]".
@@ -1511,6 +1522,21 @@ Section KexecDCommit.
        accessor closes into the contract's own one-shot move. ---- *)
     iDestruct (proc_pt_wf_get with "Hpt") as %Hwf.
     pose proof (proc_pt_covered_maxsz P sz1 Hwf Hcov) as Hmaxsz1.
+    (* THE FRESH IMAGE'S FILL IS EMPTY (lane LAZY-FLAG, K4).  Exec's space
+       is EAGER, and this state's coverage slot is that fact at the byte
+       bound; [UserPerm.lazy_free] wants it at the page bound PGROUNDUP
+       rounds to, which is [UmCovered.um_covered_pground]. *)
+    assert (Hnwsz1 : (bv_unsigned sz1 + 4095 < 2 ^ 64)%Z).
+    { pose proof (proj1 (bv_unsigned_in_range _ sz1)) as Hsz10.
+      unfold uvm_maxsz in Hmaxsz1.
+      change (2 ^ 64)%Z with 18446744073709551616%Z. lia. }
+    assert (Hlzfresh : lazy_free (ud_um P) (uint sz1)).
+    { apply (lazy_free_of_covered (ud_um P) (uint sz1)).
+      - unfold usz_ok. rewrite uint_unsigned (pgroundup_live sz1 Hnwsz1).
+        destruct (pgroundup_maxsz sz1 Hmaxsz1) as [[_ Hle] _].
+        rewrite uvm_maxsz_val in Hle. exact Hle.
+      - rewrite uint_unsigned (pgroundup_live sz1 Hnwsz1).
+        exact (um_covered_pground sz1 (ud_um P) Hmaxsz1 Hcov). }
     (* THE NEW ADDRESS SPACE'S IMAGE.  kexec loaded the program into the
        table it built, so what the commit installs is a FRESH image; the
        callees below [proc_pt] speak the ∃-weakened form, and the closer
@@ -1527,11 +1553,15 @@ Section KexecDCommit.
                       (<[tf_epc_idx := (Z_to_bv 64 (le_at ef 24 8) : mword 64)]>
                          (<[tf_arg_idx 1
                             := (mword_of_int (kxc_sp_final (uint sz1) alen c)
-                                : mword 64)]> (pv_tf (us_V U))))) Mi).
+                                : mword 64)]> (pv_tf (us_V U))))) Mi false).
     iSpecialize ("Hprivback" with "[%]"); [exact HPtfp |].
     iSpecialize ("Hprivback" with "[%]");
       [rewrite uint_unsigned; exact Hmaxsz1 |].
     iSpecialize ("Hprivback" with "[%]"); [exact Hbelow |].
+    (* THE LAZY BIT THE SWAP WRITES (lane LAZY-FLAG, K4): [false], because
+       the image exec loaded is EAGER -- uvmalloc filled every page below
+       the size it settled on ([Hlzfresh], off this state's coverage). *)
+    iSpecialize ("Hprivback" with "[%]"); [intros _; exact Hlzfresh |].
     (* the close wants the trapframe page named through the NEW descriptor;
        [HPtfp] is the equation, and it is the one thing [proc_priv_newspace]
        pins because the trapframe page genuinely does not move. *)
@@ -2027,6 +2057,21 @@ Section KexecDMain.
        ([UmCovered.proc_pt_covered_maxsz]: there are only 2^27 user vpns). *)
     iDestruct (proc_pt_wf_get with "Hpt") as %HwfP.
     pose proof (proc_pt_covered_maxsz P sz1 HwfP Hcov) as Hmaxsz1.
+    (* THE FRESH IMAGE'S FILL IS EMPTY (lane LAZY-FLAG, K4).  Exec's space
+       is EAGER, and this state's coverage slot is that fact at the byte
+       bound; [UserPerm.lazy_free] wants it at the page bound PGROUNDUP
+       rounds to, which is [UmCovered.um_covered_pground]. *)
+    assert (Hnwsz1 : (bv_unsigned sz1 + 4095 < 2 ^ 64)%Z).
+    { pose proof (proj1 (bv_unsigned_in_range _ sz1)) as Hsz10.
+      unfold uvm_maxsz in Hmaxsz1.
+      change (2 ^ 64)%Z with 18446744073709551616%Z. lia. }
+    assert (Hlzfresh : lazy_free (ud_um P) (uint sz1)).
+    { apply (lazy_free_of_covered (ud_um P) (uint sz1)).
+      - unfold usz_ok. rewrite uint_unsigned (pgroundup_live sz1 Hnwsz1).
+        destruct (pgroundup_maxsz sz1 Hmaxsz1) as [[_ Hle] _].
+        rewrite uvm_maxsz_val in Hle. exact Hle.
+      - rewrite uint_unsigned (pgroundup_live sz1 Hnwsz1).
+        exact (um_covered_pground sz1 (ud_um P) Hmaxsz1 Hcov). }
     (* the GUARDED premise [kxd_commit] asks for, discharged from this
        state's own image conjuncts: [kxq_pay]'s [U'] is pinned to [Mi] and
        [sz1], which is exactly where [kexec_built] reads.  Phase D writes
@@ -2045,7 +2090,12 @@ Section KexecDMain.
         | rewrite Hup; exact Hpermok
         (* ...and S7, off the table's own [um_below] *)
         | rewrite Hup;
-          exact (kxb_perm_below_intro P.(ud_um) sz1 Hbelow Hmaxsz1) ]. }
+          exact (kxb_perm_below_intro P.(ud_um) sz1 Hbelow Hmaxsz1)
+        (* ...and S8, THE COVERAGE ROW (lane LAZY-FLAG, K4): the image exec
+           built is eager, which is what lets [ProcInv.upd_exec] clear the
+           bit and what [SpecKexec.exec_slot_pre]'s [uvis_lazy W' = false]
+           stands on. *)
+        | rewrite Hup; exact Hlzfresh ]. }
     rewrite /kxc_frameB.
     iDestruct "Hframe" as "(Hf1 & Hf2 & Hf3 & Hf4 & Hf5 & Hf6 & Hf7 & Hf8 & Hf9 &
                             Hf10 & Hf11 & Hf12 & Hf13 & Hust & Hph &
@@ -2062,6 +2112,7 @@ Section KexecDMain.
         %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb & _)".
     iPoseProof (pt_node_claim_from_static (ud_tfp (pv_upt (us_V U))) Hpv_valid with "Hkmapb") as "#Hptc".
     (* ---- the process block, opened for the FIRST trapframe write ---- *)
+    iDestruct (proc_priv_lazy with "Hpriv") as "%Hlzold".
     iDestruct (proc_priv_newspace with "Hpriv")
       as "(%Hszmax & %Hbelold & Hpsz & Hppt & Hptf & Hptold & Htfp & Hprivback)".
     iDestruct (kxd_tf_len with "Htfp") as "[%Htflen Htfp]".
@@ -2131,10 +2182,13 @@ Section KexecDMain.
     iSpecialize ("Hprivback" $! (pv_upt (us_V U)) (pv_sz (us_V U))
                    (<[tf_arg_idx 1
                       := (mword_of_int (kxc_sp_final (uint sz1) alen c) : mword 64)]>
-                      (pv_tf (us_V U))) (us_M U)).
+                      (pv_tf (us_V U))) (us_M U) (pv_lazy (us_V U))).
     iSpecialize ("Hprivback" with "[%]"); [reflexivity |].
     iSpecialize ("Hprivback" with "[%]"); [exact Hszmax |].
     iSpecialize ("Hprivback" with "[%]"); [exact Hbelold |].
+    (* THE NO-OP CLOSE keeps the bit the block came in at, and pays the
+       claim with the block's own (lane LAZY-FLAG). *)
+    iSpecialize ("Hprivback" with "[%]"); [exact Hlzold |].
     iDestruct ("Hprivback" with "Hpsz Hppt Hptf Hptold Htfp") as "Hpriv".
     iDestruct (kxd_priv_close_tf with "Hpriv") as "Hpriv".
     assert (Hpp2a4 : add_vec_int (mword_of_int (KXD + 0x2a0) : mword 64) 4

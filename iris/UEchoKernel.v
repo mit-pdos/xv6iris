@@ -425,17 +425,23 @@ Section UEchoKernel.
     (forall (p : mword 27) (q : uperm), uvis_perm W !! p = Some q ->
        bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W)) ->
     (forall k : Z, k <> USYS_exec -> psok k) ->
+    (* ...AND THE KEY'S LAZY BIT IS [false] (lane LAZY-FLAG, L6): the U
+       tier's run is at an empty fill, so an entry constructor can only
+       build a slot for a key that says so.  [UexecCond.echo_gate] decides
+       it; exec's slot post is what will supply it there
+       ([SpecKexec.exec_slot_pre], lane LAZY-FLAG's K4). *)
+    uvis_lazy W = false ->
     (* THE PAY FACT, at the trivial payload: echo's exit owes its parent
        nothing this lane ([UkRun.ukn_pay] is what the record carries). *)
     udep -∗ my_pay (uvis_gen W) (fun _ => True)%I -∗ uslot W.
   Proof.
-    intros Hpc Hsub Hx Hroom Hal8 Hstk Hargs Havd Havs Hfdlen Hstop Hpsok.
+    intros Hpc Hsub Hx Hroom Hal8 Hstk Hargs Havd Havs Hfdlen Hstop Hpsok Hlzf.
     iIntros "#Hdep #Hpay".
     assert (Hsp0 : 0 <= uint (uvis_sp W)) by lia.
     assert (Hargc0 : 0 <= uvis_argc W)
       by exact (proj1 (uka_argc _ _ _ _ _ _ Hargs)).
     iApply (uslot_of_urun_ro W 12 (fun _ => True)%I Hal8
-              ltac:(unfold uvis_sp in Hroom; lia) Hstk Hfdlen Hstop
+              ltac:(unfold uvis_sp in Hroom; lia) Hstk Hfdlen Hstop Hlzf
               with "Hdep Hpay []").
     (* the payload at the trivial one *)
     { done. }

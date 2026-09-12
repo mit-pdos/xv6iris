@@ -239,6 +239,14 @@ Section UkShMalloc.
 
   Lemma wp_kshm_sys_sbrk (h : CpuId) (m : regfile) (sz n : Z) (avail : nat) :
     sint (sign_extend' 64 (trunc32 (m !!! Regidx a0_idx))) = n ->
+    (* ...AND a1 IS SBRK_EAGER (lane LAZY-FLAG, K3).  This stub is the tail
+       of [ulib.c]'s [sbrk], which calls [sys_sbrk(n, SBRK_EAGER)]
+       ([ulib.c:153]); the wrapper sets a1 and this stub only sets a7, so
+       the value is the CALLER's and the row is stated on it.  The leaf
+       underneath ([UkRunSys.wp_uk_ecall_sbrk]) is the eager one, and this
+       is what says so. *)
+    sign_extend' 64 (trunc32 (m !!! Regidx a1_idx))
+      = (mword_of_int 1 : mword 64) ->
     0 <= n -> 0 <= sz -> usz_ok (sz + n) -> UserPtTree.pgroundup sz = sz ->
     shm_code γt -∗
     urun N h m (mword_of_int ShSyms.sys_sbrk) avail -∗
@@ -252,7 +260,7 @@ Section UkShMalloc.
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Harg Hn0 Hsz0 Hszok Hal.
+    intros Harg Heag Hn0 Hsz0 Hszok Hal.
     iIntros "#Hcode Hrun Hsz Hcont".
     unfold ShSyms.sys_sbrk.
     (* ---- 0xd0e  c.li a7,12 ---- *)
@@ -276,12 +284,17 @@ Section UkShMalloc.
     assert (Ha0_1 : m1 !!! Regidx a0_idx = m !!! Regidx a0_idx)
       by (rewrite /m1 (upd_ne m (Regidx a7_idx) (Regidx a0_idx) _
                          ltac:(vm_compute; discriminate)); reflexivity).
+    (* ...and so does a1, for the same reason: the stub writes a7 only *)
+    assert (Ha1_1 : m1 !!! Regidx a1_idx = m !!! Regidx a1_idx)
+      by (rewrite /m1 (upd_ne m (Regidx a7_idx) (Regidx a1_idx) _
+                         ltac:(vm_compute; discriminate)); reflexivity).
     (* ---- 0xd10  ecall -- THE SBRK ROW ---- *)
     iApply (wp_uk_ecall_sbrk N h1 m1 (mword_of_int 0xd10) sz n avail
               ltac:(rewrite /m1 /usysno
                       (upd_eq m (Regidx a7_idx) (mword_of_int 12 : mword 64));
                     vm_compute; reflexivity)
               ltac:(rewrite Ha0_1; exact Harg)
+              ltac:(rewrite Ha1_1; exact Heag)
               Hn0 Hsz0 Hszok Hal
               ltac:(vm_compute; reflexivity)
               with "[] Hrun [] Hsz").
@@ -389,9 +402,20 @@ Section UkShMalloc.
                ltac:(vm_compute; discriminate)). }
     assert (Hra_3 : m3 !!! Regidx ra_idx = (mword_of_int 0xc60 : mword 64))
       by (rewrite /m3 (upd_eq m2 (Regidx ra_idx) _); reflexivity).
+    (* ...and the EAGER FLAG the [c.li a1,1] at 0xc5a wrote is still there:
+       [ulib.c]'s [sbrk] is [sys_sbrk(n, SBRK_EAGER)] and this is that
+       argument (lane LAZY-FLAG, K3). *)
+    assert (Ha1_3 : sign_extend' 64 (trunc32 (m3 !!! Regidx a1_idx))
+                    = (mword_of_int 1 : mword 64)).
+    { rewrite /m3 (upd_ne m2 (Regidx ra_idx) (Regidx a1_idx) _
+                     ltac:(vm_compute; discriminate)).
+      rewrite /m2 (upd_eq m1 (Regidx a1_idx) _).
+      apply bv_eq; vm_compute; reflexivity. }
     (* ---- the stub ---- *)
     iApply (wp_kshm_sys_sbrk h3 m3 sz n nn
-              ltac:(rewrite Ha0_3; exact Harg) Hn0 Hsz0 Hszok Hal
+              ltac:(rewrite Ha0_3; exact Harg)
+              Ha1_3
+              Hn0 Hsz0 Hszok Hal
               with "Hcode Hrun Hsz").
     iIntros (h4 r) "Hans Hrun".
     rewrite Hra_3.

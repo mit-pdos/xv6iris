@@ -948,7 +948,7 @@ Section UkFork.
        proves is the deposit AT that payload ([UexecRet.uexec_pay_dep]) *)
     iIntros "Hpayv".
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c gn Sc pidv))
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c gn Sc pidv false))
                    = USYS_fork).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
     rewrite Hnum. cbv zeta.
@@ -968,8 +968,8 @@ Section UkFork.
        over and fork's parent arm hands it back. *)
     rewrite /uexec_pay_arm (sexit_pay_at (ukn_pay N) (sfam_pay Q)).
     iSplitL "Hpayv";
-      [ iApply (uexec_pay_dep_ret USYS_fork m pc M pm sz fdv c gn Sc pidv _
-                  (sfam_at (ukn_pay N) (sfam_pay Q))
+      [ iApply (uexec_pay_dep_ret USYS_fork m pc M pm sz fdv c gn Sc pidv
+                  false _ (sfam_at (ukn_pay N) (sfam_pay Q))
                   ltac:(rewrite tf_of_num; exact Hn)
                   ltac:(unfold USYS_fork, USYS_exit; lia)
                   (sexit_pay_at (ukn_pay N) (sfam_pay Q)) with "Hmy Hpayv") | ].
@@ -1009,7 +1009,7 @@ Section UkFork.
       iDestruct "Hmv" as (cs2) "(%Hcs2 & Hcha & Harm)". subst cs'.
       iModIntro.
       rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv c c gn gn Sc
-                 cs2 pidv r Hx0 Hal4).
+                 cs2 pidv false false r Hx0 Hal4).
       iApply ukcq_ukc.
       iApply (urun_close_upd N M pm m (mword_of_int 10) r sz fdv c gn
                 cs2 pidv (add_vec_int pc 4) avail
@@ -1044,7 +1044,7 @@ Section UkFork.
       iMod (uch_alloc (∅ : gset gname)) as (γch') "[Hcha' Hchf']".
       iModIntro.
       rewrite (uslot_bump_at_run m pc M M pm pm sz sz fdv fdv c c gn g' Sc ∅
-                 pidv pidc (mword_of_int 0) Hx0 Hal4).
+                 pidv pidc false false (mword_of_int 0) Hx0 Hal4).
       (* THE CHILD'S RECORD IS MINTED AT THE PARENT'S CHOSEN PAYLOAD, and
          the fact that BACKS it is the [ChildTok.my_pay] the kernel handed
          in on this very arm ([SpecSyscall.sysc_fork_in]): the parent chose

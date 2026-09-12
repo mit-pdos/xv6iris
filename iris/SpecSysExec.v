@@ -242,14 +242,18 @@ Section SysExecAU.
   (* ...and over the PATHS it may have fetched, at the same guard the walk
      premise carries, because the cursor the slot wand consumes is at the
      last hop of THAT path ([exec_slot_pre]'s [Pfin]). *)
+  (* ...AND THE CALLER'S WORKING DIRECTORY, threaded to [exec_slot_pre]'s
+     two rows (2026-09-12, the coordinator): the syscall's bundle is stated
+     at the same [cw] the boot's is ([SpecKexec.exec_au_pre]), so both hand
+     the slot wands the inum the resumed key carries. *)
   Definition sys_exec_slot_pre (S : uvis -> iProp Σ) (Q : Z -> iProp Σ)
       (P : nat -> Z -> iProp Σ)
-      (Φo : aview -> Z -> anode -> iProp Σ)
+      (Φo : aview -> Z -> anode -> iProp Σ) (cw : Z)
       (M : gmap Z (bv 8)) (pv av : mword 64) (sts : list fdstate) : iProp Σ :=
     (∀ (pl : list (bv 8)) (na : nat) (alen : nat -> nat)
        (afun : nat -> nat -> bv 8),
        ⌜exec_path_of M pv pl⌝ -∗ ⌜exec_args_of M av na alen afun⌝ -∗
-       exec_slot_pre S Q (P (length (path_elems pl))) Φo na alen afun sts)%I.
+       exec_slot_pre S Q (P (length (path_elems pl))) Φo cw na alen afun sts)%I.
 
   (* Both one-shot pieces at their pairs ([SpecKexec.exec_au_pre]'s
      shape, at the argument-shape-quantified slot wand). *)
@@ -260,17 +264,17 @@ Section SysExecAU.
       (M : gmap Z (bv 8)) (pv av : mword 64) (sts : list fdstate) : iProp Σ :=
     ((∀ pl : list (bv 8), ⌜exec_path_of M pv pl⌝ -∗ ex_start γfs cw P Pmiss pl)
      ∗ pf_at (aopen_commit_at Γ appE) Fo
-     ∗ pf_at (fun S => sys_exec_slot_pre S Q P Fo.(pf_recv) M pv av sts) Fs)%I.
+     ∗ pf_at (fun S => sys_exec_slot_pre S Q P Fo.(pf_recv) cw M pv av sts) Fs)%I.
 
   (* non-expansive in the slot predicate, as [SpecKexec.exec_au_pre_ne]:
      what UexecExecInst.v's instance at the fixpoint variable needs *)
   Lemma sys_exec_slot_pre_ne (n : nat) (S S' : uvis -d> iPropO Σ)
       (Q : Z -> iProp Σ) (P : nat -> Z -> iProp Σ)
-      (Φo : aview -> Z -> anode -> iProp Σ)
+      (Φo : aview -> Z -> anode -> iProp Σ) (cw : Z)
       (M : gmap Z (bv 8)) (pv av : mword 64) (sts : list fdstate) :
     S ≡{n}≡ S' ->
-    sys_exec_slot_pre S Q P Φo M pv av sts
-    ≡{n}≡ sys_exec_slot_pre S' Q P Φo M pv av sts.
+    sys_exec_slot_pre S Q P Φo cw M pv av sts
+    ≡{n}≡ sys_exec_slot_pre S' Q P Φo cw M pv av sts.
   Proof.
     intros HS. rewrite /sys_exec_slot_pre.
     apply bi.forall_ne; intros pl.
@@ -278,7 +282,7 @@ Section SysExecAU.
     apply bi.forall_ne; intros afun. apply bi.wand_ne; [reflexivity |].
     apply bi.wand_ne; [reflexivity |].
     exact (exec_slot_pre_ne n S S' Q (P (length (path_elems pl)))
-             Φo na alen afun sts HS).
+             Φo cw na alen afun sts HS).
   Qed.
 
   Lemma sys_exec_au_pre_ne (n : nat) (S S' : uvis -d> iPropO Σ) (Rs : iProp Σ)
@@ -291,7 +295,7 @@ Section SysExecAU.
     ≡{n}≡ sys_exec_au_pre (MkPfam S' Rs) Γ γfs cw Q P Pmiss Fo M pv av sts.
   Proof.
     intros HS. rewrite /sys_exec_au_pre /pf_at. cbn [pf_recv pf_refund].
-    by rewrite (sys_exec_slot_pre_ne n S S' Q P Fo.(pf_recv) M pv av sts HS).
+    by rewrite (sys_exec_slot_pre_ne n S S' Q P Fo.(pf_recv) cw M pv av sts HS).
   Qed.
 
   (* ret = -1: sys_exec's own early exits (the whole bundle back) folded

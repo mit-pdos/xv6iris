@@ -509,17 +509,26 @@ Section UInitSh.
     iAssert (□ (∀ (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
                   (W' : uvis),
                   ⌜kexec_image_ok ElfUser.sh_elf na alen afun fdv W'⌝ -∗
+                  (* ...AND THE TWO ROWS [SpecKexec.exec_slot_pre] carries,
+                     in [PinnedExec.pinned_exec_bundle]'s own order: the
+                     resumed key's working directory is the exec'ing
+                     process's, and its lazy bit is [false] because exec's
+                     image is EAGER (lane LAZY-FLAG's K4).  sh's own
+                     constructor spends the second and drops the first. *)
+                  ⌜uvis_cwd W' = FsImg.ROOTINO⌝ -∗
+                  ⌜uvis_lazy W' = false⌝ -∗
                   ⌜exec_args_of M (mword_of_int 0x1000 : mword 64)
                      na alen afun⌝ -∗
                   my_pay (uvis_gen W') (ucons_pay cn γp T) -∗
                   ucons_pay cn γp T (-1) -∗
                   (sh_pay Rsh n0 ∗ upos γp np) -∗ uslot W'))%I as "#Hcon".
-    { iModIntro. iIntros (na alen afun W') "%Hok %Hargs #Hmp HQ [[#Hp1 #Hp2] Hps]".
+    { iModIntro.
+      iIntros (na alen afun W') "%Hok %Hcw %Hlzf %Hargs #Hmp HQ [[#Hp1 #Hp2] Hps]".
       destruct (init_args_det M na alen afun Hsav Hsro Hargs) as [-> Halen].
       iApply (sh_slot_of_kexec Hpsok Rsh γp T (ucons_pay cn γp T)
                 1%nat alen afun fdv W' n0 np
                 (ucons_pay_const cn γp T) Hok
-                (init_sh_room alen n0 Halen Hn0) Hlen
+                (init_sh_room alen n0 Halen Hn0) Hlen Hlzf
                 with "[] Hdep [] [] Hmp HQ Hps").
       - iModIntro. iIntros (γt γd γs) "Hsz Hlo".
         iApply ("Hp1" $! W' γt γd γs with "Hsz Hlo").
@@ -546,10 +555,10 @@ Section UInitSh.
                  (init_sh_path_of M Hsro)
                  with "Hcl Hinv Hcon Hgen' [Hpos]") as (P Pmiss Fo R) "Hb".
     { iFrame "Hpay Hpos". }
-    assert (Ea0 : tf_w (uvis_tf (uvis_of_run m pc M pm sz fdv FsImg.ROOTINO gn cs pidv))
+    assert (Ea0 : tf_w (uvis_tf (uvis_of_run m pc M pm sz fdv FsImg.ROOTINO gn cs pidv false))
                     (tf_arg_idx 0) = (mword_of_int 0x9a8 : mword 64))
       by (etransitivity; [ exact (tf_of_arg0 m pc) | exact Ha0 ]).
-    assert (Ea1 : tf_w (uvis_tf (uvis_of_run m pc M pm sz fdv FsImg.ROOTINO gn cs pidv))
+    assert (Ea1 : tf_w (uvis_tf (uvis_of_run m pc M pm sz fdv FsImg.ROOTINO gn cs pidv false))
                     (tf_arg_idx 1) = (mword_of_int 0x1000 : mword 64))
       by (etransitivity; [ exact (tf_of_arg1 m pc) | exact Ha1 ]).
     (* THE DEPOSIT IS WANTED AT THIS PROGRAM'S OWN PAYLOAD (app-echo.md,
@@ -558,7 +567,7 @@ Section UInitSh.
        introduced AT that payload rather than re-keyed afterwards.  init's
        own is the trivial one ([Hpeq], userinit's choice). *)
     iApply (sbundle_pay_exec_intro uslot
-              (uvis_of_run m pc M pm sz fdv FsImg.ROOTINO gn cs pidv)
+              (uvis_of_run m pc M pm sz fdv FsImg.ROOTINO gn cs pidv false)
               (ukn_pay N) P Pmiss Fo R).
     { cbn [uvis_gen uvis_of_run]. iExact "Hmpay". }
     rewrite Hpeq Ea0 Ea1. iExact "Hb".

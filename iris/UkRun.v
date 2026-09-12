@@ -360,7 +360,7 @@ Section UkRun.
            the one the leaf hands the trap beside [ukn_pay N (-1)], and
            read's bundle is a wand from exactly that. *)
         ∨ sbundle_pay uslot n (ukn_pay N)
-            (uvis_of_run m pc M pm sz fdv cw gn cs pidv)))%I.
+            (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)))%I.
 
   (* THE FAMILY-NAMED EXPLICIT DEPOSIT (app-echo.md, lane CONS-CURSOR, C3).
      [udepw]'s explicit disjunct hides the deposited FAMILY under an
@@ -387,7 +387,7 @@ Section UkRun.
        my_pay gn (ukn_pay N) -∗
        uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗ ufd_auth (ukn_fd N) fdv -∗
        uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz ∗ ufd_auth (ukn_fd N) fdv ∗
-       sbundle_at uslot n fdep (uvis_of_run m pc M pm sz fdv cw gn cs pidv))%I.
+       sbundle_at uslot n fdep (uvis_of_run m pc M pm sz fdv cw gn cs pidv false))%I.
 
   Lemma udepwf_udepw (N : uk_names Σ) (m : regfile) (pc : mword 64)
       (n : Z) (fdep : sfam) :
@@ -418,7 +418,7 @@ Section UkRun.
     udep -∗ my_pay gn (ukn_pay N) -∗ udepw N m pc n -∗
     uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗ ufd_auth (ukn_fd N) fdv ==∗
     uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz ∗ ufd_auth (ukn_fd N) fdv ∗
-    sbundle_pay uslot n (ukn_pay N) (uvis_of_run m pc M pm sz fdv cw gn cs pidv).
+    sbundle_pay uslot n (ukn_pay N) (uvis_of_run m pc M pm sz fdv cw gn cs pidv false).
   Proof.
     iIntros "#Hdep #Hmp Hsb Hheap Hufd".
     iDestruct ("Hsb" $! M pm sz fdv cw gn cs pidv with "Hmp Hheap Hufd")
@@ -531,7 +531,7 @@ Section UkRun.
        uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz ∗ ufd_auth (ukn_fd N) fdv ∗
        (⌜psok n /\ n <> USYS_exec⌝
         ∨ sbundle_pay uslot n (ukn_pay N)
-            (uvis_of_run m pc M pm sz fdv c gn cs pidv)))%I.
+            (uvis_of_run m pc M pm sz fdv c gn cs pidv false)))%I.
 
   (* [udepw] IS THE ∀-CWD FORM, one direction.  The two differ only in
      where the [cw] binder sits, so the equivalence holds both ways; this
@@ -559,7 +559,7 @@ Section UkRun.
     n <> USYS_read -> n <> USYS_exec ->
     (∀ (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (sz : Z)
        (fdv : list fdstate) (gn : gname) (cs : gset gname) (pidv : mword 32),
-       sbundle uslot n (uvis_of_run m pc M pm sz fdv c gn cs pidv)) -∗
+       sbundle uslot n (uvis_of_run m pc M pm sz fdv c gn cs pidv false)) -∗
     udepw_at N m pc n c.
   Proof.
     intros Hne Hnx. iIntros "Hb" (M pm sz fdv gn cs pidv) "_ Hh Hf".
@@ -600,7 +600,7 @@ Section UkRun.
     udep -∗ my_pay gn (ukn_pay N) -∗ udepw_at N m pc n c -∗
     uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗ ufd_auth (ukn_fd N) fdv ==∗
     uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz ∗ ufd_auth (ukn_fd N) fdv ∗
-    sbundle_pay uslot n (ukn_pay N) (uvis_of_run m pc M pm sz fdv c gn cs pidv).
+    sbundle_pay uslot n (ukn_pay N) (uvis_of_run m pc M pm sz fdv c gn cs pidv false).
   Proof.
     iIntros "#Hdep #Hmp Hsb Hheap Hufd".
     iDestruct ("Hsb" $! M pm sz fdv gn cs with "Hmp Hheap Hufd")
@@ -638,7 +638,7 @@ Section UkRun.
        my_pay gn (ukn_pay N) -∗
        uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗ ufd_auth (ukn_fd N) fdv -∗
        uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz ∗ ufd_auth (ukn_fd N) fdv ∗
-       sbundle_at uslot n fdep (uvis_of_run m pc M pm sz fdv c gn cs pidv))%I.
+       sbundle_at uslot n fdep (uvis_of_run m pc M pm sz fdv c gn cs pidv false))%I.
 
   (* [udepwf] IS THE ∀-CWD FORM, in the direction a caller that has one
      needs -- [udepw_at_of_udepw]'s twin, and stated rather than made the
@@ -692,7 +692,7 @@ Section UkRun.
        my_pay gn (ukn_pay N) -∗
        uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗ ufd_auth (ukn_fd N) fdv -∗
        uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz ∗ ufd_auth (ukn_fd N) fdv ∗
-       sbundle_at uslot n fdep (uvis_of_run m pc M pm sz fdv cw gn cs pidv))%I.
+       sbundle_at uslot n fdep (uvis_of_run m pc M pm sz fdv cw gn cs pidv false))%I.
 
   (* [udepwf] IS THE ∀-LEDGER FORM, in the direction a caller that has one
      needs -- [udepwf_at_of_udepwf]'s twin. *)
@@ -775,7 +775,7 @@ Section UkRun.
           and costs nothing. *)
        ukn_pay N (-1) ∗
        udep ∗
-       uvb (CID := h) (XI := xi) C pt Rfd Rut sz pm fdv cw gn cs pidv M m pc)%I.
+       uvb (CID := h) (XI := xi) C pt Rfd Rut sz pm fdv cw gn cs pidv false M m pc)%I.
 
   (* THE ROUND'S EFFECT ON THE CWD, AT EVERY NUMBER BUT CHDIR.  A leaf
      re-closes [urun] at the [cw'] the round resumed the process at, and
@@ -934,7 +934,7 @@ Section UkRun.
     iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs pidv)
       "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hcwda & Hcha & #Hmy & Hpayv & #Hdep & Hb)".
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
-    iDestruct ("Hgen" $! (uvis_of_run m pc M pm sz fdv cw gn cs pidv)
+    iDestruct ("Hgen" $! (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)
                  with "HT [] Hpayv") as "Hslot".
     { cbn [uvis_gen uvis_of_run]. iExact "Hmy". }
     rewrite (uslot_run m pc M pm sz fdv cw gn cs pidv Hx0 Hal).
@@ -1286,6 +1286,15 @@ Section UkRun.
     (* the map stops at the break -- [uslot_of_urun]'s own premise *)
     (forall (p : mword 27) (q : uperm), uvis_perm W !! p = Some q ->
        bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W)) ->
+    (* ...AND THE KEY'S LAZY BIT IS [false] (lane LAZY-FLAG, L6).  The
+       verified-program tier runs at an EMPTY FILL: [UexecRet.ukcq], and
+       with it [urun], is hardwired at [false], so a constructor can only
+       build a slot for a key that says so.  A process that called
+       [sbrklazy] simply has no [urun] to run on -- a restriction of that
+       tier, not of the model.  WHO SUPPLIES IT: exec, whose fresh image is
+       eager ([SpecKexec.exec_slot_pre]'s success wands; lane LAZY-FLAG's
+       K4 is what puts the fact on them). *)
+    uvis_lazy W = false ->
     (* ...and the deposit supplier, exactly as [uslot_of_urun] takes it *)
     udep -∗
     (* ...AND THE PROCESS'S OWN KNOWLEDGE OF ITS EXIT PAYLOAD.  A [urun]
@@ -1340,8 +1349,9 @@ Section UkRun.
        WP (Loop : expr riscv_lang))
     -∗ uslot W.
   Proof.
-    intros Hal8 Hroom Hstk Hfdlen Hstop. iIntros "#Hdep #Hpay Hpayv Hprog".
-    rewrite uslot_ukc /ukc.
+    intros Hal8 Hroom Hstk Hfdlen Hstop Hlzf.
+    iIntros "#Hdep #Hpay Hpayv Hprog".
+    rewrite uslot_ukc /ukc Hlzf.
     iIntros (h xi C pt Rfd Rut HRut) "%Hlo %Hpm Hb".
     set (sz := uvis_sz W).
     assert (Hwf : proc_pt_wf pt)
@@ -1445,6 +1455,8 @@ Section UkRun.
        what makes [sbrk]'s new run FRESH ([UserHeap]'s own clause). *)
     (forall (p : mword 27) (q : uperm), uvis_perm W !! p = Some q ->
        bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W)) ->
+    (* ...AND THE KEY'S LAZY BIT IS [false] -- see [uslot_of_urun_all]. *)
+    uvis_lazy W = false ->
     (* THE DEPOSIT SUPPLIER, at the key the slot is being built for.  This
        is the one obligation the ARM adds to an entry constructor: whoever
        hands a program a [urun] says which syscall bundles it can pay and
@@ -1501,7 +1513,8 @@ Section UkRun.
        WP (Loop : expr riscv_lang))
     -∗ uslot W.
   Proof.
-    intros Hal8 Hroom Hstk Hfdlen Hstop. iIntros "#Hdep #Hpay Hpayv Hprog". rewrite uslot_ukc /ukc.
+    intros Hal8 Hroom Hstk Hfdlen Hstop Hlzf.
+    iIntros "#Hdep #Hpay Hpayv Hprog". rewrite uslot_ukc /ukc Hlzf.
     iIntros (h xi C pt Rfd Rut HRut) "%Hlo %Hpm Hb".
     set (sz := uvis_sz W).
     assert (Hwf : proc_pt_wf pt)
@@ -1589,6 +1602,8 @@ Section UkRun.
        what makes [sbrk]'s new run FRESH ([UserHeap]'s own clause). *)
     (forall (p : mword 27) (q : uperm), uvis_perm W !! p = Some q ->
        bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W)) ->
+    (* ...AND THE KEY'S LAZY BIT IS [false] -- see [uslot_of_urun_all]. *)
+    uvis_lazy W = false ->
     (* THE DEPOSIT SUPPLIER, at the key the slot is being built for.  This
        is the one obligation the ARM adds to an entry constructor: whoever
        hands a program a [urun] says which syscall bundles it can pay and
@@ -1650,7 +1665,8 @@ Section UkRun.
        WP (Loop : expr riscv_lang))
     -∗ uslot W.
   Proof.
-    intros Hal8 Hroom Hstk Hfdlen Hstop. iIntros "#Hdep #Hpay Hpayv Hprog". rewrite uslot_ukc /ukc.
+    intros Hal8 Hroom Hstk Hfdlen Hstop Hlzf.
+    iIntros "#Hdep #Hpay Hpayv Hprog". rewrite uslot_ukc /ukc Hlzf.
     iIntros (h xi C pt Rfd Rut HRut) "%Hlo %Hpm Hb".
     set (sz := uvis_sz W).
     assert (Hwf : proc_pt_wf pt)

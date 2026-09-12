@@ -153,6 +153,13 @@ Section KforkPrologue.
        ⌜ud_tfp P' = ud_tfp (pv_upt (us_V U))⌝ -∗
        ⌜uint szv <= uvm_maxsz⌝ -∗
        ⌜um_below szv (ud_um P')⌝ -∗
+       (* ...AND WHAT THE LAZY BIT CLAIMS, at the table and break that come
+          back (lane LAZY-FLAG, K2): [ProcInv.proc_priv_addrspace]'s row, at
+          kfork's own three-axis accessor.  uvmcopy writes the CHILD's
+          pages, so on the parent's side this is the identity; the child's
+          block is built at the parent's bit
+          ([KforkChild.urun_eq_kfork_child]). *)
+       ⌜pv_lazy (us_V U) = false -> lazy_free (ud_um P') (uint szv)⌝ -∗
        p_sz pa ↦₈ szv -∗
        p_pagetable pa ↦₈ page_base (ud_root (pv_upt (us_V U))) -∗
        proc_ptm P' (uint szv) M' -∗
@@ -163,13 +170,13 @@ Section KforkPrologue.
     iIntros "Hpv".
     iDestruct (proc_priv_sz_maxsz with "Hpv") as "#Hszb".
     iDestruct (proc_priv_um_below with "Hpv") as "#Hbel".
-    iDestruct "Hpv" as "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc) Ho]".
+    iDestruct "Hpv" as "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & %Hlz & Hc) Ho]".
     rewrite /proc_fields /proc_ptm_at.
     iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
     iDestruct "Hpt" as "(Hpg & Htfc & Hptt)".
     iSplitR; [done|]. iSplitR; [done|].
     iFrame "Hsz Hpg Hptt Htfc Htfp".
-    iIntros (P' szv ws' M') "%Hroot %Htf %Hszb' %Hbel' Hsz Hpg Hptt Htfc Htfp".
+    iIntros (P' szv ws' M') "%Hroot %Htf %Hszb' %Hbel' %Hlz' Hsz Hpg Hptt Htfc Htfp".
     rewrite /proc_priv /proc_priv_core /proc_fields /proc_ptm_at.
     cbn [upd_pt upd_sz pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
     rewrite Hroot Htf.
@@ -179,13 +186,25 @@ Section KforkPrologue.
     iFrame "Hpid".
     iSplitL "Hsz Hcwd Hnm".
     { iFrame "Hsz Hcwd Hnm". iPureIntro. exact Hnl. }
-    iFrame "Hpg Htfc Hptt Htfp Hc".
+    iFrame "Hpg Htfc Hptt Htfp".
+    iSplitR; [iPureIntro; exact Hlz' |].
+    iFrame "Hc".
   Qed.
 
   (* the same, on the DEFICIT block: the CHILD is still in the construction
      window here -- allocproc left [np->cwd] at 0 -- so uvmcopy's
      destination side opens a [proc_priv_nocwd].  Neither this nor its
      [proc_priv] twin touches [p->cwd]. *)
+  (* THE CHILD'S SIDE ALSO WRITES THE BIT (lane LAZY-FLAG, K2).  kfork is
+     the one caller that has to MOVE [ProcDefs.pv_lazy]: allocproc hands
+     the child's block out dormant, i.e. at [true]
+     ([ProcDefs.proc_dormant]), while the slot the parent deposited is
+     keyed at the PARENT's bit ([UexecRet.uexec_fork_child_F],
+     [KforkChild.urun_eq_kfork_child]) -- so the close names the bit the
+     child ends at and owes the claim AT THAT BIT.  uvmcopy gives the child
+     an entry at every vpn the parent had one at, which is what pays it
+     ([KforkChild.lazy_free_uvmcopy_child]); at a parent already [true] the
+     premise is vacuous. *)
   Lemma kfk_priv_open_nocwd (γf : gname) (pa : mword 64) (pid : mword 32) (U : ustate) :
     proc_priv_nocwd γf pa pid U -∗
     ⌜uint (pv_sz (us_V U)) <= uvm_maxsz⌝ ∗
@@ -198,42 +217,56 @@ Section KforkPrologue.
     (* uvmcopy writes the child's pages: the block is rebuilt at the image
        that comes back (milestone J item 1's ∃-weakened staging). *)
     (∀ (P' : uptd) (szv : mword 64) (ws' : list (mword 64))
-       (M' : gmap Z (bv 8)),
+       (M' : gmap Z (bv 8)) (lz' : bool),
        ⌜ud_root P' = ud_root (pv_upt (us_V U))⌝ -∗
        ⌜ud_tfp P' = ud_tfp (pv_upt (us_V U))⌝ -∗
        ⌜uint szv <= uvm_maxsz⌝ -∗
        ⌜um_below szv (ud_um P')⌝ -∗
+       (* ...AND WHAT THE LAZY BIT CLAIMS, at the table, the break AND the
+          bit that come back (lane LAZY-FLAG, K2). *)
+       ⌜lz' = false -> lazy_free (ud_um P') (uint szv)⌝ -∗
        p_sz pa ↦₈ szv -∗
        p_pagetable pa ↦₈ page_base (ud_root (pv_upt (us_V U))) -∗
        proc_ptm P' (uint szv) M' -∗
        p_trapframe pa ↦₈ page_base (ud_tfp (pv_upt (us_V U))) -∗
        tf_page (ud_tfp (pv_upt (us_V U))) ws' -∗
-       proc_priv_nocwd γf pa pid (upd_usM (upd_usV U (upd_pt (upd_sz (us_V U) szv) P' ws')) M')).
+       proc_priv_nocwd γf pa pid
+         (upd_usM (upd_usV U
+                     (upd_lazy (upd_pt (upd_sz (us_V U) szv) P' ws') lz')) M')).
   Proof.
     iIntros "Hpv".
     iDestruct (proc_priv_nocwd_sz_maxsz with "Hpv") as "#Hszb".
     iDestruct (proc_priv_nocwd_um_below with "Hpv") as "#Hbel".
-    iDestruct "Hpv" as "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Ho)".
+    iDestruct "Hpv" as "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & %Hlz & Ho)".
     rewrite /proc_fields /proc_ptm_at.
     iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
     iDestruct "Hpt" as "(Hpg & Htfc & Hptt)".
     iSplitR; [done|]. iSplitR; [done|].
     iFrame "Hsz Hpg Hptt Htfc Htfp".
-    iIntros (P' szv ws' M') "%Hroot %Htf %Hszb' %Hbel' Hsz Hpg Hptt Htfc Htfp".
+    iIntros (P' szv ws' M' lz') "%Hroot %Htf %Hszb' %Hbel' %Hlz' Hsz Hpg Hptt Htfc Htfp".
     rewrite /proc_priv_nocwd /proc_fields /proc_ptm_at.
-    cbn [upd_pt upd_sz pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
+    cbn [upd_lazy upd_pt upd_sz pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name
+         pv_fdg pv_cwi pv_gen pv_chg pv_lazy].
     rewrite Hroot Htf.
     iSplitR; [iPureIntro; exact Hszb'|].
     iSplitR; [iPureIntro; exact Hbel'|].
     iFrame "Hpid".
     iSplitL "Hsz Hcwd Hnm".
     { iFrame "Hsz Hcwd Hnm". iPureIntro. exact Hnl. }
-    iFrame "Hpg Htfc Hptt Htfp Ho".
+    iFrame "Hpg Htfc Hptt Htfp".
+    iSplitR; [iPureIntro; exact Hlz' |].
+    iFrame "Ho".
   Qed.
 
   (* closing [kfk_priv_open]'s wand with NOTHING changed is the identity. *)
   Lemma kfk_priv_close_id (V : pprivate) :
     upd_pt (upd_sz V (pv_sz V)) (pv_upt V) (pv_tf V) = V.
+  Proof. destruct V; reflexivity. Qed.
+
+  (* ...and the child's, whose wand names the lazy bit as well: closing it
+     at the bit the block already carries is the same identity. *)
+  Lemma kfk_priv_close_id_lz (V : pprivate) :
+    upd_lazy (upd_pt (upd_sz V (pv_sz V)) (pv_upt V) (pv_tf V)) (pv_lazy V) = V.
   Proof. destruct V; reflexivity. Qed.
   (* exit continuation 3 of [kfk_prologue], named: inline it was
      4614 B in Delta at every step of that walk
@@ -275,10 +308,18 @@ Section KforkPrologue.
            these three with the copied trapframe and the copied cwd inum
            into the child's RUN KEY, which is what lets kfork be handed ONE
            slot ([KforkChild.urun_eq_kfork_child], [SpecKfork]'s premise). *)
+        (* ...AND THE CHILD'S LAZY BIT IS THE PARENT'S (lane LAZY-FLAG, K2).
+           allocproc hands the block out at [true] ([ProcDefs.proc_dormant])
+           and this block writes it: the slot the parent deposited is keyed
+           at the parent's bit ([UexecRet.uexec_fork_child_F]), and uvmcopy
+           gives the child an entry at every vpn the parent had one at,
+           which is what makes the claim behind [false] survive the copy
+           ([KforkChild.lazy_free_uvmcopy_child]). *)
         ⌜ pv_sz (us_V Uc') = pv_sz (us_V Up) /\
           us_M Uc' = us_M Up /\
           perm_of (ud_um (pv_upt (us_V Uc'))) (uint (pv_sz (us_V Up)))
-            = perm_of (ud_um (pv_upt (us_V Up))) (uint (pv_sz (us_V Up))) ⌝ -∗
+            = perm_of (ud_um (pv_upt (us_V Up))) (uint (pv_sz (us_V Up))) /\
+          pv_lazy (us_V Uc') = pv_lazy (us_V Up) ⌝ -∗
         (* IN-LOCK EXIT: allocproc returned holding np->lock, so the index
            carries the trap reserve of the arm the caller will eventually
            return at ([trap_res b]) -- exactly [SpecAllocproc]'s found-arm
@@ -886,6 +927,11 @@ Section KforkPrologue.
       iEval (rewrite Hpp01e) in "Hpc".
       (* ---- open the parent's and the child's proc_priv, all five pieces
              at once, held through the whole rest of this block. ---- *)
+      (* WHAT THE TWO BLOCKS' LAZY BITS CLAIM, read off before the opens
+         (lane LAZY-FLAG, K2): both are pure, so the blocks stay whole, and
+         each close below owes its own back. *)
+      iDestruct (proc_priv_lazy with "Hpv") as "%HlzP".
+      iDestruct (proc_priv_nocwd_lazy with "Hcpriv") as "%HlzC".
       iDestruct (kfk_priv_open with "Hpv") as
         "(%HszbP & %HbelP & HPsz & HPpg & HPpt & HPtf & HPtfpg & HPwand)".
       iDestruct (kfk_priv_open_nocwd with "Hcpriv") as
@@ -1153,8 +1199,10 @@ Section KforkPrologue.
         iEval (rewrite HCIDeq7c) in "Harmpay".
         (* close both proc_privs back up UNCHANGED *)
         iDestruct ("HPwand" $! (pv_upt (us_V Up)) (pv_sz (us_V Up)) (pv_tf (us_V Up)) (us_M Up)
-                     with "[%] [%] [%] [%] HPsz HPpg HPpt HPtf HPtfpg") as "HPpriv".
+                     with "[%] [%] [%] [%] [%] HPsz HPpg HPpt HPtf HPtfpg") as "HPpriv".
         { reflexivity. } { reflexivity. } { exact HszbP. } { exact HbelP. }
+        (* the parent's table did not move, so its own claim comes back *)
+        { exact HlzP. }
         (* uvmcopy failed: the child's table is exactly what it was handed,
            at the size the call was opened at (the parent's); [HCwand]
            wants it back at the child's OWN (still zero) size -- [np->sz]
@@ -1162,11 +1210,13 @@ Section KforkPrologue.
         iDestruct (proc_ptm_pt with "HCpt") as "HCpt".
         iEval (rewrite (proc_pt_ptm (pv_upt Vc) (uint (pv_sz Vc)))) in "HCpt".
         iDestruct "HCpt" as (MCo) "HCpt".
-        iDestruct ("HCwand" $! (pv_upt Vc) (pv_sz Vc) (pv_tf Vc) MCo
-                     with "[%] [%] [%] [%] HCsz HCpg HCpt HCtf HCtfpg") as "HCpriv".
+        iDestruct ("HCwand" $! (pv_upt Vc) (pv_sz Vc) (pv_tf Vc) MCo (pv_lazy Vc)
+                     with "[%] [%] [%] [%] [%] HCsz HCpg HCpt HCtf HCtfpg") as "HCpriv".
         { reflexivity. } { reflexivity. } { exact HszbC. } { exact HbelC. }
+        (* nothing moved on this arm, so the child's own claim comes back *)
+        { exact HlzC. }
         iEval (rewrite (kfk_priv_close_id (us_V Up))) in "HPpriv".
-        iEval (rewrite (kfk_priv_close_id Vc)) in "HCpriv".
+        iEval (rewrite (kfk_priv_close_id_lz Vc)) in "HCpriv".
         (* [rget] is indexed by the AMBIENT [CpuId], so a fact stated with
            [rget] here does not rewrite into a hypothesis the store leaf
            produced at an earlier hart -- the two print identically.
@@ -1428,8 +1478,10 @@ Section KforkPrologue.
         { apply (kfk_um_below_child (pv_sz (us_V Up)) (svpn_of (mword_of_int 0 : mword 64))
                    (pv_upt (us_V Up)) (pv_upt Vc) P' HCempty HbelP Hout Hin'). }
         iDestruct ("HPwand" $! (pv_upt (us_V Up)) (pv_sz (us_V Up)) (pv_tf (us_V Up)) (us_M Up)
-                     with "[%] [%] [%] [%] HPsz HPpg HPpt HPtf HPtfpg") as "HPpriv".
+                     with "[%] [%] [%] [%] [%] HPsz HPpg HPpt HPtf HPtfpg") as "HPpriv".
         { reflexivity. } { reflexivity. } { exact HszbP. } { exact HbelP. }
+        (* the parent's table did not move, so its own claim comes back *)
+        { exact HlzP. }
         (* THE CHILD'S IMAGE IS THE PARENT'S, as a gmap.  uvmcopy reports it
            as the parent's bytes WRITTEN OVER whatever the fresh child had
            ([umem_write Mnew 0 (4096*n) (Mold !!! .)]); both maps are the
@@ -1464,9 +1516,22 @@ Section KforkPrologue.
                       (svpn_of (mword_of_int 0 : mword 64))
                       (pv_upt (us_V Up)) (pv_upt Vc) P'
                       KforkChild.svpn_of_zero HCempty HbelP Hout Hin2) as Hpermc.
+        (* THE CHILD IS BORN AT THE PARENT'S BIT (lane LAZY-FLAG, K2).  The
+           slot the parent deposited is keyed at [pv_lazy (us_V Up)]
+           ([UexecRet.uexec_fork_child_F]), and what pays the claim at a
+           parent already [false] is uvmcopy's own third clause: the child
+           has an entry at every vpn the parent had one at, so the fill it
+           inherits is the parent's ([KforkChild.lazy_free_uvmcopy_child]). *)
         iDestruct ("HCwand" $! P' (pv_sz (us_V Up)) (pv_tf Vc) (us_M Up)
-                     with "[%] [%] [%] [%] HCsz HCpg HCpt HCtf HCtfpg") as "HCpriv".
+                     (pv_lazy (us_V Up))
+                     with "[%] [%] [%] [%] [%] HCsz HCpg HCpt HCtf HCtfpg") as "HCpriv".
         { exact Hroot2. } { exact Htf2. } { exact HszbP. } { exact HbelC'. }
+        { intro Hlzp.
+          exact (KforkChild.lazy_free_uvmcopy_child (pv_sz (us_V Up))
+                   (svpn_of (mword_of_int 0 : mword 64))
+                   (pv_upt (us_V Up)) (pv_upt Vc) P'
+                   KforkChild.svpn_of_zero HbelP
+                   (HlzP Hlzp) Hin'). }
         iEval (rewrite (kfk_priv_close_id (us_V Up))) in "HPpriv".
         (* same [rget]/[!!!] normalisation as the failure arm above *)
         assert (Hslot6' : mf6 !!! Regidx Rs4 = m !!! Regidx Rs4)
@@ -1487,7 +1552,9 @@ Section KforkPrologue.
         iSpecialize ("Hcont4a" $! CID11 with "[%]"); [wp_next_chain|].
         iSpecialize ("Hcont4a" $! CID28 with "[%]"); [wp_next_chain|].
         iApply ("Hcont4a" $! N10 npa j γl2 pid_c ch
-                  (MkUstate (upd_pt (upd_sz Vc (pv_sz (us_V Up))) P' (pv_tf Vc)) (us_M Up))
+                  (MkUstate (upd_lazy (upd_pt (upd_sz Vc (pv_sz (us_V Up))) P' (pv_tf Vc))
+                               (pv_lazy (us_V Up)))
+                            (us_M Up))
                   (ud_tfp (pv_upt (us_V Up))) (ud_tfp (pv_upt Vc))
                   with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Htext Hpc Hframe_alloc HPpriv Hpfrag HCpriv
                         Hcgen Hcsg Hcpr Hcfrag Hcrow Hcxb
@@ -1498,15 +1565,16 @@ Section KforkPrologue.
         * rewrite HN10a5. exact (eq_sym HN10a0).
         * rewrite HN10a4. exact (eq_sym HN10a4').
         * exact HN10a3.
-        * split; [reflexivity | cbn [upd_pt pv_upt pv_fdg]; exact Htf2].
+        * split; [reflexivity | cbn [upd_lazy upd_pt pv_upt pv_fdg]; exact Htf2].
         * intros r Hr Ncsp N8' N9' N20 N21. apply HN10thr; assumption.
         * split_and!; [reflexivity | exact HjN | exact Hgamma
-                      | cbn [upd_pt upd_sz pv_ofile pv_fdg]; exact HVcof
-                      | cbn [upd_pt upd_sz pv_cwd pv_fdg]; exact HVccwd
+                      | cbn [upd_lazy upd_pt upd_sz pv_ofile pv_fdg]; exact HVcof
+                      | cbn [upd_lazy upd_pt upd_sz pv_cwd pv_fdg]; exact HVccwd
                       (* [split_and!] splits the interval too *)
                       | exact (proj1 Hpidc) | exact (proj2 Hpidc)].
         * split_and!; [reflexivity | reflexivity |
-                       cbn [upd_pt upd_sz pv_upt pv_fdg]; exact Hpermc].
+                       cbn [upd_lazy upd_pt upd_sz pv_upt pv_fdg]; exact Hpermc |
+                       cbn [upd_lazy pv_lazy]; reflexivity].
         * iExists ks, rest. iSplitR; [iPureIntro; exact Hrestlen|].
           iFrame "Hks Hctx".
         * iExact "Henv'".

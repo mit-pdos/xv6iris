@@ -465,14 +465,17 @@ Section ProofSysUnlinkW5D.
        CLOSER, built once (W2/W3's shape) *)
     iDestruct (proc_priv_split_cwd gf (proc_addr jx) pid (us_upt U P1)
                  with "Hpriv") as "[Hpnc Href]".
-    iEval (rewrite proc_priv_nocwd_bare) in "Hpnc".
+    (* the lazy bit's claim, read off the block before the regrouping
+       drops it (lane LAZY-FLAG): it is pure, so holding it is free. *)
+    iDestruct (proc_priv_nocwd_lazy with "Hpnc") as %Hlzq.
+    iEval (rewrite (proc_priv_nocwd_bare _ _ _ _ Hlzq)) in "Hpnc".
     iDestruct "Hpnc" as "[Hpidq Hofiles]".
     iAssert (proc_priv_bare (proc_addr jx) pid (us_upt U P1) -∗
              proc_priv gf (proc_addr jx) pid (us_upt U P1))%I
       with "[Hofiles Href]" as "Hpre".
     { iIntros "Hpidq".
       iApply (proc_priv_split_cwd gf (proc_addr jx) pid (us_upt U P1)).
-      rewrite proc_priv_nocwd_bare.
+      rewrite (proc_priv_nocwd_bare _ _ _ _ Hlzq).
       iSplitR "Href"; [| iExact "Href"].
       iSplitL "Hpidq"; [iExact "Hpidq" | iExact "Hofiles"]. }
     (* ===== +0x8a addi s3,s0,-64 -- writei's [&de] ===== *)

@@ -366,6 +366,11 @@ Proof.
              ⌜pv_gen V' = pv_gen (us_V U)⌝ ∗
              (* ...nor the cwd's inum *)
              ⌜pv_cwi V' = pv_cwi (us_V U)⌝ ∗
+             (* ...nor the LAZY BIT (lane LAZY-FLAG): prepare_return writes
+                trapframe words and no block field ([ProcDefs.pv_lazy]), and
+                the resumed record's run key reads it
+                ([UexecRet.urun_eq]). *)
+             ⌜pv_lazy V' = pv_lazy (us_V U)⌝ ∗
              (* ...nor the break.  [upd_tf] rewrites the word list and
                 nothing else, and the resumed record's RUN KEY reads the
                 size ([UexecRet.urun_eq]), so the steady mode's closer
@@ -378,9 +383,10 @@ Proof.
                 sret's to is the [sepc] cell prepare_return wrote from it. *)
              ⌜tf_ueq (pv_tf (us_V U)) (pv_tf V')⌝ ∗
              UsertrapRes.ut_tfk (CID := CIDf) ksp V' ∗ proc_priv γf p pid (MkUstate V' ((us_M U))))%I
-    with "[Hpv]" as (V') "(%HuptV' & %Hfg & %Hcg & %Hgenk & %Hcwi & %Hpsz & %Htueq & #Htfk & Hpv)".
+    with "[Hpv]" as (V') "(%HuptV' & %Hfg & %Hcg & %Hgenk & %Hcwi & %Hlzq & %Hpsz & %Htueq & #Htfk & Hpv)".
   { iExists (upd_tf (us_V U) (prepare_return_tf (pv_tf (us_V U)) ksat ksp (cid_word (CID := CIDf)))).
     iFrame "Hpv". iSplitR; [iPureIntro; reflexivity |].
+    iSplitR; [iPureIntro; reflexivity |].
     iSplitR; [iPureIntro; reflexivity |].
     iSplitR; [iPureIntro; reflexivity |].
     iSplitR; [iPureIntro; reflexivity |].
@@ -788,12 +794,14 @@ Proof.
   { destruct steady; [| exact I].
     refine (urun_eq_resume (uvis_of U [] gn cs pid) U
               (MkUstate (upd_upt V' pt) (us_M U))
-              (urun_eq_of U [] gn cs pid) _ _ _ _ _).
+              (urun_eq_of U [] gn cs pid) _ _ _ _ _ _).
     - exact Htueq.
     - reflexivity.
     - exact Hpsz.
     - exact Hcwi.
-    - reflexivity. }
+    - reflexivity.
+    (* the lazy bit: forkret writes no block field (lane LAZY-FLAG) *)
+    - cbn [us_V]. exact Hlzq. }
   (* ---- the config record for this round ---- *)
   assert (HSEa0 : tp_pin SE !!! Regidx (mword_of_int 10)
                   = kvi_satp_word (ud_root pt)).
@@ -823,7 +831,10 @@ Proof.
                  (MkUstate (upd_upt V' pt) (us_M U)) sts gn cs pid
                  (urun_eq_resume (uvis_of U sts gn cs pid) U
                     (MkUstate (upd_upt V' pt) (us_M U))
-                    (urun_eq_of U sts gn cs pid) Htueq eq_refl Hpsz Hcwi eq_refl)
+                    (urun_eq_of U sts gn cs pid) Htueq eq_refl Hpsz Hcwi eq_refl
+                    (* the lazy bit: prepare_return writes trapframe words
+                       and no block field (lane LAZY-FLAG) *)
+                    Hlzq)
                  eq_refl eq_refl eq_refl eq_refl)).
     iExact "Hbslot". }
   assert (Hpcslot : tf_resume_pc
@@ -1150,7 +1161,10 @@ Proof.
      which is why the token carries two. *)
   iDestruct (iref_slots_split 1 1 with "Hirs2") as "[Hirs1 Hirs1b]".
   (* the process block, minus the file layer, is what the fs cone takes *)
-  iEval (rewrite proc_priv_nocwd_bare) in "Hpnc".
+  (* the lazy bit's claim, read off the block before the regrouping
+     drops it (lane LAZY-FLAG): it is pure, so holding it is free. *)
+  iDestruct (proc_priv_nocwd_lazy with "Hpnc") as %Hlzq.
+  iEval (rewrite (proc_priv_nocwd_bare _ _ _ _ Hlzq)) in "Hpnc".
   iDestruct "Hpnc" as "[Hpbare Hofiles]".
   (* ---- +0x26: c.li a0,1 -- ROOTDEV ---- *)
   iApply (wp_cli_s_sconf (mword_of_int (FR + 0x26)) Ra0
@@ -1525,6 +1539,9 @@ Proof.
   iAssert (proc_priv γf p pid U) with "[Hpbare Hcwd Hofiles Hkq Hxb Hgh]" as "Hpriv".
   { rewrite /proc_priv proc_priv_core_bare.
     iFrame "Hpbare Hcwd Hftok Hofiles Hxb Hgh".
+    (* the lazy bit's claim, back in the block: it came off it above
+       ([Hlzq]) and nothing on this walk moved the table (lane LAZY-FLAG) *)
+    iSplitR; [iPureIntro; exact Hlzq |].
     (* the incarnation's pair, back in the block: this arm is where the
        first process's block is closed, and the pair joined at the same
        seam the token does *)

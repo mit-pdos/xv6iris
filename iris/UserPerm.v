@@ -950,6 +950,65 @@ Proof.
               (proj1 (bv_unsigned_in_range _ szv)))).
 Qed.
 
+(* A PAGE THAT IS STILL LIVE AT THE SMALLER SIZE IS BELOW uvmdealloc's RUN
+   -- the arithmetic half of [perm_of_del_run], hoisted because lane
+   LAZY-FLAG's shrink arm needs exactly it and nothing else: what survives
+   the unmap is what the new break still covers
+   ([lazy_free_del_run]). *)
+Lemma live_not_in_del_run (szv szv' : mword 64) :
+  (bv_unsigned szv <= uvm_maxsz)%Z ->
+  (bv_unsigned szv' < bv_unsigned szv)%Z ->
+  forall p : mword 27,
+    p ∈ live_pages (bv_unsigned szv') ->
+    p ∉ vpn_run (svpn_of (pgroundup szv')) (uvmd_np szv szv').
+Proof.
+  intros Hmax Hlt.
+  rewrite uvm_maxsz_val in Hmax.
+  pose proof (proj1 (bv_unsigned_in_range _ szv)) as Hs0.
+  pose proof (proj1 (bv_unsigned_in_range _ szv')) as Hs'0.
+  pose proof (pd_lt_le _ _ _ Hlt Hmax) as Hmax'.
+  pose proof (pgroundup_live szv (pd_nowrap _ Hs0 Hmax)) as HG.
+  pose proof (pgroundup_live szv' (pd_nowrap _ Hs'0 Hmax')) as HG'.
+  destruct (pgroundup_maxsz szv ltac:(rewrite uvm_maxsz_val; exact Hmax))
+    as [[Hge Hle] _].
+  destruct (pgroundup_maxsz szv' ltac:(rewrite uvm_maxsz_val; exact Hmax'))
+    as [[Hge' Hle'] _].
+  rewrite uvm_maxsz_val in Hle, Hle'.
+  assert (Hok : usz_ok (bv_unsigned szv))
+    by (unfold usz_ok; rewrite HG; exact Hle).
+  assert (Hok' : usz_ok (bv_unsigned szv'))
+    by (unfold usz_ok; rewrite HG'; exact Hle').
+  assert (HgeZ : (bv_unsigned szv <= UserPtTree.pgroundup (bv_unsigned szv))%Z)
+    by (rewrite HG; exact Hge).
+  assert (HG'0 : (0 <= UserPtTree.pgroundup (bv_unsigned szv'))%Z)
+    by (rewrite HG'; exact (proj1 (bv_unsigned_in_range _ (pgroundup szv')))).
+  pose proof (UserPtTree.pgroundup_mono (bv_unsigned szv') (bv_unsigned szv)
+                (Z.lt_le_incl _ _ Hlt)) as Hmono.
+  pose proof (pd_quot (bv_unsigned szv)) as HGq.
+  pose proof (pd_quot (bv_unsigned szv')) as HG'q.
+  pose proof (pd_Abound _ HGq Hok) as HAb.
+  pose proof (pd_Bnn _ HG'0 HG'q) as HBnn.
+  assert (Hv0 : bv_unsigned (svpn_of (pgroundup szv'))
+                = (UserPtTree.pgroundup (bv_unsigned szv') / 4096)%Z).
+  { rewrite HG'.
+    exact (svpn_of_unsigned_small _ ltac:(rewrite uvm_maxsz_val; exact Hle')). }
+  assert (Hk : Z.of_nat (uvmd_np szv szv')
+               = (UserPtTree.pgroundup (bv_unsigned szv) / 4096
+                  - UserPtTree.pgroundup (bv_unsigned szv') / 4096)%Z).
+  { rewrite (uvmd_np_lt szv szv' Hlt). rewrite <- HG, <- HG'.
+    exact (pd_np _ _ HGq HG'q Hmono). }
+  intros p Hin Hrun.
+  pose proof (live_pages_bound _ p Hok' Hin) as Hpb.
+  apply elem_of_vpn_run in Hrun as (i & Hi & ->).
+  pose proof (proj1 (Nat2Z.inj_lt _ _) Hi) as Hib. rewrite Hk in Hib.
+  assert (Hnwrap : (bv_unsigned (svpn_of (pgroundup szv')) + Z.of_nat i
+                    < 134217728)%Z).
+  { rewrite Hv0.
+    exact (pd_run_bound _ _ _ HBnn (Nat2Z.is_nonneg i) Hib HAb). }
+  rewrite (vpn_at_unsigned _ _ Hnwrap), Hv0 in Hpb.
+  exact (pd_run_absurd _ _ _ HG'q (Nat2Z.is_nonneg i) Hpb).
+Qed.
+
 (* THE LEMMA.  [uvmdealloc]'s run at the smaller size takes the projection
    to the old one CUT to the pages that are still live. *)
 Lemma perm_of_del_run (um : gmap (mword 27) (mword 64)) (szv szv' : mword 64) :
@@ -1001,20 +1060,9 @@ Proof.
                   - UserPtTree.pgroundup (bv_unsigned szv') / 4096)%Z).
   { rewrite (uvmd_np_lt szv szv' Hlt). rewrite <- HG, <- HG'.
     exact (pd_np _ _ HGq HG'q Hmono). }
-  (* a still-live page is BELOW the run *)
-  assert (Hnin : forall p : mword 27,
-            p ∈ live_pages (bv_unsigned szv') ->
-            p ∉ vpn_run (svpn_of (pgroundup szv')) (uvmd_np szv szv')).
-  { intros p Hin Hrun.
-    pose proof (live_pages_bound _ p Hok' Hin) as Hpb.
-    apply elem_of_vpn_run in Hrun as (i & Hi & ->).
-    pose proof (proj1 (Nat2Z.inj_lt _ _) Hi) as Hib. rewrite Hk in Hib.
-    assert (Hnwrap : (bv_unsigned (svpn_of (pgroundup szv')) + Z.of_nat i
-                      < 134217728)%Z).
-    { rewrite Hv0.
-      exact (pd_run_bound _ _ _ HBnn (Nat2Z.is_nonneg i) Hib HAb). }
-    rewrite (vpn_at_unsigned _ _ Hnwrap), Hv0 in Hpb.
-    exact (pd_run_absurd _ _ _ HG'q (Nat2Z.is_nonneg i) Hpb). }
+  (* a still-live page is BELOW the run ([live_not_in_del_run]) *)
+  pose proof (live_not_in_del_run szv szv'
+                ltac:(rewrite uvm_maxsz_val; exact Hmax) Hlt) as Hnin.
   (* ...and a MAPPED page that is no longer live is INSIDE it *)
   assert (Hinrun : forall (p : mword 27) (w : mword 64),
             um !! p = Some w -> p ∉ live_pages (bv_unsigned szv') ->
@@ -1225,6 +1273,51 @@ Proof.
   split; [ lia | ].
   apply Z.lt_le_trans with (UserPtTree.pgroundup sz / 4096); [ lia | ].
   apply Z.div_le_mono; lia.
+Qed.
+
+(* THE BRIDGE TO COVERAGE, both ways.  [lazy_free] IS "every page below
+   PGROUNDUP(sz) is mapped", which is the shape the page-table side of the
+   tree states its facts in ([UmCovered.um_covered_z] at the rounded-up
+   break -- the same ∀, written out here so that this file needs no new
+   dependency).  Exec's image row and growproc's two arms are read through
+   these. *)
+Lemma lazy_free_of_covered (um : gmap (mword 27) (mword 64)) (sz : Z) :
+  usz_ok sz ->
+  (forall vpn : mword 27,
+     (bv_unsigned vpn * 4096 < UserPtTree.pgroundup sz)%Z -> is_Some (um !! vpn)) ->
+  lazy_free um sz.
+Proof.
+  intros Hok Hc p Hin. apply elem_of_dom.
+  exact (Hc p (live_pages_bound sz p Hok Hin)).
+Qed.
+
+Lemma lazy_free_covered (um : gmap (mword 27) (mword 64)) (sz : Z) :
+  lazy_free um sz ->
+  forall vpn : mword 27,
+    (bv_unsigned vpn * 4096 < UserPtTree.pgroundup sz)%Z -> is_Some (um !! vpn).
+Proof.
+  intros Hlf vpn Hlt.
+  exact (proj1 (elem_of_dom _ _) (Hlf vpn (live_pages_mem sz vpn Hlt))).
+Qed.
+
+(* ...AND THE SHRINK ARM.  uvmdealloc's run starts at PGROUNDUP of the NEW
+   break, so every page the new break still covers survives it
+   ([live_not_in_del_run]) -- a process whose fill was empty at the old
+   size has an empty one at the new. *)
+Lemma lazy_free_del_run (um : gmap (mword 27) (mword 64)) (szv szv' : mword 64) :
+  (bv_unsigned szv <= uvm_maxsz)%Z ->
+  (bv_unsigned szv' < bv_unsigned szv)%Z ->
+  lazy_free um (bv_unsigned szv) ->
+  lazy_free (um_del_run um (svpn_of (pgroundup szv')) (uvmd_np szv szv'))
+            (bv_unsigned szv').
+Proof.
+  intros Hmax Hlt Hlf p Hin.
+  pose proof (Hlf p (live_pages_mono (bv_unsigned szv') (bv_unsigned szv)
+                       (Z.lt_le_incl _ _ Hlt) p Hin)) as Hd.
+  apply elem_of_dom in Hd as [w Hw].
+  apply elem_of_dom. exists w.
+  rewrite (um_del_run_out um _ _ p (live_not_in_del_run szv szv' Hmax Hlt p Hin)).
+  exact Hw.
 Qed.
 
 Lemma lazy_free_mono (um um' : gmap (mword 27) (mword 64)) (sz sz' : Z) :

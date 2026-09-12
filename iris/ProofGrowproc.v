@@ -51,6 +51,11 @@ Require Import FdSlots ProcInv.
 Require Import FileInvDefs.
 Require Import CodeGrowproc.
 Require Import SpecMyproc SpecUvmalloc SpecUvmdealloc SpecGrowproc.
+Require Import UserPerm.   (* [lazy_free] and its two coverage bridges:
+                              what [ProcDefs.pv_lazy] claims *)
+Require Import UmCovered.  (* [um_covered_after] / [um_covered_pground]:
+                              the eager grow's coverage, which is what the
+                              lazy bit's claim is read through *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -592,6 +597,11 @@ Section ProofGrowproc.
     (* ---- the ONE borrow out of [proc_priv] ---- *)
     iDestruct (proc_priv_sz_maxsz with "Hpriv") as %Hszmax.
     iDestruct (proc_priv_um_below with "Hpriv") as %Hbel.
+    (* ...AND WHAT THE BLOCK'S LAZY BIT CLAIMS (lane LAZY-FLAG, K2), read
+       off before the borrow: the accessor's give-back premise owes it back
+       AT THE NEW TABLE AND BREAK, and each of growproc's four arms pays it
+       from this one. *)
+    iDestruct (proc_priv_lazy with "Hpriv") as %Hlz0.
     iDestruct (proc_priv_addrspace with "Hpriv") as "(Hszc & Hptc & Hpt & Hpback)".
     (* uvmalloc/uvmdealloc are now stated at this same real image ([Hpt] is
        already [proc_ptm _ _ (us_M U)]) -- no existential is invented. *)
@@ -683,8 +693,64 @@ Section ProofGrowproc.
       with "[Hpback Hcont]" as "EXIT".
     { iIntros (CIDx Mf P' szv' rv M')
         "%Hchain %Hfsp %Hfa0 %Hfthr %Hroot %Htfp %Hszb %Hbel' %Hok Hcg Hcpu Hpc Hszc Hptc Hpt Hb1 Hb2 Hb3 Hb4".
-      iDestruct ("Hpback" $! P' szv' M' with "[%] [%] [%] [%] Hszc Hptc Hpt") as "Hpriv";
-        [exact Hroot | exact Htfp | exact Hszb | exact Hbel' |].
+      iDestruct ("Hpback" $! P' szv' M' (pv_lazy (us_V U))
+                   with "[%] [%] [%] [%] [%] Hszc Hptc Hpt") as "Hpriv";
+        [exact Hroot | exact Htfp | exact Hszb | exact Hbel' | | ].
+      (* WHAT THE LAZY BIT CLAIMS, RE-ESTABLISHED AT THE ARM'S OWN TABLE AND
+         BREAK (lane LAZY-FLAG, K2).  Four arms, and only two of them move
+         anything: the GROW maps exactly the run that just became live, so
+         coverage extends to the new break ([UmCovered.um_covered_after] at
+         the rounded-up size, [UserPerm.lazy_free_of_covered]); the SHRINK
+         unmaps only pages at or above PGROUNDUP of the new break
+         ([UserPerm.lazy_free_del_run]); the failed and unchanged arms move
+         neither. *)
+      { intro Hlzf. pose proof (Hlz0 Hlzf) as Hlf.
+        assert (Hszmaxz' : (bv_unsigned (pv_sz (us_V U)) <= uvm_maxsz)%Z)
+          by (rewrite uvm_maxsz_val; exact Hszmaxz).
+        assert (Hcov0 : um_covered (pv_sz (us_V U)) (ud_um (pv_upt (us_V U)))).
+        { intros vpn Hvpn.
+          apply (lazy_free_covered (ud_um (pv_upt (us_V U)))
+                   (uint (pv_sz (us_V U))) Hlf vpn).
+          rewrite uint_unsigned.
+          pose proof (pgroundup_ge (bv_unsigned (pv_sz (us_V U)))
+                        (proj1 (bv_unsigned_in_range _ (pv_sz (us_V U))))).
+          lia. }
+        destruct Hok as [(Hr & HP & Hsz & HM) | [Hgrew | [Hunch | Hshr]]].
+        - rewrite HP Hsz. exact Hlf.
+        - destruct Hgrew as (_ & _ & Hmaxn & Hszv' & Hle' & _ & Hdom & _).
+          assert (Hmaxn' : (bv_unsigned szv' <= uvm_maxsz)%Z)
+            by (rewrite <- uint_unsigned, Hszv'; exact Hmaxn).
+          assert (Hnw' : (bv_unsigned szv' + 4095 < 2 ^ 64)%Z).
+          { pose proof (proj1 (bv_unsigned_in_range _ szv')) as H0.
+            unfold uvm_maxsz in Hmaxn'.
+            change (2 ^ 64)%Z with 18446744073709551616%Z. lia. }
+          assert (Hcov' : um_covered szv' (ud_um P')).
+          { apply (um_covered_after (pv_sz (us_V U)) szv'
+                     (ud_um (pv_upt (us_V U))) (ud_um P') Hszmaxz'
+                     ltac:(rewrite <- !uint_unsigned; exact Hle') Hcov0).
+            rewrite Hszv'. exact Hdom. }
+          apply (lazy_free_of_covered (ud_um P') (uint szv')).
+          + unfold usz_ok. rewrite uint_unsigned.
+            destruct (pgroundup_maxsz szv' Hmaxn') as [[_ Hle] _].
+            rewrite (pgroundup_live szv' Hnw').
+            rewrite uvm_maxsz_val in Hle. exact Hle.
+          + rewrite uint_unsigned. rewrite (pgroundup_live szv' Hnw').
+            exact (um_covered_pground szv' (ud_um P') Hmaxn' Hcov').
+        - destruct Hunch as (_ & _ & HP & Hsz & _). rewrite HP Hsz. exact Hlf.
+        - destruct Hshr as (_ & _ & HP & Hsz' & _).
+          destruct Hsz' as [(Hlt & Hszv') | (Hge & Hszv')].
+          + rewrite HP Hszv'. unfold uptd_del_run. cbn [ud_um].
+            rewrite !uint_unsigned.
+            rewrite !uint_unsigned in Hlt.
+            apply (lazy_free_del_run (ud_um (pv_upt (us_V U)))
+                     (pv_sz (us_V U)) (add_vec (pv_sz (us_V U)) nv)
+                     Hszmaxz' Hlt).
+            rewrite <- uint_unsigned. exact Hlf.
+          + (* the wrap sub-case: [uvmd_np] is 0 and nothing was unmapped *)
+            rewrite HP Hszv'. unfold uptd_del_run. cbn [ud_um].
+            rewrite !uint_unsigned in Hge.
+            rewrite (uvmd_np_ge (pv_sz (us_V U)) (add_vec (pv_sz (us_V U)) nv) Hge).
+            rewrite um_del_run_0. exact Hlf. }
       iApply (gp_tail m Mf av rv sp0 ra0 s00 s10 s20 b p
                 ltac:(lia) eq_refl eq_refl eq_refl eq_refl eq_refl
                 Hfsp Hfa0 Hfthr

@@ -125,9 +125,9 @@ Proof.
   (* the failure arm is refuted by [r <> -1] *)
   destruct Hok as [(Hr & _) | Hok]; [by contradiction |].
   destruct Hok as (Hr & Hna & Hstok & Hpsz & Hspv & Htfp & Htf
-                   & Hof & Hfdg & Hcwd & Hnm & Hlo & Hhi).
-  destruct Hbuilt as (Hsz & Hargs & Hstk & Himg & Hsize & Hperm & Hbel);
-    cbn in Hsz, Hargs, Hstk, Himg, Hsize, Hperm, Hbel.
+                   & Hof & Hfdg & Hcwd & Hnm & Hlo & Hhi & Hlzp).
+  destruct Hbuilt as (Hsz & Hargs & Hstk & Himg & Hsize & Hperm & Hbel & Hlzf);
+    cbn in Hsz, Hargs, Hstk, Himg, Hsize, Hperm, Hbel, Hlzf.
   destruct Hload as (Hwf & (e0 & He0 & Hpo) & Hfa & Hasc).
   (* (4): the walk's guard, from loadability *)
   assert (Hwalk : kxb_walk_ok f ef).

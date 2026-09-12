@@ -851,11 +851,14 @@ Section ProofFreeproc.
         iApply (fp_to_dormant_unused pa
                   (MkPPriv (zero_reg : mword 64) (pv_upt V) (pv_tf V)
                            (pv_ofile V) (pv_fdg V) (pv_cwd V) (<[0%nat := (mword_of_int 0 : mword 8)]> (pv_name V))
-                           (pv_cwi V) g (pv_chg V))
+                           (* the parked block is DORMANT, so its lazy bit
+                              is [true] -- raising it is free, the claim at
+                              [true] promises nothing (lane LAZY-FLAG, K2) *)
+                           (pv_cwi V) g (pv_chg V) true)
                   (mword_of_int 0 : mword 32) (pv_sz V) (mword_of_int 0 : mword 32)
-                  ltac:(vm_compute; reflexivity)
+                  ltac:(vm_compute; reflexivity) ltac:(reflexivity)
                   with "[Hpid Hsz Hcwd Hnm Hof Hunits Hspare Hkst Hctx] [Hrow] [Hsg] [Hxs2] [Hpg] [Htf]").
-        - rewrite /fp_rest. cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_cwi pv_gen pv_chg].
+        - rewrite /fp_rest. cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_cwi pv_gen pv_chg pv_lazy].
           iSplitR.
           { iPureIntro. split_and!; [exact Hofv | exact Hcwdv |].
             rewrite uint_unsigned. unfold uvm_maxsz. vm_compute. discriminate. }

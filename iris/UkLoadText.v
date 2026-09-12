@@ -121,8 +121,8 @@ Section UkLoadTextExec.
     uv_tree_ok pt (upa_map pt Mp) t' ->
     uk_pt_pure pt sz M Mp ->
     gen_cert -∗ uv_amb -∗
-    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw gn cs pidv ∗
-          (uvb C pt Rfd Rut sz π fdv cw gn cs pidv M
+    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw gn cs pidv false ∗
+          (uvb C pt Rfd Rut sz π fdv cw gn cs pidv false M
              (<[Regidx lrd := regval_into_reg wval]> m)
              (add_vec_int pc dpc) -∗
            WP (Loop : expr riscv_lang))) -∗
@@ -326,8 +326,8 @@ Section UkLoadTextExec.
     uv_tree_ok pt (upa_map pt Mp) t' ->
     uk_pt_pure pt sz M Mp ->
     gen_cert -∗ uv_amb -∗
-    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw gn cs pidv ∗
-          (uvb C pt Rfd Rut sz π fdv cw gn cs pidv M
+    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw gn cs pidv false ∗
+          (uvb C pt Rfd Rut sz π fdv cw gn cs pidv false M
              (<[Regidx lrd := regval_into_reg wval]> m)
              (add_vec_int pc dpc) -∗
            WP (Loop : expr riscv_lang))) -∗
@@ -436,11 +436,11 @@ Section UkLoadTextObl.
     uva_text pt (uint va) ->
     gen_cert -∗ uv_amb -∗
     uv_fetch_bridge (uc_dqc C) pt Mp rsA t (F_Base w) -∗
-    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw gn cs pidv ∗
-          ((uvb C pt Rfd Rut sz π fdv cw gn cs pidv M
+    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw gn cs pidv false ∗
+          ((uvb C pt Rfd Rut sz π fdv cw gn cs pidv false M
               (<[Regidx lrd := regval_into_reg wval]> m)
               (add_vec_int pc 4) -∗ WP (Loop : expr riscv_lang))
-           ∧ UkStep.uk_paycont Qp gn (uslot (uvis_of_run m pc M π sz fdv cw gn cs pidv)))) -∗
+           ∧ UkStep.uk_paycont Qp gn (uslot (uvis_of_run m pc M π sz fdv cw gn cs pidv false)))) -∗
     resv_any cpu_id -∗
     hreg_frame rsA u_Drw -∗ hreg_frame_ro (u_Df (uc_dqc C)) rsA u_Dro -∗
     TsoCtx.own_context XI -∗
@@ -564,11 +564,11 @@ Section UkLoadTextObl.
     uva_text pt (uint va) ->
     gen_cert -∗ uv_amb -∗
     uv_fetch_bridge (uc_dqc C) pt Mp rsA t (F_RVC h) -∗
-    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw gn cs pidv ∗
-          ((uvb C pt Rfd Rut sz π fdv cw gn cs pidv M
+    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw gn cs pidv false ∗
+          ((uvb C pt Rfd Rut sz π fdv cw gn cs pidv false M
               (<[Regidx lrd := regval_into_reg wval]> m)
               (add_vec_int pc 2) -∗ WP (Loop : expr riscv_lang))
-           ∧ UkStep.uk_paycont Qp gn (uslot (uvis_of_run m pc M π sz fdv cw gn cs pidv)))) -∗
+           ∧ UkStep.uk_paycont Qp gn (uslot (uvis_of_run m pc M π sz fdv cw gn cs pidv false)))) -∗
     resv_any cpu_id -∗
     hreg_frame rsA u_Drw -∗ hreg_frame_ro (u_Df (uc_dqc C)) rsA u_Dro -∗
     TsoCtx.own_context XI -∗
@@ -720,7 +720,7 @@ Section UkLoadText.
     (forall j : nat, (j < Z.to_nat k)%nat ->
        exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
     wval = extend_value is_unsigned (uM_word M (uint va) k) ->
-    uvb C pt Rfd Rut sz π fdv cw gn cs pidv M m pc -∗
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false M m pc -∗
     ▷ ukcq Qp π M sz fdv cw gn cs pidv (<[Regidx rd := regval_into_reg wval]> m)
         (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     WP (Loop : expr riscv_lang).
@@ -766,12 +766,12 @@ Section UkLoadText.
                         HgagA & LstvecA & LmieA & LmdlA & LmedlA & LmenvA &
                         LsatpA & LpcfgA & LpaddrA & LmiA & Hx0).
     (* the continuation at THIS table, out of the table-generic one *)
-    iAssert (R -∗ (TsoCtx.own_context (CID := CIDo) XIo -∗ Rut' pt') ∗ Rfd' fdv ∗ ukb C' pt' Rfd' Rut' sz π fdv cw gn cs pidv ∗
-             ((uvb (CID := CIDo) C' pt' Rfd' Rut' sz π fdv cw gn cs pidv M
+    iAssert (R -∗ (TsoCtx.own_context (CID := CIDo) XIo -∗ Rut' pt') ∗ Rfd' fdv ∗ ukb C' pt' Rfd' Rut' sz π fdv cw gn cs pidv false ∗
+             ((uvb (CID := CIDo) C' pt' Rfd' Rut' sz π fdv cw gn cs pidv false M
                  (<[Regidx rd := regval_into_reg wval]> m)
                  (add_vec_int pc (if is_rvc then 2 else 4)) -∗
                WP (Loop : expr riscv_lang))
-              ∧ UkStep.uk_paycont Qp gn (uslot (uvis_of_run m pc M π sz fdv cw gn cs pidv))))%I with "[Hk]" as "Hk".
+              ∧ UkStep.uk_paycont Qp gn (uslot (uvis_of_run m pc M π sz fdv cw gn cs pidv false))))%I with "[Hk]" as "Hk".
     { iIntros "HR". iDestruct ("Hk" with "HR") as "(Hrut & Hfdr & Hkb & Hkc)".
       iFrame "Hrut Hfdr Hkb". iSplit.
       - (* the RETIRE leg: the payment goes straight back into the
@@ -827,7 +827,7 @@ Section UkLoadText.
     (forall j : nat, (j < Z.to_nat k)%nat ->
        exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
     wval = extend_value is_unsigned (uM_word M (uint va) k) ->
-    uvb C pt Rfd Rut sz π fdv cw gn cs pidv M m pc -∗
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false M m pc -∗
     ukcq Qp π M sz fdv cw gn cs pidv (<[Regidx rd := regval_into_reg wval]> m)
         (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     WP (Loop : expr riscv_lang).
@@ -854,7 +854,7 @@ Section UkLoadText.
     uva_canon va ->
     M !! (uint va) = Some bb ->
     wval = zero_extend' 64 bb ->
-    uvb C pt Rfd Rut sz π fdv cw gn cs pidv M m pc -∗
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false M m pc -∗
     ukcq Qp π M sz fdv cw gn cs pidv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -894,7 +894,7 @@ Section UkLoadText.
     is_aligned_vaddr (Virtaddr va) 4 = true ->
     uM_bytes M (uint va) 4 wv ->
     wval = sign_extend' 64 wv ->
-    uvb C pt Rfd Rut sz π fdv cw gn cs pidv M m pc -∗
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false M m pc -∗
     ukcq Qp π M sz fdv cw gn cs pidv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
     WP (Loop : expr riscv_lang).
   Proof.

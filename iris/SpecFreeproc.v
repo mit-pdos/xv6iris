@@ -185,27 +185,39 @@ Section SpecFreeproc.
     iDestruct "Hgh" as "[%Hpid0 Hsg]".
     iExists V, pid, xsv. rewrite /fp_rest /fp_pt /fp_tf.
     iFrame "Hpid Hf Hof Hu Hsp Hir Hbs Hkst Hch Hsg Hxc Hctx Hpg Htf".
-    iSplitR; [iPureIntro; exact Hpure |].
+    iSplitR;
+      [iPureIntro; exact (conj (proj1 Hpure)
+                            (conj (proj1 (proj2 Hpure))
+                               (proj1 (proj2 (proj2 Hpure))))) |].
     iPureIntro; exact Hpid0.
   Qed.
 
+  (* THE PARKED BLOCK IS AT [ProcDefs.pv_lazy = true] (lane LAZY-FLAG, K2),
+     and that is freeproc's to write: a dormant block's claim is vacuous,
+     raising the bit is free (the field is not a cell), and the one caller
+     builds the literal.  It is NOT a row of [fp_rest]: the block freeproc
+     is HANDED belongs to a live process and may be at either bit. *)
   Lemma fp_to_dormant_unused (pa : mword 64) (V : pprivate) (pid : mword 32)
       (szv : mword 64) (xsv : mword 32) :
     bv_unsigned pid = 0 ->
+    pv_lazy V = true ->
     fp_rest pa V pid -∗ ch_frag (pv_chg V) pa ∅ -∗
     slot_gen pa (DfracOwn 1) (pv_gen V) -∗
     p_xstate pa ↦₄{DfracOwn (1/2)} xsv -∗
     fp_pt pa szv None -∗ fp_tf pa None -∗
     proc_dormant pa UNUSED.
   Proof.
-    intro Hpid0.
+    intros Hpid0 Hlz.
     iIntros "(%Hpure & Hpid & Hf & Hof & Hu & Hsp & Hir & Hbs & Hkst & Hctx) Hch Hsg Hxc Hpg Htf".
     rewrite /fp_pt /fp_tf /proc_dormant fp_unused_not_zombie.
     iAssert (gen_halves_dorm pa pid (pv_gen V) UNUSED) with "[Hsg]" as "Hgh".
     { rewrite /gen_halves_dorm fp_unused_not_zombie.
       iSplitR; [iPureIntro; exact Hpid0 | iExact "Hsg"]. }
     iExists V, pid. iFrame "Hpid Hf Hof Hu Hsp Hir Hbs Hkst Hch Hgh Hctx Hpg Htf".
-    iSplitR; [iPureIntro; exact Hpure |].
+    iSplitR;
+      [iPureIntro; exact (conj (proj1 Hpure)
+                            (conj (proj1 (proj2 Hpure))
+                               (conj (proj2 (proj2 Hpure)) Hlz))) |].
     iExists xsv. iFrame "Hxc".
   Qed.
 
@@ -265,7 +277,9 @@ Section SpecFreeproc.
     iDestruct (proc_pt_root_valid with "Hpt") as %Hroot.
     rewrite /fp_rest /fp_pt /fp_tf.
     iSplitL "Hpid Hf Hof Hu Hsp Hir Hbs Hkst Hctx".
-    { iFrame "Hpid Hf Hof Hu Hsp Hir Hbs Hkst Hctx". iPureIntro. exact Hpure. }
+    { iFrame "Hpid Hf Hof Hu Hsp Hir Hbs Hkst Hctx". iPureIntro.
+      exact (conj (proj1 Hpure)
+               (conj (proj1 (proj2 Hpure)) (proj1 (proj2 (proj2 Hpure))))). }
     iSplitL "Hch"; [iExact "Hch" |].
     iSplitL "Hgh"; [iExact "Hgh" |].
     iSplitL "Hxc"; [iExact "Hxc" |].
@@ -273,7 +287,7 @@ Section SpecFreeproc.
     iSplitL "Hpg Hpt".
     { iFrame "Hpg". iSplitL "Hpt".
       { iExists Mz. iExact "Hpt". }
-      iPureIntro. split; [exact Hbel | exact (proj2 (proj2 Hpure))]. }
+      iPureIntro. split; [exact Hbel | exact (proj1 (proj2 (proj2 Hpure)))]. }
     cbn [fst snd]. iFrame "Htf Htfp". iPureIntro.
     exact (proj2 (proj2 (proj2 (proj2 Hwf)))).
   Qed.

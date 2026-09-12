@@ -104,7 +104,7 @@ Lemma uvis_of_kfork_child (Up : ustate) (sts : list fdstate)
            (uint (pv_sz (us_V Up)))
            sts
            (pv_cwi (us_V Up))
-           gn cs pidc.
+           gn cs pidc (pv_lazy (us_V Up)).
 Proof. reflexivity. Qed.
 
 (* ===================================================================== *)
@@ -355,6 +355,37 @@ Proof.
     apply Hnot. apply elem_of_vpn_run. exists i. split; [exact Hi | reflexivity].
 Qed.
 
+(* THE CHILD'S FILL IS THE PARENT'S (lane LAZY-FLAG, K2).  [lazy_free] is
+   a statement about the table's DOMAIN alone ([UserPerm.lazy_free]), and
+   uvmcopy gives the child an entry at every vpn the parent had one at --
+   fresh pages, but at the same vpns -- so a parent whose fill was empty
+   hands its child an empty one.  The premise is uvmcopy's own third clause
+   weakened to "the child has SOMETHING there", which is what
+   [ProofKforkParts.kfk_um_below_child] takes as well; the run is located
+   by the parent's [um_below], exactly as [perm_of_uvmcopy_child] locates
+   it. *)
+Lemma lazy_free_uvmcopy_child (szw : mword 64) (vpn0 : mword 27)
+    (Pold Pnew P' : uptd) :
+  bv_unsigned vpn0 = 0 ->
+  um_below szw (ud_um Pold) ->
+  lazy_free (ud_um Pold) (uint szw) ->
+  (forall i : nat, (i < uvm_np szw)%nat ->
+     match ud_um Pold !! vpn_at vpn0 i with
+     | None => ud_um P' !! vpn_at vpn0 i = ud_um Pnew !! vpn_at vpn0 i
+     | Some _ => exists w' : mword 64, ud_um P' !! vpn_at vpn0 i = Some w'
+     end) ->
+  lazy_free (ud_um P') (uint szw).
+Proof.
+  intros Hv0 Hbel Hlf Hin vpn Hmem.
+  pose proof (Hlf vpn Hmem) as Hdom.
+  apply elem_of_dom in Hdom as [w Hw].
+  destruct (um_below_in_run szw vpn0 (ud_um Pold) vpn w Hv0 Hbel Hw)
+    as (i & Hi & ->).
+  specialize (Hin i Hi). rewrite Hw in Hin.
+  destruct Hin as (w' & Hw').
+  apply elem_of_dom. exists w'. exact Hw'.
+Qed.
+
 (* ===================================================================== *)
 (* §4 THE ASSEMBLY: the child's actual record has the run key of the      *)
 (* record [SpecKfork] states.                                             *)
@@ -367,11 +398,16 @@ Lemma urun_eq_kfork_child (Up Uc : ustate) (sts : list fdstate)
     = perm_of (ud_um (pv_upt (us_V Up))) (uint (pv_sz (us_V Up))) ->
   pv_sz (us_V Uc) = pv_sz (us_V Up) ->
   pv_cwi (us_V Uc) = pv_cwi (us_V Up) ->
+  (* ...AND THE CHILD'S LAZY BIT IS THE PARENT'S: kfork creates the child's
+     block at the parent's ([ProcDefs.pv_lazy]), which is what makes the
+     block invariant hold of the child -- uvmcopy gives it the parent's
+     vpns ([UserPerm.lazy_free_dom]). *)
+  pv_lazy (us_V Uc) = pv_lazy (us_V Up) ->
   urun_eq (uvis_of (kfork_child Up) sts gn cs pidc) Uc.
 Proof.
-  intros Htf HM Hperm Hsz Hcw.
+  intros Htf HM Hperm Hsz Hcw Hlz.
   unfold urun_eq. rewrite uvis_of_kfork_child.
-  cbn [uvis_tf uvis_M uvis_perm uvis_sz uvis_cwd].
+  cbn [uvis_tf uvis_M uvis_perm uvis_sz uvis_cwd uvis_lazy].
   rewrite Htf. rewrite HM. rewrite Hperm. rewrite Hsz. rewrite Hcw.
-  repeat split.
+  rewrite Hlz. repeat split.
 Qed.

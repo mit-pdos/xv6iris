@@ -1434,7 +1434,10 @@ Section ProofSysChdirBody.
          so the cell is borrowed for the two instructions that touch it (the
          [ld] at +0x48 and the [sd] at +0x54) and rides inside the block for
          everything between. *)
-      iEval (rewrite proc_priv_nocwd_bare) in "Hpnc".
+      (* the lazy bit's claim, read off the block before the regrouping
+         drops it (lane LAZY-FLAG): it is pure, so holding it is free. *)
+      iDestruct (proc_priv_nocwd_lazy with "Hpnc") as %Hlzq.
+      iEval (rewrite (proc_priv_nocwd_bare _ _ _ _ Hlzq)) in "Hpnc".
       iDestruct "Hpnc" as "[Hpbare Hofiles]".
       iDestruct (cwd_ref_at_held_at with "Href") as "Hcwdref".
       iEval (cbn [upd_upt pv_cwd pv_fdg]) in "Hcwdref".
@@ -2015,7 +2018,10 @@ Section ProofSysChdirBody.
                      (upd_usV U (upd_cwi (upd_cwd (upd_upt (us_V U) P') (ientry kk))
                                          (bv_unsigned inum))))
             with "[Hpbare Hofiles]" as "Hpnc".
-          { rewrite proc_priv_nocwd_bare.
+          { rewrite (proc_priv_nocwd_bare _ _ _
+                       (upd_usV U (upd_cwi (upd_cwd (upd_upt (us_V U) P')
+                                              (ientry kk))
+                                           (bv_unsigned inum))) Hlzq).
             cbn [upd_cwi upd_cwd pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_cwi pv_gen pv_chg].
             iSplitL "Hpbare"; [iExact "Hpbare" | iExact "Hofiles"]. }
           iDestruct (cwd_ref_at_of_held_at with "Hheldnew") as "Hrefcwd".
@@ -2326,7 +2332,7 @@ Section ProofSysChdirBody.
           iAssert (proc_priv gf pj pid (us_upt U P'))
             with "[Hpbare Hofiles Href Hftok]" as "Hpriv".
           { rewrite (proc_priv_split_cwd gf pj pid (us_upt U P'))
-                    proc_priv_nocwd_bare.
+                    (proc_priv_nocwd_bare _ _ _ _ Hlzq).
             iSplitR "Href Hftok".
             - iSplitL "Hpbare"; [iExact "Hpbare" | iExact "Hofiles"].
             - iEval (cbn [upd_upt pv_cwd pv_fdg]). iFrame "Href Hftok". }
@@ -2424,7 +2430,7 @@ Section ProofSysChdirBody.
         iAssert (proc_priv gf pj pid (us_upt U P'))
           with "[Hpbare Hofiles Href Hftok]" as "Hpriv".
         { rewrite (proc_priv_split_cwd gf pj pid (us_upt U P'))
-                  proc_priv_nocwd_bare.
+                  (proc_priv_nocwd_bare _ _ _ _ Hlzq).
           iSplitR "Href Hftok".
           - iSplitL "Hpbare"; [iExact "Hpbare" | iExact "Hofiles"].
           - iEval (cbn [upd_upt pv_cwd pv_fdg]). iFrame "Href Hftok". }

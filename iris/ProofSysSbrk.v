@@ -842,6 +842,10 @@ Section ProofSysSbrk.
     iDestruct (proc_priv_um_below with "Hpriv") as %Hbel.
     assert (Hszmaxz : (bv_unsigned (pv_sz (us_V U)) <= 274877898752)%Z).
     { rewrite <- uint_unsigned. rewrite <- uvm_maxsz_val. exact Hszmax. }
+    (* ...AND WHAT THE BLOCK'S LAZY BIT CLAIMS (lane LAZY-FLAG, K3), read
+       off before the borrow: three of sbrk's four arms hand it straight
+       back, and the LAZY grow RAISES the bit instead of paying it. *)
+    iDestruct (proc_priv_lazy with "Hpriv") as %Hlz0.
     iDestruct (proc_priv_addrspace with "Hpriv") as "(Hszc & Hptc & Hpt & Hpback)".
     (* ---- +0x22: c.ld s1,72(a0) -- s1 := p->sz, the value sbrk returns -- *)
     assert (Hszaddr : forall CID' : CpuId,
@@ -931,21 +935,23 @@ Section ProofSysSbrk.
        arms reaches +0x64 at a different point in the crossing chain -- and
        carries the chain fact back to [CID] so [Hcont] can be discharged. *)
     iAssert (∀ (CIDx : CpuId) (Mf : regfile) (P' : uptd) (M' : gmap Z (bv 8))
-               (szv' rv : mword 64),
+               (szv' rv : mword 64) (lz' : bool),
         ⌜b = false \/ p = zero_reg -> (CIDx : CPU) = (CID : CPU)⌝ -∗
         ⌜Mf !!! Regidx csp_rs1 = pa_stk sp0 6⌝ -∗
         ⌜Mf !!! Regidx Rs1 = rv⌝ -∗
         ⌜forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
             r <> Rs0 -> r <> Rs1 -> Mf !!! Regidx r = m !!! Regidx r⌝ -∗
-        ⌜sys_sbrk_ok (us_V U) v0 v1 P' szv' rv (us_M U) M'⌝ -∗
+        ⌜sys_sbrk_ok (us_V U) v0 v1 P' szv' rv lz' (us_M U) M'⌝ -∗
         sie_cap_gpr KT1 (CID := CIDx) Mf (av - 6)%nat b p -∗
         cpu_own (CID := CIDx) 0%nat eb p b lks -∗
         pc_is (mword_of_int (KernelSyms.sys_sbrk + 0x64) : mword 64) -∗
-        proc_priv γf p pid (upd_usM (upd_usV U (upd_sz (upd_upt (us_V U) P') szv')) M') -∗
+        proc_priv γf p pid
+          (upd_usM (upd_usV U
+                      (upd_lazy (upd_sz (upd_upt (us_V U) P') szv') lz')) M') -∗
         (∃ w5 : mword 64, ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 5) (DfracOwn 1) w5) -∗
         WP (Loop : expr riscv_lang))%I
       with "[Hcont Hs1 Hs2 Hs3 Hs4 Hs6]" as "EXIT".
-    { iIntros (CIDx Mf P' M' szv' rv) "%Hsx %Hfsp %Hfs1 %Hfthr %Hok Hcg Hcpu Hpc Hpriv Hw5".
+    { iIntros (CIDx Mf P' M' szv' rv lz') "%Hsx %Hfsp %Hfs1 %Hfthr %Hok Hcg Hcpu Hpc Hpriv Hw5".
       iDestruct "Hw5" as (w5) "Hs5".
       iApply (ss_tail (CID0 := CIDx) m Mf av b p rv sp0 ra0 s00 s10 u4 w5 u6
                 ltac:(lia) eq_refl eq_refl eq_refl eq_refl Hfsp Hfs1 Hfthr
@@ -953,7 +959,7 @@ Section ProofSysSbrk.
       iIntros (CIDy Hqy mf) "[%Hcsf %Hmfa0] Hcg Hpc".
       iDestruct (cpu_own_transport CIDx CIDy 0%nat eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain|].
-      iApply ("Hcont" $! mf P' szv' M' with "[%] [%] Hcg Hcpu Hpc Hpriv").
+      iApply ("Hcont" $! mf P' szv' lz' M' with "[%] [%] Hcg Hcpu Hpc Hpriv").
       { exact Hcsf. }
       { rewrite Hmfa0. exact Hok. } }
     (* ================================================================= *)
@@ -976,21 +982,29 @@ Section ProofSysSbrk.
       { iApply (ssi_2a with "Htext"). }
       iIntros (CIDs16 Hq16). iApply bi.later_intro. iIntros "Hcg Hpc".
       iEval (rewrite Htgt58) in "Hpc".
-      iDestruct ("Hpback" $! (pv_upt (us_V U)) (pv_sz (us_V U)) (us_M U) with "[%] [%] [%] [%] Hszc Hptc Hpt")
-        as "Hpriv"; [reflexivity | reflexivity | exact Hszmax | exact Hbel |].
+      iDestruct ("Hpback" $! (pv_upt (us_V U)) (pv_sz (us_V U)) (us_M U)
+                   (pv_lazy (us_V U))
+                   with "[%] [%] [%] [%] [%] Hszc Hptc Hpt")
+        as "Hpriv"; [reflexivity | reflexivity | exact Hszmax | exact Hbel
+                    | exact Hlz0 |].
       iDestruct (cpu_own_transport CIDD CIDs16 0%nat eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iApply (ss_eager (CID0 := CIDs16) γa γf m D3 av eb p pid (upd_usM U (us_M U)) sp0 (trunc32 v0) b lks
                 ltac:(lia) HD3sp HD3s0 HD3s1 HthrD3
                 with "Hcg Hcpu Htext Hpc Hpriv Henv Hs5lo").
       iIntros (CIDe Hqe Mf P' M' szv' rv) "%Hfsp %Hfs1 %Hfthr %Hres Hcg Hcpu Hpc Hpriv Hs5lo".
-      iApply ("EXIT" $! CIDe Mf P' M' szv' rv with "[%] [%] [%] [%] [%] Hcg Hcpu Hpc Hpriv [Hs5lo Hs5hi]").
+      iApply ("EXIT" $! CIDe Mf P' M' szv' rv (pv_lazy (us_V U))
+                with "[%] [%] [%] [%] [%] Hcg Hcpu Hpc Hpriv [Hs5lo Hs5hi]").
       - wp_next_chain.
       - exact Hfsp.
       - exact Hfs1.
       - exact Hfthr.
       - destruct Hres as [(Hrv & Hgok) | (Hrv & Hp & Hs & Hm')].
-        + right. split; [exact Hrv |]. left. split; [left; exact Heager | exact Hgok].
-        + left. split; [exact Hrv | split; [exact Hp | split; [exact Hs | exact Hm']]].
+        + right. split; [exact Hrv |]. left.
+          split; [left; exact Heager | split; [exact Hgok | reflexivity]].
+        + left. split; [exact Hrv
+                       | split; [exact Hp
+                                | split; [exact Hs
+                                         | split; [exact Hm' | reflexivity]]]].
       - iExists (word_of_words (trunc32 v0) (trunc32 v1)).
         iApply (ctx_word_pointsto_join4 _ _ _ _ _ Hal5 with "Hs5lo Hs5hi"). }
     (* ---- t <> SBRK_EAGER: look at the sign of n ---- *)
@@ -1060,21 +1074,29 @@ Section ProofSysSbrk.
       { iApply (ssi_32 with "Htext"). }
       iIntros (CIDs19 Hq19). iApply bi.later_intro. iIntros "Hcg Hpc".
       iEval (rewrite Htgt58) in "Hpc".
-      iDestruct ("Hpback" $! (pv_upt (us_V U)) (pv_sz (us_V U)) (us_M U) with "[%] [%] [%] [%] Hszc Hptc Hpt")
-        as "Hpriv"; [reflexivity | reflexivity | exact Hszmax | exact Hbel |].
+      iDestruct ("Hpback" $! (pv_upt (us_V U)) (pv_sz (us_V U)) (us_M U)
+                   (pv_lazy (us_V U))
+                   with "[%] [%] [%] [%] [%] Hszc Hptc Hpt")
+        as "Hpriv"; [reflexivity | reflexivity | exact Hszmax | exact Hbel
+                    | exact Hlz0 |].
       iDestruct (cpu_own_transport CIDD CIDs19 0%nat eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iApply (ss_eager (CID0 := CIDs19) γa γf m D4 av eb p pid (upd_usM U (us_M U)) sp0 (trunc32 v0) b lks
                 ltac:(lia) HD4sp HD4s0 HD4s1 HthrD4
                 with "Hcg Hcpu Htext Hpc Hpriv Henv Hs5lo").
       iIntros (CIDe Hqe Mf P' M' szv' rv) "%Hfsp %Hfs1 %Hfthr %Hres Hcg Hcpu Hpc Hpriv Hs5lo".
-      iApply ("EXIT" $! CIDe Mf P' M' szv' rv with "[%] [%] [%] [%] [%] Hcg Hcpu Hpc Hpriv [Hs5lo Hs5hi]").
+      iApply ("EXIT" $! CIDe Mf P' M' szv' rv (pv_lazy (us_V U))
+                with "[%] [%] [%] [%] [%] Hcg Hcpu Hpc Hpriv [Hs5lo Hs5hi]").
       - wp_next_chain.
       - exact Hfsp.
       - exact Hfs1.
       - exact Hfthr.
       - destruct Hres as [(Hrv & Hgok) | (Hrv & Hp & Hs & Hm')].
-        + right. split; [exact Hrv |]. left. split; [right; exact Hnneg | exact Hgok].
-        + left. split; [exact Hrv | split; [exact Hp | split; [exact Hs | exact Hm']]].
+        + right. split; [exact Hrv |]. left.
+          split; [right; exact Hnneg | split; [exact Hgok | reflexivity]].
+        + left. split; [exact Hrv
+                       | split; [exact Hp
+                                | split; [exact Hs
+                                         | split; [exact Hm' | reflexivity]]]].
       - iExists (word_of_words (trunc32 v0) (trunc32 v1)).
         iApply (ctx_word_pointsto_join4 _ _ _ _ _ Hal5 with "Hs5lo Hs5hi"). }
     (* ================================================================= *)
@@ -1220,10 +1242,14 @@ Section ProofSysSbrk.
       { iApply (ssi_76 with "Htext"). }
       iIntros (CIDs27 Hq27). iApply bi.later_intro. iIntros "Hcg Hpc".
       iEval (rewrite Htgt64) in "Hpc".
-      iDestruct ("Hpback" $! (pv_upt (us_V U)) (pv_sz (us_V U)) (us_M U) with "[%] [%] [%] [%] Hszc Hptc Hpt")
-        as "Hpriv"; [reflexivity | reflexivity | exact Hszmax | exact Hbel |].
+      iDestruct ("Hpback" $! (pv_upt (us_V U)) (pv_sz (us_V U)) (us_M U)
+                   (pv_lazy (us_V U))
+                   with "[%] [%] [%] [%] [%] Hszc Hptc Hpt")
+        as "Hpriv"; [reflexivity | reflexivity | exact Hszmax | exact Hbel
+                    | exact Hlz0 |].
       iDestruct (cpu_own_transport CIDD CIDs27 0%nat eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-      iApply ("EXIT" $! CIDs27 Y1 (pv_upt (us_V U)) (us_M U) (pv_sz (us_V U)) (mword_of_int (-1) : mword 64)
+      iApply ("EXIT" $! CIDs27 Y1 (pv_upt (us_V U)) (us_M U) (pv_sz (us_V U))
+                (mword_of_int (-1) : mword 64) (pv_lazy (us_V U))
                 with "[%] [%] [%] [%] [%] Hcg Hcpu Hpc Hpriv [Hs5lo Hs5hi]").
       - wp_next_chain.
       - rewrite /Y1 upd_ne; [exact HL4sp | reg_neq].
@@ -1433,17 +1459,23 @@ Section ProofSysSbrk.
     iDestruct (proc_ptm_grow_sz (pv_upt (us_V U)) (uint (pv_sz (us_V U)))
                  (uint (add_vec (pv_sz (us_V U)) (sbrk_arg v0))) (us_M U) Hszle
                  with "Hpt") as "Hpt".
+    (* THE ONE ARM THAT WRITES THE BIT (lane LAZY-FLAG, K3): [p->sz] rises
+       over an untouched table, which is exactly how a hole is made, so the
+       block comes back at [true] -- and at [true] the claim promises
+       nothing, which is why this arm owes no coverage fact. *)
     iDestruct ("Hpback" $! (pv_upt (us_V U)) (add_vec (pv_sz (us_V U)) (sbrk_arg v0))
                  (umem_grow (us_M U) (uint (add_vec (pv_sz (us_V U)) (sbrk_arg v0))))
-                 with "[%] [%] [%] [%] Hszc Hptc Hpt") as "Hpriv".
+                 true
+                 with "[%] [%] [%] [%] [%] Hszc Hptc Hpt") as "Hpriv".
     { reflexivity. }
     { reflexivity. }
     { rewrite uint_unsigned uvm_maxsz_val. exact Hfits. }
     { apply (um_below_mono (pv_sz (us_V U))); [| exact Hbel]. rewrite Hsum. lia. }
+    { intro Hc. discriminate Hc. }
     iDestruct (cpu_own_transport CIDE CIDs35 0%nat eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iApply ("EXIT" $! CIDs35 E3 (pv_upt (us_V U))
               (umem_grow (us_M U) (uint (add_vec (pv_sz (us_V U)) (sbrk_arg v0))))
-              (add_vec (pv_sz (us_V U)) (sbrk_arg v0)) (pv_sz (us_V U))
+              (add_vec (pv_sz (us_V U)) (sbrk_arg v0)) (pv_sz (us_V U)) true
               with "[%] [%] [%] [%] [%] Hcg Hcpu Hpc Hpriv [Hs5lo Hs5hi]").
     - wp_next_chain.
     - exact HE3sp.
@@ -1455,7 +1487,7 @@ Section ProofSysSbrk.
       split; [reflexivity |].
       split; [rewrite uint_unsigned uvm_maxsz_val; rewrite -Hsum; exact Hfits |].
       split; [reflexivity |].
-      split; [exact Hszle | reflexivity].
+      split; [exact Hszle | split; [reflexivity | reflexivity]].
     - iExists (word_of_words (trunc32 v0) (trunc32 v1)).
       iApply (ctx_word_pointsto_join4 _ _ _ _ _ Hal5 with "Hs5lo Hs5hi").
   Qed.

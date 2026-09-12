@@ -227,7 +227,15 @@ Definition skey_eq (W W' : uvis) : Prop :=
      ([ProofUserretClosed]'s [Hpi0] / [Hsz0] are exactly these two facts,
      asserted before either use). *)
   /\ uvis_perm W = uvis_perm W'
-  /\ uvis_sz W = uvis_sz W'.
+  /\ uvis_sz W = uvis_sz W'
+  (* ...AND THE LAZY BIT, for the permission map's reason exactly (lane
+     LAZY-FLAG).  read(2)'s receipt row ([UexecExecInst]'s row 5) reads the
+     bit beside the map and the size -- the bit is what turns a W page of
+     the map into a page copyout could write -- so this congruence has to
+     fix it too.  It is a stored field ([ProcDefs.pv_lazy]) that only a
+     syscall writes, so every prover of this congruence, which re-keys
+     WITHIN one side of a call, discharges it componentwise. *)
+  /\ uvis_lazy W = uvis_lazy W'.
 
 Lemma skey_eq_refl (W : uvis) : skey_eq W W.
 Proof. rewrite /skey_eq. split_and!; reflexivity. Qed.
@@ -235,10 +243,10 @@ Proof. rewrite /skey_eq. split_and!; reflexivity. Qed.
 Lemma skey_eq_sym (W W' : uvis) : skey_eq W W' -> skey_eq W' W.
 Proof.
   rewrite /skey_eq.
-  intros (HM & H0 & H1 & H2 & Hfd & Hcw & Hg & Hch & Hpid & Hpi & Hsz).
+  intros (HM & H0 & H1 & H2 & Hfd & Hcw & Hg & Hch & Hpid & Hpi & Hsz & Hlz).
   split_and!; symmetry;
     [ exact HM | exact H0 | exact H1 | exact H2 | exact Hfd | exact Hcw
-    | exact Hg | exact Hch | exact Hpid | exact Hpi | exact Hsz ].
+    | exact Hg | exact Hch | exact Hpid | exact Hpi | exact Hsz | exact Hlz ].
 Qed.
 
 (* THE CLASS IS INDEXED BY [ChildTok.ctokG], and by nothing else new.  The

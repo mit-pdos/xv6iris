@@ -367,6 +367,26 @@ Proof.
   exact (um_covered_run oldsz P.(ud_um) Pj.(ud_um) j Hob Hc Hdom).
 Qed.
 
+(* COVERAGE ROUNDS UP.  [um_covered] is MONOTONE in its bound and
+   [um_covered_z_mono] only shrinks one, so this direction needs its own
+   one-liner -- off the same [pgroundup_unsigned] bound [um_covered_run]
+   uses.  It is what turns "every page below the break is mapped" into the
+   form [UserPerm.lazy_free] reads (the break ROUNDED UP: a page is live
+   exactly when its base is below PGROUNDUP).  HOISTED out of
+   [ProofKexecC]. *)
+Lemma um_covered_pground (x : mword 64) (um : gmap (mword 27) (mword 64)) :
+  (bv_unsigned x <= uvm_maxsz)%Z -> um_covered x um -> um_covered (pgroundup x) um.
+Proof.
+  intros Hb Hc vpn Hlt. apply Hc.
+  pose proof (bv_unsigned_in_range _ x) as [Hx0 _].
+  assert (Hnw64 : (bv_unsigned x + 4095 < 2 ^ 64)%Z).
+  { unfold uvm_maxsz in Hb. change (2 ^ 64)%Z with 18446744073709551616%Z. lia. }
+  rewrite (pgroundup_unsigned x Hnw64) in Hlt.
+  pose proof (Z_div_mod_eq_full (bv_unsigned x + 4095) 4096) as Hdm.
+  pose proof (Z.mod_pos_bound (bv_unsigned x + 4095) 4096 ltac:(lia)) as Hmodb.
+  lia.
+Qed.
+
 (* ...and the form a CALLER uses to keep coverage inductive across the call:
    uvmalloc's postcondition pins the new map's domain, and
    [PGROUNDUP(oldsz) + 4096 * uvma_np oldsz newsz] is at or above [newsz] by

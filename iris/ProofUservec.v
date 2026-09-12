@@ -1661,8 +1661,10 @@ Section UservecAllPt.
                     eq_refl
                     (* the table and the size do not move across the save
                        walk, so the key's permission projection is the same
-                       term on both sides (lane CONS-SWALLOW, W4) *)
-                    eq_refl eq_refl
+                       term on both sides (lane CONS-SWALLOW, W4) -- and the
+                       lazy bit beside them, which the walk does not touch
+                       either (lane LAZY-FLAG) *)
+                    eq_refl eq_refl eq_refl
                     with "Hxin")
       end. }
     { (* FORK'S DEPOSIT ACROSS THE SAVE WALK.  The row reads the whole
@@ -1685,7 +1687,7 @@ Section UservecAllPt.
           iApply (ut_fork_in_ueq _ sc_v (tf_of g (ret_pc sepc_v)) TF
                     (upd_usM (us_tf U (tf_of g (ret_pc sepc_v))) M) UU sts
                     (tf_of_length g (ret_pc sepc_v)) Hlf Hueqf
-                    eq_refl eq_refl eq_refl eq_refl
+                    eq_refl eq_refl eq_refl eq_refl eq_refl
                     with "Hfin")
       end. }
     { (* THE PAYMENT ACROSS THE SAVE WALK.  The row reads the number and
@@ -1883,8 +1885,8 @@ Section UservecAllPt.
          [ud_data], which [perm_of] does not read. *)
       match goal with
       | |- uv_round _ _ _ _ _ ?UU =>
-          refine (uv_round_of_ut _ U M g sepc_v sc_v UU _ _ _ _ _
-                    (ut_round_same sepc_v sc_v _ U2 UU _ _ eq_refl _ _ Hrd2))
+          refine (uv_round_of_ut _ U M g sepc_v sc_v UU _ _ _ _ _ _
+                    (ut_round_same sepc_v sc_v _ U2 UU _ _ eq_refl _ _ _ Hrd2))
       end.
       + exact Hu36.
       + reflexivity.
@@ -1897,11 +1899,17 @@ Section UservecAllPt.
       + (* ...nor the cwd's inum *)
         cbn [us_V pv_cwi us_upt upd_upt upd_usV upd_usM us_tf upd_tf pv_gen pv_chg].
         reflexivity.
+      + (* ...nor the lazy bit (lane LAZY-FLAG) *)
+        cbn [us_V pv_lazy us_upt upd_upt upd_usV upd_usM us_tf upd_tf pv_gen
+             pv_chg pv_cwi].
+        reflexivity.
       + cbn [us_V pv_tf us_upt upd_upt upd_usV us_tf upd_tf]. exact Hws1.
       + cbn [us_V pv_upt pv_sz us_upt upd_upt upd_usV us_tf upd_tf].
         rewrite Huptpt2. reflexivity.
       + cbn [us_V pv_sz us_upt upd_upt upd_usV us_tf upd_tf]. reflexivity.
       + cbn [us_V pv_cwi us_upt upd_upt upd_usV us_tf upd_tf pv_gen pv_chg]. reflexivity.
+      + cbn [us_V pv_lazy us_upt upd_upt upd_usV us_tf upd_tf pv_gen pv_chg
+             pv_cwi]. reflexivity.
     - (* THE ROUND'S DESCRIPTOR HALF, forwarded verbatim: this boundary
          moves no descriptor state of its own -- it saves and restores a
          trapframe -- so whatever usertrap certified about the states is
@@ -1964,10 +1972,11 @@ Section UservecAllPt.
          the image, permission map and break are the entry frame's own. *)
       match goal with
       | |- environments.envs_entails _
-             (SpecUsertrap.ut_exec_out _ _ _ _ _ _ ?UU' _ _ _ _ _) =>
+             (SpecUsertrap.ut_exec_out _ _ _ _ _ _ _ ?UU' _ _ _ _ _) =>
           iApply (SpecUsertrap.ut_exec_out_ueq _ sc_v _ (tf_of g (ret_pc sepc_v)) M
                     (UserPerm.perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U))))
-                    (uint (pv_sz (us_V U))) U2 UU' sts sts2 gn cs pid Hu36
+                    (uint (pv_sz (us_V U))) (pv_lazy (us_V U))
+                    U2 UU' sts sts2 gn cs pid Hu36
                     ltac:(cbn [us_V pv_tf us_upt upd_upt upd_usV us_tf upd_tf];
                           rewrite Hws1; apply TfUser.tf_ueq_refl)
                     eq_refl
@@ -1975,6 +1984,11 @@ Section UservecAllPt.
                           rewrite Huptpt2; reflexivity)
                     eq_refl
                     ltac:(cbn [us_V pv_cwi us_upt upd_upt upd_usV us_tf upd_tf pv_gen pv_chg];
+                          reflexivity)
+                    (* ...and the lazy bit, which neither move touches
+                       (lane LAZY-FLAG) *)
+                    ltac:(cbn [us_V pv_lazy us_upt upd_upt upd_usV us_tf upd_tf
+                               pv_gen pv_chg pv_cwi];
                           reflexivity)
                     with "Hxo2")
       end.
@@ -2019,8 +2033,9 @@ Section UservecAllPt.
                     eq_refl
                     (* the table and the size do not move across the save
                        walk, so the key's permission projection is the same
-                       term on both sides (lane CONS-SWALLOW, W4) *)
-                    eq_refl eq_refl
+                       term on both sides (lane CONS-SWALLOW, W4) -- and the
+                       lazy bit beside them (lane LAZY-FLAG) *)
+                    eq_refl eq_refl eq_refl
                     with "Hso2")
       end.
   Qed.

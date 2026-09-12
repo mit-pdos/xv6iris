@@ -229,6 +229,15 @@ Definition sysc_mem_ok (V V' : pprivate) (M M' : gmap Z (bv 8)) : Prop :=
   if decide (sysc_num V = 7) then True                    (* exec *)
   else if decide (sysc_num V = 12) then                   (* sbrk *)
     sysc_sbrk_ok (pv_upt V) (pv_upt V') (pv_sz V) (pv_sz V') M M'
+    (* ...AND WHICH ARM RAN, on the lazy bit's terms (lane LAZY-FLAG, K3).
+       sbrk is the ONE entry that writes [ProcDefs.pv_lazy], so what it did
+       to the bit cannot be read off the address-space row -- any more than
+       its return value can -- and it rides HERE, where the dispatcher's
+       [sysc_mem_ok] already travels to every consumer.  The arm that ran
+       is [SpecSysSbrk.sys_sbrk_ok]'s to say and the sbrk arm's to relay
+       ([ProofSyscall.sysc_sbrk_lazy_of_ok]). *)
+    /\ usys_sbrk_lazy (pv_lazy V) (pv_lazy V') (pv_tf V)
+                      (uint (pv_sz V)) (uint (pv_sz V'))
   else if decide (sysc_num V = 3) then                    (* wait *)
     (* copyout of the zombie's four-byte [xstate] at argument 0 -- and
        kwait's own [addr != 0] test means a NULL destination is not a
@@ -598,6 +607,8 @@ Section SyscExec.
     /\ perm_of (ud_um (pv_upt (us_V U'))) (uint (pv_sz (us_V U')))
          = perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U)))
     /\ pv_sz (us_V U') = pv_sz (us_V U)
+    (* ...and the lazy bit: a failed exec writes no field *)
+    /\ pv_lazy (us_V U') = pv_lazy (us_V U)
     /\ sts' = sts.
 
   (* [U'] is the record AFTER the dispatcher's own a0 store, so on success
@@ -856,6 +867,12 @@ Definition wp_syscall_sconf_body
             (pv_upt (us_V U)) (pv_upt (us_V U')) ⌝ -∗
       ⌜ sysc_num (us_V U) = 7 \/ sysc_num (us_V U) = 12 \/
           pv_sz (us_V U') = pv_sz (us_V U) ⌝ -∗
+      (* (iv) THE LAZY BIT, verbatim (lane LAZY-FLAG).  It is a stored field
+         ([ProcDefs.pv_lazy]) that only sbrklazy's grow writes, so every
+         entry but exec and sbrk hands it back untouched -- the same two
+         escapes (ii) and (iii) have, and for the same reason. *)
+      ⌜ sysc_num (us_V U) = 7 \/ sysc_num (us_V U) = 12 \/
+          pv_lazy (us_V U') = pv_lazy (us_V U) ⌝ -∗
       (* THE TRAPFRAME PAGE IS THE ONE THING THAT CANNOT MOVE.  Everything
          else in the record may: [pv_tf] always does (the a0 slot is the
          return value), and sbrk / exec / chdir / open move the rest. *)

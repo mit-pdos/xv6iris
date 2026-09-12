@@ -535,6 +535,11 @@ Section KforkArms.
     us_M Uc' = us_M Up ->
     perm_of (ud_um (pv_upt (us_V Uc'))) (uint (pv_sz (us_V Up)))
       = perm_of (ud_um (pv_upt (us_V Up))) (uint (pv_sz (us_V Up))) ->
+    (* ...AND ITS LAZY BIT, the fourth reading of the same exit clause
+       (lane LAZY-FLAG, K2): B6's close writes it, because the slot the
+       parent deposited is keyed at the PARENT's bit
+       ([UexecRet.uexec_fork_child_F]). *)
+    pv_lazy (us_V Uc') = pv_lazy (us_V Up) ->
     (* THE FLOOR OF THIS CONE IS wait_lock (8), which kfork takes AFTER
        releasing np->lock (kernel/proc.c:295) and which ProofKforkB5 states.
        allocproc's "proc" (9) is the call the function is about and the one
@@ -638,7 +643,7 @@ Section KforkArms.
   Proof.
     intros HK Hlvl Hbeq Hmsp Hmra Hms0 Hms1 Hms5 HMtsp HMts4 HMts5
       HMta5 HMta4 HMta3 Htfsrc Htfdst HMtthr Hnpa HjN Hgamma
-      Hofnull Hcwdnull Hpidc Hshsz Hshimg Hshperm Hbelow.
+      Hofnull Hcwdnull Hpidc Hshsz Hshimg Hshperm Hshlz Hbelow.
     subst tfsrc tfdst.
     iIntros "#Htext #Hprocs Hcg Hcpu Hpc Hframe Hpv Hpfrag Hprow HCpriv Hcgen Hcsg Hcpr Hcfrag Hcrow Hcxb #Hmk
              Hheld Hhart Hfd Hbsl Hkst Hctxex Hpay Hkalloc #Hwlock #Hft
@@ -798,7 +803,7 @@ Section KforkArms.
          cwd and the name and nothing else, so the row allocproc handed out
          is a row of THIS block. *)
       assert (Hcchg4 : pv_chg Vc4 = pv_chg (us_V Uc')).
-      { destruct HVc4 as (_ & _ & _ & _ & _ & _ & _ & _ & _ & Hg).
+      { destruct HVc4 as (_ & _ & _ & _ & _ & _ & _ & _ & _ & Hg & _).
         rewrite Hg. rewrite /kfk_childV /V2 /V1. reflexivity. }
       iEval (rewrite -Hcchg4) in "Hcrow".
       assert (Hmf4s4 : mf4 !!! Regidx Rs4 = npa).
@@ -844,13 +849,16 @@ Section KforkArms.
       assert (Hurun : urun_eq
                         (uvis_of (kfork_child Up) stsP (pv_gen Vc4) ∅ pid_c)
                         (MkUstate Vc4 ((us_M Uc')))).
-      { destruct HVc4 as (Hs & Hu & Ht & _ & _ & _ & _ & Hc & _ & _).
+      { destruct HVc4 as (Hs & Hu & Ht & _ & _ & _ & _ & Hc & _ & _ & Hlz).
         apply urun_eq_kfork_child.
         - exact Ht.
         - exact Hshimg.
         - cbn [us_V]. rewrite Hu Hs. exact Hshperm'.
         - cbn [us_V]. rewrite Hs. exact Hshsz.
-        - cbn [us_V]. exact Hc. }
+        - cbn [us_V]. exact Hc.
+        (* the child's bit is the parent's: B6's close wrote it there and
+           B4's walk moved the cwd and the name only *)
+        - cbn [us_V]. rewrite Hlz. rewrite /kfk_childV /V2 /V1. exact Hshlz. }
       (* ---- ProofKforkB5: the two lock crossings, the RUNNABLE park ---- *)
       (* pass B5's exit arm as THIS proof's [b] (with [eq_sym Hbeq] for B5's
          own [b = match lvl ...] premise) rather than as the [match] itself:
@@ -1050,7 +1058,7 @@ Section KforkMain.
                Hke #Hwl #Hft #Hit #Hiti HR".
       iDestruct "HR" as "[Hrow HR]".
       destruct Hpures as (Hnpa & HjN & Hgamma & Hofn & Hcwdn & Hpidc).
-      destruct Hshare as (Hshsz & Hshimg & Hshperm).
+      destruct Hshare as (Hshsz & Hshimg & Hshperm & Hshlz).
       destruct Htfs as (Htfsrc & Htfdst).
       iApply (kfork_arm3 (CID0 := CID3) γf γw γl γs
  m K lvl eb b pme
@@ -1060,7 +1068,7 @@ Section KforkMain.
                 (wpk_K_ge56 K HK) Hlvl Hbeq
                 eq_refl eq_refl eq_refl eq_refl eq_refl
                 HMtsp HMts4 HMts5 HMta5 HMta4 HMta3 Htfsrc Htfdst HMtthr
-                Hnpa HjN Hgamma Hofn Hcwdn Hpidc Hshsz Hshimg Hshperm ltac:(lkbelow)
+                Hnpa HjN Hgamma Hofn Hcwdn Hpidc Hshsz Hshimg Hshperm Hshlz ltac:(lkbelow)
                 with "Ht Hprocs Hcg Hcpu Hpc Hframe Hpv Hpfrag Hrow HCp Hcgen Hcsg Hcpr Hcfrag Hcrow Hcxb Hmk Hheld Hhart
                       Hfd Hbsl Hkst Hctx Hpay Hke Hwl Hft Hit Hiti Hireg Hirs Hfdone Hworld Htoken Hjslot
                       [HR]").

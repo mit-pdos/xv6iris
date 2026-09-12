@@ -1730,6 +1730,11 @@ Section SyscallVocab.
             uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_upt (us_V U')) ⌝ -∗
         ⌜ sysc_num (us_V U) = 7 \/ sysc_num (us_V U) = 12 \/
             pv_sz (us_V U') = pv_sz (us_V U) ⌝ -∗
+        (* (iv) THE LAZY BIT, verbatim -- [SpecSyscall]'s own clause (lane
+           LAZY-FLAG): a stored field only sbrklazy's grow writes, with
+           exec's and sbrk's escapes for clauses (ii)/(iii)'s reason *)
+        ⌜ sysc_num (us_V U) = 7 \/ sysc_num (us_V U) = 12 \/
+            pv_lazy (us_V U') = pv_lazy (us_V U) ⌝ -∗
         ⌜ ud_tfp (pv_upt (us_V U')) = ud_tfp (pv_upt (us_V U)) ⌝ -∗
         (* ...and the fd-state ghost name -- see SpecSyscall.v's note: no
            syscall reassigns a live process's [pv_fdg], so the bundle is
@@ -1983,6 +1988,11 @@ Section SyscallVocab.
        uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_upt (us_V U'))) ->
     (sysc_num (us_V U) = 7 \/ sysc_num (us_V U) = 12 \/
        pv_sz (us_V U') = pv_sz (us_V U)) ->
+    (* ...and the LAZY BIT, clause (iv) of the same family (lane LAZY-FLAG):
+       only sbrklazy's grow writes it, so every entry but exec and sbrk
+       hands it back untouched *)
+    (sysc_num (us_V U) = 7 \/ sysc_num (us_V U) = 12 \/
+       pv_lazy (us_V U') = pv_lazy (us_V U)) ->
     ud_tfp (pv_upt (us_V U')) = ud_tfp (pv_upt (us_V U)) ->
     (* ...and the fd-state ghost name, which no syscall moves *)
     pv_fdg (us_V U') = pv_fdg (us_V U) ->
@@ -2066,7 +2076,7 @@ Section SyscallVocab.
     sysc_pay_out f -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HEsp Hrest Hav4 Hmem Hfdrow Hpiperow Ha0 Hupte Hszv Hud Hfg Hcwi Hsbr Hfk Hchrow Hne2 Hchg Hgeng Hpidrow.
+    intros HEsp Hrest Hav4 Hmem Hfdrow Hpiperow Ha0 Hupte Hszv Hlzv Hud Hfg Hcwi Hsbr Hfk Hchrow Hne2 Hchg Hgeng Hpidrow.
     set (sp0 := m !!! Regidx csp_rs1).
     iIntros "Hcg Hcpu #Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir HR Hpriv Hufrag Hrow Hpc Hcont Hfo Hwo Hxo Hso Hpayv".
     assert (Hb1 : pa_stk sp0 1 = add_vec (pa_stk sp0 4) (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))))
@@ -2213,7 +2223,7 @@ Section SyscallVocab.
               (Hst3 (or_intror Hgood)) (Hst2 (or_intror Hgood)) (Hst1 (or_intror Hgood)).
       reflexivity. }
     iApply ("Hcont" $! T5 U' sts' cs'
-              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcpu Hbs Hip Hfd Hir HR Hpriv Hufrag Hrow Hpc Hxo Hso Hfo Hwo Hpayv").
+              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcpu Hbs Hip Hfd Hir HR Hpriv Hufrag Hrow Hpc Hxo Hso Hfo Hwo Hpayv").
     { unfold callee_saved.
       split_and!.
       - exact HT5sp.
@@ -2240,6 +2250,7 @@ Section SyscallVocab.
     { exact Ha0. }
     { exact Hupte. }
     { exact Hszv. }
+    { exact Hlzv. }
     { exact Hud. }
     { exact Hfg. }
     { exact Hchg. }
@@ -2756,6 +2767,11 @@ Section SyscallRet.
        uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_upt (us_V U'))) ->
     (sysc_num (us_V U) = 7 \/ sysc_num (us_V U) = 12 \/
        pv_sz (us_V U') = pv_sz (us_V U)) ->
+    (* ...and the LAZY BIT, clause (iv) of the same family (lane LAZY-FLAG):
+       only sbrklazy's grow writes it, so every entry but exec and sbrk
+       hands it back untouched *)
+    (sysc_num (us_V U) = 7 \/ sysc_num (us_V U) = 12 \/
+       pv_lazy (us_V U') = pv_lazy (us_V U)) ->
     ud_tfp (pv_upt (us_V U')) = ud_tfp (pv_upt (us_V U)) ->
     (* ...and the fd-state ghost name, which no syscall moves *)
     pv_fdg (us_V U') = pv_fdg (us_V U) ->
@@ -2851,7 +2867,7 @@ Section SyscallRet.
     sysc_pay_out f -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HEsp HEs2 Hrest Hav4 Hmem Hfdrow Hpiperow Ha0 Hupte Hszv Hud Hfg Hcwi Hsbr Hfk Hchrow Hne2 Hchg Hgeng Hpidrow.
+    intros HEsp HEs2 Hrest Hav4 Hmem Hfdrow Hpiperow Ha0 Hupte Hszv Hlzv Hud Hfg Hcwi Hsbr Hfk Hchrow Hne2 Hchg Hgeng Hpidrow.
     iIntros "Hcg Hcpu #Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir HR Hpriv Hufrag Hrow Hpc Hcont Hfo Hwo Hxo Hso Hpayv".
     (* the stored word, as the store lemma spells it *)
     assert (Hrg : rget E Ra0 = E !!! Regidx Ra0) by (rgne; reflexivity).
@@ -2980,6 +2996,7 @@ Section SyscallRet.
                       rewrite Hx; reflexivity ])
               ltac:(cbn [us_V us_tf upd_usV upd_tf pv_upt pv_sz]; exact Hupte)
               ltac:(cbn [us_V us_tf upd_usV upd_tf pv_sz]; exact Hszv)
+              ltac:(cbn [us_V us_tf upd_usV upd_tf pv_lazy]; exact Hlzv)
               Hud
               ltac:(cbn [pv_fdg upd_tf]; exact Hfg)
               ltac:(cbn [us_V us_tf upd_usV upd_tf pv_cwi pv_tf pv_gen pv_chg]; exact Hcwstored)
@@ -3326,6 +3343,17 @@ Section SyscallArms.
        bytes at [v1] in the resume image [M'] *)
     pv_tf (us_V U) !! tf_arg_idx 1 = Some v1 ->
     pv_tf (us_V U) !! tf_arg_idx 2 = Some v2 ->
+    (* ...AND THE TABLE IS WELL-FORMED, which row 5 now exhibits beside the
+       projection (lane LAZY-FLAG, L5): [UserPerm.lazy_free_wmapped] needs
+       it to turn a W page of the projection into a real user leaf.  A
+       PREMISE here rather than a resource step, because this lemma holds no
+       block: the caller does ([ProcPtOwn.proc_ptm_wf] is the step). *)
+    ProcPtOwn.proc_pt_wf (pv_upt (us_V U)) ->
+    (* ...AND WHAT THE BLOCK'S LAZY BIT CLAIMS, which is row 5's tie:
+       [ProcInv.proc_priv_core]'s own invariant on [ProcDefs.pv_lazy], read
+       at the record this arm is holding.  A premise for [Hwf]'s reason. *)
+    (pv_lazy (us_V U) = false ->
+       lazy_free (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U)))) ->
     (* THE PAYLOAD IS ALREADY PEELED: what the process is handed back is
        the arm's payout alone, [SpecFileread.fileread_extra_core] -- the
        borrowed payload went back on the trap's own resume row
@@ -3338,13 +3366,14 @@ Section SyscallArms.
       (rf_ret f) r M' v1 -∗
     sysc_sys_out U sts gn cs pid f r M' sts' cw' cs'.
   Proof.
-    intros Hn Hv0 Hv1 Hv2. iIntros "H".
+    intros Hn Hv0 Hv1 Hv2 Hwf Hlzp. iIntros "H".
     iApply (sysc_sys_out_at U sts gn cs pid f r M' sts' cw' cs' 5 Hn
               ltac:(vm_compute; discriminate)
               ltac:(vm_compute; discriminate)).
     iApply (spost_at_read_intro uslot f (uvis_of U sts gn cs pid)
               (pv_upt (us_V U)) r M' sts' cw' cs'
-              ltac:(rewrite /uvis_of; cbn [uvis_sz uvis_perm]; reflexivity)).
+              ltac:(rewrite /uvis_of; cbn [uvis_sz uvis_perm]; reflexivity)
+              Hwf Hlzp).
     rewrite /uvis_of /tf_w. cbn [uvis_tf uvis_fd].
     rewrite (list_lookup_total_correct _ _ _ Hv0)
             (list_lookup_total_correct _ _ _ Hv1)
@@ -3630,11 +3659,17 @@ Section SyscallArms.
   Lemma sysc_mem_ok_sbrk (V V' : pprivate) (M M' : gmap Z (bv 8)) :
     sysc_num V = Z.of_nat 12 ->
     sysc_sbrk_ok (pv_upt V) (pv_upt V') (pv_sz V) (pv_sz V') M M' ->
+    (* ...AND WHICH ARM RAN, on the lazy bit (lane LAZY-FLAG, K3): the sbrk
+       branch of [SpecSyscall.sysc_mem_ok] carries it and only this arm can
+       pay it ([sysc_sbrk_lazy_of_ok]). *)
+    usys_sbrk_lazy (pv_lazy V) (pv_lazy V') (pv_tf V)
+                   (uint (pv_sz V)) (uint (pv_sz V')) ->
     sysc_mem_ok V V' M M'.
   Proof.
-    intros Hn Him. unfold sysc_mem_ok. rewrite Hn.
+    intros Hn Him Hlz. unfold sysc_mem_ok. rewrite Hn.
     destruct (decide (Z.of_nat 12 = 7)) as [Hc | _]; [exfalso; lia |].
-    destruct (decide (Z.of_nat 12 = 12)) as [_ | Hc]; [exact Him | exfalso; lia].
+    destruct (decide (Z.of_nat 12 = 12)) as [_ | Hc];
+      [exact (conj Him Hlz) | exfalso; lia].
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -3707,6 +3742,7 @@ Section SyscallArms.
               ltac:(right; reflexivity)
               ltac:(right; right; apply uptd_ext_sz_refl)
               ltac:(right; right; reflexivity)
+              ltac:(right; right; reflexivity)
               eq_refl eq_refl
               ltac:(right; reflexivity)
               (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
@@ -3742,11 +3778,11 @@ Section SyscallArms.
      and, on the eager path, the page-table descriptor), which is why the
      trapframe page's immobility has to be extracted from [sys_sbrk_ok]. *)
   Lemma sysc_sbrk_tfp (V : pprivate) (v0 v1 : mword 64)
-      (P' : uptd) (szv' r : mword 64) (M M' : gmap Z (bv 8)) :
-    sys_sbrk_ok V v0 v1 P' szv' r M M' -> ud_tfp P' = ud_tfp (pv_upt V).
+      (P' : uptd) (szv' r : mword 64) (lz' : bool) (M M' : gmap Z (bv 8)) :
+    sys_sbrk_ok V v0 v1 P' szv' r lz' M M' -> ud_tfp P' = ud_tfp (pv_upt V).
   Proof.
     intro Hok.
-    destruct Hok as [ (_ & HP & _) | (_ & [ (_ & Hg) | (_ & _ & HP & _ & _) ]) ].
+    destruct Hok as [ (_ & HP & _) | (_ & [ (_ & Hg & _) | (_ & _ & HP & _ & _) ]) ].
     - rewrite HP. reflexivity.
     - destruct Hg as [ (_ & HP & _)
                      | [ (_ & _ & _ & _ & _ & ((_ & Htf & _) & _ & _) & _)
@@ -3833,9 +3869,9 @@ Section SyscallArms.
      the old size leaves [p->sz] where it was -- and [n = 0] is the grow
      arm at a zero step. *)
   Lemma sysc_sbrk_ret_of_ok (V : pprivate) (v0 v1 : mword 64)
-      (P' : uptd) (szv' r : mword 64) (M M' : gmap Z (bv 8)) :
+      (P' : uptd) (szv' r : mword 64) (lz' : bool) (M M' : gmap Z (bv 8)) :
     pv_tf V !!! tf_arg_idx 0 = v0 ->
-    sys_sbrk_ok V v0 v1 P' szv' r M M' ->
+    sys_sbrk_ok V v0 v1 P' szv' r lz' M M' ->
     (r = (mword_of_int (-1) : mword 64) /\ szv' = pv_sz V)
     \/ (r = pv_sz V /\
         ((0 <= sint (usys_sbrk_arg (pv_tf V)))%Z ->
@@ -3848,7 +3884,7 @@ Section SyscallArms.
     destruct Hok as [ (Hr & _ & Hs & _) | (Hr & Hg) ].
     - left. split; [ exact Hr | exact Hs ].
     - right. split; [ exact Hr | ]. intro Hnn.
-      destruct Hg as [ (_ & Hgp) | (_ & _ & _ & _ & Hsz & Hle & _) ].
+      destruct Hg as [ (_ & Hgp & _) | (_ & _ & _ & _ & Hsz & Hle & _) ].
       + (* the EAGER path: growproc, at a return value of 0 *)
         destruct Hgp as [ (Hbad & _)
                         | [ (_ & _ & _ & Hsz & Hle & _)
@@ -3875,13 +3911,13 @@ Section SyscallArms.
      [sz' = sz]; both growth paths (eager and lazy) give it at the size the
      process ends at; and the real shrink IS uvmdealloc's own run. *)
   Lemma sysc_sbrk_ok_of_ok (V : pprivate) (v0 v1 : mword 64)
-      (P' : uptd) (szv' r : mword 64) (M M' : gmap Z (bv 8)) :
+      (P' : uptd) (szv' r : mword 64) (lz' : bool) (M M' : gmap Z (bv 8)) :
     (forall a : Z, uva_live (uint (pv_sz V)) a -> is_Some (M !! a)) ->
-    sys_sbrk_ok V v0 v1 P' szv' r M M' ->
+    sys_sbrk_ok V v0 v1 P' szv' r lz' M M' ->
     sysc_sbrk_ok (pv_upt V) P' (pv_sz V) szv' M M'.
   Proof.
     intros Hdom Hok.
-    destruct Hok as [ (_ & HP & Hs & Hm) | (_ & [ (_ & Hg) | Hlz ]) ].
+    destruct Hok as [ (_ & HP & Hs & Hm & _) | (_ & [ (_ & Hg & _) | Hlz ]) ].
     - subst. exact (sbrk_ok_still V M Hdom).
     - destruct Hg as [ (_ & HP & Hs & Hm)
                      | [ (_ & _ & _ & _ & Hle & Hext & _ & Hm)
@@ -3918,11 +3954,37 @@ Section SyscallArms.
           -- cbn [umem_del] in Hm. rewrite Hm Hs. symmetry.
              apply umem_grow_id. exact Hdom.
     - (* GREW, lazily: the size alone moved, and the table not at all *)
-      destruct Hlz as (_ & _ & HP & _ & _ & Hle & Hm).
+      destruct Hlz as (_ & _ & HP & _ & _ & Hle & Hm & _).
       unfold sysc_sbrk_ok.
       destruct (decide (uint (pv_sz V) <= uint szv')%Z) as [_ | Hc];
         [ | exfalso; exact (Hc Hle) ].
       rewrite HP. exact (conj (uptd_ext_sz_refl szv' (pv_upt V)) Hm).
+  Qed.
+
+  (* ...AND WHICH ARM RAN, ON THE LAZY BIT (lane LAZY-FLAG, K3).  The row
+     the U tier reads ([UsysMemOk.usys_sbrk_lazy]) promises the KEEP under
+     the disjunction the C branches on -- the caller passed SBRK_EAGER, or
+     the break went strictly down -- and both of those select a path that
+     leaves [ProcDefs.pv_lazy] alone.  The LAZY grow is the one arm that
+     raises it, and it is on neither side of the guard: it runs only at
+     [t != SBRK_EAGER] and never lowers the break. *)
+  Lemma sysc_sbrk_lazy_of_ok (V : pprivate) (v0 v1 : mword 64)
+      (P' : uptd) (szv' r : mword 64) (lz' : bool) (M M' : gmap Z (bv 8)) :
+    pv_tf V !!! tf_arg_idx 1 = v1 ->
+    sys_sbrk_ok V v0 v1 P' szv' r lz' M M' ->
+    usys_sbrk_lazy (pv_lazy V) lz' (pv_tf V) (uint (pv_sz V)) (uint szv').
+  Proof.
+    intros Hv1 Hok Hguard.
+    assert (Heq : UsysMemOk.usys_sbrk_eager (pv_tf V) = sbrk_eager v1).
+    { unfold UsysMemOk.usys_sbrk_eager, sbrk_eager, sbrk_arg.
+      rewrite Hv1. reflexivity. }
+    destruct Hok as [ (_ & _ & _ & _ & Hlz) | (_ & [ (_ & _ & Hlz) | Hlaz ]) ].
+    - rewrite Hlz. exact (usys_lazy_keep_refl _).
+    - rewrite Hlz. exact (usys_lazy_keep_refl _).
+    - exfalso. destruct Hlaz as (Hne & _ & _ & _ & _ & Hle & _).
+      destruct Hguard as [Heag | Hlt].
+      + rewrite Heq in Heag. exact (Hne Heag).
+      + lia.
   Qed.
 
   Lemma sysc_arm_sbrk (γf : gname) (γw : gname) (pj : mword 64)
@@ -3966,17 +4028,18 @@ Section SyscallArms.
     iApply (SysSbrk.wp_sys_sbrk_sconf fsc_kalloc γf M (av - 4)%nat true pj pid U v0 v1 true lks
               Hv0 Hv1 ltac:(lia)
               with "Hcg Hcpu Htext Hdata Hpc Hpriv Hkalloc").
-    iIntros (CIDy Hsy mf P' szv' M') "%Hcs %Hok Hcg Hcpu Hpc Hpriv".
+    iIntros (CIDy Hsy mf P' szv' lz' M') "%Hcs %Hok Hcg Hcpu Hpc Hpriv".
     assert (Htfp' : ud_tfp P' = ud_tfp (pv_upt (us_V U)))
-      by exact (sysc_sbrk_tfp (us_V U) v0 v1 P' szv' (mf !!! Regidx Ra0)
+      by exact (sysc_sbrk_tfp (us_V U) v0 v1 P' szv' (mf !!! Regidx Ra0) lz'
                   (us_M U) M' Hok).
     (* ---- what the shared tail needs of the returned register file ---- *)
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
     assert (Hmfs2 : mf !!! Regidx Rs2
-                    = page_base (ud_tfp (pv_upt (upd_sz (upd_upt (us_V U) P') szv')))).
+                    = page_base (ud_tfp (pv_upt
+                        (upd_lazy (upd_sz (upd_upt (us_V U) P') szv') lz')))).
     { rewrite (callee_saved_lookup Hcs Rs2 ltac:(vm_compute; reflexivity)).
-      cbn [pv_upt upd_sz upd_upt pv_fdg]. rewrite Htfp'. exact HMs2. }
+      cbn [pv_upt upd_lazy upd_sz upd_upt pv_fdg]. rewrite Htfp'. exact HMs2. }
     assert (Hmfrest : forall r : mword 5, is_cs_idx r = true ->
               r <> csp_rs1 -> r <> Rs0 -> r <> Rs1 -> r <> Rs2 ->
               mf !!! Regidx r = m !!! Regidx r).
@@ -4000,18 +4063,25 @@ Section SyscallArms.
     iDestruct (sysc_pay_in_ret _ U ltac:(rewrite Hnum; unfold UsysMemOk.USYS_exit; lia)
                  with "Hdep") as "Hpayv".
     iApply (sysc_ret_tail (CID := CIDy) γf pj fn dqi ip pid U
-              (upd_usM (upd_usV U (upd_sz (upd_upt (us_V U) P') szv')) M') sts sts gn cs cs lks av m mf fdep
+              (upd_usM (upd_usV U
+                          (upd_lazy (upd_sz (upd_upt (us_V U) P') szv') lz')) M')
+              sts sts gn cs cs lks av m mf fdep
               Hmfsp Hmfs2 Hmfrest ltac:(lia)
               ltac:(apply (sysc_mem_ok_sbrk (us_V U)
-                             (upd_sz (upd_upt (us_V U) P') szv') (us_M U) M' Hnum);
-                    exact (sysc_sbrk_ok_of_ok (us_V U) v0 v1 P' szv'
-                             (mf !!! Regidx Ra0) (us_M U) M' HMdom Hok))
+                             (upd_lazy (upd_sz (upd_upt (us_V U) P') szv') lz')
+                             (us_M U) M' Hnum);
+                    [ exact (sysc_sbrk_ok_of_ok (us_V U) v0 v1 P' szv'
+                               (mf !!! Regidx Ra0) lz' (us_M U) M' HMdom Hok)
+                    | exact (sysc_sbrk_lazy_of_ok (us_V U) v0 v1 P' szv'
+                               (mf !!! Regidx Ra0) lz' (us_M U) M'
+                               (list_lookup_total_correct _ _ _ Hv1) Hok) ])
               (* this entry never receives the fragment bundle, so its
                  descriptor row is the identity, at its own number *)
               ltac:(apply (sysc_fd_ok_refl_at _ _ _ _ Hnum); discriminate)
               (* ...and pipe's joined row: not this entry's number *)
               ltac:(apply sysc_pipe_ok_quiet; rewrite Hnum; discriminate)
               ltac:(right; reflexivity)
+              ltac:(right; left; rewrite Hnum; reflexivity)
               ltac:(right; left; rewrite Hnum; reflexivity)
               ltac:(right; left; rewrite Hnum; reflexivity)
               Htfp' ltac:(reflexivity)
@@ -4021,7 +4091,7 @@ Section SyscallArms.
                  returns the OLD break, and [sysc_sbrk_ret_of_ok] reads it
                  in the U tier's shape. *)
               (or_intror (sysc_sbrk_ret_of_ok (us_V U) v0 v1 P' szv'
-                            (mf !!! Regidx Ra0) (us_M U) M'
+                            (mf !!! Regidx Ra0) lz' (us_M U) M'
                             (list_lookup_total_correct _ _ _ Hv0) Hok))
               (* ...and fork's answer: not this entry's number *)
               (or_introl (sysc_num_ne1 _ _ Hnum eq_refl))
@@ -4133,6 +4203,7 @@ Section SyscallArms.
               ltac:(apply sysc_pipe_ok_quiet; rewrite Hnum; discriminate)
               ltac:(right; reflexivity)
               ltac:(right; right; exact Hext)
+              ltac:(right; right; reflexivity)
               ltac:(right; right; reflexivity)
               Htfp' ltac:(reflexivity)
               ltac:(right; reflexivity)
@@ -4246,6 +4317,7 @@ Section SyscallArms.
               ltac:(right; reflexivity)
               ltac:(right; right; apply uptd_ext_sz_refl)
               ltac:(right; right; reflexivity)
+              ltac:(right; right; reflexivity)
               eq_refl eq_refl
               ltac:(right; reflexivity)
               (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
@@ -4345,6 +4417,7 @@ Section SyscallArms.
               ltac:(apply sysc_pipe_ok_quiet; rewrite Hnum; discriminate)
               ltac:(right; reflexivity)
               ltac:(right; right; apply uptd_ext_sz_refl)
+              ltac:(right; right; reflexivity)
               ltac:(right; right; reflexivity)
               eq_refl eq_refl
               ltac:(right; reflexivity)
@@ -4446,6 +4519,7 @@ Section SyscallArms.
               ltac:(right; reflexivity)
               ltac:(right; right; apply uptd_ext_sz_refl)
               ltac:(right; right; reflexivity)
+              ltac:(right; right; reflexivity)
               eq_refl eq_refl
               ltac:(right; reflexivity)
               (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
@@ -4518,6 +4592,9 @@ Section SyscallArms.
       ⌜pv_tf V' = pv_tf (us_V U)⌝ ∗
       ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_upt V')⌝ ∗
       ⌜pv_sz V' = pv_sz (us_V U)⌝ ∗
+      (* ...AND THE LAZY BIT, which only sbrk writes (lane LAZY-FLAG,
+         K1): this entry hands the block back at the bit it was given. *)
+      ⌜pv_lazy V' = pv_lazy (us_V U)⌝ ∗
       ⌜sysc_fd_ok (us_V U) r sts sts'⌝ ∗
       proc_priv γf p pid (MkUstate V' ((us_M U))) ∗
       fd_frags (pv_fdg (us_V U)) sts'.
@@ -4529,13 +4606,15 @@ Section SyscallArms.
     iIntros "[[[%Hr _] [Hp Hfr]] | [Hb | Hc]]".
     - iExists (us_V U), sts. iFrame "Hp Hfr". iPureIntro.
       split_and!; [reflexivity | reflexivity | reflexivity | reflexivity | reflexivity
-                  | reflexivity | apply uptd_ext_sz_refl | reflexivity |].
+                  | reflexivity | apply uptd_ext_sz_refl | reflexivity
+                  | reflexivity |].
       (* nothing was installed: the row's right disjunct *)
       by right.
     - iDestruct "Hb" as (fd0 fv) "[[%Hr _] [Hp Hfr]]".
       iExists (us_V U), sts. iFrame "Hp Hfr". iPureIntro.
       split_and!; [reflexivity | reflexivity | reflexivity | reflexivity | reflexivity
-                  | reflexivity | apply uptd_ext_sz_refl | reflexivity |].
+                  | reflexivity | apply uptd_ext_sz_refl | reflexivity
+                  | reflexivity |].
       (* nothing was installed: the row's right disjunct *)
       by right.
     - iDestruct "Hc" as (fd0 fd1 fv l) "[[%Hr [%Ha [%Hfl %Hcl]]] [Hp Hfr]]".
@@ -4561,7 +4640,8 @@ Section SyscallArms.
       iExists (upd_ofile (us_V U) fd1 fv), (<[fd1 := sts !!! fd0]> sts).
       iFrame "Hp Hfr". iPureIntro.
       split_and!; [reflexivity | reflexivity | reflexivity | reflexivity | reflexivity
-                  | reflexivity | apply uptd_ext_sz_refl | reflexivity |].
+                  | reflexivity | apply uptd_ext_sz_refl | reflexivity
+                  | reflexivity |].
       (* THE TWO INDICES ARE THE POST'S.  The row reads the returned and the
          argument descriptor as C [int]s; the post names them [fd1] and
          [fd0].  [usys_retfd_moi] is the return's round trip -- a descriptor
@@ -4618,7 +4698,7 @@ Section SyscallArms.
     iDestruct (sysc_dup_priv _ _ _ _ _ _ _ Hnum
                  (list_lookup_total_correct _ _ _ Hv0) Hoflen with "Hpost")
       as (V' sts')
-      "(%Htfp' & %Hfg' & %Hchg' & %Hgeng' & %Hcwi' & %Htfw' & %Hupte' & %Hszv' & %Hfdrow & Hpriv & Hufrag)".
+      "(%Htfp' & %Hfg' & %Hchg' & %Hgeng' & %Hcwi' & %Htfw' & %Hupte' & %Hszv' & %Hlzv' & %Hfdrow & Hpriv & Hufrag)".
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
     assert (Hmfs2 : mf !!! Regidx Rs2 = page_base (ud_tfp (pv_upt V'))).
@@ -4651,6 +4731,7 @@ Section SyscallArms.
               ltac:(right; exact Htfw')
               ltac:(right; right; exact Hupte')
               ltac:(right; right; exact Hszv')
+              ltac:(right; right; exact Hlzv')
               Htfp' Hfg'
               ltac:(right; exact Hcwi')
               (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
@@ -4820,6 +4901,7 @@ Section SyscallArms.
               ltac:(apply sysc_pipe_ok_quiet; rewrite Hnum; discriminate)
               ltac:(right; reflexivity)
               ltac:(right; right; apply uptd_ext_sz_refl)
+              ltac:(right; right; reflexivity)
               ltac:(right; right; reflexivity)
               eq_refl eq_refl
               ltac:(right; reflexivity)
@@ -5017,7 +5099,9 @@ Section SyscallArms.
         rewrite Hr HV HM. cbn [pv_tf pv_upt pv_sz upd_upt].
         split_and!;
           [ reflexivity | reflexivity
-          | exact (perm_of_uptd_ext_sz _ _ _ Hext) | reflexivity | reflexivity ].
+          | exact (perm_of_uptd_ext_sz _ _ _ Hext) | reflexivity
+          (* the lazy bit: a failed exec writes no block field *)
+          | reflexivity | reflexivity ].
       - (* SUCCEEDED *)
         iDestruct "Hok" as (pl na alen afun) "[_ [_ Hok]]".
         rewrite /exec_post_ok.
@@ -5079,6 +5163,7 @@ Section SyscallArms.
               (sysc_mem_ok_exec (us_V U) V' (us_M U) Mk Hnum)
               ltac:(apply (sysc_fd_ok_refl_at _ _ _ _ Hnum); discriminate)
               ltac:(apply sysc_pipe_ok_quiet; rewrite Hnum; discriminate)
+              ltac:(left; rewrite Hnum; reflexivity)
               ltac:(left; rewrite Hnum; reflexivity)
               ltac:(left; rewrite Hnum; reflexivity)
               ltac:(left; rewrite Hnum; reflexivity)
@@ -5307,6 +5392,7 @@ Section SyscallArms.
               ltac:(right; reflexivity)
               ltac:(right; right; apply uptd_ext_sz_refl)
               ltac:(right; right; reflexivity)
+              ltac:(right; right; reflexivity)
               eq_refl eq_refl
               ltac:(right; reflexivity)
               (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
@@ -5485,6 +5571,7 @@ Section SyscallArms.
               ltac:(right; reflexivity)
               ltac:(right; right; exact Hextz)
               ltac:(right; right; reflexivity)
+              ltac:(right; right; reflexivity)
               Htfp' ltac:(reflexivity)
               ltac:(right; reflexivity)
               (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
@@ -5529,6 +5616,10 @@ Section SyscallArms.
     assert (Hpce : (mword_of_int (sysc_target 5) : mword 64)
                    = mword_of_int KernelSyms.sys_read) by reflexivity.
     iEval (rewrite Hpce) in "Hpc".
+    (* ROW 5'S TWO NEW FACTS, read off the block before it is handed on
+       (lane LAZY-FLAG, L5).  Both are pure, so the block stays whole. *)
+    iDestruct (proc_priv_pt_wf with "Hpriv") as "%Hptwf".
+    iDestruct (proc_priv_lazy with "Hpriv") as "%Hlzp".
     iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlks Hcpu]". subst lks.
     iDestruct (procs_inv_len with "Hprocs") as "%Hlen".
     (* the two trapframe argument words -- only their EXISTENCE is asked *)
@@ -5655,6 +5746,7 @@ Section SyscallArms.
               ltac:(right; reflexivity)
               ltac:(right; right; exact Hextz)
               ltac:(right; right; reflexivity)
+              ltac:(right; right; reflexivity)
               Htfp' ltac:(reflexivity)
               ltac:(right; reflexivity)
               (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
@@ -5679,7 +5771,8 @@ Section SyscallArms.
     iApply (sysc_exec_out_ne _ _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
     rewrite Hmfa0.
     iApply (sysc_out_read U sts gn cs pid fdep v0 v1 v2 r _ _ _ _
-              ltac:(rewrite Hnum; reflexivity) Hv0 Hv1 Hv2 with "Hex").
+              ltac:(rewrite Hnum; reflexivity) Hv0 Hv1 Hv2 Hptwf Hlzp
+              with "Hex").
   Qed.
 
   Lemma sysc_arm_fstat (γf : gname) (γw : gname) (pj : mword 64)
@@ -5770,6 +5863,7 @@ Section SyscallArms.
               ltac:(apply sysc_pipe_ok_quiet; rewrite Hnum; discriminate)
               ltac:(right; reflexivity)
               ltac:(right; right; exact Hextz)
+              ltac:(right; right; reflexivity)
               ltac:(right; right; reflexivity)
               Htfp' ltac:(reflexivity)
               ltac:(right; reflexivity)
@@ -5891,22 +5985,26 @@ Section SyscallArms.
                ⌜pv_tf V' = pv_tf (us_V U)⌝ ∗
                ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_upt V')⌝ ∗
                ⌜pv_sz V' = pv_sz (us_V U)⌝ ∗
+               (* ...AND THE LAZY BIT, which only sbrk writes (lane LAZY-FLAG,
+                  K1): this entry hands the block back at the bit it was given. *)
+               ⌜pv_lazy V' = pv_lazy (us_V U)⌝ ∗
                proc_priv γf (proc_addr j) pid (MkUstate V' (us_M U)) ∗
                chdir_receipt (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U))
                  (cf_P fdep) (cf_Pmiss fdep) (cf_Fo fdep)
                  (mf !!! Regidx (mword_of_int 10 : mword 5)) (pv_cwi V'))%I
       with "[Hpv Hrc]" as
-      (V') "(%Htfp' & %Hfg' & %Hchg' & %Hgeng' & %Hcw' & %Htfw' & %Hupte' & %Hszv' & Hpriv & Hrcpt)".
+      (V') "(%Htfp' & %Hfg' & %Hchg' & %Hgeng' & %Hcw' & %Htfw' & %Hupte' & %Hszv' & %Hlzv' & Hpriv & Hrcpt)".
     { pose proof Hextz as Hue. destruct Hext as (_ & Htf & _).
       destruct Hdisj as [[Hr ->] | [Hr (ipv & z & ->)]].
       - iExists (upd_upt (us_V U) P'). iFrame "Hpv Hrc". iPureIntro.
         split_and!; [exact Htf | reflexivity | reflexivity | reflexivity
-                     | right; reflexivity | reflexivity | exact Hue | reflexivity].
+                     | right; reflexivity | reflexivity | exact Hue
+                     | reflexivity | reflexivity].
       - iExists (upd_cwi (upd_cwd (upd_upt (us_V U) P') ipv) z).
         iFrame "Hpv Hrc". iPureIntro.
         split_and!; [exact Htf | reflexivity | reflexivity | reflexivity
                      | left; rewrite Hr; reflexivity
-                     | reflexivity | exact Hue | reflexivity]. }
+                     | reflexivity | exact Hue | reflexivity | reflexivity]. }
     iDestruct (sysc_iref_join with "Hirk Hirc") as "Hir".
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
@@ -5940,6 +6038,7 @@ Section SyscallArms.
               ltac:(right; exact Htfw')
               ltac:(right; right; exact Hupte')
               ltac:(right; right; exact Hszv')
+              ltac:(right; right; exact Hlzv')
               Htfp' Hfg'
               (* chdir: the one entry that moves the inum -- the row's left
                  arm, at a successful call; a failed one is the right arm *)
@@ -6083,6 +6182,7 @@ Section SyscallArms.
               ltac:(right; reflexivity)
               ltac:(right; right; exact Hextz)
               ltac:(right; right; reflexivity)
+              ltac:(right; right; reflexivity)
               Htfp' ltac:(reflexivity)
               ltac:(right; reflexivity)
               (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
@@ -6211,6 +6311,7 @@ Section SyscallArms.
               ltac:(right; reflexivity)
               ltac:(right; right; exact Hextz)
               ltac:(right; right; reflexivity)
+              ltac:(right; right; reflexivity)
               Htfp' ltac:(reflexivity)
               ltac:(right; reflexivity)
               (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
@@ -6311,12 +6412,15 @@ Section SyscallArms.
                ⌜pv_tf V' = pv_tf (us_V U)⌝ ∗
                ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_upt V')⌝ ∗
                ⌜pv_sz V' = pv_sz (us_V U)⌝ ∗
+               (* ...AND THE LAZY BIT, which only sbrk writes (lane LAZY-FLAG,
+                  K1): this entry hands the block back at the bit it was given. *)
+               ⌜pv_lazy V' = pv_lazy (us_V U)⌝ ∗
                ⌜sysc_fd_ok (us_V U) (mf !!! Regidx (mword_of_int 10 : mword 5))
                            sts sts'⌝ ∗
                proc_priv γf (proc_addr j) pid (MkUstate V' ((us_M U))) ∗
                fd_frags (pv_fdg (us_V U)) sts')%I
       with "[Hpost]" as (V' sts')
-        "(%Htfp' & %Hfg' & %Hchg' & %Hgeng' & %Hcwi' & %Htfw' & %Hupte' & %Hszv' & %Hfdrow & Hpriv & Hufrag)".
+        "(%Htfp' & %Hfg' & %Hchg' & %Hgeng' & %Hcwi' & %Htfw' & %Hupte' & %Hszv' & %Hlzv' & %Hfdrow & Hpriv & Hufrag)".
     { rewrite /sysc_fd_ok /usys_fd_ok Hnum.
       destruct (decide (21 = USYS_close)) as [_ | Hcc];
         [| exfalso; exact (Hcc eq_refl)].
@@ -6331,7 +6435,8 @@ Section SyscallArms.
         iDestruct (proc_priv_states_agree with "Hpv Hfr") as %Hag.
         iExists (us_V U), sts. iFrame "Hpv Hfr". iPureIntro.
         split_and!; [reflexivity | reflexivity | reflexivity | reflexivity | reflexivity
-                    | reflexivity | apply uptd_ext_sz_refl | reflexivity |].
+                    | reflexivity | apply uptd_ext_sz_refl | reflexivity
+                    | reflexivity |].
         split.
         + (* the failure arm returns -1, so the guard is false *)
           rewrite decide_False; [reflexivity |].
@@ -6355,7 +6460,8 @@ Section SyscallArms.
                 (<[fd := FdClosed]> sts).
         iFrame "Hpv Hfr". iPureIntro.
         split_and!; [reflexivity | reflexivity | reflexivity | reflexivity | reflexivity
-                    | reflexivity | apply uptd_ext_sz_refl | reflexivity |].
+                    | reflexivity | apply uptd_ext_sz_refl | reflexivity
+                    | reflexivity |].
         split.
         + (* success returns 0, and the row's index is [arg_fd]'s own *)
           rewrite decide_True; [| rewrite Hr; vm_compute; reflexivity].
@@ -6394,6 +6500,7 @@ Section SyscallArms.
               ltac:(right; exact Htfw')
               ltac:(right; right; exact Hupte')
               ltac:(right; right; exact Hszv')
+              ltac:(right; right; exact Hlzv')
               Htfp' Hfg'
               ltac:(right; exact Hcwi')
               (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
@@ -6530,6 +6637,9 @@ Section SyscallArms.
                ⌜pv_tf V' = pv_tf (us_V U)⌝ ∗
                ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_upt V')⌝ ∗
                ⌜pv_sz V' = pv_sz (us_V U)⌝ ∗
+               (* ...AND THE LAZY BIT, which only sbrk writes (lane LAZY-FLAG,
+                  K1): this entry hands the block back at the bit it was given. *)
+               ⌜pv_lazy V' = pv_lazy (us_V U)⌝ ∗
                ⌜sysc_fd_ok (us_V U) (mf !!! Regidx (mword_of_int 10 : mword 5))
                            sts sts'⌝ ∗
                (* ...and pipe's JOINED row: the two descriptors it opened
@@ -6540,7 +6650,7 @@ Section SyscallArms.
                              sts sts'⌝ ∗
                proc_priv γf (proc_addr j) pid (MkUstate V' M') ∗
                fd_frags (pv_fdg (us_V U)) sts')%I with "[Hpv]" as
-      (V' sts') "(%Htfp' & %Hfg' & %Hchg' & %Hgeng' & %Hcwi' & %Htfw' & %Hupte' & %Hszv' & %Hfdrow
+      (V' sts') "(%Htfp' & %Hfg' & %Hchg' & %Hgeng' & %Hcwi' & %Htfw' & %Hupte' & %Hszv' & %Hlzv' & %Hfdrow
                   & %Hpiperow & Hpriv & Hufrag)".
     { rewrite /sysc_fd_ok /usys_fd_ok Hnum.
       destruct (decide (4 = USYS_close)) as [Hcc | _]; [discriminate Hcc |].
@@ -6552,7 +6662,7 @@ Section SyscallArms.
           | (%fd0 & %fd1 & %l & %k0 & %k1 &
              (%Hr & %Hfl & %Hne & %Hcl0 & %Hcl1 & %Hd8 & %Hbytes) & Hpv & Hb)]".
       - iExists (upd_upt (us_V U) P'), sts. iFrame "Hpv Hb". iPureIntro.
-        split_and!; [exact Htfpe | reflexivity | reflexivity | reflexivity | reflexivity | reflexivity | exact Huptz | reflexivity | |].
+        split_and!; [exact Htfpe | reflexivity | reflexivity | reflexivity | reflexivity | reflexivity | exact Huptz | reflexivity | reflexivity | |].
         { rewrite decide_False; [reflexivity |].
           rewrite Hr. vm_compute. discriminate. }
         (* a failed pipe returned -1, so the joined row's [uint r = 0]
@@ -6639,7 +6749,7 @@ Section SyscallArms.
                 (<[fd1 := FdOpen false true FdPipe]>
                    (<[fd0 := FdOpen true false FdPipe]> sts)).
         iFrame "Hpv Hb". iPureIntro.
-        split_and!; [exact Htfpe | reflexivity | reflexivity | reflexivity | reflexivity | reflexivity | exact Huptz | reflexivity | |].
+        split_and!; [exact Htfpe | reflexivity | reflexivity | reflexivity | reflexivity | reflexivity | exact Huptz | reflexivity | reflexivity | |].
         { rewrite decide_True; [| rewrite Hr; vm_compute; reflexivity].
         (* the table's row binds the two NUMBERS existentially -- at this
            vocabulary they are reported by being WRITTEN -- and the post
@@ -6699,6 +6809,7 @@ Section SyscallArms.
               ltac:(right; exact Htfw')
               ltac:(right; right; exact Hupte')
               ltac:(right; right; exact Hszv')
+              ltac:(right; right; exact Hlzv')
               Htfp' Hfg'
               ltac:(right; exact Hcwi')
               (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
@@ -6865,6 +6976,7 @@ Section SyscallArms.
               ltac:(right; reflexivity)
               ltac:(right; right; exact Hextz)
               ltac:(right; right; reflexivity)
+              ltac:(right; right; reflexivity)
               Htfp' ltac:(reflexivity)
               ltac:(right; reflexivity)
               (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
@@ -7004,6 +7116,7 @@ Section SyscallArms.
               ltac:(apply sysc_pipe_ok_quiet; rewrite Hnum; discriminate)
               ltac:(right; reflexivity)
               ltac:(right; right; exact Hextz)
+              ltac:(right; right; reflexivity)
               ltac:(right; right; reflexivity)
               Htfp' ltac:(reflexivity)
               ltac:(right; reflexivity)
@@ -7203,6 +7316,9 @@ Section SyscallArms.
                ⌜pv_tf V' = pv_tf (us_V U)⌝ ∗
                ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_upt V')⌝ ∗
                ⌜pv_sz V' = pv_sz (us_V U)⌝ ∗
+               (* ...AND THE LAZY BIT, which only sbrk writes (lane LAZY-FLAG,
+                  K1): this entry hands the block back at the bit it was given. *)
+               ⌜pv_lazy V' = pv_lazy (us_V U)⌝ ∗
                ⌜sysc_fd_ok (us_V U) (mf !!! Regidx (mword_of_int 10 : mword 5))
                            sts sts'⌝ ∗
                proc_priv γf (proc_addr j) pid (MkUstate V' (us_M U)) ∗
@@ -7215,7 +7331,7 @@ Section SyscallArms.
                  (of_Fok fdep) (of_Fex fdep) (of_Fo fdep) (of_Ft fdep) sts
                  (mf !!! Regidx (mword_of_int 10 : mword 5)) sts')%I
       with "[Hpv Hb Hrc]" as
-      (V' sts') "(%Htfp' & %Hfg' & %Hchg' & %Hgeng' & %Hcwi' & %Htfw' & %Hupte' & %Hszv' & %Hfdrow & Hpriv & Hufrag & Hrcpt)".
+      (V' sts') "(%Htfp' & %Hfg' & %Hchg' & %Hgeng' & %Hcwi' & %Htfw' & %Hupte' & %Hszv' & %Hlzv' & %Hfdrow & Hpriv & Hufrag & Hrcpt)".
     { rewrite /sysc_fd_ok /usys_fd_ok Hnum.
       destruct (decide (15 = USYS_close)) as [Hcc | _]; [discriminate Hcc |].
       destruct (decide (15 = USYS_dup)) as [Hcd | _]; [discriminate Hcd |].
@@ -7224,7 +7340,7 @@ Section SyscallArms.
         [(Hr & -> & ->)
         | (fd & ll & kf & rb & wb & tp & Hr & Hfrees & -> & Hcl & ->)].
       - iExists (upd_upt (us_V U) P'), sts. iFrame "Hpv Hb Hrc". iPureIntro.
-        split_and!; [exact Htfpe | reflexivity | reflexivity | reflexivity | reflexivity | reflexivity | exact Hextz | reflexivity |].
+        split_and!; [exact Htfpe | reflexivity | reflexivity | reflexivity | reflexivity | reflexivity | exact Hextz | reflexivity | reflexivity |].
         (* the failure arm installs nothing: the row's right disjunct *)
         by right.
       - (* FDALLOC'S SCAN, CONVERTED -- the same three lines as dup's arm.
@@ -7251,7 +7367,7 @@ Section SyscallArms.
         iExists (upd_ofile (upd_upt (us_V U) P') fd (fnode kf)),
                 (<[fd := FdOpen rb wb tp]> sts).
         iFrame "Hpv Hb Hrc". iPureIntro.
-        split_and!; [exact Htfpe | reflexivity | reflexivity | reflexivity | reflexivity | reflexivity | exact Hextz | reflexivity |].
+        split_and!; [exact Htfpe | reflexivity | reflexivity | reflexivity | reflexivity | reflexivity | exact Hextz | reflexivity | reflexivity |].
         (* the table's open row binds the descriptor, the mode bits and the
            type existentially; the split names all three, so the arm
            exhibits them. *)
@@ -7287,6 +7403,7 @@ Section SyscallArms.
               ltac:(right; exact Htfw')
               ltac:(right; right; exact Hupte')
               ltac:(right; right; exact Hszv')
+              ltac:(right; right; exact Hlzv')
               Htfp' Hfg'
               ltac:(right; exact Hcwi')
               (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
@@ -7719,6 +7836,7 @@ Section SyscallArms.
               ltac:(apply sysc_pipe_ok_quiet; unfold UsysMemOk.USYS_pipe; lia)
               ltac:(right; exists (rget G1 Ra4); reflexivity)
               ltac:(right; right; apply uptd_ext_sz_refl)
+              ltac:(right; right; reflexivity)
               ltac:(right; right; reflexivity)
               eq_refl eq_refl
               ltac:(right; reflexivity)

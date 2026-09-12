@@ -1169,7 +1169,10 @@ Section ProofSysLinkBody.
            every rebuilding arm below hands it straight back. *)
         iDestruct (proc_priv_split_cwd γf pj pid (us_upt U P2) with "Hpriv")
           as "[Hpnc [Href Hftok]]".
-        iEval (rewrite proc_priv_nocwd_bare) in "Hpnc".
+        (* the lazy bit's claim, read off the block before the regrouping
+           drops it (lane LAZY-FLAG): it is pure, so holding it is free. *)
+        iDestruct (proc_priv_nocwd_lazy with "Hpnc") as %Hlzq.
+        iEval (rewrite (proc_priv_nocwd_bare _ _ _ _ Hlzq)) in "Hpnc".
         iDestruct "Hpnc" as "[Hpidq Hofiles]".
         iDestruct (cwd_ref_at_held_at with "Href") as "Hcwdref".
         iEval (cbn [upd_upt pv_cwd pv_fdg]) in "Hcwdref".
@@ -1528,7 +1531,7 @@ Section ProofSysLinkBody.
              iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
              iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
              iCombine "Hpidq Hofiles" as "Hpnc".
-             iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
+             iEval (rewrite -(proc_priv_nocwd_bare _ _ _ _ Hlzq)) in "Hpnc".
              iDestruct (proc_priv_split_cwd γf pj pid (us_upt U P2)
                           with "[Hpnc Href Hftok]") as "Hpriv";
                [iSplitL "Hpnc"; [iExact "Hpnc" | iFrame "Href Hftok"] |].
@@ -1691,7 +1694,7 @@ Section ProofSysLinkBody.
                 iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
                 iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
                 iCombine "Hpidq Hofiles" as "Hpnc".
-                iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
+                iEval (rewrite -(proc_priv_nocwd_bare _ _ _ _ Hlzq)) in "Hpnc".
                 iDestruct (proc_priv_split_cwd γf pj pid (us_upt U P2)
                              with "[Hpnc Href Hftok]") as "Hpriv";
                   [iSplitL "Hpnc"; [iExact "Hpnc" | iFrame "Href Hftok"] |].
@@ -2488,7 +2491,7 @@ Section ProofSysLinkBody.
                      iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
                      iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
                      iCombine "Hpidq Hofiles" as "Hpnc".
-                     iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
+                     iEval (rewrite -(proc_priv_nocwd_bare _ _ _ _ Hlzq)) in "Hpnc".
                      iDestruct (proc_priv_split_cwd γf pj pid (us_upt U P2)
                                   with "[Hpnc Href Hftok]") as "Hpriv";
                        [iSplitL "Hpnc"; [iExact "Hpnc" | iFrame "Href Hftok"] |].
@@ -2905,7 +2908,7 @@ Section ProofSysLinkBody.
                        iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
                        iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
                        iCombine "Hpidq Hofiles" as "Hpnc".
-                       iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
+                       iEval (rewrite -(proc_priv_nocwd_bare _ _ _ _ Hlzq)) in "Hpnc".
                        iDestruct (proc_priv_split_cwd γf pj pid (us_upt U P2)
                                     with "[Hpnc Href Hftok]") as "Hpriv";
                          [iSplitL "Hpnc"; [iExact "Hpnc" | iFrame "Href Hftok"] |].
@@ -3624,7 +3627,7 @@ Section ProofSysLinkBody.
                               [wp_next_chain |].
                             iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
                             iCombine "Hpidq Hofiles" as "Hpnc".
-                            iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
+                            iEval (rewrite -(proc_priv_nocwd_bare _ _ _ _ Hlzq)) in "Hpnc".
                             iDestruct (proc_priv_split_cwd γf pj pid (us_upt U P2)
                                          with "[Hpnc Href Hftok]") as "Hpriv";
                               [iSplitL "Hpnc"; [iExact "Hpnc" | iFrame "Href Hftok"] |].
@@ -3844,7 +3847,7 @@ Section ProofSysLinkBody.
                               [wp_next_chain |].
                             iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
                             iCombine "Hpidq Hofiles" as "Hpnc".
-                            iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
+                            iEval (rewrite -(proc_priv_nocwd_bare _ _ _ _ Hlzq)) in "Hpnc".
                             iDestruct (proc_priv_split_cwd γf pj pid (us_upt U P2)
                                          with "[Hpnc Href Hftok]") as "Hpriv";
                               [iSplitL "Hpnc"; [iExact "Hpnc" | iFrame "Href Hftok"] |].
@@ -3926,7 +3929,7 @@ Section ProofSysLinkBody.
                    iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
                    iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
                    iCombine "Hpidq Hofiles" as "Hpnc".
-                   iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
+                   iEval (rewrite -(proc_priv_nocwd_bare _ _ _ _ Hlzq)) in "Hpnc".
                    iDestruct (proc_priv_split_cwd γf pj pid (us_upt U P2)
                                 with "[Hpnc Href Hftok]") as "Hpriv";
                      [iSplitL "Hpnc"; [iExact "Hpnc" | iFrame "Href Hftok"] |].
@@ -3980,7 +3983,7 @@ Section ProofSysLinkBody.
           iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
           iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
           iCombine "Hpidq Hofiles" as "Hpnc".
-          iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
+          iEval (rewrite -(proc_priv_nocwd_bare _ _ _ _ Hlzq)) in "Hpnc".
           iDestruct (proc_priv_split_cwd γf pj pid (us_upt U P2)
                        with "[Hpnc Href Hftok]") as "Hpriv";
             [iSplitL "Hpnc"; [iExact "Hpnc" | iFrame "Href Hftok"] |].

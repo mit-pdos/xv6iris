@@ -604,8 +604,23 @@ Section UexecExecInst.
           [UexecSlot.uvis_of]'s definition ([ProofSyscall.sysc_out_read]).
           READING THE KEY HERE IS WHY [UexecSG.skey_eq] FIXES THE
           PERMISSION MAP AND THE SIZE. *)
+       (* ...AND THE TABLE IS WELL-FORMED AND THE KEY'S LAZY BIT IS A CLAIM
+          ABOUT IT (lane LAZY-FLAG, L5).  The projection cannot tell a page
+          vmfault has yet to serve from a mapped RW page, and copyout can
+          write only the second kind -- so the ∃ table is exhibited WITH
+          what the key's bit claims about it ([UserPerm.lazy_free]) and with
+          the well-formedness [UserPerm.lazy_free_wmapped] consumes.  At
+          [uvis_lazy W = false] a process that owns a byte of its own buffer
+          can then refute the receipt's copyout-fault disjunct; at [true] it
+          learns nothing new, which is the honest reading of a process that
+          may have called sbrklazy.  Both come off the DISPATCHER's own
+          block: well-formedness from [ProcPtOwn.proc_ptm], and the claim
+          from [ProcInv.proc_priv_core]'s invariant on
+          [ProcDefs.pv_lazy]. *)
        (∃ P : uptd,
           ⌜perm_of (ud_um P) (uvis_sz W) = uvis_perm W⌝ ∗
+          ⌜ProcPtOwn.proc_pt_wf P⌝ ∗
+          ⌜uvis_lazy W = false -> lazy_free (ud_um P) (uvis_sz W)⌝ ∗
           fileread_extra_core P (fd_st_of_key (xk_a W 0) (uvis_fd W))
             (sys_rw_count (xk_a W 2)) (rf_F f) (rf_ret f) r M' (xk_a W 1))
      else if decide (n = 9) then
@@ -689,8 +704,9 @@ Section UexecExecInst.
     xv6_spost X n f W r M' fdv' cw' cs' ⊣⊢ xv6_spost X n f W' r M' fdv' cw' cs'.
   Proof.
     intros Hk.
-    pose proof Hk as (HM & Ha0 & Ha1 & Ha2 & Hfd & Hcw & _ & _ & _ & Hpi & Hsz).
-    rewrite /xv6_spost /xk_a /tf_w HM Ha0 Ha1 Ha2 Hfd Hcw Hpi Hsz.
+    pose proof Hk as (HM & Ha0 & Ha1 & Ha2 & Hfd & Hcw & _ & _ & _ & Hpi & Hsz
+                      & Hlz).
+    rewrite /xv6_spost /xk_a /tf_w HM Ha0 Ha1 Ha2 Hfd Hcw Hpi Hsz Hlz.
     reflexivity.
   Qed.
 
@@ -725,14 +741,14 @@ Section UexecExecInst.
     rewrite /exec_slot_pre.
     iDestruct "Hslot" as "[Hsa Hsb]".
     iSplitL "Hsa".
-    - iIntros (av i ff nl W') "HP Ho %Hld %Him Hpy HQ".
+    - iIntros (av i ff nl W') "HP Ho %Hld %Him %Hcwq %Hlzq Hpy HQ".
       iApply "Hup".
-      iApply ("Hsa" $! av i ff nl W' with "HP Ho [%] [%] Hpy HQ");
-        [ exact Hld | exact Him ].
-    - iIntros (av i a W') "HP Ho %Hnl %Hkk Hpy HQ".
+      iApply ("Hsa" $! av i ff nl W' with "HP Ho [%] [%] [%] [%] Hpy HQ");
+        [ exact Hld | exact Him | exact Hcwq | exact Hlzq ].
+    - iIntros (av i a W') "HP Ho %Hnl %Hkk %Hcwq %Hlzq Hpy HQ".
       iApply "Hup".
-      iApply ("Hsb" $! av i a W' with "HP Ho [%] [%] Hpy HQ");
-        [ exact Hnl | exact Hkk ].
+      iApply ("Hsb" $! av i a W' with "HP Ho [%] [%] [%] [%] Hpy HQ");
+        [ exact Hnl | exact Hkk | exact Hcwq | exact Hlzq ].
   Qed.
 
   (* THE SUPPLY.  Opaque in the class, and at THIS instance it is the
@@ -836,8 +852,8 @@ Section UexecExecInst.
          wand takes is the [R] the new image's slot runs on and is handed
          straight to the credential. *)
       rewrite /exec_slot_pre. iSplitR.
-      + iIntros (av' i ff nl W') "_ _ _ _ Hp HQ". iApply ("Hs" with "Hp HQ").
-      + iIntros (av' i a W') "_ _ _ _ Hp HQ". iApply ("Hs" with "Hp HQ").
+      + iIntros (av' i ff nl W') "_ _ _ _ _ _ Hp HQ". iApply ("Hs" with "Hp HQ").
+      + iIntros (av' i a W') "_ _ _ _ _ _ Hp HQ". iApply ("Hs" with "Hp HQ").
     - iApply (xv6_sbundle_of_supply_ne X n W (fun _ => R)%I Hne).
       iExact "Hsup".
   Qed.
@@ -1109,13 +1125,17 @@ Section UexecExecInst.
       (P : uptd)
       (r : mword 64) (M' : gmap Z (bv 8)) (fdv' : list fdstate) (cw' : Z) (cs' : gset gname) :
     perm_of (ud_um P) (uvis_sz W) = uvis_perm W ->
+    ProcPtOwn.proc_pt_wf P ->
+    (uvis_lazy W = false -> lazy_free (ud_um P) (uvis_sz W)) ->
     fileread_extra_core P (fd_st_of_key (tf_w (uvis_tf W) (tf_arg_idx 0)) (uvis_fd W))
       (sys_rw_count (tf_w (uvis_tf W) (tf_arg_idx 2))) (rf_F f) (rf_ret f)
       r M' (tf_w (uvis_tf W) (tf_arg_idx 1)) -∗
     spost_at X 5 f W r M' fdv' cw' cs'.
   Proof.
-    intros Hpm. iIntros "H". rewrite /spost_at /= /xv6_spost /xk_a.
-    xv6_take. iExists P. iSplitR; [by iPureIntro |]. iExact "H".
+    intros Hpm Hwf Hlz. iIntros "H". rewrite /spost_at /= /xv6_spost /xk_a.
+    xv6_take. iExists P.
+    iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
+    iSplitR; [by iPureIntro |]. iExact "H".
   Qed.
 
   (* ...and chdir's, at the working directory the call RESUMES at: the arm

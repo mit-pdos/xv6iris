@@ -2039,4 +2039,13 @@ Definition kexec_built (f : elf_bytes) (ef : nat -> bv 8) (sz1 : mword 64)
      quotes it at [uvis_sz W'] as [SpecKexec.kexec_image_ok]'s
      [kxb_perm_below] row. *)
   /\ kxb_perm_below (uint sz1)
-       (perm_of (ud_um (pv_upt (us_V U'))) (uint sz1)).
+       (perm_of (ud_um (pv_upt (us_V U'))) (uint sz1))
+  (* S8: AND THE IMAGE IS EAGER (lane LAZY-FLAG, K4).  uvmalloc fills every
+     page from 0 to the size exec settled on -- the guard page is in the
+     table without U, and [UserPerm.lazy_free] is about the DOMAIN, so it is
+     covered either way -- so the new space's projection has an EMPTY fill.
+     This is the row [ProcInv.upd_exec] clears [ProcDefs.pv_lazy] on, and
+     what [SpecKexec.exec_slot_pre]'s [uvis_lazy W' = false] stands on.
+     Unguarded by the walk, like S7: it is a fact about the table exec
+     built. *)
+  /\ lazy_free (ud_um (pv_upt (us_V U'))) (uint sz1).

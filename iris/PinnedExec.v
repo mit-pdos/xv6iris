@@ -191,6 +191,12 @@ Section PinnedExec.
     □ (∀ (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
          (W' : uvis),
          ⌜kexec_image_ok f na alen afun sts W'⌝ -∗
+         (* ...AND THE TWO ROWS [SpecKexec.exec_slot_pre] now carries, in
+            its own order (2026-09-12, the coordinator): the resumed key's
+            working directory is the caller's, and its lazy bit is
+            [false]. *)
+         ⌜uvis_cwd W' = cw⌝ -∗
+         ⌜uvis_lazy W' = false⌝ -∗
          ⌜exec_args_of M av na alen afun⌝ -∗
          my_pay (uvis_gen W') Q -∗ Q (-1) -∗ Pay -∗ X W') -∗
     (* THE TAINT ARM TAKES THE KEY FIRST AND THE PAY FACT BESIDE [T]: a
@@ -201,7 +207,7 @@ Section PinnedExec.
     □ (∀ W' : uvis, T -∗ my_pay (uvis_gen W') Q -∗ Q (-1) -∗ X W') -∗
     Pay -∗
     pf_at (fun S => sys_exec_slot_pre S Q (pobs_P T hops) (pobs_recv Pin T)
-                      M pv av sts) (MkPfam X Pay).
+                      cw M pv av sts) (MkPfam X Pay).
   Proof.
     intros Hres Hload Hpath. iIntros "#Hcon #Hgen HPay".
     rewrite /pf_at. cbn [pf_recv pf_refund]. iSplit; [ | iExact "HPay" ].
@@ -209,16 +215,20 @@ Section PinnedExec.
     rewrite (exec_path_of_uniq M pv pl' pl Hpath' Hpath).
     rewrite /exec_slot_pre. iSplitL "HPay".
     - (* ---- ARM (a): the observed node IS the pinned file ---- *)
-      iIntros (av' i f' nl' W') "HP Hrecv %Hload' %Hok #Hp HQ".
+      iIntros (av' i f' nl' W') "HP Hrecv %Hload' %Hok %Hcwq %Hlzq #Hp HQ".
       iDestruct (pobs_node Pin T cw pl hops ino (MkAnode (AFile f) nl)
                    av' i (MkAnode (AFile f') nl') Hres with "HP Hrecv")
         as "[%Hid | #HT]"; last first.
       { iApply ("Hgen" with "HT Hp HQ"). }
-      destruct Hid as [_ Hnode]. injection Hnode; intros Hnl Hf; subst.
-      iApply ("Hcon" $! na alen afun W' with "[%] [%] Hp HQ HPay");
-        [ exact Hok | exact Hargs ].
+      (* [subst f' nl'] and not a bare [subst]: the two rows introduced just
+         above are equations on [cw] and on [uvis_lazy W'], and a bare
+         [subst] would spend the [cw] one instead (lane LAZY-FLAG). *)
+      destruct Hid as [_ Hnode]. injection Hnode; intros Hnl Hf.
+      subst f' nl'.
+      iApply ("Hcon" $! na alen afun W' with "[%] [%] [%] [%] Hp HQ HPay");
+        [ exact Hok | exact Hcwq | exact Hlzq | exact Hargs ].
     - (* ---- ARM (b): a pinned file IS loadable, so this arm is dead ---- *)
-      iIntros (av' i a W') "HP Hrecv %Hnload %Hkey #Hp HQ".
+      iIntros (av' i a W') "HP Hrecv %Hnload %Hkey %Hcwq %Hlzq #Hp HQ".
       iDestruct (pobs_node Pin T cw pl hops ino (MkAnode (AFile f) nl)
                    av' i a Hres with "HP Hrecv")
         as "[%Hid | #HT]"; last first.
@@ -250,6 +260,12 @@ Section PinnedExec.
     □ (∀ (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
          (W' : uvis),
          ⌜kexec_image_ok f na alen afun sts W'⌝ -∗
+         (* ...AND THE TWO ROWS [SpecKexec.exec_slot_pre] now carries, in
+            its own order (2026-09-12, the coordinator): the resumed key's
+            working directory is the caller's, and its lazy bit is
+            [false]. *)
+         ⌜uvis_cwd W' = cw⌝ -∗
+         ⌜uvis_lazy W' = false⌝ -∗
          ⌜exec_args_of M av na alen afun⌝ -∗
          my_pay (uvis_gen W') Q -∗ Q (-1) -∗ Pay -∗ X W') -∗
     (* the taint's generic slot, indexed by the pay fact and handed the
@@ -292,6 +308,12 @@ Section PinnedExec.
     □ (∀ (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
          (W' : uvis),
          ⌜kexec_image_ok f na alen afun sts W'⌝ -∗
+         (* ...AND THE TWO ROWS [SpecKexec.exec_slot_pre] now carries, in
+            its own order (2026-09-12, the coordinator): the resumed key's
+            working directory is the caller's, and its lazy bit is
+            [false]. *)
+         ⌜uvis_cwd W' = cw⌝ -∗
+         ⌜uvis_lazy W' = false⌝ -∗
          ⌜exec_args_of M av na alen afun⌝ -∗
          my_pay (uvis_gen W') Q -∗ Q (-1) -∗ Pay -∗ X W') -∗
     □ (∀ W' : uvis, T -∗ my_pay (uvis_gen W') Q -∗ Q (-1) -∗ X W') -∗

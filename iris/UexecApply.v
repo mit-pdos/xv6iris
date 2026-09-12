@@ -268,17 +268,20 @@ Qed.
 (* 15), so state the congruence at those.                                  *)
 (* ===================================================================== *)
 Lemma usys_mem_ok_args (n : Z) (tf tf' : list (mword 64)) (r : mword 64)
-    (M M' : gmap Z (bv 8)) (pi pi' : gmap (mword 27) uperm) (szv szv' : Z) :
+    (M M' : gmap Z (bv 8)) (pi pi' : gmap (mword 27) uperm) (szv szv' : Z)
+    (lz lz' : bool) :
   tf !!! tf_arg_idx 0 = tf' !!! tf_arg_idx 0 ->
   tf !!! tf_arg_idx 1 = tf' !!! tf_arg_idx 1 ->
   tf !!! tf_arg_idx 2 = tf' !!! tf_arg_idx 2 ->
-  usys_mem_ok n tf r M pi szv M' pi' szv'
-  -> usys_mem_ok n tf' r M pi szv M' pi' szv'.
+  usys_mem_ok n tf r M pi szv lz M' pi' szv' lz'
+  -> usys_mem_ok n tf' r M pi szv lz M' pi' szv' lz'.
 Proof.
   intros H0 H1 H2 H. unfold usys_mem_ok, usys_rdcount in H |- *.
   destruct (decide (n = USYS_exec)); [ exact H | ].
   destruct (decide (n = USYS_sbrk));
-    [ unfold usys_sbrk_ret, usys_sbrk_arg in H |- *; rewrite <- H0; exact H | ].
+    [ unfold usys_sbrk_ret, usys_sbrk_arg, usys_sbrk_lazy, usys_sbrk_eager
+        in H |- *;
+      rewrite <- H0, <- H1; exact H | ].
   destruct (decide (n = USYS_wait)); [ rewrite <- H0; exact H | ].
   destruct (decide (n = USYS_pipe)); [ rewrite <- H0; exact H | ].
   destruct (decide (n = USYS_read)); [ rewrite <- H1; rewrite <- H2; exact H | ].
@@ -299,7 +302,10 @@ Definition uvis_run (W : uvis) : uvis :=
   uvis_of_run (tf_resume_gpr0 (uvis_tf W))
               (ret_pc (tf_w (uvis_tf W) tf_epc_idx))
               (uvis_M W) (uvis_perm W) (uvis_sz W) (uvis_fd W) (uvis_cwd W)
-              (uvis_gen W) (uvis_ch W) (uvis_pid W).
+              (uvis_gen W) (uvis_ch W) (uvis_pid W) (uvis_lazy W).
+
+Lemma uvis_run_lazy (W : uvis) : uvis_lazy (uvis_run W) = uvis_lazy W.
+Proof. reflexivity. Qed.
 
 Lemma uvis_run_length (W : uvis) : length (uvis_tf (uvis_run W)) = TFWORDS.
 Proof. exact (tf_of_length _ _). Qed.
@@ -385,14 +391,19 @@ Section Apply.
     (* ...and the PID, the tenth reading: getpid(2)'s answer is a reading of
        the key ([UexecSlot.uvis_pid]), so a slot sees it. *)
     uvis_pid W = uvis_pid W' ->
+    (* ...AND THE LAZY BIT, the eleventh: [ukc] carries it, because what a
+       continuation is told about its own table includes whether the fill
+       is empty ([ProcInv.proc_priv_core]'s invariant on
+       [ProcDefs.pv_lazy]). *)
+    uvis_lazy W = uvis_lazy W' ->
     (* the type ascription pins [Σ]: [uvis] is Σ-free, so without it the
        [⊣⊢] notation cannot elaborate [uslot]'s implicit [Σ] before it
        has to unify against [bi_car]. *)
     (uslot W : iProp Σ) ⊣⊢ uslot W'.
   Proof.
-    intros Hg Hp HM Hpi Hsz Hfd Hcw Hgn Hch Hpid.
+    intros Hg Hp HM Hpi Hsz Hfd Hcw Hgn Hch Hpid Hlz.
     rewrite (uslot_ukc W) (uslot_ukc W').
-    rewrite Hg Hp HM Hpi Hsz Hfd Hcw Hgn Hch Hpid. reflexivity.
+    rewrite Hg Hp HM Hpi Hsz Hfd Hcw Hgn Hch Hpid Hlz. reflexivity.
   Qed.
 
   (* ...AND THE RETURN CHANNEL SEES THOSE FOUR PLUS THE NUMBER AND THE TWO
@@ -414,6 +425,7 @@ Section Apply.
               uvis_gen W = uvis_gen W' ->
               uvis_ch W = uvis_ch W' ->
               uvis_pid W = uvis_pid W' ->
+              uvis_lazy W = uvis_lazy W' ->
               (S W : iProp Σ) ⊣⊢ S W')
       (sc : mword 64) (W W' : uvis) (f : sfam) :
     length (uvis_tf W) = TFWORDS ->
@@ -432,22 +444,24 @@ Section Apply.
     uvis_gen W = uvis_gen W' ->
     uvis_ch W = uvis_ch W' ->
     uvis_pid W = uvis_pid W' ->
+    uvis_lazy W = uvis_lazy W' ->
     (uexec_arm_F S sc W f : iProp Σ) ⊣⊢ uexec_arm_F S sc W' f.
   Proof.
-    intros HlW HlW' Hn Ha0 Ha1 Ha2 Hg Hp HM Hpi Hsz Hfd Hcw Hgn Hch Hpid.
+    intros HlW HlW' Hn Ha0 Ha1 Ha2 Hg Hp HM Hpi Hsz Hfd Hcw Hgn Hch Hpid Hlz.
     assert (Hsk : skey_eq W W')
       by (rewrite /skey_eq; split_and!;
           [ exact HM | exact Ha0 | exact Ha1 | exact Ha2 | exact Hfd | exact Hcw
-          | exact Hgn | exact Hch | exact Hpid | exact Hpi | exact Hsz ]).
+          | exact Hgn | exact Hch | exact Hpid | exact Hpi | exact Hsz
+          | exact Hlz ]).
     (* the BUMPED keys agree too, at every return value and every
        image/permission pair the row allows *)
     assert (Hb : forall (r : mword 64) (M' : gmap Z (bv 8))
                         (pi' : gmap (mword 27) uperm) (szv' : Z)
                         (fdv' : list fdstate) (cw' : Z) (gn' : gname)
-                        (cs' : gset gname),
-                   (S (bump W r M' pi' szv' fdv' cw' gn' cs') : iProp Σ)
-                     ⊣⊢ S (bump W' r M' pi' szv' fdv' cw' gn' cs')).
-    { intros r M' pi' szv' fdv' cw' gn' cs'.
+                        (cs' : gset gname) (lz' : bool),
+                   (S (bump W r M' pi' szv' fdv' cw' gn' cs' lz') : iProp Σ)
+                     ⊣⊢ S (bump W' r M' pi' szv' fdv' cw' gn' cs' lz')).
+    { intros r M' pi' szv' fdv' cw' gn' cs' lz'.
       apply HS;
         cbn [bump bump_at uvis_tf uvis_M uvis_perm uvis_sz uvis_fd uvis_cwd
              uvis_gen uvis_ch uvis_pid].
@@ -471,19 +485,23 @@ Section Apply.
       - reflexivity.
       (* the two keys' pids are the two keys' own, which is the premise:
          [bump] keeps the key's pid rather than taking one *)
-      - exact Hpid. }
+      - exact Hpid.
+      (* ...and the two bumped keys carry the SAME lazy bit: it is the
+         row's own [lz'], bound outside *)
+      - reflexivity. }
     rewrite /uexec_arm_F /uexec_fork_parent_F /ufork_ans /uexec_ret_cont_F
             /uexec_wait_F /uexec_ret_cont_gen. cbv zeta.
     destruct (decide (sc = uecall_scause)) as [_ | _];
       [ | (* the payment is at the FAMILY and reads no key row, so the
              transparent arm transports exactly as its slot does *)
         apply bi.wand_proper;
-        [ reflexivity | exact (HS W W' Hg Hp HM Hpi Hsz Hfd Hcw Hgn Hch Hpid) ] ].
+        [ reflexivity
+        | exact (HS W W' Hg Hp HM Hpi Hsz Hfd Hcw Hgn Hch Hpid Hlz) ] ].
     (* [Hfd] joins the other four: the returning arm's row reads the ENTRY
        descriptor view, so both sides have to name the same one before the
        trapframe transport can be the only difference left.  [Hcw] the
        same: the cwd row reads the entry inum. *)
-    rewrite Hn HM Hpi Hsz Hfd Hcw Hgn Hch Hpid.
+    rewrite Hn HM Hpi Hsz Hfd Hcw Hgn Hch Hpid Hlz.
     destruct (decide (usys_num (uvis_tf W') = USYS_exit)) as [_ | _];
       [ reflexivity | ].
     destruct (decide (usys_num (uvis_tf W') = USYS_fork)) as [_ | _].
@@ -494,24 +512,24 @@ Section Apply.
       + iIntros "H1 Hpay" (r fdv' cw' cs' Hr).
         iDestruct ("H1" with "Hpay") as "H1".
         rewrite -(Hb r (uvis_M W') (uvis_perm W') (uvis_sz W') fdv' cw'
-                    (uvis_gen W') cs').
+                    (uvis_gen W') cs' (uvis_lazy W')).
         iApply ("H1" $! r fdv' cw' cs'). iPureIntro. exact Hr.
       + iIntros "H1 Hpay" (r fdv' cw' cs' Hr).
         iDestruct ("H1" with "Hpay") as "H1".
         rewrite (Hb r (uvis_M W') (uvis_perm W') (uvis_sz W') fdv' cw'
-                   (uvis_gen W') cs').
+                   (uvis_gen W') cs' (uvis_lazy W')).
         iApply ("H1" $! r fdv' cw' cs'). iPureIntro. exact Hr.
     - (* wait's arm: the returning arm with the kernel's answer in place of
          the quiet row.  The answer reads the return value and the two
          sets and no trapframe word, so it transports on the nose. *)
       destruct (decide (usys_num (uvis_tf W') = USYS_wait)) as [_ | _].
       { iSplit.
-        + iIntros "H Hpay" (r M' pi' szv' fdv' cw' gn' cs') "%Hmo %Hfo %Hpo %Hco %Hgo %Hpio Hcho Hsp".
+        + iIntros "H Hpay" (r M' pi' szv' fdv' cw' gn' cs' lz') "%Hmo %Hfo %Hpo %Hco %Hgo %Hpio Hcho Hsp".
           iDestruct ("H" with "Hpay") as "H".
           rewrite -(Hb r M' pi' szv' fdv' cw' gn' cs').
           iApply ("H" $! r M' pi' szv' fdv' cw' gn' cs'
                     with "[%] [%] [%] [%] [%] [%] [Hcho] [Hsp]").
-          * exact (usys_mem_ok_args _ (uvis_tf W') (uvis_tf W) r _ _ _ _ _ _
+          * exact (usys_mem_ok_args _ (uvis_tf W') (uvis_tf W) r _ _ _ _ _ _ _ _
                      (eq_sym Ha0) (eq_sym Ha1) (eq_sym Ha2) Hmo).
           * exact (usys_fd_ok_arg_cong _ (uvis_tf W') (uvis_tf W) _ _ _
                      (eq_sym Ha0) Hfo).
@@ -524,12 +542,12 @@ Section Apply.
           * iEval (rewrite (spost_at_cong S (usys_num (uvis_tf W')) f W' W r
                               M' fdv' cw' cs' (skey_eq_sym W W' Hsk))) in "Hsp".
             iExact "Hsp".
-        + iIntros "H Hpay" (r M' pi' szv' fdv' cw' gn' cs') "%Hmo %Hfo %Hpo %Hco %Hgo %Hpio Hcho Hsp".
+        + iIntros "H Hpay" (r M' pi' szv' fdv' cw' gn' cs' lz') "%Hmo %Hfo %Hpo %Hco %Hgo %Hpio Hcho Hsp".
           iDestruct ("H" with "Hpay") as "H".
           rewrite (Hb r M' pi' szv' fdv' cw' gn' cs').
           iApply ("H" $! r M' pi' szv' fdv' cw' gn' cs'
                     with "[%] [%] [%] [%] [%] [%] [Hcho] [Hsp]").
-          * exact (usys_mem_ok_args _ (uvis_tf W) (uvis_tf W') r _ _ _ _ _ _
+          * exact (usys_mem_ok_args _ (uvis_tf W) (uvis_tf W') r _ _ _ _ _ _ _ _
                      Ha0 Ha1 Ha2 Hmo).
           * exact (usys_fd_ok_arg_cong _ (uvis_tf W) (uvis_tf W') _ _ _
                      Ha0 Hfo).
@@ -543,12 +561,12 @@ Section Apply.
                               M' fdv' cw' cs' Hsk)) in "Hsp". iExact "Hsp". } 
     (* the returning arms: the row transports by SS3 *)
       iSplit.
-      + iIntros "H Hpay" (r M' pi' szv' fdv' cw' gn' cs') "%Hmo %Hfo %Hpo %Hco %Hgo %Hpio %Hcho Hsp".
+      + iIntros "H Hpay" (r M' pi' szv' fdv' cw' gn' cs' lz') "%Hmo %Hfo %Hpo %Hco %Hgo %Hpio %Hcho Hsp".
         iDestruct ("H" with "Hpay") as "H".
         rewrite -(Hb r M' pi' szv' fdv' cw' gn' cs').
         iApply ("H" $! r M' pi' szv' fdv' cw' gn' cs'
                   with "[%] [%] [%] [%] [%] [%] [%] [Hsp]").
-        * exact (usys_mem_ok_args _ (uvis_tf W') (uvis_tf W) r _ _ _ _ _ _
+        * exact (usys_mem_ok_args _ (uvis_tf W') (uvis_tf W) r _ _ _ _ _ _ _ _
                    (eq_sym Ha0) (eq_sym Ha1) (eq_sym Ha2) Hmo).
         * exact (usys_fd_ok_arg_cong _ (uvis_tf W') (uvis_tf W) _ _ _
                    (eq_sym Ha0) Hfo).
@@ -567,12 +585,12 @@ Section Apply.
         * iEval (rewrite (spost_at_cong S (usys_num (uvis_tf W')) f W' W r
                             M' fdv' cw' cs' (skey_eq_sym W W' Hsk))) in "Hsp".
           iExact "Hsp".
-      + iIntros "H Hpay" (r M' pi' szv' fdv' cw' gn' cs') "%Hmo %Hfo %Hpo %Hco %Hgo %Hpio %Hcho Hsp".
+      + iIntros "H Hpay" (r M' pi' szv' fdv' cw' gn' cs' lz') "%Hmo %Hfo %Hpo %Hco %Hgo %Hpio %Hcho Hsp".
         iDestruct ("H" with "Hpay") as "H".
         rewrite (Hb r M' pi' szv' fdv' cw' gn' cs').
         iApply ("H" $! r M' pi' szv' fdv' cw' gn' cs'
                   with "[%] [%] [%] [%] [%] [%] [%] [Hsp]").
-        * exact (usys_mem_ok_args _ (uvis_tf W) (uvis_tf W') r _ _ _ _ _ _
+        * exact (usys_mem_ok_args _ (uvis_tf W) (uvis_tf W') r _ _ _ _ _ _ _ _
                    Ha0 Ha1 Ha2 Hmo).
         * exact (usys_fd_ok_arg_cong _ (uvis_tf W) (uvis_tf W') _ _ _
                    Ha0 Hfo).
@@ -603,6 +621,7 @@ Section Apply.
     uvis_gen W = uvis_gen W' ->
     uvis_ch W = uvis_ch W' ->
     uvis_pid W = uvis_pid W' ->
+    uvis_lazy W = uvis_lazy W' ->
     (uexec_arm sc W f : iProp Σ) ⊣⊢ uexec_arm sc W' f.
   Proof. exact (uexec_arm_F_key_cong uslot uslot_key_cong sc W W' f). Qed.
 
@@ -622,6 +641,7 @@ Section Apply.
               uvis_gen W = uvis_gen W' ->
               uvis_ch W = uvis_ch W' ->
               uvis_pid W = uvis_pid W' ->
+              uvis_lazy W = uvis_lazy W' ->
               (S W : iProp Σ) ⊣⊢ S W')
       (sc : mword 64) (W : uvis) (f : sfam) :
     length (uvis_tf W) = TFWORDS ->
@@ -633,7 +653,7 @@ Section Apply.
              (eq_sym (uvis_run_arg1 W)) (eq_sym (uvis_run_arg2 W))
              (eq_sym (uvis_run_gpr W))
              (eq_sym (uvis_run_pc W)) eq_refl eq_refl eq_refl eq_refl eq_refl
-             eq_refl eq_refl eq_refl).
+             eq_refl eq_refl eq_refl eq_refl).
   Qed.
 
   Lemma uexec_arm_run (sc : mword 64) (W : uvis) (f : sfam) :
@@ -811,6 +831,7 @@ Section LoopApply.
               uvis_gen W = uvis_gen W' ->
               uvis_ch W = uvis_ch W' ->
               uvis_pid W = uvis_pid W' ->
+              uvis_lazy W = uvis_lazy W' ->
               (S W : iProp Σ) ⊣⊢ S W')
       (W W' : uvis) (f : sfam) (r : mword 64)
       (* THE CHILDREN ROW IS A PARAMETER, for [UexecRet.uexec_ret_cont_gen]'s
@@ -825,8 +846,8 @@ Section LoopApply.
     uvis_gen W' = uvis_gen W ->
     uround_bump_ok (uvis_tf (uvis_run W)) (uvis_tf W') r ->
     usys_mem_ok (usys_num (uvis_tf (uvis_run W))) (uvis_tf (uvis_run W)) r
-      (uvis_M W) (uvis_perm W) (uvis_sz W)
-      (uvis_M W') (uvis_perm W') (uvis_sz W') ->
+      (uvis_M W) (uvis_perm W) (uvis_sz W) (uvis_lazy W)
+      (uvis_M W') (uvis_perm W') (uvis_sz W') (uvis_lazy W') ->
     usys_fd_ok (usys_num (uvis_tf (uvis_run W))) (uvis_tf (uvis_run W))
       (uvis_tf W' !!! tf_arg_idx 0) (uvis_fd W) (uvis_fd W') ->
     usys_pipe_ok (usys_num (uvis_tf (uvis_run W))) (uvis_tf (uvis_run W))
@@ -864,9 +885,10 @@ Section LoopApply.
       (uvis_ch W') -∗
     (∀ (r' : mword 64) (M' : gmap Z (bv 8)) (π' : gmap (mword 27) uperm)
        (szv' : Z) (fdv' : list fdstate) (cw' : Z) (gn' : gname)
-       (cs' : gset gname),
+       (cs' : gset gname) (lz' : bool),
        ⌜usys_mem_ok (usys_num (uvis_tf (uvis_run W))) (uvis_tf (uvis_run W))
-                    r' (uvis_M W) (uvis_perm W) (uvis_sz W) M' π' szv'⌝ -∗
+                    r' (uvis_M W) (uvis_perm W) (uvis_sz W) (uvis_lazy W)
+                    M' π' szv' lz'⌝ -∗
        ⌜usys_fd_ok (usys_num (uvis_tf (uvis_run W))) (uvis_tf (uvis_run W))
                    r' (uvis_fd W) fdv'⌝ -∗
        ⌜usys_pipe_ok (usys_num (uvis_tf (uvis_run W))) (uvis_tf (uvis_run W))
@@ -877,7 +899,7 @@ Section LoopApply.
        CH r' cs' -∗
        spost_at S (usys_num (uvis_tf (uvis_run W))) f (uvis_run W) r'
          M' fdv' cw' cs' -∗
-       S (bump (uvis_run W) r' M' π' szv' fdv' cw' gn' cs')) -∗
+       S (bump (uvis_run W) r' M' π' szv' fdv' cw' gn' cs' lz')) -∗
     S W'.
   Proof.
     intros Hl Hgn [Hb1 Hb2] Hm Hfdrow Hpiperow Hcwrow Hpidrow Hpidk.
@@ -918,6 +940,7 @@ Section LoopApply.
     iEval (rewrite Ha0) in "Hch".
     iDestruct ("Hret" $! r (uvis_M W') (uvis_perm W') (uvis_sz W')
                  (uvis_fd W') (uvis_cwd W') (uvis_gen W') (uvis_ch W')
+                 (uvis_lazy W')
                  with "[%] [%] [%] [%] [%] [%] Hch Hsp") as "Hs";
       [ exact Hm | rewrite <- Ha0; exact Hfdrow
       | rewrite <- Ha0; exact Hpiperow | exact Hcwrow
@@ -928,9 +951,9 @@ Section LoopApply.
       exact (eq_sym Hb2). }
     iEval (rewrite (HS (bump (uvis_run W) r (uvis_M W') (uvis_perm W')
                           (uvis_sz W') (uvis_fd W') (uvis_cwd W')
-                          (uvis_gen W') (uvis_ch W')) W'
+                          (uvis_gen W') (uvis_ch W') (uvis_lazy W')) W'
                       Hg1 Hp1 eq_refl eq_refl eq_refl eq_refl eq_refl
-                      eq_refl eq_refl (eq_sym Hpidk))) in "Hs".
+                      eq_refl eq_refl (eq_sym Hpidk) eq_refl)) in "Hs".
     iExact "Hs".
   Qed.
 
@@ -993,8 +1016,9 @@ Section LoopApply.
        separately -- the transparent arm pins it, the returning arm reads
        [UsysMemOk.usys_cwd_ok] off the round's own conjunct. *)
     uround_ok sc (uvis_tf (uvis_run W)) (uvis_M W) (uvis_perm W) (uvis_sz W)
-      (uvis_cwd W)
-      (uvis_tf W') (uvis_M W') (uvis_perm W') (uvis_sz W') (uvis_cwd W') ->
+      (uvis_cwd W) (uvis_lazy W)
+      (uvis_tf W') (uvis_M W') (uvis_perm W') (uvis_sz W') (uvis_cwd W')
+      (uvis_lazy W') ->
     (* THE KERNEL'S EXEC ANSWER:
        exec is the one entry whose round says nothing, because the record it
        leaves is a DIFFERENT program's.  The dispatcher answers with the
@@ -1006,8 +1030,8 @@ Section LoopApply.
        (⌜exists r : mword 64,
            uround_bump_ok (uvis_tf (uvis_run W)) (uvis_tf W') r
            /\ usys_mem_ok USYS_exec (uvis_tf (uvis_run W)) r
-                (uvis_M W) (uvis_perm W) (uvis_sz W)
-                (uvis_M W') (uvis_perm W') (uvis_sz W')
+                (uvis_M W) (uvis_perm W) (uvis_sz W) (uvis_lazy W)
+                (uvis_M W') (uvis_perm W') (uvis_sz W') (uvis_lazy W')
            /\ uvis_fd W' = uvis_fd W⌝
         (* ...AND THE SUCCESS ARM TAKES THE PAYMENT (EXEC-PAY).  exec keeps
            the process: the record the kernel resumes is a different
@@ -1069,7 +1093,8 @@ Section LoopApply.
       rewrite Hec in Hr.
       destruct (uround_ok_ecall (uvis_tf (uvis_run W)) (uvis_M W) (uvis_M W')
                   (uvis_perm W) (uvis_perm W') (uvis_sz W) (uvis_sz W')
-                  (uvis_cwd W) (uvis_cwd W') (uvis_tf W') Hr)
+                  (uvis_cwd W) (uvis_cwd W') (uvis_lazy W) (uvis_lazy W')
+                  (uvis_tf W') Hr)
         as [[Hexec Hcwx] | [Hnex [r [Hb [Hm Hc]]]]].
       + (* exec: the round says NOTHING by design -- the kernel answers *)
         cbv zeta.
@@ -1135,7 +1160,7 @@ Section LoopApply.
              it is spent.  The parent therefore always resumes on the
              program's own arm; nothing is minted here. *)
           assert (Hrne : r <> (mword_of_int 0 : mword 64))
-            by exact (usys_mem_ok_fork_nz _ _ _ _ _ _ _ _ _ Hfk Hm).
+            by exact (usys_mem_ok_fork_nz _ _ _ _ _ _ _ _ _ _ _ Hfk Hm).
           (* fork's three rows, read off the table's defaults *)
           assert (Hne7 : usys_num (uvis_tf (uvis_run W)) <> USYS_exec)
             by (rewrite Hfk; vm_compute; discriminate).
@@ -1160,7 +1185,10 @@ Section LoopApply.
           destruct (usys_mem_ok_quiet (usys_num (uvis_tf (uvis_run W)))
                       (uvis_tf (uvis_run W)) r (uvis_M W) (uvis_M W')
                       (uvis_perm W) (uvis_perm W') (uvis_sz W) (uvis_sz W')
+                      (uvis_lazy W) (uvis_lazy W')
                       Hne7 Hne12 Hne3 Hne4 Hne5 Hne8 Hm) as (HM' & Hpi' & Hsz').
+          assert (Hlz' : uvis_lazy W' = uvis_lazy W)
+            by exact (usys_mem_ok_lazy _ _ _ _ _ _ _ _ _ _ _ Hne12 Hm).
           assert (Hfd' : uvis_fd W' = uvis_fd W)
             by exact (usys_fd_ok_quiet (usys_num (uvis_tf (uvis_run W)))
                         (uvis_tf (uvis_run W)) (uvis_tf W' !!! tf_arg_idx 0)
@@ -1204,10 +1232,11 @@ Section LoopApply.
                             (bump (uvis_run W) r (uvis_M (uvis_run W))
                                (uvis_perm (uvis_run W)) (uvis_sz (uvis_run W))
                                (uvis_fd W') (uvis_cwd W')
-                               (uvis_gen (uvis_run W)) (uvis_ch W'))
+                               (uvis_gen (uvis_run W)) (uvis_ch W')
+                               (uvis_lazy (uvis_run W)))
                             W' Hg1 Hp1 (eq_sym HM') (eq_sym Hpi') (eq_sym Hsz')
                             eq_refl eq_refl (eq_sym Hgn) eq_refl
-                            (eq_sym Hpidk))) in "Hs".
+                            (eq_sym Hpidk) (eq_sym Hlz'))) in "Hs".
           iExact "Hs".
         * (* the returning arms: the row is the round's own conjunct *)
           iDestruct ("Hsp" with "[%]") as "Hsp";
@@ -1248,7 +1277,8 @@ Section LoopApply.
       destruct (uround_ok_transparent sc (uvis_tf (uvis_run W))
                   (uvis_M W) (uvis_M W') (uvis_perm W) (uvis_perm W')
                   (uvis_sz W) (uvis_sz W') (uvis_cwd W) (uvis_cwd W')
-                  (uvis_tf W') Hne Hr) as [[Hi1 Hi2] [HM [Hpi [Hsz Hcw]]]].
+                  (uvis_lazy W) (uvis_lazy W')
+                  (uvis_tf W') Hne Hr) as [[Hi1 Hi2] [HM [Hpi [Hsz [Hcw Hlz]]]]].
       assert (Hchq : uvis_ch W' = uvis_ch W)
         by (apply Hch; intros [Hx _]; exact (Hne Hx)).
       iDestruct ("Hret" with "Hpay") as "Hret".
@@ -1256,7 +1286,8 @@ Section LoopApply.
                         (eq_sym Hi1) (eq_sym Hi2)
                         (eq_sym HM) (eq_sym Hpi) (eq_sym Hsz)
                         (eq_sym (Hfd Hne)) (eq_sym Hcw)
-                        (eq_sym Hgn) (eq_sym Hchq) (eq_sym Hpidk))) in "Hret".
+                        (eq_sym Hgn) (eq_sym Hchq) (eq_sym Hpidk)
+                        (eq_sym Hlz))) in "Hret".
       iExact "Hret".
   Qed.
 
@@ -1308,18 +1339,18 @@ Section LoopApply.
        inum rides inside the block, so the resumed key's [uvis_cwd] is
        [pv_cwi (us_V U')] by [uvis_of] itself -- no view to choose *)
     uround_ok sc (tf_of g (ret_pc sepc_v)) (uvis_M W) (uvis_perm W) (uvis_sz W)
-      (uvis_cwd W)
+      (uvis_cwd W) (uvis_lazy W)
       (pv_tf (us_V U')) (us_M U')
       (perm_of (ud_um (pv_upt (us_V U'))) (uint (pv_sz (us_V U'))))
-      (uint (pv_sz (us_V U'))) (pv_cwi (us_V U')) ->
+      (uint (pv_sz (us_V U'))) (pv_cwi (us_V U')) (pv_lazy (us_V U')) ->
     (⌜sc = uecall_scause /\ usys_num (tf_of g (ret_pc sepc_v)) = USYS_exec⌝ -∗
        (⌜exists r : mword 64,
            uround_bump_ok (tf_of g (ret_pc sepc_v)) (pv_tf (us_V U')) r
            /\ usys_mem_ok USYS_exec (tf_of g (ret_pc sepc_v)) r
-                (uvis_M W) (uvis_perm W) (uvis_sz W)
+                (uvis_M W) (uvis_perm W) (uvis_sz W) (uvis_lazy W)
                 (us_M U')
                 (perm_of (ud_um (pv_upt (us_V U'))) (uint (pv_sz (us_V U'))))
-                (uint (pv_sz (us_V U')))
+                (uint (pv_sz (us_V U'))) (pv_lazy (us_V U'))
            /\ fdv' = uvis_fd W⌝
         ∨ (uexec_pay_arm f -∗
              uslot (uvis_of U' fdv' (uvis_gen W) cs' (uvis_pid W))))) -∗
@@ -1367,20 +1398,20 @@ Section LoopApply.
                 ⊢ Rut pt' -∗ TsoCtx.own_context XI ∗
                              (TsoCtx.own_context XI -∗ Rut pt'))
       (sz : Z) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname)
-      (pidv : mword 32)
+      (pidv : mword 32) (lz : bool)
       (M : gmap Z (bv 8)) (m : regfile)
       (ms_v sc_v stv_v sepc_v pc : mword 64) :
     loop_ok C pt ->
     usz_ok sz ->
     user_mstatus_ok ms_v ->
-    ukc (perm_of (ud_um pt) sz) M sz fdv cw gn cs pidv m pc -∗
+    ukc (perm_of (ud_um pt) sz) M sz fdv cw gn cs pidv lz m pc -∗
     hw_config -∗ minstret_inv -∗ wire_inv -∗
     u_regs (HART_ACTIVE tt) ms_v sc_v stv_v sepc_v pc pc m -∗
     user_ptm_inv_x pt sz M -∗
     Rfd fdv -∗
     user_cfg C -∗
     Rut pt -∗
-    ▷ ukb C pt Rfd Rut sz (perm_of (ud_um pt) sz) fdv cw gn cs pidv -∗
+    ▷ ukb C pt Rfd Rut sz (perm_of (ud_um pt) sz) fdv cw gn cs pidv lz -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hlo Hsz Hms.
@@ -1416,7 +1447,7 @@ Section LoopApply.
                 ⊢ Rut pt' -∗ TsoCtx.own_context XI ∗
                              (TsoCtx.own_context XI -∗ Rut pt'))
       (sz : Z) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname)
-      (pidv : mword 32)
+      (pidv : mword 32) (lz : bool)
       (W : uvis) (M : gmap Z (bv 8))
       (m : regfile) (ms_v sc_v stv_v sepc_v pc : mword 64) :
     loop_ok C pt ->
@@ -1430,6 +1461,7 @@ Section LoopApply.
     uvis_gen W = gn ->
     uvis_ch W = cs ->
     uvis_pid W = pidv ->
+    uvis_lazy W = lz ->
     tf_resume_gpr0 (uvis_tf W) = m ->
     tf_resume_pc (uvis_tf W) = pc ->
     uslot W -∗
@@ -1439,16 +1471,16 @@ Section LoopApply.
     Rfd fdv -∗
     user_cfg C -∗
     Rut pt -∗
-    ▷ ukb C pt Rfd Rut sz (perm_of (ud_um pt) sz) fdv cw gn cs pidv -∗
+    ▷ ukb C pt Rfd Rut sz (perm_of (ud_um pt) sz) fdv cw gn cs pidv lz -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hlo Hsz Hms Hpi HM Hsw Hfd Hcw Hgn Hch Hpid Hg Hpc.
+    intros Hlo Hsz Hms Hpi HM Hsw Hfd Hcw Hgn Hch Hpid Hlz Hg Hpc.
     iIntros "Hs".
     (* the seal comes off the HYPOTHESIS only *)
     iEval (rewrite uslot_ukc) in "Hs".
-    iEval (rewrite Hpi HM Hsw Hfd Hcw Hgn Hch Hpid Hg Hpc) in "Hs".
-    iApply (ukc_apply C pt Rfd Rut HRut sz fdv cw gn cs pidv M m ms_v sc_v stv_v
-              sepc_v pc Hlo Hsz Hms with "Hs").
+    iEval (rewrite Hpi HM Hsw Hfd Hcw Hgn Hch Hpid Hlz Hg Hpc) in "Hs".
+    iApply (ukc_apply C pt Rfd Rut HRut sz fdv cw gn cs pidv lz M m ms_v sc_v
+              stv_v sepc_v pc Hlo Hsz Hms with "Hs").
   Qed.
 
 End LoopApply.

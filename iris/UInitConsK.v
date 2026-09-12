@@ -687,7 +687,7 @@ Section UInitConsK.
     iDestruct (init_cons_ro_sub N M pm sz with "Hheap Hro") as %Hsro.
     iFrame "Hheap Hufd".
     iApply (sbundle_at_open_intro_at uslot (init_cons_absent_fam T K (ukn_pay N))
-              (uvis_of_run m pc M pm sz fdv FsImg.ROOTINO gn cs pidv)
+              (uvis_of_run m pc M pm sz fdv FsImg.ROOTINO gn cs pidv false)
               FsImg.ROOTINO M (mword_of_int 0x970) (mword_of_int 2)
               eq_refl eq_refl
               (eq_trans (tf_of_arg0 m pc) Ha0)
@@ -728,7 +728,7 @@ Section UInitConsK.
     iFrame "Hheap Hufd".
     iApply (sbundle_at_open_intro_at uslot
               (init_cons_console_fam T i (ukn_pay N))
-              (uvis_of_run m pc M pm sz fdv FsImg.ROOTINO gn cs pidv)
+              (uvis_of_run m pc M pm sz fdv FsImg.ROOTINO gn cs pidv false)
               FsImg.ROOTINO M (mword_of_int 0x970) (mword_of_int 2)
               eq_refl eq_refl
               (eq_trans (tf_of_arg0 m pc) Ha0)
@@ -770,7 +770,7 @@ Section UInitConsK.
     iFrame "Hheap Hufd".
     iApply (sbundle_at_mknod_intro_at uslot
               (init_cons_mknod_fam T K r (ukn_pay N))
-              (uvis_of_run m pc M pm sz fdv FsImg.ROOTINO gn cs pidv)
+              (uvis_of_run m pc M pm sz fdv FsImg.ROOTINO gn cs pidv false)
               FsImg.ROOTINO M (mword_of_int 0x970) CONSOLE 0
               eq_refl eq_refl
               (eq_trans (tf_of_arg0 m pc) Ha0)

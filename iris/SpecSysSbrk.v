@@ -106,12 +106,20 @@ Definition sbrk_eager (v1 : mword 64) : Prop :=
    GREW arm, over a range the table never backs), and FAILED moves
    nothing.  See [growproc_ok]'s header for why the lazy [proc_ptm] view
    makes every one of these an equation. *)
+(* ...AND THE LAZY BIT IS NAMED AT THE BLOCK LEVEL (lane LAZY-FLAG, K3).
+   sbrk is the ONE entry that writes [ProcDefs.pv_lazy], and which arm ran
+   is exactly what decides it: the LAZY grow raises [p->sz] with the table
+   untouched -- that IS a hole -- so it sets the bit; the EAGER path and
+   every failure leave it where it was.  The kernel's own row
+   ([UsysMemOk.usys_sbrk_lazy]) is READ OFF this, through
+   [SpecSyscall.sysc_mem_ok]'s sbrk branch. *)
 Definition sys_sbrk_ok (V : pprivate) (v0 v1 : mword 64)
-    (P' : uptd) (szv' r : mword 64) (M M' : gmap Z (bv 8)) : Prop :=
+    (P' : uptd) (szv' r : mword 64) (lz' : bool) (M M' : gmap Z (bv 8)) : Prop :=
   (* FAILED -- and failure is total: neither half of the address space
      moved.  All three failure arms (growproc's, and the lazy path's
      TRAPFRAME test) return before writing anything. *)
-  (r = (mword_of_int (-1) : mword 64) /\ P' = pv_upt V /\ szv' = pv_sz V /\ M' = M)
+  (r = (mword_of_int (-1) : mword 64) /\ P' = pv_upt V /\ szv' = pv_sz V /\ M' = M
+   /\ lz' = pv_lazy V)
   \/
   (* SUCCEEDED -- the answer is the OLD size, which is sbrk's contract with
      userspace, and one of the two paths ran. *)
@@ -120,7 +128,10 @@ Definition sys_sbrk_ok (V : pprivate) (v0 v1 : mword 64)
         this is its own postcondition at a return value of 0. *)
      ( (sbrk_eager v1 \/ (sint (sbrk_arg v0) < 0)%Z) /\
        growproc_ok (pv_sz V) (sbrk_arg v0) (pv_upt V) P' szv'
-                   (mword_of_int 0 : mword 64) M M' )
+                   (mword_of_int 0 : mword 64) M M' /\
+       (* growproc maps the run it grows by and lowers the break below
+          everything it unmaps, so this path keeps the bit *)
+       lz' = pv_lazy V )
      \/
      (* LAZY: the size alone moves, the table does not, and the new size is
         inside the user region.  vmfault backs the pages on demand; at the
@@ -136,7 +147,10 @@ Definition sys_sbrk_ok (V : pprivate) (v0 v1 : mword 64)
           comparison, and this is the one place the no-wrap argument is
           already in hand. *)
        (uint (pv_sz V) <= uint szv')%Z /\
-       M' = umem_grow M (uint szv') ) )).
+       M' = umem_grow M (uint szv') /\
+       (* THE ONE WRITE: the break rose over an untouched table, so the
+          projection's fill is no longer empty and the bit says so. *)
+       lz' = true ) )).
 
 Definition wp_sys_sbrk_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !wchG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γa : gname) (γf : gname)
@@ -158,14 +172,17 @@ Definition wp_sys_sbrk_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslot
   wp_next b p (fun (CID : CpuId) =>
     (* sys_sbrk's whole effect on user memory is [p->sz] moving, on either
        path; see [sys_sbrk_ok]'s header. *)
-  ∀ (mf : regfile) (P' : uptd) (szv' : mword 64) (M' : gmap Z (bv 8)),
+  ∀ (mf : regfile) (P' : uptd) (szv' : mword 64) (lz' : bool)
+      (M' : gmap Z (bv 8)),
       ⌜callee_saved m mf⌝ -∗
       ⌜sys_sbrk_ok (us_V U) v0 v1 P' szv'
-         (mf !!! Regidx (mword_of_int 10 : mword 5)) (us_M U) M'⌝ -∗
+         (mf !!! Regidx (mword_of_int 10 : mword 5)) lz' (us_M U) M'⌝ -∗
       sie_cap_gpr KT1 mf av b p -∗
       cpu_own 0%nat eb p b lks -∗
       pc_is ret_tgt -∗
-      proc_priv γf p pid (upd_usM (upd_usV U (upd_sz (upd_upt (us_V U) P') szv')) M') -∗
+      proc_priv γf p pid
+        (upd_usM (upd_usV U
+                    (upd_lazy (upd_sz (upd_upt (us_V U) P') szv') lz')) M') -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

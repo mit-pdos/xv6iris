@@ -163,6 +163,27 @@ Record uvis := MkUvis {
      child's generation ([UexecRet.uexec_fork_child_F], [SpecKfork]'s slot
      premise). *)
   uvis_pid  : mword 32;
+  (* THE LAZY-PAGE FLAG (app-echo.md, "THE OWNER'S RULING ON THE FORK").
+     "This process MAY have pages the kernel has promised but not yet
+     mapped."  [uvis_perm] shows a live-but-unmapped page at [uperm_rw]
+     exactly as it shows a mapped RW page ([UserPerm.perm_of]'s fill), and
+     copyout can write only the second kind -- so a process that owns a
+     byte cannot, from [uvis_perm] alone, refute a copyout fault at it.
+     This bit is what closes that gap: at [false] the fill is EMPTY
+     ([UserPerm.lazy_free]) and every W page of the projection is a real
+     user leaf ([UserPerm.lazy_free_wmapped]).
+
+     A VALUE, for [uvis_fd]'s reason and [uvis_cwd]'s: the KERNEL holds the
+     bit ([ProcDefs.pv_lazy], whose meaning is [ProcInv.proc_priv_core]'s
+     own invariant) and the key carries what the boundary read off the
+     block.  It is STORED rather than computed because vmfault maps a page
+     -- so the table's own verdict moves across a trap the process cannot
+     see, while the trap loop's transparent arm returns the slot AT THE
+     SAME KEY; see [ProcDefs.pv_lazy]'s note.
+
+     LAST in the record, so every existing [MkUvis] and every componentwise
+     proof keeps its order. *)
+  uvis_lazy : bool;
 }.
 
 (* the projection from the kernel's process state to the slot's key: drop
@@ -187,7 +208,22 @@ Definition uvis_of (U : ustate) (sts : list fdstate) (g : gname)
          (uint (pv_sz (us_V U)))
          sts
          (pv_cwi (us_V U))
-         g cs pid.
+         g cs pid
+         (* ...AND THE LAZY BIT, off the block exactly as the cwd's inum is
+            ([ProcDefs.pv_lazy]).  No new argument: the boundary is holding
+            the block, so the bit is a PROJECTION of [ustate] the way the
+            permission map and the break are. *)
+         (pv_lazy (us_V U)).
+
+(* the key with its lazy bit replaced, and nothing else moved -- the shape
+   a syscall row that MOVES the bit is read at ([UexecRet.bump] takes it as
+   an argument; this is for the arms that do not bump). *)
+Definition uvis_lz (W : uvis) (lz : bool) : uvis :=
+  MkUvis (uvis_tf W) (uvis_M W) (uvis_perm W) (uvis_sz W) (uvis_fd W)
+         (uvis_cwd W) (uvis_gen W) (uvis_ch W) (uvis_pid W) lz.
+
+Lemma uvis_lz_id (W : uvis) : uvis_lz W (uvis_lazy W) = W.
+Proof. destruct W; reflexivity. Qed.
 
 (* ===================================================================== *)
 (* SS1 The trapframe as a word reader.                                     *)

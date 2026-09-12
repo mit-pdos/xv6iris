@@ -101,7 +101,7 @@ Notation KF := KernelSyms.kfork (only parsing).
    in this file reduces to. *)
 Lemma pprivate_eta (V : pprivate) :
   MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) (pv_fdg V) (pv_cwd V) (pv_name V)
-          (pv_cwi V) (pv_gen V) (pv_chg V) = V.
+          (pv_cwi V) (pv_gen V) (pv_chg V) (pv_lazy V) = V.
 Proof. destruct V; reflexivity. Qed.
 
 Lemma upd_cwd_id (V : pprivate) : upd_cwd V (pv_cwd V) = V.
@@ -157,7 +157,7 @@ Section KforkB4Res.
     pname_cells pa (DfracOwn 1) (pv_name (us_V U)) ∗
     ⌜length (pv_name (us_V U)) = PNAMELEN⌝ ∗
     (∀ ns : list (bv 8), ⌜length ns = PNAMELEN⌝ -∗ pname_cells pa (DfracOwn 1) ns -∗
-       proc_priv γf pa pid (upd_usV U (MkPPriv (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_tf (us_V U)) (pv_ofile (us_V U)) (pv_fdg (us_V U)) (pv_cwd (us_V U)) ns (pv_cwi (us_V U)) (pv_gen (us_V U)) (pv_chg (us_V U))))).
+       proc_priv γf pa pid (upd_usV U (MkPPriv (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_tf (us_V U)) (pv_ofile (us_V U)) (pv_fdg (us_V U)) (pv_cwd (us_V U)) ns (pv_cwi (us_V U)) (pv_gen (us_V U)) (pv_chg (us_V U)) (pv_lazy (us_V U))))).
   Proof.
     iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft & Hgq & Hxs & Hgh) Ho]".
     rewrite /proc_fields. iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
@@ -309,7 +309,12 @@ Section KforkB4Proof.
                generation is what the park keys the child's slot at
                ([ParkCap.park_cap] passes [ProcDefs.pv_gen]). *)
             pv_gen Vc' = pv_gen (us_V Uc) /\
-            pv_chg Vc' = pv_chg (us_V Uc)⌝ ∗
+            pv_chg Vc' = pv_chg (us_V Uc) /\
+            (* ...AND THE LAZY BIT, which this block does not touch either
+               (lane LAZY-FLAG): kfork writes it once, at the close after
+               uvmcopy ([ProofKforkB6]), and the child's run key reads it
+               ([KforkChild.urun_eq_kfork_child]). *)
+            pv_lazy Vc' = pv_lazy (us_V Uc)⌝ ∗
            proc_priv γf npa pid_c (MkUstate Vc' ((us_M Uc)))) -∗
         iref_slots IREFSPARE -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -637,7 +642,7 @@ Section KforkB4Proof.
     iDestruct ("HnmCback" $! (h <$> seq 0 16%nat) Hlen_hn with "HnmCfold") as "Hchild3".
     set (Vc3 := MkPPriv (pv_sz Vc2) (pv_upt Vc2) (pv_tf Vc2) (pv_ofile Vc2)
                   (pv_fdg Vc2) (pv_cwd Vc2) (h <$> seq 0 16%nat) (pv_cwi Vc2)
-                  (pv_gen Vc2) (pv_chg Vc2)).
+                  (pv_gen Vc2) (pv_chg Vc2) (pv_lazy Vc2)).
     (* ------------------------------------------------------------- *)
     (* +0xbe: lw s1,48(s4) -- s1 := np->pid, THE RETURN VALUE.        *)
     (* ------------------------------------------------------------- *)
@@ -684,13 +689,15 @@ Section KforkB4Proof.
                 length (pv_name Vc') = PNAMELEN /\
                 pv_cwi Vc' = pv_cwi (us_V Up) /\
                 pv_gen Vc' = pv_gen (us_V Uc) /\
-                pv_chg Vc' = pv_chg (us_V Uc)⌝ ∗
+                pv_chg Vc' = pv_chg (us_V Uc) /\
+                pv_lazy Vc' = pv_lazy (us_V Uc)⌝ ∗
                proc_priv γf npa pid_c (MkUstate Vc' ((us_M Uc))))%I
       with "[Hchild4]" as "HchildFinal".
     { iExists Vc3.
       iSplitR.
       - iPureIntro. rewrite /Vc3 /Vc2 /upd_cwi /upd_cwd.
-        cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_fdg pv_cwi pv_gen pv_chg].
+        cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_fdg pv_cwi pv_gen pv_chg
+             pv_lazy].
         rewrite Hcwd. repeat split; reflexivity.
       - iExact "Hchild4". }
     iSpecialize ("Hcont" $! CID0 with "[%]"); [intros _; reflexivity |].

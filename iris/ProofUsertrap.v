@@ -226,6 +226,11 @@ Section UtEntry.
           payment row and the post's [SpecUsertrap.ut_gen_kept] are keyed
           by. *)
        ⌜pv_gen V' = pv_gen (us_V U)⌝ -∗
+       (* ...AND ITS LAZY BIT, on the generation's footing exactly (lane
+          LAZY-FLAG): the prologue writes one trapframe word and no block
+          field, so [ProcDefs.pv_lazy] is the entry record's -- which is
+          what [SpecUsertrap.ut_pro]'s seventh row states. *)
+       ⌜pv_lazy V' = pv_lazy (us_V U)⌝ -∗
        pc_is (mword_of_int (UT + 0x30)) -∗
        sie_cap_gpr KT1 M (av - 4)%nat false (un_pj N) -∗
        cpu_own 0%nat false (un_pj N) false ∅ -∗ cpu_claim (un_pj N) -∗
@@ -676,7 +681,7 @@ Section UtEntry.
       iSplitL "Hb3"; [iExact "Hb3" | iExact "Hb4"]. }
     assert (HS3a4 : rget S3 Ra4 = ret_pc sepc_v)
       by (rgne; rewrite /S3; apply upd_eq).
-    iApply ("Hcont" $! S3 V' with "[%] [%] [%] [%] [%] [%] [%] [%] [%] Hpc Hcg Hcpu Hclm
+    iApply ("Hcont" $! S3 V' with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hpc Hcg Hcpu Hclm
               Hraw Henv Hfr").
     - exact HS3sp.
     - exact HS3s1.
@@ -687,6 +692,8 @@ Section UtEntry.
     - rewrite /V'; destruct (us_V U); reflexivity.
     - rewrite /V'; destruct (us_V U); reflexivity.
     - (* ...and the generation: the prologue writes one trapframe word *)
+      rewrite /V'; destruct (us_V U); reflexivity.
+    - (* ...and the lazy bit, for the generation's reason (lane LAZY-FLAG) *)
       rewrite /V'; destruct (us_V U); reflexivity.
   Qed.
 
@@ -922,7 +929,7 @@ Section UtDispatch.
          below run at: the prologue writes one trapframe word and no
          incarnation ([SpecUsertrap.ut_pro]'s own generation row). *)
       iAssert (my_pay (pv_gen (us_V U)) (sexit_pay fdep)) as "#Hmyu".
-      { rewrite (proj2 (proj2 (proj2 (proj2 (proj2 Hpro))))). iExact "Hmyp". }
+      { rewrite (proj1 (proj2 (proj2 (proj2 (proj2 (proj2 Hpro)))))). iExact "Hmyp". }
       iApply (wp_beq_fall_s_sconf (mword_of_int (UT + 0x36))
                 (mword_of_int 90 : mword 13) Ra5 Ra4 D2 nx false
                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
@@ -1019,7 +1026,7 @@ Section UtDispatch.
           rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"]. }
         iApply (A.ut_e8 SY.syscall_env N U0 U pt ksp m0 D4 av nx
                   mie_v menvcfg0 ep sc ∅ sts gn cs pid fdep
-                  Hwf' ltac:(exact (proj2 (proj2 (proj2 (proj2 (proj2 Hpro))))))
+                  Hwf' ltac:(exact (proj1 (proj2 (proj2 (proj2 (proj2 (proj2 Hpro)))))))
                   Hav Hnx Htfpe Hksp Hm0sp HD4sp HD4s1 HcsD4
                   Hmiev Hmenvv (ut_round_entry ep sc U0 U Hscne Hpro)
                   (* the transparent arms' defining cause, off the dispatch's own
@@ -1099,7 +1106,7 @@ Section UtDispatch.
             rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"]. }
           iApply (A.ut_d0 SY.syscall_env N U0 U pt ksp m0 D6 av nx
                     mie_v menvcfg0 ep sc ∅ sts gn cs pid fdep
-                    Hpk Hwf' ltac:(exact (proj2 (proj2 (proj2 (proj2 (proj2 Hpro))))))
+                    Hpk Hwf' ltac:(exact (proj1 (proj2 (proj2 (proj2 (proj2 (proj2 Hpro)))))))
                     Hav Hnx Htfpe Hksp Hm0sp HD6sp HD6s1 HcsD6
                     Hmiev Hmenvv (ut_round_entry ep sc U0 U Hscne Hpro)
                     (* the transparent arms' defining cause, off the dispatch's own
@@ -1181,7 +1188,7 @@ Section UtDispatch.
                rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"]. }
              iApply (A.ut_d0 SY.syscall_env N U0 U pt ksp m0 D8 av nx
                        mie_v menvcfg0 ep sc ∅ sts gn cs pid fdep
-                       Hpk Hwf' ltac:(exact (proj2 (proj2 (proj2 (proj2 (proj2 Hpro))))))
+                       Hpk Hwf' ltac:(exact (proj1 (proj2 (proj2 (proj2 (proj2 (proj2 Hpro)))))))
                        Hav Hnx Htfpe Hksp Hm0sp HD8sp HD8s1 HcsD8
                        Hmiev Hmenvv (ut_round_entry ep sc U0 U Hscne Hpro)
                        (* the transparent arms' defining cause, off the dispatch's own
@@ -1206,7 +1213,7 @@ Section UtDispatch.
                rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"]. }
              iApply (A.ut_56 SY.syscall_env N U0 U pt ksp m0 D8 av nx
                        mie_v menvcfg0 ep sc ∅ sts gn cs pid fdep
-                       Hpk Hwf' ltac:(exact (proj2 (proj2 (proj2 (proj2 (proj2 Hpro))))))
+                       Hpk Hwf' ltac:(exact (proj1 (proj2 (proj2 (proj2 (proj2 (proj2 Hpro)))))))
                        Hav Hnx Htfpe Hksp Hm0sp HD8sp HD8s1 HcsD8
                        Hmiev Hmenvv (ut_round_entry ep sc U0 U Hscne Hpro)
                        (* the transparent arms' defining cause, off the dispatch's own
@@ -1416,11 +1423,12 @@ Section UtSeal.
               Hms Hav Hsp Htp Hmiev Hmask Hmenvv
               with "Htext Hpc Hhw Hminv Hhs Hpriv Hms Hsc Hst Hep Hstv
                     Hmie Hmdl Hmenv Hgpr Htc Htrap Henv [Hcont Hxin Hfin Hein]").
-    iIntros (M V') "%HMsp %HMs1 %HMa0 %HcsM %HuptV %HtfV %HszV %HcwiV %HgenV Hpc Hcg Hcpu Hclm Hraw Henv Hfr".
+    iIntros (M V') "%HMsp %HMs1 %HMa0 %HcsM %HuptV %HtfV %HszV %HcwiV %HgenV %HlzV Hpc Hcg Hcpu Hclm Hraw Henv Hfr".
     iApply (ut_dispatch N (MkUstate V Mu) (MkUstate V' Mu) pt ksp m M av (av - 4)%nat sepc_v sc_v stval_v
               mie_v menvcfg0 sts gn cs pid fdep
               (ut_printk (fsc_printk) (fsc_uart) (fsc_disk))
-              (conj HtfV (conj HuptV (conj HszV (conj eq_refl (conj HcwiV HgenV)))))
+              (conj HtfV (conj HuptV (conj HszV (conj eq_refl
+                 (conj HcwiV (conj HgenV HlzV))))))
               Hwf Hav
               (trap_res_off (av - 4)%nat)
               ltac:(rewrite HuptV Hupt; reflexivity) Hksp Hsp HMsp HMs1 HMa0 HcsM

@@ -46,10 +46,14 @@ Proof. reflexivity. Qed.
    new program's WP is a kernel mint), and its failure arm's [r = -1] is
    the dispatcher's return-value fact, which [sysc_mem_ok] does not carry. *)
 Lemma sysc_mem_ok_usys (V V' : pprivate) (M M' : gmap Z (bv 8)) (r : mword 64)
-    (π π' : gmap (mword 27) uperm) (szv szv' : Z) :
+    (π π' : gmap (mword 27) uperm) (szv szv' : Z) (lz lz' : bool) :
   sysc_num V <> 7 -> sysc_num V <> 12 ->
   π' = π ->
   szv' = szv ->
+  (* ...AND THE LAZY BIT, a premise on the permission map's terms: the bit
+     is a stored field ([ProcDefs.pv_lazy]) and no entry but sbrk writes it,
+     so the caller reads [lz' = lz] straight off the block it is holding. *)
+  lz' = lz ->
   (* ...and what fork ANSWERED, a PREMISE for the reason sbrk's answer is
      one below: [sysc_mem_ok] never mentions the return value, and the tie
      between a fork's return and the pid <allocpid> allocated is
@@ -59,9 +63,9 @@ Lemma sysc_mem_ok_usys (V V' : pprivate) (M M' : gmap Z (bv 8)) (r : mword 64)
   (sysc_num V = USYS_fork ->
      r = (mword_of_int (-1) : mword 64) \/ (1 <= sint r <= PIDMAX)%Z) ->
   sysc_mem_ok V V' M M' ->
-  usys_mem_ok (sysc_num V) (pv_tf V) r M π szv M' π' szv'.
+  usys_mem_ok (sysc_num V) (pv_tf V) r M π szv lz M' π' szv' lz'.
 Proof.
-  intros Hne Hns Hp Hs Hfk H. unfold sysc_mem_ok in H.
+  intros Hne Hns Hp Hs Hlz Hfk H. unfold sysc_mem_ok in H.
   unfold usys_mem_ok, USYS_exec, USYS_sbrk, USYS_wait, USYS_pipe,
          USYS_read, USYS_fstat, usys_rdcount.
   destruct (decide (sysc_num V = 7)); [ contradiction | ].
@@ -70,16 +74,16 @@ Proof.
   { (* the null test is [= zero_reg] on the kernel side and [uint _ = 0] on
        the user side: the U tier's file is below [zero_reg]'s. *)
     destruct H as (d & bs & Hd & Hz & Hm).
-    split; [ | exact (conj Hp Hs) ].
+    split; [ | exact (conj Hp (conj Hs Hlz)) ].
     exists d, bs. split; [ exact Hd | ]. split; [ | exact Hm ].
     intros Hu. apply Hz.
     rewrite zero_reg_moi. rewrite <- Hu. symmetry. apply moi_of_uint. }
-  destruct (decide (sysc_num V = 4)); [ exact (conj H (conj Hp Hs)) | ].
-  destruct (decide (sysc_num V = 5)); [ exact (conj H (conj Hp Hs)) | ].
-  destruct (decide (sysc_num V = 8)); [ exact (conj H (conj Hp Hs)) | ].
+  destruct (decide (sysc_num V = 4)); [ exact (conj H (conj Hp (conj Hs Hlz))) | ].
+  destruct (decide (sysc_num V = 5)); [ exact (conj H (conj Hp (conj Hs Hlz))) | ].
+  destruct (decide (sysc_num V = 8)); [ exact (conj H (conj Hp (conj Hs Hlz))) | ].
   destruct (decide (sysc_num V = USYS_fork)) as [Hf | _];
-    [ exact (conj (Hfk Hf) (conj H (conj Hp Hs))) | ].
-  exact (conj H (conj Hp Hs)).
+    [ exact (conj (Hfk Hf) (conj H (conj Hp (conj Hs Hlz)))) | ].
+  exact (conj H (conj Hp (conj Hs Hlz))).
 Qed.
 
 (* THE DESCRIPTOR BRIDGE, AND IT IS AN IDENTITY -- which is the point.
@@ -115,7 +119,23 @@ Lemma sysc_mem_ok_sbrk_row (V V' : pprivate) (M M' : gmap Z (bv 8)) :
 Proof.
   intros Hn H. unfold sysc_mem_ok in H. rewrite Hn in H.
   destruct (decide (12 = 7)) as [Hc | _]; [ discriminate Hc | ].
-  destruct (decide (12 = 12)) as [_ | Hc]; [ exact H | exfalso; exact (Hc eq_refl) ].
+  destruct (decide (12 = 12)) as [_ | Hc];
+    [ exact (proj1 H) | exfalso; exact (Hc eq_refl) ].
+Qed.
+
+(* ...and the lazy half of the same branch (lane LAZY-FLAG, K3): which arm
+   of sbrk ran, which is what [usys_mem_ok]'s own sbrk row demands and what
+   nothing else in [sysc_mem_ok] can supply. *)
+Lemma sysc_mem_ok_sbrk_lazy (V V' : pprivate) (M M' : gmap Z (bv 8)) :
+  sysc_num V = 12 ->
+  sysc_mem_ok V V' M M' ->
+  usys_sbrk_lazy (pv_lazy V) (pv_lazy V') (pv_tf V)
+                 (uint (pv_sz V)) (uint (pv_sz V')).
+Proof.
+  intros Hn H. unfold sysc_mem_ok in H. rewrite Hn in H.
+  destruct (decide (12 = 7)) as [Hc | _]; [ discriminate Hc | ].
+  destruct (decide (12 = 12)) as [_ | Hc];
+    [ exact (proj2 H) | exfalso; exact (Hc eq_refl) ].
 Qed.
 
 (* the IMAGE half is the dispatcher's row with the descriptor forgotten *)
@@ -128,7 +148,7 @@ Proof.
 Qed.
 
 Lemma sysc_mem_ok_usys_sbrk (V V' : pprivate) (M M' : gmap Z (bv 8)) (r : mword 64)
-    (π π' : gmap (mword 27) uperm) :
+    (π π' : gmap (mword 27) uperm) (lz lz' : bool) :
   sysc_num V = 12 ->
   usys_sbrk_perm π π' (pv_sz V) (pv_sz V') ->
   (* ...and what sbrk ANSWERED (lane SB).  It is a PREMISE and not a
@@ -138,11 +158,18 @@ Lemma sysc_mem_ok_usys_sbrk (V V' : pprivate) (M M' : gmap Z (bv 8)) (r : mword 
      returning post.  Without it the U tier learns that memory grew but not
      WHERE, which is exactly what a verified [malloc] needs. *)
   usys_sbrk_ret (pv_tf V) r (uint (pv_sz V)) (uint (pv_sz V')) ->
+  (* ...AND WHICH ARM RAN, on the lazy bit's terms (lane LAZY-FLAG, K3).
+     sbrk is the one entry that writes [ProcDefs.pv_lazy], so the row it
+     owes cannot be read off [sysc_mem_ok] -- which does not mention the
+     field -- any more than its return value can.  It is the dispatcher's
+     to supply, out of [SpecSyscall.sysc_sbrk_ok]'s relay of
+     [SpecSysSbrk.sys_sbrk_ok]'s three arms. *)
+  usys_sbrk_lazy lz lz' (pv_tf V) (uint (pv_sz V)) (uint (pv_sz V')) ->
   sysc_mem_ok V V' M M' ->
-  usys_mem_ok (sysc_num V) (pv_tf V) r M π (uint (pv_sz V))
-              M' π' (uint (pv_sz V')).
+  usys_mem_ok (sysc_num V) (pv_tf V) r M π (uint (pv_sz V)) lz
+              M' π' (uint (pv_sz V')) lz'.
 Proof.
-  intros Hn Hp Hret H.
+  intros Hn Hp Hret Hlz H.
   pose proof (sysc_mem_ok_sbrk_row V V' M M' Hn H) as Hrow.
   unfold usys_mem_ok, USYS_exec, USYS_sbrk. rewrite Hn.
   destruct (decide (12 = 7)) as [Hc | _]; [ discriminate Hc | ].
@@ -151,7 +178,8 @@ Proof.
      two [mword_of_int (uint ...)] round-trips are the only work left *)
   rewrite !moi_of_uint.
   split_and!;
-    [ exact (usys_sbrk_img_of_row _ _ _ _ _ _ Hrow) | exact Hp | exact Hret ].
+    [ exact (usys_sbrk_img_of_row _ _ _ _ _ _ Hrow) | exact Hp | exact Hret
+    | exact Hlz ].
 Qed.
 
 (* ===================================================================== *)
