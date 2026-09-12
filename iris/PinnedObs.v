@@ -28,13 +28,21 @@
 (*                                                                       *)
 (* THE THREE PIECES:                                                      *)
 (*                                                                       *)
-(*  THE CURSOR [pobs_P] / [pobs_Pmiss]: the walk's inum at hop [k] is the *)
-(*  pinned run's, or the taint.  Each hop opens [app_inv] inside its own  *)
-(*  [={⊤}=∗], reads the claim, and reads the LENT entry map against the   *)
-(*  invariant's authority ([pobs_elend_aents]) -- [FsAbs.apn_hop_rd]'s    *)
-(*  reasoning with the pin coming from the invariant rather than from     *)
-(*  held shares.  A miss is the taint: at a pinned path the entry is      *)
-(*  there, so the arm is unreachable rather than false.                   *)
+(*  THE CURSOR [pobs_P] AND THE MISS [Pmiss]: the walk's inum at hop [k] *)
+(*  is the pinned run's, or the taint.  Each hop opens [app_inv] inside   *)
+(*  its own [={⊤}=∗], reads the claim, and reads the LENT entry map       *)
+(*  against the invariant's authority ([pobs_elend_aents]) --             *)
+(*  [FsAbs.apn_hop_rd]'s reasoning with the pin coming from the           *)
+(*  invariant rather than from held shares.                              *)
+(*                                                                       *)
+(*  THE MISS ARM IS A PARAMETER.  At a pin that RESOLVES the entry is     *)
+(*  there, so the arm is unreachable and any [Pmiss] does ([pobs_Pmiss    *)
+(*  T] -- the taint -- is what exec takes).  At a pin that says the entry *)
+(*  is NOT there the walk legitimately MISSES, and then the arm has to be *)
+(*  payable: section 8's dead walk takes [pobs_miss_free Pmiss].  The     *)
+(*  only thing every hop owes whatever the pin is, is the TAINTED branch  *)
+(*  of its own cursor, which carries no view and no inum -- hence the one *)
+(*  premise [pobs_miss_taint].                                           *)
 (*                                                                       *)
 (*  THE OBSERVATION [pobs_Fo]: [FsAbsInvFire.fsabs_aopen]'s mold with the *)
 (*  receipt enriched by the claim -- the row the kernel observed, beside  *)
@@ -109,6 +117,28 @@ Definition pin_resolves_at (Pin : aview -> Prop) (cw : Z) (pl : list (bv 8))
         arun v (hops !!! 0%nat) (path_elems pl) hops
         /\ v !! ino = Some a).
 
+(* ...AND THE OTHER KIND OF PIN: one that says the path is NOT THERE.
+   [pin_misses_at Pin cw pl d0] is "the walk starts at [d0], and at every
+   view the claim admits, the FIRST element of the path is not an entry of
+   [d0]".  That is all a walk needs to die: namei's first hop misses, the
+   syscall returns [-1], and no later hop and no observation ever runs.
+
+   WHY IT IS A SEPARATE DEFINITION and not [pin_resolves_at] at some inum:
+   there IS no inum.  [FsConsPin.cons_absent] is the instance -- /init's
+   console at era 0, before its own mknod creates the node.
+
+   THE CLAIM LAW THIS ONE NEEDS IS LINEAR.  "the entry is absent" is not a
+   consequence of the claim alone: the claim's console conjunct has a
+   PRESENT arm too, and what excludes it is an EXCLUSIVE credential the
+   caller holds ([AppEcho]'s console flag is the authority side of that;
+   see [UInitCons] section 7).  So section 8's law takes a resource [K] and
+   hands it back, rather than being [□]-shaped over nothing. *)
+Definition pin_misses_at (Pin : aview -> Prop) (cw : Z) (pl : list (bv 8))
+    (d0 : Z) : Prop :=
+  um_start_of cw pl = d0
+  /\ (forall (v : aview) (s : fname),
+        Pin v -> path_elems pl !! 0%nat = Some s -> astep v d0 s = None).
+
 Section PinnedObs.
   (* [SpecSysExec.SysExecAU]'s ghost list without the two binders nothing
      here reads.  NO [CpuId] and NO [CurCtx]: nothing is hart-indexed, and
@@ -131,9 +161,39 @@ Section PinnedObs.
   Definition pobs_P (T : iProp Σ) (hops : list Z) (k : nat) (d : Z) : iProp Σ :=
     (⌜d = hops !!! k⌝ ∨ T)%I.
 
-  (* ...and a MISS is the taint outright: at a pinned path the entry is
-     there, so this arm is only ever reached under [T]. *)
+  (* ...and the MISS ARM exec takes: the taint outright.  At a pinned path
+     the entry is there, so this arm is only ever reached under [T]. *)
   Definition pobs_Pmiss (T : iProp Σ) (k : nat) (d : Z) : iProp Σ := T.
+
+  (* THE ONE THING EVERY HOP OWES, whatever the pin says.  A hop whose
+     cursor came in TAINTED knows nothing about the entry map it was lent,
+     so it may find no entry and must still answer the miss -- and all it
+     holds is [T].  Every instance below pays it in one line ([pobs_Pmiss]
+     is the identity, [pobs_miss_free] absorbs anything). *)
+  Definition pobs_miss_taint (T : iProp Σ) (Pmiss : nat -> Z -> iProp Σ)
+      : iProp Σ :=
+    (□ (∀ (k : nat) (d : Z), T -∗ Pmiss k d))%I.
+
+  Lemma pobs_miss_taint_Pmiss (T : iProp Σ) :
+    ⊢ pobs_miss_taint T (pobs_Pmiss T).
+  Proof. rewrite /pobs_miss_taint /pobs_Pmiss. iIntros "!>" (k d) "H". iExact "H". Qed.
+
+  (* ...and A FREE MISS: the arm says nothing, so anybody can pay it.
+     This is what a pin whose content is "the entry is NOT there" hands the
+     walk -- the walk really does miss, and what the CALLER learns from the
+     miss is the syscall's own [-1], not this family. *)
+  Definition pobs_miss_free (Pmiss : nat -> Z -> iProp Σ) : iProp Σ :=
+    (□ (∀ (k : nat) (d : Z), Pmiss k d))%I.
+
+  Lemma pobs_miss_free_triv : ⊢ pobs_miss_free (fun _ _ => True%I).
+  Proof. rewrite /pobs_miss_free. iIntros "!>" (k d). done. Qed.
+
+  Lemma pobs_miss_taint_of_free (T : iProp Σ) (Pmiss : nat -> Z -> iProp Σ) :
+    pobs_miss_free Pmiss -∗ pobs_miss_taint T Pmiss.
+  Proof.
+    rewrite /pobs_miss_free /pobs_miss_taint. iIntros "#H !>" (k d) "_".
+    iApply "H".
+  Qed.
 
   (* THE OBSERVATION'S RECEIPT: the row the kernel observed, plus the pin
      AT THE VIEW IT OBSERVED IT IN.  Without the second conjunct the row
@@ -244,23 +304,24 @@ Section PinnedObs.
      directory's and the entry is the run's next inum.  The tainted arm
      answers both branches with [T] and opens nothing. *)
   Lemma pobs_hop (γfs : fs_names) (Pin : aview -> Prop) (T : iProp Σ)
-      `{!Persistent T} `{!Timeless T}
+      `{!Persistent T} `{!Timeless T} (Pmiss : nat -> Z -> iProp Σ)
       (cw : Z) (pl : list (bv 8)) (hops : list Z) (ino : Z) (a : anode)
       (k : nat) (s : fname) :
     pin_resolves_at Pin cw pl hops ino a ->
     path_elems pl !! k = Some s ->
+    pobs_miss_taint T Pmiss -∗
     □ (∀ v : aview, app_pred app_run v -∗
                       app_pred app_run v ∗ (⌜Pin v⌝ ∨ T)) -∗
     app_inv γfs -∗
-    ex_hop γfs (pobs_P T hops) (pobs_Pmiss T) k s.
+    ex_hop γfs (pobs_P T hops) Pmiss k s.
   Proof.
-    intros (_ & _ & Hpin) Hk. iIntros "#Hcl #Hinv".
-    rewrite /ex_hop /ax_hop /pobs_P /pobs_Pmiss.
+    intros (_ & _ & Hpin) Hk. iIntros "#Hmt #Hcl #Hinv".
+    rewrite /ex_hop /ax_hop /pobs_P.
     iIntros (d ents dqv) "HP HF".
     iDestruct "HP" as "[%Hd | #HT]"; last first.
-    { (* tainted: both branches are the taint *)
+    { (* tainted: the hit is the taint and the miss is [pobs_miss_taint] *)
       iModIntro. iFrame "HF".
-      destruct (ents !! s) as [c |]; [ by iRight | iExact "HT" ]. }
+      destruct (ents !! s) as [c |]; [ by iRight | iApply ("Hmt" with "HT") ]. }
     subst d.
     iMod (inv_acc ⊤ appN with "Hinv") as "[Hbody Hclose]"; [ set_solver | ].
     iEval (rewrite /app_body) in "Hbody".
@@ -277,7 +338,7 @@ Section PinnedObs.
       iPureIntro. exact Hdom. }
     iModIntro. iFrame "HF".
     iDestruct "Hc" as "[%HP | #HT]"; last first.
-    { destruct (ents !! s) as [c |]; [ by iRight | iExact "HT" ]. }
+    { destruct (ents !! s) as [c |]; [ by iRight | iApply ("Hmt" with "HT") ]. }
     destruct (Hpin (abs_view I) HP) as [Hrun _].
     pose proof (arun_step_tot (abs_view I) (hops !!! 0%nat) (path_elems pl)
                   hops k s Hrun Hk) as Hst.
@@ -299,23 +360,24 @@ Section PinnedObs.
      [SpecSysMknod.mknod_au_at]).  chdir and unlink still carry the [∀ pl]
      form and need that seam first. *)
   Lemma pobs_walk (γfs : fs_names) (Pin : aview -> Prop) (T : iProp Σ)
-      `{!Persistent T} `{!Timeless T}
+      `{!Persistent T} `{!Timeless T} (Pmiss : nat -> Z -> iProp Σ)
       (cw : Z) (pl : list (bv 8)) (hops : list Z) (ino : Z) (a : anode) :
     pin_resolves_at Pin cw pl hops ino a ->
+    pobs_miss_taint T Pmiss -∗
     □ (∀ v : aview, app_pred app_run v -∗
                       app_pred app_run v ∗ (⌜Pin v⌝ ∨ T)) -∗
     app_inv γfs -∗
-    ex_start γfs cw (pobs_P T hops) (pobs_Pmiss T) pl.
+    ex_start γfs cw (pobs_P T hops) Pmiss pl.
   Proof.
-    intros Hres. iIntros "#Hcl #Hinv".
+    intros Hres. iIntros "#Hmt #Hcl #Hinv".
     pose proof Hres as Hres'. destruct Hres' as (Hstart & _ & _).
     rewrite /ex_start. iIntros (r Hr). iModIntro. iSplitR.
     { rewrite /pobs_P. iLeft. iPureIntro. by rewrite Hr Hstart. }
     rewrite /ex_hops_from /ax_hops_from.
     iApply big_sepL_intro. iIntros "!>" (j s Hj).
     rewrite lookup_drop in Hj.
-    iApply (pobs_hop γfs Pin T cw pl hops ino a (0 + j)%nat s Hres Hj
-              with "Hcl Hinv").
+    iApply (pobs_hop γfs Pin T Pmiss cw pl hops ino a (0 + j)%nat s Hres Hj
+              with "Hmt Hcl Hinv").
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -368,14 +430,15 @@ Section PinnedObs.
      wands are [PinnedExec.pex_slot], and exec's bundle
      ([PinnedExec.pinned_exec_bundle]) is the assembly. *)
   Lemma pinned_obs (γfs : fs_names) (Pin : aview -> Prop) (T : iProp Σ)
-      `{!Persistent T} `{!Timeless T}
+      `{!Persistent T} `{!Timeless T} (Pmiss : nat -> Z -> iProp Σ)
       (cw : Z) (pl : list (bv 8)) (hops : list Z) (ino : Z) (a : anode) :
     pin_resolves_at Pin cw pl hops ino a ->
+    pobs_miss_taint T Pmiss -∗
     □ (∀ v : aview, app_pred app_run v -∗
                       app_pred app_run v ∗ (⌜Pin v⌝ ∨ T)) -∗
     app_inv γfs -∗
       (* (i) THE WALK, at the one path the pin is about *)
-      ex_start γfs cw (pobs_P T hops) (pobs_Pmiss T) pl
+      ex_start γfs cw (pobs_P T hops) Pmiss pl
       (* (ii) THE OBSERVATION *)
       ∗ pf_at (aopen_commit_at (fs_gamma_L γfs) appE) (pobs_Fo Pin T)
       (* (iii) THE NODE, off the terminal cursor and that observation's
@@ -384,13 +447,155 @@ Section PinnedObs.
              pobs_P T hops (length (path_elems pl)) i -∗
              pobs_recv Pin T v i b -∗ ⌜i = ino /\ b = a⌝ ∨ T).
   Proof.
-    intros Hres. iIntros "#Hcl #Hinv".
+    intros Hres. iIntros "#Hmt #Hcl #Hinv".
     iSplitL.
-    { iApply (pobs_walk γfs Pin T cw pl hops ino a Hres with "Hcl Hinv"). }
+    { iApply (pobs_walk γfs Pin T Pmiss cw pl hops ino a Hres with "Hmt Hcl Hinv"). }
     iSplitR.
     { iApply (pobs_aopen γfs Pin T with "Hcl Hinv"). }
     iModIntro. iIntros (v i b) "HP Hr".
     iApply (pobs_node Pin T cw pl hops ino a v i b Hres with "HP Hr").
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (*  8.  THE DEAD WALK: a pin that says the path is not there            *)
+  (*                                                                      *)
+  (*  /init's FIRST open("console") at era 0.  The application's claim     *)
+  (*  says the console node does not exist yet ([FsConsPin.cons_absent]),  *)
+  (*  so the walk MISSES at its first hop and the call returns [-1].  What *)
+  (*  this buys is not a receipt -- it is the REFUTATION of the success    *)
+  (*  arm: the cursor below is the start rule AND NOTHING ELSE, so the     *)
+  (*  cursor the receipt hands back at the walk's terminal hop is the      *)
+  (*  TAINT, and a syscall's whole success fold collapses to it            *)
+  (*  ([PinnedOpen.pinned_open_dead]).                                     *)
+  (*                                                                      *)
+  (*  THE MISS ARM MUST BE FREE HERE, and that is what the [Pmiss]         *)
+  (*  parameter is for: this walk really does miss, so [pobs_Pmiss T] --   *)
+  (*  the taint -- is unpayable and [fun _ _ => True] is the instance.     *)
+  (* ------------------------------------------------------------------ *)
+
+  (* THE CURSOR: hop 0 stands on the start inum; every later hop, and the
+     terminal one, is the taint.  (A later hop is only ever reached under
+     the taint anyway -- the walk died at hop 0.) *)
+  Definition pobs_P_dead (T : iProp Σ) (d0 : Z) (k : nat) (d : Z) : iProp Σ :=
+    (⌜k = 0%nat /\ d = d0⌝ ∨ T)%I.
+
+  Global Instance pobs_P_dead_persistent (T : iProp Σ) d0 k d :
+    Persistent T -> Persistent (pobs_P_dead T d0 k d).
+  Proof. intros. rewrite /pobs_P_dead. apply _. Qed.
+
+  (* THE TERMINAL READING, and the whole point of the shape: at any hop but
+     the first the cursor IS the taint. *)
+  Lemma pobs_dead_term (T : iProp Σ) (d0 : Z) (n : nat) (d : Z) :
+    (n <> 0)%nat -> pobs_P_dead T d0 n d -∗ T.
+  Proof.
+    intros Hn. rewrite /pobs_P_dead.
+    iIntros "[%Hp | HT]"; [ destruct Hp as [Hk _]; destruct (Hn Hk) | iExact "HT" ].
+  Qed.
+
+  (* HOP 0: the claim says the entry is not there, the lent entry map IS
+     the start inum's ([pobs_elend_astep]), so the hop takes the MISS
+     branch and pays it out of the free supply. *)
+  Lemma pobs_hop_dead (γfs : fs_names) (Pin : aview -> Prop) (T : iProp Σ)
+      `{!Persistent T} `{!Timeless T} (K : iProp Σ)
+      (Pmiss : nat -> Z -> iProp Σ)
+      (cw : Z) (pl : list (bv 8)) (d0 : Z) (s : fname) :
+    pin_misses_at Pin cw pl d0 ->
+    path_elems pl !! 0%nat = Some s ->
+    □ (∀ v : aview, K -∗ app_pred app_run v -∗
+                      app_pred app_run v ∗ K ∗ (⌜Pin v⌝ ∨ T)) -∗
+    pobs_miss_free Pmiss -∗
+    app_inv γfs -∗
+    K -∗
+    ex_hop γfs (pobs_P_dead T d0) Pmiss 0%nat s.
+  Proof.
+    intros (_ & Hmiss) Hs. iIntros "#Hcl #Hfree #Hinv HK".
+    rewrite /ex_hop /ax_hop /pobs_P_dead /pobs_miss_free.
+    iIntros (d ents dqv) "HP HF".
+    iDestruct "HP" as "[%Hpd | #HT]"; last first.
+    { iModIntro. iFrame "HF".
+      destruct (ents !! s) as [c |]; [ by iRight | iApply "Hfree" ]. }
+    destruct Hpd as [_ Hd]. subst d.
+    iMod (inv_acc ⊤ appN with "Hinv") as "[Hbody Hclose]"; [ set_solver | ].
+    iEval (rewrite /app_body) in "Hbody".
+    iDestruct "Hbody" as (I) "(>Hh & Hp & >%Hdom & #Hx)".
+    iAssert (▷ (app_pred app_run (abs_view I) ∗ K ∗ (⌜Pin (abs_view I)⌝ ∨ T)))%I
+      with "[Hp HK]" as "Hpc".
+    { iNext. iApply ("Hcl" with "HK Hp"). }
+    iDestruct "Hpc" as "[Hp [HK Hc]]".
+    iMod "Hc".
+    iDestruct (pobs_elend_astep γfs (1/2)%Qp I d0 dqv ents s
+                 with "Hh HF") as %Hae.
+    iMod ("Hclose" with "[Hh Hp]") as "_".
+    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp Hx".
+      iPureIntro. exact Hdom. }
+    iModIntro. iFrame "HF".
+    iDestruct "Hc" as "[%HP | #HT]"; last first.
+    { destruct (ents !! s) as [c |]; [ by iRight | iApply "Hfree" ]. }
+    assert (Hn : ents !! s = None)
+      by (rewrite -Hae; exact (Hmiss (abs_view I) s HP Hs)).
+    rewrite Hn. iApply "Hfree".
+  Qed.
+
+  (* ...AND EVERY LATER HOP, which is reached only under the taint: the
+     cursor hands it over and the hop opens nothing. *)
+  Lemma pobs_hop_dead_hi (γfs : fs_names) (T : iProp Σ)
+      (Pmiss : nat -> Z -> iProp Σ) (d0 : Z) (k : nat) (s : fname) :
+    (k <> 0)%nat ->
+    pobs_miss_free Pmiss -∗ ex_hop γfs (pobs_P_dead T d0) Pmiss k s.
+  Proof.
+    intros Hk. iIntros "#Hfree".
+    rewrite /ex_hop /ax_hop /pobs_P_dead /pobs_miss_free.
+    iIntros (d ents dqv) "HP HF".
+    iDestruct "HP" as "[%Hpd | HT]";
+      [ destruct Hpd as [Hz _]; destruct (Hk Hz) | ].
+    iModIntro. iFrame "HF".
+    destruct (ents !! s) as [c |]; [ by iRight | iApply "Hfree" ].
+  Qed.
+
+  (* THE WHOLE WALK, at the one path the pin is about. *)
+  Lemma pobs_walk_dead (γfs : fs_names) (Pin : aview -> Prop) (T : iProp Σ)
+      `{!Persistent T} `{!Timeless T} (K : iProp Σ)
+      (Pmiss : nat -> Z -> iProp Σ)
+      (cw : Z) (pl : list (bv 8)) (d0 : Z) :
+    pin_misses_at Pin cw pl d0 ->
+    □ (∀ v : aview, K -∗ app_pred app_run v -∗
+                      app_pred app_run v ∗ K ∗ (⌜Pin v⌝ ∨ T)) -∗
+    pobs_miss_free Pmiss -∗
+    app_inv γfs -∗
+    K -∗
+    ex_start γfs cw (pobs_P_dead T d0) Pmiss pl.
+  Proof.
+    intros Hres. pose proof Hres as [Hstart _].
+    iIntros "#Hcl #Hfree #Hinv HK".
+    rewrite /ex_start. iIntros (r Hr). iModIntro. iSplitR "HK".
+    { rewrite /pobs_P_dead. iLeft. iPureIntro.
+      split; [ reflexivity | by rewrite Hr ]. }
+    rewrite /ex_hops_from /ax_hops_from drop_0.
+    destruct (path_elems pl) as [| s0 rest] eqn:Hpe; [ done | ].
+    rewrite big_sepL_cons. iSplitL "HK".
+    - iApply (pobs_hop_dead γfs Pin T K Pmiss cw pl d0 s0 Hres
+                ltac:(rewrite Hpe; reflexivity) with "Hcl Hfree Hinv HK").
+    - iApply big_sepL_intro. iIntros "!>" (j s Hj).
+      iApply (pobs_hop_dead_hi γfs T Pmiss d0 (0 + S j)%nat s
+                ltac:(lia) with "Hfree").
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (*  9.  THE OBSERVATION A DEAD WALK OWES: nothing                       *)
+  (*                                                                      *)
+  (*  A bundle owes its observation piece whether or not the walk will     *)
+  (*  reach it, so the dead walk still has to hand one in -- and since its *)
+  (*  receipt is never read (the cursor has already collapsed the success  *)
+  (*  fold to the taint), the TRIVIAL family does.  [SysOpenDefs.          *)
+  (*  aopen_commit_at_unit] is this without the [pf_at] wrapper and with a *)
+  (*  [CurCtx] binder this section does not have.                          *)
+  (* ------------------------------------------------------------------ *)
+  Lemma pobs_aopen_triv (γfs : fs_names) :
+    ⊢ pf_at (aopen_commit_at (fs_gamma_L γfs) appE)
+        (pfam_triv (fun (_ : aview) (_ : Z) (_ : anode) => True%I)).
+  Proof.
+    iApply pf_at_triv. rewrite /aopen_commit_at.
+    iIntros (I i a) "%Hrow Hka". iModIntro. by iFrame "Hka".
   Qed.
 
 End PinnedObs.

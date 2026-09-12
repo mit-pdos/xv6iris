@@ -2254,7 +2254,7 @@ Section ProofCreateMkdir.
           iEval (rewrite top_frag_1) in "Hctop".
           iMod (caf_acre_fire fsc_fs ⊤
                   (cre_child (bv_unsigned ty) (bv_unsigned major) (bv_unsigned minor))
-                  Fok (bv_unsigned dind) (bv_unsigned cinum) (bname 14 nf) (DfracOwn 1)
+                  Farm Fok (bv_unsigned dind) (bv_unsigned cinum) (bname 14 nf) (DfracOwn 1)
                   (era_node dn bm data)
                   (era_node (cr_setf dp3 (di_major dp3) (di_minor dp3)
                                (add_vec (di_nlink dp3 : mword 16)
@@ -2275,7 +2275,7 @@ Section ProofCreateMkdir.
                   (mkf_era_is_dir dn bm data Hdntdir)
                   (mkf_era_live dn bm data Hdnnlnz)
                   Hnonep Habsp' Habsc
-                  with "[] [] Hacre Htop Hctop") as "(Htop & Hctop & Hokr)";
+                  with "[] [] Hacre Harmr Htop Hctop") as "(Htop & Hctop & Hokr)";
             [iApply (ireg_inv_ftop with "Hiregi") | iApply (ireg_inv_app with "Hiregi") |].
           iEval (rewrite -top_frag_1) in "Hctop".
           iModIntro.
@@ -2506,7 +2506,7 @@ Section ProofCreateMkdir.
                           Hpath Hbsl [%] Hisl [%] Hop [Hslkc Hcslkd
                           Hcdep Hoffrc Hcidev Hciinum Hcivalid Hcdlnk2 Hcdiat Hcmeta
                           Hcmap Hcblocks Hctop Hcfrz Hckeep
-                          Hruc HPpar Hdlkc Harmr Hdotsr Hun HFok]").
+                          Hruc HPpar Hdlkc Hdotsr Hun HFok]").
           { exact Hcsf. }
           { exact (cr_slots_3 _ ns eq_refl Hns). }
           { split_and!.
@@ -2539,7 +2539,7 @@ Section ProofCreateMkdir.
             split; [exact Hc2mn |].
             split; [exact Hc2nlz |].
             intro Hnd. exfalso. exact (Hnd Htdir). }
-          iSplitR "HPpar Harmr Hdotsr Hun HFok Hdlkc"; last first.
+          iSplitR "HPpar Hdotsr Hun HFok Hdlkc"; last first.
           { (* ARM C-OK's receipts at a directory: the arm, the dots and the
                parent leg fired; the unarm and the exists observation come
                home and the cursor is at the parent. *)
@@ -2548,7 +2548,7 @@ Section ProofCreateMkdir.
                       (bview plen pfun) (bv_unsigned dind) (bname 14 nf)
                       (bv_unsigned cinum)
                       (cr_last_of_npar _ nf Hnpname)
-                      with "HPpar Harmr [Hdotsr] [HFok] Hun Hdlkc").
+                      with "HPpar [Hdotsr] [HFok] Hun Hdlkc").
             { iLeft. iExact "Hdotsr". }
             { rewrite /cre_acre_fired.
               iExists avy, (dir_entries (era_node dn bm data)),

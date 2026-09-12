@@ -100,8 +100,9 @@ Section PinnedOpen.
       (pobs_P T hops) (pobs_Pmiss T) (pobs_Fo Pin T) Ft.
   Proof.
     intros Hres Hpath. iIntros "#Hcl #Hinv Ht".
-    iDestruct (pinned_obs γfs Pin T cw pl hops ino a Hres with "Hcl Hinv")
-      as "(Hw & Ho & _)".
+    iDestruct (pinned_obs γfs Pin T (pobs_Pmiss T) cw pl hops ino a Hres
+                 with "[] Hcl Hinv") as "(Hw & Ho & _)";
+      [ iApply pobs_miss_taint_Pmiss | ].
     rewrite /open_au_plain_at. iFrame "Ho Ht".
     iIntros (pl') "%Hpath'".
     rewrite (arg_path_of_uniq M pv pl' pl Hpath' Hpath). iExact "Hw".
@@ -227,6 +228,80 @@ Section PinnedOpen.
         as "[%Hid | #HT]"; last first.
       { iRight. iRight. iExact "HT". }
       destruct Hid as [_ Hnode]. discriminate Hnode.
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (*  3.  THE OPEN THAT MUST FAIL                                         *)
+  (*                                                                      *)
+  (*  /init's FIRST open("console", O_RDWR), at era 0.  The claim says the *)
+  (*  console node is not there yet, so the walk dies at its first hop     *)
+  (*  ([PinnedObs.pobs_walk_dead]) and the call returns [-1].  What the    *)
+  (*  caller gets is not a descriptor but the REFUTATION of the success    *)
+  (*  fold: [pobs_P_dead]'s cursor at the walk's terminal hop IS the taint *)
+  (*  ([PinnedObs.pobs_dead_term]), and [open_receipt_plain] hands that    *)
+  (*  cursor back inside every success arm.                               *)
+  (*                                                                      *)
+  (*  THE OBSERVATION PIECE IS TRIVIAL here, and honestly so: it is never  *)
+  (*  fired (the walk died before any node was locked) and its receipt is  *)
+  (*  never read.                                                         *)
+  (* ------------------------------------------------------------------ *)
+  Lemma pinned_open_bundle_dead (γfs : fs_names)
+      (Pin : aview -> Prop) (T : iProp Σ) `{!Persistent T} `{!Timeless T}
+      (K : iProp Σ) (Pmiss : nat -> Z -> iProp Σ)
+      (cw : Z) (pl : list (bv 8)) (d0 : Z)
+      (M : gmap Z (bv 8)) (pv vom : mword 64)
+      (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
+      (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
+      (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) :
+    om_create vom = false ->
+    om_trunc vom = false ->
+    pin_misses_at Pin cw pl d0 ->
+    arg_path_of M pv pl ->
+    □ (∀ v : aview, K -∗ app_pred app_run v -∗
+                      app_pred app_run v ∗ K ∗ (⌜Pin v⌝ ∨ T)) -∗
+    pobs_miss_free Pmiss -∗
+    app_inv γfs -∗
+    K -∗
+    open_in (fs_gamma_L γfs) γfs cw M pv vom
+      (pobs_P_dead T d0) Pmiss Farm Fun Fok Fex
+      (pfam_triv (fun (_ : aview) (_ : Z) (_ : anode) => True%I)) Ft.
+  Proof.
+    intros Hcr Htr Hres Hpath. iIntros "#Hcl #Hfree #Hinv HK".
+    rewrite /open_in Hcr /open_au_plain_at.
+    iSplitL "HK".
+    { iIntros (pl') "%Hpath'".
+      rewrite (arg_path_of_uniq M pv pl' pl Hpath' Hpath).
+      iApply (pobs_walk_dead γfs Pin T K Pmiss cw pl d0 Hres
+                with "Hcl Hfree Hinv HK"). }
+    iSplitR; [ iApply pobs_aopen_triv | ].
+    iApply (open_trunc_piece_none _ vom Ft Htr).
+  Qed.
+
+  (* ...AND THE RECEIPT, READ: the call failed and the table did not move,
+     or the application is tainted.  There is no third arm -- which is the
+     point, and is what kills the `fd 0 is open at SOME type` arm /init's
+     head carried while its first open went through the generic leaf. *)
+  Lemma pinned_open_dead (γfs : fs_names) (T : iProp Σ)
+      (Pmiss : nat -> Z -> iProp Σ)
+      (cw : Z) (pl : list (bv 8)) (d0 : Z)
+      (M : gmap Z (bv 8)) (pv vom : mword 64)
+      (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
+      (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
+      (sts : list fdstate) (r : mword 64) (fdv' : list fdstate) :
+    arg_path_of M pv pl ->
+    path_elems pl <> [] ->
+    open_receipt_plain (fs_gamma_L γfs) γfs cw M pv vom
+      (pobs_P_dead T d0) Pmiss Fo Ft sts r fdv' -∗
+      ((⌜r = (mword_of_int (-1) : mword 64)⌝ ∗ ⌜fdv' = sts⌝) ∨ T).
+  Proof.
+    intros Hpath Hne. iIntros "Hrc". rewrite /open_receipt_plain.
+    iDestruct "Hrc" as "[(%Hr & %Hfd & _) | Hok]".
+    { iLeft. iPureIntro. exact (conj Hr Hfd). }
+    iDestruct "Hok" as (pl' av i) "(%Hpath' & HP & _)".
+    rewrite (arg_path_of_uniq M pv pl' pl Hpath' Hpath).
+    iRight.
+    iApply (pobs_dead_term T d0 (length (path_elems pl)) i with "HP").
+    intros Hz. apply Hne. by apply nil_length_inv.
   Qed.
 
 End PinnedOpen.

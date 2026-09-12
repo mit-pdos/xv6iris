@@ -511,7 +511,7 @@ Section OpenDefs.
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) : iProp Σ :=
     (ep_start γfs cw P Pmiss pl
-     ∗ pf_at (acre_commit_at Γ appE (AFile [])) Fok
+     ∗ pf_at (acre_commit_at Γ appE (AFile []) Farm) Fok
      ∗ pf_at (dlookup_commit_at Γ appE) Fex
      ∗ pf_at (aopen_commit_at Γ appE) Fo
      ∗ open_trunc_piece Γ vom Ft
@@ -559,7 +559,7 @@ Section OpenDefs.
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) : iProp Σ :=
     ((∀ pl : list (bv 8), ⌜arg_path_of M pv pl⌝ -∗ ep_start γfs cw P Pmiss pl)
-     ∗ pf_at (acre_commit_at Γ appE (AFile [])) Fok
+     ∗ pf_at (acre_commit_at Γ appE (AFile []) Farm) Fok
      ∗ pf_at (dlookup_commit_at Γ appE) Fex
      ∗ pf_at (aopen_commit_at Γ appE) Fo
      ∗ open_trunc_piece Γ vom Ft
@@ -625,7 +625,7 @@ Section OpenDefs.
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) :
     npar_walk_pre_era γfs cw P Pmiss -∗
-    pf_at (acre_commit_at Γ appE (AFile [])) Fok -∗
+    pf_at (acre_commit_at Γ appE (AFile []) Farm) Fok -∗
     pf_at (dlookup_commit_at Γ appE) Fex -∗
     pf_at (aopen_commit_at Γ appE) Fo -∗
     open_trunc_piece Γ vom Ft -∗
@@ -661,7 +661,7 @@ Section OpenDefs.
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (Ft : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ)) :
     npar_walk_pre_era γfs cw P Pmiss -∗
-    pf_at (acre_commit_at Γ appE (AFile [])) Fok -∗
+    pf_at (acre_commit_at Γ appE (AFile []) Farm) Fok -∗
     pf_at (dlookup_commit_at Γ appE) Fex -∗
     pf_at (aopen_commit_at Γ appE) Fo -∗
     open_trunc_piece Γ vom Ft -∗

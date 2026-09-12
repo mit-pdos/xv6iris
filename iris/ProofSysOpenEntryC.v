@@ -324,7 +324,7 @@ Section ProofSysOpenEntryC.
        at this buffer, so what reaches this block is already create's
        [FsAbsEra.ep_start] at the one path. *)
     ep_start fsc_fs (pv_cwi (us_V U)) P Pmiss (bview plen bp) -∗
-    pf_at (acre_commit_at (fs_gamma_L fsc_fs) appE (AFile [])) Phiok -∗
+    pf_at (acre_commit_at (fs_gamma_L fsc_fs) appE (AFile []) Phiarm) Phiok -∗
     pf_at (dlookup_commit_at (fs_gamma_L fsc_fs) appE) Phiex -∗
     pf_at (aopen_commit_at (fs_gamma_L fsc_fs) appE) Phio -∗
     open_trunc_piece (fs_gamma_L fsc_fs) vom Phit -∗
@@ -685,11 +685,11 @@ Section ProofSysOpenEntryC.
         with "[Hcauf Hoc]" as "HR".
       { rewrite /socr_fresh.
         iDestruct (cre_ok_file_fresh with "Hcauf") as (d nm av ents nl)
-          "(%Hl & %Hpre & HP & HPhi & Hdl & Harmr & Hun)".
+          "(%Hl & %Hpre & HP & HPhi & Hdl & Hun)".
         iExists d, nm, av, ents, nl.
         iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
         iSplitR; [iPureIntro; lia |].
-        iFrame "HP HPhi Hdl Hoc Harmr Hun". }
+        iFrame "HP HPhi Hdl Hoc Hun". }
       iAssert (so_obs (socr_Phio_pure (bv_unsigned inum)
                          (MkAnode (AFile [])
                                   (fn_nlink (era_node dn bm data))))

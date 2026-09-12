@@ -678,6 +678,7 @@ Section CreateFire.
      observation [cre_pre]'s third conjunct asks for: nlink 1, not yet in
      the parent) and comes back untouched. *)
   Lemma caf_acre_fire (γfs : fs_names) (E : coPset) (cf : Z -> Z -> absnode)
+      (Farm : pfam Σ (aview -> Z -> iProp Σ))
       (Fok : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
       (d i : Z) (nm : fname) (dqc : dfrac) (np np' nc : fs_node) :
     ↑ftopN ∪ ↑appN ⊆ E ->
@@ -689,7 +690,11 @@ Section CreateFire.
                                (fn_nlink np + acre_bump (cf d i))%nat) ->
     abs_of nc = Some (MkAnode (cf d i) 1%nat) ->
     ftop_inv γfs -∗ app_inv γfs -∗
-    pf_at (acre_commit_at_gen (fs_gamma_L γfs) appE cf) Fok -∗
+    pf_at (acre_commit_at_gen (fs_gamma_L γfs) appE cf Farm) Fok -∗
+    (* THE ARM'S PERMIT, SPENT HERE: the create's child IS the inode
+       [ialloc] armed, and the leg that ends the inode is the one that
+       spends the permit ([FsAbsCreateFire.acre_commit_at_gen]'s note). *)
+    cre_arm_fired Farm i -∗
     top_frag (fs_gamma_L γfs) d np -∗
     top_frag_q (fs_gamma_L γfs) dqc i nc ={E}=∗
       top_frag (fs_gamma_L γfs) d np'
@@ -699,7 +704,7 @@ Section CreateFire.
           ∗ Fok.(pf_recv) av d nm i.
   Proof.
     intros HE Hloc Hdir Hnl Hnone Habsp' Habsc.
-    iIntros "#Hi #Hai Hcm Hfp Hfc".
+    iIntros "#Hi #Hai Hcm Harm Hfp Hfc".
     iDestruct (pf_at_au with "Hcm") as "Hcm".
     (* the re-spelling is needed because
        [γtop (fs_gamma_L γfs)] and [fs_top γfs] are the SAME gname
@@ -729,7 +734,7 @@ Section CreateFire.
                     (fn_nlink np) i (cf d i) Hpre Hne). }
     iMod (fupd_mask_subseteq appE) as "Hcl2"; [rewrite /appE; solve_ndisj |].
     iMod ("Hcm" $! I d i nm (dir_entries np) (fn_nlink np)
-            with "[//] Hta") as "(Hta & Hstep & Hph2)".
+            with "[//] Harm Hta") as "(Hta & Hstep & Hph2)".
     (* THE MOVE, at the whole authority: the application's half comes out
        of [appN] beside its claim, which the caller's step re-establishes
        under the later ([AppInv.app_top_update]) *)
@@ -752,6 +757,7 @@ Section CreateFire.
   (* the [AFile []] instance, which is the one the T_FILE create-AU fires:
      a file child is never an [ADir]. *)
   Lemma caf_acre_fire_file (γfs : fs_names) (E : coPset)
+      (Farm : pfam Σ (aview -> Z -> iProp Σ))
       (Fok : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
       (d i : Z) (nm : fname) (dqc : dfrac) (np np' nc : fs_node) :
     ↑ftopN ∪ ↑appN ⊆ E ->
@@ -762,7 +768,8 @@ Section CreateFire.
     abs_of np' = Some (MkAnode (ADir (<[nm := i]> (dir_entries np))) (fn_nlink np)) ->
     abs_of nc = Some (MkAnode (AFile []) 1%nat) ->
     ftop_inv γfs -∗ app_inv γfs -∗
-    pf_at (acre_commit_at (fs_gamma_L γfs) appE (AFile [])) Fok -∗
+    pf_at (acre_commit_at (fs_gamma_L γfs) appE (AFile []) Farm) Fok -∗
+    cre_arm_fired Farm i -∗
     top_frag (fs_gamma_L γfs) d np -∗
     top_frag_q (fs_gamma_L γfs) dqc i nc ={E}=∗
       top_frag (fs_gamma_L γfs) d np'
@@ -772,11 +779,11 @@ Section CreateFire.
           ∗ Fok.(pf_recv) av d nm i.
   Proof.
     intros HE Hloc Hdir Hnl Hnone Habsp' Habsc.
-    iIntros "Hi Hai Hcm Hfp Hfc".
-    iApply (caf_acre_fire γfs E (fun _ _ => AFile []) Fok d i nm dqc np np' nc HE
-              Hloc Hdir Hnl Hnone
+    iIntros "Hi Hai Hcm Harm Hfp Hfc".
+    iApply (caf_acre_fire γfs E (fun _ _ => AFile []) Farm Fok d i nm dqc
+              np np' nc HE Hloc Hdir Hnl Hnone
               ltac:(rewrite Habsp'; cbn [acre_bump]; by rewrite Nat.add_0_r)
-              Habsc with "Hi Hai Hcm Hfp Hfc").
+              Habsc with "Hi Hai Hcm Harm Hfp Hfc").
   Qed.
 
   (* THE MINTED CHILD'S ROW AT ANY TYPE: [FsAbsCreateFire.create_made] at a

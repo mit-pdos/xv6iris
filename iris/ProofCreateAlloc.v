@@ -1343,7 +1343,7 @@ Section ProofCreateAlloc.
              iEval (rewrite top_frag_1) in "Hctop".
              iMod (caf_acre_fire fsc_fs ⊤
                      (cre_child (bv_unsigned ty) (bv_unsigned major) (bv_unsigned minor))
-                     Fok (bv_unsigned dind) (bv_unsigned cinum) (bname 14 nf) (DfracOwn 1)
+                     Farm Fok (bv_unsigned dind) (bv_unsigned cinum) (bname 14 nf) (DfracOwn 1)
                      (era_node dn bm data) (era_node dn' bm' data')
                      (era_node (cr_setf dnc major minor
                                   (mword_of_int 1 : mword 16)) bmc datc)
@@ -1353,7 +1353,7 @@ Section ProofCreateAlloc.
                      (mkf_era_is_dir dn bm data Hdz)
                      (mkf_era_live dn bm data (cr_nl0z dn Hnl0))
                      Hnonep Habsp' Habsc
-                     with "[] [] Hacre Htop Hctop") as "(Htop & Hctop & Hokr)";
+                     with "[] [] Hacre Harmr Htop Hctop") as "(Htop & Hctop & Hokr)";
                [iApply (ireg_inv_ftop with "Hiregi") | iApply (ireg_inv_app with "Hiregi") |].
              iEval (rewrite -top_frag_1) in "Hctop".
              iModIntro.
@@ -1566,7 +1566,7 @@ Section ProofCreateAlloc.
                              Hpath Hbsl [%] Hisl [%] Hop [Hslkc Hcslkd
                              Hcdep Hoffrc Hcidev Hciinum Hcivalid Hcdlnk Hcdiat Hcmeta
                              Hcmap Hcblocks Hctop Hcfrz Hckeep Hruc
-                             HPpar Hdlkc Harmr Hdots Hun HFok]").
+                             HPpar Hdlkc Hdots Hun HFok]").
              { exact Hcsf. }
              { exact (cr_slots_3 _ ns eq_refl Hns). }
              { split_and!.
@@ -1599,7 +1599,7 @@ Section ProofCreateAlloc.
                split; [rewrite cr_setf_nlink; vm_compute; reflexivity |].
                intros _. exact (cr_setf_fresh_made dnc ty major minor
                                   Hfresh Htyc). }
-             iSplitR "HPpar Harmr Hdots Hun HFok Hdlkc"; last first.
+             iSplitR "HPpar Hdots Hun HFok Hdlkc"; last first.
              { (* ARM C-OK-FILE's receipts: the arm and the parent leg fired,
                   no dots on a non-directory, the unarm and the exists
                   observation come home, and the cursor is at the parent. *)
@@ -1608,7 +1608,7 @@ Section ProofCreateAlloc.
                          (bview plen pfun) (bv_unsigned dind) (bname 14 nf)
                          (bv_unsigned cinum)
                          (cr_last_of_npar _ nf Hnpname)
-                         with "HPpar Harmr [Hdots] [HFok] Hun Hdlkc").
+                         with "HPpar [Hdots] [HFok] Hun Hdlkc").
                { iRight. iExact "Hdots". }
                { rewrite /cre_acre_fired.
                  iExists avy, (dir_entries (era_node dn bm data)),

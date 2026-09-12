@@ -265,6 +265,13 @@ Section CreateFire.
   (*      FsAbsMknodFire.v, which re-exports them; the legs are new)      *)
   (* =================================================================== *)
 
+  (* THE ARM'S RECEIPT, hoisted above the commits because the CREATE leg
+     now takes it too (see [acre_commit_at_gen]).  It says the row at [i]
+     APPEARED: at the arm's own view the map had nothing there. *)
+  Definition cre_arm_fired (Farm : pfam Σ (aview -> Z -> iProp Σ))
+      (i : Z) : iProp Σ :=
+    (∃ av : aview, ⌜av !! i = None⌝ ∗ Farm.(pf_recv) av i)%I.
+
   (* the read-only sibling, at the raw map.  Note the receipt is handed
      the READING [abs_view I], so a client never sees a record. *)
   Definition dlookup_commit_at Γ (E : coPset)
@@ -282,11 +289,37 @@ Section CreateFire.
      constrained by its READING alone -- so the client still witnesses
      exactly "the delta was applied" and nothing about the record the
      mover chose. *)
+  (* THE CREATE'S CHILD IS THE ARMED INODE, and the leg now says so: it
+     takes [cre_arm_fired Farm i], exactly as [aunarm_of_arm] below does.
+
+     THE ARM'S RECEIPT IS A PERMIT, SPENT BY WHICHEVER LEG ENDS THE
+     INODE.  The child's two legs -- the create and the unarm -- are the
+     two ways one armed inode can end, and they are EXCLUSIVE on every
+     run: the unarm fires only when [dirlink] failed, which is when the
+     create commit did not.  That exclusion used to be a property of the
+     RUN and of nothing in the logic, and a constraining application could
+     not use it: a step at either leg needs the same exclusion credential
+     (an exclusive token -- the echo application's [AppEcho.cons_key],
+     which is what makes "the console is not there yet" a fact rather than
+     an arm), and an exclusive resource can sit in only ONE of two
+     [∗]-joined pieces, so whichever leg did not get it was unprovable.
+
+     Taking the arm's receipt HERE and in [aunarm_of_arm], and CONSUMING it
+     in both, makes the exclusion structural: the kernel holds one permit
+     per armed inode and can fire at most one of the two legs with it.  The
+     application parks its credential in [Farm]'s receipt and gets it back
+     through the receipt of the leg that actually fired ([Φ] here,
+     [cre_unarm_fired] there) -- nothing is lost, it moves.  The kernel
+     pays nothing: every fire site already holds the arm's receipt at the
+     instant it fires the parent leg (the arm ran at [ialloc], the create
+     at [dirlink]), and the generic supplier drops it. *)
   Definition acre_commit_at_gen Γ (E : coPset) (cf : Z -> Z -> absnode)
+      (Farm : pfam Σ (aview -> Z -> iProp Σ))
       (Φ : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
     (∀ (I : gmap Z fs_node) (d i : Z) (nm : fname) (ents : gmap fname Z)
        (nl : nat),
        ⌜cre_pre (abs_view I) d nm ents nl i (cf d i)⌝ -∗
+       cre_arm_fired Farm i -∗
        ghost_map_auth (γtop Γ) (1/2) I ={E}=∗
        ghost_map_auth (γtop Γ) (1/2) I ∗
          (* THE CALLER'S STEP (app-instances.md section 7): its claim about
@@ -301,8 +334,9 @@ Section CreateFire.
   (* ...and the CONSTANT-content instance the two pinned AU twins carry
      (a device at mknod, an empty file at open(O_CREATE)) *)
   Definition acre_commit_at Γ (E : coPset) (c : absnode)
+      (Farm : pfam Σ (aview -> Z -> iProp Σ))
       (Φ : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
-    acre_commit_at_gen Γ E (fun _ _ => c) Φ.
+    acre_commit_at_gen Γ E (fun _ _ => c) Farm Φ.
 
   (* the child-content index is used POINTWISE, so a pointwise equality
      moves the commit.  Named because the two type-pinned readings of
@@ -310,14 +344,15 @@ Section CreateFire.
      and are only convertible (durable-notes, "Terms that print
      identically"): [iApply] this rather than [rewrite]. *)
   Lemma acre_commit_at_gen_ext Γ (E : coPset) (cf cf' : Z -> Z -> absnode)
+      (Farm : pfam Σ (aview -> Z -> iProp Σ))
       (Φ : aview -> Z -> fname -> Z -> iProp Σ) :
     (forall d i, cf d i = cf' d i) ->
-    acre_commit_at_gen Γ E cf Φ -∗ acre_commit_at_gen Γ E cf' Φ.
+    acre_commit_at_gen Γ E cf Farm Φ -∗ acre_commit_at_gen Γ E cf' Farm Φ.
   Proof.
     intros Hext. rewrite /acre_commit_at_gen. iIntros "H".
-    iIntros (I d i nm ents nl) "%Hpre Ha".
+    iIntros (I d i nm ents nl) "%Hpre Harm Ha".
     rewrite -(Hext d i) in Hpre. rewrite -(Hext d i).
-    iApply ("H" with "[//] Ha").
+    iApply ("H" with "[//] Harm Ha").
   Qed.
 
   (* THE ARM: the row APPEARS.  The view has no row at [i] (the claim box
@@ -384,10 +419,6 @@ Section CreateFire.
      receipt.  A FIRED piece pays only its receipt: the pair's refund is
      dropped here, which is the whole content of "the investment comes
      back through the receipt the caller chose". *)
-  Definition cre_arm_fired (Farm : pfam Σ (aview -> Z -> iProp Σ))
-      (i : Z) : iProp Σ :=
-    (∃ av : aview, ⌜av !! i = None⌝ ∗ Farm.(pf_recv) av i)%I.
-
   Definition cre_dots_fired (Fdots : pfam Σ (aview -> Z -> Z -> bool -> iProp Σ))
       (i d : Z) (full : bool) : iProp Σ :=
     (∃ av : aview, ⌜av !! i = Some (MkAnode (ADir ∅) 1%nat)⌝
@@ -427,8 +458,7 @@ Section CreateFire.
   Definition aunarm_of_arm Γ (E : coPset)
       (Farm : pfam Σ (aview -> Z -> iProp Σ))
       (Φ : aview -> Z -> iProp Σ) : iProp Σ :=
-    (∀ i : Z, cre_arm_fired Farm i -∗
-       cre_arm_fired Farm i ∗ aunarm_commit_at Γ E i Φ)%I.
+    (∀ i : Z, cre_arm_fired Farm i -∗ aunarm_commit_at Γ E i Φ)%I.
 
   (* The child's two legs, as the AU twins' arms carry them: both commits
      back UNFIRED, or the do-then-undo PAIR (ruling Q-h).  UNFIRED means
@@ -440,9 +470,13 @@ Section CreateFire.
     (pf_at (aarm_commit_at Γ appE c) Farm
      ∗ pf_at (aunarm_of_arm Γ appE Farm) Fun)%I.
 
+  (* THE DO-THEN-UNDO PAIR (ruling Q-h), and the ARM'S RECEIPT IS NOT IN
+     IT ANY MORE: the unarm spent the permit, and what the application gets
+     back is the unarm's own receipt -- which is where it parks whatever it
+     had in the arm's ([acre_commit_at_gen]'s note). *)
   Definition cre_child_pair (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
       (i : Z) : iProp Σ :=
-    (cre_arm_fired Farm i ∗ cre_unarm_fired Fun i)%I.
+    (cre_unarm_fired Fun i)%I.
 
   (* ------------------------------------------------------------------ *)
   (*  1b.  Satisfiability: the [_unit] dischargers                        *)
@@ -457,21 +491,24 @@ Section CreateFire.
 
   (* the write-kind ones owe the caller's step, paid at the live Γ out of
      the SUPPLY ([AppInv.app_step_acc]) *)
-  Lemma acre_commit_at_gen_unit (γfs : fs_names) E (cf : Z -> Z -> absnode) :
-    app_sup -∗ acre_commit_at_gen (fs_gamma_L γfs) E cf (fun _ _ _ _ => True%I).
+  Lemma acre_commit_at_gen_unit (γfs : fs_names) E (cf : Z -> Z -> absnode)
+      (Farm : pfam Σ (aview -> Z -> iProp Σ)) :
+    app_sup -∗
+    acre_commit_at_gen (fs_gamma_L γfs) E cf Farm (fun _ _ _ _ => True%I).
   Proof.
     iIntros "#Hsup". rewrite /acre_commit_at_gen.
-    iIntros (I d i nm ents nl) "%Hpre Ha".
+    iIntros (I d i nm ents nl) "%Hpre _ Ha".
     iDestruct (app_step_acc d I _ with "Hsup") as "Hstep".
     iModIntro. iFrame "Ha Hstep". iIntros (I') "%Heq Ha'". iModIntro.
     by iFrame "Ha'".
   Qed.
 
-  Lemma acre_commit_at_unit (γfs : fs_names) E c :
-    app_sup -∗ acre_commit_at (fs_gamma_L γfs) E c (fun _ _ _ _ => True%I).
+  Lemma acre_commit_at_unit (γfs : fs_names) E c
+      (Farm : pfam Σ (aview -> Z -> iProp Σ)) :
+    app_sup -∗ acre_commit_at (fs_gamma_L γfs) E c Farm (fun _ _ _ _ => True%I).
   Proof.
     iIntros "#Hsup". rewrite /acre_commit_at.
-    iApply (acre_commit_at_gen_unit γfs E _ with "Hsup").
+    iApply (acre_commit_at_gen_unit γfs E _ Farm with "Hsup").
   Qed.
 
   (* the arm's step is paid although the VIEW has no row: the supply holds
@@ -509,7 +546,7 @@ Section CreateFire.
       (Farm : pfam Σ (aview -> Z -> iProp Σ)) :
     app_sup -∗ aunarm_of_arm (fs_gamma_L γfs) E Farm (fun _ _ => True%I).
   Proof.
-    iIntros "#Hsup". rewrite /aunarm_of_arm. iIntros (i) "$".
+    iIntros "#Hsup". rewrite /aunarm_of_arm. iIntros (i) "_".
     iApply (aunarm_commit_at_unit γfs E i with "Hsup").
   Qed.
 
@@ -520,18 +557,18 @@ Section CreateFire.
       (Φ : aview -> Z -> iProp Σ) :
     (∀ i : Z, aunarm_commit_at Γ E i Φ) -∗ aunarm_of_arm Γ E Farm Φ.
   Proof.
-    iIntros "H". rewrite /aunarm_of_arm. iIntros (i) "$". iApply "H".
+    iIntros "H". rewrite /aunarm_of_arm. iIntros (i) "_". iApply "H".
   Qed.
 
   (* THE OPEN: the one move an unarm fire site takes.  It holds the arm's
      receipt -- the unarm runs only on the [dirlink] failure path, past the
-     arm -- and spends the tied piece's AU side for the unarm's AU AT THAT
-     INUM.  The refund goes with the unarm that is about to happen, exactly
-     as [pf_at_au] does at every other fire. *)
+     arm -- and SPENDS it for the unarm's AU AT THAT INUM.  The permit goes
+     with the leg that fires ([acre_commit_at_gen]'s note); what the caller
+     parked in it comes back through [cre_unarm_fired]. *)
   Lemma aunarm_of_arm_open Γ E (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
       (i : Z) :
     cre_arm_fired Farm i -∗ pf_at (aunarm_of_arm Γ E Farm) Fun -∗
-      cre_arm_fired Farm i ∗ aunarm_commit_at Γ E i Fun.(pf_recv).
+      aunarm_commit_at Γ E i Fun.(pf_recv).
   Proof.
     iIntros "Ha Hp". iDestruct (pf_at_au with "Hp") as "Hp".
     rewrite /aunarm_of_arm. iApply ("Hp" $! i with "Ha").
@@ -580,31 +617,33 @@ Section CreateFire.
   Qed.
 
   Lemma acre_commit_at_gen_pinned (γfs : fs_names) E (cf : Z -> Z -> absnode)
+      (Farm : pfam Σ (aview -> Z -> iProp Σ))
       (q : Qp) (jpin : Z) (a : anode) (Φ : aview -> Z -> fname -> Z -> iProp Σ) :
     app_sup -∗
     nview (fs_gamma_L γfs) q jpin a -∗
     (∀ (av : aview) (d : Z) (nm : fname) (i : Z),
        ⌜av !! jpin = Some a⌝ -∗ nview (fs_gamma_L γfs) q jpin a -∗ Φ av d nm i) -∗
-    acre_commit_at_gen (fs_gamma_L γfs) E cf Φ.
+    acre_commit_at_gen (fs_gamma_L γfs) E cf Farm Φ.
   Proof.
     iIntros "#Hsup Hn HΦ". rewrite /acre_commit_at_gen.
-    iIntros (I d i nm ents nl) "%Hpre Ha".
+    iIntros (I d i nm ents nl) "%Hpre _ Ha".
     iDestruct (mkf_auth_nview with "Ha Hn") as %Hav.
     iDestruct (app_step_acc d I _ with "Hsup") as "Hstep".
     iModIntro. iFrame "Ha Hstep". iIntros (I') "%Heq Ha'". iModIntro.
     iFrame "Ha'". iApply ("HΦ" $! (abs_view I) d nm i with "[%] Hn"). done.
   Qed.
 
-  Lemma acre_commit_at_pinned (γfs : fs_names) E (c : absnode) (q : Qp) (jpin : Z)
+  Lemma acre_commit_at_pinned (γfs : fs_names) E (c : absnode)
+      (Farm : pfam Σ (aview -> Z -> iProp Σ)) (q : Qp) (jpin : Z)
       (a : anode) (Φ : aview -> Z -> fname -> Z -> iProp Σ) :
     app_sup -∗
     nview (fs_gamma_L γfs) q jpin a -∗
     (∀ (av : aview) (d : Z) (nm : fname) (i : Z),
        ⌜av !! jpin = Some a⌝ -∗ nview (fs_gamma_L γfs) q jpin a -∗ Φ av d nm i) -∗
-    acre_commit_at (fs_gamma_L γfs) E c Φ.
+    acre_commit_at (fs_gamma_L γfs) E c Farm Φ.
   Proof.
     iIntros "#Hsup Hn HΦ". rewrite /acre_commit_at.
-    iApply (acre_commit_at_gen_pinned γfs E _ q jpin a Φ with "Hsup Hn HΦ").
+    iApply (acre_commit_at_gen_pinned γfs E _ Farm q jpin a Φ with "Hsup Hn HΦ").
   Qed.
 
   Lemma aarm_commit_at_pinned (γfs : fs_names) E (c : absnode) (q : Qp) (jpin : Z)

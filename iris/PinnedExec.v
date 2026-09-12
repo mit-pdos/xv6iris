@@ -264,8 +264,10 @@ Section PinnedExec.
     rewrite /sys_exec_au_pre. iSplitR.
     { iIntros (pl') "%Hpath'".
       rewrite (exec_path_of_uniq M pv pl' pl Hpath' Hpath).
-      iApply (pobs_walk γfs Pin T cw pl hops ino (MkAnode (AFile f) nl)
-                Hres with "Hcl Hinv"). }
+      iApply (pobs_walk γfs Pin T (pobs_Pmiss T) cw pl hops ino
+                (MkAnode (AFile f) nl) Hres
+                with "[] Hcl Hinv").
+      iApply pobs_miss_taint_Pmiss. }
     iSplitR.
     { iApply (pobs_aopen γfs Pin T with "Hcl Hinv"). }
     rewrite /pobs_Fo /pfam_triv. cbn [pf_recv].

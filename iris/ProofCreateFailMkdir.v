@@ -516,7 +516,7 @@ Section ProofCreateFailMkdir.
     iApply fupd_wp.
     (* THE UNARM IS THE UNDO OF THIS ARM (see [ProofCreateFail]'s note). *)
     iDestruct (aunarm_of_arm_open (fs_gamma_L fsc_fs) _ Farm Fun
-                 (bv_unsigned cinum) with "Harmr Hun") as "[Harmr Hun]".
+                 (bv_unsigned cinum) with "Harmr Hun") as "Hun".
     iMod (cr_dirty_clear_unarm ⊤ t (bv_unsigned cinum) _ Fun
             (era_node dc bmc datc)
             (era_node (cr_setf dc major minor (mword_of_int 0 : mword 16))
@@ -791,7 +791,7 @@ Section ProofCreateFailMkdir.
     iDestruct (cr_fail_of_pair fsc_fs (bv_unsigned ty) (bv_unsigned major)
                  (bv_unsigned minor) P Pmiss Farm Fdots Fun Fok Fex
                  (bview plen pfun) (bv_unsigned dind) (bv_unsigned cinum)
-                 with "HPpar Hdlkc Hacre Harmr Hdotsx Hunr") as "Hcf".
+                 with "HPpar Hdlkc Hacre Hdotsx Hunr") as "Hcf".
     iSpecialize ("Hcont" $! CIDfin with "[%]"); [wp_next_chain |].
     iApply ("Hcont" $! mf false false 0%nat 1%Qp 1%Qp γf
               (mword_of_int 0 : mword 32) dp bmp n6 Sb6

@@ -594,7 +594,7 @@ Section CreateSpec.
     (pf_at (aarm_commit_at Γ appE (cre_c0 tyz ma mi)) Farm
      ∗ cre_dots_leg Γ tyz Fdots
      ∗ pf_at (aunarm_of_arm Γ appE Farm) Fun
-     ∗ pf_at (acre_commit_at_gen Γ appE (cre_child tyz ma mi)) Fok)%I.
+     ∗ pf_at (acre_commit_at_gen Γ appE (cre_child tyz ma mi) Farm) Fok)%I.
 
   (* SATISFIABILITY, and the discharger every caller of the landed create
      hands down: the GENERIC application asks nothing of create's legs, so
@@ -619,7 +619,7 @@ Section CreateSpec.
     { iApply pf_at_triv.
       iApply (aunarm_of_arm_unit γfs appE _ with "Hsup"). }
     iApply pf_at_triv.
-    iApply (acre_commit_at_gen_unit γfs appE _ with "Hsup").
+    iApply (acre_commit_at_gen_unit γfs appE _ _ with "Hsup").
   Qed.
 
   (* ARM C-OK / F-OK, keyed on [made].  Both success arms ran nameiparent,
@@ -641,8 +641,7 @@ Section CreateSpec.
        ⌜list_basics.last (path_elems pl) = Some nm⌝
        ∗ P (length (npar_elems pl)) d
        ∗ (if made
-          then cre_arm_fired Farm i
-               ∗ (cre_dots_fired Fdots i d true ∨ cre_dots_leg Γ tyz Fdots)
+          then (cre_dots_fired Fdots i d true ∨ cre_dots_leg Γ tyz Fdots)
                ∗ cre_acre_fired Fok d nm i (cre_child tyz ma mi d i)
                ∗ pf_at (aunarm_of_arm Γ appE Farm) Fun
                ∗ pf_at (dlookup_commit_at Γ appE) Fex
@@ -674,13 +673,12 @@ Section CreateSpec.
                 ⌜list_basics.last (path_elems pl) = Some nm⌝
                 ∗ cre_ex_fired Fex d nm i)
              ∨ pf_at (dlookup_commit_at Γ appE) Fex)
-          ∗ pf_at (acre_commit_at_gen Γ appE (cre_child tyz ma mi)) Fok
+          ∗ pf_at (acre_commit_at_gen Γ appE (cre_child tyz ma mi) Farm) Fok
           ∗ ((pf_at (aarm_commit_at Γ appE (cre_c0 tyz ma mi)) Farm
                 ∗ cre_dots_leg Γ tyz Fdots
                 ∗ pf_at (aunarm_of_arm Γ appE Farm) Fun)
              ∨ (∃ i : Z,
-                  cre_arm_fired Farm i
-                  ∗ ((∃ full : bool, cre_dots_fired Fdots i d full)
+                  ((∃ full : bool, cre_dots_fired Fdots i d full)
                      ∨ cre_dots_leg Γ tyz Fdots)
                   ∗ cre_unarm_fired Fun i))))%I.
 
@@ -776,7 +774,7 @@ Section CreateSpec.
   Lemma cre_commits_of_dev (Γ : fs_view_names Σ) (ma mi : Z)
       (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
       (Fok : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) :
-    pf_at (acre_commit_at Γ appE (ADev ma mi)) Fok -∗
+    pf_at (acre_commit_at Γ appE (ADev ma mi) Farm) Fok -∗
     cre_child_unfired Γ (ADev ma mi) Farm Fun -∗
     cre_commits Γ (bv_unsigned T_DEVICE) ma mi Farm (pfam_triv (fun _ _ _ _ => True%I)) Fun Fok.
   Proof.
@@ -790,14 +788,14 @@ Section CreateSpec.
        AU side alone, and [refund_mono] lifts it over the conjunction. *)
     iApply (pf_at_mono with "[] Hac"). iIntros "Hac".
     iApply (acre_commit_at_gen_ext Γ appE (fun _ _ => ADev ma mi)
-              (cre_child (bv_unsigned T_DEVICE) ma mi) Fok.(pf_recv)
+              (cre_child (bv_unsigned T_DEVICE) ma mi) Farm Fok.(pf_recv)
               (fun d i => eq_sym (cre_child_dev ma mi d i)) with "Hac").
   Qed.
 
   Lemma cre_commits_of_file (Γ : fs_view_names Σ) (ma mi : Z)
       (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
       (Fok : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) :
-    pf_at (acre_commit_at Γ appE (AFile [])) Fok -∗
+    pf_at (acre_commit_at Γ appE (AFile []) Farm) Fok -∗
     cre_child_unfired Γ (AFile []) Farm Fun -∗
     cre_commits Γ (bv_unsigned T_FILE) ma mi Farm (pfam_triv (fun _ _ _ _ => True%I)) Fun Fok.
   Proof.
@@ -809,7 +807,7 @@ Section CreateSpec.
     iFrame "Ha Hd Hu".
     iApply (pf_at_mono with "[] Hac"). iIntros "Hac".
     iApply (acre_commit_at_gen_ext Γ appE (fun _ _ => AFile [])
-              (cre_child (bv_unsigned T_FILE) ma mi) Fok.(pf_recv)
+              (cre_child (bv_unsigned T_FILE) ma mi) Farm Fok.(pf_recv)
               (fun d i => eq_sym (cre_child_file ma mi d i)) with "Hac").
   Qed.
 
@@ -840,16 +838,16 @@ Section CreateSpec.
         P (length (npar_elems pl)) d ∗
         pf_at (dlookup_commit_at Γ appE) Fex ∗
         Fok.(pf_recv) av d nm i ∗
-        cre_arm_fired Farm i ∗ pf_at (aunarm_of_arm Γ appE Farm) Fun.
+        pf_at (aunarm_of_arm Γ appE Farm) Fun.
   Proof.
     rewrite /cre_ok_arms. iIntros "H".
-    iDestruct "H" as (d nm) "(%Hlast & HP & Harm & _ & Hacre & Hun & Hdl)".
+    iDestruct "H" as (d nm) "(%Hlast & HP & _ & Hacre & Hun & Hdl)".
     rewrite /cre_acre_fired.
     iDestruct "Hacre" as (av ents nl) "(%Hpre & HΦ)".
     iExists av, d, nm, ents, nl.
     iSplitR; [by iPureIntro |].
     iSplitR; [iPureIntro; exact Hpre |].
-    iFrame "HP Hdl HΦ Harm Hun".
+    iFrame "HP Hdl HΦ Hun".
   Qed.
 
   (* ...and its failure fold. *)
@@ -863,12 +861,12 @@ Section CreateSpec.
     cre_fail_arms Γ γfs (bv_unsigned T_DEVICE) ma mi P Pmiss
       Farm Fdots Fun Fok Fex pl ⊢
       ((npar_walk_dead_era γfs P Pmiss pl
-          ∗ pf_at (acre_commit_at Γ appE (ADev ma mi)) Fok
+          ∗ pf_at (acre_commit_at Γ appE (ADev ma mi) Farm) Fok
           ∗ pf_at (dlookup_commit_at Γ appE) Fex
           ∗ cre_child_unfired Γ (ADev ma mi) Farm Fun)
        ∨ (∃ d : Z,
             P (length (npar_elems pl)) d
-            ∗ pf_at (acre_commit_at Γ appE (ADev ma mi)) Fok
+            ∗ pf_at (acre_commit_at Γ appE (ADev ma mi) Farm) Fok
             ∗ ((∃ (av : aview) (i : Z) (nm : fname) (ents : gmap fname Z)
                   (nl : nat),
                   ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
@@ -894,8 +892,8 @@ Section CreateSpec.
         iSplitR; [by iPureIntro |]. iExact "HΦ". }
       iDestruct "Hlegs" as "[(Ha & _ & Hu) | Hpair]".
       + iLeft. iSplitL "Ha"; [iExact "Ha" | iExact "Hu"].
-      + iRight. iDestruct "Hpair" as (i) "(Ha & _ & Hu)".
-        iExists i. iFrame "Ha Hu".
+      + iRight. iDestruct "Hpair" as (i) "(_ & Hu)".
+        iExists i. iExact "Hu".
   Qed.
 
   (* sys_open's O_CREATE success payout: both arms survive the pin, keyed on
@@ -917,23 +915,23 @@ Section CreateSpec.
             ⌜cre_pre av d nm ents nl i (AFile [])⌝ ∗
             Fok.(pf_recv) av d nm i ∗
             pf_at (dlookup_commit_at Γ appE) Fex ∗
-            cre_arm_fired Farm i ∗ pf_at (aunarm_of_arm Γ appE Farm) Fun)
+            pf_at (aunarm_of_arm Γ appE Farm) Fun)
          ∨ (∃ (av : aview) (ents : gmap fname Z) (nl : nat),
             ⌜av !! d = Some (MkAnode (ADir ents) nl)⌝ ∗
             ⌜ents !! nm = Some i⌝ ∗
             Fex.(pf_recv) av d nm i ∗
-            pf_at (acre_commit_at Γ appE (AFile [])) Fok ∗
+            pf_at (acre_commit_at Γ appE (AFile []) Farm) Fok ∗
             cre_child_unfired Γ (AFile []) Farm Fun)).
   Proof.
     rewrite /cre_ok_arms /cre_commits /cre_child_unfired. iIntros "H".
     iDestruct "H" as (d nm) "(%Hlast & HP & Hrest)".
     iExists d, nm. iSplitR; [by iPureIntro |]. iFrame "HP".
     destruct made.
-    - iDestruct "Hrest" as "(Harm & _ & Hacre & Hun & Hdl)".
+    - iDestruct "Hrest" as "(_ & Hacre & Hun & Hdl)".
       rewrite /cre_acre_fired.
       iDestruct "Hacre" as (av ents nl) "(%Hpre & HΦ)".
       iLeft. iExists av, ents, nl.
-      iSplitR; [iPureIntro; exact Hpre |]. iFrame "HΦ Hdl Harm Hun".
+      iSplitR; [iPureIntro; exact Hpre |]. iFrame "HΦ Hdl Hun".
     - iDestruct "Hrest" as "(Hex & Ha & _ & Hu & Hac)".
       rewrite /cre_ex_fired.
       iDestruct "Hex" as (av ents nl) "(%Hrow & %Hent & HΦ)".
@@ -961,15 +959,15 @@ Section CreateSpec.
         P (length (npar_elems pl)) d ∗
         Fok.(pf_recv) av d nm i ∗
         pf_at (dlookup_commit_at Γ appE) Fex ∗
-        cre_arm_fired Farm i ∗ pf_at (aunarm_of_arm Γ appE Farm) Fun.
+        pf_at (aunarm_of_arm Γ appE Farm) Fun.
   Proof.
     rewrite /cre_ok_arms /cre_acre_fired. iIntros "H".
-    iDestruct "H" as (d nm) "(%Hl & HP & Ha & _ & Hac & Hu & Hdl)".
+    iDestruct "H" as (d nm) "(%Hl & HP & _ & Hac & Hu & Hdl)".
     iDestruct "Hac" as (av ents nl) "(%Hpre & HΦ)".
     rewrite (cre_child_file ma mi d i) in Hpre.
     iExists d, nm, av, ents, nl.
     iSplitR; [by iPureIntro |]. iSplitR; [iPureIntro; exact Hpre |].
-    iFrame "HP HΦ Hdl Ha Hu".
+    iFrame "HP HΦ Hdl Hu".
   Qed.
 
   Lemma cre_ok_file_exists (Γ : fs_view_names Σ) (ma mi : Z)
@@ -987,7 +985,7 @@ Section CreateSpec.
         ⌜ents !! nm = Some i⌝ ∗
         P (length (npar_elems pl)) d ∗
         Fex.(pf_recv) av d nm i ∗
-        pf_at (acre_commit_at Γ appE (AFile [])) Fok ∗
+        pf_at (acre_commit_at Γ appE (AFile []) Farm) Fok ∗
         cre_child_unfired Γ (AFile []) Farm Fun.
   Proof.
     rewrite /cre_ok_arms /cre_ex_fired /cre_commits /cre_child_unfired
@@ -1004,7 +1002,7 @@ Section CreateSpec.
       iApply (pf_at_mono with "[] Hac"). iIntros "Hac".
       iApply (acre_commit_at_gen_ext Γ appE
                 (cre_child (bv_unsigned T_FILE) ma mi) (fun _ _ => AFile [])
-                Fok.(pf_recv) (fun d0 i0 => cre_child_file ma mi d0 i0)
+                Farm Fok.(pf_recv) (fun d0 i0 => cre_child_file ma mi d0 i0)
                 with "Hac"). }
     iSplitL "Ha"; [iExact "Ha" | iExact "Hu"].
   Qed.
@@ -1020,12 +1018,12 @@ Section CreateSpec.
     cre_fail_arms Γ γfs (bv_unsigned T_FILE) ma mi P Pmiss
       Farm Fdots Fun Fok Fex pl ⊢
       ((npar_walk_dead_era γfs P Pmiss pl
-          ∗ pf_at (acre_commit_at Γ appE (AFile [])) Fok
+          ∗ pf_at (acre_commit_at Γ appE (AFile []) Farm) Fok
           ∗ pf_at (dlookup_commit_at Γ appE) Fex
           ∗ cre_child_unfired Γ (AFile []) Farm Fun)
        ∨ (∃ d : Z,
             P (length (npar_elems pl)) d
-            ∗ pf_at (acre_commit_at Γ appE (AFile [])) Fok
+            ∗ pf_at (acre_commit_at Γ appE (AFile []) Farm) Fok
             ∗ ((∃ (av : aview) (i : Z) (nm : fname) (ents : gmap fname Z)
                   (nl : nat),
                   ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
@@ -1051,8 +1049,8 @@ Section CreateSpec.
         iSplitR; [by iPureIntro |]. iExact "HΦ". }
       iDestruct "Hlegs" as "[(Ha & _ & Hu) | Hpair]".
       + iLeft. iSplitL "Ha"; [iExact "Ha" | iExact "Hu"].
-      + iRight. iDestruct "Hpair" as (i) "(Ha & _ & Hu)".
-        iExists i. iFrame "Ha Hu".
+      + iRight. iDestruct "Hpair" as (i) "(_ & Hu)".
+        iExists i. iExact "Hu".
   Qed.
 End CreateSpec.
 

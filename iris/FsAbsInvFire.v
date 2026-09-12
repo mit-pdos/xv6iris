@@ -180,12 +180,14 @@ Section FsAbsInvFire.
     - done.
   Qed.
 
-  Lemma fsabs_acre (γfs : fs_names) (c : absnode) :
+  Lemma fsabs_acre (γfs : fs_names) (c : absnode)
+      (Farm : pfam Σ (aview -> Z -> iProp Σ)) :
     app_sup -∗
-    pf_at (acre_commit_at (fs_gamma_L γfs) appE c) (pfam_triv (fun _ _ _ _ => True%I)).
+    pf_at (acre_commit_at (fs_gamma_L γfs) appE c Farm)
+      (pfam_triv (fun _ _ _ _ => True%I)).
   Proof.
     iIntros "#Hsup". iApply pf_at_triv.
-    iApply (acre_commit_at_unit γfs appE c with "Hsup").
+    iApply (acre_commit_at_unit γfs appE c Farm with "Hsup").
   Qed.
 
   (* CREATE'S CHILD LEGS (round E2, lane E2-C): the arm and the unarm, both

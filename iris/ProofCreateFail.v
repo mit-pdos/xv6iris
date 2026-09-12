@@ -505,7 +505,7 @@ Section ProofCreateFail.
        inum the arm's receipt names ([FsAbsCreateFire.aunarm_of_arm]), which
        hands the receipt straight back. *)
     iDestruct (aunarm_of_arm_open (fs_gamma_L fsc_fs) _ Farm Fun
-                 (bv_unsigned cinum) with "Harmr Hun") as "[Harmr Hun]".
+                 (bv_unsigned cinum) with "Harmr Hun") as "Hun".
     iMod (caf_unarm_fire fsc_fs ⊤ (bv_unsigned cinum) _ Fun
             (era_node (cr_setf dnc major minor (mword_of_int 1 : mword 16))
                       bmc datc)
@@ -889,7 +889,7 @@ Section ProofCreateFail.
     iDestruct (cr_fail_of_pair fsc_fs (bv_unsigned ty) (bv_unsigned major)
                  (bv_unsigned minor) P Pmiss Farm Fdots Fun Fok Fex
                  (bview plen pfun) (bv_unsigned dind) (bv_unsigned cinum)
-                 with "HPpar Hdlkc Hacre Harmr [Hdots] Hunr") as "Hcf".
+                 with "HPpar Hdlkc Hacre [Hdots] Hunr") as "Hcf".
     { iRight. iExact "Hdots". }
     iSpecialize ("Hcont" $! CIDfin with "[%]"); [wp_next_chain |].
     iApply ("Hcont" $! mf false false 0%nat 1%Qp 1%Qp γf

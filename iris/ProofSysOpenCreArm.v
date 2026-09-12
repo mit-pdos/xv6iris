@@ -160,9 +160,9 @@ Section ProofSysOpenCreArm.
           CALLER'S OWN [Phit] and fires it over the [itrunc], which is the
           honest reading and is what removed the one piece this proof used
           to conjure. *)
-       (* ...and create's CHILD leg (round E2, lane E2-C): the row APPEARED
-          at this inum, the unarm comes home *)
-       cre_arm_fired Phiarm i0 ∗
+       (* ...and create's CHILD leg (round E2, lane E2-C): the unarm comes
+          home; the arm's permit was SPENT by the create leg
+          ([FsAbsCreateFire.acre_commit_at_gen]'s note) *)
        pf_at (aunarm_of_arm (fs_gamma_L fsc_fs) appE Phiarm) Phiun)%I.
 
   (* ARM F-OK's payout: the exists observation fired, the create commit
@@ -178,7 +178,7 @@ Section ProofSysOpenCreArm.
        ⌜ents !! nm = Some i0⌝ ∗
        P (length (npar_elems pl)) d ∗
        Phiex.(pf_recv) av d nm i0 ∗
-       pf_at (acre_commit_at (fs_gamma_L fsc_fs) appE (AFile [])) Phiok ∗
+       pf_at (acre_commit_at (fs_gamma_L fsc_fs) appE (AFile []) Phiarm) Phiok ∗
        (* the name was already there: create's child legs are whole *)
        cre_child_unfired (fs_gamma_L fsc_fs) (AFile []) Phiarm Phiun)%I.
 
@@ -394,22 +394,22 @@ Section ProofSysOpenCreArm.
       iModIntro. iLeft. iSplitR; [by iPureIntro |]. iFrame "Hpriv Hfrag".
       rewrite /open_post_fail_create /socr_fresh.
       iDestruct "HR" as (d nm av ents nl)
-        "(%Hl & %Hpre & %Hib & HP & HPhi & Hdl & Hoc & Harmr & Hun)".
+        "(%Hl & %Hpre & %Hib & HP & HPhi & Hdl & Hoc & Hun)".
       iRight. iExists pl. iSplitR; [by iPureIntro |].
       iRight. iExists d. iFrame "HP Htc".
       iLeft. iExists av, i0, nm, ents, nl.
       iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
-      iSplitR; [by iPureIntro |]. iFrame "HPhi Hdl Hoc Harmr Hun".
+      iSplitR; [by iPureIntro |]. iFrame "HPhi Hdl Hoc Hun".
     - iDestruct (socr_ok_fresh_arm with "Hok") as "(HR & Htr & Hfd)".
       rewrite /socr_fresh.
       iDestruct "HR" as (d nm av ents nl)
-        "(%Hl & %Hpre & %Hib & HP & HPhi & Hdl & Hoc & Harmr & Hun)".
+        "(%Hl & %Hpre & %Hib & HP & HPhi & Hdl & Hoc & Hun)".
       iModIntro. iRight. rewrite /open_post_ok_create.
       iExists pl, d, i0, nm.
       iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |]. iFrame "HP".
       iLeft. iExists av, ents, nl.
       iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
-      iFrame "HPhi Hdl Hoc Htr Harmr Hun Hfd".
+      iFrame "HPhi Hdl Hoc Htr Hun Hfd".
   Qed.
 
   Lemma socr_arms_exists `{GEN : GenId}

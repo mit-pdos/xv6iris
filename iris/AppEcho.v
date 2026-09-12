@@ -105,8 +105,13 @@ Require Import FsInitPinBoot.    (* [era0_pins], [era0_recovery_pins],
                                     [era0_recovery] *)
 Require Import FsShPin.          (* [era0_sh_pins], [era0_recovery_sh_pins] *)
 Require Import FsEchoPin.        (* [era0_echo_pins], [era0_recovery_echo_pins] *)
+Require Import FsTree.           (* [fname] *)
+Require Import FsAbsDelta.       (* [cre_pre], [delta_create]: the mknod
+                                    commit's own pre- and post-shapes *)
+Require Import ConsoleInv.       (* [CONSOLE] *)
 Require Import FsConsPin.        (* [cons_absent] / [cons_present_at], the
-                                    era-0 console state and its transport *)
+                                    era-0 console state and its transport,
+                                    and section 5's delta algebra *)
 Require Import FsCfgBoot.        (* [fs_boot_image_wf]: the theorem's [Himg] *)
 Require Import FsDurImg.         (* [img_state], [img_snap_ok]: era 0's snapshot *)
 Require Import AppInv.           (* [app_xfer_raw], [app_xfer_raw_pers_or_pure],
@@ -394,7 +399,16 @@ Definition echo_fs_pure (av : aview) : Prop :=
    while it was three pins about the IMAGE; the console is the first thing
    it says that /init's own write establishes, and a monotone flag is what
    carries "established" across the views a later syscall observes. *)
-Definition echo_names : Type := gname.
+(* TWO GHOSTS, and one will not do.  The FLAG [cons_made] has to refute
+   the claim's ABSENT arm (that is what /init's SECOND open runs on: the
+   console it just made is still there), and the KEY [cons_key] has to
+   refute the claim's two PRESENT arms (that is what /init's FIRST open
+   runs on: at era 0 there is no console, so the walk misses and the call
+   returns [-1]).  No single ghost does both: the claim's authority cannot
+   be in two places at once, and a PERSISTENT witness of "not yet shot"
+   cannot exist -- it would survive the shot.  So the instance names are a
+   PAIR, [(flag, key)], and the transport allocates both. *)
+Definition echo_names : Type := gname * gname.
 
 Section EchoPred.
   (* the console flag's camera: a [mono_list] over inums, at [] before the
@@ -412,18 +426,44 @@ Section EchoPred.
   (* THE TOKEN: exclusive, born with the instance, spent by the mknod that
      creates the console. *)
   Definition cons_tok (r : echo_names) : iProp Σ :=
-    own r (●ML ([] : list (leibnizO Z))).
+    own r.1 (●ML ([] : list (leibnizO Z))).
 
   (* ...and what it becomes: the authority at the inum the mknod chose *)
   Definition cons_shot (r : echo_names) (i : Z) : iProp Σ :=
-    own r (●ML ([i] : list (leibnizO Z))).
+    own r.1 (●ML ([i] : list (leibnizO Z))).
 
   (* THE FLAG, PERSISTENT: "the console was made, at inum [i]".  This is
      the fact /init carries from its mknod to its open, and it is the ONE
      thing that makes the claim's console conjunct a PIN at a fixed inum
      rather than an existential a walk cannot follow. *)
   Definition cons_made (r : echo_names) (i : Z) : iProp Σ :=
-    own r (◯ML ([i] : list (leibnizO Z))).
+    own r.1 (◯ML ([i] : list (leibnizO Z))).
+
+  (* THE KEY: "the console has not been made yet", as an EXCLUSIVE resource
+     rather than as a fact.  /init is handed it at the era mint, spends it
+     into the mknod's phase-1 step -- which is the instant the view becomes
+     present -- and gets it back as that piece's refund on every path where
+     the commit did not fire.  While it holds the key, the claim's two
+     PRESENT arms are refuted at EVERY view, which is what makes "the
+     console is absent" a fact /init can carry into a walk cursor
+     ([UInitCons] section 5).
+
+     IT IS THE SAME CAMERA as the flag, at the second name: [●ML []] is
+     exclusive, which is the only property asked of it -- so no binder
+     anywhere gains a camera. *)
+  Definition cons_key (r : echo_names) : iProp Σ :=
+    own r.2 (●ML ([] : list (leibnizO Z))).
+
+  Global Instance cons_key_timeless r : Timeless (cons_key r).
+  Proof. rewrite /cons_key. apply _. Qed.
+
+  Lemma cons_key_excl (r : echo_names) : cons_key r -∗ cons_key r -∗ False.
+  Proof.
+    rewrite /cons_key. iIntros "Ha Hb".
+    iDestruct (own_valid_2 with "Ha Hb") as %Hv.
+    iPureIntro. apply mono_list_auth_dfrac_op_valid_L in Hv.
+    destruct Hv as [Hd _]. exact (exclusive_l (DfracOwn 1) (DfracOwn 1) Hd).
+  Qed.
 
   Global Instance cons_made_persistent r i : Persistent (cons_made r i).
   Proof. rewrite /cons_made. apply _. Qed.
@@ -482,18 +522,15 @@ Section EchoPred.
     iModIntro. iApply (cons_shot_made r i with "Ha").
   Qed.
 
-  Lemma cons_tok_alloc : ⊢ |==> ∃ r : echo_names, cons_tok r.
+  (* THE INSTANCE IS BORN with the flag unraised and the key in hand: both
+     names are fresh, and the key is what the era mint hands /init. *)
+  Lemma cons_tok_alloc : ⊢ |==> ∃ r : echo_names, cons_tok r ∗ cons_key r.
   Proof.
-    iMod (own_alloc (●ML ([] : list (leibnizO Z)))) as (r) "Ha";
+    iMod (own_alloc (●ML ([] : list (leibnizO Z)))) as (g1) "H1";
       [ apply mono_list_auth_valid |].
-    iModIntro. iExists r. iExact "Ha".
-  Qed.
-
-  Lemma cons_shot_alloc (i : Z) : ⊢ |==> ∃ r : echo_names, cons_shot r i.
-  Proof.
-    iMod (own_alloc (●ML ([i] : list (leibnizO Z)))) as (r) "Ha";
+    iMod (own_alloc (●ML ([] : list (leibnizO Z)))) as (g2) "H2";
       [ apply mono_list_auth_valid |].
-    iModIntro. iExists r. iExact "Ha".
+    iModIntro. iExists (g1, g2). rewrite /cons_tok /cons_key /=. iFrame "H1 H2".
   Qed.
 
   (* ---------------------------------------------------------------- *)
@@ -513,8 +550,8 @@ Section EchoPred.
      ([AppInv.app_sup]) is tainted by construction. *)
   Definition cons_state (r : echo_names) (av : aview) : iProp Σ :=
     ((⌜cons_absent av⌝ ∗ cons_tok r)
-     ∨ (∃ i : Z, ⌜cons_present_at i av⌝ ∗ cons_tok r)
-     ∨ (∃ i : Z, ⌜cons_present_at i av⌝ ∗ cons_shot r i))%I.
+     ∨ (∃ i : Z, ⌜cons_present_at i av⌝ ∗ cons_key r ∗ cons_tok r)
+     ∨ (∃ i : Z, ⌜cons_present_at i av⌝ ∗ cons_key r ∗ cons_shot r i))%I.
 
   Global Instance cons_state_timeless r av : Timeless (cons_state r av).
   Proof. rewrite /cons_state. apply _. Qed.
@@ -568,15 +605,244 @@ Section EchoPred.
     rewrite /cons_state.
     iDestruct "Hcs" as "[[%Hab Htok] | [Hc | Hc]]".
     - iDestruct (cons_tok_made_False r i with "Htok Hm") as %[].
-    - iDestruct "Hc" as (j) "[%Hpr Htok]".
+    - iDestruct "Hc" as (j) "(%Hpr & Hkey & Htok)".
       iDestruct (cons_tok_made_False r i with "Htok Hm") as %[].
-    - iDestruct "Hc" as (j) "[%Hpr Hsh]".
+    - iDestruct "Hc" as (j) "(%Hpr & Hkey & Hsh)".
       iDestruct (cons_shot_made_agree r j i with "Hsh Hm") as %Heq.
       subst i.
-      iSplitL "Hsh".
+      iSplitL "Hsh Hkey".
       + iRight. iSplitR; [ by iPureIntro |]. rewrite /cons_state.
-        iRight. iRight. iExists j. iSplitR; [ by iPureIntro | iExact "Hsh" ].
+        iRight. iRight. iExists j. iFrame "Hkey Hsh". by iPureIntro.
       + iLeft. by iPureIntro.
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (*  3c'.  THE CLAIM LAW THE *FIRST* OPEN RUNS ON                      *)
+  (*                                                                    *)
+  (*  The mirror of [echo_cons_law], and the reason the key exists: a    *)
+  (*  holder of the KEY refutes both PRESENT arms -- each carries one --  *)
+  (*  so at every view the claim holds of, the console is ABSENT.  That   *)
+  (*  is [PinnedObs.pin_misses_at]'s input, and it is what makes /init's  *)
+  (*  first [open("console")] provably return [-1] instead of leaving an  *)
+  (*  arm nobody can refute.                                             *)
+  (*                                                                    *)
+  (*  LINEAR, not [□]-over-nothing: the key is exclusive.  It goes in and *)
+  (*  comes back, so one key answers the walk's hop, the mknod's step and *)
+  (*  -- if the mknod failed -- the second open in turn.                  *)
+  (* ---------------------------------------------------------------- *)
+  Lemma echo_cons_abs_law (γ : echo_fixed) (r : echo_names) :
+    ⊢ □ (∀ v : aview, cons_key r -∗ echo_pred γ r v -∗
+           echo_pred γ r v ∗ cons_key r ∗ (⌜cons_absent v⌝ ∨ echo_taint γ)).
+  Proof.
+    iIntros "!>" (v) "Hkey Hp". rewrite /echo_pred.
+    iDestruct "Hp" as "[#Ht | [%Hpins Hcs]]".
+    { iSplitR; [ iLeft; iExact "Ht" |]. iFrame "Hkey". iRight. iExact "Ht". }
+    rewrite /cons_state.
+    iDestruct "Hcs" as "[[%Hab Htok] | [Hc | Hc]]".
+    - iSplitL "Htok".
+      + iRight. iSplitR; [ by iPureIntro |]. iLeft.
+        iSplitR; [ by iPureIntro | iExact "Htok" ].
+      + iFrame "Hkey". iLeft. by iPureIntro.
+    - iDestruct "Hc" as (j) "(_ & Hk2 & _)".
+      iDestruct (cons_key_excl r with "Hkey Hk2") as %[].
+    - iDestruct "Hc" as (j) "(_ & Hk2 & _)".
+      iDestruct (cons_key_excl r with "Hkey Hk2") as %[].
+  Qed.
+
+  (* ...and the step the mknod's PHASE 1 takes with it: the key turns the
+     claim's three arms into ONE (the absent one), so the console's state
+     moves ABSENT -> PRESENT at the inum the create chose and the key goes
+     INTO the claim beside the flag's authority.  This is the whole of what
+     [AppInv.app_step] owes at /init's own write. *)
+  Lemma echo_cons_mknod (γ : echo_fixed) (r : echo_names) (av : aview)
+      (ents : gmap fname Z) (nl : nat) (i : Z) :
+    cre_pre av FsImg.ROOTINO fname_console ents nl i (ADev CONSOLE 0) ->
+    cons_key r -∗ echo_pred γ r av -∗
+      echo_pred γ r (delta_create FsImg.ROOTINO fname_console i
+                       (ADev CONSOLE 0) av).
+  Proof.
+    intros Hpre. iIntros "Hkey Hp". rewrite /echo_pred.
+    iDestruct "Hp" as "[#Ht | [%Hpins Hcs]]"; [ by iLeft |].
+    iRight. iSplitR.
+    { iPureIntro. destruct Hpins as (H1 & H2 & H3). split_and!.
+      - apply file_pin_init.
+        exact (file_pin_create fname_init INIT_INO init_bytes FsImg.ROOTINO
+                 fname_console ents nl i CONSOLE 0 av Hpre
+                 (proj2 (file_pin_init av) H1)).
+      - apply file_pin_sh.
+        exact (file_pin_create fname_sh SH_INO sh_bytes FsImg.ROOTINO
+                 fname_console ents nl i CONSOLE 0 av Hpre
+                 (proj2 (file_pin_sh av) H2)).
+      - apply file_pin_echo.
+        exact (file_pin_create fname_echo ECHO_INO echo_bytes FsImg.ROOTINO
+                 fname_console ents nl i CONSOLE 0 av Hpre
+                 (proj2 (file_pin_echo av) H3)). }
+    rewrite /cons_state.
+    iDestruct "Hcs" as "[[%Hab Htok] | [Hc | Hc]]".
+    - iRight. iLeft. iExists i. iFrame "Hkey Htok". iPureIntro.
+      exact (cons_state_mknod ents nl i av Hpre).
+    - iDestruct "Hc" as (j) "(_ & Hk2 & _)".
+      iDestruct (cons_key_excl r with "Hkey Hk2") as %[].
+    - iDestruct "Hc" as (j) "(_ & Hk2 & _)".
+      iDestruct (cons_key_excl r with "Hkey Hk2") as %[].
+  Qed.
+
+  (* ...AND THE SHOOT, which is the mknod commit's PHASE 2: the view is
+     already present at [i], so the claim's only arms are the two present
+     ones; the flag's authority moves [[] -> [i]] and the persistent
+     [cons_made r i] comes out.  (An arm that is ALREADY shot agrees at
+     [i], because [apath_at] is functional.) *)
+  Lemma echo_cons_shoot (γ : echo_fixed) (r : echo_names) (av : aview)
+      (i : Z) :
+    cons_present_at i av ->
+    echo_pred γ r av ==∗ echo_pred γ r av ∗ (cons_made r i ∨ echo_taint γ).
+  Proof.
+    intros Hpr. iIntros "Hp". rewrite /echo_pred.
+    iDestruct "Hp" as "[#Ht | [%Hpins Hcs]]".
+    { iModIntro. iSplitR; [ by iLeft |]. iRight. iExact "Ht". }
+    rewrite /cons_state.
+    iDestruct "Hcs" as "[[%Hab _] | [Hc | Hc]]".
+    { (* absent and present at once: the entry both is and is not there *)
+      exfalso. rewrite /cons_absent (cons_present_astep i av Hpr) in Hab.
+      discriminate Hab. }
+    - iDestruct "Hc" as (j) "(%Hprj & Hkey & Htok)".
+      iMod (cons_shoot r i with "Htok") as "[Hsh #Hm]".
+      iModIntro. iSplitR "Hm".
+      + iRight. iSplitR; [ by iPureIntro |]. iRight. iRight.
+        iExists i. iFrame "Hkey Hsh". by iPureIntro.
+      + iLeft. iExact "Hm".
+    - iDestruct "Hc" as (j) "(%Hprj & Hkey & Hsh)".
+      assert (Hij : j = i).
+      { destruct Hprj as (Hpj & _ & _). destruct Hpr as (Hpi & _ & _).
+        rewrite Hpj in Hpi. by injection Hpi. }
+      subst j.
+      iDestruct (cons_shot_made r i with "Hsh") as "[Hsh #Hm]".
+      iModIntro. iSplitR "Hm".
+      + iRight. iSplitR; [ by iPureIntro |]. iRight. iRight.
+        iExists i. iFrame "Hkey Hsh". by iPureIntro.
+      + iLeft. iExact "Hm".
+  Qed.
+
+  (* THE PURE HALF OF THE CLAIM, read off without spending it: the three
+     binaries are the image's, or the taint.  The mknod's ARM leg stashes
+     this at its own view and hands it on in the permit, which is what the
+     UNARM leg needs to know the pins survive deleting a FRESH inum. *)
+  Lemma echo_fs_pure_acc (γ : echo_fixed) (r : echo_names) (v : aview) :
+    echo_pred γ r v -∗ echo_pred γ r v ∗ (⌜echo_fs_pure v⌝ ∨ echo_taint γ).
+  Proof.
+    iIntros "Hp". rewrite /echo_pred.
+    iDestruct "Hp" as "[#Ht | [%Hpins Hcs]]".
+    { iSplitR; [ by iLeft |]. iRight. iExact "Ht". }
+    iSplitL "Hcs"; [ iRight; by iFrame "Hcs" | iLeft; by iPureIntro ].
+  Qed.
+
+  (* THE ARM LEG'S STEP: a DEVICE row appears at an inum the view does not
+     have.  Free -- the commit's own freshness is all of it. *)
+  Lemma echo_cons_arm (γ : echo_fixed) (r : echo_names) (av : aview)
+      (i ma mi : Z) :
+    av !! i = None ->
+    echo_pred γ r av -∗ echo_pred γ r (delta_arm i (ADev ma mi) av).
+  Proof.
+    intros Hfree. iIntros "Hp". rewrite /echo_pred.
+    iDestruct "Hp" as "[#Ht | [%Hpins Hcs]]"; [ by iLeft |].
+    iRight. iSplitR.
+    { iPureIntro. destruct Hpins as (H1 & H2 & H3). split_and!.
+      - apply file_pin_init.
+        exact (file_pin_arm fname_init INIT_INO init_bytes i ma mi av Hfree
+                 (proj2 (file_pin_init av) H1)).
+      - apply file_pin_sh.
+        exact (file_pin_arm fname_sh SH_INO sh_bytes i ma mi av Hfree
+                 (proj2 (file_pin_sh av) H2)).
+      - apply file_pin_echo.
+        exact (file_pin_arm fname_echo ECHO_INO echo_bytes i ma mi av Hfree
+                 (proj2 (file_pin_echo av) H3)). }
+    rewrite /cons_state.
+    iDestruct "Hcs" as "[[%Hab Htok] | [Hc | Hc]]".
+    - iLeft. iFrame "Htok". iPureIntro. exact (cons_absent_arm i ma mi av Hab).
+    - iDestruct "Hc" as (j) "(%Hprj & Hkey & Htok)".
+      iRight. iLeft. iExists j. iFrame "Hkey Htok". iPureIntro.
+      exact (cons_present_arm j i ma mi av Hfree Hprj).
+    - iDestruct "Hc" as (j) "(%Hprj & Hkey & Hsh)".
+      iRight. iRight. iExists j. iFrame "Hkey Hsh". iPureIntro.
+      exact (cons_present_arm j i ma mi av Hfree Hprj).
+  Qed.
+
+  (* THE UNARM LEG'S STEP, and it is PURE: the row at a FRESH inum goes
+     away again.  The pins survive because the arm's own view did not have
+     the inum ([FsConsPin.file_pin_unarm_fresh] -- the permit carries that
+     view's pure claim), and the console survives because at the unarm's
+     view it is ABSENT, which is what the KEY established one level up
+     ([echo_cons_abs_law]); at an absent view [FsConsPin.cons_absent_unarm]
+     has no side condition at all. *)
+  Lemma echo_cons_unarm (γ : echo_fixed) (r : echo_names) (av0 av : aview)
+      (i : Z) :
+    av0 !! i = None ->
+    echo_fs_pure av0 ->
+    cons_absent av ->
+    echo_pred γ r av -∗ echo_pred γ r (delta_unarm i av).
+  Proof.
+    intros Hfree Hp0 Hab0. iIntros "Hp". rewrite /echo_pred.
+    iDestruct "Hp" as "[#Ht | [%Hpins Hcs]]"; [ by iLeft |].
+    iRight. iSplitR.
+    { iPureIntro. destruct Hpins as (H1 & H2 & H3).
+      destruct Hp0 as (G1 & G2 & G3). split_and!.
+      - apply file_pin_init.
+        exact (file_pin_unarm_fresh fname_init INIT_INO init_bytes i av0 av
+                 Hfree (proj2 (file_pin_init av0) G1)
+                 (proj2 (file_pin_init av) H1)).
+      - apply file_pin_sh.
+        exact (file_pin_unarm_fresh fname_sh SH_INO sh_bytes i av0 av
+                 Hfree (proj2 (file_pin_sh av0) G2)
+                 (proj2 (file_pin_sh av) H2)).
+      - apply file_pin_echo.
+        exact (file_pin_unarm_fresh fname_echo ECHO_INO echo_bytes i av0 av
+                 Hfree (proj2 (file_pin_echo av0) G3)
+                 (proj2 (file_pin_echo av) H3)). }
+    rewrite /cons_state.
+    iDestruct "Hcs" as "[[%Hab Htok] | [Hc | Hc]]".
+    - iLeft. iFrame "Htok". iPureIntro. exact (cons_absent_unarm i av Hab).
+    - iDestruct "Hc" as (j) "(%Hprj & _ & _)".
+      exfalso. rewrite /cons_absent (cons_present_astep j av Hprj) in Hab0.
+      discriminate Hab0.
+    - iDestruct "Hc" as (j) "(%Hprj & _ & _)".
+      exfalso. rewrite /cons_absent (cons_present_astep j av Hprj) in Hab0.
+      discriminate Hab0.
+  Qed.
+
+  (* ...and the create that is NOT the console's: the claim survives with
+     no key spent, which is what the mknod's phase-1 step takes at any
+     other [(d, nm)] the call could have reached. *)
+  Lemma echo_cons_create_other (γ : echo_fixed) (r : echo_names) (av : aview)
+      (d : Z) (nmn : fname) (ents : gmap fname Z) (nl : nat) (i : Z)
+      (ma mi : Z) :
+    cre_pre av d nmn ents nl i (ADev ma mi) ->
+    (d <> FsImg.ROOTINO \/ nmn <> fname_console) ->
+    echo_pred γ r av -∗
+      echo_pred γ r (delta_create d nmn i (ADev ma mi) av).
+  Proof.
+    intros Hpre Hother. iIntros "Hp". rewrite /echo_pred.
+    iDestruct "Hp" as "[#Ht | [%Hpins Hcs]]"; [ by iLeft |].
+    iRight. iSplitR.
+    { iPureIntro. destruct Hpins as (H1 & H2 & H3). split_and!.
+      - apply file_pin_init.
+        exact (file_pin_create fname_init INIT_INO init_bytes d nmn ents nl i
+                 ma mi av Hpre (proj2 (file_pin_init av) H1)).
+      - apply file_pin_sh.
+        exact (file_pin_create fname_sh SH_INO sh_bytes d nmn ents nl i
+                 ma mi av Hpre (proj2 (file_pin_sh av) H2)).
+      - apply file_pin_echo.
+        exact (file_pin_create fname_echo ECHO_INO echo_bytes d nmn ents nl i
+                 ma mi av Hpre (proj2 (file_pin_echo av) H3)). }
+    rewrite /cons_state.
+    iDestruct "Hcs" as "[[%Hab Htok] | [Hc | Hc]]".
+    - iLeft. iFrame "Htok". iPureIntro.
+      exact (cons_absent_create_other d nmn ents nl i ma mi av Hpre Hother Hab).
+    - iDestruct "Hc" as (j) "(%Hprj & Hkey & Htok)".
+      iRight. iLeft. iExists j. iFrame "Hkey Htok". iPureIntro.
+      exact (cons_present_create_other j d nmn ents nl i ma mi av Hpre Hprj).
+    - iDestruct "Hc" as (j) "(%Hprj & Hkey & Hsh)".
+      iRight. iRight. iExists j. iFrame "Hkey Hsh". iPureIntro.
+      exact (cons_present_create_other j d nmn ents nl i ma mi av Hpre Hprj).
   Qed.
 
   (* ---------------------------------------------------------------- *)
@@ -595,18 +861,25 @@ Section EchoPred.
        BEFORE the arm is read.  The view decides it -- that is what
        [cons_inum_absent] / [cons_inum_present] say -- so each arm then
        finds the flag it needs. *)
-    iMod (own_alloc (●ML (cons_inum av : list (leibnizO Z)))) as (r') "Ha";
+    iMod (own_alloc (●ML (cons_inum av : list (leibnizO Z)))) as (g1) "Ha";
       [ apply mono_list_auth_valid |].
+    (* ...AND A FRESH KEY BESIDE IT.  The copy's present arms need one, and
+       it is fresh, so nothing holds it and nothing is spent.  (The absent
+       arm needs none, which is why the allocation is unconditional and the
+       arms below simply drop it.) *)
+    iMod (own_alloc (●ML ([] : list (leibnizO Z)))) as (g2) "Hk";
+      [ apply mono_list_auth_valid |].
+    set (r' := (g1, g2) : echo_names).
     (* both halves are [▷]-shaped, so the rest of the proof runs under ONE
        later, with the original claim stripped by it *)
-    iAssert (▷ (echo_pred γ r av ∗ echo_pred γ r' av))%I with "[H Ha]" as "HH";
+    iAssert (▷ (echo_pred γ r av ∗ echo_pred γ r' av))%I with "[H Ha Hk]" as "HH";
       last first.
     { iDestruct "HH" as "[H1 H2]". iModIntro. iFrame "H1". iExists r'.
       iExact "H2". }
     iNext. rewrite /echo_pred.
     iDestruct "H" as "[#Ht | [%Hpins Hcs]]".
     { iSplitR; [ by iLeft | by iLeft ]. }
-    rewrite /cons_state.
+    rewrite /cons_state /cons_tok /cons_shot /cons_key /r' /=.
     iDestruct "Hcs" as "[[%Hab Htok] | [Hc | Hc]]".
     - rewrite (cons_inum_absent av Hab).
       iSplitL "Htok".
@@ -614,20 +887,20 @@ Section EchoPred.
         iSplitR; [ by iPureIntro | iExact "Htok" ].
       + iRight. iSplitR; [ by iPureIntro |]. iLeft.
         iSplitR; [ by iPureIntro | iExact "Ha" ].
-    - iDestruct "Hc" as (i) "[%Hpr Htok]".
+    - iDestruct "Hc" as (i) "(%Hpr & Hkey & Htok)".
       rewrite (cons_inum_present i av Hpr).
-      iSplitL "Htok".
+      iSplitL "Htok Hkey".
       + iRight. iSplitR; [ by iPureIntro |]. iRight. iLeft.
-        iExists i. iSplitR; [ by iPureIntro | iExact "Htok" ].
+        iExists i. iFrame "Hkey Htok". by iPureIntro.
       + iRight. iSplitR; [ by iPureIntro |]. iRight. iRight.
-        iExists i. iSplitR; [ by iPureIntro | iExact "Ha" ].
-    - iDestruct "Hc" as (i) "[%Hpr Hsh]".
+        iExists i. iFrame "Hk Ha". by iPureIntro.
+    - iDestruct "Hc" as (i) "(%Hpr & Hkey & Hsh)".
       rewrite (cons_inum_present i av Hpr).
-      iSplitL "Hsh".
+      iSplitL "Hsh Hkey".
       + iRight. iSplitR; [ by iPureIntro |]. iRight. iRight.
-        iExists i. iSplitR; [ by iPureIntro | iExact "Hsh" ].
+        iExists i. iFrame "Hkey Hsh". by iPureIntro.
       + iRight. iSplitR; [ by iPureIntro |]. iRight. iRight.
-        iExists i. iSplitR; [ by iPureIntro | iExact "Ha" ].
+        iExists i. iFrame "Hk Ha". by iPureIntro.
   Qed.
 
   (* ---------------------------------------------------------------- *)
@@ -675,6 +948,31 @@ Section EchoInit.
   (* ...as the era-0 obligation's shape: the claim at the founded state's
      view, at the one instance, under the update.  It takes the RIGHT
      disjunct -- there is no taint at boot, and none is needed. *)
+  (* THE ERA-0 CLAIM *AND THE KEY*, which is the form the boot arm wants:
+     the instance is born with the flag unraised, the console absent, and
+     the key IN HAND -- and the key is what /init carries to its first open
+     and its mknod ([UInitCons] sections 5-6).  [echo_init] below is this
+     with the key dropped, which is the shape [App.xv6_app_adequacy]'s
+     [Happ_init] binder is stated at; E2's boot arm takes THIS one and
+     routes the key into /init's own bundle. *)
+  Lemma echo_init_key (γ : echo_fixed) (dk : Z -> bv 8)
+      (D : gmap Z (list (bv 8))) (S : fs_state_rec) :
+    fs_blocks dk = fsimg_P ->
+    fs_recovery (fs_blocks dk) D fsimg_cov (FsImg.sb_logstart fsimg_sb) ->
+    snap_ok S D ->
+    ⊢ |==> ∃ r : echo_names,
+        echo_pred γ r (abs_view (fss_inodes S)) ∗ cons_key r.
+  Proof.
+    intros Hdk Hrec HS.
+    (* the instance IS the console flag and its key, so the era-0 claim is
+       where both are born -- unraised, beside the three pins and the
+       absent console *)
+    iMod cons_tok_alloc as (r) "[Htok Hkey]".
+    iModIntro. iExists r. iFrame "Hkey".
+    iApply (echo_pred_absent γ r _ (echo_fs_era0 dk D S Hdk Hrec HS)
+              (era0_recovery_cons_absent dk D S Hdk Hrec HS) with "Htok").
+  Qed.
+
   Lemma echo_init (γ : echo_fixed) (dk : Z -> bv 8)
       (D : gmap Z (list (bv 8))) (S : fs_state_rec) :
     fs_blocks dk = fsimg_P ->
@@ -683,12 +981,8 @@ Section EchoInit.
     ⊢ |==> ∃ r : echo_names, echo_pred γ r (abs_view (fss_inodes S)).
   Proof.
     intros Hdk Hrec HS.
-    (* the instance IS the console flag, so the era-0 claim is where it is
-       born -- unraised, beside the three pins and the absent console *)
-    iMod cons_tok_alloc as (r) "Htok".
-    iModIntro. iExists r.
-    iApply (echo_pred_absent γ r _ (echo_fs_era0 dk D S Hdk Hrec HS)
-              (era0_recovery_cons_absent dk D S Hdk Hrec HS) with "Htok").
+    iMod (echo_init_key γ dk D S Hdk Hrec HS) as (r) "[Hp _]".
+    iModIntro. iExists r. iExact "Hp".
   Qed.
 
   (* ...AND AT THE THEOREM'S OWN LITERAL SHAPE ([App.xv6_app_adequacy]'s

@@ -272,7 +272,7 @@ Section SysMknod.
       (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
       (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) : iProp Σ :=
     (ep_start γfs cw P Pmiss pl
-     ∗ pf_at (acre_commit_at Γ appE (ADev ma mi)) Fok
+     ∗ pf_at (acre_commit_at Γ appE (ADev ma mi) Farm) Fok
      ∗ pf_at (dlookup_commit_at Γ appE) Fex
      (* ...and the CHILD's two legs, unfired *)
      ∗ cre_child_unfired Γ (ADev ma mi) Farm Fun)%I.
@@ -295,7 +295,7 @@ Section SysMknod.
       (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
       (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) : iProp Σ :=
     ((∀ pl : list (bv 8), ⌜arg_path_of M pv pl⌝ -∗ ep_start γfs cw P Pmiss pl)
-     ∗ pf_at (acre_commit_at Γ appE (ADev ma mi)) Fok
+     ∗ pf_at (acre_commit_at Γ appE (ADev ma mi) Farm) Fok
      ∗ pf_at (dlookup_commit_at Γ appE) Fex
      ∗ cre_child_unfired Γ (ADev ma mi) Farm Fun)%I.
 
@@ -323,7 +323,7 @@ Section SysMknod.
       (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
       (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) :
     npar_walk_pre_era γfs cw P Pmiss -∗
-    pf_at (acre_commit_at Γ appE (ADev ma mi)) Fok -∗
+    pf_at (acre_commit_at Γ appE (ADev ma mi) Farm) Fok -∗
     pf_at (dlookup_commit_at Γ appE) Fex -∗
     cre_child_unfired Γ (ADev ma mi) Farm Fun -∗
     mknod_au_at Γ γfs cw M pv ma mi P Pmiss Farm Fun Fok Fex.
@@ -338,7 +338,7 @@ Section SysMknod.
       (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
       (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) :
     npar_walk_pre_era γfs cw P Pmiss -∗
-    pf_at (acre_commit_at Γ appE (ADev ma mi)) Fok -∗
+    pf_at (acre_commit_at Γ appE (ADev ma mi) Farm) Fok -∗
     pf_at (dlookup_commit_at Γ appE) Fex -∗
     cre_child_unfired Γ (ADev ma mi) Farm Fun -∗
     mknod_au_pre Γ γfs cw pl ma mi P Pmiss Farm Fun Fok Fex.
@@ -368,10 +368,12 @@ Section SysMknod.
          P (length (npar_elems pl)) d ∗
          pf_at (dlookup_commit_at Γ appE) Fex ∗
          Fok.(pf_recv) av d nm i ∗
-         (* ...AND THE CHILD'S OWN LEG: the row APPEARED at this inum before
-            the parent's entry went in, so the ARM's receipt rides beside
-            [cre_pre]; the UNARM comes home unfired. *)
-         cre_arm_fired Farm i ∗ pf_at (aunarm_of_arm Γ appE Farm) Fun)%I.
+         (* ...AND THE CHILD'S OWN LEG: the UNARM comes home unfired.  The
+            ARM'S RECEIPT IS NOT HERE -- the create leg SPENT it (it is the
+            permit that makes the two legs exclusive,
+            [FsAbsCreateFire.acre_commit_at_gen]'s note), and what the
+            caller parked in it comes back through [Fok]'s own receipt. *)
+         pf_at (aunarm_of_arm Γ appE Farm) Fun)%I.
 
   (* ret -1's two-way fold: nothing fs-visible happened (argstr failed)
      and the whole bundle comes back, or create's own failure fold (the
@@ -390,12 +392,12 @@ Section SysMknod.
              fired (ARM F-BAD) or not, and the child's legs whole or the
              do-then-undo PAIR (ruling Q-h). *)
           ((npar_walk_dead_era γfs P Pmiss pl
-              ∗ pf_at (acre_commit_at Γ appE (ADev ma mi)) Fok
+              ∗ pf_at (acre_commit_at Γ appE (ADev ma mi) Farm) Fok
               ∗ pf_at (dlookup_commit_at Γ appE) Fex
               ∗ cre_child_unfired Γ (ADev ma mi) Farm Fun)
            ∨ (∃ d : Z,
                 P (length (npar_elems pl)) d
-                ∗ pf_at (acre_commit_at Γ appE (ADev ma mi)) Fok
+                ∗ pf_at (acre_commit_at Γ appE (ADev ma mi) Farm) Fok
                 ∗ ((∃ (av : aview) (i : Z) (nm : fname)
                       (ents : gmap fname Z) (nl : nat),
                       ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
@@ -508,8 +510,9 @@ Section SysMknod.
        ⌜arun av root ps ds⌝ ∗
        pf_at (dlookup_commit_at Γ appE) Fex ∗
        Fok.(pf_recv) av d nm i ∗
-       (* the child's row APPEARED at this inum *)
-       cre_arm_fired Farm i ∗ pf_at (aunarm_of_arm Γ appE Farm) Fun)%I.
+       (* the child's UNARM comes home; the arm's permit was spent by the
+          create leg *)
+       pf_at (aunarm_of_arm Γ appE Farm) Fun)%I.
 
   (* ret -1: TWO arms where the AU form has three folds, and the collapse
      is the cursor's disappearance -- "the walk died at hop k" and "nothing
@@ -521,7 +524,7 @@ Section SysMknod.
       (ps : list fname) (ds : list Z)
       (Farm Fun : pfam Σ (aview -> Z -> iProp Σ))
       (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) : iProp Σ :=
-    ((pf_at (acre_commit_at Γ appE (ADev ma mi)) Fok
+    ((pf_at (acre_commit_at Γ appE (ADev ma mi) Farm) Fok
       ∗ pf_at (dlookup_commit_at Γ appE) Fex
       (* the child's legs: whole, or the do-then-undo PAIR (ruling Q-h) --
          "nothing fired" and "the walk died" collapse into one arm here, and
@@ -534,7 +537,7 @@ Section SysMknod.
           ⌜av !! d = Some (MkAnode (ADir ents) nl)⌝ ∗
           ⌜ents !! nm = Some i⌝ ∗
           ⌜arun av root ps ds⌝ ∗
-          pf_at (acre_commit_at Γ appE (ADev ma mi)) Fok ∗
+          pf_at (acre_commit_at Γ appE (ADev ma mi) Farm) Fok ∗
           Fex.(pf_recv) av d nm i
           (* ...and the child's legs: whole, or the do-then-undo PAIR
              (ruling Q-h) *)
@@ -777,7 +780,7 @@ Definition wp_sys_mknod_stable_body
   wp_sys_mknod_frame γf gs j gl pd pav pu ns dqb dqs dqbs dqn
     v0 v1 v2 pid U m K eb b lks
     (mkr_chain Γfs avc ds ps
-     ∗ pf_at (acre_commit_at Γfs appE (ADev ma mi)) Fok
+     ∗ pf_at (acre_commit_at Γfs appE (ADev ma mi) Farm) Fok
      ∗ pf_at (dlookup_commit_at Γfs appE) Fex
      ∗ cre_child_unfired Γfs (ADev ma mi) Farm Fun)%I
     (mknod_stable_arms Γfs ma mi root ps ds Farm Fun Fok Fex).

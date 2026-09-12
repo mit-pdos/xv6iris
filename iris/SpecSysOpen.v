@@ -651,10 +651,9 @@ Section SysOpenArms.
                    ⌜arow_at av' i (MkAnode (AFile []) nl')⌝ ∗
                    Ft.(pf_recv) av' i []
             else emp) ∗
-           (* the child's row APPEARED at this inum; the unarm comes home
-              (round E2, lane E2-C) *)
-           cre_arm_fired Farm i
-           ∗ pf_at (aunarm_of_arm Γ appE Farm) Fun ∗
+           (* the unarm comes home (round E2, lane E2-C); the arm's permit
+              was spent by the create leg *)
+           pf_at (aunarm_of_arm Γ appE Farm) Fun ∗
            ∃ γo : gname,
              open_fd_ok γf p pid UW (om_readable vom) (om_writable vom)
                (FdInode i γo) sts r)
@@ -663,7 +662,7 @@ Section SysOpenArms.
            ⌜avx !! d = Some (MkAnode (ADir entsx) nlx)⌝ ∗
            ⌜entsx !! nm = Some i⌝ ∗
            Fex.(pf_recv) avx d nm i ∗
-           pf_at (acre_commit_at Γ appE (AFile [])) Fok ∗
+           pf_at (acre_commit_at Γ appE (AFile []) Farm) Fok ∗
            (* the name was already there: create's child legs are whole *)
            cre_child_unfired Γ (AFile []) Farm Fun ∗
            (∃ (av : aview) (nl : nat),
@@ -704,7 +703,7 @@ Section SysOpenArms.
      ∨ (∃ pl : list (bv 8),
           ⌜arg_path_of M pv pl⌝ ∗
           ((npar_walk_dead_era γfs P Pmiss pl
-             ∗ pf_at (acre_commit_at Γ appE (AFile [])) Fok
+             ∗ pf_at (acre_commit_at Γ appE (AFile []) Farm) Fok
              ∗ pf_at (dlookup_commit_at Γ appE) Fex
              ∗ pf_at (aopen_commit_at Γ appE) Fo
              ∗ open_trunc_piece Γ vom Ft
@@ -721,8 +720,8 @@ Section SysOpenArms.
                      Fok.(pf_recv) av d nm i
                      ∗ pf_at (dlookup_commit_at Γ appE) Fex
                      ∗ pf_at (aopen_commit_at Γ appE) Fo
-                     (* the child's row APPEARED and STANDS *)
-                     ∗ cre_arm_fired Farm i
+                     (* the child's row STANDS; the arm's permit was spent
+                        by the create leg *)
                      ∗ pf_at (aunarm_of_arm Γ appE Farm) Fun)
                   ∨ (* (b) the name existed: found DIR (F-BAD), a bad
                        found-device major, or table full past a good
@@ -733,7 +732,7 @@ Section SysOpenArms.
                      ⌜av !! d = Some (MkAnode (ADir ents) nl)⌝ ∗
                      ⌜ents !! nm = Some i⌝ ∗
                      Fex.(pf_recv) av d nm i
-                     ∗ pf_at (acre_commit_at Γ appE (AFile [])) Fok
+                     ∗ pf_at (acre_commit_at Γ appE (AFile []) Farm) Fok
                      (* create's child legs: whole, or the do-then-undo
                         PAIR -- the fold does not separate the two here
                         (round E2, lane E2-C) *)
@@ -744,7 +743,7 @@ Section SysOpenArms.
                              ⌜arow_at av' i a⌝ ∗ Fo.(pf_recv) av' i a)))
                   ∨ (* (c) nothing observed: the nlink guard, out of
                        inodes, dirlink failure, "/" *)
-                  (pf_at (acre_commit_at Γ appE (AFile [])) Fok
+                  (pf_at (acre_commit_at Γ appE (AFile []) Farm) Fok
                    ∗ pf_at (dlookup_commit_at Γ appE) Fex
                    ∗ pf_at (aopen_commit_at Γ appE) Fo
                    (* the guards and "out of inodes" fired nothing; a failed
@@ -875,7 +874,7 @@ Section SysOpenArms.
     - iLeft. by iFrame "Hp Hb".
     - iRight.
       iDestruct "H" as (pl d i nm) "(_ & _ & _ & [H | H])".
-      + iDestruct "H" as (av ents nl) "(_ & _ & _ & _ & _ & _ & _ & _ & H)".
+      + iDestruct "H" as (av ents nl) "(_ & _ & _ & _ & _ & _ & _ & H)".
         iDestruct "H" as (γo) "H".
         iApply (open_fd_ok_landed _ _ _ _ _ _ _ _ (trunc32 vom) with "H");
           [exact Hrd | exact Hwr].
@@ -1022,8 +1021,7 @@ Section SysOpenArms.
                       ⌜arow_at av' i (MkAnode (AFile []) nl')⌝ ∗
                       Ft.(pf_recv) av' i []
                else emp) ∗
-              cre_arm_fired Farm i
-              ∗ pf_at (aunarm_of_arm Γ appE Farm) Fun ∗
+              pf_at (aunarm_of_arm Γ appE Farm) Fun ∗
               ∃ γo : gname,
                 ⌜open_fd_rcpt (om_readable vom) (om_writable vom)
                    (FdInode i γo) sts r fdv'⌝)
@@ -1032,7 +1030,7 @@ Section SysOpenArms.
               ⌜avx !! d = Some (MkAnode (ADir entsx) nlx)⌝ ∗
               ⌜entsx !! nm = Some i⌝ ∗
               Fex.(pf_recv) avx d nm i ∗
-              pf_at (acre_commit_at Γ appE (AFile [])) Fok ∗
+              pf_at (acre_commit_at Γ appE (AFile []) Farm) Fok ∗
               cre_child_unfired Γ (AFile []) Farm Fun ∗
               (∃ (av : aview) (nl : nat),
                  ((∃ bs0 : list (bv 8),
@@ -1222,7 +1220,7 @@ Section SysOpenArms.
     - iDestruct "H" as (pl d i nm) "(%Hpl & %Hlast & HP & [Hfresh | Hex])".
       + (* FRESH *)
         iDestruct "Hfresh" as (av ents nl)
-          "(%Hcre & %Hib & HFok & Hex & Ho & Htr & Harm & Hun & Hfd)".
+          "(%Hcre & %Hib & HFok & Hex & Ho & Htr & Hun & Hfd)".
         iDestruct "Hfd" as (go) "Hfd".
         iDestruct (open_fd_ok_split with "Hfd") as (fd l k fdv')
           "((%Hr & %Hfl & %Hcl & %Hins) & %Hrc & Hpriv & Hb)".
@@ -1243,7 +1241,6 @@ Section SysOpenArms.
         iSplitL "Hex"; [ iExact "Hex" | ].
         iSplitL "Ho"; [ iExact "Ho" | ].
         iSplitL "Htr"; [ iExact "Htr" | ].
-        iSplitL "Harm"; [ iExact "Harm" | ].
         iSplitL "Hun"; [ iExact "Hun" | ].
         iExists go. iPureIntro. exact Hrc.
       + (* EXISTS-OPENS *)

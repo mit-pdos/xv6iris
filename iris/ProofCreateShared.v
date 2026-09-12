@@ -1867,17 +1867,16 @@ Section ProofCreateMain.
       (pl : list (bv 8)) (d i : Z) :
     P (length (npar_elems pl)) d -∗
     pf_at (dlookup_commit_at (fs_gamma_L fsc_fs) appE) Fex -∗
-    pf_at (acre_commit_at_gen (fs_gamma_L fsc_fs) appE (cre_child tyz ma mi)) Fok -∗
-    cre_arm_fired Farm i -∗
+    pf_at (acre_commit_at_gen (fs_gamma_L fsc_fs) appE (cre_child tyz ma mi) Farm) Fok -∗
     ((∃ full : bool, cre_dots_fired Fdots i d full)
      ∨ cre_dots_leg (fs_gamma_L fsc_fs) tyz Fdots) -∗
     cre_unarm_fired Fun i -∗
     cre_fail_arms (fs_gamma_L fsc_fs) γfs tyz ma mi P Pmiss
       Farm Fdots Fun Fok Fex pl.
   Proof.
-    iIntros "HP Hdl Hac Ha Hd Hu". rewrite /cre_fail_arms.
+    iIntros "HP Hdl Hac Hd Hu". rewrite /cre_fail_arms.
     iRight. iExists d. iFrame "HP". iSplitL "Hdl"; [by iRight |].
-    iFrame "Hac". iRight. iExists i. iFrame "Ha Hd Hu".
+    iFrame "Hac". iRight. iExists i. iFrame "Hd Hu".
   Qed.
 
   (* ARM F-OK: the name was already there and create hands it back; every
@@ -1911,7 +1910,6 @@ Section ProofCreateMain.
       (pl : list (bv 8)) (d : Z) (nm : fname) (i : Z) :
     list_basics.last (path_elems pl) = Some nm ->
     P (length (npar_elems pl)) d -∗
-    cre_arm_fired Farm i -∗
     (cre_dots_fired Fdots i d true
      ∨ cre_dots_leg (fs_gamma_L fsc_fs) tyz Fdots) -∗
     cre_acre_fired Fok d nm i (cre_child tyz ma mi d i) -∗
@@ -1920,8 +1918,8 @@ Section ProofCreateMain.
     cre_ok_arms (fs_gamma_L fsc_fs) tyz ma mi P Farm Fdots Fun Fok Fex
       pl true i.
   Proof.
-    iIntros (Hlast) "HP Ha Hd Hac Hu Hdl". rewrite /cre_ok_arms.
-    iExists d, nm. iSplitR; [by iPureIntro |]. iFrame "HP Ha Hd Hac Hu Hdl".
+    iIntros (Hlast) "HP Hd Hac Hu Hdl". rewrite /cre_ok_arms.
+    iExists d, nm. iSplitR; [by iPureIntro |]. iFrame "HP Hd Hac Hu Hdl".
   Qed.
 
   Definition cr_cont_body
@@ -2646,7 +2644,7 @@ Section ProofCreateMain.
        pf_at (aunarm_of_arm (fs_gamma_L fsc_fs) appE Farm) Fun -∗
        pf_at (acre_commit_at_gen (fs_gamma_L fsc_fs) appE
                 (cre_child (bv_unsigned ty) (bv_unsigned major)
-                           (bv_unsigned minor))) Fok -∗
+                           (bv_unsigned minor)) Farm) Fok -∗
        wp_next (CID0 := CID) true (proc_addr j)
          (fun CIDc : CpuId =>
             cr_cont_body γf
@@ -2874,7 +2872,7 @@ Section ProofCreateMain.
        pf_at (aunarm_of_arm (fs_gamma_L fsc_fs) appE Farm) Fun -∗
        pf_at (acre_commit_at_gen (fs_gamma_L fsc_fs) appE
                 (cre_child (bv_unsigned ty) (bv_unsigned major)
-                           (bv_unsigned minor))) Fok -∗
+                           (bv_unsigned minor)) Farm) Fok -∗
        wp_next (CID0 := CID) true (proc_addr j)
          (fun CIDc : CpuId =>
             cr_cont_body γf
@@ -3153,7 +3151,7 @@ Section ProofCreateMain.
        pf_at (aunarm_of_arm (fs_gamma_L fsc_fs) appE Farm) Fun -∗
        pf_at (acre_commit_at_gen (fs_gamma_L fsc_fs) appE
                 (cre_child (bv_unsigned ty) (bv_unsigned major)
-                           (bv_unsigned minor))) Fok -∗
+                           (bv_unsigned minor)) Farm) Fok -∗
        wp_next (CID0 := CID) true (proc_addr j)
          (fun CIDc : CpuId =>
             cr_cont_body γf
