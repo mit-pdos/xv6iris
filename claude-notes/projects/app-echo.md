@@ -2404,6 +2404,53 @@ ORDER: GENERIC-PAY → CONS-SWALLOW → SH-LINE 2b (gets on `ush_gets_line`,
 `wp_uk_ecall_read_recv` with `upos` threaded read → gets_loop → gets → getcmd
 → main) → LAZY-FLAG (the owner's form of (A)).
 
+APP-IFACE PHASE 1 -- THE STATEMENT DIFF, FOR THE OWNER'S REVIEW (2026-09-12;
+`-disc`, `lane/app-iface` uncommitted, build `iface15` green, 3 files
++435/-76: App.v, SystemAdequacy.v, AppEcho.v; RiscvAdequacy/WpUart/BootShared
+untouched; all corollaries unchanged in statement).
+(1) `xv6_app` gains `app_boot : app_fixed -> app_names -> iProp Σ` (data;
+`app_triv`: `emp`).  (2) THE PRODUCER IS THE TRANSPORT, NOT `Happ_init`:
+every boot -- era 0 included (`Hpow0`) -- goes through the PowerOn arm, which
+CLONES the slot's claim through the transport at a fresh instance `r'`, so the
+`r` that reaches `Hinit_boot` is always the transport's; hence `Happ_xfer`
+becomes `Happ_boot : ⊢ app_xfer_boot_raw (app_pred A c) (app_boot A c)` =
+`□ (∀ r av, ▷ A r av ==∗ ▷ A r av ∗ ∃ r', ▷ A r' av ∗ B r')` (at `B := emp`
+interderivable with the old; `AppInv.app_xfer_raw` untouched, derived by
+`app_xfer_raw_of_boot`).  (3) `Hinit_boot` gains `riscv_rx_tag = app_tag A c`
+(pure; a reading of the record the theorem itself builds, discharged by
+reflexivity inside the proof) and takes `app_boot A c r` LINEARLY beside
+`app_inv` -- the theorem is STRONGER (its discharger is given more).
+(4) ERA IDENTIFICATION WITHOUT A NEW GHOST: `Htx`/`Hrx` (and `Hperm`) gain
+the era's `fileG` and the pure premises `file_app = MkAppcfg … r` and
+`FsCfg.fsc_uart = γ` -- narrowing the wands from "every γ" to the era's;
+both equations are facts the boot already carries (`fs_boot_supply`'s
+`⌜fsc_uart = γd⌝`, `boot_shared_alloc`'s `⌜file_app = APP⌝`) and are
+discharged in `xv6_boot_era`, where `wp_uart_loop` is applied exactly once per
+era at that γ.  An AGREEMENT token minted at `uart_ghosts_alloc` is neither
+buildable (every era's token persists at a different γ) nor needed (the
+ledger stores pure data; `uart_pop_tag`'s premises are already in `Htx`);
+if a γ-indexed resource ever must survive between firings, the only sound
+home is a generation-keyed registry in the FIXED layer (machine-layer lane).
+(5) NOT LANDED, ITS OWN RIDER: the LOOP-off fact `u_wire u = u_out u` is
+inductive and not derivable from `Htx`'s pointwise `uart_loopback u = false`;
+target: a ninth clause of `WpUart.uart_col_ok` and one more pure premise on
+`Htx` (WpUart is at the bottom of the tree: a TX-TAG-phase-2 rider or a lane).
+(6) ECHO'S BOOT RESOURCE IS TWO-ARMED: `echo_boot γ r := cons_key r ∨ ∃ i,
+cons_made r i` (`echo_xfer_boot` PROVED; the arm is decided outside the ▷ by
+`cons_inum av`) -- at era ≥ 1 the console node is DURABLE, the claim sits in a
+PRESENT arm with the key inside it, and /init's FIRST open SUCCEEDS: E2 owes
+init's console dance at the FLAG arm (a pinned hit at `cons_made r i`, the
+same leaf as OPEN-PIN's second open) beside the landed key arm -- new E2
+work exposed by routing the boot resource across eras.  (7) E2's premise
+audit: the token `ucons_reader cn 0` is the BUNDLE's own wand argument
+(`init_boot_bundle` is a wand from `cons_reader fsc_cons 0`), not
+`Hinit_boot`'s; `ush_tag_law` is `rewrite Htag; auto` now.  (8) `Hphi` holds
+`▷ app_R A c h` at the run's FINAL `h`, so a per-cycle tagged shadow for
+EVERY cycle is readable; DISC-RATE's per-cycle `echo_phi` is compatible.
+Corrections: `design/app-instances.md` does not exist (App.v's headers cite
+it); `uart-trace.md` is under `completed/`.  AWAITING THE OWNER'S GO-AHEAD
+before phase 2 (proofs + commit).
+
 SUPPLY-SPLIT PHASE 2 GREEN ON ITS BRANCH (2026-09-12; `-sup`,
 `lane/supply-split` = `d2708e5b7`; 31 files +1163/-561; build `sup27`, audit =
 the thirteen; lemma_diff: 29 `Hpsok` → 24 `Hpsok_free` (five files lose the
