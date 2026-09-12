@@ -132,7 +132,11 @@ process entry and someone owns it.  Consequences:
   the honest reading of "it is not tracking its descriptors" (`sync`, `echo`).
 - A program that DOES call open/dup/pipe threads it.  For a proof that does
   not read it, `ustd_any γfd` (`∃ l, ustd γfd l`) costs a lemma statement one
-  resource and NO binder — that is what `init` carries.
+  resource and NO binder.  `init` USED to carry that; since OPEN-PIN it carries
+  `UInitFd.ufd_head T st γfd` (slot 0 = console ∨ all closed ∨ the taint) from
+  its second open to the fork, because sh's fd 0 must be KNOWN to be the
+  console device for the input line (`projects/app-echo.md`, "OPEN-PIN
+  COMPLETE").
 - `cat` carries the ledger with `⌜fd_lowest_closed l = None⌝` through its
   main loop, which is what says its `open` lands above the standard streams
   and returns a handle it may close.  The body neither moves nor reads it.
@@ -187,17 +191,17 @@ Two consequences in the CONTRACTS, and they are the point:
   discharges it by `reflexivity`; the generic inhabitant satisfies it by
   ignoring it (`ProofSysFork`, `ProofUserinit`, whose park is at `fdt0`).
 
-What is still NOT earned is the other side of that premise:
-`UexecApply.uexec_ret_round_slot`'s fork case MINTS a slot from the family
-instead of INSTANTIATING the program's own child arm, so a verified parent's
-fork continuation has no route to its child yet
-(`projects/user-wp-slot.md` §4c, R-b).
+The other side of that premise is earned too: `UkFork.wp_uk_ecall_fork` gives
+the parent a CHILD ARM (the child's run at its own names, with the parent's
+ledger states, the exit payload `Q` chosen by the parent, and `my_pay`), and
+`UkInitMain.wp_kinit_fork` instantiates it for init's child
+(`projects/app-echo.md`, "WX-WAIT LANDED" and "SH-LINE RULING").
 
 ## 6  What this does NOT yet do
 
 `UkSh.ush_std l` is the ledger plus `⌜fd_lowest_closed l = None⌝` — sh's
-entry precondition, and what its console loop's open reads.  Spending it on
-a REDIR is the parked runner's business: see the parking note in
-`iris/_CoqProject`, whose remaining blocker is R-b — the fork ecall arm
-MINTING the child's slot rather than instantiating the program's own child
-continuation — and not the descriptor table, which §5 settled.
+entry precondition, and what its console loop's open reads.  SH-LINE
+(in flight) makes sh's entry take init's head's three arms (console / all
+closed / taint) so that the read of fd 0 is the console read.  Spending the
+ledger on a REDIR is the parked runner's business: see the parking note in
+`iris/_CoqProject`.
