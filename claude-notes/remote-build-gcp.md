@@ -128,6 +128,13 @@ for p in $(pgrep -x make); do echo "$p $(readlink /proc/$p/cwd)"; done
   tree's workers, and their `make` reports `Error 143` on whatever was in flight
   with no cause visible to its agent. Kill your own `make` by PID and leave the
   workers to exit with it.
+- **Killing `vmbuild.sh`'s wrapper does not reap its remote `make`.** The
+  next `vmbuild.sh` in the same tree then races the orphan (both `rm -f
+  CoqMakefile`, both compile) and one side dies with `Error 143` -- SIGTERM,
+  not a Rocq error. Wait for `EXIT=` in your own `/tmp/<log>.log` before
+  starting the next build. The same `Error 143` appears when `vmbuild.sh` is
+  run under a foreground tool timeout: the timeout SIGTERMs the ssh and the
+  remote compile with it. Run builds detached and poll the log.
 - **Two `make`s in the SAME remote tree race**, and the loser dies with *"Cannot
   find a physical path bound to logical path X"* — character-for-character the
   failure a missing opam env produces. It is neither; a plain rerun is green. A

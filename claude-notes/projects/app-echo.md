@@ -2610,6 +2610,48 @@ TX-RECEIPT's `tx_claim` so the two lanes merge by juxtaposition; the hart lines'
 invariant; `boot_k_shape` deleted.  `BACKSPACE` is the int 0x100 (not byte 8):
 the "\b \b" triple is reachable only from `%c`, unused.
 
+CLOSED-READ LANDED (2026-09-12; owner's ruling: "read on fd 0 returns -1.
+maybe your spec isn't good enough to say it. fix it then.").
+`SpecFileread.fileread_extra_core`'s `FdClosed` and `FdOpen false _ _` arms
+say `⌜r = mword_of_int (-1)⌝` (they were `emp`); the readable pipe arm is
+spelled out; the -1 constructors and the keyed `fileread_extra_of_*` forms
+carry the walk's `f->readable` boolean; SpecSysRead/ProofFileread re-closed;
+no consumer changed.  sh's all-closed ledger arm can now conclude read(0) =
+-1 from the post instead of assuming it (2b's B5 closed).
+
+SH-LINE 2b PHASE 2, R1 LANDED (2026-09-12; 7 U-tier files: UConsLine,
+UShLine (new), UkInit, UkRunSys, UkSh, UkShDiag, _CoqProject).  THE READ
+SUPPLY IS A WAND FROM THE EXIT PAYLOAD -- no escrow is opened and no mask is
+needed: read's deposit (`xv6_sbundle` at 5) is `fileread_in … (kf_xpay f
+(-1))` and the kernel feeds `ukn_pay N (-1) = ucons_pay fsc_cons γp T (-1)`
+back in at that wand.  `UShLine.ush_read_sup N γp T m pc l n wr : ukn_pay N =
+ucons_pay fsc_cons γp T -> a0 = 0 -> l !! 0 = Some (FdOpen true wr (FdDevice
+CONSOLE)) -> (⊢ app_sup -∗ T) -> (⊢ T -∗ app_sup) -> Persistent T -> upos γp
+n -∗ udepwf_std N m pc USYS_read (ush_read_fam γp T n (ukn_pay N)) l`, with
+`ush_rd_ret γp T n := fun cur dc => (⌜cur = n⌝ ∗ upos γp (n+dc)) ∨ (T ∗ ∃ n',
+upos γp n')`.  The leaf `ush_read_recv_leaf` is reshaped as the landed
+contracts force: the count `cap` separate from the buffer length `k` (`cap <
+k`), `⌜Z.of_nat dd = bv_unsigned r⌝` with the window behind `⌜dd <= cap⌝ -∗`,
+and a KILLED arm `⌜r = -1⌝ ∗ ∃ n', upos γp n'`.  ONE discharger,
+`UShLine.ush_read_recv_leaf_holds` (concrete bundle; `UkSh.ush_read_leaf_holds`
+deleted); `UkRunSys.wp_uk_ecall_read_recv` gained three pure rows only it can
+produce (the destination run's linearity, `M' !! (dst+j) = Some (g j)`, the
+positive no-fault fact).  Named premises: the two taint/supply readings
+(E2/AppEcho's `echo_taint_of_sup`/`echo_sup_of_taint`, Coq-level so the result
+is an `⊢`), `ukn_pay N = ucons_pay …` (UInitSh chooses it).  R2/R3 (the line
+fact through getcmd; the composer above UkShEcho with E4's dispatch) are
+BLOCKED on kernel-side contract gaps, to be taken after the kernel bump:
+B1 consoleread's post should say `d = cap -> dc = d` (the swallowed byte
+past the request is not refutable by the caller); B2 `console_receipt`'s -1
+arm pays no window (handled by the killed arm for now); B3
+`UexecExecInst.xv6_spost` drops `fileread_ret`'s `0 <= r <= n` (usys_mem_ok
+bounds bytes written, not r) -- one line to restore; B4 `cons_swallow`'s left
+arm is unconditional, the true row is `r = 0 -> dc = d+1` (consoleread
+returns 0 only on the ^D exit); B5 closed (CLOSED-READ).  Note: the
+discharge cannot live at UShKernel's altitude (abstract `uexecSG`); wiring
+the position into `UkSh.ush_read_leaf` means `sh_uexec_slot` takes the
+discharge as a Coq-level premise.
+
 SH-LINE 2b PHASE 1 LANDED (2026-09-12, iris 798a59476; 7 files: UConsLine,
 UInitSh, UShKernel, UkSh, UkShFork, UkShLoop, UserConsole).  L1: the U-tier
 read leaf's window arm is `ucons_swallow cn False sl d dc` (the program's
