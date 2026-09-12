@@ -2050,6 +2050,14 @@ UkShFork.v
 # Its header records the two things the tree does not have yet: a payload
 # that crosses exec, and a pinned open that says fd 0 is the console.
 UConsLine.v
+# UkShEcho = E4 SH-ECHO's u-TIER HALF (statements): the ONE command the
+# disciplined line parses to ([echo_cmd], over [UkShMain.ush_args] at the
+# three tokens the literal line lexes to -- PROVED by vm_compute), sh's
+# PINNED exec supply at the root ([sh_exec_sup_echo], on
+# [UkInit.init_exec_sup_pos]'s mould), the cwd-indexed exec stub and the
+# specialised EXEC arm and child dispatch.  It adds no cone: nothing below
+# it requires it, and the payment lives in UShEcho.v at the top.
+UkShEcho.v
 # UInitCons = OPEN-PIN'S STATEMENTS: init's console prologue.  The pin
 # resolves at the console's PRESENT state, the pinned open bundle at init's
 # own path argument and the reading of open's receipt (fd 0 is the CONSOLE
@@ -2079,3 +2087,13 @@ UInitConsK.v
 # ShSyms.open.  UInitConsK's twin one program over; the ABSENT arm runs on
 # a PERSISTENT absence law, which E2 owes (AppEcho.cons_never).
 UShConsK.v
+
+# UShEcho = E4 SH-ECHO's APPLICATION HALF (statements): the /echo pin
+# resolved at the child's cwd and [kexec_loadable echo_elf] (both PROVED),
+# the two readings of sh's own node that price echo's arguments, echo's
+# entry at the EXEC channel ([echo_slot_of_kexec] -- the piece sh's lane
+# never needed, since [UEchoKernel.echo_uexec_slot] is key-level), the
+# assembly through [PinnedExec.pinned_exec_bundle], and echo's post over
+# its transcript against E5's named write receipt.  Above UexecExecInst,
+# UkShEcho and AppEcho, as UInitSh is one level up.
+UShEcho.v
