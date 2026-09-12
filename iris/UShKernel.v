@@ -264,7 +264,7 @@ Section UShKernel.
      hypothesis here as it is in the program files, and the exec dispatcher
      -- which sees the instance -- discharges it, exactly as it discharges
      [UexecCond.cond_entry_slot]'s. *)
-  Hypothesis Hpsok : forall k : Z, k <> UsysMemOk.USYS_exec -> psok k.
+  Hypothesis Hpsok_free : forall k : Z, free_num k -> psok k.
 
   (* NO [Context {CID : CpuId}] and no ambient [CurCtx]: the slot binds the
      hart itself, and the run binds its own context. *)
@@ -272,6 +272,13 @@ Section UShKernel.
   (* ------------------------------------------------------------------- *)
   (* SS1 UkSh's Hypothesis, discharged (header).                          *)
   (* ------------------------------------------------------------------- *)
+  (* ...AND IT TAKES THE READ DEPOSIT (lane SUPPLY-SPLIT, P4).  read(5) is a
+     CLAIM number: the console arm of its bundle spends the application's
+     supply ([FsAbsInvFire.fsabs_fileread_in]), so this discharge may not
+     route through [UkRun.udep]'s law -- that would put [AppInv.app_sup],
+     and hence the taint, in sh's entry.  [UkSh.sh_deps]'s read conjunct is
+     the premise, and SH-LINE 2b is what pays it, out of the lease
+     ([UkRun.udepwf_std] + [UkRunSys.wp_uk_ecall_read_recv] are landed). *)
   Lemma ush_read_leaf_of_win (N : uk_names Σ) :
     forall (h : CpuId) (m : regfile) (pc : mword 64) (a : Z) (k : nat)
            (f : nat -> bv 8) (avail : nat),
@@ -279,6 +286,7 @@ Section UShKernel.
       uint (m !!! Regidx (mword_of_int 11 : mword 5)) = a ->
       uint (m !!! Regidx (mword_of_int 12 : mword 5)) = Z.of_nat k ->
       is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
+      UkSh.sh_deps -∗
       uinstr_is (ukn_t N) pc false (ECALL tt) -∗
       ubytes (ukn_d N) a k f -∗
       urun N h m pc avail -∗
@@ -292,12 +300,13 @@ Section UShKernel.
       WP (Loop : expr riscv_lang).
   Proof.
     intros h m pc a k f avail Hn Ha Hk Hal4.
-    iIntros "#Hi Hbuf Hrun Hcont".
+    iIntros "#Hdp #Hi Hbuf Hrun Hcont".
     subst a.
     pose proof (sh_rdcount_le _ k Hk) as Hcnt.
     iApply (wp_uk_ecall_read_win N h m pc _ k f avail Hn eq_refl
               Hcnt Hal4 with "Hi Hrun [] Hbuf").
-    { iApply udepw_of_psok; [ apply Hpsok | ]; (vm_compute; discriminate). }
+    { iApply (udepw_of_law N m pc USYS_read with "[Hdp]").
+      iDestruct "Hdp" as "($ & _ & _)". }
     iIntros (h' r d g) "%Hd %Hgf Hrun Hbuf".
     iApply ("Hcont" $! h' r d g with "[%] [%] Hbuf Hrun");
       [ lia | exact Hgf ].
@@ -373,6 +382,14 @@ Section UShKernel.
        obligation; the exec bundle rides in through [ush_rest], whose
        discharge takes [UkRun.uxsup].) *)
     udep -∗
+    (* ...AND THE THREE DEPOSITS SH OWES BESIDE IT (lane SUPPLY-SPLIT, P4).
+       sh calls read(5), open(15) and write(16), and all three are CLAIM
+       numbers -- no supplier admits them through the key-free law -- so
+       they are named here, one conjunct each ([UkSh.sh_deps]'s header says
+       who owes what).  This is what keeps sh's entry off the generic
+       supplier: [udep] above is at the program's OWN instance, where the
+       admitted numbers are [UexecSG.free_num] and nothing more. *)
+    UkSh.sh_deps -∗
     (∀ N : uk_names Σ,
        ush_rest N γp (R (ukn_t N) (ukn_d N) (ukn_s N))) -∗
     (* THE ENTRY'S ONE DESCRIPTOR ROW, at its three arms
@@ -394,7 +411,7 @@ Section UShKernel.
     uslot W.
   Proof.
     intros HQc Hpc Hsub Hx Hal8 Hroom Hstk Hfdlen Hstop Hlzf.
-    iIntros "#Hpay #Hdep #Hrest #Hfd0 #Hmp HQ Hpos".
+    iIntros "#Hpay #Hdep #Hdp #Hrest #Hfd0 #Hmp HQ Hpos".
     iApply (uslot_of_urun_all W (2 + (8 + (16 + (ush_Dbody + n0)))) Q
               Hal8 Hroom Hstk Hfdlen Hstop Hlzf with "Hdep Hmp HQ").
     (* sh's own half of its children set travels in [UkSh.ush_pstate]
@@ -409,9 +426,9 @@ Section UShKernel.
     iDestruct ("Hpay" $! (ukn_t N) (ukn_d N) (ukn_s N) with "Hszf Dlo")
       as (f) "[HR Hbs]".
     iPoseProof ("Hrest" $! N) as "#Hr".
-    iApply (wp_ksh_start N γp T Hpsok (ush_read_leaf_of_win N)
+    iApply (wp_ksh_start N γp T Hpsok_free (ush_read_leaf_of_win N)
               (R (ukn_t N) (ukn_d N) (ukn_s N)) h _ f n0 (take NSTD (uvis_fd W))
-              with "Hr [] Hfd0 [Hstd Hcwf Hchf Hpos] HR Hbs [Hrun]").
+              with "Hdp Hr [] Hfd0 [Hstd Hcwf Hchf Hpos] HR Hbs [Hrun]").
     - iApply (shk_code_of_text (ukn_t N) (uvis_M W) (uvis_perm W)
                 (shk_img_text _ Hsub) Hx with "Ht").
     - rewrite /UkSh.ush_pstate /UkSh.ush_std /UkSh.ush_pos. iFrame "Hstd".
@@ -451,8 +468,10 @@ Section UShKernel.
               (udata_lo (uvis_M W') (uvis_perm W') (uvis_sz W')),
            ubyte γd k b) -∗
         ∃ f : nat -> bv 8, R γt γd γs ∗ ubytes γd sh_buf sh_nbuf f) -∗
-    (* the deposit supplier, passed straight through *)
+    (* the deposit supplier and the three deposits, passed straight
+       through: see [sh_uexec_slot] and [UkSh.sh_deps] *)
     udep -∗
+    UkSh.sh_deps -∗
     (∀ N : uk_names Σ,
        ush_rest N γp (R (ukn_t N) (ukn_d N) (ukn_s N))) -∗
     (* the entry row, the pay fact, the payload and the position, all four

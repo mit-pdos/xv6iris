@@ -21,7 +21,10 @@
 (*                                                                        *)
 (* (2) THE WINDOW ROW, ONCE, AND AS A HYPOTHESIS.  [read] (5) IS in the    *)
 (* window table, and the consumer leaf for the general window --           *)
-(* [wp_uk_ecall_window] -- does not exist on this engine yet.  Its         *)
+(* [UkRunSys.wp_uk_ecall_window] -- has since landed; this file still takes *)
+(* the row as a Hypothesis, because read is a CLAIM number (its console arm *)
+(* spends the supply) and what a verified sh may take is a DEPOSIT, not the *)
+(* program-generic supplier.  Its                                          *)
 (* statement is the file's one Hypothesis, [ush_read_leaf], spelled at the *)
 (* idiom of the landed [UkRunSys.wp_uk_ecall_wait_null].  Every lemma that *)
 (* depends on it SAYS SO in its own header and carries it as an explicit   *)
@@ -173,10 +176,43 @@ Section UkSh.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
      hypothesis, so no lemma statement in this file names it and the ~570
      [urun] sites did not move; the program's kernel-side constructor
-     discharges it (ARM-a's generic instance is [psok := fun _ => True]).
-     exec is excluded by the minting law itself -- its bundle reads the key,
-     so its deposit is always the explicit disjunct of [UkRun.udepw]. *)
-  Hypothesis Hpsok : forall k : Z, k <> USYS_exec -> psok k.
+     discharges it.
+     AT THE FREE NUMBERS AND NO MORE (lane SUPPLY-SPLIT).  It used to read
+     "every number but exec", which at the generic instance is true and at
+     a VERIFIED program's instance is not: a program whose supplier is the
+     application's ([AppInv.app_sup] -- for the echo application, the
+     TAINT) could only ever be entered tainted.  What a verified program
+     admits is [UexecSG.free_num] -- every number whose bundle is [emp],
+     plus chdir, whose branch is a closed fact -- and at
+     [UexecExecInst.uprogSG_free] this hypothesis is the identity.  A call
+     at a number OUTSIDE that set takes its own deposit as a premise
+     ([UkRun.udepw_law]) and is named at its site. *)
+  Hypothesis Hpsok_free : forall k : Z, free_num k -> psok k.
+
+  (* ===================================================================== *)
+  (* THE DEPOSITS SH OWES (lane SUPPLY-SPLIT, P4), as ONE persistent        *)
+  (* bundle: the three CLAIM numbers sh calls, and nothing else.            *)
+  (*                                                                        *)
+  (*   read(5)   the console read behind [ush_read_leaf] -- getcmd's whole  *)
+  (*             input.  read's console arm spends the supply               *)
+  (*             ([FsAbsInvFire.fsabs_fileread_in]); a LEASE holder pays it *)
+  (*             at its own claim ([UkRun.udepwf_std] is the landed shape,  *)
+  (*             [UkRunSys.wp_uk_ecall_read_recv] its leaf).  SH-LINE 2b.   *)
+  (*   open(15)  sh's [open("console", O_RDWR)] at its start, before the    *)
+  (*             two dups.  The sh-open lane owes a PINNED open, exactly as *)
+  (*             UInitConsK landed /init's ([UkRun.udepwf_at]).             *)
+  (*   write(16) the prompt and every diagnostic.  E5's output lane.        *)
+  (*                                                                        *)
+  (* WHAT IS NOT HERE: [UkRun.udep] at the generic supplier.  sh's own      *)
+  (* free numbers -- close(21) here, chdir(9), sbrk(12), wait(3) in the     *)
+  (* sibling files -- go through the minting law at [psok := free_num] and  *)
+  (* cost nothing, which is what [Hpsok_free] above says.                   *)
+  (* ===================================================================== *)
+  Definition sh_deps : iProp Σ :=
+    (udepw_law 5 ∗ udepw_law 15 ∗ udepw_law 16)%I.
+
+  Global Instance sh_deps_persistent : Persistent sh_deps.
+  Proof. rewrite /sh_deps. apply _. Qed.
 
   Local Notation ra_idx := (mword_of_int 1 : mword 5).
   Local Notation s0_idx := (mword_of_int 8 : mword 5).
@@ -426,6 +462,13 @@ Section UkSh.
     add_vec_int (mword_of_int pc0 : mword 64) 2 = mword_of_int pc1 ->
     add_vec_int (mword_of_int pc1 : mword 64) 4 = mword_of_int pc2 ->
     is_aligned_vaddr (Virtaddr (mword_of_int pc2 : mword 64)) 2 = true ->
+    (* THE DEPOSIT AT THIS STUB'S OWN NUMBER (lane SUPPLY-SPLIT, P4).  The
+       twelve exclusions above still leave 16 / 17 / 18 / 19 / 20, every one
+       a CLAIM number, so this stub may not route through [UkRun.udep]'s
+       law; it takes the deposit for the number it is instantiated at.  Its
+       one caller is [wp_ksh_write] at 16, which pays it out of
+       [sh_deps]. *)
+    udepw_law n -∗
     uinstr_is γt (mword_of_int pc0) true (C_LI (imm, Regidx a7_idx)) -∗
     uinstr_is γt (mword_of_int pc1) false (ECALL tt) -∗
     uinstr_is γt (mword_of_int pc2) true (C_JR (Regidx ra_idx)) -∗
@@ -439,7 +482,7 @@ Section UkSh.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Himm Hno He Hf Hx Hs Hw Hp Hr Hst Hcl Hdp Hop Hcd E01 E12 Hal2.
-    iIntros "#Ci0 #Ci1 #Ci2 Hrun Hcont".
+    iIntros "#Hdp #Ci0 #Ci1 #Ci2 Hrun Hcont".
     (* ---- pc0  c.li a7,n ---- *)
     iApply (wp_uk_cli N h m (mword_of_int pc0) imm a7_idx avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
@@ -455,8 +498,9 @@ Section UkSh.
               Hno He Hf Hx Hs Hw Hp Hr Hst Hcl Hdp Hop Hcd
               ltac:(rewrite E12; exact Hal2)
               with "Ci1 Hrun []").
-    { iApply udepw_of_psok; [ apply Hpsok | ];
-      (discriminate || assumption || (vm_compute; discriminate)). }
+    (* THE FLAGGED DEPOSIT, at this stub's own number: its one caller is
+       [wp_ksh_write] at 16 (P4) *)
+    { iApply (udepw_of_law N m1 (mword_of_int pc1) n with "Hdp"). }
     rewrite E12.
     iIntros (h2 ret) "Hrun".
     set (m2 := <[Regidx a0_idx := ret]> m1).
@@ -493,6 +537,7 @@ Section UkSh.
     add_vec_int (mword_of_int pc0 : mword 64) 2 = mword_of_int pc1 ->
     add_vec_int (mword_of_int pc1 : mword 64) 4 = mword_of_int pc2 ->
     is_aligned_vaddr (Virtaddr (mword_of_int pc2 : mword 64)) 2 = true ->
+    sh_deps -∗
     uinstr_is γt (mword_of_int pc0) true (C_LI (imm, Regidx a7_idx)) -∗
     uinstr_is γt (mword_of_int pc1) false (ECALL tt) -∗
     uinstr_is γt (mword_of_int pc2) true (C_JR (Regidx ra_idx)) -∗
@@ -511,7 +556,7 @@ Section UkSh.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Himm Hno E01 E12 Hal2.
-    iIntros "#Ci0 #Ci1 #Ci2 Hrun Hstd Hcont".
+    iIntros "#Hdp #Ci0 #Ci1 #Ci2 Hrun Hstd Hcont".
     (* ---- pc0  c.li a7,USYS_open ---- *)
     iApply (wp_uk_cli N h m (mword_of_int pc0) imm a7_idx avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
@@ -526,8 +571,9 @@ Section UkSh.
     iApply (wp_uk_ecall_open N h1 m1 (mword_of_int pc1) l avail
               Hno ltac:(rewrite E12; exact Hal2)
               with "Ci1 Hrun [] Hstd").
-    { iApply udepw_of_psok; [ apply Hpsok | ];
-      (discriminate || assumption || (vm_compute; discriminate)). }
+    (* THE FLAGGED DEPOSIT: open(15), the sh-open lane's (P4) *)
+    { iApply (udepw_of_law N m1 (mword_of_int pc1) USYS_open with "[Hdp]").
+      iDestruct "Hdp" as "(_ & $ & _)". }
     rewrite E12.
     (* the allocation is FORWARDED whole: which descriptor came back is the
        caller's case analysis, not this stub's *)
@@ -599,7 +645,7 @@ Section UkSh.
                     exact Harg)
               ltac:(rewrite E12; exact Hal2)
               with "Ci1 Hrun [] Hfdh").
-    { iApply udepw_of_psok; [ apply Hpsok | ];
+    { iApply udepw_of_psok; [ apply Hpsok_free; free_lit | ];
       (discriminate || assumption || (vm_compute; discriminate)). }
     rewrite E12.
     (* close of an OPEN descriptor returns 0; sh does not read it *)
@@ -626,6 +672,7 @@ Section UkSh.
   (* ---- open @0xcc6, SYS_open = 15 ------------------------------------- *)
   Lemma wp_ksh_open (h : CpuId) (m : regfile) (l : list fdstate)
       (avail : nat) :
+    sh_deps -∗
     shk_code γt -∗
     urun N h m (mword_of_int ShSyms.open) avail -∗
     ustd γfd l -∗
@@ -644,7 +691,7 @@ Section UkSh.
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcode Hrun Hstd Hcont".
+    iIntros "#Hdp #Hcode Hrun Hstd Hcont".
     rewrite shp_open.
     iApply (wp_ksh_ostub h m 0xcc6 0xcc8 0xccc
               (mword_of_int 15 : mword 6) l avail
@@ -655,7 +702,7 @@ Section UkSh.
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "[] [] [] Hrun Hstd Hcont").
+              with "Hdp [] [] [] Hrun Hstd Hcont").
     { iApply (uis_shk_cc6 with "Hcode"). }
     { iApply (uis_shk_cc8 with "Hcode"). }
     { iApply (uis_shk_ccc with "Hcode"). }
@@ -743,6 +790,7 @@ Section UkSh.
 
   (* ---- write @0xca6, SYS_write = 16 -- quiet, the third stub instance -- *)
   Lemma wp_ksh_write (h : CpuId) (m : regfile) (avail : nat) :
+    sh_deps -∗
     shk_code γt -∗
     urun N h m (mword_of_int ShSyms.write) avail -∗
     (∀ (h' : CpuId) (ret : mword 64),
@@ -753,7 +801,7 @@ Section UkSh.
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcode Hrun Hcont".
+    iIntros "#Hdp #Hcode Hrun Hcont".
     rewrite shp_write.
     iApply (wp_ksh_qstub h m 0xca6 0xca8 0xcac
               (mword_of_int 16 : mword 6) 16 avail
@@ -771,7 +819,8 @@ Section UkSh.
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "[] [] [] Hrun Hcont").
+              with "[Hdp] [] [] [] Hrun Hcont").
+    { iDestruct "Hdp" as "(_ & _ & $)". }
     { iApply (uis_shk_ca6 with "Hcode"). }
     { iApply (uis_shk_ca8 with "Hcode"). }
     { iApply (uis_shk_cac with "Hcode"). }
@@ -787,8 +836,8 @@ Section UkSh.
   (* degenerate consumers of that table -- [wp_uk_ecall_quiet], where the   *)
   (* window is empty by the row, and [wp_uk_ecall_wait_null], where it is   *)
   (* empty by the argument -- but not the GENERAL one, where the caller     *)
-  (* hands the buffer over and gets it back with a prefix rewritten.  A     *)
-  (* sibling lane is building it as [wp_uk_ecall_window]; this is its       *)
+  (* hands the buffer over and gets it back with a prefix rewritten.  That  *)
+  (* leaf has landed as [UkRunSys.wp_uk_ecall_window]; this is its          *)
   (* statement, spelled at the same section variables, the same binder      *)
   (* order and the same resource spellings as [wp_uk_ecall_wait_null]       *)
   (* (UkRunSys.v:175) so that the discharge is [intros] and an [exact].     *)
@@ -812,6 +861,7 @@ Section UkSh.
       uint (m !!! Regidx a1_idx) = a ->
       uint (m !!! Regidx a2_idx) = Z.of_nat k ->
       is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
+      sh_deps -∗
       uinstr_is γt pc false (ECALL tt) -∗
       ubytes γd a k f -∗
       urun N h m pc avail -∗
@@ -830,6 +880,7 @@ Section UkSh.
       (f : nat -> bv 8) (avail : nat) :
     uint (m !!! Regidx a1_idx) = a ->
     uint (m !!! Regidx a2_idx) = Z.of_nat k ->
+    sh_deps -∗
     shk_code γt -∗
     ubytes γd a k f -∗
     urun N h m (mword_of_int ShSyms.read) avail -∗
@@ -844,7 +895,7 @@ Section UkSh.
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Ha1 Ha2. iIntros "#Hcode Hbs Hrun Hcont".
+    intros Ha1 Ha2. iIntros "#Hdp #Hcode Hbs Hrun Hcont".
     rewrite shp_read.
     (* ---- 0xc9e  c.li a7,5 ---- *)
     iApply (wp_uk_cli N h m (mword_of_int 0xc9e)
@@ -878,7 +929,7 @@ Section UkSh.
                     vm_compute; reflexivity)
               Ha1_1 Ha2_1
               ltac:(vm_compute; reflexivity)
-              with "[] Hbs Hrun").
+              with "Hdp [] Hbs Hrun").
     { iApply (uis_shk_ca0 with "Hcode"). }
     assert (Eca0 : add_vec_int (mword_of_int 0xca0 : mword 64) 4
                    = mword_of_int 0xca4)
@@ -1545,6 +1596,7 @@ Section UkSh.
     mc !!! Regidx s4_idx = mword_of_int (Z.of_nat Nb) ->
     mc !!! Regidx s5_idx = mword_of_int 1 ->
     mc !!! Regidx s6_idx = mword_of_int (spz - 81) ->
+    sh_deps -∗
     shk_code γt -∗
     ubytes γd a Nb f -∗
     ubyte γd (spz - 81) bc -∗
@@ -1564,7 +1616,7 @@ Section UkSh.
       intros i h mc f bc nn HN Hi Ha0 Ha64 HN31 Hsz0 Hsz1
              Hs0 Hs1 Hs2 Hs4 Hs5 Hs6.
     { assert (HF : False) by lia. destruct HF. }
-    iIntros "#Hcode Hbs Hb Hrun Hcont".
+    iIntros "#Hdp #Hcode Hbs Hb Hrun Hcont".
     (* ---- 0xad0  c.mv s8,s1 ---- *)
     iApply (wp_uk_cmv N h mc (mword_of_int 0xad0) s8_idx s1_idx
               (mword_of_int (Z.of_nat i)) nn
@@ -1785,7 +1837,7 @@ Section UkSh.
     iAssert (ubytes γd (spz - 81) 1 (fun _ => bc)) with "[Hb]" as "Hbw".
     { iApply "Hcv". iExact "Hb". }
     iApply (wp_ksh_read h8 m7 (spz - 81) 1 (fun _ => bc) nn Ha1_7 Ha2_7
-              with "Hcode Hbw Hrun").
+              with "Hdp Hcode Hbw Hrun").
     iIntros (h9 ret d g1) "%Hd %Hg1 Hbw Hrun".
     rewrite Hra7.
     assert (Eret : ret_pc (mword_of_int 0xae6 : mword 64) = mword_of_int 0xae6)
@@ -2121,7 +2173,7 @@ Section UkSh.
                       exact Hs5)
                 ltac:(rewrite (PCall s6_idx ltac:(vm_compute; reflexivity));
                       exact Hs6)
-                with "Hcode Hbs Hb Hrun").
+                with "Hdp Hcode Hbs Hb Hrun").
       iIntros (h18 mc'' i2 g2 bc2) "%Hi2 %Hs8'' %Hp'' Hbs Hb Hrun".
       iApply ("Hcont" $! h18 mc'' i2 g2 bc2 with "[] [] [] Hbs Hb Hrun");
         iPureIntro; [ exact Hi2 | exact Hs8'' | ].
@@ -2238,6 +2290,7 @@ Section UkSh.
     m !!! Regidx a0_idx = mword_of_int a ->
     m !!! Regidx a1_idx = mword_of_int (Z.of_nat Nb) ->
     (0 < Nb)%nat -> Z.of_nat Nb < Z31 ->
+    sh_deps -∗
     shk_code γt -∗
     ubytes γd a Nb f -∗
     urun N h m (mword_of_int ShSyms.gets) (12 + nn) -∗
@@ -2249,7 +2302,7 @@ Section UkSh.
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Ha0 Ha1 HN0 HN31. iIntros "#Hcode Hbs Hrun Hcont".
+    intros Ha0 Ha1 HN0 HN31. iIntros "#Hdp #Hcode Hbs Hrun Hcont".
     rewrite shp_gets.
     iDestruct (urun_stack with "Hrun") as %[Hal8 Hroom].
     iDestruct (urun_ubytes_bnd h m _ (12 + nn) (DfracOwn 1) a Nb f ltac:(lia)
@@ -2631,7 +2684,7 @@ Section UkSh.
                     exact (upd_eq m6 (Regidx s6_idx)
                              (regval_into_reg (mword_of_int (spz - 81)
                                                : mword 64))))
-              with "Hcode Hbs Hbc Hrun").
+              with "Hdp Hcode Hbs Hbc Hrun").
     iIntros (h19 mc i2 g bc2) "%Hi2 %Hs8c %Hpk Hbs Hbc Hrun".
     iDestruct ("Hclc" $! bc2 with "Hbc") as "Hw11".
     (* ---- 0xb00  c.add s8,s8,s7 ---- *)
@@ -3230,6 +3283,7 @@ Section UkSh.
     m !!! Regidx a0_idx = mword_of_int a ->
     m !!! Regidx a1_idx = mword_of_int (Z.of_nat Nb) ->
     (0 < Nb)%nat -> Z.of_nat Nb < Z31 ->
+    sh_deps -∗
     shk_code γt -∗
     ubytes γd a Nb f -∗
     urun N h m (mword_of_int ShSyms.getcmd) (4 + (12 + nn)) -∗
@@ -3241,7 +3295,7 @@ Section UkSh.
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Ha0 Ha1 HN0 HN31. iIntros "#Hcode Hbs Hrun Hcont".
+    intros Ha0 Ha1 HN0 HN31. iIntros "#Hdp #Hcode Hbs Hrun Hcont".
     rewrite shp_getcmd.
     iDestruct (urun_stack with "Hrun") as %[Hal8 Hroom].
     iDestruct (urun_ubytes_bnd h m _ (4 + (12 + nn)) (DfracOwn 1) a Nb f
@@ -3500,7 +3554,7 @@ Section UkSh.
     assert (Hra9 : n9 !!! Regidx ra_idx = mword_of_int 0x20)
       by exact (upd_eq n8 (Regidx ra_idx)
                   (regval_into_reg (mword_of_int 0x20 : mword 64))).
-    iApply (wp_ksh_write h13 n9 (12 + nn) with "Hcode Hrun").
+    iApply (wp_ksh_write h13 n9 (12 + nn) with "Hdp Hcode Hrun").
     iIntros (h14 rw) "Hrun". rewrite Hra9.
     assert (Er20 : ret_pc (mword_of_int 0x20 : mword 64) = mword_of_int 0x20)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -3697,7 +3751,7 @@ Section UkSh.
       exact (upd_eq mM (Regidx a1_idx)
                (regval_into_reg (mword_of_int (Z.of_nat Nb) : mword 64))). }
     iApply (wp_ksh_gets h22 nH a Nb fm nn Ha0_H Ha1_H HN0 HN31
-              with "Hcode Hbs Hrun").
+              with "Hdp Hcode Hbs Hrun").
     iIntros "Hbs" (h23 mG) "%HcsG Hrun". rewrite HraH.
     assert (Er32 : ret_pc (mword_of_int 0x32 : mword 64) = mword_of_int 0x32)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -4653,12 +4707,13 @@ Section UkSh.
   (* ---- the loop itself: 0x938..0x976, under one iLöb ------------------ *)
   (* DEPENDS ON [ush_read_leaf] (through getcmd).                          *)
   Local Lemma wp_ksh_loop (R : iProp Σ) (l : list fdstate) :
+    sh_deps -∗
     ush_rest R -∗ shk_code γt -∗ ush_loop_head R l.
   Proof.
     assert (Hbf : sh_buf = 8224) by (vm_compute; reflexivity).
     assert (Hnb : sh_nbuf = 100%nat) by (vm_compute; reflexivity).
     assert (Hnbz : Z.of_nat sh_nbuf = 100) by (vm_compute; reflexivity).
-    iIntros "#Hrest #Hcode".
+    iIntros "#Hdp #Hrest #Hcode".
     iLöb as "IH".
     iIntros (h m f n0) "%Hregs Hstd HR Hbs Hrun".
     set (n := (ush_Dbody + n0)%nat).
@@ -4734,7 +4789,7 @@ Section UkSh.
     replace (16 + n)%nat with (4 + (12 + n))%nat by lia.
     iApply (wp_ksh_getcmd h3 m3 sh_buf sh_nbuf f n Ha0_3 Ha1_3
               ltac:(rewrite Hnb; lia) ltac:(rewrite Hnbz; unfold Z31; lia)
-              with "Hcode Hbs Hrun").
+              with "Hdp Hcode Hbs Hrun").
     iIntros "Hbs" (h4 mR) "%HcsR Hrun".
     replace (4 + (12 + n))%nat with (16 + n)%nat by lia.
     rewrite Hra3.
@@ -5021,6 +5076,7 @@ Section UkSh.
   (* ===================================================================== *)
   Lemma wp_ksh_cmd_head (R : iProp Σ) (h : CpuId) (m : regfile)
       (f : nat -> bv 8) (n0 : nat) (l : list fdstate) :
+    sh_deps -∗
     ush_rest R -∗
     shk_code γt -∗
     ush_pstate l -∗
@@ -5029,7 +5085,7 @@ Section UkSh.
     urun N h m (mword_of_int 0x914) (16 + (ush_Dbody + n0)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hrest #Hcode Hstd HR Hbs Hrun".
+    iIntros "#Hdp #Hrest #Hcode Hstd HR Hbs Hrun".
     set (n := (ush_Dbody + n0)%nat).
     (* ---- 0x914  li s3,100 ---- *)
     iApply (wp_uk_li N h m (mword_of_int 0x914)
@@ -5178,7 +5234,7 @@ Section UkSh.
                  (regval_into_reg (mword_of_int 99 : mword 64))).
       - exact (upd_eq m5 (Regidx s6_idx)
                  (regval_into_reg (mword_of_int 32 : mword 64))). }
-    iDestruct (wp_ksh_loop R l with "Hrest Hcode") as "Hhead".
+    iDestruct (wp_ksh_loop R l with "Hdp Hrest Hcode") as "Hhead".
     iApply ("Hhead" $! h7 m6 f n0 with "[] Hstd HR Hbs Hrun").
     iPureIntro. exact Hregs.
   Qed.
@@ -5226,6 +5282,7 @@ Section UkSh.
   (* ===================================================================== *)
   Local Lemma wp_ksh_console (R : iProp Σ) (h : CpuId) (m : regfile)
       (f : nat -> bv 8) (n0 : nat) (l : list fdstate) :
+    sh_deps -∗
     ush_rest R -∗
     shk_code γt -∗
     ⌜m !!! Regidx s1_idx = (mword_of_int 2 : mword 64)⌝ -∗
@@ -5235,7 +5292,7 @@ Section UkSh.
     urun N h m (mword_of_int 0x900) (16 + (ush_Dbody + n0)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hrest #Hcode".
+    iIntros "#Hdp #Hrest #Hcode".
     set (n := (16 + (ush_Dbody + n0))%nat).
     iLöb as "IH" forall (h m l).
     iIntros "%Hs1 Hstd HR Hbs Hrun".
@@ -5282,7 +5339,7 @@ Section UkSh.
     assert (HraC : mC !!! Regidx ra_idx = mword_of_int 0x908)
       by exact (upd_eq mB (Regidx ra_idx) (mword_of_int 0x908 : mword 64)).
     iDestruct "Hstd" as "(Hstd & Hcwd & Hch & Hpos)".
-    iApply (wp_ksh_open h3 mC l n with "Hcode Hrun Hstd").
+    iApply (wp_ksh_open h3 mC l n with "Hdp Hcode Hrun Hstd").
     (* WHAT CAME BACK, PUT IN THE FORM THE TWO BRANCHES CONSUME: the ledger
        the open left, and then either the handle (the descriptor landed
        above the standard streams, [UserFd.ualloc_at]'s [None] arm) or a
@@ -5357,7 +5414,7 @@ Section UkSh.
     { (* the loop is left, at whatever ledger the open left behind *)
       iIntros (h5) "Hrun".
       iApply (wp_ksh_cmd_head R h5 mD f n0 l'
-                with "Hrest Hcode Hstd HR Hbs Hrun"). }
+                with "Hdp Hrest Hcode Hstd HR Hbs Hrun"). }
     assert (E908 : add_vec_int (mword_of_int 0x908 : mword 64) 4
                    = mword_of_int 0x90c)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -5434,7 +5491,7 @@ Section UkSh.
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite Eret2.
     iApply (wp_ksh_cmd_head R h8 _ f n0 l'
-              with "Hrest Hcode Hstd HR Hbs Hrun").
+              with "Hdp Hrest Hcode Hstd HR Hbs Hrun").
   Qed.
 
 
@@ -5447,6 +5504,7 @@ Section UkSh.
   (* ===================================================================== *)
   Lemma wp_ksh_main (R : iProp Σ) (h : CpuId) (m : regfile)
       (f : nat -> bv 8) (n0 : nat) (l : list fdstate) :
+    sh_deps -∗
     ush_rest R -∗
     shk_code γt -∗
     ush_pstate l -∗
@@ -5456,7 +5514,7 @@ Section UkSh.
       (8 + (16 + (ush_Dbody + n0))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hrest #Hcode Hstd HR Hbs Hrun".
+    iIntros "#Hdp #Hrest #Hcode Hstd HR Hbs Hrun".
     set (n := (16 + (ush_Dbody + n0))%nat).
     rewrite shp_main.
     iDestruct (urun_stack with "Hrun") as %[Hal8' Hroom].
@@ -5671,7 +5729,7 @@ Section UkSh.
        [bge s1,a0] at 0x90c is what tells a descriptor above the standard
        streams from one that landed on a closed standard stream. *)
     iApply (wp_ksh_console R he _ f n0 l
-              with "Hrest Hcode [] Hstd HR Hbs Hrun").
+              with "Hdp Hrest Hcode [] Hstd HR Hbs Hrun").
     iPureIntro.
     rewrite (upd_ne mD (Regidx s2_idx) (Regidx s1_idx) _
                ltac:(vm_compute; discriminate)).
@@ -5691,6 +5749,7 @@ Section UkSh.
   (* ===================================================================== *)
   Lemma wp_ksh_start (R : iProp Σ) (h : CpuId) (m : regfile)
       (f : nat -> bv 8) (n0 : nat) (l : list fdstate) :
+    sh_deps -∗
     ush_rest R -∗
     shk_code γt -∗
     (* THE ONE ROW THE ENTRY IS TOLD ABOUT, at its three arms ([ush_fd0]'s
@@ -5706,7 +5765,7 @@ Section UkSh.
       (2 + (8 + (16 + (ush_Dbody + n0)))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hrest #Hcode #Hfd0 Hstd HR Hbs Hrun".
+    iIntros "#Hdp #Hrest #Hcode #Hfd0 Hstd HR Hbs Hrun".
     set (n := (16 + (ush_Dbody + n0))%nat).
     rewrite shp_start.
     iDestruct (urun_stack with "Hrun") as %[Hal8' Hroom].
@@ -5805,7 +5864,7 @@ Section UkSh.
        had work to do while the wide catalog destruct was dumping unused
        [uinstr_is] hypotheses holding the literal into the context. *)
     rewrite <- ?shp_main.
-    iApply (wp_ksh_main R h5 _ f n0 l with "Hrest Hcode Hstd HR Hbs Hrun").
+    iApply (wp_ksh_main R h5 _ f n0 l with "Hdp Hrest Hcode Hstd HR Hbs Hrun").
   Qed.
 
 End UkSh.
@@ -5873,13 +5932,11 @@ Section UkShLeaf.
   Context `{!ctokG Σ}.
   Context {SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
-  (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
-     hypothesis, so no lemma statement in this file names it and the ~570
-     [urun] sites did not move; the program's kernel-side constructor
-     discharges it (ARM-a's generic instance is [psok := fun _ => True]).
-     exec is excluded by the minting law itself -- its bundle reads the key,
-     so its deposit is always the explicit disjunct of [UkRun.udepw]. *)
-  Hypothesis Hpsok : forall k : Z, k <> USYS_exec -> psok k.
+  (* NO [psok] HYPOTHESIS (lane SUPPLY-SPLIT).  This section's one lemma
+     discharges UkSh's read-window Hypothesis, and read(5) is a CLAIM
+     number: its console arm spends the application's supply.  So the
+     discharge takes the deposit ([UkSh.sh_deps]'s read conjunct) exactly
+     as the Hypothesis it answers does. *)
 
   Lemma ush_read_leaf_holds :
     forall (h : CpuId) (m : regfile) (pc : mword 64) (a : Z) (k : nat)
@@ -5888,6 +5945,7 @@ Section UkShLeaf.
       uint (m !!! Regidx (mword_of_int 11 : mword 5)) = a ->
       uint (m !!! Regidx (mword_of_int 12 : mword 5)) = Z.of_nat k ->
       is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
+      sh_deps -∗
       uinstr_is γt pc false (ECALL tt) -∗
       ubytes γd a k f -∗
       urun N h m pc avail -∗
@@ -5904,14 +5962,15 @@ Section UkShLeaf.
     pose proof (ush_narrow_count_le (m !!! Regidx (mword_of_int 12 : mword 5))
                   k Ha2) as Hbound.
     subst a.
-    iIntros "#Hi Hbuf Hrun Hcont".
+    iIntros "#Hdp #Hi Hbuf Hrun Hcont".
     iApply (wp_uk_ecall_read_win N h m pc
               (bv_signed (subrange_vec_dec
                             (m !!! Regidx (mword_of_int 12 : mword 5)) 31 0
                           : mword 32))
               k f avail Hn eq_refl Hbound Hal with "Hi Hrun [] Hbuf").
-    { iApply udepw_of_psok; [ apply Hpsok | ];
-      (discriminate || assumption || (vm_compute; discriminate)). }
+    (* THE FLAGGED DEPOSIT: read(5), SH-LINE 2b's (P4) *)
+    { iApply (udepw_of_law N m pc USYS_read with "[Hdp]").
+      iDestruct "Hdp" as "($ & _ & _)". }
     iIntros (h' r d g) "%Hd %Hgf Hrun Hbuf".
     iApply ("Hcont" $! h' r d g with "[%] [%] Hbuf Hrun");
       [ lia | exact Hgf ].

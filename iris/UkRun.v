@@ -407,6 +407,47 @@ Section UkRun.
     iFrame "Hh Hf". iLeft. iPureIntro. exact (conj Hok Hne).
   Qed.
 
+  (* ...AND THE FLAGGED DEPOSIT (lane SUPPLY-SPLIT, P4): the premise a
+     program takes for a number OUTSIDE its supplier's admitted set.  It is
+     [udepw] at every key and under a [□], for two reasons: the call sits
+     inside a loop (init's and sh's printf, echo's three writes), so a
+     linear premise could not answer the second turn; and the key the call
+     is made at is bound by the walk, not by the caller, so a key-fixed
+     premise could not be stated where the program lemma is.
+
+     WHAT IT IS NOT: [udep].  A verified program may not take the
+     program-generic supplier -- at this instance that is [AppInv.app_sup],
+     which for the echo application IS the taint
+     ([AppEcho.echo_taint_of_sup]), so a slot taking it could only ever be
+     entered tainted.  ONE NUMBER'S deposit is exactly the work owed, and
+     naming it per number is what makes the debt readable. *)
+  (* IT QUANTIFIES THE RECORD TOO.  A program's lemmas are stated at the
+     section's [N], but the one that forks re-enters at its CHILD's record
+     ([UkInitMain.wp_kinit_main_child] is proved at an [N'] the fork arm
+     binds), and a slot constructor's run is built per trap round under its
+     own [∀ N].  A deposit for a number is not about the record -- the
+     bundle's content reads the KEY and the payload only through
+     [ukn_pay N], which every discharger answers at any payload -- so the
+     law is stated once, over all three binders, and every site applies it. *)
+  Definition udepw_law (n : Z) : iProp Σ :=
+    (□ ∀ (N : uk_names Σ) (m : regfile) (pc : mword 64), udepw N m pc n)%I.
+
+  Global Instance udepw_law_persistent n : Persistent (udepw_law n).
+  Proof. rewrite /udepw_law. apply _. Qed.
+
+  Lemma udepw_of_law (N : uk_names Σ) (m : regfile) (pc : mword 64) (n : Z) :
+    udepw_law n -∗ udepw N m pc n.
+  Proof. iIntros "#H". iApply "H". Qed.
+
+  (* ...and the instance's own supplier of one, so a program whose number IS
+     admitted never needs the premise ([UexecSG.free_num]) *)
+  Lemma udepw_law_of_psok (n : Z) :
+    psok n -> n <> USYS_exec -> ⊢ udepw_law n.
+  Proof.
+    intros Hok Hne. rewrite /udepw_law. iIntros "!>" (N m pc).
+    iApply (udepw_of_psok N m pc n Hok Hne).
+  Qed.
+
   (* THE LEAF'S USE OF IT, at every number including exec: the left
      disjunct carries [n <> USYS_exec] itself, so at exec only the explicit
      deposit can have been taken and no side condition is owed here. *)

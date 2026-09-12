@@ -53,13 +53,10 @@ Section UkInitPutc.
   Context `{!ctokG Σ}.
   Context {SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
-  (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
-     hypothesis, so no lemma statement in this file names it and the ~570
-     [urun] sites did not move; the program's kernel-side constructor
-     discharges it (ARM-a's generic instance is [psok := fun _ => True]).
-     exec is excluded by the minting law itself -- its bundle reads the key,
-     so its deposit is always the explicit disjunct of [UkRun.udepw]. *)
-  Hypothesis Hpsok : forall k : Z, k <> USYS_exec -> psok k.
+  (* NO [psok] HYPOTHESIS (lane SUPPLY-SPLIT).  Every ecall this file
+     reaches is at a CLAIM number, so nothing here routes through
+     [UkRun.udep]'s minting law: the deposit is a premise
+     ([UkRun.udepw_law]) and is named at the leaf that spends it. *)
 
   Local Notation ra_idx := (mword_of_int 1 : mword 5).
   Local Notation s0_idx := (mword_of_int 8 : mword 5).
@@ -108,7 +105,11 @@ Section UkInitPutc.
   (* [avail] and learns nothing about the frame's contents, which is why     *)
   (* the post is [ucallee_saved] and nothing else.                           *)
   (* --------------------------------------------------------------------- *)
+  (* ...AND THE WRITE DEPOSIT (lane SUPPLY-SPLIT, P4), threaded: putc is
+     one ecall of write(16), a CLAIM number, so the whole printf chain
+     carries the deposit rather than routing through [UkRun.udep]. *)
   Lemma wp_kinit_putc (h : CpuId) (m : regfile) (n : nat) :
+    udepw_law 16 -∗
     init_code γt -∗
     urun N h m (mword_of_int InitSyms.putc) (4 + n) -∗
     (∀ (h' : CpuId) (m' : regfile),
@@ -117,7 +118,7 @@ Section UkInitPutc.
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcode Hrun Hcont".
+    iIntros "#Hwr #Hcode Hrun Hcont".
     destruct init_syms_pins
       as (_ & _ & _ & _ & Hputc & _ & _ & _ & _ & _ & _ & Hwrite & _).
     rewrite Hputc.
@@ -313,7 +314,7 @@ Section UkInitPutc.
     assert (Hra5 : m5 !!! Regidx ra_idx = (mword_of_int 0x430 : mword 64))
       by exact (upd_eq m4 (Regidx ra_idx) (regval_into_reg _)).
     (* ---- write(fd, sp0-17, 1) -- the QUIET row: no heap effect at all ---- *)
-    iApply (wp_kinit_write N Hpsok h8 m5 n with "Hcode Hrun").
+    iApply (wp_kinit_write N h8 m5 n with "Hwr Hcode Hrun").
     iIntros (h9 ret) "Hrun".
     assert (Eret : ret_pc (m5 !!! Regidx ra_idx) = (mword_of_int 0x430 : mword 64))
       by (rewrite Hra5; apply bv_eq; vm_compute; reflexivity).

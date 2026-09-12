@@ -424,19 +424,32 @@ Section UEchoKernel.
     (* the map stops at the break -- see [UkRun.uslot_of_urun]'s premise *)
     (forall (p : mword 27) (q : uperm), uvis_perm W !! p = Some q ->
        bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W)) ->
-    (forall k : Z, k <> USYS_exec -> psok k) ->
+    (* NO [psok] PREMISE (lane SUPPLY-SPLIT).  echo calls write(16) and
+       exit(2) and nothing else; exit's leaf takes no deposit and 16 is a
+       CLAIM number, so echo routes NOTHING through [UkRun.udep]'s minting
+       law and its whole debt is the one deposit below. *)
     (* ...AND THE KEY'S LAZY BIT IS [false] (lane LAZY-FLAG, L6): the U
        tier's run is at an empty fill, so an entry constructor can only
        build a slot for a key that says so.  [UexecCond.echo_gate] decides
        it; exec's slot post is what will supply it there
        ([SpecKexec.exec_slot_pre], lane LAZY-FLAG's K4). *)
     uvis_lazy W = false ->
+    (* ECHO'S ONE DEPOSIT.  write(16)'s branch of
+       [UexecExecInst.xv6_sbundle] is the write chain at a key whose
+       descriptor row may be an inode, and the minting law is key-free, so
+       16 is not free.  [N] is bound by the slot's own ∀ (the run is built
+       per trap round), which is why the premise quantifies it -- the same
+       shape [UInitKernel.init_uexec_slot] takes its console leaves at.
+       E5's output lane discharges this from the echo application's console
+       claim; [UexecExecMint.uslot_mint] pays it out of [AppInv.app_sup],
+       which is what a process on the generic path always had. *)
+    udepw_law 16 -∗
     (* THE PAY FACT, at the trivial payload: echo's exit owes its parent
        nothing this lane ([UkRun.ukn_pay] is what the record carries). *)
     udep -∗ my_pay (uvis_gen W) (fun _ => True)%I -∗ uslot W.
   Proof.
-    intros Hpc Hsub Hx Hroom Hal8 Hstk Hargs Havd Havs Hfdlen Hstop Hpsok Hlzf.
-    iIntros "#Hdep #Hpay".
+    intros Hpc Hsub Hx Hroom Hal8 Hstk Hargs Havd Havs Hfdlen Hstop Hlzf.
+    iIntros "#Hwr #Hdep #Hpay".
     assert (Hsp0 : 0 <= uint (uvis_sp W)) by lia.
     assert (Hargc0 : 0 <= uvis_argc W)
       by exact (proj1 (uka_argc _ _ _ _ _ _ Hargs)).
@@ -451,14 +464,16 @@ Section UEchoKernel.
     iIntros (N h) "%Hpayeq %Hsz Hszf #Ht _ _ _ #HA Hrun".
     pose proof (Hpayeq : UkRun.ukn_triv N) as Hti.
     rewrite Hpc.
-    iApply (wp_kecho_start N Hpsok h (tf_resume_gpr0 (uvis_tf W))
+    iApply (wp_kecho_start N h (tf_resume_gpr0 (uvis_tf W))
               (uvis_av W)
               (echo_args (uvis_M W) (uvis_av W) (Z.to_nat (uvis_argc W))) 0
               ltac:(rewrite echo_args_length;
                     rewrite (Z2Nat.id (uvis_argc W) Hargc0);
                     unfold uvis_argc; symmetry; apply moi_of_uint)
               ltac:(unfold uvis_av; symmetry; apply moi_of_uint)
-              with "[] [] Hrun").
+              with "[] [] [] Hrun").
+    (* echo's one deposit, at this round's own record *)
+    { iApply "Hwr". }
     { iApply (echo_code_of_text (ukn_t N) (uvis_M W) (uvis_perm W) Hsub Hx
                 with "Ht"). }
     { iApply (echo_uargv_of_area (ukn_d N) (uvis_M W) (uvis_perm W) (uvis_sz W)

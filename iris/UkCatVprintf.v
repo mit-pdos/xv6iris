@@ -59,10 +59,18 @@ Section UkCatVprintf.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
      hypothesis, so no lemma statement in this file names it and the ~570
      [urun] sites did not move; the program's kernel-side constructor
-     discharges it (ARM-a's generic instance is [psok := fun _ => True]).
-     exec is excluded by the minting law itself -- its bundle reads the key,
-     so its deposit is always the explicit disjunct of [UkRun.udepw]. *)
-  Hypothesis Hpsok : forall k : Z, k <> USYS_exec -> psok k.
+     discharges it.
+     AT THE FREE NUMBERS AND NO MORE (lane SUPPLY-SPLIT).  It used to read
+     "every number but exec", which at the generic instance is true and at
+     a VERIFIED program's instance is not: a program whose supplier is the
+     application's ([AppInv.app_sup] -- for the echo application, the
+     TAINT) could only ever be entered tainted.  What a verified program
+     admits is [UexecSG.free_num] -- every number whose bundle is [emp],
+     plus chdir, whose branch is a closed fact -- and at
+     [UexecExecInst.uprogSG_free] this hypothesis is the identity.  A call
+     at a number OUTSIDE that set takes its own deposit as a premise
+     ([UkRun.udepw_law]) and is named at its site. *)
+  Hypothesis Hpsok_free : forall k : Z, free_num k -> psok k.
 
   Local Notation ra_idx := (mword_of_int 1 : mword 5).
   Local Notation s0_idx := (mword_of_int 8 : mword 5).
@@ -903,6 +911,7 @@ Section UkCatVprintf.
     bv_unsigned b0 <> 37 ->
     vp_inv m0 m sp0 a fd ap i ->
     m !!! Regidx s1_idx = mword_of_int (bv_unsigned b0) ->
+    UkCat.cat_deps -∗
     cat_code γt -∗
     utext γt (a + Z.of_nat (S i)) b1 -∗
     urun N h m (mword_of_int 0x566) (4 + n) -∗
@@ -915,7 +924,7 @@ Section UkCatVprintf.
   Proof.
     intros Ha0 Habnd Hpct Hinv Hs1.
     destruct Hinv as (Hsp & Hs0 & Hs2 & Hs3 & Hs4 & Hs5 & Hs6 & Hfr).
-    iIntros "#Hcode #Hb1 Hrun Hcont".
+    iIntros "#Hdp #Hcode #Hb1 Hrun Hcont".
     assert (Hb0 : 0 <= bv_unsigned b0 < 256).
     { pose proof (bv_unsigned_in_range 8 b0) as HH.
       assert (Em8 : bv_modulus 8 = 256) by (vm_compute; reflexivity).
@@ -1048,7 +1057,7 @@ Section UkCatVprintf.
     assert (Hra4 : m4 !!! Regidx ra_idx = (mword_of_int 0x54e : mword 64))
       by exact (upd_eq m3 (Regidx ra_idx) (regval_into_reg _)).
     (* ---- putc(fd, c) ---- *)
-    iApply (wp_kcat_putc N Hpsok h6 m4 n with "Hcode Hrun").
+    iApply (wp_kcat_putc N h6 m4 n with "Hdp Hcode Hrun").
     iIntros (h7 m5) "%Hcs Hrun".
     assert (Eret : ret_pc (m4 !!! Regidx ra_idx) = (mword_of_int 0x54e : mword 64))
       by (rewrite Hra4; apply bv_eq; vm_compute; reflexivity).
@@ -1240,6 +1249,7 @@ Section UkCatVprintf.
       (i + S k)%nat = len ->
       vp_inv m0 m sp0 a fd ap i ->
       m !!! Regidx s1_idx = mword_of_int (bv_unsigned (f i)) ->
+      UkCat.cat_deps -∗
       cat_code γt -∗
       utext_str γt a len f -∗
       uword γd (uint sp0 - 8) (m0 !!! Regidx ra_idx) -∗
@@ -1264,7 +1274,7 @@ Section UkCatVprintf.
     intros Ha0 Habnd Hpct Hsp0 Hal8 Hlo.
     induction k as [| k IH ];
       intros i h m n Hlo_i Hik Hinv Hs1;
-      iIntros "#Hcode #Hstr Hwra Hws0 Hws1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw11 Hw12 Hrun Hcont";
+      iIntros "#Hdp #Hcode #Hstr Hwra Hws0 Hws1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw11 Hw12 Hrun Hcont";
       iDestruct (utext_str_nonul with "Hstr") as %Hnn;
       assert (Hilt : (i < len)%nat) by lia.
     - (* the LAST character: the byte after it is the terminator *)
@@ -1272,7 +1282,7 @@ Section UkCatVprintf.
       iDestruct (utext_str_nul with "Hstr") as "#Hnul".
       iApply (wp_kcat_vprintf_step m0 sp0 fd ap a i (f i) ubyte0 h m n
                 Ha0 ltac:(lia) (Hpct i ltac:(lia)) Hinv Hs1
-                with "Hcode [] Hrun").
+                with "Hdp Hcode [] Hrun").
       { rewrite Ei. iExact "Hnul". }
       iIntros (h1 m1) "%Hinv1 %Hs11 Hrun".
       (* ---- 0x562  beqz s1,0x736 -- TAKEN: this was the terminator ---- *)
@@ -1300,7 +1310,7 @@ Section UkCatVprintf.
       iDestruct (utext_str_byte γt a len f (S i) Hslt with "Hstr") as "#Hb1".
       iApply (wp_kcat_vprintf_step m0 sp0 fd ap a i (f i) (f (S i)) h m n
                 Ha0 ltac:(lia) (Hpct i ltac:(lia)) Hinv Hs1
-                with "Hcode Hb1 Hrun").
+                with "Hdp Hcode Hb1 Hrun").
       iIntros (h1 m1) "%Hinv1 %Hs11 Hrun".
       (* ---- 0x562  beqz s1,0x736 -- NOT taken: a body byte is not NUL ---- *)
       assert (Hnz : bv_unsigned (f (S i)) <> 0).
@@ -1334,7 +1344,7 @@ Section UkCatVprintf.
       rewrite E528.
       iIntros (h2) "Hrun".
       iApply (IH (S i) h2 m1 n ltac:(lia) ltac:(lia) Hinv1 Hs11
-                with "Hcode Hstr Hwra Hws0 Hws1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw11 Hw12 Hrun Hcont").
+                with "Hdp Hcode Hstr Hwra Hws0 Hws1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw11 Hw12 Hrun Hcont").
   Qed.
 
 
@@ -2102,6 +2112,7 @@ Section UkCatVprintf.
     (0 < len)%nat ->
     (forall j : nat, (j < len)%nat -> bv_unsigned (f j) <> 37) ->
     m !!! Regidx a1_idx = mword_of_int a ->
+    UkCat.cat_deps -∗
     cat_code γt -∗
     utext_str γt a len f -∗
     urun N h m (mword_of_int CatSyms.vprintf) (12 + (4 + n)) -∗
@@ -2112,7 +2123,7 @@ Section UkCatVprintf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Ha0 Habnd Hlen Hpct Ha1.
-    iIntros "#Hcode #Hstr Hrun Hcont".
+    iIntros "#Hdp #Hcode #Hstr Hrun Hcont".
     iApply (wp_kcat_vprintf_pro a len f h m n Ha0 Habnd Hlen Ha1
               with "Hcode Hstr Hrun").
     iIntros (h' m' fd ap) "%Hal8 %Hlo %Hinv0 %Hs1z %Hap
@@ -2122,7 +2133,7 @@ Section UkCatVprintf.
     iApply (wp_kcat_vprintf_loop m (m !!! Regidx csp_rs1) fd ap a len f
               0%nat (len - 1)%nat Ha0 Habnd ltac:(intros j Hj; apply Hpct; lia)
               eq_refl Hal8 Hlo 0%nat h' m' n ltac:(lia) Hk0 Hinv0 Hs1z
-              with "Hcode Hstr Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hrun Hcont").
+              with "Hdp Hcode Hstr Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hrun Hcont").
   Qed.
 
 

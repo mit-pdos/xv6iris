@@ -107,10 +107,18 @@ Section UkInit.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
      hypothesis, so no lemma statement in this file names it and the ~570
      [urun] sites did not move; the program's kernel-side constructor
-     discharges it (ARM-a's generic instance is [psok := fun _ => True]).
-     exec is excluded by the minting law itself -- its bundle reads the key,
-     so its deposit is always the explicit disjunct of [UkRun.udepw]. *)
-  Hypothesis Hpsok : forall k : Z, k <> USYS_exec -> psok k.
+     discharges it.
+     AT THE FREE NUMBERS AND NO MORE (lane SUPPLY-SPLIT).  It used to read
+     "every number but exec", which at the generic instance is true and at
+     a VERIFIED program's instance is not: a program whose supplier is the
+     application's ([AppInv.app_sup] -- for the echo application, the
+     TAINT) could only ever be entered tainted.  What a verified program
+     admits is [UexecSG.free_num] -- every number whose bundle is [emp],
+     plus chdir, whose branch is a closed fact -- and at
+     [UexecExecInst.uprogSG_free] this hypothesis is the identity.  A call
+     at a number OUTSIDE that set takes its own deposit as a premise
+     ([UkRun.udepw_law]) and is named at its site. *)
+  Hypothesis Hpsok_free : forall k : Z, free_num k -> psok k.
 
   Local Notation ra_idx := (mword_of_int 1 : mword 5).
   Local Notation s0_idx := (mword_of_int 8 : mword 5).
@@ -152,7 +160,15 @@ Section UkInit.
      (it drops the descriptor), so [ustd_any] is all it needs to carry;
      what it would take to say init's own open lands on 0 is the ledger at
      a NAMED state, which is [UserFd.ualloc]'s business. *)
+  (* THE OPEN DEPOSIT, AS A PREMISE (lane SUPPLY-SPLIT, P4).  open(15) is a
+     CLAIM number -- its create / trunc / child legs are write-kind commits
+     on the abstract view -- so this leaf does not route through
+     [UkRun.udep]'s law.  Under the CREDENTIAL /init's opens go through the
+     PINNED leaves below ([uki_open_absent_leaf] / [uki_open_console_leaf],
+     discharged in UInitConsK); this walk is what the TAINT arm takes, and
+     its one premise is the taint's own deposit. *)
   Lemma wp_kinit_open (h : CpuId) (m : regfile) (avail : nat) :
+    udepw_law 15 -∗
     init_code γt -∗
     urun N h m (mword_of_int InitSyms.open) avail -∗
     ustd_any γfd -∗
@@ -165,7 +181,7 @@ Section UkInit.
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcode Hrun Hstd Hcont".
+    iIntros "#Hwr #Hcode Hrun Hstd Hcont".
     iDestruct "Hstd" as (l) "Hstd".
     destruct init_syms_pins as (Hstart & Hmain & Hprintf & Hvprintf & Hputc & Hopen & Hmknod & Hdup & Hfork & Hwait & Hexec & Hwrite & Hexit). rewrite Hopen.
     (* ---- 0x3b2  c.li a7,15 ---- *)
@@ -198,8 +214,8 @@ Section UkInit.
               ltac:(vm_compute; reflexivity)
               with "[] Hrun [] Hstd").
     { iApply (uis_init_3b4 with "Hcode"). }
-    { iApply udepw_of_psok; [ apply Hpsok | ];
-      (discriminate || assumption || (vm_compute; discriminate)). }
+    (* THE FLAGGED DEPOSIT: open(15), the taint arm's own *)
+    { iApply (udepw_of_law N m1 (mword_of_int 0x3b4) 15 with "Hwr"). }
     assert (E1 : add_vec_int (mword_of_int 0x3b4 : mword 64) 4
                  = mword_of_int 0x3b8)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -418,7 +434,41 @@ Section UkInit.
     Persistent (init_cons_leaves T K stc).
   Proof. rewrite /init_cons_leaves. apply _. Qed.
 
+  (* ===================================================================== *)
+  (* THE DEPOSITS /init OWES (lane SUPPLY-SPLIT, P4), as ONE persistent      *)
+  (* bundle, so the chain from [wp_kinit_start] down to the write leaf       *)
+  (* threads one name instead of three.                                     *)
+  (*                                                                        *)
+  (*   write(16)  UNCONDITIONALLY.  Every line /init prints -- the banner,   *)
+  (*              "init: starting sh", the three diagnostics -- is one       *)
+  (*              ecall of 16, whose branch of                               *)
+  (*              [UexecExecInst.xv6_sbundle] is the write chain at a key    *)
+  (*              whose descriptor row may be an inode.  The minting law is  *)
+  (*              key-free, so no supplier admits it; E5's output lane       *)
+  (*              discharges this from the application's console claim.      *)
+  (*   open(15) and mknod(17) UNDER THE TAINT ONLY.  With the credential in  *)
+  (*              hand both go through the PINNED leaves                     *)
+  (*              ([init_cons_leaves]), which UInitConsK discharges at the   *)
+  (*              era; the taint arms have no pin and walk the generic stub, *)
+  (*              so they take the deposit -- as a law OFF [T], which is     *)
+  (*              what the era can actually pay ([AppEcho.echo_sup_of_taint] *)
+  (*              turns the taint into the supply, and the supply pays any   *)
+  (*              number's bundle).                                          *)
+  (*                                                                        *)
+  (* WHAT IS NOT HERE: [UkRun.udep] at the generic supplier.  That is the    *)
+  (* whole point of the lane -- /init's slot may not be a function of        *)
+  (* [AppInv.app_sup], because for the echo application that IS the taint.   *)
+  (* ===================================================================== *)
+  Definition init_deps (T : iProp Σ) : iProp Σ :=
+    (udepw_law 16 ∗ □ (T -∗ udepw_law 15) ∗ □ (T -∗ udepw_law 17))%I.
+
+  Global Instance init_deps_persistent T : Persistent (init_deps T).
+  Proof. rewrite /init_deps. apply _. Qed.
+
+  (* ...and mknod's, for open's reason: 17's branch is a create, and the
+     credential arm goes through [uki_mknod_leaf]. *)
   Lemma wp_kinit_mknod (h : CpuId) (m : regfile) (avail : nat) :
+    udepw_law 17 -∗
     init_code γt -∗
     urun N h m (mword_of_int InitSyms.mknod) avail -∗
     (∀ (h' : CpuId) (ret : mword 64),
@@ -429,7 +479,7 @@ Section UkInit.
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcode Hrun Hcont".
+    iIntros "#Hwr #Hcode Hrun Hcont".
     destruct init_syms_pins as (Hstart & Hmain & Hprintf & Hvprintf & Hputc & Hopen & Hmknod & Hdup & Hfork & Hwait & Hexec & Hwrite & Hexit). rewrite Hmknod.
     (* ---- 0x3ba  c.li a7,17 ---- *)
     iApply (wp_uk_cli N h m (mword_of_int 0x3ba)
@@ -463,8 +513,8 @@ Section UkInit.
               ltac:(vm_compute; reflexivity)
               with "[] Hrun []").
     { iApply (uis_init_3bc with "Hcode"). }
-    { iApply udepw_of_psok; [ apply Hpsok | ];
-      (discriminate || assumption || (vm_compute; discriminate)). }
+    (* THE FLAGGED DEPOSIT: mknod(17), the taint arm's own *)
+    { iApply (udepw_of_law N m1 (mword_of_int 0x3bc) 17 with "Hwr"). }
     assert (E1 : add_vec_int (mword_of_int 0x3bc : mword 64) 4
                  = mword_of_int 0x3c0)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -539,7 +589,7 @@ Section UkInit.
               ltac:(vm_compute; reflexivity)
               with "[] Hrun [] Hstd").
     { iApply (uis_init_3ec with "Hcode"). }
-    { iApply udepw_of_psok; [ apply Hpsok | ];
+    { iApply udepw_of_psok; [ apply Hpsok_free; free_lit | ];
       (discriminate || assumption || (vm_compute; discriminate)). }
     assert (E1 : add_vec_int (mword_of_int 0x3ec : mword 64) 4
                  = mword_of_int 0x3f0)
@@ -639,7 +689,7 @@ Section UkInit.
               ltac:(vm_compute; reflexivity)
               with "[] Hrun [] Hstd []").
     { iApply (uis_init_3ec with "Hcode"). }
-    { iApply udepw_of_psok; [ apply Hpsok | ];
+    { iApply udepw_of_psok; [ apply Hpsok_free; free_lit | ];
       (discriminate || assumption || (vm_compute; discriminate)). }
     { iApply (ufd_dup_src γfd l fd0 st); [ exact Hlt | exact Hrow ]. }
     assert (E1 : add_vec_int (mword_of_int 0x3ec : mword 64) 4
@@ -741,7 +791,7 @@ Section UkInit.
               ltac:(vm_compute; reflexivity)
               with "[] Hrun [] Hstd").
     { iApply (uis_init_3ec with "Hcode"). }
-    { iApply udepw_of_psok; [ apply Hpsok | ];
+    { iApply udepw_of_psok; [ apply Hpsok_free; free_lit | ];
       (discriminate || assumption || (vm_compute; discriminate)). }
     assert (E1 : add_vec_int (mword_of_int 0x3ec : mword 64) 4
                  = mword_of_int 0x3f0)
@@ -778,12 +828,20 @@ Section UkInit.
   (* THE TAINT ARM IS THE SAME ON ALL THREE, so it is proved once: there is
      no pin to run on, the generic stub walks the call, and the head's
      third arm is what comes out. *)
+  (* ...AND THE TAINT'S OWN DEPOSIT RIDES WITH IT (lane SUPPLY-SPLIT, P4).
+     The generic stub walks the call, and 15 is a CLAIM number, so what the
+     arm needs is open's deposit -- but only UNDER the taint, which is
+     exactly the shape the era can pay: the taint entails the application's
+     supply ([AppEcho.echo_sup_of_taint]) and the supply pays any number's
+     bundle ([UexecExecInst.xv6_sbundle_of_supply_ne]).  This tier may not
+     name an application, so what crosses is the deposit as a LAW OFF [T]. *)
   Lemma uki_open2_taint_arm (T : iProp Σ) `{!Persistent T} (stc : fdstate) :
-    T -∗ uki_open2 T stc.
+    □ (T -∗ udepw_law 15) -∗ T -∗ uki_open2 T stc.
   Proof.
     rewrite /uki_open2 /uki_open2_in.
-    iIntros "#Ht" (h m avail) "#Hcode #Hro %Hargs Hrun Hcwd Hin Hcont".
-    iApply (wp_kinit_open h m avail with "Hcode Hrun [Hin]").
+    iIntros "#Hwl #Ht" (h m avail) "#Hcode #Hro %Hargs Hrun Hcwd Hin Hcont".
+    iDestruct ("Hwl" with "Ht") as "#Hwr".
+    iApply (wp_kinit_open h m avail with "Hwr Hcode Hrun [Hin]").
     { iDestruct "Hin" as "[H | [H _]]"; [ by iExists ufd_l0 | iExact "H" ]. }
     iIntros (h' ret) "Hstd Hrun".
     iApply ("Hcont" $! h' ret with "[Hstd] Hcwd Hrun").
@@ -793,13 +851,13 @@ Section UkInit.
   (* the node exists: the PINNED open at the resolving pin.  Its taint arm
      is the lemma above, because under the taint there is no pin. *)
   Lemma uki_open2_of_console (T : iProp Σ) `{!Persistent T} (stc : fdstate) :
-    uki_open_console_leaf T stc -∗ uki_open2 T stc.
+    □ (T -∗ udepw_law 15) -∗ uki_open_console_leaf T stc -∗ uki_open2 T stc.
   Proof.
-    iIntros "Hlf".
+    iIntros "#Hwl Hlf".
     rewrite /uki_open2 /uki_open2_in.
     iIntros (h m avail) "#Hcode #Hro %Hargs Hrun Hcwd Hin Hcont".
     iDestruct "Hin" as "[Hstd | [Hstd #Ht]]"; last first.
-    { iDestruct (uki_open2_taint_arm T stc with "Ht") as "Hop".
+    { iDestruct (uki_open2_taint_arm T stc with "Hwl Ht") as "Hop".
       rewrite /uki_open2 /uki_open2_in.
       iApply ("Hop" $! h m avail with "Hcode Hro [%] Hrun Hcwd [Hstd] Hcont");
         [ exact Hargs | ].
@@ -817,13 +875,13 @@ Section UkInit.
   (* the mknod failed and handed the credential back: the MISS pin again,
      and fd 0 stays closed *)
   Lemma uki_open2_of_absent (T K : iProp Σ) `{!Persistent T} (stc : fdstate) :
-    uki_open_absent_leaf T K -∗ K -∗ uki_open2 T stc.
+    □ (T -∗ udepw_law 15) -∗ uki_open_absent_leaf T K -∗ K -∗ uki_open2 T stc.
   Proof.
-    iIntros "Hlf HK".
+    iIntros "#Hwl Hlf HK".
     rewrite /uki_open2 /uki_open2_in.
     iIntros (h m avail) "#Hcode #Hro %Hargs Hrun Hcwd Hin Hcont".
     iDestruct "Hin" as "[Hstd | [Hstd #Ht]]"; last first.
-    { iDestruct (uki_open2_taint_arm T stc with "Ht") as "Hop".
+    { iDestruct (uki_open2_taint_arm T stc with "Hwl Ht") as "Hop".
       rewrite /uki_open2 /uki_open2_in.
       iApply ("Hop" $! h m avail with "Hcode Hro [%] Hrun Hcwd [Hstd] Hcont");
         [ exact Hargs | ].
@@ -891,7 +949,12 @@ Section UkInit.
       iDestruct "Hstd" as (l) "Hstd". iApply (ufd_head_taint with "Ht Hstd").
   Qed.
 
+  (* ...and write's.  16's branch is the write chain at a key whose
+     descriptor row may be an inode and the minting law is key-free, so no
+     supplier admits it; /init's banner and diagnostics all come through
+     here, and E5's output lane is what discharges the premise. *)
   Lemma wp_kinit_write (h : CpuId) (m : regfile) (avail : nat) :
+    udepw_law 16 -∗
     init_code γt -∗
     urun N h m (mword_of_int InitSyms.write) avail -∗
     (∀ (h' : CpuId) (ret : mword 64),
@@ -902,7 +965,7 @@ Section UkInit.
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcode Hrun Hcont".
+    iIntros "#Hwr #Hcode Hrun Hcont".
     destruct init_syms_pins as (Hstart & Hmain & Hprintf & Hvprintf & Hputc & Hopen & Hmknod & Hdup & Hfork & Hwait & Hexec & Hwrite & Hexit). rewrite Hwrite.
     (* ---- 0x392  c.li a7,16 ---- *)
     iApply (wp_uk_cli N h m (mword_of_int 0x392)
@@ -936,8 +999,8 @@ Section UkInit.
               ltac:(vm_compute; reflexivity)
               with "[] Hrun []").
     { iApply (uis_init_394 with "Hcode"). }
-    { iApply udepw_of_psok; [ apply Hpsok | ];
-      (discriminate || assumption || (vm_compute; discriminate)). }
+    (* THE FLAGGED DEPOSIT: write(16), E5's to discharge *)
+    { iApply (udepw_of_law N m1 (mword_of_int 0x394) 16 with "Hwr"). }
     assert (E1 : add_vec_int (mword_of_int 0x394 : mword 64) 4
                  = mword_of_int 0x398)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -1267,7 +1330,7 @@ Section UkInit.
               Ha0 ltac:(vm_compute; reflexivity)
               with "[] Hrun [] Hch").
     { iApply (uis_init_37c with "Hcode"). }
-    { iApply udepw_of_psok; [ apply Hpsok | ];
+    { iApply udepw_of_psok; [ apply Hpsok_free; free_lit | ];
       (discriminate || assumption || (vm_compute; discriminate)). }
     assert (E1 : add_vec_int (mword_of_int 0x37c : mword 64) 4
                  = mword_of_int 0x380)

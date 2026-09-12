@@ -569,3 +569,43 @@ Class uprogSG (Σ : gFunctors) := {
   (* ...and the syscall numbers it undertakes to pay a bundle for *)
   psok : Z -> Prop;
 }.
+
+(* ===================================================================== *)
+(* THE FREE NUMBERS (lane SUPPLY-SPLIT).  The literal predicate lives      *)
+(* HERE, beside the class, because both ends need it and they are on       *)
+(* opposite sides of the file-system tower: the PROGRAM tier (UkRun and    *)
+(* every [Uk*.v]) says "my numbers are free" without naming an instance,   *)
+(* and the INSTANCE ([UexecExecInst.xv6_free]) is this same predicate, so  *)
+(* the two meet by [eq_refl] rather than by a bridge lemma.                *)
+(*                                                                        *)
+(* WHICH NUMBERS ARE MISSING, and why (the classification's CLAIM/TAINT    *)
+(* column -- [UexecExecInst.xv6_sbundle] is the evidence, one branch per   *)
+(* number):                                                               *)
+(*   7  exec  -- the minting law never admits it at all (its bundle reads  *)
+(*               the key); the deposit goes the EXPLICIT route             *)
+(*               ([UkRun.uxsup]).                                          *)
+(*   5  read  -- the CONSOLE arm spends the supply; a LEASE holder pays it *)
+(*               at its own claim ([UkRun.udepwf_std]).                    *)
+(*   15 open  -- create / trunc / child are write-kind commits; a PINNED   *)
+(*               open pays them ([UkRun.udepwf_at]).                       *)
+(*   16 write -- the INODE arm is the write chain.  The console arm is     *)
+(*               free, but this law is KEY-FREE, so admitting 16 would     *)
+(*               mean paying it at a key whose fd IS an inode; 16's        *)
+(*               honest supplier is LEDGER-FIXED, not key-free.            *)
+(*   17/18/19/20 mknod / unlink / link / mkdir -- write-kind commits.      *)
+(*                                                                        *)
+(* Every other number's bundle is [emp], and 9 (chdir) -- a walk premise   *)
+(* and a READ-kind commit -- is a closed fact                              *)
+(* ([FsAbsInvFire.fsabs_chdir_pre] takes no supply), so chdir is FREE.     *)
+(* ===================================================================== *)
+Definition free_num (n : Z) : Prop :=
+  n <> USYS_exec /\ n <> 5 /\ n <> 15 /\ n <> 16 /\ n <> 17 /\
+  n <> 18 /\ n <> 19 /\ n <> 20.
+
+Global Instance free_num_dec (n : Z) : Decision (free_num n).
+Proof. rewrite /free_num. apply _. Defined.
+
+(* ...and what a call site at a LITERAL number discharges it with *)
+Ltac free_lit :=
+  unfold free_num; repeat split;
+  (discriminate || (vm_compute; discriminate)).

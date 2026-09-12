@@ -87,10 +87,18 @@ Section UkCatMain.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
      hypothesis, so no lemma statement in this file names it and the ~570
      [urun] sites did not move; the program's kernel-side constructor
-     discharges it (ARM-a's generic instance is [psok := fun _ => True]).
-     exec is excluded by the minting law itself -- its bundle reads the key,
-     so its deposit is always the explicit disjunct of [UkRun.udepw]. *)
-  Hypothesis Hpsok : forall k : Z, k <> USYS_exec -> psok k.
+     discharges it.
+     AT THE FREE NUMBERS AND NO MORE (lane SUPPLY-SPLIT).  It used to read
+     "every number but exec", which at the generic instance is true and at
+     a VERIFIED program's instance is not: a program whose supplier is the
+     application's ([AppInv.app_sup] -- for the echo application, the
+     TAINT) could only ever be entered tainted.  What a verified program
+     admits is [UexecSG.free_num] -- every number whose bundle is [emp],
+     plus chdir, whose branch is a closed fact -- and at
+     [UexecExecInst.uprogSG_free] this hypothesis is the identity.  A call
+     at a number OUTSIDE that set takes its own deposit as a premise
+     ([UkRun.udepw_law]) and is named at its site. *)
+  Hypothesis Hpsok_free : forall k : Z, free_num k -> psok k.
 
   Local Notation ra_idx := (mword_of_int 1 : mword 5).
   Local Notation s0_idx := (mword_of_int 8 : mword 5).
@@ -272,6 +280,7 @@ Section UkCatMain.
     args !! i = Some g ->
     ua_ptr g <> 0 ->
     m !!! Regidx s2_idx = mword_of_int (av + 8 * Z.of_nat i) ->
+    UkCat.cat_deps -∗
     cat_code γt -∗
     cat_rodata γt -∗
     uargv γd av args -∗
@@ -279,7 +288,7 @@ Section UkCatMain.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hi Hnz Hs2.
-    iIntros "#Hcode #Hro #Hargv Hrun".
+    iIntros "#Hdp #Hcode #Hro #Hargv Hrun".
     iDestruct (cm_str with "Hro") as "#Hstr".
     iDestruct (uargv_align with "Hargv") as %[Hal Hargc].
     iDestruct (uargv_acc γd av args i g Hi with "Hargv") as "[[#Hw #Hsstr] _]".
@@ -401,7 +410,7 @@ Section UkCatMain.
                      ltac:(vm_compute; discriminate)).
       rewrite /m1. exact (upd_eq m (Regidx a2_idx) (regval_into_reg _)). }
     (* ---- fprintf(2, "cat: cannot open %s\n", argv[i]) ---- *)
-    iApply (wp_kcat_fprintf_s N Hpsok cm_msg cm_msg_len cm_msg_q cm_lit
+    iApply (wp_kcat_fprintf_s N cm_msg cm_msg_len cm_msg_q cm_lit
               (ua_ptr g) (ua_len g) (ua_bytes g) h5 m5 n
               ltac:(unfold cm_msg; lia)
               ltac:(unfold cm_msg, cm_msg_len; lia)
@@ -414,7 +423,7 @@ Section UkCatMain.
               ltac:(unfold cm_lit, cm_msg, cm_msg_q; vm_compute; discriminate)
               ltac:(unfold cm_msg_len, cm_msg_q; intros HH; exfalso; lia)
               Hnz Ha1_5 Ha2_5
-              with "Hcode Hstr Hsstr Hrun").
+              with "Hdp Hcode Hstr Hsstr Hrun").
     iIntros (h6 m6) "_ Hrun".
     assert (Eret : ret_pc (m5 !!! Regidx ra_idx)
                    = (mword_of_int 0xf0 : mword 64))
@@ -477,6 +486,7 @@ Section UkCatMain.
     (i < length args)%nat ->
     fd_lowest_closed l = None ->
     cm_inv sp0 av (length args) i m ->
+    UkCat.cat_deps -∗
     cat_code γt -∗
     cat_rodata γt -∗
     uargv γd av args -∗
@@ -492,7 +502,7 @@ Section UkCatMain.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hav0 Havhi Hptr Hilt Hnone Hinv.
-    iIntros "#Hcode #Hro #Hargv Hbuf Hstd Hrun Hcont".
+    iIntros "#Hdp #Hcode #Hro #Hargv Hbuf Hstd Hrun Hcont".
     iDestruct (uargv_align with "Hargv") as %[Hal Hargc].
     destruct (lookup_lt_is_Some_2 args i Hilt) as [g Hg].
     iDestruct (uargv_acc γd av args i g Hg with "Hargv") as "[[#Hw _] _]".
@@ -570,8 +580,8 @@ Section UkCatMain.
     assert (Hinv3 : cm_inv sp0 av (length args) i m3)
       by exact (cm_inv_upd sp0 av (length args) i m2 ra_idx _
                   ltac:(vm_compute; reflexivity) Hinv2).
-    iApply (wp_kcat_open N Hpsok h3 m3 l (8 + (10 + (12 + (4 + n))))
-              Hnone with "Hcode Hrun Hstd").
+    iApply (wp_kcat_open N h3 m3 l (8 + (10 + (12 + (4 + n))))
+              Hnone with "Hdp Hcode Hrun Hstd").
     (* THE HANDLE FOR THE FILE CAT JUST OPENED.  Carried from here to the
        close at 0xbe -- it is a separate resource, so it simply rides in the
        context across every step in between. *)
@@ -633,7 +643,7 @@ Section UkCatMain.
       replace (8 + (10 + (12 + (4 + n))))%nat
         with (10 + (12 + (4 + (8 + n))))%nat by lia.
       iApply (wp_kcat_main_die h6 m5 av args i g (8 + n)%nat
-                Hg (Hptr i g Hg) Hs2_5 with "Hcode Hro Hargv Hrun").
+                Hg (Hptr i g Hg) Hs2_5 with "Hdp Hcode Hro Hargv Hrun").
     - (* IT SUCCEEDED: cat(fd), close(fd) *)
       iApply (wp_uk_btype0 N h5 m5 (mword_of_int 0xb2)
                 (mword_of_int 44 : mword 13) a0_idx BLT false
@@ -678,8 +688,8 @@ Section UkCatMain.
         exact (upd_ne m5 (Regidx ra_idx) (Regidx s1_idx) _
                  ltac:(vm_compute; discriminate)). }
       (* ---- cat(fd) ---- *)
-      iApply (wp_kcat_cat N Hpsok ret f h7 m6 n Ha0_6
-                with "Hcode Hro Hbuf Hrun").
+      iApply (wp_kcat_cat N ret f h7 m6 n Ha0_6
+                with "Hdp Hcode Hro Hbuf Hrun").
       iIntros (h8 m7 f') "%Hcs Hbuf Hrun".
       assert (Ecat : ret_pc (m6 !!! Regidx ra_idx)
                      = (mword_of_int 0xba : mword 64))
@@ -758,7 +768,7 @@ Section UkCatMain.
         assert (Hh32 : bv_half_modulus 32 = 2147483648%Z)
           by (vm_compute; reflexivity).
         rewrite Hh32. lia. }
-      iApply (wp_kcat_close N Hpsok h10 m9 fd (FdOpen rd wr t)
+      iApply (wp_kcat_close N Hpsok_free h10 m9 fd (FdOpen rd wr t)
                 (8 + (10 + (12 + (4 + n)))) Ha0_9
                 with "Hcode Hrun Hh").
       iIntros (h11 ret2) "Hrun".
@@ -826,6 +836,7 @@ Section UkCatMain.
     forall (i : nat) (h : CpuId) (m : regfile) (f : nat -> bv 8) (n : nat),
       (i + S k)%nat = length args ->
       cm_inv sp0 av (length args) i m ->
+      UkCat.cat_deps -∗
       cat_code γt -∗
       cat_rodata γt -∗
       uargv γd av args -∗
@@ -837,11 +848,11 @@ Section UkCatMain.
     intros Hav0 Havhi Hptr Hnone.
     induction k as [| k IH ];
       intros i h m f n Hik Hinv;
-      iIntros "#Hcode #Hro #Hargv Hbuf Hstd Hrun";
+      iIntros "#Hdp #Hcode #Hro #Hargv Hbuf Hstd Hrun";
       destruct cat_syms_pins
         as (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Hexit);
       iApply (wp_kcat_main_body sp0 av args i h m l f n Hav0 Havhi Hptr
-                ltac:(lia) Hnone Hinv with "Hcode Hro Hargv Hbuf Hstd Hrun");
+                ltac:(lia) Hnone Hinv with "Hdp Hcode Hro Hargv Hbuf Hstd Hrun");
       iIntros (h1 m1 f1) "%Hinv1 Hbuf Hstd Hrun";
       pose proof Hinv1 as Hd1;
       destruct Hd1 as (Hsp1 & Hs2_1 & Hs3_1);
@@ -918,7 +929,7 @@ Section UkCatMain.
       { iApply (uis_cat_c2 with "Hcode"). }
       iIntros (h2) "Hrun".
       iApply (IH (S i) h2 m1 f1 n ltac:(lia) Hinv1
-                with "Hcode Hro Hargv Hbuf Hstd Hrun").
+                with "Hdp Hcode Hro Hargv Hbuf Hstd Hrun").
   Qed.
 
   (* ===================================================================== *)
@@ -935,6 +946,7 @@ Section UkCatMain.
     m !!! Regidx a0_idx = mword_of_int (Z.of_nat (length args)) ->
     m !!! Regidx a1_idx = mword_of_int av ->
     fd_lowest_closed l = None ->
+    UkCat.cat_deps -∗
     cat_code γt -∗
     cat_rodata γt -∗
     uargv γd av args -∗
@@ -945,7 +957,7 @@ Section UkCatMain.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hptr Ha0 Ha1 Hnone.
-    iIntros "#Hcode #Hro #Hargv Hbuf Hstd Hrun".
+    iIntros "#Hdp #Hcode #Hro #Hargv Hbuf Hstd Hrun".
     iDestruct (uargv_align with "Hargv") as %[Hal Hargc].
     change (2 ^ 31) with 2147483648 in Hargc.
     destruct cat_syms_pins
@@ -1193,8 +1205,8 @@ Section UkCatMain.
       { rewrite /m5 (upd_ne m4 (Regidx ra_idx) (Regidx a0_idx) _
                        ltac:(vm_compute; discriminate)).
         rewrite /m4. exact (upd_eq m3 (Regidx a0_idx) (regval_into_reg _)). }
-      iApply (wp_kcat_cat N Hpsok _ f h10 m5 n Ha0_5
-                with "Hcode Hro Hbuf Hrun").
+      iApply (wp_kcat_cat N _ f h10 m5 n Ha0_5
+                with "Hdp Hcode Hro Hbuf Hrun").
       iIntros (h11 m6 f') "_ Hbuf Hrun".
       rewrite (_ : ret_pc (m5 !!! Regidx ra_idx)
                    = (mword_of_int 0xd8 : mword 64));
@@ -1450,7 +1462,7 @@ Section UkCatMain.
                          : mword 64)]> m8).
       iApply (wp_kcat_main_loop sp0 av args l (length args - 2)%nat
                 Hav0' Havhi' Hptr Hnone 1%nat h14 m9 f n ltac:(lia)
-                with "Hcode Hro Hargv Hbuf Hstd Hrun").
+                with "Hdp Hcode Hro Hargv Hbuf Hstd Hrun").
       unfold cm_inv.
       split.
       { rewrite /m9 (upd_ne m8 (Regidx s3_idx) (Regidx csp_rs1) _
@@ -1492,6 +1504,7 @@ Section UkCatMain.
     m !!! Regidx a0_idx = mword_of_int (Z.of_nat (length args)) ->
     m !!! Regidx a1_idx = mword_of_int av ->
     fd_lowest_closed l = None ->
+    UkCat.cat_deps -∗
     cat_code γt -∗
     cat_rodata γt -∗
     uargv γd av args -∗
@@ -1502,7 +1515,7 @@ Section UkCatMain.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hptr Ha0 Ha1 Hnone.
-    iIntros "#Hcode #Hro #Hargv Hbuf Hstd Hrun".
+    iIntros "#Hdp #Hcode #Hro #Hargv Hbuf Hstd Hrun".
     destruct cat_syms_pins
       as (Hstart & Hmain & _ & _ & _ & _ & _ & _ & _ & _ & _).
     rewrite Hstart.
@@ -1624,7 +1637,7 @@ Section UkCatMain.
                     exact (upd_ne m (Regidx csp_rs1) (Regidx a1_idx) _
                              ltac:(vm_compute; discriminate)))
               Hnone
-              with "Hcode Hro Hargv Hbuf Hstd Hrun").
+              with "Hdp Hcode Hro Hargv Hbuf Hstd Hrun").
   Qed.
 
 End UkCatMain.

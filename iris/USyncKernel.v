@@ -160,7 +160,13 @@ Section USyncKernel.
        ([UserHeap.uheap]'s own clause). *)
     (forall (p : mword 27) (q : uperm), uvis_perm W !! p = Some q ->
        bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W)) ->
-    (forall k : Z, k <> USYS_exec -> psok k) ->
+    (* THE NUMBERS SYNC ADMITS (lane SUPPLY-SPLIT).  sync makes two calls,
+       sync(22) and exit(2), and 22's branch of [UexecExecInst.xv6_sbundle]
+       is [emp] -- so what this constructor takes is the FREE numbers'
+       admission, which [UexecExecInst.uprogSG_free] grants by [eq_refl].
+       It used to read "every number but exec", which is the GENERIC
+       instance's [psok] and therefore, at this application, the taint. *)
+    (forall k : Z, free_num k -> psok k) ->
     (* ...AND THE KEY'S LAZY BIT IS [false] (lane LAZY-FLAG, L6): the U
        tier's run is at an empty fill, so an entry constructor can only
        build a slot for a key that says so.  exec's slot post is what will
@@ -171,7 +177,7 @@ Section USyncKernel.
        record ([UkRun.ukn_pay]). *)
     udep -∗ my_pay (uvis_gen W) (fun _ => True)%I -∗ uslot W.
   Proof.
-    intros Hpc Hsub Hx Hroom Hal8 Hdata Hfdlen Hstop Hpsok Hlzf.
+    intros Hpc Hsub Hx Hroom Hal8 Hdata Hfdlen Hstop Hpsok_free Hlzf.
     iIntros "#Hdep #Hpay".
     iApply (uslot_of_urun W 4 (fun _ => True)%I Hal8 ltac:(lia) Hdata Hfdlen
               Hstop Hlzf with "Hdep Hpay []").
@@ -183,7 +189,7 @@ Section USyncKernel.
     iIntros (N h) "%Hpayeq %Hsz Hszf #Ht _ _ _ Hrun".
     pose proof (Hpayeq : UkRun.ukn_triv N) as Hti.
     rewrite Hpc.
-    iApply (wp_ksync_start N Hpsok h (tf_resume_gpr0 (uvis_tf W))
+    iApply (wp_ksync_start N Hpsok_free h (tf_resume_gpr0 (uvis_tf W))
               (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1) 0
               eq_refl with "[] Hrun").
     iApply (sync_code_of_text (ukn_t N) (uvis_M W) (uvis_perm W) Hsub Hx with "Ht").

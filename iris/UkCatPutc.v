@@ -56,10 +56,18 @@ Section UkCatPutc.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
      hypothesis, so no lemma statement in this file names it and the ~570
      [urun] sites did not move; the program's kernel-side constructor
-     discharges it (ARM-a's generic instance is [psok := fun _ => True]).
-     exec is excluded by the minting law itself -- its bundle reads the key,
-     so its deposit is always the explicit disjunct of [UkRun.udepw]. *)
-  Hypothesis Hpsok : forall k : Z, k <> USYS_exec -> psok k.
+     discharges it.
+     AT THE FREE NUMBERS AND NO MORE (lane SUPPLY-SPLIT).  It used to read
+     "every number but exec", which at the generic instance is true and at
+     a VERIFIED program's instance is not: a program whose supplier is the
+     application's ([AppInv.app_sup] -- for the echo application, the
+     TAINT) could only ever be entered tainted.  What a verified program
+     admits is [UexecSG.free_num] -- every number whose bundle is [emp],
+     plus chdir, whose branch is a closed fact -- and at
+     [UexecExecInst.uprogSG_free] this hypothesis is the identity.  A call
+     at a number OUTSIDE that set takes its own deposit as a premise
+     ([UkRun.udepw_law]) and is named at its site. *)
+  Hypothesis Hpsok_free : forall k : Z, free_num k -> psok k.
 
   Local Notation ra_idx := (mword_of_int 1 : mword 5).
   Local Notation s0_idx := (mword_of_int 8 : mword 5).
@@ -109,6 +117,7 @@ Section UkCatPutc.
   (* the post is [ucallee_saved] and nothing else.                           *)
   (* --------------------------------------------------------------------- *)
   Lemma wp_kcat_putc (h : CpuId) (m : regfile) (n : nat) :
+    UkCat.cat_deps -∗
     cat_code γt -∗
     urun N h m (mword_of_int CatSyms.putc) (4 + n) -∗
     (∀ (h' : CpuId) (m' : regfile),
@@ -117,7 +126,7 @@ Section UkCatPutc.
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcode Hrun Hcont".
+    iIntros "#Hdp #Hcode Hrun Hcont".
     destruct cat_syms_pins
       as (_ & _ & _ & _ & _ & Hputc & _ & Hwrite & _ & _ & _).
     rewrite Hputc.
@@ -313,7 +322,7 @@ Section UkCatPutc.
     assert (Hra5 : m5 !!! Regidx ra_idx = (mword_of_int 0x46a : mword 64))
       by exact (upd_eq m4 (Regidx ra_idx) (regval_into_reg _)).
     (* ---- write(fd, sp0-17, 1) -- the QUIET row: no heap effect at all ---- *)
-    iApply (wp_kcat_write N Hpsok h8 m5 n with "Hcode Hrun").
+    iApply (wp_kcat_write N h8 m5 n with "Hdp Hcode Hrun").
     iIntros (h9 ret) "Hrun".
     assert (Eret : ret_pc (m5 !!! Regidx ra_idx) = (mword_of_int 0x46a : mword 64))
       by (rewrite Hra5; apply bv_eq; vm_compute; reflexivity).

@@ -945,12 +945,13 @@ Section UexecExecInst.
   (*                LEDGER-FIXED, not key-free.                              *)
   (*   17 mknod, 18 unlink, 19 link, 20 mkdir -- write-kind commits.          *)
   (* ===================================================================== *)
-  Definition xv6_free (n : Z) : Prop :=
-    n <> USYS_exec /\ n <> 5 /\ n <> 15 /\ n <> 16 /\ n <> 17 /\
-    n <> 18 /\ n <> 19 /\ n <> 20.
-
-  Global Instance xv6_free_dec (n : Z) : Decision (xv6_free n).
-  Proof. rewrite /xv6_free. apply _. Defined.
+  (* ...and it IS the program tier's own predicate ([UexecSG.free_num]),
+     not a copy: the two ends of this lane -- a program file saying "my
+     numbers are free" and this instance saying "those numbers cost
+     nothing" -- are on opposite sides of the file-system tower, and
+     making them the SAME definition is what lets them meet by [eq_refl]
+     instead of by a bridge lemma nobody would keep in step. *)
+  Definition xv6_free (n : Z) : Prop := free_num n.
 
   (* the FREE column of the classification, as one lemma: at a free number
      the deposit is minted from nothing, at whatever payload the leaf names *)

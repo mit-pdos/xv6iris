@@ -115,10 +115,18 @@ Section UkShMain.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
      hypothesis, so no lemma statement in this file names it and the ~570
      [urun] sites did not move; the program's kernel-side constructor
-     discharges it (ARM-a's generic instance is [psok := fun _ => True]).
-     exec is excluded by the minting law itself -- its bundle reads the key,
-     so its deposit is always the explicit disjunct of [UkRun.udepw]. *)
-  Hypothesis Hpsok : forall k : Z, k <> USYS_exec -> psok k.
+     discharges it.
+     AT THE FREE NUMBERS AND NO MORE (lane SUPPLY-SPLIT).  It used to read
+     "every number but exec", which at the generic instance is true and at
+     a VERIFIED program's instance is not: a program whose supplier is the
+     application's ([AppInv.app_sup] -- for the echo application, the
+     TAINT) could only ever be entered tainted.  What a verified program
+     admits is [UexecSG.free_num] -- every number whose bundle is [emp],
+     plus chdir, whose branch is a closed fact -- and at
+     [UexecExecInst.uprogSG_free] this hypothesis is the identity.  A call
+     at a number OUTSIDE that set takes its own deposit as a premise
+     ([UkRun.udepw_law]) and is named at its site. *)
+  Hypothesis Hpsok_free : forall k : Z, free_num k -> psok k.
 
   Local Notation a0_idx := (mword_of_int 10 : mword 5).
   Local Notation a5_idx := (mword_of_int 15 : mword 5).
@@ -519,6 +527,7 @@ Section UkShMain.
     ushp_tokens len f 0 toks ->
     (length toks < 10)%nat ->
     0 < s0 -> s0 + Z.of_nat len + 1 < Z64 -> s0 + Z.of_nat len < 2 ^ 38 ->
+    UkSh.sh_deps -∗
     shk_code γt -∗
     (* the exec deposit's supplier -- [UkRun.uxsup], see
        [UkShRun.wp_kshr_runcmd]: this walk reaches runcmd's EXEC arm *)
@@ -537,7 +546,7 @@ Section UkShMain.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hs1 Hns Htoks Htlen Hs0 Hs64 Hs38.
-    iIntros "#Hcode #Hxs #Hpcode #Hpro #Hjt Hline Hws Hsy Hstd Hcwd Hch HM Hrun".
+    iIntros "#Hdp #Hcode #Hxs #Hpcode #Hpro #Hjt Hline Hws Hsy Hstd Hcwd Hch HM Hrun".
     (* the line's own bytes are non-NUL, which is what makes each token a
        string once the cut lands *)
     iDestruct (ustr_nonul with "Hline") as %Hnn0.
@@ -633,11 +642,11 @@ Section UkShMain.
     (* runcmd is stated at the record's OWN exec payload now; this file's
        record is the forked child's, which pays nothing. *)
     iDestruct (uxsup_at_triv N with "Hxs") as "#Hxs'".
-    iApply (UkShDiag.wp_kshr_runcmd_final Hpsok
+    iApply (UkShDiag.wp_kshr_runcmd_final Hpsok_free
               (UExec (ush_args s0 (ushp_nulfold toks (ushp_ext len f)) toks))
               ltac:(cbn [ush_simple]; exact I)
               N h4 m4 p szv ld (60 + n) Ha0_4
-              with "Hcode Hxs' Hxs Hjt Htree Hsz Hstd Hcwd Hch Hrun").
+              with "Hdp Hcode Hxs' Hxs Hjt Htree Hsz Hstd Hcwd Hch Hrun").
   Qed.
 
   (* ===================================================================== *)
@@ -674,6 +683,7 @@ Section UkShMain.
     8344 <= sz ->
     UserPtTree.pgroundup sz = sz ->
     usz_ok (sz + 65536) ->
+    UkSh.sh_deps -∗
     shk_code γt -∗
     (* the exec deposit's supplier -- [UkRun.uxsup], see
        [UkShRun.wp_kshr_runcmd]: this walk reaches runcmd's EXEC arm *)
@@ -691,13 +701,13 @@ Section UkShMain.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hs1 Hns Htoks Htlen Hs0 Hs64 Hs38 Hszlo Hszal Hszok.
-    iIntros "#Hcode #Hxs #Hpcode #Hpro #Hjt Hline Hws Hsy Hstd Hcwd Hch HM Hrun".
+    iIntros "#Hdp #Hcode #Hxs #Hpcode #Hpro #Hjt Hline Hws Hsy Hstd Hcwd Hch HM Hrun".
     iApply (wp_kshm_child (UkShMalloc.ushm_fresh N sz) (sz + 65536)
-              (UkShMalloc.ushm_malloc_ok_holds N Hpsok Hsbrk sz
+              (UkShMalloc.ushm_malloc_ok_holds N Hpsok_free Hsbrk sz
                  Hszlo Hszal Hszok)
               h m dw dv s0 len f toks ld n
               Hs1 Hns Htoks Htlen Hs0 Hs64 Hs38
-              with "Hcode Hxs Hpcode Hpro Hjt Hline Hws Hsy Hstd Hcwd Hch HM Hrun").
+              with "Hdp Hcode Hxs Hpcode Hpro Hjt Hline Hws Hsy Hstd Hcwd Hch HM Hrun").
   Qed.
 
 End UkShMain.

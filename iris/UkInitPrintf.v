@@ -62,13 +62,10 @@ Section UkInitPrintf.
   Context `{!ctokG Σ}.
   Context {SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
-  (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
-     hypothesis, so no lemma statement in this file names it and the ~570
-     [urun] sites did not move; the program's kernel-side constructor
-     discharges it (ARM-a's generic instance is [psok := fun _ => True]).
-     exec is excluded by the minting law itself -- its bundle reads the key,
-     so its deposit is always the explicit disjunct of [UkRun.udepw]. *)
-  Hypothesis Hpsok : forall k : Z, k <> USYS_exec -> psok k.
+  (* NO [psok] HYPOTHESIS (lane SUPPLY-SPLIT).  Every ecall this file
+     reaches is at a CLAIM number, so nothing here routes through
+     [UkRun.udep]'s minting law: the deposit is a premise
+     ([UkRun.udepw_law]) and is named at the leaf that spends it. *)
 
   Local Notation ra_idx := (mword_of_int 1 : mword 5).
   Local Notation s0_idx := (mword_of_int 8 : mword 5).
@@ -106,6 +103,7 @@ Section UkInitPrintf.
     (0 < len)%nat ->
     (forall j : nat, (j < len)%nat -> bv_unsigned (f j) <> 37) ->
     m !!! Regidx a0_idx = mword_of_int a ->
+    udepw_law 16 -∗
     init_code γt -∗
     utext_str γt a len f -∗
     urun N h m (mword_of_int InitSyms.printf) (12 + (12 + (4 + n))) -∗
@@ -116,7 +114,7 @@ Section UkInitPrintf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Ha0 Habnd Hlen Hpct Ha0r.
-    iIntros "#Hcode #Hstr Hrun Hcont".
+    iIntros "#Hwr #Hcode #Hstr Hrun Hcont".
     destruct init_syms_pins
       as (_ & _ & Hprintf & Hvprintf & _ & _ & _ & _ & _ & _ & _ & _ & _).
     rewrite Hprintf.
@@ -483,8 +481,8 @@ Section UkInitPrintf.
       exact (upd_ne mq5 (Regidx ra_idx) (Regidx a1_idx) _
                ltac:(vm_compute; discriminate)). }
     (* ---- vprintf(1, fmt, ap) ---- *)
-    iApply (wp_kinit_vprintf N Hpsok a len f h15 mq6 n
-              Ha0 Habnd Hlen Hpct Ha1q6 with "Hcode Hstr Hrun").
+    iApply (wp_kinit_vprintf N a len f h15 mq6 n
+              Ha0 Habnd Hlen Hpct Ha1q6 with "Hwr Hcode Hstr Hrun").
     iIntros (h16 mq7) "%Hcs Hrun".
     assert (Eret : ret_pc (mq6 !!! Regidx ra_idx)
                    = (mword_of_int 0x7ea : mword 64))

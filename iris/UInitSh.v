@@ -445,7 +445,8 @@ Section UInitSh.
   Lemma init_exec_sup_of_sh_slot (T : iProp Σ) `{!Persistent T} `{!Timeless T}
       (cn : cons_names) (st : fdstate)
       (Rsh : gname -> gname -> gname -> iProp Σ) (n0 : nat) :
-    (forall k : Z, k <> USYS_exec -> psok k) ->
+    (* the numbers sh admits -- THE FREE ONES (lane SUPPLY-SPLIT) *)
+    (forall k : Z, free_num k -> psok k) ->
     8 * Z.of_nat (2 + (8 + (16 + (ush_Dbody + n0)))) <= 0xFE0 ->
     (* WHAT INIT'S OWN OPEN INSTALLED ON SLOT 0.  sh's entry is told one
        row about its table -- fd 0 is the console, slot 0 is closed, or the
@@ -457,11 +458,15 @@ Section UInitSh.
        pinned open's receipt gives it. *)
     (exists wr : bool, st = FdOpen true wr (FdDevice ConsoleInv.CONSOLE)) ->
     udep -∗
+    (* ...AND THE THREE DEPOSITS SH OWES: read(5), open(15), write(16), the
+       CLAIM numbers sh calls ([UkSh.sh_deps]).  They cross the exec with
+       the slot, because the slot they build IS sh's. *)
+    UkSh.sh_deps -∗
     init_sh_slot T (sh_pay Rsh n0) -∗
     UkInit.init_exec_sup_lend cn T st.
   Proof.
-    intros Hpsok Hn0 Hst.
-    iIntros "#Hdep (#Hinv & #Hcl & #Hgen & #Hpay)".
+    intros Hpsok_free Hn0 Hst.
+    iIntros "#Hdep #Hdp (#Hinv & #Hcl & #Hgen & #Hpay)".
     (* THE LEDGER IS TAKEN AND NOT READ: sh's entry says nothing about its
        standard streams, and the only descriptor fact this constructor
        needs is [length fdv = NOFILE], which comes off the LENT authority
@@ -525,11 +530,11 @@ Section UInitSh.
     { iModIntro.
       iIntros (na alen afun W') "%Hok %Hcw %Hlzf %Hargs #Hmp HQ [[#Hp1 #Hp2] Hps]".
       destruct (init_args_det M na alen afun Hsav Hsro Hargs) as [-> Halen].
-      iApply (sh_slot_of_kexec Hpsok Rsh γp T (ucons_pay cn γp T)
+      iApply (sh_slot_of_kexec Hpsok_free Rsh γp T (ucons_pay cn γp T)
                 1%nat alen afun fdv W' n0 np
                 (ucons_pay_const cn γp T) Hok
                 (init_sh_room alen n0 Halen Hn0) Hlen Hlzf
-                with "[] Hdep [] [] Hmp HQ Hps").
+                with "[] Hdep Hdp [] [] Hmp HQ Hps").
       - iModIntro. iIntros (γt γd γs) "Hsz Hlo".
         iApply ("Hp1" $! W' γt γd γs with "Hsz Hlo").
       - iIntros (N0). iApply ("Hp2" $! γp N0).

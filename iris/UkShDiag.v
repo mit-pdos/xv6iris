@@ -436,10 +436,18 @@ Section UkShDiagPutc.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
      hypothesis, so no lemma statement in this file names it and the ~570
      [urun] sites did not move; the program's kernel-side constructor
-     discharges it (ARM-a's generic instance is [psok := fun _ => True]).
-     exec is excluded by the minting law itself -- its bundle reads the key,
-     so its deposit is always the explicit disjunct of [UkRun.udepw]. *)
-  Hypothesis Hpsok : forall k : Z, k <> USYS_exec -> psok k.
+     discharges it.
+     AT THE FREE NUMBERS AND NO MORE (lane SUPPLY-SPLIT).  It used to read
+     "every number but exec", which at the generic instance is true and at
+     a VERIFIED program's instance is not: a program whose supplier is the
+     application's ([AppInv.app_sup] -- for the echo application, the
+     TAINT) could only ever be entered tainted.  What a verified program
+     admits is [UexecSG.free_num] -- every number whose bundle is [emp],
+     plus chdir, whose branch is a closed fact -- and at
+     [UexecExecInst.uprogSG_free] this hypothesis is the identity.  A call
+     at a number OUTSIDE that set takes its own deposit as a premise
+     ([UkRun.udepw_law]) and is named at its site. *)
+  Hypothesis Hpsok_free : forall k : Z, free_num k -> psok k.
 
   Local Notation ra_idx := (mword_of_int 1 : mword 5).
   Local Notation s0_idx := (mword_of_int 8 : mword 5).
@@ -488,6 +496,7 @@ Section UkShDiagPutc.
   (* the post is [ucallee_saved] and nothing else.                           *)
   (* --------------------------------------------------------------------- *)
   Lemma wp_kshd_putc (h : CpuId) (m : regfile) (n : nat) :
+    UkSh.sh_deps -∗
     shk_code γt -∗
     urun N h m (mword_of_int ShSyms.putc) (4 + n) -∗
     (∀ (h' : CpuId) (m' : regfile),
@@ -496,7 +505,7 @@ Section UkShDiagPutc.
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcode Hrun Hcont".
+    iIntros "#Hdp #Hcode Hrun Hcont".
     pose proof shd_pin_putc as Hputc.
     pose proof shd_pin_write as Hwrite.
     rewrite Hputc.
@@ -692,7 +701,7 @@ Section UkShDiagPutc.
     assert (Hra5 : m5 !!! Regidx ra_idx = (mword_of_int 0xd44 : mword 64))
       by exact (upd_eq m4 (Regidx ra_idx) (regval_into_reg _)).
     (* ---- write(fd, sp0-17, 1) -- the QUIET row: no heap effect at all ---- *)
-    iApply (wp_ksh_write N Hpsok h8 m5 n with "Hcode Hrun").
+    iApply (wp_ksh_write N h8 m5 n with "Hdp Hcode Hrun").
     iIntros (h9 ret) "Hrun".
     assert (Eret : ret_pc (m5 !!! Regidx ra_idx) = (mword_of_int 0xd44 : mword 64))
       by (rewrite Hra5; apply bv_eq; vm_compute; reflexivity).
@@ -894,10 +903,18 @@ Section UkShDiagVprintf.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
      hypothesis, so no lemma statement in this file names it and the ~570
      [urun] sites did not move; the program's kernel-side constructor
-     discharges it (ARM-a's generic instance is [psok := fun _ => True]).
-     exec is excluded by the minting law itself -- its bundle reads the key,
-     so its deposit is always the explicit disjunct of [UkRun.udepw]. *)
-  Hypothesis Hpsok : forall k : Z, k <> USYS_exec -> psok k.
+     discharges it.
+     AT THE FREE NUMBERS AND NO MORE (lane SUPPLY-SPLIT).  It used to read
+     "every number but exec", which at the generic instance is true and at
+     a VERIFIED program's instance is not: a program whose supplier is the
+     application's ([AppInv.app_sup] -- for the echo application, the
+     TAINT) could only ever be entered tainted.  What a verified program
+     admits is [UexecSG.free_num] -- every number whose bundle is [emp],
+     plus chdir, whose branch is a closed fact -- and at
+     [UexecExecInst.uprogSG_free] this hypothesis is the identity.  A call
+     at a number OUTSIDE that set takes its own deposit as a premise
+     ([UkRun.udepw_law]) and is named at its site. *)
+  Hypothesis Hpsok_free : forall k : Z, free_num k -> psok k.
 
   Local Notation ra_idx := (mword_of_int 1 : mword 5).
   Local Notation s0_idx := (mword_of_int 8 : mword 5).
@@ -1738,6 +1755,7 @@ Section UkShDiagVprintf.
     bv_unsigned b0 <> 37 ->
     vp_inv m0 m sp0 a fd ap i ->
     m !!! Regidx s1_idx = mword_of_int (bv_unsigned b0) ->
+    UkSh.sh_deps -∗
     shk_code γt -∗
     utext γt (a + Z.of_nat (S i)) b1 -∗
     urun N h m (mword_of_int 0xe40) (4 + n) -∗
@@ -1750,7 +1768,7 @@ Section UkShDiagVprintf.
   Proof.
     intros Ha0 Habnd Hpct Hinv Hs1.
     destruct Hinv as (Hsp & Hs0 & Hs2 & Hs3 & Hs4 & Hs5 & Hs6 & Hfr).
-    iIntros "#Hcode #Hb1 Hrun Hcont".
+    iIntros "#Hdp #Hcode #Hb1 Hrun Hcont".
     assert (Hb0 : 0 <= bv_unsigned b0 < 256).
     { pose proof (bv_unsigned_in_range 8 b0) as HH.
       assert (Em8 : bv_modulus 8 = 256) by (vm_compute; reflexivity).
@@ -1882,7 +1900,7 @@ Section UkShDiagVprintf.
     assert (Hra4 : m4 !!! Regidx ra_idx = (mword_of_int 0xe28 : mword 64))
       by exact (upd_eq m3 (Regidx ra_idx) (regval_into_reg _)).
     (* ---- putc(fd, c) ---- *)
-    iApply (wp_kshd_putc N Hpsok h6 m4 n with "Hcode Hrun").
+    iApply (wp_kshd_putc N h6 m4 n with "Hdp Hcode Hrun").
     iIntros (h7 m5) "%Hcs Hrun".
     assert (Eret : ret_pc (m4 !!! Regidx ra_idx) = (mword_of_int 0xe28 : mword 64))
       by (rewrite Hra4; apply bv_eq; vm_compute; reflexivity).
@@ -2073,6 +2091,7 @@ Section UkShDiagVprintf.
       (i + S k)%nat = len ->
       vp_inv m0 m sp0 a fd ap i ->
       m !!! Regidx s1_idx = mword_of_int (bv_unsigned (f i)) ->
+      UkSh.sh_deps -∗
       shk_code γt -∗
       utext_str γt a len f -∗
       uword γd (uint sp0 - 8) (m0 !!! Regidx ra_idx) -∗
@@ -2097,7 +2116,7 @@ Section UkShDiagVprintf.
     intros Ha0 Habnd Hpct Hsp0 Hal8 Hlo.
     induction k as [| k IH ];
       intros i h m n Hlo_i Hik Hinv Hs1;
-      iIntros "#Hcode #Hstr Hwra Hws0 Hws1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw11 Hw12 Hrun Hcont";
+      iIntros "#Hdp #Hcode #Hstr Hwra Hws0 Hws1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw11 Hw12 Hrun Hcont";
       iDestruct (utext_str_nonul with "Hstr") as %Hnn;
       assert (Hilt : (i < len)%nat) by lia.
     - (* the LAST character: the byte after it is the terminator *)
@@ -2105,7 +2124,7 @@ Section UkShDiagVprintf.
       iDestruct (utext_str_nul with "Hstr") as "#Hnul".
       iApply (wp_kshd_vprintf_step m0 sp0 fd ap a i (f i) ubyte0 h m n
                 Ha0 ltac:(lia) (Hpct i ltac:(lia)) Hinv Hs1
-                with "Hcode [] Hrun").
+                with "Hdp Hcode [] Hrun").
       { rewrite Ei. iExact "Hnul". }
       iIntros (h1 m1) "%Hinv1 %Hs11 Hrun".
       (* ---- 0xe3c  beqz s1,0x1010 -- TAKEN: this was the terminator ---- *)
@@ -2133,7 +2152,7 @@ Section UkShDiagVprintf.
       iDestruct (utext_str_byte γt a len f (S i) Hslt with "Hstr") as "#Hb1".
       iApply (wp_kshd_vprintf_step m0 sp0 fd ap a i (f i) (f (S i)) h m n
                 Ha0 ltac:(lia) (Hpct i ltac:(lia)) Hinv Hs1
-                with "Hcode Hb1 Hrun").
+                with "Hdp Hcode Hb1 Hrun").
       iIntros (h1 m1) "%Hinv1 %Hs11 Hrun".
       (* ---- 0xe3c  beqz s1,0x1010 -- NOT taken: a body byte is not NUL ---- *)
       assert (Hnz : bv_unsigned (f (S i)) <> 0).
@@ -2167,7 +2186,7 @@ Section UkShDiagVprintf.
       rewrite E528.
       iIntros (h2) "Hrun".
       iApply (IH (S i) h2 m1 n ltac:(lia) ltac:(lia) Hinv1 Hs11
-                with "Hcode Hstr Hwra Hws0 Hws1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw11 Hw12 Hrun Hcont").
+                with "Hdp Hcode Hstr Hwra Hws0 Hws1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw11 Hw12 Hrun Hcont").
   Qed.
 
 
@@ -2934,6 +2953,7 @@ Section UkShDiagVprintf.
     (0 < len)%nat ->
     (forall j : nat, (j < len)%nat -> bv_unsigned (f j) <> 37) ->
     m !!! Regidx a1_idx = mword_of_int a ->
+    UkSh.sh_deps -∗
     shk_code γt -∗
     utext_str γt a len f -∗
     urun N h m (mword_of_int ShSyms.vprintf) (12 + (4 + n)) -∗
@@ -2944,7 +2964,7 @@ Section UkShDiagVprintf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Ha0 Habnd Hlen Hpct Ha1.
-    iIntros "#Hcode #Hstr Hrun Hcont".
+    iIntros "#Hdp #Hcode #Hstr Hrun Hcont".
     iApply (wp_kshd_vprintf_pro a len f h m n Ha0 Habnd Hlen Ha1
               with "Hcode Hstr Hrun").
     iIntros (h' m' fd ap) "%Hal8 %Hlo %Hinv0 %Hs1z %Hap
@@ -2954,7 +2974,7 @@ Section UkShDiagVprintf.
     iApply (wp_kshd_vprintf_loop m (m !!! Regidx csp_rs1) fd ap a len f
               0%nat (len - 1)%nat Ha0 Habnd ltac:(intros j Hj; apply Hpct; lia)
               eq_refl Hal8 Hlo 0%nat h' m' n ltac:(lia) Hk0 Hinv0 Hs1z
-              with "Hcode Hstr Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hrun Hcont").
+              with "Hdp Hcode Hstr Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hrun Hcont").
   Qed.
 
 
@@ -3018,10 +3038,18 @@ Section UkShDiagVprintfS.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
      hypothesis, so no lemma statement in this file names it and the ~570
      [urun] sites did not move; the program's kernel-side constructor
-     discharges it (ARM-a's generic instance is [psok := fun _ => True]).
-     exec is excluded by the minting law itself -- its bundle reads the key,
-     so its deposit is always the explicit disjunct of [UkRun.udepw]. *)
-  Hypothesis Hpsok : forall k : Z, k <> USYS_exec -> psok k.
+     discharges it.
+     AT THE FREE NUMBERS AND NO MORE (lane SUPPLY-SPLIT).  It used to read
+     "every number but exec", which at the generic instance is true and at
+     a VERIFIED program's instance is not: a program whose supplier is the
+     application's ([AppInv.app_sup] -- for the echo application, the
+     TAINT) could only ever be entered tainted.  What a verified program
+     admits is [UexecSG.free_num] -- every number whose bundle is [emp],
+     plus chdir, whose branch is a closed fact -- and at
+     [UexecExecInst.uprogSG_free] this hypothesis is the identity.  A call
+     at a number OUTSIDE that set takes its own deposit as a premise
+     ([UkRun.udepw_law]) and is named at its site. *)
+  Hypothesis Hpsok_free : forall k : Z, free_num k -> psok k.
 
   Local Notation ra_idx := (mword_of_int 1 : mword 5).
   Local Notation s0_idx := (mword_of_int 8 : mword 5).
@@ -3056,6 +3084,7 @@ Section UkShDiagVprintfS.
       (forall j : nat, (i0 <= j < i0 + k)%nat -> bv_unsigned (f j) <> 37) ->
       vp_inv m0 m sp0 a fd ap i0 ->
       m !!! Regidx s1_idx = mword_of_int (bv_unsigned (f i0)) ->
+      UkSh.sh_deps -∗
       shk_code γt -∗
       utext_str γt a len f -∗
       urun N h m (mword_of_int 0xe40) (4 + n) -∗
@@ -3070,7 +3099,7 @@ Section UkShDiagVprintfS.
     intros Ha0 Habnd.
     induction k as [| k IH ];
       intros i0 h m n Hlt Hpct Hinv Hs1;
-      iIntros "#Hcode #Hstr Hrun Hcont";
+      iIntros "#Hdp #Hcode #Hstr Hrun Hcont";
       iDestruct (utext_str_nonul with "Hstr") as %Hnn.
     - (* nothing to walk *)
       rewrite Nat.add_0_r.
@@ -3079,9 +3108,9 @@ Section UkShDiagVprintfS.
     - (* one plain round, then the rest *)
       assert (Hslt : (S i0 < len)%nat) by lia.
       iDestruct (utext_str_byte γt a len f (S i0) Hslt with "Hstr") as "#Hb1".
-      iApply (wp_kshd_vprintf_step N Hpsok m0 sp0 fd ap a i0 (f i0)
+      iApply (wp_kshd_vprintf_step N m0 sp0 fd ap a i0 (f i0)
                 (f (S i0)) h m n Ha0 ltac:(lia) (Hpct i0 ltac:(lia)) Hinv Hs1
-                with "Hcode Hb1 Hrun").
+                with "Hdp Hcode Hb1 Hrun").
       iIntros (h1 m1) "%Hinv1 %Hs11 Hrun".
       (* ---- 0xe3c  beqz s1,0x1010 -- NOT taken: a body byte is not NUL ---- *)
       assert (Hnz : bv_unsigned (f (S i0)) <> 0).
@@ -3114,7 +3143,7 @@ Section UkShDiagVprintfS.
       rewrite Ek.
       iApply (IH (S i0) h2 m1 n ltac:(lia)
                 ltac:(intros j Hj; apply Hpct; lia) Hinv1 Hs11
-                with "Hcode Hstr Hrun Hcont").
+                with "Hdp Hcode Hstr Hrun Hcont").
   Qed.
 
   (* ===================================================================== *)
@@ -3309,6 +3338,7 @@ Section UkShDiagVprintfS.
     0 <= p -> p + 1 < Z64 ->
     vp_inv3 m0 m sp0 a fd ap v3 i ->
     m !!! Regidx s1_idx = mword_of_int p ->
+    UkSh.sh_deps -∗
     shk_code γt -∗
     shd_sb γt γd tx dqs (p + 1) b1 -∗
     urun N h m (mword_of_int 0xfdc) (4 + n) -∗
@@ -3322,7 +3352,7 @@ Section UkShDiagVprintfS.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hp0 Hp1 Hinv Hs1.
-    iIntros "#Hcode Hb1 Hrun Hcont".
+    iIntros "#Hdp #Hcode Hb1 Hrun Hcont".
     pose proof shd_pin_putc as Hputc.
     (* ---- 0xfdc  c.mv a0,s6 ---- *)
     iApply (wp_uk_cmv N h m (mword_of_int 0xfdc) a0_idx s6_idx
@@ -3354,7 +3384,7 @@ Section UkShDiagVprintfS.
                  := regval_into_reg (mword_of_int 0xfe2 : mword 64)]> m1).
     assert (Hra2 : m2 !!! Regidx ra_idx = (mword_of_int 0xfe2 : mword 64))
       by exact (upd_eq m1 (Regidx ra_idx) (regval_into_reg _)).
-    iApply (wp_kshd_putc N Hpsok h2 m2 n with "Hcode Hrun").
+    iApply (wp_kshd_putc N h2 m2 n with "Hdp Hcode Hrun").
     iIntros (h3 m3) "%Hcs Hrun".
     assert (Eret : ret_pc (m2 !!! Regidx ra_idx)
                    = (mword_of_int 0xfe2 : mword 64))
@@ -3548,6 +3578,7 @@ Section UkShDiagVprintfS.
       (j + S k)%nat = slen ->
       vp_inv3 m0 m sp0 a fd ap v3 i ->
       m !!! Regidx s1_idx = mword_of_int (sa + Z.of_nat j) ->
+      UkSh.sh_deps -∗
       shk_code γt -∗
       shd_str γt γd tx dqs sa slen sf -∗
       urun N h m (mword_of_int 0xfdc) (4 + n) -∗
@@ -3561,7 +3592,7 @@ Section UkShDiagVprintfS.
     intros Hsa0 Hsahi.
     induction k as [| k IH ];
       intros j h m n Hjk Hinv Hs1;
-      iIntros "#Hcode Hstr Hrun Hcont";
+      iIntros "#Hdp #Hcode Hstr Hrun Hcont";
       iDestruct (shd_str_nonul with "Hstr") as "[%Hnn Hstr]";
       assert (Hjlt : (j < slen)%nat) by lia;
       assert (Hp0 : 0 <= sa + Z.of_nat j) by lia;
@@ -3573,7 +3604,7 @@ Section UkShDiagVprintfS.
       iEval (rewrite Ea) in "Hnul".
       iApply (wp_kshd_vprintf_sstep m0 sp0 fd ap v3 a i
                 (sa + Z.of_nat j) ubyte0 h m n Hp0 Hp1
-                Hinv Hs1 with "Hcode Hnul Hrun").
+                Hinv Hs1 with "Hdp Hcode Hnul Hrun").
       iIntros (h1 m1) "Hnul %Hinv1 %Hs11 %Ha11 Hrun".
       iEval (rewrite <- Ea) in "Hnul".
       iDestruct ("Hcl" with "Hnul") as "Hstr".
@@ -3609,7 +3640,7 @@ Section UkShDiagVprintfS.
       iEval (rewrite Ea) in "Hb1".
       iApply (wp_kshd_vprintf_sstep m0 sp0 fd ap v3 a i
                 (sa + Z.of_nat j) (sf (S j)) h m n Hp0 Hp1
-                Hinv Hs1 with "Hcode Hb1 Hrun").
+                Hinv Hs1 with "Hdp Hcode Hb1 Hrun").
       iIntros (h1 m1) "Hb1 %Hinv1 %Hs11 %Ha11 Hrun".
       iEval (rewrite <- Ea) in "Hb1".
       iDestruct ("Hcl" with "Hb1") as "Hstr".
@@ -3646,7 +3677,7 @@ Section UkShDiagVprintfS.
                      = mword_of_int (sa + Z.of_nat (S j)))
         by (rewrite Hs11; f_equal; lia).
       iApply (IH (S j) h2 m1 n ltac:(lia) Hinv1 Hs1'
-                with "Hcode Hstr Hrun Hcont").
+                with "Hdp Hcode Hstr Hrun Hcont").
   Qed.
 
 
@@ -3979,6 +4010,7 @@ Section UkShDiagVprintfS.
     0 <= apz -> apz + 8 <= 2 ^ 38 -> apz mod 8 = 0 ->
     sa <> 0 ->
     vp_inv3 m0 m sp0 a fd (mword_of_int apz) (mword_of_int 37) i ->
+    UkSh.sh_deps -∗
     shk_code γt -∗
     utext γt (a + Z.of_nat (S i)) c1 -∗
     uwordq γd dq apz (mword_of_int sa) -∗
@@ -3996,7 +4028,7 @@ Section UkShDiagVprintfS.
     intros Ha0 Habnd Hap0 Haphi Hapal Hsanz Hinv.
     pose proof Hinv as Hd.
     destruct Hd as (Hsp & Hs0 & Hs2 & Hs3 & Hs4 & Hs5 & Hs6 & Hs7 & Hs8 & Hfr).
-    iIntros "#Hcode #Hc1 Hw Hstr Hrun Hcont".
+    iIntros "#Hdp #Hcode #Hc1 Hw Hstr Hrun Hcont".
     iDestruct (urun_shd_str_bnd with "Hrun Hstr") as %[Hsa0 Hsahi].
     assert (Ezr : (sign_extend' 64 (mword_of_int 0 : mword 6) : mword 64)
                   = zero_reg)
@@ -4261,7 +4293,7 @@ Section UkShDiagVprintfS.
       iApply (wp_kshd_vprintf_sloop m0 sp0 fd (mword_of_int apz)
                 (mword_of_int (apz + 8)) a i sa (S slen') sf slen'
                 Hsa0 Hsahi 0%nat h5 m3 n ltac:(lia) Hinv3 Hs1_3
-                with "Hcode Hstr Hrun [Hw Hcont]").
+                with "Hdp Hcode Hstr Hrun [Hw Hcont]").
       iIntros (h6 m6) "%Hinv6 Hstr Hrun".
       pose proof Hinv6 as Hd6.
       destruct Hd6 as (_ & _ & _ & Hs36 & _).
@@ -4341,6 +4373,7 @@ Section UkShDiagVprintfS.
     m !!! Regidx a1_idx = mword_of_int (bv_unsigned c2) ->
     m !!! Regidx a2_idx = mword_of_int (bv_unsigned c1) ->
     m !!! Regidx a5_idx = mword_of_int 115 ->
+    UkSh.sh_deps -∗
     shk_code γt -∗
     utext γt (a + Z.of_nat (S i)) c1 -∗
     uwordq γd dq apz (mword_of_int sa) -∗
@@ -4357,7 +4390,7 @@ Section UkShDiagVprintfS.
   Proof.
     intros Ha0 Habnd Hap0 Haphi Hapal Hsanz Hr1 Hr2 Hc1u Hc1x Hc2u Hc2x
            Hinv Ha1 Ha2 Ha5.
-    iIntros "#Hcode #Hc1 Hw Hstr Hrun Hcont".
+    iIntros "#Hdp #Hcode #Hc1 Hw Hstr Hrun Hcont".
     assert (Em117 : (sign_extend' 64 (mword_of_int 3979 : mword 12) : mword 64)
                     = mword_of_int (-117))
       by (apply bv_eq; vm_compute; reflexivity).
@@ -4802,7 +4835,7 @@ Section UkShDiagVprintfS.
     iIntros (h18) "Hrun".
     iApply (wp_kshd_vprintf_pcs3 m0 sp0 fd a i apz sa dq c1 slen sf
               m9 h18 n Ha0 ltac:(lia) Hap0 Haphi Hapal Hsanz Hinv9
-              with "Hcode Hc1 Hw Hstr Hrun Hcont").
+              with "Hdp Hcode Hc1 Hw Hstr Hrun Hcont").
   Qed.
 
   (* ===================================================================== *)
@@ -4833,6 +4866,7 @@ Section UkShDiagVprintfS.
     vp_inv3 m0 m sp0 a fd (mword_of_int apz) (mword_of_int 37) i ->
     m !!! Regidx s1_idx = mword_of_int 115 ->
     m !!! Regidx a4_idx = mword_of_int (Z.of_nat i) ->
+    UkSh.sh_deps -∗
     shk_code γt -∗
     utext γt (a + Z.of_nat (S i)) c1 -∗
     utext γt (a + Z.of_nat (S (S i))) c2 -∗
@@ -4852,7 +4886,7 @@ Section UkShDiagVprintfS.
            Hc1z Hc1d Hc1u Hc1x Hc2d Hc2u Hc2x Hinv Hs1 Ha4.
     pose proof Hinv as Hd.
     destruct Hd as (Hsp & Hs0 & Hs2 & Hs3 & Hs4 & Hs5 & Hs6 & Hs7 & Hs8 & Hfr).
-    iIntros "#Hcode #Hc1 #Hc2 Hw Hstr Hrun Hcont".
+    iIntros "#Hdp #Hcode #Hc1 #Hc2 Hw Hstr Hrun Hcont".
     iDestruct (urun_shd_str_bnd with "Hrun Hstr") as %[Hsa0 Hsahi].
     (* the byte ranges, and the four negative immediates *)
     assert (Hr1 : 0 <= bv_unsigned c1 < 256).
@@ -5393,7 +5427,7 @@ Section UkShDiagVprintfS.
                                    ltac:(vm_compute; discriminate)); exact Ha2_11)
               ltac:(rewrite /m12 (upd_ne m11 (Regidx a0_idx) (Regidx a5_idx) _
                                    ltac:(vm_compute; discriminate)); exact Ha5_11)
-              with "Hcode Hc1 Hw Hstr Hrun Hcont").
+              with "Hdp Hcode Hc1 Hw Hstr Hrun Hcont").
   Qed.
 
   (* ===================================================================== *)
@@ -5424,6 +5458,7 @@ Section UkShDiagVprintfS.
     sa <> 0 ->
     m !!! Regidx a1_idx = mword_of_int a ->
     m !!! Regidx a2_idx = mword_of_int apz ->
+    UkSh.sh_deps -∗
     shk_code γt -∗
     utext_str γt a len f -∗
     uwordq γd dq apz (mword_of_int sa) -∗
@@ -5438,7 +5473,7 @@ Section UkShDiagVprintfS.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Ha0 Habnd Hq2 Hfq Hfsq Hpct Hc1d Hc1u Hc1x Hc2set Hapal Hsanz Ha1 Ha2.
-    iIntros "#Hcode #Hstr Hw Hsstr Hrun Hcont".
+    iIntros "#Hdp #Hcode #Hstr Hw Hsstr Hrun Hcont".
     iDestruct (urun_uword_bnd with "Hrun Hw") as %[Hap0 Haphi].
     iDestruct (utext_str_nonul with "Hstr") as %Hnn.
     (* the byte two past the directive: a body byte if there is one, and
@@ -5469,7 +5504,7 @@ Section UkShDiagVprintfS.
     iApply (wp_kshd_vprintf_seg m (m !!! Regidx csp_rs1) fd
               (mword_of_int apz) a len f q Ha0 Habnd 0%nat h0 mA n
               ltac:(lia) ltac:(intros j Hj; apply Hpct; lia) Hinv0 Hs1z
-              with "Hcode Hstr Hrun
+              with "Hdp Hcode Hstr Hrun
                     [Hw Hsstr Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11
                      Hw12 Hcont]").
     iIntros (h1 mB) "%HinvB %Hs1B Hrun".
@@ -5510,7 +5545,7 @@ Section UkShDiagVprintfS.
                     rewrite He; vm_compute; reflexivity)
               Hc1d Hc1u Hc1x Hc2d Hc2u Hc2x HinvC
               ltac:(rewrite Hs1C Hfsq; reflexivity) Ha4C
-              with "Hcode Hbssq Hc2b Hw Hsstr Hrun
+              with "Hdp Hcode Hbssq Hc2b Hw Hsstr Hrun
                     [Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12
                      Hcont]").
     iIntros (h4 mD) "Hw Hsstr %HinvD %Hs1D Hrun".
@@ -5539,12 +5574,12 @@ Section UkShDiagVprintfS.
     rewrite E562.
     iIntros (h5) "Hrun".
     (* ---- and the rest of the string, which has no '%' left in it ---- *)
-    iApply (wp_kshd_vprintf_loop N Hpsok m (m !!! Regidx csp_rs1) fd
+    iApply (wp_kshd_vprintf_loop N m (m !!! Regidx csp_rs1) fd
               (mword_of_int (apz + 8)) a len f (S (S q))
               (len - S (S (S q)))%nat Ha0 Habnd
               ltac:(intros j Hj; apply Hpct; lia) eq_refl Hal8 Hlo
               (S (S q)) h5 mD n ltac:(lia) ltac:(lia) HinvD Hs1D
-              with "Hcode Hstr Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10
+              with "Hdp Hcode Hstr Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10
                     Hw11 Hw12 Hrun [Hw Hsstr Hcont]").
     iIntros (h6 mE) "%Hcs Hrun".
     iApply ("Hcont" $! h6 mE with "Hw Hsstr [] Hrun").
@@ -5600,10 +5635,18 @@ Section UkShDiagFprintf.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
      hypothesis, so no lemma statement in this file names it and the ~570
      [urun] sites did not move; the program's kernel-side constructor
-     discharges it (ARM-a's generic instance is [psok := fun _ => True]).
-     exec is excluded by the minting law itself -- its bundle reads the key,
-     so its deposit is always the explicit disjunct of [UkRun.udepw]. *)
-  Hypothesis Hpsok : forall k : Z, k <> USYS_exec -> psok k.
+     discharges it.
+     AT THE FREE NUMBERS AND NO MORE (lane SUPPLY-SPLIT).  It used to read
+     "every number but exec", which at the generic instance is true and at
+     a VERIFIED program's instance is not: a program whose supplier is the
+     application's ([AppInv.app_sup] -- for the echo application, the
+     TAINT) could only ever be entered tainted.  What a verified program
+     admits is [UexecSG.free_num] -- every number whose bundle is [emp],
+     plus chdir, whose branch is a closed fact -- and at
+     [UexecExecInst.uprogSG_free] this hypothesis is the identity.  A call
+     at a number OUTSIDE that set takes its own deposit as a premise
+     ([UkRun.udepw_law]) and is named at its site. *)
+  Hypothesis Hpsok_free : forall k : Z, free_num k -> psok k.
 
   Local Notation ra_idx := (mword_of_int 1 : mword 5).
   Local Notation s0_idx := (mword_of_int 8 : mword 5).
@@ -6774,6 +6817,7 @@ Section UkShDiagFprintf.
     (0 < len)%nat ->
     (forall j : nat, (j < len)%nat -> bv_unsigned (f j) <> 37) ->
     m !!! Regidx a1_idx = mword_of_int a ->
+    UkSh.sh_deps -∗
     shk_code γt -∗
     utext_str γt a len f -∗
     urun N h m (mword_of_int ShSyms.fprintf) (10 + (12 + (4 + n))) -∗
@@ -6784,14 +6828,14 @@ Section UkShDiagFprintf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Ha0 Habnd Hlen Hpct Ha1.
-    iIntros "#Hcode #Hstr Hrun Hcont".
+    iIntros "#Hdp #Hcode #Hstr Hrun Hcont".
     iApply (wp_kshd_fprintf_gen emp%I a h m n Ha1
               with "Hcode [] Hrun [Hcont]").
     2:{ iIntros (h' m') "_ %Hcs Hrun".
         iApply ("Hcont" $! h' m' with "[] Hrun"). iPureIntro. exact Hcs. }
     iIntros (h' m') "%Ha1' %Ha2' %Hra' Hu6 Hrun Hk".
-    iApply (wp_kshd_vprintf N Hpsok a len f h' m' n
-              Ha0 Habnd Hlen Hpct Ha1' with "Hcode Hstr Hrun").
+    iApply (wp_kshd_vprintf N a len f h' m' n
+              Ha0 Habnd Hlen Hpct Ha1' with "Hdp Hcode Hstr Hrun").
     iIntros (h'' m'') "%Hcs Hrun".
     assert (Eret : ret_pc (m' !!! Regidx ra_idx)
                    = (mword_of_int 0x10cc : mword 64))
@@ -6819,6 +6863,7 @@ Section UkShDiagFprintf.
     sa <> 0 ->
     m !!! Regidx a1_idx = mword_of_int a ->
     m !!! Regidx a2_idx = mword_of_int sa ->
+    UkSh.sh_deps -∗
     shk_code γt -∗
     utext_str γt a len f -∗
     shd_str γt γd tx dqs sa slen sf -∗
@@ -6831,7 +6876,7 @@ Section UkShDiagFprintf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Ha0 Habnd Hq2 Hfq Hfsq Hpct Hc1d Hc1u Hc1x Hc2set Hsanz Ha1 Ha2.
-    iIntros "#Hcode #Hstr Hsstr Hrun Hcont".
+    iIntros "#Hdp #Hcode #Hstr Hsstr Hrun Hcont".
     iDestruct (urun_stack with "Hrun") as %[Hal8 _].
     assert (Hapal : (uint (m !!! Regidx csp_rs1) - 48) mod 8 = 0)
       by (rewrite Zminus_mod Hal8; reflexivity).
@@ -6839,11 +6884,11 @@ Section UkShDiagFprintf.
               a h m n Ha1 with "Hcode [Hsstr] Hrun Hcont").
     iIntros (h' m') "%Ha1' %Ha2' %Hra' Hu6 Hrun Hk".
     rewrite Ha2.
-    iApply (wp_kshd_vprintf_s N tx dqs Hpsok a len q f
+    iApply (wp_kshd_vprintf_s N tx dqs a len q f
               (uint (m !!! Regidx csp_rs1) - 48) sa (DfracOwn 1) slen sf
               h' m' n Ha0 Habnd Hq2 Hfq Hfsq Hpct Hc1d Hc1u Hc1x Hc2set
               Hapal Hsanz Ha1' Ha2'
-              with "Hcode Hstr Hu6 Hsstr Hrun").
+              with "Hdp Hcode Hstr Hu6 Hsstr Hrun").
     iIntros (h'' m'') "Hu6 Hsstr %Hcs Hrun".
     assert (Eret : ret_pc (m' !!! Regidx ra_idx)
                    = (mword_of_int 0x10cc : mword 64))
@@ -6913,10 +6958,18 @@ Section UkShDiagFmt.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
      hypothesis, so no lemma statement in this file names it and the ~570
      [urun] sites did not move; the program's kernel-side constructor
-     discharges it (ARM-a's generic instance is [psok := fun _ => True]).
-     exec is excluded by the minting law itself -- its bundle reads the key,
-     so its deposit is always the explicit disjunct of [UkRun.udepw]. *)
-  Hypothesis Hpsok : forall k : Z, k <> USYS_exec -> psok k.
+     discharges it.
+     AT THE FREE NUMBERS AND NO MORE (lane SUPPLY-SPLIT).  It used to read
+     "every number but exec", which at the generic instance is true and at
+     a VERIFIED program's instance is not: a program whose supplier is the
+     application's ([AppInv.app_sup] -- for the echo application, the
+     TAINT) could only ever be entered tainted.  What a verified program
+     admits is [UexecSG.free_num] -- every number whose bundle is [emp],
+     plus chdir, whose branch is a closed fact -- and at
+     [UexecExecInst.uprogSG_free] this hypothesis is the identity.  A call
+     at a number OUTSIDE that set takes its own deposit as a premise
+     ([UkRun.udepw_law]) and is named at its site. *)
+  Hypothesis Hpsok_free : forall k : Z, free_num k -> psok k.
   (* the literal, cut out of the image the caller holds *)
   Lemma shd_fmt_str (gt : gname) (base : Z) (len : nat) :
     shd_fmt_ok base len = true ->
@@ -6980,10 +7033,18 @@ Section UkShDiagRun.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
      hypothesis, so no lemma statement in this file names it and the ~570
      [urun] sites did not move; the program's kernel-side constructor
-     discharges it (ARM-a's generic instance is [psok := fun _ => True]).
-     exec is excluded by the minting law itself -- its bundle reads the key,
-     so its deposit is always the explicit disjunct of [UkRun.udepw]. *)
-  Hypothesis Hpsok : forall k : Z, k <> USYS_exec -> psok k.
+     discharges it.
+     AT THE FREE NUMBERS AND NO MORE (lane SUPPLY-SPLIT).  It used to read
+     "every number but exec", which at the generic instance is true and at
+     a VERIFIED program's instance is not: a program whose supplier is the
+     application's ([AppInv.app_sup] -- for the echo application, the
+     TAINT) could only ever be entered tainted.  What a verified program
+     admits is [UexecSG.free_num] -- every number whose bundle is [emp],
+     plus chdir, whose branch is a closed fact -- and at
+     [UexecExecInst.uprogSG_free] this hypothesis is the identity.  A call
+     at a number OUTSIDE that set takes its own deposit as a premise
+     ([UkRun.udepw_law]) and is named at its site. *)
+  Hypothesis Hpsok_free : forall k : Z, free_num k -> psok k.
 
   Local Notation ra_idx := (mword_of_int 1 : mword 5).
   Local Notation s0_idx := (mword_of_int 8 : mword 5).
@@ -7037,6 +7098,7 @@ Section UkShDiagRun.
     (* the argument *)
     sa <> 0 ->
     m !!! Regidx a2_idx = mword_of_int sa ->
+    UkSh.sh_deps -∗
     shk_code γt -∗
     shk_rodata γt -∗
     shd_str γt γd tx dqs sa slen sf -∗
@@ -7053,7 +7115,7 @@ Section UkShDiagRun.
   Proof.
     intros Hok Hnp Hfa0 Hfahi Hq2 Hpq Hps Hc1d Hc1u Hc1x Hc2set
            E0 E1 E2 E3 E4 Efa Ejf Eje Eret Hsanz Ha2.
-    iIntros "#Hcode #Hro Hsstr #Ci0 #Ci1 #Ci2 #Ci3 #Ci4 #Ci5 Hrun".
+    iIntros "#Hdp #Hcode #Hro Hsstr #Ci0 #Ci1 #Ci2 #Ci3 #Ci4 #Ci5 Hrun".
     iDestruct (shd_fmt_str γt fa flen Hok ltac:(lia) with "Hro") as "#Hfstr".
     (* ---- p0  auipc a1,0x1 ---- *)
     iApply (wp_uk_auipc N h m (mword_of_int p0) hi a1_idx
@@ -7123,12 +7185,12 @@ Section UkShDiagRun.
                      ltac:(vm_compute; discriminate)).
       exact Ha2. }
     (* ---- fprintf(2, <fmt>, <the string>) ---- *)
-    iApply (wp_kshd_fprintf_s N tx dqs Hpsok fa flen fq (shd_lit fa)
+    iApply (wp_kshd_fprintf_s N tx dqs fa flen fq (shd_lit fa)
               sa slen sf h4 m4 n
               Hfa0 Hfahi Hq2 Hpq Hps
               (fun j Hj Hne => shd_nopct_ok fa flen fq j Hnp Hj Hne)
               Hc1d Hc1u Hc1x Hc2set Hsanz Ha1_4 Ha2_4
-              with "Hcode Hfstr Hsstr Hrun").
+              with "Hdp Hcode Hfstr Hsstr Hrun").
     iIntros (h5 m5) "_ _ Hrun".
     rewrite Hra4 Eret.
     (* ---- p4  c.li a0,<k> ---- *)
@@ -7172,6 +7234,7 @@ Section UkShDiagRun.
       (h : CpuId) (m : regfile) (n : nat) :
     sa <> 0 ->
     m !!! Regidx a0_idx = mword_of_int sa ->
+    UkSh.sh_deps -∗
     shk_code γt -∗
     shk_rodata γt -∗
     shd_str γt γd tx dqs sa slen sf -∗
@@ -7180,7 +7243,7 @@ Section UkShDiagRun.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hsanz Ha0.
-    iIntros "#Hcode #Hro Hsstr Hrun".
+    iIntros "#Hdp #Hcode #Hro Hsstr Hrun".
     rewrite shd_pin_panic.
     iDestruct (urun_stack with "Hrun") as %[Hal8' Hroom'].
     remember (m !!! Regidx csp_rs1) as sp0 eqn:Hsp0e.
@@ -7314,7 +7377,7 @@ Section UkShDiagRun.
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               Hsanz Ha2_3
-              with "Hcode Hro Hsstr [] [] [] [] [] [] Hrun").
+              with "Hdp Hcode Hro Hsstr [] [] [] [] [] [] Hrun").
     { iApply (uis_shk_54 with "Hcode"). }
     { iApply (uis_shk_58 with "Hcode"). }
     { iApply (uis_shk_5c with "Hcode"). }
@@ -7350,10 +7413,18 @@ Section UkShDiagLeaf.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
      hypothesis, so no lemma statement in this file names it and the ~570
      [urun] sites did not move; the program's kernel-side constructor
-     discharges it (ARM-a's generic instance is [psok := fun _ => True]).
-     exec is excluded by the minting law itself -- its bundle reads the key,
-     so its deposit is always the explicit disjunct of [UkRun.udepw]. *)
-  Hypothesis Hpsok : forall k : Z, k <> USYS_exec -> psok k.
+     discharges it.
+     AT THE FREE NUMBERS AND NO MORE (lane SUPPLY-SPLIT).  It used to read
+     "every number but exec", which at the generic instance is true and at
+     a VERIFIED program's instance is not: a program whose supplier is the
+     application's ([AppInv.app_sup] -- for the echo application, the
+     TAINT) could only ever be entered tainted.  What a verified program
+     admits is [UexecSG.free_num] -- every number whose bundle is [emp],
+     plus chdir, whose branch is a closed fact -- and at
+     [UexecExecInst.uprogSG_free] this hypothesis is the identity.  A call
+     at a number OUTSIDE that set takes its own deposit as a premise
+     ([UkRun.udepw_law]) and is named at its site. *)
+  Hypothesis Hpsok_free : forall k : Z, free_num k -> psok k.
 
   Local Notation s1_idx := (mword_of_int 9 : mword 5).
   Local Notation a0_idx := (mword_of_int 10 : mword 5).
@@ -7378,6 +7449,7 @@ Section UkShDiagLeaf.
   Lemma ush_diag_leaf_holds :
     forall (N : uk_names Σ) `{!ukn_const N} (h : CpuId) (m : regfile) (pc : Z) (n : nat),
       ush_diag_at pc m ->
+      UkSh.sh_deps -∗
       shk_code (ukn_t N) -∗
       shk_rodata (ukn_t N) -∗
       ush_diag_res (ukn_d N) pc m -∗
@@ -7385,7 +7457,7 @@ Section UkShDiagLeaf.
       WP (Loop : expr riscv_lang).
   Proof.
     intros N Hti h m pc n Hat.
-    iIntros "#Hcode #Hro Hres Hrun".
+    iIntros "#Hdp #Hcode #Hro Hres Hrun".
     destruct Hat as [ [-> Hmsg] | [ [-> Hal] | [-> Hal] ] ].
     - (* =============== panic, at one of the three messages =============== *)
       rewrite ush_diag_res_panic.
@@ -7401,24 +7473,24 @@ Section UkShDiagLeaf.
       + iDestruct (shd_msg_str (ukn_t N) (ukn_d N) DfracDiscarded 0x1298 4%nat
                      ltac:(vm_compute; reflexivity) ltac:(lia)
                      with "Hro") as "#Hs".
-        iApply (wp_kshd_panic N Hpsok true DfracDiscarded 0x1298 4%nat (shd_lit 0x1298)
+        iApply (wp_kshd_panic N true DfracDiscarded 0x1298 4%nat (shd_lit 0x1298)
                   h m n ltac:(lia)
                   (Hmoi 0x1298 Hm1)
-                  with "Hcode Hro Hs Hrun").
+                  with "Hdp Hcode Hro Hs Hrun").
       + iDestruct (shd_msg_str (ukn_t N) (ukn_d N) DfracDiscarded 0x12a0 6%nat
                      ltac:(vm_compute; reflexivity) ltac:(lia)
                      with "Hro") as "#Hs".
-        iApply (wp_kshd_panic N Hpsok true DfracDiscarded 0x12a0 6%nat (shd_lit 0x12a0)
+        iApply (wp_kshd_panic N true DfracDiscarded 0x12a0 6%nat (shd_lit 0x12a0)
                   h m n ltac:(lia)
                   (Hmoi 0x12a0 Hm1)
-                  with "Hcode Hro Hs Hrun").
+                  with "Hdp Hcode Hro Hs Hrun").
       + iDestruct (shd_msg_str (ukn_t N) (ukn_d N) DfracDiscarded 0x12c8 4%nat
                      ltac:(vm_compute; reflexivity) ltac:(lia)
                      with "Hro") as "#Hs".
-        iApply (wp_kshd_panic N Hpsok true DfracDiscarded 0x12c8 4%nat (shd_lit 0x12c8)
+        iApply (wp_kshd_panic N true DfracDiscarded 0x12c8 4%nat (shd_lit 0x12c8)
                   h m n ltac:(lia)
                   (Hmoi 0x12c8 Hm1)
-                  with "Hcode Hro Hs Hrun").
+                  with "Hdp Hcode Hro Hs Hrun").
     - (* ================ 0xda: "exec %s failed" ================ *)
       rewrite /ush_diag_res.
       destruct (decide ((0xda : Z) = 0xda)) as [_ | Hc];
@@ -7450,7 +7522,7 @@ Section UkShDiagLeaf.
       iDestruct (shd_str_of_ustr (ukn_t N) (ukn_d N) DfracDiscarded (ua_ptr x) (ua_len x)
                    (ua_bytes x)
                    with "Hxs") as "#Hs".
-      iApply (wp_kshd_die N Hpsok false DfracDiscarded
+      iApply (wp_kshd_die N false DfracDiscarded
                 0xdc 0xe0 0xe4 0xe6 0xea 0xec
                 (mword_of_int 1 : mword 20) (mword_of_int 460 : mword 12)
                 (mword_of_int 4036 : mword 21) (mword_of_int 2970 : mword 21)
@@ -7477,7 +7549,7 @@ Section UkShDiagLeaf.
                 ltac:(apply bv_eq; vm_compute; reflexivity)
                 ltac:(lia)
                 ltac:(exact (upd_eq m (Regidx a2_idx) (regval_into_reg _)))
-                with "Hcode Hro Hs [] [] [] [] [] [] Hrun").
+                with "Hdp Hcode Hro Hs [] [] [] [] [] [] Hrun").
       { iApply (uis_shk_dc with "Hcode"). }
       { iApply (uis_shk_e0 with "Hcode"). }
       { iApply (uis_shk_e4 with "Hcode"). }
@@ -7517,7 +7589,7 @@ Section UkShDiagLeaf.
       iDestruct (shd_str_of_ustr (ukn_t N) (ukn_d N) DfracDiscarded (ua_ptr x) (ua_len x)
                    (ua_bytes x)
                    with "Hxs") as "#Hs".
-      iApply (wp_kshd_die N Hpsok false DfracDiscarded
+      iApply (wp_kshd_die N false DfracDiscarded
                 0x110 0x114 0x118 0x11a 0x11e 0x120
                 (mword_of_int 1 : mword 20) (mword_of_int 424 : mword 12)
                 (mword_of_int 3984 : mword 21) (mword_of_int 2918 : mword 21)
@@ -7544,7 +7616,7 @@ Section UkShDiagLeaf.
                 ltac:(apply bv_eq; vm_compute; reflexivity)
                 ltac:(lia)
                 ltac:(exact (upd_eq m (Regidx a2_idx) (regval_into_reg _)))
-                with "Hcode Hro Hs [] [] [] [] [] [] Hrun").
+                with "Hdp Hcode Hro Hs [] [] [] [] [] [] Hrun").
       { iApply (uis_shk_110 with "Hcode"). }
       { iApply (uis_shk_114 with "Hcode"). }
       { iApply (uis_shk_118 with "Hcode"). }
@@ -7570,6 +7642,9 @@ Section UkShDiagLeaf.
     forall (N : uk_names Σ) `{!ukn_const N} (h : CpuId) (m : regfile) (t szv : Z)
            (ld : list fdstate) (n : nat),
       m !!! Regidx a0_idx = (mword_of_int t : mword 64) ->
+      (* the three deposits sh owes, passed straight through to the
+         diagnostic leaf this lemma discharges ([UkSh.sh_deps]) *)
+      UkSh.sh_deps -∗
       shk_code (ukn_t N) -∗
       (* the exec deposit's two suppliers -- see [wp_kshr_runcmd]: this
          record's own payload, and the trivial one its forks run at *)
@@ -7582,12 +7657,13 @@ Section UkShDiagLeaf.
       urun N h m (mword_of_int ShSyms.runcmd)
         (6 * ush_ht c + (2 + (ush_Dg + n))) -∗
       WP (Loop : expr riscv_lang).
-  Proof. exact (wp_kshr_runcmd ush_Dg Hpsok ush_diag_leaf_holds c). Qed.
+  Proof. exact (wp_kshr_runcmd ush_Dg Hpsok_free ush_diag_leaf_holds c). Qed.
 
   Lemma wp_kshr_fork1_final (N : uk_names Σ) `{!ukn_const N}
       (P : gname -> gname -> gname -> iProp Σ) `{FP : !Forkable P}
       (szv : Z) (l : list fdstate) (D : gmap nat fdstate)
       (h : CpuId) (m : regfile) (n : nat) :
+    UkSh.sh_deps -∗
     shk_code (ukn_t N) -∗ shk_rodata (ukn_t N) -∗ P (ukn_t N) (ukn_d N) (ukn_s N) -∗ usz (ukn_s N) szv -∗
     UserFd.ustd (ukn_fd N) l -∗
     UserCwd.ucwd_any (ukn_cwd N) -∗

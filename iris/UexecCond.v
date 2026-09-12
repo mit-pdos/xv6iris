@@ -261,32 +261,48 @@ Section UexecCond.
      so a key that somehow satisfied two gates would simply take the first.
      Adding the next verified program is one more [destruct]. *)
   (* the gate's yes branch: sync's own slot *)
-  Lemma sync_gate_slot (W : uvis) :
-    (forall k : Z, k <> USYS_exec -> psok k) ->
-    sync_gate W -> udep -∗ my_pay (uvis_gen W) (fun _ => True)%I -∗ uslot W.
+  (* ...AT A SECOND [uprogSG] INSTANCE, EXPLICIT (lane SUPPLY-SPLIT, P3).
+     The verified arms are for programs whose supplier is NOT the
+     application's ([UexecExecInst.uprogSG_free] is the one they run at),
+     while the generic tail below is at the ambient instance -- so the
+     instance cannot be ambient here, and this file sits below
+     [UexecExecInst] and may not name the free one.  What it takes instead
+     is ANY instance that admits the free numbers, which is exactly what
+     the two constructors need. *)
+  Lemma sync_gate_slot (PF : uprogSG Σ) (W : uvis) :
+    (forall k : Z, free_num k -> @psok Σ PF k) ->
+    sync_gate W -> udep (PS := PF) -∗ my_pay (uvis_gen W) (fun _ => True)%I -∗ uslot W.
   Proof.
-    intros Hpsok (Hteq & Hpc & Hxo & Hroom & Hal8 & Hstk & Hfdlen & Hlzf
-                  & Hstop).
-    exact (sync_uexec_slot W Hpc
+    intros Hpsok_free (Hteq & Hpc & Hxo & Hroom & Hal8 & Hstk & Hfdlen & Hlzf
+                      & Hstop).
+    exact (sync_uexec_slot (PS := PF) W Hpc
              (text_region_eq_uimg_sub (uvis_M W) Hteq)
              (sync_xopage_addrs (uvis_perm W) Hxo)
              Hroom Hal8 (sync_stkdata_all W Hstk) Hfdlen
-             (ustop_gate_at W Hstop) Hpsok Hlzf).
+             (ustop_gate_at W Hstop) Hpsok_free Hlzf).
   Qed.
 
   (* ...and echo's *)
-  Lemma echo_gate_slot (W : uvis) :
-    (forall k : Z, k <> USYS_exec -> psok k) ->
-    echo_gate W -> udep -∗ my_pay (uvis_gen W) (fun _ => True)%I -∗ uslot W.
+  (* ...and echo's, which owes ONE deposit besides: its output is
+     write(16), the one number whose branch is the write chain at a key
+     whose fd may be an inode, so the free supply does not admit it.  The
+     premise is that deposit and nothing else -- E5's output lane is what
+     discharges it from the echo application's own claim; the generic mint
+     below pays it out of [AppInv.app_sup], which is all a process entering
+     on the generic path ever had. *)
+  Lemma echo_gate_slot (PF : uprogSG Σ) (W : uvis) :
+    echo_gate W ->
+    udepw_law (PS := PF) 16 -∗
+    udep (PS := PF) -∗ my_pay (uvis_gen W) (fun _ => True)%I -∗ uslot W.
   Proof.
-    intros Hpsok (Hteq & Hpc & Hxo & Hroom & Hal8 & Hstk & Hargs & Havd & Havs
+    intros (Hteq & Hpc & Hxo & Hroom & Hal8 & Hstk & Hargs & Havd & Havs
             & Hfdlen & Hlzf & Hstop).
-    exact (echo_uexec_slot W Hpc
+    exact (echo_uexec_slot (PS := PF) W Hpc
              (text_region_eq_of_uimg_sub EchoInstrs.echo_bytes (uvis_M W) Hteq)
              (sync_xopage_addrs (uvis_perm W) Hxo)
              Hroom Hal8 (echo_stkdata_all W Hstk) Hargs
              (echo_avd_arr_all W Havd) (echo_avd_str_all W Havs) Hfdlen
-             (ustop_gate_at W Hstop) Hpsok Hlzf).
+             (ustop_gate_at W Hstop) Hlzf).
   Qed.
 
   (* THE SUPPLY REACHES EVERY BRANCH, not only the generic tail: sync and
@@ -303,19 +319,22 @@ Section UexecCond.
      run at this lane.  The kernel is what hands it in: [SpecKexec.
      exec_slot_pre]'s wands at an exec, the fork deposit's own premise at a
      fork, and [SpecUserinit] at boot. *)
-  Lemma cond_entry_slot (W : uvis) :
-    (* the numbers every branch may route through the supplier; the mint
-       sites see the instance and discharge it ([UexecSG.v]'s header for why
-       it travels beside [udep] rather than inside its law) *)
-    (forall k : Z, k <> USYS_exec -> psok k) ->
-    udep -∗ □ ssupply -∗ □ uexec_wp -∗
+  (* ...AND THE CHAIN, at the verified programs' OWN instance [PF] for the
+     two gated arms and at the ambient one for the generic tail.  The
+     [psok] blanket is gone: what the gated arms take is the FREE numbers'
+     admission, which every instance a verified program runs at grants by
+     construction, plus echo's one flagged deposit. *)
+  Lemma cond_entry_slot (PF : uprogSG Σ) (W : uvis) :
+    (forall k : Z, free_num k -> @psok Σ PF k) ->
+    udepw_law (PS := PF) 16 -∗
+    udep (PS := PF) -∗ □ ssupply -∗ □ uexec_wp -∗
     my_pay (uvis_gen W) (fun _ => True)%I -∗ uslot W.
   Proof.
-    intros Hpsok. iIntros "#Hdep #Hsup #Hgen #Hpay".
+    intros Hpsok_free. iIntros "#Hwr #Hdep #Hsup #Hgen #Hpay".
     destruct (decide (sync_gate W)) as [Hgate | _].
-    { iApply (sync_gate_slot W Hpsok Hgate with "Hdep Hpay"). }
+    { iApply (sync_gate_slot PF W Hpsok_free Hgate with "Hdep Hpay"). }
     destruct (decide (echo_gate W)) as [Hgate | _].
-    { iApply (echo_gate_slot W Hpsok Hgate with "Hdep Hpay"). }
+    { iApply (echo_gate_slot PF W Hgate with "Hwr Hdep Hpay"). }
     iApply (uexec_wp_uslot_triv W with "Hsup Hgen Hpay").
   Qed.
 

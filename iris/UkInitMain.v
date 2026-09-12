@@ -100,10 +100,18 @@ Section UkInitMain.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
      hypothesis, so no lemma statement in this file names it and the ~570
      [urun] sites did not move; the program's kernel-side constructor
-     discharges it (ARM-a's generic instance is [psok := fun _ => True]).
-     exec is excluded by the minting law itself -- its bundle reads the key,
-     so its deposit is always the explicit disjunct of [UkRun.udepw]. *)
-  Hypothesis Hpsok : forall k : Z, k <> USYS_exec -> psok k.
+     discharges it.
+     AT THE FREE NUMBERS AND NO MORE (lane SUPPLY-SPLIT).  It used to read
+     "every number but exec", which at the generic instance is true and at
+     a VERIFIED program's instance is not: a program whose supplier is the
+     application's ([AppInv.app_sup] -- for the echo application, the
+     TAINT) could only ever be entered tainted.  What a verified program
+     admits is [UexecSG.free_num] -- every number whose bundle is [emp],
+     plus chdir, whose branch is a closed fact -- and at
+     [UexecExecInst.uprogSG_free] this hypothesis is the identity.  A call
+     at a number OUTSIDE that set takes its own deposit as a premise
+     ([UkRun.udepw_law]) and is named at its site. *)
+  Hypothesis Hpsok_free : forall k : Z, free_num k -> psok k.
 
   Local Notation ra_idx := (mword_of_int 1 : mword 5).
   Local Notation s0_idx := (mword_of_int 8 : mword 5).
@@ -147,11 +155,12 @@ Section UkInitMain.
   (* why they need no frame word and no register fact beyond the budget.     *)
   (* --------------------------------------------------------------------- *)
   Lemma wp_kinit_main_die_df (N' : uk_names Σ) `{!ukn_const N'} (hdf : CpuId) (mdf0 : regfile) (n : nat) :
+    udepw_law 16 -∗
     init_code (ukn_t N') -∗ init_rodata (ukn_t N') -∗
     urun N' hdf mdf0 (mword_of_int 0x84) (12 + (12 + (4 + n))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcode #Hro Hrun".
+    iIntros "#Hwr #Hcode #Hro Hrun".
     destruct init_syms_pins
       as (_ & _ & Hprintf & _ & _ & _ & _ & _ & _ & _ & _ & _ & Hexit).
     assert (Hokdf : init_lit_ok 0x990 18%nat = true)
@@ -216,10 +225,10 @@ Section UkInitMain.
     { rewrite /df3 (upd_ne df2 (Regidx ra_idx) (Regidx a0_idx) _
                       ltac:(vm_compute; discriminate)).
       rewrite /df2. exact (upd_eq df1 (Regidx a0_idx) (regval_into_reg _)). }
-    iApply (wp_kinit_printf N' Hpsok 0x990 18%nat (init_lit 0x990) hdf3 df3 n
+    iApply (wp_kinit_printf N' 0x990 18%nat (init_lit 0x990) hdf3 df3 n
               ltac:(vm_compute; discriminate)
               ltac:(vm_compute; reflexivity) ltac:(lia) (fun j Hj => init_lit_nopct 0x990 18%nat j Hokdf Hj) Ha0df
-              with "Hcode Hstrdf Hrun").
+              with "Hwr Hcode Hstrdf Hrun").
     iIntros (hdf4 df4) "%Hcsdf Hrun".
     assert (Eretdf : ret_pc (df3 !!! Regidx ra_idx)
                      = (mword_of_int 0x90 : mword 64))
@@ -255,11 +264,12 @@ Section UkInitMain.
   Qed.
 
   Lemma wp_kinit_main_die_de (N' : uk_names Σ) `{!ukn_const N'} (hde : CpuId) (mde0 : regfile) (n : nat) :
+    udepw_law 16 -∗
     init_code (ukn_t N') -∗ init_rodata (ukn_t N') -∗
     urun N' hde mde0 (mword_of_int 0xaa) (12 + (12 + (4 + n))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcode #Hro Hrun".
+    iIntros "#Hwr #Hcode #Hro Hrun".
     destruct init_syms_pins
       as (_ & _ & Hprintf & _ & _ & _ & _ & _ & _ & _ & _ & _ & Hexit).
     assert (Hokde : init_lit_ok 0x9b0 21%nat = true)
@@ -324,10 +334,10 @@ Section UkInitMain.
     { rewrite /de3 (upd_ne de2 (Regidx ra_idx) (Regidx a0_idx) _
                       ltac:(vm_compute; discriminate)).
       rewrite /de2. exact (upd_eq de1 (Regidx a0_idx) (regval_into_reg _)). }
-    iApply (wp_kinit_printf N' Hpsok 0x9b0 21%nat (init_lit 0x9b0) hde3 de3 n
+    iApply (wp_kinit_printf N' 0x9b0 21%nat (init_lit 0x9b0) hde3 de3 n
               ltac:(vm_compute; discriminate)
               ltac:(vm_compute; reflexivity) ltac:(lia) (fun j Hj => init_lit_nopct 0x9b0 21%nat j Hokde Hj) Ha0de
-              with "Hcode Hstrde Hrun").
+              with "Hwr Hcode Hstrde Hrun").
     iIntros (hde4 de4) "%Hcsde Hrun".
     assert (Eretde : ret_pc (de3 !!! Regidx ra_idx)
                      = (mword_of_int 0xb6 : mword 64))
@@ -363,11 +373,12 @@ Section UkInitMain.
   Qed.
 
   Lemma wp_kinit_main_die_dw (N' : uk_names Σ) `{!ukn_const N'} (hdw : CpuId) (mdw0 : regfile) (n : nat) :
+    udepw_law 16 -∗
     init_code (ukn_t N') -∗ init_rodata (ukn_t N') -∗
     urun N' hdw mdw0 (mword_of_int 0x52) (12 + (12 + (4 + n))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcode #Hro Hrun".
+    iIntros "#Hwr #Hcode #Hro Hrun".
     destruct init_syms_pins
       as (_ & _ & Hprintf & _ & _ & _ & _ & _ & _ & _ & _ & _ & Hexit).
     assert (Hokdw : init_lit_ok 0x9c8 29%nat = true)
@@ -432,10 +443,10 @@ Section UkInitMain.
     { rewrite /dw3 (upd_ne dw2 (Regidx ra_idx) (Regidx a0_idx) _
                       ltac:(vm_compute; discriminate)).
       rewrite /dw2. exact (upd_eq dw1 (Regidx a0_idx) (regval_into_reg _)). }
-    iApply (wp_kinit_printf N' Hpsok 0x9c8 29%nat (init_lit 0x9c8) hdw3 dw3 n
+    iApply (wp_kinit_printf N' 0x9c8 29%nat (init_lit 0x9c8) hdw3 dw3 n
               ltac:(vm_compute; discriminate)
               ltac:(vm_compute; reflexivity) ltac:(lia) (fun j Hj => init_lit_nopct 0x9c8 29%nat j Hokdw Hj) Ha0dw
-              with "Hcode Hstrdw Hrun").
+              with "Hwr Hcode Hstrdw Hrun").
     iIntros (hdw4 dw4) "%Hcsdw Hrun".
     assert (Eretdw : ret_pc (dw3 !!! Regidx ra_idx)
                      = (mword_of_int 0x5e : mword 64))
@@ -494,6 +505,7 @@ Section UkInitMain.
        hands the new image ([UkInit.init_exec_sup_pos]) and what a KILL
        gives init back ([UexecRet.uexec_pay_arm]). *)
     ukn_pay N' = ucons_pay cn γ T ->
+    init_deps T -∗
     init_code (ukn_t N') -∗
     (* the exec deposit's supplier -- [UkInit.init_exec_sup]: init's child
        arm ecalls exec("sh", argv), whose bundle READS THE KEY (the path
@@ -536,7 +548,7 @@ Section UkInitMain.
        read the exit status ([UserConsole.ucons_pay_const]) *)
     pose proof (ukn_const_of_eq N' (ucons_pay cn γ T) Hpeq
                   (ucons_pay_const cn γ T)) as Hcst'.
-    iIntros "#Hcode #Hxs #Hro #Hargv Hcwd Hstd Hpos Hrun".
+    iIntros "#(Hwr & Hwl15 & Hwl17) #Hcode #Hxs #Hro #Hargv Hcwd Hstd Hpos Hrun".
     destruct init_syms_pins
       as (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Hexec & _ & _).
     (* ---- 0x96  auipc a1,0x1 ---- *)
@@ -663,7 +675,7 @@ Section UkInitMain.
       by (rewrite Hrac5; apply bv_eq; vm_compute; reflexivity).
     rewrite Eretc.
     (* ---- 0xaa  "init: exec sh failed" ; exit(1) ---- *)
-    iApply (wp_kinit_main_die_de N' hc6 _ n with "Hcode Hro Hrun").
+    iApply (wp_kinit_main_die_de N' hc6 _ n with "Hwr Hcode Hro Hrun").
   Qed.
 
 
@@ -908,6 +920,7 @@ Section UkInitMain.
   (* --------------------------------------------------------------------- *)
   Lemma wp_kinit_main_loop (T : iProp Σ) `{!Persistent T} `{!Timeless T}
       (stc : fdstate) (cn : cons_names) (szv : Z) (n : nat) :
+    init_deps T -∗
     init_code γt -∗
     (* the exec deposit's supplier -- [UkInit.init_exec_sup]: init's child
        arm ecalls exec("sh", argv), whose bundle READS THE KEY (the path
@@ -955,7 +968,7 @@ Section UkInitMain.
           urun N h m (mword_of_int 0x44) (12 + (12 + (4 + n))) -∗
           WP (Loop : expr riscv_lang))).
   Proof.
-    iIntros "#Hcode #Hxs #Hro #Hargv".
+    iIntros "#(Hwr & Hwl15 & Hwl17) #Hcode #Hxs #Hro #Hargv".
     destruct init_syms_pins
       as (_ & _ & Hprintf & _ & _ & _ & _ & _ & Hfork & Hwait & _ & _ & _).
     assert (HokS : init_lit_ok LIT_START 18%nat = true)
@@ -1003,12 +1016,12 @@ Section UkInitMain.
       { rewrite <- Ha0l1.
         exact (upd_ne ml1 (Regidx ra_idx) (Regidx a0_idx) _
                  ltac:(vm_compute; discriminate)). }
-      iApply (wp_kinit_printf N Hpsok LIT_START 18%nat (init_lit LIT_START)
+      iApply (wp_kinit_printf N LIT_START 18%nat (init_lit LIT_START)
                 hl2 ml2 n
                 ltac:(vm_compute; discriminate)
                 ltac:(vm_compute; reflexivity) ltac:(lia)
                 (fun j Hj => init_lit_nopct LIT_START 18%nat j HokS Hj) Ha0l2
-                with "Hcode HstrS Hrun").
+                with "Hwr Hcode HstrS Hrun").
       iIntros (hl3 ml3) "%Hcsl Hrun".
       assert (Eretl : ret_pc (ml2 !!! Regidx ra_idx)
                       = (mword_of_int 0x38 : mword 64))
@@ -1109,7 +1122,7 @@ Section UkInitMain.
                     with "[] Hrun").
           { iApply (uis_init_3e with "Hcode"). }
           iIntros (hp2) "Hrun".
-          iApply (wp_kinit_main_die_df N hp2 _ n with "Hcode Hro Hrun").
+          iApply (wp_kinit_main_die_df N hp2 _ n with "Hwr Hcode Hro Hrun").
         * (* fork succeeded: this is the parent, so a0 <> 0 too.
              THE LATER COMES FROM HERE.  The path 0x32 -> printf -> fork ->
              0x3c -> 0x42 -> 0x44 falls THROUGH into the wait head; it is
@@ -1240,7 +1253,7 @@ Section UkInitMain.
         { iApply (uis_init_42 with "Hck"). }
         iIntros (hc3) "Hrun".
         iApply (wp_kinit_main_child T stc cn γ np N' hc3 mc1 n Hpeq
-                  with "Hck Hxs Hrk Hak Hcwd Hstd Hpos Hrun").
+                  with "[$Hwr $Hwl15 $Hwl17] Hck Hxs Hrk Hak Hcwd Hstd Hpos Hrun").
     - (* ==================== the WAIT head @0x44 ==================== *)
       iIntros (h m cs γ γsh pidsh) "%Hs2 %Hs1 %Hin %Hpnz Hsz Hstd Hcwd Hch Htok Hrun".
       (* ---- 0x44  c.li a0,0 -- the NULL status pointer ---- *)
@@ -1300,7 +1313,7 @@ Section UkInitMain.
         rewrite (upd_eq m (Regidx a0_idx) (regval_into_reg _)).
         vm_compute. reflexivity. }
       (* ---- wait(0) ---- *)
-      iApply (wp_kinit_wait N Hpsok hw2 mw2 (12 + (12 + (4 + n))) cs Ha0w2
+      iApply (wp_kinit_wait N Hpsok_free hw2 mw2 (12 + (12 + (4 + n))) cs Ha0w2
                 with "Hcode Hrun Hch").
       iIntros (hw3 ret cs') "Hans Hrun Hch".
       assert (Eretw : ret_pc (mw2 !!! Regidx ra_idx)
@@ -1441,7 +1454,7 @@ Section UkInitMain.
                         = mword_of_int 0x52)
             by (apply bv_eq; vm_compute; reflexivity).
           iNext. rewrite E4e. iIntros (hw5) "Hrun".
-          iApply (wp_kinit_main_die_dw N hw5 _ n with "Hcode Hro Hrun").
+          iApply (wp_kinit_main_die_dw N hw5 _ n with "Hwr Hcode Hro Hrun").
   Qed.
 
 
@@ -1454,6 +1467,7 @@ Section UkInitMain.
       (stc : fdstate) (cn : cons_names)
       (szv : Z) (h : CpuId) (m : regfile) (n : nat) :
     stc <> FdClosed ->
+    init_deps T -∗
     init_code γt -∗
     (* the exec deposit's supplier -- [UkInit.init_exec_sup]: init's child
        arm ecalls exec("sh", argv), whose bundle READS THE KEY (the path
@@ -1476,7 +1490,7 @@ Section UkInitMain.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hne.
-    iIntros "#Hcode #Hxs #Hro #Hargv Hsz Hstd Hcwd Hch Htk Hrun".
+    iIntros "#(Hwr & Hwl15 & Hwl17) #Hcode #Hxs #Hro #Hargv Hsz Hstd Hcwd Hch Htk Hrun".
     destruct init_syms_pins
       as (_ & _ & _ & _ & _ & _ & _ & Hdup & _ & _ & _ & _ & _).
     (* ---- 0x1e  c.li a0,0 ---- *)
@@ -1516,7 +1530,7 @@ Section UkInitMain.
                       ltac:(vm_compute; discriminate)).
       rewrite /mq1 (upd_eq m (Regidx a0_idx) (regval_into_reg _)).
       vm_compute; reflexivity. }
-    iApply (wp_kinit_dup_head N Hpsok T stc hq2 mq2 (12 + (12 + (4 + n)))
+    iApply (wp_kinit_dup_head N Hpsok_free T stc hq2 mq2 (12 + (12 + (4 + n)))
               Hne Ha0q2 with "Hcode Hrun Hstd").
     iIntros (hq3 r1) "Hstd Hrun".
     assert (Eq2 : ret_pc (mq2 !!! Regidx ra_idx)
@@ -1562,7 +1576,7 @@ Section UkInitMain.
                       ltac:(vm_compute; discriminate)).
       rewrite /mq4 (upd_eq mq3 (Regidx a0_idx) (regval_into_reg _)).
       vm_compute; reflexivity. }
-    iApply (wp_kinit_dup_head N Hpsok T stc hq5 mq5 (12 + (12 + (4 + n)))
+    iApply (wp_kinit_dup_head N Hpsok_free T stc hq5 mq5 (12 + (12 + (4 + n)))
               Hne Ha0q5 with "Hcode Hrun Hstd").
     iIntros (hq6 r2) "Hstd Hrun".
     assert (Eq5 : ret_pc (mq5 !!! Regidx ra_idx)
@@ -1612,7 +1626,8 @@ Section UkInitMain.
     assert (Hs2q8 : mq8 !!! Regidx s2_idx = mword_of_int LIT_START)
       by exact (upd_eq mq7 (Regidx s2_idx) (regval_into_reg _)).
     (* ---- 0x32: the restart head, and main never comes back ---- *)
-    iDestruct (wp_kinit_main_loop T stc cn szv n with "Hcode Hxs Hro Hargv")
+    iDestruct (wp_kinit_main_loop T stc cn szv n
+                 with "[$Hwr $Hwl15 $Hwl17] Hcode Hxs Hro Hargv")
       as "[Hloop _]".
     iApply ("Hloop" $! hq8 mq8 with "[] Hsz Hstd Hcwd Hch Htk Hrun").
     iPureIntro. exact Hs2q8.
@@ -1638,6 +1653,7 @@ Section UkInitMain.
       (stc : fdstate) (cn : cons_names)
       (szv : Z) (h : CpuId) (m : regfile) (n : nat) :
     stc <> FdClosed ->
+    init_deps T -∗
     init_code γt -∗
     init_exec_sup_lend cn T stc -∗
     init_rodata γt -∗ init_argv γd -∗ usz γs szv -∗
@@ -1654,7 +1670,7 @@ Section UkInitMain.
   Proof.
     intros Hne.
     rewrite /uki_open2.
-    iIntros "#Hcode #Hxs #Hro #Hargv Hsz Hop2 Hin Hcwd Hch Htk Hrun".
+    iIntros "#(Hwr & Hwl15 & Hwl17) #Hcode #Hxs #Hro #Hargv Hsz Hop2 Hin Hcwd Hch Htk Hrun".
     destruct init_syms_pins
       as (_ & _ & _ & _ & _ & Hopen & _ & _ & _ & _ & _ & _ & _).
     set (mr4 := m). set (hr4 := h).
@@ -1756,13 +1772,14 @@ Section UkInitMain.
     { iApply (uis_init_82 with "Hcode"). }
     iIntros (hr8) "Hrun".
     iApply (wp_kinit_main_from_1e T stc cn szv hr8 mr7 n Hne
-              with "Hcode Hxs Hro Hargv Hsz Hstd Hcwd Hch Htk Hrun").
+              with "[$Hwr $Hwl15 $Hwl17] Hcode Hxs Hro Hargv Hsz Hstd Hcwd Hch Htk Hrun").
   Qed.
 
   Lemma wp_kinit_main_repair (T K : iProp Σ) `{!Persistent T} `{!Timeless T}
       (stc : fdstate) (cn : cons_names)
       (szv : Z) (h : CpuId) (m : regfile) (n : nat) :
     stc <> FdClosed ->
+    init_deps T -∗
     init_code γt -∗
     (* the exec deposit's supplier -- [UkInit.init_exec_sup] *)
     init_exec_sup_lend cn T stc -∗
@@ -1784,7 +1801,7 @@ Section UkInitMain.
   Proof.
     intros Hne.
     rewrite /init_cons_leaves /uki_cons_in.
-    iIntros "#Hcode #Hxs [#Habs #Hmkl] #Hro #Hargv Hsz Hin Hcwd Hch Htk Hrun".
+    iIntros "#(Hwr & Hwl15 & Hwl17) #Hcode #Hxs [#Habs #Hmkl] #Hro #Hargv Hsz Hin Hcwd Hch Htk Hrun".
     destruct init_syms_pins
       as (_ & _ & _ & _ & _ & Hopen & Hmknod & _ & _ & _ & _ & _ & _).
     (* ---- 0x64  c.li a2,0 ---- *)
@@ -1890,19 +1907,21 @@ Section UkInitMain.
       rewrite Er3.
       iAssert (uki_open2 N T stc) with "[Hans]" as "Hop2".
       { iDestruct "Hans" as "[Hc | [HK | HT]]".
-        - iApply (uki_open2_of_console N Hpsok T stc with "Hc").
-        - iApply (uki_open2_of_absent N Hpsok T K stc with "Habs HK").
-        - iApply (uki_open2_taint_arm N Hpsok T stc with "HT"). }
+        - iApply (uki_open2_of_console N T stc with "Hwl15 Hc").
+        - iApply (uki_open2_of_absent N T K stc with "Hwl15 Habs HK").
+        - iApply (uki_open2_taint_arm N T stc with "Hwl15 HT"). }
       iApply (wp_kinit_main_repair_tail T stc cn szv hr4 _ n Hne
-                with "Hcode Hxs Hro Hargv Hsz Hop2 [Hstd] Hcwd Hch Htk Hrun").
+                with "[$Hwr $Hwl15 $Hwl17] Hcode Hxs Hro Hargv Hsz Hop2 [Hstd] Hcwd Hch Htk Hrun").
       rewrite /uki_open2_in. by iLeft.
-    - iApply (wp_kinit_mknod N Hpsok hr3 mr3 (12 + (12 + (4 + n)))
-                with "Hcode Hrun").
+    - (* the TAINT branch's mknod: 17's deposit off the taint (P4) *)
+      iDestruct ("Hwl17" with "HT") as "#Hwr17".
+      iApply (wp_kinit_mknod N hr3 mr3 (12 + (12 + (4 + n)))
+                with "Hwr17 Hcode Hrun").
       iIntros (hr4 rr1) "Hrun".
       rewrite Er3.
       iApply (wp_kinit_main_repair_tail T stc cn szv hr4 _ n Hne
-                with "Hcode Hxs Hro Hargv Hsz [] [Hstd] Hcwd Hch Htk Hrun").
-      { iApply (uki_open2_taint_arm N Hpsok T stc with "HT"). }
+                with "[$Hwr $Hwl15 $Hwl17] Hcode Hxs Hro Hargv Hsz [] [Hstd] Hcwd Hch Htk Hrun").
+      { iApply (uki_open2_taint_arm N T stc with "Hwl15 HT"). }
       rewrite /uki_open2_in. iRight. iFrame "Hstd HT".
   Qed.
 
@@ -1922,6 +1941,7 @@ Section UkInitMain.
       (stc : fdstate) (cn : cons_names)
       (szv : Z) (h : CpuId) (m : regfile) (n : nat) :
     stc <> FdClosed ->
+    init_deps T -∗
     init_code γt -∗
     (* the exec deposit's supplier -- [UkInit.init_exec_sup]: init's child
        arm ecalls exec("sh", argv), whose bundle READS THE KEY (the path
@@ -1950,7 +1970,7 @@ Section UkInitMain.
   Proof.
     intros Hne.
     rewrite /init_cons_leaves.
-    iIntros "#Hcode #Hxs [#Habs #Hmkl] #Hro #Hargv Hsz Hstd HK Hcwd Hch Htk Hrun".
+    iIntros "#(Hwr & Hwl15 & Hwl17) #Hcode #Hxs [#Habs #Hmkl] #Hro #Hargv Hsz Hstd HK Hcwd Hch Htk Hrun".
     destruct init_syms_pins
       as (_ & Hmain & _ & _ & _ & Hopen & _ & _ & _ & _ & _ & _ & _).
     rewrite Hmain.
@@ -2179,7 +2199,7 @@ Section UkInitMain.
       { iApply (uis_init_1a with "Hcode"). }
       iIntros (hm11) "Hrun".
       iApply (wp_kinit_main_repair T K stc cn szv hm11 mm7 n Hne
-                with "Hcode Hxs [] Hro Hargv Hsz [Hstd HK] Hcwd Hch Htk Hrun").
+                with "[$Hwr $Hwl15 $Hwl17] Hcode Hxs [] Hro Hargv Hsz [Hstd HK] Hcwd Hch Htk Hrun").
       { rewrite /init_cons_leaves. iFrame "Habs Hmkl". }
       { rewrite /uki_cons_in. iLeft. iFrame "Hstd HK". }
     - (* THE TAINT: nothing is known about the return value, so both ways
@@ -2194,7 +2214,7 @@ Section UkInitMain.
         { iApply (uis_init_1a with "Hcode"). }
         iIntros (hm11) "Hrun".
         iApply (wp_kinit_main_repair T K stc cn szv hm11 mm7 n Hne
-                  with "Hcode Hxs [] Hro Hargv Hsz [Hstd] Hcwd Hch Htk Hrun").
+                  with "[$Hwr $Hwl15 $Hwl17] Hcode Hxs [] Hro Hargv Hsz [Hstd] Hcwd Hch Htk Hrun").
         { rewrite /init_cons_leaves. iFrame "Habs Hmkl". }
         { rewrite /uki_cons_in. iRight. iFrame "Hstd HT". }
       + iApply (wp_uk_btype0 N hm10 mm7 (mword_of_int 0x1a)
@@ -2210,7 +2230,7 @@ Section UkInitMain.
           by (apply bv_eq; vm_compute; reflexivity).
         rewrite E1a. iIntros (hm11) "Hrun".
         iApply (wp_kinit_main_from_1e T stc cn szv hm11 mm7 n Hne
-                  with "Hcode Hxs Hro Hargv Hsz [Hstd] Hcwd Hch Htk Hrun").
+                  with "[$Hwr $Hwl15 $Hwl17] Hcode Hxs Hro Hargv Hsz [Hstd] Hcwd Hch Htk Hrun").
         iDestruct "Hstd" as (l) "Hstd".
         iApply (ufd_head_taint with "HT Hstd").
   Qed.
@@ -2237,6 +2257,7 @@ Section UkInitMain.
       (stc : fdstate) (cn : cons_names)
       (szv : Z) (h : CpuId) (m : regfile) (n : nat) :
     stc <> FdClosed ->
+    init_deps T -∗
     init_code γt -∗
     (* the exec deposit's supplier -- [UkInit.init_exec_sup]: init's child
        arm ecalls exec("sh", argv), whose bundle READS THE KEY (the path
@@ -2261,7 +2282,7 @@ Section UkInitMain.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hne.
-    iIntros "#Hcode #Hxs #Hcl #Hro #Hargv Hsz Hstd HK Hcwd Hch Htk Hrun".
+    iIntros "#(Hwr & Hwl15 & Hwl17) #Hcode #Hxs #Hcl #Hro #Hargv Hsz Hstd HK Hcwd Hch Htk Hrun".
     destruct init_syms_pins
       as (Hstart & Hmain & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _).
     rewrite Hstart.
@@ -2374,7 +2395,7 @@ Section UkInitMain.
     { iApply (uis_init_c4 with "Hcode"). }
     iIntros (hs4) "Hrun".
     iApply (wp_kinit_main T K stc cn szv hs4 _ n Hne
-              with "Hcode Hxs Hcl Hro Hargv Hsz Hstd HK Hcwd Hch Htk Hrun").
+              with "[$Hwr $Hwl15 $Hwl17] Hcode Hxs Hcl Hro Hargv Hsz Hstd HK Hcwd Hch Htk Hrun").
   Qed.
 
 End UkInitMain.

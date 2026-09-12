@@ -244,17 +244,24 @@ Section UInitKernel.
        is at that inum -- which is what makes the exec of the RELATIVE
        "sh" name a file, and what init's exec supply is stated at. *)
     uvis_cwd W = FsImg.ROOTINO ->
-    (* the numbers init admits ([UexecSG.uprogSG]'s [psok]) *)
-    (forall k : Z, k <> USYS_exec -> psok k) ->
+    (* the numbers init admits ([UexecSG.uprogSG]'s [psok]) -- THE FREE
+       ONES (lane SUPPLY-SPLIT): what /init routes through
+       [UkRun.udep]'s minting law is wait(3) and dup(10), whose branches of
+       [UexecExecInst.xv6_sbundle] are [emp].  It used to read "every
+       number but exec", which is the GENERIC instance's [psok] and
+       therefore, at this application, the taint. *)
+    (forall k : Z, free_num k -> psok k) ->
     (* ...AND THE KEY'S LAZY BIT IS [false] (lane LAZY-FLAG, L6).  The U
        tier's run is at an EMPTY FILL ([UexecRet.ukcq] is hardwired at
        [false]), so a constructor can only build a slot for a key that says
        so.  WHO SUPPLIES IT: exec, whose fresh image is eager -- lane
        LAZY-FLAG's K4 puts [uvis_lazy W' = false] on
-       [SpecKexec.kexec_image_ok] and on [exec_slot_pre]'s two wands, and
-       until it lands this is a premise the caller carries. *)
+       [SpecKexec.kexec_image_ok] and on [exec_slot_pre]'s two wands. *)
     uvis_lazy W = false ->
-
+    (* ...AND THE THREE DEPOSITS IT DOES NOT ADMIT FREE: write(16) always,
+       open(15) and mknod(17) on the taint arms.  [UkInit.init_deps] is the
+       bundle and its header says who owes what. *)
+    UkInit.init_deps T -∗
     (* the ordinary deposit supplier... *)
     udep -∗
     (* ...and the EXEC supplier, which init's child arm spends on
@@ -288,8 +295,14 @@ Section UInitKernel.
     uslot W.
   Proof.
     intros Hne Hpc Hsub Hx Hwd Hszd Hbase Hal8 Hroom Hstk Hfdlen Hl0 Hstop Hcw
-           Hpsok Hlzf.
-    iIntros "#Hdep #Hxs #Hcl HK Hrd #Hmp".
+           Hpsok_free Hlzf.
+    (* [Hdp] LINEARLY, and that is not a style choice: [UkInit.init_deps]
+       is persistent, but its [T]-indexed conjuncts send the [Persistent]
+       search for the WHOLE bundle off unfolding [udepw]'s wand chain and
+       it does not come back.  The bundle is spent once here, so a linear
+       intro is what it wants; the destructuring [#(Hwr & Hwl15 & Hwl17)]
+       the walk uses checks each conjunct on its own and is fine. *)
+    iIntros "Hdp #Hdep #Hxs #Hcl HK Hrd #Hmp".
     iApply (uslot_of_urun_all W (2 + (4 + (12 + (12 + (4 + n0))))) (fun _ => True)%I
               Hal8 Hroom Hstk Hfdlen Hstop Hlzf with "Hdep Hmp []").
     (* the payload at the trivial one -- <init> has no parent *)
@@ -320,9 +333,9 @@ Section UInitKernel.
       as "Dargv".
     iMod (uarea_persist (ukn_d N) init_argv_map with "Dargv") as "#Hargv".
     rewrite Hpc.
-    iApply (wp_kinit_start N Hpsok T K stc cn (uvis_sz W) h
+    iApply (wp_kinit_start N Hpsok_free T K stc cn (uvis_sz W) h
               (tf_resume_gpr0 (uvis_tf W)) n0 Hne
-              with "[] Hxs [] [] [] Hszf [Hstd] HK [Hcwf] [Hchf] [Hrd] Hrun").
+              with "Hdp [] Hxs [] [] [] Hszf [Hstd] HK [Hcwf] [Hchf] [Hrd] Hrun").
     - iApply (init_code_of_text (ukn_t N) (uvis_M W) (uvis_perm W)
                 (init_img_text _ Hsub) Hx with "Ht").
     - iApply ("Hcl" $! N).
@@ -359,10 +372,13 @@ Section UInitKernel.
        carry -- exec does not chdir, so the key's [uvis_cwd] is whatever
        the caller's block held.  ARM-c (1) discharges it. *)
     uvis_cwd W' = FsImg.ROOTINO ->
-    (forall k : Z, k <> USYS_exec -> psok k) ->
+    (forall k : Z, free_num k -> psok k) ->
     (* ...and the lazy bit, passed straight through: see [init_uexec_slot].
        Lane LAZY-FLAG's K4 turns it into a reading of [kexec_image_ok]. *)
     uvis_lazy W' = false ->
+    (* the three deposits /init owes, passed straight through: see
+       [init_uexec_slot] and [UkInit.init_deps] *)
+    UkInit.init_deps T -∗
     (* the pay fact, passed straight through: see [init_uexec_slot] *)
     udep -∗ UkInit.init_exec_sup_lend cn T stc -∗
     □ (∀ N : uk_names Σ, UkInit.init_cons_leaves N T K stc) -∗
@@ -372,7 +388,7 @@ Section UInitKernel.
     ucons_reader cn 0%nat -∗
     my_pay (uvis_gen W') (fun _ => True)%I -∗ uslot W'.
   Proof.
-    intros Hne Hok Hroom Hlen Hl0 Hcw Hpsok Hlzf.
+    intros Hne Hok Hroom Hlen Hl0 Hcw Hpsok_free Hlzf.
     (* THE MAP STOPS AT THE BREAK, off the image fact's own row --
        [UShKernel.sh_slot_of_kexec]'s note is the reasoning. *)
     pose proof (kexec_image_ok_below _ _ _ _ _ _ Hok) as Hstop.
@@ -466,7 +482,7 @@ Section UInitKernel.
     - rewrite Hfd. exact Hl0.
     - exact Hstop.
     - exact Hcw.
-    - exact Hpsok.
+    - exact Hpsok_free.
     - exact Hlzf.
   Qed.
 

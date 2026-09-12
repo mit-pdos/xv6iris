@@ -125,9 +125,16 @@ Section UexecExecMint.
     iIntros "#Hsup #Hgen".
     iDestruct (udep_gen with "Hsup") as "#Hdep".
     iIntros "!>" (W) "#Hpay".
-    iApply (UexecCond.cond_entry_slot W ltac:(intros k _; exact I)
-              with "Hdep [] Hgen Hpay").
-    rewrite /ssupply /= /xv6_ssupply. iModIntro. iExact "Hsup".
+    (* AT THE GENERIC INSTANCE, EXPLICITLY (lane SUPPLY-SPLIT).  The chain
+       is now parametric in which [uprogSG] its two verified arms run at,
+       because a verified program's is NOT this one; the generic mint is
+       the caller that instantiates it here, where every number is admitted
+       and echo's flagged deposit is therefore free as well. *)
+    iApply (UexecCond.cond_entry_slot uprogSG_gen W ltac:(intros k _; exact I)
+              with "[] Hdep [] Hgen Hpay").
+    { iApply (udepw_law_of_psok (PS := uprogSG_gen) 16
+                ltac:(exact I) ltac:(vm_compute; discriminate)). }
+    { rewrite /ssupply /= /xv6_ssupply. iModIntro. iExact "Hsup". }
   Qed.
 
   (* ...AND THE MINT AT A CONSTANT PAYLOAD (GENERIC-PAY): the same generic

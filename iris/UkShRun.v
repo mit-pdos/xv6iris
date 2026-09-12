@@ -234,10 +234,18 @@ Section UkShRun.
   (* THE NUMBERS THIS PROGRAM ADMITS ([UexecSG.uprogSG]'s [psok]).  A SECTION
      hypothesis, so no lemma statement in this file names it and the ~570
      [urun] sites did not move; the program's kernel-side constructor
-     discharges it (ARM-a's generic instance is [psok := fun _ => True]).
-     exec is excluded by the minting law itself -- its bundle reads the key,
-     so its deposit is always the explicit disjunct of [UkRun.udepw]. *)
-  Hypothesis Hpsok : forall k : Z, k <> USYS_exec -> psok k.
+     discharges it.
+     AT THE FREE NUMBERS AND NO MORE (lane SUPPLY-SPLIT).  It used to read
+     "every number but exec", which at the generic instance is true and at
+     a VERIFIED program's instance is not: a program whose supplier is the
+     application's ([AppInv.app_sup] -- for the echo application, the
+     TAINT) could only ever be entered tainted.  What a verified program
+     admits is [UexecSG.free_num] -- every number whose bundle is [emp],
+     plus chdir, whose branch is a closed fact -- and at
+     [UexecExecInst.uprogSG_free] this hypothesis is the identity.  A call
+     at a number OUTSIDE that set takes its own deposit as a premise
+     ([UkRun.udepw_law]) and is named at its site. *)
+  Hypothesis Hpsok_free : forall k : Z, free_num k -> psok k.
 
   Local Notation ra_idx := (mword_of_int 1 : mword 5).
   Local Notation s0_idx := (mword_of_int 8 : mword 5).
@@ -796,78 +804,15 @@ Section UkShRun.
   Qed.
 
   (* ===================================================================== *)
-  (* §4a THE QUIET STUB SHAPE, again.  UkSh.v's [wp_ksh_qstub] is [Local]   *)
-  (* and stages 1-2 instantiated it at open, close and write; stage 5 needs *)
-  (* it at dup, so here it is once more.  The [n <> USYS_*] premises are    *)
-  (* the program paying for not being in any row that writes user memory,   *)
-  (* moves a descriptor, or moves the working directory.                    *)
+  (* SS4a THE QUIET STUB SHAPE, again -- DELETED (lane SUPPLY-SPLIT).        *)
+  (* [wp_kshr_qstub] was UkSh.v's [wp_ksh_qstub] copied here for a stage-5   *)
+  (* dup instantiation that never landed, and it had no callers at all.  Its *)
+  (* only live consequence was a [psok n] at an UNCONSTRAINED number: the    *)
+  (* stub excludes twelve numbers, which still leaves 16 / 17 / 18 / 19 / 20,*)
+  (* every one of them a CLAIM number.  A dead lemma is not a place to owe   *)
+  (* the application anything, so it is gone; [UkSh.wp_ksh_qstub] is the     *)
+  (* live shape and it takes its deposit as a premise.                      *)
   (* ===================================================================== *)
-  Local Lemma wp_kshr_qstub (N : uk_names Σ) `{!ukn_const N} (h : CpuId) (m : regfile) (pc0 pc1 pc2 : Z)
-      (imm : mword 6) (n : Z) (avail : nat) :
-    (sign_extend' 64 imm : mword 64) = mword_of_int n ->
-    usysno (<[Regidx a7_idx := (mword_of_int n : mword 64)]> m) = n ->
-    n <> USYS_exit -> n <> USYS_fork ->
-    n <> USYS_exec -> n <> USYS_sbrk ->
-    n <> USYS_wait -> n <> USYS_pipe -> n <> USYS_read -> n <> USYS_fstat ->
-    (* ...and the three that move the descriptor table: this stub re-closes
-       the run at the view it opened at, so it is for calls that leave
-       [p->ofile[]] alone.  open / close / dup have their own leaves. *)
-    n <> USYS_close -> n <> USYS_dup -> n <> USYS_open ->
-    (* ...and chdir, the one row that moves the working directory, which
-       [urun] carries the process's own authority over *)
-    n <> USYS_chdir ->
-    add_vec_int (mword_of_int pc0 : mword 64) 2 = mword_of_int pc1 ->
-    add_vec_int (mword_of_int pc1 : mword 64) 4 = mword_of_int pc2 ->
-    is_aligned_vaddr (Virtaddr (mword_of_int pc2 : mword 64)) 2 = true ->
-    uinstr_is (ukn_t N) (mword_of_int pc0) true (C_LI (imm, Regidx a7_idx)) -∗
-    uinstr_is (ukn_t N) (mword_of_int pc1) false (ECALL tt) -∗
-    uinstr_is (ukn_t N) (mword_of_int pc2) true (C_JR (Regidx ra_idx)) -∗
-    urun N h m (mword_of_int pc0) avail -∗
-    (∀ (h' : CpuId) (ret : mword 64),
-       urun N h'
-         (<[Regidx a0_idx := ret]>
-            (<[Regidx a7_idx := (mword_of_int n : mword 64)]> m))
-         (ret_pc (m !!! Regidx ra_idx)) avail -∗
-       WP (Loop : expr riscv_lang)) -∗
-    WP (Loop : expr riscv_lang).
-  Proof.
-    intros Himm Hno He Hf Hx Hs Hw Hp Hr Hst Hcl Hdp Hop Hcd E01 E12 Hal2.
-    iIntros "#Ci0 #Ci1 #Ci2 Hrun Hcont".
-    iApply (wp_uk_cli N h m (mword_of_int pc0) imm a7_idx avail
-              ltac:(unfold unot_sp; vm_compute; discriminate)
-              ltac:(vm_compute; discriminate) with "Ci0 Hrun").
-    assert (Em : <[Regidx a7_idx
-                   := regval_into_reg (sign_extend' 64 imm : mword 64)]> m
-                 = <[Regidx a7_idx := (mword_of_int n : mword 64)]> m)
-      by (f_equal; exact Himm).
-    rewrite E01 Em.
-    iIntros (h1) "Hrun".
-    set (m1 := <[Regidx a7_idx := (mword_of_int n : mword 64)]> m).
-    iApply (wp_uk_ecall_quiet N h1 m1 (mword_of_int pc1) n avail
-              Hno He Hf Hx Hs Hw Hp Hr Hst Hcl Hdp Hop Hcd
-              ltac:(rewrite E12; exact Hal2)
-              with "Ci1 Hrun []").
-    { iApply udepw_of_psok; [ apply Hpsok | ];
-      (discriminate || assumption || (vm_compute; discriminate)). }
-    rewrite E12.
-    iIntros (h2 ret) "Hrun".
-    set (m2 := <[Regidx a0_idx := ret]> m1).
-    assert (Hra : m2 !!! Regidx ra_idx = m !!! Regidx ra_idx).
-    { unfold m2, m1.
-      exact (eq_trans
-               (upd_ne m1 (Regidx a0_idx) (Regidx ra_idx) ret
-                  ltac:(vm_compute; discriminate))
-               (upd_ne m (Regidx a7_idx) (Regidx ra_idx)
-                  (mword_of_int n : mword 64)
-                  ltac:(vm_compute; discriminate))). }
-    iApply (wp_uk_cjr N h2 m2 (mword_of_int pc2) ra_idx
-              (ret_pc (m !!! Regidx ra_idx)) avail
-              ltac:(vm_compute; discriminate)
-              ltac:(rewrite Hra; reflexivity)
-              with "Ci2 Hrun").
-    iIntros (h3) "Hrun".
-    iApply ("Hcont" $! h3 ret with "Hrun").
-  Qed.
 
   (* ---- wait @0xc8e, SYS_wait = 3, AT A NULL STATUS POINTER ------------- *)
   (* sh calls [wait] with a0 = 0 at all three of its call sites, so the      *)
@@ -922,7 +867,7 @@ Section UkShRun.
               ltac:(vm_compute; reflexivity)
               with "[] Hrun [] Hch").
     { iApply (uis_shk_c90 with "Hcode"). }
-    { iApply udepw_of_psok; [ apply Hpsok | ];
+    { iApply udepw_of_psok; [ apply Hpsok_free; free_lit | ];
       (discriminate || assumption || (vm_compute; discriminate)). }
     assert (E1 : add_vec_int (mword_of_int 0xc90 : mword 64) 4
                  = mword_of_int 0xc94)
@@ -1208,6 +1153,7 @@ Section UkShRun.
   Hypothesis ush_diag_leaf :
     forall (N : uk_names Σ) `{!ukn_const N} (h : CpuId) (m : regfile) (pc : Z) (n : nat),
       ush_diag_at pc m ->
+      UkSh.sh_deps -∗
       shk_code (ukn_t N) -∗
       shk_rodata (ukn_t N) -∗
       ush_diag_res (ukn_d N) pc m -∗
@@ -1234,6 +1180,7 @@ Section UkShRun.
     uint sp0 mod 8 = 0 ->
     16 <= uint sp0 ->
     mt !!! Regidx csp_rs1 = add_vec_int sp0 (- (8 * Z.of_nat 2)) ->
+    UkSh.sh_deps -∗
     shk_code (ukn_t N) -∗
     shk_rodata (ukn_t N) -∗
     uword (ukn_d N) (uint sp0 - 8) vra -∗
@@ -1249,7 +1196,7 @@ Section UkShRun.
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hal8 Hlo Hsp. iIntros "#Hcode #Hro Hw8 Hw0 Hrun Hcont".
+    intros Hal8 Hlo Hsp. iIntros "#Hdp #Hcode #Hro Hw8 Hw0 Hrun Hcont".
     assert (Hbsp1 : bv_unsigned (add_vec_int sp0 (- (8 * Z.of_nat 2)))
                     = bv_unsigned sp0 - 16).
     { replace (- (8 * Z.of_nat 2)) with (-16) by lia.
@@ -1352,7 +1299,7 @@ Section UkShRun.
         apply uint_moi. unfold Z64. lia. }
       iApply (ush_diag_leaf N h5 t4 ShSyms.panic n
                 ltac:(left; split; [ reflexivity | left; exact Hmsg ])
-                with "Hcode Hro [] Hrun").
+                with "Hdp Hcode Hro [] Hrun").
       rewrite ush_diag_res_panic. done. }
     (* ---- fork succeeded: pop and return ---- *)
     (* 0x7a  c.ldsp ra,8(sp) *)
@@ -1461,6 +1408,7 @@ Section UkShRun.
       (P : gname -> gname -> gname -> iProp Σ) `{FP : !Forkable P}
       (szv : Z) (l : list fdstate) (D : gmap nat fdstate)
       (h : CpuId) (m : regfile) (n : nat) :
+    UkSh.sh_deps -∗
     shk_code (ukn_t N) -∗ shk_rodata (ukn_t N) -∗ P (ukn_t N) (ukn_d N) (ukn_s N) -∗ usz (ukn_s N) szv -∗
     UserFd.ustd (ukn_fd N) l -∗
     UserCwd.ucwd_any (ukn_cwd N) -∗
@@ -1503,7 +1451,7 @@ Section UkShRun.
         WP (Loop : expr riscv_lang))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcode #Hro HP Hsz Hstd Hcwd Hch HD Hrun [Hpar Hchi]".
+    iIntros "#Hdp #Hcode #Hro HP Hsz Hstd Hcwd Hch HD Hrun [Hpar Hchi]".
     rewrite shr_fork1.
     iDestruct (urun_stack with "Hrun") as %[Hal8 Hroom].
     remember (m !!! Regidx csp_rs1) as sp0 eqn:Hsp0.
@@ -1703,7 +1651,7 @@ Section UkShRun.
                 (<[Regidx a0_idx := r]>
                    (<[Regidx a7_idx := (mword_of_int 1 : mword 64)]> m3))
                 sp0 vra vs0 n Hal8 Hlo (Hspf r)
-                with "Hcode Hro Hw8 Hw0 Hrun").
+                with "Hdp Hcode Hro Hw8 Hw0 Hrun").
       iIntros (hp2 m') "%Hq %Hra %Hs0 %Hsps Hrun".
       iApply ("Hpar" $! hp2 m' r
                 with "[%] [%] [%] HP Hsz Hstd Hcwd Hch HD [Hrun]").
@@ -1720,7 +1668,7 @@ Section UkShRun.
                 (<[Regidx a0_idx := (mword_of_int 0 : mword 64)]>
                    (<[Regidx a7_idx := (mword_of_int 1 : mword 64)]> m3))
                 sp0 vra vs0 n Hal8 Hlo (Hspf (mword_of_int 0 : mword 64))
-                with "Hck Hcro Hw8 Hw0 Hrun").
+                with "Hdp Hck Hcro Hw8 Hw0 Hrun").
       iIntros (hc2 m') "%Hq %Hra %Hs0 %Hsps Hrun".
       iApply ("Hchi" $! N' hc2 m'
                 with "[%] [%] [%] Hck HP Hsz Hstd Hcwd Hch HD [Hrun]").
@@ -2717,6 +2665,7 @@ Section UkShRun.
     forall (N : uk_names Σ) `{!ukn_const N} (h : CpuId) (m : regfile) (t szv : Z)
            (ld : list fdstate) (n : nat),
       m !!! Regidx a0_idx = (mword_of_int t : mword 64) ->
+      UkSh.sh_deps -∗
       shk_code (ukn_t N) -∗
       (* THE EXEC DEPOSIT'S SUPPLIER.  runcmd's EXEC arm ecalls exec, whose
          bundle the key-free minting law cannot pay ([UkRun.uxsup_at]); sh
@@ -2743,7 +2692,7 @@ Section UkShRun.
     induction c as [ args | c1 IH file mode fd | l IHl r IHr
                    | l IHl r IHr | c1 IH ];
       intros Hs N Hcst h m t szv ld n Ha0;
-      iIntros "#Hcode #Hexs #Hexs0 #Hjt #Htree Hsz Hstd Hcwd Hch Hrun";
+      iIntros "#Hdp #Hcode #Hexs #Hexs0 #Hjt #Htree Hsz Hstd Hcwd Hch Hrun";
       iDestruct (ush_jtab_ro with "Hjt") as "#Hro";
       iDestruct (ush_cmd_addr with "Htree") as %[Htr Ht8];
       assert (Ht4 : t mod 4 = 0)
@@ -2898,7 +2847,7 @@ Section UkShRun.
         iApply (ush_diag_leaf N h6 k4 0xda (2 + n)
                   ltac:(right; left; split;
                         [ reflexivity | rewrite Hs1_k4; exact Ht8 ])
-                  with "Hcode Hro [] Hrun").
+                  with "Hdp Hcode Hro [] Hrun").
         rewrite /ush_diag_res.
         destruct (decide ((0xda : Z) = 0xda)) as [_ | Hc];
           [ | exfalso; exact (Hc eq_refl) ].
@@ -2951,7 +2900,7 @@ Section UkShRun.
                 (fun gt gd _ => (ush_jtab gt ∗ ush_cmd gd t (UList l r))%I)
                 (FP := forkable_ush_pay t (UList l r))
                 szv ld ∅ h2 g1 (6 * Nat.max (ush_ht l) (ush_ht r) + n)
-                with "Hcode Hro [] Hsz Hstd Hcwd Hch [] Hrun").
+                with "Hdp Hcode Hro [] Hsz Hstd Hcwd Hch [] Hrun").
       { iFrame "Hjt Htree". }
       { rewrite big_sepM_empty. done. }
       rewrite Hra_g1.
@@ -3026,7 +2975,7 @@ Section UkShRun.
                                    - ush_ht r) + n))))%nat by lia.
         iApply (IHr (proj2 Hs) N Hcst hE g3 qr szv ld
                   ((6 * (Nat.max (ush_ht l) (ush_ht r) - ush_ht r) + n)%nat)
-                  Ha0_g3 with "Hcode Hexs Hexs0 Hjt2 Hqrc Hsz Hstd Hcwd Hch Hrun").
+                  Ha0_g3 with "Hdp Hcode Hexs Hexs0 Hjt2 Hqrc Hsz Hstd Hcwd Hch Hrun").
       + (* ---- the CHILD: runcmd(lcmd->left) ---- *)
         iIntros (N' hA mA) "%Hti' %HcsA %Ha0A #Hck (#Hjt2 & #Ht2) Hsz Hstd Hcwd Hch _ Hrun".
         pose proof (ukn_const_of_triv N' Hti') as Hcst'.
@@ -3092,7 +3041,7 @@ Section UkShRun.
         iDestruct (uxsup_at_triv N' with "Hexs0") as "#Hexs'".
         iApply (IHl (proj1 Hs) N' Hcst' hD g3 ql2 szv ld
                   ((6 * (Nat.max (ush_ht l) (ush_ht r) - ush_ht l) + n)%nat)
-                  Ha0_g3 with "Hck Hexs' Hexs0 Hjt2 Hqlc2 Hsz Hstd Hcwd Hch Hrun").
+                  Ha0_g3 with "Hdp Hck Hexs' Hexs0 Hjt2 Hqlc2 Hsz Hstd Hcwd Hch Hrun").
 
     - (* =================== BACK =================== *)
       iDestruct (ush_cmd_back with "Htree") as (q) "[#Hqp #Hqc]".
@@ -3127,7 +3076,7 @@ Section UkShRun.
                 (fun gt gd _ => (ush_jtab gt ∗ ush_cmd gd t (UBack c1))%I)
                 (FP := forkable_ush_pay t (UBack c1))
                 szv ld ∅ h2 b1 (6 * ush_ht c1 + n)
-                with "Hcode Hro [] Hsz Hstd Hcwd Hch [] Hrun").
+                with "Hdp Hcode Hro [] Hsz Hstd Hcwd Hch [] Hrun").
       { iFrame "Hjt Htree". }
       { rewrite big_sepM_empty. done. }
       rewrite Hra_b1.
@@ -3214,7 +3163,7 @@ Section UkShRun.
           with (6 * ush_ht c1 + (2 + (Dg + n)))%nat by lia.
         iDestruct (uxsup_at_triv N' with "Hexs0") as "#Hexs'".
         iApply (IH Hs N' Hcst' hD b3 q2 szv ld n Ha0_b3
-                  with "Hck Hexs' Hexs0 Hjt2 Hqc2 Hsz Hstd Hcwd Hch Hrun").
+                  with "Hdp Hck Hexs' Hexs0 Hjt2 Hqc2 Hsz Hstd Hcwd Hch Hrun").
   Qed.
 
 End UkShRun.
