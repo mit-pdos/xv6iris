@@ -801,16 +801,17 @@ theorem hartViews_store_plain (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (
     simp only [MState.store, updCpu]; split <;> simp_all [HRead.clearAcq]
   rw [e1, e2, e3]
 
-/-- A plain store by a hart with no reservation: the store order grows by the
-hart's message, whose authorship and position become persistent facts. -/
+/-- A plain store by a hart: the store order grows by the hart's message,
+whose authorship and position become persistent facts; the hart's
+reservation, whatever it was, is cleared. -/
 theorem memModel_store_plain (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
-    (hno : ¬ othersReserve σ.resv cpu pa n) :
-    memModelAt E σ ∗ resvFragAt E cpu none false ⊢@{IProp GF} |==>
+    (r : Option Resv) (hno : ¬ othersReserve σ.resv cpu pa n) :
+    memModelAt E σ ∗ resvFragAt E cpu r false ⊢@{IProp GF} |==>
       (memModelAt E (σ.store cpu pa n w false) ∗ resvFragAt E cpu none false ∗
        authoredByAt E (σ.top + 1) (hartAgent cpu) ∗ topLbAt E (σ.top + 1)) := by
   iintro ⟨Hmm, Hfrag⟩
-  ihave %hres : ⌜σ.resv cpu = none ∧ (σ.hr cpu).acq = false⌝ $$ [Hmm Hfrag]
-  · iapply memModel_resv E σ cpu none false $$ [Hmm Hfrag]
+  ihave %hres : ⌜σ.resv cpu = r ∧ (σ.hr cpu).acq = false⌝ $$ [Hmm Hfrag]
+  · iapply memModel_resv E σ cpu r false $$ [Hmm Hfrag]
     iframe
   unfold memModelAt
   icases Hmm with ⟨Htop, Hauth, Hviews, Hresv, %hmm⟩
@@ -818,13 +819,13 @@ theorem memModel_store_plain (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w
     (by simp only [MaxNat.le_toNat]; omega) $$ Htop with ⟨Htop, #Htoplb⟩
   imod ghost_map_insert_persist (σ.top + 1) (hartAgent cpu)
     (by rw [authMap_get?, if_neg (by simp only [MState.top]; omega)]) $$ Hauth with ⟨Hauth, #Hau⟩
+  unfold resvFragAt
+  imod ghost_map_update ((none, false) : ResvVal) $$ Hresv Hfrag with ⟨Hresv, Hfrag⟩
   imodintro
-  have hresv : resvMap (σ.store cpu pa n w false) = resvMap σ :=
-    resvMap_congr _ _ (fun c => by
-      simp only [MState.store, updCpu]
-      split
-      · rename_i hc; subst hc; simp [HRead.clearAcq, hres.1, hres.2]
-      · simp)
+  have hresv : resvMap (σ.store cpu pa n w false) =
+      Iris.Std.PartialMap.insert (resvMap σ) cpu.val (none, false) :=
+    resvMap_upd σ _ cpu _ _ (by simp [updCpu, HRead.clearAcq])
+      (fun c hc => by simp [updCpu, hc])
   rw [hresv]
   iframe Hfrag Hresv
   isplitl [Htop Hauth Hviews]
@@ -1052,8 +1053,8 @@ theorem readBytes_unique (m : FlatMem) (h : Agent) (tv : Nat) (pa : PAddr) (n : 
 /-- A store by the running context: the memory model moves, the new timestamp
 enters ξ's dirty set (authored on `cpu`), and ξ's token is re-established. -/
 theorem ctx_store (σ : MState) (cpu : CPU) (ξ : CtxId) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
-    (hno : ¬ othersReserve σ.resv cpu pa n) :
-    memModel σ ∗ ownCtx cpu ξ ∗ resvFrag cpu none false ⊢@{IProp GF} |==>
+    (r : Option Resv) (hno : ¬ othersReserve σ.resv cpu pa n) :
+    memModel σ ∗ ownCtx cpu ξ ∗ resvFrag cpu r false ⊢@{IProp GF} |==>
       (memModel (σ.store cpu pa n w false) ∗ ownCtx cpu ξ ∗ resvFrag cpu none false ∗
        keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ (σ.top + 1)) := by
   unfold ownCtx ownCtxAt resvFrag memModel
@@ -1062,7 +1063,7 @@ theorem ctx_store (σ : MState) (cpu : CPU) (ξ : CtxId) (pa : PAddr) (n : Nat) 
   · iapply memModel_topLb _ σ W $$ [Hmm HW]
     iframe Hmm
     iexact HW
-  imod memModel_store_plain _ σ cpu pa n w hno $$ [$Hmm $Hfrag] with ⟨Hmm, Hfrag, #Hau, #Htop'⟩
+  imod memModel_store_plain _ σ cpu pa n w r hno $$ [$Hmm $Hfrag] with ⟨Hmm, Hfrag, #Hau, #Htop'⟩
   unfold ctxAt
   icases Hctx with ⟨Hbound, Hdirty⟩
   have hfresh : get? D (σ.top + 1) = none := by
@@ -1217,13 +1218,13 @@ theorem swp_sail_mem_read_plain (cpu : CPU) {n vasize : Nat}
     ▷ (ctxTok cpu ξ -∗ ctxBytes ξ req.pa n dq w -∗ Φ (.Ok (w, none)))
     ⊢ swp cpu (ConcurrencyInterfaceV1.sail_mem_read req) Φ := by
   iintro ⟨Htok, Hb, HΦ⟩
-  icases ctxTok_cases cpu ξ $$ Htok with ⟨Hctx, Hfrag⟩
+  icases ctxTok_cases cpu ξ $$ Htok with ⟨Hctx, %r, Hfrag⟩
   iapply swp_sail_mem_read_plain_ctx cpu req ξ dq w hk Φ
   iframe Hctx Hb
   inext
   iintro Hctx Hb
   iapply HΦ $$ [Hctx Hfrag] Hb
-  iapply ctxTok_intro
+  iapply ctxTok_intro cpu ξ r
   iframe Hctx Hfrag
 
 /-- A plain store of the running context's bytes: full ownership is required,
@@ -1256,8 +1257,8 @@ theorem swp_sail_mem_write_plain (cpu : CPU) {n vasize : Nat}
     obtain ⟨w'', hv', hno, rfl, rfl⟩ := Hev
     rw [hv] at hv'
     obtain rfl := Option.some.inj hv'
-    icases ctxTok_cases cpu ξ $$ Htok with ⟨Hctx, Hfrag⟩
-    imod ctx_store σ cpu ξ req.pa n w' hno $$ [$Hmm $Hctx $Hfrag] with ⟨Hmm, Hctx, Hfrag, #Hkey⟩
+    icases ctxTok_cases cpu ξ $$ Htok with ⟨Hctx, %r, Hfrag⟩
+    imod ctx_store σ cpu ξ req.pa n w' r hno $$ [$Hmm $Hctx $Hfrag] with ⟨Hmm, Hctx, Hfrag, #Hkey⟩
     imod ctxBytes_update ξ σ.mem req.pa n w w' (σ.top + 1) (hartAgent cpu) $$ [$Hkey $Hmem $Hb]
       with ⟨Hmem, Hb⟩
     imod Hmask
@@ -1267,7 +1268,7 @@ theorem swp_sail_mem_write_plain (cpu : CPU) {n vasize : Nat}
     · iapply Hclose $$ %(σ.store cpu req.pa n w' false) %(fun _ _ => rfl) Hregs Hmem Hmm
     · iapply swp_ret
       iapply HΦ $$ [Hctx Hfrag] Hb
-      iapply ctxTok_intro
+      iapply ctxTok_intro cpu ξ none
       iframe Hctx Hfrag
   · iintro %Hbk
     obtain ⟨_, hσ⟩ := Hbk

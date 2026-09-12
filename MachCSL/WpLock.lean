@@ -191,11 +191,11 @@ theorem wp_s_lw_lockword (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : 
     intro c hok' _ Φ
     iintro ⟨HmConf, HPC, HnextPC, ⟨HF, Htok, Hlocks, #Hlk⟩, HΦ⟩
     icases isLock_cases γ lk s R $$ Hlk with ⟨%_, ⟨%lo, #Hinv, #Hfl⟩⟩
-    icases ctxTok_cases cpu curCtx $$ Htok with ⟨Hctx, Hfrag⟩
+    icases ctxTok_cases cpu curCtx $$ Htok with ⟨Hctx, %r, Hfrag⟩
     icases ownCtx_floor_view cpu curCtx lo $$ [Hctx Hfl] with ⟨Hctx, ⟨%K, #HK, %hloK⟩⟩
     · iframe Hctx; iexact Hfl
     have e := execSpecF_lw_au (GF := GF) cpu (DFrac.own 1) c false hok' pc (pc + instrLen is_rvc) imm rd rs1 hrd.1
-      (tpPin cpu k.regs) K (fun _ => iprop(ownCtx cpu curCtx ∗ resvFrag cpu none false ∗ lockSet cpu k.locks))
+      (tpPin cpu k.regs) K (fun _ => iprop(ownCtx cpu curCtx ∗ resvFrag cpu r false ∗ lockSet cpu k.locks))
       hram hal
     simp only [KCtx.rget] at haddr
     rw [haddr] at e
@@ -235,7 +235,7 @@ theorem wp_s_lw_lockword (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : 
       iapply HΦ $$ HmConf HPC HnextPC
       iexists w
       rw [htp w]
-      ihave Htok := ctxTok_intro cpu curCtx $$ [Hctx Hfrag]
+      ihave Htok := ctxTok_intro cpu curCtx r $$ [Hctx Hfrag]
       case' _ => iframe
       iframe
   iapply (wpLoop_k_lock cpu k hsie htier pc (pc + instrLen is_rvc) is_rvc _
@@ -280,12 +280,12 @@ theorem wp_s_lw_lockword_locked (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (h
     iintro ⟨HmConf, HPC, HnextPC, ⟨HF, Htok, Hlocks, #Hlk, Hlc⟩, HΦ⟩
     icases isLock_cases γ lk s R $$ Hlk with ⟨%_, ⟨%lo, #Hinv, #Hfl⟩⟩
     icases lockedCore_cases γ cpu $$ Hlc with ⟨%B0, Hhalf0, #HflB⟩
-    icases ctxTok_cases cpu curCtx $$ Htok with ⟨Hctx, Hfrag⟩
+    icases ctxTok_cases cpu curCtx $$ Htok with ⟨Hctx, %r, Hfrag⟩
     icases lock_reader_view cpu lo B0 $$ [Hctx Hfl HflB] with ⟨Hctx, ⟨%K, #HK, %hK⟩⟩
     · iframe Hctx
       all_goals iframe #
     have e := execSpecF_lw_au (GF := GF) cpu (DFrac.own 1) c false hok' pc (pc + instrLen is_rvc) imm rd rs1 hrd.1
-      (tpPin cpu k.regs) K (fun w => iprop(ownCtx cpu curCtx ∗ resvFrag cpu none false ∗ lockSet cpu k.locks ∗
+      (tpPin cpu k.regs) K (fun w => iprop(ownCtx cpu curCtx ∗ resvFrag cpu r false ∗ lockSet cpu k.locks ∗
         ⌜w = lkOne⌝ ∗ lockHalf γ (some (cpu, true)) B0))
       hram hal
     simp only [KCtx.rget] at haddr
@@ -335,7 +335,7 @@ theorem wp_s_lw_lockword_locked (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (h
       iapply HΦ $$ HmConf HPC HnextPC
       iexists w
       rw [htp w]
-      ihave Htok := ctxTok_intro cpu curCtx $$ [Hctx Hfrag]
+      ihave Htok := ctxTok_intro cpu curCtx r $$ [Hctx Hfrag]
       case' _ => iframe
       ihave Hlc := lockedCore_intro γ cpu B0 $$ [Hhalf0]
       case' _ => iframe Hhalf0; iexact HflB
@@ -383,11 +383,11 @@ theorem wp_s_ld_lkcpu_notheld (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (hti
     intro c hok' _ Φ
     iintro ⟨HmConf, HPC, HnextPC, ⟨HF, Htok, Hlocks, #Hlk⟩, HΦ⟩
     icases isLock_cases γ lk s R $$ Hlk with ⟨%_, ⟨%lo, #Hinv, #Hfl⟩⟩
-    icases ctxTok_cases cpu curCtx $$ Htok with ⟨Hctx, Hfrag⟩
+    icases ctxTok_cases cpu curCtx $$ Htok with ⟨Hctx, %r, Hfrag⟩
     icases ownCtx_floor_view cpu curCtx lo $$ [Hctx Hfl] with ⟨Hctx, ⟨%K, #HK, %hloK⟩⟩
     · iframe Hctx; iexact Hfl
     have e := execSpecF_ld_au (GF := GF) cpu (DFrac.own 1) c false hok' pc (pc + instrLen is_rvc) imm rd rs1 hrd.1
-      (tpPin cpu k.regs) K (fun w => iprop(ownCtx cpu curCtx ∗ resvFrag cpu none false ∗ lockSet cpu k.locks ∗
+      (tpPin cpu k.regs) K (fun w => iprop(ownCtx cpu curCtx ∗ resvFrag cpu r false ∗ lockSet cpu k.locks ∗
         ⌜w ≠ cpuAddr cpu⌝))
       hram hal
     simp only [KCtx.rget] at haddr
@@ -445,7 +445,7 @@ theorem wp_s_ld_lkcpu_notheld (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (hti
       iapply HΦ $$ HmConf HPC HnextPC
       iexists w
       rw [htp w]
-      ihave Htok := ctxTok_intro cpu curCtx $$ [Hctx Hfrag]
+      ihave Htok := ctxTok_intro cpu curCtx r $$ [Hctx Hfrag]
       case' _ => iframe
       iframe HF Htok Hlocks
       ipureintro; exact hw
@@ -491,11 +491,11 @@ theorem wp_s_ld_lkcpu_locked (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htie
     iintro ⟨HmConf, HPC, HnextPC, ⟨HF, Htok, Hlocks, #Hlk, Hlc⟩, HΦ⟩
     icases isLock_cases γ lk s R $$ Hlk with ⟨%_, ⟨%lo, #Hinv, #Hfl⟩⟩
     icases lockedCore_cases γ cpu $$ Hlc with ⟨%B0, Hhalf0, #HflB⟩
-    icases ctxTok_cases cpu curCtx $$ Htok with ⟨Hctx, Hfrag⟩
+    icases ctxTok_cases cpu curCtx $$ Htok with ⟨Hctx, %r, Hfrag⟩
     icases ownCtx_floor_view cpu curCtx lo $$ [Hctx Hfl] with ⟨Hctx, ⟨%K, #HK, %hloK⟩⟩
     · iframe Hctx; iexact Hfl
     have e := execSpecF_ld_au (GF := GF) cpu (DFrac.own 1) c false hok' pc (pc + instrLen is_rvc) imm rd rs1 hrd.1
-      (tpPin cpu k.regs) K (fun w => iprop(ownCtx cpu curCtx ∗ resvFrag cpu none false ∗ lockSet cpu k.locks ∗
+      (tpPin cpu k.regs) K (fun w => iprop(ownCtx cpu curCtx ∗ resvFrag cpu r false ∗ lockSet cpu k.locks ∗
         ⌜w = cpuAddr cpu⌝ ∗ lockHalf γ (some (cpu, true)) B0))
       hram hal
     simp only [KCtx.rget] at haddr
@@ -544,7 +544,7 @@ theorem wp_s_ld_lkcpu_locked (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htie
       iapply HΦ $$ HmConf HPC HnextPC
       iexists w
       rw [htp w]
-      ihave Htok := ctxTok_intro cpu curCtx $$ [Hctx Hfrag]
+      ihave Htok := ctxTok_intro cpu curCtx r $$ [Hctx Hfrag]
       case' _ => iframe
       ihave Hlc := lockedCore_intro γ cpu B0 $$ [Hhalf0]
       case' _ => iframe Hhalf0; iexact HflB
@@ -606,11 +606,11 @@ theorem wp_s_amoswap_lock (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier :
     intro c hok' _ Φ
     iintro ⟨HmConf, HPC, HnextPC, ⟨HF, Htok, Hlocks, #Hlk⟩, HΦ⟩
     icases isLock_cases γ lk s R $$ Hlk with ⟨%_, ⟨%lo, #Hinv, #Hfl⟩⟩
-    icases ctxTok_cases cpu curCtx $$ Htok with ⟨Hctx, Hfrag⟩
+    icases ctxTok_cases cpu curCtx $$ Htok with ⟨Hctx, %r, Hfrag⟩
     have e := execSpecF_amoswap_w_aq (GF := GF) cpu (DFrac.own 1) c false hok' pc (pc + instrLen is_rvc) rd rs1 rs2 hrd.1
       (tpPin cpu k.regs)
       (fun old => iprop(ownCtx cpu curCtx ∗ lockSet cpu (acqLocks s k.locks old) ∗ acqPost γ R cpu old))
-      hram hal
+      hram hal r
     simp only [KCtx.rget] at haddr hval
     rw [haddr, hval] at e
     iapply (e Φ)
@@ -734,7 +734,7 @@ theorem wp_s_amoswap_lock (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier :
       iapply HΦ $$ HmConf HPC HnextPC
       iexists old
       rw [htp old]
-      ihave Htok := ctxTok_intro cpu curCtx $$ [Hctx Hfrag]
+      ihave Htok := ctxTok_intro cpu curCtx none $$ [Hctx Hfrag]
       case' _ => iframe
       iframe
   iapply (wpLoop_k_lock cpu k hsie htier pc (pc + instrLen is_rvc) is_rvc _
@@ -775,9 +775,9 @@ theorem wp_s_sd_lkcpu_acquire (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (hti
     iintro ⟨HmConf, HPC, HnextPC, ⟨HF, Htok, #Hlk, Hlp⟩, HΦ⟩
     icases isLock_cases γ lk s R $$ Hlk with ⟨%_, ⟨%lo, #Hinv, #Hfl⟩⟩
     icases lockedPre_cases γ cpu $$ Hlp with ⟨%B0, Hhalf0, #HflB⟩
-    icases ctxTok_cases cpu curCtx $$ Htok with ⟨Hctx, Hfrag⟩
+    icases ctxTok_cases cpu curCtx $$ Htok with ⟨Hctx, %r, Hfrag⟩
     have e := execSpecF_sd_au (GF := GF) cpu (DFrac.own 1) c false hok' pc (pc + instrLen is_rvc) imm rs1 rs2
-      (tpPin cpu k.regs) iprop(ownCtx cpu curCtx ∗ lockHalf γ (some (cpu, true)) B0) hram hal
+      (tpPin cpu k.regs) iprop(ownCtx cpu curCtx ∗ lockHalf γ (some (cpu, true)) B0) hram hal r
     simp only [KCtx.rget] at haddr hval
     rw [haddr, hval] at e
     iapply (e Φ)
@@ -819,7 +819,7 @@ theorem wp_s_sd_lkcpu_acquire (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (hti
     · inext
       iintro HmConf HPC HnextPC ⟨HF, Hfrag, Hctx, Hhalf0⟩
       iapply HΦ $$ HmConf HPC HnextPC
-      ihave Htok := ctxTok_intro cpu curCtx $$ [Hctx Hfrag]
+      ihave Htok := ctxTok_intro cpu curCtx none $$ [Hctx Hfrag]
       case' _ => iframe
       ihave Hlc := lockedCore_intro γ cpu B0 $$ [Hhalf0]
       case' _ => iframe Hhalf0; iexact HflB
@@ -854,9 +854,9 @@ theorem wp_s_sd_zero_lkcpu_release (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     iintro ⟨HmConf, HPC, HnextPC, ⟨HF, Htok, #Hlk, Hlc⟩, HΦ⟩
     icases isLock_cases γ lk s R $$ Hlk with ⟨%_, ⟨%lo, #Hinv, #Hfl⟩⟩
     icases lockedCore_cases γ cpu $$ Hlc with ⟨%B0, Hhalf0, #HflB⟩
-    icases ctxTok_cases cpu curCtx $$ Htok with ⟨Hctx, Hfrag⟩
+    icases ctxTok_cases cpu curCtx $$ Htok with ⟨Hctx, %r, Hfrag⟩
     have e := execSpecF_sd_au (GF := GF) cpu (DFrac.own 1) c false hok' pc (pc + instrLen is_rvc) imm rs1 0#5
-      (tpPin cpu k.regs) iprop(ownCtx cpu curCtx ∗ lockHalf γ (some (cpu, false)) B0) hram hal
+      (tpPin cpu k.regs) iprop(ownCtx cpu curCtx ∗ lockHalf γ (some (cpu, false)) B0) hram hal r
     simp only [KCtx.rget] at haddr
     rw [haddr, RegMap.get_zero] at e
     iapply (e Φ)
@@ -898,7 +898,7 @@ theorem wp_s_sd_zero_lkcpu_release (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     · inext
       iintro HmConf HPC HnextPC ⟨HF, Hfrag, Hctx, Hhalf0⟩
       iapply HΦ $$ HmConf HPC HnextPC
-      ihave Htok := ctxTok_intro cpu curCtx $$ [Hctx Hfrag]
+      ihave Htok := ctxTok_intro cpu curCtx none $$ [Hctx Hfrag]
       case' _ => iframe
       ihave Hlp := lockedPre_intro γ cpu B0 $$ [Hhalf0]
       case' _ => iframe Hhalf0; iexact HflB
@@ -945,10 +945,10 @@ theorem wp_s_sw_zero_release (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htie
     iintro ⟨HmConf, HPC, HnextPC, ⟨HF, Htok, Hlocks, #Hlk, Hlp, Hheld, HR⟩, HΦ⟩
     icases isLock_cases γ lk s R $$ Hlk with ⟨%_, ⟨%lo, #Hinv, #Hfl⟩⟩
     icases lockedPre_cases γ cpu $$ Hlp with ⟨%B0, Hhalf0, #HflB⟩
-    icases ctxTok_cases cpu curCtx $$ Htok with ⟨Hctx, Hfrag⟩
+    icases ctxTok_cases cpu curCtx $$ Htok with ⟨Hctx, %r, Hfrag⟩
     have e := execSpecF_sw_au (GF := GF) cpu (DFrac.own 1) c false hok' pc (pc + instrLen is_rvc) imm rs1 0#5
       (tpPin cpu k.regs) iprop(ownCtx cpu curCtx ∗ lockSet cpu (k.locks.filter (fun x => x ≠ s)) ∗ ⌜s ∈ k.locks⌝)
-      hram hal
+      hram hal r
     simp only [KCtx.rget] at haddr
     have hz : BitVec.extractLsb' 0 32 (RegMap.get (tpPin cpu k.regs) 0#5) = 0#32 := by
       rw [RegMap.get_zero]; rfl
@@ -1003,7 +1003,7 @@ theorem wp_s_sw_zero_release (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htie
       iintro HmConf HPC HnextPC ⟨HF, Hfrag, Hctx, Hlocks, %hmem⟩
       iapply HΦ $$ HmConf HPC HnextPC
       iexists ()
-      ihave Htok := ctxTok_intro cpu curCtx $$ [Hctx Hfrag]
+      ihave Htok := ctxTok_intro cpu curCtx none $$ [Hctx Hfrag]
       case' _ => iframe
       iframe HF Htok Hlocks
       ipureintro; exact hmem

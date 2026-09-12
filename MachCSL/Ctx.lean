@@ -277,9 +277,11 @@ def ownCtxAt (E : EraGS GF) (cpu : CPU) (ξ : CtxId) : IProp GF := iprop%
     topLbAt E W ∗ ⌜dirtyOk cpu B W D⌝ ∗ dirtyElems E ξ D
 
 /-- What a hart's memory operations thread: its running context and its
-reservation fragment (no reservation, no pending acquire, outside an AMO). -/
+reservation fragment (some reservation or none -- a page walk's exclusive
+re-read may leave one standing, and every store clears it -- and no pending
+acquire, outside an AMO). -/
 def ctxTokAt (E : EraGS GF) (cpu : CPU) (ξ : CtxId) : IProp GF := iprop%
-  ownCtxAt E cpu ξ ∗ resvFragAt E cpu none false
+  ownCtxAt E cpu ξ ∗ ∃ r : Option Resv, resvFragAt E cpu r false
 
 
 end fixed
@@ -370,14 +372,17 @@ theorem ownCtx_intro (cpu : CPU) (ξ : CtxId) (B K W : Nat) (D : RegMapF CPU) :
   iexact H
 
 theorem ctxTok_cases (cpu : CPU) (ξ : CtxId) :
-    ctxTok cpu ξ ⊢@{IProp GF} ownCtx cpu ξ ∗ resvFrag cpu none false := by
+    ctxTok cpu ξ ⊢@{IProp GF} ownCtx cpu ξ ∗ ∃ r : Option Resv, resvFrag cpu r false := by
   unfold ctxTok ctxTokAt ownCtx resvFrag
   iintro H; iexact H
 
-theorem ctxTok_intro (cpu : CPU) (ξ : CtxId) :
-    ownCtx cpu ξ ∗ resvFrag cpu none false ⊢@{IProp GF} ctxTok cpu ξ := by
+theorem ctxTok_intro (cpu : CPU) (ξ : CtxId) (r : Option Resv) :
+    ownCtx cpu ξ ∗ resvFrag cpu r false ⊢@{IProp GF} ctxTok cpu ξ := by
   unfold ctxTok ctxTokAt ownCtx resvFrag
-  iintro H; iexact H
+  iintro ⟨H, Hf⟩
+  iframe H
+  iexists r
+  iexact Hf
 
 /-! ## Memory points-to -/
 

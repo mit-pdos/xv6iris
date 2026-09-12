@@ -118,9 +118,9 @@ set_option swp_run.memStop true in
 /-- A 4-byte aligned store into the accessor's bytes. -/
 theorem swp_checked_mem_write_store4_S_au (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
     (hok : SConfPhys (GF := GF) c sie)
-    (pa : BitVec 64) (data : BitVec (8 * 4)) (hram : inRam pa 4) (hal : pa.toNat % 4 = 0) (Ψ : IProp GF)
+    (pa : BitVec 64) (data : BitVec (8 * 4)) (hram : inRam pa 4) (hal : pa.toNat % 4 = 0) (r : Option Resv) (Ψ : IProp GF)
     (Φ : Result Bool (physaddr × ExceptionType) → IProp GF) :
-    confCells cpu dq Privilege.Supervisor c ∗ resvFrag cpu none false ∗ writeAU cpu pa 4 data Ψ ∗
+    confCells cpu dq Privilege.Supervisor c ∗ resvFrag cpu r false ∗ writeAU cpu pa 4 data Ψ ∗
     ▷ (confCells cpu dq Privilege.Supervisor c -∗ resvFrag cpu none false -∗ Ψ -∗ Φ (.Ok true))
     ⊢ swp cpu (checked_mem_write (physaddr.Physaddr pa) 4 data
         (MemoryAccessType.Store mem_payload.Data) page_based_mem_type.PBMT_PMA
@@ -129,7 +129,7 @@ theorem swp_checked_mem_write_store4_S_au (cpu : CPU) (dq : DFrac) (c : MConf) (
   unfold checked_mem_write
   checked_mem_S_au_prefix pa 4 hram hal
   iapply swp_bind
-  iapply (swp_sail_mem_write_plain_au cpu _ data rfl rfl)
+  iapply (swp_sail_mem_write_plain_au cpu _ data rfl rfl r)
   iframe Hfrag
   iapply writeAU_wand cpu pa 4 data Ψ $$ HAU
   inext
@@ -144,9 +144,9 @@ set_option swp_run.memStop true in
 /-- An 8-byte aligned store into the accessor's bytes. -/
 theorem swp_checked_mem_write_store8_S_au (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
     (hok : SConfPhys (GF := GF) c sie)
-    (pa : BitVec 64) (data : BitVec (8 * 8)) (hram : inRam pa 8) (hal : pa.toNat % 8 = 0) (Ψ : IProp GF)
+    (pa : BitVec 64) (data : BitVec (8 * 8)) (hram : inRam pa 8) (hal : pa.toNat % 8 = 0) (r : Option Resv) (Ψ : IProp GF)
     (Φ : Result Bool (physaddr × ExceptionType) → IProp GF) :
-    confCells cpu dq Privilege.Supervisor c ∗ resvFrag cpu none false ∗ writeAU cpu pa 8 data Ψ ∗
+    confCells cpu dq Privilege.Supervisor c ∗ resvFrag cpu r false ∗ writeAU cpu pa 8 data Ψ ∗
     ▷ (confCells cpu dq Privilege.Supervisor c -∗ resvFrag cpu none false -∗ Ψ -∗ Φ (.Ok true))
     ⊢ swp cpu (checked_mem_write (physaddr.Physaddr pa) 8 data
         (MemoryAccessType.Store mem_payload.Data) page_based_mem_type.PBMT_PMA
@@ -155,7 +155,7 @@ theorem swp_checked_mem_write_store8_S_au (cpu : CPU) (dq : DFrac) (c : MConf) (
   unfold checked_mem_write
   checked_mem_S_au_prefix pa 8 hram hal
   iapply swp_bind
-  iapply (swp_sail_mem_write_plain_au cpu _ data rfl rfl)
+  iapply (swp_sail_mem_write_plain_au cpu _ data rfl rfl r)
   iframe Hfrag
   iapply writeAU_wand cpu pa 8 data Ψ $$ HAU
   inext
@@ -174,9 +174,9 @@ set_option swp_run.memStop true in
 of the store order; the reservation is taken. -/
 theorem swp_checked_mem_read_amo4_S (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
     (hok : SConfPhys (GF := GF) c sie)
-    (pa : BitVec 64) (hram : inRam pa 4) (hal : pa.toNat % 4 = 0) (Ψ : BitVec (8 * 4) → IProp GF)
+    (pa : BitVec 64) (hram : inRam pa 4) (hal : pa.toNat % 4 = 0) (r : Option Resv) (Ψ : BitVec (8 * 4) → IProp GF)
     (Φ : Result ((BitVec (8 * 4)) × Unit) (physaddr × ExceptionType) → IProp GF) :
-    confCells cpu dq Privilege.Supervisor c ∗ resvFrag cpu none false ∗
+    confCells cpu dq Privilege.Supervisor c ∗ resvFrag cpu r false ∗
     exclReadAU pa 4 (fun w => iprop(resvFrag cpu (some (snapOf pa 4 w)) true -∗ Ψ w)) ∗
     ▷ (confCells cpu dq Privilege.Supervisor c -∗ ∀ w, Ψ w -∗ Φ (.Ok (w, ())))
     ⊢ swp cpu (checked_mem_read amoswapAq page_based_mem_type.PBMT_PMA
@@ -185,7 +185,7 @@ theorem swp_checked_mem_read_amo4_S (cpu : CPU) (dq : DFrac) (c : MConf) (sie : 
   unfold checked_mem_read
   checked_mem_S_au_prefix pa 4 hram hal
   iapply swp_bind
-  iapply (swp_sail_mem_read_excl_au cpu _ true rfl rfl (by decide))
+  iapply (swp_sail_mem_read_excl_au cpu _ true rfl rfl (by decide) r)
   iframe Hfrag
   iapply exclReadAU_wand pa 4 _ _ $$ HAU
   inext
@@ -344,10 +344,10 @@ set_option maxRecDepth 100000 in
 theorem execSpecF_sw_au (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool) (hok : SConfBare (GF := GF) c sie)
     (pc npc₀ : BitVec 64) (imm : BitVec 12) (rs1 rs2 : BitVec 5) (R : RegMap) (Ψ : IProp GF)
     (hram : inRam (RegMap.get R rs1 + BitVec.signExtend 64 imm) 4)
-    (hal : (RegMap.get R rs1 + BitVec.signExtend 64 imm).toNat % 4 = 0) :
+    (hal : (RegMap.get R rs1 + BitVec.signExtend 64 imm).toNat % 4 = 0) (r : Option Resv) :
     execSpecPP (GF := GF) cpu dq Privilege.Supervisor c Privilege.Supervisor c
       (instruction.STORE (imm, regidx.Regidx rs2, regidx.Regidx rs1, 4)) pc npc₀ npc₀
-      iprop(gprFile cpu R ∗ resvFrag cpu none false ∗
+      iprop(gprFile cpu R ∗ resvFrag cpu r false ∗
         writeAU cpu (RegMap.get R rs1 + BitVec.signExtend 64 imm) 4 (BitVec.extractLsb' 0 32 (RegMap.get R rs2)) Ψ)
       iprop(gprFile cpu R ∗ resvFrag cpu none false ∗ Ψ) := by
   have hva := is_aligned_vaddr_of (RegMap.get R rs1 + BitVec.signExtend 64 imm) 4 hal
@@ -360,10 +360,10 @@ set_option maxRecDepth 100000 in
 theorem execSpecF_sd_au (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool) (hok : SConfBare (GF := GF) c sie)
     (pc npc₀ : BitVec 64) (imm : BitVec 12) (rs1 rs2 : BitVec 5) (R : RegMap) (Ψ : IProp GF)
     (hram : inRam (RegMap.get R rs1 + BitVec.signExtend 64 imm) 8)
-    (hal : (RegMap.get R rs1 + BitVec.signExtend 64 imm).toNat % 8 = 0) :
+    (hal : (RegMap.get R rs1 + BitVec.signExtend 64 imm).toNat % 8 = 0) (r : Option Resv) :
     execSpecPP (GF := GF) cpu dq Privilege.Supervisor c Privilege.Supervisor c
       (instruction.STORE (imm, regidx.Regidx rs2, regidx.Regidx rs1, 8)) pc npc₀ npc₀
-      iprop(gprFile cpu R ∗ resvFrag cpu none false ∗
+      iprop(gprFile cpu R ∗ resvFrag cpu r false ∗
         writeAU cpu (RegMap.get R rs1 + BitVec.signExtend 64 imm) 8 (RegMap.get R rs2) Ψ)
       iprop(gprFile cpu R ∗ resvFrag cpu none false ∗ Ψ) := by
   have hva := is_aligned_vaddr_of (RegMap.get R rs1 + BitVec.signExtend 64 imm) 8 hal
@@ -376,11 +376,11 @@ set_option maxRecDepth 100000 in
 accessor: the old word (sign-extended) lands in `rd`. -/
 theorem execSpecF_amoswap_w_aq (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool) (hok : SConfBare (GF := GF) c sie)
     (pc npc₀ : BitVec 64) (rd rs1 rs2 : BitVec 5) (hrd : rd ≠ 0#5) (R : RegMap)
-    (Ψ : BitVec (8 * 4) → IProp GF) (hram : inRam (RegMap.get R rs1) 4) (hal : (RegMap.get R rs1).toNat % 4 = 0) :
+    (Ψ : BitVec (8 * 4) → IProp GF) (hram : inRam (RegMap.get R rs1) 4) (hal : (RegMap.get R rs1).toNat % 4 = 0) (r : Option Resv) :
     execSpecPP (GF := GF) cpu dq Privilege.Supervisor c Privilege.Supervisor c
       (instruction.AMO (amoop.AMOSWAP, true, false, regidx.Regidx rs2, regidx.Regidx rs1, 4, regidx.Regidx rd))
       pc npc₀ npc₀
-      iprop(gprFile cpu R ∗ resvFrag cpu none false ∗
+      iprop(gprFile cpu R ∗ resvFrag cpu r false ∗
         amoAU cpu (RegMap.get R rs1) 4 true (BitVec.setWidth 32 (RegMap.get R rs2)) Ψ)
       iprop(∃ old : BitVec (8 * 4), gprFile cpu (RegMap.set R rd (BitVec.signExtend 64 old)) ∗
         resvFrag cpu none false ∗ Ψ old) := by

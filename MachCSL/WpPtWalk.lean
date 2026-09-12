@@ -73,9 +73,9 @@ set_option swp_run.memStop true in
 /-- The exclusive physical read of an entry (the write-back's read half). -/
 theorem swp_checked_mem_read_pte8_excl_S (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
     (hok : SConfPhys (GF := GF) c sie)
-    (pa : BitVec 64) (hram : inRam pa 8) (hal : pa.toNat % 8 = 0) (Ψ : BitVec (8 * 8) → IProp GF)
+    (pa : BitVec 64) (hram : inRam pa 8) (hal : pa.toNat % 8 = 0) (r : Option Resv) (Ψ : BitVec (8 * 8) → IProp GF)
     (Φ : Result ((BitVec (8 * 8)) × Unit) (physaddr × ExceptionType) → IProp GF) :
-    confCells cpu dq Privilege.Supervisor c ∗ resvFrag cpu none false ∗
+    confCells cpu dq Privilege.Supervisor c ∗ resvFrag cpu r false ∗
     exclReadAU pa 8 (fun w => iprop(resvFrag cpu (some (snapOf pa 8 w)) false -∗ Ψ w)) ∗
     ▷ (confCells cpu dq Privilege.Supervisor c -∗ ∀ w, Ψ w -∗ Φ (.Ok (w, ())))
     ⊢ swp cpu (checked_mem_read (MemoryAccessType.Load mem_payload.PageTableEntry) page_based_mem_type.PBMT_PMA
@@ -84,7 +84,7 @@ theorem swp_checked_mem_read_pte8_excl_S (cpu : CPU) (dq : DFrac) (c : MConf) (s
   unfold checked_mem_read
   checked_mem_S_au_prefix pa 8 hram hal
   iapply swp_bind
-  iapply (swp_sail_mem_read_excl_au cpu _ false rfl rfl (by decide))
+  iapply (swp_sail_mem_read_excl_au cpu _ false rfl rfl (by decide) r)
   iframe Hfrag
   iapply exclReadAU_wand pa 8 _ _ $$ HAU
   inext
@@ -100,9 +100,9 @@ set_option swp_run.memStop true in
 /-- `read_pte_exclusive`: the entry at `pa`, taking the reservation. -/
 theorem swp_read_pte_exclusive (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
     (hok : SConfPhys (GF := GF) c sie)
-    (pa : BitVec 64) (hram : inRam pa 8) (hal : pa.toNat % 8 = 0) (Ψ : BitVec (8 * 8) → IProp GF)
+    (pa : BitVec 64) (hram : inRam pa 8) (hal : pa.toNat % 8 = 0) (r : Option Resv) (Ψ : BitVec (8 * 8) → IProp GF)
     (Φ : Result (BitVec (8 * 8)) (physaddr × ExceptionType) → IProp GF) :
-    confCells cpu dq Privilege.Supervisor c ∗ resvFrag cpu none false ∗
+    confCells cpu dq Privilege.Supervisor c ∗ resvFrag cpu r false ∗
     exclReadAU pa 8 (fun w => iprop(resvFrag cpu (some (snapOf pa 8 w)) false -∗ Ψ w)) ∗
     ▷ (confCells cpu dq Privilege.Supervisor c -∗ ∀ w, Ψ w -∗ Φ (.Ok w))
     ⊢ swp cpu (read_pte_exclusive (physaddr.Physaddr pa) 8) Φ := by
@@ -110,7 +110,7 @@ theorem swp_read_pte_exclusive (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
   unfold read_pte_exclusive mem_read_priv mem_read_priv_meta
   swp_run 20
   iapply swp_bind
-  iapply (swp_checked_mem_read_pte8_excl_S cpu dq c sie hok pa hram hal Ψ)
+  iapply (swp_checked_mem_read_pte8_excl_S cpu dq c sie hok pa hram hal r Ψ)
   iframe HmConf Hfrag HAU
   inext
   iintro HmConf %w HΨ
@@ -473,8 +473,8 @@ theorem swp_update_and_write_pte_kpt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MCon
     (acc : MemoryAccessType mem_payload) (hacc : kernelAccess acc) (mxr do_sum : Bool)
     (addr : BitVec 64) (ppn : BitVec 44) (perm : KPerm) (a d a0 d0 : BitVec 1)
     (hmem : (addr, kLeaf ppn perm a0 d0) ∈ t.entries 2) (hperm : perm.allows acc = true) (u : Unit)
-    (Φ : Result (Option (BitVec 64) × Unit) (PTW_Error × Unit) → IProp GF) :
-    confCells cpu dq Privilege.Supervisor c ∗ kptOn t M ∗ ownCtx cpu curCtx ∗ resvFrag cpu none false ∗
+    (r0 : Option Resv) (Φ : Result (Option (BitVec 64) × Unit) (PTW_Error × Unit) → IProp GF) :
+    confCells cpu dq Privilege.Supervisor c ∗ kptOn t M ∗ ownCtx cpu curCtx ∗ resvFrag cpu r0 false ∗
     (confCells cpu dq Privilege.Supervisor c -∗ ownCtx cpu curCtx -∗
         ∀ (r : Option Resv), resvFrag cpu r false -∗
         ∀ (p : Option (BitVec 64)), ⌜pteOptVariant ppn perm p⌝ -∗ Φ (.Ok (p, u)))
@@ -489,7 +489,7 @@ theorem swp_update_and_write_pte_kpt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MCon
   cases hupd : update_PTE_Bits (kLeaf ppn perm a d) acc with
   | none =>
     swp_run 40
-    iapply HΦ $$ HmConf Hctx %none Hfrag %none
+    iapply HΦ $$ HmConf Hctx %r0 Hfrag %none
     ipureintro; trivial
   | some p =>
     conf_cases HmConf
@@ -497,7 +497,7 @@ theorem swp_update_and_write_pte_kpt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MCon
     conf_intro HmConf
     ihave HAU := kpt_exclReadAU t M addr _ hmem $$ Hkpt
     iapply swp_bind
-    iapply (swp_read_pte_exclusive cpu dq c sie hok addr (hents _ hmem).1 (hents _ hmem).2
+    iapply (swp_read_pte_exclusive cpu dq c sie hok addr (hents _ hmem).1 (hents _ hmem).2 r0
       (fun w => iprop(⌜pteVariant (kLeaf ppn perm a0 d0) w⌝ ∗ resvFrag cpu (some (snapOf addr 8 w)) false)))
     iframe HmConf Hfrag
     isplitl [HAU]
@@ -724,8 +724,8 @@ theorem swp_translate_TLB_hit_kpt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) 
     (i : Nat) (ent : TLB_Entry) (hres : lookupRes t tlb vpn (some (i, ent)))
     (addr : BitVec 64) (ppn : BitVec 44) (perm : KPerm) (hmaps : t.maps vpn addr ppn perm)
     (hperm : perm.allows acc = true) (u : Unit)
-    (Φ : Result (BitVec 44 × page_based_mem_type × Unit) (PTW_Error × Unit) → IProp GF) :
-    confCells cpu dq Privilege.Supervisor c ∗ kptOn t M ∗ ownCtx cpu curCtx ∗ resvFrag cpu none false ∗
+    (r0 : Option Resv) (Φ : Result (BitVec 44 × page_based_mem_type × Unit) (PTW_Error × Unit) → IProp GF) :
+    confCells cpu dq Privilege.Supervisor c ∗ kptOn t M ∗ ownCtx cpu curCtx ∗ resvFrag cpu r0 false ∗
     Register.tlb ↦ᵣ[cpu] tlb ∗
     (confCells cpu dq Privilege.Supervisor c -∗ ownCtx cpu curCtx -∗
         ∀ (r : Option Resv), resvFrag cpu r false -∗
@@ -747,7 +747,7 @@ theorem swp_translate_TLB_hit_kpt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) 
   rw [pteAddr_tlbEntryOf, tlb_get_level_tlbEntryOf, update_and_write_pte39_eq]
   iapply swp_bind
   iapply (swp_update_and_write_pte_kpt cpu dq c sie hok hadue t M vpn acc hacc mxr do_sum addr₁ ppn₁ perm₁
-    a' d' a d hmem hperm u)
+    a' d' a d hmem hperm u r0)
   iframe HmConf Hkpt Hctx Hfrag
   iintro HmConf Hctx %r Hfrag %p %hp
   rw [tlb_get_ppn_tlbEntryOf, tlb_get_pbmt_kLeaf]
@@ -773,8 +773,8 @@ theorem swp_translate_TLB_miss_kpt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf)
     (acc : MemoryAccessType mem_payload) (hacc : kernelAccess acc) (mxr do_sum : Bool)
     (addr : BitVec 64) (ppn : BitVec 44) (perm : KPerm) (hmaps : t.maps vpn addr ppn perm)
     (hperm : perm.allows acc = true) (u : Unit)
-    (Φ : Result (BitVec 44 × page_based_mem_type × Unit) (PTW_Error × Unit) → IProp GF) :
-    confCells cpu dq Privilege.Supervisor c ∗ kptOn t M ∗ ownCtx cpu curCtx ∗ resvFrag cpu none false ∗
+    (r0 : Option Resv) (Φ : Result (BitVec 44 × page_based_mem_type × Unit) (PTW_Error × Unit) → IProp GF) :
+    confCells cpu dq Privilege.Supervisor c ∗ kptOn t M ∗ ownCtx cpu curCtx ∗ resvFrag cpu r0 false ∗
     Register.tlb ↦ᵣ[cpu] tlb ∗
     (confCells cpu dq Privilege.Supervisor c -∗ ownCtx cpu curCtx -∗
         ∀ (r : Option Resv), resvFrag cpu r false -∗
@@ -798,7 +798,7 @@ theorem swp_translate_TLB_miss_kpt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf)
   rw [update_and_write_pte39_eq]
   iapply swp_bind
   iapply (swp_update_and_write_pte_kpt cpu dq c sie hok hadue t M vpn acc hacc mxr do_sum addr ppn perm
-    a d a₀ d₀ hmem hperm u)
+    a d a₀ d₀ hmem hperm u r0)
   iframe HmConf Hkpt Hctx Hfrag
   iintro HmConf Hctx %r Hfrag %p %hp
   cases p with
@@ -866,8 +866,8 @@ theorem swp_translateAddr_kpt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie
     (acc : MemoryAccessType mem_payload) (hacc : kernelAccess acc)
     (addr : BitVec 64) (ppn : BitVec 44) (perm : KPerm) (hmaps : t.maps (vpnOf va) addr ppn perm)
     (hperm : perm.allows acc = true)
-    (Φ : Result (physaddr × page_based_mem_type × Unit) (ExceptionType × Unit) → IProp GF) :
-    confCells cpu dq Privilege.Supervisor c ∗ kptOn t M ∗ ownCtx cpu curCtx ∗ resvFrag cpu none false ∗
+    (r0 : Option Resv) (Φ : Result (physaddr × page_based_mem_type × Unit) (ExceptionType × Unit) → IProp GF) :
+    confCells cpu dq Privilege.Supervisor c ∗ kptOn t M ∗ ownCtx cpu curCtx ∗ resvFrag cpu r0 false ∗
     Register.tlb ↦ᵣ[cpu] tlb ∗
     (confCells cpu dq Privilege.Supervisor c -∗ ownCtx cpu curCtx -∗
         ∀ (r : Option Resv), resvFrag cpu r false -∗
@@ -899,7 +899,7 @@ theorem swp_translateAddr_kpt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie
     rw [translate_TLB_miss39_eq]
     iapply swp_bind
     iapply (swp_translate_TLB_miss_kpt cpu dq c sie hok' hadue t M tlb htlb (vpnOf va) acc hacc _ _ addr ppn perm
-      hmaps hperm _)
+      hmaps hperm _ r0)
     iframe HmConf Hkpt Hctx Hfrag Htlb
     iintro HmConf Hctx %r Hfrag %tlb' Htlb %htlb'
     swp_run 20
@@ -911,7 +911,7 @@ theorem swp_translateAddr_kpt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie
     rw [translate_TLB_hit39_eq]
     iapply swp_bind
     iapply (swp_translate_TLB_hit_kpt cpu dq c sie hok' hadue t M tlb htlb (vpnOf va) acc hacc _ _ i ent hres
-      addr ppn perm hmaps hperm _)
+      addr ppn perm hmaps hperm _ r0)
     iframe HmConf Hkpt Hctx Hfrag Htlb
     iintro HmConf Hctx %r Hfrag %tlb' Htlb %htlb'
     swp_run 20
