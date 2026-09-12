@@ -65,6 +65,59 @@ theorem byteBuf_upd [CurCtx] (a : BitVec 64) (bs : List (BitVec 8)) (j : Nat) (b
   iframe Hj
   iexact Hclose
 
+/-! ## C strings -/
+
+/-- No NUL byte inside. -/
+def nonul (s : List (BitVec 8)) : Prop := ∀ b ∈ s, b ≠ 0#8
+
+/-- **The C string `s` at `a`**, owned at `dq`: the bytes of `s` followed by
+the terminating NUL, no NUL inside `s`, all of it in RAM.  What a `char *`
+argument points to: the points-to of a string. -/
+def cstr [CurCtx] (a : BitVec 64) (dq : DFrac) (s : List (BitVec 8)) : IProp GF := iprop%
+  ⌜nonul s ∧ inRam a (s.length + 1)⌝ ∗ byteBuf a dq (s ++ [0#8])
+
+/-- A terminated buffer with no NUL inside, in RAM, is a C string. -/
+theorem cstr_intro [CurCtx] (a : BitVec 64) (dq : DFrac) (s : List (BitVec 8))
+    (hnul : nonul s) (hram : inRam a (s.length + 1)) :
+    byteBuf (GF := GF) a dq (s ++ [0#8]) ⊢ cstr a dq s := by
+  unfold cstr
+  iintro H; iframe H; ipureintro; exact ⟨hnul, hram⟩
+
+/-- A C string is its terminated buffer, with the facts. -/
+theorem cstr_elim [CurCtx] (a : BitVec 64) (dq : DFrac) (s : List (BitVec 8)) :
+    cstr (GF := GF) a dq s ⊢ ⌜nonul s ∧ inRam a (s.length + 1)⌝ ∗ byteBuf a dq (s ++ [0#8]) := by
+  unfold cstr
+  iintro H; iexact H
+
+/-- The facts of a C string. -/
+theorem cstr_pure [CurCtx] (a : BitVec 64) (dq : DFrac) (s : List (BitVec 8)) :
+    cstr (GF := GF) a dq s ⊢ ⌜nonul s ∧ inRam a (s.length + 1)⌝ ∗ cstr a dq s := by
+  unfold cstr
+  iintro ⟨%h, H⟩; iframe H; ipureintro; exact ⟨h, h⟩
+
+/-- RAM starts above 0: a C string's pointer is not null. -/
+theorem inRam_ne_zero {a : BitVec 64} {n : Nat} (h : inRam a n) : a ≠ 0#64 := by
+  intro h0; subst h0; unfold inRam ramBase at h; simp at h
+
+theorem cstr_ne_zero [CurCtx] (a : BitVec 64) (dq : DFrac) (s : List (BitVec 8)) :
+    cstr (GF := GF) a dq s ⊢ ⌜a ≠ 0#64⌝ := by
+  unfold cstr
+  iintro ⟨%h, _⟩; ipureintro; exact inRam_ne_zero h.2
+
+/-- Read byte `j` of a C string (`j ≤ s.length`: the terminator is byte `s.length`). -/
+theorem cstr_acc [CurCtx] (a : BitVec 64) (dq : DFrac) (s : List (BitVec 8)) (j : Nat) (b : BitVec 8)
+    (hj : (s ++ [0#8])[j]? = some b) :
+    cstr (GF := GF) a dq s ⊢
+      bytesPointsTo (a + BitVec.ofNat 64 j) 1 dq b ∗
+      (bytesPointsTo (a + BitVec.ofNat 64 j) 1 dq b -∗ cstr a dq s) := by
+  unfold cstr
+  iintro ⟨%h, H⟩
+  icases byteBuf_acc a dq (s ++ [0#8]) j b hj $$ H with ⟨Hj, Hclose⟩
+  iframe Hj
+  iintro Hj
+  ihave H := Hclose $$ Hj
+  iframe H; ipureintro; exact h
+
 /-! ## Four-slot frames -/
 
 /-- A four-slot frame: the words at `sp - 8`, `sp - 16`, `sp - 24`, `sp - 32`. -/

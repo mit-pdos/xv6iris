@@ -107,8 +107,9 @@ MachCSL/                          the framework (nothing xv6-specific)
                    (`bcond`), `subw`/`addw`
   WpSmodeRules.lean the `kctx` rules `wp_s_lbu/ld/sb/sd/branch/j/jal/ret/
                    subw/addw/push/pop` (one schema, `wpLoop_k_gen`)
-  CallConv.lean    `byteBuf` (a byte buffer as a list), `calleeSaved`, the
-                   canonical body context `(k.pushed m).withRegs R` and the
+  CallConv.lean    `byteBuf` (a byte buffer as a list), `cstr` (the
+                   points-to of a C string: terminated, no NUL inside, in
+                   RAM), `calleeSaved`, the canonical body context `(k.pushed m).withRegs R` and the
                    reading of register chains on literal indices
   WpSmodeFrame.lean the standard two-slot frame as two derived rules
                    (`wp_prologue2`, `wp_epilogue2`) and the tactics

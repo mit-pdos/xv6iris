@@ -3106,12 +3106,14 @@ set_option maxHeartbeats 4000000 in
 /-- **`printk` meets its specification**, given `acquire`, `release`,
 `consputc` and `printint`. -/
 theorem printk_proof (AC : ACQUIRE) (RE : RELEASE) (CP : CONSPUTC) (PI : PRINTINT) : PRINTK :=
-  ⟨fun {hlc GF} _ _ _ cpu k γpr γl γd bs dqf f descs hsie htier hK hflen hnonul hkinds hdlen hnoff hpr huart hfmt => by
+  ⟨fun {hlc GF} _ _ _ cpu k γpr γl γd bs dqf f descs hsie htier hK hflen hkinds hdlen hnoff hpr huart => by
   unfold wp_printk_body
   simp only [printkAddr, KernelSyms.«printk»]
   rw [hsie]
-  iintro ⟨Hk, #Htext, #HD, Hpc, Hbuf, Hdescs, #Hlk, #Htx, Hsent, Hnext⟩
+  iintro ⟨Hk, #Htext, #HD, Hpc, Hstr, Hdescs, #Hlk, #Htx, Hsent, Hnext⟩
+  icases cstr_elim _ _ _ $$ Hstr with ⟨%⟨hnonul, hfmt⟩, Hbuf⟩
   ihave HΦ := wpNext_off _ _ _ $$ Hnext
+  ihave HΦ := pkPost_of_cstr cpu k γd bs dqf f descs hnonul hfmt $$ HΦ
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   icases kctx_stackFacts _ _ $$ Hk with ⟨%hf0, Hk⟩
   have hf : stackFacts (k.regs 2#5) k.avail := by rw [hsie, trapRes_off] at hf0; exact hf0

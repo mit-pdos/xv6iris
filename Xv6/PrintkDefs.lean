@@ -955,13 +955,27 @@ theorem pkDescRes_str_acc (v : BitVec 64) (dq : DFrac) (s : List (BitVec 8)) :
       ⌜nonul s ∧ v ≠ 0#64 ∧ inRam v (s.length + 1)⌝ ∗ byteBuf v dq (s ++ [0#8]) ∗
       (byteBuf v dq (s ++ [0#8]) -∗ pkDescRes v (.str dq s)) := by
   simp only [pkDescRes]
-  iintro ⟨%h, Hb⟩
+  iintro H
+  icases cstr_elim _ _ _ $$ H with ⟨%h, Hb⟩
   isplitr
-  · ipureintro; exact h
+  · ipureintro; exact ⟨h.1, inRam_ne_zero h.2, h.2⟩
   · iframe Hb
     iintro Hb
-    iframe Hb
-    ipureintro; exact h
+    iapply cstr_intro _ _ _ h.1 h.2 $$ Hb
+
+/-- `printk`'s postcondition as the contract states it (the format as a
+`cstr`) implies the walk's form (the terminated buffer). -/
+theorem pkPost_of_cstr [Xv6G GF] (cpu : CPU) (k : KCtx) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
+    (f : List (BitVec 8)) (descs : List PkArgDesc) (hnonul : nonul f) (hfmt : inRam (k.regs 10#5) (f.length + 1)) :
+    (∀ (R' : RegMap) (cs : List (BitVec 8)),
+      kctx cpu (k.withRegs R') -∗ pcIs cpu (retPc (k.regs 1#5)) -∗
+      ⌜calleeSaved k.regs R' ∧ R' 10#5 = 0#64⌝ -∗
+      cstr (k.regs 10#5) dqf f -∗ pkDescs k.regs descs -∗
+      uartSentSub γd (bs ++ cs) -∗ wpLoop cpu)
+    ⊢ pkPost (GF := GF) cpu k γd bs dqf f descs := by
+  iintro HΦ %R' %cs Hk Hpc %h Hbuf Hdescs Hsent
+  ihave Hstr := cstr_intro _ _ _ hnonul hfmt $$ Hbuf
+  iapply HΦ $$ %R' %cs Hk Hpc %h Hstr Hdescs Hsent
 
 theorem pkDescRes_null_pure (v : BitVec 64) : pkDescRes (GF := GF) v .null ⊢ ⌜v = 0#64⌝ := by
   simp only [pkDescRes]

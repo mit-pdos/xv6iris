@@ -3,8 +3,8 @@ Specification of `printk` (kernel/printf.c).  Rocq
 `SpecPrintk.wp_printk_sconf_body`, with the same three parts beyond the
 context boilerplate:
 
-1. THE FORMAT STRING: a C string `f` (no NUL inside, terminator after) the
-   caller owns at some fraction; handed back untouched.
+1. THE FORMAT STRING: a C string `f` (`cstr`: no NUL inside, terminator
+   after, in RAM) the caller owns at some fraction; handed back untouched.
 2. THE VARARGS: a variadic call has no types at the call site, so the
    caller DESCRIBES its arguments (`PkArgDesc`): an integer-ish value
    (`%d %u %x %p %c` and the `l`/`ll` forms), a null `char *` (printed as
@@ -99,9 +99,6 @@ def pkKinds : List (BitVec 8) → List PkKind
         let d := pkDir c0 c1 c2
         pkCons d.1 (match d.2 with | 0 => pkKinds (c1 :: c2 :: r3) | 1 => pkKinds (c2 :: r3) | _ => pkKinds r3)
 
-/-- No NUL byte inside. -/
-def nonul (s : List (BitVec 8)) : Prop := ∀ b ∈ s, b ≠ 0#8
-
 /-! ## The caller's description of the varargs -/
 
 /-- One vararg. -/
@@ -116,12 +113,12 @@ def PkArgDesc.kind : PkArgDesc → PkKind
   | .str _ _ => .str
 
 /-- What a description costs: nothing for a value; the pointer's nullness
-for a null string; the string (terminated, in RAM, not at 0) otherwise. -/
+for a null string; the C string (`cstr`, hence not at 0) otherwise. -/
 def pkDescRes {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx] (v : BitVec 64) :
     PkArgDesc → IProp GF
   | .num => iprop(⌜True⌝)
   | .null => iprop(⌜v = 0#64⌝)
-  | .str dq s => iprop(⌜nonul s ∧ v ≠ 0#64 ∧ inRam v (s.length + 1)⌝ ∗ byteBuf v dq (s ++ [0#8]))
+  | .str dq s => cstr v dq s
 
 /-- Vararg `j` is the entry value of `a(j+1) = x(11+j)`. -/
 def pkVararg (R : RegMap) (j : Nat) : BitVec 64 := R (BitVec.ofNat 5 (11 + j))
@@ -138,17 +135,16 @@ def wp_printk_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G G
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8))
     (dqf : DFrac) (f : List (BitVec 8)) (descs : List PkArgDesc)
     (hsie : k.sie = false) (htier : k.tier = KTier.bare) (hK : 48 ≤ k.avail)
-    (hflen : f.length + 4 < 2 ^ 31) (hnonul : nonul f)
+    (hflen : f.length + 4 < 2 ^ 31)
     (hkinds : pkKinds f = descs.map PkArgDesc.kind) (hdlen : descs.length ≤ 7)
-    (hnoff : k.noff + 2 < 2 ^ 31) (hpr : "pr" ∉ k.locks) (huart : "uart" ∉ k.locks)
-    (hfmt : inRam (k.regs 10#5) (f.length + 1)) : Prop :=
+    (hnoff : k.noff + 2 < 2 ^ 31) (hpr : "pr" ∉ k.locks) (huart : "uart" ∉ k.locks) : Prop :=
   kctx cpu k ∗ kernelText ∗ kernelData ∗ pcIs cpu printkAddr ∗
-  byteBuf (k.regs 10#5) dqf (f ++ [0#8]) ∗ pkDescs k.regs descs ∗
+  cstr (k.regs 10#5) dqf f ∗ pkDescs k.regs descs ∗
   isLock γpr prLock "pr" (fun _ => emp) ∗ isTxLock γl γd ∗ uartSentSub γd bs ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ (R' : RegMap) (cs : List (BitVec 8)),
     kctx cpu' (k.withRegs R') -∗ pcIs cpu' (retPc (k.regs 1#5)) -∗
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = 0#64⌝ -∗
-    byteBuf (k.regs 10#5) dqf (f ++ [0#8]) -∗ pkDescs k.regs descs -∗
+    cstr (k.regs 10#5) dqf f -∗ pkDescs k.regs descs -∗
     uartSentSub γd (bs ++ cs) -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
@@ -156,8 +152,8 @@ def wp_printk_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G G
 structure PRINTK : Prop where
   wp_printk : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac) (f : List (BitVec 8))
-    (descs : List PkArgDesc) hsie htier hK hflen hnonul hkinds hdlen hnoff hpr huart hfmt,
-    wp_printk_body (hlc := hlc) (GF := GF) cpu k γpr γl γd bs dqf f descs hsie htier hK hflen hnonul hkinds hdlen
-      hnoff hpr huart hfmt
+    (descs : List PkArgDesc) hsie htier hK hflen hkinds hdlen hnoff hpr huart,
+    wp_printk_body (hlc := hlc) (GF := GF) cpu k γpr γl γd bs dqf f descs hsie htier hK hflen hkinds hdlen
+      hnoff hpr huart
 
 end Xv6
