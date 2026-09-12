@@ -42,7 +42,7 @@ macro "ti_step" rule:term : tactic =>
 
 set_option maxHeartbeats 4000000 in
 theorem TimerinitProof : TIMERINIT where
-  wp_timerinit cpu c hok hcbie hpmm hstce ret sp₀ v8 v14 v15 f0 f8 := by
+  wp_timerinit hct cpu c hok hcbie hpmm hstce ret sp₀ v8 v14 v15 f0 f8 := by
     unfold wp_timerinit_body
     iintro ⟨HmConf, Hclock, Htok, #Htext, Hpc, Hx1, Hx2, Hx8, Hx14, Hx15, Hf0, Hf8, HΦ⟩
     ti_norm
@@ -51,12 +51,12 @@ theorem TimerinitProof : TIMERINIT where
     iintro HmConf Hclock Hpc Hx2
     ti_norm
     -- 8000001e: sd ra,8(sp)
-    ti_step wp_m_sd cpu (DFrac.own 1) c hok _ true 8#12 2#5 1#5 (by decide) (by decide)
+    ti_step wp_m_sd cpu (DFrac.own 1) c hok hct _ true 8#12 2#5 1#5 (by decide) (by decide)
       (sp₀ + 0xfffffffffffffff0#64) ret f8
     iintro HmConf Hclock Hpc Hx2 Hx1 Htok Hf8
     ti_norm
     -- 80000020: sd s0,0(sp)
-    ti_step wp_m_sd cpu (DFrac.own 1) c hok _ true 0#12 2#5 8#5 (by decide) (by decide)
+    ti_step wp_m_sd cpu (DFrac.own 1) c hok hct _ true 0#12 2#5 8#5 (by decide) (by decide)
       (sp₀ + 0xfffffffffffffff0#64) v8 f0
     iintro HmConf Hclock Hpc Hx2 Hx8 Htok Hf0
     ti_norm
@@ -128,12 +128,12 @@ theorem TimerinitProof : TIMERINIT where
                       stimecmp := t + 1000000#64 })
       rfl rfl rfl
     -- 80000050: ld ra,8(sp)
-    ti_step wp_m_ld cpu (DFrac.own 1) (DFrac.own 1) _ hok3 _ true 8#12 1#5 2#5 (by decide) (by decide) _
+    ti_step wp_m_ld cpu (DFrac.own 1) (DFrac.own 1) _ hok3 hct _ true 8#12 1#5 2#5 (by decide) (by decide) _
       (sp₀ + 0xfffffffffffffff0#64) ret
     iintro HmConf Hclock Hpc Hx1 Hx2 Htok Hf8
     ti_norm
     -- 80000052: ld s0,0(sp)
-    ti_step wp_m_ld cpu (DFrac.own 1) (DFrac.own 1) _ hok3 _ true 0#12 8#5 2#5 (by decide) (by decide) _
+    ti_step wp_m_ld cpu (DFrac.own 1) (DFrac.own 1) _ hok3 hct _ true 0#12 8#5 2#5 (by decide) (by decide) _
       (sp₀ + 0xfffffffffffffff0#64) v8
     iintro HmConf Hclock Hpc Hx8 Hx2 Htok Hf0
     ti_norm

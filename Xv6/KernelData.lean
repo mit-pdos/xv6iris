@@ -8,6 +8,7 @@ Format strings, the `(null)` string and `printint`'s digit table live here.
 import MachCSL.Wp
 import MachCSL.CallConv
 import Xv6.KernelText
+import Xv6.KernelMap
 
 namespace Xv6.Kernel
 
@@ -2172,17 +2173,28 @@ theorem kernelData_sub (i n : Nat) :
   exact bigSepL_drop_take _ _ i n
 
 
+/-- The identity read-write claim of a static page. -/
+theorem kmapStatic_rw [CurCtx] (a : BitVec 64) (h : kmapClass (vpnOf a).toNat = some .rw) :
+    kmapStatic (GF := GF) ⊢ kmapId a := by
+  apply kmapStatic_at
+  rw [regmap_get?_eq, show (KernelMap.static : RegMapF (BitVec 64)) = kmapStaticMap from rfl,
+    kmapStaticMap_get _ _ h]
+  unfold idLeaf
+  rw [BitVec.ofNat_toNat, BitVec.setWidth_eq]
+
 /-- One read-only byte, as a (discarded-fraction) points-to at the ambient
 context: the image's bytes are readable by every context. -/
 theorem kernelData_byte [CurCtx] (i a b : Nat) (h : Kernel.rodata[i]? = some (a, b))
-    (hram : inRam (BitVec.ofNat 64 a) 1) :
-    kernelData (GF := GF) ⊢ wordPointsTo (BitVec.ofNat 64 a) 1 DFrac.discard (BitVec.ofNat 8 b) := by
+    (hram : inRam (BitVec.ofNat 64 a) 1) (hcl : kmapClass (vpnOf (BitVec.ofNat 64 a)).toNat = some .rw) :
+    kmapStatic (GF := GF) ⊢ kernelData -∗ wordPointsTo (BitVec.ofNat 64 a) 1 DFrac.discard (BitVec.ofNat 8 b) := by
+  iintro HS H
   unfold kernelData
-  iintro H
   icases BigSepL.bigSepL_lookup h $$ H with H
   unfold dataByte
-  iapply wordPointsTo_intro _ _ _ _ hram (Nat.mod_one _)
-  iapply imgBytes_ctx curCtx _ 1 _ $$ H
+  ihave #Hcl := kmapStatic_rw (BitVec.ofNat 64 a) hcl $$ HS
+  ihave Hb := imgBytes_ctx curCtx (BitVec.ofNat 64 a) 1 (BitVec.ofNat 8 b) $$ H
+  ihave Hw := wordPointsTo_intro_id (BitVec.ofNat 64 a) 1 DFrac.discard (BitVec.ofNat 8 b) hram (Nat.mod_one _) $$ Hcl Hb
+  iexact Hw
 
 /-- `"(null)"` (with its terminator) at `0x80007008`. -/
 def nullStr : List (BitVec 8) := [0x28#8, 0x6e#8, 0x75#8, 0x6c#8, 0x6c#8, 0x29#8, 0#8]
@@ -2193,15 +2205,15 @@ def digitsStr : List (BitVec 8) :=
    0x61#8, 0x62#8, 0x63#8, 0x64#8, 0x65#8, 0x66#8]
 
 set_option maxRecDepth 100000 in
-theorem kernelData_null [CurCtx] : kernelData (GF := GF) ⊢ byteBuf 0x80007008#64 DFrac.discard nullStr := by
-  iintro #H
-  ihave #H0 := kernelData_byte 8 0x80007008 0x28 rfl (by unfold inRam ramBase ramEnd; decide) $$ H
-  ihave #H1 := kernelData_byte 9 0x80007009 0x6e rfl (by unfold inRam ramBase ramEnd; decide) $$ H
-  ihave #H2 := kernelData_byte 10 0x8000700a 0x75 rfl (by unfold inRam ramBase ramEnd; decide) $$ H
-  ihave #H3 := kernelData_byte 11 0x8000700b 0x6c rfl (by unfold inRam ramBase ramEnd; decide) $$ H
-  ihave #H4 := kernelData_byte 12 0x8000700c 0x6c rfl (by unfold inRam ramBase ramEnd; decide) $$ H
-  ihave #H5 := kernelData_byte 13 0x8000700d 0x29 rfl (by unfold inRam ramBase ramEnd; decide) $$ H
-  ihave #H6 := kernelData_byte 14 0x8000700e 0x00 rfl (by unfold inRam ramBase ramEnd; decide) $$ H
+theorem kernelData_null [CurCtx] : kmapStatic (GF := GF) ⊢ kernelData -∗ byteBuf 0x80007008#64 DFrac.discard nullStr := by
+  iintro #HS #H
+  ihave #H0 := kernelData_byte 8 0x80007008 0x28 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #H1 := kernelData_byte 9 0x80007009 0x6e rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #H2 := kernelData_byte 10 0x8000700a 0x75 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #H3 := kernelData_byte 11 0x8000700b 0x6c rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #H4 := kernelData_byte 12 0x8000700c 0x6c rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #H5 := kernelData_byte 13 0x8000700d 0x29 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #H6 := kernelData_byte 14 0x8000700e 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
   unfold byteBuf nullStr
   simp only [Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil, Nat.reduceAdd, Nat.zero_add,
     BitVec.reduceAdd]
@@ -2209,24 +2221,24 @@ theorem kernelData_null [CurCtx] : kernelData (GF := GF) ⊢ byteBuf 0x80007008#
   all_goals iempintro
 
 set_option maxRecDepth 100000 in
-theorem kernelData_digits [CurCtx] : kernelData (GF := GF) ⊢ byteBuf 0x80007730#64 DFrac.discard digitsStr := by
-  iintro #H
-  ihave #H0 := kernelData_byte 1840 0x80007730 0x30 rfl (by unfold inRam ramBase ramEnd; decide) $$ H
-  ihave #H1 := kernelData_byte 1841 0x80007731 0x31 rfl (by unfold inRam ramBase ramEnd; decide) $$ H
-  ihave #H2 := kernelData_byte 1842 0x80007732 0x32 rfl (by unfold inRam ramBase ramEnd; decide) $$ H
-  ihave #H3 := kernelData_byte 1843 0x80007733 0x33 rfl (by unfold inRam ramBase ramEnd; decide) $$ H
-  ihave #H4 := kernelData_byte 1844 0x80007734 0x34 rfl (by unfold inRam ramBase ramEnd; decide) $$ H
-  ihave #H5 := kernelData_byte 1845 0x80007735 0x35 rfl (by unfold inRam ramBase ramEnd; decide) $$ H
-  ihave #H6 := kernelData_byte 1846 0x80007736 0x36 rfl (by unfold inRam ramBase ramEnd; decide) $$ H
-  ihave #H7 := kernelData_byte 1847 0x80007737 0x37 rfl (by unfold inRam ramBase ramEnd; decide) $$ H
-  ihave #H8 := kernelData_byte 1848 0x80007738 0x38 rfl (by unfold inRam ramBase ramEnd; decide) $$ H
-  ihave #H9 := kernelData_byte 1849 0x80007739 0x39 rfl (by unfold inRam ramBase ramEnd; decide) $$ H
-  ihave #H10 := kernelData_byte 1850 0x8000773a 0x61 rfl (by unfold inRam ramBase ramEnd; decide) $$ H
-  ihave #H11 := kernelData_byte 1851 0x8000773b 0x62 rfl (by unfold inRam ramBase ramEnd; decide) $$ H
-  ihave #H12 := kernelData_byte 1852 0x8000773c 0x63 rfl (by unfold inRam ramBase ramEnd; decide) $$ H
-  ihave #H13 := kernelData_byte 1853 0x8000773d 0x64 rfl (by unfold inRam ramBase ramEnd; decide) $$ H
-  ihave #H14 := kernelData_byte 1854 0x8000773e 0x65 rfl (by unfold inRam ramBase ramEnd; decide) $$ H
-  ihave #H15 := kernelData_byte 1855 0x8000773f 0x66 rfl (by unfold inRam ramBase ramEnd; decide) $$ H
+theorem kernelData_digits [CurCtx] : kmapStatic (GF := GF) ⊢ kernelData -∗ byteBuf 0x80007730#64 DFrac.discard digitsStr := by
+  iintro #HS #H
+  ihave #H0 := kernelData_byte 1840 0x80007730 0x30 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #H1 := kernelData_byte 1841 0x80007731 0x31 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #H2 := kernelData_byte 1842 0x80007732 0x32 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #H3 := kernelData_byte 1843 0x80007733 0x33 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #H4 := kernelData_byte 1844 0x80007734 0x34 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #H5 := kernelData_byte 1845 0x80007735 0x35 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #H6 := kernelData_byte 1846 0x80007736 0x36 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #H7 := kernelData_byte 1847 0x80007737 0x37 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #H8 := kernelData_byte 1848 0x80007738 0x38 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #H9 := kernelData_byte 1849 0x80007739 0x39 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #H10 := kernelData_byte 1850 0x8000773a 0x61 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #H11 := kernelData_byte 1851 0x8000773b 0x62 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #H12 := kernelData_byte 1852 0x8000773c 0x63 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #H13 := kernelData_byte 1853 0x8000773d 0x64 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #H14 := kernelData_byte 1854 0x8000773e 0x65 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #H15 := kernelData_byte 1855 0x8000773f 0x66 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
   unfold byteBuf digitsStr
   simp only [Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil, Nat.reduceAdd, Nat.zero_add,
     BitVec.reduceAdd]

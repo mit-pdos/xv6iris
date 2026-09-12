@@ -1357,6 +1357,8 @@ theorem printk_str_loop (CP : CONSPUTC) {hlc : HasLC} {GF : BundledGFunctors} [M
     intro j R bs hj hR hR20 hR10
     iintro ⟨#Htx, Hk, Hpc, Hbuf, Hsent, HΦ⟩
     icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
+    icases kctx_tier _ _ $$ Hk with ⟨%hkt, Hk⟩
+    have hct : curTier = KTier.bare := by rw [← hkt]; simp only [pkBase, KCtx.withRegs_tier, KCtx.push_tier]; exact htier
     have huart' : "uart" ∉ "pr" :: k.locks := by
       intro h; rcases List.mem_cons.mp h with h | h
       · exact absurd h (by decide)
@@ -1405,6 +1407,8 @@ theorem printk_str_loop (CP : CONSPUTC) {hlc : HasLC} {GF : BundledGFunctors} [M
     intro j R bs hj hR hR20 hR10
     iintro ⟨#Htx, Hk, Hpc, Hbuf, Hsent, HΦ⟩
     icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
+    icases kctx_tier _ _ $$ Hk with ⟨%hkt, Hk⟩
+    have hct : curTier = KTier.bare := by rw [← hkt]; simp only [pkBase, KCtx.withRegs_tier, KCtx.push_tier]; exact htier
     have huart' : "uart" ∉ "pr" :: k.locks := by
       intro h; rcases List.mem_cons.mp h with h | h
       · exact absurd h (by decide)
@@ -1431,7 +1435,7 @@ theorem printk_str_loop (CP : CONSPUTC) {hlc : HasLC} {GF : BundledGFunctors} [M
     iintro Hk Hpc
     -- lbu a0,0(s4): the next character
     have hb : (s ++ [0#8])[j + 1]? = some (fmtByte s (j + 1)) := fmtByte_get s (j + 1) (by omega)
-    icases cstr_pure v dq s $$ Hbuf with ⟨%⟨hs, _⟩, Hbuf⟩
+    icases cstr_pure v dq s hct $$ Hbuf with ⟨%⟨hs, _⟩, Hbuf⟩
     have hnz : fmtByte s (j + 1) ≠ 0#8 := fmtByte_ne_zero s hs (j + 1) (by omega)
     icases cstr_acc v dq s (j + 1) _ hb $$ Hbuf with ⟨Hb, Hclose⟩
     k_step (wp_s_lbu cpu _ ?hs ?ht 0x80000726#64 false 0#12 10#5 20#5 (by decide) dq (fmtByte s (j + 1))) from (text_instr _ _ _ _ rfl rfl) HT
@@ -1475,6 +1479,7 @@ theorem printk_hex_iter (CP : CONSPUTC) {hlc : HasLC} {GF : BundledGFunctors} [M
   iintro ⟨#Htx, Hk, Hpc, Hsent, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
   icases kctx_kernelData _ _ $$ Hk with ⟨#HD, Hk⟩
+  icases kctx_kmapStatic _ _ $$ Hk with ⟨#HS, Hk⟩
   have huart' : "uart" ∉ "pr" :: k.locks := by
     intro h; rcases List.mem_cons.mp h with h | h
     · exact absurd h (by decide)
@@ -1492,7 +1497,7 @@ theorem printk_hex_iter (CP : CONSPUTC) {hlc : HasLC} {GF : BundledGFunctors} [M
     with [hR25, BitVec.add_comm (R 21#5 >>> 60) 0x80007730#64]
   iintro Hk Hpc
   -- lbu a0,0(a5)
-  ihave Hdig := kernelData_digits $$ HD
+  ihave Hdig := kernelData_digits $$ HS HD
   icases byteBuf_acc _ _ _ _ _ hdig $$ Hdig with ⟨Hb, _⟩
   ihave Hb := (show wordPointsTo (0x80007730#64 + BitVec.ofNat 64 (R 21#5 >>> 60).toNat) 1 DFrac.discard
       (digitsStr[(R 21#5 >>> 60).toNat]'h16) ⊢
@@ -2060,6 +2065,9 @@ theorem printk_arm_s (CP : CONSPUTC) {hlc : HasLC} {GF : BundledGFunctors} [Mach
   iintro ⟨#Htx, Hk, Hpc, Hbuf, Hdescs, Hframe, Hsent, Hlocked, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
   icases kctx_kernelData _ _ $$ Hk with ⟨#HD, Hk⟩
+  icases kctx_kmapStatic _ _ $$ Hk with ⟨#HS, Hk⟩
+  icases kctx_tier _ _ $$ Hk with ⟨%hkt, Hk⟩
+  have hct : curTier = KTier.bare := by rw [← hkt]; simp only [pkBase, KCtx.withRegs_tier, KCtx.push_tier]; exact htier
   have hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFF40#64 := hR.1.1
   have hR8 : R 8#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFC0#64 := hR.1.2.1
   have huart' : "uart" ∉ "pr" :: k.locks := by
@@ -2105,7 +2113,7 @@ theorem printk_arm_s (CP : CONSPUTC) {hlc : HasLC} {GF : BundledGFunctors} [Mach
     iintro Hk Hpc
     k_step (wp_s_j cpu _ ?hs ?ht 0x8000073a#64 true 2097126#21) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
     iintro Hk Hpc
-    ihave Hnull := kernelData_nullBody $$ HD
+    ihave Hnull := kernelData_nullBody $$ HS HD
     iapply (printk_str_loop CP cpu k γl γd hsie htier hK hnoff huart 0x80007008#64 DFrac.discard nullBody
       5 0 _ bs (by decide) ?hRn ?h20n ?h10n) $$ [- $Hk $Hpc $Hsent]
     rotate_right 1
@@ -2123,7 +2131,7 @@ theorem printk_arm_s (CP : CONSPUTC) {hlc : HasLC} {GF : BundledGFunctors} [Mach
     rw [h'.2]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hR9
   · -- a string
     icases pkDescRes_str_acc _ _ _ $$ Hd with ⟨Hbs, Hdcl'⟩
-    icases cstr_pure _ _ _ $$ Hbs with ⟨%⟨hs, hv⟩, Hbs⟩
+    icases cstr_pure _ _ _ hct $$ Hbs with ⟨%⟨hs, hv⟩, Hbs⟩
     have hv' : k.regs (BitVec.ofNat 5 (11 + kk)) ≠ 0#64 := hv
     k_step (wp_s_branch cpu _ ?hs ?ht 0x80000714#64 false 26#13 20#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) HT
       $$ [- $Hk $Hpc] with [ite_beq_zero, if_neg hv']
@@ -2859,6 +2867,7 @@ theorem printk_proof (AC : ACQUIRE) (RE : RELEASE) (CP : CONSPUTC) (PI : PRINTIN
   iintro ⟨Hk, Hpc, Hstr, Hdescs, #Hlk, #Htx, Hsent, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_kernelData _ _ $$ Hk with ⟨#HD, Hk⟩
+  icases kctx_kmapStatic _ _ $$ Hk with ⟨#HS, Hk⟩
   icases cstr_elim _ _ _ $$ Hstr with ⟨%hnonul, Hbuf⟩
   ihave HΦ := wpNext_off _ _ _ $$ Hnext
   ihave HΦ := pkPost_of_cstr cpu k γd bs dqf f descs hnonul $$ HΦ

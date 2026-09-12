@@ -9,6 +9,7 @@ nothing else: no client proves RAM membership or alignment at a memory access.
 -/
 import MachCSL.Ctx
 import MachCSL.PlatformFacts
+import MachCSL.KMap
 
 namespace MachCSL
 
@@ -16,29 +17,75 @@ open Iris Iris.BI Iris.ProofMode Std
 
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
-/-- **The `n`-byte word `w` at `pa`**, owned at `dq`: its bytes, in RAM, at an
-`n`-aligned address. -/
-def wordPointsTo [CurCtx] (pa : PAddr) (n : Nat) (dq : DFrac) (w : BitVec (8 * n)) : IProp GF := iprop%
-  ⌜inRam pa n ∧ pa.toNat % n = 0⌝ ∗ bytesPointsTo pa n dq w
+/-- The identity claim of a kernel address: its page maps to itself, read-write. -/
+abbrev kmapId [CurCtx] (va : BitVec 64) : IProp GF :=
+  kmapAt (vpnOf va) (kLeaf (idPpn (vpnOf va)) .rw 0#1 0#1)
 
-/-- A byte window in RAM at an aligned address is a word. -/
-theorem wordPointsTo_intro [CurCtx] (pa : PAddr) (n : Nat) (dq : DFrac) (w : BitVec (8 * n))
-    (hram : inRam pa n) (hal : pa.toNat % n = 0) :
-    bytesPointsTo (GF := GF) pa n dq w ⊢ wordPointsTo pa n dq w := by
-  unfold wordPointsTo
-  iintro H; iframe H; ipureintro; exact ⟨hram, hal⟩
+/-- **The `n`-byte word `w` at kernel address `va`**, owned at `dq` (the
+Rocq prototype's `mem_pointsto`): the kernel page table maps `va`'s page to
+some page `ppn` read-write (a persistent claim), the ambient tier pins that
+mapping (Bare: the address is its own physical address), and the bytes sit
+at the physical address, in RAM, at an `n`-aligned address.  The facts
+travel with the ownership, so an instruction rule takes the cell and nothing
+else. -/
+def wordPointsTo [CurCtx] (va : PAddr) (n : Nat) (dq : DFrac) (w : BitVec (8 * n)) : IProp GF := iprop%
+  ∃ ppn : BitVec 44, kmapAt (vpnOf va) (kLeaf ppn .rw 0#1 0#1) ∗
+    ⌜tierPin curTier ppn va ∧ inRam (paOf ppn va) n ∧ va.toNat % n = 0⌝ ∗
+    bytesPointsTo (paOf ppn va) n dq w
 
-/-- A word is its byte window, with the facts. -/
-theorem wordPointsTo_cases [CurCtx] (pa : PAddr) (n : Nat) (dq : DFrac) (w : BitVec (8 * n)) :
-    wordPointsTo (GF := GF) pa n dq w ⊢ ⌜inRam pa n ∧ pa.toNat % n = 0⌝ ∗ bytesPointsTo pa n dq w := by
-  unfold wordPointsTo
-  iintro H; iexact H
+/-- A pinned identity mapping at Bare is the identity page. -/
+theorem ppn_of_pin (ppn : BitVec 44) (va : BitVec 64) (h : paOf ppn va = va) (hlt : va.toNat < 2 ^ 39) :
+    ppn = idPpn (vpnOf va) := by
+  unfold paOf at h
+  unfold idPpn vpnOf
+  have h' : va < 0x8000000000#64 := by
+    rw [BitVec.lt_def]; simpa using hlt
+  revert h h'
+  bv_decide
 
-/-- The facts of a word. -/
-theorem wordPointsTo_facts [CurCtx] (pa : PAddr) (n : Nat) (dq : DFrac) (w : BitVec (8 * n)) :
-    wordPointsTo (GF := GF) pa n dq w ⊢ ⌜inRam pa n ∧ pa.toNat % n = 0⌝ ∗ wordPointsTo pa n dq w := by
+/-- A byte window in RAM at an aligned address, with the address's identity
+claim, is a word (at any tier). -/
+theorem wordPointsTo_intro_id [CurCtx] (va : PAddr) (n : Nat) (dq : DFrac) (w : BitVec (8 * n))
+    (hram : inRam va n) (hal : va.toNat % n = 0) :
+    kmapId (GF := GF) va ⊢ bytesPointsTo va n dq w -∗ wordPointsTo va n dq w := by
   unfold wordPointsTo
-  iintro ⟨%h, H⟩; iframe H; ipureintro; exact ⟨h, h⟩
+  iintro #Hcl Hb
+  iexists idPpn (vpnOf va)
+  rw [paOf_id va (inRam_lt va n hram)]
+  iframe Hb
+  isplit
+  · iexact Hcl
+  · ipureintro
+    exact ⟨tierPin_id _ va (inRam_lt va n hram), hram, hal⟩
+
+/-- At the Bare tier a word is its byte window at `va` itself, with the
+facts and the identity claim. -/
+theorem wordPointsTo_bare_acc [CurCtx] (va : PAddr) (n : Nat) (dq : DFrac) (w : BitVec (8 * n))
+    (hct : curTier = KTier.bare) :
+    wordPointsTo (GF := GF) va n dq w ⊢
+      ⌜inRam va n ∧ va.toNat % n = 0⌝ ∗ kmapId va ∗ bytesPointsTo va n dq w := by
+  unfold wordPointsTo
+  iintro ⟨%ppn, #Hcl, %⟨hpin, hram, hal⟩, Hb⟩
+  rw [hct] at hpin
+  simp only [tierPin] at hpin
+  have hlt : va.toNat < 2 ^ 39 := by rw [hpin] at hram; exact inRam_lt va n hram
+  obtain rfl := ppn_of_pin ppn va hpin hlt
+  rw [hpin] at hram
+  rw [hpin]
+  iframe Hb
+  isplit
+  · ipureintro; exact ⟨hram, hal⟩
+  · iexact Hcl
+
+/-- The facts of a word, at the Bare tier. -/
+theorem wordPointsTo_facts [CurCtx] (va : PAddr) (n : Nat) (dq : DFrac) (w : BitVec (8 * n))
+    (hct : curTier = KTier.bare) :
+    wordPointsTo (GF := GF) va n dq w ⊢ ⌜inRam va n ∧ va.toNat % n = 0⌝ ∗ wordPointsTo va n dq w := by
+  iintro H
+  icases wordPointsTo_bare_acc va n dq w hct $$ H with ⟨%⟨hram, hal⟩, #Hcl, Hb⟩
+  ihave H := wordPointsTo_intro_id va n dq w hram hal $$ Hcl Hb
+  iframe H
+  ipureintro; exact ⟨hram, hal⟩
 
 instance [CurCtx] (pa : PAddr) (n : Nat) (dq : DFrac) (w : BitVec (8 * n)) :
     Timeless (PROP := IProp GF) (wordPointsTo pa n dq w) := by
@@ -69,14 +116,28 @@ theorem wordPointsTo_lo4_acc [CurCtx] (a : BitVec 64) (dq : DFrac) (w : BitVec 6
       wordPointsTo a 4 dq (BitVec.extractLsb' 0 32 w) ∗
       (wordPointsTo a 4 dq (BitVec.extractLsb' 0 32 w) -∗ wordPointsTo a 8 dq w) := by
   unfold wordPointsTo
-  iintro ⟨%⟨hram, hal⟩, H⟩
-  have hram4 : inRam a 4 := by unfold inRam at *; omega
+  iintro ⟨%ppn, #Hcl, %⟨hpin, hram, hal⟩, H⟩
+  have hram4 : inRam (paOf ppn a) 4 := by unfold inRam at *; omega
   have hal4 : a.toNat % 4 = 0 := by omega
-  icases bytesPointsTo_lo4_acc a dq w $$ H with ⟨Hlo, Hclose⟩
+  icases bytesPointsTo_lo4_acc (paOf ppn a) dq w $$ H with ⟨Hlo, Hclose⟩
   isplitl [Hlo]
-  · iframe Hlo; ipureintro; exact ⟨hram4, hal4⟩
-  · iintro ⟨_, Hlo⟩
+  · iexists ppn
+    iframe Hlo
+    isplit
+    · iexact Hcl
+    · ipureintro; exact ⟨hpin, hram4, hal4⟩
+  · iintro ⟨%ppn', #Hcl', %_, Hlo⟩
+    icases kmapAt_agree (vpnOf a) (kLeaf ppn .rw 0#1 0#1) (kLeaf ppn' .rw 0#1 0#1) $$ [Hcl Hcl'] with %heq
+    · isplit
+      · iexact Hcl
+      · iexact Hcl'
+    obtain ⟨h, -⟩ := kLeaf_inj heq
+    subst h
     ihave H := Hclose $$ Hlo
-    iframe H; ipureintro; exact ⟨hram, hal⟩
+    iexists ppn
+    iframe H
+    isplit
+    · iexact Hcl
+    · ipureintro; exact ⟨hpin, hram, hal⟩
 
 end MachCSL

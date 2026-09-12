@@ -106,9 +106,12 @@ class KernelMap where
 section fixed
 variable [MachFixedGS hlc GF]
 
-/-- The static claims of era `E`: one persistent element per static entry. -/
+/-- The static claims of era `E`: the persistent element of every static
+entry.  Stated as a quantifier, not as a big-op over the map: the proof
+mode cannot afford to look inside a 33k-entry map literal. -/
 def kmapStaticAt (E : EraGS GF) [KernelMap] : IProp GF := iprop%
-  [∗map] k ↦ v ∈ KernelMap.static, E.kmapName ↪◯MAP[k]{.discard} v
+  ∀ (k : Nat) (v : BitVec 64), ⌜Iris.Std.PartialMap.get? (M := RegMapF) KernelMap.static k = some v⌝ →
+    E.kmapName ↪◯MAP[k]{.discard} v
 
 instance kmapStaticAt_persistent (E : EraGS GF) [KernelMap] : Persistent (kmapStaticAt (GF := GF) E) := by
   unfold kmapStaticAt; infer_instance
@@ -119,19 +122,22 @@ theorem kmap_elem_persist (γ : GName) (k : Nat) (v : BitVec 64) :
   iintro H
   iapply ghost_map_elem_persist γ k (DFrac.own 1) v $$ H
 
-/-- Publishing the static entries. -/
-theorem kmapStatic_persist (γ : GName) [KernelMap] :
-    ([∗map] k ↦ v ∈ KernelMap.static, γ ↪◯MAP[k] v) ⊢@{IProp GF}
-      |==> [∗map] k ↦ v ∈ KernelMap.static, γ ↪◯MAP[k]{.discard} v := by
+/-- Publishing the static entries, as the claims. -/
+theorem kmapStatic_persist (E : EraGS GF) [KernelMap] :
+    ([∗map] k ↦ v ∈ KernelMap.static, E.kmapName ↪◯MAP[k] v) ⊢@{IProp GF} |==> kmapStaticAt E := by
   iintro H
-  ihave Hl := (BigSepM.bigSepM_toList (Φ := fun k v => iprop(γ ↪◯MAP[k] v))
+  ihave Hl := (BigSepM.bigSepM_toList (Φ := fun k v => iprop(E.kmapName ↪◯MAP[k] v))
     (m := KernelMap.static)).1 $$ H
-  ihave Hl' := BigSepL.bigSepL_mono (fun {_ kv} _ => kmap_elem_persist γ kv.1 kv.2) $$ Hl
+  ihave Hl' := BigSepL.bigSepL_mono (fun {_ kv} _ => kmap_elem_persist E.kmapName kv.1 kv.2) $$ Hl
   ihave Hb := BigSepL.bigSepL_bupd $$ Hl'
   imod Hb with Hl''
   imodintro
-  iapply (BigSepM.bigSepM_toList (Φ := fun k v => iprop(γ ↪◯MAP[k]{.discard} v))
+  ihave Hm := (BigSepM.bigSepM_toList (Φ := fun k v => iprop(E.kmapName ↪◯MAP[k]{.discard} v))
     (m := KernelMap.static)).2 $$ Hl''
+  unfold kmapStaticAt
+  iintro %k %v %hk
+  icases (BigSepM.bigSepM_lookup_acc hk).1 $$ Hm with ⟨Hel, _⟩
+  iexact Hel
 
 end fixed
 
@@ -141,14 +147,18 @@ variable [MachGS hlc GF] [KernelMap]
 /-- The static claims at the ambient era. -/
 abbrev kmapStatic : IProp GF := kmapStaticAt (MachGS.era (hlc := hlc) (GF := GF))
 
+/-- The iris lookup on a register map is the map's own. -/
+theorem regmap_get?_eq {V : Type} (m : RegMapF V) (k : Nat) :
+    Iris.Std.PartialMap.get? (M := RegMapF) m k = m[k]? := rfl
+
 /-- A static entry's claim. -/
 theorem kmapStatic_at (vpn : BitVec 27) (v : BitVec 64)
     (h : Iris.Std.PartialMap.get? (M := RegMapF) KernelMap.static vpn.toNat = some v) :
     kmapStatic (GF := GF) ⊢ kmapAt vpn v := by
   unfold kmapStatic kmapStaticAt kmapAt
   iintro H
-  icases (BigSepM.bigSepM_lookup_acc h).1 $$ H with ⟨Hel, _⟩
-  iexact Hel
+  iapply H $$ %vpn.toNat %v
+  ipureintro; exact h
 
 end ambient
 

@@ -137,6 +137,10 @@ theorem kmapClass_lt (k : Nat) (perm : KPerm) (h : kmapClass k = some perm) : k 
     · omega
     · cases h
 
+-- The map is never unfolded past its lookup lemmas: a proof-mode goal
+-- mentioning `kmapStatic` must not evaluate the 33k-entry tree.
+attribute [irreducible] kmapStaticMap
+
 /-- xv6's static kernel map. -/
 instance : KernelMap where
   static := kmapStaticMap

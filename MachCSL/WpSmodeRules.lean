@@ -234,13 +234,14 @@ theorem wp_s_lbu [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (
           wordPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 1 dq' b -∗ wpLoop cpu'))
     ⊢ wpLoop cpu := by
   iintro ⟨Hi, Hk, Hpc, Hw, Hnext⟩
-  icases wordPointsTo_cases _ _ _ _ $$ Hw with ⟨%⟨hram, hal⟩, Hm⟩
+  icases kctx_tier _ _ $$ Hk with ⟨%hkt, Hk⟩
+  icases wordPointsTo_bare_acc _ _ _ _ (hkt ▸ htier) $$ Hw with ⟨%⟨hram, hal⟩, #Hcl, Hm⟩
   iapply (wp_s_lbu_bytes cpu k hsie htier pc is_rvc imm rd rs1 hrd dq' b hram)
   iframe Hi Hk Hpc Hm
   inext
   iapply wpNext_mono $$ Hnext
   iintro %cpu' HK Hk Hpc Hm
-  ihave Hw := wordPointsTo_intro _ _ _ _ hram hal $$ Hm
+  ihave Hw := wordPointsTo_intro_id _ _ _ _ hram hal $$ Hcl Hm
   iapply HK $$ Hk Hpc Hw
 
 /-- `ld rd, imm(rs1)`: the word at `rs1 + imm` (8-aligned) (the raw form: a byte window plus the facts; clients use `wp_s_ld`). -/
@@ -271,13 +272,14 @@ theorem wp_s_ld [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (h
           wordPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 8 dq' v -∗ wpLoop cpu'))
     ⊢ wpLoop cpu := by
   iintro ⟨Hi, Hk, Hpc, Hw, Hnext⟩
-  icases wordPointsTo_cases _ _ _ _ $$ Hw with ⟨%⟨hram, hal⟩, Hm⟩
+  icases kctx_tier _ _ $$ Hk with ⟨%hkt, Hk⟩
+  icases wordPointsTo_bare_acc _ _ _ _ (hkt ▸ htier) $$ Hw with ⟨%⟨hram, hal⟩, #Hcl, Hm⟩
   iapply (wp_s_ld_bytes cpu k hsie htier pc is_rvc imm rd rs1 hrd dq' v hram hal)
   iframe Hi Hk Hpc Hm
   inext
   iapply wpNext_mono $$ Hnext
   iintro %cpu' HK Hk Hpc Hm
-  ihave Hw := wordPointsTo_intro _ _ _ _ hram hal $$ Hm
+  ihave Hw := wordPointsTo_intro_id _ _ _ _ hram hal $$ Hcl Hm
   iapply HK $$ Hk Hpc Hw
 
 /-- `sb rs2, imm(rs1)`: the low byte of `rs2` to `rs1 + imm` (the raw form: a byte window plus the RAM fact; clients use `wp_s_sb`). -/
@@ -307,13 +309,14 @@ theorem wp_s_sb [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (h
             (BitVec.extractLsb' 0 8 (k.rget cpu rs2)) -∗ wpLoop cpu'))
     ⊢ wpLoop cpu := by
   iintro ⟨Hi, Hk, Hpc, Hw, Hnext⟩
-  icases wordPointsTo_cases _ _ _ _ $$ Hw with ⟨%⟨hram, hal⟩, Hm⟩
+  icases kctx_tier _ _ $$ Hk with ⟨%hkt, Hk⟩
+  icases wordPointsTo_bare_acc _ _ _ _ (hkt ▸ htier) $$ Hw with ⟨%⟨hram, hal⟩, #Hcl, Hm⟩
   iapply (wp_s_sb_bytes cpu k hsie htier pc is_rvc imm rs1 rs2 old hram)
   iframe Hi Hk Hpc Hm
   inext
   iapply wpNext_mono $$ Hnext
   iintro %cpu' HK Hk Hpc Hm
-  ihave Hw := wordPointsTo_intro _ _ _ _ hram hal $$ Hm
+  ihave Hw := wordPointsTo_intro_id _ _ _ _ hram hal $$ Hcl Hm
   iapply HK $$ Hk Hpc Hw
 
 /-- `sd rs2, imm(rs1)`: `rs2` to `rs1 + imm` (8-aligned) (the raw form: a byte window plus the facts; clients use `wp_s_sd`). -/
@@ -343,13 +346,14 @@ theorem wp_s_sd [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (h
           wordPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 8 (DFrac.own 1) (k.rget cpu rs2) -∗ wpLoop cpu'))
     ⊢ wpLoop cpu := by
   iintro ⟨Hi, Hk, Hpc, Hw, Hnext⟩
-  icases wordPointsTo_cases _ _ _ _ $$ Hw with ⟨%⟨hram, hal⟩, Hm⟩
+  icases kctx_tier _ _ $$ Hk with ⟨%hkt, Hk⟩
+  icases wordPointsTo_bare_acc _ _ _ _ (hkt ▸ htier) $$ Hw with ⟨%⟨hram, hal⟩, #Hcl, Hm⟩
   iapply (wp_s_sd_bytes cpu k hsie htier pc is_rvc imm rs1 rs2 old hram hal)
   iframe Hi Hk Hpc Hm
   inext
   iapply wpNext_mono $$ Hnext
   iintro %cpu' HK Hk Hpc Hm
-  ihave Hw := wordPointsTo_intro _ _ _ _ hram hal $$ Hm
+  ihave Hw := wordPointsTo_intro_id _ _ _ _ hram hal $$ Hcl Hm
   iapply HK $$ Hk Hpc Hw
 
 /-! ## Control flow -/
@@ -644,13 +648,14 @@ theorem wp_s_lw [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (h
           wordPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 4 dq' w -∗ wpLoop cpu'))
     ⊢ wpLoop cpu := by
   iintro ⟨Hi, Hk, Hpc, Hw, Hnext⟩
-  icases wordPointsTo_cases _ _ _ _ $$ Hw with ⟨%⟨hram, hal⟩, Hm⟩
+  icases kctx_tier _ _ $$ Hk with ⟨%hkt, Hk⟩
+  icases wordPointsTo_bare_acc _ _ _ _ (hkt ▸ htier) $$ Hw with ⟨%⟨hram, hal⟩, #Hcl, Hm⟩
   iapply (wp_s_lw_bytes cpu k hsie htier pc is_rvc imm rd rs1 hrd dq' w hram hal)
   iframe Hi Hk Hpc Hm
   inext
   iapply wpNext_mono $$ Hnext
   iintro %cpu' HK Hk Hpc Hm
-  ihave Hw := wordPointsTo_intro _ _ _ _ hram hal $$ Hm
+  ihave Hw := wordPointsTo_intro_id _ _ _ _ hram hal $$ Hcl Hm
   iapply HK $$ Hk Hpc Hw
 
 /-- `sw rs2, imm(rs1)`: the low word of `rs2` to `rs1 + imm` (4-aligned) (the raw form: a byte window plus the facts; clients use `wp_s_sw`). -/
@@ -681,13 +686,14 @@ theorem wp_s_sw [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (h
             (BitVec.extractLsb' 0 32 (k.rget cpu rs2)) -∗ wpLoop cpu'))
     ⊢ wpLoop cpu := by
   iintro ⟨Hi, Hk, Hpc, Hw, Hnext⟩
-  icases wordPointsTo_cases _ _ _ _ $$ Hw with ⟨%⟨hram, hal⟩, Hm⟩
+  icases kctx_tier _ _ $$ Hk with ⟨%hkt, Hk⟩
+  icases wordPointsTo_bare_acc _ _ _ _ (hkt ▸ htier) $$ Hw with ⟨%⟨hram, hal⟩, #Hcl, Hm⟩
   iapply (wp_s_sw_bytes cpu k hsie htier pc is_rvc imm rs1 rs2 old hram hal)
   iframe Hi Hk Hpc Hm
   inext
   iapply wpNext_mono $$ Hnext
   iintro %cpu' HK Hk Hpc Hm
-  ihave Hw := wordPointsTo_intro _ _ _ _ hram hal $$ Hm
+  ihave Hw := wordPointsTo_intro_id _ _ _ _ hram hal $$ Hcl Hm
   iapply HK $$ Hk Hpc Hw
 
 /-- The conditional branches against `x0` as `rs1` (`blez`, `bgtz`, ...). -/
@@ -802,7 +808,8 @@ theorem wp_s_lw_noff [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
   iintro ⟨HI, Hk, Hpc, HΦ⟩
   icases kctx_cases cpu k $$ Hk with ⟨%hwf, Hrest⟩
   ihave Hk := kctx_intro' cpu k hwf $$ Hrest
-  icases kctx_cpu_facts cpu k $$ Hk with ⟨%hf, Hk⟩
+  icases kctx_cpu_facts cpu k htier $$ Hk with ⟨%hf, Hk⟩
+  icases kctx_tier cpu k $$ Hk with ⟨%hkt, Hk⟩
   have ⟨hram, hal⟩ := hf.2.1
   rw [← haddr] at hram hal
   have htp := tpPin_set cpu k.regs rd (BitVec.ofNat 64 k.noff) hrd.2.2
@@ -814,10 +821,10 @@ theorem wp_s_lw_noff [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
     (by
       unfold cpuCells
       iintro ⟨Hp, Hn, Hi⟩
-      icases wordPointsTo_cases _ _ _ _ $$ Hn with ⟨%⟨hr, ha⟩, Hn⟩
+      icases wordPointsTo_bare_acc _ _ _ _ (hkt ▸ htier) $$ Hn with ⟨%⟨hr, ha⟩, #Hcl, Hn⟩
       iframe Hn
       iintro Hn
-      ihave Hn := wordPointsTo_intro _ _ _ _ hr ha $$ Hn
+      ihave Hn := wordPointsTo_intro_id _ _ _ _ hr ha $$ Hcl Hn
       iframe)
     (fun c hok _ => by
       have e := execSpecF_lw (GF := GF) cpu (DFrac.own 1) (DFrac.own 1) c false hok pc (pc + instrLen is_rvc) imm rd rs1
@@ -844,7 +851,8 @@ theorem wp_s_lw_intena [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : K
   iintro ⟨HI, Hk, Hpc, HΦ⟩
   icases kctx_cases cpu k $$ Hk with ⟨%hwf, Hrest⟩
   ihave Hk := kctx_intro' cpu k hwf $$ Hrest
-  icases kctx_cpu_facts cpu k $$ Hk with ⟨%hf, Hk⟩
+  icases kctx_cpu_facts cpu k htier $$ Hk with ⟨%hf, Hk⟩
+  icases kctx_tier cpu k $$ Hk with ⟨%hkt, Hk⟩
   have ⟨hram, hal⟩ := hf.2.2
   rw [← haddr] at hram hal
   have htp := tpPin_set cpu k.regs rd (if k.intena then 1#64 else 0#64) hrd.2.2
@@ -857,10 +865,10 @@ theorem wp_s_lw_intena [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : K
     (by
       unfold cpuCells
       iintro ⟨Hp, Hn, Hi⟩
-      icases wordPointsTo_cases _ _ _ _ $$ Hi with ⟨%⟨hr, ha⟩, Hi⟩
+      icases wordPointsTo_bare_acc _ _ _ _ (hkt ▸ htier) $$ Hi with ⟨%⟨hr, ha⟩, #Hcl, Hi⟩
       iframe Hi
       iintro Hi
-      ihave Hi := wordPointsTo_intro _ _ _ _ hr ha $$ Hi
+      ihave Hi := wordPointsTo_intro_id _ _ _ _ hr ha $$ Hcl Hi
       iframe)
     (fun c hok _ => by
       have e := execSpecF_lw (GF := GF) cpu (DFrac.own 1) (DFrac.own 1) c false hok pc (pc + instrLen is_rvc) imm rd rs1
@@ -888,7 +896,8 @@ theorem wp_s_sw_noff [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
           pcIs cpu' (pc + instrLen is_rvc) -∗ wpLoop cpu'))
     ⊢ wpLoop cpu := by
   iintro ⟨HI, Hk, Hpc, HΦ⟩
-  icases kctx_cpu_facts cpu k $$ Hk with ⟨%hf, Hk⟩
+  icases kctx_cpu_facts cpu k htier $$ Hk with ⟨%hf, Hk⟩
+  icases kctx_tier cpu k $$ Hk with ⟨%hkt, Hk⟩
   have ⟨hram, hal⟩ := hf.2.1
   rw [← haddr] at hram hal
   iapply (wpLoop_k_cpu cpu k hsie htier pc (pc + instrLen is_rvc) is_rvc _ k.regs rfl n' k.intena hwf'
@@ -897,10 +906,10 @@ theorem wp_s_sw_noff [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
     (by
       unfold cpuCells
       iintro ⟨Hp, Hn, Hi⟩
-      icases wordPointsTo_cases _ _ _ _ $$ Hn with ⟨%⟨hr, ha⟩, Hn⟩
+      icases wordPointsTo_bare_acc _ _ _ _ (hkt ▸ htier) $$ Hn with ⟨%⟨hr, ha⟩, #Hcl, Hn⟩
       iframe Hn
       iintro Hn
-      ihave Hn := wordPointsTo_intro _ _ _ _ hr ha $$ Hn
+      ihave Hn := wordPointsTo_intro_id _ _ _ _ hr ha $$ Hcl Hn
       iframe)
     (fun c hok _ => by
       have e := execSpecF_sw (GF := GF) cpu (DFrac.own 1) c false hok pc (pc + instrLen is_rvc) imm rs1 rs2
@@ -924,7 +933,8 @@ theorem wp_s_sw_intena [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : K
           pcIs cpu' (pc + instrLen is_rvc) -∗ wpLoop cpu'))
     ⊢ wpLoop cpu := by
   iintro ⟨HI, Hk, Hpc, HΦ⟩
-  icases kctx_cpu_facts cpu k $$ Hk with ⟨%hf, Hk⟩
+  icases kctx_cpu_facts cpu k htier $$ Hk with ⟨%hf, Hk⟩
+  icases kctx_tier cpu k $$ Hk with ⟨%hkt, Hk⟩
   have ⟨hram, hal⟩ := hf.2.2
   rw [← haddr] at hram hal
   iapply (wpLoop_k_cpu cpu k hsie htier pc (pc + instrLen is_rvc) is_rvc _ k.regs rfl k.noff b' hwf'
@@ -933,10 +943,10 @@ theorem wp_s_sw_intena [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : K
     (by
       unfold cpuCells
       iintro ⟨Hp, Hn, Hi⟩
-      icases wordPointsTo_cases _ _ _ _ $$ Hi with ⟨%⟨hr, ha⟩, Hi⟩
+      icases wordPointsTo_bare_acc _ _ _ _ (hkt ▸ htier) $$ Hi with ⟨%⟨hr, ha⟩, #Hcl, Hi⟩
       iframe Hi
       iintro Hi
-      ihave Hi := wordPointsTo_intro _ _ _ _ hr ha $$ Hi
+      ihave Hi := wordPointsTo_intro_id _ _ _ _ hr ha $$ Hcl Hi
       iframe)
     (fun c hok _ => by
       have e := execSpecF_sw (GF := GF) cpu (DFrac.own 1) c false hok pc (pc + instrLen is_rvc) imm rs1 rs2
@@ -958,7 +968,8 @@ theorem wp_s_ld_proc [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
   iintro ⟨HI, Hk, Hpc, HΦ⟩
   icases kctx_cases cpu k $$ Hk with ⟨%hwf, Hrest⟩
   ihave Hk := kctx_intro' cpu k hwf $$ Hrest
-  icases kctx_cpu_facts cpu k $$ Hk with ⟨%hf, Hk⟩
+  icases kctx_cpu_facts cpu k htier $$ Hk with ⟨%hf, Hk⟩
+  icases kctx_tier cpu k $$ Hk with ⟨%hkt, Hk⟩
   have ⟨hram, hal⟩ := hf.1
   rw [← haddr] at hram hal
   have htp := tpPin_set cpu k.regs rd k.proc hrd.2.2
@@ -969,10 +980,10 @@ theorem wp_s_ld_proc [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
     (by
       unfold cpuCells
       iintro ⟨Hp, Hn, Hi⟩
-      icases wordPointsTo_cases _ _ _ _ $$ Hp with ⟨%⟨hr, ha⟩, Hp⟩
+      icases wordPointsTo_bare_acc _ _ _ _ (hkt ▸ htier) $$ Hp with ⟨%⟨hr, ha⟩, #Hcl, Hp⟩
       iframe Hp
       iintro Hp
-      ihave Hp := wordPointsTo_intro _ _ _ _ hr ha $$ Hp
+      ihave Hp := wordPointsTo_intro_id _ _ _ _ hr ha $$ Hcl Hp
       iframe)
     (fun c hok _ => by
       have e := execSpecF_ld (GF := GF) cpu (DFrac.own 1) (DFrac.own 1) c false hok pc (pc + instrLen is_rvc) imm rd rs1

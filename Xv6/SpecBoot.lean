@@ -80,6 +80,7 @@ def wp_boot_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
 /-- The interface of the boot path. -/
 structure BOOT : Prop where
   wp_boot : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+    (hct : curTier = KTier.bare)
     (cpu : CPU) (hartid s0 v1 v2 v4 v8 v10 v11 v14 v15 f0 f8 g0 g8 : BitVec 64),
     wp_boot_body (hlc := hlc) (GF := GF) cpu hartid s0 v1 v2 v4 v8 v10 v11 v14 v15 f0 f8 g0 g8
      

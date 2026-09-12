@@ -58,13 +58,14 @@ theorem wp_s_lwu [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (
           wordPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 4 dq' w -∗ wpLoop cpu'))
     ⊢ wpLoop cpu := by
   iintro ⟨Hi, Hk, Hpc, Hw, Hnext⟩
-  icases wordPointsTo_cases _ _ _ _ $$ Hw with ⟨%⟨hram, hal⟩, Hm⟩
+  icases kctx_tier _ _ $$ Hk with ⟨%hkt, Hk⟩
+  icases wordPointsTo_bare_acc _ _ _ _ (hkt ▸ htier) $$ Hw with ⟨%⟨hram, hal⟩, #Hcl, Hm⟩
   iapply (wp_s_lwu_bytes cpu k hsie htier pc is_rvc imm rd rs1 hrd dq' w hram hal)
   iframe Hi Hk Hpc Hm
   inext
   iapply wpNext_mono $$ Hnext
   iintro %cpu' HK Hk Hpc Hm
-  ihave Hw := wordPointsTo_intro _ _ _ _ hram hal $$ Hm
+  ihave Hw := wordPointsTo_intro_id _ _ _ _ hram hal $$ Hcl Hm
   iapply HK $$ Hk Hpc Hw
 
 end MachCSL

@@ -153,6 +153,7 @@ theorem execSpec_ld [CurCtx] (cpu : CPU) (dq dq' : DFrac) (c : MConf) (hok : MCo
 
 /-- `sd rs2, imm(rs1)` (also `c.sdsp`) to an 8-aligned RAM address. -/
 theorem wp_m_sd [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c)
+    (hct : curTier = KTier.bare)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rs1 rs2 : BitVec 5)
     (hrs1 : rs1 ≠ 0#5) (hrs2 : rs2 ≠ 0#5) (a v old : BitVec 64) :
     instr (GF := GF) pc is_rvc (instruction.STORE (imm, regidx.Regidx rs2, regidx.Regidx rs1, 8)) ∗
@@ -164,17 +165,18 @@ theorem wp_m_sd [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (G
         wordPointsTo (a + BitVec.signExtend 64 imm) 8 (DFrac.own 1) v -∗ wpLoop cpu)
     ⊢ wpLoop cpu := by
   iintro ⟨HI, HmConf, Hclock, Hpc, Hrs1, Hrs2, Htok, Hw, HΦ⟩
-  icases wordPointsTo_cases _ _ _ _ $$ Hw with ⟨%⟨hram, hal⟩, Hbytes⟩
+  icases wordPointsTo_bare_acc _ _ _ _ hct $$ Hw with ⟨%⟨hram, hal⟩, #Hcl, Hbytes⟩
   iapply wpLoop_m_instr cpu dq c c hok pc _ is_rvc _ _ _
     (execSpec_sd cpu dq c hok pc _ imm rs1 rs2 hrs1 hrs2 a v old hram hal)
   iframe
   inext
   iintro HmConf Hclock Hpc ⟨Hrs1, Hrs2, Htok, Hbytes⟩
-  ihave Hw := wordPointsTo_intro _ _ _ _ hram hal $$ Hbytes
+  ihave Hw := wordPointsTo_intro_id _ _ _ _ hram hal $$ Hcl Hbytes
   iapply HΦ $$ HmConf Hclock Hpc Hrs1 Hrs2 Htok Hw
 
 /-- `ld rd, imm(rs1)` with `rd ≠ rs1` (also `c.ldsp`) from an 8-aligned RAM address. -/
 theorem wp_m_ld [CurCtx] (cpu : CPU) (dq dq' : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c)
+    (hct : curTier = KTier.bare)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rd rs1 : BitVec 5)
     (hrd : rd ≠ 0#5) (hrs1 : rs1 ≠ 0#5) (v a data : BitVec 64) :
     instr (GF := GF) pc is_rvc (instruction.LOAD (imm, regidx.Regidx rs1, regidx.Regidx rd, false, 8)) ∗
@@ -186,13 +188,13 @@ theorem wp_m_ld [CurCtx] (cpu : CPU) (dq dq' : DFrac) (c : MConf) (hok : MConf.o
         wordPointsTo (a + BitVec.signExtend 64 imm) 8 dq' data -∗ wpLoop cpu)
     ⊢ wpLoop cpu := by
   iintro ⟨HI, HmConf, Hclock, Hpc, Hrd, Hrs1, Htok, Hw, HΦ⟩
-  icases wordPointsTo_cases _ _ _ _ $$ Hw with ⟨%⟨hram, hal⟩, Hbytes⟩
+  icases wordPointsTo_bare_acc _ _ _ _ hct $$ Hw with ⟨%⟨hram, hal⟩, #Hcl, Hbytes⟩
   iapply wpLoop_m_instr cpu dq c c hok pc _ is_rvc _ _ _
     (execSpec_ld cpu dq dq' c hok pc _ imm rd rs1 hrd hrs1 v a data hram hal)
   iframe
   inext
   iintro HmConf Hclock Hpc ⟨Hrd, Hrs1, Htok, Hbytes⟩
-  ihave Hw := wordPointsTo_intro _ _ _ _ hram hal $$ Hbytes
+  ihave Hw := wordPointsTo_intro_id _ _ _ _ hram hal $$ Hcl Hbytes
   iapply HΦ $$ HmConf Hclock Hpc Hrd Hrs1 Htok Hw
 
 end MachCSL

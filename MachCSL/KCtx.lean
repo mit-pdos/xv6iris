@@ -433,9 +433,15 @@ abbrev ctxToken [CurCtx] (cpu : CPU) : IProp GF := ctxTok cpu curCtx
 
 /-- The translation slot at each tier.  Bare: `stvec` is still owned here
 (no handler installed).  Kpt: the kernel page table at `root`. -/
-def transSlot (cpu : CPU) : KTier → BitVec 44 → IProp GF
+def transSlotAt (cpu : CPU) : KTier → BitVec 44 → IProp GF
   | .bare, _ => iprop(∃ v : BitVec 64, Register.stvec ↦ᵣ[cpu] v)
   | .kpt, root => kptSlot cpu root
+
+/-- The translation slot, tied to the ambient tier: a context at tier
+`tier` is used by proofs conducted at that tier (whose points-to facts are
+pinned accordingly). -/
+def transSlot [CurCtx] (cpu : CPU) (tier : KTier) (root : BitVec 44) : IProp GF := iprop%
+  ⌜tier = curTier⌝ ∗ transSlotAt cpu tier root
 
 /-- The trap CSRs a trap scribbles; owned by the enabled arm. -/
 def trapCsrs (cpu : CPU) : IProp GF := iprop%
@@ -544,7 +550,8 @@ theorem aCpuIntena_ok [KernelGeom] (cpu : CPU) : inRam (aCpuIntena cpu) 4 ∧ (a
 /-- The cells' own facts: each is an aligned RAM word, and says so.  The
 rules that read or write a `struct cpu` field take what their leaf needs
 from the cell itself, not from the geometry. -/
-theorem cpuCells_facts [CurCtx] [KernelGeom] (cpu : CPU) (noff : Nat) (intena : Bool) (p : BitVec 64) :
+theorem cpuCells_facts [CurCtx] [KernelGeom] (cpu : CPU) (noff : Nat) (intena : Bool) (p : BitVec 64)
+    (hct : curTier = KTier.bare) :
     cpuCells (GF := GF) cpu noff intena p ⊢
       ⌜(inRam (aCpuProc cpu) 8 ∧ (aCpuProc cpu).toNat % 8 = 0) ∧
         (inRam (aCpuNoff cpu) 4 ∧ (aCpuNoff cpu).toNat % 4 = 0) ∧
@@ -552,9 +559,9 @@ theorem cpuCells_facts [CurCtx] [KernelGeom] (cpu : CPU) (noff : Nat) (intena : 
       cpuCells cpu noff intena p := by
   unfold cpuCells
   iintro ⟨Hp, Hn, Hi⟩
-  icases wordPointsTo_facts _ _ _ _ $$ Hp with ⟨%hp, Hp⟩
-  icases wordPointsTo_facts _ _ _ _ $$ Hn with ⟨%hn, Hn⟩
-  icases wordPointsTo_facts _ _ _ _ $$ Hi with ⟨%hi, Hi⟩
+  icases wordPointsTo_facts _ _ _ _ hct $$ Hp with ⟨%hp, Hp⟩
+  icases wordPointsTo_facts _ _ _ _ hct $$ Hn with ⟨%hn, Hn⟩
+  icases wordPointsTo_facts _ _ _ _ hct $$ Hi with ⟨%hi, Hi⟩
   iframe Hp Hn Hi
   ipureintro
   exact ⟨hp, hn, hi⟩
@@ -575,7 +582,7 @@ def cpuOwn [CurCtx] [KernelGeom] (cpu : CPU) (noff : Nat) (intena : Bool) (p : B
 
 /-- The `struct cpu` cells' facts, from the bookkeeping. -/
 theorem cpuOwn_facts [CurCtx] [KernelGeom] (cpu : CPU) (noff : Nat) (intena : Bool) (p : BitVec 64)
-    (locks : List String) :
+    (locks : List String)(hct : curTier = KTier.bare) :
     cpuOwn (GF := GF) cpu noff intena p locks ⊢
       ⌜(inRam (aCpuProc cpu) 8 ∧ (aCpuProc cpu).toNat % 8 = 0) ∧
         (inRam (aCpuNoff cpu) 4 ∧ (aCpuNoff cpu).toNat % 4 = 0) ∧
@@ -583,7 +590,7 @@ theorem cpuOwn_facts [CurCtx] [KernelGeom] (cpu : CPU) (noff : Nat) (intena : Bo
       cpuOwn cpu noff intena p locks := by
   unfold cpuOwn
   iintro ⟨Hcells, Hlocks, Hcsrs⟩
-  icases cpuCells_facts _ _ _ _ $$ Hcells with ⟨%h, Hcells⟩
+  icases cpuCells_facts _ _ _ _ hct $$ Hcells with ⟨%h, Hcells⟩
   iframe Hcells Hlocks Hcsrs
   ipureintro
   exact h
@@ -774,6 +781,20 @@ theorem kctx_intro' [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx
   ipureintro
   exact hwf
 
+/-- The context's tier is the ambient tier. -/
+theorem kctx_tier [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) :
+    kctx (GF := GF) cpu k ⊢ ⌜k.tier = curTier⌝ ∗ kctx cpu k := by
+  unfold kctx transSlot
+  iintro ⟨%hwf, HConf, HF, Hstack, ⟨%ht, Htrans⟩, Harm, Hcpu, Htok, Hclock, #Hro⟩
+  iframe HConf HF Hstack Htrans Harm Hcpu Htok Hclock
+  isplit
+  · ipureintro; exact ht
+  isplit
+  · ipureintro; exact hwf
+  isplit
+  · ipureintro; exact ht
+  · iexact Hro
+
 /-- The context's copy of the read-only image (persistent: the context
 keeps it). -/
 theorem kctx_ro [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) :
@@ -786,15 +807,19 @@ theorem kctx_ro [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) :
 
 /-- The `struct cpu` cells' facts, from the context: the cells ride inside
 `cpuOwn`, and carry the RAM membership and alignment their rules need. -/
-theorem kctx_cpu_facts [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) :
+theorem kctx_cpu_facts [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)(htier : k.tier = KTier.bare) :
     kctx (GF := GF) cpu k ⊢
       ⌜(inRam (aCpuProc cpu) 8 ∧ (aCpuProc cpu).toNat % 8 = 0) ∧
         (inRam (aCpuNoff cpu) 4 ∧ (aCpuNoff cpu).toNat % 4 = 0) ∧
         (inRam (aCpuIntena cpu) 4 ∧ (aCpuIntena cpu).toNat % 4 = 0)⌝ ∗
       kctx cpu k := by
+  iintro H
+  icases kctx_tier _ _ $$ H with ⟨%hkt, H⟩
+  irevert H
+  have hct : curTier = KTier.bare := hkt ▸ htier
   unfold kctx
   iintro ⟨%hwf, HConf, HF, Hstack, Htrans, Harm, Hcpu, Htok, Hclock, #Htext⟩
-  icases cpuOwn_facts _ _ _ _ _ $$ Hcpu with ⟨%h, Hcpu⟩
+  icases cpuOwn_facts _ _ _ _ _ hct $$ Hcpu with ⟨%h, Hcpu⟩
   iframe Htext
   iframe HConf HF Hstack Htrans Harm Hcpu Htok Hclock
   ipureintro; exact ⟨h, hwf⟩

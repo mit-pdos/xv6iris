@@ -339,7 +339,7 @@ theorem wp_power [KernelMap]
     imod (names_alloc (fun γ _ => γ ↪●MAP (∅ : StrMapF Unit))
       (fun _ => ghost_map_alloc_empty (K := String) (V := Unit) (H := StrMapF))) with ⟨%lsn, Hls⟩
     imod (ghost_map_alloc (K := Nat) (V := BitVec 64) (H := RegMapF) KernelMap.static) with ⟨%γkmap, Hkmap, Hkfrags⟩
-    imod (kmapStatic_persist γkmap) $$ Hkfrags with Hkst
+    imod (kmapStatic_persist ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap⟩) $$ Hkfrags with Hkst
     icases BigSepL.bigSepL_sep_eqv.1 $$ Hv with ⟨Hva, Hvlb⟩
     imod (ctxs_boot ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap⟩) $$ Hvlb with Hctx
     imod registry_insert R g.gen ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap⟩ (registryOk_none Hok)

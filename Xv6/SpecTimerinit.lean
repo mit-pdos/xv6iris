@@ -73,6 +73,7 @@ def wp_timerinit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Cur
 /-- The interface of `timerinit`. -/
 structure TIMERINIT : Prop where
   wp_timerinit : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+    (hct : curTier = KTier.bare)
     (cpu : CPU) (c : MConf) (hok : MConf.ok (GF := GF) c) hcbie hpmm hstce
     (ret sp₀ v8 v14 v15 f0 f8 : BitVec 64),
     wp_timerinit_body (hlc := hlc) (GF := GF) cpu c hok hcbie hpmm hstce ret sp₀ v8 v14 v15 f0 f8

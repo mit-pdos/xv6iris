@@ -65,6 +65,7 @@ def wp_entry_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
 the binder list is restated, the statement lives only in `wp_entry_body`. -/
 structure ENTRY : Prop where
   wp_entry : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+    (hct : curTier = KTier.bare)
     (cpu : CPU) (dq : DFrac) (hartid s0 v1 v2 v10 v11 : BitVec 64),
     wp_entry_body (hlc := hlc) (GF := GF) cpu dq hartid s0 v1 v2 v10 v11
 

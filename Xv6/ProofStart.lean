@@ -61,7 +61,7 @@ set_option maxHeartbeats 4000000 in
 /-- `start`, first segment: the prologue and `mstatus.MPP := S`
 (`80000058`–`80000074`). -/
 theorem start_seg1 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
-    (cpu : CPU) (ret sp₀ v8 v14 v15 f0 f8 : BitVec 64) :
+    (hct : curTier = KTier.bare) (cpu : CPU) (ret sp₀ v8 v14 v15 f0 f8 : BitVec 64) :
     mBoot cpu (DFrac.own 1) ∗ clockCells cpu ∗ ctxTok cpu curCtx ∗ kernelText ∗ pcIs cpu startAddr ∗
     gpr cpu 1#5 (DFrac.own 1) ret ∗ gpr cpu 2#5 (DFrac.own 1) sp₀ ∗ gpr cpu 8#5 (DFrac.own 1) v8 ∗
     gpr cpu 14#5 (DFrac.own 1) v14 ∗ gpr cpu 15#5 (DFrac.own 1) v15 ∗
@@ -81,12 +81,12 @@ theorem start_seg1 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx
   iintro HmConf Hclock Hpc Hx2
   st_norm
   -- 8000005a: sd ra,8(sp)
-  st_step wp_m_sd cpu (DFrac.own 1) bootConf bootConf_ok _ true 8#12 2#5 1#5 (by decide) (by decide)
+  st_step wp_m_sd cpu (DFrac.own 1) bootConf bootConf_ok hct _ true 8#12 2#5 1#5 (by decide) (by decide)
     (sp₀ + 0xfffffffffffffff0#64) ret f8
   iintro HmConf Hclock Hpc Hx2 Hx1 Htok Hf8
   st_norm
   -- 8000005c: sd s0,0(sp)
-  st_step wp_m_sd cpu (DFrac.own 1) bootConf bootConf_ok _ true 0#12 2#5 8#5 (by decide) (by decide)
+  st_step wp_m_sd cpu (DFrac.own 1) bootConf bootConf_ok hct _ true 0#12 2#5 8#5 (by decide) (by decide)
     (sp₀ + 0xfffffffffffffff0#64) v8 f0
   iintro HmConf Hclock Hpc Hx2 Hx8 Htok Hf0
   st_norm
@@ -255,11 +255,11 @@ theorem main_mepc_mask : 0x80000e30#64 &&& 0xFFFFFFFFFFFFFFFE#64 = 0x80000e30#64
 
 set_option maxHeartbeats 4000000 in
 theorem StartProof (T : TIMERINIT) : START where
-  wp_start cpu dq hartid ret sp₀ v4 v8 v14 v15 f0 f8 g0 g8 := by
+  wp_start hct cpu dq hartid ret sp₀ v4 v8 v14 v15 f0 f8 g0 g8 := by
     rename_i hlc GF inst instC
     unfold wp_start_body
     iintro ⟨HmConf, Hmhartid, Hclock, Htok, #Htext, Hpc, Hx1, Hx2, Hx4, Hx8, Hx14, Hx15, Hf0, Hf8, Hg0, Hg8, HΦ⟩
-    iapply (start_seg1 cpu ret sp₀ v8 v14 v15 f0 f8)
+    iapply (start_seg1 hct cpu ret sp₀ v8 v14 v15 f0 f8)
     iframe
     iframe #
     iintro HmConf Hclock Htok Hpc Hx1 Hx2 Hx8 Hx14 Hx15 Hf0 Hf8
@@ -276,7 +276,7 @@ theorem StartProof (T : TIMERINIT) : START where
     iintro HmConf Hclock Hpc Hx1
     st_norm
     -- the call: timerinit's contract
-    have hT := T.wp_timerinit cpu { mstatus := 0xA00000800#64, mie := 0x220#64, mideleg := 0x2222#64, medeleg := 0xb3ff#64, mepc := 0x80000e30#64, satp := 0#64, menvcfg := 0x2000000000000000#64, mcounteren := 0#32, mtimecmp := 0xFFFFFFFFFFFFFFFF#64, stimecmp := 0xFFFFFFFFFFFFFFFF#64, pmpcfg := xv6Pmpcfg, pmpaddr := xv6Pmpaddr }
+    have hT := T.wp_timerinit hct cpu { mstatus := 0xA00000800#64, mie := 0x220#64, mideleg := 0x2222#64, medeleg := 0xb3ff#64, mepc := 0x80000e30#64, satp := 0#64, menvcfg := 0x2000000000000000#64, mcounteren := 0#32, mtimecmp := 0xFFFFFFFFFFFFFFFF#64, stimecmp := 0xFFFFFFFFFFFFFFFF#64, pmpcfg := xv6Pmpcfg, pmpaddr := xv6Pmpaddr }
       ok8 xv6_menvcfg_cbie2 xv6_menvcfg_pmm2 (by simp only [BitVec.reduceOr, menvcfgWrite_stce]; exact xv6_menvcfg_stce)
       0x800000c2#64 (sp₀ + 0xfffffffffffffff0#64) sp₀ 0x2000000000000000#64 0x2000000000000000#64 g0 g8
     unfold wp_timerinit_body at hT

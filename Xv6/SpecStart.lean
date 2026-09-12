@@ -88,6 +88,7 @@ def wp_start_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
 /-- The interface of `start`. -/
 structure START : Prop where
   wp_start : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+    (hct : curTier = KTier.bare)
     (cpu : CPU) (dq : DFrac) (hartid ret sp₀ v4 v8 v14 v15 f0 f8 g0 g8 : BitVec 64),
     wp_start_body (hlc := hlc) (GF := GF) cpu dq hartid ret sp₀ v4 v8 v14 v15 f0 f8 g0 g8
 

@@ -1058,9 +1058,9 @@ theorem cstr_acc0 (a : BitVec 64) (dq : DFrac) (s : List (BitVec 8)) (b : BitVec
   rwa [show a + BitVec.ofNat 64 0 = a by simp] at h
 
 /-- `"(null)"` at `0x80007008`, as the C string `printk` walks. -/
-theorem kernelData_nullBody : kernelData (GF := GF) ⊢ cstr 0x80007008#64 DFrac.discard nullBody := by
-  iintro H
-  ihave H := kernelData_null $$ H
+theorem kernelData_nullBody : kmapStatic (GF := GF) ⊢ kernelData -∗ cstr 0x80007008#64 DFrac.discard nullBody := by
+  iintro HS H
+  ihave H := kernelData_null $$ HS H
   ihave H := (show byteBuf 0x80007008#64 DFrac.discard nullStr ⊢
     byteBuf (GF := GF) 0x80007008#64 DFrac.discard (nullBody ++ [0#8]) from by rw [nullStr_eq]) $$ H
   iapply cstr_intro _ _ _ nullBody_nonul $$ H
