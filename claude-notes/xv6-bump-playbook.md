@@ -406,6 +406,42 @@ The durable fix for the jump table is the same as for everything else here:
 derive from a pair of symbols rather than transcribing, and a re-dump carries it
 for free.
 
+### 4b-bis. EVERY ADDRESS SWEEP IS ONE-SHOT, and that is a correctness property
+
+Both address sweeps below are **not idempotent**, and re-running one is not a
+no-op but a second move.  A `.rodata` literal one pass rewrote can coincide
+with a DIFFERENT old string's address, so a second pass reads the OLD image
+there, finds another string, and moves it again -- `SpecProcinit`'s three lock
+names form exactly that chain (`nextpid` lands where `proc` used to be).  The
+`.data`/`.bss` remap is worse: re-running it shifts everything a second
+symbol-width, silently.
+
+So: **derive from the PRE-BUMP text, apply once, and if you have to redo a
+sweep, restore `iris/` first.**  `git checkout <pre-bump> -- iris/` then
+gen-code, relayout, imms, `.rodata`, `.data` is a cheap ten minutes and is the
+only reliable recovery.  (`relayout_*` read the old image from `HEAD`, so once
+the bump is committed they need `RELAYOUT_OLD_REV=<pre-bump>`.)
+
+Three more traps the sweeps themselves have:
+
+- **Guard a content sweep on a STRING BOUNDARY.**  Without `old[a-1] = 0` the
+  search matches a TAIL -- `0x80007580` "resolves" to `b'e'` and gets moved
+  somewhere absurd.  Match the whole NUL-terminated string and require a NUL
+  (or the region start) before it.
+- **`.bss` is `0x8001….`/`0x8002….`, not `0x8000….`.**  A hex sweep written for
+  `.data` misses every `bcache`/`proc`/`disk`/`log` literal, and the tell is a
+  `lia` or a `replace` failing on arithmetic that looks right.
+- **Some round numbers in that range are NOT symbol-relative.**  `PGROUNDUP(end)`
+  and the page above it (`0x80024000` / `0x80025000` in `BootShared`) are the
+  same in both images whenever `end` stays inside the same page; remapping them
+  through `end_` corrupts them.  Freeze them by value.
+
+And a comment carrying an address is not evidence: three of them
+(`BootShared`'s `kernel_pagetable`/`initproc`/`ticks` markers, `ProofKfree`'s
+`<end>`) were ALREADY stale from an earlier bump, so a sweep "fixing" them
+produces a differently wrong number.  Re-derive a comment from the symbol
+table, never from its old value.
+
 ### 4c. Data symbols
 
 `sb`, `disk`, `proc`, `tickslock`, `end`, `bcache`, `itable`, `ftable`, `log`,
