@@ -60,7 +60,18 @@ patch: `projects/wx-briefs/`.
   `openpin80` EXIT=0, audit = the thirteen, lemma_diff clean) -- OPEN-PIN COMPLETE
   (note "OPEN-PIN COMPLETE"; E2 owes init's entry the key, the record equation,
   app_inv, init_cons_leaves and the entry-ledger fact) → SH-LINE phase 2
-  (`wx-briefs/brief-sh-line-2.md`, a fresh agent; LAUNCHED 2026-09-12) → E4 → E2 →
+  (`wx-briefs/brief-sh-line-2.md`; phase 1 GREEN 2026-09-12, build `shline14`,
+  6 u-tier files +477/-46, no kernel diff; phase-2 GO-AHEAD given with these
+  accepted deviations: `UkFork.wp_uk_ecall_fork` takes a child lend `Rc`
+  (Forkable cannot carry a ghost_var); `wp_uk_ecall_read_recv_body` restated at
+  the TRAPPING key (the defect was a0 = the return value, not `uvis_M`);
+  `UkRun.udepwf_std` (the read supplier told the ledger, as `udepwf_at` is told
+  the cwd); `UkRun.urun_gen` (the taint's generic continuation from a run --
+  drops everything the run holds); `ukn_triv` stays in sh's CHILD-side files
+  (`UkShRun/Diag/Parse*/Malloc`, whose payload IS trivial after
+  `wp_uk_ecall_fork_any`), parent side moves to `ukn_const`; init's token premise
+  is `UserConsole.ucons_reader cn 0` at the narrow class, held as
+  `UConsLine.uinit_tok cn T` on the restart head) → E4 → E2 →
   E5
   → SH-LINE phase 2 → E4 → E2 → E5.
 - Standing rulings from the lanes (WX-EXIT/WX-INV build on them): rows per slot
