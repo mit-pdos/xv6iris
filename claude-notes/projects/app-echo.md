@@ -2404,6 +2404,134 @@ ORDER: GENERIC-PAY → CONS-SWALLOW → SH-LINE 2b (gets on `ush_gets_line`,
 `wp_uk_ecall_read_recv` with `upos` threaded read → gets_loop → gets → getcmd
 → main) → LAZY-FLAG (the owner's form of (A)).
 
+E5 -- THE OUTPUT SIDE: DESIGN PROPOSAL (coordinator, 2026-09-12; after the
+pre-mortem review `review-echo-plan-2026-09-12.md` findings 2-5, 7, 12 and
+the owner's ruling "the output includes the 'hart N starting' outputs, along
+with the shell, and the real 'echo hello world'").
+
+O1 WHO WRITES THE UART.  Three callers, one register.  (K) the kernel's
+`printk` -- `consputc` → `uartputc_sync`, `tx_lock` per BYTE, `pr.lock` per
+MESSAGE (so K messages never interleave with each other, but their bytes do
+interleave with everything else); in this scenario K is exactly the boot
+banner ("\n", "xv6 kernel is booting\n", "\n" on hart 0) and one
+"hart N starting\n" per secondary hart (seven), each emitted at most once,
+at unconstrained times.  (E) `consoleintr`'s ECHO of every typed byte
+(`consputc` again; `\r` echoed as `\n`; BACKSPACE/^U produce "\b \b"; a
+FULL ring echoes nothing and drops the byte).  (W) `uartwrite` from
+`consolewrite` ← `filewrite` ← `write(2)`: `tx_lock` per byte; init's
+banner is 18 one-byte writes, sh's prompt one `write(2, "$ ", 2)`, echo's
+output four writes.  This fork has NO software tx ring: every writer spins
+on `LSR_TX_IDLE` and stores THR, so a byte is ACCEPTED (`uart_sent γu tr`,
+the mono_list of `UartTxInv`) in program order, `write(2)` returns only after
+all its bytes are accepted, and the wire (`obs_wire`) is a prefix of the
+accepted list (`uart_col_ok`, LOOP off).
+
+O2 THE CLAIM (the owner's ruling made precise).  The transmitted bytes are a
+SHUFFLE of the kernel stream K and the session stream U, where
+  K ∈ shuffle-free concatenation of whole boot messages (each of the eight
+      at most once, the three hart-0 banners first), and
+  U = the session: the process outputs, in causal order, interleaved with
+      the echoes, each echo after its input byte:
+      init's banner "init: starting sh\n" · sh's prompt "$ " · (per typed
+      line: the echo of the typed bytes) · echo's "hello world\n" · "$ " …
+The claim is stated as a relation `session inputs U` (a transducer, not a
+fixed string): it needs NO timing hypothesis to be TRUE -- if the user types
+before the prompt, the echo bytes simply precede the prompt bytes in U --
+except for ONE thing: the 128-byte ring.  Typing more than the ring holds
+while sh is not reading drops bytes (and their echoes), and then the session
+is wrong.  So the ONLY hypothesis the theorem needs on input timing is a
+RATE bound, and the per-character "type after the echo" discipline is one
+way to state it, the per-command "type the next line after the previous
+command's output" another.
+
+O3 THE DISCIPLINE OVER AN UNTAGGED WIRE (the design problem).  `mobs` has
+`ObsUartOut b` with NO source; a real user cannot tell a K byte from a U
+byte, and neither can a predicate on `h`.  Options:
+  (a) per-character, content-matched: "the next input byte is typed only
+      after an output byte EQUAL to the previous typed byte has appeared
+      since it" -- cheap to state, but K bytes match spuriously ('h','a',
+      'r','t',' ','s','i','n','g','\n' all occur in "hart N starting\n"),
+      so an adversarial schedule lets the user run up to ~136 bytes ahead:
+      > 128, so overflow is NOT excluded.  Rejected.
+  (b) per-command, subsequence-matched (RECOMMENDED): "the first byte of
+      line n+1 is typed only after the outputs since line n's '\n' contain
+      "hello world\n$ " as a SUBSEQUENCE".  K contains no 'l','o','w','d',
+      so the subsequence forces the real U to have progressed through echo's
+      output, hence sh consumed line n: at most one line (17 bytes) is ever
+      outstanding.  Stated on the raw wire, decidable, robust to K.  The
+      first line: typed only after "$ " appears as a subsequence after
+      "init: starting sh\n" -- or simply no condition on the first line
+      (one line never overflows).
+  (c) tag-aware, via the app's own ledger: `app_R c h` may carry a TAGGED
+      shadow of the accepted list (the kernel's per-byte source tags, read
+      off `uart_ghosts` in `Htx`); `disc` on the shadow.  Sound, and the
+      per-character form becomes exact, but the CONCLUSION must still be a
+      predicate on untagged `h`, so the tags help the PROOF, not the
+      statement.  Keep as the proof device (O4), not the hypothesis.
+`AppEcho.disc` (today: inputs are a prefix of `(echo_line)*`, per power
+cycle) becomes `disc_in h ∧ rate h` with `rate` = (b).  It stays UPSTREAM
+of everything SH-LINE 2b proves; 2b's line lemmas need only `disc_in` (the
+projection), so the restatement is a bridge, not a re-proof.
+
+O4 THE KERNEL WORK (lanes, in order).
+  TX-TAG: the accepted list is tagged by CALLER: `uart_sent γu : list (txsrc
+    * bv 8)` with `txsrc := K | E | W pid` (or a parallel mono_list of tags,
+    as `cons_tags` is for rx).  `uartputc_sync`'s and `uartputc`'s specs take
+    the tag from the caller (`printk`: K; `consoleintr`: E; `consolewrite`:
+    W at the caller's pid) -- the tag is chosen by whoever holds `tx_lock`
+    for the byte.  `uart_sent_sub`/`uart_sent_from` gain the tag.  Cost:
+    `UartTxInv`, `SpecUartputc*`, `SpecConsputc`, `SpecPrintk`
+    (+ `PrintkFmt`?), `SpecConsoleintr`, `SpecConsolewrite`, `WpUart`'s
+    `uart_ghosts`; the boot's `printk`s (`SpecMain`, `SpecMainSecondary`) at K.
+  TX-RECEIPT: `consolewrite`'s located receipt becomes EXACT on the writer's
+    own tag: "the W-pid-tagged bytes accepted since the seed are exactly my
+    bytes, in order" (a process's writes are sequential, so no second
+    writer shares the tag; pids are unique per generation -- WX-GEN's
+    `pid_reg`), relayed through `filewrite`/the dispatcher/row 16 to a U-tier
+    `wp_uk_ecall_write_recv` (OPEN-PIN phase 3's mold), and the three write
+    cones re-proved: `UkInitPrintf` (18 bytes), sh's prompt/diagnostics,
+    `UkEcho`'s four writes.  This is also where the supply split's
+    write(16) premise is discharged (a claim-based deposit for the console
+    write: the console arm of `filewrite` needs no fs resource; state what
+    it needs).
+  ECHO-RECEIPT: `consoleintr`'s echo is recorded as E-tagged WITH the input
+    byte's history (the rx tag machinery already gives the history per
+    stored byte), so the ledger can say "echo of the byte at position n".
+    `SpecConsoleintr` currently discards `uart_sent_sub γu []`; it keeps it.
+  LEDGER: `App.Htx` fires per popped byte with `uart_ghosts γ u'`; the app's
+    `app_R` shadow records (tag, byte) -- which needs the era identification
+    gate closed (finding 3): `Htx`/`Hrx` must be given evidence that `γ` is
+    the era's UART names.  This is the APP-IFACE lane's third item.
+  GOOD_OUT: `echo_phi g h := disc_in h -> rate h -> ∃ D, K(D) ∈ bootmsgs ∧
+    session (inputs h) (U(D))`, proved from the ledger's real tagging (the
+    witness D is the kernel's tagging, so the ∃ is inhabited by a REAL
+    decomposition, never chosen for convenience); the K part's shape from
+    `SpecMain`/`SpecMainSecondary`'s printk posts (whole messages under
+    `pr.lock`).
+
+O5 ALLOCATION FAILURE (finding 12; the owner's earlier ruling covers init's
+open, not these).  In the model kalloc fails nondeterministically, so:
+`forkret` panics ("panic: exec\n", kernel spins) if the very first exec
+fails; sh's `fork1` panics ("fork\n", exit 1) → init reaps and reprints the
+banner; a failed exec of echo prints "exec echo failed\n" and exits 0 → init
+reprints the banner.  Under O2 these are U bytes the session relation does
+not predict.  Two honest choices: (i) the session relation ADMITS them as
+alternative continuations ("… or 'fork\n' then a fresh banner and prompt";
+the panic arm ends the trace), which keeps the theorem hypothesis-free but
+weakens what it says; (ii) a hypothesis "no allocation failure" (a kalloc
+budget the model does not have today).  RECOMMEND (i) for exec/fork failure
+in sh (the messages are fixed strings; `session` gains two alternatives),
+and for the boot panic: the trace ends (no further U bytes), which the
+relation already tolerates as a prefix.  OWNER TO CONFIRM.
+
+O6 ORDER.  CONS-SWALLOW (in flight) → LAZY-FLAG → DISC-RATE (the
+restatement O3, with `session`'s definition and `echo_phi`'s shape --
+application-side, small) → TX-TAG → TX-RECEIPT + ECHO-RECEIPT → APP-IFACE
+(three statement changes: `app_boot` key handoff, the rx-tag equation, the
+era identification) → the U-tier write leaf and the three write cones →
+SH-LINE 2b → E4 → E2 → E5 proofs.  In parallel (sibling checkouts):
+TEXT-LW and SUPPLY-SPLIT (running), then sh's pinned console open.
+
 SH-LINE PHASE 2 -- THE SWALLOWED BYTE (BLOCKER FOUND 2026-09-12; phase 1
 green at `shline14`, the read leaf and the `ukn_triv` split green at
 `shline22`, 21 u-tier files uncommitted, no kernel diff).
