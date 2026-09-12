@@ -33,7 +33,7 @@ def releaseAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«release»
 /-- **WP of `release`.** -/
 def wp_release_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : GName) (s : String) (R : CtxId → IProp GF) [CtxMorph R]
-    (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+    (hsie : k.sie = false)
     (hnoff : 1 ≤ k.noff) (hK : 10 ≤ k.avail) (hexit : k.noff = 1 → k.intena = false) : Prop :=
   kctx cpu k ∗ pcIs cpu releaseAddr ∗ isLock γ (k.regs 10#5) s R ∗
   locked γ cpu ∗ R curCtx ∗
@@ -44,7 +44,7 @@ def wp_release_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
 /-- The interface of `release`. -/
 structure RELEASE : Prop where
   wp_release : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx] (cpu : CPU) (k : KCtx)
-    (γ : GName) (s : String) (R : CtxId → IProp GF) [CtxMorph R] hsie htier hnoff hK hexit,
-    wp_release_body (hlc := hlc) (GF := GF) cpu k γ s R hsie htier hnoff hK hexit
+    (γ : GName) (s : String) (R : CtxId → IProp GF) [CtxMorph R] hsie hnoff hK hexit,
+    wp_release_body (hlc := hlc) (GF := GF) cpu k γ s R hsie hnoff hK hexit
 
 end Xv6

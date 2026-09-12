@@ -32,7 +32,7 @@ def myprocAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«myproc»
 /-- **WP of `myproc`.**  Returns `k.proc`, the current process, in `a0`;
 the context comes back unchanged but for the registers. -/
 def wp_myproc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
-    (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+    (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 10 ≤ k.avail) : Prop :=
   kctx cpu k ∗ pcIs cpu myprocAddr ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ R' : RegMap,
@@ -42,7 +42,7 @@ def wp_myproc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx
 
 /-- The interface of `myproc`. -/
 structure MYPROC : Prop where
-  wp_myproc : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx] (cpu : CPU) (k : KCtx) hsie htier hnoff hK,
-    wp_myproc_body (hlc := hlc) (GF := GF) cpu k hsie htier hnoff hK
+  wp_myproc : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx] (cpu : CPU) (k : KCtx) hsie hnoff hK,
+    wp_myproc_body (hlc := hlc) (GF := GF) cpu k hsie hnoff hK
 
 end Xv6

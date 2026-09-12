@@ -27,7 +27,7 @@ theorem execSpecF_lwu [CurCtx] (cpu : CPU) (dq dq' : DFrac) (c : MConf) (sie : B
   load_file_S_proof swp_checked_mem_read_load4_S hrd (RegMap.get R rs1 + BitVec.signExtend 64 imm) 4 (split_on_page_boundary_4 (RegMap.get R rs1 + BitVec.signExtend 64 imm) hal)
 
 /-- `lwu rd, imm(rs1)`: the word at `rs1 + imm`, zero-extended. -/
-theorem wp_s_lwu [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+theorem wp_s_lwu [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rd rs1 : BitVec 5) (hrd : rdOk rd)
     (dq' : DFrac) (w : BitVec 32) :
     instr (GF := GF) pc is_rvc (instruction.LOAD (imm, regidx.Regidx rs1, regidx.Regidx rd, true, 4)) ∗

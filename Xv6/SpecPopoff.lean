@@ -33,7 +33,7 @@ def popOffAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«pop_off»
 
 /-- **WP of `pop_off`** (interrupts-off exit). -/
 def wp_pop_off_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
-    (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+    (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (hnoff : 1 ≤ k.noff) (hK : 4 ≤ k.avail) (hlks : k.locks.length ≤ k.noff - 1)
     (hexit : k.noff = 1 → k.intena = false) : Prop :=
   kctx cpu k ∗ pcIs cpu popOffAddr ∗
@@ -44,7 +44,7 @@ def wp_pop_off_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
 /-- The interface of `pop_off`. -/
 structure POPOFF : Prop where
   wp_pop_off : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx] (cpu : CPU) (k : KCtx)
-    hsie htier hnoff hK hlks hexit,
-    wp_pop_off_body (hlc := hlc) (GF := GF) cpu k hsie htier hnoff hK hlks hexit
+    hsie hnoff hK hlks hexit,
+    wp_pop_off_body (hlc := hlc) (GF := GF) cpu k hsie hnoff hK hlks hexit
 
 end Xv6

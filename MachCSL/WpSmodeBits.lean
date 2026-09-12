@@ -19,7 +19,7 @@ theorem and_bits' (p q : Prop) [Decidable p] [Decidable q] :
   by_cases hp : p <;> by_cases hq : q <;> simp [hp, hq]
 
 /-- `and rd, rs1, rs2` on two flag bits. -/
-theorem wp_s_and_bits [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+theorem wp_s_and_bits [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (pc : BitVec 64) (is_rvc : Bool) (rd rs1 rs2 : BitVec 5) (hrd : rdOk rd) (p q : Prop) [Decidable p] [Decidable q]
     (h1 : k.rget cpu rs1 = if p then 1#64 else 0#64) (h2 : k.rget cpu rs2 = if q then 1#64 else 0#64) :
     instr (GF := GF) pc is_rvc (instruction.RTYPE (regidx.Regidx rs2, regidx.Regidx rs1, regidx.Regidx rd, rop.AND)) ∗
@@ -31,6 +31,6 @@ theorem wp_s_and_bits [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KC
   have e : k.rget cpu rs1 &&& k.rget cpu rs2 = if p ∧ q then 1#64 else 0#64 := by
     rw [h1, h2, and_bits']
   rw [← e]
-  exact wp_s_and cpu k hsie htier pc is_rvc rd rs1 rs2 hrd
+  exact wp_s_and cpu k hsie pc is_rvc rd rs1 rs2 hrd
 
 end MachCSL

@@ -99,16 +99,6 @@ theorem wordPointsTo_bare_acc [CurCtx] (va : PAddr) (n : Nat) (dq : DFrac) (w : 
   · ipureintro; exact ⟨hram, hal⟩
   · iexact Hcl
 
-/-- The facts of a word, at the Bare tier. -/
-theorem wordPointsTo_facts [CurCtx] (va : PAddr) (n : Nat) (dq : DFrac) (w : BitVec (8 * n))
-    (hct : curTier = KTier.bare) :
-    wordPointsTo (GF := GF) va n dq w ⊢ ⌜inRam va n ∧ va.toNat % n = 0⌝ ∗ wordPointsTo va n dq w := by
-  iintro H
-  icases wordPointsTo_bare_acc va n dq w hct $$ H with ⟨%⟨hram, hal⟩, #Hcl, Hb⟩
-  ihave H := wordPointsTo_intro_id va n dq w hram hal $$ Hcl Hb
-  iframe H
-  ipureintro; exact ⟨hram, hal⟩
-
 instance [CurCtx] (pa : PAddr) (n : Nat) (dq : DFrac) (w : BitVec (8 * n)) :
     Timeless (PROP := IProp GF) (wordPointsTo pa n dq w) := by
   unfold wordPointsTo

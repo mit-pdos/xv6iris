@@ -23,7 +23,7 @@ def mycpuAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«mycpu»
 
 /-- **WP of `mycpu`.**  Two stack slots; returns `&cpus[hartid]` in `a0`. -/
 def wp_mycpu_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
-    (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare) (hK : 2 ≤ k.avail) : Prop :=
+    (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (hK : 2 ≤ k.avail) : Prop :=
   kctx cpu k ∗ pcIs cpu mycpuAddr ∗
   (∀ R' : RegMap, kctx cpu (k.withRegs R') -∗ pcIs cpu (jumpPc (k.regs 1#5)) -∗
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = cpuAddr cpu⌝ -∗ wpLoop cpu)
@@ -31,7 +31,7 @@ def wp_mycpu_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
 
 /-- The interface of `mycpu`. -/
 structure MYCPU : Prop where
-  wp_mycpu : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx] (cpu : CPU) (k : KCtx) hsie htier hK,
-    wp_mycpu_body (hlc := hlc) (GF := GF) cpu k hsie htier hK
+  wp_mycpu : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx] (cpu : CPU) (k : KCtx) hsie hK,
+    wp_mycpu_body (hlc := hlc) (GF := GF) cpu k hsie hK
 
 end Xv6

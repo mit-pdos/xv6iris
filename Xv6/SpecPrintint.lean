@@ -22,7 +22,7 @@ def printintAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«printint»
 /-- **WP of `printint`.** -/
 def wp_printint_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γd : UartNames) (bs : List (BitVec 8))
-    (hsie : k.sie = false) (htier : k.tier = KTier.bare) (hK : 24 ≤ k.avail)
+    (hsie : k.sie = false) (hK : 24 ≤ k.avail)
     (hbase : k.regs 11#5 = 10#64 ∨ k.regs 11#5 = 16#64)
     (hnoff : k.noff + 1 < 2 ^ 31) (huart : "uart" ∉ k.locks) : Prop :=
   kctx cpu k ∗ pcIs cpu printintAddr ∗ isTxLock γl γd ∗
@@ -35,7 +35,7 @@ def wp_printint_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
 /-- The interface of `printint`. -/
 structure PRINTINT : Prop where
   wp_printint : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx] (cpu : CPU) (k : KCtx)
-    (γl : GName) (γd : UartNames) (bs : List (BitVec 8)) hsie htier hK hbase hnoff huart,
-    wp_printint_body (hlc := hlc) (GF := GF) cpu k γl γd bs hsie htier hK hbase hnoff huart
+    (γl : GName) (γd : UartNames) (bs : List (BitVec 8)) hsie hK hbase hnoff huart,
+    wp_printint_body (hlc := hlc) (GF := GF) cpu k γl γd bs hsie hK hbase hnoff huart
 
 end Xv6

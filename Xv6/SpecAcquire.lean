@@ -44,7 +44,7 @@ def acquireAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«acquire»
 /-- **WP of `acquire`.** -/
 def wp_acquire_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : GName) (s : String) (R : CtxId → IProp GF) [CtxMorph R]
-    (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+    (hsie : k.sie = false)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 10 ≤ k.avail) (hs : s ∉ k.locks) : Prop :=
   kctx cpu k ∗ pcIs cpu acquireAddr ∗ isLock γ (k.regs 10#5) s R ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ R' : RegMap,
@@ -56,7 +56,7 @@ def wp_acquire_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
 /-- The interface of `acquire`. -/
 structure ACQUIRE : Prop where
   wp_acquire : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx] (cpu : CPU) (k : KCtx)
-    (γ : GName) (s : String) (R : CtxId → IProp GF) [CtxMorph R] hsie htier hnoff hK hs,
-    wp_acquire_body (hlc := hlc) (GF := GF) cpu k γ s R hsie htier hnoff hK hs
+    (γ : GName) (s : String) (R : CtxId → IProp GF) [CtxMorph R] hsie hnoff hK hs,
+    wp_acquire_body (hlc := hlc) (GF := GF) cpu k γ s R hsie hnoff hK hs
 
 end Xv6

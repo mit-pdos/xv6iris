@@ -35,7 +35,7 @@ def memcmpRes (bs1 bs2 : List (BitVec 8)) (n : Nat) (res : BitVec 64) : Prop :=
 /-- **WP of `memcmp`.** -/
 def wp_memcmp_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (bs1 bs2 : List (BitVec 8)) (n : Nat) (dq1 dq2 : DFrac)
-    (hsie : k.sie = false) (htier : k.tier = KTier.bare) (hK : 2 ≤ k.avail)
+    (hsie : k.sie = false) (hK : 2 ≤ k.avail)
     (hn : k.regs 12#5 = BitVec.ofNat 64 n) (hn32 : n < 2 ^ 32)
     (hl1 : n ≤ bs1.length) (hl2 : n ≤ bs2.length) : Prop :=
   kctx cpu k ∗ pcIs cpu memcmpAddr ∗
@@ -50,7 +50,7 @@ def wp_memcmp_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx
 structure MEMCMP : Prop where
   wp_memcmp : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (bs1 bs2 : List (BitVec 8)) (n : Nat) (dq1 dq2 : DFrac)
-    hsie htier hK hn hn32 hl1 hl2,
-    wp_memcmp_body (hlc := hlc) (GF := GF) cpu k bs1 bs2 n dq1 dq2 hsie htier hK hn hn32 hl1 hl2
+    hsie hK hn hn32 hl1 hl2,
+    wp_memcmp_body (hlc := hlc) (GF := GF) cpu k bs1 bs2 n dq1 dq2 hsie hK hn hn32 hl1 hl2
 
 end Xv6

@@ -926,16 +926,20 @@ theorem fmt_i3 (a : BitVec 64) (i : Nat) :
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
 
-/-- The C string a `.str` description owns, given back on return.  The
-string's own facts (no NUL inside, the pointer not null) travel with the
-`cstr`; a client that needs one reads it off with `cstr_pure`. -/
+/-- The C string a `.str` description owns (the pointer not null), given
+back on return.  The string's own fact (no NUL inside) travels with the
+`cstr`; a client that needs it reads it off with `cstr_pure`. -/
 theorem pkDescRes_str_acc (v : BitVec 64) (dq : DFrac) (s : List (BitVec 8)) :
     pkDescRes (GF := GF) v (.str dq s) ⊢
-      cstr v dq s ∗ (cstr v dq s -∗ pkDescRes v (.str dq s)) := by
+      ⌜v ≠ 0#64⌝ ∗ cstr v dq s ∗ (cstr v dq s -∗ pkDescRes v (.str dq s)) := by
   simp only [pkDescRes]
-  iintro H
+  iintro ⟨%h, H⟩
+  isplit
+  · ipureintro; exact h
   iframe H
   iintro H
+  isplit
+  · ipureintro; exact h
   iexact H
 
 /-- `printk`'s postcondition as the contract states it (the format as a
@@ -1103,7 +1107,7 @@ macro_rules
       BitVec.zero_add, BitVec.reduceMul, BitVec.reduceOfNat, BitVec.reduceSignExtend, BitVec.reduceSetWidth,
       BitVec.reduceExtractLsb', BitVec.reduceAnd, BitVec.reduceOr, BitVec.reduceXOr, BitVec.reduceNot,
       BitVec.reduceShiftLeft, BitVec.reduceHShiftLeft, BitVec.reduceHShiftRight,
-      BitVec.toNat_ofNat, Nat.reducePow, Nat.reduceMod, Bool.false_eq_true, hsie, htier, $lems,*])
+      BitVec.toNat_ofNat, Nat.reducePow, Nat.reduceMod, Bool.false_eq_true, hsie, $lems,*])
   | `(tactic| k_norm_noite [$extra:term,*] at $h:ident) => do
     let lems ← extra.getElems.mapM fun l => `(Lean.Parser.Tactic.simpLemma| $l:term)
     `(tactic| try simp only [KCtx.push_eq, KCtx.setReg_withRegs, KCtx.withRegs_withRegs, KCtx.rget_withRegs',
@@ -1126,7 +1130,7 @@ macro_rules
       BitVec.zero_add, BitVec.reduceMul, BitVec.reduceOfNat, BitVec.reduceSignExtend, BitVec.reduceSetWidth,
       BitVec.reduceExtractLsb', BitVec.reduceAnd, BitVec.reduceOr, BitVec.reduceXOr, BitVec.reduceNot,
       BitVec.reduceShiftLeft, BitVec.reduceHShiftLeft, BitVec.reduceHShiftRight,
-      BitVec.toNat_ofNat, Nat.reducePow, Nat.reduceMod, Bool.false_eq_true, hsie, htier, $lems,*] at $h:ident)
+      BitVec.toNat_ofNat, Nat.reducePow, Nat.reduceMod, Bool.false_eq_true, hsie, $lems,*] at $h:ident)
 
 
 syntax "k_step_noite" term:max " $$ " specPat : tactic
@@ -1146,8 +1150,7 @@ macro_rules
                inext
                k_norm_noite [$extra,*]
                iapply wpNext_off_intro
-               case hs => k_norm_noite
-               case ht => k_norm_noite))
+               case hs => k_norm_noite))
 
 set_option hygiene false in
 /-- `k_step_noite rule from code HT $$ pat`: as `k_step_noite`, with the rule's `instr` premise
@@ -1168,8 +1171,7 @@ macro_rules
                inext
                k_norm_noite [$extra,*]
                iapply wpNext_off_intro
-               case hs => k_norm_noite
-               case ht => k_norm_noite))
+               case hs => k_norm_noite))
 
 
 

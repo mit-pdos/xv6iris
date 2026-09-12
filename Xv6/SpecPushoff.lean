@@ -35,7 +35,7 @@ def pushOffAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«push_off»
 
 /-- **WP of `push_off`.** -/
 def wp_push_off_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
-    (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+    (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 6 ≤ k.avail) : Prop :=
   kctx cpu k ∗ pcIs cpu pushOffAddr ∗
   (∀ R' : RegMap, kctx cpu (k.pushOff.withRegs R') -∗ pcIs cpu (jumpPc (k.regs 1#5)) -∗
@@ -44,7 +44,7 @@ def wp_push_off_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurC
 
 /-- The interface of `push_off`. -/
 structure PUSHOFF : Prop where
-  wp_push_off : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx] (cpu : CPU) (k : KCtx) hsie htier hnoff hK,
-    wp_push_off_body (hlc := hlc) (GF := GF) cpu k hsie htier hnoff hK
+  wp_push_off : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx] (cpu : CPU) (k : KCtx) hsie hnoff hK,
+    wp_push_off_body (hlc := hlc) (GF := GF) cpu k hsie hnoff hK
 
 end Xv6

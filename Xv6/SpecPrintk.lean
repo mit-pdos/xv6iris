@@ -119,7 +119,7 @@ def pkDescRes {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx] (v 
     PkArgDesc → IProp GF
   | .num => iprop(⌜True⌝)
   | .null => iprop(⌜v = 0#64⌝)
-  | .str dq s => cstr v dq s
+  | .str dq s => iprop(⌜v ≠ 0#64⌝ ∗ cstr v dq s)
 
 /-- Vararg `j` is the entry value of `a(j+1) = x(11+j)`. -/
 def pkVararg (R : RegMap) (j : Nat) : BitVec 64 := R (BitVec.ofNat 5 (11 + j))
@@ -135,7 +135,7 @@ def pkDescs {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx] (R : 
 def wp_printk_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8))
     (dqf : DFrac) (f : List (BitVec 8)) (descs : List PkArgDesc)
-    (hsie : k.sie = false) (htier : k.tier = KTier.bare) (hK : 48 ≤ k.avail)
+    (hsie : k.sie = false) (hK : 48 ≤ k.avail)
     (hflen : f.length + 4 < 2 ^ 31)
     (hkinds : pkKinds f = descs.map PkArgDesc.kind) (hdlen : descs.length ≤ 7)
     (hnoff : k.noff + 2 < 2 ^ 31) (hpr : "pr" ∉ k.locks) (huart : "uart" ∉ k.locks) : Prop :=
@@ -153,8 +153,8 @@ def wp_printk_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G G
 structure PRINTK : Prop where
   wp_printk : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac) (f : List (BitVec 8))
-    (descs : List PkArgDesc) hsie htier hK hflen hkinds hdlen hnoff hpr huart,
-    wp_printk_body (hlc := hlc) (GF := GF) cpu k γpr γl γd bs dqf f descs hsie htier hK hflen hkinds hdlen
+    (descs : List PkArgDesc) hsie hK hflen hkinds hdlen hnoff hpr huart,
+    wp_printk_body (hlc := hlc) (GF := GF) cpu k γpr γl γd bs dqf f descs hsie hK hflen hkinds hdlen
       hnoff hpr huart
 
 end Xv6

@@ -38,7 +38,7 @@ def holdingAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«holding»
 /-- **WP of `holding`, not held by the caller.**  `lk` in `a0`; returns 0. -/
 def wp_holding_notheld_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : GName) (s : String) (R : CtxId → IProp GF)
-    (hsie : k.sie = false) (htier : k.tier = KTier.bare) (hK : 6 ≤ k.avail) (hs : s ∉ k.locks) : Prop :=
+    (hsie : k.sie = false) (hK : 6 ≤ k.avail) (hs : s ∉ k.locks) : Prop :=
   kctx cpu k ∗ pcIs cpu holdingAddr ∗ isLock γ (k.regs 10#5) s R ∗
   (∀ R' : RegMap, kctx cpu (k.withRegs R') -∗ pcIs cpu (jumpPc (k.regs 1#5)) -∗
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = 0#64⌝ -∗ wpLoop cpu)
@@ -48,7 +48,7 @@ def wp_holding_notheld_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
 holder token comes back. -/
 def wp_holding_locked_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : GName) (s : String) (R : CtxId → IProp GF)
-    (hsie : k.sie = false) (htier : k.tier = KTier.bare) (hK : 6 ≤ k.avail) : Prop :=
+    (hsie : k.sie = false) (hK : 6 ≤ k.avail) : Prop :=
   kctx cpu k ∗ pcIs cpu holdingAddr ∗ isLock γ (k.regs 10#5) s R ∗
   locked γ cpu ∗
   (∀ R' : RegMap, kctx cpu (k.withRegs R') -∗ pcIs cpu (jumpPc (k.regs 1#5)) -∗
@@ -58,10 +58,10 @@ def wp_holding_locked_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 /-- The interface of `holding`. -/
 structure HOLDING : Prop where
   wp_holding_notheld : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx] (cpu : CPU) (k : KCtx)
-    (γ : GName) (s : String) (R : CtxId → IProp GF) hsie htier hK hs,
-    wp_holding_notheld_body (hlc := hlc) (GF := GF) cpu k γ s R hsie htier hK hs
+    (γ : GName) (s : String) (R : CtxId → IProp GF) hsie hK hs,
+    wp_holding_notheld_body (hlc := hlc) (GF := GF) cpu k γ s R hsie hK hs
   wp_holding_locked : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx] (cpu : CPU) (k : KCtx)
-    (γ : GName) (s : String) (R : CtxId → IProp GF) hsie htier hK,
-    wp_holding_locked_body (hlc := hlc) (GF := GF) cpu k γ s R hsie htier hK
+    (γ : GName) (s : String) (R : CtxId → IProp GF) hsie hK,
+    wp_holding_locked_body (hlc := hlc) (GF := GF) cpu k γ s R hsie hK
 
 end Xv6

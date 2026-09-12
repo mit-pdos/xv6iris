@@ -64,19 +64,6 @@ def nonul (s : List (BitVec 8)) : Prop := ∀ b ∈ s, b ≠ 0#8
 theorem inRam_ne_zero {a : BitVec 64} {n : Nat} (h : inRam a n) : a ≠ 0#64 := by
   intro h0; subst h0; unfold inRam ramBase at h; simp at h
 
-/-- A non-empty buffer's pointer is not null (its first byte is in RAM). -/
-theorem byteBuf_ne_zero [CurCtx] (a : BitVec 64) (dq : DFrac) (bs : List (BitVec 8)) (b : BitVec 8)
-    (hb : bs[0]? = some b) (hct : curTier = KTier.bare) :
-    byteBuf (GF := GF) a dq bs ⊢ ⌜a ≠ 0#64⌝ ∗ byteBuf a dq bs := by
-  iintro H
-  icases byteBuf_acc a dq bs 0 b hb $$ H with ⟨H0, Hclose⟩
-  icases wordPointsTo_facts _ _ _ _ hct $$ H0 with ⟨%h, H0⟩
-  ihave H := Hclose $$ H0
-  iframe H
-  ipureintro
-  have := inRam_ne_zero h.1
-  simpa using this
-
 /-- **The C string `s` at `a`**, owned at `dq`: the bytes of `s` followed by
 the terminating NUL, with no NUL inside `s`.  What a `char *` argument
 points to: the points-to of a string. -/
@@ -95,20 +82,12 @@ theorem cstr_elim [CurCtx] (a : BitVec 64) (dq : DFrac) (s : List (BitVec 8)) :
   unfold cstr
   iintro H; iexact H
 
-/-- The facts of a C string: no NUL inside, and the pointer is not null. -/
-theorem cstr_pure [CurCtx] (a : BitVec 64) (dq : DFrac) (s : List (BitVec 8)) (hct : curTier = KTier.bare) :
-    cstr (GF := GF) a dq s ⊢ ⌜nonul s ∧ a ≠ 0#64⌝ ∗ cstr a dq s := by
+/-- The fact of a C string: no NUL inside. -/
+theorem cstr_pure [CurCtx] (a : BitVec 64) (dq : DFrac) (s : List (BitVec 8)) :
+    cstr (GF := GF) a dq s ⊢ ⌜nonul s⌝ ∗ cstr a dq s := by
   unfold cstr
   iintro ⟨%h, H⟩
-  icases byteBuf_ne_zero a dq (s ++ [0#8]) ((s ++ [0#8]).getD 0 0#8)
-    (by cases s <;> simp) hct $$ H with ⟨%h0, H⟩
-  iframe H; ipureintro; exact ⟨⟨h, h0⟩, h⟩
-
-theorem cstr_ne_zero [CurCtx] (a : BitVec 64) (dq : DFrac) (s : List (BitVec 8)) (hct : curTier = KTier.bare) :
-    cstr (GF := GF) a dq s ⊢ ⌜a ≠ 0#64⌝ := by
-  iintro H
-  icases cstr_pure _ _ _ hct $$ H with ⟨%h, _⟩
-  ipureintro; exact h.2
+  iframe H; ipureintro; exact ⟨h, h⟩
 
 /-- Read byte `j` of a C string (`j ≤ s.length`: the terminator is byte `s.length`). -/
 theorem cstr_acc [CurCtx] (a : BitVec 64) (dq : DFrac) (s : List (BitVec 8)) (j : Nat) (b : BitVec 8)

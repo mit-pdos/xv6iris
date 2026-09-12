@@ -229,7 +229,7 @@ theorem wpLoop_k_setReg_mem' [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) 
 /-! ## Memory -/
 
 /-- `lbu rd, imm(rs1)`: the byte at `rs1 + imm`, zero-extended. -/
-theorem wp_s_lbu [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+theorem wp_s_lbu [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rd rs1 : BitVec 5) (hrd : rdOk rd)
     (dq' : DFrac) (b : BitVec 8) :
     instr (GF := GF) pc is_rvc (instruction.LOAD (imm, regidx.Regidx rs1, regidx.Regidx rd, true, 1)) ∗
@@ -244,7 +244,7 @@ theorem wp_s_lbu [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (
       (tpPin cpu k.regs) b)
 
 /-- `ld rd, imm(rs1)`: the word at `rs1 + imm`. -/
-theorem wp_s_ld [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+theorem wp_s_ld [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rd rs1 : BitVec 5) (hrd : rdOk rd)
     (dq' : DFrac) (v : BitVec 64) :
     instr (GF := GF) pc is_rvc (instruction.LOAD (imm, regidx.Regidx rs1, regidx.Regidx rd, false, 8)) ∗
@@ -259,7 +259,7 @@ theorem wp_s_ld [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (h
       (tpPin cpu k.regs) v)
 
 /-- `sb rs2, imm(rs1)`: the low byte of `rs2` to the byte at `rs1 + imm`. -/
-theorem wp_s_sb [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+theorem wp_s_sb [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rs1 rs2 : BitVec 5) (old : BitVec 8) :
     instr (GF := GF) pc is_rvc (instruction.STORE (imm, regidx.Regidx rs2, regidx.Regidx rs1, 1)) ∗
     kctx cpu k ∗ pcIs cpu pc ∗
@@ -273,7 +273,7 @@ theorem wp_s_sb [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (h
     (fun c hok _ => execSpecF_sb cpu (DFrac.own 1) c false k.root hok pc _ imm rs1 rs2 (tpPin cpu k.regs) old)
 
 /-- `sd rs2, imm(rs1)`: `rs2` to the word at `rs1 + imm`. -/
-theorem wp_s_sd [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+theorem wp_s_sd [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rs1 rs2 : BitVec 5) (old : BitVec 64) :
     instr (GF := GF) pc is_rvc (instruction.STORE (imm, regidx.Regidx rs2, regidx.Regidx rs1, 8)) ∗
     kctx cpu k ∗ pcIs cpu pc ∗
@@ -289,7 +289,7 @@ theorem wp_s_sd [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (h
 /-! ## Control flow -/
 
 /-- The conditional branches. -/
-theorem wp_s_branch [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+theorem wp_s_branch [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 13) (rs1 rs2 : BitVec 5) (hrs1 : rs1 ≠ 0#5) (op : bop) :
     instr (GF := GF) pc is_rvc (instruction.BTYPE (imm, regidx.Regidx rs2, regidx.Regidx rs1, op)) ∗
     kctx cpu k ∗ pcIs cpu pc ∗
@@ -304,7 +304,7 @@ theorem wp_s_branch [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx
         (tpPin cpu k.regs) (jumpTgt_even_13 pc imm hpc (instrWf_btype hwf))))
 
 /-- `j off`. -/
-theorem wp_s_j [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+theorem wp_s_j [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 21) :
     instr (GF := GF) pc is_rvc (instruction.JAL (imm, regidx.Regidx 0#5)) ∗
     kctx cpu k ∗ pcIs cpu pc ∗
@@ -317,7 +317,7 @@ theorem wp_s_j [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hs
         (jumpTgt_even_21 pc imm hpc (instrWf_jal hwf))))
 
 /-- `jal rd, off` (`rd` not `x0`/`sp`/`tp`, e.g. `ra`): link, jump. -/
-theorem wp_s_jal [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+theorem wp_s_jal [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 21) (rd : BitVec 5) (hrd : rdOk rd) :
     instr (GF := GF) pc is_rvc (instruction.JAL (imm, regidx.Regidx rd)) ∗
     kctx cpu k ∗ pcIs cpu pc ∗
@@ -331,7 +331,7 @@ theorem wp_s_jal [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (
         (jumpTgt_even_21 pc imm hpc (instrWf_jal hwf))))
 
 /-- `ret` (`jalr x0, 0(rs1)`, `rs1 = ra`): jump to `rs1` with bit 0 cleared. -/
-theorem wp_s_ret [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+theorem wp_s_ret [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (pc : BitVec 64) (is_rvc : Bool) (rs1 : BitVec 5) :
     instr (GF := GF) pc is_rvc (instruction.JALR (0#12, regidx.Regidx rs1, regidx.Regidx 0#5)) ∗
     kctx cpu k ∗ pcIs cpu pc ∗
@@ -344,7 +344,7 @@ theorem wp_s_ret [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (
 /-! ## Word arithmetic -/
 
 /-- `subw rd, rs1, rs2`. -/
-theorem wp_s_subw [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+theorem wp_s_subw [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (pc : BitVec 64) (is_rvc : Bool) (rd rs1 rs2 : BitVec 5) (hrd : rdOk rd) :
     instr (GF := GF) pc is_rvc (instruction.RTYPEW (regidx.Regidx rs2, regidx.Regidx rs1, regidx.Regidx rd, ropw.SUBW)) ∗
     kctx cpu k ∗ pcIs cpu pc ∗
@@ -357,7 +357,7 @@ theorem wp_s_subw [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) 
     (fun c _ _ => execSpecF_subw cpu (DFrac.own 1) c pc _ rd rs1 rs2 hrd.1 (tpPin cpu k.regs))
 
 /-- `addw rd, rs1, rs2`. -/
-theorem wp_s_addw [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+theorem wp_s_addw [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (pc : BitVec 64) (is_rvc : Bool) (rd rs1 rs2 : BitVec 5) (hrd : rdOk rd) :
     instr (GF := GF) pc is_rvc (instruction.RTYPEW (regidx.Regidx rs2, regidx.Regidx rs1, regidx.Regidx rd, ropw.ADDW)) ∗
     kctx cpu k ∗ pcIs cpu pc ∗
@@ -374,7 +374,7 @@ theorem wp_s_addw [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) 
 set_option maxHeartbeats 4000000 in
 /-- `addi sp, sp, -8m`: push `m` slots (out of the `avail`); the slots
 `[sp - 8m, sp)` become the caller's frame. -/
-theorem wp_s_push [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+theorem wp_s_push [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (m : Nat) (hm : m ≤ k.avail)
     (himm : BitVec.signExtend 64 imm = -(8#64 * BitVec.ofNat 64 m)) :
     instr (GF := GF) pc is_rvc (instruction.ITYPE (imm, regidx.Regidx 2#5, regidx.Regidx 2#5, iop.ADDI)) ∗
@@ -427,7 +427,7 @@ theorem wp_s_push [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) 
 set_option maxHeartbeats 4000000 in
 /-- `addi sp, sp, 8m`: pop `m` slots; the frame `[sp, sp + 8m)` returns to
 the `avail`. -/
-theorem wp_s_pop [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+theorem wp_s_pop [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (m : Nat)
     (himm : BitVec.signExtend 64 imm = 8#64 * BitVec.ofNat 64 m) :
     instr (GF := GF) pc is_rvc (instruction.ITYPE (imm, regidx.Regidx 2#5, regidx.Regidx 2#5, iop.ADDI)) ∗
@@ -536,7 +536,7 @@ def sstatusAt (sie : Bool) (v : BitVec 64) : Prop :=
   BitVec.extractLsb' 1 1 v = (if sie then 1#1 else 0#1)
 
 /-- `csrr rd, sstatus`: some value whose `SIE` bit is the context's. -/
-theorem wp_s_csrr_sstatus [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+theorem wp_s_csrr_sstatus [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (pc : BitVec 64) (is_rvc : Bool) (rd : BitVec 5) (hrd : rdOk rd) :
     instr (GF := GF) pc is_rvc (instruction.CSRReg (0x100#12, regidx.Regidx 0#5, regidx.Regidx rd, csrop.CSRRS)) ∗
     kctx cpu k ∗ pcIs cpu pc ∗
@@ -558,7 +558,7 @@ theorem wp_s_csrr_sstatus [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k 
 
 /-- `csrrci rd, sstatus, SIE` with interrupts off: reads `sstatus` (its `SIE`
 bit is `0`), leaves the configuration alone (`intr_off` at `SIE = 0`). -/
-theorem wp_s_csrrci_sstatus [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+theorem wp_s_csrrci_sstatus [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (pc : BitVec 64) (is_rvc : Bool) (rd : BitVec 5) (hrd : rdOk rd) :
     instr (GF := GF) pc is_rvc (instruction.CSRImm (0x100#12, 2#5, regidx.Regidx rd, csrop.CSRRC)) ∗
     kctx cpu k ∗ pcIs cpu pc ∗
@@ -580,7 +580,7 @@ theorem wp_s_csrrci_sstatus [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (
 /-! ## Words -/
 
 /-- `lw rd, imm(rs1)`: the sign-extended word at `rs1 + imm`. -/
-theorem wp_s_lw [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+theorem wp_s_lw [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rd rs1 : BitVec 5) (hrd : rdOk rd)
     (dq' : DFrac) (w : BitVec 32) :
     instr (GF := GF) pc is_rvc (instruction.LOAD (imm, regidx.Regidx rs1, regidx.Regidx rd, false, 4)) ∗
@@ -595,7 +595,7 @@ theorem wp_s_lw [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (h
       (tpPin cpu k.regs) w)
 
 /-- `sw rs2, imm(rs1)`: the low word of `rs2` to the word at `rs1 + imm`. -/
-theorem wp_s_sw [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+theorem wp_s_sw [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rs1 rs2 : BitVec 5) (old : BitVec 32) :
     instr (GF := GF) pc is_rvc (instruction.STORE (imm, regidx.Regidx rs2, regidx.Regidx rs1, 4)) ∗
     kctx cpu k ∗ pcIs cpu pc ∗
@@ -609,7 +609,7 @@ theorem wp_s_sw [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (h
     (fun c hok _ => execSpecF_sw cpu (DFrac.own 1) c false k.root hok pc _ imm rs1 rs2 (tpPin cpu k.regs) old)
 
 /-- The conditional branches against `x0` as `rs1` (`blez`, `bgtz`, ...). -/
-theorem wp_s_branch0 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+theorem wp_s_branch0 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 13) (rs2 : BitVec 5) (hrs2 : rs2 ≠ 0#5) (op : bop) :
     instr (GF := GF) pc is_rvc (instruction.BTYPE (imm, regidx.Regidx rs2, regidx.Regidx 0#5, op)) ∗
     kctx cpu k ∗ pcIs cpu pc ∗
@@ -717,7 +717,7 @@ theorem signExtend_intena (b : Bool) :
   cases b <;> rfl
 
 /-- `lw rd, imm(rs1)` of `c->noff` (`rs1 + imm = &c->noff`): the depth. -/
-theorem wp_s_lw_noff [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+theorem wp_s_lw_noff [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rd rs1 : BitVec 5) (hrd : rdOk rd)
     (haddr : k.rget cpu rs1 + BitVec.signExtend 64 imm = aCpuNoff cpu) :
     instr (GF := GF) pc is_rvc (instruction.LOAD (imm, regidx.Regidx rs1, regidx.Regidx rd, false, 4)) ∗
@@ -754,7 +754,7 @@ theorem wp_s_lw_noff [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
   iexact HΦ
 
 /-- `lw rd, imm(rs1)` of `c->intena`: the saved enable state. -/
-theorem wp_s_lw_intena [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+theorem wp_s_lw_intena [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rd rs1 : BitVec 5) (hrd : rdOk rd)
     (haddr : k.rget cpu rs1 + BitVec.signExtend 64 imm = aCpuIntena cpu) :
     instr (GF := GF) pc is_rvc (instruction.LOAD (imm, regidx.Regidx rs1, regidx.Regidx rd, false, 4)) ∗
@@ -793,7 +793,7 @@ theorem wp_s_lw_intena [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : K
 
 /-- `sw rs2, imm(rs1)` to `c->noff`: the depth becomes `n'` (the value
 stored), which must keep the context well formed. -/
-theorem wp_s_sw_noff [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+theorem wp_s_sw_noff [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rs1 rs2 : BitVec 5)
     (haddr : k.rget cpu rs1 + BitVec.signExtend 64 imm = aCpuNoff cpu) (n' : Nat)
     (hval : BitVec.extractLsb' 0 32 (k.rget cpu rs2) = BitVec.ofNat 32 n')
@@ -824,7 +824,7 @@ theorem wp_s_sw_noff [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
 
 /-- `sw rs2, imm(rs1)` to `c->intena`: the saved enable state becomes `b'`
 (the value stored), which must keep the context well formed. -/
-theorem wp_s_sw_intena [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+theorem wp_s_sw_intena [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rs1 rs2 : BitVec 5)
     (haddr : k.rget cpu rs1 + BitVec.signExtend 64 imm = aCpuIntena cpu) (b' : Bool)
     (hval : BitVec.extractLsb' 0 32 (k.rget cpu rs2) = intenaVal b')
@@ -854,7 +854,7 @@ theorem wp_s_sw_intena [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : K
   iframe
 
 /-- `ld rd, imm(rs1)` of `c->proc`: the running proc. -/
-theorem wp_s_ld_proc [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+theorem wp_s_ld_proc [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rd rs1 : BitVec 5) (hrd : rdOk rd)
     (haddr : k.rget cpu rs1 + BitVec.signExtend 64 imm = aCpuProc cpu) :
     instr (GF := GF) pc is_rvc (instruction.LOAD (imm, regidx.Regidx rs1, regidx.Regidx rd, false, 8)) ∗

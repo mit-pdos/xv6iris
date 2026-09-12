@@ -87,7 +87,7 @@ theorem wpLoop_k_lock [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KC
 
 /-- `fence rw,w`. -/
 theorem wp_s_fence_rw_w [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
-    (htier : k.tier = KTier.bare) (pc : BitVec 64) (is_rvc : Bool) (rs rd : BitVec 5) :
+    (pc : BitVec 64) (is_rvc : Bool) (rs rd : BitVec 5) :
     instr (GF := GF) pc is_rvc (instruction.FENCE (0#4, 3#4, 1#4, regidx.Regidx rs, regidx.Regidx rd)) ∗
     kctx cpu k ∗ pcIs cpu pc ∗
     ▷ wpNext k.sie k.proc cpu (fun cpu' =>
@@ -98,7 +98,7 @@ theorem wp_s_fence_rw_w [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : 
 
 /-- `fence rw,rw`. -/
 theorem wp_s_fence_rw_rw [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
-    (htier : k.tier = KTier.bare) (pc : BitVec 64) (is_rvc : Bool) (rs rd : BitVec 5) :
+    (pc : BitVec 64) (is_rvc : Bool) (rs rd : BitVec 5) :
     instr (GF := GF) pc is_rvc (instruction.FENCE (0#4, 3#4, 3#4, regidx.Regidx rs, regidx.Regidx rd)) ∗
     kctx cpu k ∗ pcIs cpu pc ∗
     ▷ wpNext k.sie k.proc cpu (fun cpu' =>
@@ -108,7 +108,7 @@ theorem wp_s_fence_rw_rw [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k :
     (fun c hok hmenv => execSpecF_fence_rw_rw cpu (DFrac.own 1) c false hok.phys hmenv pc _ rs rd (tpPin cpu k.regs))
 
 /-- `sltiu rd, rs1, imm` (covers `seqz rd, rs1`). -/
-theorem wp_s_sltiu [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+theorem wp_s_sltiu [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rd rs1 : BitVec 5) (hrd : rdOk rd) :
     instr (GF := GF) pc is_rvc (instruction.ITYPE (imm, regidx.Regidx rs1, regidx.Regidx rd, iop.SLTIU)) ∗
     kctx cpu k ∗ pcIs cpu pc ∗
@@ -173,7 +173,7 @@ theorem lock_reader_view (cpu : CPU) (lo B : Nat) :
   · ipureintro; omega
 
 /-- The racy load of the lock word: any value. -/
-theorem wp_s_lw_lockword (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+theorem wp_s_lw_lockword (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rd rs1 : BitVec 5) (hrd : rdOk rd)
     (γ : GName) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF)
     (haddr : k.rget cpu rs1 + BitVec.signExtend 64 imm = lk) :
@@ -268,7 +268,7 @@ theorem wp_s_lw_lockword (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : 
   iapply HK $$ %w Hk Hpc
 
 /-- The racy load of the lock word by its HOLDER: 1. -/
-theorem wp_s_lw_lockword_locked (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+theorem wp_s_lw_lockword_locked (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rd rs1 : BitVec 5) (hrd : rdOk rd)
     (γ : GName) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF)
     (haddr : k.rget cpu rs1 + BitVec.signExtend 64 imm = lk) :
@@ -380,7 +380,7 @@ theorem wp_s_lw_lockword_locked (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (h
 
 /-- The racy load of the owner word by a hart that does NOT hold the lock:
 not its own `&cpus[i]`. -/
-theorem wp_s_ld_lkcpu_notheld (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+theorem wp_s_ld_lkcpu_notheld (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rd rs1 : BitVec 5) (hrd : rdOk rd)
     (γ : GName) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF)
     (haddr : k.rget cpu rs1 + BitVec.signExtend 64 imm = lk + 16#64) (hs : s ∉ k.locks) :
@@ -494,7 +494,7 @@ theorem wp_s_ld_lkcpu_notheld (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (hti
   iapply HK $$ %w Hk Hpc %hw
 
 /-- The racy load of the owner word by the HOLDER: its own `&cpus[i]`. -/
-theorem wp_s_ld_lkcpu_locked (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+theorem wp_s_ld_lkcpu_locked (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rd rs1 : BitVec 5) (hrd : rdOk rd)
     (γ : GName) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF)
     (haddr : k.rget cpu rs1 + BitVec.signExtend 64 imm = lk + 16#64) :
@@ -605,7 +605,7 @@ theorem wp_s_ld_lkcpu_locked (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htie
 set_option maxHeartbeats 4000000 in
 /-- `amoswap.w.aq rd, rs2, (rs1)` with `rs2 = 1` on the lock word: the old
 word lands in `rd`; if it was 0 the lock is taken (`acqPost`). -/
-theorem wp_s_amoswap_lock (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+theorem wp_s_amoswap_lock (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (pc : BitVec 64) (is_rvc : Bool) (rd rs1 rs2 : BitVec 5) (hrd : rdOk rd)
     (γ : GName) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF) [CtxMorph R]
     (haddr : k.rget cpu rs1 = lk) (hval : BitVec.setWidth 32 (k.rget cpu rs2) = lkOne)
@@ -793,7 +793,7 @@ theorem wp_s_amoswap_lock (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier :
 
 /-- `sd rs2, imm(rs1)` of `&cpus[cpu]` into the owner word, by the hart that
 just won the AMO: the holder token proper. -/
-theorem wp_s_sd_lkcpu_acquire (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+theorem wp_s_sd_lkcpu_acquire (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rs1 rs2 : BitVec 5)
     (γ : GName) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF)
     (haddr : k.rget cpu rs1 + BitVec.signExtend 64 imm = lk + 16#64) (hval : k.rget cpu rs2 = cpuAddr cpu) :
@@ -874,7 +874,7 @@ theorem wp_s_sd_lkcpu_acquire (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (hti
 
 /-- `sd x0, imm(rs1)` into the owner word by the holder (release's first
 store): back to the window shape. -/
-theorem wp_s_sd_zero_lkcpu_release (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+theorem wp_s_sd_zero_lkcpu_release (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rs1 : BitVec 5)
     (γ : GName) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF)
     (haddr : k.rget cpu rs1 + BitVec.signExtend 64 imm = lk + 16#64) :
@@ -957,7 +957,7 @@ set_option maxHeartbeats 4000000 in
 /-- `sw x0, imm(rs1)` into the lock word by the holder (release's last
 store): the lock is free again, with the payload deposited at the holder's
 context and moved into the lock's; `s` leaves the held set. -/
-theorem wp_s_sw_zero_release (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (htier : k.tier = KTier.bare)
+theorem wp_s_sw_zero_release (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rs1 : BitVec 5)
     (γ : GName) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF) [CtxMorph R]
     (haddr : k.rget cpu rs1 + BitVec.signExtend 64 imm = lk) :
