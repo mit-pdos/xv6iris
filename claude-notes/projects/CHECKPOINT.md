@@ -269,3 +269,7 @@ PRINTK-LEDGER agent out of context before milestone A's commit (2026-09-12);
 PRINTK-LEDGER-2 (fresh, `brief-printk-ledger-2.md`) continues on the dirty
 `lane/printk-ledger` in `-sup`.  NOTE: the VM is saturated (five trees building;
 load 22-40) -- builds queue.
+
+OWNER (2026-09-12): printk's contract takes a caller-supplied FUPD that appends
+the message to the ledger at the commit under pr.lock (note "OWNER'S RULING ON
+PRINTK'S CONTRACT"); PRINTK-LEDGER-2 told before its A commit.

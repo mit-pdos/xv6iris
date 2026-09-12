@@ -2404,6 +2404,21 @@ ORDER: GENERIC-PAY → CONS-SWALLOW → SH-LINE 2b (gets on `ush_gets_line`,
 `wp_uk_ecall_read_recv` with `upos` threaded read → gets_loop → gets → getcmd
 → main) → LAZY-FLAG (the owner's form of (A)).
 
+OWNER'S RULING ON PRINTK'S CONTRACT (2026-09-12): "the printk spec should
+require a fupd to append to the UART output resource".  So printk does not
+take a ledger lower bound in and hand one back; the CALLER supplies a view
+shift `Ψ : ∀ ms cs, ⌜pk_site f⌝ -∗ [⌜cs = pk_render …⌝ from C] k_ledger_auth γd
+ms ={E}=∗ k_ledger_auth γd (ms ++ [(f, cs)]) ∗ Φ ms cs`, which printk invokes
+exactly once under pr.lock at the commit (after the last byte, before the
+release), and printk's post returns `Φ ms cs` at the lock's real ledger --
+the linearization point, so the "other harts in between" issue vanishes and
+an application-level ledger can be updated in lockstep.  The GEN corollary
+supplies the trivial shift.  Mask E chosen where the commit opens the UART
+invariant for the tie (the lane reports it).  E5 OPTION: the boot's printk
+sites are kernel proofs, so an application-chosen Ψ would ride `printk_env`
+(the way the app's `Htx` rides the ledger's permit) if the app wants a
+per-message hook beyond the per-byte tags.
+
 PRINTK-LEDGER MILESTONE A, IN PROGRESS (2026-09-12; `lane/printk-ledger`
 uncommitted, 19 files +404/-71; `pkl32`: only ProofMain + ProofPrintk red).
 SOUNDNESS CORRECTION: the post `k_ledger_lb γd (ms ++ [(f, cs)])` was
