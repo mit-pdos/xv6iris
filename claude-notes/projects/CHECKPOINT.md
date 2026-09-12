@@ -205,3 +205,10 @@ flight: LAZY-FLAG-2 p1 (main), TX-TAG p2 (`-tlw`), SH-OPEN p1 (`-sup`), E2 p1
 
 TX-TAG LANDED on main (2026-09-12).  `-tlw` free → TX-RECEIPT (per-pid
 transmit token; exact receipts) next there.
+
+TX-RECEIPT LAUNCHED (2026-09-12) in `-tlw` on `lane/tx-receipt` from main
+`3159c77d5` (brief `brief-tx-receipt.md`: the per-pid transmit token, exact
+console-write receipts, the relay to row 16, the U-tier write leaf; phase 1
+PROPOSES the key component `uvis_tx` for the coordinator's ruling).  In flight:
+LAZY-FLAG-2 p1 (main), SH-OPEN p1 (`-sup`), E2 p1 (`-disc`), TX-RECEIPT p1
+(`-tlw`).
