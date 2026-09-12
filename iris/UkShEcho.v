@@ -152,6 +152,78 @@ Definition ush_line_toks : Prop :=
     /\ ushp_no_symbols len (fun j : nat => f (k + j)%nat)
     /\ ushp_tokens len (fun j : nat => f (k + j)%nat) 0%nat echo_toks.
 
+(* ---- the transport, which is all the determinacy costs --------------- *)
+(* [ushp_skipws] / [ushp_toklen] read [f] only inside the window they are
+   given, and [ushp_tokens]' two constructors read it only through them --
+   so pointwise equality below [len] carries a tokenization across.  Three
+   plain inductions; nothing about echo. *)
+Lemma ushp_skipws_ext (n : nat) :
+  forall (i : nat) (f f' : nat -> bv 8),
+    (forall j : nat, (i <= j < i + n)%nat -> f j = f' j) ->
+    ushp_skipws n i f = ushp_skipws n i f'.
+Proof.
+  induction n as [| n IH ]; intros i f f' H; cbn; [ reflexivity | ].
+  rewrite (H i ltac:(lia)).
+  destruct (ushp_is_ws (f' i)); [ | reflexivity ].
+  f_equal. apply IH. intros j Hj. apply H. lia.
+Qed.
+
+Lemma ushp_toklen_ext (n : nat) :
+  forall (i : nat) (f f' : nat -> bv 8),
+    (forall j : nat, (i <= j < i + n)%nat -> f j = f' j) ->
+    ushp_toklen n i f = ushp_toklen n i f'.
+Proof.
+  induction n as [| n IH ]; intros i f f' H; cbn; [ reflexivity | ].
+  rewrite (H i ltac:(lia)).
+  destruct (ushp_is_ws (f' i) || ushp_is_sym (f' i)); [ reflexivity | ].
+  f_equal. apply IH. intros j Hj. apply H. lia.
+Qed.
+
+Lemma ushp_no_symbols_ext (len : nat) (f f' : nat -> bv 8) :
+  (forall j : nat, (j < len)%nat -> f j = f' j) ->
+  ushp_no_symbols len f -> ushp_no_symbols len f'.
+Proof.
+  intros H Hns j Hj. rewrite <- (H j Hj). exact (Hns j Hj).
+Qed.
+
+Lemma ushp_tokens_ext (len : nat) (f f' : nat -> bv 8) :
+  (forall j : nat, (j < len)%nat -> f j = f' j) ->
+  forall (i : nat) (toks : list (nat * nat)),
+    ushp_tokens len f i toks -> ushp_tokens len f' i toks.
+Proof.
+  intros Hff i toks Ht.
+  assert (Hsk : forall a : nat,
+            ushp_skipws (len - a) a f' = ushp_skipws (len - a) a f).
+  { intro a. apply ushp_skipws_ext. intros j Hj. symmetry. apply Hff. lia. }
+  assert (Htl : forall b : nat,
+            ushp_toklen (len - b) b f' = ushp_toklen (len - b) b f).
+  { intro b. apply ushp_toklen_ext. intros j Hj. symmetry. apply Hff. lia. }
+  induction Ht as [ off Hnil | off toks0 k0 n0 Hpos Hrec IH ].
+  - apply UshpTokNil. rewrite (Hsk off). exact Hnil.
+  - apply (ushe_tok_step len off k0 n0 f').
+    + exact (Hsk off).
+    + exact (Htl (off + k0)%nat).
+    + exact Hpos.
+    + exact IH.
+Qed.
+
+(* ...and the determinacy itself: ONE transport of the closed computation. *)
+Lemma ush_line_toks_holds : ush_line_toks.
+Proof.
+  intros f k len [Hlen Hf].
+  rewrite echo_line_length in Hlen.
+  split; [ exact Hlen | ].
+  subst len.
+  destruct ush_echo_tokens_holds as (Hns & Htk & _).
+  rewrite echo_line_length in Hns, Htk.
+  assert (Hext : forall j : nat, (j < 17)%nat ->
+            echo_line !!! j = f (k + j)%nat)
+    by (intros j Hj; symmetry; exact (Hf j Hj)).
+  split.
+  - exact (ushp_no_symbols_ext 17 _ _ Hext Hns).
+  - exact (ushp_tokens_ext 17 _ _ Hext 0%nat echo_toks Htk).
+Qed.
+
 (* ---- the command, as a VALUE ---------------------------------------- *)
 (* [UkShMain.ush_cmd_of_ushp] converts the parser's node into the runner's
    tree at [UExec (UkShMain.ush_args s0 g toks)], where [g] is the line
@@ -209,6 +281,48 @@ Definition echo_argv_bytes_of_line : Prop :=
     UConsLine.ush_line_is f k len ->
     echo_argv_bytes
       (ushp_nulfold echo_toks (ushp_ext len (fun j : nat => f (k + j)%nat))).
+
+(* [nulterminate]'s cut at [echo_toks] is the three stores at 4, 10 and 16
+   and nothing else, so every index inside a token is the line's own byte
+   and every token's end is the terminator. *)
+Local Lemma nulfold_echo_other (g : nat -> bv 8) (x : nat) :
+  (x < 17)%nat -> x <> 4%nat -> x <> 10%nat -> x <> 16%nat ->
+  ushp_nulfold echo_toks (ushp_ext 17 g) x = g x.
+Proof.
+  intros Hx H4 H10 H16.
+  unfold echo_toks. cbn [ushp_nulfold snd].
+  rewrite /ushp_setb /ushp_ext.
+  rewrite (proj2 (Nat.eqb_neq x 16) H16).
+  rewrite (proj2 (Nat.eqb_neq x 10) H10).
+  rewrite (proj2 (Nat.eqb_neq x 4) H4).
+  rewrite (bool_decide_eq_true_2 _ Hx).
+  reflexivity.
+Qed.
+
+Local Lemma nulfold_echo_nul (g : nat -> bv 8) (x : nat) :
+  (x = 4 \/ x = 10 \/ x = 16)%nat ->
+  ushp_nulfold echo_toks (ushp_ext 17 g) x = ubyte0.
+Proof.
+  intros Hx. unfold echo_toks. cbn [ushp_nulfold snd].
+  rewrite /ushp_setb.
+  destruct Hx as [-> | [-> | ->]]; reflexivity.
+Qed.
+
+Lemma echo_argv_bytes_of_line_holds : echo_argv_bytes_of_line.
+Proof.
+  intros f k len [Hlen Hf].
+  rewrite echo_line_length in Hlen. subst len.
+  split.
+  - intros i j Hi Hj.
+    assert (Hb : (echo_off i + j < 17)%nat /\ (echo_off i + j <> 4)%nat
+                 /\ (echo_off i + j <> 10)%nat /\ (echo_off i + j <> 16)%nat)
+      by (destruct i as [| [| i]]; cbn [echo_off echo_alen] in *; lia).
+    destruct Hb as (Hb1 & Hb2 & Hb3 & Hb4).
+    rewrite (nulfold_echo_other _ _ Hb1 Hb2 Hb3 Hb4).
+    exact (Hf _ Hb1).
+  - intros i Hi. apply nulfold_echo_nul.
+    destruct i as [| [| i]]; cbn [echo_off echo_alen]; auto.
+Qed.
 
 Section UkShEcho.
   Context `{!riscvGS Σ}.

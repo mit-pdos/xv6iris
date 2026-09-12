@@ -649,7 +649,10 @@ Section UkShRun.
       destruct Hr as [Er | [Er | [Er | [Er | Er]]]]; lia.
   Qed.
 
-  Local Lemma wp_kshr_jal (N : uk_names Σ) `{!ukn_const N} (h : CpuId) (m : regfile) (pc tgt ret : Z)
+  (* PUBLIC (lane E4): the specialised EXEC arm for the disciplined line
+     re-walks runcmd's EXEC arm in [UkShEcho.v], where the pinned exec
+     supply is nameable, and needs this ABI step and [wp_kshr_entry]. *)
+  Lemma wp_kshr_jal (N : uk_names Σ) `{!ukn_const N} (h : CpuId) (m : regfile) (pc tgt ret : Z)
       (imm : mword 21) (avail : nat) :
     (mword_of_int tgt : mword 64)
       = add_vec (mword_of_int pc : mword 64) (sign_extend' 64 imm) ->
@@ -1730,7 +1733,8 @@ Section UkShRun.
   Lemma ush_jtab_bnd (c : ushcmd) : 0 <= SH_JTAB + 4 * ush_ty c < Z64.
   Proof. destruct c; unfold Z64; cbn [ush_ty]; unfold SH_JTAB; lia. Qed.
 
-  Local Lemma wp_kshr_entry (N : uk_names Σ) `{!ukn_const N} (c : ushcmd)
+  (* PUBLIC (lane E4): see [wp_kshr_jal]. *)
+  Lemma wp_kshr_entry (N : uk_names Σ) `{!ukn_const N} (c : ushcmd)
       (h : CpuId) (m : regfile) (t : Z) (n : nat) :
     m !!! Regidx a0_idx = (mword_of_int t : mword 64) ->
     shk_code (ukn_t N) -∗ ush_jtab (ukn_t N) -∗ ush_cmd (ukn_d N) t c -∗
