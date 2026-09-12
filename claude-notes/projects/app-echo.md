@@ -2404,6 +2404,28 @@ ORDER: GENERIC-PAY → CONS-SWALLOW → SH-LINE 2b (gets on `ush_gets_line`,
 `wp_uk_ecall_read_recv` with `upos` threaded read → gets_loop → gets → getcmd
 → main) → LAZY-FLAG (the owner's form of (A)).
 
+SUPPLY-SPLIT PHASE 2 GREEN ON ITS BRANCH (2026-09-12; `-sup`,
+`lane/supply-split` = `d2708e5b7`; 31 files +1163/-561; build `sup27`, audit =
+the thirteen; lemma_diff: 29 `Hpsok` → 24 `Hpsok_free` (five files lose the
+hypothesis outright), `xv6_free_dec` moved down as `UexecSG.free_num_dec`,
+`wp_kshr_qstub` deleted).  LANDING DEFERRED until LAZY-FLAG's main tree is in
+a known state (both touch UkRun/UexecSG/UexecExecInst).  As landed: a verified
+program's slot is no longer a function of the application's supply;
+`UexecSG.free_num`; `uprogSG_free` (a Definition); `xv6_sbundle_free`,
+`udep_free`, `udepw_free`; every program's blanket `Hpsok` is `Hpsok_free` at
+`free_num`; `cond_entry_slot` takes the verified programs' instance explicitly
+for its gated arms; a CLAIM-number call takes ONE named deposit `UkRun.udepw_law
+n := □ ∀ N m pc, udepw N m pc n` (consumed by `udepw_of_law`), bundled per
+program: `UkInit.init_deps T := udepw_law 16 ∗ □ (T -∗ udepw_law 15) ∗ □ (T -∗
+udepw_law 17)` (E5 owes 16; E2 discharges 15/17 from `□ (T -∗ app_sup)`, which
+`UInitCons.v:493` carries); `UkSh.sh_deps := udepw_law 5 ∗ udepw_law 15 ∗
+udepw_law 16` (2b / SH-OPEN / E5); `UkCat.cat_deps` (nobody: cat is in no
+theorem); echo owes exactly `udepw_law 16` (E5); sync owes nothing.
+Deviation accepted: `USyncKernel` keeps the `free_num` admission (it sits below
+`UexecExecInst`).  GOTCHA (now in durable-notes): `iIntros "#H"` on a whole
+deposit bundle sends the Persistent search down `udepw`'s wand chain and never
+returns -- intro linearly or destructure per conjunct.
+
 TX-TAG PHASE 1 (2026-09-12; sibling `-tlw`, branch `lane/tx-tag`, build
 `txtag14`, 29 files +1328/-289, green).  Landed: `txsrc := TxK | TxE h | TxW
 pid` (Xv6Cameras), `un_tag`, `uart_tags_auth`/`uart_sent_tagged`/`uart_tag_at`,

@@ -1312,3 +1312,12 @@ defining one as the symbol directly compiles, but `unfold` then leaves something
   the range invariant open at the record, which a walk usually cannot name.
 - Avoid ad-hoc argument couplings in preconditions; prefer deriving branch
   conditions internally.
+
+## `iIntros "#H"` on a bundle of wands can hang the Persistent search (2026-09-12)
+
+Introducing a whole conjunction of persistent wands with `iIntros "#Hdp"` (e.g.
+`UkInit.init_deps T`, three `□ ∀ N m pc, udepw N m pc n` laws) sends the
+`Persistent` instance search unfolding `udepw`'s wand chain and it does not
+return -- `UInitKernel.v` sat 40 minutes at flat 1.1 GB RSS on that one tactic.
+Intro such a bundle LINEARLY (`iIntros "Hdp"`) or destructure it per conjunct
+(`iIntros "#(Hwr & Hwl15 & Hwl17)"`) so each piece answers on its own.
