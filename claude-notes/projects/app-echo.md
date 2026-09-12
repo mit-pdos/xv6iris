@@ -2404,6 +2404,22 @@ ORDER: GENERIC-PAY → CONS-SWALLOW → SH-LINE 2b (gets on `ush_gets_line`,
 `wp_uk_ecall_read_recv` with `upos` threaded read → gets_loop → gets → getcmd
 → main) → LAZY-FLAG (the owner's form of (A)).
 
+CONS-SWALLOW LANDED (2026-09-12; the iris commit after `2c0d32048`; 28 kernel
+and tier files, +883/-208; build `swallow26`, audit = the thirteen, lemma_diff
+CLEAN).  `SpecCopyout.copyout_wrote P …`'s -1 arm carries `~ uva_wmapped P
+(dstva + d)` (V|U|W leaf: `uva_mapped` is true of the guard page and of text);
+`either_copyout_ran P dst …` relays; `ConsoleInv.cons_swallow cn fault sl d dc`
+replaces `d <= dc <= d+1` in consoleread's window arm (at `dc = d+1`: the
+popped byte's history, the stored bound extended by it, its chain, its rx tag,
+and `⌜d = 0 ∧ bv_unsigned (cons_xlate b) = 4⌝ ∨ ⌜fault⌝` with `fault :=
+~ uva_wmapped (pv_upt (us_V U)) (dst + d)`); `console_receipt P Rd r M' addr`
+and `console_recv P addr …` relay it; row 5 is `∃ P, ⌜perm_of (ud_um P)
+(uvis_sz W) = uvis_perm W⌝ ∗ fileread_extra_core P …`; `UexecSG.skey_eq` pins
+`uvis_perm`/`uvis_sz`.  OWED: `cons_swallow_range` (the bridge to
+`UConsLine.ush_read_recv_leaf`'s weaker arm) and `console_recv` have no
+consumer until SH-LINE 2b; LAZY-FLAG strengthens row 5's `∃ P` with the flag
+tie so the fault disjunct is refutable from `ubytes`.
+
 TEXT-LW LANDED (2026-09-12; `c3775524d` rebased onto main; 9 files +898/-420;
 build `tlw20`, audit = the thirteen).  Review finding 11 closed: the four-byte
 load from the text segment is a proved engine leaf (`UkRunMem.wp_uk_clw_text`)

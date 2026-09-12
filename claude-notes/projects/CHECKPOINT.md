@@ -132,7 +132,9 @@ THE OUTPUT SIDE: DESIGN PROPOSAL"); awaiting the owner on O3 (rate discipline
 CONS-SWALLOW (phase 2 running) → LAZY-FLAG → DISC-RATE → TX-TAG → TX-RECEIPT
 + ECHO-RECEIPT → APP-IFACE → write leaf + cones → SH-LINE 2b → E4 → E2 → E5.
 
-LANES RUNNING (2026-09-12, later): main tree CONS-SWALLOW phase 2; siblings
+LANES (2026-09-12, later): CONS-SWALLOW LANDED on main (note "CONS-SWALLOW
+LANDED"); main is free for LAZY-FLAG (`brief-lazy-flag.md`) after a verify
+build of the merged HEAD; siblings
 SUPPLY-SPLIT phase 2 (`-sup`, rulings (a)-(f) in the note "SUPPLY-SPLIT PHASE
 1"), TEXT-LW LANDED on main (2026-09-12), DISC-RATE phase 1 (`-disc`, brief
 `brief-disc-rate.md`; O3/O5 RULED: wait for the harts; failure outputs valid).
