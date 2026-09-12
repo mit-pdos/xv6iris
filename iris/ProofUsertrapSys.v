@@ -617,7 +617,13 @@ Section UtSysBlock.
              | exact (Hargw 2%nat ltac:(lia))
              | reflexivity
              | exact (eq_sym Hpr5)
-             | reflexivity | reflexivity | reflexivity ]. }
+             | reflexivity | reflexivity | reflexivity
+             (* the permission map and the size: the prologue's one epc
+                store moves neither ([HV1upt] / [HV1sz]) and neither does
+                the dispatcher's record row ([ut_pro]) *)
+             | (cbn [uvis_of uvis_perm];
+                rewrite HV1upt HV1sz Hpr2 Hpr3; reflexivity)
+             | (cbn [uvis_of uvis_sz]; rewrite HV1sz Hpr3; reflexivity) ]. }
          rewrite <- (sbundle_at_cong uslot n fdep (uvis_of U0 sts gn cs pid)
                        (uvis_of (MkUstate V1 (us_M U)) sts gn cs pid) Hkey).
          iExact "Hx". }
@@ -1023,7 +1029,10 @@ Section UtSysBlock.
           | exact (Hargw 2%nat ltac:(lia))
           | reflexivity
           | exact (eq_sym Hpr5)
-          | reflexivity | reflexivity | reflexivity ]. }
+          | reflexivity | reflexivity | reflexivity
+          | (cbn [uvis_of uvis_perm];
+             rewrite HV1upt HV1sz Hpr2 Hpr3; reflexivity)
+          | (cbn [uvis_of uvis_sz]; rewrite HV1sz Hpr3; reflexivity) ]. }
       (* FORK'S ANSWER, from the dispatcher's row to the trap contract's:
          the two are the same disjunction, read at the same a0 word, and
          the guard differs only in the cause conjunct the dispatcher does

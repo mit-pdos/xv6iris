@@ -438,7 +438,7 @@ Section Apply.
     assert (Hsk : skey_eq W W')
       by (rewrite /skey_eq; split_and!;
           [ exact HM | exact Ha0 | exact Ha1 | exact Ha2 | exact Hfd | exact Hcw
-          | exact Hgn | exact Hch | exact Hpid ]).
+          | exact Hgn | exact Hch | exact Hpid | exact Hpi | exact Hsz ]).
     (* the BUMPED keys agree too, at every return value and every
        image/permission pair the row allows *)
     assert (Hb : forall (r : mword 64) (M' : gmap Z (bv 8))

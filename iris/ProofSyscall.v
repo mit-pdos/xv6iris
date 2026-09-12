@@ -3330,7 +3330,11 @@ Section SyscallArms.
        the arm's payout alone, [SpecFileread.fileread_extra_core] -- the
        borrowed payload went back on the trap's own resume row
        ([SpecSyscall.sysc_pay_out]). *)
-    fileread_extra_core (fd_st_of_key v0 sts) (sys_rw_count v2) (rf_F f)
+    (* THE TABLE IS THE PROCESS'S OWN, and the key's permission map is its
+       projection by [UexecSlot.uvis_of]'s own definition -- which is the
+       equation row 5's existential asks for (lane CONS-SWALLOW, W4). *)
+    fileread_extra_core (pv_upt (us_V U)) (fd_st_of_key v0 sts)
+      (sys_rw_count v2) (rf_F f)
       (rf_ret f) r M' v1 -∗
     sysc_sys_out U sts gn cs pid f r M' sts' cw' cs'.
   Proof.
@@ -3338,7 +3342,9 @@ Section SyscallArms.
     iApply (sysc_sys_out_at U sts gn cs pid f r M' sts' cw' cs' 5 Hn
               ltac:(vm_compute; discriminate)
               ltac:(vm_compute; discriminate)).
-    iApply (spost_at_read_intro uslot f (uvis_of U sts gn cs pid) r M' sts' cw' cs').
+    iApply (spost_at_read_intro uslot f (uvis_of U sts gn cs pid)
+              (pv_upt (us_V U)) r M' sts' cw' cs'
+              ltac:(rewrite /uvis_of; cbn [uvis_sz uvis_perm]; reflexivity)).
     rewrite /uvis_of /tf_w. cbn [uvis_tf uvis_fd].
     rewrite (list_lookup_total_correct _ _ _ Hv0)
             (list_lookup_total_correct _ _ _ Hv1)

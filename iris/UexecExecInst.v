@@ -142,6 +142,8 @@ Require Import Xv6Cameras.
 Require Import IrefSlots.
 Require Import FileInvDefs.
 Require Import UserFd.         (* [ufdG]                              *)
+Require Import UserPtTree.     (* [uptd] / [ud_um] -- row 5's table    *)
+Require Import UserPerm.       (* [perm_of] -- and the key's projection *)
 Require Import UexecSlot.      (* [uvis] / [tf_w]                     *)
 Require Import UsysMemOk.      (* [USYS_exec] -- the one number with a bundle *)
 Require Import UexecSG.        (* [uexecSG] / [uprogSG] -- the class   *)
@@ -584,9 +586,28 @@ Section UexecExecInst.
           [SpecFileread.fileread_extra_core], the arm's payout without the
           borrowed payload -- the payload goes back on the trap's own
           resume row ([UexecRet.uexec_pay_arm]), so this post is unchanged
-          in force by R1. *)
-       fileread_extra_core (fd_st_of_key (xk_a W 0) (uvis_fd W))
-         (sys_rw_count (xk_a W 2)) (rf_F f) (rf_ret f) r M' (xk_a W 1)
+          in force by R1.
+
+          ...AND THE TABLE IS EXISTENTIAL, AT THE KEY'S OWN PROJECTION
+          (app-echo.md, lane CONS-SWALLOW, W4).  The receipt is stated at
+          the process's PAGE TABLE -- whether a byte read() popped reached
+          the caller's buffer is a fact about that table
+          ([SpecFileread.console_receipt]) -- and the key carries no
+          table, only the per-page permission map [uvis_perm] it projects
+          to.  So what the process is told here is that SOME table
+          projecting to its own key's permission map was the one the call
+          ran on: the honest weak form, since the projection cannot see
+          which pages are lazily unmapped ([UserPerm]'s note on
+          [perm_fill], and [ProcPtOwn.perm_of_uptd_ext_sz] -- MAP-KEY is
+          what would strengthen it).  The dispatcher supplies the
+          process's own [pv_upt (us_V U)] and the equation holds by
+          [UexecSlot.uvis_of]'s definition ([ProofSyscall.sysc_out_read]).
+          READING THE KEY HERE IS WHY [UexecSG.skey_eq] FIXES THE
+          PERMISSION MAP AND THE SIZE. *)
+       (∃ P : uptd,
+          ⌜perm_of (ud_um P) (uvis_sz W) = uvis_perm W⌝ ∗
+          fileread_extra_core P (fd_st_of_key (xk_a W 0) (uvis_fd W))
+            (sys_rw_count (xk_a W 2)) (rf_F f) (rf_ret f) r M' (xk_a W 1))
      else if decide (n = 9) then
        chdir_receipt (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
          (cf_P f) (cf_Pmiss f) (cf_Fo f) r cw'
@@ -649,7 +670,8 @@ Section UexecExecInst.
       (W W' : uvis) :
     skey_eq W W' -> xv6_sbundle X n f W ⊣⊢ xv6_sbundle X n f W'.
   Proof.
-    intros Hk. pose proof Hk as (HM & Ha0 & Ha1 & Ha2 & Hfd & Hcw & Hgn & _ & _).
+    intros Hk.
+    pose proof Hk as (HM & Ha0 & Ha1 & Ha2 & Hfd & Hcw & Hgn & _ & _ & _ & _).
     rewrite /xv6_sbundle.
     destruct (decide (n = USYS_exec)) as [_ | _];
       [ exact (exec_sbundle_cong X f W W' HM Ha0 Ha1 Hfd Hcw Hgn) | ].
@@ -657,17 +679,18 @@ Section UexecExecInst.
     reflexivity.
   Qed.
 
-  (* ...and the post's, at the same six rows: every branch reads the image,
-     one of the three argument words, the descriptor view or the working
-     directory, and [skey_eq] pins all six. *)
+  (* ...and the post's, at the same rows PLUS the permission map and the
+     size, which read(2)'s receipt reads ([xv6_spost]'s row 5 names the
+     table its key projects from) and [skey_eq] pins for that reason. *)
   Lemma xv6_spost_cong (X : uvis -d> iPropO Σ) (n : Z) (f : xfam)
       (W W' : uvis) (r : mword 64) (M' : gmap Z (bv 8))
       (fdv' : list fdstate) (cw' : Z) (cs' : gset gname) :
     skey_eq W W' ->
     xv6_spost X n f W r M' fdv' cw' cs' ⊣⊢ xv6_spost X n f W' r M' fdv' cw' cs'.
   Proof.
-    intros Hk. pose proof Hk as (HM & Ha0 & Ha1 & Ha2 & Hfd & Hcw & _ & _ & _).
-    rewrite /xv6_spost /xk_a /tf_w HM Ha0 Ha1 Ha2 Hfd Hcw.
+    intros Hk.
+    pose proof Hk as (HM & Ha0 & Ha1 & Ha2 & Hfd & Hcw & _ & _ & _ & Hpi & Hsz).
+    rewrite /xv6_spost /xk_a /tf_w HM Ha0 Ha1 Ha2 Hfd Hcw Hpi Hsz.
     reflexivity.
   Qed.
 
@@ -1083,14 +1106,16 @@ Section UexecExecInst.
   (* from.  Each is the match at one literal and nothing else.             *)
   (* ================================================================== *)
   Lemma spost_at_read_intro (X : uvis -d> iPropO Σ) (f : xfam) (W : uvis)
+      (P : uptd)
       (r : mword 64) (M' : gmap Z (bv 8)) (fdv' : list fdstate) (cw' : Z) (cs' : gset gname) :
-    fileread_extra_core (fd_st_of_key (tf_w (uvis_tf W) (tf_arg_idx 0)) (uvis_fd W))
+    perm_of (ud_um P) (uvis_sz W) = uvis_perm W ->
+    fileread_extra_core P (fd_st_of_key (tf_w (uvis_tf W) (tf_arg_idx 0)) (uvis_fd W))
       (sys_rw_count (tf_w (uvis_tf W) (tf_arg_idx 2))) (rf_F f) (rf_ret f)
       r M' (tf_w (uvis_tf W) (tf_arg_idx 1)) -∗
     spost_at X 5 f W r M' fdv' cw' cs'.
   Proof.
-    iIntros "H". rewrite /spost_at /= /xv6_spost /xk_a.
-    xv6_take. iExact "H".
+    intros Hpm. iIntros "H". rewrite /spost_at /= /xv6_spost /xk_a.
+    xv6_take. iExists P. iSplitR; [by iPureIntro |]. iExact "H".
   Qed.
 
   (* ...and chdir's, at the working directory the call RESUMES at: the arm

@@ -912,11 +912,12 @@ Section ProofEitherCopyout.
          whole buffer crossed, on the -1 arm some prefix of it did. *)
       rewrite HU5a2 in Hwrote.
       assert (Hran : exists d : nat,
-                either_copyout_ran len (mr !!! Regidx Ra0) d
+                either_copyout_ran (pv_upt (us_V U)) dst len (mr !!! Regidx Ra0) d
                 /\ Mo = umem_wr (us_M U) dst d src_bytes).
-      { destruct Hwrote as [(Hr & HM) | (Hr & d & Hd & HM)].
+      { destruct Hwrote as [(Hr & HM) | (Hr & d & Hd & HM & Hfl)].
         - exists len. split; [left; split; [exact Hr | reflexivity] | exact HM].
-        - exists d. split; [right; split; [exact Hr | exact Hd] | exact HM]. }
+        - exists d. split;
+            [right; split_and!; [exact Hr | exact Hd | exact Hfl] | exact HM]. }
       destruct Hran as (dwr & Hran & HMo). subst Mo.
       assert (Hpc2c : ret_pc (U5 !!! Regidx Rra) = mword_of_int (KernelSyms.either_copyout + 0x2c))
         by (rewrite HU5ra; apply bv_eq; vm_compute; reflexivity).

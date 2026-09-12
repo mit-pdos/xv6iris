@@ -2112,7 +2112,7 @@ Section ProofKwait.
          only in the count -- exactly [readi]'s idiom (campaign idiom 4). *)
       assert (Hex : exists d : nat, (d <= 4)%nat /\
                 Mco = umem_wr (us_M U) addr d (fun i => nth_byte xs i)).
-      { destruct Hwrote as [(_ & HMco) | (_ & d0 & Hd0 & HMco)].
+      { destruct Hwrote as [(_ & HMco) | (_ & d0 & Hd0 & HMco & _)].
         - exists 4%nat. split; [lia | exact HMco].
         - exists d0. split; [lia | exact HMco]. }
       destruct Hex as (d & Hdle & HMco).

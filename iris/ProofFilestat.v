@@ -1228,7 +1228,7 @@ Section ProofFilestat.
       rewrite HU6a2 in Hwrote.
       assert (Hdw : exists d : nat, (d <= 24)%nat
                     /\ Mo = umem_wr (us_M U) addr d fbytes).
-      { destruct Hwrote as [[_ Hm] | [_ (d & Hd & Hm)]].
+      { destruct Hwrote as [[_ Hm] | [_ (d & Hd & Hm & _)]].
         - exists 24%nat. split; [lia | exact Hm].
         - exists d. split; [lia | exact Hm]. }
       assert (Hret : (mco !!! Regidx Ra0 : mword 64) = (mword_of_int 0 : mword 64)

@@ -1236,6 +1236,77 @@ Section ConsoleInv.
     iApply (own_mono with "H"). by apply mono_list_lb_mono.
   Qed.
 
+  (* =====================================================================
+     THE BYTE A READ POPPED AND DID NOT DELIVER  (app-echo.md, "SH-LINE
+     PHASE 2 -- THE SWALLOWED BYTE"; lane CONS-SWALLOW, W2)
+
+     consoleread's cursor moves by [d] or by [d + 1]: two of its exits pop a
+     byte and break without copying it (the [C('D')] arm with nothing
+     delivered yet, and the [either_copyout] failure past [cons.r++]).  A
+     reader that is told only "[d <= dc <= d + 1]" cannot tell the two apart,
+     and a program reading one byte at a time then cannot tell a delivered
+     line from a line with a hole in it.  So the [d + 1] case NAMES the byte
+     it swallowed: its history sits in the stored sequence immediately after
+     the window ([sl ++ [(h, b)]] is a bound on the ring's committed prefix,
+     so the byte really is the next one), it carries the input tag every
+     stored byte carries, and the reason is one of exactly the two the code
+     has -- the byte was [C('D')] and nothing had been delivered, or the
+     copy-out of it faulted, which is [fault] (the caller's own
+     [SpecCopyout.copyout_wrote] clause at its destination).
+
+     [fault] IS A PARAMETER because this file names no page table; the
+     kernel contract instantiates it ([SpecConsoleread]) and a program
+     refutes it from what it owns of its own address space. *)
+  Definition cons_swallow (cn : cons_names) (fault : Prop)
+      (sl : list (list mobs * bv 8)) (d dc : nat) : iProp Σ :=
+    (⌜dc = d⌝
+     ∨ ⌜dc = (d + 1)%nat⌝ ∗
+       ∃ (h : list mobs) (b : bv 8),
+         ⌜obs_ends_in h b⌝ ∗
+         cons_stored_lb cn (sl ++ [(h, b)])%list ∗
+         ⌜cons_chain (sl ++ [(h, b)])%list⌝ ∗
+         riscv_rx_tag h ∗
+         (⌜d = 0%nat /\ bv_unsigned (cons_xlate b) = 4⌝ ∨ ⌜fault⌝))%I.
+
+  Global Instance cons_swallow_persistent cn fault sl d dc :
+    Persistent (cons_swallow cn fault sl d dc).
+  Proof. rewrite /cons_swallow. apply _. Qed.
+
+  (* THE REASON WEAKENS.  [fault] is a statement about the reader's own
+     address space, and the table it is read at only GROWS while the call
+     runs ([UserPtTree.uva_wmapped_mono]), so a receipt earned at the grown
+     table is handed on at the entry one -- which is where the contract
+     states it. *)
+  Lemma cons_swallow_mono (cn : cons_names) (f1 f2 : Prop)
+      (sl : list (list mobs * bv 8)) (d dc : nat) :
+    (f1 -> f2) ->
+    cons_swallow cn f1 sl d dc -∗ cons_swallow cn f2 sl d dc.
+  Proof.
+    intros Himp. rewrite /cons_swallow.
+    iIntros "[%He | [%He H]]"; [iLeft; by iPureIntro |].
+    iRight. iSplitR; [by iPureIntro |].
+    iDestruct "H" as (h b) "(%Hen & #Hlb & %Hch & #Htg & Hwhy)".
+    iExists h, b. iFrame "Hlb Htg".
+    iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
+    iDestruct "Hwhy" as "[%Hd | %Hf]";
+      [iLeft; by iPureIntro | iRight; iPureIntro; exact (Himp Hf)].
+  Qed.
+
+  (* the arm every OTHER exit takes: the cursor moved by exactly the run *)
+  Lemma cons_swallow_eq (cn : cons_names) (fault : Prop)
+      (sl : list (list mobs * bv 8)) (d : nat) :
+    ⊢ cons_swallow cn fault sl d d.
+  Proof. rewrite /cons_swallow. iLeft. by iPureIntro. Qed.
+
+  (* ...and the bound it carries: [d] or one more, which is what the landed
+     callers read off it *)
+  Lemma cons_swallow_range (cn : cons_names) (fault : Prop)
+      (sl : list (list mobs * bv 8)) (d dc : nat) :
+    cons_swallow cn fault sl d dc -∗ ⌜(d <= dc <= d + 1)%nat⌝.
+  Proof.
+    rewrite /cons_swallow. iIntros "[%He | [%He _]]"; iPureIntro; lia.
+  Qed.
+
   Lemma cons_stored_append cn st st' :
     cons_stored_auth cn st ==∗ cons_stored_auth cn (st ++ st').
   Proof.

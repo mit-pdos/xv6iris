@@ -2680,7 +2680,7 @@ Section ProofSysPipe.
               (list_insert_id sts fd1 FdClosed Hst1c).
       iLeft. iSplitR; [done|]. iFrame "Hpriv Hfrag". }
     (* +0x62 blt a0,x0 -- did the first copyout fail? *)
-    destruct Hret1 as [[Hco0 HM1s]|[Hcom1 (d1 & Hd1 & HM1f)]].
+    destruct Hret1 as [[Hco0 HM1s]|[Hcom1 (d1 & Hd1 & HM1f & _)]].
     2:{ (* ===== copyout(&fd0) failed: null both descriptors, close both ===== *)
       iApply (wp_blt_x0_taken_s_sconf (mword_of_int (KernelSyms.sys_pipe + 0x62))
                 (mword_of_int 30 : mword 13) Ra0 B0 (av - 8)%nat b
@@ -3009,7 +3009,7 @@ Section ProofSysPipe.
       rewrite /D1 upd_ne; [| congruence]. apply HthrD0; assumption. }
     iDestruct ("Hpback" $! Pb M2 with "[%] Hszc Hptc Hpt") as "Hpriv"; [exact Hextb|].
     (* +0x7c bge a0,x0 -- both copies landed? *)
-    destruct Hret2 as [[Hs0 HM2s]|[Hsm1 (d2 & Hd2 & HM2f)]].
+    destruct Hret2 as [[Hs0 HM2s]|[Hsm1 (d2 & Hd2 & HM2f & _)]].
     - (* ============ SUCCESS: return 0 ============ *)
       (* both runs landed: the composed window is the full 8 bytes *)
       pose proof (sp_umem_compose (us_M U) v

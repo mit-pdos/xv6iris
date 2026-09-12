@@ -2409,6 +2409,70 @@ Proof.
   reflexivity.
 Qed.
 
+(* ---------------------------------------------------------------------- *)
+(* THE W BIT ALONE -- copyout's [( *pte & PTE_W) == 0], an [andi a5,a5,4]   *)
+(* against bit 2.  The same bridge as [pte_vu_bits] one field over, and in  *)
+(* the REFUTING direction: the branch the C takes when the test yields zero *)
+(* is the one that returns -1, so what the caller needs out of it is        *)
+(* [~ pte_w w] ([SpecCopyout.copyout_wrote]'s fault clause).                *)
+(* ---------------------------------------------------------------------- *)
+
+(* a low flag bit of the byte, read back as a bit of the whole word -- the
+   equality [pb_bitn] uses one direction of *)
+Local Lemma pb_bit_low (x n : Z) :
+  0 <= n -> n < 8 -> Z.odd ((x mod 256) / 2 ^ n) = Z.testbit x n.
+Proof.
+  intros H0 H8.
+  change 256 with (2 ^ 8).
+  rewrite <- Z.bit0_odd.
+  rewrite (Z.div_pow2_bits (x mod 2 ^ 8) n 0 H0 ltac:(lia)).
+  replace (0 + n) with n by lia.
+  rewrite (Z.mod_pow2_bits_low x 8 n ltac:(lia)).
+  reflexivity.
+Qed.
+
+Local Lemma pb_bitn_zero (x n : Z) :
+  0 <= n -> n < 8 -> Z.testbit x n = false -> (x mod 256) / 2 ^ n mod 2 = 0.
+Proof.
+  intros H0 H8 Hb. rewrite Zmod_odd.
+  rewrite (pb_bit_low x n H0 H8) Hb. reflexivity.
+Qed.
+
+Lemma andi4_unsigned (w : mword 64) :
+  bv_unsigned (and_vec w (sign_extend' 64 (mword_of_int 4 : mword 12)) : mword 64)
+  = Z.land (bv_unsigned w) 4.
+Proof.
+  unfold and_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
+    to_word, get_word, SailStdpp.Values.with_word.
+  unfold MachineWord.MachineWord.and.
+  rewrite bv_and_unsigned.
+  match goal with |- context [Z.land _ (bv_unsigned ?mm)] =>
+    replace (bv_unsigned mm) with 4 by (vm_compute; reflexivity) end.
+  reflexivity.
+Qed.
+
+Lemma pte_not_w_bits (w : mword 64) :
+  and_vec w (sign_extend' 64 (mword_of_int 4 : mword 12)) = (mword_of_int 0 : mword 64) ->
+  ~ pte_w w.
+Proof.
+  intros Hand Hw.
+  apply (f_equal bv_unsigned) in Hand.
+  rewrite andi4_unsigned in Hand.
+  replace (bv_unsigned (mword_of_int 0 : mword 64)) with 0 in Hand
+    by (vm_compute; reflexivity).
+  assert (Hb2 : Z.testbit (bv_unsigned w) 2 = false).
+  { pose proof (Z.land_spec (bv_unsigned w) 4 2) as Hs.
+    rewrite Hand Z.bits_0 in Hs.
+    replace (Z.testbit 4 2) with true in Hs by (vm_compute; reflexivity).
+    rewrite andb_true_r in Hs. symmetry. exact Hs. }
+  unfold pte_w, _get_PTE_Flags_W, Mk_PTE_Flags in Hw.
+  apply (f_equal bv_unsigned) in Hw.
+  rewrite pb_sub_2_2 pb_sub_7_0 in Hw.
+  replace (bv_unsigned ('b"1" : mword 1)) with 1 in Hw by (vm_compute; reflexivity).
+  rewrite (pb_bitn_zero (bv_unsigned w) 2 ltac:(lia) ltac:(lia) Hb2) in Hw.
+  discriminate.
+Qed.
+
 (* the C's [(pte & (PTE_R|PTE_W|PTE_X)) == 0] test on a NON-LEAF word *)
 Lemma fw_ptr_and14 (w : mword 64) :
   pte_ptr w ->

@@ -1980,6 +1980,36 @@ Proof.
   - exists w0. split; [exact Hl0 | symmetry; apply pte_ppn_set_ad].
 Qed.
 
+(* ...AND THE STEP THE OTHER WAY, which is what a FAILING walk's verdict
+   travels on.  walkaddr and copyout's PTE_W test report on the EXACT map
+   [m_ad] the walk reads; what a caller's descriptor holds is the user map
+   [um], one A/D variant away.  So a user leaf that is V|U and writable has
+   a V|U and writable image in the exact map, and a verdict of "absent", "not
+   V|U" or "not writable" AT [m_ad] refutes it.  The tramp/tf leaves cannot
+   be in [um] at all ([UptTree.upt_map_wf_not_tramp] / [_not_tf]), which is
+   why the well-formedness premise is here. *)
+Lemma upt_ad_view_um_vu_w (tfp : mword 44) (um m_ad : gmap (mword 27) (mword 64))
+    (vpn : mword 27) (w0 : mword 64) :
+  upt_ad_view tfp um m_ad -> upt_map_wf um ->
+  um !! vpn = Some w0 -> pte_vu w0 -> pte_w w0 ->
+  exists w, m_ad !! vpn = Some w /\ pte_vu w /\ pte_w w.
+Proof.
+  intros (Hnone & Hsome) Hwf Hl Hvu Hw.
+  destruct (m_ad !! vpn) as [w |] eqn:Hm.
+  - destruct (Hsome vpn w Hm) as (w1 & a & d & Hleaf & ->).
+    assert (Hw1 : w1 = w0).
+    { destruct Hleaf as [(He & _) | [(He & _) | Hl1]].
+      - exfalso. exact (upt_map_wf_not_tramp um vpn w0 Hwf Hl He).
+      - exfalso. exact (upt_map_wf_not_tf um vpn w0 Hwf Hl He).
+      - rewrite Hl1 in Hl. injection Hl as Hl. exact Hl. }
+    subst w1. exists (pte_set_ad w0 a d).
+    split_and!; [ reflexivity
+                | apply (pte_vu_set_ad w0 a d); exact Hvu
+                | apply (pte_w_set_ad w0 a d); exact Hw ].
+  - exfalso. destruct (proj1 (Hnone vpn) Hm) as (_ & _ & Hun).
+    rewrite Hun in Hl. discriminate.
+Qed.
+
 (* ===================================================================== *)
 (* §3 VALIDITY.  One predicate, over the existing pure pieces plus the    *)
 (*    kalloc-page conjunct.                                              *)

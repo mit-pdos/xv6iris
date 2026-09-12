@@ -1845,7 +1845,7 @@ Section ReadiLoop.
       { rewrite /rd_dst. destruct user.
         - iDestruct "Hpost" as (P2 dwr) "(%Hx & %Hran & Hpriv)".
           assert (Hdwrle : (dwr <= mm)%nat)
-            by (destruct Hran as [[_ ->] | [_ Hle]]; lia).
+            by (destruct Hran as [[_ ->] | (_ & Hle & _)]; lia).
           (* THE APPEND.  The chunk landed at [dst + tot], where the run so
              far stops, and its bytes ARE the file's bytes at [off+tot+jj]
              ([rd_deliver_mid] then [rd_delivered_bytes]).  So the two runs
@@ -1874,7 +1874,7 @@ Section ReadiLoop.
           iSplitR; [iPureIntro; exact (uptd_ext_sz_trans _ _ _ _ HextI Hx)|].
           iSplitR; [iPureIntro; exact Hdwrle|].
           iSplitR; [iPureIntro;
-                    destruct Hran as [[Hr Hd] | [Hr _]];
+                    destruct Hran as [[Hr Hd] | (Hr & _ & _)];
                     [left; split; [exact Hr | exact Hd]
                     | right; split; [exact Hr | reflexivity]]|].
           rewrite /rd_img -Himg. iExact "Hpriv".

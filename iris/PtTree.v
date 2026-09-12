@@ -111,6 +111,19 @@ Definition pte_vu (w : mword 64) : Prop :=
   _get_PTE_Flags_V (Mk_PTE_Flags (subrange_vec_dec w 7 0)) = ('b"1" : mword 1) /\
   _get_PTE_Flags_U (Mk_PTE_Flags (subrange_vec_dec w 7 0)) = ('b"1" : mword 1).
 
+(* W set -- the single bit [copyout] tests in its own [andi a5,a5,4]
+   ([( *pte & PTE_W) == 0 -> return -1], kernel/vm.c).  It is the verdict a
+   leaf that is present and USER-reachable ([pte_vu] above) can still fail:
+   xv6's user TEXT pages are R|X|U with W clear, and a copyout to one
+   returns -1 with the page fully mapped.  So "the map has a leaf here and
+   it passes the V&U test" is NOT enough to copy a byte out, and the
+   address a copyout can write is [UserPtTree.uva_wmapped], which asks for
+   this bit beside [pte_vu].  Stated over the model's flag accessor, like
+   its two siblings, so that the [andi] bit-test bridge is proved the way
+   [PtBuild.pte_vu_bits] is. *)
+Definition pte_w (w : mword 64) : Prop :=
+  _get_PTE_Flags_W (Mk_PTE_Flags (subrange_vec_dec w 7 0)) = ('b"1" : mword 1).
+
 (* leaf extras consumed by the success walk / TLB-hit path *)
 Definition pte_no_napot (w : mword 64) : Prop :=
   eq_vec (_get_PTE_Ext_N (ext_bits_of_PTE w)) ('b"1") = false.
@@ -1819,6 +1832,22 @@ Proof.
   rewrite pte_set_ad_flag_X pte_set_ad_flag_W pte_set_ad_flag_R.
   reflexivity.
 Qed.
+
+(* THE TWO VERDICTS A COPY-OUT READS ARE A/D-STABLE TOO.  [walkaddr]'s V|U
+   test and copyout's [( *pte & PTE_W)] test are made on the leaf the WALK
+   finds, which is an A/D variant of the one the user map records; these are
+   what carry a failing copyout's verdict back to the map
+   ([ProcPtOwn.upt_ad_view_um_vu_w]). *)
+Lemma pte_vu_set_ad (w : mword 64) (a d : mword 1) :
+  pte_vu (pte_set_ad w a d) <-> pte_vu w.
+Proof.
+  unfold pte_vu.
+  rewrite pte_set_ad_flag_V pte_set_ad_flag_U. reflexivity.
+Qed.
+
+Lemma pte_w_set_ad (w : mword 64) (a d : mword 1) :
+  pte_w (pte_set_ad w a d) <-> pte_w w.
+Proof. unfold pte_w. rewrite pte_set_ad_flag_W. reflexivity. Qed.
 
 Lemma pte_set_ad_ptr (w : mword 64) (a d : mword 1) :
   pte_ptr (pte_set_ad w a d) <-> pte_ptr w.

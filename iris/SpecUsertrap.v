@@ -895,10 +895,18 @@ Lemma ut_sys_in_cong `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : C
   tf_w (pv_tf (us_V U)) (tf_arg_idx 1) = tf_w (pv_tf (us_V U')) (tf_arg_idx 1) ->
   tf_w (pv_tf (us_V U)) (tf_arg_idx 2) = tf_w (pv_tf (us_V U')) (tf_arg_idx 2) ->
   pv_cwi (us_V U) = pv_cwi (us_V U') ->
+  (* ...AND THE PERMISSION MAP AND THE SIZE, which read(2)'s receipt row
+     reads ([UexecExecInst.xv6_spost] at 5 names the table its key projects
+     from, lane CONS-SWALLOW W4).  Stated at the projection rather than at
+     the descriptor, because that is what the key holds; a caller whose two
+     states share a table and a size discharges both with [eq_refl]. *)
+  perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U)))
+    = perm_of (ud_um (pv_upt (us_V U'))) (uint (pv_sz (us_V U'))) ->
+  uint (pv_sz (us_V U)) = uint (pv_sz (us_V U')) ->
   ut_sys_in n f sc_v tf U sts gn cs pid -∗
   ut_sys_in n f sc_v tf' U' sts gn cs pid.
 Proof.
-  intros Hn HM Ha0 Ha1 Ha2 Hcw. rewrite /ut_sys_in. iIntros "H %Hc".
+  intros Hn HM Ha0 Ha1 Ha2 Hcw Hpi Hsz. rewrite /ut_sys_in. iIntros "H %Hc".
   destruct Hc as (Hce & Hcn & Hcx & Hcf).
   iDestruct ("H" with "[%]") as "H";
     [ split_and!; [ exact Hce | rewrite Hn; exact Hcn | exact Hcx | exact Hcf ] |].
@@ -908,7 +916,7 @@ Proof.
                           [ exact HM | exact Ha0 | exact Ha1 | exact Ha2
                           | reflexivity | exact Hcw
                           | reflexivity | reflexivity
-                          | reflexivity ]))) in "H".
+                          | reflexivity | exact Hpi | exact Hsz ]))) in "H".
   iExact "H".
 Qed.
 
@@ -926,10 +934,18 @@ Lemma ut_sys_out_cong `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : 
   tf_w (pv_tf (us_V U)) (tf_arg_idx 1) = tf_w (pv_tf (us_V U')) (tf_arg_idx 1) ->
   tf_w (pv_tf (us_V U)) (tf_arg_idx 2) = tf_w (pv_tf (us_V U')) (tf_arg_idx 2) ->
   pv_cwi (us_V U) = pv_cwi (us_V U') ->
+  (* ...AND THE PERMISSION MAP AND THE SIZE, which read(2)'s receipt row
+     reads ([UexecExecInst.xv6_spost] at 5 names the table its key projects
+     from, lane CONS-SWALLOW W4).  Stated at the projection rather than at
+     the descriptor, because that is what the key holds; a caller whose two
+     states share a table and a size discharges both with [eq_refl]. *)
+  perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U)))
+    = perm_of (ud_um (pv_upt (us_V U'))) (uint (pv_sz (us_V U'))) ->
+  uint (pv_sz (us_V U)) = uint (pv_sz (us_V U')) ->
   ut_sys_out n f sc_v tf U sts gn cs pid r M' sts' cw' cs' -∗
   ut_sys_out n f sc_v tf' U' sts gn cs pid r M' sts' cw' cs'.
 Proof.
-  intros Hn HM Ha0 Ha1 Ha2 Hcw. rewrite /ut_sys_out. iIntros "H %Hc".
+  intros Hn HM Ha0 Ha1 Ha2 Hcw Hpi Hsz. rewrite /ut_sys_out. iIntros "H %Hc".
   destruct Hc as (Hce & Hcn & Hcx & Hcf).
   iDestruct ("H" with "[%]") as "H";
     [ split_and!; [ exact Hce | rewrite <- Hn; exact Hcn | exact Hcx | exact Hcf ] |].
@@ -940,7 +956,7 @@ Proof.
                           [ exact HM | exact Ha0 | exact Ha1 | exact Ha2
                           | reflexivity | exact Hcw
                           | reflexivity | reflexivity
-                          | reflexivity ]))) in "H".
+                          | reflexivity | exact Hpi | exact Hsz ]))) in "H".
   iExact "H".
 Qed.
 

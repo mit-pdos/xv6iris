@@ -271,6 +271,18 @@ Proof.
   mw_prep. tb1.
 Qed.
 
+(* ...and U, the fifth: [walkaddr]'s V|U verdict and the user map's own
+   classification read it, and an A/D write-back must not move it
+   ([ProcPtOwn.upt_ad_view_um_vu_w] is where that matters). *)
+Lemma pte_set_ad_flag_U (w : mword 64) (a d : mword 1) :
+  _get_PTE_Flags_U (Mk_PTE_Flags (subrange_vec_dec (pte_set_ad w a d) 7 0))
+  = _get_PTE_Flags_U (Mk_PTE_Flags (subrange_vec_dec w 7 0)).
+Proof.
+  unfold _get_PTE_Flags_U, Mk_PTE_Flags,
+    pte_set_ad, _update_PTE_Flags_D, _update_PTE_Flags_A.
+  mw_prep. tb1.
+Qed.
+
 Lemma pte_set_ad_flag_X (w : mword 64) (a d : mword 1) :
   _get_PTE_Flags_X (Mk_PTE_Flags (subrange_vec_dec (pte_set_ad w a d) 7 0))
   = _get_PTE_Flags_X (Mk_PTE_Flags (subrange_vec_dec w 7 0)).

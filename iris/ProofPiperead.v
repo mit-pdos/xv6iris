@@ -2111,7 +2111,7 @@ Section ProofPiperead.
             apply (f_equal bv_unsigned) in H0. by vm_compute in H0. }
         assert (Hwany : exists d : nat, (d <= S i)%nat
                         /\ umem_wrote (us_M U) Mc' addrv d).
-        { destruct Hwrote as [[_ Hm] | [_ (dd & Hdd & Hm)]].
+        { destruct Hwrote as [[_ Hm] | [_ (dd & Hdd & Hm & _)]].
           - exists (S i). split; [lia |]. rewrite <- Nat.add_1_r.
             apply (umem_wrote_app (us_M U) Mc Mc' addrv i 1
                      (fun _ => trunc8 (K5 !!! Regidx Ra5)) Hwr3).
@@ -2129,7 +2129,7 @@ Section ProofPiperead.
                           = (mword_of_int (-1) : mword 64) ->
                           (i = 0)%nat -> Mc' = us_M U).
         { intros Hm1 Hi00.
-          destruct Hwrote as [[Hr _] | [_ (dd & Hdd & Hm)]].
+          destruct Hwrote as [[Hr _] | [_ (dd & Hdd & Hm & _)]].
           - exfalso. rewrite Hr in Hm1.
             apply (f_equal bv_unsigned) in Hm1. by vm_compute in Hm1.
           - assert (Hdd0 : dd = 0%nat) by lia. rewrite Hdd0 in Hm.
@@ -2141,7 +2141,7 @@ Section ProofPiperead.
                           = (mword_of_int (-1) : mword 64) ->
                           umem_wrote (us_M U) Mc' addrv i).
         { intros Hm1.
-          destruct Hwrote as [[Hr _] | [_ (dd & Hdd & Hm)]].
+          destruct Hwrote as [[Hr _] | [_ (dd & Hdd & Hm & _)]].
           - exfalso. rewrite Hr in Hm1.
             apply (f_equal bv_unsigned) in Hm1. by vm_compute in Hm1.
           - assert (Hdd0 : dd = 0%nat) by lia. rewrite Hdd0 in Hm.

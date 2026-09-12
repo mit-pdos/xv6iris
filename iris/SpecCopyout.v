@@ -158,12 +158,26 @@ Require Import TsoCtx.
 (* WHAT THE CALL DID TO THE PROCESS'S MEMORY, as one predicate over the
    returned [a0] and the returned view.  It subsumes the plain
    "returns 0 or -1" of [wp_copyout_sconf_body]: each arm names the value. *)
-Definition copyout_wrote (M : gmap Z (bv 8)) (dstva : mword 64) (len : nat)
-    (src_bytes : nat -> bv 8) (res : mword 64) (M' : gmap Z (bv 8)) : Prop :=
+(* ...AND WHEN IT FAILS, WHY (app-echo.md, lane CONS-SWALLOW, W1).  The -1
+   arm used to be unconditional, which made "the byte never reached the
+   process" unrefutable by any caller.  It is not unconditional: the loop
+   gives up exactly where the destination page is one it cannot copy to --
+   walkaddr answered 0 on the round's table and vmfault could not back the
+   page, or the re-walk's leaf has PTE_W clear -- and every one of those
+   verdicts says [~ uva_wmapped] at the failing address.  Stated at the
+   ENTRY table [P]: the round's table only GREW ([uptd_ext_sz]), and a byte
+   this table can take the grown one can take too
+   ([UserPtTree.uva_wmapped_mono]), so the entry form is the weaker and the
+   one a caller can use.  Keyed by the 64-bit va like the image equation
+   beside it, so this arm promises nothing about wrap either. *)
+Definition copyout_wrote (P : uptd) (M : gmap Z (bv 8)) (dstva : mword 64)
+    (len : nat) (src_bytes : nat -> bv 8) (res : mword 64)
+    (M' : gmap Z (bv 8)) : Prop :=
   (res = (mword_of_int 0 : mword 64)
    /\ M' = umem_wr M dstva len src_bytes)
   \/ (res = (mword_of_int (-1) : mword 64)
-      /\ exists d : nat, (d < len)%nat /\ M' = umem_wr M dstva d src_bytes).
+      /\ exists d : nat, (d < len)%nat /\ M' = umem_wr M dstva d src_bytes
+           /\ ~ uva_wmapped P (uint (add_vec_int dstva (Z.of_nat d)))).
 
 Definition wp_copyout_sconf_mem_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (ktb : ktier) `{!KtierLe ktb KT1} (γa : gname) (mm : regfile)
@@ -198,7 +212,7 @@ Definition wp_copyout_sconf_mem_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{C
     ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb]{dqsrc} src_bytes j) -∗
     ⌜callee_saved mm mr⌝ -∗
     ⌜uptd_ext_sz szv P P'⌝ -∗
-    ⌜ copyout_wrote M dstva len src_bytes
+    ⌜ copyout_wrote P M dstva len src_bytes
         (mr !!! Regidx (mword_of_int 10)) M' ⌝ -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).

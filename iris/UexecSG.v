@@ -212,17 +212,33 @@ Definition skey_eq (W W' : uvis) : Prop :=
      pid belongs to the data a bundle may read.  It does not move under the
      epc bump either, so every prover of this congruence still discharges
      it componentwise. *)
-  /\ uvis_pid W = uvis_pid W'.
+  /\ uvis_pid W = uvis_pid W'
+  (* ...AND THE PERMISSION MAP AND THE SIZE (app-echo.md, lane
+     CONS-SWALLOW, W4).  read(2)'s receipt says WHY a byte it popped never
+     reached the caller's buffer, and the only reason is that the
+     destination page is not one the kernel can copy to -- a statement
+     about the process's page table, which the key carries as its
+     PROJECTION ([UexecSlot.uvis_perm], beside the size the lazy region is
+     measured by).  So a post row reads them and this congruence has to fix
+     them.  The two are the components a syscall can MOVE (sbrk does, and
+     [UsysMemOk.usys_sbrk_perm] is the row that says how), which is why
+     they were not here before: every prover of this congruence re-keys
+     WITHIN one side of a call, where both are the entry projection
+     ([ProofUserretClosed]'s [Hpi0] / [Hsz0] are exactly these two facts,
+     asserted before either use). *)
+  /\ uvis_perm W = uvis_perm W'
+  /\ uvis_sz W = uvis_sz W'.
 
 Lemma skey_eq_refl (W : uvis) : skey_eq W W.
 Proof. rewrite /skey_eq. split_and!; reflexivity. Qed.
 
 Lemma skey_eq_sym (W W' : uvis) : skey_eq W W' -> skey_eq W' W.
 Proof.
-  rewrite /skey_eq. intros (HM & H0 & H1 & H2 & Hfd & Hcw & Hg & Hch & Hpid).
+  rewrite /skey_eq.
+  intros (HM & H0 & H1 & H2 & Hfd & Hcw & Hg & Hch & Hpid & Hpi & Hsz).
   split_and!; symmetry;
     [ exact HM | exact H0 | exact H1 | exact H2 | exact Hfd | exact Hcw
-    | exact Hg | exact Hch | exact Hpid ].
+    | exact Hg | exact Hch | exact Hpid | exact Hpi | exact Hsz ].
 Qed.
 
 (* THE CLASS IS INDEXED BY [ChildTok.ctokG], and by nothing else new.  The

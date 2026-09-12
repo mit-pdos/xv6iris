@@ -511,7 +511,12 @@ Section UserretClosed.
                                   | reflexivity
                                   | exact (eq_trans Hcww (eq_sym Hcwi))
                                   | reflexivity | reflexivity
-                                  | reflexivity ]))
+                                  | reflexivity
+                                  (* the permission map and the size: both
+                                     keys are the ENTRY projection, which is
+                                     what [Hpi0] / [Hsz0] say *)
+                                  | exact (eq_sym Hpi0)
+                                  | exact (eq_sym Hsz0) ]))
           end.
           iExact "Hxin".
         + (* not fork, so the fork row is vacuous *)
@@ -691,7 +696,9 @@ Section UserretClosed.
                        [ reflexivity | reflexivity | reflexivity
                        | reflexivity | reflexivity
                        | exact (eq_trans Hcwi (eq_sym Hcww))
-                       | reflexivity | reflexivity | reflexivity ]))) in "Hso";
+                       | reflexivity | reflexivity | reflexivity
+                       (* ...and the two the read row reads *)
+                       | exact Hpi0 | exact Hsz0 ]))) in "Hso";
         iExact "Hso" | ].
     (* ---- STEPS C/D: the guard, and the bundle, both inside the named
            lemma -- the loop only says which key it is at. ---- *)

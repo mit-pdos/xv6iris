@@ -258,10 +258,24 @@ Definition wp_consoleread_sconf_body
          the committed sequence and the per-byte tags hold on every arm --
          every byte delivered really did arrive at its history -- and it is
          only their CONSECUTIVENESS that a concurrent reader can take
-         away. *)
+         away.
+
+         ...AND THE SWALLOWED BYTE IS NAMED (app-echo.md, "SH-LINE PHASE 2
+         -- THE SWALLOWED BYTE"; lane CONS-SWALLOW).  [dc = d + 1] is a byte
+         this call popped and did not deliver, and
+         [ConsoleInv.cons_swallow] says WHICH byte and WHY: its history is
+         the next element of the committed sequence, it carries the input
+         tag, and the reason is the one of the code's two exits that fired
+         -- the byte was [C('D')] with nothing delivered yet, or its
+         copy-out faulted, which is [SpecCopyout.copyout_wrote]'s clause at
+         this call's own destination and the entry table.  Without it a
+         one-byte reader cannot tell a delivered line from a line with a
+         hole in it. *)
       cons_stored_lb cn sl -∗
       (⌜cons_window sl cur d bs hs⌝ ∗ ⌜cons_chain sl⌝
-         ∗ ⌜(d <= dc <= d + 1)%nat⌝
+         ∗ cons_swallow cn
+             (~ uva_wmapped (pv_upt (us_V U))
+                  (uint (add_vec_int dst (Z.of_nat d)))) sl d dc
        ∨ cons_dirty_cred Wd) -∗
       cons_out cn Wd ord cur dc -∗
       sie_cap_gpr KT1 mf av b pj -∗

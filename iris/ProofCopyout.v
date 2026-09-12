@@ -130,6 +130,7 @@ Require Import HartTp WpNext.
 Require Import WpLock.
 Require Import CommonWalk PtTree PtBuild.
 Require Import KptTree.
+Require Import UptTree.     (* [upt_ad_view] -- the walk's map vs the user map *)
 Require Import UserPtTree.
 Require Import CpuOwn.
 Require Import KvmSpec.
@@ -220,6 +221,81 @@ Section ProofCopyout.
       | lazymatch goal with |- ?M !!! _ = _ => is_var M; progress unfold M end ].
 
   (* ------------------------------------------------------------------ *)
+  (* WHY THE -1 ARM FAILED, as a fact about the ENTRY table.              *)
+  (*                                                                     *)
+  (* Every failure exit knows something about the failing PAGE -- its va  *)
+  (* is above MAXVA, or the map the walk reads has no leaf for it, or     *)
+  (* that leaf fails the V&U test, or it has PTE_W clear.  What           *)
+  (* [SpecCopyout.copyout_wrote] promises is about the BYTE, at the table *)
+  (* the call was entered with.  These three steps join the two: the      *)
+  (* entry table's leaves are all still there in the round's grown one    *)
+  (* ([UserPtTree.uva_wmapped_mono]), the byte's page is the one the      *)
+  (* round walked ([ProcPtOwn.svpn_of_pgd]), and the leaf the WALK sees   *)
+  (* is an A/D variant of the one the map records                         *)
+  (* ([ProcPtOwn.upt_ad_view_um_vu_w]).                                   *)
+  (* ------------------------------------------------------------------ *)
+  Local Lemma co_fault_vpn (P Pc : uptd) (szv dstva va0 : mword 64) :
+    va0 = and_vec dstva (mword_of_int (-4096) : mword 64) ->
+    uptd_ext_sz szv P Pc -> proc_pt_wf Pc -> uva_wmapped P (uint dstva) ->
+    exists w : mword 64,
+      Pc.(ud_um) !! svpn_of va0 = Some w
+      /\ pte_vu w /\ pte_w w
+      /\ (uint va0 < 2 ^ 38)%Z.
+  Proof.
+    intros -> Hext Hwf Hwm.
+    destruct Hext as ((_ & _ & Hsub) & _).
+    pose proof (uva_wmapped_mono P Pc (uint dstva) Hsub Hwm) as Hwc.
+    pose proof (uva_mapped_below_maxva Pc (uint dstva) (proj1 Hwf)
+                  (uva_mapped_of_wmapped Pc (uint dstva) Hwc)) as Hbel.
+    destruct Hwc as (vpn & w & j & Hl & Hvu & Hw & Hj & Heq).
+    rewrite uint_unsigned in Heq.
+    assert (Hva0 : (uint (and_vec dstva (mword_of_int (-4096) : mword 64))
+                    = bv_unsigned vpn * 4096)%Z).
+    { rewrite uint_unsigned pgd_unsigned Heq.
+      rewrite (Z.add_comm (bv_unsigned vpn * 4096) (Z.of_nat j)).
+      rewrite Z_mod_plus_full (Z.mod_small (Z.of_nat j) 4096 ltac:(lia)). lia. }
+    rewrite uint_unsigned in Hbel.
+    assert (Hlt : (uint (and_vec dstva (mword_of_int (-4096) : mword 64))
+                   < 2 ^ 38)%Z) by lia.
+    assert (Hvpn : svpn_of (and_vec dstva (mword_of_int (-4096) : mword 64)) = vpn).
+    { apply bv_eq. pose proof (svpn_of_pgd dstva Hlt) as Hs.
+      rewrite Hva0 in Hs. lia. }
+    exists w. rewrite Hvpn.
+    split_and!; [exact Hl | exact Hvu | exact Hw | exact Hlt].
+  Qed.
+
+  (* the MAXVA exit: the whole user map lives below the trapframe *)
+  Local Lemma co_fault_maxva (P Pc : uptd) (szv dstva va0 : mword 64) :
+    va0 = and_vec dstva (mword_of_int (-4096) : mword 64) ->
+    uptd_ext_sz szv P Pc -> proc_pt_wf Pc ->
+    (2 ^ 38 <= uint va0)%Z ->
+    ~ uva_wmapped P (uint dstva).
+  Proof.
+    intros Hva0 Hext Hwf Hmax Hwm.
+    destruct (co_fault_vpn P Pc szv dstva va0 Hva0 Hext Hwf Hwm)
+      as (w & _ & _ & _ & Hlt).
+    lia.
+  Qed.
+
+  (* ...and the three leaf verdicts, all reported at the map the walk read *)
+  Local Lemma co_fault_leaf (P Pc : uptd) (szv dstva va0 : mword 64)
+      (m_ad : gmap (mword 27) (mword 64)) :
+    va0 = and_vec dstva (mword_of_int (-4096) : mword 64) ->
+    uptd_ext_sz szv P Pc -> proc_pt_wf Pc ->
+    upt_ad_view Pc.(ud_tfp) Pc.(ud_um) m_ad ->
+    (forall w : mword 64,
+       m_ad !! svpn_of va0 = Some w -> ~ pte_vu w \/ ~ pte_w w) ->
+    ~ uva_wmapped P (uint dstva).
+  Proof.
+    intros Hva0 Hext Hwf Hview Hverd Hwm.
+    destruct (co_fault_vpn P Pc szv dstva va0 Hva0 Hext Hwf Hwm)
+      as (w0 & Hl & Hvu & Hw & _).
+    destruct (upt_ad_view_um_vu_w Pc.(ud_tfp) Pc.(ud_um) m_ad
+                _ w0 Hview (proj1 Hwf) Hl Hvu Hw) as (w & Hm & Hvu' & Hw').
+    destruct (Hverd w Hm) as [Hc | Hc]; [exact (Hc Hvu') | exact (Hc Hw')].
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
   (* +0x78 .. +0x86: re-walk for the PTE and test PTE_W.                  *)
   (*                                                                     *)
   (* Shared by both routes into it -- walkaddr's hit branches here from   *)
@@ -230,6 +306,11 @@ Section ProofCopyout.
   (*                                                                     *)
   (* The premise [m_ad !! svpn_of va0 <> None] is what makes the missing   *)
   (* null check on walk's result sound.                                   *)
+  (*                                                                     *)
+  (* THE VERDICT IS RETURNED, not merely dispatched on: the [wr = false]  *)
+  (* branch is a -1 exit, and what it owes its caller is the REASON       *)
+  (* ([SpecCopyout.copyout_wrote]'s fault clause).  Nothing below         *)
+  (* interprets the bit; the [false] arm carries the leaf it read.        *)
   (* ------------------------------------------------------------------ *)
   Local Lemma co_walkpt `{CID0 : CpuId}
       (t : ptree) (m_ad : gmap (mword 27) (mword 64))
@@ -247,6 +328,8 @@ Section ProofCopyout.
     wp_next (CID0:=CID0) b pcur (fun (CID : CpuId) =>
       ∀ (Mf : regfile) (wr : bool),
         ⌜callee_saved M Mf⌝ -∗
+        ⌜wr = false ->
+         exists w : mword 64, m_ad !! svpn_of va0 = Some w /\ ~ pte_w w⌝ -∗
         sie_cap_gpr KT1 Mf n b pcur -∗
         pc_is (if wr then (mword_of_int (KernelSyms.copyout + 0x88) : mword 64)
                     else (mword_of_int (KernelSyms.copyout + 0xc2) : mword 64)) -∗
@@ -403,7 +486,23 @@ Section ProofCopyout.
               = mword_of_int (KernelSyms.copyout + 0xc2)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtc2) in "Hpc".
       iSpecialize ("Hcont" $! CID8 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont" $! H2 false with "[%] Hcg Hpc Hptree"). exact HcsH2.
+      (* the byte the load read IS the map's leaf, and the [andi] says its
+         W bit is clear ([PtBuild.pte_not_w_bits]) *)
+      assert (HA5 : H2 !!! Regidx Ra5
+                    = and_vec w0 (sign_extend' 64
+                        (sign_extend' 12 (mword_of_int 4 : mword 6)))).
+      { rewrite /H2 upd_eq. rewrite /H1 upd_eq. reflexivity. }
+      assert (Himm4 : and_vec w0 (sign_extend' 64 (mword_of_int 4 : mword 12))
+                      = (mword_of_int 0 : mword 64)).
+      { replace (sign_extend' 64 (mword_of_int 4 : mword 12) : mword 64)
+          with (sign_extend' 64 (sign_extend' 12 (mword_of_int 4 : mword 6))
+                : mword 64)
+          by (apply bv_eq; vm_compute; reflexivity).
+        rewrite -HA5. apply eq_vec_true_iff in Hpw. rewrite Hpw.
+        apply bv_eq; vm_compute; reflexivity. }
+      iApply ("Hcont" $! H2 false with "[%] [%] Hcg Hpc Hptree");
+        [ exact HcsH2 | ].
+      intros _. exists w0. split; [exact Hw0 | exact (pte_not_w_bits w0 Himm4)].
     - (* writable: fall through to +0x88 *)
       iApply (wp_cbeqz_fall_s_sconf (mword_of_int (KernelSyms.copyout + 0x86))
                 (mword_of_int 30 : mword 8) (Cregidx (mword_of_int 7)) Ra5 H2 n b
@@ -415,7 +514,8 @@ Section ProofCopyout.
                      = mword_of_int (KernelSyms.copyout + 0x88)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp88) in "Hpc".
       iSpecialize ("Hcont" $! CID9 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont" $! H2 true with "[%] Hcg Hpc Hptree"). exact HcsH2.
+      iApply ("Hcont" $! H2 true with "[%] [%] Hcg Hpc Hptree");
+        [ exact HcsH2 | discriminate ].
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -492,7 +592,7 @@ Section ProofCopyout.
        ∀ (mj : regfile) (res : mword 64) (P' : uptd) (Mu' : gmap Z (bv 8)),
          ⌜ mj !!! Regidx csp_rs1 = spr
            /\ mj !!! Regidx Ra0 = res
-           /\ copyout_wrote Mu dstva0 len src_bytes res Mu'
+           /\ copyout_wrote P Mu dstva0 len src_bytes res Mu'
            /\ uptd_ext_sz szv P P' ⌝ -∗
          sie_cap_gpr KT1 mj (K - 14)%nat b p -∗
          cpu_own lvl eb p b lks -∗
@@ -545,7 +645,7 @@ Section ProofCopyout.
        ∀ (mj : regfile) (res : mword 64) (P' : uptd) (Mu' : gmap Z (bv 8)),
          ⌜ mj !!! Regidx csp_rs1 = spr
            /\ mj !!! Regidx Ra0 = res
-           /\ copyout_wrote Mu dstva0 len src_bytes res Mu'
+           /\ copyout_wrote P Mu dstva0 len src_bytes res Mu'
            /\ uptd_ext_sz szv P P' ⌝ -∗
          sie_cap_gpr KT1 mj (K - 14)%nat b p -∗
          cpu_own lvl eb p b lks -∗
@@ -597,7 +697,7 @@ Section ProofCopyout.
       ∀ (mj : regfile) (res : mword 64) (P' : uptd) (Mu' : gmap Z (bv 8)),
         ⌜ mj !!! Regidx csp_rs1 = spr
           /\ mj !!! Regidx Ra0 = res
-          /\ copyout_wrote Mu dstva0 len src_bytes res Mu'
+          /\ copyout_wrote P Mu dstva0 len src_bytes res Mu'
           /\ uptd_ext_sz szv P P' ⌝ -∗
         sie_cap_gpr KT1 mj (K - 14)%nat b p -∗
         cpu_own lvl eb p b lks -∗
@@ -661,6 +761,16 @@ Section ProofCopyout.
                 with "Hcg Hpc []").
       { iApply (coi_58 with "Htext"). }
       iApply bi.later_intro. iIntros (CIDl2 Hsl2) "Hcg Hpc".
+      (* the table's own well-formedness, which is what puts every mapped
+         byte below MAXVA ([UserPtTree.uva_mapped_below_maxva]) *)
+      iDestruct (proc_ptm_wf with "Hpt") as %Hwfm.
+      assert (Hmaxb : (2 ^ 38 <= uint va0)%Z).
+      { unfold zopz0zI_u in Hmaxva. apply Z.ltb_lt in Hmaxva.
+        rewrite HV1s9 HV1s1 in Hmaxva.
+        assert (Hs9v : uint (mword_of_int 274877906943 : mword 64) = 274877906943)
+          by (vm_compute; reflexivity).
+        rewrite Hs9v in Hmaxva.
+        change (2 ^ 38)%Z with 274877906944%Z. lia. }
       assert (Htgt9e : add_vec (mword_of_int (KernelSyms.copyout + 0x58) : mword 64)
                          (sign_extend' 64 (mword_of_int 70 : mword 13))
                        = mword_of_int (KernelSyms.copyout + 0x9e))
@@ -687,7 +797,10 @@ Section ProofCopyout.
       split_and!.
       - rewrite /Z1. rewrite upd_ne; [exact HV1sp | reg_neq].
       - rewrite /Z1 upd_eq. reflexivity.
-      - right. split; [reflexivity | exists done; split; [lia | reflexivity]].
+      - right. split; [reflexivity | exists done; split_and!;
+          [ lia | reflexivity
+          | rewrite -Hcur;
+            exact (co_fault_maxva P Pc szv dstva va0 eq_refl Hextc Hwfm Hmaxb) ] ].
       - exact Hextc. }
     (* ---- va0 < MAXVA: on to walkaddr ---- *)
     assert (Hva0b : (uint va0 < 2 ^ 38)%Z).
@@ -1357,11 +1470,10 @@ Section ProofCopyout.
     iEval (rewrite Hp66) in "Hpc".
     destruct Hwapay as [(Ha0z & Hwhy) | (w & Hsome & Hvu & _ & Ha0v)].
     { (* ===== walkaddr missed: fault the page in ===== *)
-      (* [Hwhy] -- walkaddr's report of WHICH of its three reasons fired --
-         is not consumed any more.  It used to be refuted three ways on the
-         deleted mapped arm; the one contract this file proves reaches the
-         [vmfault] call for real, so the reason is simply not interesting. *)
-      clear Hwhy.
+      (* [Hwhy] -- walkaddr's report of WHICH of its three reasons fired.
+         The vmfault below may still back the page; if it does not, this is
+         the whole reason the -1 exit gives its caller
+         ([SpecCopyout.copyout_wrote]'s fault clause), so it is kept. *)
       iApply (wp_cbnez_fall_s_sconf (mword_of_int (KernelSyms.copyout + 0x66))
                 (mword_of_int 9 : mword 8) (Cregidx (mword_of_int 2)) Ra0
                 R1 (K - 14)%nat b
@@ -1567,7 +1679,15 @@ Section ProofCopyout.
           rewrite (HF6get csp_rs1 ltac:(vm_compute; reflexivity) ltac:(reg_neq)).
           exact HV1sp.
         - rewrite /FB upd_eq. reflexivity.
-        - right. split; [reflexivity | exists done; split; [lia | reflexivity]].
+        - right. split; [reflexivity | exists done; split_and!;
+            [ lia | reflexivity
+            | rewrite -Hcur;
+              apply (co_fault_leaf P Pc szv dstva va0 m_ad eq_refl Hextc Hwf Hview);
+              intros wv Hmv;
+              destruct Hwhy as [Hmx | [Hnone | (wy & Hsy & Hnvu)]];
+              [ exfalso; lia
+              | rewrite Hnone in Hmv; discriminate
+              | rewrite Hsy in Hmv; injection Hmv as <-; left; exact Hnvu ] ] ].
         - exact Hextc. }
       (* ---- the page was faulted in ---- *)
       iDestruct "Hvs" as (r) "(%Hra0 & %Hrpv & %Hszlt & %Hunone & Hpt)".
@@ -1616,7 +1736,7 @@ Section ProofCopyout.
                       exact HV1s1)
                 HF6s7 Hva0b Hrep' Hsome'
                 with "Hcg Htext Hpc Hptree").
-      iIntros (CIDms2 Hsms2 Mf wr) "%Hcsf Hcg Hpc Hptree".
+      iIntros (CIDms2 Hsms2 Mf wr) "%Hcsf %Hverd Hcg Hpc Hptree".
       assert (Hfget : forall c : mword 5, is_cs_idx c = true ->
                 Mf !!! Regidx c = F6 !!! Regidx c).
       { intros c Hc. exact (callee_saved_lookup Hcsf c Hc). }
@@ -1710,7 +1830,13 @@ Section ProofCopyout.
           rewrite (Hfget csp_rs1 ltac:(vm_compute; reflexivity)).
           rewrite (HF6get csp_rs1 ltac:(vm_compute; reflexivity) ltac:(reg_neq)). exact HV1sp.
         + rewrite /FC upd_eq. reflexivity.
-        + right. split; [reflexivity | exists done; split; [lia | reflexivity]].
+        + right. split; [reflexivity | exists done; split_and!;
+            [ lia | reflexivity
+            | rewrite -Hcur;
+              apply (co_fault_leaf P Pd szv dstva va0 m' eq_refl Hextd Hwf' Hview');
+              intros wv Hmv;
+              destruct (Hverd eq_refl) as (wy & Hsy & Hnw);
+              rewrite Hsy in Hmv; injection Hmv as <-; right; exact Hnw ] ].
         + exact Hextd. }
     (* ===== walkaddr hit: the page is already mapped ===== *)
     destruct (upt_ad_view_vu Pc.(ud_tfp) Pc.(ud_um) m_ad (svpn_of va0) w Hview Hsome Hvu)
@@ -1747,7 +1873,7 @@ Section ProofCopyout.
                     exact HV1s1)
               HR1s7 Hva0b Hrep ltac:(rewrite Hsome; discriminate)
               with "Hcg Htext Hpc Hptree").
-    iIntros (CIDh2 Hsh2 Mf wr) "%Hcsf Hcg Hpc Hptree".
+    iIntros (CIDh2 Hsh2 Mf wr) "%Hcsf %Hverd Hcg Hpc Hptree".
     assert (Hfget : forall c : mword 5, is_cs_idx c = true ->
               Mf !!! Regidx c = R1 !!! Regidx c).
     { intros c Hc. exact (callee_saved_lookup Hcsf c Hc). }
@@ -1841,7 +1967,13 @@ Section ProofCopyout.
         rewrite (Hfget csp_rs1 ltac:(vm_compute; reflexivity)).
         rewrite (HR1get csp_rs1 ltac:(vm_compute; reflexivity) ltac:(reg_neq)). exact HV1sp.
       + rewrite /GC upd_eq. reflexivity.
-      + right. split; [reflexivity | exists done; split; [lia | reflexivity]].
+      + right. split; [reflexivity | exists done; split_and!;
+          [ lia | reflexivity
+          | rewrite -Hcur;
+            apply (co_fault_leaf P Pc szv dstva va0 m_ad eq_refl Hextc Hwf Hview);
+            intros wv Hmv;
+            destruct (Hverd eq_refl) as (wy & Hsy & Hnw);
+            rewrite Hsy in Hmv; injection Hmv as <-; right; exact Hnw ] ].
       + exact Hextc.
   Qed.
 
@@ -2370,7 +2502,7 @@ Section ProofCopyout.
         ∀ (mj : regfile) (res : mword 64) (P' : uptd) (Mu' : gmap Z (bv 8)),
         ⌜ mj !!! Regidx csp_rs1 = spr
           /\ mj !!! Regidx Ra0 = res
-          /\ copyout_wrote Mu dstva len src_bytes res Mu'
+          /\ copyout_wrote P Mu dstva len src_bytes res Mu'
           /\ uptd_ext_sz szv P P' ⌝ -∗
         sie_cap_gpr KT1 mj (K - 14)%nat b p -∗
         cpu_own lvl eb p b lks -∗

@@ -106,12 +106,22 @@ Notation either_copyout_stack := (58%nat) (only parsing).
    copy loops need to say they wrote exactly what they return.  This is
    the ONLY existential left in the user arm's memory story -- a prefix
    LENGTH, not an image. *)
-Definition either_copyout_ran (len : nat) (r : mword 64) (d : nat) : Prop :=
+(* ...AND THE -1 ARM SAYS WHERE IT STOPPED AND WHY (app-echo.md, lane
+   CONS-SWALLOW, W1): the byte at [dst + d] is at a page the kernel cannot
+   copy to -- not mapped for the user, or mapped read-only -- in the table
+   the call was ENTERED at ([SpecCopyout.copyout_wrote] says why the entry
+   table is the right one).  At [len = 1] this is exactly "the one byte was
+   lost, and here is the reason", which is what consoleread's swallowed-byte
+   arm carries out to its caller. *)
+Definition either_copyout_ran (P : uptd) (dst : mword 64) (len : nat)
+    (r : mword 64) (d : nat) : Prop :=
   (r = (mword_of_int 0 : mword 64) /\ d = len)
-  \/ (r = (mword_of_int (-1) : mword 64) /\ (d < len)%nat).
+  \/ (r = (mword_of_int (-1) : mword 64) /\ (d < len)%nat
+      /\ ~ uva_wmapped P (uint (add_vec_int dst (Z.of_nat d)))).
 
-Lemma either_copyout_ran_ret (len : nat) (r : mword 64) (d : nat) :
-  either_copyout_ran len r d ->
+Lemma either_copyout_ran_ret (P : uptd) (dst : mword 64) (len : nat)
+    (r : mword 64) (d : nat) :
+  either_copyout_ran P dst len r d ->
   r = (mword_of_int 0 : mword 64) \/ r = (mword_of_int (-1) : mword 64).
 Proof. intros [[Hr _] | [Hr _]]; [by left | by right]. Qed.
 
@@ -148,7 +158,7 @@ Section SpecEitherCopyout.
         what the ∃ [P'] and [uptd_ext] are. *)
           ∃ (P' : uptd) (d : nat),
             ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ ∗
-            ⌜either_copyout_ran len r d⌝ ∗
+            ⌜either_copyout_ran (pv_upt (us_V U)) dst len r d⌝ ∗
             proc_priv_core p pid
               (upd_usM (us_upt U P') (umem_wr (us_M U) dst d src_bytes))
      else ⌜r = (mword_of_int 0 : mword 64)⌝ ∗

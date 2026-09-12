@@ -1659,6 +1659,10 @@ Section UservecAllPt.
                     ltac:(cbn [us_V pv_tf upd_usM us_tf upd_usV upd_tf];
                           unfold UexecSlot.tf_w, tf_arg_idx, tf_of; reflexivity)
                     eq_refl
+                    (* the table and the size do not move across the save
+                       walk, so the key's permission projection is the same
+                       term on both sides (lane CONS-SWALLOW, W4) *)
+                    eq_refl eq_refl
                     with "Hxin")
       end. }
     { (* FORK'S DEPOSIT ACROSS THE SAVE WALK.  The row reads the whole
@@ -2013,6 +2017,10 @@ Section UservecAllPt.
                     ltac:(cbn [us_V pv_tf upd_usM us_tf upd_usV upd_tf];
                           unfold UexecSlot.tf_w, tf_arg_idx, tf_of; reflexivity)
                     eq_refl
+                    (* the table and the size do not move across the save
+                       walk, so the key's permission projection is the same
+                       term on both sides (lane CONS-SWALLOW, W4) *)
+                    eq_refl eq_refl
                     with "Hso2")
       end.
   Qed.

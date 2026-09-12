@@ -247,6 +247,84 @@ Qed.
 Definition u_data_pa (P : uptd) (a : mword 64) : Prop :=
   exists va, uva_mapped P va /\ uva_pa P va = a.
 
+(* ===================================================================== *)
+(*  THE ADDRESSES A COPYOUT CAN WRITE.                                    *)
+(*                                                                       *)
+(*  [uva_mapped] asks only that the map have a leaf at the address's vpn, *)
+(*  and that is strictly weaker than "a copyout to this address stores a  *)
+(*  byte there".  copyout (kernel/vm.c) fails on a mapped page twice      *)
+(*  over: walkaddr answers 0 on a leaf whose U bit is CLEAR -- a          *)
+(*  [uvmclear]'d guard page, which [ProcPtOwn.proc_pt_wf_clear_u] keeps   *)
+(*  in [ud_um] -- and the re-walk's own [( *pte & PTE_W) == 0] returns    *)
+(*  -1 on a leaf that is present and user-reachable but READ-ONLY, which  *)
+(*  is every user text page.  So the predicate a failing copyout refutes  *)
+(*  is this one, not [uva_mapped]: the map has a leaf here, it passes the *)
+(*  V&U test walkaddr makes, and its W bit is set.                        *)
+(*                                                                       *)
+(*  Spelled like [uva_mapped] -- PAGE * 4096 + OFFSET, with no [svpn_of]  *)
+(*  and no wrap reasoning -- so the two are compared by decomposition     *)
+(*  ([uva_mapped_of_wmapped]) and a failing copyout's clause is read at   *)
+(*  the caller's own byte address.                                        *)
+(* ===================================================================== *)
+Definition uva_wmapped (P : uptd) (va : Z) : Prop :=
+  exists (vpn : mword 27) (w : mword 64) (j : nat),
+    P.(ud_um) !! vpn = Some w /\ pte_vu w /\ pte_w w /\ (j < 4096)%nat /\
+    va = bv_unsigned vpn * 4096 + Z.of_nat j.
+
+Lemma uva_mapped_of_wmapped (P : uptd) (va : Z) :
+  uva_wmapped P va -> uva_mapped P va.
+Proof.
+  intros (vpn & w & j & Hl & _ & _ & Hj & Hva).
+  exists vpn, w, j. split_and!; [exact Hl | exact Hj | exact Hva].
+Qed.
+
+(* THE MAP ONLY GROWS, so a byte a copyout can write at the table it was
+   HANDED it can still write at any table that extends it -- which is what
+   lets a failure reported at the round's own (already grown) descriptor be
+   restated at the ENTRY descriptor the caller named.  [ProcPtOwn.uptd_ext]
+   is the submap relation this reads. *)
+Lemma uva_wmapped_mono (P P' : uptd) (va : Z) :
+  P.(ud_um) ⊆ P'.(ud_um) -> uva_wmapped P va -> uva_wmapped P' va.
+Proof.
+  intros Hsub (vpn & w & j & Hl & Hvu & Hw & Hj & Hva).
+  exists vpn, w, j.
+  split_and!; [exact (lookup_weaken _ _ _ _ Hl Hsub) | exact Hvu | exact Hw
+               | exact Hj | exact Hva].
+Qed.
+
+(* ...and the vpn a writable address decomposes at is the one the address
+   divides down to, which is how a verdict walkaddr reported at the PAGE
+   base [va0 = PGROUNDDOWN va] reaches the byte. *)
+Lemma uva_wmapped_page (P : uptd) (vpn : mword 27) (w : mword 64) (j : nat) :
+  P.(ud_um) !! vpn = Some w -> pte_vu w -> pte_w w -> (j < 4096)%nat ->
+  uva_wmapped P (bv_unsigned vpn * 4096 + Z.of_nat j).
+Proof. intros Hl Hvu Hw Hj. by exists vpn, w, j. Qed.
+
+(* EVERY MAPPED ADDRESS IS BELOW MAXVA, which is what refutes walkaddr's
+   FIRST reason for answering 0 ([SpecWalkaddr]'s [2 ^ 38 <= uint va] arm):
+   the user map's own well-formedness keeps every vpn below the trapframe's,
+   and the trapframe is the second page from the top of the address space. *)
+Lemma uva_mapped_below_maxva (P : uptd) (va : Z) :
+  upt_map_wf P.(ud_um) -> uva_mapped P va -> (va < 2 ^ 38)%Z.
+Proof.
+  intros Hwf (vpn & w & j & Hl & Hj & ->).
+  destruct (Hwf _ _ Hl) as (Hlt & _).
+  rewrite tf_vpn_unsigned in Hlt.
+  change (2 ^ 38)%Z with 274877906944%Z. nia.
+Qed.
+
+Lemma uva_wmapped_vpn (P : uptd) (va : Z) :
+  uva_wmapped P va ->
+  exists w : mword 64,
+    P.(ud_um) !! Z_to_bv 27 (va / 4096) = Some w /\ pte_vu w /\ pte_w w.
+Proof.
+  intros (vpn & w & j & Hl & Hvu & Hw & Hj & ->).
+  exists w. split_and!; [| exact Hvu | exact Hw].
+  rewrite (Z.div_add_l (bv_unsigned vpn) 4096 (Z.of_nat j) ltac:(lia)).
+  rewrite (Z.div_small (Z.of_nat j) 4096 ltac:(lia)) Z.add_0_r.
+  by rewrite Z_to_bv_bv_unsigned.
+Qed.
+
 (* NO ALIASING, at byte granularity: distinct user vas name distinct
    bytes.  [ProcPtOwn.um_inj] read through [uva_pa]. *)
 Definition uva_pa_inj (P : uptd) : Prop :=
