@@ -1313,6 +1313,46 @@ defining one as the symbol directly compiles, but `unfold` then leaves something
 - Avoid ad-hoc argument couplings in preconditions; prefer deriving branch
   conditions internally.
 
+## Two non-convertible instances of one class in one application do not fail -- they wedge (2026-09-12)
+
+`UexecExecInst.uprogSG_gen` and `uprogSG_free` differ in a field (`Dsup`,
+`psok`), so they are not convertible. An `iApply` whose lemma is at one and
+whose hypotheses are at the other does not report a mismatch: it unfolds both
+sides into `UexecSG.sbundle`'s tower looking for a match that cannot exist
+(20 min, RSS growing ~100 MB/min, killed). The statements at either instance
+elaborate instantly; only the mixed application hangs. Rule: name the instance
+on BOTH sides (`(PS := uprogSG_free)` on the lemma and on every deposit it
+consumes), per lemma, in files above the instance (`UInitSh`, `UShConsK`,
+`UInitConsK`); files that bind `{SG}`/`{PS}` as section variables need nothing.
+`UkRun.urun` contains `udep`, so the deposit instance threads through walk
+steps, not only leaf statements. Diagnosing: `pose proof (lemma (SG := …)
+(PS := …) args) as H` with a mark after it -- if that is fast and the `iApply`
+hangs, `Set Printing Implicit` on `H`'s premises vs the hypotheses handed to it.
+
+## Applying the whole-system adequacy theorem (2026-09-12, E2)
+
+`App.xv6_app_adequacy` has fifteen hypotheses. Give them as HOLES
+(`refine (xv6_app_adequacy _ _ … )` then discharge the goals one by one), not
+as arguments -- elaborating the instantiated term went to 47 GB. Never sweep
+the goals with `try first [exact …]` (493 GB: every `exact` is tried against
+`Hinit_boot`'s goal too). `echo_Htx`/`echo_Hrx` have their instance binders
+ahead of `HR`, so apply them pointwise after `intros`, not as terms (34 GB
+otherwise).
+
+## A missing `Require Import` under a backtick binder INVENTS the class (2026-09-12)
+
+`` Context `{!inG Σ (mono_listR (leibnizO Z))} `` with `iris.algebra.lib.mono_list`
+not imported does not fail: backtick generalisation invents fresh variables
+(`mono_listR : ofe -> cmra`, likewise `ghost_varG`, `CurCtx`), so the section
+binds an instance at an ABSTRACT camera that no real `own` can match. The
+symptom is far from the cause -- the first statement that mentions a real
+`own` at that camera elaborates for minutes and is OOM-killed (47 GB in 94 s
+in `UInitBoot.v`; the same thing behind an earlier 8.6 GB blow-up in
+`UInitSh.v`). Check: `About mono_listR` inside the section must print the
+library constant, not a section variable. Locating a wedge: `idtac "MARK-n"`
+after each `Proof.` plus a `Lemma mark_n : True.` between declarations pins it
+to a statement or a proof in one build.
+
 ## A heavy `Require Import` in a walk-heavy file can wedge its compile (2026-09-12)
 
 `UkShFork.v` sat more than 40 minutes (RSS climbing) after gaining `Require
