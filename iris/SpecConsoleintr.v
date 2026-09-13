@@ -18,7 +18,8 @@
 
      acquire / release   [ConsoleInv.is_conslock]
      consputc            [WpUart.dev_inv] ∗ [UartTxInv.is_txlock] ∗ a
-                         [UartTxInv.uart_sent_sub] to extend
+                         [UartTxInv.uart_sent_sub] to extend ∗
+                         [SpecUartPutc.uart_base_word Uart0]
      wakeup              [procs_inv]
 
    ALL OF THEM ARE PERSISTENT, which is what makes the ripple cheap: the two
@@ -27,6 +28,16 @@
    caller threading it gains a conjunct and NO new parameter.  uartintr's
    contract gains [console_caps], [SpecDevintr.devintr_caps] gains it, and
    every file that merely passes that bundle along changes by one name.
+
+   [uart_base_word Uart0] rides in the bundle for the same reason the lock
+   handles do.  Since XV6_REV 163d39b the driver LOADS its MMIO base out of
+   `uarts[0].base` instead of spelling it as a constant, so consputc's
+   contract needs to know what that word holds; it is persistent and depends
+   on no ghost name, and putting it here means the four call sites project it
+   from a bundle consoleintr already has rather than threading a new premise
+   up through uartintr and devintr.  It is a VA-tier points-to, so only the
+   boot chain can mint it ([KMap.kmap_static_claims]) -- a driver cannot
+   cross from the physical [UartsFields.uarts_pinned] form.
 
    [uart_sent_sub γu []] rather than a threaded [bs]: the bundle carries
    only the BASELINE each [consputc] call extends.  Keeping it INSIDE the
@@ -98,6 +109,10 @@ Require Import DiskPtsto WpUart.
 Require Import UartTxInv.
 Require Import SpecConsputc.   (* [consputc_bs]: the three bytes an erase
      puts on the wire, and what this function's echo is stated against *)
+Require Import SpecUartPutc.   (* [uart_base_word]: the .data word the
+   console driver LOADS its MMIO base from, since XV6_REV 163d39b.
+   Required explicitly -- SpecConsputc requires it, but Import is not
+   transitive. *)
 Require Import ConsoleInv.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
@@ -135,7 +150,8 @@ Section ConsoleCaps.
        is_txlock γtx γu ∗
        WpLock.is_lock γc a_cons "cons"%string (cons_res_at cn) ∗
        ⌜cn_uart cn = γu⌝ ∗
-       uart_sent_sub γu [] ∗ uart_inited γu)%I.
+       uart_sent_sub γu [] ∗ uart_inited γu ∗
+       uart_base_word Uart0)%I.
 
   Global Instance console_caps_persistent `{XI : CurCtx} γu : Persistent (console_caps γu).
   Proof. rewrite /console_caps. apply _. Qed.
