@@ -75,12 +75,11 @@ Require Import ElfLoadable.        (* [sh_elf_loadable] *)
 Require Import AppEcho.            (* [echo_fs_pure] -- the WHOLE pins law
                                       sh is handed (lane E4: its own exec of
                                       /echo needs [FsEchoPin.era0_echo_pins],
-                                      which is one of its conjuncts) *)
-Require Import FsConsPin.          (* [cons_absent] / [cons_present_at] *)
-Require Import UInitCons.          (* [init_cons_cred] -- the console
-                                      credential /init hands the shell *)
-Require Import UShConsK.           (* sh's two console leaf discharges at
-                                      echo's era (lane SH-OPEN) *)
+                                      which is one of its conjuncts).  A PURE
+                                      [Prop], so naming it costs nothing; the
+                                      era's console GHOSTS are deliberately
+                                      NOT named here -- see the note at
+                                      [init_sh_slot]. *)
 Require Import PageGeom.           (* [PGSIZE] *)
 Require Import KexecDefs.
 Require Import SpecKexec.
@@ -346,6 +345,30 @@ Section UInitSh.
   (* [n0] is the slack sh's entry is priced at.  Any [n0] under 402 fits   *)
   (* ([init_sh_room] below); the caller picks one.                         *)
   (* ------------------------------------------------------------------- *)
+  (* ITS THREE CONJUNCTS, NAMED (lane E2).  Each is owed by a different
+     lane, and the top theorem carries the two it does not own as named
+     hypotheses -- so [sh_pay] itself is assembled from the parts rather
+     than quoted twice ([sh_pay_of_parts]).  The tag's reading is E2's own
+     and is proved from the theorem's [riscv_rx_tag = app_tag] equation. *)
+  Definition sh_pay_state (Rsh : gname -> gname -> gname -> iProp Σ)
+      (n0 : nat) : iProp Σ :=
+    (□ (∀ (W' : uvis) (γt γd γs : gname),
+          usz γs (uvis_sz W') -∗
+          ([∗ map] k ↦ b ∈ base.filter
+                (fun kv : Z * bv 8 =>
+                   kv.1 < uint (tf_resume_gpr0 (uvis_tf W')
+                                !!! Regidx csp_rs1)
+                          - 8 * Z.of_nat (2 + (8 + (16 + (ush_Dbody + n0)))))
+                (udata_lo (uvis_M W') (uvis_perm W') (uvis_sz W')),
+             ubyte γd k b) -∗
+          ∃ f : nat -> bv 8, Rsh γt γd γs ∗ ubytes γd sh_buf sh_nbuf f))%I.
+
+  Definition sh_pay_rest (Rsh : gname -> gname -> gname -> iProp Σ)
+      : iProp Σ :=
+    (∀ (γp : gname) (N : uk_names Σ),
+       ush_rest (PS := uprogSG_free) N γp
+         (Rsh (ukn_t N) (ukn_d N) (ukn_s N)))%I.
+
   Definition sh_pay (T : iProp Σ) (Rsh : gname -> gname -> gname -> iProp Σ)
       (n0 : nat) : iProp Σ :=
     (□ (∀ (W' : uvis) (γt γd γs : gname),
@@ -362,7 +385,8 @@ Section UInitSh.
         per child ([UserConsole.upos_alloc]), so what the application owes
         is sh's body at whichever name this round's pair got. *)
      ∗ (∀ (γp : gname) (N : uk_names Σ),
-          ush_rest N γp (Rsh (ukn_t N) (ukn_d N) (ukn_s N)))
+          ush_rest (PS := uprogSG_free) N γp
+            (Rsh (ukn_t N) (ukn_d N) (ukn_s N)))
      (* ...AND THE TAG'S READING (lane SH-LINE 2b, L4).  How a tagged input
         history is READ -- as the discipline or as the taint -- is a fact
         about the TOP theorem's [boot_fixedGS] equation [riscv_rx_tag =
@@ -372,6 +396,15 @@ Section UInitSh.
         law.  LAST, so every existing destructuring of this payload keeps
         working (durable-notes, "Shaping a change so the sweep is small"). *)
      ∗ UkSh.ush_tag_law T)%I.
+
+  Lemma sh_pay_of_parts (T : iProp Σ)
+      (Rsh : gname -> gname -> gname -> iProp Σ) (n0 : nat) :
+    sh_pay_state Rsh n0 -∗ sh_pay_rest Rsh -∗ UkSh.ush_tag_law T -∗
+    sh_pay T Rsh n0.
+  Proof.
+    iIntros "#Hst #Hre #Htg". rewrite /sh_pay /sh_pay_state /sh_pay_rest.
+    iSplitR; [ iExact "Hst" | ]. iSplitR; [ iExact "Hre" | iExact "Htg" ].
+  Qed.
 
   Global Instance sh_pay_persistent T Rsh n0 : Persistent (sh_pay T Rsh n0).
   Proof. rewrite /sh_pay. apply _. Qed.
@@ -413,7 +446,15 @@ Section UInitSh.
   (* THE CONSOLE CREDENTIAL IS NOT HERE but a premise of the constructor
      ([init_exec_sup_of_sh_slot]'s third, lane SH-OPEN): which of sh's two
      pinned leaves it can make is decided by /INIT'S OWN mknod, mid-walk,
-     and this record is fixed at /init's entry. *)
+     and this record is fixed at /init's entry.
+
+     AND THE ERA'S SIDE OF THAT PREMISE IS NOT HERE EITHER.  Stating the
+     bridge from [UInitCons.init_cons_cred] to those two leaves IN THIS
+     FILE makes its elaboration explode -- measured at 8.6 GB RSS in 20
+     seconds, killed as [UInitSh.vo Error 143].  The leaves are [UkSh]'s,
+     over ITS section's binder list, and this file's is a different one;
+     the bridge therefore lives in [UInitBoot.v], whose context is the
+     assembly's ([UInitBoot.ush_cons_in_of_Cns]). *)
   Definition init_sh_slot (T : iProp Σ) (Pay : iProp Σ) : iProp Σ :=
     init_sh_slot_core T Pay.
 
@@ -507,7 +548,22 @@ Section UInitSh.
       (cn : cons_names) (st : fdstate) (K : iProp Σ) `{!Persistent K}
       (Rsh : gname -> gname -> gname -> iProp Σ) (n0 : nat) :
     (* the numbers sh admits -- THE FREE ONES (lane SUPPLY-SPLIT) *)
-    (forall k : Z, free_num k -> psok k) ->
+    (* AT THE FREE INSTANCE, NAMED AND NOT RESOLVED (lane SUPPLY-SPLIT's
+       own intent, ruled for E2).  A VERIFIED program's slot never takes
+       the taint: [UkRun.udep] at the ambient [UexecExecInst.uprogSG_gen]
+       is [box Dsup] with [Dsup := xv6_ssupply := AppInv.app_sup], and for
+       the echo era the supply and the taint are interderivable
+       ([AppEcho.echo_sup_of_taint] / [echo_taint_of_sup]) -- so a shell
+       slot built at [gen] would be a vacuous arm.  This file may not bind
+       [uprogSG] as a section variable (see the header: [uprogSG_gen] is
+       the one instance resolution may find, and a second makes every
+       [udep] in the tree ambiguous), and the GENERIC slot's lemmas below
+       stay at [gen] by design.  So the free instance is written on EVERY
+       position that carries a deposit -- the premises, the conclusion,
+       and the [sh_slot_of_kexec] application in the proof -- and nowhere
+       else.  At that instance [psok] IS [free_num], so this premise is
+       the identity. *)
+    (forall k : Z, free_num k -> @psok Σ uprogSG_free k) ->
     8 * Z.of_nat (2 + (8 + (16 + (ush_Dbody + n0)))) <= 0xFE0 ->
     (* WHAT INIT'S OWN OPEN INSTALLED ON SLOT 0.  sh's entry is told one
        row about its table -- fd 0 is the console, slot 0 is closed, or the
@@ -518,11 +574,11 @@ Section UInitSh.
        is that the head's OWN state is the console one, which is what the
        pinned open's receipt gives it. *)
     (exists wr : bool, st = FdOpen true wr (FdDevice ConsoleInv.CONSOLE)) ->
-    udep -∗
+    udep (PS := uprogSG_free) -∗
     (* ...AND THE THREE DEPOSITS SH OWES: read(5), open(15), write(16), the
        CLAIM numbers sh calls ([UkSh.sh_deps]).  They cross the exec with
        the slot, because the slot they build IS sh's. *)
-    UkSh.sh_deps -∗
+    UkSh.sh_deps (PS := uprogSG_free) -∗
     (* ...AND WHAT SH'S CONSOLE PREAMBLE IS TOLD (lane SH-OPEN, H3).  sh's
        open of "console" is PINNED, so which of the two pinned leaves it
        makes is decided here.  PERSISTENT, AND THAT IS FORCED: this
@@ -533,11 +589,23 @@ Section UInitSh.
        ([AppEcho.cons_key]) therefore cannot reach sh at all; the
        credential is [AppEcho.cons_never] (the owner's ruling (A), E2's to
        mint) and [UShConsK] states the two leaves against it. *)
-    (□ (∀ N : uk_names Σ, UkSh.ush_open_console_leaf N T)
-     ∨ (□ (∀ N : uk_names Σ, UkSh.ush_open_absent_leaf N T K) ∗ K)
+    (* AT THE FREE INSTANCE TOO, and this is where the seam actually bit:
+       the leaves CARRY the deposit instance ([UkSh]'s leaf section binds
+       [{SG}] and [{PS}] as section variables), so an unannotated premise
+       here is at [uprogSG_gen] while the [sh_slot_of_kexec] application
+       below wants [uprogSG_free] -- and the two records are NOT
+       convertible ([Dsup := xv6_ssupply] vs [True], [psok := fun _ =>
+       True] vs [xv6_free]), so [iApply] unfolds both into
+       [UexecSG.sbundle]'s tower looking for a match that cannot exist.
+       That FAILING unification is the wedge; naming the instance on both
+       sides removes it. *)
+    (□ (∀ N : uk_names Σ,
+          UkSh.ush_open_console_leaf (PS := uprogSG_free) N T)
+     ∨ (□ (∀ N : uk_names Σ,
+             UkSh.ush_open_absent_leaf (PS := uprogSG_free) N T K) ∗ K)
      ∨ T) -∗
     init_sh_slot T (sh_pay T Rsh n0) -∗
-    UkInit.init_exec_sup_lend cn T st.
+    UkInit.init_exec_sup_lend (PS := uprogSG_free) cn T st.
   Proof.
     intros Hpsok_free Hn0 Hst.
     iIntros "#Hdep #Hdp #Hcons (#Hinv & #Hcl0 & #Hgen & #Hpay)".
@@ -621,11 +689,22 @@ Section UInitSh.
       iIntros (na alen afun W')
         "%Hok %Hcwd0 %Hlzf %Hargs #Hmp HQ [[#Hp1 [#Hp2 #Htag]] Hps]".
       destruct (init_args_det M na alen afun Hsav Hsro Hargs) as [-> Halen].
-      iApply (sh_slot_of_kexec Hpsok_free Rsh γp T K (ucons_pay cn γp T)
-                1%nat alen afun fdv W' n0 np
-                (ucons_pay_const cn γp T) Hok Hcwd0
-                (init_sh_room alen n0 Halen Hn0) Hlen Hlzf
-                with "[] Hdep Hdp Htag [] [] Hcons Hgen' Hmp HQ Hps").
+      idtac "MARK-s4b-args-det".
+      (* STAGED, AND WITH BOTH CLASS ARGUMENTS GIVEN.  [sh_slot_of_kexec]
+         is polymorphic in the PAIR ([UShKernel.v] binds [{SG : uexecSG}]
+         and [{PS : uprogSG}] as section variables), so leaving [SG] to
+         [iApply] means solving it against the goal while [PS] is already
+         fixed -- and that unification runs inside [UexecSG.sbundle]'s
+         tower and does not return.  The [pose proof] elaborates the
+         INSTANTIATED lemma with no goal in play; the [iApply] then has
+         only the resource list to do. *)
+      pose proof (sh_slot_of_kexec (SG := uexecSG_xv6) (PS := uprogSG_free)
+                    Hpsok_free Rsh γp T K (ucons_pay cn γp T)
+                    1%nat alen afun fdv W' n0 np
+                    (ucons_pay_const cn γp T) Hok Hcwd0
+                    (init_sh_room alen n0 Halen Hn0) Hlen Hlzf) as Hsk.
+      idtac "MARK-s4c-pose-ok".
+      iApply (Hsk with "[] Hdep Hdp Htag [] [] Hcons Hgen' Hmp HQ Hps").
       - iModIntro. iIntros (γt γd γs) "Hsz Hlo".
         iApply ("Hp1" $! W' γt γd γs with "Hsz Hlo").
       - iIntros (N0). iApply ("Hp2" $! γp N0).
@@ -668,57 +747,4 @@ Section UInitSh.
   (*  taint.  Everything else the shell's slot needs is persistent and is  *)
   (*  fixed at the entry.                                                  *)
   (* =================================================================== *)
-  (* ...AND THE SEAM SH-OPEN CONSUMES.  [UShConsK] states sh's two console
-     leaves against an abstract credential; these are its two discharges,
-     chosen by the credential /init's own mknod left.  At the SEAL the
-     credential is [AppEcho.cons_never] and sh's first open MISSES (its
-     repair arm runs); at the FLAG it is [cons_made r i] and sh's first
-     open is the pinned one; under the taint sh proves nothing. *)
-  Lemma ush_cons_in_of_Cns (γ : echo_fixed) (r : echo_names) :
-    file_app = MkAppcfg echo_names (echo_pred γ) r ->
-    app_inv fsc_fs -∗ init_cons_cred (echo_taint γ) r -∗
-    (□ (∀ N : uk_names Σ, UkSh.ush_open_console_leaf N (echo_taint γ))
-     ∨ (□ (∀ N : uk_names Σ,
-             UkSh.ush_open_absent_leaf N (echo_taint γ) (cons_never r))
-        ∗ cons_never r)
-     ∨ echo_taint γ).
-  Proof.
-    intros Heq. iIntros "#Hinv #Hc".
-    rewrite /init_cons_cred.
-    iDestruct "Hc" as "[#Hn | [[%i #Hm] | #HT]]".
-    - iRight. iLeft. iSplitR; [ | iExact "Hn" ].
-      iApply (sh_cons_absent_echo γ r (cons_never r)
-                ltac:(apply _) ltac:(apply _) Heq with "[] Hinv").
-      rewrite /sh_cons_never_law. rewrite Heq.
-      cbn [app_pred app_run app_names].
-      iApply (echo_cons_never_law γ r).
-    - iLeft. iApply (sh_cons_console_echo γ r i Heq with "Hm Hinv").
-    - iRight. iRight. iExact "HT".
-  Qed.
-
-  Lemma init_cons_sup_of_sh_slot (γ : echo_fixed) (r : echo_names)
-      (cn : cons_names) (st : fdstate)
-      (Rsh : gname -> gname -> gname -> iProp Σ) (n0 : nat) :
-    file_app = MkAppcfg echo_names (echo_pred γ) r ->
-    (forall k : Z, free_num k -> psok k) ->
-    8 * Z.of_nat (2 + (8 + (16 + (ush_Dbody + n0)))) <= 0xFE0 ->
-    (exists wr : bool, st = FdOpen true wr (FdDevice ConsoleInv.CONSOLE)) ->
-    udep -∗ UkSh.sh_deps -∗
-    init_sh_slot (echo_taint γ) (sh_pay Rsh n0) -∗
-    UkInit.init_cons_sup cn (echo_taint γ)
-      (init_cons_cred (echo_taint γ) r) st.
-  Proof.
-    intros Heq Hpsok_free Hn0 Hst.
-    iIntros "#Hdep #Hdp #Hcore". rewrite /UkInit.init_cons_sup. iSplit.
-    - iIntros "!> #Hcns".
-      iDestruct "Hcore" as "#Hcore'".
-      iApply (init_exec_sup_of_sh_slot (echo_taint γ) cn st (cons_never r)
-                ltac:(apply _) Rsh n0 Hpsok_free Hn0 Hst
-                with "Hdep Hdp [] Hcore'").
-      iApply (ush_cons_in_of_Cns γ r Heq with "[] Hcns").
-      iDestruct "Hcore'" as "(#Hinv & _)". iExact "Hinv".
-    - iIntros "!> #HT".
-      iApply (init_cons_cred_of_taint (echo_taint γ) r with "HT").
-  Qed.
-
 End UInitSh.

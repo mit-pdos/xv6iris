@@ -69,7 +69,20 @@ Require Import ChildTok.
 Require Import UexecSlot UexecRet UsysMemOk UexecSG.
 Require Import UkRun UkRunLeaf UkRunSys.
 Require Import UCodeShK UkSh.
-Require Import UexecExecInst.      (* THE INSTANCE: [uexecSG_xv6] *)
+Require Import UexecExecInst.      (* THE INSTANCE: [uexecSG_xv6], and
+                                      [uprogSG_free] -- sh's own deposit
+                                      instance, NAMED on every leaf below
+                                      (lane E2's ruling): a verified
+                                      program's slot never takes the
+                                      taint, and the ambient
+                                      [uprogSG_gen]'s [Dsup] IS the
+                                      application's supply.  The two
+                                      records are not convertible, so a
+                                      leaf left at [gen] does not merely
+                                      fail to match a [free] one -- the
+                                      unification unfolds into
+                                      [UexecSG.sbundle] and does not
+                                      return. *)
 Require Import AppCfg AppInv.
 Require Import FsCfg.
 Require Import FsBlocks.           (* [fs_names] *)
@@ -235,14 +248,14 @@ Section UShConsK.
       (r : echo_names) (i : Z) :
     Persistent T -> Timeless T ->
     init_cons_laws T K r -∗ cons_made r i -∗ app_inv fsc_fs -∗
-    □ UkSh.ush_open_console_leaf N T.
+    □ UkSh.ush_open_console_leaf (PS := uprogSG_free) N T.
   Proof.
     intros HPT HTT. iIntros "#Hlaws #Hmade #Hinv !>".
     iIntros (h m l avail) "#Hcode #Hro %Hargs Hrun Hcwd Hstd Hcont".
     destruct Hargs as [Ha0 Ha1].
     rewrite sh_open_pc.
     (* ---- 0xcc6  c.li a7,15 ---- *)
-    iApply (wp_uk_cli N h m (mword_of_int 0xcc6)
+    iApply (wp_uk_cli (PS := uprogSG_free) N h m (mword_of_int 0xcc6)
               (mword_of_int 15 : mword 6) a7_idx avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) with "[] Hrun").
@@ -272,7 +285,7 @@ Section UShConsK.
                  ltac:(vm_compute; discriminate)).
       exact Ha1. }
     (* ---- 0xcc8  ecall -- the RECEIPT-KEEPING open leaf ---- *)
-    iApply (wp_uk_ecall_open_recv_img N h1 m1 (mword_of_int 0xcc8) l avail
+    iApply (wp_uk_ecall_open_recv_img (PS := uprogSG_free) N h1 m1 (mword_of_int 0xcc8) l avail
               (init_cons_console_fam T i (ukn_pay N)) FsImg.ROOTINO
               UCodeShK.shk_ro
               ltac:(unfold m1, usysno;
@@ -320,7 +333,7 @@ Section UShConsK.
                (upd_ne m (Regidx a7_idx) (Regidx ra_idx)
                   (mword_of_int 15 : mword 64)
                   ltac:(vm_compute; discriminate))). }
-    iApply (wp_uk_cjr N h2 m2 (mword_of_int 0xccc) ra_idx
+    iApply (wp_uk_cjr (PS := uprogSG_free) N h2 m2 (mword_of_int 0xccc) ra_idx
               (ret_pc (m !!! Regidx ra_idx)) avail
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Hra; reflexivity)
@@ -375,7 +388,7 @@ Section UShConsK.
   Lemma sh_open_absent_leaf_holds (N : uk_names Σ) (T K : iProp Σ) :
     Persistent T -> Timeless T -> Persistent K -> Timeless K ->
     sh_cons_never_law T K -∗ app_inv fsc_fs -∗
-    □ UkSh.ush_open_absent_leaf N T K.
+    □ UkSh.ush_open_absent_leaf (PS := uprogSG_free) N T K.
   Proof.
     intros HPT HTT HPK HTK. iIntros "#Hlaw #Hinv !>".
     iIntros (h m l avail) "#Hcode #Hro %Hargs Hrun Hcwd Hstd HK Hcont".
@@ -383,7 +396,7 @@ Section UShConsK.
     iDestruct (sh_cons_abs_law_of_never T K HPK with "Hlaw") as "#Habs".
     rewrite sh_open_pc.
     (* ---- 0xcc6  c.li a7,15 ---- *)
-    iApply (wp_uk_cli N h m (mword_of_int 0xcc6)
+    iApply (wp_uk_cli (PS := uprogSG_free) N h m (mword_of_int 0xcc6)
               (mword_of_int 15 : mword 6) a7_idx avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) with "[] Hrun").
@@ -413,7 +426,7 @@ Section UShConsK.
                  ltac:(vm_compute; discriminate)).
       exact Ha1. }
     (* ---- 0xcc8  ecall ---- *)
-    iApply (wp_uk_ecall_open_recv_img N h1 m1 (mword_of_int 0xcc8) l avail
+    iApply (wp_uk_ecall_open_recv_img (PS := uprogSG_free) N h1 m1 (mword_of_int 0xcc8) l avail
               (init_cons_absent_fam T K (ukn_pay N))
               FsImg.ROOTINO UCodeShK.shk_ro
               ltac:(unfold m1, usysno;
@@ -466,7 +479,7 @@ Section UShConsK.
                (upd_ne m (Regidx a7_idx) (Regidx ra_idx)
                   (mword_of_int 15 : mword 64)
                   ltac:(vm_compute; discriminate))). }
-    iApply (wp_uk_cjr N h2 m2 (mword_of_int 0xccc) ra_idx
+    iApply (wp_uk_cjr (PS := uprogSG_free) N h2 m2 (mword_of_int 0xccc) ra_idx
               (ret_pc (m !!! Regidx ra_idx)) avail
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Hra; reflexivity)
@@ -494,7 +507,8 @@ Section UShConsK.
   Lemma sh_cons_console_echo (γ : echo_fixed) (r : echo_names) (i : Z) :
     file_app = MkAppcfg echo_names (echo_pred γ) r ->
     cons_made r i -∗ app_inv fsc_fs -∗
-    □ (∀ N : uk_names Σ, UkSh.ush_open_console_leaf N (echo_taint γ)).
+    □ (∀ N : uk_names Σ,
+         UkSh.ush_open_console_leaf (PS := uprogSG_free) N (echo_taint γ)).
   Proof.
     intros Heq. iIntros "#Hmade #Hinv".
     iDestruct (init_cons_laws_echo γ r Heq) as "#Hlaws".
@@ -511,7 +525,8 @@ Section UShConsK.
     Persistent K -> Timeless K ->
     file_app = MkAppcfg echo_names (echo_pred γ) r ->
     sh_cons_never_law (echo_taint γ) K -∗ app_inv fsc_fs -∗
-    □ (∀ N : uk_names Σ, UkSh.ush_open_absent_leaf N (echo_taint γ) K).
+    □ (∀ N : uk_names Σ,
+         UkSh.ush_open_absent_leaf (PS := uprogSG_free) N (echo_taint γ) K).
   Proof.
     intros HPK HTK Heq. iIntros "#Hlaw #Hinv". iIntros "!>" (N).
     iDestruct (sh_open_absent_leaf_holds N (echo_taint γ) K _ _ HPK HTK

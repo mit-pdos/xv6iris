@@ -426,7 +426,7 @@ Section UInitConsK.
   Lemma init_open_absent_leaf_holds (N : uk_names Σ) (T K : iProp Σ) :
     Persistent T -> Timeless T -> Timeless K ->
     init_cons_abs_law T K -∗ app_inv fsc_fs -∗
-    □ UkInit.uki_open_absent_leaf N T K.
+    □ UkInit.uki_open_absent_leaf (PS := uprogSG_free) N T K.
   Proof.
     intros HPT HTT HTK. iIntros "#Hlaws #Hinv !>".
     iIntros (h m l avail) "#Hcode #Hro %Hargs Hrun Hcwd Hstd HK Hcont".
@@ -435,7 +435,7 @@ Section UInitConsK.
       as (_ & _ & _ & _ & _ & Hopen & _ & _ & _ & _ & _ & _ & _).
     rewrite Hopen.
     (* ---- 0x3b2  c.li a7,15 ---- *)
-    iApply (wp_uk_cli N h m (mword_of_int 0x3b2)
+    iApply (wp_uk_cli (PS := uprogSG_free) N h m (mword_of_int 0x3b2)
               (mword_of_int 15 : mword 6) a7_idx avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) with "[] Hrun").
@@ -464,7 +464,7 @@ Section UInitConsK.
                  ltac:(vm_compute; discriminate)).
       exact Ha1. }
     (* ---- 0x3b4  ecall -- the RECEIPT-KEEPING open leaf ---- *)
-    iApply (wp_uk_ecall_open_recv_img N h1 m1 (mword_of_int 0x3b4) l avail
+    iApply (wp_uk_ecall_open_recv_img (PS := uprogSG_free) N h1 m1 (mword_of_int 0x3b4) l avail
               (init_cons_absent_fam T K (ukn_pay N)) FsImg.ROOTINO
               UCodeInit.init_ro
               ltac:(unfold m1, usysno;
@@ -516,7 +516,7 @@ Section UInitConsK.
                (upd_ne m (Regidx a7_idx) (Regidx ra_idx)
                   (mword_of_int 15 : mword 64)
                   ltac:(vm_compute; discriminate))). }
-    iApply (wp_uk_cjr N h2 m2 (mword_of_int 0x3b8) ra_idx
+    iApply (wp_uk_cjr (PS := uprogSG_free) N h2 m2 (mword_of_int 0x3b8) ra_idx
               (ret_pc (m !!! Regidx ra_idx)) avail
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Hra; reflexivity)
@@ -544,7 +544,7 @@ Section UInitConsK.
       (T K : iProp Σ) (r : echo_names) (i : Z) :
     Persistent T -> Timeless T ->
     init_cons_laws_at Pv T K r -∗ cons_made r i -∗ app_inv fsc_fs -∗
-    □ UkInit.uki_open_console_leaf N T init_cons_fd.
+    □ UkInit.uki_open_console_leaf (PS := uprogSG_free) N T init_cons_fd.
   Proof.
     intros HPT HTT. iIntros "#Hlaws #Hmade #Hinv !>".
     iIntros (h m avail) "#Hcode #Hro %Hargs Hrun Hcwd Hstd Hcont".
@@ -553,7 +553,7 @@ Section UInitConsK.
       as (_ & _ & _ & _ & _ & Hopen & _ & _ & _ & _ & _ & _ & _).
     rewrite Hopen.
     (* ---- 0x3b2  c.li a7,15 ---- *)
-    iApply (wp_uk_cli N h m (mword_of_int 0x3b2)
+    iApply (wp_uk_cli (PS := uprogSG_free) N h m (mword_of_int 0x3b2)
               (mword_of_int 15 : mword 6) a7_idx avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) with "[] Hrun").
@@ -582,7 +582,7 @@ Section UInitConsK.
                  ltac:(vm_compute; discriminate)).
       exact Ha1. }
     (* ---- 0x3b4  ecall ---- *)
-    iApply (wp_uk_ecall_open_recv_img N h1 m1 (mword_of_int 0x3b4) ufd_l0 avail
+    iApply (wp_uk_ecall_open_recv_img (PS := uprogSG_free) N h1 m1 (mword_of_int 0x3b4) ufd_l0 avail
               (init_cons_console_fam T i (ukn_pay N)) FsImg.ROOTINO
               UCodeInit.init_ro
               ltac:(unfold m1, usysno;
@@ -627,7 +627,7 @@ Section UInitConsK.
                (upd_ne m (Regidx a7_idx) (Regidx ra_idx)
                   (mword_of_int 15 : mword 64)
                   ltac:(vm_compute; discriminate))). }
-    iApply (wp_uk_cjr N h2 m2 (mword_of_int 0x3b8) ra_idx
+    iApply (wp_uk_cjr (PS := uprogSG_free) N h2 m2 (mword_of_int 0x3b8) ra_idx
               (ret_pc (m !!! Regidx ra_idx)) avail
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Hra; reflexivity)
@@ -698,9 +698,9 @@ Section UInitConsK.
        open is the pinned one.  A [□] and a fupd, because the seal is an
        update of the claim under [AppInv.app_inv]
        ([AppInv.app_claim_update]). *)
-    □ (K ={⊤}=∗ UkInit.uki_mknod_out N T (init_cons_cred T r) init_cons_fd) -∗
+    □ (K ={⊤}=∗ UkInit.uki_mknod_out (PS := uprogSG_free) N T (init_cons_cred T r) init_cons_fd) -∗
     app_inv fsc_fs -∗
-    □ UkInit.uki_mknod_leaf N T K (init_cons_cred T r) init_cons_fd.
+    □ UkInit.uki_mknod_leaf (PS := uprogSG_free) N T K (init_cons_cred T r) init_cons_fd.
   Proof.
     intros HPT HTT HTK HTL. iIntros "#Hlaws #Hfl #Hinv !>".
     iIntros (h m avail) "#Hcode #Hro %Hargs Hrun Hcwd HK Hcont".
@@ -709,7 +709,7 @@ Section UInitConsK.
       as (_ & _ & _ & _ & _ & _ & Hmknod & _ & _ & _ & _ & _ & _).
     rewrite Hmknod.
     (* ---- 0x3ba  c.li a7,17 ---- *)
-    iApply (wp_uk_cli N h m (mword_of_int 0x3ba)
+    iApply (wp_uk_cli (PS := uprogSG_free) N h m (mword_of_int 0x3ba)
               (mword_of_int 17 : mword 6) a7_idx avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) with "[] Hrun").
@@ -744,7 +744,7 @@ Section UInitConsK.
                  ltac:(vm_compute; discriminate)).
       exact Ha2. }
     (* ---- 0x3bc  ecall -- the RECEIPT-KEEPING quiet leaf ---- *)
-    iApply (wp_uk_ecall_quiet_recv_img N h1 m1 (mword_of_int 0x3bc) 17 avail
+    iApply (wp_uk_ecall_quiet_recv_img (PS := uprogSG_free) N h1 m1 (mword_of_int 0x3bc) 17 avail
               (init_cons_mknod_fam Pv T K r (ukn_pay N)) FsImg.ROOTINO
               UCodeInit.init_ro
               ltac:(unfold m1, usysno;
@@ -789,7 +789,7 @@ Section UInitConsK.
                (upd_ne m (Regidx a7_idx) (Regidx ra_idx)
                   (mword_of_int 17 : mword 64)
                   ltac:(vm_compute; discriminate))). }
-    iApply (wp_uk_cjr N h2 m2 (mword_of_int 0x3c0) ra_idx
+    iApply (wp_uk_cjr (PS := uprogSG_free) N h2 m2 (mword_of_int 0x3c0) ra_idx
               (ret_pc (m !!! Regidx ra_idx)) avail
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Hra; reflexivity)
@@ -797,7 +797,7 @@ Section UInitConsK.
     { iApply (uis_init_3c0 with "Hcode"). }
     iIntros (h3) "Hrun".
     iApply fupd_wp_triv.
-    iAssert (|={⊤}=> UkInit.uki_mknod_out N T (init_cons_cred T r) init_cons_fd)%I
+    iAssert (|={⊤}=> UkInit.uki_mknod_out (PS := uprogSG_free) N T (init_cons_cred T r) init_cons_fd)%I
       with "[Harms]" as ">Hout".
     { rewrite /mknod_arms.
       iDestruct "Harms" as "[[_ Hok] | [_ Hfail]]".
@@ -874,7 +874,7 @@ Section UInitConsK.
     file_app = MkAppcfg echo_names (echo_pred γ) r ->
     app_inv fsc_fs -∗
     □ (cons_key r ={⊤}=∗
-         UkInit.uki_mknod_out N (echo_taint γ)
+         UkInit.uki_mknod_out (PS := uprogSG_free) N (echo_taint γ)
            (init_cons_cred (echo_taint γ) r) init_cons_fd).
   Proof.
     intros Heq. iIntros "#Hinv !> HK".
@@ -899,7 +899,7 @@ Section UInitConsK.
     file_app = MkAppcfg echo_names (echo_pred γ) r ->
     app_inv fsc_fs -∗
     □ (∀ N : uk_names Σ,
-         UkInit.init_cons_leaves N (echo_taint γ) (cons_key r)
+         UkInit.init_cons_leaves (PS := uprogSG_free) N (echo_taint γ) (cons_key r)
            (init_cons_cred (echo_taint γ) r) init_cons_fd).
   Proof.
     intros Heq.
@@ -929,8 +929,8 @@ Section UInitConsK.
     file_app = MkAppcfg echo_names (echo_pred γ) r ->
     cons_made r i0 -∗ app_inv fsc_fs -∗
     □ (∀ N : uk_names Σ,
-         □ UkInit.uki_open_console_leaf N (echo_taint γ) init_cons_fd
-         ∗ □ UkInit.uki_mknod_hit_leaf N (echo_taint γ)
+         □ UkInit.uki_open_console_leaf (PS := uprogSG_free) N (echo_taint γ) init_cons_fd
+         ∗ □ UkInit.uki_mknod_hit_leaf (PS := uprogSG_free) N (echo_taint γ)
                (init_cons_cred (echo_taint γ) r) init_cons_fd).
   Proof.
     intros Heq.
@@ -948,7 +948,7 @@ Section UInitConsK.
     - (* the mknod at a view that ALREADY HAS the node: it cannot commit,
          and the credential it hands on is the flag it went in with *)
       iModIntro.
-      iApply (UkInit.uki_mknod_hit_of_leaf N (echo_taint γ)
+      iApply (UkInit.uki_mknod_hit_of_leaf (PS := uprogSG_free) N (echo_taint γ)
                 (cons_made r i0) (init_cons_cred (echo_taint γ) r)
                 init_cons_fd with "[] Hm").
       iApply (init_mknod_leaf_holds N (cons_present_at i0) (echo_taint γ)

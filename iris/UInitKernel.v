@@ -517,4 +517,92 @@ Section UInitKernel.
     - exact Hlzf.
   Qed.
 
+  (* ===================================================================== *)
+  (*  SS3  THE ENTRY AS A PINNED EXEC'S CONSTRUCTOR WAND (lane E2)          *)
+  (*                                                                       *)
+  (*  [PinnedExec]'s bundle fires its slot wand at whatever key the         *)
+  (*  kernel's image fact admits, and this is that wand at /init's own      *)
+  (*  entry: [init_slot_of_kexec] packaged as a [□] over the key, with the  *)
+  (*  two LINEAR things -- the console dance and the reader token -- riding *)
+  (*  the bundle's one linear slot.                                         *)
+  (*                                                                       *)
+  (*  IT IS STATED HERE, AND NOT AT THE ASSEMBLY, because every name in it  *)
+  (*  is this file's: this section binds [ctokG] as a VARIABLE, while the   *)
+  (*  assembly ([InitBoot]'s side) binds [Xv6G.xv6G] and gets its [ctokG]   *)
+  (*  from the bundle's field.  A statement that mentions both makes Coq    *)
+  (*  unify the two inside [UkInit]'s wand tower, and the elaboration does  *)
+  (*  not come back (measured: 8.6 GB RSS in 20 seconds, killed as [Error   *)
+  (*  143]).  The assembly APPLIES this lemma once, with the instance given *)
+  (*  explicitly at the call, so the unification happens at one top-level   *)
+  (*  application.                                                          *)
+  (* ===================================================================== *)
+  Definition init_boot_pay (T Cns : iProp Σ) (cn : cons_names)
+      (stc : fdstate) : iProp Σ :=
+    (init_cons_dance_all T Cns stc ∗ ucons_reader cn 0%nat)%I.
+
+  Lemma init_boot_con (T Cns : iProp Σ) `{!Persistent T} `{!Timeless T}
+      (stc : fdstate) (cn : cons_names)
+      (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
+      (sts : list fdstate) (n0 : nat) :
+    stc <> FdClosed ->
+    kexec_sz ElfUser.init_elf - PGSIZE
+      + 8 * Z.of_nat (2 + (4 + (12 + (12 + (4 + n0)))))
+      <= kxc_sp_final (kexec_sz ElfUser.init_elf) alen na ->
+    length sts = NOFILE ->
+    take NSTD sts = ufd_l0 ->
+    (forall k : Z, free_num k -> psok k) ->
+    (* THE BOX IS IN THE STATEMENT, and that is not decoration.  The
+       conclusion is a [□], so the deposits have to be intuitionistic here;
+       asking the proofmode to see [UkInit.init_deps T] as persistent --
+       [iIntros "#Hdp"] at an unboxed premise, or the walk's destructuring
+       [#(Hwr & Hwl15 & Hwl17)] -- sends the [Persistent] search down
+       [UkRun.udepw]'s wand chain and IN THIS FILE it does not come back
+       (measured: UInitKernel.vo at a flat 1.1 GB RSS for 40 minutes; see
+       [init_uexec_slot]'s note, which intros the same bundle LINEARLY for
+       the same reason, and durable-notes, "iIntros "#H" on a bundle of
+       wands").  With the [□] written down, the intro is structural and no
+       search runs; the caller pays the box once
+       ([UInitBoot.init_deps_of_sup]). *)
+    □ UkInit.init_deps T -∗ udep -∗ UkInit.init_cons_sup cn T Cns stc -∗
+    □ (∀ W' : uvis,
+         ⌜kexec_image_ok ElfUser.init_elf na alen afun sts W'⌝ -∗
+         ⌜uvis_cwd W' = FsImg.ROOTINO⌝ -∗
+         ⌜uvis_lazy W' = false⌝ -∗
+         my_pay (uvis_gen W') (fun _ => True)%I -∗
+         init_boot_pay T Cns cn stc -∗ uslot W').
+  Proof.
+    (* THE BUNDLE IS NEVER TAKEN APART: it goes in through the box and
+       straight out into [init_slot_of_kexec]'s own linear premise.  No
+       [Persistent] search, no [iFrame] against a [□]-wand -- see the
+       statement's note. *)
+    intros Hne Hroom Hlen Hl0 Hpsok.
+    iIntros "#Hdp #Hdep #Hxs !>"
+      (W') "%Hok %Hcw %Hlz #Hmp [Hdn Hrd]".
+    iApply (init_slot_of_kexec T Cns stc cn na alen afun sts W' n0
+              Hne Hok Hroom Hlen Hl0 Hcw Hpsok Hlz
+              with "Hdp Hdep Hxs Hdn Hrd Hmp").
+  Qed.
+
+  (* ...and the two ways the application's boot resource builds the dance,
+     likewise stated here: the assembly hands in the era's leaves and its
+     credential and never names [init_cons_dance_all] in a statement of its
+     own. *)
+  Lemma init_cons_dance_all_miss (T Cns K : iProp Σ) (stc : fdstate) :
+    □ (∀ N : uk_names Σ, UkInit.init_cons_leaves N T K Cns stc) -∗ K -∗
+    init_cons_dance_all T Cns stc.
+  Proof.
+    iIntros "#Hl HK". rewrite /init_cons_dance_all. iLeft.
+    iExists K. iSplitR "HK"; [ iExact "Hl" | iExact "HK" ].
+  Qed.
+
+  Lemma init_cons_dance_all_hit (T Cns : iProp Σ) (stc : fdstate) :
+    □ (∀ N : uk_names Σ,
+         □ UkInit.uki_open_console_leaf N T stc
+         ∗ □ UkInit.uki_mknod_hit_leaf N T Cns stc) -∗ Cns -∗
+    init_cons_dance_all T Cns stc.
+  Proof.
+    iIntros "#Hh HC". rewrite /init_cons_dance_all. iRight.
+    iSplitR "HC"; [ iExact "Hh" | iExact "HC" ].
+  Qed.
+
 End UInitKernel.
