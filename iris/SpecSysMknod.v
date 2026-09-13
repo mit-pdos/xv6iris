@@ -238,9 +238,9 @@ Local Open Scope Z_scope.
 
 (* sys_mknod's own frame is 160 bytes -- TWENTY slots ([c.addi16sp sp,-160]
    at +0x00), of which sixteen are the [path] buffer and one holds the two
-   [int] locals.  Its deepest callee is create (114); iunlockput wants 64,
-   argstr 60, end_op 58, begin_op 26, argint 18. *)
-Notation K_sys_mknod := (144%nat) (only parsing).
+   [int] locals.  Its deepest callee is create (128); iunlockput wants 82,
+   end_op 80, argstr 60, begin_op 26, argint 18. *)
+Notation K_sys_mknod := (148%nat) (only parsing).
 
 Section SysMknodRet.
   Context `{!riscvGS Σ, FSC : fscfg}.

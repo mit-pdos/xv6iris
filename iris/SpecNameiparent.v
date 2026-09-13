@@ -81,8 +81,8 @@ Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
-(* nameiparent's own frame is 16 bytes (2 slots) over namex's 102. *)
-Notation K_nameiparent := (114%nat) (only parsing).
+(* nameiparent's own frame is 16 bytes (2 slots) over namex's 116. *)
+Notation K_nameiparent := (118%nat) (only parsing).
 Definition wp_nameiparent_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}

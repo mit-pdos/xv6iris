@@ -166,8 +166,8 @@ Definition wp_procdump_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN :
   let pcE : mword 64 := mword_of_int KernelSyms.procdump in
   let ra0 := m !!! Regidx ra_idx in
   let ret_tgt := ret_pc ra0 in
-  (* ten slots of its own, forty-eight for printk (printk_stack) *)
-  (58 <= K)%nat ->
+  (* ten slots of its own, fifty-two for printk (printk_stack) *)
+  (62 <= K)%nat ->
   (* the callee, as a hypothesis and not a functor -- see the header *)
   printk_gen_contract (kt := KT1) γpr γd γv ->
   (* procdump takes no lock of its own (the header's whole point); its one

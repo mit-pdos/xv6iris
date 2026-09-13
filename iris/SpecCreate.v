@@ -377,19 +377,18 @@ Local Open Scope Z_scope.
 (* create's own frame is 80 bytes (10 slots) -- UNCHANGED by 9da28f5's guard,
    which added instructions but no stack (the `c.addi16sp` at +0x00 is still
    0x715d = -80 and the eight callee-saves still go to 72..16).  Its deepest
-   callee is nameiparent (104); dirlink wants 100, dirlookup 90, iunlockput
-   64, ialloc 56, ilock and iupdate 44 each.
+   callee is nameiparent (118); dirlink wants 114, dirlookup 104,
+   iunlockput 82, ialloc 70, ilock and iupdate 66 each.
 
-   104, and every one of nameiparent/dirlink/dirlookup/ialloc moved for ONE
-   reason, the bmap chain SpecReadi.v documents: printk's real stack need
-   (48, printk_stack) dominates bmap (64), which dominates balloc's
-   out-of-blocks arm (58), which pushed bmap's callers readi 72 -> 78 and
-   dirlookup 84 -> 90, and from there namex 96 -> 102, nameiparent 98 -> 104,
-   dirlink 94 -> 100.  10 + 104 = 114.  Checked against SpecNameiparent.v
-   (104), SpecDirlink.v (100), SpecDirlookup.v (90), SpecIunlockput.v (64),
-   SpecIalloc.v (56), SpecIlock.v (44), SpecIupdate.v (44).
+   nameiparent/dirlink/dirlookup/ialloc all ride ONE chain, the one
+   SpecReadi.v documents: panic_stack (56) fixes bread (62), bread fixes
+   balloc (72) and bmap (78), and from there readi (92), dirlookup (104),
+   namex (116) and nameiparent (118).  10 + 118 = 128.  Checked against
+   SpecNameiparent.v (118), SpecDirlink.v (114), SpecDirlookup.v (104),
+   SpecIunlockput.v (82), SpecIalloc.v (70), SpecIlock.v (66),
+   SpecIupdate.v (66).
    [ProofCreateParts.cr_K_value] carries the same number. *)
-Notation K_create := (124%nat) (only parsing).
+Notation K_create := (128%nat) (only parsing).
 (* THE LEDGER UNITS create must have in hand.  nameiparent takes two and
    returns one on success; dirlookup's iget takes the second on the found
    arm; ialloc takes one on the allocate half; dirlink is NET ZERO but

@@ -86,8 +86,8 @@ Require Import TsoCtx.
 Import Defs.
 
 (* write_head's own frame is 4 slots ([c.addi sp,sp,-32] at +0x00); its
-   deepest callee is bread (40).  bwrite/brelse want less. *)
-Notation K_write_head := (62%nat) (only parsing).
+   deepest callee is bread (62).  bwrite/brelse want less. *)
+Notation K_write_head := (66%nat) (only parsing).
 Definition wp_write_head_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     

@@ -114,18 +114,16 @@ Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
-(* iput's own frame is 48 bytes; its deepest callee is bread (40) below
-   itrunc's own frame, plus acquiresleep.  Sized like balloc's, one frame
-   deeper.
+(* iput's own frame is 48 bytes (6 slots); its deepest callee is itrunc
+   (72), which is in turn bfree/iupdate over bread.  acquiresleep wants 26.
 
-   72 -> 74 (THE SPLICE FINDING, iclaim-ledger.md 6.2).  The REORDERED free
-   path calls itrunc from the LOCKED block ([ip_free_locked], iput+0x6c) with
-   iput's own six frame slots already pushed, so the cone reserve it must
-   carry is [K_itrunc (68) <= K - 6], i.e. K >= 74 -- strictly stronger than
-   the 72 the pre-reorder walk needed.  Every landed caller was re-checked
-   against the new value; only [K_iunlockput] had to move with it (76 -> 78,
-   because ProofIunlockput calls iput at [K - 4]). *)
-Notation K_iput := (74%nat) (only parsing).
+   THE SPLICE FINDING (iclaim-ledger.md 6.2) is what makes it [6 + itrunc]
+   rather than [6 + bread]: the REORDERED free path calls itrunc from the
+   LOCKED block ([ip_free_locked], iput+0x6c) with iput's own six frame
+   slots already pushed, so the cone reserve it must carry is
+   [K_itrunc <= K - 6].  [K_iunlockput] moves with this number, because
+   ProofIunlockput calls iput at [K - 4]. *)
+Notation K_iput := (78%nat) (only parsing).
 (* itrunc's two (bitmap block + its closing iupdate) plus iput's own
    iupdate at +0x6c.  SPEND-AT-MOST: the fast path spends nothing. *)
 Definition iput_units : nat := 3%nat.

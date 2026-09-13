@@ -201,13 +201,12 @@ Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* dirlookup's own frame is 96 bytes (12 slots); its deepest callee is
-   readi at 78 (namecmp wants 4, iget 16).
+   readi at 92 (iget wants 62, namecmp 4).
 
-   78, and readi's dominant chain is now bmap's (not copyout's): printk's
-   real stack need (48, printk_stack) dominates bmap (64), which dominates
-   readi (78, SpecReadi.v's header has the arithmetic) -- so this one is
-   12 + 78 = 90. *)
-Notation K_dirlookup := (100%nat) (only parsing).
+   readi's dominant chain is bmap's, not copyout's, and it bottoms out at
+   panic on bget's no-buffers path (SpecReadi.v's header has the
+   arithmetic) -- so this one is 12 + 92 = 104. *)
+Notation K_dirlookup := (104%nat) (only parsing).
 (* T_DIR, read off the [li a5,1] at +0x1a that [lh a4,68(a0)] is compared
    against. *)
 Definition T_DIR : mword 16 := mword_of_int 1.

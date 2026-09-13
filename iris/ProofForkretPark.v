@@ -61,7 +61,7 @@
        here.  [V] left [forkret_park_pkg] for the same reason;
 
      - the depth obligation is kexec's, not prepare_return's, and it is not
-       a premise: [6 + trap_res true + K_kexec = 280] and [K_usertrap = 342],
+       a premise: [6 + trap_res true + K_kexec = 284] and [K_usertrap = 346],
        so [Hut] gives it by [lia];
 
      - the closer takes [FirstTok.first_done] (SpecForkret.v's last header
@@ -404,7 +404,7 @@ Proof.
   (* ---- the budget: one parked depth, both arms ----
      [trap_res] is a Definition, not a Notation, so [lia] needs the enabled
      arm's value spelled out; the two K's ARE literals and it sees them.
-     [6 + trap_res true + K_kexec = 280 <= 342 = K_usertrap], so forkret's
+     [6 + trap_res true + K_kexec = 284 <= 346 = K_usertrap], so forkret's
      deepest callee is covered by [Hut] and is not a premise of this park. *)
   pose proof (fkp_trap_res_le eb') as Htr.
   assert (Htrue : trap_res true = kv_frame_slots) by reflexivity.

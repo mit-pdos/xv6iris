@@ -181,9 +181,9 @@ Local Open Scope Z_scope.
 
 (* ireclaim's own frame is 64 bytes (8 slots) -- [c.addi16sp sp,-64] at +0x0e,
    with ra/s0/s1/s2/s3/s4/s5/s6 pushed at 56/48/40/32/24/16/8/0.  Its deepest
-   callee is iput (60); end_op wants 58, ilock 44, bread 40, iunlock 26,
-   begin_op 26, brelse 26, iget 16. *)
-Notation K_ireclaim := (84%nat) (only parsing).
+   callee is end_op (80); iput wants 78, ilock 66, bread 62, iget 62,
+   iunlock 26, begin_op 26, brelse 26. *)
+Notation K_ireclaim := (88%nat) (only parsing).
 Definition wp_ireclaim_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
       ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}

@@ -345,11 +345,11 @@ Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* sys_unlink's own frame is 240 bytes -- THIRTY slots ([c.addi16sp sp,-240]
-   at +0x00) -- over its deepest callee, nameiparent (104).  Every other
-   callee fits under that: dirlookup 90, readi 78, writei 78, iunlockput 64,
-   argstr 60, end_op 58, ilock 44, iupdate 44, begin_op 26, namecmp 4,
+   at +0x00) -- over its deepest callee, nameiparent (118).  Every other
+   callee fits under that: dirlookup 104, readi 92, writei 92, iunlockput
+   82, end_op 80, ilock 66, iupdate 66, argstr 60, begin_op 26, namecmp 4,
    memset 2. *)
-Notation K_sys_unlink := (144%nat) (only parsing).
+Notation K_sys_unlink := (148%nat) (only parsing).
 (* THE REFERENCE ALLOWANCE.  Two, and TWO is what the single resolve buys:
    see the header's reference ledger, and [SysUnlinkBudget]'s section 6. *)
 Definition sys_unlink_slots : nat := 2%nat.

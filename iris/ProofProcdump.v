@@ -47,9 +47,9 @@ Import Defs.
 Local Open Scope Z_scope.
 
 (* the numeric side conditions, mword-free and passed by name *)
-Lemma pd_K48 (K : nat) : (58 <= K)%nat -> (48 <= K - 10)%nat.
+Lemma pd_K52 (K : nat) : (62 <= K)%nat -> (52 <= K - 10)%nat.
 Proof. lia. Qed.
-Lemma pd_K10 (K : nat) : (58 <= K)%nat -> (10 <= K)%nat.
+Lemma pd_K10 (K : nat) : (62 <= K)%nat -> (10 <= K)%nat.
 Proof. lia. Qed.
 Lemma pd_NPROC_sub0 : (NPROC - 0)%nat = NPROC.
 Proof. reflexivity. Qed.
@@ -118,7 +118,7 @@ Section ProofProcdumpMain.
     iDestruct (cpu_own_transport CID CID2 0%nat eb p b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Hpk CID2 cur_ctx M1 (K - 10)%nat eb p DfracDiscarded pd_nl [] b lks
-              (pd_K48 K HK) pd_nl_len pd_nl_nonul
+              (pd_K52 K HK) pd_nl_len pd_nl_nonul
               ltac:(rewrite pd_nl_kinds; reflexivity)
               ltac:(cbn [length]; lia)
               with "Hcg Htext Hkdata Hpc Hcnt Hpenv [Hnlstr] []").
@@ -158,7 +158,7 @@ Section ProofProcdumpMain.
     (* ================================================================== *)
     iPoseProof (wp_pd_loop (CID0 := CID4) γpr γd γv m
                   (pa_stk (m !!! pdR 2 : mword 64) 10) p (K - 10)%nat eb b lks
-                  Hpk (pd_K48 K HK) Hlkbelow
+                  Hpk (pd_K52 K HK) Hlkbelow
                   with "Htext Hkdata Hpenv [Hframe Hcont]") as "Hscan".
     { iIntros (CIDx Hsx Mx) "%Hxc Hcg Hcnt2 Hpc Hview".
       destruct Hxc as [Hxsp Hxhi].

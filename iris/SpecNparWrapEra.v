@@ -85,8 +85,8 @@ Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
-(* nameiparent's own frame is 16 bytes (2 slots) over namex's 102. *)
-Notation K_nameiparent := (114%nat) (only parsing).
+(* nameiparent's own frame is 16 bytes (2 slots) over namex's 116. *)
+Notation K_nameiparent := (118%nat) (only parsing).
 (* ===================================================================== *)
 (*  THE TRACE CONTRACT.  A thin forward of [SpecNparEra.wp_npar_era]:     *)
 (*  this function's whole body is a namex call plus a stack carve, so the *)

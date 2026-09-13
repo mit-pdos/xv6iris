@@ -154,9 +154,10 @@ Local Open Scope Z_scope.
 
 (* ialloc's own frame is 64 bytes (8 slots) -- [c.addi16sp sp,-64] at +0x00,
    with ra/s0/s1/s2/s3/s4/s5/s6 pushed at 56/48/40/32/24/16/8/0.  Its
-   deepest callee is now printk on the out-of-inodes path (48, printk_stack);
-   bread wants 40, brelse 26, log_write 18, iget 16 and memset 2. *)
-Notation K_ialloc := (66%nat) (only parsing).
+   deepest callees are bread and iget, both at 62 (each one frame over
+   panic_stack = 56); printk on the out-of-inodes path wants 52, brelse 26,
+   log_write 18, memset 2. *)
+Notation K_ialloc := (70%nat) (only parsing).
 (* THE RECORD THE CLAIM WRITES.  [memset(dip, 0, 64)] at +0x90 followed by
    [sh s6,0(s3)] at +0x94 -- the type halfword and nothing else.  Stated as
    a named constructor rather than inline so that [create]'s own contract,

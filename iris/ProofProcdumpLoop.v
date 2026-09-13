@@ -454,11 +454,9 @@ Section ProofProcdumpLoop.
     printk_gen_contract (kt := KT1) γpr γd γv ->
     (* THE BUDGET BELOW procdump's OWN FRAME, and it is printk's whole need:
        the two [Hpk] applications in the body are made at [K'] itself, so this
-       IS [SpecPrintk]'s literal.  48 -> 52 at 163d39b: uartputc_sync's frame
-       doubled (4 -> 8 slots), which carried prputc/printint/printk up by four
-       apiece ([SpecPrintk.printk_stack]).  It is a claim about the image, not
-       a knob -- and it costs [ProofProcdump.pd_K48] and [SpecProcdump]'s own
-       [58 <= K], which must become 62 = 10 + 52. *)
+       IS [SpecPrintk.printk_stack]'s literal.  It is a claim about the image,
+       not a knob; [ProofProcdump.pd_K52] and [SpecProcdump]'s own [62 <= K]
+       (procdump's ten slots over this 52) are its two dependents. *)
     (52 <= K')%nat ->
     (* procdump's own cone touches no lock directly -- printk (rank "pr") is
        the only callee, and it is the whole order premise. *)

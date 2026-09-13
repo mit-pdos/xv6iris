@@ -89,9 +89,9 @@ Require Import TsoCtx.
 Import Defs.
 
 (* end_op's own frame is 8 slots ([c.addi16sp sp,-64] at +0x00); its deepest
-   callee is install_trans (50).  write_head wants 44, bread 40, sleep-free
+   callee is install_trans (72).  write_head wants 66, bread 62, sleep-free
    acquire/release 10. *)
-Notation K_end_op := (76%nat) (only parsing).
+Notation K_end_op := (80%nat) (only parsing).
 Definition wp_end_op_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)

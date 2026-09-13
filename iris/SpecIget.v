@@ -205,9 +205,10 @@ Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 
 (* iget's own frame is 6 slots ([c.addi16sp sp,-48] at +0x00, with ra / s0 /
    s1 / s2 / s3 / s4 pushed at 40 / 32 / 24 / 16 / 8 / 0 and [c.addi4spn
-   s0,sp,48] on top); acquire and release want 10 below that, and panic wants
-   none.  [K_idup]'s budget for a frame half again as deep. *)
-Notation K_iget := (58%nat) (only parsing).
+   s0,sp,48] on top); below it panic on the no-inodes path (56,
+   [SpecPanic.panic_stack]) sets the bound, acquire and release wanting only
+   10.  [K_idup]'s budget for a frame half again as deep. *)
+Notation K_iget := (62%nat) (only parsing).
 Require Import TsoCtx.
 Definition wp_iget_sconf_body
     `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}

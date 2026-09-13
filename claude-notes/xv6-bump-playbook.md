@@ -546,6 +546,40 @@ surface one build round at a time.
   because gcc takes the freed register pressure as licence to reallocate. So "the
   C only deleted code" does not license skipping the check.
 
+**Do the whole closure in one pass, not one build round at a time.** Every
+explicit edge is a `(<callee budget> <= <var> - d)` in a `Spec*`/`Proof*` file,
+and the implicit ones are the whole-function applications that pass `(K - d)`
+positionally; grep both, add the file's own budget as the parent where the
+lemma has no budget premise, and take the monotone fixpoint. The check that the
+answer is right is that **every new value equals its own measured frame plus
+its binding callee's new value** — if a number does not decompose that way you
+have a missing edge, not a knob to turn.
+
+**The literals no `Notation` names are the ones only a build finds**, and they
+are outside every grep for `K_*`/`*_stack`:
+
+- `ProcDefs.KSTACK_AV` is `UsertrapRes.K_usertrap` spelled as a literal (the
+  file sits far below `UsertrapRes`), so **anything that raises `K_sys_exec`
+  raises it too** — its own header says the two agree "on the nose", larger is
+  unpayable at the ZOMBIE donation and smaller does not fit the first trap. It
+  fails as `Cannot find witness` in `ParkCap.v`, which reads like a resource
+  bug. The prose in `SpecForkretParkPaid.v` / `ProofForkretPark.v` restates
+  both numbers and drifts with them.
+- pipealloc has no budget notation at all: its need is a bare numeral in
+  `SpecPipealloc`'s premise (pipealloc's six slots over `fileclose_stack`),
+  copied again in `ProofSysPipe.sp_bounds`, with `SpecSysPipe.sys_pipe_stack`
+  eight above it. So `fileclose_stack` moving moves `sys_pipe_stack`, and no
+  edge in the `K_*` graph shows it.
+- procdump likewise: `SpecProcdump`'s bare premise and `ProofProcdump.pd_K52`
+  are `printk_stack` plus procdump's ten slots, in a cone nothing else
+  reaches.
+
+**The derivation comments beside these notations go stale silently** — they name
+each callee's figure in prose, nothing checks them, and a `+N` wave that only
+edits numerals leaves every one of them a wave behind. Re-derive the comment
+from the fixpoint at the same time as the numeral, or the next lane inherits a
+paragraph that contradicts the constant three lines below it.
+
 ### 4d-bis. A parity flip changes FETCH WIDTHS, not just jump targets
 
 `execution-model.md`'s standing warning is that an odd-halfword shift flips

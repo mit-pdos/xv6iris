@@ -179,8 +179,8 @@ Local Open Scope Z_scope.
 
 (* sys_mkdir's own frame is 144 bytes -- EIGHTEEN slots ([c.addi16sp sp,-144]
    at +0x00), of which sixteen are the [path] buffer.  Its deepest callee is
-   create (114); iunlockput wants 64, argstr 60, end_op 58, begin_op 26. *)
-Notation K_sys_mkdir := (142%nat) (only parsing).
+   create (128); iunlockput wants 82, end_op 80, argstr 60, begin_op 26. *)
+Notation K_sys_mkdir := (146%nat) (only parsing).
 Section SpecSysMkdir.
   Context `{!riscvGS Σ, FSC : fscfg}.
 

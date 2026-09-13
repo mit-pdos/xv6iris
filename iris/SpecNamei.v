@@ -83,8 +83,8 @@ Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
-(* namei's own frame is 32 bytes (4 slots) over namex's 102. *)
-Notation K_namei := (116%nat) (only parsing).
+(* namei's own frame is 32 bytes (4 slots) over namex's 116. *)
+Notation K_namei := (120%nat) (only parsing).
 Definition wp_namei_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
@@ -385,8 +385,8 @@ End NAMEI.
 (*  four frame slots stay four stack slots from the push to the pop.       *)
 (* ===================================================================== *)
 
-(* namei's own frame is 32 bytes (4 slots) over the corner's 28. *)
-Notation K_namei_root := (74%nat) (only parsing).
+(* namei's own frame is 32 bytes (4 slots) over the corner's 74. *)
+Notation K_namei_root := (78%nat) (only parsing).
 Definition wp_namei_root_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, ICFG : icfg, APP : appcfg Σ, FSC : fscfg,
       !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}

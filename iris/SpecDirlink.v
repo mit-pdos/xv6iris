@@ -217,16 +217,15 @@ Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* dirlink's own frame is 80 bytes (10 slots); its deepest callee is
-   dirlookup (90); writei wants 78.
+   dirlookup (104); readi and writei want 92 each, iput 78.
 
-   90, and dirlookup's dominant chain is now bmap's, not copyout's: printk's
-   real stack need (48, printk_stack) dominates bmap (64), which dominates
-   balloc's out-of-blocks arm (58), which dominates bmap's own callers,
-   readi (78) and dirlookup (90) -- SpecReadi.v / SpecDirlookup.v have the
-   arithmetic.  writei also grew (78, dominated by the same bmap chain, not
-   the copyout one), but stays under dirlookup, so dirlookup alone still
-   fixes this number: 10 + 90 = 100. *)
-Notation K_dirlink := (110%nat) (only parsing).
+   dirlookup's dominant chain is bmap's, not copyout's: panic_stack (56)
+   fixes bread (62), bread fixes balloc (72), balloc fixes bmap (78), bmap
+   fixes readi (92) and through it dirlookup (104) -- SpecReadi.v /
+   SpecDirlookup.v have the arithmetic.  writei rides the same chain but
+   stays under dirlookup, so dirlookup alone fixes this number:
+   10 + 104 = 114. *)
+Notation K_dirlink := (114%nat) (only parsing).
 (* writei's [wi_cost off 16] at a 16-aligned [off] (= 7), which dominates
    iput's 3. *)
 Definition dirlink_units : nat := 7%nat.

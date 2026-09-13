@@ -337,12 +337,12 @@ Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
-(* writei's own frame is 112 bytes (14 slots).  Its deepest callee is now
-   bmap at 64 (itself dominated by balloc's out-of-blocks printk, 58, which
-   is itself dominated by printk's own real stack need, printk_stack = 48;
-   see SpecReadi.v's header); either_copyin wants 56 (unaffected -- it does
-   not reach printk), iupdate 44, bread 40, brelse 26, log_write 18. *)
-Notation K_writei := (88%nat) (only parsing).
+(* writei's own frame is 112 bytes (14 slots).  Its deepest callee is bmap
+   at 78 (itself over balloc, bread and panic -- SpecReadi.v's header has
+   the arithmetic); iupdate wants 66, bread 62, either_copyin 56 (unaffected
+   -- it reaches neither panic nor printk), brelse 26, log_write 18.
+   14 + 78 = 92. *)
+Notation K_writei := (92%nat) (only parsing).
 (* [file_byte], [file_byte_block] and [blk_holes_zero] live in InodeInv.v,
    next to [inode_blocks] whose flat view they are.  They were parked here
    while editing InodeInv.v was too expensive; both are shared with readi. *)

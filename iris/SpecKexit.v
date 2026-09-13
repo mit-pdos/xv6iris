@@ -144,9 +144,9 @@ Require Import TsoCtx.
 Import Defs.
 
 (* kexit's own six frame slots, plus the deepest callee below it: fileclose
-   (68 -- a descriptor may name an inode file, so its own arm reaches iput);
-   iput wants 60, end_op 58, reparent 24, sched 16. *)
-Notation K_kexit := (90%nat) (only parsing).
+   (88 -- a descriptor may name an inode file, so its own arm reaches
+   end_op and iput); end_op wants 80, iput 78, reparent 24, sched 16. *)
+Notation K_kexit := (94%nat) (only parsing).
 (* THE STATUS ARGUMENT, READ ONCE.  [void exit(int status)] takes it in
    a0, and this function stores its low 32 bits into [p->xstate]; the
    escrow the ZOMBIE park carries is keyed at what that cell then reads

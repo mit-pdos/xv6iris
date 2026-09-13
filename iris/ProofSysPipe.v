@@ -274,7 +274,7 @@ Qed.
    a step).  Every arithmetic obligation of this file is therefore packaged
    as a closed lemma over plain [Z]/[nat] and applied as a fact. *)
 Lemma sp_bounds (av : nat) : (sys_pipe_stack <= av)%nat ->
-  (8 <= av)%nat /\ (10 <= av - 8)%nat /\ (90 <= av - 8)%nat /\ (52 <= av - 8)%nat /\
+  (8 <= av)%nat /\ (10 <= av - 8)%nat /\ (94 <= av - 8)%nat /\ (52 <= av - 8)%nat /\
   (argaddr_stack <= av - 8)%nat /\ (fdalloc_stack <= av - 8)%nat /\
   (fileclose_stack <= av - 8)%nat.
 Proof.

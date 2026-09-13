@@ -127,9 +127,9 @@ Local Open Scope Z_scope.
 
 (* bmap's own frame is 48 bytes (6 slots) -- [c.addi16sp sp,-48] at +0x00
    (s4 rides in the same frame, at slot 0, on the indirect paths).  Its
-   deepest callee is balloc (58, itself dominated by printk's out-of-blocks
-   path); bread wants 40 and log_write 18. *)
-Notation K_bmap := (74%nat) (only parsing).
+   deepest callee is balloc (72, itself ten slots over bread); bread wants
+   62 and log_write 18. *)
+Notation K_bmap := (78%nat) (only parsing).
 (* ===================================================================== *)
 (*  THE ARMS, AS THE CALLER READS THEM OFF THE BLOCK MAP                  *)
 (*  (fs-icache.md section 18: "bmap: ONE credit (the bitmap), arm-wise    *)

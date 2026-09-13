@@ -138,9 +138,10 @@ Import Defs.
 Local Open Scope Z_scope.
 
 (* balloc's own frame is 80 bytes (10 slots) -- [c.addi16sp sp,-80] at
-   +0x00; its deepest callee is now printk on the out-of-blocks path (48,
-   printk_stack).  bread wants 40, log_write 18 and brelse less. *)
-Notation K_balloc := (68%nat) (only parsing).
+   +0x00; its deepest callee is bread (62, itself one frame over panic on
+   bget's no-buffers path); printk on the out-of-blocks path wants 52,
+   log_write 18 and brelse less. *)
+Notation K_balloc := (72%nat) (only parsing).
 Definition wp_balloc_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     

@@ -124,13 +124,13 @@ Local Open Scope Z_scope.
    contracts below keep the premise at the same spelling. *)
 
 (* iunlockput's own frame is 32 bytes (4 slots: ra@24 s0@16 s1@8, one hole);
-   its deepest callee is iput (60).  iunlock wants 26.
+   its deepest callee is iput (78).  iunlock wants 26.
 
-   76 -> 78, forced by [K_iput]'s 72 -> 74 (SpecIput.v's note): the walk calls
-   iput at [K - 4], so [K_iput <= K - 4] needs K >= 78.  All eleven
-   iunlockput call sites were re-checked and every one has slack (the
-   tightest is ProofCreate/ProofSysUnlinkPure at K - 10 / K - 30, i.e. 114). *)
-Notation K_iunlockput := (78%nat) (only parsing).
+   The walk calls iput at [K - 4], so [K_iput <= K - 4] is what fixes this
+   number (SpecIput.v's note).  All eleven iunlockput call sites have slack;
+   the tightest are ProofCreate / ProofSysUnlinkPure, at [K - 10] / [K - 30]
+   of budgets that are themselves well above this. *)
+Notation K_iunlockput := (82%nat) (only parsing).
 (* =====================================================================  *)
 (*  THE CREDITED SET-FORM CONTRACT (fs-sysfile GR-2b, retrofit 4b)        *)
 (*                                                                        *)

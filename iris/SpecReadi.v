@@ -203,17 +203,16 @@ Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
-(* readi's own frame is 112 bytes (14 slots).  Its deepest callee is now
-   bmap at 64 (itself dominated by balloc's out-of-blocks printk, 58, which
-   is itself dominated by printk's own real stack need, printk_stack = 48);
-   either_copyout wants 58, bread 40, brelse 26.
+(* readi's own frame is 112 bytes (14 slots).  Its deepest callee is bmap
+   at 78; bread wants 62, either_copyout 58, brelse 26.  14 + 78 = 92.
 
-   64, NOT 56: bmap's own budget grew 56 -> 64 when SpecPrintk.v's general
-   contract stopped undercounting printk's frame (38 -> 48), which pushed
-   balloc's out-of-blocks arm 50 -> 58, which pushed bmap 56 -> 64 (6 + 58).
+   THE BMAP CHAIN, NOT THE COPYOUT ONE, is what fixes this number, and it
+   bottoms out in the console: panic_stack (56) fixes bread (6 + 56 = 62),
+   bread fixes balloc (10 + 62 = 72), balloc fixes bmap (6 + 72 = 78).
    either_copyout's 58 (SpecCopyout.v's own, unrelated, [psz]-in-s11 chain)
-   does NOT reach printk, so it is unaffected and is no longer the max. *)
-Notation K_readi := (88%nat) (only parsing).
+   reaches neither panic nor printk, so it is unaffected and is not the
+   max. *)
+Notation K_readi := (92%nat) (only parsing).
 (* ===================================================================== *)
 (*  THE TWO PURE FUNCTIONS THE CONTRACT SPEAKS IN                        *)
 (* ===================================================================== *)

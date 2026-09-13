@@ -132,8 +132,8 @@ Require Import TsoCtx.
 Import Defs.
 
 (* install_trans's own frame is 10 slots ([c.addi sp,sp,-80] at +0x0c); its
-   deepest callee is bread (40).  memmove/bwrite/bunpin/brelse want less. *)
-Notation K_install_trans := (68%nat) (only parsing).
+   deepest callee is bread (62).  memmove/bwrite/bunpin/brelse want less. *)
+Notation K_install_trans := (72%nat) (only parsing).
 
 (* THE RECOVERED LOGICAL VIEW (durable-disk stage D2).  At recovering = 1
    the memmove is NOT content-preserving -- the home block holds its OLD

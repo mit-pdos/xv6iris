@@ -131,8 +131,8 @@ Local Open Scope Z_scope.
 
 (* itrunc's own frame is 48 bytes (6 slots) -- [addi sp,sp,-48] at +0x00,
    ra/s0/s1/s2/s3 pushed, and s4 conditionally at +0x50.  Its deepest
-   callee is bfree (44); bread wants 40, brelse 26 and iupdate 44. *)
-Notation K_itrunc := (68%nat) (only parsing).
+   callee is bfree (66); bread wants 62, brelse 26 and iupdate 66. *)
+Notation K_itrunc := (72%nat) (only parsing).
 (* THE TRUNCATED RECORD: the same inode with its size zeroed and its addrs
    emptied.  [type], [major], [minor] and [nlink] are untouched -- itrunc
    frees blocks, it does not delete the inode; zeroing the type is iput's

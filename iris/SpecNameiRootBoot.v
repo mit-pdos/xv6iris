@@ -120,13 +120,13 @@ Local Open Scope Z_scope.
 
 
 (* [SpecNamei.K_namei_root]'s figure -- namei's 4-slot frame over namex's
-   corner's 28 -- written as the literal because requiring [SpecNamei] here
+   corner's 74 -- written as the literal because requiring [SpecNamei] here
    would drag the whole walk's cone (the log, the bio cache, the bitmap)
    into main's, and this file exists precisely to keep it out.  That is
    durable-notes.md's sanctioned trade for a budget numeral: say what the
    number is and where it comes from.  [ProofUserinit]'s own figure is
    [4 + K_namei_root_boot], so a change here still propagates. *)
-Notation K_namei_root_boot := (74%nat) (only parsing).
+Notation K_namei_root_boot := (78%nat) (only parsing).
 
 Definition wp_namei_root_boot_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}

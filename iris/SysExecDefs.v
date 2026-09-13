@@ -153,9 +153,9 @@ Local Open Scope Z_scope.
 (* sys_exec's own frame is 480 bytes -- SIXTY slots ([c.addi16sp sp,-480] at
    +0x00) -- of which sixteen are [path[MAXPATH]] and thirty-two are
    [argv[MAXARG]].  Its deepest callee is kexec by a wide margin
-   ([KexecDefs.K_kexec] = 174); argstr wants 60, fetchstr 56, fetchaddr and
+   ([KexecDefs.K_kexec] = 188); argstr wants 60, fetchstr 56, fetchaddr and
    memset and kalloc and kfree less. *)
-Notation K_sys_exec := (244%nat) (only parsing).
+Notation K_sys_exec := (248%nat) (only parsing).
 Section SysExecDefs.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ, !wchG Σ}.

@@ -124,11 +124,11 @@ Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 
-(* sys_pipe's own frame is 8 slots (c.addi16sp sp,-64).  Below it: copyout
-   wants 74, fileclose 68, copyout 50, argaddr 18, fdalloc 14, myproc 10 --
-   so pipealloc sets the bound, and what makes pipealloc the deepest is the
-   fileclose on its own error path. *)
-Notation sys_pipe_stack := (98%nat) (only parsing).
+(* sys_pipe's own frame is 8 slots (c.addi16sp sp,-64); below it pipealloc
+   wants 94 ([SpecPipealloc]'s literal), so 102.  pipealloc sets the bound,
+   and what makes pipealloc the deepest is the fileclose on its own error
+   path -- copyout wants 52, argaddr 18, fdalloc 14, myproc 10. *)
+Notation sys_pipe_stack := (102%nat) (only parsing).
 Require Import RiscvModelBytes.  (* [nth_byte] -- pipe reports its
                                     descriptors by writing them *)
 Section SpecSysPipe.

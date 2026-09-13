@@ -216,19 +216,18 @@ Local Open Scope Z_scope.
 Definition MAXARG : nat := 32%nat.
 Definition USERSTACK : nat := 1%nat.
 
-(* kexec's own 68-slot frame over namei's 106, which is the tallest callee
-   (readi 78, iunlockput 64, end_op 58, copyout 52, uvmalloc 42, ilock 44,
+(* kexec's own 68-slot frame over namei's 120, which is the tallest callee
+   (readi 92, iunlockput 82, end_op 80, ilock 66, copyout 52, uvmalloc 42,
    proc_pagetable / proc_freepagetable 40, begin_op 26, walkaddr 10,
    flags2perm / safestrcpy / strlen 2).
 
-   THE TOP OF THE BMAP CHAIN now, not the psz/copyout one: printk's real
-   stack need (48, printk_stack) dominates bmap (64), which dominates
-   balloc's out-of-blocks arm (58), which propagated readi 72 -> 78 ->
-   dirlookup 84 -> 90 -> namex 96 -> 102 -> namei 100 -> 106, and so this
-   one 168 -> 174.  None of it is a soundness question, it is all just "the
-   callee needs six more slots than it did" (SpecReadi.v's header has the
+   THE TOP OF THE BMAP CHAIN, not the psz/copyout one: panic_stack (56)
+   fixes bread (62), which fixes balloc (72) and bmap (78), which fixes
+   readi (92) -> dirlookup (104) -> namex (116) -> namei (120), and so this
+   one 68 + 120 = 188.  None of it is a soundness question, it is all just
+   "the callee needs more slots than it did" (SpecReadi.v's header has the
    arithmetic). *)
-Notation K_kexec := (184%nat) (only parsing).
+Notation K_kexec := (188%nat) (only parsing).
 (* ===================================================================== *)
 (*  The argument-stack model.                                             *)
 (* ===================================================================== *)

@@ -199,9 +199,9 @@ Local Open Scope Z_scope.
 
 (* ilock's own frame is 32 bytes (4 slots) -- [c.addi sp,sp,-32] at +0x00,
    ra/s0/s1 pushed there and s2 pushed on the uncached arm only.  Its
-   deepest callee is bread (40); acquiresleep wants 26, brelse 26,
+   deepest callee is bread (62); acquiresleep wants 26, brelse 26,
    memmove 2. *)
-Notation K_ilock := (62%nat) (only parsing).
+Notation K_ilock := (66%nat) (only parsing).
 Definition wp_ilock_dep_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)

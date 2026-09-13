@@ -427,7 +427,7 @@ Section ProcDefs.
   (* in main out of kvminit's pages and kvminithart's claims, and reach a  *)
   (* slot at [SpecProcinit.procs_inv_alloc]'s deposit.                     *)
   (* ------------------------------------------------------------------ *)
-  (* 342 of the page's 512 slots, AND IT IS [UsertrapRes.K_usertrap]'S VALUE
+  (* 346 of the page's 512 slots, AND IT IS [UsertrapRes.K_usertrap]'S VALUE
      ON THE NOSE -- the two constants have to agree and the reason is the
      donation.  A dying thread hands its whole page to the slot it leaves at
      ZOMBIE ([kstack_closer_top], spent at usertrap's entry, where sp IS
@@ -438,9 +438,9 @@ Section ProcDefs.
      [6 + trap_res true + K_prepare_return] (96) is comfortably under it.
      Spelled as a literal because [UsertrapRes] sits far above this file;
      the agreement is checked where it is spent (the [unfold KSTACK_AV; lia]
-     at each kexit(-1) site), not here.  The 170 slots below it are the
+     at each kexit(-1) site), not here.  The 166 slots below it are the
      page's slack and are simply dropped at the deposit. *)
-  Definition KSTACK_AV : nat := 342%nat.
+  Definition KSTACK_AV : nat := 346%nat.
 
   Definition kstack_free (pa : mword 64) : iProp Σ :=
     (∃ ks : mword 64,

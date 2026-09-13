@@ -203,9 +203,9 @@ Local Open Scope Z_scope.
 
 (* sys_chdir's own frame is 160 bytes -- TWENTY slots ([c.addi16sp sp,-160]
    at +0x00), of which sixteen are the [path] buffer.  Its deepest callee is
-   namei (106); iunlockput wants 64, argstr 60, iput 60, end_op 58, ilock
-   44, begin_op 26, iunlock 26, myproc 10. *)
-Notation K_sys_chdir := (136%nat) (only parsing).
+   namei (120); iunlockput wants 82, end_op 80, iput 78, ilock 66, argstr
+   60, begin_op 26, iunlock 26, myproc 10. *)
+Notation K_sys_chdir := (140%nat) (only parsing).
 Section SpecSysChdir.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ, !wchG Σ}.

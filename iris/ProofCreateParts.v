@@ -648,7 +648,7 @@ Qed.
    that pushed dirlookup 84 -> 90 (SpecCreate.v's note on [K_create] has the
    whole ladder); 9da28f5's [dp->nlink == 0] guard did NOT move it, because
    the frame is still 80 bytes. *)
-Lemma cr_K_value : K_create = 124%nat.
+Lemma cr_K_value : K_create = 128%nat.
 Proof. reflexivity. Qed.
 
 Lemma cr_slots_value : create_slots = 3%nat.

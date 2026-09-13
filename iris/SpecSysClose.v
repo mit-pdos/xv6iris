@@ -73,9 +73,9 @@ Local Open Scope Z_scope.
 
 
 (* sys_close's own frame is 4 slots (addi sp,sp,-32); below it fileclose
-   wants 68 -- the descriptor may name an inode file, and that arm reaches
-   iput -- argfd 24 and myproc 10. *)
-Notation sys_close_stack := (88%nat) (only parsing).
+   wants 88 -- the descriptor may name an inode file, and that arm reaches
+   end_op and iput -- argfd 24 and myproc 10. *)
+Notation sys_close_stack := (92%nat) (only parsing).
 Section SpecSysClose.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   (* [GenId], for [ProcInv.proc_priv]'s own index: the private block now

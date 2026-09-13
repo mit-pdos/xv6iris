@@ -363,11 +363,11 @@ Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* sys_open's own frame is 192 bytes -- TWENTY-FOUR slots ([addi sp,sp,-192]
-   at +0x00) -- over its deepest callee, create (114).  Every other callee
-   fits under that: namei 106, fileclose [8 + K_iput] = 68, iunlockput 64,
-   argstr 60, end_op 58, itrunc 50, ilock 44, begin_op 26, iunlock 26,
+   at +0x00) -- over its deepest callee, create (128).  Every other callee
+   fits under that: namei 120, fileclose [8 + K_end_op] = 88, iunlockput 82,
+   end_op 80, itrunc 72, ilock 66, argstr 60, begin_op 26, iunlock 26,
    argint 18, filealloc 14, fdalloc 14. *)
-Notation K_sys_open := (148%nat) (only parsing).
+Notation K_sys_open := (152%nat) (only parsing).
 (* THE REFERENCE ALLOWANCE.  create's own, and for create's own reason; see
    the header's reference ledger. *)
 Definition sys_open_slots : nat := create_slots.

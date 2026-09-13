@@ -249,13 +249,12 @@ Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* namex's own frame is 96 bytes (12 slots); its deepest callee is dirlookup
-   at 90 (iunlockput wants 64, iput 60, ilock 44, iunlock 26, iget 16, idup
+   at 104 (iunlockput wants 82, iput 78, ilock 66, iget 62, iunlock 26, idup
    14, myproc 10, memmove 2).
 
-   90, and dirlookup's dominant chain is now bmap's, not copyout's --
-   SpecDirlink.v's header has the arithmetic.  Nothing else in namex's list
-   moved. *)
-Notation K_namex := (112%nat) (only parsing).
+   dirlookup's dominant chain is bmap's, not copyout's -- SpecDirlink.v's
+   header has the arithmetic.  12 + 104 = 116. *)
+Notation K_namex := (116%nat) (only parsing).
 (* ===================================================================== *)
 (*  THE WALK'S LEDGER FIGURES (fs-log.md §G.24/§G.25)                     *)
 (*                                                                        *)
@@ -817,8 +816,8 @@ End NAMEX.
 (*  literal, i.e. [KernelDataInv.kernel_data]'s [↦ₘ□].                    *)
 (* ===================================================================== *)
 
-(* 12 slots for namex's own frame, over iget's 16. *)
-Notation K_namex_root := (70%nat) (only parsing).
+(* 12 slots for namex's own frame, over iget's 62. *)
+Notation K_namex_root := (74%nat) (only parsing).
 Definition wp_namex_root_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, ICFG : icfg, APP : appcfg Σ, FSC : fscfg,
       !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}

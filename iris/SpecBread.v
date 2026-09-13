@@ -63,9 +63,10 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
 Import Defs.
 
-(* bread's own frame is 48 bytes (6 slots); its deepest callee is
-   virtio_disk_rw (34). *)
-Notation K_bread := (58%nat) (only parsing).
+(* bread's own frame is 48 bytes (6 slots); its deepest callee is panic on
+   bget's no-buffers path (56, [SpecPanic.panic_stack]) -- virtio_disk_rw
+   wants only 34. *)
+Notation K_bread := (62%nat) (only parsing).
 Definition wp_bread_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     

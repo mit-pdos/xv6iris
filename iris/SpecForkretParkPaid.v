@@ -43,9 +43,9 @@
      - THE DEPTH PREMISE IS GONE, not merely restated.  It used to read
        [6 + trap_res true + K_prepare_return <= av]; forkret's deepest
        callee is now kexec's, so the obligation is [K_kexec <= av2] at
-       [av2 = av - 6 - trap_res eb'].  With [K_kexec = 184],
-       [trap_res true = kv_frame_slots = 90] and [K_usertrap = 342], that is
-       [280 <= av] -- implied by the [K_usertrap <= av] this file already
+       [av2 = av - 6 - trap_res eb'].  With [K_kexec = 188],
+       [trap_res true = kv_frame_slots = 90] and [K_usertrap = 346], that is
+       [284 <= av] -- implied by the [K_usertrap <= av] this file already
        carries, so it is [lia]'s job and not a caller's.
 
    ====================================================================== *)
@@ -71,7 +71,7 @@
 (*     and [SpecAllocproc]'s postcondition ALREADY hands it back beside    *)
 (*     the [is_kstack] one line above it.  [ProcDefs.kstack_free_at]       *)
 (*     recovers the words at the caller's concrete [ks].  And the arithmetic*)
-(*     lands exactly: [KSTACK_AV = 342 = K_usertrap], so [av := KSTACK_AV] *)
+(*     lands exactly: [KSTACK_AV = 346 = K_usertrap], so [av := KSTACK_AV] *)
 (*     satisfies the depth premise on the nose, at either [eb'].           *)
 (*                                                                        *)
 (*   - THE RESIDUE CLOSER -- the wand that turns what forkret's tail       *)
@@ -312,9 +312,9 @@ Definition forkret_park_paid_body
      is stated over that [eb'], so the depth must cover the ENABLED arm's
      reserve as well as forkret's own frame and its deepest callee's.  That
      callee is now KEXEC, not prepare_return: [6 + trap_res true + K_kexec
-     = 6 + 90 + 184 = 280], which [K_usertrap = 342] already dominates.  So
+     = 6 + 90 + 188 = 284], which [K_usertrap = 346] already dominates.  So
      the second premise this used to carry is [lia]'s job, not a caller's.
-       [KSTACK_AV = 342] too, which is not a coincidence: a caller that
+       [KSTACK_AV = 346] too, which is not a coincidence: a caller that
      hands over a whole free kernel stack satisfies this exactly. *)
   (K_usertrap <= av)%nat ->
   (* THE PACKAGE IS TAKEN UNDER A LATER.  The proof uses none of it before
