@@ -536,4 +536,67 @@ theorem KCtx.popExit_pushed (k : KCtx) (m : Nat) (r : Bool) : (k.pushed m).popEx
       _root_.and_true]
     omega
 
+
+/-! ## A balanced push_off / pop_off pair -/
+
+/-- The context with its `SPIE`/`SPP` indices replaced: what a balanced
+push_off / pop_off pair leaves (interrupts back as they were; the pinned
+bits are the ones the push read). -/
+def KCtx.withSpie (k : KCtx) (spie spp : Bool) : KCtx :=
+  { k with
+    spie := spie
+    spp := spp }
+
+@[simp] theorem KCtx.withSpie_regs (k : KCtx) (a b : Bool) : (k.withSpie a b).regs = k.regs := rfl
+@[simp] theorem KCtx.withSpie_sie (k : KCtx) (a b : Bool) : (k.withSpie a b).sie = k.sie := rfl
+@[simp] theorem KCtx.withSpie_spie (k : KCtx) (a b : Bool) : (k.withSpie a b).spie = a := rfl
+@[simp] theorem KCtx.withSpie_spp (k : KCtx) (a b : Bool) : (k.withSpie a b).spp = b := rfl
+@[simp] theorem KCtx.withSpie_avail (k : KCtx) (a b : Bool) : (k.withSpie a b).avail = k.avail := rfl
+@[simp] theorem KCtx.withSpie_noff (k : KCtx) (a b : Bool) : (k.withSpie a b).noff = k.noff := rfl
+@[simp] theorem KCtx.withSpie_intena (k : KCtx) (a b : Bool) : (k.withSpie a b).intena = k.intena := rfl
+@[simp] theorem KCtx.withSpie_locks (k : KCtx) (a b : Bool) : (k.withSpie a b).locks = k.locks := rfl
+@[simp] theorem KCtx.withSpie_tier (k : KCtx) (a b : Bool) : (k.withSpie a b).tier = k.tier := rfl
+@[simp] theorem KCtx.withSpie_root (k : KCtx) (a b : Bool) : (k.withSpie a b).root = k.root := rfl
+@[simp] theorem KCtx.withSpie_proc (k : KCtx) (a b : Bool) : (k.withSpie a b).proc = k.proc := rfl
+@[simp] theorem KCtx.withSpie_sp (k : KCtx) (a b : Bool) : (k.withSpie a b).sp = k.sp := rfl
+theorem KCtx.withSpie_withRegs (k : KCtx) (R : RegMap) (a b : Bool) :
+    (k.withRegs R).withSpie a b = (k.withSpie a b).withRegs R := rfl
+
+/-- With interrupts off the pinned bits are the context's own. -/
+theorem KCtx.withSpie_self' (k : KCtx) (a b : Bool) (ha : a = k.spie) (hb : b = k.spp) : k.withSpie a b = k := by
+  subst ha hb; cases k; rfl
+
+/-- Under `KCtx.wf`, whether the pop after a push at depth `k.noff` re-enables
+interrupts is exactly whether they were on. -/
+theorem KCtx.reen_of_wf (k : KCtx) (hwf : k.wf) : k.sie = (decide (k.noff + 1 = 1) && k.intena) := by
+  obtain ⟨w1, w2, w3, -, -⟩ := hwf
+  cases hs : k.sie
+  · by_cases hn : k.noff = 0
+    · have := w1 hn; rw [hs] at this; simp [hn, ← this]
+    · simp [hn]
+  · obtain ⟨hn, hi, -, -⟩ := w3 hs
+    simp [hn, hi]
+
+/-- The arm a balanced pair takes back is the one its push paid out. -/
+theorem popArm_sie [KernelGeom] [KernelImage GF] (cpu : CPU) (k k' : KCtx) (hp : k'.proc = k.proc) :
+    sieArm (GF := GF) cpu k.sie k.proc ⊢ popArm cpu k' k.sie := by
+  unfold popArm
+  cases k.sie
+  · simp only [Bool.false_eq_true, ite_false]; iintro _; iempintro
+  · simp only [ite_true, hp]; iintro H; iexact H
+
+/-- A balanced pair from `k` ends at `k` with the pinned bits. -/
+theorem KCtx.pushOffAt_popExit (k : KCtx) (a b : Bool) (hwf : k.wf) :
+    (k.pushOffAt a b).popExit k.sie = k.withSpie a b := by
+  obtain ⟨w1, w2, w3, -, -⟩ := hwf
+  obtain ⟨regs, sie, spie, spp, avail, noff, intena, locks, tier, root, proc⟩ := k
+  simp only at w1 w2 w3
+  cases sie
+  · simp only [KCtx.popExit_false, KCtx.pushOffAt, KCtx.popOff, KCtx.withSpie, KCtx.mk.injEq, _root_.true_and,
+      _root_.and_true, trapRes, Bool.false_eq_true, ite_false, Nat.zero_add, Nat.add_sub_cancel]
+  · obtain ⟨hn, hi, -, -⟩ := w3 rfl
+    subst hn hi
+    simp only [KCtx.popExit_true, KCtx.pushOffAt, KCtx.popOff, KCtx.intrOn, KCtx.withSpie, KCtx.mk.injEq,
+      _root_.true_and, _root_.and_true, trapRes, ite_true, Nat.add_sub_cancel_left]
+
 end MachCSL

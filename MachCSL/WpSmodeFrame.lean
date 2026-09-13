@@ -92,7 +92,10 @@ macro_rules
       KCtx.popExit_regs, KCtx.popExit_sie, KCtx.popExit_spie, KCtx.popExit_spp, KCtx.popExit_avail, KCtx.popExit_noff,
       KCtx.popExit_intena, KCtx.popExit_locks, KCtx.popExit_tier, KCtx.popExit_root, KCtx.popExit_proc, KCtx.popExit_sp,
       KCtx.popExit_withRegs, KCtx.popExit_withLocks, KCtx.popExit_pushed, KCtx.intrOn_withRegs, KCtx.intrOn_withLocks,
-      KCtx.intrOn_pushed, Bool.or_false, Bool.false_or, $lems,*])
+      KCtx.intrOn_pushed, Bool.or_false, Bool.false_or,
+      KCtx.withSpie_regs, KCtx.withSpie_sie, KCtx.withSpie_spie, KCtx.withSpie_spp, KCtx.withSpie_avail,
+      KCtx.withSpie_noff, KCtx.withSpie_intena, KCtx.withSpie_locks, KCtx.withSpie_tier, KCtx.withSpie_root,
+      KCtx.withSpie_proc, KCtx.withSpie_sp, KCtx.withSpie_withRegs, $lems,*])
   | `(tactic| k_norm_g [$extra:term,*] at $h:ident) => do
     let lems ← extra.getElems.mapM fun l => `(Lean.Parser.Tactic.simpLemma| $l:term)
     `(tactic| try simp only [KCtx.push_eq, KCtx.setReg_withRegs, KCtx.withRegs_withRegs, KCtx.rget_withRegs',
@@ -130,7 +133,10 @@ macro_rules
       KCtx.popExit_regs, KCtx.popExit_sie, KCtx.popExit_spie, KCtx.popExit_spp, KCtx.popExit_avail, KCtx.popExit_noff,
       KCtx.popExit_intena, KCtx.popExit_locks, KCtx.popExit_tier, KCtx.popExit_root, KCtx.popExit_proc, KCtx.popExit_sp,
       KCtx.popExit_withRegs, KCtx.popExit_withLocks, KCtx.popExit_pushed, KCtx.intrOn_withRegs, KCtx.intrOn_withLocks,
-      KCtx.intrOn_pushed, Bool.or_false, Bool.false_or, $lems,*] at $h:ident)
+      KCtx.intrOn_pushed, Bool.or_false, Bool.false_or,
+      KCtx.withSpie_regs, KCtx.withSpie_sie, KCtx.withSpie_spie, KCtx.withSpie_spp, KCtx.withSpie_avail,
+      KCtx.withSpie_noff, KCtx.withSpie_intena, KCtx.withSpie_locks, KCtx.withSpie_tier, KCtx.withSpie_root,
+      KCtx.withSpie_proc, KCtx.withSpie_sp, KCtx.withSpie_withRegs, $lems,*] at $h:ident)
 
 set_option hygiene false in
 macro_rules
