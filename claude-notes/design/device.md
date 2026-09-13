@@ -125,19 +125,30 @@
   There is consequently NO raw-fragment device leaf anywhere: every store/load opens an invariant. `wp_uartinit_sconf` (SpecUartinit/ProofUartinit/LinkUartinit) is the whole `uartinit` over the accessor leaves — a 2-slot-frame straight-line function, a kinit clone (byte-identical prologue/epilogue + `initlock` call) with 7 UART stores instead of freerange — and `wp_consoleinit_sconf` (SpecConsoleinit/ProofConsoleinit/LinkConsoleinit) carries that transit one level up, since `consoleinit` is `initlock(&cons.lock,"cons")` + `uartinit()` + the two `devsw[]` stores. Neither names a closed-form successor UART state; the proofs go write-by-write.
 - **`devsw[]` has no abstraction, on purpose.** `consoleinit` is the only writer of `devsw[CONSOLE].read`/`.write` (at `devsw + 16` / `+ 24`; `CONSOLE` = 1 and a `struct devsw` is two function pointers), and `SpecConsoleinit` hands those back as the raw 8-byte cells holding `KernelSyms.consoleread` / `KernelSyms.consolewrite`. Nothing yet says what a `struct devsw` entry MEANS — consoleread/consolewrite are unproven and the `fileread`/`filewrite` dispatch that reads these slots does not exist — so a richer predicate would have no consumer. Build one at the caller when the first consumer arrives, out of these cells.
 - **RAM-path proof convention (thread it in every new memory tower):** every `run`/`exec`/`execR` lemma about a memory access at a symbolic address takes `Hdev : dev_addr addr = false`, placed immediately AFTER the `within_htif_*` premise and BEFORE the byte-presence premise (walk towers: `dev_addr (pte_paddr root_ppn) = false`). Store-lemma conclusion states carry the third `MState` field (`s.(mdev)` hit / `s'.(mdev)` walk); `set_reg` chains preserve `mdev` definitionally (extend `cbn [sregs mem]` to `cbn [sregs mem mdev]` when framing). Discharge at the Iris level via `addr_is_ram_not_dev : addr_is_ram a -> dev_addr a = false` from the `↦ₘ` bundle; concrete addresses by `(vm_compute; reflexivity)`. Outcome-level tools: `exec_MemRead`/`exec_MemWrite`(+`_dev`) equations (RiscvFetchExec.v, `rewrite exec_MemWrite; last exact Hdev`), `run_MemRead_ram`/`run_MemWrite_ram` iffs + `_intro` eapply-forms (RiscvTryStep.v).
-- **THE PHYSICAL DEVICE LEAVES ARE PORT-GENERIC; THE S-MODE LAYER AND THE
-  DRIVER PROOFS ARE AT `Uart0`.**  WpUart.v §2 (`uart_pa i off`,
-  `uint_uart_pa`, `uart_pa_access_io`, `dev_addr_uart`, `dev_read_uart` /
-  `dev_write_uart`, `uart_pa_not_in_clint`/`_sig`, and `uart_decode_pa`)
-  takes the port, because that is what the device threads and the
-  conformance suite need and it costs a `destruct i` in each proof (the two
-  bases are literals).  Everything above it names `Uart0`: the S-mode layer
-  bakes in the page-table mapping `kvmmake` installs, and xv6 maps ONE
-  UART.  UART1 sits at vpn `0x1000a` — the SAME l1 slot 128, l0 slot 10
-  instead of 0 — so that layer generalises over the leaf index and ppn the
-  day the kernel maps the second port; building the generality before there
-  is a mapping would be an abstraction with no consumer and no way to check
-  it.
+- **THE PHYSICAL AND S-MODE DEVICE LEAVES ARE BOTH PORT-GENERIC.**  WpUart.v
+  §2 (`uart_pa i off`, `uint_uart_pa`, `uart_pa_access_io`, `dev_addr_uart`,
+  `dev_read_uart` / `dev_write_uart`, `uart_pa_not_in_clint`/`_sig`,
+  `uart_decode_pa`) takes the port, because that is what the device threads
+  and the conformance suite need and it costs a `destruct i` in each proof
+  (the two bases are literals).  The S-mode leaves above it
+  (`wp_lb_uart_uinv_s_sconf_at` / `wp_sb_uart_uinv_s_sconf_at`, SpecUart.v)
+  take the port too, and take the BARE `uart_inv i` rather than the `dev_inv`
+  bundle — `dev_inv` is the CONSOLE bundle and cannot even be STATED at port
+  1.  This became provable once `kvmmake` mapped UART1; before that the
+  generality had no consumer and no way to check it.
+  - **The console forms survive as `Uart0` corollaries with statements
+    character-for-character unchanged**, so no existing caller moves and
+    `dev_inv` keeps arity 2.  That is the pattern to repeat whenever a leaf
+    generalises: state the primitive, keep the specialisation.
+  - **The mapping premise is a DISJUNCTION**, `kpt_dev_vpn v \/
+    kpt_uart1_vpn v`, because UART1's page landed as its own KptPt predicate
+    rather than as a widening of the device range (five unowned files
+    discharge that range as a half-open interval).  The arms converge
+    immediately — both conclude `kmap_class _ = Some KP_rw` — so one assert
+    handles both and nothing below it knows which port it is.  UART1 sits at
+    vpn `0x1000a`: the SAME l1 slot 128, l0 slot 10 instead of 0.
+  - `uart_vpn_of` belongs beside `uart_vpn` in WpSmodeUart.v; while it lives
+    in SpecUart.v nothing below that file in the cone can see it.
 - **S-mode instruction-level UART access (WpSmodeUart.v)** lifts the M-mode physical device leaves to a full S-mode LOAD/STORE through Sv39 translation of the kernel's UART mapping (a 4KB identity page `root[0]→l1[128]→l0[0]` leaf, ppn 0x10000, R|W|A|D — what `kvmmake`'s `kvmmap(UART0,UART0,PGSIZE,R|W)` installs; the model's page table is otherwise a single RAM gigapage, so the UART needs its own 3-level walk). Layered exactly like the RAM S-mode store: §1 device `checked_mem_{read,write}_dev_1_S` (= WpUart's M-mode dev leaves with the PMP check swapped to the Supervisor TOR grant, width 1) → §2 `mem_{read,write_value}_dev_1_S` (Supervisor, MPRV=0; a device read/write ADVANCES the device so the post-state carries `d'`, memory untouched) → §3 `exec_translateAddr_{store,load}_walk_u_S` (the 3-level walk; reuses CommonWalk's `exec_translate_walk_user` at (Store/Load Data, Supervisor), three PTE reads taken as `read_pte` hyps, FILLS the TLB) → §4 device STORE vmem/execute towers (`exec_vmem_write_addr_1_S_walk_dev`, `_1_gpr_S_walk_dev`, `exec_execute_STORE_1_gpr_S_walk_dev`), cloned from WpMemsetS's width-1 RAM store walk towers with the RAM leaf swapped for the device leaf (the `untilMT` loop machinery reuses verbatim) → §5 device LOAD vmem/execute towers (`exec_vmem_read_addr_1_S_walk_dev`, `_1_gpr_S_walk_dev`, `exec_execute_LOAD_1_gpr_S_walk_dev`), a width-1 device adaptation of WpSmodeGpr's width-8 `RWSwalk`/`RWgSwalk`/`ExecLoadGSwalk` (a device read ADVANCES the device, so the post-read state is `MState s'.(sregs) s'.(mem) d'` and the register write runs at that state; LB sign-extended, LBU = `extend_value true`). Gotcha: the model computes `mxr`/`do_sum` as concrete mstatus expressions right before `translate`, so a data-walk translateAddr lemma canNOT keep them as abstract params (unlike a fetch-walk where they don't reach the goal the same way) — quantify the leaf `check_PTE_permission` hypothesis over `∀ mxr do_sum` (the UART leaf passes for any, R|W set, U=0) and `match goal` to capture the goal's concrete `mxr`/`do_sum`.
 - **UART S-mode instruction-level store/load WPs** live in WpSmodePtUart.v (`tlb_inv_pt`-native).  WpSmodeUart.v holds the PURE device layer they build on: the §1 checked/mem device read/write leaves (a device access ADVANCES the device: post-state carries `d'`), the width-1 device LOAD towers (`exec_vmem_read_addr_1_S_walk_dev` / `_1_gpr_` / `exec_execute_LOAD_1_gpr_S_walk_dev`), `uart_vpn`, `uart_pmp_match1`, and the width-1 write helpers (`exec_split_misaligned_aligned_1`/`exec_mem_write_ea_1`).  Gotcha: the model computes `mxr`/`do_sum` as concrete mstatus expressions right before `translate`, so a data-walk translateAddr lemma canNOT keep them abstract — quantify the leaf `check_PTE_permission` hypothesis over `∀ mxr do_sum` and `match goal` to capture the goal's concrete values.
 - TLB-consistency is `tlb_ok_pt`/`tlb_ok_pt2` (PtTree.v) under `tlb_inv_pt`/`tlb_inv_pt2`. The predicate-generalized `tlb_consistent P` layer (SmodePte.v) remains as SmodePte's definition + KptPt's `P_kpt` fill lemmas.
