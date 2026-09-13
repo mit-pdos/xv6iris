@@ -496,4 +496,15 @@ def popArm [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (reen : Bool) : 
 @[simp] theorem popArm_true [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) :
     popArm (GF := GF) cpu k true = sieArm cpu true k.proc := rfl
 
+
+theorem KCtx.pushOffAt_withRegs (k : KCtx) (R : RegMap) (a b : Bool) :
+    (k.withRegs R).pushOffAt a b = (k.pushOffAt a b).withRegs R := rfl
+
+theorem KCtx.pushOffAt_pushed (k : KCtx) (m : Nat) (a b : Bool) (h : m ≤ k.avail) :
+    (k.pushed m).pushOffAt a b = (k.pushOffAt a b).pushed m := by
+  obtain ⟨regs, sie, spie, spp, avail, noff, intena, locks, tier, root, proc⟩ := k
+  simp only at h
+  simp only [KCtx.pushed, KCtx.pushOffAt, KCtx.mk.injEq, _root_.true_and, _root_.and_true]
+  omega
+
 end MachCSL

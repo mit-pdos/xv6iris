@@ -82,52 +82,24 @@ theorem acquire_spin {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurC
     exact hinv i hi
 
 set_option maxHeartbeats 4000000 in
-theorem acquire_proof (PU : PUSHOFF) (HO : HOLDING) (MC : MYCPU) : ACQUIRE := ⟨
-  fun {hlc GF} _ _ cpu k γ s R _ hsie hnoff hK hs => by
-  unfold wp_acquire_body
-  iintro ⟨Hk, Hpc, #Hlk, HΦ⟩
+/-- `acquire` from its `mv a0,s1` on, with interrupts off, from the context
+`kb` push_off left (its lock name not yet held): holding's check, the spin,
+`mycpu`, the owner store, the epilogue. -/
+theorem acquire_body (HO : HOLDING) (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+    (cpu : CPU) (kb : KCtx) (hsie : kb.sie = false) (hK : 10 ≤ kb.avail)
+    (γ : GName) (s : String) (R : CtxId → IProp GF) [CtxMorph R]
+    (hs : s ∉ kb.locks) (hlen : kb.locks.length < kb.noff) (R2 : RegMap)
+    (hcs2 : calleeSaved ((((kb.regs.set 2#5 (kb.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64)).set 8#5 (kb.regs 2#5)).set
+      9#5 (kb.regs 10#5)).set 1#5 0x80000bca#64) R2) :
+    kctx cpu ((kb.pushed 4).withRegs R2) ∗ pcIs cpu 0x80000bca#64 ∗ isLock γ (kb.regs 10#5) s R ∗
+    frame4s1 (kb.regs 2#5) (kb.regs 1#5) (kb.regs 8#5) (kb.regs 9#5) ∗
+    (∀ R' : RegMap, kctx cpu ((kb.withRegs R').withLocks (s :: kb.locks)) -∗
+      pcIs cpu (jumpPc (kb.regs 1#5)) -∗ ⌜calleeSaved kb.regs R'⌝ -∗
+      locked γ cpu -∗ R curCtx -∗ (∃ K : Nat, viewLb cpu K) -∗ wpLoop cpu)
+    ⊢ wpLoop (GF := GF) cpu := by
+  iintro ⟨Hk, Hpc, #Hlk, Hframe, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
-  simp only [acquireAddr, KernelSyms.«acquire»]
-  k_norm
-  ihave HΦ := wpNext_off _ _ _ $$ HΦ
-  -- prologue
-  iapply (wp_prologue4s1 cpu k hsie 0x80000bba#64 (by omega))
-  k_code (text_instr _ _ _ _ rfl rfl) Htext
-  k_norm
-  iframe
-  inext
-  iintro Hk Hpc Hframe
-  -- mv s1,a0
-  k_step (wp_s_add cpu _ 0x80000bc4#64 true 9#5 0#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-  iintro Hk Hpc
-  -- jal push_off
-  k_step (wp_s_jal cpu _ 0x80000bc6#64 false 2097082#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-  iintro Hk Hpc
-  have hpu : ∀ (k' : KCtx) (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 6 ≤ k'.avail),
-      kctx cpu k' ∗ pcIs cpu 0x80000b80#64 ∗
-      wpNext k'.sie k'.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
-        ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
-        kctx cpu' ((k'.pushOffAt spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-        ⌜calleeSaved k'.regs R'⌝ -∗ sieArm cpu' k'.sie k'.proc -∗ wpLoop cpu')) ⊢ wpLoop (GF := GF) cpu := by
-    intro k' hnoff' hK'
-    have h := PU.wp_push_off (hlc := hlc) (GF := GF) cpu k' hnoff' hK'
-    unfold wp_push_off_body at h
-    simp only [pushOffAddr, KernelSyms.«push_off»] at h
-    exact h
-  iapply (hpu _ ?hn ?hK) $$ [- $Hk $Hpc]
-  rotate_right 1
-  case hn => k_norm; omega
-  case hK => k_norm; omega
-  k_norm
-  iapply wpNext_off_intro
-  iintro %spie %spp %R2 %hsp Hk Hpc %hcs2 _
-  obtain ⟨rfl, rfl⟩ := hsp (by trivial)
-  k_norm [KCtx.pushOffAt_off']
-  have hret1 : jumpPc 0x80000bca#64 = 0x80000bca#64 := by simp only [jumpPc, BitVec.reduceAnd]
-  k_norm [hret1]
-  k_norm at hcs2
-  have h9 : R2 9#5 = k.regs 10#5 := by
+  have h9 : R2 9#5 = kb.regs 10#5 := by
     have := hcs2.2.2.1
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at this
     exact this
@@ -166,12 +138,12 @@ theorem acquire_proof (PU : PUSHOFF) (HO : HOLDING) (MC : MYCPU) : ACQUIRE := �
     $$ [- $Hk $Hpc] with [h10, bcond_bne_zero]
   iintro Hk Hpc
   -- the spin
-  have h39 : R3 9#5 = k.regs 10#5 := by
+  have h39 : R3 9#5 = kb.regs 10#5 := by
     have := hcs3.2.2.1
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at this
     rw [this]; exact h9
-  iapply (acquire_spin cpu (k.pushOff.pushed 4) (by k_norm) γ (k.regs 10#5) s R
-    (by k_norm; exact hs) (by k_norm; exact Nat.lt_succ_of_le hwf.2.2.2.1) (R3.set 14#5 1#64)
+  iapply (acquire_spin cpu (kb.pushed 4) (by k_norm) γ (kb.regs 10#5) s R
+    (by k_norm; exact hs) (by k_norm; exact hlen) (R3.set 14#5 1#64)
     (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h39)
     (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_true])) $$ [HΦ Hframe] %_ %(fun _ _ => rfl) Hk Hpc
   -- after the spin: mycpu, the owner store, the epilogue
@@ -198,20 +170,20 @@ theorem acquire_proof (PU : PUSHOFF) (HO : HOLDING) (MC : MYCPU) : ACQUIRE := �
   have hret3 : jumpPc 0x80000be2#64 = 0x80000be2#64 := by simp only [jumpPc, BitVec.reduceAnd]
   k_norm [hret3]
   k_norm at hcs4
-  have h49 : R4 9#5 = k.regs 10#5 := by
+  have h49 : R4 9#5 = kb.regs 10#5 := by
     have := hcs4.2.2.1
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] at this
     rw [this, hR' 9#5 (by decide)]
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]
     exact h39
   -- sd a0,16(s1): lk->cpu = mycpu()
-  k_step (wp_s_sd_lkcpu_acquire cpu _ ?hs 0x80000be2#64 true 16#12 9#5 10#5 γ (k.regs 10#5) s R ?haddr ?hval) from (text_instr _ _ _ _ rfl rfl) Htext
+  k_step (wp_s_sd_lkcpu_acquire cpu _ ?hs 0x80000be2#64 true 16#12 9#5 10#5 γ (kb.regs 10#5) s R ?haddr ?hval) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc $Hpre]
   case haddr => k_norm [h49]
   case hval => k_norm; exact h10'
   iintro Hk Hpc Hlc
   -- epilogue
-  have h42 : R4 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64 := by
+  have h42 : R4 2#5 = kb.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64 := by
     have := hcs4.1
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] at this
     rw [this, hR' 2#5 (by decide)]
@@ -222,8 +194,8 @@ theorem acquire_proof (PU : PUSHOFF) (HO : HOLDING) (MC : MYCPU) : ACQUIRE := �
     have h22 := hcs2.1
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at h22
     exact h22
-  iapply (wp_epilogue4s1 cpu ((k.withLocks (s :: k.locks)).pushOff) (by k_norm) 0x80000be4#64
-    (by k_norm; omega) R4 (by k_norm; exact h42) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5)) $$ [- $Hk $Hpc]
+  iapply (wp_epilogue4s1 cpu (kb.withLocks (s :: kb.locks)) (by k_norm) 0x80000be4#64
+    (by k_norm; omega) R4 (by k_norm; exact h42) (kb.regs 1#5) (kb.regs 8#5) (kb.regs 9#5)) $$ [- $Hk $Hpc]
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm
   iframe
@@ -255,6 +227,65 @@ theorem acquire_proof (PU : PUSHOFF) (HO : HOLDING) (MC : MYCPU) : ACQUIRE := �
       (c4_25.trans (hR'' _ (by decide) (by decide))).trans (c3_25.trans c2_25),
       (c4_26.trans (hR'' _ (by decide) (by decide))).trans (c3_26.trans c2_26),
       (c4_27.trans (hR'' _ (by decide) (by decide))).trans (c3_27.trans c2_27)⟩
-  · iapply locked_intro; iframe Hlc Hheld⟩
+  · iapply locked_intro; iframe Hlc Hheld
+set_option maxHeartbeats 4000000 in
+theorem acquire_proof (PU : PUSHOFF) (HO : HOLDING) (MC : MYCPU) : ACQUIRE := ⟨
+  fun {hlc GF} _ _ cpu k γ s R _ hnoff hK hs => by
+  unfold wp_acquire_body
+  iintro ⟨Hk, Hpc, #Hlk, HΦ⟩
+  icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
+  icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
+  simp only [acquireAddr, KernelSyms.«acquire»]
+  k_norm_g
+  -- prologue: interrupts may be on, at whichever hart the thread lands
+  iapply (wp_prologue4s1_gen cpu k 0x80000bba#64 (by omega))
+  k_code (text_instr _ _ _ _ rfl rfl) Htext
+  k_norm_g
+  iframe
+  inext
+  iapply wpNext_intro_pin
+  iintro %c1 %hp1 Hk Hpc Hframe
+  -- mv s1,a0
+  k_step_gen (wp_s_add c1 _ 0x80000bc4#64 true 9#5 0#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
+    $$ [- $Hk $Hpc] next c2 hp2
+  iintro Hk Hpc
+  -- jal push_off
+  k_step_gen (wp_s_jal c2 _ 0x80000bc6#64 false 2097082#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
+    $$ [- $Hk $Hpc] next c3 hp3
+  iintro Hk Hpc
+  have hpu : ∀ (k' : KCtx) (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 6 ≤ k'.avail),
+      kctx c3 k' ∗ pcIs c3 0x80000b80#64 ∗
+      wpNext k'.sie k'.proc c3 (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
+        ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
+        kctx cpu' ((k'.pushOffAt spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
+        ⌜calleeSaved k'.regs R'⌝ -∗ sieArm cpu' k'.sie k'.proc -∗ wpLoop cpu')) ⊢ wpLoop (GF := GF) c3 := by
+    intro k' hnoff' hK'
+    have h := PU.wp_push_off (hlc := hlc) (GF := GF) c3 k' hnoff' hK'
+    unfold wp_push_off_body at h
+    simp only [pushOffAddr, KernelSyms.«push_off»] at h
+    exact h
+  iapply (hpu _ ?hn ?hK) $$ [- $Hk $Hpc]
+  rotate_right 1
+  case hn => k_norm_g; omega
+  case hK => k_norm_g; omega
+  k_norm_g
+  iapply wpNext_intro_pin
+  iintro %c4 %hp4 %spie %spp %R2 %hsp Hk Hpc %hcs2 Harm
+  have hK4 : 4 ≤ k.avail := by omega
+  have hret1 : jumpPc 0x80000bca#64 = 0x80000bca#64 := by simp only [jumpPc, BitVec.reduceAnd]
+  k_norm_g [hret1, KCtx.pushOffAt_withRegs, KCtx.pushOffAt_pushed, hK4]
+  k_norm_g at hcs2
+  have hpin : k.sie = false ∨ k.proc = 0#64 → c4 = cpu :=
+    fun h => (hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))
+  ihave HΦ' := wpNext_at _ _ _ c4 _ hpin $$ HΦ
+  rw [show k.regs = (k.pushOffAt spie spp).regs from rfl]
+  iapply (acquire_body HO MC c4 (k.pushOffAt spie spp) rfl (by simp only [KCtx.pushOffAt_avail]; omega) γ s R
+    (by simp only [KCtx.pushOffAt_locks]; exact hs)
+    (by simp only [KCtx.pushOffAt_locks, KCtx.pushOffAt_noff]; exact Nat.lt_succ_of_le hwf.2.2.2.1) R2 hcs2)
+    $$ [- $Hk $Hpc]
+  iframe Hlk Hframe
+  iintro %R' Hk Hpc %hcs Hlk' HR Hview
+  k_norm_g
+  iapply HΦ' $$ %spie %spp %R' %hsp Hk Hpc %hcs Hlk' HR Hview Harm⟩
 
 end Xv6

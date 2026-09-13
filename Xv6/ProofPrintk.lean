@@ -2891,7 +2891,7 @@ theorem printk_proof (AC : ACQUIRE) (RE : RELEASE) (CP : CONSPUTC) (PI : PRINTIN
         pcIs cpu (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ locked γpr cpu -∗ wpLoop cpu)
       ⊢ wpLoop (GF := GF) cpu := by
     intro k' hsie' hnoff' hK' hs'
-    have h := AC.wp_acquire (hlc := hlc) (GF := GF) cpu k' γpr "pr" (fun _ => emp) hsie' hnoff' hK' hs'
+    have h := AC.wp_acquire (hlc := hlc) (GF := GF) cpu k' γpr "pr" (fun _ => emp) hnoff' hK' hs'
     unfold wp_acquire_body at h
     simp only [acquireAddr, KernelSyms.«acquire»] at h
     iintro ⟨Hk, Hp, #Hl, Hcont⟩
@@ -2900,7 +2900,9 @@ theorem printk_proof (AC : ACQUIRE) (RE : RELEASE) (CP : CONSPUTC) (PI : PRINTIN
     iframe #
     rw [hsie']
     iapply wpNext_off_intro
-    iintro %R' Hk Hp %hcs Hlo _ _
+    iintro %spie %spp %R' %hsp Hk Hp %hcs Hlo _ _ _
+    obtain ⟨rfl, rfl⟩ := hsp rfl
+    rw [KCtx.pushOffAt_off' k' _ _ hsie' rfl rfl]
     iapply Hcont $$ %_ Hk Hp %hcs Hlo
   ihave #Hlk' := (show isLock γpr prLock "pr" (fun _ => emp) ⊢ isLock (GF := GF) γpr 0x80012338#64 "pr" (fun _ => emp)
     from by rw [show prLock = 0x80012338#64 from rfl]) $$ Hlk
