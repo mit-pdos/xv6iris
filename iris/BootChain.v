@@ -55,6 +55,9 @@ Require Import LinkEntry.
 Require Import SpecMainSecondary LinkMainSecondary.
 Require Import StartedInv.
 Require Import WpUart DiskPtsto.
+Require Import UartsFields.   (* [uarts_pinned] -- the two immutable `.data` fields per port *)
+Require Import UartTxInv.     (* [uart_rx_word] -- their VA-tier snapshots... *)
+Require Import SpecUartPutc.  (* ...and [uart_base_word], the other one *)
 Require Import KallocInv FdSlots.
 Require Import FileInvDefs.
 Require Import KptGhost VirtioProto VirtioModel SpecFreerange KvmSpec.
@@ -308,9 +311,10 @@ End BootSecondary.
 (* mostly made of.                                                        *)
 (*                                                                        *)
 (* THE DEPOSIT WAND IS DISCHARGED HERE, not taken.  [SpecMain]'s boot arm    *)
-(* asks for [□ (∀ γpr γs γk pd pav pu root pas, <nine facts> -∗ P)] and this *)
+(* asks for [□ (∀ γpr γs γk pd pav pu root pas, <ten facts> -∗ P)] and this  *)
 (* chain instantiates [P := SpecMainSecondary.main_deposit γd γv Φ] -- whose *)
-(* body IS those nine facts under an existential over exactly those eight    *)
+(* body IS those ten facts, plus the [dev_inv] this chain frames itself,     *)
+(* under an existential over exactly those eight                             *)
 (* names.  So the wand is [iIntros] + [iExists] + [iFrame], and THAT is what *)
 (* ties the two arms together: the boot hart deposits precisely what a       *)
 (* secondary hart's [started_inv] withdrawal (§4) consumes.                 *)
@@ -328,6 +332,12 @@ Section BootPrimary.
       (cn : cons_names)
       (γi : gname) (ξd : CtxId)
       (ps : list (mword 64)) (l0 : list (bv 8)) (b0 : bool) (c0 : virtio_cfg)
+      (* THE SECOND PORT'S BUNDLE AND ITS TWO STATE PARAMETERS (bump
+         163d39b), straight out of [BootShared.boot_shared_alloc]: main's
+         [uartinit] initialises BOTH elements of [uarts[]], and main is where
+         port 1's receive token is deposited.  This chain neither reads nor
+         opens any of it. *)
+      (γd1 : uart_names) (l1 : list (bv 8)) (b1 : bool)
       (* the file system's boot-era mint, at the era's own disk: threaded
          straight through to [SpecMain]'s boot arm (fs-cfg-boot.md stage
          (e)).  This chain neither reads nor opens it. *)
@@ -426,6 +436,22 @@ Section BootPrimary.
        which main parks in the PLIC payload beside the token *)
     uart_rx_hi γd (1/2) None -∗
     uart_dlab_is γd (DfracOwn (1/2)) b0 -∗
+    (* ---- THE SECOND PORT (bump 163d39b), forwarded whole.  [uart_inv Uart1]
+       and the CONCRETE [plic_inv γd γd1] are [BootShared]'s exports beside
+       [dev_inv] ([dev_inv]'s own PLIC conjunct ∃-packs the second name, which
+       is what keeps that bundle at arity 2); the four `.data` words are the
+       VA-tier snapshots every [WriteReg] in [uartinitone] loads its MMIO base
+       from; and the port's ghost row is the console's verbatim, because
+       [uartinitone] is ONE contract run at two ports. ---- *)
+    uart_inv Uart1 γd1 -∗
+    plic_inv γd γd1 -∗
+    uarts_pinned -∗
+    uart_base_word Uart0 -∗ uart_rx_word Uart0 -∗
+    uart_base_word Uart1 -∗ uart_rx_word Uart1 -∗
+    uart_tx_own γd1 l1 -∗ uart_sent γd1 l1 -∗ uart_out_lb γd1 l1 -∗
+    uart_rx_tok γd1 0%nat None -∗
+    uart_rx_hi γd1 (1/2) None -∗
+    uart_dlab_is γd1 (DfracOwn (1/2)) b1 -∗
     disk_cfg_is γv (DfracOwn (1/2)) c0 -∗
     ([∗ map] i ↦ st ∈ gset_to_gmap HInactive (set_seq 0 8 : gset nat),
        i ↪[dn_head γv] st) -∗
@@ -443,13 +469,17 @@ Section BootPrimary.
     intros Hreset Hz Hprun Hlen Hlive Hcnu Himg.
     iIntros "#Htext #Hdata Hres Hthr #Hstarted Hprim Hlk Hgl Hfirst Hnext Hpark Hpst Hpav Hchb
              Hfs Hmir Hirslot Hirauth #Hcert #Hseam
-             #Hdev #Hwire Hinitb Htx Hsent Hlb Htok Hhi Hdlab Hcfg Hclaim Hcmauth #Hdone Hkpt Hkptb Hkmap Hpages".
+             #Hdev #Hwire Hinitb Htx Hsent Hlb Htok Hhi Hdlab
+             #Huinv1 #Hplic #Hpinned #Hubw0 #Hurw0 #Hubw1 #Hurw1
+             Htx1 Hsent1 Hlb1 Htok1 Hhi1 Hdlab1
+             Hcfg Hclaim Hcmauth #Hdone Hkpt Hkptb Hkmap Hpages".
     iApply (boot_entry_bridge rs iv dq Hreset with "Htext Hres Hthr").
     iIntros (mf) "Hcap Hctx Hcpu Hg Hraw #Htimc Hpc".
     iApply (Main.wp_main_boot_sconf mf (kv_frame_slots + K_main)%nat zero_reg ps
               (add_vec (and_vec (add_vec (mword_of_int kmem_lo : mword 64)
                  (mword_of_int 4095 : mword 64)) negPGSIZEv) PGSIZEv)
               (mword_of_int 0x88000000 : mword 64) γd γv cn l0 b0 c0
+              γd1 l1 b1
               dk sb nib cov ndisk S Pb Rspent
               (register_lookup tlb rs) γi ξd (main_dep γd γv)
               (cid_word_of_zero _ Hz) K_main_boot_le eq_refl eq_refl Hprun Hlen
@@ -458,17 +488,24 @@ Section BootPrimary.
                     Hfirst Hnext Hpark Hpst Hpav Hchb Hfs Hmir Hirslot Hirauth
                     Hcert Hseam
                     Hdev Hwire Hinitb Htx Hsent Hlb Htok Hhi Hdlab
+                    Huinv1 Hplic Hpinned Hubw0 Hurw0 Hubw1 Hurw1
+                    Htx1 Hsent1 Hlb1 Htok1 Hhi1 Hdlab1
                     Hcfg Hclaim Hcmauth Hdone Htimc Hraw Hkpt Hkptb Hkmap Hpages").
     (* THE DEPOSIT WAND: main's boot arm hands over exactly [main_deposit]'s
-       nine conjuncts at exactly its eight existential witnesses, plus
+       ten conjuncts at exactly its eight existential witnesses, plus
        (A6.138) the position-indexed bound tie the store site supplies. *)
     iModIntro.
     iIntros (pos γpr γs γk pd pav pu root pas)
-      "Hpr Hpi Hcc Hdl Hgeom Hkpti Hroot Htramp Hkst Hbnd".
+      "Hpr Hpi Hcc Hu1 Hdl Hgeom Hkpti Hroot Htramp Hkst Hbnd".
     rewrite /main_dep /main_deposit.
     iSplitR "Hbnd"; last iExact "Hbnd".
     iExists γpr, γk, γs, pd, pav, pu, root, pas.
-    iFrame "Hpr Hpi Hcc Hdl Hgeom Hkpti Hroot Htramp Hkst".
+    (* [dev_inv] is NOT one of the wand's arguments: it exists from time 0 and
+       this chain already holds it, so the deposit's own row is framed from
+       here rather than routed through main.  It rides the escrow because the
+       secondaries used to reach it inside [printk_env], which since the
+       printk move to UART1 carries no console row at all. *)
+    iFrame "Hpr Hpi Hcc Hu1 Hdl Hgeom Hkpti Hroot Htramp Hkst Hdev".
   Qed.
 
 End BootPrimary.

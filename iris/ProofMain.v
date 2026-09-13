@@ -120,6 +120,9 @@ Require Import SpecUserinit SpecScheduler SpecKernelvec SpecFreerange.
 Require Import SpecDevintr SpecClockintr TicksInv.
 Require Import KMap.
 Require Import UartTxInv.
+Require Import UartsFields.   (* [uarts_pinned] / [uart_f_lock]: the `struct uart uarts[2]` geometry *)
+Require Import SpecUartPutc.  (* [uart_base_word]: the VA-tier `uarts[i].base` snapshot *)
+Require Import SpecPrputc.    (* [prputc_env] / [prputc_env_of]: printk's UART1 credential *)
 Require Import ConsoleInv SpecConsoleintr.
 Require Import SpecMain.
 Require Import CodeMain.
@@ -421,7 +424,14 @@ Section ProofMain.
   Local Lemma mn_grp_printk 
       (γd : uart_names) (γv : disk_names) (cn : cons_names)
       (m : regfile) (n : nat) (p0 : mword 64) (l0 : list (bv 8)) (b0 : bool)
-      (k0 : nat) (hl0 : option (list mobs)) :
+      (k0 : nat) (hl0 : option (list mobs))
+      (* THE SECOND PORT (bump 163d39b).  [uartinit] runs [uartinitone] at
+         BOTH elements of [uarts[]], so port 1's whole ghost row travels
+         through this group -- and printk's own credential is at [Uart1]
+         now, so the group's [newlock] on that port's [tx_lock] is what
+         [SpecPrputc.prputc_env] is built from. *)
+      (γd1 : uart_names) (l1 : list (bv 8)) (b1 : bool)
+      (k1 : nat) (hl1 : option (list mobs)) :
     (K_userinit <= n)%nat ->
     (* the ring's names carry the RECEIVE side's, which is where the
        high-water mark's two halves live *)
@@ -437,8 +447,12 @@ Section ProofMain.
     cpu_ctx_free -∗
     cpu_own 0 false p0 false ∅ -∗
     lk_raw (mword_of_int KernelSyms.cons) -∗
-    (* the transmit spinlock's three raw fields, on their way to uartinit *)
-    lk_raw (mword_of_int KernelSyms.tx_lock) -∗
+    (* THE TWO transmit spinlocks' raw fields, on their way to uartinit.
+       [tx_lock] left the symbol table at 163d39b: the lock is the field
+       [uarts[i].tx_lock] ([UartsFields.uart_f_lock]) and there is one per
+       port, both initialised by [uartinit]'s two [uartinitone] calls. *)
+    lk_raw (UartTxInv.a_tx_lock_at Uart0) -∗
+    lk_raw (UartTxInv.a_tx_lock_at Uart1) -∗
     lk_raw (mword_of_int KernelSyms.pr) -∗
     (* the "pr" lock's ghost, at the AMBIENT [fsc_printk] -- kit 1's first
        early peel (fs-cfg-boot.md stage (e), row (P3)).  [FsReady.fs_ready]
@@ -461,6 +475,26 @@ Section ProofMain.
        in the PLIC payload beside the token by the deposit below *)
     uart_rx_hi γd (1/2) None -∗
     uart_dlab_is γd (DfracOwn (1/2)) b0 -∗
+    (* ==================== THE SECOND PORT (bump 163d39b) ==================
+       [plic_inv γd γd1] CONCRETELY, because this group runs BOTH receive-token
+       deposits and the second one is at [γd1] -- [dev_inv]'s own PLIC conjunct
+       ∃-packs the name, which is all a claim/complete client needs and not
+       enough to name a slot.  [uarts_pinned] and the four `.data` words are
+       the immutable image facts every [WriteReg] inside [uartinitone] loads
+       its MMIO base from; the port's own five ghosts are the console's row
+       verbatim, because [uartinitone] is ONE contract run at two ports.
+       ==================================================================== *)
+    plic_inv γd γd1 -∗
+    uarts_pinned -∗
+    uart_inv Uart1 γd1 -∗
+    uart_base_word Uart0 -∗ uart_rx_word Uart0 -∗
+    uart_base_word Uart1 -∗ uart_rx_word Uart1 -∗
+    uart_tx_own γd1 l1 -∗ uart_sent γd1 l1 -∗ uart_out_lb γd1 l1 -∗
+    uart_rx_tok γd1 k1 hl1 -∗
+    (* port 1 has NO consumer, so this half never moves: it is parked in the
+       PLIC payload at [None], where [ohist_le None _] is free. *)
+    uart_rx_hi γd1 (1/2) None -∗
+    uart_dlab_is γd1 (DfracOwn (1/2)) b1 -∗
     (* NO [γpr] BINDER ANY MORE (fs-cfg-boot.md (f-3)): the "pr" lock is
        allocated at the AMBIENT [fsc_printk] since debt (E), so the group's
        product is spelled, and stage (f) needs it spelled -- an existential
@@ -473,6 +507,12 @@ Section ProofMain.
         cpu_own 0 false p0 false ∅ -∗
         printk_env fsc_printk γd γv -∗
         console_caps γd -∗
+        (* THE SECOND PORT'S ROW OF [SpecDevintr.devintr_caps], assembled
+           here because this is where its last member is MINTED: the deposit
+           of port 1's receive token turns that port's PLIC slot over to its
+           one-shot [uart_inited γd1].  The other three members are premises
+           of this group. *)
+        uart1_caps γd -∗
         (* THE CONSOLE BUNDLE.  This group is where both halves exist at
            once: consoleinit hands back the filled [devsw_table] and the
            [newlock] below mints the [is_conslock].  [console_caps] closes
@@ -483,8 +523,10 @@ Section ProofMain.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hn Hcnu Hconsq.
-    iIntros "Hcg #Htext #Hkdata #Hdev Hpc Hfree Hcpu Hlcons Hltx Hlpr".
-    iIntros "Hkprintk Hdevsw Hrest Hring Hclean Htx Hsent Hlb Htok Hhi Hdlab Hcont".
+    iIntros "Hcg #Htext #Hkdata #Hdev Hpc Hfree Hcpu Hlcons Hltx0 Hltx1 Hlpr".
+    iIntros "Hkprintk Hdevsw Hrest Hring Hclean Htx Hsent Hlb Htok Hhi Hdlab".
+    iIntros "#Hplic #Hpinned #Huinv1 #Hubw0 #Hurw0 #Hubw1 #Hurw1".
+    iIntros "Htx1 Hsent1 Hlb1 Htok1 Hhi1 Hdlab1 Hcont".
     iPoseProof (dev_inv_uart with "Hdev") as "#Huinv".
     iPoseProof (kernel_data_string mn_nl_addr mn_nl
                   (mword_of_int mn_nl_addr) eq_refl
@@ -499,8 +541,8 @@ Section ProofMain.
     pose proof mn_nl_fmt as (Hknl & Hnnl & Hlnl).
     pose proof mn_boot_fmt as (Hkbt & Hnbt & Hlbt).
     iDestruct "Hlcons" as (vcl vcn vcc) "(Hcw & Hcn & Hcc)".
-    (* [Hltx] is NOT unpacked: it goes to consoleinit whole, and comes back
-       whole as [lk_fresh]. *)
+    (* [Hltx0]/[Hltx1] are NOT unpacked: they go to consoleinit whole, and
+       come back whole as the two [lk_fresh]es. *)
     iDestruct "Hlpr" as (vpl vpn vpc) "(Hpw & Hpn & Hpc2)".
     iDestruct "Hdevsw" as (dr0 dw0) "(Hdr & Hdw)".
     (* ---- +0x42 jal consoleinit ---- *)
@@ -518,30 +560,50 @@ Section ProofMain.
               = (mword_of_int KernelSyms.consoleinit : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtci) in "Hpc".
-    (* BOTH CONSOLE LOCKS ARE BROUGHT UP HERE.  consoleinit runs
-       [initlock(&cons.lock,"cons")] itself and, through uartinit,
-       [initlock(&tx_lock,"uart")] -- so [Hlcons]'s three fields come back as
-       [Hclw]/[Hclnm]/[Hclcpu] and [Hltx]'s as [Hlkfresh], and those are
-       exactly [WpLock.newlock]'s premises.  The two [newlock]s are taken
-       twenty lines below, once [printkinit] has returned; together they are
-       [SpecConsoleintr.console_caps]. *)
+    (* ALL THREE CONSOLE-SIDE LOCKS ARE BROUGHT UP HERE.  consoleinit runs
+       [initlock(&cons.lock,"cons")] itself and, through uartinit's two
+       [uartinitone] calls, [initlock(&uarts[i].tx_lock,"uart<i>")] -- so
+       [Hlcons]'s three fields come back as [Hclw]/[Hclnm]/[Hclcpu] and the
+       two [lk_raw]s as [Hlkfresh0]/[Hlkfresh1], which are exactly
+       [WpLock.newlock]'s premises.  The three [newlock]s are taken twenty
+       lines below, once [printkinit] has returned; the first two are
+       [SpecConsoleintr.console_caps] and the third is the transmit lock
+       [SpecPrputc.prputc_env] -- printk's own credential -- is built from. *)
     iApply (Consoleinit.wp_consoleinit_sconf γd C0 n l0 b0 k0 hl0
+              γd1 l1 b1 k1 hl1
               vcl vcn vcc dr0 dw0 p0 ltac:(lia)
               with "Hcg Htext Hkdata Hpc Huinv Htx Hlb Hsent Htok Hdlab
-                    Hcw Hcn Hcc Hltx Hdr Hdw Hrest").
-    iIntros (mc) "Hcg Hpc %Hcsci Htx Hsent Htok #Hdoff Hclw #Hclnm Hclcpu Hlkfresh #Htbl".
-    (* ===== THE DEPOSIT.  uartinit's FCR flush is done, so the receive
-       token has no further boot-chain business: park it in the PLIC
-       invariant, which mints the persistent [uart_inited] every later
-       enable write and every reader of a tagged byte holds.  It runs HERE,
-       between consoleinit and plicinit, which is why the invariant's
-       pre-deposit arm can say the UART is enabled nowhere. ===== *)
+                    Hubw0 Hurw0 Hubw1 Hurw1
+                    Huinv1 Htx1 Hlb1 Hsent1 Htok1 Hdlab1
+                    Hcw Hcn Hcc Hltx0 Hltx1 Hdr Hdw Hrest").
+    iIntros (mc) "Hcg Hpc %Hcsci Htx Hsent Htok #Hdoff Hclw #Hclnm Hclcpu
+                  Hlkfresh0 Htx1 Hsent1 Htok1 #Hdoff1 Hlkfresh1 #Htbl".
+    (* ===== THE TWO DEPOSITS, ONE PER PORT.  uartinit's FCR flush is done at
+       both, so neither receive token has any further boot-chain business:
+       park each in the PLIC invariant, which mints the persistent
+       [uart_inited] every later enable write and every reader of a tagged
+       byte holds -- and, at port 1, the last member of
+       [SpecDevintr.uart1_caps].  They run HERE, between consoleinit and
+       plicinit, which is why the invariant's pre-deposit arm can say the
+       UART is enabled nowhere; plicinithart is what enables source 12 and it
+       runs strictly later, so no claim can return 12 before this point.
+       BOTH go through the CONCRETE [plic_inv γd γd1]: the slot the deposit
+       moves is keyed by the port's own bundle, and [dev_inv]'s ∃-packed PLIC
+       conjunct cannot name the second one. ===== *)
     iDestruct "Htok" as (ktok hltok) "Htok".
+    iDestruct "Htok1" as (ktok1 hltok1) "Htok1".
     iApply fupd_wp.
-    iMod (uart_rx_tok_deposit ⊤ γd ktok hltok None ltac:(solve_ndisj)
+    iMod (uart_rx_tok_deposit ⊤ γd γd1 Uart0 ktok hltok None ltac:(solve_ndisj)
             (ohist_le_none hltok)
-            with "[] Htok Hhi") as "#Hinit".
-    { iApply (dev_inv_plic with "Hdev"). }
+            with "Hplic Htok Hhi") as "#Hinit".
+    iMod (uart_rx_tok_deposit ⊤ γd γd1 Uart1 ktok1 hltok1 None ltac:(solve_ndisj)
+            (ohist_le_none hltok1)
+            with "Hplic Htok1 Hhi1") as "#Hinit1".
+    (* [plic_unames γd γd1 Uart0] IS [γd] and [... Uart1] IS [γd1], by iota on
+       the port; normalising the two one-shots here keeps every later
+       [iFrame] a syntactic match rather than a conversion. *)
+    iEval (cbn [plic_unames]) in "Hinit".
+    iEval (cbn [plic_unames]) in "Hinit1".
     iModIntro.
     assert (Hretci : ret_pc (C0 !!! Regidx (mword_of_int 1 : mword 5) : mword 64)
                      = (mword_of_int (KernelSyms.main + 0x46) : mword 64)).
@@ -592,22 +654,38 @@ Section ProofMain.
     iMod (newlock_at ⊤ fsc_printk (mword_of_int KernelSyms.pr) "pr"%string <{ pr_res γd }> with "Hkprintk Hprnm Hrun Hprw Hprcpu []") as "[Hrun #Hprlk]".
     { rewrite /pr_res. done. }
     iDestruct ("Hcgb" with "Hrun") as "Hcg".
-    (* ---- THE OTHER TWO [newlock]s, and this is the point of the group.
-       consoleinit has just run [initlock] on cons.lock and, through uartinit,
-       on tx_lock; both come back as [WpLock.newlock]'s raw material, and both
-       RESOURCES are in hand -- the ring out of [main_globals_raw], the
-       transmitter token [Htx] straight back from consoleinit (d80e61c5 left
-       [pr_res] empty, so nothing else wants it).  Together the two are
-       [SpecConsoleintr.console_caps], which the kernelvec handler contract
-       closes over ([SpecDevintr.devintr_caps]) because devintr -> uartintr ->
-       consoleintr takes both locks.  Nothing consumed it before consoleintr
-       was proven, which is why the two steps sat here un-taken. ---- *)
-    iDestruct "Hlkfresh" as "(Htxw & #Htxnm & Htxcpu)".
+    (* ---- THE OTHER THREE [newlock]s, and this is the point of the group.
+       consoleinit has just run [initlock] on cons.lock and, through
+       uartinit's two [uartinitone] calls, on BOTH [uarts[i].tx_lock]; all
+       three come back as [WpLock.newlock]'s raw material, and every
+       RESOURCE is in hand -- the ring out of [main_globals_raw], and each
+       port's transmitter token straight back from consoleinit (d80e61c5
+       left [pr_res] empty, so nothing else wants either).  cons.lock and
+       port 0's are [SpecConsoleintr.console_caps], which the kernelvec
+       handler contract closes over ([SpecDevintr.devintr_caps]) because
+       devintr -> uartintr -> consoleintr takes both.
+
+       PORT 1's IS PRINTK'S OWN.  At 163d39b printk/printint/printptr/panic
+       print through [prputc] on the SECOND UART, so the credential their
+       cone consumes is [SpecPrputc.prputc_env] -- that port's invariant,
+       that port's transmit lock (with its frozen DLAB inside
+       [is_txlock_at]) and the `.data` word its MMIO base is loaded from --
+       and none of it is the console's.  [printk_env] is that plus the "pr"
+       lock, so this is the one site in the tree where the second port's
+       lock is founded.
+
+       THE TWO RANKS ARE EQUAL ON PURPOSE ([LockRank.v]: "uart0" and "uart1"
+       are both 17), so [locks_below {["uart0"]} "uart1"] is FALSE and a
+       hart may not hold one port's transmit lock while taking the other's.
+       That is the intended discipline, not a gap. ---- *)
+    iDestruct "Hlkfresh0" as "(Htxw & #Htxnm & Htxcpu)".
+    iDestruct "Hlkfresh1" as "(Htxw1 & #Htxnm1 & Htxcpu1)".
     (* A6.69: the honest creator deposit (A6.66) wants the running token;
        this proof holds the kernel bundle, so it borrows its own and puts
        it straight back ([SieCapCtx.sie_cap_gpr_own_ctx_acc]). *)
     iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
-    iMod (newlock ⊤ UartTxInv.a_tx_lock "uart"%string <{ tx_res γd }>
+    iMod (newlock ⊤ (UartTxInv.a_tx_lock_at Uart0)
+            (UartTxInv.uart_lock_name Uart0) <{ tx_res γd }>
             with "Htxnm Hrun Htxw Htxcpu [Htx]") as "[Hrun Htxi0]".
     { iApply (tx_res_intro γd l0 with "Htx"). }
     iDestruct ("Hcgb" with "Hrun") as "Hcg".
@@ -617,11 +695,21 @@ Section ProofMain.
        both consumers (LinkPrintk.v needs the witness to invoke the real
        [SpecPrintk.wp_printk_sconf]). *)
     iPoseProof (is_txlock_intro γtx γd with "Htxinv Hdoff") as "#Htxl".
+    (* ---- AND THE SECOND PORT'S, at [uarts + 56] under the name "uart1",
+       paid for with THAT port's transmitter token and its frozen DLAB --
+       both of which [uartinit] handed back through consoleinit. ---- *)
+    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
+    iMod (newlock ⊤ (UartTxInv.a_tx_lock_at Uart1)
+            (UartTxInv.uart_lock_name Uart1) <{ tx_res γd1 }>
+            with "Htxnm1 Hrun Htxw1 Htxcpu1 [Htx1]") as "[Hrun Htxi1]".
+    { iApply (tx_res_intro γd1 l1 with "Htx1"). }
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
+    iDestruct "Htxi1" as (γtx1) "#Htxinv1".
+    iPoseProof (is_txlock_at_intro Uart1 γtx1 γd1 with "Htxinv1 Hdoff1")
+      as "#Htxl1".
     iAssert (printk_env fsc_printk γd γv) as "#Hpenv".
     { rewrite /printk_env /pr_lock. iSplitR; [iExact "Hprlk"|].
-      iSplitR; [iExact "Hdoff" |].
-      iSplitR; [iExact "Hdev" |].
-      iSplitR; [iExists γtx; iExact "Htxl" | iExact "Hsub0"]. }
+      iApply (SpecPrputc.prputc_env_of γtx1 γd1 with "Huinv1 Htxl1 Hubw1"). }
     (* A6.69: the honest creator deposit (A6.66) wants the running token;
        this proof holds the kernel bundle, so it borrows its own and puts
        it straight back ([SieCapCtx.sie_cap_gpr_own_ctx_acc]). *)
@@ -647,17 +735,18 @@ Section ProofMain.
       iSplitR; [iExact "Hconslk0" |].
       iSplitR; [iPureIntro; exact Hcnu |].
       iSplitR; [iExact "Hsub0" |].
-      (* ================= OPEN SEAM (bump 163d39b) =================
-         [Hubw0 : SpecUartPutc.uart_base_word Uart0] -- the VA-tier
-         snapshot of `uarts[0].base`, which consputc now LOADS instead of
-         spelling as a constant, and which rides in [console_caps] so that
-         consoleintr / uartintr / devintr each keep their premise list.
-         [BootShared]'s supply MINTS it already (`uart_base_word Uart0 ∗
-         uart_base_word Uart1`, beside [uarts_pinned]); what is missing is
-         the threading from that supply into main's own contract.  This is
-         the only place the credential is PRODUCED.
-         ============================================================ *)
+      (* [Hubw0] is the VA-tier snapshot of `uarts[0].base`, which consputc
+         LOADS since 163d39b instead of spelling as a constant.  It rides in
+         [console_caps] so that consoleintr / uartintr / devintr each keep
+         their premise list; [BootShared]'s supply mints it beside
+         [uarts_pinned], and this is the only place it is CONSUMED. *)
       iSplitR; [iExact "Hinit" | iExact "Hubw0"]. }
+    (* ---- THE SECOND PORT'S ROW OF [devintr_caps], complete only now: its
+       fourth member is the one-shot the deposit above just minted at
+       [γd1].  The other three are this group's premises. ---- *)
+    iAssert (uart1_caps γd) as "#Hu1caps".
+    { rewrite /uart1_caps. iExists γd1.
+      iFrame "Hpinned Huinv1 Hplic Hinit1". }
     (* THE CONSOLE BUNDLE, and this is the only point at which it can be
        built: [Hconslk] is [is_conslock γcl] with γcl still concrete, and
        [Htbl] is the table consoleinit filled twenty instructions ago.
@@ -852,7 +941,7 @@ Section ProofMain.
     { rewrite /D3 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hretpk3) in "Hpc".
     destruct Hcsk3 as (Hcsk3 & _).
-    iApply ("Hcont" $! mk3 with "Hcg Hpc Hfree Hcpu Hpenv Hccaps Hcready").
+    iApply ("Hcont" $! mk3 with "Hcg Hpc Hfree Hcpu Hpenv Hccaps Hu1caps Hcready").
   Qed.
 
   (* =================================================================== *)
@@ -1293,7 +1382,11 @@ Section ProofMain.
        form once is what lets [rget_tp]'s output be rewritten below. *)
     assert (Hcidz : cid_word_of cpu_id = (zero_reg : mword 64)) by exact Hcid.
     iIntros "Hcg #Htext #Hkdata #Hdev Hpc Hltick Hticks Hstvec Hq Hcont".
-    iPoseProof (dev_inv_plic with "Hdev") as "#Hpinv".
+    (* [dev_inv]'s PLIC conjunct ∃-PACKS the second port's names (WpUart.v:
+       that is what keeps the bundle at arity 2).  plicinit/plicinithart only
+       borrow [plic_frag], so the witness is all they need and this group
+       never has to know which bundle it is. *)
+    iDestruct (dev_inv_plic with "Hdev") as (γp1) "#Hpinv".
     iDestruct "Hltick" as (vtl vtn vtc) "(Htw & Htn & Htc)".
     (* ---- +0x7e jal trapinit ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x7e)) (mword_of_int 1 : mword 5)
@@ -1376,7 +1469,7 @@ Section ProofMain.
               = (mword_of_int KernelSyms.plicinit : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtpl) in "Hpc".
-    iApply (Plicinit.wp_plicinit_sconf γd T3 n p0 ltac:(lia)
+    iApply (Plicinit.wp_plicinit_sconf γd γp1 T3 n p0 ltac:(lia)
               with "Hcg Htext Hpc Hpinv").
     iApply wp_next_off_intro.
     iIntros (mpl) "Hcg Hpc %Hcspl".
@@ -1483,6 +1576,11 @@ Section ProofMain.
     ConsoleInv.cons_reader fsc_cons 0%nat -∗
     kmap_at tramp_vpn tramp_ppn KP_rx -∗
     console_caps γd -∗
+    (* ...and the SECOND PORT's row beside it (bump 163d39b): the park's
+       [UsertrapRes.devintr_caps_any] gained it when devintr gained the
+       [irq == UART1_IRQ] arm, and this group makes no part of it --
+       [mn_grp_printk] does, at its second deposit. *)
+    uart1_caps γd -∗
     SpecFileread.console_ready_app -∗
     is_tickslock γtl -∗
     is_lock γw wait_lock_addr "wait_lock"%string (wait_res_at) -∗
@@ -1612,7 +1710,7 @@ Section ProofMain.
   Proof.
     intros Hn Hlen Hlive Hdevq Hnibq Hcov0 Hnibeq Hpures
            Huartq Hdiskq Hgeomok Hpkc.
-    iIntros "Hcg #Htext #Hkdata #Hdev #Hwire Hbundle Hrdtok #Htramp #Hccaps #Hcready #Htl #Hwaitlk
+    iIntros "Hcg #Htext #Hkdata #Hdev #Hwire Hbundle Hrdtok #Htramp #Hccaps #Hu1caps #Hcready #Htl #Hwaitlk
              #Hpenv #Hkmem #Hcert #Hseam Hfolauth Hoffa Hfirst
              #Hpanic Hpc Hfree Hcpu #Hpinv Hpavail #Hlpidlk Hkenv".
     iIntros "Hlbc Hbufl Hbufn Hbhead Hbpay Hlit Hinl Hkit1 Hkit2
@@ -1992,8 +2090,6 @@ Section ProofMain.
     iAssert (devintr_caps_any fsc_uart fsc_disk fsc_dlock γtl γs pd pav pu)
       as "#Hdcaps".
     { rewrite /devintr_caps_any Huartq Hdiskq.
-      (* [Hu1caps] -- see the OPEN SEAM marker at the [devintr_caps] site
-         below; the same row, at the ambient names. *)
       iFrame "Hdev Hccaps Hgeom Hdlock Htl Hpinv Hu1caps". }
     iAssert first_boot_persist as "#Hpersist".
     { rewrite /first_boot_persist /ic_sleeplocks.
@@ -2080,6 +2176,12 @@ Section ProofMain.
          printk_env γpr' γd γv -∗
          procs_inv γs' -∗
          console_caps γd -∗
+         (* THE SECOND PORT'S ROW (bump 163d39b), in the position
+            [SpecMainSecondary.main_deposit] carries it: the boot chain
+            discharges this wand into that deposit, and no hart but this one
+            can make the row -- its fourth member is minted by main's own
+            second receive-token deposit. *)
+         uart1_caps γd -∗
          is_lock γk' d_lock "virtio_disk"%string (disk_res_at γv pd' pav' pu') -∗
          disk_geom γv pd' pav' pu' -∗
          kpt_inv root' -∗
@@ -2093,6 +2195,7 @@ Section ProofMain.
     printk_env γpr γd γv -∗
     procs_inv γs -∗
     console_caps γd -∗
+    uart1_caps γd -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res_at γv pd pav pu) -∗
     disk_geom γv pd pav pu -∗
     kpt_inv root -∗
@@ -2104,7 +2207,7 @@ Section ProofMain.
   Proof.
     intros Hn Hp0 Hcid.
     iIntros "Hcg #Htext Hpc Hfree Hcpu Htcsr #Hsinv Hprim #Hwand #Hcreds".
-    iIntros "#Hpenv #Hpinv #Hccaps #Hdlock #Hgeom #Hkinv #Hkptp #Htramp #Hkstx".
+    iIntros "#Hpenv #Hpinv #Hccaps #Hu1caps #Hdlock #Hgeom #Hkinv #Hkptp #Htramp #Hkstx".
     (* A6.138: the deposit is POSITION-GENERIC -- the builder fires at the
        flag store's own position, where [B ≤ pos] is the bound-below-flag
        tie the secondaries' credentials need. *)
@@ -2113,7 +2216,7 @@ Section ProofMain.
     iAssert (□ (∀ pos : nat, ⌜(Bk <= pos)%nat⌝ -∗ P pos cur_ctx))%I as "#HPmk".
     { iIntros "!>" (pos) "%Hpos".
       iApply ("Hwand" $! pos γpr γs γk pd pav pu root pas
-                with "Hpenv Hpinv Hccaps Hdlock Hgeom Hkinv Hkptp Htramp Hkstx
+                with "Hpenv Hpinv Hccaps Hu1caps Hdlock Hgeom Hkinv Hkptp Htramp Hkstx
                       [ ]").
       iExists Bk. iFrame "Hbd". by iPureIntro. }
     (* The release sequence.  Note the shape: the address is materialized
@@ -2262,6 +2365,7 @@ Section ProofMain.
       (ps : list (mword 64)) (s1entry phystop : mword 64)
       (γd : uart_names) (γv : disk_names) (cn : cons_names)
       (l0 : list (bv 8)) (b0 : bool) (c0 : virtio_cfg)
+      (γd1 : uart_names) (l1 : list (bv 8)) (b1 : bool)
       (dk : Z -> bv 8) (sb : FsImg.fs_sb) (nib : nat) (cov : gset Z)
       (ndisk : nat)
       (S : FsState.fs_state_rec) (Pb : Z -> list (bv 8)) (Rspent : gset Z)
@@ -2269,7 +2373,7 @@ Section ProofMain.
       (γi : gname) (ξd : CtxId) (P : nat -> CtxId -> iProp Σ)
       `{!∀ pos ξ, Persistent (P pos ξ)} `{!∀ pos, CtxMorph (P pos)}
     : wp_main_boot_sconf_body m K p0 ps s1entry phystop
-        γd γv cn l0 b0 c0 dk sb nib cov ndisk S Pb Rspent tlbvec0 γi ξd P.
+        γd γv cn l0 b0 c0 γd1 l1 b1 dk sb nib cov ndisk S Pb Rspent tlbvec0 γi ξd P.
   Proof.
     cbv beta delta [wp_main_boot_sconf_body].
     intros pcE Hcid HK Hphystop Hs1 Hprun Hlen Hlive Hcnu Hsnap Hp0.
@@ -2294,19 +2398,30 @@ Section ProofMain.
     iIntros "Hcg Hfree Hcpu Hq #Htext #Hkdata Hpc #Hsinv Hprim #Hwand Hlocks Hglobals".
     iIntros "Hfirst Hnpid".
     iIntros "Hparks Hpst Hpavail Hchb Hfs Hmir Hirslot Hirauth #Hcert #Hseam".
-    iIntros "#Hdev #Hwire Hbundle Htx Hsent Hlb Htok Hhi Hdlab Hcfg Hclaim Hcmauth #Hdone #Htimc Hhart Hunset Hbunset Hkauth Hpages".
-    iDestruct "Hlocks" as "(Hlcons & Hltx & Hlpr & Hlkmem & Hlpid & Hlwait &
+    iIntros "#Hdev #Hwire Hbundle Htx Hsent Hlb Htok Hhi Hdlab".
+    (* ---- THE SECOND PORT'S THIRTEEN ROWS (bump 163d39b), all of them out
+       of [BootShared.boot_shared_alloc] and none derivable below the boot
+       chain: UART1's own invariant, the PLIC's at the two CONCRETE bundles
+       (main needs the name for its second deposit -- [dev_inv]'s conjunct
+       ∃-packs it), the four immutable `.data` words at the VA tier, and
+       port 1's ghost row, which is the console's verbatim because
+       [uartinitone] is ONE contract run at two ports. ---- *)
+    iIntros "#Huinv1 #Hplic #Hpinned #Hubw0 #Hurw0 #Hubw1 #Hurw1".
+    iIntros "Htx1 Hsent1 Hlb1 Htok1 Hhi1 Hdlab1".
+    iIntros "Hcfg Hclaim Hcmauth #Hdone #Htimc Hhart Hunset Hbunset Hkauth Hpages".
+    iDestruct "Hlocks" as "(Hlcons & Hltx0 & Hltx1 & Hlpr & Hlkmem & Hlpid & Hlwait &
                             Hltick & Hlbc & Hlit & Hlft & Hldisk)".
     (* THE [tx_busy] CELL IS GONE from the bundle: ae96fd0 deleted the flag, so
-       there is no such symbol and nothing to carve (BootShared.v skips the
-       word, which is now [tx_chan], and nobody owns it).  [Hltx] is still
-       carried, and is the ordinary [lk_raw] spinlock shape (three cells over
-       24 bytes): uartinit's [initlock(&tx_lock,"uart")] consumes it and
-       consoleinit returns [lk_fresh].  What the flag was being carried FOR is
-       still gone -- uartintr takes no lock, so [is_txlock] left
-       [devintr_caps] entirely -- and the [newlock] step
-       that would turn that [lk_fresh] into [is_txlock] is not taken here; see
-       [mn_grp_printk].
+       there is no such symbol and nothing to carve.  THE TRANSMIT LOCK IS
+       NOW TWO OF THEM ([Hltx0]/[Hltx1]) and neither is in .bss: at 163d39b
+       the kernel drives both 16550s out of one `struct uart uarts[2]` in
+       `.data`, so the lock is the FIELD [uarts[i].tx_lock] and uartinit
+       initialises both through [uartinitone(&uarts[i], "uart<i>")].  Each is
+       the ordinary [lk_raw] spinlock shape (three cells over 24 bytes),
+       consumed by that [initlock] and returned as [lk_fresh]; the two
+       [newlock]s that seal them are [mn_grp_printk]'s -- port 0's into
+       [console_caps], port 1's into [SpecPrputc.prputc_env], which is what
+       printk prints through now.
        [Hient] -- the fifty itable entries' cells -- IS CONSUMED NOW: it
        goes into [mn_grp_fs], which runs [IcacheBoot.icache_boot_at] on it at
        main+0x92 against the era fupd's [FsCfgBoot.fs_kit_icache] (whose
@@ -2379,12 +2494,15 @@ Section ProofMain.
     iApply (mn_boot_entry m K p0 Hcid HK with "Hcg Htext Hpc").
     iIntros (m1) "Hcg Hpc".
     (* --- 0x42 .. 0x6a : console / printk --- *)
-    iApply (mn_grp_printk γd γv cn m1 (K - 2)%nat p0 l0 b0 0%nat None Hn50
+    iApply (mn_grp_printk γd γv cn m1 (K - 2)%nat p0 l0 b0 0%nat None
+              γd1 l1 b1 0%nat None Hn50
               Hcnu Hconsq
-              with "Hcg Htext Hkdata Hdev Hpc Hfree Hcpu Hlcons Hltx Hlpr
+              with "Hcg Htext Hkdata Hdev Hpc Hfree Hcpu Hlcons Hltx0 Hltx1 Hlpr
                     Hkprintk Hdevsw Hdevrest Hring Hclean Htx Hsent Hlb Htok
-                    Hhi Hdlab").
-    iIntros (m2) "Hcg Hpc Hfree Hcpu #Hpenv #Hccaps #Hcready".
+                    Hhi Hdlab
+                    Hplic Hpinned Huinv1 Hubw0 Hurw0 Hubw1 Hurw1
+                    Htx1 Hsent1 Hlb1 Htok1 Hhi1 Hdlab1").
+    iIntros (m2) "Hcg Hpc Hfree Hcpu #Hpenv #Hccaps #Hu1caps #Hcready".
     (* ---- STAGE (f): the printk half of [FirstTok.first_boot_persist],
        re-spelled at the CONFIGURATION's device gnames.  The group produces
        it at [γd]/[γv]; the bundle is written at [fsc_uart]/[fsc_disk], and
@@ -2429,7 +2547,7 @@ Section ProofMain.
               Pb Rspent
               Hn50 Hlen Hlive Hdevq Hnibpos Hcovpos Hnibq Hpures
               Huartq Hdiskq Hgeomok Hpkc
-              with "Hcg Htext Hkdata Hdev Hwire Hbundle Hrdtok Htramp Hccaps Hcready Htl Hwaitlock
+              with "Hcg Htext Hkdata Hdev Hwire Hbundle Hrdtok Htramp Hccaps Hu1caps Hcready Htl Hwaitlock
                     Hpenvc Hkmem Hcert Hseamc Hfolat Hoffa Hfirst
                     [Hpenv] Hpc Hfree Hcpu Hpinv Hpavail
                     Hpidlock Hkenv Hlbc Hbufl
@@ -2452,17 +2570,13 @@ Section ProofMain.
        trapinit's group brought up, plus [procs_inv]. *)
     iAssert (tick_keeper γtl γs) as "#Htick".
     { iRight. iFrame "Htl Hpinv". }
-    (* ===================== OPEN SEAM (bump 163d39b) =====================
-       [Hu1caps : SpecDevintr.uart1_caps γd] -- the second port's row, which
-       [devintr_caps] gained because the [irq == UART1_IRQ] arm calls the
-       same uartintr at [Uart1].  Its three members are [uarts_pinned],
-       [uart_inv Uart1 γd1] and [plic_inv γd γd1] at ONE γd1;
-       [BootShared]'s supply already mints the first two but NOT the third,
-       and none of them is threaded into main's contract yet.  One row in
-       the boot supply plus the threading closes this -- and the same row
-       must then go into [SpecMainSecondary.main_deposit], which is where a
-       secondary hart gets every other member of this credential.
-       ==================================================================== *)
+    (* [Hu1caps] is the SECOND PORT'S ROW, which [devintr_caps] gained because
+       the [irq == UART1_IRQ] arm calls the same uartintr at [Uart1].
+       [mn_grp_printk] built it: three of its four members come down the boot
+       chain ([uarts_pinned], [uart_inv Uart1 γd1], the concrete
+       [plic_inv γd γd1]) and the fourth, [uart_inited γd1], is minted there
+       by port 1's own receive-token deposit.  It also travels to the
+       secondaries, through [SpecMainSecondary.main_deposit]. *)
     iAssert (devintr_caps γd γv γk γtl γs pd pav pu) as "#Hcaps".
     { rewrite /devintr_caps.
       iFrame "Hdev Hccaps Hgeom Hdlock Htimc Htick Hpinv Hu1caps". }
@@ -2482,7 +2596,7 @@ Section ProofMain.
               root pas γi ξd P ltac:(lia) Hp0 Hcid
               with "Hcg Htext Hpc Hfree Hcpu [Htcsr Hintr Hkpt] Hsinv Hprim Hwand
                     Hcreds Hpenv
-                    Hpinv Hccaps Hdlock Hgeom Hkinv Hkptp Htramp Hkstx").
+                    Hpinv Hccaps Hu1caps Hdlock Hgeom Hkinv Hkptp Htramp Hkstx").
     (* fold the boot cells and the freshly built handler resource into the
        [trap_csrs] the scheduler consumes. *)
     iApply (trap_csrs_of_raw with "Htcsr Hintr Hkpt").

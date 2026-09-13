@@ -138,6 +138,7 @@ Require Import StartedInv.
 (* the callees, for the vocabulary main's precondition is stated in *)
 Require Import ConsoleInv.
 Require Import SpecConsoleintr.
+Require Import SpecDevintr.   (* [uart1_caps] -- the second port's row of the deposit *)
 Require Import SpecConsoleinit.
 Require Import SpecProcinit.
 (* [IcacheBoot.ientry_raw] -- the fifty itable ENTRIES' cells, which iinit
@@ -580,6 +581,14 @@ Section SpecMain.
          printk_env γpr γd γv -∗
          procs_inv γs -∗
          console_caps γd -∗
+         (* THE SECOND PORT'S ROW (bump 163d39b), in the position
+            [SpecMainSecondary.main_deposit] carries it.  It has to travel
+            through this wand and not beside it: three of its four members
+            come down the boot chain, but the fourth -- [uart_inited γd1] --
+            is minted by MAIN's own second receive-token deposit, which runs
+            after uartinit's FCR flush, so no caller of main can hold the
+            row. *)
+         uart1_caps γd -∗
          is_lock γk d_lock "virtio_disk"%string (disk_res_at γv pd pav pu) -∗
          disk_geom γv pd pav pu -∗
          kpt_inv root -∗

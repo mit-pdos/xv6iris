@@ -103,7 +103,7 @@ Proof. split_and!; [vm_compute; reflexivity | vm_compute; reflexivity | vm_compu
    sized by: the loop-head enable funds [kv_frame_slots] out of what the arm
    hands it. *)
 Lemma ms_bounds (K : nat) : (K_main_secondary <= K)%nat ->
-  (2 <= K)%nat /\ (48 <= K - 2)%nat /\ (kv_frame_slots + 22 <= K - 2)%nat.
+  (2 <= K)%nat /\ (52 <= K - 2)%nat /\ (kv_frame_slots + 22 <= K - 2)%nat.
 Proof. lia. Qed.
 
 (* ===================================================================== *)
@@ -159,7 +159,7 @@ Section ProofMainSecondary.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hcid HK.
-    pose proof (ms_bounds K HK) as (Hc2 & Hn38 & Hn20).
+    pose proof (ms_bounds K HK) as (Hc2 & Hn52 & Hn20).
     iIntros "Hcg #Htext Hpc Hcont".
     (* frame-cell address facts (2-slot frame: ra @ slot 1, s0 @ slot 2) *)
     assert (Hpush : add_vec (m !!! Regidx csp_rs1)
@@ -479,7 +479,11 @@ Section ProofMainSecondary.
   Local Lemma ms_printk (γpr : gname) 
       (γd : uart_names) (γv : disk_names)
       (m : regfile) (n : nat) (p0 : mword 64) :
-    (48 <= n)%nat ->
+    (* [printk_stack] WENT 48 -> 52 AT 163d39b: uartputc_sync's register
+       writes moved into a called function, so printk's chain is one frame
+       deeper.  [K_main_secondary] is unmoved -- it is set by the scheduler's
+       trap reserve, and [K - 2 = 112] leaves 60 slots of slack here. *)
+    (52 <= n)%nat ->
     sie_cap_gpr KT0 m n false p0 -∗ kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.main + 0x20) : mword 64) -∗
     cpu_ctx_free -∗
@@ -800,7 +804,7 @@ Section ProofMainSecondary.
   Proof using All.
     cbv beta delta [wp_main_secondary_sconf_body].
     intros pcE Hcid Hdc HK Hp0.
-    pose proof (ms_bounds K HK) as (Hc2 & Hn38 & Hn20).
+    pose proof (ms_bounds K HK) as (Hc2 & Hn52 & Hn20).
     iIntros "Hcg Hfree Hcpu Hq #Htext #Hkdata Hpc #Hsinv #Htimc Hhart".
     (* printk wants the ambient form; the scheduler join wants the generic one
        (its acquire does), so keep both. *)
@@ -818,23 +822,18 @@ Section ProofMainSecondary.
                  (hart_agent cpu_id) pos Bk ltac:(lia) with "Hvpos") as "#HvB".
     iDestruct (CtxValues.cv_boot_cred_view Bk with "HvB") as "#Hbc".
     iDestruct (KptShare.kpt_creds_intro Bk with "Hbd Hbc") as "#Hcreds".
+    (* THE DEPOSIT'S ELEVEN ROWS.  A SECONDARY HART MAKES NONE OF THEM: every
+       one is a lock over a static global, an invariant, or a one-shot the
+       boot hart minted, and they arrive through the [started] escrow.
+       [Hu1caps] is the second port's row, which [devintr_caps] gained
+       because devintr's [irq == UART1_IRQ] arm runs the same uartintr at
+       [Uart1]; [Hdev] is the device fabric, which used to be reached by
+       projecting [printk_env] and no longer can -- printk prints through
+       [prputc] on UART1 now, so its credential carries no console row. *)
     iDestruct "Hdepm" as (γpr γk γs pd pav pu root pas)
-      "(#Hpenv & #Hpinv & #Hccaps & #Hdlock & #Hgeom & #Hkinv & #Hkptp & #Htramp & #Hkstx)".
-    (* ===================== OPEN SEAM (bump 163d39b) =====================
-       [Hu1caps : SpecDevintr.uart1_caps γd] -- the second port's row.  A
-       SECONDARY hart makes none of the credential itself; every member of
-       it arrives through the one-shot [started] escrow
-       ([SpecMainSecondary.main_deposit]), so this row belongs there too,
-       beside [console_caps].  It is NOT there yet, because the depositor is
-       [ProofMain]'s [mn_grp_started] and the boot chain does not yet hand
-       [ProofMain] the row either -- [BootShared]'s supply already mints
-       [uarts_pinned] and [uart_inv Uart1 γd1] but NOT [plic_inv γd γd1],
-       which is the third member.  Two rows, one in the boot supply and one
-       in [main_deposit], close this.
-       ==================================================================== *)
-    iPoseProof "Hpenv" as "Hpenv2".
-    iDestruct "Hpenv2" as "(_ & _ & #Hdev & _ & _)".
-    iApply (ms_printk γpr γd γv m2 (K - 2)%nat p0 Hn38
+      "(#Hpenv & #Hpinv & #Hccaps & #Hu1caps & #Hdlock & #Hgeom & #Hkinv &
+        #Hkptp & #Htramp & #Hkstx & #Hdev)".
+    iApply (ms_printk γpr γd γv m2 (K - 2)%nat p0 Hn52
               with "Hcg Htext Hkdata Hpc Hfree Hcpu Hpenv").
     iIntros (m3) "Hcg Hpc Hfree Hcpu".
     iApply (ms_inithart_sched γd γv γs γk pd pav pu m3 (K - 2)%nat p0 root tlbvec0

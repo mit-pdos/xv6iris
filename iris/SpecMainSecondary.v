@@ -69,6 +69,7 @@ Require Import ProcGeom FdSlots CpuOwn SchedCtx.
 (* [dev_ncpu], the PLIC's modelled hart count, for plicinithart's premise *)
 Require Import DevModel.
 Require Import DiskPtsto.
+Require Import WpUart.   (* [dev_inv] -- the deposit's last row *)
 Require Import UartNames.
 Require Import Xv6Cameras.
 Require Import DiskInv.
@@ -102,8 +103,10 @@ Section SpecMainSecondary.
 
   (* ------------------------------------------------------------------- *)
   (* THE DEPOSIT: the canonical instantiation of SpecMain's payload [P].  *)
-  (* Exactly the nine facts the boot arm's □-wand takes as arguments,      *)
-  (* packaged with their ghost names / pages / root / pas existential.     *)
+  (* The ten facts the boot arm's □-wand takes as arguments, packaged with *)
+  (* their ghost names / pages / root / pas existential -- plus [dev_inv],  *)
+  (* which the boot CHAIN frames from its own copy rather than routing      *)
+  (* through main (see the row itself).                                     *)
   (* Every conjunct is persistent, which is what lets the whole package    *)
   (* ride the one-shot [started] escrow to up to NCPU-1 readers.           *)
   (* ------------------------------------------------------------------- *)
@@ -131,7 +134,17 @@ Section SpecMainSecondary.
        (mword_of_int KernelSyms.kernel_pagetable : mword 64) ↦₈□
          (zero_extend' 64 (concat_vec root (zeros' 12 : mword 12))) ∗
        kmap_at tramp_vpn tramp_ppn KP_rx ∗
-       ([∗ list] i ∈ seq 0 64, kmap_at (kstack_vpn i) (pas i) KP_rw))%I.
+       ([∗ list] i ∈ seq 0 64, kmap_at (kstack_vpn i) (pas i) KP_rw) ∗
+       (* THE DEVICE FABRIC, LAST (bump 163d39b).  A secondary hart used to
+          reach [dev_inv] by projecting it out of [printk_env]; at 163d39b
+          printk drives UART1 through [prputc] and its credential carries no
+          console row at all ([SpecPrintk.printk_env] is the "pr" lock plus
+          [SpecPrputc.prputc_env]), so the one route is gone.  [dev_inv] is
+          persistent and exists from time 0, so this costs the depositor
+          nothing -- [BootChain.boot_hart_primary] frames its own -- and it
+          keeps the secondary's [devintr_caps] assembly exactly where it
+          was. *)
+       dev_inv γd γv)%I.
 
   Global Instance main_deposit_persistent γd γv :
     Persistent (main_deposit γd γv).
