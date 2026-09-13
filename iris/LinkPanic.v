@@ -1,10 +1,9 @@
 (* LinkPanic.v -- instantiates panic's proof against its callee's.
 
    panic's only callee is printk, on the one path printk now has
-   ([LinkPrintk.v]'s [Printk], proven).  The placeholder credential panic
-   still hands printk for acquire's "already holding" arm is a HYPOTHESIS of
-   [SpecPanic.wp_panic_sconf_body], not an axiom of this link -- see
-   the placeholder this replaced. *)
+   ([LinkPrintk.v]'s [Printk], proven).  Nothing here moved at 163d39b: the
+   functor arity is the same and printk's contract lost arguments rather than
+   gaining any. *)
 Require Import LinkPrintk ProofPanic.
 
 Module Panic := PanicProof Printk.

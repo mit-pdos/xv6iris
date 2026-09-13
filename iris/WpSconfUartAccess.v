@@ -4,11 +4,11 @@
    These are single-instruction leaf WPs built on the general UART device leaves
    [Uart.wp_lb_uart_s_sconf] / [Uart.wp_sb_uart_s_sconf]: they pre-discharge the
    constant PTE/geometry premises (the caller supplies only that the base
-   register already holds the concrete UART register address [uart_pa Uart0 off]) and
+   register already holds the concrete UART register address [uart_pa i off]) and
    package the transmitter-token protocol.  The reuse pattern for any device-MMIO
    S-mode instruction while holding [dev_inv] + the transmitter token:
-     - [wp_uart_lsr_read_s_sconf]  : LSR poll load (offset 5)
-     - [wp_uart_thr_write_s_sconf] : THR write (offset 0)
+     - [wp_uart_lsr_read_s_sconf_at]  : LSR poll load (offset 5)
+     - [wp_uart_thr_write_s_sconf_at] : THR write (offset 0)
 
    A functor over UART so a function proof (e.g. UartPutc) instantiates it against
    the sealed [Uart] instance; the leaves live here, out of the whole-function
@@ -26,6 +26,7 @@ Require Import InstrBytes.
 Require Import RegFile HartTp WpNext.
 Require Import DevModel DiskPtsto WpUart.
 Require Import IntrDefs.
+Require Import RiscvExtras.
 Require Import SpecUart.
 Require Import WpSmodeUart.
 From Kernel Require KernelSyms.
@@ -131,6 +132,43 @@ Section WpSconfUartAccess.
      bundle like the register map.  Implicit, so no call site changes. *)
   Context {p : mword 64}.
 
+  (* the constant Sv39 geometry of the UART page, at every register offset:
+     the address is canonical, its vpn is [uart_vpn_of i], and the leaf ppn
+     recomposes to the address.  Discharged by an eight-way case split, since
+     each offset is then a closed term. *)
+  Local Lemma uart_geom_ok (i : uart_id) (off : Z) :
+    (0 <= off < uart_size)%Z ->
+    let a8 := sign_extend' 64 (subrange_vec_dec (uart_pa i off) (xlen - 0 - 1) 0) in
+    neq_vec (bits_of_virtaddr (Virtaddr a8))
+      (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false
+    /\ autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)
+         (Z.sub 39 1) pagesize_bits) = uart_vpn_of i
+    /\ zero_extend' 64 (add_vec_int a8 (0 * 1)) = uart_pa i off.
+  Proof.
+    unfold uart_size. intro Hoff.
+    assert (Hc : off = 0 \/ off = 1 \/ off = 2 \/ off = 3 \/
+                 off = 4 \/ off = 5 \/ off = 6 \/ off = 7) by lia.
+    destruct i;
+    destruct Hc as [H|[H|[H|[H|[H|[H|[H|H]]]]]]]; subst off; cbn zeta;
+      (split; [vm_compute; reflexivity
+              | split; [apply bv_eq; vm_compute; reflexivity
+                       | apply bv_eq; vm_compute; reflexivity]]).
+  Qed.
+
+  (* [imm = 0] normalisation, for the leaves whose call sites pre-add the
+     offset into the base register.  At [Uart0] this used to fall out of a
+     [vm_compute] on a closed address; at an abstract port it does not, so
+     the cancellation is proved once, abstractly. *)
+  Local Lemma addv_imm0 (x : mword 64) :
+    add_vec x (sign_extend' 64 (mword_of_int 0 : mword 12)) = x.
+  Proof.
+    replace (sign_extend' 64 (mword_of_int 0 : mword 12) : mword 64)
+      with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity).
+    apply kv_addv_zero.
+  Qed.
+
+
   (* The LSR poll load (offset 5).  Takes [dev_inv] + the transmitter token;
      hands back the token and -- IF the read byte says THRE was set -- the
      [uart_out_lb] bound that makes the observation survive to a later THR
@@ -139,14 +177,14 @@ Section WpSconfUartAccess.
      [lbu a5,0(a4)] off a base register already holding UART0+5
      (uartputc_sync) or as [lbu a5,5(a5)] off one holding UART0 (uartintr).
      The [imm = 0] restatement below keeps the original callers unchanged. *)
-  Lemma wp_uart_lsr_read_ea_s_sconf (γd : uart_names) (γv : disk_names) (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
+  Lemma wp_uart_lsr_read_ea_s_sconf_at (i : uart_id) (γd : uart_names) (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (l : list (bv 8)) (b : bool) :
     uint rd <> 0 ->
     rd_ok rd ->
-    add_vec (rget m rs1) (sign_extend' 64 imm) = uart_pa Uart0 5 ->
+    add_vec (rget m rs1) (sign_extend' 64 imm) = uart_pa i 5 ->
     sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 1)) -∗
-    dev_inv γd γv -∗ uart_tx_own γd l -∗
+    uart_inv i γd -∗ uart_tx_own γd l -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ bt : bv 8,
       sie_cap_gpr kt (<[Regidx rd := regval_into_reg (lsr_ldval_of bt)]> m) n b p -∗
@@ -161,15 +199,16 @@ Section WpSconfUartAccess.
        and this leaf's wiring check.  See the family note at the head of this
        section. *)
     assert (Haddr_all : forall hh : CpuId,
-              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = uart_pa Uart0 5)
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = uart_pa i 5)
       by (intros hh; rewrite (src_ok_rget_indep m rs1 hh CID); exact Haddr).
-    iApply (Uart.wp_lb_uart_s_sconf kt (CID:=CID) γd γv 5 pc false true rd rs1 imm
+    destruct (uart_geom_ok i 5 ltac:(unfold uart_size; lia)) as (Hg1 & Hg2 & Hg3).
+    iApply (Uart.wp_lb_uart_uinv_s_sconf_at kt (CID:=CID) i γd 5 pc false true rd rs1 imm
               m n (uart_tx_own γd l)
               (fun bt => uart_tx_own γd l ∗ (⌜ lsr_thre_clear bt = false ⌝ -∗ uart_out_lb γd l))%I b p
               ltac:(unfold uart_size; lia) Hrd Hrdok
-              ltac:(rewrite Haddr; vm_compute; reflexivity)
-              ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)
-              ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)
+              ltac:(rewrite Haddr; exact Hg1)
+              ltac:(rewrite Haddr; exact Hg2)
+              ltac:(rewrite Haddr; exact Hg3)
               with "Hcg Hpc Hinstr Hdinv Hown [] [Hcont]").
     - iIntros (u bt u') "%Hread Hg Hcol Hown".
       (* the LSR is read-only: the receive FIFO and LOOP are where the
@@ -177,7 +216,7 @@ Section WpSconfUartAccess.
       assert (Hne5 : (5 <> 0)%Z) by lia.
       destruct (uart_read_rx_stable u 5 bt u' (or_introl Hne5) Hread)
         as [Hrxe Hlbe].
-      iDestruct (uart_colE_stable Uart0 γd u u' Hrxe Hlbe
+      iDestruct (uart_colE_stable i γd u u' Hrxe Hlbe
                 ltac:(exact (uart_read_wire _ _ _ _ Hread))
                 ltac:(exact (proj1 (proj2 (uart_read_stable _ _ _ _ Hread))))
                 with "Hcol") as "Hcol".
@@ -199,14 +238,14 @@ Section WpSconfUartAccess.
      application, so an instance attached to the wrong parameter is reported
      here ("Cannot infer the implicit parameter ... SrcOk ...") rather than
      shelved -- which is why this wrapper needs no consuming [assert]. *)
-  Lemma wp_uart_lsr_read_s_sconf (γd : uart_names) (γv : disk_names) (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1}
+  Lemma wp_uart_lsr_read_s_sconf_at (i : uart_id) (γd : uart_names) (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1}
       (m : regfile) (n : nat) (l : list (bv 8)) (b : bool) :
     uint rd <> 0 ->
     rd_ok rd ->
-    rget m rs1 = uart_pa Uart0 5 ->
+    rget m rs1 = uart_pa i 5 ->
     sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc false (LOAD (mword_of_int 0 : mword 12, Regidx rs1, Regidx rd, true, 1)) -∗
-    dev_inv γd γv -∗ uart_tx_own γd l -∗
+    uart_inv i γd -∗ uart_tx_own γd l -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ bt : bv 8,
       sie_cap_gpr kt (<[Regidx rd := regval_into_reg (lsr_ldval_of bt)]> m) n b p -∗
@@ -217,9 +256,9 @@ Section WpSconfUartAccess.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hrd Hrdok Haddr.
-    exact (wp_uart_lsr_read_ea_s_sconf γd γv pc rd rs1 (mword_of_int 0 : mword 12)
+    exact (wp_uart_lsr_read_ea_s_sconf_at i γd pc rd rs1 (mword_of_int 0 : mword 12)
              m n l b Hrd Hrdok
-             ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)).
+             ltac:(rewrite Haddr; apply addv_imm0)).
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -235,46 +274,24 @@ Section WpSconfUartAccess.
      ([lbu a5,5(a5)] off a base register holding UART0, which is how gcc emits
      them) rather than pre-added into the base. *)
 
-  (* the constant Sv39 geometry of the UART page, at every register offset:
-     the address is canonical, its vpn is [uart_vpn], and the leaf ppn
-     recomposes to the address.  Discharged by an eight-way case split, since
-     each offset is then a closed term. *)
-  Local Lemma uart_geom_ok (off : Z) :
-    (0 <= off < uart_size)%Z ->
-    let a8 := sign_extend' 64 (subrange_vec_dec (uart_pa Uart0 off) (xlen - 0 - 1) 0) in
-    neq_vec (bits_of_virtaddr (Virtaddr a8))
-      (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false
-    /\ autocast (T := mword) (subrange_vec_dec
-         (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)
-         (Z.sub 39 1) pagesize_bits) = uart_vpn
-    /\ zero_extend' 64 (add_vec_int a8 (0 * 1)) = uart_pa Uart0 off.
-  Proof.
-    unfold uart_size. intro Hoff.
-    assert (Hc : off = 0 \/ off = 1 \/ off = 2 \/ off = 3 \/
-                 off = 4 \/ off = 5 \/ off = 6 \/ off = 7) by lia.
-    destruct Hc as [H|[H|[H|[H|[H|[H|[H|H]]]]]]]; subst off; cbn zeta;
-      (split; [vm_compute; reflexivity
-              | split; [apply bv_eq; vm_compute; reflexivity
-                       | apply bv_eq; vm_compute; reflexivity]]).
-  Qed.
 
   (* [off <> 0] IS THE RECEIVE COLUMN'S SIDE CONDITION.  Offset 0 with DLAB
      clear is the RHR, and reading it POPS the FIFO -- which moves the column
-     and needs the receive token ([wp_uart_rhr_pop_s_sconf] below).  Every
+     and needs the receive token ([wp_uart_rhr_pop_s_sconf_at] below).  Every
      other offset leaves [u_rx] and LOOP where they were, which is what makes
      this read free.  uartintr's two uses are the ISR acknowledge (offset 2)
      and its own THRE poll (offset 5). *)
-  Lemma wp_uart_read_free_s_sconf (γd : uart_names) (γv : disk_names)
+  Lemma wp_uart_read_free_s_sconf_at (i : uart_id) (γd : uart_names)
       (off : Z) (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (b : bool) :
     (0 <= off < uart_size)%Z ->
     off <> 0 ->
     uint rd <> 0 ->
     rd_ok rd ->
-    add_vec (rget m rs1) (sign_extend' 64 imm) = uart_pa Uart0 off ->
+    add_vec (rget m rs1) (sign_extend' 64 imm) = uart_pa i off ->
     sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 1)) -∗
-    dev_inv γd γv -∗
+    uart_inv i γd -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ bt : bv 8,
       sie_cap_gpr kt (<[Regidx rd := regval_into_reg (lsr_ldval_of bt)]> m) n b p -∗
@@ -287,10 +304,10 @@ Section WpSconfUartAccess.
        and this leaf's wiring check.  See the family note at the head of this
        section. *)
     assert (Haddr_all : forall hh : CpuId,
-              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = uart_pa Uart0 off)
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = uart_pa i off)
       by (intros hh; rewrite (src_ok_rget_indep m rs1 hh CID); exact Haddr).
-    destruct (uart_geom_ok off Hoff) as (Hg1 & Hg2 & Hg3).
-    iApply (Uart.wp_lb_uart_s_sconf kt (CID:=CID) γd γv off pc false true rd rs1 imm
+    destruct (uart_geom_ok i off Hoff) as (Hg1 & Hg2 & Hg3).
+    iApply (Uart.wp_lb_uart_uinv_s_sconf_at kt (CID:=CID) i γd off pc false true rd rs1 imm
               m n emp%I (fun _ => emp%I) b p
               Hoff Hrd Hrdok
               ltac:(rewrite Haddr; exact Hg1)
@@ -305,7 +322,7 @@ Section WpSconfUartAccess.
       iModIntro. iSplitL "Hg".
       { iApply (uart_ghosts_stable γd u u' Ha Ho Hd with "Hg"). }
       iSplitL "Hcol"; [| done].
-      iApply (uart_colE_stable Uart0 γd u u' Hrxe Hlbe
+      iApply (uart_colE_stable i γd u u' Hrxe Hlbe
                 ltac:(exact (uart_read_wire _ _ _ _ Hread))
                 ltac:(exact (proj1 (proj2 (uart_read_stable _ _ _ _ Hread))))
                 with "Hcol").
@@ -319,16 +336,16 @@ Section WpSconfUartAccess.
      [uart_tx_ready_persists] turns them into [uart_write_thr_acc]'s two
      premises at the write's own state, so the byte provably lands in the FIFO.
      Postcondition: the grown token plus a permanent [uart_sent] record. *)
-  Lemma wp_uart_thr_write_s_sconf (γd : uart_names) (γv : disk_names) (pc : mword 64) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2}
+  Lemma wp_uart_thr_write_s_sconf_at (i : uart_id) (γd : uart_names) (pc : mword 64) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2}
       (m : regfile) (n : nat) (l : list (bv 8)) (b : bool) :
     (* the stored byte reads [rs2] at the hart we ENTER on, so it must be
        bound OUTSIDE the [wp_next] lambda (which rebinds [CID], and would
        silently re-read [rs2] -- i.e. [tp] -- at the RESUMING hart). *)
     let sb : mword 8 := autocast (T := mword) (subrange_vec_dec (rget m rs2) (Z.sub (Z.mul 1 8) 1) 0) in
-    rget m rs1 = uart_pa Uart0 0 ->
+    rget m rs1 = uart_pa i 0 ->
     sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc false (STORE (mword_of_int 0 : mword 12, Regidx rs2, Regidx rs1, 1)) -∗
-    dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_out_lb γd l -∗ uart_dlab_off γd -∗
+    uart_inv i γd -∗ uart_tx_own γd l -∗ uart_out_lb γd l -∗ uart_dlab_off γd -∗
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr kt m n b p -∗
       pc_is (add_vec_int pc 4) -∗
@@ -342,23 +359,24 @@ Section WpSconfUartAccess.
     (* the class, consumed at [rs1 / rs2] -- the one line the funnel change needs,
        and this leaf's wiring check.  See the family note at the head of this
        section. *)
-    assert (Haddr_all : forall hh : CpuId, rget (CID := hh) m rs1 = uart_pa Uart0 0)
+    assert (Haddr_all : forall hh : CpuId, rget (CID := hh) m rs1 = uart_pa i 0)
       by (intros hh; rewrite (src_ok_rget_indep m rs1 hh CID); exact Haddr).
     assert (Hsb_all : forall hh : CpuId, rget (CID := hh) m rs2 = rget (CID := CID) m rs2)
       by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
-    iApply (Uart.wp_sb_uart_s_sconf kt (CID:=CID) γd γv 0 pc false rs2 rs1 (mword_of_int 0 : mword 12)
+    destruct (uart_geom_ok i 0 ltac:(unfold uart_size; lia)) as (Hg1 & Hg2 & Hg3).
+    iApply (Uart.wp_sb_uart_uinv_s_sconf_at kt (CID:=CID) i γd 0 pc false rs2 rs1 (mword_of_int 0 : mword 12)
               m n (uart_tx_own γd l)
               (uart_tx_own γd (l ++ [sb]) ∗ uart_sent γd (l ++ [sb]))%I b p
               ltac:(unfold uart_size; lia)
-              ltac:(rewrite Haddr; vm_compute; reflexivity)
-              ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)
-              ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)
+              ltac:(rewrite Haddr; rewrite addv_imm0; exact Hg1)
+              ltac:(rewrite Haddr; rewrite addv_imm0; exact Hg2)
+              ltac:(rewrite Haddr; rewrite addv_imm0; exact Hg3)
               with "Hcg Hpc Hinstr Hdinv Hown [] [Hcont]").
     - iIntros (u u') "%Hwrite Hg Hcol Hown".
       (* a THR write is offset 0, which is neither FCR nor MCR *)
       destruct (uart_write_rx_stable u 0 sb u' ltac:(lia) ltac:(lia) Hwrite)
         as [Hrxe Hlbe].
-      iDestruct (uart_colE_stable Uart0 γd u u' Hrxe Hlbe
+      iDestruct (uart_colE_stable i γd u u' Hrxe Hlbe
                 ltac:(exact (uart_write_wire _ _ _ _ Hwrite))
                 ltac:(exact (uart_write_out _ _ _ _ Hwrite))
                 with "Hcol") as "Hcol".
@@ -395,16 +413,16 @@ Section WpSconfUartAccess.
   (* THE RX-READY POLL (offset 5), under the token.  The LSR is a pure read,
      so the column is untouched; what the caller gains is the persistent
      lower bound that survives to the pop when DR was set. *)
-  Lemma wp_uart_lsr_read_rx_s_sconf (γd : uart_names) (γv : disk_names)
+  Lemma wp_uart_lsr_read_rx_s_sconf_at (i : uart_id) (γd : uart_names)
       (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (k : nat) (hl : option (list mobs))
       (b : bool) :
     uint rd <> 0 ->
     rd_ok rd ->
-    add_vec (rget m rs1) (sign_extend' 64 imm) = uart_pa Uart0 5 ->
+    add_vec (rget m rs1) (sign_extend' 64 imm) = uart_pa i 5 ->
     sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 1)) -∗
-    dev_inv γd γv -∗ uart_rx_tok γd k hl -∗
+    uart_inv i γd -∗ uart_rx_tok γd k hl -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ bt : bv 8,
       sie_cap_gpr kt (<[Regidx rd := regval_into_reg (lsr_ldval_of bt)]> m) n b p -∗
@@ -418,22 +436,23 @@ Section WpSconfUartAccess.
   Proof.
     iIntros (Hrd Hrdok Haddr) "Hcg Hpc Hinstr #Hdinv Htok Hcont".
     assert (Haddr_all : forall hh : CpuId,
-              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = uart_pa Uart0 5)
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = uart_pa i 5)
       by (intros hh; rewrite (src_ok_rget_indep m rs1 hh CID); exact Haddr).
-    iApply (Uart.wp_lb_uart_s_sconf kt (CID:=CID) γd γv 5 pc false true rd rs1 imm
+    destruct (uart_geom_ok i 5 ltac:(unfold uart_size; lia)) as (Hg1 & Hg2 & Hg3).
+    iApply (Uart.wp_lb_uart_uinv_s_sconf_at kt (CID:=CID) i γd 5 pc false true rd rs1 imm
               m n (uart_rx_tok γd k hl)
               (fun bt => uart_rx_tok γd k hl ∗
                  (⌜ rx_empty bt = false ⌝ -∗ uart_rx_pushed_lb γd (S k)))%I b p
               ltac:(unfold uart_size; lia) Hrd Hrdok
-              ltac:(rewrite Haddr; vm_compute; reflexivity)
-              ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)
-              ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)
+              ltac:(rewrite Haddr; exact Hg1)
+              ltac:(rewrite Haddr; exact Hg2)
+              ltac:(rewrite Haddr; exact Hg3)
               with "Hcg Hpc Hinstr Hdinv Htok [] [Hcont]").
     - iIntros (u bt u') "%Hread Hg Hcol Htok".
       assert (Hne5 : (5 <> 0)%Z) by lia.
       destruct (uart_read_rx_stable u 5 bt u' (or_introl Hne5) Hread)
         as [Hrxe Hlbe].
-      iDestruct (uart_colE_stable Uart0 γd u u' Hrxe Hlbe
+      iDestruct (uart_colE_stable i γd u u' Hrxe Hlbe
                 ltac:(exact (uart_read_wire _ _ _ _ Hread))
                 ltac:(exact (proj1 (proj2 (uart_read_stable _ _ _ _ Hread))))
                 with "Hcol") as "Hcol".
@@ -441,7 +460,7 @@ Section WpSconfUartAccess.
       destruct (uart_rx_ready u) eqn:Hdr.
       + assert (Hne : u_rx u <> []).
         { intro Hnil. rewrite /uart_rx_ready Hnil in Hdr. discriminate. }
-        iDestruct (uart_col_poll Uart0 γd u k hl Hne with "Hcol Htok")
+        iDestruct (uart_col_poll i γd u k hl Hne with "Hcol Htok")
           as "(Hcol & Htok & #Hlb)".
         iModIntro. iSplitL "Hg"; [iExact "Hg"|].
         iSplitL "Hcol"; [iExact "Hcol"|].
@@ -461,16 +480,16 @@ Section WpSconfUartAccess.
      refutes the empty FIFO, so this really is a pop; out come the head's
      history and the application's claim about it, and the token's count
      moves by one. *)
-  Lemma wp_uart_rhr_pop_s_sconf (γd : uart_names) (γv : disk_names)
+  Lemma wp_uart_rhr_pop_s_sconf_at (i : uart_id) (γd : uart_names)
       (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (k : nat) (hl : option (list mobs))
       (b : bool) :
     uint rd <> 0 ->
     rd_ok rd ->
-    add_vec (rget m rs1) (sign_extend' 64 imm) = uart_pa Uart0 0 ->
+    add_vec (rget m rs1) (sign_extend' 64 imm) = uart_pa i 0 ->
     sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 1)) -∗
-    dev_inv γd γv -∗ uart_dlab_off γd -∗
+    uart_inv i γd -∗ uart_dlab_off γd -∗
     uart_rx_tok γd k hl -∗ uart_rx_pushed_lb γd (S k) -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ c : bv 8,
@@ -483,29 +502,30 @@ Section WpSconfUartAccess.
          it filed before.  The token rides INSIDE the existential because
          its new anchor IS the popped history. *)
       (∃ h : list mobs,
-         ⌜ obs_ends_in Uart0 h c ⌝ ∗ ⌜ ohist_ext hl h ⌝ ∗
+         ⌜ obs_ends_in i h c ⌝ ∗ ⌜ ohist_ext hl h ⌝ ∗
          riscv_rx_tag h ∗ obs_hist_lb h ∗ uart_rx_tok γd (S k) (Some h)) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hrdok Haddr) "Hcg Hpc Hinstr #Hdinv #Hdlab Htok #Hlb Hcont".
     assert (Haddr_all : forall hh : CpuId,
-              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = uart_pa Uart0 0)
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = uart_pa i 0)
       by (intros hh; rewrite (src_ok_rget_indep m rs1 hh CID); exact Haddr).
-    iApply (Uart.wp_lb_uart_s_sconf kt (CID:=CID) γd γv 0 pc false true rd rs1 imm
+    destruct (uart_geom_ok i 0 ltac:(unfold uart_size; lia)) as (Hg1 & Hg2 & Hg3).
+    iApply (Uart.wp_lb_uart_uinv_s_sconf_at kt (CID:=CID) i γd 0 pc false true rd rs1 imm
               m n (uart_rx_tok γd k hl)
               (fun c => ∃ h : list mobs,
-                 ⌜ obs_ends_in Uart0 h c ⌝ ∗ ⌜ ohist_ext hl h ⌝ ∗
+                 ⌜ obs_ends_in i h c ⌝ ∗ ⌜ ohist_ext hl h ⌝ ∗
                  riscv_rx_tag h ∗ obs_hist_lb h ∗
                  uart_rx_tok γd (S k) (Some h))%I b p
               ltac:(unfold uart_size; lia) Hrd Hrdok
-              ltac:(rewrite Haddr; vm_compute; reflexivity)
-              ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)
-              ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)
+              ltac:(rewrite Haddr; exact Hg1)
+              ltac:(rewrite Haddr; exact Hg2)
+              ltac:(rewrite Haddr; exact Hg3)
               with "Hcg Hpc Hinstr Hdinv Htok [] [Hcont]").
     - iIntros (u bt u') "%Hread Hg Hcol Htok".
       iDestruct (uart_ghosts_dlab_off with "Hdlab Hg") as %Hd.
-      iMod (uart_col_pop Uart0 γd u u' k hl bt
+      iMod (uart_col_pop i γd u u' k hl bt
               ltac:(intros bb rx' Hrx;
                     exact (uart_read_rhr_pop u bb rx' bt u' Hd Hrx Hread))
               ltac:(exact (uart_read_wire _ _ _ _ Hread))
@@ -524,16 +544,16 @@ Section WpSconfUartAccess.
      receive FIFO -- a pop of everything -- so this write takes the token
      too.  It is uartinit's sixth store, and the reason the token is born
      into the boot chain rather than into the PLIC invariant. *)
-  Lemma wp_uart_fcr_write_s_sconf (γd : uart_names) (γv : disk_names)
+  Lemma wp_uart_fcr_write_s_sconf_at (i : uart_id) (γd : uart_names)
       (pc : mword 64) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2}
       (imm : mword 12) (m : regfile) (n : nat) (k : nat)
       (hl : option (list mobs)) (R S : iProp Σ)
       (b : bool) :
     let sb : mword 8 := autocast (T := mword) (subrange_vec_dec (rget m rs2) (Z.sub (Z.mul 1 8) 1) 0) in
-    add_vec (rget m rs1) (sign_extend' 64 imm) = uart_pa Uart0 2 ->
+    add_vec (rget m rs1) (sign_extend' 64 imm) = uart_pa i 2 ->
     sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc false (STORE (imm, Regidx rs2, Regidx rs1, 1)) -∗
-    dev_inv γd γv -∗ uart_rx_tok γd k hl -∗ R -∗
+    uart_inv i γd -∗ uart_rx_tok γd k hl -∗ R -∗
     (* the transmitter side of an FCR write is the caller's own business
        (bit 2 clears the TX FIFO): it runs the usual ghost step beside the
        column's *)
@@ -550,12 +570,12 @@ Section WpSconfUartAccess.
     intros sb.
     iIntros (Haddr) "Hcg Hpc Hinstr #Hdinv Htok HR Hstep Hcont".
     assert (Haddr_all : forall hh : CpuId,
-              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = uart_pa Uart0 2)
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = uart_pa i 2)
       by (intros hh; rewrite (src_ok_rget_indep m rs1 hh CID); exact Haddr).
     assert (Hsb_all : forall hh : CpuId, rget (CID := hh) m rs2 = rget (CID := CID) m rs2)
       by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
-    destruct (uart_geom_ok 2 ltac:(unfold uart_size; lia)) as (Hg1 & Hg2 & Hg3).
-    iApply (Uart.wp_sb_uart_s_sconf kt (CID:=CID) γd γv 2 pc false rs2 rs1 imm
+    destruct (uart_geom_ok i 2 ltac:(unfold uart_size; lia)) as (Hg1 & Hg2 & Hg3).
+    iApply (Uart.wp_sb_uart_uinv_s_sconf_at kt (CID:=CID) i γd 2 pc false rs2 rs1 imm
               m n (uart_rx_tok γd k hl ∗ R)%I
               ((∃ (k' : nat) (hl' : option (list mobs)),
                   uart_rx_tok γd k' hl') ∗ S)%I b p
@@ -569,12 +589,12 @@ Section WpSconfUartAccess.
       destruct (uart_write_fcr_rx u sb u' Hwrite) as [Hrxe Hlbe].
       iMod ("Hstep" $! u u' with "[//] Hg HR") as "[Hg HS]".
       destruct (uart_fcr_clr_rx u sb) eqn:Hclr.
-      + iMod (uart_colE_flush Uart0 γd u u' k hl Hrxe Hlbe
+      + iMod (uart_colE_flush i γd u u' k hl Hrxe Hlbe
                 ltac:(exact (uart_write_wire _ _ _ _ Hwrite))
                 ltac:(exact (uart_write_out _ _ _ _ Hwrite))
                 with "Hcol Htok") as "[Hcol Htok]".
         iModIntro. iFrame "Hg Hcol Htok HS".
-      + iDestruct (uart_colE_stable Uart0 γd u u' Hrxe Hlbe
+      + iDestruct (uart_colE_stable i γd u u' Hrxe Hlbe
                 ltac:(exact (uart_write_wire _ _ _ _ Hwrite))
                 ltac:(exact (uart_write_out _ _ _ _ Hwrite))
                 with "Hcol") as "Hcol".
@@ -582,6 +602,189 @@ Section WpSconfUartAccess.
     - iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hcg Hpc [Htok HS]".
       iApply ("Hcont" $! CID1 with "[] Hcg Hpc Htok HS").
       iPureIntro. exact Hs1.
+  Qed.
+
+  (* ==================================================================== *)
+  (*  THE CONSOLE-BUNDLE COROLLARIES.                                      *)
+  (*                                                                      *)
+  (*  Every leaf above is stated at the BARE [uart_inv i γd], which is     *)
+  (*  what a port has; [dev_inv] is the CONSOLE BUNDLE (uart + plic +      *)
+  (*  virtio, and its UART conjunct is [uart_inv Uart0]) and cannot even   *)
+  (*  be stated at the second port.  A caller that is genuinely            *)
+  (*  console-only keeps its old premise and its old spelling: these seven *)
+  (*  are the [Uart0] instances, derived by projecting the bundle with     *)
+  (*  [WpUart.dev_inv_uart], and nothing about them moved.                 *)
+  (* ==================================================================== *)
+
+  Lemma wp_uart_lsr_read_ea_s_sconf (γd : uart_names) (γv : disk_names) (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
+      (m : regfile) (n : nat) (l : list (bv 8)) (b : bool) :
+    uint rd <> 0 ->
+    rd_ok rd ->
+    add_vec (rget m rs1) (sign_extend' 64 imm) = uart_pa Uart0 5 ->
+    sie_cap_gpr kt m n b p -∗
+    pc_is pc -∗ instr pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 1)) -∗
+    dev_inv γd γv -∗ uart_tx_own γd l -∗
+    wp_next b p (fun (CID : CpuId) =>
+      ∀ bt : bv 8,
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg (lsr_ldval_of bt)]> m) n b p -∗
+      pc_is (add_vec_int pc 4) -∗
+      uart_tx_own γd l -∗
+      (⌜ lsr_thre_clear bt = false ⌝ -∗ uart_out_lb γd l) -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    iIntros (Hrd Hrdok Haddr) "Hcg Hpc Hinstr #Hdinv Hown Hcont".
+    iDestruct (dev_inv_uart with "Hdinv") as "#Huinv".
+    iApply (wp_uart_lsr_read_ea_s_sconf_at Uart0 γd pc rd rs1 imm m n l b
+              Hrd Hrdok Haddr with "Hcg Hpc Hinstr Huinv Hown Hcont").
+  Qed.
+
+  Lemma wp_uart_lsr_read_s_sconf (γd : uart_names) (γv : disk_names) (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1}
+      (m : regfile) (n : nat) (l : list (bv 8)) (b : bool) :
+    uint rd <> 0 ->
+    rd_ok rd ->
+    rget m rs1 = uart_pa Uart0 5 ->
+    sie_cap_gpr kt m n b p -∗
+    pc_is pc -∗ instr pc false (LOAD (mword_of_int 0 : mword 12, Regidx rs1, Regidx rd, true, 1)) -∗
+    dev_inv γd γv -∗ uart_tx_own γd l -∗
+    wp_next b p (fun (CID : CpuId) =>
+      ∀ bt : bv 8,
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg (lsr_ldval_of bt)]> m) n b p -∗
+      pc_is (add_vec_int pc 4) -∗
+      uart_tx_own γd l -∗
+      (⌜ lsr_thre_clear bt = false ⌝ -∗ uart_out_lb γd l) -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    iIntros (Hrd Hrdok Haddr) "Hcg Hpc Hinstr #Hdinv Hown Hcont".
+    iDestruct (dev_inv_uart with "Hdinv") as "#Huinv".
+    iApply (wp_uart_lsr_read_s_sconf_at Uart0 γd pc rd rs1 m n l b
+              Hrd Hrdok Haddr with "Hcg Hpc Hinstr Huinv Hown Hcont").
+  Qed.
+
+  Lemma wp_uart_read_free_s_sconf (γd : uart_names) (γv : disk_names)
+      (off : Z) (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
+      (m : regfile) (n : nat) (b : bool) :
+    (0 <= off < uart_size)%Z ->
+    off <> 0 ->
+    uint rd <> 0 ->
+    rd_ok rd ->
+    add_vec (rget m rs1) (sign_extend' 64 imm) = uart_pa Uart0 off ->
+    sie_cap_gpr kt m n b p -∗
+    pc_is pc -∗ instr pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 1)) -∗
+    dev_inv γd γv -∗
+    wp_next b p (fun (CID : CpuId) =>
+      ∀ bt : bv 8,
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg (lsr_ldval_of bt)]> m) n b p -∗
+      pc_is (add_vec_int pc 4) -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    iIntros (Hoff Hne0 Hrd Hrdok Haddr) "Hcg Hpc Hinstr #Hdinv Hcont".
+    iDestruct (dev_inv_uart with "Hdinv") as "#Huinv".
+    iApply (wp_uart_read_free_s_sconf_at Uart0 γd off pc rd rs1 imm m n b
+              Hoff Hne0 Hrd Hrdok Haddr with "Hcg Hpc Hinstr Huinv Hcont").
+  Qed.
+
+  Lemma wp_uart_thr_write_s_sconf (γd : uart_names) (γv : disk_names) (pc : mword 64) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2}
+      (m : regfile) (n : nat) (l : list (bv 8)) (b : bool) :
+    let sb : mword 8 := autocast (T := mword) (subrange_vec_dec (rget m rs2) (Z.sub (Z.mul 1 8) 1) 0) in
+    rget m rs1 = uart_pa Uart0 0 ->
+    sie_cap_gpr kt m n b p -∗
+    pc_is pc -∗ instr pc false (STORE (mword_of_int 0 : mword 12, Regidx rs2, Regidx rs1, 1)) -∗
+    dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_out_lb γd l -∗ uart_dlab_off γd -∗
+    wp_next b p (fun (CID : CpuId) =>
+      sie_cap_gpr kt m n b p -∗
+      pc_is (add_vec_int pc 4) -∗
+      uart_tx_own γd (l ++ [sb]) -∗
+      uart_sent γd (l ++ [sb]) -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros sb.
+    iIntros (Haddr) "Hcg Hpc Hinstr #Hdinv Hown #Hlb #Hoff Hcont".
+    iDestruct (dev_inv_uart with "Hdinv") as "#Huinv".
+    iApply (wp_uart_thr_write_s_sconf_at Uart0 γd pc rs2 rs1 m n l b
+              Haddr with "Hcg Hpc Hinstr Huinv Hown Hlb Hoff Hcont").
+  Qed.
+
+  Lemma wp_uart_lsr_read_rx_s_sconf (γd : uart_names) (γv : disk_names)
+      (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
+      (m : regfile) (n : nat) (k : nat) (hl : option (list mobs))
+      (b : bool) :
+    uint rd <> 0 ->
+    rd_ok rd ->
+    add_vec (rget m rs1) (sign_extend' 64 imm) = uart_pa Uart0 5 ->
+    sie_cap_gpr kt m n b p -∗
+    pc_is pc -∗ instr pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 1)) -∗
+    dev_inv γd γv -∗ uart_rx_tok γd k hl -∗
+    wp_next b p (fun (CID : CpuId) =>
+      ∀ bt : bv 8,
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg (lsr_ldval_of bt)]> m) n b p -∗
+      pc_is (add_vec_int pc 4) -∗
+      uart_rx_tok γd k hl -∗
+      (⌜ rx_empty bt = false ⌝ -∗ uart_rx_pushed_lb γd (S k)) -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    iIntros (Hrd Hrdok Haddr) "Hcg Hpc Hinstr #Hdinv Htok Hcont".
+    iDestruct (dev_inv_uart with "Hdinv") as "#Huinv".
+    iApply (wp_uart_lsr_read_rx_s_sconf_at Uart0 γd pc rd rs1 imm m n k hl b
+              Hrd Hrdok Haddr with "Hcg Hpc Hinstr Huinv Htok Hcont").
+  Qed.
+
+  Lemma wp_uart_rhr_pop_s_sconf (γd : uart_names) (γv : disk_names)
+      (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
+      (m : regfile) (n : nat) (k : nat) (hl : option (list mobs))
+      (b : bool) :
+    uint rd <> 0 ->
+    rd_ok rd ->
+    add_vec (rget m rs1) (sign_extend' 64 imm) = uart_pa Uart0 0 ->
+    sie_cap_gpr kt m n b p -∗
+    pc_is pc -∗ instr pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 1)) -∗
+    dev_inv γd γv -∗ uart_dlab_off γd -∗
+    uart_rx_tok γd k hl -∗ uart_rx_pushed_lb γd (S k) -∗
+    wp_next b p (fun (CID : CpuId) =>
+      ∀ c : bv 8,
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg (lsr_ldval_of c)]> m) n b p -∗
+      pc_is (add_vec_int pc 4) -∗
+      (∃ h : list mobs,
+         ⌜ obs_ends_in Uart0 h c ⌝ ∗ ⌜ ohist_ext hl h ⌝ ∗
+         riscv_rx_tag h ∗ obs_hist_lb h ∗ uart_rx_tok γd (S k) (Some h)) -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    iIntros (Hrd Hrdok Haddr) "Hcg Hpc Hinstr #Hdinv #Hdlab Htok #Hlb Hcont".
+    iDestruct (dev_inv_uart with "Hdinv") as "#Huinv".
+    iApply (wp_uart_rhr_pop_s_sconf_at Uart0 γd pc rd rs1 imm m n k hl b
+              Hrd Hrdok Haddr with "Hcg Hpc Hinstr Huinv Hdlab Htok Hlb Hcont").
+  Qed.
+
+  Lemma wp_uart_fcr_write_s_sconf (γd : uart_names) (γv : disk_names)
+      (pc : mword 64) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2}
+      (imm : mword 12) (m : regfile) (n : nat) (k : nat)
+      (hl : option (list mobs)) (R S : iProp Σ)
+      (b : bool) :
+    let sb : mword 8 := autocast (T := mword) (subrange_vec_dec (rget m rs2) (Z.sub (Z.mul 1 8) 1) 0) in
+    add_vec (rget m rs1) (sign_extend' 64 imm) = uart_pa Uart0 2 ->
+    sie_cap_gpr kt m n b p -∗
+    pc_is pc -∗ instr pc false (STORE (imm, Regidx rs2, Regidx rs1, 1)) -∗
+    dev_inv γd γv -∗ uart_rx_tok γd k hl -∗ R -∗
+    (∀ u u', ⌜ uart_write u 2 sb = Some u' ⌝ -∗
+       uart_ghosts γd u -∗ R ==∗ uart_ghosts γd u' ∗ S) -∗
+    wp_next b p (fun (CID : CpuId) =>
+      sie_cap_gpr kt m n b p -∗
+      pc_is (add_vec_int pc 4) -∗
+      (∃ (k' : nat) (hl' : option (list mobs)), uart_rx_tok γd k' hl') -∗
+      S -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros sb.
+    iIntros (Haddr) "Hcg Hpc Hinstr #Hdinv Htok HR Hstep Hcont".
+    iDestruct (dev_inv_uart with "Hdinv") as "#Huinv".
+    iApply (wp_uart_fcr_write_s_sconf_at Uart0 γd pc rs2 rs1 imm m n k hl R S b
+              Haddr with "Hcg Hpc Hinstr Huinv Htok HR Hstep Hcont").
   Qed.
 
   (* ------------------------------------------------------------------- *)

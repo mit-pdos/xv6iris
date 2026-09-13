@@ -4,11 +4,15 @@
 
      int printk(char *fmt, ...);
 
-   THE POST.  printk promises that SOME byte list [cs] was appended to what this
-   caller has provably sent, and returns 0.  It does NOT say which bytes:
-   nothing in the kernel reads back what was printed, and a byte-accurate post
-   would have to carry a decimal/hex rendering of every vararg up through the
-   format recursion -- for no consumer.
+   THE POST SAYS NOTHING ABOUT THE OUTPUT, and returns 0.  At XV6_REV 163d39b
+   printk's character sink is [prputc] -- uartputc_sync at the SECOND 16550 --
+   and nothing in the system tracks that wire (claude-notes/projects/
+   xv6-bump-163d39b.md, "THE OWNER'S RULING: UART1's output is
+   unconstrained").  So the trace claim this contract used to carry --
+   [UartTxInv.uart_sent_sub γd bs] in, [bs ++ cs] out, with [cs] existential
+   -- is gone in both directions, and with it the [γl]/[γd]/[γv]/[bs]
+   parameters that existed only to state it.  What replaces the three console
+   credentials is ONE: [SpecPrputc.prputc_env].
 
    THERE IS ONLY ONE PATH NOW.  printk.c's two [volatile int] globals are
    deleted:
@@ -29,22 +33,21 @@
    (b) THE LOCKS ARRIVE.  Two of them, and both are persistent credentials
        rather than resources: [pr.lock] itself, which after the transmitter
        moved out of it protects NOTHING ([pr_res] below is [emp] -- see
-       (c)), and [UartTxInv.is_txlock γl γd], which every byte below needs.
-       With them comes the ordinary spinlock-caller accounting: [cpu_own]
-       threaded net-zero (printk leaves the interrupt level as it found it),
-       and a transient
-       bound on [noff] -- [+2] here, not [+1], because printk holds pr.lock
-       while the cone below takes tx_lock.
+       (c)), and, inside [SpecPrputc.prputc_env], the SECOND port's tx_lock,
+       which every byte below needs.  With them comes the ordinary
+       spinlock-caller accounting: [cpu_own] threaded net-zero (printk leaves
+       the interrupt level as it found it), and a transient bound on [noff] --
+       [+2] here, not [+1], because printk holds pr.lock while the cone below
+       takes that tx_lock.
 
-   (c) THE TRANSMITTER IS NOT THREADED, and the trace claim WEAKENS.
-       [uart_tx_own] is [tx_lock]'s resource now, so it is neither a premise
-       nor a postcondition.  And since that lock is re-acquired PER BYTE,
-       another hart can interleave between two of printk's bytes: a CONTIGUOUS
-       [uart_sent γd (l ++ bs)] would be false.  The honest claim is the
-       sublist [UartTxInv.uart_sent_sub], threaded [bs] in / [bs ++ cs] out.
-       Threading it IN is what makes the empty-format path work (a printk whose
-       format string is empty prints nothing and must still return something),
-       and costs nothing: [uart_sent_sub] is persistent.
+   (c) THE TRANSMITTER IS NOT THREADED, AND NEITHER IS A TRACE.
+       [uart_tx_own] is [tx_lock]'s resource, so it is neither a premise nor a
+       postcondition.  And the trace claim is not weakened but ABSENT: the
+       bytes go to UART1, whose wire is unconstrained by ruling, so there is
+       nothing for printk to promise and nothing for a caller to accumulate.
+       [SpecPrputc.v]'s header carries the ruling and the reasoning; the
+       [uart_sent_sub] uartputc_sync still asks for is minted inside
+       [ProofPrputc] out of nothing at all.
 
    THE REST OF THE PRECONDITION is unchanged, and it has exactly three parts
    beyond the usual capability/config boilerplate.
@@ -94,6 +97,7 @@ Require Import WpLock.
 Require Import CpuOwn.
 Require Import UartTxInv.
 Require Export PrintkArgs.
+Require Import SpecPrputc.
 Require Import SpecPanic.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -105,12 +109,18 @@ Require Import TsoCtx.
    [Require Export]s -- panic's spec needs them while sitting below this one.
    Nothing that reached them through SpecPrintk.v has to change. *)
 
-(* printk's own frame is 24 slots ([addi sp,sp,-192] at 0x8000050a), over
-   printint's 24. *)
-Notation printk_stack := (48%nat) (only parsing).
+(* printk's own frame is 24 slots ([addi sp,sp,-192] at +0x00), over
+   printint's [SpecPrintint.printint_stack] = 28.
+
+   IT WENT 48 -> 52 AT 163d39b.  printk's own frame did not move (its shape
+   did not change at all -- the bump was pure relayout for this function);
+   uartputc_sync's did, 32 -> 64 bytes, and the +4 arrives here through
+   prputc -> printint.  Every derived bound above -- [panic_stack], and the
+   literal in [wp_printk_gen_sconf_body] below -- moved with it. *)
+Notation printk_stack := (52%nat) (only parsing).
 Definition wp_printk_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-    (kt : ktier) (γpr : gname) (γl : gname) (γd : uart_names) (γv : disk_names)
-    (m0 : regfile) (K : nat) (bs : list (bv 8))
+    (kt : ktier) (γpr : gname)
+    (m0 : regfile) (K : nat)
     (n : nat) (eb : bool) (dqf : dfrac)
     (f : string) (descs : list pk_arg_desc) (b : bool) (p : mword 64) (lks : gset string) :=
   let ra_idx : mword 5 := mword_of_int 1 in
@@ -147,11 +157,10 @@ Definition wp_printk_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : 
      separation logic, so the resource is [emp] and the acquire is nearly
      free. *)
   is_lock γpr pk_pr_lock "pr"%string <{ emp : iProp Σ }> -∗
-  dev_inv γd γv -∗
-  is_txlock γl γd -∗
-  uart_sent_sub γd bs -∗
+  (* THE SECOND PORT, AND NOTHING OF THE CONSOLE'S.  [SpecPrputc.v]. *)
+  prputc_env -∗
   wp_next b p (fun (CID : CpuId) =>
-    ∀ mf cs,
+    ∀ mf,
     sie_cap_gpr kt mf K b p -∗
     cpu_own n eb p b lks -∗
     pc_is ret_tgt -∗
@@ -159,38 +168,46 @@ Definition wp_printk_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : 
       /\ mf !!! Regidx a0_idx = zero_reg ⌝ -∗
     fmt ↦ₛ{ dqf } f -∗
     ([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m0 j) d) -∗
-    uart_sent_sub γd (bs ++ cs) -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type PRINTK.
   Parameter wp_printk_sconf :
     forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-      (kt : ktier) (γpr : gname) (γl : gname) (γd : uart_names) (γv : disk_names)
-      (m0 : regfile) (K : nat) (bs : list (bv 8))
+      (kt : ktier) (γpr : gname)
+      (m0 : regfile) (K : nat)
       (n : nat) (eb : bool) {dqf : dfrac}
       (f : string) (descs : list pk_arg_desc) (b : bool) (p : mword 64) (lks : gset string),
-      wp_printk_sconf_body kt γpr γl γd γv m0 K bs n eb dqf f descs b p lks.
+      wp_printk_sconf_body kt γpr m0 K n eb dqf f descs b p lks.
 End PRINTK.
 
 (* ========================================================================
    THE WEAK COROLLARY.  [wp_printk_sconf_body] above is the real, code-derived
    contract, and it is what ~15 non-trace callers (main's boot banners,
    usertrap's unexpected-scause diagnostic, and several fs.c error arms) do
-   NOT want to carry in full: threading [γl]/[bs]/a general [n] and the
-   [uart_sent_sub] trace postcondition through a whole proof cone just to
-   call printk once, on a path nobody reads the output of, is pure overhead.
+   NOT want to carry in full: threading a general [n] and the return-value
+   postcondition through a whole proof cone just to call printk once is pure
+   overhead.  (Until 163d39b the gap was much wider -- [γl], [bs] and a trace
+   postcondition too -- and it is worth noting that the ruling on the second
+   port's wire has made the FULL contract nearly as cheap as this corollary.)
 
-   [wp_printk_gen_sconf_body] is [wp_printk_sconf_body] with [n := 0] and
-   [bs := []] baked in and the trace/return-value postcondition dropped --
-   the strictly weaker fact those callers actually need.  [printk_env]
-   bundles exactly the extra ingredients that instantiation wants
-   ([γl]/[is_txlock] and the trivial [uart_sent_sub γd []] witness) as ONE
-   persistent credential, and [printk_gen_contract] packages the whole thing
-   as a [Prop] so a caller can carry it as a plain hypothesis instead of
-   instantiating a functor -- [LinkPrintk.v] proves it once, as a corollary
-   of [PRINTK] above, and every consumer threads that proof (or, for
-   main/main-secondary/usertrap, the [PRINTK_GEN] functor it also seals). *)
+   [wp_printk_gen_sconf_body] is [wp_printk_sconf_body] with [n := 0] baked in
+   and the return-value postcondition dropped -- the strictly weaker fact
+   those callers actually need.  [printk_env] bundles the two persistent
+   credentials that instantiation wants (pr.lock's [is_lock] and
+   [SpecPrputc.prputc_env]) as ONE, and [printk_gen_contract] packages the
+   whole thing as a [Prop] so a caller can carry it as a plain hypothesis
+   instead of instantiating a functor -- [LinkPrintk.v] proves it once, as a
+   corollary of [PRINTK] above, and every consumer threads that proof (or, for
+   main/main-secondary/usertrap, the [PRINTK_GEN] functor it also seals).
+
+   ITS ARGUMENT LIST DID NOT MOVE AT 163d39b, and that is deliberate: [γd] and
+   [γv] survive as parameters of [printk_env] (and hence of this corollary)
+   even though the credential no longer names the console's device bundle,
+   because ~55 files thread them and a premise that is merely unused is still
+   provable.  What changed is the DEFINITION of [printk_env], one file, no
+   fan-out -- and the one construction site, [ProofMain.v]'s [mn_grp_printk],
+   which now has to supply the second port instead of the console. *)
 
 (* the [pr] lock, the one object the general path touches that panic's own
    call site does not thread explicitly.  [static struct { struct spinlock
@@ -211,35 +228,41 @@ Section PrintkGen.
 
   (* The whole general-path credential, and it is PERSISTENT -- which is
      what lets it cross main's [started] invariant to the other harts for
-     free (claude-notes/projects/main-boot.md). [is_txlock]/[uart_sent_sub]
-     are what [wp_printk_sconf_body] additionally wants over [is_lock]/
-     [dev_inv] -- both already sitting at this credential's one construction
-     site (ProofMain.v's [mn_grp_printk], right where [console_caps] is built
-     from the very same [Htxinv]/[Hdoff]/[Hsent]).  [uart_sent_sub γd []] is
-     the trivial (any-trace) witness: gen callers make no claim about what
-     has been sent, so the empty sublist is all the corollary below ever
-     needs to hand [wp_printk_sconf_body]'s [bs]. *)
+     free (claude-notes/projects/main-boot.md).
+
+     IT NAMES THE SECOND PORT NOW.  What used to be here was the console
+     quadruple -- [uart_dlab_off γd], [dev_inv γd γv], an existential
+     [is_txlock γl γd] and the trivial [uart_sent_sub γd []].  printk prints
+     through [prputc] at XV6_REV 163d39b, so every one of those is the wrong
+     port's, and [SpecPrputc.prputc_env] (UART1's invariant, UART1's tx lock
+     with its frozen DLAB, and the .data word UART1's MMIO base is loaded
+     from) is what the cone actually consumes.  The trace witness is not
+     re-pointed but DROPPED: nothing tracks that wire, so nothing below asks
+     for one.
+
+     [γd]/[γv] STAY IN THE ARGUMENT LIST even though only [pr_res γd] still
+     mentions one, and [pr_res] is [emp].  Keeping the arity is what makes
+     this a one-file change: ~55 files name [printk_env γpr γd γv] and none
+     of them moves. *)
   Definition printk_env (γpr : gname) (γd : uart_names) (γv : disk_names) : iProp Σ :=
     (is_lock γpr pr_lock "pr"%string <{ pr_res γd }> ∗
-     uart_dlab_off γd ∗
-     dev_inv γd γv ∗
-     (∃ γl : gname, is_txlock γl γd) ∗
-     uart_sent_sub γd [])%I.
+     prputc_env)%I.
 
   Global Instance printk_env_persistent γpr γd γv : Persistent (printk_env γpr γd γv).
   Proof. apply _. Qed.
 
-  (* printk_env IS panic_env plus an existential [γl] and the trivial trace
-     witness: pr.lock's resource is [emp] on both sides ([pr_res] is [emp])
-     and the address is the same [KernelSyms.pr] under two names.  So any site
-     already carrying the general printk credential can call panic without
-     gaining a premise -- which is what makes the first conversions free. *)
+  (* printk_env IS panic_env, with γpr concrete: pr.lock's resource is [emp]
+     on both sides ([pr_res] is [emp]) and the address is the same
+     [KernelSyms.pr] under two names, and the second conjunct is literally the
+     same [prputc_env].  So any site already carrying the general printk
+     credential can call panic without gaining a premise -- which is what
+     makes the first conversions free, and what kept this derivation working
+     across both the 06ea57f emptying and the 163d39b refill. *)
   Lemma printk_env_panic γpr γd γv :
     printk_env γpr γd γv -∗ SpecPanic.panic_env.
   Proof.
-    iIntros "(#Hlk & _ & #Hdev & Htx & _)".
-    iDestruct "Htx" as (γl) "#Htx".
-    iApply (SpecPanic.panic_env_of γpr γl γd γv with "[] Hdev Htx").
+    iIntros "(#Hlk & #Hpre)".
+    iApply (SpecPanic.panic_env_of γpr with "[] Hpre").
     rewrite /pr_res /pr_lock /PrintkArgs.pk_pr_lock. iExact "Hlk".
   Qed.
 
@@ -258,9 +281,11 @@ Definition wp_printk_gen_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CI
   (* a LITERAL, not [printk_stack <= K], so a caller's bare [ltac:(lia)]
      still closes it -- [printk_stack] is opaque to [lia] and every
      established call site just does [ltac:(lia)] against its own ambient
-     bound.  Matches [printk_stack] exactly: same frame, minus [γl]/[bs]/[n]
-     in this contract's own argument list. *)
-  (48 <= K)%nat ->
+     bound.  Matches [printk_stack] exactly: same frame, minus [n] in this
+     contract's own argument list.  IT WENT 48 -> 52 AT 163d39b (see
+     [printk_stack]), so a caller whose own budget was exactly 48 slots deep
+     here no longer closes. *)
+  (52 <= K)%nat ->
   (Z.of_nat (String.length f) < 2147483645)%Z ->
   nonul f = true ->
   pk_kinds f = map pk_desc_kind descs ->

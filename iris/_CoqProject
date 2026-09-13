@@ -665,6 +665,10 @@ CodeFileinit.v
 SpecFileinit.v
 ProofFileinit.v
 LinkFileinit.v
+CodeUartinitone.v
+SpecUartinitone.v
+ProofUartinitone.v
+LinkUartinitone.v
 CodeUartinit.v
 SpecUartinit.v
 SpecVirtioDiskInit.v
@@ -992,6 +996,8 @@ ProofConsputc.v
 LinkConsputc.v
 PrintkFmt.v
 CstringInv.v
+CodePrputc.v
+SpecPrputc.v
 SpecPrintint.v
 PrintkArgs.v
 SpecPrintk.v
@@ -1001,6 +1007,8 @@ BootConfig.v
 BootCarve.v
 BootCarveMain.v
 StackBytes.v
+ProofPrputc.v
+LinkPrputc.v
 ProofPrintint.v
 LinkPrintint.v
 CodePrintk.v

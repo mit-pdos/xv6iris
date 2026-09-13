@@ -19,6 +19,14 @@
    moved +0x24 while the two strings did not move at all.  Both [jal]
    displacements to printk are unchanged, and so is every register.
 
+   AND THE TRACE THREADING IS GONE.  printk prints to the SECOND 16550 now
+   ([SpecPrputc.v]), whose output nothing tracks, so printk's contract has no
+   [bs]/[uart_sent_sub] to accumulate: the [uart_sent_sub_nil_free] mint this
+   proof opened with, and the [Hsub]/[Hsub1] threading between the two calls,
+   are simply deleted.  [panic_env] is REFILLED rather than emptied -- see
+   SpecPanic.v -- but with the second port's credential, so what is destructed
+   here is [is_lock] + [SpecPrputc.prputc_env] and nothing of the console's.
+
    THE SELF-JUMP IS THE WHOLE POINT.  [pn_spin] proves it by Löb, hart-
    generically: [wp_cj_s_sconf] hands its continuation back UNDER A LATER
    (a backward jump is a loop back edge), and that later is exactly what
@@ -228,16 +236,14 @@ Section ProofPanic.
     cbv beta zeta delta [wp_panic_sconf_body].
     intros HK Hdm Hn31 Hbelow.
     iIntros "Hcg Hown #Htext #Hkdata Hpc #Henv0 Hmsg".
-    iDestruct "Henv0" as (γpr γl γd γv) "#Henv".
-    iDestruct "Henv" as "(#Hlk & #Hdev & #Htx)".
-    (* THE TRACE BASELINE, MINTED HERE RATHER THAN DEMANDED.  printk wants a
-       [uart_sent_sub] to extend, but it never inspects it -- see SpecPanic.v's
-       header -- and panic has no postcondition to report the extension in, so
-       the contract does not ask the caller for one.  [◯ML []] is the unit of
-       the mono-list RA, so this costs a basic update and nothing else. *)
-    iApply fupd_wp.
-    iMod (uart_sent_sub_nil_free γd) as "#Hsub".
-    iModIntro.
+    iDestruct "Henv0" as (γpr) "#Henv".
+    iDestruct "Henv" as "(#Hlk & #Hpre)".
+    (* NO TRACE BASELINE TO MINT ANY MORE.  This proof used to open with
+       [uart_sent_sub_nil_free], because printk's contract wanted a trace to
+       extend and panic had no caller-supplied one.  163d39b moved printk's
+       output to the second port, whose wire is unconstrained by ruling
+       (SpecPrputc.v), so printk asks for no trace at all and there is
+       nothing to mint. *)
     iPoseProof (pn_hdr_str with "Hkdata") as "#Hhdr".
     iPoseProof (pn_fmt_str with "Hkdata") as "#Hfmt".
     (* ================================================================== *)
@@ -399,15 +405,15 @@ Section ProofPanic.
     iDestruct (cpu_own_transport CID CID9 n eb p b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iApply (Printk.wp_printk_sconf kt (CID := CID9) (dqf := DfracDiscarded)
-              γpr γl γd γv P5 (K - 4)%nat [] n eb pn_hdr [] b p lks
+              γpr P5 (K - 4)%nat n eb pn_hdr [] b p lks
               (pn_Kpk K HK) pn_hdr_len pn_hdr_nonul
               ltac:(rewrite pn_hdr_kinds; reflexivity)
               ltac:(cbn [length]; lia) Hn31 Hbelow
-              with "Hcg Hown Htext Hkdata Hpc [Hhdr] [] Hlk Hdev Htx Hsub").
+              with "Hcg Hown Htext Hkdata Hpc [Hhdr] [] Hlk Hpre").
     all: try lkbelow.
     { rewrite HP5a0. iExact "Hhdr". }
     { done. }
-    iIntros (CID10 Hs10 mf cs) "Hcg Hown Hpc %Hcs1 _ _ #Hsub1".
+    iIntros (CID10 Hs10 mf) "Hcg Hown Hpc %Hcs1 _ _".
     destruct Hcs1 as (Hcs & _ & _).
     assert (Hpc18 : ret_pc (P5 !!! Regidx Rra : mword 64)
                     = mword_of_int (PA + 0x18)) by (rewrite HP5ra; pcw).
@@ -492,16 +498,16 @@ Section ProofPanic.
     iDestruct (cpu_own_transport CID10 CID14 n eb p b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iApply (Printk.wp_printk_sconf kt (CID := CID14) (dqf := DfracDiscarded)
-              γpr γl γd γv Q3 (K - 4)%nat cs n eb pn_fmt [dm] b p lks
+              γpr Q3 (K - 4)%nat n eb pn_fmt [dm] b p lks
               (pn_Kpk K HK) pn_fmt_len pn_fmt_nonul
               ltac:(rewrite pn_fmt_kinds; cbn [map pk_desc_kind];
                     rewrite Hdm; reflexivity)
               ltac:(cbn [length]; lia) Hn31 Hbelow
-              with "Hcg Hown Htext Hkdata Hpc [Hfmt] [Hmsg] Hlk Hdev Htx Hsub1").
+              with "Hcg Hown Htext Hkdata Hpc [Hfmt] [Hmsg] Hlk Hpre").
     all: try lkbelow.
     { rewrite HQ3a0. iExact "Hfmt". }
     { rewrite big_sepL_singleton Hva. iExact "Hmsg". }
-    iIntros (CID15 Hs15 mg cs2) "Hcg Hown Hpc %Hcs2 _ _ #Hsub2".
+    iIntros (CID15 Hs15 mg) "Hcg Hown Hpc %Hcs2 _ _".
     assert (Hpc26 : ret_pc (Q3 !!! Regidx Rra : mword 64)
                     = mword_of_int (PA + 0x26)) by (rewrite HQ3ra; pcw).
     iEval (rewrite Hpc26) in "Hpc".
