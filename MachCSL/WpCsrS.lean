@@ -485,5 +485,60 @@ theorem sstatus_clear_sie_id' (o : BitVec 64)
     Sail.BitVec.length]
   bv_decide
 
+/-- Clearing `SIE` in `sstatus` (the supervisor view of an `mstatus` as
+`start` left it, at either `SIE`) clears exactly that bit of `mstatus`. -/
+theorem sstatus_clear_sie' (o : BitVec 64)
+    (hSXL : BitVec.extractLsb' 34 2 o = 2#2)
+    (hFS : BitVec.extractLsb' 13 2 o = 0#2) (hXS : BitVec.extractLsb' 15 2 o = 0#2)
+    (hVS : BitVec.extractLsb' 9 2 o = 0#2) (hSD : BitVec.extractLsb' 63 1 o = 0#1)
+    (hMPP : BitVec.extractLsb' 11 2 o ≠ 2#2) :
+    mstatusLegalize o (lift_sstatus o (Mk_Sstatus (zero_extend (m := 64) (lower_mstatus o &&& 0xFFFFFFFFFFFFFFFD#64)))) =
+      o &&& 0xFFFFFFFFFFFFFFFD#64 := by
+  have h3 : ∀ x : BitVec 2, x ≠ 2#2 → x = 0#2 ∨ x = 1#2 ∨ x = 3#2 := by decide
+  unfold mstatusLegalize lift_sstatus lower_mstatus
+  simp only [Mk_Mstatus, Mk_Sstatus, zero_extend_eq, BitVec.setWidth_eq, plat_mstatus_legal_fs, plat_mstatus_legal_vs,
+    legalize_extStatus_four, extStatus_dirty_iff, bool_to_bit_eq, extStatus_map_forwards, Functions.zeros,
+    _update_Mstatus_SIE, _update_Mstatus_MIE, _update_Mstatus_SPIE, _update_Mstatus_MPIE, _update_Mstatus_SPP,
+    _update_Mstatus_MPP, _update_Mstatus_VS, _update_Mstatus_FS, _update_Mstatus_XS, _update_Mstatus_MPRV,
+    _update_Mstatus_SUM, _update_Mstatus_MXR, _update_Mstatus_TVM, _update_Mstatus_TW, _update_Mstatus_TSR,
+    _update_Mstatus_SPELP, _update_Mstatus_MPELP, _update_Mstatus_SD, _update_Mstatus_UXL,
+    _get_Mstatus_MPELP, _get_Mstatus_SPELP, _get_Mstatus_TSR, _get_Mstatus_MPRV, _get_Mstatus_MPP, _get_Mstatus_MIE, _get_Mstatus_TW, _get_Mstatus_TVM, _get_Mstatus_MXR,
+    _get_Mstatus_SUM, _get_Mstatus_FS, _get_Mstatus_VS, _get_Mstatus_XS, _get_Mstatus_SPP, _get_Mstatus_MPIE,
+    _get_Mstatus_SPIE, _get_Mstatus_SIE, _get_Mstatus_SD, _get_Mstatus_UXL,
+    _update_Sstatus_SIE, _update_Sstatus_SPIE, _update_Sstatus_SPP, _update_Sstatus_VS, _update_Sstatus_FS,
+    _update_Sstatus_XS, _update_Sstatus_SUM, _update_Sstatus_MXR, _update_Sstatus_SPELP, _update_Sstatus_UXL,
+    _update_Sstatus_SD, _get_Sstatus_SIE, _get_Sstatus_SPIE, _get_Sstatus_SPP, _get_Sstatus_VS, _get_Sstatus_FS,
+    _get_Sstatus_XS, _get_Sstatus_SUM, _get_Sstatus_MXR, _get_Sstatus_SPELP, _get_Sstatus_UXL, _get_Sstatus_SD,
+    Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange', Sail.BitVec.extractLsb, BitVec.extractLsb,
+    Sail.BitVec.length]
+  bv_decide
+
+/-- Setting `SIE` in `sstatus` sets exactly that bit of `mstatus`. -/
+theorem sstatus_set_sie' (o : BitVec 64)
+    (hSXL : BitVec.extractLsb' 34 2 o = 2#2)
+    (hFS : BitVec.extractLsb' 13 2 o = 0#2) (hXS : BitVec.extractLsb' 15 2 o = 0#2)
+    (hVS : BitVec.extractLsb' 9 2 o = 0#2) (hSD : BitVec.extractLsb' 63 1 o = 0#1)
+    (hMPP : BitVec.extractLsb' 11 2 o ≠ 2#2) :
+    mstatusLegalize o (lift_sstatus o (Mk_Sstatus (zero_extend (m := 64) (lower_mstatus o ||| 2#64)))) =
+      o ||| 2#64 := by
+  have h3 : ∀ x : BitVec 2, x ≠ 2#2 → x = 0#2 ∨ x = 1#2 ∨ x = 3#2 := by decide
+  unfold mstatusLegalize lift_sstatus lower_mstatus
+  simp only [Mk_Mstatus, Mk_Sstatus, zero_extend_eq, BitVec.setWidth_eq, plat_mstatus_legal_fs, plat_mstatus_legal_vs,
+    legalize_extStatus_four, extStatus_dirty_iff, bool_to_bit_eq, extStatus_map_forwards, Functions.zeros,
+    _update_Mstatus_SIE, _update_Mstatus_MIE, _update_Mstatus_SPIE, _update_Mstatus_MPIE, _update_Mstatus_SPP,
+    _update_Mstatus_MPP, _update_Mstatus_VS, _update_Mstatus_FS, _update_Mstatus_XS, _update_Mstatus_MPRV,
+    _update_Mstatus_SUM, _update_Mstatus_MXR, _update_Mstatus_TVM, _update_Mstatus_TW, _update_Mstatus_TSR,
+    _update_Mstatus_SPELP, _update_Mstatus_MPELP, _update_Mstatus_SD, _update_Mstatus_UXL,
+    _get_Mstatus_MPELP, _get_Mstatus_SPELP, _get_Mstatus_TSR, _get_Mstatus_MPRV, _get_Mstatus_MPP, _get_Mstatus_MIE, _get_Mstatus_TW, _get_Mstatus_TVM, _get_Mstatus_MXR,
+    _get_Mstatus_SUM, _get_Mstatus_FS, _get_Mstatus_VS, _get_Mstatus_XS, _get_Mstatus_SPP, _get_Mstatus_MPIE,
+    _get_Mstatus_SPIE, _get_Mstatus_SIE, _get_Mstatus_SD, _get_Mstatus_UXL,
+    _update_Sstatus_SIE, _update_Sstatus_SPIE, _update_Sstatus_SPP, _update_Sstatus_VS, _update_Sstatus_FS,
+    _update_Sstatus_XS, _update_Sstatus_SUM, _update_Sstatus_MXR, _update_Sstatus_SPELP, _update_Sstatus_UXL,
+    _update_Sstatus_SD, _get_Sstatus_SIE, _get_Sstatus_SPIE, _get_Sstatus_SPP, _get_Sstatus_VS, _get_Sstatus_FS,
+    _get_Sstatus_XS, _get_Sstatus_SUM, _get_Sstatus_MXR, _get_Sstatus_SPELP, _get_Sstatus_UXL, _get_Sstatus_SD,
+    Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange', Sail.BitVec.extractLsb, BitVec.extractLsb,
+    Sail.BitVec.length]
+  bv_decide
+
 
 end MachCSL
