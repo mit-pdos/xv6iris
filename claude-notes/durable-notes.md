@@ -197,27 +197,6 @@ work.
   -C rocqworker` is the honest signal, and a STABLE multi-GB RSS is the tell.
   Bisect by stubbing with `Admitted`, under a `timeout N` so exit 124 is a
   result.
-- **A STABLE multi-GB RSS is a slow proof; a GROWING one is a degenerate proof.**
-  They need opposite responses. Stable means wait or bisect. Growing --
-  measure it twice a minute apart -- means the tactic will never converge:
-  kill it and localize, never wait it out. Legitimate peak on this tree is
-  about 3.5 GB, so anything past ~10 GB and still climbing is the bug itself.
-  Establish WHERE first (`Set Ltac Profiling.` + `Show Ltac Profile.`, or
-  `idtac` checkpoints), and note whether it grows during the SCRIPT or at
-  `Qed`: the script means a tactic is reducing something open, `Qed` means you
-  built a giant term (classically a `vm_compute` inside a proof, whose cast the
-  kernel re-runs). The fix is almost always the same shape -- replace the
-  computation with a NAMED LEMMA proved once at the symbolic form.
-- **Run every build under `ulimit -v 41943040` (40 GB).** The VM is shared with
-  other sessions, and an unbounded runaway starves all of them; bounded, it
-  dies as an OOM in your own make in minutes. This costs nothing on any
-  legitimate file. A computation that used to close against a CONCRETE address
-  and now sees a SYMBOLIC one is the usual way a file crosses that line.
-- **`make vos` is NOT a shortcut here.** Rocq cannot skip a `Qed` whose lemma
-  has no `Proof using` annotation -- it must run the proof to compute the used
-  section variables -- and every lemma in this tree lives in a `Section` with
-  `Context`. `vos` therefore costs what `vo` costs and still fails on the same
-  files.
 - **`timeout N coqc` does not kill the worker and `pgrep -x coqc` does not find
   it** — `coqc` runs as `rocqworker --kind=compile`, and the orphan holds a
   worker slot, stalling the next build at a random point. (`pgrep -c` also prints
