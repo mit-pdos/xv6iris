@@ -36,10 +36,10 @@ theorem release_proof (HO : HOLDING) (PO : POPOFF) : RELEASE := ⟨
   inext
   iintro Hk Hpc Hframe
   -- mv s1,a0
-  k_step (wp_s_add cpu _ ?hs 0x80000c4c#64 true 9#5 0#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_add cpu _ 0x80000c4c#64 true 9#5 0#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- jal holding
-  k_step (wp_s_jal cpu _ ?hs 0x80000c4e#64 false 2096902#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_jal cpu _ 0x80000c4e#64 false 2096902#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   have hho : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hK' : 6 ≤ k'.avail),
       kctx cpu k' ∗ pcIs cpu 0x80000b54#64 ∗ isLock γ (k'.regs 10#5) s R ∗
@@ -66,7 +66,7 @@ theorem release_proof (HO : HOLDING) (PO : POPOFF) : RELEASE := ⟨
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at this
     exact this
   -- beqz a0, panic: not taken (holding answered 1)
-  k_step (wp_s_branch cpu _ ?hs 0x80000c52#64 true 28#13 10#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
+  k_step (wp_s_branch cpu _ 0x80000c52#64 true 28#13 10#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc] with [h10, bcond_beq_one]
   iintro Hk Hpc
   icases locked_cases γ cpu $$ Hlocked with ⟨Hlc, Hheld⟩
@@ -76,7 +76,7 @@ theorem release_proof (HO : HOLDING) (PO : POPOFF) : RELEASE := ⟨
   case haddr => k_norm [h29]
   iintro Hk Hpc Hlp
   -- fence rw,w
-  k_step (wp_s_fence_rw_w cpu _ ?hs 0x80000c58#64 false 0#5 0#5) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_fence_rw_w cpu _ 0x80000c58#64 false 0#5 0#5) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- sw zero,0(s1): the lock is free
   k_step (wp_s_sw_zero_release cpu _ ?hs 0x80000c5c#64 false 0#12 9#5 γ (k.regs 10#5) s R ?haddr) from (text_instr _ _ _ _ rfl rfl) Htext
@@ -84,7 +84,7 @@ theorem release_proof (HO : HOLDING) (PO : POPOFF) : RELEASE := ⟨
   case haddr => k_norm [h29]
   iintro Hk Hpc %hmem
   -- jal pop_off
-  k_step (wp_s_jal cpu _ ?hs 0x80000c60#64 false 2097050#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_jal cpu _ 0x80000c60#64 false 2097050#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   have hpo : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hnoff' : 1 ≤ k'.noff)
       (hK' : 4 ≤ k'.avail) (hlks' : k'.locks.length ≤ k'.noff - 1) (hexit' : k'.noff = 1 → k'.intena = false),

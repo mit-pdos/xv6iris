@@ -28,8 +28,8 @@ theorem execSpecF_lwu [CurCtx] (cpu : CPU) (dq dq' : DFrac) (c : MConf) (sie : B
   load_file_S_proof swp_checked_mem_read_load4_S hrd (RegMap.get R rs1 + BitVec.signExtend 64 imm) 4 (split_on_page_boundary_4 (RegMap.get R rs1 + BitVec.signExtend 64 imm) hal)
 
 /-- `lwu rd, imm(rs1)`: the word at `rs1 + imm`, zero-extended. -/
-theorem wp_s_lwu [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
-    (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rd rs1 : BitVec 5) (hrd : rdOk rd)
+theorem wp_s_lwu [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
+    (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rd rs1 : BitVec 5) (hrs1 : rs1 ≠ 4#5) (hrd : rdOk rd)
     (dq' : DFrac) (w : BitVec 32) :
     instr (GF := GF) pc is_rvc (instruction.LOAD (imm, regidx.Regidx rs1, regidx.Regidx rd, true, 4)) ∗
     kctxL lent cpu k ∗ pcIs cpu pc ∗
@@ -39,9 +39,10 @@ theorem wp_s_lwu [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (
           wordPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 4 dq' w -∗ wpLoop cpu'))
     ⊢ wpLoop cpu :=
   wpLoop_k_setReg_mem' cpu k pc _ is_rvc _ rd hrd _ _ _
-    (fun (cpu' : CPU) (c : MConf) (hpin : k.sie = false ∨ k.proc = 0#64 → cpu' = cpu) hok _ => by
-      obtain rfl := hpin (Or.inl hsie)
-      exact execSpecF_lwu cpu' (DFrac.own 1) dq' c k.sie k.root hok pc _ imm rd rs1 hrd.1
-        (tpPin cpu' k.regs) w)
+    (fun cpu' c _ hok _ => by
+      have e := execSpecF_lwu cpu' (DFrac.own 1) dq' c k.sie k.root hok pc (pc + instrLen is_rvc) imm rd rs1 hrd.1
+        (tpPin cpu' k.regs) w
+      rw [KCtx.rget_hart cpu cpu' k rs1 hrs1] at e
+      exact e)
 
 end MachCSL

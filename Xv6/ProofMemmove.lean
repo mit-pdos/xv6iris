@@ -220,29 +220,29 @@ theorem memmove_fwd_iter {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
   icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
   obtain ⟨o, ho⟩ := mixF_get_self bs olds i (by omega) (by omega)
   -- addi a1,a1,1
-  k_step (wp_s_addi cpu _ ?hs 0x80000cf2#64 true 1#12 11#5 11#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
+  k_step (wp_s_addi cpu _ 0x80000cf2#64 true 1#12 11#5 11#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
     with [h11]
   iintro Hk Hpc
   -- addi a4,a4,1
-  k_step (wp_s_addi cpu _ ?hs 0x80000cf4#64 true 1#12 14#5 14#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
+  k_step (wp_s_addi cpu _ 0x80000cf4#64 true 1#12 14#5 14#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
     with [h14]
   iintro Hk Hpc
   -- lbu a3,-1(a1)
   icases byteBuf_acc s dqs bs i b hb $$ Hsrc with ⟨Hb, Hclose⟩
-  k_step (wp_s_lbu cpu _ ?hs 0x80000cf6#64 false 4095#12 13#5 11#5 (by decide) dqs b) from (text_instr _ _ _ _ rfl rfl) HT
+  k_step (wp_s_lbu cpu _ 0x80000cf6#64 false 4095#12 13#5 11#5 (by decide) (by decide) dqs b) from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc]
   iintro Hk Hpc Hb
   ihave Hsrc := Hclose $$ Hb
   -- sb a3,-1(a4)
   icases byteBuf_upd d (mixF bs olds i) i o ho $$ Hdst with ⟨Ho, Hclose⟩
-  k_step (wp_s_sb cpu _ ?hs 0x80000cfa#64 false 4095#12 14#5 13#5 o) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
+  k_step (wp_s_sb cpu _ 0x80000cfa#64 false 4095#12 14#5 13#5 (by decide) o) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
     with [extractLsb'_setWidth8]
   iintro Hk Hpc Ho
   ihave Hdst := Hclose $$ %b Ho
   ihave Hdst := (show byteBuf (GF := GF) d (DFrac.own 1) ((mixF bs olds i).set i b) ⊢
       byteBuf d (DFrac.own 1) (mixF bs olds (i + 1)) by rw [mixF_set bs olds i b hb (by omega)]) $$ Hdst
   -- bne a5,a1,cf2
-  k_step (wp_s_branch cpu _ ?hs 0x80000cfe#64 false 8180#13 15#5 11#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) HT
+  k_step (wp_s_branch cpu _ 0x80000cfe#64 false 8180#13 15#5 11#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc] with [h15, ite_bne_eq, add_ofNat_succ_eq_iff s n i hn32 (by omega)]
   iintro Hk Hpc
   iapply HΦ $$ Hk Hpc Hsrc Hdst
@@ -323,29 +323,29 @@ theorem memmove_bwd_iter {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
   obtain ⟨o, ho⟩ := mixB_get_pred bs olds i hi1 (by omega) (by omega)
   have hneg := ofNat_add_neg1 i hi1 (by omega)
   -- addi a4,a4,-1
-  k_step (wp_s_addi cpu _ ?hs 0x80000d28#64 true 4095#12 14#5 14#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
+  k_step (wp_s_addi cpu _ 0x80000d28#64 true 4095#12 14#5 14#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
     with [h14, hneg]
   iintro Hk Hpc
   -- addi a3,a3,-1
-  k_step (wp_s_addi cpu _ ?hs 0x80000d2a#64 true 4095#12 13#5 13#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
+  k_step (wp_s_addi cpu _ 0x80000d2a#64 true 4095#12 13#5 13#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
     with [h13, hneg]
   iintro Hk Hpc
   -- lbu a2,0(a4)
   icases byteBuf_acc s dqs bs (i - 1) b hb $$ Hsrc with ⟨Hb, Hclose⟩
-  k_step (wp_s_lbu cpu _ ?hs 0x80000d2c#64 false 0#12 12#5 14#5 (by decide) dqs b) from (text_instr _ _ _ _ rfl rfl) HT
+  k_step (wp_s_lbu cpu _ 0x80000d2c#64 false 0#12 12#5 14#5 (by decide) (by decide) dqs b) from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc]
   iintro Hk Hpc Hb
   ihave Hsrc := Hclose $$ Hb
   -- sb a2,0(a3)
   icases byteBuf_upd d (mixB bs olds i) (i - 1) o ho $$ Hdst with ⟨Ho, Hclose⟩
-  k_step (wp_s_sb cpu _ ?hs 0x80000d30#64 false 0#12 13#5 12#5 o) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
+  k_step (wp_s_sb cpu _ 0x80000d30#64 false 0#12 13#5 12#5 (by decide) o) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
     with [extractLsb'_setWidth8]
   iintro Hk Hpc Ho
   ihave Hdst := Hclose $$ %b Ho
   ihave Hdst := (show byteBuf (GF := GF) d (DFrac.own 1) ((mixB bs olds i).set (i - 1) b) ⊢
       byteBuf d (DFrac.own 1) (mixB bs olds (i - 1)) by rw [mixB_set bs olds i hi1 b hb (by omega) (by omega)]) $$ Hdst
   -- bne a5,a4,d28
-  k_step (wp_s_branch cpu _ ?hs 0x80000d34#64 false 8180#13 15#5 14#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) HT
+  k_step (wp_s_branch cpu _ 0x80000d34#64 false 8180#13 15#5 14#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc] with [h15, ite_bne_eq, self_eq_add_ofNat_iff s (i - 1) (by omega)]
   iintro Hk Hpc
   iapply HΦ $$ Hk Hpc Hsrc Hdst
@@ -463,18 +463,18 @@ theorem memmove_fwd_seg {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [C
   iintro ⟨Hk, Hpc, Hframe, Hsrc, Hdst, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
   -- slli a2,a2,32 ; srli a2,a2,32
-  k_step (wp_s_slli cpu _ ?hs 0x80000ce8#64 true 32#6 12#5 12#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
+  k_step (wp_s_slli cpu _ 0x80000ce8#64 true 32#6 12#5 12#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
     with [h12]
   iintro Hk Hpc
-  k_step (wp_s_srli cpu _ ?hs 0x80000cea#64 true 32#6 12#5 12#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
+  k_step (wp_s_srli cpu _ 0x80000cea#64 true 32#6 12#5 12#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
     with [shl_shr_32_ofNat n hn32]
   iintro Hk Hpc
   -- add a5,a1,a2
-  k_step (wp_s_add cpu _ ?hs 0x80000cec#64 false 15#5 11#5 12#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
+  k_step (wp_s_add cpu _ 0x80000cec#64 false 15#5 11#5 12#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
     with [h11]
   iintro Hk Hpc
   -- mv a4,a0
-  k_step (wp_s_add cpu _ ?hs 0x80000cf0#64 true 14#5 0#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
+  k_step (wp_s_add cpu _ 0x80000cf0#64 true 14#5 0#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
     with [h10]
   iintro Hk Hpc
   -- the loop
@@ -517,7 +517,7 @@ theorem memmove_proof : MEMMOVE := ⟨fun cpu k bs olds n dqs hsie hK hn hn32 hl
   inext
   iintro Hk Hpc Hframe
   -- beqz a2,d02
-  k_step (wp_s_branch cpu _ ?hs 0x80000ce2#64 true 32#13 12#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
+  k_step (wp_s_branch cpu _ 0x80000ce2#64 true 32#13 12#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc] with [hn, ite_beq_ofNat' n hn32]
   iintro Hk Hpc
   by_cases hn0 : n = 0
@@ -536,23 +536,23 @@ theorem memmove_proof : MEMMOVE := ⟨fun cpu k bs olds n dqs hsie hK hn hn32 hl
   · simp only [hn0, ite_false]
     have hn1 : 1 ≤ n := by omega
     -- bltu a1,a0,d0a
-    k_step (wp_s_branch cpu _ ?hs 0x80000ce4#64 false 38#13 11#5 10#5 (by decide) bop.BLTU) from (text_instr _ _ _ _ rfl rfl) Htext
+    k_step (wp_s_branch cpu _ 0x80000ce4#64 false 38#13 11#5 10#5 (by decide) bop.BLTU) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc]
     iintro Hk Hpc
     rcases Bool.eq_false_or_eq_true (bcond bop.BLTU (k.regs 11#5) (k.regs 10#5)) with hlt | hlt
     · -- src < dst
       simp only [hlt, ↓reduceIte]
       -- slli a3,a2,32 ; srli a3,a3,32 ; add a4,a1,a3
-      k_step (wp_s_slli cpu _ ?hs 0x80000d0a#64 false 32#6 13#5 12#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+      k_step (wp_s_slli cpu _ 0x80000d0a#64 false 32#6 13#5 12#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [hn]
       iintro Hk Hpc
-      k_step (wp_s_srli cpu _ ?hs 0x80000d0e#64 true 32#6 13#5 13#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+      k_step (wp_s_srli cpu _ 0x80000d0e#64 true 32#6 13#5 13#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [shl_shr_32_ofNat n hn32]
       iintro Hk Hpc
-      k_step (wp_s_add cpu _ ?hs 0x80000d10#64 false 14#5 11#5 13#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+      k_step (wp_s_add cpu _ 0x80000d10#64 false 14#5 11#5 13#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       iintro Hk Hpc
       -- bgeu a0,a4,ce8
-      k_step (wp_s_branch cpu _ ?hs 0x80000d14#64 false 8148#13 10#5 14#5 (by decide) bop.BGEU) from (text_instr _ _ _ _ rfl rfl) Htext
+      k_step (wp_s_branch cpu _ 0x80000d14#64 false 8148#13 10#5 14#5 (by decide) bop.BGEU) from (text_instr _ _ _ _ rfl rfl) Htext
         $$ [- $Hk $Hpc]
       iintro Hk Hpc
       rcases Bool.eq_false_or_eq_true (bcond bop.BGEU (k.regs 10#5) (k.regs 11#5 + BitVec.ofNat 64 n)) with hge | hge
@@ -570,19 +570,19 @@ theorem memmove_proof : MEMMOVE := ⟨fun cpu k bs olds n dqs hsie hK hn hn32 hl
       · -- dst < src + n: overlap, backward
         simp only [hge, Bool.false_eq_true, ↓reduceIte]
         have hcomm : BitVec.ofNat 64 n + k.regs 10#5 = k.regs 10#5 + BitVec.ofNat 64 n := BitVec.add_comm _ _
-        k_step (wp_s_add cpu _ ?hs 0x80000d18#64 true 13#5 13#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+        k_step (wp_s_add cpu _ 0x80000d18#64 true 13#5 13#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
           with [hcomm]
         iintro Hk Hpc
-        k_step (wp_s_addiw cpu _ ?hs 0x80000d1a#64 false 4095#12 15#5 12#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+        k_step (wp_s_addiw cpu _ 0x80000d1a#64 false 4095#12 15#5 12#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
           with [hn]
         iintro Hk Hpc
-        k_step (wp_s_slli cpu _ ?hs 0x80000d1e#64 true 32#6 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+        k_step (wp_s_slli cpu _ 0x80000d1e#64 true 32#6 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         iintro Hk Hpc
-        k_step (wp_s_srli cpu _ ?hs 0x80000d20#64 true 32#6 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+        k_step (wp_s_srli cpu _ 0x80000d20#64 true 32#6 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         iintro Hk Hpc
-        k_step (wp_s_xori cpu _ ?hs 0x80000d22#64 false 4095#12 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+        k_step (wp_s_xori cpu _ 0x80000d22#64 false 4095#12 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         iintro Hk Hpc
-        k_step (wp_s_add cpu _ ?hs 0x80000d26#64 true 15#5 15#5 14#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+        k_step (wp_s_add cpu _ 0x80000d26#64 true 15#5 15#5 14#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
           with [bwd_a5 (k.regs 11#5) n hn1 hn32]
         iintro Hk Hpc
         -- the loop
@@ -596,7 +596,7 @@ theorem memmove_proof : MEMMOVE := ⟨fun cpu k bs olds n dqs hsie hK hn hn32 hl
         case h15 => simp [RegMap.set_apply, hn, bwd_a5 (k.regs 11#5) n hn1 hn32]
         iintro %R' Hk Hpc Hsrc Hdst %hother
         -- j d02
-        k_step (wp_s_j cpu _ ?hs 0x80000d38#64 true 2097098#21) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+        k_step (wp_s_j cpu _ 0x80000d38#64 true 2097098#21) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         iintro Hk Hpc
         iapply (memmove_finish cpu k hsie hK bs dqs R' ?hR2 ?h10 ?hcs) $$ [- $Hk $Hpc]
         rotate_right 1

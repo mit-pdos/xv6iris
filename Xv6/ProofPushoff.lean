@@ -116,7 +116,7 @@ theorem push_off_tail {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Cur
   iintro ⟨Hk, Hpc, Hframe, Hpin, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
   -- jal mycpu
-  k_step (wp_s_jal cpu _ ?hs 0x80000b98#64 false 3362#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
+  k_step (wp_s_jal cpu _ 0x80000b98#64 false 3362#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc
   have hm := M.wp_mycpu (hlc := hlc) (GF := GF) (lent := lent) cpu ((k.pushed 4).withRegs (R.set 1#5 0x80000b9c#64))
     (by k_norm) (by k_norm; omega)
@@ -134,7 +134,7 @@ theorem push_off_tail {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Cur
   case haddr => k_norm [h10]; rfl
   iintro Hk Hpc
   -- addiw a5,a5,1
-  k_step (wp_s_addiw cpu _ ?hs 0x80000b9e#64 true 1#12 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
+  k_step (wp_s_addiw cpu _ 0x80000b9e#64 true 1#12 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
     with [addiw_succ' k.noff hnoff]
   iintro Hk Hpc
   -- sw a5,120(a0): the depth becomes noff + 1 (the lent cell, if any, is pinned again)
@@ -192,10 +192,10 @@ theorem push_off_proof (M : MYCPU) : PUSHOFF := ⟨fun {hlc GF} _ _ cpu k hsie h
   simp only [sstatusAt] at hv
   k_norm at hv
   -- mv s1,a5
-  k_step (wp_s_add cpu _ ?hs 0x80000b8e#64 true 9#5 0#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_add cpu _ 0x80000b8e#64 true 9#5 0#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- jal mycpu
-  k_step (wp_s_jal cpu _ ?hs 0x80000b90#64 false 3370#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_jal cpu _ 0x80000b90#64 false 3370#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   have hm := M.wp_mycpu (hlc := hlc) (GF := GF) (lent := false) cpu ((k.pushed 4).withRegs
       (((((k.regs.set 2#5 (k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64)).set 8#5 (k.regs 2#5)).set 15#5 v).set 9#5 v).set 1#5
@@ -219,11 +219,11 @@ theorem push_off_proof (M : MYCPU) : PUSHOFF := ⟨fun {hlc GF} _ _ cpu k hsie h
   by_cases hn0 : k.noff = 0
   · -- depth 0: `c->intena := old` (= 0, as the context already has it)
     have hint : k.intena = false := by rw [← hwf.1 hn0, hsie]
-    k_step (wp_s_branch cpu _ ?hs 0x80000b96#64 true 22#13 15#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
+    k_step (wp_s_branch cpu _ 0x80000b96#64 true 22#13 15#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc] with [hn0, bcond_beq_00']
     iintro Hk Hpc
     -- jal mycpu
-    k_step (wp_s_jal cpu _ ?hs 0x80000bac#64 false 3342#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    k_step (wp_s_jal cpu _ 0x80000bac#64 false 3342#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
     have hm4 := M.wp_mycpu (hlc := hlc) (GF := GF) (lent := false) cpu ((k.pushed 4).withRegs
         ((R2.set 15#5 0#64).set 1#5 0x80000bb0#64))
@@ -238,25 +238,25 @@ theorem push_off_proof (M : MYCPU) : PUSHOFF := ⟨fun {hlc GF} _ _ cpu k hsie h
     k_norm [hret']
     have hs1' : R4 9#5 = v := by rw [hcs4.2.2.1]; simp [RegMap.set_apply, hs1]
     -- srli a5,s1,1
-    k_step (wp_s_srli cpu _ ?hs 0x80000bb0#64 false 1#6 15#5 9#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    k_step (wp_s_srli cpu _ 0x80000bb0#64 false 1#6 15#5 9#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [hs1']
     iintro Hk Hpc
     -- andi a5,a5,1
-    k_step (wp_s_andi cpu _ ?hs 0x80000bb4#64 true 1#12 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    k_step (wp_s_andi cpu _ 0x80000bb4#64 true 1#12 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [sie0_shr_and1' v hv]
     iintro Hk Hpc
     -- sw a5,124(a0): the depth-0 cell is scratch; borrow it from the bundle,
     -- store `old = 0` into it and keep it until the depth is written
     have hA : aCpuIntena cpu = cpuAddr cpu + 124#64 := rfl
     icases kctx_lend cpu _ (by k_norm; exact hn0) (by k_norm) $$ Hk with ⟨%b, Hk, Hcell⟩
-    k_step (wp_s_sw cpu _ ?hs 0x80000bb6#64 true 124#12 10#5 15#5 (intenaVal b)) from (text_instr _ _ _ _ rfl rfl) Htext
+    k_step (wp_s_sw cpu _ 0x80000bb6#64 true 124#12 10#5 15#5 (by decide) (intenaVal b)) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc] with [h10', hA]
     iintro Hk Hpc Hcell
     rw [← hA]
     ihave Hpin : pinRes cpu true k.intena $$ [Hcell]
     case' _ => (unfold pinRes; simp only [ite_true, hint, intenaVal, Bool.false_eq_true, ite_false]; iexact Hcell)
     -- j b98
-    k_step (wp_s_j cpu _ ?hs 0x80000bb8#64 true 2097120#21) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    k_step (wp_s_j cpu _ 0x80000bb8#64 true 2097120#21) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
     iapply (push_off_tail M true cpu k hsie hnoff hK hwf (fun h => nomatch h) _ ?hsp ?hcs) $$ [- $Hk $Hpc $Hpin]
     rotate_right 1
@@ -276,7 +276,7 @@ theorem push_off_proof (M : MYCPU) : PUSHOFF := ⟨fun {hlc GF} _ _ cpu k hsie h
       exact csRegs_set (csRegs_set c4 15#5 _ (by decide)) 15#5 _ (by decide)
   · -- depth ≥ 1: straight to the increment
     have hd : k.noff ≠ 0 := hn0
-    k_step (wp_s_branch cpu _ ?hs 0x80000b96#64 true 22#13 15#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
+    k_step (wp_s_branch cpu _ 0x80000b96#64 true 22#13 15#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc] with [bcond_beq_ofNat' k.noff (by omega), decide_eq_false hd]
     iintro Hk Hpc
     iapply (push_off_tail M false cpu k hsie hnoff hK hwf (fun _ => by omega) _ ?hsp ?hcs) $$ [- $Hk $Hpc]

@@ -56,23 +56,23 @@ theorem mycpu_proof : MYCPU := ⟨fun {hlc GF} _ _ {lent} cpu k hsie hK => by
   inext
   iintro Hk Hpc Hframe
   -- mv a5,tp
-  k_step (wp_s_add cpu _ ?hs 0x800018c2#64 true 15#5 0#5 4#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_add cpu _ 0x800018c2#64 true 15#5 0#5 4#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- sext.w a5,a5
-  k_step (wp_s_addiw cpu _ ?hs 0x800018c4#64 true 0#12 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_addiw cpu _ 0x800018c4#64 true 0#12 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- slli a5,a5,7
-  k_step (wp_s_slli cpu _ ?hs 0x800018c6#64 true 7#6 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_slli cpu _ 0x800018c6#64 true 7#6 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- auipc a0,0x11
-  k_step (wp_s_auipc cpu _ ?hs 0x800018c8#64 false 17#20 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_auipc cpu _ 0x800018c8#64 false 17#20 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [BitVec.reduceAppend]
   iintro Hk Hpc
   -- addi a0,a0,-1296
-  k_step (wp_s_addi cpu _ ?hs 0x800018cc#64 false 2800#12 10#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_addi cpu _ 0x800018cc#64 false 2800#12 10#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- add a0,a0,a5
-  k_step (wp_s_add cpu _ ?hs 0x800018d0#64 true 10#5 10#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_add cpu _ 0x800018d0#64 true 10#5 10#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [mycpu_addr]
   iintro Hk Hpc
   -- epilogue

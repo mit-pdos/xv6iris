@@ -117,7 +117,7 @@ macro_rules
                inext
                k_norm [$extra,*]
                iapply wpNext_off_intro
-               case hs => k_norm))
+               try (case hs => k_norm)))
 
 /-- `k_code code HT`: discharge the leading `instr` conjuncts of the goal, each
 by `code` (a proof of `instr ...` from the persistent text hypothesis `HT`,
@@ -147,7 +147,7 @@ macro_rules
                inext
                k_norm [$extra,*]
                iapply wpNext_off_intro
-               case hs => k_norm))
+               try (case hs => k_norm)))
 
 set_option maxHeartbeats 4000000 in
 /-- The standard prologue at `pc`: push two slots, save `ra`/`s0`, `s0 := sp₀`. -/
@@ -164,16 +164,16 @@ theorem wp_prologue2 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
         frame2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) -∗ wpLoop cpu)
     ⊢ wpLoop cpu := by
   iintro ⟨#Hi0, #Hi2, #Hi4, #Hi6, Hk, Hpc, HΦ⟩
-  k_step (wp_s_push cpu _ ?hs pc true 4080#12 2 hK imm_m16) $$ [- $Hk $Hpc]
+  k_step (wp_s_push cpu _ pc true 4080#12 2 hK imm_m16) $$ [- $Hk $Hpc]
   iintro Hk Hpc Hframe
   irevert Hframe
   stack_cells
   iintro ⟨⟨%w₁, Hf8⟩, ⟨%w₂, Hf16⟩, _⟩
-  k_step (wp_s_sd cpu _ ?hs (pc + 2#64) true 8#12 2#5 1#5 w₁) $$ [- $Hk $Hpc]
+  k_step (wp_s_sd cpu _ (pc + 2#64) true 8#12 2#5 1#5 (by decide) w₁) $$ [- $Hk $Hpc]
   iintro Hk Hpc Hf8
-  k_step (wp_s_sd cpu _ ?hs (pc + 4#64) true 0#12 2#5 8#5 w₂) $$ [- $Hk $Hpc]
+  k_step (wp_s_sd cpu _ (pc + 4#64) true 0#12 2#5 8#5 (by decide) w₂) $$ [- $Hk $Hpc]
   iintro Hk Hpc Hf16
-  k_step (wp_s_addi cpu _ ?hs (pc + 6#64) true 16#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc]
+  k_step (wp_s_addi cpu _ (pc + 6#64) true 16#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc]
   iintro Hk Hpc
   k_norm
   iapply HΦ $$ Hk Hpc [Hf8 Hf16]
@@ -196,18 +196,18 @@ theorem wp_epilogue2 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
     ⊢ wpLoop cpu := by
   unfold frame2
   iintro ⟨#Hi0, #Hi2, #Hi4, #Hi6, Hk, Hpc, ⟨Hf8, Hf16⟩, HΦ⟩
-  k_step (wp_s_ld cpu _ ?hs pc true 8#12 1#5 2#5 (by decide) (DFrac.own 1) ra)
+  k_step (wp_s_ld cpu _ pc true 8#12 1#5 2#5 (by decide) (by decide) (DFrac.own 1) ra)
     $$ [- $Hk $Hpc] with [hR2]
   iintro Hk Hpc Hf8
-  k_step (wp_s_ld cpu _ ?hs (pc + 2#64) true 0#12 8#5 2#5 (by decide) (DFrac.own 1) s0)
+  k_step (wp_s_ld cpu _ (pc + 2#64) true 0#12 8#5 2#5 (by decide) (by decide) (DFrac.own 1) s0)
     $$ [- $Hk $Hpc] with [hR2]
   iintro Hk Hpc Hf16
   ihave Hframe : stackOwn (k.regs 2#5) 2 $$ [Hf8 Hf16]
   case' _ => stack_cells; iframe
-  k_step (wp_s_pop cpu _ ?hs (pc + 4#64) true 16#12 2 imm_p16) $$ [- $Hk $Hpc]
+  k_step (wp_s_pop cpu _ (pc + 4#64) true 16#12 2 imm_p16) $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK, hR2]
   iintro Hk Hpc
-  k_step (wp_s_ret cpu _ ?hs (pc + 6#64) true 1#5) $$ [- $Hk $Hpc]
+  k_step (wp_s_ret cpu _ (pc + 6#64) true 1#5) $$ [- $Hk $Hpc]
   iintro Hk Hpc
   iapply HΦ $$ Hk Hpc
 
@@ -242,18 +242,18 @@ theorem wp_prologue4s1 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : K
         frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) -∗ wpLoop cpu)
     ⊢ wpLoop cpu := by
   iintro ⟨#Hi0, #Hi2, #Hi4, #Hi6, #Hi8, Hk, Hpc, HΦ⟩
-  k_step (wp_s_push cpu _ ?hs pc true 4064#12 4 hK imm_m32) $$ [- $Hk $Hpc]
+  k_step (wp_s_push cpu _ pc true 4064#12 4 hK imm_m32) $$ [- $Hk $Hpc]
   iintro Hk Hpc Hframe
   irevert Hframe
   stack_cells
   iintro ⟨⟨%w₁, Hf8⟩, ⟨%w₂, Hf16⟩, ⟨%w₃, Hf24⟩, ⟨%w₄, Hf32⟩, _⟩
-  k_step (wp_s_sd cpu _ ?hs (pc + 2#64) true 24#12 2#5 1#5 w₁) $$ [- $Hk $Hpc]
+  k_step (wp_s_sd cpu _ (pc + 2#64) true 24#12 2#5 1#5 (by decide) w₁) $$ [- $Hk $Hpc]
   iintro Hk Hpc Hf8
-  k_step (wp_s_sd cpu _ ?hs (pc + 4#64) true 16#12 2#5 8#5 w₂) $$ [- $Hk $Hpc]
+  k_step (wp_s_sd cpu _ (pc + 4#64) true 16#12 2#5 8#5 (by decide) w₂) $$ [- $Hk $Hpc]
   iintro Hk Hpc Hf16
-  k_step (wp_s_sd cpu _ ?hs (pc + 6#64) true 8#12 2#5 9#5 w₃) $$ [- $Hk $Hpc]
+  k_step (wp_s_sd cpu _ (pc + 6#64) true 8#12 2#5 9#5 (by decide) w₃) $$ [- $Hk $Hpc]
   iintro Hk Hpc Hf24
-  k_step (wp_s_addi cpu _ ?hs (pc + 8#64) true 32#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc]
+  k_step (wp_s_addi cpu _ (pc + 8#64) true 32#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc]
   iintro Hk Hpc
   k_norm
   iapply HΦ $$ Hk Hpc [Hf8 Hf16 Hf24 Hf32]
@@ -277,21 +277,21 @@ theorem wp_epilogue4s1 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : K
     ⊢ wpLoop cpu := by
   unfold frame4s1
   iintro ⟨#Hi0, #Hi2, #Hi4, #Hi6, #Hi8, Hk, Hpc, ⟨Hf8, Hf16, Hf24, %w₄, Hf32⟩, HΦ⟩
-  k_step (wp_s_ld cpu _ ?hs pc true 24#12 1#5 2#5 (by decide) (DFrac.own 1) ra)
+  k_step (wp_s_ld cpu _ pc true 24#12 1#5 2#5 (by decide) (by decide) (DFrac.own 1) ra)
     $$ [- $Hk $Hpc] with [hR2]
   iintro Hk Hpc Hf8
-  k_step (wp_s_ld cpu _ ?hs (pc + 2#64) true 16#12 8#5 2#5 (by decide) (DFrac.own 1) s0)
+  k_step (wp_s_ld cpu _ (pc + 2#64) true 16#12 8#5 2#5 (by decide) (by decide) (DFrac.own 1) s0)
     $$ [- $Hk $Hpc] with [hR2]
   iintro Hk Hpc Hf16
-  k_step (wp_s_ld cpu _ ?hs (pc + 4#64) true 8#12 9#5 2#5 (by decide) (DFrac.own 1) s1)
+  k_step (wp_s_ld cpu _ (pc + 4#64) true 8#12 9#5 2#5 (by decide) (by decide) (DFrac.own 1) s1)
     $$ [- $Hk $Hpc] with [hR2]
   iintro Hk Hpc Hf24
   ihave Hframe : stackOwn (k.regs 2#5) 4 $$ [Hf8 Hf16 Hf24 Hf32]
   case' _ => stack_cells; iframe
-  k_step (wp_s_pop cpu _ ?hs (pc + 6#64) true 32#12 4 imm_p32) $$ [- $Hk $Hpc]
+  k_step (wp_s_pop cpu _ (pc + 6#64) true 32#12 4 imm_p32) $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK, hR2]
   iintro Hk Hpc
-  k_step (wp_s_ret cpu _ ?hs (pc + 8#64) true 1#5) $$ [- $Hk $Hpc]
+  k_step (wp_s_ret cpu _ (pc + 8#64) true 1#5) $$ [- $Hk $Hpc]
   iintro Hk Hpc
   iapply HΦ $$ Hk Hpc
 

@@ -109,18 +109,18 @@ theorem memcmp_iter {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
   icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
   -- lbu a5,0(a0)
   icases byteBuf_acc s1 dq1 bs1 i a ha $$ Hbuf1 with ⟨Hb1, Hclose1⟩
-  k_step (wp_s_lbu cpu _ ?hs 0x80000cb2#64 false 0#12 15#5 10#5 (by decide) dq1 a) from (text_instr _ _ _ _ rfl rfl) HT
+  k_step (wp_s_lbu cpu _ 0x80000cb2#64 false 0#12 15#5 10#5 (by decide) (by decide) dq1 a) from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc] with [h10]
   iintro Hk Hpc Hb1
   ihave Hbuf1 := Hclose1 $$ Hb1
   -- lbu a4,0(a1)
   icases byteBuf_acc s2 dq2 bs2 i b hb $$ Hbuf2 with ⟨Hb2, Hclose2⟩
-  k_step (wp_s_lbu cpu _ ?hs 0x80000cb6#64 false 0#12 14#5 11#5 (by decide) dq2 b) from (text_instr _ _ _ _ rfl rfl) HT
+  k_step (wp_s_lbu cpu _ 0x80000cb6#64 false 0#12 14#5 11#5 (by decide) (by decide) dq2 b) from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc] with [h11]
   iintro Hk Hpc Hb2
   ihave Hbuf2 := Hclose2 $$ Hb2
   -- bne a5,a4,cca
-  k_step (wp_s_branch cpu _ ?hs 0x80000cba#64 false 16#13 15#5 14#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) HT
+  k_step (wp_s_branch cpu _ 0x80000cba#64 false 16#13 15#5 14#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc] with [ite_bne_bytes]
   iintro Hk Hpc
   iapply HΦ $$ Hk Hpc Hbuf1 Hbuf2
@@ -166,13 +166,13 @@ theorem memcmp_loop {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
     by_cases hab : bs1[i] = bs2[i]
     · simp only [hab, ite_true]
       -- addi a0,a0,1 ; addi a1,a1,1 ; bne a0,a3,cb2 (not taken: the last byte)
-      k_step (wp_s_addi cpu _ ?hs 0x80000cbe#64 true 1#12 10#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
+      k_step (wp_s_addi cpu _ 0x80000cbe#64 true 1#12 10#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
         with [h10]
       iintro Hk Hpc
-      k_step (wp_s_addi cpu _ ?hs 0x80000cc0#64 true 1#12 11#5 11#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
+      k_step (wp_s_addi cpu _ 0x80000cc0#64 true 1#12 11#5 11#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
         with [h11]
       iintro Hk Hpc
-      k_step (wp_s_branch cpu _ ?hs 0x80000cc2#64 false 8176#13 10#5 13#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) HT
+      k_step (wp_s_branch cpu _ 0x80000cc2#64 false 8176#13 10#5 13#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) HT
         $$ [- $Hk $Hpc] with [h13, ite_bne, ptr_next_eq s1 i n (by omega) (by omega), hi]
       iintro Hk Hpc
       iapply HΦ $$ %_ Hk Hbuf1 Hbuf2
@@ -211,14 +211,14 @@ theorem memcmp_loop {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
     iintro Hk Hpc Hbuf1 Hbuf2
     by_cases hab : bs1[i] = bs2[i]
     · simp only [hab, ite_true]
-      k_step (wp_s_addi cpu _ ?hs 0x80000cbe#64 true 1#12 10#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
+      k_step (wp_s_addi cpu _ 0x80000cbe#64 true 1#12 10#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
         with [h10]
       iintro Hk Hpc
-      k_step (wp_s_addi cpu _ ?hs 0x80000cc0#64 true 1#12 11#5 11#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
+      k_step (wp_s_addi cpu _ 0x80000cc0#64 true 1#12 11#5 11#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
         with [h11]
       iintro Hk Hpc
       have hne : ¬ (i + 1 = n) := by omega
-      k_step (wp_s_branch cpu _ ?hs 0x80000cc2#64 false 8176#13 10#5 13#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) HT
+      k_step (wp_s_branch cpu _ 0x80000cc2#64 false 8176#13 10#5 13#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) HT
         $$ [- $Hk $Hpc] with [h13, ite_bne, ptr_next_eq s1 i n (by omega) (by omega), hne]
       iintro Hk Hpc
       iapply (ih (i + 1) hi (by omega)
@@ -270,15 +270,15 @@ theorem memcmp_proof : MEMCMP := ⟨fun cpu k bs1 bs2 n dq1 dq2 hsie hK hn hn32 
   inext
   iintro Hk Hpc Hframe
   -- beqz a2,cd6
-  k_step (wp_s_branch cpu _ ?hs 0x80000ca8#64 true 46#13 12#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
+  k_step (wp_s_branch cpu _ 0x80000ca8#64 true 46#13 12#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc] with [hn, ite_beq_ofNat n (by omega)]
   iintro Hk Hpc
   by_cases hn0 : n = 0
   · -- n = 0: a0 := 0, jump to the epilogue
     simp only [hn0, ite_true]
-    k_step (wp_s_addi cpu _ ?hs 0x80000cd6#64 true 0#12 10#5 0#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    k_step (wp_s_addi cpu _ 0x80000cd6#64 true 0#12 10#5 0#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
-    k_step (wp_s_j cpu _ ?hs 0x80000cd8#64 true 2097142#21) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    k_step (wp_s_j cpu _ 0x80000cd8#64 true 2097142#21) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
     iapply (wp_epilogue2 cpu k hsie 0x80000cce#64 hK _ ?hR2 (k.regs 1#5) (k.regs 8#5)) $$ [- $Hk $Hpc]
     rotate_right 1
@@ -296,13 +296,13 @@ theorem memcmp_proof : MEMCMP := ⟨fun cpu k bs1 bs2 n dq1 dq2 hsie hK hn hn32 
     case hR2 => simp [RegMap.set_apply]
   · -- n > 0: truncate the count, compute the end pointer, run the loop
     simp only [hn0, ite_false]
-    k_step (wp_s_slli cpu _ ?hs 0x80000caa#64 true 32#6 12#5 12#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    k_step (wp_s_slli cpu _ 0x80000caa#64 true 32#6 12#5 12#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [hn]
     iintro Hk Hpc
-    k_step (wp_s_srli cpu _ ?hs 0x80000cac#64 true 32#6 12#5 12#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    k_step (wp_s_srli cpu _ 0x80000cac#64 true 32#6 12#5 12#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [shl_shr32 n hn32]
     iintro Hk Hpc
-    k_step (wp_s_add cpu _ ?hs 0x80000cae#64 false 13#5 10#5 12#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    k_step (wp_s_add cpu _ 0x80000cae#64 false 13#5 10#5 12#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
     iapply (memcmp_loop cpu (k.pushed 2) (by k_norm) (k.regs 10#5) (k.regs 11#5) dq1 dq2 bs1 bs2 n
       hn32 hl1 hl2 (n - 1) 0 (by omega) (by omega) (fun j hj => absurd hj (by omega)) _ ?h10 ?h11 ?h13)
@@ -324,7 +324,7 @@ theorem memcmp_proof : MEMCMP := ⟨fun cpu k bs1 bs2 n dq1 dq2 hsie hK hn hn32 
     iintro (⟨Hpc, %hdiff⟩ | ⟨Hpc, %heqall⟩)
     · -- the differing pair: subw a0,a5,a4, epilogue
       obtain ⟨j, a, b, hj, hpre, ha, hb, hab, h15, h14⟩ := hdiff
-      k_step (wp_s_subw cpu _ ?hs 0x80000cca#64 false 10#5 15#5 14#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+      k_step (wp_s_subw cpu _ 0x80000cca#64 false 10#5 15#5 14#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [h15, h14, subw_bytes a b]
       iintro Hk Hpc
       iapply (wp_epilogue2 cpu k hsie 0x80000cce#64 hK _ ?hR2 (k.regs 1#5) (k.regs 8#5)) $$ [- $Hk $Hpc]
@@ -354,9 +354,9 @@ theorem memcmp_proof : MEMCMP := ⟨fun cpu k bs1 bs2 n dq1 dq2 hsie hK hn hn32 
         exact ⟨j, a, b, hj, hpre, ha, hb, hab, by simp [RegMap.set_apply]⟩
       case hR2 => simp [RegMap.set_apply, hR2]
     · -- all equal: a0 := 0, jump to the epilogue
-      k_step (wp_s_addi cpu _ ?hs 0x80000cc6#64 true 0#12 10#5 0#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+      k_step (wp_s_addi cpu _ 0x80000cc6#64 true 0#12 10#5 0#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       iintro Hk Hpc
-      k_step (wp_s_j cpu _ ?hs 0x80000cc8#64 true 6#21) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+      k_step (wp_s_j cpu _ 0x80000cc8#64 true 6#21) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       iintro Hk Hpc
       iapply (wp_epilogue2 cpu k hsie 0x80000cce#64 hK _ ?hR2 (k.regs 1#5) (k.regs 8#5)) $$ [- $Hk $Hpc]
       rotate_right 1

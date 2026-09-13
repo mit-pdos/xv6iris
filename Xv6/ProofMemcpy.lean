@@ -31,7 +31,7 @@ theorem memcpy_proof (M : MEMMOVE) : MEMCPY := ⟨fun {hlc GF} _ _ cpu k bs olds
   inext
   iintro Hk Hpc Hframe
   -- jal ra, memmove
-  k_step (wp_s_jal cpu _ ?hs 0x80000d42#64 false 2097048#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_jal cpu _ 0x80000d42#64 false 2097048#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- the call
   have hm := M.wp_memmove (hlc := hlc) (GF := GF) cpu ((k.pushed 2).withRegs

@@ -1150,7 +1150,7 @@ macro_rules
                inext
                k_norm_noite [$extra,*]
                iapply wpNext_off_intro
-               case hs => k_norm_noite))
+               try (case hs => k_norm_noite)))
 
 set_option hygiene false in
 /-- `k_step_noite rule from code HT $$ pat`: as `k_step_noite`, with the rule's `instr` premise
@@ -1171,7 +1171,7 @@ macro_rules
                inext
                k_norm_noite [$extra,*]
                iapply wpNext_off_intro
-               case hs => k_norm_noite))
+               try (case hs => k_norm_noite)))
 
 
 

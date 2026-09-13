@@ -94,7 +94,7 @@ theorem wpLoop_k_lock [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KC
 /-! ## Fences and `sltiu` -/
 
 /-- `fence rw,w`. -/
-theorem wp_s_fence_rw_w [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
+theorem wp_s_fence_rw_w [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
     (pc : BitVec 64) (is_rvc : Bool) (rs rd : BitVec 5) :
     instr (GF := GF) pc is_rvc (instruction.FENCE (0#4, 3#4, 1#4, regidx.Regidx rs, regidx.Regidx rd)) ∗
     kctxL lent cpu k ∗ pcIs cpu pc ∗
@@ -102,12 +102,11 @@ theorem wp_s_fence_rw_w [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : 
         iprop(kctxL lent cpu' k -∗ pcIs cpu' (pc + instrLen is_rvc) -∗ wpLoop cpu'))
     ⊢ wpLoop cpu :=
   wpLoop_k_keep0 cpu k pc _ is_rvc _
-    (fun (cpu' : CPU) (c : MConf) (hpin : k.sie = false ∨ k.proc = 0#64 → cpu' = cpu) hok hmenv => by
-      obtain rfl := hpin (Or.inl hsie)
-      exact execSpecF_fence_rw_w cpu' (DFrac.own 1) c k.sie hok.phys hmenv pc _ rs rd (tpPin cpu' k.regs))
+    (fun cpu' c _ hok hmenv =>
+      execSpecF_fence_rw_w cpu' (DFrac.own 1) c k.sie hok.phys hmenv pc _ rs rd (tpPin cpu' k.regs))
 
 /-- `fence rw,rw`. -/
-theorem wp_s_fence_rw_rw [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
+theorem wp_s_fence_rw_rw [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
     (pc : BitVec 64) (is_rvc : Bool) (rs rd : BitVec 5) :
     instr (GF := GF) pc is_rvc (instruction.FENCE (0#4, 3#4, 3#4, regidx.Regidx rs, regidx.Regidx rd)) ∗
     kctxL lent cpu k ∗ pcIs cpu pc ∗
@@ -115,23 +114,21 @@ theorem wp_s_fence_rw_rw [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k :
         iprop(kctxL lent cpu' k -∗ pcIs cpu' (pc + instrLen is_rvc) -∗ wpLoop cpu'))
     ⊢ wpLoop cpu :=
   wpLoop_k_keep0 cpu k pc _ is_rvc _
-    (fun (cpu' : CPU) (c : MConf) (hpin : k.sie = false ∨ k.proc = 0#64 → cpu' = cpu) hok hmenv => by
-      obtain rfl := hpin (Or.inl hsie)
-      exact execSpecF_fence_rw_rw cpu' (DFrac.own 1) c k.sie hok.phys hmenv pc _ rs rd (tpPin cpu' k.regs))
+    (fun cpu' c _ hok hmenv =>
+      execSpecF_fence_rw_rw cpu' (DFrac.own 1) c k.sie hok.phys hmenv pc _ rs rd (tpPin cpu' k.regs))
 
 /-- `sltiu rd, rs1, imm` (covers `seqz rd, rs1`). -/
-theorem wp_s_sltiu [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
+theorem wp_s_sltiu [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rd rs1 : BitVec 5) (hrd : rdOk rd) :
     instr (GF := GF) pc is_rvc (instruction.ITYPE (imm, regidx.Regidx rs1, regidx.Regidx rd, iop.SLTIU)) ∗
     kctxL lent cpu k ∗ pcIs cpu pc ∗
     ▷ wpNext k.sie k.proc cpu (fun cpu' =>
-        iprop(kctxL lent cpu' (k.setReg rd (if (k.rget cpu rs1).ult (BitVec.signExtend 64 imm) then 1#64 else 0#64)) -∗
+        iprop(kctxL lent cpu' (k.setReg rd (if (k.rget cpu' rs1).ult (BitVec.signExtend 64 imm) then 1#64 else 0#64)) -∗
           pcIs cpu' (pc + instrLen is_rvc) -∗ wpLoop cpu'))
     ⊢ wpLoop cpu :=
   wpLoop_k_setReg cpu k pc _ is_rvc _ rd hrd _
-    (fun (cpu' : CPU) (c : MConf) (hpin : k.sie = false ∨ k.proc = 0#64 → cpu' = cpu) _ _ => by
-      obtain rfl := hpin (Or.inl hsie)
-      exact execSpecF_sltiu cpu' (DFrac.own 1) c pc _ imm rd rs1 hrd.1 (tpPin cpu' k.regs))
+    (fun cpu' c _ _ _ =>
+      execSpecF_sltiu cpu' (DFrac.own 1) c pc _ imm rd rs1 hrd.1 (tpPin cpu' k.regs))
 
 /-! ## The lock rules -/
 
@@ -881,8 +878,8 @@ theorem wp_s_sd_lkcpu_acquire (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
       ihave Hlc := lockedCore_intro γ cpu B0 $$ [Hhalf0]
       case' _ => iframe Hhalf0; iexact HflB
       iframe
-  iapply (wpLoop_k_keep_mem cpu k pc (pc + instrLen is_rvc) is_rvc _
-    iprop(isLock γ lk s R ∗ lockedPre γ cpu) (lockedCore γ cpu)
+  iapply (wpLoop_k_keep_mem cpu k pc (fun _ => pc + instrLen is_rvc) is_rvc _
+    iprop(isLock γ lk s R ∗ lockedPre γ cpu) (fun _ => lockedCore γ cpu)
     (fun cpu' c hpin hok hm => by
       obtain rfl := hpin (Or.inl hsie)
       exact hexec c (by rw [hsie] at hok; exact hok) hm))
@@ -965,8 +962,8 @@ theorem wp_s_sd_zero_lkcpu_release (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
       ihave Hlp := lockedPre_intro γ cpu B0 $$ [Hhalf0]
       case' _ => iframe Hhalf0; iexact HflB
       iframe
-  iapply (wpLoop_k_keep_mem cpu k pc (pc + instrLen is_rvc) is_rvc _
-    iprop(isLock γ lk s R ∗ lockedCore γ cpu) (lockedPre γ cpu)
+  iapply (wpLoop_k_keep_mem cpu k pc (fun _ => pc + instrLen is_rvc) is_rvc _
+    iprop(isLock γ lk s R ∗ lockedCore γ cpu) (fun _ => lockedPre γ cpu)
     (fun cpu' c hpin hok hm => by
       obtain rfl := hpin (Or.inl hsie)
       exact hexec c (by rw [hsie] at hok; exact hok) hm))

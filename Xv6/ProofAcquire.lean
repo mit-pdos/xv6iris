@@ -43,7 +43,7 @@ theorem acquire_spin {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurC
   have hc9 : Rc 9#5 = lk := by rw [hinv 9#5 (by decide)]; exact h9
   have hc14 : Rc 14#5 = 1#64 := by rw [hinv 14#5 (by decide)]; exact h14
   -- mv a5,a4
-  k_step (wp_s_add cpu _ ?hs 0x80000bd4#64 true 15#5 0#5 14#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hc14]
+  k_step (wp_s_add cpu _ 0x80000bd4#64 true 15#5 0#5 14#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hc14]
   iintro Hk Hpc
   -- amoswap.w.aq a5,a5,(s1)
   k_step (wp_s_amoswap_lock cpu _ ?hs 0x80000bd6#64 false 15#5 9#5 15#5 (by decide) γ lk s R
@@ -54,13 +54,13 @@ theorem acquire_spin {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurC
   case hlen => k_norm; exact hlen
   iintro %old Hk Hpc Hpost
   -- sext.w a5,a5
-  k_step (wp_s_addiw cpu _ ?hs 0x80000bda#64 true 0#12 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
+  k_step (wp_s_addiw cpu _ 0x80000bda#64 true 0#12 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
     with [sext_low_sext old]
   iintro Hk Hpc
   by_cases h0 : old = 0#32
   · -- won: fall through to 0x80000bde
     subst h0
-    k_step (wp_s_branch cpu _ ?hs 0x80000bdc#64 true 8184#13 15#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) HT
+    k_step (wp_s_branch cpu _ 0x80000bdc#64 true 8184#13 15#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) HT
       $$ [- $Hk $Hpc] with [bcond_bne_zero, acqLocks_zero]
     iintro Hk Hpc
     icases (show acqPost γ R cpu 0#32 ⊢ lockedPre γ cpu ∗ R curCtx ∗ lockCtxHeld ∗ ∃ K : Nat, viewLb cpu K from by
@@ -71,7 +71,7 @@ theorem acquire_spin {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurC
     simp only [RegMap.set_apply, hi, ite_false]
     exact hinv i hi
   · -- lost: the word was 1; back to 0x80000bd4
-    k_step (wp_s_branch cpu _ ?hs 0x80000bdc#64 true 8184#13 15#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) HT
+    k_step (wp_s_branch cpu _ 0x80000bdc#64 true 8184#13 15#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) HT
       $$ [- $Hk $Hpc] with [bcond_bne_sext_ne old h0, acqLocks_ne s _ h0]
     iintro Hk Hpc
     icases (show acqPost γ R cpu old ⊢ emp from by rw [acqPost_ne γ R cpu h0]) $$ Hpost with _
@@ -99,10 +99,10 @@ theorem acquire_proof (PU : PUSHOFF) (HO : HOLDING) (MC : MYCPU) : ACQUIRE := �
   inext
   iintro Hk Hpc Hframe
   -- mv s1,a0
-  k_step (wp_s_add cpu _ ?hs 0x80000bc4#64 true 9#5 0#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_add cpu _ 0x80000bc4#64 true 9#5 0#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- jal push_off
-  k_step (wp_s_jal cpu _ ?hs 0x80000bc6#64 false 2097082#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_jal cpu _ 0x80000bc6#64 false 2097082#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   have hpu : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hnoff' : k'.noff + 1 < 2 ^ 31)
       (hK' : 6 ≤ k'.avail),
@@ -128,10 +128,10 @@ theorem acquire_proof (PU : PUSHOFF) (HO : HOLDING) (MC : MYCPU) : ACQUIRE := �
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at this
     exact this
   -- mv a0,s1
-  k_step (wp_s_add cpu _ ?hs 0x80000bca#64 true 10#5 0#5 9#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9]
+  k_step (wp_s_add cpu _ 0x80000bca#64 true 10#5 0#5 9#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9]
   iintro Hk Hpc
   -- jal holding
-  k_step (wp_s_jal cpu _ ?hs 0x80000bcc#64 false 2097032#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_jal cpu _ 0x80000bcc#64 false 2097032#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   have hho : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hK' : 6 ≤ k'.avail)
       (hs' : s ∉ k'.locks),
@@ -155,10 +155,10 @@ theorem acquire_proof (PU : PUSHOFF) (HO : HOLDING) (MC : MYCPU) : ACQUIRE := �
   k_norm [hret2]
   k_norm at hcs3
   -- li a4,1
-  k_step (wp_s_addi cpu _ ?hs 0x80000bd0#64 true 1#12 14#5 0#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_addi cpu _ 0x80000bd0#64 true 1#12 14#5 0#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- bnez a0, panic: not taken (holding answered 0)
-  k_step (wp_s_branch cpu _ ?hs 0x80000bd2#64 true 28#13 10#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) Htext
+  k_step (wp_s_branch cpu _ 0x80000bd2#64 true 28#13 10#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc] with [h10, bcond_bne_zero]
   iintro Hk Hpc
   -- the spin
@@ -175,7 +175,7 @@ theorem acquire_proof (PU : PUSHOFF) (HO : HOLDING) (MC : MYCPU) : ACQUIRE := �
   iintro %R' Hk Hpc %hR' Hpre HR Hheld Hview
   k_norm
   -- jal mycpu
-  k_step (wp_s_jal cpu _ ?hs 0x80000bde#64 false 3292#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_jal cpu _ 0x80000bde#64 false 3292#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   have hmc : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hK' : 2 ≤ k'.avail),
       kctx cpu k' ∗ pcIs cpu 0x800018ba#64 ∗

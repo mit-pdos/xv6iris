@@ -91,10 +91,10 @@ theorem holding_tail (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors} [MachGS 
   iintro %w Hk Hpc HQ
   k_norm
   -- mv s1,a5
-  k_step (wp_s_add cpu _ ?hs 0x80000b68#64 true 9#5 0#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
+  k_step (wp_s_add cpu _ 0x80000b68#64 true 9#5 0#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- jal mycpu
-  k_step (wp_s_jal cpu _ ?hs 0x80000b6a#64 false 3408#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
+  k_step (wp_s_jal cpu _ 0x80000b6a#64 false 3408#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc
   have hmc : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hK' : 2 ≤ k'.avail),
       kctx cpu k' ∗ pcIs cpu 0x800018ba#64 ∗
@@ -113,12 +113,12 @@ theorem holding_tail (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors} [MachGS 
   have hret : jumpPc 0x80000b6e#64 = 0x80000b6e#64 := by simp only [jumpPc, BitVec.reduceAnd]
   k_norm [hret]
   -- sub a0,s1,a0
-  k_step (wp_s_sub cpu _ ?hs 0x80000b6e#64 false 10#5 9#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
+  k_step (wp_s_sub cpu _ 0x80000b6e#64 false 10#5 9#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
     with [hcs2.2.2.1, h10]
   iintro Hk Hpc
   -- sltiu a0,a0,1
   icases hans w $$ HQ with ⟨%hval, HQ⟩
-  k_step (wp_s_sltiu cpu _ ?hs 0x80000b72#64 false 1#12 10#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
+  k_step (wp_s_sltiu cpu _ 0x80000b72#64 false 1#12 10#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
     with [hval]
   iintro Hk Hpc
   -- epilogue
@@ -165,14 +165,14 @@ theorem holding_notheld_proof (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors}
   by_cases hw : w = 0#32
   · -- the word is 0: not held; return 0
     subst hw
-    k_step (wp_s_branch cpu _ ?hs 0x80000b56#64 true 6#13 15#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) Htext
+    k_step (wp_s_branch cpu _ 0x80000b56#64 true 6#13 15#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc] with [bcond_bne_00']
     iintro Hk Hpc
     -- li a0,0
-    k_step (wp_s_addi cpu _ ?hs 0x80000b58#64 true 0#12 10#5 0#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    k_step (wp_s_addi cpu _ 0x80000b58#64 true 0#12 10#5 0#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
     -- ret
-    k_step (wp_s_ret cpu _ ?hs 0x80000b5a#64 true 1#5) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    k_step (wp_s_ret cpu _ 0x80000b5a#64 true 1#5) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
     iapply HΦ $$ %_ Hk Hpc
     ipureintro
@@ -181,7 +181,7 @@ theorem holding_notheld_proof (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors}
       simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, eq_self_iff_true, true_and, and_true]
     · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, BitVec.reduceSignExtend, BitVec.add_zero]
   · -- the word is nonzero: read the owner word, which is not ours
-    k_step (wp_s_branch cpu _ ?hs 0x80000b56#64 true 6#13 15#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) Htext
+    k_step (wp_s_branch cpu _ 0x80000b56#64 true 6#13 15#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc] with [bcond_bne_sext_ne w hw]
     iintro Hk Hpc
     iapply (holding_tail MC cpu (k.withRegs (k.regs.set 15#5 (BitVec.signExtend 64 w))) hsie hK
@@ -235,7 +235,7 @@ theorem holding_locked_proof (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors} 
   case haddr => k_norm
   iintro %w Hk Hpc %hw Hlc
   subst hw
-  k_step (wp_s_branch cpu _ ?hs 0x80000b56#64 true 6#13 15#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) Htext
+  k_step (wp_s_branch cpu _ 0x80000b56#64 true 6#13 15#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc] with [bcond_bne_one]
   iintro Hk Hpc
   iapply (holding_tail MC cpu (k.withRegs (k.regs.set 15#5 (BitVec.signExtend 64 lkOne))) hsie hK

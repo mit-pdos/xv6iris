@@ -106,21 +106,21 @@ theorem strlen_iter {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
   iintro ⟨Hk, Hpc, Hbuf, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
   -- mv a3,a5
-  k_step (wp_s_add cpu _ ?hs 0x80000e16#64 true 13#5 0#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
+  k_step (wp_s_add cpu _ 0x80000e16#64 true 13#5 0#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
     with [h15]
   iintro Hk Hpc
   -- addi a5,a5,1
-  k_step (wp_s_addi cpu _ ?hs 0x80000e18#64 true 1#12 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
+  k_step (wp_s_addi cpu _ 0x80000e18#64 true 1#12 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
     with [h15]
   iintro Hk Hpc
   -- lbu a4,-1(a5)
   icases byteBuf_acc s dq bs i b hb $$ Hbuf with ⟨Hb, Hclose⟩
-  k_step (wp_s_lbu cpu _ ?hs 0x80000e1a#64 false 4095#12 14#5 15#5 (by decide) dq b) from (text_instr _ _ _ _ rfl rfl) HT
+  k_step (wp_s_lbu cpu _ 0x80000e1a#64 false 4095#12 14#5 15#5 (by decide) (by decide) dq b) from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc] with [h15]
   iintro Hk Hpc Hb
   ihave Hbuf := Hclose $$ Hb
   -- bnez a4,e16
-  k_step (wp_s_branch cpu _ ?hs 0x80000e1e#64 true 8184#13 14#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) HT
+  k_step (wp_s_branch cpu _ 0x80000e1e#64 true 8184#13 14#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc] with [h15, ite_bne_byte]
   iintro Hk Hpc
   iapply HΦ $$ Hk Hpc Hbuf
@@ -203,13 +203,13 @@ theorem strlen_proof : STRLEN := ⟨fun cpu k s dq hsie hK hn31 => by
     · refine ⟨0#8, ?_, fun h => absurd h (by omega)⟩
       have h2 := hcstr.2; rwa [show s.length = 0 by omega] at h2
   icases byteBuf_acc (k.regs 10#5) dq (s ++ [0#8]) 0 b0 hb0 $$ Hbuf with ⟨Hb, Hclose⟩
-  k_step (wp_s_lbu cpu _ ?hs 0x80000e0c#64 false 0#12 15#5 10#5 (by decide) dq b0) from (text_instr _ _ _ _ rfl rfl) Htext
+  k_step (wp_s_lbu cpu _ 0x80000e0c#64 false 0#12 15#5 10#5 (by decide) (by decide) dq b0) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc]
   k_norm
   iintro Hk Hpc Hb
   ihave Hbuf := Hclose $$ Hb
   -- beqz a5,e2c
-  k_step (wp_s_branch cpu _ ?hs 0x80000e10#64 true 28#13 15#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
+  k_step (wp_s_branch cpu _ 0x80000e10#64 true 28#13 15#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc] with [ite_beq_byte]
   iintro Hk Hpc
   by_cases hn0 : s.length = 0
@@ -218,9 +218,9 @@ theorem strlen_proof : STRLEN := ⟨fun cpu k s dq hsie hK hn31 => by
       have h2 := hcstr.2; rw [hn0, hb0] at h2; exact (Option.some.inj h2)
     subst hb0z
     simp only [ite_true]
-    k_step (wp_s_addi cpu _ ?hs 0x80000e2c#64 true 0#12 10#5 0#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    k_step (wp_s_addi cpu _ 0x80000e2c#64 true 0#12 10#5 0#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
-    k_step (wp_s_j cpu _ ?hs 0x80000e2e#64 true 2097142#21) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    k_step (wp_s_j cpu _ 0x80000e2e#64 true 2097142#21) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
     iapply (wp_epilogue2 cpu k hsie 0x80000e24#64 hK _ ?hR2 (k.regs 1#5) (k.regs 8#5)) $$ [- $Hk $Hpc]
     rotate_right 1
@@ -239,7 +239,7 @@ theorem strlen_proof : STRLEN := ⟨fun cpu k s dq hsie hK hn31 => by
   · -- a nonempty string: into the loop
     have hb0ne' : b0 ≠ 0#8 := hb0ne (by omega)
     simp only [hb0ne', ite_false]
-    k_step (wp_s_addi cpu _ ?hs 0x80000e12#64 false 1#12 15#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    k_step (wp_s_addi cpu _ 0x80000e12#64 false 1#12 15#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
     iapply (strlen_loop cpu (k.pushed 2) (by k_norm) (k.regs 10#5) dq (s ++ [0#8]) s.length hcstr
       (s.length - 1) 1 (by omega) (by omega) rfl _ ?h15) $$ [- $Hk $Hpc]
@@ -250,7 +250,7 @@ theorem strlen_proof : STRLEN := ⟨fun cpu k s dq hsie hK hn31 => by
     have h10 : R' 10#5 = k.regs 10#5 := by
       rw [hother 10#5 (by decide) (by decide) (by decide)]; simp [RegMap.set_apply]
     -- subw a0,a3,a0
-    k_step (wp_s_subw cpu _ ?hs 0x80000e20#64 false 10#5 13#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    k_step (wp_s_subw cpu _ 0x80000e20#64 false 10#5 13#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [h13, h10, subw_len (k.regs 10#5) s.length hn31]
     iintro Hk Hpc
     have hR2 : R' 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFF0#64 := by

@@ -69,7 +69,7 @@ theorem myproc_proof (PU : PUSHOFF) (PO : POPOFF) : MYPROC := ⟨fun {hlc GF} _ 
   inext
   iintro Hk Hpc Hframe
   -- jal push_off
-  k_step (wp_s_jal cpu _ ?hs 0x800018e4#64 false 2093724#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_jal cpu _ 0x800018e4#64 false 2093724#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- push_off (its contract, unfolded, at the callee's context)
   have hpu : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hnoff' : k'.noff + 1 < 2 ^ 31)
@@ -91,27 +91,27 @@ theorem myproc_proof (PU : PUSHOFF) (PO : POPOFF) : MYPROC := ⟨fun {hlc GF} _ 
   have hret1 : jumpPc 0x800018e8#64 = 0x800018e8#64 := by simp only [jumpPc, BitVec.reduceAnd]
   k_norm [hret1]
   -- mv a5,tp
-  k_step (wp_s_add cpu _ ?hs 0x800018e8#64 true 15#5 0#5 4#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_add cpu _ 0x800018e8#64 true 15#5 0#5 4#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
 
   iintro Hk Hpc
   -- sext.w a5,a5
-  k_step (wp_s_addiw cpu _ ?hs 0x800018ea#64 true 0#12 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_addiw cpu _ 0x800018ea#64 true 0#12 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
 
   iintro Hk Hpc
   -- slli a5,a5,7
-  k_step (wp_s_slli cpu _ ?hs 0x800018ec#64 true 7#6 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_slli cpu _ 0x800018ec#64 true 7#6 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
 
   iintro Hk Hpc
   -- auipc a4
-  k_step (wp_s_auipc cpu _ ?hs 0x800018ee#64 false 17#20 14#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_auipc cpu _ 0x800018ee#64 false 17#20 14#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
 
   iintro Hk Hpc
   -- addi a4,a4,-1334
-  k_step (wp_s_addi cpu _ ?hs 0x800018f2#64 false 2714#12 14#5 14#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_addi cpu _ 0x800018f2#64 false 2714#12 14#5 14#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
 
   iintro Hk Hpc
   -- add a5,a5,a4
-  k_step (wp_s_add cpu _ ?hs 0x800018f6#64 true 15#5 15#5 14#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_add cpu _ 0x800018f6#64 true 15#5 15#5 14#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
 
   iintro Hk Hpc
   -- ld a5,48(a5): c->proc
@@ -120,10 +120,10 @@ theorem myproc_proof (PU : PUSHOFF) (PO : POPOFF) : MYPROC := ⟨fun {hlc GF} _ 
   case haddr => k_norm; exact myproc_cpu_addr cpu
   iintro Hk Hpc
   -- mv s1,a5
-  k_step (wp_s_add cpu _ ?hs 0x800018fa#64 true 9#5 0#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_add cpu _ 0x800018fa#64 true 9#5 0#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- jal pop_off
-  k_step (wp_s_jal cpu _ ?hs 0x800018fc#64 false 2093822#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_jal cpu _ 0x800018fc#64 false 2093822#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- pop_off (its contract, unfolded, at the callee's context)
   have hpo : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hnoff' : 1 ≤ k'.noff)
@@ -148,7 +148,7 @@ theorem myproc_proof (PU : PUSHOFF) (PO : POPOFF) : MYPROC := ⟨fun {hlc GF} _ 
   k_norm [hret2]
   simp only [KCtx.withRegs_regs] at hcs2 hcs4
   -- mv a0,s1
-  k_step (wp_s_add cpu _ ?hs 0x80001900#64 true 10#5 0#5 9#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_add cpu _ 0x80001900#64 true 10#5 0#5 9#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- epilogue
   have hR2 : (R4.set 10#5 (R4 9#5)) 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64 := by

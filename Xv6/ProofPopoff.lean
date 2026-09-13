@@ -130,7 +130,7 @@ theorem pop_off_proof (M : MYCPU) : POPOFF := ⟨fun {hlc GF} _ _ cpu k hsie hno
   inext
   iintro Hk Hpc Hframe
   -- jal mycpu
-  k_step (wp_s_jal cpu _ ?hs 0x80000c02#64 false 3256#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_jal cpu _ 0x80000c02#64 false 3256#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   have hm := M.wp_mycpu (hlc := hlc) (GF := GF) (lent := false) cpu ((k.pushed 2).withRegs
       (((k.regs.set 2#5 (k.regs 2#5 + 0xFFFFFFFFFFFFFFF0#64)).set 8#5 (k.regs 2#5)).set 1#5 0x80000c06#64))
@@ -144,16 +144,16 @@ theorem pop_off_proof (M : MYCPU) : POPOFF := ⟨fun {hlc GF} _ _ cpu k hsie hno
   have hret : jumpPc 0x80000c06#64 = 0x80000c06#64 := by simp only [jumpPc, BitVec.reduceAnd]
   k_norm [hret]
   -- csrr a5,sstatus
-  k_step (wp_s_csrr_sstatus cpu _ ?hs 0x80000c06#64 false 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_csrr_sstatus cpu _ 0x80000c06#64 false 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro %v %hv Hk Hpc
   simp only [sstatusAt] at hv
   k_norm at hv
   -- andi a5,a5,2
-  k_step (wp_s_andi cpu _ ?hs 0x80000c0a#64 true 2#12 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_andi cpu _ 0x80000c0a#64 true 2#12 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [sie0_and2 v hv]
   iintro Hk Hpc
   -- bnez a5, c2a: not taken
-  k_step (wp_s_branch cpu _ ?hs 0x80000c0c#64 true 30#13 15#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) Htext
+  k_step (wp_s_branch cpu _ 0x80000c0c#64 true 30#13 15#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc] with [bcond_bne_00]
   iintro Hk Hpc
   -- lw a5,120(a0)
@@ -162,11 +162,11 @@ theorem pop_off_proof (M : MYCPU) : POPOFF := ⟨fun {hlc GF} _ _ cpu k hsie hno
   case haddr => k_norm [h10]; rfl
   iintro Hk Hpc
   -- blez a5, c36: not taken
-  k_step (wp_s_branch0 cpu _ ?hs 0x80000c10#64 false 38#13 15#5 (by decide) bop.BGE) from (text_instr _ _ _ _ rfl rfl) Htext
+  k_step (wp_s_branch0 cpu _ 0x80000c10#64 false 38#13 15#5 (by decide) bop.BGE) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc] with [bcond_bge_zero_pos k.noff hnoff hn31]
   iintro Hk Hpc
   -- addiw a5,a5,-1
-  k_step (wp_s_addiw cpu _ ?hs 0x80000c14#64 true 4095#12 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_addiw cpu _ 0x80000c14#64 true 4095#12 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [addiw_pred k.noff hnoff hn31]
   iintro Hk Hpc
   have hA : aCpuIntena cpu = cpuAddr cpu + 124#64 := rfl
@@ -191,15 +191,15 @@ theorem pop_off_proof (M : MYCPU) : POPOFF := ⟨fun {hlc GF} _ _ cpu k hsie hno
         by omega, by omega⟩
     iintro Hk Hpc Hcell
     -- bnez a5, c22: not taken
-    k_step (wp_s_branch cpu _ ?hs 0x80000c18#64 true 10#13 15#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) Htext
+    k_step (wp_s_branch cpu _ 0x80000c18#64 true 10#13 15#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc] with [h0, bcond_bne_00]
     iintro Hk Hpc
     -- lw a5,124(a0): the lent cell, 0
-    k_step (wp_s_lw cpu _ ?hs 0x80000c1a#64 true 124#12 15#5 10#5 (by decide) (DFrac.own 1) (intenaVal false)) from (text_instr _ _ _ _ rfl rfl) Htext
+    k_step (wp_s_lw cpu _ 0x80000c1a#64 true 124#12 15#5 10#5 (by decide) (by decide) (DFrac.own 1) (intenaVal false)) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc] with [h10, hA, hsx, hint]
     iintro Hk Hpc Hcell
     -- beqz a5, c22: taken
-    k_step (wp_s_branch cpu _ ?hs 0x80000c1c#64 true 6#13 15#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
+    k_step (wp_s_branch cpu _ 0x80000c1c#64 true 6#13 15#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc] with [bcond_beq_00]
     iintro Hk Hpc
     -- the cell goes back into the bundle
@@ -237,7 +237,7 @@ theorem pop_off_proof (M : MYCPU) : POPOFF := ⟨fun {hlc GF} _ _ cpu k hsie hno
         KCtx.pushed_intena, KCtx.pushed_locks, KCtx.pushed_tier]
       refine ⟨fun h => absurd h hd, fun _ => hsie, fun h => absurd h (by rw [hsie]; decide), hlks, by omega⟩
     iintro Hk Hpc
-    k_step (wp_s_branch cpu _ ?hs 0x80000c18#64 true 10#13 15#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) Htext
+    k_step (wp_s_branch cpu _ 0x80000c18#64 true 10#13 15#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc] with [bcond_bne_ofNat (k.noff - 1) (by omega), decide_eq_true hd]
     iintro Hk Hpc
     iapply (wp_epilogue2 cpu k.popOff (by k_norm) 0x80000c22#64 (by k_norm; omega) _ ?hR2

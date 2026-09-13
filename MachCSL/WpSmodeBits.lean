@@ -31,7 +31,14 @@ theorem wp_s_and_bits [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KC
     ⊢ wpLoop cpu := by
   have e : k.rget cpu rs1 &&& k.rget cpu rs2 = if p ∧ q then 1#64 else 0#64 := by
     rw [h1, h2, and_bits']
-  rw [← e]
-  exact wp_s_and cpu k hsie pc is_rvc rd rs1 rs2 hrd
+  iintro ⟨HI, Hk, Hpc, HΦ⟩
+  iapply (wp_s_and cpu k pc is_rvc rd rs1 rs2 hrd)
+  iframe HI Hk Hpc
+  inext
+  rw [hsie]
+  ihave HΦ' := wpNext_off _ _ _ $$ HΦ
+  iapply wpNext_off_intro
+  rw [e]
+  iexact HΦ'
 
 end MachCSL
