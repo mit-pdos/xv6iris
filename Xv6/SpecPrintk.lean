@@ -22,12 +22,14 @@ bytes: nothing in the kernel reads them back.
 printk takes `pr.lock` (whose payload is nothing: the lock only serializes
 format walks) and, per byte below it, `tx_lock`; so the depth headroom is
 `+2` and neither lock may be held on entry.  Stack: printk's 24 slots over
-printint's 24.  `sie = false` is the only index the context layer
-supports today.
+printint's 24.  At either `SIE`: with interrupts on the caller resumes at
+whichever hart the thread lands on, with the `SPIE`/`SPP` bits `acquire`'s
+push_off pinned (a balanced push_off / pop_off pair, `KCtx.withSpie`).
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.Image
+import MachCSL.WpSmodeIntr
 import Xv6.SpecPrintint
 
 namespace Xv6
@@ -135,15 +137,16 @@ def pkDescs {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx] (R : 
 def wp_printk_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8))
     (dqf : DFrac) (f : List (BitVec 8)) (descs : List PkArgDesc)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail)
+    (hK : 48 ≤ k.avail)
     (hflen : f.length + 4 < 2 ^ 31)
     (hkinds : pkKinds f = descs.map PkArgDesc.kind) (hdlen : descs.length ≤ 7)
     (hnoff : k.noff + 2 < 2 ^ 31) (hpr : "pr" ∉ k.locks) (huart : "uart" ∉ k.locks) : Prop :=
   kctx cpu k ∗ pcIs cpu printkAddr ∗
   cstr (k.regs 10#5) dqf f ∗ pkDescs k.regs descs ∗
   isLock γpr prLock "pr" (fun _ => emp) ∗ isTxLock γl γd ∗ uartSentSub γd bs ∗
-  wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ (R' : RegMap) (cs : List (BitVec 8)),
-    kctx cpu' (k.withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+  wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ (R' : RegMap) (cs : List (BitVec 8)),
+    ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
+    kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = 0#64⌝ -∗
     cstr (k.regs 10#5) dqf f -∗ pkDescs k.regs descs -∗
     uartSentSub γd (bs ++ cs) -∗ wpLoop cpu'))
@@ -153,8 +156,8 @@ def wp_printk_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G G
 structure PRINTK : Prop where
   wp_printk : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac) (f : List (BitVec 8))
-    (descs : List PkArgDesc) hsie hK hflen hkinds hdlen hnoff hpr huart,
-    wp_printk_body (hlc := hlc) (GF := GF) cpu k γpr γl γd bs dqf f descs hsie hK hflen hkinds hdlen
+    (descs : List PkArgDesc) hK hflen hkinds hdlen hnoff hpr huart,
+    wp_printk_body (hlc := hlc) (GF := GF) cpu k γpr γl γd bs dqf f descs hK hflen hkinds hdlen
       hnoff hpr huart
 
 end Xv6

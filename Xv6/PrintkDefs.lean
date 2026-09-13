@@ -5,6 +5,7 @@ constants, and pure facts about the format language.  Definitional only
 -/
 import MachCSL.WpSmodeRules
 import MachCSL.WpSmodeBits
+import MachCSL.WpSmodeIntr
 import Xv6.SpecPrintk
 
 namespace Xv6
@@ -92,9 +93,14 @@ def pkRegsN (R0 R : RegMap) : Prop :=
 /-- The registers the walk keeps, `s9` included (the `%p` arm borrows it). -/
 def pkRegs (R0 R : RegMap) : Prop := pkRegsN R0 R ∧ R 25#5 = R0 25#5
 
-/-- The base context of the walk: the held set with `pr`, `push_off`'s
-depth, the 24 slots pushed. -/
-abbrev pkBase (k : KCtx) : KCtx := (k.withLocks ("pr" :: k.locks)).pushOff.pushed 24
+/-- The base context of the walk over `k`, the context `acquire`'s
+push_off left (interrupts off, depth `≥ 1`): the held set with `pr`, the
+24 slots pushed. -/
+abbrev pkBase (k : KCtx) : KCtx := (k.withLocks ("pr" :: k.locks)).pushed 24
+
+/-- Whether printk's `release` re-enables interrupts: it pops the walk's
+base depth `k.noff`. -/
+abbrev pkReen (k : KCtx) : Bool := decide (k.noff = 1) && k.intena
 
 /-! ## Bytes of the format string -/
 
@@ -834,14 +840,19 @@ theorem ite_decide_ne {α : Type} (n : Nat) (x y : α) :
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
 
-/-- `printk`'s own postcondition, as the walk carries it. -/
+/-- `printk`'s own postcondition, as the walk carries it: what its
+`release` needs to pop the base depth (the re-enable arm and, if it
+re-enables, the trap reserve over printk's 24 slots and release's 6), and
+the caller's continuation at the exit context, at the hart the thread
+resumes on. -/
 abbrev pkPost (cpu : CPU) (k : KCtx) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac) (f : List (BitVec 8))
     (descs : List PkArgDesc) : IProp GF := iprop%
-  ∀ (R' : RegMap) (cs : List (BitVec 8)),
-    kctx cpu (k.withRegs R') -∗ pcIs cpu (jumpPc (k.regs 1#5)) -∗
-    ⌜calleeSaved k.regs R' ∧ R' 10#5 = 0#64⌝ -∗
+  ⌜1 ≤ k.noff ∧ (pkReen k = true → k.tier = .kpt ∧ trapRes true + 30 ≤ k.avail)⌝ ∗
+  popArm cpu k (pkReen k) ∗
+  wpNext (k.popExit (pkReen k)).sie k.proc cpu (fun cpu' => iprop(∀ (R' : RegMap) (cs : List (BitVec 8)),
+    kctx cpu' ((k.popExit (pkReen k)).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     byteBuf (k.regs 10#5) dqf (f ++ [0#8]) -∗ pkDescs k.regs descs -∗
-    uartSentSub γd (bs ++ cs) -∗ wpLoop cpu
+    uartSentSub γd (bs ++ cs) -∗ ⌜calleeSaved k.regs R' ∧ R' 10#5 = 0#64⌝ -∗ wpLoop cpu'))
 
 /-- The continuation at `0x8000056e`: `s1 = p`, the last consumed index
 (`i ≤ p`), the kinds left are those of the descriptions from `kk'`. -/
@@ -942,19 +953,26 @@ theorem pkDescRes_str_acc (v : BitVec 64) (dq : DFrac) (s : List (BitVec 8)) :
   · ipureintro; exact h
   iexact H
 
-/-- `printk`'s postcondition as the contract states it (the format as a
-`cstr`) implies the walk's form (the terminated buffer). -/
+/-- `printk`'s postcondition with the contract's format (a `cstr`)
+implies the walk's form (the terminated buffer). -/
 theorem pkPost_of_cstr [Xv6G GF] (cpu : CPU) (k : KCtx) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
-    (f : List (BitVec 8)) (descs : List PkArgDesc) (hnonul : nonul f) :
-    (∀ (R' : RegMap) (cs : List (BitVec 8)),
-      kctx cpu (k.withRegs R') -∗ pcIs cpu (jumpPc (k.regs 1#5)) -∗
+    (f : List (BitVec 8)) (descs : List PkArgDesc) (hnonul : nonul f) (hn : 1 ≤ k.noff)
+    (hon : pkReen k = true → k.tier = .kpt ∧ trapRes true + 30 ≤ k.avail) :
+    popArm cpu k (pkReen k) ∗
+    wpNext (k.popExit (pkReen k)).sie k.proc cpu (fun cpu' => iprop(∀ (R' : RegMap) (cs : List (BitVec 8)),
+      kctx cpu' ((k.popExit (pkReen k)).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
       ⌜calleeSaved k.regs R' ∧ R' 10#5 = 0#64⌝ -∗
       cstr (k.regs 10#5) dqf f -∗ pkDescs k.regs descs -∗
-      uartSentSub γd (bs ++ cs) -∗ wpLoop cpu)
+      uartSentSub γd (bs ++ cs) -∗ wpLoop cpu'))
     ⊢ pkPost (GF := GF) cpu k γd bs dqf f descs := by
-  iintro HΦ %R' %cs Hk Hpc %h Hbuf Hdescs Hsent
+  iintro ⟨Harm, HΦ⟩
+  isplitl []
+  · ipureintro; exact ⟨hn, hon⟩
+  iframe Harm
+  iapply wpNext_mono _ _ _ _ _ $$ HΦ
+  iintro %cpu' H %R' %cs Hk Hpc Hbuf Hdescs Hsent %h
   ihave Hstr := cstr_intro _ _ _ hnonul $$ Hbuf
-  iapply HΦ $$ %R' %cs Hk Hpc %h Hstr Hdescs Hsent
+  iapply H $$ %R' %cs Hk Hpc %h Hstr Hdescs Hsent
 
 theorem pkDescRes_null_pure (v : BitVec 64) : pkDescRes (GF := GF) v .null ⊢ ⌜v = 0#64⌝ := by
   simp only [pkDescRes]

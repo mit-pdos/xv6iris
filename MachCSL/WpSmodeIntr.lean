@@ -429,6 +429,13 @@ def KCtx.pushOffAt (k : KCtx) (spie spp : Bool) : KCtx :=
 @[simp] theorem KCtx.pushOffAt_proc (k : KCtx) (a b : Bool) : (k.pushOffAt a b).proc = k.proc := rfl
 @[simp] theorem KCtx.pushOffAt_sp (k : KCtx) (a b : Bool) : (k.pushOffAt a b).sp = k.sp := rfl
 
+/-- `push_off`'s exit is well-formed. -/
+theorem KCtx.wf_pushOffAt (k : KCtx) (a b : Bool) (h : k.wf) (hn : k.noff + 1 < 2 ^ 31) :
+    (k.pushOffAt a b).wf := by
+  obtain ⟨-, -, -, w4, -⟩ := h
+  exact ⟨fun h0 => absurd h0 (Nat.succ_ne_zero _), fun _ => rfl, fun h' => absurd h' Bool.false_ne_true,
+    Nat.le_succ_of_le w4, hn⟩
+
 /-- With interrupts already off, `push_off`'s exit is `pushOff`. -/
 theorem KCtx.pushOffAt_off' (k : KCtx) (a b : Bool) (hs : k.sie = false) (ha : a = k.spie) (hb : b = k.spp) :
     k.pushOffAt a b = k.pushOff := by
@@ -496,6 +503,17 @@ def popArm [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (reen : Bool) : 
 @[simp] theorem popArm_true [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) :
     popArm (GF := GF) cpu k true = sieArm cpu true k.proc := rfl
 
+
+/-- The arm depends on the context only through `proc`. -/
+theorem popArm_proc [KernelGeom] [KernelImage GF] (cpu : CPU) (k k' : KCtx) (r : Bool) (hp : k'.proc = k.proc) :
+    popArm (GF := GF) cpu k r ⊢ popArm cpu k' r := by
+  unfold popArm
+  cases r
+  · simp only [Bool.false_eq_true, ite_false]; iintro _; iempintro
+  · simp only [ite_true, hp]; iintro H; iexact H
+
+theorem KCtx.popExit_withLocks_self (k : KCtx) (r : Bool) : (k.popExit r).withLocks k.locks = k.popExit r := by
+  cases r <;> rfl
 
 theorem KCtx.pushOffAt_withRegs (k : KCtx) (R : RegMap) (a b : Bool) :
     (k.withRegs R).pushOffAt a b = (k.pushOffAt a b).withRegs R := rfl

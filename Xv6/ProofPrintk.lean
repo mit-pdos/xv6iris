@@ -41,10 +41,13 @@ theorem sp_restore (sp0 : BitVec 64) : sp0 + 0xFFFFFFFFFFFFFF40#64 + 8#64 * BitV
 set_option maxHeartbeats 4000000 in
 /-- `auipc/addi a0 = &pr.lock; jal release; li a0,0; ld ra; ld s0; ld s2;
 addi sp,sp,192; ret`, from a context whose callee-saved registers other
-than `s0`/`s2` are the entry ones. -/
+than `s0`/`s2` are the entry ones.  `release` pops the walk's base depth:
+past it interrupts may be on again and the thread may resume at another
+hart, so the rest runs at whichever hart each step lands on. -/
 theorem printk_release_tail (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
-    (cpu : CPU) (k : KCtx) (γpr : GName) (hsie : k.sie = false) (hK : 48 ≤ k.avail)
-    (hpr : "pr" ∉ k.locks) (hwf : k.wf)
+    (cpu : CPU) (k : KCtx) (γpr : GName) (γd : UartNames) (bs cs0 : List (BitVec 8)) (dqf : DFrac)
+    (f : List (BitVec 8)) (descs : List PkArgDesc)
+    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hpr : "pr" ∉ k.locks)
     (R : RegMap) (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFF40#64)
     (hcs : R 9#5 = k.regs 9#5 ∧ R 19#5 = k.regs 19#5 ∧ R 20#5 = k.regs 20#5 ∧ R 21#5 = k.regs 21#5 ∧
       R 22#5 = k.regs 22#5 ∧ R 23#5 = k.regs 23#5 ∧ R 24#5 = k.regs 24#5 ∧ R 25#5 = k.regs 25#5 ∧
@@ -52,11 +55,11 @@ theorem printk_release_tail (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors}
     kctx cpu ((pkBase k).withRegs R) ∗ pcIs cpu 0x80000756#64 ∗
     isLock γpr prLock "pr" (fun _ => emp) ∗ locked γpr cpu ∗
     pkFrameExit (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 18#5) ∗
-    (∀ R' : RegMap, kctx cpu (k.withRegs R') -∗ pcIs cpu (jumpPc (k.regs 1#5)) -∗
-      ⌜calleeSaved k.regs R' ∧ R' 10#5 = 0#64⌝ -∗ wpLoop cpu)
+    byteBuf (k.regs 10#5) dqf (f ++ [0#8]) ∗ pkDescs k.regs descs ∗ uartSentSub γd (bs ++ cs0) ∗
+    pkPost cpu k γd bs dqf f descs
     ⊢ wpLoop (GF := GF) cpu := by
-  unfold prLock pkBase pkFrameExit
-  iintro ⟨Hk, Hpc, #Hlk, Hlocked, Hframe, HΦ⟩
+  unfold prLock pkBase pkFrameExit pkPost
+  iintro ⟨Hk, Hpc, #Hlk, Hlocked, Hframe, Hbuf, Hdescs, Hsent, %hpure, Harm, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
   icases Hframe with ⟨⟨%v0, C0⟩, ⟨%v1, C1⟩, ⟨%v2, C2⟩, ⟨%v3, C3⟩, ⟨%v4, C4⟩, ⟨%v5, C5⟩, ⟨%v6, C6⟩, ⟨%v7, C7⟩,
     C8, C9, ⟨%v10, C10⟩, C11, ⟨%v12, C12⟩, ⟨%v13, C13⟩, ⟨%v14, C14⟩, ⟨%v15, C15⟩, ⟨%v16, C16⟩, ⟨%v17, C17⟩,
@@ -71,77 +74,80 @@ theorem printk_release_tail (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors}
   -- jal release
   k_step (wp_s_jal cpu _ 0x8000075e#64 false 1252#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  have hre : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hnoff' : 1 ≤ k'.noff)
-      (hK' : 10 ≤ k'.avail) (hexit' : k'.noff = 1 → k'.intena = false),
+  have hre : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hnoff' : 1 ≤ k'.noff) (hK' : 10 ≤ k'.avail)
+      (reen : Bool) (hreen : reen = (decide (k'.noff = 1) && k'.intena))
+      (hon : reen = true → k'.tier = .kpt ∧ trapRes true + 6 ≤ k'.avail),
       kctx cpu k' ∗ pcIs cpu 0x80000c42#64 ∗ isLock γpr (k'.regs 10#5) "pr" (fun _ => emp) ∗
-      locked γpr cpu ∗
-      (∀ R' : RegMap, kctx cpu ((k'.popOff.withRegs R').withLocks (k'.locks.filter (fun x => x ≠ "pr"))) -∗
-        pcIs cpu (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu)
+      locked γpr cpu ∗ popArm cpu k' reen ∗
+      wpNext (k'.popExit reen).sie k'.proc cpu (fun cpu' => iprop(∀ R' : RegMap,
+        kctx cpu' (((k'.popExit reen).withRegs R').withLocks (k'.locks.filter (fun x => x ≠ "pr"))) -∗
+        pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
       ⊢ wpLoop (GF := GF) cpu := by
-    intro k' hsie' hnoff' hK' hexit'
-    have hr : false = (decide (k'.noff = 1) && k'.intena) := by
-      cases h : k'.intena
-      · simp
-      · simp [show k'.noff ≠ 1 from fun h1 => by rw [hexit' h1] at h; cases h]
-    have h := RE.wp_release (hlc := hlc) (GF := GF) cpu k' γpr "pr" (fun _ => emp) hsie' hnoff' hK' false hr
-      (fun h => nomatch h)
+    intro k' hsie' hnoff' hK' reen hreen hon
+    have h := RE.wp_release (hlc := hlc) (GF := GF) cpu k' γpr "pr" (fun _ => emp) hsie' hnoff' hK' reen hreen hon
     unfold wp_release_body at h
-    simp only [releaseAddr, KernelSyms.«release», KCtx.popExit_false, popArm_false, KCtx.popOff_sie, hsie'] at h
-    iintro ⟨Hk, Hp, #Hl, Hlo, Hcont⟩
+    simp only [releaseAddr, KernelSyms.«release»] at h
+    iintro ⟨Hk, Hp, #Hl, Hlo, Harm, Hcont⟩
     iapply h
-    iframe Hk Hp Hlo
+    iframe Hk Hp Hlo Harm Hcont
     iframe #
-    isplitl []
-    · iempintro
-    isplitl []
-    · iempintro
-    iapply wpNext_off_intro
-    iintro %R' Hk Hp %hcs
-    iapply Hcont $$ %_ Hk Hp %hcs
-  iapply (hre _ ?hs ?hn ?hK ?he) $$ [- $Hk $Hpc $Hlocked]
+  iapply (hre _ ?hs ?hn ?hK (pkReen k) ?hr ?ho) $$ [- $Hk $Hpc $Hlocked]
   rotate_right 1
-  k_norm
+  k_norm [hfilt, KCtx.popExit_withLocks_self]
   iframe #
   case hs => k_norm
   case hn => k_norm; omega
   case hK => k_norm; omega
-  case he =>
+  case hr => k_norm; try rfl
+  case ho =>
     k_norm
     intro h
-    have := hwf.1 (by omega)
-    rw [hsie] at this
-    exact this.symm
-  iintro %R2 Hk Hpc %hcs2
+    obtain ⟨ht, ha⟩ := hpure.2 h
+    exact ⟨ht, by omega⟩
+  isplitl [Harm]
+  · iapply (popArm_proc cpu k _ _ (by k_norm)) $$ Harm
+  -- past release: at whichever hart the thread resumes on
+  iapply wpNext_intro_pin
+  iintro %c1 %hp1 %R2 Hk Hpc %hcs2
   have hret : jumpPc 0x80000762#64 = 0x80000762#64 := by simp only [jumpPc, BitVec.reduceAnd]
-  k_norm [hret, hfilt]
+  k_norm [hret, hfilt, KCtx.popExit_withLocks_self]
   k_norm at hcs2
   -- li a0,0
-  k_step (wp_s_addi cpu _ 0x80000762#64 true 0#12 10#5 0#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
+  k_step_gen (wp_s_addi c1 _ 0x80000762#64 true 0#12 10#5 0#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT
+    $$ [- $Hk $Hpc] with [hsie] next c2 hp2
   iintro Hk Hpc
   have h22 : R2 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFF40#64 := by
     have := hcs2.1
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] at this
     rw [this]; exact hR2
   -- ld ra,120(sp) ; ld s0,112(sp) ; ld s2,96(sp)
-  k_step (wp_s_ld cpu _ 0x80000764#64 true 120#12 1#5 2#5 (by decide) (by decide) (DFrac.own 1) (k.regs 1#5)) from (text_instr _ _ _ _ rfl rfl) HT
-    $$ [- $Hk $Hpc] with [h22]
+  k_step_gen (wp_s_ld c2 _ 0x80000764#64 true 120#12 1#5 2#5 (by decide) (by decide) (DFrac.own 1) (k.regs 1#5)) from (text_instr _ _ _ _ rfl rfl) HT
+    $$ [- $Hk $Hpc] with [hsie, h22] next c3 hp3
   iintro Hk Hpc C8
-  k_step (wp_s_ld cpu _ 0x80000766#64 true 112#12 8#5 2#5 (by decide) (by decide) (DFrac.own 1) (k.regs 8#5)) from (text_instr _ _ _ _ rfl rfl) HT
-    $$ [- $Hk $Hpc] with [h22]
+  k_step_gen (wp_s_ld c3 _ 0x80000766#64 true 112#12 8#5 2#5 (by decide) (by decide) (DFrac.own 1) (k.regs 8#5)) from (text_instr _ _ _ _ rfl rfl) HT
+    $$ [- $Hk $Hpc] with [hsie, h22] next c4 hp4
   iintro Hk Hpc C9
-  k_step (wp_s_ld cpu _ 0x80000768#64 true 96#12 18#5 2#5 (by decide) (by decide) (DFrac.own 1) (k.regs 18#5)) from (text_instr _ _ _ _ rfl rfl) HT
-    $$ [- $Hk $Hpc] with [h22]
+  k_step_gen (wp_s_ld c4 _ 0x80000768#64 true 96#12 18#5 2#5 (by decide) (by decide) (DFrac.own 1) (k.regs 18#5)) from (text_instr _ _ _ _ rfl rfl) HT
+    $$ [- $Hk $Hpc] with [hsie, h22] next c5 hp5
   iintro Hk Hpc C11
   -- addi sp,sp,192
   ihave Hframe : stackOwn (k.regs 2#5) 24 $$ [C0 C1 C2 C3 C4 C5 C6 C7 C8 C9 C10 C11 C12 C13 C14 C15 C16 C17 C18 C19 C20 C21 C22 C23]
   case' _ => stack_cells; iframe
-  k_step (wp_s_pop cpu _ 0x8000076a#64 true 192#12 24 imm_p192) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
-    with [h22, KCtx.pop_pushed _ _ _ (by omega : 24 ≤ k.avail), sp_restore]
+  have hav : 24 ≤ (k.popExit (pkReen k)).avail := by
+    rw [KCtx.popExit_avail]
+    cases h : pkReen k
+    · simp only [Bool.false_eq_true, ite_false]; omega
+    · have := (hpure.2 h).2; simp only [ite_true]; omega
+  k_step_gen (wp_s_pop c5 _ 0x8000076a#64 true 192#12 24 imm_p192) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
+    with [hsie, h22, KCtx.pop_pushed _ _ _ hav, sp_restore] next c6 hp6
   iintro Hk Hpc
   -- ret
-  k_step (wp_s_ret cpu _ 0x8000076c#64 true 1#5) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
+  k_step_gen (wp_s_ret c6 _ 0x8000076c#64 true 1#5) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hsie] next c7 hp7
   iintro Hk Hpc
-  iapply HΦ $$ %_ Hk Hpc
+  have hpin : pkReen k = false ∨ k.proc = 0#64 → c7 = cpu :=
+    fun h => (hp7 h).trans ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h))))))
+  ihave HΦ' := wpNext_at _ _ _ c7 _ hpin $$ HΦ
+  iapply HΦ' $$ %_ %cs0 Hk Hpc Hbuf Hdescs Hsent
   ipureintro
   obtain ⟨c2_2, c2_8, c2_9, c2_18, c2_19, c2_20, c2_21, c2_22, c2_23, c2_24, c2_25, c2_26, c2_27⟩ := hcs2
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] at c2_9 c2_19 c2_20 c2_21 c2_22 c2_23 c2_24 c2_25 c2_26 c2_27
@@ -230,8 +236,7 @@ it): restore, release, and return `0`. -/
 theorem printk_exit (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr : GName) (γd : UartNames) (bs cs0 : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail)
-    (hpr : "pr" ∉ k.locks) (hwf : k.wf)
+    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hpr : "pr" ∉ k.locks)
     (pc0 : BitVec 64) (hpc : pc0 = 0x80000744#64 ∨ pc0 = 0x80000800#64)
     (R : RegMap) (hR : pkRegs k.regs R) (ap w18 : BitVec 64) :
     kctx cpu ((pkBase k).withRegs R) ∗ pcIs cpu pc0 ∗
@@ -239,7 +244,6 @@ theorem printk_exit (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS
     byteBuf (k.regs 10#5) dqf (f ++ [0#8]) ∗ pkDescs k.regs descs ∗ uartSentSub γd (bs ++ cs0) ∗
     pkPost cpu k γd bs dqf f descs
     ⊢ wpLoop (GF := GF) cpu := by
-  unfold pkPost
   iintro ⟨Hk, Hpc, #Hlk, Hlocked, Hframe, Hbuf, Hdescs, Hsent, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
   have hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFF40#64 := hR.1.1
@@ -252,19 +256,13 @@ theorem printk_exit (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS
       isLock γpr prLock "pr" (fun _ => emp) ∗ locked γpr cpu ∗
       pkFrameExit (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 18#5) ∗
       byteBuf (k.regs 10#5) dqf (f ++ [0#8]) ∗ pkDescs k.regs descs ∗ uartSentSub γd (bs ++ cs0) ∗
-      (∀ (R' : RegMap) (cs : List (BitVec 8)),
-        kctx cpu (k.withRegs R') -∗ pcIs cpu (jumpPc (k.regs 1#5)) -∗
-        ⌜calleeSaved k.regs R' ∧ R' 10#5 = 0#64⌝ -∗
-        byteBuf (k.regs 10#5) dqf (f ++ [0#8]) -∗ pkDescs k.regs descs -∗
-        uartSentSub γd (bs ++ cs) -∗ wpLoop cpu)
+      pkPost cpu k γd bs dqf f descs
       ⊢ wpLoop (GF := GF) cpu := by
     intro R' hR'2 hcs
     iintro ⟨Hk, Hpc, #Hlk, Hlocked, Hexit, Hbuf, Hdescs, Hsent, HΦ⟩
-    iapply (printk_release_tail RE cpu k γpr hsie hK hpr hwf R' hR'2 hcs)
-      $$ [- $Hk $Hpc $Hlocked $Hexit]
+    iapply (printk_release_tail RE cpu k γpr γd bs cs0 dqf f descs hsie hK hpr R' hR'2 hcs)
+      $$ [- $Hk $Hpc $Hlocked $Hexit $Hbuf $Hdescs $Hsent $HΦ]
     iframe #
-    iintro %R2 Hk Hpc %h
-    iapply HΦ $$ %_ %cs0 Hk Hpc %h Hbuf Hdescs Hsent
   rcases hpc with rfl | rfl
   · iapply (printk_restore cpu k hsie 0x80000744#64 0x80000746#64 0x80000748#64 0x8000074a#64
       0x8000074c#64 0x8000074e#64 0x80000750#64 0x80000752#64 0x80000754#64 (by decide) (by decide) (by decide)
@@ -356,7 +354,7 @@ set_option maxHeartbeats 4000000 in
 theorem printk_arm_d (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 2 < 2 ^ 31)
+    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (huart : "uart" ∉ k.locks) (hflen : f.length + 4 < 2 ^ 31)
     (i kk : Nat) (R : RegMap) (w18 : BitVec 64) (hR : pkRegs k.regs R) (hR20 : R 20#5 = BitVec.ofNat 64 i)
     (hR9 : R 9#5 = BitVec.ofNat 64 (i + 1))
@@ -435,7 +433,7 @@ set_option maxHeartbeats 4000000 in
 theorem printk_arm_ld (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 2 < 2 ^ 31)
+    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (huart : "uart" ∉ k.locks) (hflen : f.length + 4 < 2 ^ 31)
     (i kk : Nat) (R : RegMap) (w18 : BitVec 64) (hR : pkRegs k.regs R) (hR20 : R 20#5 = BitVec.ofNat 64 i)
     (hR9 : R 9#5 = BitVec.ofNat 64 (i + 1))
@@ -517,7 +515,7 @@ set_option maxHeartbeats 4000000 in
 theorem printk_arm_lld (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 2 < 2 ^ 31)
+    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (huart : "uart" ∉ k.locks) (hflen : f.length + 4 < 2 ^ 31)
     (i kk : Nat) (R : RegMap) (w18 : BitVec 64) (hR : pkRegs k.regs R) (hR20 : R 20#5 = BitVec.ofNat 64 i)
     (hR9 : R 9#5 = BitVec.ofNat 64 (i + 1))
@@ -599,7 +597,7 @@ set_option maxHeartbeats 4000000 in
 theorem printk_arm_u (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 2 < 2 ^ 31)
+    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (huart : "uart" ∉ k.locks) (hflen : f.length + 4 < 2 ^ 31)
     (i kk : Nat) (R : RegMap) (w18 : BitVec 64) (hR : pkRegs k.regs R) (hR20 : R 20#5 = BitVec.ofNat 64 i)
     (hR9 : R 9#5 = BitVec.ofNat 64 (i + 1))
@@ -678,7 +676,7 @@ set_option maxHeartbeats 4000000 in
 theorem printk_arm_lu (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 2 < 2 ^ 31)
+    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (huart : "uart" ∉ k.locks) (hflen : f.length + 4 < 2 ^ 31)
     (i kk : Nat) (R : RegMap) (w18 : BitVec 64) (hR : pkRegs k.regs R) (hR20 : R 20#5 = BitVec.ofNat 64 i)
     (hR9 : R 9#5 = BitVec.ofNat 64 (i + 1))
@@ -760,7 +758,7 @@ set_option maxHeartbeats 4000000 in
 theorem printk_arm_llu (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 2 < 2 ^ 31)
+    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (huart : "uart" ∉ k.locks) (hflen : f.length + 4 < 2 ^ 31)
     (i kk : Nat) (R : RegMap) (w18 : BitVec 64) (hR : pkRegs k.regs R) (hR20 : R 20#5 = BitVec.ofNat 64 i)
     (hR9 : R 9#5 = BitVec.ofNat 64 (i + 1))
@@ -842,7 +840,7 @@ set_option maxHeartbeats 4000000 in
 theorem printk_arm_x (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 2 < 2 ^ 31)
+    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (huart : "uart" ∉ k.locks) (hflen : f.length + 4 < 2 ^ 31)
     (i kk : Nat) (R : RegMap) (w18 : BitVec 64) (hR : pkRegs k.regs R) (hR20 : R 20#5 = BitVec.ofNat 64 i)
     (hR9 : R 9#5 = BitVec.ofNat 64 (i + 1))
@@ -921,7 +919,7 @@ set_option maxHeartbeats 4000000 in
 theorem printk_arm_lx (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 2 < 2 ^ 31)
+    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (huart : "uart" ∉ k.locks) (hflen : f.length + 4 < 2 ^ 31)
     (i kk : Nat) (R : RegMap) (w18 : BitVec 64) (hR : pkRegs k.regs R) (hR20 : R 20#5 = BitVec.ofNat 64 i)
     (hR9 : R 9#5 = BitVec.ofNat 64 (i + 1))
@@ -1000,7 +998,7 @@ set_option maxHeartbeats 4000000 in
 theorem printk_arm_llx (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 2 < 2 ^ 31)
+    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (huart : "uart" ∉ k.locks) (hflen : f.length + 4 < 2 ^ 31)
     (i kk : Nat) (R : RegMap) (w18 : BitVec 64) (hR : pkRegs k.regs R) (hR20 : R 20#5 = BitVec.ofNat 64 i)
     (hR9 : R 9#5 = BitVec.ofNat 64 (i + 1))
@@ -1082,7 +1080,7 @@ set_option maxHeartbeats 4000000 in
 theorem printk_arm_c (CP : CONSPUTC) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 2 < 2 ^ 31)
+    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (huart : "uart" ∉ k.locks) (hflen : f.length + 4 < 2 ^ 31)
     (i kk : Nat) (R : RegMap) (w18 : BitVec 64) (hR : pkRegs k.regs R) (hR20 : R 20#5 = BitVec.ofNat 64 i)
     (hR9 : R 9#5 = BitVec.ofNat 64 (i + 1))
@@ -1154,7 +1152,7 @@ set_option maxHeartbeats 4000000 in
 theorem printk_arm_pct (CP : CONSPUTC) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 2 < 2 ^ 31)
+    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (huart : "uart" ∉ k.locks) (hflen : f.length + 4 < 2 ^ 31)
     (i kk : Nat) (R : RegMap) (w18 : BitVec 64) (hR : pkRegs k.regs R) (hR20 : R 20#5 = BitVec.ofNat 64 i)
     (hR9 : R 9#5 = BitVec.ofNat 64 (i + 1))
@@ -1207,7 +1205,7 @@ set_option maxHeartbeats 4000000 in
 theorem printk_arm_default (CP : CONSPUTC) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 2 < 2 ^ 31)
+    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (huart : "uart" ∉ k.locks) (hflen : f.length + 4 < 2 ^ 31)
     (i kk : Nat) (R : RegMap) (w18 : BitVec 64) (hR : pkRegs k.regs R) (hR20 : R 20#5 = BitVec.ofNat 64 i)
     (hR9 : R 9#5 = BitVec.ofNat 64 (i + 1))
@@ -1279,7 +1277,7 @@ set_option maxHeartbeats 4000000 in
 theorem printk_arm_plain (CP : CONSPUTC) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 2 < 2 ^ 31)
+    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (huart : "uart" ∉ k.locks) (hflen : f.length + 4 < 2 ^ 31)
     (i kk : Nat) (R : RegMap) (w18 : BitVec 64) (hR : pkRegs k.regs R) (hR20 : R 20#5 = BitVec.ofNat 64 i)
     (hR10 : R 10#5 = BitVec.setWidth 64 (fmtByte f i))
@@ -1336,7 +1334,7 @@ set_option maxHeartbeats 4000000 in
 is a `cstr`, which carries `nonul s` itself. -/
 theorem printk_str_loop (CP : CONSPUTC) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γd : UartNames)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 2 < 2 ^ 31)
+    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (huart : "uart" ∉ k.locks) (v : BitVec 64) (dq : DFrac) (s : List (BitVec 8))
     (n : Nat) :
     ∀ (j : Nat) (R : RegMap) (bs : List (BitVec 8)), j + n + 1 = s.length → pkRegs k.regs R →
@@ -1455,7 +1453,7 @@ set_option maxHeartbeats 4000000 in
 /-- One turn of the `%p` digit loop at `0x800006d6`, count `n + 1`. -/
 theorem printk_hex_iter (CP : CONSPUTC) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γd : UartNames)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 2 < 2 ^ 31)
+    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (huart : "uart" ∉ k.locks) (n : Nat) (R : RegMap) (bs : List (BitVec 8))
     (hR : pkRegsN k.regs R) (hR25 : R 25#5 = 0x80007730#64) (hR20 : R 20#5 = BitVec.ofNat 64 (n + 1))
     (hn : n + 1 ≤ 16) (tgt : BitVec 64) (htgt : tgt = if n = 0 then 0x800006ec#64 else 0x800006d6#64) :
@@ -1542,7 +1540,7 @@ set_option maxHeartbeats 4000000 in
 /-- The `%p` digit loop: from count `m + 1` down to the exit at `0x800006ec`. -/
 theorem printk_hex_loop (CP : CONSPUTC) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γd : UartNames)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 2 < 2 ^ 31)
+    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (huart : "uart" ∉ k.locks) (m : Nat) :
     ∀ (R : RegMap) (bs : List (BitVec 8)), pkRegsN k.regs R → R 25#5 = 0x80007730#64 →
     R 20#5 = BitVec.ofNat 64 (m + 1) → m + 1 ≤ 16 →
@@ -1912,7 +1910,7 @@ set_option maxHeartbeats 4000000 in
 theorem printk_arm_p (CP : CONSPUTC) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 2 < 2 ^ 31)
+    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (huart : "uart" ∉ k.locks) (hflen : f.length + 4 < 2 ^ 31)
     (i kk : Nat) (R : RegMap) (w18 : BitVec 64) (hR : pkRegs k.regs R) (hR20 : R 20#5 = BitVec.ofNat 64 i)
     (hR9 : R 9#5 = BitVec.ofNat 64 (i + 1))
@@ -2034,7 +2032,7 @@ set_option maxHeartbeats 4000000 in
 theorem printk_arm_s (CP : CONSPUTC) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 2 < 2 ^ 31)
+    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (huart : "uart" ∉ k.locks) (hflen : f.length + 4 < 2 ^ 31)
     (i kk : Nat) (R : RegMap) (w18 : BitVec 64) (hR : pkRegs k.regs R) (hR20 : R 20#5 = BitVec.ofNat 64 i)
     (hR9 : R 9#5 = BitVec.ofNat 64 (i + 1))
@@ -2165,7 +2163,7 @@ set_option maxHeartbeats 4000000 in
 theorem printk_pct_tail (CP : CONSPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 2 < 2 ^ 31)
+    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (huart : "uart" ∉ k.locks) (hflen : f.length + 4 < 2 ^ 31)
     (hnonul : nonul f) (hdlen : descs.length ≤ 7)
     (i kk : Nat) (R : RegMap) (w18 : BitVec 64) (hR : pkRegs k.regs R) (hR20 : R 20#5 = BitVec.ofNat 64 i)
@@ -2377,7 +2375,7 @@ set_option maxHeartbeats 4000000 in
 theorem printk_pct_5e2 (CP : CONSPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 2 < 2 ^ 31)
+    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (huart : "uart" ∉ k.locks) (hflen : f.length + 4 < 2 ^ 31)
     (hnonul : nonul f) (hdlen : descs.length ≤ 7)
     (i kk : Nat) (R : RegMap) (w18 : BitVec 64) (hR : pkRegs k.regs R) (hR20 : R 20#5 = BitVec.ofNat 64 i)
@@ -2495,7 +2493,7 @@ set_option maxHeartbeats 4000000 in
 theorem printk_pct (CP : CONSPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 2 < 2 ^ 31)
+    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (huart : "uart" ∉ k.locks) (hflen : f.length + 4 < 2 ^ 31)
     (hnonul : nonul f) (hdlen : descs.length ≤ 7)
     (i kk : Nat) (R : RegMap) (w18 : BitVec 64) (hR : pkRegs k.regs R) (hR20 : R 20#5 = BitVec.ofNat 64 i)
@@ -2740,7 +2738,7 @@ set_option maxHeartbeats 4000000 in
 theorem printk_turn (CP : CONSPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 2 < 2 ^ 31)
+    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (huart : "uart" ∉ k.locks) (hflen : f.length + 4 < 2 ^ 31)
     (hnonul : nonul f) (hdlen : descs.length ≤ 7)
     (i kk : Nat) (R : RegMap) (w18 : BitVec 64) (hR : pkRegs k.regs R) (hR20 : R 20#5 = BitVec.ofNat 64 i)
@@ -2770,8 +2768,8 @@ theorem printk_loop (CP : CONSPUTC) (PI : PRINTINT) (RE : RELEASE) {hlc : HasLC}
     [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs0 : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 2 < 2 ^ 31)
-    (hpr : "pr" ∉ k.locks) (huart : "uart" ∉ k.locks) (hwf : k.wf)
+    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
+    (hpr : "pr" ∉ k.locks) (huart : "uart" ∉ k.locks)
     (hflen : f.length + 4 < 2 ^ 31) (hnonul : nonul f) (hdlen : descs.length ≤ 7)
     (n : Nat) :
     ∀ (p kk : Nat) (R : RegMap) (w18 : BitVec 64) (cs0 : List (BitVec 8)), f.length - p ≤ n → p < f.length →
@@ -2811,7 +2809,7 @@ theorem printk_loop (CP : CONSPUTC) (PI : PRINTINT) (RE : RELEASE) {hlc : HasLC}
     iintro Hk Hpc
     by_cases hz : fmtByte f (p + 1) = 0#8
     · ihave Hpc := pcIs_ite_pos _ _ _ _ hz $$ Hpc
-      iapply (printk_exit RE cpu k γpr γd bs0 cs0 dqf f descs hsie hK hpr hwf 0x80000744#64 (Or.inl rfl) _ ?HRe _ w18)
+      iapply (printk_exit RE cpu k γpr γd bs0 cs0 dqf f descs hsie hK hpr 0x80000744#64 (Or.inl rfl) _ ?HRe _ w18)
         $$ [- $Hk $Hpc $Hlocked $Hframe $Hbuf $Hdescs $Hsent $HΦ]
       rotate_right 1
       iframe #
@@ -2835,7 +2833,7 @@ theorem printk_loop (CP : CONSPUTC) (PI : PRINTINT) (RE : RELEASE) {hlc : HasLC}
       iframe #
     · -- a `%` ended the string
       iintro %R' %w18' Hk Hpc Hbuf Hdescs Hframe Hsent Hlocked %h'
-      iapply (printk_exit RE cpu k γpr γd bs0 cs0 dqf f descs hsie hK hpr hwf 0x80000800#64 (Or.inr rfl) R' h' _ w18')
+      iapply (printk_exit RE cpu k γpr γd bs0 cs0 dqf f descs hsie hK hpr 0x80000800#64 (Or.inr rfl) R' h' _ w18')
         $$ [- $Hk $Hpc $Hlocked $Hframe $Hbuf $Hdescs $Hsent $HΦ]
       iframe #
 
@@ -2843,92 +2841,125 @@ set_option maxHeartbeats 4000000 in
 /-- **`printk` meets its specification**, given `acquire`, `release`,
 `consputc` and `printint`. -/
 theorem printk_proof (AC : ACQUIRE) (RE : RELEASE) (CP : CONSPUTC) (PI : PRINTINT) : PRINTK :=
-  ⟨fun {hlc GF} _ _ _ cpu k γpr γl γd bs dqf f descs hsie hK hflen hkinds hdlen hnoff hpr huart => by
+  ⟨fun {hlc GF} _ _ _ cpu k γpr γl γd bs dqf f descs hK hflen hkinds hdlen hnoff hpr huart => by
   unfold wp_printk_body
   simp only [printkAddr, KernelSyms.«printk»]
-  rw [hsie]
   iintro ⟨Hk, Hpc, Hstr, Hdescs, #Hlk, #Htx, Hsent, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_kernelData _ _ $$ Hk with ⟨#HD, Hk⟩
   icases kctx_kmapStatic _ _ $$ Hk with ⟨#HS, Hk⟩
   icases cstr_elim _ _ _ $$ Hstr with ⟨%hnonul, Hbuf⟩
-  ihave HΦ := wpNext_off _ _ _ $$ Hnext
-  ihave HΦ := pkPost_of_cstr cpu k γd bs dqf f descs hnonul $$ HΦ
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   have hnoff1 : k.noff + 1 < 2 ^ 31 := by omega
   have hi0 : 0 < f.length ∨ f.length = 0 := by omega
+  -- the prologue up to `acquire`, at whichever hart each step lands on
   -- addi sp,sp,-192
-  k_step (wp_s_push cpu _ 0x80000502#64 true 3904#12 24 (by omega) imm_m192) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step_gen (wp_s_push cpu _ 0x80000502#64 true 3904#12 24 (by omega) imm_m192) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c1 hp1
   iintro Hk Hpc Hstk
   irevert Hstk
   stack_cells
   iintro ⟨⟨%w0, C0⟩, ⟨%w1, C1⟩, ⟨%w2, C2⟩, ⟨%w3, C3⟩, ⟨%w4, C4⟩, ⟨%w5, C5⟩, ⟨%w6, C6⟩, ⟨%w7, C7⟩, ⟨%w8, C8⟩, ⟨%w9, C9⟩, ⟨%w10, C10⟩, ⟨%w11, C11⟩, ⟨%w12, C12⟩, ⟨%w13, C13⟩, ⟨%w14, C14⟩, ⟨%w15, C15⟩, ⟨%w16, C16⟩, ⟨%w17, C17⟩, ⟨%w18, C18⟩, ⟨%w19, C19⟩, ⟨%w20, C20⟩, ⟨%w21, C21⟩, ⟨%w22, C22⟩, ⟨%w23, C23⟩, _⟩
-  k_step (wp_s_sd cpu _ 0x80000504#64 true 120#12 2#5 1#5 (by decide) w8) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step_gen (wp_s_sd c1 _ 0x80000504#64 true 120#12 2#5 1#5 (by decide) w8) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c2 hp2
   iintro Hk Hpc C8
-  k_step (wp_s_sd cpu _ 0x80000506#64 true 112#12 2#5 8#5 (by decide) w9) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step_gen (wp_s_sd c2 _ 0x80000506#64 true 112#12 2#5 8#5 (by decide) w9) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
   iintro Hk Hpc C9
-  k_step (wp_s_sd cpu _ 0x80000508#64 true 96#12 2#5 18#5 (by decide) w11) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step_gen (wp_s_sd c3 _ 0x80000508#64 true 96#12 2#5 18#5 (by decide) w11) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hp4
   iintro Hk Hpc C11
-  k_step (wp_s_addi cpu _ 0x8000050a#64 true 128#12 8#5 2#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step_gen (wp_s_addi c4 _ 0x8000050a#64 true 128#12 8#5 2#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c5 hp5
   iintro Hk Hpc
-  k_step (wp_s_add cpu _ 0x8000050c#64 true 18#5 0#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step_gen (wp_s_add c5 _ 0x8000050c#64 true 18#5 0#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c6 hp6
   iintro Hk Hpc
-  k_step (wp_s_sd cpu _ 0x8000050e#64 true 8#12 8#5 11#5 (by decide) w6) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step_gen (wp_s_sd c6 _ 0x8000050e#64 true 8#12 8#5 11#5 (by decide) w6) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c7 hp7
   iintro Hk Hpc C6
-  k_step (wp_s_sd cpu _ 0x80000510#64 true 16#12 8#5 12#5 (by decide) w5) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step_gen (wp_s_sd c7 _ 0x80000510#64 true 16#12 8#5 12#5 (by decide) w5) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c8 hp8
   iintro Hk Hpc C5
-  k_step (wp_s_sd cpu _ 0x80000512#64 true 24#12 8#5 13#5 (by decide) w4) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step_gen (wp_s_sd c8 _ 0x80000512#64 true 24#12 8#5 13#5 (by decide) w4) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c9 hp9
   iintro Hk Hpc C4
-  k_step (wp_s_sd cpu _ 0x80000514#64 true 32#12 8#5 14#5 (by decide) w3) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step_gen (wp_s_sd c9 _ 0x80000514#64 true 32#12 8#5 14#5 (by decide) w3) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c10 hp10
   iintro Hk Hpc C3
-  k_step (wp_s_sd cpu _ 0x80000516#64 true 40#12 8#5 15#5 (by decide) w2) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step_gen (wp_s_sd c10 _ 0x80000516#64 true 40#12 8#5 15#5 (by decide) w2) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c11 hp11
   iintro Hk Hpc C2
-  k_step (wp_s_sd cpu _ 0x80000518#64 false 48#12 8#5 16#5 (by decide) w1) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step_gen (wp_s_sd c11 _ 0x80000518#64 false 48#12 8#5 16#5 (by decide) w1) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c12 hp12
   iintro Hk Hpc C1
-  k_step (wp_s_sd cpu _ 0x8000051c#64 false 56#12 8#5 17#5 (by decide) w0) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step_gen (wp_s_sd c12 _ 0x8000051c#64 false 56#12 8#5 17#5 (by decide) w0) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c13 hp13
   iintro Hk Hpc C0
   -- a0 = &pr.lock ; jal acquire
-  k_step (wp_s_auipc cpu _ 0x80000520#64 false 18#20 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step_gen (wp_s_auipc c13 _ 0x80000520#64 false 18#20 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c14 hp14
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ 0x80000524#64 false 3608#12 10#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [pr_addr_520]
+  k_step_gen (wp_s_addi c14 _ 0x80000524#64 false 3608#12 10#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    with [pr_addr_520] next c15 hp15
   iintro Hk Hpc
-  k_step (wp_s_jal cpu _ 0x80000528#64 false 1682#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step_gen (wp_s_jal c15 _ 0x80000528#64 false 1682#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c16 hp16
   iintro Hk Hpc
-  have hac : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hnoff' : k'.noff + 1 < 2 ^ 31)
-      (hK' : 10 ≤ k'.avail) (hs' : "pr" ∉ k'.locks),
-      kctx cpu k' ∗ pcIs cpu 0x80000bba#64 ∗ isLock γpr (k'.regs 10#5) "pr" (fun _ => emp) ∗
-      (∀ R' : RegMap, kctx cpu ((k'.pushOff.withRegs R').withLocks ("pr" :: k'.locks)) -∗
-        pcIs cpu (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ locked γpr cpu -∗ wpLoop cpu)
-      ⊢ wpLoop (GF := GF) cpu := by
-    intro k' hsie' hnoff' hK' hs'
-    have h := AC.wp_acquire (hlc := hlc) (GF := GF) cpu k' γpr "pr" (fun _ => emp) hnoff' hK' hs'
+  have hac : ∀ (k' : KCtx) (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 10 ≤ k'.avail) (hs' : "pr" ∉ k'.locks),
+      kctx c16 k' ∗ pcIs c16 0x80000bba#64 ∗ isLock γpr (k'.regs 10#5) "pr" (fun _ => emp) ∗
+      wpNext k'.sie k'.proc c16 (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
+        ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
+        kctx cpu' (((k'.pushOffAt spie spp).withRegs R').withLocks ("pr" :: k'.locks)) -∗
+        pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗
+        locked γpr cpu' -∗ emp -∗ (∃ K : Nat, viewLb cpu' K) -∗ sieArm cpu' k'.sie k'.proc -∗ wpLoop cpu'))
+      ⊢ wpLoop (GF := GF) c16 := by
+    intro k' hnoff' hK' hs'
+    have h := AC.wp_acquire (hlc := hlc) (GF := GF) c16 k' γpr "pr" (fun _ => emp) hnoff' hK' hs'
     unfold wp_acquire_body at h
     simp only [acquireAddr, KernelSyms.«acquire»] at h
-    iintro ⟨Hk, Hp, #Hl, Hcont⟩
-    iapply h
-    iframe Hk Hp
-    iframe #
-    rw [hsie']
-    iapply wpNext_off_intro
-    iintro %spie %spp %R' %hsp Hk Hp %hcs Hlo _ _ _
-    obtain ⟨rfl, rfl⟩ := hsp rfl
-    rw [KCtx.pushOffAt_off' k' _ _ hsie' rfl rfl]
-    iapply Hcont $$ %_ Hk Hp %hcs Hlo
+    exact h
   ihave #Hlk' := (show isLock γpr prLock "pr" (fun _ => emp) ⊢ isLock (GF := GF) γpr 0x80012338#64 "pr" (fun _ => emp)
     from by rw [show prLock = 0x80012338#64 from rfl]) $$ Hlk
-  iapply (hac _ ?hs ?hn ?hK ?hl) $$ [- $Hk $Hpc]
+  iapply (hac _ ?hn ?hK ?hl) $$ [- $Hk $Hpc]
   rotate_right 1
-  k_norm
+  k_norm_g
   iframe #
-  case hs => k_norm
-  case hn => k_norm; omega
-  case hK => k_norm; omega
-  case hl => k_norm; exact hpr
-  iintro %R2 Hk Hpc %hcs2 Hlocked
+  case hn => k_norm_g; omega
+  case hK => k_norm_g; omega
+  case hl => k_norm_g; exact hpr
+  k_norm_g
+  iapply wpNext_intro_pin
+  iintro %c %hp %spie %spp %R2 %hsp Hk Hpc %hcs2 Hlocked _ _ Harm
+  have hpin : k.sie = false ∨ k.proc = 0#64 → c = cpu :=
+    fun h => (hp h).trans ((hp16 h).trans ((hp15 h).trans ((hp14 h).trans ((hp13 h).trans ((hp12 h).trans
+      ((hp11 h).trans ((hp10 h).trans ((hp9 h).trans ((hp8 h).trans ((hp7 h).trans ((hp6 h).trans
+      ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h))))))))))))))))
+  have hK24 : 24 ≤ k.avail := by omega
+  k_norm_g [KCtx.pushOffAt_withRegs, KCtx.pushOffAt_pushed, hK24, ret_52c]
   unfold calleeSaved at hcs2
-  k_norm at hcs2
-  k_norm [ret_52c]
+  k_norm_g at hcs2
+  -- printk's postcondition, for the walk's base `k.pushOffAt spie spp`
+  -- (acquire's push_off exit): its release pops that depth, re-enabling
+  -- interrupts exactly when they were on at entry
+  have hreen : pkReen (k.pushOffAt spie spp) = k.sie := by
+    simp only [pkReen, KCtx.pushOffAt_noff, KCtx.pushOffAt_intena]
+    exact (KCtx.reen_of_wf k hwf).symm
+  have hon : pkReen (k.pushOffAt spie spp) = true →
+      (k.pushOffAt spie spp).tier = .kpt ∧ trapRes true + 30 ≤ (k.pushOffAt spie spp).avail := by
+    rw [hreen]; intro h
+    obtain ⟨-, -, -, ht⟩ := hwf.2.2.1 h
+    simp only [KCtx.pushOffAt_tier, KCtx.pushOffAt_avail, h]
+    exact ⟨ht, by omega⟩
+  ihave HΦ : pkPost c (k.pushOffAt spie spp) γd bs dqf f descs $$ [Harm Hnext]
+  case' _ =>
+    iapply (pkPost_of_cstr c (k.pushOffAt spie spp) γd bs dqf f descs hnonul
+      (by simp only [KCtx.pushOffAt_noff]; omega) hon)
+    rw [hreen, KCtx.pushOffAt_popExit k spie spp hwf]
+    isplitl [Harm]
+    · iapply (popArm_sie c k (k.pushOffAt spie spp) rfl) $$ Harm
+    ihave Hnext := wpNext_shift _ _ _ _ _ hpin $$ Hnext
+    k_norm_g
+    iapply wpNext_mono _ _ _ _ _ $$ Hnext
+    iintro %cpu' H %R' %cs Hk Hpc %h Hstr Hdescs Hsent
+    iapply H $$ %spie %spp %R' %cs %hsp Hk Hpc %h Hstr Hdescs Hsent
+  -- the walk, over its base as a context of its own (`k`), at its hart (`cpu`)
+  have hsie : (k.pushOffAt spie spp).sie = false := rfl
+  have hK : 48 ≤ (k.pushOffAt spie spp).avail := by simp only [KCtx.pushOffAt_avail]; omega
+  have hnoff : (k.pushOffAt spie spp).noff + 1 < 2 ^ 31 := by simp only [KCtx.pushOffAt_noff]; omega
+  have hpr : "pr" ∉ (k.pushOffAt spie spp).locks := hpr
+  have huart : "uart" ∉ (k.pushOffAt spie spp).locks := huart
+  rw [show k.regs = (k.pushOffAt spie spp).regs from rfl] at hcs2 ⊢
+  rw [show k.locks = (k.pushOffAt spie spp).locks from rfl]
+  clear hreen hon hpin hp
+  generalize k.pushOffAt spie spp = k at hsie hK hnoff hpr huart hcs2 ⊢
+  revert c
+  intro cpu
   obtain ⟨h2_2, h2_8, h2_9, h2_18, h2_19, h2_20, h2_21, h2_22, h2_23, h2_24, h2_25, h2_26, h2_27⟩ := hcs2
   -- a5 = s0 + 8 ; the va_list slot
   k_step (wp_s_addi cpu _ 0x8000052c#64 false 8#12 15#5 8#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h2_8]
@@ -2953,16 +2984,15 @@ theorem printk_proof (AC : ACQUIRE) (RE : RELEASE) (CP : CONSPUTC) (PI : PRINTIN
       w10 w12 w13 w14 w15 w16 w17 w18 w19 w20 w21 (k.regs 2#5 + 0xFFFFFFFFFFFFFFC8#64) w23
       $$ [C0 C1 C2 C3 C4 C5 C6 C7 C8 C9 C10 C11 C12 C13 C14 C15 C16 C17 C18 C19 C20 C21 C22 C23]
     case' _ => iframe
-    iapply (printk_release_tail RE cpu k γpr hsie hK hpr hwf _ ?hR2 ?hcs) $$ [- $Hk $Hpc $Hlocked $Hexit]
+    ihave Hsent := (show uartSentSub γd bs ⊢ uartSentSub γd (bs ++ []) from by rw [List.append_nil]) $$ Hsent
+    iapply (printk_release_tail RE cpu k γpr γd bs [] dqf f descs hsie hK hpr _ ?hR2 ?hcs)
+      $$ [- $Hk $Hpc $Hlocked $Hexit $Hbuf $Hdescs $Hsent $HΦ]
     rotate_right 1
     iframe #
     case hR2 => simp only [RegMap.set_apply, BitVec.reduceEq, if_false]; exact h2_2
     case hcs =>
       simp only [RegMap.set_apply, BitVec.reduceEq, if_false]
       exact ⟨h2_9, h2_19, h2_20, h2_21, h2_22, h2_23, h2_24, h2_25, h2_26, h2_27⟩
-    iintro %R' Hk Hpc %h
-    ihave Hsent := (show uartSentSub γd bs ⊢ uartSentSub γd (bs ++ []) from by rw [List.append_nil]) $$ Hsent
-    iapply HΦ $$ %_ %([]) Hk Hpc %h Hbuf Hdescs Hsent
   ihave Hpc := pcIs_ite_neg _ _ _ _ h0 $$ Hpc
   have hi : 0 < f.length := fmt_lt_of_ne f 0 (Nat.zero_le _) h0
   k_step (wp_s_sd cpu _ 0x8000053c#64 true 104#12 2#5 9#5 (by decide) w10) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h2_2, h2_9]
@@ -3013,19 +3043,19 @@ theorem printk_proof (AC : ACQUIRE) (RE : RELEASE) (CP : CONSPUTC) (PI : PRINTIN
   iframe #
   case HR =>
     unfold pkRegs pkRegsN pkConsts
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, and_true, true_and]
+    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, _root_.and_true, _root_.true_and]
     exact ⟨⟨h2_2, h2_8, h2_18⟩, h2_25⟩
   case H20 => simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
   case H10 => simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
   isplit
   · iintro %R' %p' %kk' %cs %w18' Hk Hpc Hbuf Hdescs Hframe Hsent Hlocked %h'
-    iapply (printk_loop CP PI RE cpu k γpr γl γd bs dqf f descs hsie hK hnoff hpr huart hwf hflen hnonul hdlen
+    iapply (printk_loop CP PI RE cpu k γpr γl γd bs dqf f descs hsie hK hnoff hpr huart hflen hnonul hdlen
       f.length p' kk' R' w18' cs (by omega) h'.2.2.2.1 h'.1 h'.2.1 h'.2.2.2.2)
       $$ [- $Hk $Hpc $Hbuf $Hdescs $Hframe $Hsent $Hlocked $HΦ]
     iframe #
   · iintro %R' %w18' Hk Hpc Hbuf Hdescs Hframe Hsent Hlocked %h'
     ihave Hsent := (show uartSentSub γd bs ⊢ uartSentSub γd (bs ++ []) from by rw [List.append_nil]) $$ Hsent
-    iapply (printk_exit RE cpu k γpr γd bs [] dqf f descs hsie hK hpr hwf 0x80000800#64 (Or.inr rfl) R' h' _ w18')
+    iapply (printk_exit RE cpu k γpr γd bs [] dqf f descs hsie hK hpr 0x80000800#64 (Or.inr rfl) R' h' _ w18')
       $$ [- $Hk $Hpc $Hlocked $Hframe $Hbuf $Hdescs $Hsent $HΦ]
     iframe #⟩
 
