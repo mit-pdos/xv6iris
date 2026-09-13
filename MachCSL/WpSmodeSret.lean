@@ -178,4 +178,58 @@ theorem wp_s_sret [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) 
   · ipureintro; rfl
   · iexact Hro
 
+/-! ## The handler contract is persistent; the bundle up to `x0` and `tp` -/
+
+/-- The handler contract is persistent (its body is a `□`). -/
+instance ihs_persistent [KernelGeom] [KernelImage GF] (x : IhsIx) : Persistent (ihs (GF := GF) x) where
+  persistent := by
+    iintro H
+    ihave HF := ihs_unfold x $$ H
+    unfold ihsF
+    icases HF with #HF
+    imodintro
+    iapply (ihs_fold x)
+    unfold ihsF
+    imodintro
+    iexact HF
+
+/-- The bundle's context, from the abstract handler-contract form at `ihs`. -/
+theorem kctxP_kctx (X : CurCtx) [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) :
+    kctxP X ihs false cpu k ⊢ kctxL (GF := GF) (X := X) false cpu k := by
+  unfold kctxL; exact .rfl
+
+/-- The register file does not look at the map's slot `0`. -/
+theorem gprFile_ext (cpu : CPU) (m m' : RegMap) (h : ∀ i, i ≠ 0#5 → m i = m' i) :
+    gprFile (GF := GF) cpu m ⊢ gprFile cpu m' := by
+  unfold gprFile gprIdxs
+  simp only [Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil, h 1#5 (by decide), h 2#5 (by decide), h 3#5 (by decide), h 4#5 (by decide), h 5#5 (by decide), h 6#5 (by decide), h 7#5 (by decide), h 8#5 (by decide), h 9#5 (by decide), h 10#5 (by decide), h 11#5 (by decide), h 12#5 (by decide), h 13#5 (by decide), h 14#5 (by decide), h 15#5 (by decide), h 16#5 (by decide), h 17#5 (by decide), h 18#5 (by decide), h 19#5 (by decide), h 20#5 (by decide), h 21#5 (by decide), h 22#5 (by decide), h 23#5 (by decide), h 24#5 (by decide), h 25#5 (by decide), h 26#5 (by decide), h 27#5 (by decide), h 28#5 (by decide), h 29#5 (by decide), h 30#5 (by decide), h 31#5 (by decide)]
+  iintro H; iexact H
+
+/-- The bundle does not look at the map's slot `0` nor at `tp` (pinned to
+the hart). -/
+theorem kctx_regs_ext [CurCtx] [KernelGeom] [KernelImage GF] {lent : Bool} (cpu : CPU) (k : KCtx) (R : RegMap)
+    (h : ∀ i, i ≠ 0#5 → i ≠ 4#5 → R i = k.regs i) :
+    kctxL (GF := GF) lent cpu (k.withRegs R) ⊢ kctxL lent cpu k := by
+  have htp : ∀ i, i ≠ 0#5 → tpPin cpu R i = tpPin cpu k.regs i := by
+    intro i h0
+    unfold tpPin
+    by_cases h4 : i = 4#5
+    · subst h4; simp [RegMap.set_apply]
+    · simp [RegMap.set_apply, h4, h i h0 h4]
+  have h2 : R 2#5 = k.regs 2#5 := h 2#5 (by decide) (by decide)
+  iintro H
+  icases kctx_cases cpu (k.withRegs R) $$ H with ⟨%hwf, HConf, HF, Hstack, Htrans, Harm, Hcpu, Htok, Hclock, #Hro⟩
+  rw [KCtx.wf_withRegs] at hwf
+  simp only [KCtx.withRegs_regs, KCtx.withRegs_sie, KCtx.withRegs_spie, KCtx.withRegs_spp, KCtx.withRegs_avail,
+    KCtx.withRegs_noff, KCtx.withRegs_intena, KCtx.withRegs_locks, KCtx.withRegs_tier, KCtx.withRegs_root,
+    KCtx.withRegs_proc, KCtx.sp_withRegs, h2]
+  ihave HF := gprFile_ext cpu _ _ htp $$ HF
+  iapply (kctx_intro' cpu k hwf)
+  simp only [KCtx.sp]
+  iframe HConf HF Hstack Htrans Harm Hcpu Htok Hclock
+  iexact Hro
+
+theorem KCtx.sretTo_withRegs (k : KCtx) (R : RegMap) (a b : Bool) :
+    (k.withRegs R).sretTo a b = (k.sretTo a b).withRegs R := rfl
+
 end MachCSL

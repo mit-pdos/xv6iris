@@ -61,3 +61,7 @@ import Xv6.SpecPrintk
 import Xv6.PrintkDefs
 import Xv6.ProofPrintk
 import Xv6.LinkPrintk
+import Xv6.SpecKerneltrap
+import Xv6.SpecKernelvec
+import Xv6.ProofKernelvec
+import Xv6.LinkKernelvec
