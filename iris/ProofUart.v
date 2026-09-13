@@ -1,6 +1,12 @@
 (* ProofUart.v: the UART device leaves over the SIE-agnostic v2 bundle
    ([sconf] + [sie_cap], stage-5 straggler of the interrupt sweep).
 
+   THE LEAVES ARE PORT-GENERIC and take the BARE [uart_inv i]; the [Uart0]
+   forms -- including the two that take the console bundle [dev_inv] -- are
+   corollaries with their landed statements.  [dev_inv] bundles the PLIC and
+   the disk and so cannot be stated at the second port at all, which is why
+   the primitive is the one-invariant form.
+
    These are the accessor-form device leaves of WpSmodePtUart rebased on
    the funnel [wp_instr_s_sconf]: [dev_inv] is opened across the funnel
    callback's own step (devN is disjoint from minstretN, so
@@ -47,32 +53,47 @@ Context `{!riscvGS Σ, !xv6G Σ}.
 Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Context {kt : ktier}.
-  Lemma wp_sb_uart_uinv_s_sconf (γd : uart_names)
+
+  (* ================================================================= *)
+  (*  §1  THE PORT-GENERIC STORE LEAF.                                  *)
+  (*  Nothing above the physical device layer used to be port-generic;   *)
+  (*  what makes it so now is that [kvmmake] maps BOTH UART pages, and   *)
+  (*  that WpUart's [uart_pa]/[dev_addr_uart]/[uart_pa_not_in_clint]/    *)
+  (*  [uart_pa_access_io]/[dev_write_uart] family already takes the      *)
+  (*  port.  The mapping premise is the ONE place the second port is not *)
+  (*  free: [kmap_class] carries UART1's page as its own band, so the    *)
+  (*  static claim comes off a two-arm case split that converges at once *)
+  (*  ([uart_vpn_of_mapped], SpecUart.v).                                *)
+  (* ================================================================= *)
+  Lemma wp_sb_uart_uinv_s_sconf_at (i : uart_id) (γd : uart_names)
     (off : Z)
     (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
     (m : regfile) (n : nat) (R S : iProp Σ) (b : bool) (p : mword 64)
-    : wp_sb_uart_uinv_s_sconf_body kt γd off pc is_rvc rs2 rs1 imm m n R S b p.
+    : wp_sb_uart_uinv_s_sconf_at_body kt i γd off pc is_rvc rs2 rs1 imm m n R S b p.
   Proof.
-    cbv beta delta [wp_sb_uart_uinv_s_sconf_body].
-    intros ea a8 storebyte lppn Hoff Hcanon Hvpn_def Hpa.
+    cbv beta delta [wp_sb_uart_uinv_s_sconf_at_body].
+    intros ea a8 storebyte Hoff Hcanon Hvpn_def Hpa.
     (* COLLAPSE [a8] INTO [ea] FIRST.  Every premise is stated at [a8] while
        every engine argument below wants [ea]; leaving the two spellings
        apart makes the [ktier_pin] argument fail to unify. *)
     assert (Ha8ea : a8 = ea)
       by (unfold a8; rewrite subrange_id sign_extend'_id; reflexivity).
     rewrite Ha8ea in Hcanon, Hvpn_def, Hpa.
-    assert (Heapa : ea = uart_pa Uart0 off).
+    assert (Heapa : ea = uart_pa i off).
     { rewrite <- Hpa. change (0 * 1) with 0. rewrite avi0. symmetry.
       apply zero_extend'_id. }
-    assert (Hdevvpn : kpt_dev_vpn (svpn_of ea)).
-    { unfold svpn_of. rewrite Hvpn_def. unfold kpt_dev_vpn.
-      assert (bv_unsigned uart_vpn = 65536) as -> by (vm_compute; reflexivity).
-      lia. }
+    (* THE MAPPING PREMISE, port-generically.  [kpt_dev_vpn] is the
+       contiguous PLIC/UART0/VIRTIO band and [kpt_uart1_vpn] is UART1's own
+       page eight pages above it; both land on [kmap_class _ = Some KP_rw],
+       so the case split closes on the spot and nothing below this line
+       knows which port it is looking at. *)
+    assert (Hdevstatic : kmap_static (svpn_of ea) KP_rw).
+    { unfold svpn_of. rewrite Hvpn_def.
+      destruct (uart_vpn_of_mapped i) as [Hd | Hd];
+        [ exact (kmap_class_rw _ (or_intror Hd)) | exact (kmap_class_uart1 _ Hd) ]. }
     (* the device window's own claim, off [hw_config]'s STATIC bundle: a
        device page is mapped by the kernel table at every tier, so nothing
        here has to open an invariant to learn its [ppn]. *)
-    assert (Hdevstatic : kmap_static (svpn_of ea) KP_rw)
-      by (apply kmap_class_rw; right; exact Hdevvpn).
     pose proof (static_canon_lo ea KP_rw Hdevstatic Hcanon) as Healt.
     pose proof (pa_of_id ea Healt) as Hpaid.
     assert (Halignv : is_aligned_vaddr (Virtaddr ea) 1 = true)
@@ -82,9 +103,9 @@ Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
       by (rewrite <- is_aligned_vaddr_paddr; unfold is_aligned_vaddr;
           rewrite Z.rem_1_r; reflexivity).
     assert (Hdcls : dev_cls 1 (pa_of (kpt_leaf_ppn (svpn_of ea)) ea)).
-    { rewrite Hpaid Heapa. split; [ exact (dev_addr_uart Uart0 off Hoff) | ].
-      split; [ exact (uart_pa_not_in_clint Uart0 off Hoff) | ].
-      exact (uart_pa_access_io Uart0 off 1 Hoff (pma_width_ok 1 eq_refl eq_refl)). }
+    { rewrite Hpaid Heapa. split; [ exact (dev_addr_uart i off Hoff) | ].
+      split; [ exact (uart_pa_not_in_clint i off Hoff) | ].
+      exact (uart_pa_access_io i off 1 Hoff (pma_width_ok 1 eq_refl eq_refl)). }
     iIntros "Hcg Hpc #Hinstr #Huinv HR Hacc Hcont".
     iApply (wp_instr_s_sconf m n b b pc is_rvc
               (STORE (imm, Regidx rs2, Regidx rs1, 1))
@@ -223,16 +244,16 @@ Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
             iDestruct "Hdbody" as (u) "(Huf & Hg & Hcol)".
             iDestruct (uarts_agree with "Hua Huf") as %Hduart.
             destruct (uart_write_total u off storebyte Hoff) as [u' Hwrite_u].
-            iMod (dev_interp_update_uart sigma.(mdev) Uart0 u u'
+            iMod (dev_interp_update_uart sigma.(mdev) i u u'
                     with "[$Hua $Hpldev $Hvdev] Huf") as "[Hdev' Huf']".
             iMod ("Hacc" $! u u' with "[//] Hg Hcol HR") as "(Hg' & Hcol' & HS)".
             iMod ("Hdclose" with "[Huf' Hg' Hcol']") as "_".
             { iApply bi.later_intro. iExists u'. iFrame. }
             iMod (fupd_mask_subseteq ∅) as "Hb2"; [set_solver|].
-            iModIntro. iExists (set_duart sigma.(mdev) Uart0 u').
+            iModIntro. iExists (set_duart sigma.(mdev) i u').
             iSplitR.
             { iPureIntro. rewrite Hpaid Heapa.
-              apply (dev_write_uart Uart0 sigma.(mdev) off storebyte u' Hoff).
+              apply (dev_write_uart i sigma.(mdev) off storebyte u' Hoff).
               rewrite <- Hduart. exact Hwrite_u. }
             iApply bi.later_intro. iMod "Hb2" as "_". iModIntro.
             iFrame "Hreg Hmem Hdev' HS". }
@@ -284,6 +305,30 @@ Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 Qed.
 
+  (* ================================================================= *)
+  (*  §2  THE [Uart0] RESTATEMENTS, statements verbatim.                *)
+  (*  The console port's page IS [WpSmodeUart.uart_vpn]                  *)
+  (*  ([uart_vpn_of_console]), so each is the generic leaf at [Uart0]     *)
+  (*  with that one equation composed onto the vpn premise.  The bundle-  *)
+  (*  taking pair additionally projects [uart_inv Uart0] out of           *)
+  (*  [dev_inv] -- which is the console's bundle and cannot be stated at  *)
+  (*  the second port at all, hence the split.                            *)
+  (* ================================================================= *)
+
+  Lemma wp_sb_uart_uinv_s_sconf (γd : uart_names)
+    (off : Z)
+    (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
+    (m : regfile) (n : nat) (R S : iProp Σ) (b : bool) (p : mword 64)
+    : wp_sb_uart_uinv_s_sconf_body kt γd off pc is_rvc rs2 rs1 imm m n R S b p.
+  Proof.
+    cbv beta delta [wp_sb_uart_uinv_s_sconf_body].
+    intros ea a8 storebyte lppn Hoff Hcanon Hvpn_def Hpa.
+    iIntros "Hcg Hpc Hinstr #Huinv HR Hacc Hcont".
+    iApply (wp_sb_uart_uinv_s_sconf_at Uart0 γd off pc is_rvc rs2 rs1 imm m n R S b p
+              Hoff Hcanon (eq_trans Hvpn_def (eq_sym uart_vpn_of_console)) Hpa
+              with "Hcg Hpc Hinstr Huinv HR Hacc Hcont").
+  Qed.
+
   (* The bundle-taking RESTATEMENT of the accessor leaf above, statement
      verbatim, proof one projection out of [dev_inv]. *)
   Lemma wp_sb_uart_s_sconf (γd : uart_names) (γv : disk_names)
@@ -301,28 +346,37 @@ Qed.
               with "Hcg Hpc Hinstr Huinv HR Hacc Hcont").
   Qed.
 
-  Lemma wp_lb_uart_s_sconf (γd : uart_names) (γv : disk_names)
+  (* ================================================================= *)
+  (*  §3  THE PORT-GENERIC LOAD LEAF, over the bare per-port invariant.  *)
+  (*  Same generalization as the store leaf; the read node additionally   *)
+  (*  ADVANCES the device, so the byte is existential and comes out of    *)
+  (*  the invariant's own state.                                          *)
+  (* ================================================================= *)
+  Lemma wp_lb_uart_uinv_s_sconf_at (i : uart_id) (γd : uart_names)
     (off : Z)
     (pc : mword 64) (is_rvc is_unsigned : bool) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
     (m : regfile) (n : nat) (R : iProp Σ) (S : bv 8 -> iProp Σ) (b : bool) (p : mword 64)
-    : wp_lb_uart_s_sconf_body kt γd γv off pc is_rvc is_unsigned rd rs1 imm m n R S b p.
+    : wp_lb_uart_uinv_s_sconf_at_body kt i γd off pc is_rvc is_unsigned rd rs1 imm m n R S b p.
   Proof.
-    cbv beta delta [wp_lb_uart_s_sconf_body].
-    intros ea a8 ldval lppn Hoff Hrd Hrdok Hcanon Hvpn_def Hpa.
+    cbv beta delta [wp_lb_uart_uinv_s_sconf_at_body].
+    intros ea a8 ldval Hoff Hrd Hrdok Hcanon Hvpn_def Hpa.
     rdok_split Hrdok.
     (* COLLAPSE [a8] INTO [ea] FIRST -- see the store leaf above. *)
     assert (Ha8ea : a8 = ea)
       by (unfold a8; rewrite subrange_id sign_extend'_id; reflexivity).
     rewrite Ha8ea in Hcanon, Hvpn_def, Hpa.
-    assert (Heapa : ea = uart_pa Uart0 off).
+    assert (Heapa : ea = uart_pa i off).
     { rewrite <- Hpa. change (0 * 1) with 0. rewrite avi0. symmetry.
       apply zero_extend'_id. }
-    assert (Hdevvpn : kpt_dev_vpn (svpn_of ea)).
-    { unfold svpn_of. rewrite Hvpn_def. unfold kpt_dev_vpn.
-      assert (bv_unsigned uart_vpn = 65536) as -> by (vm_compute; reflexivity).
-      lia. }
-    assert (Hdevstatic : kmap_static (svpn_of ea) KP_rw)
-      by (apply kmap_class_rw; right; exact Hdevvpn).
+    (* THE MAPPING PREMISE, port-generically.  [kpt_dev_vpn] is the
+       contiguous PLIC/UART0/VIRTIO band and [kpt_uart1_vpn] is UART1's own
+       page eight pages above it; both land on [kmap_class _ = Some KP_rw],
+       so the case split closes on the spot and nothing below this line
+       knows which port it is looking at. *)
+    assert (Hdevstatic : kmap_static (svpn_of ea) KP_rw).
+    { unfold svpn_of. rewrite Hvpn_def.
+      destruct (uart_vpn_of_mapped i) as [Hd | Hd];
+        [ exact (kmap_class_rw _ (or_intror Hd)) | exact (kmap_class_uart1 _ Hd) ]. }
     pose proof (static_canon_lo ea KP_rw Hdevstatic Hcanon) as Healt.
     pose proof (pa_of_id ea Healt) as Hpaid.
     assert (Halignv : is_aligned_vaddr (Virtaddr ea) 1 = true)
@@ -332,11 +386,10 @@ Qed.
       by (rewrite <- is_aligned_vaddr_paddr; unfold is_aligned_vaddr;
           rewrite Z.rem_1_r; reflexivity).
     assert (Hdcls : dev_cls 1 (pa_of (kpt_leaf_ppn (svpn_of ea)) ea)).
-    { rewrite Hpaid Heapa. split; [ exact (dev_addr_uart Uart0 off Hoff) | ].
-      split; [ exact (uart_pa_not_in_clint Uart0 off Hoff) | ].
-      exact (uart_pa_access_io Uart0 off 1 Hoff (pma_width_ok 1 eq_refl eq_refl)). }
-    iIntros "Hcg Hpc #Hinstr #Hdinv HR Hacc Hcont".
-    iDestruct (dev_inv_uart with "Hdinv") as "#Huinv".
+    { rewrite Hpaid Heapa. split; [ exact (dev_addr_uart i off Hoff) | ].
+      split; [ exact (uart_pa_not_in_clint i off Hoff) | ].
+      exact (uart_pa_access_io i off 1 Hoff (pma_width_ok 1 eq_refl eq_refl)). }
+    iIntros "Hcg Hpc #Hinstr #Huinv HR Hacc Hcont".
     iApply (wp_instr_s_sconf m n b b pc is_rvc
               (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 1))
               (fun (_CIDx : CpuId) npc _ms' m' n' =>
@@ -474,17 +527,17 @@ Qed.
             iDestruct "Hdbody" as (u) "(Huf & Hg & Hcol)".
             iDestruct (uarts_agree with "Hua Huf") as %Hduart.
             destruct (uart_read_total u off Hoff) as (bt & u' & Hread_u).
-            iMod (dev_interp_update_uart sigma.(mdev) Uart0 u u'
+            iMod (dev_interp_update_uart sigma.(mdev) i u u'
                     with "[$Hua $Hpldev $Hvdev] Huf") as "[Hdev' Huf']".
             iMod ("Hacc" $! u bt u' with "[//] Hg Hcol HR")
               as "(Hg' & Hcol' & HS)".
             iMod ("Hdclose" with "[Huf' Hg' Hcol']") as "_".
             { iApply bi.later_intro. iExists u'. iFrame. }
             iMod (fupd_mask_subseteq ∅) as "Hb2"; [set_solver|].
-            iModIntro. iExists bt, (set_duart sigma.(mdev) Uart0 u').
+            iModIntro. iExists bt, (set_duart sigma.(mdev) i u').
             iSplitR.
             { iPureIntro. rewrite Hpaid Heapa.
-              apply (dev_read_uart Uart0 sigma.(mdev) off bt u' Hoff).
+              apply (dev_read_uart i sigma.(mdev) off bt u' Hoff).
               rewrite <- Hduart. exact Hread_u. }
             iApply bi.later_intro. iMod "Hb2" as "_". iModIntro.
             iFrame "Hreg Hmem Hdev' HS". }
@@ -546,6 +599,24 @@ Qed.
       iApply ("Hcont" $! bt with "Hcg' Hpc' HS").
 
 Qed.
+
+  (* The bundle-taking [Uart0] RESTATEMENT of the load leaf, statement
+     verbatim: the console projection out of [dev_inv], plus the console
+     port's vpn equation. *)
+  Lemma wp_lb_uart_s_sconf (γd : uart_names) (γv : disk_names)
+    (off : Z)
+    (pc : mword 64) (is_rvc is_unsigned : bool) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
+    (m : regfile) (n : nat) (R : iProp Σ) (S : bv 8 -> iProp Σ) (b : bool) (p : mword 64)
+    : wp_lb_uart_s_sconf_body kt γd γv off pc is_rvc is_unsigned rd rs1 imm m n R S b p.
+  Proof.
+    cbv beta delta [wp_lb_uart_s_sconf_body].
+    intros ea a8 ldval lppn Hoff Hrd Hrdok Hcanon Hvpn_def Hpa.
+    iIntros "Hcg Hpc Hinstr #Hdinv HR Hacc Hcont".
+    iDestruct (dev_inv_uart with "Hdinv") as "#Huinv".
+    iApply (wp_lb_uart_uinv_s_sconf_at Uart0 γd off pc is_rvc is_unsigned rd rs1 imm m n R S b p
+              Hoff Hrd Hrdok Hcanon (eq_trans Hvpn_def (eq_sym uart_vpn_of_console)) Hpa
+              with "Hcg Hpc Hinstr Huinv HR Hacc Hcont").
+  Qed.
 
 End ProofUart.
 
