@@ -713,9 +713,12 @@ Section SystemBoot.
             S Pb (MkAppcfg N A rap) (fun _ => emp)%I gsn gln gtn Hbf Hbundle
             with "Hok Hxfer Hseamg Hdursnap Hres")
       as (Hfd Hir Hpav Hbs Hwch HF γd γd1 γv cnm Rspent γi ξd)
-      "(%Hdimg & %Hcnu & %Happ & #Htext & #Hdata & #Hstarted & Hprim & #Hdev & #Hdev1 & #Hwinv &
+      "(%Hdimg & %Hcnu & %Happ & #Htext & #Hdata &
+        #Hpinned & #Hubw0 & #Hubw1 & #Hurw0 & #Hurw1 &
+        #Hstarted & Hprim & #Hdev & #Hdev1 & #Hplic & #Hwinv &
         #Hcinv & #Hcert & Hharts & Hlk & Hgl & Hmdata & Hpark & Hpst & Hpavail & Hchb & Huart &
-        Htok & Hhi & Hdlab & Hcfg & Hclaim & Hcmauth & #Hdone & Hkpt & Hkptb & Hkmap & Hmir & Hpages & Hirauth &
+        Htok & Hhi & Hdlab & Huart1 & Htok1 & Hhi1 & Hdlab1 &
+        Hcfg & Hclaim & Hcmauth & #Hdone & Hkpt & Hkptb & Hkmap & Hmir & Hpages & Hirauth &
         Hirslot & Hfs)".
     (* THE FIRST PROCESS'S EXEC BUNDLE, off [Hinit_boot] at the era's own
        ghost classes -- which is why the hypothesis quantifies over them:
@@ -752,6 +755,13 @@ Section SystemBoot.
        is forkret's [if (first)] arm. *)
     iDestruct "Huart" as (l0) "(Htx & #Hsent & #Hlb)".
     iDestruct "Hdlab" as (b0) "Hdlab".
+    (* ...AND THE SAME TWO ROWS AT THE SECOND PORT (bump 163d39b): main runs
+       [uartinitone] there too, so port 1 owes the transmitter token, the
+       transmitted-prefix bound, the receipt and the UNFROZEN DLAB half,
+       exactly as the console does.  What it does NOT owe is any claim about
+       the bytes -- its output is unconstrained. *)
+    iDestruct "Huart1" as (l1) "(Htx1 & #Hsent1 & #Hlb1)".
+    iDestruct "Hdlab1" as (b1) "Hdlab1".
     iDestruct "Hcfg" as (c0) "[%Hlive Hcfg]".
     iDestruct "Hpages" as (ps) "(%Hprun & %Hplen & Hpages)".
     (* one row out of [boot_shared_alloc], two premises at [BootChain] -- the
@@ -776,12 +786,12 @@ Section SystemBoot.
     iDestruct (dev_inv_disk with "Hdev") as "#Hvinv".
     iDestruct (dev_inv_perm with "Hdev") as "#Hqinv".
     iModIntro.
-    iSplitL "Hthr0 Hprim Hh0 Hhrest Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Hchb Hfs Hmir Hirslot Hirauth Hboot Htx Htok Hhi Hdlab Hcfg Hclaim Hcmauth Hkpt Hkptb Hkmap
+    iSplitL "Hthr0 Hprim Hh0 Hhrest Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Hchb Hfs Hmir Hirslot Hirauth Hboot Htx Htok Hhi Hdlab Htx1 Htok1 Hhi1 Hdlab1 Hcfg Hclaim Hcmauth Hkpt Hkptb Hkmap
              Hpages".
     { iApply (big_sepL_cpu_glue
                 (fun c => WP (LoopE gen_id c : expr riscv_lang) @ ⊤
 )%I).
-      iSplitL "Hthr0 Hprim Hh0 Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Hchb Hfs Hmir Hirslot Hirauth Hboot Htx Htok Hhi Hdlab Hcfg Hclaim Hcmauth Hkpt Hkptb Hkmap
+      iSplitL "Hthr0 Hprim Hh0 Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Hchb Hfs Hmir Hirslot Hirauth Hboot Htx Htok Hhi Hdlab Htx1 Htok1 Hhi1 Hdlab1 Hcfg Hclaim Hcmauth Hkpt Hkptb Hkmap
                Hpages".
       { (* THE BOOT HART: the arm that consumes the whole supply. *)
         (* AT [HF] EXPLICITLY, not by resolution.  [SpecMain.MAIN]'s
@@ -815,6 +825,7 @@ Section SystemBoot.
            mismatch has to surface. *)
         iPoseProof (boot_hart_primary (fileG0 := HF) (CID := 0%fin) (XI := ξ0)
                   (g.(gregs) 0%fin) iv DfracDiscarded γd γv cnm γi ξd ps l0 b0 c0
+                  γd1 l1 b1
                   (v_disk (g.(gdev).(dvirtio))) (fss_sb S) (fs_nib S) cov
                   XV6_DISK_BYTES S Pb Rspent
                   (boot_regs_of_facts g Hbf 0%fin) fin_0_z Hprun Hplen Hlive
@@ -857,6 +868,26 @@ Section SystemBoot.
         iSpecialize ("HP" with "Htok").
         iSpecialize ("HP" with "Hhi").
         iSpecialize ("HP" with "Hdlab").
+        (* ---- THE SECOND PORT'S THIRTEEN ROWS (bump 163d39b).  Two
+           invariants -- UART1's own, and the PLIC's at the two CONCRETE
+           bundles, which main needs by name for port 1's receive-token
+           deposit ([dev_inv]'s PLIC conjunct ∃-packs the second name, and
+           that is what keeps that bundle at arity 2) -- then [uarts_pinned]
+           and the four `.data` words every [WriteReg] in [uartinitone]
+           loads its MMIO base from, then port 1's ghost row. ---- *)
+        iSpecialize ("HP" with "Hdev1").
+        iSpecialize ("HP" with "Hplic").
+        iSpecialize ("HP" with "Hpinned").
+        iSpecialize ("HP" with "Hubw0").
+        iSpecialize ("HP" with "Hurw0").
+        iSpecialize ("HP" with "Hubw1").
+        iSpecialize ("HP" with "Hurw1").
+        iSpecialize ("HP" with "Htx1").
+        iSpecialize ("HP" with "Hsent1").
+        iSpecialize ("HP" with "Hlb1").
+        iSpecialize ("HP" with "Htok1").
+        iSpecialize ("HP" with "Hhi1").
+        iSpecialize ("HP" with "Hdlab1").
         iSpecialize ("HP" with "Hcfg").
         iSpecialize ("HP" with "Hclaim").
         iSpecialize ("HP" with "Hcmauth").
