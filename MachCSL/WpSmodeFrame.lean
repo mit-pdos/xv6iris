@@ -88,7 +88,11 @@ macro_rules
       KCtx.pushOffAt_noff, KCtx.pushOffAt_intena, KCtx.pushOffAt_locks, KCtx.pushOffAt_tier, KCtx.pushOffAt_root,
       KCtx.pushOffAt_proc, KCtx.pushOffAt_sp,
       KCtx.intrOn_regs, KCtx.intrOn_sie, KCtx.intrOn_spie, KCtx.intrOn_spp, KCtx.intrOn_avail, KCtx.intrOn_noff,
-      KCtx.intrOn_intena, KCtx.intrOn_locks, KCtx.intrOn_tier, KCtx.intrOn_root, KCtx.intrOn_proc, KCtx.intrOn_sp, $lems,*])
+      KCtx.intrOn_intena, KCtx.intrOn_locks, KCtx.intrOn_tier, KCtx.intrOn_root, KCtx.intrOn_proc, KCtx.intrOn_sp,
+      KCtx.popExit_regs, KCtx.popExit_sie, KCtx.popExit_spie, KCtx.popExit_spp, KCtx.popExit_avail, KCtx.popExit_noff,
+      KCtx.popExit_intena, KCtx.popExit_locks, KCtx.popExit_tier, KCtx.popExit_root, KCtx.popExit_proc, KCtx.popExit_sp,
+      KCtx.popExit_withRegs, KCtx.popExit_withLocks, KCtx.popExit_pushed, KCtx.intrOn_withRegs, KCtx.intrOn_withLocks,
+      KCtx.intrOn_pushed, Bool.or_false, Bool.false_or, $lems,*])
   | `(tactic| k_norm_g [$extra:term,*] at $h:ident) => do
     let lems ← extra.getElems.mapM fun l => `(Lean.Parser.Tactic.simpLemma| $l:term)
     `(tactic| try simp only [KCtx.push_eq, KCtx.setReg_withRegs, KCtx.withRegs_withRegs, KCtx.rget_withRegs',
@@ -122,7 +126,11 @@ macro_rules
       KCtx.pushOffAt_noff, KCtx.pushOffAt_intena, KCtx.pushOffAt_locks, KCtx.pushOffAt_tier, KCtx.pushOffAt_root,
       KCtx.pushOffAt_proc, KCtx.pushOffAt_sp,
       KCtx.intrOn_regs, KCtx.intrOn_sie, KCtx.intrOn_spie, KCtx.intrOn_spp, KCtx.intrOn_avail, KCtx.intrOn_noff,
-      KCtx.intrOn_intena, KCtx.intrOn_locks, KCtx.intrOn_tier, KCtx.intrOn_root, KCtx.intrOn_proc, KCtx.intrOn_sp, $lems,*] at $h:ident)
+      KCtx.intrOn_intena, KCtx.intrOn_locks, KCtx.intrOn_tier, KCtx.intrOn_root, KCtx.intrOn_proc, KCtx.intrOn_sp,
+      KCtx.popExit_regs, KCtx.popExit_sie, KCtx.popExit_spie, KCtx.popExit_spp, KCtx.popExit_avail, KCtx.popExit_noff,
+      KCtx.popExit_intena, KCtx.popExit_locks, KCtx.popExit_tier, KCtx.popExit_root, KCtx.popExit_proc, KCtx.popExit_sp,
+      KCtx.popExit_withRegs, KCtx.popExit_withLocks, KCtx.popExit_pushed, KCtx.intrOn_withRegs, KCtx.intrOn_withLocks,
+      KCtx.intrOn_pushed, Bool.or_false, Bool.false_or, $lems,*] at $h:ident)
 
 set_option hygiene false in
 macro_rules

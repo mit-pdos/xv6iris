@@ -507,4 +507,33 @@ theorem KCtx.pushOffAt_pushed (k : KCtx) (m : Nat) (a b : Bool) (h : m ≤ k.ava
   simp only [KCtx.pushed, KCtx.pushOffAt, KCtx.mk.injEq, _root_.true_and, _root_.and_true]
   omega
 
+
+theorem KCtx.intrOn_withLocks (k : KCtx) (l : List String) : (k.withLocks l).intrOn = k.intrOn.withLocks l := rfl
+
+@[simp] theorem KCtx.popExit_regs (k : KCtx) (r : Bool) : (k.popExit r).regs = k.regs := by cases r <;> rfl
+@[simp] theorem KCtx.popExit_sie (k : KCtx) (r : Bool) : (k.popExit r).sie = (r || k.sie) := by cases r <;> rfl
+@[simp] theorem KCtx.popExit_spie (k : KCtx) (r : Bool) : (k.popExit r).spie = k.spie := by cases r <;> rfl
+@[simp] theorem KCtx.popExit_spp (k : KCtx) (r : Bool) : (k.popExit r).spp = k.spp := by cases r <;> rfl
+@[simp] theorem KCtx.popExit_avail (k : KCtx) (r : Bool) :
+    (k.popExit r).avail = k.avail - (if r then trapRes true else 0) := by cases r <;> rfl
+@[simp] theorem KCtx.popExit_noff (k : KCtx) (r : Bool) : (k.popExit r).noff = k.noff - 1 := by cases r <;> rfl
+@[simp] theorem KCtx.popExit_intena (k : KCtx) (r : Bool) : (k.popExit r).intena = (r || k.intena) := by
+  cases r <;> rfl
+@[simp] theorem KCtx.popExit_locks (k : KCtx) (r : Bool) : (k.popExit r).locks = k.locks := by cases r <;> rfl
+@[simp] theorem KCtx.popExit_tier (k : KCtx) (r : Bool) : (k.popExit r).tier = k.tier := by cases r <;> rfl
+@[simp] theorem KCtx.popExit_root (k : KCtx) (r : Bool) : (k.popExit r).root = k.root := by cases r <;> rfl
+@[simp] theorem KCtx.popExit_proc (k : KCtx) (r : Bool) : (k.popExit r).proc = k.proc := by cases r <;> rfl
+@[simp] theorem KCtx.popExit_sp (k : KCtx) (r : Bool) : (k.popExit r).sp = k.sp := by cases r <;> rfl
+theorem KCtx.popExit_withRegs (k : KCtx) (R : RegMap) (r : Bool) :
+    (k.withRegs R).popExit r = (k.popExit r).withRegs R := by cases r <;> rfl
+theorem KCtx.popExit_withLocks (k : KCtx) (l : List String) (r : Bool) :
+    (k.withLocks l).popExit r = (k.popExit r).withLocks l := by cases r <;> rfl
+theorem KCtx.popExit_pushed (k : KCtx) (m : Nat) (r : Bool) : (k.pushed m).popExit r = (k.popExit r).pushed m := by
+  cases r
+  · rfl
+  · obtain ⟨regs, sie, spie, spp, avail, noff, intena, locks, tier, root, proc⟩ := k
+    simp only [KCtx.popExit_true, KCtx.pushed, KCtx.popOff, KCtx.intrOn, KCtx.mk.injEq, _root_.true_and,
+      _root_.and_true]
+    omega
+
 end MachCSL

@@ -21,9 +21,9 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 
 set_option maxHeartbeats 4000000 in
 theorem release_proof (HO : HOLDING) (PO : POPOFF) : RELEASE := ⟨
-  fun {hlc GF} _ _ cpu k γ s R _ hsie hnoff hK hexit => by
+  fun {hlc GF} _ _ cpu k γ s R _ hsie hnoff hK reen hreen hon => by
   unfold wp_release_body
-  iintro ⟨Hk, Hpc, #Hlk, Hlocked, HR, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hlk, Hlocked, HR, Harm, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   simp only [releaseAddr, KernelSyms.«release»]
@@ -102,28 +102,23 @@ theorem release_proof (HO : HOLDING) (PO : POPOFF) : RELEASE := ⟨
   have hflt : (k.locks.filter (fun x => x ≠ s)).length < k.locks.length := by
     rw [List.length_filter_lt_length_iff_exists]
     exact ⟨s, hmem, by simp⟩
-  iapply (hpo _ ?hs ?hn ?hK ?hl false ?hr ?ho) $$ [- $Hk $Hpc]
+  iapply (hpo _ ?hs ?hn ?hK ?hl reen ?hr ?ho) $$ [- $Hk $Hpc]
   rotate_right 1
   case hs => k_norm
   case hn => k_norm; omega
   case hK => k_norm; omega
   case hl => k_norm; have := hwf.2.2.2.1; omega
-  case hr =>
-    k_norm
-    cases h : k.intena
-    · simp
-    · simp [show k.noff ≠ 1 from fun h1 => by rw [hexit h1] at h; cases h]
-  case ho => intro h; cases h
-  simp only [KCtx.popExit_false, popArm_false]
-  isplitl []
-  · iempintro
+  case hr => k_norm; exact hreen
+  case ho => k_norm; intro h; obtain ⟨ht, hav⟩ := hon h; exact ⟨ht, by omega⟩
+  unfold popArm
   k_norm
-  iapply wpNext_off_intro
-  iintro %R3 Hk Hpc %hcs3
+  iframe Harm
+  iapply wpNext_intro_pin
+  iintro %c1 %hp1 %R3 Hk Hpc %hcs3
   have hret2 : jumpPc 0x80000c64#64 = 0x80000c64#64 := by simp only [jumpPc, BitVec.reduceAnd]
   k_norm [hret2]
   k_norm at hcs3
-  -- epilogue
+  -- epilogue, at either index
   have h32 : R3 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64 := by
     have := hcs3.1
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] at this
@@ -131,23 +126,32 @@ theorem release_proof (HO : HOLDING) (PO : POPOFF) : RELEASE := ⟨
     have h22 := hcs2.1
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at h22
     exact h22
-  iapply (wp_epilogue4s1 cpu ((k.withLocks (k.locks.filter (fun x => x ≠ s))).popOff) (by k_norm)
-    0x80000c64#64 (by k_norm; omega) R3 (by k_norm; exact h32) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5))
+  have hav4 : 4 ≤ ((k.popExit reen).withLocks (k.locks.filter (fun x => x ≠ s))).avail := by
+    k_norm
+    cases reen
+    · simp; omega
+    · have := (hon rfl).2; simp; omega
+  iapply (wp_epilogue4s1_gen c1 ((k.popExit reen).withLocks (k.locks.filter (fun x => x ≠ s)))
+    0x80000c64#64 hav4 R3 (by k_norm; exact h32) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5))
     $$ [- $Hk $Hpc]
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm
   iframe
   inext
-  iintro Hk Hpc
   k_norm
-  iapply HΦ $$ %_ Hk Hpc
+  ihave HΦ1 := wpNext_shift _ _ cpu c1 _ hp1 $$ HΦ
+  iapply wpNext_mono _ _ _ _ _ $$ HΦ1
+  iintro %cpu' HK Hk Hpc
+  k_norm
+  iapply HK $$ %_ Hk Hpc
   ipureintro
   obtain ⟨c3_2, c3_8, c3_9, c3_18, c3_19, c3_20, c3_21, c3_22, c3_23, c3_24, c3_25, c3_26, c3_27⟩ := hcs3
   obtain ⟨c2_2, c2_8, c2_9, c2_18, c2_19, c2_20, c2_21, c2_22, c2_23, c2_24, c2_25, c2_26, c2_27⟩ := hcs2
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] at c3_18 c3_19 c3_20 c3_21 c3_22 c3_23 c3_24 c3_25 c3_26 c3_27
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] at c2_18 c2_19 c2_20 c2_21 c2_22 c2_23 c2_24 c2_25 c2_26 c2_27
   unfold calleeSaved
-  simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, eq_self_iff_true, true_and, and_true]
+  simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, eq_self_iff_true, _root_.true_and,
+    _root_.and_true]
   exact ⟨c3_18.trans c2_18, c3_19.trans c2_19, c3_20.trans c2_20, c3_21.trans c2_21, c3_22.trans c2_22,
     c3_23.trans c2_23, c3_24.trans c2_24, c3_25.trans c2_25, c3_26.trans c2_26, c3_27.trans c2_27⟩⟩
 

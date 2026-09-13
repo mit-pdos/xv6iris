@@ -79,14 +79,25 @@ theorem printk_release_tail (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors}
         pcIs cpu (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu)
       ⊢ wpLoop (GF := GF) cpu := by
     intro k' hsie' hnoff' hK' hexit'
-    have h := RE.wp_release (hlc := hlc) (GF := GF) cpu k' γpr "pr" (fun _ => emp) hsie' hnoff' hK' hexit'
+    have hr : false = (decide (k'.noff = 1) && k'.intena) := by
+      cases h : k'.intena
+      · simp
+      · simp [show k'.noff ≠ 1 from fun h1 => by rw [hexit' h1] at h; cases h]
+    have h := RE.wp_release (hlc := hlc) (GF := GF) cpu k' γpr "pr" (fun _ => emp) hsie' hnoff' hK' false hr
+      (fun h => nomatch h)
     unfold wp_release_body at h
-    simp only [releaseAddr, KernelSyms.«release»] at h
+    simp only [releaseAddr, KernelSyms.«release», KCtx.popExit_false, popArm_false, KCtx.popOff_sie, hsie'] at h
     iintro ⟨Hk, Hp, #Hl, Hlo, Hcont⟩
     iapply h
-    iframe Hk Hp Hlo Hcont
+    iframe Hk Hp Hlo
     iframe #
-    all_goals iempintro
+    isplitl []
+    · iempintro
+    isplitl []
+    · iempintro
+    iapply wpNext_off_intro
+    iintro %R' Hk Hp %hcs
+    iapply Hcont $$ %_ Hk Hp %hcs
   iapply (hre _ ?hs ?hn ?hK ?he) $$ [- $Hk $Hpc $Hlocked]
   rotate_right 1
   k_norm
