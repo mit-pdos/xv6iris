@@ -29,8 +29,7 @@ def memmoveAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«memmove»
 /-- **WP of `memmove`.**  `src` holds `bs`, `dst` holds `olds` (both of
 length `n`). -/
 def wp_memmove_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
-    (cpu : CPU) (k : KCtx) (bs olds : List (BitVec 8)) (n : Nat) (dqs : DFrac)
-    (hsie : k.sie = false) (hK : 2 ≤ k.avail)
+    (cpu : CPU) (k : KCtx) (bs olds : List (BitVec 8)) (n : Nat) (dqs : DFrac) (hK : 2 ≤ k.avail)
     (hn : k.regs 12#5 = BitVec.ofNat 64 n) (hn32 : n < 2 ^ 32)
     (hls : bs.length = n) (hld : olds.length = n) : Prop :=
   kctx cpu k ∗ pcIs cpu memmoveAddr ∗
@@ -45,7 +44,7 @@ def wp_memmove_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
 structure MEMMOVE : Prop where
   wp_memmove : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (bs olds : List (BitVec 8)) (n : Nat) (dqs : DFrac)
-    hsie hK hn hn32 hls hld,
-    wp_memmove_body (hlc := hlc) (GF := GF) cpu k bs olds n dqs hsie hK hn hn32 hls hld
+    hK hn hn32 hls hld,
+    wp_memmove_body (hlc := hlc) (GF := GF) cpu k bs olds n dqs hK hn hn32 hls hld
 
 end Xv6
