@@ -65,3 +65,6 @@ import Xv6.SpecKerneltrap
 import Xv6.SpecKernelvec
 import Xv6.ProofKernelvec
 import Xv6.LinkKernelvec
+import Xv6.SpecTrapinithart
+import Xv6.ProofTrapinithart
+import Xv6.LinkTrapinithart

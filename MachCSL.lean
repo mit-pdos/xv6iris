@@ -23,6 +23,7 @@ import MachCSL.WpSmodeCtl
 import MachCSL.WpSmodeRules
 import MachCSL.WpSmodeIntr
 import MachCSL.WpSmodeSret
+import MachCSL.WpSmodeStvec
 import MachCSL.CallConv
 import MachCSL.WpSmodeFrame
 import MachCSL.WpStagesM
