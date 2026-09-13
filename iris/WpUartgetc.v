@@ -1,29 +1,47 @@
 (* WpUartgetc.v -- uartgetc(), the one xv6 UART function that has no symbol.
 
-     static int uartgetc(void) {
-       if (ReadReg(LSR) & LSR_RX_READY) return ReadReg(RHR);
+     static int uartgetc(struct uart *u) {
+       if (ReadReg(u, LSR) & LSR_RX_READY) return ReadReg(u, RHR);
        else return -1;
      }
 
    It is [static] and called once, so gcc INLINES it: there is no [uartgetc]
-   entry in KernelSyms.v, and the coverage report -- which is symbol-driven --
-   cannot count it.  What exists in the image is its BODY, four instructions
-   inside uartintr (+0x44 .. +0x4c), with the C's [c != -1] test fused into
-   the caller's loop branch: the "-1" is never materialized, the [beqz] on the
-   rx-ready bit IS it.
+   entry in KernelSyms.v -- there never was one -- and the coverage report,
+   which is symbol-driven, cannot count it.  What exists in the image is its
+   BODY, five instructions inside uartintr (+0x46 .. +0x52), with the C's
+   [c != -1] test fused into the caller's loop branch: the "-1" is never
+   materialized, the [beqz] on the rx-ready bit IS it.
 
    So this file states uartgetc the only way the compiled kernel admits: as a
-   block lemma parameterized by its four instruction addresses and its two
-   exits ("no input", at the branch target; "a byte", at the instruction after
-   the RHR read, with the byte in a0).  It is the pc-parameterized-block
-   recipe from claude-notes/durable-notes.md, used here not because the block
-   occurs twice but because it belongs to a function that no longer has an
-   address of its own.
+   block lemma parameterized by its five instruction addresses and its two
+   exits ("no input", at the branch target; "a byte", at [pcK], with the byte
+   in a0).  It is the pc-parameterized-block recipe from
+   claude-notes/durable-notes.md, used here not because the block occurs twice
+   but because it belongs to a function that no longer has an address of its
+   own.
 
-   Both accesses are ghost-free: no UART read moves the accepted trace, the
-   transmitted prefix or DLAB ([DevModel.uart_read_stable]), so uartgetc needs
-   neither the transmitter token nor tx_lock -- which is exactly why xv6 can
-   run the rx drain outside the critical section. *)
+   PORT-GENERIC (XV6_REV 163d39b).  The C takes the ELEMENT pointer now, and
+   the block is stated at an abstract [i : uart_id] over the BARE
+   [uart_inv i] -- [dev_inv] is the console bundle and cannot even be stated
+   at the second port, while uartintr's rx drain runs at BOTH.  The two
+   register bases stay parameters: gcc keeps `u->base` in a4 and `u->base + 5`
+   in a3, both recomputed from the element pointer OUTSIDE this block (the
+   `c.ld`/`addi` pair at +0x40/+0x42 is re-executed after every hook call and
+   is therefore the caller's, not the block's -- the port-1 back edge lands at
+   +0x46, INSIDE the block, so a block that began at +0x40 could not serve
+   it).
+
+   THE TRAILING [andi a0,a0,255] IS ABSORBED.  gcc emits a `zext.b` after the
+   RHR read; it is the identity on the zero-extended load value
+   ([ug_and255]), so the block swallows it and its exit [pcK] is the
+   instruction after it, with the post still exactly "a0 holds the byte".
+
+   Both accesses are ghost-free as far as the TRANSMITTER is concerned: no
+   UART read moves the accepted trace, the transmitted prefix or DLAB
+   ([DevModel.uart_read_stable]), so uartgetc needs neither the transmitter
+   token nor tx_lock -- which is exactly why xv6 can run the rx drain outside
+   the critical section.  The RECEIVE column is a different matter: the RHR
+   read POPS, so the token rides through. *)
 From Stdlib Require Import ZArith Bool Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -33,6 +51,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang ObsTrace RiscvPtsto.
+Require Import RiscvExtras.   (* [and_vec64_unsigned]: the absorbed zext.b *)
 Require Import InstrBytes.
 Require Import RegFile.
 Require Import DiskPtsto WpUart.
@@ -68,6 +87,49 @@ Section WpUartgetc.
   Proof. vm_compute. reflexivity. Qed.
 
   (* -------------------------------------------------------------------- *)
+  (*  The [zext.b] the block absorbs.                                       *)
+  (* -------------------------------------------------------------------- *)
+  (* gcc emits [andi a0,a0,255] after the RHR read.  The load value is a
+     ZERO extension of one byte, so the mask changes nothing and the block's
+     post can name the load value itself rather than a masked copy. *)
+  (* an [imm = 0] displacement is the identity.  It CANNOT be discharged by
+     [vm_compute] here: the port is abstract, so the goal carries a variable
+     and [vm_compute] does not fail on one -- it does not return
+     (durable-notes, "vm_compute on a goal containing a variable hangs"). *)
+  Lemma ug_imm0 (x : mword 64) :
+    add_vec x (sign_extend' 64 (mword_of_int 0 : mword 12)) = x.
+  Proof.
+    replace (sign_extend' 64 (mword_of_int 0 : mword 12) : mword 64)
+      with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity).
+    apply kv_addv_zero.
+  Qed.
+
+  Lemma ug_ldval_unsigned (c : bv 8) :
+    bv_unsigned (lsr_ldval_of c : mword 64) = bv_unsigned c.
+  Proof.
+    unfold lsr_ldval_of, extend_value.
+    cbv [zero_extend' Operators_mwords.zero_extend Operators_mwords.extz_vec
+         to_word get_word MachineWord.MachineWord.zero_extend].
+    rewrite bv_zero_extend_unsigned;
+      [reflexivity | first [ done | vm_compute; discriminate | lia ] ].
+  Qed.
+
+  Lemma ug_and255 (c : bv 8) :
+    and_vec (lsr_ldval_of c) (sign_extend' 64 (mword_of_int 255 : mword 12))
+    = lsr_ldval_of c.
+  Proof.
+    apply bv_eq. rewrite and_vec64_unsigned.
+    assert (H255 : bv_unsigned (sign_extend' 64 (mword_of_int 255 : mword 12) : mword 64)
+                   = 255%Z) by (vm_compute; reflexivity).
+    assert (Ho : (255 = Z.ones 8)%Z) by (vm_compute; reflexivity).
+    assert (E8 : (2 ^ 8 = 256)%Z) by (vm_compute; reflexivity).
+    assert (Hm8 : bv_modulus 8 = 256%Z) by (vm_compute; reflexivity).
+    pose proof (bv_unsigned_in_range _ c) as Hr. rewrite Hm8 in Hr.
+    rewrite H255 Ho (Z.land_ones (bv_unsigned (lsr_ldval_of c)) 8 ltac:(lia)).
+    rewrite E8 (ug_ldval_unsigned c). apply Z.mod_small. lia.
+  Qed.
+
+  (* -------------------------------------------------------------------- *)
   (*  uartgetc, inlined.                                                    *)
   (* -------------------------------------------------------------------- *)
   (* THE SIDE CONDITION ON [rs_lsr] ARRIVES BY INSTANCE RESOLUTION.  This
@@ -77,14 +139,14 @@ Section WpUartgetc.
      Rtp], on the raw [mword 5]) -- and [IntrDefs.srcok_solve]'s injection arm
      is exactly what turns that spelling into the class, so that premise stays
      put and nothing about it moves.  [rs_lsr] carried NO such fact: its only
-     premise was the value fact [rget m rs_lsr = uart_pa Uart0 5], which says nothing
-     about tp.  Since [wp_uart_read_free_s_sconf] now takes [SrcOk rs1], an
-     application at [rs_lsr] would have had NOTHING to resolve against -- and
-     the resulting failure is the silent one, an instance SHELVED inside
-     [iApply] that only surfaces at [Qed] as "Attempt to save an incomplete
-     proof".  So the class is stated here too, as an implicit argument, which
-     costs no positional slot: the block's two call sites (ProofUartintr.v)
-     pass concrete registers and do not move.
+     premise was the value fact [rget m rs_lsr = uart_pa i 5], which says
+     nothing about tp.  Since [wp_uart_lsr_read_rx_s_sconf_at] takes [SrcOk
+     rs1], an application at [rs_lsr] would have had NOTHING to resolve
+     against -- and the resulting failure is the silent one, an instance
+     SHELVED inside [iApply] that only surfaces at [Qed] as "Attempt to save
+     an incomplete proof".  So the class is stated here too, as an implicit
+     argument, which costs no positional slot: the block's call site
+     (ProofUartintr.v) passes concrete registers and does not move.
 
      WHY IT IS TRUE AND NOT MERELY CONVENIENT: [rs_lsr] holds the UART LSR
      address, so it is a data pointer, not the thread pointer; and the value
@@ -93,17 +155,19 @@ Section WpUartgetc.
      the read to be hart-independent for exactly the same reason [rs_rhr] does.
      The asymmetry in the ORIGINAL statement (a premise for one base, nothing
      for the other) was the gap. *)
-  Lemma wp_uartgetc_inline (γd : uart_names) (γv : disk_names) (m : regfile) (n : nat)
+  Lemma wp_uartgetc_inline (i : uart_id) (γd : uart_names) (m : regfile) (n : nat)
       (rs_lsr rs_rhr : mword 5) `{!SrcOk rs_lsr} (imm8 : mword 8)
       (k : nat) (hl : option (list mobs))
-      (pcL pcA pcB pcR pcK pcNo : mword 64) (b : bool) :
+      (pcL pcA pcB pcR pcZ pcK pcNo : mword 64) (b : bool) :
     (* the two bases: the LSR and the RHR, each already in a register --
        [rs_lsr]/[rs_rhr] are register-index VARIABLES, so the read has to go
        through [rget] (either could in principle be tp). *)
-    rget m rs_lsr = uart_pa Uart0 5 ->
-    rget m rs_rhr = uart_pa Uart0 0 ->
-    (* the RHR base must survive the [andi] that clobbers a5 *)
+    rget m rs_lsr = uart_pa i 5 ->
+    rget m rs_rhr = uart_pa i 0 ->
+    (* the RHR base must survive the [andi] that clobbers a5, and the [lbu]
+       and [andi] that write a0 *)
     rs_rhr <> Ra5 ->
+    rs_rhr <> Ra0 ->
     (* the RHR base is read again after the block's possible migrations
        (the [c.beqz]/poll may trap with interrupts enabled), so its value
        has to survive a hart change; that only holds away from tp -- a plain
@@ -113,7 +177,8 @@ Section WpUartgetc.
     add_vec_int pcL 4 = pcA ->
     add_vec_int pcA 2 = pcB ->
     add_vec_int pcB 2 = pcR ->
-    add_vec_int pcR 4 = pcK ->
+    add_vec_int pcR 4 = pcZ ->
+    add_vec_int pcZ 4 = pcK ->
     add_vec pcB (sign_extend' 64 (sign_extend' 13 (concat_vec imm8 ('b"0")))) = pcNo ->
     eq_vec (access_vec_dec pcNo 0) ('b"0") = true ->
     sie_cap_gpr kt m n b p -∗
@@ -123,7 +188,8 @@ Section WpUartgetc.
     instr pcB true (BTYPE (sign_extend' 13 (concat_vec imm8 ('b"0")), zreg,
                            creg2reg_idx (Cregidx (mword_of_int 7)), BEQ)) -∗
     instr pcR false (LOAD (mword_of_int 0 : mword 12, Regidx rs_rhr, Regidx Ra0, true, 1)) -∗
-    dev_inv γd γv -∗ uart_dlab_off γd -∗ uart_rx_tok γd k hl -∗
+    instr pcZ false (ITYPE (mword_of_int 255 : mword 12, Regidx Ra0, Regidx Ra0, ANDI)) -∗
+    uart_inv i γd -∗ uart_dlab_off γd -∗ uart_rx_tok γd k hl -∗
     wp_next b p (fun (CID : CpuId) =>
       (* the two returns, as a CONJUNCTION: exactly one is taken, and they must
          share whatever the caller is carrying across the call *)
@@ -147,36 +213,38 @@ Section WpUartgetc.
                lower bound -- with the token itself at its NEW anchor
                (app-echo.md, lane CONS-CURSOR, C1) *)
             (∃ h : list mobs,
-               ⌜ obs_ends_in Uart0 h c ⌝ ∗ ⌜ ohist_ext hl h ⌝ ∗
+               ⌜ obs_ends_in i h c ⌝ ∗ ⌜ ohist_ext hl h ⌝ ∗
                riscv_rx_tag h ∗ obs_hist_lb h ∗
                uart_rx_tok γd (S k) (Some h)) -∗
             WP (Loop : expr riscv_lang)) )) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros (Hlsr Hrhr Hne Hrtp HA HB HR HK HNo Hal)
-      "Hcg Hpc HiL HiA HiB HiR #Hdinv #Hdlab Htok Hk".
+    iIntros (Hlsr Hrhr Hne Hne0 Hrtp HA HB HR HZ HK HNo Hal)
+      "Hcg Hpc HiL HiA HiB HiR HiZ #Huinv #Hdlab Htok Hk".
     (* the class, consumed at [rs_lsr]: the LSR address is the same word at
        every hart, so the premise stated at the entry hart still holds at the
        hart the poll's [wp_next] lands on.  Also the wiring check -- attach the
        class to any other parameter and this line stops typechecking. *)
-    assert (Hlsr_all : forall hh : CpuId, rget (CID := hh) m rs_lsr = uart_pa Uart0 5)
+    assert (Hlsr_all : forall hh : CpuId, rget (CID := hh) m rs_lsr = uart_pa i 5)
       by (intros hh; rewrite (src_ok_rget_indep m rs_lsr hh CID); exact Hlsr).
     (* Ra5 (x15) is never tp (x4): the one register-index fact the a5-side
        reasoning below needs to peel [rget] back to a raw map lookup. *)
     assert (HR5tp : Regidx Ra5 <> Regidx Rtp)
       by (vm_compute; discriminate).
+    assert (HR0tp : Regidx Ra0 <> Regidx Rtp)
+      by (vm_compute; discriminate).
     (* the RHR base, reduced to a HART-INDEPENDENT raw map fact once and for
        all: [rget] at a non-tp index is the plain lookup ([rget_ne]), so this
        survives every later hart change unlike [Hrhr] itself (whose [rget] is
        pinned at the ENTRY hart). *)
-    assert (Hrhr0 : m !!! Regidx rs_rhr = uart_pa Uart0 0).
+    assert (Hrhr0 : m !!! Regidx rs_rhr = uart_pa i 0).
     { rewrite -(rget_ne m rs_rhr ltac:(congruence)). exact Hrhr. }
-    (* --- the rx-ready poll: [lbu a5,0(s1)] --- *)
-    iApply (UAcc.wp_uart_lsr_read_rx_s_sconf γd γv pcL Ra5 rs_lsr (mword_of_int 0 : mword 12)
+    (* --- the rx-ready poll: [lbu a5,0(rs_lsr)] --- *)
+    iApply (UAcc.wp_uart_lsr_read_rx_s_sconf_at i γd pcL Ra5 rs_lsr (mword_of_int 0 : mword 12)
               m n k hl b ltac:(vm_compute; discriminate)
               ltac:(rdok)
-              ltac:(rewrite Hlsr; apply bv_eq; vm_compute; reflexivity)
-              with "Hcg Hpc HiL Hdinv Htok [-]").
+              ltac:(rewrite Hlsr; apply ug_imm0)
+              with "Hcg Hpc HiL Huinv Htok [-]").
     iIntros (CID1 Hs1 bt) "Hcg Hpc Htok Hlb". iEval (rewrite HA) in "Hpc".
     (* --- [c.andi a5,a5,1] --- *)
     iApply (wp_candi_s_sconf pcA Ra5 (mword_of_int 1 : mword 6)
@@ -208,26 +276,36 @@ Section WpUartgetc.
       iSpecialize ("Hk" $! CID3 with "[%]"); [wp_next_chain|].
       iDestruct "Hk" as "[Hno _]".
       iApply ("Hno" $! bt with "[%] Hcg Hpc Htok"). exact Hempty.
-    - (* a byte is waiting: [lbu a0,0(s2)] pops it *)
+    - (* a byte is waiting: [lbu a0,0(rs_rhr)] pops it *)
       iApply (wp_cbeqz_fall_s_sconf (CID:=CID2) pcB imm8 (Cregidx (mword_of_int 7)) Ra5
                 (<[Regidx Ra5 := regval_into_reg (rx_masked bt)]> m) n b
                 ug_cr7 ltac:(vm_compute; discriminate)
                 ltac:(rewrite Hlk; exact Hempty)
                 with "Hcg Hpc HiB [-]").
       iIntros (CID3 Hs3) "Hcg Hpc". iEval (rewrite HR) in "Hpc".
-      iApply (UAcc.wp_uart_rhr_pop_s_sconf (CID:=CID3) γd γv pcR Ra0 rs_rhr (mword_of_int 0 : mword 12)
+      iApply (UAcc.wp_uart_rhr_pop_s_sconf_at (CID:=CID3) i γd pcR Ra0 rs_rhr (mword_of_int 0 : mword 12)
                 (<[Regidx Ra5 := regval_into_reg (rx_masked bt)]> m) n k hl b
                 ltac:(vm_compute; discriminate)
                 ltac:(rdok)
                 ltac:(rewrite (rget_ne _ rs_rhr ltac:(congruence))
                         (upd_ne m (Regidx Ra5) (Regidx rs_rhr)
                            (regval_into_reg (rx_masked bt)) ltac:(congruence)) Hrhr0;
-                      apply bv_eq; vm_compute; reflexivity)
-                with "Hcg Hpc HiR Hdinv Hdlab [Htok] [Hlb]").
+                      apply ug_imm0)
+                with "Hcg Hpc HiR Huinv Hdlab [Htok] [Hlb]").
       { iExact "Htok". }
       { iApply "Hlb". iPureIntro. reflexivity. }
-      iIntros (CID4 Hs4 c) "Hcg Hpc Hh". iEval (rewrite HK) in "Hpc".
-      iSpecialize ("Hk" $! CID4 with "[%]"); [wp_next_chain|].
+      iIntros (CID4 Hs4 c) "Hcg Hpc Hh". iEval (rewrite HZ) in "Hpc".
+      (* --- [andi a0,a0,255]: the zext.b, absorbed --- *)
+      iApply (wp_andi_s_sconf (CID:=CID4) pcZ Ra0 Ra0 (mword_of_int 255 : mword 12)
+                (lsr_ldval_of c)
+                (<[Regidx Ra0 := regval_into_reg (lsr_ldval_of c)]>
+                 (<[Regidx Ra5 := regval_into_reg (rx_masked bt)]> m)) n b
+                ltac:(vm_compute; discriminate) ltac:(rdok)
+                ltac:(rewrite (rget_ne _ Ra0 HR0tp) upd_eq; apply ug_and255)
+                with "Hcg Hpc HiZ [-]").
+      iIntros (CID5 Hs5) "Hcg Hpc". iEval (rewrite HK) in "Hpc".
+      iEval (rewrite upd_upd) in "Hcg".
+      iSpecialize ("Hk" $! CID5 with "[%]"); [wp_next_chain|].
       iDestruct "Hk" as "[_ Hyes]".
       iApply ("Hyes" $! bt c with "[%] Hcg Hpc Hh"). exact Hempty.
   Qed.

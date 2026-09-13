@@ -49,8 +49,11 @@ Require Import WpNext.
 Require Import LockRank.
 Require Import ProcGeom CpuOwn.
 Require Import FdSlots.
+Require Import DevModel.
 Require Import DiskPtsto WpUart.
 Require Import UartTxInv.
+Require Import UartsFields.
+Require Import SpecUartPutc.  (* [uart_base_word] *)
 Require Import UartSentLoc.   (* [uart_sent_from]: the located receipt *)
 Require Import SpecUartwrite. (* the landed contract this parallels;
                                  [uartwrite_stack] *)
@@ -65,21 +68,22 @@ Import Defs.
 Local Open Scope Z_scope.
 
 Definition wp_uartwrite_loc_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-    (γu : uart_names) (γv : disk_names)
-    (γs : list gname) (j : nat) (γlp : gname) (γl : gname)
+    (i : uart_id) (gu : uart_names)
+    (gs : list gname) (j : nat) (glp : gname) (gl : gname)
     (m : regfile) (av : nat) (eb : bool)
     (n : nat) (f : nat -> bv 8) (dq : dfrac) (b : bool)
     (pidv : mword 32) (dqp : dfrac) (lks : gset string)
     (tr0 : list (bv 8)) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uartwrite in
   let pj := proc_addr j in
-  (* a0 = the buffer, a1 = the count *)
-  let buf := m !!! Regidx (mword_of_int 10 : mword 5) in
+  (* a0 = the PORT INDEX, a1 = the buffer, a2 = the count *)
+  let buf := m !!! Regidx (mword_of_int 11 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (* the process running here is proc j (sleep's linkage) *)
   (j < NPROC)%nat ->
-  γs !! j = Some γlp ->
-  m !!! Regidx (mword_of_int 11 : mword 5) = (mword_of_int (Z.of_nat n) : mword 64) ->
+  gs !! j = Some glp ->
+  m !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int (uart_index i) : mword 64) ->
+  m !!! Regidx (mword_of_int 12 : mword 5) = (mword_of_int (Z.of_nat n) : mword 64) ->
   (Z.of_nat n < 2 ^ 31)%Z ->
   (uartwrite_stack <= av)%nat ->
   eb = true ->
@@ -87,40 +91,43 @@ Definition wp_uartwrite_loc_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !f
   sie_cap_gpr KT1 m av b pj -∗
   cpu_own 0%nat eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  dev_inv γu γv -∗
-  is_txlock γl γu -∗
+  (* the VA-tier `uarts[i].base` -- see SpecUartwrite.v for why the raw
+     physical [uarts_pinned] is the wrong tier for a driver *)
+  uart_base_word i -∗
+  uart_inv i gu -∗
+  is_txlock_at i gl gu -∗
   p_pid pj ↦₄{dqp} pidv -∗
   (* the buffer, read-only *)
-  ([∗ list] k ∈ seq 0 n, (pa_add buf k) ↦ₘ[KT1]{dq} f k) -∗
+  ([∗ list] kk ∈ seq 0 n, (pa_add buf kk) ↦ₘ[KT1]{dq} f kk) -∗
   (* the running-thread bundle (SpecSleep.v) *)
-  procs_inv γs -∗
+  procs_inv gs -∗
   (* ---- THE SEED: the ONE addition to the landed premises.  Any accepted
      trace bound the caller holds; [[]] is free ([UartSentLoc.uart_sent_nil]),
      and it is persistent, so handing it over costs nothing. ---- *)
-  uart_sent γu tr0 -∗
+  uart_sent gu tr0 -∗
   wp_next b pj (fun (CID : CpuId) =>
   ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
-      ([∗ list] k ∈ seq 0 n, (pa_add buf k) ↦ₘ[KT1]{dq} f k) -∗
+      ([∗ list] kk ∈ seq 0 n, (pa_add buf kk) ↦ₘ[KT1]{dq} f kk) -∗
       p_pid pj ↦₄{dqp} pidv -∗
       (* THE LOCATED RECEIPT, in place of the landed [uart_sent_sub]: every
          byte of the buffer was accepted by the UART, IN ORDER, at positions
          after the seed.  [UartSentLoc.uart_sent_from_sub] projects it back
          to the landed vocabulary for a caller that does not chain. *)
-      uart_sent_from γu tr0 (f <$> seq 0 n) -∗
+      uart_sent_from gu tr0 (f <$> seq 0 n) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type UARTWRITE_LOC.
   Parameter wp_uartwrite_loc_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-      (γu : uart_names) (γv : disk_names) (γs : list gname) (j : nat) (γlp : gname) (γl : gname)
+      (i : uart_id) (gu : uart_names) (gs : list gname) (j : nat) (glp : gname) (gl : gname)
       (m : regfile) (av : nat) (eb : bool)
       (n : nat) (f : nat -> bv 8) (dq : dfrac) (b : bool)
       (pidv : mword 32) (dqp : dfrac) (lks : gset string)
       (tr0 : list (bv 8)),
-      wp_uartwrite_loc_sconf_body γu γv γs j γlp γl m av eb n f dq b pidv dqp lks tr0.
+      wp_uartwrite_loc_sconf_body i gu gs j glp gl m av eb n f dq b pidv dqp lks tr0.
 End UARTWRITE_LOC.
