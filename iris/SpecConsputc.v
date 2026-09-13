@@ -4,9 +4,9 @@
 
      void consputc(int c) {
        if (c == BACKSPACE) {
-         uartputc_sync('\b'); uartputc_sync(' '); uartputc_sync('\b');
+         uartputc_sync(0, '\b'); uartputc_sync(0, ' '); uartputc_sync(0, '\b');
        } else {
-         uartputc_sync(c);
+         uartputc_sync(0, c);
        }
      }
 
@@ -31,6 +31,16 @@
    transient-increment bound on [noff].  Acquire's "already holding" arm is
    refuted, so nothing panic-related is threaded.
 
+   THE PORT IS THE CALLEE'S BUSINESS, NOT THIS CONTRACT'S.  XV6_REV 163d39b
+   gives uartputc_sync a port index and consputc passes 0 at each of its four
+   call sites, but the console IS port 0 and always was, so nothing a caller of
+   consputc can observe moved: no binder, no premise and no postcondition
+   conjunct here mentions a port.  What the bump does add is ONE premise --
+   [SpecUartPutc.uart_base_word Uart0], the persistent .data word the callee
+   LOADS its MMIO address out of.  It is not derivable from anything already
+   here (the old driver spelled the address as a constant), so it has to be
+   relayed; being persistent, a caller hands it over for free.
+
    THE TRANSMITTER IS NOT THREADED.  It is [tx_lock]'s resource
    ([UartTxInv.tx_res]), taken and given back inside each callee, so
    [uart_tx_own] appears nowhere; the caller brings only the persistent
@@ -53,6 +63,7 @@ Require Import KernelText.
 Require Import RegFile.
 Require Import RiscvExtras.
 Require Import CalleeSaved.
+Require Import DevModel.   (* [Uart0] *)
 Require Import DiskPtsto WpUart.
 Require Import IntrDefs WpNext.
 Require Import LockRank.
@@ -65,9 +76,13 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
 
 
-(* consputc's own frame is 2 slots ([c.addi16sp sp,-16] at 0x8000028a), over
-   uartputc_sync's 14. *)
-Notation consputc_stack := (16%nat) (only parsing).
+(* consputc's own frame is 2 slots ([c.addi16sp sp,-16] at +0x00), over
+   uartputc_sync's 18.  IT WAS 16: at 163d39b uartputc_sync keeps the port
+   pointer, the lock pointer and the loaded base in callee-saved registers, so
+   its own frame doubled (32 -> 64 bytes, 4 -> 8 slots) and every caller's
+   budget rises by four.  Above this, printint's [printint_stack] and every
+   budget over it move with it. *)
+Notation consputc_stack := (20%nat) (only parsing).
 
 (* ===================================================================== *)
 (*  WHICH BYTES (app-echo.md, E5/O4, lane ECHO-RECEIPT).                  *)
@@ -119,6 +134,8 @@ Definition wp_consputc_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID 
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   dev_inv γd γv -∗
+  (* the .data word the callee LOADS its MMIO base from (SpecUartPutc.v) *)
+  uart_base_word Uart0 -∗
   is_txlock γl γd -∗
   uart_sent_sub γd bs -∗
   wp_next b p (fun (CID : CpuId) =>
