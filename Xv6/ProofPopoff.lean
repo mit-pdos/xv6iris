@@ -107,6 +107,33 @@ new depth is the popped one. -/
 theorem withCpu_popOff2 (k : KCtx) (R : RegMap) :
     ((k.pushed 2).withRegs R).withCpu R (k.noff - 1) k.intena = (k.popOff.pushed 2).withRegs R := rfl
 
+theorem bcond_beq_10 : bcond bop.BEQ 1#64 0#64 = false := by decide
+
+/-- The context in pop_off's re-enable window: depth 0 with the canonical
+`intena` (the cell, lent, holds the saved `1`). -/
+def _root_.MachCSL.KCtx.popOffZ (k : KCtx) : KCtx :=
+  { k with
+    noff := 0
+    intena := false }
+
+@[simp] theorem KCtx.popOffZ_regs (k : KCtx) : k.popOffZ.regs = k.regs := rfl
+@[simp] theorem KCtx.popOffZ_sie (k : KCtx) : k.popOffZ.sie = k.sie := rfl
+@[simp] theorem KCtx.popOffZ_avail (k : KCtx) : k.popOffZ.avail = k.avail := rfl
+@[simp] theorem KCtx.popOffZ_noff (k : KCtx) : k.popOffZ.noff = 0 := rfl
+@[simp] theorem KCtx.popOffZ_intena (k : KCtx) : k.popOffZ.intena = false := rfl
+@[simp] theorem KCtx.popOffZ_locks (k : KCtx) : k.popOffZ.locks = k.locks := rfl
+@[simp] theorem KCtx.popOffZ_tier (k : KCtx) : k.popOffZ.tier = k.tier := rfl
+@[simp] theorem KCtx.popOffZ_proc (k : KCtx) : k.popOffZ.proc = k.proc := rfl
+@[simp] theorem KCtx.popOffZ_sp (k : KCtx) : k.popOffZ.sp = k.sp := rfl
+
+theorem withCpu_popOff2_z (k : KCtx) (R : RegMap) :
+    ((k.pushed 2).withRegs R).withCpu R 0 false = (k.popOffZ.pushed 2).withRegs R := rfl
+
+theorem KCtx.popOffZ_intrOn (k : KCtx) (h : k.noff = 1) : k.popOffZ.intrOn = k.popOff.intrOn := by
+  obtain ⟨regs, sie, spie, spp, avail, noff, intena, locks, tier, root, proc⟩ := k
+  simp only at h
+  simp only [KCtx.popOffZ, KCtx.popOff, KCtx.intrOn, h]
+
 /-- The same at depth 1 with `intena = false`, where the new depth is
 written as `0`. -/
 theorem withCpu_popOff2_one (k : KCtx) (R : RegMap) (h : k.noff = 1) (hi : k.intena = false) :
@@ -114,9 +141,9 @@ theorem withCpu_popOff2_one (k : KCtx) (R : RegMap) (h : k.noff = 1) (hi : k.int
   rw [← hi, ← withCpu_popOff2, h]
 
 set_option maxHeartbeats 4000000 in
-theorem pop_off_proof (M : MYCPU) : POPOFF := ⟨fun {hlc GF} _ _ cpu k hsie hnoff hK hlks hexit => by
+theorem pop_off_proof (M : MYCPU) : POPOFF := ⟨fun {hlc GF} _ _ cpu k hsie hnoff hK hlks reen hreen hon => by
   unfold wp_pop_off_body
-  iintro ⟨Hk, Hpc, HΦ⟩
+  iintro ⟨Hk, Hpc, Harm, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   have hn31 : k.noff < 2 ^ 31 := hwf.2.2.2.2
@@ -172,9 +199,82 @@ theorem pop_off_proof (M : MYCPU) : POPOFF := ⟨fun {hlc GF} _ _ cpu k hsie hno
   have hA : aCpuIntena cpu = cpuAddr cpu + 124#64 := rfl
   by_cases hn1 : k.noff = 1
   · -- the count reaches 0: the `c->noff` store lends the `c->intena` cell to
-    -- this proof, which reads it (0) and skips the re-enable
-    have hint : k.intena = false := hexit hn1
+    -- this proof, which reads it
     have h0 : k.noff - 1 = 0 := by omega
+    by_cases hi : k.intena = true
+    · -- the outermost push_off found interrupts on: re-enable them
+      have hr : reen = true := by rw [hreen, hn1, hi]; decide
+      simp only [hr, KCtx.popExit_true, popArm_true]
+      have hsx1 : BitVec.signExtend 64 (intenaVal true) = 1#64 := rfl
+      obtain ⟨ht, hav⟩ := hon hr
+      have hl0 : k.locks = [] := List.eq_nil_of_length_eq_zero (by omega)
+      k_step (wp_s_sw_noff_lend cpu _ ?hs ?hn 0x80000c16#64 true 120#12 10#5 15#5 ?haddr ?hval false ?hwf') from (text_instr _ _ _ _ rfl rfl) Htext
+        $$ [- $Hk $Hpc] with [h10, withCpu_popOff2_z, hi]
+      case hn => k_norm; exact hn1
+      case haddr => k_norm [h10]; rfl
+      case hval => k_norm [hn1]; rfl
+      case hwf' =>
+        obtain ⟨w1, w2, w3, w4, w5⟩ := hwf
+        unfold KCtx.wf
+        simp only [KCtx.withCpu_sie, KCtx.withCpu_noff, KCtx.withCpu_intena, KCtx.withCpu_locks, KCtx.withCpu_tier,
+          KCtx.withRegs_sie, KCtx.withRegs_locks, KCtx.withRegs_tier, KCtx.pushed_sie, KCtx.pushed_locks,
+          KCtx.pushed_tier]
+        refine ⟨fun _ => hsie, fun h => absurd h (by omega), fun h => absurd h (by rw [hsie]; decide), by omega,
+          by omega⟩
+      iintro Hk Hpc Hcell
+      -- bnez a5, c22: not taken
+      k_step (wp_s_branch cpu _ 0x80000c18#64 true 10#13 15#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) Htext
+        $$ [- $Hk $Hpc] with [h0, bcond_bne_00, KCtx.popOffZ_sie, KCtx.popOffZ_proc]
+      iintro Hk Hpc
+      -- lw a5,124(a0): the lent cell, 1
+      k_step (wp_s_lw cpu _ 0x80000c1a#64 true 124#12 15#5 10#5 (by decide) (by decide) (DFrac.own 1) (intenaVal true)) from (text_instr _ _ _ _ rfl rfl) Htext
+        $$ [- $Hk $Hpc] with [h10, hA, hsx1, hi, KCtx.popOffZ_sie, KCtx.popOffZ_proc]
+      iintro Hk Hpc Hcell
+      -- beqz a5, c22: not taken
+      k_step (wp_s_branch cpu _ 0x80000c1c#64 true 6#13 15#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
+        $$ [- $Hk $Hpc] with [bcond_beq_10, KCtx.popOffZ_sie, KCtx.popOffZ_proc]
+      iintro Hk Hpc
+      -- the cell goes back into the bundle
+      rw [← hA]
+      ihave Hk := kctx_return cpu _ true $$ [Hk Hcell]
+      case' _ => iframe Hk Hcell
+      -- csrsi sstatus,2: interrupts on, the arm back in the bundle
+      icases kctx_wf _ _ $$ Hk with ⟨%hwf2, Hk⟩
+      k_step (wp_s_csrsi_sstatus_x0 cpu _ ?hs ?hres ?hwf'' 0x80000c1e#64 false) from (text_instr _ _ _ _ rfl rfl) Htext
+        $$ [- $Hk $Hpc] with [KCtx.intrOn_withRegs, KCtx.intrOn_pushed, KCtx.popOffZ_intrOn k hn1, KCtx.popOffZ_sie,
+          KCtx.popOffZ_proc, KCtx.popOffZ_regs]
+      case hs => k_norm [KCtx.popOffZ_sie]
+      case hres => k_norm [KCtx.popOffZ_avail]; omega
+      case hwf'' =>
+        refine KCtx.wf_intrOn _ hwf2 (by k_norm [KCtx.popOffZ_noff]) (by k_norm [KCtx.popOffZ_locks]; exact hl0)
+          (by k_norm [KCtx.popOffZ_tier]; exact ht)
+      iintro Hk Hpc
+      -- the epilogue, with interrupts on: at whichever hart the thread lands
+      iapply (wp_epilogue2_gen cpu k.popOff.intrOn 0x80000c22#64 (by k_norm; omega) _ ?hR2
+        (k.regs 1#5) (k.regs 8#5)) $$ [- $Hk $Hpc]
+      rotate_right 1
+      k_code (text_instr _ _ _ _ rfl rfl) Htext
+      k_norm_g
+      iframe
+      inext
+      k_norm_g
+      iapply wpNext_mono _ _ _ _ _ $$ HΦ
+      iintro %cpu' HK Hk Hpc
+      iapply HK $$ %_ Hk Hpc
+      ipureintro
+      obtain ⟨hs2, _, h9, h18, h19, h20, h21, h22, h23, h24, h25, h26, h27⟩ := hcs2
+      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at h9 h18 h19 h20 h21 h22 h23 h24 h25 h26 h27
+      unfold calleeSaved
+      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, eq_self_iff_true, _root_.true_and,
+        _root_.and_true]
+      exact ⟨h9, h18, h19, h20, h21, h22, h23, h24, h25, h26, h27⟩
+      case hR2 => k_norm; rw [hcs2.1]; simp [RegMap.set_apply]
+    -- the outermost push_off found interrupts off: they stay off
+    have hint : k.intena = false := by cases h : k.intena <;> simp_all
+    have hr : reen = false := by rw [hreen, hint]; simp
+    simp only [hr, KCtx.popExit_false, popArm_false]
+    k_norm
+    ihave HΦ' := wpNext_off _ _ _ $$ HΦ
     have hsx : BitVec.signExtend 64 (intenaVal false) = 0#64 := rfl
     k_step (wp_s_sw_noff_lend cpu _ ?hs ?hn 0x80000c16#64 true 120#12 10#5 15#5 ?haddr ?hval false ?hwf') from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc] with [h10, withCpu_popOff2_one k _ hn1 hint]
@@ -214,16 +314,21 @@ theorem pop_off_proof (M : MYCPU) : POPOFF := ⟨fun {hlc GF} _ _ cpu k hsie hno
     iframe
     inext
     iintro Hk Hpc
-    iapply HΦ $$ %_ Hk Hpc
+    iapply HΦ' $$ %_ Hk Hpc
     ipureintro
     obtain ⟨hs2, _, h9, h18, h19, h20, h21, h22, h23, h24, h25, h26, h27⟩ := hcs2
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at h9 h18 h19 h20 h21 h22 h23 h24 h25 h26 h27
     unfold calleeSaved
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, eq_self_iff_true, true_and, and_true]
+    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, eq_self_iff_true, _root_.true_and,
+      _root_.and_true]
     exact ⟨h9, h18, h19, h20, h21, h22, h23, h24, h25, h26, h27⟩
     case hR2 => k_norm; rw [hcs2.1]; simp [RegMap.set_apply]
   · -- the count is still positive: the depth becomes noff - 1, straight to the epilogue
     have hd : k.noff - 1 ≠ 0 := by omega
+    have hr : reen = false := by rw [hreen]; simp [hn1]
+    simp only [hr, KCtx.popExit_false, popArm_false]
+    k_norm
+    ihave HΦ' := wpNext_off _ _ _ $$ HΦ
     k_step (wp_s_sw_noff cpu _ ?hs 0x80000c16#64 true 120#12 10#5 15#5 ?haddr (k.noff - 1) ?hval ?hpin ?hwf') from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc] with [h10, withCpu_popOff2]
     case haddr => k_norm [h10]; rfl
@@ -248,12 +353,13 @@ theorem pop_off_proof (M : MYCPU) : POPOFF := ⟨fun {hlc GF} _ _ cpu k hsie hno
     iframe
     inext
     iintro Hk Hpc
-    iapply HΦ $$ %_ Hk Hpc
+    iapply HΦ' $$ %_ Hk Hpc
     ipureintro
     obtain ⟨hs2, _, h9, h18, h19, h20, h21, h22, h23, h24, h25, h26, h27⟩ := hcs2
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at h9 h18 h19 h20 h21 h22 h23 h24 h25 h26 h27
     unfold calleeSaved
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, eq_self_iff_true, true_and, and_true]
+    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, eq_self_iff_true, _root_.true_and,
+      _root_.and_true]
     exact ⟨h9, h18, h19, h20, h21, h22, h23, h24, h25, h26, h27⟩
     case hR2 => k_norm; rw [hcs2.1]; simp [RegMap.set_apply]
 ⟩

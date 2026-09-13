@@ -471,4 +471,29 @@ theorem sie_shr_and1 (v : BitVec 64) (old : Bool) (hv : sstatusAt old v) :
     show (v >>> 1) &&& 1#64 = 1#64
     bv_decide
 
+
+/-! ## The pop_off exit -/
+
+theorem KCtx.intrOn_withRegs (k : KCtx) (R : RegMap) : (k.withRegs R).intrOn = k.intrOn.withRegs R := rfl
+
+theorem KCtx.intrOn_pushed (k : KCtx) (m : Nat) : (k.pushed m).intrOn = k.intrOn.pushed m := by
+  obtain ⟨regs, sie, spie, spp, avail, noff, intena, locks, tier, root, proc⟩ := k
+  simp only [KCtx.pushed, KCtx.intrOn, KCtx.mk.injEq, _root_.true_and, _root_.and_true]
+  omega
+
+/-- `pop_off`'s exit: the depth decremented, and interrupts back on
+(`reen`) when the outermost push_off found them on. -/
+def KCtx.popExit (k : KCtx) (reen : Bool) : KCtx := if reen then k.popOff.intrOn else k.popOff
+
+/-- What `pop_off` takes to re-enable interrupts: the arm the outermost
+push_off paid out (nothing otherwise). -/
+def popArm [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (reen : Bool) : IProp GF :=
+  if reen then sieArm cpu true k.proc else emp
+
+@[simp] theorem KCtx.popExit_false (k : KCtx) : k.popExit false = k.popOff := rfl
+@[simp] theorem KCtx.popExit_true (k : KCtx) : k.popExit true = k.popOff.intrOn := rfl
+@[simp] theorem popArm_false [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) : popArm (GF := GF) cpu k false = emp := rfl
+@[simp] theorem popArm_true [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) :
+    popArm (GF := GF) cpu k true = sieArm cpu true k.proc := rfl
+
 end MachCSL

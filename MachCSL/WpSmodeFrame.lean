@@ -86,7 +86,9 @@ macro_rules
       KCtx.pushOffB_intena, KCtx.pushOffB_locks, KCtx.pushOffB_tier, KCtx.pushOffB_root, KCtx.pushOffB_proc, KCtx.pushOffB_sp,
       KCtx.pushOffAt_regs, KCtx.pushOffAt_sie, KCtx.pushOffAt_spie, KCtx.pushOffAt_spp, KCtx.pushOffAt_avail,
       KCtx.pushOffAt_noff, KCtx.pushOffAt_intena, KCtx.pushOffAt_locks, KCtx.pushOffAt_tier, KCtx.pushOffAt_root,
-      KCtx.pushOffAt_proc, KCtx.pushOffAt_sp, $lems,*])
+      KCtx.pushOffAt_proc, KCtx.pushOffAt_sp,
+      KCtx.intrOn_regs, KCtx.intrOn_sie, KCtx.intrOn_spie, KCtx.intrOn_spp, KCtx.intrOn_avail, KCtx.intrOn_noff,
+      KCtx.intrOn_intena, KCtx.intrOn_locks, KCtx.intrOn_tier, KCtx.intrOn_root, KCtx.intrOn_proc, KCtx.intrOn_sp, $lems,*])
   | `(tactic| k_norm_g [$extra:term,*] at $h:ident) => do
     let lems ← extra.getElems.mapM fun l => `(Lean.Parser.Tactic.simpLemma| $l:term)
     `(tactic| try simp only [KCtx.push_eq, KCtx.setReg_withRegs, KCtx.withRegs_withRegs, KCtx.rget_withRegs',
@@ -118,7 +120,9 @@ macro_rules
       KCtx.pushOffB_intena, KCtx.pushOffB_locks, KCtx.pushOffB_tier, KCtx.pushOffB_root, KCtx.pushOffB_proc, KCtx.pushOffB_sp,
       KCtx.pushOffAt_regs, KCtx.pushOffAt_sie, KCtx.pushOffAt_spie, KCtx.pushOffAt_spp, KCtx.pushOffAt_avail,
       KCtx.pushOffAt_noff, KCtx.pushOffAt_intena, KCtx.pushOffAt_locks, KCtx.pushOffAt_tier, KCtx.pushOffAt_root,
-      KCtx.pushOffAt_proc, KCtx.pushOffAt_sp, $lems,*] at $h:ident)
+      KCtx.pushOffAt_proc, KCtx.pushOffAt_sp,
+      KCtx.intrOn_regs, KCtx.intrOn_sie, KCtx.intrOn_spie, KCtx.intrOn_spp, KCtx.intrOn_avail, KCtx.intrOn_noff,
+      KCtx.intrOn_intena, KCtx.intrOn_locks, KCtx.intrOn_tier, KCtx.intrOn_root, KCtx.intrOn_proc, KCtx.intrOn_sp, $lems,*] at $h:ident)
 
 set_option hygiene false in
 macro_rules

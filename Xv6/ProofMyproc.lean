@@ -131,26 +131,40 @@ theorem myproc_proof (PU : PUSHOFF) (PO : POPOFF) : MYPROC := ⟨fun {hlc GF} _ 
   iintro Hk Hpc
   -- pop_off (its contract, unfolded, at the callee's context)
   have hpo : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hnoff' : 1 ≤ k'.noff)
-      (hK' : 4 ≤ k'.avail) (hlks' : k'.locks.length ≤ k'.noff - 1) (hexit' : k'.noff = 1 → k'.intena = false),
-      kctx cpu k' ∗ pcIs cpu 0x80000bfa#64 ∗
-      (∀ R' : RegMap, kctx cpu (k'.popOff.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
-        ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu) ⊢ wpLoop (GF := GF) cpu := by
-    intro k' hsie' hnoff' hK' hlks' hexit'
-    have h := PO.wp_pop_off (hlc := hlc) (GF := GF) cpu k' hsie' hnoff' hK' hlks' hexit'
+      (hK' : 4 ≤ k'.avail) (hlks' : k'.locks.length ≤ k'.noff - 1)
+      (reen : Bool) (hreen : reen = (decide (k'.noff = 1) && k'.intena))
+      (hon' : reen = true → k'.tier = .kpt ∧ trapRes true + 2 ≤ k'.avail),
+      kctx cpu k' ∗ pcIs cpu 0x80000bfa#64 ∗ popArm cpu k' reen ∗
+      wpNext (k'.popExit reen).sie k'.proc cpu (fun cpu' => iprop(∀ R' : RegMap,
+        kctx cpu' ((k'.popExit reen).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
+        ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu')) ⊢ wpLoop (GF := GF) cpu := by
+    intro k' hsie' hnoff' hK' hlks' reen hreen hon'
+    have h := PO.wp_pop_off (hlc := hlc) (GF := GF) cpu k' hsie' hnoff' hK' hlks' reen hreen hon'
     unfold wp_pop_off_body at h
     simp only [popOffAddr, KernelSyms.«pop_off»] at h
     exact h
-  iapply (hpo _ ?hs ?hn ?hK ?hl ?he) $$ [- $Hk $Hpc]
+  iapply (hpo _ ?hs ?hn ?hK ?hl false ?hr ?ho) $$ [- $Hk $Hpc]
   rotate_right 1
   case hs => k_norm
   case hn => k_norm; omega
   case hK => k_norm; omega
   case hl => k_norm; exact hwf.2.2.2.1
-  case he => k_norm; intro h; have := hwf.1 (by omega); rw [hsie] at this; exact this.symm
+  case hr =>
+    k_norm
+    cases h : k.intena
+    · simp
+    · have hn0 : k.noff ≠ 0 := fun h0 => by have := hwf.1 h0; rw [hsie, h] at this; cases this
+      simp <;> omega
+  case ho => intro h; cases h
+  simp only [KCtx.popExit_false, popArm_false]
+  isplitl []
+  · iempintro
+  k_norm [KCtx.popExit_false, popArm_false]
+  iapply wpNext_off_intro
   iintro %R4 Hk Hpc %hcs4
   have hret2 : jumpPc 0x80001900#64 = 0x80001900#64 := by simp only [jumpPc, BitVec.reduceAnd]
   k_norm [hret2]
-  simp only [KCtx.withRegs_regs] at hcs2 hcs4
+  try simp only [KCtx.withRegs_regs] at hcs2 hcs4
   -- mv a0,s1
   k_step (wp_s_add cpu _ 0x80001900#64 true 10#5 0#5 9#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
