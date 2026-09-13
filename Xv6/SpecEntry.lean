@@ -44,7 +44,7 @@ def wp_entry_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
   clockCells cpu ∗
   ctxTok cpu curCtx ∗
   kernelText ∗
-  wordPointsTo stack0Slot 8 dq s0 ∗
+  pwordPointsTo stack0Slot 8 dq s0 ∗
   pcIs cpu (BitVec.ofNat 64 KernelSyms.«_entry») ∗
   Register.x1 ↦ᵣ[cpu] v1 ∗ Register.x2 ↦ᵣ[cpu] v2 ∗
   Register.x10 ↦ᵣ[cpu] v10 ∗ Register.x11 ↦ᵣ[cpu] v11 ∗
@@ -52,7 +52,7 @@ def wp_entry_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
    Register.mhartid ↦ᵣ[cpu]{dq} hartid -∗
    clockCells cpu -∗
    ctxTok cpu curCtx -∗
-   wordPointsTo stack0Slot 8 dq s0 -∗
+   pwordPointsTo stack0Slot 8 dq s0 -∗
    pcIs cpu startAddr -∗
    Register.x1 ↦ᵣ[cpu] 0x8000001a#64 -∗
    Register.x2 ↦ᵣ[cpu] (s0 + 4096#64 * (hartid + 1#64)) -∗
@@ -65,7 +65,6 @@ def wp_entry_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
 the binder list is restated, the statement lives only in `wp_entry_body`. -/
 structure ENTRY : Prop where
   wp_entry : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
-    (hct : curTier = KTier.bare)
     (cpu : CPU) (dq : DFrac) (hartid s0 v1 v2 v10 v11 : BitVec 64),
     wp_entry_body (hlc := hlc) (GF := GF) cpu dq hartid s0 v1 v2 v10 v11
 

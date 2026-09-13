@@ -67,8 +67,8 @@ def wp_start_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
   pcIs cpu startAddr ∗
   gpr cpu 1#5 (DFrac.own 1) ret ∗ gpr cpu 2#5 (DFrac.own 1) sp₀ ∗ gpr cpu 4#5 (DFrac.own 1) v4 ∗
   gpr cpu 8#5 (DFrac.own 1) v8 ∗ gpr cpu 14#5 (DFrac.own 1) v14 ∗ gpr cpu 15#5 (DFrac.own 1) v15 ∗
-  wordPointsTo (sp₀ - 16#64) 8 (DFrac.own 1) f0 ∗ wordPointsTo (sp₀ - 8#64) 8 (DFrac.own 1) f8 ∗
-  wordPointsTo (sp₀ - 32#64) 8 (DFrac.own 1) g0 ∗ wordPointsTo (sp₀ - 24#64) 8 (DFrac.own 1) g8 ∗
+  pwordPointsTo (sp₀ - 16#64) 8 (DFrac.own 1) f0 ∗ pwordPointsTo (sp₀ - 8#64) 8 (DFrac.own 1) f8 ∗
+  pwordPointsTo (sp₀ - 32#64) 8 (DFrac.own 1) g0 ∗ pwordPointsTo (sp₀ - 24#64) 8 (DFrac.own 1) g8 ∗
   (∀ t : BitVec 64,
    sConf cpu (DFrac.own 1) (startConf t) -∗
    Register.mhartid ↦ᵣ[cpu]{dq} hartid -∗
@@ -79,16 +79,15 @@ def wp_start_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
    gpr cpu 4#5 (DFrac.own 1) (BitVec.signExtend 64 (BitVec.extractLsb' 0 32 hartid)) -∗
    gpr cpu 8#5 (DFrac.own 1) sp₀ -∗ gpr cpu 14#5 (DFrac.own 1) 1000000#64 -∗
    gpr cpu 15#5 (DFrac.own 1) (BitVec.signExtend 64 (BitVec.extractLsb' 0 32 hartid)) -∗
-   wordPointsTo (sp₀ - 16#64) 8 (DFrac.own 1) v8 -∗ wordPointsTo (sp₀ - 8#64) 8 (DFrac.own 1) ret -∗
-   wordPointsTo (sp₀ - 32#64) 8 (DFrac.own 1) sp₀ -∗
-   wordPointsTo (sp₀ - 24#64) 8 (DFrac.own 1) (startAddr + 0x6a#64) -∗
+   pwordPointsTo (sp₀ - 16#64) 8 (DFrac.own 1) v8 -∗ pwordPointsTo (sp₀ - 8#64) 8 (DFrac.own 1) ret -∗
+   pwordPointsTo (sp₀ - 32#64) 8 (DFrac.own 1) sp₀ -∗
+   pwordPointsTo (sp₀ - 24#64) 8 (DFrac.own 1) (startAddr + 0x6a#64) -∗
    wpLoop cpu)
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `start`. -/
 structure START : Prop where
   wp_start : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
-    (hct : curTier = KTier.bare)
     (cpu : CPU) (dq : DFrac) (hartid ret sp₀ v4 v8 v14 v15 f0 f8 g0 g8 : BitVec 64),
     wp_start_body (hlc := hlc) (GF := GF) cpu dq hartid ret sp₀ v4 v8 v14 v15 f0 f8 g0 g8
 

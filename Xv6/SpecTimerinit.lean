@@ -58,7 +58,7 @@ def wp_timerinit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Cur
   pcIs cpu timerinitAddr ∗
   gpr cpu 1#5 (DFrac.own 1) ret ∗ gpr cpu 2#5 (DFrac.own 1) sp₀ ∗ gpr cpu 8#5 (DFrac.own 1) v8 ∗
   gpr cpu 14#5 (DFrac.own 1) v14 ∗ gpr cpu 15#5 (DFrac.own 1) v15 ∗
-  wordPointsTo (sp₀ - 16#64) 8 (DFrac.own 1) f0 ∗ wordPointsTo (sp₀ - 8#64) 8 (DFrac.own 1) f8 ∗
+  pwordPointsTo (sp₀ - 16#64) 8 (DFrac.own 1) f0 ∗ pwordPointsTo (sp₀ - 8#64) 8 (DFrac.own 1) f8 ∗
   (∀ t : BitVec 64,
    mConf cpu (DFrac.own 1) (timerinitConf c t) -∗
    clockCells cpu -∗
@@ -66,14 +66,13 @@ def wp_timerinit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Cur
    pcIs cpu (ret &&& 0xFFFFFFFFFFFFFFFE#64) -∗
    gpr cpu 1#5 (DFrac.own 1) ret -∗ gpr cpu 2#5 (DFrac.own 1) sp₀ -∗ gpr cpu 8#5 (DFrac.own 1) v8 -∗
    gpr cpu 14#5 (DFrac.own 1) 1000000#64 -∗ gpr cpu 15#5 (DFrac.own 1) (t + 1000000#64) -∗
-   wordPointsTo (sp₀ - 16#64) 8 (DFrac.own 1) v8 -∗ wordPointsTo (sp₀ - 8#64) 8 (DFrac.own 1) ret -∗
+   pwordPointsTo (sp₀ - 16#64) 8 (DFrac.own 1) v8 -∗ pwordPointsTo (sp₀ - 8#64) 8 (DFrac.own 1) ret -∗
    wpLoop cpu)
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `timerinit`. -/
 structure TIMERINIT : Prop where
   wp_timerinit : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
-    (hct : curTier = KTier.bare)
     (cpu : CPU) (c : MConf) (hok : MConf.ok (GF := GF) c) hcbie hpmm hstce
     (ret sp₀ v8 v14 v15 f0 f8 : BitVec 64),
     wp_timerinit_body (hlc := hlc) (GF := GF) cpu c hok hcbie hpmm hstce ret sp₀ v8 v14 v15 f0 f8
