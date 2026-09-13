@@ -104,22 +104,26 @@ theorem acquire_proof (PU : PUSHOFF) (HO : HOLDING) (MC : MYCPU) : ACQUIRE := �
   -- jal push_off
   k_step (wp_s_jal cpu _ 0x80000bc6#64 false 2097082#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  have hpu : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hnoff' : k'.noff + 1 < 2 ^ 31)
-      (hK' : 6 ≤ k'.avail),
+  have hpu : ∀ (k' : KCtx) (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 6 ≤ k'.avail),
       kctx cpu k' ∗ pcIs cpu 0x80000b80#64 ∗
-      (∀ R' : RegMap, kctx cpu (k'.pushOff.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
-        ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu) ⊢ wpLoop (GF := GF) cpu := by
-    intro k' hsie' hnoff' hK'
-    have h := PU.wp_push_off (hlc := hlc) (GF := GF) cpu k' hsie' hnoff' hK'
+      wpNext k'.sie k'.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
+        ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
+        kctx cpu' ((k'.pushOffAt spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
+        ⌜calleeSaved k'.regs R'⌝ -∗ sieArm cpu' k'.sie k'.proc -∗ wpLoop cpu')) ⊢ wpLoop (GF := GF) cpu := by
+    intro k' hnoff' hK'
+    have h := PU.wp_push_off (hlc := hlc) (GF := GF) cpu k' hnoff' hK'
     unfold wp_push_off_body at h
     simp only [pushOffAddr, KernelSyms.«push_off»] at h
     exact h
-  iapply (hpu _ ?hs ?hn ?hK) $$ [- $Hk $Hpc]
+  iapply (hpu _ ?hn ?hK) $$ [- $Hk $Hpc]
   rotate_right 1
-  case hs => k_norm
   case hn => k_norm; omega
   case hK => k_norm; omega
-  iintro %R2 Hk Hpc %hcs2
+  k_norm
+  iapply wpNext_off_intro
+  iintro %spie %spp %R2 %hsp Hk Hpc %hcs2 _
+  obtain ⟨rfl, rfl⟩ := hsp (by trivial)
+  k_norm [KCtx.pushOffAt_off']
   have hret1 : jumpPc 0x80000bca#64 = 0x80000bca#64 := by simp only [jumpPc, BitVec.reduceAnd]
   k_norm [hret1]
   k_norm at hcs2

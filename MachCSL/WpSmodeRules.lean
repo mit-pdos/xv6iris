@@ -1128,20 +1128,21 @@ comes back into the bundle, pinned at depth 1. -/
 theorem wp_s_sw_noff_inc [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rs1 rs2 : BitVec 5)
     (haddr : k.rget cpu rs1 + BitVec.signExtend 64 imm = aCpuNoff cpu)
-    (hval : BitVec.extractLsb' 0 32 (k.rget cpu rs2) = BitVec.ofNat 32 (k.noff + 1))
-    (hl : lent = false → 1 ≤ k.noff) (hwf' : (k.withCpu k.regs (k.noff + 1) k.intena).wf) :
+    (hval : BitVec.extractLsb' 0 32 (k.rget cpu rs2) = BitVec.ofNat 32 (k.noff + 1)) (b : Bool)
+    (hb : lent = false → b = k.intena) (hl : lent = false → 1 ≤ k.noff)
+    (hwf' : (k.withCpu k.regs (k.noff + 1) b).wf) :
     instr (GF := GF) pc is_rvc (instruction.STORE (imm, regidx.Regidx rs2, regidx.Regidx rs1, 4)) ∗
-    kctxL lent cpu k ∗ pcIs cpu pc ∗ pinRes cpu lent k.intena ∗
+    kctxL lent cpu k ∗ pcIs cpu pc ∗ pinRes cpu lent b ∗
     ▷ wpNext k.sie k.proc cpu (fun cpu' =>
-        iprop(kctx cpu' (k.withCpu k.regs (k.noff + 1) k.intena) -∗
+        iprop(kctx cpu' (k.withCpu k.regs (k.noff + 1) b) -∗
           pcIs cpu' (pc + instrLen is_rvc) -∗ wpLoop cpu'))
     ⊢ wpLoop cpu := by
   iintro ⟨HI, Hk, Hpc, HE, HΦ⟩
   iapply (wpLoop_k_cpuE (lent := lent) (lent' := false) cpu k hsie pc (pc + instrLen is_rvc) is_rvc _ k.regs rfl
-    (k.noff + 1) k.intena hwf'
+    (k.noff + 1) b hwf'
     (wordPointsTo (aCpuNoff cpu) 4 (DFrac.own 1) (BitVec.ofNat 32 k.noff))
     (wordPointsTo (aCpuNoff cpu) 4 (DFrac.own 1) (BitVec.ofNat 32 (k.noff + 1)))
-    (pinRes cpu lent k.intena) emp
+    (pinRes cpu lent b) emp
     (by
       unfold cpuCells pinRes
       iintro ⟨⟨Hp, Hn, Hi⟩, HE⟩
@@ -1152,7 +1153,7 @@ theorem wp_s_sw_noff_inc [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k :
       cases lent
       · simp only [Bool.false_eq_true, ite_false]
         obtain ⟨m, hm⟩ : ∃ m, k.noff = m + 1 := ⟨k.noff - 1, by have := hl rfl; omega⟩
-        simp only [hm, intenaCell_succ]
+        simp only [hm, intenaCell_succ, hb rfl]
         iframe Hi
       · simp only [ite_true, intenaCell_lent]
         icases Hi with %_

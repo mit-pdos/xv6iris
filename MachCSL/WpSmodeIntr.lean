@@ -13,6 +13,7 @@ follows the canonical value (`KCtx.wf`: `noff = 0 → sie = intena`).  Turning
 them on takes the arm back and reserves the slots again.
 -/
 import MachCSL.WpSmodeRules
+import MachCSL.CallConv
 
 namespace MachCSL
 
@@ -378,5 +379,96 @@ theorem wp_s_csrsi_sstatus_x0_on [CurCtx] [KernelGeom] [KernelImage GF] (cpu : C
       have hc : { c with mstatus := c.mstatus ||| 2#64 } = c := by rw [ms_or_sie_self c.mstatus h1]
       rw [hc] at e
       exact e)
+
+
+/-! ## The push_off contexts -/
+
+/-- `push_off`'s exit from a context whose saved enable state is `b` (the
+lent cell's value at depth 0, the context's own deeper). -/
+def KCtx.pushOffB (k : KCtx) (b : Bool) : KCtx :=
+  { k with
+    noff := k.noff + 1
+    intena := b }
+
+@[simp] theorem KCtx.pushOffB_regs (k : KCtx) (b : Bool) : (k.pushOffB b).regs = k.regs := rfl
+@[simp] theorem KCtx.pushOffB_sie (k : KCtx) (b : Bool) : (k.pushOffB b).sie = k.sie := rfl
+@[simp] theorem KCtx.pushOffB_spie (k : KCtx) (b : Bool) : (k.pushOffB b).spie = k.spie := rfl
+@[simp] theorem KCtx.pushOffB_spp (k : KCtx) (b : Bool) : (k.pushOffB b).spp = k.spp := rfl
+@[simp] theorem KCtx.pushOffB_avail (k : KCtx) (b : Bool) : (k.pushOffB b).avail = k.avail := rfl
+@[simp] theorem KCtx.pushOffB_noff (k : KCtx) (b : Bool) : (k.pushOffB b).noff = k.noff + 1 := rfl
+@[simp] theorem KCtx.pushOffB_intena (k : KCtx) (b : Bool) : (k.pushOffB b).intena = b := rfl
+@[simp] theorem KCtx.pushOffB_locks (k : KCtx) (b : Bool) : (k.pushOffB b).locks = k.locks := rfl
+@[simp] theorem KCtx.pushOffB_tier (k : KCtx) (b : Bool) : (k.pushOffB b).tier = k.tier := rfl
+@[simp] theorem KCtx.pushOffB_root (k : KCtx) (b : Bool) : (k.pushOffB b).root = k.root := rfl
+@[simp] theorem KCtx.pushOffB_proc (k : KCtx) (b : Bool) : (k.pushOffB b).proc = k.proc := rfl
+@[simp] theorem KCtx.pushOffB_sp (k : KCtx) (b : Bool) : (k.pushOffB b).sp = k.sp := rfl
+theorem KCtx.pushOffB_self (k : KCtx) : k.pushOffB k.intena = k.pushOff := by cases k; rfl
+
+/-- `push_off`'s exit at either `SIE`: interrupts off with `SPIE`/`SPP`
+pinned, the trap reserve free, the depth incremented; `intena` is the
+entry context's (at depth 0 that is the `SIE` bit push_off saves, by
+`KCtx.wf`'s canonical value). -/
+def KCtx.pushOffAt (k : KCtx) (spie spp : Bool) : KCtx :=
+  { k with
+    sie := false
+    spie := spie
+    spp := spp
+    noff := k.noff + 1
+    avail := trapRes k.sie + k.avail }
+
+@[simp] theorem KCtx.pushOffAt_regs (k : KCtx) (a b : Bool) : (k.pushOffAt a b).regs = k.regs := rfl
+@[simp] theorem KCtx.pushOffAt_sie (k : KCtx) (a b : Bool) : (k.pushOffAt a b).sie = false := rfl
+@[simp] theorem KCtx.pushOffAt_spie (k : KCtx) (a b : Bool) : (k.pushOffAt a b).spie = a := rfl
+@[simp] theorem KCtx.pushOffAt_spp (k : KCtx) (a b : Bool) : (k.pushOffAt a b).spp = b := rfl
+@[simp] theorem KCtx.pushOffAt_avail (k : KCtx) (a b : Bool) : (k.pushOffAt a b).avail = trapRes k.sie + k.avail := rfl
+@[simp] theorem KCtx.pushOffAt_noff (k : KCtx) (a b : Bool) : (k.pushOffAt a b).noff = k.noff + 1 := rfl
+@[simp] theorem KCtx.pushOffAt_intena (k : KCtx) (a b : Bool) : (k.pushOffAt a b).intena = k.intena := rfl
+@[simp] theorem KCtx.pushOffAt_locks (k : KCtx) (a b : Bool) : (k.pushOffAt a b).locks = k.locks := rfl
+@[simp] theorem KCtx.pushOffAt_tier (k : KCtx) (a b : Bool) : (k.pushOffAt a b).tier = k.tier := rfl
+@[simp] theorem KCtx.pushOffAt_root (k : KCtx) (a b : Bool) : (k.pushOffAt a b).root = k.root := rfl
+@[simp] theorem KCtx.pushOffAt_proc (k : KCtx) (a b : Bool) : (k.pushOffAt a b).proc = k.proc := rfl
+@[simp] theorem KCtx.pushOffAt_sp (k : KCtx) (a b : Bool) : (k.pushOffAt a b).sp = k.sp := rfl
+
+/-- With interrupts already off, `push_off`'s exit is `pushOff`. -/
+theorem KCtx.pushOffAt_off' (k : KCtx) (a b : Bool) (hs : k.sie = false) (ha : a = k.spie) (hb : b = k.spp) :
+    k.pushOffAt a b = k.pushOff := by
+  subst ha hb; cases k; simp only [KCtx.pushOffAt, KCtx.pushOff] at *; simp [hs, trapRes]
+
+/-- `push_off`'s exit, from the context after its `csrrci`: the saved
+enable state is the `SIE` bit read at depth 0 and the context's own deeper,
+which `KCtx.wf` makes the entry context's in both cases. -/
+theorem KCtx.pushOffB_intrOff (k : KCtx) (a b : Bool) (hwf : k.wf) :
+    (k.intrOff a b).pushOffB (if (k.intrOff a b).noff = 0 then k.sie else (k.intrOff a b).intena) =
+      k.pushOffAt a b := by
+  obtain ⟨w1, w2, -, -, -⟩ := hwf
+  obtain ⟨regs, sie, spie, spp, avail, noff, intena, locks, tier, root, proc⟩ := k
+  simp only at w1 w2
+  simp only [KCtx.intrOff_noff, KCtx.intrOff_intena]
+  simp only [KCtx.pushOffB, KCtx.intrOff, KCtx.pushOffAt, KCtx.mk.injEq, _root_.true_and, _root_.and_true]
+  by_cases hn : noff = 0
+  · rw [if_pos hn]; exact w1 hn
+  · rw [if_neg hn, w2 (by omega)]; rfl
+
+theorem KCtx.intrOff_withRegs (k : KCtx) (R : RegMap) (a b : Bool) :
+    (k.withRegs R).intrOff a b = (k.intrOff a b).withRegs R := rfl
+
+theorem KCtx.intrOff_pushed (k : KCtx) (m : Nat) (a b : Bool) (h : m ≤ k.avail) :
+    (k.pushed m).intrOff a b = (k.intrOff a b).pushed m := by
+  obtain ⟨regs, sie, spie, spp, avail, noff, intena, locks, tier, root, proc⟩ := k
+  simp only at h
+  simp only [KCtx.pushed, KCtx.intrOff, KCtx.mk.injEq, _root_.true_and, _root_.and_true]
+  omega
+
+/-- The `SIE` bit of a value with `sstatusAt`, as `srli; andi` extracts it. -/
+theorem sie_shr_and1 (v : BitVec 64) (old : Bool) (hv : sstatusAt old v) :
+    (v >>> 1) &&& 1#64 = if old then 1#64 else 0#64 := by
+  unfold sstatusAt at hv
+  cases old
+  · have h : BitVec.extractLsb' 1 1 v = 0#1 := hv
+    show (v >>> 1) &&& 1#64 = 0#64
+    bv_decide
+  · have h : BitVec.extractLsb' 1 1 v = 1#1 := hv
+    show (v >>> 1) &&& 1#64 = 1#64
+    bv_decide
 
 end MachCSL
