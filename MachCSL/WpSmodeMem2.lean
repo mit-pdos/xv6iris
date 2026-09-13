@@ -11,6 +11,7 @@ open Sail Sail.ConcurrencyInterfaceV1
 open LeanRV64D LeanRV64D.Functions
 
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {lent : Bool}
 
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
@@ -31,14 +32,16 @@ theorem wp_s_lwu [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rd rs1 : BitVec 5) (hrd : rdOk rd)
     (dq' : DFrac) (w : BitVec 32) :
     instr (GF := GF) pc is_rvc (instruction.LOAD (imm, regidx.Regidx rs1, regidx.Regidx rd, true, 4)) ∗
-    kctx cpu k ∗ pcIs cpu pc ∗
+    kctxL lent cpu k ∗ pcIs cpu pc ∗
     wordPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 4 dq' w ∗
     ▷ wpNext k.sie k.proc cpu (fun cpu' =>
-        iprop(kctx cpu' (k.setReg rd (BitVec.setWidth 64 w)) -∗ pcIs cpu' (pc + instrLen is_rvc) -∗
+        iprop(kctxL lent cpu' (k.setReg rd (BitVec.setWidth 64 w)) -∗ pcIs cpu' (pc + instrLen is_rvc) -∗
           wordPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 4 dq' w -∗ wpLoop cpu'))
     ⊢ wpLoop cpu :=
-  wpLoop_k_setReg_mem' cpu k hsie pc _ is_rvc _ rd hrd _ _ _
-    (fun c hok _ => execSpecF_lwu cpu (DFrac.own 1) dq' c false k.root hok pc _ imm rd rs1 hrd.1
-      (tpPin cpu k.regs) w)
+  wpLoop_k_setReg_mem' cpu k pc _ is_rvc _ rd hrd _ _ _
+    (fun (cpu' : CPU) (c : MConf) (hpin : k.sie = false ∨ k.proc = 0#64 → cpu' = cpu) hok _ => by
+      obtain rfl := hpin (Or.inl hsie)
+      exact execSpecF_lwu cpu' (DFrac.own 1) dq' c k.sie k.root hok pc _ imm rd rs1 hrd.1
+        (tpPin cpu' k.regs) w)
 
 end MachCSL

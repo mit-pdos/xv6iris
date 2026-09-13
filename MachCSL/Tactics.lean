@@ -691,7 +691,7 @@ def specced : List Name :=
    ``LeanRV64D.Functions.translate_TLB_hit, ``LeanRV64D.Functions.translate_TLB_miss,
    ``LeanRV64D.Functions.lookup_TLB, ``LeanRV64D.Functions.add_to_TLB,
    ``LeanRV64D.Functions.translateAddr, ``LeanRV64D.Functions.transform_effective_address,
-   ``LeanRV64D.Functions.translationMode]
+   ``LeanRV64D.Functions.translationMode, ``LeanRV64D.Functions.handle_interrupt]
 
 /-- Succeeds (doing nothing) iff the head of the `swp` goal is a call of a
 function with its own stage spec, so that `swp_run` stops there. -/

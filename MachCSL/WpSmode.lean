@@ -165,9 +165,9 @@ theorem swp_translationMode_bare (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Boo
 
 /-- The kernel's configuration at the Bare tier satisfies the S-mode fetch
 side conditions. -/
-theorem SConfBare_sConfOf_bare (root : BitVec 44) (ms mdl mepc stc : BitVec 64)
-    (hsm : smFacts ms false) :
-    SConfBare (GF := GF) (sConfOf KTier.bare root ms mdl mepc stc) false :=
+theorem SConfBare_sConfOf_bare (root : BitVec 44) (ms mdl mepc stc : BitVec 64) (sie : Bool)
+    (hsm : smFacts ms sie) :
+    SConfBare (GF := GF) (sConfOf KTier.bare root ms mdl mepc stc) sie :=
   ⟨⟨fun cpu dq => pmpPassesS_xv6 cpu dq _ rfl rfl, hsm, by simp only [sConfOf]; decide,
     by simp only [sConfOf]; decide⟩, by simp only [sConfOf, satpOf]; try decide⟩
 

@@ -182,7 +182,7 @@ theorem acquire_proof (PU : PUSHOFF) (HO : HOLDING) (MC : MYCPU) : ACQUIRE := �
       (∀ R' : RegMap, kctx cpu (k'.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
         ⌜calleeSaved k'.regs R' ∧ R' 10#5 = cpuAddr cpu⌝ -∗ wpLoop cpu) ⊢ wpLoop (GF := GF) cpu := by
     intro k' hsie' hK'
-    have h := MC.wp_mycpu (hlc := hlc) (GF := GF) cpu k' hsie' hK'
+    have h := MC.wp_mycpu (hlc := hlc) (GF := GF) (lent := false) cpu k' hsie' hK'
     unfold wp_mycpu_body at h
     simp only [mycpuAddr, KernelSyms.«mycpu»] at h
     exact h

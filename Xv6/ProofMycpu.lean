@@ -42,7 +42,7 @@ theorem mycpu_addr (cpu : CPU) :
   rfl
 
 set_option maxHeartbeats 4000000 in
-theorem mycpu_proof : MYCPU := ⟨fun {hlc GF} _ _ cpu k hsie hK => by
+theorem mycpu_proof : MYCPU := ⟨fun {hlc GF} _ _ {lent} cpu k hsie hK => by
   unfold wp_mycpu_body
   iintro ⟨Hk, Hpc, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩

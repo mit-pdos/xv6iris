@@ -91,6 +91,7 @@ import MachCSL.GprLit
 import MachCSL.Boot
 import MachCSL.WordPointsTo
 import MachCSL.KptInv
+import Iris.BI.Lib.Fixpoint
 
 
 namespace MachCSL
@@ -363,6 +364,66 @@ def smFacts (ms : BitVec 64) (sie : Bool) : Prop :=
   BitVec.extractLsb' 63 1 ms = 0#1 ∧
   BitVec.extractLsb' 11 2 ms ≠ 2#2
 
+/-- The `SPIE`/`SPP` bits: pinned to the context's indices while interrupts
+are off (a trap sets them, `sret` reads them); unconstrained while they are
+on (a trap round trip rewrites them, so nothing may depend on them). -/
+def sretFacts (ms : BitVec 64) (sie spie spp : Bool) : Prop :=
+  sie = false →
+    BitVec.extractLsb' 5 1 ms = (if spie then 1#1 else 0#1) ∧ BitVec.extractLsb' 8 1 ms = (if spp then 1#1 else 0#1)
+
+theorem sretFacts_on (ms : BitVec 64) (spie spp : Bool) : sretFacts ms true spie spp := fun h => by cases h
+
+/-! ## The supervisor interrupt trap, on the configuration -/
+
+/-- `mstatus` after a supervisor trap: `SPELP := 0` (Zicfilp), `SPIE := SIE`,
+`SIE := 0`, `SPP := S` (the model's writes, in order). -/
+def trapMs (ms : BitVec 64) : BitVec 64 :=
+  Sail.BitVec.updateSubrange (Sail.BitVec.updateSubrange
+    (Sail.BitVec.updateSubrange (Sail.BitVec.updateSubrange ms 23 23 0#1) 5 5
+      (Functions._get_Mstatus_SIE (Sail.BitVec.updateSubrange ms 23 23 0#1))) 1 1 0#1) 8 8 1#1
+
+/-- The configuration after a supervisor trap. -/
+def trapConf (c : MConf) : MConf := { c with mstatus := trapMs c.mstatus }
+
+/-- `scause` of a supervisor interrupt. -/
+def sCause (i : InterruptType) : BitVec 64 := 1#1 ++ BitVec.zeroExtend 63 (Functions.interruptType_bits_forwards i)
+
+/-- The two `scause` words the kernel is trapped with (`mie = SEIE | STIE`). -/
+def sCauseOk (sc : BitVec 64) : Prop := sc = sCause InterruptType.I_S_Timer ∨ sc = sCause InterruptType.I_S_External
+
+/-- `stvec` in direct mode (the base is 4-aligned; the vector is the base). -/
+def stvecDirect (h : BitVec 64) : Prop := BitVec.extractLsb' 0 2 h = 0#2
+
+theorem trapMs_sie (ms : BitVec 64) : BitVec.extractLsb' 1 1 (trapMs ms) = 0#1 := by
+  unfold trapMs Functions._get_Mstatus_SIE
+  simp only [Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange', Sail.BitVec.extractLsb, BitVec.extractLsb]
+  bv_decide
+
+theorem trapMs_spie (ms : BitVec 64) : BitVec.extractLsb' 5 1 (trapMs ms) = BitVec.extractLsb' 1 1 ms := by
+  unfold trapMs Functions._get_Mstatus_SIE
+  simp only [Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange', Sail.BitVec.extractLsb, BitVec.extractLsb]
+  bv_decide
+
+theorem trapMs_spp (ms : BitVec 64) : BitVec.extractLsb' 8 1 (trapMs ms) = 1#1 := by
+  unfold trapMs Functions._get_Mstatus_SIE
+  simp only [Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange', Sail.BitVec.extractLsb, BitVec.extractLsb]
+  bv_decide
+
+theorem smFacts_trapMs (ms : BitVec 64) (sie : Bool) (h : smFacts ms sie) : smFacts (trapMs ms) false := by
+  obtain ⟨_, h17, h34, h19, h22, h20, h13, h15, h9, h63, h11⟩ := h
+  refine ⟨trapMs_sie ms, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  all_goals
+    unfold trapMs Functions._get_Mstatus_SIE
+    simp only [Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange', Sail.BitVec.extractLsb, BitVec.extractLsb]
+    bv_decide
+
+/-- The trapped configuration has the pinned `SPIE`/`SPP` of a trap from
+`SIE = 1`. -/
+theorem sretFacts_trapMs (ms : BitVec 64) (h : smFacts ms true) : sretFacts (trapMs ms) false true true := by
+  intro _
+  refine ⟨?_, trapMs_spp ms⟩
+  rw [trapMs_spie]; simpa using h.1
+
 /-- The kernel's S-mode configuration record: what `start` leaves, with the
 cells later code moves (`mstatus`, `mideleg`'s exact value, `mepc`,
 `stimecmp`, the root) as parameters. -/
@@ -380,28 +441,31 @@ def sConfOf (tier : KTier) (root : BitVec 44) (ms mdl mepc stc : BitVec 64) : MC
   pmpcfg := xv6Pmpcfg
   pmpaddr := xv6Pmpaddr
 
+theorem trapConf_sConfOf (tier : KTier) (root : BitVec 44) (ms mdl mepc stc : BitVec 64) :
+    trapConf (sConfOf tier root ms mdl mepc stc) = sConfOf tier root (trapMs ms) mdl mepc stc := rfl
+
 /-- The kernel's S-mode configuration cells of hart `cpu`, at tier `tier` (root
-`root`) with interrupts at `sie`.  `mie` masked by the complement of
+`root`) with interrupts at `sie` (and, while off, `SPIE`/`SPP` at `spie`/`spp`).  `mie` masked by the complement of
 `mideleg` is zero: no machine-level interrupt is ever pending in S-mode,
 so the interrupt question is decided by `sie` alone. -/
-def kConf (cpu : CPU) (tier : KTier) (root : BitVec 44) (sie : Bool) : IProp GF := iprop%
+def kConf (cpu : CPU) (tier : KTier) (root : BitVec 44) (sie spie spp : Bool) : IProp GF := iprop%
   ∃ ms mdl mepc stc : BitVec 64,
-    ⌜smFacts ms sie ∧ 0x220#64 &&& ~~~mdl = 0#64⌝ ∗
+    ⌜smFacts ms sie ∧ sretFacts ms sie spie spp ∧ 0x220#64 &&& ~~~mdl = 0#64⌝ ∗
     confCells cpu (DFrac.own 1) Privilege.Supervisor (sConfOf tier root ms mdl mepc stc)
 
-theorem kConf_cases (cpu : CPU) (tier : KTier) (root : BitVec 44) (sie : Bool) :
-    kConf (GF := GF) cpu tier root sie ⊢
+theorem kConf_cases (cpu : CPU) (tier : KTier) (root : BitVec 44) (sie spie spp : Bool) :
+    kConf (GF := GF) cpu tier root sie spie spp ⊢
       ∃ ms mdl mepc stc : BitVec 64,
-        ⌜smFacts ms sie ∧ 0x220#64 &&& ~~~mdl = 0#64⌝ ∗
+        ⌜smFacts ms sie ∧ sretFacts ms sie spie spp ∧ 0x220#64 &&& ~~~mdl = 0#64⌝ ∗
         confCells cpu (DFrac.own 1) Privilege.Supervisor (sConfOf tier root ms mdl mepc stc) := by
   unfold kConf
   iintro H
   iexact H
 
-theorem kConf_intro (cpu : CPU) (tier : KTier) (root : BitVec 44) (sie : Bool)
-    (ms mdl mepc stc : BitVec 64) (h : smFacts ms sie ∧ 0x220#64 &&& ~~~mdl = 0#64) :
+theorem kConf_intro (cpu : CPU) (tier : KTier) (root : BitVec 44) (sie spie spp : Bool)
+    (ms mdl mepc stc : BitVec 64) (h : smFacts ms sie ∧ sretFacts ms sie spie spp ∧ 0x220#64 &&& ~~~mdl = 0#64) :
     confCells cpu (DFrac.own 1) Privilege.Supervisor (sConfOf tier root ms mdl mepc stc) ⊢
-      kConf (GF := GF) cpu tier root sie := by
+      kConf (GF := GF) cpu tier root sie spie spp := by
   unfold kConf
   iintro H
   iexists ms, mdl, mepc, stc
@@ -415,10 +479,6 @@ theorem kConf_intro (cpu : CPU) (tier : KTier) (root : BitVec 44) (sie : Bool)
 proc table's `RUNNING` state half and the hart tag, once the table is
 ported. -/
 def cpuClaim (p : BitVec 64) : IProp GF := iprop(⌜p = p⌝)
-
-/-- The trap handler's contract (the prototype's `intr_res`): what the
-enabled arm delivers to a preempting trap.  Not ported yet. -/
-def trapReady (cpu : CPU) : IProp GF := iprop(⌜cpu = cpu⌝)
 
 /-- The running-thread context token (the prototype's `own_context cur_ctx`
 inside `sie_cap_gpr`): the ambient context's running token on this hart,
@@ -434,18 +494,73 @@ pinned accordingly). -/
 def transSlot [CurCtx] (cpu : CPU) (tier : KTier) (root : BitVec 44) : IProp GF := iprop%
   ⌜tier = curTier⌝ ∗ transSlotAt cpu tier root
 
+/-- The trap CSRs at given values (what a trap leaves: `sepc`, `scause`,
+`stval`). -/
+def trapCsrsAt (cpu : CPU) (epc cause tv : BitVec 64) : IProp GF := iprop%
+  Register.sepc ↦ᵣ[cpu] epc ∗ Register.scause ↦ᵣ[cpu] cause ∗ Register.stval ↦ᵣ[cpu] tv
+
 /-- The trap CSRs a trap scribbles; owned by the enabled arm. -/
 def trapCsrs (cpu : CPU) : IProp GF := iprop%
   (∃ v : BitVec 64, Register.sepc ↦ᵣ[cpu] v) ∗
   (∃ v : BitVec 64, Register.scause ↦ᵣ[cpu] v) ∗
   (∃ v : BitVec 64, Register.stval ↦ᵣ[cpu] v)
 
-/-- The interrupt arm.  Enabled: the trap CSRs, the running proc claim and
-the trap handler's contract -- what a preempting trap needs and cannot get
-from any frame.  Disabled: nothing; the SIE bit itself is tied to the index
-in `kConf`, and the per-cpu bookkeeping is in `cpuOwn` at either index. -/
-def sieArm (cpu : CPU) (sie : Bool) (p : BitVec 64) : IProp GF :=
-  if sie then iprop(trapCsrs cpu ∗ cpuClaim p ∗ trapReady cpu) else iprop(True)
+theorem trapCsrs_cases (cpu : CPU) :
+    trapCsrs (GF := GF) cpu ⊢ ∃ a b c : BitVec 64, trapCsrsAt cpu a b c := by
+  unfold trapCsrs trapCsrsAt
+  iintro ⟨⟨%a, Ha⟩, ⟨%b, Hb⟩, ⟨%c, Hc⟩⟩
+  iexists a, b, c
+  iframe
+
+theorem trapCsrs_intro (cpu : CPU) (a b c : BitVec 64) : trapCsrsAt (GF := GF) cpu a b c ⊢ trapCsrs cpu := by
+  unfold trapCsrs trapCsrsAt
+  iintro ⟨Ha, Hb, Hc⟩
+  isplitl [Ha]
+  · iexists a; iexact Ha
+  isplitl [Hb]
+  · iexists b; iexact Hb
+  · iexists c; iexact Hc
+
+/-- The index of the trap handler's contract: a hart and its handler. -/
+structure IhsIx where
+  cpu : CPU
+  h : BitVec 64
+
+instance : OFE IhsIx := OFE.ofDiscrete _
+
+/-- The installed handler (the prototype's `intr_res`), over an abstract
+contract `S`: `stvec` in direct mode at `h`, and the contract at `h`. -/
+def intrResP (S : IhsIx → IProp GF) (cpu : CPU) : IProp GF := iprop%
+  ∃ h : BitVec 64, ⌜stvecDirect h⌝ ∗ Register.stvec ↦ᵣ[cpu] h ∗ □ S ⟨cpu, h⟩
+
+/-- The interrupt arm, over an abstract contract.  Enabled: the trap CSRs,
+the running proc claim and the installed handler -- what a preempting trap
+needs and cannot get from any frame.  Disabled: nothing; the SIE bit itself
+is tied to the index in `kConf`, and the per-cpu bookkeeping is in `cpuOwn`
+at either index. -/
+def sieArmP (S : IhsIx → IProp GF) (cpu : CPU) (sie : Bool) (p : BitVec 64) : IProp GF :=
+  if sie then iprop(trapCsrs cpu ∗ cpuClaim p ∗ intrResP S cpu) else iprop(True)
+
+theorem intrResP_mono (Φ Ψ : IhsIx → IProp GF) (cpu : CPU) :
+    □ (∀ x, Φ x -∗ Ψ x) ⊢ intrResP Φ cpu -∗ intrResP Ψ cpu := by
+  unfold intrResP
+  iintro #Hm ⟨%h, %hd, Hstv, #HS⟩
+  iexists h
+  iframe Hstv
+  isplit
+  · ipureintro; exact hd
+  · iapply Hm $$ HS
+
+theorem sieArmP_mono (Φ Ψ : IhsIx → IProp GF) (cpu : CPU) (sie : Bool) (p : BitVec 64) :
+    □ (∀ x, Φ x -∗ Ψ x) ⊢ sieArmP Φ cpu sie p -∗ sieArmP Ψ cpu sie p := by
+  unfold sieArmP
+  cases sie
+  · simp only [Bool.false_eq_true, ite_false]
+    iintro _ H; iexact H
+  · simp only [ite_true]
+    iintro #Hm ⟨Hcsrs, Hclaim, Hres⟩
+    iframe Hcsrs Hclaim
+    iapply intrResP_mono Φ Ψ cpu $$ Hm Hres
 
 /-! ## The per-cpu bookkeeping -/
 
@@ -475,15 +590,44 @@ def aCpuIntena [KernelGeom] (cpu : CPU) : BitVec 64 := cpuAddr cpu + BitVec.ofNa
 /-- `c->intena` as the kernel stores it. -/
 def intenaVal (eb : Bool) : BitVec 32 := if eb then 1#32 else 0#32
 
+/-- The `c->intena` cell of the bundle: pinned to the saved enable state at
+depth ≥ 1, scratch at depth 0 (as in the prototype's `cpu_cells`: a trap
+handler's own push_off overwrites it, so an interrupted thread cannot be
+promised its value back), and LENT OUT (`lent = true`, only at depth 0 with
+interrupts off) while push_off / pop_off hold it themselves across the
+window between their `c->intena` access and their `c->noff` write. -/
+def intenaCell [CurCtx] [KernelGeom] (cpu : CPU) (lent sie : Bool) (noff : Nat) (intena : Bool) : IProp GF :=
+  if lent then iprop(⌜noff = 0 ∧ sie = false⌝)
+  else match noff with
+    | 0 => iprop(∃ b : Bool, wordPointsTo (aCpuIntena cpu) 4 (DFrac.own 1) (intenaVal b))
+    | _ + 1 => wordPointsTo (aCpuIntena cpu) 4 (DFrac.own 1) (intenaVal intena)
+
+@[simp] theorem intenaCell_lent [CurCtx] [KernelGeom] (cpu : CPU) (sie : Bool) (noff : Nat) (intena : Bool) :
+    intenaCell (GF := GF) cpu true sie noff intena = iprop(⌜noff = 0 ∧ sie = false⌝) := rfl
+@[simp] theorem intenaCell_zero [CurCtx] [KernelGeom] (cpu : CPU) (sie : Bool) (intena : Bool) :
+    intenaCell (GF := GF) cpu false sie 0 intena =
+      iprop(∃ b : Bool, wordPointsTo (aCpuIntena cpu) 4 (DFrac.own 1) (intenaVal b)) := rfl
+@[simp] theorem intenaCell_succ [CurCtx] [KernelGeom] (cpu : CPU) (sie : Bool) (n : Nat) (intena : Bool) :
+    intenaCell (GF := GF) cpu false sie (n + 1) intena =
+      wordPointsTo (aCpuIntena cpu) 4 (DFrac.own 1) (intenaVal intena) := rfl
+
 /-- This hart's `struct cpu` cells: `c->proc` at the running proc, `c->noff`
-at the depth, and `c->intena` at the saved enable state.  (The prototype
-leaves `intena` scratch at depth 0; here it is pinned at every depth --
-`KCtx.wf` ties it to the live `SIE` bit there, which is exactly the value
-the 0→1 push writes, and boot finds the cell at 0 = interrupts off.) -/
-def cpuCells [CurCtx] [KernelGeom] (cpu : CPU) (noff : Nat) (intena : Bool) (p : BitVec 64) : IProp GF := iprop%
+at the depth, and the `c->intena` cell (`intenaCell`). -/
+def cpuCells [CurCtx] [KernelGeom] (cpu : CPU) (lent sie : Bool) (noff : Nat) (intena : Bool) (p : BitVec 64) :
+    IProp GF := iprop%
   wordPointsTo (aCpuProc cpu) 8 (DFrac.own 1) p ∗
   wordPointsTo (aCpuNoff cpu) 4 (DFrac.own 1) (BitVec.ofNat 32 noff) ∗
-  wordPointsTo (aCpuIntena cpu) 4 (DFrac.own 1) (intenaVal intena)
+  intenaCell cpu lent sie noff intena
+
+/-- At depth 0 the ghost `intena` is a canonical placeholder: the cell does
+not pin it. -/
+theorem cpuCells_zero [CurCtx] [KernelGeom] (cpu : CPU) (lent s s' : Bool) (noff : Nat) (b b' : Bool) (p : BitVec 64)
+    (h : noff = 0) (hs : lent = true → s' = s) :
+    cpuCells (GF := GF) cpu lent s noff b p ⊢ cpuCells cpu lent s' noff b' p := by
+  subst h
+  cases lent
+  · unfold cpuCells; simp only [intenaCell_zero]; iintro H; iexact H
+  · rw [hs rfl]; unfold cpuCells; simp only [intenaCell_lent]; iintro H; iexact H
 
 /-- The cells are aligned RAM words: the geometry facts the constructor of
 `cpuCells` needs (`aCpu*_ok`; once the cells are built, they carry the facts
@@ -548,9 +692,17 @@ def hartCsrs (cpu : CPU) : IProp GF := iprop%
 
 /-- The per-cpu bookkeeping: the cells, the held-lock set (the authority
 each held lock's invariant keeps a fragment of), and the kernel-owned CSRs. -/
-def cpuOwn [CurCtx] [KernelGeom] (cpu : CPU) (noff : Nat) (intena : Bool) (p : BitVec 64) (locks : List String) :
-    IProp GF := iprop%
-  cpuCells cpu noff intena p ∗ lockSet cpu locks ∗ hartCsrs cpu
+def cpuOwn [CurCtx] [KernelGeom] (cpu : CPU) (lent sie : Bool) (noff : Nat) (intena : Bool) (p : BitVec 64)
+    (locks : List String) : IProp GF := iprop%
+  cpuCells cpu lent sie noff intena p ∗ lockSet cpu locks ∗ hartCsrs cpu
+
+theorem cpuOwn_zero [CurCtx] [KernelGeom] (cpu : CPU) (lent s s' : Bool) (noff : Nat) (b b' : Bool) (p : BitVec 64)
+    (locks : List String) (h : noff = 0) (hs : lent = true → s' = s) :
+    cpuOwn (GF := GF) cpu lent s noff b p locks ⊢ cpuOwn cpu lent s' noff b' p locks := by
+  unfold cpuOwn
+  iintro ⟨Hc, Hl, Hh⟩
+  iframe Hl Hh
+  iapply cpuCells_zero cpu lent s s' noff b b' p h hs $$ Hc
 
 /-! ## The bundle -/
 
@@ -562,6 +714,10 @@ structure KCtx where
   regs : RegMap
   /-- interrupts enabled -/
   sie : Bool
+  /-- `sstatus.SPIE`, meaningful while interrupts are off (a trap set it) -/
+  spie : Bool
+  /-- `sstatus.SPP` is `S`, meaningful while interrupts are off -/
+  spp : Bool
   /-- free stack slots below `sp`, beyond the trap reserve -/
   avail : Nat
   /-- push_off depth (`c->noff`) -/
@@ -578,10 +734,12 @@ structure KCtx where
   proc : BitVec 64
 
 /-- The coupling of the interrupt flag with the push_off discipline: at
-depth 0 the live SIE bit is the saved one; at depth ≥ 1 interrupts are off;
-interrupts enabled means depth 0, `intena`, no lock held (xv6 takes every
-lock under push_off) and the kernel table installed (no trap handler can be
-installed while translation is Bare). -/
+depth ≥ 1 interrupts are off; interrupts enabled means depth 0, `intena`,
+no lock held (xv6 takes every lock under push_off) and the kernel table
+installed (no trap handler can be installed while translation is Bare).
+At depth 0 the cell does not pin `intena` (`intenaCell`), so the ghost value
+is canonical there: the live `SIE` bit, which is exactly what the next
+push_off writes. -/
 def KCtx.wf (k : KCtx) : Prop :=
   (k.noff = 0 → k.sie = k.intena) ∧
   (1 ≤ k.noff → k.sie = false) ∧
@@ -602,6 +760,10 @@ def KCtx.setReg (k : KCtx) (i : BitVec 5) (v : BitVec 64) : KCtx :=
     (k.setReg i v).regs = k.regs.set i v := rfl
 @[simp] theorem KCtx.setReg_sie (k : KCtx) (i : BitVec 5) (v : BitVec 64) :
     (k.setReg i v).sie = k.sie := rfl
+@[simp] theorem KCtx.setReg_spie (k : KCtx) (i : BitVec 5) (v : BitVec 64) :
+    (k.setReg i v).spie = k.spie := rfl
+@[simp] theorem KCtx.setReg_spp (k : KCtx) (i : BitVec 5) (v : BitVec 64) :
+    (k.setReg i v).spp = k.spp := rfl
 @[simp] theorem KCtx.setReg_avail (k : KCtx) (i : BitVec 5) (v : BitVec 64) :
     (k.setReg i v).avail = k.avail := rfl
 @[simp] theorem KCtx.setReg_noff (k : KCtx) (i : BitVec 5) (v : BitVec 64) :
@@ -628,6 +790,8 @@ def KCtx.withRegs (k : KCtx) (R : RegMap) : KCtx := { k with regs := R }
 
 @[simp] theorem KCtx.withRegs_regs (k : KCtx) (R : RegMap) : (k.withRegs R).regs = R := rfl
 @[simp] theorem KCtx.withRegs_sie (k : KCtx) (R : RegMap) : (k.withRegs R).sie = k.sie := rfl
+@[simp] theorem KCtx.withRegs_spie (k : KCtx) (R : RegMap) : (k.withRegs R).spie = k.spie := rfl
+@[simp] theorem KCtx.withRegs_spp (k : KCtx) (R : RegMap) : (k.withRegs R).spp = k.spp := rfl
 @[simp] theorem KCtx.withRegs_avail (k : KCtx) (R : RegMap) : (k.withRegs R).avail = k.avail := rfl
 @[simp] theorem KCtx.withRegs_noff (k : KCtx) (R : RegMap) : (k.withRegs R).noff = k.noff := rfl
 @[simp] theorem KCtx.withRegs_intena (k : KCtx) (R : RegMap) : (k.withRegs R).intena = k.intena := rfl
@@ -653,6 +817,8 @@ def KCtx.pop (k : KCtx) (m : Nat) : KCtx :=
 @[simp] theorem KCtx.push_regs (k : KCtx) (m : Nat) :
     (k.push m).regs = k.regs.set 2#5 (k.sp - 8#64 * BitVec.ofNat 64 m) := rfl
 @[simp] theorem KCtx.push_sie (k : KCtx) (m : Nat) : (k.push m).sie = k.sie := rfl
+@[simp] theorem KCtx.push_spie (k : KCtx) (m : Nat) : (k.push m).spie = k.spie := rfl
+@[simp] theorem KCtx.push_spp (k : KCtx) (m : Nat) : (k.push m).spp = k.spp := rfl
 @[simp] theorem KCtx.push_avail (k : KCtx) (m : Nat) : (k.push m).avail = k.avail - m := rfl
 @[simp] theorem KCtx.push_noff (k : KCtx) (m : Nat) : (k.push m).noff = k.noff := rfl
 @[simp] theorem KCtx.push_intena (k : KCtx) (m : Nat) : (k.push m).intena = k.intena := rfl
@@ -666,6 +832,8 @@ def KCtx.pop (k : KCtx) (m : Nat) : KCtx :=
 @[simp] theorem KCtx.pop_regs (k : KCtx) (m : Nat) :
     (k.pop m).regs = k.regs.set 2#5 (k.sp + 8#64 * BitVec.ofNat 64 m) := rfl
 @[simp] theorem KCtx.pop_sie (k : KCtx) (m : Nat) : (k.pop m).sie = k.sie := rfl
+@[simp] theorem KCtx.pop_spie (k : KCtx) (m : Nat) : (k.pop m).spie = k.spie := rfl
+@[simp] theorem KCtx.pop_spp (k : KCtx) (m : Nat) : (k.pop m).spp = k.spp := rfl
 @[simp] theorem KCtx.pop_avail (k : KCtx) (m : Nat) : (k.pop m).avail = k.avail + m := rfl
 @[simp] theorem KCtx.pop_noff (k : KCtx) (m : Nat) : (k.pop m).noff = k.noff := rfl
 @[simp] theorem KCtx.pop_intena (k : KCtx) (m : Nat) : (k.pop m).intena = k.intena := rfl
@@ -677,6 +845,27 @@ def KCtx.pop (k : KCtx) (m : Nat) : KCtx :=
   simp [KCtx.sp, KCtx.pop]
 @[simp] theorem KCtx.wf_pop (k : KCtx) (m : Nat) : (k.pop m).wf ↔ k.wf := Iff.rfl
 
+/-- The context a supervisor interrupt trap leaves for the handler:
+interrupts off with `SPIE = 1` and `SPP = S`, the trap reserve turned into
+free slots (the handler's frame is carved out of it). -/
+def KCtx.trapped (k : KCtx) : KCtx :=
+  { k with sie := false, spie := true, spp := true, intena := false, avail := trapRes true + k.avail }
+
+@[simp] theorem KCtx.trapped_regs (k : KCtx) : k.trapped.regs = k.regs := rfl
+@[simp] theorem KCtx.trapped_sie (k : KCtx) : k.trapped.sie = false := rfl
+@[simp] theorem KCtx.trapped_spie (k : KCtx) : k.trapped.spie = true := rfl
+@[simp] theorem KCtx.trapped_spp (k : KCtx) : k.trapped.spp = true := rfl
+@[simp] theorem KCtx.trapped_avail (k : KCtx) : k.trapped.avail = trapRes true + k.avail := rfl
+@[simp] theorem KCtx.trapped_noff (k : KCtx) : k.trapped.noff = k.noff := rfl
+@[simp] theorem KCtx.trapped_intena (k : KCtx) : k.trapped.intena = false := rfl
+@[simp] theorem KCtx.trapped_locks (k : KCtx) : k.trapped.locks = k.locks := rfl
+@[simp] theorem KCtx.trapped_tier (k : KCtx) : k.trapped.tier = k.tier := rfl
+@[simp] theorem KCtx.trapped_root (k : KCtx) : k.trapped.root = k.root := rfl
+@[simp] theorem KCtx.trapped_proc (k : KCtx) : k.trapped.proc = k.proc := rfl
+@[simp] theorem KCtx.trapped_sp (k : KCtx) : k.trapped.sp = k.sp := rfl
+theorem KCtx.wf_trapped (k : KCtx) (h : k.wf) : k.trapped.wf :=
+  ⟨fun _ => rfl, fun _ => rfl, fun h' => absurd h' Bool.false_ne_true, h.2.2.2.1, h.2.2.2.2⟩
+
 /-- The kernel's read-only image, as the client presents it: a persistent
 proposition (the xv6 client's `kernelText ∗ kernelData`).  `kctx` owns a
 copy, so no contract states it, and a proof takes the copy out (`kctx_ro`)
@@ -687,61 +876,190 @@ class KernelImage (GF : BundledGFunctors) where
 
 attribute [instance] KernelImage.ro_persistent
 
-/-- The kernel execution context resource of hart `cpu`: everything below
+/-- The continuation of an S-mode instruction: with interrupts enabled and a
+current proc, execution may resume on ANY hart (a preempting trap, the
+scheduler, a resume elsewhere); otherwise on this one.  A continuation
+proved for every hart discharges it at any index. -/
+def wpNext (sie : Bool) (p : BitVec 64) (cpu : CPU) (K : CPU → IProp GF) : IProp GF := iprop%
+  ∀ cpu' : CPU, ⌜sie = false ∨ p = 0#64 → cpu' = cpu⌝ → K cpu'
+
+theorem wpNext_intro (sie : Bool) (p : BitVec 64) (cpu : CPU) (K : CPU → IProp GF) :
+    (∀ cpu', K cpu') ⊢ wpNext sie p cpu K := by
+  unfold wpNext
+  iintro H %cpu' %_
+  iapply H
+
+/-- With interrupts off, it suffices to continue at this hart. -/
+theorem wpNext_off_intro (p : BitVec 64) (cpu : CPU) (K : CPU → IProp GF) :
+    K cpu ⊢ wpNext false p cpu K := by
+  unfold wpNext
+  iintro H %cpu' %h
+  have := h (Or.inl rfl)
+  subst this
+  iexact H
+
+/-- With interrupts off, the continuation is at this hart. -/
+theorem wpNext_off (p : BitVec 64) (cpu : CPU) (K : CPU → IProp GF) :
+    wpNext false p cpu K ⊢ K cpu := by
+  unfold wpNext
+  iintro H
+  iapply H $$ %cpu %(fun _ => rfl)
+
+/-- The continuation at a hart the pinning condition allows. -/
+theorem wpNext_at (sie : Bool) (p : BitVec 64) (cpu cpu' : CPU) (K : CPU → IProp GF)
+    (h : sie = false ∨ p = 0#64 → cpu' = cpu) : wpNext sie p cpu K ⊢ K cpu' := by
+  unfold wpNext
+  iintro H
+  iapply H $$ %cpu' %h
+
+/-- The continuation at this hart, whatever the index. -/
+theorem wpNext_self (sie : Bool) (p : BitVec 64) (cpu : CPU) (K : CPU → IProp GF) :
+    wpNext sie p cpu K ⊢ K cpu :=
+  wpNext_at sie p cpu cpu K (fun _ => rfl)
+
+/-- `wpNext` is monotone in its continuation. -/
+theorem wpNext_mono (sie : Bool) (p : BitVec 64) (cpu : CPU) (K K' : CPU → IProp GF) :
+    wpNext sie p cpu K ⊢ (∀ cpu', K cpu' -∗ K' cpu') -∗ wpNext sie p cpu K' := by
+  unfold wpNext
+  iintro H HK %cpu' %h
+  iapply HK $$ %cpu'
+  iapply H $$ %cpu' %h
+
+/-- The kernel execution context resource of hart `cpu`, over an abstract
+handler contract `S` and an explicit ambient context `X`: everything below
 shares the index `k.sie`; the kernel's read-only image rides along. -/
-def kctx [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) : IProp GF := iprop%
-  ⌜k.wf⌝ ∗
-  kConf cpu k.tier k.root k.sie ∗
-  gprFile cpu (tpPin cpu k.regs) ∗
-  stackOwn k.sp (trapRes k.sie + k.avail) ∗
-  transSlot cpu k.tier k.root ∗
-  sieArm cpu k.sie k.proc ∗
-  cpuOwn cpu k.noff k.intena k.proc k.locks ∗
-  ctxToken cpu ∗
-  clockCells cpu ∗
-  KernelImage.ro
+def kctxP (X : CurCtx) [KernelGeom] [KernelImage GF] (S : IhsIx → IProp GF) (lent : Bool) (cpu : CPU) (k : KCtx) :
+    IProp GF :=
+  letI : CurCtx := X
+  iprop(⌜k.wf⌝ ∗
+    kConf cpu k.tier k.root k.sie k.spie k.spp ∗
+    gprFile cpu (tpPin cpu k.regs) ∗
+    stackOwn k.sp (trapRes k.sie + k.avail) ∗
+    transSlot cpu k.tier k.root ∗
+    sieArmP S cpu k.sie k.proc ∗
+    cpuOwn cpu lent k.sie k.noff k.intena k.proc k.locks ∗
+    ctxToken cpu ∗
+    clockCells cpu ∗
+    KernelImage.ro)
+
+theorem kctxP_mono (X : CurCtx) [KernelGeom] [KernelImage GF] (Φ Ψ : IhsIx → IProp GF) (lent : Bool) (cpu : CPU)
+    (k : KCtx) : □ (∀ x, Φ x -∗ Ψ x) ⊢ kctxP (GF := GF) X Φ lent cpu k -∗ kctxP X Ψ lent cpu k := by
+  unfold kctxP
+  iintro #Hm ⟨%hwf, HConf, HF, Hstack, Htrans, Harm, Hcpu, Htok, Hclock, #Hro⟩
+  iframe HConf HF Hstack Htrans Hcpu Htok Hclock
+  isplit
+  · ipureintro; exact hwf
+  isplitl [Harm]
+  · iapply sieArmP_mono Φ Ψ cpu k.sie k.proc $$ Hm Harm
+  · iexact Hro
+
+/-- With interrupts off the arm is empty: the contract does not matter. -/
+theorem kctxP_off (X : CurCtx) [KernelGeom] [KernelImage GF] (Φ Ψ : IhsIx → IProp GF) (lent : Bool) (cpu : CPU)
+    (k : KCtx) (h : k.sie = false) : kctxP (GF := GF) X Φ lent cpu k ⊢ kctxP X Ψ lent cpu k := by
+  unfold kctxP sieArmP
+  rw [h]
+  simp only [Bool.false_eq_true, ite_false]
+  iintro H; iexact H
+
+/-! ## The trap handler's contract
+
+The enabled arm holds the installed handler's contract (the prototype's
+`intr_handler_spec`): from the state a supervisor interrupt trap leaves --
+the interrupted context `k` at `k.trapped` (interrupts off, `SPIE = 1`,
+`SPP = S`, the reserve available), `PC` at the handler, the trap CSRs, the
+`stvec` cell, the proc claim -- and the promise that resuming `k` at the
+trapped `pc` on ANY hart (this one if there is no proc to yield) is safe,
+the handler is safe.  The resumed context holds the arm again, contract
+included, so the contract is the greatest fixpoint of this functional. -/
+
+/-- The functional of the handler contract at `S`. -/
+def ihsF [KernelGeom] [KernelImage GF] (S : IhsIx → IProp GF) (x : IhsIx) : IProp GF := iprop%
+  □ ∀ (X : CurCtx) (k : KCtx) (pc sc : BitVec 64),
+    ⌜k.wf ∧ k.sie = true ∧ pc.toNat % 2 = 0 ∧ sCauseOk sc⌝ -∗
+    kctxP X S false x.cpu k.trapped -∗ pcIs x.cpu x.h -∗ trapCsrsAt x.cpu pc sc 0#64 -∗
+    Register.stvec ↦ᵣ[x.cpu] x.h -∗ cpuClaim k.proc -∗
+    ▷ wpNext true k.proc x.cpu (fun cpu' => iprop(kctxP X S false cpu' k -∗ pcIs cpu' pc -∗ wpLoop cpu')) -∗
+    wpLoop x.cpu
+
+instance ihsF_mono [KernelGeom] [KernelImage GF] : BIMonoPred (ihsF (GF := GF)) where
+  mono_pred {Φ Ψ} _ _ := by
+    iintro #Hm %x HF
+    unfold ihsF
+    iintuitionistic HF
+    iintro !> %X %k %pc %sc %hp Hk Hpc Hcsrs Hstv Hclaim Hcont
+    ihave Hk' := kctxP_off X Ψ Φ false x.cpu k.trapped rfl $$ Hk
+    iapply HF $$ %X %k %pc %sc %hp Hk' Hpc Hcsrs Hstv Hclaim
+    inext
+    iapply wpNext_mono $$ Hcont
+    iintro %cpu' HK Hk Hpc
+    ihave Hk'' := kctxP_mono X Φ Ψ false cpu' k $$ Hm Hk
+    iapply HK $$ Hk'' Hpc
+  mono_pred_ne {Φ} _ := ⟨fun {_ _ _} (h : _ = _) => h ▸ OFE.Dist.rfl⟩
+
+/-- The handler contract (the greatest fixpoint). -/
+def ihs [KernelGeom] [KernelImage GF] : IhsIx → IProp GF := bi_greatest_fixpoint (ihsF (GF := GF))
+
+theorem ihs_unfold [KernelGeom] [KernelImage GF] (x : IhsIx) : ihs (GF := GF) x ⊢ ihsF ihs x :=
+  greatest_fixpoint_unfold_mp _
+
+theorem ihs_fold [KernelGeom] [KernelImage GF] (x : IhsIx) : ihsF (GF := GF) ihs x ⊢ ihs x :=
+  greatest_fixpoint_unfold_mpr _
+
+/-- The installed handler. -/
+def intrRes [KernelGeom] [KernelImage GF] (cpu : CPU) : IProp GF := intrResP ihs cpu
+
+/-- The interrupt arm (see `sieArmP`). -/
+def sieArm [KernelGeom] [KernelImage GF] (cpu : CPU) (sie : Bool) (p : BitVec 64) : IProp GF := sieArmP ihs cpu sie p
+
+/-- The kernel execution context resource of hart `cpu` (see `kctxP`), with
+the `c->intena` cell lent out when `lent` (see `intenaCell`). -/
+def kctxL [X : CurCtx] [KernelGeom] [KernelImage GF] (lent : Bool) (cpu : CPU) (k : KCtx) : IProp GF :=
+  kctxP X ihs lent cpu k
+
+/-- The kernel execution context resource of hart `cpu`: the bundle whole. -/
+abbrev kctx [X : CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) : IProp GF := kctxL false cpu k
 
 /-- A register the generic write rules may target: not `x0`, not `sp` (the
 stack is keyed on it) and not `tp` (pinned to the hart). -/
 def rdOk (rd : BitVec 5) : Prop := rd ≠ 0#5 ∧ rd ≠ 2#5 ∧ rd ≠ 4#5
 
-theorem kctx_cases [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) :
-    kctx (GF := GF) cpu k ⊢
-      ⌜k.wf⌝ ∗ kConf cpu k.tier k.root k.sie ∗ gprFile cpu (tpPin cpu k.regs) ∗
+theorem kctx_cases [CurCtx] [KernelGeom] [KernelImage GF] {lent : Bool} (cpu : CPU) (k : KCtx) :
+    kctxL (GF := GF) lent cpu k ⊢
+      ⌜k.wf⌝ ∗ kConf cpu k.tier k.root k.sie k.spie k.spp ∗ gprFile cpu (tpPin cpu k.regs) ∗
       stackOwn k.sp (trapRes k.sie + k.avail) ∗ transSlot cpu k.tier k.root ∗
-      sieArm cpu k.sie k.proc ∗ cpuOwn cpu k.noff k.intena k.proc k.locks ∗ ctxToken cpu ∗ clockCells cpu ∗
-      KernelImage.ro := by
-  unfold kctx
+      sieArm cpu k.sie k.proc ∗ cpuOwn cpu lent k.sie k.noff k.intena k.proc k.locks ∗ ctxToken cpu ∗
+      clockCells cpu ∗ KernelImage.ro := by
+  unfold kctxL kctxP sieArm
   iintro H
   iexact H
 
-theorem kctx_intro [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) :
-    ⌜k.wf⌝ ∗ kConf cpu k.tier k.root k.sie ∗ gprFile cpu (tpPin cpu k.regs) ∗
+theorem kctx_intro [CurCtx] [KernelGeom] [KernelImage GF] {lent : Bool} (cpu : CPU) (k : KCtx) :
+    ⌜k.wf⌝ ∗ kConf cpu k.tier k.root k.sie k.spie k.spp ∗ gprFile cpu (tpPin cpu k.regs) ∗
       stackOwn k.sp (trapRes k.sie + k.avail) ∗ transSlot cpu k.tier k.root ∗
-      sieArm cpu k.sie k.proc ∗ cpuOwn cpu k.noff k.intena k.proc k.locks ∗ ctxToken cpu ∗ clockCells cpu ∗
-      KernelImage.ro ⊢
-    kctx (GF := GF) cpu k := by
-  unfold kctx
+      sieArm cpu k.sie k.proc ∗ cpuOwn cpu lent k.sie k.noff k.intena k.proc k.locks ∗ ctxToken cpu ∗
+      clockCells cpu ∗ KernelImage.ro ⊢
+    kctxL (GF := GF) lent cpu k := by
+  unfold kctxL kctxP sieArm
   iintro H
   iexact H
 
 /-- `kctx_intro` with the well-formedness as a Lean hypothesis. -/
-theorem kctx_intro' [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hwf : k.wf) :
-    kConf cpu k.tier k.root k.sie ∗ gprFile cpu (tpPin cpu k.regs) ∗
+theorem kctx_intro' [CurCtx] [KernelGeom] [KernelImage GF] {lent : Bool} (cpu : CPU) (k : KCtx) (hwf : k.wf) :
+    kConf cpu k.tier k.root k.sie k.spie k.spp ∗ gprFile cpu (tpPin cpu k.regs) ∗
       stackOwn k.sp (trapRes k.sie + k.avail) ∗ transSlot cpu k.tier k.root ∗
-      sieArm cpu k.sie k.proc ∗ cpuOwn cpu k.noff k.intena k.proc k.locks ∗ ctxToken cpu ∗ clockCells cpu ∗
-      KernelImage.ro ⊢
-    kctx (GF := GF) cpu k := by
-  unfold kctx
+      sieArm cpu k.sie k.proc ∗ cpuOwn cpu lent k.sie k.noff k.intena k.proc k.locks ∗ ctxToken cpu ∗
+      clockCells cpu ∗ KernelImage.ro ⊢
+    kctxL (GF := GF) lent cpu k := by
+  unfold kctxL kctxP sieArm
   iintro H
   iframe
   ipureintro
   exact hwf
 
 /-- The context's tier is the ambient tier. -/
-theorem kctx_tier [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) :
-    kctx (GF := GF) cpu k ⊢ ⌜k.tier = curTier⌝ ∗ kctx cpu k := by
-  unfold kctx transSlot
+theorem kctx_tier [CurCtx] [KernelGeom] [KernelImage GF] {lent : Bool} (cpu : CPU) (k : KCtx) :
+    kctxL (GF := GF) lent cpu k ⊢ ⌜k.tier = curTier⌝ ∗ kctxL lent cpu k := by
+  unfold kctxL kctxP transSlot
   iintro ⟨%hwf, HConf, HF, Hstack, ⟨%ht, Htrans⟩, Harm, Hcpu, Htok, Hclock, #Hro⟩
   iframe HConf HF Hstack Htrans Harm Hcpu Htok Hclock
   isplit
@@ -754,9 +1072,9 @@ theorem kctx_tier [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) 
 
 /-- The context's copy of the read-only image (persistent: the context
 keeps it). -/
-theorem kctx_ro [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) :
-    kctx (GF := GF) cpu k ⊢ KernelImage.ro ∗ kctx cpu k := by
-  unfold kctx
+theorem kctx_ro [CurCtx] [KernelGeom] [KernelImage GF] {lent : Bool} (cpu : CPU) (k : KCtx) :
+    kctxL (GF := GF) lent cpu k ⊢ KernelImage.ro ∗ kctxL lent cpu k := by
+  unfold kctxL kctxP
   iintro ⟨%hwf, HConf, HF, Hstack, Htrans, Harm, Hcpu, Htok, Hclock, #Htext⟩
   iframe Htext
   iframe HConf HF Hstack Htrans Harm Hcpu Htok Hclock
@@ -791,33 +1109,87 @@ theorem KCtx.setReg_setReg_same (k : KCtx) (i : BitVec 5) (v w : BitVec 64) :
     (k.setReg i v).setReg i w = k.setReg i w := by
   simp [KCtx.setReg, RegMap.set_set_same]
 
-/-- The continuation of an S-mode instruction: with interrupts enabled and a
-current proc, execution may resume on ANY hart (a preempting trap, the
-scheduler, a resume elsewhere); otherwise on this one.  A continuation
-proved for every hart discharges it at any index. -/
-def wpNext (sie : Bool) (p : BitVec 64) (cpu : CPU) (K : CPU → IProp GF) : IProp GF := iprop%
-  ∀ cpu' : CPU, ⌜sie = false ∨ p = 0#64 → cpu' = cpu⌝ → K cpu'
+/-! ## The trap arm, opened and closed -/
 
-theorem wpNext_intro (sie : Bool) (p : BitVec 64) (cpu : CPU) (K : CPU → IProp GF) :
-    (∀ cpu', K cpu') ⊢ wpNext sie p cpu K := by
-  unfold wpNext
-  iintro H %cpu' %_
-  iapply H
+/-- The enabled arm, opened: the trap CSRs, the claim, the vector and the
+contract. -/
+theorem sieArm_on [KernelGeom] [KernelImage GF] (cpu : CPU) (p : BitVec 64) :
+    sieArm (GF := GF) cpu true p ⊢
+      ∃ h : BitVec 64, ⌜stvecDirect h⌝ ∗ trapCsrs cpu ∗ cpuClaim p ∗ Register.stvec ↦ᵣ[cpu] h ∗ □ ihs ⟨cpu, h⟩ := by
+  unfold sieArm sieArmP intrResP
+  simp only [ite_true]
+  iintro ⟨Hcsrs, Hclaim, %h, %hd, Hstv, #HS⟩
+  iexists h
+  iframe Hcsrs Hclaim Hstv
+  isplit
+  · ipureintro; exact hd
+  · iexact HS
 
-/-- With interrupts off, it suffices to continue at this hart. -/
-theorem wpNext_off_intro (p : BitVec 64) (cpu : CPU) (K : CPU → IProp GF) :
-    K cpu ⊢ wpNext false p cpu K := by
-  unfold wpNext
-  iintro H %cpu' %h
-  have := h (Or.inl rfl)
-  subst this
-  iexact H
+theorem sieArm_on_intro [KernelGeom] [KernelImage GF] (cpu : CPU) (p h : BitVec 64) (hd : stvecDirect h) :
+    trapCsrs cpu ∗ cpuClaim p ∗ Register.stvec ↦ᵣ[cpu] h ∗ □ ihs ⟨cpu, h⟩ ⊢ sieArm (GF := GF) cpu true p := by
+  unfold sieArm sieArmP intrResP
+  simp only [ite_true]
+  iintro ⟨Hcsrs, Hclaim, Hstv, #HS⟩
+  iframe Hcsrs Hclaim
+  iexists h
+  iframe Hstv
+  isplit
+  · ipureintro; exact hd
+  · iexact HS
 
-/-- With interrupts off, the continuation is at this hart. -/
-theorem wpNext_off (p : BitVec 64) (cpu : CPU) (K : CPU → IProp GF) :
-    wpNext false p cpu K ⊢ K cpu := by
+theorem sieArm_off [KernelGeom] [KernelImage GF] (cpu : CPU) (p : BitVec 64) : ⊢ sieArm (GF := GF) cpu false p := by
+  unfold sieArm sieArmP
+  simp only [Bool.false_eq_true, ite_false]
+  ipureintro; trivial
+
+/-- The handler's context, from the cells a trap from `k` (interrupts on)
+leaves: the trapped configuration and the rest of `k`'s bundle. -/
+theorem kctx_trapped_intro [X : CurCtx] [KernelGeom] [KernelImage GF] {lent : Bool} (cpu : CPU) (k : KCtx) (hwf : k.wf)
+    (hs : k.sie = true) (ms mdl mepc stc : BitVec 64) (hsm : smFacts ms k.sie) (hmdl : 0x220#64 &&& ~~~mdl = 0#64) :
+    confCells cpu (DFrac.own 1) Privilege.Supervisor (trapConf (sConfOf k.tier k.root ms mdl mepc stc)) ∗
+    gprFile cpu (tpPin cpu k.regs) ∗ stackOwn k.sp (trapRes k.sie + k.avail) ∗ transSlot cpu k.tier k.root ∗
+    cpuOwn cpu lent k.sie k.noff k.intena k.proc k.locks ∗ ctxToken cpu ∗ clockCells cpu ∗ KernelImage.ro
+    ⊢ kctx (GF := GF) cpu k.trapped := by
+  rw [hs] at hsm
+  iintro ⟨HmConf, HF, Hstack, Htrans, Hcpu, Htok, Hclock, #Hro⟩
+  have hn0 : k.noff = 0 := (hwf.2.2.1 hs).1
+  -- the cell is not lent while interrupts are on
+  cases lent
+  case true =>
+    unfold cpuOwn cpuCells
+    simp only [intenaCell_lent]
+    icases Hcpu with ⟨⟨_, _, %⟨_, hs'⟩⟩, _, _⟩
+    exact absurd (hs.symm.trans hs') (by decide)
+  ihave Hcpu := cpuOwn_zero cpu false k.sie false k.noff k.intena false k.proc k.locks hn0 (fun h => nomatch h) $$ Hcpu
+  rw [trapConf_sConfOf]
+  ihave HConf := kConf_intro cpu k.tier k.root false true true (trapMs ms) mdl mepc stc
+    ⟨smFacts_trapMs ms true hsm, sretFacts_trapMs ms hsm, hmdl⟩ $$ HmConf
+  iapply (kctx_intro' cpu k.trapped (KCtx.wf_trapped k hwf))
+  simp only [KCtx.trapped_regs, KCtx.trapped_sie, KCtx.trapped_spie, KCtx.trapped_spp, KCtx.trapped_avail,
+    KCtx.trapped_noff, KCtx.trapped_intena, KCtx.trapped_locks, KCtx.trapped_tier, KCtx.trapped_root,
+    KCtx.trapped_proc, KCtx.trapped_sp, trapRes_off, hs]
+  iframe HConf HF Hstack Htrans Hcpu Htok Hclock
+  isplitl []
+  · iapply sieArm_off
+  · iexact Hro
+
+/-- The trap's resumption: the handler's contract, applied to the trapped
+state, with the promise to resume `k` at `pc` from the client's continuation
+`I`, on any hart the pinning allows. -/
+theorem kctx_trap_resume [X : CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (pc sc h : BitVec 64)
+    (I : IProp GF) (hwf : k.wf) (hs : k.sie = true) (hpc : pc.toNat % 2 = 0) (hsc : sCauseOk sc) :
+    kctx cpu k.trapped ∗ pcIs cpu h ∗ trapCsrsAt cpu pc sc 0#64 ∗ Register.stvec ↦ᵣ[cpu] h ∗ cpuClaim k.proc ∗
+    □ ihs ⟨cpu, h⟩ ∗ I ∗
+    ▷ (∀ cpu' : CPU, ⌜k.proc = 0#64 → cpu' = cpu⌝ → I -∗ kctx cpu' k -∗ pcIs cpu' pc -∗ wpLoop cpu')
+    ⊢ wpLoop (GF := GF) cpu := by
+  iintro ⟨Hk, Hpc, Hcsrs, Hstv, Hclaim, #HS, HI, IH⟩
+  ihave #HF := ihs_unfold ⟨cpu, h⟩ $$ HS
+  unfold ihsF kctx kctxL
+  dsimp only
+  iapply HF $$ %X %k %pc %sc %⟨hwf, hs, hpc, hsc⟩ Hk Hpc Hcsrs Hstv Hclaim
+  inext
   unfold wpNext
-  iintro H
-  iapply H $$ %cpu %(fun _ => rfl)
+  iintro %cpu' %hpin Hk Hpc
+  iapply IH $$ %cpu' %(fun h0 => hpin (Or.inr h0)) HI Hk Hpc
 
 end MachCSL

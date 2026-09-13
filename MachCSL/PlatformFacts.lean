@@ -182,6 +182,12 @@ write callbacks (no-ops) at those names; the tactic never unfolds the maps. -/
 @[sail_facts] theorem csr_name_map_backwards_mideleg : csr_name_map_backwards "mideleg" = pure 0x303#12 := rfl
 @[sail_facts] theorem csr_name_write_callback_mideleg (v : BitVec 64) : csr_name_write_callback "mideleg" v = pure () := rfl
 @[sail_facts] theorem csr_name_map_backwards_sie : csr_name_map_backwards "sie" = pure 0x104#12 := rfl
+@[sail_facts] theorem csr_name_map_backwards_sepc : csr_name_map_backwards "sepc" = pure 0x141#12 := rfl
+@[sail_facts] theorem csr_name_write_callback_sepc (v : BitVec 64) : csr_name_write_callback "sepc" v = pure () := rfl
+@[sail_facts] theorem csr_name_map_backwards_scause : csr_name_map_backwards "scause" = pure 0x142#12 := rfl
+@[sail_facts] theorem csr_name_write_callback_scause (v : BitVec 64) : csr_name_write_callback "scause" v = pure () := rfl
+@[sail_facts] theorem csr_name_map_backwards_stval : csr_name_map_backwards "stval" = pure 0x143#12 := rfl
+@[sail_facts] theorem csr_name_write_callback_stval (v : BitVec 64) : csr_name_write_callback "stval" v = pure () := rfl
 @[sail_facts] theorem csr_name_write_callback_sie (v : BitVec 64) : csr_name_write_callback "sie" v = pure () := rfl
 @[sail_facts] theorem csr_name_map_backwards_pmpaddr0 : csr_name_map_backwards "pmpaddr0" = pure 0x3b0#12 := rfl
 @[sail_facts] theorem csr_name_write_callback_pmpaddr0 (v : BitVec 64) : csr_name_write_callback "pmpaddr0" v = pure () := rfl

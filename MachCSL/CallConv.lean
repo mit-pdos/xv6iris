@@ -165,6 +165,8 @@ def KCtx.pushed (k : KCtx) (m : Nat) : KCtx := { k with avail := k.avail - m }
 
 @[simp] theorem KCtx.pushed_regs (k : KCtx) (m : Nat) : (k.pushed m).regs = k.regs := rfl
 @[simp] theorem KCtx.pushed_sie (k : KCtx) (m : Nat) : (k.pushed m).sie = k.sie := rfl
+@[simp] theorem KCtx.pushed_spie (k : KCtx) (m : Nat) : (k.pushed m).spie = k.spie := rfl
+@[simp] theorem KCtx.pushed_spp (k : KCtx) (m : Nat) : (k.pushed m).spp = k.spp := rfl
 @[simp] theorem KCtx.pushed_avail (k : KCtx) (m : Nat) : (k.pushed m).avail = k.avail - m := rfl
 @[simp] theorem KCtx.pushed_noff (k : KCtx) (m : Nat) : (k.pushed m).noff = k.noff := rfl
 @[simp] theorem KCtx.pushed_intena (k : KCtx) (m : Nat) : (k.pushed m).intena = k.intena := rfl
@@ -202,15 +204,17 @@ theorem KCtx.rget_pop (cpu : CPU) (k : KCtx) (m : Nat) (j : BitVec 5) :
 theorem KCtx.rget_sp (cpu : CPU) (k : KCtx) : k.rget cpu 2#5 = k.sp :=
   KCtx.rget_ne cpu k 2#5 (by decide) (by decide)
 
-/-- The context after `push_off` (at `sie = false`: the depth incremented,
-`intena` untouched -- the write of `old = 0` at depth 0 agrees with `wf`'s
-coupling `noff = 0 → sie = intena`). -/
+/-- The context after `push_off`: the depth incremented, `intena` untouched
+(the write of `old` at depth 0 is exactly `wf`'s canonical value there,
+`noff = 0 → sie = intena`). -/
 def KCtx.pushOff (k : KCtx) : KCtx := { k with noff := k.noff + 1 }
 /-- The context after `pop_off` (staying at `sie = false`). -/
 def KCtx.popOff (k : KCtx) : KCtx := { k with noff := k.noff - 1 }
 
 @[simp] theorem KCtx.pushOff_regs (k : KCtx) : k.pushOff.regs = k.regs := rfl
 @[simp] theorem KCtx.pushOff_sie (k : KCtx) : k.pushOff.sie = k.sie := rfl
+@[simp] theorem KCtx.pushOff_spie (k : KCtx) : k.pushOff.spie = k.spie := rfl
+@[simp] theorem KCtx.pushOff_spp (k : KCtx) : k.pushOff.spp = k.spp := rfl
 @[simp] theorem KCtx.pushOff_avail (k : KCtx) : k.pushOff.avail = k.avail := rfl
 @[simp] theorem KCtx.pushOff_noff (k : KCtx) : k.pushOff.noff = k.noff + 1 := rfl
 @[simp] theorem KCtx.pushOff_intena (k : KCtx) : k.pushOff.intena = k.intena := rfl
@@ -221,6 +225,8 @@ def KCtx.popOff (k : KCtx) : KCtx := { k with noff := k.noff - 1 }
 @[simp] theorem KCtx.pushOff_sp (k : KCtx) : k.pushOff.sp = k.sp := rfl
 @[simp] theorem KCtx.popOff_regs (k : KCtx) : k.popOff.regs = k.regs := rfl
 @[simp] theorem KCtx.popOff_sie (k : KCtx) : k.popOff.sie = k.sie := rfl
+@[simp] theorem KCtx.popOff_spie (k : KCtx) : k.popOff.spie = k.spie := rfl
+@[simp] theorem KCtx.popOff_spp (k : KCtx) : k.popOff.spp = k.spp := rfl
 @[simp] theorem KCtx.popOff_avail (k : KCtx) : k.popOff.avail = k.avail := rfl
 @[simp] theorem KCtx.popOff_noff (k : KCtx) : k.popOff.noff = k.noff - 1 := rfl
 @[simp] theorem KCtx.popOff_intena (k : KCtx) : k.popOff.intena = k.intena := rfl
@@ -243,6 +249,8 @@ def KCtx.withLocks (k : KCtx) (l : List String) : KCtx := { k with locks := l }
 
 @[simp] theorem KCtx.withLocks_regs (k : KCtx) (l : List String) : (k.withLocks l).regs = k.regs := rfl
 @[simp] theorem KCtx.withLocks_sie (k : KCtx) (l : List String) : (k.withLocks l).sie = k.sie := rfl
+@[simp] theorem KCtx.withLocks_spie (k : KCtx) (l : List String) : (k.withLocks l).spie = k.spie := rfl
+@[simp] theorem KCtx.withLocks_spp (k : KCtx) (l : List String) : (k.withLocks l).spp = k.spp := rfl
 @[simp] theorem KCtx.withLocks_avail (k : KCtx) (l : List String) : (k.withLocks l).avail = k.avail := rfl
 @[simp] theorem KCtx.withLocks_noff (k : KCtx) (l : List String) : (k.withLocks l).noff = k.noff := rfl
 @[simp] theorem KCtx.withLocks_intena (k : KCtx) (l : List String) : (k.withLocks l).intena = k.intena := rfl
@@ -266,9 +274,9 @@ theorem KCtx.rget_withLocks (cpu : CPU) (k : KCtx) (l : List String) (i : BitVec
     (k.withLocks l).rget cpu i = k.rget cpu i := rfl
 
 /-- The well-formedness a context carries. -/
-theorem kctx_wf [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) :
-    kctx (GF := GF) cpu k ⊢ ⌜k.wf⌝ ∗ kctx cpu k := by
-  unfold kctx
+theorem kctx_wf [CurCtx] [KernelGeom] [KernelImage GF] {lent : Bool} (cpu : CPU) (k : KCtx) :
+    kctxL (GF := GF) lent cpu k ⊢ ⌜k.wf⌝ ∗ kctxL lent cpu k := by
+  unfold kctxL kctxP
   iintro ⟨%hwf, H⟩
   isplitr
   · ipureintro; exact hwf
@@ -276,7 +284,8 @@ theorem kctx_wf [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) :
     ipureintro; exact hwf
 
 /-- A context is its base with its own registers if all other fields agree. -/
-theorem KCtx.eq_withRegs (k k' : KCtx) (hsie : k'.sie = k.sie) (havail : k'.avail = k.avail)
+theorem KCtx.eq_withRegs (k k' : KCtx) (hsie : k'.sie = k.sie) (hspie : k'.spie = k.spie)
+    (hspp : k'.spp = k.spp) (havail : k'.avail = k.avail)
     (hnoff : k'.noff = k.noff) (hintena : k'.intena = k.intena) (hlocks : k'.locks = k.locks)
     (htier : k'.tier = k.tier) (hroot : k'.root = k.root) (hproc : k'.proc = k.proc) :
     k' = k.withRegs k'.regs := by

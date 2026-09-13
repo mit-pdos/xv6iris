@@ -104,21 +104,21 @@ set_option maxHeartbeats 4000000 in
 /-- The common tail from `80000b98`: `mycpu()`, `noff += 1`, the epilogue.
 `R` is the body's map; its callee-saved registers other than `s1` (restored
 from the frame) are the caller's. -/
-theorem push_off_tail {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx] (M : MYCPU)
+theorem push_off_tail {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx] (M : MYCPU) (lent : Bool)
     (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
-    (hnoff : k.noff + 1 < 2 ^ 31) (hK : 6 ≤ k.avail) (hwf : k.wf) (R : RegMap)
+    (hnoff : k.noff + 1 < 2 ^ 31) (hK : 6 ≤ k.avail) (hwf : k.wf) (hl : lent = false → 1 ≤ k.noff) (R : RegMap)
     (hsp : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64) (hcs : csRegs k.regs R) :
-    kctx cpu ((k.pushed 4).withRegs R) ∗ pcIs cpu 0x80000b98#64 ∗
-    frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
+    kctxL lent cpu ((k.pushed 4).withRegs R) ∗ pcIs cpu 0x80000b98#64 ∗
+    frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗ pinRes cpu lent k.intena ∗
     (∀ R' : RegMap, kctx cpu (k.pushOff.withRegs R') -∗ pcIs cpu (jumpPc (k.regs 1#5)) -∗
       ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
-  iintro ⟨Hk, Hpc, Hframe, HΦ⟩
+  iintro ⟨Hk, Hpc, Hframe, Hpin, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
   -- jal mycpu
   k_step (wp_s_jal cpu _ ?hs 0x80000b98#64 false 3362#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  have hm := M.wp_mycpu (hlc := hlc) (GF := GF) cpu ((k.pushed 4).withRegs (R.set 1#5 0x80000b9c#64))
+  have hm := M.wp_mycpu (hlc := hlc) (GF := GF) (lent := lent) cpu ((k.pushed 4).withRegs (R.set 1#5 0x80000b9c#64))
     (by k_norm) (by k_norm; omega)
   unfold wp_mycpu_body at hm
   simp only [mycpuAddr, KernelSyms.«mycpu»] at hm
@@ -137,17 +137,18 @@ theorem push_off_tail {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Cur
   k_step (wp_s_addiw cpu _ ?hs 0x80000b9e#64 true 1#12 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
     with [addiw_succ' k.noff hnoff]
   iintro Hk Hpc
-  -- sw a5,120(a0): the depth becomes noff + 1
-  k_step (wp_s_sw_noff cpu _ ?hs 0x80000ba0#64 true 120#12 10#5 15#5 ?haddr (k.noff + 1) ?hval ?hwf') from (text_instr _ _ _ _ rfl rfl) HT
+  -- sw a5,120(a0): the depth becomes noff + 1 (the lent cell, if any, is pinned again)
+  k_step (wp_s_sw_noff_inc cpu _ ?hs 0x80000ba0#64 true 120#12 10#5 15#5 ?haddr ?hval ?hl ?hwf') from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc] with [h10, withCpu_pushOff4]
   case haddr => k_norm [h10]; rfl
   case hval => k_norm; exact extractLsb'_ofNat64' _ (by omega)
+  case hl => k_norm; exact hl
   case hwf' =>
     obtain ⟨w1, w2, w3, w4, w5⟩ := hwf
     unfold KCtx.wf
     simp only [KCtx.withCpu_sie, KCtx.withCpu_noff, KCtx.withCpu_intena, KCtx.withCpu_locks, KCtx.withCpu_tier,
-      KCtx.withRegs_sie, KCtx.withRegs_intena, KCtx.withRegs_locks, KCtx.withRegs_tier, KCtx.pushed_sie,
-      KCtx.pushed_intena, KCtx.pushed_locks, KCtx.pushed_tier]
+      KCtx.withRegs_sie, KCtx.withRegs_noff, KCtx.withRegs_intena, KCtx.withRegs_locks, KCtx.withRegs_tier,
+      KCtx.pushed_sie, KCtx.pushed_noff, KCtx.pushed_intena, KCtx.pushed_locks, KCtx.pushed_tier]
     refine ⟨fun h => absurd h (by omega), fun _ => hsie, fun h => absurd h (by rw [hsie]; decide), by omega, hnoff⟩
   iintro Hk Hpc
   -- epilogue
@@ -196,7 +197,7 @@ theorem push_off_proof (M : MYCPU) : PUSHOFF := ⟨fun {hlc GF} _ _ cpu k hsie h
   -- jal mycpu
   k_step (wp_s_jal cpu _ ?hs 0x80000b90#64 false 3370#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  have hm := M.wp_mycpu (hlc := hlc) (GF := GF) cpu ((k.pushed 4).withRegs
+  have hm := M.wp_mycpu (hlc := hlc) (GF := GF) (lent := false) cpu ((k.pushed 4).withRegs
       (((((k.regs.set 2#5 (k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64)).set 8#5 (k.regs 2#5)).set 15#5 v).set 9#5 v).set 1#5
         0x80000b94#64))
     (by k_norm) (by k_norm; omega)
@@ -224,7 +225,7 @@ theorem push_off_proof (M : MYCPU) : PUSHOFF := ⟨fun {hlc GF} _ _ cpu k hsie h
     -- jal mycpu
     k_step (wp_s_jal cpu _ ?hs 0x80000bac#64 false 3342#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
-    have hm4 := M.wp_mycpu (hlc := hlc) (GF := GF) cpu ((k.pushed 4).withRegs
+    have hm4 := M.wp_mycpu (hlc := hlc) (GF := GF) (lent := false) cpu ((k.pushed 4).withRegs
         ((R2.set 15#5 0#64).set 1#5 0x80000bb0#64))
       (by k_norm) (by k_norm; omega)
     unfold wp_mycpu_body at hm4
@@ -244,24 +245,20 @@ theorem push_off_proof (M : MYCPU) : PUSHOFF := ⟨fun {hlc GF} _ _ cpu k hsie h
     k_step (wp_s_andi cpu _ ?hs 0x80000bb4#64 true 1#12 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [sie0_shr_and1' v hv]
     iintro Hk Hpc
-    -- sw a5,124(a0)
-    k_step (wp_s_sw_intena cpu _ ?hs 0x80000bb6#64 true 124#12 10#5 15#5 ?haddr k.intena ?hval ?hwf') from (text_instr _ _ _ _ rfl rfl) Htext
-      $$ [- $Hk $Hpc] with [h10', withCpu_self4]
-    case haddr => k_norm [h10']; rfl
-    case hval => k_norm [hint]; rfl
-    case hwf' =>
-      k_norm [withCpu_self4]
-      have hw := hwf
-      unfold KCtx.wf at hw ⊢
-      simp only [KCtx.withRegs_sie, KCtx.withRegs_noff, KCtx.withRegs_intena, KCtx.withRegs_locks,
-        KCtx.withRegs_tier, KCtx.pushed_sie, KCtx.pushed_noff, KCtx.pushed_intena, KCtx.pushed_locks,
-        KCtx.pushed_tier]
-      exact hw
-    iintro Hk Hpc
+    -- sw a5,124(a0): the depth-0 cell is scratch; borrow it from the bundle,
+    -- store `old = 0` into it and keep it until the depth is written
+    have hA : aCpuIntena cpu = cpuAddr cpu + 124#64 := rfl
+    icases kctx_lend cpu _ (by k_norm; exact hn0) (by k_norm) $$ Hk with ⟨%b, Hk, Hcell⟩
+    k_step (wp_s_sw cpu _ ?hs 0x80000bb6#64 true 124#12 10#5 15#5 (intenaVal b)) from (text_instr _ _ _ _ rfl rfl) Htext
+      $$ [- $Hk $Hpc] with [h10', hA]
+    iintro Hk Hpc Hcell
+    rw [← hA]
+    ihave Hpin : pinRes cpu true k.intena $$ [Hcell]
+    case' _ => (unfold pinRes; simp only [ite_true, hint, intenaVal, Bool.false_eq_true, ite_false]; iexact Hcell)
     -- j b98
     k_step (wp_s_j cpu _ ?hs 0x80000bb8#64 true 2097120#21) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
-    iapply (push_off_tail M cpu k hsie hnoff hK hwf _ ?hsp ?hcs) $$ [- $Hk $Hpc]
+    iapply (push_off_tail M true cpu k hsie hnoff hK hwf (fun h => nomatch h) _ ?hsp ?hcs) $$ [- $Hk $Hpc $Hpin]
     rotate_right 1
     iframe
     case hsp =>
@@ -282,8 +279,9 @@ theorem push_off_proof (M : MYCPU) : PUSHOFF := ⟨fun {hlc GF} _ _ cpu k hsie h
     k_step (wp_s_branch cpu _ ?hs 0x80000b96#64 true 22#13 15#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc] with [bcond_beq_ofNat' k.noff (by omega), decide_eq_false hd]
     iintro Hk Hpc
-    iapply (push_off_tail M cpu k hsie hnoff hK hwf _ ?hsp ?hcs) $$ [- $Hk $Hpc]
+    iapply (push_off_tail M false cpu k hsie hnoff hK hwf (fun _ => by omega) _ ?hsp ?hcs) $$ [- $Hk $Hpc]
     rotate_right 1
+    simp only [pinRes_false]
     iframe
     case hsp => simp [RegMap.set_apply]; rw [hcs2.1]; simp [RegMap.set_apply]
     case hcs =>

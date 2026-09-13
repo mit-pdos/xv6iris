@@ -19,6 +19,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
 open LeanRV64D
 
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {lent : Bool}
 
 /-- A two-slot frame at `sp` holding `ra` and `s0`. -/
 def frame2 [CurCtx] (sp ra s0 : BitVec 64) : IProp GF := iprop%
@@ -156,8 +157,8 @@ theorem wp_prologue2 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
     instr (GF := GF) (pc + 2#64) true (instruction.STORE (8#12, regidx.Regidx 1#5, regidx.Regidx 2#5, 8)) ∗
     instr (GF := GF) (pc + 4#64) true (instruction.STORE (0#12, regidx.Regidx 8#5, regidx.Regidx 2#5, 8)) ∗
     instr (GF := GF) (pc + 6#64) true (instruction.ITYPE (16#12, regidx.Regidx 2#5, regidx.Regidx 8#5, iop.ADDI)) ∗
-    kctx cpu k ∗ pcIs cpu pc ∗
-    ▷ (kctx cpu ((k.pushed 2).withRegs
+    kctxL lent cpu k ∗ pcIs cpu pc ∗
+    ▷ (kctxL lent cpu ((k.pushed 2).withRegs
           ((k.regs.set 2#5 (k.regs 2#5 + 0xFFFFFFFFFFFFFFF0#64)).set 8#5 (k.regs 2#5))) -∗
         pcIs cpu (pc + 8#64) -∗
         frame2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) -∗ wpLoop cpu)
@@ -189,8 +190,8 @@ theorem wp_epilogue2 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
     instr (GF := GF) (pc + 2#64) true (instruction.LOAD (0#12, regidx.Regidx 2#5, regidx.Regidx 8#5, false, 8)) ∗
     instr (GF := GF) (pc + 4#64) true (instruction.ITYPE (16#12, regidx.Regidx 2#5, regidx.Regidx 2#5, iop.ADDI)) ∗
     instr (GF := GF) (pc + 6#64) true (instruction.JALR (0#12, regidx.Regidx 1#5, regidx.Regidx 0#5)) ∗
-    kctx cpu ((k.pushed 2).withRegs R) ∗ pcIs cpu pc ∗ frame2 (k.regs 2#5) ra s0 ∗
-    ▷ (kctx cpu (k.withRegs (((R.set 1#5 ra).set 8#5 s0).set 2#5 (k.regs 2#5))) -∗
+    kctxL lent cpu ((k.pushed 2).withRegs R) ∗ pcIs cpu pc ∗ frame2 (k.regs 2#5) ra s0 ∗
+    ▷ (kctxL lent cpu (k.withRegs (((R.set 1#5 ra).set 8#5 s0).set 2#5 (k.regs 2#5))) -∗
         pcIs cpu (jumpPc ra) -∗ wpLoop cpu)
     ⊢ wpLoop cpu := by
   unfold frame2
@@ -234,8 +235,8 @@ theorem wp_prologue4s1 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : K
     instr (GF := GF) (pc + 4#64) true (instruction.STORE (16#12, regidx.Regidx 8#5, regidx.Regidx 2#5, 8)) ∗
     instr (GF := GF) (pc + 6#64) true (instruction.STORE (8#12, regidx.Regidx 9#5, regidx.Regidx 2#5, 8)) ∗
     instr (GF := GF) (pc + 8#64) true (instruction.ITYPE (32#12, regidx.Regidx 2#5, regidx.Regidx 8#5, iop.ADDI)) ∗
-    kctx cpu k ∗ pcIs cpu pc ∗
-    ▷ (kctx cpu ((k.pushed 4).withRegs
+    kctxL lent cpu k ∗ pcIs cpu pc ∗
+    ▷ (kctxL lent cpu ((k.pushed 4).withRegs
           ((k.regs.set 2#5 (k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64)).set 8#5 (k.regs 2#5))) -∗
         pcIs cpu (pc + 10#64) -∗
         frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) -∗ wpLoop cpu)
@@ -270,8 +271,8 @@ theorem wp_epilogue4s1 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : K
     instr (GF := GF) (pc + 4#64) true (instruction.LOAD (8#12, regidx.Regidx 2#5, regidx.Regidx 9#5, false, 8)) ∗
     instr (GF := GF) (pc + 6#64) true (instruction.ITYPE (32#12, regidx.Regidx 2#5, regidx.Regidx 2#5, iop.ADDI)) ∗
     instr (GF := GF) (pc + 8#64) true (instruction.JALR (0#12, regidx.Regidx 1#5, regidx.Regidx 0#5)) ∗
-    kctx cpu ((k.pushed 4).withRegs R) ∗ pcIs cpu pc ∗ frame4s1 (k.regs 2#5) ra s0 s1 ∗
-    ▷ (kctx cpu (k.withRegs ((((R.set 1#5 ra).set 8#5 s0).set 9#5 s1).set 2#5 (k.regs 2#5))) -∗
+    kctxL lent cpu ((k.pushed 4).withRegs R) ∗ pcIs cpu pc ∗ frame4s1 (k.regs 2#5) ra s0 s1 ∗
+    ▷ (kctxL lent cpu (k.withRegs ((((R.set 1#5 ra).set 8#5 s0).set 9#5 s1).set 2#5 (k.regs 2#5))) -∗
         pcIs cpu (jumpPc ra) -∗ wpLoop cpu)
     ⊢ wpLoop cpu := by
   unfold frame4s1

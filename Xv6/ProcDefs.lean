@@ -198,9 +198,9 @@ def curProc [KernelGeom] (cpu : CPU) (p : BitVec 64) : IProp GF :=
   wordPointsTo (aCpuProc cpu) 8 (DFrac.own 1) p
 
 /-- `cur_proc` is the first cell of the per-cpu bundle (Rocq `cpu_cells`). -/
-theorem cpuCells_curProc [KernelGeom] (cpu : CPU) (noff : Nat) (intena : Bool) (p : BitVec 64) :
-    cpuCells (GF := GF) cpu noff intena p ⊢
-      curProc cpu p ∗ (curProc cpu p -∗ cpuCells cpu noff intena p) := by
+theorem cpuCells_curProc [KernelGeom] (cpu : CPU) (lent sie : Bool) (noff : Nat) (intena : Bool) (p : BitVec 64) :
+    cpuCells (GF := GF) cpu lent sie noff intena p ⊢
+      curProc cpu p ∗ (curProc cpu p -∗ cpuCells cpu lent sie noff intena p) := by
   unfold cpuCells curProc
   iintro ⟨Hp, Hn, Hi⟩
   iframe Hp

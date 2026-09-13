@@ -43,11 +43,11 @@ theorem canonical_of_lt38 (va : BitVec 64) (h : va.toNat < 2 ^ 38) :
   bv_decide
 
 /-- The kernel's configuration at each tier satisfies the tier's facts. -/
-theorem SConfAt_sConfOf (tier : KTier) (root : BitVec 44) (ms mdl mepc stc : BitVec 64)
-    (hsm : smFacts ms false) :
-    SConfAt (GF := GF) tier (sConfOf tier root ms mdl mepc stc) root false := by
+theorem SConfAt_sConfOf (tier : KTier) (root : BitVec 44) (ms mdl mepc stc : BitVec 64) (sie : Bool)
+    (hsm : smFacts ms sie) :
+    SConfAt (GF := GF) tier (sConfOf tier root ms mdl mepc stc) root sie := by
   cases tier
-  · exact SConfBare_sConfOf_bare root ms mdl mepc stc hsm
+  · exact SConfBare_sConfOf_bare root ms mdl mepc stc sie hsm
   · refine ⟨⟨fun cpu dq => pmpPassesS_xv6 cpu dq _ rfl rfl, hsm, by simp only [sConfOf]; decide,
       by simp only [sConfOf]; decide⟩, ?_, ?_, ?_, by simp only [sConfOf]; decide⟩ <;>
       simp only [sConfOf, satpOf] <;> bv_decide
