@@ -631,12 +631,16 @@ Section ProofMainSecondary.
       (zero_extend' 64 (concat_vec root (zeros' 12 : mword 12))) -∗
     dev_inv γd γv -∗
     procs_inv γs -∗
-    (* THE LAST THREE [devintr_caps] MEMBERS, out of the [started] deposit: the
+    (* THE LAST FOUR [devintr_caps] MEMBERS, out of the [started] deposit: the
        handler contract this block folds into [intr_res] closes over the whole
-       credential, and the console's two lock credentials, the disk lock and
-       the geometry are the pieces that are not this hart's to make.
-       Persistent, so they simply ride in. *)
+       credential, and the console's two lock credentials, the disk lock, the
+       geometry and the second port's row are the pieces that are not this
+       hart's to make.  Persistent, so they simply ride in. *)
     console_caps γd -∗
+    (* THE SECOND PORT (XV6_REV 163d39b), [SpecDevintr.uart1_caps]: two
+       invariants and a `.data` snapshot, none of them this hart's to make.
+       *** NOT YET SUPPLIED AT THE CALL SITE BELOW -- see the marker there. *)
+    uart1_caps γd -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res_at γv pd pav pu) -∗
     disk_geom γv pd pav pu -∗
     (* this hart's timer capability, allocated in the boot chain *)
@@ -647,7 +651,7 @@ Section ProofMainSecondary.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hn Hdc Hcidne Hp0.
-    iIntros "Hcg #Htext Hpc Hfree Hcpu Hq Hsbit Htlb Htcsr #Hkinv #Hkptp #Hdev #Hpinv #Hccaps #Hdlock #Hgeom #Htimc #Hcreds".
+    iIntros "Hcg #Htext Hpc Hfree Hcpu Hq Hsbit Htlb Htcsr #Hkinv #Hkptp #Hdev #Hpinv #Hccaps #Hu1 #Hdlock #Hgeom #Htimc #Hcreds".
     (* ---- +0x32 jal kvminithart ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x32)) (mword_of_int 1 : mword 5)
               (mword_of_int 130 : mword 21) m n false
@@ -721,7 +725,7 @@ Section ProofMainSecondary.
       apply eq_vec_false_iff. exact Hcidne. }
     iAssert (devintr_caps γd γv γk γk γs pd pav pu) as "#Hcaps".
     { rewrite /devintr_caps.
-      iFrame "Hdev Hccaps Hgeom Hdlock Htimc Htick Hpinv". }
+      iFrame "Hdev Hccaps Hgeom Hdlock Htimc Htick Hpinv Hu1". }
     iPoseProof (Kernelvec.kernelvec_handler_spec γd γv γk γk γs pd pav pu
                   Hnproc with "Hhw Hmin Htext") as "#Hkvs".
     iPoseProof (kernelvec_env_move γd γv γk γk γs pd pav pu) as "#HEmv".
@@ -816,6 +820,18 @@ Section ProofMainSecondary.
     iDestruct (KptShare.kpt_creds_intro Bk with "Hbd Hbc") as "#Hcreds".
     iDestruct "Hdepm" as (γpr γk γs pd pav pu root pas)
       "(#Hpenv & #Hpinv & #Hccaps & #Hdlock & #Hgeom & #Hkinv & #Hkptp & #Htramp & #Hkstx)".
+    (* ===================== OPEN SEAM (bump 163d39b) =====================
+       [Hu1caps : SpecDevintr.uart1_caps γd] -- the second port's row.  A
+       SECONDARY hart makes none of the credential itself; every member of
+       it arrives through the one-shot [started] escrow
+       ([SpecMainSecondary.main_deposit]), so this row belongs there too,
+       beside [console_caps].  It is NOT there yet, because the depositor is
+       [ProofMain]'s [mn_grp_started] and the boot chain does not yet hand
+       [ProofMain] the row either -- [BootShared]'s supply already mints
+       [uarts_pinned] and [uart_inv Uart1 γd1] but NOT [plic_inv γd γd1],
+       which is the third member.  Two rows, one in the boot supply and one
+       in [main_deposit], close this.
+       ==================================================================== *)
     iPoseProof "Hpenv" as "Hpenv2".
     iDestruct "Hpenv2" as "(_ & _ & #Hdev & _ & _)".
     iApply (ms_printk γpr γd γv m2 (K - 2)%nat p0 Hn38
@@ -824,7 +840,7 @@ Section ProofMainSecondary.
     iApply (ms_inithart_sched γd γv γs γk pd pav pu m3 (K - 2)%nat p0 root tlbvec0
               Hn20 Hdc Hcid Hp0
               with "Hcg Htext Hpc Hfree Hcpu Hq Hsbit Htlb Htcsr Hkinv Hkptp Hdev Hpinv
-                    Hccaps Hdlock Hgeom Htimc Hcreds").
+                    Hccaps Hu1caps Hdlock Hgeom Htimc Hcreds").
   Qed.
 
 End ProofMainSecondary.

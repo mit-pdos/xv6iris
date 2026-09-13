@@ -114,6 +114,7 @@ Require Import SieCapCtx.   (* [sie_cap_gpr_own_ctx_acc]: the park borrows the r
 Require Import ParkCap.               (* [park_token_park] *)
 Require Import UsertrapRes.           (* [ut_names], [park_env], [park_own] *)
 Require Import SyscParkEnv.           (* [sysc_park_extra] / [park_world] *)
+Require Import SpecDevintr.           (* [uart1_caps] -- [park_world]'s second-port row *)
 Require Import UexecRet.              (* [uslot] -- DIRECT, the seal does not
                                          travel through a re-export *)
 Require Import InitBoot.              (* [init_boot_bundle] -- what the park
@@ -799,11 +800,15 @@ Section ProofUserinit.
         iSplitR; [iExact "Hftable"|].
         iSplitR; [iExact "Hgeom"|].
         (* the world a child's park will need, handed down from here *)
-        rewrite /park_world. iExists γtl, pd, pav, pu.
-        iDestruct "Hdcaps" as "(#Hd1 & #Hd2 & #Hd3 & #Hd4 & #Hd5 & #Hd6)".
+        (* the second port's row rides along: [devintr_caps_any] gained it
+           at the bump and [park_world] spells it out, so the copy that came
+           in is the copy that goes down. *)
+        rewrite /park_world /uart1_caps. iExists γtl, pd, pav, pu.
+        iDestruct "Hdcaps" as "(#Hd1 & #Hd2 & #Hd3 & #Hd4 & #Hd5 & #Hd6 & #Hd7)".
         iFrame "Hd1 Hd2 Hd3 Hd4 Hd5 Hd6 Hcready Hwire Htramp Hpav".
         iSplitR; [iExists γp; iExact "Hlpid"|].
-        iExists iv1; iExact "Hip1". }
+        iSplitR; [iExists iv1; iExact "Hip1"|].
+        iExact "Hd7". }
       iSplitR; [iExists γp; iExact "Hlpid"|].
       iSplitR; [iExact "Hpav"|].
       iSplitR; [iExact "Htl"|].

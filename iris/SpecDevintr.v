@@ -6,7 +6,8 @@
        uint64 scause = r_scause();
        if (scause == 0x8000000000000009L) {          // supervisor external, via PLIC
          int irq = plic_claim();
-         if      (irq == UART0_IRQ)   uartintr();
+         if      (irq == UART0_IRQ)   uartintr(0);
+         else if (irq == UART1_IRQ)   uartintr(1);
          else if (irq == VIRTIO0_IRQ) virtio_disk_intr();
          else if (irq)                printk("unexpected interrupt irq=%d\n", irq);
          if (irq) plic_complete(irq);
@@ -17,7 +18,7 @@
        } else return 0;
      }
 
-   @ KernelSyms.devintr = 0x8000250c, 39 instructions, a 32-byte frame
+   @ KernelSyms.devintr, 134 bytes, 52 instructions, a 32-byte frame
    (ra/s0 always, s1 SHRINK-WRAPPED into the PLIC arm).
 
    THIS IS THE MACHINE'S INTERRUPT DEMULTIPLEXER, and the contract is
@@ -36,12 +37,13 @@
    interrupts off no trap rewrites it).  [dq] is any fraction: the read pins
    the value and does not need the cell exclusively.
 
-   THE printk ARM IS DEAD, and that is what [PlicPlan.plic_claim_ret_ok]
-   exists for: under the kernel's PLIC plan a claim can only return 0,
-   [(uart_irq_id Uart0)] or [virtio_irq_id], so the two [beq]s above it are exhaustive
-   on the nonzero cases and the [c.bnez a4] at +0x42 provably falls through.
-   Nothing on this path calls printk -- which matters, because only printk's
-   PANIC path is proved.
+   THE printk ARM IS STILL DEAD, and the second UART did not weaken the
+   argument -- [PlicPlan.plic_claim_ret_ok] stays CLOSED, it merely gained an
+   arm: a claim returns 0, [uart_irq_id Uart0], [uart_irq_id Uart1] or
+   [virtio_irq_id].  So there are now THREE [beq]s above it, they are
+   exhaustive on the nonzero cases, and the [c.bnez a4] at +0x48 provably
+   falls through.  Nothing on this path calls printk -- which matters, because
+   only printk's PANIC path is proved.
 
    INTERRUPTS ARE OFF ([b = false]), and not as a convenience: plic_claim,
    plic_complete and clockintr are each [false]-ONLY (they call cpuid()
@@ -73,6 +75,7 @@ Require Import FdSlots.
 Require Import ProcGeom CpuOwn.
 Require Import SchedCtx.
 Require Import DiskPtsto WpUart DiskInv.
+Require Import UartsFields.   (* [uarts_pinned]: uarts[]'s two immutable fields *)
 Require Import TimerCap.
 Require Import SpecClockintr.
 Require Import SpecConsoleintr.
@@ -114,6 +117,56 @@ Section DevintrCaps.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
+  (* ------------------------------------------------------------------ *)
+  (* THE SECOND PORT, AS ONE ROW WITH ITS GHOST NAME BURIED.              *)
+  (* ------------------------------------------------------------------ *)
+  (* [irq == UART1_IRQ] calls the SAME uartintr at [Uart1], and that
+     contract is stated port-generically, so devintr owes three things it
+     did not owe before:
+
+       [uarts_pinned]        (UartsFields.v) the boot chain's snapshot of
+                             the two immutable fields of each `uarts[]`
+                             element.  uartintr needs it at BOTH ports now
+                             that the MMIO base is LOADED from `.data`
+                             rather than assembled from a constant;
+       [uart_inv Uart1 γ1]   the second port's own invariant.  The console
+                             bundle [dev_inv] deliberately does not contain
+                             it (WpUart.v: "the bundle is the console
+                             port's");
+       [plic_inv γu γ1]      the PLIC at a NAMED second bundle.  [dev_inv]
+                             does carry the PLIC, but at an EXISTENTIAL
+                             second name -- which is all a client that only
+                             claims and completes needs, and is what keeps
+                             the console bundle at arity 2.  devintr needs
+                             more: it CONSUMES source 12's payload at a
+                             named [γ1] and hands it to uartintr;
+       [uart_inited γ1]      the second port's one-shot, PAST its deposit.
+                             Port 1 has a real pre-state -- uartinitone
+                             threads [uart_rx_tok γ1] through its FCR flush
+                             and deposits it (SpecUartinit.v) -- so
+                             [plic_slots_claim] has to refute that arm at
+                             source 12 exactly as it does at source 10
+                             before it can hand the payload out.  Hence a
+                             witness per port, not one.
+
+     THE NAME IS EXISTENTIAL HERE FOR THE SAME REASON IT IS IN [dev_inv].
+     devintr's postcondition says nothing whatever about the second port --
+     the owner's ruling is that UART1's output is unconstrained -- so no
+     caller ever has to agree with devintr about WHICH bundle it is; the
+     function only needs the invariant and the payload to be at the same
+     one.  Burying it is what keeps this an ADDITIVE row: [devintr_caps],
+     [UsertrapRes.devintr_caps_any], [SpecKerneltrap], [SpecKernelvec] and
+     [SpecUserinit] all keep their arity, and the five construction sites
+     gain one row instead of a parameter each.  A reader of the [Uart1] arm
+     still sees exactly which resource paid for it, which is the test that
+     distinguishes bundling from burying. *)
+  Definition uart1_caps (γu : uart_names) : iProp Σ :=
+    (∃ γ1 : uart_names,
+       uarts_pinned ∗ uart_inv Uart1 γ1 ∗ plic_inv γu γ1 ∗ uart_inited γ1)%I.
+
+  Global Instance uart1_caps_persistent γu : Persistent (uart1_caps γu).
+  Proof. rewrite /uart1_caps. apply _. Qed.
+
   (* Everything the five handlers ask of a caller, in the order the branches
      reach them:
 
@@ -140,9 +193,8 @@ Section DevintrCaps.
                       free);
        [procs_inv]    the proc array's locks -- wakeup, reached from three of
                       the handlers;
-
-     ALL PERSISTENT, so the bundle is threaded and never consumed, and the
-     postcondition does not mention it. *)
+       [uart1_caps]   THE SECOND PORT (XV6_REV 163d39b), LAST and persistent.
+                      See its own header, just above. *)
   Definition devintr_caps (γu : uart_names) (γv : disk_names)
       (γdk γtl : gname)  (γs : list gname)
       (pd pav pu : mword 64) : iProp Σ :=
@@ -152,7 +204,8 @@ Section DevintrCaps.
       is_lock γdk d_lock "virtio_disk"%string (disk_res_at γv pd pav pu) ∗
       timer_cap ∗
       tick_keeper γtl γs ∗
-      procs_inv γs )%I.
+      procs_inv γs ∗
+      uart1_caps γu )%I.
 
   Global Instance devintr_caps_persistent γu γv γdk γtl γs pd pav pu :
     Persistent (devintr_caps γu γv γdk γtl γs pd pav pu).
@@ -185,7 +238,9 @@ End DevintrCapsMorph.
 
 (* devintr's own frame is 4 slots; the deepest callee is uartintr at
    [SpecUartintr.uartintr_stack] = 36 (virtio_disk_intr wants 22, clockintr
-   20, plic_complete 6, plic_claim 4). *)
+   20, plic_complete 6, plic_claim 4).  The second port reaches no deeper
+   than the console -- uartintr's own bound is already the MAXIMUM over the
+   ports -- so the number is unchanged. *)
 Notation devintr_stack := (52%nat) (only parsing).
 Definition wp_devintr_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}

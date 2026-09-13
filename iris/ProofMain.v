@@ -646,7 +646,18 @@ Section ProofMain.
       iSplitR; [iExact "Htxl" |].
       iSplitR; [iExact "Hconslk0" |].
       iSplitR; [iPureIntro; exact Hcnu |].
-      iSplitR; [iExact "Hsub0" | iExact "Hinit"]. }
+      iSplitR; [iExact "Hsub0" |].
+      (* ================= OPEN SEAM (bump 163d39b) =================
+         [Hubw0 : SpecUartPutc.uart_base_word Uart0] -- the VA-tier
+         snapshot of `uarts[0].base`, which consputc now LOADS instead of
+         spelling as a constant, and which rides in [console_caps] so that
+         consoleintr / uartintr / devintr each keep their premise list.
+         [BootShared]'s supply MINTS it already (`uart_base_word Uart0 ∗
+         uart_base_word Uart1`, beside [uarts_pinned]); what is missing is
+         the threading from that supply into main's own contract.  This is
+         the only place the credential is PRODUCED.
+         ============================================================ *)
+      iSplitR; [iExact "Hinit" | iExact "Hubw0"]. }
     (* THE CONSOLE BUNDLE, and this is the only point at which it can be
        built: [Hconslk] is [is_conslock γcl] with γcl still concrete, and
        [Htbl] is the table consoleinit filled twenty instructions ago.
@@ -1981,7 +1992,9 @@ Section ProofMain.
     iAssert (devintr_caps_any fsc_uart fsc_disk fsc_dlock γtl γs pd pav pu)
       as "#Hdcaps".
     { rewrite /devintr_caps_any Huartq Hdiskq.
-      iFrame "Hdev Hccaps Hgeom Hdlock Htl Hpinv". }
+      (* [Hu1caps] -- see the OPEN SEAM marker at the [devintr_caps] site
+         below; the same row, at the ambient names. *)
+      iFrame "Hdev Hccaps Hgeom Hdlock Htl Hpinv Hu1caps". }
     iAssert first_boot_persist as "#Hpersist".
     { rewrite /first_boot_persist /ic_sleeplocks.
       (* SEVENTEEN ROWS, ONE [iSplitR] EACH, NOT ONE [iFrame] -- and the
@@ -2439,9 +2452,20 @@ Section ProofMain.
        trapinit's group brought up, plus [procs_inv]. *)
     iAssert (tick_keeper γtl γs) as "#Htick".
     { iRight. iFrame "Htl Hpinv". }
+    (* ===================== OPEN SEAM (bump 163d39b) =====================
+       [Hu1caps : SpecDevintr.uart1_caps γd] -- the second port's row, which
+       [devintr_caps] gained because the [irq == UART1_IRQ] arm calls the
+       same uartintr at [Uart1].  Its three members are [uarts_pinned],
+       [uart_inv Uart1 γd1] and [plic_inv γd γd1] at ONE γd1;
+       [BootShared]'s supply already mints the first two but NOT the third,
+       and none of them is threaded into main's contract yet.  One row in
+       the boot supply plus the threading closes this -- and the same row
+       must then go into [SpecMainSecondary.main_deposit], which is where a
+       secondary hart gets every other member of this credential.
+       ==================================================================== *)
     iAssert (devintr_caps γd γv γk γtl γs pd pav pu) as "#Hcaps".
     { rewrite /devintr_caps.
-      iFrame "Hdev Hccaps Hgeom Hdlock Htimc Htick Hpinv". }
+      iFrame "Hdev Hccaps Hgeom Hdlock Htimc Htick Hpinv Hu1caps". }
     iDestruct (mn_dup_hw with "Hcg") as "(#Hhw & #Hmin & Hcg)".
     iPoseProof (Kernelvec.kernelvec_handler_spec γd γv γk γtl γs pd pav pu
                   Hnproc with "Hhw Hmin Htext") as "#Hkvs".

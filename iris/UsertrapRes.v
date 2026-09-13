@@ -537,13 +537,13 @@ Section UsertrapRes.
   (* ------------------------------------------------------------------- *)
   (* THE DEVICE COMPLEMENT, MINUS ITS ONE PER-HART MEMBER.                 *)
   (* ------------------------------------------------------------------- *)
-  (* [SpecDevintr.devintr_caps] has seven members and exactly one of them is
+  (* [SpecDevintr.devintr_caps] has eight members and exactly one of them is
      hart-indexed: [TimerCap.timer_cap], which is [sstc_enabled ∗
      stimecmp_inv] over THIS hart's [mcounteren] and [stimecmp].  (The tick
      keeper's LEFT disjunct is hart-indexed too, but its real arm is not, and
      the real arm is the one the boot hart brings up.)
 
-     THIS BUNDLE IS THE OTHER SIX, and it is hart-FREE by construction --
+     THIS BUNDLE IS THE OTHER SEVEN, and it is hart-FREE by construction --
      invariants, locks and memory points-to, no register cell.  So it needs
      no quantifier at all: a holder can use it at whatever hart it happens to
      be on, which is what a resource that is FRAMED across steps at [b =
@@ -577,7 +577,19 @@ Section UsertrapRes.
         [⌜tick_hart = false⌝], a statement about a particular hart, and this
         bundle is not allowed to depend on one. *)
      is_tickslock γtl ∗
-     procs_inv γs)%I.
+     procs_inv γs ∗
+     (* THE SECOND PORT, at the bump (SpecDevintr.v's own header).  Hart-free
+        like the rest -- two invariants and a discarded-word snapshot -- and
+        it carries its ghost bundle EXISTENTIALLY, so this row costs no
+        parameter here either. *)
+     uart1_caps γu)%I.
+
+  (* ...and its projection, for a holder who has to rebuild the bundle at a
+     different context and has nowhere else to get the row. *)
+  Lemma devintr_caps_any_uart1 (γu : uart_names) (γv : disk_names)
+      (γdk γtl : gname) (γs : list gname) (pd pav pu : mword 64) :
+    devintr_caps_any γu γv γdk γtl γs pd pav pu -∗ uart1_caps γu.
+  Proof. iIntros "(_ & _ & _ & _ & _ & _ & #H)". iExact "H". Qed.
 
   (* [SyscParkEnv.park_world], opened: its first six rows ARE
      [devintr_caps_any] at the ambient names. *)
@@ -590,9 +602,10 @@ Section UsertrapRes.
       (∃ ip : mword 64, (mword_of_int KernelSyms.initproc : mword 64) ↦₈□ ip).
   Proof.
     iIntros "H". iDestruct "H" as (γtl pd pav pu)
-      "(#Hdev & #Hcc & #Hgeom & #Hdlk & #Htl & #Hpi & #Hcr & #Hnp & #Hpav & #Hwire & #Hkmap & #Hip)".
+      "(#Hdev & #Hcc & #Hgeom & #Hdlk & #Htl & #Hpi & #Hcr & #Hnp & #Hpav & #Hwire & #Hkmap & #Hip & #Hu1)".
     iExists γtl, pd, pav, pu. iFrame "Hwire Hkmap Hip".
-    iSplitR; [rewrite /devintr_caps_any; iFrame "Hdev Hcc Hgeom Hdlk Htl Hpi"|].
+    iSplitR; [rewrite /devintr_caps_any /uart1_caps;
+              iFrame "Hdev Hcc Hgeom Hdlk Htl Hpi Hu1"|].
     rewrite /sysc_park_extra. iFrame "Hnp Hpav Htl Hcr".
   Qed.
 
@@ -600,7 +613,7 @@ Section UsertrapRes.
     Persistent (devintr_caps_any γu γv γdk γtl γs pd pav pu).
   Proof. rewrite /devintr_caps_any. apply _. Qed.
 
-  (* ...and the join, at whatever hart the caller is on: the six hart-free
+  (* ...and the join, at whatever hart the caller is on: the seven hart-free
      rows plus THAT hart's timer capability. *)
   Lemma devintr_caps_any_at (h : CPU) (γu : uart_names) (γv : disk_names)
       (γdk γtl : gname) (γs : list gname) (pd pav pu : mword 64) :
@@ -608,16 +621,16 @@ Section UsertrapRes.
     timer_cap (CID := h) -∗
     devintr_caps (CID := h) γu γv γdk γtl γs pd pav pu.
   Proof.
-    iIntros "(#Hdev & #Hcons & #Hgeom & #Hdlk & #Htick & #Hprocs) #Htc".
+    iIntros "(#Hdev & #Hcons & #Hgeom & #Hdlk & #Htick & #Hprocs & #Hu1) #Htc".
     rewrite /devintr_caps.
     iSplitR; [iExact "Hdev"|].
     iSplitR; [iExact "Hcons"|].
     iSplitR; [iExact "Hgeom"|].
     iSplitR; [iExact "Hdlk"|].
     iSplitR; [iExact "Htc"|].
-    iSplitR; [| iExact "Hprocs"].
     (* [tick_keeper]'s real arm *)
-    iRight. iSplitR; [iExact "Htick" | iExact "Hprocs"].
+    iSplitR; [iRight; iSplitR; [iExact "Htick" | iExact "Hprocs"]|].
+    iSplitR; [iExact "Hprocs" | iExact "Hu1"].
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -2069,7 +2082,11 @@ Proof.
                 (#Hprocs & #Hwl & #Hft & #Hcc & #Hcr & #Htl & #Hnp & #Hipx) #Hfs".
   destruct Hwf as (Hj & Hlk & _ & _).
   iDestruct (park_world_open with "Hpw0") as (γtl0 pd0 pav0 pu0)
-    "(_ & #Hextra0 & #Hwire & #Hkmap & _)".
+    "(#Hdca0 & #Hextra0 & #Hwire & #Hkmap & _)".
+  (* THE SECOND PORT'S ROW travels with the parked world -- it is the one
+     member neither [fs_ready] nor the park globals carry, and it is
+     context-free, so the copy that came in is the copy that goes out. *)
+  iDestruct (devintr_caps_any_uart1 with "Hdca0") as "#Hu1".
   iDestruct "Hextra0" as "(_ & #Hpav & _ & _)".
   iDestruct (fs_ready_disk with "Hfs") as "[#Hdinv Hdex]".
   iDestruct "Hdex" as (pd pav pu) "[#Hdg2 #Hdlk]".
@@ -2088,9 +2105,10 @@ Proof.
     iSplitR; [iExact "Hcc"|].
     iSplitR; [rewrite Hpd Hpav Hpu; iExact "Hdg2"|].
     iSplitR; [rewrite Hpd Hpav Hpu; iExact "Hdlk"|].
-    iSplitR; [iExact "Htl" | iExact "Hprocs"]. }
+    iSplitR; [iExact "Htl"|].
+    iSplitR; [iExact "Hprocs" | iExact "Hu1"]. }
   iAssert (park_world (XI := Xc) (un_s N)) as "#Hpw".
-  { rewrite /park_world. iExists (un_tk N), pd, pav, pu.
+  { rewrite /park_world /uart1_caps. iExists (un_tk N), pd, pav, pu.
     iSplitR; [iExact "Hdinv"|].
     iSplitR; [iExact "Hcc"|].
     iSplitR; [iExact "Hdg2"|].
@@ -2102,7 +2120,7 @@ Proof.
     iSplitR; [iExact "Hpav"|].
     iSplitR; [iExact "Hwire"|].
     iSplitR; [iExact "Hkmap"|].
-    iExact "Hipx". }
+    iSplitR; [iExact "Hipx" | iExact "Hu1"]. }
   rewrite /ut_caps.
   iSplitR; [iExact "Hprocs"|].
   iSplitR; [iApply (fs_ready_data with "Hfs")|].
