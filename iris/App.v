@@ -272,6 +272,18 @@ Theorem xv6_app_adequacy Σ
             about the world, and the premise a pinned <init> discharges
             [UConsLine.ush_tag_law] from. *)
          riscv_rx_tag = app_tag A c ->
+         (* ...and (b') THE GENERATION-COUNTER EQUATION (lane APP-IFACE, the
+            same pattern as the rx-tag one above).  The era's [A] is FIXED
+            before [HR] exists, so the camera [A]'s own predicate carries
+            for the taint counter is the PRE-structure's, while [AppInv]'s
+            laws ABOUT that predicate are at the FIXED layer's.
+            [RiscvAdequacy.boot_fixedGS] fills every anonymous class slot
+            from [riscvGpreS] (its header: "All resolve from
+            [riscvGpreS]"), so at the instance this theorem is taken at the
+            two are the SAME TERM -- a fact about that instance, not an
+            assumption about the world, and the premise that lets the
+            record's predicate meet [AppInv]'s laws. *)
+         @riscvF_genGS Σ (@riscv_fixedGS Σ HR) = riscv_pre_genGS ->
          (* ...and (a) THE BOOT RESOURCE, LINEARLY, at the instance the
             record equation names *)
          ⊢ AppInv.app_inv FsCfg.fsc_fs -∗ app_boot A c r -∗
@@ -387,10 +399,13 @@ Section AppTriv.
     @file_app Σ HF
       = MkAppcfg (app_names (app_triv Σ)) (app_pred (app_triv Σ) c) r ->
     riscv_rx_tag = app_tag (app_triv Σ) c ->
+    (* ...and the generation-counter equation (lane APP-IFACE (b')), which
+       the generic application takes and does not use *)
+    @riscvF_genGS Σ (@riscv_fixedGS Σ HR) = riscv_pre_genGS ->
     ⊢ AppInv.app_inv FsCfg.fsc_fs -∗ app_boot (app_triv Σ) c r -∗
       |==> init_boot_bundle (bv_unsigned InodeInv.ROOTINO) fdt0.
   Proof.
-    intros Heq _. iIntros "_ _". iModIntro.
+    intros Heq _ _. iIntros "_ _". iModIntro.
     (* the rewrite goes BEFORE the [intros]: [r'] is typed at
        [app_names file_app], so rewriting under it is a dependent rewrite *)
     iApply init_boot_of_triv. rewrite Heq. intros r' av.

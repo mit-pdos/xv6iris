@@ -1026,6 +1026,18 @@ Theorem xv6_power_adequacy_gen Σ
               (c : CT) (r : app_names),
          @file_app Σ HF = MkAppcfg app_names (app_fs c) r ->
          riscv_rx_tag = Tg c ->
+         (* ...and (b') THE GENERATION-COUNTER EQUATION (lane APP-IFACE, the
+            same pattern as the rx-tag one above).  The era's [A] is FIXED
+            before [HR] exists, so the camera [A]'s own predicate carries
+            for the taint counter is the PRE-structure's, while [AppInv]'s
+            laws ABOUT that predicate are at the FIXED layer's.
+            [RiscvAdequacy.boot_fixedGS] fills every anonymous class slot
+            from [riscvGpreS] (its header: "All resolve from
+            [riscvGpreS]"), so at the instance this theorem is taken at the
+            two are the SAME TERM -- a fact about that instance, not an
+            assumption about the world, and the premise that lets the
+            record's predicate meet [AppInv]'s laws. *)
+         @riscvF_genGS Σ (@riscv_fixedGS Σ HR) = riscv_pre_genGS ->
          ⊢ AppInv.app_inv FsCfg.fsc_fs -∗ app_boot c r -∗
            |==> init_boot_bundle (bv_unsigned InodeInv.ROOTINO) fdt0)
     (* THE TRACE INVARIANT, PASSED THROUGH TO
@@ -1304,6 +1316,12 @@ Proof.
      to be a NAMED hypothesis rather than an [eq_refl] in the term. *)
   assert (Htagfix : @riscv_rx_tag Σ F = Tg Gcl)
     by (rewrite Hfix; reflexivity).
+  (* ...AND ITS TWIN FOR THE GENERATION COUNTER (lane APP-IFACE (b')), read
+     off the same literal and for the same reason: [boot_fixedGS] resolves
+     the anonymous class slots from [riscvGpreS], so the fixed layer's
+     counter IS the pre-structure's here. *)
+  assert (Hgenfix : @riscvF_genGS Σ F = riscv_pre_genGS)
+    by (rewrite Hfix; reflexivity).
   subst F.
   (* THE RECORD'S SHAPE, substituted: every projection below reduces, which
      is what makes the crash slot's value -- and hence the seam -- visible
@@ -1325,7 +1343,7 @@ Proof.
             (app_xfer_raw_of_boot _ _ (Happ_boot Gcl))
             (fun HBs HFd HIr HPav HWc HF r Hr =>
                Hinit_boot (RiscvGS Σ _ HE) gen HBs HFd HIr HPav HWc HF Gcl r
-                 Hr Htagfix)
+                 Hr Htagfix Hgenfix)
             Hbf Hpure Hcovin Hlogsub Hls2 _ _).
   (* the descriptor class comes back as a GOAL here rather than being
      shelved, because the application is explicit ([@]); it is the section's
@@ -1391,7 +1409,8 @@ Proof.
             (fun _ : unit => rx_tag_triv)
             (fun (_ : unit) (h : list mobs) => @rx_tag_triv_persistent Σ h)
             (fun (_ : unit) (h : list mobs) => @rx_tag_triv_timeless Σ h)
-            ltac:(intros HRi GENi HBsi HFdi HIri HPavi HWci HFi ci ri Heq Htag;
+            ltac:(intros HRi GENi HBsi HFdi HIri HPavi HWci HFi ci ri
+                         Heq Htag Hgeni;
                   iIntros "_ _"; iModIntro; iApply init_boot_of_triv;
                   rewrite Heq; intros r' av; reflexivity)
             (fun γobs _ => obs_pred_at γobs)
@@ -1465,7 +1484,8 @@ Proof.
                   iPureIntro; exact Logic.I)
             (fun _ : unit => Tg) (fun (_ : unit) (h : list mobs) => HTg h)
             (fun (_ : unit) (h : list mobs) => HTgt h)
-            ltac:(intros HRi GENi HBsi HFdi HIri HPavi HWci HFi ci ri Heq Htag;
+            ltac:(intros HRi GENi HBsi HFdi HIri HPavi HWci HFi ci ri
+                         Heq Htag Hgeni;
                   iIntros "_ _"; iModIntro; iApply init_boot_of_triv;
                   rewrite Heq; intros r' av; reflexivity)
             (fun γobs _ => obs_ledger_at R γobs)
@@ -1868,7 +1888,8 @@ Proof.
             (fun _ : unit => rx_tag_triv)
             (fun (_ : unit) (h : list mobs) => @rx_tag_triv_persistent xv6Σ h)
             (fun (_ : unit) (h : list mobs) => @rx_tag_triv_timeless xv6Σ h)
-            ltac:(intros HRi GENi HBsi HFdi HIri HPavi HWci HFi ci ri Heq Htag;
+            ltac:(intros HRi GENi HBsi HFdi HIri HPavi HWci HFi ci ri
+                         Heq Htag Hgeni;
                   iIntros "_ _"; iModIntro; iApply init_boot_of_triv;
                   rewrite Heq; intros r' av; reflexivity)
             (fun γobs _ => obs_pred_at γobs)

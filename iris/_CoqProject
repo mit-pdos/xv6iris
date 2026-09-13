@@ -2108,3 +2108,11 @@ UInitSh.v
 # which is what forkret's kexec("/init") is) rather than out of the
 # syscall shape UInitSh uses.
 UInitBoot.v
+# UInitBootAdequacy = E2's B3: App.xv6_app_adequacy at AppEcho.app_echo,
+# with Hinit_boot discharged by UInitBoot.echo_Hinit_boot and only Hphi
+# (E5's) and the shell's owed pieces left as named hypotheses.  SEPARATE
+# from UInitBoot.v because it needs the ADEQUACY cone (RiscvAdequacy,
+# SystemAdequacy, FsCfgBoot, iris.program_logic.adequacy), and that cone
+# does not mix with the u-tier's sbundle wand towers: importing it into
+# UInitBoot.v elaborates without bound (54 GB in 64 s, measured).
+UInitBootAdequacy.v
