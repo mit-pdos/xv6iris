@@ -72,7 +72,7 @@
    the port, so producing it costs this contract nothing and a caller that
    owes nothing about the wire simply drops it. *)
 From Stdlib Require Import ZArith Bool Lia List.
-From stdpp Require Import gmap list bitvector.definitions.
+From stdpp Require Import gmap list finite bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import ghost_var gen_heap invariants.
 From iris.program_logic Require Import language weakestpre lifting.
@@ -187,6 +187,55 @@ Section UartBaseWord.
      or a persistent [↦₈□] sibling of [BootCarve.boot_ran_ran_word] minted
      directly.  Either way it is one lemma in the boot lane's files, and
      until it exists this premise is what a UART driver must be handed. *)
+  (* ------------------------------------------------------------------ *)
+  (*  BOTH ELEMENTS' BOTH IMMUTABLE FIELDS, AS ONE ROW.                   *)
+  (* ------------------------------------------------------------------ *)
+  (* The VA-tier twin of [UartsFields.uarts_pinned], and it travels as ONE
+     row for two reasons.  `uarts[]` is one static array: the boot chain
+     crosses all four words in one place and no client ever learns one
+     without the others.  And these are the only CONTEXT-RELATIVE facts the
+     interrupt path needs about the array -- everything else it carries
+     about a port (that port's invariant, its PLIC slot's one-shot, its
+     frozen DLAB) is a ghost and rides any context for free -- so keeping
+     the four together puts the whole context-relative half in ONE bundle,
+     the one that already crosses ([SpecConsoleintr.console_caps], which
+     [UsertrapRes.park_globals] carries to the resumer's context).  Splitting
+     them per port would put a ξ-relative row into the SECOND port's
+     otherwise ξ-free credential ([SpecDevintr.uart1_caps]), which is
+     rebuilt at a foreign context by a proof that holds no domination and so
+     can transport nothing.
+
+     Indexed off [enum uart_id] exactly as [uarts_pinned] is, so a third
+     port stays a constructor and nothing else. *)
+  Definition uarts_words : iProp Σ :=
+    ([∗ list] i ∈ enum uart_id, uart_base_word i ∗ uart_rx_word i)%I.
+
+  Global Instance uarts_words_persistent : Persistent uarts_words.
+  Proof. rewrite /uarts_words. apply _. Qed.
+
+  (* focus one port out of the four, the only way a driver reaches one *)
+  Lemma uarts_words_at (i : uart_id) :
+    uarts_words -∗ uart_base_word i ∗ uart_rx_word i.
+  Proof.
+    rewrite /uarts_words /enum /uart_id_finite /=.
+    iIntros "#(H0 & H1 & _)". by destruct i.
+  Qed.
+
+  Lemma uarts_words_base (i : uart_id) : uarts_words -∗ uart_base_word i.
+  Proof. iIntros "#H". by iDestruct (uarts_words_at i with "H") as "[$ _]". Qed.
+
+  Lemma uarts_words_rx (i : uart_id) : uarts_words -∗ uart_rx_word i.
+  Proof. iIntros "#H". by iDestruct (uarts_words_at i with "H") as "[_ $]". Qed.
+
+  (* ...and the assembly, which only the boot chain runs *)
+  Lemma uarts_words_intro :
+    uart_base_word Uart0 -∗ uart_rx_word Uart0 -∗
+    uart_base_word Uart1 -∗ uart_rx_word Uart1 -∗ uarts_words.
+  Proof.
+    iIntros "#Hb0 #Hr0 #Hb1 #Hr1".
+    rewrite /uarts_words /enum /uart_id_finite /=.
+    iFrame "Hb0 Hr0 Hb1 Hr1".
+  Qed.
 End UartBaseWord.
 
 Definition wp_uartputc_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}

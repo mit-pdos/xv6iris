@@ -1689,8 +1689,12 @@ Section BootAlloc.
          boot chain knows the names it minted, and main needs the concrete
          invariant for its second deposit and for [plic_claim]/
          [plic_complete].  [SpecDevintr.uart1_caps] is built out of this row
-         plus [uarts_pinned] plus [uart_inv Uart1] plus the [uart_inited] the
-         deposit mints, so main can assemble it after depositing. *)
+         plus [uart_inv Uart1], the [uart_inited] the deposit mints and the
+         DLAB freeze uartinit hands back, so main can assemble it after
+         depositing.  [uarts_pinned] is NOT in it: uartintr consumes the two
+         `uarts[1]` words at the VA tier, and that form is context-relative,
+         so all four of the array's words travel in
+         [SpecConsoleintr.console_caps] instead. *)
       plic_inv γd γd1 ∗
       wire_inv ∗ crash_inv ∗ gen_cert ∗
       (* --- one bundle per hart --- *)

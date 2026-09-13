@@ -38,19 +38,13 @@
    (4) THE PUSH SITE USES THE LOCATED TWINS.  At +0x6a, where the
        sublist-only proof re-links its receipt with
        [UartTxInv.uart_tx_own_sent_sub_at] and extends it with
-       [uart_sent_sub_snoc], this one uses [uwl_tx_own_sent_from_at] (the
-       port-generic located re-link, below) and
+       [uart_sent_sub_snoc], this one uses
+       [UartSentLoc.uart_tx_own_sent_from_at] (the port-generic located
+       re-link) and
        [UartSentLoc.uart_sent_from_snoc], which returns the seed's prefix
        fact ALONGSIDE the sublist fact -- the extra output is the whole
        point.  Same [fupd_wp], same position in the instruction stream, same
        [Hsublist] name for the sublist half.
-
-   WHERE [uwl_tx_own_sent_from_at] BELONGS.  Beside its console-bundle twin
-   [UartSentLoc.uart_tx_own_sent_from], which takes [dev_inv] and therefore
-   cannot be stated at the second port; it lives here only because this lane
-   may not edit that file.  Move it there when the port-generic sweep of
-   [UartSentLoc.v] happens -- [ProofConsolewrite.v] will want it without this
-   file's cone.
 
    ProofUartwrite.v's header is the design of record for the walk itself --
    the port arithmetic, the rotated loop, the [iLoeb] at +0x48 inside the
@@ -447,31 +441,6 @@ Section UwProps.
     iSplitL "H3"; [by iExists _|]. iSplitL "H4"; [by iExists _|].
     iSplitL "H5"; [by iExists _|]. iSplitL "H6"; [by iExists _|].
     iSplitL "H7"; [by iExists _|]. iSplitL "H8"; [by iExists _|]. done.
-  Qed.
-
-  (* THE TOKEN RE-LINKS THE LOCATED RECEIPT, PORT-GENERICALLY.
-     [UartSentLoc.uart_tx_own_sent_from] is the same fact over the CONSOLE
-     bundle [dev_inv], which cannot be stated at the second port; this is
-     its [uart_inv i] twin, and it belongs in UartSentLoc.v beside the
-     original as soon as a lane may edit that file. *)
-  Lemma uwl_tx_own_sent_from_at (prt : uart_id) (γu : uart_names)
-      (l tr0 bs : list (bv 8)) (E : coPset) :
-    ↑(uartN prt) ⊆ E ->
-    uart_inv prt γu -∗ uart_tx_own γu l -∗ uart_sent_from γu tr0 bs ={E}=∗
-      uart_tx_own γu l ∗ ⌜ tr0 `prefix_of` l ⌝ ∗
-      ⌜ bs `sublist_of` drop (length tr0) l ⌝.
-  Proof.
-    iIntros (HE) "#Huinv Hown #Hfrom".
-    iDestruct "Hfrom" as (tr) "(#HL & %Hp & %Hs)".
-    iMod (uart_tx_own_sent_prefix_at prt γu l tr E HE with "Huinv Hown HL")
-      as "[Hown %Hpre]".
-    iModIntro. iFrame "Hown". iPureIntro.
-    pose proof Hpre as Hpre'. destruct Hpre' as [k ->].
-    split.
-    - by etrans.
-    - rewrite drop_app_le; last by apply stdpp.list_relations.prefix_length.
-      apply (transitivity Hs).
-      apply stdpp.list_relations.sublist_inserts_r. reflexivity.
   Qed.
 
   Definition uw_buf `{XI : CurCtx} (buf : mword 64) (dq : dfrac) (f : nat -> bv 8) (n : nat) : iProp Σ :=
@@ -1259,7 +1228,7 @@ Section UwBodies.
         iEval (rewrite P6a) in "Hpc".
         (* --- the trace re-link, before the push --- *)
         iApply fupd_wp.
-        iMod (uwl_tx_own_sent_from_at prt γu l tr0 (uw_bytes f i) ⊤ ltac:(solve_ndisj)
+        iMod (uart_tx_own_sent_from_at prt γu l tr0 (uw_bytes f i) ⊤ ltac:(solve_ndisj)
                 with "Huinv Hown Hsub") as "(Hown & %Hprefix & %Hsublist)".
         iModIntro.
         (* --- +0x6a  sb a5,0(a4)  -- the THR write, off the base a4 --- *)

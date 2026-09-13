@@ -390,6 +390,7 @@ Require Import FsReady FsCfg.
 Require Import FirstTok.  (* [first_done] -- syscall_env's last conjunct *)
 Require Import SyscParkEnv.  (* [sysc_park_extra] -- what the producer below takes;
                                 its rows are what a park needs *)
+Require SpecUartPutc.        (* [uart_base_word] -- the console arm's `.data` row *)
 Require Import ParkCap.      (* [park_token] -- the park, handed down through [syscall_env] *)
 Require Import SpecSyscall.
 (* THE EXEC CHANNEL (lane E2): the AU contract the exec arm runs on when the
@@ -1059,24 +1060,29 @@ Section SyscallVocab.
     syscall_env γf pj fn -∗ park_token (fcn_procs fn).
   Proof. by iIntros "(_ & _ & _ & _ & _ & $)". Qed.
 
-  (* ...and the `.data` SNAPSHOT OF uarts[], off that same world.  Since
-     163d39b the console driver LOADS its MMIO base out of [uarts[i].base]
-     instead of spelling it as a constant, so [SpecFilewrite]'s
-     [filewrite_dev_caps] carries [UartsFields.uarts_pinned] and the FD_DEVICE
-     arm below has to supply it.  It is genuinely absent from filewrite's own
-     context ([kernel_text]/[kernel_data] do not cover `.data`, and
-     [panic_env]'s [prputc_env] carries [uart_base_word Uart1] -- wrong tier
-     AND wrong port), and it is already here: [park_world]'s LAST conjunct is
-     [SpecDevintr.uart1_caps] spelled out, whose first row IS the snapshot.
+  (* ...and the `.data` SNAPSHOT OF `uarts[0].base`, off that same world.
+     Since 163d39b the console driver LOADS its MMIO base out of
+     [uarts[0].base] instead of spelling it as a constant, so
+     [SpecFilewrite]'s [filewrite_dev_caps] carries
+     [SpecUartPutc.uart_base_word Uart0] and the FD_DEVICE arm below has to
+     supply it.  It is genuinely absent from filewrite's own context
+     ([kernel_text]/[kernel_data] do not cover `.data`, and [panic_env]'s
+     [prputc_env] carries [uart_base_word Uart1] -- right tier, wrong PORT),
+     and it is already here: [park_world]'s console row is
+     [SpecConsoleintr.console_caps], whose LAST member is the whole array's
+     four words ([SpecUartPutc.uarts_words]).  THE PHYSICAL [UartsFields.uarts_pinned] WOULD NOT DO -- an
+     S-mode load leaf consumes the context tier and no law crosses from the
+     raw physical form -- which is why the credential travels at this tier
+     from boot down.
      Persistent, so the projection costs nothing and no arm's pattern moves. *)
-  Lemma syscall_env_uarts_pinned (γf : gname) (pj : mword 64)
+  Lemma syscall_env_uart_base0 (γf : gname) (pj : mword 64)
  (fn : fclose_names) :
-    syscall_env γf pj fn -∗ UartsFields.uarts_pinned.
+    syscall_env γf pj fn -∗ SpecUartPutc.uart_base_word Uart0.
   Proof.
     iIntros "Henv".
-    iDestruct (syscall_env_world with "Henv") as (γtl pd pav pu)
-      "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Hu1)".
-    iDestruct "Hu1" as (γu1) "(#Hpin & _ & _ & _)". iExact "Hpin".
+    iDestruct (syscall_env_world with "Henv") as (γtl pd pav pu) "(_ & #Hcc & _)".
+    iDestruct "Hcc" as (γtx γc cn) "(_ & _ & _ & _ & _ & #Hwords)".
+    iApply (SpecUartPutc.uarts_words_base Uart0 with "Hwords").
   Qed.
 
   (* ...and THE CONSOLE'S TRANSMIT LOCK, off that same world.  It used to be
@@ -5527,9 +5533,9 @@ Section SyscallArms.
        its own transaction and the escrow parks at [icfg_log] (durable-disk
        B''-tx).  [sysc_proc_ties] has said so all along. *)
     iDestruct (sysc_fs_env_ties with "Hfsenv") as %Twr.
-    (* the third row is the `.data` snapshot uartwrite loads its base from,
-       off the park's world -- see [syscall_env_uarts_pinned]. *)
-    iDestruct (syscall_env_uarts_pinned with "Henvc") as "#Hupin".
+    (* the third row is the `.data` word uartwrite loads its base from, off
+       the park's world -- see [syscall_env_uart_base0]. *)
+    iDestruct (syscall_env_uart_base0 with "Henvc") as "#Hupin".
     iAssert (SpecFilewrite.filewrite_dev_caps
                (sysc_fwrite_names γtxl γs j γl fn)) as "#Hcaps".
     { rewrite /SpecFilewrite.filewrite_dev_caps /sysc_fwrite_names; cbn.

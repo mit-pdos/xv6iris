@@ -29,15 +29,24 @@
    contract gains [console_caps], [SpecDevintr.devintr_caps] gains it, and
    every file that merely passes that bundle along changes by one name.
 
-   [uart_base_word Uart0] rides in the bundle for the same reason the lock
-   handles do.  Since XV6_REV 163d39b the driver LOADS its MMIO base out of
-   `uarts[0].base` instead of spelling it as a constant, so consputc's
-   contract needs to know what that word holds; it is persistent and depends
-   on no ghost name, and putting it here means the four call sites project it
-   from a bundle consoleintr already has rather than threading a new premise
-   up through uartintr and devintr.  It is a VA-tier points-to, so only the
-   boot chain can mint it ([KMap.kmap_static_claims]) -- a driver cannot
-   cross from the physical [UartsFields.uarts_pinned] form.
+   [SpecUartPutc.uarts_words] rides in the bundle for the same reason the
+   lock handles do.  Since XV6_REV 163d39b the driver reaches a port through
+   `&uarts[uid]` and LOADS both of that element's immutable fields out of
+   `.data` instead of spelling them as constants: consputc's callee needs the
+   base, and uartintr's receive drain needs the hook word -- it is what
+   decides the `if (u->rx)` guard STATICALLY.  All four words are persistent
+   and depend on no ghost name, and putting them here means the call sites
+   project what they need from a bundle consoleintr already has rather than
+   threading new premises up through uartintr and devintr.  They are VA-tier
+   points-to, so only the boot chain can mint them
+   ([KMap.kmap_static_claims]) -- a driver cannot cross from the physical
+   [UartsFields.uarts_pinned] form.
+
+   AND IT IS BOTH PORTS' WORDS, not the console's alone, because this bundle
+   is the interrupt path's ONE context-relative carrier: devintr calls the
+   same uartintr at [Uart1], whose credential ([SpecDevintr.uart1_caps]) is
+   rebuilt at a foreign context by a proof holding no domination and must
+   therefore stay ξ-free.  See [SpecUartPutc.uarts_words].
 
    [uart_sent_sub γu []] rather than a threaded [bs]: the bundle carries
    only the BASELINE each [consputc] call extends.  Keeping it INSIDE the
@@ -137,7 +146,9 @@ Section ConsoleCaps.
      to know the token exists at all.  It is persistent and context-free, so
      it costs the bundle one conjunct and the morphism nothing.
      [uart_dlab_off γu] is already here, inside [is_txlock] (UartTxInv.v) --
-     which is where uartintr's RHR pop reads it from. *)
+     which is where uartintr's RHR pop reads it from.  [uarts_words] REPLACES
+     the bare [uart_base_word Uart0] in the last row, so the bundle keeps its
+     arity and every destructuring pattern keeps its shape. *)
   (* THE CONS LOCK'S HANDLE AND NOT [ConsoleInv.is_conslock]: since the
      credential escrow moved into [is_conslock] (ConsoleInv.v, the
      timelessness split), that constant carries the application's [Wd], and
@@ -151,7 +162,7 @@ Section ConsoleCaps.
        WpLock.is_lock γc a_cons "cons"%string (cons_res_at cn) ∗
        ⌜cn_uart cn = γu⌝ ∗
        uart_sent_sub γu [] ∗ uart_inited γu ∗
-       uart_base_word Uart0)%I.
+       uarts_words)%I.
 
   Global Instance console_caps_persistent `{XI : CurCtx} γu : Persistent (console_caps γu).
   Proof. rewrite /console_caps. apply _. Qed.
@@ -160,7 +171,7 @@ Section ConsoleCaps.
   Global Instance console_caps_morph γu :
     CtxMorph (λ ξ, console_caps (XI := ξ) γu).
   Proof.
-    rewrite /console_caps /UartTxInv.is_txlock.
+    rewrite /console_caps /UartTxInv.is_txlock /SpecUartPutc.uarts_words.
     ctx_morph_solve.
   Qed.
 

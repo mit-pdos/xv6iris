@@ -182,7 +182,7 @@ Require Import SysWriteDefs.   (* [FW_MAX], [wri_pre], [wchunks]           *)
 Require Import FsAbsWriteFire.   (* [awrite_chain]: the cursor chain         *)
 Require Import UartSentLoc.      (* [uart_sent_from]: the console receipt    *)
 Require Import SpecConsolewrite. (* [cons_sent_cnt]: the callee's post      *)
-Require Import UartsFields.      (* [uarts_pinned]: relayed to consolewrite  *)
+Require Import SpecUartPutc.     (* [uart_base_word]: relayed to consolewrite *)
 Require Import TsoCtx.
 
 Local Open Scope Z_scope.
@@ -330,11 +330,13 @@ Section SpecFilewrite.
      is_txlock (fwn_txlock fn) (fsc_uart) ∗
      (* since 163d39b uartwrite LOADS its MMIO base out of uarts[i].base
         rather than spelling it as a constant, so consolewrite relays the
-        .data snapshot.  Genuinely absent from filewrite's own context:
-        kernel_text / kernel_data do not cover .data, and panic_env's
-        [prputc_env] carries [uart_base_word Uart1] -- wrong tier AND wrong
-        port. *)
-     UartsFields.uarts_pinned)%I.
+        .data word -- AT THE VA TIER, which is the only tier an S-mode load
+        leaf consumes and the only one the driver's contract will take (the
+        raw physical [UartsFields.uarts_pinned] does not cross).  Genuinely
+        absent from filewrite's own context: kernel_text / kernel_data do not
+        cover .data, and panic_env's [prputc_env] carries the same word at
+        [Uart1] -- right tier, wrong port. *)
+     SpecUartPutc.uart_base_word Uart0)%I.
 
   Global Instance filewrite_dev_caps_persistent fn :
     Persistent (filewrite_dev_caps fn).

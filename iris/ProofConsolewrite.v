@@ -85,7 +85,8 @@ Require Import UserPtTree KvmSpec ProcPtOwn.
 Require Import FdSlots ProcInv.
 Require Import FileInvDefs.
 Require Import DiskPtsto WpUart UartTxInv.
-Require Import DevModel UartsFields.   (* [Uart0], [uart_index], [uarts_pinned] *)
+Require Import DevModel UartsFields.   (* [Uart0], [uart_index] *)
+Require Import SpecUartPutc.           (* [uart_base_word]: the relayed .data word *)
 Require Import SchedCtx.
 Require Import SpecEitherCopyin.
 Require Import SpecUartwriteLoc.   (* the located callee contract *)
@@ -1026,9 +1027,9 @@ Section CwBodies.
       proc_priv_core (proc_addr jp) pid U -∗
       kalloc_env γa None -∗
       dev_inv γu γv -∗
-      (* the two immutable fields of every [uarts[]] element: the callee LOADS
-         its MMIO base out of one of them (SpecUartwrite.v). *)
-      uarts_pinned -∗
+      (* the `.data` word the callee LOADS its MMIO base out of, at the VA
+         tier its load leaf consumes (SpecUartwrite.v). *)
+      uart_base_word Uart0 -∗
       is_txlock γl γu -∗
       procs_inv γs -∗
       cw_saved sp0 m0 -∗ cw_spill sp0 m0 -∗ cw_buf sp0 -∗

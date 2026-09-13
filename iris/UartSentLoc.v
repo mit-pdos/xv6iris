@@ -20,11 +20,14 @@
    THE TWO LEMMAS THIS FILE ADDS BEYOND THE SPEC FILE'S ALGEBRA are exactly
    what a walk that pushes bytes under the transmitter token needs:
 
-   * [uart_tx_own_sent_from] -- the token re-links a receipt it kept across
-     a park to the CURRENT accepted trace, delivering BOTH pure facts about
-     [l] (this is [UartTxInv.uart_tx_own_sent_sub] plus the location, and
-     the located form of [uart_tx_own_sent_prefix] the campaign's plan
-     named);
+   * [uart_tx_own_sent_from_at] -- the token re-links a receipt it kept
+     across a park to the CURRENT accepted trace, delivering BOTH pure facts
+     about [l] (this is [UartTxInv.uart_tx_own_sent_sub] plus the location,
+     and the located form of [uart_tx_own_sent_prefix] the campaign's plan
+     named).  PORT-GENERIC, over that port's bare [uart_inv], with the
+     console form [uart_tx_own_sent_from] kept as the [Uart0] corollary: a
+     driver walk proven at BOTH ports ([ProofUartwriteLoc.v]) cannot even
+     state [dev_inv], which is the console's bundle;
    * [uart_sent_from_snoc] -- one more byte at the end of that trace
      extends the receipt ([UartTxInv.uart_sent_sub_snoc]'s located twin).
 
@@ -40,6 +43,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvPtsto.
+Require Import DevModel.   (* [uart_id]: the port the primitive form takes *)
 Require Import DiskPtsto WpUart.
 Require Import UartTxInv.
 From Kernel Require KernelSyms.
@@ -151,17 +155,24 @@ Section UartSentLoc.
      transmitter at trace [l] learns BOTH of the pure facts about [l] that
      the next push needs: its seed is still a prefix, and its own bytes are
      still located after it.  [UartTxInv.uart_tx_own_sent_sub] with the
-     location kept -- same proof, one transitivity longer. *)
-  Lemma uart_tx_own_sent_from (γu : uart_names) (γd : disk_names)
+     location kept -- same proof, one transitivity longer.
+
+     STATED AT AN ARBITRARY PORT, over that port's BARE invariant, with the
+     console form kept as the [Uart0] corollary below -- the same shape
+     [UartTxInv.uart_tx_own_sent_prefix_at] / [uart_tx_own_sent_prefix]
+     have, and for the same reason: [dev_inv] is the CONSOLE bundle and
+     cannot be stated at the second port, while a port-generic driver walk
+     ([ProofUartwriteLoc.v]) holds only [uart_inv i]. *)
+  Lemma uart_tx_own_sent_from_at (i : uart_id) (γu : uart_names)
       (l tr0 bs : list (bv 8)) (E : coPset) :
-    ↑devN ⊆ E ->
-    dev_inv γu γd -∗ uart_tx_own γu l -∗ uart_sent_from γu tr0 bs ={E}=∗
+    ↑(uartN i) ⊆ E ->
+    uart_inv i γu -∗ uart_tx_own γu l -∗ uart_sent_from γu tr0 bs ={E}=∗
       uart_tx_own γu l ∗ ⌜ tr0 `prefix_of` l ⌝ ∗
       ⌜ bs `sublist_of` drop (length tr0) l ⌝.
   Proof.
-    iIntros (HE) "#Hinv Hown #Hfrom".
+    iIntros (HE) "#Huinv Hown #Hfrom".
     iDestruct "Hfrom" as (tr) "(#HL & %Hp & %Hs)".
-    iMod (uart_tx_own_sent_prefix γu γd l tr E HE with "Hinv Hown HL")
+    iMod (uart_tx_own_sent_prefix_at i γu l tr E HE with "Huinv Hown HL")
       as "[Hown %Hpre]".
     iModIntro. iFrame "Hown". iPureIntro.
     pose proof Hpre as Hpre'. destruct Hpre' as [k ->].
@@ -170,6 +181,20 @@ Section UartSentLoc.
     - rewrite drop_app_le; last by apply stdpp.list_relations.prefix_length.
       apply (transitivity Hs).
       apply stdpp.list_relations.sublist_inserts_r. reflexivity.
+  Qed.
+
+  (* the console form, statement character-for-character as it landed *)
+  Lemma uart_tx_own_sent_from (γu : uart_names) (γd : disk_names)
+      (l tr0 bs : list (bv 8)) (E : coPset) :
+    ↑devN ⊆ E ->
+    dev_inv γu γd -∗ uart_tx_own γu l -∗ uart_sent_from γu tr0 bs ={E}=∗
+      uart_tx_own γu l ∗ ⌜ tr0 `prefix_of` l ⌝ ∗
+      ⌜ bs `sublist_of` drop (length tr0) l ⌝.
+  Proof.
+    iIntros (HE) "#Hinv Hown #Hfrom".
+    iDestruct (dev_inv_uart with "Hinv") as "#Huinv".
+    iApply (uart_tx_own_sent_from_at Uart0 γu l tr0 bs E
+              (transitivity uartN_devN_console HE) with "Huinv Hown Hfrom").
   Qed.
 
 End UartSentLoc.

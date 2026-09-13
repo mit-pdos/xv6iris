@@ -30,10 +30,14 @@
    * [UartTxInv.is_txlock γl γu] and [WpUart.dev_inv γu γv], uartwrite's whole
      credential (SpecUartwrite.v) -- the callee wants port 0's bare
      [uart_inv], which [WpUart.dev_inv_uart] projects out of the bundle --
-     plus, since XV6_REV 163d39b, [UartsFields.uarts_pinned]: the driver
-     reaches the port through `&uarts[uid]` and LOADS the MMIO base out of
-     `uarts[uid].base`, so the .data snapshot has to be relayed from here.
-     All three are persistent, so the loop carries them for free;
+     plus, since XV6_REV 163d39b, [SpecUartPutc.uart_base_word Uart0]: the
+     driver reaches the port through `&uarts[uid]` and LOADS the MMIO base
+     out of `uarts[uid].base`, so that `.data` word has to be relayed from
+     here.  IT IS THE VA-TIER FORM AND NOT [UartsFields.uarts_pinned]: an
+     S-mode load leaf consumes the context tier, no law crosses from the raw
+     physical one, and only the boot chain mints the crossing
+     ([BootShared.uart_base_word_of_pinned]).  All three are persistent, so
+     the loop carries them for free;
    * [proc_priv_core] and [kalloc_env], either_copyin's user arm (it reaches
      copyin, hence walkaddr and vmfault, hence kalloc), with the descriptor
      coming back EXTENDED ([uptd_ext]) -- writei's user arm does the same;
@@ -105,7 +109,7 @@ Require Import FileInvDefs.
 Require Import DevModel.
 Require Import DiskPtsto WpUart.
 Require Import UartTxInv.
-Require Import UartsFields.   (* [uarts_pinned]: the callee LOADS its base *)
+Require Import SpecUartPutc.  (* [uart_base_word]: the callee LOADS its base *)
 Require Import UartSentLoc.       (* [uart_sent_from]: the located receipt *)
 Require Import SpecCopyin.        (* [ubytes_at]: the content seam        *)
 Require Import SchedCtx.
@@ -244,8 +248,9 @@ Definition wp_consolewrite_sconf_body
   proc_priv_core pj pid U -∗
   kalloc_env γa None -∗
   dev_inv γu γv -∗
-  (* the two immutable fields of every [uarts[]] element (163d39b) *)
-  uarts_pinned -∗
+  (* the `.data` word the callee LOADS its MMIO base out of (163d39b), at
+     the VA tier an S-mode load leaf consumes *)
+  uart_base_word Uart0 -∗
   is_txlock γl γu -∗
   procs_inv γs -∗
   (* ---- THE SEED: the one addition to the landed premises.  Persistent,

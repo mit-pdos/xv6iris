@@ -416,7 +416,8 @@ Require Import SpecIlock SpecIunlock.
 Require Import SpecWritei.
 Require Import WriteiBudget.
 Require Import SpecPipewrite.
-Require Import UartsFields.   (* [uarts_pinned]: the third console credential *)
+Require Import DevModel.      (* [Uart0]: the console's port                    *)
+Require Import SpecUartPutc.  (* [uart_base_word]: the third console credential *)
 Require Import SpecConsolewrite. (* [consolewrite_stack], [cons_sent_cnt] *)
 Require Import ConsoleInv.  (* [NDEV_max], [a_devsw_write] *)
 Require Import SysWriteDefs.  (* [FW_MAX], [wchunks], [wri_pre] *)
@@ -1422,10 +1423,11 @@ Section ProofFilewrite.
       fwn_wp fn' (dev_major Cf') ∗
     dev_inv (fsc_uart) (fsc_disk) ∗
     is_txlock (fwn_txlock fn') (fsc_uart) ∗
-    (* the two immutable [uarts[]] fields consolewrite's callee LOADS its MMIO
-       base out of (XV6_REV 163d39b); the third member of
-       [SpecFilewrite.filewrite_dev_caps], persistent like the other two. *)
-    uarts_pinned.
+    (* the `.data` word consolewrite's callee LOADS its MMIO base out of
+       (XV6_REV 163d39b), at the VA tier the load leaf consumes; the third
+       member of [SpecFilewrite.filewrite_dev_caps], persistent like the
+       other two. *)
+    SpecUartPutc.uart_base_word Uart0.
   Proof.
     intro H. rewrite /filewrite_dev_env /filewrite_dev_caps.
     case_decide as H'; [by iIntros "$"|].
@@ -1444,7 +1446,7 @@ Section ProofFilewrite.
       fwn_wp fn' (dev_major Cf') -∗
     dev_inv (fsc_uart) (fsc_disk) -∗
     is_txlock (fwn_txlock fn') (fsc_uart) -∗
-    uarts_pinned -∗
+    SpecUartPutc.uart_base_word Uart0 -∗
     filewrite_dev_env fn' (dev_major Cf').
   Proof.
     intro H. rewrite /filewrite_dev_env /filewrite_dev_caps.

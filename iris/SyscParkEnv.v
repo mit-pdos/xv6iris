@@ -52,7 +52,6 @@ Require Import TicksInv.      (* [is_tickslock] *)
 Require Import ConsoleInv.    (* the console ring's invariant *)
 Require Import SchedCtx.      (* [procs_inv] *)
 Require Import WpUart.        (* [dev_inv] / [uart_inv] / [plic_inv] *)
-Require Import UartsFields.   (* [uarts_pinned] -- the second port's row, below *)
 Require Import SpecConsoleintr.  (* [console_caps] *)
 Require Import DiskInv.  (* [disk_geom] / [disk_res] / [d_lock] *)
 Require Import Xv6Cameras.
@@ -142,15 +141,17 @@ Section ParkWorld.
           so it needs no credential to mint one with. *)
        (∃ ip : mword 64, (mword_of_int KernelSyms.initproc : mword 64) ↦₈□ ip) ∗
        (* THE SECOND PORT (XV6_REV 163d39b), which is [SpecDevintr.uart1_caps
-          fsc_uart] spelled out -- this file sits below that one, exactly as
+          fsc_uart] spelled out -- ROW FOR ROW, so [ProofUserinit.v] can pass
+          one to the other by [iExact] after unfolding both -- this file sits
+          below that one, exactly as
           the six [devintr_caps_any] members above it are spelled out.  The
           ghost bundle is existential for the reason given there: devintr's
           postcondition says nothing about port 1, so nobody has to agree
           with it about which bundle it is.  LAST, so every existing
           destructuring pattern keeps working up to one added name. *)
        (∃ γu1 : uart_names,
-          uarts_pinned ∗ uart_inv Uart1 γu1 ∗ plic_inv fsc_uart γu1 ∗
-          uart_inited γu1))%I.
+          uart_inv Uart1 γu1 ∗ plic_inv fsc_uart γu1 ∗ uart_inited γu1 ∗
+          uart_dlab_off γu1))%I.
 
   Global Instance park_world_persistent γs : Persistent (park_world γs).
   Proof. rewrite /park_world. apply _. Qed.

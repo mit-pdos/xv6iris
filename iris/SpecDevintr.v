@@ -75,7 +75,6 @@ Require Import FdSlots.
 Require Import ProcGeom CpuOwn.
 Require Import SchedCtx.
 Require Import DiskPtsto WpUart DiskInv.
-Require Import UartsFields.   (* [uarts_pinned]: uarts[]'s two immutable fields *)
 Require Import TimerCap.
 Require Import SpecClockintr.
 Require Import SpecConsoleintr.
@@ -121,14 +120,9 @@ Section DevintrCaps.
   (* THE SECOND PORT, AS ONE ROW WITH ITS GHOST NAME BURIED.              *)
   (* ------------------------------------------------------------------ *)
   (* [irq == UART1_IRQ] calls the SAME uartintr at [Uart1], and that
-     contract is stated port-generically, so devintr owes three things it
+     contract is stated port-generically, so devintr owes four things it
      did not owe before:
 
-       [uarts_pinned]        (UartsFields.v) the boot chain's snapshot of
-                             the two immutable fields of each `uarts[]`
-                             element.  uartintr needs it at BOTH ports now
-                             that the MMIO base is LOADED from `.data`
-                             rather than assembled from a constant;
        [uart_inv Uart1 γ1]   the second port's own invariant.  The console
                              bundle [dev_inv] deliberately does not contain
                              it (WpUart.v: "the bundle is the console
@@ -147,7 +141,29 @@ Section DevintrCaps.
                              [plic_slots_claim] has to refute that arm at
                              source 12 exactly as it does at source 10
                              before it can hand the payload out.  Hence a
-                             witness per port, not one.
+                             witness per port, not one;
+       [uart_dlab_off γ1]    DLAB IS OFF AT THE SECOND PORT.  uartintr's RHR
+                             pop reads offset 0, which is the divisor latch
+                             while DLAB is set, and it pops at BOTH ports.
+                             At the console the fact rides inside
+                             [SpecConsoleintr.console_caps]'s [is_txlock];
+                             port 1 has no such bundle here, so it is a row
+                             of its own.  [uartinit] freezes it at both
+                             ports and hands both out ([SpecUartinit.v]).
+
+     WHAT LEFT THIS BUNDLE, and where it went.  It used to carry
+     [UartsFields.uarts_pinned] -- the two immutable `uarts[]` fields at the
+     RAW PHYSICAL tier -- because uartintr took that form.  It does not any
+     more: an S-mode load leaf consumes the CONTEXT tier and no law crosses
+     the two ([SpecUartintr.v]), so the credential a driver must be handed
+     is the VA-tier [SpecUartPutc.uarts_words].  That row is
+     CONTEXT-RELATIVE, and this bundle may not hold one: it is rebuilt at a
+     foreign context by [UsertrapRes.ut_caps_of_park], which holds no
+     domination and can transport nothing.  So all four words -- BOTH ports'
+     -- ride [SpecConsoleintr.console_caps], which the resumer's
+     [park_globals] supplies at its own context, and this bundle stays
+     entirely ξ-free.  The [Uart1] arm of [ProofDevintr] projects port 1's
+     pair out of the console bundle it is holding anyway.
 
      THE NAME IS EXISTENTIAL HERE FOR THE SAME REASON IT IS IN [dev_inv].
      devintr's postcondition says nothing whatever about the second port --
@@ -162,7 +178,8 @@ Section DevintrCaps.
      distinguishes bundling from burying. *)
   Definition uart1_caps (γu : uart_names) : iProp Σ :=
     (∃ γ1 : uart_names,
-       uarts_pinned ∗ uart_inv Uart1 γ1 ∗ plic_inv γu γ1 ∗ uart_inited γ1)%I.
+       uart_inv Uart1 γ1 ∗ plic_inv γu γ1 ∗ uart_inited γ1 ∗
+       uart_dlab_off γ1)%I.
 
   Global Instance uart1_caps_persistent γu : Persistent (uart1_caps γu).
   Proof. rewrite /uart1_caps. apply _. Qed.

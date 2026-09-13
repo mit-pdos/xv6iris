@@ -3331,7 +3331,12 @@ Section ProofConsoleintr.
     cbv beta delta [wp_consoleintr_sconf_body].
     intros rettgt HK Hcva Hends Hx Hlen Hlvl Hbelow.
     iIntros "Hcg Hcnt #Ht Hpc #Hpinv #Hdev #Hcaps #Htg #Hlbh Hhi Hcont".
-    iDestruct "Hcaps" as (γtx γc cn) "(#Htxl & #Hlk & %Hcnu & #Hsub & #Hinitd & #Hbw)".
+    iDestruct "Hcaps" as (γtx γc cn)
+      "(#Htxl & #Hlk & %Hcnu & #Hsub & #Hinitd & #Hwords)".
+    (* the console's own `.data` base word, out of the array's row: the
+       bundle carries all four words as one ([SpecUartPutc.uarts_words]) and
+       every arm below wants just this one. *)
+    iPoseProof (uarts_words_base Uart0 with "Hwords") as "#Hbw".
     (* the byte and its history are the contract's own parameters now: the
        arm that files the byte in the ring is the default arm's store. *)
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.

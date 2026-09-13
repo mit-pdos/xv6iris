@@ -71,6 +71,8 @@ Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfCsr.
 Require Import WpSmodeIntr.
 Require Import DevModel DiskPtsto WpUart.
 Require Import UartsFields.   (* [uart_index]: the port argument a0 carries *)
+Require Import UartTxInv.     (* [uart_rx_word], [is_txlock_dlab]            *)
+Require Import SpecUartPutc.  (* [uart_base_word]                            *)
 Require Import CodeDevintr.
 Require Import SpecPlicClaim SpecPlicComplete SpecUartintr SpecVirtioDiskIntr SpecClockintr.
 Require Import SpecDevintr.
@@ -453,11 +455,29 @@ Section ProofDevintr.
        has to agree with it about which bundle it is; peeling it once at the
        top is what lets both the claim and the [Uart1] arm speak of the same
        [γu1]. *)
-    iDestruct "Hu1" as (γu1) "(#Hupin & #Huinv1 & #Hplic1 & #Hinit1)".
+    iDestruct "Hu1" as (γu1) "(#Huinv1 & #Hplic1 & #Hinit1 & #Hdoff1)".
     (* the deposit witness, out of the console credential: it is what the
        PLIC leaves need to know the invariant is past its pre-deposit arm *)
     iAssert (uart_inited γu) as "#Hinit".
     { iDestruct "Hccaps" as (γtx γc cn) "(_ & _ & _ & _ & #Hin & _)". iExact "Hin". }
+    (* THE FOUR `.data` WORDS, out of the SAME bundle, AT BOTH PORTS.
+       uartintr's contract is port-generic and takes that element's two
+       immutable fields at the VA tier; all four ride
+       [SpecConsoleintr.console_caps] as one row ([SpecUartPutc.uarts_words])
+       because that is the interrupt path's only credential a foreign
+       context can be handed, so neither arm pays a new premise -- only a
+       projection.  DLAB at the console comes out of the same bundle's
+       [is_txlock]; at [Uart1] it is [uart1_caps]' own row above. *)
+    iAssert (uarts_words) as "#Hwords".
+    { iDestruct "Hccaps" as (γtx γc cn) "(_ & _ & _ & _ & _ & #Hw)".
+      iExact "Hw". }
+    iPoseProof (uarts_words_base Uart0 with "Hwords") as "#Hubw0".
+    iPoseProof (uarts_words_rx   Uart0 with "Hwords") as "#Hurw0".
+    iPoseProof (uarts_words_base Uart1 with "Hwords") as "#Hubw1".
+    iPoseProof (uarts_words_rx   Uart1 with "Hwords") as "#Hurw1".
+    iAssert (uart_dlab_off γu) as "#Hdoff0".
+    { iDestruct "Hccaps" as (γtx γc cn) "(#Htx & _)".
+      iApply (UartTxInv.is_txlock_dlab with "Htx"). }
     (* THE TWO PORT-SHAPED CREDENTIALS uartintr TAKES, built ONCE.  Its
        contract is port-generic, so what it asks for at [Uart0] is the
        console bundle PROJECTED ([dev_inv_uart]) plus [ui_rx_caps Uart0]
@@ -988,7 +1008,8 @@ Section ProofDevintr.
         iDestruct ("Hrxtok" with "[%]") as (kk hlk) "Htok"; [exact Huart0|].
         iApply (Uartintr.wp_uartintr_sconf Uart0 γu γv γs U0 (av - 4)%nat lvl eb p false
                   kk hlk lks HU0a0 Hlen ltac:(lia) ltac:(lia) ltac:(lkbelow)
-                  with "Hcg Hcnt Htext Hpc Hupin Huinv0 Hpinv Hrxc0 Htok").
+                  with "Hcg Hcnt Htext Hpc Hubw0 Hurw0 Hdoff0 Huinv0 Hpinv
+                        Hrxc0 Htok").
         iApply wp_next_off_intro. iIntros (MU) "%HcsU Hcg Hcnt Hpc Htok".
         destruct HcsU as [HcsU HdomU].
         assert (Hpc54 : ret_pc (U0 !!! Regidx ra_idx) = mword_of_int (KernelSyms.devintr + 0x54))
@@ -1114,7 +1135,8 @@ Section ProofDevintr.
         iDestruct ("Hrxtok1" with "[%]") as (kk1 hlk1) "Htok1"; [exact Huart1|].
         iApply (Uartintr.wp_uartintr_sconf Uart1 γu1 γv γs W2 (av - 4)%nat lvl eb p false
                   kk1 hlk1 lks HW2a0 Hlen ltac:(lia) ltac:(lia) ltac:(lkbelow)
-                  with "Hcg Hcnt Htext Hpc Hupin Huinv1 Hpinv Hrxc1 Htok1").
+                  with "Hcg Hcnt Htext Hpc Hubw1 Hurw1 Hdoff1 Huinv1 Hpinv
+                        Hrxc1 Htok1").
         iApply wp_next_off_intro. iIntros (MW) "%HcsW Hcg Hcnt Hpc Htokw".
         destruct HcsW as [HcsW HdomW].
         assert (Hpc66 : ret_pc (W2 !!! Regidx ra_idx) = mword_of_int (KernelSyms.devintr + 0x66))

@@ -115,6 +115,18 @@ Rules that follow, stated once:
 - A pinned scheduler context that is never stamped accumulates the keys of
   every record ever parked under it.  Sound (membership is justification,
   not ownership) and free of proof-term cost.
+- **A credential that a foreign context REBUILDS rather than transports must
+  be ξ-free.**  `UsertrapRes.ut_caps_of_park` reassembles the resumer's
+  `ut_caps` at `Xc` out of `park_globals Xc` and `fs_ready Xc`, and the only
+  rows it may take from the PARKER's `park_world` are the context-free ones:
+  it holds no domination, so it can morph nothing.  Every ξ-relative fact the
+  trap path needs therefore has to arrive through `park_globals`, which the
+  park machinery `ctx_move`s — and a bundle reached only through `park_world`
+  (`SpecDevintr.uart1_caps`) may hold ghost names and invariants and NO
+  points-to.  That is why BOTH UART ports' `.data` word snapshots ride
+  `SpecConsoleintr.console_caps` as one row (`SpecUartPutc.uarts_words`)
+  instead of being split per port: putting the second port's pair in the
+  second port's own credential is the natural shape and does not compile.
 
 ## 3. The thread record at `swtch`
 

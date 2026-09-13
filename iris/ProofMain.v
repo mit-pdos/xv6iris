@@ -735,18 +735,29 @@ Section ProofMain.
       iSplitR; [iExact "Hconslk0" |].
       iSplitR; [iPureIntro; exact Hcnu |].
       iSplitR; [iExact "Hsub0" |].
-      (* [Hubw0] is the VA-tier snapshot of `uarts[0].base`, which consputc
-         LOADS since 163d39b instead of spelling as a constant.  It rides in
-         [console_caps] so that consoleintr / uartintr / devintr each keep
-         their premise list; [BootShared]'s supply mints it beside
-         [uarts_pinned], and this is the only place it is CONSUMED. *)
-      iSplitR; [iExact "Hinit" | iExact "Hubw0"]. }
+      (* THE ARRAY'S FOUR `.data` WORDS, at the VA tier, as one row
+         ([SpecUartPutc.uarts_words]).  The driver LOADS both fields of the
+         element it is given since 163d39b instead of spelling them as
+         constants -- the base for consputc's THR store and uartwrite's, the
+         hook word for uartintr's `if (u->rx)` guard -- and BOTH ports'
+         travel here because this bundle is the interrupt path's only
+         context-relative carrier (see [SpecUartPutc.uarts_words]).
+         [BootShared]'s supply mints them beside [uarts_pinned], and this is
+         the only place they are CONSUMED. *)
+      iSplitR; [iExact "Hinit" |].
+      iApply (uarts_words_intro with "Hubw0 Hurw0 Hubw1 Hurw1"). }
     (* ---- THE SECOND PORT'S ROW OF [devintr_caps], complete only now: its
-       fourth member is the one-shot the deposit above just minted at
-       [γd1].  The other three are this group's premises. ---- *)
+       third member is the one-shot the deposit above just minted at [γd1],
+       and its last is the DLAB freeze uartinit handed back.  The other two
+       are this group's premises.  The physical [uarts_pinned] is NOT a
+       member any more -- uartintr consumes the `.data` words at the VA tier
+       and nothing crosses from the raw form -- and the VA-tier words did
+       NOT take its place here: they are context-relative and this bundle
+       must stay ξ-free, so they ride [console_caps] above, at BOTH ports.
+       ---- *)
     iAssert (uart1_caps γd) as "#Hu1caps".
     { rewrite /uart1_caps. iExists γd1.
-      iFrame "Hpinned Huinv1 Hplic Hinit1". }
+      iFrame "Huinv1 Hplic Hinit1 Hdoff1". }
     (* THE CONSOLE BUNDLE, and this is the only point at which it can be
        built: [Hconslk] is [is_conslock γcl] with γcl still concrete, and
        [Htbl] is the table consoleinit filled twenty instructions ago.
@@ -2572,10 +2583,10 @@ Section ProofMain.
     { iRight. iFrame "Htl Hpinv". }
     (* [Hu1caps] is the SECOND PORT'S ROW, which [devintr_caps] gained because
        the [irq == UART1_IRQ] arm calls the same uartintr at [Uart1].
-       [mn_grp_printk] built it: three of its four members come down the boot
-       chain ([uarts_pinned], [uart_inv Uart1 γd1], the concrete
-       [plic_inv γd γd1]) and the fourth, [uart_inited γd1], is minted there
-       by port 1's own receive-token deposit.  It also travels to the
+       [mn_grp_printk] built it: two of its four members come down the boot
+       chain ([uart_inv Uart1 γd1] and the concrete [plic_inv γd γd1]), the
+       third, [uart_inited γd1], is minted there by port 1's own
+       receive-token deposit, and the fourth is that port's frozen DLAB.  It also travels to the
        secondaries, through [SpecMainSecondary.main_deposit]. *)
     iAssert (devintr_caps γd γv γk γtl γs pd pav pu) as "#Hcaps".
     { rewrite /devintr_caps.
