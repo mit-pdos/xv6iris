@@ -66,7 +66,7 @@ Import Defs.
    [wp_next] wrapper (it would collapse via [wp_next_off] anyway, since the
    hart cannot move). *)
 Definition wp_plic_complete_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-    (γd : uart_names) (γv : disk_names) (m0 : regfile) (n : nat) (p : mword 64) :=
+    (γd γd1 : uart_names) (γv : disk_names) (m0 : regfile) (n : nat) (p : mword 64) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let tp_idx : mword 5 := mword_of_int 4 in
   let pcE := mword_of_int KernelSyms.plic_complete in
@@ -83,7 +83,9 @@ Definition wp_plic_complete_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `
   (6 <= n)%nat ->
   sie_cap_gpr KT1 m0 n false p -∗
   kernel_text -∗ pc_is pcE -∗
-  dev_inv γd γv -∗ uart_inited γd -∗
+  (* THE PLIC INVARIANT IS TAKEN BARE, beside the bundle: this contract names
+     the SECOND port's ghosts (its park), and [dev_inv] ∃-packs them. *)
+  dev_inv γd γv -∗ plic_inv γd γd1 -∗ uart_inited γd -∗ uart_inited γd1 -∗
   (* THE RECEIVE TOKEN GOES BACK, when the id being completed is the UART's.
      A completion clears the source's service bit, and the PLIC invariant
      holds the token precisely while the source is out of service -- so the
@@ -91,6 +93,13 @@ Definition wp_plic_complete_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `
   (⌜ rget m0 (mword_of_int 10 : mword 5)
      = (mword_of_int (Z.of_N (uart_irq_id Uart0)) : mword 64) ⌝ -∗
      plic_payload_uart γd) -∗
+  (* ...and the SECOND port's, on the arm that completes 12.  uartintr pops
+     port 1's FIFO too, so its writer came out of plic_claim and has to go
+     back here; the two wands mirror [SpecPlicClaim]'s two post arms and at
+     most one of them is ever satisfiable. *)
+  (⌜ rget m0 (mword_of_int 10 : mword 5)
+     = (mword_of_int (Z.of_N (uart_irq_id Uart1)) : mword 64) ⌝ -∗
+     plic_payload_uart γd1) -∗
   ( ∀ m' : regfile,
     sie_cap_gpr KT1 m' n false p -∗
     pc_is ret_tgt -∗
@@ -101,6 +110,6 @@ Definition wp_plic_complete_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `
 Module Type PLIC_COMPLETE.
   Parameter wp_plic_complete_sconf :
     forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-      (γd : uart_names) (γv : disk_names) (m0 : regfile) (n : nat) (p : mword 64),
-      wp_plic_complete_sconf_body γd γv m0 n p.
+      (γd γd1 : uart_names) (γv : disk_names) (m0 : regfile) (n : nat) (p : mword 64),
+      wp_plic_complete_sconf_body γd γd1 γv m0 n p.
 End PLIC_COMPLETE.

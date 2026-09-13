@@ -765,7 +765,14 @@ Section SystemBoot.
     iDestruct (big_sepL_cpu_peel with "Hharts") as "[Hh0 Hhrest]".
     (* the three device threads' invariants, off the one device fabric *)
     iDestruct (dev_inv_uart with "Hdev") as "#Huinv".
-    iDestruct (dev_inv_plic with "Hdev") as "#Hpinv".
+    (* THE PLIC INVARIANT IS KEYED BY BOTH PORTS, and the bundle ∃-packs the
+       second port's names (WpUart.v, [dev_inv]).  Nothing HERE needs to know
+       which they are -- the three device threads only ever move slots by
+       [plic_slots_stable], which is port-generic -- so the packed witness is
+       what the loops are instantiated at.  The site that DOES need the
+       concrete [γd1] is main's second deposit, and it gets [plic_inv γd γd1]
+       from [boot_shared_alloc] directly. *)
+    iDestruct (dev_inv_plic with "Hdev") as (γp1) "#Hpinv".
     iDestruct (dev_inv_disk with "Hdev") as "#Hvinv".
     iDestruct (dev_inv_perm with "Hdev") as "#Hqinv".
     iModIntro.
@@ -883,12 +890,12 @@ Section SystemBoot.
     iSplitR.
     { rewrite /enum /uart_id_finite /=.
       iSplitR;
-        [iApply (wp_uart_loop Uart0 γd γd with "Hcert Huinv Hpinv Hperm")|].
+        [iApply (wp_uart_loop Uart0 γd γd γp1 with "Hcert Huinv Hpinv Hperm")|].
       iSplitR; [|done].
-      iApply (wp_uart_loop Uart1 γd1 γd with "Hcert Hdev1 Hpinv Hperm1"). }
+      iApply (wp_uart_loop Uart1 γd1 γd γp1 with "Hcert Hdev1 Hpinv Hperm1"). }
     iSplitR;
-      [iApply (wp_disk_loop γd γv Hdimg with "Hcert Hcinv Hqinv Hvinv Hpinv") |].
-    iApply (wp_plic_loop γd with "Hcert Hpinv Hwinv").
+      [iApply (wp_disk_loop γd γp1 γv Hdimg with "Hcert Hcinv Hqinv Hvinv Hpinv") |].
+    iApply (wp_plic_loop γd γp1 with "Hcert Hpinv Hwinv").
   Qed.
 
 End SystemBoot.

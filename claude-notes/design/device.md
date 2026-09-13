@@ -51,7 +51,7 @@
   (`DiskStepWild`). Lifting rules `wp_uart_step`/`wp_disk_step`/
   `wp_plic_step` (RiscvExec.v) each hand over the full interp triple (the
   disk one is the reason: DMA needs `gen_heap_interp` handed over, not
-  framed). Loop WPs (WpUart.v): `wp_uart_loop i γ γp` under `uart_inv i γ ∗ plic_inv γp ∗ uart_obs_permit i γ` (the TRACE PERMIT: the tx/rx arms are observed and the history ghost moves only with the client's half — `completed/uart-trace.md`; `uart_obs_permit_triv` discharges it at the trivial trace predicate).  `γ` is THIS port's bundle and `γp` is whatever bundle the ONE PLIC invariant was allocated at (the console's), which the latch arm needs and does not otherwise read — source `uart_irq_id i` has a payload only for the console, every other source's slot being `emp` (`plic_slot_other`), so the second port's latch costs the PLIC invariant nothing.  Likewise
+  framed). Loop WPs (WpUart.v): `wp_uart_loop i γ γp γp1` under `uart_inv i γ ∗ plic_inv γp γp1 ∗ uart_obs_permit i γ` (the TRACE PERMIT: the tx/rx arms are observed and the history ghost moves only with the client's half — `completed/uart-trace.md`; `uart_obs_permit_triv` discharges it at the trivial trace predicate).  `γ` is THIS port's bundle and `γp γp1` are the two bundles the ONE PLIC invariant was allocated at, which the latch arm needs and does not otherwise read — a latch sets a PENDING bit and moves no slot at either port (`plic_slots_stable`), so a device thread never has to know what is in one.  Likewise
   `wp_disk_loop` under `disk_inv ∗ plic_inv` (each device reaches into the
   weak PLIC invariant to latch its own interrupt), `wp_plic_loop` under
   `plic_inv ∗ wire_inv` (`wire_inv`, WireInv.v `wireN`: every hart's
@@ -63,19 +63,29 @@
 - The device invariants are PER-DEVICE, and the UART's is PER PORT (all in
   WpUart.v for historical
   reasons): `uart_inv i γ = inv (uartN i) (∃ u, uart_frag i u ∗ uart_ghosts γ u ∗ uart_colE i γ u)`,
-  `plic_inv = inv plicN (∃ p, plic_frag p ∗ ⌜plic_ok p⌝)`,
+  `plic_inv γ γ1 = inv plicN (∃ p, plic_frag p ∗ ⌜plic_ok p⌝ ∗ plic_slots γ γ1 p)`
+  (the SLOT TABLE — see below — is why it names BOTH ports' ghosts),
   `disk_inv γd = inv diskN (∃ v, virtio_frag v ∗ virtio_proto γd v ∗
   ⌜virtio_isr_ok v⌝)`, with `uartN i`/`plicN`/`diskN` SUB-namespaces of the
   `devN` so every `↑devN ⊆ E` side condition works against any of them —
   and one namespace PER PORT, or the two UART threads could not open their
   invariants independently.
   **`dev_inv γ γd` is the BUNDLE, and it is the CONSOLE PORT'S**
-  (`uart_inv Uart0 γ ∗ plic_inv ∗ disk_inv γd ∗ perm_inv …`): xv6 drives one
-  of the two ports and nothing in the kernel names the other, so widening
-  the bundle would put a resource nobody uses into ~140 specs.  The second
-  port's `uart_inv Uart1 γ1` is an equally ordinary invariant that only
-  adequacy and that port's own device thread hold ("new specs take only the
-  invariant(s) they use").  Projections `dev_inv_uart`/`dev_inv_plic`/
+  (`uart_inv Uart0 γ ∗ (∃ γ1, plic_inv γ γ1) ∗ disk_inv γd ∗ perm_inv …`):
+  xv6 drives one of the two ports and nothing that merely borrows the fabric
+  names the other, so widening the bundle would put a resource nobody uses
+  into ~140 specs.  **The PLIC conjunct is ∃-PACKED over the second port's
+  names, and that is what keeps the bundle at ARITY 2** now that `plic_inv`
+  is keyed by both: a client that only borrows `plic_frag` (an enable write,
+  a threshold write) needs no more than "the invariant exists", while a
+  client that must NAME `γ1` — plic_claim's handout, plic_complete's park,
+  the second slot's deposit, devintr — takes the bare `plic_inv γ γ1` as its
+  own premise ("new specs take only the invariant(s) they use").  The same
+  ∃-packing is what lets `wp_sw_plic_dev_s_sconf` keep taking the bundle: its
+  slot callback is ∀-quantified over `γ1`, which every port-generic mover
+  (`plic_slots_stable`) discharges uniformly.  The second port's
+  `uart_inv Uart1 γ1` is an equally ordinary invariant.  Projections
+  `dev_inv_uart`/`dev_inv_plic` (which yields the ∃)/
   `dev_inv_disk`, per-device `dev_interp_agree_uart`/`_plic`, and
   per-invariant allocs `uart_inv_alloc`/`plic_inv_alloc`/`disk_inv_alloc`
   exist. New function specs should take only the invariant(s) they use;
@@ -85,6 +95,48 @@
   if it interrupts.  Adding another INSTANCE of a device already modelled
   means adding a constructor to its index type and nothing else — that is
   what the `uart_id` parameterisation buys.
+- **THE PLIC INVARIANT'S PER-SOURCE SLOTS** (WpUart.v, the block from
+  `plic_payload` to `plic_slots_complete`).  Every source the PLIC can hand a
+  hart owns a SLOT, and a slot is a ONE-SHOT: before that source's device is
+  initialized it holds the exclusive PRE-state (`uart_preinit`, the `un_init`
+  field), and the initialization (`uart_rx_tok_deposit`, one fupd) swaps it
+  for the persistent post-state `uart_inited` together with the source's
+  PAYLOAD.  **The payload sits in the slot exactly while the source is NOT in
+  service**, so `plic_slots_claim` takes it out and `plic_slots_complete` puts
+  it back, and the handshake is folded into the two movers — their callers
+  name only the payload.  `plic_tracked = [uart_irq_id Uart0; uart_irq_id
+  Uart1; virtio_irq_id]`, so the big-op is a three-element cons, not a
+  ninety-five-element fold: under `plic_ok` a claim can only ever return one
+  of the machine's own three (`PlicPlan.plic_enabled_srcs`).
+  - **BOTH ports have a payload, and it is the SAME one.**
+    `plic_payload_uart γ = ∃ k hl, uart_rx_writer γ k hl` — the pop token AND
+    the consumer's high-water half under `ohist_le` — at `Uart1` as much as at
+    `Uart0`, because `uartintr` drains the receive FIFO at both ports (only
+    the `u->rx` hook CALL is skipped where the hook is null; the pop still
+    happens), and `SpecUartintr`'s `uart_rx_writer` premise is therefore
+    unconditional.  Port 1 has no consumer, so its high-water half never moves
+    and stays at `None`, where `ohist_le None _` is free: nothing about the
+    second port's payload is weaker, only unused.  The disk's slot is `emp` at
+    every state (`plic_slot_other`, guarded on `uart_of_irq i = None`).
+  - The three tables (`plic_payload`/`plic_preinit`/`plic_inited`) dispatch
+    through the MODEL's own inverse `DevModel.uart_of_irq` and pick the names
+    with `plic_unames γ γ1 : uart_id -> uart_names`, so a third port would be
+    a constructor and nothing else.  Every slot lemma is stated port-free on
+    `plic_uslot γu cl` (`cl` = that source's service bit), reached by
+    `plic_slots_eq : plic_slots γ γ1 p ⊣⊢ plic_uslot γ (claimed 10) ∗
+    plic_uslot γ1 (claimed 12)` — the collapse that also makes the movers'
+    `iFrame`s work.  `plic_slots_stable` therefore takes ONE service-bit
+    premise PER PORT; both suppliers (`plic_write_outside_claim`,
+    `plic_latch_claimed`) are already ∀-quantified over the source, so a
+    caller pays two instantiations.
+  - **The two movers hand the payload out PORT-QUANTIFIED**
+    (`∀ j : uart_id, ⌜the id⌝ -∗ plic_payload_uart (plic_unames γ γ1 j)`),
+    because the claim returns ONE id and the arm that did not happen is
+    refuted by 10 ≠ 12.  The FUNCTION specs above them
+    (`SpecPlicClaim`/`SpecPlicComplete`) split that into TWO separate wands,
+    one per port, since a caller's two branches are separate proofs; the
+    conversion in either direction is one case split on the id.
+
 - Ghost state: `dev_interp d = uarts_auth (duart d) ∗ plic_auth ∗ virtio_auth` (ghost-var halves) sits in `state_interp`/`mstate_interp`; user-facing halves `uart_frag i u`/`plic_frag p`/`virtio_frag v` with `uart_agree/update`, `plic_agree/update`, `virtio_agree/update` (RiscvPtsto.v), `dev_interp_update{_uart,_plic}` (WpUart.v) and `dev_interp_{agree,update}_virtio` (WpVirtio.v).  **THE UART SIDE IS ONE NAME PER PORT** — `era_uart_name : uart_id -> gname`, exactly as `era_reg_name` is one per hart — and `uarts_auth f = era_uarts_half uart_name f` is the big-op over `enum uart_id`; `uarts_auth_acc` FOCUSES one port out of it (the only way a rule reaches a port's authority, so no proof has to know how many ports there are) and `uarts_agree`/`uarts_alloc` are the agreement and the allocation.  `era_uarts_half` exists as a NAMED wrapper rather than the big-op spelled at each site so that the two ends (`dev_interp_at` and `power_boot_res`) agree on a head symbol: the era's name is a FUNCTION, and `iFrame`/`iExact` will not unify one under a big-op's binder — which is also why the framing sites `replace (era_uart_name HE) with γu by reflexivity` first. Per-hart register access for the wire (an EXPLICIT, non-ambient hart): `reg_pointsto_at`/`reg_valid_at`/`reg_update_at`/`gregs_interp_acc_at` (RiscvPtsto.v §3b).
 - **The PLIC gateway is per-SOURCE.** `plic_latch p i` takes the source id, and `dev_irq_level d i` says which device drives which line (`uart_irq_id` = 10 → `uart_irq`, `virtio_irq_id` = 1 → `virtio_irq`, everything else permanently low). `plic_ok_latch` (PlicPlan.v) takes the source too. Wire a new device's interrupt in by extending `dev_irq_level`, not by cloning the latch.
 - **The PLIC is indexed by CONTEXT, never by hart.** It has `plic_nctx` = 2·NCPU independent contexts — enable bitmap, threshold, claim/complete each — and the BOARD is what ties two of them to a hart: `plic_mctx h` = 2h drives hart h's M pin and `plic_sctx h` = 2h+1 its S pin (`dev_meip`/`dev_seip`, one `RiscvLang.plic_step` wire arm each, both cells living in `WireInv` with existential contents so a second arm costs the Iris side nothing). Anything hart-shaped in a PLIC statement is a bug waiting to happen: xv6 touches only the S half, which is exactly how modelling only that half went unnoticed.

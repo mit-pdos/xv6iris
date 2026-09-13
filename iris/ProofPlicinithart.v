@@ -329,13 +329,15 @@ Section ProofPlicinithart.
     { done. }
     { (* an ENABLE write: it touches the enable bitmap and nothing else, so
          the slots come straight back *)
-      iIntros (pq pq') "%Hpw _ Hslots _".
+      iIntros (γ1 pq pq') "%Hpw _ Hslots _".
       rewrite HN5sw HN5a5 (ph_senable_write _ pq _ Hhart) in Hpw.
       injection Hpw as Hrec.
-      assert (Hcl : p_claimed pq' (uart_irq_id Uart0) = p_claimed pq (uart_irq_id Uart0))
-        by (rewrite <- Hrec; reflexivity).
+      assert (Hcl : forall j : N, p_claimed pq' j = p_claimed pq j)
+        by (intro j; rewrite <- Hrec; reflexivity).
       iModIntro. iSplitL "Hslots"; [| done].
-      iApply (plic_slots_stable _ pq pq' Hcl). iExact "Hslots". }
+      iApply (plic_slots_stable _ _ pq pq'
+                (Hcl (uart_irq_id Uart0)) (Hcl (uart_irq_id Uart1))).
+      iExact "Hslots". }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc _".
     assert (Hpp20 : add_vec_int (mword_of_int (KernelSyms.plicinithart + 0x1c) : mword 64) 4 = mword_of_int (KernelSyms.plicinithart + 0x20)) by (apply bv_eq; vm_compute; reflexivity).
@@ -404,13 +406,15 @@ Section ProofPlicinithart.
               with "Hcg Hpc [] Hdinv [] []").
     { iApply (phi_2a with "Htext"). }
     { done. }
-    { iIntros (pq pq') "%Hpw _ Hslots _".
+    { iIntros (γ1 pq pq') "%Hpw _ Hslots _".
       rewrite HN8sw HN8a5 (ph_sthresh_write _ pq _ Hhart) in Hpw.
       injection Hpw as Hrec.
-      assert (Hcl : p_claimed pq' (uart_irq_id Uart0) = p_claimed pq (uart_irq_id Uart0))
-        by (rewrite <- Hrec; reflexivity).
+      assert (Hcl : forall j : N, p_claimed pq' j = p_claimed pq j)
+        by (intro j; rewrite <- Hrec; reflexivity).
       iModIntro. iSplitL "Hslots"; [| done].
-      iApply (plic_slots_stable _ pq pq' Hcl). iExact "Hslots". }
+      iApply (plic_slots_stable _ _ pq pq'
+                (Hcl (uart_irq_id Uart0)) (Hcl (uart_irq_id Uart1))).
+      iExact "Hslots". }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc _".
     assert (Hpp2e : add_vec_int (mword_of_int (KernelSyms.plicinithart + 0x2a) : mword 64) 4 = mword_of_int (KernelSyms.plicinithart + 0x2e)) by (apply bv_eq; vm_compute; reflexivity).

@@ -19,7 +19,7 @@
 
    The load is a CLAIM: the model's read of that register takes the best pending
    enabled source, clears its pending bit and marks it claimed.  It therefore
-   runs with the device invariant open ([wp_lw_plic_dev_s_sconf], WpPlic.v) --
+   runs with the PLIC invariant open ([wp_lw_plic_pinv_s_sconf], WpPlic.v) --
    every hart claims concurrently, so none may own [plic_frag] across a step.
    The mutation touches no enable word, so the kernel's plan [plic_ok]
    (PlicPlan.v) survives it, and the plan in turn is what bounds the id read
@@ -71,14 +71,16 @@ Qed.
 (* ...and the reverse reading, which is what carries the RECEIVE TOKEN out of
    the claim: a0 holding the UART's id means the 32-bit register did.  Both
    sides are literals, so the two encodings are compared by computation. *)
-Lemma pq_claim_of_a0 (v : bv 32) :
+Lemma pq_claim_of_a0 (j : uart_id) (v : bv 32) :
   plic_claim_ret_ok v ->
   (extend_value (n := 8*4) false v : mword 64)
-    = (mword_of_int (Z.of_N (uart_irq_id Uart0)) : mword 64) ->
-  v = Z_to_bv 32 (Z.of_N (uart_irq_id Uart0)).
+    = (mword_of_int (Z.of_N (uart_irq_id j)) : mword 64) ->
+  v = Z_to_bv 32 (Z.of_N (uart_irq_id j)).
 Proof.
-  intros [-> | [-> | [-> | ->]]] H; [ | reflexivity | | ];
-    exfalso; apply (f_equal bv_unsigned) in H; vm_compute in H; discriminate.
+  intros [-> | [-> | [-> | ->]]] H; destruct j;
+    first [ reflexivity
+          | exfalso; apply (f_equal bv_unsigned) in H;
+            vm_compute in H; discriminate ].
 Qed.
 
 (* [rget m k] at a NON-tp index is the plain map lookup ([rget_ne]) -- the
@@ -118,8 +120,8 @@ Section ProofPlicClaim.
   (*  [rewrite wp_next_off] per leaf, save for the [jal cpuid] call, whose *)
   (*  own contract likewise has no wrapper to collapse. *)
   (* =================================================================== *)
-  Lemma wp_plic_claim_sconf (γd : uart_names) (γv : disk_names) (m0 : regfile) (n : nat) (p : mword 64)
-    : wp_plic_claim_sconf_body γd γv m0 n p.
+  Lemma wp_plic_claim_sconf (γd γd1 : uart_names) (γv : disk_names) (m0 : regfile) (n : nat) (p : mword 64)
+    : wp_plic_claim_sconf_body γd γd1 γv m0 n p.
   Proof.
     cbv beta delta [wp_plic_claim_sconf_body].
     intros ra_idx tp_idx a0_idx pcE ra0 ret_tgt Hhart Hn.
@@ -139,7 +141,7 @@ Section ProofPlicClaim.
     set (s00 := m0 !!! Regidx s0_idx).
     set (R1 := <[Regidx csp_rs1 := regval_into_reg sp']> m0).
     set (R2 := <[Regidx s0_idx := regval_into_reg (add_vec (R1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm_s0)))]> R1).
-    iIntros "Hcg #Htext Hpc #Hdinv #Hinit Hcont".
+    iIntros "Hcg #Htext Hpc #Hdinv #Hpinv #Hinit #Hinit1 Hcont".
     assert (Hn2 : (2 <= n)%nat) by lia.
     assert (Hcsp1 : R1 !!! Regidx csp_rs1 = sp') by (apply upd_eq).
     assert (Hpush : sp' = pa_stk (m0 !!! Regidx csp_rs1) 2).
@@ -259,11 +261,13 @@ Section ProofPlicClaim.
     { rgne. unfold N4. rewrite upd_eq. unfold regval_into_reg, ph_sthb.
       rewrite HN3a5 HN3a0. reflexivity. }
     (* ---- 0x16: c.lw a0,4(a5) -- THE CLAIM ---- *)
-    iApply (wp_lw_plic_dev_s_sconf (CID := CID) γd γv (mword_of_int (KernelSyms.plic_claim + 0x16)) true false
+    iApply (wp_lw_plic_pinv_s_sconf (CID := CID) γd γd1 (mword_of_int (KernelSyms.plic_claim + 0x16)) true false
               a0_idx a5_idx (mword_of_int 4 : mword 12) N4 (n - 2)%nat plic_claim_ret_ok
               emp%I
-              (fun cv => ⌜ cv = Z_to_bv 32 (Z.of_N (uart_irq_id Uart0)) ⌝ -∗
-                           plic_payload_uart γd)%I
+              (fun cv => ((⌜ cv = Z_to_bv 32 (Z.of_N (uart_irq_id Uart0)) ⌝ -∗
+                             plic_payload_uart γd) ∗
+                          (⌜ cv = Z_to_bv 32 (Z.of_N (uart_irq_id Uart1)) ⌝ -∗
+                             plic_payload_uart γd1))%I)
               ltac:(rewrite HN4a5; exact (ph_geom_range _ (ph_sclaim_geom _ Hhart)))
               ltac:(rewrite HN4a5; exact (ph_geom_align _ (ph_sclaim_geom _ Hhart)))
               ltac:(rewrite HN4a5; exact (ph_geom_canon _ (ph_sclaim_geom _ Hhart)))
@@ -277,7 +281,7 @@ Section ProofPlicClaim.
                       rewrite Hc in Hk; exact Hk
                     | pose proof (plic_claim_ret pq (plic_sctx (Z.to_nat (bv_unsigned cid_word))) Hpq) as Hk;
                       rewrite Hc in Hk; exact Hk ])
-              with "Hcg Hpc [] Hdinv [] []").
+              with "Hcg Hpc [] Hpinv [] []").
     { iApply (pqi_16 with "Htext"). }
     { done. }
     { (* THE CLAIM TAKES THE PAYLOAD OUT.  The read IS [plic_claim] at this
@@ -288,13 +292,26 @@ Section ProofPlicClaim.
       iIntros (pq cv pq') "%Hpr %Hpq Hslots _".
       rewrite HN4a5 (ph_sclaim_read _ pq Hhart) in Hpr.
       injection Hpr as Hpr.
-      iDestruct (plic_slots_claim γd pq
+      iDestruct (plic_slots_claim γd γd1 pq
                    (plic_sctx (Z.to_nat (bv_unsigned cid_word))) Hpq
-                   with "Hinit Hslots") as "[Hslots Htok]".
-      rewrite Hpr. cbn [fst snd]. iModIntro. iFrame "Hslots Htok". }
+                   with "Hinit Hinit1 Hslots") as "[Hslots Htok]".
+      rewrite Hpr. cbn [fst snd]. iModIntro. iFrame "Hslots".
+      (* ONE payload, TWO wands: split on the id the claim actually took, so
+         the arm that did not happen is refuted by 10 <> 12 and the arm that
+         did takes [plic_slots_claim]'s port-quantified handout at its own
+         port. *)
+      destruct (decide (cv = Z_to_bv 32 (Z.of_N (uart_irq_id Uart0))))
+        as [He|Hne].
+      - iSplitL "Htok".
+        + iIntros (_). iApply ("Htok" $! Uart0). iPureIntro. exact He.
+        + iIntros (Hv). exfalso. rewrite He in Hv.
+          apply (f_equal bv_unsigned) in Hv. vm_compute in Hv. discriminate.
+      - iSplitR "Htok".
+        + iIntros (Hv). exfalso. exact (Hne Hv).
+        + iIntros (Hv). iApply ("Htok" $! Uart1). iPureIntro. exact Hv. }
     iIntros (cv) "%Hcv".
     iApply wp_next_off_intro.
-    iIntros "Hcg Hpc Htok".
+    iIntros "Hcg Hpc [Htok Htok1]".
     assert (Hpp18 : add_vec_int (mword_of_int (KernelSyms.plic_claim + 0x16) : mword 64) 2 = mword_of_int (KernelSyms.plic_claim + 0x18)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp18) in "Hpc".
     set (cval := (extend_value (n := 8*4) false cv : mword 64)).
@@ -378,12 +395,16 @@ Section ProofPlicClaim.
     assert (Hra_final : ret_pc (rget N8 ra_idx) = ret_tgt)
       by (rgne; rewrite HN8ra; reflexivity).
     iEval (rewrite Hra_final) in "Hpc".
-    iApply ("Hcont" $! N8 with "Hcg Hpc [%] [Htok]").
+    iApply ("Hcont" $! N8 with "Hcg Hpc [%] [Htok] [Htok1]").
+    3:{ (* the second port's token, same re-keying at [Uart1] *)
+        iIntros (Ha0). iApply "Htok1". iPureIntro.
+        revert Ha0. rewrite HN8a0. unfold cval.
+        exact (pq_claim_of_a0 Uart1 cv Hcv). }
     2:{ (* the token, re-keyed from the 32-bit register value to the 64-bit
            word the epilogue leaves in a0 *)
         iIntros (Ha0). iApply "Htok". iPureIntro.
         revert Ha0. rewrite HN8a0. unfold cval.
-        exact (pq_claim_of_a0 cv Hcv). }
+        exact (pq_claim_of_a0 Uart0 cv Hcv). }
     split; [ | split ].
     - (* sp and s0 are saved-then-restored ACROSS the call, so the fact does not
          factor through the callee's [callee_saved]; each conjunct on its own. *)

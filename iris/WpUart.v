@@ -1189,14 +1189,26 @@ Section DevLoops.
   (*  the whole handshake is folded into [plic_claim]/[plic_complete]:    *)
   (*  their callers name only the payload.                                *)
   (*                                                                     *)
-  (*  The three tables are CONCRETE.  Only the UART has a payload -- the  *)
-  (*  receive token, THE EXCLUSIVE RIGHT TO POP the receive FIFO -- so    *)
-  (*  only the UART has a one-shot to run, and it is the [un_init] field  *)
-  (*  [uart_names] already carries.  Every other source's slot is [emp]   *)
-  (*  at every [p]: it is founded in its post-state at boot and survives  *)
-  (*  every transition with nothing to prove.  Giving a second source a   *)
-  (*  payload is three table rows, one ghost name, and an extra case in   *)
-  (*  the two movers below; no statement outside this block moves.        *)
+  (*  The three tables are CONCRETE, and they are indexed BY PORT.  BOTH    *)
+  (*  16550s have a payload -- the receive token, THE EXCLUSIVE RIGHT TO    *)
+  (*  POP that port's receive FIFO -- because uartintr drains the FIFO at   *)
+  (*  BOTH ports: `while(1){c=uartgetc(u); if(c==-1)break; if(u->rx)        *)
+  (*  u->rx(c);}` skips only the HOOK CALL where the hook is null, never    *)
+  (*  the pop.  So the tables read through [DevModel.uart_of_irq] -- the    *)
+  (*  model's own inverse of [uart_irq_id] -- and hand it the names         *)
+  (*  [plic_unames] selects: the console's [γ] at [Uart0] and [γ1] at       *)
+  (*  [Uart1].  Each port carries its own one-shot (the [un_init] field of  *)
+  (*  its own [uart_names]).  The disk's slot is [emp] at every [p]: it is  *)
+  (*  founded in its post-state at boot and survives every transition with  *)
+  (*  nothing to prove.                                                     *)
+  (*                                                                        *)
+  (*  THE SECOND PORT'S PAYLOAD IS NOT A WEAKER ONE.  It is the SAME        *)
+  (*  [plic_payload_uart] -- the pop token AND the consumer's high-water    *)
+  (*  half under [ohist_le].  Port 1 has no consumer, so that half simply   *)
+  (*  never moves: it is founded at [None], where [ohist_le None _] holds   *)
+  (*  at every anchor ([ObsTrace.ohist_le_none]).  Free, not false -- and   *)
+  (*  stating it any weaker would make [SpecUartintr]'s port-generic        *)
+  (*  [uart_rx_writer] premise unsuppliable at [Uart1].                     *)
   (* ------------------------------------------------------------------ *)
   (* THE RIGHT TO POP, AND THE RIGHT TO STORE WHAT WAS POPPED.  The receive
      token alone is not a whole payload any more: the byte a hart pops has
@@ -1214,80 +1226,157 @@ Section DevLoops.
   Definition plic_payload_uart (γ : uart_names) : iProp Σ :=
     (∃ (k : nat) (hl : option (list mobs)), uart_rx_writer γ k hl)%I.
 
-  Definition plic_payload (γ : uart_names) (i : N) : iProp Σ :=
-    (if (i =? (uart_irq_id Uart0))%N then plic_payload_uart γ else emp)%I.
-  Definition plic_preinit (γ : uart_names) (i : N) : iProp Σ :=
-    (if (i =? (uart_irq_id Uart0))%N then uart_preinit γ else False)%I.
-  Definition plic_inited (γ : uart_names) (i : N) : iProp Σ :=
-    (if (i =? (uart_irq_id Uart0))%N then uart_inited γ else emp)%I.
+  (* WHICH PORT'S GHOSTS A TRACKED UART SOURCE NAMES.  The one place the two
+     bundles are told apart; everything below is stated through it, so no
+     slot lemma is written twice. *)
+  Definition plic_unames (γ γ1 : uart_names) (i : uart_id) : uart_names :=
+    match i with Uart0 => γ | Uart1 => γ1 end.
 
-  Definition plic_slot (γ : uart_names) (p : plic_state) (i : N) : iProp Σ :=
-    (plic_preinit γ i
-     ∨ (plic_inited γ i ∗
-        if p_claimed p i then emp else plic_payload γ i))%I.
+  Definition plic_payload (γ γ1 : uart_names) (i : N) : iProp Σ :=
+    (match uart_of_irq i with
+     | Some j => plic_payload_uart (plic_unames γ γ1 j)
+     | None => emp
+     end)%I.
+  Definition plic_preinit (γ γ1 : uart_names) (i : N) : iProp Σ :=
+    (match uart_of_irq i with
+     | Some j => uart_preinit (plic_unames γ γ1 j)
+     | None => False
+     end)%I.
+  Definition plic_inited (γ γ1 : uart_names) (i : N) : iProp Σ :=
+    (match uart_of_irq i with
+     | Some j => uart_inited (plic_unames γ γ1 j)
+     | None => emp
+     end)%I.
+
+  Definition plic_slot (γ γ1 : uart_names) (p : plic_state) (i : N) : iProp Σ :=
+    (plic_preinit γ γ1 i
+     ∨ (plic_inited γ γ1 i ∗
+        if p_claimed p i then emp else plic_payload γ γ1 i))%I.
 
   (* THE SOURCES THE INVARIANT TRACKS.  Not [plic_srcs] (DevModel.v: all
      ninety-five real ids): under [plic_ok] a claim can only ever return one
-     of the machine's own two ([PlicPlan.plic_enabled_srcs], and
+     of the machine's own three ([PlicPlan.plic_enabled_srcs], and
      [plic_claim_ret] on top of it), so this list already covers every source
-     a claim can hand a payload for -- and the big-op is a two-element cons
+     a claim can hand a payload for -- and the big-op is a three-element cons
      instead of a ninety-five-element fold. *)
-  Definition plic_tracked : list N := [(uart_irq_id Uart0); virtio_irq_id].
+  Definition plic_tracked : list N :=
+    [(uart_irq_id Uart0); (uart_irq_id Uart1); virtio_irq_id].
 
-  Definition plic_slots (γ : uart_names) (p : plic_state) : iProp Σ :=
-    ([∗ list] i ∈ plic_tracked, plic_slot γ p i)%I.
+  Definition plic_slots (γ γ1 : uart_names) (p : plic_state) : iProp Σ :=
+    ([∗ list] i ∈ plic_tracked, plic_slot γ γ1 p i)%I.
+
+  (* ONE PORT'S SLOT, PORT-FREE: the shape the accessors and the two movers
+     are stated at, so the second port costs no cloned lemma.  [cl] is that
+     source's service bit. *)
+  Definition plic_uslot (γu : uart_names) (cl : bool) : iProp Σ :=
+    (uart_preinit γu
+     ∨ (uart_inited γu ∗ if cl then emp else plic_payload_uart γu))%I.
+
+  Lemma plic_slot_to_uslot (γ γ1 : uart_names) (p : plic_state) (j : uart_id) :
+    plic_slot γ γ1 p (uart_irq_id j) -∗
+    plic_uslot (plic_unames γ γ1 j) (p_claimed p (uart_irq_id j)).
+  Proof.
+    rewrite /plic_slot /plic_uslot /plic_preinit /plic_inited /plic_payload
+            uart_of_irq_id. iIntros "H". iExact "H".
+  Qed.
+
+  Lemma plic_uslot_to_slot (γ γ1 : uart_names) (p : plic_state) (j : uart_id) :
+    plic_uslot (plic_unames γ γ1 j) (p_claimed p (uart_irq_id j)) -∗
+    plic_slot γ γ1 p (uart_irq_id j).
+  Proof.
+    rewrite /plic_slot /plic_uslot /plic_preinit /plic_inited /plic_payload
+            uart_of_irq_id. iIntros "H". iExact "H".
+  Qed.
 
   (* A PAYLOAD-LESS SLOT IS FREE, at any state: both of its arms are [emp].
-     This is what makes the big-op collapse to the UART's slot. *)
-  Lemma plic_slot_other (γ : uart_names) (p : plic_state) (i : N) :
-    (i =? (uart_irq_id Uart0))%N = false -> ⊢ plic_slot γ p i.
+     This is what makes the big-op collapse to the two ports' slots. *)
+  Lemma plic_slot_other (γ γ1 : uart_names) (p : plic_state) (i : N) :
+    uart_of_irq i = None -> ⊢ plic_slot γ γ1 p i.
   Proof.
     intros Hi.
     rewrite /plic_slot /plic_preinit /plic_inited /plic_payload Hi.
     iRight. iSplitR; [done|]. destruct (p_claimed p i); done.
   Qed.
 
-  (* ...so the big-op IS the UART's slot, in both directions. *)
-  Lemma plic_slots_uart (γ : uart_names) (p : plic_state) :
-    plic_slots γ p -∗ plic_slot γ p (uart_irq_id Uart0).
-  Proof. rewrite /plic_slots /plic_tracked. iIntros "(Hu & _)". iExact "Hu". Qed.
-
-  Lemma plic_slots_of_uart (γ : uart_names) (p : plic_state) :
-    plic_slot γ p (uart_irq_id Uart0) -∗ plic_slots γ p.
+  (* ...so the big-op IS the two UART slots, in both directions. *)
+  Lemma plic_slots_eq (γ γ1 : uart_names) (p : plic_state) :
+    plic_slots γ γ1 p ⊣⊢
+      plic_uslot γ  (p_claimed p (uart_irq_id Uart0)) ∗
+      plic_uslot γ1 (p_claimed p (uart_irq_id Uart1)).
   Proof.
-    rewrite /plic_slots /plic_tracked. iIntros "Hu".
-    iSplitL "Hu"; [iExact "Hu"|]. iSplitR; [| done].
-    iApply (plic_slot_other γ p virtio_irq_id). vm_compute. reflexivity.
+    rewrite /plic_slots /plic_tracked. iSplit.
+    - iIntros "(H0 & H1 & _)".
+      iSplitL "H0".
+      + iApply (plic_slot_to_uslot γ γ1 p Uart0 with "H0").
+      + iApply (plic_slot_to_uslot γ γ1 p Uart1 with "H1").
+    - iIntros "(H0 & H1)".
+      iSplitL "H0".
+      + iApply (plic_uslot_to_slot γ γ1 p Uart0 with "H0").
+      + iSplitL "H1".
+        * iApply (plic_uslot_to_slot γ γ1 p Uart1 with "H1").
+        * iSplitR; [| done].
+          iApply (plic_slot_other γ γ1 p virtio_irq_id).
+          vm_compute. reflexivity.
   Qed.
 
-  (* THE UART SLOT, read and written.  [plic_slot] is a definition, so the
+  (* THE UART SLOT, read and written.  [plic_uslot] is a definition, so the
      proofmode needs these three to see its disjunction; they are also where
      the PRE-STATE IS REFUTED, which is the whole content of "a caller
      holding [uart_inited] never meets the left arm". *)
-  Lemma plic_slot_uart_cases (γ : uart_names) (p : plic_state) :
-    plic_slot γ p (uart_irq_id Uart0) -∗
-      uart_preinit γ
-      ∨ (uart_inited γ ∗
-         if p_claimed p (uart_irq_id Uart0) then emp else plic_payload_uart γ).
-  Proof. rewrite /plic_slot. iIntros "H". iExact "H". Qed.
+  Lemma plic_uslot_cases (γu : uart_names) (cl : bool) :
+    plic_uslot γu cl -∗
+      uart_preinit γu
+      ∨ (uart_inited γu ∗ if cl then emp else plic_payload_uart γu).
+  Proof. rewrite /plic_uslot. iIntros "H". iExact "H". Qed.
 
-  Lemma plic_slot_uart_intro (γ : uart_names) (p : plic_state) :
-    uart_inited γ -∗
-    (if p_claimed p (uart_irq_id Uart0) then emp else plic_payload_uart γ) -∗
-    plic_slot γ p (uart_irq_id Uart0).
+  Lemma plic_uslot_intro (γu : uart_names) (cl : bool) :
+    uart_inited γu -∗
+    (if cl then emp else plic_payload_uart γu) -∗
+    plic_uslot γu cl.
   Proof.
-    iIntros "#Hin Hpay". rewrite /plic_slot. iRight.
+    iIntros "#Hin Hpay". rewrite /plic_uslot. iRight.
     iSplitR; [iExact "Hin"|]. iExact "Hpay".
   Qed.
 
-  Lemma plic_slot_uart_elim (γ : uart_names) (p : plic_state) :
-    uart_inited γ -∗ plic_slot γ p (uart_irq_id Uart0) -∗
-    (if p_claimed p (uart_irq_id Uart0) then emp else plic_payload_uart γ).
+  Lemma plic_uslot_elim (γu : uart_names) (cl : bool) :
+    uart_inited γu -∗ plic_uslot γu cl -∗
+    (if cl then emp else plic_payload_uart γu).
   Proof.
     iIntros "#Hin Hu".
-    iDestruct (plic_slot_uart_cases with "Hu") as "[Hpre | [_ Hpay]]".
+    iDestruct (plic_uslot_cases with "Hu") as "[Hpre | [_ Hpay]]".
     - iDestruct (uart_preinit_inited_False with "Hpre Hin") as %[].
     - iExact "Hpay".
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (*  TWO PURE FACTS THE MOVERS NEED AT EITHER PORT.                     *)
+  (* ------------------------------------------------------------------ *)
+
+  (* [PlicPlan.uart_irq_id_range] is stated at the console; a completion of
+     the SECOND port's source must land as well. *)
+  Lemma uart_irq_id_range_at (j : uart_id) :
+    (1 <= Z.of_N (uart_irq_id j))%Z /\
+    (Z.of_N (uart_irq_id j) < Z.of_nat plic_nsrc)%Z.
+  Proof. destruct j; unfold uart_irq_id, plic_nsrc; cbn; lia. Qed.
+
+  (* ...and the port-generic twin of [PlicPlan.plic_claim_uart_of_ret]: the
+     id a claim RETURNS identifies the source it took, at either port. *)
+  Lemma plic_claim_uart_ret_at (p : plic_state) (c : nat) (i : N) (j : uart_id) :
+    plic_ok p -> plic_best p c = Some i ->
+    Z_to_bv 32 (Z.of_N i) = Z_to_bv 32 (Z.of_N (uart_irq_id j)) ->
+    i = uart_irq_id j.
+  Proof.
+    intros Hok Hbest Heq.
+    destruct (plic_best_spec p c i Hbest) as [Hin Hcand].
+    assert (Hen : plic_enabled p c i = true).
+    { unfold plic_cand in Hcand.
+      apply andb_prop in Hcand as [Hc _]. apply andb_prop in Hc as [_ Hc].
+      exact Hc. }
+    destruct (plic_enabled_srcs p c i Hok Hin Hen) as [E | [E | E]]; subst i;
+      destruct j;
+      first [ reflexivity
+            | exfalso; apply (f_equal bv_unsigned) in Heq;
+              vm_compute in Heq; discriminate ].
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -1295,83 +1384,141 @@ Section DevLoops.
   (* ------------------------------------------------------------------ *)
 
   (* ANYTHING THAT LEAVES SERVICE ALONE leaves the slots alone: a latch, a
-     priority write, an enable write, a threshold write. *)
-  Lemma plic_slots_stable (γ : uart_names) (p p' : plic_state) :
+     priority write, an enable write, a threshold write.  ONE PREMISE PER
+     TRACKED PORT -- both suppliers ([PlicPlan.plic_write_outside_claim],
+     [plic_latch_claimed]) are already universally quantified over the
+     source, so a caller pays two instantiations and nothing else. *)
+  Lemma plic_slots_stable (γ γ1 : uart_names) (p p' : plic_state) :
     p_claimed p' (uart_irq_id Uart0) = p_claimed p (uart_irq_id Uart0) ->
-    plic_slots γ p -∗ plic_slots γ p'.
+    p_claimed p' (uart_irq_id Uart1) = p_claimed p (uart_irq_id Uart1) ->
+    plic_slots γ γ1 p -∗ plic_slots γ γ1 p'.
   Proof.
-    intros Hcl. iIntros "H". iDestruct (plic_slots_uart with "H") as "Hu".
-    iApply plic_slots_of_uart. rewrite /plic_slot Hcl. iExact "Hu".
+    intros H0 H1. rewrite !plic_slots_eq H0 H1. iIntros "$".
   Qed.
 
   (* A CLAIM TAKES THE PAYLOAD OUT of the slot it marks in service, and the
      handout is keyed by the id the claim RETURNS -- which is what lets a
-     caller spend it without any fact about [plic_best]. *)
-  Lemma plic_slots_claim (γ : uart_names) (p : plic_state) (c : nat) :
+     caller spend it without any fact about [plic_best].  The handout is
+     quantified over the PORT, so devintr's two arms each instantiate it at
+     their own and the other arm's premise is refuted by 10 <> 12. *)
+  Lemma plic_slots_claim (γ γ1 : uart_names) (p : plic_state) (c : nat) :
     plic_ok p ->
-    uart_inited γ -∗ plic_slots γ p -∗
-      plic_slots γ (snd (plic_claim p c)) ∗
-      (⌜ fst (plic_claim p c) = Z_to_bv 32 (Z.of_N (uart_irq_id Uart0)) ⌝ -∗
-         plic_payload_uart γ).
+    uart_inited γ -∗ uart_inited γ1 -∗ plic_slots γ γ1 p -∗
+      plic_slots γ γ1 (snd (plic_claim p c)) ∗
+      (∀ j : uart_id,
+         ⌜ fst (plic_claim p c) = Z_to_bv 32 (Z.of_N (uart_irq_id j)) ⌝ -∗
+         plic_payload_uart (plic_unames γ γ1 j)).
   Proof.
-    intros Hok. iIntros "#Hin H".
-    iDestruct (plic_slots_uart with "H") as "Hu".
+    intros Hok. iIntros "#Hin0 #Hin1 H".
+    rewrite plic_slots_eq. iDestruct "H" as "[H0 H1]".
     destruct (plic_best p c) as [i|] eqn:Hbest; last first.
     { (* nothing to serve: the state is unchanged and the id is 0 *)
       assert (Hsnd : snd (plic_claim p c) = p)
         by (unfold plic_claim; rewrite Hbest; reflexivity).
       assert (Hfst : fst (plic_claim p c) = Z_to_bv 32 0)
         by (unfold plic_claim; rewrite Hbest; reflexivity).
-      rewrite Hsnd Hfst.
-      iSplitL "Hu"; [by iApply plic_slots_of_uart|].
-      iIntros (Hv). exfalso.
-      apply (f_equal bv_unsigned) in Hv. vm_compute in Hv. discriminate. }
+      rewrite Hsnd Hfst plic_slots_eq.
+      iSplitL "H0 H1"; [iFrame "H0 H1"|].
+      iIntros (j Hv). exfalso.
+      apply (f_equal bv_unsigned) in Hv. destruct j; vm_compute in Hv;
+        discriminate. }
     destruct (plic_claim_serves p c i Hok Hbest) as [Hb Ha].
-    destruct (decide (i = (uart_irq_id Uart0))) as [->|Hne].
-    - (* the UART: it was out of service, so the payload was in the slot, and
-         it is in service now, so the slot is empty and the payload leaves *)
-      iDestruct (plic_slot_uart_elim with "Hin Hu") as "Hpay".
+    assert (Hfst : fst (plic_claim p c) = Z_to_bv 32 (Z.of_N i))
+      by (unfold plic_claim; rewrite Hbest; reflexivity).
+    destruct (decide (i = uart_irq_id Uart0)) as [Hi0|Hn0].
+    - (* THE CONSOLE'S SOURCE: it was out of service, so the payload was in
+         the slot; it is in service now, so the slot is empty and the
+         payload leaves.  The other port's service bit is untouched. *)
+      rewrite Hi0 in Hb Ha.
+      assert (Hcl1 : p_claimed (snd (plic_claim p c)) (uart_irq_id Uart1)
+                     = p_claimed p (uart_irq_id Uart1)).
+      { apply plic_claim_other_claimed. rewrite Hbest Hi0.
+        injection 1 as Hc. vm_compute in Hc. discriminate Hc. }
+      iDestruct (plic_uslot_elim with "Hin0 H0") as "Hpay".
       iEval (rewrite Hb) in "Hpay".
+      rewrite plic_slots_eq Ha Hcl1.
       iSplitR "Hpay".
-      { iApply plic_slots_of_uart.
-        iApply (plic_slot_uart_intro with "Hin"). rewrite Ha. done. }
-      iIntros (_). iExact "Hpay".
-    - (* some other source: the UART's service bit is untouched, and the id
-         the claim returns is not the UART's *)
-      assert (Hother : plic_best p c <> Some (uart_irq_id Uart0)).
-      { rewrite Hbest. injection 1 as Hi. exact (Hne Hi). }
-      assert (Hcl : p_claimed (snd (plic_claim p c)) (uart_irq_id Uart0)
-                    = p_claimed p (uart_irq_id Uart0))
-        by exact (plic_claim_other_claimed p c (uart_irq_id Uart0) Hother).
-      assert (Hfst : fst (plic_claim p c) = Z_to_bv 32 (Z.of_N i))
-        by (unfold plic_claim; rewrite Hbest; reflexivity).
-      iSplitL "Hu".
-      { iApply plic_slots_of_uart. rewrite /plic_slot Hcl. iExact "Hu". }
-      iIntros (Hv). exfalso. apply Hne.
-      apply (plic_claim_uart_of_ret p c i Hok Hbest).
-      rewrite -Hfst. exact Hv.
+      { iSplitR "H1"; [| iExact "H1"].
+        iApply (plic_uslot_intro γ true with "Hin0"). done. }
+      iIntros (j Hv). destruct j; [iExact "Hpay"|].
+      exfalso. rewrite Hfst Hi0 in Hv.
+      apply (f_equal bv_unsigned) in Hv. vm_compute in Hv. discriminate.
+    - destruct (decide (i = uart_irq_id Uart1)) as [Hi1|Hn1].
+      + (* THE SECOND PORT'S SOURCE: the identical move at the other slot *)
+        rewrite Hi1 in Hb Ha.
+        assert (Hcl0 : p_claimed (snd (plic_claim p c)) (uart_irq_id Uart0)
+                       = p_claimed p (uart_irq_id Uart0)).
+        { apply plic_claim_other_claimed. rewrite Hbest Hi1.
+          injection 1 as Hc. vm_compute in Hc. discriminate Hc. }
+        iDestruct (plic_uslot_elim with "Hin1 H1") as "Hpay".
+        iEval (rewrite Hb) in "Hpay".
+        rewrite plic_slots_eq Ha Hcl0.
+        iSplitR "Hpay".
+        { iSplitL "H0"; [iExact "H0"|].
+          iApply (plic_uslot_intro γ1 true with "Hin1"). done. }
+        iIntros (j Hv). destruct j; [| iExact "Hpay"].
+        exfalso. rewrite Hfst Hi1 in Hv.
+        apply (f_equal bv_unsigned) in Hv. vm_compute in Hv. discriminate.
+      + (* some other source: BOTH UART service bits are untouched, and the
+           id the claim returns is neither port's *)
+        assert (Hcl0 : p_claimed (snd (plic_claim p c)) (uart_irq_id Uart0)
+                       = p_claimed p (uart_irq_id Uart0)).
+        { apply plic_claim_other_claimed. rewrite Hbest. congruence. }
+        assert (Hcl1 : p_claimed (snd (plic_claim p c)) (uart_irq_id Uart1)
+                       = p_claimed p (uart_irq_id Uart1)).
+        { apply plic_claim_other_claimed. rewrite Hbest. congruence. }
+        rewrite plic_slots_eq Hcl0 Hcl1.
+        iSplitL "H0 H1"; [iFrame "H0 H1"|].
+        iIntros (j Hv). exfalso.
+        assert (Hij : i = uart_irq_id j).
+        { apply (plic_claim_uart_ret_at p c i j Hok Hbest).
+          rewrite -Hfst. exact Hv. }
+        destruct j; [exact (Hn0 Hij) | exact (Hn1 Hij)].
   Qed.
 
-  (* ...and a completion puts it back. *)
-  Lemma plic_slots_complete (γ : uart_names) (p : plic_state) (i : N) :
-    uart_inited γ -∗ plic_slots γ p -∗
-    (⌜ i = (uart_irq_id Uart0) ⌝ -∗ plic_payload_uart γ) -∗
-    plic_slots γ (plic_complete p i).
+  (* ...and a completion puts it back, at whichever port's source it names. *)
+  Lemma plic_slots_complete (γ γ1 : uart_names) (p : plic_state) (i : N) :
+    uart_inited γ -∗ uart_inited γ1 -∗ plic_slots γ γ1 p -∗
+    (∀ j : uart_id, ⌜ i = uart_irq_id j ⌝ -∗
+       plic_payload_uart (plic_unames γ γ1 j)) -∗
+    plic_slots γ γ1 (plic_complete p i).
   Proof.
-    iIntros "#Hin H Htok".
-    destruct (decide (i = (uart_irq_id Uart0))) as [Heq|Hne].
-    - iDestruct (plic_slots_uart with "H") as "Hu".
-      iApply plic_slots_of_uart.
-      assert (Hf : p_claimed (plic_complete p i) (uart_irq_id Uart0) = false).
-      { rewrite Heq.
-        exact (plic_complete_claimed_in p (uart_irq_id Uart0)
-                 (proj1 uart_irq_id_range) (proj2 uart_irq_id_range)). }
-      iApply (plic_slot_uart_intro with "Hin"). rewrite Hf.
-      iApply "Htok". iPureIntro. exact Heq.
-    - (* a completion of anything else leaves the UART's service bit alone *)
-      iApply (plic_slots_stable γ p (plic_complete p i)
-                (plic_complete_claimed_ne p i (uart_irq_id Uart0) ltac:(congruence))).
-      iExact "H".
+    iIntros "#Hin0 #Hin1 H Hpay".
+    destruct (decide (i = uart_irq_id Uart0)) as [Hi0|Hn0].
+    - subst i. rewrite plic_slots_eq. iDestruct "H" as "[H0 H1]".
+      assert (Hf : p_claimed (plic_complete p (uart_irq_id Uart0))
+                     (uart_irq_id Uart0) = false)
+        by exact (plic_complete_claimed_in p (uart_irq_id Uart0)
+                    (proj1 (uart_irq_id_range_at Uart0))
+                    (proj2 (uart_irq_id_range_at Uart0))).
+      assert (Hcl1 : p_claimed (plic_complete p (uart_irq_id Uart0))
+                       (uart_irq_id Uart1) = p_claimed p (uart_irq_id Uart1))
+        by (apply plic_complete_claimed_ne; vm_compute; discriminate).
+      rewrite plic_slots_eq Hf Hcl1.
+      iSplitR "H1"; [| iExact "H1"].
+      iApply (plic_uslot_intro γ false with "Hin0").
+      iApply ("Hpay" $! Uart0). done.
+    - destruct (decide (i = uart_irq_id Uart1)) as [Hi1|Hn1].
+      + subst i. rewrite plic_slots_eq. iDestruct "H" as "[H0 H1]".
+        assert (Hf : p_claimed (plic_complete p (uart_irq_id Uart1))
+                       (uart_irq_id Uart1) = false)
+          by exact (plic_complete_claimed_in p (uart_irq_id Uart1)
+                      (proj1 (uart_irq_id_range_at Uart1))
+                      (proj2 (uart_irq_id_range_at Uart1))).
+        assert (Hcl0 : p_claimed (plic_complete p (uart_irq_id Uart1))
+                         (uart_irq_id Uart0) = p_claimed p (uart_irq_id Uart0))
+          by (apply plic_complete_claimed_ne; vm_compute; discriminate).
+        rewrite plic_slots_eq Hf Hcl0.
+        iSplitL "H0"; [iExact "H0"|].
+        iApply (plic_uslot_intro γ1 false with "Hin1").
+        iApply ("Hpay" $! Uart1). done.
+      + (* a completion of anything else leaves both service bits alone *)
+        iApply (plic_slots_stable γ γ1 p (plic_complete p i)
+                  (plic_complete_claimed_ne p i (uart_irq_id Uart0)
+                     ltac:(congruence))
+                  (plic_complete_claimed_ne p i (uart_irq_id Uart1)
+                     ltac:(congruence))).
+        iExact "H".
   Qed.
 
   (* THE PLIC INVARIANT: the fabric, the plan, and one slot per tracked
@@ -1379,8 +1526,8 @@ Section DevLoops.
      moves it to its post-state in ONE fupd ([uart_rx_tok_deposit]), which is
      also where the receive token is parked; every later PLIC access carries
      [uart_inited] and therefore never meets the pre-state again. *)
-  Definition plic_inv_body (γ : uart_names) : iProp Σ :=
-    (∃ p : plic_state, plic_frag p ∗ ⌜ plic_ok p ⌝ ∗ plic_slots γ p)%I.
+  Definition plic_inv_body (γ γ1 : uart_names) : iProp Σ :=
+    (∃ p : plic_state, plic_frag p ∗ ⌜ plic_ok p ⌝ ∗ plic_slots γ γ1 p)%I.
 
   Definition disk_inv_body (γd : disk_names) : iProp Σ :=
     (∃ v : virtio_state,
@@ -1388,34 +1535,36 @@ Section DevLoops.
 
   Global Instance uart_inv_body_timeless i γ : Timeless (uart_inv_body i γ).
   Proof. rewrite /uart_inv_body. apply _. Qed.
-  Global Instance plic_slot_timeless γ p i : Timeless (plic_slot γ p i).
+  Global Instance plic_slot_timeless γ γ1 p i : Timeless (plic_slot γ γ1 p i).
   Proof.
     rewrite /plic_slot /plic_preinit /plic_inited /plic_payload
             /uart_preinit /uart_inited.
-    destruct (i =? (uart_irq_id Uart0))%N; destruct (p_claimed p i); apply _.
+    destruct (uart_of_irq i) as [j|]; [destruct j|];
+      destruct (p_claimed p i); apply _.
   Qed.
-  Global Instance plic_slots_timeless γ p : Timeless (plic_slots γ p).
+  Global Instance plic_slots_timeless γ γ1 p : Timeless (plic_slots γ γ1 p).
   Proof. rewrite /plic_slots. apply _. Qed.
-  Global Instance plic_inv_body_timeless γ : Timeless (plic_inv_body γ).
+  Global Instance plic_inv_body_timeless γ γ1 : Timeless (plic_inv_body γ γ1).
   Proof. rewrite /plic_inv_body. apply _. Qed.
   Global Instance disk_inv_body_timeless γd : Timeless (disk_inv_body γd).
   Proof. rewrite /disk_inv_body. apply _. Qed.
 
   Definition uart_inv (i : uart_id) (γ : uart_names) : iProp Σ :=
     inv (uartN i) (uart_inv_body i γ).
-  Definition plic_inv (γ : uart_names) : iProp Σ := inv plicN (plic_inv_body γ).
+  Definition plic_inv (γ γ1 : uart_names) : iProp Σ :=
+    inv plicN (plic_inv_body γ γ1).
   Definition disk_inv (γd : disk_names) : iProp Σ := inv diskN (disk_inv_body γd).
 
   Global Instance uart_inv_persistent i γ : Persistent (uart_inv i γ).
   Proof. rewrite /uart_inv. apply _. Qed.
-  Global Instance plic_inv_persistent γ : Persistent (plic_inv γ).
+  Global Instance plic_inv_persistent γ γ1 : Persistent (plic_inv γ γ1).
   Proof. rewrite /plic_inv. apply _. Qed.
   Global Instance disk_inv_persistent γd : Persistent (disk_inv γd).
   Proof. rewrite /disk_inv. apply _. Qed.
 
   Lemma uart_inv_alloc E i γ : uart_inv_body i γ ={E}=∗ uart_inv i γ.
   Proof. iIntros "Hbody". rewrite /uart_inv. by iApply inv_alloc. Qed.
-  Lemma plic_inv_alloc E γ : plic_inv_body γ ={E}=∗ plic_inv γ.
+  Lemma plic_inv_alloc E γ γ1 : plic_inv_body γ γ1 ={E}=∗ plic_inv γ γ1.
   Proof. iIntros "Hbody". rewrite /plic_inv. by iApply inv_alloc. Qed.
   Lemma disk_inv_alloc E γd : disk_inv_body γd ={E}=∗ disk_inv γd.
   Proof. iIntros "Hbody". rewrite /disk_inv. by iApply inv_alloc. Qed.
@@ -1437,8 +1586,19 @@ Section DevLoops.
      NO proof may hold [uart_frag]/[plic_frag]/[virtio_frag] across a step: a
      client threads [dev_inv] and borrows the fragment by opening the relevant
      half around the access. *)
+  (* THE PLIC CONJUNCT IS ∃-PACKED OVER THE SECOND PORT'S NAMES, and that is
+     what keeps this bundle at ARITY 2 now that [plic_inv] is keyed by both
+     ports.  [dev_inv] is the CONSOLE bundle -- ~140 specs name it and none
+     of them has any business naming [Uart1]'s ghosts -- so the bundle says
+     only "the one PLIC invariant exists", which is all a client borrowing
+     [plic_frag] needs.  Anything that must name the second port's names --
+     the claim's payload, the completion's park, the second slot's deposit --
+     takes the BARE [plic_inv γ γ1] as its own premise instead
+     (SpecPlicinit/SpecPlicClaim/SpecPlicComplete/SpecDevintr), exactly as
+     "new specs take only the invariant(s) they use" says. *)
   Definition dev_inv (γ : uart_names) (γd : disk_names) : iProp Σ :=
-    (uart_inv Uart0 γ ∗ plic_inv γ ∗ disk_inv γd ∗ perm_inv gen_id (dn_perm γd))%I.
+    (uart_inv Uart0 γ ∗ (∃ γ1 : uart_names, plic_inv γ γ1) ∗
+     disk_inv γd ∗ perm_inv gen_id (dn_perm γd))%I.
 
   Global Instance dev_inv_persistent γ γd : Persistent (dev_inv γ γd).
   Proof. rewrite /dev_inv. apply _. Qed.
@@ -1449,8 +1609,16 @@ Section DevLoops.
      leaf holding [dev_inv] in its intuitionistic context keeps it. *)
   Lemma dev_inv_uart γ γd : dev_inv γ γd -∗ uart_inv Uart0 γ.
   Proof. iIntros "(#H & _ & _ & _)". iExact "H". Qed.
-  Lemma dev_inv_plic γ γd : dev_inv γ γd -∗ plic_inv γ.
+  Lemma dev_inv_plic γ γd : dev_inv γ γd -∗ ∃ γ1 : uart_names, plic_inv γ γ1.
   Proof. iIntros "(_ & #H & _ & _)". iExact "H". Qed.
+  (* ...and the way IN, for the one construction site that knows [γ1]. *)
+  Lemma dev_inv_intro γ γ1 γd :
+    uart_inv Uart0 γ -∗ plic_inv γ γ1 -∗ disk_inv γd -∗
+    perm_inv gen_id (dn_perm γd) -∗ dev_inv γ γd.
+  Proof.
+    iIntros "#Hu #Hp #Hd #Hq". rewrite /dev_inv.
+    iFrame "Hu Hd Hq". iExists γ1. iExact "Hp".
+  Qed.
   Lemma dev_inv_disk γ γd : dev_inv γ γd -∗ disk_inv γd.
   Proof. iIntros "(_ & _ & #H & _)". iExact "H". Qed.
   (* THE CRASH-PERMIT CHANNEL rides the SAME bundle (PermInv.v), which is why
@@ -1466,71 +1634,103 @@ Section DevLoops.
      [dev_inv_body]: that body carries a [Timeless] instance (it is what the
      three timeless per-device invariants are carved out of), and
      [perm_inv_body] is deliberately NOT timeless. *)
-  (* THE ALLOCATION HANDS THE RECEIVE TOKEN OUT.  The UART's slot is founded
-     in its PRE-STATE ([uart_preinit]) and every other tracked source's in
-     its post-state with an [emp] payload, so the token itself goes to the
-     boot chain, which threads it through consoleinit into uartinit's FCR
-     flush and deposits it afterwards ([uart_rx_tok_deposit]). *)
-  Lemma dev_inv_alloc E γ γd :
-    dev_inv_body γ γd -∗ perm_inv_body gen_id (dn_perm γd) -∗
-    uart_rx_tok γ 0 None ={E}=∗ dev_inv γ γd ∗ uart_rx_tok γ 0 None.
+  (* THE ALLOCATION HANDS THE RECEIVE TOKEN OUT.  BOTH ports' slots are
+     founded in their PRE-STATE ([uart_preinit]) and the disk's in its
+     post-state with an [emp] payload, so each port's token itself goes to
+     the boot chain, which threads it through uartinit's FCR flush and
+     deposits it afterwards ([uart_rx_tok_deposit]).  The console's token
+     travels as an argument here (it is also consoleinit's); the second
+     port's never enters this lemma -- only its one-shot does.
+
+     [γ1] IS AN ARGUMENT AND [plic_inv γ γ1] COMES BACK OUT, because the
+     bundle ∃-packs it: the boot chain knows which names it minted and has
+     to keep the concrete invariant for main's second deposit and for
+     plic_claim/plic_complete. *)
+  Lemma dev_inv_alloc E γ γ1 γd :
+    dev_inv_body γ γd -∗ uart_preinit γ1 -∗
+    perm_inv_body gen_id (dn_perm γd) -∗
+    uart_rx_tok γ 0 None ={E}=∗
+    dev_inv γ γd ∗ plic_inv γ γ1 ∗ uart_rx_tok γ 0 None.
   Proof.
-    iIntros "Hbody Hperm Htok". rewrite /dev_inv_body.
+    iIntros "Hbody Hpre1 Hperm Htok". rewrite /dev_inv_body.
     iDestruct "Hbody" as (u p v)
       "(Hu & Hp & Hv & Hg & Hcol & Hpre & Hproto & %Hpok & %Hvok)".
     iMod (uart_inv_alloc E Uart0 γ with "[Hu Hg Hcol]") as "#Huinv".
     { iExists u. iFrame "Hu Hg Hcol". }
-    iMod (plic_inv_alloc E γ with "[Hp Hpre]") as "#Hpinv".
+    iMod (plic_inv_alloc E γ γ1 with "[Hp Hpre Hpre1]") as "#Hpinv".
     { iExists p. iFrame "Hp". iSplitR; [iPureIntro; exact Hpok|].
-      iApply plic_slots_of_uart. rewrite /plic_slot. iLeft. iExact "Hpre". }
+      rewrite plic_slots_eq.
+      iSplitL "Hpre"; rewrite /plic_uslot; iLeft;
+        [iExact "Hpre" | iExact "Hpre1"]. }
     iMod (disk_inv_alloc E γd with "[Hv Hproto]") as "#Hdinv".
     { iExists v. iFrame "Hv Hproto". iPureIntro. exact Hvok. }
     iMod (perm_inv_alloc E gen_id (dn_perm γd) with "Hperm") as "#Hqinv".
-    iModIntro. rewrite /dev_inv. iFrame "Huinv Hpinv Hdinv Hqinv Htok".
+    iModIntro. rewrite /dev_inv.
+    iSplitR "Htok".
+    - iSplitR; [iExact "Huinv" |].
+      iSplitR; [iExists γ1; iExact "Hpinv" |].
+      iSplitR; [iExact "Hdinv" | iExact "Hqinv"].
+    - iFrame "Hpinv Htok".
   Qed.
 
-  (* THE DEPOSIT: the boot chain parks the token, in the ONE fupd that runs
-     the UART slot's one-shot -- out of the pre-state, into the post-state
-     with the payload.  main runs it between consoleinit and plicinit, and
-     the [uart_inited] it mints is what every later PLIC access carries, so
-     no one meets the pre-state again.
+  (* THE DEPOSIT: the boot chain parks a port's token, in the ONE fupd that
+     runs that port's slot one-shot -- out of the pre-state, into the
+     post-state with the payload.  ONE LEMMA FOR BOTH PORTS ([j] selects the
+     names): main runs it at [Uart0] between consoleinit and plicinit and at
+     [Uart1] after uartinitone's FCR flush, and the [uart_inited] each mints
+     is what every later PLIC access at that port carries, so no one meets a
+     pre-state again.
 
      THE SLOT'S [if] IS THE ONE PLACE the pre-state's silence about [p] is
      felt.  The pre-state says nothing at all about the PLIC state -- no
-     "the UART is enabled nowhere" clause -- so [p_claimed p (uart_irq_id Uart0) =
-     false] is not available here, and the (unreachable: nothing has enabled
-     the UART's source yet, so no claim can have taken it) in-service branch
-     parks [emp] and drops the token.  Nothing downstream is weakened by
-     that: a claim hands out the payload only from an OUT-of-service slot,
-     and this branch leaves the slot exactly as an in-service one must look. *)
-  Lemma uart_rx_tok_deposit E γ (k : nat) (hl hh : option (list mobs)) :
+     "the port is enabled nowhere" clause -- so [p_claimed p (uart_irq_id j)
+     = false] is not available here, and the (unreachable: nothing has
+     enabled the port's source yet, so no claim can have taken it)
+     in-service branch parks [emp] and drops the token.  Nothing downstream
+     is weakened by that: a claim hands out the payload only from an
+     OUT-of-service slot, and this branch leaves the slot exactly as an
+     in-service one must look. *)
+  Lemma plic_uslot_deposit (γu : uart_names) (cl : bool)
+      (k : nat) (hl hh : option (list mobs)) :
+    ohist_le hh hl ->
+    plic_uslot γu cl -∗ uart_rx_tok γu k hl -∗ uart_rx_hi γu (1/2) hh
+      ==∗ uart_inited γu ∗ plic_uslot γu cl.
+  Proof.
+    iIntros (Hle) "Hu Htok Hhi".
+    iDestruct (plic_uslot_cases with "Hu") as "[Hpre | [#Hin Hrest]]".
+    - iMod (uart_preinit_fire with "Hpre") as "#Hin".
+      iModIntro. iSplitR; [iExact "Hin" |].
+      iApply (plic_uslot_intro γu cl with "Hin").
+      destruct cl; [done|].
+      rewrite /plic_payload_uart /uart_rx_writer.
+      iExists k, hl. iFrame "Htok". iExists hh. iFrame "Hhi".
+      iPureIntro. exact Hle.
+    - (* the deposit has already run: the slot's own payload is the token's
+         partner, so this one is spare and is simply dropped *)
+      iModIntro. iSplitR; [iExact "Hin" |].
+      iApply (plic_uslot_intro γu cl with "Hin"). iExact "Hrest".
+  Qed.
+
+  Lemma uart_rx_tok_deposit E (γ γ1 : uart_names) (j : uart_id)
+      (k : nat) (hl hh : option (list mobs)) :
     ↑plicN ⊆ E ->
     ohist_le hh hl ->
-    plic_inv γ -∗ uart_rx_tok γ k hl -∗ uart_rx_hi γ (1/2) hh
-      ={E}=∗ uart_inited γ.
+    plic_inv γ γ1 -∗ uart_rx_tok (plic_unames γ γ1 j) k hl -∗
+    uart_rx_hi (plic_unames γ γ1 j) (1/2) hh
+      ={E}=∗ uart_inited (plic_unames γ γ1 j).
   Proof.
     iIntros (Hmask Hle) "#Hpinv Htok Hhi".
     iInv "Hpinv" as ">Hbody" "Hclose".
     iDestruct "Hbody" as (p) "(Hp & %Hpok & Hslots)".
-    iDestruct (plic_slots_uart with "Hslots") as "Hu".
-    iDestruct (plic_slot_uart_cases with "Hu") as "[Hpre | [#Hin Hrest]]".
-    - iMod (uart_preinit_fire with "Hpre") as "#Hin".
-      iMod ("Hclose" with "[Hp Htok Hhi]") as "_".
-      { iNext. iExists p. iFrame "Hp". iSplitR; [iPureIntro; exact Hpok|].
-        iApply plic_slots_of_uart.
-        iApply (plic_slot_uart_intro with "Hin").
-        destruct (p_claimed p (uart_irq_id Uart0)); [done |].
-        rewrite /plic_payload_uart /uart_rx_writer.
-        iExists k, hl. iFrame "Htok". iExists hh. iFrame "Hhi".
-        iPureIntro. exact Hle. }
-      by iModIntro.
-    - (* the deposit has already run: the slot's own payload is the token's
-         partner, so this one is spare and is simply dropped *)
-      iMod ("Hclose" with "[Hp Hrest]") as "_".
-      { iNext. iExists p. iFrame "Hp". iSplitR; [iPureIntro; exact Hpok|].
-        iApply plic_slots_of_uart.
-        iApply (plic_slot_uart_intro with "Hin"). iExact "Hrest". }
-      iModIntro. iFrame "Hin".
+    rewrite plic_slots_eq.
+    destruct j; cbn [plic_unames];
+      [ iDestruct "Hslots" as "[Hu Hw]" | iDestruct "Hslots" as "[Hw Hu]" ];
+      (iMod (plic_uslot_deposit _ _ k hl hh Hle with "Hu Htok Hhi")
+         as "[#Hin Hu]";
+       iMod ("Hclose" with "[Hp Hu Hw]") as "_";
+       [ iNext; iExists p; iFrame "Hp"; iSplitR; [iPureIntro; exact Hpok|];
+         rewrite plic_slots_eq; iFrame "Hu Hw"
+       | iModIntro; iExact "Hin" ]).
   Qed.
 
   (* Allocate all four UART ghosts from an initial device state.  Hands back
@@ -1760,11 +1960,11 @@ Section DevLoops.
   Qed.
 
   (* ONE THREAD PER PORT.  [γ] is THIS port's ghost bundle and its own
-     invariant; [γp] is whatever bundle the ONE PLIC invariant was allocated
-     at (the console's), which the latch arm needs and does not otherwise
-     read -- source [uart_irq_id i] has a payload only for the console. *)
-  Lemma wp_uart_loop (i : uart_id) (γ γp : uart_names) :
-    gen_cert -∗ uart_inv i γ -∗ plic_inv γp -∗ uart_obs_permit i γ -∗
+     invariant; [γp γp1] are the names the ONE PLIC invariant was allocated
+     at, which the latch arm needs and does not otherwise read -- a latch
+     sets a PENDING bit and no slot moves, at either port. *)
+  Lemma wp_uart_loop (i : uart_id) (γ γp γp1 : uart_names) :
+    gen_cert -∗ uart_inv i γ -∗ plic_inv γp γp1 -∗ uart_obs_permit i γ -∗
     WP (UartLoop i : expr riscv_lang).
   Proof.
     iIntros "#Hcert #Huinv #Hpinv #Hperm".
@@ -1867,7 +2067,8 @@ Section DevLoops.
       { iNext. iExists p'. iFrame "Hp'".
         iSplitR;
           [iPureIntro; exact (plic_ok_latch p p' (uart_irq_id i) Hlat Hpok)|].
-        iApply (plic_slots_stable _ p p' (Hcl' (uart_irq_id Uart0))).
+        iApply (plic_slots_stable _ _ p p' (Hcl' (uart_irq_id Uart0))
+                  (Hcl' (uart_irq_id Uart1))).
         iExact "Harm". }
       (* silent: the history is unchanged *)
       rewrite app_nil_r.
@@ -1882,7 +2083,7 @@ Section DevLoops.
   (*  THE DISK THREAD.  Opens [diskN] for the DMA/wild arms and [plicN]   *)
   (*  for the latch arm.                                                 *)
   (* ------------------------------------------------------------------ *)
-  Lemma wp_disk_loop (γu : uart_names) γd :
+  Lemma wp_disk_loop (γu γu1 : uart_names) γd :
     (* the disk names are the CANONICAL ones: the image gname is the AMBIENT
        ERA's, which is what identifies the auth [wp_disk_step] hands over with
        the fragments [virtio_proto] holds.  [disk_ghosts_alloc] exports this
@@ -1894,7 +2095,7 @@ Section DevLoops.
        (claude-notes/design/crash.md).  [crashN] is disjoint from [diskN] and
        [plicN], so the two openings compose. *)
     gen_cert -∗ crash_inv -∗ perm_inv gen_id (dn_perm γd) -∗ disk_inv γd -∗
-    plic_inv γu -∗
+    plic_inv γu γu1 -∗
     WP (DiskLoop : expr riscv_lang).
   Proof.
     intros Himg.
@@ -2392,7 +2593,8 @@ Section DevLoops.
       { iNext. iExists p'. iFrame "Hp'".
         iSplitR;
           [iPureIntro; exact (plic_ok_latch p p' virtio_irq_id Hlat Hpok)|].
-        iApply (plic_slots_stable _ p p' (Hcl' (uart_irq_id Uart0))). iExact "Harm". }
+        iApply (plic_slots_stable _ _ p p' (Hcl' (uart_irq_id Uart0))
+                  (Hcl' (uart_irq_id Uart1))). iExact "Harm". }
       iMod ("Hpclose" with "[Hpbody]") as "_"; [iApply bi.later_intro; iExact "Hpbody"|].
       iModIntro. iFrame "Hgr Hmem Hdev'".
       iDestruct "Hdur" as (dmap) "[Hdauth %Hdview]".
@@ -2428,8 +2630,8 @@ Section DevLoops.
   (*  three loops' interfaces uniform and to record that the wire's value   *)
   (*  is the PLIC's.                                                       *)
   (* ------------------------------------------------------------------ *)
-  Lemma wp_plic_loop (γu : uart_names) :
-    gen_cert -∗ plic_inv γu -∗ wire_inv -∗
+  Lemma wp_plic_loop (γu γu1 : uart_names) :
+    gen_cert -∗ plic_inv γu γu1 -∗ wire_inv -∗
     WP (PlicLoop : expr riscv_lang).
   Proof.
     iIntros "#Hcert #Hpinv #Hwinv".

@@ -102,8 +102,8 @@ Section ProofPlicinit.
   (*  THE CAPSTONE: a WP for the entire plicinit(), entry through return.  *)
   (* =================================================================== *)
   Lemma wp_plicinit_sconf
-      (γd : uart_names) (m0 : regfile) (n : nat) (p : mword 64)
-    : wp_plicinit_sconf_body γd m0 n p.
+      (γd γd1 : uart_names) (m0 : regfile) (n : nat) (p : mword 64)
+    : wp_plicinit_sconf_body γd γd1 m0 n p.
   Proof.
     cbv beta delta [wp_plicinit_sconf_body].
     intros ra_idx pcE ra0 ret_tgt Hn.
@@ -214,7 +214,7 @@ Section ProofPlicinit.
        against [Hcg], so left implicit it is still a bare evar when [Ha4']
        tries to [rewrite] into it ("does not match any subterm" against
        [rget ?CID m4 a4_idx]) -- pin it to the hart [Hcg] is actually at. *)
-    iApply (wp_sw_plic_pinv_s_sconf (CID := CID6) γd (mword_of_int (KernelSyms.plicinit + 0x0e)) true a5_idx a4_idx (mword_of_int 40) m4 (n - 2)%nat
+    iApply (wp_sw_plic_pinv_s_sconf (CID := CID6) γd γd1 (mword_of_int (KernelSyms.plicinit + 0x0e)) true a5_idx a4_idx (mword_of_int 40) m4 (n - 2)%nat
               emp%I emp%I
               ltac:(rewrite Ha4'; zrange_vm)
               ltac:(rewrite Ha4'; vm_compute; reflexivity)
@@ -230,9 +230,11 @@ Section ProofPlicinit.
          straight back *)
       iIntros (pq pq') "%Hpw _ Hslots _".
       iModIntro. iSplitL "Hslots"; [| done].
-      iApply (plic_slots_stable _ pq pq'
+      iApply (plic_slots_stable _ _ pq pq'
                 (plic_write_outside_claim _ _ _ _ Hpw
-                   ltac:(rewrite Ha4'; vm_compute; reflexivity) (uart_irq_id Uart0))).
+                   ltac:(rewrite Ha4'; vm_compute; reflexivity) (uart_irq_id Uart0))
+                (plic_write_outside_claim _ _ _ _ Hpw
+                   ltac:(rewrite Ha4'; vm_compute; reflexivity) (uart_irq_id Uart1))).
       iExact "Hslots". }
     iIntros (CID7 Hs7) "Hcg Hpc _".
     assert (Hpp10 : add_vec_int (mword_of_int (KernelSyms.plicinit + 0x0e) : mword 64) 2 = mword_of_int (KernelSyms.plicinit + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
@@ -240,7 +242,7 @@ Section ProofPlicinit.
     (* ---- 0x10: c.sw a5,48(a4)  -- source 12 priority (the second UART) ----
        The port xv6 prints on: one more source-priority write, discharged by
        the same [plic_write_prio_ok] at [12%N]. *)
-    iApply (wp_sw_plic_pinv_s_sconf (CID := CID7) γd (mword_of_int (KernelSyms.plicinit + 0x10)) true a5_idx a4_idx (mword_of_int 48) m4 (n - 2)%nat
+    iApply (wp_sw_plic_pinv_s_sconf (CID := CID7) γd γd1 (mword_of_int (KernelSyms.plicinit + 0x10)) true a5_idx a4_idx (mword_of_int 48) m4 (n - 2)%nat
               emp%I emp%I
               ltac:(rewrite Ha4'; zrange_vm)
               ltac:(rewrite Ha4'; vm_compute; reflexivity)
@@ -254,15 +256,17 @@ Section ProofPlicinit.
     { done. }
     { iIntros (pq pq') "%Hpw _ Hslots _".
       iModIntro. iSplitL "Hslots"; [| done].
-      iApply (plic_slots_stable _ pq pq'
+      iApply (plic_slots_stable _ _ pq pq'
                 (plic_write_outside_claim _ _ _ _ Hpw
-                   ltac:(rewrite Ha4'; vm_compute; reflexivity) (uart_irq_id Uart0))).
+                   ltac:(rewrite Ha4'; vm_compute; reflexivity) (uart_irq_id Uart0))
+                (plic_write_outside_claim _ _ _ _ Hpw
+                   ltac:(rewrite Ha4'; vm_compute; reflexivity) (uart_irq_id Uart1))).
       iExact "Hslots". }
     iIntros (CID7b Hs7b) "Hcg Hpc _".
     assert (Hpp12 : add_vec_int (mword_of_int (KernelSyms.plicinit + 0x10) : mword 64) 2 = mword_of_int (KernelSyms.plicinit + 0x12)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp12) in "Hpc".
     (* ---- 0x12: c.sw a5,4(a4)  -- source 1 priority ---- *)
-    iApply (wp_sw_plic_pinv_s_sconf (CID := CID7b) γd (mword_of_int (KernelSyms.plicinit + 0x12)) true a5_idx a4_idx (mword_of_int 4) m4 (n - 2)%nat
+    iApply (wp_sw_plic_pinv_s_sconf (CID := CID7b) γd γd1 (mword_of_int (KernelSyms.plicinit + 0x12)) true a5_idx a4_idx (mword_of_int 4) m4 (n - 2)%nat
               emp%I emp%I
               ltac:(rewrite Ha4'; zrange_vm)
               ltac:(rewrite Ha4'; vm_compute; reflexivity)
@@ -276,9 +280,11 @@ Section ProofPlicinit.
     { done. }
     { iIntros (pq pq') "%Hpw _ Hslots _".
       iModIntro. iSplitL "Hslots"; [| done].
-      iApply (plic_slots_stable _ pq pq'
+      iApply (plic_slots_stable _ _ pq pq'
                 (plic_write_outside_claim _ _ _ _ Hpw
-                   ltac:(rewrite Ha4'; vm_compute; reflexivity) (uart_irq_id Uart0))).
+                   ltac:(rewrite Ha4'; vm_compute; reflexivity) (uart_irq_id Uart0))
+                (plic_write_outside_claim _ _ _ _ Hpw
+                   ltac:(rewrite Ha4'; vm_compute; reflexivity) (uart_irq_id Uart1))).
       iExact "Hslots". }
     iIntros (CID8 Hs8) "Hcg Hpc _".
     assert (Hpp14 : add_vec_int (mword_of_int (KernelSyms.plicinit + 0x12) : mword 64) 2 = mword_of_int (KernelSyms.plicinit + 0x14)) by (apply bv_eq; vm_compute; reflexivity).

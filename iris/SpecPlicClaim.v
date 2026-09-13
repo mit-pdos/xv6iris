@@ -30,10 +30,18 @@
    [lw]; all four admissible ids are small and positive, so the post states
    them as the concrete 64-bit words 0, 10, 12 and 1.
 
-   ONLY THE CONSOLE UART'S CLAIM HANDS OUT A PAYLOAD.  [WpUart]'s
-   [plic_payload] is [emp] at every source but [uart_irq_id Uart0], so a
-   claim that returns 12 delivers nothing -- which is what the second UART's
-   handler needs, having no receive consumer.
+   BOTH UARTS' CLAIMS HAND OUT A PAYLOAD, and it is the SAME payload
+   ([WpUart.plic_payload_uart], the pop token plus the consumer's high-water
+   half): uartintr drains the receive FIFO at BOTH ports -- only the `u->rx`
+   hook call is skipped at the port with no consumer -- so a claim returning
+   12 must deliver the second port's writer or [SpecUartintr]'s port-generic
+   premise is unsuppliable there.  Hence the second ghost bundle [γd1] and
+   the second post arm.  Only the disk's source (1) delivers nothing.
+
+   THE PLIC INVARIANT IS TAKEN BARE, beside the bundle.  [WpUart.dev_inv] is
+   the CONSOLE bundle and ∃-packs the second port's names, so a contract that
+   must NAME them -- this one does, in its post -- takes [plic_inv γd γd1]
+   itself.
 
    Requires only the definitional layer + SpecCpuid -- never a whole-function
    proof file. *)
@@ -83,7 +91,7 @@ Definition plic_claim_a0_ok (v : mword 64) : Prop :=
    [wp_next] wrapper (it would collapse via [wp_next_off] anyway, since the
    hart cannot move). *)
 Definition wp_plic_claim_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-    (γd : uart_names) (γv : disk_names) (m0 : regfile) (n : nat) (p : mword 64) :=
+    (γd γd1 : uart_names) (γv : disk_names) (m0 : regfile) (n : nat) (p : mword 64) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let tp_idx : mword 5 := mword_of_int 4 in
   let a0_idx : mword 5 := mword_of_int 10 in
@@ -96,7 +104,7 @@ Definition wp_plic_claim_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CI
   (4 <= n)%nat ->
   sie_cap_gpr KT1 m0 n false p -∗
   kernel_text -∗ pc_is pcE -∗
-  dev_inv γd γv -∗ uart_inited γd -∗
+  dev_inv γd γv -∗ plic_inv γd γd1 -∗ uart_inited γd -∗ uart_inited γd1 -∗
   ( ∀ m' : regfile,
     sie_cap_gpr KT1 m' n false p -∗
     pc_is ret_tgt -∗
@@ -111,12 +119,20 @@ Definition wp_plic_claim_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CI
     (⌜ m' !!! Regidx a0_idx
        = (mword_of_int (Z.of_N (uart_irq_id Uart0)) : mword 64) ⌝ -∗
        plic_payload_uart γd) -∗
+    (* ...AND THE SECOND PORT'S, on the arm that returns 12.  The two are
+       separate wands rather than one quantified over the port because a
+       caller's two branches are separate proofs; at most one of them is
+       ever satisfiable, so the pair costs the callee only a case split on
+       the id it actually took. *)
+    (⌜ m' !!! Regidx a0_idx
+       = (mword_of_int (Z.of_N (uart_irq_id Uart1)) : mword 64) ⌝ -∗
+       plic_payload_uart γd1) -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type PLIC_CLAIM.
   Parameter wp_plic_claim_sconf :
     forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-      (γd : uart_names) (γv : disk_names) (m0 : regfile) (n : nat) (p : mword 64),
-      wp_plic_claim_sconf_body γd γv m0 n p.
+      (γd γd1 : uart_names) (γv : disk_names) (m0 : regfile) (n : nat) (p : mword 64),
+      wp_plic_claim_sconf_body γd γd1 γv m0 n p.
 End PLIC_CLAIM.

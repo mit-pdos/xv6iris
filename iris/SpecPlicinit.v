@@ -60,7 +60,7 @@ Import Defs.
    [uart_irq_id Uart0] (= 10), [uart_irq_id Uart1] (= 12) and [virtio_irq_id]
    (= 1) -- all come from DevModel. *)
 
-Definition wp_plicinit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (γd : uart_names) (m0 : regfile) (n : nat) (p : mword 64) :=
+Definition wp_plicinit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (γd γd1 : uart_names) (m0 : regfile) (n : nat) (p : mword 64) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let pcE := mword_of_int KernelSyms.plicinit in
   let ra0 := m0 !!! Regidx ra_idx in
@@ -70,11 +70,14 @@ Definition wp_plicinit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID 
   kernel_text -∗ pc_is pcE -∗
   (* the PLIC fabric, borrowed from the invariant around each priority write;
      all three writes preserve [plic_ok], so nothing is owed back to the caller *)
-  (* the PLIC invariant is keyed by the UART's ghost names: it is where the
-     receive token lives while the UART is not in service.  plicinit's three
-     writes are source-PRIORITY writes and touch no service bit, so every
-     slot survives them untouched. *)
-  plic_inv γd -∗
+  (* the PLIC invariant is keyed by BOTH ports' ghost names: it is where each
+     port's receive token lives while that port is not in service.  plicinit's
+     three writes are source-PRIORITY writes and touch no service bit, so
+     every slot survives them untouched -- which is why the second name is a
+     pass-through here and this contract says nothing more than it did.  It
+     takes the BARE [plic_inv], not [dev_inv], because the bundle ∃-packs
+     [γd1] and this contract has to be callable at the names main minted. *)
+  plic_inv γd γd1 -∗
   wp_next false p (fun (CID : CpuId) =>
     ∀ m' : regfile,
     sie_cap_gpr KT1 m' n false p -∗
@@ -85,6 +88,6 @@ Definition wp_plicinit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID 
 
 Module Type PLICINIT.
   Parameter wp_plicinit_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (γd : uart_names) (m0 : regfile) (n : nat) (p : mword 64),
-      wp_plicinit_sconf_body γd m0 n p.
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (γd γd1 : uart_names) (m0 : regfile) (n : nat) (p : mword 64),
+      wp_plicinit_sconf_body γd γd1 m0 n p.
 End PLICINIT.

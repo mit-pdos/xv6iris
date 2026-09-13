@@ -5,8 +5,10 @@
    with the UART device leaf swapped for the width-4 PLIC device-store tower
    ([exec_execute_STORE_4_gpr_S_walk_dev], WpPlicExec.v).  Two forms of the
    store: [wp_sw_plic_pinv_s_sconf], which borrows the shared [plic_frag] half
-   by opening the bare [plic_inv], and [wp_sw_plic_dev_s_sconf], that leaf's
-   restatement over the [dev_inv] bundle.  (A RAW-[plic_frag] form was retired
+   by opening the bare [plic_inv γ γ1] -- the form a caller that must NAME the
+   second port's ghosts takes -- and [wp_sw_plic_dev_s_sconf], that leaf's
+   restatement over the [dev_inv] bundle, whose slot callback is ∀-quantified
+   over [γ1] because the bundle ∃-packs it (WpUart.v, [dev_inv]).  (A RAW-[plic_frag] form was retired
    once [plicinit] was proved under the invariant: the PLIC gateway latches
    from step 0, so no CPU precondition may hold a device fragment raw, and
    nothing was left to call it.)  The translate side still runs
@@ -142,7 +144,7 @@ Existing Instance riscv_memGS.
    [plic_slots] to the caller's callback, which is where plic_complete parks
    the receive token and where every other PLIC write simply gives them back
    ([WpUart.plic_slots_stable]). *)
-Lemma wp_sw_plic_pinv_s_sconf (γ : uart_names) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
+Lemma wp_sw_plic_pinv_s_sconf (γ γ1 : uart_names) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
     (m : regfile) (n : nat) (R S : iProp Σ) :
   let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
   let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
@@ -155,10 +157,10 @@ Lemma wp_sw_plic_pinv_s_sconf (γ : uart_names) (pc : mword 64) (is_rvc : bool) 
      exists p', plic_write p (uint a8 - plic_base)%Z storeword = Some p' /\ plic_ok p') ->
   sie_cap_gpr kt m n false p -∗
   pc_is pc -∗ instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗
-  plic_inv γ -∗ R -∗
+  plic_inv γ γ1 -∗ R -∗
   (∀ pl pl', ⌜ plic_write pl (uint a8 - plic_base)%Z storeword = Some pl' ⌝ -∗
      ⌜ plic_ok pl ⌝ -∗
-     plic_slots γ pl -∗ R ==∗ plic_slots γ pl' ∗ S) -∗
+     plic_slots γ γ1 pl -∗ R ==∗ plic_slots γ γ1 pl' ∗ S) -∗
   wp_next false p (fun (CID : CpuId) =>
     sie_cap_gpr kt m n false p -∗
     pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
@@ -405,9 +407,14 @@ Proof.
     iApply ("Hcont" $! CID with "[%] Hcg' Hpc' HS"). exact Hs.
 Qed.
 
-(* The bundle-taking RESTATEMENT of the leaf above, for the consumers written
-   before the device invariant was split per device ([plicinithart],
-   [plic_complete]): statement verbatim, proof one projection. *)
+(* The bundle-taking RESTATEMENT of the leaf above, for the consumer whose
+   callback does not care WHICH ghosts the second port's slot is at
+   ([plicinithart]: an enable and a threshold write, both of which move no
+   slot).  [dev_inv] ∃-packs [γ1], so the callback is ∀-quantified over it and
+   the caller discharges it uniformly -- typically by [plic_slots_stable],
+   which is itself port-generic.  A caller that must NAME [γ1] -- plic_claim's
+   handout, plic_complete's park -- takes the bare [plic_inv γ γ1] leaf
+   instead. *)
 Lemma wp_sw_plic_dev_s_sconf (γd : uart_names) (γv : disk_names) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
     (m : regfile) (n : nat) (R S : iProp Σ) :
   let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
@@ -422,9 +429,10 @@ Lemma wp_sw_plic_dev_s_sconf (γd : uart_names) (γv : disk_names) (pc : mword 6
   sie_cap_gpr kt m n false p -∗
   pc_is pc -∗ instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗
   dev_inv γd γv -∗ R -∗
-  (∀ pl pl', ⌜ plic_write pl (uint a8 - plic_base)%Z storeword = Some pl' ⌝ -∗
+  (∀ (γ1 : uart_names) pl pl',
+     ⌜ plic_write pl (uint a8 - plic_base)%Z storeword = Some pl' ⌝ -∗
      ⌜ plic_ok pl ⌝ -∗
-     plic_slots γd pl -∗ R ==∗ plic_slots γd pl' ∗ S) -∗
+     plic_slots γd γ1 pl -∗ R ==∗ plic_slots γd γ1 pl' ∗ S) -∗
   wp_next false p (fun (CID : CpuId) =>
     sie_cap_gpr kt m n false p -∗
     pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
@@ -442,20 +450,25 @@ Proof.
   assert (Hsv2_all : forall hh : CpuId, rget (CID := hh) m rs2 = rget (CID := CID) m rs2)
     by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
   iIntros "Hcg Hpc Hinstr #Hdinv HR Hacc Hcont".
-  iDestruct (dev_inv_plic with "Hdinv") as "#Hpinv".
-  iApply (wp_sw_plic_pinv_s_sconf γd pc is_rvc rs2 rs1 imm m n R S
+  iDestruct (dev_inv_plic with "Hdinv") as (γ1) "#Hpinv".
+  iApply (wp_sw_plic_pinv_s_sconf γd γ1 pc is_rvc rs2 rs1 imm m n R S
             Hrange Halign Hcanon Hdevvpn Hwrite
-            with "Hcg Hpc Hinstr Hpinv HR Hacc Hcont").
+            with "Hcg Hpc Hinstr Hpinv HR [Hacc] Hcont").
+  iIntros (pl pl') "%Hw %Hok Hslots HR".
+  iApply ("Hacc" $! γ1 pl pl' with "[%] [%] Hslots HR"); [exact Hw | exact Hok].
 Qed.
 
-(* The width-4 PLIC MMIO LOAD, dual to [wp_sw_plic_dev_s_sconf].  A PLIC read
+(* The width-4 PLIC MMIO LOAD, dual to [wp_sw_plic_pinv_s_sconf].  A PLIC read
    can MUTATE the device (a claim takes a source: it clears that source's
-   pending bit and marks it claimed), so it too runs with [dev_inv] open across
-   the step.  The caller's obligation is again universal over every state the
+   pending bit and marks it claimed), so it too runs with [plicN] open across
+   the step.  IT TAKES THE BARE [plic_inv γd γ1], not the bundle: its one
+   consumer is plic_claim, whose whole point is to hand the CLAIMED source's
+   payload to the caller -- and at source 12 that payload is the second port's,
+   which the ∃-packed bundle cannot name.  The caller's obligation is again universal over every state the
    kernel's plan admits, and in exchange it may name a property [P] of the value
    read that holds at all of them -- that is how [plic_claim] learns its result
    is one of the machine's own interrupt ids. *)
-Lemma wp_lw_plic_dev_s_sconf (γd : uart_names) (γv : disk_names) (pc : mword 64) (is_rvc is_unsigned : bool) (rd rs1 : mword 5) `{!SrcOk rs1}
+Lemma wp_lw_plic_pinv_s_sconf (γd γ1 : uart_names) (pc : mword 64) (is_rvc is_unsigned : bool) (rd rs1 : mword 5) `{!SrcOk rs1}
     (imm : mword 12) (m : regfile) (n : nat) (P : bv 32 -> Prop)
     (R : iProp Σ) (S : bv 32 -> iProp Σ) :
   let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
@@ -472,13 +485,13 @@ Lemma wp_lw_plic_dev_s_sconf (γd : uart_names) (γv : disk_names) (pc : mword 6
      exists v p', plic_read p (uint a8 - plic_base)%Z = Some (v, p') /\ plic_ok p' /\ P v) ->
   sie_cap_gpr kt m n false p -∗
   pc_is pc -∗ instr pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 4)) -∗
-  dev_inv γd γv -∗ R -∗
+  plic_inv γd γ1 -∗ R -∗
   (* THE CLAIM MOVES THE SLOTS: a read of the claim register marks its source
      in service, so the payload the PLIC invariant holds for it leaves with
      the read and the caller does the ghost step while the invariant is
      open. *)
   (∀ pl v pl', ⌜ plic_read pl (uint a8 - plic_base)%Z = Some (v, pl') ⌝ -∗
-     ⌜ plic_ok pl ⌝ -∗ plic_slots γd pl -∗ R ==∗ plic_slots γd pl' ∗ S v) -∗
+     ⌜ plic_ok pl ⌝ -∗ plic_slots γd γ1 pl -∗ R ==∗ plic_slots γd γ1 pl' ∗ S v) -∗
   ( ∀ v : bv 32,
     ⌜ P v ⌝ -∗
     wp_next false p (fun (CID : CpuId) =>
@@ -518,8 +531,7 @@ Proof.
                 = <[Regidx rd := regval_into_reg (zero_reg : mword 64)]> m
                     !!! Regidx csp_rs1)
     by (symmetry; apply upd_ne; congruence).
-  iIntros "Hcg Hpc Hinstr #Hdinv HR Hacc Hcont".
-  iDestruct (dev_inv_plic with "Hdinv") as "#Hpinv".
+  iIntros "Hcg Hpc Hinstr #Hpinv HR Hacc Hcont".
   iApply (wp_instr_s_sconf m n false false pc is_rvc
             (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 4))
             (fun (_CIDx : CpuId) npc _ms' m' n' =>
