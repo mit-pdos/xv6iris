@@ -53,7 +53,7 @@
    that runs that step -- a [WpLock.newlock] -- and the resource it
    must supply, [tx_res], which is the printk cone's business now that
    [SpecPrintk.pr_res] no longer holds the transmitter. *)
-From Stdlib Require Import ZArith List.
+From Stdlib Require Import ZArith List String.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.algebra.lib Require Import mono_list.
@@ -62,7 +62,10 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvPtsto.
+Require Import PowerBoot.   (* [pa_of_z] *)
+Require Import Ktier.
 Require Import DevModel DiskPtsto WpUart.
+Require Import UartsFields.   (* the [struct uart] geometry: [uart_f_lock] / [uart_f_chan] *)
 Require Import WpLock.
 Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
 From Kernel Require KernelSyms.
@@ -96,10 +99,55 @@ Section UartTxInv.
      [uartputc_sync]'s own arithmetic -- `((uid*4 + uid) << 3) + 16 + uarts`
      for the lock, and `uartinit` passing `uarts + 0x28` for `&uarts[1]`.
      This file is the CONSOLE port's; the second port's pair is the same
-     arithmetic at uid = 1. *)
-  Definition a_tx_lock : mword 64 :=
-    mword_of_int (KernelSyms.uarts + 16).
-  Definition a_tx_chan : mword 64 := mword_of_int KernelSyms.uarts.
+     arithmetic at uid = 1, and everything below is stated at both ([_at]
+     forms) with the console port's spelling kept as the abbreviation.
+
+     AND THE LOCK'S NAME MOVED WITH IT.  [uartinit] now calls
+     [initlock(&u->tx_lock, name)] with the literals "uart0"/"uart1"; the
+     old single "uart" is gone from `.rodata`.  So [is_txlock]'s name is
+     [uart_lock_name Uart0] = "uart0".  [LockRank.v]'s rank table and every
+     [locks_below lks "uart"] premise in the printk / uartwrite /
+     uartputc_sync cones name the OLD string and are a separate lane's to
+     rename -- nothing here can do it without touching those files. *)
+  (* PORT-INDEXED, off [UartsFields]' geometry, with the console port's pair
+     kept under its old names so no caller changes.  The second port's are
+     the same arithmetic at [Uart1] and are what printk/panic's cone takes. *)
+  Definition a_tx_lock_at (i : uart_id) : mword 64 :=
+    mword_of_int (uart_f_lock i).
+  Definition a_tx_chan_at (i : uart_id) : mword 64 :=
+    mword_of_int (uart_f_chan i).
+
+  Definition a_tx_lock : mword 64 := a_tx_lock_at Uart0.
+  Definition a_tx_chan : mword 64 := a_tx_chan_at Uart0.
+
+  Lemma a_tx_lock_uarts : a_tx_lock = mword_of_int (KernelSyms.uarts + 16).
+  Proof. reflexivity. Qed.
+  Lemma a_tx_chan_uarts : a_tx_chan = mword_of_int KernelSyms.uarts.
+  Proof. reflexivity. Qed.
+
+  (* THE LOCK'S NAME IS THE PORT'S NAME.  [uartinit] passes the literal
+     "uart0"/"uart1" to [initlock(&u->tx_lock, name)] -- the old single
+     "uart" left `.rodata` with the single lock -- so the name a boot
+     assembly can seal into an [is_lock] is decided by the port and by
+     nothing else. *)
+  Definition uart_lock_name (i : uart_id) : string :=
+    match i with Uart0 => "uart0"%string | Uart1 => "uart1"%string end.
+
+  (* ---- THE RECEIVE HOOK, at the VA tier.  [uarts[i].rx] is the second
+     immutable `.data` word of the element: [uartinitone] reads it to decide
+     whether to enable the receive interrupt, and [uartintr] to decide
+     whether to call it.  [UartsFields.uart_rx_pinned] is the same fact at
+     the PHYSICAL tier; this is the form an S-mode [ld] leaf consumes, and
+     the crossing between the two is BOOT'S -- a VA-tier points-to carries
+     the mapping claim ([KMap.kmap_at]) inside it and only the boot chain
+     holds [KMap.kmap_static_claims] ([BootShared.uart_field_word_of_pinned]).
+     Its [base] twin is [SpecUartPutc.uart_base_word]; the two live apart
+     only because [base]'s first consumer was uartputc_sync's. *)
+  Definition uart_rx_word (i : uart_id) : iProp Σ :=
+    ((pa_of_z (uart_f_rx i)) ↦₈[KT0]□ (Z_to_bv 64 (uart_rx_hook i)))%I.
+
+  Global Instance uart_rx_word_persistent i : Persistent (uart_rx_word i).
+  Proof. rewrite /uart_rx_word. apply _. Qed.
 
   (* ---- the protected resource: the transmitter, at whatever trace it is at.
      The trace is EXISTENTIAL here because no reader of the lock predicts it --
@@ -137,22 +185,44 @@ Section UartTxInv.
      a driver that re-acquires per byte cannot claim a CONTIGUOUS
      [uart_sent], because another hart may interleave between two of its
      bytes.  That is what [uart_sent_sub] below is for. *)
-  Definition is_txlock (γl : gname) (γu : uart_names) : iProp Σ :=
-    (is_lock γl a_tx_lock "uart"%string <{ tx_res γu }> ∗
+  (* THE PORT-INDEXED FORM, and the console port's abbreviation.  Every
+     existing caller names [is_txlock]; the second port's transmitter -- the
+     one printk and panic drive -- is [is_txlock_at Uart1], the same
+     predicate at the other element of [uarts]. *)
+  Definition is_txlock_at (i : uart_id) (γl : gname) (γu : uart_names) : iProp Σ :=
+    (is_lock γl (a_tx_lock_at i) (uart_lock_name i) <{ tx_res γu }> ∗
      uart_dlab_off γu)%I.
 
+  Definition is_txlock (γl : gname) (γu : uart_names) : iProp Σ :=
+    is_txlock_at Uart0 γl γu.
+
+  Global Instance is_txlock_at_persistent i γl γu : Persistent (is_txlock_at i γl γu).
+  Proof. apply _. Qed.
   Global Instance is_txlock_persistent γl γu : Persistent (is_txlock γl γu).
   Proof. apply _. Qed.
 
-  Lemma is_txlock_lock γl γu :
-    is_txlock γl γu -∗ is_lock γl a_tx_lock "uart"%string <{ tx_res γu }>.
+  Lemma is_txlock_at_lock i γl γu :
+    is_txlock_at i γl γu -∗
+    is_lock γl (a_tx_lock_at i) (uart_lock_name i) <{ tx_res γu }>.
   Proof. iIntros "[$ _]". Qed.
+
+  Lemma is_txlock_lock γl γu :
+    is_txlock γl γu -∗ is_lock γl a_tx_lock (uart_lock_name Uart0) <{ tx_res γu }>.
+  Proof. iIntros "[$ _]". Qed.
+
+  Lemma is_txlock_at_dlab i γl γu : is_txlock_at i γl γu -∗ uart_dlab_off γu.
+  Proof. iIntros "[_ $]". Qed.
 
   Lemma is_txlock_dlab γl γu : is_txlock γl γu -∗ uart_dlab_off γu.
   Proof. iIntros "[_ $]". Qed.
 
+  Lemma is_txlock_at_intro i γl γu :
+    is_lock γl (a_tx_lock_at i) (uart_lock_name i) <{ tx_res γu }> -∗
+    uart_dlab_off γu -∗ is_txlock_at i γl γu.
+  Proof. iIntros "#Hl #Ho". by iFrame "Hl Ho". Qed.
+
   Lemma is_txlock_intro γl γu :
-    is_lock γl a_tx_lock "uart"%string <{ tx_res γu }> -∗
+    is_lock γl a_tx_lock (uart_lock_name Uart0) <{ tx_res γu }> -∗
     uart_dlab_off γu -∗ is_txlock γl γu.
   Proof. iIntros "#Hl #Ho". by iFrame "Hl Ho". Qed.
 
@@ -221,15 +291,20 @@ Section UartTxInv.
      exactly [l]; opening [dev_inv] turns that into the permanent record
      [uart_sent γu l].  No physical step happens, so this is a plain fupd a
      caller runs under [fupd_wp]. *)
-  Lemma uart_tx_own_snapshot (γu : uart_names) (γd : disk_names)
+  (* PORT-INDEXED, AND THE CONSOLE-BUNDLE FORM IS A COROLLARY.  [dev_inv] is
+     the CONSOLE bundle -- its UART conjunct is [uart_inv Uart0] and its
+     arity is fixed, ~140 specs naming it -- so a driver that runs at BOTH
+     ports (uartwrite, and printk's cone at [Uart1]) cannot state its
+     premise that way at all.  These three take the bare [uart_inv i], which
+     is what every port has; the [dev_inv]-taking versions below are their
+     [Uart0] instances, kept verbatim so nothing console-only moves. *)
+  Lemma uart_tx_own_snapshot_at (i : uart_id) (γu : uart_names)
       (l : list (bv 8)) (E : coPset) :
-    ↑devN ⊆ E ->
-    dev_inv γu γd -∗ uart_tx_own γu l ={E}=∗
+    ↑(uartN i) ⊆ E ->
+    uart_inv i γu -∗ uart_tx_own γu l ={E}=∗
       uart_tx_own γu l ∗ uart_sent γu l.
   Proof.
-    iIntros (HE) "#Hinv Hown".
-    (* only the UART half is needed, and [↑uartN ⊆ ↑devN ⊆ E] *)
-    iDestruct (dev_inv_uart with "Hinv") as "#Huinv".
+    iIntros (HE) "#Huinv Hown".
     iInv "Huinv" as ">Hbody" "Hclose".
     iDestruct "Hbody" as (u) "(Hu & Hg & Hcol)".
     iEval (rewrite /uart_ghosts) in "Hg".
@@ -241,14 +316,13 @@ Section UartTxInv.
     iModIntro. iFrame "Hown". rewrite -Hacc. iExact "Hlb".
   Qed.
 
-  Lemma uart_tx_own_sent_prefix (γu : uart_names) (γd : disk_names)
+  Lemma uart_tx_own_sent_prefix_at (i : uart_id) (γu : uart_names)
       (l L : list (bv 8)) (E : coPset) :
-    ↑devN ⊆ E ->
-    dev_inv γu γd -∗ uart_tx_own γu l -∗ uart_sent γu L ={E}=∗
+    ↑(uartN i) ⊆ E ->
+    uart_inv i γu -∗ uart_tx_own γu l -∗ uart_sent γu L ={E}=∗
       uart_tx_own γu l ∗ ⌜ L `prefix_of` l ⌝.
   Proof.
-    iIntros (HE) "#Hinv Hown #HL".
-    iDestruct (dev_inv_uart with "Hinv") as "#Huinv".
+    iIntros (HE) "#Huinv Hown #HL".
     iInv "Huinv" as ">Hbody" "Hclose".
     iDestruct "Hbody" as (u) "(Hu & Hg & Hcol)".
     iEval (rewrite /uart_ghosts) in "Hg".
@@ -265,6 +339,49 @@ Section UartTxInv.
      across a sleep.  Everything it saw accepted is still a prefix of what has
      been accepted now, so its sublist claim carries over to the trace it is
      about to extend. *)
+  Lemma uart_tx_own_sent_sub_at (i : uart_id) (γu : uart_names)
+      (l : list (bv 8)) (bs : list (bv 8)) (E : coPset) :
+    ↑(uartN i) ⊆ E ->
+    uart_inv i γu -∗ uart_tx_own γu l -∗ uart_sent_sub γu bs ={E}=∗
+      uart_tx_own γu l ∗ ⌜ bs `sublist_of` l ⌝.
+  Proof.
+    iIntros (HE) "#Huinv Hown #Hsub".
+    iDestruct "Hsub" as (L) "[#HL %Hbs]".
+    iMod (uart_tx_own_sent_prefix_at i γu l L E HE with "Huinv Hown HL")
+      as "[Hown %Hpre]".
+    iModIntro. iFrame "Hown". iPureIntro.
+    destruct Hpre as [k ->].
+    apply (transitivity Hbs). apply stdpp.list_relations.sublist_inserts_r. reflexivity.
+  Qed.
+
+  (* ---- the console-bundle instances, verbatim in their old statements ---- *)
+  Lemma uartN_devN_console : (↑(uartN Uart0) : coPset) ⊆ ↑devN.
+  Proof. rewrite /uartN. solve_ndisj. Qed.
+
+  Lemma uart_tx_own_snapshot (γu : uart_names) (γd : disk_names)
+      (l : list (bv 8)) (E : coPset) :
+    ↑devN ⊆ E ->
+    dev_inv γu γd -∗ uart_tx_own γu l ={E}=∗
+      uart_tx_own γu l ∗ uart_sent γu l.
+  Proof.
+    iIntros (HE) "#Hinv Hown".
+    iDestruct (dev_inv_uart with "Hinv") as "#Huinv".
+    iApply (uart_tx_own_snapshot_at Uart0 γu l E
+              (transitivity uartN_devN_console HE) with "Huinv Hown").
+  Qed.
+
+  Lemma uart_tx_own_sent_prefix (γu : uart_names) (γd : disk_names)
+      (l L : list (bv 8)) (E : coPset) :
+    ↑devN ⊆ E ->
+    dev_inv γu γd -∗ uart_tx_own γu l -∗ uart_sent γu L ={E}=∗
+      uart_tx_own γu l ∗ ⌜ L `prefix_of` l ⌝.
+  Proof.
+    iIntros (HE) "#Hinv Hown #HL".
+    iDestruct (dev_inv_uart with "Hinv") as "#Huinv".
+    iApply (uart_tx_own_sent_prefix_at Uart0 γu l L E
+              (transitivity uartN_devN_console HE) with "Huinv Hown HL").
+  Qed.
+
   Lemma uart_tx_own_sent_sub (γu : uart_names) (γd : disk_names)
       (l : list (bv 8)) (bs : list (bv 8)) (E : coPset) :
     ↑devN ⊆ E ->
@@ -272,12 +389,9 @@ Section UartTxInv.
       uart_tx_own γu l ∗ ⌜ bs `sublist_of` l ⌝.
   Proof.
     iIntros (HE) "#Hinv Hown #Hsub".
-    iDestruct "Hsub" as (L) "[#HL %Hbs]".
-    iMod (uart_tx_own_sent_prefix γu γd l L E HE with "Hinv Hown HL")
-      as "[Hown %Hpre]".
-    iModIntro. iFrame "Hown". iPureIntro.
-    destruct Hpre as [k ->].
-    apply (transitivity Hbs). apply stdpp.list_relations.sublist_inserts_r. reflexivity.
+    iDestruct (dev_inv_uart with "Hinv") as "#Huinv".
+    iApply (uart_tx_own_sent_sub_at Uart0 γu l bs E
+              (transitivity uartN_devN_console HE) with "Huinv Hown Hsub").
   Qed.
 
 

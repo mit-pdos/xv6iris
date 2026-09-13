@@ -61,6 +61,7 @@ Require Import IntrDefs.
 Require Import WpLock.
 Require Import WpUart.
 Require Import UartTxInv.
+Require Import SpecUartPutc.  (* [uart_base_word] -- the VA-tier [uarts[i].base] snapshot *)
 (* [lk_raw] / [lk_fresh] -- the three-cell spinlock bundle, before and after
    [initlock]; tx_lock's storage is pure transit through this contract. *)
 Require Import SpecProcinit.
@@ -95,6 +96,11 @@ Definition devsw_console_write : mword 64 := mword_of_int (KernelSyms.devsw + 24
 Definition wp_consoleinit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γd : uart_names) (m : regfile) (K : nat)
     (l : list (bv 8)) (b0 : bool) (k : nat) (hl : option (list mobs))
+    (* THE SECOND PORT (bump 163d39b).  consoleinit names nothing of it; it
+       is on the path between the boot assembly and [uartinit], which
+       initialises BOTH elements of [uarts[]]. *)
+    (γd1 : uart_names) (l1 : list (bv 8)) (b1 : bool)
+    (k1 : nat) (hl1 : option (list mobs))
     (vclock : bv 32) (vcname vccpu : bv 64)
     (dread0 dwrite0 : mword 64) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.consoleinit in
@@ -104,9 +110,11 @@ Definition wp_consoleinit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{C
   let c_cname := lock_name_field clk in
   let c_ccpu := add_vec clk (sign_extend' 64 (mword_of_int 0x10 : mword 12)) in
   (* consoleinit's own frame is [addi sp,sp,-16] = 2 slots, and its deepest
-     callee is uartinit, which needs 4 (its own 2-slot frame plus initlock's
-     2).  So the budget is 2 + 4. *)
-  (6 <= K)%nat ->
+     callee is uartinit, which needs 6 now (its own 2-slot frame, plus
+     [uartinitone]'s 2, plus initlock's 2 under that -- the bump split the
+     seven register writes into a called function, so the chain is one frame
+     deeper).  So the budget is 2 + 6. *)
+  (8 <= K)%nat ->
   sie_cap_gpr KT0 m K false p -∗
   (* [kernel_data] supplies the "cons" string literal consoleinit's [auipc a1 /
      addi a1] points at -- the name it hands to initlock -- and, through
@@ -122,6 +130,21 @@ Definition wp_consoleinit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{C
      (SpecUartinit.v) and back *)
   uart_rx_tok γd k hl -∗
   uart_dlab_is γd (DfracOwn (1/2)) b0 -∗
+  (* the four immutable `.data` words of [uarts[]], at the VA tier: every
+     [WriteReg] inside [uartinitone] LOADS [u->base] and the last one reads
+     [u->rx], so both ports' pairs pass straight through
+     ([SpecUartinit.v]). *)
+  uart_base_word Uart0 -∗ uart_rx_word Uart0 -∗
+  uart_base_word Uart1 -∗ uart_rx_word Uart1 -∗
+  (* ...and the SECOND PORT's fabric and ghosts, the same row as the
+     console's: [uartinit] runs ONE contract at both ports, so both need the
+     transmitter token, the transmitted-prefix bound, the receipt, the
+     receive token (the FCR clear empties that FIFO too) and the unfrozen
+     DLAB half.  consoleinit relays them and reads none of them. *)
+  uart_inv Uart1 γd1 -∗
+  uart_tx_own γd1 l1 -∗ uart_out_lb γd1 l1 -∗ uart_sent γd1 l1 -∗
+  uart_rx_tok γd1 k1 hl1 -∗
+  uart_dlab_is γd1 (DfracOwn (1/2)) b1 -∗
   clk ↦₄ vclock -∗
   c_cname ↦₈ vcname -∗
   c_ccpu ↦₈ vccpu -∗
@@ -129,7 +152,8 @@ Definition wp_consoleinit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{C
      consoleinit itself names no field of it; it is only on the path between
      the boot assembly that owns the bss and the initlock call that consumes
      it. *)
-  lk_raw UartTxInv.a_tx_lock -∗
+  lk_raw (UartTxInv.a_tx_lock_at Uart0) -∗
+  lk_raw (UartTxInv.a_tx_lock_at Uart1) -∗
   (* THE DEVICE TABLE.  consoleinit's own two cells, whose old values are
      arbitrary because it is about to overwrite them, and the eighteen it
      never touches, still as the BSS left them.  What comes back is the
@@ -156,7 +180,14 @@ Definition wp_consoleinit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{C
     (* and back out initialized: [WpLock.newlock]'s raw material, which is
        what lets a boot assembly mint [UartTxInv.is_txlock]
        ([WpLock.newlock] over [UartTxInv.tx_res]). *)
-    lk_fresh UartTxInv.a_tx_lock "uart"%string -∗
+    lk_fresh (UartTxInv.a_tx_lock_at Uart0) (UartTxInv.uart_lock_name Uart0) -∗
+    (* ...and the SECOND port's, all five rows.  Its output is
+       UNCONSTRAINED (the bump's ruling), so a caller that has no use for
+       the trace claims simply drops them. *)
+    uart_tx_own γd1 l1 -∗ uart_sent γd1 l1 -∗
+    (∃ (k' : nat) (hl' : option (list mobs)), uart_rx_tok γd1 k' hl') -∗
+    uart_dlab_off γd1 -∗
+    lk_fresh (UartTxInv.a_tx_lock_at Uart1) (UartTxInv.uart_lock_name Uart1) -∗
     (* ...and the table, filled and DUPLICABLE.  [ConsoleInv.console_inv] is
        this plus the [is_conslock] the caller mints from [lock_name] above,
        which is why consoleinit produces the devsw half and not the whole
@@ -170,7 +201,10 @@ Module Type CONSOLEINIT.
     forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γd : uart_names) (m : regfile) (K : nat)
       (l : list (bv 8)) (b0 : bool) (k : nat) (hl : option (list mobs))
+      (γd1 : uart_names) (l1 : list (bv 8)) (b1 : bool)
+      (k1 : nat) (hl1 : option (list mobs))
       (vclock : bv 32) (vcname vccpu : bv 64)
       (dread0 dwrite0 : mword 64) (p : mword 64),
-      wp_consoleinit_sconf_body γd m K l b0 k hl vclock vcname vccpu dread0 dwrite0 p.
+      wp_consoleinit_sconf_body γd m K l b0 k hl γd1 l1 b1 k1 hl1
+        vclock vcname vccpu dread0 dwrite0 p.
 End CONSOLEINIT.

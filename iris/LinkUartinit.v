@@ -1,15 +1,15 @@
-(* LinkUartinit.v -- instantiates the Uartinit proof against its callees: the
-   UART device leaves (Uart) and initlock.  Sealed, so this is the only place
-   the three ever meet.
+(* LinkUartinit.v -- instantiates the Uartinit proof against its ONE callee.
 
-   BEWARE: FORGETTING THE SECOND ARGUMENT HERE COMPILES.  Rocq accepts PARTIAL
-   functor application, so `UartinitProof Uart` against the two-argument
-   functor silently defines [Uartinit] as a FUNCTOR rather than a module --
-   this file goes green and the mistake surfaces only downstream, where
-   `ConsoleinitProof Initlock Uartinit` rejects it.  A Link file compiling is
-   not on its own evidence that it links the right things; the check that
-   works is a module-type ascription (`Module Chk : UARTINIT := Uartinit.`),
-   which a functor cannot satisfy. *)
-Require Import LinkUart LinkInitlock ProofUartinit.
+   At XV6_REV 163d39b uartinit is a two-call wrapper around [uartinitone], so
+   this file links exactly one thing: the UART device leaves and [initlock]
+   are reached through [Uartinitone]'s own seal ([LinkUartinitone]) and never
+   appear here.
 
-Module Uartinit := UartinitProof Uart Initlock.
+   The module-type ascription below is the check that a Link file's own
+   compiling does not give: Rocq accepts PARTIAL functor application, so a
+   missing argument would leave [Uartinit] a FUNCTOR and go green. *)
+Require Import SpecUartinit.
+Require Import LinkUartinitone ProofUartinit.
+
+Module Uartinit := UartinitProof Uartinitone.
+Module ChkUartinit : UARTINIT := Uartinit.

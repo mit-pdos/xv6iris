@@ -36,7 +36,8 @@ Local Open Scope nat_scope.
    and every [wakeup] acquires, so it sits above all of them), then the
    allocators, and finally the two panic-path locks.
 
-   [pr] and [uart] sit above everything a panic can fire under, because
+   [pr] and the two [uart<i>] leaves sit above everything a panic can fire
+   under, because
    [panic] takes [pr.lock]: this
    revision has no [panicking] flag, so panic is [printk] + [printk] +
    self-jump and printk holds [pr.lock] across [consputc] -> [uartputc_sync]
@@ -90,7 +91,17 @@ Definition lock_ranks : list (string * nat) :=
   ; ("itable",      14)
   ; ("ftable",      15)
   ; ("pr",          16)   (* panic -> printk *)
-  ; ("uart",        17)   (* printk -> consputc -> uartputc_sync *)
+  (* THE TWO TRANSMIT LOCKS, ONE PER 16550, AT THE SAME RANK.  At XV6_REV
+     163d39b the kernel drives two ports out of [uarts[]] and names each
+     port's lock after it ([initlock(&u->tx_lock, "uart0"/"uart1")]), so the
+     single "uart" is gone from the image and from here.  EQUAL RANKS ARE
+     THE POINT: [locks_below {["uart0"]} "uart1"] is FALSE (17 < 17 fails),
+     so a hart holding one port's transmit lock may not take the other's --
+     which is exactly the discipline, since neither is ever held while
+     anything is acquired.  Names at one rank are still distinguished by the
+     held SET, so nothing is conflated. *)
+  ; ("uart0",       17)   (* consolewrite -> uartwrite / consputc          *)
+  ; ("uart1",       17)   (* printk / panic -> prputc                      *)
   ].
 
 Fixpoint rank_lookup (l : list (string * nat)) (s : string) : nat :=

@@ -58,6 +58,7 @@ Require Import DiskInv SpecVirtioDiskInit.
    (fs-cfg-boot.md (f-2)) *)
 Require Import LogDefs LogInv.
 Require Import SpecMain.
+Require Import UartsFields.   (* [uart_f_lock] -- the two transmit locks live in `.data` now *)
 Require Import FileInvDefs.   (* the open-file table's geometry and [fentry_raw] *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
@@ -343,22 +344,23 @@ Qed.
 Lemma bhead_of_z : bhead = pa_of_z (buf_base + buf_stride * Z.of_nat NBUF).
 Proof. exact (bnode_of_z NBUF). Qed.
 
-(* the eleven [struct spinlock] windows [main_locks_raw] enumerates, IN
+(* the TEN .bss [struct spinlock] windows [main_locks_raw] enumerates, IN
    ADDRESS ORDER and pairwise disjoint -- which is what lets a client cut all
-   eleven out of the one .bss range with [boot_cran_split] alone.  Every step
+   ten out of the one .bss range with [boot_cran_split] alone.  Every step
    is [x + 24 <= y] on two literals, so the whole check is one [vm_compute]
    per conjunct.  (The full .bss decomposition -- which of these gaps holds
    which other bundle -- is tabulated in claude-notes/completed/crash.md.)
 
-   ALL ELEVEN WINDOWS ARE 24 BYTES, [tx_lock] included: it is a [struct
-   spinlock], which the layout confirms exactly -- [pr] = 0x80012348,
-   [tx_lock] = 0x80012418 and [kmem] = 0x80012430, so the linker left 24
-   bytes on each side of it and there is no slack in either direction. *)
+   THE TRANSMIT LOCK IS NOT AMONG THEM ANY MORE.  At 163d39b it is a FIELD
+   of [uarts[]] in `.data` and there are two of them, so the .bss chain is
+   one record shorter: [pr] = 0x800123f8 and [kmem] = 0x80012410, i.e.
+   [pr + 24 = kmem] exactly, with no slack in either direction.  The two
+   UART windows are [main_uart_lock_windows] below, checked against the
+   `.data` array's own bounds instead. *)
 Lemma main_lock_windows :
   img_end <= KernelSyms.cons /\
   KernelSyms.cons + 24 <= KernelSyms.pr /\
-  KernelSyms.pr + 24 <= KernelSyms.tx_lock /\
-  KernelSyms.tx_lock + 24 <= KernelSyms.kmem /\
+  KernelSyms.pr + 24 <= KernelSyms.kmem /\
   KernelSyms.kmem + 24 <= KernelSyms.pid_lock /\
   KernelSyms.pid_lock + 24 <= KernelSyms.wait_lock /\
   KernelSyms.wait_lock + 24 <= KernelSyms.tickslock /\
@@ -367,6 +369,19 @@ Lemma main_lock_windows :
   KernelSyms.itable + 24 <= KernelSyms.ftable /\
   KernelSyms.ftable + 24 <= KernelSyms.disk + 296 /\
   KernelSyms.disk + 296 + 24 <= ram_hi.
+Proof. split_and!; vm_compute; discriminate. Qed.
+
+(* the two TRANSMIT-LOCK windows, in `.data`, checked the same way and
+   against the array they are fields of: [uarts[i].tx_lock] is 24 bytes at
+   [uarts + 40*i + 16] ([UartsFields.uart_f_lock]), so each sits wholly
+   inside its own 40-byte element and the two are disjoint.  The array's
+   own window is [nextpid + 4 .. entry_got), which [BootShared]'s .data
+   walk cut out and dropped before these two claimed a slice of it. *)
+Lemma main_uart_lock_windows :
+  KernelSyms.nextpid + 4 <= uart_f_lock Uart0 /\
+  uart_f_lock Uart0 + 24 <= uart_f_base Uart1 /\
+  uart_f_base Uart1 + 16 <= uart_f_lock Uart1 /\
+  uart_f_lock Uart1 + 24 <= KernelSyms.uarts + 2 * uart_stride.
 Proof. split_and!; vm_compute; discriminate. Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -1694,10 +1709,11 @@ Section BootCarveMain.
   Qed.
 
   (* ------------------------------------------------------------------ *)
-  (* [SpecMain.main_locks_raw]'s ELEVEN.                                 *)
+  (* [SpecMain.main_locks_raw]'s TWELVE.                                 *)
   (*                                                                    *)
-  (* Inherently eleven applications of [boot_lk_raw]: the eleven         *)
-  (* [struct spinlock]s sit at UNRELATED symbols, not at a stride.  What *)
+  (* Inherently twelve applications of [boot_lk_raw]: the ten .bss       *)
+  (* [struct spinlock]s sit at UNRELATED symbols, not at a stride, and   *)
+  (* the two transmit locks are fields of `.data`'s [uarts[]].  What     *)
   (* the lemma buys is the address bridge for each (ten of them ARE      *)
   (* [mword_of_int <symbol>]; [disk_lock] alone needs [disk_lock_of_z])  *)
   (* and the ORDER -- the windows are taken in ADDRESS order, which is   *)
@@ -1708,9 +1724,10 @@ Section BootCarveMain.
     (forall x : Z, ram_lo <= x < ram_hi ->
        g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
     kmap_static_claims -∗
+    boot_cran g (uart_f_lock Uart0) (uart_f_lock Uart0 + 24) -∗
+    boot_cran g (uart_f_lock Uart1) (uart_f_lock Uart1 + 24) -∗
     boot_cran g KernelSyms.cons (KernelSyms.cons + 24) -∗
     boot_cran g KernelSyms.pr (KernelSyms.pr + 24) -∗
-    boot_cran g KernelSyms.tx_lock (KernelSyms.tx_lock + 24) -∗
     boot_cran g KernelSyms.kmem (KernelSyms.kmem + 24) -∗
     boot_cran g KernelSyms.pid_lock (KernelSyms.pid_lock + 24) -∗
     boot_cran g KernelSyms.wait_lock (KernelSyms.wait_lock + 24) -∗
@@ -1721,16 +1738,19 @@ Section BootCarveMain.
     boot_cran g (KernelSyms.disk + 296) (KernelSyms.disk + 296 + 24)
     -∗ main_locks_raw.
   Proof.
-    intro Hmem. iIntros "#Hcl H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11".
+    intro Hmem. iIntros "#Hcl Hu0 Hu1 H1 H2 H4 H5 H6 H7 H8 H9 H10 H11".
+    iDestruct (boot_lk_raw g (uart_f_lock Uart0) Hmem
+                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+                 ltac:(vm_compute; reflexivity) with "Hcl Hu0") as "Hu0".
+    iDestruct (boot_lk_raw g (uart_f_lock Uart1) Hmem
+                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+                 ltac:(vm_compute; reflexivity) with "Hcl Hu1") as "Hu1".
     iDestruct (boot_lk_raw g KernelSyms.cons Hmem
                  ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                  ltac:(vm_compute; reflexivity) with "Hcl H1") as "H1".
     iDestruct (boot_lk_raw g KernelSyms.pr Hmem
                  ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                  ltac:(vm_compute; reflexivity) with "Hcl H2") as "H2".
-    iDestruct (boot_lk_raw g KernelSyms.tx_lock Hmem
-                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
-                 ltac:(vm_compute; reflexivity) with "Hcl H3") as "H3".
     iDestruct (boot_lk_raw g KernelSyms.kmem Hmem
                  ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                  ltac:(vm_compute; reflexivity) with "Hcl H4") as "H4".
@@ -1757,7 +1777,8 @@ Section BootCarveMain.
                  ltac:(vm_compute; reflexivity) with "Hcl H11") as "H11".
     rewrite /main_locks_raw /pid_lock_addr /wait_lock_addr /bcache_addr
             /itable_addr disk_lock_of_z.
-    iSplitL "H1"; [iExact "H1"|]. iSplitL "H3"; [iExact "H3"|].
+    iSplitL "H1"; [iExact "H1"|]. iSplitL "Hu0"; [iExact "Hu0"|].
+    iSplitL "Hu1"; [iExact "Hu1"|].
     iSplitL "H2"; [iExact "H2"|]. iSplitL "H4"; [iExact "H4"|].
     iSplitL "H5"; [iExact "H5"|]. iSplitL "H6"; [iExact "H6"|].
     iSplitL "H7"; [iExact "H7"|]. iSplitL "H8"; [iExact "H8"|].

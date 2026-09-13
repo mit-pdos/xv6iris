@@ -77,6 +77,7 @@ Require Import FileInvDefs.
 (* the boot-arm interface, for the per-hart bundle [main_hart_raw] (and the
    □-wand whose arguments [main_deposit] packages) *)
 Require Import SpecConsoleintr.
+Require Import SpecDevintr.   (* [uart1_caps] -- the second port's row of [devintr_caps] *)
 Require Import SpecMain.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import TimerCap.
@@ -116,6 +117,14 @@ Section SpecMainSecondary.
           closes over ([SpecDevintr.devintr_caps]) and which no hart can make
           for itself: both halves are locks over static globals. *)
        console_caps γd ∗
+       (* THE SECOND PORT'S ROW (bump 163d39b).  [devintr_caps] gained it
+          because devintr's [irq == UART1_IRQ] arm runs the same uartintr at
+          [Uart1], and a SECONDARY hart makes no part of it: the [uart_inv
+          Uart1] and the [plic_inv] at the two concrete bundles are the boot
+          chain's ([BootShared.boot_shared_alloc] exports both), and the
+          [uart_inited] is minted by main's SECOND deposit.  So it arrives
+          through this one-shot escrow, beside [console_caps]. *)
+       uart1_caps γd ∗
        is_lock γk d_lock "virtio_disk"%string (disk_res_at γv pd pav pu) ∗
        disk_geom γv pd pav pu ∗
        kpt_inv root ∗

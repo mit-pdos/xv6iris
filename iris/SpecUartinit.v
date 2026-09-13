@@ -2,60 +2,50 @@
    its proof.  Requires only the definitional layer -- never a whole-function
    proof file -- so every function proof can be checked in parallel.
 
-   [uartinit] is the 16550 device-init routine (kernel/uart.c).  It runs in
-   S-mode during boot.  The seven MMIO byte writes are, in order (all to
-   UART0 = [uart_pa Uart0 off]):
-     off 1 = 0x00   disable interrupts (IER)
-     off 3 = 0x80   set DLAB (LCR_BAUD_LATCH)
-     off 0 = 0x03   LSB divisor       (DLL, DLAB set)
-     off 1 = 0x00   MSB divisor       (DLM, DLAB set)
-     off 3 = 0x03   8N1, clear DLAB   (LCR_EIGHT_BITS)
-     off 2 = 0x07   enable + clear both FIFOs (FCR)
-     off 1 = 0x03   enable tx/rx interrupts (IER)
-   then [initlock(&tx_lock, "uart")].
+   AT XV6_REV 163d39b [uartinit] IS A TWO-CALL WRAPPER AND NOTHING ELSE:
 
-   STATED OVER THE TIME-0 DEVICE INVARIANT.  Device init does NOT run before
-   [dev_inv] is allocated: the UART thread is a top-level thread from step 0 and
-   every one of its steps needs the fragment, so [uart_frag] can never sit raw
-   in a CPU's precondition while the system runs.  The contract is therefore
-   stated over [WpUart.uart_inv Uart0], and the two writes that look incompatible with
-   an invariant are both discharged by ghost arithmetic rather than by running
-   early:
+     void uartinit(void) {
+       uartinitone(&uarts[0], "uart0");
+       uartinitone(&uarts[1], "uart1");
+     }
 
-     - the FCR FIFO-CLEAR (off 2, bit 2) discards queued bytes, which a
-       [mono_list] over [uart_acc] cannot do -- unless the FIFO is provably
-       empty.  It is: the caller's [uart_tx_own γ l] pins [uart_acc u = l] and
-       [uart_out_lb γ l] says the transmitted prefix has already reached [l],
-       so [DevModel.uart_tx_empty_of_out] leaves nothing in [u_tx] and the
-       clear shrinks nothing.  This is the same pair [uartputc_sync]'s poll
-       hands forward ([WpUart.uart_tx_ready_persists]).
-     - the DLAB SET (off 3 = 0x80) is why the caller threads the UNFROZEN
-       half [uart_dlab_is γ (DfracOwn (1/2)) b0] at an ARBITRARY [b0] rather
-       than the persistent [uart_dlab_off]: the freeze moved out of
-       [uart_ghosts_alloc Uart0] into this function's tail, where the final LCR write
-       has just cleared DLAB.  So [uart_dlab_off] is uartinit's OUTPUT.
+   The seven MMIO writes and the [initlock] moved into [uartinitone], which
+   has a symbol and a contract of its own ([SpecUartinitone]); this file is
+   two applications of that contract, one per element of [uarts[]], plus the
+   prologue/epilogue and the two argument pairs.  Everything that used to be
+   said here about the device -- the FCR FIFO-clear, the baud-latch dance,
+   the DLAB freeze -- is said there, once, for both ports.
 
-   uartinit writes no THR, so the accepted trace is unchanged and the token and
-   receipt come back at the same [l].
+   WHAT THIS FILE STILL OWNS is the pairing:
 
-   AND IT INITIALIZES THE TRANSMIT LOCK, WHICH IS A SPINLOCK.  [tx_lock] is a
-   [struct spinlock] again -- the new [uartwrite] takes and releases it around
-   each LSR-check/THR-write pair and parks OUTSIDE it, so nothing is held
-   across a park and a spinlock suffices -- and uartinit's trailing call is
-   [initlock(&tx_lock, "uart")].  The contract therefore takes the raw storage
-   of that one lock and hands back the zeroed cells plus the persistent name,
-   in [SpecProcinit.v]'s vocabulary: [lk_raw] in (three cells, 24 bytes),
-   [lk_fresh] out.  Those are exactly [WpLock.newlock]'s premises minus the
-   resource, so the caller's ghost step
-   [lk_fresh a_tx_lock "uart" ∗ tx_res γd ==∗ is_lock … a_tx_lock "uart" <{ tx_res γd }>] plus the [uart_dlab_off] below is [UartTxInv.is_txlock] --
-   what a boot assembly feeds to [WpLock.newlock].
+   - THE TWO PORTS' GHOST BUNDLES, side by side.  The contract takes one per
+     port and hands one back per port.  The bundles are the SAME shape at
+     both, deliberately: the owner's ruling for this bump is that UART1's
+     OUTPUT is unconstrained, but that says who CONSUMES [uart_sent], not
+     whether the port has FIFO and DLAB ghosts -- the FCR clear and the
+     baud-latch dance are the same instructions at both ports, so both need
+     the token, the transmitted-prefix bound and the unfrozen DLAB half.
+     The second port's caller simply drops the trace claims it gets back.
 
-   ProofUartinit.v proves it by running each of the seven writes through the
-   invariant-opening ACCESSOR-form UART store leaf
-   [SpecUart.wp_sb_uart_uinv_s_sconf] and doing one ghost step per write, out
-   of the per-offset [uart_write] readings in DevModel.v
-   ([uart_write_1_stable] / [_0_dlab_stable] / [_3_stable] / [_2_stable]). *)
-From Stdlib Require Import Eqdep_dec ZArith Lia List.
+   - THE TWO [.rodata] NAMES.  The old single "uart" left the image with the
+     old single [tx_lock]; the literals are "uart0" and "uart1" now, and
+     [uartinit] is the only place that knows which port gets which.  Their
+     addresses are DERIVED BY CONTENT out of [KernelData] (a NUL before and
+     after) and spelled [KernelSyms.etext + <off>], so an ordinary
+     text-growing bump carries them for free.
+
+   - THE PINNED FIELDS.  Every [WriteReg(u, …)] inside [uartinitone] loads
+     [u->base] out of `.data` and the last one reads [u->rx], so the callee
+     takes [uart_base_word i] / [uart_rx_word i] -- the VA-tier snapshots an
+     S-mode [ld] leaf consumes.  uartinit relays all four; the boot chain
+     mints them.
+
+   THE STACK BUDGET IS 2 + 4.  uartinit's own frame is two slots
+   ([addi sp,sp,-16]) and [uartinitone] asks [(4 <= av)] of what is left
+   (its own two plus [initlock]'s two).  That is ONE SLICE MORE than the old
+   flat uartinit needed, and it ripples: [SpecConsoleinit]'s premise, and
+   main's through it, have to widen with it. *)
+From Stdlib Require Import Eqdep_dec ZArith Lia List String.
 From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
 From iris.algebra Require Import excl.
@@ -68,8 +58,10 @@ Require Import InstrBytes.
 Require Import RiscvExtras.
 Require Import CalleeSaved.
 Require Import KernelText KernelDataInv.
-Require Import WpUart.
+Require Import DevModel WpUart.
+Require Import UartsFields.
 Require Import UartTxInv.
+Require Import SpecUartPutc.  (* [uart_base_word] *)
 (* [lk_raw] / [lk_fresh] -- the three-cell spinlock bundle, before and after
    [initlock].  They live in SpecProcinit.v with the rest of the boot-time
    lock vocabulary; nothing else in that file is used here. *)
@@ -80,82 +72,87 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Import Defs.
+Local Open Scope Z_scope.
+
+(* ---------------------------------------------------------------------- *)
+(* The two lock-name literals in `.rodata`.                                *)
+(*                                                                        *)
+(* DERIVED BY CONTENT, not by arithmetic: each is the unique NUL-preceded, *)
+(* NUL-terminated occurrence of its own name in [KernelData.kernel_data],  *)
+(* and both are spelled [KernelSyms.etext + <off>] because [etext] IS the  *)
+(* base of `.rodata` -- written that way an ordinary text-growing bump     *)
+(* carries them and only a `.rodata` REORDERING touches the offset.        *)
+(* The [ltac:(eval vm_compute …)] shape is load-bearing: the body stays a  *)
+(* plain [Z] literal downstream, which is what the byte lemmas'            *)
+(* [vm_compute] and [lia] need (xv6-bump-playbook.md section 4b).          *)
+(* ---------------------------------------------------------------------- *)
+Definition uart0_name_str : Z :=
+  ltac:(let x := eval vm_compute in (KernelSyms.etext + 0x30)%Z in exact x).
+Definition uart1_name_str : Z :=
+  ltac:(let x := eval vm_compute in (KernelSyms.etext + 0x38)%Z in exact x).
+
+Definition uart_name_str (i : uart_id) : Z :=
+  match i with Uart0 => uart0_name_str | Uart1 => uart1_name_str end.
+
+(* the string itself is the LOCK's name, so it is [UartTxInv]'s -- the one
+   place that says what an [is_lock] over a transmit lock is named. *)
+Definition uart_name (i : uart_id) : string := uart_lock_name i.
 
 
-(* NOTE: there is deliberately no [uartinit_post] naming the concrete UART state
-   the seven writes produce.  The state lives inside [uart_inv Uart0], the contract
-   talks only about the four ghosts, and the proof goes write-by-write through
-   the accessor leaf rather than composing a closed-form successor, so nothing
-   would consume it. *)
-
-(* BOOT-ONLY: uartinit runs strictly before interrupts are ever enabled
-   (main()'s [consoleinit()], on hart 0, always before scheduler()'s
-   [intr_on()]) -- see claude-notes/projects/explicit-cpuid-porting-guide.md,
-   "A function that READS tp mid-body must be stated at b = false" for the
-   general shape this follows (worked example: SpecCpuid.v).  So the
-   contract is stated at the literal index [false] rather than a generic
-   [b], with no [wp_next] wrapper at all (it would collapse via
-   [wp_next_off] anyway, since the hart cannot move). *)
 Definition wp_uartinit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-    (γd : uart_names) (m : regfile) (K : nat)
-    (l : list (bv 8)) (b0 : bool) (k : nat) (hl : option (list mobs))
+    (γ0 γ1 : uart_names) (m : regfile) (K : nat)
+    (l0 l1 : list (bv 8)) (d0 d1 : bool)
+    (k0 k1 : nat) (hl0 hl1 : option (list mobs))
     (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uartinit in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
-  (* THE FRAME PLUS THE CALLEE.  uartinit's own frame is [addi sp,sp,-16] = 2
-     slots, and [initlock] demands [(2 <= av)] of what is left, so the budget
-     is 2 + 2. *)
-  (4 <= K)%nat ->
+  (* uartinit's own two slots over [uartinitone]'s four *)
+  (6 <= K)%nat ->
   sie_cap_gpr KT0 m K false p -∗
-  (* [kernel_data] is load-bearing again: it is where the "uart" string
-     literal that the [auipc a1 / addi a1] pair points at comes from -- the
-     name uartinit hands [initsleeplock] -- alongside the device-register
-     writes, which are stated over the same image resources. *)
+  (* [kernel_data] is load-bearing: it is where the two "uart0"/"uart1"
+     string literals the [auipc a1 / addi a1] pairs point at come from. *)
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  (* the UART fabric, borrowed from the invariant around each write *)
-  uart_inv Uart0 γd -∗
-  (* "everything accepted has been transmitted, and the transmitter is mine":
-     the pair that makes the FCR FIFO-clear shrink nothing *)
-  uart_tx_own γd l -∗ uart_out_lb γd l -∗ uart_sent γd l -∗
-  (* THE RECEIVE TOKEN.  uartinit's FCR write is [FCR_FIFO_ENABLE |
-     FCR_FIFO_CLEAR], and the CLEAR empties the RECEIVE FIFO -- a pop of
-     everything, which only the token's holder may perform (WpUart.v's
-     receive column).  The token is born into the boot chain by
-     [dev_inv_alloc] for exactly this write, and main parks it in the PLIC
-     invariant afterwards. *)
-  uart_rx_tok γd k hl -∗
-  (* the UNFROZEN DLAB half, at an arbitrary power-on value *)
-  uart_dlab_is γd (DfracOwn (1/2)) b0 -∗
-  (* the transmit lock's storage, uninitialized: all three fields of
-     [struct spinlock tx_lock], contents arbitrary. *)
-  lk_raw a_tx_lock -∗
+  (* the four immutable `.data` words of [uarts[]], both ports, at the VA
+     tier -- the form the callee's [ld] leaves consume.  Persistent, minted
+     once in the boot chain ([BootShared]'s `.data` walk, which crosses them
+     from the physical [UartsFields.uarts_pinned] it carves). *)
+  uart_base_word Uart0 -∗ uart_rx_word Uart0 -∗
+  uart_base_word Uart1 -∗ uart_rx_word Uart1 -∗
+  (* ---- the console port ---- *)
+  uart_inv Uart0 γ0 -∗
+  uart_tx_own γ0 l0 -∗ uart_out_lb γ0 l0 -∗ uart_sent γ0 l0 -∗
+  uart_rx_tok γ0 k0 hl0 -∗
+  uart_dlab_is γ0 (DfracOwn (1/2)) d0 -∗
+  lk_raw (a_tx_lock_at Uart0) -∗
+  (* ---- the printk/panic port ---- *)
+  uart_inv Uart1 γ1 -∗
+  uart_tx_own γ1 l1 -∗ uart_out_lb γ1 l1 -∗ uart_sent γ1 l1 -∗
+  uart_rx_tok γ1 k1 hl1 -∗
+  uart_dlab_is γ1 (DfracOwn (1/2)) d1 -∗
+  lk_raw (a_tx_lock_at Uart1) -∗
   ( ∀ mr,
     sie_cap_gpr KT0 mr K false p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
-    (* no THR write, so the accepted trace is untouched *)
-    uart_tx_own γd l -∗ uart_sent γd l -∗
-    (* ...and the token back, at whatever the flush left the counter *)
-    (∃ (k' : nat) (hl' : option (list mobs)), uart_rx_tok γd k' hl') -∗
-    (* the final LCR write cleared DLAB, so the half is frozen for good *)
-    uart_dlab_off γd -∗
-    (* THE TRANSMIT LOCK COMES BACK OUT, INITIALIZED -- the "newlock" ghost
-       step's raw material.  [initlock(&tx_lock, "uart")] zeroes [locked] and
-       [cpu] and writes [name], which is then DISCARDED in favour of the
-       persistent [lock_name a_tx_lock "uart"] -- tx_lock is a static global
-       that is never freed, so nothing needs the field back owned.
-       [WpLock.newlock] seals the bundle into [is_lock … a_tx_lock "uart" R]
-       for the caller's choice of R ([UartTxInv.tx_res γd] is the one the
-       driver wants). *)
-    lk_fresh a_tx_lock "uart"%string -∗
+    (* neither call writes THR, so both accepted traces are untouched *)
+    uart_tx_own γ0 l0 -∗ uart_sent γ0 l0 -∗
+    (∃ (k' : nat) (hl' : option (list mobs)), uart_rx_tok γ0 k' hl') -∗
+    uart_dlab_off γ0 -∗
+    lk_fresh (a_tx_lock_at Uart0) (uart_name Uart0) -∗
+    uart_tx_own γ1 l1 -∗ uart_sent γ1 l1 -∗
+    (∃ (k' : nat) (hl' : option (list mobs)), uart_rx_tok γ1 k' hl') -∗
+    uart_dlab_off γ1 -∗
+    lk_fresh (a_tx_lock_at Uart1) (uart_name Uart1) -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type UARTINIT.
   Parameter wp_uartinit_sconf :
     forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-      (γd : uart_names) (m : regfile) (K : nat)
-      (l : list (bv 8)) (b0 : bool) (k : nat) (hl : option (list mobs))
+      (γ0 γ1 : uart_names) (m : regfile) (K : nat)
+      (l0 l1 : list (bv 8)) (d0 d1 : bool)
+      (k0 k1 : nat) (hl0 hl1 : option (list mobs))
       (p : mword 64),
-      wp_uartinit_sconf_body γd m K l b0 k hl p.
+      wp_uartinit_sconf_body γ0 γ1 m K l0 l1 d0 d1 k0 k1 hl0 hl1 p.
 End UARTINIT.

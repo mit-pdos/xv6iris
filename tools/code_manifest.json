@@ -624,6 +624,12 @@
   2
  ],
  [
+  "CodePrputc.v",
+  "prputc",
+  "ppc_",
+  2
+ ],
+ [
   "CodePrintint.v",
   "printint",
   "pii_",
@@ -873,6 +879,12 @@
   "CodeUartinit.v",
   "uartinit",
   "uii_",
+  2
+ ],
+ [
+  "CodeUartinitone.v",
+  "uartinitone",
+  "uio_",
   2
  ],
  [

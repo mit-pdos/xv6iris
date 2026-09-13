@@ -152,6 +152,9 @@ Require Import SpecFreerange SpecPrintk.
 Require Import ProcGeom FdSlots CpuOwn SchedCtx.
 Require Import KallocInv KvmSpec BcacheInv SleepLock.
 Require Import DiskPtsto WpUart.
+Require Import UartsFields.   (* [uart_f_lock] -- the two transmit locks are FIELDS of [uarts[]] now *)
+Require Import UartTxInv.     (* [uart_rx_word] *)
+Require Import SpecUartPutc.  (* [uart_base_word] *)
 Require Import VirtioModel.
 (* [DiskInv] for the vdisk_lock's vocabulary: [d_used_idx] and
    [disk_slot_raw] are cells of the static [struct disk] that main hands
@@ -213,23 +216,37 @@ Section SpecMain.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ------------------------------------------------------------------- *)
-  (* The eleven [struct spinlock]s the init sequence brings up, each as   *)
+  (* The TWELVE [struct spinlock]s the init sequence brings up, each as   *)
   (* [SpecProcinit.lk_raw] -- the three cells [lk ↦₄ _],                  *)
   (* [lock_name_field lk ↦₈ _], [lk_cpu lk ↦₈ _] bundled with their       *)
   (* values existentially quantified, which is the only shape a caller    *)
   (* can honestly claim about a static global it has never written.       *)
   (*                                                                     *)
-  (* [tx_lock] IS ONE OF THEM: it is a [struct spinlock] (uartwrite takes *)
-  (* and releases it around each LSR-check/THR-write pair and parks       *)
-  (* OUTSIDE it, so nothing is held across a park), and uartinit's        *)
-  (* trailing [initlock(&tx_lock, "uart")] is what consumes this entry.   *)
-  (* Its boot-carve window is 24 bytes like every other one here          *)
-  (* ([BootCarveMain.boot_lk_raw]), which the layout confirms:            *)
-  (* [pr + 24 = tx_lock] exactly and [tx_lock + 24 = kmem] exactly.       *)
+  (* TWO OF THEM ARE TRANSMIT LOCKS, AND THEY ARE NOT IN .bss.  At        *)
+  (* 163d39b the kernel drives two 16550s out of one array in `.data`,    *)
+  (* [struct uart uarts[2]] (stride 40, [tx_lock] at +16 --               *)
+  (* [UartsFields.uart_f_lock]), so the single [tx_lock] symbol is gone   *)
+  (* from the table and there are two locks, one per port.  uartinit      *)
+  (* initialises both, through [uartinitone(&uarts[i], "uart<i>")], and   *)
+  (* those two calls are what consume these two entries.                  *)
+  (*                                                                     *)
+  (* THE ADJACENCY ARGUMENT MOVED WITH THEM.  It used to read             *)
+  (* [pr + 24 = tx_lock] and [tx_lock + 24 = kmem] -- three .bss records  *)
+  (* back to back.  In the new symbol table [pr + 24 = kmem] exactly      *)
+  (* (0x800123f8 + 24 = 0x80012410), so the .bss chain is one record      *)
+  (* shorter and tight without any UART in it; the two transmit locks are *)
+  (* instead cut out of the `.data` window [uarts, uarts + 80), whose     *)
+  (* other four words are the two immutable fields per port that          *)
+  (* [UartsFields.uarts_pinned] pins.  That window was previously cut out *)
+  (* by [BootShared]'s .data walk and DROPPED, so claiming it is purely   *)
+  (* additive -- and it is tight on both sides too: [nextpid + 4]         *)
+  (* through the array's leading padding below, and [uarts + 80 =         *)
+  (* entry_got] exactly above.                                            *)
   (* ------------------------------------------------------------------- *)
   Definition main_locks_raw : iProp Σ :=
     (lk_raw (mword_of_int KernelSyms.cons) ∗       (* consoleinit: cons.lock  *)
-     lk_raw (mword_of_int KernelSyms.tx_lock) ∗    (* -> uartinit: uart tx    *)
+     lk_raw (mword_of_int (uart_f_lock Uart0)) ∗   (* -> uartinit: uarts[0]   *)
+     lk_raw (mword_of_int (uart_f_lock Uart1)) ∗   (* -> uartinit: uarts[1]   *)
      lk_raw (mword_of_int KernelSyms.pr) ∗         (* printkinit              *)
      lk_raw (mword_of_int KernelSyms.kmem) ∗       (* kinit                   *)
      lk_raw pid_lock_addr ∗                        (* procinit                *)
@@ -473,6 +490,12 @@ Section SpecMain.
          ambient one lives in exists. *)
       (cn : cons_names)
       (l0 : list (bv 8)) (b0 : bool) (c0 : virtio_cfg)
+      (* THE SECOND PORT'S BUNDLE AND ITS TWO STATE PARAMETERS (bump
+         163d39b).  main does not drive UART1 itself -- printk does, and
+         devintr's [irq == UART1_IRQ] arm -- but main is where [uartinit]
+         initialises BOTH ports and where the second port's receive token is
+         deposited, so its ghosts pass through here. *)
+      (γd1 : uart_names) (l1 : list (bv 8)) (b1 : bool)
       (* THE FILE SYSTEM'S BOOT-ERA MINT, as the era chose it: the disk's
          bytes, the parsed superblock, the inode region's block count and
          the coverage set.  They are PARAMETERS and not projections of the
@@ -693,6 +716,44 @@ Section SpecMain.
        (app-echo.md, lane CONS-CURSOR, C2). *)
     uart_rx_hi γd (1/2) None -∗
     uart_dlab_is γd (DfracOwn (1/2)) b0 -∗
+    (* ==================== THE SECOND PORT (bump 163d39b) ==================
+       Everything main needs about UART1, all of it minted in
+       [BootShared.boot_shared_alloc] and none of it derivable below the
+       boot chain.
+
+       [uart_inv Uart1 γd1] and [plic_inv γd γd1] are the two persistent
+       invariants; [dev_inv]'s own PLIC conjunct ∃-packs the second port's
+       names (which is what keeps [dev_inv] arity 2, ~140 specs naming it),
+       so the CONCRETE one has to arrive separately.  With [uarts_pinned]
+       and the [uart_inited γd1] main's own second deposit mints, they are
+       exactly [SpecDevintr.uart1_caps γd] -- the row [devintr_caps] gained
+       because the [irq == UART1_IRQ] arm runs the same uartintr at Uart1,
+       and the row [SpecMainSecondary.main_deposit] has to carry for the
+       harts that make none of it themselves.
+
+       The four `.data` WORDS are the VA-tier snapshots of [uarts[i].base]
+       and [uarts[i].rx]: [uartinit] relays them to [uartinitone], consputc
+       loads [base] at Uart0 (through [SpecConsoleintr.console_caps]) and
+       prputc at Uart1.  Their PHYSICAL twin is [uarts_pinned]; the crossing
+       between the tiers is boot's, because a VA-tier points-to carries the
+       mapping claim inside it.
+
+       The port's own ghost row is the console's, verbatim: [uartinitone] is
+       ONE contract run at two ports, so port 1 needs the transmitter token,
+       the transmitted-prefix bound, the receipt, the receive token (the FCR
+       clear empties that FIFO too) and the UNFROZEN DLAB half.  What port 1
+       does NOT owe is any claim about the bytes -- its output is
+       unconstrained -- so main drops the trace rows it gets back.
+       ==================================================================== *)
+    uart_inv Uart1 γd1 -∗
+    plic_inv γd γd1 -∗
+    uarts_pinned -∗
+    uart_base_word Uart0 -∗ uart_rx_word Uart0 -∗
+    uart_base_word Uart1 -∗ uart_rx_word Uart1 -∗
+    uart_tx_own γd1 l1 -∗ uart_sent γd1 l1 -∗ uart_out_lb γd1 l1 -∗
+    uart_rx_tok γd1 0%nat None -∗
+    uart_rx_hi γd1 (1/2) None -∗
+    uart_dlab_is γd1 (DfracOwn (1/2)) b1 -∗
     disk_cfg_is γv (DfracOwn (1/2)) c0 -∗
     (* ...and the two disk ghosts the protocol invariant does NOT hold, minted
        with it at power-on ([VirtioProto.disk_ghosts_alloc]) and owed to the
@@ -748,6 +809,7 @@ Module Type MAIN.
       (ps : list (mword 64)) (s1entry phystop : mword 64)
       (γd : uart_names) (γv : disk_names) (cn : cons_names)
       (l0 : list (bv 8)) (b0 : bool) (c0 : virtio_cfg)
+      (γd1 : uart_names) (l1 : list (bv 8)) (b1 : bool)
       (dk : Z -> bv 8) (sb : FsImg.fs_sb) (nib : nat) (cov : gset Z)
       (ndisk : nat)
       (S : FsState.fs_state_rec) (Pb : Z -> list (bv 8)) (Rspent : gset Z)
@@ -755,5 +817,5 @@ Module Type MAIN.
       (γi : gname) (ξd : CtxId) (P : nat -> CtxId -> iProp Σ)
       `{!∀ pos ξ, Persistent (P pos ξ)} `{!∀ pos, CtxMorph (P pos)},
       wp_main_boot_sconf_body m K p0 ps s1entry phystop
-        γd γv cn l0 b0 c0 dk sb nib cov ndisk S Pb Rspent tlbvec0 γi ξd P.
+        γd γv cn l0 b0 c0 γd1 l1 b1 dk sb nib cov ndisk S Pb Rspent tlbvec0 γi ξd P.
 End MAIN.
