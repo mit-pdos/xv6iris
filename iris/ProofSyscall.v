@@ -1059,6 +1059,45 @@ Section SyscallVocab.
     syscall_env γf pj fn -∗ park_token (fcn_procs fn).
   Proof. by iIntros "(_ & _ & _ & _ & _ & $)". Qed.
 
+  (* ...and the `.data` SNAPSHOT OF uarts[], off that same world.  Since
+     163d39b the console driver LOADS its MMIO base out of [uarts[i].base]
+     instead of spelling it as a constant, so [SpecFilewrite]'s
+     [filewrite_dev_caps] carries [UartsFields.uarts_pinned] and the FD_DEVICE
+     arm below has to supply it.  It is genuinely absent from filewrite's own
+     context ([kernel_text]/[kernel_data] do not cover `.data`, and
+     [panic_env]'s [prputc_env] carries [uart_base_word Uart1] -- wrong tier
+     AND wrong port), and it is already here: [park_world]'s LAST conjunct is
+     [SpecDevintr.uart1_caps] spelled out, whose first row IS the snapshot.
+     Persistent, so the projection costs nothing and no arm's pattern moves. *)
+  Lemma syscall_env_uarts_pinned (γf : gname) (pj : mword 64)
+ (fn : fclose_names) :
+    syscall_env γf pj fn -∗ UartsFields.uarts_pinned.
+  Proof.
+    iIntros "Henv".
+    iDestruct (syscall_env_world with "Henv") as (γtl pd pav pu)
+      "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Hu1)".
+    iDestruct "Hu1" as (γu1) "(#Hpin & _ & _ & _)". iExact "Hpin".
+  Qed.
+
+  (* ...and THE CONSOLE'S TRANSMIT LOCK, off that same world.  It used to be
+     taken out of [printk_env]'s own existential, and at 163d39b it is not
+     there any more: printk drives the SECOND port, so [SpecPrintk.printk_env]
+     is pr.lock plus [SpecPrputc.prputc_env] (UART1's triple) and carries no
+     console row at all.  [SpecConsoleintr.console_caps] is where the console
+     [is_txlock] lives, and [park_world] has carried it all along -- second
+     conjunct -- so the arm below reads it from there instead.  The gname is
+     existential exactly as it was before: [fwrite_names] closes over it and
+     nothing outside this arm has to agree about which one it is. *)
+  Lemma syscall_env_txlock (γf : gname) (pj : mword 64)
+ (fn : fclose_names) :
+    syscall_env γf pj fn -∗ ∃ γtx : gname, is_txlock γtx (fsc_uart).
+  Proof.
+    iIntros "Henv".
+    iDestruct (syscall_env_world with "Henv") as (γtl pd pav pu) "(_ & #Hcc & _)".
+    iDestruct "Hcc" as (γtx γc cn) "(#Htx & _)".
+    iExists γtx. iExact "Htx".
+  Qed.
+
   (* ...and the OLD shape, as a projection.  Same reason [sysc_fs_env_all]
      keeps its order: an arm's [iDestruct] pattern is an interface, and
      re-shuffling eleven of them by hand is the kind of edit that compiles
@@ -5476,22 +5515,26 @@ Section SyscallArms.
     (* filewrite's FD_INODE arm is the whole log cone, so it wants all THREE
        block slots -- unlike fstat/read, which take one and hand it back. *)
     (* filewrite's DEVICE arm wants the TX lock, not the cons lock --
-       consolewrite drives the UART -- so what is destructed here is
-       [printk_env]'s own existential.  The console table still comes from
-       [console_ready_app], but without its gname: the write column does not
-       mention it. *)
+       consolewrite drives the UART -- and since 163d39b that lock is NOT in
+       [printk_env] any more (printk moved to UART1), so it comes off the
+       park's world instead: see [syscall_env_txlock].  The console table
+       still comes from [console_ready_app], but without its gname: the write
+       column does not mention it. *)
     iDestruct (syscall_env_console with "Henvc") as "#Hcr".
     iPoseProof (SpecFileread.console_ready_app_devsw with "Hcr") as "#Htbl".
-    iDestruct "Hpe" as "(_ & _ & _ & Hxl & _)".
-    iDestruct "Hxl" as (γtxl) "#Htx".
+    iDestruct (syscall_env_txlock with "Henvc") as (γtxl) "#Htx".
     (* the ambient log, named: filewrite's FD_INODE arm write-locks inside
        its own transaction and the escrow parks at [icfg_log] (durable-disk
        B''-tx).  [sysc_proc_ties] has said so all along. *)
     iDestruct (sysc_fs_env_ties with "Hfsenv") as %Twr.
+    (* the third row is the `.data` snapshot uartwrite loads its base from,
+       off the park's world -- see [syscall_env_uarts_pinned]. *)
+    iDestruct (syscall_env_uarts_pinned with "Henvc") as "#Hupin".
     iAssert (SpecFilewrite.filewrite_dev_caps
                (sysc_fwrite_names γtxl γs j γl fn)) as "#Hcaps".
     { rewrite /SpecFilewrite.filewrite_dev_caps /sysc_fwrite_names; cbn.
-      iSplitR; [iExact "Hdevi" | iExact "Htx"]. }
+      iSplitR; [iExact "Hdevi" |].
+      iSplitR; [iExact "Htx" | iExact "Hupin"]. }
     iDestruct (sysc_filewrite_env γf γtxl γs j γl (proc_addr j) fn
                  with "Hdata Htx Hfsenv Hbs") as "Hfse".
     (* ---- THE CALLER'S INPUT IS THE PROCESS'S OWN DEPOSIT ----

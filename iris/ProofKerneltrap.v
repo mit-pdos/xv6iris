@@ -361,7 +361,11 @@ Section ProofKerneltrap.
         (* the proc's lock ghost, and the trap CSRs the crossing carries:
            at [eb = false] yield takes them from US, because there is no
            enabled arm to dismantle. *)
-        iDestruct "Hcaps" as "(#Hdev & #Hccaps & #Hgeom & #Hdisk & #Htimer & #Htick & #Hprocs)".
+        (* EIGHT conjuncts since the bump: devintr_caps gained [uart1_caps].
+           kerneltrap does not use it, but the name must still be consumed --
+           a seven-name pattern binds [Hprocs] to the PAIR and fails five
+           lines later at the yield call, not here. *)
+        iDestruct "Hcaps" as "(#Hdev & #Hccaps & #Hgeom & #Hdisk & #Htimer & #Htick & #Hprocs & _)".
         (* [j < NPROC] and [length γs = NPROC] give a slot ghost for proc j *)
         assert (Hjl : (j < length γs)%nat) by (rewrite Hlen; exact Hj).
         destruct (lookup_lt_is_Some_2 γs j Hjl) as [γl Hgl].
