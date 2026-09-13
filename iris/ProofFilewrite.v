@@ -416,6 +416,7 @@ Require Import SpecIlock SpecIunlock.
 Require Import SpecWritei.
 Require Import WriteiBudget.
 Require Import SpecPipewrite.
+Require Import UartsFields.   (* [uarts_pinned]: the third console credential *)
 Require Import SpecConsolewrite. (* [consolewrite_stack], [cons_sent_cnt] *)
 Require Import ConsoleInv.  (* [NDEV_max], [a_devsw_write] *)
 Require Import SysWriteDefs.  (* [FW_MAX], [wchunks], [wri_pre] *)
@@ -1420,7 +1421,11 @@ Section ProofFilewrite.
     a_devsw_write (dev_major Cf') ↦₈{fwn_dqv fn' (dev_major Cf')}
       fwn_wp fn' (dev_major Cf') ∗
     dev_inv (fsc_uart) (fsc_disk) ∗
-    is_txlock (fwn_txlock fn') (fsc_uart).
+    is_txlock (fwn_txlock fn') (fsc_uart) ∗
+    (* the two immutable [uarts[]] fields consolewrite's callee LOADS its MMIO
+       base out of (XV6_REV 163d39b); the third member of
+       [SpecFilewrite.filewrite_dev_caps], persistent like the other two. *)
+    uarts_pinned.
   Proof.
     intro H. rewrite /filewrite_dev_env /filewrite_dev_caps.
     case_decide as H'; [by iIntros "$"|].
@@ -1439,14 +1444,15 @@ Section ProofFilewrite.
       fwn_wp fn' (dev_major Cf') -∗
     dev_inv (fsc_uart) (fsc_disk) -∗
     is_txlock (fwn_txlock fn') (fsc_uart) -∗
+    uarts_pinned -∗
     filewrite_dev_env fn' (dev_major Cf').
   Proof.
     intro H. rewrite /filewrite_dev_env /filewrite_dev_caps.
     case_decide as H'; last first.
     { exfalso. apply H'. split; [| exact H]. rewrite /dev_major.
       apply (proj1 (bv_unsigned_in_range _ (fc_major Cf'))). }
-    iIntros "%Hd Hc #Hdi #Htx".
-    iSplitR; [iPureIntro; exact Hd |]. iFrame "Hc Hdi Htx".
+    iIntros "%Hd Hc #Hdi #Htx #Hup".
+    iSplitR; [iPureIntro; exact Hd |]. iFrame "Hc Hdi Htx Hup".
   Qed.
 
   (* ---- the FD_INODE arm's environment, opened and closed --------------
@@ -4458,7 +4464,7 @@ Section ProofFilewrite.
                exact (Z.le_lt_trans (bv_unsigned (fc_major Cf)) 9 32768 Hin
                         ltac:(reflexivity)). }
              iDestruct (fw_dev_in fn Cf Hin with "Henv")
-               as "(%Hwp & Hslot & #Hdevinv & #Htxlk)".
+               as "(%Hwp & Hslot & #Hdevinv & #Htxlk & #Hupin)".
              iApply (wp_bltu_fall_s_sconf (mword_of_int (FW + 0x70))
                        (mword_of_int 174 : mword 13) Ra3 Ra4 D4 (K - 12)%nat b
                        ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
@@ -4559,7 +4565,7 @@ Section ProofFilewrite.
                   iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
                 { rewrite HVid. iExact "Hpriv". }
                 { iApply (fw_env_out_dev fn st Cf inumx _ Hok Htyd).
-                  iApply (fw_dev_in_back fn Cf Hin with "[%] Hslot Hdevinv Htxlk").
+                  iApply (fw_dev_in_back fn Cf Hin with "[%] Hslot Hdevinv Htxlk Hupin").
                   by left. }
                 { (* THE NULL SLOT.  At the console the PIN refutes it; at
                      any other major nothing is armed. *)
@@ -4674,7 +4680,7 @@ Section ProofFilewrite.
                           E2 (K - 12)%nat eb pidv U n b lks trs
                           Hj Hgs Hlens HE2a0 HE2a2 (fw_n_range n Hn01)
                           (fw_av_cons K HK) Heb
-                          with "Hcg Hcnt Htext Hpc Hpriv Hkenv Hdevinv Htxlk
+                          with "Hcg Hcnt Htext Hpc Hpriv Hkenv Hdevinv Hupin Htxlk
                                 Hprocs Hseed").
                 all: try lkbelow.
                 (* consolewrite copies FROM user memory, so its post hands
@@ -4734,7 +4740,7 @@ Section ProofFilewrite.
                 { rewrite /file_ref /file_fields.
                   iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
                 { iApply (fw_env_out_dev fn st Cf inumx _ Hok Htyd).
-                  iApply (fw_dev_in_back fn Cf Hin with "[%] Hslot Hdevinv Htxlk").
+                  iApply (fw_dev_in_back fn Cf Hin with "[%] Hslot Hdevinv Htxlk Hupin").
                   by right. }
                 { (* THE COUNT-TO-ARMS BRIDGE.  The FD_DEVICE arm relays [r]
                      untouched, so the located receipt IS the console arm's

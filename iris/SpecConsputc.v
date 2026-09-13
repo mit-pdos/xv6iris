@@ -128,8 +128,12 @@ Definition wp_consputc_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID 
   (consputc_stack <= K)%nat ->
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (* the order premise, at the LOWEST rank this cone touches; every
-     higher one follows by [locks_below_mono]. *)
-  locks_below lks "uart" ->
+     higher one follows by [locks_below_mono].  [uart_lock_name Uart0] --
+     the single "uart" left LockRank at 163d39b (there are two transmit
+     locks now), and naming a rank that is not in the table makes this
+     premise UNSATISFIABLE rather than merely wrong: [lock_rank] returns 0
+     and no caller holding any lock can discharge it. *)
+  locks_below lks "uart0" ->
   sie_cap_gpr kt m0 K b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
