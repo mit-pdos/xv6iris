@@ -29,6 +29,12 @@ def devSig : DevId → DevSig
 
 /-- Device `d`'s local state type. -/
 abbrev DevSt (d : DevId) : Type := (devSig d).S
+instance (d : DevId) : Inhabited (DevSt d) :=
+  match d with
+  | .uart _ => ⟨Uart.reset⟩
+  | .plic => ⟨Plic.reset⟩
+  | .virtio => ⟨Virtio.initial (fun _ => 0#8)⟩
+
 /-- Device `d`'s task names. -/
 abbrev DevTask (d : DevId) : Type := (devSig d).T
 /-- Device `d`'s programs. -/

@@ -750,6 +750,13 @@ def devFragAt [MachFixedGS hlc GF] (E : EraGS GF) (d : DevId) (s : DevSt d) : IP
 def devInterpAt [MachFixedGS hlc GF] (E : EraGS GF) (ds : DevStates) : IProp GF := iprop%
   [∗list] d ∈ DevId.all, devAuthAt E d (ds.st d)
 
+instance [MachFixedGS hlc GF] (E : EraGS GF) (d : DevId) (s : DevSt d) :
+    Timeless (PROP := IProp GF) (devAuthAt E d s) := by
+  unfold devAuthAt; infer_instance
+instance [MachFixedGS hlc GF] (E : EraGS GF) (d : DevId) (s : DevSt d) :
+    Timeless (PROP := IProp GF) (devFragAt E d s) := by
+  unfold devFragAt; infer_instance
+
 theorem devAgreeAt [MachFixedGS hlc GF] (E : EraGS GF) (d : DevId) (s s' : DevSt d) :
     devAuthAt E d s ∗ devFragAt E d s' ⊢@{IProp GF} ⌜s' = s⌝ := by
   unfold devAuthAt devFragAt
