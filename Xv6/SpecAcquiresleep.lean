@@ -109,4 +109,47 @@ theorem ACQUIRESLEEP.wp_acquiresleep (A : ACQUIRESLEEP) {hlc : HasLC} {GF : Bund
   unfold slUntracked
   iempintro
 
+/-! ## The NON-BLOCKING nested contract (Rocq `wp_acquiresleep_nb_body`)
+
+A BLOCKING `acquiresleep`'s wait loop reaches `sleep_prepare`, which
+acquires `p->lock`; a caller that already holds a spinlock (`iput` holds
+`itable`) cannot park there.  Here the caller instead presents
+`slhAuth γt none`, the AUTHORITATIVE ZERO of the object's outstanding-share
+count: no share of the "may hold this lock" right exists anywhere, so no
+deposit sits in the lock, so the `lk->locked != 0` arm of the payload is
+REFUTED at the leaf that reads the word.  The loop is not proved, it is
+unreachable, so no sleep resources appear: what is left is the prologue,
+the entry `acquire`, the two stores and the interior `release`, at
+whatever depth the caller is (`k.noff + 2` for the nested `myproc`).
+
+The deposit this call makes is minted from the zero on the way in, so the
+caller leaves with `slhAuth γt (some q)` beside its holder token;
+`slh_return_last` turns that back into the zero once `releasesleep`
+returns the share.  THIS IS THE ONLY WAY TO TAKE A SLEEPLOCK WITH A
+SPINLOCK HELD. -/
+def wp_acquiresleep_nb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [SleepLockG GF]
+    [CurCtx]
+    (cpu : CPU) (k : KCtx) (γl γ γt : GName) (R : CtxId → IProp GF) [CtxMorph R] (q : Qp)
+    (pid : BitVec 32) (dqp : DFrac)
+    (hK : acquiresleepSlots ≤ k.avail) (hsie : k.sie = false) (hnoff : k.noff + 2 < 2 ^ 31)
+    (hs : "sleep lock" ∉ k.locks) (htier : k.tier = KTier.kpt) : Prop :=
+  kctx cpu k ∗ pcIs cpu acquiresleepAddr ∗
+  isSleeplockTok γl γ γt (k.regs 10#5) R ∗ slhAuth γt none ∗
+  wordPointsTo (pPid k.proc) 4 dqp pid ∗
+  wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
+    ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
+    kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+    ⌜calleeSaved k.regs R'⌝ -∗
+    sleeplockedQ γ q (k.regs 10#5) pid -∗ slhAuth γt (some q) -∗ R curCtx -∗
+    wordPointsTo (pPid k.proc) 4 dqp pid -∗ wpLoop cpu'))
+  ⊢ wpLoop (GF := GF) cpu
+
+/-- The non-blocking interface of `acquiresleep`. -/
+structure ACQUIRESLEEP_NB : Prop where
+  wp_acquiresleep_nb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [SleepLockG GF]
+    [CurCtx]
+    (cpu : CPU) (k : KCtx) (γl γ γt : GName) (R : CtxId → IProp GF) [CtxMorph R] (q : Qp)
+    (pid : BitVec 32) (dqp : DFrac) hK hsie hnoff hs htier,
+    wp_acquiresleep_nb_body (hlc := hlc) (GF := GF) cpu k γl γ γt R q pid dqp hK hsie hnoff hs htier
+
 end Xv6

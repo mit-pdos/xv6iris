@@ -807,4 +807,288 @@ theorem acquiresleep_proof (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (SP : SLE
   case hKa => k_norm_g; unfold acquiresleepSlots sleepSlots at hK; omega
   case hla => k_norm_g; rw [hlocks]; decide⟩
 
+
+/-! ## The NON-BLOCKING contract (`ACQUIRESLEEP_NB`)
+
+The caller presents `slhAuth γt none`, the authoritative zero of the
+object's outstanding-share count, so the `lk->locked != 0` arm of the
+payload -- which would have to exhibit a share -- is refuted at the leaf
+that reads the word: the wait loop is unreachable.  What is left is the
+prologue, the entry `acquire`, the two stores, the interior `release` and
+the epilogue, at whatever depth the caller is. -/
+
+theorem asl_filter_nb (l : List String) (h : "sleep lock" ∉ l) :
+    ("sleep lock" :: l).filter (fun x => x ≠ "sleep lock") = l := by
+  rw [List.filter_cons_of_neg (by simp)]
+  exact List.filter_eq_self.2 (fun x hx => by simp; intro e; subst e; exact h hx)
+
+theorem asl_withLocks_nb (k : KCtx) (m : Nat) (a b : Bool) :
+    ((k.pushed m).withSpie a b).withLocks k.locks = (k.pushed m).withSpie a b := rfl
+
+theorem asl_pushed_spie_nb (k : KCtx) (m : Nat) :
+    (k.pushed m).withSpie k.spie k.spp = k.pushed m := rfl
+
+theorem asl_withSpie_self_nb (k : KCtx) : k.withSpie k.spie k.spp = k := rfl
+
+section
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [SleepLockG GF] [X : CurCtx]
+
+/-- The non-blocking specification's post, as a λ over the returning hart. -/
+def aslPostNb (k : KCtx) (γ γt : GName) (Rp : CtxId → IProp GF) (q : Qp) (slk : BitVec 64)
+    (pid : BitVec 32) (dqp : DFrac) : CPU → IProp GF := fun cpu' => iprop(
+  ∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
+    ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
+    kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+    ⌜calleeSaved k.regs R'⌝ -∗
+    sleeplockedQ γ q slk pid -∗ slhAuth γt (some q) -∗ Rp curCtx -∗
+    wordPointsTo (pPid k.proc) 4 dqp pid -∗ wpLoop cpu')
+
+theorem aslPostNb_of_spec (cpu : CPU) (k : KCtx) (γ γt : GName) (Rp : CtxId → IProp GF) (q : Qp)
+    (slk : BitVec 64) (pid : BitVec 32) (dqp : DFrac) :
+    wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
+      ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
+      kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+      ⌜calleeSaved k.regs R'⌝ -∗
+      sleeplockedQ γ q slk pid -∗ slhAuth γt (some q) -∗ Rp curCtx -∗
+      wordPointsTo (pPid k.proc) 4 dqp pid -∗ wpLoop cpu'))
+    ⊢ wpNext k.sie k.proc cpu (aslPostNb (GF := GF) k γ γt Rp q slk pid dqp) := by
+  unfold aslPostNb; iintro H; iexact H
+
+theorem aslPostNb_elim (c : CPU) (k : KCtx) (γ γt : GName) (Rp : CtxId → IProp GF) (q : Qp)
+    (slk : BitVec 64) (pid : BitVec 32) (dqp : DFrac) :
+    aslPostNb (GF := GF) k γ γt Rp q slk pid dqp c ⊢
+    ∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
+      ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
+      kctx c ((k.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k.regs 1#5)) -∗
+      ⌜calleeSaved k.regs R'⌝ -∗
+      sleeplockedQ γ q slk pid -∗ slhAuth γt (some q) -∗ Rp curCtx -∗
+      wordPointsTo (pPid k.proc) 4 dqp pid -∗ wpLoop c := by
+  unfold aslPostNb; iintro H; iexact H
+
+/-- The returning context, in the post's `withSpie` shape. -/
+theorem asl_kctx_spie_nb (cpu : CPU) (k : KCtx) (R : RegMap) :
+    kctx (GF := GF) cpu (k.withRegs R) ⊢ kctx cpu ((k.withSpie k.spie k.spp).withRegs R) := by
+  simp only [asl_withSpie_self_nb]
+  iintro H; iexact H
+
+set_option maxHeartbeats 8000000 in
+/-- From `0x80003ff6` at a GENERIC base (any depth, any lock set without
+"sleep lock"), with the inner lock held and its payload OPEN in the FREE
+state: mint the deposit out of the authoritative zero, `lk->locked = 1`,
+`lk->pid = myproc()->pid`, `release(&lk->lk)`, the epilogue. -/
+theorem asl_exit_nb (RE : RELEASE) (MP : MYPROC) (cpu : CPU) (k : KCtx)
+    (γl γ γt : GName) (Rp : CtxId → IProp GF) [CtxMorph Rp] (q q0 : Qp)
+    (slk : BitVec 64) (pid : BitVec 32) (dqp : DFrac)
+    (hwf : k.wf) (hsie : k.sie = false) (hnoff : k.noff + 2 < 2 ^ 31)
+    (hs : "sleep lock" ∉ k.locks) (hK : acquiresleepSlots ≤ k.avail)
+    (vln vn : BitVec 64) (Rl : RegMap) (hpre : aslPre k slk Rl) :
+    kctx cpu ((((k.pushed 4).pushOffAt k.spie k.spp).withLocks ("sleep lock" :: k.locks)).withRegs Rl) ∗
+    pcIs cpu 0x80003ff6#64 ∗
+    isLock γl (slk + 8#64) "sleep lock" (slBody γ slk Rp (slhTok γt)) ∗ locked γl cpu ∗
+    wordPointsTo (slLk slk + 8#64) 8 (DFrac.own 1) vln ∗
+    wordPointsTo (slNameField slk) 8 (DFrac.own 1) vn ∗
+    wordPointsTo slk 4 (DFrac.own 1) 0#32 ∗
+    sleeplockedQ γ q0 slk 0#32 ∗ slHauth γ q0 ∗ Rp curCtx ∗ slhAuth γt none ∗
+    frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
+    wordPointsTo (pPid k.proc) 4 dqp pid ∗
+    wpNext false k.proc cpu (aslPostNb k γ γt Rp q slk pid dqp)
+    ⊢ wpLoop (GF := GF) cpu := by
+  obtain ⟨p2, p8, p9, p18, p19, p20, p21, p22, p23, p24, p25, p26, p27⟩ := id hpre
+  have hK4 : 4 ≤ k.avail := by unfold acquiresleepSlots sleepSlots at hK; omega
+  iintro ⟨Hk, Hpc, #Hlk, Hlocked, Hvln, Hvn, Hw, Hfree, Hauth, HR, Hcnt, Hframe, Hpid, HΦ⟩
+  icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
+  -- the ghost steps: retarget the idle holder pair, and mint the deposit
+  iapply wpLoop_bupd
+  imod slFree_retarget γ slk q0 q $$ [Hfree Hauth] with ⟨Hfree, Hauth⟩
+  · iframe
+  imod slh_mint_none γt q $$ Hcnt with ⟨Hcnt, Htok⟩
+  imodintro
+  -- c.li a5,1 ; c.sw a5,0(s1)
+  k_step (wp_s_addi cpu _ 0x80003ff6#64 true 1#12 15#5 0#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_zero]
+  iintro Hk Hpc
+  k_step (wp_s_sw cpu _ 0x80003ff8#64 true 0#12 9#5 15#5 (by decide) 0#32)
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [p9, asl_add0, asl_ext_one]
+  iintro Hk Hpc Hw
+  -- jal myproc
+  k_step (wp_s_jal cpu _ 0x80003ffa#64 false 2087136#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  iintro Hk Hpc
+  iapply (asl_myproc MP cpu _ ?hnm ?hKm) $$ [- $Hk $Hpc]
+  rotate_right 1
+  · k_norm_g [aslj_3ffe]
+    iapply wpNext_off_intro
+    iintro %spieM %sppM %RM %hspM Hk Hpc %⟨hcsM, hM10⟩
+    icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
+    k_norm_g at hspM
+    obtain ⟨e1, e2⟩ := hspM trivial
+    subst spieM; subst sppM
+    k_norm_g [asl_withSpie_sec]
+    k_norm_g at hM10
+    have hpreM : aslPre k slk RM := aslPre_cs k slk _ RM
+      (by unfold aslPre at hpre ⊢
+          simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hpre) hcsM
+    obtain ⟨m2, m8, m9, m18, m19, m20, m21, m22, m23, m24, m25, m26, m27⟩ := id hpreM
+    -- c.lw a5,48(a0) : the caller's pid
+    ihave Hpid := (show wordPointsTo (GF := GF) (pPid k.proc) 4 dqp pid ⊢
+        wordPointsTo (k.proc + 48#64) 4 dqp pid from by unfold pPid; iintro H; iexact H) $$ Hpid
+    k_step (wp_s_lw cpu _ 0x80003ffe#64 true 48#12 15#5 10#5 (by decide) (by decide) dqp pid)
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hM10]
+    iintro Hk Hpc Hpid
+    ihave Hpid := (show wordPointsTo (GF := GF) (k.proc + 48#64) 4 dqp pid ⊢
+        wordPointsTo (pPid k.proc) 4 dqp pid from by unfold pPid; iintro H; iexact H) $$ Hpid
+    -- c.sw a5,40(s1) : into the lock's pid field
+    icases sleeplockedQ_elim γ q slk 0#32 $$ Hfree with ⟨Htk, Hlkpid⟩
+    ihave Hlkpid := (show wordPointsTo (GF := GF) (slPid slk) 4 (DFrac.own 1) 0#32 ⊢
+        wordPointsTo (slk + 40#64) 4 (DFrac.own 1) 0#32 from by
+      unfold slPid; iintro H; iexact H) $$ Hlkpid
+    k_step (wp_s_sw cpu _ 0x80004000#64 true 40#12 9#5 15#5 (by decide) 0#32)
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [m9, asl_ext_sext]
+    iintro Hk Hpc Hlkpid
+    ihave Hlkpid := (show wordPointsTo (GF := GF) (slk + 40#64) 4 (DFrac.own 1) pid ⊢
+        wordPointsTo (slPid slk) 4 (DFrac.own 1) pid from by
+      unfold slPid; iintro H; iexact H) $$ Hlkpid
+    ihave Hheld := sleeplockedQ_intro γ q slk pid $$ [Htk Hlkpid]
+    case' _ => iframe
+    -- the payload, closed in the HELD state, over the minted deposit
+    ihave Hpay := slBody_intro_held γ slk Rp (slhTok γt) 1#32 vln vn q (by decide)
+      $$ [Hvln Hvn Hw Hauth Htok]
+    case' _ => iframe
+    -- c.mv a0,s2 ; jal release
+    k_step (wp_s_add cpu _ 0x80004002#64 true 10#5 0#5 18#5 (by decide))
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [m18]
+    iintro Hk Hpc
+    k_step (wp_s_jal cpu _ 0x80004004#64 false 2083902#21 1#5 (by decide))
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    iintro Hk Hpc
+    iapply (asl_release RE cpu _ γl (slk + 8#64) (slBody γ slk Rp (slhTok γt)) ?ha0 ?hsr ?hnr
+        ?hKr false ?hrr ?hor) $$ [- $Hk $Hpc $Hlk $Hlocked $Hpay]
+    rotate_right 1
+    · isplitl []
+      · iempintro
+      k_norm_g [hsie, asl_popExit_off (k.pushed 4) k.spie k.spp hwf hsie, asl_filter_nb k.locks hs,
+        aslj_4008, asl_withSpie_sec, asl_withLocks_nb k 4 k.spie k.spp, asl_pushed_spie_nb k 4]
+      iapply wpNext_off_intro
+      iintro %R5 Hk Hpc %hcs5
+      icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
+      k_norm_g
+      have hpre5 : aslPre k slk R5 := aslPre_cs k slk _ R5
+        (by unfold aslPre at hpreM ⊢
+            simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hpreM) hcs5
+      obtain ⟨e2, e8, e9, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩ := id hpre5
+      -- the epilogue
+      iapply (wp_epilogue4s2_gen cpu k 0x80004008#64 hK4 R5 e2
+          (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5)) $$ [- $Hk $Hpc $Hframe]
+      k_code (text_instr _ _ _ _ rfl rfl) Htext
+      k_norm_g [hsie]
+      iframe
+      inext
+      iapply wpNext_off_intro
+      iintro Hk Hpc
+      ihave HΦ := wpNext_off k.proc cpu (aslPostNb k γ γt Rp q slk pid dqp) $$ HΦ
+      ihave HΦ := aslPostNb_elim cpu k γ γt Rp q slk pid dqp $$ HΦ
+      k_norm_g
+      ihave Hk := asl_kctx_spie_nb cpu k _ $$ Hk
+      iapply HΦ $$ %(k.spie) %(k.spp) %_ %(fun _ => ⟨rfl, rfl⟩) Hk Hpc [] Hheld Hcnt HR Hpid
+      ipureintro
+      exact asl_calleeSaved_mk k.regs R5 e19 e20 e21 e22 e23 e24 e25 e26 e27
+    case ha0 => k_norm_g [m18]
+    case hsr => k_norm_g
+    case hnr => k_norm_g; omega
+    case hKr => k_norm_g; unfold acquiresleepSlots sleepSlots at hK; omega
+    case hrr => k_norm_g; rw [← hsie]; exact KCtx.reen_of_wf k hwf
+    case hor => simp
+  case hnm => k_norm_g; omega
+  case hKm => k_norm_g; unfold acquiresleepSlots sleepSlots at hK; omega
+
+end
+
+/-! ## The non-blocking function -/
+
+set_option maxHeartbeats 32000000 in
+set_option maxRecDepth 20000 in
+/-- **`acquiresleep` meets its non-blocking specification.** -/
+theorem acquiresleep_nb_proof (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) : ACQUIRESLEEP_NB := ⟨
+  fun {hlc GF} _ _ _ X cpu k γl γ γt Rp _ q pid dqp hK hsie hnoff hs htier => by
+  obtain ⟨ξ0, t0⟩ := X
+  letI : CurCtx := ⟨ξ0, t0⟩
+  unfold wp_acquiresleep_nb_body
+  simp only [acquiresleepAddr, KernelSyms.«acquiresleep»]
+  iintro ⟨Hk, Hpc, #Hsl, Hcnt, Hpid, HΦ⟩
+  icases kctx_tier cpu k $$ Hk with ⟨%hct, Hk⟩
+  have ht0 : t0 = KTier.kpt := hct.symm.trans htier
+  subst ht0
+  icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
+  icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
+  have hK4 : 4 ≤ k.avail := by unfold acquiresleepSlots sleepSlots at hK; omega
+  ihave #Hlk := (show isSleeplockTok (GF := GF) γl γ γt (k.regs 10#5) Rp
+      ⊢ isLock γl (k.regs 10#5 + 8#64) "sleep lock" (slBody γ (k.regs 10#5) Rp (slhTok γt)) from by
+    unfold isSleeplockTok isSleeplockGen slLk; iintro H; iexact H) $$ Hsl
+  ihave HΦ := aslPostNb_of_spec cpu k γ γt Rp q (k.regs 10#5) pid dqp $$ HΦ
+  -- the prologue
+  iapply (wp_prologue4s2_gen cpu k 0x80003fc0#64 hK4)
+  k_code (text_instr _ _ _ _ rfl rfl) Htext
+  k_norm_g [hsie]
+  iframe
+  inext
+  iapply wpNext_off_intro
+  iintro Hk Hpc Hframe
+  -- c.mv s1,a0 ; addi s2,a0,8 ; c.mv a0,s2 ; jal acquire(&lk->lk)
+  k_step (wp_s_add cpu _ 0x80003fcc#64 true 9#5 0#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  iintro Hk Hpc
+  k_step (wp_s_addi cpu _ 0x80003fce#64 false 8#12 18#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  iintro Hk Hpc
+  k_step (wp_s_add cpu _ 0x80003fd2#64 true 10#5 0#5 18#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  iintro Hk Hpc
+  k_step (wp_s_jal cpu _ 0x80003fd4#64 false 2083814#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  iintro Hk Hpc
+  iapply (asl_acquire AC cpu _ γl (k.regs 10#5 + 8#64) (slBody γ (k.regs 10#5) Rp (slhTok γt))
+      ?ha0a ?hna ?hKa ?hla) $$ [- $Hk $Hpc $Hlk]
+  rotate_right 1
+  · k_norm_g [hsie]
+    iapply wpNext_off_intro
+    iintro %spieA %sppA %RA %hspA Hk Hpc %hcsA Hlocked Hpay _ Harm
+    icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
+    k_norm_g at hspA
+    obtain ⟨e1, e2⟩ := hspA trivial
+    subst spieA; subst sppA
+    k_norm_g [aslj_3fd8, KCtx.pushOffAt_withRegs, KCtx.withRegs_withLocks,
+      KCtx.withRegs_withRegs]
+    unfold calleeSaved at hcsA
+    k_norm_g at hcsA
+    obtain ⟨c2, c8, c9, c18, c19, c20, c21, c22, c23, c24, c25, c26, c27⟩ := hcsA
+    -- lw a5,0(s1) : the `locked` word, out of the payload
+    icases slBody_elim γ (k.regs 10#5) Rp (slhTok γt) $$ Hpay with ⟨%v, %vln, %vn, Hvln, Hvn, Hw,
+      ⟨%hv0, ⟨%q0, Hfree, Hauth⟩, HR⟩ | ⟨%hvn, Hdep⟩⟩
+    · -- FREE: `beqz` jumps straight to the store path
+      subst hv0
+      k_step (wp_s_lw cpu _ 0x80003fd8#64 true 0#12 15#5 9#5 (by decide) (by decide)
+          (DFrac.own 1) 0#32)
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [c9, asl_add0]
+      iintro Hk Hpc Hw
+      k_step (wp_s_branch cpu _ 0x80003fda#64 true 28#13 15#5 0#5 (by decide) bop.BEQ)
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [asl_beq_z, asl_beq_zz]
+      iintro Hk Hpc
+      k_norm_g
+      iapply (asl_exit_nb RE MP cpu k γl γ γt Rp q q0 (k.regs 10#5) pid dqp hwf hsie hnoff hs hK
+          vln vn _
+          (by unfold aslPre
+              simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
+              exact ⟨c2, c8, c9, c18, c19, c20, c21, c22, c23, c24, c25, c26, c27⟩))
+        $$ [- $Hk $Hpc $Hlk $Hlocked $Hvln $Hvn $Hw $Hfree $Hauth $HR $Hcnt $Hframe $Hpid $HΦ]
+    · -- HELD: REFUTED -- the deposit would be a share of the authoritative zero
+      iexfalso
+      icases (show slDep (GF := GF) γ (slhTok γt) ⊢ ∃ q' : Qp, slHauth γ q' ∗ slhTok γt q' from by
+        unfold slDep; iintro H; iexact H) $$ Hdep with ⟨%q1, Ha1, Htok1⟩
+      iapply slhAuth_none_no_tok γt q1 $$ [Hcnt Htok1]
+      iframe
+  case ha0a => k_norm_g
+  case hna => k_norm_g; omega
+  case hKa => k_norm_g; unfold acquiresleepSlots sleepSlots at hK; omega
+  case hla => k_norm_g; exact hs⟩
+
 end Xv6
