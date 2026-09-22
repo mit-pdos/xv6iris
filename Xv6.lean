@@ -238,6 +238,10 @@ import Xv6.TicksDefs
 import Xv6.SpecArgaddr
 import Xv6.SpecSysWait
 import Xv6.SpecSysPause
+import Xv6.SleepLockDefs
+import Xv6.SpecAcquiresleep
+import Xv6.SpecReleasesleep
+import Xv6.SpecHoldingsleep
 import Xv6.SpecKfork
 import Xv6.SpecUserinit
 import Xv6.SpecEither
@@ -309,3 +313,9 @@ import Xv6.ProofKfork
 import Xv6.LinkKfork
 import Xv6.ProofSysPause
 import Xv6.LinkSysPause
+import Xv6.ProofAcquiresleep
+import Xv6.LinkAcquiresleep
+import Xv6.ProofReleasesleep
+import Xv6.LinkReleasesleep
+import Xv6.ProofHoldingsleep
+import Xv6.LinkHoldingsleep
