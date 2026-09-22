@@ -66,8 +66,8 @@ theorem memModel_dropResv (σ : MState) (cpu : CPU) (r : Option Resv) (b : Bool)
   · rw [BigSepL.bigSepL_eq (fun {_ c} _ => hartViews_dropResv E σ cpu c)]
     iexact Hviews
   · ipureintro
-    obtain ⟨h1, h2, h3⟩ := hmm
-    refine ⟨h1, h2, fun c r hr => ?_⟩
+    obtain ⟨h1, h2, h3, h4⟩ := hmm
+    refine ⟨h1, h2, fun c r hr => ?_, h4⟩
     simp only [updCpu] at hr
     split at hr
     · cases hr
@@ -109,8 +109,8 @@ theorem memModel_read_excl (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w :
       simp only [MState.afterExcl, updCpu, if_true, HRead.afterExcl]
       iframe Hv Hi Hr
   · ipureintro
-    obtain ⟨h1, h2, h3⟩ := hmm
-    refine ⟨h1, fun c => ?_, fun c r hr => ?_⟩
+    obtain ⟨h1, h2, h3, h4⟩ := hmm
+    refine ⟨h1, fun c => ?_, fun c r hr => ?_, h4⟩
     · obtain ⟨a1, a2, a3, a4⟩ := h2 c
       simp only [MState.top] at *
       by_cases hc : c = cpu
@@ -168,7 +168,7 @@ theorem hartViews_store_excl (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w
 reservation and the acquire bit; an acquire pair's floor passes its own
 append). -/
 theorem memModel_store_excl (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
-    (r : Resv) (acq : Bool) (hno : ¬ othersReserve σ.resv cpu pa n) :
+    (r : Resv) (acq : Bool) (hram : ramBytes pa n) (hno : ¬ othersReserve σ.resv cpu pa n) :
     memModelAt E σ ∗ resvFragAt E cpu (some r) acq ⊢@{IProp GF} |==>
       (memModelAt E (σ.store cpu pa n w true) ∗ resvFragAt E cpu none false ∗
        authoredByAt E (σ.top + 1) (hartAgent cpu) ∗ topLbAt E (σ.top + 1) ∗
@@ -210,7 +210,7 @@ theorem memModel_store_excl (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w 
         simp only [updCpu, if_true, HRead.clearAcq, Bool.true_and, hres.2]
         iframe Hv Hi Hr
     · ipureintro
-      exact mmOk_store σ cpu pa n w true hno hmm
+      exact mmOk_store σ cpu pa n w true hram hno hmm
   · isplit
     · unfold authoredByAt; iexact Hau
     isplit
@@ -499,17 +499,20 @@ theorem swp_sail_mem_read_plain_au (cpu : CPU) {n vasize : Nat}
     intro p hp j hj e he het
     exact histOk_author_eq σ.log (Hs j) (hmm.1 _ _ (hget j hj)) e he p.1 p.2
       (hau p hp).1 (hau p hp).2 het
+  have hram : ramBytes req.pa n := ramBytes_of_cells hmm.2.2.2 (fun j hj => ⟨Hs j, hget j hj⟩)
   imodintro
   isplit
   · ipureintro
     obtain ⟨w, hw⟩ := exists_read_top σ (hartAgent cpu) req.pa n Hs hmm hget hne
-    refine ⟨.Ok (w, none), σ.afterLoad cpu req.pa n σ.top, Or.inr (Or.inl
-      ⟨hk, σ.top, w, (hmm.2.1 cpu).1, le_refl _, ?_, hw, rfl, rfl⟩)⟩
+    refine ⟨.Ok (w, none), σ.afterLoad cpu req.pa n σ.top, Or.inr (Or.inr (Or.inl
+      ⟨hram, hk, σ.top, w, (hmm.2.1 cpu).1, le_refl _, ?_, hw, rfl, rfl⟩))⟩
     intro j _
     exact (hmm.2.1 cpu).2.2.2 _
   inext
   iintro %v' %σ' %Hev
-  rcases Hev with ⟨hif, _⟩ | ⟨_, tvn, w', htv, htop, _, hrd', rfl, rfl⟩ | ⟨hex', _⟩
+  rcases Hev with ⟨hdev, w₀, ds₀, hdr, _, _⟩ | ⟨_, hif, _⟩ |
+    ⟨_, _, tvn, w', htv, htop, _, hrd', rfl, rfl⟩ | ⟨_, hex', _⟩
+  · exact absurd hdev (not_devBytes_of_ramBytes hram (devRead_pos hdr))
   · rw [hk'.1] at hif
     exact absurd hif (by decide)
   · imod memModel_load _ σ cpu req.pa n tvn htop $$ Hmm with Hmm
@@ -522,7 +525,7 @@ theorem swp_sail_mem_read_plain_au (cpu : CPU) {n vasize : Nat}
     imod Hcont $$ %w' %tvn %(by omega) %hreads %hauthors Hb with HΦ
     imodintro
     isplitl [Hregs Hmem Hmm Hclose]
-    · iapply Hclose $$ %(σ.afterLoad cpu req.pa n tvn) %(fun _ _ => rfl) Hregs Hmem Hmm
+    · iapply Hclose $$ %(σ.afterLoad cpu req.pa n tvn) %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
     · iapply swp_ret
       iexact HΦ
   · rw [hk'.2] at hex'
@@ -544,6 +547,8 @@ theorem swp_sail_mem_write_plain_au (cpu : CPU) {n vasize : Nat}
   iapply swp_event_step cpu (.memWrite n vasize req) (fun v => FreeM.pure v) Φ
   iintro %σ Hσ
   icases machInterp_acc_mem σ cpu $$ Hσ with ⟨Hregs, Hmem, Hmm, Hclose⟩
+  ihave %hmm : ⌜mmOk σ⌝ $$ [Hmm]
+  · iapply memModel_mmOk $$ Hmm
   by_cases hno : othersReserve σ.resv cpu req.pa n
   · -- blocked: retry
     iapply fupd_mask_intro LawfulSet.empty_subset
@@ -555,36 +560,42 @@ theorem swp_sail_mem_write_plain_au (cpu : CPU) {n vasize : Nat}
     iintro %σ'
     isplit
     · iintro %v %Hev
-      obtain ⟨_, _, hno', _, _⟩ := Hev
-      exact absurd hno hno'
+      rcases Hev with ⟨hdev, _⟩ | ⟨_, _, _, hno', _, _⟩
+      · exact absurd hdev (not_devBytes_of_othersReserve hmm.2.2.1 hmm.2.2.2 hno)
+      · exact absurd hno hno'
     · iintro %Hbk
       obtain ⟨_, hσ⟩ := Hbk
       subst σ'
       imod Hmask
       imodintro
       isplitl [Hregs Hmem Hmm Hclose]
-      · iapply Hclose $$ %σ %(fun _ _ => rfl) Hregs Hmem Hmm
+      · iapply Hclose $$ %σ %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
       · iapply IH $$ Hfrag H
   · imod H with ⟨%Hs, Hb, Hcont⟩
+    ihave %hget : ⌜histsAt σ.mem req.pa n Hs⌝ $$ [Hmem Hb]
+    · iapply histBytes_valid σ.mem req.pa n _ Hs $$ [Hmem Hb]
+      iframe
+    have hram : ramBytes req.pa n := ramBytes_of_cells hmm.2.2.2 (fun j hj => ⟨Hs j, hget j hj⟩)
     imodintro
     isplit
     · ipureintro
-      exact Or.inl ⟨.Ok (some true), _, w', hv, hno, rfl, rfl⟩
+      exact Or.inl ⟨.Ok (some true), _, Or.inr ⟨hram, w', hv, hno, rfl, rfl⟩⟩
     inext
     iintro %σ'
     isplit
     · iintro %v %Hev
-      obtain ⟨w'', hv', _, rfl, rfl⟩ := Hev
+      rcases Hev with ⟨hdev, w₀, ds₀, _, hdw, _, _⟩ | ⟨_, w'', hv', _, rfl, rfl⟩
+      · exact absurd hdev (not_devBytes_of_ramBytes hram (devWrite_pos hdw))
       rw [hv] at hv'
       obtain rfl := Option.some.inj hv'
-      imod memModel_store_plain _ σ cpu req.pa n w' r hno $$ [$Hmm $Hfrag] with ⟨Hmm, Hfrag, #Hau, #Htop'⟩
+      imod memModel_store_plain _ σ cpu req.pa n w' r hram hno $$ [$Hmm $Hfrag] with ⟨Hmm, Hfrag, #Hau, #Htop'⟩
       imod histBytes_update σ.mem req.pa n Hs (σ.top + 1) (hartAgent cpu) w' $$ [$Hmem $Hb]
         with ⟨Hmem, Hb⟩
       imod Hcont $$ %(σ.top + 1) Hb Hau Htop' with HΦ
       rw [hk]
       imodintro
       isplitl [Hregs Hmem Hmm Hclose]
-      · iapply Hclose $$ %(σ.store cpu req.pa n w' false) %(fun _ _ => rfl) Hregs Hmem Hmm
+      · iapply Hclose $$ %(σ.store cpu req.pa n w' false) %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
       · iapply swp_ret
         iapply HΦ $$ Hfrag
     · iintro %Hbk
@@ -612,6 +623,8 @@ theorem swp_sail_mem_read_excl_au_gen (cpu : CPU) {n vasize : Nat}
   iapply swp_event_step cpu (.memRead n vasize req) (fun v => FreeM.pure v) Φ
   iintro %σ Hσ
   icases machInterp_acc_mem σ cpu $$ Hσ with ⟨Hregs, Hmem, Hmm, Hclose⟩
+  ihave %hmm : ⌜mmOk σ⌝ $$ [Hmm]
+  · iapply memModel_mmOk $$ Hmm
   by_cases hno : othersReserve σ.resv cpu req.pa n
   · iapply fupd_mask_intro LawfulSet.empty_subset
     iintro Hmask
@@ -622,7 +635,8 @@ theorem swp_sail_mem_read_excl_au_gen (cpu : CPU) {n vasize : Nat}
     iintro %σ'
     isplit
     · iintro %v %Hev
-      rcases Hev with ⟨hif', _⟩ | ⟨hpl, _⟩ | ⟨_, hno', _⟩
+      rcases Hev with ⟨hdev, _⟩ | ⟨_, hif', _⟩ | ⟨_, hpl, _⟩ | ⟨_, _, hno', _⟩
+      · exact absurd hdev (not_devBytes_of_othersReserve hmm.2.2.1 hmm.2.2.2 hno)
       · rw [hif] at hif'; exact absurd hif' (by decide)
       · simp [akPlain, hk] at hpl
       · exact absurd hno hno'
@@ -633,22 +647,25 @@ theorem swp_sail_mem_read_excl_au_gen (cpu : CPU) {n vasize : Nat}
       imod Hmask
       imodintro
       isplitl [Hregs Hmem Hmm Hclose]
-      · iapply Hclose $$ %(σ.dropResv cpu) %(fun _ _ => rfl) Hregs Hmem Hmm
+      · iapply Hclose $$ %(σ.dropResv cpu) %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
       · iapply IH $$ %none Hfrag H
   · imod H with ⟨%dqs, %Hs, Hb, %hne, Hcont⟩
     ihave %hget : ⌜histsAt σ.mem req.pa n Hs⌝ $$ [Hmem Hb]
     · iapply histBytes_valid σ.mem req.pa n dqs Hs $$ [Hmem Hb]
       iframe
     obtain ⟨w, htop, hheads⟩ := exists_top_bytes σ req.pa n Hs hget hne
+    have hram : ramBytes req.pa n := ramBytes_of_cells hmm.2.2.2 (fun j hj => ⟨Hs j, hget j hj⟩)
     imodintro
     isplit
     · ipureintro
-      exact Or.inl ⟨.Ok (w, none), _, Or.inr (Or.inr ⟨hk, hno, w, htop, rfl, rfl⟩)⟩
+      exact Or.inl ⟨.Ok (w, none), _, Or.inr (Or.inr (Or.inr ⟨hram, hk, hno, w, htop, rfl, rfl⟩))⟩
     inext
     iintro %σ'
     isplit
     · iintro %v %Hev
-      rcases Hev with ⟨hif', _⟩ | ⟨hpl, _⟩ | ⟨_, _, w', htop', rfl, rfl⟩
+      rcases Hev with ⟨hdev, w₀, ds₀, hdr, _, _⟩ | ⟨_, hif', _⟩ | ⟨_, hpl, _⟩ |
+        ⟨_, _, _, w', htop', rfl, rfl⟩
+      · exact absurd hdev (not_devBytes_of_ramBytes hram (devRead_pos hdr))
       · rw [hif] at hif'; exact absurd hif' (by decide)
       · simp [akPlain, hk] at hpl
       · have hww : w' = w := by
@@ -663,7 +680,7 @@ theorem swp_sail_mem_read_excl_au_gen (cpu : CPU) {n vasize : Nat}
         imod Hcont $$ %w' %hheads Hb with HΦ
         imodintro
         isplitl [Hregs Hmem Hmm Hclose]
-        · iapply Hclose $$ %(σ.afterExcl cpu req.pa n w' (akAcq req.access_kind)) %(fun _ _ => rfl)
+        · iapply Hclose $$ %(σ.afterExcl cpu req.pa n w' (akAcq req.access_kind)) %⟨fun _ _ => rfl, rfl⟩
             Hregs Hmem Hmm
         · iapply swp_ret
           iapply HΦ $$ Hfrag
@@ -700,6 +717,8 @@ theorem swp_sail_mem_write_excl_au (cpu : CPU) {n vasize : Nat}
   iapply swp_event_step cpu (.memWrite n vasize req) (fun v => FreeM.pure v) Φ
   iintro %σ Hσ
   icases machInterp_acc_mem σ cpu $$ Hσ with ⟨Hregs, Hmem, Hmm, Hclose⟩
+  ihave %hmm : ⌜mmOk σ⌝ $$ [Hmm]
+  · iapply memModel_mmOk $$ Hmm
   by_cases hno : othersReserve σ.resv cpu req.pa n
   · iapply fupd_mask_intro LawfulSet.empty_subset
     iintro Hmask
@@ -710,15 +729,16 @@ theorem swp_sail_mem_write_excl_au (cpu : CPU) {n vasize : Nat}
     iintro %σ'
     isplit
     · iintro %v %Hev
-      obtain ⟨_, _, hno', _, _⟩ := Hev
-      exact absurd hno hno'
+      rcases Hev with ⟨hdev, _⟩ | ⟨_, _, _, hno', _, _⟩
+      · exact absurd hdev (not_devBytes_of_othersReserve hmm.2.2.1 hmm.2.2.2 hno)
+      · exact absurd hno hno'
     · iintro %Hbk
       obtain ⟨_, hσ⟩ := Hbk
       subst σ'
       imod Hmask
       imodintro
       isplitl [Hregs Hmem Hmm Hclose]
-      · iapply Hclose $$ %σ %(fun _ _ => rfl) Hregs Hmem Hmm
+      · iapply Hclose $$ %σ %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
       · iapply IH $$ Hfrag H
   · imod H with ⟨%Hs, %T, Hb, #HT, Hcont⟩
     ihave %hget : ⌜histsAt σ.mem req.pa n Hs⌝ $$ [Hmem Hb]
@@ -727,29 +747,29 @@ theorem swp_sail_mem_write_excl_au (cpu : CPU) {n vasize : Nat}
     ihave %hres : ⌜σ.resv cpu = some (snapOf req.pa n w0) ∧ (σ.hr cpu).acq = acq⌝ $$ [Hmm Hfrag]
     · iapply memModel_resv _ σ cpu _ acq $$ [Hmm Hfrag]
       iframe
-    ihave %hmm : ⌜mmOk σ⌝ $$ [Hmm]
-    · iapply memModel_mmOk $$ Hmm
     ihave %hT : ⌜T ≤ σ.top⌝ $$ [Hmm HT]
     · iapply memModel_topLb _ σ T $$ [Hmm HT]
       iframe Hmm
       iexact HT
     have hheads : headsAre Hs n w0 := by
       intro j hj
-      have h := hmm.2.2 cpu _ hres.1 _ (nthByte w0 j) (snapOf_get? req.pa n w0 hn j hj)
+      have h := hmm.2.2.1 cpu _ hres.1 _ (nthByte w0 j) (snapOf_get? req.pa n w0 hn j hj)
       rw [hget j hj, Option.bind_some] at h
       exact h
+    have hram : ramBytes req.pa n := ramBytes_of_cells hmm.2.2.2 (fun j hj => ⟨Hs j, hget j hj⟩)
     imodintro
     isplit
     · ipureintro
-      exact Or.inl ⟨.Ok (some true), _, w', hv, hno, rfl, rfl⟩
+      exact Or.inl ⟨.Ok (some true), _, Or.inr ⟨hram, w', hv, hno, rfl, rfl⟩⟩
     inext
     iintro %σ'
     isplit
     · iintro %v %Hev
-      obtain ⟨w'', hv', _, rfl, rfl⟩ := Hev
+      rcases Hev with ⟨hdev, w₀, ds₀, _, hdw, _, _⟩ | ⟨_, w'', hv', _, rfl, rfl⟩
+      · exact absurd hdev (not_devBytes_of_ramBytes hram (devWrite_pos hdw))
       rw [hv] at hv'
       obtain rfl := Option.some.inj hv'
-      imod memModel_store_excl _ σ cpu req.pa n w' _ acq hno $$ [$Hmm $Hfrag]
+      imod memModel_store_excl _ σ cpu req.pa n w' _ acq hram hno $$ [$Hmm $Hfrag]
         with ⟨Hmm, Hfrag, #Hau, #Htop', Hvlb⟩
       imod histBytes_update σ.mem req.pa n Hs (σ.top + 1) (hartAgent cpu) w' $$ [$Hmem $Hb]
         with ⟨Hmem, Hb⟩
@@ -757,7 +777,7 @@ theorem swp_sail_mem_write_excl_au (cpu : CPU) {n vasize : Nat}
       rw [hk]
       imodintro
       isplitl [Hregs Hmem Hmm Hclose]
-      · iapply Hclose $$ %(σ.store cpu req.pa n w' true) %(fun _ _ => rfl) Hregs Hmem Hmm
+      · iapply Hclose $$ %(σ.store cpu req.pa n w' true) %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
       · iapply swp_ret
         iapply HΦ $$ Hfrag
     · iintro %Hbk

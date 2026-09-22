@@ -22,6 +22,7 @@ ambient `MachGS` with that era and generation and discharges each hart's
 `RiscvAdequacy.wp_power_loop`.
 -/
 import MachCSL.Wp
+import MachCSL.WpDev
 import MachCSL.KMap
 
 namespace MachCSL
@@ -255,10 +256,70 @@ theorem ctxTok_boot_elem (E : EraGS GF) (c : CPU) :
 def memCells (E : EraGS GF) (m : MemF Hist) : IProp GF := iprop%
   [∗map] a ↦ H ∈ m, pointsTo (G := E.mem) a (DFrac.own 1) H
 
+/-! ## The device mirrors at power-on -/
+
+/-- The two halves of device `d`'s mirror, at a bare name function. -/
+def devAuthN (dn : DevId → GName) (d : DevId) (s : DevSt d) : IProp GF :=
+  (dn d) ↪VAR{.own (1 : Qp).half} (⟨d, s⟩ : DevVal)
+def devFragN (dn : DevId → GName) (d : DevId) (s : DevSt d) : IProp GF :=
+  (dn d) ↪VAR{.own (1 : Qp).half} (⟨d, s⟩ : DevVal)
+
+theorem dev_alloc_one (d : DevId) (s : DevSt d) :
+    ⊢@{IProp GF} |==> ∃ γ, (γ ↪VAR{.own (1 : Qp).half} (⟨d, s⟩ : DevVal)) ∗
+      (γ ↪VAR{.own (1 : Qp).half} (⟨d, s⟩ : DevVal)) := by
+  imod (ghost_var_alloc (⟨d, s⟩ : DevVal)) with ⟨%γ, H⟩
+  imodintro
+  iexists γ
+  have h := (ghost_var_fractional (GF := GF) γ (⟨d, s⟩ : DevVal)).fractional (1 : Qp).half (1 : Qp).half
+  rw [Qp.half_add_half] at h
+  iapply h.1 $$ H
+
+theorem devs_alloc_list (ds : DevStates) (l : List DevId) (hl : l.Nodup) :
+    ⊢@{IProp GF} |==> ∃ dn : DevId → GName,
+      ([∗list] d ∈ l, devAuthN dn d (ds.st d)) ∗ ([∗list] d ∈ l, devFragN dn d (ds.st d)) := by
+  induction l with
+  | nil =>
+    imodintro
+    iexists (fun _ => 0)
+    isplit <;> exact BigSepL.bigSepL_nil_intro
+  | cons c l ih =>
+    have hc : c ∉ l := (List.nodup_cons.mp hl).1
+    imod (ih (List.nodup_cons.mp hl).2) with ⟨%names, Hi, Hc⟩
+    imod (dev_alloc_one c (ds.st c)) with ⟨%γ, Hic, Hcc⟩
+    imodintro
+    iexists (fun c' => if c' = c then γ else names c')
+    have ei : (([∗list] d ∈ l, devAuthN (fun c' => if c' = c then γ else names c') d (ds.st d)) : IProp GF) =
+        [∗list] d ∈ l, devAuthN names d (ds.st d) :=
+      BigSepL.bigSepL_eq fun {k x} hk => by
+        simp only [devAuthN]
+        rw [if_neg (fun (h : x = c) => hc (h ▸ List.mem_of_getElem? hk))]
+    have ec : (([∗list] d ∈ l, devFragN (fun c' => if c' = c then γ else names c') d (ds.st d)) : IProp GF) =
+        [∗list] d ∈ l, devFragN names d (ds.st d) :=
+      BigSepL.bigSepL_eq fun {k x} hk => by
+        simp only [devFragN]
+        rw [if_neg (fun (h : x = c) => hc (h ▸ List.mem_of_getElem? hk))]
+    isplitl [Hic Hi]
+    · iapply BigSepL.bigSepL_cons.2
+      rw [ei]
+      unfold devAuthN
+      simp only [if_true]
+      iframe Hic Hi
+    · iapply BigSepL.bigSepL_cons.2
+      rw [ec]
+      unfold devFragN
+      simp only [if_true]
+      iframe Hcc Hc
+
+theorem devs_alloc (ds : DevStates) :
+    ⊢@{IProp GF} |==> ∃ dn : DevId → GName,
+      ([∗list] d ∈ DevId.all, devAuthN dn d (ds.st d)) ∗ ([∗list] d ∈ DevId.all, devFragN dn d (ds.st d)) :=
+  devs_alloc_list ds DevId.all (by decide)
+
 /-- What a `PowerOn` hands the boot client of era `E`, generation `gen`, at
 the booted machine `σ`: the generation's certificate, every hart's register
-cells, every byte's history (the image's byte at timestamp 0), and, per
-hart, a fresh running context with its memory token. -/
+cells, every byte's history (the image's byte at timestamp 0), per hart a
+fresh running context with its memory token, and every device's mirror
+half (the device's invariant is the client's to build). -/
 def powerBootRes [KernelMap] (E : EraGS GF) (gen : Nat) (σ : MState) : IProp GF := iprop%
   (∃ r : BitVec 44, E.kptRootName ↪VAR r) ∗
   genCertAt gen E ∗
@@ -266,7 +327,8 @@ def powerBootRes [KernelMap] (E : EraGS GF) (gen : Nat) (σ : MState) : IProp GF
   memCells E σ.mem ∗
   ([∗list] cpu ∈ cpus, ∃ ξ : CtxId, ctxTokAt E cpu ξ) ∗
   ([∗list] cpu ∈ cpus, lockSetAt E cpu []) ∗
-  (E.kmapName ↪●MAP KernelMap.static) ∗ kmapStaticAt E
+  (E.kmapName ↪●MAP KernelMap.static) ∗ kmapStaticAt E ∗
+  ([∗list] d ∈ DevId.all, devFragAt E d (σ.devs.st d))
 
 /-- A hart at its cycle boundary, as the power thread forks it. -/
 theorem hartWP_loop (gen : Nat) (cpu : CPU) :
@@ -296,7 +358,9 @@ the boot resources of the fresh era at the booted machine, the WPs of the new
 generation's harts. -/
 theorem wp_power [KernelMap]
     (Hboot : ∀ (E : EraGS GF) (gen : Nat) (σ : MState) (image : Mem), bootFacts σ image →
-      powerBootRes E gen σ ⊢@{IProp GF} |={⊤}=> [∗list] cpu ∈ cpus, hartWP gen cpu (pure ())) :
+      powerBootRes E gen σ ⊢@{IProp GF} |={⊤}=>
+        ([∗list] cpu ∈ cpus, hartWP gen cpu (pure ())) ∗
+        ([∗list] d ∈ DevId.all, devWP gen d rootTask (pure ()))) :
     ⊢@{IProp GF} WP Expr.power @ Stuckness.NotStuck; ⊤ {{ _v, True }} := by
   iloeb as IH
   iapply wp_lift_step rfl
@@ -319,7 +383,7 @@ theorem wp_power [KernelMap]
     inext
     iintro %e₂ %g₂ %eₜ %Hstep _
     obtain ⟨rfl, h⟩ := primStep_power_inv Hstep
-    rcases h with ⟨hp, _, _, _⟩ | ⟨_, rfl, rfl, hgen, hpow', himg, hbf⟩
+    rcases h with ⟨hp, _, _, _⟩ | ⟨_, rfl, rfl, hgen, hpow', himg, hbf, hdevs⟩
     · rw [hpow] at hp
       exact absurd hp (by decide)
     imod Hclose
@@ -341,10 +405,11 @@ theorem wp_power [KernelMap]
       (fun _ => ghost_map_alloc_empty (K := String) (V := Unit) (H := StrMapF))) with ⟨%lsn, Hls⟩
     imod (ghost_map_alloc (K := Nat) (V := BitVec 64) (H := RegMapF) KernelMap.static) with ⟨%γkmap, Hkmap, Hkfrags⟩
     imod (ghost_var_alloc (A := BitVec 44) 0#44) with ⟨%γkroot, Hkroot⟩
-    imod (kmapStatic_persist ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot⟩) $$ Hkfrags with Hkst
+    imod (devs_alloc g₂.m.devs) with ⟨%dn, Hda, Hdf⟩
+    imod (kmapStatic_persist ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn⟩) $$ Hkfrags with Hkst
     icases BigSepL.bigSepL_sep_eqv.1 $$ Hv with ⟨Hva, Hvlb⟩
-    imod (ctxs_boot ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot⟩) $$ Hvlb with Hctx
-    imod registry_insert R g.gen ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot⟩ (registryOk_none Hok)
+    imod (ctxs_boot ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn⟩) $$ Hvlb with Hctx
+    imod registry_insert R g.gen ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn⟩ (registryOk_none Hok)
       $$ HR with ⟨HR, #Hreg⟩
     imod startAuth_bump _ $$ Hstart with ⟨Hstart, #Hstarted⟩
     ihave #Hborn := genAuth_get_born _ $$ Hgen
@@ -353,7 +418,7 @@ theorem wp_power [KernelMap]
       (fun c => (g₂.m.resv c, (g₂.m.hr c).acq)) cpus (resvMap g₂.m) (List.nodup_finRange NCPU)
       (fun c _ => resvMap_get? g₂.m c) $$ Hfrags
     have hfrag : ∀ c : CPU, (γresv ↪◯MAP[c.val] ((g₂.m.resv c, (g₂.m.hr c).acq) : ResvVal)) ⊢@{IProp GF}
-        resvFragAt ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot⟩ c none false := by
+        resvFragAt ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn⟩ c none false := by
       intro c
       unfold resvFragAt
       rw [(hhart0 c).2.2.2, (hhart0 c).2.2.1]
@@ -361,12 +426,18 @@ theorem wp_power [KernelMap]
       iintro H
       iexact H
     -- the boot client
-    ihave Hres : powerBootRes ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot⟩ g.gen g₂.m $$ [Hrc Hpts Hctx Hfrags' Hls Hkmap Hkst Hkroot]
+    ihave Hdf := (show ([∗list] d ∈ DevId.all, devFragN (GF := GF) dn d (g₂.m.devs.st d)) ⊢
+        [∗list] d ∈ DevId.all, devFragAt ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn⟩ d (g₂.m.devs.st d)
+        from by unfold devFragAt devFragN; iintro H; iexact H) $$ Hdf
+    ihave Hda := (show ([∗list] d ∈ DevId.all, devAuthN (GF := GF) dn d (g₂.m.devs.st d)) ⊢
+        [∗list] d ∈ DevId.all, devAuthAt ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn⟩ d (g₂.m.devs.st d)
+        from by unfold devAuthAt devAuthN; iintro H; iexact H) $$ Hda
+    ihave Hres : powerBootRes ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn⟩ g.gen g₂.m $$ [Hrc Hpts Hctx Hfrags' Hls Hkmap Hkst Hkroot Hdf]
     · unfold powerBootRes genCertAt memCells kmapStaticAt
       isplitl [Hkroot]
       · iexists 0#44
         iexact Hkroot
-      iframe Hrc Hpts Hkmap Hkst
+      iframe Hrc Hpts Hkmap Hkst Hdf
       isplitr [Hctx Hfrags' Hls]
       · isplit
         · iexact Hborn
@@ -380,30 +451,30 @@ theorem wp_power [KernelMap]
           iapply BigSepL.bigSepL_mono (fun {_ c} _ => hfrag c) $$ Hfrags'
         · unfold lockSetAt locksMap
           iexact Hls
-    imod (Hboot ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot⟩ g.gen g₂.m g.image hbf) $$ Hres with Hwps
+    imod (Hboot ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn⟩ g.gen g₂.m g.image hbf) $$ Hres with ⟨Hwps, Hdwps⟩
     imodintro
     -- the state interpretation at the booted state
     rw [stateInterp_eq]
     unfold powerInterp
     rw [hgen, show startCount g₂ = g.gen + 1 by simp [startCount, hgen, hpow']]
     iframe Hgen Hstart
-    isplitl [HR Hheap Hri Hva Hiv Hrv Htop Hauth Hresv]
-    · iexists (insert R g.gen ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot⟩)
+    isplitl [HR Hheap Hri Hva Hiv Hrv Htop Hauth Hresv Hda]
+    · iexists (insert R g.gen ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn⟩)
       iframe HR
       isplit
       · ipureintro
         exact registryOk_insert Hok _
       rw [eraCur_true hpow', hgen]
-      iexists ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot⟩
+      iexists ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn⟩
       isplit
       · ipureintro
         exact get?_insert_eq rfl
-      unfold eraInterp memModelAt
-      iframe Hheap Hri Hresv
+      unfold eraInterp memModelAt devInterpAt
+      iframe Hheap Hri Hresv Hda
       rw [show g₂.m.top = 0 by simp [MState.top, hlog0], hlog0, authMap_nil]
       iframe Htop Hauth
       isplitl [Hva Hiv Hrv]
-      · rw [BigSepL.bigSepL_eq (Φ := fun _ c => hartViewsAt ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot⟩ g₂.m c)
+      · rw [BigSepL.bigSepL_eq (Φ := fun _ c => hartViewsAt ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn⟩ g₂.m c)
           (Ψ := fun _ c => iprop(MonoNat.auth_own (vn c) (DFrac.own 1) (.ofNat 0) ∗
             MonoNat.auth_own (ivn c) (DFrac.own 1) (.ofNat 0) ∗
             MonoNat.auth_own (rvn c) (DFrac.own 1) (.ofNat 0)))
@@ -418,11 +489,15 @@ theorem wp_power [KernelMap]
         iframe Hiv Hrv
       · ipureintro
         exact mmOk_boot g₂.m g.image hbf
-    isplitr [Hwps]
+    isplitr [Hwps Hdwps]
     · iexact IH
     · unfold powerFork
-      rw [BigSepL.bigSepL_map, BigSepL.bigSepL_eq (fun _ => (hartWP_loop g.gen _).symm)]
-      iexact Hwps
+      iapply BigSepL.bigSepL_append.2
+      isplitl [Hwps]
+      · rw [BigSepL.bigSepL_map, BigSepL.bigSepL_eq (fun _ => (hartWP_loop g.gen _).symm)]
+        iexact Hwps
+      · rw [BigSepL.bigSepL_map, BigSepL.bigSepL_eq (fun _ => (devWP_loop g.gen _).symm)]
+        iexact Hdwps
   · -- powered on: `PowerOff`
     rw [eraCur_true hpow]
     have hcount : startCount g = g.gen + 1 := by simp [startCount, hpow]
@@ -482,7 +557,7 @@ environment is persistent). -/
   { regName := E.regName, mem := E.mem, viewName := E.viewName, iviewName := E.iviewName,
     rviewName := E.rviewName, topName := E.topName, authName := E.authName, resvName := E.resvName,
     lockSetName := E.lockSetName, kmapName := E.kmapName, kptRootName := E.kptRootName,
-    gen := gen, claimP := cP, claim_idle := cI, envP := eP, env_persistent := ePe }
+    devName := E.devName, gen := gen, claimP := cP, claim_idle := cI, envP := eP, env_persistent := ePe }
 
 theorem wpLoop_ofEra (E : EraGS GF) (gen : Nat) (cP : CPU → BitVec 64 → IProp GF)
     (cI : ∀ cpu : CPU, ⊢ cP cpu 0#64) (eP : CtxId → IProp GF)

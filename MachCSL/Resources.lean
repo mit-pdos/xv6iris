@@ -78,6 +78,10 @@ theorem regIdx_injective : Function.Injective regIdx := by
 acquire bit. -/
 abbrev ResvVal := Option Resv × Bool
 
+/-- A device's state, tagged with the device (the value of the per-device
+ghost variables: one `GhostVarG` covers every device). -/
+abbrev DevVal := (d : DevId) × DevSt d
+
 /-- One era's ghost names: a register map per hart, the memory heap, and the
 memory-model mirrors. -/
 structure EraGS (GF : BundledGFunctors) where
@@ -108,6 +112,11 @@ structure EraGS (GF : BundledGFunctors) where
   hart and is dispatched on another needs the two harts' `satp` values to
   agree (`Xv6.ProofYield`). -/
   kptRootName : GName
+  /-- each device's state mirror: a ghost variable in two halves, the
+  authoritative half in the era's interpretation, the other with the
+  device's invariant (the Rocq prototype's `uart_frag`/`plic_frag`/
+  `virtio_frag`) -/
+  devName : DevId → GName
 
 /-- The functors the machine needs (for adequacy: what a `BundledGFunctors`
 must contain). -/
@@ -125,6 +134,8 @@ class MachGpreS (hlc : outParam HasLC) (GF : BundledGFunctors) extends InvGpreS 
   kmap_pre : GhostMapG GF Nat (BitVec 64) RegMapF
   /-- the kernel root's functor -/
   kptroot_pre : GhostVarG GF (BitVec 44)
+  /-- the device mirrors' functor -/
+  dev_pre : GhostVarG GF DevVal
 
 attribute [reducible, instance] MachGpreS.reg_pre
 attribute [reducible, instance] MachGpreS.mem_pre
@@ -137,6 +148,7 @@ attribute [reducible, instance] MachGpreS.lockset_pre
 attribute [reducible, instance] MachGpreS.lock_pre
 attribute [reducible, instance] MachGpreS.kmap_pre
 attribute [reducible, instance] MachGpreS.kptroot_pre
+attribute [reducible, instance] MachGpreS.dev_pre
 
 /-- The fixed layer: allocated once, survives every power cycle. -/
 class MachFixedGS (hlc : outParam HasLC) (GF : BundledGFunctors) where
@@ -161,6 +173,8 @@ class MachFixedGS (hlc : outParam HasLC) (GF : BundledGFunctors) where
   kmapG : GhostMapG GF Nat (BitVec 64) RegMapF
   /-- the kernel root's functor (`MachCSL.KptInv`) -/
   kptRootG : GhostVarG GF (BitVec 44)
+  /-- the device mirrors' functor (`MachCSL.WpDev`) -/
+  devG : GhostVarG GF DevVal
   /-- the generation counter -/
   genName : GName
   /-- the started-generations counter -/
@@ -179,6 +193,7 @@ attribute [reducible, instance] MachFixedGS.lockSetG
 attribute [reducible, instance] MachFixedGS.lockG
 attribute [reducible, instance] MachFixedGS.kmapG
 attribute [reducible, instance] MachFixedGS.kptRootG
+attribute [reducible, instance] MachFixedGS.devG
 
 /-- A context: a thread of control's ghost identity -- its bound (a monotone
 counter) and its dirty set (a ghost map keyed by timestamp).  The laws live
@@ -209,6 +224,8 @@ class MachGS (hlc : outParam HasLC) (GF : BundledGFunctors) where
   kmapName : GName
   /-- the kernel page table's root (see `EraGS.kptRootName`) -/
   kptRootName : GName
+  /-- the device mirrors (see `EraGS.devName`) -/
+  devName : DevId → GName
   gen : Nat
   /-- the running-proc claim of a hart (`MachCSL.KCtx.cpuClaim`): the client
   chooses it when it instantiates the machine (the xv6 client: the claimed
@@ -242,7 +259,8 @@ variable {hlc : HasLC} {GF : BundledGFunctors}
    MachGS.rviewName (hlc := hlc) (GF := GF), MachGS.topName (hlc := hlc) (GF := GF),
    MachGS.authName (hlc := hlc) (GF := GF), MachGS.resvName (hlc := hlc) (GF := GF),
    MachGS.lockSetName (hlc := hlc) (GF := GF), MachGS.kmapName (hlc := hlc) (GF := GF),
-   MachGS.kptRootName (hlc := hlc) (GF := GF)⟩
+   MachGS.kptRootName (hlc := hlc) (GF := GF),
+   MachGS.devName (hlc := hlc) (GF := GF)⟩
 
 /-- The register-map ghost name of hart `cpu` in the ambient era. -/
 def regName [MachGS hlc GF] (cpu : CPU) : GName := MachGS.regName (hlc := hlc) (GF := GF) cpu
@@ -411,20 +429,149 @@ theorem resvMap_upd (σ σ' : MState) (cpu : CPU) (r : Option Resv) (b : Bool)
       rw [resvMap_get? σ ⟨j, hlt⟩, resvMap_get? σ' ⟨j, hlt⟩, (h _ hne).1, (h _ hne).2]
     · rw [resvMap_get?_ge σ j (by omega), resvMap_get?_ge σ' j (by omega)]
 
+/-! ### The DRAM bank in the memory model
+
+Byte histories exist at DRAM addresses only: the boot image is loaded into
+RAM (`imgFlat`), and every arm that grows a history -- the hart store and the
+disk's DMA write -- carries `ramBytes` for its footprint.  This is what turns
+"the rule owns a cell at `pa`" into "`pa` is not a device address", the side
+condition the memory arms of `evStep` are guarded by. -/
+
+/-- Histories live at DRAM addresses only. -/
+def memRam (m : FlatMem) : Prop := ∀ (a : PAddr) (H : Hist), m[a]? = some H → inRam a 1
+
+/-- A DRAM address is not a device address (the DRAM bank starts exactly
+where the device fabric ends). -/
+theorem devAddr_false_of_inRam {pa : PAddr} {n : Nat} (h : inRam pa n) : devAddr pa = false := by
+  have h1 := h.1
+  simp only [ramBase] at h1
+  simp only [devAddr, devBound, decide_eq_false_iff_not, Nat.not_lt]
+  omega
+
+/-- A memory access whose footprint is DRAM is not an MMIO access. -/
+theorem devAddr_false_of_ramBytes {pa : PAddr} {n : Nat} (h : ramBytes pa n) (hn : 0 < n) :
+    devAddr pa = false :=
+  devAddr_false_of_inRam (ramBytes_head h hn)
+
+/-- DRAM and MMIO footprints are exclusive (at a positive width). -/
+theorem not_devBytes_of_ramBytes {pa : PAddr} {n : Nat} (h : ramBytes pa n) (hn : 0 < n) :
+    ¬ devBytes pa n := by
+  intro hd
+  have h1 := hd 0 hn
+  simp only [BitVec.ofNat_eq_ofNat, BitVec.add_zero] at h1
+  rw [devAddr_false_of_ramBytes h hn] at h1
+  exact absurd h1 (by decide)
+
+/-! ### Zero-width MMIO
+
+No device answers a zero-byte transaction (every window is 1/2/4/8 bytes
+wide), so the MMIO arms of `evStep` are enabled only at a positive width --
+which is what lets a memory rule dismiss them from its footprint's cells. -/
+
+theorem devRead_pos {ds : DevStates} {pa : PAddr} {n : Nat} {r : BitVec (8 * n) × DevStates}
+    (h : devRead ds pa n = some r) : 0 < n := by
+  rcases Nat.eq_zero_or_pos n with rfl | hn
+  · exfalso
+    unfold devRead at h
+    revert h
+    cases hd : devDecode pa with
+    | none => simp
+    | some p =>
+      obtain ⟨d, off⟩ := p
+      cases d <;> simp [devSig, Uart.sig, Uart.readN, Plic.sig, Plic.readN,
+        Virtio.sig, Virtio.readN]
+  · exact hn
+
+theorem devWrite_pos {ds ds' : DevStates} {pa : PAddr} {n : Nat} {w : BitVec (8 * n)}
+    (h : devWrite ds pa n w = some ds') : 0 < n := by
+  rcases Nat.eq_zero_or_pos n with rfl | hn
+  · exfalso
+    unfold devWrite at h
+    revert h
+    cases hd : devDecode pa with
+    | none => simp
+    | some p =>
+      obtain ⟨d, off⟩ := p
+      cases d <;> simp [devSig, Uart.sig, Uart.writeN, Plic.sig, Plic.writeN,
+        Virtio.sig, Virtio.writeN]
+  · exact hn
+
+/-! ### Getting `ramBytes` out of the memory -/
+
+/-- Every byte of the footprint has a history: the footprint is DRAM. -/
+theorem ramBytes_of_cells {m : FlatMem} (hm : memRam m) {pa : PAddr} {n : Nat}
+    (h : ∀ j, j < n → ∃ H, m[pa + BitVec.ofNat 64 j]? = some H) : ramBytes pa n := by
+  intro j hj
+  obtain ⟨H, hH⟩ := h j hj
+  exact hm _ _ hH
+
+/-- What an agent reads, it reads from DRAM. -/
+theorem ramBytes_of_readBytes {m : FlatMem} (hm : memRam m) {ag : Agent} {tv : Nat} {pa : PAddr}
+    {n : Nat} {w : BitVec (8 * n)} (h : m.readBytes ag tv pa n w) : ramBytes pa n := by
+  refine ramBytes_of_cells hm (fun j hj => ?_)
+  have hr := h j hj
+  unfold FlatMem.read at hr
+  cases hg : m[pa + BitVec.ofNat 64 j]? with
+  | none => rw [hg] at hr; simp at hr
+  | some H => exact ⟨H, rfl⟩
+
+theorem ramBytes_of_topBytes {m : FlatMem} (hm : memRam m) {pa : PAddr} {n : Nat}
+    {w : BitVec (8 * n)} (h : m.topBytes pa n w) : ramBytes pa n := by
+  refine ramBytes_of_cells hm (fun j hj => ?_)
+  have hr := h j hj
+  cases hg : m[pa + BitVec.ofNat 64 j]? with
+  | none => rw [hg] at hr; simp at hr
+  | some H => exact ⟨H, rfl⟩
+
+/-- A store into a DRAM footprint keeps the histories inside DRAM. -/
+theorem memRam_writeBytes {m : FlatMem} {pa : PAddr} {n : Nat} {w : BitVec (8 * n)} {t : Nat}
+    {h : Agent} (hram : ramBytes pa n) (hm : memRam m) : memRam (m.writeBytes pa n w t h) := by
+  intro a H hget
+  by_cases hin : ∀ j, j < n → a ≠ pa + BitVec.ofNat 64 j
+  · rw [FlatMem.writeBytes_get?_notin m pa w t h a hin] at hget
+    exact hm a H hget
+  · have hex : ∃ j, j < n ∧ a = pa + BitVec.ofNat 64 j :=
+      Classical.byContradiction fun hc => hin (fun j hj heq => hc ⟨j, hj, heq⟩)
+    obtain ⟨j, hj, rfl⟩ := hex
+    exact hram j hj
+
+/-- A byte that agrees with the top of memory has a history, so it is DRAM. -/
+theorem inRam_of_top {m : FlatMem} (hm : memRam m) {a : PAddr} {v : BitVec 8}
+    (h : (m[a]?).bind Hist.top = some v) : inRam a 1 := by
+  cases hg : m[a]? with
+  | none => rw [hg] at h; simp at h
+  | some H => exact hm _ _ hg
+
+/-- A footprint some other hart reserves is not an MMIO footprint: a
+reserved byte mirrors the memory, and the memory is DRAM. -/
+theorem not_devBytes_of_othersReserve {σ : MState} {cpu : CPU} {pa : PAddr} {n : Nat}
+    (hres : ∀ c r, σ.resv c = some r → ∀ (a : PAddr) (v : BitVec 8), r[a]? = some v →
+             (σ.mem[a]?).bind Hist.top = some v)
+    (hram : memRam σ.mem) (h : othersReserve σ.resv cpu pa n) : ¬ devBytes pa n := by
+  obtain ⟨c, _, r, hr, j, hj, hsome⟩ := h
+  intro hd
+  obtain ⟨v, hv⟩ := Option.isSome_iff_exists.1 hsome
+  have hin := inRam_of_top hram (hres c r hr _ v hv)
+  have hdj := hd j hj
+  rw [devAddr_false_of_inRam hin] at hdj
+  exact absurd hdj (by decide)
+
 /-- The memory-model step invariant (the Rocq prototype's `mm_ok`, `itv_ok`,
 `hr_ok` and `resv_ok`): every history is well formed against the author log,
-every view and read-side position is at or below the top, and every
-outstanding reservation still agrees with the top of memory. -/
+every view and read-side position is at or below the top, every outstanding
+reservation still agrees with the top of memory, and every history sits at a
+DRAM address. -/
 def mmOk (σ : MState) : Prop :=
   (∀ (a : PAddr) (H : Hist), σ.mem[a]? = some H → histOk σ.log H) ∧
   (∀ c, σ.tv c ≤ σ.top ∧ σ.itv c ≤ σ.top ∧ (σ.hr c).bound σ.top) ∧
   (∀ c r, σ.resv c = some r → ∀ (a : PAddr) (v : BitVec 8), r[a]? = some v →
-    (σ.mem[a]?).bind Hist.top = some v)
+    (σ.mem[a]?).bind Hist.top = some v) ∧
+  memRam σ.mem
 
 theorem mmOk_afterLoad (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (htv : tvn ≤ σ.top)
     (h : mmOk σ) : mmOk (σ.afterLoad cpu pa n tvn) := by
-  obtain ⟨h1, h2, h3⟩ := h
-  refine ⟨h1, fun c => ?_, h3⟩
+  obtain ⟨h1, h2, h3, h4⟩ := h
+  refine ⟨h1, fun c => ?_, h3, h4⟩
   obtain ⟨a1, a2, a3, a4⟩ := h2 c
   simp only [MState.top] at *
   by_cases hc : c = cpu
@@ -441,8 +588,8 @@ theorem mmOk_afterLoad (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (htv
     exact ⟨a1, a2, a3, a4⟩
 
 theorem mmOk_fence (σ : MState) (cpu : CPU) (b : barrier_kind) (h : mmOk σ) : mmOk (σ.fence cpu b) := by
-  obtain ⟨h1, h2, h3⟩ := h
-  refine ⟨h1, fun c => ?_, h3⟩
+  obtain ⟨h1, h2, h3, h4⟩ := h
+  refine ⟨h1, fun c => ?_, h3, h4⟩
   obtain ⟨a1, a2, a3, a4⟩ := h2 c
   obtain ⟨b1, b2, b3, b4⟩ := h2 cpu
   have hpub := ownPub_le (hartAgent cpu) σ.log
@@ -458,9 +605,10 @@ theorem mmOk_fence (σ : MState) (cpu : CPU) (b : barrier_kind) (h : mmOk σ) : 
     exact ⟨a1, a2, a3, a4⟩
 
 theorem mmOk_store (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (excl : Bool)
-    (hno : ¬ othersReserve σ.resv cpu pa n) (h : mmOk σ) : mmOk (σ.store cpu pa n w excl) := by
-  obtain ⟨h1, h2, h3⟩ := h
-  refine ⟨?_, ?_, ?_⟩
+    (hram : ramBytes pa n) (hno : ¬ othersReserve σ.resv cpu pa n) (h : mmOk σ) :
+    mmOk (σ.store cpu pa n w excl) := by
+  obtain ⟨h1, h2, h3, h4⟩ := h
+  refine ⟨?_, ?_, ?_, memRam_writeBytes hram h4⟩
   · intro a H hget
     exact FlatMem.writeBytes_histOk σ.mem σ.log pa w (hartAgent cpu) h1 a H hget
   · intro c
@@ -489,12 +637,37 @@ theorem mmOk_store (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec 
       rw [FlatMem.writeBytes_get?_notin _ _ _ _ _ _ hno']
       exact h3 c r hr a v hav
 
+/-- The disk's DMA write: the bytes' histories grow and the author log grows
+exactly as for a hart store (the disk agent is pinned to the top of the
+order), and no hart's views move.  The footprint must be DRAM, and no hart
+may reserve a byte of it. -/
+theorem mmOk_storeDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+    (hram : ramBytes pa n) (hno : ¬ anyReserve σ.resv pa n) (h : mmOk σ) :
+    mmOk (σ.storeDma pa n w) := by
+  obtain ⟨h1, h2, h3, h4⟩ := h
+  refine ⟨?_, ?_, ?_, memRam_writeBytes hram h4⟩
+  · intro a H hget
+    exact FlatMem.writeBytes_histOk σ.mem σ.log pa w diskAgent h1 a H hget
+  · intro c
+    obtain ⟨a1, a2, a3, a4⟩ := h2 c
+    simp only [MState.storeDma, MState.top, List.length_append, List.length_singleton] at *
+    exact ⟨by omega, by omega, by omega, fun a => by have := a4 a; omega⟩
+  · intro c r hr a v hav
+    simp only [MState.storeDma] at hr ⊢
+    have hno' : ∀ j, j < n → a ≠ pa + BitVec.ofNat 64 j := by
+      intro j hj heq
+      exact hno ⟨c, r, hr, j, hj, by rw [← heq, hav]; rfl⟩
+    rw [FlatMem.writeBytes_get?_notin _ _ _ _ _ _ hno']
+    exact h3 c r hr a v hav
+
 /-- A booted machine satisfies the step invariant. -/
 theorem mmOk_boot (σ : MState) (image : Mem) (h : bootFacts σ image) : mmOk σ := by
   obtain ⟨hmem, hlog, hhart, _⟩ := h
-  refine ⟨?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_⟩
   · intro a H hget
     rw [hmem, imgFlat_get?] at hget
+    split at hget
+    case isFalse => simp at hget
     cases hi : image[a]? with
     | none => rw [hi] at hget; simp at hget
     | some v =>
@@ -512,6 +685,11 @@ theorem mmOk_boot (σ : MState) (image : Mem) (h : bootFacts σ image) : mmOk σ
   · intro c r hr
     rw [(hhart c).2.2.2] at hr
     cases hr
+  · intro a H hget
+    rw [hmem, imgFlat_get?] at hget
+    split at hget
+    · assumption
+    · simp at hget
 
 /-- Hart `cpu`'s view mirrors at the machine `σ`: data view, instruction
 view, read watermark. -/
@@ -557,11 +735,43 @@ theorem cpus_get?_ne {k : Nat} {y : CPU} (hk : cpus[k]? = some y) (cpu : CPU) (h
   simp at this
   omega
 
+/-! ## The device mirrors -/
+
+/-- The authoritative half of device `d`'s mirror at era `E`. -/
+def devAuthAt [MachFixedGS hlc GF] (E : EraGS GF) (d : DevId) (s : DevSt d) : IProp GF :=
+  (E.devName d) ↪VAR{.own (1 : Qp).half} (⟨d, s⟩ : DevVal)
+
+/-- The other half: what a device's invariant holds (the Rocq prototype's
+`uart_frag`/`plic_frag`/`virtio_frag`). -/
+def devFragAt [MachFixedGS hlc GF] (E : EraGS GF) (d : DevId) (s : DevSt d) : IProp GF :=
+  (E.devName d) ↪VAR{.own (1 : Qp).half} (⟨d, s⟩ : DevVal)
+
+/-- Every device's authoritative half, at the machine's states. -/
+def devInterpAt [MachFixedGS hlc GF] (E : EraGS GF) (ds : DevStates) : IProp GF := iprop%
+  [∗list] d ∈ DevId.all, devAuthAt E d (ds.st d)
+
+theorem devAgreeAt [MachFixedGS hlc GF] (E : EraGS GF) (d : DevId) (s s' : DevSt d) :
+    devAuthAt E d s ∗ devFragAt E d s' ⊢@{IProp GF} ⌜s' = s⌝ := by
+  unfold devAuthAt devFragAt
+  iintro ⟨Ha, Hf⟩
+  ihave %h := ghost_var_agree (E.devName d) (⟨d, s⟩ : DevVal) _ ⟨d, s'⟩ _ $$ Ha Hf
+  ipureintro
+  have h' := h
+  simp only [Sigma.mk.injEq, heq_eq_eq, true_and] at h'
+  exact h'.symm
+
+theorem devUpdateAt [MachFixedGS hlc GF] (E : EraGS GF) (d : DevId) (s s' s'' : DevSt d) :
+    devAuthAt E d s ∗ devFragAt E d s' ⊢@{IProp GF} |==> (devAuthAt E d s'' ∗ devFragAt E d s'') := by
+  unfold devAuthAt devFragAt
+  iintro ⟨Ha, Hf⟩
+  iapply ghost_var_update_halves (⟨d, s''⟩ : DevVal) (E.devName d) _ _ $$ Ha Hf
+
 /-- Era `E`'s interpretation of the machine `σ`. -/
 def eraInterp [MachFixedGS hlc GF] (E : EraGS GF) (σ : MState) : IProp GF := iprop%
   ([∗list] cpu ∈ cpus, regInterpAt (E.regName cpu) (σ.regs cpu)) ∗
   genHeapInterp (G := E.mem) σ.mem ∗
-  memModelAt E σ
+  memModelAt E σ ∗
+  devInterpAt E σ.devs
 
 /-! ## The generation ghosts -/
 

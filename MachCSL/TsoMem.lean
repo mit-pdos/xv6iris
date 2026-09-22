@@ -93,6 +93,42 @@ abbrev FlatMem := Std.ExtTreeMap PAddr Hist compare
 /-- Plain byte memory (the boot image; also reservation snapshots). -/
 abbrev Mem := Std.ExtTreeMap PAddr (BitVec 8) compare
 
+/-! ### The DRAM bank
+
+The bus decode: the device fabric owns every physical address below
+`ramBase`, the DRAM bank the range `[ramBase, ramEnd)`.  Byte histories
+exist exactly at DRAM addresses (`MachCSL.memRam`), so "this byte has a
+history" is what a memory rule turns into "this access is not MMIO". -/
+
+/-- The platform's DRAM: `[0x80000000, 0x88000000)` (128 MiB, xv6's `PHYSTOP`). -/
+def ramBase : Nat := 0x80000000
+def ramEnd : Nat := 0x88000000
+
+/-- An access of `n` bytes at `pa` lies inside RAM. -/
+def inRam (pa : PAddr) (n : Nat) : Prop := ramBase ≤ pa.toNat ∧ pa.toNat + n ≤ ramEnd
+
+instance (pa : PAddr) (n : Nat) : Decidable (inRam pa n) := by unfold inRam; infer_instance
+
+/-- Every byte of the `n`-byte footprint at `pa` is a DRAM byte.  This is the
+footprint form of `inRam`: it is stable under the `pa + j` addressing the
+memory events use (no wrap-around side condition), and it is vacuous for a
+zero-width access, which reaches no device. -/
+def ramBytes (pa : PAddr) (n : Nat) : Prop := ∀ j, j < n → inRam (pa + BitVec.ofNat 64 j) 1
+
+theorem ramBytes_head {pa : PAddr} {n : Nat} (h : ramBytes pa n) (hn : 0 < n) : inRam pa 1 := by
+  have := h 0 hn
+  simpa using this
+
+theorem ramBytes_of_inRam {pa : PAddr} {n : Nat} (h : inRam pa n) : ramBytes pa n := by
+  obtain ⟨h1, h2⟩ := h
+  intro j hj
+  have hlt : pa.toNat + j < 2 ^ 64 := by
+    simp only [ramEnd] at h2; omega
+  have he : (pa + BitVec.ofNat 64 j).toNat = pa.toNat + j := by
+    rw [BitVec.toNat_add, BitVec.toNat_ofNat, Nat.mod_eq_of_lt (by omega),
+      Nat.mod_eq_of_lt (by omega)]
+  refine ⟨?_, ?_⟩ <;> rw [he] <;> omega
+
 /-- An entry is visible to agent `h` at view `tv`: at or below the view, or
 the agent's own. -/
 def HEnt.visible (h : Agent) (tv : Nat) (e : HEnt) : Bool :=
@@ -142,13 +178,19 @@ def FlatMem.writeBytes (m : FlatMem) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
     (h : Agent) : FlatMem :=
   (List.range n).foldl (fun m j => m.push (pa + BitVec.ofNat 64 j) ⟨t, h, nthByte w j⟩) m
 
-/-- The histories of a fresh era: every image byte at timestamp 0. -/
-def imgFlat (image : Mem) : FlatMem := image.map (fun _ v => [⟨0, 0, v⟩])
+/-- The histories of a fresh era: every image byte the DRAM bank holds, at
+timestamp 0.  The bus decode again: an image byte outside `[ramBase, ramEnd)`
+is not backed by memory (there is nothing to load it into), so a fresh era's
+histories sit at RAM addresses only. -/
+def imgFlat (image : Mem) : FlatMem :=
+  (image.filter (fun a _ => decide (inRam a 1))).map (fun _ v => [⟨0, 0, v⟩])
 
 theorem imgFlat_get? (image : Mem) (a : PAddr) :
-    (imgFlat image)[a]? = (image[a]?).map (fun v => [⟨0, 0, v⟩]) := by
+    (imgFlat image)[a]? =
+      if inRam a 1 then (image[a]?).map (fun v => [⟨0, 0, v⟩]) else none := by
   unfold imgFlat
-  rw [Std.ExtTreeMap.getElem?_map]
+  rw [Std.ExtTreeMap.getElem?_map, Std.ExtTreeMap.getElem?_filter']
+  by_cases h : inRam a 1 <;> simp [h, Option.filter] <;> cases image[a]? <;> simp
 
 /-! ### Plain-memory writes (reservation snapshots) -/
 

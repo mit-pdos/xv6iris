@@ -99,11 +99,16 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 /-- The ambient era's memory-model mirrors. -/
 abbrev memModel (σ : MState) : IProp GF := memModelAt (MachGS.era (hlc := hlc) (GF := GF)) σ
 
+/-- The ambient era's device mirrors. -/
+abbrev devInterp (ds : DevStates) : IProp GF := devInterpAt (MachGS.era (hlc := hlc) (GF := GF)) ds
+
 /-- The ambient era's interpretation of the machine: every hart's register
-map agrees with its register file, the memory heap is the byte histories, and
-the memory-model mirrors are at the machine's values. -/
+map agrees with its register file, the memory heap is the byte histories,
+the memory-model mirrors are at the machine's values, and the device
+mirrors are at the devices' states. -/
 abbrev machInterp (σ : MState) : IProp GF := iprop%
-  ([∗list] cpu ∈ cpus, regInterp cpu (σ.regs cpu)) ∗ genHeapInterp σ.mem ∗ memModel σ
+  ([∗list] cpu ∈ cpus, regInterp cpu (σ.regs cpu)) ∗ genHeapInterp σ.mem ∗ memModel σ ∗
+  devInterp σ.devs
 
 theorem eraInterp_ambient (σ : MState) :
     eraInterp (MachGS.era (hlc := hlc) (GF := GF)) σ = machInterp σ := rfl
@@ -114,10 +119,11 @@ theorem memModel_regs (σ : MState) (f : CPU → RegFile) :
 
 /-- Re-assemble the interpretation after a register update. -/
 theorem machInterp_of_regs (σ : MState) (f : CPU → RegFile) :
-    ([∗list] cpu ∈ cpus, regInterp cpu (f cpu)) ∗ genHeapInterp σ.mem ∗ memModel σ ⊢@{IProp GF}
-      machInterp { σ with regs := f } := by
+    ([∗list] cpu ∈ cpus, regInterp cpu (f cpu)) ∗ genHeapInterp σ.mem ∗ memModel σ ∗
+      devInterp σ.devs ⊢@{IProp GF} machInterp { σ with regs := f } := by
   have e : machInterp (GF := GF) { σ with regs := f } =
-      iprop(([∗list] cpu ∈ cpus, regInterp cpu (f cpu)) ∗ genHeapInterp σ.mem ∗ memModel σ) := rfl
+      iprop(([∗list] cpu ∈ cpus, regInterp cpu (f cpu)) ∗ genHeapInterp σ.mem ∗ memModel σ ∗
+        devInterp σ.devs) := rfl
   rw [e]
 
 /-! ## The hart WP -/
@@ -348,13 +354,13 @@ theorem machInterp_acc (σ : MState) (cpu : CPU) :
       ∀ (f : RegFile), regInterp cpu f -∗ machInterp { σ with regs := updCpu σ.regs cpu f } := by
   have hget := cpus_get? cpu
   unfold machInterp
-  iintro ⟨Hregs, Hmem, Hmm⟩
+  iintro ⟨Hregs, Hmem, Hmm, Hdev⟩
   icases BigSepL.bigSepL_lookup_acc_impl (Φ := fun _ c => regInterp c (σ.regs c)) hget $$ Hregs
     with ⟨Hcpu, Hclose⟩
   iframe Hcpu
   iintro %f Hf
   iapply machInterp_of_regs σ (updCpu σ.regs cpu f)
-  iframe Hmem Hmm
+  iframe Hmem Hmm Hdev
   iapply Hclose $$ %(fun _ c => regInterp c (updCpu σ.regs cpu f c))
   · imodintro
     iintro %k %y %hk %hne Hy
@@ -370,22 +376,25 @@ accepts any state that agrees with `σ` on the other harts' registers. -/
 theorem machInterp_acc_mem (σ : MState) (cpu : CPU) :
     machInterp (GF := GF) σ ⊢
       regInterp cpu (σ.regs cpu) ∗ genHeapInterp σ.mem ∗ memModel σ ∗
-      ∀ (σ' : MState), ⌜∀ c, c ≠ cpu → σ'.regs c = σ.regs c⌝ -∗ regInterp cpu (σ'.regs cpu) -∗
+      ∀ (σ' : MState), ⌜(∀ c, c ≠ cpu → σ'.regs c = σ.regs c) ∧ σ'.devs = σ.devs⌝ -∗
+        regInterp cpu (σ'.regs cpu) -∗
         genHeapInterp σ'.mem -∗ memModel σ' -∗ machInterp σ' := by
   have hget := cpus_get? cpu
   unfold machInterp
-  iintro ⟨Hregs, Hmem, Hmm⟩
+  iintro ⟨Hregs, Hmem, Hmm, Hdev⟩
   iframe Hmem Hmm
   icases BigSepL.bigSepL_lookup_acc_impl (Φ := fun _ c => regInterp c (σ.regs c)) hget $$ Hregs
     with ⟨Hcpu, Hclose⟩
   iframe Hcpu
   iintro %σ' %hσ' Hf Hmem Hmm
   iframe Hmem Hmm
+  ihave Hdev := (show devInterp (GF := GF) σ.devs ⊢ devInterp σ'.devs from by rw [hσ'.2]) $$ Hdev
+  iframe Hdev
   iapply Hclose $$ %(fun _ c => regInterp c (σ'.regs c))
   · imodintro
     iintro %k %y %hk %hne Hy
     have hy : y ≠ cpu := cpus_get?_ne hk cpu hne
-    simp only [hσ' y hy]
+    simp only [hσ'.1 y hy]
     iexact Hy
   · iexact Hf
 
@@ -823,7 +832,7 @@ theorem hartViews_store_plain (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (
 whose authorship and position become persistent facts; the hart's
 reservation, whatever it was, is cleared. -/
 theorem memModel_store_plain (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
-    (r : Option Resv) (hno : ¬ othersReserve σ.resv cpu pa n) :
+    (r : Option Resv) (hram : ramBytes pa n) (hno : ¬ othersReserve σ.resv cpu pa n) :
     memModelAt E σ ∗ resvFragAt E cpu r false ⊢@{IProp GF} |==>
       (memModelAt E (σ.store cpu pa n w false) ∗ resvFragAt E cpu none false ∗
        authoredByAt E (σ.top + 1) (hartAgent cpu) ∗ topLbAt E (σ.top + 1)) := by
@@ -855,7 +864,7 @@ theorem memModel_store_plain (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w
     · rw [BigSepL.bigSepL_eq (fun {_ c} _ => hartViews_store_plain E σ cpu pa n w c)]
       iexact Hviews
     · ipureintro
-      exact mmOk_store σ cpu pa n w false hno hmm
+      exact mmOk_store σ cpu pa n w false hram hno hmm
   · unfold authoredByAt topLbAt
     iframe Hau
     iright
@@ -1071,7 +1080,7 @@ theorem readBytes_unique (m : FlatMem) (h : Agent) (tv : Nat) (pa : PAddr) (n : 
 /-- A store by the running context: the memory model moves, the new timestamp
 enters ξ's dirty set (authored on `cpu`), and ξ's token is re-established. -/
 theorem ctx_store (σ : MState) (cpu : CPU) (ξ : CtxId) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
-    (r : Option Resv) (hno : ¬ othersReserve σ.resv cpu pa n) :
+    (r : Option Resv) (hram : ramBytes pa n) (hno : ¬ othersReserve σ.resv cpu pa n) :
     memModel σ ∗ ownCtx cpu ξ ∗ resvFrag cpu r false ⊢@{IProp GF} |==>
       (memModel (σ.store cpu pa n w false) ∗ ownCtx cpu ξ ∗ resvFrag cpu none false ∗
        keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ (σ.top + 1)) := by
@@ -1081,7 +1090,7 @@ theorem ctx_store (σ : MState) (cpu : CPU) (ξ : CtxId) (pa : PAddr) (n : Nat) 
   · iapply memModel_topLb _ σ W $$ [Hmm HW]
     iframe Hmm
     iexact HW
-  imod memModel_store_plain _ σ cpu pa n w r hno $$ [$Hmm $Hfrag] with ⟨Hmm, Hfrag, #Hau, #Htop'⟩
+  imod memModel_store_plain _ σ cpu pa n w r hram hno $$ [$Hmm $Hfrag] with ⟨Hmm, Hfrag, #Hau, #Htop'⟩
   unfold ctxAt
   icases Hctx with ⟨Hbound, Hdirty⟩
   have hfresh : get? D (σ.top + 1) = none := by
@@ -1155,20 +1164,24 @@ theorem swp_sail_mem_read_ifetch (cpu : CPU) {n vasize : Nat}
     iexact Hb
   ihave %hmm : ⌜mmOk σ⌝ $$ [Hmm]
   · iapply memModel_mmOk $$ Hmm
+  have hram : ramBytes req.pa n := ramBytes_of_readBytes hmm.2.2.2 (hrd (ifetchAgent cpu) 0)
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hmask
   isplit
   · ipureintro
-    exact ⟨.Ok (w, none), σ, Or.inl ⟨hk, σ.itv cpu, w, le_refl _, (hmm.2.1 cpu).2.1, hrd _ _, rfl, rfl⟩⟩
+    exact ⟨.Ok (w, none), σ, Or.inr (Or.inl
+      ⟨hram, hk, σ.itv cpu, w, le_refl _, (hmm.2.1 cpu).2.1, hrd _ _, rfl, rfl⟩)⟩
   inext
   iintro %v' %σ' %Hev
-  rcases Hev with ⟨_, tvn, w', _, _, hrd', rfl, hσ⟩ | ⟨hpl, _⟩ | ⟨hex', _⟩
+  rcases Hev with ⟨hdev, w₀, ds₀, hdr, _, _⟩ | ⟨_, _, tvn, w', _, _, hrd', rfl, hσ⟩ |
+    ⟨_, hpl, _⟩ | ⟨_, hex', _⟩
+  · exact absurd hdev (not_devBytes_of_ramBytes hram (devRead_pos hdr))
   · subst σ'
     obtain rfl := readBytes_unique _ _ _ _ _ _ _ (hrd _ _) hrd'
     imod Hmask
     imodintro
     isplitl [Hregs Hmem Hmm Hclose]
-    · iapply Hclose $$ %σ %(fun _ _ => rfl) Hregs Hmem Hmm
+    · iapply Hclose $$ %σ %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
     · iapply swp_ret
       iapply HΦ $$ Hb
   · simp [akPlain, hk] at hpl
@@ -1202,17 +1215,20 @@ theorem swp_sail_mem_read_plain_ctx (cpu : CPU) {n vasize : Nat}
     iframe
   ihave %hmm : ⌜mmOk σ⌝ $$ [Hmm]
   · iapply memModel_mmOk $$ Hmm
+  have hram : ramBytes req.pa n := ramBytes_of_readBytes hmm.2.2.2 (hrd _ (Nat.le_refl _))
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hmask
   isplit
   · ipureintro
-    refine ⟨.Ok (w, none), σ.afterLoad cpu req.pa n σ.top, Or.inr (Or.inl
-      ⟨hk, σ.top, w, (hmm.2.1 cpu).1, le_refl _, ?_, hrd _ (hmm.2.1 cpu).1, rfl, rfl⟩)⟩
+    refine ⟨.Ok (w, none), σ.afterLoad cpu req.pa n σ.top, Or.inr (Or.inr (Or.inl
+      ⟨hram, hk, σ.top, w, (hmm.2.1 cpu).1, le_refl _, ?_, hrd _ (hmm.2.1 cpu).1, rfl, rfl⟩))⟩
     intro j _
     exact (hmm.2.1 cpu).2.2.2 _
   inext
   iintro %v' %σ' %Hev
-  rcases Hev with ⟨hif, _⟩ | ⟨_, tvn, w', htv, htop, _, hrd', rfl, rfl⟩ | ⟨hex', _⟩
+  rcases Hev with ⟨hdev, w₀, ds₀, hdr, _, _⟩ | ⟨_, hif, _⟩ |
+    ⟨_, _, tvn, w', htv, htop, _, hrd', rfl, rfl⟩ | ⟨_, hex', _⟩
+  · exact absurd hdev (not_devBytes_of_ramBytes hram (devRead_pos hdr))
   · rw [hk'.1] at hif
     exact absurd hif (by decide)
   · obtain rfl := readBytes_unique _ _ _ _ _ _ _ (hrd tvn htv) hrd'
@@ -1220,7 +1236,7 @@ theorem swp_sail_mem_read_plain_ctx (cpu : CPU) {n vasize : Nat}
     imod Hmask
     imodintro
     isplitl [Hregs Hmem Hmm Hclose]
-    · iapply Hclose $$ %(σ.afterLoad cpu req.pa n tvn) %(fun _ _ => rfl) Hregs Hmem Hmm
+    · iapply Hclose $$ %(σ.afterLoad cpu req.pa n tvn) %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
     · iapply swp_ret
       iapply HΦ $$ Hctx Hb
   · rw [hk'.2] at hex'
@@ -1261,29 +1277,40 @@ theorem swp_sail_mem_write_plain (cpu : CPU) {n vasize : Nat}
   iapply swp_event_step cpu (.memWrite n vasize req) (fun v => FreeM.pure v) Φ
   iintro %σ Hσ
   icases machInterp_acc_mem σ cpu $$ Hσ with ⟨Hregs, Hmem, Hmm, Hclose⟩
+  ihave %hram : ⌜ramBytes req.pa n⌝ $$ [Htok Hb Hmem Hmm]
+  · icases ctxTok_cases cpu ξ $$ Htok with ⟨Hctx, %r, Hfrag⟩
+    ihave %hrd : ⌜∀ tvn, σ.tv cpu ≤ tvn → σ.mem.readBytes (hartAgent cpu) tvn req.pa n w⌝
+        $$ [Hmm Hctx Hmem Hb]
+    · iapply ctxBytes_readable σ cpu ξ req.pa n (DFrac.own 1) w $$ [Hmm Hctx Hmem Hb]
+      iframe
+    ihave %hmm : ⌜mmOk σ⌝ $$ [Hmm]
+    · iapply memModel_mmOk $$ Hmm
+    ipureintro
+    exact ramBytes_of_readBytes hmm.2.2.2 (hrd _ (Nat.le_refl _))
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hmask
   isplit
   · ipureintro
     by_cases hno : othersReserve σ.resv cpu req.pa n
     · exact Or.inr ⟨σ, hno, rfl⟩
-    · exact Or.inl ⟨.Ok (some true), _, w', hv, hno, rfl, rfl⟩
+    · exact Or.inl ⟨.Ok (some true), _, Or.inr ⟨hram, w', hv, hno, rfl, rfl⟩⟩
   inext
   iintro %σ'
   isplit
   · iintro %v %Hev
-    obtain ⟨w'', hv', hno, rfl, rfl⟩ := Hev
+    rcases Hev with ⟨hdev, w₀, ds₀, _, hdw, _, _⟩ | ⟨_, w'', hv', hno, rfl, rfl⟩
+    · exact absurd hdev (not_devBytes_of_ramBytes hram (devWrite_pos hdw))
     rw [hv] at hv'
     obtain rfl := Option.some.inj hv'
     icases ctxTok_cases cpu ξ $$ Htok with ⟨Hctx, %r, Hfrag⟩
-    imod ctx_store σ cpu ξ req.pa n w' r hno $$ [$Hmm $Hctx $Hfrag] with ⟨Hmm, Hctx, Hfrag, #Hkey⟩
+    imod ctx_store σ cpu ξ req.pa n w' r hram hno $$ [$Hmm $Hctx $Hfrag] with ⟨Hmm, Hctx, Hfrag, #Hkey⟩
     imod ctxBytes_update ξ σ.mem req.pa n w w' (σ.top + 1) (hartAgent cpu) $$ [$Hkey $Hmem $Hb]
       with ⟨Hmem, Hb⟩
     imod Hmask
     imodintro
     rw [hk]
     isplitl [Hregs Hmem Hmm Hclose]
-    · iapply Hclose $$ %(σ.store cpu req.pa n w' false) %(fun _ _ => rfl) Hregs Hmem Hmm
+    · iapply Hclose $$ %(σ.store cpu req.pa n w' false) %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
     · iapply swp_ret
       iapply HΦ $$ [Hctx Hfrag] Hb
       iapply ctxTok_intro cpu ξ none
@@ -1294,7 +1321,7 @@ theorem swp_sail_mem_write_plain (cpu : CPU) {n vasize : Nat}
     imod Hmask
     imodintro
     isplitl [Hregs Hmem Hmm Hclose]
-    · iapply Hclose $$ %σ %(fun _ _ => rfl) Hregs Hmem Hmm
+    · iapply Hclose $$ %σ %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
     · iapply IH $$ Htok Hb
       inext
       iexact HΦ
@@ -1319,7 +1346,7 @@ theorem swp_sail_barrier (cpu : CPU) (b : barrier_kind) (Φ : Unit → IProp GF)
   imod Hmask
   imodintro
   isplitl [Hregs Hmem Hmm Hclose]
-  · iapply Hclose $$ %(σ.fence cpu b) %(fun _ _ => rfl) Hregs Hmem Hmm
+  · iapply Hclose $$ %(σ.fence cpu b) %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
   · iapply swp_ret
     iexact HΦ
 

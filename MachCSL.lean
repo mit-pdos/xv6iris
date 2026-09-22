@@ -1,9 +1,16 @@
 import MachCSL.Hello
 import MachCSL.TsoMem
+import MachCSL.Dev.DevIds
+import MachCSL.Dev.DevLang
+import MachCSL.Dev.Uart
+import MachCSL.Dev.Plic
+import MachCSL.Dev.Virtio
+import MachCSL.Dev.Fabric
 import MachCSL.Lang
 import MachCSL.Resources
 import MachCSL.Ctx
 import MachCSL.Wp
+import MachCSL.WpDev
 import MachCSL.Power
 import MachCSL.SimpAttr
 import MachCSL.ModelFacts

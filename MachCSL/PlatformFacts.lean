@@ -6,19 +6,13 @@ by arithmetic on the address; for a *symbolic* address inside RAM these are
 the closed forms the stage specifications rewrite with.
 -/
 import MachCSL.Platform
+import MachCSL.TsoMem
 import MachCSL.SimpAttr
 
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1
 open LeanRV64D LeanRV64D.Functions
-
-/-- The platform's DRAM: `[0x80000000, 0x88000000)` (128 MiB, xv6's `PHYSTOP`). -/
-def ramBase : Nat := 0x80000000
-def ramEnd : Nat := 0x88000000
-
-/-- An access of `n` bytes at `pa` lies inside RAM. -/
-def inRam (pa : BitVec 64) (n : Nat) : Prop := ramBase ≤ pa.toNat ∧ pa.toNat + n ≤ ramEnd
 
 /-- The RAM region of the platform's PMA table. -/
 def ramRegion : PMA_Region := bootPMA[2]!

@@ -29,13 +29,26 @@ power cycle.
 
 Shared memory is the TSO machine of `MachCSL.TsoMem` (the Rocq prototype's
 `mnode_step`): per-byte write histories, per-hart data and instruction views,
-per-hart read side, reservations for exclusive accesses.  What is deliberately
-NOT here yet: devices (UART/PLIC/disk) and MMIO, and the disk as a bus master.
+per-hart read side, reservations for exclusive accesses.
+
+Devices (`MachCSL.Dev.*`): the two UARTs, the PLIC and the virtio disk are
+separate models, each a program of the device language (`MachCSL.Dev.DevLang`)
+over its own state.  Every device is a set of THREADS of the language: its
+root thread runs its `body` forever (restarted at each return, as a hart's
+cycle is), and the tasks it forks (`DevOp.fork`) are threads of their own,
+so the disk serves its requests concurrently and completes them in any
+order.  A hart's memory access below the DRAM bank is an MMIO transaction
+routed to the device whose window it hits (`devRead`/`devWrite`); the disk's
+DMA reads see the top of the store order and its DMA writes append there as
+the disk agent (`MState.storeDma`), blocked while a hart reserves a byte of
+the footprint; the PLIC drives the harts' external-interrupt pins
+(`sig_seip`/`sig_meip`) through the wire primitive.
 -/
 import Sail
 import LeanRV64D
 import MachCSL.Platform
 import MachCSL.TsoMem
+import MachCSL.Dev.Fabric
 import Iris.ProgramLogic.Language
 
 namespace MachCSL
@@ -73,6 +86,10 @@ structure MState where
   itv : CPU → Nat
   hr : CPU → HRead
   resv : CPU → Option Resv
+  /-- every device's local state -/
+  devs : DevStates
+  /-- every device's task bookkeeping -/
+  devrt : DevId → DevRt
 
 /-- The top of the store order: the timestamp of the latest store. -/
 abbrev MState.top (σ : MState) : Nat := σ.log.length
@@ -84,6 +101,10 @@ abbrev MState.setReg (σ : MState) (cpu : CPU) (r : Register) (v : RegisterType 
 /-- Update one hart's entry of a per-hart map. -/
 abbrev updCpu {α : Type} (f : CPU → α) (cpu : CPU) (x : α) : CPU → α :=
   fun c => if c = cpu then x else f c
+
+/-- Update one device's entry of a per-device map. -/
+abbrev updCpu' {α : Type} (f : DevId → α) (d : DevId) (x : α) : DevId → α :=
+  fun d' => if d' = d then x else f d'
 
 /-- After a plain load of `n` bytes at `pa` at view `tvn`: the read side moves,
 nothing else. -/
@@ -125,6 +146,37 @@ abbrev MState.fence (σ : MState) (cpu : CPU) (b : barrier_kind) : MState :=
              (if fenceIfetch b then max (σ.itv cpu) (fencePost true false (σ.tv cpu) (σ.hr cpu).rv pub)
               else σ.itv cpu) }
 
+/-- After a DMA write of `w` at `pa` by the disk: the bytes' histories grow,
+the author log grows; no hart's views move (the device is pinned to the top
+of the order). -/
+abbrev MState.storeDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) : MState :=
+  { σ with mem := σ.mem.writeBytes pa n w (σ.top + 1) diskAgent,
+           log := σ.log ++ [diskAgent] }
+
+/-- Every byte of the `n`-byte footprint at `pa` is a device address: the
+access is an MMIO transaction.  The footprint form (rather than `devAddr pa`
+alone) is what makes the MMIO and memory arms of `evStep` exclusive: a byte a
+hart reserves, or a byte the memory has a history for, is a DRAM byte. -/
+def devBytes (pa : PAddr) (n : Nat) : Prop := ∀ j, j < n → devAddr (pa + BitVec.ofNat 64 j) = true
+
+/-- Some hart reserves a byte of the footprint. -/
+def anyReserve (resv : CPU → Option Resv) (pa : PAddr) (n : Nat) : Prop :=
+  ∃ c r, resv c = some r ∧ r.overlaps pa n
+
+/-- What a DMA read of `n` bytes at `pa` may answer: every byte the memory
+covers is its byte at the top of the order, the others are anything (the
+Rocq prototype's `mem_view`). -/
+def dmaView (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) : Prop :=
+  ∀ j, j < n → ∀ b, (σ.mem[pa + BitVec.ofNat 64 j]?).bind Hist.top = some b → nthByte w j = b
+
+/-- Update one device's state. -/
+abbrev MState.setDev (σ : MState) (d : DevId) (st : DevSt d) : MState :=
+  { σ with devs := σ.devs.set d st }
+
+/-- Update one device's task bookkeeping. -/
+abbrev MState.setRt (σ : MState) (d : DevId) (rt : DevRt) : MState :=
+  { σ with devrt := updCpu' σ.devrt d rt }
+
 /-! ## One cycle of the model -/
 
 /-- One fetch/decode/execute cycle of the Sail model, optionally followed by
@@ -139,10 +191,15 @@ noncomputable def riscvStep (tick : Bool) : SailM Unit := do
 /-! ## Expressions -/
 
 /-- A hart of generation `gen`, with the rest of its current cycle left to
-run; or the power thread. -/
+run; a task of a device of generation `gen`, with the rest of its program
+left to run; or the power thread. -/
 inductive Expr where
   | hart (gen : Nat) (cpu : CPU) (m : SailM Unit)
+  | dev (gen : Nat) (d : DevId) (tid : TaskId) (m : DevProg d)
   | power
+
+/-- The root thread of device `d` at its loop boundary. -/
+def DevLoop (gen : Nat) (d : DevId) : Expr := .dev gen d rootTask (pure ())
 
 /-- The cycle boundary: hart `cpu` of generation `gen` with nothing left of
 its current cycle. -/
@@ -151,10 +208,11 @@ def Loop (gen : Nat) (cpu : CPU) : Expr := .hart gen cpu (pure ())
 /-- No expression is a value: the machine runs forever. -/
 abbrev Val := Empty
 
-/-- Observations: the power events.  (Devices will add console I/O.) -/
+/-- Observations: the power events, and the devices' wire events. -/
 inductive Obs where
   | powerOn
   | powerOff
+  | dev (o : DevObs)
   deriving DecidableEq, Repr
 
 /-! ## The global state -/
@@ -244,29 +302,33 @@ hands the boot client (`wp_power`'s `Hboot`). -/
 def bootFacts (σ : MState) (image : Mem) : Prop :=
   σ.mem = imgFlat image ∧ σ.log = [] ∧
   (∀ cpu, σ.tv cpu = 0 ∧ σ.itv cpu = 0 ∧ σ.hr cpu = HRead.zero ∧ σ.resv cpu = none) ∧
-  ∀ cpu, resetRegs cpu (σ.regs cpu)
+  (∀ cpu, resetRegs cpu (σ.regs cpu)) ∧
+  ∀ d, σ.devrt d = DevRt.init
 
 /-- The state a `PowerOn` hands over: same generation (`PowerOff` already
-bumped it), power on, the same image, and a booted machine. -/
+bumped it), power on, the same image, a booted machine, and every device
+reset from what it was (the disk keeps its durable image). -/
 def bootShape (g g' : GState) : Prop :=
-  g'.gen = g.gen ∧ g'.pow = true ∧ g'.image = g.image ∧ bootFacts g'.m g.image
+  g'.gen = g.gen ∧ g'.pow = true ∧ g'.image = g.image ∧ bootFacts g'.m g.image ∧
+  g'.m.devs = g.m.devs.reset
 
 /-- A booted state exists (so the power-on arm is always enabled): reset every
-hart's file and reload the image. -/
+hart's file, reload the image, reset the devices. -/
 def bootWitness (g : GState) : GState :=
   { m := ⟨fun cpu => resetWith cpu (g.m.regs cpu), imgFlat g.image, [], fun _ => 0, fun _ => 0,
-          fun _ => HRead.zero, fun _ => none⟩,
+          fun _ => HRead.zero, fun _ => none, g.m.devs.reset, fun _ => DevRt.init⟩,
     gen := g.gen, pow := true, image := g.image }
 
 theorem bootShape_bootWitness (g : GState) : bootShape g (bootWitness g) :=
-  ⟨rfl, rfl, rfl, rfl, rfl, fun _ => ⟨rfl, rfl, rfl, rfl⟩, fun cpu => resetRegs_resetWith cpu _⟩
+  ⟨rfl, rfl, rfl, ⟨rfl, rfl, fun _ => ⟨rfl, rfl, rfl, rfl⟩, fun cpu => resetRegs_resetWith cpu _,
+    fun _ => rfl⟩, rfl⟩
 
 /-- All harts. -/
 def cpus : List CPU := List.finRange NCPU
 
 /-- What a `PowerOn` forks: the new generation's whole complement of harts,
-each at its cycle boundary. -/
-def powerFork (gen : Nat) : List Expr := cpus.map (Loop gen)
+each at its cycle boundary, and every device's root thread. -/
+def powerFork (gen : Nat) : List Expr := cpus.map (Loop gen) ++ DevId.all.map (DevLoop gen)
 
 /-! ## The per-event step relation -/
 
@@ -275,8 +337,17 @@ abbrev Ev := Eff RegisterType exception
 
 /-- `evStep cpu o σ v σ'`: in state `σ`, hart `cpu`'s event `o` can be
 answered with `v`, moving the state to `σ'`.  Failure events and the legacy
-direct-RAM events have no answer (the hart is stuck).  Memory events follow
-`MachCSL.TsoMem` (the Rocq prototype's `mnode_step`):
+direct-RAM events have no answer (the hart is stuck).
+
+A memory event is routed by its address (the BUS DECODE): an access that
+reaches a device window (`devAddr`) is an MMIO transaction, serviced by that
+device alone (`devRead`/`devWrite`); an access whose whole footprint is DRAM
+(`ramBytes`) is a memory transaction, and follows `MachCSL.TsoMem` (the Rocq
+prototype's `mnode_step`).  The two are exclusive: a DRAM byte is at or above
+`ramBase = devBound`.  An access that is neither -- a store to an address no
+device and no DRAM byte answers -- has no answer at all.
+
+The memory transactions:
 
 * a **fetch** (`AK_ifetch`) reads every byte of the footprint as the hart's
   instruction-cache agent at one view between the hart's instruction view
@@ -298,20 +369,28 @@ abbrev evStep (cpu : CPU) (o : Outcome Register RegisterType) (σ : MState) :
   | .regRead r => fun v σ' => v = σ.regs cpu r ∧ σ' = σ
   | .regWrite r v => fun _ σ' => σ' = σ.setReg cpu r v
   | .memRead n _ req => fun v σ' =>
-      (akIfetch req.access_kind = true ∧
+      (devBytes req.pa n ∧
+        ∃ w ds', devRead σ.devs req.pa n = some (w, ds') ∧ v = .Ok (w, none) ∧
+          σ' = { σ with devs := ds' }) ∨
+      (ramBytes req.pa n ∧ akIfetch req.access_kind = true ∧
         ∃ (tvn : Nat) (w : BitVec (8 * n)), σ.itv cpu ≤ tvn ∧ tvn ≤ σ.top ∧
           σ.mem.readBytes (ifetchAgent cpu) tvn req.pa n w ∧ v = .Ok (w, none) ∧ σ' = σ) ∨
-      (akPlain req.access_kind = true ∧
+      (ramBytes req.pa n ∧ akPlain req.access_kind = true ∧
         ∃ (tvn : Nat) (w : BitVec (8 * n)), σ.tv cpu ≤ tvn ∧ tvn ≤ σ.top ∧
           (σ.hr cpu).cohOk req.pa n tvn ∧
           σ.mem.readBytes (hartAgent cpu) tvn req.pa n w ∧ v = .Ok (w, none) ∧
           σ' = σ.afterLoad cpu req.pa n tvn) ∨
-      (akExcl req.access_kind = true ∧ ¬ othersReserve σ.resv cpu req.pa n ∧
+      (ramBytes req.pa n ∧ akExcl req.access_kind = true ∧
+        ¬ othersReserve σ.resv cpu req.pa n ∧
         ∃ w : BitVec (8 * n), σ.mem.topBytes req.pa n w ∧ v = .Ok (w, none) ∧
           σ' = σ.afterExcl cpu req.pa n w (akAcq req.access_kind))
   | .memWrite n _ req => fun v σ' =>
-      ∃ w : BitVec (8 * n), req.value = some w ∧ ¬ othersReserve σ.resv cpu req.pa n ∧
-        v = .Ok (some true) ∧ σ' = σ.store cpu req.pa n w (akExcl req.access_kind)
+      (devBytes req.pa n ∧
+        ∃ w ds', req.value = some w ∧ devWrite σ.devs req.pa n w = some ds' ∧
+          v = .Ok (some true) ∧ σ' = { σ with devs := ds' }) ∨
+      (ramBytes req.pa n ∧
+        ∃ w : BitVec (8 * n), req.value = some w ∧ ¬ othersReserve σ.resv cpu req.pa n ∧
+          v = .Ok (some true) ∧ σ' = σ.store cpu req.pa n w (akExcl req.access_kind))
   | .readRam .. => fun _ _ => False
   | .writeRam .. => fun _ _ => False
   | .barrier b => fun _ σ' => σ' = σ.fence cpu b
@@ -332,7 +411,8 @@ read dropping the hart's own reservation. -/
 abbrev blockedStep (cpu : CPU) (o : Outcome Register RegisterType) (σ σ' : MState) : Prop :=
   match o with
   | .memRead n _ req =>
-      akExcl req.access_kind = true ∧ othersReserve σ.resv cpu req.pa n ∧ σ' = σ.dropResv cpu
+      akExcl req.access_kind = true ∧ othersReserve σ.resv cpu req.pa n ∧
+        σ' = σ.dropResv cpu
   | .memWrite n _ req => othersReserve σ.resv cpu req.pa n ∧ σ' = σ
   | _ => False
 
@@ -346,22 +426,96 @@ def hartStep (cpu : CPU) (m : SailM Unit) (σ : MState) (m' : SailM Unit) (σ' :
   | .impure (.ok o) k =>
       (∃ v : o.ret, m' = k v ∧ evStep cpu o σ v σ') ∨ (blockedStep cpu o σ σ' ∧ m' = m)
 
+/-! ## The device steps -/
+
+/-- `devOpStep d o σ v σ' obs efs`: device `d`'s primitive `o` in state `σ`
+is answered with `v`, moving the state to `σ'`, emitting `obs` and forking
+`efs` (the tasks of `DevOp.fork`).
+
+* `step g`: the guarded update, with `g` answering;
+* `get`, `choose`: read the local state, any number;
+* `dmaRead`: any value consistent with the top of the order (`dmaView`);
+* `dmaWrite g`: appended at the top as the disk agent if `g` holds and the
+  footprint is DRAM (no hart may reserve a byte of it), a silent no-op
+  otherwise;
+* `sample`: the level its device drives on the source;
+* `setPin`: the hart's `sig_meip`/`sig_seip` register;
+* `fork t`: the next task id, and the named subprogram as a new thread;
+* `join tid`: only once task `tid` has finished. -/
+def devOpStep (gen : Nat) (d : DevId) (o : DevOp (DevSt d) (DevTask d)) (σ : MState) :
+    o.ret → MState → List Obs → List Expr → Prop :=
+  match o with
+  | .step g => fun _ σ' obs efs =>
+      ∃ s' os, g (σ.devs.st d) = some (s', os) ∧ σ' = σ.setDev d s' ∧ obs = os.map Obs.dev ∧ efs = []
+  | .get => fun v σ' obs efs => v = σ.devs.st d ∧ σ' = σ ∧ obs = [] ∧ efs = []
+  | .choose => fun _ σ' obs efs => σ' = σ ∧ obs = [] ∧ efs = []
+  | .dmaRead pa n => fun v σ' obs efs => dmaView σ pa n v ∧ σ' = σ ∧ obs = [] ∧ efs = []
+  | .dmaWrite g pa n w => fun _ σ' obs efs =>
+      obs = [] ∧ efs = [] ∧
+      ((g (σ.devs.st d) = true ∧ ramBytes pa n ∧ ¬ anyReserve σ.resv pa n ∧
+          σ' = σ.storeDma pa n w) ∨
+       ((g (σ.devs.st d) = false ∨ ¬ ramBytes pa n) ∧ σ' = σ))
+  | .sample src => fun v σ' obs efs => v = devLevel σ.devs src ∧ σ' = σ ∧ obs = [] ∧ efs = []
+  | .setPin cpu mmode b => fun _ σ' obs efs =>
+      obs = [] ∧ efs = [] ∧
+      σ' = (if mmode then σ.setReg cpu .sig_meip (if b then 1#1 else 0#1)
+            else σ.setReg cpu .sig_seip (if b then 1#1 else 0#1))
+  | .fork t => fun v σ' obs efs =>
+      v = (σ.devrt d).next ∧ obs = [] ∧
+      σ' = σ.setRt d { σ.devrt d with next := (σ.devrt d).next + 1 } ∧
+      efs = [.dev gen d (σ.devrt d).next ((devSig d).task t)]
+  | .join tid => fun _ σ' obs efs => tid ∈ (σ.devrt d).done ∧ σ' = σ ∧ obs = [] ∧ efs = []
+
+/-- `devBlocked d o σ`: primitive `o` is blocked (the thread retries it): a
+guard that does not answer, a DMA write into a reserved footprint, a join
+on an unfinished task. -/
+def devBlocked (d : DevId) (o : DevOp (DevSt d) (DevTask d)) (σ : MState) : Prop :=
+  match o with
+  | .step g => g (σ.devs.st d) = none
+  | .dmaWrite g pa n _ => g (σ.devs.st d) = true ∧ anyReserve σ.resv pa n
+  | .join tid => tid ∉ (σ.devrt d).done
+  | _ => False
+
+/-- `devStep gen d tid m σ obs m' σ' efs`: task `tid` of device `d`, with `m`
+left to run, takes one step.  At a program's end the root thread restarts
+the device's body; a forked task records that it has finished (and then
+self-loops forever, a finished task's corpse). -/
+def devStep (gen : Nat) (d : DevId) (tid : TaskId) (m : DevProg d) (σ : MState)
+    (obs : List Obs) (m' : DevProg d) (σ' : MState) (efs : List Expr) : Prop :=
+  match m with
+  | .pure _ =>
+      obs = [] ∧ efs = [] ∧
+      ((tid = rootTask ∧ m' = (devSig d).body ∧ σ' = σ) ∨
+       (tid ≠ rootTask ∧ m' = .pure () ∧
+         σ' = (if tid ∈ (σ.devrt d).done then σ
+               else σ.setRt d { σ.devrt d with done := tid :: (σ.devrt d).done })))
+  | .op o k =>
+      (∃ v : o.ret, m' = k v ∧ devOpStep gen d o σ v σ' obs efs) ∨
+      (devBlocked d o σ ∧ m' = m ∧ σ' = σ ∧ obs = [] ∧ efs = [])
+
 /-- The primitive step relation of the language.
 
 * A hart of generation `gen`: if live, one event step of the machine (silent,
   no forks); otherwise the corpse arm, a pure self-loop.  The two arms
   partition, so the relation is total without a stutter arm, and a dead
   generation's hart can only self-loop.
+* A device task of generation `gen`: if live, one step of its program
+  (`devStep`: possibly observed, possibly forking); otherwise the corpse
+  arm.
 * The power thread: with the power on, `PowerOff` (observed) bumps the
   generation and clears the power bit, freezing the machine; with the power
   off, `PowerOn` (observed) resets the machine to the image and forks the new
-  generation's harts. -/
+  generation's harts and device roots. -/
 def primStep : Expr × GState → List Obs → Expr × GState × List Expr → Prop
   | (.hart gen cpu m, g), obs, (e', g', efs) =>
     obs = [] ∧ efs = [] ∧
     ((threadLive g gen ∧ ∃ m' σ', e' = .hart gen cpu m' ∧ hartStep cpu m g.m m' σ' ∧
         g' = { g with m := σ' }) ∨
      (¬ threadLive g gen ∧ e' = .hart gen cpu m ∧ g' = g))
+  | (.dev gen d tid m, g), obs, (e', g', efs) =>
+    (threadLive g gen ∧ ∃ m' σ', e' = .dev gen d tid m' ∧ devStep gen d tid m g.m obs m' σ' efs ∧
+        g' = { g with m := σ' }) ∨
+    (¬ threadLive g gen ∧ obs = [] ∧ efs = [] ∧ e' = .dev gen d tid m ∧ g' = g)
   | (.power, g), obs, (e', g', efs) =>
     e' = .power ∧
     ((g.pow = true ∧ obs = [.powerOff] ∧ efs = [] ∧
@@ -404,6 +558,24 @@ theorem primStep_hart_dead {gen : Nat} {cpu : CPU} {m : SailM Unit} {g : GState}
     (hd : ¬ threadLive g gen) :
     PrimStep.primStep (Expr.hart gen cpu m, g) ([] : List Obs) (.hart gen cpu m, g, []) :=
   ⟨rfl, rfl, Or.inr ⟨hd, rfl, rfl⟩⟩
+
+theorem primStep_dev_inv {gen : Nat} {d : DevId} {tid : TaskId} {m : DevProg d} {g : GState}
+    {obs : List Obs} {e' : Expr} {g' : GState} {efs : List Expr}
+    (h : PrimStep.primStep (Expr.dev gen d tid m, g) obs (e', g', efs)) :
+    (threadLive g gen ∧ ∃ m' σ', e' = .dev gen d tid m' ∧ devStep gen d tid m g.m obs m' σ' efs ∧
+        g' = { g with m := σ' }) ∨
+    (¬ threadLive g gen ∧ obs = [] ∧ efs = [] ∧ e' = .dev gen d tid m ∧ g' = g) := h
+
+theorem primStep_dev_live {gen : Nat} {d : DevId} {tid : TaskId} {m m' : DevProg d} {g : GState}
+    {obs : List Obs} {σ' : MState} {efs : List Expr} (hl : threadLive g gen)
+    (h : devStep gen d tid m g.m obs m' σ' efs) :
+    PrimStep.primStep (Expr.dev gen d tid m, g) obs (.dev gen d tid m', { g with m := σ' }, efs) :=
+  Or.inl ⟨hl, m', σ', rfl, h, rfl⟩
+
+theorem primStep_dev_dead {gen : Nat} {d : DevId} {tid : TaskId} {m : DevProg d} {g : GState}
+    (hd : ¬ threadLive g gen) :
+    PrimStep.primStep (Expr.dev gen d tid m, g) ([] : List Obs) (.dev gen d tid m, g, []) :=
+  Or.inr ⟨hd, rfl, rfl, rfl, rfl⟩
 
 theorem primStep_power_inv {g : GState} {obs : List Obs} {e' : Expr} {g' : GState}
     {efs : List Expr} (h : PrimStep.primStep (Expr.power, g) obs (e', g', efs)) :
