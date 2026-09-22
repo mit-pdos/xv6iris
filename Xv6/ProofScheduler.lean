@@ -663,6 +663,8 @@ theorem scheduler_dispatch (SW : SWTCH) [Xv6G GF] [X : CurCtx] (Γ : SchedNames)
   have ht0 : t0 = KTier.kpt := hct.symm.trans htier
   subst ht0
   -- the record and the tag come out of the slot
+  icases procSlots_used Γ curCtx (procAddr n) RUNNABLE
+      (not_isUnused_of_needsCtx sc_needsCtx_RUNNABLE) $$ Hslots with ⟨#Hused, Hslots⟩
   icases procSlots_dispatch Γ curCtx (procAddr n) RUNNABLE sc_needsCtx_RUNNABLE $$ Hslots with
     ⟨Hrec, Htag⟩
   icases hartAtAny_elim Γ n hn $$ Htag with ⟨%h0, Htag⟩
@@ -772,7 +774,7 @@ theorem scheduler_dispatch (SW : SWTCH) [Xv6G GF] [X : CurCtx] (Γ : SchedNames)
   subst hA'
   subst hcret
   subst hback
-  ihave Hsl := procSlots_park_gen' Γ ξ0 n hn st hpark cpu $$ [$Hrec' $Htag2 $Hpay2]
+  ihave Hsl := procSlots_park_gen' Γ ξ0 n hn st hpark cpu $$ [$Hused $Hrec' $Htag2 $Hpay2]
   icases procHeldAt_cases Γ ξ0 cpu n st ch2 $$ Hheld2 with
     ⟨Hlocked2, Hpw2, %kl2, %xs2, %pid2, Hstate2, Hchan2, Hrest2⟩
   icases (pstateWhole_split Γ (procAddr n) st).mp $$ Hpw2 with ⟨Hpl2, _⟩

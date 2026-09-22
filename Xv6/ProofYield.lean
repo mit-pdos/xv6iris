@@ -162,6 +162,11 @@ theorem yield_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : Y
       pstateHlf Γ j RUNNING ∗ hartHlf Γ j cpu from by
       rw [cpuClaim_eq Γ]; exact procClaim_elim Γ cpu j hj) $$ Hclaim
   icases Hcl with ⟨Hpst, Hhart⟩
+  by_cases hstu : isUnused st
+  · icases procSlots_running Γ ξ0 j cpu st hj $$ [$Hhart $Hslots] with ⟨%hstx, Htag, Hcells, Hvc⟩
+    subst hstx
+    exact absurd hstu (by decide)
+  icases procSlots_used Γ ξ0 (procAddr j) st hstu $$ Hslots with ⟨#Hused, Hslots⟩
   icases procSlots_running Γ ξ0 j cpu st hj $$ [$Hhart $Hslots] with ⟨%hstr, Htag, Hcells, Hvc⟩
   subst hstr
   -- the mirror: the lock's half joins the claim's
@@ -252,7 +257,7 @@ theorem yield_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : Y
     ⟨Hlocked2, Hwhole2, %kl2, %xs2, %pid2, Hstate2, Hchan2, Hrest2⟩
   icases hsplit.mp $$ Hwhole2 with ⟨Hpsl2, Hpst2⟩
   icases hart_split Γ j h1 $$ Htag with ⟨Htag1, Htag2⟩
-  ihave Hslots2 := procSlots_running_intro Γ ξ0 j h1 hj $$ [$Htag1 $Hcells $Hvc]
+  ihave Hslots2 := procSlots_running_intro Γ ξ0 j h1 hj $$ [$Hused $Htag1 $Hcells $Hvc]
   ihave HR2 := procLockRes_intro Γ ξ0 (procAddr j) RUNNING ch2 kl2 xs2 pid2
     $$ [$Hstate2 $Hpsl2 $Hchan2 $Hrest2 $Hslots2]
   ihave HR2 := (show procLockResAt (GF := GF) Γ ξ0 (procAddr j) ⊢ procLockPay Γ j curCtx from by

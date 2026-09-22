@@ -44,6 +44,11 @@ structure SchedNames where
   lock : Nat → GName
   park : Nat → GName
   pstate : Nat → GName
+  /-- the per-slot "ever allocated" ghost (`Xv6/ProcAvail.lean`): a `Nat`
+  ghost variable at `0` while the slot has never been allocated (one half in
+  the slot's UNUSED arm, the other with the boot holder), persistently `1`
+  from the first `allocproc` on -/
+  used : BitVec 64 → GName
 
 /-! ## The state predicates (Rocq `ProcGeom.v`) -/
 
@@ -1075,19 +1080,111 @@ instance instCtxMorphRunSlotAt (Γ : SchedNames) (pa : BitVec 64) :
 
 /-! ## The slot (Rocq `proc_slots_at`) -/
 
+/-! ### The "ever allocated" marker (Rocq `ProcAvail.pslot_used`)
+
+`allocproc` scans for an UNUSED slot and returns 0 if it finds none; its
+caller `userinit` does NOT check the result, so a proof of `userinit` has
+to REFUTE the empty-table arm, and nothing in the table's own resources
+can express "some slot is UNUSED" (the lock owns both halves of the state
+mirror exactly at the unclaimed states).  The marker is on the ALLOCATED
+side and PERSISTENT: `slotUsed Γ pa` sits in every arm except UNUSED, so a
+scan that releases each lock before moving on still KEEPS what it read,
+and after all `NPROC` slots it holds every marker -- which the counted
+boot regime of `Xv6/ProcAvail.lean` contradicts.  The UNUSED arm holds
+either the slot's half of the still-`0` ghost (the other half is the boot
+holder's, or the sealed invariant's) or, once the slot has been allocated
+and freed, the marker itself. -/
+
+/-- The slot has been allocated at least once (persistent). -/
+def slotUsed (Γ : SchedNames) (pa : BitVec 64) : IProp GF := (Γ.used pa) ↪VAR{.discard} (1 : Nat)
+
+/-- The slot's half of a never-allocated slot's ghost. -/
+def slotFree (Γ : SchedNames) (pa : BitVec 64) : IProp GF := (Γ.used pa) ↪VAR{.own (1 : Qp).half} (0 : Nat)
+
+instance slotUsed_persistent (Γ : SchedNames) (pa : BitVec 64) : Persistent (slotUsed (GF := GF) Γ pa) := by
+  unfold slotUsed; infer_instance
+instance slotUsed_timeless (Γ : SchedNames) (pa : BitVec 64) : Timeless (slotUsed (GF := GF) Γ pa) := by
+  unfold slotUsed; infer_instance
+instance slotFree_timeless (Γ : SchedNames) (pa : BitVec 64) : Timeless (slotFree (GF := GF) Γ pa) := by
+  unfold slotFree; infer_instance
+
+/-- A never-allocated slot is not allocated. -/
+theorem slotFree_used_excl (Γ : SchedNames) (pa : BitVec 64) :
+    slotFree (GF := GF) Γ pa ∗ slotUsed Γ pa ⊢ False := by
+  unfold slotFree slotUsed
+  iintro ⟨Hf, Hu⟩
+  ihave %h := ghost_var_agree (Γ.used pa) (0 : Nat) _ (1 : Nat) _ $$ Hf Hu
+  exact absurd h (by decide)
+
+/-- Both halves mint the marker. -/
+theorem slot_mint (Γ : SchedNames) (pa : BitVec 64) :
+    slotFree (GF := GF) Γ pa ∗ slotFree Γ pa ⊢ |==> slotUsed Γ pa := by
+  unfold slotFree slotUsed
+  iintro ⟨H1, H2⟩
+  imod ghost_var_update_halves (1 : Nat) (Γ.used pa) 0 0 $$ H1 H2 with ⟨H1, -⟩
+  imod ghost_var_persist (Γ.used pa) _ (1 : Nat) $$ H1 with H1
+  imodintro
+  iexact H1
+
+/-- The marker arm of a slot: the UNUSED arm keeps the slot's half of a
+never-allocated ghost, or the marker of a slot allocated and freed; every
+other arm the marker. -/
+def pavSlot (Γ : SchedNames) (pa : BitVec 64) (st : BitVec 32) : IProp GF := iprop%
+  if isUnused st then (slotFree Γ pa ∨ slotUsed Γ pa) else slotUsed Γ pa
+
+theorem pavSlot_used (Γ : SchedNames) (pa : BitVec 64) (st : BitVec 32) (h : ¬ isUnused st) :
+    pavSlot (GF := GF) Γ pa st ⊢ slotUsed Γ pa := by
+  unfold pavSlot; rw [if_neg h]
+
+theorem pavSlot_intro (Γ : SchedNames) (pa : BitVec 64) (st : BitVec 32) (h : ¬ isUnused st) :
+    slotUsed (GF := GF) Γ pa ⊢ pavSlot Γ pa st := by
+  unfold pavSlot; rw [if_neg h]
+
+theorem pavSlot_unused_elim (Γ : SchedNames) (pa : BitVec 64) :
+    pavSlot (GF := GF) Γ pa UNUSED ⊢ slotFree Γ pa ∨ slotUsed Γ pa := by
+  unfold pavSlot; rw [if_pos (show isUnused UNUSED from rfl)]
+
+theorem pavSlot_unused_intro (Γ : SchedNames) (pa : BitVec 64) :
+    (slotFree (GF := GF) Γ pa ∨ slotUsed Γ pa) ⊢ pavSlot Γ pa UNUSED := by
+  unfold pavSlot; rw [if_pos (show isUnused UNUSED from rfl)]
+
+theorem pavSlot_unused_of_used (Γ : SchedNames) (pa : BitVec 64) :
+    slotUsed (GF := GF) Γ pa ⊢ pavSlot Γ pa UNUSED := by
+  iintro H; iapply pavSlot_unused_intro; iright; iexact H
+
+theorem not_isUnused_of_needsCtx {st : BitVec 32} (h : needsCtx st) : ¬ isUnused st := by
+  unfold isUnused; intro he; subst he
+  rcases h with h | h | h <;> exact absurd h (by decide)
+theorem not_isUnused_of_not_invDormant {st : BitVec 32} (h : ¬ invDormant st) : ¬ isUnused st :=
+  fun hu => h (Or.inl hu)
+theorem not_isUnused_of_parkOk {st : BitVec 32} (h : parkOk st) : ¬ isUnused st := by
+  rcases h.1 with hn | hz
+  · exact not_isUnused_of_needsCtx hn
+  · unfold isUnused; intro hu; rw [hu] at hz; exact absurd hz (by decide)
+
 /-- What slot `pa` owns at state `st` beside the flat cells: the parked
-record, the running arm, the dormant block, the hart tag. -/
+record, the running arm, the dormant block, the hart tag, the marker arm. -/
 def procSlotsAt (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) (st : BitVec 32) : IProp GF := iprop%
   (if needsCtx st then procCtxAt Γ ξl pa else emp) ∗
   (if isRunning st then runSlotAt Γ ξl pa else emp) ∗
   (if invDormant st then @procDormant hlc GF _ ⟨ξl, KTier.kpt⟩ pa st else emp) ∗
-  (if notRunning st then hartAtAny Γ pa else emp)
+  (if notRunning st then hartAtAny Γ pa else emp) ∗
+  pavSlot Γ pa st
+
+/-- The marker, copied out of any allocated slot. -/
+theorem procSlots_used (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) (st : BitVec 32)
+    (h : ¬ isUnused st) :
+    procSlotsAt (GF := GF) Γ ξl pa st ⊢ slotUsed Γ pa ∗ procSlotsAt Γ ξl pa st := by
+  unfold procSlotsAt
+  iintro ⟨H1, H2, H3, H4, H5⟩
+  ihave #Hu := pavSlot_used Γ pa st h $$ H5
+  iframe H1 H2 H3 H4 H5 Hu
 
 instance instCtxMorphProcSlotsAt (Γ : SchedNames) (pa : BitVec 64) (st : BitVec 32) :
     CtxMorph (GF := GF) (fun ξ => procSlotsAt Γ ξ pa st) := by
   unfold procSlotsAt
   refine @instCtxMorphSep hlc GF _ _ _ ?_ (@instCtxMorphSep hlc GF _ _ _ ?_
-    (@instCtxMorphSep hlc GF _ _ _ ?_ ?_))
+    (@instCtxMorphSep hlc GF _ _ _ ?_ (@instCtxMorphSep hlc GF _ _ _ ?_ (instCtxMorphConst _))))
   · by_cases h : needsCtx st
     · simp only [if_pos h]; exact instCtxMorphProcCtxAt _ _
     · simp only [if_neg h]; exact instCtxMorphConst _
@@ -1125,8 +1222,11 @@ theorem procSlots_recast (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) (st st
     by_cases h : notRunning st
     · rw [if_pos h, if_pos (hr.2 h)]
     · rw [if_neg h, if_neg (show ¬ notRunning st' from fun hc => h (hr.1 hc))]
+  have e5 : pavSlot (GF := GF) Γ pa st' = pavSlot Γ pa st := by
+    unfold pavSlot
+    rw [if_neg (not_isUnused_of_not_invDormant hd'), if_neg (not_isUnused_of_not_invDormant hd)]
   unfold procSlotsAt
-  rw [e1, e2, e4, if_neg hd, if_neg hd']
+  rw [e1, e2, e4, e5, if_neg hd, if_neg hd']
 
 /-- The scheduler's dispatch: a slot that owns a record hands it over
 together with the whole hart tag. -/
@@ -1136,33 +1236,36 @@ theorem procSlots_dispatch (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) (st 
   unfold procSlotsAt
   rw [if_pos hn, if_neg (needsCtx_not_isRunning hn), if_neg (needsCtx_not_invDormant hn),
     if_pos (needsCtx_notRunning hn)]
-  iintro ⟨H1, _, _, H4⟩
+  iintro ⟨H1, _, _, H4, _⟩
   iframe
 
 /-- The reclaiming scheduler's slot: what the crossing handed back, in
 exactly the shape the slot's own `needsCtx` guard asks for. -/
 theorem procSlots_park_gen (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) (st : BitVec 32)
     (hst : parkOk st) :
+    slotUsed Γ pa ∗
     (if needsCtx st then procCtxAt (GF := GF) Γ ξl pa
      else @ownCtxCells hlc GF _ ⟨ξl, KTier.kpt⟩ (pContext pa 0)) ∗
     hartAtAny Γ pa ∗ parkPayAt ξl pa st ⊢ procSlotsAt Γ ξl pa st := by
-  unfold procSlotsAt parkPayAt
+  have hnu : ¬ isUnused st := not_isUnused_of_parkOk hst
+  unfold procSlotsAt parkPayAt pavSlot
+  rw [if_neg hnu]
   rcases hst.1 with hn | hz
   · rw [if_pos hn, if_pos hn, if_neg (needsCtx_not_isRunning hn),
       if_neg (needsCtx_not_invDormant hn), if_pos (needsCtx_notRunning hn),
       if_neg (needsCtx_not_invDormant hn)]
-    iintro ⟨H1, H2, _⟩
-    iframe H1 H2
+    iintro ⟨Hu, H1, H2, _⟩
+    iframe H1 H2 Hu
   · subst hz
     rw [if_neg (by decide : ¬ needsCtx ZOMBIE), if_neg (by decide : ¬ needsCtx ZOMBIE),
       if_neg (by decide : ¬ isRunning ZOMBIE), if_pos (by decide : invDormant ZOMBIE),
       if_pos (by decide : notRunning ZOMBIE), if_pos (by decide : invDormant ZOMBIE)]
-    iintro ⟨Hc, Htag, Hpay⟩
+    iintro ⟨Hu, Hc, Htag, Hpay⟩
     isplitl []
     · iempintro
     isplitl []
     · iempintro
-    iframe Htag
+    iframe Htag Hu
     iapply (@procDormant_split hlc GF _ ⟨ξl, KTier.kpt⟩ pa ZOMBIE).mpr
     iframe Hpay Hc
 
@@ -1171,7 +1274,8 @@ theorem procSlots_park_gen (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) (st 
 parking thread hands over its whole tag rather than an anonymous one. -/
 theorem procSlots_park_gen' (Γ : SchedNames) (ξl : CtxId) (n : Nat) (hn : n < NPROC)
     (st : BitVec 32) (hpark : parkOk st) (h : CPU) :
-    ((if (decide (needsCtx st) : Bool) then
+    (slotUsed Γ (procAddr n) ∗
+     (if (decide (needsCtx st) : Bool) then
         ∃ ξo : CtxId, parkTokAt (GF := GF) ξl none ξo ∗
           ▷ validCtx (pSched Γ) ⟨none, pContext (procAddr n) 0, procAddr n, ξo⟩
       else @ownCtxCells hlc GF _ ⟨ξl, KTier.kpt⟩ (pContext (procAddr n) 0)) ∗
@@ -1179,9 +1283,10 @@ theorem procSlots_park_gen' (Γ : SchedNames) (ξl : CtxId) (n : Nat) (hn : n < 
   by_cases hnc : needsCtx st
   · rw [decide_eq_true hnc]
     simp only [reduceIte]
-    iintro ⟨⟨%ξo, Htok, Hvc⟩, Htag, Hpay⟩
+    iintro ⟨Hu, ⟨%ξo, Htok, Hvc⟩, Htag, Hpay⟩
     iapply (procSlots_park_gen Γ ξl (procAddr n) st hpark)
     rw [if_pos hnc]
+    iframe Hu
     isplitl [Htok Hvc]
     · iapply procCtx_of_tok Γ ξl ξo (procAddr n) $$ [$Htok $Hvc]
     isplitl [Htag]
@@ -1189,9 +1294,10 @@ theorem procSlots_park_gen' (Γ : SchedNames) (ξl : CtxId) (n : Nat) (hn : n < 
     · iexact Hpay
   · rw [decide_eq_false hnc]
     simp only [Bool.false_eq_true, if_false]
-    iintro ⟨Hc, Htag, Hpay⟩
+    iintro ⟨Hu, Hc, Htag, Hpay⟩
     iapply (procSlots_park_gen Γ ξl (procAddr n) st hpark)
     rw [if_neg hnc]
+    iframe Hu
     isplitl [Hc]
     · iexact Hc
     isplitl [Htag]
@@ -1208,7 +1314,7 @@ theorem procSlots_running (Γ : SchedNames) (ξl : CtxId) (j : Nat) (h : CPU) (s
   unfold procSlotsAt
   by_cases hnr : notRunning st
   · rw [if_pos hnr]
-    iintro ⟨Hhlf, _, _, _, Hany⟩
+    iintro ⟨Hhlf, _, _, _, Hany, _⟩
     icases hartAtAny_elim Γ j hj $$ Hany with ⟨%h', Hfull⟩
     iexfalso
     iapply hart_excl Γ j h h' $$ [$Hhlf $Hfull]
@@ -1217,7 +1323,7 @@ theorem procSlots_running (Γ : SchedNames) (ξl : CtxId) (j : Nat) (h : CPU) (s
     rw [if_neg (by decide : ¬ needsCtx RUNNING), if_pos (by decide : isRunning RUNNING),
       if_neg (by decide : ¬ invDormant RUNNING), if_neg hnr]
     unfold runSlotAt
-    iintro ⟨Hhlf, _, ⟨Hcells, %h', Hhlf', Hvc⟩, _, _⟩
+    iintro ⟨Hhlf, _, ⟨Hcells, %h', Hhlf', Hvc⟩, _, _, _⟩
     ihave Hhlf' := hartAt_elim Γ j (1 : Qp).half h' hj $$ Hhlf'
     ihave %heq := hartOwn_agree Γ j (1 : Qp).half (1 : Qp).half h h' $$ [$Hhlf $Hhlf']
     subst heq
@@ -1228,12 +1334,14 @@ theorem procSlots_running (Γ : SchedNames) (ξl : CtxId) (j : Nat) (h : CPU) (s
 
 /-- The converse, for the release side. -/
 theorem procSlots_running_intro (Γ : SchedNames) (ξl : CtxId) (j : Nat) (h : CPU) (hj : j < NPROC) :
+    slotUsed Γ (procAddr j) ∗
     hartHlf (GF := GF) Γ j h ∗ @ownCtxCells hlc GF _ ⟨ξl, KTier.kpt⟩ (pContext (procAddr j) 0) ∗
       ▷ schedVcAt Γ h (cpuCtxAddr h) (procAddr j) ⊢ procSlotsAt Γ ξl (procAddr j) RUNNING := by
-  unfold procSlotsAt runSlotAt
+  unfold procSlotsAt runSlotAt pavSlot
   rw [if_neg (by decide : ¬ needsCtx RUNNING), if_pos (by decide : isRunning RUNNING),
-    if_neg (by decide : ¬ invDormant RUNNING), if_neg (by decide : ¬ notRunning RUNNING)]
-  iintro ⟨Hhlf, Hcells, Hvc⟩
+    if_neg (by decide : ¬ invDormant RUNNING), if_neg (by decide : ¬ notRunning RUNNING),
+    if_neg (by decide : ¬ isUnused RUNNING)]
+  iintro ⟨Hu, Hhlf, Hcells, Hvc⟩
   isplitl []
   · iempintro
   isplitl [Hhlf Hcells Hvc]
@@ -1243,7 +1351,9 @@ theorem procSlots_running_intro (Γ : SchedNames) (ξl : CtxId) (j : Nat) (h : C
     iapply hartAt_intro Γ j (1 : Qp).half h hj $$ Hhlf
   isplitl []
   · iempintro
+  isplitl []
   · iempintro
+  · iexact Hu
 
 /-! ## The lock payload and the table invariant -/
 

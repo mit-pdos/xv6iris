@@ -132,12 +132,13 @@ with a parked record owed (`procCtxAt`) and the whole hart tag
 (the record) and `notRunning` (the tag), the `isRunning`/`invDormant`
 arms empty. -/
 theorem procSlots_used_intro (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) :
-    procCtxAt (GF := GF) Γ ξl pa ∗ hartAtAny Γ pa ⊢ procSlotsAt Γ ξl pa USED := by
+    slotUsed Γ pa ∗ procCtxAt (GF := GF) Γ ξl pa ∗ hartAtAny Γ pa ⊢ procSlotsAt Γ ξl pa USED := by
   unfold procSlotsAt
   rw [if_pos (show needsCtx USED from by decide), if_neg (show ¬ isRunning USED from by decide),
     if_neg (show ¬ invDormant USED from by decide), if_pos (show notRunning USED from by decide)]
-  iintro ⟨Hc, Htag⟩
+  iintro ⟨Hu, Hc, Htag⟩
   iframe Hc Htag
+  iapply pavSlot_intro Γ pa USED (by decide) $$ Hu
 
 end
 
@@ -1356,7 +1357,7 @@ def kfOfileΨ [CurCtx] (cpu : CPU) (k : KCtx) (Γ : SchedNames) [ClaimIs (hlc :=
   pnameCells (procAddr i) (DFrac.own 1) V_c.name ∗
   procPtAt Pnew' Mnew' ∗ tfPageAt V_c.upt.tfp (V.tf.set 14 0#64) ∗
   stackOwn (V_c.kstack + 4096#64) 512 ∗
-  procHeld Γ cpu i USED ch ∗ hartAtAny Γ (procAddr i)
+  procHeld Γ cpu i USED ch ∗ hartAtAny Γ (procAddr i) ∗ slotUsed Γ (procAddr i)
 
 /-- The prologue frame under a register bundle is well formed (the fields
 `KCtx.wf` cares about are the entry's, and `kfork`'s entry has `noff = 0`,
@@ -1445,28 +1446,29 @@ theorem kf_rel_at [CurCtx] (RE : RELEASE) (c : CPU) (k' : KCtx) (γ : GName) (lk
 
 /-- Rebuild an UNUSED slot from `freeproc`'s output and the hart tag. -/
 theorem kf_slots_unused_intro [CurCtx] (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) :
-    @procDormant hlc GF _ ⟨ξl, KTier.kpt⟩ pa UNUSED ∗ hartAtAny Γ pa ⊢
+    slotUsed Γ pa ∗ @procDormant hlc GF _ ⟨ξl, KTier.kpt⟩ pa UNUSED ∗ hartAtAny Γ pa ⊢
       procSlotsAt (GF := GF) Γ ξl pa UNUSED := by
   unfold procSlotsAt
   rw [if_neg (by decide : ¬ needsCtx UNUSED), if_neg (by decide : ¬ isRunning UNUSED),
     if_pos (by decide : invDormant UNUSED), if_pos (by decide : notRunning UNUSED)]
-  iintro ⟨Hd, Hh⟩
+  iintro ⟨Hu, Hd, Hh⟩
   isplitl []
   · iempintro
   isplitl []
   · iempintro
   iframe Hd Hh
+  iapply pavSlot_unused_of_used Γ pa $$ Hu
 
 /-- `freeproc`'s output plus the hart tag reassemble the UNUSED lock payload. -/
 theorem kf_pay_unused [CurCtx] (Γ : SchedNames) (ξl : CtxId) (j : Nat) (c : CPU) :
-    procHeldAt (GF := GF) Γ ξl c j UNUSED 0#64 ∗
+    slotUsed Γ (procAddr j) ∗ procHeldAt (GF := GF) Γ ξl c j UNUSED 0#64 ∗
     @procDormant hlc GF _ ⟨ξl, KTier.kpt⟩ (procAddr j) UNUSED ∗ hartAtAny Γ (procAddr j) ⊢
       @locked hlc GF _ ⟨ξl, KTier.kpt⟩ (Γ.lock j) c ∗ procLockResAt Γ ξl (procAddr j) := by
-  iintro ⟨Hheld, Hdorm, Hhart⟩
+  iintro ⟨Hused, Hheld, Hdorm, Hhart⟩
   icases procHeldAt_cases Γ ξl c j UNUSED 0#64 $$ Hheld with
     ⟨Hlocked, Hpg, %kl, %xs, %pid, Hstate, Hchan, Hrest⟩
   icases (pstateWhole_split Γ (procAddr j) UNUSED).1 $$ Hpg with ⟨Hpl, _⟩
-  ihave Hslots := kf_slots_unused_intro Γ ξl (procAddr j) $$ [$Hdorm $Hhart]
+  ihave Hslots := kf_slots_unused_intro Γ ξl (procAddr j) $$ [$Hused $Hdorm $Hhart]
   isplitl [Hlocked]
   · iexact Hlocked
   iapply procLockRes_intro Γ ξl (procAddr j) UNUSED 0#64 kl xs pid
@@ -1601,12 +1603,12 @@ theorem kf_publish [X : CurCtx] (AC : ACQUIRE) (RE : RELEASE) (SS : SAFESTRCPY) 
       pnameCells (procAddr i) (DFrac.own 1) V_c.name ∗
       procPtAt Pnew' Mnew' ∗ tfPageAt V_c.upt.tfp (V.tf.set 14 0#64) ∗
       stackOwn (V_c.kstack + 4096#64) 512 ∗
-      procHeld Γ cpu i USED ch ∗ hartAtAny Γ (procAddr i))
+      procHeld Γ cpu i USED ch ∗ hartAtAny Γ (procAddr i) ∗ slotUsed Γ (procAddr i))
       from by unfold kfOfileΨ; iintro H; iexact H) $$ HΨ
     with ⟨F0, F1, F2, Fs2, Fs3, Fs4, F6, F7, Htc, Hclaim, Hres, Hwand,
       Hpid_p, Hks_p, Hsz_p, Hpg_p, Htf_p, Hcwd_p, Hname_p, HPt_p, HTf_p,
       Hpid_c, Hks_c, Hsz_c, Hpg_c, Htf_c, Hctx_c, Hcwd_c, Hname_c, HPtn', HTf_c,
-      Hcstack, Hheld, Hhart⟩
+      Hcstack, Hheld, Hhart, #Hused⟩
   -- ld a0,336(s5): a0 = p->cwd
   ihave Hcwd_p := (show wordPointsTo (GF := GF) (pCwd (procAddr j)) 8 (DFrac.own 1) V.cwd ⊢
     wordPointsTo (procAddr j + 336#64) 8 (DFrac.own 1) V.cwd from by unfold pCwd; iintro H; iexact H) $$ Hcwd_p
@@ -1801,7 +1803,7 @@ theorem kf_publish [X : CurCtx] (AC : ACQUIRE) (RE : RELEASE) (SS : SAFESTRCPY) 
       Mnew' hi rfl hVc.2.2.2.2) $$ [$Hk $Hpinv $HcPriv $Hcstack] with ⟨Hk, HprocCtx⟩
   imodintro
   -- the used slot: procCtxAt + hartAtAny
-  ihave Hslots := procSlots_used_intro Γ curCtx (procAddr i) $$ [$HprocCtx $Hhart]
+  ihave Hslots := procSlots_used_intro Γ curCtx (procAddr i) $$ [$Hused $HprocCtx $Hhart]
   -- open the held lock's payload
   icases procHeldAt_cases Γ curCtx cpu i USED ch $$ Hheld with
     ⟨Hlocked, Hpg, %kl, %xs, %pidx, HstateW, Hchan, Hrest⟩
@@ -2183,7 +2185,7 @@ theorem kfork_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCPROC)
     letI : CurCtx := ⟨ξ0, t0⟩
     unfold wp_kfork_body
     simp only [kforkAddr, KernelSyms.«kfork»]
-    iintro ⟨Hk, Hpc, #Hpinv, Htc, Hclaim, Hres, #Hwl, #Hpl, #Hkm, Hkav, Hpriv, Hclient⟩
+    iintro ⟨Hk, Hpc, #Hpinv, Htc, Hclaim, Hres, #Hwl, #Hpl, #Hkm, Hkav, Hpav, Hpriv, Hclient⟩
     icases kctx_tier cpu k $$ Hk with ⟨%hct, Hk⟩
     have ht0 : t0 = KTier.kpt := hct.symm.trans htier
     subst ht0
@@ -2263,21 +2265,21 @@ theorem kfork_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCPROC)
         (hlq' : "proc" ∉ k'.locks) (htier' : k'.tier = KTier.kpt),
         kctx cpu k' ∗ pcIs cpu 0x80001ae0#64 ∗ procsInv Γ ∗
           isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ isLock γp pidLockAddr "nextpid" pidLockPay ∗
-          kallocAvail γk none ∗
+          kallocAvail γk none ∗ procsAvail Γ none ∗
           (∀ R' : RegMap,
             ((⌜R' 10#5 = 0#64⌝ ∗ kctx cpu (k'.withRegs R')) ∨
              (⌜R' 10#5 ≠ 0#64⌝ ∗
               kctx cpu (((k'.pushOffAt k'.spie k'.spp).withRegs R').withLocks ("proc" :: k'.locks)))) -∗
-            pcIs cpu (jumpPc (k'.regs 1#5)) -∗ allocprocPost Γ cpu γk none (R' 10#5) -∗
+            pcIs cpu (jumpPc (k'.regs 1#5)) -∗ allocprocPost Γ cpu γk none none (R' 10#5) -∗
             ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu)
         ⊢ wpLoop (GF := GF) cpu := by
       intro k' hsie' hnoff' hK' hlk' hlp' hlq' htier'
-      have h := AL.wp_allocproc (hlc := hlc) (GF := GF) Γ cpu k' γl γp γk none hnoff' hK' hlk' hlp' hlq' htier'
+      have h := AL.wp_allocproc (hlc := hlc) (GF := GF) Γ cpu k' γl γp γk none none hnoff' hK' hlk' hlp' hlq' htier'
       unfold wp_allocproc_body at h
       simp only [allocprocAddr, KernelSyms.«allocproc»] at h
-      iintro ⟨Hk, Hp, #Hpinv, #Hkm, #Hpl, Hkav, Hcont⟩
+      iintro ⟨Hk, Hp, #Hpinv, #Hkm, #Hpl, Hkav, Hpav, Hcont⟩
       iapply h
-      iframe Hk Hp Hpinv Hkm Hpl Hkav
+      iframe Hk Hp Hpinv Hkm Hpl Hkav Hpav
       rw [hsie']
       iapply wpNext_off_intro
       iintro %spie %spp %R' %hsp Hdisj Hpc Hpost %hcs
@@ -2299,7 +2301,7 @@ theorem kfork_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCPROC)
           · ipureintro; exact hne
           · iexact Hkd
         iapply Hcont $$ %R' Hdj Hpc Hpost %hcs
-    iapply (hal _ ?hsA ?hnA ?hKA ?hlkA ?hlpA ?hlqA ?htA) $$ [- $Hk $Hpc $Hpinv $Hkm $Hpl $Hkav]
+    iapply (hal _ ?hsA ?hnA ?hKA ?hlkA ?hlpA ?hlqA ?htA) $$ [- $Hk $Hpc $Hpinv $Hkm $Hpl $Hkav $Hpav]
     rotate_right 1
     case hsA => k_norm [KCtx.setReg_sie]
     case hnA => k_norm [KCtx.setReg_noff]; omega
@@ -2360,18 +2362,24 @@ theorem kfork_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCPROC)
         · exact b2_26.trans a1_26
         · exact b2_27.trans a1_27
     · -- allocproc succeeded (r = procAddr i ≠ 0): fall through
-      icases (show allocprocPost Γ cpu γk none (R2 10#5) ⊢
-          (⌜R2 10#5 = 0#64⌝ ∗ ∃ on' : Option Nat, ⌜on' = none ∨ on' = none⌝ ∗ kallocAvail γk on') ∨
+      icases (show allocprocPost Γ cpu γk none none (R2 10#5) ⊢
+          (⌜R2 10#5 = 0#64 ∧ (((none : Option Nat) = none ∨ (none : Option Nat) = some 0) ∨
+              ∃ g : Nat, g ≤ procPagetableNodes + 1 ∧ availZero (availSub none g))⌝ ∗
+            procsAvail Γ none ∗
+            ∃ on' : Option Nat, ⌜on' = none ∨ on' = none⌝ ∗ kallocAvail γk on') ∨
           (∃ (i : Nat) (ch : BitVec 64) (pid_c : BitVec 32) (V_c : ProcPriv) (M_c : Nat → List (BitVec 8))
               (gc : Nat),
             ⌜R2 10#5 = procAddr i ∧ i < NPROC ∧ 1 ≤ pid_c.toNat ∧ pid_c.toNat ≤ PIDMAX ∧
               allocprocPriv V_c ∧ gc ≤ procPagetableNodes + 1⌝ ∗
-            procHeld Γ cpu i USED ch ∗ hartAtAny Γ (procAddr i) ∗ procPriv (procAddr i) pid_c V_c M_c ∗
+            procHeld Γ cpu i USED ch ∗ hartAtAny Γ (procAddr i) ∗ slotUsed Γ (procAddr i) ∗
+            procsAvail Γ (pavDec none) ∗
+            procPriv (procAddr i) pid_c V_c M_c ∗
             stackOwn (V_c.kstack + 4096#64) 512 ∗ kallocAvail γk (availSub none gc))
           from by unfold allocprocPost; iintro H; iexact H) $$ Hpost
-        with (⟨%h0bad, _⟩ |
-          ⟨%i, %ch, %pid_c, %V_c, %M_c, %gc, %hpure, Hheld, Hhart, HcPriv, Hcstack, Hcav⟩)
-      · exact absurd h0bad hrne
+        with (⟨%hbad, _, _⟩ |
+          ⟨%i, %ch, %pid_c, %V_c, %M_c, %gc, %hpure, Hheld, Hhart, #Hused, _,
+            HcPriv, Hcstack, Hcav⟩)
+      · exact absurd hbad.1 hrne
       obtain ⟨hri, hi, hpid1, hpid2, hVc, hg⟩ := hpure
       unfold calleeSaved at hcs2
       k_norm [KCtx.setReg_regs, RegMap.set_apply, KCtx.withRegs_regs] at hcs2
@@ -2567,7 +2575,7 @@ theorem kfork_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCPROC)
           ihave #HlkN := procsInv_lookup Γ i hi $$ Hpinv
           ihave Hunused : (@locked hlc GF _ ⟨ξ0, KTier.kpt⟩ (Γ.lock i) cpu ∗
               procLockResAt Γ ξ0 (procAddr i)) $$ [Hheld2 Hdormu Hhart]
-          case' _ => iapply kf_pay_unused Γ ξ0 i cpu; iframe Hheld2 Hdormu Hhart
+          case' _ => iapply kf_pay_unused Γ ξ0 i cpu; iframe Hused Hheld2 Hdormu Hhart
           icases Hunused with ⟨Hlocked, Hlockres⟩
           ihave Hlockres := (show procLockResAt Γ ξ0 (procAddr i) ⊢ procLockPay Γ i curCtx
             from by unfold procLockPay; iintro H; iexact H) $$ Hlockres
@@ -2830,7 +2838,7 @@ theorem kfork_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCPROC)
             isplitl []
             · iexact Hwl
             unfold kfOfileΨ
-            iframe F0 F1 F2 Fs2 Fs3 Fs4 F6 F7 Htc Hclaim Hres Hclient Hpid_p Hks_p Hsz_p Hpg_p Htf_p Hcwd_p Hname_p HPt_p HTf_p Hpid_c Hks_c Hsz_c Hpg_c Htf_c Hctx_c Hcwd_c Hname_c HPtn' HTf_c Hcstack Hheld Hhart
+            iframe F0 F1 F2 Fs2 Fs3 Fs4 F6 F7 Htc Hclaim Hres Hclient Hpid_p Hks_p Hsz_p Hpg_p Htf_p Hcwd_p Hname_p HPt_p HTf_p Hpid_c Hks_c Hsz_c Hpg_c Htf_c Hctx_c Hcwd_c Hname_c HPtn' HTf_c Hcstack Hheld Hhart Hused
           iapply (kf_ofile_copy FsEnv.filedup Γ j i 1 (by omega) ["proc"]
             (k.regs 2#5 + 0xFFFFFFFFFFFFFFC0#64) kf.avail k.root k.regs V.ofile hlenofp cpu
             (iprop(isLock γw waitLockAddr "wait_lock" waitLockPay ∗

@@ -325,26 +325,28 @@ theorem kw_pstate_whole_zombie (Γ : SchedNames) (pa : BitVec 64) :
 /-- The slot at ZOMBIE hands out the dormant block and the hart tag. -/
 theorem kw_slots_zombie_elim (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) :
     procSlotsAt (GF := GF) Γ ξl pa ZOMBIE ⊢
-      @procDormant hlc GF _ ⟨ξl, KTier.kpt⟩ pa ZOMBIE ∗ hartAtAny Γ pa := by
+      slotUsed Γ pa ∗ @procDormant hlc GF _ ⟨ξl, KTier.kpt⟩ pa ZOMBIE ∗ hartAtAny Γ pa := by
   unfold procSlotsAt
   rw [if_neg kw_zombie_not_needsCtx, if_neg kw_zombie_not_isRunning,
     if_pos kw_zombie_invDormant, if_pos kw_zombie_notRunning]
-  iintro ⟨_, _, Hd, Hh⟩
-  iframe Hd Hh
+  iintro ⟨_, _, Hd, Hh, Hm⟩
+  ihave #Hu := pavSlot_used Γ pa ZOMBIE (by decide) $$ Hm
+  iframe Hu Hd Hh
 
 /-- Rebuild an UNUSED slot from `freeproc`'s output and the hart tag. -/
 theorem kw_slots_unused_intro (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) :
-    @procDormant hlc GF _ ⟨ξl, KTier.kpt⟩ pa UNUSED ∗ hartAtAny Γ pa ⊢
+    slotUsed Γ pa ∗ @procDormant hlc GF _ ⟨ξl, KTier.kpt⟩ pa UNUSED ∗ hartAtAny Γ pa ⊢
       procSlotsAt (GF := GF) Γ ξl pa UNUSED := by
   unfold procSlotsAt
   rw [if_neg (by decide : ¬ needsCtx UNUSED), if_neg (by decide : ¬ isRunning UNUSED),
     if_pos (by decide : invDormant UNUSED), if_pos (by decide : notRunning UNUSED)]
-  iintro ⟨Hd, Hh⟩
+  iintro ⟨Hu, Hd, Hh⟩
   isplitl []
   · iempintro
   isplitl []
   · iempintro
   iframe Hd Hh
+  iapply pavSlot_unused_of_used Γ pa $$ Hu
 
 /-- **The ZOMBIE reap** (the mathematical heart of `kwait`'s reap arm): a
 ZOMBIE's dormant block IS exactly what `freeproc` consumes.  Its trapframe
@@ -388,14 +390,14 @@ theorem kw_dormant_freeprocIn (pa : BitVec 64) :
 and the fresh dormant block) plus the hart tag `kwait` kept aside from the
 ZOMBIE slot reassemble the UNUSED lock payload, ready for `release`. -/
 theorem kw_pay_unused (Γ : SchedNames) (ξl : CtxId) (j : Nat) (c : CPU) :
-    procHeldAt (GF := GF) Γ ξl c j UNUSED 0#64 ∗
+    slotUsed Γ (procAddr j) ∗ procHeldAt (GF := GF) Γ ξl c j UNUSED 0#64 ∗
     @procDormant hlc GF _ ⟨ξl, KTier.kpt⟩ (procAddr j) UNUSED ∗ hartAtAny Γ (procAddr j) ⊢
       @locked hlc GF _ ⟨ξl, KTier.kpt⟩ (Γ.lock j) c ∗ procLockResAt Γ ξl (procAddr j) := by
-  iintro ⟨Hheld, Hdorm, Hhart⟩
+  iintro ⟨Hused, Hheld, Hdorm, Hhart⟩
   icases procHeldAt_cases Γ ξl c j UNUSED 0#64 $$ Hheld with
     ⟨Hlocked, Hpg, %kl, %xs, %pid, Hstate, Hchan, Hrest⟩
   icases (pstateWhole_split Γ (procAddr j) UNUSED).1 $$ Hpg with ⟨Hpl, _⟩
-  ihave Hslots := kw_slots_unused_intro Γ ξl (procAddr j) $$ [$Hdorm $Hhart]
+  ihave Hslots := kw_slots_unused_intro Γ ξl (procAddr j) $$ [$Hused $Hdorm $Hhart]
   isplitl [Hlocked]
   · iexact Hlocked
   iapply procLockRes_intro Γ ξl (procAddr j) UNUSED 0#64 kl xs pid
@@ -1010,7 +1012,7 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
     case' _ => unfold procPubRest; iframe Hkilled Hxs Hpid
     ihave Hheld : procHeldAt (GF := GF) Γ ξ0 cur n ZOMBIE ch $$ [HlpC Hpw Hstate Hchan Hpub]
     case' _ => iapply procHeldAt_intro Γ ξ0 cur n ZOMBIE ch kl xs pid0; iframe HlpC Hpw Hstate Hchan Hpub
-    icases kw_slots_zombie_elim Γ ξ0 (procAddr n) $$ Hslots with ⟨Hdorm, Hhart⟩
+    icases kw_slots_zombie_elim Γ ξ0 (procAddr n) $$ Hslots with ⟨#Hused, Hdorm, Hhart⟩
     icases kw_dormant_freeprocIn (procAddr n) $$ Hdorm with ⟨%Vf, %pidf, %Mf, Hfin⟩
     -- mv a0,s1 ; jal freeproc
     k_step (wp_s_add cur _ 0x8000220e#64 true 10#5 0#5 9#5 (by decide))
@@ -1027,7 +1029,7 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
       iintro %spie3 %spp3 %R3 %hsp3 Hk Hpc Hheld2 Hdormu %hcs3
       ihave Hunused : iprop(locked (Γ.lock n) cur ∗ procLockResAt Γ ξ0 (procAddr n))
         $$ [Hheld2 Hdormu Hhart]
-      case' _ => iapply kw_pay_unused Γ ξ0 n cur; iframe Hheld2 Hdormu Hhart
+      case' _ => iapply kw_pay_unused Γ ξ0 n cur; iframe Hused Hheld2 Hdormu Hhart
       icases Hunused with ⟨Hlockp2, Hlockres⟩
       obtain ⟨rfl, rfl⟩ : spie3 = spie2 ∧ spp3 = spp2 := hsp3 trivial
       icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩

@@ -158,7 +158,7 @@ theorem sleep_tail (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS 
     (hhi : sl_savedHigh kb.regs R)
     (ch : BitVec 64) (kl xs pid : BitVec 32) :
     kctx h (((kb.pushed 4).pushOff.withRegs R).withLocks ["proc"]) ∗ pcIs h 0x80001f84#64 ∗
-    procsInv Γ ∗ locked (Γ.lock j) h ∗ pstateWhole Γ (procAddr j) RUNNING ∗
+    procsInv Γ ∗ slotUsed Γ (procAddr j) ∗ locked (Γ.lock j) h ∗ pstateWhole Γ (procAddr j) RUNNING ∗
     wordPointsTo (pState (procAddr j)) 4 (DFrac.own 1) RUNNING ∗
     wordPointsTo (pChan (procAddr j)) 8 (DFrac.own 1) ch ∗
     procPubRest (procAddr j) kl xs pid ∗
@@ -171,7 +171,7 @@ theorem sleep_tail (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS 
     ⊢ wpLoop (GF := GF) h := by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
-  iintro ⟨Hk, Hpc, #Hpinv, Hlocked, Hpstw, Hstate, Hchan, Hrest, Hcells, Hfull, Hvc, Hframe,
+  iintro ⟨Hk, Hpc, #Hpinv, #Hused, Hlocked, Hpstw, Hstate, Hchan, Hrest, Hcells, Hfull, Hvc, Hframe,
     Htc, Hir, HΦ⟩
   icases kctx_tier h _ $$ Hk with ⟨%hct, Hk⟩
   have ht0 : t0 = KTier.kpt := hct.symm.trans htier
@@ -203,7 +203,7 @@ theorem sleep_tail (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS 
     exact hh
   -- the slot, rebuilt at RUNNING; the claim's halves come back out
   icases hart_split Γ j h $$ Hfull with ⟨Hh1, Hh2⟩
-  ihave Hslots := procSlots_running_intro Γ curCtx j h hj $$ [$Hh1 $Hcells $Hvc]
+  ihave Hslots := procSlots_running_intro Γ curCtx j h hj $$ [$Hused $Hh1 $Hcells $Hvc]
   icases sl_pstateWhole_elim Γ (procAddr j) $$ Hpstw with ⟨Hpstl, Hpsth⟩
   ihave HRnew := procLockRes_intro Γ curCtx (procAddr j) RUNNING ch kl xs pid
     $$ [$Hstate $Hpstl $Hchan $Hrest $Hslots]
@@ -377,6 +377,11 @@ theorem sleep_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : S
   icases procLockRes_elim Γ curCtx (procAddr j) $$ HR with
     ⟨%st, %ch, Hstate, Hpstl, Hchan, ⟨%kl, %xs, %pid, Hrest⟩, Hslots⟩
   -- the claim's hart tag forces RUNNING, and out come the record and the cells
+  by_cases hstu : isUnused st
+  · icases procSlots_running Γ curCtx j cpu st hj $$ [$Hhart $Hslots] with ⟨%hstx, Hfull, Hcells, Hvc⟩
+    subst hstx
+    exact absurd hstu (by decide)
+  icases procSlots_used Γ curCtx (procAddr j) st hstu $$ Hslots with ⟨#Hused, Hslots⟩
   icases procSlots_running Γ curCtx j cpu st hj $$ [$Hhart $Hslots] with ⟨%hst, Hfull, Hcells, Hvc⟩
   subst hst
   ihave Hpsth := pstateAt_intro Γ j (1 : Qp).half RUNNING hj $$ Hpst2
@@ -403,7 +408,7 @@ theorem sleep_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : S
     iapply (sleep_tail RE Γ cpu k j hj hsie hnoff hlocks htier hproc hintena
       (by unfold sleepSlots at hK; omega) (R3.set 15#5 ch) g2 g9 ghi ch kl xs pid)
     k_norm
-    iframe Hk Hpc Hpinv Hlocked Hpstw Hstate Hchan Hrest Hcells Hfull Hvc Hframe Htc Hir
+    iframe Hk Hpc Hpinv Hused Hlocked Hpstw Hstate Hchan Hrest Hcells Hfull Hvc Hframe Htc Hir
     iintro %R' Hk Hpc Htc Hclaim Hir %hcs
     ihave HΦ := wpNext_at true (procAddr j) cpu cpu
       (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
@@ -497,7 +502,7 @@ theorem sleep_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : S
       hproc hintena (by unfold sleepSlots at hK; simp only [KCtx.withSpie_avail]; omega) R9 f2 f9
       hhi9 ch' kl' xs' pid')
     k_norm
-    iframe Hk Hpc Hpinv Hlocked Hpstw Hstate Hchan Hrest Hcells Hfull Hvc Hframe Htc Hir
+    iframe Hk Hpc Hpinv Hused Hlocked Hpstw Hstate Hchan Hrest Hcells Hfull Hvc Hframe Htc Hir
     iintro %R' Hk Hpc Htc Hclaim Hir %hcs
     k_norm
     ihave HΦ := wpNext_at true (procAddr j) cpu h

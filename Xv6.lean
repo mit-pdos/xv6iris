@@ -190,6 +190,7 @@ import Xv6.UPtLemmas
 import Xv6.PidLock
 import Xv6.SpecProcPagetable
 import Xv6.SpecFreeproc
+import Xv6.ProcAvail
 import Xv6.SpecAllocproc
 import Xv6.SpecKilled
 import Xv6.SpecGrowproc
@@ -242,6 +243,7 @@ import Xv6.SleepLockDefs
 import Xv6.SpecAcquiresleep
 import Xv6.SpecReleasesleep
 import Xv6.SpecHoldingsleep
+import Xv6.SpecProcdump
 import Xv6.SpecKfork
 import Xv6.SpecUserinit
 import Xv6.SpecEither
@@ -319,3 +321,7 @@ import Xv6.ProofReleasesleep
 import Xv6.LinkReleasesleep
 import Xv6.ProofHoldingsleep
 import Xv6.LinkHoldingsleep
+import Xv6.ProofUserinit
+import Xv6.LinkUserinit
+import Xv6.ProofProcdump
+import Xv6.LinkProcdump

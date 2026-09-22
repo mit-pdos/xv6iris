@@ -50,6 +50,7 @@ import Xv6.PidLock
 import Xv6.FsEnv
 import Xv6.SpecForkret
 import Xv6.SpecAllocproc
+import Xv6.ProcAvail
 import Xv6.SpecFreeproc
 import Xv6.SpecUvmcopy
 import Xv6.SpecSleep
@@ -86,7 +87,7 @@ def wp_kfork_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
   trapCsrs cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ∗
   isLock γw waitLockAddr "wait_lock" waitLockPay ∗
   isLock γp pidLockAddr "nextpid" pidLockPay ∗
-  isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
+  isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗ procsAvail Γ none ∗
   procPrivNoctxAt curCtx (procAddr j) pid V M ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (rv : BitVec 32),
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ kforkAns rv⌝ -∗
