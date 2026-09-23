@@ -3886,6 +3886,125 @@ theorem imgOk_read_blk (v : VirtioState) (m : RegMapF (List (BitVec 8)))
   · exact he
 
 
+/-- **The cache is DRY under a `.pushed` WRITE.**
+`MachCSL.Virtio.completeOk` tests `MachCSL.Virtio.reqCached` at the
+`.pushed` INSTALL -- two machine steps before the used-index write that
+IS the completion -- and what the completion needs is that the test still
+holds THERE: with `Virtio.wce c0 = false` (write-THROUGH mode, which
+`Xv6.diskGeom` and the live arm of `Xv6.diskProto` both carry), a write
+request's payload has reached the DURABLE image, so the collect may hand
+the sleeper the block's image fragment at the bytes the driver wrote.
+
+It is preserved because the ONLY step that caches a sector is a serving
+task's capture (`MachCSL.Virtio.xferOut`, which since the data phase
+moved into `MachCSL.Virtio.serve` runs on the WRITE branch alone), and
+that task's permit puts its head at `.fetched`: a head at `.pushed` is a
+different head, hence -- `Xv6.blkInj` off the rows -- a different block,
+hence disjoint sectors.  A DRAIN only removes cache entries, and
+`Virtio.complete` takes the `.pushed` head out of flight altogether. -/
+def dryOk (v : VirtioState) : Prop :=
+  ∀ (h : BitVec 16) (r : VioReq), Virtio.phase v h = some (.pushed r) →
+    r.type.toNat = Virtio.blkTOut → Virtio.reqCached v r = false
+
+/-- The phases and the cache both stand still. -/
+theorem dryOk_congr (v v' : VirtioState)
+    (hph : ∀ h : BitVec 16, Virtio.phase v' h = Virtio.phase v h)
+    (hca : v'.cache = v.cache) (hx : dryOk v) : dryOk v' := by
+  intro h r hp hty
+  have : Virtio.reqCached v' r = Virtio.reqCached v r := by
+    unfold Virtio.reqCached; rw [hca]
+  rw [this]
+  exact hx h r (by rw [← hph h]; exact hp) hty
+
+/-- Nothing in flight. -/
+theorem dryOk_none (v : VirtioState) (hni : noInflight v) : dryOk v := by
+  intro h r hp
+  rw [hni h] at hp
+  exact absurd hp (by simp)
+
+/-- A phase install at `h` that does NOT install `.pushed`: every other
+head's phase and the cache are untouched. -/
+theorem dryOk_setPhase (v : VirtioState) (h : BitVec 16) (ph : VPhase)
+    (hnp : ∀ r, ph ≠ .pushed r) (hx : dryOk v) : dryOk (Virtio.setPhase v h ph) := by
+  intro k r hp hty
+  have hca : (Virtio.setPhase v h ph).cache = v.cache := rfl
+  have : Virtio.reqCached (Virtio.setPhase v h ph) r = Virtio.reqCached v r := by
+    unfold Virtio.reqCached; rw [hca]
+  rw [this]
+  by_cases hk : k = h
+  · subst hk
+    rw [phase_setPhase_self] at hp
+    cases hp
+    exact absurd rfl (hnp r)
+  · exact hx k r (by rw [← phase_setPhase_other v h k ph hk]; exact hp) hty
+
+/-- A DRAIN only removes a cache entry. -/
+theorem dryOk_drain (v : VirtioState) (k : Nat) (hx : dryOk v) : dryOk (Virtio.drain v k) := by
+  have hph : ∀ h : BitVec 16, Virtio.phase (Virtio.drain v k) h = Virtio.phase v h := by
+    intro h
+    unfold Virtio.phase Virtio.drain
+    cases hc : Virtio.alistGet v.cache k <;> rfl
+  have hget : ∀ j, Virtio.alistGet v.cache j = none →
+      Virtio.alistGet (Virtio.drain v k).cache j = none := by
+    intro j hj
+    unfold Virtio.drain
+    cases hc : Virtio.alistGet v.cache k with
+    | none => exact hj
+    | some bs =>
+      show Virtio.alistGet (Virtio.alistDel v.cache k) j = none
+      by_cases hjk : j = k
+      · rw [hjk]; exact Alist.get_del_eq _ _
+      · rw [Alist.get_del_ne _ _ _ hjk]; exact hj
+  intro h r hp hty
+  have h0 := hx h r (by rw [← hph h]; exact hp) hty
+  unfold Virtio.reqCached at h0 ⊢
+  rw [List.any_eq_false] at h0 ⊢
+  intro i hi
+  have h1 := h0 i hi
+  have h2 : Virtio.alistGet v.cache (Virtio.reqKey r i) = none := by
+    cases hg : Virtio.alistGet v.cache (Virtio.reqKey r i) with
+    | none => rfl
+    | some bs => rw [hg] at h1; simp at h1
+  simp [hget _ h2]
+
+/-- **The `.pushed` install ESTABLISHES it.**  `MachCSL.Virtio.completeOk`
+is the gate the install passes, and in write-THROUGH mode
+(`Virtio.wce _ = false`, which the live arm of `Xv6.diskProto` carries)
+it says outright that no sector of the request is still in the cache. -/
+theorem dryOk_pushed (v : VirtioState) (h : BitVec 16) (r : VioReq)
+    (hwce : Virtio.wce v.cfg = false) (hgate : Virtio.completeOk v r h = true)
+    (hx : dryOk v) : dryOk (Virtio.setPhase v h (.pushed r)) := by
+  intro k r' hp hty
+  have hca : Virtio.reqCached (Virtio.setPhase v h (.pushed r)) r'
+      = Virtio.reqCached v r' := rfl
+  rw [hca]
+  by_cases hk : k = h
+  · subst hk
+    rw [phase_setPhase_self] at hp
+    have hrr : r' = r := by
+      have := Option.some.inj hp
+      cases this; rfl
+    subst hrr
+    unfold Virtio.completeOk at hgate
+    rw [if_pos hty, hwce] at hgate
+    simp only [Bool.and_eq_true, Bool.false_or, Bool.not_eq_true'] at hgate
+    exact hgate.2
+  · exact hx k r' (by rw [← phase_setPhase_other v h k _ hk]; exact hp) hty
+
+/-- The completion takes the head out of flight. -/
+theorem dryOk_complete (v : VirtioState) (h : BitVec 16) (hx : dryOk v) :
+    dryOk (Virtio.complete v h) := by
+  intro k r hp hty
+  have hca : (Virtio.complete v h).cache = v.cache := rfl
+  have heq : Virtio.reqCached (Virtio.complete v h) r = Virtio.reqCached v r := by
+    unfold Virtio.reqCached; rw [hca]
+  rw [heq]
+  by_cases hk : k = h
+  · subst hk
+    rw [phase_complete_self] at hp
+    exact absurd hp (by simp)
+  · exact hx k r (by rw [← phase_complete_other v h k hk]; exact hp) hty
+
 /-- The live arm: the queue, the receipts, the leases. -/
 def diskLive (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState)
     (pm : RegMapF PermVal) : IProp GF := iprop%
@@ -3905,7 +4024,7 @@ def diskLive (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState)
       posOk pmap ring lo np ∧ stageOk stg ring lo np ∧ inflightOff v st ring lo np stg ∧
       imgOk v m (inFlightBlk st) ∧ cachedOk v st ∧ permOk v pm st ∧ usedOk dl dl0 nc M ∧
       unreadArmed v st dl nr ring lo np stg sb ∧ cntOk pm dl nc ∧ p3Ok v pm dl nr ∧
-      ueInv pm dl nr ue ∧ epOk v st pm dl ring lo np stg⌝
+      ueInv pm dl nr ue ∧ epOk v st pm dl ring lo np stg ∧ dryOk v⌝
 
 /-- The dead arm: before `virtio_disk_init`, and never again after.
 
@@ -3940,7 +4059,8 @@ def diskProto (γ : DiskNames) (v : VirtioState) : IProp GF := iprop%
     ⌜permFresh pn pm ∧ permInj pm ∧ pushedUniq v⌝ ∗
     (diskDead γ v pm ∨
      ∃ c0 : VirtioCfg, diskCfgFrozen γ c0 ∗
-       ⌜v.cfg = c0 ∧ Virtio.live c0 = true ∧ c0.qnum.toNat = NUM⌝ ∗ diskLive γ c0 v pm)
+       ⌜v.cfg = c0 ∧ Virtio.live c0 = true ∧ c0.qnum.toNat = NUM ∧
+         Virtio.wce c0 = false⌝ ∗ diskLive γ c0 v pm)
 
 instance headRes_timeless (γ : DiskNames) (pd : PAddr) (i : Nat) (s : HState) :
     Timeless (headRes (GF := GF) γ pd i s) := by
