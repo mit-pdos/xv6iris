@@ -63,6 +63,12 @@ def uartBaseWord [CurCtx] (i : UartId) : IProp GF :=
 def uartRxWord [CurCtx] (i : UartId) : IProp GF :=
   wordPointsTo (uartElt i + 8#64) 8 DFrac.discard (uartRxHook i)
 
+instance uartBaseWord_persistent [CurCtx] (i : UartId) : Persistent (uartBaseWord (GF := GF) i) := by
+  unfold uartBaseWord; infer_instance
+
+instance uartRxWord_persistent [CurCtx] (i : UartId) : Persistent (uartRxWord (GF := GF) i) := by
+  unfold uartRxWord; infer_instance
+
 /-! ## The ghost state beside the mirror -/
 
 def sentAuth (γ : UartNames) (u : UartState) : IProp GF := γ.acc ↪●ML (Uart.acc u)
@@ -832,6 +838,25 @@ theorem fcr_write_au (i : UartId) (γ : UartNames) (l : List (BitVec 8)) (k : Na
   iframe Htok
   iexists (if fcrClrRx u b then ins.length else k)
   iexact Hrx
+
+end
+
+/-! ## The persistent bundle a transmitter needs
+
+What `uartputc_sync` (and everything above it: `consputc`, `prputc`,
+`printk`) carries about port `i`: the invariant, the transmit-lock
+credential, the frozen divisor latch and the port's base word.  All
+persistent, so one copy serves every caller. -/
+
+section
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+
+def uartPort [CurCtx] (i : UartId) (γl : GName) (γ : UartNames) : IProp GF := iprop%
+  uartInv i γ ∗ isTxLockAt i γl γ ∗ dlabOff γ ∗ uartBaseWord i
+
+instance uartPort_persistent [CurCtx] (i : UartId) (γl : GName) (γ : UartNames) :
+    Persistent (uartPort (GF := GF) i γl γ) := by
+  unfold uartPort; infer_instance
 
 end
 

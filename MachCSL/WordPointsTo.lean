@@ -33,6 +33,20 @@ def wordPointsTo [CurCtx] (va : PAddr) (n : Nat) (dq : DFrac) (w : BitVec (8 * n
     ⌜tierPin curTier ppn va ∧ va.toNat < 2 ^ 38 ∧ inRam (paOf ppn va) n ∧ va.toNat % n = 0⌝ ∗
     bytesPointsTo (paOf ppn va) n dq w
 
+/-- A discarded cell is persistent (its byte histories are discarded
+points-to beside the persistent `keyAt` witness). -/
+instance ctxByte_discard_persistent (ξ : CtxId) (a : PAddr) (v : BitVec 8) :
+    Persistent (PROP := IProp GF) (ctxByte ξ a DFrac.discard v) := by
+  unfold ctxByte; infer_instance
+
+instance ctxBytes_discard_persistent (ξ : CtxId) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
+    Persistent (PROP := IProp GF) (ctxBytes ξ pa n DFrac.discard w) := by
+  unfold ctxBytes; infer_instance
+
+instance wordPointsTo_discard_persistent [CurCtx] (va : PAddr) (n : Nat) (w : BitVec (8 * n)) :
+    Persistent (PROP := IProp GF) (wordPointsTo va n DFrac.discard w) := by
+  unfold wordPointsTo; infer_instance
+
 /-- A pinned identity mapping at Bare is the identity page. -/
 theorem ppn_of_pin (ppn : BitVec 44) (va : BitVec 64) (h : paOf ppn va = va) (hlt : va.toNat < 2 ^ 39) :
     ppn = idPpn (vpnOf va) := by

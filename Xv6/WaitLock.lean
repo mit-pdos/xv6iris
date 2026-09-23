@@ -35,20 +35,7 @@ def waitLockPay [CurCtx] : CtxId → IProp GF := fun ξ => iprop(∃ parents, wa
 
 `initprocIs` is a `DFrac.discard` word: the byte histories under it are
 discarded points-to (persistent) beside the persistent `keyAt` witness, so
-the whole cell is.  The instances are not declared in `MachCSL` -- they
-are here, where the first discarded cell of the kernel appears. -/
-
-instance ctxByte_discard_persistent (ξ : CtxId) (a : PAddr) (v : BitVec 8) :
-    Persistent (PROP := IProp GF) (ctxByte ξ a DFrac.discard v) := by
-  unfold ctxByte; infer_instance
-
-instance ctxBytes_discard_persistent (ξ : CtxId) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
-    Persistent (PROP := IProp GF) (ctxBytes ξ pa n DFrac.discard w) := by
-  unfold ctxBytes; infer_instance
-
-instance wordPointsTo_discard_persistent [CurCtx] (va : PAddr) (n : Nat) (w : BitVec (8 * n)) :
-    Persistent (PROP := IProp GF) (wordPointsTo va n DFrac.discard w) := by
-  unfold wordPointsTo; infer_instance
+the whole cell is (`MachCSL.wordPointsTo_discard_persistent`). -/
 
 /-- The published `initproc` pointer. -/
 def initprocIs [CurCtx] (ip : BitVec 64) : IProp GF :=
