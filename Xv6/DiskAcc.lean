@@ -2255,17 +2255,24 @@ structure DISK_ACC_ASSUMPTIONS : Prop where
   the request header come back WHOLE at the context tier -- the driver
   hands in its halves (`Xv6.claimRes`) and the invariant's halves, out of
   `Xv6.chainLease`, are joined onto them, which is what `free_desc` needs
-  (`Xv6.descCells` is `own 1`).  The status byte comes back at the `0` the
-  device wrote, `b->data` at the bytes it transferred, and the block's
-  image fragment with them.
+  (`Xv6.descCells` is `own 1`).  The status byte comes back out of the
+  head's STATUS ROW at the `0` the device wrote (`Xv6.statusRes`, which is
+  where it lives now -- `chainLease` no longer carries it), `b->data` at
+  the bytes it transferred, and the block's image fragment with them.
 
-  Blocked three ways: on the per-completion row (to own the device's
-  writes at a known value and to carry the `topLb` of them), on the
+  Blocked two ways.  The status byte is no longer one of them: the row is
+  there, at its value and with the position of the device's write, and
+  `Xv6.disk_status_read` is proved off it.  What is left is (i) the
   invariant's `bufLease` being `dmaOwn` -- the CONTENT of a read's
   transfer is existential, so the bytes cannot be pinned to `blockView`
-  without the snapshot clause of the section head -- and on the TSO
-  credential, which is what `ctxFloor curCtx T` beside `diskWm γ n T`
-  stands for here.
+  without the snapshot clause of the section head -- and (ii) ruling out
+  a `.lent` marker at the head being collected, which is the same (P3) /
+  linear-witness gap the section head sets out: a head whose task is
+  between its status write and its `.status` install has NO status byte
+  in the invariant, and only "every completion of this head has been
+  READ" plus the one-write-per-arming discipline says that cannot be the
+  head the sleeper is collecting.  The TSO credential is what
+  `ctxFloor curCtx T` beside `diskWm γ n T` stands for here.
 
   THE READ PREMISE.  `Xv6.diskReadAt γ nr ∗ ⌜n ≤ nr⌝ ∗
   Xv6.headRead γ c.hd nr` says every completion of this head has been READ
