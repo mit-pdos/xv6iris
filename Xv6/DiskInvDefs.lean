@@ -2116,6 +2116,74 @@ theorem unread_window (pm : RegMapF PermVal) (dl : List UsedRec) (nr nc : Nat)
     have hthis : p + 1 = q + 1 := by rw [← hc.1 p hp2, ← hc.1 q hq2]; exact this
     omega
 
+/-- **The pigeonhole with one value EXCLUDED.**  An injection of a window
+into the descriptors that AVOIDS one of them bounds the window strictly. -/
+theorem window_lt_of_inj_excl (lo np : Nat) (f : Nat → Nat) (x : Nat) (hx : x < NUM)
+    (hlt : ∀ p, lo ≤ p → p < np → f p < NUM)
+    (hne : ∀ p, lo ≤ p → p < np → f p ≠ x)
+    (hinj : ∀ p q, lo ≤ p → p < np → lo ≤ q → q < np → f p = f q → p = q) :
+    np < lo + NUM := by
+  have hN : 0 < NUM := by unfold NUM; omega
+  by_cases hle : np ≤ lo
+  · omega
+  have hmem : ∀ j, j ∈ List.range (np - lo) → lo ≤ lo + j ∧ lo + j < np := by
+    intro j hj
+    have := List.mem_range.1 hj
+    omega
+  have hnd : ((List.range (np - lo)).map
+      (fun j => if f (lo + j) < x then f (lo + j) else f (lo + j) - 1)).Nodup := by
+    refine queue_nodup_map_on _ _ ?_ List.nodup_range
+    intro a ha b hb he
+    obtain ⟨ha1, ha2⟩ := hmem a ha
+    obtain ⟨hb1, hb2⟩ := hmem b hb
+    have hfa := hlt _ ha1 ha2
+    have hfb := hlt _ hb1 hb2
+    have hna := hne _ ha1 ha2
+    have hnb := hne _ hb1 hb2
+    have hff : f (lo + a) = f (lo + b) := by
+      by_cases h1 : f (lo + a) < x <;> by_cases h2 : f (lo + b) < x <;>
+        simp only [h1, h2, if_true, if_false] at he <;> omega
+    have := hinj (lo + a) (lo + b) ha1 ha2 hb1 hb2 hff
+    omega
+  have hb : ∀ i ∈ (List.range (np - lo)).map
+      (fun j => if f (lo + j) < x then f (lo + j) else f (lo + j) - 1), i < NUM - 1 := by
+    intro i hi
+    obtain ⟨j, hj, rfl⟩ := List.mem_map.1 hi
+    obtain ⟨h1, h2⟩ := hmem j hj
+    have hfa := hlt _ h1 h2
+    have hna := hne _ h1 h2
+    by_cases hc : f (lo + j) < x <;> simp only [hc, if_true, if_false] <;> omega
+  have := queue_nodup_length_le (NUM - 1) _ hnd hb
+  simp only [List.length_map, List.length_range] at this
+  omega
+
+/-- **The window bound, STRICTLY**, while a head is in flight without an
+unread completion of its own: the unread heads are distinct descriptors
+and none of them is that head, so there is room for one more.  It is what
+the used-ELEMENT write needs: the slot it is about to overwrite,
+`nc % NUM`, must be no unread entry's. -/
+theorem unread_window_lt (v : VirtioState) (pm : RegMapF PermVal) (dl : List UsedRec)
+    (nr nc : Nat) (hd : BitVec 16) (hhd : hd.toNat < NUM)
+    (hfly : (Virtio.phase v hd).isSome = true) (hnw : ¬ wroteAt pm hd)
+    (hc : cntOk pm dl nc) (hp : p3Ok v pm dl nr) : dl.length < nr + NUM := by
+  have hfresh : ∀ e ∈ dl, nr < e.cnt → e.hd ≠ hd.toNat := hp.1 hd hfly hnw
+  refine window_lt_of_inj_excl nr dl.length
+    (fun k => (dl[k]?.getD ((0, 0, 0) : UsedRec)).hd) hd.toNat hhd
+    (fun p hp1 hp2 => ?_) (fun p hp1 hp2 => ?_) (fun p q hp1 hp2 hq1 hq2 he => ?_)
+  · simp only [List.getElem?_eq_getElem hp2, Option.getD_some]
+    exact hp.2.1 (dl[p]'hp2) (List.getElem_mem hp2)
+      (by show nr < (dl[p]'hp2).1; rw [hc.1 p hp2]; omega)
+  · simp only [List.getElem?_eq_getElem hp2, Option.getD_some]
+    exact hfresh (dl[p]'hp2) (List.getElem_mem hp2)
+      (by show nr < (dl[p]'hp2).1; rw [hc.1 p hp2]; omega)
+  · simp only [List.getElem?_eq_getElem hp2, List.getElem?_eq_getElem hq2,
+      Option.getD_some] at he
+    have hx := hp.2.2 (dl[p]'hp2) (List.getElem_mem hp2) (dl[q]'hq2) (List.getElem_mem hq2)
+      (by show nr < (dl[p]'hp2).1; rw [hc.1 p hp2]; omega)
+      (by show nr < (dl[q]'hq2).1; rw [hc.1 q hq2]; omega) he
+    have hthis : p + 1 = q + 1 := by rw [← hc.1 p hp2, ← hc.1 q hq2]; exact hx
+    omega
+
 /-- **The entry at a counter.**  With strict counters, an index into the
 log IS its counter minus one. -/
 theorem cntOk_mem (pm : RegMapF PermVal) (dl : List UsedRec) (nc k : Nat)
@@ -2491,6 +2559,26 @@ theorem dmaOwn_excl1 (pa : PAddr) : dmaOwn (GF := GF) pa 1 ∗ dmaOwn pa 1 ⊢ F
   iintro ⟨⟨%Hs, H1⟩, ⟨%Hs', H2⟩⟩
   ihave H1 := histBytes_one_l pa (DFrac.own 1) Hs $$ H1
   ihave H2 := histBytes_one_l pa (DFrac.own 1) Hs' $$ H2
+  icases pointsTo_ne (L := PAddr) (V := Hist) (H := MemF) $$ H1 H2 with %hne
+  exact absurd rfl hne
+
+/-- **Two full footprints over one WINDOW are one too many**, at any
+nonzero width: the width-generic `Xv6.dmaOwn_excl1`. -/
+theorem dmaOwn_byte0 (pa : PAddr) (n : Nat) (hn : 0 < n) :
+    dmaOwn (GF := GF) pa n ⊢ ∃ H : Hist, pa ↦ₕ{DFrac.own 1} H := by
+  unfold dmaOwn histBytes
+  iintro ⟨%Hs, H⟩
+  icases BigSepL.bigSepL_mem_acc
+      (Φ := fun j => iprop((pa + BitVec.ofNat 64 j) ↦ₕ{(fun _ => DFrac.own 1) j} Hs j))
+      (List.mem_range.2 hn) $$ H with ⟨Hb, -⟩
+  iexists (Hs 0)
+  iapply pt_cong (pa + BitVec.ofNat 64 0) pa (DFrac.own 1) (Hs 0) (by simp) $$ Hb
+
+theorem dmaOwn_excl (pa : PAddr) (n : Nat) (hn : 0 < n) :
+    dmaOwn (GF := GF) pa n ∗ dmaOwn pa n ⊢ False := by
+  iintro ⟨H1, H2⟩
+  icases dmaOwn_byte0 pa n hn $$ H1 with ⟨%Ha, H1⟩
+  icases dmaOwn_byte0 pa n hn $$ H2 with ⟨%Hb, H2⟩
   icases pointsTo_ne (L := PAddr) (V := Hist) (H := MemF) $$ H1 H2 with %hne
   exact absurd rfl hne
 
@@ -2886,11 +2974,293 @@ words are leased under its HEAD. -/
 theorem headRes_member (γ : DiskNames) (pd : PAddr) (i h : Nat) :
     headRes (GF := GF) γ pd i (.member h) = iprop(emp) := rfl
 
+/-! ### The used-ring ROWS
+
+The used ring is entirely the device's, but a row at a plain `dmaOwn`
+tells a READ nothing: the handler's `lw` of `used->ring[nr % NUM].id`
+must come back with the head the device reported, at a position the
+handler's floor has passed.  So the ring is slot-indexed exactly as the
+status row is head-indexed (`Xv6.statusRes`):
+
+* `.free` -- the invariant holds the eight bytes at no particular value
+  (a slot no unread completion needs);
+* `.lent` -- the SERVING task holds them, between its used-element write
+  and its used-index write.  That is the only channel by which the value
+  the element write left behind can reach the moment the log entry is
+  appended, which is what LINKS the row to the entry;
+* `.done w ts` -- the invariant holds them at the `w` the device wrote,
+  at the POSITION `ts` of that write.
+
+`Xv6.ueOk` is the coupling: every UNREAD entry's row is `.done` at a word
+whose low half spells the entry's head, at a position at or below the
+entry's own used-index write. -/
+inductive UElem where
+  /-- the invariant holds the eight bytes, at no particular value -/
+  | free
+  /-- the serving task holds them, between its two writes -/
+  | lent
+  /-- the invariant holds them at the `w` the device wrote, at the
+  POSITION `ts` of that write -/
+  | done (w : BitVec (8 * 8)) (ts : Nat)
+  deriving Inhabited
+
+/-- One used-ring slot, where the row says it is. -/
+def ueRes (pu : PAddr) (j : Nat) : UElem → IProp GF
+  | .free => dmaOwn (usedElemAt pu j) 8
+  | .lent => iprop(emp)
+  | .done w ts => dmaOwnT (usedElemAt pu j) 8 w ts
+
+theorem ueRes_free (pu : PAddr) (j : Nat) :
+    ueRes (GF := GF) pu j .free = dmaOwn (usedElemAt pu j) 8 := rfl
+theorem ueRes_lent (pu : PAddr) (j : Nat) : ueRes (GF := GF) pu j .lent = iprop(emp) := rfl
+theorem ueRes_done (pu : PAddr) (j : Nat) (w : BitVec (8 * 8)) (ts : Nat) :
+    ueRes (GF := GF) pu j (.done w ts) = dmaOwnT (usedElemAt pu j) 8 w ts := rfl
+
+instance ueRes_timeless (pu : PAddr) (j : Nat) (u : UElem) :
+    Timeless (ueRes (GF := GF) pu j u) := by
+  cases u with
+  | free => show Timeless (dmaOwn (GF := GF) (usedElemAt pu j) 8); infer_instance
+  | lent => show Timeless (iprop(emp) : IProp GF); infer_instance
+  | done w ts => show Timeless (dmaOwnT (GF := GF) (usedElemAt pu j) 8 w ts); infer_instance
+
+/-- **The row comes out at own 1** unless the serving task has it. -/
+theorem ueRes_own (pu : PAddr) (j : Nat) (u : UElem) (hu : u ≠ UElem.lent) :
+    ueRes (GF := GF) pu j u ⊢ dmaOwn (usedElemAt pu j) 8 := by
+  cases u with
+  | free => rw [ueRes_free]
+  | lent => exact absurd rfl hu
+  | done w ts => rw [ueRes_done]; exact dmaOwnT_dmaOwn _ _ _ _
+
+/-- A row the serving task holds at own 1 says `.lent`. -/
+theorem ueRes_not_lent (pu : PAddr) (j : Nat) (u : UElem) :
+    ueRes (GF := GF) pu j u ∗ dmaOwn (usedElemAt pu j) 8 ⊢ ⌜u = UElem.lent⌝ := by
+  cases u with
+  | lent => iintro _; ipureintro; rfl
+  | free =>
+    rw [ueRes_free]
+    iintro ⟨H1, H2⟩
+    iapply false_elim
+    iapply dmaOwn_excl (usedElemAt pu j) 8 (by omega)
+    iframe H1 H2
+  | done w ts =>
+    rw [ueRes_done]
+    iintro ⟨H1, H2⟩
+    iapply false_elim
+    iapply dmaOwn_excl (usedElemAt pu j) 8 (by omega)
+    isplitl [H1]
+    · iapply dmaOwnT_dmaOwn (usedElemAt pu j) 8 w ts $$ H1
+    · iexact H2
+
+/-- A row the serving task holds, POSITIONED: the pure fact, with both
+resources given back. -/
+theorem ueRes_lent_of_done (pu : PAddr) (j : Nat) (u : UElem) (w : BitVec (8 * 8)) (ts : Nat) :
+    ⊢@{IProp GF} ueRes pu j u -∗ dmaOwnT (usedElemAt pu j) 8 w ts -∗ ⌜u = UElem.lent⌝ := by
+  iintro H1 H2
+  iapply ueRes_not_lent pu j u
+  isplitl [H1]
+  · iexact H1
+  · iapply dmaOwnT_dmaOwn (usedElemAt pu j) 8 w ts $$ H2
+
+/-- One row, updated. -/
+def updU (ue : Nat → UElem) (j : Nat) (u : UElem) : Nat → UElem :=
+  fun k => if k = j then u else ue k
+
+@[simp] theorem updU_self (ue : Nat → UElem) (j : Nat) (u : UElem) : updU ue j u j = u := by
+  simp [updU]
+
+theorem updU_ne (ue : Nat → UElem) (j : Nat) (u : UElem) (k : Nat) (h : k ≠ j) :
+    updU ue j u k = ue k := by simp [updU, h]
+
 /-- The used RING is entirely the device's.  The used INDEX is kept apart
 (`Xv6.usedIdxCell`), because the handler reads it and a `dmaOwn` cell tells
 a read nothing. -/
-def usedLease (pu : PAddr) : IProp GF := iprop%
-  [∗list] j ∈ List.range NUM, dmaOwn (usedElemAt pu j) 8
+def usedLease (pu : PAddr) (ue : Nat → UElem) : IProp GF := iprop%
+  [∗list] j ∈ List.range NUM, ueRes pu j (ue j)
+
+/-- **The rows of the UNREAD entries.**  Row `k % NUM` of an unread entry
+`dl[k]` holds the eight bytes the device wrote for it -- whose low word
+spells the entry's head -- at a position at or below the entry's own
+used-index write. -/
+def ueOk (dl : List UsedRec) (nr : Nat) (ue : Nat → UElem) : Prop :=
+  ∀ (k : Nat) (hk : k < dl.length), nr ≤ k →
+    ∃ (w : BitVec (8 * 8)) (ts : Nat), ue (k % NUM) = UElem.done w ts ∧
+      BitVec.extractLsb' 0 32 w = BitVec.setWidth 32 (BitVec.ofNat 16 (dl[k]'hk).hd) ∧ ts ≤ (dl[k]'hk).pos
+
+theorem ueOk_nil (nr : Nat) (ue : Nat → UElem) : ueOk [] nr ue :=
+  fun k hk _ => absurd hk (by simp)
+
+/-- **The handler's deposit**: fewer rows are asked for. -/
+theorem ueOk_nr (dl : List UsedRec) (nr nr' : Nat) (ue : Nat → UElem) (h : ueOk dl nr ue)
+    (hle : nr ≤ nr') : ueOk dl nr' ue := fun k hk hk' => h k hk (by omega)
+
+/-- **The used-ELEMENT write** lends slot `nc % NUM` to the serving task.
+No unread entry's row is disturbed: the window is STRICTLY narrower than
+`NUM` while that task is in flight without an unread completion of its
+own (`Xv6.unread_window_lt`), so `nc % NUM` is no unread entry's slot. -/
+theorem ueOk_lend (dl : List UsedRec) (nr nc : Nat) (ue : Nat → UElem) (h : ueOk dl nr ue)
+    (hlen : dl.length = nc) (hroom : dl.length < nr + NUM) (u : UElem) :
+    ueOk dl nr (updU ue (nc % NUM) u) := by
+  intro k hk hk'
+  obtain ⟨w, ts, h1, h2, h3⟩ := h k hk hk'
+  refine ⟨w, ts, ?_, h2, h3⟩
+  rw [updU_ne ue (nc % NUM) u (k % NUM) ?_]
+  · exact h1
+  · have hkn : k < nc := by omega
+    unfold NUM at hroom ⊢
+    omega
+
+/-- **The used-INDEX write** puts the row back at its value and position,
+and the entry it appends is the one that row belongs to. -/
+theorem ueOk_write (dl : List UsedRec) (nr nc t hd : Nat) (ue : Nat → UElem)
+    (w : BitVec (8 * 8)) (ts : Nat) (h : ueOk dl nr ue) (hlen : dl.length = nc)
+    (hroom : dl.length < nr + NUM) (hlow : BitVec.extractLsb' 0 32 w = BitVec.setWidth 32 (BitVec.ofNat 16 hd))
+    (hts : ts ≤ t) :
+    ueOk (dl ++ [((nc + 1, t, hd) : UsedRec)]) nr (updU ue (nc % NUM) (UElem.done w ts)) := by
+  intro k hk hk'
+  rw [List.length_append, List.length_singleton, hlen] at hk
+  by_cases hlt : k < dl.length
+  · obtain ⟨w', ts', h1, h2, h3⟩ := h k hlt hk'
+    refine ⟨w', ts', ?_, ?_, ?_⟩
+    · rw [updU_ne ue (nc % NUM) _ (k % NUM) ?_]
+      · exact h1
+      · have hkn : k < nc := by omega
+        unfold NUM at hroom ⊢
+        omega
+    · rw [List.getElem_append_left hlt]; exact h2
+    · rw [List.getElem_append_left hlt]; exact h3
+  · have hke : k = dl.length := by omega
+    subst hke
+    refine ⟨w, ts, ?_, ?_, ?_⟩
+    · rw [hlen]; simp
+    · rw [List.getElem_append_right (Nat.le_refl _)]; simpa using hlow
+    · rw [List.getElem_append_right (Nat.le_refl _)]; simpa using hts
+
+/-- **A LENT row is in the hands of a LATCHED task that has not yet made
+its used-index write.**  At most one task is `.pushed` (`Xv6.pushedUniq`)
+and at most one permit names a head (`Xv6.permInj`), so at most one row is
+`.lent`, and the used-index write -- which sets the bit -- takes it
+back. -/
+def ueLent (pm : RegMapF PermVal) (ue : Nat → UElem) : Prop :=
+  ∀ j, ue j = UElem.lent →
+    ∃ (key : Nat) (h : BitVec 16) (c : Chain) (r : VioReq) (ui : BitVec 16),
+      PartialMap.get? pm key = some ((h, c, some (VPhase.pushed r), some (ui, false)) : PermVal) ∧
+      ui.toNat % NUM = j
+
+/-- The two used-ring clauses, as `Xv6.diskLive` carries them. -/
+def ueInv (pm : RegMapF PermVal) (dl : List UsedRec) (nr : Nat) (ue : Nat → UElem) : Prop :=
+  ueOk dl nr ue ∧ ueLent pm ue
+
+theorem ueInv_nil (pm : RegMapF PermVal) (nr : Nat) :
+    ueInv pm [] nr (fun _ => UElem.free) :=
+  ⟨ueOk_nil nr _, fun j hj => absurd hj (by simp)⟩
+
+theorem ueInv_nr (pm : RegMapF PermVal) (dl : List UsedRec) (nr nr' : Nat) (ue : Nat → UElem)
+    (h : ueInv pm dl nr ue) (hle : nr ≤ nr') : ueInv pm dl nr' ue :=
+  ⟨ueOk_nr dl nr nr' ue h.1 hle, h.2⟩
+
+/-- No permit's `(.pushed, false)` entry moves: the rows travel. -/
+theorem ueLent_congr (pm pm' : RegMapF PermVal) (ue : Nat → UElem) (h : ueLent pm ue)
+    (hp : ∀ key h c r ui,
+      PartialMap.get? pm key = some ((h, c, some (VPhase.pushed r), some (ui, false)) : PermVal) →
+      ∃ key', PartialMap.get? pm' key'
+        = some ((h, c, some (VPhase.pushed r), some (ui, false)) : PermVal)) :
+    ueLent pm' ue := by
+  intro j hj
+  obtain ⟨key, hh, c, r, ui, hg, hui⟩ := h j hj
+  obtain ⟨key', hg'⟩ := hp key hh c r ui hg
+  exact ⟨key', hh, c, r, ui, hg', hui⟩
+
+theorem ueInv_congr (pm pm' : RegMapF PermVal) (dl : List UsedRec) (nr : Nat)
+    (ue : Nat → UElem) (h : ueInv pm dl nr ue)
+    (hp : ∀ key h c r ui,
+      PartialMap.get? pm key = some ((h, c, some (VPhase.pushed r), some (ui, false)) : PermVal) →
+      ∃ key', PartialMap.get? pm' key'
+        = some ((h, c, some (VPhase.pushed r), some (ui, false)) : PermVal)) :
+    ueInv pm' dl nr ue := ⟨h.1, ueLent_congr pm pm' ue h.2 hp⟩
+
+/-- **The LATCH lends slot `ui % NUM`**: the invariant gives the row up,
+and the permit it installs is the witness. -/
+theorem ueInv_lend (pm : RegMapF PermVal) (dl : List UsedRec) (nr nc : Nat) (ue : Nat → UElem)
+    (key : Nat) (h : BitVec 16) (c : Chain) (r : VioReq) (ui : BitVec 16)
+    (hin : ueInv pm dl nr ue) (hlen : dl.length = nc) (hroom : dl.length < nr + NUM)
+    (hj : ui.toNat % NUM = nc % NUM)
+    (hget : PartialMap.get? (PartialMap.insert pm key
+      ((h, c, some (VPhase.pushed r), some (ui, false)) : PermVal)) key
+      = some ((h, c, some (VPhase.pushed r), some (ui, false)) : PermVal))
+    (hold : ∀ key' hh cc rr uu,
+      PartialMap.get? pm key'
+        = some ((hh, cc, some (VPhase.pushed rr), some (uu, false)) : PermVal) →
+      ∃ key'', PartialMap.get? (PartialMap.insert pm key
+        ((h, c, some (VPhase.pushed r), some (ui, false)) : PermVal)) key''
+        = some ((hh, cc, some (VPhase.pushed rr), some (uu, false)) : PermVal)) :
+    ueInv (PartialMap.insert pm key
+      ((h, c, some (VPhase.pushed r), some (ui, false)) : PermVal)) dl nr
+      (updU ue (nc % NUM) UElem.lent) := by
+  refine ⟨ueOk_lend dl nr nc ue hin.1 hlen hroom UElem.lent, fun j hjl => ?_⟩
+  by_cases hje : j = nc % NUM
+  · subst hje
+    exact ⟨key, h, c, r, ui, hget, hj⟩
+  · rw [updU_ne ue (nc % NUM) UElem.lent j hje] at hjl
+    obtain ⟨key', hh, cc, rr, uu, hg, hu⟩ := hin.2 j hjl
+    obtain ⟨key'', hg''⟩ := hold key' hh cc rr uu hg
+    exact ⟨key'', hh, cc, rr, uu, hg'', hu⟩
+
+/-- **The used-INDEX write** puts the row back and sets the witness bit,
+so no row is `.lent` under a `false` permit any more. -/
+theorem ueLent_write (pm : RegMapF PermVal) (ue : Nat → UElem) (key : Nat) (h : BitVec 16)
+    (c : Chain) (r : VioReq) (ui : BitVec 16) (u : UElem) (hu : u ≠ UElem.lent)
+    (hne : ∀ key' hh cc rr uu,
+      PartialMap.get? pm key'
+        = some ((hh, cc, some (VPhase.pushed rr), some (uu, false)) : PermVal) →
+      key' = key ∧ uu.toNat % NUM = ui.toNat % NUM)
+    (hl : ueLent pm ue) :
+    ueLent (PartialMap.insert pm key
+      ((h, c, some (VPhase.pushed r), some (ui, true)) : PermVal))
+      (updU ue (ui.toNat % NUM) u) := by
+  intro j hj
+  by_cases hje : j = ui.toNat % NUM
+  · rw [hje, updU_self] at hj; exact absurd hj hu
+  · rw [updU_ne ue (ui.toNat % NUM) u j hje] at hj
+    obtain ⟨key', hh, cc, rr, uu, hg, huu⟩ := hl j hj
+    obtain ⟨-, hmod⟩ := hne key' hh cc rr uu hg
+    exact absurd (by rw [← huu, hmod] : j = ui.toNat % NUM) hje
+
+/-- **The used-INDEX write**, on the rows: the lent row goes back at the
+value and position of the element write, the entry it belongs to joins
+the log, and the witness bit makes any other `.lent` impossible. -/
+theorem ueInv_write (pm : RegMapF PermVal) (dl : List UsedRec) (nr nc t : Nat)
+    (ue : Nat → UElem) (key : Nat) (h : BitVec 16) (c : Chain) (r : VioReq) (ui : BitVec 16)
+    (w : BitVec (8 * 8)) (ts : Nat)
+    (hin : ueInv pm dl nr ue) (hlen : dl.length = nc) (hroom : dl.length < nr + NUM)
+    (hmod : ui.toNat % NUM = nc % NUM)
+    (hlow : BitVec.extractLsb' 0 32 w = BitVec.setWidth 32 (BitVec.ofNat 16 h.toNat))
+    (hts : ts ≤ t)
+    (hne : ∀ key' hh cc rr uu,
+      PartialMap.get? pm key'
+        = some ((hh, cc, some (VPhase.pushed rr), some (uu, false)) : PermVal) →
+      key' = key ∧ uu.toNat % NUM = ui.toNat % NUM) :
+    ueInv (PartialMap.insert pm key ((h, c, some (VPhase.pushed r), some (ui, true)) : PermVal))
+      (dl ++ [((nc + 1, t, h.toNat) : UsedRec)]) nr (updU ue (nc % NUM) (UElem.done w ts)) := by
+  refine ⟨ueOk_write dl nr nc t h.toNat ue w ts hin.1 hlen hroom hlow hts, ?_⟩
+  have := ueLent_write pm ue key h c r ui (UElem.done w ts) (by simp) hne hin.2
+  rwa [hmod] at this
+
+/-- One row, read off the eight. -/
+theorem ueRes_acc (pu : PAddr) (ue : Nat → UElem) (j : Nat) (hj : j < NUM) :
+    usedLease (GF := GF) pu ue ⊢ ueRes pu j (ue j) ∗ (ueRes pu j (ue j) -∗ usedLease pu ue) := by
+  unfold usedLease
+  exact BigSepL.bigSepL_mem_acc (Φ := fun j => ueRes (GF := GF) pu j (ue j))
+    (List.mem_range.2 hj)
+
+/-- One row, replaced. -/
+theorem ueRes_upd (pu : PAddr) (ue : Nat → UElem) (j : Nat) (hj : j < NUM) (u : UElem) :
+    usedLease (GF := GF) pu ue ⊢
+      ueRes pu j (ue j) ∗ (ueRes pu j u -∗ usedLease pu (updU ue j u)) := by
+  have h := diskRange_acc (GF := GF) j hj (fun k => ueRes pu k (ue k))
+    (fun k => ueRes pu k (updU ue j u k))
+    (fun k hk => by rw [updU_ne ue j u k hk])
+  rw [updU_self] at h
+  exact h
 
 /-- The invariant's half of `avail->idx` and of the eight ring cells. -/
 def availLease (pav : PAddr) (np : Nat) (ring : Nat → Nat) : IProp GF := iprop%
@@ -2900,12 +3270,6 @@ def availLease (pav : PAddr) (np : Nat) (ring : Nat → Nat) : IProp GF := iprop
 /-! ### Accessors -/
 
 theorem range_mem (i n : Nat) (h : i < n) : i ∈ List.range n := List.mem_range.2 h
-
-theorem usedElem_acc (pu : PAddr) (j : Nat) (hj : j < NUM) :
-    usedLease (GF := GF) pu ⊢ dmaOwn (usedElemAt pu j) 8 ∗ (dmaOwn (usedElemAt pu j) 8 -∗ usedLease pu) := by
-  unfold usedLease
-  exact BigSepL.bigSepL_mem_acc (Φ := fun j => dmaOwn (GF := GF) (usedElemAt pu j) 8)
-    (range_mem j NUM hj)
 
 theorem availLease_idx (pav : PAddr) (np : Nat) (ring : Nat → Nat) :
     availLease (GF := GF) pav np ring ⊢ dmaHalfAt (availIdxAt pav) 2 (wrap16 np) ∗
@@ -2957,11 +3321,11 @@ def diskLive (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState)
     (pm : RegMapF PermVal) : IProp GF := iprop%
   ∃ (st : Nat → HState) (nc np lo : Nat) (ring : Nat → Nat) (m : RegMapF (List (BitVec 8)))
       (pmap : List Nat) (stg : Option Nat) (b M : Nat) (dl dl0 : List UsedRec) (nr : Nat)
-      (sb : Nat → SByte),
+      (sb : Nat → SByte) (ue : Nat → UElem),
     imgAuth γ m ∗
     ([∗list] i ∈ List.range NUM, headAuth γ i (st i)) ∗
     ([∗list] i ∈ List.range NUM, headRes γ c0.desc i (st i)) ∗
-    usedLease c0.used ∗ availLease c0.avail np ring ∗
+    usedLease c0.used ue ∗ availLease c0.avail np ring ∗
     diskDoneAuth γ M ∗ diskPubAuth γ np ∗ diskLoAuth γ lo ∗
     diskPubAuthM γ np ∗ posAuth γ pmap ∗ diskStageAuth γ stg ∗
     usedIdxCell (usedIdxAt c0.used) b dl ∗ doneAuth γ dl0 ∗ diskBaseFrozen γ b ∗
@@ -2970,7 +3334,8 @@ def diskLive (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState)
     ⌜v.usedIdx = wrap16 nc ∧ v.seen = wrap16 lo ∧ lo ≤ np ∧ queueOk st ring lo np ∧
       posOk pmap ring lo np ∧ stageOk stg ring lo np ∧ inflightOff v st ring lo np stg ∧
       imgOk v m (inFlightBlk st) ∧ cachedOk v st ∧ permOk v pm st ∧ usedOk dl dl0 nc M ∧
-      unreadArmed v st dl nr ring lo np stg sb ∧ cntOk pm dl nc ∧ p3Ok v pm dl nr⌝
+      unreadArmed v st dl nr ring lo np stg sb ∧ cntOk pm dl nc ∧ p3Ok v pm dl nr ∧
+      ueInv pm dl nr ue⌝
 
 /-- The dead arm: before `virtio_disk_init`, and never again after.
 
@@ -3021,7 +3386,8 @@ instance headRes_timeless (γ : DiskNames) (pd : PAddr) (i : Nat) (s : HState) :
     show Timeless (iprop(emp) : IProp GF)
     infer_instance
 
-instance usedLease_timeless (pu : PAddr) : Timeless (usedLease (GF := GF) pu) := by
+instance usedLease_timeless (pu : PAddr) (ue : Nat → UElem) :
+    Timeless (usedLease (GF := GF) pu ue) := by
   unfold usedLease; infer_instance
 instance availLease_timeless (pav : PAddr) (np : Nat) (ring : Nat → Nat) :
     Timeless (availLease (GF := GF) pav np ring) := by unfold availLease; infer_instance
