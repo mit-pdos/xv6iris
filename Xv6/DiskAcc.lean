@@ -626,7 +626,7 @@ theorem diskProto_avail_acc (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) 
   · ihave %hcc := diskCfgFrozen_agree γ c0 c0' $$ [$Hfr0 $Hfr]
     subst hcc
     unfold diskLive
-    icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, %hpure⟩
+    icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, %hpure⟩
     obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10⟩ := hpure
     iexists np, lo, ring, st, pmap, stg
     isplitl []
@@ -645,7 +645,7 @@ theorem diskProto_avail_acc (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) 
     isplitl []
     · ipureintro; exact hc0
     iexists st, nc, np', lo, ring', m, pmap', stg', b, M, dl, dl0
-    iframe Hm Ha' Hr Hu Hav' Hnc Hnp' Hlo HnpM' Hpos' Hstg' Hui Hdn Hbs
+    iframe Hm Ha' Hr Hu Hav' Hnc Hnp' Hlo HnpM' Hpos' Hstg' Hui Hdn Hbs Htp
     ipureintro
     exact ⟨e1, e2, hq.1, hq.2.1, hq.2.2.1, hq.2.2.2, e6, e7, e8, e9, e10⟩
 
@@ -1197,7 +1197,8 @@ theorem diskProto_flip [CurCtx] (γ : DiskNames) (v : VirtioState) (c c' : Virti
       · ipureintro; exact ⟨rfl, hlive, hqnum⟩
       unfold diskLive
       iexists stInit, 0, 0, 0, ringInit, m, [], none, bb, 0, [], []
-      iframe Hm Hauths Hrows Hnc Hpa Hlo0 HnpM0 Hpos0 HstgA0 HuiR Hdn0 Hbs
+      ihave #Htp := dlTops_nil (GF := GF)
+      iframe Hm Hauths Hrows Hnc Hpa Hlo0 HnpM0 Hpos0 HstgA0 HuiR Hdn0 Hbs Htp
       isplitl [HueR]
       · unfold usedLease
         iexact HueR
@@ -1277,17 +1278,18 @@ theorem disk_driver_ok_write [CurCtx] (γ : DiskNames) (c c' : VirtioCfg) (w : B
 Everything above is PROVED, and it is everything `virtio_disk_init` needs
 (`disk_reg_read_dead` for each of its loads, `disk_reg_write_dead` for each
 of its stores up to `QUEUE_READY = 1`, and `disk_driver_ok_write` for the
-`DRIVER_OK` store that ends it) and everything the PUBLISH path of
+`DRIVER_OK` store that ends it), everything the PUBLISH path of
 `virtio_disk_rw` needs of the avail page (`disk_ring_write`,
-`disk_avail_idx_write`, now carrying the queue accounting) and of the
-publication point (`disk_publish`, above).  What follows is stated but
-ASSUMED, as an interface (no `sorry`): five accessors of `virtio_disk_rw`
-and `virtio_disk_intr`, ALL of them waiting on the COMPLETION side of the
-accounting.
+`disk_avail_idx_write`, carrying the queue accounting) and of the
+publication point (`disk_publish`, below), and -- since the completion
+side landed -- the `used->idx` read and the watermark bump of
+`virtio_disk_intr` (`disk_used_idx_read`, `disk_deposit`, above).  What
+follows is stated but ASSUMED, as an interface (no `sorry`): three
+accessors of `virtio_disk_rw` and `virtio_disk_intr`.
 
 -------------------------------------------------------------------------
 WHAT THE QUEUE ACCOUNTING HAS SETTLED.  `Xv6/DiskInvDefs.lean`'s
-`diskLive` now carries the Rocq `vproto_ok`'s pending window:
+`diskLive` carries the Rocq `vproto_ok`'s pending window:
 
     lo ≤ np,  queueOk st ring lo np,  posOk pmap ring lo np,
     stageOk stg ring lo np,  v.seen = wrap16 lo
@@ -1296,47 +1298,60 @@ WHAT THE QUEUE ACCOUNTING HAS SETTLED.  `Xv6/DiskInvDefs.lean`'s
 descriptor at ring cell `p % NUM`, distinct positions name distinct
 descriptors (so `np ≤ lo + NUM`, by pigeonhole over the eight
 descriptors), and each such position's head is recorded for ever in a
-monotone list (`posRec`).  The DEVICE's root loop holds the other half of
-`lo` for the whole of its iteration (`Xv6.diskRoot`,
-`MachCSL.DevSig.LeaseV`'s `Cr`), so the `avail->idx` read's answer --
-carried forward as the PERSISTENT `diskPubLb γ (lo+1)` and
-`posRec γ lo i` by the new `MachCSL.DevM.LeaseV.dmaReadV` arm -- still
-holds at the pop.  Consequently:
-
-* a POP always lands on a published position, whose head is armed, and it
-  MINTS the serving task's permit there (`Xv6.diskProto_pop_live`);
-* a permit therefore records a CHAIN, not a receipt
-  (`Xv6.PermVal = BitVec 16 × Chain`), and `Xv6.permOk` says a permit's
-  head is armed with that chain.  A head the driver holds FREE
-  (`headTok γ h .inactive`) provably has no permit out -- which was
-  `disk_publish`'s whole blocker;
-* a `serve` task never meets a free descriptor, so the invariant holds
-  NOTHING for one (`headRes .inactive = emp`), the driver keeps the whole
-  zeroed descriptor at the context tier, and `disk_free_desc_write` has
-  DISAPPEARED: `free_desc`'s four stores are ordinary stores to cells the
-  payload owns outright.
+monotone list (`posRec`).  Consequently a POP always lands on a published
+position, a permit records a CHAIN, a `serve` task never meets a free
+descriptor, and `disk_publish` goes through.
 
 -------------------------------------------------------------------------
-WHAT THE TIER ARITHMETIC HAS SETTLED.  `disk_publish` was blocked only on
-that, and it is now there: `MachCSL/WpDmaCtx2.lean` splits and joins a
-`ctxBytes`/`histBytes` window at a byte offset (`ctxBytes_split_at`,
-`histBytes_split_at`, `histBytes_glue`), and `Xv6/DiskTier.lean` lifts it
-to the three DMA shapes (`dmaOwn`/`dmaOwnAt`/`dmaHalfAt` split and join),
-to the request header's 4/4/8 pieces (`ctxBytes_hdr_split`,
-`dmaHalfAt_hdr_split`), to the 512/512 split of `b->data`
-(`byteBuf_bufLease`), and to the bridge between the driver's
-`wordAtN`/`byteBuf` cells and the raw tier under a page's identity claim
-(`wordPointsTo_dmaOwn`, `byteBuf_dmaOwn`, and the reverse
-`ctxBytes_wordPointsTo`, `ctxIdx_byteBuf` that `disk_collect` will need).
+WHAT THE COMPLETION SIDE HAS SETTLED.  `diskLive` now also carries the
+used-index cell's WRITE LOG (`usedIdxCell`, `usedOk`, `dlTops`): the
+device's writes in order, each with the counter it published, the POSITION
+of the write in the store order, and the descriptor head whose completion
+it reported.  Out of it come
+
+* `Xv6.usedIdx_read` -- what a racy read of `used->idx` returns: a counter
+  the device published that DOMINATES every write the reader's view has
+  passed.  That is `disk_used_idx_read` above;
+* `Xv6.doneRec` / `Xv6.headDone` -- the persistent per-completion record,
+  the used ring's twin of `Xv6.posRec`, which `disk_deposit` hands the
+  handler and which the two reads below must take as their premise: a
+  status byte is `0`, and a chain is reclaimable, only for a head whose
+  request has COMPLETED;
+* `Xv6.diskWm` -- the TSO credential (Rocq's `disk_flr`), carried from one
+  iteration of the handler's loop to the next by `disk_deposit`.
 
 -------------------------------------------------------------------------
-WHAT IS LEFT.  All five accessors below are blocked on the COMPLETION side
-of the accounting, which `diskLive` does not carry: the used-index cell's
-history, a per-completion record of the head reported at each used-ring
-position, the completed request's status byte and its DMA timestamp bound
-(Rocq's `disk_flr`), and the `ctxFloor` those give the handler.  The
-structure's own docstring lists the design; each field's docstring below
-says what its accessor needs. -/
+WHAT IS LEFT, AND WHY.  Two things, and the three accessors below wait on
+one or both.
+
+(1) THE PER-POSITION ROWS.  The invariant still holds nothing about a
+COMPLETED request beyond the log: the used-ring ELEMENT the device wrote
+at `nr % NUM`, the status byte at `dmaOwnAt c.status 1 0#8`, and the
+`topLb` of the request's data writes all belong in a row for each position
+in `[nr, nc)`.  That needs the invariant to know `nr` (so `diskReadAt`
+must become a ghost PAIR, its other half in the dead and live arms), and
+the rows need the window bound `nc - nr ≤ NUM` -- the completion-side twin
+of `np - lo ≤ NUM` -- to say that position `nr`'s used-ring cell has not
+been overwritten.  It also needs `Virtio.complete` to know the status byte
+was written, which is a phase-tracking clause (`pushOk`) the port does not
+carry.  Note that the device CANNOT allocate ghost state
+(`MachCSL.dmaWriteLease`'s continuation is a plain wand), so every row the
+device creates has to be built the way the write log is: a pure list the
+device grows alone, with a LAGGING ghost a client catches up inside a view
+shift.
+
+(2) THE TSO CREDENTIAL IS A PREMISE, NOT A THEOREM.  `Xv6.diskWm γ n F`
+says the hart's floor `F` has passed a used-index write publishing at
+least `n`.  Nothing in the present MachCSL exposes a way to establish it:
+`MachCSL.readAU`'s continuation never names the position the load read, so
+a plain load cannot raise the reader's floor, and the only view-raising
+rule (`MachCSL.exclWriteAU`'s acquire arm) hands out a floor at the
+position the lock's own accessor names.  `__sync_synchronize()` is what
+buys it on the machine -- the fence's `MachCSL.memModel_fence` already
+proves the model supports it -- so the missing piece is a hart-side rule
+that turns a `topLb T` into a `viewLb cpu T` after a fence.  `disk_deposit`
+is written so that this plugs straight in: it returns the write's `topLb T`
+and a wand from `⌜F ≤ F' ∧ T ≤ F'⌝` to the next credential. -/
 
 /-! ## Arming a head: the publication view shift
 
@@ -1397,7 +1412,7 @@ theorem diskProto_armHead (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) (p
     subst hcc
     unfold diskLive
     icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0,
-      Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, %hpure⟩
+      Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, %hpure⟩
     obtain ⟨q1, q2, q3, q4, q5, q6, q7, q8, q9, q10, q11⟩ := hpure
     ihave %hst := headTok_state γ st c.hd .inactive hwf.1 $$ Ha Htok
     icases diskArm_acc c.hd hwf.1 (fun j => headAuth γ j (st j))
@@ -1433,7 +1448,7 @@ theorem diskProto_armHead (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) (p
     isplitl []
     · ipureintro; exact hc0
     iexists (armSt st c.hd c), nc, np, lo, ring, m, pmap, stg, b, M, dl, dl0
-    iframe Hm Ha Hr Hu Hav Hnc Hnp Hlo HnpM Hpos Hstg Hui Hdn Hbs
+    iframe Hm Ha Hr Hu Hav Hnc Hnp Hlo HnpM Hpos Hstg Hui Hdn Hbs Htp
     ipureintro
     exact ⟨q1, q2, q3, queueOk_arm st ring lo np c.hd c q4 hst, q5, q6,
       inflightOk_arm v st c.hd c hst q7, imgOk_arm v m st c.hd c hst q8,
@@ -1504,121 +1519,259 @@ theorem disk_publish [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (c : Chain)
   imodintro
   iframe Htok Hc0 Hc1 Hc2 Hch
 
+/-! ## The completion side: reading `used->idx`
+
+The used page is the DEVICE's, so the handler's reads of it open the
+invariant (`MachCSL.readAU`).  What makes them say anything is the WRITE
+LOG `Xv6/DiskInvDefs.lean` now keeps for `used->idx`, and the TSO
+credential `Xv6.diskWm` the handler brings: its floor has passed the
+stores that zeroed the used page, and the used-index write that published
+its own watermark.  `Xv6.usedIdx_read` then says the racy read returns a
+counter that DOMINATES that write -- so it is at least the watermark. -/
+
+/-- **The used-index cell, borrowed out of the live arm**, with the
+monotone completion counter beside it so that a reader may cash the
+counter it saw. -/
+theorem diskProto_usedRead_acc (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState)
+    (hlive : Virtio.live c0 = true) :
+    diskCfgFrozen (GF := GF) γ c0 ∗ diskProto γ v ⊢
+      ∃ (b nc M : Nat) (dl dl0 : List UsedRec),
+        ⌜usedOk dl dl0 nc M⌝ ∗ diskBaseFrozen γ b ∗ dlTops dl ∗
+        usedIdxCell (usedIdxAt c0.used) b dl ∗ doneAuth γ dl0 ∗ diskDoneAuth γ M ∗
+        (∀ (M' : Nat) (dl0' : List UsedRec), ⌜usedOk dl dl0' nc M'⌝ -∗
+          usedIdxCell (usedIdxAt c0.used) b dl -∗ doneAuth γ dl0' -∗ diskDoneAuth γ M' -∗
+          diskProto γ v) := by
+  unfold diskProto
+  iintro ⟨#Hfr0, %hc, %pn, %pm, Hpm, %hfr, Harm⟩
+  icases Harm with ⟨Hd | ⟨%c0', #Hfr, %hc0, Hl⟩⟩
+  · unfold diskDead
+    icases Hd with ⟨%m, Hm, Hcfg, Hlo0, HnpM0, Hpos0, HstgA0, Hbs0, Hdn0, %hpure⟩
+    ihave %heq := diskCfgFrozen_auth_agree γ c0 v.cfg $$ Hfr0 Hcfg
+    rw [heq, hpure.1] at hlive
+    exact absurd hlive (by simp)
+  · ihave %hcc := diskCfgFrozen_agree γ c0 c0' $$ [$Hfr0 $Hfr]
+    subst hcc
+    unfold diskLive
+    icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, %hpure⟩
+    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10⟩ := hpure
+    iexists b, nc, M, dl, dl0
+    isplitl []
+    · ipureintro; exact e10
+    iframe Hbs Htp Hui Hdn Hnc
+    iintro %M' %dl0' %hok Hui' Hdn' Hnc'
+    isplitl []
+    · ipureintro; exact hc
+    iexists pn, pm
+    iframe Hpm
+    isplitl []
+    · ipureintro; exact hfr
+    iright
+    iexists c0
+    iframe Hfr
+    isplitl []
+    · ipureintro; exact hc0
+    iexists st, nc, np, lo, ring, m, pmap, stg, b, M', dl, dl0'
+    iframe Hm Ha Hr Hu Hav Hnc' Hnp Hlo HnpM Hpos Hstg Hui' Hdn' Hbs Htp
+    ipureintro
+    exact ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, hok⟩
+
+/-- **`disk.used->idx`, read** (the `lhu` of `virtio_disk_intr`'s loop
+test).  The answer is `wrap16 m` for a counter `m` the device has
+published, and `m` is at least the handler's watermark -- which is what
+makes `disk.used_idx != disk.used->idx` mean `nr < m`, and so licenses the
+reads of the used element and of the status byte at position `nr`.
+
+`diskWm γ nr K` is the TSO credential: `K` is a bound the hart's view has
+reached, and it has passed the write that published `nr` (and the stores
+that zeroed the page).  Nothing in a plain load can establish that on its
+own -- the load rules expose no read position -- so it is a PREMISE, the
+one residue of the completion side; see the head of the assumed-interface
+section below. -/
+theorem disk_used_idx_read [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu : CPU)
+    (K nr : Nat) :
+    diskInv (GF := GF) γ ∗ diskGeom γ pd pav pu ∗ diskReadAt γ nr ∗ diskWm γ nr K ⊢
+      readAU cpu (usedIdxAt pu) 2 K [] (fun w =>
+        iprop(diskReadAt γ nr ∗ ∃ m : Nat, ⌜w = wrap16 m ∧ nr ≤ m⌝ ∗ diskDoneLb γ m)) := by
+  unfold diskInv devInvR readAU
+  iintro ⟨#Hinv, #Hgeom, Hnr, #Hwm⟩
+  icases diskGeom_cfg γ pd pav pu $$ Hgeom with ⟨%c0, #Hfr, %hg⟩
+  obtain ⟨hgd, hga, hgu, hgl, hgq⟩ := hg
+  subst hgu
+  isplitl []
+  · exact BigSepL.bigSepL_nil_intro
+  iinv Hinv with Hbody Hclose
+  icases Hbody with ⟨%v, >Hfrag, >Hproto⟩
+  icases diskProto_usedRead_acc γ c0 v hgl $$ [$Hfr $Hproto]
+    with ⟨%b, %nc, %M, %dl, %dl0, %hok, #Hbs, #Htp, Hui, Hdn, Hnc, Hback⟩
+  icases diskWm_base γ nr K $$ Hwm with ⟨%b', #Hbs', %hbK⟩
+  ihave %hbb := diskBaseFrozen_agree γ b b' $$ Hbs Hbs'
+  subst hbb
+  ihave %hmem := diskWm_mem γ nr K dl dl0 hok.1 $$ Hdn Hwm
+  icases usedIdxCell_cases (usedIdxAt c0.used) b dl $$ Hui with ⟨%Hold, Hb, %htail⟩
+  iapply fupd_mask_intro LawfulSet.empty_subset
+  iintro Hmask
+  iexists (fun _ => DFrac.own 1), ((usedW dl).hist Hold)
+  iframe Hb
+  isplit
+  · ipureintro
+    exact fun j hj => usedIdxCell_ne_nil b dl Hold htail j hj
+  inext
+  iintro %w %tvn %hKt %hrd %hauth Hb
+  imod Hmask
+  obtain ⟨m, hwm, hmm, hdom⟩ :=
+    usedIdx_read dl Hold b cpu tvn w htail (by omega) hok.2.2.2.1 hrd
+  have hmle : m ≤ nc + 1 := by
+    rcases hmm with hz | ⟨t, hd, ht⟩
+    · omega
+    · exact hok.2.1 (m, t, hd) ht
+  have hnrm : nr ≤ m := by
+    rcases hmem with hz | ⟨m0, t, hd, hmt, hnm0, htK⟩
+    · omega
+    · exact Nat.le_trans hnm0 (hdom (m0, t, hd) hmt (Nat.le_trans htK hKt))
+  imod diskDoneAuth_cash γ M m $$ Hnc with ⟨Hnc, #Hlb⟩
+  ihave Hui := usedIdxCell_intro (usedIdxAt c0.used) b dl Hold htail $$ Hb
+  have hach : m = 0 ∨ ∃ r ∈ dl, m ≤ r.1 := by
+    rcases hmm with hz | ⟨t, hd, ht⟩
+    · exact Or.inl hz
+    · exact Or.inr ⟨(m, t, hd), ht, Nat.le_refl _⟩
+  ihave Hproto := Hback $$ %(max M m) %dl0 %(usedOk_bump dl dl0 nc M m hok hmle hach)
+    Hui Hdn Hnc
+  ihave Hcl := Hclose $$ [Hfrag Hproto]
+  case' _ =>
+    inext
+    iexists v
+    iframe Hfrag Hproto
+  imod Hcl
+  imodintro
+  iframe Hnr
+  iexists m
+  isplitl []
+  · ipureintro; exact ⟨hwm, hnrm⟩
+  · iexact Hlb
+
+/-- **`deposit`** (`disk.used_idx += 1`, the tail of `virtio_disk_intr`'s
+loop body): the handler advances its watermark past the completion it has
+just read, and takes out of the invariant the PERSISTENT receipts of a
+used-index write that published a counter past the new watermark -- the
+record itself, and the write's POSITION as a `topLb`.
+
+Those two are the credential the next loop test needs
+(`Xv6.disk_used_idx_read`), up to one thing the MachCSL layer cannot yet
+supply: a view receipt `F'` of the hart past both the old credential's
+bound and the write's position `T`.  That is what `__sync_synchronize()`
+buys on the machine, and what the model's plain-load rules do not expose;
+the wand is where it plugs in. -/
+theorem disk_deposit [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (nr F : Nat) :
+    diskInv (GF := GF) γ ∗ diskGeom γ pd pav pu ∗ diskReadAt γ nr ∗ diskDoneLb γ (nr + 1) ∗
+      diskWm γ nr F ⊢
+      |={⊤}=> (diskReadAt γ (nr + 1) ∗ ∃ T : Nat, topLb T ∗
+        ∀ F' : Nat, ⌜F ≤ F' ∧ T ≤ F'⌝ -∗ diskWm γ (nr + 1) F') := by
+  unfold diskInv devInvR
+  iintro ⟨#Hinv, #Hgeom, Hnr, #Hlb, #Hwm⟩
+  icases diskGeom_cfg γ pd pav pu $$ Hgeom with ⟨%c0, #Hfr, %hg⟩
+  icases diskWm_base γ nr F $$ Hwm with ⟨%b', #Hbs', %hb'⟩
+  iinv Hinv with Hbody Hclose
+  icases Hbody with ⟨%v, >Hfrag, >Hproto⟩
+  icases diskProto_usedRead_acc γ c0 v hg.2.2.2.1 $$ [$Hfr $Hproto]
+    with ⟨%b, %nc, %M, %dl, %dl0, %hok, #Hbs, #Htp, Hui, Hdn, Hnc, Hback⟩
+  ihave %hle := diskDoneLb_le γ M (nr + 1) $$ Hnc Hlb
+  obtain ⟨r, hrmem, hrle⟩ : ∃ r ∈ dl, nr + 1 ≤ r.1 := by
+    rcases hok.2.2.2.2 with hz | ⟨r, hr, hmr⟩
+    · omega
+    · exact ⟨r, hr, by omega⟩
+  obtain ⟨k, hk⟩ := List.getElem?_of_mem hrmem
+  imod doneAuth_sync γ dl0 dl hok.1 $$ Hdn with Hdn
+  icases doneRec_get γ dl k r hk $$ Hdn with ⟨Hdn, #Hrec⟩
+  ihave #Htr := dlTops_mem dl r hrmem $$ Htp
+  ihave Hproto := Hback $$ %M %dl %(usedOk_sync dl dl0 nc M hok) Hui Hdn Hnc
+  ihave Hcl := Hclose $$ [Hfrag Hproto]
+  case' _ =>
+    inext
+    iexists v
+    iframe Hfrag Hproto
+  imod Hcl
+  imod diskReadAt_update γ nr (nr + 1) $$ Hnr with Hnr
+  imodintro
+  iframe Hnr
+  iexists r.2.1
+  iframe Htr
+  iintro %F' %hF'
+  unfold diskWm
+  isplitl []
+  · iexists b'
+    iframe Hbs'
+    ipureintro; omega
+  · iright
+    iexists k, r.1, r.2.1, r.2.2
+    iframe Hrec
+    ipureintro
+    exact ⟨hrle, by omega⟩
+
 /-- **The accessors whose obligations this port leaves open.**
 
-All five need the SAME missing piece: the COMPLETION-side accounting of
-the queue, which `Xv6/DiskInvDefs.lean`'s `diskLive` does not carry.  The
-pending side is there (`nr`-free: `lo ≤ np ≤ lo + NUM`, `queueOk`,
-`posOk`, `stageOk`, the serve permits), and `disk_publish` above is what
-it buys.  What is missing is, per position `p ∈ [nr, nc)` -- completed by
-the device and not yet read by the interrupt handler -- a ROW carrying
-
-* the head `h_p` and its chain, with the receipt at `.done c` (a THIRD
-  arm of `Xv6.HState`, which the device installs at the used-index write;
-  the driver's `collect` flips it back to `.inactive`).  Because the
-  DEVICE moves that value while the DRIVER holds a token, `headAuth`
-  and `headTok` cannot stay a plain ghost-var pair: the invariant must
-  own the whole variable and the driver an exclusive per-head claim
-  token beside a persistent "armed at generation g" record;
-* the status byte at `dmaOwnAt c.status 1 0#8` (`Virtio.statusOf r = 0`
-  for both request types xv6 issues);
-* the used element written at `usedElemAt pu (p % NUM)`;
-* the DMA timestamp bound `t_p` with `topLb t_p`, monotone in `p`, which
-  is what `MachCSL.ctxBytes_of_pushedFloor` needs to hand the
-  device-written bytes back at the driver's context;
-* and, beside the rows, the used-index cell's EXPLICIT history
-  (`histBytes (usedIdxAt pu) 2 own1 Hs` with `Hs` the pushed sequence
-  `wrap16 0, …, wrap16 nc` by `MachCSL.diskAgent`), plus `nr` as a ghost
-  HALF of `diskReadAt` so that `nc - nr ≤ NUM` is available.
-
-Adding the `.done` arm ripples through `Xv6/VirtioQueue.lean`
-(`isActive`, `queueOk`, `inflightOk`, `inFlightBlk`, `cachedOk`),
-`Xv6/DiskInvDefs.lean` (`headRes`, `slotBody`) and every device step of
-`Xv6/DiskInv.lean` (`complete` in particular, which must move the row and
-record `t`); that is the work these five are waiting on.  Nothing else is
-missing: the TIER arithmetic they also need -- sub-range splits and joins
-of `ctxBytes`/`histBytes`/`dmaOwn`/`dmaHalfAt`/`dmaOwnAt`, the `byteBuf`
-bridge -- is proved in `MachCSL/WpDmaCtx2.lean` and `Xv6/DiskTier.lean`.
-
-`disk_collect` needs one thing beyond that: the reverse of
-`Xv6.byteBuf_dmaOwn`, which asks for `inRam` of the buffer (a
-`wordPointsTo` carries it, a `dmaOwn` does not), so its statement will
-grow the same `kmapStatic`-style premises `disk_publish` now carries. -/
+All three wait on the PER-POSITION ROWS of the completion side (see the
+section head above): the used-ring element the device wrote, the status
+byte at a known value, the block snapshot of a read's transfer, and the
+`topLb` of the request's data writes.  Their statements are now stated
+against the vocabulary the completion side does provide -- `Xv6.headDone`
+for "this head's request has completed", `Xv6.diskWm` for the TSO
+credential -- so that each is SOUND as written and each premise names a
+resource a caller can hold. -/
 structure DISK_ACC_ASSUMPTIONS : Prop where
-  /-- **`disk.used->idx`, read** (the `lhu` of `virtio_disk_intr`'s loop
-  test).  The used page is entirely the device's, and the invariant holds
-  it as `dmaOwn` -- FULL ownership at an UNCONSTRAINED value -- so a read
-  learns nothing.  The fix is to record the used-index cell's HISTORY:
-  every entry's value is `wrap16 m` for some `m ≤ nc`, and the head is
-  `wrap16 nc`; then `readsAre` picks an entry and the watermark
-  `diskReadAt γ nr` plus `nc - nr < 2^16` recovers a natural number.  The
-  bound `nc - nr ≤ NUM` is the completion-side twin of the pending window
-  `np - lo ≤ NUM` this file now carries. -/
-  disk_used_idx_read : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
-      [DiskG GF] [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu : CPU) (K nr : Nat),
-    diskInv (GF := GF) γ ∗ diskGeom γ pd pav pu ∗ diskReadAt γ nr ∗ viewLb cpu K ⊢
-      readAU cpu (usedIdxAt pu) 2 K [] (fun w =>
-        iprop(diskReadAt γ nr ∗ ∃ nc : Nat, ⌜w = wrap16 nc ∧ nr ≤ nc⌝ ∗ diskDoneLb γ nc))
-
   /-- **`disk.used->ring[disk.used_idx % NUM].id`, read** (the `lw` of the
-  handler's loop).  Blocked on the same absence: nothing says what the
-  device wrote there.  The fix is the Rocq `vp_uix`/`disk_ord` row -- a
-  PERSISTENT per-COMPLETION record of the head reported at that used-ring
-  position, written by the device's `usedElem_write_lease` and read here.
-  It is the exact mirror of `Xv6.posRec`, which this file now has for the
-  AVAIL ring. -/
+  handler's loop).  Blocked on the used ring's own write log: nothing yet
+  says what the device wrote there, nor that the cell has not been
+  overwritten since -- the latter is the window bound `nc - nr ≤ NUM`, the
+  completion-side twin of `np - lo ≤ NUM`, which needs the per-position
+  rows.  What it returns is the completion record `Xv6.headDone`, the used
+  ring's twin of `Xv6.posRec`, which is what the status read below and
+  `disk_collect` take as their premise. -/
   disk_used_elem_read : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
       [DiskG GF] [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu : CPU) (K nr nc : Nat),
     nr < nc →
     diskInv (GF := GF) γ ∗ diskGeom γ pd pav pu ∗ diskReadAt γ nr ∗ diskDoneLb γ nc ∗
-      viewLb cpu K ⊢
+      diskWm γ nc K ⊢
       readAU cpu (usedElemAt pu (nr % NUM)) 8 K [] (fun w =>
         iprop(diskReadAt γ nr ∗ ∃ i : Nat,
-          ⌜i < NUM ∧ BitVec.extractLsb' 0 32 w = BitVec.ofNat 32 i⌝))
+          ⌜i < NUM ∧ BitVec.extractLsb' 0 32 w = BitVec.ofNat 32 i⌝ ∗ headDone γ (nr + 1) i))
 
   /-- **`disk.info[id].status`, read** (the byte the `unreachable` of
   `virtio_disk_intr` tests).  The invariant owns it as `dmaOwn c.status 1`
-  -- own 1, value unconstrained -- so `0` is not derivable.  The fix is to
-  move a COMPLETED request's status byte to `dmaOwnAt .. 1 (statusOf r)`
-  in the invariant's row when the device completes it, which is where the
-  "done" marking of `deposit` belongs too. -/
+  -- own 1, value unconstrained -- so `0` is not derivable.  The fix is the
+  per-position row: a COMPLETED request's status byte moves to
+  `dmaOwnAt .. 1 (Virtio.statusOf r)` when the device completes it.  The
+  completion premise `headDone γ (nr + 1) c.hd` is what makes the claim
+  sound at all -- an armed head whose request is still in flight may have
+  any byte there -- and `disk_used_elem_read` is where it comes from. -/
   disk_status_read : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
       [DiskG GF] [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu : CPU) (K nr : Nat)
       (c : Chain),
     diskInv (GF := GF) γ ∗ diskGeom γ pd pav pu ∗ diskReadAt γ nr ∗
-      headTok γ c.hd (.active c) ∗ viewLb cpu K ⊢
+      headTok γ c.hd (.active c) ∗ headDone γ (nr + 1) c.hd ∗ diskWm γ (nr + 1) K ⊢
       readAU cpu c.status 1 K [] (fun b =>
         iprop(diskReadAt γ nr ∗ headTok γ c.hd (.active c) ∗ ⌜b = 0#8⌝))
-
-  /-- **`deposit`**: the handler advances its watermark past position `nr`
-  and marks the chain reported, transferring into the payload the TSO
-  FLOOR (`ctxFloor`) of the DMA writes of that request -- without it the
-  sleeper cannot turn the device-written bytes of `b->data` into context
-  cells (`MachCSL.ctxBytes_of_pushedFloor` needs a floor past the disk's
-  write position).  Blocked on the invariant recording, per completed
-  request, a `topLb` bound on its DMA writes (Rocq's `disk_flr`). -/
-  disk_deposit : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
-      [DiskG GF] [CurCtx] (γ : DiskNames) (cpu : CPU) (nr K : Nat) (c : Chain),
-    diskInv (GF := GF) γ ∗ diskReadAt γ nr ∗ diskDoneLb γ (nr + 1) ∗
-      headTok γ c.hd (.active c) ∗ viewLb cpu K ⊢
-      |={⊤}=> (diskReadAt γ (nr + 1) ∗ headTok γ c.hd (.active c) ∗
-        ∃ T : Nat, ctxFloor curCtx T)
 
   /-- **`collect`**: the sleeper takes the chain back once `b->disk` is
   `0`.  The descriptors, the header, the status byte and `b->data` return
   to the CONTEXT tier, and the block's image fragment comes back holding
-  the transferred bytes.  Blocked three ways: on the floor of
-  `disk_deposit` (to justify the device's entries at the driver's
-  context), on the invariant's `bufLease` being `dmaOwn` -- the CONTENT of
-  a read's transfer is existential, so `bs'` cannot be pinned to
+  the transferred bytes.  Blocked three ways: on the per-position row (to
+  own the device's writes at a known value and to carry the `topLb` of
+  them), on the invariant's `bufLease` being `dmaOwn` -- the CONTENT of a
+  read's transfer is existential, so the bytes cannot be pinned to
   `blockView` without a generation-keyed snapshot of the block (see
-  `Xv6/DiskInvDefs.lean`'s header) -- and, now, on the completion-side
-  accounting: freeing a head must show that the head's serve permit has
-  gone back, which is exactly "its request has completed". -/
+  `Xv6/DiskInvDefs.lean`'s header) -- and on the TSO credential, which is
+  what `ctxFloor curCtx T` beside `diskWm γ n T` stands for here.
+
+  The `kmapStatic` premises are `disk_publish`'s, in reverse: the reverse
+  bridges `Xv6.ctxBytes_wordPointsTo` / `Xv6.ctxIdx_byteBuf` need `inRam`
+  of the buffer, which a `wordPointsTo` carries and a `dmaOwn` does
+  not. -/
   disk_collect : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
-      [DiskG GF] [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (c : Chain) (T : Nat),
-    diskInv (GF := GF) γ ∗ diskGeom γ pd pav pu ∗ headTok γ c.hd (.active c) ∗
-      ctxFloor curCtx T ⊢
+      [DiskG GF] [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (c : Chain) (n T : Nat),
+    c.wf →
+    (∀ j, j < BSIZE → kmapClass (vpnOf (c.data + BitVec.ofNat 64 j)).toNat = some .rw) →
+    diskInv (GF := GF) γ ∗ kmapStatic ∗ diskGeom γ pd pav pu ∗
+      headTok γ c.hd (.active c) ∗ headDone γ n c.hd ∗ diskWm γ n T ∗ ctxFloor curCtx T ⊢
       |={⊤}=> (headTok γ c.hd .inactive ∗ claimRes curCtx pd c ∗
         wordAtN curCtx c.status 1 (DFrac.own 1) 0#8 ∗
         ∃ data : List (BitVec 8), ⌜data.length = BSIZE⌝ ∗
