@@ -35,6 +35,7 @@ import Xv6.SchedCtx
 import Xv6.SpecSleep
 import Xv6.DiskInvDefs
 import Xv6.BufDefs
+import Xv6.VirtioDiskRwDefs
 
 namespace Xv6
 
@@ -64,7 +65,10 @@ def wp_virtio_disk_rw_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : virtioDiskRwSlots ≤ k.avail)
     (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
     (htier : k.tier = KTier.kpt)
-    (hbno : bno.toNat < 2 ^ 31) (hdata : dataDisk.length = BSIZE) : Prop :=
+    (hbno : bno.toNat < 2 ^ 31) (hdata : dataDisk.length = BSIZE)
+    (hpd : descPageRw pd)
+    (hkm : ∀ m, m < BSIZE →
+      kmapClass (vpnOf (aBufData (k.regs 10#5) + BitVec.ofNat 64 m)).toNat = some .rw) : Prop :=
   let wr : Bool := k.regs 11#5 ≠ 0#64
   kctx cpu k ∗ pcIs cpu virtioDiskRwAddr ∗ procsInv Γ ∗
   trapCsrs cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ∗
@@ -84,8 +88,8 @@ structure VIRTIO_DISK_RW : Prop where
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (bno dsk0 : BitVec 32) (dataBuf dataDisk : List (BitVec 8))
-    hj hproc hK hsie hnoff hlocks htier hbno hdata,
+    hj hproc hK hsie hnoff hlocks htier hbno hdata hpd hkm,
     wp_virtio_disk_rw_body (hlc := hlc) (GF := GF) Γ cpu k γ γl pd pav pu j bno dsk0 dataBuf dataDisk
-      hj hproc hK hsie hnoff hlocks htier hbno hdata
+      hj hproc hK hsie hnoff hlocks htier hbno hdata hpd hkm
 
 end Xv6
