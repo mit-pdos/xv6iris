@@ -19,11 +19,21 @@ tasks run interleaved with each other, the harts and the other devices --
 so requests complete in ANY order, and every DMA transaction of a request
 (each descriptor read, the header read, each SECTOR of the data transfer,
 the status byte, the used element, the used index) is its own machine
-step.  The data phase itself forks one sub-task per sector (`xferIn` /
-`xferOut`) and joins them, so a request's sectors move in any order too.
-The in-flight map is still kept, and still advances through the Rocq
-phases at the same points: it is the OBSERVABLE device state a driver
-proof reasons about, while the tasks are its control.
+step.  The DATA PHASE runs IN the serving task, one sector at a time
+(`xferIn` / `xferOut`, sequenced by `seqSectors`): its transactions still
+interleave with every other request, every other device and every hart,
+but the sectors OF ONE REQUEST move in order.  That is deliberate.  The
+sub-tasks this file used to fork for them were joined before the request
+could complete, so operationally nothing is lost -- but a per-step
+program logic cannot observe a JOIN, so with the transfers in tasks of
+their own the invariant had no way to know, at the completion, that the
+data phase had run at all, which is exactly what the driver's collect
+must know.  Putting them in the serving task puts them in the one place
+that holds the request's exclusive permit, so the transferred bytes and
+the request they belong to travel together.  The in-flight map is still
+kept, and still advances through the Rocq phases at the same points: it
+is the OBSERVABLE device state a driver proof reasons about, while the
+tasks are its control.
 
 THE GATES are the Rocq model's: a write completes only once its payload is
 captured (and, in write-through mode, drained); a flush once the cache is
@@ -410,12 +420,12 @@ def initial (image : Nat → BitVec 8) : VirtioState :=
 
 /-! ## The programs -/
 
-/-- The tasks the disk forks: the service of a request, and one sector of
-its data transfer (a read's fill, a write's capture). -/
+/-- The task the disk forks: the service of one popped request.  Its DATA
+PHASE -- one transfer per sector -- runs IN the serving task, sector by
+sector, rather than as sub-tasks of its own (see the note at the head of
+this file). -/
 inductive VTask where
   | serve (h : BitVec 16)
-  | xferIn (h : BitVec 16) (i : Nat)
-  | xferOut (h : BitVec 16) (i : Nat)
 
 abbrev VM := DevM VirtioState VTask
 
@@ -446,6 +456,30 @@ def fetch (c : VirtioCfg) (h : BitVec 16) : VM (Option VioReq) := do
   pure (some { head := h, type := ty, sector := sec, buf := d1.addr, len := d1.len,
                status := d2.addr, wr := d1.has descFWrite })
 
+/-- Sector `i` of a READ request: the driver's buffer receives the
+cache-overlaid image.  The write is guarded on the request still being in
+flight AT the store, so a device reset writes nothing. -/
+def xferIn (h : BitVec 16) (r : VioReq) (i : Nat) : VM Unit := do
+  let v ← DevM.get
+  let n := reqSectorLen r i
+  let bs := diskRead (cacheView v) (sectorSize * reqKey r i) n
+  DevM.dmaWriteIf (fun v => decide (reqOf v h = some r)) (reqSectorAddr r i) n (bvOfBytes n bs)
+
+/-- Sector `i` of a WRITE request: the driver's buffer is read into the
+cache. -/
+def xferOut (h : BitVec 16) (r : VioReq) (i : Nat) : VM Unit := do
+  let n := reqSectorLen r i
+  let w ← DevM.dmaRead (reqSectorAddr r i) n
+  DevM.modify (fun v =>
+    if reqOf v h = some r then { v with cache := alistSet v.cache (reqKey r i) (bytesOf w) }
+    else v)
+
+/-- The data phase: one transfer per sector, in order, in the serving
+task itself. -/
+def seqSectors (f : Nat → VM Unit) : List Nat → VM Unit
+  | [] => pure ()
+  | i :: is => do f i; seqSectors f is
+
 /-- The service of one popped request, from its fetch to its completion. -/
 def serve (h : BitVec 16) : VM Unit := do
   let v ← DevM.get
@@ -456,10 +490,10 @@ def serve (h : BitVec 16) : VM Unit := do
     if r.type.toNat = blkTOut then
       -- THE CAPTURE: latch the payload into the cache, one sector at a time
       DevM.guard (fun v => if v.taken = none then some { v with taken := some h } else none)
-      DevM.forkJoinAll ((List.range (reqSpan r)).map (VTask.xferOut h))
+      seqSectors (xferOut h r) (List.range (reqSpan r))
     else if r.type.toNat = blkTIn then
       -- THE FILL: the buffer receives the cache-overlaid image, one sector at a time
-      DevM.forkJoinAll ((List.range (reqSpan r)).map (VTask.xferIn h))
+      seqSectors (xferIn h r) (List.range (reqSpan r))
     else pure ()
     DevM.modify (fun v => setPhase v h (.served r))
     -- the status byte
@@ -482,30 +516,6 @@ def serve (h : BitVec 16) : VM Unit := do
     DevM.dmaWriteStep (fun s =>
       if decide (reqOf s h = some r) && decide (s.usedIdx = ui) && decide (s.cfg = c) then
         some (complete s h) else none) (usedIdxAddr c) 2 (ui + 1#16)
-
-/-- Sector `i` of a read request: written to the driver's buffer from the
-cache-overlaid image. -/
-def xferIn (h : BitVec 16) (i : Nat) : VM Unit := do
-  let v ← DevM.get
-  match reqOf v h with
-  | none => pure ()
-  | some r =>
-    let n := reqSectorLen r i
-    let bs := diskRead (cacheView v) (sectorSize * reqKey r i) n
-    DevM.dmaWriteIf (fun v => decide (reqOf v h = some r)) (reqSectorAddr r i) n (bvOfBytes n bs)
-
-/-- Sector `i` of a write request: read from the driver's buffer into the
-cache. -/
-def xferOut (h : BitVec 16) (i : Nat) : VM Unit := do
-  let v ← DevM.get
-  match reqOf v h with
-  | none => pure ()
-  | some r =>
-    let n := reqSectorLen r i
-    let w ← DevM.dmaRead (reqSectorAddr r i) n
-    DevM.modify (fun v =>
-      if reqOf v h = some r then { v with cache := alistSet v.cache (reqKey r i) (bytesOf w) }
-      else v)
 
 /-- THE ROOT LOOP: pop the next available request and fork its service, or
 drain one cached sector to the medium, or do nothing. -/
@@ -542,8 +552,6 @@ def body : VM Unit := do
 
 def task : VTask → VM Unit
   | .serve h => serve h
-  | .xferIn h i => xferIn h i
-  | .xferOut h i => xferOut h i
 
 /-- The device, as the fabric sees it.  A power cycle is a device reset: the
 durable image survives it, the cache and every in-flight request do not. -/

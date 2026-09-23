@@ -1403,22 +1403,10 @@ starts owning the exclusive right to head `h`'s armed chain, and never has
 to cope with a free descriptor. -/
 def diskTaskRes (γ : DiskNames) : Virtio.VTask → IProp GF
   | .serve h => iprop(diskUp γ ∗ ∃ (k : Nat) (c : Chain), permTok γ k h c none none)
-  | .xferIn _ _ => iprop(True)
-  | .xferOut _ _ => iprop(True)
 
 theorem diskTaskRes_serve (γ : DiskNames) (h : BitVec 16) :
     diskTaskRes (GF := GF) γ (.serve h) =
       iprop(diskUp γ ∗ ∃ (k : Nat) (c : Chain), permTok γ k h c none none) := rfl
-
-theorem diskTaskRes_xferIn (γ : DiskNames) (h : BitVec 16) (i : Nat) :
-    ⊢@{IProp GF} diskTaskRes γ (.xferIn h i) := by
-  show ⊢@{IProp GF} iprop(True)
-  itrivial
-
-theorem diskTaskRes_xferOut (γ : DiskNames) (h : BitVec 16) (i : Nat) :
-    ⊢@{IProp GF} diskTaskRes γ (.xferOut h i) := by
-  show ⊢@{IProp GF} iprop(True)
-  itrivial
 
 /-- Which arm the invariant is in, as a persistent fact. -/
 theorem diskDead_notlive (γ : DiskNames) (v : VirtioState) (pm : RegMapF PermVal) :
@@ -1720,98 +1708,77 @@ theorem leaseL_stall (γ : DiskNames) (C : IProp GF) :
   unfold Virtio.stall DevM.await DevM.step DevM.lift
   exact DevM.LeaseL.step C C _ _ (fun s s' os hgs => by simp at hgs) (DevM.LeaseL.pure _ () true_intro)
 
-/-- `Virtio.xferIn h i`: one sector of a read request's fill. -/
-theorem leaseL_xferIn (γ : DiskNames) (C : IProp GF) (h : BitVec 16) (i : Nat) :
-    DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) iprop(True) C (Virtio.xferIn h i) := by
+/-- `Virtio.xferIn h r i`: one sector of a read request's fill, in the
+serving task.  The write's lease comes out of the invariant and goes back
+into it at the same step. -/
+theorem leaseL_xferIn (γ : DiskNames) (C : IProp GF) (h : BitVec 16) (r : VioReq) (i : Nat)
+    (k : Unit → Virtio.VM Unit)
+    (hk : DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) iprop(True) C (k ())) :
+    DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) iprop(True) C
+      (DevM.bind (Virtio.xferIn h r i) k) := by
   unfold Virtio.xferIn
   simp only [bind, DevM.bind, DevM.get, DevM.lift, Pure.pure]
   refine DevM.LeaseL.get C (X := Unit) (fun _ _ => C) _ (fun s => leaseL_get_keep γ C s)
     (fun s _ => ?_)
-  cases hr : Virtio.reqOf s h with
-  | none => exact DevM.LeaseL.pure _ () true_intro
-  | some r =>
-    unfold Virtio.reqSectorLen DevM.dmaWriteIf DevM.lift
-    refine DevM.LeaseL.dmaWriteIf _ _ _ _ _ _ _ ?_ (fun s _ => leaseL_write_skip γ _ s)
-      (DevM.LeaseL.pure _ () true_intro)
-    intro s' hg
-    exact leaseL_write_frame γ s' C _ _ _ (data_write_lease γ s' h r i (of_decide_eq_true hg) _)
+  unfold Virtio.reqSectorLen DevM.dmaWriteIf DevM.lift
+  refine DevM.LeaseL.dmaWriteIf _ _ _ _ _ _ _ ?_ (fun s _ => leaseL_write_skip γ _ s) hk
+  intro s' hg
+  exact leaseL_write_frame γ s' C _ _ _ (data_write_lease γ s' h r i (of_decide_eq_true hg) _)
 
-/-- `Virtio.xferOut h i`: one sector of a write request's capture. -/
-theorem leaseL_xferOut (γ : DiskNames) (C : IProp GF) (h : BitVec 16) (i : Nat) :
-    DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) iprop(True) C (Virtio.xferOut h i) := by
-  unfold Virtio.xferOut
-  simp only [bind, DevM.bind, DevM.get, DevM.lift, Pure.pure]
-  refine DevM.LeaseL.get C (X := Unit) (fun _ _ => C) _ (fun s => leaseL_get_keep γ C s)
-    (fun s _ => ?_)
-  cases hr : Virtio.reqOf s h with
-  | none => exact DevM.LeaseL.pure _ () true_intro
-  | some r =>
-    unfold DevM.dmaRead DevM.lift
-    refine DevM.LeaseL.dmaRead _ _ _ (fun _ _ => True) _ ?_ (fun w _ => ?_)
-    · intro s'
-      iintro ⟨HC, HR⟩
-      iapply dmaReadPin_any
-      iframe HR HC
-    · unfold DevM.modify DevM.step DevM.lift
-      refine DevM.LeaseL.step _ C _ _ ?_ (DevM.LeaseL.pure _ () true_intro)
-      intro s1 s2 os hgs
-      have hs2 : s2 = (if Virtio.reqOf s1 h = some r then
-          { s1 with cache := Virtio.alistSet s1.cache (Virtio.reqKey r i) (bytesOf w) }
-          else s1) := by
-        simp only [Option.some.injEq, Prod.mk.injEq] at hgs
-        exact hgs.1.symm
-      subst hs2
-      by_cases hc : Virtio.reqOf s1 h = some r
-      · rw [if_pos hc]
-        iintro ⟨HC, HR⟩
-        imodintro
-        iframe HC
-        iapply diskProto_capture γ s1 h r i (bytesOf w) hc (by simp [bytesOf]) $$ HR
-      · rw [if_neg hc]
-        iintro ⟨HC, HR⟩
-        imodintro
-        iframe HC
-        iexact HR
-
-/-! ### Forking the data phase -/
-
-theorem leaseL_bind_join (γ : DiskNames) (C : IProp GF) (l : List TaskId)
+/-- `Virtio.xferOut h r i`: one sector of a write request's capture, in
+the serving task. -/
+theorem leaseL_xferOut (γ : DiskNames) (C : IProp GF) (h : BitVec 16) (r : VioReq) (i : Nat)
     (k : Unit → Virtio.VM Unit)
     (hk : DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) iprop(True) C (k ())) :
     DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) iprop(True) C
-      (DevM.bind (List.forM l DevM.join) k) := by
-  induction l with
-  | nil => exact hk
-  | cons t l ih =>
-    exact DevM.LeaseL.op C _ _ (fun _ _ _ _ => nofun) (fun _ _ => nofun) nofun
-      (fun _ => nofun) (fun _ => nofun) (fun _ _ _ => nofun) (fun _ => ih)
+      (DevM.bind (Virtio.xferOut h r i) k) := by
+  unfold Virtio.xferOut
+  simp only [bind, DevM.bind, DevM.get, DevM.lift, Pure.pure]
+  unfold DevM.dmaRead DevM.lift
+  refine DevM.LeaseL.dmaRead _ _ _ (fun _ _ => True) _ ?_ (fun w _ => ?_)
+  · intro s'
+    iintro ⟨HC, HR⟩
+    iapply dmaReadPin_any
+    iframe HR HC
+  · unfold DevM.modify DevM.step DevM.lift
+    refine DevM.LeaseL.step _ C _ _ ?_ hk
+    intro s1 s2 os hgs
+    have hs2 : s2 = (if Virtio.reqOf s1 h = some r then
+        { s1 with cache := Virtio.alistSet s1.cache (Virtio.reqKey r i) (bytesOf w) }
+        else s1) := by
+      simp only [Option.some.injEq, Prod.mk.injEq] at hgs
+      exact hgs.1.symm
+    subst hs2
+    by_cases hc : Virtio.reqOf s1 h = some r
+    · rw [if_pos hc]
+      iintro ⟨HC, HR⟩
+      imodintro
+      iframe HC
+      iapply diskProto_capture γ s1 h r i (bytesOf w) hc (by simp [bytesOf]) $$ HR
+    · rw [if_neg hc]
+      iintro ⟨HC, HR⟩
+      imodintro
+      iframe HC
+      iexact HR
 
-theorem leaseL_bind_fork (γ : DiskNames) (C : IProp GF) (ts : List Virtio.VTask)
-    (k : List TaskId → Virtio.VM Unit)
-    (hk : ∀ l, DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) iprop(True) C (k l)) :
-    (∀ t ∈ ts, (⊢@{IProp GF} diskTaskRes γ t)) → ∀ acc : List TaskId,
-      DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) iprop(True) C
-        (DevM.bind (List.mapM.loop DevM.fork ts acc) k) := by
-  induction ts with
-  | nil => intro _ acc; exact hk _
-  | cons t ts ih =>
-    intro hts acc
-    refine DevM.LeaseL.fork C C t _ ?_
-      (fun r => ih (fun t' ht' => hts t' (List.mem_cons_of_mem _ ht')) (r :: acc))
-    iintro HC
-    isplitr []
-    · iexact HC
-    · iapply hts t (List.mem_cons_self ..)
+/-! ### The data phase, sector by sector -/
 
-theorem leaseL_forkJoinAll (γ : DiskNames) (C : IProp GF) (ts : List Virtio.VTask)
-    (hts : ∀ t ∈ ts, (⊢@{IProp GF} diskTaskRes γ t)) (k : Unit → Virtio.VM Unit)
+/-- **The data phase**: the sectors of one request, transferred in order
+in the serving task.  The context is threaded through unchanged. -/
+theorem leaseL_seqSectors (γ : DiskNames) (C : IProp GF) (f : Nat → Virtio.VM Unit)
+    (hf : ∀ (i : Nat) (k : Unit → Virtio.VM Unit),
+      DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) iprop(True) C (k ()) →
+      DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) iprop(True) C (DevM.bind (f i) k))
+    (l : List Nat) (k : Unit → Virtio.VM Unit)
     (hk : DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) iprop(True) C (k ())) :
     DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) iprop(True) C
-      (DevM.bind (DevM.forkJoinAll ts) k) := by
-  show DevM.LeaseL _ _ _ C
-    (DevM.bind (DevM.bind (List.mapM.loop DevM.fork ts []) (fun l => List.forM l DevM.join)) k)
-  rw [DevM_bind_assoc]
-  exact leaseL_bind_fork γ C ts _ (fun l => leaseL_bind_join γ C l _ hk) hts []
+      (DevM.bind (Virtio.seqSectors f l) k) := by
+  induction l with
+  | nil => exact hk
+  | cons i l ih =>
+    show DevM.LeaseL _ _ _ C (DevM.bind (DevM.bind (f i) (fun _ => Virtio.seqSectors f l)) k)
+    rw [DevM_bind_assoc]
+    exact hf i _ ih
 
 /-! ### The tail of a request -/
 
@@ -2216,15 +2183,11 @@ theorem leaseL_serve (γ : DiskNames) (h : BitVec 16) :
             iframe HC
             iapply diskProto_latch γ s1 (some h) $$ HR
           · exact absurd hgs' (by simp)
-        · refine leaseL_forkJoinAll γ _ _ (fun t ht => ?_) _
+        · exact leaseL_seqSectors γ _ _ (fun i k hk => leaseL_xferOut γ _ h c.req i k hk) _ _
             (leaseL_serveTail γ h xc0 xkey c s _ xhlive xhqnum xhhd)
-          obtain ⟨i, _, rfl⟩ := List.mem_map.1 ht
-          exact diskTaskRes_xferOut γ h i
       · split
-        · refine leaseL_forkJoinAll γ _ _ (fun t ht => ?_) _
+        · exact leaseL_seqSectors γ _ _ (fun i k hk => leaseL_xferIn γ _ h c.req i k hk) _ _
             (leaseL_serveTail γ h xc0 xkey c s _ xhlive xhqnum xhhd)
-          obtain ⟨i, _, rfl⟩ := List.mem_map.1 ht
-          exact diskTaskRes_xferIn γ h i
         · exact leaseL_serveTail γ h xc0 xkey c s _ xhlive xhqnum xhhd
 
 /-! ## `Virtio.body`: the root loop
@@ -2651,8 +2614,6 @@ theorem disk_leaseV (γ : DiskNames) :
   refine ⟨leaseV_body γ, fun t => ?_⟩
   cases t with
   | serve h => rw [diskTaskRes_serve]; exact leaseV_of_leaseL _ _ _ _ _ (leaseL_serve γ h)
-  | xferIn h i => exact leaseV_of_leaseL _ _ _ _ _ (leaseL_xferIn γ _ h i)
-  | xferOut h i => exact leaseV_of_leaseL _ _ _ _ _ (leaseL_xferOut γ _ h i)
 
 /-- **The disk's device thread is safe under its invariant**, with no
 assumption left -- the instance of `MachCSL.wpDev_dmaV` the adequacy
