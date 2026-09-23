@@ -25,7 +25,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `freerange`. -/
-def freerangeAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«freerange»
+def freerangeAddr : BitVec 64 := KA.«freerange»
 
 /-- `PGROUNDUP`. -/
 def pgRoundUp (a : BitVec 64) : BitVec 64 := (a + 0xfff#64) &&& 0xfffffffffffff000#64

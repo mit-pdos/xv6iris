@@ -17,7 +17,7 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
-def freewalkAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«freewalk»
+def freewalkAddr : BitVec 64 := KA.«freewalk»
 def freewalkSlots (lvl : Nat) : Nat := 6 * (lvl + 1) + 14
 
 def wp_freewalk_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]

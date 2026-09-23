@@ -25,7 +25,7 @@ macro "ti_norm" : tactic =>
       BitVec.reduceNeg, BitVec.add_assoc, BitVec.reduceAdd, BitVec.add_zero, BitVec.reduceSignExtend,
       BitVec.reduceAppend, BitVec.reduceHShiftLeft, BitVec.reduceHShiftRight, BitVec.reduceNot, BitVec.reduceAnd, BitVec.reduceOr, BitVec.reduceSetWidth,
       BitVec.toNat_ofNat, Nat.reducePow, Nat.reduceMod,
-      timerinitAddr, KernelSyms.«timerinit», BitVec.reduceOfNat])
+      timerinitAddr, BitVec.reduceOfNat])
 
 set_option hygiene false in
 /-- One instruction: apply its rule, frame the resources, prove the rule's

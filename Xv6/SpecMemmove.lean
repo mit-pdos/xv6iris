@@ -24,7 +24,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `memmove`. -/
-def memmoveAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«memmove»
+def memmoveAddr : BitVec 64 := KA.«memmove»
 
 /-- **WP of `memmove`.**  `src` holds `bs`, `dst` holds `olds` (both of
 length `n`). -/

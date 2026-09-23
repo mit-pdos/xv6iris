@@ -22,7 +22,7 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
-def fdallocAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«fdalloc»
+def fdallocAddr : BitVec 64 := KA.«fdalloc»
 
 /-- fdalloc's 4-slot frame over `myproc`'s 10. -/
 def fdallocSlots : Nat := 14

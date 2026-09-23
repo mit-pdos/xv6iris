@@ -9,9 +9,9 @@ namespace Xv6
 
 /-- `vmfault` meets its specification, given `ismapped`, `kalloc`, `kfree`,
 `memset`, and the general `mappages` contract. -/
-theorem Vmfault (IM : ISMAPPED) (KA : KALLOC) (KF : KFREE) (MS : MEMSET)
+theorem Vmfault (IM : ISMAPPED) (KAL : KALLOC) (KF : KFREE) (MS : MEMSET)
     (MA : MAPPAGES_ANY) : VMFAULT :=
-  vmfault_proof IM KA KF MS MA
+  vmfault_proof IM KAL KF MS MA
 
 /-- `uvmclear` meets its specification, given non-allocating `walk`. -/
 theorem Uvmclear (W : WALK_NOALLOC) : UVMCLEAR := uvmclear_proof W

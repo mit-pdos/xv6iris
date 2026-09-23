@@ -19,8 +19,8 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
-def uvmallocAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«uvmalloc»
-def uvmdeallocAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«uvmdealloc»
+def uvmallocAddr : BitVec 64 := KA.«uvmalloc»
+def uvmdeallocAddr : BitVec 64 := KA.«uvmdealloc»
 def uvmallocSlots : Nat := 42
 def uvmdeallocSlots : Nat := 26
 

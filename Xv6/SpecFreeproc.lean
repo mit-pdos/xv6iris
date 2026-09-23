@@ -25,7 +25,7 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
-def freeprocAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«freeproc»
+def freeprocAddr : BitVec 64 := KA.«freeproc»
 def freeprocSlots : Nat := 44
 
 section

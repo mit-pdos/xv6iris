@@ -47,7 +47,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `wakeup`. -/
-def wakeupAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«wakeup»
+def wakeupAddr : BitVec 64 := KA.«wakeup»
 
 /-- The stack `wakeup` needs: its own 8-slot frame over `acquire`'s (and
 `release`'s) 10. -/

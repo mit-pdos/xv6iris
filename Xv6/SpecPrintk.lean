@@ -38,10 +38,10 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `printk`. -/
-def printkAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«printk»
+def printkAddr : BitVec 64 := KA.«printk»
 
 /-- `pr.lock` (`kernel/printf.c`): the lock is the object's first field. -/
-def prLock : BitVec 64 := 0x800123f8#64
+def prLock : BitVec 64 := KA.«pr»
 
 /-! ## The format language -/
 

@@ -44,7 +44,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 /-- Address of `yield`. -/
-def yieldAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«yield»
+def yieldAddr : BitVec 64 := KA.«yield»
 
 /-- The stack yield's cone needs: its own 4-slot frame over `sched`'s 16. -/
 def yieldSlots : Nat := 20

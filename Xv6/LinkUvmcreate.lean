@@ -8,6 +8,6 @@ import Xv6.ProofUvmcreate
 namespace Xv6
 
 /-- The proved `uvmcreate` interface, given `kalloc` and `memset`. -/
-theorem Uvmcreate (KA : KALLOC) (MS : MEMSET) : UVMCREATE := uvmcreate_proof KA MS
+theorem Uvmcreate (KAL : KALLOC) (MS : MEMSET) : UVMCREATE := uvmcreate_proof KAL MS
 
 end Xv6

@@ -23,7 +23,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `memset`. -/
-def memsetAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«memset»
+def memsetAddr : BitVec 64 := KA.«memset»
 
 /-- **WP of `memset`.**  `dst` holds `olds` (of length `n`) and afterwards
 holds `n` copies of the low byte of `a1`. -/

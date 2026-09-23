@@ -1,7 +1,7 @@
 /-
 Proof of `filedup`'s specification (`SpecFiledup.FILEDUP`), given the
 interfaces of `acquire` and `release`.  Mirrors Rocq ProofFiledup.v against
-the Lean image (`KernelSyms.filedup = 0x800041d6`).
+the Lean image (`KernelSyms.filedup = KernelSyms.«filedup»`).
 
     acquire(&ftable.lock); if (f->ref < 1) panic; f->ref++; release; return f
 
@@ -29,12 +29,19 @@ set_option linter.unusedVariables false
 
 /-! ## Constants the code computes -/
 
-theorem fd_ret_4130 : jumpPc 0x800041ee#64 = 0x800041ee#64 := by simp only [jumpPc, BitVec.reduceAnd]
-theorem fd_ret_4146 : jumpPc 0x80004204#64 = 0x80004204#64 := by simp only [jumpPc, BitVec.reduceAnd]
+theorem fd_ret_4130 : jumpPc (KA.«filedup» + 0x18#64) = (KA.«filedup» + 0x18#64) := by decide
+theorem fd_ret_4146 : jumpPc (KA.«filedup» + 0x2e#64) = (KA.«filedup» + 0x2e#64) := by decide
 
-theorem fd_lock_4124 : 0x800041e2#64 + (BitVec.signExtend 64 (0x1e#20 ++ 0#12) + 870#64) = ftableAddr := by
+/-- The normaliser splits `BitVec.ofNat 32 (n + 1)` into `BitVec.ofNat 32 n + 1#32`;
+this folds it back. -/
+theorem fd_ofNat32_succ (n : Nat) : BitVec.ofNat 32 n + 1#32 = BitVec.ofNat 32 (n + 1) := by
+  apply BitVec.eq_of_toNat_eq
+  simp only [BitVec.toNat_add, BitVec.toNat_ofNat]
+  omega
+
+theorem fd_lock_4124 : KA.«filedup» + 0x1e372#64 = ftableAddr := by
   unfold ftableAddr; decide
-theorem fd_lock_413a : 0x800041f8#64 + (BitVec.signExtend 64 (0x1e#20 ++ 0#12) + 848#64) = ftableAddr := by
+theorem fd_lock_413a : KA.«filedup» + 0x1e372#64 = ftableAddr := by
   unfold ftableAddr; decide
 
 section
@@ -46,7 +53,7 @@ theorem fd_tail (c : CPU) (kb : KCtx) (hK : 4 ≤ kb.avail) (v : BitVec 64)
     (KR : RegMap) (hregs : kb.regs = KR)
     (R : RegMap) (hR2 : R 2#5 = KR 2#5 + 0xFFFFFFFFFFFFFFE0#64) (h9 : R 9#5 = v)
     (hcs : calleeSaved KR (((R.set 2#5 (KR 2#5)).set 8#5 (KR 8#5)).set 9#5 (KR 9#5))) :
-    kctx c ((kb.pushed 4).withRegs R) ∗ pcIs c 0x80004204#64 ∗
+    kctx c ((kb.pushed 4).withRegs R) ∗ pcIs c (KA.«filedup» + 0x2e#64) ∗
     frame4s1 (KR 2#5) (KR 1#5) (KR 8#5) (KR 9#5) ∗
     wpNext kb.sie kb.proc c (fun cpu' => iprop(∀ R'' : RegMap,
       kctx cpu' (kb.withRegs R'') -∗ pcIs cpu' (jumpPc (KR 1#5)) -∗
@@ -55,10 +62,10 @@ theorem fd_tail (c : CPU) (kb : KCtx) (hK : 4 ≤ kb.avail) (v : BitVec 64)
   subst hregs
   iintro ⟨Hk, Hpc, Hframe, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
-  k_step_gen (wp_s_add c _ 0x80004204#64 true 10#5 0#5 9#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT
+  k_step_gen (wp_s_add c _ (KA.«filedup» + 0x2e#64) true 10#5 0#5 9#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc] with [h9] next c1 hp1
   iintro Hk Hpc
-  iapply (wp_epilogue4s1_gen c1 kb 0x80004206#64 hK (R.set 10#5 v)
+  iapply (wp_epilogue4s1_gen c1 kb (KA.«filedup» + 0x30#64) hK (R.set 10#5 v)
     (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hR2)
     (kb.regs 1#5) (kb.regs 8#5) (kb.regs 9#5)) $$ [- $Hk $Hpc $Hframe]
   k_code (text_instr _ _ _ _ rfl rfl) HT
@@ -83,7 +90,7 @@ theorem fd_exit (cpu cr : CPU) (k : KCtx) (γ : FileNames) (kk : Nat) (q : Qp) (
     (spie spp : Bool) (hsp : k.sie = false → spie = k.spie ∧ spp = k.spp)
     (R : RegMap) (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64) (hpins : faPins k R)
     (h9 : R 9#5 = fnode kk) :
-    kctx cr (((k.withSpie spie spp).pushed 4).withRegs R) ∗ pcIs cr 0x80004204#64 ∗
+    kctx cr (((k.withSpie spie spp).pushed 4).withRegs R) ∗ pcIs cr (KA.«filedup» + 0x2e#64) ∗
     frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
     fileRef γ kk q.half st ∗ fileRef γ kk q.half st ∗
     wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie2 : Bool, ∀ spp2 : Bool, ∀ R' : RegMap,
@@ -110,11 +117,17 @@ end
 
 /-! ## The function -/
 
+theorem filedup_br_ffffffffffffcb0a : KA.«filedup» + 0xffffffffffffcb0a#64 = KA.«release» := by decide
+
+theorem filedup_br_ffffffffffffca82 : KA.«filedup» + 0xffffffffffffca82#64 = KA.«acquire» := by decide
+
+theorem filedup_br_1e372 : KA.«filedup» + 0x1e372#64 = ftableAddr := by decide
+
 set_option maxHeartbeats 16000000 in
 theorem filedup_proof (AC : ACQUIRE) (RE : RELEASE) : FILEDUP := ⟨
   fun {hlc GF} _ _ _ _ cpu k γl γ kk q st hnoff hK hlk ha0 => by
   unfold wp_filedup_body
-  simp only [filedupAddr, KernelSyms.«filedup»]
+  simp only [filedupAddr]
   iintro ⟨Hk, Hpc, #Hft, Hfd, Href, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
@@ -123,25 +136,25 @@ theorem filedup_proof (AC : ACQUIRE) (RE : RELEASE) : FILEDUP := ⟨
   ihave #Hlk := (show isFtable (GF := GF) γl γ ⊢ isLock γl ftableAddr "ftable" (ftableResAt γ) from by
     unfold isFtable; iintro H; iexact H) $$ Hft
   -- the prologue ; c.mv s1,a0
-  iapply (wp_prologue4s1_gen cpu k 0x800041d6#64 hK4)
+  iapply (wp_prologue4s1_gen cpu k KA.«filedup» hK4)
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm_g
   iframe
   inext
   iapply wpNext_intro_pin
   iintro %c1 %hp1 Hk Hpc Hframe
-  k_step_gen (wp_s_add c1 _ 0x800041e0#64 true 9#5 0#5 10#5 (by decide))
+  k_step_gen (wp_s_add c1 _ (KA.«filedup» + 0xa#64) true 9#5 0#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0] next c2 hp2
   iintro Hk Hpc
   -- auipc a0,0x1e ; addi a0,a0,892 ; jal acquire
-  k_step_gen (wp_s_auipc c2 _ 0x800041e2#64 false 0x1e#20 10#5 (by decide))
+  k_step_gen (wp_s_auipc c2 _ (KA.«filedup» + 0xc#64) false 0x1e#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c3 _ 0x800041e6#64 false 870#12 10#5 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fd_lock_4124] next c4 hp4
+  k_step_gen (wp_s_addi c3 _ (KA.«filedup» + 0x10#64) false 870#12 10#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filedup_br_1e372, fd_lock_4124] next c4 hp4
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c4 _ 0x800041ea#64 false 2083438#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c5 hp5
+  k_step_gen (wp_s_jal c4 _ (KA.«filedup» + 0x14#64) false 2083438#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filedup_br_ffffffffffffca82] next c5 hp5
   iintro Hk Hpc
   iapply (fa_acquire AC c5 _ γl γ ?ha0 ?hna ?hKa ?hla) $$ [- $Hk $Hpc]
   rotate_right 1
@@ -183,22 +196,23 @@ theorem filedup_proof (AC : ACQUIRE) (RE : RELEASE) : FILEDUP := ⟨
       wordPointsTo (fnode kk + BitVec.signExtend 64 4#12) 4 (DFrac.own 1) (BitVec.ofNat 32 n) from by
     rw [wordAtN_cur, aFref_eq, hn]) $$ Hrefc
   -- c.lw a5,4(s1) ; blez a5 (dead: ref >= 1) ; c.addiw a5,a5,1 ; c.sw a5,4(s1)
-  k_step (wp_s_lw c _ 0x800041ee#64 true 4#12 15#5 9#5 (by decide) (by decide) (DFrac.own 1) (BitVec.ofNat 32 n))
+  k_step (wp_s_lw c _ (KA.«filedup» + 0x18#64) true 4#12 15#5 9#5 (by decide) (by decide) (DFrac.own 1) (BitVec.ofNat 32 n))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9]
   iintro Hk Hpc Hrefc
-  k_step (wp_s_branch0 c _ 0x800041f0#64 false 32#13 15#5 (by decide) bop.BGE)
+  k_step (wp_s_branch0 c _ (KA.«filedup» + 0x1a#64) false 32#13 15#5 (by decide) bop.BGE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fd_bgtz n hn1 (hn ▸ hlt)]
   iintro Hk Hpc
-  k_step (wp_s_addiw c _ 0x800041f4#64 true 1#12 15#5 15#5 (by decide))
+  k_step (wp_s_addiw c _ (KA.«filedup» + 0x1e#64) true 1#12 15#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_sw c _ 0x800041f6#64 true 4#12 9#5 15#5 (by decide) (BitVec.ofNat 32 n))
+  k_step (wp_s_sw c _ (KA.«filedup» + 0x20#64) true 4#12 9#5 15#5 (by decide) (BitVec.ofNat 32 n))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, fd_incr n, fd_incr' n]
   iintro Hk Hpc Hrefc
-  ihave Hrefc := (show wordPointsTo (GF := GF) (fnode kk + 4#64) 4 (DFrac.own 1) (BitVec.ofNat 32 (n + 1)) ⊢
+  ihave Hrefc := (show wordPointsTo (GF := GF) (fnode kk + 4#64) 4 (DFrac.own 1)
+        (BitVec.ofNat 32 n + 1#32) ⊢
       wordAtN curCtx (aFref kk) 4 (DFrac.own 1)
         (BitVec.ofNat 32 ((nx, q.half) :: (id, q.half) :: (s ++ t)).length) from by
-    rw [wordAtN_cur, aFref_eq', hlen]) $$ Hrefc
+    rw [wordAtN_cur, aFref_eq', hlen, fd_ofNat32_succ]) $$ Hrefc
   -- the dup ghost step
   iapply wpLoop_bupd
   ihave Hup := file_dup_step γ M Ls s t nx id kk q hkk hfresh hok hL hnd $$ [Ha He Hhalves]
@@ -240,14 +254,14 @@ theorem filedup_proof (AC : ACQUIRE) (RE : RELEASE) : FILEDUP := ⟨
   ihave HR := ftableRes_intro γ curCtx _ (nx + 1) _ hfresh' hok' $$ [Ha Hs]
   case' _ => iframe
   -- auipc a0,0x1e ; addi a0,a0,870 ; jal release
-  k_step (wp_s_auipc c _ 0x800041f8#64 false 0x1e#20 10#5 (by decide))
+  k_step (wp_s_auipc c _ (KA.«filedup» + 0x22#64) false 0x1e#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ 0x800041fc#64 false 848#12 10#5 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fd_lock_413a]
+  k_step (wp_s_addi c _ (KA.«filedup» + 0x26#64) false 848#12 10#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filedup_br_1e372, fd_lock_413a]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ 0x80004200#64 false 2083552#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_jal c _ (KA.«filedup» + 0x2a#64) false 2083552#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filedup_br_ffffffffffffcb0a]
   iintro Hk Hpc
   iapply (fa_release RE c _ γl γ ?ha0 ?hsr ?hnr ?hKr k.sie ?hrr ?hor) $$ [- $Hk $Hpc $Hlocked $HR]
   rotate_right 1

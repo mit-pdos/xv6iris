@@ -287,7 +287,7 @@ def main():
     print('rewritten %d files' % len(changed))
     for r in rb.report: print('REPORT', r)
 
-if __name__ == '__main__' and not (len(sys.argv) > 1 and sys.argv[1] in ('--fixup', '--symbolize')):
+if __name__ == '__main__' and not (len(sys.argv) > 1 and sys.argv[1] in ('--fixup', '--symbolize', '--bridge')):
     main()
 
 # ---------------------------------------------------------------------------
@@ -459,6 +459,7 @@ HEX_RE = re.compile(r'0x(80[0-9a-fA-F]{6})(#64)?\b')
 
 def sym_of(rb, a):
     """(kind, name, off) for a NEW address `a`, or None"""
+    if a == 0x80000000: return None   # 2^31 / KERNBASE: a layout constant, not the `_entry` symbol
     best = None
     for f, (s, ins) in rb.fn.items():
         if ins and s <= a <= ins[-1][0] + 4 and (best is None or s > best[1]): best = (f, s)
@@ -484,6 +485,8 @@ def sym_of(rb, a):
             return ('str', name, off - start)
     for n, (s, sz, sec) in rb.sn.items():
         if sz == 0 and s == a and sec in ('.data', '.bss', '.got', '.rodata'): return ('data', n, 0)
+    # anonymous rodata (switch tables): relative to `etext`, the section start
+    if rb.rn_base <= a < rb.rn_base + len(rb.rn) and 'etext' in rb.sn: return ('data', 'etext', a - rb.sn['etext'][0])
     return None
 
 def lean_name(n):
@@ -493,10 +496,13 @@ def symbolize_file(rb, path, dry):
     src = open(path).read()
     lines = src.split('\n')
     out = []
+    pre = '' if re.search(r'^open .*\bMachCSL\b', src, re.M) else 'MachCSL.'
     for i, line in enumerate(lines):
         where = '%s:%d' % (path, i + 1)
         cpos = line.find('--')
         code, comment = (line, '') if cpos < 0 else (line[:cpos], line[cpos:])
+        if re.match(r'^\s*\(0x[0-9a-fA-F]+, 0x[0-9a-fA-F]+\),?\s*$', code):
+            out.append(line); continue
         def rep(m):
             a = int(m.group(1), 16)
             r = sym_of(rb, a)
@@ -505,12 +511,40 @@ def symbolize_file(rb, path, dry):
             kind, name, off = r
             bv = m.group(2) is not None
             if kind == 'str':
-                base = ('KStr.' if bv else 'KernelStr.') + lean_name(name)
+                base = pre + ('KStr.' if bv else 'KernelStr.') + lean_name(name)
             else:
-                base = ('KA.' if bv else 'KernelSyms.') + lean_name(name)
+                base = pre + ('KA.' if bv else 'KernelSyms.') + lean_name(name)
             if off == 0: return base
             return '(%s + 0x%x#64)' % (base, off) if bv else '(%s + 0x%x)' % (base, off)
         code = HEX_RE.sub(rep, code)
+        # decimal BitVec address literals (`2147492532#64`)
+        def drep64(m):
+            a = int(m.group(1))
+            if not (0x80000000 <= a < 0x80100000): return m.group(0)
+            r = sym_of(rb, a)
+            if r is None: return m.group(0)
+            kind, name, off = r
+            base = pre + ('KStr.' if kind == 'str' else 'KA.') + lean_name(name)
+            return base if off == 0 else '(%s + 0x%x#64)' % (base, off)
+        code = re.sub(r'(?<![\w.])(\d{10})#64', drep64, code)
+        # address-arithmetic lemmas `(KA.«f» + OFF#64) + (signExtend (U#20 ++ 0#12) + I#64)`: the
+        # normaliser now folds these to `KA.«f» + LIT#64`, so state them that way
+        def foldrep(m):
+            f = m.group(1); off = int(m.group(2), 16) if m.group(2) else 0
+            u = int(m.group(4), 16) if m.group(4).startswith('0x') else int(m.group(4))
+            hi = (u << 12) & 0xffffffff
+            if hi & 0x80000000: hi |= 0xffffffff00000000
+            if m.group(5) is not None:
+                iv = int(m.group(5), 16) if m.group(5).startswith('0x') else int(m.group(5))
+            else:
+                iv = int(m.group(6)); iv = iv - 0x1000 if iv >= 0x800 else iv
+            L = (off + hi + iv) & 0xffffffffffffffff
+            return '%sKA.«%s» + 0x%x#64' % (pre, f, L)
+        code = re.sub(r'\(?(?:MachCSL\.)?KA\.«([^»]+)»(?: \+ 0x([0-9a-fA-F]+)#64)?\)?( : BitVec 64\))? \+ \(BitVec\.signExtend 64 \((0x[0-9a-fA-F]+|\d+)#20 \+\+ (?:0#12|\(0#12 : BitVec 12\))\) \+\s*(?:(0x[0-9a-fA-F]+|\d+)#64|BitVec\.signExtend 64 \((\d+)#12\))\)', foldrep, code)
+        # `jumpPc E = E` lemmas: the literal fold no longer applies; `decide` sees through the symbols
+        code = re.sub(r"((?:theorem|have) [\w']+ : jumpPc [^:]*:= by) simp only \[jumpPc, BitVec\.reduceAnd\]", r'\1 decide', code)
+        if re.match(r'^\s*simp only \[jumpPc, BitVec\.reduceAnd\]\s*$', code) and i > 0 and re.search(r"(?:theorem|have) [\w']+ : jumpPc .*:= by\s*$", lines[i - 1]):
+            code = code.replace('simp only [jumpPc, BitVec.reduceAnd]', 'decide')
         # the Spec-level address definitions and the unfoldings of the symbols
         code = re.sub(r'BitVec\.ofNat 64 KernelSyms\.(«[^»]+»)', r'KA.\1', code)
         code = re.sub(r',\s*KernelSyms\.«[^»]+»', '', code)
@@ -541,3 +575,132 @@ def symbolize_main():
 
 if __name__ == '__main__' and len(sys.argv) > 1 and sys.argv[1] == '--symbolize':
     symbolize_main()
+
+# ---------------------------------------------------------------------------
+# Bridging lemmas: after symbolization the normaliser folds a `jal` target or an
+# `auipc`+`addi`/load/store address to `KA.«f» + LIT#64`, where the proof
+# needs the symbol the code refers to (`KA.«initlock»`, `KA.«kmem» + 0x18#64`).
+# In the literal world both sides folded to the same number; now each site
+# gets `theorem f_br_LIT : KA.«f» + LIT#64 = <symbol> := by decide`, named in
+# the `with [...]` clause of the rule line that produces the value.
+
+SYMPC_RE = re.compile(r'\(KA\.«([^»]+)» \+ 0x([0-9a-fA-F]+)#64\)|KA\.«([^»]+)»')
+SRULE_RE = re.compile(r'\((wp_s_(\w+?))(?:_[a-z_]+)?\s+\S+\s+_\s+(\(KA\.«[^»]+» \+ 0x[0-9a-fA-F]+#64\)|KA\.«[^»]+»)\s+(true|false)')
+
+def target_expr(rb, a, bv=True):
+    r = sym_of(rb, a)
+    if r is None: return None
+    kind, name, off = r
+    base = ('KStr.' if kind == 'str' else 'KA.') + lean_name(name)
+    return base if off == 0 else '(%s + 0x%x#64)' % (base, off)
+
+def bridge_file(rb, path, dry):
+    src = open(path).read()
+    lines = src.split('\n')
+    lemmas = {}      # (f, L, target) -> name
+    inserts = []     # (line index of enclosing theorem start, text)
+    withs = {}       # line index -> [names]
+    def enclosing_start(i):
+        j = i
+        while j > 0 and not re.match(r'^(theorem|def|instance|lemma|example|private theorem) ', lines[j]): j -= 1
+        # walk back over `set_option ... in` / docstring / attribute lines
+        k = j
+        while k > 0 and (lines[k - 1].startswith('set_option') or lines[k - 1].startswith('/--') or lines[k - 1].startswith('@[') or lines[k - 1].startswith('attribute') or (lines[k - 1].strip() != '' and not lines[k - 1].startswith(('theorem', 'def', 'instance', 'end', 'namespace', 'open', 'variable', 'section', '/-!')) and k - 1 > 0 and lines[k - 2].startswith('/--'))):
+            k -= 1
+        return k
+    for i, line in enumerate(lines):
+        m = SRULE_RE.search(line)
+        if not m: continue
+        full, mn_ = m.group(1), m.group(2)
+        pcm = SYMPC_RE.search(m.group(3))
+        f = pcm.group(1) or pcm.group(3); off = int(pcm.group(2), 16) if pcm.group(2) else 0
+        if f not in rb.fn: continue
+        pc = rb.fn[f][0] + off
+        ins = rb.new_ins.get(pc)
+        if ins is None: continue
+        mn, ops, cm = ins
+        L = None; tgt = None
+        if mn in ('jal', 'j') and full in ('wp_s_jal', 'wp_s_j'):
+            mt = re.search(r'([0-9a-f]{8}) <', ops)
+            if not mt: continue
+            T = int(mt.group(1), 16)
+            L = (off + (T - pc)) & 0xffffffffffffffff
+            tgt = target_expr(rb, T)
+        elif full.startswith('wp_s_') and cm and mn in ('addi', 'mv', 'ld', 'lw', 'lwu', 'lbu', 'lb', 'lh', 'lhu', 'sd', 'sw', 'sb', 'sh'):
+            # the value/address materialised from an `auipc` base: LIT = (base's auipc offset + U<<12 + I)
+            mc = re.match(r'([0-9a-f]+) <', cm)
+            if not mc: continue
+            T = int(mc.group(1), 16)
+            # which auipc? the closest earlier `auipc` in the function writing the base register
+            base_reg = None
+            mo = re.match(r'\w+,(-?\d+)\((\w+)\)', ops) or re.match(r'\w+,(\w+),-?\d+', ops) or re.match(r'\w+,(\w+)$', ops)
+            if mo: base_reg = mo.group(2) if mo.lastindex == 2 else mo.group(1)
+            a = pc - 4; apc = None
+            fs = rb.fn[f][0]
+            while a >= fs:
+                if a in rb.new_ins and rb.new_ins[a][0] == 'auipc' and rb.new_ins[a][1].split(',')[0] == base_reg:
+                    apc = a; break
+                a -= 2
+            if apc is None: continue
+            U = int(rb.new_ins[apc][1].split(',')[1], 16)
+            hi = (U << 12) & 0xffffffff
+            if hi & 0x80000000: hi |= 0xffffffff00000000
+            r = rb.imm_of('addi', pc)
+            if r is None: continue
+            I = r[0] if r[0] < 0x800 else r[0] - 0x1000
+            L = ((apc - fs) + hi + I) & 0xffffffffffffffff
+            if ((fs + L) & 0xffffffffffffffff) != T:
+                rb.report.append('%s: bridging mismatch at %#x: computed %#x, code says %#x' % (path, pc, (fs + L) & 0xffffffffffffffff, T)); continue
+            tgt = target_expr(rb, T)
+        if L is None or tgt is None: continue
+        if tgt == 'KA.%s' % lean_name(f) or tgt.startswith('(KA.%s + ' % lean_name(f)): continue
+        key = (f, L, tgt)
+        if key not in lemmas:
+            name = '%s_br_%x' % (f.replace('.', '_').replace('$', '_'), L)
+            lemmas[key] = name
+            if ('theorem %s ' % name) not in src:
+                inserts.append((enclosing_start(i), 'theorem %s : KA.%s + 0x%x#64 = %s := by decide\n' % (name, lean_name(f), L, tgt)))
+        # the `with [...]` clause: on the line holding `$$`, or the next line if that is a `with`/`next` continuation
+        j = i
+        while j < len(lines) and '$$' not in lines[j]: j += 1
+        if j >= len(lines): continue
+        if j + 1 < len(lines) and re.match(r'^\s+(with \[|next )', lines[j + 1]): j += 1
+        if lemmas[key] in lines[j]: continue
+        withs.setdefault(j, []).append(lemmas[key])
+    if not inserts and not withs:
+        return False
+    for j, names in withs.items():
+        names = [n for k, n in enumerate(names) if n not in names[:k]]
+        l = lines[j]
+        if ' with [' in l:
+            l = l.replace(' with [', ' with [' + ', '.join(names) + ', ', 1)
+        elif ' next ' in l:
+            l = l.replace(' next ', ' with [' + ', '.join(names) + '] next ', 1)
+        else:
+            l = l.rstrip() + ' with [' + ', '.join(names) + ']'
+        lines[j] = l
+    for j, text in sorted(inserts, key=lambda x: -x[0]):
+        lines.insert(j, text.rstrip('\n'))
+        lines.insert(j + 1, '')
+    text = '\n'.join(lines)
+    if text != src and not dry: open(path, 'w').write(text)
+    return True
+
+def bridge_main():
+    global OBJ
+    ap = argparse.ArgumentParser()
+    ap.add_argument('new')
+    ap.add_argument('--objdump', default=OBJ)
+    ap.add_argument('--dry-run', action='store_true')
+    ap.add_argument('files', nargs='*')
+    a = ap.parse_args(sys.argv[2:])
+    OBJ = a.objdump
+    rb = Rebase(a.new, a.new)
+    files = a.files or [f for f in sorted(glob.glob('Xv6/*.lean'))
+                        if os.path.basename(f) not in ('KernelImage.lean', 'KernelTree.lean', 'KernelText.lean', 'KernelData.lean')]
+    changed = [f for f in files if bridge_file(rb, f, a.dry_run)]
+    print('bridged %d files' % len(changed))
+    for r in rb.report: print('REPORT', r)
+
+if __name__ == '__main__' and len(sys.argv) > 1 and sys.argv[1] == '--bridge':
+    bridge_main()

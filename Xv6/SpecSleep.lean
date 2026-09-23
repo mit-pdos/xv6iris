@@ -37,7 +37,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `sleep`. -/
-def sleepAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«sleep»
+def sleepAddr : BitVec 64 := KA.«sleep»
 
 /-- The stack `sleep`'s cone needs: its own 4-slot frame over `sched`'s 16. -/
 def sleepSlots : Nat := 20

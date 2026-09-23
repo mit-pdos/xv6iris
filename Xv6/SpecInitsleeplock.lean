@@ -18,9 +18,9 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `initsleeplock`. -/
-def initsleeplockAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«initsleeplock»
+def initsleeplockAddr : BitVec 64 := KA.«initsleeplock»
 /-- The `"sleep lock"` literal. -/
-def sleepLockNameAddr : BitVec 64 := 0x80007570#64
+def sleepLockNameAddr : BitVec 64 := KStr.«sleep lock»
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]

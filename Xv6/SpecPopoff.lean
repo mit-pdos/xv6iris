@@ -29,7 +29,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `pop_off`. -/
-def popOffAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«pop_off»
+def popOffAddr : BitVec 64 := KA.«pop_off»
 
 /-- **WP of `pop_off`.**  Interrupts off on entry (depth ≥ 1); on exit the
 depth is decremented, and when this was the outermost push_off and it

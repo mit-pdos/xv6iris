@@ -26,7 +26,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `main`. -/
-def mainAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«main»
+def mainAddr : BitVec 64 := KA.«main»
 
 /-- The configuration at the `mret`, `t` being the time `timerinit` read:
 `mstatus` with `MPIE = 1`, `MPP = U`, `MIE = 0`; `mepc = main`; all

@@ -58,7 +58,7 @@ def forkretStack : Nat := 512
 
 /-- `forkret`'s entry is even, so `jumpPc` of it is itself. -/
 theorem jumpPc_forkretAddr : jumpPc forkretAddr = forkretAddr := by
-  unfold forkretAddr jumpPc KernelSyms.«forkret»
+  unfold forkretAddr jumpPc
   decide
 
 /-- **WP of `forkret`** (assumed): the resume wand of a fresh process's

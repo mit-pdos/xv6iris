@@ -18,8 +18,8 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
-def vmfaultAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«vmfault»
-def uvmclearAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«uvmclear»
+def vmfaultAddr : BitVec 64 := KA.«vmfault»
+def uvmclearAddr : BitVec 64 := KA.«uvmclear»
 def vmfaultSlots : Nat := 38
 
 def wp_vmfault_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]

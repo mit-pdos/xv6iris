@@ -49,7 +49,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `sys_pause`. -/
-def sysPauseAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«sys_pause»
+def sysPauseAddr : BitVec 64 := KA.«sys_pause»
 
 /-- 8 slots for this frame, and below it the deepest callee: sleep's 20
 (argint's 18, killed's 14, acquire/release/myproc's 10). -/

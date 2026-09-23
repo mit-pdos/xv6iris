@@ -14,8 +14,8 @@ theorem Uvmdealloc (UM : UVMUNMAP) : UVMDEALLOC := uvmdealloc_proof UM
 
 /-- `uvmalloc` meets its contract, given `kalloc`, `kfree`, `memset`,
 `mappages` (uncounted) and `uvmunmap` (for the rollback via `uvmdealloc`). -/
-theorem Uvmalloc (KA : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPPAGES_ANY)
+theorem Uvmalloc (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPPAGES_ANY)
     (UM : UVMUNMAP) : UVMALLOC :=
-  uvmalloc_proof KA KF MS MA (uvmdealloc_proof UM)
+  uvmalloc_proof KAL KF MS MA (uvmdealloc_proof UM)
 
 end Xv6

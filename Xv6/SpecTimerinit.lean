@@ -27,7 +27,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `timerinit`. -/
-def timerinitAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«timerinit»
+def timerinitAddr : BitVec 64 := KA.«timerinit»
 
 /-- The configuration `timerinit` leaves, from `c`, having read `t` from `mtime`. -/
 def timerinitConf (c : MConf) (t : BitVec 64) : MConf :=

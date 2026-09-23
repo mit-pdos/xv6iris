@@ -21,7 +21,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `consputc`. -/
-def consputcAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«consputc»
+def consputcAddr : BitVec 64 := KA.«consputc»
 
 /-- **WP of `consputc`.**  The byte in `a0`. -/
 def wp_consputc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]

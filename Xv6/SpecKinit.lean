@@ -27,14 +27,14 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `kinit`. -/
-def kinitAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«kinit»
+def kinitAddr : BitVec 64 := KA.«kinit»
 
 /-- `PGROUNDUP(end)`. -/
-def kinitBase : BitVec 64 := 0x80024000#64
+def kinitBase : BitVec 64 := (KA.«end» + 4095#64) &&& ~~~4095#64
 /-- The pages between `PGROUNDUP(end)` and `PHYSTOP`. -/
 def kinitPages : Nat := 32732
 /-- The `"kmem"` literal `kinit` names the lock with. -/
-def kmemNameAddr : BitVec 64 := 0x80007048#64
+def kmemNameAddr : BitVec 64 := KStr.«kmem»
 
 /-- The specification of `kinit`. -/
 def wp_kinit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]

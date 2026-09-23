@@ -112,13 +112,17 @@ theorem parkOk_not_RUNNING {st : BitVec 32} (h : parkOk st) : st ≠ RUNNING := 
 
 /-! ## `&proc[j]` is injective -/
 
-theorem procAddr_toNat (j : Nat) (hj : j < NPROC) : (procAddr j).toNat = 2147559520 + 360 * j := by
+/-- `&proc[]` as a number: the symbol's value (below `2^32`). -/
+theorem procs_toNat : (procsAddr : BitVec 64).toNat = KernelSyms.«proc» := by decide
+theorem procs_lt : KernelSyms.«proc» < 2 ^ 32 := by decide
+
+theorem procAddr_toNat (j : Nat) (hj : j < NPROC) : (procAddr j).toNat = KernelSyms.«proc» + 360 * j := by
   have h1 : (BitVec.ofNat 64 (procSize * j)).toNat = 360 * j := by
     simp only [BitVec.toNat_ofNat, procSize]
     exact Nat.mod_eq_of_lt (by unfold NPROC at hj; omega)
-  have h2 : (procsAddr : BitVec 64).toNat = 2147559520 := by decide
+  have hp := procs_lt
   unfold procAddr
-  rw [BitVec.toNat_add, h1, h2]
+  rw [BitVec.toNat_add, h1, procs_toNat]
   exact Nat.mod_eq_of_lt (by unfold NPROC at hj; omega)
 
 theorem procAddr_inj {j j' : Nat} (hj : j < NPROC) (hj' : j' < NPROC) (h : procAddr j = procAddr j') :
@@ -132,6 +136,7 @@ theorem procAddr_nonzero {j : Nat} (hj : j < NPROC) : procAddr j ≠ 0#64 := by
   have := congrArg BitVec.toNat h
   rw [procAddr_toNat j hj] at this
   simp only [BitVec.toNat_ofNat] at this
+  have hpos : 0 < KernelSyms.«proc» := by decide
   omega
 
 /-- `&p->context` determines the slot. -/
@@ -879,21 +884,28 @@ instance instCtxMorphProcHeld (Γ : SchedNames) (h : CPU) (j : Nat) (st : BitVec
 
 /-! ### Address disjointness: `cpus[]` and `proc[]` -/
 
-theorem cpuCtxAddr_toNat (h : CPU) : (cpuCtxAddr h).toNat = 2147558504 + 128 * h.val := by
+/-- `&cpus[]` as a number: the symbol's value (below `2^32`). -/
+theorem cpus_toNat : (cpusAddr : BitVec 64).toNat = KernelSyms.«cpus» := by decide
+theorem cpus_lt : KernelSyms.«cpus» < 2 ^ 32 := by decide
+/-- `proc[]` lies above `cpus[]`: what the disjointness of the two arrays rests on. -/
+theorem cpus_lt_procs : KernelSyms.«cpus» + 128 * 8 ≤ KernelSyms.«proc» := by decide
+
+theorem cpuCtxAddr_toNat (h : CPU) : (cpuCtxAddr h).toNat = KernelSyms.«cpus» + 8 + 128 * h.val := by
   have hv : h.val < 8 := h.isLt
+  have hc := cpus_lt
   unfold cpuCtxAddr cpuAddr
   show ((cpusAddr + BitVec.ofNat 64 (cpuSize * h.val)) + 8#64).toNat = _
   rw [BitVec.toNat_add, BitVec.toNat_add]
   have h1 : (BitVec.ofNat 64 (cpuSize * h.val)).toNat = 128 * h.val := by
     simp only [BitVec.toNat_ofNat, cpuSize]
     exact Nat.mod_eq_of_lt (by omega)
-  have h2 : (cpusAddr : BitVec 64).toNat = 2147558496 := by decide
   have h3 : (8#64 : BitVec 64).toNat = 8 := by decide
-  rw [h1, h2, h3, Nat.mod_eq_of_lt (by omega), Nat.mod_eq_of_lt (by omega)]
+  rw [h1, cpus_toNat, h3, Nat.mod_eq_of_lt (by omega), Nat.mod_eq_of_lt (by omega)]
   omega
 
 theorem pContext0_toNat (j : Nat) (hj : j < NPROC) :
-    (pContext (procAddr j) 0).toNat = 2147559616 + 360 * j := by
+    (pContext (procAddr j) 0).toNat = KernelSyms.«proc» + 96 + 360 * j := by
+  have hp := procs_lt
   unfold pContext
   simp only [Nat.mul_zero]
   rw [BitVec.toNat_add, BitVec.toNat_add, procAddr_toNat j hj]
@@ -911,6 +923,7 @@ theorem cpuCtxAddr_ne_pContext (h : CPU) (j : Nat) (hj : j < NPROC) :
   have hv : h.val < 8 := h.isLt
   have := congrArg BitVec.toNat he
   rw [cpuCtxAddr_toNat h, pContext0_toNat j hj] at this
+  have := cpus_lt_procs
   omega
 
 /-! ## The scheduler chain payload (Rocq `p_sched`) -/

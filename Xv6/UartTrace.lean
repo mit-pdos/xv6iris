@@ -83,7 +83,7 @@ def _root_.MachCSL.UartId.idx : UartId → Nat
 /-- `&uarts[i].tx_lock` (`kernel/uart.c`: `struct uart` is 40 bytes, the
 lock at offset 16). -/
 def txLockAddr (i : UartId) : BitVec 64 :=
-  BitVec.ofNat 64 KernelSyms.«uarts» + BitVec.ofNat 64 (40 * i.idx + 16)
+  KA.«uarts» + BitVec.ofNat 64 (40 * i.idx + 16)
 
 /-- The name `uartinit` gives port `i`'s transmit lock. -/
 def txLockName : UartId → String

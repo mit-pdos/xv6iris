@@ -19,7 +19,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `mycpu`. -/
-def mycpuAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«mycpu»
+def mycpuAddr : BitVec 64 := KA.«mycpu»
 
 /-- **WP of `mycpu`.**  Two stack slots; returns `&cpus[hartid]` in `a0`. -/
 def wp_mycpu_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx] {lent : Bool}

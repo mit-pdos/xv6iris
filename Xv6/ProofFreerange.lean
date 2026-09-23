@@ -37,11 +37,11 @@ theorem lui_1k : BitVec.signExtend 64 (1#20 ++ 0#12) = 0x1000#64 := by decide
 theorem lui_top : BitVec.signExtend 64 (0xfffff#20 ++ 0#12) = 0xFFFFFFFFFFFFF000#64 := by decide
 
 /-- `ret` out of `kfree` lands on the instruction after the `jal`. -/
-theorem ret_a96 : jumpPc 0x80000b34#64 = 0x80000b34#64 := by
-  simp only [jumpPc, BitVec.reduceAnd]
+theorem ret_a96 : jumpPc (KA.«freerange» + 0x32#64) = (KA.«freerange» + 0x32#64) := by
+  decide
 
 theorem physTop_toNat : physTop.toNat = 0x88000000 := rfl
-theorem kernelEnd_toNat : kernelEndAddr.toNat = 0x80023640 := rfl
+theorem kernelEnd_toNat : kernelEndAddr.toNat = KernelSyms.«end» := rfl
 
 theorem toNat_add_ofNat (b : BitVec 64) (m : Nat) (h : b.toNat + m < 2 ^ 64) :
     (b + BitVec.ofNat 64 m).toNat = b.toNat + m := by
@@ -225,7 +225,7 @@ theorem freerange_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
     (h21 : R 21#5 = k.regs 21#5) (h22 : R 22#5 = k.regs 22#5) (h23 : R 23#5 = k.regs 23#5)
     (h24 : R 24#5 = k.regs 24#5) (h25 : R 25#5 = k.regs 25#5) (h26 : R 26#5 = k.regs 26#5)
     (h27 : R 27#5 = k.regs 27#5) (v3 v4 v5 : BitVec 64) :
-    kctx cur (((k.pushed 6).withSpie spie spp).withRegs R) ∗ pcIs cur 0x80000b40#64 ∗
+    kctx cur (((k.pushed 6).withSpie spie spp).withRegs R) ∗ pcIs cur (KA.«freerange» + 0x3e#64) ∗
     frFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) v3 v4 v5 ∗
     kallocAvail γk oN ∗
     wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie' : Bool, ∀ spp' : Bool, ∀ R' : RegMap,
@@ -238,21 +238,21 @@ theorem freerange_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK' : 6 ≤ (k.withSpie spie spp).avail := hK
   simp only [KCtx.pushed_withSpie]
-  k_step_gen (wp_s_ld cur _ 0x80000b40#64 true 40#12 1#5 2#5 (by decide) (by decide) (DFrac.own 1) (k.regs 1#5))
+  k_step_gen (wp_s_ld cur _ (KA.«freerange» + 0x3e#64) true 40#12 1#5 2#5 (by decide) (by decide) (DFrac.own 1) (k.regs 1#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c1 hp1
   iintro Hk Hpc F0
-  k_step_gen (wp_s_ld c1 _ 0x80000b42#64 true 32#12 8#5 2#5 (by decide) (by decide) (DFrac.own 1) (k.regs 8#5))
+  k_step_gen (wp_s_ld c1 _ (KA.«freerange» + 0x40#64) true 32#12 8#5 2#5 (by decide) (by decide) (DFrac.own 1) (k.regs 8#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c2 hp2
   iintro Hk Hpc F1
-  k_step_gen (wp_s_ld c2 _ 0x80000b44#64 true 24#12 9#5 2#5 (by decide) (by decide) (DFrac.own 1) (k.regs 9#5))
+  k_step_gen (wp_s_ld c2 _ (KA.«freerange» + 0x42#64) true 24#12 9#5 2#5 (by decide) (by decide) (DFrac.own 1) (k.regs 9#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c3 hp3
   iintro Hk Hpc F2
   ihave Hstack : stackOwn (k.regs 2#5) 6 $$ [F0 F1 F2 F3 F4 F5]
   case' _ => stack_cells; iframe
-  k_step_gen (wp_s_pop c3 _ 0x80000b46#64 true 48#12 6 imm_p48) from (text_instr _ _ _ _ rfl rfl) Htext
+  k_step_gen (wp_s_pop c3 _ (KA.«freerange» + 0x44#64) true 48#12 6 imm_p48) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc] with [KCtx.pop_pushed _ _ _ hK', hR2] next c4 hp4
   iintro Hk Hpc
-  k_step_gen (wp_s_ret c4 _ 0x80000b48#64 true 1#5) from (text_instr _ _ _ _ rfl rfl) Htext
+  k_step_gen (wp_s_ret c4 _ (KA.«freerange» + 0x46#64) true 1#5) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc] next c5 hp5
   iintro Hk Hpc
   ihave HΦ' := wpNext_at _ _ _ c5 _
@@ -271,7 +271,7 @@ theorem fr_kfree_call (KF : KFREE) [CurCtx] (c : CPU) (k' : KCtx)
     (γl : GName) (γk : KmemNames) (on' : Option Nat)
     (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 14 ≤ k'.avail) (hlk' : "kmem" ∉ k'.locks)
     (hp : pageValid (k'.regs 10#5)) :
-    kctx c k' ∗ pcIs c 0x80000a96#64 ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
+    kctx c k' ∗ pcIs c KA.«kfree» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
     pageOwn (k'.regs 10#5) ∗ kallocAvail γk on' ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie' : Bool, ∀ spp' : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie' = k'.spie ∧ spp' = k'.spp⌝ -∗
@@ -280,10 +280,12 @@ theorem fr_kfree_call (KF : KFREE) [CurCtx] (c : CPU) (k' : KCtx)
     ⊢ wpLoop (GF := GF) c := by
   have h := KF.wp_kfree (hlc := hlc) (GF := GF) c k' γl γk on' hnoff' hK' hlk' hp
   unfold wp_kfree_body at h
-  simp only [kfreeAddr, KernelSyms.«kfree»] at h
+  simp only [kfreeAddr] at h
   exact h
 
 /-! ## One iteration -/
+
+theorem freerange_br_ffffffffffffff94 : KA.«freerange» + 0xffffffffffffff94#64 = KA.«kfree» := by decide
 
 set_option maxHeartbeats 4000000 in
 /-- The body at `0x80000b2c`: `kfree` the page below the cursor, step the
@@ -300,25 +302,25 @@ theorem freerange_iter (KF : KFREE) [CurCtx]
     (h9 : R 9#5 = base + BitVec.ofNat 64 (4096 * (i + 1)))
     (h18 : R 18#5 = k.regs 11#5) (h19 : R 19#5 = 4096#64)
     (h20 : R 20#5 = 0xFFFFFFFFFFFFF000#64) (cur : CPU) :
-    kctx cur (((k.pushed 6).withSpie spie spp).withRegs R) ∗ pcIs cur 0x80000b2c#64 ∗
+    kctx cur (((k.pushed 6).withSpie spie spp).withRegs R) ∗ pcIs cur (KA.«freerange» + 0x2a#64) ∗
     isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
     pageOwn (base + BitVec.ofNat 64 (4096 * i)) ∗ kallocAvail γk (availAdd on i) ∗
     wpNext k.sie k.proc cur (fun cpu' => iprop(∀ spie2 : Bool, ∀ spp2 : Bool, ∀ R2 : RegMap,
       ⌜k.sie = false → spie2 = spie ∧ spp2 = spp⌝ -∗
       kctx cpu' (((k.pushed 6).withSpie spie2 spp2).withRegs R2) -∗
-      pcIs cpu' (if i + 1 = n then 0x80000b3a#64 else 0x80000b2c#64) -∗
+      pcIs cpu' (if i + 1 = n then (KA.«freerange» + 0x38#64) else (KA.«freerange» + 0x2a#64)) -∗
       kallocAvail γk (availAdd on (i + 1)) -∗
       ⌜frSaved R R2 ∧ R2 9#5 = base + BitVec.ofNat 64 (4096 * (i + 2))⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cur := by
   iintro ⟨Hk, Hpc, #Hlk, Hpg, Hav, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- add a0,s1,s4 : the page
-  k_step_gen (wp_s_add cur _ 0x80000b2c#64 false 10#5 9#5 20#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
+  k_step_gen (wp_s_add cur _ (KA.«freerange» + 0x2a#64) false 10#5 9#5 20#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc] with [h9, h20, page_step] next c1 hp1
   iintro Hk Hpc
   -- jal ra, kfree
-  k_step_gen (wp_s_jal c1 _ 0x80000b30#64 false 2096998#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
-    $$ [- $Hk $Hpc] next c2 hp2
+  k_step_gen (wp_s_jal c1 _ (KA.«freerange» + 0x2e#64) false 2096998#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
+    $$ [- $Hk $Hpc] with [freerange_br_ffffffffffffff94] next c2 hp2
   iintro Hk Hpc
   -- kfree(pa)
   iapply (fr_kfree_call KF c2 _ γl γk (availAdd on i) ?hn ?hKa ?hl ?hpv) $$ [- $Hk $Hpc]
@@ -337,11 +339,11 @@ theorem freerange_iter (KF : KFREE) [CurCtx]
   k_norm_g [h9, h18, h19, h20] at hcs2
   obtain ⟨e2, e8, e9, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩ := hcs2
   -- add s1,s1,s3 : the cursor moves on
-  k_step_gen (wp_s_add c3 _ 0x80000b34#64 true 9#5 9#5 19#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
+  k_step_gen (wp_s_add c3 _ (KA.«freerange» + 0x32#64) true 9#5 9#5 19#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc] with [e9, e19, page_inc] next c4 hp4
   iintro Hk Hpc
   -- bgeu s2,s1 : another page?
-  k_step_gen (wp_s_branch c4 _ 0x80000b36#64 false 8182#13 18#5 9#5 (by decide) bop.BGEU)
+  k_step_gen (wp_s_branch c4 _ (KA.«freerange» + 0x34#64) false 8182#13 18#5 9#5 (by decide) bop.BGEU)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [e18, fr_branch (k.regs 11#5) base n i hi hb1 hb2 hb4] next c5 hp5
   iintro Hk Hpc
@@ -376,7 +378,7 @@ theorem freerange_loop (KF : KFREE) [CurCtx]
       (_ : R 21#5 = k.regs 21#5) (_ : R 22#5 = k.regs 22#5) (_ : R 23#5 = k.regs 23#5)
       (_ : R 24#5 = k.regs 24#5) (_ : R 25#5 = k.regs 25#5) (_ : R 26#5 = k.regs 26#5)
       (_ : R 27#5 = k.regs 27#5) (cur : CPU),
-    kctx cur (((k.pushed 6).withSpie spie spp).withRegs R) ∗ pcIs cur 0x80000b2c#64 ∗
+    kctx cur (((k.pushed 6).withSpie spie spp).withRegs R) ∗ pcIs cur (KA.«freerange» + 0x2a#64) ∗
     isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
     pageRange (base + BitVec.ofNat 64 (4096 * i)) (n - i) ∗ kallocAvail γk (availAdd on i) ∗
     frFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5)
@@ -406,13 +408,13 @@ theorem freerange_loop (KF : KFREE) [CurCtx]
     icases frFrame_split _ _ _ _ _ _ _ $$ Hframe with ⟨F0, F1, F2, F3, F4, F5⟩
     have hR32 : R3 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64 := s2.trans h2
     -- ld s2,16(sp) ; ld s3,8(sp) ; ld s4,0(sp)
-    k_step_gen (wp_s_ld c6 _ 0x80000b3a#64 true 16#12 18#5 2#5 (by decide) (by decide) (DFrac.own 1) (k.regs 18#5))
+    k_step_gen (wp_s_ld c6 _ (KA.«freerange» + 0x38#64) true 16#12 18#5 2#5 (by decide) (by decide) (DFrac.own 1) (k.regs 18#5))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR32] next c7 hp7
     iintro Hk Hpc F3
-    k_step_gen (wp_s_ld c7 _ 0x80000b3c#64 true 8#12 19#5 2#5 (by decide) (by decide) (DFrac.own 1) (k.regs 19#5))
+    k_step_gen (wp_s_ld c7 _ (KA.«freerange» + 0x3a#64) true 8#12 19#5 2#5 (by decide) (by decide) (DFrac.own 1) (k.regs 19#5))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR32] next c8 hp8
     iintro Hk Hpc F4
-    k_step_gen (wp_s_ld c8 _ 0x80000b3e#64 true 0#12 20#5 2#5 (by decide) (by decide) (DFrac.own 1) (k.regs 20#5))
+    k_step_gen (wp_s_ld c8 _ (KA.«freerange» + 0x3c#64) true 0#12 20#5 2#5 (by decide) (by decide) (DFrac.own 1) (k.regs 20#5))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR32] next c9 hp9
     iintro Hk Hpc F5
     ihave Hframe := frFrame_join (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5)
@@ -472,50 +474,50 @@ theorem freerange_proof (KF : KFREE) : FREERANGE :=
   unfold wp_freerange_body
   iintro ⟨Hk, Hpc, #Hlk, Hpages, Hav, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  simp only [freerangeAddr, KernelSyms.«freerange»]
+  simp only [freerangeAddr]
   k_norm_g
   have hrnd : (k.regs 10#5 + 0xfff#64) &&& 0xFFFFFFFFFFFFF000#64 = base := by
     rw [hbase]; rfl
   -- addi sp,sp,-48 : the frame
-  k_step_gen (wp_s_push cpu _ 0x80000b02#64 true 4048#12 6 (by omega) imm_m48)
+  k_step_gen (wp_s_push cpu _ KA.«freerange» true 4048#12 6 (by omega) imm_m48)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c1 hp1
   iintro Hk Hpc Hframe
   irevert Hframe
   stack_cells
   iintro ⟨⟨%w0, F0⟩, ⟨%w1, F1⟩, ⟨%w2, F2⟩, ⟨%w3, F3⟩, ⟨%w4, F4⟩, ⟨%w5, F5⟩, _⟩
-  k_step_gen (wp_s_sd c1 _ 0x80000b04#64 true 40#12 2#5 1#5 (by decide) w0)
+  k_step_gen (wp_s_sd c1 _ (KA.«freerange» + 0x2#64) true 40#12 2#5 1#5 (by decide) w0)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c2 hp2
   iintro Hk Hpc F0
-  k_step_gen (wp_s_sd c2 _ 0x80000b06#64 true 32#12 2#5 8#5 (by decide) w1)
+  k_step_gen (wp_s_sd c2 _ (KA.«freerange» + 0x4#64) true 32#12 2#5 8#5 (by decide) w1)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
   iintro Hk Hpc F1
-  k_step_gen (wp_s_sd c3 _ 0x80000b08#64 true 24#12 2#5 9#5 (by decide) w2)
+  k_step_gen (wp_s_sd c3 _ (KA.«freerange» + 0x6#64) true 24#12 2#5 9#5 (by decide) w2)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hp4
   iintro Hk Hpc F2
-  k_step_gen (wp_s_addi c4 _ 0x80000b0a#64 true 48#12 8#5 2#5 (by decide))
+  k_step_gen (wp_s_addi c4 _ (KA.«freerange» + 0x8#64) true 48#12 8#5 2#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c5 hp5
   iintro Hk Hpc
   -- PGROUNDUP(pa_start) + PGSIZE
-  k_step_gen (wp_s_lui c5 _ 0x80000b0c#64 true 1#20 15#5 (by decide))
+  k_step_gen (wp_s_lui c5 _ (KA.«freerange» + 0xa#64) true 1#20 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [lui_1k] next c6 hp6
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c6 _ 0x80000b0e#64 false 4095#12 14#5 15#5 (by decide))
+  k_step_gen (wp_s_addi c6 _ (KA.«freerange» + 0xc#64) false 4095#12 14#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c7 hp7
   iintro Hk Hpc
-  k_step_gen (wp_s_add c7 _ 0x80000b12#64 false 9#5 10#5 14#5 (by decide))
+  k_step_gen (wp_s_add c7 _ (KA.«freerange» + 0x10#64) false 9#5 10#5 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c8 hp8
   iintro Hk Hpc
-  k_step_gen (wp_s_lui c8 _ 0x80000b16#64 true 0xfffff#20 14#5 (by decide))
+  k_step_gen (wp_s_lui c8 _ (KA.«freerange» + 0x14#64) true 0xfffff#20 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [lui_top] next c9 hp9
   iintro Hk Hpc
-  k_step_gen (wp_s_and c9 _ 0x80000b18#64 true 9#5 9#5 14#5 (by decide))
+  k_step_gen (wp_s_and c9 _ (KA.«freerange» + 0x16#64) true 9#5 9#5 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hrnd] next c10 hp10
   iintro Hk Hpc
-  k_step_gen (wp_s_add c10 _ 0x80000b1a#64 true 9#5 9#5 15#5 (by decide))
+  k_step_gen (wp_s_add c10 _ (KA.«freerange» + 0x18#64) true 9#5 9#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c11 hp11
   iintro Hk Hpc
   -- bltu a1,s1 : is there a whole page?
-  k_step_gen (wp_s_branch c11 _ 0x80000b1c#64 false 36#13 11#5 9#5 (by decide) bop.BLTU)
+  k_step_gen (wp_s_branch c11 _ (KA.«freerange» + 0x1a#64) false 36#13 11#5 9#5 (by decide) bop.BLTU)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [fr_branch0 (k.regs 11#5) base n hb1 hb2 hb4] next c12 hp12
   iintro Hk Hpc
@@ -546,22 +548,22 @@ theorem freerange_proof (KF : KFREE) : FREERANGE :=
     case e27 => simp [RegMap.set_apply]
   · -- save s2, s3, s4 and enter the loop
     rw [if_neg hn0]
-    k_step_gen (wp_s_sd c12 _ 0x80000b20#64 true 16#12 2#5 18#5 (by decide) w3)
+    k_step_gen (wp_s_sd c12 _ (KA.«freerange» + 0x1e#64) true 16#12 2#5 18#5 (by decide) w3)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c13 hp13
     iintro Hk Hpc F3
-    k_step_gen (wp_s_sd c13 _ 0x80000b22#64 true 8#12 2#5 19#5 (by decide) w4)
+    k_step_gen (wp_s_sd c13 _ (KA.«freerange» + 0x20#64) true 8#12 2#5 19#5 (by decide) w4)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c14 hp14
     iintro Hk Hpc F4
-    k_step_gen (wp_s_sd c14 _ 0x80000b24#64 true 0#12 2#5 20#5 (by decide) w5)
+    k_step_gen (wp_s_sd c14 _ (KA.«freerange» + 0x22#64) true 0#12 2#5 20#5 (by decide) w5)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c15 hp15
     iintro Hk Hpc F5
-    k_step_gen (wp_s_add c15 _ 0x80000b26#64 true 18#5 0#5 11#5 (by decide))
+    k_step_gen (wp_s_add c15 _ (KA.«freerange» + 0x24#64) true 18#5 0#5 11#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c16 hp16
     iintro Hk Hpc
-    k_step_gen (wp_s_add c16 _ 0x80000b28#64 true 20#5 0#5 14#5 (by decide))
+    k_step_gen (wp_s_add c16 _ (KA.«freerange» + 0x26#64) true 20#5 0#5 14#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c17 hp17
     iintro Hk Hpc
-    k_step_gen (wp_s_add c17 _ 0x80000b2a#64 true 19#5 0#5 15#5 (by decide))
+    k_step_gen (wp_s_add c17 _ (KA.«freerange» + 0x28#64) true 19#5 0#5 15#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c18 hp18
     iintro Hk Hpc
     ihave Hframe := frFrame_join (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5)

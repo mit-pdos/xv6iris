@@ -17,7 +17,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `printint`. -/
-def printintAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«printint»
+def printintAddr : BitVec 64 := KA.«printint»
 
 /-- **WP of `printint`.** -/
 def wp_printint_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]

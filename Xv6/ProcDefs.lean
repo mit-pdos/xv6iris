@@ -14,7 +14,7 @@ and the trapframe words `tf`, and the private block owns them through
 Layout of `struct proc` (kernel/proc.h, spinlock = {locked; name; cpu} =
 24 bytes, NOFILE = 16), corroborated by the compiled image (`myproc`'s
 `ld a5,48(a5)` off `pid_lock` = `cpus` + 48 - 48 ...; `allocproc`'s
-`auipc/addi` pins `proc` at 0x80012810; sizeof = 360 = 96 + 14*8 + 16*8
+`auipc/addi` pins `proc` at (KernelSyms.«cpus» + 0x3b0); sizeof = 360 = 96 + 14*8 + 16*8
 + 8 + 16, the Rocq `proc_size`):
 
   lock@0 (locked@0, name@8, cpu@16), state@24, chan@32, killed@40,
@@ -43,10 +43,10 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
 
 /-- `proc[NPROC]` (kernel/proc.c) in this image: `procinit`'s and
 `proc_mapstacks`' `auipc s1,0x11; addi s1,s1,-116` / `addi s1,s1,82`
-both land on `0x80012860`, and `&proc[NPROC] = 0x80018260 = tickslock`
-(`0x80012860 + 64 * 360`).  (The Rocq `KernelSyms.proc` is 0x80012810: a
+both land on `KernelSyms.«proc»`, and `&proc[NPROC] = KernelSyms.«tickslock» = tickslock`
+(`KernelSyms.«proc» + 64 * 360`).  (The Rocq `KernelSyms.proc` is (KernelSyms.«cpus» + 0x3b0): a
 different build of the same kernel.) -/
-def procsAddr : BitVec 64 := 0x80012860#64
+def procsAddr : BitVec 64 := KA.«proc»
 
 /-- `NPROC`. -/
 def NPROC : Nat := 64

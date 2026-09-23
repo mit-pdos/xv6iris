@@ -55,17 +55,17 @@ theorem ec_addiw_id (n : Nat) (h : n < 2 ^ 31) :
   generalize BitVec.ofNat 64 n = v
   bv_decide
 
-theorem ec_ret_2fc : jumpPc 0x800023aa#64 = 0x800023aa#64 := by
-  simp only [jumpPc, BitVec.reduceAnd]
+theorem ec_ret_2fc : jumpPc (KA.«either_copyout» + 0x48#64) = (KA.«either_copyout» + 0x48#64) := by
+  decide
 
-theorem ei_ret_31c : jumpPc 0x800023ca#64 = 0x800023ca#64 := by
-  simp only [jumpPc, BitVec.reduceAnd]
+theorem ei_ret_31c : jumpPc (KA.«either_copyin» + 0x1c#64) = (KA.«either_copyin» + 0x1c#64) := by
+  decide
 
-theorem ei_ret_32c : jumpPc 0x800023da#64 = 0x800023da#64 := by
-  simp only [jumpPc, BitVec.reduceAnd]
+theorem ei_ret_32c : jumpPc (KA.«either_copyin» + 0x2c#64) = (KA.«either_copyin» + 0x2c#64) := by
+  decide
 
-theorem ei_ret_348 : jumpPc 0x800023f6#64 = 0x800023f6#64 := by
-  simp only [jumpPc, BitVec.reduceAnd]
+theorem ei_ret_348 : jumpPc (KA.«either_copyin» + 0x48#64) = (KA.«either_copyin» + 0x48#64) := by
+  decide
 
 /-- The pinned bits after the outer call, at a frame. -/
 theorem ec_pushed_withSpie (k : KCtx) (m : Nat) (a b : Bool) :
@@ -75,14 +75,14 @@ theorem ec_withSpie_twice (k : KCtx) (a b c d : Bool) :
     (k.withSpie a b).withSpie c d = k.withSpie c d := by
   cases k; rfl
 
-theorem ec_ret_2d0 : jumpPc 0x8000237e#64 = 0x8000237e#64 := by
-  simp only [jumpPc, BitVec.reduceAnd]
+theorem ec_ret_2d0 : jumpPc (KA.«either_copyout» + 0x1c#64) = (KA.«either_copyout» + 0x1c#64) := by
+  decide
 
-theorem ec_ret_2e0 : jumpPc 0x8000238e#64 = 0x8000238e#64 := by
-  simp only [jumpPc, BitVec.reduceAnd]
+theorem ec_ret_2e0 : jumpPc (KA.«either_copyout» + 0x2c#64) = (KA.«either_copyout» + 0x2c#64) := by
+  decide
 
-theorem ec_ret_32c : jumpPc 0x800023da#64 = 0x800023da#64 := by
-  simp only [jumpPc, BitVec.reduceAnd]
+theorem ec_ret_32c : jumpPc (KA.«either_copyin» + 0x2c#64) = (KA.«either_copyin» + 0x2c#64) := by
+  decide
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
@@ -110,7 +110,7 @@ set_option maxHeartbeats 4000000 in
 theorem ec_ret [CurCtx] (c : CPU) (k : KCtx) (hK : 6 ≤ k.avail) (R : RegMap) (sp : BitVec 64)
     (hsp : sp = k.regs 2#5)
     (hR2 : R 2#5 = sp + 0xFFFFFFFFFFFFFFD0#64) (ra s0 s1 s2 s3 s4 : BitVec 64) :
-    kctx c ((k.pushed 6).withRegs R) ∗ pcIs c 0x8000238e#64 ∗
+    kctx c ((k.pushed 6).withRegs R) ∗ pcIs c (KA.«either_copyout» + 0x2c#64) ∗
     ecFrame sp ra s0 s1 s2 s3 s4 ∗
     wpNext k.sie k.proc c (fun cpu' => iprop(∀ R' : RegMap,
       kctx cpu' (k.withRegs R') -∗ pcIs cpu' (jumpPc ra) -∗
@@ -120,37 +120,37 @@ theorem ec_ret [CurCtx] (c : CPU) (k : KCtx) (hK : 6 ≤ k.avail) (R : RegMap) (
   unfold ecFrame
   iintro ⟨Hk, Hpc, ⟨Hf1, Hf2, Hf3, Hf4, Hf5, Hf6⟩, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  k_step_gen (wp_s_ld c _ 0x8000238e#64 true 40#12 1#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c _ (KA.«either_copyout» + 0x2c#64) true 40#12 1#5 2#5 (by decide) (by decide)
       (DFrac.own 1) ra)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c1 hp1
   iintro Hk Hpc Hf1
-  k_step_gen (wp_s_ld c1 _ 0x80002390#64 true 32#12 8#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c1 _ (KA.«either_copyout» + 0x2e#64) true 32#12 8#5 2#5 (by decide) (by decide)
       (DFrac.own 1) s0)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c2 hp2
   iintro Hk Hpc Hf2
-  k_step_gen (wp_s_ld c2 _ 0x80002392#64 true 24#12 9#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c2 _ (KA.«either_copyout» + 0x30#64) true 24#12 9#5 2#5 (by decide) (by decide)
       (DFrac.own 1) s1)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c3 hp3
   iintro Hk Hpc Hf3
-  k_step_gen (wp_s_ld c3 _ 0x80002394#64 true 16#12 18#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c3 _ (KA.«either_copyout» + 0x32#64) true 16#12 18#5 2#5 (by decide) (by decide)
       (DFrac.own 1) s2)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c4 hp4
   iintro Hk Hpc Hf4
-  k_step_gen (wp_s_ld c4 _ 0x80002396#64 true 8#12 19#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c4 _ (KA.«either_copyout» + 0x34#64) true 8#12 19#5 2#5 (by decide) (by decide)
       (DFrac.own 1) s3)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c5 hp5
   iintro Hk Hpc Hf5
-  k_step_gen (wp_s_ld c5 _ 0x80002398#64 true 0#12 20#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c5 _ (KA.«either_copyout» + 0x36#64) true 0#12 20#5 2#5 (by decide) (by decide)
       (DFrac.own 1) s4)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c6 hp6
   iintro Hk Hpc Hf6
   ihave Hstack : stackOwn (GF := GF) (k.regs 2#5) 6 $$ [Hf1 Hf2 Hf3 Hf4 Hf5 Hf6]
   case' _ => stack_cells; iframe
-  k_step_gen (wp_s_pop c6 _ 0x8000239a#64 true 48#12 6 ec_imm_p48)
+  k_step_gen (wp_s_pop c6 _ (KA.«either_copyout» + 0x38#64) true 48#12 6 ec_imm_p48)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK, hR2] next c7 hp7
   iintro Hk Hpc
-  k_step_gen (wp_s_ret c7 _ 0x8000239c#64 true 1#5)
+  k_step_gen (wp_s_ret c7 _ (KA.«either_copyout» + 0x3a#64) true 1#5)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c8 hp8
   iintro Hk Hpc
   ihave HΦ' := wpNext_at _ _ _ c8 _
@@ -171,7 +171,7 @@ set_option maxHeartbeats 4000000 in
 theorem ei_ret [CurCtx] (c : CPU) (k : KCtx) (hK : 6 ≤ k.avail) (R : RegMap) (sp : BitVec 64)
     (hsp : sp = k.regs 2#5)
     (hR2 : R 2#5 = sp + 0xFFFFFFFFFFFFFFD0#64) (ra s0 s1 s2 s3 s4 : BitVec 64) :
-    kctx c ((k.pushed 6).withRegs R) ∗ pcIs c 0x800023da#64 ∗
+    kctx c ((k.pushed 6).withRegs R) ∗ pcIs c (KA.«either_copyin» + 0x2c#64) ∗
     ecFrame sp ra s0 s1 s2 s3 s4 ∗
     wpNext k.sie k.proc c (fun cpu' => iprop(∀ R' : RegMap,
       kctx cpu' (k.withRegs R') -∗ pcIs cpu' (jumpPc ra) -∗
@@ -181,37 +181,37 @@ theorem ei_ret [CurCtx] (c : CPU) (k : KCtx) (hK : 6 ≤ k.avail) (R : RegMap) (
   unfold ecFrame
   iintro ⟨Hk, Hpc, ⟨Hf1, Hf2, Hf3, Hf4, Hf5, Hf6⟩, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  k_step_gen (wp_s_ld c _ 0x800023da#64 true 40#12 1#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c _ (KA.«either_copyin» + 0x2c#64) true 40#12 1#5 2#5 (by decide) (by decide)
       (DFrac.own 1) ra)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c1 hp1
   iintro Hk Hpc Hf1
-  k_step_gen (wp_s_ld c1 _ 0x800023dc#64 true 32#12 8#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c1 _ (KA.«either_copyin» + 0x2e#64) true 32#12 8#5 2#5 (by decide) (by decide)
       (DFrac.own 1) s0)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c2 hp2
   iintro Hk Hpc Hf2
-  k_step_gen (wp_s_ld c2 _ 0x800023de#64 true 24#12 9#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c2 _ (KA.«either_copyin» + 0x30#64) true 24#12 9#5 2#5 (by decide) (by decide)
       (DFrac.own 1) s1)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c3 hp3
   iintro Hk Hpc Hf3
-  k_step_gen (wp_s_ld c3 _ 0x800023e0#64 true 16#12 18#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c3 _ (KA.«either_copyin» + 0x32#64) true 16#12 18#5 2#5 (by decide) (by decide)
       (DFrac.own 1) s2)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c4 hp4
   iintro Hk Hpc Hf4
-  k_step_gen (wp_s_ld c4 _ 0x800023e2#64 true 8#12 19#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c4 _ (KA.«either_copyin» + 0x34#64) true 8#12 19#5 2#5 (by decide) (by decide)
       (DFrac.own 1) s3)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c5 hp5
   iintro Hk Hpc Hf5
-  k_step_gen (wp_s_ld c5 _ 0x800023e4#64 true 0#12 20#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c5 _ (KA.«either_copyin» + 0x36#64) true 0#12 20#5 2#5 (by decide) (by decide)
       (DFrac.own 1) s4)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c6 hp6
   iintro Hk Hpc Hf6
   ihave Hstack : stackOwn (GF := GF) (k.regs 2#5) 6 $$ [Hf1 Hf2 Hf3 Hf4 Hf5 Hf6]
   case' _ => stack_cells; iframe
-  k_step_gen (wp_s_pop c6 _ 0x800023e6#64 true 48#12 6 ec_imm_p48)
+  k_step_gen (wp_s_pop c6 _ (KA.«either_copyin» + 0x38#64) true 48#12 6 ec_imm_p48)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK, hR2] next c7 hp7
   iintro Hk Hpc
-  k_step_gen (wp_s_ret c7 _ 0x800023e8#64 true 1#5)
+  k_step_gen (wp_s_ret c7 _ (KA.«either_copyin» + 0x3a#64) true 1#5)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c8 hp8
   iintro Hk Hpc
   ihave HΦ' := wpNext_at _ _ _ c8 _
@@ -233,7 +233,7 @@ set_option maxHeartbeats 1000000 in
 /-- `myproc`'s contract as a rule. -/
 theorem ec_myproc_call (MP : MYPROC) [CurCtx] (c : CPU) (k' : KCtx)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 10 ≤ k'.avail) :
-    kctx c k' ∗ pcIs c 0x80001988#64 ∗
+    kctx c k' ∗ pcIs c KA.«myproc» ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
@@ -241,7 +241,7 @@ theorem ec_myproc_call (MP : MYPROC) [CurCtx] (c : CPU) (k' : KCtx)
     ⊢ wpLoop (GF := GF) c := by
   have h := MP.wp_myproc (hlc := hlc) (GF := GF) c k' hnoff hK
   unfold wp_myproc_body at h
-  simp only [myprocAddr, KernelSyms.«myproc»] at h
+  simp only [myprocAddr] at h
   exact h
 
 set_option maxHeartbeats 1000000 in
@@ -249,7 +249,7 @@ set_option maxHeartbeats 1000000 in
 theorem ec_memmove_call (MM : MEMMOVE) [CurCtx] (c : CPU) (k' : KCtx) (bs olds : List (BitVec 8))
     (n : Nat) (dqs : DFrac) (hK : 2 ≤ k'.avail) (hn : k'.regs 12#5 = BitVec.ofNat 64 n)
     (hn32 : n < 2 ^ 32) (hls : bs.length = n) (hld : olds.length = n) :
-    kctx c k' ∗ pcIs c 0x80000d78#64 ∗
+    kctx c k' ∗ pcIs c KA.«memmove» ∗
     byteBuf (k'.regs 11#5) dqs bs ∗ byteBuf (k'.regs 10#5) (DFrac.own 1) olds ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ R' : RegMap,
       kctx cpu' (k'.withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
@@ -258,7 +258,7 @@ theorem ec_memmove_call (MM : MEMMOVE) [CurCtx] (c : CPU) (k' : KCtx) (bs olds :
     ⊢ wpLoop (GF := GF) c := by
   have h := MM.wp_memmove (hlc := hlc) (GF := GF) c k' bs olds n dqs hK hn hn32 hls hld
   unfold wp_memmove_body at h
-  simp only [memmoveAddr, KernelSyms.«memmove»] at h
+  simp only [memmoveAddr] at h
   exact h
 
 set_option maxHeartbeats 1000000 in
@@ -268,7 +268,7 @@ theorem ec_copyout_call (CO : COPYOUT) [CurCtx] (c : CPU) (k' : KCtx) (γl : GNa
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 52 ≤ k'.avail) (hlk : "kmem" ∉ k'.locks)
     (hroot : k'.regs 10#5 = pageAddr P.root) (hsz : (k'.regs 11#5).toNat ≤ 2 ^ 38)
     (hlen : k'.regs 14#5 = BitVec.ofNat 64 bs.length) (hlen' : bs.length < 2 ^ 63) :
-    kctx c k' ∗ pcIs c 0x800015c2#64 ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
+    kctx c k' ∗ pcIs c KA.«copyout» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
     kallocAvail γk none ∗ procPtAt P M ∗ byteBuf (k'.regs 13#5) dqs bs ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
@@ -284,7 +284,7 @@ theorem ec_copyout_call (CO : COPYOUT) [CurCtx] (c : CPU) (k' : KCtx) (γl : GNa
     ⊢ wpLoop (GF := GF) c := by
   have h := CO.wp_copyout (hlc := hlc) (GF := GF) c k' γl γk P M dqs bs hnoff hK hlk hroot hsz hlen hlen'
   unfold wp_copyout_body at h
-  simp only [copyoutAddr, KernelSyms.«copyout»] at h
+  simp only [copyoutAddr] at h
   exact h
 
 set_option maxHeartbeats 1000000 in
@@ -294,7 +294,7 @@ theorem ec_copyin_call (CI : COPYIN) [CurCtx] (c : CPU) (k' : KCtx) (γl : GName
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 50 ≤ k'.avail) (hlk : "kmem" ∉ k'.locks)
     (hroot : k'.regs 10#5 = pageAddr P.root) (hsz : (k'.regs 11#5).toNat ≤ 2 ^ 38)
     (hlen : k'.regs 14#5 = BitVec.ofNat 64 old.length) (hlen' : old.length < 2 ^ 63) :
-    kctx c k' ∗ pcIs c 0x80001688#64 ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
+    kctx c k' ∗ pcIs c KA.«copyin» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
     kallocAvail γk none ∗ procPtAt P M ∗ byteBuf (k'.regs 12#5) (DFrac.own 1) old ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
@@ -309,7 +309,7 @@ theorem ec_copyin_call (CI : COPYIN) [CurCtx] (c : CPU) (k' : KCtx) (γl : GName
     ⊢ wpLoop (GF := GF) c := by
   have h := CI.wp_copyin (hlc := hlc) (GF := GF) c k' γl γk P M old hnoff hK hlk hroot hsz hlen hlen'
   unfold wp_copyin_body at h
-  simp only [copyinAddr, KernelSyms.«copyin»] at h
+  simp only [copyinAddr] at h
   exact h
 
 /-! ## Opening and closing the private block -/
@@ -355,60 +355,66 @@ theorem ec_priv_close [CurCtx] (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
 
 /-! ## `either_copyout` -/
 
+theorem either_copyout_br_ffffffffffffea16 : KA.«either_copyout» + 0xffffffffffffea16#64 = KA.«memmove» := by decide
+
+theorem either_copyout_br_fffffffffffff260 : KA.«either_copyout» + 0xfffffffffffff260#64 = KA.«copyout» := by decide
+
+theorem either_copyout_br_fffffffffffff626 : KA.«either_copyout» + 0xfffffffffffff626#64 = KA.«myproc» := by decide
+
 set_option maxHeartbeats 4000000 in
 theorem either_copyout_proof (MP : MYPROC) (CO : COPYOUT) (MM : MEMMOVE) : EITHER_COPYOUT :=
   ⟨fun {hlc GF} _ _ _ cpu k γl γk j pid V M user dqs bs olds hj hproc hnoff hK hlk huser
       hlen hlen' holds => by
   unfold wp_either_copyout_body
-  simp only [eitherCopyoutAddr, KernelSyms.«either_copyout»]
+  simp only [eitherCopyoutAddr]
   iintro ⟨Hk, Hpc, #Hlk, Hav, Hbs, Harm, HΦ⟩
   have hK58 : 58 ≤ k.avail := hK
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   k_norm_g
   -- the prologue: six slots, `ra`, `s0`, `s1`, `s2`, `s3`, `s4`
-  k_step_gen (wp_s_push cpu _ 0x80002362#64 true 4048#12 6 (by omega) ec_imm_m48)
+  k_step_gen (wp_s_push cpu _ KA.«either_copyout» true 4048#12 6 (by omega) ec_imm_m48)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c1 hp1
   iintro Hk Hpc Hframe
   irevert Hframe
   stack_cells
   iintro ⟨⟨%w1, Hs1⟩, ⟨%w2, Hs2⟩, ⟨%w3, Hs3⟩, ⟨%w4, Hs4⟩, ⟨%w5, Hs5⟩, ⟨%w6, Hs6⟩, _⟩
-  k_step_gen (wp_s_sd c1 _ 0x80002364#64 true 40#12 2#5 1#5 (by decide) w1)
+  k_step_gen (wp_s_sd c1 _ (KA.«either_copyout» + 0x2#64) true 40#12 2#5 1#5 (by decide) w1)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c2 hp2
   iintro Hk Hpc Hs1
-  k_step_gen (wp_s_sd c2 _ 0x80002366#64 true 32#12 2#5 8#5 (by decide) w2)
+  k_step_gen (wp_s_sd c2 _ (KA.«either_copyout» + 0x4#64) true 32#12 2#5 8#5 (by decide) w2)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
   iintro Hk Hpc Hs2
-  k_step_gen (wp_s_sd c3 _ 0x80002368#64 true 24#12 2#5 9#5 (by decide) w3)
+  k_step_gen (wp_s_sd c3 _ (KA.«either_copyout» + 0x6#64) true 24#12 2#5 9#5 (by decide) w3)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hp4
   iintro Hk Hpc Hs3
-  k_step_gen (wp_s_sd c4 _ 0x8000236a#64 true 16#12 2#5 18#5 (by decide) w4)
+  k_step_gen (wp_s_sd c4 _ (KA.«either_copyout» + 0x8#64) true 16#12 2#5 18#5 (by decide) w4)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c5 hp5
   iintro Hk Hpc Hs4
-  k_step_gen (wp_s_sd c5 _ 0x8000236c#64 true 8#12 2#5 19#5 (by decide) w5)
+  k_step_gen (wp_s_sd c5 _ (KA.«either_copyout» + 0xa#64) true 8#12 2#5 19#5 (by decide) w5)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c6 hp6
   iintro Hk Hpc Hs5
-  k_step_gen (wp_s_sd c6 _ 0x8000236e#64 true 0#12 2#5 20#5 (by decide) w6)
+  k_step_gen (wp_s_sd c6 _ (KA.«either_copyout» + 0xc#64) true 0#12 2#5 20#5 (by decide) w6)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c7 hp7
   iintro Hk Hpc Hs6
-  k_step_gen (wp_s_addi c7 _ 0x80002370#64 true 48#12 8#5 2#5 (by decide))
+  k_step_gen (wp_s_addi c7 _ (KA.«either_copyout» + 0xe#64) true 48#12 8#5 2#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c8 hp8
   iintro Hk Hpc
   -- the four arguments into the saved registers
-  k_step_gen (wp_s_add c8 _ 0x80002372#64 true 9#5 0#5 10#5 (by decide))
+  k_step_gen (wp_s_add c8 _ (KA.«either_copyout» + 0x10#64) true 9#5 0#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c9 hp9
   iintro Hk Hpc
-  k_step_gen (wp_s_add c9 _ 0x80002374#64 true 20#5 0#5 11#5 (by decide))
+  k_step_gen (wp_s_add c9 _ (KA.«either_copyout» + 0x12#64) true 20#5 0#5 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c10 hp10
   iintro Hk Hpc
-  k_step_gen (wp_s_add c10 _ 0x80002376#64 true 19#5 0#5 12#5 (by decide))
+  k_step_gen (wp_s_add c10 _ (KA.«either_copyout» + 0x14#64) true 19#5 0#5 12#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c11 hp11
   iintro Hk Hpc
-  k_step_gen (wp_s_add c11 _ 0x80002378#64 true 18#5 0#5 13#5 (by decide))
+  k_step_gen (wp_s_add c11 _ (KA.«either_copyout» + 0x16#64) true 18#5 0#5 13#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c12 hp12
   iintro Hk Hpc
   -- jal myproc
-  k_step_gen (wp_s_jal c12 _ 0x8000237a#64 false 2094606#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c13 hp13
+  k_step_gen (wp_s_jal c12 _ (KA.«either_copyout» + 0x18#64) false 2094606#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [either_copyout_br_fffffffffffff626] next c13 hp13
   iintro Hk Hpc
   k_norm_g
   -- myproc()
@@ -435,31 +441,31 @@ theorem either_copyout_proof (MP : MYPROC) (CO : COPYOUT) (MM : MEMMOVE) : EITHE
     have hpa : R1 10#5 = procAddr j := h10.trans (hproc rfl)
     simp only [reduceIte]
     icases ec_priv_split (procAddr j) pid V M $$ Harm with ⟨%hfacts, Hsz, Hpg, Hspace, Hrest⟩
-    k_step_gen (wp_s_branch c14 _ 0x8000237e#64 true 32#13 9#5 0#5 (by decide) bop.BEQ)
+    k_step_gen (wp_s_branch c14 _ (KA.«either_copyout» + 0x1c#64) true 32#13 9#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [e9, ec_beq_ne _ huser] next c15 hp15
     iintro Hk Hpc
-    k_step_gen (wp_s_add c15 _ 0x80002380#64 true 14#5 0#5 18#5 (by decide))
+    k_step_gen (wp_s_add c15 _ (KA.«either_copyout» + 0x1e#64) true 14#5 0#5 18#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c16 hp16
     iintro Hk Hpc
-    k_step_gen (wp_s_add c16 _ 0x80002382#64 true 13#5 0#5 19#5 (by decide))
+    k_step_gen (wp_s_add c16 _ (KA.«either_copyout» + 0x20#64) true 13#5 0#5 19#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c17 hp17
     iintro Hk Hpc
-    k_step_gen (wp_s_add c17 _ 0x80002384#64 true 12#5 0#5 20#5 (by decide))
+    k_step_gen (wp_s_add c17 _ (KA.«either_copyout» + 0x22#64) true 12#5 0#5 20#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c18 hp18
     iintro Hk Hpc
-    k_step_gen (wp_s_ld c18 _ 0x80002386#64 true 72#12 11#5 10#5 (by decide) (by decide)
+    k_step_gen (wp_s_ld c18 _ (KA.«either_copyout» + 0x24#64) true 72#12 11#5 10#5 (by decide) (by decide)
         (DFrac.own 1) V.sz)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [hpa, pSz, pPagetable] next c19 hp19
     iintro Hk Hpc Hsz
-    k_step_gen (wp_s_ld c19 _ 0x80002388#64 true 80#12 10#5 10#5 (by decide) (by decide)
+    k_step_gen (wp_s_ld c19 _ (KA.«either_copyout» + 0x26#64) true 80#12 10#5 10#5 (by decide) (by decide)
         (DFrac.own 1) V.pagetable)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [hpa, pSz, pPagetable] next c20 hp20
     iintro Hk Hpc Hpg
-    k_step_gen (wp_s_jal c20 _ 0x8000238a#64 false 2093624#21 1#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c21 hp21
+    k_step_gen (wp_s_jal c20 _ (KA.«either_copyout» + 0x28#64) false 2093624#21 1#5 (by decide))
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [either_copyout_br_fffffffffffff260] next c21 hp21
     iintro Hk Hpc
     k_norm_g
     -- copyout(p->pagetable, p->sz, dst, src, len)
@@ -538,22 +544,22 @@ theorem either_copyout_proof (MP : MYPROC) (CO : COPYOUT) (MM : MEMMOVE) : EITHE
   case false =>
     -- `user_dst == 0`: `memmove` in kernel memory
     have hl31 : bs.length < 2 ^ 31 := hlen'
-    k_step_gen (wp_s_branch c14 _ 0x8000237e#64 true 32#13 9#5 0#5 (by decide) bop.BEQ)
+    k_step_gen (wp_s_branch c14 _ (KA.«either_copyout» + 0x1c#64) true 32#13 9#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [e9, ec_beq_zero _ huser] next c15 hp15
     iintro Hk Hpc
-    k_step_gen (wp_s_addiw c15 _ 0x8000239e#64 false 0#12 12#5 18#5 (by decide))
+    k_step_gen (wp_s_addiw c15 _ (KA.«either_copyout» + 0x3c#64) false 0#12 12#5 18#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c16 hp16
     iintro Hk Hpc
     k_norm_g [e18, hlen, ec_addiw_id bs.length hl31]
-    k_step_gen (wp_s_add c16 _ 0x800023a2#64 true 11#5 0#5 19#5 (by decide))
+    k_step_gen (wp_s_add c16 _ (KA.«either_copyout» + 0x40#64) true 11#5 0#5 19#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c17 hp17
     iintro Hk Hpc
-    k_step_gen (wp_s_add c17 _ 0x800023a4#64 true 10#5 0#5 20#5 (by decide))
+    k_step_gen (wp_s_add c17 _ (KA.«either_copyout» + 0x42#64) true 10#5 0#5 20#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c18 hp18
     iintro Hk Hpc
-    k_step_gen (wp_s_jal c18 _ 0x800023a6#64 false 2091474#21 1#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c19 hp19
+    k_step_gen (wp_s_jal c18 _ (KA.«either_copyout» + 0x44#64) false 2091474#21 1#5 (by decide))
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [either_copyout_br_ffffffffffffea16] next c19 hp19
     iintro Hk Hpc
     k_norm_g
     -- memmove(dst, src, len)
@@ -575,10 +581,10 @@ theorem either_copyout_proof (MP : MYPROC) (CO : COPYOUT) (MM : MEMMOVE) : EITHE
     unfold calleeSaved at hcs2
     k_norm_g at hcs2
     obtain ⟨f2, f8, f9, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27⟩ := hcs2
-    k_step_gen (wp_s_add c20 _ 0x800023aa#64 true 10#5 0#5 9#5 (by decide))
+    k_step_gen (wp_s_add c20 _ (KA.«either_copyout» + 0x48#64) true 10#5 0#5 9#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c21 hp21
     iintro Hk Hpc
-    k_step_gen (wp_s_j c21 _ 0x800023ac#64 true 2097122#21)
+    k_step_gen (wp_s_j c21 _ (KA.«either_copyout» + 0x4a#64) true 2097122#21)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c22 hp22
     iintro Hk Hpc
     k_norm_g
@@ -624,60 +630,66 @@ theorem either_copyout_proof (MP : MYPROC) (CO : COPYOUT) (MM : MEMMOVE) : EITHE
 
 /-! ## `either_copyin` -/
 
+theorem either_copyin_br_ffffffffffffe9ca : KA.«either_copyin» + 0xffffffffffffe9ca#64 = KA.«memmove» := by decide
+
+theorem either_copyin_br_fffffffffffff2da : KA.«either_copyin» + 0xfffffffffffff2da#64 = KA.«copyin» := by decide
+
+theorem either_copyin_br_fffffffffffff5da : KA.«either_copyin» + 0xfffffffffffff5da#64 = KA.«myproc» := by decide
+
 set_option maxHeartbeats 4000000 in
 theorem either_copyin_proof (MP : MYPROC) (CI : COPYIN) (MM : MEMMOVE) : EITHER_COPYIN :=
   ⟨fun {hlc GF} _ _ _ cpu k γl γk j pid V M user dqs bs old hj hproc hnoff hK hlk huser
       hlen hlen' hbs => by
   unfold wp_either_copyin_body
-  simp only [eitherCopyinAddr, KernelSyms.«either_copyin»]
+  simp only [eitherCopyinAddr]
   iintro ⟨Hk, Hpc, #Hlk, Hav, Hold, Harm, HΦ⟩
   have hK56 : 56 ≤ k.avail := hK
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   k_norm_g
   -- the prologue
-  k_step_gen (wp_s_push cpu _ 0x800023ae#64 true 4048#12 6 (by omega) ec_imm_m48)
+  k_step_gen (wp_s_push cpu _ KA.«either_copyin» true 4048#12 6 (by omega) ec_imm_m48)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c1 hp1
   iintro Hk Hpc Hframe
   irevert Hframe
   stack_cells
   iintro ⟨⟨%w1, Hs1⟩, ⟨%w2, Hs2⟩, ⟨%w3, Hs3⟩, ⟨%w4, Hs4⟩, ⟨%w5, Hs5⟩, ⟨%w6, Hs6⟩, _⟩
-  k_step_gen (wp_s_sd c1 _ 0x800023b0#64 true 40#12 2#5 1#5 (by decide) w1)
+  k_step_gen (wp_s_sd c1 _ (KA.«either_copyin» + 0x2#64) true 40#12 2#5 1#5 (by decide) w1)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c2 hp2
   iintro Hk Hpc Hs1
-  k_step_gen (wp_s_sd c2 _ 0x800023b2#64 true 32#12 2#5 8#5 (by decide) w2)
+  k_step_gen (wp_s_sd c2 _ (KA.«either_copyin» + 0x4#64) true 32#12 2#5 8#5 (by decide) w2)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
   iintro Hk Hpc Hs2
-  k_step_gen (wp_s_sd c3 _ 0x800023b4#64 true 24#12 2#5 9#5 (by decide) w3)
+  k_step_gen (wp_s_sd c3 _ (KA.«either_copyin» + 0x6#64) true 24#12 2#5 9#5 (by decide) w3)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hp4
   iintro Hk Hpc Hs3
-  k_step_gen (wp_s_sd c4 _ 0x800023b6#64 true 16#12 2#5 18#5 (by decide) w4)
+  k_step_gen (wp_s_sd c4 _ (KA.«either_copyin» + 0x8#64) true 16#12 2#5 18#5 (by decide) w4)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c5 hp5
   iintro Hk Hpc Hs4
-  k_step_gen (wp_s_sd c5 _ 0x800023b8#64 true 8#12 2#5 19#5 (by decide) w5)
+  k_step_gen (wp_s_sd c5 _ (KA.«either_copyin» + 0xa#64) true 8#12 2#5 19#5 (by decide) w5)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c6 hp6
   iintro Hk Hpc Hs5
-  k_step_gen (wp_s_sd c6 _ 0x800023ba#64 true 0#12 2#5 20#5 (by decide) w6)
+  k_step_gen (wp_s_sd c6 _ (KA.«either_copyin» + 0xc#64) true 0#12 2#5 20#5 (by decide) w6)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c7 hp7
   iintro Hk Hpc Hs6
-  k_step_gen (wp_s_addi c7 _ 0x800023bc#64 true 48#12 8#5 2#5 (by decide))
+  k_step_gen (wp_s_addi c7 _ (KA.«either_copyin» + 0xe#64) true 48#12 8#5 2#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c8 hp8
   iintro Hk Hpc
   -- the four arguments into the saved registers
-  k_step_gen (wp_s_add c8 _ 0x800023be#64 true 20#5 0#5 10#5 (by decide))
+  k_step_gen (wp_s_add c8 _ (KA.«either_copyin» + 0x10#64) true 20#5 0#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c9 hp9
   iintro Hk Hpc
-  k_step_gen (wp_s_add c9 _ 0x800023c0#64 true 9#5 0#5 11#5 (by decide))
+  k_step_gen (wp_s_add c9 _ (KA.«either_copyin» + 0x12#64) true 9#5 0#5 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c10 hp10
   iintro Hk Hpc
-  k_step_gen (wp_s_add c10 _ 0x800023c2#64 true 19#5 0#5 12#5 (by decide))
+  k_step_gen (wp_s_add c10 _ (KA.«either_copyin» + 0x14#64) true 19#5 0#5 12#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c11 hp11
   iintro Hk Hpc
-  k_step_gen (wp_s_add c11 _ 0x800023c4#64 true 18#5 0#5 13#5 (by decide))
+  k_step_gen (wp_s_add c11 _ (KA.«either_copyin» + 0x16#64) true 18#5 0#5 13#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c12 hp12
   iintro Hk Hpc
   -- jal myproc
-  k_step_gen (wp_s_jal c12 _ 0x800023c6#64 false 2094530#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c13 hp13
+  k_step_gen (wp_s_jal c12 _ (KA.«either_copyin» + 0x18#64) false 2094530#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [either_copyin_br_fffffffffffff5da] next c13 hp13
   iintro Hk Hpc
   k_norm_g
   -- myproc()
@@ -704,31 +716,31 @@ theorem either_copyin_proof (MP : MYPROC) (CI : COPYIN) (MM : MEMMOVE) : EITHER_
     have hpa : R1 10#5 = procAddr j := h10.trans (hproc rfl)
     simp only [reduceIte]
     icases ec_priv_split (procAddr j) pid V M $$ Harm with ⟨%hfacts, Hsz, Hpg, Hspace, Hrest⟩
-    k_step_gen (wp_s_branch c14 _ 0x800023ca#64 true 32#13 9#5 0#5 (by decide) bop.BEQ)
+    k_step_gen (wp_s_branch c14 _ (KA.«either_copyin» + 0x1c#64) true 32#13 9#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [e9, ec_beq_ne _ huser] next c15 hp15
     iintro Hk Hpc
-    k_step_gen (wp_s_add c15 _ 0x800023cc#64 true 14#5 0#5 18#5 (by decide))
+    k_step_gen (wp_s_add c15 _ (KA.«either_copyin» + 0x1e#64) true 14#5 0#5 18#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c16 hp16
     iintro Hk Hpc
-    k_step_gen (wp_s_add c16 _ 0x800023ce#64 true 13#5 0#5 19#5 (by decide))
+    k_step_gen (wp_s_add c16 _ (KA.«either_copyin» + 0x20#64) true 13#5 0#5 19#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c17 hp17
     iintro Hk Hpc
-    k_step_gen (wp_s_add c17 _ 0x800023d0#64 true 12#5 0#5 20#5 (by decide))
+    k_step_gen (wp_s_add c17 _ (KA.«either_copyin» + 0x22#64) true 12#5 0#5 20#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c18 hp18
     iintro Hk Hpc
-    k_step_gen (wp_s_ld c18 _ 0x800023d2#64 true 72#12 11#5 10#5 (by decide) (by decide)
+    k_step_gen (wp_s_ld c18 _ (KA.«either_copyin» + 0x24#64) true 72#12 11#5 10#5 (by decide) (by decide)
         (DFrac.own 1) V.sz)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [hpa, pSz, pPagetable] next c19 hp19
     iintro Hk Hpc Hsz
-    k_step_gen (wp_s_ld c19 _ 0x800023d4#64 true 80#12 10#5 10#5 (by decide) (by decide)
+    k_step_gen (wp_s_ld c19 _ (KA.«either_copyin» + 0x26#64) true 80#12 10#5 10#5 (by decide) (by decide)
         (DFrac.own 1) V.pagetable)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [hpa, pSz, pPagetable] next c20 hp20
     iintro Hk Hpc Hpg
-    k_step_gen (wp_s_jal c20 _ 0x800023d6#64 false 2093746#21 1#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c21 hp21
+    k_step_gen (wp_s_jal c20 _ (KA.«either_copyin» + 0x28#64) false 2093746#21 1#5 (by decide))
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [either_copyin_br_fffffffffffff2da] next c21 hp21
     iintro Hk Hpc
     k_norm_g
     -- copyin(p->pagetable, p->sz, dst, src, len)
@@ -812,22 +824,22 @@ theorem either_copyin_proof (MP : MYPROC) (CI : COPYIN) (MM : MEMMOVE) : EITHER_
   case false =>
     -- `user_src == 0`: `memmove` in kernel memory
     have hl31 : old.length < 2 ^ 31 := hlen'
-    k_step_gen (wp_s_branch c14 _ 0x800023ca#64 true 32#13 9#5 0#5 (by decide) bop.BEQ)
+    k_step_gen (wp_s_branch c14 _ (KA.«either_copyin» + 0x1c#64) true 32#13 9#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [e9, ec_beq_zero _ huser] next c15 hp15
     iintro Hk Hpc
-    k_step_gen (wp_s_addiw c15 _ 0x800023ea#64 false 0#12 12#5 18#5 (by decide))
+    k_step_gen (wp_s_addiw c15 _ (KA.«either_copyin» + 0x3c#64) false 0#12 12#5 18#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c16 hp16
     iintro Hk Hpc
     k_norm_g [e18, hlen, ec_addiw_id old.length hl31]
-    k_step_gen (wp_s_add c16 _ 0x800023ee#64 true 11#5 0#5 19#5 (by decide))
+    k_step_gen (wp_s_add c16 _ (KA.«either_copyin» + 0x40#64) true 11#5 0#5 19#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c17 hp17
     iintro Hk Hpc
-    k_step_gen (wp_s_add c17 _ 0x800023f0#64 true 10#5 0#5 20#5 (by decide))
+    k_step_gen (wp_s_add c17 _ (KA.«either_copyin» + 0x42#64) true 10#5 0#5 20#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c18 hp18
     iintro Hk Hpc
-    k_step_gen (wp_s_jal c18 _ 0x800023f2#64 false 2091398#21 1#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c19 hp19
+    k_step_gen (wp_s_jal c18 _ (KA.«either_copyin» + 0x44#64) false 2091398#21 1#5 (by decide))
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [either_copyin_br_ffffffffffffe9ca] next c19 hp19
     iintro Hk Hpc
     k_norm_g
     -- memmove(dst, src, len)
@@ -849,10 +861,10 @@ theorem either_copyin_proof (MP : MYPROC) (CI : COPYIN) (MM : MEMMOVE) : EITHER_
     unfold calleeSaved at hcs2
     k_norm_g at hcs2
     obtain ⟨f2, f8, f9, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27⟩ := hcs2
-    k_step_gen (wp_s_add c20 _ 0x800023f6#64 true 10#5 0#5 9#5 (by decide))
+    k_step_gen (wp_s_add c20 _ (KA.«either_copyin» + 0x48#64) true 10#5 0#5 9#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c21 hp21
     iintro Hk Hpc
-    k_step_gen (wp_s_j c21 _ 0x800023f8#64 true 2097122#21)
+    k_step_gen (wp_s_j c21 _ (KA.«either_copyin» + 0x4a#64) true 2097122#21)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c22 hp22
     iintro Hk Hpc
     k_norm_g

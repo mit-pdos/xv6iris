@@ -61,7 +61,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `userinit`. -/
-def userinitAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«userinit»
+def userinitAddr : BitVec 64 := KA.«userinit»
 
 /-- The stack `userinit`'s cone needs: its own 4-slot frame over `namei`'s
 (`allocproc` needs 48). -/

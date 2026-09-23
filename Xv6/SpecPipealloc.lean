@@ -41,7 +41,7 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
-def pipeallocAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«pipealloc»
+def pipeallocAddr : BitVec 64 := KA.«pipealloc»
 
 /-- pipealloc's own 6-slot frame over `fileclose`'s cone (the deepest callee). -/
 def pipeallocSlots : Nat := 6 + filecloseSlots

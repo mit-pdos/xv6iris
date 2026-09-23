@@ -21,7 +21,7 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
-def uvmunmapAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«uvmunmap»
+def uvmunmapAddr : BitVec 64 := KA.«uvmunmap»
 def uvmunmapSlots : Nat := 22
 
 /-- `do_free = 0` over a raw table: the run's leaves cleared (their pages,

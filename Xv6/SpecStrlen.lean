@@ -25,7 +25,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `strlen`. -/
-def strlenAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«strlen»
+def strlenAddr : BitVec 64 := KA.«strlen»
 
 /-- **WP of `strlen`.** -/
 def wp_strlen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]

@@ -11,8 +11,8 @@ namespace Xv6
 
 /-- The proved `allocproc` interface, given `acquire`, `release`, `kalloc`,
 `memset`, `proc_pagetable` and `freeproc`. -/
-theorem Allocproc (AC : ACQUIRE) (RE : RELEASE) (KA : KALLOC) (MS : MEMSET)
+theorem Allocproc (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
     (PP : PROC_PAGETABLE) (FP : FREEPROC) : ALLOCPROC :=
-  allocproc_proof AC RE KA MS PP FP
+  allocproc_proof AC RE KAL MS PP FP
 
 end Xv6

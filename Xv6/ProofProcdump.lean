@@ -37,14 +37,14 @@ def pdNlStr : List (BitVec 8) := [0x0a#8]
 
 set_option maxRecDepth 100000 in
 theorem pd_cstr_pdNl [CurCtx] :
-    kmapStatic (GF := GF) ⊢ kernelData -∗ cstr 0x80007080#64 DFrac.discard pdNlStr := by
+    kmapStatic (GF := GF) ⊢ kernelData -∗ cstr KStr.«\n» DFrac.discard pdNlStr := by
   iintro #HS #H
-  ihave #B0 := kernelData_byte 128 0x80007080 0x0a rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B1 := kernelData_byte 129 0x80007081 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  iapply cstr_intro 0x80007080#64 DFrac.discard pdNlStr (by unfold nonul pdNlStr; decide)
+  ihave #B0 := kernelData_byte 128 KernelStr.«\n» 0x0a rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B1 := kernelData_byte 129 (KernelStr.«\n» + 0x1) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  iapply cstr_intro KStr.«\n» DFrac.discard pdNlStr (by unfold nonul pdNlStr; decide)
   unfold byteBuf pdNlStr
   simp only [List.cons_append, List.nil_append, Iris.Algebra.BigOpL.bigOpL_cons,
-    Iris.Algebra.BigOpL.bigOpL_nil, Nat.reduceAdd, Nat.zero_add, BitVec.reduceAdd]
+    Iris.Algebra.BigOpL.bigOpL_nil, Nat.reduceAdd, Nat.zero_add, BitVec.reduceAdd, BitVec.ofNat_add, k_addr, BitVec.reduceOfNat, BitVec.add_zero]
   iframe #
   all_goals iempintro
 
@@ -53,16 +53,16 @@ def pdQStr : List (BitVec 8) := [0x3f#8, 0x3f#8, 0x3f#8]
 
 set_option maxRecDepth 100000 in
 theorem pd_cstr_pdQ [CurCtx] :
-    kmapStatic (GF := GF) ⊢ kernelData -∗ cstr 0x80007228#64 DFrac.discard pdQStr := by
+    kmapStatic (GF := GF) ⊢ kernelData -∗ cstr KStr.«???» DFrac.discard pdQStr := by
   iintro #HS #H
-  ihave #B0 := kernelData_byte 552 0x80007228 0x3f rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B1 := kernelData_byte 553 0x80007229 0x3f rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B2 := kernelData_byte 554 0x8000722a 0x3f rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B3 := kernelData_byte 555 0x8000722b 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  iapply cstr_intro 0x80007228#64 DFrac.discard pdQStr (by unfold nonul pdQStr; decide)
+  ihave #B0 := kernelData_byte 552 KernelStr.«???» 0x3f rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B1 := kernelData_byte 553 (KernelStr.«???» + 0x1) 0x3f rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B2 := kernelData_byte 554 (KernelStr.«???» + 0x2) 0x3f rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B3 := kernelData_byte 555 (KernelStr.«???» + 0x3) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  iapply cstr_intro KStr.«???» DFrac.discard pdQStr (by unfold nonul pdQStr; decide)
   unfold byteBuf pdQStr
   simp only [List.cons_append, List.nil_append, Iris.Algebra.BigOpL.bigOpL_cons,
-    Iris.Algebra.BigOpL.bigOpL_nil, Nat.reduceAdd, Nat.zero_add, BitVec.reduceAdd]
+    Iris.Algebra.BigOpL.bigOpL_nil, Nat.reduceAdd, Nat.zero_add, BitVec.reduceAdd, BitVec.ofNat_add, k_addr, BitVec.reduceOfNat, BitVec.add_zero]
   iframe #
   all_goals iempintro
 
@@ -71,21 +71,21 @@ def pdFmtStr : List (BitVec 8) := [0x25#8, 0x64#8, 0x20#8, 0x25#8, 0x73#8, 0x20#
 
 set_option maxRecDepth 100000 in
 theorem pd_cstr_pdFmt [CurCtx] :
-    kmapStatic (GF := GF) ⊢ kernelData -∗ cstr 0x80007230#64 DFrac.discard pdFmtStr := by
+    kmapStatic (GF := GF) ⊢ kernelData -∗ cstr KStr.«%d %s %s» DFrac.discard pdFmtStr := by
   iintro #HS #H
-  ihave #B0 := kernelData_byte 560 0x80007230 0x25 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B1 := kernelData_byte 561 0x80007231 0x64 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B2 := kernelData_byte 562 0x80007232 0x20 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B3 := kernelData_byte 563 0x80007233 0x25 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B4 := kernelData_byte 564 0x80007234 0x73 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B5 := kernelData_byte 565 0x80007235 0x20 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B6 := kernelData_byte 566 0x80007236 0x25 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B7 := kernelData_byte 567 0x80007237 0x73 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B8 := kernelData_byte 568 0x80007238 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  iapply cstr_intro 0x80007230#64 DFrac.discard pdFmtStr (by unfold nonul pdFmtStr; decide)
+  ihave #B0 := kernelData_byte 560 KernelStr.«%d %s %s» 0x25 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B1 := kernelData_byte 561 (KernelStr.«%d %s %s» + 0x1) 0x64 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B2 := kernelData_byte 562 (KernelStr.«%d %s %s» + 0x2) 0x20 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B3 := kernelData_byte 563 (KernelStr.«%d %s %s» + 0x3) 0x25 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B4 := kernelData_byte 564 (KernelStr.«%d %s %s» + 0x4) 0x73 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B5 := kernelData_byte 565 (KernelStr.«%d %s %s» + 0x5) 0x20 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B6 := kernelData_byte 566 (KernelStr.«%d %s %s» + 0x6) 0x25 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B7 := kernelData_byte 567 (KernelStr.«%d %s %s» + 0x7) 0x73 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B8 := kernelData_byte 568 (KernelStr.«%d %s %s» + 0x8) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  iapply cstr_intro KStr.«%d %s %s» DFrac.discard pdFmtStr (by unfold nonul pdFmtStr; decide)
   unfold byteBuf pdFmtStr
   simp only [List.cons_append, List.nil_append, Iris.Algebra.BigOpL.bigOpL_cons,
-    Iris.Algebra.BigOpL.bigOpL_nil, Nat.reduceAdd, Nat.zero_add, BitVec.reduceAdd]
+    Iris.Algebra.BigOpL.bigOpL_nil, Nat.reduceAdd, Nat.zero_add, BitVec.reduceAdd, BitVec.ofNat_add, k_addr, BitVec.reduceOfNat, BitVec.add_zero]
   iframe #
   all_goals iempintro
 
@@ -94,17 +94,17 @@ def pdS1Str : List (BitVec 8) := [0x75#8, 0x73#8, 0x65#8, 0x64#8]
 
 set_option maxRecDepth 100000 in
 theorem pd_cstr_pdS1 [CurCtx] :
-    kmapStatic (GF := GF) ⊢ kernelData -∗ cstr 0x80007248#64 DFrac.discard pdS1Str := by
+    kmapStatic (GF := GF) ⊢ kernelData -∗ cstr KStr.«used» DFrac.discard pdS1Str := by
   iintro #HS #H
-  ihave #B0 := kernelData_byte 584 0x80007248 0x75 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B1 := kernelData_byte 585 0x80007249 0x73 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B2 := kernelData_byte 586 0x8000724a 0x65 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B3 := kernelData_byte 587 0x8000724b 0x64 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B4 := kernelData_byte 588 0x8000724c 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  iapply cstr_intro 0x80007248#64 DFrac.discard pdS1Str (by unfold nonul pdS1Str; decide)
+  ihave #B0 := kernelData_byte 584 KernelStr.«used» 0x75 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B1 := kernelData_byte 585 (KernelStr.«used» + 0x1) 0x73 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B2 := kernelData_byte 586 (KernelStr.«used» + 0x2) 0x65 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B3 := kernelData_byte 587 (KernelStr.«used» + 0x3) 0x64 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B4 := kernelData_byte 588 (KernelStr.«used» + 0x4) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  iapply cstr_intro KStr.«used» DFrac.discard pdS1Str (by unfold nonul pdS1Str; decide)
   unfold byteBuf pdS1Str
   simp only [List.cons_append, List.nil_append, Iris.Algebra.BigOpL.bigOpL_cons,
-    Iris.Algebra.BigOpL.bigOpL_nil, Nat.reduceAdd, Nat.zero_add, BitVec.reduceAdd]
+    Iris.Algebra.BigOpL.bigOpL_nil, Nat.reduceAdd, Nat.zero_add, BitVec.reduceAdd, BitVec.ofNat_add, k_addr, BitVec.reduceOfNat, BitVec.add_zero]
   iframe #
   all_goals iempintro
 
@@ -113,19 +113,19 @@ def pdS2Str : List (BitVec 8) := [0x73#8, 0x6c#8, 0x65#8, 0x65#8, 0x70#8, 0x20#8
 
 set_option maxRecDepth 100000 in
 theorem pd_cstr_pdS2 [CurCtx] :
-    kmapStatic (GF := GF) ⊢ kernelData -∗ cstr 0x80007250#64 DFrac.discard pdS2Str := by
+    kmapStatic (GF := GF) ⊢ kernelData -∗ cstr KStr.«sleep » DFrac.discard pdS2Str := by
   iintro #HS #H
-  ihave #B0 := kernelData_byte 592 0x80007250 0x73 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B1 := kernelData_byte 593 0x80007251 0x6c rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B2 := kernelData_byte 594 0x80007252 0x65 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B3 := kernelData_byte 595 0x80007253 0x65 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B4 := kernelData_byte 596 0x80007254 0x70 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B5 := kernelData_byte 597 0x80007255 0x20 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B6 := kernelData_byte 598 0x80007256 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  iapply cstr_intro 0x80007250#64 DFrac.discard pdS2Str (by unfold nonul pdS2Str; decide)
+  ihave #B0 := kernelData_byte 592 KernelStr.«sleep » 0x73 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B1 := kernelData_byte 593 (KernelStr.«sleep » + 0x1) 0x6c rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B2 := kernelData_byte 594 (KernelStr.«sleep » + 0x2) 0x65 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B3 := kernelData_byte 595 (KernelStr.«sleep » + 0x3) 0x65 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B4 := kernelData_byte 596 (KernelStr.«sleep » + 0x4) 0x70 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B5 := kernelData_byte 597 (KernelStr.«sleep » + 0x5) 0x20 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B6 := kernelData_byte 598 (KernelStr.«sleep » + 0x6) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  iapply cstr_intro KStr.«sleep » DFrac.discard pdS2Str (by unfold nonul pdS2Str; decide)
   unfold byteBuf pdS2Str
   simp only [List.cons_append, List.nil_append, Iris.Algebra.BigOpL.bigOpL_cons,
-    Iris.Algebra.BigOpL.bigOpL_nil, Nat.reduceAdd, Nat.zero_add, BitVec.reduceAdd]
+    Iris.Algebra.BigOpL.bigOpL_nil, Nat.reduceAdd, Nat.zero_add, BitVec.reduceAdd, BitVec.ofNat_add, k_addr, BitVec.reduceOfNat, BitVec.add_zero]
   iframe #
   all_goals iempintro
 
@@ -134,19 +134,19 @@ def pdS3Str : List (BitVec 8) := [0x72#8, 0x75#8, 0x6e#8, 0x62#8, 0x6c#8, 0x65#8
 
 set_option maxRecDepth 100000 in
 theorem pd_cstr_pdS3 [CurCtx] :
-    kmapStatic (GF := GF) ⊢ kernelData -∗ cstr 0x80007258#64 DFrac.discard pdS3Str := by
+    kmapStatic (GF := GF) ⊢ kernelData -∗ cstr KStr.«runble» DFrac.discard pdS3Str := by
   iintro #HS #H
-  ihave #B0 := kernelData_byte 600 0x80007258 0x72 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B1 := kernelData_byte 601 0x80007259 0x75 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B2 := kernelData_byte 602 0x8000725a 0x6e rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B3 := kernelData_byte 603 0x8000725b 0x62 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B4 := kernelData_byte 604 0x8000725c 0x6c rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B5 := kernelData_byte 605 0x8000725d 0x65 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B6 := kernelData_byte 606 0x8000725e 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  iapply cstr_intro 0x80007258#64 DFrac.discard pdS3Str (by unfold nonul pdS3Str; decide)
+  ihave #B0 := kernelData_byte 600 KernelStr.«runble» 0x72 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B1 := kernelData_byte 601 (KernelStr.«runble» + 0x1) 0x75 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B2 := kernelData_byte 602 (KernelStr.«runble» + 0x2) 0x6e rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B3 := kernelData_byte 603 (KernelStr.«runble» + 0x3) 0x62 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B4 := kernelData_byte 604 (KernelStr.«runble» + 0x4) 0x6c rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B5 := kernelData_byte 605 (KernelStr.«runble» + 0x5) 0x65 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B6 := kernelData_byte 606 (KernelStr.«runble» + 0x6) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  iapply cstr_intro KStr.«runble» DFrac.discard pdS3Str (by unfold nonul pdS3Str; decide)
   unfold byteBuf pdS3Str
   simp only [List.cons_append, List.nil_append, Iris.Algebra.BigOpL.bigOpL_cons,
-    Iris.Algebra.BigOpL.bigOpL_nil, Nat.reduceAdd, Nat.zero_add, BitVec.reduceAdd]
+    Iris.Algebra.BigOpL.bigOpL_nil, Nat.reduceAdd, Nat.zero_add, BitVec.reduceAdd, BitVec.ofNat_add, k_addr, BitVec.reduceOfNat, BitVec.add_zero]
   iframe #
   all_goals iempintro
 
@@ -155,19 +155,19 @@ def pdS4Str : List (BitVec 8) := [0x72#8, 0x75#8, 0x6e#8, 0x20#8, 0x20#8, 0x20#8
 
 set_option maxRecDepth 100000 in
 theorem pd_cstr_pdS4 [CurCtx] :
-    kmapStatic (GF := GF) ⊢ kernelData -∗ cstr 0x80007260#64 DFrac.discard pdS4Str := by
+    kmapStatic (GF := GF) ⊢ kernelData -∗ cstr KStr.«run   » DFrac.discard pdS4Str := by
   iintro #HS #H
-  ihave #B0 := kernelData_byte 608 0x80007260 0x72 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B1 := kernelData_byte 609 0x80007261 0x75 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B2 := kernelData_byte 610 0x80007262 0x6e rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B3 := kernelData_byte 611 0x80007263 0x20 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B4 := kernelData_byte 612 0x80007264 0x20 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B5 := kernelData_byte 613 0x80007265 0x20 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B6 := kernelData_byte 614 0x80007266 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  iapply cstr_intro 0x80007260#64 DFrac.discard pdS4Str (by unfold nonul pdS4Str; decide)
+  ihave #B0 := kernelData_byte 608 KernelStr.«run   » 0x72 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B1 := kernelData_byte 609 (KernelStr.«run   » + 0x1) 0x75 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B2 := kernelData_byte 610 (KernelStr.«run   » + 0x2) 0x6e rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B3 := kernelData_byte 611 (KernelStr.«run   » + 0x3) 0x20 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B4 := kernelData_byte 612 (KernelStr.«run   » + 0x4) 0x20 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B5 := kernelData_byte 613 (KernelStr.«run   » + 0x5) 0x20 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B6 := kernelData_byte 614 (KernelStr.«run   » + 0x6) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  iapply cstr_intro KStr.«run   » DFrac.discard pdS4Str (by unfold nonul pdS4Str; decide)
   unfold byteBuf pdS4Str
   simp only [List.cons_append, List.nil_append, Iris.Algebra.BigOpL.bigOpL_cons,
-    Iris.Algebra.BigOpL.bigOpL_nil, Nat.reduceAdd, Nat.zero_add, BitVec.reduceAdd]
+    Iris.Algebra.BigOpL.bigOpL_nil, Nat.reduceAdd, Nat.zero_add, BitVec.reduceAdd, BitVec.ofNat_add, k_addr, BitVec.reduceOfNat, BitVec.add_zero]
   iframe #
   all_goals iempintro
 
@@ -176,134 +176,134 @@ def pdS5Str : List (BitVec 8) := [0x7a#8, 0x6f#8, 0x6d#8, 0x62#8, 0x69#8, 0x65#8
 
 set_option maxRecDepth 100000 in
 theorem pd_cstr_pdS5 [CurCtx] :
-    kmapStatic (GF := GF) ⊢ kernelData -∗ cstr 0x80007268#64 DFrac.discard pdS5Str := by
+    kmapStatic (GF := GF) ⊢ kernelData -∗ cstr KStr.«zombie» DFrac.discard pdS5Str := by
   iintro #HS #H
-  ihave #B0 := kernelData_byte 616 0x80007268 0x7a rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B1 := kernelData_byte 617 0x80007269 0x6f rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B2 := kernelData_byte 618 0x8000726a 0x6d rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B3 := kernelData_byte 619 0x8000726b 0x62 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B4 := kernelData_byte 620 0x8000726c 0x69 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B5 := kernelData_byte 621 0x8000726d 0x65 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B6 := kernelData_byte 622 0x8000726e 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  iapply cstr_intro 0x80007268#64 DFrac.discard pdS5Str (by unfold nonul pdS5Str; decide)
+  ihave #B0 := kernelData_byte 616 KernelStr.«zombie» 0x7a rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B1 := kernelData_byte 617 (KernelStr.«zombie» + 0x1) 0x6f rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B2 := kernelData_byte 618 (KernelStr.«zombie» + 0x2) 0x6d rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B3 := kernelData_byte 619 (KernelStr.«zombie» + 0x3) 0x62 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B4 := kernelData_byte 620 (KernelStr.«zombie» + 0x4) 0x69 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B5 := kernelData_byte 621 (KernelStr.«zombie» + 0x5) 0x65 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B6 := kernelData_byte 622 (KernelStr.«zombie» + 0x6) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  iapply cstr_intro KStr.«zombie» DFrac.discard pdS5Str (by unfold nonul pdS5Str; decide)
   unfold byteBuf pdS5Str
   simp only [List.cons_append, List.nil_append, Iris.Algebra.BigOpL.bigOpL_cons,
-    Iris.Algebra.BigOpL.bigOpL_nil, Nat.reduceAdd, Nat.zero_add, BitVec.reduceAdd]
+    Iris.Algebra.BigOpL.bigOpL_nil, Nat.reduceAdd, Nat.zero_add, BitVec.reduceAdd, BitVec.ofNat_add, k_addr, BitVec.reduceOfNat, BitVec.add_zero]
   iframe #
   all_goals iempintro
 
 set_option maxRecDepth 100000 in
 /-- `states[1]` out of the table at `0x80007758`. -/
 theorem pd_tbl1 [CurCtx] :
-    kmapStatic (GF := GF) ⊢ kernelData -∗ wordPointsTo 0x80007758#64 8 DFrac.discard 0x80007248#64 := by
+    kmapStatic (GF := GF) ⊢ kernelData -∗ wordPointsTo (KA.«states_0» + 0x8#64) 8 DFrac.discard KStr.«used» := by
   iintro #HS #H
-  ihave #B0 := kernelData_byte 1880 0x80007758 0x48 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B1 := kernelData_byte 1881 0x80007759 0x72 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B2 := kernelData_byte 1882 0x8000775a 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B3 := kernelData_byte 1883 0x8000775b 0x80 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B4 := kernelData_byte 1884 0x8000775c 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B5 := kernelData_byte 1885 0x8000775d 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B6 := kernelData_byte 1886 0x8000775e 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B7 := kernelData_byte 1887 0x8000775f 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  iapply (show wordPointsTo (GF := GF) 0x80007758#64 8 DFrac.discard
+  ihave #B0 := kernelData_byte 1880 (KernelSyms.«states_0» + 0x8) 0x48 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B1 := kernelData_byte 1881 (KernelSyms.«states_0» + 0x9) 0x72 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B2 := kernelData_byte 1882 (KernelSyms.«states_0» + 0xa) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B3 := kernelData_byte 1883 (KernelSyms.«states_0» + 0xb) 0x80 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B4 := kernelData_byte 1884 (KernelSyms.«states_0» + 0xc) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B5 := kernelData_byte 1885 (KernelSyms.«states_0» + 0xd) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B6 := kernelData_byte 1886 (KernelSyms.«states_0» + 0xe) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B7 := kernelData_byte 1887 (KernelSyms.«states_0» + 0xf) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  iapply (show wordPointsTo (GF := GF) (KA.«states_0» + 0x8#64) 8 DFrac.discard
       (bytesToWord [0x48#8, 0x72#8, 0x00#8, 0x80#8, 0x00#8, 0x00#8, 0x00#8, 0x00#8]) ⊢
-      wordPointsTo 0x80007758#64 8 DFrac.discard 0x80007248#64 from by rfl)
-  iapply wordPointsTo_of_bytes 0x80007758#64 DFrac.discard _ rfl (by decide)
+      wordPointsTo (KA.«states_0» + 0x8#64) 8 DFrac.discard KStr.«used» from by rfl)
+  iapply wordPointsTo_of_bytes (KA.«states_0» + 0x8#64) DFrac.discard _ rfl (by decide)
   unfold byteBuf
   simp only [Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil,
-    Nat.reduceAdd, Nat.zero_add, BitVec.reduceAdd]
+    Nat.reduceAdd, Nat.zero_add, BitVec.add_assoc, BitVec.reduceAdd, BitVec.ofNat_add, k_addr, BitVec.reduceOfNat, BitVec.add_zero]
   iframe #
   all_goals iempintro
 
 set_option maxRecDepth 100000 in
 /-- `states[2]` out of the table at `0x80007760`. -/
 theorem pd_tbl2 [CurCtx] :
-    kmapStatic (GF := GF) ⊢ kernelData -∗ wordPointsTo 0x80007760#64 8 DFrac.discard 0x80007250#64 := by
+    kmapStatic (GF := GF) ⊢ kernelData -∗ wordPointsTo (KA.«states_0» + 0x10#64) 8 DFrac.discard KStr.«sleep » := by
   iintro #HS #H
-  ihave #B0 := kernelData_byte 1888 0x80007760 0x50 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B1 := kernelData_byte 1889 0x80007761 0x72 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B2 := kernelData_byte 1890 0x80007762 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B3 := kernelData_byte 1891 0x80007763 0x80 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B4 := kernelData_byte 1892 0x80007764 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B5 := kernelData_byte 1893 0x80007765 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B6 := kernelData_byte 1894 0x80007766 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B7 := kernelData_byte 1895 0x80007767 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  iapply (show wordPointsTo (GF := GF) 0x80007760#64 8 DFrac.discard
+  ihave #B0 := kernelData_byte 1888 (KernelSyms.«states_0» + 0x10) 0x50 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B1 := kernelData_byte 1889 (KernelSyms.«states_0» + 0x11) 0x72 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B2 := kernelData_byte 1890 (KernelSyms.«states_0» + 0x12) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B3 := kernelData_byte 1891 (KernelSyms.«states_0» + 0x13) 0x80 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B4 := kernelData_byte 1892 (KernelSyms.«states_0» + 0x14) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B5 := kernelData_byte 1893 (KernelSyms.«states_0» + 0x15) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B6 := kernelData_byte 1894 (KernelSyms.«states_0» + 0x16) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B7 := kernelData_byte 1895 (KernelSyms.«states_0» + 0x17) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  iapply (show wordPointsTo (GF := GF) (KA.«states_0» + 0x10#64) 8 DFrac.discard
       (bytesToWord [0x50#8, 0x72#8, 0x00#8, 0x80#8, 0x00#8, 0x00#8, 0x00#8, 0x00#8]) ⊢
-      wordPointsTo 0x80007760#64 8 DFrac.discard 0x80007250#64 from by rfl)
-  iapply wordPointsTo_of_bytes 0x80007760#64 DFrac.discard _ rfl (by decide)
+      wordPointsTo (KA.«states_0» + 0x10#64) 8 DFrac.discard KStr.«sleep » from by rfl)
+  iapply wordPointsTo_of_bytes (KA.«states_0» + 0x10#64) DFrac.discard _ rfl (by decide)
   unfold byteBuf
   simp only [Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil,
-    Nat.reduceAdd, Nat.zero_add, BitVec.reduceAdd]
+    Nat.reduceAdd, Nat.zero_add, BitVec.add_assoc, BitVec.reduceAdd, BitVec.ofNat_add, k_addr, BitVec.reduceOfNat, BitVec.add_zero]
   iframe #
   all_goals iempintro
 
 set_option maxRecDepth 100000 in
 /-- `states[3]` out of the table at `0x80007768`. -/
 theorem pd_tbl3 [CurCtx] :
-    kmapStatic (GF := GF) ⊢ kernelData -∗ wordPointsTo 0x80007768#64 8 DFrac.discard 0x80007258#64 := by
+    kmapStatic (GF := GF) ⊢ kernelData -∗ wordPointsTo (KA.«states_0» + 0x18#64) 8 DFrac.discard KStr.«runble» := by
   iintro #HS #H
-  ihave #B0 := kernelData_byte 1896 0x80007768 0x58 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B1 := kernelData_byte 1897 0x80007769 0x72 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B2 := kernelData_byte 1898 0x8000776a 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B3 := kernelData_byte 1899 0x8000776b 0x80 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B4 := kernelData_byte 1900 0x8000776c 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B5 := kernelData_byte 1901 0x8000776d 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B6 := kernelData_byte 1902 0x8000776e 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B7 := kernelData_byte 1903 0x8000776f 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  iapply (show wordPointsTo (GF := GF) 0x80007768#64 8 DFrac.discard
+  ihave #B0 := kernelData_byte 1896 (KernelSyms.«states_0» + 0x18) 0x58 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B1 := kernelData_byte 1897 (KernelSyms.«states_0» + 0x19) 0x72 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B2 := kernelData_byte 1898 (KernelSyms.«states_0» + 0x1a) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B3 := kernelData_byte 1899 (KernelSyms.«states_0» + 0x1b) 0x80 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B4 := kernelData_byte 1900 (KernelSyms.«states_0» + 0x1c) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B5 := kernelData_byte 1901 (KernelSyms.«states_0» + 0x1d) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B6 := kernelData_byte 1902 (KernelSyms.«states_0» + 0x1e) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B7 := kernelData_byte 1903 (KernelSyms.«states_0» + 0x1f) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  iapply (show wordPointsTo (GF := GF) (KA.«states_0» + 0x18#64) 8 DFrac.discard
       (bytesToWord [0x58#8, 0x72#8, 0x00#8, 0x80#8, 0x00#8, 0x00#8, 0x00#8, 0x00#8]) ⊢
-      wordPointsTo 0x80007768#64 8 DFrac.discard 0x80007258#64 from by rfl)
-  iapply wordPointsTo_of_bytes 0x80007768#64 DFrac.discard _ rfl (by decide)
+      wordPointsTo (KA.«states_0» + 0x18#64) 8 DFrac.discard KStr.«runble» from by rfl)
+  iapply wordPointsTo_of_bytes (KA.«states_0» + 0x18#64) DFrac.discard _ rfl (by decide)
   unfold byteBuf
   simp only [Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil,
-    Nat.reduceAdd, Nat.zero_add, BitVec.reduceAdd]
+    Nat.reduceAdd, Nat.zero_add, BitVec.add_assoc, BitVec.reduceAdd, BitVec.ofNat_add, k_addr, BitVec.reduceOfNat, BitVec.add_zero]
   iframe #
   all_goals iempintro
 
 set_option maxRecDepth 100000 in
 /-- `states[4]` out of the table at `0x80007770`. -/
 theorem pd_tbl4 [CurCtx] :
-    kmapStatic (GF := GF) ⊢ kernelData -∗ wordPointsTo 0x80007770#64 8 DFrac.discard 0x80007260#64 := by
+    kmapStatic (GF := GF) ⊢ kernelData -∗ wordPointsTo (KA.«states_0» + 0x20#64) 8 DFrac.discard KStr.«run   » := by
   iintro #HS #H
-  ihave #B0 := kernelData_byte 1904 0x80007770 0x60 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B1 := kernelData_byte 1905 0x80007771 0x72 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B2 := kernelData_byte 1906 0x80007772 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B3 := kernelData_byte 1907 0x80007773 0x80 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B4 := kernelData_byte 1908 0x80007774 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B5 := kernelData_byte 1909 0x80007775 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B6 := kernelData_byte 1910 0x80007776 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B7 := kernelData_byte 1911 0x80007777 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  iapply (show wordPointsTo (GF := GF) 0x80007770#64 8 DFrac.discard
+  ihave #B0 := kernelData_byte 1904 (KernelSyms.«states_0» + 0x20) 0x60 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B1 := kernelData_byte 1905 (KernelSyms.«states_0» + 0x21) 0x72 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B2 := kernelData_byte 1906 (KernelSyms.«states_0» + 0x22) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B3 := kernelData_byte 1907 (KernelSyms.«states_0» + 0x23) 0x80 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B4 := kernelData_byte 1908 (KernelSyms.«states_0» + 0x24) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B5 := kernelData_byte 1909 (KernelSyms.«states_0» + 0x25) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B6 := kernelData_byte 1910 (KernelSyms.«states_0» + 0x26) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B7 := kernelData_byte 1911 (KernelSyms.«states_0» + 0x27) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  iapply (show wordPointsTo (GF := GF) (KA.«states_0» + 0x20#64) 8 DFrac.discard
       (bytesToWord [0x60#8, 0x72#8, 0x00#8, 0x80#8, 0x00#8, 0x00#8, 0x00#8, 0x00#8]) ⊢
-      wordPointsTo 0x80007770#64 8 DFrac.discard 0x80007260#64 from by rfl)
-  iapply wordPointsTo_of_bytes 0x80007770#64 DFrac.discard _ rfl (by decide)
+      wordPointsTo (KA.«states_0» + 0x20#64) 8 DFrac.discard KStr.«run   » from by rfl)
+  iapply wordPointsTo_of_bytes (KA.«states_0» + 0x20#64) DFrac.discard _ rfl (by decide)
   unfold byteBuf
   simp only [Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil,
-    Nat.reduceAdd, Nat.zero_add, BitVec.reduceAdd]
+    Nat.reduceAdd, Nat.zero_add, BitVec.add_assoc, BitVec.reduceAdd, BitVec.ofNat_add, k_addr, BitVec.reduceOfNat, BitVec.add_zero]
   iframe #
   all_goals iempintro
 
 set_option maxRecDepth 100000 in
 /-- `states[5]` out of the table at `0x80007778`. -/
 theorem pd_tbl5 [CurCtx] :
-    kmapStatic (GF := GF) ⊢ kernelData -∗ wordPointsTo 0x80007778#64 8 DFrac.discard 0x80007268#64 := by
+    kmapStatic (GF := GF) ⊢ kernelData -∗ wordPointsTo (KA.«states_0» + 0x28#64) 8 DFrac.discard KStr.«zombie» := by
   iintro #HS #H
-  ihave #B0 := kernelData_byte 1912 0x80007778 0x68 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B1 := kernelData_byte 1913 0x80007779 0x72 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B2 := kernelData_byte 1914 0x8000777a 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B3 := kernelData_byte 1915 0x8000777b 0x80 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B4 := kernelData_byte 1916 0x8000777c 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B5 := kernelData_byte 1917 0x8000777d 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B6 := kernelData_byte 1918 0x8000777e 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B7 := kernelData_byte 1919 0x8000777f 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  iapply (show wordPointsTo (GF := GF) 0x80007778#64 8 DFrac.discard
+  ihave #B0 := kernelData_byte 1912 (KernelSyms.«states_0» + 0x28) 0x68 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B1 := kernelData_byte 1913 (KernelSyms.«states_0» + 0x29) 0x72 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B2 := kernelData_byte 1914 (KernelSyms.«states_0» + 0x2a) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B3 := kernelData_byte 1915 (KernelSyms.«states_0» + 0x2b) 0x80 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B4 := kernelData_byte 1916 (KernelSyms.«states_0» + 0x2c) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B5 := kernelData_byte 1917 (KernelSyms.«states_0» + 0x2d) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B6 := kernelData_byte 1918 (KernelSyms.«states_0» + 0x2e) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  ihave #B7 := kernelData_byte 1919 (KernelSyms.«states_0» + 0x2f) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
+  iapply (show wordPointsTo (GF := GF) (KA.«states_0» + 0x28#64) 8 DFrac.discard
       (bytesToWord [0x68#8, 0x72#8, 0x00#8, 0x80#8, 0x00#8, 0x00#8, 0x00#8, 0x00#8]) ⊢
-      wordPointsTo 0x80007778#64 8 DFrac.discard 0x80007268#64 from by rfl)
-  iapply wordPointsTo_of_bytes 0x80007778#64 DFrac.discard _ rfl (by decide)
+      wordPointsTo (KA.«states_0» + 0x28#64) 8 DFrac.discard KStr.«zombie» from by rfl)
+  iapply wordPointsTo_of_bytes (KA.«states_0» + 0x28#64) DFrac.discard _ rfl (by decide)
   unfold byteBuf
   simp only [Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil,
-    Nat.reduceAdd, Nat.zero_add, BitVec.reduceAdd]
+    Nat.reduceAdd, Nat.zero_add, BitVec.add_assoc, BitVec.reduceAdd, BitVec.ofNat_add, k_addr, BitVec.reduceOfNat, BitVec.add_zero]
   iframe #
   all_goals iempintro
 
@@ -315,17 +315,18 @@ theorem pd_toNat (m : Nat) (h : m < 2 ^ 64) : (BitVec.ofNat 64 m).toNat = m := b
 
 /-- The cursor `&proc[i].name`, as a number, up to and including the sentinel. -/
 theorem pd_cursor_toNat (j : Nat) (hj : j ≤ NPROC) :
-    (pName (procAddr j)).toNat = 2147559864 + 360 * j := by
+    (pName (procAddr j)).toNat = KernelSyms.«proc» + 344 + 360 * j := by
   have h1 : (BitVec.ofNat 64 (procSize * j)).toNat = 360 * j := by
     simp only [BitVec.toNat_ofNat, procSize]
     exact Nat.mod_eq_of_lt (by unfold NPROC at hj; omega)
-  have h2 : (procsAddr : BitVec 64).toNat = 2147559520 := by decide
+  have h2 : (procsAddr : BitVec 64).toNat = KernelSyms.«proc» := by decide
   have h3 : (344#64).toNat = 344 := by decide
+  have hp : KernelSyms.«proc» < 2 ^ 32 := by decide
   unfold NPROC at hj
   unfold pName procAddr
   rw [BitVec.toNat_add, BitVec.toNat_add, h1, h2, h3,
-    Nat.mod_eq_of_lt (show 2147559520 + 360 * j < 2 ^ 64 by omega),
-    Nat.mod_eq_of_lt (show 2147559520 + 360 * j + 344 < 2 ^ 64 by omega)]
+    Nat.mod_eq_of_lt (show KernelSyms.«proc» + 360 * j < 2 ^ 64 by omega),
+    Nat.mod_eq_of_lt (show KernelSyms.«proc» + 360 * j + 344 < 2 ^ 64 by omega)]
   omega
 
 /-- The cursor one slot on (`addi s1,s1,360`). -/
@@ -336,20 +337,22 @@ theorem pd_cursor (i : Nat) : pName (procAddr i) + 360#64 = pName (procAddr (i +
   bv_omega
 
 /-- The end sentinel `&proc[NPROC].name = 0x800183b8`. -/
-theorem pd_sentinel : pName (procAddr NPROC) = 0x800183b8#64 := by
+theorem pd_bcache_end : (KA.«bcache» + 0x140#64).toNat = KernelSyms.«proc» + 344 + 360 * 64 := by
+  decide
+
+theorem pd_sentinel : pName (procAddr NPROC) = (KA.«bcache» + 0x140#64) := by
   apply BitVec.eq_of_toNat_eq
-  rw [pd_cursor_toNat NPROC (Nat.le_refl _)]
+  rw [pd_cursor_toNat NPROC (Nat.le_refl _), pd_bcache_end]
   unfold NPROC
-  rw [pd_toNat 2147582904 (by omega)]
+  rfl
 
 theorem pd_cursor_eq (i : Nat) (hi : i < NPROC) :
-    (pName (procAddr (i + 1)) = 0x800183b8#64) ↔ i + 1 = NPROC := by
+    (pName (procAddr (i + 1)) = (KA.«bcache» + 0x140#64)) ↔ i + 1 = NPROC := by
   constructor
   · intro he
     have h := congrArg BitVec.toNat he
     rw [pd_cursor_toNat (i + 1) (by unfold NPROC at hi ⊢; omega)] at h
-    have hr : (0x800183b8#64).toNat = 2147582904 := by decide
-    rw [hr] at h
+    rw [pd_bcache_end] at h
     unfold NPROC
     omega
   · intro he
@@ -358,7 +361,7 @@ theorem pd_cursor_eq (i : Nat) (hi : i < NPROC) :
 
 /-- The loop test `beq s1,s2` at the end of an iteration. -/
 theorem pd_beq_last {α : Type} (i : Nat) (hi : i < NPROC) (p q : α) :
-    (if bcond bop.BEQ (pName (procAddr (i + 1))) 0x800183b8#64 then p else q)
+    (if bcond bop.BEQ (pName (procAddr (i + 1))) (KA.«bcache» + 0x140#64) then p else q)
       = if i + 1 = NPROC then p else q := by
   by_cases he : i + 1 = NPROC
   · rw [if_pos he, if_pos (by simp only [bcond, beq_iff_eq]; exact (pd_cursor_eq i hi).mpr he)]
@@ -367,7 +370,7 @@ theorem pd_beq_last {α : Type} (i : Nat) (hi : i < NPROC) (p q : α) :
       exact fun hc => he ((pd_cursor_eq i hi).mp hc))]
 
 /-- `&proc[0].name`. -/
-theorem pd_cursor_zero : pName (procAddr 0) = 0x800129b8#64 := by decide
+theorem pd_cursor_zero : pName (procAddr 0) = (KA.«proc» + 0x158#64) := by decide
 
 /-- The immediates of the ten-slot frame. -/
 theorem pd_imm_m80 : BitVec.signExtend 64 4016#12 = -(8#64 * BitVec.ofNat 64 10) := by
@@ -433,24 +436,24 @@ theorem pd_pushed_spie_self (k : KCtx) (m : Nat) :
 /-! ## The `auipc`/`addi` address pairs -/
 
 theorem pd_nl_addr :
-    0x80002410#64 + (BitVec.signExtend 64 (5#20 ++ 0#12) + 18446744073709550704#64)
-      = 0x80007080#64 := by decide
+    KA.«procdump» + 0x4c86#64
+      = KStr.«\n» := by decide
 theorem pd_s1_addr :
-    0x8000241c#64 + (BitVec.signExtend 64 (16#20 ++ 0#12) + 1436#64) = 0x800129b8#64 := by decide
+    KA.«procdump» + 0x105be#64 = (KA.«proc» + 0x158#64) := by decide
 theorem pd_s2_addr :
-    0x80002424#64 + (BitVec.signExtend 64 (22#20 ++ 0#12) + 18446744073709551508#64)
-      = 0x800183b8#64 := by decide
+    KA.«procdump» + 0x15fbe#64
+      = (KA.«bcache» + 0x140#64) := by decide
 theorem pd_s3_addr :
-    0x8000242e#64 + (BitVec.signExtend 64 (5#20 ++ 0#12) + 18446744073709551098#64)
-      = 0x80007228#64 := by decide
+    KA.«procdump» + 0x4e2e#64
+      = KStr.«???» := by decide
 theorem pd_s5_addr :
-    0x80002436#64 + (BitVec.signExtend 64 (5#20 ++ 0#12) + 18446744073709551098#64)
-      = 0x80007230#64 := by decide
+    KA.«procdump» + 0x4e36#64
+      = KStr.«%d %s %s» := by decide
 theorem pd_s4_addr :
-    0x8000243e#64 + (BitVec.signExtend 64 (5#20 ++ 0#12) + 18446744073709550658#64)
-      = 0x80007080#64 := by decide
+    KA.«procdump» + 0x4c86#64
+      = KStr.«\n» := by decide
 theorem pd_s7_addr :
-    0x80002446#64 + (BitVec.signExtend 64 (5#20 ++ 0#12) + 778#64) = 0x80007750#64 := by decide
+    KA.«procdump» + 0x5356#64 = KA.«states_0» := by decide
 
 /-! ## The view, slot by slot -/
 
@@ -505,7 +508,7 @@ theorem pd_printk (PK : PRINTK) [CurCtx]
     (hK : 48 ≤ k'.avail) (hflen : f.length + 4 < 2 ^ 31)
     (hkinds : pkKinds f = descs.map PkArgDesc.kind) (hdlen : descs.length ≤ 7)
     (hnoff : k'.noff + 2 < 2 ^ 31) (hpr : "pr" ∉ k'.locks) (huart : "uart1" ∉ k'.locks) :
-    kctx c k' ∗ pcIs c 0x80000526#64 ∗
+    kctx c k' ∗ pcIs c KA.«printk» ∗
     cstr (k'.regs 10#5) dqf f ∗ pkDescs k'.regs descs ∗
     isLock γpr prLock "pr" (fun _ => emp) ∗ isTxLock γl γd ∗ uartSentSub γd bs ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (cs : List (BitVec 8)),
@@ -518,7 +521,7 @@ theorem pd_printk (PK : PRINTK) [CurCtx]
   have h := PK.wp_printk (hlc := hlc) (GF := GF) c k' γpr γl γd bs dqf f descs hK hflen hkinds
     hdlen hnoff hpr huart
   unfold wp_printk_body at h
-  simp only [printkAddr, KernelSyms.«printk»] at h
+  simp only [printkAddr] at h
   exact h
 
 /-! ## The varargs of the two calls -/
@@ -557,22 +560,22 @@ set_option maxHeartbeats 4000000 in
 sentinel. -/
 theorem pd_tail [CurCtx] (k : KCtx) (i : Nat) (hi : i < NPROC) (spie spp : Bool) (R R0 : RegMap)
     (hkept0 : pdKept R0 R)
-    (h9 : R 9#5 = pName (procAddr i)) (h18 : R 18#5 = 0x800183b8#64)
+    (h9 : R 9#5 = pName (procAddr i)) (h18 : R 18#5 = (KA.«bcache» + 0x140#64))
     (cur c : CPU) (hpin : k.sie = false ∨ k.proc = 0#64 → c = cur) :
-    kctx c (((k.withSpie spie spp).pushed 10).withRegs R) ∗ pcIs c 0x80002460#64 ∗
+    kctx c (((k.withSpie spie spp).pushed 10).withRegs R) ∗ pcIs c (KA.«procdump» + 0x66#64) ∗
     wpNext k.sie k.proc cur (fun cpu' => iprop(∀ (spie2 spp2 : Bool) (R2 : RegMap),
       ⌜k.sie = false → spie2 = spie ∧ spp2 = spp⌝ -∗
       kctx cpu' (((k.withSpie spie2 spp2).pushed 10).withRegs R2) -∗
-      pcIs cpu' (if i + 1 = NPROC then 0x80002488#64 else 0x80002468#64) -∗
+      pcIs cpu' (if i + 1 = NPROC then (KA.«procdump» + 0x8e#64) else (KA.«procdump» + 0x6e#64)) -∗
       ⌜pdKept R0 R2 ∧ R2 9#5 = pName (procAddr (i + 1))⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   iintro ⟨Hk, Hpc, HPhi⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  k_step_gen (wp_s_addi c _ 0x80002460#64 false 360#12 9#5 9#5 (by decide))
+  k_step_gen (wp_s_addi c _ (KA.«procdump» + 0x66#64) false 360#12 9#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [h9, pd_cursor i] next c1 hq1
   iintro Hk Hpc
-  k_step_gen (wp_s_branch c1 _ 0x80002464#64 false 36#13 9#5 18#5 (by decide) bop.BEQ)
+  k_step_gen (wp_s_branch c1 _ (KA.«procdump» + 0x6a#64) false 36#13 9#5 18#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [h18, pd_beq_last i hi] next c2 hq2
   iintro Hk Hpc
@@ -601,7 +604,7 @@ theorem pd_printk0 (PK : PRINTK) [CurCtx]
     (dqf : DFrac) (f : List (BitVec 8))
     (hK : 48 ≤ k'.avail) (hflen : f.length + 4 < 2 ^ 31) (hkinds : pkKinds f = [])
     (hnoff : k'.noff + 2 < 2 ^ 31) (hpr : "pr" ∉ k'.locks) (huart : "uart1" ∉ k'.locks) :
-    kctx c k' ∗ pcIs c 0x80000526#64 ∗ cstr (k'.regs 10#5) dqf f ∗
+    kctx c k' ∗ pcIs c KA.«printk» ∗ cstr (k'.regs 10#5) dqf f ∗
     isLock γpr prLock "pr" (fun _ => emp) ∗ isTxLock γl γd ∗ uartSentSub γd bs ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (cs : List (BitVec 8)),
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
@@ -628,7 +631,7 @@ theorem pd_printk3 (PK : PRINTK) [CurCtx]
     (hkinds : pkKinds f = [PkKind.num, PkKind.str, PkKind.str])
     (hnoff : k'.noff + 2 < 2 ^ 31) (hpr : "pr" ∉ k'.locks) (huart : "uart1" ∉ k'.locks)
     (hv1 : k'.regs 12#5 ≠ 0#64) (hv2 : k'.regs 13#5 ≠ 0#64) :
-    kctx c k' ∗ pcIs c 0x80000526#64 ∗
+    kctx c k' ∗ pcIs c KA.«printk» ∗
     cstr (k'.regs 10#5) dqf f ∗ cstr (k'.regs 12#5) dq1 s1 ∗ cstr (k'.regs 13#5) dq2 s2 ∗
     isLock γpr prLock "pr" (fun _ => emp) ∗ isTxLock γl γd ∗ uartSentSub γd bs ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (cs : List (BitVec 8)),
@@ -680,6 +683,8 @@ theorem pdKept_of_calleeSaved {R R' : RegMap} (h : calleeSaved R R') : pdKept R 
     h.2.2.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.2.2.2.1,
     h.2.2.2.2.2.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.2.2.2.2.2⟩
 
+theorem procdump_br_ffffffffffffe12c : KA.«procdump» + 0xffffffffffffe12c#64 = KA.«printk» := by decide
+
 set_option maxHeartbeats 4000000 in
 /-- The print site at `0x80002450`: `printk("%d %s %s", p->pid, state, p->name)`,
 then `printk("\n")`, then the cursor step and the termination test. -/
@@ -692,9 +697,9 @@ theorem pd_print (PK : PRINTK) [CurCtx] (k : KCtx) (γpr γl : GName) (γd : Uar
     (bs' : List (BitVec 8)) (spie spp : Bool) (R R0 : RegMap) (hkept0 : pdKept R0 R)
     (h9 : R 9#5 = pName (procAddr i)) (h12 : R 12#5 = v)
     (h13 : R 13#5 = procAddr i + 344#64)
-    (h18 : R 18#5 = 0x800183b8#64) (h20 : R 20#5 = 0x80007080#64) (h21 : R 21#5 = 0x80007230#64)
+    (h18 : R 18#5 = (KA.«bcache» + 0x140#64)) (h20 : R 20#5 = KStr.«\n») (h21 : R 21#5 = KStr.«%d %s %s»)
     (cur c : CPU) (hpin : k.sie = false ∨ k.proc = 0#64 → c = cur) :
-    kctx c (((k.withSpie spie spp).pushed 10).withRegs R) ∗ pcIs c 0x80002450#64 ∗
+    kctx c (((k.withSpie spie spp).pushed 10).withRegs R) ∗ pcIs c (KA.«procdump» + 0x56#64) ∗
     cstr v DFrac.discard sv ∗
     wordPointsTo (pState (procAddr i)) 4 dqs st ∗
     wordPointsTo (procAddr i + 48#64) 4 dqp pid ∗
@@ -704,7 +709,7 @@ theorem pd_print (PK : PRINTK) [CurCtx] (k : KCtx) (γpr γl : GName) (γd : Uar
     wpNext k.sie k.proc cur (fun cpu' => iprop(∀ (spie2 spp2 : Bool) (R2 : RegMap) (cs : List (BitVec 8)),
       ⌜k.sie = false → spie2 = spie ∧ spp2 = spp⌝ -∗
       kctx cpu' (((k.withSpie spie2 spp2).pushed 10).withRegs R2) -∗
-      pcIs cpu' (if i + 1 = NPROC then 0x80002488#64 else 0x80002468#64) -∗
+      pcIs cpu' (if i + 1 = NPROC then (KA.«procdump» + 0x8e#64) else (KA.«procdump» + 0x6e#64)) -∗
       ⌜pdKept R0 R2 ∧ R2 9#5 = pName (procAddr (i + 1))⌝ -∗
       procdumpView -∗ uartSentSub γd (bs' ++ cs) -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
@@ -722,19 +727,19 @@ theorem pd_print (PK : PRINTK) [CurCtx] (k : KCtx) (γpr γl : GName) (γd : Uar
     rw [h0] at h2
     have hz : (0#64 : BitVec 64).toNat = 0 := by decide
     omega
-  have hret1 : jumpPc 0x8000245a#64 = 0x8000245a#64 := by simp only [jumpPc, BitVec.reduceAnd]
-  have hret2 : jumpPc 0x80002460#64 = 0x80002460#64 := by simp only [jumpPc, BitVec.reduceAnd]
+  have hret1 : jumpPc (KA.«procdump» + 0x60#64) = (KA.«procdump» + 0x60#64) := by decide
+  have hret2 : jumpPc (KA.«procdump» + 0x66#64) = (KA.«procdump» + 0x66#64) := by decide
   -- lw a1,-296(a3)  :  a1 := p->pid
-  k_step_gen (wp_s_lw c _ 0x80002450#64 false 3800#12 11#5 13#5 (by decide) (by decide) dqp pid)
+  k_step_gen (wp_s_lw c _ (KA.«procdump» + 0x56#64) false 3800#12 11#5 13#5 (by decide) (by decide) dqp pid)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h13] next c1 hq1
   iintro Hk Hpc Hpid
   -- c.mv a0,s5
-  k_step_gen (wp_s_add c1 _ 0x80002454#64 true 10#5 0#5 21#5 (by decide))
+  k_step_gen (wp_s_add c1 _ (KA.«procdump» + 0x5a#64) true 10#5 0#5 21#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h21] next c2 hq2
   iintro Hk Hpc
   -- jal ra, printk
-  k_step_gen (wp_s_jal c2 _ 0x80002456#64 false 2089168#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hq3
+  k_step_gen (wp_s_jal c2 _ (KA.«procdump» + 0x5c#64) false 2089168#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [procdump_br_ffffffffffffe12c] next c3 hq3
   iintro Hk Hpc
   iapply (pd_printk3 PK c3 _ γpr γl γd bs' DFrac.discard DFrac.discard dqn pdFmtStr sv nm
     ?hK1 ?hf1 ?hkin1 ?hn1 ?hp1 ?hu1 ?hv1 ?hv2) $$ [- $Hk $Hpc]
@@ -758,16 +763,16 @@ theorem pd_print (PK : PRINTK) [CurCtx] (k : KCtx) (γpr γl : GName) (γd : Uar
   k_norm_g at hcs1
   obtain ⟨⟨b2, b8, b9, b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩, -⟩ := hcs1
   have g9 : R1 9#5 = pName (procAddr i) := b9.trans h9
-  have g18 : R1 18#5 = 0x800183b8#64 := b18.trans h18
-  have g20 : R1 20#5 = 0x80007080#64 := b20.trans h20
+  have g18 : R1 18#5 = (KA.«bcache» + 0x140#64) := b18.trans h18
+  have g20 : R1 20#5 = KStr.«\n» := b20.trans h20
   have hkept1 : pdKept R R1 := ⟨b2, b8, b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩
   -- c.mv a0,s4
-  k_step_gen (wp_s_add c4 _ 0x8000245a#64 true 10#5 0#5 20#5 (by decide))
+  k_step_gen (wp_s_add c4 _ (KA.«procdump» + 0x60#64) true 10#5 0#5 20#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g20] next c5 hq5
   iintro Hk Hpc
   -- jal ra, printk
-  k_step_gen (wp_s_jal c5 _ 0x8000245c#64 false 2089162#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c6 hq6
+  k_step_gen (wp_s_jal c5 _ (KA.«procdump» + 0x62#64) false 2089162#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [procdump_br_ffffffffffffe12c] next c6 hq6
   iintro Hk Hpc
   iapply (pd_printk0 PK c6 _ γpr γl γd (bs' ++ cs1) DFrac.discard pdNlStr
     ?hK2 ?hf2 ?hkin2 ?hn2 ?hp2 ?hu2) $$ [- $Hk $Hpc]
@@ -789,7 +794,7 @@ theorem pd_print (PK : PRINTK) [CurCtx] (k : KCtx) (γpr γl : GName) (γd : Uar
   k_norm_g at hcs2
   obtain ⟨⟨e2, e8, e9, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩, -⟩ := hcs2
   have f9 : R2 9#5 = pName (procAddr i) := e9.trans g9
-  have f18 : R2 18#5 = 0x800183b8#64 := e18.trans g18
+  have f18 : R2 18#5 = (KA.«bcache» + 0x140#64) := e18.trans g18
   have hkept2 : pdKept R1 R2 := ⟨e2, e8, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩
   -- give the slot back
   ihave Hpid := pd_pid_fold (procAddr i) dqp pid $$ Hpid
@@ -833,16 +838,16 @@ theorem pd_tbl_arm (PK : PRINTK) [CurCtx] (k : KCtx) (γpr γl : GName) (γd : U
     (hpr : "pr" ∉ k.locks) (huart : "uart1" ∉ k.locks)
     (i : Nat) (hi : i < NPROC)
     (st : BitVec 32) (ta ptr : BitVec 64) (sv : List (BitVec 8))
-    (hshift : BitVec.signExtend 64 st <<< 32 >>> 29 + 0x80007750#64 = ta)
+    (hshift : BitVec.signExtend 64 st <<< 32 >>> 29 + KA.«states_0» = ta)
     (hptr : ptr ≠ 0#64)
     (dqs dqp dqn : DFrac) (pid : BitVec 32) (nm : List (BitVec 8)) (hnm : nm.length < PNAMELEN)
     (bs' : List (BitVec 8)) (spie spp : Bool) (R R0 : RegMap) (hkept0 : pdKept R0 R)
     (h9 : R 9#5 = pName (procAddr i)) (h13 : R 13#5 = procAddr i + 344#64)
     (h15 : R 15#5 = BitVec.signExtend 64 st)
-    (h18 : R 18#5 = 0x800183b8#64) (h20 : R 20#5 = 0x80007080#64) (h21 : R 21#5 = 0x80007230#64)
-    (h23 : R 23#5 = 0x80007750#64)
+    (h18 : R 18#5 = (KA.«bcache» + 0x140#64)) (h20 : R 20#5 = KStr.«\n») (h21 : R 21#5 = KStr.«%d %s %s»)
+    (h23 : R 23#5 = KA.«states_0»)
     (cur c : CPU) (hpin : k.sie = false ∨ k.proc = 0#64 → c = cur) :
-    kctx c (((k.withSpie spie spp).pushed 10).withRegs R) ∗ pcIs c 0x80002476#64 ∗
+    kctx c (((k.withSpie spie spp).pushed 10).withRegs R) ∗ pcIs c (KA.«procdump» + 0x7c#64) ∗
     wordPointsTo ta 8 DFrac.discard ptr ∗ cstr ptr DFrac.discard sv ∗
     wordPointsTo (pState (procAddr i)) 4 dqs st ∗
     wordPointsTo (procAddr i + 48#64) 4 dqp pid ∗
@@ -852,31 +857,31 @@ theorem pd_tbl_arm (PK : PRINTK) [CurCtx] (k : KCtx) (γpr γl : GName) (γd : U
     wpNext k.sie k.proc cur (fun cpu' => iprop(∀ (spie2 spp2 : Bool) (R2 : RegMap) (cs : List (BitVec 8)),
       ⌜k.sie = false → spie2 = spie ∧ spp2 = spp⌝ -∗
       kctx cpu' (((k.withSpie spie2 spp2).pushed 10).withRegs R2) -∗
-      pcIs cpu' (if i + 1 = NPROC then 0x80002488#64 else 0x80002468#64) -∗
+      pcIs cpu' (if i + 1 = NPROC then (KA.«procdump» + 0x8e#64) else (KA.«procdump» + 0x6e#64)) -∗
       ⌜pdKept R0 R2 ∧ R2 9#5 = pName (procAddr (i + 1))⌝ -∗
       procdumpView -∗ uartSentSub γd (bs' ++ cs) -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   iintro ⟨Hk, Hpc, Hword, Hsv, Hstate, Hpid, Hname, Hclose, #Hlk, #Htx, Hsent, HPhi⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- slli a4,a5,0x20
-  k_step_gen (wp_s_slli c _ 0x80002476#64 false 32#6 14#5 15#5 (by decide))
+  k_step_gen (wp_s_slli c _ (KA.«procdump» + 0x7c#64) false 32#6 14#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h15] next c1 hq1
   iintro Hk Hpc
   -- srli a5,a4,0x1d
-  k_step_gen (wp_s_srli c1 _ 0x8000247a#64 false 29#6 15#5 14#5 (by decide))
+  k_step_gen (wp_s_srli c1 _ (KA.«procdump» + 0x80#64) false 29#6 15#5 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c2 hq2
   iintro Hk Hpc
   -- c.add a5,a5,s7
-  k_step_gen (wp_s_add c2 _ 0x8000247e#64 true 15#5 15#5 23#5 (by decide))
+  k_step_gen (wp_s_add c2 _ (KA.«procdump» + 0x84#64) true 15#5 15#5 23#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h23, hshift] next c3 hq3
   iintro Hk Hpc
   -- c.ld a2,0(a5)
-  k_step_gen (wp_s_ld c3 _ 0x80002480#64 true 0#12 12#5 15#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c3 _ (KA.«procdump» + 0x86#64) true 0#12 12#5 15#5 (by decide) (by decide)
       DFrac.discard ptr)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hq4
   iintro Hk Hpc Hword
   -- c.bnez a2
-  k_step_gen (wp_s_branch c4 _ 0x80002482#64 true 8142#13 12#5 0#5 (by decide) bop.BNE)
+  k_step_gen (wp_s_branch c4 _ (KA.«procdump» + 0x88#64) true 8142#13 12#5 0#5 (by decide) bop.BNE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [pd_bne_ne ptr 0#64 hptr] next c5 hq5
   iintro Hk Hpc
@@ -913,17 +918,17 @@ theorem pd_iter (PK : PRINTK) [CurCtx] (k : KCtx) (γpr γl : GName) (γd : Uart
     (hnoff : k.noff + 2 < 2 ^ 31) (hK : procdumpSlots ≤ k.avail)
     (hpr : "pr" ∉ k.locks) (huart : "uart1" ∉ k.locks)
     (i : Nat) (hi : i < NPROC) (bs' : List (BitVec 8)) (spie spp : Bool) (R : RegMap)
-    (h9 : R 9#5 = pName (procAddr i)) (h18 : R 18#5 = 0x800183b8#64)
-    (h19 : R 19#5 = 0x80007228#64) (h20 : R 20#5 = 0x80007080#64)
-    (h21 : R 21#5 = 0x80007230#64) (h22 : R 22#5 = 5#64) (h23 : R 23#5 = 0x80007750#64)
+    (h9 : R 9#5 = pName (procAddr i)) (h18 : R 18#5 = (KA.«bcache» + 0x140#64))
+    (h19 : R 19#5 = KStr.«???») (h20 : R 20#5 = KStr.«\n»)
+    (h21 : R 21#5 = KStr.«%d %s %s») (h22 : R 22#5 = 5#64) (h23 : R 23#5 = KA.«states_0»)
     (cur : CPU) :
-    kctx cur (((k.withSpie spie spp).pushed 10).withRegs R) ∗ pcIs cur 0x80002468#64 ∗
+    kctx cur (((k.withSpie spie spp).pushed 10).withRegs R) ∗ pcIs cur (KA.«procdump» + 0x6e#64) ∗
     procdumpView ∗
     isLock γpr prLock "pr" (fun _ => emp) ∗ isTxLock γl γd ∗ uartSentSub γd bs' ∗
     wpNext k.sie k.proc cur (fun cpu' => iprop(∀ (spie2 spp2 : Bool) (R2 : RegMap) (cs : List (BitVec 8)),
       ⌜k.sie = false → spie2 = spie ∧ spp2 = spp⌝ -∗
       kctx cpu' (((k.withSpie spie2 spp2).pushed 10).withRegs R2) -∗
-      pcIs cpu' (if i + 1 = NPROC then 0x80002488#64 else 0x80002468#64) -∗
+      pcIs cpu' (if i + 1 = NPROC then (KA.«procdump» + 0x8e#64) else (KA.«procdump» + 0x6e#64)) -∗
       ⌜pdKept R R2 ∧ R2 9#5 = pName (procAddr (i + 1))⌝ -∗
       procdumpView -∗ uartSentSub γd (bs' ++ cs) -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cur := by
@@ -939,17 +944,17 @@ theorem pd_iter (PK : PRINTK) [CurCtx] (k : KCtx) (γpr γl : GName) (γd : Uart
   have h9u : R 9#5 = procAddr i + 344#64 := h9
   have hkeptR : pdKept R R := ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
   -- c.mv a3,s1
-  k_step_gen (wp_s_add cur _ 0x80002468#64 true 13#5 0#5 9#5 (by decide))
+  k_step_gen (wp_s_add cur _ (KA.«procdump» + 0x6e#64) true 13#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9u] next c1 hq1
   iintro Hk Hpc
   -- lw a5,-320(s1)  :  a5 := p->state
-  k_step_gen (wp_s_lw c1 _ 0x8000246a#64 false 3776#12 15#5 9#5 (by decide) (by decide) dqs st)
+  k_step_gen (wp_s_lw c1 _ (KA.«procdump» + 0x70#64) false 3776#12 15#5 9#5 (by decide) (by decide) dqs st)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9u, pState] next c2 hq2
   iintro Hk Hpc Hstate
   ihave Hstate := pd_state_fold (procAddr i) dqs st $$ Hstate
   by_cases hst0 : BitVec.signExtend 64 st = 0#64
   · -- UNUSED: skip the slot
-    k_step_gen (wp_s_branch c2 _ 0x8000246e#64 true 8178#13 15#5 0#5 (by decide) bop.BEQ)
+    k_step_gen (wp_s_branch c2 _ (KA.«procdump» + 0x74#64) true 8178#13 15#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [pd_beq_eq _ 0#64 hst0] next c3 hq3
     iintro Hk Hpc
@@ -974,24 +979,24 @@ theorem pd_iter (PK : PRINTK) [CurCtx] (k : KCtx) (γpr γl : GName) (γd : Uart
     case t9 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h9
     case t18 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h18
   · -- a live slot
-    k_step_gen (wp_s_branch c2 _ 0x8000246e#64 true 8178#13 15#5 0#5 (by decide) bop.BEQ)
+    k_step_gen (wp_s_branch c2 _ (KA.«procdump» + 0x74#64) true 8178#13 15#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [pd_beq_ne _ 0#64 hst0] next c3 hq3
     iintro Hk Hpc
     -- c.mv a2,s3   :  a2 := "???"
-    k_step_gen (wp_s_add c3 _ 0x80002470#64 true 12#5 0#5 19#5 (by decide))
+    k_step_gen (wp_s_add c3 _ (KA.«procdump» + 0x76#64) true 12#5 0#5 19#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h19] next c4 hq4
     iintro Hk Hpc
     by_cases hlt : (5#64).ult (BitVec.signExtend 64 st) = true
     · -- out of range (or negative): "???"
-      k_step_gen (wp_s_branch c4 _ 0x80002472#64 false 8158#13 22#5 15#5 (by decide) bop.BLTU)
+      k_step_gen (wp_s_branch c4 _ (KA.«procdump» + 0x78#64) false 8158#13 22#5 15#5 (by decide) bop.BLTU)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [h22, pd_bltu_true _ _ hlt] next c5 hq5
       iintro Hk Hpc
       ihave #HQ := pd_cstr_pdQ $$ HS HD
       have hpin5 : k.sie = false ∨ k.proc = 0#64 → c5 = cur := fun h =>
         (hq5 h).trans ((hq4 h).trans ((hq3 h).trans ((hq2 h).trans (hq1 h))))
-      iapply (pd_print PK k γpr γl γd hnoff hK hpr huart i hi 0x80007228#64 pdQStr (by decide)
+      iapply (pd_print PK k γpr γl γd hnoff hK hpr huart i hi KStr.«???» pdQStr (by decide)
         dqs dqp dqn st pid nm hnm bs' spie spp _ R ?q0 ?q9 ?q12 ?q13 ?q18 ?q20 ?q21
         cur c5 hpin5) $$ [- $Hk $Hpc]
       rotate_right 1
@@ -1011,7 +1016,7 @@ theorem pd_iter (PK : PRINTK) [CurCtx] (k : KCtx) (γpr γl : GName) (γd : Uart
     · -- 1 <= state <= 5: the table entry
       have hlt' : (5#64).ult (BitVec.signExtend 64 st) = false := by
         simp only [Bool.not_eq_true] at hlt; exact hlt
-      k_step_gen (wp_s_branch c4 _ 0x80002472#64 false 8158#13 22#5 15#5 (by decide) bop.BLTU)
+      k_step_gen (wp_s_branch c4 _ (KA.«procdump» + 0x78#64) false 8158#13 22#5 15#5 (by decide) bop.BLTU)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [h22, pd_bltu_false _ _ hlt'] next c5 hq5
       iintro Hk Hpc
@@ -1021,7 +1026,7 @@ theorem pd_iter (PK : PRINTK) [CurCtx] (k : KCtx) (γpr γl : GName) (γd : Uart
       rcases hcase with rfl | rfl | rfl | rfl | rfl
       · ihave #HW := pd_tbl1 $$ HS HD
         ihave #HC := pd_cstr_pdS1 $$ HS HD
-        iapply (pd_tbl_arm PK k γpr γl γd hnoff hK hpr huart i hi 1#32 0x80007758#64 0x80007248#64
+        iapply (pd_tbl_arm PK k γpr γl γd hnoff hK hpr huart i hi 1#32 (KA.«states_0» + 0x8#64) KStr.«used»
           pdS1Str (by bv_decide) (by decide) dqs dqp dqn pid nm hnm bs' spie spp _ R ?a10
           ?a19 ?a113 ?a115 ?a118 ?a120 ?a121 ?a123 cur c5 hpin5) $$ [- $Hk $Hpc]
         rotate_right 1
@@ -1041,7 +1046,7 @@ theorem pd_iter (PK : PRINTK) [CurCtx] (k : KCtx) (γpr γl : GName) (γd : Uart
         case a123 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h23
       · ihave #HW := pd_tbl2 $$ HS HD
         ihave #HC := pd_cstr_pdS2 $$ HS HD
-        iapply (pd_tbl_arm PK k γpr γl γd hnoff hK hpr huart i hi 2#32 0x80007760#64 0x80007250#64
+        iapply (pd_tbl_arm PK k γpr γl γd hnoff hK hpr huart i hi 2#32 (KA.«states_0» + 0x10#64) KStr.«sleep »
           pdS2Str (by bv_decide) (by decide) dqs dqp dqn pid nm hnm bs' spie spp _ R ?a20
           ?a29 ?a213 ?a215 ?a218 ?a220 ?a221 ?a223 cur c5 hpin5) $$ [- $Hk $Hpc]
         rotate_right 1
@@ -1061,7 +1066,7 @@ theorem pd_iter (PK : PRINTK) [CurCtx] (k : KCtx) (γpr γl : GName) (γd : Uart
         case a223 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h23
       · ihave #HW := pd_tbl3 $$ HS HD
         ihave #HC := pd_cstr_pdS3 $$ HS HD
-        iapply (pd_tbl_arm PK k γpr γl γd hnoff hK hpr huart i hi 3#32 0x80007768#64 0x80007258#64
+        iapply (pd_tbl_arm PK k γpr γl γd hnoff hK hpr huart i hi 3#32 (KA.«states_0» + 0x18#64) KStr.«runble»
           pdS3Str (by bv_decide) (by decide) dqs dqp dqn pid nm hnm bs' spie spp _ R ?a30
           ?a39 ?a313 ?a315 ?a318 ?a320 ?a321 ?a323 cur c5 hpin5) $$ [- $Hk $Hpc]
         rotate_right 1
@@ -1081,7 +1086,7 @@ theorem pd_iter (PK : PRINTK) [CurCtx] (k : KCtx) (γpr γl : GName) (γd : Uart
         case a323 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h23
       · ihave #HW := pd_tbl4 $$ HS HD
         ihave #HC := pd_cstr_pdS4 $$ HS HD
-        iapply (pd_tbl_arm PK k γpr γl γd hnoff hK hpr huart i hi 4#32 0x80007770#64 0x80007260#64
+        iapply (pd_tbl_arm PK k γpr γl γd hnoff hK hpr huart i hi 4#32 (KA.«states_0» + 0x20#64) KStr.«run   »
           pdS4Str (by bv_decide) (by decide) dqs dqp dqn pid nm hnm bs' spie spp _ R ?a40
           ?a49 ?a413 ?a415 ?a418 ?a420 ?a421 ?a423 cur c5 hpin5) $$ [- $Hk $Hpc]
         rotate_right 1
@@ -1101,7 +1106,7 @@ theorem pd_iter (PK : PRINTK) [CurCtx] (k : KCtx) (γpr γl : GName) (γd : Uart
         case a423 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h23
       · ihave #HW := pd_tbl5 $$ HS HD
         ihave #HC := pd_cstr_pdS5 $$ HS HD
-        iapply (pd_tbl_arm PK k γpr γl γd hnoff hK hpr huart i hi 5#32 0x80007778#64 0x80007268#64
+        iapply (pd_tbl_arm PK k γpr γl γd hnoff hK hpr huart i hi 5#32 (KA.«states_0» + 0x28#64) KStr.«zombie»
           pdS5Str (by bv_decide) (by decide) dqs dqp dqn pid nm hnm bs' spie spp _ R ?a50
           ?a59 ?a513 ?a515 ?a518 ?a520 ?a521 ?a523 cur c5 hpin5) $$ [- $Hk $Hpc]
         rotate_right 1
@@ -1134,16 +1139,16 @@ theorem pd_loop (PK : PRINTK) [CurCtx] (k : KCtx) (γpr γl : GName) (γd : Uart
     (hnoff : k.noff + 2 < 2 ^ 31) (hK : procdumpSlots ≤ k.avail)
     (hpr : "pr" ∉ k.locks) (huart : "uart1" ∉ k.locks) (fuel : Nat) :
     ∀ (i : Nat) (_ : NPROC - i = fuel + 1) (bs' : List (BitVec 8)) (spie spp : Bool) (R : RegMap)
-      (_ : R 9#5 = pName (procAddr i)) (_ : R 18#5 = 0x800183b8#64)
-      (_ : R 19#5 = 0x80007228#64) (_ : R 20#5 = 0x80007080#64) (_ : R 21#5 = 0x80007230#64)
-      (_ : R 22#5 = 5#64) (_ : R 23#5 = 0x80007750#64) (cur : CPU),
-    kctx cur (((k.withSpie spie spp).pushed 10).withRegs R) ∗ pcIs cur 0x80002468#64 ∗
+      (_ : R 9#5 = pName (procAddr i)) (_ : R 18#5 = (KA.«bcache» + 0x140#64))
+      (_ : R 19#5 = KStr.«???») (_ : R 20#5 = KStr.«\n») (_ : R 21#5 = KStr.«%d %s %s»)
+      (_ : R 22#5 = 5#64) (_ : R 23#5 = KA.«states_0») (cur : CPU),
+    kctx cur (((k.withSpie spie spp).pushed 10).withRegs R) ∗ pcIs cur (KA.«procdump» + 0x6e#64) ∗
     procdumpView ∗
     isLock γpr prLock "pr" (fun _ => emp) ∗ isTxLock γl γd ∗ uartSentSub γd bs' ∗
     wpNext k.sie k.proc cur (fun cpu' => iprop(∀ (spie2 spp2 : Bool) (R2 : RegMap) (cs : List (BitVec 8)),
       ⌜k.sie = false → spie2 = spie ∧ spp2 = spp⌝ -∗
       kctx cpu' (((k.withSpie spie2 spp2).pushed 10).withRegs R2) -∗
-      pcIs cpu' 0x80002488#64 -∗ ⌜pdKept R R2⌝ -∗
+      pcIs cpu' (KA.«procdump» + 0x8e#64) -∗ ⌜pdKept R R2⌝ -∗
       procdumpView -∗ uartSentSub γd (bs' ++ cs) -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cur := by
   induction fuel with
@@ -1206,7 +1211,7 @@ theorem pd_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
     (h24 : R 24#5 = k.regs 24#5) (h25 : R 25#5 = k.regs 25#5)
     (h26 : R 26#5 = k.regs 26#5) (h27 : R 27#5 = k.regs 27#5)
     (w9 : BitVec 64) :
-    kctx cur (((k.withSpie spie spp).pushed 10).withRegs R) ∗ pcIs cur 0x80002488#64 ∗
+    kctx cur (((k.withSpie spie spp).pushed 10).withRegs R) ∗ pcIs cur (KA.«procdump» + 0x8e#64) ∗
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) (k.regs 1#5) ∗
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) (k.regs 8#5) ∗
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFE8#64) 8 (DFrac.own 1) (k.regs 9#5) ∗
@@ -1225,49 +1230,49 @@ theorem pd_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
   iintro ⟨Hk, Hpc, F0, F1, F2, F3, F4, F5, F6, F7, F8, F9, HPhi⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK' : 10 ≤ (k.withSpie spie spp).avail := hK
-  k_step_gen (wp_s_ld cur _ 0x80002488#64 true 72#12 1#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld cur _ (KA.«procdump» + 0x8e#64) true 72#12 1#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 1#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c1 hq1
   iintro Hk Hpc F0
-  k_step_gen (wp_s_ld c1 _ 0x8000248a#64 true 64#12 8#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c1 _ (KA.«procdump» + 0x90#64) true 64#12 8#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 8#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c2 hq2
   iintro Hk Hpc F1
-  k_step_gen (wp_s_ld c2 _ 0x8000248c#64 true 56#12 9#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c2 _ (KA.«procdump» + 0x92#64) true 56#12 9#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 9#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c3 hq3
   iintro Hk Hpc F2
-  k_step_gen (wp_s_ld c3 _ 0x8000248e#64 true 48#12 18#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c3 _ (KA.«procdump» + 0x94#64) true 48#12 18#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 18#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c4 hq4
   iintro Hk Hpc F3
-  k_step_gen (wp_s_ld c4 _ 0x80002490#64 true 40#12 19#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c4 _ (KA.«procdump» + 0x96#64) true 40#12 19#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 19#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c5 hq5
   iintro Hk Hpc F4
-  k_step_gen (wp_s_ld c5 _ 0x80002492#64 true 32#12 20#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c5 _ (KA.«procdump» + 0x98#64) true 32#12 20#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 20#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c6 hq6
   iintro Hk Hpc F5
-  k_step_gen (wp_s_ld c6 _ 0x80002494#64 true 24#12 21#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c6 _ (KA.«procdump» + 0x9a#64) true 24#12 21#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 21#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c7 hq7
   iintro Hk Hpc F6
-  k_step_gen (wp_s_ld c7 _ 0x80002496#64 true 16#12 22#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c7 _ (KA.«procdump» + 0x9c#64) true 16#12 22#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 22#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c8 hq8
   iintro Hk Hpc F7
-  k_step_gen (wp_s_ld c8 _ 0x80002498#64 true 8#12 23#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c8 _ (KA.«procdump» + 0x9e#64) true 8#12 23#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 23#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c9 hq9
   iintro Hk Hpc F8
   ihave Hstack : stackOwn (k.regs 2#5) 10 $$ [F0 F1 F2 F3 F4 F5 F6 F7 F8 F9]
   case' _ => stack_cells; iframe
-  k_step_gen (wp_s_pop c9 _ 0x8000249a#64 true 80#12 10 pd_imm_p80)
+  k_step_gen (wp_s_pop c9 _ (KA.«procdump» + 0xa0#64) true 80#12 10 pd_imm_p80)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK', hR2] next c10 hq10
   iintro Hk Hpc
-  k_step_gen (wp_s_ret c10 _ 0x8000249c#64 true 1#5)
+  k_step_gen (wp_s_ret c10 _ (KA.«procdump» + 0xa2#64) true 1#5)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c11 hq11
   iintro Hk Hpc
   have hpinZ : k.sie = false ∨ k.proc = 0#64 → c11 = cpu := fun h =>
@@ -1288,12 +1293,24 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 
 /-! ## The function -/
 
+theorem procdump_br_4e36 : KA.«procdump» + 0x4e36#64 = KStr.«%d %s %s» := by decide
+
+theorem procdump_br_4e2e : KA.«procdump» + 0x4e2e#64 = KStr.«???» := by decide
+
+theorem procdump_br_15fbe : KA.«procdump» + 0x15fbe#64 = (KA.«bcache» + 0x140#64) := by decide
+
+theorem procdump_br_4c86 : KA.«procdump» + 0x4c86#64 = KStr.«\n» := by decide
+
+theorem procdump_br_5356 : KA.«procdump» + 0x5356#64 = KA.«states_0» := by decide
+
+theorem procdump_br_105be : KA.«procdump» + 0x105be#64 = (KA.«proc» + 0x158#64) := by decide
+
 set_option maxHeartbeats 4000000 in
 /-- **`procdump` meets its specification.** -/
 theorem procdump_proof (PK : PRINTK) : PROCDUMP :=
   ⟨fun {hlc GF} _ _ _ cpu k γpr γl γd bs hK hnoff hpr huart => by
   unfold wp_procdump_body
-  simp only [procdumpAddr, KernelSyms.«procdump»]
+  simp only [procdumpAddr]
   iintro ⟨Hk, Hpc, #Hlk, #Htx, Hsent, Hview, HPhi⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -1301,54 +1318,54 @@ theorem procdump_proof (PK : PRINTK) : PROCDUMP :=
   icases kctx_kernelData _ _ $$ Hk with ⟨#HD, Hk⟩
   ihave #Hnl := pd_cstr_pdNl $$ HS HD
   have hK10 : 10 ≤ k.avail := by unfold procdumpSlots at hK; omega
-  have hret0 : jumpPc 0x8000241c#64 = 0x8000241c#64 := by simp only [jumpPc, BitVec.reduceAnd]
+  have hret0 : jumpPc (KA.«procdump» + 0x22#64) = (KA.«procdump» + 0x22#64) := by decide
   k_norm_g
   -- the prologue
-  k_step_gen (wp_s_push cpu _ 0x800023fa#64 true 4016#12 10 hK10 pd_imm_m80)
+  k_step_gen (wp_s_push cpu _ KA.«procdump» true 4016#12 10 hK10 pd_imm_m80)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c1 hp1
   iintro Hk Hpc Hframe
   irevert Hframe
   stack_cells
   iintro ⟨⟨%w0, F0⟩, ⟨%w1, F1⟩, ⟨%w2, F2⟩, ⟨%w3, F3⟩, ⟨%w4, F4⟩, ⟨%w5, F5⟩, ⟨%w6, F6⟩,
     ⟨%w7, F7⟩, ⟨%w8, F8⟩, ⟨%w9, F9⟩, _⟩
-  k_step_gen (wp_s_sd c1 _ 0x800023fc#64 true 72#12 2#5 1#5 (by decide) w0)
+  k_step_gen (wp_s_sd c1 _ (KA.«procdump» + 0x2#64) true 72#12 2#5 1#5 (by decide) w0)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c2 hp2
   iintro Hk Hpc F0
-  k_step_gen (wp_s_sd c2 _ 0x800023fe#64 true 64#12 2#5 8#5 (by decide) w1)
+  k_step_gen (wp_s_sd c2 _ (KA.«procdump» + 0x4#64) true 64#12 2#5 8#5 (by decide) w1)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
   iintro Hk Hpc F1
-  k_step_gen (wp_s_sd c3 _ 0x80002400#64 true 56#12 2#5 9#5 (by decide) w2)
+  k_step_gen (wp_s_sd c3 _ (KA.«procdump» + 0x6#64) true 56#12 2#5 9#5 (by decide) w2)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hp4
   iintro Hk Hpc F2
-  k_step_gen (wp_s_sd c4 _ 0x80002402#64 true 48#12 2#5 18#5 (by decide) w3)
+  k_step_gen (wp_s_sd c4 _ (KA.«procdump» + 0x8#64) true 48#12 2#5 18#5 (by decide) w3)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c5 hp5
   iintro Hk Hpc F3
-  k_step_gen (wp_s_sd c5 _ 0x80002404#64 true 40#12 2#5 19#5 (by decide) w4)
+  k_step_gen (wp_s_sd c5 _ (KA.«procdump» + 0xa#64) true 40#12 2#5 19#5 (by decide) w4)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c6 hp6
   iintro Hk Hpc F4
-  k_step_gen (wp_s_sd c6 _ 0x80002406#64 true 32#12 2#5 20#5 (by decide) w5)
+  k_step_gen (wp_s_sd c6 _ (KA.«procdump» + 0xc#64) true 32#12 2#5 20#5 (by decide) w5)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c7 hp7
   iintro Hk Hpc F5
-  k_step_gen (wp_s_sd c7 _ 0x80002408#64 true 24#12 2#5 21#5 (by decide) w6)
+  k_step_gen (wp_s_sd c7 _ (KA.«procdump» + 0xe#64) true 24#12 2#5 21#5 (by decide) w6)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c8 hp8
   iintro Hk Hpc F6
-  k_step_gen (wp_s_sd c8 _ 0x8000240a#64 true 16#12 2#5 22#5 (by decide) w7)
+  k_step_gen (wp_s_sd c8 _ (KA.«procdump» + 0x10#64) true 16#12 2#5 22#5 (by decide) w7)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c9 hp9
   iintro Hk Hpc F7
-  k_step_gen (wp_s_sd c9 _ 0x8000240c#64 true 8#12 2#5 23#5 (by decide) w8)
+  k_step_gen (wp_s_sd c9 _ (KA.«procdump» + 0x12#64) true 8#12 2#5 23#5 (by decide) w8)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c10 hp10
   iintro Hk Hpc F8
-  k_step_gen (wp_s_addi c10 _ 0x8000240e#64 true 80#12 8#5 2#5 (by decide))
+  k_step_gen (wp_s_addi c10 _ (KA.«procdump» + 0x14#64) true 80#12 8#5 2#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c11 hp11
   iintro Hk Hpc
-  k_step_gen (wp_s_auipc c11 _ 0x80002410#64 false 5#20 10#5 (by decide))
+  k_step_gen (wp_s_auipc c11 _ (KA.«procdump» + 0x16#64) false 5#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c12 hp12
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c12 _ 0x80002414#64 false 3184#12 10#5 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pd_nl_addr] next c13 hp13
+  k_step_gen (wp_s_addi c12 _ (KA.«procdump» + 0x1a#64) false 3184#12 10#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [procdump_br_4c86, pd_nl_addr] next c13 hp13
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c13 _ 0x80002418#64 false 2089230#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c14 hp14
+  k_step_gen (wp_s_jal c13 _ (KA.«procdump» + 0x1e#64) false 2089230#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [procdump_br_ffffffffffffe12c] next c14 hp14
   iintro Hk Hpc
   -- printk("\n")
   iapply (pd_printk0 PK c14 _ γpr γl γd bs DFrac.discard pdNlStr
@@ -1370,46 +1387,46 @@ theorem procdump_proof (PK : PRINTK) : PROCDUMP :=
   k_norm_g at hcs1
   obtain ⟨⟨b2, b8, b9, b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩, -⟩ := hcs1
   -- the cursor set-up
-  k_step_gen (wp_s_auipc d0 _ 0x8000241c#64 false 16#20 9#5 (by decide))
+  k_step_gen (wp_s_auipc d0 _ (KA.«procdump» + 0x22#64) false 16#20 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next d1 hd1
   iintro Hk Hpc
-  k_step_gen (wp_s_addi d1 _ 0x80002420#64 false 1436#12 9#5 9#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pd_s1_addr] next d2 hd2
+  k_step_gen (wp_s_addi d1 _ (KA.«procdump» + 0x26#64) false 1436#12 9#5 9#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [procdump_br_105be, pd_s1_addr] next d2 hd2
   iintro Hk Hpc
-  k_step_gen (wp_s_auipc d2 _ 0x80002424#64 false 22#20 18#5 (by decide))
+  k_step_gen (wp_s_auipc d2 _ (KA.«procdump» + 0x2a#64) false 22#20 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next d3 hd3
   iintro Hk Hpc
-  k_step_gen (wp_s_addi d3 _ 0x80002428#64 false 3988#12 18#5 18#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pd_s2_addr] next d4 hd4
+  k_step_gen (wp_s_addi d3 _ (KA.«procdump» + 0x2e#64) false 3988#12 18#5 18#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [procdump_br_15fbe, pd_s2_addr] next d4 hd4
   iintro Hk Hpc
-  k_step_gen (wp_s_addi d4 _ 0x8000242c#64 true 5#12 22#5 0#5 (by decide))
+  k_step_gen (wp_s_addi d4 _ (KA.«procdump» + 0x32#64) true 5#12 22#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next d5 hd5
   iintro Hk Hpc
-  k_step_gen (wp_s_auipc d5 _ 0x8000242e#64 false 5#20 19#5 (by decide))
+  k_step_gen (wp_s_auipc d5 _ (KA.«procdump» + 0x34#64) false 5#20 19#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next d6 hd6
   iintro Hk Hpc
-  k_step_gen (wp_s_addi d6 _ 0x80002432#64 false 3578#12 19#5 19#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pd_s3_addr] next d7 hd7
+  k_step_gen (wp_s_addi d6 _ (KA.«procdump» + 0x38#64) false 3578#12 19#5 19#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [procdump_br_4e2e, pd_s3_addr] next d7 hd7
   iintro Hk Hpc
-  k_step_gen (wp_s_auipc d7 _ 0x80002436#64 false 5#20 21#5 (by decide))
+  k_step_gen (wp_s_auipc d7 _ (KA.«procdump» + 0x3c#64) false 5#20 21#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next d8 hd8
   iintro Hk Hpc
-  k_step_gen (wp_s_addi d8 _ 0x8000243a#64 false 3578#12 21#5 21#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pd_s5_addr] next d9 hd9
+  k_step_gen (wp_s_addi d8 _ (KA.«procdump» + 0x40#64) false 3578#12 21#5 21#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [procdump_br_4e36, pd_s5_addr] next d9 hd9
   iintro Hk Hpc
-  k_step_gen (wp_s_auipc d9 _ 0x8000243e#64 false 5#20 20#5 (by decide))
+  k_step_gen (wp_s_auipc d9 _ (KA.«procdump» + 0x44#64) false 5#20 20#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next d10 hd10
   iintro Hk Hpc
-  k_step_gen (wp_s_addi d10 _ 0x80002442#64 false 3138#12 20#5 20#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pd_s4_addr] next d11 hd11
+  k_step_gen (wp_s_addi d10 _ (KA.«procdump» + 0x48#64) false 3138#12 20#5 20#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [procdump_br_4c86, pd_s4_addr] next d11 hd11
   iintro Hk Hpc
-  k_step_gen (wp_s_auipc d11 _ 0x80002446#64 false 5#20 23#5 (by decide))
+  k_step_gen (wp_s_auipc d11 _ (KA.«procdump» + 0x4c#64) false 5#20 23#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next d12 hd12
   iintro Hk Hpc
-  k_step_gen (wp_s_addi d12 _ 0x8000244a#64 false 778#12 23#5 23#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pd_s7_addr] next d13 hd13
+  k_step_gen (wp_s_addi d12 _ (KA.«procdump» + 0x50#64) false 778#12 23#5 23#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [procdump_br_5356, pd_s7_addr] next d13 hd13
   iintro Hk Hpc
-  k_step_gen (wp_s_j d13 _ 0x8000244e#64 true 26#21)
+  k_step_gen (wp_s_j d13 _ (KA.«procdump» + 0x54#64) true 26#21)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next d14 hd14
   iintro Hk Hpc
   -- the scan

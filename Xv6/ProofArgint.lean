@@ -25,8 +25,8 @@ set_option linter.unusedVariables false
 /-! ## Constants and register bookkeeping -/
 
 /-- `argraw` returns to `0x8000292e`. -/
-theorem ai_ret_2870 : jumpPc 0x8000292e#64 = 0x8000292e#64 := by
-  simp only [jumpPc, BitVec.reduceAnd]
+theorem ai_ret_2870 : jumpPc (KA.«argint» + 0x10#64) = (KA.«argint» + 0x10#64) := by
+  decide
 
 /-- The callee-saved registers `s2..s11`, pinned to the entry map. -/
 def aiPins (k : KCtx) (R : RegMap) : Prop :=
@@ -60,7 +60,7 @@ theorem ai_argraw (AR : ARGRAW) (c : CPU) (k' : KCtx) (i : Nat) (tfp : BitVec 44
     (ws : List (BitVec 64)) (v : BitVec 64) (dqt : DFrac)
     (hi : i < NARG) (ha0 : k'.regs 10#5 = BitVec.ofNat 64 i) (hws : ws[tfArgIdx i]? = some v)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : argrawSlots ≤ k'.avail) :
-    kctx c k' ∗ pcIs c 0x80002832#64 ∗
+    kctx c k' ∗ pcIs c KA.«argraw» ∗
     wordPointsTo (pTrapframe k'.proc) 8 dqt (pageAddr tfp) ∗ tfPageAt tfp ws ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
@@ -70,17 +70,17 @@ theorem ai_argraw (AR : ARGRAW) (c : CPU) (k' : KCtx) (i : Nat) (tfp : BitVec 44
     ⊢ wpLoop (GF := GF) c := by
   have h := AR.wp_argraw (hlc := hlc) (GF := GF) c k' i tfp ws v dqt hi ha0 hws hnoff hK
   unfold wp_argraw_body at h
-  simp only [argrawAddr, KernelSyms.«argraw»] at h
+  simp only [argrawAddr] at h
   exact h
 
-/-! ## The epilogue at `0x80002930` -/
+/-! ## The epilogue at `(KernelSyms.«argint» + 0x12)` -/
 
 set_option maxHeartbeats 4000000 in
 theorem ai_tail (c : CPU) (kb : KCtx) (hK : 4 ≤ kb.avail)
     (KR : RegMap) (hregs : kb.regs = KR)
     (R : RegMap) (hR2 : R 2#5 = KR 2#5 + 0xFFFFFFFFFFFFFFE0#64)
     (hcs : calleeSaved KR (((R.set 2#5 (KR 2#5)).set 8#5 (KR 8#5)).set 9#5 (KR 9#5))) :
-    kctx c ((kb.pushed 4).withRegs R) ∗ pcIs c 0x80002930#64 ∗
+    kctx c ((kb.pushed 4).withRegs R) ∗ pcIs c (KA.«argint» + 0x12#64) ∗
     frame4s1 (KR 2#5) (KR 1#5) (KR 8#5) (KR 9#5) ∗
     wpNext kb.sie kb.proc c (fun cpu' => iprop(∀ R'' : RegMap,
       kctx cpu' (kb.withRegs R'') -∗ pcIs cpu' (jumpPc (KR 1#5)) -∗
@@ -89,7 +89,7 @@ theorem ai_tail (c : CPU) (kb : KCtx) (hK : 4 ≤ kb.avail)
   subst hregs
   iintro ⟨Hk, Hpc, Hframe, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
-  iapply (wp_epilogue4s1_gen c kb 0x80002930#64 hK R hR2 (kb.regs 1#5) (kb.regs 8#5) (kb.regs 9#5))
+  iapply (wp_epilogue4s1_gen c kb (KA.«argint» + 0x12#64) hK R hR2 (kb.regs 1#5) (kb.regs 8#5) (kb.regs 9#5))
     $$ [- $Hk $Hpc $Hframe]
   k_code (text_instr _ _ _ _ rfl rfl) HT
   k_norm_g
@@ -112,7 +112,7 @@ theorem ai_exit (cpu cr : CPU) (k : KCtx) (tfp : BitVec 44) (ws : List (BitVec 6
     (hpin : k.sie = false ∨ k.proc = 0#64 → cr = cpu)
     (spie spp : Bool) (hsp : k.sie = false → spie = k.spie ∧ spp = k.spp)
     (R : RegMap) (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64) (hpins : aiPins k R) :
-    kctx cr (((k.withSpie spie spp).pushed 4).withRegs R) ∗ pcIs cr 0x80002930#64 ∗
+    kctx cr (((k.withSpie spie spp).pushed 4).withRegs R) ∗ pcIs cr (KA.«argint» + 0x12#64) ∗
     frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
     wordPointsTo (pTrapframe k.proc) 8 dqt (pageAddr tfp) ∗ tfPageAt tfp ws ∗
     wordPointsTo (k.regs 11#5) 4 (DFrac.own 1) (BitVec.extractLsb' 0 32 v) ∗
@@ -142,17 +142,19 @@ end
 
 /-! ## The function -/
 
+theorem argint_br_ffffffffffffff14 : KA.«argint» + 0xffffffffffffff14#64 = KA.«argraw» := by decide
+
 set_option maxHeartbeats 8000000 in
 theorem argint_proof (MP : MYPROC) (AR : ARGRAW) : ARGINT := ⟨
   fun {hlc GF} _ _ _ cpu k i tfp ws v old dqt hi ha0 hws hnoff hK => by
   unfold wp_argint_body
-  simp only [argintAddr, KernelSyms.«argint»]
+  simp only [argintAddr]
   iintro ⟨Hk, Hpc, Htf, Hpage, Hcell, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   unfold argintSlots argrawSlots at hK
   have hK4 : 4 ≤ k.avail := by omega
   -- the prologue
-  iapply (wp_prologue4s1_gen cpu k 0x8000291e#64 hK4)
+  iapply (wp_prologue4s1_gen cpu k KA.«argint» hK4)
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm_g
   iframe
@@ -160,11 +162,11 @@ theorem argint_proof (MP : MYPROC) (AR : ARGRAW) : ARGINT := ⟨
   iapply wpNext_intro_pin
   iintro %c1 %hp1 Hk Hpc Hframe
   -- c.mv s1,a1 ; jal argraw
-  k_step_gen (wp_s_add c1 _ 0x80002928#64 true 9#5 0#5 11#5 (by decide))
+  k_step_gen (wp_s_add c1 _ (KA.«argint» + 0xa#64) true 9#5 0#5 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c2 hp2
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c2 _ 0x8000292a#64 false 2096904#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
+  k_step_gen (wp_s_jal c2 _ (KA.«argint» + 0xc#64) false 2096904#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [argint_br_ffffffffffffff14] next c3 hp3
   iintro Hk Hpc
   iapply (ai_argraw AR c3 _ i tfp ws v dqt hi ?ha0 hws ?hnoff ?hKa) $$ [- $Hk $Hpc]
   rotate_right 1
@@ -183,7 +185,7 @@ theorem argint_proof (MP : MYPROC) (AR : ARGRAW) : ARGINT := ⟨
   have q0 : k.sie = false ∨ k.proc = 0#64 → cm = cpu :=
     fun h => (hpm h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))
   -- c.sw a0,0(s1)
-  k_step_gen (wp_s_sw cm _ 0x8000292e#64 true 0#12 9#5 10#5 (by decide) old)
+  k_step_gen (wp_s_sw cm _ (KA.«argint» + 0x10#64) true 0#12 9#5 10#5 (by decide) old)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [b9, hv] next c4 hp4
   iintro Hk Hpc Hcell
   -- the epilogue

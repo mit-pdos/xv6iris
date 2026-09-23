@@ -18,12 +18,19 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
+/-- The addresses `_entry` materialises: the GOT slot holding `&stack0`
+(`auipc sp,0xa; ld sp,792(sp)`) and the `jal start` target. -/
+theorem entry_br_got : KA.«_entry» + 0xa318#64 = KA.«_GLOBAL_OFFSET_TABLE_» + 8#64 := by decide
+theorem entry_br_start : KA.«_entry» + 0x58#64 = KA.«start» := by decide
+/-- The return address of the `jal`: the `spin` label. -/
+theorem entry_br_spin : KA.«_entry» + 0x1a#64 = KA.«spin» := by decide
+
 /-- Normalise the literal arithmetic an instruction rule leaves behind
 (next `PC`, immediates) and the register cells it is stated over. -/
 macro "entry_norm" : tactic =>
   `(tactic| try simp only [gpr_x1, gpr_x2, gpr_x10, gpr_x11, instrLen, BitVec.reduceAdd,
-      BitVec.reduceSignExtend, BitVec.reduceAppend, BitVec.reduceMul, KernelSyms.«_entry», startAddr,
-      KernelSyms.«start», stack0Slot, BitVec.reduceOfNat])
+      BitVec.reduceSignExtend, BitVec.reduceAppend, BitVec.reduceMul, BitVec.add_assoc, startAddr,
+      stack0Slot, entry_br_got, entry_br_start, entry_br_spin, BitVec.reduceOfNat, BitVec.ofNat_add, k_addr])
 
 set_option hygiene false in
 /-- One instruction: apply its rule, frame the resources, prove the rule's
@@ -49,7 +56,7 @@ theorem EntryProof : ENTRY where
     iintro HmBoot Hclock Hpc Hx2
     entry_norm
     -- 80000004: ld sp, 600(sp)
-    entry_step wp_m_ld_same cpu dq dq bootConf bootConf_ok _ false 792#12 2#5 (by decide) 0x8000a000#64 s0
+    entry_step wp_m_ld_same cpu dq dq bootConf bootConf_ok _ false 792#12 2#5 (by decide) (KA.«_entry» + 0xa000#64) s0
     iintro HmBoot Hclock Hpc Hx2 Htok Hslot
     entry_norm
     -- 80000008: c.lui a0, 0x1
@@ -73,7 +80,7 @@ theorem EntryProof : ENTRY where
     iintro HmBoot Hclock Hpc Hx2 Hx10
     entry_norm
     -- 80000016: jal start
-    entry_step wp_m_jal cpu dq bootConf bootConf_ok 0x80000016#64 false 66#21 1#5 (by decide) v1
+    entry_step wp_m_jal cpu dq bootConf bootConf_ok (KA.«_entry» + 0x16#64) false 66#21 1#5 (by decide) v1
     iintro HmBoot Hclock Hpc Hx1
     entry_norm
     iapply HΦ $$ HmBoot Hmhartid Hclock Htok Hslot Hpc Hx1 Hx2 Hx10 Hx11

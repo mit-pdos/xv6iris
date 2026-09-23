@@ -26,13 +26,13 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
-def filecloseAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«fileclose»
-def beginOpAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«begin_op»
-def endOpAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«end_op»
-def iputAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«iput»
-def nameiAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«namei»
-def filedupAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«filedup»
-def idupAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«idup»
+def filecloseAddr : BitVec 64 := KA.«fileclose»
+def beginOpAddr : BitVec 64 := KA.«begin_op»
+def endOpAddr : BitVec 64 := KA.«end_op»
+def iputAddr : BitVec 64 := KA.«iput»
+def nameiAddr : BitVec 64 := KA.«namei»
+def filedupAddr : BitVec 64 := KA.«filedup»
+def idupAddr : BitVec 64 := KA.«idup»
 
 /-- The stack an fs entry point may use (assumed). -/
 def fsSlots : Nat := 64

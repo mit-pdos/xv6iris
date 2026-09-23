@@ -25,7 +25,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `kalloc`. -/
-def kallocAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«kalloc»
+def kallocAddr : BitVec 64 := KA.«kalloc»
 
 /-- What `kalloc` returns in `a0`: `0` only if the count, if tracked, was
 zero; otherwise a valid page filled with `5`s, the count down by one. -/

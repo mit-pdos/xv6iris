@@ -20,8 +20,8 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
-def procPagetableAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«proc_pagetable»
-def procFreepagetableAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«proc_freepagetable»
+def procPagetableAddr : BitVec 64 := KA.«proc_pagetable»
+def procFreepagetableAddr : BitVec 64 := KA.«proc_freepagetable»
 def procPagetableSlots : Nat := 40
 /-- The nodes of a fresh table (root and the two nodes of the top page's path). -/
 def procPagetableNodes : Nat := 3

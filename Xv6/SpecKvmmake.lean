@@ -29,7 +29,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `kvmmake`. -/
-def kvmmakeAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«kvmmake»
+def kvmmakeAddr : BitVec 64 := KA.«kvmmake»
 
 /-- The pure facts of the table `kvmmake` returns. -/
 def kvmTableOk (t : PTree) (pas : Nat → BitVec 44) : Prop :=

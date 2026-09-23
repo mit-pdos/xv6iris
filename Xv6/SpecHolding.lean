@@ -33,7 +33,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `holding`. -/
-def holdingAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«holding»
+def holdingAddr : BitVec 64 := KA.«holding»
 
 /-- **WP of `holding`, not held by the caller.**  `lk` in `a0`; returns 0. -/
 def wp_holding_notheld_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]

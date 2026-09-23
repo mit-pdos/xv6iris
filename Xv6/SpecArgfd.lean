@@ -27,7 +27,7 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
-def argfdAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«argfd»
+def argfdAddr : BitVec 64 := KA.«argfd»
 
 /-- argfd's 6-slot frame over argint's 18 (`myproc`'s 10 fits under). -/
 def argfdSlots : Nat := 6 + argintSlots

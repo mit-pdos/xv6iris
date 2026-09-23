@@ -9,8 +9,8 @@ import Xv6.ProofUvmcopy
 namespace Xv6
 
 /-- The proved `uvmcopy` interface, given its callees. -/
-theorem Uvmcopy (W : WALK_NOALLOC) (KA : KALLOC) (KF : KFREE) (MM : MEMMOVE)
+theorem Uvmcopy (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (MM : MEMMOVE)
     (MA : MAPPAGES_ANY) (UM : UVMUNMAP) : UVMCOPY :=
-  uvmcopy_proof W KA KF MM MA UM
+  uvmcopy_proof W KAL KF MM MA UM
 
 end Xv6

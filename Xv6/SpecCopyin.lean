@@ -19,7 +19,7 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
-def copyinAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«copyin»
+def copyinAddr : BitVec 64 := KA.«copyin»
 
 def wp_copyin_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (P : UPtd) (M : Nat → List (BitVec 8))

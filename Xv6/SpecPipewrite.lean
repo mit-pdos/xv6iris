@@ -43,7 +43,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `pipewrite`. -/
-def pipewriteAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«pipewrite»
+def pipewriteAddr : BitVec 64 := KA.«pipewrite»
 
 /-- pipewrite's 14-slot frame over copyin's 50. -/
 def pipewriteSlots : Nat := 64

@@ -24,11 +24,11 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `kvminithart`. -/
-def kvminithartAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«kvminithart»
+def kvminithartAddr : BitVec 64 := KA.«kvminithart»
 
 /-- The global `kernel_pagetable` (kernel/vm.c; the `ld a5,904(a5)` at
 `kvminithart+0x10` reads it). -/
-def kernelPagetableAddr : BitVec 64 := 0x8000a338#64
+def kernelPagetableAddr : BitVec 64 := KA.«kernel_pagetable»
 
 /-- **WP of `kvminithart`.**  `rootAddr` is the table's physical address
 (page-aligned, in RAM: `rootAddr = root ≪ 12`), `t` the installed table. -/

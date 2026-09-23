@@ -19,7 +19,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `devintr`. -/
-def devintrAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«devintr»
+def devintrAddr : BitVec 64 := KA.«devintr»
 
 /-- devintr's result for a supervisor interrupt: `1` for an external one,
 `2` for the timer. -/

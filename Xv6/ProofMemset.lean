@@ -116,11 +116,11 @@ theorem memset_iter {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
     (i : Nat) (hi : i < n) (R : RegMap)
     (h11 : R 11#5 = cv) (h14 : R 14#5 = d + BitVec.ofNat 64 n)
     (h15 : R 15#5 = d + BitVec.ofNat 64 i) :
-    kctx cpu (kb.withRegs R) ∗ pcIs cpu 0x80000d2c#64 ∗
+    kctx cpu (kb.withRegs R) ∗ pcIs cpu (KA.«memset» + 0x14#64) ∗
     byteBuf d (DFrac.own 1) (mixS (BitVec.extractLsb' 0 8 cv) olds i) ∗
     wpNext kb.sie kb.proc cpu (fun cpu' => iprop(
       kctx cpu' (kb.withRegs (R.set 15#5 (d + BitVec.ofNat 64 i + 1#64))) -∗
-      pcIs cpu' (if i + 1 = n then 0x80000d36#64 else 0x80000d2c#64) -∗
+      pcIs cpu' (if i + 1 = n then (KA.«memset» + 0x1e#64) else (KA.«memset» + 0x14#64)) -∗
       byteBuf d (DFrac.own 1) (mixS (BitVec.extractLsb' 0 8 cv) olds (i + 1)) -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hdst, HΦ⟩
@@ -128,7 +128,7 @@ theorem memset_iter {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
   obtain ⟨o, ho⟩ := mixS_get_self (BitVec.extractLsb' 0 8 cv) olds i (by omega)
   -- sb a1,0(a5)
   icases byteBuf_upd d (mixS (BitVec.extractLsb' 0 8 cv) olds i) i o ho $$ Hdst with ⟨Ho, Hclose⟩
-  k_step_gen (wp_s_sb cpu _ 0x80000d2c#64 false 0#12 15#5 11#5 (by decide) o) from (text_instr _ _ _ _ rfl rfl) HT
+  k_step_gen (wp_s_sb cpu _ (KA.«memset» + 0x14#64) false 0#12 15#5 11#5 (by decide) o) from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc] with [h11, h15] next c1 hp1
   iintro Hk Hpc Ho
   ihave Hdst := Hclose $$ %_ Ho
@@ -137,11 +137,11 @@ theorem memset_iter {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
       byteBuf d (DFrac.own 1) (mixS (BitVec.extractLsb' 0 8 cv) olds (i + 1)) by
     rw [mixS_set _ olds i (by omega)]) $$ Hdst
   -- addi a5,a5,1
-  k_step_gen (wp_s_addi c1 _ 0x80000d30#64 true 1#12 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT
+  k_step_gen (wp_s_addi c1 _ (KA.«memset» + 0x18#64) true 1#12 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc] with [h15] next c2 hp2
   iintro Hk Hpc
   -- bne a5,a4,c8e
-  k_step_gen (wp_s_branch c2 _ 0x80000d32#64 false 8186#13 15#5 14#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) HT
+  k_step_gen (wp_s_branch c2 _ (KA.«memset» + 0x1a#64) false 8186#13 15#5 14#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc] with [h14, ite_bne_eq_ms, add_succ_eq_iff_ms d i n (by omega) hn32] next c3 hp3
   iintro Hk Hpc
   ihave HΦ' := wpNext_at _ _ _ c3 _ (fun h => (hp3 h).trans ((hp2 h).trans (hp1 h))) $$ HΦ
@@ -159,10 +159,10 @@ theorem memset_loop {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
     ∀ (i : Nat) (_ : n - i = c + 1) (R : RegMap)
       (_ : R 11#5 = cv) (_ : R 14#5 = d + BitVec.ofNat 64 n) (_ : R 15#5 = d + BitVec.ofNat 64 i)
       (cpu : CPU),
-    kctx cpu (kb.withRegs R) ∗ pcIs cpu 0x80000d2c#64 ∗
+    kctx cpu (kb.withRegs R) ∗ pcIs cpu (KA.«memset» + 0x14#64) ∗
     byteBuf d (DFrac.own 1) (mixS (BitVec.extractLsb' 0 8 cv) olds i) ∗
     wpNext kb.sie kb.proc cpu (fun cpu' => iprop(∀ R' : RegMap,
-      kctx cpu' (kb.withRegs R') -∗ pcIs cpu' 0x80000d36#64 -∗
+      kctx cpu' (kb.withRegs R') -∗ pcIs cpu' (KA.«memset» + 0x1e#64) -∗
       byteBuf d (DFrac.own 1) (List.replicate n (BitVec.extractLsb' 0 8 cv)) -∗
       ⌜∀ r, r ≠ 15#5 → R' r = R r⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cpu := by
@@ -216,7 +216,7 @@ theorem memset_finish {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Cur
     (h10 : R' 10#5 = k.regs 10#5)
     (hcs : ∀ r : BitVec 5, r ≠ 2#5 → r ≠ 8#5 → r ≠ 10#5 → r ≠ 11#5 → r ≠ 12#5 → r ≠ 14#5 → r ≠ 15#5 →
       R' r = k.regs r) :
-    kctx c ((k.pushed 2).withRegs R') ∗ pcIs c 0x80000d36#64 ∗
+    kctx c ((k.pushed 2).withRegs R') ∗ pcIs c (KA.«memset» + 0x1e#64) ∗
     frame2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) ∗
     byteBuf (k.regs 10#5) (DFrac.own 1) (List.replicate n (BitVec.extractLsb' 0 8 (k.regs 11#5))) ∗
     wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ R'' : RegMap,
@@ -226,7 +226,7 @@ theorem memset_finish {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Cur
     ⊢ wpLoop (GF := GF) c := by
   iintro ⟨Hk, Hpc, Hframe, Hdst, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
-  iapply (wp_epilogue2_gen c k 0x80000d36#64 hK R' hR2 (k.regs 1#5) (k.regs 8#5)) $$ [- $Hk $Hpc]
+  iapply (wp_epilogue2_gen c k (KA.«memset» + 0x1e#64) hK R' hR2 (k.regs 1#5) (k.regs 8#5)) $$ [- $Hk $Hpc]
   k_code (text_instr _ _ _ _ rfl rfl) HT
   k_norm_g
   iframe
@@ -259,10 +259,10 @@ theorem memset_proof : MEMSET := ⟨fun {hlc GF} _ _ cpu k olds n hK hn hn32 hl 
   unfold wp_memset_body
   iintro ⟨Hk, Hpc, Hdst, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  simp only [memsetAddr, KernelSyms.«memset»]
+  simp only [memsetAddr]
   k_norm_g
   -- prologue
-  iapply (wp_prologue2_gen cpu k 0x80000d18#64 hK)
+  iapply (wp_prologue2_gen cpu k KA.«memset» hK)
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm_g
   iframe
@@ -270,7 +270,7 @@ theorem memset_proof : MEMSET := ⟨fun {hlc GF} _ _ cpu k olds n hK hn hn32 hl 
   iapply wpNext_intro_pin
   iintro %c1 %hp1 Hk Hpc Hframe
   -- beqz a2,c98
-  k_step_gen (wp_s_branch c1 _ 0x80000d20#64 true 22#13 12#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
+  k_step_gen (wp_s_branch c1 _ (KA.«memset» + 0x8#64) true 22#13 12#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc] with [hn, ite_beq_ofNat_ms n hn32] next c2 hp2
   iintro Hk Hpc
   have hpin2 : k.sie = false ∨ k.proc = 0#64 → c2 = cpu := fun h => (hp2 h).trans (hp1 h)
@@ -289,19 +289,19 @@ theorem memset_proof : MEMSET := ⟨fun {hlc GF} _ _ cpu k olds n hK hn hn32 hl 
     case hcs => intro r h2 h8 _ _ _ _ _; simp [RegMap.set_apply, h2, h8]
   · simp only [hn0, ite_false]
     -- mv a5,a0
-    k_step_gen (wp_s_add c2 _ 0x80000d22#64 true 15#5 0#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
+    k_step_gen (wp_s_add c2 _ (KA.«memset» + 0xa#64) true 15#5 0#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc] next c3 hp3
     iintro Hk Hpc
     -- slli a2,a2,32 ; srli a2,a2,32
-    k_step_gen (wp_s_slli c3 _ 0x80000d24#64 true 32#6 12#5 12#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
+    k_step_gen (wp_s_slli c3 _ (KA.«memset» + 0xc#64) true 32#6 12#5 12#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc] with [hn] next c4 hp4
     iintro Hk Hpc
-    k_step_gen (wp_s_srli c4 _ 0x80000d26#64 true 32#6 12#5 12#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
+    k_step_gen (wp_s_srli c4 _ (KA.«memset» + 0xe#64) true 32#6 12#5 12#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc] with [shl_shr32_ms n hn32] next c5 hp5
     iintro Hk Hpc
     -- add a4,a2,a0
     have hcomm : BitVec.ofNat 64 n + k.regs 10#5 = k.regs 10#5 + BitVec.ofNat 64 n := BitVec.add_comm _ _
-    k_step_gen (wp_s_add c5 _ 0x80000d28#64 false 14#5 12#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
+    k_step_gen (wp_s_add c5 _ (KA.«memset» + 0x10#64) false 14#5 12#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc] with [hcomm] next c6 hp6
     iintro Hk Hpc
     have hpin6 : k.sie = false ∨ k.proc = 0#64 → c6 = cpu :=
@@ -342,12 +342,12 @@ theorem memset_free_iter {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     (i : Nat) (hi : i < n) (R : RegMap)
     (h11 : R 11#5 = cv) (h14 : R 14#5 = d + BitVec.ofNat 64 n)
     (h15 : R 15#5 = d + BitVec.ofNat 64 i) :
-    kctx cpu (kb.withRegs R) ∗ pcIs cpu 0x80000d2c#64 ∗
+    kctx cpu (kb.withRegs R) ∗ pcIs cpu (KA.«memset» + 0x14#64) ∗
     byteBuf d (DFrac.own 1) (List.replicate i (BitVec.extractLsb' 0 8 cv)) ∗
     bytesFree (d + BitVec.ofNat 64 i) (olds.drop i) ∗
     wpNext kb.sie kb.proc cpu (fun cpu' => iprop(
       kctx cpu' (kb.withRegs (R.set 15#5 (d + BitVec.ofNat 64 i + 1#64))) -∗
-      pcIs cpu' (if i + 1 = n then 0x80000d36#64 else 0x80000d2c#64) -∗
+      pcIs cpu' (if i + 1 = n then (KA.«memset» + 0x1e#64) else (KA.«memset» + 0x14#64)) -∗
       byteBuf d (DFrac.own 1) (List.replicate (i + 1) (BitVec.extractLsb' 0 8 cv)) -∗
       bytesFree (d + BitVec.ofNat 64 (i + 1)) (olds.drop (i + 1)) -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cpu := by
@@ -356,7 +356,7 @@ theorem memset_free_iter {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
   -- peel the visibility-free byte at position i
   icases (bytesFree_drop_cons (d + BitVec.ofNat 64 i) olds i (by omega)).1 $$ Hsuf with ⟨Hbyte, Hsuf⟩
   -- sb a1,0(a5)
-  k_step_gen (wp_s_sb_free cpu _ 0x80000d2c#64 false 0#12 15#5 11#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT
+  k_step_gen (wp_s_sb_free cpu _ (KA.«memset» + 0x14#64) false 0#12 15#5 11#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc] with [h11, h15] next c1 hp1
   iintro Hk Hpc Hword
   -- normalise the store's output cell to the prefix slot's address/value
@@ -373,11 +373,11 @@ theorem memset_free_iter {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     (olds.drop (i + 1)) (by apply BitVec.eq_of_toNat_eq; simp only [BitVec.toNat_add, BitVec.toNat_ofNat]; omega)
     $$ Hsuf
   -- addi a5,a5,1
-  k_step_gen (wp_s_addi c1 _ 0x80000d30#64 true 1#12 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT
+  k_step_gen (wp_s_addi c1 _ (KA.«memset» + 0x18#64) true 1#12 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc] with [h15] next c2 hp2
   iintro Hk Hpc
   -- bne a5,a4,c8e
-  k_step_gen (wp_s_branch c2 _ 0x80000d32#64 false 8186#13 15#5 14#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) HT
+  k_step_gen (wp_s_branch c2 _ (KA.«memset» + 0x1a#64) false 8186#13 15#5 14#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc] with [h14, ite_bne_eq_ms, add_succ_eq_iff_ms d i n (by omega) hn32] next c3 hp3
   iintro Hk Hpc
   ihave HΦ' := wpNext_at _ _ _ c3 _ (fun h => (hp3 h).trans ((hp2 h).trans (hp1 h))) $$ HΦ
@@ -394,11 +394,11 @@ theorem memset_free_loop {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     ∀ (i : Nat) (_ : n - i = c + 1) (R : RegMap)
       (_ : R 11#5 = cv) (_ : R 14#5 = d + BitVec.ofNat 64 n) (_ : R 15#5 = d + BitVec.ofNat 64 i)
       (cpu : CPU),
-    kctx cpu (kb.withRegs R) ∗ pcIs cpu 0x80000d2c#64 ∗
+    kctx cpu (kb.withRegs R) ∗ pcIs cpu (KA.«memset» + 0x14#64) ∗
     byteBuf d (DFrac.own 1) (List.replicate i (BitVec.extractLsb' 0 8 cv)) ∗
     bytesFree (d + BitVec.ofNat 64 i) (olds.drop i) ∗
     wpNext kb.sie kb.proc cpu (fun cpu' => iprop(∀ R' : RegMap,
-      kctx cpu' (kb.withRegs R') -∗ pcIs cpu' 0x80000d36#64 -∗
+      kctx cpu' (kb.withRegs R') -∗ pcIs cpu' (KA.«memset» + 0x1e#64) -∗
       byteBuf d (DFrac.own 1) (List.replicate n (BitVec.extractLsb' 0 8 cv)) -∗
       ⌜∀ r, r ≠ 15#5 → R' r = R r⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cpu := by
@@ -446,10 +446,10 @@ theorem memset_free_proof : MEMSET_FREE := ⟨fun {hlc GF} _ _ cpu k olds n hK h
   unfold wp_memset_free_body
   iintro ⟨Hk, Hpc, Hsuf, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  simp only [memsetAddr, KernelSyms.«memset»]
+  simp only [memsetAddr]
   k_norm_g
   -- prologue
-  iapply (wp_prologue2_gen cpu k 0x80000d18#64 hK)
+  iapply (wp_prologue2_gen cpu k KA.«memset» hK)
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm_g
   iframe
@@ -457,7 +457,7 @@ theorem memset_free_proof : MEMSET_FREE := ⟨fun {hlc GF} _ _ cpu k olds n hK h
   iapply wpNext_intro_pin
   iintro %c1 %hp1 Hk Hpc Hframe
   -- beqz a2,c98
-  k_step_gen (wp_s_branch c1 _ 0x80000d20#64 true 22#13 12#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
+  k_step_gen (wp_s_branch c1 _ (KA.«memset» + 0x8#64) true 22#13 12#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc] with [hn, ite_beq_ofNat_ms n hn32] next c2 hp2
   iintro Hk Hpc
   have hpin2 : k.sie = false ∨ k.proc = 0#64 → c2 = cpu := fun h => (hp2 h).trans (hp1 h)
@@ -473,19 +473,19 @@ theorem memset_free_proof : MEMSET_FREE := ⟨fun {hlc GF} _ _ cpu k olds n hK h
     case hcs => intro r h2 h8 _ _ _ _ _; simp [RegMap.set_apply, h2, h8]
   · simp only [hn0, ite_false]
     -- mv a5,a0
-    k_step_gen (wp_s_add c2 _ 0x80000d22#64 true 15#5 0#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
+    k_step_gen (wp_s_add c2 _ (KA.«memset» + 0xa#64) true 15#5 0#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc] next c3 hp3
     iintro Hk Hpc
     -- slli a2,a2,32 ; srli a2,a2,32
-    k_step_gen (wp_s_slli c3 _ 0x80000d24#64 true 32#6 12#5 12#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
+    k_step_gen (wp_s_slli c3 _ (KA.«memset» + 0xc#64) true 32#6 12#5 12#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc] with [hn] next c4 hp4
     iintro Hk Hpc
-    k_step_gen (wp_s_srli c4 _ 0x80000d26#64 true 32#6 12#5 12#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
+    k_step_gen (wp_s_srli c4 _ (KA.«memset» + 0xe#64) true 32#6 12#5 12#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc] with [shl_shr32_ms n hn32] next c5 hp5
     iintro Hk Hpc
     -- add a4,a2,a0
     have hcomm : BitVec.ofNat 64 n + k.regs 10#5 = k.regs 10#5 + BitVec.ofNat 64 n := BitVec.add_comm _ _
-    k_step_gen (wp_s_add c5 _ 0x80000d28#64 false 14#5 12#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
+    k_step_gen (wp_s_add c5 _ (KA.«memset» + 0x10#64) false 14#5 12#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc] with [hcomm] next c6 hp6
     iintro Hk Hpc
     have hpin6 : k.sie = false ∨ k.proc = 0#64 → c6 = cpu :=

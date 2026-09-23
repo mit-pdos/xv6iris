@@ -659,18 +659,18 @@ theorem kinds_step (descs : List PkArgDesc) (kk : Nat) (κ : PkKind) (rest : Lis
 
 /-- The dispatch chain from `0x800007c4`, as the code decides it. -/
 def dispatch7a0 (c0 c1 c2 : BitVec 8) : BitVec 64 :=
-  if c0 = chU then 0x8000062c#64
-  else if c1 = chU ∧ c0 = chL then 0x80000646#64
-  else if c2 = chU ∧ (c1 = chL ∧ c0 = chL) then 0x80000662#64
-  else if c0 = chX then 0x8000067e#64
-  else if c1 = chX ∧ c0 = chL then 0x80000698#64
-  else if c2 = chX ∧ (c1 = chL ∧ c0 = chL) then 0x800006b2#64
-  else if c0 = chP then 0x800006ce#64
-  else if c0 = chC then 0x80000714#64
-  else if c0 = chS then 0x80000728#64
-  else if c0 = chPct then 0x80000760#64
-  else if c0 = 0#8 then 0x80000824#64
-  else 0x80000814#64
+  if c0 = chU then (KA.«printk» + 0x106#64)
+  else if c1 = chU ∧ c0 = chL then (KA.«printk» + 0x120#64)
+  else if c2 = chU ∧ (c1 = chL ∧ c0 = chL) then (KA.«printk» + 0x13c#64)
+  else if c0 = chX then (KA.«printk» + 0x158#64)
+  else if c1 = chX ∧ c0 = chL then (KA.«printk» + 0x172#64)
+  else if c2 = chX ∧ (c1 = chL ∧ c0 = chL) then (KA.«printk» + 0x18c#64)
+  else if c0 = chP then (KA.«printk» + 0x1a8#64)
+  else if c0 = chC then (KA.«printk» + 0x1ee#64)
+  else if c0 = chS then (KA.«printk» + 0x202#64)
+  else if c0 = chPct then (KA.«printk» + 0x23a#64)
+  else if c0 = 0#8 then (KA.«printk» + 0x2fe#64)
+  else (KA.«printk» + 0x2ee#64)
 
 
 /-! ## Frame introduction and access -/
@@ -824,10 +824,10 @@ theorem nullBody_nonul : nonul nullBody := by
   simp only [nullBody, List.mem_cons, List.not_mem_nil, or_false] at hb
   rcases hb with rfl | rfl | rfl | rfl | rfl | rfl <;> decide
 
-theorem null_addr : 0x80000752#64 + (BitVec.signExtend 64 (7#20 ++ 0#12) + 18446744073709549750#64) = 0x80007008#64 := by
+theorem null_addr : KA.«printk» + 0x6ae2#64 = KStr.«(null)» := by
   decide
 
-theorem digits_addr : 0x800006f2#64 + (BitVec.signExtend 64 (7#20 ++ 0#12) + 70#64) = 0x80007738#64 := by
+theorem digits_addr : KA.«printk» + 0x7212#64 = KA.«digits» := by
   decide
 
 theorem ite_decide_ne {α : Type} (n : Nat) (x y : α) :
@@ -859,7 +859,7 @@ abbrev pkPost (cpu : CPU) (k : KCtx) (γd : UartNames) (bs : List (BitVec 8)) (d
 abbrev pkNext (cpu : CPU) (k : KCtx) (γpr : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc) (i : Nat) : IProp GF := iprop%
   ∀ (R' : RegMap) (p kk' : Nat) (cs : List (BitVec 8)) (w18 : BitVec 64),
-    kctx cpu ((pkBase k).withRegs R') -∗ pcIs cpu 0x80000592#64 -∗
+    kctx cpu ((pkBase k).withRegs R') -∗ pcIs cpu (KA.«printk» + 0x6c#64) -∗
     byteBuf (k.regs 10#5) dqf (f ++ [0#8]) -∗ pkDescs k.regs descs -∗
     pkFrame (k.regs 2#5) k.regs (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk') w18 -∗
     uartSentSub γd (bs ++ cs) -∗ locked γpr cpu -∗
@@ -871,7 +871,7 @@ abbrev pkNext (cpu : CPU) (k : KCtx) (γpr : GName) (γd : UartNames) (bs : List
 abbrev pkExit (cpu : CPU) (k : KCtx) (γpr : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc) (kk : Nat) : IProp GF := iprop%
   ∀ (R' : RegMap) (w18 : BitVec 64),
-    kctx cpu ((pkBase k).withRegs R') -∗ pcIs cpu 0x80000824#64 -∗
+    kctx cpu ((pkBase k).withRegs R') -∗ pcIs cpu (KA.«printk» + 0x2fe#64) -∗
     byteBuf (k.regs 10#5) dqf (f ++ [0#8]) -∗ pkDescs k.regs descs -∗
     pkFrame (k.regs 2#5) k.regs (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 kk) w18 -∗
     uartSentSub γd bs -∗ locked γpr cpu -∗ ⌜pkRegs k.regs R'⌝ -∗ wpLoop cpu
@@ -879,7 +879,7 @@ abbrev pkExit (cpu : CPU) (k : KCtx) (γpr : GName) (γd : UartNames) (bs : List
 end
 
 
-theorem dispatch7a0_zero : dispatch7a0 0#8 0#8 0#8 = 0x80000824#64 := by decide
+theorem dispatch7a0_zero : dispatch7a0 0#8 0#8 0#8 = (KA.«printk» + 0x2fe#64) := by decide
 
 /-! ## The directive table, case by case -/
 
@@ -1042,10 +1042,10 @@ theorem pkKinds_at_none (f : List (BitVec 8)) (i : Nat) (hi : i < f.length) (hp 
   rw [pkKinds_at f i hi hp, h]
   rfl
 
-theorem pr_addr_520 : 0x80000544#64 + (BitVec.signExtend 64 (18#20 ++ 0#12) + 18446744073709551284#64) = 0x800123f8#64 := by
+theorem pr_addr_520 : KA.«printk» + 0x11ed2#64 = KA.«pr» := by
   decide
 
-theorem ret_52c : jumpPc 0x80000550#64 = 0x80000550#64 := by decide
+theorem ret_52c : jumpPc (KA.«printk» + 0x2a#64) = (KA.«printk» + 0x2a#64) := by decide
 
 
 theorem pkRegsN_of_cs (R0 R R' : RegMap) (h : pkRegsN R0 R)
@@ -1080,11 +1080,11 @@ theorem cstr_acc0 (a : BitVec 64) (dq : DFrac) (s : List (BitVec 8)) (b : BitVec
   rwa [show a + BitVec.ofNat 64 0 = a by simp] at h
 
 /-- `"(null)"` at `0x80007008`, as the C string `printk` walks. -/
-theorem kernelData_nullBody : kmapStatic (GF := GF) ⊢ kernelData -∗ cstr 0x80007008#64 DFrac.discard nullBody := by
+theorem kernelData_nullBody : kmapStatic (GF := GF) ⊢ kernelData -∗ cstr KStr.«(null)» DFrac.discard nullBody := by
   iintro HS H
   ihave H := kernelData_null $$ HS H
-  ihave H := (show byteBuf 0x80007008#64 DFrac.discard nullStr ⊢
-    byteBuf (GF := GF) 0x80007008#64 DFrac.discard (nullBody ++ [0#8]) from by rw [nullStr_eq]) $$ H
+  ihave H := (show byteBuf KStr.«(null)» DFrac.discard nullStr ⊢
+    byteBuf (GF := GF) KStr.«(null)» DFrac.discard (nullBody ++ [0#8]) from by rw [nullStr_eq]) $$ H
   iapply cstr_intro _ _ _ nullBody_nonul $$ H
 
 end

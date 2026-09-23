@@ -11,7 +11,7 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
-def argintAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«argint»
+def argintAddr : BitVec 64 := KA.«argint»
 
 /-- argint's 4-slot frame over argraw's 14. -/
 def argintSlots : Nat := 4 + argrawSlots

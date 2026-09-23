@@ -29,7 +29,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `initlock`. -/
-def initlockAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«initlock»
+def initlockAddr : BitVec 64 := KA.«initlock»
 
 /-- **WP of `initlock`.**  The three fields go in owned; the name field
 comes back at `a1` and the other two as `lkFresh`. -/

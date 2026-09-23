@@ -18,7 +18,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `kvminit`. -/
-def kvminitAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«kvminit»
+def kvminitAddr : BitVec 64 := KA.«kvminit»
 
 /-- The specification of `kvminit` (counted mode). -/
 def wp_kvminit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]

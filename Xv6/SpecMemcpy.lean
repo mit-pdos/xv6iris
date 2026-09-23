@@ -16,7 +16,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `memcpy`. -/
-def memcpyAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«memcpy»
+def memcpyAddr : BitVec 64 := KA.«memcpy»
 
 /-- **WP of `memcpy`.** -/
 def wp_memcpy_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]

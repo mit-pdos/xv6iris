@@ -18,7 +18,7 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
 /-- `&ticks` (kernel/trap.c). -/
-def ticksAddr : BitVec 64 := 0x8000a348#64
+def ticksAddr : BitVec 64 := KA.«ticks»
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]

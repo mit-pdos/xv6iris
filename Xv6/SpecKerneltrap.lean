@@ -28,7 +28,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `kerneltrap`. -/
-def kerneltrapAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«kerneltrap»
+def kerneltrapAddr : BitVec 64 := KA.«kerneltrap»
 
 /-- The stack kerneltrap and its cone need below kernelvec's 32-slot frame:
 the rest of the trap reserve. -/

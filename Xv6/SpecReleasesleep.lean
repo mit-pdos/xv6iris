@@ -31,7 +31,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 /-- Address of `releasesleep`. -/
-def releasesleepAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«releasesleep»
+def releasesleepAddr : BitVec 64 := KA.«releasesleep»
 
 /-- releasesleep's 4-slot frame over `wakeup`'s 18 (`acquire`/`release` 10). -/
 def releasesleepSlots : Nat := 4 + wakeupSlots

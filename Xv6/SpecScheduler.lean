@@ -43,7 +43,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `scheduler`. -/
-def schedulerAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«scheduler»
+def schedulerAddr : BitVec 64 := KA.«scheduler»
 
 /-- The stack `scheduler` needs: its own 12-slot frame, the trap reserve the
 loop head arms, and the 10 slots `acquire`/`release` want under it. -/

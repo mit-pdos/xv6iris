@@ -43,12 +43,20 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
-theorem yield_pState (pa : BitVec 64) : pa + 24#64 = pState pa := rfl
+theorem yield_pState (i : Nat) : procAddr i + 24#64 = pState (procAddr i) := rfl
 
 theorem yield_filter_proc :
     List.filter (fun x => decide (x ≠ "proc")) ["proc"] = ([] : List String) := by decide
 
 theorem yield_runnable : BitVec.extractLsb' 0 32 (3#64) = RUNNABLE := by decide
+
+theorem yield_br_ffffffffffffed36 : KA.«yield» + 0xffffffffffffed36#64 = KA.«release» := by decide
+
+theorem yield_br_ffffffffffffff44 : KA.«yield» + 0xffffffffffffff44#64 = KA.«sched» := by decide
+
+theorem yield_br_ffffffffffffecae : KA.«yield» + 0xffffffffffffecae#64 = KA.«acquire» := by decide
+
+theorem yield_br_fffffffffffff9de : KA.«yield» + 0xfffffffffffff9de#64 = KA.«myproc» := by decide
 
 set_option maxHeartbeats 4000000 in
 theorem yield_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : YIELD :=
@@ -63,10 +71,10 @@ theorem yield_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : Y
   have ht0 : t0 = KTier.kpt := hct.symm.trans htier
   subst ht0
   have hint : k.intena = false := (hwf.1 hnoff).symm.trans hsie
-  simp only [yieldAddr, KernelSyms.«yield»]
+  simp only [yieldAddr]
   k_norm
   -- the prologue: addi sp,sp,-32; sd ra,24(sp); sd s0,16(sp); sd s1,8(sp); addi s0,sp,32
-  iapply (wp_prologue4s1 cpu k hsie 0x80001faa#64 (by unfold yieldSlots at hK; omega)) $$ [- $Hk $Hpc]
+  iapply (wp_prologue4s1 cpu k hsie KA.«yield» (by unfold yieldSlots at hK; omega)) $$ [- $Hk $Hpc]
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm
   iframe
@@ -74,19 +82,19 @@ theorem yield_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : Y
   iintro Hk Hpc Hframe
   k_norm
   -- jal myproc
-  k_step (wp_s_jal cpu _ 0x80001fb4#64 false 2095572#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_jal cpu _ (KA.«yield» + 0xa#64) false 2095572#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [yield_br_fffffffffffff9de]
   iintro Hk Hpc
   -- myproc()
   have hmp : ∀ (k' : KCtx) (_ : k'.sie = false) (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 10 ≤ k'.avail),
-      kctx cpu k' ∗ pcIs cpu 0x80001988#64 ∗
+      kctx cpu k' ∗ pcIs cpu KA.«myproc» ∗
       (∀ R' : RegMap, kctx cpu (k'.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
         ⌜calleeSaved k'.regs R' ∧ R' 10#5 = k'.proc⌝ -∗ wpLoop cpu)
       ⊢ wpLoop (GF := GF) cpu := by
     intro k' hsie' hnoff' hK'
     have h := MP.wp_myproc (hlc := hlc) (GF := GF) cpu k' hnoff' hK'
     unfold wp_myproc_body at h
-    simp only [myprocAddr, KernelSyms.«myproc»] at h
+    simp only [myprocAddr] at h
     iintro ⟨Hk, Hp, Hcont⟩
     iapply h
     iframe Hk Hp
@@ -101,25 +109,25 @@ theorem yield_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : Y
   case hnM => k_norm [hnoff]; omega
   case hKM => k_norm; unfold yieldSlots at hK; omega
   iintro %R2 Hk Hpc %⟨hcs2, h10⟩
-  have hret0a : jumpPc 0x80001fb8#64 = 0x80001fb8#64 := by decide
+  have hret0a : jumpPc (KA.«yield» + 0xe#64) = (KA.«yield» + 0xe#64) := by decide
   k_norm [hret0a]
   k_norm at h10
   unfold calleeSaved at hcs2
   k_norm at hcs2
   obtain ⟨c2_2, c2_8, c2_9, c2_18, c2_19, c2_20, c2_21, c2_22, c2_23, c2_24, c2_25, c2_26, c2_27⟩ := hcs2
   -- mv s1,a0
-  k_step (wp_s_add cpu _ 0x80001fb8#64 true 9#5 0#5 10#5 (by decide))
+  k_step (wp_s_add cpu _ (KA.«yield» + 0xe#64) true 9#5 0#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_eq, h10, hproc]
   iintro Hk Hpc
   -- jal acquire
-  k_step (wp_s_jal cpu _ 0x80001fba#64 false 2092190#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_jal cpu _ (KA.«yield» + 0x10#64) false 2092190#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [yield_br_ffffffffffffecae]
   iintro Hk Hpc
   -- acquire(&p->lock)
   ihave #Hlk := procsInv_lookup Γ j hj $$ Hpinv
   have hac : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 10 ≤ k'.avail)
       (hs' : "proc" ∉ k'.locks) (pa : BitVec 64) (ha0 : k'.regs 10#5 = pa),
-      kctx cpu k' ∗ pcIs cpu 0x80000c58#64 ∗ isLock (Γ.lock j) pa "proc" (procLockPay Γ j) ∗
+      kctx cpu k' ∗ pcIs cpu KA.«acquire» ∗ isLock (Γ.lock j) pa "proc" (procLockPay Γ j) ∗
       (∀ R' : RegMap,
         kctx cpu (((k'.pushOffAt k'.spie k'.spp).withRegs R').withLocks ("proc" :: k'.locks)) -∗
         pcIs cpu (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ locked (Γ.lock j) cpu -∗
@@ -130,7 +138,7 @@ theorem yield_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : Y
     have h := AC.wp_acquire (hlc := hlc) (GF := GF) cpu k' (Γ.lock j) "proc" (procLockPay Γ j)
       hnoff' hK' hs'
     unfold wp_acquire_body at h
-    simp only [acquireAddr, KernelSyms.«acquire»] at h
+    simp only [acquireAddr] at h
     iintro ⟨Hk, Hp, #Hlk', Hcont⟩
     iapply h
     iframe Hk Hp Hlk'
@@ -147,7 +155,7 @@ theorem yield_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : Y
   case hlA => k_norm [hlocks]; exact List.not_mem_nil
   case ha0A => k_norm [h10, hproc]
   iintro %R3 Hk Hpc %hcs3 Hlocked HR Hview Harm
-  have hret10 : jumpPc 0x80001fbe#64 = 0x80001fbe#64 := by decide
+  have hret10 : jumpPc (KA.«yield» + 0x14#64) = (KA.«yield» + 0x14#64) := by decide
   k_norm [hret10]
   unfold calleeSaved at hcs3
   k_norm at hcs3
@@ -175,10 +183,10 @@ theorem yield_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : Y
   ihave Hpst := pstateAt_intro Γ j (1 : Qp).half RUNNING hj $$ Hpst
   ihave Hwhole := hsplit.mpr $$ [$Hpsl $Hpst]
   -- li a5,3 ; sw a5,24(s1): p->state = RUNNABLE
-  k_step (wp_s_addi cpu _ 0x80001fbe#64 true 3#12 15#5 0#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«yield» + 0x14#64) true 3#12 15#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_eq]
   iintro Hk Hpc
-  k_step (wp_s_sw cpu _ 0x80001fc0#64 true 24#12 9#5 15#5 (by decide) RUNNING)
+  k_step (wp_s_sw cpu _ (KA.«yield» + 0x16#64) true 24#12 9#5 15#5 (by decide) RUNNING)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.rget_eq, e3_9, yield_pState, yield_runnable]
   iintro Hk Hpc Hstate
@@ -189,13 +197,13 @@ theorem yield_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : Y
   ihave Hheld := procHeldAt_intro Γ ξ0 cpu j RUNNABLE ch kl xs pid
     $$ [$Hlocked $Hwhole $Hstate $Hchan $Hrest]
   -- jal sched
-  k_step (wp_s_jal cpu _ 0x80001fc2#64 false 2096940#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_jal cpu _ (KA.«yield» + 0x18#64) false 2096940#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [yield_br_ffffffffffffff44]
   iintro Hk Hpc
   have hsc : ∀ (k' : KCtx) (ch' : BitVec 64) (hK' : schedSlots ≤ k'.avail) (hsie' : k'.sie = false)
       (hnoff' : k'.noff = 1) (hlocks' : k'.locks = ["proc"]) (htier' : k'.tier = KTier.kpt)
       (hproc' : k'.proc = procAddr j),
-      kctx cpu k' ∗ pcIs cpu 0x80001eee#64 ∗ procsInv Γ ∗ procHeld Γ cpu j RUNNABLE ch' ∗
+      kctx cpu k' ∗ pcIs cpu KA.«sched» ∗ procsInv Γ ∗ procHeld Γ cpu j RUNNABLE ch' ∗
       (stackOwn k'.sp k'.avail -∗ parkPay (procAddr j) RUNNABLE) ∗
       trapCsrs cpu ∗ intrRes cpu ∗ ownCtxCells (pContext (procAddr j) 0) ∗ hartFull Γ j cpu ∗
       ▷ schedVcAt Γ cpu (cpuCtxAddr cpu) (procAddr j) ∗
@@ -213,7 +221,7 @@ theorem yield_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : Y
       (by decide : parkOk RUNNABLE) hK' hsie' hnoff' hlocks' htier' hproc'
     unfold wp_sched_body at h
     rw [if_pos (show needsCtx RUNNABLE from by decide)] at h
-    simp only [schedAddr, KernelSyms.«sched»] at h
+    simp only [schedAddr] at h
     exact h
   ihave Hvc : ▷ schedVcAt Γ cpu (cpuCtxAddr cpu) (procAddr j) $$ [Hvc]
   case' _ => iapply (BI.later_intro (PROP := IProp GF)); iexact Hvc
@@ -233,7 +241,7 @@ theorem yield_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : Y
     iempintro
   iapply wpNext_intro_pin
   iintro %h1 %hp1 %R4 %spie %spp %ch2 %hcs4 Hk Hpc Hheld Htc Hres Hcells Htag Hvc
-  have hretB : jumpPc 0x80001fc6#64 = 0x80001fc6#64 := by decide
+  have hretB : jumpPc (KA.«yield» + 0x1c#64) = (KA.«yield» + 0x1c#64) := by decide
   k_norm [hint, hretB, trapRes_off, resumedK_regs, resumedK_sie, resumedK_spie, resumedK_spp, resumedK_avail,
     resumedK_noff, resumedK_intena, resumedK_locks, resumedK_tier, resumedK_root, resumedK_proc,
     resumedK_sp]
@@ -271,17 +279,17 @@ theorem yield_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : Y
       · iapply pstateAt_elim Γ j (1 : Qp).half RUNNING hj $$ Hs
       · iexact Hh) $$ [$Hpst2 $Htag2]
   -- mv a0,s1
-  k_step (wp_s_add h1 _ 0x80001fc6#64 true 10#5 0#5 9#5 (by decide))
+  k_step (wp_s_add h1 _ (KA.«yield» + 0x1c#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_eq, e4_9]
   iintro Hk Hpc
   -- jal release
-  k_step (wp_s_jal h1 _ 0x80001fc8#64 false 2092312#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_jal h1 _ (KA.«yield» + 0x1e#64) false 2092312#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [yield_br_ffffffffffffed36]
   iintro Hk Hpc
   -- release(&p->lock)
   have hre : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hnoff' : 1 ≤ k'.noff) (hK' : 10 ≤ k'.avail)
       (hint' : k'.intena = false) (pa : BitVec 64) (ha0 : k'.regs 10#5 = pa),
-      kctx h1 k' ∗ pcIs h1 0x80000ce0#64 ∗ isLock (Γ.lock j) pa "proc" (procLockPay Γ j) ∗
+      kctx h1 k' ∗ pcIs h1 KA.«release» ∗ isLock (Γ.lock j) pa "proc" (procLockPay Γ j) ∗
       locked (Γ.lock j) h1 ∗ procLockPay Γ j curCtx ∗
       (∀ R' : RegMap,
         kctx h1 ((k'.popOff.withRegs R').withLocks (k'.locks.filter (fun x => x ≠ "proc"))) -∗
@@ -295,7 +303,7 @@ theorem yield_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : Y
     have h := RE.wp_release (hlc := hlc) (GF := GF) h1 k' (Γ.lock j) "proc" (procLockPay Γ j)
       hsie' hnoff' hK' false hreen hon
     unfold wp_release_body at h
-    simp only [releaseAddr, KernelSyms.«release», KCtx.popExit_false, popArm_false,
+    simp only [releaseAddr, KCtx.popExit_false, popArm_false,
       KCtx.popOff_sie, hsie'] at h
     iintro ⟨Hk, Hp, #Hlk', Hlocked, HR, Hcont⟩
     iapply h
@@ -315,7 +323,7 @@ theorem yield_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : Y
   iintro %R6 Hk Hpc %hcs6
   have hlk0 : ((k.withSpie spie spp).withLocks ([] : List String)) = k.withSpie spie spp := by
     rw [← hlocks]; rfl
-  have hretE : jumpPc 0x80001fcc#64 = 0x80001fcc#64 := by decide
+  have hretE : jumpPc (KA.«yield» + 0x22#64) = (KA.«yield» + 0x22#64) := by decide
   k_norm [yield_filter_proc, hlk0, hretE]
   unfold calleeSaved at hcs6
   k_norm at hcs6
@@ -323,7 +331,7 @@ theorem yield_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : Y
   -- the epilogue: ld ra,24(sp); ld s0,16(sp); ld s1,8(sp); addi sp,sp,32; ret
   have hR2E : R6 2#5 = (k.withSpie spie spp).regs 2#5 + 0xFFFFFFFFFFFFFFE0#64 := by
     rw [c6_2, c4_2, c3_2, c2_2]; rfl
-  iapply (wp_epilogue4s1 h1 (k.withSpie spie spp) (by k_norm) 0x80001fcc#64
+  iapply (wp_epilogue4s1 h1 (k.withSpie spie spp) (by k_norm) (KA.«yield» + 0x22#64)
       (by k_norm; unfold yieldSlots at hK; omega) R6 hR2E (k.regs 1#5) (k.regs 8#5) (k.regs 9#5))
     $$ [- $Hk $Hpc]
   k_code (text_instr _ _ _ _ rfl rfl) Htext

@@ -8,7 +8,7 @@ import Xv6.ProofWalk
 namespace Xv6
 
 /-- The proved `walk` interface (allocating), given `kalloc` and `memset`. -/
-theorem Walk (KA : KALLOC) (MS : MEMSET) : WALK := walk_proof KA MS
+theorem Walk (KAL : KALLOC) (MS : MEMSET) : WALK := walk_proof KAL MS
 
 /-- The proved `walk` interface with `alloc = 0`. -/
 theorem WalkNoalloc : WALK_NOALLOC := walk_noalloc_proof

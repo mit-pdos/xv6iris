@@ -43,7 +43,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `sched`. -/
-def schedAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«sched»
+def schedAddr : BitVec 64 := KA.«sched»
 
 /-- The stack `sched` needs: its own 6-slot frame over `myproc`'s cone. -/
 def schedSlots : Nat := 16

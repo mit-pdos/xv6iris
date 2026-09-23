@@ -22,7 +22,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `cpuid`. -/
-def cpuidAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«cpuid»
+def cpuidAddr : BitVec 64 := KA.«cpuid»
 
 /-- The `int`-truncated hart id `cpuid` returns: sign-extend `tp`'s low 32
 bits (Rocq `cpuid_ret`). -/

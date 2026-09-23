@@ -17,7 +17,7 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
-def uvmcreateAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«uvmcreate»
+def uvmcreateAddr : BitVec 64 := KA.«uvmcreate»
 def uvmcreateSlots : Nat := 18
 
 /-- `0` with the count dry, or an empty root node one page down. -/

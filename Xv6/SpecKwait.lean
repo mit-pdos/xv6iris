@@ -71,7 +71,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `kwait`. -/
-def kwaitAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«kwait»
+def kwaitAddr : BitVec 64 := KA.«kwait»
 
 /-- The stack `kwait`'s cone needs: its own 10-slot frame over `copyout`'s
 52 (`freeproc` needs 44, `sleep` 20, `killed` 14). -/

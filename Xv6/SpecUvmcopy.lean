@@ -18,7 +18,7 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
-def uvmcopyAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«uvmcopy»
+def uvmcopyAddr : BitVec 64 := KA.«uvmcopy»
 
 /-- The child's space after a successful copy of `n` pages: outside the
 run unchanged; inside, each of the parent's leaves duplicated on a fresh

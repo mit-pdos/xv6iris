@@ -357,6 +357,12 @@ theorem pageValid_kmapClass (b : BitVec 44) (hb : pageValid (pageAddr b)) (off :
   rw [BitVec.toNat_add, BitVec.toNat_ofNat]
   rw [Nat.mod_eq_of_lt (a := off) (by omega)]
   rw [Nat.mod_eq_of_lt (by omega)]
+  -- `omega` treats `KA.«end».toNat` as an atom: give it the linker symbol's
+  -- value range (the image ends inside RAM, past the text pages).
+  have hend : KA.«end».toNat = KernelSyms.«end» := rfl
+  have hend_lo : 0x80007 * 4096 ≤ KernelSyms.«end» := by decide
+  have hend_hi : KernelSyms.«end» < 0x88000 * 4096 := by decide
+  rw [hend] at hlo'
   unfold kmapClass
   split
   · omega

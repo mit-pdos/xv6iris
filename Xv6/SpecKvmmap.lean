@@ -19,7 +19,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `kvmmap`. -/
-def kvmmapAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«kvmmap»
+def kvmmapAddr : BitVec 64 := KA.«kvmmap»
 
 /-- The specification of `kvmmap` (counted mode): `a0 = kpgtbl`, `a1 = va`,
 `a2 = pa`, `a3 = sz`, `a4 = perm`. -/

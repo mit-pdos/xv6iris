@@ -86,8 +86,10 @@ theorem pteAddr_ok (b : BitVec 44) (i : BitVec 9) (h : pageValid (Xv6.pageAddr b
   simp only [BitVec.ult, decide_eq_true_eq, Nat.not_lt, kernelEndAddr, physTop,
     BitVec.toNat_ofNat, Nat.reducePow, Nat.reduceMod, pageAddr_toNat] at h2 h3
   have hi : i.toNat < 512 := i.isLt
-  have hram : ramBase = 0x80000000 := rfl
+  have hram : ramBase = KernelSyms.«_entry» := rfl
   have hrend : ramEnd = 0x88000000 := rfl
+  have hend : KA.«end».toNat = KernelSyms.«end» := rfl
+  have hle : KernelSyms.«_entry» ≤ KernelSyms.«end» := by decide
   refine ⟨⟨?_, ?_⟩, ?_⟩ <;> rw [pteAddr_toNat] <;> omega
 
 /-! ## The pure facts of the built table -/

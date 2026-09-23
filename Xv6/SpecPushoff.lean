@@ -30,7 +30,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `push_off`. -/
-def pushOffAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«push_off»
+def pushOffAddr : BitVec 64 := KA.«push_off»
 
 /-- **WP of `push_off`**, at either `SIE`.  Interrupts are off on exit,
 the depth incremented (`KCtx.pushOffAt`); with them on at entry, the

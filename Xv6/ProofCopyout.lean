@@ -35,6 +35,34 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 
 set_option maxRecDepth 8000
 
+/-! ## Address folds in `k_norm`'s normal form
+
+`k_norm` now carries `BitVec.ofNat_add`, so `BitVec.ofNat 64 (A + d)` never
+survives as such: it is split into `BitVec.ofNat 64 A + BitVec.ofNat 64 d`
+(and `BitVec.add_assoc` then re-associates).  These are the page-offset folds
+stated on the shapes the normaliser actually leaves. -/
+
+theorem co_offB (A d : Nat) (hA64 : A + d < 2 ^ 64) :
+    BitVec.ofNat 64 A + BitVec.ofNat 64 d + -BitVec.ofNat 64 ((A + d) / 4096 * 4096)
+      = BitVec.ofNat 64 ((A + d) % 4096) := by
+  rw [← BitVec.sub_eq_add_neg, ← BitVec.ofNat_add, co_ofNat_sub (A + d) _ (by omega) hA64]
+  congr 1
+  omega
+
+theorem co_offB' (A d : Nat) (hA64 : A + d < 2 ^ 64) :
+    BitVec.ofNat 64 A + (BitVec.ofNat 64 d + -BitVec.ofNat 64 ((A + d) / 4096 * 4096))
+      = BitVec.ofNat 64 ((A + d) % 4096) := by
+  rw [← BitVec.add_assoc]; exact co_offB A d hA64
+
+theorem co_addSplit (b : BitVec 64) (x y : Nat) :
+    b + (BitVec.ofNat 64 x + BitVec.ofNat 64 y) = b + BitVec.ofNat 64 (x + y) := by
+  rw [co_ofNat_add]
+
+theorem co_nval (A d : Nat) (hA64 : A + d < 2 ^ 64) :
+    BitVec.ofNat 64 ((A + d) / 4096 * 4096) + (-(BitVec.ofNat 64 A + BitVec.ofNat 64 d) + 4096#64)
+      = BitVec.ofNat 64 (4096 - (A + d) % 4096) := by
+  rw [← BitVec.ofNat_add]; exact co_n_val3 (A + d) hA64
+
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 variable {lent : Bool}
@@ -98,14 +126,14 @@ theorem co_ite_bgeu {α : Type _} (x y : BitVec 64) (p q : α) :
 
 /-! ## Return addresses -/
 
-theorem co_ret_1578 : jumpPc 0x80001626#64 = 0x80001626#64 := by
-  simp only [jumpPc, BitVec.reduceAnd]
-theorem co_ret_1588 : jumpPc 0x80001636#64 = 0x80001636#64 := by
-  simp only [jumpPc, BitVec.reduceAnd]
-theorem co_ret_1596 : jumpPc 0x80001644#64 = 0x80001644#64 := by
-  simp only [jumpPc, BitVec.reduceAnd]
-theorem co_ret_155a : jumpPc 0x80001608#64 = 0x80001608#64 := by
-  simp only [jumpPc, BitVec.reduceAnd]
+theorem co_ret_1578 : jumpPc (KA.«copyout» + 0x64#64) = (KA.«copyout» + 0x64#64) := by
+  decide
+theorem co_ret_1588 : jumpPc (KA.«copyout» + 0x74#64) = (KA.«copyout» + 0x74#64) := by
+  decide
+theorem co_ret_1596 : jumpPc (KA.«copyout» + 0x82#64) = (KA.«copyout» + 0x82#64) := by
+  decide
+theorem co_ret_155a : jumpPc (KA.«copyout» + 0x46#64) = (KA.«copyout» + 0x46#64) := by
+  decide
 
 
 /-! ## The fourteen-slot frame -/
@@ -357,14 +385,14 @@ theorem co_walk_call (W : WALK_NOALLOC) [Xv6G GF] [CurCtx]
     (c : CPU) (k' : KCtx) (dq : DFrac) (t : PTree)
     (hK' : 8 ≤ k'.avail) (hroot' : k'.regs 10#5 = pageAddr t.base)
     (hva' : (k'.regs 11#5).toNat < 2 ^ 38) (halloc' : k'.regs 12#5 = 0#64) (hwf' : t.wfU 2) :
-    kctx c k' ∗ pcIs c 0x80000fae#64 ∗ ptreeOwn 2 dq t ∗
+    kctx c k' ∗ pcIs c KA.«walk» ∗ ptreeOwn 2 dq t ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ R' : RegMap,
       kctx cpu' (k'.withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ptreeOwn 2 dq t -∗
       ⌜calleeSaved k'.regs R' ∧ walkRet t (vpnOf (k'.regs 11#5)) (R' 10#5)⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   have h := W.wp_walk_noalloc (hlc := hlc) (GF := GF) c k' dq t hK' hroot' hva' halloc' hwf'
   unfold wp_walk_noalloc_body at h
-  simp only [walkAddr, KernelSyms.«walk»] at h
+  simp only [walkAddr] at h
   exact h
 
 
@@ -375,8 +403,12 @@ theorem co_walk_call (W : WALK_NOALLOC) [Xv6G GF] [CurCtx]
 set_option maxHeartbeats 4000000 in
 /-- From the loop head `0x80001616`: `va0 = PGROUNDDOWN(dstva)`, the
 `MAXVA` test, `walkaddr` and, when that fails, `vmfault`.  Either the
-function has left for its `-1` exit, or `0x8000163a` is reached with the
+function has left for its `-1` exit, or `(KernelSyms.«copyout» + 0x78)` is reached with the
 page mapped in `P2` and its physical address in `s3`. -/
+theorem copyout_br_ffffffffffffff84 : KA.«copyout» + 0xffffffffffffff84#64 = KA.«vmfault» := by decide
+
+theorem copyout_br_fffffffffffffa86 : KA.«copyout» + 0xfffffffffffffa86#64 = KA.«walkaddr» := by decide
+
 theorem copyout_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
     (k : KCtx) (γl : GName) (γk : KmemNames)
     (P : UPtd) (M : Nat → List (BitVec 8)) (bs : List (BitVec 8)) (A : Nat) (psz : BitVec 64)
@@ -390,7 +422,7 @@ theorem copyout_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
     (h20 : R 20#5 = BitVec.ofNat 64 (A + d)) (h26 : R 26#5 = 0xFFFFFFFFFFFFF000#64)
     (h25 : R 25#5 = 0x3FFFFFFFFF#64)
     (cur : CPU) (Res : IProp GF) :
-    kctx cur (((k.pushed 14).withSpie spie spp).withRegs R) ∗ pcIs cur 0x80001616#64 ∗
+    kctx cur (((k.pushed 14).withSpie spie spp).withRegs R) ∗ pcIs cur (KA.«copyout» + 0x54#64) ∗
     isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     procPtAt P1 (umemWrite (viewFaulted P P1 M) A (bs.take d)) ∗ Res ∗
     wpNext k.sie k.proc cur (fun cpu' => iprop(∀ (spie2 spp2 : Bool) (R2 : RegMap)
@@ -399,37 +431,39 @@ theorem copyout_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
       kctx cpu' (((k.pushed 14).withSpie spie2 spp2).withRegs R2) -∗ pcIs cpu' pcv -∗
       procPtAt P2 (umemWrite (viewFaulted P P2 M) A (bs.take d)) -∗ Res -∗
       ⌜coKeep R R2 ∧ P.ext P2 ∧
-        ((pcv = 0x80001662#64 ∧ R2 10#5 = -1#64) ∨
-         (pcv = 0x8000163a#64 ∧ get? P2.um ((A + d) / 4096) = some w ∧
+        ((pcv = (KA.«copyout» + 0xa0#64) ∧ R2 10#5 = -1#64) ∨
+         (pcv = (KA.«copyout» + 0x78#64) ∧ get? P2.um ((A + d) / 4096) = some w ∧
           R2 19#5 = pte2pa w ∧ R2 9#5 = BitVec.ofNat 64 ((A + d) / 4096 * 4096) ∧
           (A + d) / 4096 * 4096 < 2 ^ 38))⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cur := by
   have htk : (bs.take d).length = d := by rw [List.length_take]; omega
-  have hva0 : BitVec.ofNat 64 (A + d) &&& 0xFFFFFFFFFFFFF000#64
+  -- `k_norm` splits `BitVec.ofNat 64 (A + d)`, so state the fold on the split form.
+  have hva0 : BitVec.ofNat 64 A + BitVec.ofNat 64 d &&& 0xFFFFFFFFFFFFF000#64
       = BitVec.ofNat 64 ((A + d) / 4096 * 4096) := by
+    rw [← BitVec.ofNat_add]
     apply BitVec.eq_of_toNat_eq
     rw [co_pgdown_toNat, BitVec.toNat_ofNat, BitVec.toNat_ofNat, Nat.mod_eq_of_lt hA64]
     omega
   iintro ⟨Hk, Hpc, #Hlk, #Hav, HP, HRes, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- and s1,s4,s10
-  k_step_gen (wp_s_and cur _ 0x80001616#64 false 9#5 20#5 26#5 (by decide))
+  k_step_gen (wp_s_and cur _ (KA.«copyout» + 0x54#64) false 9#5 20#5 26#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h20, h26, hva0] next c1 hp1
   iintro Hk Hpc
   by_cases hmax : (A + d) / 4096 * 4096 < 2 ^ 38
   · -- the page is below MAXVA
-    k_step_gen (wp_s_branch c1 _ 0x8000161a#64 false 70#13 25#5 9#5 (by decide) bop.BLTU)
+    k_step_gen (wp_s_branch c1 _ (KA.«copyout» + 0x58#64) false 70#13 25#5 9#5 (by decide) bop.BLTU)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [h25, co_bltu_in ((A + d) / 4096 * 4096) hmax] next c2 hp2
     iintro Hk Hpc
-    k_step_gen (wp_s_add c2 _ 0x8000161e#64 true 11#5 0#5 9#5 (by decide))
+    k_step_gen (wp_s_add c2 _ (KA.«copyout» + 0x5c#64) true 11#5 0#5 9#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
     iintro Hk Hpc
-    k_step_gen (wp_s_add c3 _ 0x80001620#64 true 10#5 0#5 23#5 (by decide))
+    k_step_gen (wp_s_add c3 _ (KA.«copyout» + 0x5e#64) true 10#5 0#5 23#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h23] next c4 hp4
     iintro Hk Hpc
-    k_step_gen (wp_s_jal c4 _ 0x80001622#64 false 2095654#21 1#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c5 hp5
+    k_step_gen (wp_s_jal c4 _ (KA.«copyout» + 0x60#64) false 2095654#21 1#5 (by decide))
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [copyout_br_fffffffffffffa86] next c5 hp5
     iintro Hk Hpc
     icases UMemL.procPtAt_elim _ _ $$ HP with ⟨%hwf1, ⟨%t1, %ht1, Htree⟩, Hum⟩
     iapply (co_walkaddr_call WA c5 _ (DFrac.own 1) t1 P1.leaves ?hKa ?hro ht1.2) $$ [- $Hk $Hpc]
@@ -455,29 +489,29 @@ theorem copyout_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
       (umemWrite (viewFaulted P P1 M) A (bs.take d)) t1 ht1 hwf1 $$ [Htree Hum]
     case' _ => iframe
     -- c.mv s3,a0
-    k_step_gen (wp_s_add c6 _ 0x80001626#64 true 19#5 0#5 10#5 (by decide))
+    k_step_gen (wp_s_add c6 _ (KA.«copyout» + 0x64#64) true 19#5 0#5 10#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c7 hp7
     iintro Hk Hpc
     by_cases hz : R2 10#5 = 0#64
     · -- not mapped: vmfault
-      k_step_gen (wp_s_branch c7 _ 0x80001628#64 true 18#13 10#5 0#5 (by decide) bop.BNE)
+      k_step_gen (wp_s_branch c7 _ (KA.«copyout» + 0x66#64) true 18#13 10#5 0#5 (by decide) bop.BNE)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [co_bne_zero _ hz] next c8 hp8
       iintro Hk Hpc
-      k_step_gen (wp_s_addi c8 _ 0x8000162a#64 true 0#12 13#5 0#5 (by decide))
+      k_step_gen (wp_s_addi c8 _ (KA.«copyout» + 0x68#64) true 0#12 13#5 0#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c9 hp9
       iintro Hk Hpc
-      k_step_gen (wp_s_add c9 _ 0x8000162c#64 true 12#5 0#5 9#5 (by decide))
+      k_step_gen (wp_s_add c9 _ (KA.«copyout» + 0x6a#64) true 12#5 0#5 9#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e9] next c10 hp10
       iintro Hk Hpc
-      k_step_gen (wp_s_add c10 _ 0x8000162e#64 true 11#5 0#5 27#5 (by decide))
+      k_step_gen (wp_s_add c10 _ (KA.«copyout» + 0x6c#64) true 11#5 0#5 27#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e27, h27] next c11 hp11
       iintro Hk Hpc
-      k_step_gen (wp_s_add c11 _ 0x80001630#64 true 10#5 0#5 23#5 (by decide))
+      k_step_gen (wp_s_add c11 _ (KA.«copyout» + 0x6e#64) true 10#5 0#5 23#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e23, h23] next c12 hp12
       iintro Hk Hpc
-      k_step_gen (wp_s_jal c12 _ 0x80001632#64 false 2096916#21 1#5 (by decide))
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c13 hp13
+      k_step_gen (wp_s_jal c12 _ (KA.«copyout» + 0x70#64) false 2096916#21 1#5 (by decide))
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [copyout_br_ffffffffffffff84] next c13 hp13
       iintro Hk Hpc
       iapply (co_vmfault_call VF c13 _ γl γk P1 (umemWrite (viewFaulted P P1 M) A (bs.take d))
         ?hn2 ?hK2 ?hl2 ?hro2 ?hsz2) $$ [- $Hk $Hpc]
@@ -502,17 +536,17 @@ theorem copyout_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
         intro hh; exact hsp3 hh
       icases HPost with ⟨⟨%hr0, HP⟩ | ⟨%r, %hrf, HP⟩⟩
       · -- vmfault failed: return -1
-        k_step_gen (wp_s_add c14 _ 0x80001636#64 true 19#5 0#5 10#5 (by decide))
+        k_step_gen (wp_s_add c14 _ (KA.«copyout» + 0x74#64) true 19#5 0#5 10#5 (by decide))
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c15 hp15
         iintro Hk Hpc
-        k_step_gen (wp_s_branch c15 _ 0x80001638#64 true 72#13 10#5 0#5 (by decide) bop.BEQ)
+        k_step_gen (wp_s_branch c15 _ (KA.«copyout» + 0x76#64) true 72#13 10#5 0#5 (by decide) bop.BEQ)
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
           with [co_beq_zero _ hr0] next c16 hp16
         iintro Hk Hpc
-        k_step_gen (wp_s_addi c16 _ 0x80001680#64 true 4095#12 10#5 0#5 (by decide))
+        k_step_gen (wp_s_addi c16 _ (KA.«copyout» + 0xbe#64) true 4095#12 10#5 0#5 (by decide))
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [co_li_neg1] next c17 hp17
         iintro Hk Hpc
-        k_step_gen (wp_s_j c17 _ 0x80001682#64 true 2097120#21)
+        k_step_gen (wp_s_j c17 _ (KA.«copyout» + 0xc0#64) true 2097120#21)
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c18 hp18
         iintro Hk Hpc
         ihave HΦ' := wpNext_at _ _ _ c18 _ (fun h => (hp18 h).trans ((hp17 h).trans
@@ -548,10 +582,10 @@ theorem copyout_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
         have hpa2 : pte2pa (uLeaf (BitVec.extractLsb' 12 44 r) (PTE_W ||| PTE_U ||| PTE_R)) = r := by
           rw [UMemL.pte2pa_uLeaf _ _ (by simp only [PTE_W, PTE_U, PTE_R]; decide)]
           exact UMemL.pageAddr_of_valid r hval
-        k_step_gen (wp_s_add c14 _ 0x80001636#64 true 19#5 0#5 10#5 (by decide))
+        k_step_gen (wp_s_add c14 _ (KA.«copyout» + 0x74#64) true 19#5 0#5 10#5 (by decide))
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c15 hp15
         iintro Hk Hpc
-        k_step_gen (wp_s_branch c15 _ 0x80001638#64 true 72#13 10#5 0#5 (by decide) bop.BEQ)
+        k_step_gen (wp_s_branch c15 _ (KA.«copyout» + 0x76#64) true 72#13 10#5 0#5 (by decide) bop.BEQ)
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
           with [co_beq_ne _ hrne] next c16 hp16
         iintro Hk Hpc
@@ -569,7 +603,7 @@ theorem copyout_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
         · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
           rw [f9, e9]
     · -- the page is mapped already
-      k_step_gen (wp_s_branch c7 _ 0x80001628#64 true 18#13 10#5 0#5 (by decide) bop.BNE)
+      k_step_gen (wp_s_branch c7 _ (KA.«copyout» + 0x66#64) true 18#13 10#5 0#5 (by decide) bop.BNE)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [co_bne_ne _ hz] next c8 hp8
       iintro Hk Hpc
@@ -588,11 +622,11 @@ theorem copyout_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
       · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
         exact e9
   · -- va0 ≥ MAXVA: return -1
-    k_step_gen (wp_s_branch c1 _ 0x8000161a#64 false 70#13 25#5 9#5 (by decide) bop.BLTU)
+    k_step_gen (wp_s_branch c1 _ (KA.«copyout» + 0x58#64) false 70#13 25#5 9#5 (by decide) bop.BLTU)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [h25, co_bltu_out ((A + d) / 4096 * 4096) (by omega) (by omega)] next c2 hp2
     iintro Hk Hpc
-    k_step_gen (wp_s_addi c2 _ 0x80001660#64 true 4095#12 10#5 0#5 (by decide))
+    k_step_gen (wp_s_addi c2 _ (KA.«copyout» + 0x9e#64) true 4095#12 10#5 0#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [co_li_neg1] next c3 hp3
     iintro Hk Hpc
     ihave HΦ' := wpNext_at _ _ _ c3 _
@@ -602,6 +636,8 @@ theorem copyout_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
     refine ⟨?_, hext1, Or.inl ⟨rfl, ?_⟩⟩
     · simp [coKeep, RegMap.set_apply]
     · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
+
+theorem copyout_br_fffffffffffff7b6 : KA.«copyout» + 0xfffffffffffff7b6#64 = KA.«memmove» := by decide
 
 set_option maxHeartbeats 4000000 in
 /-- From `0x800015f8` with the chunk size `n` in `s2`: `memmove` of the
@@ -627,7 +663,7 @@ theorem copyout_move (MM : MEMMOVE) [Xv6G GF] [CurCtx]
     (h25 : R 25#5 = 0x3FFFFFFFFF#64) (h26 : R 26#5 = 0xFFFFFFFFFFFFF000#64)
     (h27 : R 27#5 = psz)
     (cur : CPU) :
-    kctx cur (((k.pushed 14).withSpie spie spp).withRegs R) ∗ pcIs cur 0x800015f8#64 ∗
+    kctx cur (((k.pushed 14).withSpie spie spp).withRegs R) ∗ pcIs cur (KA.«copyout» + 0x36#64) ∗
     procPtAt P2 (umemWrite (viewFaulted P P2 M) A (bs.take d)) ∗ byteBuf src0 dqs bs ∗
     wpNext k.sie k.proc cur (fun cpu' => iprop(∀ (spie2 spp2 : Bool) (R2 : RegMap)
       (P3 : UPtd) (M3 : Nat → List (BitVec 8)) (d2 : Nat) (pcv : BitVec 64),
@@ -635,8 +671,8 @@ theorem copyout_move (MM : MEMMOVE) [Xv6G GF] [CurCtx]
       kctx cpu' (((k.pushed 14).withSpie spie2 spp2).withRegs R2) -∗ pcIs cpu' pcv -∗
       procPtAt P3 M3 -∗ byteBuf src0 dqs bs -∗
       ⌜R2 2#5 = sp ∧
-        ((pcv = 0x80001662#64 ∧ coPost P M A bs P3 M3 (R2 10#5)) ∨
-         (pcv = 0x80001616#64 ∧ d < d2 ∧ d2 < bs.length ∧ P.ext P3 ∧
+        ((pcv = (KA.«copyout» + 0xa0#64) ∧ coPost P M A bs P3 M3 (R2 10#5)) ∨
+         (pcv = (KA.«copyout» + 0x54#64) ∧ d < d2 ∧ d2 < bs.length ∧ P.ext P3 ∧
           M3 = umemWrite (viewFaulted P P3 M) A (bs.take d2) ∧
           A + d2 ≤ 2 ^ 38 ∧ (A + d2) % 4096 = 0 ∧
           R2 23#5 = pageAddr P.root ∧ R2 27#5 = psz ∧
@@ -690,21 +726,21 @@ theorem copyout_move (MM : MEMMOVE) [Xv6G GF] [CurCtx]
   icases Hpg with ⟨Hpg1, Hpg2, Hpg3⟩
   icases Hsrc with ⟨Hsrc1, Hsrc2, Hsrc3⟩
   -- sub a0,s4,s1 ; addiw a2,s2,0 ; c.mv a1,s6 ; c.add a0,s3 ; jal memmove
-  k_step_gen (wp_s_sub cur _ 0x800015f8#64 false 10#5 20#5 9#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h20, h9, hoffB] next c1 hp1
+  k_step_gen (wp_s_sub cur _ (KA.«copyout» + 0x36#64) false 10#5 20#5 9#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h20, h9, co_offB A d hA64, co_offB' A d hA64] next c1 hp1
   iintro Hk Hpc
-  k_step_gen (wp_s_addiw c1 _ 0x800015fc#64 false 0#12 12#5 18#5 (by decide))
+  k_step_gen (wp_s_addiw c1 _ (KA.«copyout» + 0x3a#64) false 0#12 12#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [h18, co_sext_0, BitVec.add_zero, hsext] next c2 hp2
   iintro Hk Hpc
-  k_step_gen (wp_s_add c2 _ 0x80001600#64 true 11#5 0#5 22#5 (by decide))
+  k_step_gen (wp_s_add c2 _ (KA.«copyout» + 0x3e#64) true 11#5 0#5 22#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h22] next c3 hp3
   iintro Hk Hpc
-  k_step_gen (wp_s_add c3 _ 0x80001602#64 true 10#5 10#5 19#5 (by decide))
+  k_step_gen (wp_s_add c3 _ (KA.«copyout» + 0x40#64) true 10#5 10#5 19#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h19, hcomm] next c4 hp4
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c4 _ 0x80001604#64 false 2094964#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c5 hp5
+  k_step_gen (wp_s_jal c4 _ (KA.«copyout» + 0x42#64) false 2094964#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [copyout_br_fffffffffffff7b6] next c5 hp5
   iintro Hk Hpc
   iapply (co_memmove_call MM c5 _ ((bs.drop d).take n)
     (((umemWrite (viewFaulted P P2 M) A (bs.take d) ((A + d) / 4096)).drop ((A + d) % 4096)).take n)
@@ -748,29 +784,29 @@ theorem copyout_move (MM : MEMMOVE) [Xv6G GF] [CurCtx]
   have hadd4 : BitVec.ofNat 64 ((A + d) / 4096 * 4096) + 4096#64
       = BitVec.ofNat 64 ((A + d) / 4096 * 4096 + 4096) := by
     rw [show (4096#64 : BitVec 64) = BitVec.ofNat 64 4096 from rfl, co_ofNat_add]
-  k_step_gen (wp_s_sub c6 _ 0x80001608#64 false 21#5 21#5 18#5 (by decide))
+  k_step_gen (wp_s_sub c6 _ (KA.«copyout» + 0x46#64) false 21#5 21#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [g21, h21, g18, h18, hsub] next c7 hp7
   iintro Hk Hpc
-  k_step_gen (wp_s_add c7 _ 0x8000160c#64 true 22#5 22#5 18#5 (by decide))
+  k_step_gen (wp_s_add c7 _ (KA.«copyout» + 0x4a#64) true 22#5 22#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [g22, h22, g18, h18, hadd6] next c8 hp8
   iintro Hk Hpc
-  k_step_gen (wp_s_add c8 _ 0x8000160e#64 false 20#5 9#5 24#5 (by decide))
+  k_step_gen (wp_s_add c8 _ (KA.«copyout» + 0x4c#64) false 20#5 9#5 24#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [g9, h9, g24, h24, hadd4] next c9 hp9
+    with [g9, h9, g24, h24] next c9 hp9
   iintro Hk Hpc
   by_cases hlast : bs.length - d - n = 0
   · -- the last chunk: return 0
     have hfull : d + n = bs.length := by omega
-    k_step_gen (wp_s_branch c9 _ 0x80001612#64 false 70#13 21#5 0#5 (by decide) bop.BEQ)
+    k_step_gen (wp_s_branch c9 _ (KA.«copyout» + 0x50#64) false 70#13 21#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [co_beq_ofNat_zero _ hlast] next c10 hp10
     iintro Hk Hpc
-    k_step_gen (wp_s_addi c10 _ 0x80001658#64 true 0#12 10#5 0#5 (by decide))
+    k_step_gen (wp_s_addi c10 _ (KA.«copyout» + 0x96#64) true 0#12 10#5 0#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [co_li_zero] next c11 hp11
     iintro Hk Hpc
-    k_step_gen (wp_s_j c11 _ 0x8000165a#64 true 8#21)
+    k_step_gen (wp_s_j c11 _ (KA.«copyout» + 0x98#64) true 8#21)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c12 hp12
     iintro Hk Hpc
     ihave HΦ' := wpNext_at _ _ _ c12 _ (fun h => (hp12 h).trans ((hp11 h).trans
@@ -787,7 +823,7 @@ theorem copyout_move (MM : MEMMOVE) [Xv6G GF] [CurCtx]
       rcases hncase with h | h
       · exact h
       · omega
-    k_step_gen (wp_s_branch c9 _ 0x80001612#64 false 70#13 21#5 0#5 (by decide) bop.BEQ)
+    k_step_gen (wp_s_branch c9 _ (KA.«copyout» + 0x50#64) false 70#13 21#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [co_beq_ofNat_nz _ hlast (by omega)] next c10 hp10
     iintro Hk Hpc
@@ -803,10 +839,10 @@ theorem copyout_move (MM : MEMMOVE) [Xv6G GF] [CurCtx]
       rw [g23, h23]
     · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
       rw [g27, h27]
-    · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
+    · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, ← BitVec.ofNat_add]
       congr 1
       omega
-    · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
+    · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, ← BitVec.ofNat_add]
     · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
       congr 1
       omega
@@ -817,6 +853,8 @@ theorem copyout_move (MM : MEMMOVE) [Xv6G GF] [CurCtx]
     · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
       rw [g24, h24]
 
+
+theorem copyout_br_fffffffffffff9ec : KA.«copyout» + 0xfffffffffffff9ec#64 = KA.«walk» := by decide
 
 set_option maxHeartbeats 4000000 in
 /-- From `0x8000163a`: `walk` to the page's entry, the `PTE_W` test, and
@@ -839,7 +877,7 @@ theorem copyout_check (W : WALK_NOALLOC) (MM : MEMMOVE) [Xv6G GF] [CurCtx]
     (h25 : R 25#5 = 0x3FFFFFFFFF#64) (h26 : R 26#5 = 0xFFFFFFFFFFFFF000#64)
     (h27 : R 27#5 = psz)
     (cur : CPU) :
-    kctx cur (((k.pushed 14).withSpie spie spp).withRegs R) ∗ pcIs cur 0x8000163a#64 ∗
+    kctx cur (((k.pushed 14).withSpie spie spp).withRegs R) ∗ pcIs cur (KA.«copyout» + 0x78#64) ∗
     procPtAt P2 (umemWrite (viewFaulted P P2 M) A (bs.take d)) ∗ byteBuf src0 dqs bs ∗
     wpNext k.sie k.proc cur (fun cpu' => iprop(∀ (spie2 spp2 : Bool) (R2 : RegMap)
       (P3 : UPtd) (M3 : Nat → List (BitVec 8)) (d2 : Nat) (pcv : BitVec 64),
@@ -847,8 +885,8 @@ theorem copyout_check (W : WALK_NOALLOC) (MM : MEMMOVE) [Xv6G GF] [CurCtx]
       kctx cpu' (((k.pushed 14).withSpie spie2 spp2).withRegs R2) -∗ pcIs cpu' pcv -∗
       procPtAt P3 M3 -∗ byteBuf src0 dqs bs -∗
       ⌜R2 2#5 = sp ∧
-        ((pcv = 0x80001662#64 ∧ coPost P M A bs P3 M3 (R2 10#5)) ∨
-         (pcv = 0x80001616#64 ∧ d < d2 ∧ d2 < bs.length ∧ P.ext P3 ∧
+        ((pcv = (KA.«copyout» + 0xa0#64) ∧ coPost P M A bs P3 M3 (R2 10#5)) ∨
+         (pcv = (KA.«copyout» + 0x54#64) ∧ d < d2 ∧ d2 < bs.length ∧ P.ext P3 ∧
           M3 = umemWrite (viewFaulted P P3 M) A (bs.take d2) ∧
           A + d2 ≤ 2 ^ 38 ∧ (A + d2) % 4096 = 0 ∧
           R2 23#5 = pageAddr P.root ∧ R2 27#5 = psz ∧
@@ -858,22 +896,22 @@ theorem copyout_check (W : WALK_NOALLOC) (MM : MEMMOVE) [Xv6G GF] [CurCtx]
           R2 24#5 = 4096#64))⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cur := by
   have hoff : (A + d) % 4096 < 4096 := Nat.mod_lt _ (by omega)
-  have hnval := co_n_val3 (A + d) hA64
+  have hnval := co_nval A d hA64
   iintro ⟨Hk, Hpc, HP, Hsrc, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases UMemL.procPtAt_elim _ _ $$ HP with ⟨%hwf2, ⟨%t2, %ht2, Htree⟩, Hum⟩
   -- c.li a2,0 ; c.mv a1,s1 ; c.mv a0,s7 ; jal walk
-  k_step_gen (wp_s_addi cur _ 0x8000163a#64 true 0#12 12#5 0#5 (by decide))
+  k_step_gen (wp_s_addi cur _ (KA.«copyout» + 0x78#64) true 0#12 12#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [co_li_zero] next c1 hp1
   iintro Hk Hpc
-  k_step_gen (wp_s_add c1 _ 0x8000163c#64 true 11#5 0#5 9#5 (by decide))
+  k_step_gen (wp_s_add c1 _ (KA.«copyout» + 0x7a#64) true 11#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9] next c2 hp2
   iintro Hk Hpc
-  k_step_gen (wp_s_add c2 _ 0x8000163e#64 true 10#5 0#5 23#5 (by decide))
+  k_step_gen (wp_s_add c2 _ (KA.«copyout» + 0x7c#64) true 10#5 0#5 23#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h23] next c3 hp3
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c3 _ 0x80001640#64 false 2095470#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hp4
+  k_step_gen (wp_s_jal c3 _ (KA.«copyout» + 0x7e#64) false 2095470#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [copyout_br_fffffffffffff9ec] next c4 hp4
   iintro Hk Hpc
   iapply (co_walk_call W c4 _ (DFrac.own 1) t2 ?hKw ?hrow ?hvaw ?hallw ht2.2.1) $$ [- $Hk $Hpc]
   rotate_right 1
@@ -903,11 +941,11 @@ theorem copyout_check (W : WALK_NOALLOC) (MM : MEMMOVE) [Xv6G GF] [CurCtx]
     · exact absurd hcomp hnc
     · exact ha
   icases PtRun.ptreeOwn_leaf_acc 2 (DFrac.own 1) t2 _ hcomp $$ Htree with ⟨Hcell, Hclose⟩
-  k_step_gen (wp_s_ld c5 _ 0x80001644#64 true 0#12 15#5 10#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c5 _ (KA.«copyout» + 0x82#64) true 0#12 15#5 10#5 (by decide) (by decide)
       (DFrac.own 1) (t2.entAt 2 (vpnOf (BitVec.ofNat 64 ((A + d) / 4096 * 4096)))))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [haddr] next c6 hp6
   iintro Hk Hpc Hcell
-  k_step_gen (wp_s_andi c6 _ 0x80001646#64 true 4#12 15#5 15#5 (by decide))
+  k_step_gen (wp_s_andi c6 _ (KA.«copyout» + 0x84#64) true 4#12 15#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [co_sext_4] next c7 hp7
   iintro Hk Hpc
   ihave Htree := Hclose $$ %(t2.entAt 2 (vpnOf (BitVec.ofNat 64 ((A + d) / 4096 * 4096)))) Hcell
@@ -921,14 +959,14 @@ theorem copyout_check (W : WALK_NOALLOC) (MM : MEMMOVE) [Xv6G GF] [CurCtx]
     simpa only [PTE_W] using this
   by_cases hW : w &&& 4#64 = 0#64
   · -- the page is read-only: return -1
-    k_step_gen (wp_s_branch c7 _ 0x80001648#64 true 60#13 15#5 0#5 (by decide) bop.BEQ)
+    k_step_gen (wp_s_branch c7 _ (KA.«copyout» + 0x86#64) true 60#13 15#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [co_beq_zero _ (hWeq.trans hW)] next c8 hp8
     iintro Hk Hpc
-    k_step_gen (wp_s_addi c8 _ 0x80001684#64 true 4095#12 10#5 0#5 (by decide))
+    k_step_gen (wp_s_addi c8 _ (KA.«copyout» + 0xc2#64) true 4095#12 10#5 0#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [co_li_neg1] next c9 hp9
     iintro Hk Hpc
-    k_step_gen (wp_s_j c9 _ 0x80001686#64 true 2097116#21)
+    k_step_gen (wp_s_j c9 _ (KA.«copyout» + 0xc4#64) true 2097116#21)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c10 hp10
     iintro Hk Hpc
     ihave HΦ' := wpNext_at _ _ _ c10 _ (fun h => (hp10 h).trans ((hp9 h).trans
@@ -941,20 +979,20 @@ theorem copyout_check (W : WALK_NOALLOC) (MM : MEMMOVE) [Xv6G GF] [CurCtx]
     · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
       decide
   · -- writable: the chunk size, then the copy
-    k_step_gen (wp_s_branch c7 _ 0x80001648#64 true 60#13 15#5 0#5 (by decide) bop.BEQ)
+    k_step_gen (wp_s_branch c7 _ (KA.«copyout» + 0x86#64) true 60#13 15#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [co_beq_ne _ (fun hc => hW (hWeq.symm.trans hc))] next c8 hp8
     iintro Hk Hpc
-    k_step_gen (wp_s_sub c8 _ 0x8000164a#64 false 18#5 9#5 20#5 (by decide))
+    k_step_gen (wp_s_sub c8 _ (KA.«copyout» + 0x88#64) false 18#5 9#5 20#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g9, h9, g20, h20] next c9 hp9
     iintro Hk Hpc
-    k_step_gen (wp_s_add c9 _ 0x8000164e#64 true 18#5 18#5 24#5 (by decide))
+    k_step_gen (wp_s_add c9 _ (KA.«copyout» + 0x8c#64) true 18#5 18#5 24#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [g24, h24, hnval] next c10 hp10
     iintro Hk Hpc
     by_cases hge : 4096 - (A + d) % 4096 ≤ bs.length - d
     · -- the whole rest of the page
-      k_step_gen (wp_s_branch c10 _ 0x80001650#64 false 8104#13 21#5 18#5 (by decide) bop.BGEU)
+      k_step_gen (wp_s_branch c10 _ (KA.«copyout» + 0x8e#64) false 8104#13 21#5 18#5 (by decide) bop.BGEU)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [g21, h21, co_bgeu_ge _ _ (by omega) (by omega) hge] next c11 hp11
       iintro Hk Hpc
@@ -965,6 +1003,7 @@ theorem copyout_check (W : WALK_NOALLOC) (MM : MEMMOVE) [Xv6G GF] [CurCtx]
         ?hsp' ?h9' ?h18' ?h19' ?h20' ?h21' ?h22' ?h23' ?h24' ?h25' ?h26' ?h27' _)
         $$ [- $Hk $Hpc $HP $Hsrc]
       rotate_right 1
+      simp only [← BitVec.ofNat_add]
       iframe
       case hsp' => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
                    exact (g2.trans hsp : _)
@@ -990,15 +1029,15 @@ theorem copyout_check (W : WALK_NOALLOC) (MM : MEMMOVE) [Xv6G GF] [CurCtx]
       case h27' => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
                    rw [g27, h27]
     · -- only what is left of the buffer
-      k_step_gen (wp_s_branch c10 _ 0x80001650#64 false 8104#13 21#5 18#5 (by decide) bop.BGEU)
+      k_step_gen (wp_s_branch c10 _ (KA.«copyout» + 0x8e#64) false 8104#13 21#5 18#5 (by decide) bop.BGEU)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [g21, h21, co_bgeu_lt (bs.length - d) (4096 - (A + d) % 4096)
           (by omega) (by omega) (by omega)] next c11 hp11
       iintro Hk Hpc
-      k_step_gen (wp_s_add c11 _ 0x80001654#64 true 18#5 0#5 21#5 (by decide))
+      k_step_gen (wp_s_add c11 _ (KA.«copyout» + 0x92#64) true 18#5 0#5 21#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g21, h21] next c12 hp12
       iintro Hk Hpc
-      k_step_gen (wp_s_j c12 _ 0x80001656#64 true 2097058#21)
+      k_step_gen (wp_s_j c12 _ (KA.«copyout» + 0x94#64) true 2097058#21)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c13 hp13
       iintro Hk Hpc
       ihave HΦ := wpNext_shift _ _ _ _ _ (fun h => (hp13 h).trans ((hp12 h).trans
@@ -1009,6 +1048,7 @@ theorem copyout_check (W : WALK_NOALLOC) (MM : MEMMOVE) [Xv6G GF] [CurCtx]
         ?hsp2' ?h92' ?h182' ?h192' ?h202' ?h212' ?h222' ?h232' ?h242' ?h252' ?h262' ?h272' _)
         $$ [- $Hk $Hpc $HP $Hsrc]
       rotate_right 1
+      simp only [← BitVec.ofNat_add]
       iframe
       case hsp2' => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
                     exact (g2.trans hsp : _)
@@ -1053,7 +1093,7 @@ theorem copyout_iter (WA : WALKADDR) (VF : VMFAULT) (W : WALK_NOALLOC) (MM : MEM
     (h25 : R 25#5 = 0x3FFFFFFFFF#64) (h26 : R 26#5 = 0xFFFFFFFFFFFFF000#64)
     (h27 : R 27#5 = psz)
     (cur : CPU) :
-    kctx cur (((k.pushed 14).withSpie spie spp).withRegs R) ∗ pcIs cur 0x80001616#64 ∗
+    kctx cur (((k.pushed 14).withSpie spie spp).withRegs R) ∗ pcIs cur (KA.«copyout» + 0x54#64) ∗
     isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     procPtAt P1 (umemWrite (viewFaulted P P1 M) A (bs.take d)) ∗ byteBuf src0 dqs bs ∗
     wpNext k.sie k.proc cur (fun cpu' => iprop(∀ (spie2 spp2 : Bool) (R2 : RegMap)
@@ -1062,8 +1102,8 @@ theorem copyout_iter (WA : WALKADDR) (VF : VMFAULT) (W : WALK_NOALLOC) (MM : MEM
       kctx cpu' (((k.pushed 14).withSpie spie2 spp2).withRegs R2) -∗ pcIs cpu' pcv -∗
       procPtAt P3 M3 -∗ byteBuf src0 dqs bs -∗
       ⌜R2 2#5 = sp ∧
-        ((pcv = 0x80001662#64 ∧ coPost P M A bs P3 M3 (R2 10#5)) ∨
-         (pcv = 0x80001616#64 ∧ d < d2 ∧ d2 < bs.length ∧ P.ext P3 ∧
+        ((pcv = (KA.«copyout» + 0xa0#64) ∧ coPost P M A bs P3 M3 (R2 10#5)) ∨
+         (pcv = (KA.«copyout» + 0x54#64) ∧ d < d2 ∧ d2 < bs.length ∧ P.ext P3 ∧
           M3 = umemWrite (viewFaulted P P3 M) A (bs.take d2) ∧
           A + d2 ≤ 2 ^ 38 ∧ (A + d2) % 4096 = 0 ∧
           R2 23#5 = pageAddr P.root ∧ R2 27#5 = psz ∧
@@ -1123,14 +1163,14 @@ theorem copyout_loop (WA : WALKADDR) (VF : VMFAULT) (W : WALK_NOALLOC) (MM : MEM
       (_ : R 23#5 = pageAddr P.root) (_ : R 24#5 = 4096#64)
       (_ : R 25#5 = 0x3FFFFFFFFF#64) (_ : R 26#5 = 0xFFFFFFFFFFFFF000#64)
       (_ : R 27#5 = psz) (cur : CPU),
-    kctx cur (((k.pushed 14).withSpie spie spp).withRegs R) ∗ pcIs cur 0x80001616#64 ∗
+    kctx cur (((k.pushed 14).withSpie spie spp).withRegs R) ∗ pcIs cur (KA.«copyout» + 0x54#64) ∗
     isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     procPtAt P1 (umemWrite (viewFaulted P P1 M) A (bs.take d)) ∗ byteBuf src0 dqs bs ∗
     wpNext k.sie k.proc cur (fun cpu' => iprop(∀ (spie2 spp2 : Bool) (R2 : RegMap)
       (P3 : UPtd) (M3 : Nat → List (BitVec 8)),
       ⌜k.sie = false → spie2 = spie ∧ spp2 = spp⌝ -∗
       kctx cpu' (((k.pushed 14).withSpie spie2 spp2).withRegs R2) -∗
-      pcIs cpu' 0x80001662#64 -∗
+      pcIs cpu' (KA.«copyout» + 0xa0#64) -∗
       procPtAt P3 M3 -∗ byteBuf src0 dqs bs -∗
       ⌜R2 2#5 = sp ∧ coPost P M A bs P3 M3 (R2 10#5)⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cur := by
@@ -1184,22 +1224,22 @@ theorem copyout_proof (WA : WALKADDR) (VF : VMFAULT) (W : WALK_NOALLOC) (MM : ME
     COPYOUT :=
   ⟨fun {hlc GF} _ _ _ cpu k γl γk P M dqs bs hnoff hK hlk hroot hsz hlen hlen' => by
   unfold wp_copyout_body
-  simp only [copyoutAddr, KernelSyms.«copyout»]
+  simp only [copyoutAddr]
   iintro ⟨Hk, Hpc, #Hlk, #Hav, HP, Hsrc, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   by_cases hnil : bs.length = 0
   · -- nothing to copy
     have hbs : bs = [] := List.length_eq_zero_iff.mp hnil
     have h0 : k.regs 14#5 = 0#64 := by rw [hlen, hnil]
-    k_step_gen (wp_s_branch cpu _ 0x800015c2#64 true 154#13 14#5 0#5 (by decide) bop.BEQ)
+    k_step_gen (wp_s_branch cpu _ KA.«copyout» true 154#13 14#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [KCtx.rget_eq, co_beq_zero _ h0] next c1 hp1
     iintro Hk Hpc
-    k_step_gen (wp_s_addi c1 _ 0x8000165c#64 true 0#12 10#5 0#5 (by decide))
+    k_step_gen (wp_s_addi c1 _ (KA.«copyout» + 0x9a#64) true 0#12 10#5 0#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [co_li_zero, KCtx.setReg_eq_withRegs] next c2 hp2
     iintro Hk Hpc
-    k_step_gen (wp_s_ret c2 _ 0x8000165e#64 true 1#5)
+    k_step_gen (wp_s_ret c2 _ (KA.«copyout» + 0x9c#64) true 1#5)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
     iintro Hk Hpc
     ihave Hk := co_kctx_self c3 k _ $$ Hk
@@ -1223,11 +1263,11 @@ theorem copyout_proof (WA : WALKADDR) (VF : VMFAULT) (W : WALK_NOALLOC) (MM : ME
       rw [BitVec.toNat_ofNat] at this
       simp only [BitVec.toNat_ofNat] at this
       omega
-    k_step_gen (wp_s_branch cpu _ 0x800015c2#64 true 154#13 14#5 0#5 (by decide) bop.BEQ)
+    k_step_gen (wp_s_branch cpu _ KA.«copyout» true 154#13 14#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [KCtx.rget_eq, co_beq_ne _ hlenne] next c0 hp0
     iintro Hk Hpc
-    iapply (wp_prologue14_gen c0 _ 0x800015c4#64 (by k_norm_g; omega)) $$ [- $Hk $Hpc]
+    iapply (wp_prologue14_gen c0 _ (KA.«copyout» + 0x2#64) (by k_norm_g; omega)) $$ [- $Hk $Hpc]
     rotate_right 1
     k_code (text_instr _ _ _ _ rfl rfl) Htext
     k_norm_g
@@ -1237,34 +1277,34 @@ theorem copyout_proof (WA : WALKADDR) (VF : VMFAULT) (W : WALK_NOALLOC) (MM : ME
     iintro %c1 %hp1 Hk Hpc Hframe
     k_norm_g
     -- the cursor set-up
-    k_step_gen (wp_s_add c1 _ 0x800015e2#64 true 23#5 0#5 10#5 (by decide))
+    k_step_gen (wp_s_add c1 _ (KA.«copyout» + 0x20#64) true 23#5 0#5 10#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hroot] next c2 hp2
     iintro Hk Hpc
-    k_step_gen (wp_s_add c2 _ 0x800015e4#64 true 27#5 0#5 11#5 (by decide))
+    k_step_gen (wp_s_add c2 _ (KA.«copyout» + 0x22#64) true 27#5 0#5 11#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
     iintro Hk Hpc
-    k_step_gen (wp_s_add c3 _ 0x800015e6#64 true 20#5 0#5 12#5 (by decide))
+    k_step_gen (wp_s_add c3 _ (KA.«copyout» + 0x24#64) true 20#5 0#5 12#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hp4
     iintro Hk Hpc
-    k_step_gen (wp_s_add c4 _ 0x800015e8#64 true 22#5 0#5 13#5 (by decide))
+    k_step_gen (wp_s_add c4 _ (KA.«copyout» + 0x26#64) true 22#5 0#5 13#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c5 hp5
     iintro Hk Hpc
-    k_step_gen (wp_s_add c5 _ 0x800015ea#64 true 21#5 0#5 14#5 (by decide))
+    k_step_gen (wp_s_add c5 _ (KA.«copyout» + 0x28#64) true 21#5 0#5 14#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hlen] next c6 hp6
     iintro Hk Hpc
-    k_step_gen (wp_s_lui c6 _ 0x800015ec#64 true 0xfffff#20 26#5 (by decide))
+    k_step_gen (wp_s_lui c6 _ (KA.«copyout» + 0x2a#64) true 0xfffff#20 26#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [co_lui_mask] next c7 hp7
     iintro Hk Hpc
-    k_step_gen (wp_s_addi c7 _ 0x800015ee#64 true 4095#12 25#5 0#5 (by decide))
+    k_step_gen (wp_s_addi c7 _ (KA.«copyout» + 0x2c#64) true 4095#12 25#5 0#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [co_li_neg1] next c8 hp8
     iintro Hk Hpc
-    k_step_gen (wp_s_srli c8 _ 0x800015f0#64 false 26#6 25#5 25#5 (by decide))
+    k_step_gen (wp_s_srli c8 _ (KA.«copyout» + 0x2e#64) false 26#6 25#5 25#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [co_srli_max] next c9 hp9
     iintro Hk Hpc
-    k_step_gen (wp_s_lui c9 _ 0x800015f4#64 true 1#20 24#5 (by decide))
+    k_step_gen (wp_s_lui c9 _ (KA.«copyout» + 0x32#64) true 1#20 24#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [co_lui_4096] next c10 hp10
     iintro Hk Hpc
-    k_step_gen (wp_s_j c10 _ 0x800015f6#64 true 32#21)
+    k_step_gen (wp_s_j c10 _ (KA.«copyout» + 0x34#64) true 32#21)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c11 hp11
     iintro Hk Hpc
     have hpinA : k.sie = false ∨ k.proc = 0#64 → c11 = cpu := fun h =>
@@ -1298,7 +1338,7 @@ theorem copyout_proof (WA : WALKADDR) (VF : VMFAULT) (W : WALK_NOALLOC) (MM : ME
     iintro %c12 %hp12 %spie2 %spp2 %R2 %P3 %M3 %hsp2 Hk Hpc HP Hsrc %hpost
     obtain ⟨hs2, hres⟩ := hpost
     rw [co_pushed_withSpie] at *
-    iapply (wp_epilogue14_gen c12 (k.withSpie spie2 spp2) 0x80001662#64
+    iapply (wp_epilogue14_gen c12 (k.withSpie spie2 spp2) (KA.«copyout» + 0xa0#64)
       (by simp only [KCtx.withSpie_avail]; omega) R2 hs2
       (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5) (k.regs 20#5)
       (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) (k.regs 26#5)
@@ -1492,10 +1532,10 @@ theorem wp_epilogueCstr_gen [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (
 
 /-! ## Return addresses of `copyinstr` -/
 
-theorem cs_ret_16fe : jumpPc 0x800017ac#64 = 0x800017ac#64 := by
-  simp only [jumpPc, BitVec.reduceAnd]
-theorem cs_ret_16b0 : jumpPc 0x8000175e#64 = 0x8000175e#64 := by
-  simp only [jumpPc, BitVec.reduceAnd]
+theorem cs_ret_16fe : jumpPc (KA.«copyinstr» + 0x88#64) = (KA.«copyinstr» + 0x88#64) := by
+  decide
+theorem cs_ret_16b0 : jumpPc (KA.«copyinstr» + 0x3a#64) = (KA.«copyinstr» + 0x3a#64) := by
+  decide
 
 /-! ## The registers `copyinstr`'s body keeps across a page resolution -/
 
@@ -1519,7 +1559,11 @@ def csNoNul (view : Nat → List (BitVec 8)) (A d : Nat) : Prop :=
 set_option maxHeartbeats 4000000 in
 /-- From the loop head `0x800017a0`: `va0 = PGROUNDDOWN(srcva)`, `walkaddr`
 and, when that fails, `vmfault`.  Either the function has left for its `-1`
-exit (`0x80001772`), or `0x800017ae` is reached with the page mapped. -/
+exit (`(KernelSyms.«copyinstr» + 0x4e)`), or `(KernelSyms.«copyinstr» + 0x8a)` is reached with the page mapped. -/
+theorem copyinstr_br_fffffffffffffe22 : KA.«copyinstr» + 0xfffffffffffffe22#64 = KA.«vmfault» := by decide
+
+theorem copyinstr_br_fffffffffffff924 : KA.«copyinstr» + 0xfffffffffffff924#64 = KA.«walkaddr» := by decide
+
 theorem cstr_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
     (k : KCtx) (γl : GName) (γk : KmemNames)
     (P : UPtd) (M : Nat → List (BitVec 8)) (old : List (BitVec 8)) (A : Nat)
@@ -1534,7 +1578,7 @@ theorem cstr_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
     (h9 : R 9#5 = BitVec.ofNat 64 (A + d)) (h23 : R 23#5 = 0xFFFFFFFFFFFFF000#64)
     (h25 : R 25#5 = 1#64)
     (cur : CPU) :
-    kctx cur (((k.pushed 12).withSpie spie spp).withRegs R) ∗ pcIs cur 0x800017a0#64 ∗
+    kctx cur (((k.pushed 12).withSpie spie spp).withRegs R) ∗ pcIs cur (KA.«copyinstr» + 0x7c#64) ∗
     isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     procPtAt P1 (viewFaulted P P1 M) ∗
     byteBuf dst0 (DFrac.own 1) (umemRead (viewFaulted P P1 M) A d ++ old.drop d) ∗
@@ -1546,14 +1590,16 @@ theorem cstr_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
       byteBuf dst0 (DFrac.own 1) (umemRead (viewFaulted P P2 M) A d ++ old.drop d) -∗
       ⌜csKeep R R2 ∧ P.ext P2 ∧
         umemRead (viewFaulted P P2 M) A d = umemRead (viewFaulted P P1 M) A d ∧
-        ((pcv = 0x80001772#64 ∧ R2 10#5 = -1#64) ∨
-         (pcv = 0x800017ae#64 ∧ get? P2.um ((A + d) / 4096) = some w ∧
+        ((pcv = (KA.«copyinstr» + 0x4e#64) ∧ R2 10#5 = -1#64) ∨
+         (pcv = (KA.«copyinstr» + 0x8a#64) ∧ get? P2.um ((A + d) / 4096) = some w ∧
           R2 10#5 = pte2pa w ∧ R2 18#5 = BitVec.ofNat 64 ((A + d) / 4096 * 4096) ∧
           (A + d) / 4096 * 4096 < 2 ^ 38))⌝ -∗
       wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cur := by
-  have hva0 : BitVec.ofNat 64 (A + d) &&& 0xFFFFFFFFFFFFF000#64
+  -- `k_norm` splits `BitVec.ofNat 64 (A + d)`, so state the fold on the split form.
+  have hva0 : BitVec.ofNat 64 A + BitVec.ofNat 64 d &&& 0xFFFFFFFFFFFFF000#64
       = BitVec.ofNat 64 ((A + d) / 4096 * 4096) := by
+    rw [← BitVec.ofNat_add]
     apply BitVec.eq_of_toNat_eq
     rw [co_pgdown_toNat, BitVec.toNat_ofNat, BitVec.toNat_ofNat, Nat.mod_eq_of_lt hA64]
     omega
@@ -1562,17 +1608,17 @@ theorem cstr_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
   iintro ⟨Hk, Hpc, #Hlk, #Hav, HP, Hdst, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- and s2,s1,s7
-  k_step_gen (wp_s_and cur _ 0x800017a0#64 false 18#5 9#5 23#5 (by decide))
+  k_step_gen (wp_s_and cur _ (KA.«copyinstr» + 0x7c#64) false 18#5 9#5 23#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, h23, hva0] next c1 hp1
   iintro Hk Hpc
-  k_step_gen (wp_s_add c1 _ 0x800017a4#64 true 11#5 0#5 18#5 (by decide))
+  k_step_gen (wp_s_add c1 _ (KA.«copyinstr» + 0x80#64) true 11#5 0#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c2 hp2
   iintro Hk Hpc
-  k_step_gen (wp_s_add c2 _ 0x800017a6#64 true 10#5 0#5 22#5 (by decide))
+  k_step_gen (wp_s_add c2 _ (KA.«copyinstr» + 0x82#64) true 10#5 0#5 22#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h22] next c3 hp3
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c3 _ 0x800017a8#64 false 2095264#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hp4
+  k_step_gen (wp_s_jal c3 _ (KA.«copyinstr» + 0x84#64) false 2095264#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [copyinstr_br_fffffffffffff924] next c4 hp4
   iintro Hk Hpc
   icases UMemL.procPtAt_elim _ _ $$ HP with ⟨%hwf1, ⟨%t1, %ht1, Htree⟩, Hum⟩
   iapply (co_walkaddr_call WA c4 _ (DFrac.own 1) t1 P1.leaves ?hKa ?hro ht1.2) $$ [- $Hk $Hpc]
@@ -1593,24 +1639,24 @@ theorem cstr_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
   case' _ => iframe
   by_cases hz : R2 10#5 = 0#64
   · -- not mapped: vmfault
-    k_step_gen (wp_s_branch c5 _ 0x800017ac#64 true 8102#13 10#5 0#5 (by decide) bop.BEQ)
+    k_step_gen (wp_s_branch c5 _ (KA.«copyinstr» + 0x88#64) true 8102#13 10#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [co_beq_zero _ hz] next c6 hp6
     iintro Hk Hpc
-    k_step_gen (wp_s_add c6 _ 0x80001752#64 true 13#5 0#5 25#5 (by decide))
+    k_step_gen (wp_s_add c6 _ (KA.«copyinstr» + 0x2e#64) true 13#5 0#5 25#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e25, h25] next c7 hp7
     iintro Hk Hpc
-    k_step_gen (wp_s_add c7 _ 0x80001754#64 true 12#5 0#5 18#5 (by decide))
+    k_step_gen (wp_s_add c7 _ (KA.«copyinstr» + 0x30#64) true 12#5 0#5 18#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e18] next c8 hp8
     iintro Hk Hpc
-    k_step_gen (wp_s_add c8 _ 0x80001756#64 true 11#5 0#5 24#5 (by decide))
+    k_step_gen (wp_s_add c8 _ (KA.«copyinstr» + 0x32#64) true 11#5 0#5 24#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e24, h24] next c9 hp9
     iintro Hk Hpc
-    k_step_gen (wp_s_add c9 _ 0x80001758#64 true 10#5 0#5 22#5 (by decide))
+    k_step_gen (wp_s_add c9 _ (KA.«copyinstr» + 0x34#64) true 10#5 0#5 22#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e22, h22] next c10 hp10
     iintro Hk Hpc
-    k_step_gen (wp_s_jal c10 _ 0x8000175a#64 false 2096620#21 1#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c11 hp11
+    k_step_gen (wp_s_jal c10 _ (KA.«copyinstr» + 0x36#64) false 2096620#21 1#5 (by decide))
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [copyinstr_br_fffffffffffffe22] next c11 hp11
     iintro Hk Hpc
     iapply (co_vmfault_call VF c11 _ γl γk P1 (viewFaulted P P1 M)
       ?hn2 ?hK2 ?hl2 ?hro2 ?hsz2) $$ [- $Hk $Hpc]
@@ -1634,14 +1680,14 @@ theorem cstr_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
     have hsp3' : k.sie = false → spie2 = spie ∧ spp2 = spp := hsp3
     icases HPost with ⟨⟨%hr0, HP⟩ | ⟨%r, %hrf, HP⟩⟩
     · -- vmfault failed: return -1
-      k_step_gen (wp_s_branch c12 _ 0x8000175e#64 true 80#13 10#5 0#5 (by decide) bop.BNE)
+      k_step_gen (wp_s_branch c12 _ (KA.«copyinstr» + 0x3a#64) true 80#13 10#5 0#5 (by decide) bop.BNE)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [co_bne_zero _ hr0] next c13 hp13
       iintro Hk Hpc
-      k_step_gen (wp_s_addi c13 _ 0x80001760#64 true 4095#12 10#5 0#5 (by decide))
+      k_step_gen (wp_s_addi c13 _ (KA.«copyinstr» + 0x3c#64) true 4095#12 10#5 0#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [co_li_neg1] next c14 hp14
       iintro Hk Hpc
-      k_step_gen (wp_s_j c14 _ 0x80001762#64 true 16#21)
+      k_step_gen (wp_s_j c14 _ (KA.«copyinstr» + 0x3e#64) true 16#21)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c15 hp15
       iintro Hk Hpc
       ihave HΦ' := wpNext_at _ _ _ c15 _ (fun h => (hp15 h).trans ((hp14 h).trans
@@ -1682,7 +1728,7 @@ theorem cstr_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
         rw [UMemL.pte2pa_uLeaf _ _ (by simp only [PTE_W, PTE_U, PTE_R]; decide)]
         exact UMemL.pageAddr_of_valid r hval
       rw [hvpn, ← hVF, hbufeq]
-      k_step_gen (wp_s_branch c12 _ 0x8000175e#64 true 80#13 10#5 0#5 (by decide) bop.BNE)
+      k_step_gen (wp_s_branch c12 _ (KA.«copyinstr» + 0x3a#64) true 80#13 10#5 0#5 (by decide) bop.BNE)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [co_bne_ne _ hrne] next c13 hp13
       iintro Hk Hpc
@@ -1698,7 +1744,7 @@ theorem cstr_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
       · rw [hR3, hpa2]
       · rw [f18, e18]
   · -- the page is mapped already
-    k_step_gen (wp_s_branch c5 _ 0x800017ac#64 true 8102#13 10#5 0#5 (by decide) bop.BEQ)
+    k_step_gen (wp_s_branch c5 _ (KA.«copyinstr» + 0x88#64) true 8102#13 10#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [co_beq_ne _ hz] next c6 hp6
     iintro Hk Hpc
@@ -1773,9 +1819,10 @@ theorem cs_ite_beq_byte {α : Type _} (b : BitVec 8) (x y : α) :
     simp [bcond, hb, this]
 
 theorem cs_a4 (pw dst0 : BitVec 64) (off d j : Nat) :
-    pw + (BitVec.ofNat 64 off + (-(dst0 + BitVec.ofNat 64 d) + (dst0 + BitVec.ofNat 64 (d + j))))
+    pw + (BitVec.ofNat 64 off +
+        (-(dst0 + BitVec.ofNat 64 d) + (dst0 + (BitVec.ofNat 64 d + BitVec.ofNat 64 j))))
       = pw + BitVec.ofNat 64 (off + j) := by
-  rw [← co_ofNat_add d j, ← co_ofNat_add off j]
+  rw [← co_ofNat_add off j]
   generalize BitVec.ofNat 64 off = o
   generalize BitVec.ofNat 64 d = dd
   generalize BitVec.ofNat 64 j = jj
@@ -1794,6 +1841,16 @@ theorem cs_a5_step (dst0 : BitVec 64) (m : Nat) :
     dst0 + (BitVec.ofNat 64 m + 1#64) = dst0 + BitVec.ofNat 64 (m + 1) := by
   rw [show (1#64 : BitVec 64) = BitVec.ofNat 64 1 from rfl, co_ofNat_add]
 
+/-- `BitVec.ofNat 64 (m+1)` as `k_norm` leaves it (`BitVec.ofNat_add` splits the sum). -/
+theorem cs_a5_succ (m : Nat) : BitVec.ofNat 64 m + 1#64 = BitVec.ofNat 64 (m + 1) := by
+  rw [show (1#64 : BitVec 64) = BitVec.ofNat 64 1 from rfl, co_ofNat_add]
+
+/-- `a5` after `addi a5,1`, in `k_norm_g`'s normal form. -/
+theorem cs_a5_split (dst0 : BitVec 64) (d j : Nat) :
+    dst0 + (BitVec.ofNat 64 d + (BitVec.ofNat 64 j + 1#64))
+      = dst0 + BitVec.ofNat 64 (d + (j + 1)) := by
+  rw [cs_a5_succ, co_ofNat_add]
+
 theorem cs_ofNat_ne (a b : Nat) (ha : a < 2 ^ 64) (hb : b < 2 ^ 64) (h : a ≠ b)
     (dst0 : BitVec 64) : dst0 + BitVec.ofNat 64 a ≠ dst0 + BitVec.ofNat 64 b := by
   intro hc
@@ -1802,10 +1859,23 @@ theorem cs_ofNat_ne (a b : Nat) (ha : a < 2 ^ 64) (hb : b < 2 ^ 64) (h : a ≠ b
     simpa [BitVec.add_sub_cancel, BitVec.add_comm dst0] using this
   exact h ((co_ofNat_eq_iff a b ha hb).mp this)
 
+/-- The inner loop test `bne a5,a2`, both sides in `k_norm_g`'s normal form. -/
+theorem cs_step_eq (dst0 : BitVec 64) (d j n : Nat) (h : j + 1 = n) :
+    dst0 + (BitVec.ofNat 64 d + (BitVec.ofNat 64 j + 1#64))
+      = dst0 + (BitVec.ofNat 64 d + BitVec.ofNat 64 n) := by
+  rw [cs_a5_succ, h]
+
+theorem cs_step_ne (dst0 : BitVec 64) (d j n : Nat) (hj : d + (j + 1) < 2 ^ 64)
+    (hn : d + n < 2 ^ 64) (h : d + (j + 1) ≠ d + n) :
+    ¬ (dst0 + (BitVec.ofNat 64 d + (BitVec.ofNat 64 j + 1#64))
+        = dst0 + (BitVec.ofNat 64 d + BitVec.ofNat 64 n)) := by
+  rw [cs_a5_split, co_addSplit]
+  exact cs_ofNat_ne (d + (j + 1)) (d + n) hj hn h dst0
+
 set_option maxHeartbeats 4000000 in
 /-- The inner byte loop from `0x800017ca`, position `j` in the chunk
 (`0 ≤ j < n`): copies bytes of the page into the kernel buffer until a NUL
-(→ `0x80001764`) or the chunk end (→ `0x8000178c`). -/
+(→ `(KernelSyms.«copyinstr» + 0x40)`) or the chunk end (→ `(KernelSyms.«copyinstr» + 0x68)`). -/
 theorem cstr_inner [Xv6G GF] [CurCtx]
     (k : KCtx) (P : UPtd) (M : Nat → List (BitVec 8)) (old : List (BitVec 8)) (A : Nat)
     (dst0 : BitVec 64) (psz : BitVec 64) (sp : BitVec 64) (s10val s11val : BitVec 64)
@@ -1822,7 +1892,7 @@ theorem cstr_inner [Xv6G GF] [CurCtx]
       (_ : R 22#5 = pageAddr P.root) (_ : R 23#5 = 0xFFFFFFFFFFFFF000#64)
       (_ : R 24#5 = psz) (_ : R 25#5 = 1#64) (_ : R 26#5 = s10val) (_ : R 27#5 = s11val)
       (_ : csNoNul (viewFaulted P P2 M) A (d + j)) (cur : CPU),
-    kctx cur (((k.pushed 12).withSpie spie spp).withRegs R) ∗ pcIs cur 0x800017ca#64 ∗
+    kctx cur (((k.pushed 12).withSpie spie spp).withRegs R) ∗ pcIs cur (KA.«copyinstr» + 0xa6#64) ∗
     procPtAt P2 (viewFaulted P P2 M) ∗
     byteBuf dst0 (DFrac.own 1) (umemRead (viewFaulted P P2 M) A (d + j) ++ old.drop (d + j)) ∗
     wpNext k.sie k.proc cur (fun cpu' => iprop(∀ (R2 : RegMap) (pcv : BitVec 64) (D2 : Nat),
@@ -1833,9 +1903,9 @@ theorem cstr_inner [Xv6G GF] [CurCtx]
          R2 20#5 = BitVec.ofNat 64 (old.length - d) ∧ R2 18#5 = BitVec.ofNat 64 va0nat ∧
          R2 21#5 = 4096#64 ∧ R2 22#5 = pageAddr P.root ∧ R2 23#5 = 0xFFFFFFFFFFFFF000#64 ∧
          R2 24#5 = psz ∧ R2 25#5 = 1#64 ∧ R2 26#5 = s10val ∧ R2 27#5 = s11val) ∧
-        ((pcv = 0x80001764#64 ∧ D2 < d + n ∧ d ≤ D2 ∧ R2 15#5 = dst0 + BitVec.ofNat 64 D2 ∧
+        ((pcv = (KA.«copyinstr» + 0x40#64) ∧ D2 < d + n ∧ d ≤ D2 ∧ R2 15#5 = dst0 + BitVec.ofNat 64 D2 ∧
           umemByte (viewFaulted P P2 M) (A + D2) = 0#8 ∧ csNoNul (viewFaulted P P2 M) A D2) ∨
-         (pcv = 0x8000178c#64 ∧ D2 = d + n ∧ R2 15#5 = dst0 + BitVec.ofNat 64 (d + n) ∧
+         (pcv = (KA.«copyinstr» + 0x68#64) ∧ D2 = d + n ∧ R2 15#5 = dst0 + BitVec.ofNat 64 (d + n) ∧
           R2 11#5 = dst0 + BitVec.ofNat 64 (d + n - 1) ∧
           csNoNul (viewFaulted P P2 M) A (d + n)))⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cur := by
@@ -1861,14 +1931,14 @@ theorem cstr_inner [Xv6G GF] [CurCtx]
       rw [show A + (d + j) = A + d + j from by omega, cs_page_byte _ A d j (by omega), ← hoff,
         hpb, Option.getD_some]
     -- mv a1,a5 ; add a4,s1,a5 ; lbu a3,0(a4)
-    k_step_gen (wp_s_add cur _ 0x800017ca#64 true 11#5 0#5 15#5 (by decide))
+    k_step_gen (wp_s_add cur _ (KA.«copyinstr» + 0xa6#64) true 11#5 0#5 15#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h15] next c1 hp1
     iintro Hk Hpc
-    k_step_gen (wp_s_add c1 _ 0x800017cc#64 false 14#5 9#5 15#5 (by decide))
+    k_step_gen (wp_s_add c1 _ (KA.«copyinstr» + 0xa8#64) false 14#5 9#5 15#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, h15, ha4] next c2 hp2
     iintro Hk Hpc
     icases byteBuf_acc (pte2pa w) (DFrac.own 1) _ (off + j) pb hpb $$ Hpage with ⟨Hb, HpageC⟩
-    k_step_gen (wp_s_lbu c2 _ 0x800017d0#64 false 0#12 13#5 14#5 (by decide) (by decide)
+    k_step_gen (wp_s_lbu c2 _ (KA.«copyinstr» + 0xac#64) false 0#12 13#5 14#5 (by decide) (by decide)
         (DFrac.own 1) pb) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [co_sext_0, BitVec.add_zero] next c3 hp3
     iintro Hk Hpc Hb
@@ -1881,7 +1951,7 @@ theorem cstr_inner [Xv6G GF] [CurCtx]
       fun h => (hp3 h).trans ((hp2 h).trans (hp1 h))
     by_cases hpb0 : pb = 0#8
     · -- NUL found at position d + j
-      k_step_gen (wp_s_branch c3 _ 0x800017d4#64 true 8080#13 13#5 0#5 (by decide) bop.BEQ)
+      k_step_gen (wp_s_branch c3 _ (KA.«copyinstr» + 0xb0#64) true 8080#13 13#5 0#5 (by decide) bop.BEQ)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [cs_ite_beq_byte, hpb0, if_pos rfl] next c4 hp4
       iintro Hk Hpc
@@ -1904,7 +1974,7 @@ theorem cstr_inner [Xv6G GF] [CurCtx]
       · exact h15
       · rw [hbyte]; exact hpb0
     · -- non-NUL: store and continue
-      k_step_gen (wp_s_branch c3 _ 0x800017d4#64 true 8080#13 13#5 0#5 (by decide) bop.BEQ)
+      k_step_gen (wp_s_branch c3 _ (KA.«copyinstr» + 0xb0#64) true 8080#13 13#5 0#5 (by decide) bop.BEQ)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [cs_ite_beq_byte, hpb0, if_neg hpb0] next c4 hp4
       iintro Hk Hpc
@@ -1915,28 +1985,26 @@ theorem cstr_inner [Xv6G GF] [CurCtx]
           UMemL.umemRead_length, Nat.sub_self, List.getElem?_drop, Nat.add_zero,
           List.getElem?_eq_getElem hdjlt]
       icases byteBuf_upd dst0 _ (d + j) _ hbufget $$ Hdst with ⟨Hcell, HdstC⟩
-      k_step_gen (wp_s_sb c4 _ 0x800017d6#64 false 0#12 15#5 13#5 (by decide) (old[d + j]'hdjlt))
+      k_step_gen (wp_s_sb c4 _ (KA.«copyinstr» + 0xb2#64) false 0#12 15#5 13#5 (by decide) (old[d + j]'hdjlt))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [h15, co_sext_0, BitVec.add_zero] next c5 hp5
       iintro Hk Hpc Hcell
       ihave Hdst := HdstC $$ %(BitVec.extractLsb' 0 8 (BitVec.setWidth 64 pb)) Hcell
       rw [cs_extract_setw pb, cs_set_step (viewFaulted P P2 M) A d j old pb hbyte.symm hdjlt]
       -- addi a5,1
-      k_step_gen (wp_s_addi c5 _ 0x800017da#64 true 1#12 15#5 15#5 (by decide))
+      k_step_gen (wp_s_addi c5 _ (KA.«copyinstr» + 0xb6#64) true 1#12 15#5 15#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-        with [h15, show BitVec.signExtend 64 1#12 = 1#64 from by decide,
-          cs_a5_step dst0 (d + j)] next c6 hp6
+        with [h15, show BitVec.signExtend 64 1#12 = 1#64 from by decide, cs_a5_step dst0 (d + j)] next c6 hp6
       iintro Hk Hpc
       have hNoNul' : csNoNul (viewFaulted P P2 M) A (d + j + 1) :=
         cs_noNul_step _ A d j hNoNul (by rw [hbyte]; exact hpb0)
       by_cases hlast : j + 1 = n
       · -- chunk done
-        k_step_gen (wp_s_branch c6 _ 0x800017dc#64 false 8174#13 15#5 12#5 (by decide) bop.BNE)
+        k_step_gen (wp_s_branch c6 _ (KA.«copyinstr» + 0xb8#64) false 8174#13 15#5 12#5 (by decide) bop.BNE)
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-          with [h12, co_ite_bne, show dst0 + BitVec.ofNat 64 (d + j + 1) = dst0 + BitVec.ofNat 64 (d + n)
-            from by rw [show d + j + 1 = d + n from by omega], if_pos rfl] next c7 hp7
+          with [h12, co_ite_bne, if_pos (cs_step_eq dst0 d j n (by omega))] next c7 hp7
         iintro Hk Hpc
-        k_step_gen (wp_s_j c7 _ 0x800017e0#64 true 2097068#21)
+        k_step_gen (wp_s_j c7 _ (KA.«copyinstr» + 0xbc#64) true 2097068#21)
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c8 hp8
         iintro Hk Hpc
         ihave HΦ' := wpNext_at _ _ _ c8 _ (fun h => (hp8 h).trans ((hp7 h).trans ((hp6 h).trans
@@ -1958,12 +2026,14 @@ theorem cstr_inner [Xv6G GF] [CurCtx]
         · exact h25
         · exact h26
         · exact h27
+        · exact cs_step_eq dst0 d j n hlast
         · rw [show d + n - 1 = d + j from by omega]
+          exact co_addSplit dst0 d j
       · -- another byte
-        k_step_gen (wp_s_branch c6 _ 0x800017dc#64 false 8174#13 15#5 12#5 (by decide) bop.BNE)
+        k_step_gen (wp_s_branch c6 _ (KA.«copyinstr» + 0xb8#64) false 8174#13 15#5 12#5 (by decide) bop.BNE)
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-          with [h12, co_ite_bne, if_neg (cs_ofNat_ne (d + j + 1) (d + n) (by omega) (by omega)
-            (by omega) dst0)] next c7 hp7
+          with [h12, co_ite_bne,
+            if_neg (cs_step_ne dst0 d j n (by omega) (by omega) (by omega))] next c7 hp7
         iintro Hk Hpc
         ihave HΦ := wpNext_shift _ _ _ _ _ (fun h => (hp7 h).trans ((hp6 h).trans
           ((hp5 h).trans ((hp4 h).trans (hpinA h))))) $$ HΦ
@@ -1971,12 +2041,13 @@ theorem cstr_inner [Xv6G GF] [CurCtx]
           ?hsp' ?h9' ?h12' ?h15' ?h18' ?h19' ?h20' ?h21' ?h22' ?h23' ?h24' ?h25'
           ?h26' ?h27' hNoNul' c7) $$ [- $Hk $Hpc $HP $Hdst]
         rotate_right 1
+        simp only [← BitVec.ofNat_add]
         iframe
         case hsp' => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; exact hsp
         case h9' => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; exact h9
         case h12' => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; exact h12
         case h15' => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
-                     rw [show d + (j + 1) = d + j + 1 from by omega]
+                     exact cs_a5_split dst0 d j
         case h18' => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; exact h18
         case h19' => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; exact h19
         case h20' => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; exact h20
@@ -2017,7 +2088,7 @@ theorem cstr_setup [Xv6G GF] [CurCtx]
     (h23 : R 23#5 = 0xFFFFFFFFFFFFF000#64) (h24 : R 24#5 = psz) (h25 : R 25#5 = 1#64)
     (h26 : R 26#5 = s10val) (h27 : R 27#5 = s11val)
     (cur : CPU) :
-    kctx cur (((k.pushed 12).withSpie spie spp).withRegs R) ∗ pcIs cur 0x800017bc#64 ∗
+    kctx cur (((k.pushed 12).withSpie spie spp).withRegs R) ∗ pcIs cur (KA.«copyinstr» + 0x98#64) ∗
     procPtAt P2 (viewFaulted P P2 M) ∗
     byteBuf dst0 (DFrac.own 1) (umemRead (viewFaulted P P2 M) A d ++ old.drop d) ∗
     wpNext k.sie k.proc cur (fun cpu' => iprop(∀ (R2 : RegMap) (pcv : BitVec 64) (D2 : Nat),
@@ -2028,9 +2099,9 @@ theorem cstr_setup [Xv6G GF] [CurCtx]
          R2 20#5 = BitVec.ofNat 64 (old.length - d) ∧ R2 18#5 = BitVec.ofNat 64 ((A + d) / 4096 * 4096) ∧
          R2 21#5 = 4096#64 ∧ R2 22#5 = pageAddr P.root ∧ R2 23#5 = 0xFFFFFFFFFFFFF000#64 ∧
          R2 24#5 = psz ∧ R2 25#5 = 1#64 ∧ R2 26#5 = s10val ∧ R2 27#5 = s11val) ∧
-        ((pcv = 0x80001764#64 ∧ D2 < d + n ∧ d ≤ D2 ∧ R2 15#5 = dst0 + BitVec.ofNat 64 D2 ∧
+        ((pcv = (KA.«copyinstr» + 0x40#64) ∧ D2 < d + n ∧ d ≤ D2 ∧ R2 15#5 = dst0 + BitVec.ofNat 64 D2 ∧
           umemByte (viewFaulted P P2 M) (A + D2) = 0#8 ∧ csNoNul (viewFaulted P P2 M) A D2) ∨
-         (pcv = 0x8000178c#64 ∧ D2 = d + n ∧ R2 15#5 = dst0 + BitVec.ofNat 64 (d + n) ∧
+         (pcv = (KA.«copyinstr» + 0x68#64) ∧ D2 = d + n ∧ R2 15#5 = dst0 + BitVec.ofNat 64 (d + n) ∧
           R2 11#5 = dst0 + BitVec.ofNat 64 (d + n - 1) ∧
           csNoNul (viewFaulted P P2 M) A (d + n)))⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cur := by
@@ -2040,20 +2111,20 @@ theorem cstr_setup [Xv6G GF] [CurCtx]
   iintro ⟨Hk, Hpc, HP, Hdst, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- sub s1,s1,s2 ; c.add s1,a0 ; c.mv a5,s3 ; sub s1,s1,s3 ; c.add a2,s3
-  k_step_gen (wp_s_sub cur _ 0x800017bc#64 false 9#5 9#5 18#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, h18, hoffB] next c1 hp1
+  k_step_gen (wp_s_sub cur _ (KA.«copyinstr» + 0x98#64) false 9#5 9#5 18#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, h18, co_offB A d hA64, co_offB' A d hA64] next c1 hp1
   iintro Hk Hpc
-  k_step_gen (wp_s_add c1 _ 0x800017c0#64 true 9#5 9#5 10#5 (by decide))
+  k_step_gen (wp_s_add c1 _ (KA.«copyinstr» + 0x9c#64) true 9#5 9#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10] next c2 hp2
   iintro Hk Hpc
-  k_step_gen (wp_s_add c2 _ 0x800017c2#64 true 15#5 0#5 19#5 (by decide))
+  k_step_gen (wp_s_add c2 _ (KA.«copyinstr» + 0x9e#64) true 15#5 0#5 19#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h19] next c3 hp3
   iintro Hk Hpc
-  k_step_gen (wp_s_sub c3 _ 0x800017c4#64 false 9#5 9#5 19#5 (by decide))
+  k_step_gen (wp_s_sub c3 _ (KA.«copyinstr» + 0xa0#64) false 9#5 9#5 19#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [h19, cs_s1_form (pte2pa w) dst0 ((A + d) % 4096) d] next c4 hp4
   iintro Hk Hpc
-  k_step_gen (wp_s_add c4 _ 0x800017c8#64 true 12#5 12#5 19#5 (by decide))
+  k_step_gen (wp_s_add c4 _ (KA.«copyinstr» + 0xa4#64) true 12#5 12#5 19#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [h12, h19, cs_a2end dst0 d n] next c5 hp5
   iintro Hk Hpc
@@ -2064,11 +2135,13 @@ theorem cstr_setup [Xv6G GF] [CurCtx]
     0 (by omega) (by omega) _ ?hsp' ?h9' ?h12' ?h15' ?h18' ?h19' ?h20' ?h21' ?h22' ?h23'
     ?h24' ?h25' ?h26' ?h27' ?hNoNul' c5) $$ [- $Hk $Hpc $HP $Hdst]
   rotate_right 1
+  simp only [← BitVec.ofNat_add]
   iframe
   case hsp' => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; exact hsp
   case h9' => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
               rw [BitVec.sub_eq_add_neg, ← BitVec.add_assoc]
   case h12' => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
+               exact co_addSplit dst0 d n
   case h15' => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, Nat.add_zero,
                  BitVec.zero_add]
   case h18' => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; exact h18
@@ -2101,7 +2174,7 @@ theorem cstr_nsel [Xv6G GF] [CurCtx]
     (h23 : R 23#5 = 0xFFFFFFFFFFFFF000#64) (h24 : R 24#5 = psz) (h25 : R 25#5 = 1#64)
     (h26 : R 26#5 = s10val) (h27 : R 27#5 = s11val)
     (cur : CPU) :
-    kctx cur (((k.pushed 12).withSpie spie spp).withRegs R) ∗ pcIs cur 0x800017ae#64 ∗
+    kctx cur (((k.pushed 12).withSpie spie spp).withRegs R) ∗ pcIs cur (KA.«copyinstr» + 0x8a#64) ∗
     procPtAt P2 (viewFaulted P P2 M) ∗
     byteBuf dst0 (DFrac.own 1) (umemRead (viewFaulted P P2 M) A d ++ old.drop d) ∗
     wpNext k.sie k.proc cur (fun cpu' => iprop(∀ (R2 : RegMap) (pcv : BitVec 64) (D2 : Nat),
@@ -2112,10 +2185,10 @@ theorem cstr_nsel [Xv6G GF] [CurCtx]
          R2 20#5 = BitVec.ofNat 64 (old.length - d) ∧ R2 18#5 = BitVec.ofNat 64 ((A + d) / 4096 * 4096) ∧
          R2 21#5 = 4096#64 ∧ R2 22#5 = pageAddr P.root ∧ R2 23#5 = 0xFFFFFFFFFFFFF000#64 ∧
          R2 24#5 = psz ∧ R2 25#5 = 1#64 ∧ R2 26#5 = s10val ∧ R2 27#5 = s11val) ∧
-        ((pcv = 0x80001764#64 ∧ D2 < d + min (4096 - (A + d) % 4096) (old.length - d) ∧ d ≤ D2 ∧
+        ((pcv = (KA.«copyinstr» + 0x40#64) ∧ D2 < d + min (4096 - (A + d) % 4096) (old.length - d) ∧ d ≤ D2 ∧
           R2 15#5 = dst0 + BitVec.ofNat 64 D2 ∧
           umemByte (viewFaulted P P2 M) (A + D2) = 0#8 ∧ csNoNul (viewFaulted P P2 M) A D2) ∨
-         (pcv = 0x8000178c#64 ∧ D2 = d + min (4096 - (A + d) % 4096) (old.length - d) ∧
+         (pcv = (KA.«copyinstr» + 0x68#64) ∧ D2 = d + min (4096 - (A + d) % 4096) (old.length - d) ∧
           R2 15#5 = dst0 + BitVec.ofNat 64 (d + min (4096 - (A + d) % 4096) (old.length - d)) ∧
           R2 11#5 = dst0 + BitVec.ofNat 64 (d + min (4096 - (A + d) % 4096) (old.length - d) - 1) ∧
           csNoNul (viewFaulted P P2 M) A (d + min (4096 - (A + d) % 4096) (old.length - d))))⌝ -∗
@@ -2124,23 +2197,23 @@ theorem cstr_nsel [Xv6G GF] [CurCtx]
   have hoff : (A + d) % 4096 < 4096 := Nat.mod_lt _ (by omega)
   iintro ⟨Hk, Hpc, HP, Hdst, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  k_step_gen (wp_s_sub cur _ 0x800017ae#64 false 12#5 18#5 9#5 (by decide))
+  k_step_gen (wp_s_sub cur _ (KA.«copyinstr» + 0x8a#64) false 12#5 18#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h18, h9] next c1 hp1
   iintro Hk Hpc
-  k_step_gen (wp_s_add c1 _ 0x800017b2#64 true 12#5 12#5 21#5 (by decide))
+  k_step_gen (wp_s_add c1 _ (KA.«copyinstr» + 0x8e#64) true 12#5 12#5 21#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [h21, co_n_val3 (A + d) hA64] next c2 hp2
+    with [h21, co_nval A d hA64] next c2 hp2
   iintro Hk Hpc
   have hmineq : min (4096 - (A + d) % 4096) (old.length - d)
       = if 4096 - (A + d) % 4096 ≤ old.length - d then 4096 - (A + d) % 4096 else old.length - d :=
     rfl
   by_cases hge : 4096 - (A + d) % 4096 ≤ old.length - d
   · have hnval : min (4096 - (A + d) % 4096) (old.length - d) = 4096 - (A + d) % 4096 := by omega
-    k_step_gen (wp_s_branch c2 _ 0x800017b4#64 false 6#13 20#5 12#5 (by decide) bop.BGEU)
+    k_step_gen (wp_s_branch c2 _ (KA.«copyinstr» + 0x90#64) false 6#13 20#5 12#5 (by decide) bop.BGEU)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [h20, co_bgeu_ge _ _ (by omega) (by omega) hge] next c3 hp3
     iintro Hk Hpc
-    k_step_gen (wp_s_branch c3 _ 0x800017ba#64 true 44#13 12#5 0#5 (by decide) bop.BEQ)
+    k_step_gen (wp_s_branch c3 _ (KA.«copyinstr» + 0x96#64) true 44#13 12#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [RegMap.set_apply, co_beq_ofNat_nz (4096 - (A + d) % 4096) (by omega) (by omega)] next c4 hp4
     iintro Hk Hpc
@@ -2152,6 +2225,7 @@ theorem cstr_nsel [Xv6G GF] [CurCtx]
       ?hsp' ?h9' ?h10' ?h12' ?h18' ?h19' ?h20' ?h21' ?h22' ?h23' ?h24' ?h25' ?h26' ?h27' c4)
       $$ [- $Hk $Hpc $HP $Hdst]
     rotate_right 1
+    simp only [← BitVec.ofNat_add]
     iframe
     case hsp' => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; exact hsp
     case h9' => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; exact h9
@@ -2168,15 +2242,15 @@ theorem cstr_nsel [Xv6G GF] [CurCtx]
     case h26' => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; exact h26
     case h27' => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; exact h27
   · have hnval : min (4096 - (A + d) % 4096) (old.length - d) = old.length - d := by omega
-    k_step_gen (wp_s_branch c2 _ 0x800017b4#64 false 6#13 20#5 12#5 (by decide) bop.BGEU)
+    k_step_gen (wp_s_branch c2 _ (KA.«copyinstr» + 0x90#64) false 6#13 20#5 12#5 (by decide) bop.BGEU)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [h20, co_bgeu_lt (old.length - d) (4096 - (A + d) % 4096) (by omega) (by omega)
         (by omega)] next c3 hp3
     iintro Hk Hpc
-    k_step_gen (wp_s_add c3 _ 0x800017b8#64 true 12#5 0#5 20#5 (by decide))
+    k_step_gen (wp_s_add c3 _ (KA.«copyinstr» + 0x94#64) true 12#5 0#5 20#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h20] next c3b hp3b
     iintro Hk Hpc
-    k_step_gen (wp_s_branch c3b _ 0x800017ba#64 true 44#13 12#5 0#5 (by decide) bop.BEQ)
+    k_step_gen (wp_s_branch c3b _ (KA.«copyinstr» + 0x96#64) true 44#13 12#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [RegMap.set_apply, co_beq_ofNat_nz (old.length - d) (by omega) (by omega)] next c4 hp4
     iintro Hk Hpc
@@ -2188,6 +2262,7 @@ theorem cstr_nsel [Xv6G GF] [CurCtx]
       ?hsp2' ?h92' ?h102' ?h122' ?h182' ?h192' ?h202' ?h212' ?h222' ?h232' ?h242' ?h252'
       ?h262' ?h272' c4) $$ [- $Hk $Hpc $HP $Hdst]
     rotate_right 1
+    simp only [← BitVec.ofNat_add]
     iframe
     case hsp2' => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; exact hsp
     case h92' => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; exact h9
@@ -2292,7 +2367,7 @@ theorem cs_beq_untaken {α : Type _} (dst0 : BitVec 64) (a b : Nat) (ha : a < 2 
   have hne : (dst0 + BitVec.ofNat 64 a) ≠ dst0 + BitVec.ofNat 64 b := cs_ofNat_ne a b ha hb h dst0
   simp [bcond, hne]
 
-/-! ## One turn of the page loop, from `0x800017a0` -/
+/-! ## One turn of the page loop, from `(KernelSyms.«copyinstr» + 0x7c)` -/
 
 set_option maxHeartbeats 4000000 in
 theorem cstr_iter (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
@@ -2311,7 +2386,7 @@ theorem cstr_iter (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
     (h23 : R 23#5 = 0xFFFFFFFFFFFFF000#64) (h24 : R 24#5 = psz) (h25 : R 25#5 = 1#64)
     (h26 : R 26#5 = s10val) (h27 : R 27#5 = s11val)
     (cur : CPU) :
-    kctx cur (((k.pushed 12).withSpie spie spp).withRegs R) ∗ pcIs cur 0x800017a0#64 ∗
+    kctx cur (((k.pushed 12).withSpie spie spp).withRegs R) ∗ pcIs cur (KA.«copyinstr» + 0x7c#64) ∗
     isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     procPtAt P1 (viewFaulted P P1 M) ∗
     byteBuf dst0 (DFrac.own 1) (umemRead (viewFaulted P P1 M) A d ++ old.drop d) ∗
@@ -2321,9 +2396,9 @@ theorem cstr_iter (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
       kctx cpu' (((k.pushed 12).withSpie spie2 spp2).withRegs R2) -∗ pcIs cpu' pcv -∗
       procPtAt P3 (viewFaulted P P3 M) -∗ byteBuf dst0 (DFrac.own 1) bs' -∗
       ⌜R2 2#5 = sp ∧
-        ((pcv = 0x80001772#64 ∧ cstrPost P M A old P3 bs' (R2 10#5) ∧
+        ((pcv = (KA.«copyinstr» + 0x4e#64) ∧ cstrPost P M A old P3 bs' (R2 10#5) ∧
           R2 26#5 = s10val ∧ R2 27#5 = s11val) ∨
-         (pcv = 0x800017a0#64 ∧ d < d2 ∧ d2 < old.length ∧ P.ext P3 ∧
+         (pcv = (KA.«copyinstr» + 0x7c#64) ∧ d < d2 ∧ d2 < old.length ∧ P.ext P3 ∧
           bs' = umemRead (viewFaulted P P3 M) A d2 ++ old.drop d2 ∧
           csNoNul (viewFaulted P P3 M) A d2 ∧
           A + d2 < 2 ^ 64 ∧ (A + d2) % 4096 = 0 ∧
@@ -2377,7 +2452,7 @@ theorem cstr_iter (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
           UMemL.umemRead_length, Nat.sub_self, List.getElem?_drop, Nat.add_zero,
           List.getElem?_eq_getElem hD2L]
       icases byteBuf_upd dst0 _ D2 _ hbufget $$ Hdst with ⟨HcellA, HdstC⟩
-      k_step_gen (wp_s_sb c2 _ 0x80001764#64 false 0#12 15#5 0#5 (by decide) (old[D2]'hD2L))
+      k_step_gen (wp_s_sb c2 _ (KA.«copyinstr» + 0x40#64) false 0#12 15#5 0#5 (by decide) (old[D2]'hD2L))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [g15, co_sext_0, BitVec.add_zero] next c3 hp3
       iintro Hk Hpc Hcell
@@ -2388,13 +2463,13 @@ theorem cstr_iter (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
           (by rw [Nat.add_zero]; exact gbyte.symm) (by omega)
         simpa using this
       rw [hset]
-      k_step_gen (wp_s_addi c3 _ 0x80001768#64 true 1#12 15#5 0#5 (by decide))
+      k_step_gen (wp_s_addi c3 _ (KA.«copyinstr» + 0x44#64) true 1#12 15#5 0#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ci_li_one] next c4 hp4
       iintro Hk Hpc
-      k_step_gen (wp_s_xori c4 _ 0x8000176a#64 false 1#12 15#5 15#5 (by decide))
+      k_step_gen (wp_s_xori c4 _ (KA.«copyinstr» + 0x46#64) false 1#12 15#5 15#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c5 hp5
       iintro Hk Hpc
-      k_step_gen (wp_s_subw c5 _ 0x8000176e#64 false 10#5 0#5 15#5 (by decide))
+      k_step_gen (wp_s_subw c5 _ (KA.«copyinstr» + 0x4a#64) false 10#5 0#5 15#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [cs_subw_00] next c6 hp6
       iintro Hk Hpc
       have hpinN : k.sie = false ∨ k.proc = 0#64 → c6 = cur := fun h =>
@@ -2421,38 +2496,38 @@ theorem cstr_iter (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
       have hLpos : 1 ≤ old.length := by omega
       have hDle : d + min (4096 - (A + d) % 4096) (old.length - d) ≤ old.length := by omega
       have hDge1 : 1 ≤ d + min (4096 - (A + d) % 4096) (old.length - d) := by omega
-      k_step_gen (wp_s_addi c2 _ 0x8000178c#64 false 4095#12 14#5 20#5 (by decide))
+      k_step_gen (wp_s_addi c2 _ (KA.«copyinstr» + 0x68#64) false 4095#12 14#5 20#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g20] next c3 hp3
       iintro Hk Hpc
-      k_step_gen (wp_s_add c3 _ 0x80001790#64 true 14#5 14#5 19#5 (by decide))
+      k_step_gen (wp_s_add c3 _ (KA.«copyinstr» + 0x6c#64) true 14#5 14#5 19#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [g19, cs_a4adv' dst0 old.length d hLpos (by omega) (by omega)] next c4 hp4
       iintro Hk Hpc
-      k_step_gen (wp_s_sub c4 _ 0x80001792#64 false 20#5 14#5 11#5 (by decide))
+      k_step_gen (wp_s_sub c4 _ (KA.«copyinstr» + 0x6e#64) false 20#5 14#5 11#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [g11, cs_s4adv' dst0 old.length (d + min (4096 - (A + d) % 4096) (old.length - d)) hDge1 hDle (by omega)] next c5 hp5
       iintro Hk Hpc
-      k_step_gen (wp_s_add c5 _ 0x80001796#64 false 9#5 18#5 21#5 (by decide))
+      k_step_gen (wp_s_add c5 _ (KA.«copyinstr» + 0x72#64) false 9#5 18#5 21#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-        with [g18, g21, cs_s1adv ((A + d) / 4096 * 4096)] next c6 hp6
+        with [g18, g21] next c6 hp6
       iintro Hk Hpc
       by_cases hmax : d + min (4096 - (A + d) % 4096) (old.length - d) = old.length
       · -- ran out of `max` without a NUL: return -1
-        k_step_gen (wp_s_branch c6 _ 0x8000179a#64 false 72#13 11#5 14#5 (by decide) bop.BEQ)
+        k_step_gen (wp_s_branch c6 _ (KA.«copyinstr» + 0x76#64) false 72#13 11#5 14#5 (by decide) bop.BEQ)
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
           with [g11, cs_beq_taken dst0 (d + min (4096 - (A + d) % 4096) (old.length - d) - 1) (old.length - 1) (by omega) (by omega)
             (by omega)] next c7 hp7
         iintro Hk Hpc
-        k_step_gen (wp_s_addi c7 _ 0x800017e2#64 true 0#12 15#5 0#5 (by decide))
+        k_step_gen (wp_s_addi c7 _ (KA.«copyinstr» + 0xbe#64) true 0#12 15#5 0#5 (by decide))
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [co_li_zero] next c8 hp8
         iintro Hk Hpc
-        k_step_gen (wp_s_j c8 _ 0x800017e4#64 true 2097030#21)
+        k_step_gen (wp_s_j c8 _ (KA.«copyinstr» + 0xc0#64) true 2097030#21)
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c9 hp9
         iintro Hk Hpc
-        k_step_gen (wp_s_xori c9 _ 0x8000176a#64 false 1#12 15#5 15#5 (by decide))
+        k_step_gen (wp_s_xori c9 _ (KA.«copyinstr» + 0x46#64) false 1#12 15#5 15#5 (by decide))
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [cs_xori_01] next c10 hp10
         iintro Hk Hpc
-        k_step_gen (wp_s_subw c10 _ 0x8000176e#64 false 10#5 0#5 15#5 (by decide))
+        k_step_gen (wp_s_subw c10 _ (KA.«copyinstr» + 0x4a#64) false 10#5 0#5 15#5 (by decide))
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [cs_subw_01] next c11 hp11
         iintro Hk Hpc
         have hpinM : k.sie = false ∨ k.proc = 0#64 → c11 = cur := fun h =>
@@ -2472,12 +2547,12 @@ theorem cstr_iter (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
         have hmod : (A + (d + min (4096 - (A + d) % 4096) (old.length - d))) % 4096 = 0 := by rw [← hAD2]; omega
         have hDlt : d + min (4096 - (A + d) % 4096) (old.length - d) < old.length := by omega
         have hA64' : A + (d + min (4096 - (A + d) % 4096) (old.length - d)) < 2 ^ 64 := by omega
-        k_step_gen (wp_s_branch c6 _ 0x8000179a#64 false 72#13 11#5 14#5 (by decide) bop.BEQ)
+        k_step_gen (wp_s_branch c6 _ (KA.«copyinstr» + 0x76#64) false 72#13 11#5 14#5 (by decide) bop.BEQ)
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
           with [g11, cs_beq_untaken dst0 (d + min (4096 - (A + d) % 4096) (old.length - d) - 1) (old.length - 1) (by omega) (by omega)
             (by omega)] next c7 hp7
         iintro Hk Hpc
-        k_step_gen (wp_s_add c7 _ 0x8000179e#64 true 19#5 0#5 15#5 (by decide))
+        k_step_gen (wp_s_add c7 _ (KA.«copyinstr» + 0x7a#64) true 19#5 0#5 15#5 (by decide))
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g15] next c8 hp8
         iintro Hk Hpc
         have hpinC : k.sie = false ∨ k.proc = 0#64 → c8 = cur := fun h =>
@@ -2489,9 +2564,10 @@ theorem cstr_iter (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
         refine ⟨?_, Or.inr ⟨rfl, by omega, hDlt, hext2, rfl, gnonul, hA64', hmod,
           ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩⟩
         · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; exact hs3
-        · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; rw [← hAD2]
         · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
-        · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
+          rw [cs_s1adv, ← BitVec.ofNat_add, ← hAD2]
+        · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, ← BitVec.ofNat_add]
+        · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, ← BitVec.ofNat_add]
         · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; exact g21
         · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; exact g22
         · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; exact g23
@@ -2500,7 +2576,7 @@ theorem cstr_iter (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
         · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; exact g26
         · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; exact g27
 
-/-! ## The page loop: from `0x800017a0` to the epilogue -/
+/-! ## The page loop: from `(KernelSyms.«copyinstr» + 0x7c)` to the epilogue -/
 
 set_option maxHeartbeats 1000000 in
 theorem cstr_loop (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
@@ -2518,7 +2594,7 @@ theorem cstr_loop (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
       (_ : R 21#5 = 4096#64) (_ : R 22#5 = pageAddr P.root)
       (_ : R 23#5 = 0xFFFFFFFFFFFFF000#64) (_ : R 24#5 = psz) (_ : R 25#5 = 1#64)
       (_ : R 26#5 = s10val) (_ : R 27#5 = s11val) (cur : CPU),
-    kctx cur (((k.pushed 12).withSpie spie spp).withRegs R) ∗ pcIs cur 0x800017a0#64 ∗
+    kctx cur (((k.pushed 12).withSpie spie spp).withRegs R) ∗ pcIs cur (KA.«copyinstr» + 0x7c#64) ∗
     isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     procPtAt P1 (viewFaulted P P1 M) ∗
     byteBuf dst0 (DFrac.own 1) (umemRead (viewFaulted P P1 M) A d ++ old.drop d) ∗
@@ -2526,7 +2602,7 @@ theorem cstr_loop (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
       (P3 : UPtd) (bs' : List (BitVec 8)),
       ⌜k.sie = false → spie2 = spie ∧ spp2 = spp⌝ -∗
       kctx cpu' (((k.pushed 12).withSpie spie2 spp2).withRegs R2) -∗
-      pcIs cpu' 0x80001772#64 -∗
+      pcIs cpu' (KA.«copyinstr» + 0x4e#64) -∗
       procPtAt P3 (viewFaulted P P3 M) -∗ byteBuf dst0 (DFrac.own 1) bs' -∗
       ⌜R2 2#5 = sp ∧ cstrPost P M A old P3 bs' (R2 10#5) ∧
         R2 26#5 = s10val ∧ R2 27#5 = s11val⌝ -∗ wpLoop cpu'))
@@ -2578,28 +2654,28 @@ set_option maxHeartbeats 4000000 in
 theorem copyinstr_proof (WA : WALKADDR) (VF : VMFAULT) : COPYINSTR :=
   ⟨fun {hlc GF} _ _ _ cpu k γl γk P M old hnoff hK hlk hroot hsz hmax hmax' => by
   unfold wp_copyinstr_body
-  simp only [copyinstrAddr, KernelSyms.«copyinstr»]
+  simp only [copyinstrAddr]
   iintro ⟨Hk, Hpc, #Hlk, #Hav, HP, Hdst, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   by_cases hnil : old.length = 0
   · -- max is 0: return -1 immediately
     have hbs : old = [] := List.length_eq_zero_iff.mp hnil
     have h0 : k.regs 14#5 = 0#64 := by rw [hmax, hnil]
-    k_step_gen (wp_s_branch cpu _ 0x80001724#64 true 202#13 14#5 0#5 (by decide) bop.BEQ)
+    k_step_gen (wp_s_branch cpu _ KA.«copyinstr» true 202#13 14#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [KCtx.rget_eq, co_beq_zero _ h0] next c1 hp1
     iintro Hk Hpc
-    k_step_gen (wp_s_addi c1 _ 0x800017ee#64 true 0#12 15#5 0#5 (by decide))
+    k_step_gen (wp_s_addi c1 _ (KA.«copyinstr» + 0xca#64) true 0#12 15#5 0#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [KCtx.rget_zero, co_li_zero, KCtx.setReg_eq_withRegs] next c2 hp2
     iintro Hk Hpc
-    k_step_gen (wp_s_xori c2 _ 0x800017f0#64 false 1#12 15#5 15#5 (by decide))
+    k_step_gen (wp_s_xori c2 _ (KA.«copyinstr» + 0xcc#64) false 1#12 15#5 15#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [cs_xori_01] next c3 hp3
     iintro Hk Hpc
-    k_step_gen (wp_s_subw c3 _ 0x800017f4#64 false 10#5 0#5 15#5 (by decide))
+    k_step_gen (wp_s_subw c3 _ (KA.«copyinstr» + 0xd0#64) false 10#5 0#5 15#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [cs_subw_01] next c4 hp4
     iintro Hk Hpc
-    k_step_gen (wp_s_ret c4 _ 0x800017f8#64 true 1#5)
+    k_step_gen (wp_s_ret c4 _ (KA.«copyinstr» + 0xd4#64) true 1#5)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c5 hp5
     iintro Hk Hpc
     ihave Hk := co_kctx_self c5 k _ $$ Hk
@@ -2626,11 +2702,11 @@ theorem copyinstr_proof (WA : WALKADDR) (VF : VMFAULT) : COPYINSTR :=
       rw [BitVec.toNat_ofNat] at this
       simp only [BitVec.toNat_ofNat] at this
       omega
-    k_step_gen (wp_s_branch cpu _ 0x80001724#64 true 202#13 14#5 0#5 (by decide) bop.BEQ)
+    k_step_gen (wp_s_branch cpu _ KA.«copyinstr» true 202#13 14#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [KCtx.rget_eq, co_beq_ne _ hlenne] next c0 hp0
     iintro Hk Hpc
-    iapply (wp_prologueCstr_gen c0 _ 0x80001726#64 (by k_norm_g; omega)) $$ [- $Hk $Hpc]
+    iapply (wp_prologueCstr_gen c0 _ (KA.«copyinstr» + 0x2#64) (by k_norm_g; omega)) $$ [- $Hk $Hpc]
     rotate_right 1
     k_code (text_instr _ _ _ _ rfl rfl) Htext
     k_norm_g
@@ -2639,31 +2715,31 @@ theorem copyinstr_proof (WA : WALKADDR) (VF : VMFAULT) : COPYINSTR :=
     iapply wpNext_intro_pin
     iintro %c1 %hp1 Hk Hpc Hframe
     k_norm_g
-    k_step_gen (wp_s_add c1 _ 0x80001740#64 true 22#5 0#5 10#5 (by decide))
+    k_step_gen (wp_s_add c1 _ (KA.«copyinstr» + 0x1c#64) true 22#5 0#5 10#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hroot] next c2 hp2
     iintro Hk Hpc
-    k_step_gen (wp_s_add c2 _ 0x80001742#64 true 24#5 0#5 11#5 (by decide))
+    k_step_gen (wp_s_add c2 _ (KA.«copyinstr» + 0x1e#64) true 24#5 0#5 11#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
     iintro Hk Hpc
-    k_step_gen (wp_s_add c3 _ 0x80001744#64 true 19#5 0#5 12#5 (by decide))
+    k_step_gen (wp_s_add c3 _ (KA.«copyinstr» + 0x20#64) true 19#5 0#5 12#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hp4
     iintro Hk Hpc
-    k_step_gen (wp_s_add c4 _ 0x80001746#64 true 9#5 0#5 13#5 (by decide))
+    k_step_gen (wp_s_add c4 _ (KA.«copyinstr» + 0x22#64) true 9#5 0#5 13#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c5 hp5
     iintro Hk Hpc
-    k_step_gen (wp_s_add c5 _ 0x80001748#64 true 20#5 0#5 14#5 (by decide))
+    k_step_gen (wp_s_add c5 _ (KA.«copyinstr» + 0x24#64) true 20#5 0#5 14#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hmax] next c6 hp6
     iintro Hk Hpc
-    k_step_gen (wp_s_lui c6 _ 0x8000174a#64 true 0xfffff#20 23#5 (by decide))
+    k_step_gen (wp_s_lui c6 _ (KA.«copyinstr» + 0x26#64) true 0xfffff#20 23#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [co_lui_mask] next c7 hp7
     iintro Hk Hpc
-    k_step_gen (wp_s_addi c7 _ 0x8000174c#64 true 1#12 25#5 0#5 (by decide))
+    k_step_gen (wp_s_addi c7 _ (KA.«copyinstr» + 0x28#64) true 1#12 25#5 0#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ci_li_one] next c8 hp8
     iintro Hk Hpc
-    k_step_gen (wp_s_lui c8 _ 0x8000174e#64 true 1#20 21#5 (by decide))
+    k_step_gen (wp_s_lui c8 _ (KA.«copyinstr» + 0x2a#64) true 1#20 21#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [co_lui_4096] next c9 hp9
     iintro Hk Hpc
-    k_step_gen (wp_s_j c9 _ 0x80001750#64 true 80#21)
+    k_step_gen (wp_s_j c9 _ (KA.«copyinstr» + 0x2c#64) true 80#21)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c10 hp10
     iintro Hk Hpc
     have hpinA : k.sie = false ∨ k.proc = 0#64 → c10 = cpu := fun h =>
@@ -2700,7 +2776,7 @@ theorem copyinstr_proof (WA : WALKADDR) (VF : VMFAULT) : COPYINSTR :=
     iintro %c11 %hp11 %spie2 %spp2 %R2 %P3 %bs' %hsp2 Hk Hpc HP Hdst %hpost
     obtain ⟨hs2, hcp, h26fin, h27fin⟩ := hpost
     rw [co_pushed_withSpie] at *
-    iapply (wp_epilogueCstr_gen c11 (k.withSpie spie2 spp2) 0x80001772#64
+    iapply (wp_epilogueCstr_gen c11 (k.withSpie spie2 spp2) (KA.«copyinstr» + 0x4e#64)
       (by simp only [KCtx.withSpie_avail]; omega) R2 hs2
       (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5) (k.regs 20#5)
       (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5) (k.regs 25#5)) $$ [- $Hk $Hpc]

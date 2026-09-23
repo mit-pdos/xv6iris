@@ -27,7 +27,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `proc_mapstacks`. -/
-def procMapstacksAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«proc_mapstacks»
+def procMapstacksAddr : BitVec 64 := KA.«proc_mapstacks»
 
 /-- The 64 stack pages, owned, as `kalloc` left them. -/
 def kstackPages {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]

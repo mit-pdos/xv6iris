@@ -22,7 +22,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `memcmp`. -/
-def memcmpAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«memcmp»
+def memcmpAddr : BitVec 64 := KA.«memcmp»
 
 /-- The value `memcmp` leaves in `a0`: the unsigned-byte difference at the
 first differing index below `n`, or `0` if the two buffers agree on their

@@ -21,7 +21,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `prputc`. -/
-def prputcAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«prputc»
+def prputcAddr : BitVec 64 := KA.«prputc»
 
 /-- **WP of `prputc`.**  The byte in `a0`. -/
 def wp_prputc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]

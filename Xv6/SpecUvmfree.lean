@@ -16,7 +16,7 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
-def uvmfreeAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«uvmfree»
+def uvmfreeAddr : BitVec 64 := KA.«uvmfree»
 def uvmfreeSlots : Nat := 36
 
 def wp_uvmfree_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]

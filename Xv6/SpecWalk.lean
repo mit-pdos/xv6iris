@@ -30,7 +30,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `walk`. -/
-def walkAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«walk»
+def walkAddr : BitVec 64 := KA.«walk»
 
 /-- What `walk` leaves in `a0`: `0` (the path incomplete), or the address of
 the level-0 entry of `vpn` (the path complete). -/

@@ -33,7 +33,7 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-def pipereadAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«piperead»
+def pipereadAddr : BitVec 64 := KA.«piperead»
 
 /-- Stack slots: 12 of its own, and `copyout`'s 52 below them. -/
 def pipereadSlots : Nat := 64

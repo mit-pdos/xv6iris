@@ -19,8 +19,8 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
-def copyoutAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«copyout»
-def copyinstrAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«copyinstr»
+def copyoutAddr : BitVec 64 := KA.«copyout»
+def copyinstrAddr : BitVec 64 := KA.«copyinstr»
 
 /-- `copyout(pt a0, psz a1, dstva a2, src a3, len a4)`. -/
 def wp_copyout_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]

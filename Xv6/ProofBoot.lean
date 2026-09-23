@@ -24,7 +24,7 @@ theorem BootProof (E : ENTRY) (S : START) : BOOT where
     iframe #
     iintro HmConf Hmhartid Hclock Htok Hslot Hpc Hx1 Hx2 Hx10 Hx11
     -- `start`, up to its `mret` into `main`
-    have hS := S.wp_start (hlc := hlc) (GF := GF) cpu (DFrac.own 1) hartid 0x8000001a#64
+    have hS := S.wp_start (hlc := hlc) (GF := GF) cpu (DFrac.own 1) hartid KA.«spin»
       (bootSp s0 hartid) v4 v8 v14 v15 f0 f8 g0 g8
     unfold wp_start_body at hS
     simp only [gpr_x1, gpr_x2, gpr_x4, gpr_x8, gpr_x14, gpr_x15] at hS

@@ -34,7 +34,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `sys_wait`. -/
-def sysWaitAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«sys_wait»
+def sysWaitAddr : BitVec 64 := KA.«sys_wait»
 
 /-- 4 slots for sys_wait's own frame, and below it the deeper of its two
 callees: kwait's 62 (argaddr's is 18). -/

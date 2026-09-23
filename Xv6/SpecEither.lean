@@ -47,8 +47,8 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
-def eitherCopyoutAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«either_copyout»
-def eitherCopyinAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«either_copyin»
+def eitherCopyoutAddr : BitVec 64 := KA.«either_copyout»
+def eitherCopyinAddr : BitVec 64 := KA.«either_copyin»
 
 /-- six own slots, plus `copyout`'s 52 (`myproc`'s 10 and `memmove`'s 2
 both fit inside that). -/

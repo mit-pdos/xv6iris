@@ -57,7 +57,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `kexit`. -/
-def kexitAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«kexit»
+def kexitAddr : BitVec 64 := KA.«kexit»
 
 /-- The stack `kexit`'s cone needs: its own 6-slot frame over the deepest
 callee, an fs entry point (`reparent` needs 24, `sched` 16). -/

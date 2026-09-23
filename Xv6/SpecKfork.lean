@@ -63,7 +63,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `kfork`. -/
-def kforkAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«kfork»
+def kforkAddr : BitVec 64 := KA.«kfork»
 
 /-- The stack `kfork`'s cone needs: its own 8-slot frame over the deepest
 callee, an fs entry point (`allocproc` needs 48, `uvmcopy` 42,

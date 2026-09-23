@@ -31,7 +31,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `reparent`. -/
-def reparentAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«reparent»
+def reparentAddr : BitVec 64 := KA.«reparent»
 
 /-- The stack `reparent` needs: its own 6-slot frame over `wakeup`'s 18. -/
 def reparentSlots : Nat := 24

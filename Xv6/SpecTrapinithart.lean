@@ -19,7 +19,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `trapinithart`. -/
-def trapinithartAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«trapinithart»
+def trapinithartAddr : BitVec 64 := KA.«trapinithart»
 
 /-- **WP of `trapinithart`.**  `tv0` is whatever the cell held on entry. -/
 def wp_trapinithart_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]

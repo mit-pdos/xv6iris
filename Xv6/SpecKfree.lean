@@ -27,7 +27,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `kfree`. -/
-def kfreeAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«kfree»
+def kfreeAddr : BitVec 64 := KA.«kfree»
 
 /-- The specification of `kfree`, as a proposition over the ambient
 kernel context. -/

@@ -10,7 +10,7 @@ namespace Xv6
 
 /-- The proved `kvmmake` interface, given `kalloc`, `memset`, `kvmmap` and
 `proc_mapstacks`. -/
-theorem Kvmmake (KA : KALLOC) (MS : MEMSET) (KM : KVMMAP) (PM : PROC_MAPSTACKS) : KVMMAKE :=
-  kvmmake_proof KA MS KM PM
+theorem Kvmmake (KAL : KALLOC) (MS : MEMSET) (KM : KVMMAP) (PM : PROC_MAPSTACKS) : KVMMAKE :=
+  kvmmake_proof KAL MS KM PM
 
 end Xv6

@@ -1,7 +1,7 @@
 /-
 The seven `kvmmap` calls of `kvmmake` (`kvmRegions`), split off from
 `Xv6/ProofKvmmake.lean`: the callees' contracts as rules, and the straight
-line from `0x80001178` to `0x8000120c`.
+line from `(KernelSyms.«kvmmake» + 0x18)` to `(KernelSyms.«kvmmake» + 0xac)`.
 
 The shape: the four-slot frame, `kalloc` for the root page (the failing
 arm is dead in the counted mode), `memset` zeroing it into a zero node,
@@ -51,26 +51,26 @@ theorem km_u6 : BitVec.signExtend 64 (6#20 ++ 0#12) = 0x6000#64 := by decide
 theorem km_u5 : BitVec.signExtend 64 (5#20 ++ 0#12) = 0x5000#64 := by decide
 
 /-- `ret` out of a callee lands on the instruction after the `jal`. -/
-theorem km_ret_116e : jumpPc 0x8000116e#64 = 0x8000116e#64 := by
-  simp only [jumpPc, BitVec.reduceAnd]
-theorem km_ret_1178 : jumpPc 0x80001178#64 = 0x80001178#64 := by
-  simp only [jumpPc, BitVec.reduceAnd]
-theorem km_ret_1188 : jumpPc 0x80001188#64 = 0x80001188#64 := by
-  simp only [jumpPc, BitVec.reduceAnd]
-theorem km_ret_1198 : jumpPc 0x80001198#64 = 0x80001198#64 := by
-  simp only [jumpPc, BitVec.reduceAnd]
-theorem km_ret_11a8 : jumpPc 0x800011a8#64 = 0x800011a8#64 := by
-  simp only [jumpPc, BitVec.reduceAnd]
-theorem km_ret_11ba : jumpPc 0x800011ba#64 = 0x800011ba#64 := by
-  simp only [jumpPc, BitVec.reduceAnd]
-theorem km_ret_11d0 : jumpPc 0x800011d0#64 = 0x800011d0#64 := by
-  simp only [jumpPc, BitVec.reduceAnd]
-theorem km_ret_11f2 : jumpPc 0x800011f2#64 = 0x800011f2#64 := by
-  simp only [jumpPc, BitVec.reduceAnd]
-theorem km_ret_120c : jumpPc 0x8000120c#64 = 0x8000120c#64 := by
-  simp only [jumpPc, BitVec.reduceAnd]
-theorem km_ret_1212 : jumpPc 0x80001212#64 = 0x80001212#64 := by
-  simp only [jumpPc, BitVec.reduceAnd]
+theorem km_ret_116e : jumpPc (KA.«kvmmake» + 0xe#64) = (KA.«kvmmake» + 0xe#64) := by
+  decide
+theorem km_ret_1178 : jumpPc (KA.«kvmmake» + 0x18#64) = (KA.«kvmmake» + 0x18#64) := by
+  decide
+theorem km_ret_1188 : jumpPc (KA.«kvmmake» + 0x28#64) = (KA.«kvmmake» + 0x28#64) := by
+  decide
+theorem km_ret_1198 : jumpPc (KA.«kvmmake» + 0x38#64) = (KA.«kvmmake» + 0x38#64) := by
+  decide
+theorem km_ret_11a8 : jumpPc (KA.«kvmmake» + 0x48#64) = (KA.«kvmmake» + 0x48#64) := by
+  decide
+theorem km_ret_11ba : jumpPc (KA.«kvmmake» + 0x5a#64) = (KA.«kvmmake» + 0x5a#64) := by
+  decide
+theorem km_ret_11d0 : jumpPc (KA.«kvmmake» + 0x70#64) = (KA.«kvmmake» + 0x70#64) := by
+  decide
+theorem km_ret_11f2 : jumpPc (KA.«kvmmake» + 0x92#64) = (KA.«kvmmake» + 0x92#64) := by
+  decide
+theorem km_ret_120c : jumpPc (KA.«kvmmake» + 0xac#64) = (KA.«kvmmake» + 0xac#64) := by
+  decide
+theorem km_ret_1212 : jumpPc (KA.«kvmmake» + 0xb2#64) = (KA.«kvmmake» + 0xb2#64) := by
+  decide
 
 theorem km_extract0 : BitVec.extractLsb' 0 8 (0#64) = 0#8 := by decide
 
@@ -80,7 +80,7 @@ theorem km_v1a : vpnOf (0x1000a000#64) = 0x1000a#27 := by decide
 theorem km_v2 : vpnOf (0x10001000#64) = 0x10001#27 := by decide
 theorem km_v3 : vpnOf (0xC000000#64) = 0xC000#27 := by decide
 theorem km_v4 : vpnOf (0x80000000#64) = 0x80000#27 := by decide
-theorem km_v5 : vpnOf (0x80007000#64) = 0x80007#27 := by decide
+theorem km_v5 : vpnOf (KStr.«cons») = 0x80007#27 := by decide
 theorem km_v6 : vpnOf (0x3FFFFFF000#64) = 0x3FFFFFF#27 := by decide
 
 /-! ## The regions are pairwise disjoint -/
@@ -122,26 +122,26 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 
 set_option maxHeartbeats 1000000 in
 /-- `kalloc`'s contract as a rule. -/
-theorem km_kalloc_call (KA : KALLOC) [CurCtx] (c : CPU) (k' : KCtx)
+theorem km_kalloc_call (KAL : KALLOC) [CurCtx] (c : CPU) (k' : KCtx)
     (γl : GName) (γk : KmemNames) (on : Option Nat)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 14 ≤ k'.avail) (hlk : "kmem" ∉ k'.locks) :
-    kctx c k' ∗ pcIs c 0x80000b7e#64 ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
+    kctx c k' ∗ pcIs c KA.«kalloc» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
     kallocAvail γk on ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       kallocPost γk on (R' 10#5) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := KA.wp_kalloc (hlc := hlc) (GF := GF) c k' γl γk on hnoff hK hlk
+  have h := KAL.wp_kalloc (hlc := hlc) (GF := GF) c k' γl γk on hnoff hK hlk
   unfold wp_kalloc_body at h
-  simp only [kallocAddr, KernelSyms.«kalloc»] at h
+  simp only [kallocAddr] at h
   exact h
 
 set_option maxHeartbeats 1000000 in
 /-- `memset`'s contract as a rule. -/
 theorem km_memset_call (MS : MEMSET) [CurCtx] (c : CPU) (k' : KCtx) (os : List (BitVec 8))
     (hK : 2 ≤ k'.avail) (hn : k'.regs 12#5 = BitVec.ofNat 64 4096) (hl : os.length = 4096) :
-    kctx c k' ∗ pcIs c 0x80000d18#64 ∗ byteBuf (k'.regs 10#5) (DFrac.own 1) os ∗
+    kctx c k' ∗ pcIs c KA.«memset» ∗ byteBuf (k'.regs 10#5) (DFrac.own 1) os ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ R' : RegMap,
       kctx cpu' (k'.withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       byteBuf (k'.regs 10#5) (DFrac.own 1)
@@ -150,7 +150,7 @@ theorem km_memset_call (MS : MEMSET) [CurCtx] (c : CPU) (k' : KCtx) (os : List (
     ⊢ wpLoop (GF := GF) c := by
   have h := MS.wp_memset (hlc := hlc) (GF := GF) c k' os 4096 hK hn (by decide) hl
   unfold wp_memset_body at h
-  simp only [memsetAddr, KernelSyms.«memset»] at h
+  simp only [memsetAddr] at h
   exact h
 
 set_option maxHeartbeats 1000000 in
@@ -164,7 +164,7 @@ theorem km_kvmmap_call (KM : KVMMAP) [CurCtx] (c : CPU) (k' : KCtx)
     (hwf : t.wf 2) (hnd : t.pagesNodup 2)
     (hpgt : ∀ z ∈ t.pages 2, pageValid (pageAddr z))
     (hcount : t.missingRun (vpnOf (k'.regs 11#5)) n < nb) :
-    kctx c k' ∗ pcIs c 0x80001138#64 ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
+    kctx c k' ∗ pcIs c KA.«kvmmap» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
     ptreeOwn 2 (DFrac.own 1) t ∗ kallocAvail γk (some nb) ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool,
       ∀ (R' : RegMap) (fresh : List (BitVec 44)),
@@ -183,7 +183,7 @@ theorem km_kvmmap_call (KM : KVMMAP) [CurCtx] (c : CPU) (k' : KCtx)
     hroot hargs hperm (by cases perm <;> decide) (by cases perm <;> decide) (PTree.wf_wfU 2 t hwf) hnd hpgt
     hcount
   unfold wp_kvmmap_body at h
-  simp only [kvmmapAddr, KernelSyms.«kvmmap»] at h
+  simp only [kvmmapAddr] at h
   exact h
 
 set_option maxHeartbeats 1000000 in
@@ -195,7 +195,7 @@ theorem km_mapstacks_call (PM : PROC_MAPSTACKS) [CurCtx] (c : CPU) (k' : KCtx)
     (hpgt : ∀ z ∈ t.pages 2, pageValid (pageAddr z))
     (hunm : ∀ i, i < 64 → t.walk 2 (kstackVpn i) = none)
     (hcount : 64 + t.missingStacks 64 < nb) :
-    kctx c k' ∗ pcIs c 0x800017fa#64 ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
+    kctx c k' ∗ pcIs c KA.«proc_mapstacks» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
     ptreeOwn 2 (DFrac.own 1) t ∗ kallocAvail γk (some nb) ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ (R' : RegMap)
         (fresh : List (BitVec 44)) (pas : Nat → BitVec 44),
@@ -213,7 +213,7 @@ theorem km_mapstacks_call (PM : PROC_MAPSTACKS) [CurCtx] (c : CPU) (k' : KCtx)
   have h := PM.wp_proc_mapstacks (hlc := hlc) (GF := GF) c k' γl γk nb t hnoff hK hlk hroot
     (PTree.wf_wfU 2 t hwf) hnd hpgt hunm hcount
   unfold wp_proc_mapstacks_body at h
-  simp only [procMapstacksAddr, KernelSyms.«proc_mapstacks»] at h
+  simp only [procMapstacksAddr] at h
   exact h
 
 /-! ## The regions -/
@@ -224,22 +224,28 @@ def kvmRegionsCont [CurCtx] (kb : KCtx) (γk : KmemNames) (nb : Nat) (b : BitVec
     (Res1 Res2 : IProp GF) (cpu' : CPU) : IProp GF :=
   iprop(∀ (spie spp : Bool) (R' : RegMap) (T : PTree),
     ⌜kb.sie = false → spie = kb.spie ∧ spp = kb.spp⌝ -∗
-    kctx cpu' ((kb.withSpie spie spp).withRegs R') -∗ pcIs cpu' 0x8000120c#64 -∗
+    kctx cpu' ((kb.withSpie spie spp).withRegs R') -∗ pcIs cpu' (KA.«kvmmake» + 0xac#64) -∗
     ptreeOwn 2 (DFrac.own 1) T -∗ kallocAvail γk (some (nb - 102)) -∗ Res1 -∗ Res2 -∗
     ⌜calleeSaved R R' ∧ R' 9#5 = pageAddr b ∧ kvmSix b T⌝ -∗ wpLoop cpu')
 
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
 /-- The seven `kvmmap` calls, from `0x80001178` with the zeroed root page to
-`0x8000120c` with the whole direct map in place: each call is one
+`(KernelSyms.«kvmmake» + 0xac)` with the whole direct map in place: each call is one
 `PTree.mapRun` on the tree, its node count read off the dummy tree of
 `Xv6/KvmCounts.lean`, and the pages it maps were unmapped because the seven
 regions are disjoint. -/
+theorem kvmmake_br_4ea0 : KA.«kvmmake» + 0x4ea0#64 = KA.«_trampoline» := by decide
+
+theorem kvmmake_br_5ea0 : KA.«kvmmake» + 0x5ea0#64 = KStr.«cons» := by decide
+
+theorem kvmmake_br_ffffffffffffffd8 : KA.«kvmmake» + 0xffffffffffffffd8#64 = KA.«kvmmap» := by decide
+
 theorem km_regions (KM : KVMMAP) [CurCtx] (c : CPU) (kb : KCtx) (γl : GName) (γk : KmemNames)
     (nb : Nat) (b : BitVec 44) (R : RegMap) (hnoff : kb.noff + 1 < 2 ^ 31)
     (hK : 34 ≤ kb.avail) (hlk : "kmem" ∉ kb.locks) (hnb : 166 < nb)
     (h9 : R 9#5 = pageAddr b) (hbv : pageValid (pageAddr b)) (Res1 Res2 : IProp GF) :
-    kctx c (kb.withRegs R) ∗ pcIs c 0x80001178#64 ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
+    kctx c (kb.withRegs R) ∗ pcIs c (KA.«kvmmake» + 0x18#64) ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
     ptreeOwn 2 (DFrac.own 1) (PTree.zeroNode b) ∗ kallocAvail γk (some (nb - 1)) ∗ Res1 ∗ Res2 ∗
     wpNext kb.sie kb.proc c (kvmRegionsCont kb γk nb b R Res1 Res2)
     ⊢ wpLoop (GF := GF) c := by
@@ -247,23 +253,23 @@ theorem km_regions (KM : KVMMAP) [CurCtx] (c : CPU) (kb : KCtx) (γl : GName) (�
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hs0 := sOk_zero b hbv
   -- region 1
-  k_step_gen (wp_s_addi c _ 0x80001178#64 true 6#12 14#5 0#5 (by decide))
+  k_step_gen (wp_s_addi c _ (KA.«kvmmake» + 0x18#64) true 6#12 14#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c1 hp1
   iintro Hk Hpc
-  k_step_gen (wp_s_lui c1 _ 0x8000117a#64 true 1#20 13#5 (by decide))
+  k_step_gen (wp_s_lui c1 _ (KA.«kvmmake» + 0x1a#64) true 1#20 13#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [km_u1] next c2 hp2
   iintro Hk Hpc
-  k_step_gen (wp_s_lui c2 _ 0x8000117c#64 false 0x10000#20 12#5 (by decide))
+  k_step_gen (wp_s_lui c2 _ (KA.«kvmmake» + 0x1c#64) false 0x10000#20 12#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [km_u10000] next c3 hp3
   iintro Hk Hpc
-  k_step_gen (wp_s_add c3 _ 0x80001180#64 true 11#5 0#5 12#5 (by decide))
+  k_step_gen (wp_s_add c3 _ (KA.«kvmmake» + 0x20#64) true 11#5 0#5 12#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hp4
   iintro Hk Hpc
-  k_step_gen (wp_s_add c4 _ 0x80001182#64 true 10#5 0#5 9#5 (by decide))
+  k_step_gen (wp_s_add c4 _ (KA.«kvmmake» + 0x22#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9] next c5 hp5
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c5 _ 0x80001184#64 false 2097076#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c6 hp6
+  k_step_gen (wp_s_jal c5 _ (KA.«kvmmake» + 0x24#64) false 2097076#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kvmmake_br_ffffffffffffffd8] next c6 hp6
   iintro Hk Hpc
   icases (ptreeOwn_pagesNodup' 2 _) $$ Htree with ⟨%hnd1, Htree⟩
   iapply (km_kvmmap_call KM c6 _ γl γk (nb - 1) _ 1 KPerm.rw
@@ -309,23 +315,23 @@ theorem km_regions (KM : KVMMAP) [CurCtx] (c : CPU) (kb : KCtx) (γl : GName) (�
     m1_24, m1_25, m1_26, m1_27⟩ := hcs
   have hpinr1 : kb.sie = false ∨ kb.proc = 0#64 → c7 = c := fun h => (hp7 h).trans ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h))))))
   -- region 1a (UART1: its page shares UART0's level-1 and level-0 tables)
-  k_step_gen (wp_s_addi c7 _ 0x80001188#64 true 6#12 14#5 0#5 (by decide))
+  k_step_gen (wp_s_addi c7 _ (KA.«kvmmake» + 0x28#64) true 6#12 14#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c8 hp8
   iintro Hk Hpc
-  k_step_gen (wp_s_lui c8 _ 0x8000118a#64 true 1#20 13#5 (by decide))
+  k_step_gen (wp_s_lui c8 _ (KA.«kvmmake» + 0x2a#64) true 1#20 13#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [km_u1] next c9 hp9
   iintro Hk Hpc
-  k_step_gen (wp_s_lui c9 _ 0x8000118c#64 false 0x1000a#20 12#5 (by decide))
+  k_step_gen (wp_s_lui c9 _ (KA.«kvmmake» + 0x2c#64) false 0x1000a#20 12#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [km_u1000a] next c10 hp10
   iintro Hk Hpc
-  k_step_gen (wp_s_add c10 _ 0x80001190#64 true 11#5 0#5 12#5 (by decide))
+  k_step_gen (wp_s_add c10 _ (KA.«kvmmake» + 0x30#64) true 11#5 0#5 12#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c11 hp11
   iintro Hk Hpc
-  k_step_gen (wp_s_add c11 _ 0x80001192#64 true 10#5 0#5 9#5 (by decide))
+  k_step_gen (wp_s_add c11 _ (KA.«kvmmake» + 0x32#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [m1_9, h9] next c12 hp12
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c12 _ 0x80001194#64 false 2097060#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c13 hp13
+  k_step_gen (wp_s_jal c12 _ (KA.«kvmmake» + 0x34#64) false 2097060#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kvmmake_br_ffffffffffffffd8] next c13 hp13
   iintro Hk Hpc
   icases (ptreeOwn_pagesNodup' 2 _) $$ Htree with ⟨%hnd1a, Htree⟩
   iapply (km_kvmmap_call KM c13 _ γl γk (nb - 1 - 2) _ 1 KPerm.rw
@@ -371,23 +377,23 @@ theorem km_regions (KM : KVMMAP) [CurCtx] (c : CPU) (kb : KCtx) (γl : GName) (�
     m1a_24, m1a_25, m1a_26, m1a_27⟩ := hcs
   have hpinr1a : kb.sie = false ∨ kb.proc = 0#64 → c14 = c := fun h => (hp14 h).trans ((hp13 h).trans ((hp12 h).trans ((hp11 h).trans ((hp10 h).trans ((hp9 h).trans ((hp8 h).trans (hpinr1 h)))))))
   -- region 2
-  k_step_gen (wp_s_addi c14 _ 0x80001198#64 true 6#12 14#5 0#5 (by decide))
+  k_step_gen (wp_s_addi c14 _ (KA.«kvmmake» + 0x38#64) true 6#12 14#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c15 hp15
   iintro Hk Hpc
-  k_step_gen (wp_s_lui c15 _ 0x8000119a#64 true 1#20 13#5 (by decide))
+  k_step_gen (wp_s_lui c15 _ (KA.«kvmmake» + 0x3a#64) true 1#20 13#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [km_u1] next c16 hp16
   iintro Hk Hpc
-  k_step_gen (wp_s_lui c16 _ 0x8000119c#64 false 0x10001#20 12#5 (by decide))
+  k_step_gen (wp_s_lui c16 _ (KA.«kvmmake» + 0x3c#64) false 0x10001#20 12#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [km_u10001] next c17 hp17
   iintro Hk Hpc
-  k_step_gen (wp_s_add c17 _ 0x800011a0#64 true 11#5 0#5 12#5 (by decide))
+  k_step_gen (wp_s_add c17 _ (KA.«kvmmake» + 0x40#64) true 11#5 0#5 12#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c18 hp18
   iintro Hk Hpc
-  k_step_gen (wp_s_add c18 _ 0x800011a2#64 true 10#5 0#5 9#5 (by decide))
+  k_step_gen (wp_s_add c18 _ (KA.«kvmmake» + 0x42#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [m1a_9, m1_9, h9] next c19 hp19
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c19 _ 0x800011a4#64 false 2097044#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c20 hp20
+  k_step_gen (wp_s_jal c19 _ (KA.«kvmmake» + 0x44#64) false 2097044#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kvmmake_br_ffffffffffffffd8] next c20 hp20
   iintro Hk Hpc
   icases (ptreeOwn_pagesNodup' 2 _) $$ Htree with ⟨%hnd2, Htree⟩
   iapply (km_kvmmap_call KM c20 _ γl γk (nb - 1 - 2 - 0) _ 1 KPerm.rw
@@ -433,23 +439,23 @@ theorem km_regions (KM : KVMMAP) [CurCtx] (c : CPU) (kb : KCtx) (γl : GName) (�
     m2_24, m2_25, m2_26, m2_27⟩ := hcs
   have hpinr2 : kb.sie = false ∨ kb.proc = 0#64 → c21 = c := fun h => (hp21 h).trans ((hp20 h).trans ((hp19 h).trans ((hp18 h).trans ((hp17 h).trans ((hp16 h).trans ((hp15 h).trans (hpinr1a h)))))))
   -- region 3
-  k_step_gen (wp_s_addi c21 _ 0x800011a8#64 true 6#12 14#5 0#5 (by decide))
+  k_step_gen (wp_s_addi c21 _ (KA.«kvmmake» + 0x48#64) true 6#12 14#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c22 hp22
   iintro Hk Hpc
-  k_step_gen (wp_s_lui c22 _ 0x800011aa#64 false 0x4000#20 13#5 (by decide))
+  k_step_gen (wp_s_lui c22 _ (KA.«kvmmake» + 0x4a#64) false 0x4000#20 13#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [km_u4000] next c23 hp23
   iintro Hk Hpc
-  k_step_gen (wp_s_lui c23 _ 0x800011ae#64 false 0xC000#20 12#5 (by decide))
+  k_step_gen (wp_s_lui c23 _ (KA.«kvmmake» + 0x4e#64) false 0xC000#20 12#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [km_uc000] next c24 hp24
   iintro Hk Hpc
-  k_step_gen (wp_s_add c24 _ 0x800011b2#64 true 11#5 0#5 12#5 (by decide))
+  k_step_gen (wp_s_add c24 _ (KA.«kvmmake» + 0x52#64) true 11#5 0#5 12#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c25 hp25
   iintro Hk Hpc
-  k_step_gen (wp_s_add c25 _ 0x800011b4#64 true 10#5 0#5 9#5 (by decide))
+  k_step_gen (wp_s_add c25 _ (KA.«kvmmake» + 0x54#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [m2_9, m1a_9, m1_9, h9] next c26 hp26
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c26 _ 0x800011b6#64 false 2097026#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c27 hp27
+  k_step_gen (wp_s_jal c26 _ (KA.«kvmmake» + 0x56#64) false 2097026#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kvmmake_br_ffffffffffffffd8] next c27 hp27
   iintro Hk Hpc
   icases (ptreeOwn_pagesNodup' 2 _) $$ Htree with ⟨%hnd3, Htree⟩
   iapply (km_kvmmap_call KM c27 _ γl γk (nb - 1 - 2 - 0 - 0) _ 16384 KPerm.rw
@@ -495,29 +501,29 @@ theorem km_regions (KM : KVMMAP) [CurCtx] (c : CPU) (kb : KCtx) (γl : GName) (�
     m3_24, m3_25, m3_26, m3_27⟩ := hcs
   have hpinr3 : kb.sie = false ∨ kb.proc = 0#64 → c28 = c := fun h => (hp28 h).trans ((hp27 h).trans ((hp26 h).trans ((hp25 h).trans ((hp24 h).trans ((hp23 h).trans ((hp22 h).trans (hpinr2 h)))))))
   -- region 4
-  k_step_gen (wp_s_addi c28 _ 0x800011ba#64 true 10#12 14#5 0#5 (by decide))
+  k_step_gen (wp_s_addi c28 _ (KA.«kvmmake» + 0x5a#64) true 10#12 14#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c29 hp29
   iintro Hk Hpc
-  k_step_gen (wp_s_auipc c29 _ 0x800011bc#64 false 0x80006#20 13#5 (by decide))
+  k_step_gen (wp_s_auipc c29 _ (KA.«kvmmake» + 0x5c#64) false 0x80006#20 13#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [km_u80006] next c30 hp30
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c30 _ 0x800011c0#64 false 3652#12 13#5 13#5 (by decide))
+  k_step_gen (wp_s_addi c30 _ (KA.«kvmmake» + 0x60#64) false 3652#12 13#5 13#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c31 hp31
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c31 _ 0x800011c4#64 true 1#12 12#5 0#5 (by decide))
+  k_step_gen (wp_s_addi c31 _ (KA.«kvmmake» + 0x64#64) true 1#12 12#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c32 hp32
   iintro Hk Hpc
-  k_step_gen (wp_s_slli c32 _ 0x800011c6#64 true 31#6 12#5 12#5 (by decide))
+  k_step_gen (wp_s_slli c32 _ (KA.«kvmmake» + 0x66#64) true 31#6 12#5 12#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c33 hp33
   iintro Hk Hpc
-  k_step_gen (wp_s_add c33 _ 0x800011c8#64 true 11#5 0#5 12#5 (by decide))
+  k_step_gen (wp_s_add c33 _ (KA.«kvmmake» + 0x68#64) true 11#5 0#5 12#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c34 hp34
   iintro Hk Hpc
-  k_step_gen (wp_s_add c34 _ 0x800011ca#64 true 10#5 0#5 9#5 (by decide))
+  k_step_gen (wp_s_add c34 _ (KA.«kvmmake» + 0x6a#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [m3_9, m2_9, m1a_9, m1_9, h9] next c35 hp35
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c35 _ 0x800011cc#64 false 2097004#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c36 hp36
+  k_step_gen (wp_s_jal c35 _ (KA.«kvmmake» + 0x6c#64) false 2097004#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kvmmake_br_ffffffffffffffd8] next c36 hp36
   iintro Hk Hpc
   icases (ptreeOwn_pagesNodup' 2 _) $$ Htree with ⟨%hnd4, Htree⟩
   iapply (km_kvmmap_call KM c36 _ γl γk (nb - 1 - 2 - 0 - 0 - 32) _ 7 KPerm.rx
@@ -563,38 +569,38 @@ theorem km_regions (KM : KVMMAP) [CurCtx] (c : CPU) (kb : KCtx) (γl : GName) (�
     m4_24, m4_25, m4_26, m4_27⟩ := hcs
   have hpinr4 : kb.sie = false ∨ kb.proc = 0#64 → c37 = c := fun h => (hp37 h).trans ((hp36 h).trans ((hp35 h).trans ((hp34 h).trans ((hp33 h).trans ((hp32 h).trans ((hp31 h).trans ((hp30 h).trans ((hp29 h).trans (hpinr3 h)))))))))
   -- region 5
-  k_step_gen (wp_s_addi c37 _ 0x800011d0#64 true 6#12 14#5 0#5 (by decide))
+  k_step_gen (wp_s_addi c37 _ (KA.«kvmmake» + 0x70#64) true 6#12 14#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c38 hp38
   iintro Hk Hpc
-  k_step_gen (wp_s_auipc c38 _ 0x800011d2#64 false 6#20 13#5 (by decide))
+  k_step_gen (wp_s_auipc c38 _ (KA.«kvmmake» + 0x72#64) false 6#20 13#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [km_u6] next c39 hp39
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c39 _ 0x800011d6#64 false 3630#12 13#5 13#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c40 hp40
+  k_step_gen (wp_s_addi c39 _ (KA.«kvmmake» + 0x76#64) false 3630#12 13#5 13#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kvmmake_br_5ea0] next c40 hp40
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c40 _ 0x800011da#64 true 17#12 15#5 0#5 (by decide))
+  k_step_gen (wp_s_addi c40 _ (KA.«kvmmake» + 0x7a#64) true 17#12 15#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c41 hp41
   iintro Hk Hpc
-  k_step_gen (wp_s_slli c41 _ 0x800011dc#64 true 27#6 15#5 15#5 (by decide))
+  k_step_gen (wp_s_slli c41 _ (KA.«kvmmake» + 0x7c#64) true 27#6 15#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c42 hp42
   iintro Hk Hpc
-  k_step_gen (wp_s_sub c42 _ 0x800011de#64 false 13#5 15#5 13#5 (by decide))
+  k_step_gen (wp_s_sub c42 _ (KA.«kvmmake» + 0x7e#64) false 13#5 15#5 13#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c43 hp43
   iintro Hk Hpc
-  k_step_gen (wp_s_auipc c43 _ 0x800011e2#64 false 6#20 12#5 (by decide))
+  k_step_gen (wp_s_auipc c43 _ (KA.«kvmmake» + 0x82#64) false 6#20 12#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [km_u6] next c44 hp44
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c44 _ 0x800011e6#64 false 3614#12 12#5 12#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c45 hp45
+  k_step_gen (wp_s_addi c44 _ (KA.«kvmmake» + 0x86#64) false 3614#12 12#5 12#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kvmmake_br_5ea0] next c45 hp45
   iintro Hk Hpc
-  k_step_gen (wp_s_add c45 _ 0x800011ea#64 true 11#5 0#5 12#5 (by decide))
+  k_step_gen (wp_s_add c45 _ (KA.«kvmmake» + 0x8a#64) true 11#5 0#5 12#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c46 hp46
   iintro Hk Hpc
-  k_step_gen (wp_s_add c46 _ 0x800011ec#64 true 10#5 0#5 9#5 (by decide))
+  k_step_gen (wp_s_add c46 _ (KA.«kvmmake» + 0x8c#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [m4_9, m3_9, m2_9, m1a_9, m1_9, h9] next c47 hp47
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c47 _ 0x800011ee#64 false 2096970#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c48 hp48
+  k_step_gen (wp_s_jal c47 _ (KA.«kvmmake» + 0x8e#64) false 2096970#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kvmmake_br_ffffffffffffffd8] next c48 hp48
   iintro Hk Hpc
   icases (ptreeOwn_pagesNodup' 2 _) $$ Htree with ⟨%hnd5, Htree⟩
   iapply (km_kvmmap_call KM c48 _ γl γk (nb - 1 - 2 - 0 - 0 - 32 - 2) _ 32761 KPerm.rw
@@ -640,32 +646,32 @@ theorem km_regions (KM : KVMMAP) [CurCtx] (c : CPU) (kb : KCtx) (γl : GName) (�
     m5_24, m5_25, m5_26, m5_27⟩ := hcs
   have hpinr5 : kb.sie = false ∨ kb.proc = 0#64 → c49 = c := fun h => (hp49 h).trans ((hp48 h).trans ((hp47 h).trans ((hp46 h).trans ((hp45 h).trans ((hp44 h).trans ((hp43 h).trans ((hp42 h).trans ((hp41 h).trans ((hp40 h).trans ((hp39 h).trans ((hp38 h).trans (hpinr4 h))))))))))))
   -- region 6
-  k_step_gen (wp_s_addi c49 _ 0x800011f2#64 true 10#12 14#5 0#5 (by decide))
+  k_step_gen (wp_s_addi c49 _ (KA.«kvmmake» + 0x92#64) true 10#12 14#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c50 hp50
   iintro Hk Hpc
-  k_step_gen (wp_s_lui c50 _ 0x800011f4#64 true 1#20 13#5 (by decide))
+  k_step_gen (wp_s_lui c50 _ (KA.«kvmmake» + 0x94#64) true 1#20 13#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [km_u1] next c51 hp51
   iintro Hk Hpc
-  k_step_gen (wp_s_auipc c51 _ 0x800011f6#64 false 5#20 12#5 (by decide))
+  k_step_gen (wp_s_auipc c51 _ (KA.«kvmmake» + 0x96#64) false 5#20 12#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [km_u5] next c52 hp52
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c52 _ 0x800011fa#64 false 3594#12 12#5 12#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c53 hp53
+  k_step_gen (wp_s_addi c52 _ (KA.«kvmmake» + 0x9a#64) false 3594#12 12#5 12#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kvmmake_br_4ea0] next c53 hp53
   iintro Hk Hpc
-  k_step_gen (wp_s_lui c53 _ 0x800011fe#64 false 0x4000#20 11#5 (by decide))
+  k_step_gen (wp_s_lui c53 _ (KA.«kvmmake» + 0x9e#64) false 0x4000#20 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [km_u4000] next c54 hp54
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c54 _ 0x80001202#64 true 4095#12 11#5 11#5 (by decide))
+  k_step_gen (wp_s_addi c54 _ (KA.«kvmmake» + 0xa2#64) true 4095#12 11#5 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c55 hp55
   iintro Hk Hpc
-  k_step_gen (wp_s_slli c55 _ 0x80001204#64 true 12#6 11#5 11#5 (by decide))
+  k_step_gen (wp_s_slli c55 _ (KA.«kvmmake» + 0xa4#64) true 12#6 11#5 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c56 hp56
   iintro Hk Hpc
-  k_step_gen (wp_s_add c56 _ 0x80001206#64 true 10#5 0#5 9#5 (by decide))
+  k_step_gen (wp_s_add c56 _ (KA.«kvmmake» + 0xa6#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [m5_9, m4_9, m3_9, m2_9, m1a_9, m1_9, h9] next c57 hp57
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c57 _ 0x80001208#64 false 2096944#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c58 hp58
+  k_step_gen (wp_s_jal c57 _ (KA.«kvmmake» + 0xa8#64) false 2096944#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kvmmake_br_ffffffffffffffd8] next c58 hp58
   iintro Hk Hpc
   icases (ptreeOwn_pagesNodup' 2 _) $$ Htree with ⟨%hnd6, Htree⟩
   iapply (km_kvmmap_call KM c58 _ γl γk (nb - 1 - 2 - 0 - 0 - 32 - 2 - 63) _ 1 KPerm.rx
@@ -760,17 +766,23 @@ def kvmmakeCont [CurCtx] (k : KCtx) (γk : KmemNames) (nb : Nat) (cpu' : CPU) : 
 
 /-! ## The function -/
 
+theorem kvmmake_br_69a : KA.«kvmmake» + 0x69a#64 = KA.«proc_mapstacks» := by decide
+
+theorem kvmmake_br_fffffffffffffbb8 : KA.«kvmmake» + 0xfffffffffffffbb8#64 = KA.«memset» := by decide
+
+theorem kvmmake_br_fffffffffffffa1e : KA.«kvmmake» + 0xfffffffffffffa1e#64 = KA.«kalloc» := by decide
+
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
-theorem kvmmake_proof (KA : KALLOC) (MS : MEMSET) (KM : KVMMAP) (PM : PROC_MAPSTACKS) : KVMMAKE :=
+theorem kvmmake_proof (KAL : KALLOC) (MS : MEMSET) (KM : KVMMAP) (PM : PROC_MAPSTACKS) : KVMMAKE :=
   ⟨fun {hlc GF} _ _ _ cpu k γl γk nb hnoff hK hlk hcount => by
   unfold wp_kvmmake_body
-  simp only [kvmmakeAddr, KernelSyms.«kvmmake»]
+  simp only [kvmmakeAddr]
   iintro ⟨Hk, Hpc, #Hlk, Hav, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   k_norm_g
   -- the prologue
-  iapply (wp_prologue4s1_gen cpu k 0x80001160#64 (by omega))
+  iapply (wp_prologue4s1_gen cpu k KA.«kvmmake» (by omega))
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm_g
   iframe
@@ -778,10 +790,10 @@ theorem kvmmake_proof (KA : KALLOC) (MS : MEMSET) (KM : KVMMAP) (PM : PROC_MAPST
   iapply wpNext_intro_pin
   iintro %c1 %hp1 Hk Hpc Hframe
   -- jal ra, kalloc
-  k_step_gen (wp_s_jal c1 _ 0x8000116a#64 false 2095636#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c2 hp2
+  k_step_gen (wp_s_jal c1 _ (KA.«kvmmake» + 0xa#64) false 2095636#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kvmmake_br_fffffffffffffa1e] next c2 hp2
   iintro Hk Hpc
-  iapply (km_kalloc_call KA c2 _ γl γk (some nb) ?hn1 ?hK1 ?hl1) $$ [- $Hk $Hpc]
+  iapply (km_kalloc_call KAL c2 _ γl γk (some nb) ?hn1 ?hK1 ?hl1) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g
   iframe #
@@ -805,18 +817,18 @@ theorem kvmmake_proof (KA : KALLOC) (MS : MEMSET) (KM : KVMMAP) (PM : PROC_MAPST
     · injection h with h
       exact absurd hcount (by unfold kvmmakeCount kvmmakeNodes; omega)
   -- c.mv s1,a0
-  k_step_gen (wp_s_add c3 _ 0x8000116e#64 true 9#5 0#5 10#5 (by decide))
+  k_step_gen (wp_s_add c3 _ (KA.«kvmmake» + 0xe#64) true 9#5 0#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hp4
   iintro Hk Hpc
   -- c.lui a2,0x1 ; c.li a1,0 ; jal ra, memset
-  k_step_gen (wp_s_lui c4 _ 0x80001170#64 true 1#20 12#5 (by decide))
+  k_step_gen (wp_s_lui c4 _ (KA.«kvmmake» + 0x10#64) true 1#20 12#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [km_u1] next c5 hp5
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c5 _ 0x80001172#64 true 0#12 11#5 0#5 (by decide))
+  k_step_gen (wp_s_addi c5 _ (KA.«kvmmake» + 0x12#64) true 0#12 11#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c6 hp6
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c6 _ 0x80001174#64 false 2096036#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c7 hp7
+  k_step_gen (wp_s_jal c6 _ (KA.«kvmmake» + 0x14#64) false 2096036#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kvmmake_br_fffffffffffffbb8] next c7 hp7
   iintro Hk Hpc
   iapply (km_memset_call MS c7 _ (List.replicate 4096 5#8) ?hK2 ?hn2 ?hl2) $$ [- $Hk $Hpc]
   rotate_right 1
@@ -876,11 +888,11 @@ theorem kvmmake_proof (KA : KALLOC) (MS : MEMSET) (KM : KVMMAP) (PM : PROC_MAPST
   unfold calleeSaved at hcsR
   obtain ⟨r2, r8, r9, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27⟩ := hcsR
   -- c.mv a0,s1 ; jal ra, proc_mapstacks
-  k_step_gen (wp_s_add c9 _ 0x8000120c#64 true 10#5 0#5 9#5 (by decide))
+  k_step_gen (wp_s_add c9 _ (KA.«kvmmake» + 0xac#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9R'] next c10 hp10
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c10 _ 0x8000120e#64 false 1516#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c11 hp11
+  k_step_gen (wp_s_jal c10 _ (KA.«kvmmake» + 0xae#64) false 1516#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kvmmake_br_69a] next c11 hp11
   iintro Hk Hpc
   icases (ptreeOwn_pagesNodup' 2 _) $$ Htree with ⟨%hndS, Htree⟩
   iapply (km_mapstacks_call PM c11 _ γl γk (nb - 102) _ ?hnS ?hKS ?hlS ?hroS ?hwfS hndS
@@ -915,7 +927,7 @@ theorem kvmmake_proof (KA : KALLOC) (MS : MEMSET) (KM : KVMMAP) (PM : PROC_MAPST
       (by simp only [List.mem_append, List.mem_map, List.mem_range]; exact Or.inr ⟨i, hi, rfl⟩)
   have hkt := kvmmake_table (BitVec.extractLsb' 12 44 (R1 10#5)) T _ pas frs hsix rfl hndF hpn hpas
   -- c.mv a0,s1
-  k_step_gen (wp_s_add c12 _ 0x80001212#64 true 10#5 0#5 9#5 (by decide))
+  k_step_gen (wp_s_add c12 _ (KA.«kvmmake» + 0xb2#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [s9, h9R'] next c13 hp13
   iintro Hk Hpc
   -- the epilogue
@@ -930,7 +942,7 @@ theorem kvmmake_proof (KA : KALLOC) (MS : MEMSET) (KM : KVMMAP) (PM : PROC_MAPST
       = (k.withSpie spieS sppS).regs 2#5 + 0xFFFFFFFFFFFFFFE0#64 := by
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, KCtx.withSpie_regs]
     exact s2.trans (r2.trans (b2.trans a2))
-  iapply (wp_epilogue4s1_gen c13 (k.withSpie spieS sppS) 0x80001214#64 hKe
+  iapply (wp_epilogue4s1_gen c13 (k.withSpie spieS sppS) (KA.«kvmmake» + 0xb4#64) hKe
     (R4.set 10#5 (pageAddr (BitVec.extractLsb' 12 44 (R1 10#5)))) hR2e
     (k.regs 1#5) (k.regs 8#5) (k.regs 9#5)) $$ [- $Hk $Hpc]
   k_code (text_instr _ _ _ _ rfl rfl) Htext

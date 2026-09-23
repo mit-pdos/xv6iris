@@ -35,7 +35,7 @@ supervisor mode at `main`, for every time `t` the clock read, with
     ra = start + 0x6a   sp = sp₀ - 16   s0 = sp₀   tp = a5 = sext32(hartid)
     a0 = 4096 * (hartid + 1)   a1 = hartid + 1   a4 = 1000000
 
-`start`'s frame holding `_entry`'s `ra` (= 0x8000001a) and `sp`'s old value,
+`start`'s frame holding `_entry`'s `ra` (= KernelSyms.«spin») and `sp`'s old value,
 `timerinit`'s frame below it, the hart id and GOT slot unchanged, and the
 clock cells at some value. -/
 def wp_boot_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
@@ -47,7 +47,7 @@ def wp_boot_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
   ctxTok cpu curCtx ∗
   kernelText ∗
   pwordPointsTo stack0Slot 8 (DFrac.own 1) s0 ∗
-  pcIs cpu (BitVec.ofNat 64 KernelSyms.«_entry») ∗
+  pcIs cpu (KA.«_entry») ∗
   Register.x1 ↦ᵣ[cpu] v1 ∗ Register.x2 ↦ᵣ[cpu] v2 ∗ Register.x4 ↦ᵣ[cpu] v4 ∗
   Register.x8 ↦ᵣ[cpu] v8 ∗ Register.x10 ↦ᵣ[cpu] v10 ∗ Register.x11 ↦ᵣ[cpu] v11 ∗
   Register.x14 ↦ᵣ[cpu] v14 ∗ Register.x15 ↦ᵣ[cpu] v15 ∗
@@ -71,7 +71,7 @@ def wp_boot_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
    Register.x14 ↦ᵣ[cpu] 1000000#64 -∗
    Register.x15 ↦ᵣ[cpu] (BitVec.signExtend 64 (BitVec.extractLsb' 0 32 hartid)) -∗
    pwordPointsTo (bootSp s0 hartid - 16#64) 8 (DFrac.own 1) v8 -∗
-   pwordPointsTo (bootSp s0 hartid - 8#64) 8 (DFrac.own 1) 0x8000001a#64 -∗
+   pwordPointsTo (bootSp s0 hartid - 8#64) 8 (DFrac.own 1) KA.«spin» -∗
    pwordPointsTo (bootSp s0 hartid - 32#64) 8 (DFrac.own 1) (bootSp s0 hartid) -∗
    pwordPointsTo (bootSp s0 hartid - 24#64) 8 (DFrac.own 1) (startAddr + 0x6a#64) -∗
    wpLoop cpu)

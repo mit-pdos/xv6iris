@@ -19,11 +19,11 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `trapinit`. -/
-def trapinitAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«trapinit»
+def trapinitAddr : BitVec 64 := KA.«trapinit»
 /-- `&tickslock`. -/
-def tickslockAddr : BitVec 64 := 0x80018260#64
+def tickslockAddr : BitVec 64 := KA.«tickslock»
 /-- The `"time"` literal. -/
-def timeNameAddr : BitVec 64 := 0x80007270#64
+def timeNameAddr : BitVec 64 := KStr.«time»
 
 /-- The specification of `trapinit`. -/
 def wp_trapinit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]

@@ -70,7 +70,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `procdump`. -/
-def procdumpAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«procdump»
+def procdumpAddr : BitVec 64 := KA.«procdump»
 
 /-- The stack `procdump` needs: its own ten-slot frame over `printk`'s 48. -/
 def procdumpSlots : Nat := 10 + 48

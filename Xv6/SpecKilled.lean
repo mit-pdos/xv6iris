@@ -18,9 +18,9 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
-def setkilledAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«setkilled»
-def killedAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«killed»
-def kkillAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«kkill»
+def setkilledAddr : BitVec 64 := KA.«setkilled»
+def killedAddr : BitVec 64 := KA.«killed»
+def kkillAddr : BitVec 64 := KA.«kkill»
 
 def wp_setkilled_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (j : Nat)

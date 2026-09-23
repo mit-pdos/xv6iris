@@ -29,7 +29,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `swtch`. -/
-def swtchAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«swtch»
+def swtchAddr : BitVec 64 := KA.«swtch»
 
 /-- **WP of `swtch`.** -/
 def wp_swtch_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [X : CurCtx]

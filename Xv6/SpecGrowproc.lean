@@ -19,7 +19,7 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
-def growprocAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«growproc»
+def growprocAddr : BitVec 64 := KA.«growproc»
 def growprocSlots : Nat := 46
 
 /-- The size and space after `growproc(n)` with result `r`. -/

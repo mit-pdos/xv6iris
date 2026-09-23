@@ -41,7 +41,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `acquire`. -/
-def acquireAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«acquire»
+def acquireAddr : BitVec 64 := KA.«acquire»
 
 /-- **WP of `acquire`**, at either `SIE`: interrupts are off on exit
 (push_off's `KCtx.pushOffAt`, with the arm the entry context held the

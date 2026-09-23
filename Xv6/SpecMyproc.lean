@@ -28,7 +28,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `myproc`. -/
-def myprocAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«myproc»
+def myprocAddr : BitVec 64 := KA.«myproc»
 
 /-- **WP of `myproc`**, at either `SIE`.  Returns `k.proc`, the current
 process, in `a0`; the context comes back as it was but for the registers

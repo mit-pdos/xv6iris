@@ -36,7 +36,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `mappages`. -/
-def mappagesAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«mappages»
+def mappagesAddr : BitVec 64 := KA.«mappages»
 
 /-- The pure premises of a run: aligned `va`/`pa`, `n ≥ 1` pages, in range,
 every page of the run unmapped. -/

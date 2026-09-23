@@ -1,7 +1,7 @@
 /-
 Proof of `acquiresleep`'s specification (`SpecAcquiresleep.ACQUIRESLEEP`),
 given the interfaces of `acquire`, `release`, `myproc`, `sleep_prepare` and
-`sleep` (`KernelSyms.acquiresleep = 0x8000407e`).
+`sleep` (`KernelSyms.acquiresleep = KernelSyms.«acquiresleep»`).
 
     3fc0: prologue (4 slots, ra/s0/s1/s2)          -- wp_prologue4s2_gen
     3fcc: s1 = lk ; s2 = &lk->lk ; a0 = s2 ; jal acquire
@@ -43,13 +43,13 @@ set_option linter.unusedVariables false
 
 /-! ## Link registers -/
 
-theorem aslj_3fd8 : jumpPc 0x80004096#64 = 0x80004096#64 := by simp only [jumpPc, BitVec.reduceAnd]
-theorem aslj_3fe2 : jumpPc 0x800040a0#64 = 0x800040a0#64 := by simp only [jumpPc, BitVec.reduceAnd]
-theorem aslj_3fe8 : jumpPc 0x800040a6#64 = 0x800040a6#64 := by simp only [jumpPc, BitVec.reduceAnd]
-theorem aslj_3fec : jumpPc 0x800040aa#64 = 0x800040aa#64 := by simp only [jumpPc, BitVec.reduceAnd]
-theorem aslj_3ff2 : jumpPc 0x800040b0#64 = 0x800040b0#64 := by simp only [jumpPc, BitVec.reduceAnd]
-theorem aslj_3ffe : jumpPc 0x800040bc#64 = 0x800040bc#64 := by simp only [jumpPc, BitVec.reduceAnd]
-theorem aslj_4008 : jumpPc 0x800040c6#64 = 0x800040c6#64 := by simp only [jumpPc, BitVec.reduceAnd]
+theorem aslj_3fd8 : jumpPc (KA.«acquiresleep» + 0x18#64) = (KA.«acquiresleep» + 0x18#64) := by decide
+theorem aslj_3fe2 : jumpPc (KA.«acquiresleep» + 0x22#64) = (KA.«acquiresleep» + 0x22#64) := by decide
+theorem aslj_3fe8 : jumpPc (KA.«acquiresleep» + 0x28#64) = (KA.«acquiresleep» + 0x28#64) := by decide
+theorem aslj_3fec : jumpPc (KA.«acquiresleep» + 0x2c#64) = (KA.«acquiresleep» + 0x2c#64) := by decide
+theorem aslj_3ff2 : jumpPc (KA.«acquiresleep» + 0x32#64) = (KA.«acquiresleep» + 0x32#64) := by decide
+theorem aslj_3ffe : jumpPc (KA.«acquiresleep» + 0x3e#64) = (KA.«acquiresleep» + 0x3e#64) := by decide
+theorem aslj_4008 : jumpPc (KA.«acquiresleep» + 0x48#64) = (KA.«acquiresleep» + 0x48#64) := by decide
 
 /-! ## Arithmetic -/
 
@@ -216,7 +216,7 @@ set_option maxHeartbeats 1000000 in
 theorem asl_acquire (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γl : GName) (lk : BitVec 64)
     (Rp : CtxId → IProp GF) [CtxMorph Rp] (ha0 : k'.regs 10#5 = lk)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 10 ≤ k'.avail) (hs : "sleep lock" ∉ k'.locks) :
-    kctx c k' ∗ pcIs c 0x80000c58#64 ∗ isLock γl lk "sleep lock" Rp ∗
+    kctx c k' ∗ pcIs c KA.«acquire» ∗ isLock γl lk "sleep lock" Rp ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' (((k'.pushOffAt spie spp).withRegs R').withLocks ("sleep lock" :: k'.locks)) -∗
@@ -226,7 +226,7 @@ theorem asl_acquire (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γl : GName) (lk : Bit
     ⊢ wpLoop (GF := GF) c := by
   have h := AC.wp_acquire (hlc := hlc) (GF := GF) c k' γl "sleep lock" Rp hnoff hK hs
   unfold wp_acquire_body at h
-  simp only [acquireAddr, KernelSyms.«acquire»] at h
+  simp only [acquireAddr] at h
   rw [ha0] at h
   exact h
 
@@ -236,7 +236,7 @@ theorem asl_release (RE : RELEASE) (c : CPU) (k' : KCtx) (γl : GName) (lk : Bit
     (hsie : k'.sie = false) (hnoff : 1 ≤ k'.noff) (hK : 10 ≤ k'.avail)
     (reen : Bool) (hreen : reen = (decide (k'.noff = 1) && k'.intena))
     (hon : reen = true → k'.tier = .kpt ∧ trapRes true + 6 ≤ k'.avail) :
-    kctx c k' ∗ pcIs c 0x80000ce0#64 ∗ isLock γl lk "sleep lock" Rp ∗
+    kctx c k' ∗ pcIs c KA.«release» ∗ isLock γl lk "sleep lock" Rp ∗
     locked γl c ∗ Rp curCtx ∗ popArm c k' reen ∗
     wpNext (k'.popExit reen).sie k'.proc c (fun cpu' => iprop(∀ R' : RegMap,
       kctx cpu' (((k'.popExit reen).withRegs R').withLocks
@@ -246,14 +246,14 @@ theorem asl_release (RE : RELEASE) (c : CPU) (k' : KCtx) (γl : GName) (lk : Bit
   have h := RE.wp_release (hlc := hlc) (GF := GF) c k' γl "sleep lock" Rp hsie hnoff hK reen
     hreen hon
   unfold wp_release_body at h
-  simp only [releaseAddr, KernelSyms.«release»] at h
+  simp only [releaseAddr] at h
   rw [ha0] at h
   exact h
 
 set_option maxHeartbeats 1000000 in
 theorem asl_myproc (MP : MYPROC) (c : CPU) (k' : KCtx)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 10 ≤ k'.avail) :
-    kctx c k' ∗ pcIs c 0x80001988#64 ∗
+    kctx c k' ∗ pcIs c KA.«myproc» ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
@@ -261,7 +261,7 @@ theorem asl_myproc (MP : MYPROC) (c : CPU) (k' : KCtx)
     ⊢ wpLoop (GF := GF) c := by
   have h := MP.wp_myproc (hlc := hlc) (GF := GF) c k' hnoff hK
   unfold wp_myproc_body at h
-  simp only [myprocAddr, KernelSyms.«myproc»] at h
+  simp only [myprocAddr] at h
   exact h
 
 set_option maxHeartbeats 1000000 in
@@ -270,7 +270,7 @@ theorem asl_sleep_prepare (SP : SLEEP_PREPARE) (Γ : SchedNames) [ClaimIs (hlc :
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hchan : k'.regs 10#5 ≠ 0#64)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : sleepPrepareSlots ≤ k'.avail)
     (hlk : "proc" ∉ k'.locks) (htier : k'.tier = KTier.kpt) :
-    kctx c k' ∗ pcIs c 0x80001fd6#64 ∗ procsInv Γ ∗
+    kctx c k' ∗ pcIs c KA.«sleep_prepare» ∗ procsInv Γ ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
@@ -278,7 +278,7 @@ theorem asl_sleep_prepare (SP : SLEEP_PREPARE) (Γ : SchedNames) [ClaimIs (hlc :
     ⊢ wpLoop (GF := GF) c := by
   have h := SP.wp_sleep_prepare (hlc := hlc) (GF := GF) Γ c k' j hj hproc hchan hnoff hK hlk htier
   unfold wp_sleep_prepare_body at h
-  simp only [sleepPrepareAddr, KernelSyms.«sleep_prepare»] at h
+  simp only [sleepPrepareAddr] at h
   exact h
 
 set_option maxHeartbeats 1000000 in
@@ -287,7 +287,7 @@ theorem asl_sleep (SL : SLEEP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : sleepSlots ≤ k'.avail)
     (hsie : k'.sie = false) (hnoff : k'.noff = 0) (hlocks : k'.locks = [])
     (htier : k'.tier = KTier.kpt) :
-    kctx c k' ∗ pcIs c 0x80002012#64 ∗ procsInv Γ ∗
+    kctx c k' ∗ pcIs c KA.«sleep» ∗ procsInv Γ ∗
     trapCsrs c ∗ cpuClaim c k'.proc ∗ intrRes c ∗
     wpNext true k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
@@ -296,12 +296,12 @@ theorem asl_sleep (SL : SLEEP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     ⊢ wpLoop (GF := GF) c := by
   have h := SL.wp_sleep (hlc := hlc) (GF := GF) Γ c k' j hj hproc hK hsie hnoff hlocks htier
   unfold wp_sleep_body at h
-  simp only [sleepAddr, KernelSyms.«sleep»] at h
+  simp only [sleepAddr] at h
   exact h
 
 end
 
-/-! ## The exit path `0x800040b4`: take the lock, stamp the pid, release -/
+/-! ## The exit path `(KernelSyms.«acquiresleep» + 0x36)`: take the lock, stamp the pid, release -/
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [SleepLockG GF] [X : CurCtx]
@@ -310,13 +310,17 @@ set_option maxHeartbeats 8000000 in
 /-- From `0x800040b4`, with the inner lock held and its payload OPEN in the
 FREE state: `lk->locked = 1`, `lk->pid = myproc()->pid`, `release(&lk->lk)`,
 the epilogue. -/
+theorem acquiresleep_br_ffffffffffffcc62 : KA.«acquiresleep» + 0xffffffffffffcc62#64 = KA.«release» := by decide
+
+theorem acquiresleep_br_ffffffffffffd90a : KA.«acquiresleep» + 0xffffffffffffd90a#64 = KA.«myproc» := by decide
+
 theorem asl_exit (RE : RELEASE) (MP : MYPROC) (cpu c : CPU) (k kb : KCtx) (hb : AslBase k kb)
     (γl γ : GName) (Rp : CtxId → IProp GF) [CtxMorph Rp] (Hd : Qp → IProp GF) (q q0 : Qp)
     (slk : BitVec 64) (j : Nat) (pid : BitVec 32) (dqp : DFrac)
     (hj : j < NPROC) (hkproc : k.proc = procAddr j) (hksie : k.sie = false)
     (hK : acquiresleepSlots ≤ k.avail)
     (vln vn : BitVec 64) (a b : Bool) (Rl : RegMap) (hpre : aslPre k slk Rl) :
-    kctx c (((kb.pushOffAt a b).withLocks ["sleep lock"]).withRegs Rl) ∗ pcIs c 0x800040b4#64 ∗
+    kctx c (((kb.pushOffAt a b).withLocks ["sleep lock"]).withRegs Rl) ∗ pcIs c (KA.«acquiresleep» + 0x36#64) ∗
     isLock γl (slk + 8#64) "sleep lock" (slBody γ slk Rp Hd) ∗ locked γl c ∗
     wordPointsTo (slLk slk + 8#64) 8 (DFrac.own 1) vln ∗
     wordPointsTo (slNameField slk) 8 (DFrac.own 1) vn ∗
@@ -340,15 +344,15 @@ theorem asl_exit (RE : RELEASE) (MP : MYPROC) (cpu c : CPU) (k kb : KCtx) (hb : 
   · iframe
   imodintro
   -- c.li a5,1 ; c.sw a5,0(s1)
-  k_step (wp_s_addi c _ 0x800040b4#64 true 1#12 15#5 0#5 (by decide))
+  k_step (wp_s_addi c _ (KA.«acquiresleep» + 0x36#64) true 1#12 15#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_zero]
   iintro Hk Hpc
-  k_step (wp_s_sw c _ 0x800040b6#64 true 0#12 9#5 15#5 (by decide) 0#32)
+  k_step (wp_s_sw c _ (KA.«acquiresleep» + 0x38#64) true 0#12 9#5 15#5 (by decide) 0#32)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [p9, asl_add0, asl_ext_one]
   iintro Hk Hpc Hw
   -- jal myproc
-  k_step (wp_s_jal c _ 0x800040b8#64 false 2087120#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_jal c _ (KA.«acquiresleep» + 0x3a#64) false 2087120#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [acquiresleep_br_ffffffffffffd90a]
   iintro Hk Hpc
   iapply (asl_myproc MP c _ ?hnm ?hKm) $$ [- $Hk $Hpc]
   rotate_right 1
@@ -369,7 +373,7 @@ theorem asl_exit (RE : RELEASE) (MP : MYPROC) (cpu c : CPU) (k kb : KCtx) (hb : 
     -- c.lw a5,48(a0) : the caller's pid
     ihave Hpid := (show wordPointsTo (GF := GF) (pPid k.proc) 4 dqp pid ⊢
         wordPointsTo (k.proc + 48#64) 4 dqp pid from by unfold pPid; iintro H; iexact H) $$ Hpid
-    k_step (wp_s_lw c _ 0x800040bc#64 true 48#12 15#5 10#5 (by decide) (by decide) dqp pid)
+    k_step (wp_s_lw c _ (KA.«acquiresleep» + 0x3e#64) true 48#12 15#5 10#5 (by decide) (by decide) dqp pid)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hM10']
     iintro Hk Hpc Hpid
     ihave Hpid := (show wordPointsTo (GF := GF) (k.proc + 48#64) 4 dqp pid ⊢
@@ -379,7 +383,7 @@ theorem asl_exit (RE : RELEASE) (MP : MYPROC) (cpu c : CPU) (k kb : KCtx) (hb : 
     ihave Hlkpid := (show wordPointsTo (GF := GF) (slPid slk) 4 (DFrac.own 1) 0#32 ⊢
         wordPointsTo (slk + 40#64) 4 (DFrac.own 1) 0#32 from by
       unfold slPid; iintro H; iexact H) $$ Hlkpid
-    k_step (wp_s_sw c _ 0x800040be#64 true 40#12 9#5 15#5 (by decide) 0#32)
+    k_step (wp_s_sw c _ (KA.«acquiresleep» + 0x40#64) true 40#12 9#5 15#5 (by decide) 0#32)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [m9, asl_ext_sext]
     iintro Hk Hpc Hlkpid
     ihave Hlkpid := (show wordPointsTo (GF := GF) (slk + 40#64) 4 (DFrac.own 1) pid ⊢
@@ -392,11 +396,11 @@ theorem asl_exit (RE : RELEASE) (MP : MYPROC) (cpu c : CPU) (k kb : KCtx) (hb : 
       $$ [Hvln Hvn Hw Hauth HHq]
     case' _ => iframe
     -- c.mv a0,s2 ; jal release
-    k_step (wp_s_add c _ 0x800040c0#64 true 10#5 0#5 18#5 (by decide))
+    k_step (wp_s_add c _ (KA.«acquiresleep» + 0x42#64) true 10#5 0#5 18#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [m18]
     iintro Hk Hpc
-    k_step (wp_s_jal c _ 0x800040c2#64 false 2083870#21 1#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    k_step (wp_s_jal c _ (KA.«acquiresleep» + 0x44#64) false 2083870#21 1#5 (by decide))
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [acquiresleep_br_ffffffffffffcc62]
     iintro Hk Hpc
     iapply (asl_release RE c _ γl (slk + 8#64) (slBody γ slk Rp Hd) ?ha0 ?hsr ?hnr ?hKr false
         ?hrr ?hor) $$ [- $Hk $Hpc $Hlk $Hlocked $Hpay]
@@ -422,7 +426,7 @@ theorem asl_exit (RE : RELEASE) (MP : MYPROC) (cpu c : CPU) (k kb : KCtx) (hb : 
             (k.regs 9#5) (k.regs 18#5)
           ⊢ frame4s2 ((k.withSpie a b).regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5)
             (k.regs 18#5) from .rfl) $$ Hframe
-      iapply (wp_epilogue4s2_gen c (k.withSpie a b) 0x800040c6#64
+      iapply (wp_epilogue4s2_gen c (k.withSpie a b) (KA.«acquiresleep» + 0x48#64)
           (by simp only [KCtx.withSpie_avail]; unfold acquiresleepSlots sleepSlots at hK; omega)
           R5 (by simp only [KCtx.withSpie_regs]; exact e2)
           (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5)) $$ [- $Hk $Hpc $Hframe]
@@ -449,7 +453,7 @@ theorem asl_exit (RE : RELEASE) (MP : MYPROC) (cpu c : CPU) (k kb : KCtx) (hb : 
 
 end
 
-/-! ## The wait loop at `0x8000409a` -/
+/-! ## The wait loop at `(KernelSyms.«acquiresleep» + 0x1c)` -/
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [SleepLockG GF] [X : CurCtx]
@@ -462,7 +466,7 @@ def aslLoop (cpu : CPU) (k kb : KCtx) (γl γ : GName) (Rp : CtxId → IProp GF)
   ∀ (curL : CPU) (a b : Bool) (Rl : RegMap),
     ⌜aslPre k slk Rl⌝ -∗
     kctx curL (((kb.pushOffAt a b).withLocks ["sleep lock"]).withRegs Rl) -∗
-    pcIs curL 0x8000409a#64 -∗
+    pcIs curL (KA.«acquiresleep» + 0x1c#64) -∗
     trapCsrs curL -∗ cpuClaim curL k.proc -∗ intrRes curL -∗
     locked γl curL -∗ slBody γ slk Rp Hd curCtx -∗
     frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) -∗
@@ -475,7 +479,7 @@ theorem aslLoop_elim (cpu : CPU) (k kb : KCtx) (γl γ : GName) (Rp : CtxId → 
     ∀ (curL : CPU) (a b : Bool) (Rl : RegMap),
       ⌜aslPre k slk Rl⌝ -∗
       kctx curL (((kb.pushOffAt a b).withLocks ["sleep lock"]).withRegs Rl) -∗
-      pcIs curL 0x8000409a#64 -∗
+      pcIs curL (KA.«acquiresleep» + 0x1c#64) -∗
       trapCsrs curL -∗ cpuClaim curL k.proc -∗ intrRes curL -∗
       locked γl curL -∗ slBody γ slk Rp Hd curCtx -∗
       frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) -∗
@@ -488,7 +492,7 @@ theorem aslLoop_intro (cpu : CPU) (k kb : KCtx) (γl γ : GName) (Rp : CtxId →
     (∀ (curL : CPU) (a b : Bool) (Rl : RegMap),
       ⌜aslPre k slk Rl⌝ -∗
       kctx curL (((kb.pushOffAt a b).withLocks ["sleep lock"]).withRegs Rl) -∗
-      pcIs curL 0x8000409a#64 -∗
+      pcIs curL (KA.«acquiresleep» + 0x1c#64) -∗
       trapCsrs curL -∗ cpuClaim curL k.proc -∗ intrRes curL -∗
       locked γl curL -∗ slBody γ slk Rp Hd curCtx -∗
       frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) -∗
@@ -500,7 +504,13 @@ theorem aslLoop_intro (cpu : CPU) (k kb : KCtx) (γl γ : GName) (Rp : CtxId →
 set_option maxHeartbeats 16000000 in
 /-- One round from `0x8000409a`: `sleep_prepare(lk); release; sleep; acquire`,
 then the `lk->locked` test -- the back edge into the Löb hypothesis, or the
-exit at `0x800040b4`. -/
+exit at `(KernelSyms.«acquiresleep» + 0x36)`. -/
+theorem acquiresleep_br_ffffffffffffcbda : KA.«acquiresleep» + 0xffffffffffffcbda#64 = KA.«acquire» := by decide
+
+theorem acquiresleep_br_ffffffffffffdf94 : KA.«acquiresleep» + 0xffffffffffffdf94#64 = KA.«sleep» := by decide
+
+theorem acquiresleep_br_ffffffffffffdf58 : KA.«acquiresleep» + 0xffffffffffffdf58#64 = KA.«sleep_prepare» := by decide
+
 theorem asl_round (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (SP : SLEEP_PREPARE) (SL : SLEEP)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu c : CPU) (k kb : KCtx) (hb : AslBase k kb)
@@ -509,7 +519,7 @@ theorem asl_round (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (SP : SLEEP_PREPAR
     (hj : j < NPROC) (hkproc : k.proc = procAddr j) (hksie : k.sie = false)
     (hK : acquiresleepSlots ≤ k.avail) (hslk : slk ≠ 0#64)
     (a b : Bool) (Rl : RegMap) (hpre : aslPre k slk Rl) :
-    kctx c (((kb.pushOffAt a b).withLocks ["sleep lock"]).withRegs Rl) ∗ pcIs c 0x8000409a#64 ∗
+    kctx c (((kb.pushOffAt a b).withLocks ["sleep lock"]).withRegs Rl) ∗ pcIs c (KA.«acquiresleep» + 0x1c#64) ∗
     procsInv Γ ∗ isLock γl (slk + 8#64) "sleep lock" (slBody γ slk Rp Hd) ∗
     locked γl c ∗ slBody γ slk Rp Hd curCtx ∗
     frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
@@ -524,11 +534,11 @@ theorem asl_round (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (SP : SLEEP_PREPAR
   iintro ⟨Hk, Hpc, #Hpinv, #Hlk, Hlocked, Hpay, Hframe, HHq, Hpid, Htc, Hcl, Hir, HΦ, IH⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- c.mv a0,s1 ; jal sleep_prepare(lk)
-  k_step (wp_s_add c _ 0x8000409a#64 true 10#5 0#5 9#5 (by decide))
+  k_step (wp_s_add c _ (KA.«acquiresleep» + 0x1c#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [p9]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ 0x8000409c#64 false 2088762#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_jal c _ (KA.«acquiresleep» + 0x1e#64) false 2088762#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [acquiresleep_br_ffffffffffffdf58]
   iintro Hk Hpc
   iapply (asl_sleep_prepare SP Γ c _ j hj ?hspp ?hspchan ?hspn ?hspK ?hsplk ?hspt)
     $$ [- $Hk $Hpc $Hpinv]
@@ -546,11 +556,11 @@ theorem asl_round (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (SP : SLEEP_PREPAR
           simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hpre) hcsP
     obtain ⟨P2, P8, P9, P18, P19, P20, P21, P22, P23, P24, P25, P26, P27⟩ := id hpreP
     -- c.mv a0,s2 ; jal release(&lk->lk)
-    k_step (wp_s_add c _ 0x800040a0#64 true 10#5 0#5 18#5 (by decide))
+    k_step (wp_s_add c _ (KA.«acquiresleep» + 0x22#64) true 10#5 0#5 18#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [P18]
     iintro Hk Hpc
-    k_step (wp_s_jal c _ 0x800040a2#64 false 2083902#21 1#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    k_step (wp_s_jal c _ (KA.«acquiresleep» + 0x24#64) false 2083902#21 1#5 (by decide))
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [acquiresleep_br_ffffffffffffcc62]
     iintro Hk Hpc
     iapply (asl_release RE c _ γl (slk + 8#64) (slBody γ slk Rp Hd) ?ha0 ?hsr ?hnr ?hKr false
         ?hrr ?hor) $$ [- $Hk $Hpc $Hlk $Hlocked $Hpay]
@@ -568,11 +578,11 @@ theorem asl_round (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (SP : SLEEP_PREPAR
         (by unfold aslPre at hpreP ⊢
             simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hpreP) hcs6
       -- jal sleep()
-      k_step (wp_s_jal c _ 0x800040a6#64 false 2088812#21 1#5 (by decide))
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+      k_step (wp_s_jal c _ (KA.«acquiresleep» + 0x28#64) false 2088812#21 1#5 (by decide))
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [acquiresleep_br_ffffffffffffdf94]
       iintro Hk Hpc
       ihave Hcl := (show cpuClaim (GF := GF) c k.proc
-          ⊢ cpuClaim c ((kb.withSpie a b).withRegs (R6.set 1#5 0x800040aa#64)).proc from by
+          ⊢ cpuClaim c ((kb.withSpie a b).withRegs (R6.set 1#5 (KA.«acquiresleep» + 0x2c#64))).proc from by
         simp only [KCtx.withRegs_proc, KCtx.withSpie_proc]; rw [hb.proc]) $$ Hcl
       iapply (asl_sleep SL Γ c _ j hj ?hslp ?hslK ?hsls ?hsln ?hsll ?hslt)
         $$ [- $Hk $Hpc $Hpinv $Htc $Hcl $Hir]
@@ -589,11 +599,11 @@ theorem asl_round (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (SP : SLEEP_PREPAR
               simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hpre6) hcsS
         obtain ⟨S2, S8, S9, S18, S19, S20, S21, S22, S23, S24, S25, S26, S27⟩ := id hpreS
         -- c.mv a0,s2 ; jal acquire(&lk->lk)
-        k_step (wp_s_add cpu2 _ 0x800040aa#64 true 10#5 0#5 18#5 (by decide))
+        k_step (wp_s_add cpu2 _ (KA.«acquiresleep» + 0x2c#64) true 10#5 0#5 18#5 (by decide))
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [S18]
         iintro Hk Hpc
-        k_step (wp_s_jal cpu2 _ 0x800040ac#64 false 2083756#21 1#5 (by decide))
-          from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+        k_step (wp_s_jal cpu2 _ (KA.«acquiresleep» + 0x2e#64) false 2083756#21 1#5 (by decide))
+          from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [acquiresleep_br_ffffffffffffcbda]
         iintro Hk Hpc
         iapply (asl_acquire AC cpu2 _ γl (slk + 8#64) (slBody γ slk Rp Hd) ?ha0a ?hna ?hKa ?hla)
           $$ [- $Hk $Hpc $Hlk]
@@ -613,11 +623,11 @@ theorem asl_round (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (SP : SLEEP_PREPAR
             ⟨%hv0, ⟨%q0, Hfree, Hauth⟩, HR⟩ | ⟨%hvn, Hdep⟩⟩
           · -- FREE: the branch falls through to the exit
             subst hv0
-            k_step (wp_s_lw cpu2 _ 0x800040b0#64 true 0#12 15#5 9#5 (by decide) (by decide)
+            k_step (wp_s_lw cpu2 _ (KA.«acquiresleep» + 0x32#64) true 0#12 15#5 9#5 (by decide) (by decide)
                 (DFrac.own 1) 0#32)
               from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [w9, asl_add0]
             iintro Hk Hpc Hw
-            k_step (wp_s_branch cpu2 _ 0x800040b2#64 true 8168#13 15#5 0#5 (by decide) bop.BNE)
+            k_step (wp_s_branch cpu2 _ (KA.«acquiresleep» + 0x34#64) true 8168#13 15#5 0#5 (by decide) bop.BNE)
               from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
               with [asl_bne_z, asl_bne_zz]
             iintro Hk Hpc
@@ -630,7 +640,7 @@ theorem asl_round (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (SP : SLEEP_PREPAR
               $$ [- $Hk $Hpc $Hlk $Hlocked $Hvln $Hvn $Hw $Hfree $Hauth $HR $HHq $Hframe $Htc
                    $Hcl $Hir $Hpid $HΦ]
           · -- HELD: close the payload back and take the back edge
-            k_step (wp_s_lw cpu2 _ 0x800040b0#64 true 0#12 15#5 9#5 (by decide) (by decide)
+            k_step (wp_s_lw cpu2 _ (KA.«acquiresleep» + 0x32#64) true 0#12 15#5 9#5 (by decide) (by decide)
                 (DFrac.own 1) v)
               from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [w9, asl_add0]
             iintro Hk Hpc Hw
@@ -639,7 +649,7 @@ theorem asl_round (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (SP : SLEEP_PREPAR
             ihave Hpay := slBody_intro_held γ slk Rp Hd v vln vn q1 hvn
               $$ [Hvln Hvn Hw Ha1 HH1]
             case' _ => iframe
-            k_step (wp_s_branch cpu2 _ 0x800040b2#64 true 8168#13 15#5 0#5 (by decide) bop.BNE)
+            k_step (wp_s_branch cpu2 _ (KA.«acquiresleep» + 0x34#64) true 8168#13 15#5 0#5 (by decide) bop.BNE)
               from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
               with [asl_bne_nz v hvn]
             iintro Hk Hpc
@@ -708,7 +718,7 @@ theorem acquiresleep_proof (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (SP : SLE
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
   unfold wp_acquiresleep_gen_body
-  simp only [acquiresleepAddr, KernelSyms.«acquiresleep»]
+  simp only [acquiresleepAddr]
   iintro ⟨Hk, Hpc, #Hpinv, Htc, Hcl, Hir, #Hsl, HHq, Hpid, HΦ⟩
   icases kctx_tier cpu k $$ Hk with ⟨%hct, Hk⟩
   have ht0 : t0 = KTier.kpt := hct.symm.trans htier
@@ -727,7 +737,7 @@ theorem acquiresleep_proof (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (SP : SLE
   have hslk : k.regs 10#5 ≠ 0#64 := asl_slk_nz _ hok
   ihave HΦ := aslPost_of_spec cpu k γ Rp q (k.regs 10#5) pid dqp $$ HΦ
   -- the prologue
-  iapply (wp_prologue4s2_gen cpu k 0x8000407e#64 hK4)
+  iapply (wp_prologue4s2_gen cpu k KA.«acquiresleep» hK4)
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm_g [hsie]
   iframe
@@ -735,17 +745,17 @@ theorem acquiresleep_proof (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (SP : SLE
   iapply wpNext_off_intro
   iintro Hk Hpc Hframe
   -- c.mv s1,a0 ; addi s2,a0,8 ; c.mv a0,s2 ; jal acquire(&lk->lk)
-  k_step (wp_s_add cpu _ 0x8000408a#64 true 9#5 0#5 10#5 (by decide))
+  k_step (wp_s_add cpu _ (KA.«acquiresleep» + 0xc#64) true 9#5 0#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ 0x8000408c#64 false 8#12 18#5 10#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«acquiresleep» + 0xe#64) false 8#12 18#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_add cpu _ 0x80004090#64 true 10#5 0#5 18#5 (by decide))
+  k_step (wp_s_add cpu _ (KA.«acquiresleep» + 0x12#64) true 10#5 0#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_jal cpu _ 0x80004092#64 false 2083782#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_jal cpu _ (KA.«acquiresleep» + 0x14#64) false 2083782#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [acquiresleep_br_ffffffffffffcbda]
   iintro Hk Hpc
   iapply (asl_acquire AC cpu _ γl (k.regs 10#5 + 8#64) (slBody γ (k.regs 10#5) Rp Hd)
       ?ha0a ?hna ?hKa ?hla) $$ [- $Hk $Hpc $Hlk]
@@ -764,11 +774,11 @@ theorem acquiresleep_proof (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (SP : SLE
       ⟨%hv0, ⟨%q0, Hfree, Hauth⟩, HR⟩ | ⟨%hvn, Hdep⟩⟩
     · -- FREE: `beqz` jumps straight to the store path
       subst hv0
-      k_step (wp_s_lw cpu _ 0x80004096#64 true 0#12 15#5 9#5 (by decide) (by decide)
+      k_step (wp_s_lw cpu _ (KA.«acquiresleep» + 0x18#64) true 0#12 15#5 9#5 (by decide) (by decide)
           (DFrac.own 1) 0#32)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [c9, asl_add0]
       iintro Hk Hpc Hw
-      k_step (wp_s_branch cpu _ 0x80004098#64 true 28#13 15#5 0#5 (by decide) bop.BEQ)
+      k_step (wp_s_branch cpu _ (KA.«acquiresleep» + 0x1a#64) true 28#13 15#5 0#5 (by decide) bop.BEQ)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [asl_beq_z, asl_beq_zz]
       iintro Hk Hpc
       k_norm_g
@@ -780,7 +790,7 @@ theorem acquiresleep_proof (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (SP : SLE
         $$ [- $Hk $Hpc $Hlk $Hlocked $Hvln $Hvn $Hw $Hfree $Hauth $HR $HHq $Hframe $Htc $Hcl
              $Hir $Hpid $HΦ]
     · -- HELD: close the payload back and enter the wait loop
-      k_step (wp_s_lw cpu _ 0x80004096#64 true 0#12 15#5 9#5 (by decide) (by decide)
+      k_step (wp_s_lw cpu _ (KA.«acquiresleep» + 0x18#64) true 0#12 15#5 9#5 (by decide) (by decide)
           (DFrac.own 1) v)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [c9, asl_add0]
       iintro Hk Hpc Hw
@@ -789,7 +799,7 @@ theorem acquiresleep_proof (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (SP : SLE
       ihave Hpay := slBody_intro_held γ (k.regs 10#5) Rp Hd v vln vn q1 hvn
         $$ [Hvln Hvn Hw Ha1 HH1]
       case' _ => iframe
-      k_step (wp_s_branch cpu _ 0x80004098#64 true 28#13 15#5 0#5 (by decide) bop.BEQ)
+      k_step (wp_s_branch cpu _ (KA.«acquiresleep» + 0x1a#64) true 28#13 15#5 0#5 (by decide) bop.BEQ)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [asl_beq_nz v hvn]
       iintro Hk Hpc
       k_norm_g
@@ -883,7 +893,7 @@ theorem asl_exit_nb (RE : RELEASE) (MP : MYPROC) (cpu : CPU) (k : KCtx)
     (hs : "sleep lock" ∉ k.locks) (hK : acquiresleepSlots ≤ k.avail)
     (vln vn : BitVec 64) (Rl : RegMap) (hpre : aslPre k slk Rl) :
     kctx cpu ((((k.pushed 4).pushOffAt k.spie k.spp).withLocks ("sleep lock" :: k.locks)).withRegs Rl) ∗
-    pcIs cpu 0x800040b4#64 ∗
+    pcIs cpu (KA.«acquiresleep» + 0x36#64) ∗
     isLock γl (slk + 8#64) "sleep lock" (slBody γ slk Rp (slhTok γt)) ∗ locked γl cpu ∗
     wordPointsTo (slLk slk + 8#64) 8 (DFrac.own 1) vln ∗
     wordPointsTo (slNameField slk) 8 (DFrac.own 1) vn ∗
@@ -904,15 +914,15 @@ theorem asl_exit_nb (RE : RELEASE) (MP : MYPROC) (cpu : CPU) (k : KCtx)
   imod slh_mint_none γt q $$ Hcnt with ⟨Hcnt, Htok⟩
   imodintro
   -- c.li a5,1 ; c.sw a5,0(s1)
-  k_step (wp_s_addi cpu _ 0x800040b4#64 true 1#12 15#5 0#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«acquiresleep» + 0x36#64) true 1#12 15#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_zero]
   iintro Hk Hpc
-  k_step (wp_s_sw cpu _ 0x800040b6#64 true 0#12 9#5 15#5 (by decide) 0#32)
+  k_step (wp_s_sw cpu _ (KA.«acquiresleep» + 0x38#64) true 0#12 9#5 15#5 (by decide) 0#32)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [p9, asl_add0, asl_ext_one]
   iintro Hk Hpc Hw
   -- jal myproc
-  k_step (wp_s_jal cpu _ 0x800040b8#64 false 2087120#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_jal cpu _ (KA.«acquiresleep» + 0x3a#64) false 2087120#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [acquiresleep_br_ffffffffffffd90a]
   iintro Hk Hpc
   iapply (asl_myproc MP cpu _ ?hnm ?hKm) $$ [- $Hk $Hpc]
   rotate_right 1
@@ -932,7 +942,7 @@ theorem asl_exit_nb (RE : RELEASE) (MP : MYPROC) (cpu : CPU) (k : KCtx)
     -- c.lw a5,48(a0) : the caller's pid
     ihave Hpid := (show wordPointsTo (GF := GF) (pPid k.proc) 4 dqp pid ⊢
         wordPointsTo (k.proc + 48#64) 4 dqp pid from by unfold pPid; iintro H; iexact H) $$ Hpid
-    k_step (wp_s_lw cpu _ 0x800040bc#64 true 48#12 15#5 10#5 (by decide) (by decide) dqp pid)
+    k_step (wp_s_lw cpu _ (KA.«acquiresleep» + 0x3e#64) true 48#12 15#5 10#5 (by decide) (by decide) dqp pid)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hM10]
     iintro Hk Hpc Hpid
     ihave Hpid := (show wordPointsTo (GF := GF) (k.proc + 48#64) 4 dqp pid ⊢
@@ -942,7 +952,7 @@ theorem asl_exit_nb (RE : RELEASE) (MP : MYPROC) (cpu : CPU) (k : KCtx)
     ihave Hlkpid := (show wordPointsTo (GF := GF) (slPid slk) 4 (DFrac.own 1) 0#32 ⊢
         wordPointsTo (slk + 40#64) 4 (DFrac.own 1) 0#32 from by
       unfold slPid; iintro H; iexact H) $$ Hlkpid
-    k_step (wp_s_sw cpu _ 0x800040be#64 true 40#12 9#5 15#5 (by decide) 0#32)
+    k_step (wp_s_sw cpu _ (KA.«acquiresleep» + 0x40#64) true 40#12 9#5 15#5 (by decide) 0#32)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [m9, asl_ext_sext]
     iintro Hk Hpc Hlkpid
     ihave Hlkpid := (show wordPointsTo (GF := GF) (slk + 40#64) 4 (DFrac.own 1) pid ⊢
@@ -955,11 +965,11 @@ theorem asl_exit_nb (RE : RELEASE) (MP : MYPROC) (cpu : CPU) (k : KCtx)
       $$ [Hvln Hvn Hw Hauth Htok]
     case' _ => iframe
     -- c.mv a0,s2 ; jal release
-    k_step (wp_s_add cpu _ 0x800040c0#64 true 10#5 0#5 18#5 (by decide))
+    k_step (wp_s_add cpu _ (KA.«acquiresleep» + 0x42#64) true 10#5 0#5 18#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [m18]
     iintro Hk Hpc
-    k_step (wp_s_jal cpu _ 0x800040c2#64 false 2083870#21 1#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    k_step (wp_s_jal cpu _ (KA.«acquiresleep» + 0x44#64) false 2083870#21 1#5 (by decide))
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [acquiresleep_br_ffffffffffffcc62]
     iintro Hk Hpc
     iapply (asl_release RE cpu _ γl (slk + 8#64) (slBody γ slk Rp (slhTok γt)) ?ha0 ?hsr ?hnr
         ?hKr false ?hrr ?hor) $$ [- $Hk $Hpc $Hlk $Hlocked $Hpay]
@@ -977,7 +987,7 @@ theorem asl_exit_nb (RE : RELEASE) (MP : MYPROC) (cpu : CPU) (k : KCtx)
             simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hpreM) hcs5
       obtain ⟨e2, e8, e9, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩ := id hpre5
       -- the epilogue
-      iapply (wp_epilogue4s2_gen cpu k 0x800040c6#64 hK4 R5 e2
+      iapply (wp_epilogue4s2_gen cpu k (KA.«acquiresleep» + 0x48#64) hK4 R5 e2
           (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5)) $$ [- $Hk $Hpc $Hframe]
       k_code (text_instr _ _ _ _ rfl rfl) Htext
       k_norm_g [hsie]
@@ -1013,7 +1023,7 @@ theorem acquiresleep_nb_proof (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) : ACQU
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
   unfold wp_acquiresleep_nb_body
-  simp only [acquiresleepAddr, KernelSyms.«acquiresleep»]
+  simp only [acquiresleepAddr]
   iintro ⟨Hk, Hpc, #Hsl, Hcnt, Hpid, HΦ⟩
   icases kctx_tier cpu k $$ Hk with ⟨%hct, Hk⟩
   have ht0 : t0 = KTier.kpt := hct.symm.trans htier
@@ -1026,7 +1036,7 @@ theorem acquiresleep_nb_proof (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) : ACQU
     unfold isSleeplockTok isSleeplockGen slLk; iintro H; iexact H) $$ Hsl
   ihave HΦ := aslPostNb_of_spec cpu k γ γt Rp q (k.regs 10#5) pid dqp $$ HΦ
   -- the prologue
-  iapply (wp_prologue4s2_gen cpu k 0x8000407e#64 hK4)
+  iapply (wp_prologue4s2_gen cpu k KA.«acquiresleep» hK4)
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm_g [hsie]
   iframe
@@ -1034,17 +1044,17 @@ theorem acquiresleep_nb_proof (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) : ACQU
   iapply wpNext_off_intro
   iintro Hk Hpc Hframe
   -- c.mv s1,a0 ; addi s2,a0,8 ; c.mv a0,s2 ; jal acquire(&lk->lk)
-  k_step (wp_s_add cpu _ 0x8000408a#64 true 9#5 0#5 10#5 (by decide))
+  k_step (wp_s_add cpu _ (KA.«acquiresleep» + 0xc#64) true 9#5 0#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ 0x8000408c#64 false 8#12 18#5 10#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«acquiresleep» + 0xe#64) false 8#12 18#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_add cpu _ 0x80004090#64 true 10#5 0#5 18#5 (by decide))
+  k_step (wp_s_add cpu _ (KA.«acquiresleep» + 0x12#64) true 10#5 0#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_jal cpu _ 0x80004092#64 false 2083782#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_jal cpu _ (KA.«acquiresleep» + 0x14#64) false 2083782#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [acquiresleep_br_ffffffffffffcbda]
   iintro Hk Hpc
   iapply (asl_acquire AC cpu _ γl (k.regs 10#5 + 8#64) (slBody γ (k.regs 10#5) Rp (slhTok γt))
       ?ha0a ?hna ?hKa ?hla) $$ [- $Hk $Hpc $Hlk]
@@ -1066,11 +1076,11 @@ theorem acquiresleep_nb_proof (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) : ACQU
       ⟨%hv0, ⟨%q0, Hfree, Hauth⟩, HR⟩ | ⟨%hvn, Hdep⟩⟩
     · -- FREE: `beqz` jumps straight to the store path
       subst hv0
-      k_step (wp_s_lw cpu _ 0x80004096#64 true 0#12 15#5 9#5 (by decide) (by decide)
+      k_step (wp_s_lw cpu _ (KA.«acquiresleep» + 0x18#64) true 0#12 15#5 9#5 (by decide) (by decide)
           (DFrac.own 1) 0#32)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [c9, asl_add0]
       iintro Hk Hpc Hw
-      k_step (wp_s_branch cpu _ 0x80004098#64 true 28#13 15#5 0#5 (by decide) bop.BEQ)
+      k_step (wp_s_branch cpu _ (KA.«acquiresleep» + 0x1a#64) true 28#13 15#5 0#5 (by decide) bop.BEQ)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [asl_beq_z, asl_beq_zz]
       iintro Hk Hpc
       k_norm_g

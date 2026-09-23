@@ -25,11 +25,11 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `kernelvec`. -/
-def kernelvecAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«kernelvec»
+def kernelvecAddr : BitVec 64 := KA.«kernelvec»
 
 /-- `stvec := kernelvec` is a direct-mode vector. -/
 theorem kernelvecAddr_direct : stvecDirect kernelvecAddr := by
-  unfold stvecDirect kernelvecAddr KernelSyms.«kernelvec»; decide
+  unfold stvecDirect kernelvecAddr; decide
 
 /-- The interface of `kernelvec`: the handler contract, at every hart.
 

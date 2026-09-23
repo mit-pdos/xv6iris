@@ -15,9 +15,9 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `printkinit`. -/
-def printkinitAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«printkinit»
+def printkinitAddr : BitVec 64 := KA.«printkinit»
 /-- The `"pr"` literal. -/
-def prNameAddr : BitVec 64 := 0x80007028#64
+def prNameAddr : BitVec 64 := KStr.«pr»
 
 /-- The specification of `printkinit`. -/
 def wp_printkinit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]

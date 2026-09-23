@@ -57,7 +57,7 @@ theorem vpnOf_tramp : vpnOf 0x3ffffff000#64 = trampVpn := by decide
 theorem vpnOf_tramp_toNat : (vpnOf 0x3ffffff000#64).toNat = trampVpn.toNat := by decide
 theorem vpnOf_tf_toNat : (vpnOf 0x3fffffe000#64).toNat = tfVpn.toNat := by decide
 theorem vpnOf_tf : vpnOf 0x3fffffe000#64 = tfVpn := by decide
-theorem trampPpn_eq : BitVec.extractLsb' 12 44 (0x80006000#64) = trampPpn := by decide
+theorem trampPpn_eq : BitVec.extractLsb' 12 44 (KA.«_trampoline») = trampPpn := by decide
 theorem perm_rx : (PTE_R ||| PTE_X) = 10#64 := by decide
 theorem perm_rw : (PTE_R ||| PTE_W) = 6#64 := by decide
 

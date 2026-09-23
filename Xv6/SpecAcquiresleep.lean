@@ -38,7 +38,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 /-- Address of `acquiresleep`. -/
-def acquiresleepAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«acquiresleep»
+def acquiresleepAddr : BitVec 64 := KA.«acquiresleep»
 
 /-- acquiresleep's 4-slot frame over the deepest callee, `sleep`'s 20
 (`sleep_prepare` 14, `acquire`/`release`/`myproc` 10). -/

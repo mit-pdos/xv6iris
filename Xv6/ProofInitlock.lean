@@ -40,10 +40,10 @@ theorem initlock_proof : INITLOCK := ⟨fun {hlc GF} _ _ cpu k vlock vname vcpu 
     icases pwordPointsTo_cases (k.regs 10#5 + 16#64) 8 (DFrac.own 1) vcpu $$ Hp' with ⟨%h2, _⟩
     ipureintro
     exact ⟨h1.1, h1.2, h2.1, h2.2⟩
-  simp only [initlockAddr, KernelSyms.«initlock»]
+  simp only [initlockAddr]
   k_norm_g
   -- prologue
-  iapply (wp_prologue2_gen cpu k 0x80000bd8#64 hK)
+  iapply (wp_prologue2_gen cpu k KA.«initlock» hK)
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm_g
   iframe
@@ -51,12 +51,12 @@ theorem initlock_proof : INITLOCK := ⟨fun {hlc GF} _ _ cpu k vlock vname vcpu 
   iapply wpNext_intro_pin
   iintro %c1 %hp1 Hk Hpc Hframe
   -- sd a1,8(a0)
-  k_step_gen (wp_s_sd c1 _ 0x80000be0#64 true 8#12 10#5 11#5 (by decide) vname)
+  k_step_gen (wp_s_sd c1 _ (KA.«initlock» + 0x8#64) true 8#12 10#5 11#5 (by decide) vname)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sext_8] next c2 hp2
   iintro Hk Hpc Hwname
   -- sw zero,0(a0): mints the lock word (the address claim is normalised
   -- before the frame, so the persistent claim in the context matches)
-  iapply (wp_s_sw_mint c2 _ 0x80000be2#64 false 0#12 10#5 0#5 (by decide) vlock) $$ [- $Hk $Hpc]
+  iapply (wp_s_sw_mint c2 _ (KA.«initlock» + 0xa#64) false 0#12 10#5 0#5 (by decide) vlock) $$ [- $Hk $Hpc]
   rotate_right 1
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm_g [sext_0, add_0_64, rget_zero, extract_zero32]
@@ -68,7 +68,7 @@ theorem initlock_proof : INITLOCK := ⟨fun {hlc GF} _ _ cpu k vlock vname vcpu 
   k_norm_g [sext_0, add_0_64, rget_zero, extract_zero32]
   iintro Hk Hpc Hlock
   -- sd zero,16(a0): mints the owner word
-  iapply (wp_s_sd_mint c3 _ 0x80000be6#64 false 16#12 10#5 0#5 (by decide) vcpu) $$ [- $Hk $Hpc]
+  iapply (wp_s_sd_mint c3 _ (KA.«initlock» + 0xe#64) false 16#12 10#5 0#5 (by decide) vcpu) $$ [- $Hk $Hpc]
   rotate_right 1
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm_g [sext_16, rget_zero]
@@ -80,7 +80,7 @@ theorem initlock_proof : INITLOCK := ⟨fun {hlc GF} _ _ cpu k vlock vname vcpu 
   k_norm_g [sext_16, rget_zero]
   iintro Hk Hpc Hcpu
   -- epilogue
-  iapply (wp_epilogue2_gen c4 k 0x80000bea#64 hK _ (by simp [RegMap.set_apply]) (k.regs 1#5) (k.regs 8#5))
+  iapply (wp_epilogue2_gen c4 k (KA.«initlock» + 0x12#64) hK _ (by simp [RegMap.set_apply]) (k.regs 1#5) (k.regs 8#5))
     $$ [- $Hk $Hpc]
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm_g

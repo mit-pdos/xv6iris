@@ -38,7 +38,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 /-- Address of `holdingsleep`. -/
-def holdingsleepAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«holdingsleep»
+def holdingsleepAddr : BitVec 64 := KA.«holdingsleep»
 
 /-- holdingsleep's 6-slot frame over `acquire`/`release`/`myproc`'s 10. -/
 def holdingsleepSlots : Nat := 6 + 10

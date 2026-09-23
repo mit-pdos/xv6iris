@@ -25,7 +25,7 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
-def argrawAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«argraw»
+def argrawAddr : BitVec 64 := KA.«argraw»
 
 /-- The number of syscall arguments in registers (`a0..a5`). -/
 def NARG : Nat := 6

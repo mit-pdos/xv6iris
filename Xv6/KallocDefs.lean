@@ -25,11 +25,11 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 /-! ## The allocator's addresses -/
 
 /-- `&kmem.lock`. -/
-def kmemLockAddr : BitVec 64 := 0x80012410#64
+def kmemLockAddr : BitVec 64 := KA.«kmem»
 /-- `&kmem.freelist` (`kmem.lock` is 24 bytes). -/
-def kmemFreelistAddr : BitVec 64 := 0x80012428#64
+def kmemFreelistAddr : BitVec 64 := (KA.«kmem» + 0x18#64)
 /-- The linker's `end`: the first byte after the kernel image. -/
-def kernelEndAddr : BitVec 64 := 0x80023640#64
+def kernelEndAddr : BitVec 64 := KA.«end»
 /-- `PHYSTOP`. -/
 def physTop : BitVec 64 := 0x88000000#64
 

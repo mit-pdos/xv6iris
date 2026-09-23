@@ -23,17 +23,17 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `procinit`. -/
-def procinitAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«procinit»
+def procinitAddr : BitVec 64 := KA.«procinit»
 /-- `&pid_lock`, `&wait_lock`, and their names. -/
-def pidLockAddr : BitVec 64 := 0x80012430#64
-def waitLockAddr : BitVec 64 := 0x80012448#64
-def nextpidNameAddr : BitVec 64 := 0x80007168#64
-def waitLockNameAddr : BitVec 64 := 0x80007170#64
+def pidLockAddr : BitVec 64 := KA.«pid_lock»
+def waitLockAddr : BitVec 64 := KA.«wait_lock»
+def nextpidNameAddr : BitVec 64 := KStr.«nextpid»
+def waitLockNameAddr : BitVec 64 := KStr.«wait_lock»
 /-- The `"proc"` literal. -/
-def procNameAddr : BitVec 64 := 0x80007180#64
+def procNameAddr : BitVec 64 := KStr.«proc»
 /-- `&proc[i]` is `ProcDefs.procAddr` (`sizeof(struct proc) = 360`); its
 lock is its first field, `state` at `+24`, `kstack` at `+64`. -/
-theorem procAddr_eq (i : Nat) : procAddr i = 0x80012860#64 + BitVec.ofNat 64 (360 * i) := rfl
+theorem procAddr_eq (i : Nat) : procAddr i = KA.«proc» + BitVec.ofNat 64 (360 * i) := rfl
 /-- `KSTACK(i)`. -/
 def kstackVa (i : Nat) : BitVec 64 := 0x3ffffff000#64 - BitVec.ofNat 64 ((i + 1) * 8192)
 

@@ -29,7 +29,7 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
-def sysCloseAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«sys_close»
+def sysCloseAddr : BitVec 64 := KA.«sys_close»
 
 /-- sys_close's 4-slot frame over `fileclose`'s cone (argfd's 24, myproc's 10 fit under). -/
 def sysCloseSlots : Nat := 4 + filecloseSlots

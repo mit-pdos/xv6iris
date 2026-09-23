@@ -126,21 +126,21 @@ theorem co_sext_0 : BitVec.signExtend 64 0#12 = 0#64 := by decide
 theorem co_walkaddr_call (WA : WALKADDR) [Xv6G GF] [CurCtx]
     (c : CPU) (k' : KCtx) (dq : DFrac) (t : PTree) (L : RegMapF (BitVec 64))
     (hK' : 10 ≤ k'.avail) (hroot' : k'.regs 10#5 = pageAddr t.base) (hrep' : ptRep t L) :
-    kctx c k' ∗ pcIs c 0x80001048#64 ∗ ptreeOwn 2 dq t ∗
+    kctx c k' ∗ pcIs c KA.«walkaddr» ∗ ptreeOwn 2 dq t ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ R' : RegMap,
       kctx cpu' (k'.withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ptreeOwn 2 dq t -∗
       ⌜calleeSaved k'.regs R' ∧ walkaddrRet L (k'.regs 11#5) (R' 10#5)⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   have h := WA.wp_walkaddr (hlc := hlc) (GF := GF) c k' dq t L hK' hroot' hrep'
   unfold wp_walkaddr_body at h
-  simp only [walkaddrAddr, KernelSyms.«walkaddr»] at h
+  simp only [walkaddrAddr] at h
   exact h
 
 theorem co_vmfault_call (VF : VMFAULT) [Xv6G GF] [CurCtx]
     (c : CPU) (k' : KCtx) (γl : GName) (γk : KmemNames) (P : UPtd) (M : Nat → List (BitVec 8))
     (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : vmfaultSlots ≤ k'.avail) (hlk' : "kmem" ∉ k'.locks)
     (hroot' : k'.regs 10#5 = pageAddr P.root) (hsz' : (k'.regs 11#5).toNat ≤ 2 ^ 38) :
-    kctx c k' ∗ pcIs c 0x80001546#64 ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
+    kctx c k' ∗ pcIs c KA.«vmfault» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
     kallocAvail γk none ∗ procPtAt P M ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
@@ -155,14 +155,14 @@ theorem co_vmfault_call (VF : VMFAULT) [Xv6G GF] [CurCtx]
     ⊢ wpLoop (GF := GF) c := by
   have h := VF.wp_vmfault (hlc := hlc) (GF := GF) c k' γl γk P M hnoff' hK' hlk' hroot' hsz'
   unfold wp_vmfault_body at h
-  simp only [vmfaultAddr, KernelSyms.«vmfault»] at h
+  simp only [vmfaultAddr] at h
   exact h
 
 theorem co_memmove_call (MM : MEMMOVE) [CurCtx]
     (c : CPU) (k' : KCtx) (cs olds : List (BitVec 8)) (n : Nat) (dqs : DFrac)
     (hK' : 2 ≤ k'.avail) (hn : k'.regs 12#5 = BitVec.ofNat 64 n) (hn32 : n < 2 ^ 32)
     (hls : cs.length = n) (hld : olds.length = n) :
-    kctx c k' ∗ pcIs c 0x80000d78#64 ∗
+    kctx c k' ∗ pcIs c KA.«memmove» ∗
     byteBuf (k'.regs 11#5) dqs cs ∗ byteBuf (k'.regs 10#5) (DFrac.own 1) olds ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ R' : RegMap,
       kctx cpu' (k'.withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
@@ -171,7 +171,7 @@ theorem co_memmove_call (MM : MEMMOVE) [CurCtx]
     ⊢ wpLoop (GF := GF) c := by
   have h := MM.wp_memmove (hlc := hlc) (GF := GF) c k' cs olds n dqs hK' hn hn32 hls hld
   unfold wp_memmove_body at h
-  simp only [memmoveAddr, KernelSyms.«memmove»] at h
+  simp only [memmoveAddr] at h
   exact h
 
 theorem co_withSpie_withSpie (k : KCtx) (a b a' b' : Bool) :

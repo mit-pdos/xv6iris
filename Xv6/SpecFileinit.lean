@@ -12,10 +12,10 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `fileinit`. -/
-def fileinitAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«fileinit»
+def fileinitAddr : BitVec 64 := KA.«fileinit»
 /-- `&ftable.lock` and its name. -/
-def ftableLockAddr : BitVec 64 := 0x80022548#64
-def ftableNameAddr : BitVec 64 := 0x80007580#64
+def ftableLockAddr : BitVec 64 := KA.«ftable»
+def ftableNameAddr : BitVec 64 := KStr.«ftable»
 
 /-- The specification of `fileinit`. -/
 def wp_fileinit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]

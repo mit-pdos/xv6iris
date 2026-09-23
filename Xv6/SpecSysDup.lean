@@ -37,7 +37,7 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
-def sysDupAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«sys_dup»
+def sysDupAddr : BitVec 64 := KA.«sys_dup»
 
 /-- sys_dup's 6-slot frame over argfd's 24 (fdalloc 14, filedup 14). -/
 def sysDupSlots : Nat := 6 + argfdSlots

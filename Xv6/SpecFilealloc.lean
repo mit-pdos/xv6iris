@@ -31,7 +31,7 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
-def fileallocAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«filealloc»
+def fileallocAddr : BitVec 64 := KA.«filealloc»
 
 /-- What `filealloc` returns in `a0`: the table was full (the unit back), or
 entry `k`, owned exclusively and untyped. -/

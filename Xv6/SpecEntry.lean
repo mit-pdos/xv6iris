@@ -20,10 +20,10 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `start` (kernel/start.c), the target of `_entry`'s `jal`. -/
-def startAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«start»
+def startAddr : BitVec 64 := KA.«start»
 
 /-- The GOT slot `_entry` loads `sp` from; it holds the address of `stack0`. -/
-def stack0Slot : BitVec 64 := 0x8000a318#64
+def stack0Slot : BitVec 64 := KA.«_GLOBAL_OFFSET_TABLE_» + 8#64
 
 /-- **WP of `_entry` up to and including the `jal` to `start`.**
 
@@ -33,7 +33,7 @@ its hart id in `mhartid`, the kernel text, the GOT slot holding some value `s0`
 arbitrary values, is safe to run provided the continuation is safe from
 `start` with
 
-    ra = 0x8000001a,  sp = s0 + 4096 * (mhartid + 1),
+    ra = sp = s0 + 4096 * (mhartid + 1),
     a0 = 4096 * (mhartid + 1),  a1 = mhartid + 1,
 
 the configuration and GOT slot unchanged, and the clock cells at some value. -/
@@ -45,7 +45,7 @@ def wp_entry_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
   ctxTok cpu curCtx ∗
   kernelText ∗
   pwordPointsTo stack0Slot 8 dq s0 ∗
-  pcIs cpu (BitVec.ofNat 64 KernelSyms.«_entry») ∗
+  pcIs cpu (KA.«_entry») ∗
   Register.x1 ↦ᵣ[cpu] v1 ∗ Register.x2 ↦ᵣ[cpu] v2 ∗
   Register.x10 ↦ᵣ[cpu] v10 ∗ Register.x11 ↦ᵣ[cpu] v11 ∗
   (mBoot cpu dq -∗
@@ -54,7 +54,7 @@ def wp_entry_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
    ctxTok cpu curCtx -∗
    pwordPointsTo stack0Slot 8 dq s0 -∗
    pcIs cpu startAddr -∗
-   Register.x1 ↦ᵣ[cpu] 0x8000001a#64 -∗
+   Register.x1 ↦ᵣ[cpu] KA.«spin» -∗
    Register.x2 ↦ᵣ[cpu] (s0 + 4096#64 * (hartid + 1#64)) -∗
    Register.x10 ↦ᵣ[cpu] (4096#64 * (hartid + 1#64)) -∗
    Register.x11 ↦ᵣ[cpu] (hartid + 1#64) -∗

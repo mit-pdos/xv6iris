@@ -36,11 +36,11 @@ theorem pms_imm_p80 : BitVec.signExtend 64 80#12 = 8#64 * BitVec.ofNat 64 10 := 
   simp only [BitVec.reduceSignExtend, BitVec.reduceMul]
 
 /-- `ret` out of `kalloc` lands on the `mv a2,a0` after the `jal`. -/
-theorem pms_ret_17a2 : jumpPc 0x80001850#64 = 0x80001850#64 := by
-  simp only [jumpPc, BitVec.reduceAnd]
+theorem pms_ret_17a2 : jumpPc (KA.«proc_mapstacks» + 0x56#64) = (KA.«proc_mapstacks» + 0x56#64) := by
+  decide
 /-- `ret` out of `kvmmap` lands on the cursor step after the `jal`. -/
-theorem pms_ret_17c4 : jumpPc 0x80001872#64 = 0x80001872#64 := by
-  simp only [jumpPc, BitVec.reduceAnd]
+theorem pms_ret_17c4 : jumpPc (KA.«proc_mapstacks» + 0x78#64) = (KA.«proc_mapstacks» + 0x78#64) := by
+  decide
 
 /-- The virtual address of process `i`'s kernel stack (`KSTACK(i)`). -/
 def pmsVa (i : Nat) : BitVec 64 := BitVec.ofNat 64 (4096 * (0x3FFFFFF - 2 * (i + 1)))
@@ -50,9 +50,9 @@ theorem pms_toNat (m : Nat) (h : m < 2 ^ 64) : (BitVec.ofNat 64 m).toNat = m := 
   omega
 
 theorem pms_h1 (i : Nat) :
-    2147559520#64 + (BitVec.ofNat 64 (360 * i) + 18446744071561992096#64)
-      = BitVec.ofNat 64 (360 * i) := by
+    KA.«proc» + (BitVec.ofNat 64 (360 * i) + -KA.«proc») = BitVec.ofNat 64 (360 * i) := by
   generalize BitVec.ofNat 64 (360 * i) = y
+  generalize (KA.«proc» : BitVec 64) = q
   bv_omega
 
 theorem pms_h2 (i : Nat) (hi : i < 64) :
@@ -122,11 +122,10 @@ theorem pms_arith (i : Nat) (hi : i < 64) :
     274877902848#64 +
       -BitVec.signExtend 64
         (BitVec.extractLsb' 0 32
-            (((2147559520#64 + (BitVec.ofNat 64 (360 * i) + 18446744071561992096#64)).sshiftRight 3 *
-              5738987045154082725#64) <<< 13) +
-          BitVec.extractLsb' 0 32 (BitVec.signExtend 64 (2#20 ++ 0#12)))
+            (((KA.«proc» + (BitVec.ofNat 64 (360 * i) + -KA.«proc»)).sshiftRight 3 *
+              5738987045154082725#64) <<< 13) + 8192#32)
       = pmsVa i := by
-  rw [pms_h1 i, pms_h2 i hi, pms_h3 i hi, pms_h4 i hi, pms_h5 i hi, pms_h6, pms_h7 i hi,
+  rw [pms_h1 i, pms_h2 i hi, pms_h3 i hi, pms_h4 i hi, pms_h5 i hi, pms_h7 i hi,
     pms_h8 i hi, pms_h9 i hi]
 
 theorem pms_vpn (i : Nat) (hi : i < 64) : vpnOf (pmsVa i) = kstackVpn i := by
@@ -187,17 +186,20 @@ theorem pms_page_range (p : BitVec 64) (h : pageValid p) : p.toNat + 4096 < 2 ^ 
 
 /-- The cursor one process on. -/
 theorem pms_cursor (i : Nat) :
-    2147559520#64 + (BitVec.ofNat 64 (360 * i) + 360#64)
-      = 2147559520#64 + BitVec.ofNat 64 (360 * (i + 1)) := by
+    KA.«proc» + (BitVec.ofNat 64 (360 * i) + 360#64)
+      = KA.«proc» + BitVec.ofNat 64 (360 * (i + 1)) := by
   rw [show 360 * (i + 1) = 360 * i + 360 from by omega, BitVec.ofNat_add]
 
 theorem pms_s1_eq (i : Nat) (hi : i < 64) :
-    (2147559520#64 + BitVec.ofNat 64 (360 * (i + 1)) = 0x80018260#64) ↔ i + 1 = 64 := by
-  have hval : (2147559520#64 + BitVec.ofNat 64 (360 * (i + 1))).toNat
-      = 2147559520 + 360 * (i + 1) := by
-    rw [BitVec.toNat_add, pms_toNat (360 * (i + 1)) (by omega), pms_toNat 2147559520 (by omega)]
+    (KA.«proc» + BitVec.ofNat 64 (360 * (i + 1)) = KA.«tickslock») ↔ i + 1 = 64 := by
+  have hproc : KernelSyms.«proc» < 2 ^ 32 := by decide
+  have hval : (KA.«proc» + BitVec.ofNat 64 (360 * (i + 1))).toNat
+      = KernelSyms.«proc» + 360 * (i + 1) := by
+    rw [BitVec.toNat_add, pms_toNat (360 * (i + 1)) (by omega),
+      show (KA.«proc» : BitVec 64).toNat = KernelSyms.«proc» from rfl]
     exact Nat.mod_eq_of_lt (by omega)
-  have hr : (0x80018260#64).toNat = 2147582560 := pms_toNat 2147582560 (by omega)
+  have hr : (KA.«tickslock»).toNat = KernelSyms.«tickslock» := rfl
+  have hts : KernelSyms.«tickslock» = KernelSyms.«proc» + 360 * 64 := by decide
   constructor
   · intro he
     have h := congrArg BitVec.toNat he
@@ -210,7 +212,7 @@ theorem pms_s1_eq (i : Nat) (hi : i < 64) :
 
 /-- The loop test `bne s1,s5`: taken until the last process. -/
 theorem pms_bne_last {α : Type} (i : Nat) (hi : i < 64) (p q : α) :
-    (if bcond bop.BNE (2147559520#64 + BitVec.ofNat 64 (360 * (i + 1))) 0x80018260#64 then p else q)
+    (if bcond bop.BNE (KA.«proc» + BitVec.ofNat 64 (360 * (i + 1))) KA.«tickslock» then p else q)
       = if i + 1 = 64 then q else p := by
   by_cases he : i + 1 = 64
   · rw [if_pos he,
@@ -263,19 +265,19 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 
 set_option maxHeartbeats 1000000 in
 /-- `kalloc`'s contract at its entry address, as a rule. -/
-theorem pms_kalloc_call (KA : KALLOC) [CurCtx] (c : CPU) (k' : KCtx) (γl : GName)
+theorem pms_kalloc_call (KAL : KALLOC) [CurCtx] (c : CPU) (k' : KCtx) (γl : GName)
     (γk : KmemNames) (on : Option Nat)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 14 ≤ k'.avail) (hlk : "kmem" ∉ k'.locks) :
-    kctx c k' ∗ pcIs c 0x80000b7e#64 ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
+    kctx c k' ∗ pcIs c KA.«kalloc» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
     kallocAvail γk on ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       kallocPost γk on (R' 10#5) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := KA.wp_kalloc (hlc := hlc) (GF := GF) c k' γl γk on hnoff hK hlk
+  have h := KAL.wp_kalloc (hlc := hlc) (GF := GF) c k' γl γk on hnoff hK hlk
   unfold wp_kalloc_body at h
-  simp only [kallocAddr, KernelSyms.«kalloc»] at h
+  simp only [kallocAddr] at h
   exact h
 
 set_option maxHeartbeats 1000000 in
@@ -289,7 +291,7 @@ theorem pms_kvmmap_call (KM : KVMMAP) [CurCtx] (c : CPU) (k' : KCtx) (γl : GNam
     (hwf : T.wfU 2) (hnd : T.pagesNodup 2)
     (hpgT : ∀ b ∈ T.pages 2, pageValid (pageAddr b))
     (hcount : T.missingRun (vpnOf va) 1 < nb) :
-    kctx c k' ∗ pcIs c 0x80001138#64 ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
+    kctx c k' ∗ pcIs c KA.«kvmmap» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
     ptreeOwn 2 (DFrac.own 1) T ∗ kallocAvail γk (some nb) ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool,
       ∀ (R' : RegMap) (fresh : List (BitVec 44)),
@@ -308,15 +310,19 @@ theorem pms_kvmmap_call (KM : KVMMAP) [CurCtx] (c : CPU) (k' : KCtx) (γl : GNam
     hwf hnd hpgT
     (by rw [h11]; exact hcount)
   unfold wp_kvmmap_body at h
-  simp only [kvmmapAddr, KernelSyms.«kvmmap», h11, h12] at h
+  simp only [kvmmapAddr, h11, h12] at h
   exact h
 
 /-! ## One iteration -/
 
+theorem proc_mapstacks_br_fffffffffffff93e : KA.«proc_mapstacks» + 0xfffffffffffff93e#64 = KA.«kvmmap» := by decide
+
+theorem proc_mapstacks_br_fffffffffffff384 : KA.«proc_mapstacks» + 0xfffffffffffff384#64 = KA.«kalloc» := by decide
+
 set_option maxHeartbeats 4000000 in
 /-- The body at `0x8000184c`: `kalloc` a page, compute `KSTACK(i)`, map it
 read-write with `kvmmap`, step the cursor and test for the last process. -/
-theorem pms_iter (KA : KALLOC) (KM : KVMMAP) [CurCtx]
+theorem pms_iter (KAL : KALLOC) (KM : KVMMAP) [CurCtx]
     (k : KCtx) (γl : GName) (γk : KmemNames) (t : PTree)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 44 ≤ k.avail) (hlk : "kmem" ∉ k.locks)
     (i : Nat) (hi : i < 64) (T : PTree) (pas : Nat → BitVec 44) (fr : List (BitVec 44))
@@ -324,12 +330,12 @@ theorem pms_iter (KA : KALLOC) (KM : KVMMAP) [CurCtx]
     (hpgt : ∀ b ∈ t.pages 2, pageValid (pageAddr b))
     (hcount : 64 + t.missingStacks 64 < nb)
     (spie spp : Bool) (R : RegMap)
-    (h9 : R 9#5 = 2147559520#64 + BitVec.ofNat 64 (360 * i))
+    (h9 : R 9#5 = KA.«proc» + BitVec.ofNat 64 (360 * i))
     (h18 : R 18#5 = 5738987045154082725#64) (h19 : R 19#5 = 274877902848#64)
-    (h20 : R 20#5 = pageAddr t.base) (h21 : R 21#5 = 0x80018260#64)
-    (h22 : R 22#5 = 4096#64) (h23 : R 23#5 = 6#64) (h24 : R 24#5 = 2147559520#64)
+    (h20 : R 20#5 = pageAddr t.base) (h21 : R 21#5 = KA.«tickslock»)
+    (h22 : R 22#5 = 4096#64) (h23 : R 23#5 = 6#64) (h24 : R 24#5 = KA.«proc»)
     (cur : CPU) :
-    kctx cur (((k.pushed 10).withSpie spie spp).withRegs R) ∗ pcIs cur 0x8000184c#64 ∗
+    kctx cur (((k.pushed 10).withSpie spie spp).withRegs R) ∗ pcIs cur (KA.«proc_mapstacks» + 0x52#64) ∗
     isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
     ptreeOwn 2 (DFrac.own 1) T ∗ kallocAvail γk (some (nb - i - fr.length)) ∗
     ([∗list] j ∈ List.range i,
@@ -338,12 +344,12 @@ theorem pms_iter (KA : KALLOC) (KM : KVMMAP) [CurCtx]
       (fresh : List (BitVec 44)) (p : BitVec 44),
       ⌜k.sie = false → spie2 = spie ∧ spp2 = spp⌝ -∗
       kctx cpu' (((k.pushed 10).withSpie spie2 spp2).withRegs R2) -∗
-      pcIs cpu' (if i + 1 = 64 then 0x8000187a#64 else 0x8000184c#64) -∗
+      pcIs cpu' (if i + 1 = 64 then (KA.«proc_mapstacks» + 0x80#64) else (KA.«proc_mapstacks» + 0x52#64)) -∗
       ptreeOwn 2 (DFrac.own 1) (T.mapRun (kstackVpn i) p (permBits .rw) 1 fresh).1 -∗
       ([∗list] j ∈ List.range (i+1),
         byteBuf (pageAddr (PtStack.pasUpd pas i p j)) (DFrac.own 1) (List.replicate 4096 5#8)) -∗
       kallocAvail γk (some (nb - (i+1) - (fr ++ fresh).length)) -∗
-      ⌜pmsKept R R2 ∧ R2 9#5 = 2147559520#64 + BitVec.ofNat 64 (360 * (i+1)) ∧
+      ⌜pmsKept R R2 ∧ R2 9#5 = KA.«proc» + BitVec.ofNat 64 (360 * (i+1)) ∧
         PtStack.StackInv t (T.mapRun (kstackVpn i) p (permBits .rw) 1 fresh).1
           (PtStack.pasUpd pas i p) (i+1) (fr ++ fresh)⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cur := by
@@ -359,10 +365,10 @@ theorem pms_iter (KA : KALLOC) (KM : KVMMAP) [CurCtx]
   have hmle : t.missingStacks (i+1) ≤ t.missingStacks 64 :=
     PtStack.missingStacks_le t (i+1) 64 (by omega)
   -- jal ra, kalloc
-  k_step_gen (wp_s_jal cur _ 0x8000184c#64 false 2093874#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c1 hp1
+  k_step_gen (wp_s_jal cur _ (KA.«proc_mapstacks» + 0x52#64) false 2093874#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [proc_mapstacks_br_fffffffffffff384] next c1 hp1
   iintro Hk Hpc
-  iapply (pms_kalloc_call KA c1 _ γl γk (some (nb - i - fr.length)) ?hn ?hKa ?hl) $$ [- $Hk $Hpc]
+  iapply (pms_kalloc_call KAL c1 _ γl γk (some (nb - i - fr.length)) ?hn ?hKa ?hl) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g
   iframe #
@@ -378,14 +384,14 @@ theorem pms_iter (KA : KALLOC) (KM : KVMMAP) [CurCtx]
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false] at hcs2
     exact hcs2
   obtain ⟨e2, e8, e9, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩ := hcs'
-  have h9' : R2 9#5 = 2147559520#64 + BitVec.ofNat 64 (360 * i) := e9.trans h9
+  have h9' : R2 9#5 = KA.«proc» + BitVec.ofNat 64 (360 * i) := e9.trans h9
   have h18' : R2 18#5 = 5738987045154082725#64 := e18.trans h18
   have h19' : R2 19#5 = 274877902848#64 := e19.trans h19
   have h20' : R2 20#5 = pageAddr t.base := e20.trans h20
-  have h21' : R2 21#5 = 0x80018260#64 := e21.trans h21
+  have h21' : R2 21#5 = KA.«tickslock» := e21.trans h21
   have h22' : R2 22#5 = 4096#64 := e22.trans h22
   have h23' : R2 23#5 = 6#64 := e23.trans h23
-  have h24' : R2 24#5 = 2147559520#64 := e24.trans h24
+  have h24' : R2 24#5 = KA.«proc» := e24.trans h24
   unfold kallocPost
   icases HPost with ⟨⟨%hz, Hav⟩ | ⟨%hvalid, Hbuf, Hav⟩⟩
   · -- `kalloc` cannot fail: the caller's count is not zero
@@ -400,48 +406,48 @@ theorem pms_iter (KA : KALLOC) (KM : KVMMAP) [CurCtx]
     have hpa : pageAddr (BitVec.extractLsb' 12 44 (R2 10#5)) = R2 10#5 :=
       pms_pageAddr_of_valid _ hvalid
     -- c.mv a2,a0 ; c.beqz a0 (not taken)
-    k_step_gen (wp_s_add c2 _ 0x80001850#64 true 12#5 0#5 10#5 (by decide))
+    k_step_gen (wp_s_add c2 _ (KA.«proc_mapstacks» + 0x56#64) true 12#5 0#5 10#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
     iintro Hk Hpc
-    k_step_gen (wp_s_branch c3 _ 0x80001852#64 true 64#13 10#5 0#5 (by decide) bop.BEQ)
+    k_step_gen (wp_s_branch c3 _ (KA.«proc_mapstacks» + 0x58#64) true 64#13 10#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [pms_beq_ne _ hne0] next c4 hp4
     iintro Hk Hpc
     -- the address of KSTACK(i)
-    k_step_gen (wp_s_sub c4 _ 0x80001854#64 false 11#5 9#5 24#5 (by decide))
+    k_step_gen (wp_s_sub c4 _ (KA.«proc_mapstacks» + 0x5a#64) false 11#5 9#5 24#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9', h24'] next c5 hp5
     iintro Hk Hpc
-    k_step_gen (wp_s_srai c5 _ 0x80001858#64 true 3#6 11#5 11#5 (by decide))
+    k_step_gen (wp_s_srai c5 _ (KA.«proc_mapstacks» + 0x5e#64) true 3#6 11#5 11#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c6 hp6
     iintro Hk Hpc
-    k_step_gen (wp_s_mul c6 _ 0x8000185a#64 false 11#5 11#5 18#5 (by decide))
+    k_step_gen (wp_s_mul c6 _ (KA.«proc_mapstacks» + 0x60#64) false 11#5 11#5 18#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h18'] next c7 hp7
     iintro Hk Hpc
-    k_step_gen (wp_s_slli c7 _ 0x8000185e#64 true 13#6 11#5 11#5 (by decide))
+    k_step_gen (wp_s_slli c7 _ (KA.«proc_mapstacks» + 0x64#64) true 13#6 11#5 11#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c8 hp8
     iintro Hk Hpc
-    k_step_gen (wp_s_lui c8 _ 0x80001860#64 true 2#20 15#5 (by decide))
+    k_step_gen (wp_s_lui c8 _ (KA.«proc_mapstacks» + 0x66#64) true 2#20 15#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c9 hp9
     iintro Hk Hpc
-    k_step_gen (wp_s_addw c9 _ 0x80001862#64 true 11#5 11#5 15#5 (by decide))
+    k_step_gen (wp_s_addw c9 _ (KA.«proc_mapstacks» + 0x68#64) true 11#5 11#5 15#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c10 hp10
     iintro Hk Hpc
-    k_step_gen (wp_s_add c10 _ 0x80001864#64 true 14#5 0#5 23#5 (by decide))
+    k_step_gen (wp_s_add c10 _ (KA.«proc_mapstacks» + 0x6a#64) true 14#5 0#5 23#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h23'] next c11 hp11
     iintro Hk Hpc
-    k_step_gen (wp_s_add c11 _ 0x80001866#64 true 13#5 0#5 22#5 (by decide))
+    k_step_gen (wp_s_add c11 _ (KA.«proc_mapstacks» + 0x6c#64) true 13#5 0#5 22#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h22'] next c12 hp12
     iintro Hk Hpc
-    k_step_gen (wp_s_sub c12 _ 0x80001868#64 false 11#5 19#5 11#5 (by decide))
+    k_step_gen (wp_s_sub c12 _ (KA.«proc_mapstacks» + 0x6e#64) false 11#5 19#5 11#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [h19', pms_arith i hi] next c13 hp13
     iintro Hk Hpc
-    k_step_gen (wp_s_add c13 _ 0x8000186c#64 true 10#5 0#5 20#5 (by decide))
+    k_step_gen (wp_s_add c13 _ (KA.«proc_mapstacks» + 0x72#64) true 10#5 0#5 20#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h20'] next c14 hp14
     iintro Hk Hpc
     -- jal ra, kvmmap
-    k_step_gen (wp_s_jal c14 _ 0x8000186e#64 false 2095306#21 1#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c15 hp15
+    k_step_gen (wp_s_jal c14 _ (KA.«proc_mapstacks» + 0x74#64) false 2095306#21 1#5 (by decide))
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [proc_mapstacks_br_fffffffffffff93e] next c15 hp15
     iintro Hk Hpc
     have hargs : mappagesArgs T (pmsVa i) 4096#64 (R2 10#5) 1 := by
       refine ⟨pms_va_align i hi, hvalid.1, rfl, Nat.le_refl 1, ?_, ?_, ?_⟩
@@ -483,14 +489,14 @@ theorem pms_iter (KA : KALLOC) (KM : KVMMAP) [CurCtx]
       simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false] at hcs3
       exact hcs3
     obtain ⟨f2, f8, f9, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27⟩ := hcs3'
-    have h9'' : R3 9#5 = 2147559520#64 + BitVec.ofNat 64 (360 * i) := f9.trans h9'
-    have h21'' : R3 21#5 = 0x80018260#64 := f21.trans h21'
+    have h9'' : R3 9#5 = KA.«proc» + BitVec.ofNat 64 (360 * i) := f9.trans h9'
+    have h21'' : R3 21#5 = KA.«tickslock» := f21.trans h21'
     -- addi s1,s1,360 ; bne s1,s5
-    k_step_gen (wp_s_addi c16 _ 0x80001872#64 false 360#12 9#5 9#5 (by decide))
+    k_step_gen (wp_s_addi c16 _ (KA.«proc_mapstacks» + 0x78#64) false 360#12 9#5 9#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [h9'', pms_cursor i] next c17 hp17
     iintro Hk Hpc
-    k_step_gen (wp_s_branch c17 _ 0x80001876#64 false 8150#13 9#5 21#5 (by decide) bop.BNE)
+    k_step_gen (wp_s_branch c17 _ (KA.«proc_mapstacks» + 0x7c#64) false 8150#13 9#5 21#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [h21'', pms_bne_last i hi] next c18 hp18
     iintro Hk Hpc
@@ -549,8 +555,8 @@ theorem pms_iter (KA : KALLOC) (KM : KVMMAP) [CurCtx]
 
 set_option maxHeartbeats 4000000 in
 /-- The loop from `0x8000184c` with `i` stacks mapped (`i < 64`) runs to the
-epilogue at `0x8000187a`.  The hart is quantified inside the induction. -/
-theorem pms_loop (KA : KALLOC) (KM : KVMMAP) [CurCtx]
+epilogue at `(KernelSyms.«proc_mapstacks» + 0x80)`.  The hart is quantified inside the induction. -/
+theorem pms_loop (KAL : KALLOC) (KM : KVMMAP) [CurCtx]
     (k : KCtx) (γl : GName) (γk : KmemNames) (t : PTree)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 44 ≤ k.avail) (hlk : "kmem" ∉ k.locks)
     (nb : Nat) (hpgt : ∀ b ∈ t.pages 2, pageValid (pageAddr b))
@@ -558,12 +564,12 @@ theorem pms_loop (KA : KALLOC) (KM : KVMMAP) [CurCtx]
     ∀ (i : Nat) (_ : 64 - i = fuel + 1) (T : PTree) (pas : Nat → BitVec 44)
       (fr : List (BitVec 44)) (_ : PtStack.StackInv t T pas i fr)
       (spie spp : Bool) (R : RegMap)
-      (_ : R 9#5 = 2147559520#64 + BitVec.ofNat 64 (360 * i))
+      (_ : R 9#5 = KA.«proc» + BitVec.ofNat 64 (360 * i))
       (_ : R 18#5 = 5738987045154082725#64) (_ : R 19#5 = 274877902848#64)
-      (_ : R 20#5 = pageAddr t.base) (_ : R 21#5 = 0x80018260#64)
-      (_ : R 22#5 = 4096#64) (_ : R 23#5 = 6#64) (_ : R 24#5 = 2147559520#64)
+      (_ : R 20#5 = pageAddr t.base) (_ : R 21#5 = KA.«tickslock»)
+      (_ : R 22#5 = 4096#64) (_ : R 23#5 = 6#64) (_ : R 24#5 = KA.«proc»)
       (cur : CPU),
-    kctx cur (((k.pushed 10).withSpie spie spp).withRegs R) ∗ pcIs cur 0x8000184c#64 ∗
+    kctx cur (((k.pushed 10).withSpie spie spp).withRegs R) ∗ pcIs cur (KA.«proc_mapstacks» + 0x52#64) ∗
     isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
     ptreeOwn 2 (DFrac.own 1) T ∗ kallocAvail γk (some (nb - i - fr.length)) ∗
     ([∗list] j ∈ List.range i,
@@ -572,7 +578,7 @@ theorem pms_loop (KA : KALLOC) (KM : KVMMAP) [CurCtx]
       (pas2 : Nat → BitVec 44) (fr2 : List (BitVec 44)),
       ⌜k.sie = false → spie2 = spie ∧ spp2 = spp⌝ -∗
       kctx cpu' (((k.pushed 10).withSpie spie2 spp2).withRegs R2) -∗
-      pcIs cpu' 0x8000187a#64 -∗
+      pcIs cpu' (KA.«proc_mapstacks» + 0x80#64) -∗
       ptreeOwn 2 (DFrac.own 1) T2 -∗
       ([∗list] j ∈ List.range 64,
         byteBuf (pageAddr (pas2 j)) (DFrac.own 1) (List.replicate 4096 5#8)) -∗
@@ -585,7 +591,7 @@ theorem pms_loop (KA : KALLOC) (KM : KVMMAP) [CurCtx]
     have hi : i < 64 := by omega
     have hlast : i + 1 = 64 := by omega
     iintro ⟨Hk, Hpc, #Hlk, Htree, Hav, Hpages, HΦ⟩
-    iapply (pms_iter KA KM k γl γk t hnoff hK hlk i hi T pas fr nb hinv hpgt hcount spie spp R
+    iapply (pms_iter KAL KM k γl γk t hnoff hK hlk i hi T pas fr nb hinv hpgt hcount spie spp R
       h9 h18 h19 h20 h21 h22 h23 h24 cur) $$ [- $Hk $Hpc $Htree $Hav $Hpages]
     rotate_right 1
     iframe #
@@ -606,7 +612,7 @@ theorem pms_loop (KA : KALLOC) (KM : KVMMAP) [CurCtx]
     have hi : i < 64 := by omega
     have hlast : ¬ (i + 1 = 64) := by omega
     iintro ⟨Hk, Hpc, #Hlk, Htree, Hav, Hpages, HΦ⟩
-    iapply (pms_iter KA KM k γl γk t hnoff hK hlk i hi T pas fr nb hinv hpgt hcount spie spp R
+    iapply (pms_iter KAL KM k γl γk t hnoff hK hlk i hi T pas fr nb hinv hpgt hcount spie spp R
       h9 h18 h19 h20 h21 h22 h23 h24 cur) $$ [- $Hk $Hpc $Htree $Hav $Hpages]
     rotate_right 1
     iframe #
@@ -687,7 +693,7 @@ theorem pms_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
     (R : RegMap) (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFB0#64)
     (h25 : R 25#5 = k.regs 25#5) (h26 : R 26#5 = k.regs 26#5) (h27 : R 27#5 = k.regs 27#5)
     (Q : IProp GF) :
-    kctx cur (((k.pushed 10).withSpie spie spp).withRegs R) ∗ pcIs cur 0x8000187a#64 ∗
+    kctx cur (((k.pushed 10).withSpie spie spp).withRegs R) ∗ pcIs cur (KA.«proc_mapstacks» + 0x80#64) ∗
     pmsFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5) ∗ Q ∗
     wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie' : Bool, ∀ spp' : Bool, ∀ R' : RegMap,
@@ -700,53 +706,53 @@ theorem pms_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK' : 10 ≤ (k.withSpie spie spp).avail := hK
   simp only [pms_pushed_withSpie]
-  k_step_gen (wp_s_ld cur _ 0x8000187a#64 true 72#12 1#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld cur _ (KA.«proc_mapstacks» + 0x80#64) true 72#12 1#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 1#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c1 hp1
   iintro Hk Hpc F0
-  k_step_gen (wp_s_ld c1 _ 0x8000187c#64 true 64#12 8#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c1 _ (KA.«proc_mapstacks» + 0x82#64) true 64#12 8#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 8#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c2 hp2
   iintro Hk Hpc F1
-  k_step_gen (wp_s_ld c2 _ 0x8000187e#64 true 56#12 9#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c2 _ (KA.«proc_mapstacks» + 0x84#64) true 56#12 9#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 9#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c3 hp3
   iintro Hk Hpc F2
-  k_step_gen (wp_s_ld c3 _ 0x80001880#64 true 48#12 18#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c3 _ (KA.«proc_mapstacks» + 0x86#64) true 48#12 18#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 18#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c4 hp4
   iintro Hk Hpc F3
-  k_step_gen (wp_s_ld c4 _ 0x80001882#64 true 40#12 19#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c4 _ (KA.«proc_mapstacks» + 0x88#64) true 40#12 19#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 19#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c5 hp5
   iintro Hk Hpc F4
-  k_step_gen (wp_s_ld c5 _ 0x80001884#64 true 32#12 20#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c5 _ (KA.«proc_mapstacks» + 0x8a#64) true 32#12 20#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 20#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c6 hp6
   iintro Hk Hpc F5
-  k_step_gen (wp_s_ld c6 _ 0x80001886#64 true 24#12 21#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c6 _ (KA.«proc_mapstacks» + 0x8c#64) true 24#12 21#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 21#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c7 hp7
   iintro Hk Hpc F6
-  k_step_gen (wp_s_ld c7 _ 0x80001888#64 true 16#12 22#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c7 _ (KA.«proc_mapstacks» + 0x8e#64) true 16#12 22#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 22#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c8 hp8
   iintro Hk Hpc F7
-  k_step_gen (wp_s_ld c8 _ 0x8000188a#64 true 8#12 23#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c8 _ (KA.«proc_mapstacks» + 0x90#64) true 8#12 23#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 23#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c9 hp9
   iintro Hk Hpc F8
-  k_step_gen (wp_s_ld c9 _ 0x8000188c#64 true 0#12 24#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c9 _ (KA.«proc_mapstacks» + 0x92#64) true 0#12 24#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 24#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c10 hp10
   iintro Hk Hpc F9
   ihave Hstack : stackOwn (k.regs 2#5) 10 $$ [F0 F1 F2 F3 F4 F5 F6 F7 F8 F9]
   case' _ => stack_cells; iframe
-  k_step_gen (wp_s_pop c10 _ 0x8000188e#64 true 80#12 10 pms_imm_p80)
+  k_step_gen (wp_s_pop c10 _ (KA.«proc_mapstacks» + 0x94#64) true 80#12 10 pms_imm_p80)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK', hR2] next c11 hp11
   iintro Hk Hpc
-  k_step_gen (wp_s_ret c11 _ 0x80001890#64 true 1#5)
+  k_step_gen (wp_s_ret c11 _ (KA.«proc_mapstacks» + 0x96#64) true 1#5)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c12 hp12
   iintro Hk Hpc
   have hpinZ : k.sie = false ∨ k.proc = 0#64 → c12 = cpu := fun h =>
@@ -767,116 +773,120 @@ theorem pms_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
 theorem pms_add_ofNat_zero (w : Nat) (x : BitVec w) : x + BitVec.ofNat w 0 = x :=
   BitVec.add_zero x
 
+theorem proc_mapstacks_br_16a66 : KA.«proc_mapstacks» + 0x16a66#64 = KA.«tickslock» := by decide
+
+theorem proc_mapstacks_br_11066 : KA.«proc_mapstacks» + 0x11066#64 = KA.«proc» := by decide
+
 set_option maxHeartbeats 4000000 in
-theorem proc_mapstacks_proof (KA : KALLOC) (KM : KVMMAP) : PROC_MAPSTACKS :=
+theorem proc_mapstacks_proof (KAL : KALLOC) (KM : KVMMAP) : PROC_MAPSTACKS :=
   ⟨fun {hlc GF} _ _ _ cpu k γl γk nb t hnoff hK hlk hroot hwf hnd hpgt hunm hcount => by
   unfold wp_proc_mapstacks_body
-  simp only [procMapstacksAddr, KernelSyms.«proc_mapstacks»]
+  simp only [procMapstacksAddr]
   iintro ⟨Hk, Hpc, #Hlk, Htree, Hav, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK10 : 10 ≤ k.avail := by omega
   k_norm_g
   -- the prologue
-  k_step_gen (wp_s_push cpu _ 0x800017fa#64 true 4016#12 10 hK10 pms_imm_m80)
+  k_step_gen (wp_s_push cpu _ KA.«proc_mapstacks» true 4016#12 10 hK10 pms_imm_m80)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c1 hp1
   iintro Hk Hpc Hframe
   irevert Hframe
   stack_cells
   iintro ⟨⟨%w0, F0⟩, ⟨%w1, F1⟩, ⟨%w2, F2⟩, ⟨%w3, F3⟩, ⟨%w4, F4⟩, ⟨%w5, F5⟩, ⟨%w6, F6⟩,
     ⟨%w7, F7⟩, ⟨%w8, F8⟩, ⟨%w9, F9⟩, _⟩
-  k_step_gen (wp_s_sd c1 _ 0x800017fc#64 true 72#12 2#5 1#5 (by decide) w0)
+  k_step_gen (wp_s_sd c1 _ (KA.«proc_mapstacks» + 0x2#64) true 72#12 2#5 1#5 (by decide) w0)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c2 hp2
   iintro Hk Hpc F0
-  k_step_gen (wp_s_sd c2 _ 0x800017fe#64 true 64#12 2#5 8#5 (by decide) w1)
+  k_step_gen (wp_s_sd c2 _ (KA.«proc_mapstacks» + 0x4#64) true 64#12 2#5 8#5 (by decide) w1)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
   iintro Hk Hpc F1
-  k_step_gen (wp_s_sd c3 _ 0x80001800#64 true 56#12 2#5 9#5 (by decide) w2)
+  k_step_gen (wp_s_sd c3 _ (KA.«proc_mapstacks» + 0x6#64) true 56#12 2#5 9#5 (by decide) w2)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hp4
   iintro Hk Hpc F2
-  k_step_gen (wp_s_sd c4 _ 0x80001802#64 true 48#12 2#5 18#5 (by decide) w3)
+  k_step_gen (wp_s_sd c4 _ (KA.«proc_mapstacks» + 0x8#64) true 48#12 2#5 18#5 (by decide) w3)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c5 hp5
   iintro Hk Hpc F3
-  k_step_gen (wp_s_sd c5 _ 0x80001804#64 true 40#12 2#5 19#5 (by decide) w4)
+  k_step_gen (wp_s_sd c5 _ (KA.«proc_mapstacks» + 0xa#64) true 40#12 2#5 19#5 (by decide) w4)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c6 hp6
   iintro Hk Hpc F4
-  k_step_gen (wp_s_sd c6 _ 0x80001806#64 true 32#12 2#5 20#5 (by decide) w5)
+  k_step_gen (wp_s_sd c6 _ (KA.«proc_mapstacks» + 0xc#64) true 32#12 2#5 20#5 (by decide) w5)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c7 hp7
   iintro Hk Hpc F5
-  k_step_gen (wp_s_sd c7 _ 0x80001808#64 true 24#12 2#5 21#5 (by decide) w6)
+  k_step_gen (wp_s_sd c7 _ (KA.«proc_mapstacks» + 0xe#64) true 24#12 2#5 21#5 (by decide) w6)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c8 hp8
   iintro Hk Hpc F6
-  k_step_gen (wp_s_sd c8 _ 0x8000180a#64 true 16#12 2#5 22#5 (by decide) w7)
+  k_step_gen (wp_s_sd c8 _ (KA.«proc_mapstacks» + 0x10#64) true 16#12 2#5 22#5 (by decide) w7)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c9 hp9
   iintro Hk Hpc F7
-  k_step_gen (wp_s_sd c9 _ 0x8000180c#64 true 8#12 2#5 23#5 (by decide) w8)
+  k_step_gen (wp_s_sd c9 _ (KA.«proc_mapstacks» + 0x12#64) true 8#12 2#5 23#5 (by decide) w8)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c10 hp10
   iintro Hk Hpc F8
-  k_step_gen (wp_s_sd c10 _ 0x8000180e#64 true 0#12 2#5 24#5 (by decide) w9)
+  k_step_gen (wp_s_sd c10 _ (KA.«proc_mapstacks» + 0x14#64) true 0#12 2#5 24#5 (by decide) w9)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c11 hp11
   iintro Hk Hpc F9
-  k_step_gen (wp_s_addi c11 _ 0x80001810#64 true 80#12 8#5 2#5 (by decide))
+  k_step_gen (wp_s_addi c11 _ (KA.«proc_mapstacks» + 0x16#64) true 80#12 8#5 2#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c12 hp12
   iintro Hk Hpc
   have hpin12 : k.sie = false ∨ k.proc = 0#64 → c12 = cpu := fun h =>
     (hp12 h).trans ((hp11 h).trans ((hp10 h).trans ((hp9 h).trans ((hp8 h).trans ((hp7 h).trans
       ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))))))))))
   -- the cursor set-up
-  k_step_gen (wp_s_add c12 _ 0x80001812#64 true 20#5 0#5 10#5 (by decide))
+  k_step_gen (wp_s_add c12 _ (KA.«proc_mapstacks» + 0x18#64) true 20#5 0#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hroot] next c13 hp13
   iintro Hk Hpc
-  k_step_gen (wp_s_auipc c13 _ 0x80001814#64 false 0x11#20 9#5 (by decide))
+  k_step_gen (wp_s_auipc c13 _ (KA.«proc_mapstacks» + 0x1a#64) false 0x11#20 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pms_auipc_11] next c14 hp14
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c14 _ 0x80001818#64 false 76#12 9#5 9#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c15 hp15
+  k_step_gen (wp_s_addi c14 _ (KA.«proc_mapstacks» + 0x1e#64) false 76#12 9#5 9#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [proc_mapstacks_br_11066] next c15 hp15
   iintro Hk Hpc
-  k_step_gen (wp_s_add c15 _ 0x8000181c#64 true 24#5 0#5 9#5 (by decide))
+  k_step_gen (wp_s_add c15 _ (KA.«proc_mapstacks» + 0x22#64) true 24#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c16 hp16
   iintro Hk Hpc
-  k_step_gen (wp_s_lui c16 _ 0x8000181e#64 false 0xa5#20 15#5 (by decide))
+  k_step_gen (wp_s_lui c16 _ (KA.«proc_mapstacks» + 0x24#64) false 0xa5#20 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pms_lui_a5] next c17 hp17
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c17 _ 0x80001822#64 false 4005#12 15#5 15#5 (by decide))
+  k_step_gen (wp_s_addi c17 _ (KA.«proc_mapstacks» + 0x28#64) false 4005#12 15#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c18 hp18
   iintro Hk Hpc
-  k_step_gen (wp_s_slli c18 _ 0x80001826#64 true 12#6 15#5 15#5 (by decide))
+  k_step_gen (wp_s_slli c18 _ (KA.«proc_mapstacks» + 0x2c#64) true 12#6 15#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c19 hp19
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c19 _ 0x80001828#64 false 4005#12 15#5 15#5 (by decide))
+  k_step_gen (wp_s_addi c19 _ (KA.«proc_mapstacks» + 0x2e#64) false 4005#12 15#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c20 hp20
   iintro Hk Hpc
-  k_step_gen (wp_s_lui c20 _ 0x8000182c#64 false 0x4fa50#20 18#5 (by decide))
+  k_step_gen (wp_s_lui c20 _ (KA.«proc_mapstacks» + 0x32#64) false 0x4fa50#20 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pms_lui_4fa50] next c21 hp21
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c21 _ 0x80001830#64 false 2639#12 18#5 18#5 (by decide))
+  k_step_gen (wp_s_addi c21 _ (KA.«proc_mapstacks» + 0x36#64) false 2639#12 18#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c22 hp22
   iintro Hk Hpc
-  k_step_gen (wp_s_slli c22 _ 0x80001834#64 true 32#6 18#5 18#5 (by decide))
+  k_step_gen (wp_s_slli c22 _ (KA.«proc_mapstacks» + 0x3a#64) true 32#6 18#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c23 hp23
   iintro Hk Hpc
-  k_step_gen (wp_s_add c23 _ 0x80001836#64 true 18#5 18#5 15#5 (by decide))
+  k_step_gen (wp_s_add c23 _ (KA.«proc_mapstacks» + 0x3c#64) true 18#5 18#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c24 hp24
   iintro Hk Hpc
-  k_step_gen (wp_s_lui c24 _ 0x80001838#64 false 0x4000#20 19#5 (by decide))
+  k_step_gen (wp_s_lui c24 _ (KA.«proc_mapstacks» + 0x3e#64) false 0x4000#20 19#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pms_lui_4000] next c25 hp25
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c25 _ 0x8000183c#64 true 4095#12 19#5 19#5 (by decide))
+  k_step_gen (wp_s_addi c25 _ (KA.«proc_mapstacks» + 0x42#64) true 4095#12 19#5 19#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c26 hp26
   iintro Hk Hpc
-  k_step_gen (wp_s_slli c26 _ 0x8000183e#64 true 12#6 19#5 19#5 (by decide))
+  k_step_gen (wp_s_slli c26 _ (KA.«proc_mapstacks» + 0x44#64) true 12#6 19#5 19#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c27 hp27
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c27 _ 0x80001840#64 true 6#12 23#5 0#5 (by decide))
+  k_step_gen (wp_s_addi c27 _ (KA.«proc_mapstacks» + 0x46#64) true 6#12 23#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c28 hp28
   iintro Hk Hpc
-  k_step_gen (wp_s_lui c28 _ 0x80001842#64 true 1#20 22#5 (by decide))
+  k_step_gen (wp_s_lui c28 _ (KA.«proc_mapstacks» + 0x48#64) true 1#20 22#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pms_lui_1] next c29 hp29
   iintro Hk Hpc
-  k_step_gen (wp_s_auipc c29 _ 0x80001844#64 false 0x17#20 21#5 (by decide))
+  k_step_gen (wp_s_auipc c29 _ (KA.«proc_mapstacks» + 0x4a#64) false 0x17#20 21#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pms_auipc_17] next c30 hp30
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c30 _ 0x80001848#64 false 2588#12 21#5 21#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c31 hp31
+  k_step_gen (wp_s_addi c30 _ (KA.«proc_mapstacks» + 0x4e#64) false 2588#12 21#5 21#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [proc_mapstacks_br_16a66] next c31 hp31
   iintro Hk Hpc
   have hpin31 : k.sie = false ∨ k.proc = 0#64 → c31 = cpu := fun h =>
     (hp31 h).trans ((hp30 h).trans ((hp29 h).trans ((hp28 h).trans ((hp27 h).trans
@@ -886,7 +896,7 @@ theorem proc_mapstacks_proof (KA : KALLOC) (KM : KVMMAP) : PROC_MAPSTACKS :=
             (hpin12 h)))))))))))))))))))
   -- the loop
   rw [pms_pushed_spie_self k 10]
-  iapply (pms_loop KA KM k γl γk t hnoff hK hlk nb hpgt hcount 63 0 (by omega) t (fun _ => 0#44) []
+  iapply (pms_loop KAL KM k γl γk t hnoff hK hlk nb hpgt hcount 63 0 (by omega) t (fun _ => 0#44) []
     (PtStack.stackInv_init t (fun _ => 0#44) hwf hnd hunm) k.spie k.spp _
     ?g9 ?g18 ?g19 ?g20 ?g21 ?g22 ?g23 ?g24 c31) $$ [- $Hk $Hpc $Htree $Hav]
   rotate_right 1

@@ -40,7 +40,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `pipeclose`. -/
-def pipecloseAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«pipeclose»
+def pipecloseAddr : BitVec 64 := KA.«pipeclose»
 
 /-- The stack `pipeclose`'s cone needs: its own 4-slot frame over `wakeup`'s
 18 (and `kfree`'s 14 on the freeing path, which fits under 18). -/

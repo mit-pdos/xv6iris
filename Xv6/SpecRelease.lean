@@ -28,7 +28,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `release`. -/
-def releaseAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«release»
+def releaseAddr : BitVec 64 := KA.«release»
 
 /-- **WP of `release`.**  `pop_off` unwinds one level; when this was the
 outermost push_off and it found interrupts on (`reen`), they are on again

@@ -37,7 +37,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 /-- Address of `safestrcpy`. -/
-def safestrcpyAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«safestrcpy»
+def safestrcpyAddr : BitVec 64 := KA.«safestrcpy»
 
 /-- **WP of `safestrcpy`** for the `n = 16` kernel-to-kernel case (`kfork`).
 `dst` holds any 16 bytes, `src` any 16 bytes (read only); afterwards `dst`
