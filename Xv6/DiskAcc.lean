@@ -1459,7 +1459,7 @@ theorem diskProto_flip [CurCtx] (γ : DiskNames) (v : VirtioState) (c c' : Virti
       iexists stInit, 0, 0, 0, ringInit, m, [], none, bb, 0, [], [], 0, (fun _ => SByte.free),
         (fun _ => UElem.free)
       ihave #Htp := dlTops_nil (GF := GF)
-      ihave Hsb0 := statusRes_empty (GF := GF) stInit (fun _ => SByte.free) (fun _ => rfl)
+      ihave Hsb0 := statusRes_empty (GF := GF) γ stInit (fun _ => SByte.free) (fun _ => rfl)
       iframe Hm Hauths Hrows Hnc Hpa Hlo0 HnpM0 Hpos0 HstgA0 HuiR Hdn0 Hbs Htp Hnr0 Hsb0
       isplitl [HueR]
       · unfold usedLease
@@ -1956,12 +1956,16 @@ theorem diskProto_armHead (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) (p
     · rw [armSt_self]
       iexact Hai
     ihave Ha := Haback $$ Hai2
+    icases Hblk with ⟨%bs0, Hblk⟩
+    icases diskBlock_split γ c.blk bs0 $$ Hblk with ⟨HblkT, HblkQ⟩
     ihave Hres : iprop(headRes (GF := GF) γ c0.desc c.hd (armSt st c.hd c c.hd))
-      $$ [Hlease Hblk]
+      $$ [Hlease HblkT]
     · rw [armSt_self, headRes_active]
       isplitl []
       · ipureintro; exact ⟨rfl, hwf⟩
-      · iframe Hlease Hblk
+      · iframe Hlease
+        iexists bs0
+        iexact HblkT
     ihave Hr := Hrback $$ Hres
     -- the middle: `.inactive` to `.member c.hd`; the invariant holds nothing either way
     icases diskArm_acc c.md hwf.2.1 (fun j => headAuth γ j (armSt st c.hd c j))
@@ -2023,9 +2027,11 @@ theorem diskProto_armHead (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) (p
     iexists (armSt3 st c), nc, np0, lo, ring, m, pmap, stg, b, M, dl, dl0, nr,
       (updS sb c.hd SByte.free)
     iframe Hm Ha Hr Hu Hav Hnc Hnp Hlo HnpM Hpos Hstg Hui Hdn Hbs Htp Hnr
-    isplitl [Hsb Hsraw]
-    · iapply statusRes_arm3 st sb c hwf hst hstm hstt
+    isplitl [Hsb Hsraw HblkQ]
+    · iapply statusRes_arm3 γ st sb c hwf hst hstm hstt
       iframe Hsb Hsraw
+      iexists bs0
+      iexact HblkQ
     ipureintro
     exact ⟨q1, q2, q3,
       queueOk_arm3 st c hwf hst hstm hstt ring lo np0 q4, q5, q6,
@@ -2521,18 +2527,20 @@ theorem diskProto_status_acc (γ : DiskNames) (q : Qp) (c0 : VirtioCfg) (v : Vir
     obtain ⟨ep, hl0'⟩ := hl0
     have hmem : ((n, t, c.hd, ep) : UsedRec) ∈ dl := List.IsPrefix.subset e10.1 hl0'
     obtain ⟨-, -, -, ts, hts, htle⟩ := e11.2.2 (n, t, c.hd, ep) hmem (by rw [hnn]; exact hlt)
-    icases statusRes_upd st sb c.hd hwf.1 (sb c.hd) $$ Hsb with ⟨Hrow, Hsbback⟩
-    ihave Hrow : iprop(dmaOwnT (GF := GF) c.status 1 0#8 ts) $$ [Hrow]
+    icases statusRes_upd γ st sb c.hd hwf.1 (sb c.hd) $$ Hsb with ⟨Hrow, Hsbback⟩
+    ihave Hrow : iprop(dmaOwnT (GF := GF) c.status 1 0#8 ts ∗ ∃ bs, diskBlockQ γ c.blk bs)
+      $$ [Hrow]
     · rw [hst, hts, statusRes_done]
       iexact Hrow
+    icases Hrow with ⟨Hrow, HrowQ⟩
     iexists ts
     isplitl []
     · ipureintro; exact htle
     iframe Hrow
     iintro Hrow
-    ihave Hrow : iprop(statusRes (GF := GF) (st c.hd) (sb c.hd)) $$ [Hrow]
+    ihave Hrow : iprop(statusRes (GF := GF) γ (st c.hd) (sb c.hd)) $$ [Hrow HrowQ]
     · rw [hst, hts, statusRes_done]
-      iexact Hrow
+      iframe Hrow HrowQ
     ihave Hsb := Hsbback $$ Hrow
     rw [updS_id sb c.hd]
     iframe Htok Hnrd

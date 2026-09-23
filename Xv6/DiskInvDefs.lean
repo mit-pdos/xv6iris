@@ -565,6 +565,62 @@ it in the invariant's row for the duration of the transfer. -/
 def diskBlock (γ : DiskNames) (bno : Nat) (bs : List (BitVec 8)) : IProp GF :=
   γ.img ↪◯MAP[bno] bs
 
+/-- **A QUARTER of the fragment**, which is what the serving task holds
+from its `.fetched` install to its `.status` install: enough to pin the
+block's bytes across every state of the data phase (a `ghost_map` element
+agrees with the authority at any fraction), and small enough that the
+three quarters the invariant keeps are still two of them too many
+(`Xv6.headRes_blk_ne`). -/
+def diskBlockQ (γ : DiskNames) (bno : Nat) (bs : List (BitVec 8)) : IProp GF :=
+  γ.img ↪◯MAP[bno]{DFrac.own Qp.quarter} bs
+
+/-- The three quarters the invariant's row keeps. -/
+def diskBlockT (γ : DiskNames) (bno : Nat) (bs : List (BitVec 8)) : IProp GF :=
+  γ.img ↪◯MAP[bno]{DFrac.own Qp.threeQuarters} bs
+
+instance diskBlockQ_timeless (γ : DiskNames) (bno : Nat) (bs : List (BitVec 8)) :
+    Timeless (diskBlockQ (GF := GF) γ bno bs) := by unfold diskBlockQ; infer_instance
+instance diskBlockT_timeless (γ : DiskNames) (bno : Nat) (bs : List (BitVec 8)) :
+    Timeless (diskBlockT (GF := GF) γ bno bs) := by unfold diskBlockT; infer_instance
+
+theorem diskBlock_split (γ : DiskNames) (bno : Nat) (bs : List (BitVec 8)) :
+    diskBlock (GF := GF) γ bno bs ⊢ diskBlockT γ bno bs ∗ diskBlockQ γ bno bs := by
+  unfold diskBlock diskBlockT diskBlockQ
+  have h := (ghost_map_elem_fractional (GF := GF) γ.img bno bs).fractional
+    Qp.threeQuarters Qp.quarter
+  rw [show Qp.threeQuarters + Qp.quarter = 1 from by
+    rw [show Qp.threeQuarters + Qp.quarter = Qp.quarter + Qp.threeQuarters from
+      Subtype.ext (by grind)]
+    exact Qp.quarter_add_threeQuarters] at h
+  exact h.1
+
+theorem diskBlock_join (γ : DiskNames) (bno : Nat) (bs : List (BitVec 8)) :
+    iprop(diskBlockT (GF := GF) γ bno bs ∗ diskBlockQ γ bno bs) ⊢ diskBlock γ bno bs := by
+  unfold diskBlock diskBlockT diskBlockQ
+  have h := (ghost_map_elem_fractional (GF := GF) γ.img bno bs).fractional
+    Qp.threeQuarters Qp.quarter
+  rw [show Qp.threeQuarters + Qp.quarter = 1 from by
+    rw [show Qp.threeQuarters + Qp.quarter = Qp.quarter + Qp.threeQuarters from
+      Subtype.ext (by grind)]
+    exact Qp.quarter_add_threeQuarters] at h
+  exact h.2
+
+theorem diskBlockQ_agree (γ : DiskNames) (m : RegMapF (List (BitVec 8))) (bno : Nat)
+    (bs : List (BitVec 8)) :
+    ⊢@{IProp GF} imgAuth γ m -∗ diskBlockQ γ bno bs -∗ ⌜PartialMap.get? m bno = some bs⌝ := by
+  unfold imgAuth diskBlockQ
+  iintro H1 H2
+  ihave %h := ghost_map_lookup $$ H1 H2
+  ipureintro; exact h
+
+theorem diskBlockT_agree (γ : DiskNames) (m : RegMapF (List (BitVec 8))) (bno : Nat)
+    (bs : List (BitVec 8)) :
+    ⊢@{IProp GF} imgAuth γ m -∗ diskBlockT γ bno bs -∗ ⌜PartialMap.get? m bno = some bs⌝ := by
+  unfold imgAuth diskBlockT
+  iintro H1 H2
+  ihave %h := ghost_map_lookup $$ H1 H2
+  ipureintro; exact h
+
 theorem diskBlock_agree (γ : DiskNames) (m : RegMapF (List (BitVec 8))) (bno : Nat)
     (bs : List (BitVec 8)) :
     imgAuth (GF := GF) γ m ∗ diskBlock γ bno bs ⊢ ⌜PartialMap.get? m bno = some bs⌝ := by
@@ -2705,49 +2761,67 @@ inductive SByte where
 not an armed HEAD has none of its own: a free slot's byte travels with
 the driver's `Xv6.freeSlotRes`, and a member's status byte belongs to its
 head. -/
-def statusRes (s : HState) (b : SByte) : IProp GF :=
+def statusRes (γ : DiskNames) (s : HState) (b : SByte) : IProp GF :=
   match s with
   | .active c =>
     match b with
-    | .free => dmaOwn c.status 1
+    | .free => iprop(dmaOwn c.status 1 ∗ ∃ bs, diskBlockQ γ c.blk bs)
     | .lent => iprop(emp)
-    | .done ts => dmaOwnT c.status 1 0#8 ts
+    | .done ts => iprop(dmaOwnT c.status 1 0#8 ts ∗ ∃ bs, diskBlockQ γ c.blk bs)
   | _ => iprop(emp)
 
-theorem statusRes_free (c : Chain) :
-    statusRes (GF := GF) (.active c) .free = dmaOwn c.status 1 := rfl
-theorem statusRes_lent (c : Chain) :
-    statusRes (GF := GF) (.active c) .lent = iprop(emp) := rfl
-theorem statusRes_done (c : Chain) (ts : Nat) :
-    statusRes (GF := GF) (.active c) (.done ts) = dmaOwnT c.status 1 0#8 ts := rfl
+theorem statusRes_free (γ : DiskNames) (c : Chain) :
+    statusRes (GF := GF) γ (.active c) .free =
+      iprop(dmaOwn c.status 1 ∗ ∃ bs, diskBlockQ γ c.blk bs) := rfl
+theorem statusRes_lent (γ : DiskNames) (c : Chain) :
+    statusRes (GF := GF) γ (.active c) .lent = iprop(emp) := rfl
+theorem statusRes_done (γ : DiskNames) (c : Chain) (ts : Nat) :
+    statusRes (GF := GF) γ (.active c) (.done ts) =
+      iprop(dmaOwnT c.status 1 0#8 ts ∗ ∃ bs, diskBlockQ γ c.blk bs) := rfl
 
 /-- The position of the device's write, read off the row. -/
-theorem statusRes_topLb (c : Chain) (ts : Nat) :
-    statusRes (GF := GF) (.active c) (.done ts) ⊢
-      topLb ts ∗ statusRes (.active c) (.done ts) :=
-  dmaOwnT_topLb c.status 1 0#8 ts
-theorem statusRes_inactive (b : SByte) :
-    statusRes (GF := GF) .inactive b = iprop(emp) := rfl
-theorem statusRes_member (h : Nat) (b : SByte) :
-    statusRes (GF := GF) (.member h) b = iprop(emp) := rfl
+theorem statusRes_topLb (γ : DiskNames) (c : Chain) (ts : Nat) :
+    statusRes (GF := GF) γ (.active c) (.done ts) ⊢
+      topLb ts ∗ statusRes γ (.active c) (.done ts) := by
+  rw [statusRes_done]
+  iintro ⟨Hb, Hq⟩
+  icases dmaOwnT_topLb c.status 1 0#8 ts $$ Hb with ⟨#Ht, Hb⟩
+  iframe Ht Hb Hq
 
-instance statusRes_timeless (s : HState) (b : SByte) : Timeless (statusRes (GF := GF) s b) := by
+theorem statusRes_inactive (γ : DiskNames) (b : SByte) :
+    statusRes (GF := GF) γ .inactive b = iprop(emp) := rfl
+theorem statusRes_member (γ : DiskNames) (h : Nat) (b : SByte) :
+    statusRes (GF := GF) γ (.member h) b = iprop(emp) := rfl
+
+instance statusRes_timeless (γ : DiskNames) (s : HState) (b : SByte) :
+    Timeless (statusRes (GF := GF) γ s b) := by
   cases s with
   | inactive => show Timeless (iprop(emp) : IProp GF); infer_instance
   | member _ => show Timeless (iprop(emp) : IProp GF); infer_instance
   | active c =>
     cases b with
-    | free => show Timeless (dmaOwn (GF := GF) c.status 1); infer_instance
+    | free =>
+      show Timeless iprop(dmaOwn (GF := GF) c.status 1 ∗ ∃ bs, diskBlockQ γ c.blk bs)
+      infer_instance
     | lent => show Timeless (iprop(emp) : IProp GF); infer_instance
-    | done ts => show Timeless (dmaOwnT (GF := GF) c.status 1 0#8 ts); infer_instance
+    | done ts =>
+      show Timeless iprop(dmaOwnT (GF := GF) c.status 1 0#8 ts ∗ ∃ bs, diskBlockQ γ c.blk bs)
+      infer_instance
 
-/-- **The byte comes out at own 1** wherever the invariant keeps it. -/
-theorem statusRes_own (c : Chain) (b : SByte) (hb : b ≠ .lent) :
-    statusRes (GF := GF) (.active c) b ⊢ dmaOwn c.status 1 := by
+/-- **The row comes out whole** wherever the invariant keeps it: the
+status byte at own 1, and the quarter of the block's image fragment
+beside it. -/
+theorem statusRes_own (γ : DiskNames) (c : Chain) (b : SByte) (hb : b ≠ .lent) :
+    statusRes (GF := GF) γ (.active c) b ⊢
+      iprop(dmaOwn c.status 1 ∗ ∃ bs, diskBlockQ γ c.blk bs) := by
   cases b with
   | free => rw [statusRes_free]
   | lent => exact absurd rfl hb
-  | done ts => rw [statusRes_done]; exact dmaOwnT_dmaOwn _ _ _ _
+  | done ts =>
+    rw [statusRes_done]
+    iintro ⟨Hb, Hq⟩
+    iframe Hq
+    iapply dmaOwnT_dmaOwn c.status 1 0#8 ts $$ Hb
 
 /-- **Two full footprints over one byte are one too many**: what says a
 slot whose byte the serving task holds is `.lent` in the invariant. -/
@@ -2781,19 +2855,19 @@ theorem dmaOwn_excl (pa : PAddr) (n : Nat) (hn : 0 < n) :
 
 /-- The status byte of an armed slot is the invariant's unless the slot
 says `.lent`. -/
-theorem statusRes_not_lent (c : Chain) (b : SByte) :
-    statusRes (GF := GF) (.active c) b ∗ dmaOwn c.status 1 ⊢ ⌜b = SByte.lent⌝ := by
+theorem statusRes_not_lent (γ : DiskNames) (c : Chain) (b : SByte) :
+    statusRes (GF := GF) γ (.active c) b ∗ dmaOwn c.status 1 ⊢ ⌜b = SByte.lent⌝ := by
   cases b with
   | lent => iintro _; ipureintro; rfl
   | free =>
     rw [statusRes_free]
-    iintro ⟨H1, H2⟩
+    iintro ⟨⟨H1, _⟩, H2⟩
     iapply false_elim
     iapply dmaOwn_excl1 c.status
     iframe H1 H2
   | done ts =>
     rw [statusRes_done]
-    iintro ⟨H1, H2⟩
+    iintro ⟨⟨H1, _⟩, H2⟩
     iapply false_elim
     iapply dmaOwn_excl1 c.status
     isplitl [H1]
@@ -2802,22 +2876,23 @@ theorem statusRes_not_lent (c : Chain) (b : SByte) :
 
 /-- **The eight status rows, at the live flip**: every slot is free, so
 the invariant holds nothing. -/
-theorem statusRes_empty (st : Nat → HState) (sb : Nat → SByte)
+theorem statusRes_empty (γ : DiskNames) (st : Nat → HState) (sb : Nat → SByte)
     (hst : ∀ i, st i = HState.inactive) :
-    ⊢@{IProp GF} [∗list] i ∈ List.range NUM, statusRes (st i) (sb i) := by
-  have heq : (fun (i : Nat) => statusRes (GF := GF) (st i) (sb i))
+    ⊢@{IProp GF} [∗list] i ∈ List.range NUM, statusRes γ (st i) (sb i) := by
+  have heq : (fun (i : Nat) => statusRes (GF := GF) γ (st i) (sb i))
       = (fun (_ : Nat) => (iprop(emp) : IProp GF)) := by
     funext i; rw [hst i, statusRes_inactive]
-  show ⊢ iprop([∗list] i ∈ List.range NUM, (fun (i : Nat) => statusRes (st i) (sb i)) i)
+  show ⊢ iprop([∗list] i ∈ List.range NUM, (fun (i : Nat) => statusRes γ (st i) (sb i)) i)
   rw [heq]
   exact BigSepL.bigSepL_emp.2
 
 /-- One slot's status row, read off the eight. -/
-theorem statusRes_acc (st : Nat → HState) (sb : Nat → SByte) (i : Nat) (hi : i < NUM) :
-    iprop([∗list] j ∈ List.range NUM, statusRes (GF := GF) (st j) (sb j)) ⊢
-      statusRes (st i) (sb i) ∗ (statusRes (st i) (sb i) -∗
-        [∗list] j ∈ List.range NUM, statusRes (st j) (sb j)) :=
-  BigSepL.bigSepL_mem_acc (Φ := fun j => statusRes (GF := GF) (st j) (sb j))
+theorem statusRes_acc (γ : DiskNames) (st : Nat → HState) (sb : Nat → SByte) (i : Nat)
+    (hi : i < NUM) :
+    iprop([∗list] j ∈ List.range NUM, statusRes (GF := GF) γ (st j) (sb j)) ⊢
+      statusRes γ (st i) (sb i) ∗ (statusRes γ (st i) (sb i) -∗
+        [∗list] j ∈ List.range NUM, statusRes γ (st j) (sb j)) :=
+  BigSepL.bigSepL_mem_acc (Φ := fun j => statusRes (GF := GF) γ (st j) (sb j))
     (List.mem_range.2 hi)
 
 /-- One slot's status marker, updated. -/
@@ -2837,13 +2912,13 @@ theorem updS_id (sb : Nat → SByte) (i : Nat) : updS sb i (sb i) = sb := by
   · rw [updS_ne sb i (sb i) j h]
 
 /-- One slot's status row, replaced. -/
-theorem statusRes_upd (st : Nat → HState) (sb : Nat → SByte) (i : Nat) (hi : i < NUM)
-    (b : SByte) :
-    iprop([∗list] j ∈ List.range NUM, statusRes (GF := GF) (st j) (sb j)) ⊢
-      statusRes (st i) (sb i) ∗ (statusRes (st i) b -∗
-        [∗list] j ∈ List.range NUM, statusRes (st j) (updS sb i b j)) := by
-  have h := diskRange_acc (GF := GF) i hi (fun j => statusRes (st j) (sb j))
-    (fun j => statusRes (st j) (updS sb i b j))
+theorem statusRes_upd (γ : DiskNames) (st : Nat → HState) (sb : Nat → SByte) (i : Nat)
+    (hi : i < NUM) (b : SByte) :
+    iprop([∗list] j ∈ List.range NUM, statusRes (GF := GF) γ (st j) (sb j)) ⊢
+      statusRes γ (st i) (sb i) ∗ (statusRes γ (st i) b -∗
+        [∗list] j ∈ List.range NUM, statusRes γ (st j) (updS sb i b j)) := by
+  have h := diskRange_acc (GF := GF) i hi (fun j => statusRes γ (st j) (sb j))
+    (fun j => statusRes γ (st j) (updS sb i b j))
     (fun j hj => by rw [updS_ne sb i b j hj])
   rw [updS_self] at h
   exact h
@@ -3460,7 +3535,7 @@ descriptor at the context tier, which is what makes `free_desc` four
 ordinary stores. -/
 def headRes (γ : DiskNames) (pd : PAddr) (i : Nat) : HState → IProp GF
   | .inactive => iprop(emp)
-  | .active c => iprop(⌜c.hd = i ∧ c.wf⌝ ∗ chainLease pd c ∗ ∃ bs, diskBlock γ c.blk bs)
+  | .active c => iprop(⌜c.hd = i ∧ c.wf⌝ ∗ chainLease pd c ∗ ∃ bs, diskBlockT γ c.blk bs)
   | .member _ => iprop(emp)
 
 theorem headRes_inactive (γ : DiskNames) (pd : PAddr) (i : Nat) :
@@ -3468,7 +3543,7 @@ theorem headRes_inactive (γ : DiskNames) (pd : PAddr) (i : Nat) :
 
 theorem headRes_active (γ : DiskNames) (pd : PAddr) (i : Nat) (c : Chain) :
     headRes (GF := GF) γ pd i (.active c) =
-      iprop(⌜c.hd = i ∧ c.wf⌝ ∗ chainLease pd c ∗ ∃ bs, diskBlock γ c.blk bs) := rfl
+      iprop(⌜c.hd = i ∧ c.wf⌝ ∗ chainLease pd c ∗ ∃ bs, diskBlockT γ c.blk bs) := rfl
 
 /-- A MEMBER slot costs the invariant nothing: the chain's descriptor
 words are leased under its HEAD. -/
@@ -3831,20 +3906,25 @@ theorem headRes_blk_ne (γ : DiskNames) (pd : PAddr) (st : Nat → HState)
   icases bigSepL_two_acc (List.range NUM) (fun k => headRes (GF := GF) γ pd k (st k))
       i j i j (List.getElem?_range hi) (List.getElem?_range hj) hij $$ H with ⟨H1, H2⟩
   have e1 : headRes (GF := GF) γ pd i (st i) =
-      iprop(⌜c.hd = i ∧ c.wf⌝ ∗ chainLease pd c ∗ ∃ bs, diskBlock γ c.blk bs) := by
+      iprop(⌜c.hd = i ∧ c.wf⌝ ∗ chainLease pd c ∗ ∃ bs, diskBlockT γ c.blk bs) := by
     rw [h1, headRes_active]
   have e2 : headRes (GF := GF) γ pd j (st j) =
-      iprop(⌜c'.hd = j ∧ c'.wf⌝ ∗ chainLease pd c' ∗ ∃ bs, diskBlock γ c'.blk bs) := by
+      iprop(⌜c'.hd = j ∧ c'.wf⌝ ∗ chainLease pd c' ∗ ∃ bs, diskBlockT γ c'.blk bs) := by
     rw [h2, headRes_active]
   isimp only [e1] at H1
   isimp only [e2] at H2
   icases H1 with ⟨-, -, %bs, Hb⟩
   icases H2 with ⟨-, -, %bs', Hb'⟩
-  iapply (show iprop(diskBlock (GF := GF) γ c.blk bs ∗ diskBlock γ c'.blk bs') ⊢
+  iapply (show iprop(diskBlockT (GF := GF) γ c.blk bs ∗ diskBlockT γ c'.blk bs') ⊢
       iprop(⌜c.blk ≠ c'.blk⌝) from by
-    unfold diskBlock
+    unfold diskBlockT
     iintro ⟨H, H'⟩
-    iapply ghost_map_elem_ne γ.img c.blk c'.blk (DFrac.own 1) bs bs' $$ H H')
+    iapply ghost_map_elem_frac_ne γ.img c.blk c'.blk (DFrac.own Qp.threeQuarters)
+      (DFrac.own Qp.threeQuarters) bs bs' (by
+        intro hv
+        have hle : (Qp.threeQuarters + Qp.threeQuarters).val ≤ 1 := hv
+        simp only [Qp.val_add, Qp.val_threeQuarters] at hle
+        grind) $$ H H')
   iframe Hb Hb'
 
 /-- ... so the whole row is INJECTIVE in the block. -/
@@ -4028,7 +4108,7 @@ def diskLive (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState)
     diskPubAuthM γ np ∗ posAuth γ pmap ∗ diskStageAuth γ stg ∗
     usedIdxCell (usedIdxAt c0.used) b dl ∗ doneAuth γ dl0 ∗ diskBaseFrozen γ b ∗
     dlTops dl ∗ diskReadAtAuth γ nr ∗
-    ([∗list] i ∈ List.range NUM, statusRes (st i) (sb i)) ∗
+    ([∗list] i ∈ List.range NUM, statusRes γ (st i) (sb i)) ∗
     ⌜v.usedIdx = wrap16 nc ∧ v.seen = wrap16 lo ∧ lo ≤ np ∧ queueOk st ring lo np ∧
       posOk pmap ring lo np ∧ stageOk stg ring lo np ∧ inflightOff v st ring lo np stg ∧
       imgOk v m (inFlightBlk st) ∧ cachedOk v st ∧ permOk v pm st ∧ usedOk dl dl0 nc M ∧
@@ -4078,8 +4158,8 @@ instance headRes_timeless (γ : DiskNames) (pd : PAddr) (i : Nat) (s : HState) :
     show Timeless (iprop(emp) : IProp GF)
     infer_instance
   | active c =>
-    show Timeless iprop(⌜c.hd = i ∧ c.wf⌝ ∗ chainLease pd c ∗ ∃ bs, diskBlock γ c.blk bs)
-    unfold chainLease diskBlock
+    show Timeless iprop(⌜c.hd = i ∧ c.wf⌝ ∗ chainLease pd c ∗ ∃ bs, diskBlockT γ c.blk bs)
+    unfold chainLease diskBlockT
     infer_instance
   | member _ =>
     show Timeless (iprop(emp) : IProp GF)

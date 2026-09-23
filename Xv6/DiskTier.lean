@@ -661,14 +661,15 @@ theorem unreadArmed_arm3 (v : VirtioState) (st : Nat → HState) (c : Chain)
 /-- **The status rows, as the publication moves them.**  Only the HEAD's
 row changes: the middle and the tail go from `.inactive` to `.member`,
 and the invariant holds nothing for either. -/
-theorem statusRes_arm3 (st : Nat → HState) (sb : Nat → SByte) (c : Chain) (hwf : c.wf)
+theorem statusRes_arm3 (γ : DiskNames) (st : Nat → HState) (sb : Nat → SByte) (c : Chain)
+    (hwf : c.wf)
     (hst : st c.hd = .inactive) (hstm : st c.md = .inactive) (hstt : st c.tl = .inactive) :
-    iprop([∗list] j ∈ List.range NUM, statusRes (GF := GF) (st j) (sb j)) ∗
-      dmaOwn c.status 1 ⊢
-      [∗list] j ∈ List.range NUM, statusRes (armSt3 st c j) (updS sb c.hd SByte.free j) := by
-  iintro ⟨Hrows, Hb⟩
-  icases diskRange_acc (GF := GF) c.hd hwf.1 (fun j => statusRes (st j) (sb j))
-      (fun j => statusRes (armSt3 st c j) (updS sb c.hd SByte.free j))
+    iprop([∗list] j ∈ List.range NUM, statusRes (GF := GF) γ (st j) (sb j)) ∗
+      dmaOwn c.status 1 ∗ (∃ bs, diskBlockQ γ c.blk bs) ⊢
+      [∗list] j ∈ List.range NUM, statusRes γ (armSt3 st c j) (updS sb c.hd SByte.free j) := by
+  iintro ⟨Hrows, Hb, Hq⟩
+  icases diskRange_acc (GF := GF) c.hd hwf.1 (fun j => statusRes γ (st j) (sb j))
+      (fun j => statusRes γ (armSt3 st c j) (updS sb c.hd SByte.free j))
       (fun j hj => by
         by_cases h1 : j = c.md
         · subst h1
@@ -680,7 +681,7 @@ theorem statusRes_arm3 (st : Nat → HState) (sb : Nat → SByte) (c : Chain) (h
     with ⟨_, Hback⟩
   iapply Hback
   rw [armSt3_hd st c hwf, updS_self, statusRes_free]
-  iexact Hb
+  iframe Hb Hq
 
 /-! ## The arming epoch, as the driver's own moves keep it -/
 
