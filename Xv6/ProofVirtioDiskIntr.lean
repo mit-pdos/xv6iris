@@ -229,7 +229,7 @@ end
 
 Four of the five resources this structure once carried are gone: the
 used page's `Xv6.pageRw` is in `Xv6.diskGeom`, the used element's read is
-`Xv6.DISK_ACC_ASSUMPTIONS.disk_used_elem_read` at the width the code
+`Xv6.disk_used_elem_read` at the width the code
 uses, `b->disk` is in `Xv6.claimRes` (`Xv6.claimRes_bufDisk_acc`), and
 "a completed head is armed" is `Xv6.disk_slot_active`, proved from the
 invariant's `Xv6.unreadArmed`.  What is left is stated in the exact shape
@@ -714,7 +714,7 @@ theorem vdis_loop (HA : DISK_ACC_ASSUMPTIONS) (HE : DISK_INTR_EXTRA) (WK : WAKEU
   -- +0x4e  lw a5,4(a5)    the used-ring element
   obtain ⟨hram1, hal1, hkm1⟩ := vdis_usedElem_facts pu hpu (nr % NUM) (Nat.mod_lt _ (by unfold NUM; omega))
   ihave #Hid1 := kmapStatic_rw (usedElemAt pu (nr % NUM)) hkm1 $$ HS
-  ihave HAU := HA.disk_used_elem_read γ pd pav pu cpu F nr m hnrm $$ [Hinv Hgeom Hnr Hlbm Hwm]
+  ihave HAU := disk_used_elem_read γ pd pav pu cpu F nr m hnrm $$ [Hinv Hgeom Hnr Hlbm Hwm]
   · iframe #; iframe
   k_step (wp_s_lw_au cpu _ ?hs (KA.«virtio_disk_intr» + 0x4e#64) true 4#12 15#5 15#5
       (by decide) (usedElemAt pu (nr % NUM)) ?hb1 hram1 hal1 F [] _)

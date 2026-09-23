@@ -2227,61 +2227,268 @@ theorem disk_status_read [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu : CP
   iframe Hnr Htok
   ipureintro; exact hw
 
-/-- **The accessors whose obligations this port leaves open.**
+/-! ### The used-ring element of a completed request
 
-All three wait on the PER-POSITION ROWS of the completion side (see the
-section head above): the used-ring element the device wrote, the status
-byte at a known value, the block snapshot of a read's transfer, and the
-`topLb` of the request's data writes.  Their statements are now stated
-against the vocabulary the completion side does provide -- `Xv6.headDone`
-for "this head's request has completed", `Xv6.diskWm` for the TSO
-credential -- so that each is SOUND as written and each premise names a
-resource a caller can hold. -/
-structure DISK_ACC_ASSUMPTIONS : Prop where
-  /-- **`disk.used->ring[disk.used_idx % NUM].id`, read** (the `lw` of the
-  handler's loop).  No longer blocked on the invariant: the used ring's
-  write log and its per-slot rows are both there now (`Xv6.cntOk`,
-  `Xv6.ueOk`, `Xv6.unread_window`), and what is left is the
-  `MachCSL.readAU` itself -- see the note at the end of this docstring.  What it returns is the completion record `Xv6.headDone`, the used
-  ring's twin of `Xv6.posRec`, which is what the status read below and
-  `disk_collect` take as their premise.
+`Xv6.diskLive`'s used-ring rows (`Xv6.ueRes`) hold an UNREAD entry's
+element at the eight bytes the device wrote -- whose low word spells the
+entry's head -- at the POSITION of that write, and `Xv6.ueOk` says that
+position is at or below the used-index write that reported the entry.
+That is what makes the handler's `lw` of `used->ring[nr % NUM].id` return
+the head: the handler's floor `K` has passed the used-index write
+(`Xv6.diskWm`), the log's positions rise with its counters, so the floor
+has passed the element write too, and a racy load whose view has passed a
+write's position reads the head of the history. -/
 
-  THE WIDTH IS FOUR.  The instruction is `lw a5,4(a5)`, and the `id` field
-  is the first four bytes of the element, at `Xv6.usedElemAt pu j` itself;
-  an eight-byte statement is not merely wider but UNUSABLE, because
-  `usedElemAt pu j = pu + 4 + 8 * j` is never 8-aligned and no eight-byte
-  load rule can fire there.
+/-- The positions of the used-index write log rise with the index. -/
+theorem usedPos_le (dl : List UsedRec) (a b : Nat) (ha : a < dl.length) (hb : b < dl.length)
+    (hpw : dl.Pairwise (fun x y => x.1 ≤ y.1 ∧ x.2.1 ≤ y.2.1)) (hab : a ≤ b) :
+    (dl[a]'ha).2.1 ≤ (dl[b]'hb).2.1 := by
+  rcases Nat.eq_or_lt_of_le hab with h | h
+  · subst h; exact Nat.le_refl _
+  · exact (List.pairwise_iff_getElem.1 hpw a b ha hb h).2
 
-  WHAT IS LEFT IS THE READ ITSELF.  Everything this accessor rests on is
-  now in the invariant: `Xv6.cntOk` puts the entry it must return at INDEX
-  `nr` of the log, `Xv6.ueOk` holds that entry's used-ring element at row
-  `nr % NUM` -- at the word the device wrote, whose low half spells the
-  head, and at a position at or below the entry's own used-index write --
-  and `Xv6.usedOk`'s monotone positions turn `Xv6.diskWm γ nc K` into
-  `⌜t ≤ K⌝`.  What has to be written is the `MachCSL.readAU` itself, in
-  the shape of `Xv6.disk_status_read`: FOUR bytes out of the row's EIGHT
-  (`MachCSL.histBytes_split_at` / `_join_at`, and the `nthByte` algebra
-  that says the low four bytes of `w` spell `BitVec.extractLsb' 0 32 w`),
-  and `Xv6.headDoneAt` minted off `Xv6.doneAuth` the way
-  `Xv6.disk_deposit` mints `Xv6.headDone`.
+/-- A descriptor index fits in sixteen bits, and in thirty-two. -/
+theorem setWidth32_ofNat16 (i : Nat) (hi : i < NUM) :
+    BitVec.setWidth 32 (BitVec.ofNat 16 i) = BitVec.ofNat 32 i := by
+  unfold NUM at hi
+  apply BitVec.eq_of_toNat_eq
+  simp only [BitVec.toNat_setWidth, BitVec.toNat_ofNat]
+  omega
 
-  WHAT IT RETURNS IS POSITIONED.  `Xv6.headDoneAt γ (nr+1) t i` names the
-  POSITION `t` of the used-index write that reported the completion, and
-  `⌜t ≤ K⌝` says the handler's floor has passed it.  Both are what
-  `Xv6.disk_status_read` -- which is now PROVED -- consumes, and both are
-  exactly what the log's arithmetic (item (3) of the section head) yields
-  on the way: the entry at counter `nr+1` is at or below the entry the
-  `used->idx` read's own credential `Xv6.diskWm γ nc K` names, because the
-  log's counters and positions rise together. -/
-  disk_used_elem_read : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
-      [DiskG GF] [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu : CPU) (K nr nc : Nat),
-    nr < nc →
+/-- The low four bytes of an eight-byte window, borrowed and given back. -/
+theorem histBytes_acc_lo (pa : PAddr) (k m : Nat) (dq : DFrac) (Hs : Nat → Hist) :
+    histBytes (GF := GF) pa (k + m) (fun _ => dq) Hs ⊢
+      histBytes pa k (fun _ => dq) Hs ∗
+      (histBytes pa k (fun _ => dq) Hs -∗ histBytes pa (k + m) (fun _ => dq) Hs) := by
+  iintro H
+  icases histBytes_split_at pa k m dq Hs $$ H with ⟨H1, H2⟩
+  iframe H1
+  iintro H1
+  iapply histBytes_join_at pa k m dq Hs
+  iframe H1 H2
+
+theorem histBytes_acc_lo4 (pa : PAddr) (dq : DFrac) (Hs : Nat → Hist) :
+    histBytes (GF := GF) pa 8 (fun _ => dq) Hs ⊢
+      histBytes pa 4 (fun _ => dq) Hs ∗
+      (histBytes pa 4 (fun _ => dq) Hs -∗ histBytes pa 8 (fun _ => dq) Hs) :=
+  histBytes_acc_lo pa 4 4 dq Hs
+
+/-- **The used-ring row of the entry at the handler's watermark, borrowed
+out of the live arm** -- with that entry's completion record, at the
+position of its used-index write, which the credential `Xv6.diskWm γ nc K`
+bounds by `K`.
+
+`Xv6.diskDoneLb γ nc` with `nr < nc` is what says the entry EXISTS: the
+device has published `nc` completions, the log's counters are exactly its
+indices plus one (`Xv6.cntOk`), so index `nr` is in the log.  `Xv6.ueOk`
+then hands out its row and `Xv6.unreadInj` says its head is a
+descriptor. -/
+theorem diskProto_ue_acc (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) (nr nc K : Nat)
+    (hlt : nr < nc) (hlive : Virtio.live c0 = true) :
+    diskCfgFrozen (GF := GF) γ c0 ∗ diskProto γ v ∗ diskReadAt γ nr ∗ diskDoneLb γ nc ∗
+      diskWm γ nc K ⊢
+      |==> ∃ (w : BitVec (8 * 8)) (ts t i : Nat),
+        ⌜i < NUM ∧ BitVec.extractLsb' 0 32 w = BitVec.setWidth 32 (BitVec.ofNat 16 i) ∧
+          ts ≤ t ∧ t ≤ K⌝ ∗ headDoneAt γ (nr + 1) t i ∗
+        dmaOwnT (usedElemAt c0.used (nr % NUM)) 8 w ts ∗
+        (dmaOwnT (usedElemAt c0.used (nr % NUM)) 8 w ts -∗
+          (diskProto γ v ∗ diskReadAt γ nr)) := by
+  unfold diskProto
+  iintro ⟨#Hfr0, ⟨%hc, %pn, %pm, Hpm, %hfr, Harm⟩, Hnr, #Hlb, #Hwm⟩
+  icases Harm with ⟨Hd | ⟨%c0', #Hfr, %hc0, Hl⟩⟩
+  · unfold diskDead
+    icases Hd with ⟨%m, Hm, Hcfg, Hlo0, HnpM0, Hpos0, HstgA0, Hbs0, Hdn0, Hnr0, %hp⟩
+    ihave %heq := diskCfgFrozen_auth_agree γ c0 v.cfg $$ Hfr0 Hcfg
+    rw [heq, hp.1] at hlive
+    exact absurd hlive (by simp)
+  · ihave %hcc := diskCfgFrozen_agree γ c0 c0' $$ [$Hfr0 $Hfr]
+    subst hcc
+    unfold diskLive
+    icases Hl with ⟨%st, %ncl, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, %nq, %sb, %ue,
+      Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, Hnq, Hsb,
+      %hpure⟩
+    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12, e13, e14⟩ := hpure
+    ihave %hnn := diskReadAt_agree γ nq nr $$ Hnq Hnr
+    have hnn' : nr = nq := hnn.symm
+    subst hnn'
+    ihave %hMle := diskDoneLb_le γ M nc $$ Hnc Hlb
+    ihave %hmem := diskWm_mem γ nc K dl dl0 e10.1 $$ Hdn Hwm
+    -- the entry at index `nr` is in the log
+    obtain ⟨r0, hr0mem, hr0⟩ : ∃ r ∈ dl, M ≤ r.1 := by
+      rcases e10.2.2.2.2 with h | h
+      · exact absurd h (by omega)
+      · exact h
+    obtain ⟨k0, hk0lt, hk0⟩ := List.getElem_of_mem hr0mem
+    have hc0' : (dl[k0]'hk0lt).1 = k0 + 1 := e12.1 k0 hk0lt
+    rw [hk0] at hc0'
+    have hnrlen : nr < dl.length := by omega
+    have hcnt : (dl[nr]'hnrlen).1 = nr + 1 := e12.1 nr hnrlen
+    -- its position, bounded by the credential's
+    have hposK : (dl[nr]'hnrlen).2.1 ≤ K := by
+      rcases hmem with hz | ⟨m1, t1, hd1, hmem1, hnm1, ht1⟩
+      · omega
+      · obtain ⟨k1, hk1lt, hk1⟩ := List.getElem_of_mem hmem1
+        have hc1 : (dl[k1]'hk1lt).1 = k1 + 1 := e12.1 k1 hk1lt
+        rw [hk1] at hc1
+        have hm1 : m1 = k1 + 1 := hc1
+        have hle := usedPos_le dl nr k1 hnrlen hk1lt e10.2.2.2.1 (by omega)
+        rw [hk1] at hle
+        have : (dl[nr]'hnrlen).2.1 ≤ t1 := hle
+        omega
+    -- the row, and the head it spells
+    obtain ⟨w, ts, hue, hlow, htsp⟩ := e14.1 nr hnrlen (Nat.le_refl nr)
+    have hhdNUM : (dl[nr]'hnrlen).2.2 < NUM :=
+      e13.2.1 (dl[nr]'hnrlen) (List.getElem_mem hnrlen)
+        (by show nr < (dl[nr]'hnrlen).1; omega)
+    obtain ⟨t, i, hri⟩ : ∃ t i : Nat, (dl[nr]'hnrlen) = ((nr + 1, t, i) : UsedRec) :=
+      ⟨(dl[nr]'hnrlen).2.1, (dl[nr]'hnrlen).2.2, by rw [← hcnt]⟩
+    rw [hri] at hlow htsp hhdNUM hposK
+    -- the completion record
+    imod doneAuth_sync γ dl0 dl e10.1 $$ Hdn with Hdn
+    icases doneRec_get γ dl nr ((nr + 1, t, i) : UsedRec)
+      (by rw [List.getElem?_eq_getElem hnrlen, hri]) $$ Hdn with ⟨Hdn, #Hrec⟩
+    ihave #Hdone : iprop(headDoneAt (GF := GF) γ (nr + 1) t i) $$ [Hrec]
+    · iapply headDoneAt_mk γ (nr + 1) t i nr
+      iexact Hrec
+    icases ueRes_acc c0.used ue (nr % NUM) (mod_NUM_lt nr) $$ Hu with ⟨Hrow, Hback⟩
+    ihave Hrow : iprop(dmaOwnT (GF := GF) (usedElemAt c0.used (nr % NUM)) 8 w ts) $$ [Hrow]
+    · rw [hue, ueRes_done]
+      iexact Hrow
+    imodintro
+    iexists w, ts, t, i
+    isplitl []
+    · ipureintro; exact ⟨hhdNUM, hlow, htsp, hposK⟩
+    iframe Hdone Hrow
+    iintro Hrow
+    ihave Hrow : iprop(ueRes (GF := GF) c0.used (nr % NUM) (ue (nr % NUM))) $$ [Hrow]
+    · rw [hue, ueRes_done]
+      iexact Hrow
+    ihave Hu := Hback $$ Hrow
+    iframe Hnr
+    isplitl []
+    · ipureintro; exact hc
+    iexists pn, pm
+    iframe Hpm
+    isplitl []
+    · ipureintro; exact hfr
+    iright
+    iexists c0
+    iframe Hfr
+    isplitl []
+    · ipureintro; exact hc0
+    iexists st, ncl, np, lo, ring, m, pmap, stg, b, M, dl, dl, nr, sb, ue
+    iframe Hm Ha Hr Hu Hav Hnc Hnp Hlo HnpM Hpos Hstg Hui Hdn Hbs Htp Hnq Hsb
+    ipureintro
+    exact ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9,
+      usedOk_sync dl dl0 ncl M e10, e11, e12, e13, e14⟩
+
+/-- **`disk.used->ring[disk.used_idx % NUM].id`, read** (the `lw` of the
+handler's loop).  FOUR bytes out of the row's EIGHT: the `id` field is the
+first word of the element, at `Xv6.usedElemAt pu j` itself, which is never
+eight-aligned.
+
+What it returns is POSITIONED: `Xv6.headDoneAt γ (nr+1) t i` names the
+position `t` of the used-index write that reported the completion, and
+`⌜t ≤ K⌝` says the handler's floor has passed it -- both of which are what
+`Xv6.disk_status_read` consumes next. -/
+theorem disk_used_elem_read [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu : CPU)
+    (K nr nc : Nat) (hlt : nr < nc) :
     diskInv (GF := GF) γ ∗ diskGeom γ pd pav pu ∗ diskReadAt γ nr ∗ diskDoneLb γ nc ∗
       diskWm γ nc K ⊢
       readAU cpu (usedElemAt pu (nr % NUM)) 4 K [] (fun w =>
         iprop(diskReadAt γ nr ∗ ∃ i t : Nat, ⌜i < NUM ∧ w = BitVec.ofNat 32 i ∧ t ≤ K⌝ ∗
-          headDoneAt γ (nr + 1) t i))
+          headDoneAt γ (nr + 1) t i)) := by
+  unfold diskInv devInvR readAU
+  iintro ⟨#Hinv, #Hgeom, Hnr, #Hlb, #Hwm⟩
+  icases diskGeom_cfg γ pd pav pu $$ Hgeom with ⟨%c0, #Hfr, %hg⟩
+  obtain ⟨hgd, hga, hgu, hgl, hgq⟩ := hg
+  subst hgu
+  isplitl []
+  · exact BigSepL.bigSepL_nil_intro
+  iinv Hinv with Hbody Hclose
+  icases Hbody with ⟨%v, >Hfrag, >Hproto⟩
+  imod (diskProto_ue_acc γ c0 v nr nc K hlt hgl) $$ [$Hfr Hproto Hnr $Hlb $Hwm]
+    with ⟨%w8, %ts, %t, %i, %hp, #Hdone, Hrow, Hback⟩
+  · iframe Hproto Hnr
+  icases dmaOwnT_cases (usedElemAt c0.used (nr % NUM)) 8 w8 ts $$ Hrow
+    with ⟨%Hs, Hb, #Htlb, %hpp⟩
+  icases histBytes_acc_lo4 (usedElemAt c0.used (nr % NUM)) (DFrac.own 1) Hs $$ Hb
+    with ⟨Hlo, Hjoin⟩
+  iapply fupd_mask_intro LawfulSet.empty_subset
+  iintro Hmask
+  iexists (fun _ => DFrac.own 1), Hs
+  iframe Hlo
+  isplit
+  · ipureintro
+    intro j hj hnil
+    have h0 := hpp.2 j (by omega)
+    rw [hnil] at h0
+    simp at h0
+  inext
+  iintro %w %tvn %hKt %hrd %hauth Hlo
+  imod Hmask
+  have hweq : w = BitVec.extractLsb' 0 32 w8 := by
+    apply bv_eq_of_bytes
+    intro j hj
+    rw [show nthByte (n := 4) (BitVec.extractLsb' 0 32 w8) j = nthByte (n := 8) w8 j from
+      nthByte_lo (k := 4) (m := 4) w8 j hj]
+    obtain ⟨e, HT, heq⟩ : ∃ (e : HEnt) (HT : Hist), Hs j = e :: HT := by
+      have h0 := hpp.2 j (by omega)
+      cases hx : Hs j with
+      | nil => rw [hx] at h0; exact absurd h0 (by simp)
+      | cons e HT => exact ⟨e, HT, rfl⟩
+    have het : e.t = ts := by
+      have h0 := hpp.2 j (by omega)
+      rw [heq] at h0
+      simpa using h0
+    have hev : e.v = nthByte (n := 8) w8 j := by
+      have h0 := hpp.1 j (by omega)
+      rw [heq] at h0
+      simpa using h0
+    have hvis : e.visible (hartAgent cpu) tvn = true :=
+      HEnt.visible_of_le _ _ e (by omega)
+    have hr0 := hrd j hj
+    rw [heq, Hist.read_cons_visible _ _ e HT hvis] at hr0
+    have hx : e.v = nthByte w j := Option.some.inj hr0
+    rw [hev] at hx
+    exact hx.symm
+  ihave Hb := Hjoin $$ Hlo
+  ihave Hrow : iprop(dmaOwnT (GF := GF) (usedElemAt c0.used (nr % NUM)) 8 w8 ts) $$ [Hb]
+  · iapply (show iprop(histBytes (GF := GF) (usedElemAt c0.used (nr % NUM)) 8
+        (fun _ => DFrac.own 1) Hs ∗ topLb ts) ⊢
+        dmaOwnT (usedElemAt c0.used (nr % NUM)) 8 w8 ts from by
+      unfold dmaOwnT
+      iintro ⟨H, #Ht⟩
+      iexists Hs
+      iframe H Ht
+      ipureintro; exact hpp)
+    iframe Hb Htlb
+  icases Hback $$ Hrow with ⟨Hproto, Hnr⟩
+  ihave Hcl := Hclose $$ [Hfrag Hproto]
+  case' _ =>
+    inext
+    iexists v
+    iframe Hfrag Hproto
+  imod Hcl
+  imodintro
+  iframe Hnr
+  iexists i, t
+  isplitl []
+  · ipureintro
+    refine ⟨hp.1, ?_, hp.2.2.2⟩
+    rw [hweq, hp.2.1, setWidth32_ofNat16 i hp.1]
+  iexact Hdone
 
+/-- **The accessor whose obligation this port leaves open.**
+
+`Xv6.disk_used_elem_read` and `Xv6.disk_status_read` are now PROVED, and
+what is left is `disk_collect`, which waits on the block snapshot of a
+read's transfer and on ruling out a `.lent` marker at the head being
+collected.  Its statement is stated against the vocabulary the completion
+side does provide -- `Xv6.headDone` for "this head's request has
+completed", `Xv6.diskWm` for the TSO credential -- so that it is SOUND as
+written and each premise names a resource a caller can hold. -/
+structure DISK_ACC_ASSUMPTIONS : Prop where
   /-- **`collect`**: the sleeper takes the chain back once `b->disk` is
   `0`.  All THREE descriptors return to the driver: the head's receipt
   goes from `.active c` to `.inactive` and the middle's and the tail's
