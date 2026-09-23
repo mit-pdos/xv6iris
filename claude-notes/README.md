@@ -182,6 +182,12 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   dispatch is stated for one directive, and the trick of making a CALL a
   premise so two callers can share a body.  Read before touching
   `UkRun*.v` or any user-program proof.
+- **[`user-once.md`](design/user-once.md)** — PROPOSAL: the user programs
+  ONCE — where sh's parser, echo's entry, cat's round and the per-program
+  exec twins are copied today and along which axis; the three abstractions
+  (the parser as a refinement of a pure reference parser, the `fd_stream`
+  descriptor-row record, the program-generic exec/entry) and how they sit
+  under app-both's M3/M4.
 - **[`elf.md`](design/elf.md)** — ELF file semantics: the file-side
   `ElfFile.v` layer vs `ElfEnc.v`'s code-side readers, the PrimString import
   vehicle for whole binaries, the kernel-dump consistency theorem
