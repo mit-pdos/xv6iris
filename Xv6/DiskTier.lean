@@ -326,16 +326,6 @@ end hdr
 
 /-! ### A list-indexed big-op as a range-indexed one -/
 
-theorem list_eq_map_range {A : Type _} (l : List A) (d : A) :
-    (List.range l.length).map (fun j => l.getD j d) = l := by
-  apply List.ext_getElem
-  · simp
-  · intro i h1 h2
-    have hg : l.getD i d = l[i] := by
-      simp only [List.getD, List.getElem?_eq_getElem h2]
-      rfl
-    simp only [List.getElem_map, List.getElem_range, hg]
-
 theorem range_getElem?_eq {n k x : Nat} (hx : (List.range n)[k]? = some x) : x = k := by
   obtain ⟨h1, h2⟩ := List.getElem?_eq_some_iff.1 hx
   rw [List.getElem_range] at h2
@@ -367,30 +357,72 @@ theorem byteBuf_dmaOwn (a : BitVec 64) (n : Nat) (bs : List (BitVec 8)) (hn : bs
     exact histBytes_of_bytes curCtx a (DFrac.own 1) (fun j => bs.getD j 0#8) n)
   iexact Hc
 
-/-- The two sectors of a chain's buffer. -/
-theorem bufLease_of_two (c : Chain) :
-    dmaOwn (GF := GF) c.data Virtio.sectorSize ∗
-      dmaOwn (c.data + BitVec.ofNat 64 512) Virtio.sectorSize ⊢ bufLease c := by
-  unfold bufLease sectorAddr
-  simp only [show List.range SPB = [0, 1] from rfl,
-    Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil,
-    show Virtio.sectorSize * 0 = 0 from rfl, show Virtio.sectorSize * 1 = 512 from rfl,
-    show BitVec.ofNat 64 0 = 0#64 from rfl, BitVec.add_zero]
-  iintro ⟨H0, H1⟩
-  iframe H0 H1
-  all_goals try iempintro
-
 /-- **The data buffer, handed to the device.** -/
 theorem byteBuf_bufLease (c : Chain) (data : List (BitVec 8)) (hd : data.length = BSIZE)
     (hkm : ∀ j, j < BSIZE → kmapClass (vpnOf (c.data + BitVec.ofNat 64 j)).toNat = some .rw) :
     kmapStatic (GF := GF) ⊢ byteBuf c.data (DFrac.own 1) data -∗ bufLease c := by
   iintro #HS H
-  ihave Hd := byteBuf_dmaOwn c.data BSIZE data hd hkm $$ HS H
-  iapply bufLease_of_two c
-  iapply (show dmaOwn (GF := GF) c.data BSIZE ⊢
-      dmaOwn c.data Virtio.sectorSize ∗ dmaOwn (c.data + BitVec.ofNat 64 512) Virtio.sectorSize
-      from dmaOwn_split_at c.data 512 512)
-  iexact Hd
+  unfold bufLease
+  iapply byteBuf_dmaOwn c.data BSIZE data hd hkm $$ HS
+  iexact H
+
+/-- A range-indexed big-op and a list-indexed one, at the same bytes. -/
+theorem ctxBytes_of_list (ξ : CtxId) (a : BitVec 64) (n : Nat) (w : BitVec (8 * n))
+    (data : List (BitVec 8)) (hn : data.length = n) (hw : w = bvOfBytes n data) :
+    iprop([∗list] j ↦ b ∈ data, ctxByte (GF := GF) ξ (a + BitVec.ofNat 64 j) (DFrac.own 1) b) ⊢
+      ctxBytes ξ a n (DFrac.own 1) w := by
+  rw [bigSepL_range_of_list
+    (fun j b => ctxByte (GF := GF) ξ (a + BitVec.ofNat 64 j) (DFrac.own 1) b) data 0#8, hn, hw]
+  unfold ctxBytes
+  refine .of_eq (BigSepL.bigSepL_eq (PROP := IProp GF) (fun {k j} hj => ?_))
+  obtain ⟨hk, hkj⟩ := List.getElem?_eq_some_iff.1 hj
+  rw [List.length_range] at hk
+  rw [List.getElem_range] at hkj
+  subst hkj
+  rw [nthByte_bvOfBytes n data k hk]
+
+theorem list_of_ctxBytes (ξ : CtxId) (a : BitVec 64) (n : Nat) (w : BitVec (8 * n)) :
+    ctxBytes (GF := GF) ξ a n (DFrac.own 1) w ⊢
+      [∗list] j ↦ b ∈ bytesOf w, ctxByte ξ (a + BitVec.ofNat 64 j) (DFrac.own 1) b := by
+  rw [bigSepL_range_of_list
+    (fun j b => ctxByte (GF := GF) ξ (a + BitVec.ofNat 64 j) (DFrac.own 1) b) (bytesOf w) 0#8,
+    bytesOf_length]
+  unfold ctxBytes
+  refine .of_eq (BigSepL.bigSepL_eq (PROP := IProp GF) (fun {k j} hj => ?_))
+  obtain ⟨hk, hkj⟩ := List.getElem?_eq_some_iff.1 hj
+  rw [List.length_range] at hk
+  rw [List.getElem_range] at hkj
+  subst hkj
+  have : (bytesOf w).getD k 0#8 = nthByte w k := by
+    simp only [bytesOf, List.getD]
+    rw [List.getElem?_map, List.getElem?_range hk]
+    rfl
+  rw [this]
+
+/-- **The data buffer at the CONTEXT tier**, which is where a WRITE
+chain's stays for the whole flight (`Xv6.bufW`): the same bytes as
+`MachCSL.byteBuf`, indexed by position rather than by the list. -/
+theorem byteBuf_ctxBytes (a : BitVec 64) (data : List (BitVec 8)) (n : Nat)
+    (hn : data.length = n)
+    (hkm : ∀ j, j < n → kmapClass (vpnOf (a + BitVec.ofNat 64 j)).toNat = some .rw) :
+    kmapStatic (GF := GF) ⊢ byteBuf a (DFrac.own 1) data -∗
+      ctxBytes curCtx a n (DFrac.own 1) (bvOfBytes n data) := by
+  iintro #HS H
+  ihave Hc := byteBuf_ctxIdx a data (by rw [hn]; exact hkm) $$ HS H
+  iapply ctxBytes_of_list curCtx a n (bvOfBytes n data) data hn rfl
+  iexact Hc
+
+/-- ... and back: the driver's `MachCSL.byteBuf` out of the context
+window `Xv6.disk_collect` takes back. -/
+theorem ctxBytes_byteBuf (a : BitVec 64) (n : Nat) (w : BitVec (8 * n))
+    (hram : ∀ j, j < n → inRam (a + BitVec.ofNat 64 j) 1)
+    (hkm : ∀ j, j < n → kmapClass (vpnOf (a + BitVec.ofNat 64 j)).toNat = some .rw) :
+    kmapStatic (GF := GF) ⊢ ctxBytes curCtx a n (DFrac.own 1) w -∗
+      byteBuf a (DFrac.own 1) (bytesOf w) := by
+  iintro #HS H
+  iapply ctxIdx_byteBuf a (bytesOf w) (by rw [bytesOf_length]; exact hram)
+    (by rw [bytesOf_length]; exact hkm) $$ HS
+  iapply list_of_ctxBytes curCtx a n w $$ H
 
 end buf
 
@@ -600,6 +632,97 @@ theorem imgOk_arm3 (st : Nat → HState) (c : Chain) (hwf : c.wf)
     (imgOk_mem _ _ _ c.md c.hd (armSt3_md_free st c hwf h2)
       (imgOk_arm v m st c.hd c h1 hx))
 
+/-- **A block the driver holds whole is in nobody's flight**: the
+invariant keeps an armed chain's fragment at three quarters inside its
+row, and a ghost-map element cannot be held at more than one. -/
+theorem headRes_blk_notFlight (γ : DiskNames) (pd : PAddr) (st : Nat → HState) (bno : Nat)
+    (bs : List (BitVec 8)) :
+    ⊢@{IProp GF} ([∗list] k ∈ List.range NUM, headRes γ pd k (st k)) -∗
+      diskBlock γ bno bs -∗ ⌜¬ inFlightBlk st bno⌝ := by
+  by_cases h : inFlightBlk st bno
+  · obtain ⟨i, c, hi, hst, -, hblk⟩ := h
+    iintro H Hb
+    icases headRes_acc γ pd st i hi $$ H with ⟨Hi, -⟩
+    have e1 : headRes (GF := GF) γ pd i (st i) =
+        iprop(⌜c.hd = i ∧ c.wf⌝ ∗ chainLease pd c ∗ diskBlockT γ c.blk c.pay) := by
+      rw [hst, headRes_active]
+    isimp only [e1] at Hi
+    icases Hi with ⟨-, -, HT⟩
+    iapply false_elim
+    iapply (show iprop(diskBlockT (GF := GF) γ c.blk c.pay ∗ diskBlock γ bno bs) ⊢
+        iprop(False) from by
+      unfold diskBlockT diskBlock
+      rw [hblk]
+      iintro ⟨H1, H2⟩
+      ihave %hne := ghost_map_elem_frac_ne γ.img bno bno (DFrac.own Qp.threeQuarters)
+        (DFrac.own 1) c.pay bs (by
+          intro hv
+          have hle : (Qp.threeQuarters + 1).val ≤ 1 := hv
+          simp only [Qp.val_add, Qp.val_threeQuarters, Qp.val_one] at hle
+          grind) $$ H1 H2
+      exact absurd rfl hne)
+    iframe HT Hb
+  · iintro _ _
+    ipureintro; exact h
+
+set_option maxRecDepth 8000 in
+/-- **The publication deposits the payload**, and the block leaves the
+image's reach: an in-flight WRITE block is `Xv6.imgOk`'s escape, and a
+READ chain's payload IS what the fragment already said. -/
+theorem imgOk_arm3_upd (st : Nat → HState) (c : Chain) (hwf : c.wf)
+    (h1 : st c.hd = .inactive) (h2 : st c.md = .inactive) (h3 : st c.tl = .inactive)
+    (v : VirtioState) (m : RegMapF (List (BitVec 8))) (bs0 : List (BitVec 8))
+    (hnf : ¬ inFlightBlk st c.blk)
+    (hget : PartialMap.get? m c.blk = some bs0)
+    (hbs : c.dwr = true → bs0 = c.pay)
+    (hx : imgOk v m (inFlightBlk st)) :
+    imgOk v (PartialMap.insert m c.blk c.pay) (inFlightBlk (armSt3 st c)) := by
+  have harm3 : ∀ bno, inFlightBlk st bno → inFlightBlk (armSt3 st c) bno := fun bno hf =>
+    inFlightBlk_mem _ c.tl c.hd (armSt3_tl_free st c hwf h3) bno
+      (inFlightBlk_mem _ c.md c.hd (armSt3_md_free st c hwf h2) bno
+        (inFlightBlk_arm st c.hd c h1 bno hf))
+  intro bno bsx hb
+  by_cases hbn : bno = c.blk
+  · subst hbn
+    rw [get?_insert_eq rfl] at hb
+    have hbx : bsx = c.pay := (Option.some.inj hb).symm
+    subst hbx
+    cases hd : c.dwr
+    · exact Or.inl ⟨c.hd, c, hwf.1, armSt3_hd st c hwf, hd, rfl⟩
+    · rcases hx c.blk bs0 hget with hf | he
+      · exact absurd hf hnf
+      · exact Or.inr (by rw [← hbs hd]; exact he)
+  · rw [get?_insert_ne (fun he => hbn he.symm)] at hb
+    rcases hx bno bsx hb with hf | he
+    · exact Or.inl (harm3 bno hf)
+    · exact Or.inr he
+
+/-- **The publication** arms a FREE head, which is at no phase at all, and
+takes two members, which are not armed: the clause sees nothing new. -/
+theorem capOk_arm3 (v : VirtioState) (st : Nat → HState) (c : Chain) (sb : Nat → SByte)
+    (hwf : c.wf) (hst : st c.hd = .inactive) (hstm : st c.md = .inactive)
+    (hstt : st c.tl = .inactive) (hfl : inflightOk v st) (h : capOk v st sb) :
+    capOk v (armSt3 st c) (updS sb c.hd SByte.free) := by
+  intro j cj hj hstj hdw hx
+  by_cases h1 : j = c.hd
+  · subst h1
+    rcases hx with hx | ⟨ts, hts⟩
+    · exact absurd hx (not_atPostCap_of_free v st _ hj hfl hst)
+    · rw [updS_self] at hts; exact absurd hts (by simp)
+  · by_cases h2 : j = c.md
+    · subst h2
+      rw [armSt3_md st c hwf] at hstj
+      exact absurd hstj (by simp)
+    · by_cases h3 : j = c.tl
+      · subst h3
+        rw [armSt3_tl st c] at hstj
+        exact absurd hstj (by simp)
+      · rw [armSt3_ne st c j h1 h2 h3] at hstj
+        refine h j cj hj hstj hdw ?_
+        rcases hx with hx | ⟨ts, hts⟩
+        · exact Or.inl hx
+        · exact Or.inr ⟨ts, by rw [updS_ne sb c.hd SByte.free j h1] at hts; exact hts⟩
+
 theorem cachedOk_arm3 (st : Nat → HState) (c : Chain) (hwf : c.wf)
     (h1 : st c.hd = .inactive) (h2 : st c.md = .inactive) (h3 : st c.tl = .inactive)
     (v : VirtioState) (hx : cachedOk v st) : cachedOk v (armSt3 st c) :=
@@ -665,7 +788,7 @@ theorem statusRes_arm3 (γ : DiskNames) (st : Nat → HState) (sb : Nat → SByt
     (hwf : c.wf)
     (hst : st c.hd = .inactive) (hstm : st c.md = .inactive) (hstt : st c.tl = .inactive) :
     iprop([∗list] j ∈ List.range NUM, statusRes (GF := GF) γ (st j) (sb j)) ∗
-      dmaOwn c.status 1 ∗ (∃ bs, diskBlockQ γ c.blk bs) ∗ bufLease c ⊢
+      dmaOwn c.status 1 ∗ diskBlockQ γ c.blk c.pay ∗ bufFree c ⊢
       [∗list] j ∈ List.range NUM, statusRes γ (armSt3 st c j) (updS sb c.hd SByte.free j) := by
   iintro ⟨Hrows, Hb, Hq, Hbuf⟩
   icases diskRange_acc (GF := GF) c.hd hwf.1 (fun j => statusRes γ (st j) (sb j))

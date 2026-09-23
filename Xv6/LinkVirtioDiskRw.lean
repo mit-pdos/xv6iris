@@ -76,14 +76,24 @@ theorem virtio_disk_rw_proof (HA : DISK_ACC_ASSUMPTIONS) (HO : VDRW_OPEN)
     -- P4
     iapply (vdrw_P4 Γ c1 (k.withSpie a1 b1) γ γl pd pav pu bno dataBuf dataDisk
       (decide (k.regs 11#5 ≠ 0#64))
-      (vdrwChain ((k.withSpie a1 b1).regs 10#5) bno (decide (k.regs 11#5 ≠ 0#64)) hix mix tix) yy R3 hkm)
+      (vdrwChain ((k.withSpie a1 b1).regs 10#5) bno (decide (k.regs 11#5 ≠ 0#64)) hix mix tix) yy R3
+      (vdrwPayw (vdrwChain ((k.withSpie a1 b1).regs 10#5) bno
+        (decide (k.regs 11#5 ≠ 0#64)) hix mix tix) dataBuf dataDisk)
+      (fun hd => vdrwPayw_write _ dataBuf dataDisk hd)
+      (fun hd => by
+        rw [vdrwPayw_read _ dataBuf dataDisk hd]
+        exact (bytesOf_bvOfBytes BSIZE dataDisk hdata).symm)
+      hkm)
     isplitl [HP3]
     · iexact HP3
     iintro %R4 %ep HP4
     -- P5
     iapply (vdrw_P5 SP AC RE SL Γ c1 (k.withSpie a1 b1) γ γl pd pav pu j bno dataBuf
       dataDisk (decide (k.regs 11#5 ≠ 0#64))
-      { vdrwChain ((k.withSpie a1 b1).regs 10#5) bno (decide (k.regs 11#5 ≠ 0#64)) hix mix tix with ep := ep }
+      (Chain.arm (vdrwChain ((k.withSpie a1 b1).regs 10#5) bno
+          (decide (k.regs 11#5 ≠ 0#64)) hix mix tix) ep
+        (vdrwPayw (vdrwChain ((k.withSpie a1 b1).regs 10#5) bno
+          (decide (k.regs 11#5 ≠ 0#64)) hix mix tix) dataBuf dataDisk) curCtx)
       yy R4 hj hproc hK hsie hnoff hlocks htier hintena hbz)
     isplitl [HP4]
     · iexact HP4
@@ -91,7 +101,10 @@ theorem virtio_disk_rw_proof (HA : DISK_ACC_ASSUMPTIONS) (HO : VDRW_OPEN)
     -- P6
     iapply (vdrw_P6 HA HO FD RE Γ c2 ((k.withSpie a1 b1).withSpie a2 b2) γ γl pd pav pu bno
       dataBuf dataDisk (decide (k.regs 11#5 ≠ 0#64))
-      { vdrwChain ((k.withSpie a1 b1).regs 10#5) bno (decide (k.regs 11#5 ≠ 0#64)) hix mix tix with ep := ep }
+      (Chain.arm (vdrwChain ((k.withSpie a1 b1).regs 10#5) bno
+          (decide (k.regs 11#5 ≠ 0#64)) hix mix tix) ep
+        (vdrwPayw (vdrwChain ((k.withSpie a1 b1).regs 10#5) bno
+          (decide (k.regs 11#5 ≠ 0#64)) hix mix tix) dataBuf dataDisk) curCtx)
       yy R5 hK hsie hnoff hlocks htier hintena hwf hpd rfl hkm)
     iexact HP5⟩
 

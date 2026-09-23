@@ -36,6 +36,7 @@ descriptor words and its 16-byte header are `Chain.d0/d1/d2/hdr`, and
 `Chain.req` -- the request record the device's `fetch` would build.
 -/
 import MachCSL.Dev.Fabric
+import MachCSL.Resources
 import Xv6.KernelImage
 
 namespace Xv6
@@ -170,6 +171,24 @@ structure Chain where
   without naming an epoch (`Xv6.vdrwChain`), and the publisher replaces
   it (`{c with ep := np}`). -/
   ep : Nat := 0
+  /-- **The PAYLOAD**: the `BSIZE` bytes the block holds once the transfer
+  is over -- the buffer's content for a disk WRITE, the disk's for a disk
+  READ.  It is a GHOST field, like `Xv6.Chain.ep`: no cell of the queue
+  holds it, and none of `Xv6.Chain.d0`/`d1`/`d2`/`hdr`/`req`/`wf` mentions
+  it.  The invariant keeps the block's image fragment AT it for the whole
+  flight (`Xv6.headRes`, `Xv6.statusRes`), which is what lets
+  `Xv6.disk_collect` hand the sleeper the buffer and the fragment at ONE
+  list of bytes.  A `BitVec` rather than a list because a DMA read is
+  pinned by `MachCSL.headsAre`, which speaks of a value; `Xv6.Chain.pay`
+  is the list form. -/
+  payw : BitVec (8 * BSIZE) := 0
+  /-- **The CONTEXT** the driver's buffer cells live at.  A disk WRITE's
+  buffer is never written by the device, so the invariant keeps it at the
+  CONTEXT tier (`MachCSL.ctxBytes`, the bytes at a value TOGETHER with
+  their per-byte `MachCSL.keyAt`s) rather than at the raw tier, and the
+  context has to be named where the invariant can see it.  Also a ghost
+  field. -/
+  ctx : CtxId := default
   deriving DecidableEq, Repr, Inhabited
 
 namespace Chain
@@ -182,6 +201,11 @@ def status (c : Chain) : BitVec 64 := aInfoStatus c.hd
 def hdrAddr (c : Chain) : BitVec 64 := aOps c.hd
 /-- The block the chain transfers. -/
 def blk (c : Chain) : Nat := c.sector.toNat / SPB
+/-- The payload, as a list of `BSIZE` bytes. -/
+def pay (c : Chain) : List (BitVec 8) := bytesOf c.payw
+
+theorem pay_length (c : Chain) : c.pay.length = BSIZE := bytesOf_length c.payw
+theorem payw_pay (c : Chain) : bvOfBytes BSIZE c.pay = c.payw := bvOfBytes_bytesOf c.payw
 
 /-- The three indices are descriptors of the queue and distinct, and the
 transfer is block-aligned (`virtio_disk_rw` computes
@@ -242,6 +266,9 @@ move. -/
     ({c with ep := e} : Chain).sector = c.sector := rfl
 @[simp] theorem withEp_bp (c : Chain) (e : Nat) : ({c with ep := e} : Chain).bp = c.bp := rfl
 @[simp] theorem withEp_ep (c : Chain) (e : Nat) : ({c with ep := e} : Chain).ep = e := rfl
+@[simp] theorem withEp_payw (c : Chain) (e : Nat) : ({c with ep := e} : Chain).payw = c.payw := rfl
+@[simp] theorem withEp_ctx (c : Chain) (e : Nat) : ({c with ep := e} : Chain).ctx = c.ctx := rfl
+@[simp] theorem withEp_pay (c : Chain) (e : Nat) : ({c with ep := e} : Chain).pay = c.pay := rfl
 @[simp] theorem withEp_data (c : Chain) (e : Nat) : ({c with ep := e} : Chain).data = c.data := rfl
 @[simp] theorem withEp_status (c : Chain) (e : Nat) :
     ({c with ep := e} : Chain).status = c.status := rfl
@@ -249,6 +276,29 @@ move. -/
     ({c with ep := e} : Chain).hdrAddr = c.hdrAddr := rfl
 @[simp] theorem withEp_blk (c : Chain) (e : Nat) : ({c with ep := e} : Chain).blk = c.blk := rfl
 @[simp] theorem withEp_wf (c : Chain) (e : Nat) : ({c with ep := e} : Chain).wf ↔ c.wf := Iff.rfl
+
+/-- **The chain as the publication stamps it**: the queue POSITION it is
+armed at, the PAYLOAD the collect will hand back, and the CONTEXT the
+driver's buffer cells live at.  All three are ghost fields, so the bytes
+the queue holds of the chain do not move. -/
+@[reducible] def arm (c : Chain) (e : Nat) (pw : BitVec (8 * BSIZE)) (ξ : CtxId) : Chain :=
+  { c with ep := e, payw := pw, ctx := ξ }
+
+@[simp] theorem arm_hd (c : Chain) (e pw ξ) : (c.arm e pw ξ).hd = c.hd := rfl
+@[simp] theorem arm_md (c : Chain) (e pw ξ) : (c.arm e pw ξ).md = c.md := rfl
+@[simp] theorem arm_tl (c : Chain) (e pw ξ) : (c.arm e pw ξ).tl = c.tl := rfl
+@[simp] theorem arm_dwr (c : Chain) (e pw ξ) : (c.arm e pw ξ).dwr = c.dwr := rfl
+@[simp] theorem arm_sector (c : Chain) (e pw ξ) : (c.arm e pw ξ).sector = c.sector := rfl
+@[simp] theorem arm_bp (c : Chain) (e pw ξ) : (c.arm e pw ξ).bp = c.bp := rfl
+@[simp] theorem arm_ep (c : Chain) (e pw ξ) : (c.arm e pw ξ).ep = e := rfl
+@[simp] theorem arm_payw (c : Chain) (e pw ξ) : (c.arm e pw ξ).payw = pw := rfl
+@[simp] theorem arm_ctx (c : Chain) (e pw ξ) : (c.arm e pw ξ).ctx = ξ := rfl
+@[simp] theorem arm_data (c : Chain) (e pw ξ) : (c.arm e pw ξ).data = c.data := rfl
+@[simp] theorem arm_status (c : Chain) (e pw ξ) : (c.arm e pw ξ).status = c.status := rfl
+@[simp] theorem arm_hdrAddr (c : Chain) (e pw ξ) : (c.arm e pw ξ).hdrAddr = c.hdrAddr := rfl
+@[simp] theorem arm_blk (c : Chain) (e pw ξ) : (c.arm e pw ξ).blk = c.blk := rfl
+@[simp] theorem arm_pay (c : Chain) (e pw ξ) : (c.arm e pw ξ).pay = bytesOf pw := rfl
+@[simp] theorem arm_wf (c : Chain) (e pw ξ) : (c.arm e pw ξ).wf ↔ c.wf := Iff.rfl
 
 /-- The request record the device's `fetch` builds out of `d0`, `d1`,
 `d2` and `hdr`. -/
@@ -264,6 +314,12 @@ namespace Chain
 
 /-- The three descriptor words, the header and the request record do not
 see the epoch either. -/
+@[simp] theorem arm_d0 (c : Chain) (e pw ξ) : (c.arm e pw ξ).d0 = c.d0 := rfl
+@[simp] theorem arm_d1 (c : Chain) (e pw ξ) : (c.arm e pw ξ).d1 = c.d1 := rfl
+@[simp] theorem arm_d2 (c : Chain) (e pw ξ) : (c.arm e pw ξ).d2 = c.d2 := rfl
+@[simp] theorem arm_hdr (c : Chain) (e pw ξ) : (c.arm e pw ξ).hdr = c.hdr := rfl
+@[simp] theorem arm_req (c : Chain) (e pw ξ) : (c.arm e pw ξ).req = c.req := rfl
+
 @[simp] theorem withEp_d0 (c : Chain) (e : Nat) : ({c with ep := e} : Chain).d0 = c.d0 := rfl
 @[simp] theorem withEp_d1 (c : Chain) (e : Nat) : ({c with ep := e} : Chain).d1 = c.d1 := rfl
 @[simp] theorem withEp_d2 (c : Chain) (e : Nat) : ({c with ep := e} : Chain).d2 = c.d2 := rfl

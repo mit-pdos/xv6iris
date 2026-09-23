@@ -151,6 +151,7 @@ import Xv6.KallocDefs
 import Xv6.KernelMap
 import MachCSL.WpDevDma
 import MachCSL.WordHist
+import MachCSL.WpDmaCtx
 
 namespace Xv6
 
@@ -240,6 +241,16 @@ def diskN : Namespace := ndot nroot "xv6disk"
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
 
+theorem list_eq_map_range {A : Type _} (l : List A) (d : A) :
+    (List.range l.length).map (fun j => l.getD j d) = l := by
+  apply List.ext_getElem
+  · simp
+  · intro i h1 h2
+    have hg : l.getD i d = l[i] := by
+      simp only [List.getD, List.getElem?_eq_getElem h2]
+      rfl
+    simp only [List.getElem_map, List.getElem_range, hg]
+
 /-! ## The raw tier: what a lease is made of -/
 
 /-- The heads of the histories were all written at position `ts`. -/
@@ -326,6 +337,83 @@ theorem dmaOwn_leaseT (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (P : IProp GF)
   iframe Hb2 Htop
   ipureintro
   exact ⟨headsAre_pushed Hs t diskAgent n w, fun j _ => rfl⟩
+/-- **The write, at its position, with the ORDERING RECEIPT.**  The client
+hands in a position `Kb` it already holds a `MachCSL.topLb` for -- the
+position of an EARLIER write of the same device task -- and the
+continuation learns `Kb < ts`.  That is what says the status write comes
+AFTER the fill, which is what lets the collect take the buffer back on
+the floor the status byte's position carries. -/
+theorem dmaOwn_leaseTb (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (Kb : Nat) (P : IProp GF) :
+    dmaOwn (GF := GF) pa n ∗ topLb Kb ∗
+      ((∃ ts : Nat, ⌜Kb < ts⌝ ∗ dmaOwnT pa n w ts) -∗ P) ⊢ dmaWriteLease pa n w P := by
+  unfold dmaOwn dmaWriteLease
+  iintro ⟨⟨%Hs, Hb⟩, #Htb, Hback⟩
+  iexists Hs, Kb
+  iframe Hb Htb
+  iintro %t Hb2 _ #Htop %hlt
+  iapply Hback
+  iexists t
+  isplitl []
+  · ipureintro; exact hlt
+  unfold dmaOwnT
+  iexists (pushed Hs t diskAgent w)
+  iframe Hb2 Htop
+  ipureintro
+  exact ⟨headsAre_pushed Hs t diskAgent n w, fun j _ => rfl⟩
+
+/-- A context window at `own 1` is the invariant's raw half beside the
+driver's context half. -/
+theorem ctxBytes_split_dma (ξ : CtxId) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
+    ctxBytes (GF := GF) ξ pa n (DFrac.own 1) w ⊢
+      dmaHalfAt pa n w ∗ ctxBytes ξ pa n (DFrac.own (1 : Qp).half) w := by
+  iintro H
+  icases ctxBytes_split_raw ξ pa n w $$ H with ⟨%Hs, Hraw, %hh, Hctx⟩
+  iframe Hctx
+  unfold dmaHalfAt
+  iexists Hs
+  iframe Hraw
+  ipureintro; exact hh
+
+/-! ### Back from the raw tier: the two halves, rejoined
+
+`Xv6.ctxBytes_split_dma` is what `Xv6.disk_publish` does to each of the
+chain's four sixteen-byte windows.  These are its inverse, which is what
+`Xv6.disk_collect` needs: the invariant's half comes out of
+`Xv6.chainLease` and the driver's out of `Xv6.claimRes`, and the two are
+the SAME ghost element, so joining them gives the `own 1` context window
+`free_desc` asks for.  Nothing about positions is needed for these: the
+DRIVER wrote those cells and the device only ever read them, so the
+context half still carries the key. -/
+
+theorem ctxByte_join_half (ξ : CtxId) (a : PAddr) (H : Hist) (b : BitVec 8) :
+    iprop((a ↦ₕ{DFrac.own (1 : Qp).half} H) ∗ ctxByte (GF := GF) ξ a (DFrac.own (1 : Qp).half) b)
+      ⊢ ctxByte ξ a (DFrac.own 1) b := by
+  iintro ⟨Hpt, Hc⟩
+  icases ctxByte_cases ξ a (DFrac.own (1 : Qp).half) b $$ Hc with ⟨%e, %He, Hpt2, %hev, #Hkey⟩
+  icases histByte_join_half a H (e :: He) $$ [Hpt Hpt2] with ⟨Hpt, %heq⟩
+  · iframe Hpt Hpt2
+  rw [heq]
+  unfold ctxByte
+  iexists e, He
+  iframe Hpt
+  isplit
+  · ipureintro; exact hev
+  · iexact Hkey
+
+/-- **The invariant's raw half and the driver's context half, rejoined.** -/
+theorem ctxBytes_join_dma (ξ : CtxId) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
+    iprop(dmaHalfAt (GF := GF) pa n w ∗ ctxBytes ξ pa n (DFrac.own (1 : Qp).half) w) ⊢
+      ctxBytes ξ pa n (DFrac.own 1) w := by
+  unfold dmaHalfAt
+  iintro ⟨⟨%Hs, Hraw, %hh⟩, Hctx⟩
+  iapply (show iprop(histBytes (GF := GF) pa n (fun _ => DFrac.own (1 : Qp).half) Hs ∗
+      ctxBytes ξ pa n (DFrac.own (1 : Qp).half) w) ⊢ ctxBytes ξ pa n (DFrac.own 1) w from by
+    unfold histBytes ctxBytes
+    refine .trans BigSepL.bigSepL_sep_eqv_symm.1 (BigSepL.bigSepL_mono_of_forall ?_)
+    intro k j
+    exact ctxByte_join_half ξ (pa + BitVec.ofNat 64 j) (Hs j) (nthByte w j))
+  iframe Hraw Hctx
+
 instance dmaHalf_timeless (pa : PAddr) (n : Nat) : Timeless (dmaHalf (GF := GF) pa n) := by
   unfold dmaHalf; infer_instance
 instance dmaHalfAt_timeless (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
@@ -628,6 +716,27 @@ theorem diskBlock_agree (γ : DiskNames) (m : RegMapF (List (BitVec 8))) (bno : 
   iintro ⟨H1, H2⟩
   ihave %h := ghost_map_lookup $$ H1 H2
   ipureintro; exact h
+
+theorem diskBlock_agree' (γ : DiskNames) (m : RegMapF (List (BitVec 8))) (bno : Nat)
+    (bs : List (BitVec 8)) :
+    ⊢@{IProp GF} imgAuth γ m -∗ diskBlock γ bno bs -∗ ⌜PartialMap.get? m bno = some bs⌝ := by
+  unfold imgAuth diskBlock
+  iintro H1 H2
+  ihave %h := ghost_map_lookup $$ H1 H2
+  ipureintro; exact h
+
+/-- **The block's fragment, moved.**  `Xv6.disk_publish` deposits the
+chain's PAYLOAD in the row: the disk's bytes for a READ (which is what
+the driver handed in), the driver's for a WRITE (which the collect hands
+back, and which `Xv6.capOk` will say the device's image has caught up
+with). -/
+theorem diskBlock_update (γ : DiskNames) (m : RegMapF (List (BitVec 8))) (bno : Nat)
+    (bs bs' : List (BitVec 8)) :
+    imgAuth (GF := GF) γ m ∗ diskBlock γ bno bs ⊢
+      |==> (imgAuth γ (PartialMap.insert m bno bs') ∗ diskBlock γ bno bs') := by
+  unfold imgAuth diskBlock
+  iintro ⟨H1, H2⟩
+  iapply ghost_map_update bs' $$ H1 H2
 
 /-- The largest counter the used-index cell has been seen at, as the
 invariant holds it.  It LAGS the device's own count, because the device
@@ -2749,23 +2858,92 @@ still the invariant's. -/
 def sectorAddr (base : PAddr) (i : Nat) : PAddr :=
   base + BitVec.ofNat 64 (Virtio.sectorSize * i)
 
-/-- The data buffer of a chain, WHILE IT IS IN FLIGHT: both of its sectors
-at full ownership, content UNCONSTRAINED.  The driver gets the buffer back
-when it collects the chain.
-
-Full ownership in both directions, though only a READ chain's buffer is
-ever written by the device: a half would do for a disk write, and IS what
-the buffer row will take, because the device's `MachCSL.Virtio.xferOut`
-only reads it (`MachCSL.dmaReadPin` is satisfied by a cell at any
-fraction).  It is full here because the row does not exist yet -- the
-content being unconstrained is exactly the gap `Xv6.disk_collect` is
-blocked on; see the section head of `Xv6/DiskAcc.lean`. -/
+/-- A READ chain's data buffer BEFORE the fill: the whole window at full
+ownership, content UNCONSTRAINED.  What the device leaves in it is the
+chain's payload, and from the fill on the row keeps it at that value
+(`Xv6.bufDone`). -/
 def bufLease (c : Chain) : IProp GF := iprop%
-  [∗list] i ∈ List.range SPB, dmaOwn (sectorAddr c.data i) Virtio.sectorSize
+  dmaOwn c.data BSIZE
 
 instance bufLease_timeless (c : Chain) : Timeless (bufLease (GF := GF) c) := by
   unfold bufLease
   infer_instance
+
+/-- **A WRITE chain's data buffer**, for the whole flight.  The device
+only READS it (`MachCSL.Virtio.capture`), so it never leaves the
+invariant and it never needs a position: it stays at the CONTEXT tier --
+the bytes at a value TOGETHER with their per-byte `MachCSL.keyAt`s, which
+are persistent -- at the context the driver's cells live at
+(`Xv6.Chain.ctx`).  That is what pins the capture's bus read to the
+payload, and what lets `Xv6.disk_collect` hand the buffer straight back
+as a `MachCSL.byteBuf`.  A READ chain has none of this: its buffer is the
+row's (`Xv6.bufLease`, `Xv6.bufDone`). -/
+def bufW (c : Chain) : IProp GF :=
+  if c.dwr then iprop(emp) else ctxBytes c.ctx c.data BSIZE (DFrac.own 1) c.payw
+
+theorem bufW_read (c : Chain) (h : c.dwr = false) :
+    bufW (GF := GF) c = ctxBytes c.ctx c.data BSIZE (DFrac.own 1) c.payw := by
+  unfold bufW; exact if_neg (by simp [h])
+
+theorem bufW_write (c : Chain) (h : c.dwr = true) : bufW (GF := GF) c = iprop(emp) := by
+  unfold bufW; exact if_pos h
+
+instance bufW_timeless (c : Chain) : Timeless (bufW (GF := GF) c) := by
+  cases hd : c.dwr
+  · rw [bufW_read c hd]; infer_instance
+  · rw [bufW_write c hd]; infer_instance
+
+/-- The row's share of the buffer before the transfer: a READ chain's
+window at no value, nothing for a WRITE chain (whose buffer is
+`Xv6.bufW`). -/
+def bufFree (c : Chain) : IProp GF :=
+  if c.dwr then bufLease c else iprop(emp)
+
+/-- ... and after it: a READ chain's window at the PAYLOAD, at a position
+the status write's own position dominates (`Xv6.dmaOwnT`'s "heads at or
+below `ts`", which is what lets the collect take the window back through
+`Xv6.dmaOwnT_ctxBytes` on the floor the payload carries). -/
+def bufDone (c : Chain) (ts : Nat) : IProp GF :=
+  if c.dwr then iprop(∃ t : Nat, ⌜t ≤ ts⌝ ∗ dmaOwnT c.data BSIZE c.payw t) else iprop(emp)
+
+theorem bufFree_read (c : Chain) (h : c.dwr = true) :
+    bufFree (GF := GF) c = bufLease c := by unfold bufFree; exact if_pos h
+theorem bufFree_write (c : Chain) (h : c.dwr = false) :
+    bufFree (GF := GF) c = iprop(emp) := by unfold bufFree; exact if_neg (by simp [h])
+theorem bufDone_read (c : Chain) (ts : Nat) (h : c.dwr = true) :
+    bufDone (GF := GF) c ts = iprop(∃ t : Nat, ⌜t ≤ ts⌝ ∗ dmaOwnT c.data BSIZE c.payw t) := by
+  unfold bufDone; exact if_pos h
+theorem bufDone_write (c : Chain) (ts : Nat) (h : c.dwr = false) :
+    bufDone (GF := GF) c ts = iprop(emp) := by unfold bufDone; exact if_neg (by simp [h])
+
+instance bufFree_timeless (c : Chain) : Timeless (bufFree (GF := GF) c) := by
+  cases hd : c.dwr
+  · rw [bufFree_write c hd]; infer_instance
+  · rw [bufFree_read c hd]; infer_instance
+instance bufDone_timeless (c : Chain) (ts : Nat) : Timeless (bufDone (GF := GF) c ts) := by
+  cases hd : c.dwr
+  · rw [bufDone_write c ts hd]; infer_instance
+  · rw [bufDone_read c ts hd]; infer_instance
+
+/-- The position may be raised. -/
+theorem bufDone_le (c : Chain) (ts ts' : Nat) (h : ts ≤ ts') :
+    bufDone (GF := GF) c ts ⊢ bufDone c ts' := by
+  cases hd : c.dwr
+  · rw [bufDone_write c ts hd, bufDone_write c ts' hd]
+  · rw [bufDone_read c ts hd, bufDone_read c ts' hd]
+    iintro ⟨%t, %hle, H⟩
+    iexists t
+    isplitl []
+    · ipureintro; omega
+    · iexact H
+
+theorem bufDone_dmaOwn (c : Chain) (ts : Nat) : bufDone (GF := GF) c ts ⊢ bufFree c := by
+  cases hd : c.dwr
+  · rw [bufDone_write c ts hd, bufFree_write c hd]
+  · rw [bufDone_read c ts hd, bufFree_read c hd]
+    unfold bufLease
+    iintro ⟨%t, %-, H⟩
+    iapply dmaOwnT_dmaOwn c.data BSIZE c.payw t $$ H
 
 /-- Where one armed slot's status byte is. -/
 inductive SByte where
@@ -2787,20 +2965,20 @@ def statusRes (γ : DiskNames) (s : HState) (b : SByte) : IProp GF :=
   match s with
   | .active c =>
     match b with
-    | .free => iprop(dmaOwn c.status 1 ∗ (∃ bs, diskBlockQ γ c.blk bs) ∗ bufLease c)
+    | .free => iprop(dmaOwn c.status 1 ∗ diskBlockQ γ c.blk c.pay ∗ bufFree c)
     | .lent => iprop(emp)
     | .done ts =>
-      iprop(dmaOwnT c.status 1 0#8 ts ∗ (∃ bs, diskBlockQ γ c.blk bs) ∗ bufLease c)
+      iprop(dmaOwnT c.status 1 0#8 ts ∗ diskBlockQ γ c.blk c.pay ∗ bufDone c ts)
   | _ => iprop(emp)
 
 theorem statusRes_free (γ : DiskNames) (c : Chain) :
     statusRes (GF := GF) γ (.active c) .free =
-      iprop(dmaOwn c.status 1 ∗ (∃ bs, diskBlockQ γ c.blk bs) ∗ bufLease c) := rfl
+      iprop(dmaOwn c.status 1 ∗ diskBlockQ γ c.blk c.pay ∗ bufFree c) := rfl
 theorem statusRes_lent (γ : DiskNames) (c : Chain) :
     statusRes (GF := GF) γ (.active c) .lent = iprop(emp) := rfl
 theorem statusRes_done (γ : DiskNames) (c : Chain) (ts : Nat) :
     statusRes (GF := GF) γ (.active c) (.done ts) =
-      iprop(dmaOwnT c.status 1 0#8 ts ∗ (∃ bs, diskBlockQ γ c.blk bs) ∗ bufLease c) := rfl
+      iprop(dmaOwnT c.status 1 0#8 ts ∗ diskBlockQ γ c.blk c.pay ∗ bufDone c ts) := rfl
 
 /-- The position of the device's write, read off the row. -/
 theorem statusRes_topLb (γ : DiskNames) (c : Chain) (ts : Nat) :
@@ -2825,12 +3003,12 @@ instance statusRes_timeless (γ : DiskNames) (s : HState) (b : SByte) :
     cases b with
     | free =>
       show Timeless iprop(dmaOwn (GF := GF) c.status 1 ∗
-        (∃ bs, diskBlockQ γ c.blk bs) ∗ bufLease c)
+        diskBlockQ γ c.blk c.pay ∗ bufFree c)
       infer_instance
     | lent => show Timeless (iprop(emp) : IProp GF); infer_instance
     | done ts =>
       show Timeless iprop(dmaOwnT (GF := GF) c.status 1 0#8 ts ∗
-        (∃ bs, diskBlockQ γ c.blk bs) ∗ bufLease c)
+        diskBlockQ γ c.blk c.pay ∗ bufDone c ts)
       infer_instance
 
 /-- **The row comes out whole** wherever the invariant keeps it: the
@@ -2838,15 +3016,17 @@ status byte at own 1, and the quarter of the block's image fragment
 beside it. -/
 theorem statusRes_own (γ : DiskNames) (c : Chain) (b : SByte) (hb : b ≠ .lent) :
     statusRes (GF := GF) γ (.active c) b ⊢
-      iprop(dmaOwn c.status 1 ∗ (∃ bs, diskBlockQ γ c.blk bs) ∗ bufLease c) := by
+      iprop(dmaOwn c.status 1 ∗ diskBlockQ γ c.blk c.pay ∗ bufFree c) := by
   cases b with
   | free => rw [statusRes_free]
   | lent => exact absurd rfl hb
   | done ts =>
     rw [statusRes_done]
     iintro ⟨Hb, Hq, Hbuf⟩
-    iframe Hq Hbuf
-    iapply dmaOwnT_dmaOwn c.status 1 0#8 ts $$ Hb
+    isplitl [Hb]
+    · iapply dmaOwnT_dmaOwn c.status 1 0#8 ts $$ Hb
+    iframe Hq
+    iapply bufDone_dmaOwn c ts $$ Hbuf
 
 /-- **Two full footprints over one byte are one too many**: what says a
 slot whose byte the serving task holds is `.lent` in the invariant. -/
@@ -3523,7 +3703,8 @@ def chainLease (pd : PAddr) (c : Chain) : IProp GF := iprop%
   dmaHalfAt (descAt pd c.tl) 16 c.d2 ∗
   dmaHalfAt c.hdrAddr 4 c.req.type ∗
   dmaHalfAt (c.hdrAddr + 4#64) 4 0#32 ∗
-  dmaHalfAt (c.hdrAddr + 8#64) 8 c.sector
+  dmaHalfAt (c.hdrAddr + 8#64) 8 c.sector ∗
+  bufW c
 
 instance chainLease_timeless (pd : PAddr) (c : Chain) : Timeless (chainLease (GF := GF) pd c) := by
   unfold chainLease
@@ -3537,7 +3718,7 @@ descriptor at the context tier, which is what makes `free_desc` four
 ordinary stores. -/
 def headRes (γ : DiskNames) (pd : PAddr) (i : Nat) : HState → IProp GF
   | .inactive => iprop(emp)
-  | .active c => iprop(⌜c.hd = i ∧ c.wf⌝ ∗ chainLease pd c ∗ ∃ bs, diskBlockT γ c.blk bs)
+  | .active c => iprop(⌜c.hd = i ∧ c.wf⌝ ∗ chainLease pd c ∗ diskBlockT γ c.blk c.pay)
   | .member _ => iprop(emp)
 
 theorem headRes_inactive (γ : DiskNames) (pd : PAddr) (i : Nat) :
@@ -3545,7 +3726,7 @@ theorem headRes_inactive (γ : DiskNames) (pd : PAddr) (i : Nat) :
 
 theorem headRes_active (γ : DiskNames) (pd : PAddr) (i : Nat) (c : Chain) :
     headRes (GF := GF) γ pd i (.active c) =
-      iprop(⌜c.hd = i ∧ c.wf⌝ ∗ chainLease pd c ∗ ∃ bs, diskBlockT γ c.blk bs) := rfl
+      iprop(⌜c.hd = i ∧ c.wf⌝ ∗ chainLease pd c ∗ diskBlockT γ c.blk c.pay) := rfl
 
 /-- A MEMBER slot costs the invariant nothing: the chain's descriptor
 words are leased under its HEAD. -/
@@ -3908,21 +4089,21 @@ theorem headRes_blk_ne (γ : DiskNames) (pd : PAddr) (st : Nat → HState)
   icases bigSepL_two_acc (List.range NUM) (fun k => headRes (GF := GF) γ pd k (st k))
       i j i j (List.getElem?_range hi) (List.getElem?_range hj) hij $$ H with ⟨H1, H2⟩
   have e1 : headRes (GF := GF) γ pd i (st i) =
-      iprop(⌜c.hd = i ∧ c.wf⌝ ∗ chainLease pd c ∗ ∃ bs, diskBlockT γ c.blk bs) := by
+      iprop(⌜c.hd = i ∧ c.wf⌝ ∗ chainLease pd c ∗ diskBlockT γ c.blk c.pay) := by
     rw [h1, headRes_active]
   have e2 : headRes (GF := GF) γ pd j (st j) =
-      iprop(⌜c'.hd = j ∧ c'.wf⌝ ∗ chainLease pd c' ∗ ∃ bs, diskBlockT γ c'.blk bs) := by
+      iprop(⌜c'.hd = j ∧ c'.wf⌝ ∗ chainLease pd c' ∗ diskBlockT γ c'.blk c'.pay) := by
     rw [h2, headRes_active]
   isimp only [e1] at H1
   isimp only [e2] at H2
-  icases H1 with ⟨-, -, %bs, Hb⟩
-  icases H2 with ⟨-, -, %bs', Hb'⟩
-  iapply (show iprop(diskBlockT (GF := GF) γ c.blk bs ∗ diskBlockT γ c'.blk bs') ⊢
+  icases H1 with ⟨-, -, Hb⟩
+  icases H2 with ⟨-, -, Hb'⟩
+  iapply (show iprop(diskBlockT (GF := GF) γ c.blk c.pay ∗ diskBlockT γ c'.blk c'.pay) ⊢
       iprop(⌜c.blk ≠ c'.blk⌝) from by
     unfold diskBlockT
     iintro ⟨H, H'⟩
     iapply ghost_map_elem_frac_ne γ.img c.blk c'.blk (DFrac.own Qp.threeQuarters)
-      (DFrac.own Qp.threeQuarters) bs bs' (by
+      (DFrac.own Qp.threeQuarters) c.pay c'.pay (by
         intro hv
         have hle : (Qp.threeQuarters + Qp.threeQuarters).val ≤ 1 := hv
         simp only [Qp.val_add, Qp.val_threeQuarters] at hle
@@ -3944,12 +4125,6 @@ theorem headRes_blkInj (γ : DiskNames) (pd : PAddr) (st : Nat → HState) :
     ihave %hne := headRes_blk_ne γ pd st i j c c' hi hj hij h1 h2 $$ H
     exact (hne hblk).elim
 
-theorem bufSector_acc (c : Chain) (i : Nat) (hi : i < SPB) :
-    bufLease (GF := GF) c ⊢ dmaOwn (sectorAddr c.data i) Virtio.sectorSize ∗
-      (dmaOwn (sectorAddr c.data i) Virtio.sectorSize -∗ bufLease c) := by
-  unfold bufLease
-  exact BigSepL.bigSepL_mem_acc
-    (Φ := fun i => dmaOwn (GF := GF) (sectorAddr c.data i) Virtio.sectorSize) (range_mem i SPB hi)
 
 /-! ## The invariant -/
 
@@ -4096,6 +4271,188 @@ theorem dryOk_complete (v : VirtioState) (h : BitVec 16) (hx : dryOk v) :
     exact absurd hp (by simp)
   · exact hx k r (by rw [← phase_complete_other v h k hk]; exact hp) hty
 
+/-! ## The payload, in the image
+
+`Xv6.disk_collect` hands the sleeper the block's image fragment and the
+buffer AT ONE LIST OF BYTES, `Xv6.Chain.pay`: the disk's content for a
+READ (which `Xv6.imgOk` already pins, a READ chain's block not being in
+`Xv6.inFlightBlk`), the driver's payload for a WRITE.  For a WRITE the
+fragment's value is the driver's from the publication on -- nothing
+between the publication and the collect looks at it, `imgOk`'s escape
+covering an in-flight WRITE block -- so what the collect must know is
+that the DEVICE's image of the block has caught up: `blockView v c.blk`,
+the write-back cache overlaid on the durable bytes, IS the payload.
+
+That is this clause.  It holds from the capture on, and the capture is
+the step that installs `.served` (`MachCSL.Virtio.capture`): the two are
+ONE transition, so the clause is established exactly where the payload's
+bytes are in hand, and no per-sector progress counter has to travel from
+one transfer to the next.  It survives the completion -- which takes the
+head out of flight, so the phase says nothing any more -- on the ROW: the
+`.status` install, which sets `Xv6.SByte.done`, copies it over.
+
+Nothing else can break it.  Only a capture or a DRAIN moves
+`Xv6.blockView`: a drain does not move it at all
+(`Xv6.cacheView_drain`), and another chain's capture is at another block
+(`Xv6.blkInj`, off the rows). -/
+def postCap : VPhase → Bool
+  | .popped => false
+  | .fetched _ => false
+  | .served _ => true
+  | .status _ => true
+  | .pushed _ => true
+
+/-- Slot `i`'s head is in flight at or past its data phase. -/
+def atPostCap (v : VirtioState) (i : Nat) : Prop :=
+  ∃ ph : VPhase, Virtio.phase v (BitVec.ofNat 16 i) = some ph ∧ postCap ph = true
+
+def capOk (v : VirtioState) (st : Nat → HState) (sb : Nat → SByte) : Prop :=
+  ∀ (i : Nat) (c : Chain), i < NUM → st i = HState.active c → c.dwr = false →
+    (atPostCap v i ∨ ∃ ts : Nat, sb i = SByte.done ts) → blockView v c.blk = c.pay
+
+/-- Sixteen bits identify a descriptor index. -/
+theorem ofNat16_ne (i : Nat) (hd : BitVec 16) (hi : i < NUM) (h : i ≠ hd.toNat) :
+    BitVec.ofNat 16 i ≠ hd := by
+  intro he
+  apply h
+  have hx : (BitVec.ofNat 16 i).toNat = i := by
+    simp only [BitVec.toNat_ofNat]
+    unfold NUM at hi
+    omega
+  rw [← hx, he]
+
+theorem ofNat16_toNat (hd : BitVec 16) : BitVec.ofNat 16 hd.toNat = hd := by
+  simp
+
+/-- The clause travels wherever the phases, the rows and the device's
+image of the blocks all stand still. -/
+theorem capOk_congr (v v' : VirtioState) (st : Nat → HState) (sb : Nat → SByte)
+    (hph : ∀ h : BitVec 16, Virtio.phase v' h = Virtio.phase v h)
+    (hbv : ∀ bno, blockView v' bno = blockView v bno) (h : capOk v st sb) :
+    capOk v' st sb := by
+  intro i c hi hst hdw hx
+  rw [hbv]
+  refine h i c hi hst hdw ?_
+  rcases hx with ⟨ph, hp, hpc⟩ | hx
+  · exact Or.inl ⟨ph, by rw [← hph]; exact hp, hpc⟩
+  · exact Or.inr hx
+
+/-- The clause travels through the rows alone, when the state does not
+move at all. -/
+theorem capOk_sb (v : VirtioState) (st : Nat → HState) (sb sb' : Nat → SByte)
+    (hsb : ∀ i ts, sb' i = SByte.done ts → ∃ ts', sb i = SByte.done ts')
+    (h : capOk v st sb) : capOk v st sb' := by
+  intro i c hi hst hdw hx
+  refine h i c hi hst hdw ?_
+  rcases hx with hx | ⟨ts, hts⟩
+  · exact Or.inl hx
+  · exact Or.inr (hsb i ts hts)
+
+/-- **A phase install, with the row it moves.**  The obligation is the
+clause's own conclusion, and it is empty unless the install is the one
+that ENTERS the post-capture world (`Xv6.postCap`) or sets the row to
+`Xv6.SByte.done`. -/
+theorem capOk_setPhase (v : VirtioState) (st : Nat → HState) (sb : Nat → SByte)
+    (hd : BitVec 16) (ph : VPhase) (nb : SByte)
+    (hnew : ∀ c : Chain, hd.toNat < NUM → st hd.toNat = HState.active c → c.dwr = false →
+      (postCap ph = true ∨ ∃ ts : Nat, nb = SByte.done ts) → blockView v c.blk = c.pay)
+    (h : capOk v st sb) :
+    capOk (Virtio.setPhase v hd ph) st (updS sb hd.toNat nb) := by
+  have hbv : ∀ bno, blockView (Virtio.setPhase v hd ph) bno = blockView v bno := fun _ => rfl
+  intro i c hi hst hdw hx
+  rw [hbv]
+  by_cases hid : i = hd.toNat
+  · subst hid
+    refine hnew c hi hst hdw ?_
+    rcases hx with ⟨ph', hp, hpc⟩ | ⟨ts, hts⟩
+    · rw [ofNat16_toNat, phase_setPhase_self] at hp
+      cases hp
+      exact Or.inl hpc
+    · rw [updS_self] at hts
+      exact Or.inr ⟨ts, hts⟩
+  · refine h i c hi hst hdw ?_
+    rcases hx with ⟨ph', hp, hpc⟩ | ⟨ts, hts⟩
+    · exact Or.inl ⟨ph', by
+        rw [← phase_setPhase_other v hd (BitVec.ofNat 16 i) ph (ofNat16_ne i hd hi hid)]
+        exact hp, hpc⟩
+    · exact Or.inr ⟨ts, by rw [updS_ne sb hd.toNat nb i hid] at hts; exact hts⟩
+
+/-- **The completion** takes the head out of flight, so the phase says
+nothing any more; the ROW is what carries the clause past it. -/
+theorem capOk_complete (v : VirtioState) (st : Nat → HState) (sb : Nat → SByte)
+    (hd : BitVec 16) (r0 : VioReq) (hph : Virtio.phase v hd = some (.pushed r0))
+    (h : capOk v st sb) : capOk (Virtio.complete v hd) st sb := by
+  have hbv : ∀ bno, blockView (Virtio.complete v hd) bno = blockView v bno := fun _ => rfl
+  intro i c hi hst hdw hx
+  rw [hbv]
+  by_cases hid : i = hd.toNat
+  · subst hid
+    exact h _ c hi hst hdw (Or.inl ⟨.pushed r0, by rw [ofNat16_toNat]; exact hph, rfl⟩)
+  · refine h i c hi hst hdw ?_
+    rcases hx with ⟨ph', hp, hpc⟩ | hx
+    · exact Or.inl ⟨ph', by
+        rw [← phase_complete_other v hd (BitVec.ofNat 16 i) (ofNat16_ne i hd hi hid)]
+        exact hp, hpc⟩
+    · exact Or.inr hx
+
+/-- A slot that is `.inactive` is invisible to the clause. -/
+theorem capOk_free (v : VirtioState) (st : Nat → HState) (sb : Nat → SByte) (i : Nat)
+    (h : capOk v st sb) (b : SByte) :
+    capOk v (fun j => if j = i then HState.inactive else st j) (updS sb i b) := by
+  intro j c hj hst hdw hx
+  by_cases hji : j = i
+  · rw [hji] at hst; simp only [if_pos rfl] at hst; exact absurd hst (by simp)
+  · simp only [hji, if_false] at hst
+    refine h j c hj hst hdw ?_
+    rcases hx with hx | ⟨ts, hts⟩
+    · exact Or.inl hx
+    · exact Or.inr ⟨ts, by rw [← updS_ne sb i b j hji]; exact hts⟩
+
+/-- **The pop** installs `Xv6.VPhase.popped`, which is before the data
+phase, and moves no row. -/
+theorem capOk_pop (v : VirtioState) (st : Nat → HState) (sb : Nat → SByte) (hd : BitVec 16)
+    (sn : BitVec 16) (h : capOk v st sb) :
+    capOk { Virtio.setPhase v hd .popped with seen := sn } st sb := by
+  have h1 : capOk (Virtio.setPhase v hd .popped) st (updS sb hd.toNat (sb hd.toNat)) :=
+    capOk_setPhase v st sb hd .popped (sb hd.toNat)
+      (fun c hlt hst hdw hx => by
+        rcases hx with hx | ⟨ts, hts⟩
+        · exact absurd hx (by simp [postCap])
+        · exact h hd.toNat c hlt hst hdw (Or.inr ⟨ts, hts⟩)) h
+  rw [updS_id sb hd.toNat] at h1
+  exact capOk_congr _ _ st sb (fun _ => rfl) (fun _ => rfl) h1
+
+/-- A request at or past its data phase carries its request record. -/
+theorem postCap_req (ph : VPhase) (h : postCap ph = true) : ∃ r : VioReq, ph.req = some r := by
+  cases ph with
+  | popped => exact absurd h (by simp [postCap])
+  | fetched r => exact absurd h (by simp [postCap])
+  | served r => exact ⟨r, rfl⟩
+  | status r => exact ⟨r, rfl⟩
+  | pushed r => exact ⟨r, rfl⟩
+
+/-- A head that is not armed is not in flight at a post-capture phase. -/
+theorem not_atPostCap_of_free (v : VirtioState) (st : Nat → HState) (i : Nat) (hi : i < NUM)
+    (hfl : inflightOk v st) (hst : st i = HState.inactive) : ¬ atPostCap v i := by
+  rintro ⟨ph, hp, hpc⟩
+  obtain ⟨r, hr⟩ := postCap_req ph hpc
+  have hin : Virtio.reqOf v (BitVec.ofNat 16 i) = some r := by
+    unfold Virtio.reqOf; rw [hp]; exact hr
+  have hii : (BitVec.ofNat 16 i).toNat = i := by
+    simp only [BitVec.toNat_ofNat]
+    unfold NUM at hi
+    omega
+  obtain ⟨-, c, hsti, -, -⟩ := hfl _ r hin
+  rw [hii, hst] at hsti
+  exact absurd hsti (by simp)
+
+/-- The whole row is free: the clause is vacuous (the live flip). -/
+theorem capOk_none (v : VirtioState) (st : Nat → HState) (sb : Nat → SByte)
+    (hst : ∀ i, st i = HState.inactive) : capOk v st sb := by
+  intro i c _ hs
+  rw [hst i] at hs
+  exact absurd hs (by simp)
+
 /-- The live arm: the queue, the receipts, the leases. -/
 def diskLive (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState)
     (pm : RegMapF PermVal) : IProp GF := iprop%
@@ -4115,7 +4472,7 @@ def diskLive (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState)
       posOk pmap ring lo np ∧ stageOk stg ring lo np ∧ inflightOff v st ring lo np stg ∧
       imgOk v m (inFlightBlk st) ∧ cachedOk v st ∧ permOk v pm st ∧ usedOk dl dl0 nc M ∧
       unreadArmed v st dl nr ring lo np stg sb ∧ cntOk pm dl nc ∧ p3Ok v pm dl nr ∧
-      ueInv pm dl nr ue ∧ epOk v st pm dl ring lo np stg ∧ dryOk v⌝
+      ueInv pm dl nr ue ∧ epOk v st pm dl ring lo np stg ∧ dryOk v ∧ capOk v st sb⌝
 
 /-- The dead arm: before `virtio_disk_init`, and never again after.
 
@@ -4160,8 +4517,8 @@ instance headRes_timeless (γ : DiskNames) (pd : PAddr) (i : Nat) (s : HState) :
     show Timeless (iprop(emp) : IProp GF)
     infer_instance
   | active c =>
-    show Timeless iprop(⌜c.hd = i ∧ c.wf⌝ ∗ chainLease pd c ∗ ∃ bs, diskBlockT γ c.blk bs)
-    unfold chainLease diskBlockT
+    show Timeless iprop(⌜c.hd = i ∧ c.wf⌝ ∗ chainLease pd c ∗ diskBlockT γ c.blk c.pay)
+    unfold diskBlockT
     infer_instance
   | member _ =>
     show Timeless (iprop(emp) : IProp GF)
@@ -4172,6 +4529,10 @@ instance usedLease_timeless (pu : PAddr) (ue : Nat → UElem) :
   unfold usedLease; infer_instance
 instance availLease_timeless (pav : PAddr) (np : Nat) (ring : Nat → Nat) :
     Timeless (availLease (GF := GF) pav np ring) := by unfold availLease; infer_instance
+set_option maxRecDepth 40000 in
+set_option maxHeartbeats 2000000 in
+set_option synthInstance.maxSize 400 in
+set_option synthInstance.maxHeartbeats 1000000 in
 instance diskLive_timeless (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState)
     (pm : RegMapF PermVal) : Timeless (diskLive (GF := GF) γ c0 v pm) := by
   unfold diskLive headAuth diskDoneAuth diskPubAuth diskLoAuth diskStageAuth imgAuth

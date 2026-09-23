@@ -456,29 +456,45 @@ def fetch (c : VirtioCfg) (h : BitVec 16) : VM (Option VioReq) := do
   pure (some { head := h, type := ty, sector := sec, buf := d1.addr, len := d1.len,
                status := d2.addr, wr := d1.has descFWrite })
 
-/-- Sector `i` of a READ request: the driver's buffer receives the
-cache-overlaid image.  The write is guarded on the request still being in
-flight AT the store, so a device reset writes nothing. -/
-def xferIn (h : BitVec 16) (r : VioReq) (i : Nat) : VM Unit := do
+/-- Where a request's payload sits in the durable image. -/
+def reqOff (r : VioReq) : Nat := sectorSize * r.sector.toNat
+
+/-- THE FILL: a READ request's transfer.  The driver's buffer receives the
+cache-overlaid image in ONE bus transaction -- the descriptor names the
+whole buffer, and the device is free to move it in one burst.  The write
+is guarded on the request still being in flight AT the store, so a device
+reset writes nothing. -/
+def fill (h : BitVec 16) (r : VioReq) : VM Unit := do
   let v ← DevM.get
-  let n := reqSectorLen r i
-  let bs := diskRead (cacheView v) (sectorSize * reqKey r i) n
-  DevM.dmaWriteIf (fun v => decide (reqOf v h = some r)) (reqSectorAddr r i) n (bvOfBytes n bs)
+  let n := r.len.toNat
+  DevM.dmaWriteIf (fun v => decide (reqOf v h = some r)) r.buf n
+    (bvOfBytes n (diskRead (cacheView v) (reqOff r) n))
 
-/-- Sector `i` of a WRITE request: the driver's buffer is read into the
-cache. -/
-def xferOut (h : BitVec 16) (r : VioReq) (i : Nat) : VM Unit := do
-  let n := reqSectorLen r i
-  let w ← DevM.dmaRead (reqSectorAddr r i) n
+/-- The payload of a WRITE request, laid into the write-back cache: one
+entry per sector the request spans. -/
+def cacheReq (v : VirtioState) (r : VioReq) (bs : List (BitVec 8)) : VirtioState :=
+  let cc0 := (List.range (reqSpan r)).foldl
+    (fun cc i => alistSet cc (reqKey r i) ((bs.drop (sectorSize * i)).take (reqSectorLen r i)))
+    v.cache
+  { v with cache := cc0 }
+
+/-- THE CAPTURE, AND THE MOVE TO `.served`, IN ONE TRANSITION.  A WRITE
+request's payload is read off the driver's buffer in one bus transaction
+and laid into the cache AT THE SAME STEP as the request leaves its data
+phase: a real device does not stop between taking the last byte of a
+payload and declaring the transfer done, and the Rocq model does both in
+one transition.  (It is the same fusion `Virtio.serve`'s last write
+already makes between publishing `used->idx` and `Virtio.complete`.)
+
+Fusing them is what lets the invariant say, of a request at `.served` or
+beyond, that the DURABLE-plus-cache image of its block IS the driver's
+payload: the step that installs the phase is the step that establishes
+it, so no progress counter has to travel from one sector transfer to the
+next. -/
+def capture (h : BitVec 16) (r : VioReq) : VM Unit := do
+  let w ← DevM.dmaRead r.buf r.len.toNat
   DevM.modify (fun v =>
-    if reqOf v h = some r then { v with cache := alistSet v.cache (reqKey r i) (bytesOf w) }
-    else v)
-
-/-- The data phase: one transfer per sector, in order, in the serving
-task itself. -/
-def seqSectors (f : Nat → VM Unit) : List Nat → VM Unit
-  | [] => pure ()
-  | i :: is => do f i; seqSectors f is
+    setPhase (if reqOf v h = some r then cacheReq v r (bytesOf w) else v) h (.served r))
 
 /-- The service of one popped request, from its fetch to its completion. -/
 def serve (h : BitVec 16) : VM Unit := do
@@ -488,14 +504,13 @@ def serve (h : BitVec 16) : VM Unit := do
   | some r =>
     DevM.modify (fun v => setPhase v h (.fetched r))
     if r.type.toNat = blkTOut then
-      -- THE CAPTURE: latch the payload into the cache, one sector at a time
+      -- THE CAPTURE: latch the payload into the cache, and leave the data phase
       DevM.guard (fun v => if v.taken = none then some { v with taken := some h } else none)
-      seqSectors (xferOut h r) (List.range (reqSpan r))
-    else if r.type.toNat = blkTIn then
-      -- THE FILL: the buffer receives the cache-overlaid image, one sector at a time
-      seqSectors (xferIn h r) (List.range (reqSpan r))
-    else pure ()
-    DevM.modify (fun v => setPhase v h (.served r))
+      capture h r
+    else do
+      -- THE FILL: the buffer receives the cache-overlaid image
+      if r.type.toNat = blkTIn then fill h r else pure ()
+      DevM.modify (fun v => setPhase v h (.served r))
     -- the status byte
     DevM.dmaWriteIf (fun v => decide (reqOf v h = some r)) r.status 1 (statusOf r)
     DevM.modify (fun v => setPhase v h (.status r))

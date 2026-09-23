@@ -206,6 +206,90 @@ def bytesOf {n : Nat} (w : BitVec (8 * n)) : List (BitVec 8) :=
 def bvOfBytes (n : Nat) (bs : List (BitVec 8)) : BitVec (8 * n) :=
   (List.range n).foldl (fun acc j => acc ||| ((bs.getD j 0#8).setWidth (8 * n) <<< (8 * j))) 0
 
+/-! ### `bvOfBytes` and `bytesOf` are inverse
+
+The fold's partial sums have the obvious bit pattern -- byte `i / 8` of the
+list at bit `i`, for the bytes it has reached and no others -- and both
+round trips follow.  `Xv6.disk_publish` needs them: the driver hands the
+device a `byteBuf` (a LIST of bytes) and the invariant keeps the buffer at
+the context tier at a VALUE (a `BitVec`), because a DMA read is pinned by
+`MachCSL.headsAre`, which speaks of a value. -/
+
+private theorem bvOfBytes_getLsbD_aux (n : Nat) (bs : List (BitVec 8)) :
+    ∀ (m : Nat) (i : Nat),
+      ((List.range m).foldl
+        (fun acc j => acc ||| ((bs.getD j 0#8).setWidth (8 * n) <<< (8 * j))) 0).getLsbD i =
+      (decide (i / 8 < m) && decide (i < 8 * n) && (bs.getD (i / 8) 0#8).getLsbD (i % 8))
+  | 0, i => by simp
+  | m + 1, i => by
+    rw [List.range_succ, List.foldl_append]
+    simp only [List.foldl_cons, List.foldl_nil, BitVec.getLsbD_or,
+      bvOfBytes_getLsbD_aux n bs m i, BitVec.getLsbD_shiftLeft, BitVec.getLsbD_setWidth]
+    have hdm := Nat.div_add_mod i 8
+    have hlt8 : i % 8 < 8 := Nat.mod_lt _ (by omega)
+    by_cases hi : i < 8 * n
+    · by_cases hm : i / 8 = m
+      · have h1 : ¬ (i / 8 < m) := by omega
+        have h2 : ¬ (i < 8 * m) := by omega
+        have h3 : i - 8 * m = i % 8 := by omega
+        have h4 : i - 8 * m < 8 * n := by omega
+        have h5 : i / 8 < m + 1 := by omega
+        have key : (bs.getD m 0#8).getLsbD (i - 8 * m)
+            = (bs.getD (i / 8) 0#8).getLsbD (i % 8) := by rw [hm, h3]
+        rw [key]
+        simp [h1, h2, h4, h5, hi]
+      · have h5 : (decide (i / 8 < m + 1)) = (decide (i / 8 < m)) := by
+          simp only [decide_eq_decide]; omega
+        rw [h5]
+        by_cases hle : i < 8 * m
+        · simp [hle, hi]
+        · have hz : (bs[m]?.getD 0#8).getLsbD (i - 8 * m) = false :=
+            BitVec.getLsbD_of_ge _ _ (by omega)
+          simp [hi, hz]
+    · simp [hi]
+
+theorem bvOfBytes_getLsbD (n : Nat) (bs : List (BitVec 8)) (i : Nat) :
+    (bvOfBytes n bs).getLsbD i =
+      (decide (i / 8 < n) && decide (i < 8 * n) && (bs.getD (i / 8) 0#8).getLsbD (i % 8)) :=
+  bvOfBytes_getLsbD_aux n bs n i
+
+theorem nthByte_bvOfBytes (n : Nat) (bs : List (BitVec 8)) (j : Nat) (hj : j < n) :
+    nthByte (bvOfBytes n bs) j = bs.getD j 0#8 := by
+  apply BitVec.eq_of_getLsbD_eq
+  intro i hi
+  have hd : (8 * j + i) / 8 = j := by omega
+  have hmd : (8 * j + i) % 8 = i := by omega
+  have h1 : 8 * j + i < 8 * n := by omega
+  simp only [nthByte, BitVec.getLsbD_extractLsb', bvOfBytes_getLsbD, hd, hmd]
+  simp [hj, h1, hi]
+
+theorem bvOfBytes_bytesOf {n : Nat} (w : BitVec (8 * n)) : bvOfBytes n (bytesOf w) = w := by
+  apply BitVec.eq_of_getLsbD_eq
+  intro i hi
+  have hd : i / 8 < n := by omega
+  have hg : (bytesOf w).getD (i / 8) 0#8 = nthByte w (i / 8) := by
+    simp only [bytesOf, List.getD]
+    rw [List.getElem?_map, List.getElem?_range hd]
+    rfl
+  have hsum : 8 * (i / 8) + i % 8 = i := by omega
+  have hlt8 : i % 8 < 8 := by omega
+  simp only [bvOfBytes_getLsbD, hg, nthByte, BitVec.getLsbD_extractLsb', hd, hi,
+    decide_true, Bool.true_and, hlt8, hsum]
+
+theorem bytesOf_bvOfBytes (n : Nat) (bs : List (BitVec 8)) (hn : bs.length = n) :
+    bytesOf (bvOfBytes n bs) = bs := by
+  apply List.ext_getElem
+  · simp [bytesOf, hn]
+  · intro k h1 h2
+    have hk : k < n := by rw [← hn]; exact h2
+    simp only [bytesOf, List.getElem_map, List.getElem_range]
+    rw [nthByte_bvOfBytes n bs k hk]
+    simp only [List.getD, List.getElem?_eq_getElem h2]
+    rfl
+
+theorem bytesOf_length {n : Nat} (w : BitVec (8 * n)) : (bytesOf w).length = n := by
+  simp [bytesOf]
+
 /-- A DEVICE: its local state, its task names, its programs, and what it
 answers on the bus.
 

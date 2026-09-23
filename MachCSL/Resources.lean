@@ -202,7 +202,7 @@ instance carries the handler ENVIRONMENT, a family indexed by contexts. -/
 structure CtxId where
   bound : GName
   dirty : GName
-  deriving DecidableEq, Inhabited
+  deriving DecidableEq, Inhabited, Repr
 
 /-- The ambient instance: the fixed layer, one era (its register names and
 memory heap, spelled out as fields so the heap can be an instance), and the

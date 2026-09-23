@@ -63,6 +63,23 @@ def vdrwChain (b : BitVec 64) (bno : BitVec 32) (wr : Bool) (h m t : Nat) : Chai
 @[simp] theorem vdrwChain_bp (b : BitVec 64) (bno : BitVec 32) (wr : Bool) (h m t : Nat) :
     (vdrwChain b bno wr h m t).bp = b := rfl
 
+/-- **The chain's payload**, as the publication stamps it: the bytes the
+block holds once the transfer is over -- the DISK's for a read
+(`c.dwr`), the BUFFER's for a write.  It is what `Xv6.disk_collect` hands
+the sleeper, in the buffer and in the block's image fragment alike. -/
+def vdrwPayw (c : Chain) (dataBuf dataDisk : List (BitVec 8)) : BitVec (8 * BSIZE) :=
+  bvOfBytes BSIZE (if c.dwr then dataDisk else dataBuf)
+
+theorem vdrwPayw_read (c : Chain) (dataBuf dataDisk : List (BitVec 8)) (h : c.dwr = true) :
+    vdrwPayw c dataBuf dataDisk = bvOfBytes BSIZE dataDisk := by
+  unfold vdrwPayw
+  exact congrArg (bvOfBytes BSIZE) (if_pos h)
+
+theorem vdrwPayw_write (c : Chain) (dataBuf dataDisk : List (BitVec 8)) (h : c.dwr = false) :
+    vdrwPayw c dataBuf dataDisk = bvOfBytes BSIZE dataBuf := by
+  unfold vdrwPayw
+  exact congrArg (bvOfBytes BSIZE) (if_neg (by simp [h]))
+
 /-- **The chain is well formed**: three distinct descriptors of the queue
 and a block-aligned sector. -/
 theorem vdrwChain_wf (b : BitVec 64) (bno : BitVec 32) (wr : Bool) (h m t : Nat)
