@@ -45,8 +45,11 @@ takes the chain back through -- the COMPLETION-side accessors the
 used-index WRITE LOG settles (`disk_used_idx_read`, `disk_deposit`,
 `disk_used_elem_read`, `disk_status_read`, and the ARMING EPOCH's mint
 `disk_slot_epoch`, all proved), and an assumed interface for the ONE that
-is left, `disk_collect` -- with the three mechanisms it is still short of,
-and the fix each needs, written out above `DISK_ACC_ASSUMPTIONS`.
+is left, `disk_collect` -- with the two mechanisms it is still short of
+(the BUFFER ROW and the CACHE-DRAINED clause; the `.pushed` window that
+made it unprovable is gone, the model having been fixed so that the
+device's used-index write and its completion are one transition), written
+out above `DISK_ACC_ASSUMPTIONS`.
 -/
 import Xv6.DiskInv
 import MachCSL.WpDmaCtx
@@ -1630,29 +1633,31 @@ proofs found are closed, and are no longer anyone's premise:
 -------------------------------------------------------------------------
 WHAT IS LEFT, AND WHY.  Two accessors of the three are PROVED
 (`Xv6.disk_status_read` and `Xv6.disk_used_elem_read`, below); only
-`disk_collect` is left, and it waits on TWO things, neither of which the
-used-ring and status rows supply.
+`disk_collect` is left.
 
-* THE BUFFER ROW.  `Xv6.bufLease` is `Xv6.dmaOwn` -- the footprint at no
-  value -- so the bytes a READ chain's transfer left behind cannot be
-  pinned to the block's image fragment, and `disk_collect` has to hand the
-  sleeper `byteBuf c.data (own 1) data ∗ diskBlock γ c.blk data` at ONE
-  `data`.  What it needs is the STATUS row's shape at `b->data`: a
-  per-head marker carried through `Xv6.leaseL_xferIn` / `leaseL_xferOut`
-  and `Xv6.data_write_lease`, so that the value each sector write leaves
+* THE ARMING -- DONE.  Ruling out a `.lent` status marker at the head
+  being collected means ruling out that head being IN FLIGHT right now.
+  `Xv6.headDone` cannot do it: it is persistent and keyed by the HEAD,
+  not by the arming, so a head that completed, was collected, was re-armed
+  and is now at `.served` again satisfies it.  What closes it is the
+  ARMING EPOCH -- `Xv6.Chain.ep`, the queue position the chain was
+  published at, carried by `Xv6.UsedRec` and cashed by
+  `Xv6.headDoneE` -- and the invariant clauses `Xv6.epOk` that keep it.
+  `Xv6.epDone_done` now gives `Virtio.phase v c.hd = none` OUTRIGHT: the
+  device's used-index write and its `MachCSL.Virtio.complete` are one
+  transition (`MachCSL.DevOp.dmaWrite`'s state-updating guard), so there
+  is no window in which the record exists and the head is still
+  `.pushed`.
+* THE BUFFER ROW -- the remaining gap.  `Xv6.bufLease` is `Xv6.dmaOwn` --
+  the footprint at no value -- so the bytes a READ chain's transfer left
+  behind cannot be pinned to the block's image fragment, and
+  `disk_collect` has to hand the sleeper
+  `byteBuf c.data (own 1) data ∗ diskBlock γ c.blk data` at ONE `data`.
+  What it needs is the STATUS row's shape at `b->data`: a per-head marker
+  carried through `Xv6.leaseL_xferIn` / `leaseL_xferOut` and
+  `Xv6.data_write_lease`, so that the value each sector write leaves
   behind reaches the completion, plus the `dmaOwnT` position the tier
   conversion to the context needs.
-* THE ARMING.  Ruling out a `.lent` status marker at the head being
-  collected means ruling out that head being IN FLIGHT right now.
-  `Xv6.headDone` and `Xv6.headRead` cannot do it: both are persistent and
-  keyed by the HEAD, not by the arming, so a head that completed, was
-  collected, was re-armed and is now at `.served` again satisfies them
-  both.  `Xv6.unreadArmed` does not close the gap either -- it speaks only
-  of entries ABOVE the watermark, and the collect's record is at or below
-  it.  What closes it is a record keyed by the ARMING: a monotone per-head
-  epoch in the invariant, bumped at `Xv6.disk_publish`, carried by
-  `Xv6.UsedRec`, and cashed against the publisher's own quarter
-  (`Xv6.headTokQ`) at the collect.
 
 (1) THE ROWS.  The STATUS row is DONE and is the pattern the buffer row
 follows.  `Xv6.diskLive` carries a per-head marker `sb : Nat -> SByte` and
@@ -2837,14 +2842,12 @@ take a chain back from under the device, which contradicts
 stated against a premise no invariant could support.  `Xv6.Chain.ep` is
 the queue POSITION the chain was published at; positions are never
 reused, so `Xv6.headDoneE γ n c.hd c.ep` names one arming and no other.
-`Xv6.epDone_done` is what the collect cashes from it: the head is out of
-flight, or it is the single head sitting between its used-index write and
-its `MachCSL.Virtio.complete`.
-
-THE SECOND DISJUNCT IS THE BLOCKER (see the field's documentation): the
-model splits the used-index DMA write from `MachCSL.Virtio.complete` into
-two device steps, and the driver can observe the first without the
-second. -/
+`Xv6.epDone_done` is what the collect cashes from it: the head is OUT OF
+FLIGHT.  There is no second disjunct any more -- the model's used-index
+DMA write and `MachCSL.Virtio.complete` are ONE transition
+(`MachCSL.DevOp.dmaWrite`'s state-updating guard), so the state in which
+the record is in the log while the head is still `.pushed` with its
+permit out does not exist. -/
 structure DISK_ACC_ASSUMPTIONS : Prop where
   /-- **`collect`**: the sleeper takes the chain back once `b->disk` is
   `0`.  All THREE descriptors return to the driver: the head's receipt
@@ -2894,6 +2897,10 @@ structure DISK_ACC_ASSUMPTIONS : Prop where
   supplying the evidence it already holds; until then `disk_collect`
   takes the record as an explicit premise.
 
+  WHAT IS LEFT is the BUFFER ROW, the CACHE-DRAINED clause, and the
+  CHANNEL for the premise; the `.pushed` window that made the statement
+  unprovable is gone.
+
   (1) THE BUFFER ROW.  `Xv6.bufLease` is `Xv6.dmaOwn`: full ownership at
   an UNCONSTRAINED value.  A read's transfer is exactly the content the
   device chose, so nothing in the invariant pins `b->data` to anything and
@@ -2936,35 +2943,27 @@ structure DISK_ACC_ASSUMPTIONS : Prop where
   fragments it already handles; the buffer row's coupling wants the same
   fact, for the same reason.
 
-  (3) THE `.pushed` WINDOW -- THE REAL BLOCKER.  With the epoch in hand,
-  `Xv6.epDone_done` gives `Virtio.phase v c.hd = none ∨ wroteAt pm c.hd`.
-  The first disjunct is everything the collect wants.  The second is the
-  window between a serve task's used-index DMA write and its
-  `MachCSL.Virtio.complete`: the record is in the log (so the handler can
-  read it, report it and bump its watermark) while the head is still
-  `.pushed` and still holds its permit.  Freeing the receipt there breaks
-  three clauses -- `Xv6.permOk` (a permit pins its head to `.active c`),
-  `Xv6.inflightOk` and `Xv6.inflightOff` (an in-flight head is ACTIVE) --
-  and `Xv6.cachedOk` survives only because `wce c0 = false` has already
-  drained the capture.  So `disk_collect` is NOT provable as an atomic
-  view shift, and no premise the driver can hold rules the window out: the
-  counting arguments all fail, because `Xv6.disk_deposit` may bump the
-  watermark past the very entry the witness wrote.
+  (3) THE `.pushed` WINDOW -- GONE.  It used to be the real blocker:
+  `Xv6.epDone_done` gave `Virtio.phase v c.hd = none ∨ wroteAt pm c.hd`,
+  and the second disjunct was the window between a serve task's
+  used-index DMA write and its `MachCSL.Virtio.complete` -- the record in
+  the log (so the handler could read it, report it and bump its
+  watermark) while the head was still `.pushed` and still held its
+  permit.  Freeing the receipt there broke `Xv6.permOk`,
+  `Xv6.inflightOk` and `Xv6.inflightOff`, and no premise the driver could
+  hold ruled the window out.
 
-  It is an artefact of the model, not of the driver: a real device has no
-  state between publishing `used->idx` and being done with the head.  Two
-  ways out, both outside this file:
-
-  * make `MachCSL.Virtio.serve`'s last DMA write and its `complete` ONE
-    step of `MachCSL/Dev/Virtio.lean`, and redo that step's device-side
-    proof (`Xv6.diskProto_usedIdx_acc` and `Xv6.perm_complete` become
-    one); or
-  * let the invariant tolerate a freed head whose permit still carries the
-    witness -- an escape in `Xv6.permOk`, `Xv6.inflightOk` and
-    `Xv6.inflightOff` at the single head `wroteAt pm` names (`Xv6.wroteIdx`
-    and `Xv6.pushedUniq` make it unique), plus the POP's
-    `(phase popped h).isSome` branch, which becomes reachable once such a
-    head may be re-published.
+  It was an artefact of the model, not of the driver: a real device has
+  no state between publishing `used->idx` and being done with the head,
+  and the Rocq model does both in one transition.  The MODEL was fixed:
+  `MachCSL.DevOp.dmaWrite`'s guard is state-updating (`g : S -> Option S`,
+  the store and the local move in ONE step), `MachCSL.Virtio.serve`'s
+  last write answers `Virtio.complete s h`, and the device-side proof
+  fuses with it (`Xv6.diskProto_usedIdx_acc`'s continuation re-establishes
+  the protocol at `Virtio.complete s h`; `Xv6.epOk_write_complete`).  So
+  `Xv6.epDone` needs no escape, `Xv6.epDone_done` is unconditional, and
+  `disk_collect` IS provable as an atomic view shift once (1) and (2)
+  land.
 
   THE TIER PLUMBING is all in place and PROVED: `Xv6.chainLease_claim_join` takes the
   three descriptor windows and the request header back whole (the
