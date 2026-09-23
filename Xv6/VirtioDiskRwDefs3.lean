@@ -318,7 +318,7 @@ theorem diskResA_pub_open (γ : DiskNames) (pd pav pu : PAddr) (ξ : CtxId) (tk 
 is the receipt and the slot's cells. -/
 theorem diskResA_seat (γ : DiskNames) (pd pav pu : PAddr) (ξ : CtxId) (tk : Nat → Bool)
     (i : Nat) (hi : i < NUM) (ht : tk i = true) (s : HState) (hs : freeByte s = 0#8) :
-    diskResA (GF := GF) γ pd pav pu ξ tk ∗ headTok γ i s ∗ slotCells ξ pd i s ⊢
+    diskResA (GF := GF) γ pd pav pu ξ tk ∗ slotTok γ i s ∗ slotCells ξ pd i s ⊢
       diskResA γ pd pav pu ξ (updB tk i false) := by
   iintro ⟨HR, Htok, Hc⟩
   icases diskResA_slot_acc γ pd pav pu ξ tk i hi $$ HR with ⟨Hs0, Hback⟩
@@ -347,25 +347,35 @@ theorem diskResSeal (γ : DiskNames) (pd pav pu : PAddr) (c : Chain) (hwf : c.wf
       headTok γ c.hd (.active c) ∗ claimRes curCtx pd c ∗
       headTok γ c.md (.member c.hd) ∗ opsWin curCtx c.md ∗ infoWin curCtx c.md ∗
       headTok γ c.tl (.member c.hd) ∗ opsWin curCtx c.tl ∗ infoWin curCtx c.tl ⊢
-      diskRes γ pd pav pu curCtx := by
+      diskRes γ pd pav pu curCtx ∗ headTokQ γ c.hd (.active c) ∗
+      headTokQ γ c.md (.member c.hd) ∗ headTokQ γ c.tl (.member c.hd) := by
   obtain ⟨hh, hm, ht, e1, e2, e3, -⟩ := hwf
   iintro ⟨HR, Hth, Hch, Htm, Hcm, Him, Htt, Hct, Hit⟩
   ihave Hch := slotCells_active' curCtx pd c $$ Hch
   ihave Hcm := slotCells_member' curCtx pd c.md c.hd $$ Hcm Him
   ihave Hct := slotCells_member' curCtx pd c.tl c.hd $$ Hct Hit
+  icases headTok_toQ γ c.hd (.active c) $$ Hth with ⟨Hth, Hkh⟩
+  icases headTok_toQ γ c.md (.member c.hd) $$ Htm with ⟨Htm, Hkm⟩
+  icases headTok_toQ γ c.tl (.member c.hd) $$ Htt with ⟨Htt, Hkt⟩
   ihave HR := diskResA_seat γ pd pav pu curCtx (tk3 c.hd c.md c.tl) c.hd hh
       (by rw [tk3_apply]; simp) (.active c) rfl $$ [HR Hth Hch]
-  case' _ => iframe HR Hth Hch
+  case' _ =>
+    rw [slotTok_active]
+    iframe HR Hth Hch
   ihave HR := diskResA_seat γ pd pav pu curCtx (updB (tk3 c.hd c.md c.tl) c.hd false) c.md hm
       (by rw [updB_ne _ _ _ _ (Ne.symm e1), tk3_apply]; simp) (.member c.hd) rfl $$ [HR Htm Hcm]
-  case' _ => iframe HR Htm Hcm
+  case' _ =>
+    rw [slotTok_member]
+    iframe HR Htm Hcm
   ihave HR := diskResA_seat γ pd pav pu curCtx
       (updB (updB (tk3 c.hd c.md c.tl) c.hd false) c.md false) c.tl ht
       (by rw [updB_ne _ _ _ _ (Ne.symm e2), updB_ne _ _ _ _ (Ne.symm e3), tk3_apply]; simp)
       (.member c.hd) rfl $$ [HR Htt Hct]
-  case' _ => iframe HR Htt Hct
+  case' _ =>
+    rw [slotTok_member]
+    iframe HR Htt Hct
   rw [tk_clear3 c.hd c.md c.tl, diskResA_nil]
-  iexact HR
+  iframe HR Hkh Hkm Hkt
 
 end payloadA
 
@@ -465,7 +475,15 @@ def vdrwP3Exit (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
 head `c.hd` is armed with `c`, `c.md` and `c.tl` are its members, the
 chain's cells are the invariant's and the payload's, and the lock's
 payload is whole again -- the middle's and the tail's `Xv6.infoWin`s go
-back into it with their slots (`Xv6.diskResSeal`). -/
+back into it with their slots (`Xv6.diskResSeal`).
+
+THE THREE QUARTERS the publisher keeps.  `Xv6.diskResSeal` leaves the
+payload one QUARTER of each of the three receipts and hands the other
+back here (`Xv6.headTokQ`): they are what the publisher carries across
+its park inside `sleep`, and agreement with the payload's quarters is
+what says, when it wakes and re-acquires the lock, that the slots it is
+about to collect are still ITS chain
+(`Xv6.diskRes_slot_of_quarter`). -/
 def vdrwP4Exit (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64)
     (bno : BitVec 32) (dataBuf dataDisk : List (BitVec 8)) (wr : Bool)
@@ -474,6 +492,8 @@ def vdrwP4Exit (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   kctx cpu ((vdrwK k).withRegs R) ∗ pcIs cpu (KA.«virtio_disk_rw» + 0x1a2#64) ∗
   procsInv Γ ∗ trapCsrs cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ∗
   vdrwCaps γ γl pd pav pu ∗ locked γl cpu ∗ diskRes γ pd pav pu curCtx ∗
+  headTokQ γ c.hd (.active c) ∗ headTokQ γ c.md (.member c.hd) ∗
+  headTokQ γ c.tl (.member c.hd) ∗
   wordPointsTo (aBufBlockno c.bp) 4 (DFrac.own 1) bno ∗
   vdrwSaved k ∗
   idxCells (k.regs 2#5) (BitVec.ofNat 32 c.hd) (BitVec.ofNat 32 c.md) (BitVec.ofNat 32 c.tl) y ∗

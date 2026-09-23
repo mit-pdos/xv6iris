@@ -133,11 +133,12 @@ theorem slotAlloc_true (γ : DiskNames) (ξ : CtxId) (pd : PAddr) (i : Nat) :
 /-- Slot `i` with its `free` byte (at `v`) borrowed out. -/
 def slotOpen (γ : DiskNames) (ξ : CtxId) (pd : PAddr) (i : Nat) (b : Bool) (v : BitVec 8) :
     IProp GF :=
-  cond b iprop(⌜v = 0#8⌝) iprop(∃ s : HState, ⌜v = freeByte s⌝ ∗ headTok γ i s ∗ slotCells ξ pd i s)
+  cond b iprop(⌜v = 0#8⌝)
+    iprop(∃ s : HState, ⌜v = freeByte s⌝ ∗ slotTok γ i s ∗ slotCells ξ pd i s)
 
 theorem slotOpen_false (γ : DiskNames) (ξ : CtxId) (pd : PAddr) (i : Nat) (v : BitVec 8) :
     slotOpen (GF := GF) γ ξ pd i false v =
-      iprop(∃ s : HState, ⌜v = freeByte s⌝ ∗ headTok γ i s ∗ slotCells ξ pd i s) := rfl
+      iprop(∃ s : HState, ⌜v = freeByte s⌝ ∗ slotTok γ i s ∗ slotCells ξ pd i s) := rfl
 theorem slotOpen_true (γ : DiskNames) (ξ : CtxId) (pd : PAddr) (i : Nat) (v : BitVec 8) :
     slotOpen (GF := GF) γ ξ pd i true v = iprop(⌜v = 0#8⌝) := rfl
 
@@ -227,7 +228,8 @@ theorem slotAlloc_grab (γ : DiskNames) (ξ : CtxId) (pd : PAddr) (i : Nat) (b :
       isplitl [Hv]
       · iexact Hv
       isplitl [H]
-      · iexact H
+      · isimp only [slotTok_inactive] at H
+        iexact H
       · isimp only [slotCells_inactive] at Hc
         iexact Hc
 
@@ -341,7 +343,7 @@ theorem freeSlotRes_join (ξ : CtxId) (pd : PAddr) (i : Nat) :
 the slot re-enters the payload. -/
 theorem diskResA_give (γ : DiskNames) (pd pav pu : PAddr) (ξ : CtxId) (tk : Nat → Bool)
     (i : Nat) (s : HState) :
-    headTok (GF := GF) γ i s ∗ wordAtN ξ (aFree i) 1 (DFrac.own 1) (freeByte s) ∗
+    slotTok (GF := GF) γ i s ∗ wordAtN ξ (aFree i) 1 (DFrac.own 1) (freeByte s) ∗
     slotCells ξ pd i s ∗
     (∀ b : Bool, slotAlloc γ ξ pd i b -∗ diskResA γ pd pav pu ξ (updB tk i b)) ⊢
       diskResA γ pd pav pu ξ (updB tk i false) := by

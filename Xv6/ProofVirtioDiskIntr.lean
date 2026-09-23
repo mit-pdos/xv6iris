@@ -730,8 +730,9 @@ theorem vdis_loop (HA : DISK_ACC_ASSUMPTIONS) (HE : DISK_INTR_EXTRA) (WK : WAKEU
   icases vdisPay_slot γ pd pav i hi $$ Hpay with ⟨Hslot, Hback⟩
   unfold slotRes
   icases Hslot with ⟨%st, Htok, Hbody⟩
+  isimp only [slotTok_eq] at Htok
   iapply wpLoop_fupd
-  imod (disk_slot_active γ i (nr + 1) nr st hi (by omega)) $$ [Hinv Htok Hdone Hnr]
+  imod (disk_slot_active γ (slotQ st) i (nr + 1) nr st hi (by omega)) $$ [Hinv Htok Hdone Hnr]
     with ⟨Htok, Hnr, %hst⟩
   · iframe #; iframe
   imodintro
@@ -754,7 +755,7 @@ theorem vdis_loop (HA : DISK_ACC_ASSUMPTIONS) (HE : DISK_INTR_EXTRA) (WK : WAKEU
   -- +0x5a  lbu a4,16(a4)  disk.info[id].status
   ihave #Hid2 := kmapStatic_rw c.status (vdis_status_kmap c.hd hi) $$ HS
   ihave #Hwm1 := diskWm_mono γ m (nr + 1) F F (by omega) (Nat.le_refl F) $$ Hwm
-  ihave HAU2 := disk_status_read γ pd pav pu cpu F nr t1 c hcwf ht1
+  ihave HAU2 := disk_status_read γ (slotQ (HState.active c)) pd pav pu cpu F nr t1 c hcwf ht1
     $$ [Hinv Hgeom Hnr Htok HdoneAt]
   · iframe #; iframe
   k_step (wp_s_lbu_au cpu _ ?hs (KA.«virtio_disk_intr» + 0x5a#64) false 16#12 14#5 14#5
@@ -852,9 +853,10 @@ theorem vdis_loop (HA : DISK_ACC_ASSUMPTIONS) (HE : DISK_INTR_EXTRA) (WK : WAKEU
     with [vdisK_sie k, hR29, vdis_usedIdx, vdis_ext16 (wrap16 (nr + 1))]
   iintro Hk Hpc Hui
   -- the slot goes back into the payload
-  ihave Hslot : iprop(∃ s : HState, headTok (GF := GF) γ c.hd s ∗ slotBody curCtx pd c.hd s)
+  ihave Hslot : iprop(∃ s : HState, slotTok (GF := GF) γ c.hd s ∗ slotBody curCtx pd c.hd s)
       $$ [Htok Hfree Hclaim]
   · iexists (HState.active c)
+    isimp only [slotTok_eq]
     iframe Htok
     rw [slotBody_active]
     iframe Hfree Hclaim

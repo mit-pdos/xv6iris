@@ -663,15 +663,25 @@ theorem headAuth_acc (γ : DiskNames) (st : Nat → HState) (i : Nat) (hi : i < 
         [∗list] j ∈ List.range NUM, headAuth γ j (st j)) :=
   BigSepL.bigSepL_mem_acc (Φ := fun j => headAuth (GF := GF) γ j (st j)) (range_mem i NUM hi)
 
+/-- What a slot's receipt is, as ANY fragment of the driver's half sees
+it.  The fraction is generic because an in-flight slot's half is split
+(`Xv6.slotTok`): the interrupt handler reads the slot out of the lock
+payload and so holds only a quarter. -/
+theorem headTokF_state (γ : DiskNames) (q : Qp) (st : Nat → HState) (i : Nat) (s : HState)
+    (hi : i < NUM) :
+    ⊢@{IProp GF} (iprop([∗list] j ∈ List.range NUM, headAuth γ j (st j))) -∗
+      headTokF γ q i s -∗ ⌜st i = s⌝ := by
+  iintro Ha Ht
+  icases headAuth_acc γ st i hi $$ Ha with ⟨Hai, _⟩
+  unfold headAuth headTokF
+  ihave %he := ghost_var_agree (γ.head i) _ _ _ _ $$ Hai Ht
+  ipureintro; exact he
+
 /-- What a slot's receipt is, as the driver's half sees it. -/
 theorem headTok_state (γ : DiskNames) (st : Nat → HState) (i : Nat) (s : HState) (hi : i < NUM) :
     ⊢@{IProp GF} (iprop([∗list] j ∈ List.range NUM, headAuth γ j (st j))) -∗
-      headTok γ i s -∗ ⌜st i = s⌝ := by
-  iintro Ha Ht
-  icases headAuth_acc γ st i hi $$ Ha with ⟨Hai, _⟩
-  unfold headAuth headTok
-  ihave %he := ghost_var_agree (γ.head i) _ _ _ _ $$ Hai Ht
-  ipureintro; exact he
+      headTok γ i s -∗ ⌜st i = s⌝ :=
+  headTokF_state γ (1 : Qp).half st i s hi
 
 /-! ### One ring cell, borrowed out of `availLease` and put back -/
 
@@ -964,6 +974,63 @@ theorem diskRes_slot_acc (γ : DiskNames) [CurCtx] (pd pav pu : PAddr) (ξ : Ctx
   iapply diskRes_close γ pd pav pu ξ np nr stg ring
   iframe Hp Hr Hs Hlb Hu Hidx Hring Hsl
 
+/-- **Any slot the caller has a QUARTER of**: its state is the caller's,
+by agreement, and the two quarters join into the driver's whole half.
+This is the member's version of `Xv6.diskRes_slot_of_quarter` -- a chain's
+middle and tail come back the same way its head does. -/
+theorem diskRes_slotQ_acc (γ : DiskNames) [CurCtx] (pd pav pu : PAddr) (i : Nat) (s : HState)
+    (hi : i < NUM) :
+    diskRes (GF := GF) γ pd pav pu curCtx ∗ headTokQ γ i s ⊢
+      headTok γ i s ∗ slotBody curCtx pd i s ∗
+      (∀ s' : HState, slotTok γ i s' -∗ slotBody curCtx pd i s' -∗
+        diskRes γ pd pav pu curCtx) := by
+  iintro ⟨HR, Hq⟩
+  icases diskRes_slot_acc γ pd pav pu curCtx i hi $$ HR with ⟨Hsl, Hback⟩
+  unfold slotRes
+  icases Hsl with ⟨%s0, Ht, Hb⟩
+  icases slotTok_quarter_join γ i s0 s $$ [Ht Hq] with ⟨%hq, Ht⟩
+  · iframe Ht Hq
+  subst hq
+  iframe Ht Hb
+  iintro %s' Ht Hb
+  iapply Hback
+  iexists s'
+  iframe Ht Hb
+
+/-- **The slot of a head the caller has a QUARTER of.**  What the woken
+publisher of a chain does when it re-acquires `vdisk_lock`: its own
+quarter of `γ.head c.hd`, kept across the park inside `sleep`, AGREES
+with the payload's quarter, so the slot it opens is still ITS chain --
+`.active c` at the very `c` it published -- and its cells come out as
+`Xv6.claimRes`.  The two quarters join into the whole driver half, which
+is what `Xv6.disk_collect` needs to flip the receipt `.inactive`.
+
+The wand puts a slot back at any state, taking whatever fraction of the
+receipt the payload keeps there (`Xv6.slotTok`): the whole half for the
+`.inactive` the collect leaves behind, a quarter for a slot still in
+flight. -/
+theorem diskRes_slot_of_quarter (γ : DiskNames) [CurCtx] (pd pav pu : PAddr) (c : Chain)
+    (hi : c.hd < NUM) :
+    diskRes (GF := GF) γ pd pav pu curCtx ∗ headTokQ γ c.hd (.active c) ⊢
+      headTok γ c.hd (.active c) ∗
+      wordAtN curCtx (aFree c.hd) 1 (DFrac.own 1) 0#8 ∗ claimRes curCtx pd c ∗
+      (∀ s : HState, slotTok γ c.hd s -∗ slotBody curCtx pd c.hd s -∗
+        diskRes γ pd pav pu curCtx) := by
+  iintro ⟨HR, Hq⟩
+  icases diskRes_slot_acc γ pd pav pu curCtx c.hd hi $$ HR with ⟨Hsl, Hback⟩
+  unfold slotRes
+  icases Hsl with ⟨%s, Ht, Hb⟩
+  icases slotTok_quarter_join γ c.hd s (.active c) $$ [Ht Hq] with ⟨%hq, Ht⟩
+  · iframe Ht Hq
+  subst hq
+  rw [slotBody_active]
+  icases Hb with ⟨Hf, Hcl⟩
+  iframe Ht Hf Hcl
+  iintro %s Ht Hb
+  iapply Hback
+  iexists s
+  iframe Ht Hb
+
 /-! ## The live flip
 
 `virtio_disk_init`'s last MMIO store -- `*R(STATUS) = ... | DRIVER_OK` --
@@ -1096,7 +1163,7 @@ theorem diskSlotIn_split [CurCtx] (γ : DiskNames) (pd : PAddr) (i : Nat) :
     itrivial
   · unfold slotRes
     iexists HState.inactive
-    rw [slotBody_inactive]
+    rw [slotBody_inactive, slotTok_inactive]
     unfold freeSlotRes
     iframe Ht Hf Hd Ho Hi
 
@@ -1989,9 +2056,9 @@ handler's watermark names a head whose receipt is still `.active`.  The
 premise `nr < n` is what makes the claim true at all: `headDone` is
 persistent, so a head that completed, was collected and was freed still
 carries the record. -/
-theorem diskProto_unreadArmed (γ : DiskNames) (v : VirtioState) (i n nrd : Nat) (s : HState)
-    (hi : i < NUM) (hlt : nrd < n) :
-    diskProto (GF := GF) γ v ∗ headTok γ i s ∗ headDone γ n i ∗ diskReadAt γ nrd ⊢
+theorem diskProto_unreadArmed (γ : DiskNames) (q : Qp) (v : VirtioState) (i n nrd : Nat)
+    (s : HState) (hi : i < NUM) (hlt : nrd < n) :
+    diskProto (GF := GF) γ v ∗ headTokF γ q i s ∗ headDone γ n i ∗ diskReadAt γ nrd ⊢
       ⌜∃ c : Chain, s = HState.active c ∧ c.hd = i ∧ c.wf⌝ := by
   unfold diskProto headDone
   iintro ⟨⟨%hc, %pn, %pm, Hpm, %hfr, Harm⟩, Htok, ⟨%k, %t, #Hrec⟩, Hnrd⟩
@@ -2005,7 +2072,7 @@ theorem diskProto_unreadArmed (γ : DiskNames) (v : VirtioState) (i n nrd : Nat)
       Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, Hnq, Hsb,
       %hpure⟩
     obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12, e13, e14⟩ := hpure
-    ihave %hst := headTok_state γ st i s hi $$ Ha Htok
+    ihave %hst := headTokF_state γ q st i s hi $$ Ha Htok
     ihave %hnn := diskReadAt_agree γ nq nrd $$ Hnq Hnrd
     ihave %hl := doneRec_lookup γ dl0 k (n, t, i) $$ Hdn Hrec
     have hmem : ((n, t, i) : UsedRec) ∈ dl :=
@@ -2018,16 +2085,16 @@ theorem diskProto_unreadArmed (γ : DiskNames) (v : VirtioState) (i n nrd : Nat)
 /-- **A completed head is an armed head** (`Xv6.slot_active`): the handler
 reads a head out of the used ring and produces that head's receipt as
 `.active c`.  It opens the invariant only to read a pure fact off it. -/
-theorem disk_slot_active [CurCtx] (γ : DiskNames) (i n nrd : Nat) (s : HState)
+theorem disk_slot_active [CurCtx] (γ : DiskNames) (q : Qp) (i n nrd : Nat) (s : HState)
     (hi : i < NUM) (hlt : nrd < n) :
-    diskInv (GF := GF) γ ∗ headTok γ i s ∗ headDone γ n i ∗ diskReadAt γ nrd ⊢
-      |={⊤}=> (headTok γ i s ∗ diskReadAt γ nrd ∗
+    diskInv (GF := GF) γ ∗ headTokF γ q i s ∗ headDone γ n i ∗ diskReadAt γ nrd ⊢
+      |={⊤}=> (headTokF γ q i s ∗ diskReadAt γ nrd ∗
         ⌜∃ c : Chain, s = HState.active c ∧ c.hd = i ∧ c.wf⌝) := by
   unfold diskInv devInvR
   iintro ⟨#Hinv, Htok, #Hdone, Hnrd⟩
   iinv Hinv with Hbody Hclose
   icases Hbody with ⟨%v, >Hfrag, >Hproto⟩
-  ihave %hres := diskProto_unreadArmed γ v i n nrd s hi hlt $$ [$Hproto $Htok $Hdone $Hnrd]
+  ihave %hres := diskProto_unreadArmed γ q v i n nrd s hi hlt $$ [$Hproto $Htok $Hdone $Hnrd]
   ihave Hcl := Hclose $$ [Hfrag Hproto]
   case' _ =>
     inext
@@ -2084,13 +2151,13 @@ and the handler's floor has passed the used-index write. -/
 
 /-- **The status row of an unread completion, borrowed out of the live
 arm.** -/
-theorem diskProto_status_acc (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) (c : Chain)
-    (n t nrd : Nat) (hwf : c.wf) (hlt : nrd < n) (hlive : Virtio.live c0 = true) :
-    diskCfgFrozen (GF := GF) γ c0 ∗ diskProto γ v ∗ headTok γ c.hd (.active c) ∗
+theorem diskProto_status_acc (γ : DiskNames) (q : Qp) (c0 : VirtioCfg) (v : VirtioState)
+    (c : Chain) (n t nrd : Nat) (hwf : c.wf) (hlt : nrd < n) (hlive : Virtio.live c0 = true) :
+    diskCfgFrozen (GF := GF) γ c0 ∗ diskProto γ v ∗ headTokF γ q c.hd (.active c) ∗
       headDoneAt γ n t c.hd ∗ diskReadAt γ nrd ⊢
       ∃ ts : Nat, ⌜ts ≤ t⌝ ∗ dmaOwnT c.status 1 0#8 ts ∗
         (dmaOwnT c.status 1 0#8 ts -∗
-          (diskProto γ v ∗ headTok γ c.hd (.active c) ∗ diskReadAt γ nrd)) := by
+          (diskProto γ v ∗ headTokF γ q c.hd (.active c) ∗ diskReadAt γ nrd)) := by
   unfold diskProto
   iintro ⟨#Hfr0, ⟨%hc, %pn, %pm, Hpm, %hfr, Harm⟩, Htok, #Hdone, Hnrd⟩
   icases Harm with ⟨Hd | ⟨%c0', #Hfr, %hc0, Hl⟩⟩
@@ -2106,7 +2173,7 @@ theorem diskProto_status_acc (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState)
       Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, Hnq, Hsb,
       %hpure⟩
     obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12, e13, e14⟩ := hpure
-    ihave %hst := headTok_state γ st c.hd (.active c) hwf.1 $$ Ha Htok
+    ihave %hst := headTokF_state γ q st c.hd (.active c) hwf.1 $$ Ha Htok
     ihave %hnn := diskReadAt_agree γ nq nrd $$ Hnq Hnrd
     ihave %hl0 := headDoneAt_lookup γ dl0 n t c.hd $$ Hdn Hdone
     have hmem : ((n, t, c.hd) : UsedRec) ∈ dl := List.IsPrefix.subset e10.1 hl0
@@ -2156,12 +2223,12 @@ below it, so the hart's load sees the head of the history, which is the
 positional argument needs; `Xv6.disk_used_elem_read` -- where the log's
 arithmetic lives -- is what produces them, and `c.wf` comes with the
 chain. -/
-theorem disk_status_read [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu : CPU)
+theorem disk_status_read [CurCtx] (γ : DiskNames) (q : Qp) (pd pav pu : PAddr) (cpu : CPU)
     (K nr t : Nat) (c : Chain) (hwf : c.wf) (hle : t ≤ K) :
     diskInv (GF := GF) γ ∗ diskGeom γ pd pav pu ∗ diskReadAt γ nr ∗
-      headTok γ c.hd (.active c) ∗ headDoneAt γ (nr + 1) t c.hd ⊢
+      headTokF γ q c.hd (.active c) ∗ headDoneAt γ (nr + 1) t c.hd ⊢
       readAU cpu c.status 1 K [] (fun b =>
-        iprop(diskReadAt γ nr ∗ headTok γ c.hd (.active c) ∗ ⌜b = 0#8⌝)) := by
+        iprop(diskReadAt γ nr ∗ headTokF γ q c.hd (.active c) ∗ ⌜b = 0#8⌝)) := by
   unfold diskInv devInvR readAU
   iintro ⟨#Hinv, #Hgeom, Hnr, Htok, #Hdone⟩
   icases diskGeom_cfg γ pd pav pu $$ Hgeom with ⟨%c0, #Hfr, %hg⟩
@@ -2169,7 +2236,7 @@ theorem disk_status_read [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu : CP
   · exact BigSepL.bigSepL_nil_intro
   iinv Hinv with Hbody Hclose
   icases Hbody with ⟨%v, >Hfrag, >Hproto⟩
-  icases diskProto_status_acc γ c0 v c (nr + 1) t nr hwf (by omega) hg.2.2.2.1
+  icases diskProto_status_acc γ q c0 v c (nr + 1) t nr hwf (by omega) hg.2.2.2.1
       $$ [$Hfr Hproto Htok $Hdone Hnr] with ⟨%ts, %hts, Hrow, Hback⟩
   · iframe Hproto Htok Hnr
   icases dmaOwnT_cases c.status 1 0#8 ts $$ Hrow with ⟨%Hs, Hb, #Htlb, %hp⟩

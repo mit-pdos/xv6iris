@@ -472,6 +472,84 @@ theorem headTok_agree (γ : DiskNames) (i : Nat) (s s' : HState) :
   ihave %h := ghost_var_agree (γ.head i) _ _ _ _ $$ H1 H2
   ipureintro; exact h
 
+/-- The driver's side of the receipt at an ARBITRARY fraction.  Agreement
+is all a READER of the slot needs, and the readers no longer all hold the
+same fraction: an in-flight slot's driver half is split in two (see
+`Xv6.slotTok`), so the interrupt handler, which reads the slot out of the
+lock payload, holds only a QUARTER. -/
+def headTokF (γ : DiskNames) (q : Qp) (i : Nat) (s : HState) : IProp GF :=
+  γ.head i ↪VAR{.own q} s
+
+theorem headTok_eq (γ : DiskNames) (i : Nat) (s : HState) :
+    headTok (GF := GF) γ i s = headTokF γ (1 : Qp).half i s := rfl
+
+/-- **A QUARTER of the driver's half.**  From `Xv6.disk_publish` to
+`Xv6.disk_collect` the driver's half of an in-flight slot's receipt is
+split: the lock payload keeps one quarter beside the slot's cells, and
+the PUBLISHER keeps the other across its park inside `sleep`.  Agreement
+between the two is what pins the slot's state when the publisher wakes,
+re-acquires the lock and collects -- `Xv6.headDone` alone names no
+arming, and the payload's own quarter names no chain the sleeper knows.
+-/
+def headTokQ (γ : DiskNames) (i : Nat) (s : HState) : IProp GF :=
+  headTokF γ (1 : Qp).half.half i s
+
+instance headTokF_timeless (γ : DiskNames) (q : Qp) (i : Nat) (s : HState) :
+    Timeless (headTokF (GF := GF) γ q i s) := by unfold headTokF; infer_instance
+instance headTokQ_timeless (γ : DiskNames) (i : Nat) (s : HState) :
+    Timeless (headTokQ (GF := GF) γ i s) := by unfold headTokQ; infer_instance
+
+theorem headTokF_agree (γ : DiskNames) (q q' : Qp) (i : Nat) (s s' : HState) :
+    headTokF (GF := GF) γ q i s ∗ headTokF γ q' i s' ⊢ ⌜s = s'⌝ := by
+  unfold headTokF
+  iintro ⟨H1, H2⟩
+  ihave %h := ghost_var_agree (γ.head i) _ _ _ _ $$ H1 H2
+  ipureintro; exact h
+
+theorem headAuth_tokF_agree (γ : DiskNames) (q : Qp) (i : Nat) (s s' : HState) :
+    headAuth (GF := GF) γ i s ∗ headTokF γ q i s' ⊢ ⌜s = s'⌝ := by
+  unfold headAuth headTokF
+  iintro ⟨H1, H2⟩
+  ihave %h := ghost_var_agree (γ.head i) _ _ _ _ $$ H1 H2
+  ipureintro; exact h
+
+/-- The two quarters ARE the half. -/
+theorem headTok_split (γ : DiskNames) (i : Nat) (s : HState) :
+    headTok (GF := GF) γ i s ⊣⊢ headTokQ γ i s ∗ headTokQ γ i s := by
+  unfold headTok headTokQ headTokF
+  have h := (ghost_var_fractional (GF := GF) (γ.head i) s).fractional
+    (1 : Qp).half.half (1 : Qp).half.half
+  rw [Qp.half_add_half] at h
+  exact h
+
+theorem headTok_toQ (γ : DiskNames) (i : Nat) (s : HState) :
+    headTok (GF := GF) γ i s ⊢ headTokQ γ i s ∗ headTokQ γ i s :=
+  (headTok_split γ i s).1
+
+theorem headTokQ_join (γ : DiskNames) (i : Nat) (s : HState) :
+    headTokQ (GF := GF) γ i s ∗ headTokQ γ i s ⊢ headTok γ i s :=
+  (headTok_split γ i s).2
+
+/-- Two quarters at states the holder has not compared are at the SAME
+state, and they join. -/
+theorem headTokQ_agree (γ : DiskNames) (i : Nat) (s s' : HState) :
+    headTokQ (GF := GF) γ i s ∗ headTokQ γ i s' ⊢ ⌜s = s'⌝ :=
+  headTokF_agree γ _ _ i s s'
+
+theorem headTok_headTokQ_agree (γ : DiskNames) (i : Nat) (s s' : HState) :
+    headTok (GF := GF) γ i s ∗ headTokQ γ i s' ⊢ ⌜s = s'⌝ :=
+  headTokF_agree γ (1 : Qp).half (1 : Qp).half.half i s s'
+
+theorem headTokQ_join' (γ : DiskNames) (i : Nat) (s s' : HState) :
+    headTokQ (GF := GF) γ i s ∗ headTokQ γ i s' ⊢ ⌜s = s'⌝ ∗ headTok γ i s := by
+  iintro ⟨H1, H2⟩
+  ihave %he := headTokQ_agree γ i s s' $$ [$H1 $H2]
+  subst he
+  isplitl []
+  · ipureintro; rfl
+  iapply headTokQ_join γ i s
+  iframe H1 H2
+
 /-- The block image's authority. -/
 def imgAuth (γ : DiskNames) (m : RegMapF (List (BitVec 8))) : IProp GF := γ.img ↪●MAP m
 /-- **The disk image fragment**: block `bno` holds `bs`.  Exclusive, so a
@@ -3607,8 +3685,78 @@ def slotBody (ξ : CtxId) (pd : PAddr) (i : Nat) : HState → IProp GF
   | .active c => iprop(wordAtN ξ (aFree i) 1 (DFrac.own 1) 0#8 ∗ claimRes ξ pd c)
   | .member _ => iprop(wordAtN ξ (aFree i) 1 (DFrac.own 1) 0#8 ∗ opsWin ξ i ∗ infoWin ξ i)
 
+/-- **The receipt the LOCK PAYLOAD keeps of slot `i`.**  A FREE slot's
+whole driver half -- nobody else holds a piece of it -- and an IN-FLIGHT
+slot's QUARTER: the publisher of the chain keeps the other quarter from
+`Xv6.disk_publish` to `Xv6.disk_collect`, across its park inside `sleep`,
+and agreement with it is what tells the woken publisher that the slot it
+is about to collect is still ITS chain (`Xv6.diskRes_slot_of_quarter`).
+
+A member's quarter travels with the head's: `disk_collect` re-assembles
+all three driver halves out of the payload's quarters and its own. -/
+def slotTok (γ : DiskNames) (i : Nat) : HState → IProp GF
+  | .inactive => headTok γ i .inactive
+  | .active c => headTokQ γ i (.active c)
+  | .member h => headTokQ γ i (.member h)
+
+/-- The fraction the payload keeps at each state. -/
+def slotQ : HState → Qp
+  | .inactive => (1 : Qp).half
+  | .active _ => (1 : Qp).half.half
+  | .member _ => (1 : Qp).half.half
+
+theorem slotTok_eq (γ : DiskNames) (i : Nat) (s : HState) :
+    slotTok (GF := GF) γ i s = headTokF γ (slotQ s) i s := by
+  cases s <;> rfl
+
+theorem slotTok_inactive (γ : DiskNames) (i : Nat) :
+    slotTok (GF := GF) γ i .inactive = headTok γ i .inactive := rfl
+theorem slotTok_active (γ : DiskNames) (i : Nat) (c : Chain) :
+    slotTok (GF := GF) γ i (.active c) = headTokQ γ i (.active c) := rfl
+theorem slotTok_member (γ : DiskNames) (i h : Nat) :
+    slotTok (GF := GF) γ i (.member h) = headTokQ γ i (.member h) := rfl
+
+instance slotTok_timeless (γ : DiskNames) (i : Nat) (s : HState) :
+    Timeless (slotTok (GF := GF) γ i s) := by
+  cases s with
+  | inactive => show Timeless (headTok (GF := GF) γ i .inactive); unfold headTok; infer_instance
+  | active c => show Timeless (headTokQ (GF := GF) γ i (.active c)); infer_instance
+  | member h => show Timeless (headTokQ (GF := GF) γ i (.member h)); infer_instance
+
+/-- The payload's receipt agrees with any other fragment. -/
+theorem slotTok_agree (γ : DiskNames) (q : Qp) (i : Nat) (s s' : HState) :
+    slotTok (GF := GF) γ i s ∗ headTokF γ q i s' ⊢ ⌜s = s'⌝ := by
+  cases s with
+  | inactive => exact headTokF_agree γ _ q i _ s'
+  | active c => exact headTokF_agree γ _ q i _ s'
+  | member h => exact headTokF_agree γ _ q i _ s'
+
+/-- **The payload's receipt and an outside QUARTER agree and join.**  The
+whole point of the split: the woken publisher's quarter pins the slot's
+state, and the two pieces make the driver's half the collect must own to
+flip the receipt.  (At a FREE slot the payload holds the whole half, so
+the agreement is what refutes the case rather than what joins it.) -/
+theorem slotTok_quarter_join (γ : DiskNames) (i : Nat) (s s' : HState) :
+    slotTok (GF := GF) γ i s ∗ headTokQ γ i s' ⊢ ⌜s = s'⌝ ∗ headTok γ i s := by
+  cases s with
+  | inactive =>
+    rw [slotTok_inactive]
+    iintro ⟨H1, H2⟩
+    ihave %he := headTok_headTokQ_agree γ i .inactive s' $$ [$H1 $H2]
+    subst he
+    isplitl []
+    · ipureintro; rfl
+    iexact H1
+  | active c =>
+    rw [slotTok_active]
+    exact headTokQ_join' γ i (.active c) s'
+  | member h =>
+    rw [slotTok_member]
+    exact headTokQ_join' γ i (.member h) s'
+
+
 def slotRes (γ : DiskNames) (ξ : CtxId) (pd : PAddr) (i : Nat) : IProp GF := iprop%
-  ∃ s : HState, headTok γ i s ∗ slotBody ξ pd i s
+  ∃ s : HState, slotTok γ i s ∗ slotBody ξ pd i s
 
 theorem slotBody_inactive (ξ : CtxId) (pd : PAddr) (i : Nat) :
     slotBody (GF := GF) ξ pd i .inactive =
@@ -3660,7 +3808,7 @@ instance instCtxMorphSlotBody (pd : PAddr) (i : Nat) (s : HState) :
 instance instCtxMorphSlotRes (γ : DiskNames) (pd : PAddr) (i : Nat) :
     CtxMorph (GF := GF) (fun ξ => slotRes γ ξ pd i) := by
   unfold slotRes
-  exact instCtxMorphExists (fun (s : HState) ξ => iprop(headTok γ i s ∗ slotBody ξ pd i s))
+  exact instCtxMorphExists (fun (s : HState) ξ => iprop(slotTok γ i s ∗ slotBody ξ pd i s))
 
 instance instCtxMorphRingCells (pav : PAddr) (ring : Nat → Nat) :
     CtxMorph (GF := GF) (fun ξ => iprop([∗list] j ∈ List.range NUM,
