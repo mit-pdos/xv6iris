@@ -394,12 +394,15 @@ theorem byteBuf_bufLease (c : Chain) (data : List (BitVec 8)) (hd : data.length 
 
 end buf
 
-/-! ## Arming a head, in the pure clauses
+/-! ## Arming a chain, in the pure clauses
 
-`disk_publish` moves the receipt of one FREE descriptor to `.active c`.
-Every pure clause of `diskLive` survives, because a free head is named by
-nothing: no pending position (`Xv6.queueOk_arm'`), no serve permit
-(`Xv6.permOk_arm`), no in-flight request, and no cached sector. -/
+`disk_publish` moves the receipts of THREE free descriptors: the head to
+`.active c`, the middle and the tail to `.member c.hd`.  Every pure clause
+of `diskLive` survives, because a free descriptor is named by nothing (no
+pending position, `Xv6.queueOk_arm'`; no serve permit, `Xv6.permOk_arm`;
+no in-flight request and no cached sector) and because every clause only
+ever looks at `.active` slots, so a `.member` slot is as invisible to them
+as a free one. -/
 
 /-- The receipts, with head `i` armed. -/
 def armSt (st : Nat → HState) (i : Nat) (c : Chain) : Nat → HState :=
@@ -445,6 +448,153 @@ theorem queueOk_arm (st : Nat → HState) (ring : Nat → Nat) (lo np : Nat) (i 
 theorem permOk_armSt (pm : RegMapF PermVal) (st : Nat → HState) (i : Nat) (c : Chain)
     (hok : permOk pm st) (hfree : st i = .inactive) : permOk pm (armSt st i c) :=
   permOk_arm pm st i c hok hfree
+
+/-! ### Taking a MEMBER slot
+
+`disk_publish` also takes the chain's two non-head descriptors: they leave
+`.inactive` (their `disk.free[i]` byte goes to `0` and their descriptor
+words are formatted, so neither the free shape nor the armed shape fits)
+for `.member c.hd`.  Nothing in the pure clauses cares: every one of them
+only ever looks at `.active` slots, and a `.member` slot is no more active
+than a free one. -/
+
+/-- The receipts, with slot `i` taken as a member of the chain at `h`. -/
+def memSt (st : Nat → HState) (i h : Nat) : Nat → HState :=
+  fun j => if j = i then .member h else st j
+
+@[simp] theorem memSt_self (st : Nat → HState) (i h : Nat) : memSt st i h i = .member h := by
+  simp [memSt]
+
+theorem memSt_ne (st : Nat → HState) (i h : Nat) (j : Nat) (hj : j ≠ i) :
+    memSt st i h j = st j := by simp [memSt, hj]
+
+theorem inFlightBlk_mem (st : Nat → HState) (i h : Nat) (hfree : st i = .inactive)
+    (bno : Nat) (hb : inFlightBlk st bno) : inFlightBlk (memSt st i h) bno := by
+  obtain ⟨i0, c0, h1, h2, h3⟩ := hb
+  refine ⟨i0, c0, h1, ?_, h3⟩
+  have hne : i0 ≠ i := by intro e; rw [e, hfree] at h2; exact absurd h2 (by simp)
+  rw [memSt_ne st i h i0 hne]; exact h2
+
+theorem imgOk_mem (v : VirtioState) (m : RegMapF (List (BitVec 8))) (st : Nat → HState)
+    (i h : Nat) (hfree : st i = .inactive) (hx : imgOk v m (inFlightBlk st)) :
+    imgOk v m (inFlightBlk (memSt st i h)) := by
+  intro bno bs hb
+  rcases hx bno bs hb with hp | he
+  · exact Or.inl (inFlightBlk_mem st i h hfree bno hp)
+  · exact Or.inr he
+
+theorem cachedOk_mem (v : VirtioState) (st : Nat → HState) (i h : Nat)
+    (hfree : st i = .inactive) (hx : cachedOk v st) : cachedOk v (memSt st i h) :=
+  fun e he hne => inFlightBlk_mem st i h hfree _ (hx e he hne)
+
+theorem inflightOk_mem (v : VirtioState) (st : Nat → HState) (i h : Nat)
+    (hfree : st i = .inactive) (hx : inflightOk v st) : inflightOk v (memSt st i h) := by
+  intro hd r hr
+  obtain ⟨h1, c', h2, h3, h4⟩ := hx hd r hr
+  refine ⟨h1, c', ?_, h3, h4⟩
+  have hne : hd.toNat ≠ i := by intro e; rw [e, hfree] at h2; exact absurd h2 (by simp)
+  rw [memSt_ne st i h hd.toNat hne]; exact h2
+
+theorem queueOk_mem (st : Nat → HState) (ring : Nat → Nat) (lo np : Nat) (i h : Nat)
+    (hx : queueOk st ring lo np) (hfree : st i = .inactive) :
+    queueOk (memSt st i h) ring lo np := by
+  refine ⟨fun p h1 h2 => ⟨(hx.1 p h1 h2).1, ?_⟩, hx.2⟩
+  have hne : ring (p % NUM) ≠ i := by
+    intro he
+    have hact := (hx.1 p h1 h2).2
+    rw [he, hfree] at hact
+    exact absurd hact (by simp [HState.isActive])
+  rw [memSt_ne st i h _ hne]
+  exact (hx.1 p h1 h2).2
+
+theorem permOk_mem (pm : RegMapF PermVal) (st : Nat → HState) (i h : Nat)
+    (hok : permOk pm st) (hfree : st i = .inactive) : permOk pm (memSt st i h) := by
+  intro k' h' c' hget
+  obtain ⟨hlt, hst⟩ := hok k' h' c' hget
+  refine ⟨hlt, ?_⟩
+  have hne : h'.toNat ≠ i := by
+    intro e; rw [e, hfree] at hst; exact absurd hst (by simp)
+  rw [memSt_ne st i h _ hne]
+  exact hst
+
+/-! ### The three slots of a chain, at once
+
+`Xv6.armSt3` is what `disk_publish` installs: the head armed, the middle
+and the tail taken as its members. -/
+
+/-- The receipts after `disk_publish`: `c.hd` armed with `c`, `c.md` and
+`c.tl` taken as its members. -/
+def armSt3 (st : Nat → HState) (c : Chain) : Nat → HState :=
+  memSt (memSt (armSt st c.hd c) c.md c.hd) c.tl c.hd
+
+theorem armSt3_hd (st : Nat → HState) (c : Chain) (hwf : c.wf) :
+    armSt3 st c c.hd = .active c := by
+  unfold armSt3
+  rw [memSt_ne _ _ _ _ hwf.2.2.2.2.2.1, memSt_ne _ _ _ _ hwf.2.2.2.1, armSt_self]
+
+theorem armSt3_md (st : Nat → HState) (c : Chain) (hwf : c.wf) :
+    armSt3 st c c.md = .member c.hd := by
+  unfold armSt3
+  rw [memSt_ne _ _ _ _ hwf.2.2.2.2.1, memSt_self]
+
+theorem armSt3_tl (st : Nat → HState) (c : Chain) : armSt3 st c c.tl = .member c.hd := by
+  unfold armSt3; rw [memSt_self]
+
+theorem armSt3_ne (st : Nat → HState) (c : Chain) (j : Nat)
+    (h1 : j ≠ c.hd) (h2 : j ≠ c.md) (h3 : j ≠ c.tl) : armSt3 st c j = st j := by
+  unfold armSt3
+  rw [memSt_ne _ _ _ _ h3, memSt_ne _ _ _ _ h2, armSt_ne _ _ _ _ h1]
+
+/-- The middle descriptor is still free after the head is armed. -/
+theorem armSt3_md_free (st : Nat → HState) (c : Chain) (hwf : c.wf)
+    (h : st c.md = .inactive) : armSt st c.hd c c.md = .inactive := by
+  rw [armSt_ne _ _ _ _ (Ne.symm hwf.2.2.2.1)]; exact h
+
+/-- The tail descriptor is still free after the head and the middle. -/
+theorem armSt3_tl_free (st : Nat → HState) (c : Chain) (hwf : c.wf)
+    (h : st c.tl = .inactive) :
+    memSt (armSt st c.hd c) c.md c.hd c.tl = .inactive := by
+  rw [memSt_ne _ _ _ _ (Ne.symm hwf.2.2.2.2.1), armSt_ne _ _ _ _ (Ne.symm hwf.2.2.2.2.2.1)]
+  exact h
+
+theorem queueOk_arm3 (st : Nat → HState) (c : Chain) (hwf : c.wf)
+    (h1 : st c.hd = .inactive) (h2 : st c.md = .inactive) (h3 : st c.tl = .inactive)
+    (ring : Nat → Nat) (lo np : Nat) (hx : queueOk st ring lo np) :
+    queueOk (armSt3 st c) ring lo np :=
+  queueOk_mem _ _ _ _ c.tl c.hd
+    (queueOk_mem _ _ _ _ c.md c.hd (queueOk_arm st ring lo np c.hd c hx h1)
+      (armSt3_md_free st c hwf h2))
+    (armSt3_tl_free st c hwf h3)
+
+theorem inflightOk_arm3 (st : Nat → HState) (c : Chain) (hwf : c.wf)
+    (h1 : st c.hd = .inactive) (h2 : st c.md = .inactive) (h3 : st c.tl = .inactive)
+    (v : VirtioState) (hx : inflightOk v st) :
+    inflightOk v (armSt3 st c) :=
+  inflightOk_mem _ _ c.tl c.hd (armSt3_tl_free st c hwf h3)
+    (inflightOk_mem _ _ c.md c.hd (armSt3_md_free st c hwf h2)
+      (inflightOk_arm v st c.hd c h1 hx))
+
+theorem imgOk_arm3 (st : Nat → HState) (c : Chain) (hwf : c.wf)
+    (h1 : st c.hd = .inactive) (h2 : st c.md = .inactive) (h3 : st c.tl = .inactive)
+    (v : VirtioState) (m : RegMapF (List (BitVec 8)))
+    (hx : imgOk v m (inFlightBlk st)) : imgOk v m (inFlightBlk (armSt3 st c)) :=
+  imgOk_mem _ _ _ c.tl c.hd (armSt3_tl_free st c hwf h3)
+    (imgOk_mem _ _ _ c.md c.hd (armSt3_md_free st c hwf h2)
+      (imgOk_arm v m st c.hd c h1 hx))
+
+theorem cachedOk_arm3 (st : Nat → HState) (c : Chain) (hwf : c.wf)
+    (h1 : st c.hd = .inactive) (h2 : st c.md = .inactive) (h3 : st c.tl = .inactive)
+    (v : VirtioState) (hx : cachedOk v st) : cachedOk v (armSt3 st c) :=
+  cachedOk_mem _ _ c.tl c.hd (armSt3_tl_free st c hwf h3)
+    (cachedOk_mem _ _ c.md c.hd (armSt3_md_free st c hwf h2)
+      (cachedOk_arm v st c.hd c h1 hx))
+
+theorem permOk_arm3 (st : Nat → HState) (c : Chain) (hwf : c.wf)
+    (h1 : st c.hd = .inactive) (h2 : st c.md = .inactive) (h3 : st c.tl = .inactive)
+    (pm : RegMapF PermVal) (hx : permOk pm st) : permOk pm (armSt3 st c) :=
+  permOk_mem _ _ c.tl c.hd
+    (permOk_mem _ _ c.md c.hd (permOk_armSt pm st c.hd c hx h1) (armSt3_md_free st c hwf h2))
+    (armSt3_tl_free st c hwf h3)
 
 /-! ## `struct disk` is kernel data -/
 

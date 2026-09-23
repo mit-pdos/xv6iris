@@ -1378,7 +1378,17 @@ has to travel on the READ, not on the write's position. -/
 becomes the device's: the descriptor words and the request header split
 into the invariant's RAW half and the payload's CONTEXT half, the status
 byte and `b->data` go over whole, the block's image fragment is deposited
-in the row, and the receipt moves from `.inactive` to `.active c`.
+in the row, and the three receipts move -- the head from `.inactive` to
+`.active c`, the middle and the tail from `.inactive` to `.member c.hd`.
+
+The MEMBER arm is what lets the lock payload be put back together while
+the chain is in flight (P5 of the `virtio_disk_rw` proof, which releases
+the lock around `sleep`): a formatted middle descriptor has `free[i] = 0`
+and no window of its own, so it fits neither `.inactive` (a zeroed
+descriptor at `free[i] = 1`) nor `.active` (which asks `c.hd = i`).  The
+invariant holds nothing for a member (`Xv6.headRes_member`), and the
+payload holds only its `disk.free[i]` byte (`Xv6.slotBody_member`) -- the
+descriptor's own words are the HEAD's `Xv6.claimRes`.
 
 Every pure clause of `diskLive` survives because a FREE head is named by
 nothing: no pending position (`Xv6.queueOk_arm'`), no serve permit (a
@@ -1412,15 +1422,27 @@ theorem diskArm_acc (n : Nat) (hn : n < NUM) (Φ Ψ : Nat → IProp GF)
   iintro Hn'
   iapply Hback $$ %() Hn'
 
-/-- **The protocol arms a free head.** -/
+/-- **The protocol arms a free head, and takes its two members.**  All
+THREE descriptors of the chain leave the free world: the head becomes
+`.active c` and carries the whole chain, the middle and the tail become
+`.member c.hd` -- taken, but holding nothing of their own (their
+descriptor words are the head's `Xv6.claimRes`, their `disk.free[i]` byte
+is `0`, and the invariant's `Xv6.headRes` for a member is `emp`).
+
+That third arm is what lets the lock payload be put back together while
+the chain is in flight: a formatted middle descriptor fits neither
+`.inactive` (which asks for a zeroed descriptor at `free[i] = 1`) nor
+`.active` (which asks `c.hd = i`). -/
 theorem diskProto_armHead (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) (pd : PAddr) (c : Chain)
     (hpd : c0.desc = pd) (hlive : Virtio.live c0 = true) (hwf : c.wf) :
     diskCfgFrozen (GF := GF) γ c0 ∗ diskProto γ v ∗ headTok γ c.hd .inactive ∗
+      headTok γ c.md .inactive ∗ headTok γ c.tl .inactive ∗
       chainLease pd c ∗ (∃ bs : List (BitVec 8), diskBlock γ c.blk bs) ⊢
-      |==> (diskProto γ v ∗ headTok γ c.hd (.active c)) := by
+      |==> (diskProto γ v ∗ headTok γ c.hd (.active c) ∗
+        headTok γ c.md (.member c.hd) ∗ headTok γ c.tl (.member c.hd)) := by
   subst hpd
   unfold diskProto
-  iintro ⟨#Hfr0, ⟨%hc, %pn, %pm, Hpm, %hfr, Harm⟩, Htok, Hlease, Hblk⟩
+  iintro ⟨#Hfr0, ⟨%hc, %pn, %pm, Hpm, %hfr, Harm⟩, Htok, Htokm, Htokt, Hlease, Hblk⟩
   icases Harm with ⟨Hd | ⟨%c0', #Hfr, %hc0, Hl⟩⟩
   · unfold diskDead
     icases Hd with ⟨%m, Hm, Hcfg, Hlo0, HnpM0, Hpos0, HstgA0, Hbs0, Hdn0, Hnr0, %hpure⟩
@@ -1434,6 +1456,11 @@ theorem diskProto_armHead (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) (p
       Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, Hnr, %hpure⟩
     obtain ⟨q1, q2, q3, q4, q5, q6, q7, q8, q9, q10, q11⟩ := hpure
     ihave %hst := headTok_state γ st c.hd .inactive hwf.1 $$ Ha Htok
+    ihave %hstm := headTok_state γ st c.md .inactive hwf.2.1 $$ Ha Htokm
+    ihave %hstt := headTok_state γ st c.tl .inactive hwf.2.2.1 $$ Ha Htokt
+    have hmdf := armSt3_md_free st c hwf hstm
+    have htlf := armSt3_tl_free st c hwf hstt
+    -- the head: `.inactive` to `.active c`
     icases diskArm_acc c.hd hwf.1 (fun j => headAuth γ j (st j))
         (fun j => headAuth γ j (armSt st c.hd c j))
         (fun j hj => by rw [armSt_ne st c.hd c j hj]) $$ Ha with ⟨Hai, Haback⟩
@@ -1453,8 +1480,52 @@ theorem diskProto_armHead (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) (p
       · ipureintro; exact ⟨rfl, hwf⟩
       · iframe Hlease Hblk
     ihave Hr := Hrback $$ Hres
+    -- the middle: `.inactive` to `.member c.hd`; the invariant holds nothing either way
+    icases diskArm_acc c.md hwf.2.1 (fun j => headAuth γ j (armSt st c.hd c j))
+        (fun j => headAuth γ j (memSt (armSt st c.hd c) c.md c.hd j))
+        (fun j hj => by rw [memSt_ne (armSt st c.hd c) c.md c.hd j hj]) $$ Ha
+      with ⟨Ham, Hamback⟩
+    icases diskArm_acc c.md hwf.2.1 (fun j => headRes γ c0.desc j (armSt st c.hd c j))
+        (fun j => headRes γ c0.desc j (memSt (armSt st c.hd c) c.md c.hd j))
+        (fun j hj => by rw [memSt_ne (armSt st c.hd c) c.md c.hd j hj]) $$ Hr
+      with ⟨Hrm, Hrmback⟩
+    imod headTok_update γ c.md (armSt st c.hd c c.md) .inactive (.member c.hd)
+      $$ [Ham Htokm] with ⟨Ham, Htokm⟩
+    · iframe Ham Htokm
+    ihave Ham2 : iprop(headAuth (GF := GF) γ c.md (memSt (armSt st c.hd c) c.md c.hd c.md))
+      $$ [Ham]
+    · rw [memSt_self]
+      iexact Ham
+    ihave Ha := Hamback $$ Ham2
+    ihave Hrm2 : iprop(headRes (GF := GF) γ c0.desc c.md
+        (memSt (armSt st c.hd c) c.md c.hd c.md)) $$ [Hrm]
+    · rw [memSt_self, headRes_member]
+      iempintro
+    ihave Hr := Hrmback $$ Hrm2
+    -- the tail, the same way
+    icases diskArm_acc c.tl hwf.2.2.1
+        (fun j => headAuth γ j (memSt (armSt st c.hd c) c.md c.hd j))
+        (fun j => headAuth γ j (armSt3 st c j))
+        (fun j hj => by rw [show armSt3 st c j = memSt (armSt st c.hd c) c.md c.hd j from
+          memSt_ne _ c.tl c.hd j hj]) $$ Ha with ⟨Hat, Hatback⟩
+    icases diskArm_acc c.tl hwf.2.2.1
+        (fun j => headRes γ c0.desc j (memSt (armSt st c.hd c) c.md c.hd j))
+        (fun j => headRes γ c0.desc j (armSt3 st c j))
+        (fun j hj => by rw [show armSt3 st c j = memSt (armSt st c.hd c) c.md c.hd j from
+          memSt_ne _ c.tl c.hd j hj]) $$ Hr with ⟨Hrt, Hrtback⟩
+    imod headTok_update γ c.tl (memSt (armSt st c.hd c) c.md c.hd c.tl) .inactive
+      (.member c.hd) $$ [Hat Htokt] with ⟨Hat, Htokt⟩
+    · iframe Hat Htokt
+    ihave Hat2 : iprop(headAuth (GF := GF) γ c.tl (armSt3 st c c.tl)) $$ [Hat]
+    · rw [armSt3_tl]
+      iexact Hat
+    ihave Ha := Hatback $$ Hat2
+    ihave Hrt2 : iprop(headRes (GF := GF) γ c0.desc c.tl (armSt3 st c c.tl)) $$ [Hrt]
+    · rw [armSt3_tl, headRes_member]
+      iempintro
+    ihave Hr := Hrtback $$ Hrt2
     imodintro
-    iframe Htok
+    iframe Htok Htokm Htokt
     isplitl []
     · ipureintro; exact hc
     iexists pn, pm
@@ -1466,12 +1537,15 @@ theorem diskProto_armHead (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) (p
     iframe Hfr
     isplitl []
     · ipureintro; exact hc0
-    iexists (armSt st c.hd c), nc, np, lo, ring, m, pmap, stg, b, M, dl, dl0, nr
+    iexists (armSt3 st c), nc, np, lo, ring, m, pmap, stg, b, M, dl, dl0, nr
     iframe Hm Ha Hr Hu Hav Hnc Hnp Hlo HnpM Hpos Hstg Hui Hdn Hbs Htp Hnr
     ipureintro
-    exact ⟨q1, q2, q3, queueOk_arm st ring lo np c.hd c q4 hst, q5, q6,
-      inflightOk_arm v st c.hd c hst q7, imgOk_arm v m st c.hd c hst q8,
-      cachedOk_arm v st c.hd c hst q9, permOk_armSt pm st c.hd c q10 hst, q11⟩
+    exact ⟨q1, q2, q3,
+      queueOk_arm3 st c hwf hst hstm hstt ring lo np q4, q5, q6,
+      inflightOk_arm3 st c hwf hst hstm hstt v q7,
+      imgOk_arm3 st c hwf hst hstm hstt v m q8,
+      cachedOk_arm3 st c hwf hst hstm hstt v q9,
+      permOk_arm3 st c hwf hst hstm hstt pm q10, q11⟩
 
 /-- **`publish`**: the view shift that arms head `c.hd` with the chain `c`,
 carried out between the ring-cell store and the `avail->idx` bump
@@ -1491,6 +1565,7 @@ theorem disk_publish [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (c : Chain)
     (bs data : List (BitVec 8)) (hwf : c.wf) (hlen : data.length = BSIZE)
     (hkm : ∀ j, j < BSIZE → kmapClass (vpnOf (c.data + BitVec.ofNat 64 j)).toNat = some .rw) :
     diskInv (GF := GF) γ ∗ kmapStatic ∗ diskGeom γ pd pav pu ∗ headTok γ c.hd .inactive ∗
+      headTok γ c.md .inactive ∗ headTok γ c.tl .inactive ∗
       ctxBytes curCtx (descAt pd c.hd) 16 (DFrac.own 1) c.d0 ∗
       ctxBytes curCtx (descAt pd c.md) 16 (DFrac.own 1) c.d1 ∗
       ctxBytes curCtx (descAt pd c.tl) 16 (DFrac.own 1) c.d2 ∗
@@ -1498,12 +1573,13 @@ theorem disk_publish [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (c : Chain)
       wordAtN curCtx c.status 1 (DFrac.own 1) 0xff#8 ∗
       byteBuf c.data (DFrac.own 1) data ∗ diskBlock γ c.blk bs ⊢
       |={⊤}=> (headTok γ c.hd (.active c) ∗
+        headTok γ c.md (.member c.hd) ∗ headTok γ c.tl (.member c.hd) ∗
         ctxBytes curCtx (descAt pd c.hd) 16 (DFrac.own (1 : Qp).half) c.d0 ∗
         ctxBytes curCtx (descAt pd c.md) 16 (DFrac.own (1 : Qp).half) c.d1 ∗
         ctxBytes curCtx (descAt pd c.tl) 16 (DFrac.own (1 : Qp).half) c.d2 ∗
         ctxBytes curCtx c.hdrAddr 16 (DFrac.own (1 : Qp).half) c.hdr) := by
   unfold diskInv devInvR
-  iintro ⟨#Hinv, #HS, #Hgeom, Htok, Hd0, Hd1, Hd2, Hhdr, Hstat, Hbuf, Hblk⟩
+  iintro ⟨#Hinv, #HS, #Hgeom, Htok, Htokm, Htokt, Hd0, Hd1, Hd2, Hhdr, Hstat, Hbuf, Hblk⟩
   icases diskGeom_cfg γ pd pav pu $$ Hgeom with ⟨%c0, #Hfr, %hg⟩
   icases ctxBytes_split_dma curCtx (descAt pd c.hd) 16 c.d0 $$ Hd0 with ⟨Hr0, Hc0⟩
   icases ctxBytes_split_dma curCtx (descAt pd c.md) 16 c.d1 $$ Hd1 with ⟨Hr1, Hc1⟩
@@ -1525,8 +1601,8 @@ theorem disk_publish [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (c : Chain)
   iinv Hinv with Hbody Hclose
   icases Hbody with ⟨%v, >Hfrag, >Hproto⟩
   imod diskProto_armHead γ c0 v pd c hg.1 hg.2.2.2.1 hwf $$
-    [Hfr Hproto Htok Hlease Hblk] with ⟨Hproto, Htok⟩
-  · iframe Hfr Hproto Htok Hlease
+    [Hfr Hproto Htok Htokm Htokt Hlease Hblk] with ⟨Hproto, Htok, Htokm, Htokt⟩
+  · iframe Hfr Hproto Htok Htokm Htokt Hlease
     iexists bs
     iexact Hblk
   ihave Hcl := Hclose $$ [Hfrag Hproto]
@@ -1536,7 +1612,7 @@ theorem disk_publish [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (c : Chain)
     iframe Hfrag Hproto
   imod Hcl
   imodintro
-  iframe Htok Hc0 Hc1 Hc2 Hch
+  iframe Htok Htokm Htokt Hc0 Hc1 Hc2 Hch
 
 /-! ## The completion side: reading `used->idx`
 
@@ -1819,15 +1895,23 @@ structure DISK_ACC_ASSUMPTIONS : Prop where
         iprop(diskReadAt γ nr ∗ headTok γ c.hd (.active c) ∗ ⌜b = 0#8⌝))
 
   /-- **`collect`**: the sleeper takes the chain back once `b->disk` is
-  `0`.  The descriptors, the header, the status byte and `b->data` return
-  to the CONTEXT tier, and the block's image fragment comes back holding
-  the transferred bytes.  Blocked three ways: on the per-position row (to
-  own the device's writes at a known value and to carry the `topLb` of
-  them), on the invariant's `bufLease` being `dmaOwn` -- the CONTENT of a
-  read's transfer is existential, so the bytes cannot be pinned to
-  `blockView` without a generation-keyed snapshot of the block (see
-  `Xv6/DiskInvDefs.lean`'s header) -- and on the TSO credential, which is
-  what `ctxFloor curCtx T` beside `diskWm γ n T` stands for here.
+  `0`.  All THREE descriptors return to the driver: the head's receipt
+  goes from `.active c` to `.inactive` and the middle's and the tail's
+  from `.member c.hd` to `.inactive`, and the three descriptor windows and
+  the request header come back WHOLE at the context tier -- the driver
+  hands in its halves (`Xv6.claimRes`) and the invariant's halves, out of
+  `Xv6.chainLease`, are joined onto them, which is what `free_desc` needs
+  (`Xv6.descCells` is `own 1`).  The status byte comes back at the `0` the
+  device wrote, `b->data` at the bytes it transferred, and the block's
+  image fragment with them.
+
+  Blocked three ways: on the per-position row (to own the device's writes
+  at a known value and to carry the `topLb` of them), on the invariant's
+  `bufLease` being `dmaOwn` -- the CONTENT of a read's transfer is
+  existential, so the bytes cannot be pinned to `blockView` without a
+  generation-keyed snapshot of the block (see `Xv6/DiskInvDefs.lean`'s
+  header) -- and on the TSO credential, which is what `ctxFloor curCtx T`
+  beside `diskWm γ n T` stands for here.
 
   The `kmapStatic` premises are `disk_publish`'s, in reverse: the reverse
   bridges `Xv6.ctxBytes_wordPointsTo` / `Xv6.ctxIdx_byteBuf` need `inRam`
@@ -1838,8 +1922,16 @@ structure DISK_ACC_ASSUMPTIONS : Prop where
     c.wf →
     (∀ j, j < BSIZE → kmapClass (vpnOf (c.data + BitVec.ofNat 64 j)).toNat = some .rw) →
     diskInv (GF := GF) γ ∗ kmapStatic ∗ diskGeom γ pd pav pu ∗
-      headTok γ c.hd (.active c) ∗ headDone γ n c.hd ∗ diskWm γ n T ∗ ctxFloor curCtx T ⊢
-      |={⊤}=> (headTok γ c.hd .inactive ∗ claimRes curCtx pd c ∗
+      headTok γ c.hd (.active c) ∗ headTok γ c.md (.member c.hd) ∗
+      headTok γ c.tl (.member c.hd) ∗ claimRes curCtx pd c ∗
+      headDone γ n c.hd ∗ diskWm γ n T ∗ ctxFloor curCtx T ⊢
+      |={⊤}=> (headTok γ c.hd .inactive ∗ headTok γ c.md .inactive ∗
+        headTok γ c.tl .inactive ∗
+        ctxBytes curCtx (descAt pd c.hd) 16 (DFrac.own 1) c.d0 ∗
+        ctxBytes curCtx (descAt pd c.md) 16 (DFrac.own 1) c.d1 ∗
+        ctxBytes curCtx (descAt pd c.tl) 16 (DFrac.own 1) c.d2 ∗
+        ctxBytes curCtx c.hdrAddr 16 (DFrac.own 1) c.hdr ∗
+        wordAtN curCtx (aInfoB c.hd) 8 (DFrac.own 1) c.bp ∗
         wordAtN curCtx c.status 1 (DFrac.own 1) 0#8 ∗
         ∃ data : List (BitVec 8), ⌜data.length = BSIZE⌝ ∗
           byteBuf c.data (DFrac.own 1) data ∗ diskBlock γ c.blk data)

@@ -93,25 +93,43 @@ theorem lt_of_wrap16_ne (a b : Nat) (hab : a ≤ b) (hw : b - a < 65536)
 
 /-! ## The per-descriptor receipt -/
 
-/-- What a descriptor slot is: free (the driver owns and has zeroed it) or
-the head of the formatted chain `c`. -/
+/-- What a descriptor slot is: free (the driver owns and has zeroed it),
+the head of the formatted chain `c`, or a non-head MEMBER of the chain
+armed at head `h`.
+
+The member arm is what lets the payload be re-closed while a chain is in
+flight.  `alloc3_desc` takes three descriptors; `virtio_disk_rw` formats
+all three and publishes them under the HEAD, so the head's slot carries
+the whole chain (`Xv6.claimRes` holds the driver's halves of all three
+descriptor words), and the other two are TAKEN but hold nothing of their
+own: their `disk.free[i]` byte is `0` and there is no window left in their
+slot.  Without this arm a middle or tail descriptor fits neither
+`.inactive` (which asks for `free[i] = 1` and a zeroed descriptor) nor
+`.active` (which asks `c.hd = i`), and the lock payload cannot be put back
+together when `virtio_disk_rw` releases the lock around `sleep`. -/
 inductive HState where
   /-- free: the driver owns the descriptor -/
   | inactive
   /-- armed: `c` is formatted at this head and its resources are the device's -/
   | active (c : Chain)
+  /-- taken as a non-head member of the chain armed at head `h` -/
+  | member (h : Nat)
   deriving DecidableEq, Repr, Inhabited
 
 def HState.chain : HState → Option Chain
   | .inactive => none
   | .active c => some c
+  | .member _ => none
 
 def HState.isActive : HState → Bool
   | .inactive => false
   | .active _ => true
+  | .member _ => false
 
 @[simp] theorem HState.chain_active (c : Chain) : HState.chain (.active c) = some c := rfl
 @[simp] theorem HState.chain_inactive : HState.chain .inactive = none := rfl
+@[simp] theorem HState.chain_member (h : Nat) : HState.chain (.member h) = none := rfl
+@[simp] theorem HState.isActive_member (h : Nat) : HState.isActive (.member h) = false := rfl
 
 /-! ## The published positions -/
 

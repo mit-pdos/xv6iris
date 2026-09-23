@@ -1325,6 +1325,7 @@ ordinary stores. -/
 def headRes (γ : DiskNames) (pd : PAddr) (i : Nat) : HState → IProp GF
   | .inactive => iprop(emp)
   | .active c => iprop(⌜c.hd = i ∧ c.wf⌝ ∗ chainLease pd c ∗ ∃ bs, diskBlock γ c.blk bs)
+  | .member _ => iprop(emp)
 
 theorem headRes_inactive (γ : DiskNames) (pd : PAddr) (i : Nat) :
     headRes (GF := GF) γ pd i .inactive = iprop(emp) := rfl
@@ -1332,6 +1333,11 @@ theorem headRes_inactive (γ : DiskNames) (pd : PAddr) (i : Nat) :
 theorem headRes_active (γ : DiskNames) (pd : PAddr) (i : Nat) (c : Chain) :
     headRes (GF := GF) γ pd i (.active c) =
       iprop(⌜c.hd = i ∧ c.wf⌝ ∗ chainLease pd c ∗ ∃ bs, diskBlock γ c.blk bs) := rfl
+
+/-- A MEMBER slot costs the invariant nothing: the chain's descriptor
+words are leased under its HEAD. -/
+theorem headRes_member (γ : DiskNames) (pd : PAddr) (i h : Nat) :
+    headRes (GF := GF) γ pd i (.member h) = iprop(emp) := rfl
 
 /-- The used RING is entirely the device's.  The used INDEX is kept apart
 (`Xv6.usedIdxCell`), because the handler reads it and a `dmaOwn` cell tells
@@ -1460,6 +1466,9 @@ instance headRes_timeless (γ : DiskNames) (pd : PAddr) (i : Nat) (s : HState) :
     show Timeless iprop(⌜c.hd = i ∧ c.wf⌝ ∗ chainLease pd c ∗ ∃ bs, diskBlock γ c.blk bs)
     unfold chainLease diskBlock
     infer_instance
+  | member _ =>
+    show Timeless (iprop(emp) : IProp GF)
+    infer_instance
 
 instance usedLease_timeless (pu : PAddr) : Timeless (usedLease (GF := GF) pu) := by
   unfold usedLease; infer_instance
@@ -1532,6 +1541,7 @@ def claimRes (ξ : CtxId) (pd : PAddr) (c : Chain) : IProp GF := iprop%
 def slotBody (ξ : CtxId) (pd : PAddr) (i : Nat) : HState → IProp GF
   | .inactive => iprop(wordAtN ξ (aFree i) 1 (DFrac.own 1) 1#8 ∗ freeSlotRes ξ pd i)
   | .active c => iprop(wordAtN ξ (aFree i) 1 (DFrac.own 1) 0#8 ∗ claimRes ξ pd c)
+  | .member _ => iprop(wordAtN ξ (aFree i) 1 (DFrac.own 1) 0#8)
 
 def slotRes (γ : DiskNames) (ξ : CtxId) (pd : PAddr) (i : Nat) : IProp GF := iprop%
   ∃ s : HState, headTok γ i s ∗ slotBody ξ pd i s
@@ -1543,6 +1553,12 @@ theorem slotBody_inactive (ξ : CtxId) (pd : PAddr) (i : Nat) :
 theorem slotBody_active (ξ : CtxId) (pd : PAddr) (i : Nat) (c : Chain) :
     slotBody (GF := GF) ξ pd i (.active c) =
       iprop(wordAtN ξ (aFree i) 1 (DFrac.own 1) 0#8 ∗ claimRes ξ pd c) := rfl
+
+/-- A MEMBER slot on the driver's side: TAKEN (`disk.free[i] = 0`) and
+nothing else -- the descriptor's own words are the HEAD's `claimRes`. -/
+theorem slotBody_member (ξ : CtxId) (pd : PAddr) (i h : Nat) :
+    slotBody (GF := GF) ξ pd i (.member h) =
+      iprop(wordAtN ξ (aFree i) 1 (DFrac.own 1) 0#8) := rfl
 
 /-- **The payload of `disk.vdisk_lock`** (Rocq's `disk_res`): the
 publisher's and the handler's halves of the counters (the watermark
@@ -1570,6 +1586,9 @@ instance instCtxMorphSlotBody (pd : PAddr) (i : Nat) (s : HState) :
   | active c =>
     show CtxMorph (fun ξ => iprop(wordAtN ξ (aFree i) 1 (DFrac.own 1) 0#8 ∗ claimRes ξ pd c))
     unfold claimRes
+    infer_instance
+  | member _ =>
+    show CtxMorph (fun ξ => iprop(wordAtN ξ (aFree i) 1 (DFrac.own 1) 0#8))
     infer_instance
 
 instance instCtxMorphSlotRes (γ : DiskNames) (pd : PAddr) (i : Nat) :

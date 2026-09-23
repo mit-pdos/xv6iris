@@ -292,6 +292,7 @@ theorem diskProto_pop_live (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) (
       cases hs : st i with
       | inactive => rw [hs] at hact; exact absurd hact (by simp [HState.isActive])
       | active c => exact ⟨c, rfl⟩
+      | member _ => rw [hs] at hact; exact absurd hact (by simp [HState.isActive])
     imod diskLo_update γ lo lo (lo + 1) $$ [Hlo Hlot] with ⟨Hlo, Hlot⟩
     · iframe Hlo Hlot
     unfold permAuth
