@@ -127,6 +127,7 @@ WHAT IS NOT HERE, AND WHY.
 import Xv6.VirtioQueue
 import Xv6.KallocDefs
 import MachCSL.WpDevDma
+import MachCSL.WordHist
 
 namespace Xv6
 
@@ -156,10 +157,13 @@ class DiskG (GF : BundledGFunctors) where
   one entry per position, from which a persistent per-position record may
   be taken at any time -/
   [mlPosG : MonoListG GF Nat]
+  /-- the COMPLETION RECORDS (see `doneRec`): the lagging monotone list of
+  the device's used-index writes -/
+  [mlDoneG : MonoListG GF (Nat × Nat)]
 
 attribute [reducible, instance] DiskG.gvCfgG DiskG.gvHeadG DiskG.gvStageG DiskG.gmImgG DiskG.mnG
 attribute [reducible, instance] DiskG.gmPermG
-attribute [reducible, instance] DiskG.mlPosG
+attribute [reducible, instance] DiskG.mlPosG DiskG.mlDoneG
 
 /-- The disk's ghost names (Rocq's `disk_names`, the subset this port
 carries). -/
@@ -192,6 +196,10 @@ structure DiskNames where
   /-- the published POSITIONS, as a monotone list: entry `p` is the
   descriptor head published at position `p`, immutable once appended -/
   pos : GName
+  /-- the device's used-index WRITES, as a lagging monotone list -/
+  done : GName
+  /-- the bound on the stores that zeroed the used page before the flip -/
+  base : GName
 
 /-- The disk invariant's namespace. -/
 def diskN : Namespace := ndot nroot "xv6disk"
@@ -561,6 +569,443 @@ theorem posOk_extend (l : List Nat) (ring : Nat → Nat) (lo np : Nat) (h : posO
   · rw [List.getElem?_append_left (by omega)]
     exact h.2 p h1 (by omega)
 
+/-! ## The completion side: the used-index cell's WRITE LOG
+
+`used->idx` is written by the DEVICE alone, once per completion, and the
+interrupt handler reads it racily.  A `dmaOwn` cell -- full ownership at an
+UNCONSTRAINED value -- tells a read nothing, so the invariant keeps the
+cell's HISTORY instead: a list of the writes so far, newest last, each
+recorded as the counter it published and the POSITION of the write in the
+store order (`UsedRec`).  What a racy read returns is then the first entry
+of that list VISIBLE to the reader (`Xv6.usedIdx_read`), and two clauses
+turn that into a number the handler can use:
+
+* the counters never decrease along the log, so the entry a reader sees is
+  at least as new as any entry its floor has passed -- that is how
+  `disk.used_idx = nr` plus "the write that published `nr` is below my
+  floor" (`Xv6.diskWm`) yields `nr ≤ m`;
+* every counter is at most `nc + 1`, which bounds the answer.
+
+The DEVICE cannot allocate ghost state: `MachCSL.dmaWriteLease`'s
+continuation is a plain wand, with no update modality, so the used-index
+write cannot append to a ghost list.  The per-write RECORDS are therefore
+kept in a LAGGING monotone list (`doneAuth γ dl0` with `dl0 <+: dl`): the
+device grows the real log `dl` alone, and any client with a view shift in
+hand -- the handler's accessors -- catches the ghost list up and takes out
+the persistent record it needs (`Xv6.doneAuth_sync`). -/
+
+/-- One write of `used->idx`: the counter it published, and the position of
+the write in the store order. -/
+abbrev UsedRec : Type := Nat × Nat
+
+/-- The word entry a used-index write leaves in the cell's history. -/
+def usedEnt (r : UsedRec) : WEnt 2 := ⟨r.2, diskAgent, wrap16 r.1⟩
+
+/-- The used-index cell's word history: the log, NEWEST FIRST. -/
+def usedW (dl : List UsedRec) : WordHist 2 := (dl.map usedEnt).reverse
+
+theorem usedW_nil : usedW [] = [] := rfl
+
+theorem usedW_rev (dl : List UsedRec) : usedW dl = dl.reverse.map usedEnt := by
+  unfold usedW; rw [List.map_reverse]
+
+theorem usedW_snoc (dl : List UsedRec) (r : UsedRec) :
+    usedW (dl ++ [r]) = usedEnt r :: usedW dl := by
+  unfold usedW
+  rw [List.map_append, List.reverse_append]
+  rfl
+
+/-- The tails under the log: nonempty, spelling `0`, at positions at most
+`b` -- the stores that zeroed the used page before the flip. -/
+def usedTailOk (b : Nat) (Hold : Nat → Hist) : Prop :=
+  ∀ j, j < 2 → ∃ e H, Hold j = e :: H ∧ e.v = nthByte (0 : BitVec (8 * 2)) j ∧ e.t ≤ b
+
+theorem usedTailOk_vals (b : Nat) (Hold : Nat → Hist) (h : usedTailOk b Hold) :
+    tailVals 2 (0 : BitVec (8 * 2)) Hold :=
+  fun j hj => let ⟨e, H, h1, h2, _⟩ := h j hj; ⟨e, H, h1, h2⟩
+
+/-- **The log's bookkeeping.**  `dl` is the real write log, `dl0` the ghost
+list that lags it, `M` the monotone counter a reader may cash, `nc` the
+device's completion count. -/
+def usedOk (dl dl0 : List UsedRec) (nc M : Nat) : Prop :=
+  dl0 <+: dl ∧ (∀ r ∈ dl, r.1 ≤ nc + 1) ∧ M ≤ nc + 1 ∧
+  dl.Pairwise (fun a c => a.1 ≤ c.1)
+
+theorem usedOk_nil (nc : Nat) : usedOk [] [] nc 0 :=
+  ⟨List.prefix_rfl, fun r hr => absurd hr (by simp), by omega, List.Pairwise.nil⟩
+
+/-- The device's completion moves `nc` up; the log is untouched. -/
+theorem usedOk_complete (dl dl0 : List UsedRec) (nc M : Nat) (h : usedOk dl dl0 nc M) :
+    usedOk dl dl0 (nc + 1) M :=
+  ⟨h.1, fun r hr => by have := h.2.1 r hr; omega, by have := h.2.2.1; omega, h.2.2.2⟩
+
+/-- Catching the ghost list up: any longer prefix will do. -/
+theorem usedOk_sync (dl dl0 : List UsedRec) (nc M : Nat) (h : usedOk dl dl0 nc M) :
+    usedOk dl dl nc M := ⟨List.prefix_rfl, h.2.1, h.2.2.1, h.2.2.2⟩
+
+/-- Cashing a counter the log holds: `M` may rise to it. -/
+theorem usedOk_bump (dl dl0 : List UsedRec) (nc M m : Nat) (h : usedOk dl dl0 nc M)
+    (hm : m ≤ nc + 1) : usedOk dl dl0 nc (max M m) := by
+  obtain ⟨hp, hb, hM, hmono⟩ := h
+  exact ⟨hp, hb, Nat.max_le.2 ⟨hM, hm⟩, hmono⟩
+
+/-- **The used-index write**: the counter `nc + 1` joins the log. -/
+theorem usedOk_write (dl dl0 : List UsedRec) (nc M t : Nat) (h : usedOk dl dl0 nc M) :
+    usedOk (dl ++ [(nc + 1, t)]) dl0 nc M := by
+  obtain ⟨hp, hb, hM, hpw⟩ := h
+  refine ⟨hp.trans (List.prefix_append dl _), ?_, hM, ?_⟩
+  · intro r hr
+    rcases List.mem_append.1 hr with hr | hr
+    · exact hb r hr
+    · have : r = (nc + 1, t) := by simpa using hr
+      simp [this]
+  · refine List.pairwise_append.2 ⟨hpw, List.pairwise_singleton _ _, ?_⟩
+    intro a ha c hc
+    have : c = (nc + 1, t) := by simpa using hc
+    rw [this]
+    exact hb a ha
+
+/-- **The largest counter a reader can see.**  The log never decreases, so
+the newest entry a reader's view reaches dominates every entry it
+reaches. -/
+theorem used_find_max (dl : List UsedRec) (tvn : Nat) (r : UsedRec)
+    (hpw : dl.Pairwise (fun a c => a.1 ≤ c.1))
+    (hf : dl.reverse.find? (fun x => decide (x.2 ≤ tvn)) = some r)
+    (x : UsedRec) (hx : x ∈ dl) (ht : x.2 ≤ tvn) : x.1 ≤ r.1 := by
+  obtain ⟨hvis, L1, L2, hW, hL1⟩ := List.find?_eq_some_iff_append.1 hf
+  have hprev : dl.reverse.Pairwise (fun a c => c.1 ≤ a.1) := by
+    rw [List.pairwise_reverse]
+    exact hpw
+  rw [hW] at hprev
+  have hx' : x ∈ L1 ++ r :: L2 := by rw [← hW]; exact List.mem_reverse.2 hx
+  rcases List.mem_append.1 hx' with h | h
+  · have := hL1 x h
+    simp only [Bool.not_eq_true', decide_eq_false_iff_not] at this
+    exact absurd ht this
+  · rcases List.mem_cons.1 h with rfl | h
+    · exact Nat.le_refl _
+    · exact (List.pairwise_cons.1 (List.pairwise_append.1 hprev).2.1).1 x h
+
+theorem used_find_mem (dl : List UsedRec) (tvn : Nat) (r : UsedRec)
+    (hf : dl.reverse.find? (fun x => decide (x.2 ≤ tvn)) = some r) : r ∈ dl :=
+  List.mem_reverse.1 (List.mem_of_find?_eq_some hf)
+
+/-! ### The log, as resources -/
+
+/-- **The used-index cell**, with its write log explicit. -/
+def usedIdxCell (pa : PAddr) (b : Nat) (dl : List UsedRec) : IProp GF := iprop%
+  ∃ Hold : Nat → Hist,
+    histBytes pa 2 (fun _ => DFrac.own 1) ((usedW dl).hist Hold) ∗ ⌜usedTailOk b Hold⌝
+
+instance usedIdxCell_timeless (pa : PAddr) (b : Nat) (dl : List UsedRec) :
+    Timeless (usedIdxCell (GF := GF) pa b dl) := by unfold usedIdxCell; infer_instance
+
+/-- **The used-index write, leased.**  The device's store appends its entry
+to the log; the position the machine gives it is the entry's timestamp. -/
+theorem usedIdxCell_lease (pa : PAddr) (b : Nat) (dl : List UsedRec) (m : Nat)
+    (R P : IProp GF)
+    (hback : ∀ t : Nat, iprop(usedIdxCell (GF := GF) pa b (dl ++ [(m, t)]) ∗ R) ⊢ P) :
+    usedIdxCell (GF := GF) pa b dl ∗ R ⊢ dmaWriteLease pa 2 (wrap16 m) P := by
+  unfold usedIdxCell dmaWriteLease
+  iintro ⟨⟨%Hold, Hb, %ht⟩, HR⟩
+  iexists ((usedW dl).hist Hold)
+  iframe Hb
+  iintro %t Hb2 _ _
+  iapply hback t
+  isplitl [Hb2]
+  · unfold usedIdxCell
+    iexists Hold
+    rw [WordHist.hist_push, show (⟨t, diskAgent, wrap16 m⟩ : WEnt 2) :: usedW dl
+        = usedW (dl ++ [(m, t)]) from (usedW_snoc dl (m, t)).symm]
+    iframe Hb2
+    ipureintro; exact ht
+  · iexact HR
+
+/-- **The tails of a context window**, with a bound on their positions:
+what a window the driver hands over whole leaves the invariant to start
+its log from. -/
+theorem ctxBytes_tails (ξ : CtxId) (pa : PAddr) (dq : DFrac) (bs : Nat → BitVec 8) :
+    ∀ n : Nat, ([∗list] j ∈ List.range n, ctxByte ξ (pa + BitVec.ofNat 64 j) dq (bs j))
+      ⊢@{IProp GF} ∃ (Hold : Nat → Hist) (b : Nat), histBytes pa n (fun _ => dq) Hold ∗
+        ⌜∀ j, j < n → ∃ e H, Hold j = e :: H ∧ e.v = bs j ∧ e.t ≤ b⌝
+  | 0 => by
+    iintro H
+    iexists (fun _ => ([] : Hist)), 0
+    unfold histBytes
+    simp only [List.range_zero]
+    isplitl []
+    · exact BigSepL.bigSepL_nil_intro
+    · ipureintro
+      intro j hj; omega
+  | n + 1 => by
+    rw [List.range_succ]
+    iintro H
+    icases BigSepL.bigSepL_snoc.1 $$ H with ⟨H1, H2⟩
+    icases ctxBytes_tails ξ pa dq bs n $$ H1 with ⟨%Hold, %b, Hb, %hh⟩
+    icases ctxByte_cases ξ (pa + BitVec.ofNat 64 n) dq (bs n) $$ H2
+      with ⟨%e, %He, Hpt, %hev, _⟩
+    iexists (fun j => if j = n then e :: He else Hold j), (max b e.t)
+    isplitl [Hb Hpt]
+    · unfold histBytes
+      rw [List.range_succ]
+      iapply BigSepL.bigSepL_snoc.2
+      isplitl [Hb]
+      · rw [BigSepL.bigSepL_eq (l := List.range n)
+          (Φ := fun _ (j : Nat) => iprop((pa + BitVec.ofNat 64 j) ↦ₕ{dq}
+            (if j = n then e :: He else Hold j)))
+          (Ψ := fun _ (j : Nat) => iprop((pa + BitVec.ofNat 64 j) ↦ₕ{dq} Hold j))
+          (fun {_ x} hx => by rw [if_neg (Nat.ne_of_lt (range_getElem?_lt hx))])]
+        iexact Hb
+      · simp only [↓reduceIte]
+        iexact Hpt
+    · ipureintro
+      intro j hj
+      rcases Nat.lt_succ_iff_lt_or_eq.1 hj with h | h
+      · obtain ⟨e', H', h1, h2, h3⟩ := hh j h
+        exact ⟨e', H', by simp only [if_neg (Nat.ne_of_lt h)]; exact h1, h2, by omega⟩
+      · subst h
+        exact ⟨e, He, by simp, hev, by omega⟩
+
+/-- **The used-index cell, as the flip hands it over**: the driver's whole
+window becomes an empty log over tails whose positions are bounded. -/
+theorem ctxBytes_usedIdxCell (ξ : CtxId) (pa : PAddr) :
+    ctxBytes (GF := GF) ξ pa 2 (DFrac.own 1) (0 : BitVec (8 * 2)) ⊢
+      ∃ b : Nat, usedIdxCell pa b [] := by
+  unfold ctxBytes usedIdxCell
+  iintro H
+  icases ctxBytes_tails ξ pa (DFrac.own 1) (nthByte (0 : BitVec (8 * 2))) 2 $$ H
+    with ⟨%Hold, %b, Hb, %ht⟩
+  iexists b, Hold
+  rw [usedW_nil, WordHist.hist_nil]
+  iframe Hb
+  ipureintro
+  exact ht
+
+/-! ### What a racy read of `used->idx` returns -/
+
+/-- A used-index entry is visible to a hart exactly when its position is
+below the hart's view: the disk is not a hart, so there is no
+store-to-load forwarding to help. -/
+theorem usedEnt_visible (cpu : CPU) (tvn : Nat) (r : UsedRec) :
+    WEnt.visible (hartAgent cpu) tvn (usedEnt r) = decide (r.2 ≤ tvn) := by
+  unfold WEnt.visible usedEnt
+  simp only [Bool.or_eq_left_iff_imp, decide_eq_true_eq]
+  intro h
+  exact absurd h (diskAgent_ne_hartAgent cpu)
+
+theorem usedW_find (dl : List UsedRec) (cpu : CPU) (tvn : Nat) :
+    (usedW dl).find? (WEnt.visible (hartAgent cpu) tvn) =
+      (dl.reverse.find? (fun x => decide (x.2 ≤ tvn))).map usedEnt := by
+  rw [usedW_rev, List.find?_map]
+  have h : (WEnt.visible (hartAgent cpu) tvn ∘ usedEnt) = (fun x => decide (x.2 ≤ tvn)) := by
+    funext r
+    exact usedEnt_visible cpu tvn r
+  rw [h]
+
+theorem usedIdx_read_some (dl : List UsedRec) (Hold : Nat → Hist) (cpu : CPU) (tvn : Nat)
+    (w : BitVec (8 * 2)) (e : WEnt 2)
+    (hf : (usedW dl).find? (WEnt.visible (hartAgent cpu) tvn) = some e)
+    (hrd : readsAre (hartAgent cpu) tvn ((usedW dl).hist Hold) 2 w) : w = e.v := by
+  apply bv_eq_of_bytes
+  intro j hj
+  have h := hrd j hj
+  unfold Hist.read at h
+  rw [WordHist.find?_hist, hf] at h
+  simp only [Option.map_some, Option.some_or, WEnt.proj, Option.some.injEq] at h
+  exact h.symm
+
+theorem usedIdx_read_none (dl : List UsedRec) (Hold : Nat → Hist) (b : Nat) (cpu : CPU)
+    (tvn : Nat) (w : BitVec (8 * 2)) (htail : usedTailOk b Hold) (hb : b ≤ tvn)
+    (hf : (usedW dl).find? (WEnt.visible (hartAgent cpu) tvn) = none)
+    (hrd : readsAre (hartAgent cpu) tvn ((usedW dl).hist Hold) 2 w) :
+    w = (0 : BitVec (8 * 2)) := by
+  apply bv_eq_of_bytes
+  intro j hj
+  have h := hrd j hj
+  obtain ⟨e, H, hH, hev, het⟩ := htail j hj
+  unfold Hist.read at h
+  rw [WordHist.find?_hist, hf, Option.map_none, Option.none_or, hH] at h
+  have hvis : HEnt.visible (hartAgent cpu) tvn e = true :=
+    HEnt.visible_of_le _ _ _ (by omega)
+  simp only [List.find?_cons, hvis, Option.map_some, Option.some.injEq] at h
+  rw [← h, hev]
+
+theorem wrap16_zero : wrap16 0 = (0 : BitVec (8 * 2)) := by decide
+
+/-- **What a racy read of `used->idx` returns**: a counter the device has
+published (or the `0` the cell starts at), and one that dominates every
+write the reader's view has passed -- so a reader whose floor covers the
+write that published its own watermark reads a counter at least as
+large. -/
+theorem usedIdx_read (dl : List UsedRec) (Hold : Nat → Hist) (b : Nat) (cpu : CPU)
+    (tvn : Nat) (w : BitVec (8 * 2)) (htail : usedTailOk b Hold) (hb : b ≤ tvn)
+    (hpw : dl.Pairwise (fun a c => a.1 ≤ c.1))
+    (hrd : readsAre (hartAgent cpu) tvn ((usedW dl).hist Hold) 2 w) :
+    ∃ m : Nat, w = wrap16 m ∧ (m = 0 ∨ ∃ t : Nat, (m, t) ∈ dl) ∧
+      ∀ x ∈ dl, x.2 ≤ tvn → x.1 ≤ m := by
+  cases hfr : dl.reverse.find? (fun x => decide (x.2 ≤ tvn)) with
+  | none =>
+    refine ⟨0, ?_, Or.inl rfl, ?_⟩
+    · rw [wrap16_zero]
+      exact usedIdx_read_none dl Hold b cpu tvn w htail hb
+        (by rw [usedW_find, hfr]; rfl) hrd
+    · intro x hx ht
+      have := List.find?_eq_none.1 hfr x (List.mem_reverse.2 hx)
+      simp only [decide_eq_true_eq] at this
+      exact absurd ht this
+  | some r =>
+    refine ⟨r.1, ?_, Or.inr ⟨r.2, ?_⟩, ?_⟩
+    · have := usedIdx_read_some dl Hold cpu tvn w (usedEnt r)
+        (by rw [usedW_find, hfr]; rfl) hrd
+      rw [this]
+      rfl
+    · have := used_find_mem dl tvn r hfr
+      rwa [show (r.1, r.2) = r from rfl]
+    · exact fun x hx ht => used_find_max dl tvn r hpw hfr x hx ht
+
+/-- The completion records the invariant has published: the LAGGING ghost
+list of the write log, with its persistent snapshot beside it. -/
+def doneAuth (γ : DiskNames) (l : List UsedRec) : IProp GF := iprop%
+  MonoList.auth_own γ.done (DFrac.own 1) l ∗ MonoList.lb_own γ.done l
+
+/-- **The `k`-th used-index write published counter `m` at position `t`**
+(persistent). -/
+def doneRec (γ : DiskNames) (k : Nat) (r : UsedRec) : IProp GF := MonoList.idx_own γ.done k r
+
+instance doneRec_persistent (γ : DiskNames) (k : Nat) (r : UsedRec) :
+    Persistent (doneRec (GF := GF) γ k r) := by unfold doneRec MonoList.idx_own; infer_instance
+
+instance doneAuth_timeless (γ : DiskNames) (l : List UsedRec) :
+    Timeless (doneAuth (GF := GF) γ l) := by unfold doneAuth; infer_instance
+
+theorem doneRec_lookup (γ : DiskNames) (l : List UsedRec) (k : Nat) (r : UsedRec) :
+    ⊢@{IProp GF} doneAuth γ l -∗ doneRec γ k r -∗ ⌜l[k]? = some r⌝ := by
+  unfold doneAuth doneRec
+  iintro H1 H2
+  icases H1 with ⟨Ha, _⟩
+  iapply MonoList.auth_idx_lookup γ.done _ l k r $$ Ha H2
+
+theorem doneRec_get (γ : DiskNames) (l : List UsedRec) (k : Nat) (r : UsedRec)
+    (h : l[k]? = some r) : doneAuth (GF := GF) γ l ⊢ doneAuth γ l ∗ doneRec γ k r := by
+  unfold doneAuth doneRec
+  iintro ⟨Ha, #Hlb⟩
+  iframe Ha Hlb
+  iapply MonoList.idx_own_get γ.done k r h
+  iexact Hlb
+
+/-- **Catching the ghost list up with the device's log.** -/
+theorem doneAuth_sync (γ : DiskNames) (l l' : List UsedRec) (h : l <+: l') :
+    doneAuth (GF := GF) γ l ⊢ |==> doneAuth γ l' := by
+  unfold doneAuth
+  iintro ⟨Ha, _⟩
+  imod MonoList.auth_own_update γ.done l' h $$ Ha with ⟨H1, #H2⟩
+  imodintro
+  iframe H1 H2
+
+/-! ### The base of the log
+
+The used page was zeroed before the flip, by stores this invariant did not
+make; their positions are what a reader's floor must have passed before the
+`0` the cell starts at means anything to it.  The flip freezes that bound
+in a ghost variable, and `Xv6.diskWm` is how a client carries it. -/
+
+/-- The bound on the zeroing stores, before the flip. -/
+def diskBaseAuth (γ : DiskNames) (b : Nat) : IProp GF := γ.base ↪VAR{.own 1} b
+/-- The same, frozen at the flip (persistent). -/
+def diskBaseFrozen (γ : DiskNames) (b : Nat) : IProp GF := γ.base ↪VAR{.discard} b
+
+instance diskBaseFrozen_persistent (γ : DiskNames) (b : Nat) :
+    Persistent (diskBaseFrozen (GF := GF) γ b) := by unfold diskBaseFrozen; infer_instance
+
+theorem diskBase_freeze (γ : DiskNames) (b b' : Nat) :
+    diskBaseAuth (GF := GF) γ b ⊢ |==> diskBaseFrozen γ b' := by
+  unfold diskBaseAuth diskBaseFrozen
+  iintro H
+  imod ghost_var_update b' γ.base $$ H with H
+  imod ghost_var_persist γ.base _ b' $$ H with #H
+  imodintro
+  iexact H
+
+theorem diskBaseFrozen_agree (γ : DiskNames) (b b' : Nat) :
+    ⊢@{IProp GF} diskBaseFrozen γ b -∗ diskBaseFrozen γ b' -∗ ⌜b = b'⌝ := by
+  unfold diskBaseFrozen
+  iintro H1 H2
+  ihave %h := ghost_var_agree γ.base _ _ _ _ $$ H1 H2
+  ipureintro; exact h
+
+/-- **The handler's TSO credential**: its floor `F` has passed the stores
+that zeroed the used page, and -- when its watermark `n` is not zero -- the
+used-index write that published `n`.  Persistent, and monotone in `F`.
+
+This is the one fact the accessors of the completion side cannot derive for
+themselves: nothing in a plain load tells a hart that its view has reached
+a write the DISK made.  It is Rocq's `disk_flr`, as a credential. -/
+def diskWm (γ : DiskNames) : Nat → Nat → IProp GF
+  | 0, F => iprop(∃ b : Nat, diskBaseFrozen γ b ∗ ⌜b ≤ F⌝)
+  | (n + 1), F => iprop((∃ b : Nat, diskBaseFrozen γ b ∗ ⌜b ≤ F⌝) ∗
+      ∃ (k t : Nat), doneRec γ k (n + 1, t) ∗ ⌜t ≤ F⌝)
+
+theorem diskWm_zero (γ : DiskNames) (F : Nat) :
+    diskWm (GF := GF) γ 0 F = iprop(∃ b : Nat, diskBaseFrozen γ b ∗ ⌜b ≤ F⌝) := rfl
+
+theorem diskWm_succ (γ : DiskNames) (n F : Nat) :
+    diskWm (GF := GF) γ (n + 1) F = iprop((∃ b : Nat, diskBaseFrozen γ b ∗ ⌜b ≤ F⌝) ∗
+      ∃ (k t : Nat), doneRec γ k (n + 1, t) ∗ ⌜t ≤ F⌝) := rfl
+
+instance diskWm_persistent (γ : DiskNames) (n F : Nat) :
+    Persistent (diskWm (GF := GF) γ n F) := by
+  cases n with
+  | zero => rw [diskWm_zero]; infer_instance
+  | succ n => rw [diskWm_succ]; infer_instance
+
+theorem diskWm_base (γ : DiskNames) (n F : Nat) :
+    diskWm (GF := GF) γ n F ⊢ ∃ b : Nat, diskBaseFrozen γ b ∗ ⌜b ≤ F⌝ := by
+  cases n with
+  | zero => rw [diskWm_zero]
+  | succ n =>
+    rw [diskWm_succ]
+    iintro ⟨H, _⟩
+    iexact H
+
+theorem diskWm_rec (γ : DiskNames) (n F : Nat) :
+    diskWm (GF := GF) γ (n + 1) F ⊢ ∃ (k t : Nat), doneRec γ k (n + 1, t) ∗ ⌜t ≤ F⌝ := by
+  rw [diskWm_succ]
+  iintro ⟨_, H⟩
+  iexact H
+
+theorem diskWm_mk (γ : DiskNames) (n F : Nat) :
+    iprop((∃ b : Nat, diskBaseFrozen (GF := GF) γ b ∗ ⌜b ≤ F⌝) ∗
+      (match n with
+       | 0 => iprop(emp)
+       | (m + 1) => iprop(∃ (k t : Nat), doneRec γ k (m + 1, t) ∗ ⌜t ≤ F⌝))) ⊢
+      diskWm γ n F := by
+  cases n with
+  | zero =>
+    rw [diskWm_zero]
+    iintro ⟨H, _⟩
+    iexact H
+  | succ n => rw [diskWm_succ]
+
+theorem diskWm_mono (γ : DiskNames) (n F F' : Nat) (h : F ≤ F') :
+    diskWm (GF := GF) γ n F ⊢ diskWm γ n F' := by
+  cases n with
+  | zero =>
+    rw [diskWm_zero, diskWm_zero]
+    iintro ⟨%b, #Hb, %hb⟩
+    iexists b
+    iframe Hb
+    ipureintro; omega
+  | succ n =>
+    rw [diskWm_succ, diskWm_succ]
+    iintro ⟨⟨%b, #Hb, %hb⟩, ⟨%k, %t, #Hr, %ht⟩⟩
+    isplitl []
+    · iexists b
+      iframe Hb
+      ipureintro; omega
+    · iexists k, t
+      iframe Hr
+      ipureintro; omega
+
 /-! ## The published count, monotonically
 
 `np` is a ghost var split between the invariant and the publisher, so that
@@ -757,9 +1202,11 @@ theorem headRes_active (γ : DiskNames) (pd : PAddr) (i : Nat) (c : Chain) :
     headRes (GF := GF) γ pd i (.active c) =
       iprop(⌜c.hd = i ∧ c.wf⌝ ∗ chainLease pd c ∗ ∃ bs, diskBlock γ c.blk bs) := rfl
 
-/-- The used ring is ENTIRELY the device's. -/
+/-- The used RING is entirely the device's.  The used INDEX is kept apart
+(`Xv6.usedIdxCell`), because the handler reads it and a `dmaOwn` cell tells
+a read nothing. -/
 def usedLease (pu : PAddr) : IProp GF := iprop%
-  dmaOwn (usedIdxAt pu) 2 ∗ ([∗list] j ∈ List.range NUM, dmaOwn (usedElemAt pu j) 8)
+  [∗list] j ∈ List.range NUM, dmaOwn (usedElemAt pu j) 8
 
 /-- The invariant's half of `avail->idx` and of the eight ring cells. -/
 def availLease (pav : PAddr) (np : Nat) (ring : Nat → Nat) : IProp GF := iprop%
@@ -773,21 +1220,8 @@ theorem range_mem (i n : Nat) (h : i < n) : i ∈ List.range n := List.mem_range
 theorem usedElem_acc (pu : PAddr) (j : Nat) (hj : j < NUM) :
     usedLease (GF := GF) pu ⊢ dmaOwn (usedElemAt pu j) 8 ∗ (dmaOwn (usedElemAt pu j) 8 -∗ usedLease pu) := by
   unfold usedLease
-  iintro ⟨Hi, Hr⟩
-  icases BigSepL.bigSepL_mem_acc (Φ := fun j => dmaOwn (GF := GF) (usedElemAt pu j) 8)
-      (range_mem j NUM hj) $$ Hr with ⟨He, Hback⟩
-  iframe He
-  iintro He2
-  iframe Hi
-  iapply Hback $$ He2
-
-theorem usedIdx_acc (pu : PAddr) :
-    usedLease (GF := GF) pu ⊢ dmaOwn (usedIdxAt pu) 2 ∗ (dmaOwn (usedIdxAt pu) 2 -∗ usedLease pu) := by
-  unfold usedLease
-  iintro ⟨Hi, Hr⟩
-  iframe Hi
-  iintro Hi2
-  iframe Hi2 Hr
+  exact BigSepL.bigSepL_mem_acc (Φ := fun j => dmaOwn (GF := GF) (usedElemAt pu j) 8)
+    (range_mem j NUM hj)
 
 theorem availLease_idx (pav : PAddr) (np : Nat) (ring : Nat → Nat) :
     availLease (GF := GF) pav np ring ⊢ dmaHalfAt (availIdxAt pav) 2 (wrap16 np) ∗
@@ -838,16 +1272,17 @@ def imgOk (v : VirtioState) (m : RegMapF (List (BitVec 8))) (P : Nat → Prop) :
 def diskLive (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState)
     (pm : RegMapF PermVal) : IProp GF := iprop%
   ∃ (st : Nat → HState) (nc np lo : Nat) (ring : Nat → Nat) (m : RegMapF (List (BitVec 8)))
-      (pmap : List Nat) (stg : Option Nat),
+      (pmap : List Nat) (stg : Option Nat) (b M : Nat) (dl dl0 : List UsedRec),
     imgAuth γ m ∗
     ([∗list] i ∈ List.range NUM, headAuth γ i (st i)) ∗
     ([∗list] i ∈ List.range NUM, headRes γ c0.desc i (st i)) ∗
     usedLease c0.used ∗ availLease c0.avail np ring ∗
-    diskDoneAuth γ nc ∗ diskPubAuth γ np ∗ diskLoAuth γ lo ∗
+    diskDoneAuth γ M ∗ diskPubAuth γ np ∗ diskLoAuth γ lo ∗
     diskPubAuthM γ np ∗ posAuth γ pmap ∗ diskStageAuth γ stg ∗
+    usedIdxCell (usedIdxAt c0.used) b dl ∗ doneAuth γ dl0 ∗ diskBaseFrozen γ b ∗
     ⌜v.usedIdx = wrap16 nc ∧ v.seen = wrap16 lo ∧ lo ≤ np ∧ queueOk st ring lo np ∧
       posOk pmap ring lo np ∧ stageOk stg ring lo np ∧ inflightOk v st ∧
-      imgOk v m (inFlightBlk st) ∧ cachedOk v st ∧ permOk pm st⌝
+      imgOk v m (inFlightBlk st) ∧ cachedOk v st ∧ permOk pm st ∧ usedOk dl dl0 nc M⌝
 
 /-- The dead arm: before `virtio_disk_init`, and never again after.
 
@@ -870,7 +1305,7 @@ task, and the staged head's other half rides in `diskInitGhosts`. -/
 def diskDead (γ : DiskNames) (v : VirtioState) (pm : RegMapF PermVal) : IProp GF := iprop%
   ∃ m : RegMapF (List (BitVec 8)),
     imgAuth γ m ∗ diskCfgAuth γ v.cfg ∗ diskLoAuth γ 0 ∗ diskPubAuthM γ 0 ∗ posAuth γ [] ∗
-    diskStageAuth γ none ∗
+    diskStageAuth γ none ∗ diskBaseAuth γ 0 ∗ doneAuth γ [] ∗
     ⌜Virtio.live v.cfg = false ∧ noInflight v ∧ v.cache = [] ∧ imgOk v m (fun _ => False) ∧
       permOk pm (fun _ => .inactive) ∧ v.usedIdx = 0#16 ∧ v.seen = 0#16⌝
 
@@ -901,10 +1336,11 @@ instance availLease_timeless (pav : PAddr) (np : Nat) (ring : Nat → Nat) :
 instance diskLive_timeless (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState)
     (pm : RegMapF PermVal) : Timeless (diskLive (GF := GF) γ c0 v pm) := by
   unfold diskLive headAuth diskDoneAuth diskPubAuth diskLoAuth diskStageAuth imgAuth
+    diskBaseFrozen
   infer_instance
 instance diskDead_timeless (γ : DiskNames) (v : VirtioState) (pm : RegMapF PermVal) :
     Timeless (diskDead (GF := GF) γ v pm) := by
-  unfold diskDead diskCfgAuth diskLoAuth diskStageAuth imgAuth; infer_instance
+  unfold diskDead diskCfgAuth diskLoAuth diskStageAuth imgAuth diskBaseAuth; infer_instance
 
 instance permAuth_timeless (γ : DiskNames) (pm : RegMapF PermVal) :
     Timeless (permAuth (GF := GF) γ pm) := by unfold permAuth; infer_instance
