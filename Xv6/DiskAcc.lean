@@ -49,6 +49,7 @@ import Xv6.DiskInv
 import MachCSL.WpDmaCtx
 import MachCSL.WpSmodeDev4
 import MachCSL.WpSmodeAuRules
+import MachCSL.WpSmodeFenceFloor
 import Xv6.PtOwnLemmas
 import Xv6.DiskTier
 
@@ -1341,18 +1342,26 @@ device creates has to be built the way the write log is: a pure list the
 device grows alone, with a LAGGING ghost a client catches up inside a view
 shift.
 
-(2) THE TSO CREDENTIAL IS A PREMISE, NOT A THEOREM.  `Xv6.diskWm γ n F`
-says the hart's floor `F` has passed a used-index write publishing at
-least `n`.  Nothing in the present MachCSL exposes a way to establish it:
-`MachCSL.readAU`'s continuation never names the position the load read, so
-a plain load cannot raise the reader's floor, and the only view-raising
-rule (`MachCSL.exclWriteAU`'s acquire arm) hands out a floor at the
-position the lock's own accessor names.  `__sync_synchronize()` is what
-buys it on the machine -- the fence's `MachCSL.memModel_fence` already
-proves the model supports it -- so the missing piece is a hart-side rule
-that turns a `topLb T` into a `viewLb cpu T` after a fence.  `disk_deposit`
-is written so that this plugs straight in: it returns the write's `topLb T`
-and a wand from `⌜F ≤ F' ∧ T ≤ F'⌝` to the next credential. -/
+(2) THE TSO CREDENTIAL, SETTLED.  `Xv6.diskWm γ n F` says the hart's floor
+`F` has passed a used-index write publishing at least `n`.  It used to be
+a PREMISE with no way to establish it; it is now a THEOREM of the read,
+through `MachCSL/WpSmodeFenceFloor.lean`:
+
+* `MachCSL.readAUr` is `MachCSL.readAU` whose continuation ALSO receives
+  `MachCSL.rviewLb cpu tvn` -- a ghost receipt that the reader's READ
+  WATERMARK has reached the view `tvn` the load read at.  So
+  `disk_used_idx_read` can hand out `diskWm γ m tvn` beside its answer:
+  the log entry the answer came from sits at a position at or below `tvn`
+  (the disk is not this hart, so nothing above `tvn` is visible to it);
+* `MachCSL.wp_s_fence_rw_rw_floor` then turns that `rviewLb cpu tvn` into
+  a floor `MachCSL.viewLb cpu tvn`, which is exactly what the loop body's
+  `__sync_synchronize()` is there for.
+
+NOTE on what the model does NOT support: a fence does NOT take the floor
+to the top of the store order (`MachCSL.fencePost` is
+`max tv (max pub rv)`, and `MachCSL/TsoMem.lean` is a relaxed read-read
+model), so `topLb T ∗ fence ⊢ viewLb cpu T` is unsound and the credential
+has to travel on the READ, not on the write's position. -/
 
 /-! ## Arming a head: the publication view shift
 
@@ -1582,18 +1591,25 @@ published, and `m` is at least the handler's watermark -- which is what
 makes `disk.used_idx != disk.used->idx` mean `nr < m`, and so licenses the
 reads of the used element and of the status byte at position `nr`.
 
-`diskWm γ nr K` is the TSO credential: `K` is a bound the hart's view has
-reached, and it has passed the write that published `nr` (and the stores
-that zeroed the page).  Nothing in a plain load can establish that on its
-own -- the load rules expose no read position -- so it is a PREMISE, the
-one residue of the completion side; see the head of the assumed-interface
-section below. -/
+`diskWm γ nr K` is the TSO credential the read CONSUMES: `K` is a bound
+the hart's floor has reached, and it has passed the write that published
+`nr` (and the stores that zeroed the page); that is what makes
+`disk.used_idx != disk.used->idx` mean `nr < m`.
+
+The read also PRODUCES the next one.  `MachCSL.readAUr` names the view
+`F` the load read at (`MachCSL.rviewLb cpu F`), and the log entry the
+answer came from is at a position at or below `F` -- the disk is not this
+hart, so an entry above `F` is invisible to it.  So `diskWm γ m F` comes
+out beside the answer, and the `__sync_synchronize()` of the loop body
+turns the `rviewLb cpu F` into the floor `MachCSL.viewLb cpu F` that the
+element and status reads need (`MachCSL.wp_s_fence_rw_rw_floor`). -/
 theorem disk_used_idx_read [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu : CPU)
     (K nr : Nat) :
     diskInv (GF := GF) γ ∗ diskGeom γ pd pav pu ∗ diskReadAt γ nr ∗ diskWm γ nr K ⊢
-      readAU cpu (usedIdxAt pu) 2 K [] (fun w =>
-        iprop(diskReadAt γ nr ∗ ∃ m : Nat, ⌜w = wrap16 m ∧ nr ≤ m⌝ ∗ diskDoneLb γ m)) := by
-  unfold diskInv devInvR readAU
+      readAUr cpu (usedIdxAt pu) 2 K [] (fun w =>
+        iprop(diskReadAt γ nr ∗ ∃ m F : Nat, ⌜w = wrap16 m ∧ nr ≤ m⌝ ∗ diskDoneLb γ m ∗
+          rviewLb cpu F ∗ diskWm γ m F)) := by
+  unfold diskInv devInvR readAUr
   iintro ⟨#Hinv, #Hgeom, Hnr, #Hwm⟩
   icases diskGeom_cfg γ pd pav pu $$ Hgeom with ⟨%c0, #Hfr, %hg⟩
   obtain ⟨hgd, hga, hgu, hgl, hgq⟩ := hg
@@ -1617,12 +1633,12 @@ theorem disk_used_idx_read [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu : 
   · ipureintro
     exact fun j hj => usedIdxCell_ne_nil b dl Hold htail j hj
   inext
-  iintro %w %tvn %hKt %hrd %hauth Hb
+  iintro %w %tvn %hKt %hrd %hauth #Hrv Hb
   imod Hmask
   obtain ⟨m, hwm, hmm, hdom⟩ :=
     usedIdx_read dl Hold b cpu tvn w htail (by omega) hok.2.2.2.1 hrd
   have hmle : m ≤ nc + 1 := by
-    rcases hmm with hz | ⟨t, hd, ht⟩
+    rcases hmm with hz | ⟨t, hd, ht, _⟩
     · omega
     · exact hok.2.1 (m, t, hd) ht
   have hnrm : nr ≤ m := by
@@ -1632,11 +1648,36 @@ theorem disk_used_idx_read [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu : 
   imod diskDoneAuth_cash γ M m $$ Hnc with ⟨Hnc, #Hlb⟩
   ihave Hui := usedIdxCell_intro (usedIdxAt c0.used) b dl Hold htail $$ Hb
   have hach : m = 0 ∨ ∃ r ∈ dl, m ≤ r.1 := by
-    rcases hmm with hz | ⟨t, hd, ht⟩
+    rcases hmm with hz | ⟨t, hd, ht, _⟩
     · exact Or.inl hz
     · exact Or.inr ⟨(m, t, hd), ht, Nat.le_refl _⟩
-  ihave Hproto := Hback $$ %(max M m) %dl0 %(usedOk_bump dl dl0 nc M m hok hmle hach)
-    Hui Hdn Hnc
+  -- the credential for the NEXT read: the entry the answer came from sits
+  -- at a position THIS load's view has passed, so the fence that follows
+  -- takes the hart's floor past it
+  imod doneAuth_sync γ dl0 dl hok.1 $$ Hdn with Hdn
+  ihave ⟨Hdn, #Hwm2⟩ : iprop(doneAuth γ dl ∗ diskWm γ m tvn) $$ [Hdn]
+  · unfold diskWm
+    rcases hmm with hz | ⟨t, hd, ht, htt⟩
+    · iframe Hdn
+      isplitl []
+      · iexists b
+        iframe Hbs
+        ipureintro; omega
+      · ileft; ipureintro; exact hz
+    · obtain ⟨k, hk⟩ := List.getElem?_of_mem ht
+      icases doneRec_get γ dl k (m, t, hd) hk $$ Hdn with ⟨Hdn, #Hrec⟩
+      iframe Hdn
+      isplitl []
+      · iexists b
+        iframe Hbs
+        ipureintro; omega
+      · iright
+        iexists k, m, t, hd
+        iframe Hrec
+        ipureintro
+        exact ⟨Nat.le_refl _, htt⟩
+  ihave Hproto := Hback $$ %(max M m) %dl
+    %(usedOk_bump dl dl nc M m (usedOk_sync dl dl0 nc M hok) hmle hach) Hui Hdn Hnc
   ihave Hcl := Hclose $$ [Hfrag Hproto]
   case' _ =>
     inext
@@ -1645,68 +1686,24 @@ theorem disk_used_idx_read [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu : 
   imod Hcl
   imodintro
   iframe Hnr
-  iexists m
+  iexists m, tvn
   isplitl []
   · ipureintro; exact ⟨hwm, hnrm⟩
-  · iexact Hlb
+  iframe Hlb Hrv Hwm2
 
 /-- **`deposit`** (`disk.used_idx += 1`, the tail of `virtio_disk_intr`'s
 loop body): the handler advances its watermark past the completion it has
-just read, and takes out of the invariant the PERSISTENT receipts of a
-used-index write that published a counter past the new watermark -- the
-record itself, and the write's POSITION as a `topLb`.
+just read.  `Xv6.diskReadAt` is WHOLLY the driver's -- the invariant never
+mentions it -- so the bump asks for nothing else.
 
-Those two are the credential the next loop test needs
-(`Xv6.disk_used_idx_read`), up to one thing the MachCSL layer cannot yet
-supply: a view receipt `F'` of the hart past both the old credential's
-bound and the write's position `T`.  That is what `__sync_synchronize()`
-buys on the machine, and what the model's plain-load rules do not expose;
-the wand is where it plugs in. -/
-theorem disk_deposit [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (nr F : Nat) :
-    diskInv (GF := GF) γ ∗ diskGeom γ pd pav pu ∗ diskReadAt γ nr ∗ diskDoneLb γ (nr + 1) ∗
-      diskWm γ nr F ⊢
-      |={⊤}=> (diskReadAt γ (nr + 1) ∗ ∃ T : Nat, topLb T ∗
-        ∀ F' : Nat, ⌜F ≤ F' ∧ T ≤ F'⌝ -∗ diskWm γ (nr + 1) F') := by
-  unfold diskInv devInvR
-  iintro ⟨#Hinv, #Hgeom, Hnr, #Hlb, #Hwm⟩
-  icases diskGeom_cfg γ pd pav pu $$ Hgeom with ⟨%c0, #Hfr, %hg⟩
-  icases diskWm_base γ nr F $$ Hwm with ⟨%b', #Hbs', %hb'⟩
-  iinv Hinv with Hbody Hclose
-  icases Hbody with ⟨%v, >Hfrag, >Hproto⟩
-  icases diskProto_usedRead_acc γ c0 v hg.2.2.2.1 $$ [$Hfr $Hproto]
-    with ⟨%b, %nc, %M, %dl, %dl0, %hok, #Hbs, #Htp, Hui, Hdn, Hnc, Hback⟩
-  ihave %hle := diskDoneLb_le γ M (nr + 1) $$ Hnc Hlb
-  obtain ⟨r, hrmem, hrle⟩ : ∃ r ∈ dl, nr + 1 ≤ r.1 := by
-    rcases hok.2.2.2.2 with hz | ⟨r, hr, hmr⟩
-    · omega
-    · exact ⟨r, hr, by omega⟩
-  obtain ⟨k, hk⟩ := List.getElem?_of_mem hrmem
-  imod doneAuth_sync γ dl0 dl hok.1 $$ Hdn with Hdn
-  icases doneRec_get γ dl k r hk $$ Hdn with ⟨Hdn, #Hrec⟩
-  ihave #Htr := dlTops_mem dl r hrmem $$ Htp
-  ihave Hproto := Hback $$ %M %dl %(usedOk_sync dl dl0 nc M hok) Hui Hdn Hnc
-  ihave Hcl := Hclose $$ [Hfrag Hproto]
-  case' _ =>
-    inext
-    iexists v
-    iframe Hfrag Hproto
-  imod Hcl
-  imod diskReadAt_update γ nr (nr + 1) $$ Hnr with Hnr
-  imodintro
-  iframe Hnr
-  iexists r.2.1
-  iframe Htr
-  iintro %F' %hF'
-  unfold diskWm
-  isplitl []
-  · iexists b'
-    iframe Hbs'
-    ipureintro; omega
-  · iright
-    iexists k, r.1, r.2.1, r.2.2
-    iframe Hrec
-    ipureintro
-    exact ⟨hrle, by omega⟩
+The TSO credential for the next loop test no longer comes from here: since
+`MachCSL.readAUr`, `Xv6.disk_used_idx_read` hands out the next iteration's
+`Xv6.diskWm` at the READ itself, at the very view the load read at, and
+the `__sync_synchronize()` that follows turns that view receipt into a
+floor (`MachCSL.wp_s_fence_rw_rw_floor`).  See the section head below. -/
+theorem disk_deposit [CurCtx] (γ : DiskNames) (nr : Nat) :
+    diskReadAt (GF := GF) γ nr ⊢ |==> diskReadAt γ (nr + 1) :=
+  diskReadAt_update γ nr (nr + 1)
 
 /-- **The accessors whose obligations this port leaves open.**
 

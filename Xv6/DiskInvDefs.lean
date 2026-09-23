@@ -875,7 +875,7 @@ theorem usedIdx_read (dl : List UsedRec) (Hold : Nat → Hist) (b : Nat) (cpu : 
     (tvn : Nat) (w : BitVec (8 * 2)) (htail : usedTailOk b Hold) (hb : b ≤ tvn)
     (hpw : dl.Pairwise (fun a c => a.1 ≤ c.1))
     (hrd : readsAre (hartAgent cpu) tvn ((usedW dl).hist Hold) 2 w) :
-    ∃ m : Nat, w = wrap16 m ∧ (m = 0 ∨ ∃ (t hd : Nat), (m, t, hd) ∈ dl) ∧
+    ∃ m : Nat, w = wrap16 m ∧ (m = 0 ∨ ∃ (t hd : Nat), (m, t, hd) ∈ dl ∧ t ≤ tvn) ∧
       ∀ x ∈ dl, x.2.1 ≤ tvn → x.1 ≤ m := by
   cases hfr : dl.reverse.find? (fun x => decide (x.2.1 ≤ tvn)) with
   | none =>
@@ -888,7 +888,10 @@ theorem usedIdx_read (dl : List UsedRec) (Hold : Nat → Hist) (b : Nat) (cpu : 
       simp only [decide_eq_true_eq] at this
       exact absurd ht this
   | some r =>
-    refine ⟨r.1, ?_, Or.inr ⟨r.2.1, r.2.2, ?_⟩, ?_⟩
+    have hrt : r.2.1 ≤ tvn := by
+      have := List.find?_eq_some_iff_append.1 hfr
+      simpa only [decide_eq_true_eq] using this.1
+    refine ⟨r.1, ?_, Or.inr ⟨r.2.1, r.2.2, ?_, hrt⟩, ?_⟩
     · have := usedIdx_read_some dl Hold cpu tvn w (usedEnt r)
         (by rw [usedW_find, hfr]; rfl) hrd
       rw [this]
@@ -1047,11 +1050,13 @@ that zeroed the used page, and -- when its watermark `n` is not zero -- a
 used-index write that published a counter at least `n`.  Persistent,
 monotone UP in `F` and DOWN in `n`.
 
-This is the one fact the accessors of the completion side cannot derive
-for themselves: nothing in a plain load tells a hart that its view has
-reached a write the DISK made, because the load rules expose no read
-position.  It is Rocq's `disk_flr`, as a credential the handler carries
-from one iteration of its loop to the next. -/
+It is Rocq's `disk_flr`, the credential the handler carries from one
+iteration of its loop to the next.  It is MINTED by the read of
+`used->idx` itself (`Xv6.disk_used_idx_read`, over `MachCSL.readAUr`,
+whose continuation names the view the load read at) and CASHED by the
+reads that follow the loop body's `__sync_synchronize()`, which is what
+turns that read watermark into a floor
+(`MachCSL.wp_s_fence_rw_rw_floor`). -/
 def diskWm (γ : DiskNames) (n F : Nat) : IProp GF := iprop%
   (∃ b : Nat, diskBaseFrozen γ b ∗ ⌜b ≤ F⌝) ∗
   (⌜n = 0⌝ ∨ ∃ (k m t hd : Nat), doneRec γ k (m, t, hd) ∗ ⌜n ≤ m ∧ t ≤ F⌝)
