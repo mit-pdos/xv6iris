@@ -49,12 +49,21 @@ what sits beside the device's mirror inside `devInvR`:
   for a free descriptor, `.active c` for the head of the formatted chain
   `c`); the driver holds the other half as `headTok`;
 * when armed, `chainLease`: HALVES of the chain's three descriptor words
-  and of its 16-byte request header (the device only reads those, and a
-  half pins them), OWN 1 of the status byte, OWN 1 of each of the two
+  and of the three fields of its request header (the device only reads
+  those, and a half pins them -- the header is kept as the 4/4/8 pieces
+  the device's `fetch` actually reads, so no byte-range splitting is
+  needed at a read), OWN 1 of the status byte, OWN 1 of each of the two
   sectors of `b->data` for a disk READ (the device writes them) or a HALF
   for a disk WRITE (it only reads them), and the block's image fragment;
+* when FREE, a half of the descriptor's sixteen ZERO bytes: `free_desc`
+  zeroes a descriptor it gives back, and the invariant keeping its half
+  is what makes a `fetch` at an unarmed head read a descriptor with no
+  NEXT flag and STALL, instead of parsing a request out of whatever is
+  in the queue page;
 
-and, once, the whole used ring (`usedLease`: `used->idx` and the eight
+and, once, the SERVE PERMITS (`permAuth`/`permTok`, see below: what a
+`serve` task takes at its first `get` so that the receipt of the head it
+is serving cannot move under it), the whole used ring (`usedLease`: `used->idx` and the eight
 elements at own 1 -- the used page is entirely the device's), a half of
 `avail->idx` and of the eight ring cells (`availLease`), the completion
 counter `nc` as a mono-nat authority with `v.usedIdx = wrap16 nc`, and
@@ -64,12 +73,17 @@ chain armed at that head.
 ---------------------------------------------------------------------
 WHAT IS NOT HERE, AND WHY.
 
-* No `VQ.Ok` inside the invariant.  `DevM.Lease`'s `.step` obligation is
-  `rel s s'` for EVERY state `s`, so the device's `complete` has to be
-  admitted at states where nothing is in flight; `nc ≤ lo ≤ np` cannot be
-  maintained against that.  The record and its preservation lemmas live
-  in `Xv6/VirtioQueue.lean` for the driver's side.
+* No `VQ.Ok` inside the invariant.  The device's `complete` and its pop
+  have to be admitted at every state, so `nc ≤ lo ≤ np` cannot be
+  maintained against them here.  The record and its preservation lemmas
+  live in `Xv6/VirtioQueue.lean` for the driver's side, which is also
+  where they are NEEDED: the driver's future `publish`/`reclaim` must
+  show that no serve permit for the head is out, and it is the queue
+  accounting that bounds the permits on a head to the one `serve` task
+  that is running (`Xv6/DiskInv.lean`'s header).
 * No `seen` clause.  Same reason: the pop bumps `seen` unconditionally.
+* The install of a fetched request is NOT assumed any more; the serve
+  permit below is what pays for it (see `Xv6/DiskInv.lean`).
 * The CONTENT of a disk read's data transfer is existential
   (`dmaOwn`, not `dmaOwnAt`).  The device computes the payload from a
   SNAPSHOT of its image taken at the task's `get` and writes it several
@@ -106,8 +120,11 @@ class DiskG (GF : BundledGFunctors) where
   [gmImgG : GhostMapG GF Nat (List (BitVec 8)) RegMapF]
   /-- the completion counter -/
   [mnG : MonoNatG GF]
+  /-- the SERVE PERMITS (see `permTok`) -/
+  [gmPermG : GhostMapG GF Nat (BitVec 16 × HState) RegMapF]
 
 attribute [reducible, instance] DiskG.gvCfgG DiskG.gvHeadG DiskG.gvStageG DiskG.gmImgG DiskG.mnG
+attribute [reducible, instance] DiskG.gmPermG
 
 /-- The disk's ghost names (Rocq's `disk_names`, the subset this port
 carries). -/
@@ -126,6 +143,8 @@ structure DiskNames where
   nr : GName
   /-- the head staged between the ring store and the index bump -/
   stage : GName
+  /-- the serve permits -/
+  perm : GName
 
 /-- The disk invariant's namespace. -/
 def diskN : Namespace := ndot nroot "xv6disk"
@@ -334,6 +353,79 @@ def diskStageAuth (γ : DiskNames) (s : Option Nat) : IProp GF :=
 def diskStage (γ : DiskNames) (s : Option Nat) : IProp GF :=
   γ.stage ↪VAR{.own (1 : Qp).half} s
 
+/-! ## The serve permits
+
+A `serve h` task must know, at the step where it installs the request it
+parsed, that head `h` still carries the chain whose descriptors it read.
+That is not a monotone fact, so no persistent token can carry it: the
+task takes an EXCLUSIVE permit out of the invariant at its first `get`
+(`MachCSL.DevM.LeaseL`'s `.get` arm may update the invariant, and the
+invariant is re-established with the permit's key recorded in it), and
+holds it to its last step.  While a permit for `h` is out, the receipt of
+`h` cannot move: any move would have to change the permit's value, which
+needs the permit back.
+
+The permits are a ghost map keyed by a serial number, so taking one is
+always possible -- `permFresh` keeps a bound above which the map is
+empty.  The driver's future `publish`/`reclaim` accessors, which DO move
+a receipt, will have to show that no permit for that head is out; that is
+where the queue record's `nc ≤ lo ≤ np` accounting (`Xv6.VQ.Ok`) belongs,
+since it is what rules out a pop of a head that is already in flight or
+not armed at all. -/
+
+/-- What a permit records: the head, and the receipt that head carried
+when the permit was taken. -/
+abbrev PermVal : Type := BitVec 16 × HState
+
+/-- The permits the invariant has handed out. -/
+def permAuth (γ : DiskNames) (pm : RegMapF PermVal) : IProp GF := γ.perm ↪●MAP pm
+
+/-- **A serve permit**: exclusive, and pins head `h`'s receipt to `s`. -/
+def permTok (γ : DiskNames) (k : Nat) (h : BitVec 16) (s : HState) : IProp GF :=
+  γ.perm ↪◯MAP[k] ((h, s) : PermVal)
+
+/-- The receipt of a head, as a permit sees it: a head outside the queue
+is free by definition. -/
+def hstateAt (st : Nat → HState) (h : BitVec 16) : HState :=
+  if h.toNat < NUM then st h.toNat else .inactive
+
+/-- Every permit agrees with the receipt it names. -/
+def permOk (pm : RegMapF PermVal) (st : Nat → HState) : Prop :=
+  ∀ k h s, PartialMap.get? pm k = some ((h, s) : PermVal) → s = hstateAt st h
+
+/-- Keys at or above `n` are free, so `n` is a key a permit may take. -/
+def permFresh (n : Nat) (pm : RegMapF PermVal) : Prop :=
+  ∀ k, n ≤ k → PartialMap.get? pm k = none
+
+theorem permOk_insert (pm : RegMapF PermVal) (st : Nat → HState) (k : Nat) (h : BitVec 16)
+    (hok : permOk pm st) : permOk (PartialMap.insert pm k ((h, hstateAt st h) : PermVal)) st := by
+  intro k' h' s' hget
+  by_cases hk : k = k'
+  · rw [get?_insert_eq hk] at hget
+    cases hget
+    rfl
+  · exact hok k' h' s' (by rwa [get?_insert_ne hk] at hget)
+
+theorem permOk_delete (pm : RegMapF PermVal) (st : Nat → HState) (k : Nat) (hok : permOk pm st) :
+    permOk (PartialMap.delete pm k) st := by
+  intro k' h' s' hget
+  by_cases hk : k = k'
+  · rw [get?_delete_eq hk] at hget; exact absurd hget (by simp)
+  · exact hok k' h' s' (by rwa [get?_delete_ne hk] at hget)
+
+theorem permFresh_insert (pm : RegMapF PermVal) (n : Nat) (h : BitVec 16) (s : HState)
+    (hf : permFresh n pm) : permFresh (n + 1) (PartialMap.insert pm n ((h, s) : PermVal)) := by
+  intro k hk
+  rw [get?_insert_ne (by omega)]
+  exact hf k (by omega)
+
+theorem permFresh_delete (pm : RegMapF PermVal) (n k : Nat) (hf : permFresh n pm) :
+    permFresh n (PartialMap.delete pm k) := by
+  intro k' hk'
+  by_cases hkk : k = k'
+  · exact get?_delete_eq hkk
+  · rw [get?_delete_ne hkk]; exact hf k' hk'
+
 /-! ## The leases -/
 
 /-- The address of sector `i` of a buffer. -/
@@ -359,7 +451,9 @@ def chainLease (pd : PAddr) (c : Chain) : IProp GF := iprop%
   dmaHalfAt (descAt pd c.hd) 16 c.d0 ∗
   dmaHalfAt (descAt pd c.md) 16 c.d1 ∗
   dmaHalfAt (descAt pd c.tl) 16 c.d2 ∗
-  dmaHalfAt c.hdrAddr 16 c.hdr ∗
+  dmaHalfAt c.hdrAddr 4 c.req.type ∗
+  dmaHalfAt (c.hdrAddr + 4#64) 4 0#32 ∗
+  dmaHalfAt (c.hdrAddr + 8#64) 8 c.sector ∗
   dmaOwn c.status 1 ∗
   bufLease c
 
@@ -367,9 +461,13 @@ instance chainLease_timeless (pd : PAddr) (c : Chain) : Timeless (chainLease (GF
   unfold chainLease
   infer_instance
 
-/-- One descriptor slot of the invariant. -/
+/-- One descriptor slot of the invariant.  A FREE slot is not empty: the
+driver's `free_desc` zeroes the descriptor, and the invariant keeps a half
+of the sixteen zero bytes -- which is what makes a `fetch` at a head the
+driver has not armed read a descriptor with no NEXT flag, and so STALL
+rather than parse a request out of nothing. -/
 def headRes (γ : DiskNames) (pd : PAddr) (i : Nat) : HState → IProp GF
-  | .inactive => iprop(emp)
+  | .inactive => dmaHalfAt (descAt pd i) 16 (0 : BitVec (8 * 16))
   | .active c => iprop(⌜c.hd = i ∧ c.wf⌝ ∗ chainLease pd c ∗ ∃ bs, diskBlock γ c.blk bs)
 
 /-- The used ring is ENTIRELY the device's. -/
@@ -427,14 +525,16 @@ def imgOk (v : VirtioState) (m : RegMapF (List (BitVec 8))) (P : Nat → Prop) :
   ∀ bno bs, PartialMap.get? m bno = some bs → P bno ∨ bs = blockView v bno
 
 /-- The live arm: the queue, the receipts, the leases. -/
-def diskLive (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) : IProp GF := iprop%
+def diskLive (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState)
+    (pm : RegMapF PermVal) : IProp GF := iprop%
   ∃ (st : Nat → HState) (nc np : Nat) (ring : Nat → Nat) (m : RegMapF (List (BitVec 8))),
     imgAuth γ m ∗
     ([∗list] i ∈ List.range NUM, headAuth γ i (st i)) ∗
     ([∗list] i ∈ List.range NUM, headRes γ c0.desc i (st i)) ∗
     usedLease c0.used ∗ availLease c0.avail np ring ∗
     diskDoneAuth γ nc ∗ diskPubAuth γ np ∗
-    ⌜v.usedIdx = wrap16 nc ∧ inflightOk v st ∧ imgOk v m (inFlightBlk st) ∧ cachedOk v st⌝
+    ⌜v.usedIdx = wrap16 nc ∧ inflightOk v st ∧ imgOk v m (inFlightBlk st) ∧ cachedOk v st ∧
+      permOk pm st⌝
 
 /-- The dead arm: before `virtio_disk_init`, and never again after. -/
 def diskDead (γ : DiskNames) (v : VirtioState) : IProp GF := iprop%
@@ -445,14 +545,17 @@ def diskDead (γ : DiskNames) (v : VirtioState) : IProp GF := iprop%
 beside the device's mirror inside `diskInv`. -/
 def diskProto (γ : DiskNames) (v : VirtioState) : IProp GF := iprop%
   ⌜cacheOk v⌝ ∗
+  ∃ (pn : Nat) (pm : RegMapF PermVal), permAuth γ pm ∗ ⌜permFresh pn pm⌝ ∗
     (diskDead γ v ∨
      ∃ c0 : VirtioCfg, diskCfgFrozen γ c0 ∗
-       ⌜v.cfg = c0 ∧ Virtio.live c0 = true ∧ c0.qnum.toNat = NUM⌝ ∗ diskLive γ c0 v)
+       ⌜v.cfg = c0 ∧ Virtio.live c0 = true ∧ c0.qnum.toNat = NUM⌝ ∗ diskLive γ c0 v pm)
 
 instance headRes_timeless (γ : DiskNames) (pd : PAddr) (i : Nat) (s : HState) :
     Timeless (headRes (GF := GF) γ pd i s) := by
   cases s with
-  | inactive => unfold headRes; infer_instance
+  | inactive =>
+    show Timeless (dmaHalfAt (GF := GF) (descAt pd i) 16 (0 : BitVec (8 * 16)))
+    infer_instance
   | active c =>
     show Timeless iprop(⌜c.hd = i ∧ c.wf⌝ ∗ chainLease pd c ∗ ∃ bs, diskBlock γ c.blk bs)
     unfold chainLease diskBlock
@@ -462,15 +565,18 @@ instance usedLease_timeless (pu : PAddr) : Timeless (usedLease (GF := GF) pu) :=
   unfold usedLease; infer_instance
 instance availLease_timeless (pav : PAddr) (np : Nat) (ring : Nat → Nat) :
     Timeless (availLease (GF := GF) pav np ring) := by unfold availLease; infer_instance
-instance diskLive_timeless (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) :
-    Timeless (diskLive (GF := GF) γ c0 v) := by
+instance diskLive_timeless (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState)
+    (pm : RegMapF PermVal) : Timeless (diskLive (GF := GF) γ c0 v pm) := by
   unfold diskLive headAuth diskDoneAuth diskPubAuth imgAuth; infer_instance
 instance diskDead_timeless (γ : DiskNames) (v : VirtioState) :
     Timeless (diskDead (GF := GF) γ v) := by unfold diskDead diskCfgAuth imgAuth; infer_instance
 
+instance permAuth_timeless (γ : DiskNames) (pm : RegMapF PermVal) :
+    Timeless (permAuth (GF := GF) γ pm) := by unfold permAuth; infer_instance
+
 instance diskProto_timeless (γ : DiskNames) (v : VirtioState) :
     Timeless (diskProto (GF := GF) γ v) := by
-  unfold diskProto diskCfgFrozen
+  unfold diskProto diskCfgFrozen permAuth
   infer_instance
 
 /-- **The disk invariant**: the device's mirror beside the protocol. -/
