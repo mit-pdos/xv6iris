@@ -1834,13 +1834,13 @@ the serving task.  The serve permit is what says the capturing head is at
 `.fetched`, hence is not the `.pushed` one whose cache
 `Xv6.dryOk` keeps dry. -/
 theorem leaseL_xferOut (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key : Nat) (c : Chain)
-    (v2 : VirtioState) (i : Nat) (hlive : Virtio.live c0 = true)
+    (v2 : VirtioState) (i : Nat) (X : IProp GF) (hlive : Virtio.live c0 = true)
     (hwr : (Chain.req c).type.toNat = Virtio.blkTOut) (hi : i < SPB)
     (k : Unit → Virtio.VM Unit)
     (hk : DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) iprop(True)
-      (serveCtx γ h c0 key c v2 (some (.fetched c.req)) none) (k ())) :
+      iprop(serveCtx γ h c0 key c v2 (some (.fetched c.req)) none ∗ X) (k ())) :
     DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) iprop(True)
-      (serveCtx γ h c0 key c v2 (some (.fetched c.req)) none)
+      iprop(serveCtx γ h c0 key c v2 (some (.fetched c.req)) none ∗ X)
       (DevM.bind (Virtio.xferOut h c.req i) k) := by
   have hne : Virtio.reqSectorLen (Chain.req c) i ≠ 0 := by
     rw [reqSectorLen_chain_lt c i hi]; decide
@@ -1863,7 +1863,7 @@ theorem leaseL_xferOut (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key : 
     subst hs2
     by_cases hc : Virtio.reqOf s1 h = some (Chain.req c)
     · rw [if_pos hc]
-      iintro ⟨HC, HR⟩
+      iintro ⟨⟨HC, HX⟩, HR⟩
       icases serveCtx_guard γ h c0 key c v2 s1 (some (.fetched c.req)) none hlive $$ [HC HR]
         with ⟨%hp, HC, HR⟩
       · iframe HC HR
@@ -1872,7 +1872,7 @@ theorem leaseL_xferOut (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key : 
         rw [(hp.2.2.1 (VPhase.fetched c.req) rfl).1] at he
         exact absurd he (by simp)
       imodintro
-      iframe HC
+      iframe HC HX
       iapply diskProto_capture γ s1 h (Chain.req c) i (bytesOf w) hc hwr hne hnp
         (by simp [bytesOf]) $$ HR
     · rw [if_neg hc]
@@ -1982,20 +1982,20 @@ theorem leaseL_req_false (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key 
 it at own 1 up to `.fetched`, and the task takes it away for the one step
 at which its DMA write fires. -/
 theorem leaseL_lend (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key : Nat) (c : Chain)
-    (s s1 : VirtioState) (u0 : Option (BitVec 16 × Bool)) (hlive : Virtio.live c0 = true) :
-    iprop(serveCtx (GF := GF) γ h c0 key c s (some (.fetched c.req)) u0 ∗ diskProto γ s1) ⊢
-      |==> (diskProto γ (Virtio.setPhase s1 h (.served c.req)) ∗
-        (serveCtx γ h c0 key c s (some (.served c.req)) none ∗ dmaOwn c.status 1)) := by
+    (s s1 : VirtioState) (hlive : Virtio.live c0 = true) :
+    iprop(serveCtx (GF := GF) γ h c0 key c s none none ∗ diskProto γ s1) ⊢
+      |==> (diskProto γ (Virtio.setPhase s1 h (.fetched c.req)) ∗
+        (serveCtx γ h c0 key c s (some (.fetched c.req)) none ∗ dmaOwn c.status 1)) := by
   iintro ⟨HC, HR⟩
-  iapply leaseL_install_gen γ h c0 key c s s1 (some (.fetched c.req)) u0 (.served c.req)
+  iapply leaseL_install_gen γ h c0 key c s s1 none none (.fetched c.req)
     (fun _ => SByte.lent) iprop(emp) iprop(dmaOwn c.status 1) hlive rfl
     (Or.inl (by rintro r ⟨⟩)) (by rintro r ⟨⟩)
     (fun _ hx => dryOk_setPhase s1 h _ (by rintro r ⟨⟩) hx)
-    (fun ob _ => ⟨⟨fun _ => ⟨c.req, rfl⟩, fun _ => rfl⟩,
+    (fun ob _ => ⟨⟨fun _ => ⟨c.req, Or.inl rfl⟩, fun _ => rfl⟩,
       by rintro r (hr | hr) <;> exact absurd hr (by simp)⟩)
     (fun ob hob => by
       have hnl : ob ≠ SByte.lent :=
-        sbAt_notLent (some (.fetched c.req)) ob hob (by intro r; simp)
+        sbAt_notLent (some VPhase.popped) ob hob (by intro r; simp) (by intro r; simp)
       iintro ⟨_, Hrow⟩
       imodintro
       isplitl []
@@ -2018,9 +2018,9 @@ theorem leaseL_take (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key : Nat
       (Or.inl (by rintro r ⟨⟩)) (by rintro r ⟨⟩)
       (fun _ hx => dryOk_setPhase s1 h _ (by rintro r ⟨⟩) hx)
       (fun ob _ => ⟨⟨fun he => absurd he (by simp), fun hx => by
-          obtain ⟨r, hr⟩ := hx; exact absurd hr (by simp)⟩, fun r _ => ⟨ts, rfl⟩⟩)
+          obtain ⟨r, hr | hr⟩ := hx <;> exact absurd hr (by simp)⟩, fun r _ => ⟨ts, rfl⟩⟩)
       (fun ob hob => by
-        have hl : ob = SByte.lent := hob.1.2 ⟨c.req, rfl⟩
+        have hl : ob = SByte.lent := hob.1.2 ⟨c.req, Or.inr rfl⟩
         rw [hl, statusRes_lent, statusRes_done]
         iintro ⟨Hb, _⟩
         imodintro
@@ -2033,7 +2033,8 @@ theorem leaseL_serveTail (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key 
     (c : Chain) (s : VirtioState) (u0 : Option (BitVec 16 × Bool))
     (hlive : Virtio.live c0 = true) (hqnum : c0.qnum.toNat = NUM) (hhd : c.hd = h.toNat) :
     DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) iprop(True)
-      (serveCtx γ h c0 key c s (some (.fetched c.req)) u0) (serveTail h c.req) := by
+      iprop(serveCtx γ h c0 key c s (some (.fetched c.req)) u0 ∗ dmaOwn c.status 1)
+      (serveTail h c.req) := by
   unfold serveTail
   simp only [bind, DevM.bind, DevM.modify, DevM.guard, DevM.step, DevM.lift,
     DevM.dmaWriteIf, DevM.dmaWriteStep, DevM.get, Pure.pure]
@@ -2044,7 +2045,17 @@ theorem leaseL_serveTail (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key 
       simp only [Option.some.injEq, Prod.mk.injEq] at hgs
       exact hgs.1.symm
     subst hs2
-    exact leaseL_lend γ h c0 key c s s1 u0 hlive
+    iintro ⟨⟨HC, Hb⟩, HR⟩
+    imod leaseL_install γ h c0 key c s s1 (some (.fetched c.req)) u0 (.served c.req)
+        hlive rfl (Or.inl (by rintro r ⟨⟩)) (by rintro r ⟨⟩)
+        (fun _ hx => dryOk_setPhase s1 h _ (by rintro r ⟨⟩) hx)
+        (fun ob hob => ⟨⟨fun _ => ⟨c.req, Or.inr rfl⟩,
+            fun _ => hob.1.2 ⟨c.req, Or.inl rfl⟩⟩,
+          by rintro r (hr | hr) <;> exact absurd hr (by simp)⟩)
+      $$ [HC HR] with ⟨HR, HC⟩
+    · iframe HC HR
+    imodintro
+    iframe HR HC Hb
   · refine DevM.LeaseL.dmaWriteIf _
       iprop(serveCtx γ h c0 key c s (some (.served c.req)) none ∗
         ∃ ts : Nat, dmaOwnT c.status 1 0#8 ts)
@@ -2282,24 +2293,18 @@ theorem leaseL_serve (γ : DiskNames) (h : BitVec 16) :
     refine leaseL_fetch_armed γ h xc0 xkey c s none none xhlive xhqnum xhhd xhwf _
       (leaseL_stall γ _) ?_
     simp only [bind, DevM.bind, DevM.modify, DevM.step, DevM.lift, Pure.pure]
-    refine DevM.LeaseL.step _ (serveCtx γ h xc0 xkey c s (some (.fetched c.req)) none) _ _ ?_ ?_
+    refine DevM.LeaseL.step _
+      iprop(serveCtx γ h xc0 xkey c s (some (.fetched c.req)) none ∗ dmaOwn c.status 1) _ _ ?_ ?_
     · intro s1 s2 os hgs
       have hs2 : s2 = Virtio.setPhase s1 h (.fetched c.req) := by
         simp only [Option.some.injEq, Prod.mk.injEq] at hgs
         exact hgs.1.symm
       subst hs2
-      exact leaseL_install γ h xc0 xkey c s s1 none none (.fetched c.req) xhlive rfl
-        (Or.inl (by rintro r ⟨⟩)) (by rintro r ⟨⟩)
-        (fun _ hx => dryOk_setPhase s1 h _ (by rintro r ⟨⟩) hx)
-        (fun ob hob => by
-          have hnl : ob ≠ SByte.lent :=
-            sbAt_notLent (some VPhase.popped) ob hob (by intro r; simp)
-          refine ⟨⟨fun he => absurd he hnl, fun hx => ?_⟩, fun r hr => ?_⟩
-          · obtain ⟨r, hr⟩ := hx; exact absurd hr (by simp)
-          · rcases hr with hr | hr <;> exact absurd hr (by simp))
+      exact leaseL_lend γ h xc0 xkey c s s1 xhlive
     · split
       · refine DevM.LeaseL.step _
-          (serveCtx γ h xc0 xkey c s (some (.fetched c.req)) none) _ _ ?_ ?_
+          iprop(serveCtx γ h xc0 xkey c s (some (.fetched c.req)) none ∗
+            dmaOwn c.status 1) _ _ ?_ ?_
         · intro s1 s2 os hgs
           have hgs' := guard_step_inv _ s2 os hgs
           replace hgs' : (if s1.taken = none then some { s1 with taken := some h }
@@ -2318,7 +2323,8 @@ theorem leaseL_serve (γ : DiskNames) (h : BitVec 16) :
             (fun i hi => by
               have := List.mem_range.1 hi
               rwa [reqSpan_chain c] at this)
-            (fun i hi k hk => leaseL_xferOut γ h xc0 xkey c s i xhlive hty hi k hk) _
+            (fun i hi k hk =>
+              leaseL_xferOut γ h xc0 xkey c s i iprop(dmaOwn c.status 1) xhlive hty hi k hk) _
             (leaseL_serveTail γ h xc0 xkey c s _ xhlive xhqnum xhhd)
       · split
         · exact leaseL_seqSectors γ _ _ (fun _ => True) _ (fun _ _ => trivial)

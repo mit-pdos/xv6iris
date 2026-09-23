@@ -2874,10 +2874,17 @@ theorem statusOf_chain (c : Chain) : Virtio.statusOf c.req = 0#8 := by
   unfold Virtio.statusOf Chain.req
   cases hd : c.dwr <;> simp [Virtio.blkTIn, Virtio.blkTOut, Virtio.blkSOk] <;> decide
 
-/-- **The status byte is out of the invariant exactly at `.served`**, and
-is back at `0` from `.status` on. -/
+/-- **The slot row is out of the invariant exactly across the DATA
+PHASE** -- from the `.fetched` install, which is where the serving task
+takes it, to the `.status` install, which is where it hands it back at the
+`0` the device wrote.
+
+It used to be lent at `.served` alone, which is one step too late: the
+sector transfers run between `.fetched` and `.served`
+(`MachCSL.Virtio.serve`), and what they leave behind has to reach the
+completion in the serving task's own linear context. -/
 def sbAt (op : Option VPhase) (b : SByte) : Prop :=
-  (b = SByte.lent ↔ ∃ r : VioReq, op = some (.served r)) ∧
+  (b = SByte.lent ↔ ∃ r : VioReq, op = some (.fetched r) ∨ op = some (.served r)) ∧
   (∀ r : VioReq, op = some (.status r) ∨ op = some (.pushed r) → ∃ ts : Nat, b = SByte.done ts)
 
 def sbOk (v : VirtioState) (sb : Nat → SByte) : Prop :=
@@ -2886,14 +2893,16 @@ def sbOk (v : VirtioState) (sb : Nat → SByte) : Prop :=
 /-- A head that is NOT in flight keeps its byte in the invariant. -/
 theorem sbAt_none (b : SByte) (hb : b ≠ SByte.lent) : sbAt none b := by
   refine ⟨⟨fun he => absurd he hb, fun hx => ?_⟩, fun r hr => ?_⟩
-  · obtain ⟨r, hr⟩ := hx; exact absurd hr (by simp)
+  · obtain ⟨r, hr | hr⟩ := hx <;> exact absurd hr (by simp)
   · rcases hr with hr | hr <;> exact absurd hr (by simp)
 
 theorem sbAt_notLent (op : Option VPhase) (b : SByte) (h : sbAt op b)
+    (hnf : ∀ r : VioReq, op ≠ some (.fetched r))
     (hno : ∀ r : VioReq, op ≠ some (.served r)) : b ≠ SByte.lent := by
   intro he
-  obtain ⟨r, hr⟩ := h.1.1 he
-  exact hno r hr
+  obtain ⟨r, hr | hr⟩ := h.1.1 he
+  · exact hnf r hr
+  · exact hno r hr
 
 /-- **(P4): a head with an UNREAD completion is not in flight** -- unless
 it is `.pushed`, the one phase that outlives its own used-index write (the
