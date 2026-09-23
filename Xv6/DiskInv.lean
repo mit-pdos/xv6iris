@@ -67,9 +67,9 @@ pop in `Virtio.body` -- take `diskCfgFrozen γ c0` with
 
 WHAT THE DRIVER'S SIDE INHERITS.  A permit records a CHAIN, so `permOk`
 says its head is armed with that chain: a head the driver holds FREE has
-no permit out, which is `disk_publish`'s whole obligation.  What the
-driver still owes is the COMPLETION side -- see the head of the
-assumed-interface section of `Xv6/DiskAcc.lean`.
+no permit out, which is `disk_publish`'s whole obligation.  The
+COMPLETION side is `Xv6/DiskAcc.lean`'s, and its section head sets out
+the mechanisms both sides rest on.
 -/
 import Xv6.DiskInvDefs
 import MachCSL.WpDevDmaStep

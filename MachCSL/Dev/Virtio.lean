@@ -17,23 +17,32 @@ an explicit phase per in-flight request; here the root program `body` POPS
 requests and FORKS the service of each one as a task (`serve h`), and the
 tasks run interleaved with each other, the harts and the other devices --
 so requests complete in ANY order, and every DMA transaction of a request
-(each descriptor read, the header read, each SECTOR of the data transfer,
-the status byte, the used element, the used index) is its own machine
-step.  The DATA PHASE runs IN the serving task, one sector at a time
-(`xferIn` / `xferOut`, sequenced by `seqSectors`): its transactions still
-interleave with every other request, every other device and every hart,
-but the sectors OF ONE REQUEST move in order.  That is deliberate.  The
-sub-tasks this file used to fork for them were joined before the request
-could complete, so operationally nothing is lost -- but a per-step
-program logic cannot observe a JOIN, so with the transfers in tasks of
-their own the invariant had no way to know, at the completion, that the
-data phase had run at all, which is exactly what the driver's collect
-must know.  Putting them in the serving task puts them in the one place
-that holds the request's exclusive permit, so the transferred bytes and
-the request they belong to travel together.  The in-flight map is still
-kept, and still advances through the Rocq phases at the same points: it
-is the OBSERVABLE device state a driver proof reasons about, while the
-tasks are its control.
+(each descriptor read, the header read, the data transfer, the status
+byte, the used element, the used index) is its own machine step.
+
+THE DATA PHASE runs IN the serving task, and in ONE transfer: the
+descriptor names the whole buffer, and the device moves it in one burst
+(`fill` for a read, `capture` for a write).  Its transaction still
+interleaves with every other request, every other device and every hart.
+That the transfers are in the serving task rather than in sub-tasks of
+their own is deliberate: the sub-tasks this file used to fork were joined
+before the request could complete, so operationally nothing is lost --
+but a per-step program logic cannot observe a JOIN, so with the transfers
+in tasks of their own the invariant had no way to know, at the
+completion, that the data phase had run at all, which is exactly what the
+driver's collect must know.  Putting them in the serving task puts them
+in the one place that holds the request's exclusive permit, so the
+transferred bytes and the request they belong to travel together.
+
+A WRITE's capture and its move to `.served` are ONE transition
+(`capture`), for the same reason the used-index write and `complete`
+are: a real device does not stop between taking the last byte of a
+payload and declaring the transfer done, and an invariant that has to say
+what the device's image of the block IS can only say it at the step that
+puts the bytes there.  The in-flight map is still kept, and still
+advances through the Rocq phases at the same points: it is the
+OBSERVABLE device state a driver proof reasons about, while the tasks are
+its control.
 
 THE GATES are the Rocq model's: a write completes only once its payload is
 captured (and, in write-through mode, drained); a flush once the cache is

@@ -764,7 +764,7 @@ writes the block's sectors into the write-back cache.
 
 The READ chains are deliberately NOT here.  An armed READ chain's block
 does not move at all: the only step that can move a block is
-`MachCSL.Virtio.xferOut`'s capture, which runs only on the WRITE branch of
+`MachCSL.Virtio.capture`, which runs only on the WRITE branch of
 `MachCSL.Virtio.serve`, and by `Xv6.blkInj` the block it captures is its
 OWN.  So `Xv6.imgOk` pins an in-flight READ chain's image fragment to
 `Xv6.blockView` for the whole flight, which is what says that what the
@@ -804,8 +804,16 @@ theorem inFlightBlk_free (st : Nat → HState) (i : Nat) (c : Chain) (bno : Nat)
 
 /-- Every sector the write-back cache holds with DATA belongs to a block
 that is in flight.  (An EMPTY entry is not data: `cacheView` falls through
-to the durable image for it, so it constrains nothing.)  This is what
-makes a capture at a sector outside the request's span harmless. -/
+to the durable image for it, so it constrains nothing.)  It made a capture
+at a sector OUTSIDE the request's span harmless.
+
+RETIRED: `Xv6.diskLive` no longer carries it.  `MachCSL.Virtio.capture`
+caches exactly the sectors `Virtio.reqSpan` names, and `Xv6.capture_blk`
+puts every one of them in the capturing chain's own block, so the case it
+was there for does not arise -- and dropping it is what lets
+`Xv6.disk_collect` free a receipt without having to show that the
+block's sectors have drained.  The definition and its preservation
+lemmas are kept for the record. -/
 def cachedOk (v : VirtioState) (st : Nat → HState) : Prop :=
   ∀ e ∈ v.cache, e.2 ≠ [] → inFlightBlk st (e.1 / SPB)
 

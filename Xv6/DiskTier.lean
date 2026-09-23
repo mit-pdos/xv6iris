@@ -12,7 +12,11 @@ invariant actually asks for:
   (`Chain.hdr`) and the device reads as `type:4`, `reserved:4`, `sector:8`
   (`ctxBytes_hdr_split` / `_join`);
 * the data buffer, which the driver owns as a `byteBuf` of `BSIZE` bytes
-  and the device leases as `SPB` sectors (`byteBuf_bufLease`);
+  and the invariant keeps either as one raw window (`byteBuf_bufLease`,
+  a READ chain's) or as one CONTEXT window at a value
+  (`byteBuf_ctxBytes` / `ctxBytes_byteBuf`, a WRITE chain's), together
+  with the `MachCSL.inRam` facts the round trip needs
+  (`byteBuf_inRam`);
 * the bridge from a `byteBuf`/`wordPointsTo` cell to the raw tier, which
   needs the page's identity claim out of `kmapStatic` (the generalisation
   of `Xv6/ProofVirtioDiskInit.lean`'s `vdi_zbuf`/`vdi_chunk`).

@@ -121,14 +121,14 @@ WHAT IS HERE, AND WHAT IS NOT.
   (`.done ts`, WITH the position of that write).  `sbOk` is the coupling;
   it and the unread rows' clauses travel together in `unreadArmed`.
   `Xv6.disk_status_read` is proved off it.
-* THE OTHER TWO PER-COMPLETION ROWS ARE NOT: the used-ring ELEMENT the
-  device wrote at each position, and the bytes of a request's DATA
-  transfer.  Both are the status row's shape one level up -- a per-SLOT
-  marker for the element, `bufLease` at values for the data -- and both
-  wait on the used-element slot's LINEAR WITNESS, which is also what
-  makes the log's counters strictly monotone and its unread window at
-  most `NUM` wide.  The section head of `Xv6/DiskAcc.lean` sets the
-  design out in full.
+* THE OTHER TWO PER-COMPLETION ROWS ARE HERE TOO: the used-ring ELEMENT
+  the device wrote at each position (`ue : Nat -> UElem`, `ueInv`), and
+  the bytes of a request's DATA transfer.  The latter is split by
+  direction: a READ chain's buffer is the status row's (`bufFree` before
+  the transfer, `bufDone` at the payload and at a position the status
+  write's own dominates), and a WRITE chain's never leaves the invariant
+  at all (`bufW`, inside `chainLease`, at the CONTEXT tier), because the
+  device only reads it.
 * THE UNREAD ROWS' CLAUSES (P1), (P2) and (P4) are here, inside
   `unreadArmed`: an unread completion's head is ARMED, at no published
   unpopped position and not the staged one, its status byte is the
@@ -136,13 +136,14 @@ WHAT IS HERE, AND WHAT IS NOT.
   reported it, and a head in flight at a phase before `.pushed` has no
   unread completion.  (P3) -- unread completions have DISTINCT heads --
   is not, for the same reason.
-* The CONTENT of a disk read's data transfer is existential (`dmaOwn`,
-  not `dmaOwnAt`).  The device computes the payload from a SNAPSHOT of its
-  image taken at the task's `get` and writes it several steps later.  The
-  bytes themselves are not the problem -- a DMA write may re-choose the
-  invariant's existential witness, so `bufLease` can be kept at values --
-  the COUPLING to `Xv6.diskBlock` is: it needs the clause "an in-flight
-  READ chain's image fragment is `blockView v c.blk`".
+* The CONTENT of a transfer is the chain's own PAYLOAD (`Chain.payw`,
+  `Chain.pay`), a ghost field the publication stamps in, and the block's
+  image fragment is deposited AT it (`headRes`, `statusRes`).  So the
+  buffer, the fragment and `disk_collect`'s conclusion all speak of one
+  list of bytes.  What couples it to the device is `imgOk` for a READ
+  (an in-flight READ chain's block is not in `inFlightBlk`, so its
+  fragment IS `blockView v c.blk`) and `capOk` for a WRITE (from the
+  capture on, `blockView v c.blk` IS the payload).
 * No crash permits, no `Q`, no `disk_seq_permit` (the port drops Rocq's
   crash story), and no TSO floor rows (`fl0`/`fl1`/`flr`/`pos`).
 -/
@@ -4264,12 +4265,17 @@ request's payload has reached the DURABLE image, so the collect may hand
 the sleeper the block's image fragment at the bytes the driver wrote.
 
 It is preserved because the ONLY step that caches a sector is a serving
-task's capture (`MachCSL.Virtio.xferOut`, which since the data phase
-moved into `MachCSL.Virtio.serve` runs on the WRITE branch alone), and
-that task's permit puts its head at `.fetched`: a head at `.pushed` is a
+task's capture (`MachCSL.Virtio.capture`, which runs on the WRITE branch
+alone), and that task's permit puts its head at `.fetched`: a head at
+`.pushed` is a
 different head, hence -- `Xv6.blkInj` off the rows -- a different block,
 hence disjoint sectors.  A DRAIN only removes cache entries, and
-`Virtio.complete` takes the `.pushed` head out of flight altogether. -/
+`Virtio.complete` takes the `.pushed` head out of flight altogether.
+
+`Xv6.diskLive` still carries it, and it is still the write-through gate's
+own statement; what CASHES it is no longer the collect, which since
+`Xv6.cachedOk` retired has no cache obligation at all, but the record of
+what `MachCSL.Virtio.completeOk` guarantees at the `.pushed` install. -/
 def dryOk (v : VirtioState) : Prop :=
   ∀ (h : BitVec 16) (r : VioReq), Virtio.phase v h = some (.pushed r) →
     r.type.toNat = Virtio.blkTOut → Virtio.reqCached v r = false
