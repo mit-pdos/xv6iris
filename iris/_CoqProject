@@ -1611,13 +1611,14 @@ UCodeShP.v
 UkShParse.v
 RefParse.v
 UkShParseSym.v
+RefParseSym.v
 UkShParseLex.v
 UkShParseTok.v
+UkShGettoken.v
 UkShParseRedir.v
 UkShParseExec.v
 UkShParseCmd.v
 UkShRedirLex.v
-UkShRedirTok.v
 UkShRedirGtk.v
 UkShRedirCmd.v
 UkShRedirPr.v

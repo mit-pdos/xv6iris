@@ -30,7 +30,10 @@ console instance waits for its M3.
   left command); the three line-shape facts on `wl_line`; anti-vacuity by
   `vm_compute` on the three literal lines.  Exit: `UkShParseSym`'s and
   `UkShPipeLex`'s pure models are corollaries.
-- [ ] **A2a** `wp_ref_gettoken`, `wp_ref_peek`.  READ OFF THE TREE
+- [x] **A2a** `wp_ref_gettoken`, `wp_ref_peek` -- LANDED (`iris/UkShGettoken.v`,
+  `iris/RefParseSym.v`; `UkShRedirTok.v` deleted, `UkShRedirGtk.v`/`UkShPipeTok.v`
+  reduced to one-line corollaries; net -540 lines; the general file compiles in
+  the time of one of the three it replaces).  As read off the tree
   (2026-09-23): the three gettoken walks (`UkShParseTok.wp_kshp_gettoken`
   under `ushp_no_symbols`, `UkShRedirGtk.wp_kshp_gettoken_sym` under
   `ushs_gt_ok`, `UkShPipeTok.wp_kshp_gettoken_syms` under `ushq_sym_ok`)
@@ -52,8 +55,26 @@ console instance waits for its M3.
   kept as its corollary (consumers: `UkShParseExec`, `UkShParseRedir`);
   `UkShRedirTok`/`UkShRedirGtk`/`UkShPipeTok` reduced to corollaries until
   A3 deletes them with their consumers.
-- [ ] **A2b** `wp_ref_parseredirs` (induction on the redirects consumed;
-  `wp_kshp_parseredirs_ns`/`_gtn`/`_miss` are its cases).
+- [ ] **A2b** `wp_ref_parseredirs`.  READ OFF THE TREE (2026-09-23): four
+  walks -- `UkShParseRedir.wp_kshp_parseredirs` (zero turns under
+  `ushp_no_symbols`), `UkShRedirPr.wp_kshp_parseredirs_ns` (zero turns,
+  the byte at the cursor no symbol), `UkShPipePr.wp_kshp_parseredirs_miss`
+  (zero turns at the WEAKEST premise: peek's table at `ushp_T_redir` does
+  not contain the byte -- this is the general miss), `UkShRedirPr.
+  wp_kshp_parseredirs_gtn` (ONE turn on `ushs_redir`, 1,600 lines: the
+  '>' gettoken, the file-name gettoken, the switch, `redircmd`, the second
+  peek).  The general lemma is by induction on the redirect list
+  `ref_redirs len f n off [] = Some (rs, fin)`: the miss case is `_miss`,
+  the turn case is `_gtn`'s body at an arbitrary continuation (its second
+  peek IS the induction hypothesis), and the answer is the node chain
+  `ushp_redir_node` folded over `rs` around `cmd` (`ushp_redir_close`
+  closes each).  THE ALLOCATOR: today each walk threads its allocations as
+  a chain of section hypotheses (`UM0 UM1 UM2`, `ushp_malloc_ok0/1` in
+  `UkShRedirPex`); a walk over an arbitrary tree needs the chain as a
+  PREDICATE -- `ushp_malloc_chain k UM UM'` (`k` `ushp_malloc_ty` steps;
+  `ushp_malloc_ty_le 168` is what makes it close, `UkShMalloc` §7) -- at
+  `k = length rs` here and `k = ushp_nodes t` at the parser theorem.
+  Define it in `UkShParse` beside `ushp_malloc_ty_le`.
 - [ ] **A2c** `wp_ref_parseexec` (the token-list induction; the turn hands
   back REDIR + exec node as `UkShRedirEx` does; `ushp_room`/`ushp_nodes`
   replace the per-shape constants).  MEASURE against `UkShParseExec`'s
@@ -102,5 +123,4 @@ RULED by the owner: A starts now.  Branch `user-once/A` off `main` at
 monotonicity, the symbol-free bridge both ways, the redirect and pipe
 bridges, the three line-shape facts on `ush_line_is`/`ushs_line_is`/
 `ushq_line_is`) is stated and elaborates; its proofs are with a subagent.
-Merge to `main` when the bridge is `Admitted`-free and the whole tree is
-green.  NEXT: A2a as read off above.
+A1 and A2a are on `main`.  NEXT: A2b as read off above (branch `user-once/A2b`).

@@ -40,6 +40,7 @@ Require Import LineWords.
 Require Import EchoDisc.
 Require Import UkShParse.
 Require Import UkShParseSym.
+Require Import RefParse.
 Require Import UkShWords.
 Require Import UkShRedirLine.
 Require Import UShLexRedir.
@@ -338,6 +339,14 @@ Proof using.
   rewrite (ushq_one_some_off len f p j (ushq_pipe_one _ _ _ _ Hq) Hj Hne)
     in Hs. discriminate.
 Qed.
+
+(* ...and it IS the reference parser's symbol scope ([RefParse.ref_sym_scope]
+   spells the same disjunction with [rb_bar]/[rb_gt]), which is what lets
+   the one general gettoken walk (UkShGettoken.wp_ref_gettoken) stand in
+   for the pipe tier's *)
+Lemma ushq_sym_ok_scope (len : nat) (f : nat -> bv 8) :
+  ushq_sym_ok len f -> ref_sym_scope len f.
+Proof using. intro H. exact H. Qed.
 
 
 (* ===================================================================== *)
