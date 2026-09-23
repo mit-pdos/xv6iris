@@ -244,18 +244,6 @@ structure DISK_INTR_EXTRA : Prop where
     diskInv (GF := GF) γ ∗ headTok γ i s ∗ headDone γ n i ⊢
       |={⊤}=> (headTok γ i s ∗ ⌜∃ c : Chain, s = HState.active c ∧ c.hd = i ∧ c.wf⌝)
 
-  /-- **`b->disk`, out of the armed chain's claim.**  `b->disk = 0` is the
-  store the handler makes before `wakeup(b)`, and the cell must therefore
-  be in the LOCK PAYLOAD while the chain is armed -- `virtio_disk_rw`'s
-  caller is asleep and cannot be holding it.  `Xv6.claimRes` holds
-  `disk.info[hd].b` but not `b->disk`; this is the accessor `claimRes`
-  would give once it does. -/
-  buf_disk_acc : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
-      [CurCtx] (pd : PAddr) (c : Chain),
-    claimRes (GF := GF) curCtx pd c ⊢ ∃ d : BitVec 32,
-      wordPointsTo (aBufDisk c.bp) 4 (DFrac.own 1) d ∗
-      (wordPointsTo (aBufDisk c.bp) 4 (DFrac.own 1) 0#32 -∗ claimRes curCtx pd c)
-
   /-- **The handler's ENTRY credential.**  `Xv6.disk_used_idx_read` at the
   watermark `nr` consumes `Xv6.diskWm γ nr K` -- the fact that this hart's
   floor has passed the used-index write that published `nr`.  Every later
@@ -624,13 +612,13 @@ theorem vdis_claim_infob (pd : PAddr) (c : Chain) :
       wordPointsTo (aInfoB c.hd) 8 (DFrac.own 1) c.bp ∗
       (wordPointsTo (aInfoB c.hd) 8 (DFrac.own 1) c.bp -∗ claimRes curCtx pd c) := by
   unfold claimRes
-  iintro ⟨H1, H2, H3, H4, H5⟩
+  iintro ⟨H1, H2, H3, H4, H5, %d, Hd⟩
   isplitl [H5]
   · iapply (show wordAtN (GF := GF) curCtx (aInfoB c.hd) 8 (DFrac.own 1) c.bp ⊢
       wordPointsTo (aInfoB c.hd) 8 (DFrac.own 1) c.bp from by rw [wordAtN_cur])
     iexact H5
   · iintro H5'
-    iframe H1 H2 H3 H4
+    iframe H1 H2 H3 H4 Hd
     iapply (show wordPointsTo (GF := GF) (aInfoB c.hd) 8 (DFrac.own 1) c.bp ⊢
       wordAtN curCtx (aInfoB c.hd) 8 (DFrac.own 1) c.bp from by rw [wordAtN_cur])
     iexact H5'
@@ -772,7 +760,7 @@ theorem vdis_loop (HA : DISK_ACC_ASSUMPTIONS) (HE : DISK_INTR_EXTRA) (WK : WAKEU
   iintro Hk Hpc Hbp
   ihave Hclaim := Hbpback $$ Hbp
   -- +0x6a  sw zero,4(a0)  b->disk = 0
-  icases HE.buf_disk_acc pd c $$ Hclaim with ⟨%dsk0, Hdsk, Hdback⟩
+  icases claimRes_bufDisk_acc pd c $$ Hclaim with ⟨%dsk0, Hdsk, Hdback⟩
   k_step (wp_s_sw cpu _ (KA.«virtio_disk_intr» + 0x6a#64) false 4#12 10#5 0#5 (by decide) dsk0)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [vdisK_sie k, vdis_bufdisk_addr c.bp]

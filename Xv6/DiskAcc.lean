@@ -2017,6 +2017,12 @@ structure DISK_ACC_ASSUMPTIONS : Prop where
   the wakeup (the handler holds `vdisk_lock` across `b->disk = 0`,
   `wakeup(b)` and `disk.used_idx += 1` alike).
 
+  `b->disk` COMES BACK TOO, at whatever the handler left there: the cell
+  joined `Xv6.claimRes` at the publication, because the sleeper is inside
+  `sleep` and cannot hold it while the request is in flight.  Its value is
+  existential for the same reason `claimRes`'s is (see there); the sleeper
+  has just READ it as `0` in its loop test, so it knows.
+
   The `kmapStatic` premises are `disk_publish`'s, in reverse: the reverse
   bridges `Xv6.ctxBytes_wordPointsTo` / `Xv6.ctxIdx_byteBuf` need `inRam`
   of the buffer, which a `wordPointsTo` carries and a `dmaOwn` does
@@ -2036,6 +2042,7 @@ structure DISK_ACC_ASSUMPTIONS : Prop where
         ctxBytes curCtx (descAt pd c.tl) 16 (DFrac.own 1) c.d2 ∗
         ctxBytes curCtx c.hdrAddr 16 (DFrac.own 1) c.hdr ∗
         wordAtN curCtx (aInfoB c.hd) 8 (DFrac.own 1) c.bp ∗
+        (∃ d : BitVec 32, wordAtN curCtx (aBufDisk c.bp) 4 (DFrac.own 1) d) ∗
         wordAtN curCtx c.status 1 (DFrac.own 1) 0#8 ∗
         ∃ data : List (BitVec 8), ⌜data.length = BSIZE⌝ ∗
           byteBuf c.data (DFrac.own 1) data ∗ diskBlock γ c.blk data)

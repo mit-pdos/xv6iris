@@ -1993,14 +1993,54 @@ def freeSlotRes (ξ : CtxId) (pd : PAddr) (i : Nat) : IProp GF := iprop%
   ctxBytes ξ (descAt pd i) 16 (DFrac.own 1) 0
 
 /-- An ARMED descriptor, on the driver's side: the other halves of the
-chain's three descriptor words and of its request header, and
-`disk.info[hd].b`, the `struct buf` the interrupt handler wakes. -/
+chain's three descriptor words and of its request header,
+`disk.info[hd].b` -- the `struct buf` the interrupt handler wakes -- and
+`b->disk` itself.
+
+WHY `b->disk` IS HERE.  `b->disk = 0` is the store the handler makes
+before `wakeup(b)`, so the cell has to be reachable from the LOCK
+PAYLOAD while the chain is in flight: the caller of `virtio_disk_rw` is
+asleep inside `sleep`, and its `Xv6.bufOwn` (which holds the cell up to
+the publication) is not available to anyone.  So the publication hands
+the cell over with the rest of the chain, and `Xv6.disk_collect` gives it
+back.
+
+The VALUE is existential.  Rocq's `claim_cells` pins it -- `b->disk = 1`
+while in flight, or `b->disk = 0` beside the evidence that the
+completion has been READ (`ord p u ∗ u < nr`) -- which is what lets the
+sleeper's loop test turn `b->disk == 0` into the right to collect.  That
+disjunction needs the payload's own watermark `nr` in scope at the slot
+(or a monotone lower-bound ghost for it), and it needs
+`virtio_disk_intr` to restore the row only AFTER `disk.used_idx += 1`,
+two steps later; until then `Xv6.disk_collect` takes the read evidence
+(`Xv6.headDone γ n c.hd`, `n ≤ nr`) as an explicit premise instead. -/
 def claimRes (ξ : CtxId) (pd : PAddr) (c : Chain) : IProp GF := iprop%
   ctxBytes ξ (descAt pd c.hd) 16 (DFrac.own (1 : Qp).half) c.d0 ∗
   ctxBytes ξ (descAt pd c.md) 16 (DFrac.own (1 : Qp).half) c.d1 ∗
   ctxBytes ξ (descAt pd c.tl) 16 (DFrac.own (1 : Qp).half) c.d2 ∗
   ctxBytes ξ c.hdrAddr 16 (DFrac.own (1 : Qp).half) c.hdr ∗
-  wordAtN ξ (aInfoB c.hd) 8 (DFrac.own 1) c.bp
+  wordAtN ξ (aInfoB c.hd) 8 (DFrac.own 1) c.bp ∗
+  ∃ d : BitVec 32, wordAtN ξ (aBufDisk c.bp) 4 (DFrac.own 1) d
+
+/-- **`b->disk`, borrowed out of the claim and given back at `0`**: the
+handler's `b->disk = 0` before `wakeup(b)`. -/
+theorem claimRes_bufDisk_acc (pd : PAddr) (c : Chain) :
+    claimRes (GF := GF) curCtx pd c ⊢ ∃ d : BitVec 32,
+      wordPointsTo (aBufDisk c.bp) 4 (DFrac.own 1) d ∗
+      (wordPointsTo (aBufDisk c.bp) 4 (DFrac.own 1) 0#32 -∗ claimRes curCtx pd c) := by
+  unfold claimRes
+  iintro ⟨H0, H1, H2, H3, Hb, %d, Hdsk⟩
+  iexists d
+  isplitl [Hdsk]
+  · iapply (show wordAtN (GF := GF) curCtx (aBufDisk c.bp) 4 (DFrac.own 1) d ⊢
+      wordPointsTo (aBufDisk c.bp) 4 (DFrac.own 1) d from by rw [wordAtN_cur])
+    iexact Hdsk
+  iintro Hdsk2
+  iframe H0 H1 H2 H3 Hb
+  iexists 0#32
+  iapply (show wordPointsTo (GF := GF) (aBufDisk c.bp) 4 (DFrac.own 1) 0#32 ⊢
+    wordAtN curCtx (aBufDisk c.bp) 4 (DFrac.own 1) 0#32 from by rw [wordAtN_cur])
+  iexact Hdsk2
 
 /-- One slot of the payload: `disk.free[i]` and whatever the receipt says. -/
 def slotBody (ξ : CtxId) (pd : PAddr) (i : Nat) : HState → IProp GF
