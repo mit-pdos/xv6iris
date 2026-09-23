@@ -1609,6 +1609,7 @@ UShPipeCall.v
 
 UCodeShP.v
 UkShParse.v
+RefParse.v
 UkShParseSym.v
 UkShParseLex.v
 UkShParseTok.v
