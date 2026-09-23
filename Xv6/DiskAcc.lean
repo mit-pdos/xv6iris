@@ -1073,12 +1073,13 @@ theorem diskCfg_freeze (γ : DiskNames) (a b c' : VirtioCfg) :
 its receipt, its `disk.free[i]` byte at `1`, its sixteen zeroed bytes at
 full ownership, and its request header window `disk.ops[i]`
 (`Xv6.opsWin`, which the payload must hold for a free slot: the
-formatting of P3 writes it before the chain is armed). -/
+formatting of P3 writes it before the chain is armed) and its
+`disk.info[i]` window (`Xv6.infoWin`, for the same reason). -/
 def diskSlotIn [CurCtx] (γ : DiskNames) (pd : PAddr) (i : Nat) : IProp GF := iprop%
   headAuth γ i .inactive ∗ headTok γ i .inactive ∗
   wordAtN curCtx (aFree i) 1 (DFrac.own 1) 1#8 ∗
   ctxBytes curCtx (descAt pd i) 16 (DFrac.own 1) (0 : BitVec (8 * 16)) ∗
-  opsWin curCtx i
+  opsWin curCtx i ∗ infoWin curCtx i
 
 /-- The slot splits three ways: the invariant's half of the receipt, the
 invariant's row (EMPTY for a free slot: the accounting rules out a fetch
@@ -1088,7 +1089,7 @@ theorem diskSlotIn_split [CurCtx] (γ : DiskNames) (pd : PAddr) (i : Nat) :
     diskSlotIn (GF := GF) γ pd i ⊢
       headAuth γ i .inactive ∗ (headRes γ pd i .inactive ∗ slotRes γ curCtx pd i) := by
   unfold diskSlotIn
-  iintro ⟨Ha, Ht, Hf, Hd, Ho⟩
+  iintro ⟨Ha, Ht, Hf, Hd, Ho, Hi⟩
   iframe Ha
   isplitl []
   · rw [headRes_inactive]
@@ -1097,7 +1098,7 @@ theorem diskSlotIn_split [CurCtx] (γ : DiskNames) (pd : PAddr) (i : Nat) :
     iexists HState.inactive
     rw [slotBody_inactive]
     unfold freeSlotRes
-    iframe Ht Hf Hd Ho
+    iframe Ht Hf Hd Ho Hi
 
 /-- The eight slots, split. -/
 theorem diskSlots_split [CurCtx] (γ : DiskNames) (pd : PAddr) :

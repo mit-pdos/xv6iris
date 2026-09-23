@@ -684,6 +684,12 @@ theorem statusRes_arm3 (st : Nat → HState) (sb : Nat → SByte) (c : Chain) (h
 
 /-! ## `struct disk` is kernel data -/
 
+theorem info_b_kmapRw (i : Nat) (hi : i < NUM) :
+    kmapClass (vpnOf (aInfoB i)).toNat = some .rw := by
+  have h : i = 0 ∨ i = 1 ∨ i = 2 ∨ i = 3 ∨ i = 4 ∨ i = 5 ∨ i = 6 ∨ i = 7 := by
+    unfold NUM at hi; omega
+  rcases h with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide
+
 theorem info_status_kmapRw (i : Nat) (hi : i < NUM) :
     kmapClass (vpnOf (aInfoStatus i)).toNat = some .rw := by
   have h : i = 0 ∨ i = 1 ∨ i = 2 ∨ i = 3 ∨ i = 4 ∨ i = 5 ∨ i = 6 ∨ i = 7 := by

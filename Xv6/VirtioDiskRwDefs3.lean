@@ -18,27 +18,18 @@ the closing lemma that puts the three slots back at their new receipts
 (`.active c` for the head, `.member c.hd` for the middle and the tail)
 and turns `Xv6.diskResA` at `Xv6.tk3 h m t` back into `Xv6.diskRes`.
 
-### THE `disk.info[i]` CELLS OF A FREE SLOT  (a frozen-file gap)
+### THE `disk.info[i]` CELLS OF A FREE SLOT
 
 `disk_publish` asks for `wordAtN curCtx c.status 1 (own 1) 0xff` and
 `Xv6.claimRes` holds `wordAtN ξ (aInfoB c.hd) 8 (own 1) c.bp`, so the
 driver must OWN `disk.info[h].status` and `disk.info[h].b` when it
-formats the chain.  Nothing hands them over: `Xv6.freeSlotRes` is the
-descriptor's sixteen bytes and `Xv6.opsWin` only, `Xv6.slotBody` for a
-`.member` slot is its `free` byte and `Xv6.opsWin` only, and
-`Xv6.diskInitCells` (`Xv6/SpecVirtioDiskInit.lean`) lists the `ops`
-windows but no `info` window at all.  So the two cells of a free or
-member slot are owned by NOBODY.
-
-`Xv6.infoWin` below is the missing window.  The fix belongs in the
-frozen files (see the report): `freeSlotRes ξ pd i` and
-`slotBody ξ pd i (.member _)` each gain `infoWin ξ i`, `diskInitCells`
-gains the eight `info[i]` windows at their bss value, and
-`Xv6.disk_collect` gives the head's back.  Until then `Xv6.vdrw_P3`
-takes the three windows as explicit hypotheses (`hinfoH`, `hinfoM`,
-`hinfoT` in the statement) and the two that no longer fit in the payload
-(the middle's and the tail's) travel through the P3 and P4 seams as
-leftovers.
+formats the chain.  `Xv6.infoWin` -- now in `Xv6/DiskInvDefs.lean` beside
+`Xv6.opsWin` -- is that window, and it is part of `Xv6.freeSlotRes` and
+of `Xv6.slotBody _ _ _ (.member _)`, so the three slots the driver takes
+bring their `info` cells out of the payload with them.  The head's two
+cells go into the chain (`Xv6.claimRes` and the invariant's status row);
+the middle's and the tail's travel across the P3 seam and go back into
+the payload at the publication (`Xv6.diskResSeal`).
 -/
 import Xv6.VirtioDiskRwDefs2
 import Xv6.DiskAcc
@@ -159,49 +150,6 @@ theorem infoStatus_facts (i : Nat) (hi : i < NUM) :
       kmapClass (vpnOf (aInfoStatus i)).toNat = some .rw := by
   rcases lt8_cases i hi with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> exact ⟨by decide, by decide, by decide⟩
 
-/-! ## The missing `disk.info[i]` window -/
-
-section info
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
-
-/-- **The `disk.info[i]` cells of a slot the driver has not armed**: the
-`struct buf *b` pointer and the status byte, at whatever they hold.  See
-the file header: this window belongs in `Xv6.freeSlotRes` and in
-`Xv6.slotBody _ _ _ (.member _)`, and the phases take it as a hypothesis
-until it does. -/
-def infoWin (ξ : CtxId) (i : Nat) : IProp GF := iprop%
-  (∃ bp : BitVec 64, wordAtN ξ (aInfoB i) 8 (DFrac.own 1) bp) ∗
-  (∃ st : BitVec 8, wordAtN ξ (aInfoStatus i) 1 (DFrac.own 1) st)
-
-theorem infoWin_cells (i : Nat) :
-    infoWin (GF := GF) curCtx i ⊢
-      (∃ bp : BitVec 64, wordPointsTo (aInfoB i) 8 (DFrac.own 1) bp) ∗
-      (∃ st : BitVec 8, wordPointsTo (aInfoStatus i) 1 (DFrac.own 1) st) := by
-  unfold infoWin
-  rw [show (fun bp : BitVec 64 => iprop(wordAtN (GF := GF) curCtx (aInfoB i) 8 (DFrac.own 1) bp)) =
-      (fun bp : BitVec 64 => iprop(wordPointsTo (GF := GF) (aInfoB i) 8 (DFrac.own 1) bp)) from by
-    funext bp; rw [wordAtN_cur],
-    show (fun st : BitVec 8 => iprop(wordAtN (GF := GF) curCtx (aInfoStatus i) 1 (DFrac.own 1) st)) =
-      (fun st : BitVec 8 => iprop(wordPointsTo (GF := GF) (aInfoStatus i) 1 (DFrac.own 1) st)) from by
-    funext st; rw [wordAtN_cur]]
-
-theorem infoWin_intro (i : Nat) (bp : BitVec 64) (st : BitVec 8) :
-    wordPointsTo (GF := GF) (aInfoB i) 8 (DFrac.own 1) bp ∗
-    wordPointsTo (aInfoStatus i) 1 (DFrac.own 1) st ⊢ infoWin curCtx i := by
-  unfold infoWin
-  iintro ⟨H1, H2⟩
-  isplitl [H1]
-  · iexists bp
-    iapply (show wordPointsTo (GF := GF) (aInfoB i) 8 (DFrac.own 1) bp ⊢
-      wordAtN curCtx (aInfoB i) 8 (DFrac.own 1) bp from by rw [wordAtN_cur])
-    iexact H1
-  · iexists st
-    iapply (show wordPointsTo (GF := GF) (aInfoStatus i) 1 (DFrac.own 1) st ⊢
-      wordAtN curCtx (aInfoStatus i) 1 (DFrac.own 1) st from by rw [wordAtN_cur])
-    iexact H2
-
-end info
-
 /-! ## `disk.ops[i]`, as the three cells the driver stores through -/
 
 section ops
@@ -318,8 +266,10 @@ theorem slotCells_active' (ξ : CtxId) (pd : PAddr) (c : Chain) :
   rw [slotCells_active]
 
 theorem slotCells_member' (ξ : CtxId) (pd : PAddr) (i h : Nat) :
-    opsWin (GF := GF) ξ i ⊢ slotCells ξ pd i (.member h) := by
+    opsWin (GF := GF) ξ i ⊢ infoWin ξ i -∗ slotCells ξ pd i (.member h) := by
   rw [slotCells_member]
+  iintro H1 H2
+  iframe H1 H2
 
 /-- **The publication's borrow.**  The published count, the staged head,
 the driver's half of `avail->idx` and the ring cell `avail->idx % NUM`
@@ -395,14 +345,14 @@ tail become members of it, and `Xv6.diskResA` at `Xv6.tk3 h m t` is
 theorem diskResSeal (γ : DiskNames) (pd pav pu : PAddr) (c : Chain) (hwf : c.wf) :
     diskResA (GF := GF) γ pd pav pu curCtx (tk3 c.hd c.md c.tl) ∗
       headTok γ c.hd (.active c) ∗ claimRes curCtx pd c ∗
-      headTok γ c.md (.member c.hd) ∗ opsWin curCtx c.md ∗
-      headTok γ c.tl (.member c.hd) ∗ opsWin curCtx c.tl ⊢
+      headTok γ c.md (.member c.hd) ∗ opsWin curCtx c.md ∗ infoWin curCtx c.md ∗
+      headTok γ c.tl (.member c.hd) ∗ opsWin curCtx c.tl ∗ infoWin curCtx c.tl ⊢
       diskRes γ pd pav pu curCtx := by
   obtain ⟨hh, hm, ht, e1, e2, e3, -⟩ := hwf
-  iintro ⟨HR, Hth, Hch, Htm, Hcm, Htt, Hct⟩
+  iintro ⟨HR, Hth, Hch, Htm, Hcm, Him, Htt, Hct, Hit⟩
   ihave Hch := slotCells_active' curCtx pd c $$ Hch
-  ihave Hcm := slotCells_member' curCtx pd c.md c.hd $$ Hcm
-  ihave Hct := slotCells_member' curCtx pd c.tl c.hd $$ Hct
+  ihave Hcm := slotCells_member' curCtx pd c.md c.hd $$ Hcm Him
+  ihave Hct := slotCells_member' curCtx pd c.tl c.hd $$ Hct Hit
   ihave HR := diskResA_seat γ pd pav pu curCtx (tk3 c.hd c.md c.tl) c.hd hh
       (by rw [tk3_apply]; simp) (.active c) rfl $$ [HR Hth Hch]
   case' _ => iframe HR Hth Hch
@@ -481,10 +431,9 @@ the status byte at `0xff` and `b->data` -- beside what stays with the
 driver for `Xv6.claimRes` (`disk.info[h].b`, `b->disk`), the three
 receipts still `.inactive`, and the payload at `Xv6.tk3 h m t`.
 
-`infoWin curCtx c.md` and `infoWin curCtx c.tl` are the leftovers of the
-frozen-file gap the file header describes: once `Xv6.slotBody` for a
-`.member` slot carries `Xv6.infoWin`, they go back into the payload and
-leave the seam. -/
+`infoWin curCtx c.md` and `infoWin curCtx c.tl` came out of the payload
+with the two slots (`Xv6.freeSlotRes`) and go back into it at the
+publication, when the two become MEMBERS of the chain. -/
 def vdrwP3Exit (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64)
     (bno : BitVec 32) (dataBuf dataDisk : List (BitVec 8)) (wr : Bool)
@@ -515,8 +464,8 @@ def vdrwP3Exit (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
 `b->disk` that opens the completion wait): the request is published --
 head `c.hd` is armed with `c`, `c.md` and `c.tl` are its members, the
 chain's cells are the invariant's and the payload's, and the lock's
-payload is whole again.  The two `Xv6.infoWin`s are the same leftovers as
-at `Xv6.vdrwP3Exit`. -/
+payload is whole again -- the middle's and the tail's `Xv6.infoWin`s go
+back into it with their slots (`Xv6.diskResSeal`). -/
 def vdrwP4Exit (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64)
     (bno : BitVec 32) (dataBuf dataDisk : List (BitVec 8)) (wr : Bool)
@@ -526,7 +475,6 @@ def vdrwP4Exit (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   procsInv Γ ∗ trapCsrs cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ∗
   vdrwCaps γ γl pd pav pu ∗ locked γl cpu ∗ diskRes γ pd pav pu curCtx ∗
   wordPointsTo (aBufBlockno c.bp) 4 (DFrac.own 1) bno ∗
-  infoWin curCtx c.md ∗ infoWin curCtx c.tl ∗
   vdrwSaved k ∗
   idxCells (k.regs 2#5) (BitVec.ofNat 32 c.hd) (BitVec.ofNat 32 c.md) (BitVec.ofNat 32 c.tl) y ∗
   wpNext true k.proc cpu (vdrwPostK k γ bno wr dataBuf dataDisk)

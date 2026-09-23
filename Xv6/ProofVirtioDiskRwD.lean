@@ -218,11 +218,12 @@ theorem vdrw_P4 (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     iframe Hc0 Hc1 Hc2 Hch Hib
     iexists 1#32
     iexact Hdsk
-  ihave Hres := diskResSeal γ pd pav pu c hcwf $$ [Hpay Hth Hclaim Htm Hom Htt Hot]
-  · iframe Hpay Hth Hclaim Htm Hom Htt Hot
+  ihave Hres := diskResSeal γ pd pav pu c hcwf
+    $$ [Hpay Hth Hclaim Htm Hom Hinfm Htt Hot Hinft]
+  · iframe Hpay Hth Hclaim Htm Hom Hinfm Htt Hot Hinft
   iapply HΦ $$ %_
   unfold vdrwP4Exit
-  iframe Hk Hpc Hpi Htc Hcc Hir Hcaps Hlk Hres Hbno Hinfm Hinft Hsv Hidxc Hnext
+  iframe Hk Hpc Hpi Htc Hcc Hir Hcaps Hlk Hres Hbno Hsv Hidxc Hnext
   ipureintro
   refine ⟨?_, hcwf, hbp, hblk⟩
   unfold vdrwRegs

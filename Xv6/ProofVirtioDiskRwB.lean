@@ -836,7 +836,7 @@ theorem vdrw_ladder (FD : FREE_DESC) (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : R
     isimp only [tkOut_1] at Hpay
     isimp only [heldOut_1, vdrwSlotOut_eq] at Hheld
     icases Hheld with ⟨Htok, Hw⟩
-    icases freeSlotRes_split curCtx pd h $$ Hw with ⟨Hw, Hops⟩
+    icases freeSlotRes_split curCtx pd h $$ Hw with ⟨Hw, Hops, Hinfo⟩
     have hv0' := hv0 (by omega); subst hv0'
     unfold idxCells
     icases Hidx with ⟨Hi0, Hi1, Hi2, Hi3⟩
@@ -880,7 +880,7 @@ theorem vdrw_ladder (FD : FREE_DESC) (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : R
       try simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at hd
       rw [hd]; exact h18
     ihave Hw := descCells_ctxBytes pd h 0 hpd hh $$ HS Hd
-    ihave Hw := freeSlotRes_join curCtx pd h $$ Hw Hops
+    ihave Hw := freeSlotRes_join curCtx pd h $$ Hw Hops Hinfo
     try isimp only [← wordAtN_cur] at Hs
     ihave Hpay := diskResA_give_free γ pd pav pu curCtx (updB (fun _ => false) h true) h
       $$ [Htok Hs Hw Hback]
@@ -911,8 +911,8 @@ theorem vdrw_ladder (FD : FREE_DESC) (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : R
     isimp only [tkOut_2] at Hpay
     isimp only [heldOut_2, vdrwSlotOut_eq] at Hheld
     icases Hheld with ⟨⟨Htok, Hw⟩, ⟨Htok2, Hw2⟩⟩
-    icases freeSlotRes_split curCtx pd h $$ Hw with ⟨Hw, Hops⟩
-    icases freeSlotRes_split curCtx pd m $$ Hw2 with ⟨Hw2, Hops2⟩
+    icases freeSlotRes_split curCtx pd h $$ Hw with ⟨Hw, Hops, Hinfo⟩
+    icases freeSlotRes_split curCtx pd m $$ Hw2 with ⟨Hw2, Hops2, Hinfo2⟩
     have hv0' := hv0 (by omega); subst hv0'
     have hv1' := hv1 (by omega); subst hv1'
     unfold idxCells
@@ -963,7 +963,7 @@ theorem vdrw_ladder (FD : FREE_DESC) (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : R
       try simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
       exact c8
     ihave Hw := descCells_ctxBytes pd h 0 hpd hh $$ HS Hd
-    ihave Hw := freeSlotRes_join curCtx pd h $$ Hw Hops
+    ihave Hw := freeSlotRes_join curCtx pd h $$ Hw Hops Hinfo
     try isimp only [← wordAtN_cur] at Hs
     ihave Hpay := diskResA_give_free γ pd pav pu curCtx
       (updB (updB (fun _ => false) h true) m true) h $$ [Htok Hs Hw Hback]
@@ -1010,7 +1010,7 @@ theorem vdrw_ladder (FD : FREE_DESC) (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : R
     have hR2 : vdrwRegs k R2 (sectorOf bno) :=
       vdrwRegs_pin k R1 R2 _ hR1 (vdrwPin_of_calleeSaved R1 R2 hcs2')
     ihave Hw2 := descCells_ctxBytes pd m 0 hpd hm $$ HS Hd
-    ihave Hw2 := freeSlotRes_join curCtx pd m $$ Hw2 Hops2
+    ihave Hw2 := freeSlotRes_join curCtx pd m $$ Hw2 Hops2 Hinfo2
     try isimp only [← wordAtN_cur] at Hs
     ihave Hpay := diskResA_give_free γ pd pav pu curCtx
       (updB (updB (updB (fun _ => false) h true) m true) h false) m $$ [Htok2 Hs Hw2 Hback]

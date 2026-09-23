@@ -2679,12 +2679,66 @@ instance instCtxMorphOpsWin (i : Nat) : CtxMorph (GF := GF) (fun ξ => opsWin ξ
   exact instCtxMorphExists (fun (w : BitVec (8 * 16)) ξ =>
     ctxBytes ξ (aOps i) 16 (DFrac.own 1) w)
 
+/-- **The `disk.info[i]` cells of a slot the driver has not armed**: the
+`struct buf *b` pointer and the status byte, at whatever they hold.
+
+They belong to the driver for exactly as long as the slot is not the HEAD
+of an armed chain: `virtio_disk_rw`'s P3 writes `disk.info[h].b = b` and
+`disk.info[h].status = 0xff` BEFORE the chain is armed, so the two cells
+must be reachable from the lock payload for a slot that is FREE
+(`Xv6.freeSlotRes`) or a chain MEMBER (`Xv6.slotBody _ _ _ (.member _)`).
+For the head of an armed chain they are elsewhere: `disk.info[h].b` rides
+in `Xv6.claimRes` and the status byte is the device's, in the invariant's
+STATUS ROW (`Xv6.statusRes`).  The values are existential -- nothing reads
+either until the formatting overwrites it. -/
+def infoWin (ξ : CtxId) (i : Nat) : IProp GF := iprop%
+  (∃ bp : BitVec 64, wordAtN ξ (aInfoB i) 8 (DFrac.own 1) bp) ∗
+  (∃ st : BitVec 8, wordAtN ξ (aInfoStatus i) 1 (DFrac.own 1) st)
+
+instance instCtxMorphInfoWin (i : Nat) : CtxMorph (GF := GF) (fun ξ => infoWin ξ i) := by
+  have h1 : CtxMorph (GF := GF)
+      (fun ξ => iprop(∃ bp : BitVec 64, wordAtN ξ (aInfoB i) 8 (DFrac.own 1) bp)) :=
+    instCtxMorphExists (fun (bp : BitVec 64) ξ => wordAtN ξ (aInfoB i) 8 (DFrac.own 1) bp)
+  have h2 : CtxMorph (GF := GF)
+      (fun ξ => iprop(∃ st : BitVec 8, wordAtN ξ (aInfoStatus i) 1 (DFrac.own 1) st)) :=
+    instCtxMorphExists (fun (st : BitVec 8) ξ => wordAtN ξ (aInfoStatus i) 1 (DFrac.own 1) st)
+  unfold infoWin
+  infer_instance
+
+theorem infoWin_cells (i : Nat) :
+    infoWin (GF := GF) curCtx i ⊢
+      (∃ bp : BitVec 64, wordPointsTo (aInfoB i) 8 (DFrac.own 1) bp) ∗
+      (∃ st : BitVec 8, wordPointsTo (aInfoStatus i) 1 (DFrac.own 1) st) := by
+  unfold infoWin
+  rw [show (fun bp : BitVec 64 => iprop(wordAtN (GF := GF) curCtx (aInfoB i) 8 (DFrac.own 1) bp)) =
+      (fun bp : BitVec 64 => iprop(wordPointsTo (GF := GF) (aInfoB i) 8 (DFrac.own 1) bp)) from by
+    funext bp; rw [wordAtN_cur],
+    show (fun st : BitVec 8 => iprop(wordAtN (GF := GF) curCtx (aInfoStatus i) 1 (DFrac.own 1) st)) =
+      (fun st : BitVec 8 => iprop(wordPointsTo (GF := GF) (aInfoStatus i) 1 (DFrac.own 1) st)) from by
+    funext st; rw [wordAtN_cur]]
+
+theorem infoWin_intro (i : Nat) (bp : BitVec 64) (st : BitVec 8) :
+    wordPointsTo (GF := GF) (aInfoB i) 8 (DFrac.own 1) bp ∗
+    wordPointsTo (aInfoStatus i) 1 (DFrac.own 1) st ⊢ infoWin curCtx i := by
+  unfold infoWin
+  iintro ⟨H1, H2⟩
+  isplitl [H1]
+  · iexists bp
+    iapply (show wordPointsTo (GF := GF) (aInfoB i) 8 (DFrac.own 1) bp ⊢
+      wordAtN curCtx (aInfoB i) 8 (DFrac.own 1) bp from by rw [wordAtN_cur])
+    iexact H1
+  · iexists st
+    iapply (show wordPointsTo (GF := GF) (aInfoStatus i) 1 (DFrac.own 1) st ⊢
+      wordAtN curCtx (aInfoStatus i) 1 (DFrac.own 1) st from by rw [wordAtN_cur])
+    iexact H2
+
 /-- A FREE descriptor, on the driver's side: `free_desc` zeroed its
 sixteen bytes and the driver holds ALL of them -- the invariant holds
 nothing for a free slot, because the accounting rules out a fetch there
--- and the slot's request header (`Xv6.opsWin`) with them. -/
+-- and the slot's request header (`Xv6.opsWin`) and `disk.info[i]` window
+(`Xv6.infoWin`) with them. -/
 def freeSlotRes (ξ : CtxId) (pd : PAddr) (i : Nat) : IProp GF := iprop%
-  ctxBytes ξ (descAt pd i) 16 (DFrac.own 1) 0 ∗ opsWin ξ i
+  ctxBytes ξ (descAt pd i) 16 (DFrac.own 1) 0 ∗ opsWin ξ i ∗ infoWin ξ i
 
 /-- An ARMED descriptor, on the driver's side: the other halves of the
 chain's three descriptor words and of its request header,
@@ -2740,7 +2794,7 @@ theorem claimRes_bufDisk_acc (pd : PAddr) (c : Chain) :
 def slotBody (ξ : CtxId) (pd : PAddr) (i : Nat) : HState → IProp GF
   | .inactive => iprop(wordAtN ξ (aFree i) 1 (DFrac.own 1) 1#8 ∗ freeSlotRes ξ pd i)
   | .active c => iprop(wordAtN ξ (aFree i) 1 (DFrac.own 1) 0#8 ∗ claimRes ξ pd c)
-  | .member _ => iprop(wordAtN ξ (aFree i) 1 (DFrac.own 1) 0#8 ∗ opsWin ξ i)
+  | .member _ => iprop(wordAtN ξ (aFree i) 1 (DFrac.own 1) 0#8 ∗ opsWin ξ i ∗ infoWin ξ i)
 
 def slotRes (γ : DiskNames) (ξ : CtxId) (pd : PAddr) (i : Nat) : IProp GF := iprop%
   ∃ s : HState, headTok γ i s ∗ slotBody ξ pd i s
@@ -2758,7 +2812,7 @@ its own request header, which the chain does not use -- the descriptor's
 own words are the HEAD's `claimRes`. -/
 theorem slotBody_member (ξ : CtxId) (pd : PAddr) (i h : Nat) :
     slotBody (GF := GF) ξ pd i (.member h) =
-      iprop(wordAtN ξ (aFree i) 1 (DFrac.own 1) 0#8 ∗ opsWin ξ i) := rfl
+      iprop(wordAtN ξ (aFree i) 1 (DFrac.own 1) 0#8 ∗ opsWin ξ i ∗ infoWin ξ i) := rfl
 
 /-- **The payload of `disk.vdisk_lock`** (Rocq's `disk_res`): the
 publisher's and the handler's halves of the counters (the watermark
@@ -2788,7 +2842,8 @@ instance instCtxMorphSlotBody (pd : PAddr) (i : Nat) (s : HState) :
     unfold claimRes
     infer_instance
   | member _ =>
-    show CtxMorph (fun ξ => iprop(wordAtN ξ (aFree i) 1 (DFrac.own 1) 0#8 ∗ opsWin ξ i))
+    show CtxMorph (fun ξ => iprop(wordAtN ξ (aFree i) 1 (DFrac.own 1) 0#8 ∗
+      (opsWin ξ i ∗ infoWin ξ i)))
     infer_instance
 
 instance instCtxMorphSlotRes (γ : DiskNames) (pd : PAddr) (i : Nat) :

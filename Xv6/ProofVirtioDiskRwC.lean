@@ -101,11 +101,10 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG 
 set_option maxHeartbeats 6000000 in
 /-- **P3.**  From `Xv6.vdrwP2Exit` to `Xv6.vdrwP3Exit`.
 
-`hinfoH`, `hinfoM` and `hinfoT` are the `disk.info[i]` windows of the
-three descriptors the driver has taken -- cells that belong in
-`Xv6.freeSlotRes` and in `Xv6.slotBody _ _ _ (.member _)`, and that the
-lock payload therefore does not hand over today.  See the header of
-`Xv6/VirtioDiskRwDefs3.lean`. -/
+The three descriptors' `disk.info[i]` windows come out of the payload
+with the slots themselves (`Xv6.freeSlotRes` carries `Xv6.infoWin`): the
+head's two cells go into the chain, the middle's and the tail's travel
+on to `Xv6.vdrwP3Exit`. -/
 theorem vdrw_P3 (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64)
     (bno dsk0 : BitVec 32) (dataBuf dataDisk : List (BitVec 8)) (wr : Bool)
@@ -113,14 +112,13 @@ theorem vdrw_P3 (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (hpd : descPageRw pd) (hbno : bno.toNat < 2 ^ 31)
     (hwr : wr = decide (k.regs 11#5 ≠ 0#64)) :
     vdrwP2Exit Γ cpu k γ γl pd pav pu bno dsk0 dataBuf dataDisk wr h m t y R ∗
-    infoWin curCtx h ∗ infoWin curCtx m ∗ infoWin curCtx t ∗
     (∀ R' : RegMap, vdrwP3Exit Γ cpu k γ γl pd pav pu bno dataBuf dataDisk wr
         (vdrwChain (k.regs 10#5) bno wr h m t) y R' -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
   have hsie : (vdrwK k).sie = false := vdrwK_sie k
   unfold vdrwP2Exit
   iintro ⟨⟨%⟨hRk, hh, hm, ht, hnm, hnt, hmt⟩, Hk, Hpc, #Hpi, Htc, Hcc, Hir, #Hcaps, Hlk, Hpay,
-    Houth, Houtm, Houtt, Hsv, Hidx, Hbuf, Hblk, Hnext⟩, Hinfh, Hinfm, Hinft, HΦ⟩
+    Houth, Houtm, Houtt, Hsv, Hidx, Hbuf, Hblk, Hnext⟩, HΦ⟩
   obtain ⟨hR2, hR8, hR19, hR22, hR23, hR9, hR20, hR21, hR24, hR25, hR26, hR27⟩ := id hRk
   have hcwf : (vdrwChain (k.regs 10#5) bno wr h m t).wf :=
     vdrwChain_wf (k.regs 10#5) bno wr h m t hh hm ht hnm hnt hmt hbno
@@ -138,9 +136,9 @@ theorem vdrw_P3 (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   icases Houth with ⟨Hth, Hfh⟩
   icases Houtm with ⟨Htm, Hfm⟩
   icases Houtt with ⟨Htt, Hft⟩
-  icases freeSlotRes_split curCtx pd h $$ Hfh with ⟨Hdh, Hoh⟩
-  icases freeSlotRes_split curCtx pd m $$ Hfm with ⟨Hdm, Hom⟩
-  icases freeSlotRes_split curCtx pd t $$ Hft with ⟨Hdt, Hot⟩
+  icases freeSlotRes_split curCtx pd h $$ Hfh with ⟨Hdh, Hoh, Hinfh⟩
+  icases freeSlotRes_split curCtx pd m $$ Hfm with ⟨Hdm, Hom, Hinfm⟩
+  icases freeSlotRes_split curCtx pd t $$ Hft with ⟨Hdt, Hot, Hinft⟩
   ihave Hdh := ctxBytes_descCells pd h 0 hpd hh $$ HS Hdh
   ihave Hdm := ctxBytes_descCells pd m 0 hpd hm $$ HS Hdm
   ihave Hdt := ctxBytes_descCells pd t 0 hpd ht $$ HS Hdt

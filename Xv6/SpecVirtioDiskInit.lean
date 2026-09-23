@@ -55,13 +55,23 @@ lock payload it builds must own them: `virtio_disk_rw` formats
 one the head descriptor points at (`Xv6.opsWin`, in `Xv6.freeSlotRes`).
 They are taken as the two eight-byte halves the driver's own stores use
 (`type`/`reserved` and `sector`), each at the bss `0` -- `aOps i` is only
-8-aligned, so there is no sixteen-byte cell to ask for. -/
+8-aligned, so there is no sixteen-byte cell to ask for.
+
+THE `info` WINDOWS, for the same reason: `virtio_disk_rw`'s P3 writes
+`disk.info[h].b` and `disk.info[h].status` before it arms the chain, so
+the payload must own them for every slot that is free or a chain member
+(`Xv6.infoWin`, in `Xv6.freeSlotRes` and in `Xv6.slotBody _ _ _
+(.member _)`).  `virtio_disk_init` does not touch them either; they come
+in at their bss `0`. -/
 def diskInitCells {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (vlock : BitVec 32) (vname vcpu pd0 pav0 pu0 : BitVec 64) (free0 : List (BitVec 8)) : IProp GF := iprop%
   ⌜free0.length = NUM⌝ ∗
   ([∗list] i ∈ List.range NUM,
     wordPointsTo (aOps i) 8 (DFrac.own 1) (0 : BitVec (8 * 8)) ∗
     wordPointsTo (aOpsSector i) 8 (DFrac.own 1) (0 : BitVec (8 * 8))) ∗
+  ([∗list] i ∈ List.range NUM,
+    wordPointsTo (aInfoB i) 8 (DFrac.own 1) (0 : BitVec (8 * 8)) ∗
+    wordPointsTo (aInfoStatus i) 1 (DFrac.own 1) (0 : BitVec (8 * 1))) ∗
   kmapId aVdiskLock ∗ kmapId (aVdiskLock + 16#64) ∗
   wordPointsTo aVdiskLock 4 (DFrac.own 1) vlock ∗
   wordPointsTo (aVdiskLock + 8#64) 8 (DFrac.own 1) vname ∗
