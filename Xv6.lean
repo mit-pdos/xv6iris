@@ -389,3 +389,5 @@ import Xv6.LinkPlicClaim
 import Xv6.LinkPlicComplete
 import Xv6.ProofVirtioDiskInit
 import Xv6.LinkVirtioDiskInit
+import Xv6.ProofClockintr
+import Xv6.LinkClockintr

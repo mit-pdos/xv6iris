@@ -1,6 +1,6 @@
 /-
-Specification of `clockintr` (kernel/trap.c), ASSUMED as an interface for
-now: the timer-interrupt handler `devintr` calls.
+Specification of `clockintr` (kernel/trap.c): the timer-interrupt handler
+`devintr` calls.
 
 ```
 void clockintr() {
@@ -11,9 +11,8 @@ void clockintr() {
 
 Interrupts are off (the hart stays); hart 0 takes the ticks lock (depth
 headroom for it and for `wakeup`'s per-process lock); `time` and `proc`
-are not held.  Its proof needs the S-mode `rdtime`/`csrw stimecmp` rules,
-which the framework does not have yet (see notes/plic-devintr-design.md,
-item E).  Stack: its 2-slot frame over `wakeup`'s.
+are not held (the S-mode `rdtime`/`csrw stimecmp` rules are in
+MachCSL/WpSmodeTime.lean).  Stack: its 2-slot frame over `wakeup`'s.
 
 Imports only definitional files.
 -/

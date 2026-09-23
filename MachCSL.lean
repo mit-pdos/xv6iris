@@ -92,3 +92,4 @@ import MachCSL.WpDevDmaStep
 import MachCSL.WpDmaCtx
 import MachCSL.WireInv
 import MachCSL.WpWire
+import MachCSL.WpSmodeTime
