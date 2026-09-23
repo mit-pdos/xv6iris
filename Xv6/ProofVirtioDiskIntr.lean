@@ -26,7 +26,7 @@ last read of `used->idx` returned, and the TSO credential
 `Xv6.diskWm γ m F` with the read receipt `MachCSL.rviewLb cpu F` the
 fence turns into a floor.
 
-Three arms of the completion side are not derivable from the frozen
+Some arms of the completion side are not derivable from the frozen
 accessor statements as they stand; they are collected in
 `Xv6.DISK_INTR_EXTRA`, an explicit extra hypothesis of the theorem (see
 the doc comments there).
@@ -226,8 +226,8 @@ end
 
 /-! ## The arms the frozen completion side does not (yet) provide
 
-Four of the resources this proof needs are not derivable from the disk
-files as they stand at `lean-v2 @ b62d18b9a`.  Each is stated here in the
+The resources this proof needs that are not derivable from the disk
+files as they stand are collected here.  Each is stated in the
 exact shape the proof consumes, and each is discharged by a resource the
 completion side is expected to grow (see the report accompanying this
 file); until then `virtio_disk_intr_proof` takes them as an explicit
@@ -245,22 +245,6 @@ structure DISK_INTR_EXTRA : Prop where
   used_page : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
       [CurCtx] (γ : DiskNames) (pd pav pu : PAddr),
     diskGeom (GF := GF) γ pd pav pu ⊢ ⌜descPageRw pu⌝
-
-  /-- **`disk.used->ring[disk.used_idx % NUM].id`, read, AT FOUR BYTES.**
-  `Xv6.DISK_ACC_ASSUMPTIONS.disk_used_elem_read` is stated over an
-  EIGHT-byte `MachCSL.readAU` at `Xv6.usedElemAt pu j`, but the
-  instruction is `lw a5,4(a5)` -- a four-byte load, and
-  `usedElemAt pu j = pu + 4 + 8 * j` is not even 8-aligned, so no eight-byte
-  rule can fire there.  This is the same accessor at the width the code
-  uses. -/
-  used_elem_read4 : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
-      [DiskG GF] [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu : CPU) (K nr nc : Nat),
-    nr < nc →
-    diskInv (GF := GF) γ ∗ diskGeom γ pd pav pu ∗ diskReadAt γ nr ∗ diskDoneLb γ nc ∗
-      diskWm γ nc K ⊢
-      readAU cpu (usedElemAt pu (nr % NUM)) 4 K [] (fun w =>
-        iprop(diskReadAt γ nr ∗ ∃ i : Nat, ⌜i < NUM ∧ w = BitVec.ofNat 32 i⌝ ∗
-          headDone γ (nr + 1) i))
 
   /-- **A completed head is an ARMED head.**  The handler reads a head `i`
   out of the used ring and must then produce the `Xv6.headTok γ i (.active c)`
@@ -723,7 +707,7 @@ theorem vdis_loop (HA : DISK_ACC_ASSUMPTIONS) (HE : DISK_INTR_EXTRA) (WK : WAKEU
   -- +0x4e  lw a5,4(a5)    the used-ring element
   obtain ⟨hram1, hal1, hkm1⟩ := vdis_usedElem_facts pu hpu (nr % NUM) (Nat.mod_lt _ (by unfold NUM; omega))
   ihave #Hid1 := kmapStatic_rw (usedElemAt pu (nr % NUM)) hkm1 $$ HS
-  ihave HAU := HE.used_elem_read4 γ pd pav pu cpu F nr m hnrm $$ [Hinv Hgeom Hnr Hlbm Hwm]
+  ihave HAU := HA.disk_used_elem_read γ pd pav pu cpu F nr m hnrm $$ [Hinv Hgeom Hnr Hlbm Hwm]
   · iframe #; iframe
   k_step (wp_s_lw_au cpu _ ?hs (KA.«virtio_disk_intr» + 0x4e#64) true 4#12 15#5 15#5
       (by decide) (usedElemAt pu (nr % NUM)) ?hb1 hram1 hal1 F [] _)
@@ -946,7 +930,7 @@ end
 set_option maxHeartbeats 4000000 in
 /-- **`virtio_disk_intr`**, from the interfaces of `acquire`, `release`
 and `wakeup`, the frozen accessor assumptions `Xv6.DISK_ACC_ASSUMPTIONS`
-and the four completion-side arms of `Xv6.DISK_INTR_EXTRA`. -/
+and the residual completion-side arms of `Xv6.DISK_INTR_EXTRA`. -/
 theorem virtio_disk_intr_proof (HA : DISK_ACC_ASSUMPTIONS) (HE : DISK_INTR_EXTRA)
     (AC : ACQUIRE) (RE : RELEASE) (WK : WAKEUP) : VIRTIO_DISK_INTR :=
   ⟨fun {hlc GF} _ _ _ _ Γ cpu k γ γl pd pav pu hsie hnoff hK hlk htier => by

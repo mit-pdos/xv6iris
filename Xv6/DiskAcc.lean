@@ -1944,15 +1944,21 @@ structure DISK_ACC_ASSUMPTIONS : Prop where
   completion-side twin of `np - lo ≤ NUM`, which needs the per-position
   rows.  What it returns is the completion record `Xv6.headDone`, the used
   ring's twin of `Xv6.posRec`, which is what the status read below and
-  `disk_collect` take as their premise. -/
+  `disk_collect` take as their premise.
+
+  THE WIDTH IS FOUR.  The instruction is `lw a5,4(a5)`, and the `id` field
+  is the first four bytes of the element, at `Xv6.usedElemAt pu j` itself;
+  an eight-byte statement is not merely wider but UNUSABLE, because
+  `usedElemAt pu j = pu + 4 + 8 * j` is never 8-aligned and no eight-byte
+  load rule can fire there. -/
   disk_used_elem_read : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
       [DiskG GF] [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu : CPU) (K nr nc : Nat),
     nr < nc →
     diskInv (GF := GF) γ ∗ diskGeom γ pd pav pu ∗ diskReadAt γ nr ∗ diskDoneLb γ nc ∗
       diskWm γ nc K ⊢
-      readAU cpu (usedElemAt pu (nr % NUM)) 8 K [] (fun w =>
-        iprop(diskReadAt γ nr ∗ ∃ i : Nat,
-          ⌜i < NUM ∧ BitVec.extractLsb' 0 32 w = BitVec.ofNat 32 i⌝ ∗ headDone γ (nr + 1) i))
+      readAU cpu (usedElemAt pu (nr % NUM)) 4 K [] (fun w =>
+        iprop(diskReadAt γ nr ∗ ∃ i : Nat, ⌜i < NUM ∧ w = BitVec.ofNat 32 i⌝ ∗
+          headDone γ (nr + 1) i))
 
   /-- **`disk.info[id].status`, read** (the byte the `unreachable` of
   `virtio_disk_intr` tests).  The invariant owns it as `dmaOwn c.status 1`
