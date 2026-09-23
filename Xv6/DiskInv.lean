@@ -1335,8 +1335,9 @@ theorem leaseL_get_keep (γ : DiskNames) (C : IProp GF) (s : VirtioState) :
 theorem leaseL_write_frame (γ : DiskNames) (s' : VirtioState) (C : IProp GF) (pa : PAddr)
     (n : Nat) (w : BitVec (8 * n))
     (hl : diskProto (GF := GF) γ s' ⊢ dmaWriteLease pa n w (diskProto γ s')) :
-    iprop(C ∗ diskProto γ s') ⊢ dmaWriteLease pa n w iprop(diskProto γ s' ∗ C) := by
+    iprop(C ∗ diskProto γ s') ⊢ dmaWriteLease pa n w iprop(|==> (diskProto γ s' ∗ C)) := by
   iintro ⟨HC, HR⟩
+  iapply dmaWriteLease_bupd pa n w iprop(diskProto γ s' ∗ C)
   iapply dmaWriteLease_frame pa n w (diskProto γ s') C
   isplitl [HR]
   · iapply hl $$ HR
@@ -1596,9 +1597,9 @@ theorem leaseL_serveTail (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key 
       iapply dmaWriteLease_mono (Chain.req c).status 1 0#8
         iprop((∃ ts : Nat, dmaOwnT c.status 1 0#8 ts) ∗ (diskProto γ s1 ∗
           serveCtx γ h c0 key c s (some (.served c.req)) none))
-        iprop(diskProto γ s1 ∗ (serveCtx γ h c0 key c s (some (.served c.req)) none ∗
-          ∃ ts : Nat, dmaOwnT c.status 1 0#8 ts))
-        (by iintro ⟨H1, H2, H3⟩; iframe H1 H2 H3)
+        iprop(|==> (diskProto γ s1 ∗ (serveCtx γ h c0 key c s (some (.served c.req)) none ∗
+          ∃ ts : Nat, dmaOwnT c.status 1 0#8 ts)))
+        (by iintro ⟨H1, H2, H3⟩; imodintro; iframe H1 H2 H3)
       iapply status_write_lease γ c (Chain.req c).status rfl
         iprop(diskProto γ s1 ∗ serveCtx γ h c0 key c s (some (.served c.req)) none) 0#8
       iframe Hb HR HC
