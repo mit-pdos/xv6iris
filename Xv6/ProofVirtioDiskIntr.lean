@@ -261,17 +261,29 @@ structure DISK_INTR_EXTRA : Prop where
   flip freezes the base `b` of the used-index cell's log (the positions of
   `virtio_disk_init`'s own `memset` stores, out of `Xv6.ctxBytes_tails`),
   and `diskWm γ 0 T` requires `b ≤ T` with `ctxFloor curCtx T` -- i.e. the
-  initialising hart's floor past its OWN stores.  The model supports it
-  (`MachCSL.fencePost` drains the hart's `pub`), but no rule exposes it:
-  there is no `pubLb` receipt to pair with a fence the way
-  `MachCSL.rviewLb` pairs with `MachCSL.wp_s_fence_iorw_iorw_floor`, and
-  the other route -- the lock's own stamp, `MachCSL.lockPayWon`'s
-  `ctxFloor curCtx T` -- is DISCARDED by `Xv6.ACQUIRE`'s frozen statement,
-  which hands out only an unrelated `∃ K, viewLb cpu' K`.  Adding the
-  conjunct without a mint would only move the assumption into
-  `Xv6.VIRTIO_DISK_INIT`, where its caller could not discharge it either
-  (`diskWm` names `diskBaseFrozen γ b`, which does not exist until the
-  flip creates it).  So it stays here, where it is visible. -/
+  initialising hart's floor past its OWN stores.
+
+  THE FENCE RULE IS NO LONGER WHAT IS MISSING.  It used to read here that
+  the model supports the drain edge (`MachCSL.fencePost` drains the hart's
+  `pub`) but that no rule exposes it, for want of a `pubLb` receipt.  That
+  was wrong: the receipt is the store's own `MachCSL.authoredBy`, which
+  `MachCSL.machInterp_store` hands out beside `MachCSL.topLb`, and
+  `MachCSL/WpSmodeFencePub.lean` now cashes it --
+  `MachCSL.wp_s_fence_iorw_iorw_pub` turns
+  `authoredBy T (hartAgent cpu)` into `MachCSL.viewLb cpu T` across
+  `__sync_synchronize()`, at both encodings.
+
+  What is left is PLUMBING through two FROZEN statements, and that is why
+  this arm stays.  (i) The payload conjunct `∃ T, diskWm γ nr T ∗
+  ctxFloor ξ T` is a change to `Xv6.diskRes`, and (ii) the mint needs the
+  `authoredBy` receipts of `virtio_disk_init`'s `memset` stores to reach
+  `Xv6.disk_driver_ok_write`, which `Xv6.diskFlipIn` does not carry --
+  `Xv6.ctxBytes_tails` keeps only the numeric bound `b`, not the
+  authorship.  Both are one-line additions to statements this task may not
+  touch; neither needs new model support.  The other route -- the lock's
+  own stamp, `MachCSL.lockPayWon`'s `ctxFloor curCtx T` -- is DISCARDED by
+  `Xv6.ACQUIRE`'s frozen statement, which hands out only an unrelated
+  `∃ K, viewLb cpu' K`. -/
   pay_wm : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
       [CurCtx] (γ : DiskNames) (cpu : CPU) (nr : Nat),
     diskReadAt (GF := GF) γ nr ∗ (∃ K : Nat, viewLb cpu K) ⊢
