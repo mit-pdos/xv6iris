@@ -456,19 +456,18 @@ theorem swp_write_CSR_stimecmp (cpu : CPU) (dq : DFrac) (s v mt mtc mip me : Bit
     (hstce : BitVec.extractLsb' 63 1 me = 1#1) (Φ : Result (BitVec 64) Unit → IProp GF) :
     Register.misa ↦ᵣ[cpu]{dq} 0x800000000014112D#64 ∗ Register.stimecmp ↦ᵣ[cpu] s ∗
     Register.mtime ↦ᵣ[cpu]{dq} mt ∗ Register.mtimecmp ↦ᵣ[cpu]{dq} mtc ∗ Register.mip ↦ᵣ[cpu] mip ∗
-    Register.menvcfg ↦ᵣ[cpu]{dq} me ∗ Register.sig_meip ↦ᵣ[cpu]{dq} 0#1 ∗ Register.sig_seip ↦ᵣ[cpu]{dq} 0#1 ∗
+    Register.menvcfg ↦ᵣ[cpu]{dq} me ∗
     ▷ (∀ mip', Register.misa ↦ᵣ[cpu]{dq} 0x800000000014112D#64 -∗ Register.stimecmp ↦ᵣ[cpu] v -∗
         Register.mtime ↦ᵣ[cpu]{dq} mt -∗ Register.mtimecmp ↦ᵣ[cpu]{dq} mtc -∗ Register.mip ↦ᵣ[cpu] mip' -∗
-        Register.menvcfg ↦ᵣ[cpu]{dq} me -∗ Register.sig_meip ↦ᵣ[cpu]{dq} 0#1 -∗
-        Register.sig_seip ↦ᵣ[cpu]{dq} 0#1 -∗ Φ (.Ok v))
+        Register.menvcfg ↦ᵣ[cpu]{dq} me -∗ Φ (.Ok v))
     ⊢ swp cpu (write_CSR 0x14D#12 v) Φ := by
-  iintro ⟨Hmisa, Hstimecmp, Hmtime, Hmtimecmp, Hmip, Hmenvcfg, Hsig_meip, Hsig_seip, HΦ⟩
+  iintro ⟨Hmisa, Hstimecmp, Hmtime, Hmtimecmp, Hmip, Hmenvcfg, HΦ⟩
   swp_run 120
   split
   · swp_run 60
-    iapply HΦ $$ %_ Hmisa Hstimecmp Hmtime Hmtimecmp Hmip Hmenvcfg Hsig_meip Hsig_seip
+    iapply HΦ $$ %_ Hmisa Hstimecmp Hmtime Hmtimecmp Hmip Hmenvcfg
   · swp_run 60
-    iapply HΦ $$ %_ Hmisa Hstimecmp Hmtime Hmtimecmp Hmip Hmenvcfg Hsig_meip Hsig_seip
+    iapply HΦ $$ %_ Hmisa Hstimecmp Hmtime Hmtimecmp Hmip Hmenvcfg
 
 set_option maxHeartbeats 4000000 in
 /-- `csrw pmpaddr0` from the reset tables (entry 0 unlocked, entry 1 not TOR). -/
@@ -691,23 +690,21 @@ theorem swp_csrw_stimecmp (cpu : CPU) (dq : DFrac) (s v mt mtc mip me : BitVec 6
     Register.misa ↦ᵣ[cpu]{dq} 0x800000000014112D#64 ∗ Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Machine ∗
     Register.stimecmp ↦ᵣ[cpu] s ∗ Register.mtime ↦ᵣ[cpu]{dq} mt ∗ Register.mtimecmp ↦ᵣ[cpu]{dq} mtc ∗
     Register.mip ↦ᵣ[cpu] mip ∗ Register.menvcfg ↦ᵣ[cpu]{dq} me ∗
-    Register.sig_meip ↦ᵣ[cpu]{dq} 0#1 ∗ Register.sig_seip ↦ᵣ[cpu]{dq} 0#1 ∗
     ▷ (∀ mip', Register.misa ↦ᵣ[cpu]{dq} 0x800000000014112D#64 -∗
         Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Machine -∗ Register.stimecmp ↦ᵣ[cpu] v -∗
         Register.mtime ↦ᵣ[cpu]{dq} mt -∗ Register.mtimecmp ↦ᵣ[cpu]{dq} mtc -∗ Register.mip ↦ᵣ[cpu] mip' -∗
-        Register.menvcfg ↦ᵣ[cpu]{dq} me -∗ Register.sig_meip ↦ᵣ[cpu]{dq} 0#1 -∗
-        Register.sig_seip ↦ᵣ[cpu]{dq} 0#1 -∗ Φ (ExecutionResult.Retire_Success ()))
+        Register.menvcfg ↦ᵣ[cpu]{dq} me -∗ Φ (ExecutionResult.Retire_Success ()))
     ⊢ swp cpu (csrw 0x14D#12 v) Φ := by
-  iintro ⟨Hmisa, Hcur_privilege, Hstimecmp, Hmtime, Hmtimecmp, Hmip, Hmenvcfg, Hsig_meip, Hsig_seip, HΦ⟩
+  iintro ⟨Hmisa, Hcur_privilege, Hstimecmp, Hmtime, Hmtimecmp, Hmip, Hmenvcfg, HΦ⟩
   unfold csrw doCSR
   swp_run 300
   split
   · swp_run 60
     try (unfold wX_bits wX; swp_run 40)
-    iapply HΦ $$ %_ Hmisa Hcur_privilege Hstimecmp Hmtime Hmtimecmp Hmip Hmenvcfg Hsig_meip Hsig_seip
+    iapply HΦ $$ %_ Hmisa Hcur_privilege Hstimecmp Hmtime Hmtimecmp Hmip Hmenvcfg
   · swp_run 60
     try (unfold wX_bits wX; swp_run 40)
-    iapply HΦ $$ %_ Hmisa Hcur_privilege Hstimecmp Hmtime Hmtimecmp Hmip Hmenvcfg Hsig_meip Hsig_seip
+    iapply HΦ $$ %_ Hmisa Hcur_privilege Hstimecmp Hmtime Hmtimecmp Hmip Hmenvcfg
 
 set_option maxHeartbeats 4000000 in
 theorem swp_csrw_pmpaddr0 (cpu : CPU) (dq : DFrac) (Φ : ExecutionResult → IProp GF) :

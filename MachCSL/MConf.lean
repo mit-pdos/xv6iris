@@ -84,8 +84,6 @@ def confCells (cpu : CPU) (dq : DFrac) (p : Privilege) (c : MConf) : IProp GF :=
   Register.stimecmp ↦ᵣ[cpu]{dq} c.stimecmp ∗
   Register.pmpcfg_n ↦ᵣ[cpu]{dq} c.pmpcfg ∗
   Register.pmpaddr_n ↦ᵣ[cpu]{dq} c.pmpaddr ∗
-  Register.sig_meip ↦ᵣ[cpu]{dq} 0#1 ∗
-  Register.sig_seip ↦ᵣ[cpu]{dq} 0#1 ∗
   Register.mseccfg ↦ᵣ[cpu]{dq} 0#64 ∗
   Register.elp ↦ᵣ[cpu]{dq} 0#1 ∗
   Register.senvcfg ↦ᵣ[cpu]{dq} 0#64 ∗
@@ -119,8 +117,6 @@ theorem mConf_cases (cpu : CPU) (dq : DFrac) (c : MConf) :
     Register.stimecmp ↦ᵣ[cpu]{dq} c.stimecmp ∗
     Register.pmpcfg_n ↦ᵣ[cpu]{dq} c.pmpcfg ∗
     Register.pmpaddr_n ↦ᵣ[cpu]{dq} c.pmpaddr ∗
-    Register.sig_meip ↦ᵣ[cpu]{dq} 0#1 ∗
-    Register.sig_seip ↦ᵣ[cpu]{dq} 0#1 ∗
     Register.mseccfg ↦ᵣ[cpu]{dq} 0#64 ∗
     Register.elp ↦ᵣ[cpu]{dq} 0#1 ∗
     Register.senvcfg ↦ᵣ[cpu]{dq} 0#64 ∗
@@ -148,8 +144,6 @@ theorem mConf_intro (cpu : CPU) (dq : DFrac) (c : MConf) :
     Register.stimecmp ↦ᵣ[cpu]{dq} c.stimecmp ∗
     Register.pmpcfg_n ↦ᵣ[cpu]{dq} c.pmpcfg ∗
     Register.pmpaddr_n ↦ᵣ[cpu]{dq} c.pmpaddr ∗
-    Register.sig_meip ↦ᵣ[cpu]{dq} 0#1 ∗
-    Register.sig_seip ↦ᵣ[cpu]{dq} 0#1 ∗
     Register.mseccfg ↦ᵣ[cpu]{dq} 0#64 ∗
     Register.elp ↦ᵣ[cpu]{dq} 0#1 ∗
     Register.senvcfg ↦ᵣ[cpu]{dq} 0#64 ∗
@@ -178,8 +172,6 @@ theorem confCells_cases (cpu : CPU) (dq : DFrac) (p : Privilege) (c : MConf) :
     Register.stimecmp ↦ᵣ[cpu]{dq} c.stimecmp ∗
     Register.pmpcfg_n ↦ᵣ[cpu]{dq} c.pmpcfg ∗
     Register.pmpaddr_n ↦ᵣ[cpu]{dq} c.pmpaddr ∗
-    Register.sig_meip ↦ᵣ[cpu]{dq} 0#1 ∗
-    Register.sig_seip ↦ᵣ[cpu]{dq} 0#1 ∗
     Register.mseccfg ↦ᵣ[cpu]{dq} 0#64 ∗
     Register.elp ↦ᵣ[cpu]{dq} 0#1 ∗
     Register.senvcfg ↦ᵣ[cpu]{dq} 0#64 ∗
@@ -207,8 +199,6 @@ theorem confCells_intro (cpu : CPU) (dq : DFrac) (p : Privilege) (c : MConf) :
     Register.stimecmp ↦ᵣ[cpu]{dq} c.stimecmp ∗
     Register.pmpcfg_n ↦ᵣ[cpu]{dq} c.pmpcfg ∗
     Register.pmpaddr_n ↦ᵣ[cpu]{dq} c.pmpaddr ∗
-    Register.sig_meip ↦ᵣ[cpu]{dq} 0#1 ∗
-    Register.sig_seip ↦ᵣ[cpu]{dq} 0#1 ∗
     Register.mseccfg ↦ᵣ[cpu]{dq} 0#64 ∗
     Register.elp ↦ᵣ[cpu]{dq} 0#1 ∗
     Register.senvcfg ↦ᵣ[cpu]{dq} 0#64 ∗
@@ -225,7 +215,7 @@ set_option hygiene false in
 macro "conf_cases " h:ident : tactic =>
   `(tactic| ihave ⟨Hcur_privilege, Hhart_state, Hmisa, Hmstatus, Hmie, Hmideleg, Hmedeleg, Hmepc,
                   Hsatp, Hmenvcfg, Hmcounteren, Hscounteren, Hmtimecmp, Hstimecmp, Hpmpcfg_n, Hpmpaddr_n,
-                  Hsig_meip, Hsig_seip, Hmseccfg, Help, Hsenvcfg, Hmcountinhibit, Hminstretcfg,
+                  Hmseccfg, Help, Hsenvcfg, Hmcountinhibit, Hminstretcfg,
                   Hmcyclecfg, Hpma_regions, Hhtif_tohost_base⟩ := confCells_cases _ _ _ _ $$ $h:ident)
 
 open Iris.ProofMode in
@@ -234,7 +224,7 @@ set_option hygiene false in
 macro "conf_intro " h:ident : tactic =>
   `(tactic| (ihave $h:ident := confCells_intro _ _ _ _ $$ [Hcur_privilege Hhart_state Hmisa Hmstatus Hmie
                   Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hscounteren Hmtimecmp Hstimecmp Hpmpcfg_n
-                  Hpmpaddr_n Hsig_meip Hsig_seip Hmseccfg Help Hsenvcfg Hmcountinhibit Hminstretcfg
+                  Hpmpaddr_n Hmseccfg Help Hsenvcfg Hmcountinhibit Hminstretcfg
                   Hmcyclecfg Hpma_regions Hhtif_tohost_base]
              case' _ => iframe))
 
@@ -244,7 +234,7 @@ set_option hygiene false in
 macro "mconf_cases " h:ident : tactic =>
   `(tactic| ihave ⟨Hcur_privilege, Hhart_state, Hmisa, Hmstatus, Hmie, Hmideleg, Hmedeleg, Hmepc,
                   Hsatp, Hmenvcfg, Hmcounteren, Hscounteren, Hmtimecmp, Hstimecmp, Hpmpcfg_n, Hpmpaddr_n,
-                  Hsig_meip, Hsig_seip, Hmseccfg, Help, Hsenvcfg, Hmcountinhibit, Hminstretcfg,
+                  Hmseccfg, Help, Hsenvcfg, Hmcountinhibit, Hminstretcfg,
                   Hmcyclecfg, Hpma_regions, Hhtif_tohost_base⟩ := mConf_cases _ _ _ $$ $h:ident)
 
 open Iris.ProofMode in
@@ -253,7 +243,7 @@ set_option hygiene false in
 macro "mconf_intro " h:ident : tactic =>
   `(tactic| (ihave $h:ident := mConf_intro _ _ _ $$ [Hcur_privilege Hhart_state Hmisa Hmstatus Hmie
                   Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hscounteren Hmtimecmp Hstimecmp Hpmpcfg_n
-                  Hpmpaddr_n Hsig_meip Hsig_seip Hmseccfg Help Hsenvcfg Hmcountinhibit Hminstretcfg
+                  Hpmpaddr_n Hmseccfg Help Hsenvcfg Hmcountinhibit Hminstretcfg
                   Hmcyclecfg Hpma_regions Hhtif_tohost_base]
              case' _ => iframe))
 

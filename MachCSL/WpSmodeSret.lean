@@ -55,7 +55,7 @@ theorem execSpecF_sret (cpu : CPU) (c : MConf) (hok : SConfPhys (GF := GF) c fal
   simp only [update_bit0_eq]
   ihave HmConf := confCells_intro cpu (DFrac.own 1) Privilege.Supervisor { c with mstatus := sretMs c.mstatus }
     $$ [Hcur_privilege Hhart_state Hmisa Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren
-        Hscounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n Hsig_meip Hsig_seip Hmseccfg Help Hsenvcfg
+        Hscounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n Hmseccfg Help Hsenvcfg
         Hmcountinhibit Hminstretcfg Hmcyclecfg Hpma_regions Hhtif_tohost_base]
   case' _ =>
     simp only [sretMs]

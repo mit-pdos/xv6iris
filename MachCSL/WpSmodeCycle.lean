@@ -457,14 +457,14 @@ macro "cycle_retire_trap" : tactic =>
 set_option hygiene false in
 /-- The trap arm of a cycle: dispatch found `some (i, p)`; take the trap
 through the caller's `HTrap`, retire. -/
-macro "cycle_trap" : tactic =>
-  `(tactic| (obtain ⟨rfl, hi⟩ := dispatchS_cases c mip hmie' i p hd
+macro "cycle_trap" w:ident : tactic =>
+  `(tactic| (obtain ⟨rfl, hi⟩ := dispatchS_cases c $w hmie' i p hd
              have hsc : sCauseOk (sCause i) := by
                rcases hi with rfl | rfl
                · exact Or.inl rfl
                · exact Or.inr rfl
              have hs : sie = true := by
-               have h1 := dispatchS_sie c mip _ hd
+               have h1 := dispatchS_sie c $w _ hd
                have h2 := hok.phys.2.1.1
                cases sie
                · rw [h1] at h2; simp at h2
@@ -523,8 +523,8 @@ theorem wpLoop_s_base [CurCtx] (cpu : CPU) (c c' : MConf) (tier : KTier) (root :
   iapply swp_dispatchInterrupt_S (hmie := hmie)
   iframe
   inext
-  iintro HmConf Hmip
-  rcases hd : dispatchS c mip with _ | ⟨i, p⟩
+  iintro %ipw HmConf Hmip
+  rcases hd : dispatchS c ipw with _ | ⟨i, p⟩
   · icases HΦ with ⟨HΦ, -⟩
     simp only [hd]
     swp_run 40
@@ -549,7 +549,7 @@ theorem wpLoop_s_base [CurCtx] (cpu : CPU) (c c' : MConf) (tier : KTier) (root :
     iintro HmConf HPC HnextPC ⟨⟨HT, HQ⟩, %ip', %mt', Hmip, Hmtime⟩
     conf_cases HmConf
     cycle_retire_t
-  · cycle_trap
+  · cycle_trap ipw
 
 set_option maxHeartbeats 4000000 in
 /-- One supervisor-mode cycle executing a compressed instruction that
@@ -586,8 +586,8 @@ theorem wpLoop_s_rvc [CurCtx] (cpu : CPU) (c c' : MConf) (tier : KTier) (root : 
   iapply swp_dispatchInterrupt_S (hmie := hmie)
   iframe
   inext
-  iintro HmConf Hmip
-  rcases hd : dispatchS c mip with _ | ⟨i, p⟩
+  iintro %ipw HmConf Hmip
+  rcases hd : dispatchS c ipw with _ | ⟨i, p⟩
   · icases HΦ with ⟨HΦ, -⟩
     simp only [hd]
     swp_run 40
@@ -614,7 +614,7 @@ theorem wpLoop_s_rvc [CurCtx] (cpu : CPU) (c c' : MConf) (tier : KTier) (root : 
     iintro HmConf HPC HnextPC ⟨⟨HT, HQ⟩, %ip', %mt', Hmip, Hmtime⟩
     conf_cases HmConf
     cycle_retire_t
-  · cycle_trap
+  · cycle_trap ipw
 
 set_option maxHeartbeats 4000000 in
 /-- One supervisor-mode cycle executing the instruction at `PC`, from the

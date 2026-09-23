@@ -9,10 +9,15 @@ cells of every hart live -- with their contents EXISTENTIALLY quantified --
 in one invariant (`wireInv`), which is therefore persistent and freely
 shared between the CPU-side proofs and the device threads.
 
-The hart side reads them OFF-FRAME: `swp_readReg_any` needs no ownership at
-all (the read does not move the state, so the state interpretation goes
-straight back), and hands the caller a ∀-bound answer.  That is what lets
-the `read_mip` chain quantify over the pending word instead of pinning it.
+The hart side reads them OFF-FRAME: `swp_readReg_any` (`MachCSL.Wp`) needs
+no ownership at all (the read does not move the state, so the state
+interpretation goes straight back), and hands the caller a ∀-bound answer.
+That is what lets the `read_mip` chain quantify over the pending word
+instead of pinning it (`swp_dispatchInterrupt_S`).
+
+The invariant exists from POWER-ON: `wp_power` (`MachCSL.Power`) splits the
+two pins out of every hart's freshly allocated register cells and allocates
+`wireInvAt` with them, so no boot client ever owns a pin.
 
 The Rocq prototype: `WireInv.v` (`wire_inv_body`, `wire_inv_alloc`) and
 `WpIntrCore.v:115-175` (`swp_read_reg_any`).
@@ -27,49 +32,45 @@ open Sail Sail.ConcurrencyInterfaceV1
 open Sail.ArchSem (FreeM)
 open LeanRV64D
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+section Fixed
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF]
 
-/-! ## Off-frame register reads
-
-A register read moves nothing, so the rule needs no cell at all: the state
-interpretation is handed back untouched (`machInterp_acc_read` splits one
-hart's register interpretation out and puts it straight back), and the
-answer is universally quantified. -/
-
-/-- Read a register WITHOUT owning it: the answer is ∀-bound. -/
-theorem swp_readReg_any (cpu : CPU) (r : Register) (Φ : RegisterType r → IProp GF) :
-    ▷ (∀ v : RegisterType r, Φ v) ⊢ swp cpu (readReg r) Φ := by
-  unfold readReg PreSail.readReg PreSail.emit
-  iintro HΦ
-  iapply swp_event cpu (.regRead r) (fun v => FreeM.pure v) Φ (fun _ _ h => h)
-  iintro %σ Hσ
-  icases machInterp_acc_read σ cpu $$ Hσ with ⟨Hregs, Hclose⟩
-  iapply fupd_mask_intro LawfulSet.empty_subset
-  iintro Hmask
-  isplit
-  · ipureintro
-    exact ⟨σ.regs cpu r, σ, rfl, rfl⟩
-  inext
-  iintro %v' %σ' %Hev
-  obtain ⟨-, rfl⟩ := Hev
-  imod Hmask
-  imodintro
-  isplitl [Hregs Hclose]
-  · iapply Hclose $$ Hregs
-  · iapply swp_ret
-    iapply HΦ $$ %v'
-
-/-- The `>>=` form of `swp_readReg_any`. -/
-theorem swp_readReg_any_bind (cpu : CPU) {X : Type} (r : Register)
-    (f : RegisterType r → SailM X) (Φ : X → IProp GF) :
-    ▷ (∀ v : RegisterType r, swp cpu (f v) Φ) ⊢ swp cpu (readReg r >>= f) Φ := by
-  iintro HΦ
-  iapply swp_bind
-  iapply swp_readReg_any cpu r (fun v => swp cpu (f v) Φ) $$ HΦ
-
-/-! ## The wire invariant -/
+/-! ## The wire invariant, at an explicit era -/
 
 def wireN : Namespace := ndot nroot "machcslwire"
+
+/-- `wireBody` at an explicit era, for the power thread (which allocates the
+invariant before any `MachGS` instance exists). -/
+def wireBodyAt (E : EraGS GF) : IProp GF := iprop%
+  ∃ seip meip : CPU → BitVec 1, [∗list] cpu ∈ cpus,
+    (regPointsToAt (E.regName cpu) Register.sig_seip (DFrac.own 1) (seip cpu) ∗
+     regPointsToAt (E.regName cpu) Register.sig_meip (DFrac.own 1) (meip cpu))
+
+/-- `wireInv` at an explicit era. -/
+def wireInvAt (E : EraGS GF) : IProp GF := inv wireN (wireBodyAt E)
+
+instance wireInvAt_persistent (E : EraGS GF) : Persistent (wireInvAt (GF := GF) E) := by
+  unfold wireInvAt; infer_instance
+
+/-- Allocate the invariant from the owned pin cells of an era, at any levels. -/
+theorem wireInvAt_alloc (E : EraGS GF) (M : CoPset) (seip meip : CPU → BitVec 1) :
+    ([∗list] cpu ∈ cpus,
+        (regPointsToAt (E.regName cpu) Register.sig_seip (DFrac.own 1) (seip cpu) ∗
+         regPointsToAt (E.regName cpu) Register.sig_meip (DFrac.own 1) (meip cpu)))
+      ⊢@{IProp GF} |={M}=> wireInvAt E := by
+  iintro Hcells
+  unfold wireInvAt
+  iapply inv_alloc wireN M (wireBodyAt (GF := GF) E)
+  inext
+  unfold wireBodyAt
+  iexists seip, meip
+  iexact Hcells
+
+end Fixed
+
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+
+/-! ## The wire invariant in the ambient era -/
 
 /-- Value-agnostic ownership of every hart's two interrupt-pin cells.  The
 per-hart values are existentially quantified (as total functions over the
@@ -81,6 +82,11 @@ def wireBody : IProp GF := iprop%
 
 /-- The pins of every hart, at unspecified levels. -/
 def wireInv : IProp GF := inv wireN (wireBody (GF := GF))
+
+/-- In the ambient era the two forms agree. -/
+theorem wireBody_eq : wireBody (GF := GF) = wireBodyAt MachGS.era := rfl
+
+theorem wireInv_eq : wireInv (GF := GF) = wireInvAt MachGS.era := rfl
 
 instance wireBody_timeless : Timeless (wireBody (GF := GF)) := by
   unfold wireBody regPointsTo regPointsToAt; infer_instance

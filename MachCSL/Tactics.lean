@@ -603,12 +603,19 @@ def swpStepCore (x fn : Lean.Expr) (bind : Bool) : TacticM Unit := do
   match fn with
   | Lean.Expr.const n _ =>
     if n == ``LeanRV64D.readReg then
-      let h := mkIdent (regHypName x.getAppArgs[0]!)
+      let rE := x.getAppArgs[0]!
+      let h := mkIdent (regHypName rE)
       if !bind then
         -- a bare action: view it as `x >>= pure` so the bind rule applies
         let stx ← Lean.Elab.Term.exprToSyntax x
         evalTactic (← `(tactic| rw [show ($stx) = (($stx) >>= pure) from (bind_pure _).symm]))
-      evalTactic (← `(tactic| (iapply swp_readReg_bind; (first | iframe $h:ident | iframe); try (inext; iintro $h:ident))))
+      -- the interrupt pins are NOT in any hart's frame (they live in
+      -- `wireInv`, `MachCSL/WireInv.lean`): read them off-frame, which
+      -- quantifies over the answer instead of pinning it
+      if rE.isAppOf ``LeanRV64D.Register.sig_seip || rE.isAppOf ``LeanRV64D.Register.sig_meip then
+        evalTactic (← `(tactic| (iapply swp_readReg_any_bind; try (inext; iintro %$h:ident))))
+      else
+        evalTactic (← `(tactic| (iapply swp_readReg_bind; (first | iframe $h:ident | iframe); try (inext; iintro $h:ident))))
     else if n == ``LeanRV64D.writeReg then
       let h := mkIdent (regHypName x.getAppArgs[0]!)
       if !bind then

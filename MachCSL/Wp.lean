@@ -534,6 +534,41 @@ theorem swp_readReg_bind (cpu : CPU) {X : Type} (r : Register) (dq : DFrac) (v :
   iapply swp_readReg cpu r dq v $$ [Hr HΦ]
   iframe Hr HΦ
 
+/-- Read a register WITHOUT owning it: the read moves nothing, so the state
+interpretation goes straight back and the answer is ∀-bound.  This is how the
+hart side reads the interrupt pins (`sig_seip`/`sig_meip`), which live in the
+wire invariant (`MachCSL/WireInv.lean`) and not in any hart's frame.  Rocq:
+`WpIntrCore.v:115-175` (`swp_read_reg_any`). -/
+theorem swp_readReg_any (cpu : CPU) (r : Register) (Φ : RegisterType r → IProp GF) :
+    ▷ (∀ v : RegisterType r, Φ v) ⊢ swp cpu (readReg r) Φ := by
+  unfold readReg PreSail.readReg PreSail.emit
+  iintro HΦ
+  iapply swp_event cpu (.regRead r) (fun v => FreeM.pure v) Φ (fun _ _ h => h)
+  iintro %σ Hσ
+  icases machInterp_acc_read σ cpu $$ Hσ with ⟨Hregs, Hclose⟩
+  iapply fupd_mask_intro LawfulSet.empty_subset
+  iintro Hmask
+  isplit
+  · ipureintro
+    exact ⟨σ.regs cpu r, σ, rfl, rfl⟩
+  inext
+  iintro %v' %σ' %Hev
+  obtain ⟨-, rfl⟩ := Hev
+  imod Hmask
+  imodintro
+  isplitl [Hregs Hclose]
+  · iapply Hclose $$ Hregs
+  · iapply swp_ret
+    iapply HΦ $$ %v'
+
+/-- The `>>=` form of `swp_readReg_any`. -/
+theorem swp_readReg_any_bind (cpu : CPU) {X : Type} (r : Register)
+    (f : RegisterType r → SailM X) (Φ : X → IProp GF) :
+    ▷ (∀ v : RegisterType r, swp cpu (f v) Φ) ⊢ swp cpu (readReg r >>= f) Φ := by
+  iintro HΦ
+  iapply swp_bind
+  iapply swp_readReg_any cpu r (fun v => swp cpu (f v) Φ) $$ HΦ
+
 /-- Write a register: needs the full cell, and hands back the updated cell. -/
 theorem swp_writeReg (cpu : CPU) (r : Register) (v w : RegisterType r)
     (Φ : PUnit → IProp GF) :

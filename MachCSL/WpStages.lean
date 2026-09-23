@@ -28,22 +28,18 @@ theorem swp_dispatchInterrupt_m (cpu : CPU) (dq : DFrac) (ip ms : BitVec 64)
     Register.misa ↦ᵣ[cpu]{dq} 0x800000000014112D#64 ∗
     Register.mideleg ↦ᵣ[cpu]{dq} 0#64 ∗
     Register.mip ↦ᵣ[cpu] ip ∗
-    Register.sig_meip ↦ᵣ[cpu]{dq} 0#1 ∗
-    Register.sig_seip ↦ᵣ[cpu]{dq} 0#1 ∗
     Register.mie ↦ᵣ[cpu]{dq} 0#64 ∗
     Register.mstatus ↦ᵣ[cpu]{dq} ms ∗
     ▷ (Register.misa ↦ᵣ[cpu]{dq} 0x800000000014112D#64 -∗
        Register.mideleg ↦ᵣ[cpu]{dq} 0#64 -∗
        Register.mip ↦ᵣ[cpu] ip -∗
-       Register.sig_meip ↦ᵣ[cpu]{dq} 0#1 -∗
-       Register.sig_seip ↦ᵣ[cpu]{dq} 0#1 -∗
        Register.mie ↦ᵣ[cpu]{dq} 0#64 -∗
        Register.mstatus ↦ᵣ[cpu]{dq} ms -∗ Φ none)
     ⊢ swp cpu (dispatchInterrupt Privilege.Machine) Φ := by
-  iintro ⟨Hmisa, Hmideleg, Hmip, Hsig_meip, Hsig_seip, Hmie, Hmstatus, HΦ⟩
+  iintro ⟨Hmisa, Hmideleg, Hmip, Hmie, Hmstatus, HΦ⟩
   unfold dispatchInterrupt
   swp_run 40
-  iapply HΦ $$ Hmisa Hmideleg Hmip Hsig_meip Hsig_seip Hmie Hmstatus
+  iapply HΦ $$ Hmisa Hmideleg Hmip Hmie Hmstatus
 
 set_option maxHeartbeats 4000000 in
 /-- The clock tick in machine mode with the reset configuration: `mcycle` and
@@ -57,8 +53,6 @@ theorem swp_tick_clock_m (cpu : CPU) (dq : DFrac) (mcycle mtime mip : BitVec 64)
     Register.misa ↦ᵣ[cpu]{dq} 0x800000000014112D#64 ∗
     Register.mtimecmp ↦ᵣ[cpu]{dq} 0xFFFFFFFFFFFFFFFF#64 ∗
     Register.stimecmp ↦ᵣ[cpu]{dq} 0xFFFFFFFFFFFFFFFF#64 ∗
-    Register.sig_meip ↦ᵣ[cpu]{dq} 0#1 ∗
-    Register.sig_seip ↦ᵣ[cpu]{dq} 0#1 ∗
     Register.mcycle ↦ᵣ[cpu] mcycle ∗
     Register.mtime ↦ᵣ[cpu] mtime ∗
     Register.mip ↦ᵣ[cpu] mip ∗
@@ -70,22 +64,20 @@ theorem swp_tick_clock_m (cpu : CPU) (dq : DFrac) (mcycle mtime mip : BitVec 64)
         Register.misa ↦ᵣ[cpu]{dq} 0x800000000014112D#64 -∗
         Register.mtimecmp ↦ᵣ[cpu]{dq} 0xFFFFFFFFFFFFFFFF#64 -∗
         Register.stimecmp ↦ᵣ[cpu]{dq} 0xFFFFFFFFFFFFFFFF#64 -∗
-        Register.sig_meip ↦ᵣ[cpu]{dq} 0#1 -∗
-        Register.sig_seip ↦ᵣ[cpu]{dq} 0#1 -∗
         Register.mcycle ↦ᵣ[cpu] mcycle' -∗ Register.mtime ↦ᵣ[cpu] mtime' -∗
         Register.mip ↦ᵣ[cpu] mip' -∗ Φ ())
     ⊢ swp cpu (tick_clock ()) Φ := by
   iintro ⟨Hcur_privilege, Hmcountinhibit, Hmcyclecfg, Hmenvcfg, Hmisa, Hmtimecmp, Hstimecmp,
-    Hsig_meip, Hsig_seip, Hmcycle, Hmtime, Hmip, HΦ⟩
+    Hmcycle, Hmtime, Hmip, HΦ⟩
   unfold tick_clock
   swp_run 60
   split
   · swp_run 60
     iapply HΦ $$ %_ %_ %_ Hcur_privilege Hmcountinhibit Hmcyclecfg Hmenvcfg Hmisa Hmtimecmp Hstimecmp
-      Hsig_meip Hsig_seip Hmcycle Hmtime Hmip
+      Hmcycle Hmtime Hmip
   · swp_run 40
     iapply HΦ $$ %_ %_ %_ Hcur_privilege Hmcountinhibit Hmcyclecfg Hmenvcfg Hmisa Hmtimecmp Hstimecmp
-      Hsig_meip Hsig_seip Hmcycle Hmtime Hmip
+      Hmcycle Hmtime Hmip
 
 /-! ### Aligned RAM reads in machine mode -/
 

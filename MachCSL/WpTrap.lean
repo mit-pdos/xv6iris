@@ -78,33 +78,41 @@ theorem dispatchS_sie (c : MConf) (ip : BitVec 64) (x : InterruptType × Privile
 
 set_option maxHeartbeats 4000000 in
 /-- Dispatch in supervisor mode, at any `SIE`, with no machine-level
-interrupt deliverable (`mie & ~mideleg = 0`). -/
+interrupt deliverable (`mie & ~mideleg = 0`).
+
+The pending word the model looks at is `mip` ORed with the interrupt PINS
+(`sig_meip`/`sig_seip`), which are NOT in the hart's frame -- they live in
+`wireInv` and the PLIC may drive them at any moment.  So the rule reads them
+off-frame (`swp_readReg_any`) and the answer is universally quantified: the
+continuation must hold for the dispatch decision at EVERY effective pending
+word `ip'`, not just at `mip`.  `mip` itself is still owned and unmoved. -/
 theorem swp_dispatchInterrupt_S (cpu : CPU) (dq : DFrac) (c : MConf) (hmie : c.mie &&& ~~~c.mideleg = 0#64)
     (ip : BitVec 64) (Φ : Option (InterruptType × Privilege) → IProp GF) :
     confCells cpu dq Privilege.Supervisor c ∗ Register.mip ↦ᵣ[cpu] ip ∗
-    ▷ (confCells cpu dq Privilege.Supervisor c -∗ Register.mip ↦ᵣ[cpu] ip -∗ Φ (dispatchS c ip))
+    ▷ (∀ ip', confCells cpu dq Privilege.Supervisor c -∗ Register.mip ↦ᵣ[cpu] ip -∗ Φ (dispatchS c ip'))
     ⊢ swp cpu (dispatchInterrupt Privilege.Supervisor) Φ := by
   iintro ⟨HmConf, Hmip, HΦ⟩
   conf_cases HmConf
-  have hm : ip &&& (c.mie &&& ~~~c.mideleg) = 0#64 := by rw [hmie]; simp
-  have hext : ∀ v : BitVec 64,
-      Mk_Minterrupts (v ||| _update_Minterrupts_SEI (_update_Minterrupts_MEI (Mk_Minterrupts 0#64) 0#1) 0#1) = v := by
-    intro v
-    simp only [Mk_Minterrupts, _update_Minterrupts_SEI, _update_Minterrupts_MEI, Sail.BitVec.updateSubrange,
-      Sail.BitVec.updateSubrange']
+  have hext : ∀ (m s : BitVec 1) (v : BitVec 64),
+      Mk_Minterrupts (v ||| _update_Minterrupts_SEI (_update_Minterrupts_MEI (Mk_Minterrupts 0#64) m) s)
+        = v ||| ((~~~(1#64 <<< 9) &&& (BitVec.zeroExtend 64 m <<< 11)) ||| (BitVec.zeroExtend 64 s <<< 9)) := by
+    intro m s v
+    simp only [Mk_Minterrupts, _update_Minterrupts_SEI, _update_Minterrupts_MEI,
+      Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange']
     bv_decide
-  have hj : ∀ v : BitVec 64, v ||| (~~~(1#64 <<< 9) &&& 0#64 <<< 11 ||| 0#64 <<< 9) = v := by
-    intro v; bv_decide
   unfold dispatchInterrupt
   swp_run 80
-  simp only [hext, hj]
+  simp only [hext]
+  generalize (ip ||| ((~~~(1#64 <<< 9) &&& (BitVec.zeroExtend 64 Hsig_meip <<< 11)) |||
+    (BitVec.zeroExtend 64 Hsig_seip <<< 9))) = ip'
+  ispecialize HΦ $$ %ip'
   unfold dispatchS pendingS
-  by_cases hc : BitVec.extractLsb' 1 1 c.mstatus = 1#1 ∧ ip &&& (c.mie &&& c.mideleg) ≠ 0#64
-  · have hc' : (BitVec.extractLsb' 1 1 c.mstatus == 1#1 && ip &&& (c.mie &&& c.mideleg) != 0#64) = true := by
+  by_cases hc : BitVec.extractLsb' 1 1 c.mstatus = 1#1 ∧ ip' &&& (c.mie &&& c.mideleg) ≠ 0#64
+  · have hc' : (BitVec.extractLsb' 1 1 c.mstatus == 1#1 && ip' &&& (c.mie &&& c.mideleg) != 0#64) = true := by
       simp only [Bool.and_eq_true, beq_iff_eq, bne_iff_ne]; exact hc
     rw [if_pos hc]
     simp only [hc', ite_true, pure_bind]
-    generalize findPendingInterrupt (ip &&& (c.mie &&& c.mideleg)) = r
+    generalize findPendingInterrupt (ip' &&& (c.mie &&& c.mideleg)) = r
     cases r
     · swp_run 10
       conf_intro HmConf
@@ -112,11 +120,11 @@ theorem swp_dispatchInterrupt_S (cpu : CPU) (dq : DFrac) (c : MConf) (hmie : c.m
     · swp_run 10
       conf_intro HmConf
       iapply HΦ $$ HmConf Hmip
-  · have hc' : (BitVec.extractLsb' 1 1 c.mstatus == 1#1 && ip &&& (c.mie &&& c.mideleg) != 0#64) = false := by
+  · have hc' : (BitVec.extractLsb' 1 1 c.mstatus == 1#1 && ip' &&& (c.mie &&& c.mideleg) != 0#64) = false := by
       simp only [Bool.and_eq_false_iff, beq_eq_false_iff_ne, bne_eq_false_iff_eq, ne_eq]
       by_cases h1 : BitVec.extractLsb' 1 1 c.mstatus = 1#1
       · right
-        by_cases h2 : ip &&& (c.mie &&& c.mideleg) = 0#64
+        by_cases h2 : ip' &&& (c.mie &&& c.mideleg) = 0#64
         · exact h2
         · exact absurd ⟨h1, h2⟩ hc
       · left; exact h1
@@ -187,7 +195,7 @@ theorem swp_handle_interrupt_S (cpu : CPU) (c : MConf) (i : InterruptType)
   unfold trapConf
   ihave HmConf := confCells_intro _ _ _ { c with mstatus := trapMs c.mstatus } $$ [Hcur_privilege Hhart_state Hmisa Hmstatus Hmie
     Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hscounteren Hmtimecmp Hstimecmp Hpmpcfg_n
-    Hpmpaddr_n Hsig_meip Hsig_seip Hmseccfg Help Hsenvcfg Hmcountinhibit Hminstretcfg
+    Hpmpaddr_n Hmseccfg Help Hsenvcfg Hmcountinhibit Hminstretcfg
     Hmcyclecfg Hpma_regions Hhtif_tohost_base]
   case' _ => iframe
   iapply HΦ $$ HmConf HPC HnextPC Hstvec Hsepc Hscause Hstval

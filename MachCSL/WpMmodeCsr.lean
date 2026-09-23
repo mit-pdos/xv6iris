@@ -55,7 +55,7 @@ theorem execSpec_csrw_mstatus (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (r
   swp_run 60
   try (unfold wX_bits wX; swp_run 40)
   ihave HmConf := confCells_intro cpu (DFrac.own 1) Privilege.Machine { c with mstatus := mstatusWrite c.mstatus v }
-    $$ [Hcur_privilege Hhart_state Hmisa Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hscounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n Hsig_meip Hsig_seip Hmseccfg Help Hsenvcfg Hmcountinhibit Hminstretcfg Hmcyclecfg Hpma_regions Hhtif_tohost_base]
+    $$ [Hcur_privilege Hhart_state Hmisa Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hscounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n Hmseccfg Help Hsenvcfg Hmcountinhibit Hminstretcfg Hmcyclecfg Hpma_regions Hhtif_tohost_base]
   case' _ =>
     simp only []
     iframe
@@ -91,7 +91,7 @@ theorem execSpec_csrw_mepc (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (rs1 
   swp_run 60
   try (unfold wX_bits wX; swp_run 40)
   ihave HmConf := confCells_intro cpu (DFrac.own 1) Privilege.Machine { c with mepc := legalize_xepc v }
-    $$ [Hcur_privilege Hhart_state Hmisa Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hscounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n Hsig_meip Hsig_seip Hmseccfg Help Hsenvcfg Hmcountinhibit Hminstretcfg Hmcyclecfg Hpma_regions Hhtif_tohost_base]
+    $$ [Hcur_privilege Hhart_state Hmisa Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hscounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n Hmseccfg Help Hsenvcfg Hmcountinhibit Hminstretcfg Hmcyclecfg Hpma_regions Hhtif_tohost_base]
   case' _ =>
     simp only []
     iframe
@@ -129,7 +129,7 @@ theorem execSpec_csrw_satp0 (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (rs1
   swp_run 60
   try (unfold wX_bits wX; swp_run 40)
   ihave HmConf := confCells_intro cpu (DFrac.own 1) Privilege.Machine { c with satp := 0#64 }
-    $$ [Hcur_privilege Hhart_state Hmisa Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hscounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n Hsig_meip Hsig_seip Hmseccfg Help Hsenvcfg Hmcountinhibit Hminstretcfg Hmcyclecfg Hpma_regions Hhtif_tohost_base]
+    $$ [Hcur_privilege Hhart_state Hmisa Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hscounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n Hmseccfg Help Hsenvcfg Hmcountinhibit Hminstretcfg Hmcyclecfg Hpma_regions Hhtif_tohost_base]
   case' _ =>
     simp only []
     iframe
@@ -165,7 +165,7 @@ theorem execSpec_csrw_medeleg (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (r
   swp_run 60
   try (unfold wX_bits wX; swp_run 40)
   ihave HmConf := confCells_intro cpu (DFrac.own 1) Privilege.Machine { c with medeleg := legalize_medeleg c.medeleg v }
-    $$ [Hcur_privilege Hhart_state Hmisa Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hscounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n Hsig_meip Hsig_seip Hmseccfg Help Hsenvcfg Hmcountinhibit Hminstretcfg Hmcyclecfg Hpma_regions Hhtif_tohost_base]
+    $$ [Hcur_privilege Hhart_state Hmisa Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hscounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n Hmseccfg Help Hsenvcfg Hmcountinhibit Hminstretcfg Hmcyclecfg Hpma_regions Hhtif_tohost_base]
   case' _ =>
     simp only []
     iframe
@@ -201,7 +201,7 @@ theorem execSpec_csrw_mideleg (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (r
   swp_run 60
   try (unfold wX_bits wX; swp_run 40)
   ihave HmConf := confCells_intro cpu (DFrac.own 1) Privilege.Machine { c with mideleg := midelegWrite v }
-    $$ [Hcur_privilege Hhart_state Hmisa Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hscounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n Hsig_meip Hsig_seip Hmseccfg Help Hsenvcfg Hmcountinhibit Hminstretcfg Hmcyclecfg Hpma_regions Hhtif_tohost_base]
+    $$ [Hcur_privilege Hhart_state Hmisa Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hscounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n Hmseccfg Help Hsenvcfg Hmcountinhibit Hminstretcfg Hmcyclecfg Hpma_regions Hhtif_tohost_base]
   case' _ =>
     simp only []
     iframe
@@ -237,7 +237,7 @@ theorem execSpec_csrw_sie (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (rs1 :
   swp_run 60
   try (unfold wX_bits wX; swp_run 40)
   ihave HmConf := confCells_intro cpu (DFrac.own 1) Privilege.Machine { c with mie := legalize_sie c.mie c.mideleg v }
-    $$ [Hcur_privilege Hhart_state Hmisa Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hscounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n Hsig_meip Hsig_seip Hmseccfg Help Hsenvcfg Hmcountinhibit Hminstretcfg Hmcyclecfg Hpma_regions Hhtif_tohost_base]
+    $$ [Hcur_privilege Hhart_state Hmisa Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hscounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n Hmseccfg Help Hsenvcfg Hmcountinhibit Hminstretcfg Hmcyclecfg Hpma_regions Hhtif_tohost_base]
   case' _ =>
     simp only []
     iframe
@@ -274,7 +274,7 @@ theorem execSpec_csrw_menvcfg (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (r
   swp_run 60
   try (unfold wX_bits wX; swp_run 40)
   ihave HmConf := confCells_intro cpu (DFrac.own 1) Privilege.Machine { c with menvcfg := menvcfgWrite c.menvcfg v }
-    $$ [Hcur_privilege Hhart_state Hmisa Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hscounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n Hsig_meip Hsig_seip Hmseccfg Help Hsenvcfg Hmcountinhibit Hminstretcfg Hmcyclecfg Hpma_regions Hhtif_tohost_base]
+    $$ [Hcur_privilege Hhart_state Hmisa Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hscounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n Hmseccfg Help Hsenvcfg Hmcountinhibit Hminstretcfg Hmcyclecfg Hpma_regions Hhtif_tohost_base]
   case' _ =>
     simp only []
     iframe
@@ -310,7 +310,7 @@ theorem execSpec_csrw_mcounteren (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64)
   swp_run 60
   try (unfold wX_bits wX; swp_run 40)
   ihave HmConf := confCells_intro cpu (DFrac.own 1) Privilege.Machine { c with mcounteren := legalize_mcounteren c.mcounteren v }
-    $$ [Hcur_privilege Hhart_state Hmisa Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hscounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n Hsig_meip Hsig_seip Hmseccfg Help Hsenvcfg Hmcountinhibit Hminstretcfg Hmcyclecfg Hpma_regions Hhtif_tohost_base]
+    $$ [Hcur_privilege Hhart_state Hmisa Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hscounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n Hmseccfg Help Hsenvcfg Hmcountinhibit Hminstretcfg Hmcyclecfg Hpma_regions Hhtif_tohost_base]
   case' _ =>
     simp only []
     iframe
@@ -344,11 +344,11 @@ theorem execSpec_csrw_stimecmp (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (
   iapply swp_write_CSR_stimecmp (hstce := hstce)
   iframe
   inext
-  iintro %mip' Hmisa Hstimecmp Hmtime Hmtimecmp Hmip Hmenvcfg Hsig_meip Hsig_seip
+  iintro %mip' Hmisa Hstimecmp Hmtime Hmtimecmp Hmip Hmenvcfg
   swp_run 60
   try (unfold wX_bits wX; swp_run 40)
   ihave HmConf := confCells_intro cpu (DFrac.own 1) Privilege.Machine { c with stimecmp := v }
-    $$ [Hcur_privilege Hhart_state Hmisa Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hscounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n Hsig_meip Hsig_seip Hmseccfg Help Hsenvcfg Hmcountinhibit Hminstretcfg Hmcyclecfg Hpma_regions Hhtif_tohost_base]
+    $$ [Hcur_privilege Hhart_state Hmisa Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hscounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n Hmseccfg Help Hsenvcfg Hmcountinhibit Hminstretcfg Hmcyclecfg Hpma_regions Hhtif_tohost_base]
   case' _ =>
     simp only []
     iframe
@@ -394,7 +394,7 @@ theorem execSpec_csrw_pmpaddr0 (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (
   try (unfold wX_bits wX; swp_run 40)
   ihave HmConf := confCells_intro cpu (DFrac.own 1) Privilege.Machine
     { c with pmpcfg := bootPmpcfg, pmpaddr := xv6Pmpaddr }
-    $$ [Hcur_privilege Hhart_state Hmisa Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hscounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n Hsig_meip Hsig_seip Hmseccfg Help Hsenvcfg Hmcountinhibit Hminstretcfg Hmcyclecfg Hpma_regions Hhtif_tohost_base]
+    $$ [Hcur_privilege Hhart_state Hmisa Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hscounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n Hmseccfg Help Hsenvcfg Hmcountinhibit Hminstretcfg Hmcyclecfg Hpma_regions Hhtif_tohost_base]
   case' _ =>
     simp only []
     iframe
@@ -435,7 +435,7 @@ theorem execSpec_csrw_pmpcfg0 (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (r
   swp_run 60
   try (unfold wX_bits wX; swp_run 40)
   ihave HmConf := confCells_intro cpu (DFrac.own 1) Privilege.Machine { c with pmpcfg := xv6Pmpcfg }
-    $$ [Hcur_privilege Hhart_state Hmisa Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hscounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n Hsig_meip Hsig_seip Hmseccfg Help Hsenvcfg Hmcountinhibit Hminstretcfg Hmcyclecfg Hpma_regions Hhtif_tohost_base]
+    $$ [Hcur_privilege Hhart_state Hmisa Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hscounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n Hmseccfg Help Hsenvcfg Hmcountinhibit Hminstretcfg Hmcyclecfg Hpma_regions Hhtif_tohost_base]
   case' _ =>
     simp only []
     iframe

@@ -140,7 +140,7 @@ theorem execSpecF_csrrci_sstatus_flip (cpu : CPU) (c : MConf) (sie : Bool) (hok 
   swp_run 20
   ihave HmConf := confCells_intro _ _ _ { c with mstatus := c.mstatus &&& 0xFFFFFFFFFFFFFFFD#64 } $$ [Hcur_privilege Hhart_state Hmisa Hmstatus Hmie
     Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hscounteren Hmtimecmp Hstimecmp Hpmpcfg_n
-    Hpmpaddr_n Hsig_meip Hsig_seip Hmseccfg Help Hsenvcfg Hmcountinhibit Hminstretcfg
+    Hpmpaddr_n Hmseccfg Help Hsenvcfg Hmcountinhibit Hminstretcfg
     Hmcyclecfg Hpma_regions Hhtif_tohost_base]
   case' _ => iframe
   iapply HΦ $$ HmConf HPC HnextPC HF
@@ -178,7 +178,7 @@ theorem execSpecF_csrci_sstatus_x0 (cpu : CPU) (c : MConf) (sie : Bool) (hok : S
   swp_run 80
   ihave HmConf := confCells_intro _ _ _ { c with mstatus := c.mstatus &&& 0xFFFFFFFFFFFFFFFD#64 } $$ [Hcur_privilege Hhart_state Hmisa Hmstatus Hmie
     Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hscounteren Hmtimecmp Hstimecmp Hpmpcfg_n
-    Hpmpaddr_n Hsig_meip Hsig_seip Hmseccfg Help Hsenvcfg Hmcountinhibit Hminstretcfg
+    Hpmpaddr_n Hmseccfg Help Hsenvcfg Hmcountinhibit Hminstretcfg
     Hmcyclecfg Hpma_regions Hhtif_tohost_base]
   case' _ => iframe
   iapply HΦ $$ HmConf HPC HnextPC HF
@@ -216,7 +216,7 @@ theorem execSpecF_csrsi_sstatus_x0 (cpu : CPU) (c : MConf) (sie : Bool) (hok : S
   swp_run 80
   ihave HmConf := confCells_intro _ _ _ { c with mstatus := c.mstatus ||| 2#64 } $$ [Hcur_privilege Hhart_state Hmisa Hmstatus Hmie
     Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hscounteren Hmtimecmp Hstimecmp Hpmpcfg_n
-    Hpmpaddr_n Hsig_meip Hsig_seip Hmseccfg Help Hsenvcfg Hmcountinhibit Hminstretcfg
+    Hpmpaddr_n Hmseccfg Help Hsenvcfg Hmcountinhibit Hminstretcfg
     Hmcyclecfg Hpma_regions Hhtif_tohost_base]
   case' _ => iframe
   iapply HΦ $$ HmConf HPC HnextPC HF

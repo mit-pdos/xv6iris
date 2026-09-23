@@ -12,7 +12,9 @@ two arms are the machine's power events:
   memory heap, allocated at the booted machine -- registers it for the new
   generation, and hands the *boot client* everything it owns
   (`powerBootRes`) together with the fact that the machine is booted
-  (`bootFacts`).  The client owes back the WPs of the new generation's harts,
+  (`bootFacts`).  The two interrupt pins of every hart do NOT go to the
+  client: they are split out of the register cells and sealed into
+  `wireInv` (`MachCSL.WireInv`), which the client gets instead.  The client owes back the WPs of the new generation's harts,
   which the arm forks.
 
 The boot obligation `Hboot` is the client's whole proof of the system,
@@ -24,6 +26,7 @@ ambient `MachGS` with that era and generation and discharges each hart's
 import MachCSL.Wp
 import MachCSL.WpDev
 import MachCSL.KMap
+import MachCSL.WireInv
 
 namespace MachCSL
 
@@ -92,6 +95,31 @@ theorem regCells_take (γ : GName) (f : RegFile) (r : Register) :
   iintro H
   icases (BigSepM.bigSepM_delete (regAgree_regMapOf f r)).1 $$ H with ⟨Hr, Hrest⟩
   iframe Hr Hrest
+
+/-- The fully owned cells of a whole register file EXCEPT the two interrupt
+pins.  The pins are not the hart's: `wp_power` puts them into `wireInv`
+(`MachCSL.WireInv`) the moment the era is born, because the PLIC's wire step
+may drive them at any time. -/
+def regCellsNoPins (γ : GName) (f : RegFile) : IProp GF := iprop%
+  [∗map] k ↦ v ∈ delete (delete (regMapOf f) (regIdx Register.sig_seip)) (regIdx Register.sig_meip),
+    γ ↪◯MAP[k] v
+
+/-- Split a whole file's cells into the two interrupt pins and the rest. -/
+theorem regCells_split_pins (γ : GName) (f : RegFile) :
+    regCells γ f ⊢@{IProp GF}
+      (regPointsToAt γ Register.sig_seip (DFrac.own 1) (f Register.sig_seip) ∗
+       regPointsToAt γ Register.sig_meip (DFrac.own 1) (f Register.sig_meip)) ∗
+      regCellsNoPins γ f := by
+  have hne : regIdx Register.sig_seip ≠ regIdx Register.sig_meip := by decide
+  have hm : get? (delete (regMapOf f) (regIdx Register.sig_seip)) (regIdx Register.sig_meip) =
+      some ⟨Register.sig_meip, f Register.sig_meip⟩ := by
+    rw [LawfulPartialMap.get?_delete_ne hne]
+    exact regAgree_regMapOf f Register.sig_meip
+  unfold regCells regCellsNoPins regPointsToAt
+  iintro H
+  icases (BigSepM.bigSepM_delete (regAgree_regMapOf f Register.sig_seip)).1 $$ H with ⟨Hs, Hrest⟩
+  icases (BigSepM.bigSepM_delete hm).1 $$ Hrest with ⟨Hm, Hrest⟩
+  iframe Hs Hm Hrest
 
 /-- Allocate one hart's register map at the file `f`. -/
 theorem regs_alloc_one (f : RegFile) :
@@ -323,11 +351,12 @@ half (the device's invariant is the client's to build). -/
 def powerBootRes [KernelMap] (E : EraGS GF) (gen : Nat) (σ : MState) : IProp GF := iprop%
   (∃ r : BitVec 44, E.kptRootName ↪VAR r) ∗
   genCertAt gen E ∗
-  ([∗list] cpu ∈ cpus, regCells (E.regName cpu) (σ.regs cpu)) ∗
+  ([∗list] cpu ∈ cpus, regCellsNoPins (E.regName cpu) (σ.regs cpu)) ∗
   memCells E σ.mem ∗
   ([∗list] cpu ∈ cpus, ∃ ξ : CtxId, ctxTokAt E cpu ξ) ∗
   ([∗list] cpu ∈ cpus, lockSetAt E cpu []) ∗
   (E.kmapName ↪●MAP KernelMap.static) ∗ kmapStaticAt E ∗
+  wireInvAt E ∗
   ([∗list] d ∈ DevId.all, devFragAt E d (σ.devs.st d))
 
 /-- A hart at its cycle boundary, as the power thread forks it. -/
@@ -432,12 +461,20 @@ theorem wp_power [KernelMap]
     ihave Hda := (show ([∗list] d ∈ DevId.all, devAuthN (GF := GF) dn d (g₂.m.devs.st d)) ⊢
         [∗list] d ∈ DevId.all, devAuthAt ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn⟩ d (g₂.m.devs.st d)
         from by unfold devAuthAt devAuthN; iintro H; iexact H) $$ Hda
+    -- the two interrupt pins of every hart leave the client's frame: they are
+    -- sealed into the wire invariant, which the PLIC's wire step drives
+    ihave Hrc := BigSepL.bigSepL_mono
+      (fun {_ c} _ => regCells_split_pins (names c) (g₂.m.regs c)) $$ Hrc
+    icases BigSepL.bigSepL_sep_eqv.1 $$ Hrc with ⟨Hpins, Hrc⟩
+    imod (wireInvAt_alloc ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn⟩ ⊤
+      (fun c => g₂.m.regs c Register.sig_seip) (fun c => g₂.m.regs c Register.sig_meip))
+      $$ Hpins with #Hwire
     ihave Hres : powerBootRes ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn⟩ g.gen g₂.m $$ [Hrc Hpts Hctx Hfrags' Hls Hkmap Hkst Hkroot Hdf]
     · unfold powerBootRes genCertAt memCells kmapStaticAt
       isplitl [Hkroot]
       · iexists 0#44
         iexact Hkroot
-      iframe Hrc Hpts Hkmap Hkst Hdf
+      iframe Hrc Hpts Hkmap Hkst Hwire Hdf
       isplitr [Hctx Hfrags' Hls]
       · isplit
         · iexact Hborn
