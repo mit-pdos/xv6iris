@@ -615,27 +615,72 @@ theorem permOk_arm3 (st : Nat → HState) (c : Chain) (hwf : c.wf)
     (permOk_mem v _ _ c.md c.hd (permOk_armSt v pm st c.hd c hx h1) (armSt3_md_free st c hwf h2))
     (armSt3_tl_free st c hwf h3)
 
-/-- **Arming a chain preserves it.**  The three receipts the publication
-moves are all `.inactive` beforehand, so by the clause itself none of
-them is an unread head; the head's own receipt only becomes MORE
-active. -/
-theorem unreadArmed_arm3 (st : Nat → HState) (c : Chain) (dl : List UsedRec) (nr : Nat)
-    (ring : Nat → Nat) (lo np : Nat) (stg : Option Nat)
+/-- **Arming a chain preserves the unread rows.**  The three receipts the
+publication moves are all `.inactive` beforehand, so by (P1) none of them
+is an unread head and the head's own marker may be reset to `.free` (the
+driver hands the status byte in with the rest of the chain); the head's
+receipt only becomes MORE active.
+
+A free head is not in flight either (`Xv6.inflightOff`: an in-flight head
+is ACTIVE), which is what re-establishes `Xv6.sbOk` at the marker the
+publication sets. -/
+theorem unreadArmed_arm3 (v : VirtioState) (st : Nat → HState) (c : Chain)
+    (dl : List UsedRec) (nr : Nat) (ring : Nat → Nat) (lo np : Nat) (stg : Option Nat)
+    (sb : Nat → SByte)
     (hwf : c.wf) (hst : st c.hd = .inactive) (hstm : st c.md = .inactive)
-    (hstt : st c.tl = .inactive) (h : unreadArmed st dl nr ring lo np stg) :
-    unreadArmed (armSt3 st c) dl nr ring lo np stg := by
-  intro r hr hlt
-  obtain ⟨⟨c', hc'⟩, hp, hs⟩ := h r hr hlt
-  refine ⟨?_, hp, hs⟩
-  by_cases hhd : r.hd = c.hd
-  · rw [hhd, armSt3_hd st c hwf]
-    exact ⟨c, rfl⟩
-  · have hmd : r.hd ≠ c.md := by
+    (hstt : st c.tl = .inactive) (hoff : inflightOff v st ring lo np stg)
+    (h : unreadArmed v st dl nr ring lo np stg sb) :
+    unreadArmed v (armSt3 st c) dl nr ring lo np stg (updS sb c.hd SByte.free) := by
+  have hnone : ∀ hh : BitVec 16, hh.toNat = c.hd → Virtio.phase v hh = none := by
+    intro hh he
+    cases hx : Virtio.phase v hh with
+    | none => rfl
+    | some y =>
+      have := (hoff.2 hh (by rw [hx]; rfl)).2.1
+      rw [he, hst] at this
+      exact absurd this (by simp [HState.isActive])
+  refine ⟨fun hh => ?_, h.2.1, fun r hr hlt => ?_⟩
+  · by_cases hhh : hh.toNat = c.hd
+    · rw [hhh, updS_self, hnone hh hhh]
+      exact ⟨⟨fun he => absurd he (by simp), fun hx => by
+          obtain ⟨r, hr⟩ := hx; exact absurd hr (by simp)⟩,
+        fun r hr => by rcases hr with hr | hr <;> exact absurd hr (by simp)⟩
+    · rw [updS_ne sb c.hd SByte.free hh.toNat hhh]
+      exact h.1 hh
+  · obtain ⟨⟨c', hc'⟩, hp, hs, hsb⟩ := h.2.2 r hr hlt
+    have hhd : r.hd ≠ c.hd := by
+      intro he; rw [he, hst] at hc'; exact absurd hc' (by simp)
+    have hmd : r.hd ≠ c.md := by
       intro he; rw [he, hstm] at hc'; exact absurd hc' (by simp)
     have htl : r.hd ≠ c.tl := by
       intro he; rw [he, hstt] at hc'; exact absurd hc' (by simp)
-    rw [armSt3_ne st c r.hd hhd hmd htl]
-    exact ⟨c', hc'⟩
+    refine ⟨⟨c', by rw [armSt3_ne st c r.hd hhd hmd htl]; exact hc'⟩, hp, hs, ?_⟩
+    rw [updS_ne sb c.hd SByte.free r.hd hhd]
+    exact hsb
+
+/-- **The status rows, as the publication moves them.**  Only the HEAD's
+row changes: the middle and the tail go from `.inactive` to `.member`,
+and the invariant holds nothing for either. -/
+theorem statusRes_arm3 (st : Nat → HState) (sb : Nat → SByte) (c : Chain) (hwf : c.wf)
+    (hst : st c.hd = .inactive) (hstm : st c.md = .inactive) (hstt : st c.tl = .inactive) :
+    iprop([∗list] j ∈ List.range NUM, statusRes (GF := GF) (st j) (sb j)) ∗
+      dmaOwn c.status 1 ⊢
+      [∗list] j ∈ List.range NUM, statusRes (armSt3 st c j) (updS sb c.hd SByte.free j) := by
+  iintro ⟨Hrows, Hb⟩
+  icases diskRange_acc (GF := GF) c.hd hwf.1 (fun j => statusRes (st j) (sb j))
+      (fun j => statusRes (armSt3 st c j) (updS sb c.hd SByte.free j))
+      (fun j hj => by
+        by_cases h1 : j = c.md
+        · subst h1
+          rw [armSt3_md st c hwf, hstm, statusRes_member, statusRes_inactive]
+        · by_cases h2 : j = c.tl
+          · subst h2
+            rw [armSt3_tl st c, hstt, statusRes_member, statusRes_inactive]
+          · rw [armSt3_ne st c j hj h1 h2, updS_ne sb c.hd SByte.free j hj]) $$ Hrows
+    with ⟨_, Hback⟩
+  iapply Hback
+  rw [armSt3_hd st c hwf, updS_self, statusRes_free]
+  iexact Hb
 
 /-! ## `struct disk` is kernel data -/
 

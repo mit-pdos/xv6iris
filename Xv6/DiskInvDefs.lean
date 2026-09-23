@@ -318,6 +318,17 @@ theorem dmaOwn_lease_frame (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (Q : IPro
   iexists (pushed Hs t diskAgent w)
   iexact Hb2
 
+/-- The lease's continuation is monotone. -/
+theorem dmaWriteLease_mono (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (P Q : IProp GF)
+    (hpq : P ⊢ Q) : dmaWriteLease (GF := GF) pa n w P ⊢ dmaWriteLease pa n w Q := by
+  unfold dmaWriteLease
+  iintro ⟨%Hs, Hb, Hback⟩
+  iexists Hs
+  iframe Hb
+  iintro %t Hb2 Hau Ht
+  iapply hpq
+  iapply Hback $$ %t Hb2 Hau Ht
+
 /-- The empty footprint is free. -/
 theorem dmaOwn_zero (pa : PAddr) : emp ⊢@{IProp GF} dmaOwn pa 0 := by
   unfold dmaOwn histBytes
@@ -1744,6 +1755,209 @@ theorem inflightOff_publish (v : VirtioState) (st : Nat → HState) (ring : Nat 
     intro he
     exact (hx.2 h' hs).2.2.2 (by rw [he])
 
+/-! ## One entry of a big-op over the eight descriptors
+
+`Xv6.diskLive` keeps four big-ops over `List.range NUM`, and every move
+of the protocol changes ONE entry of one of them.  This is the accessor
+that does it; the `∀`-quantified variant lives in `Xv6/PtOwnLemmas.lean`,
+which this file may not import. -/
+
+theorem diskBig_upd_acc {α : Type} (l : List α) (n : Nat) (i : α)
+    (hidx : l[n]? = some i) (Φ Ψ : α → IProp GF)
+    (heq : ∀ (k : Nat) (j : α), l[k]? = some j → k ≠ n → Ψ j = Φ j) :
+    ([∗list] x ∈ l, Φ x) ⊢ Φ i ∗ (Ψ i -∗ [∗list] x ∈ l, Ψ x) := by
+  have hmono :
+      ([∗list] k ↦ x ∈ l, iprop(if k = n then emp else Φ x)) ⊢
+      ([∗list] k ↦ x ∈ l, iprop(if k = n then emp else Ψ x)) := by
+    refine BigSepL.bigSepL_mono ?_
+    intro k x hkx
+    by_cases hk : k = n
+    · rw [if_pos hk, if_pos hk]
+    · rw [if_neg hk, if_neg hk, heq k x hkx hk]
+  iintro H
+  icases (BigSepL.bigSepL_delete_cond (Φ := fun (_ : Nat) (x : α) => Φ x) hidx).1 $$ H
+    with ⟨Hi, Hrest⟩
+  iframe Hi
+  iintro Hv
+  iapply (BigSepL.bigSepL_delete_cond (Φ := fun (_ : Nat) (x : α) => Ψ x) hidx).2
+  isplitl [Hv]
+  · iexact Hv
+  · iapply hmono
+    iexact Hrest
+
+/-- Replacing the entry of index `n` in a big-op over `List.range NUM`. -/
+theorem diskRange_acc (n : Nat) (hn : n < NUM) (Φ Ψ : Nat → IProp GF)
+    (heq : ∀ j, j ≠ n → Ψ j = Φ j) :
+    iprop([∗list] j ∈ List.range NUM, Φ j) ⊢ Φ n ∗ (Ψ n -∗ [∗list] j ∈ List.range NUM, Ψ j) :=
+  diskBig_upd_acc (List.range NUM) n n (by rw [List.getElem?_range hn]) Φ Ψ
+    (fun k j hjk hne => by
+      have hjn : j ≠ n := by
+        by_cases hk : k < NUM
+        · rw [List.getElem?_range hk] at hjk; cases hjk; exact hne
+        · rw [List.getElem?_eq_none (by simp; omega)] at hjk; cases hjk
+      exact heq j hjn)
+
+/-! ## The status byte, by phase
+
+`disk.info[h].status` is the one byte of a request the DEVICE writes and
+the DRIVER (the interrupt handler) reads, so unlike `b->data` it must be
+in the invariant AT A VALUE once the request has completed: the handler's
+`if(disk.info[id].status != 0) panic(...)` is `Xv6.disk_status_read`.
+
+Its PLACE is a function of the request's phase, and the reason is
+`MachCSL.DevM.LeaseL`'s write arm: the value a DMA write leaves behind
+reaches the rest of the derivation only through the write's continuation
+context `C'`.  So the byte TRAVELS:
+
+* up to `.fetched` the invariant holds it at own 1, content unconstrained
+  (`Xv6.SByte.free`) -- the driver handed it in at the publication and
+  nothing has written it;
+* at `.served` -- the phase the status write fires at -- the byte is in
+  the SERVING TASK's linear context (`Xv6.SByte.lent`), lent to it by the
+  `.served` install one step earlier, and the invariant holds nothing;
+* from `.status` on the invariant holds it AT ZERO (`Xv6.SByte.done`):
+  the `.status` install takes the written byte back out of the task's
+  context, and `MachCSL.Virtio.statusOf` of a chain's request is
+  `MachCSL.Virtio.blkSOk = 0` (`Xv6.statusOf_chain`).
+
+`Xv6.sbOk` is the coupling, and it is an IFF at `.lent`: the byte is out
+of the invariant EXACTLY at `.served`.  That is what lets the `.fetched`
+install -- whose permit has installed nothing, and so knows the phase
+only through `Xv6.permOk`'s `.popped` clause -- know that the byte is
+still the invariant's. -/
+
+/-- Where one armed slot's status byte is. -/
+inductive SByte where
+  /-- the invariant holds it, at no particular value -/
+  | free
+  /-- the serving task holds it, between its `.served` install and its
+  `.status` install -/
+  | lent
+  /-- the invariant holds it at the `0` the device wrote -/
+  | done
+  deriving DecidableEq, Repr, Inhabited
+
+/-- One slot's status byte, where the phase says it is.  A slot that is
+not an armed HEAD has none of its own: a free slot's byte travels with
+the driver's `Xv6.freeSlotRes`, and a member's status byte belongs to its
+head. -/
+def statusRes (s : HState) (b : SByte) : IProp GF :=
+  match s with
+  | .active c =>
+    match b with
+    | .free => dmaOwn c.status 1
+    | .lent => iprop(emp)
+    | .done => dmaOwnAt c.status 1 0#8
+  | _ => iprop(emp)
+
+theorem statusRes_free (c : Chain) :
+    statusRes (GF := GF) (.active c) .free = dmaOwn c.status 1 := rfl
+theorem statusRes_lent (c : Chain) :
+    statusRes (GF := GF) (.active c) .lent = iprop(emp) := rfl
+theorem statusRes_done (c : Chain) :
+    statusRes (GF := GF) (.active c) .done = dmaOwnAt c.status 1 0#8 := rfl
+theorem statusRes_inactive (b : SByte) :
+    statusRes (GF := GF) .inactive b = iprop(emp) := rfl
+theorem statusRes_member (h : Nat) (b : SByte) :
+    statusRes (GF := GF) (.member h) b = iprop(emp) := rfl
+
+instance statusRes_timeless (s : HState) (b : SByte) : Timeless (statusRes (GF := GF) s b) := by
+  cases s with
+  | inactive => show Timeless (iprop(emp) : IProp GF); infer_instance
+  | member _ => show Timeless (iprop(emp) : IProp GF); infer_instance
+  | active c =>
+    cases b with
+    | free => show Timeless (dmaOwn (GF := GF) c.status 1); infer_instance
+    | lent => show Timeless (iprop(emp) : IProp GF); infer_instance
+    | done => show Timeless (dmaOwnAt (GF := GF) c.status 1 0#8); infer_instance
+
+/-- **The byte comes out at own 1** wherever the invariant keeps it. -/
+theorem statusRes_own (c : Chain) (b : SByte) (hb : b ≠ .lent) :
+    statusRes (GF := GF) (.active c) b ⊢ dmaOwn c.status 1 := by
+  cases b with
+  | free => rw [statusRes_free]
+  | lent => exact absurd rfl hb
+  | done => rw [statusRes_done]; exact dmaOwnAt_dmaOwn _ _ _
+
+/-- **Two full footprints over one byte are one too many**: what says a
+slot whose byte the serving task holds is `.lent` in the invariant. -/
+theorem dmaOwn_excl1 (pa : PAddr) : dmaOwn (GF := GF) pa 1 ∗ dmaOwn pa 1 ⊢ False := by
+  unfold dmaOwn
+  iintro ⟨⟨%Hs, H1⟩, ⟨%Hs', H2⟩⟩
+  ihave H1 := histBytes_one_l pa (DFrac.own 1) Hs $$ H1
+  ihave H2 := histBytes_one_l pa (DFrac.own 1) Hs' $$ H2
+  icases pointsTo_ne (L := PAddr) (V := Hist) (H := MemF) $$ H1 H2 with %hne
+  exact absurd rfl hne
+
+/-- The status byte of an armed slot is the invariant's unless the slot
+says `.lent`. -/
+theorem statusRes_not_lent (c : Chain) (b : SByte) :
+    statusRes (GF := GF) (.active c) b ∗ dmaOwn c.status 1 ⊢ ⌜b = SByte.lent⌝ := by
+  cases b with
+  | lent => iintro _; ipureintro; rfl
+  | free =>
+    rw [statusRes_free]
+    iintro ⟨H1, H2⟩
+    iapply false_elim
+    iapply dmaOwn_excl1 c.status
+    iframe H1 H2
+  | done =>
+    rw [statusRes_done]
+    iintro ⟨H1, H2⟩
+    iapply false_elim
+    iapply dmaOwn_excl1 c.status
+    isplitl [H1]
+    · iapply dmaOwnAt_dmaOwn c.status 1 0#8 $$ H1
+    · iexact H2
+
+/-- **The eight status rows, at the live flip**: every slot is free, so
+the invariant holds nothing. -/
+theorem statusRes_empty (st : Nat → HState) (sb : Nat → SByte)
+    (hst : ∀ i, st i = HState.inactive) :
+    ⊢@{IProp GF} [∗list] i ∈ List.range NUM, statusRes (st i) (sb i) := by
+  have heq : (fun (i : Nat) => statusRes (GF := GF) (st i) (sb i))
+      = (fun (_ : Nat) => (iprop(emp) : IProp GF)) := by
+    funext i; rw [hst i, statusRes_inactive]
+  show ⊢ iprop([∗list] i ∈ List.range NUM, (fun (i : Nat) => statusRes (st i) (sb i)) i)
+  rw [heq]
+  exact BigSepL.bigSepL_emp.2
+
+/-- One slot's status row, read off the eight. -/
+theorem statusRes_acc (st : Nat → HState) (sb : Nat → SByte) (i : Nat) (hi : i < NUM) :
+    iprop([∗list] j ∈ List.range NUM, statusRes (GF := GF) (st j) (sb j)) ⊢
+      statusRes (st i) (sb i) ∗ (statusRes (st i) (sb i) -∗
+        [∗list] j ∈ List.range NUM, statusRes (st j) (sb j)) :=
+  BigSepL.bigSepL_mem_acc (Φ := fun j => statusRes (GF := GF) (st j) (sb j))
+    (List.mem_range.2 hi)
+
+/-- One slot's status marker, updated. -/
+def updS (sb : Nat → SByte) (i : Nat) (b : SByte) : Nat → SByte :=
+  fun j => if j = i then b else sb j
+
+@[simp] theorem updS_self (sb : Nat → SByte) (i : Nat) (b : SByte) : updS sb i b i = b := by
+  simp [updS]
+
+theorem updS_ne (sb : Nat → SByte) (i : Nat) (b : SByte) (j : Nat) (h : j ≠ i) :
+    updS sb i b j = sb j := by simp [updS, h]
+
+theorem updS_id (sb : Nat → SByte) (i : Nat) : updS sb i (sb i) = sb := by
+  funext j
+  by_cases h : j = i
+  · rw [h]; simp
+  · rw [updS_ne sb i (sb i) j h]
+
+/-- One slot's status row, replaced. -/
+theorem statusRes_upd (st : Nat → HState) (sb : Nat → SByte) (i : Nat) (hi : i < NUM)
+    (b : SByte) :
+    iprop([∗list] j ∈ List.range NUM, statusRes (GF := GF) (st j) (sb j)) ⊢
+      statusRes (st i) (sb i) ∗ (statusRes (st i) b -∗
+        [∗list] j ∈ List.range NUM, statusRes (st j) (updS sb i b j)) := by
+  have h := diskRange_acc (GF := GF) i hi (fun j => statusRes (st j) (sb j))
+    (fun j => statusRes (st j) (updS sb i b j))
+    (fun j hj => by rw [updS_ne sb i b j hj])
+  rw [updS_self] at h
+  exact h
+
 /-! ## An unread completion names an armed head
 
 The handler's watermark `nr` splits the used-index write log in two: the
@@ -1762,71 +1976,184 @@ Stated over the COUNTERS, not over indices into `dl`: `Xv6.headDone γ n
 i` hands out an entry `(n, t, i) ∈ dl`, and reading it off needs no log
 arithmetic that way. -/
 
-/-- **Every unread completion names an armed head, at no pending position
-and not staged** -- (P1) and (P2) of `Xv6/DiskAcc.lean`'s section head, in
-one predicate over the log, the receipts, the ring and the window.
+/-- **The status byte a chain's request reports is zero.**  A chain the
+driver formats carries `VIRTIO_BLK_T_IN` or `VIRTIO_BLK_T_OUT`, both of
+which the model serves, so `MachCSL.Virtio.statusOf` is
+`MachCSL.Virtio.blkSOk`. -/
+theorem statusOf_chain (c : Chain) : Virtio.statusOf c.req = 0#8 := by
+  unfold Virtio.statusOf Chain.req
+  cases hd : c.dwr <;> simp [Virtio.blkTIn, Virtio.blkTOut, Virtio.blkSOk] <;> decide
 
-(P2) is what says an unread head cannot be POPPED again: it is at no
-position of `[lo, np)` and it is not the one the ring store has staged,
-so neither the pop nor the publication can reach it.  Together with
-`Xv6.inflightOff` -- an IN-FLIGHT head is at no pending position either --
-it is the whole of "a head with an unread completion is not served
-twice". -/
-def unreadArmed (st : Nat → HState) (dl : List UsedRec) (nr : Nat)
-    (ring : Nat → Nat) (lo np : Nat) (stg : Option Nat) : Prop :=
+/-- **The status byte is out of the invariant exactly at `.served`**, and
+is back at `0` from `.status` on. -/
+def sbAt (op : Option VPhase) (b : SByte) : Prop :=
+  (b = SByte.lent ↔ ∃ r : VioReq, op = some (.served r)) ∧
+  (∀ r : VioReq, op = some (.status r) ∨ op = some (.pushed r) → b = SByte.done)
+
+def sbOk (v : VirtioState) (sb : Nat → SByte) : Prop :=
+  ∀ h : BitVec 16, sbAt (Virtio.phase v h) (sb h.toNat)
+
+/-- A head that is NOT in flight keeps its byte in the invariant. -/
+theorem sbAt_none (b : SByte) (hb : b ≠ SByte.lent) : sbAt none b := by
+  refine ⟨⟨fun he => absurd he hb, fun hx => ?_⟩, fun r hr => ?_⟩
+  · obtain ⟨r, hr⟩ := hx; exact absurd hr (by simp)
+  · rcases hr with hr | hr <;> exact absurd hr (by simp)
+
+theorem sbAt_notLent (op : Option VPhase) (b : SByte) (h : sbAt op b)
+    (hno : ∀ r : VioReq, op ≠ some (.served r)) : b ≠ SByte.lent := by
+  intro he
+  obtain ⟨r, hr⟩ := h.1.1 he
+  exact hno r hr
+
+/-- **(P4): a head with an UNREAD completion is not in flight** -- unless
+it is `.pushed`, the one phase that outlives its own used-index write (the
+write appends the entry, and the `Virtio.complete` that takes the head out
+of flight is the step after it). -/
+def pushedOff (v : VirtioState) (dl : List UsedRec) (nr : Nat) : Prop :=
+  ∀ (h : BitVec 16) (ph : VPhase), Virtio.phase v h = some ph → (∀ r, ph ≠ .pushed r) →
+    ∀ e ∈ dl, nr < e.cnt → e.hd ≠ h.toNat
+
+/-- **The unread completions' rows**: (P1) the head is still ARMED, (P2)
+it is at no pending position and is not the staged one, (P4) it is not in
+flight, and its STATUS BYTE is the invariant's, at zero.  `Xv6.sbOk` --
+the phase-to-marker coupling the rows rest on -- travels here too, so that
+adding the status row costs `Xv6.diskLive` no new pure conjunct. -/
+def unreadArmed (v : VirtioState) (st : Nat → HState) (dl : List UsedRec) (nr : Nat)
+    (ring : Nat → Nat) (lo np : Nat) (stg : Option Nat) (sb : Nat → SByte) : Prop :=
+  sbOk v sb ∧ pushedOff v dl nr ∧
   ∀ r ∈ dl, nr < r.cnt →
     (∃ c : Chain, st r.hd = HState.active c) ∧
-    (∀ p, lo ≤ p → p < np → ring (p % NUM) ≠ r.hd) ∧ stg ≠ some r.hd
+    (∀ p, lo ≤ p → p < np → ring (p % NUM) ≠ r.hd) ∧ stg ≠ some r.hd ∧
+    sb r.hd = SByte.done
 
-/-- The armed head, read off. -/
-theorem unreadArmed_st (st : Nat → HState) (dl : List UsedRec) (nr : Nat)
-    (ring : Nat → Nat) (lo np : Nat) (stg : Option Nat)
-    (h : unreadArmed st dl nr ring lo np stg) (r : UsedRec) (hr : r ∈ dl) (hlt : nr < r.cnt) :
-    ∃ c : Chain, st r.hd = HState.active c := (h r hr hlt).1
+theorem unreadArmed_sb (v : VirtioState) (st : Nat → HState) (dl : List UsedRec) (nr : Nat)
+    (ring : Nat → Nat) (lo np : Nat) (stg : Option Nat) (sb : Nat → SByte)
+    (h : unreadArmed v st dl nr ring lo np stg sb) : sbOk v sb := h.1
 
-theorem unreadArmed_nil (st : Nat → HState) (nr : Nat) (ring : Nat → Nat) (lo np : Nat)
-    (stg : Option Nat) : unreadArmed st [] nr ring lo np stg := by
-  intro r hr; exact absurd hr (by simp)
+/-- Sixteen bits identify a head. -/
+theorem head_toNat_inj (a b : BitVec 16) (h : a.toNat = b.toNat) : a = b := by
+  have := BitVec.toNat_inj (x := a) (y := b)
+  exact this.1 h
 
-/-- **The used-index write.**  The entry that joins the log names the head
-whose request has just completed: that head is in flight, hence armed, at
-no pending position and not the staged one (`Xv6.inflightOff`). -/
-theorem unreadArmed_write (st : Nat → HState) (dl : List UsedRec) (nr nc t hd : Nat)
-    (ring : Nat → Nat) (lo np : Nat) (stg : Option Nat)
-    (h : unreadArmed st dl nr ring lo np stg) (ha : ∃ c : Chain, st hd = HState.active c)
-    (hp : ∀ p, lo ≤ p → p < np → ring (p % NUM) ≠ hd) (hs : stg ≠ some hd) :
-    unreadArmed st (dl ++ [(nc, t, hd)]) nr ring lo np stg := by
-  intro r hr hlt
-  rcases List.mem_append.1 hr with hr | hr
-  · exact h r hr hlt
-  · have hre : r = (nc, t, hd) := by simpa using hr
-    rw [hre]; exact ⟨ha, hp, hs⟩
+/-! ### The clause, as the moves keep it -/
+
+theorem sbOk_congr (v v' : VirtioState) (sb : Nat → SByte)
+    (hph : ∀ h : BitVec 16, Virtio.phase v' h = Virtio.phase v h) (h : sbOk v sb) :
+    sbOk v' sb := by
+  intro hh
+  rw [hph hh]
+  exact h hh
+
+theorem pushedOff_congr (v v' : VirtioState) (dl : List UsedRec) (nr : Nat)
+    (hph : ∀ h : BitVec 16, Virtio.phase v' h = Virtio.phase v h) (h : pushedOff v dl nr) :
+    pushedOff v' dl nr := by
+  intro hh ph hp hnp
+  rw [hph hh] at hp
+  exact h hh ph hp hnp
+
+theorem unreadArmed_congr (v v' : VirtioState) (st : Nat → HState) (dl : List UsedRec)
+    (nr : Nat) (ring : Nat → Nat) (lo np : Nat) (stg : Option Nat) (sb : Nat → SByte)
+    (hph : ∀ h : BitVec 16, Virtio.phase v' h = Virtio.phase v h)
+    (h : unreadArmed v st dl nr ring lo np stg sb) :
+    unreadArmed v' st dl nr ring lo np stg sb :=
+  ⟨sbOk_congr v v' sb hph h.1, pushedOff_congr v v' dl nr hph h.2.1, h.2.2⟩
+
+/-- Nothing in flight, nothing in the log: the state the live flip starts
+from. -/
+theorem unreadArmed_nil (v : VirtioState) (st : Nat → HState) (nr : Nat) (ring : Nat → Nat)
+    (lo np : Nat) (stg : Option Nat) (hni : noInflight v) :
+    unreadArmed v st [] nr ring lo np stg (fun _ => SByte.free) := by
+  refine ⟨fun hh => ⟨⟨fun he => absurd he (by simp), fun hx => ?_⟩, fun r hr => ?_⟩,
+    fun hh ph hp => absurd hp (by rw [hni hh]; simp), fun r hr => absurd hr (by simp)⟩
+  · obtain ⟨r, hr⟩ := hx; rw [hni hh] at hr; exact absurd hr (by simp)
+  · rcases hr with hr | hr <;> (rw [hni hh] at hr; exact absurd hr (by simp))
 
 /-- **The handler's deposit**: the unread window only ever shrinks. -/
-theorem unreadArmed_nr (st : Nat → HState) (dl : List UsedRec) (nr nr' : Nat)
-    (ring : Nat → Nat) (lo np : Nat) (stg : Option Nat)
-    (h : unreadArmed st dl nr ring lo np stg) (hle : nr ≤ nr') :
-    unreadArmed st dl nr' ring lo np stg :=
-  fun r hr hlt => h r hr (by omega)
+theorem unreadArmed_nr (v : VirtioState) (st : Nat → HState) (dl : List UsedRec) (nr nr' : Nat)
+    (ring : Nat → Nat) (lo np : Nat) (stg : Option Nat) (sb : Nat → SByte)
+    (h : unreadArmed v st dl nr ring lo np stg sb) (hle : nr ≤ nr') :
+    unreadArmed v st dl nr' ring lo np stg sb :=
+  ⟨h.1, fun hh ph hp hnp e he hlt => h.2.1 hh ph hp hnp e he (by omega),
+    fun r hr hlt => h.2.2 r hr (by omega)⟩
 
-/-- **The pop**: the pending window shrinks from below. -/
-theorem unreadArmed_pop (st : Nat → HState) (dl : List UsedRec) (nr : Nat)
-    (ring : Nat → Nat) (lo np : Nat) (stg : Option Nat)
-    (h : unreadArmed st dl nr ring lo np stg) :
-    unreadArmed st dl nr ring (lo + 1) np stg :=
-  fun r hr hlt => ⟨(h r hr hlt).1, fun p h1 h2 => (h r hr hlt).2.1 p (by omega) h2,
-    (h r hr hlt).2.2⟩
+/-- **The used-index write.**  The entry that joins the log names the head
+whose request has just completed: it is in flight at `.pushed`, hence
+armed, at no pending position, not the staged one (`Xv6.inflightOff`) and
+with its status byte back in the invariant at zero (`Xv6.sbOk`). -/
+theorem unreadArmed_write (v : VirtioState) (st : Nat → HState) (dl : List UsedRec)
+    (nr nc t : Nat) (ring : Nat → Nat) (lo np : Nat) (stg : Option Nat) (sb : Nat → SByte)
+    (hd : BitVec 16) (r0 : VioReq) (hph : Virtio.phase v hd = some (.pushed r0))
+    (ha : ∃ c : Chain, st hd.toNat = HState.active c)
+    (hp : ∀ p, lo ≤ p → p < np → ring (p % NUM) ≠ hd.toNat) (hs : stg ≠ some hd.toNat)
+    (h : unreadArmed v st dl nr ring lo np stg sb) :
+    unreadArmed v st (dl ++ [(nc, t, hd.toNat)]) nr ring lo np stg sb := by
+  refine ⟨h.1, fun hh ph hpp hnp e he hlt => ?_, fun r hr hlt => ?_⟩
+  · rcases List.mem_append.1 he with he | he
+    · exact h.2.1 hh ph hpp hnp e he hlt
+    · have hre : e = (nc, t, hd.toNat) := by simpa using he
+      rw [hre]
+      intro heq
+      have : hh = hd := head_toNat_inj hh hd heq.symm
+      subst this
+      rw [hph] at hpp
+      exact absurd (Option.some.inj hpp).symm (hnp r0)
+  · rcases List.mem_append.1 hr with hr | hr
+    · exact h.2.2 r hr hlt
+    · have hre : r = (nc, t, hd.toNat) := by simpa using hr
+      rw [hre]
+      exact ⟨ha, hp, hs, (h.1 hd).2 r0 (Or.inr hph)⟩
+
+/-- **The pop.**  The head it takes is at position `lo`, so by (P2) it has
+no unread completion; it was not in flight, so by `Xv6.sbOk` its byte is
+the invariant's. -/
+theorem unreadArmed_pop (v : VirtioState) (st : Nat → HState) (dl : List UsedRec) (nr : Nat)
+    (ring : Nat → Nat) (lo np : Nat) (stg : Option Nat) (sb : Nat → SByte) (hd : BitVec 16)
+    (sn : BitVec 16) (hlt : lo < np) (hring : ring (lo % NUM) = hd.toNat)
+    (hnf : (Virtio.phase v hd).isSome = false)
+    (h : unreadArmed v st dl nr ring lo np stg sb) :
+    unreadArmed { Virtio.setPhase v hd .popped with seen := sn } st dl nr ring (lo + 1) np
+      stg sb := by
+  have hnone : Virtio.phase v hd = none := by
+    cases hx : Virtio.phase v hd with
+    | none => rfl
+    | some y => rw [hx] at hnf; exact absurd hnf (by simp)
+  have hnotHead : ∀ e ∈ dl, nr < e.cnt → e.hd ≠ hd.toNat := by
+    intro e he hlt' heq
+    exact (h.2.2 e he hlt').2.1 lo (Nat.le_refl lo) hlt (by rw [hring, heq])
+  have hph : ∀ x : BitVec 16,
+      Virtio.phase { Virtio.setPhase v hd .popped with seen := sn } x
+        = Virtio.phase (Virtio.setPhase v hd .popped) x := fun _ => rfl
+  refine ⟨fun hh => ?_, fun hh ph hpp hnp e he hlt' => ?_,
+    fun r hr hlt' => ⟨(h.2.2 r hr hlt').1, fun p h1 h2 => (h.2.2 r hr hlt').2.1 p (by omega) h2,
+      (h.2.2 r hr hlt').2.2⟩⟩
+  · by_cases hhh : hh = hd
+    · subst hhh
+      rw [hph, phase_setPhase_self]
+      refine ⟨⟨fun he => ?_, fun hx => ?_⟩, fun r hr => ?_⟩
+      · have := (h.1 hh).1.1 he
+        obtain ⟨r, hr⟩ := this
+        rw [hnone] at hr; exact absurd hr (by simp)
+      · obtain ⟨r, hr⟩ := hx; exact absurd hr (by simp)
+      · rcases hr with hr | hr <;> exact absurd hr (by simp)
+    · rw [hph, phase_setPhase_other v hd hh _ hhh]
+      exact h.1 hh
+  · by_cases hhh : hh = hd
+    · subst hhh
+      exact hnotHead e he hlt'
+    · rw [hph, phase_setPhase_other v hd hh _ hhh] at hpp
+      exact h.2.1 hh ph hpp hnp e he hlt'
 
 /-- **The ring store.**  The head it stages is FREE, so by (P1) it is not
 an unread head; the cell it writes is `np % NUM`, which no pending
-position names (`Xv6.ring_mod_ne`, there is room). -/
-theorem unreadArmed_stage (st : Nat → HState) (dl : List UsedRec) (nr : Nat)
-    (ring : Nat → Nat) (lo np i : Nat) (stg : Option Nat) (hroom : np < lo + NUM)
-    (hfree : st i = HState.inactive) (h : unreadArmed st dl nr ring lo np stg) :
-    unreadArmed st dl nr (updN ring (np % NUM) i) lo np (some i) := by
-  intro r hr hlt
-  obtain ⟨⟨c, hc⟩, hp, _⟩ := h r hr hlt
-  refine ⟨⟨c, hc⟩, fun p h1 h2 => ?_, ?_⟩
+position names. -/
+theorem unreadArmed_stage (v : VirtioState) (st : Nat → HState) (dl : List UsedRec) (nr : Nat)
+    (ring : Nat → Nat) (lo np i : Nat) (stg : Option Nat) (sb : Nat → SByte)
+    (hroom : np < lo + NUM) (hfree : st i = HState.inactive)
+    (h : unreadArmed v st dl nr ring lo np stg sb) :
+    unreadArmed v st dl nr (updN ring (np % NUM) i) lo np (some i) sb := by
+  refine ⟨h.1, h.2.1, fun r hr hlt => ?_⟩
+  obtain ⟨⟨c, hc⟩, hp, _, hsb⟩ := h.2.2 r hr hlt
+  refine ⟨⟨c, hc⟩, fun p h1 h2 => ?_, ?_, hsb⟩
   · rw [updN_ne _ _ _ _ (ring_mod_ne lo np p h1 h2 hroom)]
     exact hp p h1 h2
   · intro he
@@ -1835,17 +2162,65 @@ theorem unreadArmed_stage (st : Nat → HState) (dl : List UsedRec) (nr : Nat)
 
 /-- **The publication.**  Position `np` joins the window with the STAGED
 head, which the clause above says is no unread head. -/
-theorem unreadArmed_publish (st : Nat → HState) (dl : List UsedRec) (nr : Nat)
-    (ring : Nat → Nat) (lo np i : Nat) (hcell : ring (np % NUM) = i)
-    (h : unreadArmed st dl nr ring lo np (some i)) :
-    unreadArmed st dl nr ring lo (np + 1) none := by
-  intro r hr hlt
-  obtain ⟨ha, hp, hs⟩ := h r hr hlt
-  refine ⟨ha, fun p h1 h2 => ?_, by simp⟩
+theorem unreadArmed_publish (v : VirtioState) (st : Nat → HState) (dl : List UsedRec) (nr : Nat)
+    (ring : Nat → Nat) (lo np i : Nat) (sb : Nat → SByte) (hcell : ring (np % NUM) = i)
+    (h : unreadArmed v st dl nr ring lo np (some i) sb) :
+    unreadArmed v st dl nr ring lo (np + 1) none sb := by
+  refine ⟨h.1, h.2.1, fun r hr hlt => ?_⟩
+  obtain ⟨ha, hp, hs, hsb⟩ := h.2.2 r hr hlt
+  refine ⟨ha, fun p h1 h2 => ?_, by simp, hsb⟩
   by_cases hpn : p = np
   · rw [hpn, hcell]
     intro he; exact hs (by rw [he])
   · exact hp p h1 (by omega)
+
+/-- **A phase install**, with the status marker it moves.  The head it
+moves is not an unread head (it is in flight at a phase before `.pushed`,
+which is (P4) read backwards), so no row's marker changes under it. -/
+theorem unreadArmed_setPhase (v : VirtioState) (st : Nat → HState) (dl : List UsedRec)
+    (nr : Nat) (ring : Nat → Nat) (lo np : Nat) (stg : Option Nat) (sb : Nat → SByte)
+    (hd : BitVec 16) (ph0 ph : VPhase) (nb : SByte)
+    (hph0 : Virtio.phase v hd = some ph0) (hnp0 : ∀ r, ph0 ≠ .pushed r)
+    (hsb : sbAt (some ph) nb)
+    (h : unreadArmed v st dl nr ring lo np stg sb) :
+    unreadArmed (Virtio.setPhase v hd ph) st dl nr ring lo np stg (updS sb hd.toNat nb) := by
+  have hnotHead : ∀ e ∈ dl, nr < e.cnt → e.hd ≠ hd.toNat := h.2.1 hd ph0 hph0 hnp0
+  refine ⟨fun hh => ?_, fun hh ph' hpp hnp e he hlt => ?_, fun r hr hlt => ?_⟩
+  · by_cases hhh : hh = hd
+    · subst hhh
+      rw [phase_setPhase_self, updS_self]
+      exact hsb
+    · have hne : hh.toNat ≠ hd.toNat := fun he => hhh (head_toNat_inj hh hd he)
+      rw [phase_setPhase_other v hd hh ph hhh, updS_ne sb hd.toNat nb hh.toNat hne]
+      exact h.1 hh
+  · by_cases hhh : hh = hd
+    · subst hhh; exact hnotHead e he hlt
+    · rw [phase_setPhase_other v hd hh ph hhh] at hpp
+      exact h.2.1 hh ph' hpp hnp e he hlt
+  · obtain ⟨ha, hp, hs, hsb⟩ := h.2.2 r hr hlt
+    exact ⟨ha, hp, hs, by rw [updS_ne sb hd.toNat nb r.hd (hnotHead r hr hlt), hsb]⟩
+
+/-- **The completion**: the head leaves the in-flight map with its byte
+already back in the invariant. -/
+theorem unreadArmed_complete (v : VirtioState) (st : Nat → HState) (dl : List UsedRec)
+    (nr : Nat) (ring : Nat → Nat) (lo np : Nat) (stg : Option Nat) (sb : Nat → SByte)
+    (hd : BitVec 16) (r0 : VioReq) (hph : Virtio.phase v hd = some (.pushed r0))
+    (h : unreadArmed v st dl nr ring lo np stg sb) :
+    unreadArmed (Virtio.complete v hd) st dl nr ring lo np stg sb := by
+  refine ⟨fun hh => ?_, fun hh ph hpp hnp e he hlt => ?_, h.2.2⟩
+  · by_cases hhh : hh = hd
+    · subst hhh
+      rw [phase_complete_self]
+      refine ⟨⟨fun he => ?_, fun hx => ?_⟩, fun r hr => ?_⟩
+      · rw [(h.1 hh).2 r0 (Or.inr hph)] at he; exact absurd he (by simp)
+      · obtain ⟨r, hr⟩ := hx; exact absurd hr (by simp)
+      · rcases hr with hr | hr <;> exact absurd hr (by simp)
+    · rw [phase_complete_other v hd hh hhh]
+      exact h.1 hh
+  · by_cases hhh : hh = hd
+    · subst hhh; rw [phase_complete_self] at hpp; exact absurd hpp (by simp)
+    · rw [phase_complete_other v hd hh hhh] at hpp
+      exact h.2.1 hh ph hpp hnp e he hlt
 
 /-! ## The leases -/
 
@@ -1875,7 +2250,6 @@ def chainLease (pd : PAddr) (c : Chain) : IProp GF := iprop%
   dmaHalfAt c.hdrAddr 4 c.req.type ∗
   dmaHalfAt (c.hdrAddr + 4#64) 4 0#32 ∗
   dmaHalfAt (c.hdrAddr + 8#64) 8 c.sector ∗
-  dmaOwn c.status 1 ∗
   bufLease c
 
 instance chainLease_timeless (pd : PAddr) (c : Chain) : Timeless (chainLease (GF := GF) pd c) := by
@@ -1975,7 +2349,8 @@ def imgOk (v : VirtioState) (m : RegMapF (List (BitVec 8))) (P : Nat → Prop) :
 def diskLive (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState)
     (pm : RegMapF PermVal) : IProp GF := iprop%
   ∃ (st : Nat → HState) (nc np lo : Nat) (ring : Nat → Nat) (m : RegMapF (List (BitVec 8)))
-      (pmap : List Nat) (stg : Option Nat) (b M : Nat) (dl dl0 : List UsedRec) (nr : Nat),
+      (pmap : List Nat) (stg : Option Nat) (b M : Nat) (dl dl0 : List UsedRec) (nr : Nat)
+      (sb : Nat → SByte),
     imgAuth γ m ∗
     ([∗list] i ∈ List.range NUM, headAuth γ i (st i)) ∗
     ([∗list] i ∈ List.range NUM, headRes γ c0.desc i (st i)) ∗
@@ -1984,10 +2359,11 @@ def diskLive (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState)
     diskPubAuthM γ np ∗ posAuth γ pmap ∗ diskStageAuth γ stg ∗
     usedIdxCell (usedIdxAt c0.used) b dl ∗ doneAuth γ dl0 ∗ diskBaseFrozen γ b ∗
     dlTops dl ∗ diskReadAtAuth γ nr ∗
+    ([∗list] i ∈ List.range NUM, statusRes (st i) (sb i)) ∗
     ⌜v.usedIdx = wrap16 nc ∧ v.seen = wrap16 lo ∧ lo ≤ np ∧ queueOk st ring lo np ∧
       posOk pmap ring lo np ∧ stageOk stg ring lo np ∧ inflightOff v st ring lo np stg ∧
       imgOk v m (inFlightBlk st) ∧ cachedOk v st ∧ permOk v pm st ∧ usedOk dl dl0 nc M ∧
-      unreadArmed st dl nr ring lo np stg⌝
+      unreadArmed v st dl nr ring lo np stg sb⌝
 
 /-- The dead arm: before `virtio_disk_init`, and never again after.
 
