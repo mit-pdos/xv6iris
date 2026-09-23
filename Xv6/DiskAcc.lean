@@ -1249,24 +1249,29 @@ runs `body` one iteration at a time -- but the logic cannot see that:
   hold it from `G2` to `M` (a ghost-map permit CAN be minted at a `.get`,
   but minting is not exclusive: the invariant would have to rule out a
   second permit, which is the same fact again);
-* `MachCSL.DevSig.LeaseL` starts the root loop from `True` at every
-  iteration (`wpDev_dmaL`'s `pure` case re-derives `body` with `True`), so
-  the right cannot be threaded ACROSS iterations either.
+* this file's own use of `MachCSL.DevSig.LeaseL` starts the root loop from
+  `True` at every iteration (`Cr := True`, so `wpDev_dmaL`'s `pure` case
+  re-derives `body` with `True`), so the right is not threaded ACROSS
+  iterations either.
 
-THE MINIMAL FIX, for whoever picks this up.  Two changes, both outside
-these five files:
+THE FRAMEWORK IS NOW READY; WHAT IS LEFT IS THE DISK'S OWN ACCOUNTING.
+`MachCSL/WpDevDmaStep.lean` has the root-linear loop: `DevM.LeaseL` carries
+an END CONTEXT `Ce` whose `.pure` arm demands `C ⊢ Ce`, `DevSig.LeaseL`
+takes the root's own resource `Cr` (the root is derived from `Cr` and gives
+`Cr` back at the end of every iteration), and `wpDev_dmaL` re-derives the
+body from `Cr` -- see `leaseL_root_ghostVar` there for the shape.  The
+`.fork` case is closed by the machine interpretation's new well-formedness
+conjunct `devRtOk σ := ∀ d, 0 < (σ.devrt d).next` (`MachCSL.mmOk`), which
+says a forked task is never named `rootTask`.
 
-1. a root-linear device loop lemma -- `DevM.LeaseL` with the `pure` arm
-   carrying `C ⊢ Cr` and `wpDev_dmaL` re-deriving the body from `Cr`, so
-   the root loop may hold one exclusive resource forever.  The disk would
-   take `Cr := ∃ lo, γ.lo ↪VAR{½} lo` with the invariant holding the other
-   half beside `⌜v.seen = wrap16 lo⌝`: then `lo` cannot move without the
-   root's half, which pins it from `G1` to `M`, and `np` and `nc` are
-   monotone (persistent lower bounds), which is all `lo < np` needs.
-2. that lemma's `.fork` case needs `(σ.devrt d).next ≠ rootTask`, which
-   `machInterp` does not track -- `DevRt.init.next = 1` and `next` only
-   grows (`MachCSL/Lang.lean:465`), so one well-formedness conjunct in the
-   machine interpretation closes it.
+What the disk still has to do is INSTANTIATE that: take
+`Cr := ∃ lo, γ.lo ↪VAR{½} lo` with the invariant holding the other half
+beside `⌜v.seen = wrap16 lo⌝`, so that `lo` cannot move without the root's
+half, which pins it from `G1` to `M`; `np` and `nc` are monotone
+(persistent lower bounds), which is all `lo < np` needs.  That is a change
+to `Xv6/DiskInvDefs.lean`'s `diskProto` and to `leaseL_body`, plus the one
+extra `Cr` the boot client must hand the root task
+(`MachCSL.wpDev_dmaL_root` now takes it).
 
 An alternative fix with the same effect and no framework change is to make
 `Virtio.body`'s pop ONE step -- the Rocq model's shape, where the guard

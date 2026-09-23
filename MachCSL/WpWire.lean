@@ -53,7 +53,7 @@ theorem devOpStep_wireR (gen : Nat) (d : DevId) (o : DevOp (DevSt d) (DevTask d)
       σ' = (if mmode then σ.setReg cpu Register.sig_meip (if b then 1#1 else 0#1)
             else σ.setReg cpu Register.sig_seip (if b then 1#1 else 0#1)) ∧ efs = []) ∨
     (∃ (rt : DevRt) (t : DevTask d) (tid' : TaskId),
-      σ' = σ.setRt d rt ∧ efs = [.dev gen d tid' ((devSig d).task t)]) := by
+      0 < rt.next ∧ σ' = σ.setRt d rt ∧ efs = [.dev gen d tid' ((devSig d).task t)]) := by
   cases o with
   | step g =>
     obtain ⟨s', os, hg, rfl, _, rfl⟩ := hop
@@ -68,7 +68,7 @@ theorem devOpStep_wireR (gen : Nat) (d : DevId) (o : DevOp (DevSt d) (DevTask d)
     exact Or.inr (Or.inr (Or.inl ⟨c, mm, b, rfl, rfl⟩))
   | fork t =>
     obtain ⟨_, _, rfl, rfl⟩ := hop
-    exact Or.inr (Or.inr (Or.inr ⟨_, t, _, rfl, rfl⟩))
+    exact Or.inr (Or.inr (Or.inr ⟨_, t, _, Nat.succ_pos _, rfl, rfl⟩))
   | join tid => obtain ⟨_, rfl, _, rfl⟩ := hop; exact Or.inr (Or.inl ⟨rfl, rfl⟩)
 
 /-! ## Pin-driving programs -/
@@ -199,7 +199,7 @@ theorem wpDev_wireR (N : Namespace) (d : DevId) (rel : DevSt d → DevSt d → P
       isplitl [Hσ]
       · split
         · iexact Hσ
-        · rw [machInterp_setRt]; iexact Hσ
+        · iapply machInterp_setRt_done _ _ _ $$ Hσ
       isplitl []
       · iapply hmk _ (DevM.WireR.pure ()) $$ IH
       · exact BigSepL.bigSepL_nil_intro
@@ -210,7 +210,7 @@ theorem wpDev_wireR (N : Namespace) (d : DevId) (rel : DevSt d → DevSt d → P
     rcases hstep with ⟨v, rfl, hop⟩ | ⟨hb, rfl, hσ, rfl, rfl⟩
     · rcases devOpStep_wireR _ d o σ v σ' obs efs hw hop with
         ⟨g, s', os, rfl, hg, rfl, rfl⟩ | ⟨hσ, rfl⟩ | ⟨c, mm, bb, rfl, rfl⟩ |
-        ⟨rt, t, tid', rfl, rfl⟩
+        ⟨rt, t, tid', hrt, rfl, rfl⟩
       · -- the device's own state moved inside `rel`
         have hrel := hs g rfl _ _ _ hg
         imod (devUpdateAt _ d (σ.devs.st d) (σ.devs.st d) s') $$ [Hauth Hfrag] with ⟨Hauth, Hfrag⟩
@@ -263,7 +263,7 @@ theorem wpDev_wireR (N : Namespace) (d : DevId) (rel : DevSt d → DevSt d → P
         ihave Hσ := machInterp_acc_dev_self σ d $$ [Hσclose Hauth]
         case' _ => iframe
         isplitl [Hσ]
-        · rw [machInterp_setRt]; iexact Hσ
+        · iapply machInterp_setRt _ _ rt (fun _ => hrt) $$ Hσ
         isplitl []
         · iapply hmk _ (hk v) $$ IH
         · iapply BigSepL.bigSepL_singleton.2

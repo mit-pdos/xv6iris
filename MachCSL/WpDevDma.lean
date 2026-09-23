@@ -47,7 +47,7 @@ theorem devOpStep_dmaR (gen : Nat) (d : DevId) (o : DevOp (DevSt d) (DevTask d))
       o = .step g ∧ g (σ.devs.st d) = some (s', os) ∧ σ' = σ.setDev d s' ∧ efs = []) ∨
     (σ' = σ ∧ efs = []) ∨
     (∃ (rt : DevRt) (t : DevTask d) (tid' : TaskId),
-      σ' = σ.setRt d rt ∧ efs = [.dev gen d tid' ((devSig d).task t)]) ∨
+      0 < rt.next ∧ σ' = σ.setRt d rt ∧ efs = [.dev gen d tid' ((devSig d).task t)]) ∨
     (∃ (g : DevSt d → Bool) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)),
       o = .dmaWrite g pa n w ∧ g (σ.devs.st d) = true ∧ ramBytes pa n ∧
       ¬ anyReserve σ.resv pa n ∧ σ' = σ.storeDma pa n w ∧ obs = [] ∧ efs = []) := by
@@ -67,7 +67,7 @@ theorem devOpStep_dmaR (gen : Nat) (d : DevId) (o : DevOp (DevSt d) (DevTask d))
   | setPin c mm b => exact absurd rfl (hp c mm b)
   | fork t =>
     obtain ⟨_, _, rfl, rfl⟩ := hop
-    exact Or.inr (Or.inr (Or.inl ⟨_, t, _, rfl, rfl⟩))
+    exact Or.inr (Or.inr (Or.inl ⟨_, t, _, Nat.succ_pos _, rfl, rfl⟩))
   | join tid => obtain ⟨_, rfl, _, rfl⟩ := hop; exact Or.inr (Or.inl ⟨rfl, rfl⟩)
 
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
@@ -240,7 +240,7 @@ theorem wpDev_dma (N : Namespace) (d : DevId) (rel : DevSt d → DevSt d → Pro
       isplitl [Hσ]
       · split
         · iexact Hσ
-        · rw [machInterp_setRt]; iexact Hσ
+        · iapply machInterp_setRt_done _ _ _ $$ Hσ
       isplitl []
       · iapply hmk _ iprop(True) (DevM.Lease.pure _ ()) $$ IH
         imodintro
@@ -252,7 +252,7 @@ theorem wpDev_dma (N : Namespace) (d : DevId) (rel : DevSt d → DevSt d → Pro
     | op _ _ _ hw hr hg hp hs hk =>
       rcases hstep with ⟨v, rfl, hop⟩ | ⟨hb, rfl, hσ, rfl, rfl⟩
       · rcases devOpStep_dmaR _ d o σ v σ' obs efs hp hop with
-          ⟨g, s', os, rfl, hgg, rfl, rfl⟩ | ⟨hσ, rfl⟩ | ⟨rt, t, tid', rfl, rfl⟩ |
+          ⟨g, s', os, rfl, hgg, rfl, rfl⟩ | ⟨hσ, rfl⟩ | ⟨rt, t, tid', hrt, rfl, rfl⟩ |
           ⟨g, pa, n, w, heq, _⟩
         · -- the device's own state moved inside `rel`
           have hrel := hs g rfl _ _ _ hgg
@@ -290,7 +290,7 @@ theorem wpDev_dma (N : Namespace) (d : DevId) (rel : DevSt d → DevSt d → Pro
           ihave Hσ := machInterp_acc_dev_self σ d $$ [Hσclose Hauth]
           case' _ => iframe
           isplitl [Hσ]
-          · rw [machInterp_setRt]; iexact Hσ
+          · iapply machInterp_setRt _ _ rt (fun _ => hrt) $$ Hσ
           isplitl []
           · iapply hmk _ _ (hk v) $$ IH
             imodintro

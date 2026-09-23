@@ -499,7 +499,7 @@ theorem swp_sail_mem_read_plain_au (cpu : CPU) {n vasize : Nat}
     intro p hp j hj e he het
     exact histOk_author_eq σ.log (Hs j) (hmm.1 _ _ (hget j hj)) e he p.1 p.2
       (hau p hp).1 (hau p hp).2 het
-  have hram : ramBytes req.pa n := ramBytes_of_cells hmm.2.2.2 (fun j hj => ⟨Hs j, hget j hj⟩)
+  have hram : ramBytes req.pa n := ramBytes_of_cells hmm.2.2.2.1 (fun j hj => ⟨Hs j, hget j hj⟩)
   imodintro
   isplit
   · ipureintro
@@ -561,7 +561,7 @@ theorem swp_sail_mem_write_plain_au (cpu : CPU) {n vasize : Nat}
     isplit
     · iintro %v %Hev
       rcases Hev with ⟨hdev, _⟩ | ⟨_, _, _, hno', _, _⟩
-      · exact absurd hdev (not_devBytes_of_othersReserve hmm.2.2.1 hmm.2.2.2 hno)
+      · exact absurd hdev (not_devBytes_of_othersReserve hmm.2.2.1 hmm.2.2.2.1 hno)
       · exact absurd hno hno'
     · iintro %Hbk
       obtain ⟨_, hσ⟩ := Hbk
@@ -575,7 +575,7 @@ theorem swp_sail_mem_write_plain_au (cpu : CPU) {n vasize : Nat}
     ihave %hget : ⌜histsAt σ.mem req.pa n Hs⌝ $$ [Hmem Hb]
     · iapply histBytes_valid σ.mem req.pa n _ Hs $$ [Hmem Hb]
       iframe
-    have hram : ramBytes req.pa n := ramBytes_of_cells hmm.2.2.2 (fun j hj => ⟨Hs j, hget j hj⟩)
+    have hram : ramBytes req.pa n := ramBytes_of_cells hmm.2.2.2.1 (fun j hj => ⟨Hs j, hget j hj⟩)
     imodintro
     isplit
     · ipureintro
@@ -636,7 +636,7 @@ theorem swp_sail_mem_read_excl_au_gen (cpu : CPU) {n vasize : Nat}
     isplit
     · iintro %v %Hev
       rcases Hev with ⟨hdev, _⟩ | ⟨_, hif', _⟩ | ⟨_, hpl, _⟩ | ⟨_, _, hno', _⟩
-      · exact absurd hdev (not_devBytes_of_othersReserve hmm.2.2.1 hmm.2.2.2 hno)
+      · exact absurd hdev (not_devBytes_of_othersReserve hmm.2.2.1 hmm.2.2.2.1 hno)
       · rw [hif] at hif'; exact absurd hif' (by decide)
       · simp [akPlain, hk] at hpl
       · exact absurd hno hno'
@@ -654,7 +654,7 @@ theorem swp_sail_mem_read_excl_au_gen (cpu : CPU) {n vasize : Nat}
     · iapply histBytes_valid σ.mem req.pa n dqs Hs $$ [Hmem Hb]
       iframe
     obtain ⟨w, htop, hheads⟩ := exists_top_bytes σ req.pa n Hs hget hne
-    have hram : ramBytes req.pa n := ramBytes_of_cells hmm.2.2.2 (fun j hj => ⟨Hs j, hget j hj⟩)
+    have hram : ramBytes req.pa n := ramBytes_of_cells hmm.2.2.2.1 (fun j hj => ⟨Hs j, hget j hj⟩)
     imodintro
     isplit
     · ipureintro
@@ -730,7 +730,7 @@ theorem swp_sail_mem_write_excl_au (cpu : CPU) {n vasize : Nat}
     isplit
     · iintro %v %Hev
       rcases Hev with ⟨hdev, _⟩ | ⟨_, _, _, hno', _, _⟩
-      · exact absurd hdev (not_devBytes_of_othersReserve hmm.2.2.1 hmm.2.2.2 hno)
+      · exact absurd hdev (not_devBytes_of_othersReserve hmm.2.2.1 hmm.2.2.2.1 hno)
       · exact absurd hno hno'
     · iintro %Hbk
       obtain ⟨_, hσ⟩ := Hbk
@@ -756,7 +756,7 @@ theorem swp_sail_mem_write_excl_au (cpu : CPU) {n vasize : Nat}
       have h := hmm.2.2.1 cpu _ hres.1 _ (nthByte w0 j) (snapOf_get? req.pa n w0 hn j hj)
       rw [hget j hj, Option.bind_some] at h
       exact h
-    have hram : ramBytes req.pa n := ramBytes_of_cells hmm.2.2.2 (fun j hj => ⟨Hs j, hget j hj⟩)
+    have hram : ramBytes req.pa n := ramBytes_of_cells hmm.2.2.2.1 (fun j hj => ⟨Hs j, hget j hj⟩)
     imodintro
     isplit
     · ipureintro

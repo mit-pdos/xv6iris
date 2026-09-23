@@ -2,7 +2,7 @@
 The virtio disk's DEVICE-SIDE proof: the device's own program respects the
 invariant of `Xv6/DiskInvDefs.lean`, with NOTHING assumed.
 
-    disk_leaseL     : DevSig.LeaseL .virtio (diskProto γ) (diskTaskRes γ)
+    disk_leaseL     : DevSig.LeaseL .virtio (diskProto γ) (diskTaskRes γ) True
     wpDev_disk_inv  : diskInv γ ∗ genCert ⊢ devWP .. .virtio rootTask (DevM.pure ())
 
 THE PROBLEM THIS FILE SOLVES.  `Virtio.serve h` reads the three
@@ -1150,34 +1150,34 @@ theorem leaseL_write_frame (γ : DiskNames) (s' : VirtioState) (C : IProp GF) (p
 
 /-- A stalled request: the guard never answers. -/
 theorem leaseL_stall (γ : DiskNames) (C : IProp GF) :
-    DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) C Virtio.stall := by
+    DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) iprop(True) C Virtio.stall := by
   unfold Virtio.stall DevM.await DevM.step DevM.lift
-  exact DevM.LeaseL.step C C _ _ (fun s s' os hgs => by simp at hgs) (DevM.LeaseL.pure _ ())
+  exact DevM.LeaseL.step C C _ _ (fun s s' os hgs => by simp at hgs) (DevM.LeaseL.pure _ () true_intro)
 
 /-- `Virtio.xferIn h i`: one sector of a read request's fill. -/
 theorem leaseL_xferIn (γ : DiskNames) (C : IProp GF) (h : BitVec 16) (i : Nat) :
-    DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) C (Virtio.xferIn h i) := by
+    DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) iprop(True) C (Virtio.xferIn h i) := by
   unfold Virtio.xferIn
   simp only [bind, DevM.bind, DevM.get, DevM.lift, Pure.pure]
   refine DevM.LeaseL.get C (X := Unit) (fun _ _ => C) _ (fun s => leaseL_get_keep γ C s)
     (fun s _ => ?_)
   cases hr : Virtio.reqOf s h with
-  | none => exact DevM.LeaseL.pure _ ()
+  | none => exact DevM.LeaseL.pure _ () true_intro
   | some r =>
     unfold Virtio.reqSectorLen DevM.dmaWriteIf DevM.lift
-    refine DevM.LeaseL.dmaWrite _ _ _ _ _ _ ?_ (DevM.LeaseL.pure _ ())
+    refine DevM.LeaseL.dmaWrite _ _ _ _ _ _ ?_ (DevM.LeaseL.pure _ () true_intro)
     intro s' hg
     exact leaseL_write_frame γ s' C _ _ _ (data_write_lease γ s' h r i (of_decide_eq_true hg) _)
 
 /-- `Virtio.xferOut h i`: one sector of a write request's capture. -/
 theorem leaseL_xferOut (γ : DiskNames) (C : IProp GF) (h : BitVec 16) (i : Nat) :
-    DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) C (Virtio.xferOut h i) := by
+    DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) iprop(True) C (Virtio.xferOut h i) := by
   unfold Virtio.xferOut
   simp only [bind, DevM.bind, DevM.get, DevM.lift, Pure.pure]
   refine DevM.LeaseL.get C (X := Unit) (fun _ _ => C) _ (fun s => leaseL_get_keep γ C s)
     (fun s _ => ?_)
   cases hr : Virtio.reqOf s h with
-  | none => exact DevM.LeaseL.pure _ ()
+  | none => exact DevM.LeaseL.pure _ () true_intro
   | some r =>
     unfold DevM.dmaRead DevM.lift
     refine DevM.LeaseL.dmaRead _ _ _ (fun _ _ => True) _ ?_ (fun w _ => ?_)
@@ -1186,7 +1186,7 @@ theorem leaseL_xferOut (γ : DiskNames) (C : IProp GF) (h : BitVec 16) (i : Nat)
       iapply dmaReadPin_any
       iframe HR HC
     · unfold DevM.modify DevM.step DevM.lift
-      refine DevM.LeaseL.step _ C _ _ ?_ (DevM.LeaseL.pure _ ())
+      refine DevM.LeaseL.step _ C _ _ ?_ (DevM.LeaseL.pure _ () true_intro)
       intro s1 s2 os hgs
       have hs2 : s2 = (if Virtio.reqOf s1 h = some r then
           { s1 with cache := Virtio.alistSet s1.cache (Virtio.reqKey r i) (bytesOf w) }
@@ -1210,8 +1210,8 @@ theorem leaseL_xferOut (γ : DiskNames) (C : IProp GF) (h : BitVec 16) (i : Nat)
 
 theorem leaseL_bind_join (γ : DiskNames) (C : IProp GF) (l : List TaskId)
     (k : Unit → Virtio.VM Unit)
-    (hk : DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) C (k ())) :
-    DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) C
+    (hk : DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) iprop(True) C (k ())) :
+    DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) iprop(True) C
       (DevM.bind (List.forM l DevM.join) k) := by
   induction l with
   | nil => exact hk
@@ -1221,9 +1221,9 @@ theorem leaseL_bind_join (γ : DiskNames) (C : IProp GF) (l : List TaskId)
 
 theorem leaseL_bind_fork (γ : DiskNames) (C : IProp GF) (ts : List Virtio.VTask)
     (k : List TaskId → Virtio.VM Unit)
-    (hk : ∀ l, DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) C (k l)) :
+    (hk : ∀ l, DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) iprop(True) C (k l)) :
     (∀ t ∈ ts, (⊢@{IProp GF} diskTaskRes γ t)) → ∀ acc : List TaskId,
-      DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) C
+      DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) iprop(True) C
         (DevM.bind (List.mapM.loop DevM.fork ts acc) k) := by
   induction ts with
   | nil => intro _ acc; exact hk _
@@ -1238,10 +1238,10 @@ theorem leaseL_bind_fork (γ : DiskNames) (C : IProp GF) (ts : List Virtio.VTask
 
 theorem leaseL_forkJoinAll (γ : DiskNames) (C : IProp GF) (ts : List Virtio.VTask)
     (hts : ∀ t ∈ ts, (⊢@{IProp GF} diskTaskRes γ t)) (k : Unit → Virtio.VM Unit)
-    (hk : DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) C (k ())) :
-    DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) C
+    (hk : DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) iprop(True) C (k ())) :
+    DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) iprop(True) C
       (DevM.bind (DevM.forkJoinAll ts) k) := by
-  show DevM.LeaseL _ _ C
+  show DevM.LeaseL _ _ _ C
     (DevM.bind (DevM.bind (List.mapM.loop DevM.fork ts []) (fun l => List.forM l DevM.join)) k)
   rw [DevM_bind_assoc]
   exact leaseL_bind_fork γ C ts _ (fun l => leaseL_bind_join γ C l _ hk) hts []
@@ -1263,7 +1263,7 @@ theorem leaseL_install (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key : 
 
 theorem leaseL_serveTail (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key : Nat)
     (c : Chain) (s : VirtioState) (hlive : Virtio.live c0 = true) :
-    DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ)
+    DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) iprop(True)
       (serveCtx γ h c0 key (.active c) s) (serveTail h c.req) := by
   unfold serveTail
   simp only [bind, DevM.bind, DevM.modify, DevM.guard, DevM.step, DevM.lift,
@@ -1311,7 +1311,7 @@ theorem leaseL_serveTail (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key 
               simp only [Bool.and_eq_true, decide_eq_true_eq] at hgg
               exact leaseL_write_frame γ s1 _ _ _ _
                 (usedIdx_write_lease γ s1 h c.req v2.cfg hgg.1.1 hgg.2 _)
-            · refine DevM.LeaseL.step _ iprop(True) _ _ ?_ (DevM.LeaseL.pure _ ())
+            · refine DevM.LeaseL.step _ iprop(True) _ _ ?_ (DevM.LeaseL.pure _ () true_intro)
               intro s1 s2 os hgs
               have hs2 : s2 = Virtio.complete s1 h := by
                 simp only [Option.some.injEq, Prod.mk.injEq] at hgs
@@ -1338,9 +1338,9 @@ flag and the chain is refused. -/
 theorem leaseL_fetch_free (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key : Nat)
     (s : VirtioState) (hlive : Virtio.live c0 = true) (hqnum : c0.qnum.toNat = NUM)
     (kf : Option VioReq → Virtio.VM Unit)
-    (hkn : DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ)
+    (hkn : DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) iprop(True)
       (serveCtx γ h c0 key .inactive s) (kf none)) :
-    DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ)
+    DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) iprop(True)
       (serveCtx γ h c0 key .inactive s) (DevM.bind (Virtio.fetch s.cfg h) kf) := by
   unfold Virtio.fetch DevM.dmaRead DevM.lift
   simp only [bind, DevM.bind, Pure.pure]
@@ -1372,11 +1372,11 @@ theorem leaseL_fetch_armed (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (ke
     (c : Chain) (s : VirtioState) (hlive : Virtio.live c0 = true) (hqnum : c0.qnum.toNat = NUM)
     (hhd : c.hd = h.toNat) (hwf : c.wf)
     (kf : Option VioReq → Virtio.VM Unit)
-    (hkn : DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ)
+    (hkn : DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) iprop(True)
       (serveCtx γ h c0 key (.active c) s) (kf none))
-    (hks : DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ)
+    (hks : DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) iprop(True)
       (serveCtx γ h c0 key (.active c) s) (kf (some c.req))) :
-    DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ)
+    DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) iprop(True)
       (serveCtx γ h c0 key (.active c) s) (DevM.bind (Virtio.fetch s.cfg h) kf) := by
   unfold Virtio.fetch DevM.dmaRead DevM.lift
   simp only [bind, DevM.bind, Pure.pure]
@@ -1446,7 +1446,7 @@ theorem leaseL_fetch_armed (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (ke
 /-! ## `Virtio.serve`: the whole service of one popped request -/
 
 theorem leaseL_serve (γ : DiskNames) (h : BitVec 16) :
-    DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) (diskUp γ) (Virtio.serve h) := by
+    DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) iprop(True) (diskUp γ) (Virtio.serve h) := by
   unfold Virtio.serve
   simp only [bind, DevM.bind, DevM.get, DevM.lift]
   refine DevM.LeaseL.get _ (X := ServeKnow h)
@@ -1505,7 +1505,7 @@ theorem leaseL_serve (γ : DiskNames) (h : BitVec 16) :
 /-! ## `Virtio.body`: the root loop -/
 
 theorem leaseL_body (γ : DiskNames) (C : IProp GF) :
-    DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) C Virtio.body := by
+    DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) iprop(True) C Virtio.body := by
   unfold Virtio.body DevM.chooseLt DevM.choose DevM.get DevM.modify DevM.step DevM.lift
     Virtio.dma16 DevM.dmaRead DevM.fork
   simp only [bind, DevM.bind, Pure.pure]
@@ -1539,7 +1539,7 @@ theorem leaseL_body (γ : DiskNames) (C : IProp GF) :
                 (fun _ _ => iprop(⌜Virtio.live v.cfg = false⌝ ∨ diskUp γ)) _
                 (fun s1 => leaseL_get_keep γ _ s1) (fun popped _ => ?_)
               split
-              · exact DevM.LeaseL.pure _ ()
+              · exact DevM.LeaseL.pure _ () true_intro
               · refine DevM.LeaseL.step _
                   iprop(⌜Virtio.live v.cfg = false⌝ ∨ diskUp γ) _ _ ?_ ?_
                 · intro s1 s2 os hgs
@@ -1559,7 +1559,7 @@ theorem leaseL_body (γ : DiskNames) (C : IProp GF) :
                     iexists c0
                     iframe Hfr
                     ipureintro; exact hl
-                · refine DevM.LeaseL.fork _ iprop(True) _ _ ?_ (fun _ => DevM.LeaseL.pure _ ())
+                · refine DevM.LeaseL.fork _ iprop(True) _ _ ?_ (fun _ => DevM.LeaseL.pure _ () true_intro)
                   rw [diskTaskRes_serve]
                   iintro Hor
                   icases Hor with ⟨%hf | #Hup⟩
@@ -1567,16 +1567,16 @@ theorem leaseL_body (γ : DiskNames) (C : IProp GF) :
                   · isplitr []
                     · itrivial
                     · iexact Hup
-          · exact DevM.LeaseL.pure _ ()
-      · exact DevM.LeaseL.pure _ ()
+          · exact DevM.LeaseL.pure _ () true_intro
+      · exact DevM.LeaseL.pure _ () true_intro
   · split
     · refine DevM.LeaseL.get _ (X := Unit) (fun _ _ => C) _ (fun s => leaseL_get_keep γ C s)
         (fun v _ => ?_)
       split
-      · exact DevM.LeaseL.pure _ ()
+      · exact DevM.LeaseL.pure _ () true_intro
       · refine DevM.LeaseL.op _ _ _ (fun _ _ _ _ => nofun) (fun _ _ => nofun) nofun
           (fun _ => nofun) (fun _ => nofun) (fun _ _ _ => nofun) (fun j => ?_)
-        refine DevM.LeaseL.step _ C _ _ ?_ (DevM.LeaseL.pure _ ())
+        refine DevM.LeaseL.step _ C _ _ ?_ (DevM.LeaseL.pure _ () true_intro)
         intro s1 s2 os hgs
         have hs2 : s2 = Virtio.drain s1 (s1.cache.getD (j % v.cache.length) (0, [])).1 := by
           simp only [Option.some.injEq, Prod.mk.injEq] at hgs
@@ -1586,7 +1586,7 @@ theorem leaseL_body (γ : DiskNames) (C : IProp GF) :
         imodintro
         iframe HC
         iapply diskProto_drain γ s1 _ $$ HR
-    · exact DevM.LeaseL.pure _ ()
+    · exact DevM.LeaseL.pure _ () true_intro
 
 /-! ## The device-side theorem -/
 
@@ -1595,7 +1595,7 @@ covered by a lease out of `diskProto`, every DMA read is pinned, and every
 move of the device's own state carries the protocol along -- the install
 included, which is what the serve permit buys. -/
 theorem disk_leaseL (γ : DiskNames) :
-    DevSig.LeaseL .virtio (diskProto (GF := GF) γ) (diskTaskRes γ) := by
+    DevSig.LeaseL .virtio (diskProto (GF := GF) γ) (diskTaskRes γ) iprop(True) := by
   refine ⟨leaseL_body γ _, fun t => ?_⟩
   cases t with
   | serve h => rw [diskTaskRes_serve]; exact leaseL_serve γ h
@@ -1609,7 +1609,10 @@ theorem wpDev_disk_inv (γ : DiskNames) :
     diskInv γ ∗ genCert ⊢@{IProp GF}
       devWP (genId (hlc := hlc) (GF := GF)) .virtio rootTask (DevM.pure ()) := by
   unfold diskInv
-  iintro H
-  iapply wpDev_dmaL_root diskN .virtio (diskProto γ) (diskTaskRes γ) (disk_leaseL γ) $$ H
+  iintro ⟨Hinv, Hcert⟩
+  iapply wpDev_dmaL_root diskN .virtio (diskProto γ) (diskTaskRes γ) iprop(True)
+    (disk_leaseL γ)
+  iframe Hinv Hcert
+  try itrivial
 
 end

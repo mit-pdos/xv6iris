@@ -265,12 +265,42 @@ theorem DevId.all_get?_ne {k : Nat} {y : DevId} (hk : DevId.all[k]? = some y) (d
 abbrev devAuth (d : DevId) (s : DevSt d) : IProp GF := devAuthAt (MachGS.era (hlc := hlc) (GF := GF)) d s
 abbrev devFrag (d : DevId) (s : DevSt d) : IProp GF := devFragAt (MachGS.era (hlc := hlc) (GF := GF)) d s
 
-/-- The interpretation does not mention the task bookkeeping. -/
-theorem machInterp_devrt (σ : MState) (f : DevId → DevRt) :
-    machInterp (GF := GF) { σ with devrt := f } = machInterp σ := rfl
+/-- Moving one device's task bookkeeping: the interpretation keeps every
+resource and only its pure `devRtOk` conjunct sees the move, so the new
+entry's `next` must still be a real task id.  Both moves the language makes
+satisfy that (`machInterp_setRt_done`, `machInterp_setRt_next`). -/
+theorem machInterp_setRt (σ : MState) (d : DevId) (rt : DevRt)
+    (hnext : 0 < (σ.devrt d).next → 0 < rt.next) :
+    machInterp (GF := GF) σ ⊢ machInterp (σ.setRt d rt) := by
+  have e : machInterp (GF := GF) (σ.setRt d rt) =
+      iprop(([∗list] cpu ∈ cpus, regInterp cpu (σ.regs cpu)) ∗ genHeapInterp σ.mem ∗
+        memModel (σ.setRt d rt) ∗ devInterp σ.devs) := rfl
+  rw [e]
+  iintro ⟨Hregs, Hmem, Hmm, Hdev⟩
+  iframe Hregs Hmem Hdev
+  iapply memModel_setRt _ σ d rt hnext $$ Hmm
 
-theorem machInterp_setRt (σ : MState) (d : DevId) (rt : DevRt) :
-    machInterp (GF := GF) (σ.setRt d rt) = machInterp σ := rfl
+/-- Every device's next task id is a real task id: the pure `devRtOk`
+conjunct the interpretation carries.  What a bus-mastering device's root
+loop needs to know that a task it forks is not itself. -/
+theorem machInterp_devRtOk (σ : MState) : machInterp (GF := GF) σ ⊢ ⌜devRtOk σ⌝ := by
+  iintro ⟨_, _, Hmm, _⟩
+  ihave %h := memModel_mmOk _ σ $$ Hmm
+  ipureintro
+  exact h.2.2.2.2
+
+/-- Recording a finished task does not move `next`. -/
+theorem machInterp_setRt_done (σ : MState) (d : DevId) (tid : TaskId) :
+    machInterp (GF := GF) σ ⊢
+      machInterp (σ.setRt d { σ.devrt d with done := tid :: (σ.devrt d).done }) :=
+  machInterp_setRt σ d _ (fun h => h)
+
+/-- Handing out the next task id keeps it positive -- which is why no forked
+task is ever named `rootTask`. -/
+theorem machInterp_setRt_next (σ : MState) (d : DevId) :
+    machInterp (GF := GF) σ ⊢
+      machInterp (σ.setRt d { σ.devrt d with next := (σ.devrt d).next + 1 }) :=
+  machInterp_setRt σ d _ (fun _ => Nat.succ_pos _)
 
 /-- Re-assemble the interpretation after a device update. -/
 theorem machInterp_of_devs (σ : MState) (ds : DevStates) :
@@ -321,7 +351,7 @@ theorem devOpStep_localR (gen : Nat) (d : DevId) (o : DevOp (DevSt d) (DevTask d
       o = .step g ∧ g (σ.devs.st d) = some (s', os) ∧ σ' = σ.setDev d s' ∧ efs = []) ∨
     (σ' = σ ∧ efs = []) ∨
     (∃ (rt : DevRt) (t : DevTask d) (tid' : TaskId),
-      σ' = σ.setRt d rt ∧ efs = [.dev gen d tid' ((devSig d).task t)]) := by
+      0 < rt.next ∧ σ' = σ.setRt d rt ∧ efs = [.dev gen d tid' ((devSig d).task t)]) := by
   cases o with
   | step g =>
     obtain ⟨s', os, hg, rfl, _, rfl⟩ := hop
@@ -334,7 +364,7 @@ theorem devOpStep_localR (gen : Nat) (d : DevId) (o : DevOp (DevSt d) (DevTask d
   | setPin c mm b => exact absurd rfl (hp c mm b)
   | fork t =>
     obtain ⟨_, _, rfl, rfl⟩ := hop
-    exact Or.inr (Or.inr ⟨_, t, _, rfl, rfl⟩)
+    exact Or.inr (Or.inr ⟨_, t, _, Nat.succ_pos _, rfl, rfl⟩)
   | join tid => obtain ⟨_, rfl, _, rfl⟩ := hop; exact Or.inr (Or.inl ⟨rfl, rfl⟩)
 
 theorem DevStates.set_self (ds : DevStates) (d : DevId) : ds.set d (ds.st d) = ds := by
@@ -410,7 +440,7 @@ theorem devOpStep_local (gen : Nat) (d : DevId) (o : DevOp (DevSt d) (DevTask d)
     (∃ s' : DevSt d, σ' = σ.setDev d s' ∧ efs = []) ∨
     (σ' = σ ∧ efs = []) ∨
     (∃ (rt : DevRt) (t : DevTask d) (tid' : TaskId),
-      σ' = σ.setRt d rt ∧ efs = [.dev gen d tid' ((devSig d).task t)]) := by
+      0 < rt.next ∧ σ' = σ.setRt d rt ∧ efs = [.dev gen d tid' ((devSig d).task t)]) := by
   cases o with
   | step g =>
     obtain ⟨s', os, _, rfl, _, rfl⟩ := hop
@@ -423,7 +453,7 @@ theorem devOpStep_local (gen : Nat) (d : DevId) (o : DevOp (DevSt d) (DevTask d)
   | setPin c mm b => exact absurd rfl (hp c mm b)
   | fork t =>
     obtain ⟨_, _, rfl, rfl⟩ := hop
-    exact Or.inr (Or.inr ⟨_, t, _, rfl, rfl⟩)
+    exact Or.inr (Or.inr ⟨_, t, _, Nat.succ_pos _, rfl, rfl⟩)
   | join tid => obtain ⟨_, rfl, _, rfl⟩ := hop; exact Or.inr (Or.inl ⟨rfl, rfl⟩)
 
 set_option maxHeartbeats 4000000 in
@@ -480,7 +510,7 @@ theorem wpDev_local (N : Namespace) (d : DevId) (hloc : DevSig.Local d) :
       isplitl [Hσ]
       · split
         · iexact Hσ
-        · rw [machInterp_setRt]; iexact Hσ
+        · iapply machInterp_setRt_done _ _ _ $$ Hσ
       isplitl []
       · iapply hmk _ (DevM.Local.pure ()) $$ IH
       · exact BigSepL.bigSepL_nil_intro
@@ -490,7 +520,7 @@ theorem wpDev_local (N : Namespace) (d : DevId) (hloc : DevSig.Local d) :
     | op _ _ hw hp hk =>
     rcases hstep with ⟨v, rfl, hop⟩ | ⟨hb, rfl, hσ, rfl, rfl⟩
     · rcases devOpStep_local _ d o σ v σ' obs efs hw hp hop with
-        ⟨s', rfl, rfl⟩ | ⟨hσ, rfl⟩ | ⟨rt, t, tid', rfl, rfl⟩
+        ⟨s', rfl, rfl⟩ | ⟨hσ, rfl⟩ | ⟨rt, t, tid', hrt, rfl, rfl⟩
       · -- the device's own state moved: both halves follow
         imod (devUpdateAt _ d (σ.devs.st d) (σ.devs.st d) s') $$ [Hauth Hfrag] with ⟨Hauth, Hfrag⟩
         · iframe
@@ -523,7 +553,7 @@ theorem wpDev_local (N : Namespace) (d : DevId) (hloc : DevSig.Local d) :
         ihave Hσ := machInterp_acc_dev_self σ d $$ [Hσclose Hauth]
         case' _ => iframe
         isplitl [Hσ]
-        · rw [machInterp_setRt]; iexact Hσ
+        · iapply machInterp_setRt _ _ rt (fun _ => hrt) $$ Hσ
         isplitl []
         · iapply hmk _ (hk v) $$ IH
         · iapply BigSepL.bigSepL_singleton.2
@@ -601,7 +631,7 @@ theorem wpDev_localR (N : Namespace) (d : DevId) (rel : DevSt d → DevSt d → 
       isplitl [Hσ]
       · split
         · iexact Hσ
-        · rw [machInterp_setRt]; iexact Hσ
+        · iapply machInterp_setRt_done _ _ _ $$ Hσ
       isplitl []
       · iapply hmk _ (DevM.LocalR.pure ()) $$ IH
       · exact BigSepL.bigSepL_nil_intro
@@ -611,7 +641,7 @@ theorem wpDev_localR (N : Namespace) (d : DevId) (rel : DevSt d → DevSt d → 
     | op _ _ hw hp hs hk =>
     rcases hstep with ⟨v, rfl, hop⟩ | ⟨hb, rfl, hσ, rfl, rfl⟩
     · rcases devOpStep_localR _ d o σ v σ' obs efs hw hp hop with
-        ⟨g, s', os, rfl, hg, rfl, rfl⟩ | ⟨hσ, rfl⟩ | ⟨rt, t, tid', rfl, rfl⟩
+        ⟨g, s', os, rfl, hg, rfl, rfl⟩ | ⟨hσ, rfl⟩ | ⟨rt, t, tid', hrt, rfl, rfl⟩
       · -- the device's own state moved inside `rel`: both halves and the client's ghosts follow
         have hrel := hs g rfl _ _ _ hg
         imod (devUpdateAt _ d (σ.devs.st d) (σ.devs.st d) s') $$ [Hauth Hfrag] with ⟨Hauth, Hfrag⟩
@@ -644,7 +674,7 @@ theorem wpDev_localR (N : Namespace) (d : DevId) (rel : DevSt d → DevSt d → 
         ihave Hσ := machInterp_acc_dev_self σ d $$ [Hσclose Hauth]
         case' _ => iframe
         isplitl [Hσ]
-        · rw [machInterp_setRt]; iexact Hσ
+        · iapply machInterp_setRt _ _ rt (fun _ => hrt) $$ Hσ
         isplitl []
         · iapply hmk _ (hk v) $$ IH
         · iapply BigSepL.bigSepL_singleton.2

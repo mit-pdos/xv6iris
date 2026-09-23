@@ -111,7 +111,7 @@ theorem histBytes_ramBytes (σ : MState) (pa : PAddr) (n : Nat) (dqs : Nat → D
   ihave %hmm : ⌜mmOk σ⌝ $$ [Hmm]
   · iapply memModel_mmOk _ σ $$ Hmm
   ipureintro
-  exact ramBytes_of_cells hmm.2.2.2 (fun j hj => ⟨Hs j, hget j hj⟩)
+  exact ramBytes_of_cells hmm.2.2.2.1 (fun j hj => ⟨Hs j, hget j hj⟩)
 
 /-- Re-assembling the interpretation after a DMA write: the registers and
 the device states are literally the same propositions. -/

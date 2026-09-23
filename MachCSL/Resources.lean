@@ -556,6 +556,14 @@ theorem not_devBytes_of_othersReserve {σ : MState} {cpu : CPU} {pa : PAddr} {n 
   rw [devAddr_false_of_inRam hin] at hdj
   exact absurd hdj (by decide)
 
+/-- Every device's next task id is a real task id: `DevRt.init.next = 1` and
+`next` only grows, so no forked task is ever named `rootTask`.  A pure fact
+the interpretation carries, because the ROOT task of a bus-mastering device
+is the only one that may hold a resource across the iterations of its loop
+(`MachCSL.DevSig.LeaseL`), and that argument needs to know that a forked
+task is not the root. -/
+def devRtOk (σ : MState) : Prop := ∀ d : DevId, 0 < (σ.devrt d).next
+
 /-- The memory-model step invariant (the Rocq prototype's `mm_ok`, `itv_ok`,
 `hr_ok` and `resv_ok`): every history is well formed against the author log,
 every view and read-side position is at or below the top, every outstanding
@@ -566,12 +574,14 @@ def mmOk (σ : MState) : Prop :=
   (∀ c, σ.tv c ≤ σ.top ∧ σ.itv c ≤ σ.top ∧ (σ.hr c).bound σ.top) ∧
   (∀ c r, σ.resv c = some r → ∀ (a : PAddr) (v : BitVec 8), r[a]? = some v →
     (σ.mem[a]?).bind Hist.top = some v) ∧
-  memRam σ.mem
+  memRam σ.mem ∧
+  devRtOk σ
+
 
 theorem mmOk_afterLoad (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (htv : tvn ≤ σ.top)
     (h : mmOk σ) : mmOk (σ.afterLoad cpu pa n tvn) := by
-  obtain ⟨h1, h2, h3, h4⟩ := h
-  refine ⟨h1, fun c => ?_, h3, h4⟩
+  obtain ⟨h1, h2, h3, h4, h5⟩ := h
+  refine ⟨h1, fun c => ?_, h3, h4, h5⟩
   obtain ⟨a1, a2, a3, a4⟩ := h2 c
   simp only [MState.top] at *
   by_cases hc : c = cpu
@@ -588,8 +598,8 @@ theorem mmOk_afterLoad (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (htv
     exact ⟨a1, a2, a3, a4⟩
 
 theorem mmOk_fence (σ : MState) (cpu : CPU) (b : barrier_kind) (h : mmOk σ) : mmOk (σ.fence cpu b) := by
-  obtain ⟨h1, h2, h3, h4⟩ := h
-  refine ⟨h1, fun c => ?_, h3, h4⟩
+  obtain ⟨h1, h2, h3, h4, h5⟩ := h
+  refine ⟨h1, fun c => ?_, h3, h4, h5⟩
   obtain ⟨a1, a2, a3, a4⟩ := h2 c
   obtain ⟨b1, b2, b3, b4⟩ := h2 cpu
   have hpub := ownPub_le (hartAgent cpu) σ.log
@@ -607,8 +617,8 @@ theorem mmOk_fence (σ : MState) (cpu : CPU) (b : barrier_kind) (h : mmOk σ) : 
 theorem mmOk_store (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (excl : Bool)
     (hram : ramBytes pa n) (hno : ¬ othersReserve σ.resv cpu pa n) (h : mmOk σ) :
     mmOk (σ.store cpu pa n w excl) := by
-  obtain ⟨h1, h2, h3, h4⟩ := h
-  refine ⟨?_, ?_, ?_, memRam_writeBytes hram h4⟩
+  obtain ⟨h1, h2, h3, h4, h5⟩ := h
+  refine ⟨?_, ?_, ?_, memRam_writeBytes hram h4, h5⟩
   · intro a H hget
     exact FlatMem.writeBytes_histOk σ.mem σ.log pa w (hartAgent cpu) h1 a H hget
   · intro c
@@ -644,8 +654,8 @@ may reserve a byte of it. -/
 theorem mmOk_storeDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
     (hram : ramBytes pa n) (hno : ¬ anyReserve σ.resv pa n) (h : mmOk σ) :
     mmOk (σ.storeDma pa n w) := by
-  obtain ⟨h1, h2, h3, h4⟩ := h
-  refine ⟨?_, ?_, ?_, memRam_writeBytes hram h4⟩
+  obtain ⟨h1, h2, h3, h4, h5⟩ := h
+  refine ⟨?_, ?_, ?_, memRam_writeBytes hram h4, h5⟩
   · intro a H hget
     exact FlatMem.writeBytes_histOk σ.mem σ.log pa w diskAgent h1 a H hget
   · intro c
@@ -660,10 +670,23 @@ theorem mmOk_storeDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
     rw [FlatMem.writeBytes_get?_notin _ _ _ _ _ _ hno']
     exact h3 c r hr a v hav
 
+/-- The task bookkeeping: everything but `devRtOk` is untouched, and the new
+entry's `next` is positive whenever the old one was (the two moves the
+language makes -- recording a finished task and handing out the next id --
+both satisfy that). -/
+theorem mmOk_setRt (σ : MState) (d : DevId) (rt : DevRt)
+    (hnext : 0 < (σ.devrt d).next → 0 < rt.next) (h : mmOk σ) : mmOk (σ.setRt d rt) := by
+  obtain ⟨h1, h2, h3, h4, h5⟩ := h
+  refine ⟨h1, h2, h3, h4, fun d' => ?_⟩
+  simp only [MState.setRt, updCpu']
+  by_cases hd : d' = d
+  · subst hd; simp only [if_true]; exact hnext (h5 d')
+  · simp only [hd, if_false]; exact h5 d'
+
 /-- A booted machine satisfies the step invariant. -/
 theorem mmOk_boot (σ : MState) (image : Mem) (h : bootFacts σ image) : mmOk σ := by
-  obtain ⟨hmem, hlog, hhart, _⟩ := h
-  refine ⟨?_, ?_, ?_, ?_⟩
+  obtain ⟨hmem, hlog, hhart, _, hrt⟩ := h
+  refine ⟨?_, ?_, ?_, ?_, fun d => by rw [hrt d]; exact Nat.zero_lt_one⟩
   · intro a H hget
     rw [hmem, imgFlat_get?] at hget
     split at hget

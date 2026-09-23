@@ -711,6 +711,24 @@ theorem memModel_mmOk (σ : MState) : memModelAt E σ ⊢@{IProp GF} ⌜mmOk σ�
   ipureintro
   exact h
 
+/-- The mirrors move with the task bookkeeping (only the pure conjunct
+`devRtOk` of `mmOk` sees `devrt` at all). -/
+theorem memModel_setRt (σ : MState) (d : DevId) (rt : DevRt)
+    (hnext : 0 < (σ.devrt d).next → 0 < rt.next) :
+    memModelAt E σ ⊢@{IProp GF} memModelAt E (σ.setRt d rt) := by
+  have e : memModelAt E (σ.setRt d rt) = iprop(
+      MonoNat.auth_own E.topName (DFrac.own 1) (.ofNat σ.top) ∗
+      (E.authName ↪●MAP authMap σ.log) ∗
+      ([∗list] cpu ∈ cpus, hartViewsAt E σ cpu) ∗
+      (E.resvName ↪●MAP resvMap σ) ∗
+      ⌜mmOk (σ.setRt d rt)⌝) := rfl
+  rw [e]
+  unfold memModelAt
+  iintro ⟨Htop, Hauth, Hviews, Hresv, %h⟩
+  iframe Htop Hauth Hviews Hresv
+  ipureintro
+  exact mmOk_setRt σ d rt hnext h
+
 theorem memModel_topLb (σ : MState) (K : Nat) :
     memModelAt E σ ∗ topLbAt E K ⊢@{IProp GF} ⌜K ≤ σ.top⌝ := by
   unfold memModelAt topLbAt
@@ -1199,7 +1217,7 @@ theorem swp_sail_mem_read_ifetch (cpu : CPU) {n vasize : Nat}
     iexact Hb
   ihave %hmm : ⌜mmOk σ⌝ $$ [Hmm]
   · iapply memModel_mmOk $$ Hmm
-  have hram : ramBytes req.pa n := ramBytes_of_readBytes hmm.2.2.2 (hrd (ifetchAgent cpu) 0)
+  have hram : ramBytes req.pa n := ramBytes_of_readBytes hmm.2.2.2.1 (hrd (ifetchAgent cpu) 0)
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hmask
   isplit
@@ -1250,7 +1268,7 @@ theorem swp_sail_mem_read_plain_ctx (cpu : CPU) {n vasize : Nat}
     iframe
   ihave %hmm : ⌜mmOk σ⌝ $$ [Hmm]
   · iapply memModel_mmOk $$ Hmm
-  have hram : ramBytes req.pa n := ramBytes_of_readBytes hmm.2.2.2 (hrd _ (Nat.le_refl _))
+  have hram : ramBytes req.pa n := ramBytes_of_readBytes hmm.2.2.2.1 (hrd _ (Nat.le_refl _))
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hmask
   isplit
@@ -1321,7 +1339,7 @@ theorem swp_sail_mem_write_plain (cpu : CPU) {n vasize : Nat}
     ihave %hmm : ⌜mmOk σ⌝ $$ [Hmm]
     · iapply memModel_mmOk $$ Hmm
     ipureintro
-    exact ramBytes_of_readBytes hmm.2.2.2 (hrd _ (Nat.le_refl _))
+    exact ramBytes_of_readBytes hmm.2.2.2.1 (hrd _ (Nat.le_refl _))
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hmask
   isplit

@@ -84,7 +84,7 @@ theorem not_othersReserve_dev {σ : MState} {cpu : CPU} {pa : PAddr} {n : Nat}
   obtain ⟨v, hv⟩ := Option.isSome_iff_exists.1 hsome
   have htop := hmm.2.2.1 c r hr _ v hv
   obtain ⟨H, hH, -⟩ := Option.bind_eq_some_iff.1 htop
-  have hram := hmm.2.2.2 _ H hH
+  have hram := hmm.2.2.2.1 _ H hH
   have hd := hdev j hj
   rw [devAddr_false_of_inRam hram] at hd
   exact absurd hd (by decide)
