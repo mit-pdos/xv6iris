@@ -682,6 +682,97 @@ theorem statusRes_arm3 (st : Nat → HState) (sb : Nat → SByte) (c : Chain) (h
   rw [armSt3_hd st c hwf, updS_self, statusRes_free]
   iexact Hb
 
+/-! ## The arming epoch, as the driver's own moves keep it -/
+
+/-- **The publication arms the head at the position it is about to
+publish.**  The staged head is the one being armed and the chain's epoch
+is the position the `avail->idx` bump will give it, so `Xv6.epPend`'s
+second clause is exactly what the publication installs; the first is
+untouched, because a head the driver holds FREE is at no pending position
+(`Xv6.queueOk`), and the middle and the tail become MEMBERS, which are
+not armed at all.
+
+`Xv6.epDone` survives for the same reason the record cannot be this
+arming's: every record's epoch is below the pop counter (`Xv6.epLt`) and
+the new chain's is the published count, which is at or above it. -/
+theorem epOk_arm3 (v : VirtioState) (st : Nat → HState) (c : Chain) (pm : RegMapF PermVal)
+    (dl : List UsedRec) (ring : Nat → Nat) (lo np : Nat) (i : Nat)
+    (hwf : c.wf) (hst : st c.hd = .inactive) (hstm : st c.md = .inactive)
+    (hstt : st c.tl = .inactive) (hq : queueOk st ring lo np) (hle : lo ≤ np)
+    (hstg : i = c.hd) (hep : c.ep = np)
+    (h : epOk v st pm dl ring lo np (some i)) :
+    epOk v (armSt3 st c) pm dl ring lo np (some i) := by
+  subst hstg
+  obtain ⟨hpend, hlow, hperm, hdone⟩ := h
+  -- an armed slot of the new receipts is either the head, with `c`, or an old one
+  have hcases : ∀ (j : Nat) (cc : Chain), armSt3 st c j = HState.active cc →
+      (j = c.hd ∧ cc = c) ∨ (j ≠ c.hd ∧ st j = HState.active cc) := by
+    intro j cc hj
+    by_cases h1 : j = c.hd
+    · subst h1
+      rw [armSt3_hd st c hwf] at hj
+      exact Or.inl ⟨rfl, (HState.active.injEq _ _ ▸ hj : c = cc).symm⟩
+    · by_cases h2 : j = c.md
+      · subst h2; rw [armSt3_md st c hwf] at hj; exact absurd hj (by simp)
+      · by_cases h3 : j = c.tl
+        · subst h3; rw [armSt3_tl st c] at hj; exact absurd hj (by simp)
+        · rw [armSt3_ne st c j h1 h2 h3] at hj
+          exact Or.inr ⟨h1, hj⟩
+  refine ⟨⟨fun p h1 h2 cc hcc => ?_, fun j hj cc hcc => ?_⟩, hlow, hperm,
+    fun hh cc hsc hs hnw r hr hrh => ?_⟩
+  · rcases hcases _ cc hcc with ⟨he, -⟩ | ⟨-, hold⟩
+    · have hact := (hq.1 p h1 h2).2
+      rw [he, hst] at hact
+      exact absurd hact (by simp [HState.isActive])
+    · exact hpend.1 p h1 h2 cc hold
+  · cases hj
+    rcases hcases _ cc hcc with ⟨-, he⟩ | ⟨hne, -⟩
+    · rw [he]; exact hep
+    · exact absurd rfl hne
+  · rcases hcases _ cc hsc with ⟨he, hcc⟩ | ⟨-, hold⟩
+    · rw [hcc, hep]
+      exact Nat.ne_of_lt (Nat.lt_of_lt_of_le (hlow r hr) hle)
+    · exact hdone hh cc hold hs hnw r hr hrh
+
+/-- **The ring store STAGES a free head**: the cell it writes is at the
+position the bump will publish, which is at no PENDING position, and the
+head it names is free, so neither clause of `Xv6.epPend` sees a change. -/
+theorem epPend_stage (st : Nat → HState) (ring : Nat → Nat) (lo np : Nat) (stg : Option Nat)
+    (x : Nat) (hfree : st x = .inactive) (hroom : np < lo + NUM)
+    (h : epPend st ring lo np stg) : epPend st (updN ring (np % NUM) x) lo np (some x) := by
+  refine ⟨fun p h1 h2 cc hcc => ?_, fun j hj cc hcc => ?_⟩
+  · rw [updN_ne ring (np % NUM) x _ (ring_mod_ne lo np p h1 h2 hroom)] at hcc
+    exact h.1 p h1 h2 cc hcc
+  · cases hj
+    rw [hfree] at hcc
+    exact absurd hcc (by simp)
+
+/-- **The `avail->idx` bump publishes the staged position**: the head it
+publishes is armed with the chain whose epoch is that position, which is
+what `Xv6.epPend`'s first clause asks of the position that joins the
+window. -/
+theorem epPend_publish (st : Nat → HState) (ring : Nat → Nat) (lo np : Nat) (i : Nat)
+    (hring : ring (np % NUM) = i) (h : epPend st ring lo np (some i)) :
+    epPend st ring lo (np + 1) none := by
+  refine ⟨fun p h1 h2 cc hcc => ?_, fun j hj => absurd hj (by simp)⟩
+  by_cases hp : p = np
+  · subst hp
+    rw [hring] at hcc
+    exact h.2 i rfl cc hcc
+  · exact h.1 p h1 (by omega) cc hcc
+
+/-- **The collect frees a head**: a receipt that is no longer armed is
+seen by no clause of the epoch. -/
+theorem epOk_free (v : VirtioState) (st : Nat → HState) (pm : RegMapF PermVal)
+    (dl : List UsedRec) (ring : Nat → Nat) (lo np : Nat) (stg : Option Nat)
+    (st' : Nat → HState)
+    (hsub : ∀ (j : Nat) (cc : Chain), st' j = HState.active cc → st j = HState.active cc)
+    (h : epOk v st pm dl ring lo np stg) : epOk v st' pm dl ring lo np stg :=
+  ⟨⟨fun p h1 h2 cc hcc => h.1.1 p h1 h2 cc (hsub _ cc hcc),
+      fun j hj cc hcc => h.1.2 j hj cc (hsub _ cc hcc)⟩,
+    h.2.1, h.2.2.1,
+    fun hh cc hsc => h.2.2.2 hh cc (hsub _ cc hsc)⟩
+
 /-! ## `struct disk` is kernel data -/
 
 theorem info_b_kmapRw (i : Nat) (hi : i < NUM) :

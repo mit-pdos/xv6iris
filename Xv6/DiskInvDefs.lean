@@ -3052,6 +3052,284 @@ theorem unreadArmed_complete (v : VirtioState) (st : Nat → HState) (dl : List 
     · rw [phase_complete_other v hd hh hhh] at hpp
       exact h.2.1 hh ph hpp hnp e he hlt
 
+/-! ## The ARMING EPOCH
+
+`Xv6.headDone` names a HEAD and a counter, and a head outlives its
+armings: a descriptor that completed, was collected, was re-armed and is
+in flight again still carries the record of the first request.  A collect
+that rested on that record alone would take a chain back from under the
+device -- which is why `Xv6.disk_collect` cannot be proved from
+`headDone` however many read-watermark premises are piled beside it.
+
+The fix is the field `Xv6.Chain.ep`: the queue POSITION the chain was
+published at.  Positions are never reused, so a chain's epoch names ONE
+arming of its head; the receipt `Xv6.HState.active c` carries the chain,
+so the epoch travels with the receipt from `Xv6.disk_publish` to
+`Xv6.disk_collect`; and the serve permit carries the chain too, so the
+device can stamp the epoch into the completion record it appends
+(`Xv6.UsedRec.ep`).
+
+Four clauses tie the three together, and they are stated exactly like
+`Xv6.unwritten`, whose shape they share:
+
+* `Xv6.epPend` -- a PENDING position's head is armed with the chain whose
+  epoch is that position (and the STAGED head, when the driver has
+  written the ring cell but not yet bumped `avail->idx`, with the chain
+  whose epoch is the position the bump will publish).  This is what
+  `disk_publish` establishes and what the POP reads off;
+* `Xv6.epLt` -- every record's epoch is BELOW the pop counter: only a
+  popped position's serve can have written one;
+* `Xv6.epPerm` -- every permit's chain was popped, likewise;
+* `Xv6.epDone` -- an armed head that is IN FLIGHT and has not made its
+  used-index write has NO record at its current epoch.  The pop
+  establishes it (the popped chain's epoch is `lo`, and every record's is
+  below `lo`), every phase install keeps it (the head stays in flight and
+  the log does not grow), and the used-index write -- the one step that
+  appends a record at the head's own epoch -- SETS the bit in the same
+  moment, which makes the clause vacuous at that head until
+  `MachCSL.Virtio.complete` takes the head out of flight.
+
+Contrapositively: a record whose head is armed with a chain of the
+record's own epoch belongs to THAT arming, and the head is either out of
+flight or is the single head sitting between its used-index write and its
+completion (`Xv6.epDone_done`).  That is the fact `disk_collect` needs. -/
+
+/-- **A pending position knows its chain's epoch.** -/
+def epPend (st : Nat → HState) (ring : Nat → Nat) (lo np : Nat) (stg : Option Nat) : Prop :=
+  (∀ p, lo ≤ p → p < np → ∀ c : Chain, st (ring (p % NUM)) = HState.active c → c.ep = p) ∧
+  (∀ i, stg = some i → ∀ c : Chain, st i = HState.active c → c.ep = np)
+
+/-- **Every completion record's epoch has been popped.** -/
+def epLt (dl : List UsedRec) (lo : Nat) : Prop := ∀ r ∈ dl, r.ep < lo
+
+/-- **Every serve permit's chain has been popped.** -/
+def epPerm (pm : RegMapF PermVal) (lo : Nat) : Prop :=
+  ∀ k h c p u, PartialMap.get? pm k = some ((h, c, p, u) : PermVal) → c.ep < lo
+
+/-- **An armed head that is in flight and has not made its used-index
+write has no completion record at its CURRENT epoch.** -/
+def epDone (v : VirtioState) (st : Nat → HState) (pm : RegMapF PermVal)
+    (dl : List UsedRec) : Prop :=
+  ∀ (h : BitVec 16) (c : Chain), st h.toNat = HState.active c →
+    (Virtio.phase v h).isSome = true → ¬ wroteAt pm h →
+    ∀ r ∈ dl, r.hd = h.toNat → r.ep ≠ c.ep
+
+/-- The four clauses, as `Xv6.diskLive` carries them. -/
+def epOk (v : VirtioState) (st : Nat → HState) (pm : RegMapF PermVal) (dl : List UsedRec)
+    (ring : Nat → Nat) (lo np : Nat) (stg : Option Nat) : Prop :=
+  epPend st ring lo np stg ∧ epLt dl lo ∧ epPerm pm lo ∧ epDone v st pm dl
+
+/-- **What the collect cashes**: a record at the head's own epoch says the
+head is out of flight, or is the one head between its used-index write and
+its completion. -/
+theorem epDone_done (v : VirtioState) (st : Nat → HState) (pm : RegMapF PermVal)
+    (dl : List UsedRec) (h : BitVec 16) (c : Chain) (r : UsedRec)
+    (hst : st h.toNat = HState.active c) (hr : r ∈ dl) (hhd : r.hd = h.toNat)
+    (hep : r.ep = c.ep) (hd : epDone v st pm dl) :
+    Virtio.phase v h = none ∨ wroteAt pm h := by
+  by_cases hw : wroteAt pm h
+  · exact Or.inr hw
+  · left
+    cases hph : Virtio.phase v h with
+    | none => rfl
+    | some ph => exact absurd hep (hd h c hst (by rw [hph]; rfl) hw r hr hhd)
+
+/-! ### The clauses, as the moves keep them -/
+
+theorem epLt_mono (dl : List UsedRec) (lo lo' : Nat) (h : epLt dl lo) (hle : lo ≤ lo') :
+    epLt dl lo' := fun r hr => Nat.lt_of_lt_of_le (h r hr) hle
+
+theorem epPerm_mono (pm : RegMapF PermVal) (lo lo' : Nat) (h : epPerm pm lo) (hle : lo ≤ lo') :
+    epPerm pm lo' := fun k hh c p u hg => Nat.lt_of_lt_of_le (h k hh c p u hg) hle
+
+/-- The phases do not move, no permit's bit moves, and the permits keep
+their chains: the clause travels. -/
+theorem epDone_congr (v v' : VirtioState) (st : Nat → HState) (pm pm' : RegMapF PermVal)
+    (dl : List UsedRec) (hph : ∀ h : BitVec 16, Virtio.phase v' h = Virtio.phase v h)
+    (hpm : ∀ h : BitVec 16, wroteAt pm' h ↔ wroteAt pm h) (h : epDone v st pm dl) :
+    epDone v' st pm' dl :=
+  fun hh c hst hs hnw => h hh c hst (by rw [← hph hh]; exact hs) (fun hx => hnw ((hpm hh).2 hx))
+
+/-- Nothing at all is armed: the clauses are vacuous.  This is the live
+flip, where the eight receipts are `.inactive`, the log is empty and the
+pop counter and the published count are both zero. -/
+theorem epOk_nil (v : VirtioState) (st : Nat → HState) (pm : RegMapF PermVal)
+    (ring : Nat → Nat) (hst : ∀ i, st i = HState.inactive)
+    (hpm : ∀ k x, PartialMap.get? pm k = some x → False) :
+    epOk v st pm [] ring 0 0 none := by
+  refine ⟨⟨fun p h1 h2 => absurd h2 (by omega), fun i hi => absurd hi (by simp)⟩,
+    fun r hr => absurd hr (by simp), fun k hh c p u hg => absurd (hpm k _ hg) (by simp),
+    fun hh c hs => ?_⟩
+  rw [hst hh.toNat] at hs
+  exact absurd hs (by simp)
+
+/-- **The handler's deposit and the reads**: the clause does not mention
+the watermark at all, so it travels unchanged. -/
+theorem epOk_congr (v v' : VirtioState) (st : Nat → HState) (pm pm' : RegMapF PermVal)
+    (dl : List UsedRec) (ring : Nat → Nat) (lo np : Nat) (stg : Option Nat)
+    (hph : ∀ h : BitVec 16, Virtio.phase v' h = Virtio.phase v h)
+    (hpm : ∀ h : BitVec 16, wroteAt pm' h ↔ wroteAt pm h)
+    (hch : ∀ k h c p u, PartialMap.get? pm' k = some ((h, c, p, u) : PermVal) →
+      ∃ k' h' p' u', PartialMap.get? pm k' = some ((h', c, p', u') : PermVal))
+    (h : epOk v st pm dl ring lo np stg) : epOk v' st pm' dl ring lo np stg :=
+  ⟨h.1, h.2.1, fun k hh c p u hg =>
+      let ⟨k', h', p', u', hg'⟩ := hch k hh c p u hg
+      h.2.2.1 k' h' c p' u' hg',
+    epDone_congr v v' st pm pm' dl hph hpm h.2.2.2⟩
+
+/-- **The pop.**  The chain at position `lo` has epoch `lo`
+(`Xv6.epPend`), and every record's epoch is below `lo` (`Xv6.epLt`), so
+the head it puts in flight has no record at its own epoch; the pop
+counter moves past `lo`, which is what keeps the two bounds. -/
+theorem epOk_pop (v : VirtioState) (st : Nat → HState) (pm : RegMapF PermVal)
+    (dl : List UsedRec) (ring : Nat → Nat) (lo np : Nat) (stg : Option Nat)
+    (hd : BitVec 16) (sn : BitVec 16) (pn : Nat) (c : Chain)
+    (hlt : lo < np) (hring : ring (lo % NUM) = hd.toNat) (hst : st hd.toNat = HState.active c)
+    (hfresh : PartialMap.get? pm pn = none)
+    (h : epOk v st pm dl ring lo np stg) :
+    epOk { Virtio.setPhase v hd .popped with seen := sn } st
+      (PartialMap.insert pm pn ((hd, c, none, none) : PermVal)) dl ring (lo + 1) np stg := by
+  obtain ⟨hpend, hlow, hperm, hdone⟩ := h
+  have hcep : c.ep = lo := hpend.1 lo (Nat.le_refl lo) hlt c (by rw [hring]; exact hst)
+  have hiff : ∀ hh : BitVec 16,
+      wroteAt (PartialMap.insert pm pn ((hd, c, none, none) : PermVal)) hh ↔ wroteAt pm hh :=
+    fun hh => wroteAt_insert pm pn _ hh
+      (fun x hx => by rw [hfresh] at hx; exact absurd hx (by simp)) (not_isWit_none hd c none)
+  refine ⟨⟨fun p h1 h2 => hpend.1 p (by omega) h2, hpend.2⟩,
+    epLt_mono dl lo (lo + 1) hlow (by omega), ?_, fun hh cc hsc hs hnw r hr hrh => ?_⟩
+  · intro k hh cc p u hg
+    by_cases hk : pn = k
+    · rw [get?_insert_eq hk] at hg
+      cases hg
+      omega
+    · rw [get?_insert_ne hk] at hg
+      exact Nat.lt_succ_of_lt (hperm k hh cc p u hg)
+  · by_cases hhh : hh = hd
+    · subst hhh
+      rw [hsc] at hst
+      cases hst
+      rw [hcep]
+      exact Nat.ne_of_lt (hlow r hr)
+    · have hs' : (Virtio.phase (Virtio.setPhase v hd .popped) hh).isSome = true := hs
+      rw [phase_setPhase_other v hd hh _ hhh] at hs'
+      exact hdone hh cc hsc hs' (fun hx => hnw ((hiff hh).2 hx)) r hr hrh
+
+/-- **A phase install**: the head stays in flight and the log does not
+grow, so the clause is untouched; the permit that replaces the old one
+carries the same chain. -/
+theorem epOk_setPhase (v : VirtioState) (st : Nat → HState) (pm : RegMapF PermVal)
+    (dl : List UsedRec) (ring : Nat → Nat) (lo np : Nat) (stg : Option Nat)
+    (hd : BitVec 16) (ph : VPhase) (k : Nat) (c : Chain) (p1 : Option VPhase)
+    (u1 : Option (BitVec 16 × Bool)) (hx1 : ¬ isWit ((hd, c, p1, u1) : PermVal))
+    (h0 : ∀ x, PartialMap.get? pm k = some x → ¬ isWit x)
+    (hget : ∃ p0 u0, PartialMap.get? pm k = some ((hd, c, p0, u0) : PermVal))
+    (hnw0 : ¬ wroteAt pm hd) (hfly : (Virtio.phase v hd).isSome = true)
+    (h : epOk v st pm dl ring lo np stg) :
+    epOk (Virtio.setPhase v hd ph) st (PartialMap.insert pm k ((hd, c, p1, u1) : PermVal))
+      dl ring lo np stg := by
+  obtain ⟨hpend, hlow, hperm, hdone⟩ := h
+  have hiff : ∀ hh : BitVec 16,
+      wroteAt (PartialMap.insert pm k ((hd, c, p1, u1) : PermVal)) hh ↔ wroteAt pm hh :=
+    fun hh => wroteAt_insert pm k _ hh h0 hx1
+  refine ⟨hpend, hlow, ?_, fun hh cc hsc hs hnw r hr hrh => ?_⟩
+  · intro k' hh cc p u hg
+    by_cases hk : k = k'
+    · rw [get?_insert_eq hk] at hg
+      obtain ⟨p0, u0, hg0⟩ := hget
+      have hcc : cc = c := by
+        have := Option.some.inj hg
+        exact (congrArg (fun x : PermVal => x.2.1) this).symm
+      rw [hcc]
+      exact hperm k hd c p0 u0 hg0
+    · rw [get?_insert_ne hk] at hg
+      exact hperm k' hh cc p u hg
+  · by_cases hhh : hh = hd
+    · subst hhh
+      exact hdone hh cc hsc hfly hnw0 r hr hrh
+    · refine hdone hh cc hsc (by rwa [phase_setPhase_other v hd hh _ hhh] at hs)
+        (fun hx => hnw ((hiff hh).2 hx)) r hr hrh
+
+/-- **The used-index write.**  The record it appends carries the writing
+chain's own epoch, and the chain was popped (`Xv6.epPerm`), which is what
+keeps `Xv6.epLt`; the bit the write SETS makes `Xv6.epDone` vacuous at
+that head from here to its completion. -/
+theorem epOk_write (v : VirtioState) (st : Nat → HState) (pm : RegMapF PermVal)
+    (dl : List UsedRec) (ring : Nat → Nat) (lo np : Nat) (stg : Option Nat)
+    (hd : BitVec 16) (c : Chain) (nc t : Nat) (key : Nat) (x1 : PermVal)
+    (hget : ∃ p0 u0, PartialMap.get? pm key = some ((hd, c, p0, u0) : PermVal))
+    (hx1 : isWit x1) (h1 : x1.1 = hd) (hch : x1.2.1 = c)
+    (h : epOk v st pm dl ring lo np stg) :
+    epOk v st (PartialMap.insert pm key x1) (dl ++ [((nc, t, hd.toNat, c.ep) : UsedRec)])
+      ring lo np stg := by
+  obtain ⟨hpend, hlow, hperm, hdone⟩ := h
+  obtain ⟨p0, u0, hg0⟩ := hget
+  have hcep : c.ep < lo := hperm key hd c p0 u0 hg0
+  refine ⟨hpend, ?_, ?_, fun hh cc hsc hs hnw r hr hrh => ?_⟩
+  · intro r hr
+    rcases List.mem_append.1 hr with hr | hr
+    · exact hlow r hr
+    · have hre : r = ((nc, t, hd.toNat, c.ep) : UsedRec) := by simpa using hr
+      rw [hre]; exact hcep
+  · intro k' hh cc p u hg
+    by_cases hk : key = k'
+    · rw [get?_insert_eq hk] at hg
+      have hcc : cc = c := by
+        have := Option.some.inj hg
+        rw [← hch]
+        exact (congrArg (fun x : PermVal => x.2.1) this).symm
+      rw [hcc]; exact hcep
+    · rw [get?_insert_ne hk] at hg
+      exact hperm k' hh cc p u hg
+  · have hne : hh ≠ hd := by
+      rintro rfl
+      exact hnw ⟨key, x1, by rw [get?_insert_eq (rfl : key = key)], hx1, h1⟩
+    have hiff := wroteAt_insert_other pm key ((hd, c, p0, u0) : PermVal) x1 hh hg0
+      (by rw [h1]) (by rw [h1]; exact hne)
+    rcases List.mem_append.1 hr with hr | hr
+    · exact hdone hh cc hsc hs (fun hx => hnw (hiff.2 hx)) r hr hrh
+    · have hre : r = ((nc, t, hd.toNat, c.ep) : UsedRec) := by simpa using hr
+      rw [hre] at hrh
+      exact absurd (head_toNat_inj hh hd hrh.symm) hne
+
+/-- **The completion**: the head leaves the in-flight map and its permit
+-- the only one whose bit was set -- goes with it. -/
+theorem epOk_complete (v : VirtioState) (st : Nat → HState) (pm : RegMapF PermVal)
+    (dl : List UsedRec) (ring : Nat → Nat) (lo np : Nat) (stg : Option Nat)
+    (hd : BitVec 16) (key : Nat) (x0 : PermVal) (hget : PartialMap.get? pm key = some x0)
+    (h0 : x0.1 = hd) (h : epOk v st pm dl ring lo np stg) :
+    epOk (Virtio.complete v hd) st (PartialMap.delete pm key) dl ring lo np stg := by
+  obtain ⟨hpend, hlow, hperm, hdone⟩ := h
+  refine ⟨hpend, hlow, ?_, fun hh cc hsc hs hnw r hr hrh => ?_⟩
+  · intro k' hh cc p u hg
+    have hk : key ≠ k' := by
+      intro he; rw [get?_delete_eq he] at hg; exact absurd hg (by simp)
+    rw [get?_delete_ne hk] at hg
+    exact hperm k' hh cc p u hg
+  · by_cases hhh : hh = hd
+    · subst hhh
+      rw [phase_complete_self] at hs
+      exact absurd hs (by simp)
+    · rw [phase_complete_other v hd hh hhh] at hs
+      refine hdone hh cc hsc hs (fun hx => hnw ?_) r hr hrh
+      exact (wroteAt_delete_other pm key x0 hh hget (by rw [h0]; exact hhh)).2 hx
+
+/-- **Dropping a permit that is not the witness** (a task that stalls, or
+hands its permit back before its write). -/
+theorem epOk_drop (v : VirtioState) (st : Nat → HState) (pm : RegMapF PermVal)
+    (dl : List UsedRec) (ring : Nat → Nat) (lo np : Nat) (stg : Option Nat)
+    (key : Nat) (x0 : PermVal) (hget : PartialMap.get? pm key = some x0) (hnw : ¬ isWit x0)
+    (h : epOk v st pm dl ring lo np stg) :
+    epOk v st (PartialMap.delete pm key) dl ring lo np stg := by
+  obtain ⟨hpend, hlow, hperm, hdone⟩ := h
+  refine ⟨hpend, hlow, ?_, fun hh cc hsc hs hnw' r hr hrh => ?_⟩
+  · intro k' hh cc p u hg
+    have hk : key ≠ k' := by
+      intro he; rw [get?_delete_eq he] at hg; exact absurd hg (by simp)
+    rw [get?_delete_ne hk] at hg
+    exact hperm k' hh cc p u hg
+  · exact hdone hh cc hsc hs
+      (fun hx => hnw' ((wroteAt_delete_nonwit pm key x0 hh hget hnw).2 hx)) r hr hrh
+
 /-! ## The leases -/
 
 /-- The address of sector `i` of a buffer. -/
@@ -3472,7 +3750,7 @@ def diskLive (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState)
       posOk pmap ring lo np ∧ stageOk stg ring lo np ∧ inflightOff v st ring lo np stg ∧
       imgOk v m (inFlightBlk st) ∧ cachedOk v st ∧ permOk v pm st ∧ usedOk dl dl0 nc M ∧
       unreadArmed v st dl nr ring lo np stg sb ∧ cntOk pm dl nc ∧ p3Ok v pm dl nr ∧
-      ueInv pm dl nr ue⌝
+      ueInv pm dl nr ue ∧ epOk v st pm dl ring lo np stg⌝
 
 /-- The dead arm: before `virtio_disk_init`, and never again after.
 

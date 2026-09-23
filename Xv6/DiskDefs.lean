@@ -224,6 +224,32 @@ def d2 (c : Chain) : BitVec (8 * 16) :=
 def hdr (c : Chain) : BitVec (8 * 16) :=
   c.sector ++ 0#32 ++ (if c.dwr then BitVec.ofNat 32 Virtio.blkTIn else BitVec.ofNat 32 Virtio.blkTOut)
 
+/-! ### The epoch is a GHOST field
+
+Everything the queue holds of a chain -- its three descriptor words, its
+request header, its buffer, its status byte, the block it transfers and
+its well-formedness -- is a function of the other six fields, so a chain
+and the same chain at a different arming epoch format the very same
+bytes.  These are the rewrites that say so; the publisher stamps the
+position in with `{c with ep := np}` and the driver's cells do not
+move. -/
+
+@[simp] theorem withEp_hd (c : Chain) (e : Nat) : ({c with ep := e} : Chain).hd = c.hd := rfl
+@[simp] theorem withEp_md (c : Chain) (e : Nat) : ({c with ep := e} : Chain).md = c.md := rfl
+@[simp] theorem withEp_tl (c : Chain) (e : Nat) : ({c with ep := e} : Chain).tl = c.tl := rfl
+@[simp] theorem withEp_dwr (c : Chain) (e : Nat) : ({c with ep := e} : Chain).dwr = c.dwr := rfl
+@[simp] theorem withEp_sector (c : Chain) (e : Nat) :
+    ({c with ep := e} : Chain).sector = c.sector := rfl
+@[simp] theorem withEp_bp (c : Chain) (e : Nat) : ({c with ep := e} : Chain).bp = c.bp := rfl
+@[simp] theorem withEp_ep (c : Chain) (e : Nat) : ({c with ep := e} : Chain).ep = e := rfl
+@[simp] theorem withEp_data (c : Chain) (e : Nat) : ({c with ep := e} : Chain).data = c.data := rfl
+@[simp] theorem withEp_status (c : Chain) (e : Nat) :
+    ({c with ep := e} : Chain).status = c.status := rfl
+@[simp] theorem withEp_hdrAddr (c : Chain) (e : Nat) :
+    ({c with ep := e} : Chain).hdrAddr = c.hdrAddr := rfl
+@[simp] theorem withEp_blk (c : Chain) (e : Nat) : ({c with ep := e} : Chain).blk = c.blk := rfl
+@[simp] theorem withEp_wf (c : Chain) (e : Nat) : ({c with ep := e} : Chain).wf ↔ c.wf := Iff.rfl
+
 /-- The request record the device's `fetch` builds out of `d0`, `d1`,
 `d2` and `hdr`. -/
 def req (c : Chain) : VioReq :=
@@ -231,6 +257,18 @@ def req (c : Chain) : VioReq :=
     type := if c.dwr then BitVec.ofNat 32 Virtio.blkTIn else BitVec.ofNat 32 Virtio.blkTOut,
     sector := c.sector, buf := c.data, len := BitVec.ofNat 32 BSIZE,
     status := c.status, wr := c.dwr }
+
+end Chain
+
+namespace Chain
+
+/-- The three descriptor words, the header and the request record do not
+see the epoch either. -/
+@[simp] theorem withEp_d0 (c : Chain) (e : Nat) : ({c with ep := e} : Chain).d0 = c.d0 := rfl
+@[simp] theorem withEp_d1 (c : Chain) (e : Nat) : ({c with ep := e} : Chain).d1 = c.d1 := rfl
+@[simp] theorem withEp_d2 (c : Chain) (e : Nat) : ({c with ep := e} : Chain).d2 = c.d2 := rfl
+@[simp] theorem withEp_hdr (c : Chain) (e : Nat) : ({c with ep := e} : Chain).hdr = c.hdr := rfl
+@[simp] theorem withEp_req (c : Chain) (e : Nat) : ({c with ep := e} : Chain).req = c.req := rfl
 
 end Chain
 
