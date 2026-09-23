@@ -97,3 +97,4 @@ import MachCSL.WpSmodeTime
 import MachCSL.WpDmaCtx2
 import MachCSL.WpSmodeFrame12b
 import MachCSL.WpSmodeFenceFloor
+import MachCSL.WpSmodeFenceFloor2
