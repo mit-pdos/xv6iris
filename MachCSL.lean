@@ -84,3 +84,5 @@ import MachCSL.WpSmodeWait
 import MachCSL.WpSmodeProc
 import MachCSL.WpDma
 import MachCSL.WpDevDma
+import MachCSL.WpSmodeDev4
+import MachCSL.WpSmodeAuRules
