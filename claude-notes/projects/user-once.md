@@ -125,8 +125,24 @@ console instance waits for its M3.
   1 min 52 s: the frame's `big_sepL` cost is the same and the statement
   is not; if slower, split the loop turn from the loop as `UkShParse` was
   split.
-- [ ] **A2d** `wp_ref_parsepipe`/`parseline`/`parsecmd`/`nulterminate`;
-  the parser theorem.  READ OFF THE TREE (2026-09-23): the top of the
+- [x] **A2d** `wp_ref_parsepipe`/`parseline`/`parsecmd`/`nulterminate`;
+  the parser theorem -- LANDED (`iris/UkShParser.v`, 4,381 lines; `iris/
+  UkShPipeNode.v` the pipe node predicate split out of `UkShPipeParse` so the
+  general walk can sit below it; `UkShRedirNul`/`UkShRedirCm`/`UkShRedirPc`/
+  `UkShPipeParse` reduced to corollaries; net -2,640).  AS LANDED: the
+  answer is `ushp_atree s0 p t a` (every child POINTER named, the bounds
+  `ushp_tree` drops KEPT; `ushp_otree` its existential, `_close` into
+  `ushp_tree`) -- this is the shape the seams should read at A3; the pipe
+  recursion is the induction hypothesis at cursor `s2` on the same `ustr`
+  (no re-basing; `UkShPipeRight`'s two lemmas unused); nulterminate is by
+  induction on `t` at `ushp_walked` (weaker than `ushp_cat`: the landed REDIR
+  row is at any mode) with the cut `ushp_zero_at (ref_nulcut t)`; rooms
+  `ushp_pp_room`/`ushp_pl_room`/`ushp_room`.  GAP, STOPPED ON: the `_bar`
+  five (`UkShPipeCm`'s parsepipe/parseline/parsecmd/`wp_kshp_parser_pipe`,
+  `UkShPipeRight`) keep their landed proofs because A2c's `wp_ref_parseexec`
+  carries the redirect turn's `+8` stack words UNCONDITIONALLY, so the
+  general recursion on the pipe's right `UshpExec` needs 6 more words than
+  the landed statements offer; that is A2e.  As read off the tree (2026-09-23): the top of the
   parser is walked three times -- `UkShParseCmd` (parsepipe, parseline,
   nulterminate, parsecmd, `wp_kshp_parser`; `UMalloc UMalloc'`),
   `UkShRedirCm` + `UkShRedirPc` + `UkShRedirNul` (`_gt` of each, `UM0..UM2`,
@@ -161,12 +177,39 @@ console instance waits for its M3.
   automatic).  The seams (`UkShRedirSeam`, `UkShPipeSeam`: `ushp_tree` to
   `UkShRun.ush_cmd`, and the child walks living in `UkShRedirSeam`) are
   A3's.  Exit: `wp_kshp_parser` is the symbol-free corollary.
-- [ ] **A3** the consumers: `ushf_child_law_at`'s `Lp` at `ref_parsecmd
-  … = Some t` (SLOT-WS paid); `UkShRedirBody`/`UkShRedirChild`/
-  `UkShPipeRound`'s children at the general theorem; DELETE `UkShRedir
-  {Lex,Tok,Pr,Pc,Ex,Pex,Cm,Cmd,Gtk,Nul,Seam,Paid,Line,Ans}` and `UkShPipe
-  {Lex,Tok,Pr,Ex,Ex2,Pex,Cm,Cmd,Parse,Right,Seam,Paid}`.  Exit: three
-  theorems closed, audits unmoved, ~30k lines gone.
+- [ ] **A2e** the budget guard.  Guard the redirect turn's `8` in
+  `UkShArgs.wp_ref_pex_loop`/`wp_ref_parseexec`/`_tree` as A2b guards
+  parseredirs (`rs' <> [] -> 8 <= nn`, i.e. no extra words at `UshpExec _`);
+  then `ushp_pp_room (UshpExec _) = 46` and `ushp_room t = 52 + 8 *
+  ushp_ht t` reproduce the landed budgets 60/68/68 exactly, and the `_bar`
+  five plus `UkShParseCmd.wp_kshp_parser` become one-line corollaries;
+  DELETE `UkShPipeRight.v` (only `UkShPipeCm` imports it).  A statement of
+  THIS campaign changes, no landed one.
+- [ ] **A3** the consumers.  READ OFF THE TREE (2026-09-23, importer map):
+  after A2a-d the parser-tier twins are corollary shells whose only
+  importers are each other and three CONSUMER files -- `UkShRedirSeam`
+  (imports `UkShRedirPc`, `UkShRedirCmd`, `UkShRedir`; holds the
+  `ushp_tree`-to-`ush_cmd` conversion `ush_cmd_of_ushs_redir` AND the child
+  walks `wp_kshm_child_redir*`/`wp_kshm_child_alloc_redir*`; imported by
+  `UShPipeChild`, `UkShCat`, `UkShPipeRound`, `UkShRedirChild`),
+  `UkShPipeSeam` (imports `UkShPipeParse`; `ush_cmd_of_ushp_pipe`; imported
+  by `UShPipeLaw`, `UShPipeChild`, `UkShPipeRound`) and `UkShPipeCm`
+  (imported by `UShPipeChild`, `UkShPipeRound`).  Outside the tier the
+  landed names are consumed through `UkShRedirChild`/`UkShRedirBody`
+  (`UShRound`, `UInitFile*`, `FileReadInst`, `UShRedirPay`) and
+  `UkShPipeRound` (`UShPipeChild`, `UShPipeLaw`).  So A3 is: (i) ONE seam
+  `ush_cmd_of_ushp_tree` (`UkShMain`'s conversion stated for the whole
+  `ushp_cmd` at `ref_nulcut`, the two seams its instances); (ii) the child
+  walks at the general parser theorem (`wp_kshm_child_redir*` at
+  `ref_parsecmd … = Some (UshpRedir …)`, `UkShPipeRound.wp_kshm_child_pipe`
+  at `… = Some (UshpPipe …)`), with `ushf_child_law_at`'s `Lp` the
+  reference equation (SLOT-WS paid); (iii) then DELETE the shells --
+  `UkShRedir{Lex,Gtk,Pr,Ex,Pex,Nul,Cm,Pc}`, `UkShPipe{Tok,Pr,Ex,Ex2,Pex,
+  Right,Cm,Cmd,Parse}` -- and re-home what survives in them (`UkShRedirCmd`'s
+  `ushp_redir_node`/`ushp_redir_close`, `UkShPipeParse`'s pipe node predicate
+  and close, `UkShPipeLex`'s pure model and `ushq_line_is`, `UkShRedirLine`'s
+  `ushs_line_is`: these are consumed outside the tier and stay, in files
+  named for what they are).  Exit: three theorems closed, audits unmoved.
 
 ## C. The program-generic exec (alongside A2)
 
@@ -201,4 +244,4 @@ RULED by the owner: A starts now.  Branch `user-once/A` off `main` at
 monotonicity, the symbol-free bridge both ways, the redirect and pipe
 bridges, the three line-shape facts on `ush_line_is`/`ushs_line_is`/
 `ushq_line_is`) is stated and elaborates; its proofs are with a subagent.
-A1 and A2a-c are on `main`.  NEXT: A2d as read off above (branch `user-once/A2d`).
+A1 and A2a-d are on `main`.  NEXT: A2e (branch `user-once/A2e`), then A3.

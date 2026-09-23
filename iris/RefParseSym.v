@@ -887,3 +887,369 @@ Proof using.
                ltac:(cbn [length]; lia) ltac:(cbn [length] in *; lia) ltac:(lia)).
     reflexivity.
 Qed.
+
+
+(* ===================================================================== *)
+(* §6 THE TOP OF THE PARSER: parsepipe, parseline, parsecmd, nulterminate  *)
+(* (design/user-once.md SS2, worklist A2d).  What the general walk        *)
+(* UkShParser reads off the reference, and what the redirect tier's       *)
+(* corollaries (UkShRedirCm / UkShRedirPc, below RefParseBridge) need:    *)
+(* the end-of-line tail facts moved down from RefParseBridge SS0-SS3, the  *)
+(* two peeks parseline makes under the scope, and the BOUNDS of the tree   *)
+(* the reference answers, which nulterminate's byte stores index by.       *)
+(* ===================================================================== *)
+
+(* ---- the & loop at the end of the line (from RefParseBridge SS0) -------- *)
+
+Lemma ref_backs_len (len : nat) (f : nat -> bv 8) (n : nat) (t : ushp_cmd) :
+  0 < n -> ref_backs len f n len t = Some (t, len).
+Proof using.
+  intro Hn. destruct n as [| n ]; [ lia | ]. cbn [ref_backs].
+  rewrite (ref_peek_end _ _ _ _ (ref_skip_at_len len f) ref_symtoks_amp). reflexivity.
+Qed.
+
+(* every token is at least one byte, so a token list fits before its stop
+   (from RefParseBridge SS2) *)
+Lemma ushs_toks_len_le (len : nat) (f : nat -> bv 8) (stop off : nat) (toks : list (nat * nat)) :
+  ushs_toks len f stop off toks -> off + length toks <= stop.
+Proof using.
+  induction 1 as [ off Hnil | off toks k n Hn Htoks IH ]; cbn [length]; lia.
+Qed.
+
+(* the three outer functions on a command that ends at the end of the line:
+   no '|', no '&', no ';' is found there (from RefParseBridge SS2) *)
+Lemma ref_parsepipe_end (len : nat) (f : nat -> bv 8) (n i : nat) (t : ushp_cmd) :
+  ref_parseexec len f n i = Some (t, len) -> ref_parsepipe len f (S n) i = Some (t, len).
+Proof using.
+  intro H. cbn [ref_parsepipe]. rewrite H.
+  rewrite (ref_peek_end _ _ _ _ (ref_skip_at_len len f) ref_symtoks_bar). reflexivity.
+Qed.
+
+Lemma ref_parseline_end (len : nat) (f : nat -> bv 8) (n i : nat) (t : ushp_cmd) :
+  0 < n -> ref_parsepipe len f n i = Some (t, len) -> ref_parseline len f (S n) i = Some (t, len).
+Proof using.
+  intros Hn H. cbn [ref_parseline]. rewrite H, (ref_backs_len _ _ _ _ Hn).
+  rewrite (ref_peek_end _ _ _ _ (ref_skip_at_len len f) ref_symtoks_semi). reflexivity.
+Qed.
+
+Lemma ref_parsecmd_of_line (len : nat) (f : nat -> bv 8) (t : ushp_cmd) :
+  ref_parseline len f (ref_fuel len) 0 = Some (t, len) -> ref_parsecmd len f = Some t.
+Proof using.
+  intro H. unfold ref_parsecmd. rewrite H.
+  rewrite (ref_peek_end _ _ _ _ (ref_skip_at_len len f) ref_symtoks_nil).
+  rewrite (bool_decide_eq_true_2 _ eq_refl). reflexivity.
+Qed.
+
+Lemma ref_fuel_SS (len : nat) : ref_fuel len = S (S (4 * len + 6)).
+Proof using. unfold ref_fuel. lia. Qed.
+
+(* the redirect line, parsed to the top (from RefParseBridge SS3) *)
+Theorem ref_parsecmd_redir (len : nat) (f : nat -> bv 8) (p e : nat)
+    (toks : list (nat * nat)) :
+  ref_nonnul len f ->
+  ushs_redir len f p e ->
+  ushs_toks len f p 0 toks -> length toks < 10 ->
+  ref_parsecmd len f = Some (UshpRedir (UshpExec toks) (S (S p)) e rr_mode_gt 1).
+Proof using.
+  intros Hnn Hr Htoks Hlen. apply ref_parsecmd_of_line. rewrite ref_fuel_SS.
+  apply ref_parseline_end; [ lia | ]. apply ref_parsepipe_end.
+  pose proof (ushs_toks_len_le _ _ _ _ _ Htoks). pose proof (ushs_redir_lt _ _ _ _ Hr).
+  apply ref_parseexec_redir; [ exact Hnn | exact Hr | lia | exact Htoks | exact Hlen | lia ].
+Qed.
+
+(* ---- the two symbol bytes parseline peeks for are OUT OF THE SCOPE ------ *)
+
+Lemma ushp_is_sym_amp : ushp_is_sym rb_amp = true.
+Proof using. vm_compute. reflexivity. Qed.
+Lemma ushp_is_sym_semi : ushp_is_sym rb_semi = true.
+Proof using. vm_compute. reflexivity. Qed.
+Lemma rb_amp_ne_bar : rb_amp <> rb_bar.
+Proof using. vm_compute. discriminate. Qed.
+Lemma rb_amp_ne_gt : rb_amp <> rb_gt.
+Proof using. vm_compute. discriminate. Qed.
+Lemma rb_semi_ne_bar : rb_semi <> rb_bar.
+Proof using. vm_compute. discriminate. Qed.
+Lemma rb_semi_ne_gt : rb_semi <> rb_gt.
+Proof using. vm_compute. discriminate. Qed.
+
+(* a peek table of symbol bytes none of which the scope admits *)
+Definition ref_out_scope (toks : list (bv 8)) : Prop :=
+  Forall (fun b => ushp_is_sym b = true /\ b <> rb_bar /\ b <> rb_gt) toks.
+
+Lemma ref_out_scope_amp : ref_out_scope [rb_amp].
+Proof using.
+  apply Forall_singleton. exact (conj ushp_is_sym_amp (conj rb_amp_ne_bar rb_amp_ne_gt)).
+Qed.
+Lemma ref_out_scope_semi : ref_out_scope [rb_semi].
+Proof using.
+  apply Forall_singleton. exact (conj ushp_is_sym_semi (conj rb_semi_ne_bar rb_semi_ne_gt)).
+Qed.
+Lemma ref_out_scope_nil : ref_out_scope [].
+Proof using. constructor. Qed.
+
+(* ...so under the scope such a peek MISSES, and the cursor is the skip *)
+Lemma ref_peek_scope_miss (len : nat) (f : nat -> bv 8) (i : nat) (toks : list (bv 8)) :
+  ref_sym_scope len f -> ref_out_scope toks ->
+  ref_peek len f i toks = (false, ref_skip len f i).
+Proof using.
+  intros Hsc Hout. apply ref_peek_miss. intro Hin.
+  set (s := ref_skip len f i) in *.
+  destruct (elem_of_list_lookup_1 _ _ Hin) as [ k Hk ].
+  destruct (Forall_lookup_1 _ _ _ _ Hout Hk) as (Hsym & Hnb & Hng).
+  destruct (lt_dec s len) as [ Hlt | Hge ].
+  - rewrite (ref_at_lt len f s Hlt) in Hsym, Hnb, Hng.
+    destruct (Hsc s Hlt Hsym) as [ E | (E & _) ]; [ exact (Hnb E) | exact (Hng E) ].
+  - rewrite (ref_at_ge len f s ltac:(lia)) in Hsym.
+    rewrite ushp_is_sym_nul in Hsym. discriminate Hsym.
+Qed.
+
+(* the backgrounding loop never turns under the scope *)
+Lemma ref_backs_scope (len : nat) (f : nat -> bv 8) (n i : nat) (t : ushp_cmd) :
+  ref_sym_scope len f -> 0 < n ->
+  ref_backs len f n i t = Some (t, ref_skip len f i).
+Proof using.
+  intros Hsc Hn. destruct n as [| n ]; [ lia | ]. cbn [ref_backs].
+  rewrite (ref_peek_scope_miss len f i [rb_amp] Hsc ref_out_scope_amp). reflexivity.
+Qed.
+
+(* ---- THE BOUNDS: every index the reference records is inside the line -- *)
+
+(* a token's two indices, a redirect's two *)
+Definition ref_tok_le (len : nat) (tk : nat * nat) : Prop :=
+  fst tk <= len /\ snd tk <= len.
+Definition ref_rr_le (len : nat) (r : rredir) : Prop :=
+  rr_q r <= len /\ rr_eq r <= len.
+
+(* ...and over the whole tree, with MAXARGS at every exec node: exactly
+   what nulterminate's stores need before they may index the line (a
+   redirect's file-name START is not stored, so it is not bounded here) *)
+Fixpoint ushp_bounded (len : nat) (t : ushp_cmd) : Prop :=
+  match t with
+  | UshpExec toks => length toks < 10 /\ Forall (ref_tok_le len) toks
+  | UshpRedir c _ e _ _ => ushp_bounded len c /\ e <= len
+  | UshpPipe l r => ushp_bounded len l /\ ushp_bounded len r
+  | UshpList l r => ushp_bounded len l /\ ushp_bounded len r
+  | UshpBack c => ushp_bounded len c
+  end.
+
+(* gettoken's two out-indices and its cursor are inside the line *)
+Lemma ref_gettoken_bounds (len : nat) (f : nat -> bv 8) (i : nat) (ret : Z) (q e fin : nat) :
+  i <= len -> ref_gettoken len f i = (ret, q, e, fin) -> q <= len /\ e <= len /\ fin <= len.
+Proof using.
+  intros Hi H. pose proof (ref_gettoken_fin_le len f i ret q e fin Hi H) as Hfin.
+  unfold ref_gettoken in H.
+  set (s := ref_skip len f i) in H.
+  assert (Hs : s <= len) by exact (ref_skip_le len f i Hi).
+  destruct (bool_decide (ref_at len f s = ubyte0)) eqn:E0.
+  { injection H as _ <- <- _. exact (conj Hs (conj Hs Hfin)). }
+  apply bool_decide_eq_false_1 in E0.
+  assert (Hlt : s < len).
+  { destruct (lt_dec s len) as [ | Hge ]; [ assumption | ].
+    exfalso. apply E0. exact (ref_at_ge len f s ltac:(lia)). }
+  destruct (bool_decide (ref_at len f s = rb_gt)) eqn:E1.
+  - destruct (bool_decide (ref_at len f (S s) = rb_gt)) eqn:E2.
+    + injection H as _ <- <- _.
+      apply bool_decide_eq_true_1 in E2.
+      assert (HSs : S s < len).
+      { destruct (lt_dec (S s) len) as [ | Hge ]; [ assumption | ].
+        exfalso. rewrite (ref_at_ge len f (S s) ltac:(lia)) in E2.
+        exact (rb_gt_ne_nul (eq_sym E2)). }
+      split; [ lia | split; [ lia | exact Hfin ] ].
+    + injection H as _ <- <- _. split; [ lia | split; [ lia | exact Hfin ] ].
+  - destruct (ushp_is_sym (ref_at len f s)).
+    + injection H as _ <- <- _. split; [ lia | split; [ lia | exact Hfin ] ].
+    + injection H as _ <- <- _. unfold ref_tokend.
+      pose proof (ushp_toklen_le (len - s) s f).
+      split; [ lia | split; [ lia | exact Hfin ] ].
+Qed.
+
+Lemma ref_redirs_bounds (len : nat) (f : nat -> bv 8) (n : nat) :
+  forall (i : nat) (acc rs : list rredir) (fin : nat),
+    i <= len -> Forall (ref_rr_le len) acc ->
+    ref_redirs len f n i acc = Some (rs, fin) ->
+    Forall (ref_rr_le len) rs /\ fin <= len.
+Proof using.
+  induction n as [| n IH ]; intros i acc rs fin Hi Hacc H; [ discriminate H | ].
+  cbn [ref_redirs] in H.
+  destruct (ref_peek len f i [rb_lt; rb_gt]) as [ hit s ] eqn:Epk.
+  destruct hit.
+  - destruct (ref_peek_hit_inv _ _ _ _ _ Epk) as (Es & _ & _).
+    assert (Hs : s <= len) by (rewrite Es; exact (ref_skip_le len f i Hi)).
+    destruct (ref_gettoken len f s) as [[[ tok q0 ] e0 ] s1 ] eqn:E1.
+    destruct (ref_gettoken len f s1) as [[[ t2 q ] e ] s2 ] eqn:E2.
+    destruct (bool_decide (t2 = rt_word)); [ | discriminate H ].
+    assert (Hs1 : s1 <= len) by exact (ref_gettoken_fin_le len f s _ _ _ _ Hs E1).
+    destruct (ref_gettoken_bounds len f s1 _ _ _ _ Hs1 E2) as (Hq & He & Hs2).
+    destruct (rredir_of tok q e) as [ r | ] eqn:Er; [ | discriminate H ].
+    apply (IH s2 (acc ++ [r]) rs fin Hs2); [ | exact H ].
+    apply Forall_app_2; [ exact Hacc | ].
+    apply Forall_singleton.
+    unfold rredir_of in Er.
+    destruct (bool_decide (tok = bv_unsigned rb_lt));
+      [ injection Er as <-; exact (conj Hq He) | ].
+    destruct (bool_decide (tok = bv_unsigned rb_gt));
+      [ injection Er as <-; exact (conj Hq He) | ].
+    destruct (bool_decide (tok = rt_app));
+      [ injection Er as <-; exact (conj Hq He) | discriminate Er ].
+  - injection H as <- <-. split; [ exact Hacc | ].
+    rewrite (ref_peek_miss_inv _ _ _ _ _ Epk). exact (ref_skip_le len f i Hi).
+Qed.
+
+Lemma ref_args_bounds (len : nat) (f : nat -> bv 8) (n : nat) :
+  forall (i : nat) (toks0 toks : list (nat * nat)) (rs0 rs : list rredir) (fin : nat),
+    i <= len -> length toks0 < 10 ->
+    Forall (ref_tok_le len) toks0 -> Forall (ref_rr_le len) rs0 ->
+    ref_args len f n i toks0 rs0 = Some (toks, rs, fin) ->
+    length toks < 10 /\ Forall (ref_tok_le len) toks /\ Forall (ref_rr_le len) rs /\ fin <= len.
+Proof using.
+  induction n as [| n IH ]; intros i toks0 toks rs0 rs fin Hi Hlen Htoks Hrs H;
+    [ discriminate H | ].
+  destruct (ref_args_inv len f n i toks0 toks rs0 rs fin Hi H)
+    as [ (Epk & -> & ->)
+       | [ (s & q & e & Epk & Hs & Eg & -> & ->)
+         | (s & q & e & s1 & s2 & rs1 & Epk & Hs & Eg & Hs1 & Hl9 & Er & Hs2 & Hrec) ] ].
+  - destruct (ref_peek_hit_inv _ _ _ _ _ Epk) as (-> & _ & _).
+    split_and!; [ exact Hlen | exact Htoks | exact Hrs | exact (ref_skip_le len f i Hi) ].
+  - split_and!; [ exact Hlen | exact Htoks | exact Hrs
+                | exact (ref_gettoken_fin_le len f s _ _ _ _ Hs Eg) ].
+  - destruct (ref_gettoken_bounds len f s _ _ _ _ Hs Eg) as (Hq & He & _).
+    destruct (ref_redirs_bounds len f n s1 [] rs1 s2 Hs1 (List.Forall_nil _) Er) as (Hrs1 & _).
+    apply (IH s2 (toks0 ++ [(q, e)]) toks (rs0 ++ rs1) rs fin Hs2).
+    + rewrite length_app. cbn [length]. lia.
+    + apply Forall_app_2; [ exact Htoks | apply Forall_singleton; exact (conj Hq He) ].
+    + apply Forall_app_2; [ exact Hrs | exact Hrs1 ].
+    + exact Hrec.
+Qed.
+
+Lemma ref_wrap_cons (c : ushp_cmd) (r : rredir) (rs : list rredir) :
+  ref_wrap c (r :: rs) = ref_wrap (UshpRedir c (rr_q r) (rr_eq r) (rr_mode r) (rr_fd r)) rs.
+Proof using. reflexivity. Qed.
+
+Lemma ushp_bounded_wrap (len : nat) (c : ushp_cmd) (rs : list rredir) :
+  ushp_bounded len c -> Forall (ref_rr_le len) rs -> ushp_bounded len (ref_wrap c rs).
+Proof using.
+  revert c. induction rs as [| r rs IH ]; intros c Hc Hrs; [ exact Hc | ].
+  rewrite ref_wrap_cons.
+  apply Forall_cons_1 in Hrs as [ Hr Hrs ].
+  apply IH; [ | exact Hrs ]. destruct Hr as [ _ He ].
+  exact (conj Hc He).
+Qed.
+
+Lemma ref_parseexec_bounded (len : nat) (f : nat -> bv 8) (n i : nat) (t : ushp_cmd) (fin : nat) :
+  i <= len -> ref_parseexec len f n i = Some (t, fin) -> ushp_bounded len t /\ fin <= len.
+Proof using.
+  intros Hi H. unfold ref_parseexec in H.
+  destruct (ref_peek len f i [rb_lpar]) as [ blk s ] eqn:Epk. destruct blk; [ discriminate H | ].
+  assert (Hs : s <= len)
+    by (rewrite (ref_peek_miss_inv _ _ _ _ _ Epk); exact (ref_skip_le len f i Hi)).
+  destruct (ref_redirs len f n s []) as [[ rs1 s1 ] | ] eqn:Er; [ | discriminate H ].
+  destruct (ref_redirs_bounds len f n s [] rs1 s1 Hs (List.Forall_nil _) Er) as (Hrs1 & Hs1).
+  destruct (ref_args len f n s1 [] rs1) as [[[ toks rs ] s2 ] | ] eqn:Ea; [ | discriminate H ].
+  injection H as <- <-.
+  destruct (ref_args_bounds len f n s1 [] toks rs1 rs s2 Hs1 ltac:(cbn [length]; lia)
+              (List.Forall_nil _) Hrs1 Ea) as (Hl & Htoks & Hrs & Hs2).
+  split; [ | exact Hs2 ].
+  apply ushp_bounded_wrap; [ exact (conj Hl Htoks) | exact Hrs ].
+Qed.
+
+Lemma ref_parsepipe_bounded (len : nat) (f : nat -> bv 8) (n : nat) :
+  forall (i : nat) (t : ushp_cmd) (fin : nat),
+    i <= len -> ref_parsepipe len f n i = Some (t, fin) -> ushp_bounded len t /\ fin <= len.
+Proof using.
+  induction n as [| n IH ]; intros i t fin Hi H; [ discriminate H | ].
+  cbn [ref_parsepipe] in H.
+  destruct (ref_parseexec len f n i) as [[ t1 s ] | ] eqn:Ex; [ | discriminate H ].
+  destruct (ref_parseexec_bounded len f n i t1 s Hi Ex) as (Ht1 & Hs).
+  destruct (ref_peek len f s [rb_bar]) as [ bar s1 ] eqn:Epk.
+  destruct bar.
+  - destruct (ref_peek_hit_inv _ _ _ _ _ Epk) as (Es1 & _ & _).
+    assert (Hs1 : s1 <= len) by (rewrite Es1; exact (ref_skip_le len f s Hs)).
+    destruct (ref_gettoken len f s1) as [[[ tok q ] e ] s2 ] eqn:Eg.
+    assert (Hs2 : s2 <= len) by exact (ref_gettoken_fin_le len f s1 _ _ _ _ Hs1 Eg).
+    destruct (ref_parsepipe len f n s2) as [[ r s3 ] | ] eqn:Er; [ | discriminate H ].
+    injection H as <- <-.
+    destruct (IH s2 r s3 Hs2 Er) as (Hr & Hs3).
+    split; [ exact (conj Ht1 Hr) | exact Hs3 ].
+  - injection H as <- <-. split; [ exact Ht1 | ].
+    rewrite (ref_peek_miss_inv _ _ _ _ _ Epk). exact (ref_skip_le len f s Hs).
+Qed.
+
+Lemma ref_backs_bounded (len : nat) (f : nat -> bv 8) (n : nat) :
+  forall (i : nat) (t t' : ushp_cmd) (fin : nat),
+    i <= len -> ushp_bounded len t -> ref_backs len f n i t = Some (t', fin) ->
+    ushp_bounded len t' /\ fin <= len.
+Proof using.
+  induction n as [| n IH ]; intros i t t' fin Hi Ht H; [ discriminate H | ].
+  cbn [ref_backs] in H.
+  destruct (ref_peek len f i [rb_amp]) as [ amp s ] eqn:Epk.
+  destruct amp.
+  - destruct (ref_peek_hit_inv _ _ _ _ _ Epk) as (Es & _ & _).
+    assert (Hs : s <= len) by (rewrite Es; exact (ref_skip_le len f i Hi)).
+    destruct (ref_gettoken len f s) as [[[ tok q ] e ] s1 ] eqn:Eg.
+    exact (IH s1 (UshpBack t) t' fin (ref_gettoken_fin_le len f s _ _ _ _ Hs Eg) Ht H).
+  - injection H as <- <-. split; [ exact Ht | ].
+    rewrite (ref_peek_miss_inv _ _ _ _ _ Epk). exact (ref_skip_le len f i Hi).
+Qed.
+
+Lemma ref_parseline_bounded (len : nat) (f : nat -> bv 8) (n : nat) :
+  forall (i : nat) (t : ushp_cmd) (fin : nat),
+    i <= len -> ref_parseline len f n i = Some (t, fin) -> ushp_bounded len t /\ fin <= len.
+Proof using.
+  induction n as [| n IH ]; intros i t fin Hi H; [ discriminate H | ].
+  cbn [ref_parseline] in H.
+  destruct (ref_parsepipe len f n i) as [[ t1 s ] | ] eqn:Ep; [ | discriminate H ].
+  destruct (ref_parsepipe_bounded len f n i t1 s Hi Ep) as (Ht1 & Hs).
+  destruct (ref_backs len f n s t1) as [[ t2 s1 ] | ] eqn:Eb; [ | discriminate H ].
+  destruct (ref_backs_bounded len f n s t1 t2 s1 Hs Ht1 Eb) as (Ht2 & Hs1).
+  destruct (ref_peek len f s1 [rb_semi]) as [ semi s2 ] eqn:Epk.
+  destruct semi.
+  - destruct (ref_peek_hit_inv _ _ _ _ _ Epk) as (Es2 & _ & _).
+    assert (Hs2 : s2 <= len) by (rewrite Es2; exact (ref_skip_le len f s1 Hs1)).
+    destruct (ref_gettoken len f s2) as [[[ tok q ] e ] s3 ] eqn:Eg.
+    assert (Hs3 : s3 <= len) by exact (ref_gettoken_fin_le len f s2 _ _ _ _ Hs2 Eg).
+    destruct (ref_parseline len f n s3) as [[ r s4 ] | ] eqn:Er; [ | discriminate H ].
+    injection H as <- <-.
+    destruct (IH s3 r s4 Hs3 Er) as (Hr & Hs4).
+    split; [ exact (conj Ht2 Hr) | exact Hs4 ].
+  - injection H as <- <-. split; [ exact Ht2 | ].
+    rewrite (ref_peek_miss_inv _ _ _ _ _ Epk). exact (ref_skip_le len f s1 Hs1).
+Qed.
+
+Theorem ref_parsecmd_bounded (len : nat) (f : nat -> bv 8) (t : ushp_cmd) :
+  ref_parsecmd len f = Some t -> ushp_bounded len t.
+Proof using.
+  intro H. unfold ref_parsecmd in H.
+  destruct (ref_parseline len f (ref_fuel len) 0) as [[ t1 s ] | ] eqn:Ep; [ | discriminate H ].
+  destruct (ref_parseline_bounded len f (ref_fuel len) 0 t1 s ltac:(lia) Ep) as (Ht1 & _).
+  destruct (ref_peek len f s []) as [ b s1 ].
+  destruct (bool_decide (s1 = len)); [ | discriminate H ].
+  injection H as <-. exact Ht1.
+Qed.
+
+(* ---- THE WALKED CONSTRUCTORS: nulterminate's three rows ---------------- *)
+
+(* EXEC, REDIR at any mode, PIPE: the rows nulterminate's jump table is
+   walked at.  Weaker than [ushp_cat] -- the REDIR row does not read the
+   mode word -- so the landed redirect row at an arbitrary mode is an
+   instance. *)
+Fixpoint ushp_walked (t : ushp_cmd) : Prop :=
+  match t with
+  | UshpExec _ => True
+  | UshpRedir c _ _ _ _ => ushp_walked c
+  | UshpPipe l r => ushp_walked l /\ ushp_walked r
+  | UshpList _ _ => False
+  | UshpBack _ => False
+  end.
+
+Lemma ushp_cat_walked (t : ushp_cmd) : ushp_cat t -> ushp_walked t.
+Proof using. induction t; cbn [ushp_cat ushp_walked]; tauto. Qed.
+
+(* the cut indices of a wrapped exec node, and the node count of the
+   three shapes, for the corollaries *)
+Lemma ref_nulcut_wrap (c : ushp_cmd) (rs : list rredir) :
+  ref_nulcut (ref_wrap c rs) = ref_nulcut c ++ map rr_eq rs.
+Proof using.
+  revert c. induction rs as [| r rs IH ]; intro c; cbn [map].
+  - cbn [ref_wrap fold_left]. rewrite app_nil_r. reflexivity.
+  - rewrite ref_wrap_cons, IH. cbn [ref_nulcut]. rewrite <- app_assoc. reflexivity.
+Qed.

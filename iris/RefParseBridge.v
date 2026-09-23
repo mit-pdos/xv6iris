@@ -52,15 +52,11 @@ Proof using. reflexivity. Qed.
 
 (* ---- the argument loop: [ref_args_nul] / [ref_args_step] moved down to
    RefParseSym SS5 (the general parseexec walk, UkShArgs, sits below this
-   file) ---- *)
-(* ---- the & loop at the end of the line ---------------------------------- *)
-
-Lemma ref_backs_len (len : nat) (f : nat -> bv 8) (n : nat) (t : ushp_cmd) :
-  0 < n -> ref_backs len f n len t = Some (t, len).
-Proof using.
-  intro Hn. destruct n as [| n ]; [ lia | ]. cbn [ref_backs].
-  rewrite (ref_peek_end _ _ _ _ (ref_skip_at_len len f) ref_symtoks_amp). reflexivity.
-Qed.
+   file); the top of the parser: [ref_backs_len], [ref_parsepipe_end],
+   [ref_parseline_end], [ref_parsecmd_of_line], [ref_fuel_SS],
+   [ushs_toks_len_le] and [ref_parsecmd_redir] moved down to RefParseSym
+   SS6 (the general parsepipe/parseline/parsecmd walk, UkShParser, and the
+   redirect tier's corollaries sit below this file) ---- *)
 
 (* ===================================================================== *)
 (* §1 FUEL: more is never different                                       *)
@@ -166,12 +162,6 @@ Proof using.
   induction 1 as [ off Hnil | off toks k n Hn Htoks IH ]; cbn [length]; lia.
 Qed.
 
-Lemma ushs_toks_len_le (len : nat) (f : nat -> bv 8) (stop off : nat) (toks : list (nat * nat)) :
-  ushs_toks len f stop off toks -> off + length toks <= stop.
-Proof using.
-  induction 1 as [ off Hnil | off toks k n Hn Htoks IH ]; cbn [length]; lia.
-Qed.
-
 (* the token model read back from the skipped cursor -- the converse of
    [ushp_tokens_skip] *)
 Lemma ushp_tokens_unskip (len : nat) (f : nat -> bv 8) (off : nat) (toks : list (nat * nat)) :
@@ -266,33 +256,6 @@ Proof using.
              (ushp_tokens_skip len f i toks Hi Htoks) ltac:(cbn [length]; lia) Hn).
   reflexivity.
 Qed.
-
-(* the three outer functions on a command that ends at the end of the line:
-   no '|', no '&', no ';' is found there *)
-Lemma ref_parsepipe_end (len : nat) (f : nat -> bv 8) (n i : nat) (t : ushp_cmd) :
-  ref_parseexec len f n i = Some (t, len) -> ref_parsepipe len f (S n) i = Some (t, len).
-Proof using.
-  intro H. cbn [ref_parsepipe]. rewrite H.
-  rewrite (ref_peek_end _ _ _ _ (ref_skip_at_len len f) ref_symtoks_bar). reflexivity.
-Qed.
-
-Lemma ref_parseline_end (len : nat) (f : nat -> bv 8) (n i : nat) (t : ushp_cmd) :
-  0 < n -> ref_parsepipe len f n i = Some (t, len) -> ref_parseline len f (S n) i = Some (t, len).
-Proof using.
-  intros Hn H. cbn [ref_parseline]. rewrite H, (ref_backs_len _ _ _ _ Hn).
-  rewrite (ref_peek_end _ _ _ _ (ref_skip_at_len len f) ref_symtoks_semi). reflexivity.
-Qed.
-
-Lemma ref_parsecmd_of_line (len : nat) (f : nat -> bv 8) (t : ushp_cmd) :
-  ref_parseline len f (ref_fuel len) 0 = Some (t, len) -> ref_parsecmd len f = Some t.
-Proof using.
-  intro H. unfold ref_parsecmd. rewrite H.
-  rewrite (ref_peek_end _ _ _ _ (ref_skip_at_len len f) ref_symtoks_nil).
-  rewrite (bool_decide_eq_true_2 _ eq_refl). reflexivity.
-Qed.
-
-Lemma ref_fuel_SS (len : nat) : ref_fuel len = S (S (4 * len + 6)).
-Proof using. unfold ref_fuel. lia. Qed.
 
 Theorem ref_parsecmd_nosym (len : nat) (f : nat -> bv 8) (toks : list (nat * nat)) :
   ref_nonnul len f -> ushp_no_symbols len f ->
@@ -437,22 +400,11 @@ Qed.
 (* ===================================================================== *)
 
 (* [ushs_one_le_sym], [ref_at_notin_gt], [ref_args_of_toks_redir] and
-   [ref_parseexec_redir] moved down to RefParseSym SS5: the redirect tier
-   (UkShRedirEx / UkShRedirPex) reads its corollaries off them and sits
-   below this file. *)
+   [ref_parseexec_redir] moved down to RefParseSym SS5, and
+   [ref_parsecmd_redir] to SS6: the redirect tier (UkShRedirEx /
+   UkShRedirPex / UkShRedirCm / UkShRedirPc) reads its corollaries off them
+   and sits below this file. *)
 
-Theorem ref_parsecmd_redir (len : nat) (f : nat -> bv 8) (p e : nat)
-    (toks : list (nat * nat)) :
-  ref_nonnul len f ->
-  ushs_redir len f p e ->
-  ushs_toks len f p 0 toks -> length toks < 10 ->
-  ref_parsecmd len f = Some (UshpRedir (UshpExec toks) (S (S p)) e rr_mode_gt 1).
-Proof using.
-  intros Hnn Hr Htoks Hlen. apply ref_parsecmd_of_line. rewrite ref_fuel_SS.
-  apply ref_parseline_end; [ lia | ]. apply ref_parsepipe_end.
-  pose proof (ushs_toks_len_le _ _ _ _ _ Htoks). pose proof (ushs_redir_lt _ _ _ _ Hr).
-  apply ref_parseexec_redir; [ exact Hnn | exact Hr | lia | exact Htoks | exact Hlen | lia ].
-Qed.
 
 (* ===================================================================== *)
 (* §4 THE PIPE LINE: [ushq_pipe] + [ushs_toks] at the '|'                   *)

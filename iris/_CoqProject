@@ -1626,6 +1626,10 @@ UkShRedirPr.v
 UkShArgs.v
 UkShRedirEx.v
 UkShRedirPex.v
+UkShPipeNode.v
+UkShPipeCmd.v
+UkShParser.v
+UkShPipeParse.v
 UkShRedirNul.v
 UkShRedirCm.v
 UkShRedirPc.v
@@ -1647,8 +1651,6 @@ UkShPipeLex.v
 UkShPipesLex.v
 RefParseBridge.v
 UkShPipeTok.v
-UkShPipeParse.v
-UkShPipeCmd.v
 UkShPipeSeam.v
 UkShPipeEx.v
 UkShPipeRight.v

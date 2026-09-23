@@ -26,7 +26,7 @@
 (* malloc's answer either, so [memset(0, 0, 24)] faults and the child dies *)
 (* on its exit payload.                                                    *)
 (*                                                                        *)
-(* Its answer is [UkShPipeParse.ushp_pipe_node] -- the node with BOTH      *)
+(* Its answer is [UkShPipeNode.ushp_pipe_node] -- the node with BOTH      *)
 (* child pointers NAMED -- and the two subtrees ride through in an         *)
 (* abstract [Sub], because everything from here to the parser theorem      *)
 (* relays the node and its children SEPARATELY (SH-PARSE-2's shape fact).  *)
@@ -70,7 +70,7 @@ Require Import UserFd.
 Require Import UkSh.
 Require Import UkShParse.
 Require Import UkShParseLex.
-Require Import UkShPipeParse.
+Require Import UkShPipeNode.
 Require Import UexecSG.
 Import Defs.
 
@@ -132,7 +132,7 @@ Section UkShPipeCmd.
        ⌜ ucallee_saved m m' ⌝ -∗
        ⌜ m' !!! Regidx a0_idx = mword_of_int t ⌝ -∗
        ⌜ 0 < t /\ t mod 16 = 0 /\ t + 24 < 2 ^ 38 ⌝ -∗
-       UkShPipeParse.ushp_pipe_node N t pl pr -∗
+       UkShPipeNode.ushp_pipe_node N t pl pr -∗
        Sub -∗
        UMalloc' -∗
        Pex -∗
@@ -696,7 +696,7 @@ Section UkShPipeCmd.
           cbn in Hi; try discriminate Hi;
           injection Hi as Hr Hu0; subst; vm_compute in He; discriminate.
     - iPureIntro. exact (conj Ht0 (conj Ht16 Htsz)).
-    - rewrite /UkShPipeParse.ushp_pipe_node.
+    - rewrite /UkShPipeNode.ushp_pipe_node.
       iSplitR; [ iPureIntro; exact Ht0 | ].
       iSplitR; [ iPureIntro; exact Ht8 | ].
       iSplitR; [ iPureIntro; rewrite H38 in Htsz; unfold Z64; lia | ].
