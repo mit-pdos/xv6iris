@@ -1501,13 +1501,34 @@ proofs found are closed, and are no longer anyone's premise:
   `virtio_disk_rw`'s P3 something to format before it arms.
 
 -------------------------------------------------------------------------
-WHAT IS LEFT, AND WHY.  One accessor of the three is PROVED
-(`Xv6.disk_status_read`, below); the other two wait on the rest of the
-per-completion rows, and those wait on ONE mechanism that is not yet
-there.
+WHAT IS LEFT, AND WHY.  Two accessors of the three are PROVED
+(`Xv6.disk_status_read` and `Xv6.disk_used_elem_read`, below); only
+`disk_collect` is left, and it waits on TWO things, neither of which the
+used-ring and status rows supply.
 
-(1) THE ROWS.  The STATUS row is DONE and is the pattern the other two
-follow.  `Xv6.diskLive` carries a per-head marker `sb : Nat -> SByte` and
+* THE BUFFER ROW.  `Xv6.bufLease` is `Xv6.dmaOwn` -- the footprint at no
+  value -- so the bytes a READ chain's transfer left behind cannot be
+  pinned to the block's image fragment, and `disk_collect` has to hand the
+  sleeper `byteBuf c.data (own 1) data ∗ diskBlock γ c.blk data` at ONE
+  `data`.  What it needs is the STATUS row's shape at `b->data`: a
+  per-head marker carried through `Xv6.leaseL_xferIn` / `leaseL_xferOut`
+  and `Xv6.data_write_lease`, so that the value each sector write leaves
+  behind reaches the completion, plus the `dmaOwnT` position the tier
+  conversion to the context needs.
+* THE ARMING.  Ruling out a `.lent` status marker at the head being
+  collected means ruling out that head being IN FLIGHT right now.
+  `Xv6.headDone` and `Xv6.headRead` cannot do it: both are persistent and
+  keyed by the HEAD, not by the arming, so a head that completed, was
+  collected, was re-armed and is now at `.served` again satisfies them
+  both.  `Xv6.unreadArmed` does not close the gap either -- it speaks only
+  of entries ABOVE the watermark, and the collect's record is at or below
+  it.  What closes it is a record keyed by the ARMING: a monotone per-head
+  epoch in the invariant, bumped at `Xv6.disk_publish`, carried by
+  `Xv6.UsedRec`, and cashed against the publisher's own quarter
+  (`Xv6.headTokQ`) at the collect.
+
+(1) THE ROWS.  The STATUS row is DONE and is the pattern the buffer row
+follows.  `Xv6.diskLive` carries a per-head marker `sb : Nat -> SByte` and
 a conjunct `[∗list] i, Xv6.statusRes (st i) (sb i)`: the invariant holds
 an armed head's status byte at own 1 up to `.fetched` (`.free`), NOTHING
 at `.served` (`.lent` -- the byte is in the serving task's linear
