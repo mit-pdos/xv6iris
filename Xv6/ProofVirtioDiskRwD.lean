@@ -76,7 +76,7 @@ theorem vdrw_P4 (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     ⊢ wpLoop (GF := GF) cpu := by
   have hsie : (vdrwK k).sie = false := vdrwK_sie k
   unfold vdrwP3Exit
-  iintro ⟨⟨%⟨hRk, hcwf, hbp, hblk, hdl, h10, h15⟩, Hk, Hpc, #Hpi, Htc, Hcc, Hir, #Hcaps, Hlk,
+  iintro ⟨⟨%⟨hRk, hcwf, hbp, hblk, hdl, h10, h15, h11⟩, Hk, Hpc, #Hpi, Htc, Hcc, Hir, #Hcaps, Hlk,
     Hpay, Hth, Htm, Htt, Hd0, Hd1, Hd2, Hhdr, Hist, Hdat, Hblk, Hib, Hdsk, Hbno,
     Hom, Hot, Hinfm, Hinft, Hsv, Hidxc, Hnext⟩, HΦ⟩
   obtain ⟨hh, hm, ht, e1, e2, e3, hsec⟩ := id hcwf
@@ -240,10 +240,12 @@ theorem vdrw_P4 (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   unfold vdrwP4Exit
   iframe Hk Hpc Hpi Htc Hcc Hir Hcaps Hlk Hres Hkh Hkm Hkt Hbno Hsv Hidxc Hnext
   ipureintro
-  refine ⟨?_, (Chain.withEp_wf c np).2 hcwf, hbp, hblk⟩
-  unfold vdrwRegs
-  k_norm
-  exact hRk
+  refine ⟨?_, (Chain.withEp_wf c np).2 hcwf, hbp, hblk, ?_⟩
+  · unfold vdrwRegs
+    k_norm
+    exact hRk
+  · k_norm
+    exact h11
 
 end
 

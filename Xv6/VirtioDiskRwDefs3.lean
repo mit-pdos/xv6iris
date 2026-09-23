@@ -451,7 +451,8 @@ def vdrwP3Exit (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (bno : BitVec 32) (dataBuf dataDisk : List (BitVec 8)) (wr : Bool)
     (c : Chain) (y : BitVec 32) (R : RegMap) : IProp GF := iprop%
   ⌜vdrwRegs k R (sectorOf bno) ∧ c.wf ∧ c.bp = k.regs 10#5 ∧ c.blk = bno.toNat ∧
-    dataBuf.length = BSIZE ∧ R 10#5 = BitVec.ofNat 64 c.hd ∧ R 15#5 = KA.«disk»⌝ ∗
+    dataBuf.length = BSIZE ∧ R 10#5 = BitVec.ofNat 64 c.hd ∧ R 15#5 = KA.«disk» ∧
+    R 11#5 = 1#64⌝ ∗
   kctx cpu ((vdrwK k).withRegs R) ∗ pcIs cpu (KA.«virtio_disk_rw» + 0x176#64) ∗
   procsInv Γ ∗ trapCsrs cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ∗
   vdrwCaps γ γl pd pav pu ∗ locked γl cpu ∗
@@ -490,7 +491,8 @@ def vdrwP4Exit (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64)
     (bno : BitVec 32) (dataBuf dataDisk : List (BitVec 8)) (wr : Bool)
     (c : Chain) (y : BitVec 32) (R : RegMap) : IProp GF := iprop%
-  ⌜vdrwRegs k R (sectorOf bno) ∧ c.wf ∧ c.bp = k.regs 10#5 ∧ c.blk = bno.toNat⌝ ∗
+  ⌜vdrwRegs k R (sectorOf bno) ∧ c.wf ∧ c.bp = k.regs 10#5 ∧ c.blk = bno.toNat ∧
+    R 11#5 = 1#64⌝ ∗
   kctx cpu ((vdrwK k).withRegs R) ∗ pcIs cpu (KA.«virtio_disk_rw» + 0x1a2#64) ∗
   procsInv Γ ∗ trapCsrs cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ∗
   vdrwCaps γ γl pd pav pu ∗ locked γl cpu ∗ diskRes γ pd pav pu curCtx ∗

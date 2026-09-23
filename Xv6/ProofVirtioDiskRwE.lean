@@ -269,7 +269,7 @@ theorem vdrw_P5_loop (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SL
 
 set_option maxHeartbeats 8000000 in
 /-- **P5.**  From `Xv6.vdrwP4Exit` to `Xv6.vdrwP5Exit`. -/
-theorem vdrw_P5 (HO : VDRW_OPEN) (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
+theorem vdrw_P5 (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) (jp : Nat)
     (bno : BitVec 32) (dataBuf dataDisk : List (BitVec 8)) (wr : Bool) (c : Chain)
@@ -284,10 +284,8 @@ theorem vdrw_P5 (HO : VDRW_OPEN) (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEA
         wpLoop cpu')
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨HP4, HΦ⟩
-  icases HO.p4_a1 Γ cpu k γ γl pd pav pu bno dataBuf dataDisk wr c y R $$ HP4
-    with ⟨%ha1, HP4⟩
   unfold vdrwP4Exit
-  icases HP4 with ⟨%⟨hRk, hcwf, hbp, hblk⟩, Hk, Hpc, #Hpi, Htc, Hcc, Hir, #Hcaps, Hlocked,
+  icases HP4 with ⟨%⟨hRk, hcwf, hbp, hblk, ha1⟩, Hk, Hpc, #Hpi, Htc, Hcc, Hir, #Hcaps, Hlocked,
     Hpay, Hkh, Hkm, Hkt, Hbno, Hsv, Hidx, Hnext⟩
   have hh : c.hd < NUM := hcwf.1
   have hdaddr : k.regs 10#5 + 4#64 = aBufDisk c.bp := by

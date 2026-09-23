@@ -81,7 +81,7 @@ theorem virtio_disk_rw_proof (HA : DISK_ACC_ASSUMPTIONS) (HO : VDRW_OPEN)
     · iexact HP3
     iintro %R4 %ep HP4
     -- P5
-    iapply (vdrw_P5 HO SP AC RE SL Γ c1 (k.withSpie a1 b1) γ γl pd pav pu j bno dataBuf
+    iapply (vdrw_P5 SP AC RE SL Γ c1 (k.withSpie a1 b1) γ γl pd pav pu j bno dataBuf
       dataDisk (decide (k.regs 11#5 ≠ 0#64))
       { vdrwChain ((k.withSpie a1 b1).regs 10#5) bno (decide (k.regs 11#5 ≠ 0#64)) hix mix tix with ep := ep }
       yy R4 hj hproc hK hsie hnoff hlocks htier hintena hbz)

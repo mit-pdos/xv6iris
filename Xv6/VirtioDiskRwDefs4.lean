@@ -21,15 +21,17 @@ and P6 the collect
 
 ### WHAT THE LANDED SEAMS DO NOT SAY (`Xv6.VDRW_OPEN`)
 
-Three facts the phases need are not in the frozen vocabulary; each is a
+Two facts the phases need are not in the frozen vocabulary; each is a
 field of `Xv6.VDRW_OPEN`, stated so that the phase is otherwise complete
 and the field falls away with the frozen-file change its doc names.
 
-* `Xv6.VDRW_OPEN.p4_a1`.  The loop test at `+0x1b0` is `bne a5,a1` with
-  `a1` still holding the `1` that P3 stored into `b->disk` at `+0x16e`;
-  `Xv6.vdrwRegs` does not pin `a1`, and neither `Xv6.vdrwP3Exit` nor
-  `Xv6.vdrwP4Exit` records it, so the sleeper cannot read the test as
-  `b->disk == 1`.
+The loop test at `+0x1b0` is `bne a5,a1` with `a1` still holding the `1`
+that P3 stored into `b->disk` at `+0x16e`.  That USED to be a field
+(`p4_a1`); it is now a pure conjunct of `Xv6.vdrwP3Exit` and
+`Xv6.vdrwP4Exit` (`R 11#5 = 1#64`), proved by P3 (`li a1,1` at `+0x104`,
+and nothing between there and `+0x176` writes `a1`) and carried by P4
+(`+0x176 .. +0x1a2` writes only `a3`/`a4`/`a5`).
+
 * `Xv6.VDRW_OPEN.claim_done`.  `Xv6.claimRes` carries `b->disk` at an
   EXISTENTIAL value (see its doc), so observing `b->disk /= 1` says
   nothing.  Rocq's `claim_cells` pins it: `b->disk = 1` while the request
@@ -427,19 +429,6 @@ stated at the point of use, gives every resource back, and names the
 frozen-file change that retires it; the header of this file sets them
 out. -/
 structure VDRW_OPEN : Prop where
-  /-- **`a1` still holds the `1` P3 stored into `b->disk`.**  The loop
-  test at `+0x1b0` is `bne a5,a1`.  RETIRED BY: adding `R 11#5 = 1#64` to
-  the pure conjunct of `Xv6.vdrwP3Exit` (P3 proves it: `li a1,1` at
-  `+0x104`, and nothing between there and `+0x176` writes `a1`) and of
-  `Xv6.vdrwP4Exit` (P4 proves it: `+0x176 .. +0x1a2` writes only
-  `a3`/`a4`/`a5`). -/
-  p4_a1 : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
-      [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-      (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64)
-      (bno : BitVec 32) (dataBuf dataDisk : List (BitVec 8)) (wr : Bool)
-      (c : Chain) (y : BitVec 32) (R : RegMap),
-    vdrwP4Exit (GF := GF) Γ cpu k γ γl pd pav pu bno dataBuf dataDisk wr c y R ⊢
-      ⌜R 11#5 = 1#64⌝ ∗ vdrwP4Exit Γ cpu k γ γl pd pav pu bno dataBuf dataDisk wr c y R
   /-- **Rocq's `claim_cells`**: while the chain is armed, `b->disk` is `1`,
   or it is `0` and the handler has recorded the completion of THIS arming
   (`Xv6.headDoneE` at the chain's epoch) at a counter it has read.

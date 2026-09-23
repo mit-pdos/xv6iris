@@ -430,12 +430,13 @@ theorem vdrw_P3 (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   iframe Hd0 Hd1 Hd2 Hhdr Hist Hdat Hblk Hib Hdsk Hbno Hom Hot Hinfm Hinft Hsv Hnext
   isplitl []
   · ipureintro
-    refine ⟨?_, hcwf, rfl, hblk, hlen, ?_, ?_⟩
+    refine ⟨?_, hcwf, rfl, hblk, hlen, ?_, ?_, ?_⟩
     · unfold vdrwRegs
       k_norm
       exact hRk
     · k_norm [vdrw2_sext32 h hh]
     · k_norm [vdrw3_disk_addr]
+    · k_norm
   · iapply idxCells_intro (k.regs 2#5) (BitVec.ofNat 32 h) (BitVec.ofNat 32 m)
       (BitVec.ofNat 32 t) y
     iframe Hi0 Hi1 Hi2 Hi3
