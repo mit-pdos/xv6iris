@@ -397,3 +397,7 @@ import Xv6.SpecFreeDesc
 import Xv6.ProofFreeDesc
 import Xv6.LinkFreeDesc
 import Xv6.ProofVirtioDiskRwA
+import Xv6.VirtioDiskRwDefs2
+import Xv6.ProofVirtioDiskRwB
+import Xv6.ProofVirtioDiskIntr
+import Xv6.LinkVirtioDiskIntr

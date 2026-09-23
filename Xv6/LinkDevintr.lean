@@ -1,21 +1,23 @@
 /-
 Link `devintr`: the proof instance clients import.  `devintr` calls
 `plic_claim`, `plic_complete`, `uartintr`, `virtio_disk_intr` and
-`clockintr`; the first three are closed with their linked interfaces, the
-disk's and the timer's handlers remain parameters until their proofs land
-(`virtio_disk_intr` is specified but not yet proved; `clockintr` needs the
-S-mode `rdtime`/`csrw stimecmp` rules).
+`clockintr`; all five are closed with their linked
+interfaces; what stays open is the disk handler's assumed accessor
+interface (`Xv6.DISK_ACC_ASSUMPTIONS`) and its extra arms
+(`Xv6.DISK_INTR_EXTRA`).
 -/
 import Xv6.ProofDevintr
 import Xv6.LinkPlicClaim
 import Xv6.LinkPlicComplete
 import Xv6.LinkUartintr
+import Xv6.LinkVirtioDiskIntr
 import Xv6.LinkClockintr
 
 namespace Xv6
 
-/-- The proved `devintr` interface, given `virtio_disk_intr`. -/
-theorem Devintr (VI : VIRTIO_DISK_INTR) : DEVINTR :=
-  devintr_proof PlicClaim PlicComplete Uartintr VI Clockintr
+/-- The proved `devintr` interface, given the disk handler's assumed
+accessor interface and its extra arms. -/
+theorem Devintr (HA : DISK_ACC_ASSUMPTIONS) (HE : DISK_INTR_EXTRA) : DEVINTR :=
+  devintr_proof PlicClaim PlicComplete Uartintr (VirtioDiskIntr HA HE) Clockintr
 
 end Xv6
