@@ -29,6 +29,7 @@ import MachCSL.WpSmode
 import MachCSL.WpSmodeMem
 import MachCSL.WpSmodeCtl
 import MachCSL.WpSmodeRules
+import MachCSL.WpSmodeJalr
 import MachCSL.WpSmodeIntr
 import MachCSL.WpSmodeSret
 import MachCSL.WpSmodeStvec
