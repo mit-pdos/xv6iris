@@ -119,10 +119,11 @@ WHAT IS NOT HERE, AND WHY.
   used-index cell's WRITE LOG is here (see below), and with it the
   per-completion record `doneRec`/`headDone` and the handler's credential
   `diskWm`; the rows are what the last three accessors of
-  `Xv6/DiskAcc.lean` still wait on.  They need the invariant to know the
-  handler watermark, so `diskReadAt` -- still a WHOLE ghost variable in
-  the lock payload -- will have to become a ghost PAIR, and they need the
-  window bound `nc - nr <= NUM` that a pair buys.
+  `Xv6/DiskAcc.lean` still wait on.  The invariant now KNOWS the handler
+  watermark (`diskReadAt` is a ghost PAIR: the payload's half and
+  `diskReadAtAuth` inside the dead and live arms), which is what the rows
+  and the window bound `nc - nr <= NUM` are indexed by; the rows
+  themselves, and that bound, are still to come.
 * The CONTENT of a disk read's data transfer is existential (`dmaOwn`,
   not `dmaOwnAt`).  The device computes the payload from a SNAPSHOT of its
   image taken at the task's `get` and writes it several steps later; a
@@ -422,12 +423,23 @@ theorem diskDoneAuth_lb (γ : DiskNames) (n : Nat) :
 def diskPubAuth (γ : DiskNames) (n : Nat) : IProp GF := γ.np ↪VAR{.own (1 : Qp).half} n
 /-- The published count: the publisher's half (Rocq's `disk_pub`). -/
 def diskPub (γ : DiskNames) (n : Nat) : IProp GF := γ.np ↪VAR{.own (1 : Qp).half} n
-/-- The handler watermark (`disk.used_idx`), Rocq's `disk_read_at`.  The
-INVARIANT never mentions it -- it is the driver's own count of the used
-elements it has consumed -- so the lock payload holds the whole ghost
-variable rather than a half, and the interrupt handler may bump it with
-nothing else in hand. -/
-def diskReadAt (γ : DiskNames) (n : Nat) : IProp GF := γ.nr ↪VAR{.own 1} n
+/-- The handler watermark (`disk.used_idx`), Rocq's `disk_read_at`: the
+LOCK PAYLOAD's half.  It is split, not whole, because the PER-POSITION
+ROWS of the completion side are indexed by `[nr, nc)`: the invariant has
+to know how far the handler has read before it can say which used-ring
+elements are still the handler's to collect.  So a bump needs both halves,
+and goes through the invariant (`Xv6.disk_deposit`). -/
+def diskReadAt (γ : DiskNames) (n : Nat) : IProp GF := γ.nr ↪VAR{.own (1 : Qp).half} n
+
+/-- The handler watermark: the INVARIANT's half. -/
+def diskReadAtAuth (γ : DiskNames) (n : Nat) : IProp GF := γ.nr ↪VAR{.own (1 : Qp).half} n
+
+theorem diskReadAt_agree (γ : DiskNames) (n n' : Nat) :
+    ⊢@{IProp GF} diskReadAtAuth γ n -∗ diskReadAt γ n' -∗ ⌜n = n'⌝ := by
+  unfold diskReadAtAuth diskReadAt
+  iintro H1 H2
+  ihave %h := ghost_var_agree γ.nr _ _ _ _ $$ H1 H2
+  ipureintro; exact h
 /-- The head staged between the ring store and the `avail->idx` bump
 (Rocq's `disk_stage`), the DRIVER's half.  It is split, not whole,
 because the invariant has to remember what the ring store established:
@@ -454,11 +466,12 @@ theorem diskStage_split (γ : DiskNames) (s : Option Nat) :
   rw [Qp.half_add_half] at h
   exact h
 
-theorem diskReadAt_update (γ : DiskNames) (n n' : Nat) :
-    diskReadAt (GF := GF) γ n ⊢ |==> diskReadAt γ n' := by
-  unfold diskReadAt
-  iintro H
-  iapply ghost_var_update n' γ.nr $$ H
+theorem diskReadAt_update (γ : DiskNames) (n n' t : Nat) :
+    diskReadAtAuth (GF := GF) γ n ∗ diskReadAt γ n' ⊢
+      |==> (diskReadAtAuth γ t ∗ diskReadAt γ t) := by
+  unfold diskReadAtAuth diskReadAt
+  iintro ⟨H1, H2⟩
+  iapply ghost_var_update_halves t γ.nr _ _ $$ H1 H2
 
 theorem diskStage_update (γ : DiskNames) (s s' t : Option Nat) :
     diskStageAuth (GF := GF) γ s ∗ diskStage γ s' ⊢
@@ -1390,7 +1403,7 @@ def imgOk (v : VirtioState) (m : RegMapF (List (BitVec 8))) (P : Nat → Prop) :
 def diskLive (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState)
     (pm : RegMapF PermVal) : IProp GF := iprop%
   ∃ (st : Nat → HState) (nc np lo : Nat) (ring : Nat → Nat) (m : RegMapF (List (BitVec 8)))
-      (pmap : List Nat) (stg : Option Nat) (b M : Nat) (dl dl0 : List UsedRec),
+      (pmap : List Nat) (stg : Option Nat) (b M : Nat) (dl dl0 : List UsedRec) (nr : Nat),
     imgAuth γ m ∗
     ([∗list] i ∈ List.range NUM, headAuth γ i (st i)) ∗
     ([∗list] i ∈ List.range NUM, headRes γ c0.desc i (st i)) ∗
@@ -1398,7 +1411,7 @@ def diskLive (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState)
     diskDoneAuth γ M ∗ diskPubAuth γ np ∗ diskLoAuth γ lo ∗
     diskPubAuthM γ np ∗ posAuth γ pmap ∗ diskStageAuth γ stg ∗
     usedIdxCell (usedIdxAt c0.used) b dl ∗ doneAuth γ dl0 ∗ diskBaseFrozen γ b ∗
-    dlTops dl ∗
+    dlTops dl ∗ diskReadAtAuth γ nr ∗
     ⌜v.usedIdx = wrap16 nc ∧ v.seen = wrap16 lo ∧ lo ≤ np ∧ queueOk st ring lo np ∧
       posOk pmap ring lo np ∧ stageOk stg ring lo np ∧ inflightOk v st ∧
       imgOk v m (inFlightBlk st) ∧ cachedOk v st ∧ permOk pm st ∧ usedOk dl dl0 nc M⌝
@@ -1424,7 +1437,7 @@ task, and the staged head's other half rides in `diskInitGhosts`. -/
 def diskDead (γ : DiskNames) (v : VirtioState) (pm : RegMapF PermVal) : IProp GF := iprop%
   ∃ m : RegMapF (List (BitVec 8)),
     imgAuth γ m ∗ diskCfgAuth γ v.cfg ∗ diskLoAuth γ 0 ∗ diskPubAuthM γ 0 ∗ posAuth γ [] ∗
-    diskStageAuth γ none ∗ diskBaseAuth γ 0 ∗ doneAuth γ [] ∗
+    diskStageAuth γ none ∗ diskBaseAuth γ 0 ∗ doneAuth γ [] ∗ diskReadAtAuth γ 0 ∗
     ⌜Virtio.live v.cfg = false ∧ noInflight v ∧ v.cache = [] ∧ imgOk v m (fun _ => False) ∧
       permOk pm (fun _ => .inactive) ∧ v.usedIdx = 0#16 ∧ v.seen = 0#16⌝
 
@@ -1455,11 +1468,12 @@ instance availLease_timeless (pav : PAddr) (np : Nat) (ring : Nat → Nat) :
 instance diskLive_timeless (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState)
     (pm : RegMapF PermVal) : Timeless (diskLive (GF := GF) γ c0 v pm) := by
   unfold diskLive headAuth diskDoneAuth diskPubAuth diskLoAuth diskStageAuth imgAuth
-    diskBaseFrozen
+    diskBaseFrozen diskReadAtAuth
   infer_instance
 instance diskDead_timeless (γ : DiskNames) (v : VirtioState) (pm : RegMapF PermVal) :
     Timeless (diskDead (GF := GF) γ v pm) := by
-  unfold diskDead diskCfgAuth diskLoAuth diskStageAuth imgAuth diskBaseAuth; infer_instance
+  unfold diskDead diskCfgAuth diskLoAuth diskStageAuth imgAuth diskBaseAuth diskReadAtAuth
+  infer_instance
 
 instance permAuth_timeless (γ : DiskNames) (pm : RegMapF PermVal) :
     Timeless (permAuth (GF := GF) γ pm) := by unfold permAuth; infer_instance
@@ -1531,7 +1545,9 @@ theorem slotBody_active (ξ : CtxId) (pd : PAddr) (i : Nat) (c : Chain) :
       iprop(wordAtN ξ (aFree i) 1 (DFrac.own 1) 0#8 ∗ claimRes ξ pd c) := rfl
 
 /-- **The payload of `disk.vdisk_lock`** (Rocq's `disk_res`): the
-publisher's and the handler's halves of the counters, the staged head,
+publisher's and the handler's halves of the counters (the watermark
+included -- the invariant holds the other half, `Xv6.diskReadAtAuth`, and
+the bump goes through `Xv6.disk_deposit`), the staged head,
 `disk.used_idx` at the handler watermark, the driver's halves of
 `avail->idx` and of the eight ring cells, and the eight descriptor slots
 with their receipts. -/

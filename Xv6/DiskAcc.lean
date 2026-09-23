@@ -239,7 +239,7 @@ theorem diskProto_dead_pure (γ : DiskNames) (v : VirtioState) (c : VirtioCfg)
   iintro ⟨⟨%hco, %pn, %pm, Hpm, %hfr, Harm⟩, Htok⟩
   icases Harm with ⟨Hd | ⟨%c0, #Hfr, %hc0, Hl⟩⟩
   · unfold diskDead
-    icases Hd with ⟨%m, Hm, Hcfg, Hlo0, HnpM0, Hpos0, HstgA0, Hbs0, Hdn0, %hp⟩
+    icases Hd with ⟨%m, Hm, Hcfg, Hlo0, HnpM0, Hpos0, HstgA0, Hbs0, Hdn0, Hnr0, %hp⟩
     ihave %he := diskCfg_auth_own_agree γ c v.cfg $$ Hcfg Htok
     ipureintro
     exact ⟨he, hp.2.1, hp.2.2.1, hp.2.2.2.2.2.1, hp.2.2.2.2.2.2⟩
@@ -349,7 +349,7 @@ theorem diskProto_dead_write (γ : DiskNames) (v v' : VirtioState) (c c' : Virti
   iintro ⟨⟨%hco, %pn, %pm, Hpm, %hfr, Harm⟩, Htok⟩
   icases Harm with ⟨Hd | ⟨%c0, #Hfr, %hc0, Hl⟩⟩
   · unfold diskDead
-    icases Hd with ⟨%m, Hm, Hcfg, Hlo0, HnpM0, Hpos0, HstgA0, Hbs0, Hdn0, %hp⟩
+    icases Hd with ⟨%m, Hm, Hcfg, Hlo0, HnpM0, Hpos0, HstgA0, Hbs0, Hdn0, Hnr0, %hp⟩
     have hview : Virtio.cacheView v' = Virtio.cacheView v := by
       funext a
       unfold Virtio.cacheView
@@ -372,7 +372,7 @@ theorem diskProto_dead_write (γ : DiskNames) (v v' : VirtioState) (c c' : Virti
     ileft
     iexists m
     rw [hcfg']
-    iframe Hm Hcfg Hlo0 HnpM0 Hpos0 HstgA0 Hbs0 Hdn0
+    iframe Hm Hcfg Hlo0 HnpM0 Hpos0 HstgA0 Hbs0 Hdn0 Hnr0
     ipureintro
     refine ⟨hlive', hni, hcache, ?_, hp.2.2.2.2.1, hu, hs⟩
     intro bno bs hb
@@ -621,14 +621,14 @@ theorem diskProto_avail_acc (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) 
   iintro ⟨#Hfr0, %hc, %pn, %pm, Hpm, %hfr, Harm⟩
   icases Harm with ⟨Hd | ⟨%c0', #Hfr, %hc0, Hl⟩⟩
   · unfold diskDead
-    icases Hd with ⟨%m, Hm, Hcfg, Hlo0, HnpM0, Hpos0, HstgA0, Hbs0, Hdn0, %hpure⟩
+    icases Hd with ⟨%m, Hm, Hcfg, Hlo0, HnpM0, Hpos0, HstgA0, Hbs0, Hdn0, Hnr0, %hpure⟩
     ihave %heq := diskCfgFrozen_auth_agree γ c0 v.cfg $$ Hfr0 Hcfg
     rw [heq, hpure.1] at hlive
     exact absurd hlive (by simp)
   · ihave %hcc := diskCfgFrozen_agree γ c0 c0' $$ [$Hfr0 $Hfr]
     subst hcc
     unfold diskLive
-    icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, %hpure⟩
+    icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, %nr, Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, Hnr, %hpure⟩
     obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10⟩ := hpure
     iexists np, lo, ring, st, pmap, stg
     isplitl []
@@ -646,8 +646,8 @@ theorem diskProto_avail_acc (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) 
     iframe Hfr
     isplitl []
     · ipureintro; exact hc0
-    iexists st, nc, np', lo, ring', m, pmap', stg', b, M, dl, dl0
-    iframe Hm Ha' Hr Hu Hav' Hnc Hnp' Hlo HnpM' Hpos' Hstg' Hui Hdn Hbs Htp
+    iexists st, nc, np', lo, ring', m, pmap', stg', b, M, dl, dl0, nr
+    iframe Hm Ha' Hr Hu Hav' Hnc Hnp' Hlo HnpM' Hpos' Hstg' Hui Hdn Hbs Htp Hnr
     ipureintro
     exact ⟨e1, e2, hq.1, hq.2.1, hq.2.2.1, hq.2.2.2, e6, e7, e8, e9, e10⟩
 
@@ -1163,7 +1163,7 @@ theorem diskProto_flip [CurCtx] (γ : DiskNames) (v : VirtioState) (c c' : Virti
   icases Harm with ⟨Hd | ⟨%c0, #Hfr0, %hc0, Hl⟩⟩
   case _ =>
     unfold diskDead
-    icases Hd with ⟨%m, Hm, Hcfg, Hlo0, HnpM0, Hpos0, HstgA0, Hbs0, Hdn0, %hp⟩
+    icases Hd with ⟨%m, Hm, Hcfg, Hlo0, HnpM0, Hpos0, HstgA0, Hbs0, Hdn0, Hnr0, %hp⟩
     obtain ⟨p1, p2, p3, p4, p5, p6, p7⟩ := hp
     imod diskCfg_freeze γ v.cfg c c' $$ [Hcfg Htok] with #Hfr
     · iframe Hcfg Htok
@@ -1182,7 +1182,7 @@ theorem diskProto_flip [CurCtx] (γ : DiskNames) (v : VirtioState) (c c' : Virti
     imod diskWordPersist aAvailPtr 8 _ c'.avail $$ Hq2 with #Hq2
     imod diskWordPersist aUsedPtr 8 _ c'.used $$ Hq3 with #Hq3
     imodintro
-    isplitl [Hpm Hauths Hrows Hpa HaiR HringR HuiR HueR Hnc Hm Hlo0 HnpM0 Hpos0 HstgA0 Hdn0]
+    isplitl [Hpm Hauths Hrows Hpa HaiR HringR HuiR HueR Hnc Hm Hlo0 HnpM0 Hpos0 HstgA0 Hdn0 Hnr0]
     · isplitl []
       · ipureintro
         intro e he
@@ -1198,9 +1198,9 @@ theorem diskProto_flip [CurCtx] (γ : DiskNames) (v : VirtioState) (c c' : Virti
       isplitl []
       · ipureintro; exact ⟨rfl, hlive, hqnum⟩
       unfold diskLive
-      iexists stInit, 0, 0, 0, ringInit, m, [], none, bb, 0, [], []
+      iexists stInit, 0, 0, 0, ringInit, m, [], none, bb, 0, [], [], 0
       ihave #Htp := dlTops_nil (GF := GF)
-      iframe Hm Hauths Hrows Hnc Hpa Hlo0 HnpM0 Hpos0 HstgA0 HuiR Hdn0 Hbs Htp
+      iframe Hm Hauths Hrows Hnc Hpa Hlo0 HnpM0 Hpos0 HstgA0 HuiR Hdn0 Hbs Htp Hnr0
       isplitl [HueR]
       · unfold usedLease
         iexact HueR
@@ -1329,12 +1329,21 @@ one or both.
 (1) THE PER-POSITION ROWS.  The invariant still holds nothing about a
 COMPLETED request beyond the log: the used-ring ELEMENT the device wrote
 at `nr % NUM`, the status byte at `dmaOwnAt c.status 1 0#8`, and the
-`topLb` of the request's data writes all belong in a row for each position
-in `[nr, nc)`.  That needs the invariant to know `nr` (so `diskReadAt`
-must become a ghost PAIR, its other half in the dead and live arms), and
-the rows need the window bound `nc - nr ≤ NUM` -- the completion-side twin
-of `np - lo ≤ NUM` -- to say that position `nr`'s used-ring cell has not
-been overwritten.  It also needs `Virtio.complete` to know the status byte
+`topLb` of the request's data writes all belong in a row for each
+completed, unread position.  The invariant now KNOWS the handler watermark
+-- `diskReadAt` is a ghost PAIR (`Xv6.diskReadAtAuth` in the dead and live
+arms), the bump goes through `Xv6.disk_deposit`, and
+`Xv6.diskProto_nr_acc` is the hook the rows will hang on -- but the rows
+themselves, and the window bound that says position `nr`'s used-ring cell
+has not been overwritten (the completion-side twin of `np - lo ≤ NUM`),
+are still to come.
+
+A CAVEAT the bound has to respect: `nc` LAGS the write log by one write.
+`usedIdx_write_lease` appends `(nc + 1, t, h)` to the log at a state whose
+`v.usedIdx` is still `wrap16 nc`, and only the `Virtio.complete` that
+follows bumps `nc`.  So `nr ≤ nc` is NOT an invariant -- a handler that
+reads in that window bumps its watermark to `nc + 1` -- and the window
+bound has to be stated against the LOG (`dl`), not against `nc`.  It also needs `Virtio.complete` to know the status byte
 was written, which is a phase-tracking clause (`pushOk`) the port does not
 carry.  Note that the device CANNOT allocate ghost state
 (`MachCSL.dmaWriteLease`'s continuation is a plain wand), so every row the
@@ -1414,15 +1423,15 @@ theorem diskProto_armHead (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) (p
   iintro ⟨#Hfr0, ⟨%hc, %pn, %pm, Hpm, %hfr, Harm⟩, Htok, Hlease, Hblk⟩
   icases Harm with ⟨Hd | ⟨%c0', #Hfr, %hc0, Hl⟩⟩
   · unfold diskDead
-    icases Hd with ⟨%m, Hm, Hcfg, Hlo0, HnpM0, Hpos0, HstgA0, Hbs0, Hdn0, %hpure⟩
+    icases Hd with ⟨%m, Hm, Hcfg, Hlo0, HnpM0, Hpos0, HstgA0, Hbs0, Hdn0, Hnr0, %hpure⟩
     ihave %heq := diskCfgFrozen_auth_agree γ c0 v.cfg $$ Hfr0 Hcfg
     rw [heq, hpure.1] at hlive
     exact absurd hlive (by simp)
   · ihave %hcc := diskCfgFrozen_agree γ c0 c0' $$ [$Hfr0 $Hfr]
     subst hcc
     unfold diskLive
-    icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0,
-      Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, %hpure⟩
+    icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, %nr,
+      Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, Hnr, %hpure⟩
     obtain ⟨q1, q2, q3, q4, q5, q6, q7, q8, q9, q10, q11⟩ := hpure
     ihave %hst := headTok_state γ st c.hd .inactive hwf.1 $$ Ha Htok
     icases diskArm_acc c.hd hwf.1 (fun j => headAuth γ j (st j))
@@ -1457,8 +1466,8 @@ theorem diskProto_armHead (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) (p
     iframe Hfr
     isplitl []
     · ipureintro; exact hc0
-    iexists (armSt st c.hd c), nc, np, lo, ring, m, pmap, stg, b, M, dl, dl0
-    iframe Hm Ha Hr Hu Hav Hnc Hnp Hlo HnpM Hpos Hstg Hui Hdn Hbs Htp
+    iexists (armSt st c.hd c), nc, np, lo, ring, m, pmap, stg, b, M, dl, dl0, nr
+    iframe Hm Ha Hr Hu Hav Hnc Hnp Hlo HnpM Hpos Hstg Hui Hdn Hbs Htp Hnr
     ipureintro
     exact ⟨q1, q2, q3, queueOk_arm st ring lo np c.hd c q4 hst, q5, q6,
       inflightOk_arm v st c.hd c hst q7, imgOk_arm v m st c.hd c hst q8,
@@ -1555,14 +1564,14 @@ theorem diskProto_usedRead_acc (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioStat
   iintro ⟨#Hfr0, %hc, %pn, %pm, Hpm, %hfr, Harm⟩
   icases Harm with ⟨Hd | ⟨%c0', #Hfr, %hc0, Hl⟩⟩
   · unfold diskDead
-    icases Hd with ⟨%m, Hm, Hcfg, Hlo0, HnpM0, Hpos0, HstgA0, Hbs0, Hdn0, %hpure⟩
+    icases Hd with ⟨%m, Hm, Hcfg, Hlo0, HnpM0, Hpos0, HstgA0, Hbs0, Hdn0, Hnr0, %hpure⟩
     ihave %heq := diskCfgFrozen_auth_agree γ c0 v.cfg $$ Hfr0 Hcfg
     rw [heq, hpure.1] at hlive
     exact absurd hlive (by simp)
   · ihave %hcc := diskCfgFrozen_agree γ c0 c0' $$ [$Hfr0 $Hfr]
     subst hcc
     unfold diskLive
-    icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, %hpure⟩
+    icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, %nr, Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, Hnr, %hpure⟩
     obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10⟩ := hpure
     iexists b, nc, M, dl, dl0
     isplitl []
@@ -1580,8 +1589,8 @@ theorem diskProto_usedRead_acc (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioStat
     iframe Hfr
     isplitl []
     · ipureintro; exact hc0
-    iexists st, nc, np, lo, ring, m, pmap, stg, b, M', dl, dl0'
-    iframe Hm Ha Hr Hu Hav Hnc' Hnp Hlo HnpM Hpos Hstg Hui' Hdn' Hbs Htp
+    iexists st, nc, np, lo, ring, m, pmap, stg, b, M', dl, dl0', nr
+    iframe Hm Ha Hr Hu Hav Hnc' Hnp Hlo HnpM Hpos Hstg Hui' Hdn' Hbs Htp Hnr
     ipureintro
     exact ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, hok⟩
 
@@ -1691,19 +1700,79 @@ theorem disk_used_idx_read [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu : 
   · ipureintro; exact ⟨hwm, hnrm⟩
   iframe Hlb Hrv Hwm2
 
+/-- **The handler watermark, borrowed out of the live arm.**  The
+invariant's half of `γ.nr` comes out and any value may go back: it is the
+hook the PER-POSITION ROWS will hang on (they are indexed by `[nr, ..)`,
+so moving `nr` is what retires a row). -/
+theorem diskProto_nr_acc (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState)
+    (hlive : Virtio.live c0 = true) :
+    diskCfgFrozen (GF := GF) γ c0 ∗ diskProto γ v ⊢
+      ∃ nr : Nat, diskReadAtAuth γ nr ∗
+        (∀ nr' : Nat, diskReadAtAuth γ nr' -∗ diskProto γ v) := by
+  unfold diskProto
+  iintro ⟨#Hfr0, %hc, %pn, %pm, Hpm, %hfr, Harm⟩
+  icases Harm with ⟨Hd | ⟨%c0', #Hfr, %hc0, Hl⟩⟩
+  · unfold diskDead
+    icases Hd with ⟨%m, Hm, Hcfg, Hlo0, HnpM0, Hpos0, HstgA0, Hbs0, Hdn0, Hnr0, %hpure⟩
+    ihave %heq := diskCfgFrozen_auth_agree γ c0 v.cfg $$ Hfr0 Hcfg
+    rw [heq, hpure.1] at hlive
+    exact absurd hlive (by simp)
+  · ihave %hcc := diskCfgFrozen_agree γ c0 c0' $$ [$Hfr0 $Hfr]
+    subst hcc
+    unfold diskLive
+    icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, %nr, Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, Hnr, %hpure⟩
+    iexists nr
+    iframe Hnr
+    iintro %nr' Hnr'
+    isplitl []
+    · ipureintro; exact hc
+    iexists pn, pm
+    iframe Hpm
+    isplitl []
+    · ipureintro; exact hfr
+    iright
+    iexists c0
+    iframe Hfr
+    isplitl []
+    · ipureintro; exact hc0
+    iexists st, nc, np, lo, ring, m, pmap, stg, b, M, dl, dl0, nr'
+    iframe Hm Ha Hr Hu Hav Hnc Hnp Hlo HnpM Hpos Hstg Hui Hdn Hbs Htp Hnr'
+    ipureintro
+    exact hpure
+
 /-- **`deposit`** (`disk.used_idx += 1`, the tail of `virtio_disk_intr`'s
 loop body): the handler advances its watermark past the completion it has
-just read.  `Xv6.diskReadAt` is WHOLLY the driver's -- the invariant never
-mentions it -- so the bump asks for nothing else.
+just read.  `Xv6.diskReadAt` is a ghost PAIR -- the invariant holds the
+other half, because the PER-POSITION ROWS of the completion side are
+indexed by `[nr, ..)` -- so the bump opens the invariant and moves both.
 
-The TSO credential for the next loop test no longer comes from here: since
+The TSO credential for the next loop test does NOT come from here: since
 `MachCSL.readAUr`, `Xv6.disk_used_idx_read` hands out the next iteration's
 `Xv6.diskWm` at the READ itself, at the very view the load read at, and
 the `__sync_synchronize()` that follows turns that view receipt into a
 floor (`MachCSL.wp_s_fence_rw_rw_floor`).  See the section head below. -/
-theorem disk_deposit [CurCtx] (γ : DiskNames) (nr : Nat) :
-    diskReadAt (GF := GF) γ nr ⊢ |==> diskReadAt γ (nr + 1) :=
-  diskReadAt_update γ nr (nr + 1)
+theorem disk_deposit [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (nr : Nat) :
+    diskInv (GF := GF) γ ∗ diskGeom γ pd pav pu ∗ diskReadAt γ nr ⊢
+      |={⊤}=> diskReadAt γ (nr + 1) := by
+  unfold diskInv devInvR
+  iintro ⟨#Hinv, #Hgeom, Hnr⟩
+  icases diskGeom_cfg γ pd pav pu $$ Hgeom with ⟨%c0, #Hfr, %hg⟩
+  iinv Hinv with Hbody Hclose
+  icases Hbody with ⟨%v, >Hfrag, >Hproto⟩
+  icases diskProto_nr_acc γ c0 v hg.2.2.2.1 $$ [$Hfr $Hproto] with ⟨%nr0, Hnr0, Hback⟩
+  ihave %hnn := diskReadAt_agree γ nr0 nr $$ Hnr0 Hnr
+  subst hnn
+  imod diskReadAt_update γ nr0 nr0 (nr0 + 1) $$ [Hnr0 Hnr] with ⟨Hnr0, Hnr⟩
+  · iframe Hnr0 Hnr
+  ihave Hproto := Hback $$ %(nr0 + 1) Hnr0
+  ihave Hcl := Hclose $$ [Hfrag Hproto]
+  case' _ =>
+    inext
+    iexists v
+    iframe Hfrag Hproto
+  imod Hcl
+  imodintro
+  iexact Hnr
 
 /-- **The accessors whose obligations this port leaves open.**
 
