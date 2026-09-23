@@ -1098,6 +1098,123 @@ theorem ctxBytes_split_dma (ξ : CtxId) (pa : PAddr) (n : Nat) (w : BitVec (8 * 
   iframe Hraw
   ipureintro; exact hh
 
+/-! ### Back from the raw tier: the two halves, rejoined
+
+`Xv6.ctxBytes_split_dma` is what `Xv6.disk_publish` does to each of the
+chain's four sixteen-byte windows.  These are its inverse, which is what
+`Xv6.disk_collect` needs: the invariant's half comes out of
+`Xv6.chainLease` and the driver's out of `Xv6.claimRes`, and the two are
+the SAME ghost element, so joining them gives the `own 1` context window
+`free_desc` asks for.  Nothing about positions is needed for these: the
+DRIVER wrote those cells and the device only ever read them, so the
+context half still carries the key. -/
+
+theorem ctxByte_join_half (ξ : CtxId) (a : PAddr) (H : Hist) (b : BitVec 8) :
+    iprop((a ↦ₕ{DFrac.own (1 : Qp).half} H) ∗ ctxByte (GF := GF) ξ a (DFrac.own (1 : Qp).half) b)
+      ⊢ ctxByte ξ a (DFrac.own 1) b := by
+  iintro ⟨Hpt, Hc⟩
+  icases ctxByte_cases ξ a (DFrac.own (1 : Qp).half) b $$ Hc with ⟨%e, %He, Hpt2, %hev, #Hkey⟩
+  icases histByte_join_half a H (e :: He) $$ [Hpt Hpt2] with ⟨Hpt, %heq⟩
+  · iframe Hpt Hpt2
+  rw [heq]
+  unfold ctxByte
+  iexists e, He
+  iframe Hpt
+  isplit
+  · ipureintro; exact hev
+  · iexact Hkey
+
+/-- **The invariant's raw half and the driver's context half, rejoined.** -/
+theorem ctxBytes_join_dma (ξ : CtxId) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
+    iprop(dmaHalfAt (GF := GF) pa n w ∗ ctxBytes ξ pa n (DFrac.own (1 : Qp).half) w) ⊢
+      ctxBytes ξ pa n (DFrac.own 1) w := by
+  unfold dmaHalfAt
+  iintro ⟨⟨%Hs, Hraw, %hh⟩, Hctx⟩
+  iapply (show iprop(histBytes (GF := GF) pa n (fun _ => DFrac.own (1 : Qp).half) Hs ∗
+      ctxBytes ξ pa n (DFrac.own (1 : Qp).half) w) ⊢ ctxBytes ξ pa n (DFrac.own 1) w from by
+    unfold histBytes ctxBytes
+    refine .trans BigSepL.bigSepL_sep_eqv_symm.1 (BigSepL.bigSepL_mono_of_forall ?_)
+    intro k j
+    exact ctxByte_join_half ξ (pa + BitVec.ofNat 64 j) (Hs j) (nthByte w j))
+  iframe Hraw Hctx
+
+/-- **A DEVICE-written window becomes the driver's again** once the
+running context's FLOOR has passed the write: the row records the
+position, `MachCSL.ctxFloor_le` lowers the floor to it, and the CLEAN arm
+of `MachCSL.keyAt` does the rest.  This is how the status byte comes back
+at the collect, and how the data buffer will once the invariant records
+its bytes. -/
+theorem dmaOwnT_ctxBytes (ξ : CtxId) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (ts T : Nat)
+    (hle : ts ≤ T) :
+    iprop(ctxFloor (GF := GF) ξ T ∗ dmaOwnT pa n w ts) ⊢ ctxBytes ξ pa n (DFrac.own 1) w := by
+  unfold dmaOwnT histBytes
+  iintro ⟨#Hfl, ⟨%Hs, Hraw, _, %hp⟩⟩
+  ihave #Hfl2 := ctxFloor_le ξ T ts hle $$ Hfl
+  unfold ctxBytes
+  iapply (BigSepL.bigSepL_impl (l := List.range n)
+    (Φ := fun (_ : Nat) (j : Nat) => iprop((pa + BitVec.ofNat 64 j) ↦ₕ{DFrac.own 1} Hs j))
+    (Ψ := fun (_ : Nat) (j : Nat) =>
+      ctxByte (GF := GF) ξ (pa + BitVec.ofNat 64 j) (DFrac.own 1) (nthByte w j))) $$ Hraw
+  imodintro
+  iintro %k %j %hk Hb
+  have hj : j < n := range_getElem?_lt hk
+  obtain ⟨e, He, heq⟩ : ∃ (e : HEnt) (He : Hist), Hs j = e :: He := by
+    have h0 := hp.2 j hj
+    cases hx : Hs j with
+    | nil => rw [hx] at h0; exact absurd h0 (by simp)
+    | cons e He => exact ⟨e, He, rfl⟩
+  have het : e.t = ts := by
+    have h0 := hp.2 j hj
+    rw [heq] at h0
+    simpa using h0
+  have hev : e.v = nthByte w j := by
+    have h0 := hp.1 j hj
+    rw [heq] at h0
+    simpa using h0
+  rw [heq]
+  unfold ctxByte
+  iexists e, He
+  iframe Hb
+  isplit
+  · ipureintro; exact hev
+  · unfold keyAt
+    ileft
+    rw [het]
+    iexact Hfl2
+
+/-- **The chain's four windows, taken back whole.**  The invariant's
+halves (`Xv6.chainLease`, minus the data buffer, which the device WROTE
+and which therefore comes back through `Xv6.dmaOwnT_ctxBytes` instead)
+and the driver's halves (`Xv6.claimRes`) are the same ghost elements, so
+the collect joins them into the `own 1` windows `free_desc` needs.  This
+is the exact inverse of what `Xv6.disk_publish` splits. -/
+theorem chainLease_claim_join [CurCtx] (ξ : CtxId) (pd : PAddr) (c : Chain) :
+    iprop(chainLease (GF := GF) pd c ∗ claimRes ξ pd c) ⊢
+      ctxBytes ξ (descAt pd c.hd) 16 (DFrac.own 1) c.d0 ∗
+      ctxBytes ξ (descAt pd c.md) 16 (DFrac.own 1) c.d1 ∗
+      ctxBytes ξ (descAt pd c.tl) 16 (DFrac.own 1) c.d2 ∗
+      ctxBytes ξ c.hdrAddr 16 (DFrac.own 1) c.hdr ∗
+      wordAtN ξ (aInfoB c.hd) 8 (DFrac.own 1) c.bp ∗
+      (∃ d : BitVec 32, wordAtN ξ (aBufDisk c.bp) 4 (DFrac.own 1) d) ∗
+      bufLease c := by
+  unfold chainLease claimRes
+  iintro ⟨⟨Hr0, Hr1, Hr2, Hh0, Hh1, Hh2, Hbuf⟩, Hc0, Hc1, Hc2, Hch, Hib, Hdsk⟩
+  iframe Hbuf Hib Hdsk
+  isplitl [Hr0 Hc0]
+  · iapply ctxBytes_join_dma ξ (descAt pd c.hd) 16 c.d0
+    iframe Hr0 Hc0
+  isplitl [Hr1 Hc1]
+  · iapply ctxBytes_join_dma ξ (descAt pd c.md) 16 c.d1
+    iframe Hr1 Hc1
+  isplitl [Hr2 Hc2]
+  · iapply ctxBytes_join_dma ξ (descAt pd c.tl) 16 c.d2
+    iframe Hr2 Hc2
+  · iapply ctxBytes_join_dma ξ c.hdrAddr 16 c.hdr
+    isplitl [Hh0 Hh1 Hh2]
+    · iapply dmaHalfAt_hdr_join c.hdrAddr c
+      iframe Hh0 Hh1 Hh2
+    · iexact Hch
+
 /-- A context window the driver gives up entirely is a full DMA footprint. -/
 theorem ctxBytes_dmaOwn (ξ : CtxId) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
     ctxBytes (GF := GF) ξ pa n (DFrac.own 1) w ⊢ dmaOwn pa n :=
