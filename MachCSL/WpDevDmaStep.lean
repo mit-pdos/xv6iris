@@ -91,12 +91,12 @@ theorem dmaReadPin_frame (pa : PAddr) (n : Nat) (Q : BitVec (8 * n) → Prop) (P
 theorem dmaWriteLease_frame (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (P C : IProp GF) :
     dmaWriteLease pa n w P ∗ C ⊢ dmaWriteLease pa n w (iprop(P ∗ C)) := by
   unfold dmaWriteLease
-  iintro ⟨⟨%Hs, Hb, Hback⟩, HC⟩
-  iexists Hs
-  iframe Hb
-  iintro %t Hb2 Hau Htop
+  iintro ⟨⟨%Hs, %Kb, Hb, #Htlb, Hback⟩, HC⟩
+  iexists Hs, Kb
+  iframe Hb Htlb
+  iintro %t Hb2 Hau Htop %hkb
   iframe HC
-  iapply Hback $$ %t Hb2 Hau Htop
+  iapply Hback $$ %t Hb2 Hau Htop %hkb
 
 /-! ## The derivation -/
 
@@ -388,9 +388,13 @@ theorem wpDev_dmaL (N : Namespace) (d : DevId) (R : DevSt d → IProp GF) [∀ s
           ihave Hl : dmaWriteLease pa n w iprop(R (σ.devs.st d) ∗ C') $$ [HC HR]
           · iapply hlease (σ.devs.st d) hgt $$ [HC HR]
             iframe HC HR
-          icases dmaWriteLease_cases pa n w iprop(R (σ.devs.st d) ∗ C') $$ Hl with ⟨%Hs, Hb, Hback⟩
+          icases dmaWriteLease_cases pa n w iprop(R (σ.devs.st d) ∗ C') $$ Hl
+            with ⟨%Hs, %Kb, Hb, #Htlb, Hback⟩
+          ihave %hkb : ⌜Kb ≤ σ.top⌝ $$ [Hσ Htlb]
+          · iapply machInterp_topLb σ Kb
+            iframe Hσ Htlb
           imod machInterp_storeDma σ pa n Hs w hnr $$ [$Hσ $Hb] with ⟨Hσ, Hb, #Hau, #Htop⟩
-          ihave Hrc := Hback $$ %(σ.top + 1) Hb Hau Htop
+          ihave Hrc := Hback $$ %(σ.top + 1) Hb Hau Htop %(by omega : Kb < σ.top + 1)
           icases Hrc with ⟨HR, HC⟩
           ihave Hcl := Hclose $$ [Hfrag HR]
           case' _ => inext; iexists (σ.devs.st d); iframe Hfrag HR
@@ -430,7 +434,7 @@ theorem wpDev_dmaL (N : Namespace) (d : DevId) (R : DevSt d → IProp GF) [∀ s
               · iapply hlease (σ.devs.st d) hgb $$ [HC HR]
                 iframe HC HR
               icases dmaWriteLease_cases pa n w iprop(R (σ.devs.st d) ∗ C') $$ Hl
-                with ⟨%Hs, Hb, _⟩
+                with ⟨%Hs, %Kb, Hb, _, _⟩
               icases Hσ with ⟨Hregs, Hmem, Hmm, Hdev⟩
               iapply histBytes_ramBytes σ pa n (fun _ => DFrac.own 1) Hs
               iframe Hmem Hmm Hb

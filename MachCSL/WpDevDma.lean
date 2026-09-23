@@ -79,17 +79,27 @@ at the raw history tier, and the wand that re-establishes the client's
 ghost state from the grown histories, the disk's authorship receipt and the
 position's top receipt. -/
 def dmaWriteLease (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (P : IProp GF) : IProp GF := iprop%
-  ∃ Hs : Nat → Hist,
-    histBytes pa n (fun _ => DFrac.own 1) Hs ∗
+  ∃ (Hs : Nat → Hist) (Kb : Nat),
+    histBytes pa n (fun _ => DFrac.own 1) Hs ∗ topLb Kb ∗
     (∀ t : Nat, histBytes pa n (fun _ => DFrac.own 1) (pushed Hs t diskAgent w) -∗
-        authoredBy t diskAgent -∗ topLb t -∗ P)
+        authoredBy t diskAgent -∗ topLb t -∗ ⌜Kb < t⌝ -∗ P)
 
+/-- **The ORDERING RECEIPT.**  The lease carries a position `Kb` the
+client already holds a `MachCSL.topLb` for -- typically the position of an
+EARLIER write of the same device task -- and the continuation learns
+`Kb < t`: the store's position is the machine's next, so it dominates
+everything the store order has seen.  `Kb := 0` is the old shape, and
+`MachCSL.dmaWriteLease_of` builds it.
+
+It is the only channel by which "the device wrote the status byte BEFORE
+it published the used index" can reach the disk's invariant, and without
+it a completed request's status byte could not be read back. -/
 theorem dmaWriteLease_cases (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (P : IProp GF) :
     dmaWriteLease pa n w P ⊢@{IProp GF}
-      ∃ Hs : Nat → Hist,
-        histBytes pa n (fun _ => DFrac.own 1) Hs ∗
+      ∃ (Hs : Nat → Hist) (Kb : Nat),
+        histBytes pa n (fun _ => DFrac.own 1) Hs ∗ topLb Kb ∗
         (∀ t : Nat, histBytes pa n (fun _ => DFrac.own 1) (pushed Hs t diskAgent w) -∗
-            authoredBy t diskAgent -∗ topLb t -∗ P) := by
+            authoredBy t diskAgent -∗ topLb t -∗ ⌜Kb < t⌝ -∗ P) := by
   unfold dmaWriteLease; iintro H; iexact H
 
 /-- What a DMA READ obligation looks like: either every answer satisfies `Q`
@@ -398,9 +408,13 @@ theorem wpDev_dma (N : Namespace) (d : DevId) (rel : DevSt d → DevSt d → Pro
           ihave Hl : dmaWriteLease pa n w (R (σ.devs.st d)) $$ [HR]
           · iapply hlease (σ.devs.st d) hgt $$ [HC HR]
             iframe HC HR
-          icases dmaWriteLease_cases pa n w (R (σ.devs.st d)) $$ Hl with ⟨%Hs, Hb, Hback⟩
+          icases dmaWriteLease_cases pa n w (R (σ.devs.st d)) $$ Hl
+            with ⟨%Hs, %Kb, Hb, #Htlb, Hback⟩
+          ihave %hkb : ⌜Kb ≤ σ.top⌝ $$ [Hσ Htlb]
+          · iapply machInterp_topLb σ Kb
+            iframe Hσ Htlb
           imod machInterp_storeDma σ pa n Hs w hnr $$ [$Hσ $Hb] with ⟨Hσ, Hb, #Hau, #Htop⟩
-          ihave HR := Hback $$ %(σ.top + 1) Hb Hau Htop
+          ihave HR := Hback $$ %(σ.top + 1) Hb Hau Htop %(by omega : Kb < σ.top + 1)
           ihave Hcl := Hclose $$ [Hfrag HR]
           case' _ => inext; iexists (σ.devs.st d); iframe Hfrag HR
           imod Hcl

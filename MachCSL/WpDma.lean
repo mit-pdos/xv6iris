@@ -123,6 +123,17 @@ theorem machInterp_of_storeDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec 
   iintro H
   iexact H
 
+/-- A position the client holds a top-bound for is below the machine's
+store-order top, hence strictly below the position a store about to
+happen will be given (`σ.top + 1`).  It is what lets a device's LATER
+write know it is ordered after an EARLIER one whose position the client
+kept. -/
+theorem machInterp_topLb (σ : MState) (K : Nat) :
+    machInterp (GF := GF) σ ∗ topLb K ⊢@{IProp GF} ⌜K ≤ σ.top⌝ := by
+  iintro ⟨⟨_, _, Hmm, _⟩, HK⟩
+  iapply memModel_topLb _ σ K $$ [Hmm HK]
+  iframe
+
 /-- **The DMA write ghost update.**  Against the lease over its footprint --
 the raw histories at full ownership -- the disk's store moves the machine's
 interpretation, grows the histories by the disk's entry at the next

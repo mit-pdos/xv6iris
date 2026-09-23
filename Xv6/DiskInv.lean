@@ -574,13 +574,14 @@ that value can reach the `.status` install one step later. -/
 theorem status_write_lease (γ : DiskNames) (c : Chain) (pa : PAddr) (hpa : pa = c.status)
     (P : IProp GF) (w : BitVec (8 * 1)) :
     dmaOwn (GF := GF) c.status 1 ∗ P ⊢
-      dmaWriteLease pa 1 w (iprop(dmaOwnAt c.status 1 w ∗ P)) := by
+      dmaWriteLease pa 1 w (iprop((∃ ts : Nat, dmaOwnT c.status 1 w ts) ∗ P)) := by
   subst hpa
   iintro ⟨Hb, HP⟩
-  iapply dmaWriteLease_frame c.status 1 w (dmaOwnAt c.status 1 w) P
+  iapply dmaOwn_leaseT c.status 1 w
   isplitl [Hb]
-  · iapply dmaOwn_lease c.status 1 w $$ Hb
-  · iexact HP
+  · iexact Hb
+  iintro Hb2
+  iframe Hb2 HP
 
 /-- W4: one sector of the data transfer. -/
 theorem data_write_lease (γ : DiskNames) (s : VirtioState) (h : BitVec 16) (r : VioReq)
@@ -647,8 +648,9 @@ theorem diskProto_usedIdx_acc (γ : DiskNames) (s : VirtioState) (h : BitVec 16)
     (hph : Virtio.phase s h = some (.pushed r)) :
     diskProto (GF := GF) γ s ⊢ ∃ (c0 : VirtioCfg) (b nc : Nat) (dl : List UsedRec),
       ⌜s.cfg = c0 ∧ s.usedIdx = wrap16 nc⌝ ∗ usedIdxCell (usedIdxAt c0.used) b dl ∗
-      (∀ t : Nat, usedIdxCell (usedIdxAt c0.used) b (dl ++ [(nc + 1, t, h.toNat)]) -∗ topLb t -∗
-        diskProto γ s) := by
+      ∃ ts : Nat, topLb ts ∗
+      (∀ t : Nat, ⌜ts ≤ t⌝ -∗ usedIdxCell (usedIdxAt c0.used) b (dl ++ [(nc + 1, t, h.toNat)]) -∗
+        topLb t -∗ diskProto γ s) := by
   have hin : Virtio.reqOf s h = some r := by unfold Virtio.reqOf; rw [hph]; rfl
   unfold diskProto
   iintro ⟨%hc, %pn, %pm, Hpm, %hfr, Harm⟩
@@ -661,11 +663,26 @@ theorem diskProto_usedIdx_acc (γ : DiskNames) (s : VirtioState) (h : BitVec 16)
   · unfold diskLive
     icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, %nr, %sb, Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, Hnr, Hsb, %hpure⟩
     obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11⟩ := hpure
+    obtain ⟨-, c, hcst, -, -⟩ := (inflightOff_ok s st ring lo np stg e6) h r hin
+    obtain ⟨ts, hts⟩ := (e11.1 h).2 r (Or.inr hph)
+    icases statusRes_acc st sb h.toNat
+        ((inflightOff_ok s st ring lo np stg e6) h r hin).1 $$ Hsb with ⟨Hrow, Hsbback⟩
+    ihave Hrow : iprop(statusRes (GF := GF) (HState.active c) (SByte.done ts)) $$ [Hrow]
+    · rw [hcst, hts]
+      iexact Hrow
+    icases statusRes_topLb c ts $$ Hrow with ⟨#Htts, Hrow⟩
+    ihave Hrow : iprop(statusRes (GF := GF) (st h.toNat) (sb h.toNat)) $$ [Hrow]
+    · rw [hcst, hts]
+      iexact Hrow
+    ihave Hsb := Hsbback $$ Hrow
     iexists c0, b, nc, dl
     isplitl []
     · ipureintro; exact ⟨hc0.1, e1⟩
     iframe Hui
-    iintro %t Hui' #Htt
+    iexists ts
+    isplitl []
+    · iexact Htts
+    iintro %t %hle Hui' #Htt
     ihave #Htp' := dlTops_snoc dl (nc + 1, t, h.toNat) $$ [$Htp $Htt]
     isplitl []
     · ipureintro; exact hc
@@ -681,7 +698,6 @@ theorem diskProto_usedIdx_acc (γ : DiskNames) (s : VirtioState) (h : BitVec 16)
     iexists st, nc, np, lo, ring, m, pmap, stg, b, M, (dl ++ [(nc + 1, t, h.toNat)]), dl0, nr, sb
     iframe Hm Ha Hr Hu Hav Hnc Hnp Hlo HnpM Hpos Hstg Hui' Hdn Hbs Htp' Hnr Hsb
     ipureintro
-    obtain ⟨-, c, hcst, -, -⟩ := (inflightOff_ok s st ring lo np stg e6) h r hin
     have hsome : (Virtio.phase s h).isSome = true := by
       unfold Virtio.reqOf at hin
       cases hp : Virtio.phase s h with
@@ -689,8 +705,8 @@ theorem diskProto_usedIdx_acc (γ : DiskNames) (s : VirtioState) (h : BitVec 16)
       | some x => rfl
     obtain ⟨-, -, hpos, hstg⟩ := e6.2 h hsome
     exact ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, usedOk_write dl dl0 nc M t h.toNat e10,
-      unreadArmed_write s st dl nr (nc + 1) t ring lo np stg sb h r hph ⟨c, hcst⟩
-        hpos hstg e11⟩
+      unreadArmed_write s st dl nr (nc + 1) t ring lo np stg sb h r ts hph hts hle
+        ⟨c, hcst⟩ hpos hstg e11⟩
 
 /-- W3: the used index.  The write appends its entry -- the counter the
 device's `usedIdx` is about to reach, at the position the machine gives the
@@ -700,19 +716,21 @@ theorem usedIdx_write_lease (γ : DiskNames) (s : VirtioState) (h : BitVec 16) (
     (w : BitVec (8 * 2)) (hw : w = s.usedIdx + 1#16) :
     diskProto (GF := GF) γ s ⊢ dmaWriteLease (Virtio.usedIdxAddr cc) 2 w (diskProto γ s) := by
   iintro H
-  icases diskProto_usedIdx_acc γ s h r hph $$ H with ⟨%c0, %b, %nc, %dl, %hp, Hui, Hback⟩
+  icases diskProto_usedIdx_acc γ s h r hph $$ H
+    with ⟨%c0, %b, %nc, %dl, %hp, Hui, %ts, #Htts, Hback⟩
   obtain ⟨hcfg, hidx⟩ := hp
   have hcc0 : cc = c0 := by rw [← hcc, hcfg]
   subst hcc0
   rw [usedIdxAt_eq cc, show w = wrap16 (nc + 1) by rw [hw, hidx, wrap16_succ]]
-  iapply usedIdxCell_lease (usedIdxAt cc.used) b dl (nc + 1) h.toNat
-    iprop(∀ t : Nat, usedIdxCell (usedIdxAt cc.used) b (dl ++ [(nc + 1, t, h.toNat)]) -∗
+  iapply usedIdxCell_lease (usedIdxAt cc.used) b dl (nc + 1) h.toNat ts
+    iprop(∀ t : Nat, ⌜ts ≤ t⌝ -∗
+      usedIdxCell (usedIdxAt cc.used) b (dl ++ [(nc + 1, t, h.toNat)]) -∗
       topLb t -∗ diskProto γ s)
     (diskProto γ s)
-    (fun t => by
+    (fun t hkb => by
       iintro ⟨H1, #Ht, H2⟩
-      iapply H2 $$ %t H1 Ht)
-  iframe Hui Hback
+      iapply H2 $$ %t %(Nat.le_of_lt hkb) H1 Ht)
+  iframe Hui Htts Hback
 
 /-! ## The serve permit
 
@@ -1525,15 +1543,15 @@ in the task's context. -/
 theorem leaseL_take (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key : Nat) (c : Chain)
     (s s1 : VirtioState) (hlive : Virtio.live c0 = true) :
     iprop((serveCtx (GF := GF) γ h c0 key c s (some (.served c.req)) none ∗
-        dmaOwnAt c.status 1 0#8) ∗ diskProto γ s1) ⊢
+        (∃ ts : Nat, dmaOwnT c.status 1 0#8 ts)) ∗ diskProto γ s1) ⊢
       |==> (diskProto γ (Virtio.setPhase s1 h (.status c.req)) ∗
         serveCtx γ h c0 key c s (some (.status c.req)) none) := by
-  iintro ⟨⟨HC, Hb⟩, HR⟩
+  iintro ⟨⟨HC, %ts, Hb⟩, HR⟩
   imod leaseL_install_gen γ h c0 key c s s1 (some (.served c.req)) none (.status c.req)
-      (fun _ => SByte.done) iprop(dmaOwnAt c.status 1 0#8) iprop(emp) hlive rfl
+      (fun _ => SByte.done ts) iprop(dmaOwnT c.status 1 0#8 ts) iprop(emp) hlive rfl
       (Or.inl (by rintro r ⟨⟩)) (by rintro r ⟨⟩)
       (fun ob _ => ⟨⟨fun he => absurd he (by simp), fun hx => by
-          obtain ⟨r, hr⟩ := hx; exact absurd hr (by simp)⟩, fun r _ => rfl⟩)
+          obtain ⟨r, hr⟩ := hx; exact absurd hr (by simp)⟩, fun r _ => ⟨ts, rfl⟩⟩)
       (fun ob hob => by
         have hl : ob = SByte.lent := hob.1.2 ⟨c.req, rfl⟩
         rw [hl, statusRes_lent, statusRes_done]
@@ -1561,16 +1579,17 @@ theorem leaseL_serveTail (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key 
     subst hs2
     exact leaseL_lend γ h c0 key c s s1 u0 hlive
   · refine DevM.LeaseL.dmaWrite _
-      iprop(serveCtx γ h c0 key c s (some (.served c.req)) none ∗ dmaOwnAt c.status 1 0#8)
+      iprop(serveCtx γ h c0 key c s (some (.served c.req)) none ∗
+        ∃ ts : Nat, dmaOwnT c.status 1 0#8 ts)
       _ _ _ _ _ ?_ ?_ ?_
     · intro s1 hgg
       iintro ⟨⟨HC, Hb⟩, HR⟩
       rw [statusOf_chain c]
       iapply dmaWriteLease_mono (Chain.req c).status 1 0#8
-        iprop(dmaOwnAt c.status 1 0#8 ∗ (diskProto γ s1 ∗
+        iprop((∃ ts : Nat, dmaOwnT c.status 1 0#8 ts) ∗ (diskProto γ s1 ∗
           serveCtx γ h c0 key c s (some (.served c.req)) none))
         iprop(diskProto γ s1 ∗ (serveCtx γ h c0 key c s (some (.served c.req)) none ∗
-          dmaOwnAt c.status 1 0#8))
+          ∃ ts : Nat, dmaOwnT c.status 1 0#8 ts))
         (by iintro ⟨H1, H2, H3⟩; iframe H1 H2 H3)
       iapply status_write_lease γ c (Chain.req c).status rfl
         iprop(diskProto γ s1 ∗ serveCtx γ h c0 key c s (some (.served c.req)) none) 0#8
@@ -1605,8 +1624,8 @@ theorem leaseL_serveTail (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key 
             exact leaseL_install γ h c0 key c s s1 (some (.status c.req)) none (.pushed c.req)
               hlive rfl (Or.inr hpo) (by rintro r ⟨⟩)
               (fun ob hob => by
-                have hd : ob = SByte.done := hob.2 c.req (Or.inl rfl)
-                refine ⟨⟨fun he => ?_, fun hx => ?_⟩, fun r _ => hd⟩
+                obtain ⟨ts, hd⟩ := hob.2 c.req (Or.inl rfl)
+                refine ⟨⟨fun he => ?_, fun hx => ?_⟩, fun r _ => ⟨ts, hd⟩⟩
                 · rw [hd] at he; exact absurd he (by simp)
                 · obtain ⟨r, hr⟩ := hx; exact absurd hr (by simp))
           · exact absurd hgs' (by simp)

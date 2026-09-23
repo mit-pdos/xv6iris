@@ -225,6 +225,10 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG 
 
 /-! ## The raw tier: what a lease is made of -/
 
+/-- The heads of the histories were all written at position `ts`. -/
+abbrev headsAtT (Hs : Nat → Hist) (n ts : Nat) : Prop :=
+  ∀ j, j < n → (Hs j).head?.map HEnt.t = some ts
+
 /-- The footprint at FULL ownership, content unconstrained: what the
 device may WRITE. -/
 def dmaOwn (pa : PAddr) (n : Nat) : IProp GF := iprop%
@@ -233,6 +237,17 @@ def dmaOwn (pa : PAddr) (n : Nat) : IProp GF := iprop%
 /-- The footprint at full ownership, at a value. -/
 def dmaOwnAt (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) : IProp GF := iprop%
   ∃ Hs : Nat → Hist, histBytes pa n (fun _ => DFrac.own 1) Hs ∗ ⌜headsAre Hs n w⌝
+
+/-- **The footprint at a value, WITH the position of the write that put
+it there** (and that position's `MachCSL.topLb`).  It is what a row of the
+invariant must keep of a byte the DRIVER will read back: a value alone
+says nothing to a racy load, because `MachCSL.Hist.read` returns the
+newest VISIBLE entry and an older one may still be visible instead.  The
+position is the handle: a reader whose view has passed it reads the
+head. -/
+def dmaOwnT (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (ts : Nat) : IProp GF := iprop%
+  ∃ Hs : Nat → Hist, histBytes pa n (fun _ => DFrac.own 1) Hs ∗ topLb ts ∗
+    ⌜headsAre Hs n w ∧ headsAtT Hs n ts⌝
 
 /-- A HALF of the footprint: all a DMA READ needs (a cell at any fraction
 pins the byte's top), and what leaves the other half to the driver. -/
@@ -248,6 +263,46 @@ instance dmaOwn_timeless (pa : PAddr) (n : Nat) : Timeless (dmaOwn (GF := GF) pa
   unfold dmaOwn; infer_instance
 instance dmaOwnAt_timeless (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
     Timeless (dmaOwnAt (GF := GF) pa n w) := by unfold dmaOwnAt; infer_instance
+instance dmaOwnT_timeless (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (ts : Nat) :
+    Timeless (dmaOwnT (GF := GF) pa n w ts) := by unfold dmaOwnT topLb topLbAt; infer_instance
+
+theorem dmaOwnT_dmaOwn (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (ts : Nat) :
+    dmaOwnT (GF := GF) pa n w ts ⊢ dmaOwn pa n := by
+  unfold dmaOwnT dmaOwn
+  iintro ⟨%Hs, H, _, %_⟩
+  iexists Hs
+  iexact H
+
+theorem dmaOwnT_topLb (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (ts : Nat) :
+    dmaOwnT (GF := GF) pa n w ts ⊢ topLb ts ∗ dmaOwnT pa n w ts := by
+  unfold dmaOwnT
+  iintro ⟨%Hs, H, #Ht, %hp⟩
+  isplitl []
+  · iexact Ht
+  iexists Hs
+  iframe H Ht
+  ipureintro; exact hp
+
+/-- **The write, at its position**: what `MachCSL.dmaWriteLease`'s
+continuation leaves behind, kept with the position the machine gave the
+store. -/
+theorem dmaOwn_leaseT (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (P : IProp GF) :
+    dmaOwn (GF := GF) pa n ∗ ((∃ ts : Nat, dmaOwnT pa n w ts) -∗ P) ⊢
+      dmaWriteLease pa n w P := by
+  unfold dmaOwn dmaWriteLease
+  iintro ⟨⟨%Hs, Hb⟩, Hback⟩
+  iexists Hs, 0
+  iframe Hb
+  isplitl []
+  · iapply topLbAt_0
+  iintro %t Hb2 _ #Htop %_
+  iapply Hback
+  iexists t
+  unfold dmaOwnT
+  iexists (pushed Hs t diskAgent w)
+  iframe Hb2 Htop
+  ipureintro
+  exact ⟨headsAre_pushed Hs t diskAgent n w, fun j _ => rfl⟩
 instance dmaHalf_timeless (pa : PAddr) (n : Nat) : Timeless (dmaHalf (GF := GF) pa n) := by
   unfold dmaHalf; infer_instance
 instance dmaHalfAt_timeless (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
@@ -267,9 +322,11 @@ theorem dmaOwn_lease (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
     dmaOwn (GF := GF) pa n ⊢ dmaWriteLease pa n w (dmaOwnAt pa n w) := by
   unfold dmaOwn dmaWriteLease dmaOwnAt
   iintro ⟨%Hs, Hb⟩
-  iexists Hs
+  iexists Hs, 0
   iframe Hb
-  iintro %t Hb2 _ _
+  isplitl []
+  · iapply topLbAt_0
+  iintro %t Hb2 _ _ %_
   iexists (pushed Hs t diskAgent w)
   iframe Hb2
   ipureintro
@@ -280,9 +337,11 @@ theorem dmaOwn_lease' (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
     dmaOwn (GF := GF) pa n ⊢ dmaWriteLease pa n w (dmaOwn pa n) := by
   unfold dmaOwn dmaWriteLease
   iintro ⟨%Hs, Hb⟩
-  iexists Hs
+  iexists Hs, 0
   iframe Hb
-  iintro %t Hb2 _ _
+  isplitl []
+  · iapply topLbAt_0
+  iintro %t Hb2 _ _ %_
   iexists (pushed Hs t diskAgent w)
   iexact Hb2
 
@@ -311,9 +370,11 @@ theorem dmaOwn_lease_frame (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (Q : IPro
     dmaOwn pa n ∗ (dmaOwn pa n -∗ Q) ⊢ dmaWriteLease pa n w Q := by
   unfold dmaOwn dmaWriteLease
   iintro ⟨⟨%Hs, Hb⟩, Hback⟩
-  iexists Hs
+  iexists Hs, 0
   iframe Hb
-  iintro %t Hb2 _ _
+  isplitl []
+  · iapply topLbAt_0
+  iintro %t Hb2 _ _ %_
   iapply Hback
   iexists (pushed Hs t diskAgent w)
   iexact Hb2
@@ -322,12 +383,12 @@ theorem dmaOwn_lease_frame (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (Q : IPro
 theorem dmaWriteLease_mono (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (P Q : IProp GF)
     (hpq : P ⊢ Q) : dmaWriteLease (GF := GF) pa n w P ⊢ dmaWriteLease pa n w Q := by
   unfold dmaWriteLease
-  iintro ⟨%Hs, Hb, Hback⟩
-  iexists Hs
-  iframe Hb
-  iintro %t Hb2 Hau Ht
+  iintro ⟨%Hs, %Kb, Hb, #Htlb, Hback⟩
+  iexists Hs, Kb
+  iframe Hb Htlb
+  iintro %t Hb2 Hau Ht %hkb
   iapply hpq
-  iapply Hback $$ %t Hb2 Hau Ht
+  iapply Hback $$ %t Hb2 Hau Ht %hkb
 
 /-- The empty footprint is free. -/
 theorem dmaOwn_zero (pa : PAddr) : emp ⊢@{IProp GF} dmaOwn pa 0 := by
@@ -764,16 +825,17 @@ instance usedIdxCell_timeless (pa : PAddr) (b : Nat) (dl : List UsedRec) :
 
 /-- **The used-index write, leased.**  The device's store appends its entry
 to the log; the position the machine gives it is the entry's timestamp. -/
-theorem usedIdxCell_lease (pa : PAddr) (b : Nat) (dl : List UsedRec) (m hd : Nat)
+theorem usedIdxCell_lease (pa : PAddr) (b : Nat) (dl : List UsedRec) (m hd Kb : Nat)
     (R P : IProp GF)
-    (hback : ∀ t : Nat, iprop(usedIdxCell (GF := GF) pa b (dl ++ [(m, t, hd)]) ∗ topLb t ∗ R) ⊢ P) :
-    usedIdxCell (GF := GF) pa b dl ∗ R ⊢ dmaWriteLease pa 2 (wrap16 m) P := by
+    (hback : ∀ t : Nat, Kb < t →
+      iprop(usedIdxCell (GF := GF) pa b (dl ++ [(m, t, hd)]) ∗ topLb t ∗ R) ⊢ P) :
+    usedIdxCell (GF := GF) pa b dl ∗ topLb Kb ∗ R ⊢ dmaWriteLease pa 2 (wrap16 m) P := by
   unfold usedIdxCell dmaWriteLease
-  iintro ⟨⟨%Hold, Hb, %ht⟩, HR⟩
-  iexists ((usedW dl).hist Hold)
-  iframe Hb
-  iintro %t Hb2 _ #Htop
-  iapply hback t
+  iintro ⟨⟨%Hold, Hb, %ht⟩, #Htlb, HR⟩
+  iexists ((usedW dl).hist Hold), Kb
+  iframe Hb Htlb
+  iintro %t Hb2 _ #Htop %hkb
+  iapply hback t hkb
   iframe Htop
   isplitl [Hb2]
   · unfold usedIdxCell
@@ -1833,8 +1895,9 @@ inductive SByte where
   /-- the serving task holds it, between its `.served` install and its
   `.status` install -/
   | lent
-  /-- the invariant holds it at the `0` the device wrote -/
-  | done
+  /-- the invariant holds it at the `0` the device wrote, at the
+  POSITION `ts` of that write -/
+  | done (ts : Nat)
   deriving DecidableEq, Repr, Inhabited
 
 /-- One slot's status byte, where the phase says it is.  A slot that is
@@ -1847,15 +1910,21 @@ def statusRes (s : HState) (b : SByte) : IProp GF :=
     match b with
     | .free => dmaOwn c.status 1
     | .lent => iprop(emp)
-    | .done => dmaOwnAt c.status 1 0#8
+    | .done ts => dmaOwnT c.status 1 0#8 ts
   | _ => iprop(emp)
 
 theorem statusRes_free (c : Chain) :
     statusRes (GF := GF) (.active c) .free = dmaOwn c.status 1 := rfl
 theorem statusRes_lent (c : Chain) :
     statusRes (GF := GF) (.active c) .lent = iprop(emp) := rfl
-theorem statusRes_done (c : Chain) :
-    statusRes (GF := GF) (.active c) .done = dmaOwnAt c.status 1 0#8 := rfl
+theorem statusRes_done (c : Chain) (ts : Nat) :
+    statusRes (GF := GF) (.active c) (.done ts) = dmaOwnT c.status 1 0#8 ts := rfl
+
+/-- The position of the device's write, read off the row. -/
+theorem statusRes_topLb (c : Chain) (ts : Nat) :
+    statusRes (GF := GF) (.active c) (.done ts) ⊢
+      topLb ts ∗ statusRes (.active c) (.done ts) :=
+  dmaOwnT_topLb c.status 1 0#8 ts
 theorem statusRes_inactive (b : SByte) :
     statusRes (GF := GF) .inactive b = iprop(emp) := rfl
 theorem statusRes_member (h : Nat) (b : SByte) :
@@ -1869,7 +1938,7 @@ instance statusRes_timeless (s : HState) (b : SByte) : Timeless (statusRes (GF :
     cases b with
     | free => show Timeless (dmaOwn (GF := GF) c.status 1); infer_instance
     | lent => show Timeless (iprop(emp) : IProp GF); infer_instance
-    | done => show Timeless (dmaOwnAt (GF := GF) c.status 1 0#8); infer_instance
+    | done ts => show Timeless (dmaOwnT (GF := GF) c.status 1 0#8 ts); infer_instance
 
 /-- **The byte comes out at own 1** wherever the invariant keeps it. -/
 theorem statusRes_own (c : Chain) (b : SByte) (hb : b ≠ .lent) :
@@ -1877,7 +1946,7 @@ theorem statusRes_own (c : Chain) (b : SByte) (hb : b ≠ .lent) :
   cases b with
   | free => rw [statusRes_free]
   | lent => exact absurd rfl hb
-  | done => rw [statusRes_done]; exact dmaOwnAt_dmaOwn _ _ _
+  | done ts => rw [statusRes_done]; exact dmaOwnT_dmaOwn _ _ _ _
 
 /-- **Two full footprints over one byte are one too many**: what says a
 slot whose byte the serving task holds is `.lent` in the invariant. -/
@@ -1901,13 +1970,13 @@ theorem statusRes_not_lent (c : Chain) (b : SByte) :
     iapply false_elim
     iapply dmaOwn_excl1 c.status
     iframe H1 H2
-  | done =>
+  | done ts =>
     rw [statusRes_done]
     iintro ⟨H1, H2⟩
     iapply false_elim
     iapply dmaOwn_excl1 c.status
     isplitl [H1]
-    · iapply dmaOwnAt_dmaOwn c.status 1 0#8 $$ H1
+    · iapply dmaOwnT_dmaOwn c.status 1 0#8 ts $$ H1
     · iexact H2
 
 /-- **The eight status rows, at the live flip**: every slot is free, so
@@ -1988,7 +2057,7 @@ theorem statusOf_chain (c : Chain) : Virtio.statusOf c.req = 0#8 := by
 is back at `0` from `.status` on. -/
 def sbAt (op : Option VPhase) (b : SByte) : Prop :=
   (b = SByte.lent ↔ ∃ r : VioReq, op = some (.served r)) ∧
-  (∀ r : VioReq, op = some (.status r) ∨ op = some (.pushed r) → b = SByte.done)
+  (∀ r : VioReq, op = some (.status r) ∨ op = some (.pushed r) → ∃ ts : Nat, b = SByte.done ts)
 
 def sbOk (v : VirtioState) (sb : Nat → SByte) : Prop :=
   ∀ h : BitVec 16, sbAt (Virtio.phase v h) (sb h.toNat)
@@ -2024,7 +2093,7 @@ def unreadArmed (v : VirtioState) (st : Nat → HState) (dl : List UsedRec) (nr 
   ∀ r ∈ dl, nr < r.cnt →
     (∃ c : Chain, st r.hd = HState.active c) ∧
     (∀ p, lo ≤ p → p < np → ring (p % NUM) ≠ r.hd) ∧ stg ≠ some r.hd ∧
-    sb r.hd = SByte.done
+    ∃ ts : Nat, sb r.hd = SByte.done ts ∧ ts ≤ r.pos
 
 theorem unreadArmed_sb (v : VirtioState) (st : Nat → HState) (dl : List UsedRec) (nr : Nat)
     (ring : Nat → Nat) (lo np : Nat) (stg : Option Nat) (sb : Nat → SByte)
@@ -2082,7 +2151,8 @@ armed, at no pending position, not the staged one (`Xv6.inflightOff`) and
 with its status byte back in the invariant at zero (`Xv6.sbOk`). -/
 theorem unreadArmed_write (v : VirtioState) (st : Nat → HState) (dl : List UsedRec)
     (nr nc t : Nat) (ring : Nat → Nat) (lo np : Nat) (stg : Option Nat) (sb : Nat → SByte)
-    (hd : BitVec 16) (r0 : VioReq) (hph : Virtio.phase v hd = some (.pushed r0))
+    (hd : BitVec 16) (r0 : VioReq) (ts : Nat) (hph : Virtio.phase v hd = some (.pushed r0))
+    (hts : sb hd.toNat = SByte.done ts) (hle : ts ≤ t)
     (ha : ∃ c : Chain, st hd.toNat = HState.active c)
     (hp : ∀ p, lo ≤ p → p < np → ring (p % NUM) ≠ hd.toNat) (hs : stg ≠ some hd.toNat)
     (h : unreadArmed v st dl nr ring lo np stg sb) :
@@ -2101,7 +2171,7 @@ theorem unreadArmed_write (v : VirtioState) (st : Nat → HState) (dl : List Use
     · exact h.2.2 r hr hlt
     · have hre : r = (nc, t, hd.toNat) := by simpa using hr
       rw [hre]
-      exact ⟨ha, hp, hs, (h.1 hd).2 r0 (Or.inr hph)⟩
+      exact ⟨ha, hp, hs, ts, hts, hle⟩
 
 /-- **The pop.**  The head it takes is at position `lo`, so by (P2) it has
 no unread completion; it was not in flight, so by `Xv6.sbOk` its byte is
@@ -2197,8 +2267,8 @@ theorem unreadArmed_setPhase (v : VirtioState) (st : Nat → HState) (dl : List 
     · subst hhh; exact hnotHead e he hlt
     · rw [phase_setPhase_other v hd hh ph hhh] at hpp
       exact h.2.1 hh ph' hpp hnp e he hlt
-  · obtain ⟨ha, hp, hs, hsb⟩ := h.2.2 r hr hlt
-    exact ⟨ha, hp, hs, by rw [updS_ne sb hd.toNat nb r.hd (hnotHead r hr hlt), hsb]⟩
+  · obtain ⟨ha, hp, hs, ts, hsb, hle⟩ := h.2.2 r hr hlt
+    exact ⟨ha, hp, hs, ts, by rw [updS_ne sb hd.toNat nb r.hd (hnotHead r hr hlt), hsb], hle⟩
 
 /-- **The completion**: the head leaves the in-flight map with its byte
 already back in the invariant. -/
@@ -2212,7 +2282,8 @@ theorem unreadArmed_complete (v : VirtioState) (st : Nat → HState) (dl : List 
     · subst hhh
       rw [phase_complete_self]
       refine ⟨⟨fun he => ?_, fun hx => ?_⟩, fun r hr => ?_⟩
-      · rw [(h.1 hh).2 r0 (Or.inr hph)] at he; exact absurd he (by simp)
+      · obtain ⟨ts, hts⟩ := (h.1 hh).2 r0 (Or.inr hph)
+        rw [hts] at he; exact absurd he (by simp)
       · obtain ⟨r, hr⟩ := hx; exact absurd hr (by simp)
       · rcases hr with hr | hr <;> exact absurd hr (by simp)
     · rw [phase_complete_other v hd hh hhh]
