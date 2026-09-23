@@ -1364,6 +1364,20 @@ pops (a `DevM.guard`), not only at the `get` before it, which is what
 keeps one permit per head.
 
 -------------------------------------------------------------------------
+WHAT THE GEOMETRY AND THE PAYLOAD NOW CARRY.  Three gaps the driver
+proofs found are closed, and are no longer anyone's premise:
+
+* `Xv6.diskGeom` carries `Xv6.pageRw` of all three queue pages, so
+  `virtio_disk_intr`'s racy loads of the used page have their `inRam`,
+  alignment and `MachCSL.kmapId` (and `virtio_disk_rw`'s `descPageRw pd`
+  premise is now redundant -- it is left in the frozen spec);
+* `Xv6.claimRes` carries `b->disk`, the cell the handler stores `0` into
+  before `wakeup(b)` while the sleeper is inside `sleep`;
+* `Xv6.opsWin` -- the whole `disk.ops[i]` window -- is in the payload for
+  every slot that is free or a chain MEMBER, which is what gives
+  `virtio_disk_rw`'s P3 something to format before it arms.
+
+-------------------------------------------------------------------------
 WHAT IS LEFT, AND WHY.  The three accessors below wait on the
 PER-COMPLETION ROWS, and those wait on one clause that is NOT yet there
 and that the rest of the design hangs off.
@@ -1393,6 +1407,26 @@ written in:
   and two chains cannot hold the same block because `diskBlock` is
   exclusive), and `MachCSL.Virtio.xferIn`'s `get` then knows the bytes it
   is about to write are the fragment's.
+
+(1b) WHAT THE ROWS' CONSUMERS NOW ASK FOR, EXACTLY.  The three clauses
+the `pend` chain below needs are PURE -- they add no existential to
+`diskLive`, only conjuncts to its `⌜..⌝`, over the log `dl`, the
+watermark `nr`, the receipts `st`, the ring and the window `[lo, np)`:
+
+    (P1) ∀ k, nr ≤ k < dl.length → ∃ c, st dl[k].hd = .active c
+    (P2) ∀ k, nr ≤ k < dl.length → ∀ p, lo ≤ p < np → ring (p % NUM) ≠ dl[k].hd
+    (P3) ∀ k k', nr ≤ k < k' < dl.length → dl[k].hd ≠ dl[k'].hd
+    (P4) ∀ h, (Virtio.phase v h).isSome → ∀ k, nr ≤ k < dl.length → dl[k].hd ≠ h.toNat
+
+(P1) is what `Xv6.DISK_INTR_EXTRA.slot_active` asks for, and with the log
+arithmetic (3) it is what turns `Xv6.headDone γ n i` with `nr < n` into
+"slot `i` is armed".  They close under each step in the obvious way, and
+the two that are not obvious are: at the used-index WRITE, (P3) for the
+new entry is (P4) for the head that is completing; and at
+`Xv6.disk_publish`, (P2) for the position that joins the window is (P1)
+read backwards -- the publisher holds `headTok γ c.hd .inactive`, so
+`c.hd` is at no unread index.  `disk_deposit` and the POP only SHRINK the
+ranges the four clauses quantify over.
 
 (2) THE CLAUSE EVERYTHING HANGS OFF, AND THE STATEMENT CHANGE IT FORCES.
 Each of the three rows above must survive from the completion to the
@@ -1436,6 +1470,19 @@ to know that the task between its gate and its index write has not
 already written: the natural witness is the used ELEMENT slot itself,
 which that task holds at `own 1` in its context between the two writes
 (the `C'` the write arm now produces), so it cannot write twice.
+
+(3b) WHERE THE LOG ARITHMETIC MUST BE PROVED.  `usedOk` (in
+`Xv6/DiskInvDefs.lean`) carries the log's bookkeeping, and the two
+clauses `nc ≤ dl.length ≤ nc + 1` and `dl[k].cnt = k + 1` belong there --
+`usedOk_nil` and `usedOk_complete` take them for free.  The work is at
+`usedOk_write`, which appends `(nc + 1, t, hd)`: the new entry's index is
+`dl.length`, so `dl[k].cnt = k + 1` needs `dl.length = nc` EXACTLY at the
+write, i.e. that no earlier write is still outstanding.  Its only source
+is the writing task itself -- `Xv6.pushedUniq` plus the used-ELEMENT slot
+the task holds at `own 1` in its linear context between its two writes --
+which means the premise has to reach `Xv6.diskProto_usedIdx_acc`
+(`Xv6/DiskInv.lean`), whose only premise today is `Virtio.reqOf s h =
+some r`.
 
 (4) THE TSO CREDENTIAL, SETTLED.  `Xv6.diskWm γ n F` says the hart's floor
 `F` has passed a used-index write publishing at least `n`.  It used to be

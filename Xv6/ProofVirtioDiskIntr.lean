@@ -233,25 +233,69 @@ completion side is expected to grow (see the report accompanying this
 file); until then `virtio_disk_intr_proof` takes them as an explicit
 hypothesis. -/
 structure DISK_INTR_EXTRA : Prop where
-  /-- **A completed head is an ARMED head.**  The handler reads a head `i`
-  out of the used ring and must then produce the `Xv6.headTok γ i (.active c)`
-  that `disk_status_read` and `disk_collect` take; all it holds is the
-  payload's own receipt for slot `i` (`Xv6.slotRes`) and the completion
-  record `Xv6.headDone γ n i`.  Nothing relates the two yet: that is the
-  per-position row of the completion side. -/
+  /-- **A head with an UNREAD completion is an ARMED head.**  The handler
+  reads a head `i` out of the used ring and must then produce the
+  `Xv6.headTok γ i (.active c)` that `disk_status_read` and `disk_collect`
+  take; all it holds is the payload's own receipt for slot `i`
+  (`Xv6.slotRes`) and the completion record `Xv6.headDone γ n i`.
+
+  THE UNREAD PREMISE IS NOT DECORATION.  `headDone` is persistent, so a
+  head that completed, was collected and was freed still carries every
+  record it ever earned; without `Xv6.diskReadAt γ nr ∗ ⌜nr < n⌝` the
+  conclusion is simply FALSE for such a head (its receipt is `.inactive`).
+  With it the claim is the first link of the chain the section head of
+  `Xv6/DiskAcc.lean` calls `pend`: a completion at or above the handler's
+  watermark has not been collected, so its head is still armed.  What the
+  invariant must carry for it is the pure clause
+
+      ∀ k, nr ≤ k < dl.length → ∃ c, st dl[k].hd = .active c
+
+  beside the log arithmetic `dl[k].cnt = k + 1` that turns `Xv6.headDone
+  γ n i` into an index `k = n - 1` of `dl`. -/
   slot_active : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
-      [CurCtx] (γ : DiskNames) (i n : Nat) (s : HState),
-    diskInv (GF := GF) γ ∗ headTok γ i s ∗ headDone γ n i ⊢
-      |={⊤}=> (headTok γ i s ∗ ⌜∃ c : Chain, s = HState.active c ∧ c.hd = i ∧ c.wf⌝)
+      [CurCtx] (γ : DiskNames) (i n nr : Nat) (s : HState),
+    nr < n →
+    diskInv (GF := GF) γ ∗ headTok γ i s ∗ headDone γ n i ∗ diskReadAt γ nr ⊢
+      |={⊤}=> (headTok γ i s ∗ diskReadAt γ nr ∗
+        ⌜∃ c : Chain, s = HState.active c ∧ c.hd = i ∧ c.wf⌝)
 
   /-- **The handler's ENTRY credential.**  `Xv6.disk_used_idx_read` at the
   watermark `nr` consumes `Xv6.diskWm γ nr K` -- the fact that this hart's
-  floor has passed the used-index write that published `nr`.  Every later
-  iteration gets it from the previous read; the FIRST one has to get it
-  from the lock, whose release-acquire edge is exactly what puts the new
-  holder's floor past the previous holder's deposit.  `Xv6.diskRes` does
-  not carry it (it would be `∃ T, diskWm γ nr T ∗ ctxFloor curCtx T`, the
-  pair `disk_collect` already asks for), so it is assumed here. -/
+  floor has passed the stores that zeroed the used page and the
+  used-index write that published `nr`.  Every later iteration gets it
+  from the previous read; the FIRST one has to get it from the lock,
+  whose release-acquire edge is exactly what puts the new holder's floor
+  past the previous holder's deposit.
+
+  WHY IT IS STILL ASSUMED (checked, not guessed).  The intended fix is a
+  payload conjunct `∃ T, diskWm γ nr T ∗ ctxFloor ξ T`, and two of its
+  three sides do work:
+
+  * it TRANSPORTS: `MachCSL.instCtxMorphFloor` makes `fun ξ => ctxFloor ξ T`
+    a `MachCSL.CtxMorph`, so the conjunct survives the lock's handoffs;
+  * it is CASHED by `MachCSL.ownCtx_floor_view` (the holder's `ownCtx`
+    comes out of its `kctxL` by `MachCSL.kctx_token_acc`) into
+    `∃ K, viewLb cpu K ∗ ⌜T ≤ K⌝`, and `Xv6.diskWm_mono` carries the
+    credential up to `K`.  That is exactly this arm;
+  * it is RESTORED at each release by `MachCSL.ctx_absorb`, which turns
+    the hart's `viewLb cpu F` -- which `disk_used_idx_read` and the loop's
+    fence leave behind -- back into `ctxFloor curCtx F`.
+
+  What has no source is the MINT, at `Xv6.disk_driver_ok_write`.  The
+  flip freezes the base `b` of the used-index cell's log (the positions of
+  `virtio_disk_init`'s own `memset` stores, out of `Xv6.ctxBytes_tails`),
+  and `diskWm γ 0 T` requires `b ≤ T` with `ctxFloor curCtx T` -- i.e. the
+  initialising hart's floor past its OWN stores.  The model supports it
+  (`MachCSL.fencePost` drains the hart's `pub`), but no rule exposes it:
+  there is no `pubLb` receipt to pair with a fence the way
+  `MachCSL.rviewLb` pairs with `MachCSL.wp_s_fence_iorw_iorw_floor`, and
+  the other route -- the lock's own stamp, `MachCSL.lockPayWon`'s
+  `ctxFloor curCtx T` -- is DISCARDED by `Xv6.ACQUIRE`'s frozen statement,
+  which hands out only an unrelated `∃ K, viewLb cpu' K`.  Adding the
+  conjunct without a mint would only move the assumption into
+  `Xv6.VIRTIO_DISK_INIT`, where its caller could not discharge it either
+  (`diskWm` names `diskBaseFrozen γ b`, which does not exist until the
+  flip creates it).  So it stays here, where it is visible. -/
   pay_wm : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
       [CurCtx] (γ : DiskNames) (cpu : CPU) (nr : Nat),
     diskReadAt (GF := GF) γ nr ∗ (∃ K : Nat, viewLb cpu K) ⊢
@@ -698,7 +742,8 @@ theorem vdis_loop (HA : DISK_ACC_ASSUMPTIONS) (HE : DISK_INTR_EXTRA) (WK : WAKEU
   unfold slotRes
   icases Hslot with ⟨%st, Htok, Hbody⟩
   iapply wpLoop_fupd
-  imod (HE.slot_active γ i (nr + 1) st) $$ [Hinv Htok Hdone] with ⟨Htok, %hst⟩
+  imod (HE.slot_active γ i (nr + 1) nr st (by omega)) $$ [Hinv Htok Hdone Hnr]
+    with ⟨Htok, Hnr, %hst⟩
   · iframe #; iframe
   imodintro
   obtain ⟨c, rfl, hchd, hcwf⟩ := hst
