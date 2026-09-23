@@ -391,3 +391,4 @@ import Xv6.ProofVirtioDiskInit
 import Xv6.LinkVirtioDiskInit
 import Xv6.ProofClockintr
 import Xv6.LinkClockintr
+import Xv6.DiskTier

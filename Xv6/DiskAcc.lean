@@ -34,19 +34,22 @@ cell, `avail->idx`) is split in halves: the invariant's half is a
 * a driver READ of a cell that is ENTIRELY the device's (`used->idx`,
   `used->ring[..]`, `info[h].status`) opens the invariant with `readAU`.
 
-The file has three parts: the MMIO accessors of `virtio_disk_init` (all
+The file has four parts: the MMIO accessors of `virtio_disk_init` (all
 proved, including the `DRIVER_OK` store that flips the invariant to its
-live arm), the queue-memory accessors that need no queue accounting (the
-avail page, also proved), and an assumed interface for the seven
-accessors of `virtio_disk_rw`/`virtio_disk_intr` that do -- with the
-reason the accounting is not there, and the fix it needs, written out
-above `DISK_ACC_ASSUMPTIONS`.
+live arm), the queue-memory accessors that need only the PENDING-side
+accounting (the avail page and `disk_publish`, also proved), the tier
+arithmetic those need (`Xv6/DiskTier.lean`, `MachCSL/WpDmaCtx2.lean`), and
+an assumed interface for the five accessors of
+`virtio_disk_rw`/`virtio_disk_intr` that need the COMPLETION-side
+accounting -- with the reason it is not there, and the fix it needs,
+written out above `DISK_ACC_ASSUMPTIONS`.
 -/
 import Xv6.DiskInv
 import MachCSL.WpDmaCtx
 import MachCSL.WpSmodeDev4
 import MachCSL.WpSmodeAuRules
 import Xv6.PtOwnLemmas
+import Xv6.DiskTier
 
 namespace Xv6
 
@@ -1275,9 +1278,11 @@ Everything above is PROVED, and it is everything `virtio_disk_init` needs
 of its stores up to `QUEUE_READY = 1`, and `disk_driver_ok_write` for the
 `DRIVER_OK` store that ends it) and everything the PUBLISH path of
 `virtio_disk_rw` needs of the avail page (`disk_ring_write`,
-`disk_avail_idx_write`, now carrying the queue accounting).  What follows
-is stated but ASSUMED, as an interface (no `sorry`): six accessors of
-`virtio_disk_rw` and `virtio_disk_intr`.
+`disk_avail_idx_write`, now carrying the queue accounting) and of the
+publication point (`disk_publish`, above).  What follows is stated but
+ASSUMED, as an interface (no `sorry`): five accessors of `virtio_disk_rw`
+and `virtio_disk_intr`, ALL of them waiting on the COMPLETION side of the
+accounting.
 
 -------------------------------------------------------------------------
 WHAT THE QUEUE ACCOUNTING HAS SETTLED.  `Xv6/DiskInvDefs.lean`'s
@@ -1311,50 +1316,146 @@ holds at the pop.  Consequently:
   payload owns outright.
 
 -------------------------------------------------------------------------
-WHAT IS LEFT.  `disk_publish` is now blocked only on TIER ARITHMETIC: the
-chain's four context windows have to be split into the invariant's raw
-halves and the driver's context halves, and the header's sixteen bytes
-into the 4/4/8 pieces `Virtio.fetch` reads (`Xv6.chainLease`), and
-`b->data`'s `byteBuf` into the two sector-sized `dmaOwn` windows of
-`Xv6.bufLease`.  `MachCSL/WpDmaCtx.lean` has the WHOLE-window split
-(`ctxBytes_split_dma`) but no SUB-RANGE split of a `ctxBytes`/`histBytes`
-window, and that is the missing piece.
+WHAT THE TIER ARITHMETIC HAS SETTLED.  `disk_publish` was blocked only on
+that, and it is now there: `MachCSL/WpDmaCtx2.lean` splits and joins a
+`ctxBytes`/`histBytes` window at a byte offset (`ctxBytes_split_at`,
+`histBytes_split_at`, `histBytes_glue`), and `Xv6/DiskTier.lean` lifts it
+to the three DMA shapes (`dmaOwn`/`dmaOwnAt`/`dmaHalfAt` split and join),
+to the request header's 4/4/8 pieces (`ctxBytes_hdr_split`,
+`dmaHalfAt_hdr_split`), to the 512/512 split of `b->data`
+(`byteBuf_bufLease`), and to the bridge between the driver's
+`wordAtN`/`byteBuf` cells and the raw tier under a page's identity claim
+(`wordPointsTo_dmaOwn`, `byteBuf_dmaOwn`, and the reverse
+`ctxBytes_wordPointsTo`, `ctxIdx_byteBuf` that `disk_collect` will need).
 
-The other five are blocked on the COMPLETION side of the accounting, which
-this file does not carry: the used-index cell's history, a per-completion
-record of the head reported at each used-ring position, the completed
-request's status byte and its DMA timestamp bound (Rocq's `disk_flr`), and
-the `ctxFloor` those give the handler.  Each docstring below says what its
-accessor needs. -/
+-------------------------------------------------------------------------
+WHAT IS LEFT.  All five accessors below are blocked on the COMPLETION side
+of the accounting, which `diskLive` does not carry: the used-index cell's
+history, a per-completion record of the head reported at each used-ring
+position, the completed request's status byte and its DMA timestamp bound
+(Rocq's `disk_flr`), and the `ctxFloor` those give the handler.  The
+structure's own docstring lists the design; each field's docstring below
+says what its accessor needs. -/
 
-/-- The accessors whose obligations this port leaves open. -/
-structure DISK_ACC_ASSUMPTIONS : Prop where
-  /-- **`publish`**: the view shift that arms head `c.hd` with the chain
-  `c`, carried out between the ring-cell store and the `avail->idx` bump
-  (`disk_avail_idx_write` does the publication itself, and needs the
-  receipt this produces).  The chain's cells leave the payload for the
-  invariant: the whole context windows of `c.d0/d1/d2/hdr` split into the
-  raw halves of `chainLease` and the context halves of `claimRes`,
-  `info[h].status` and `b->data` go over at own 1, and the block's image
-  fragment is deposited in the row.
+/-! ## Arming a head: the publication view shift
 
-  The ACCOUNTING obligation is discharged: `Xv6.permOk` now records a
-  chain per permit, so `headTok γ c.hd .inactive` rules out a permit on
-  `c.hd`, `Xv6.queueOk_arm'` keeps the pending window (an inactive head is
-  at no pending position) and `Xv6.permOk_arm` keeps the permits honest.
-  What remains is the SUB-RANGE tier arithmetic described above.
+`disk_publish` is the moment a formatted chain leaves the driver and
+becomes the device's: the descriptor words and the request header split
+into the invariant's RAW half and the payload's CONTEXT half, the status
+byte and `b->data` go over whole, the block's image fragment is deposited
+in the row, and the receipt moves from `.inactive` to `.active c`.
 
-  Note the two changes from the statement this file used to carry: the
-  driver hands in the WHOLE descriptor windows (a free slot's row is now
-  `emp`, so the invariant has no half to contribute), and the staged head
-  is no longer touched here -- `diskStage` is a ghost HALF now, moved by
-  `disk_ring_write` and `disk_avail_idx_write`, because the publication
-  point needs what the ring store established. -/
-  disk_publish : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
-      [DiskG GF] [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (c : Chain)
-      (bs data : List (BitVec 8)),
-    c.wf → data.length = BSIZE →
-    diskInv (GF := GF) γ ∗ diskGeom γ pd pav pu ∗ headTok γ c.hd .inactive ∗
+Every pure clause of `diskLive` survives because a FREE head is named by
+nothing: no pending position (`Xv6.queueOk_arm'`), no serve permit (a
+permit records an ARMED chain, `Xv6.permOk_arm`), no in-flight request and
+no cached sector (`Xv6.inflightOk_arm`, `Xv6.cachedOk_arm`).  The
+SUB-RANGE tier arithmetic -- the 4/4/8 split of the header, the 512/512
+split of `b->data`, the `byteBuf`/`wordPointsTo` bridge to the raw tier --
+is `Xv6/DiskTier.lean` and `MachCSL/WpDmaCtx2.lean`. -/
+
+/-- Both halves of a receipt move together. -/
+theorem headTok_update (γ : DiskNames) (i : Nat) (s s' t : HState) :
+    headAuth (GF := GF) γ i s ∗ headTok γ i s' ⊢ |==> (headAuth γ i t ∗ headTok γ i t) := by
+  unfold headAuth headTok
+  iintro ⟨H1, H2⟩
+  iapply ghost_var_update_halves t (γ.head i) _ _ $$ H1 H2
+
+/-- Replacing the entry of index `n` in a big-op over `List.range NUM`. -/
+theorem diskArm_acc (n : Nat) (hn : n < NUM) (Φ Ψ : Nat → IProp GF)
+    (heq : ∀ j, j ≠ n → Ψ j = Φ j) :
+    iprop([∗list] j ∈ List.range NUM, Φ j) ⊢ Φ n ∗ (Ψ n -∗ [∗list] j ∈ List.range NUM, Ψ j) := by
+  iintro H
+  icases (bigSepL_upd_acc (GF := GF) (List.range NUM) n n (by rw [List.getElem?_range hn]) Φ
+      (fun (_ : Unit) j => Ψ j)
+      (fun _ k j hjk hne => by
+        have hjn : j ≠ n := by
+          by_cases hk : k < NUM
+          · rw [List.getElem?_range hk] at hjk; cases hjk; exact hne
+          · rw [List.getElem?_eq_none (by simp; omega)] at hjk; cases hjk
+        exact heq j hjn)) $$ H with ⟨Hn, Hback⟩
+  iframe Hn
+  iintro Hn'
+  iapply Hback $$ %() Hn'
+
+/-- **The protocol arms a free head.** -/
+theorem diskProto_armHead (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) (pd : PAddr) (c : Chain)
+    (hpd : c0.desc = pd) (hlive : Virtio.live c0 = true) (hwf : c.wf) :
+    diskCfgFrozen (GF := GF) γ c0 ∗ diskProto γ v ∗ headTok γ c.hd .inactive ∗
+      chainLease pd c ∗ (∃ bs : List (BitVec 8), diskBlock γ c.blk bs) ⊢
+      |==> (diskProto γ v ∗ headTok γ c.hd (.active c)) := by
+  subst hpd
+  unfold diskProto
+  iintro ⟨#Hfr0, ⟨%hc, %pn, %pm, Hpm, %hfr, Harm⟩, Htok, Hlease, Hblk⟩
+  icases Harm with ⟨Hd | ⟨%c0', #Hfr, %hc0, Hl⟩⟩
+  · unfold diskDead
+    icases Hd with ⟨%m, Hm, Hcfg, Hlo0, HnpM0, Hpos0, HstgA0, %hpure⟩
+    ihave %heq := diskCfgFrozen_auth_agree γ c0 v.cfg $$ Hfr0 Hcfg
+    rw [heq, hpure.1] at hlive
+    exact absurd hlive (by simp)
+  · ihave %hcc := diskCfgFrozen_agree γ c0 c0' $$ [$Hfr0 $Hfr]
+    subst hcc
+    unfold diskLive
+    icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg,
+      Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, %hpure⟩
+    obtain ⟨q1, q2, q3, q4, q5, q6, q7, q8, q9, q10⟩ := hpure
+    ihave %hst := headTok_state γ st c.hd .inactive hwf.1 $$ Ha Htok
+    icases diskArm_acc c.hd hwf.1 (fun j => headAuth γ j (st j))
+        (fun j => headAuth γ j (armSt st c.hd c j))
+        (fun j hj => by rw [armSt_ne st c.hd c j hj]) $$ Ha with ⟨Hai, Haback⟩
+    icases diskArm_acc c.hd hwf.1 (fun j => headRes γ c0.desc j (st j))
+        (fun j => headRes γ c0.desc j (armSt st c.hd c j))
+        (fun j hj => by rw [armSt_ne st c.hd c j hj]) $$ Hr with ⟨Hri, Hrback⟩
+    imod headTok_update γ c.hd (st c.hd) .inactive (.active c) $$ [Hai Htok] with ⟨Hai, Htok⟩
+    · iframe Hai Htok
+    ihave Hai2 : iprop(headAuth (GF := GF) γ c.hd (armSt st c.hd c c.hd)) $$ [Hai]
+    · rw [armSt_self]
+      iexact Hai
+    ihave Ha := Haback $$ Hai2
+    ihave Hres : iprop(headRes (GF := GF) γ c0.desc c.hd (armSt st c.hd c c.hd))
+      $$ [Hlease Hblk]
+    · rw [armSt_self, headRes_active]
+      isplitl []
+      · ipureintro; exact ⟨rfl, hwf⟩
+      · iframe Hlease Hblk
+    ihave Hr := Hrback $$ Hres
+    imodintro
+    iframe Htok
+    isplitl []
+    · ipureintro; exact hc
+    iexists pn, pm
+    iframe Hpm
+    isplitl []
+    · ipureintro; exact hfr
+    iright
+    iexists c0
+    iframe Hfr
+    isplitl []
+    · ipureintro; exact hc0
+    iexists (armSt st c.hd c), nc, np, lo, ring, m, pmap, stg
+    iframe Hm Ha Hr Hu Hav Hnc Hnp Hlo HnpM Hpos Hstg
+    ipureintro
+    exact ⟨q1, q2, q3, queueOk_arm st ring lo np c.hd c q4 hst, q5, q6,
+      inflightOk_arm v st c.hd c hst q7, imgOk_arm v m st c.hd c hst q8,
+      cachedOk_arm v st c.hd c hst q9, permOk_armSt pm st c.hd c q10 hst⟩
+
+/-- **`publish`**: the view shift that arms head `c.hd` with the chain `c`,
+carried out between the ring-cell store and the `avail->idx` bump
+(`disk_avail_idx_write` does the publication itself, and needs the receipt
+this produces).  The chain's cells leave the payload for the invariant:
+the whole context windows of `c.d0/d1/d2/hdr` split into the raw halves of
+`chainLease` and the context halves of `claimRes`, `info[hd].status` and
+`b->data` go over at own 1, and the block's image fragment is deposited in
+the row.
+
+Two premises beyond the ghost state: `kmapStatic` (persistent, from
+`Xv6.kctx_kernelMap`) and the fact that `b->data`'s bytes are kernel data.
+They are what identifies the driver's VIRTUAL addresses with the physical
+ones the device's DMA windows live at -- the driver's `wordAtN`/`byteBuf`
+cells carry a page mapping, the invariant's `dmaOwn` does not. -/
+theorem disk_publish [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (c : Chain)
+    (bs data : List (BitVec 8)) (hwf : c.wf) (hlen : data.length = BSIZE)
+    (hkm : ∀ j, j < BSIZE → kmapClass (vpnOf (c.data + BitVec.ofNat 64 j)).toNat = some .rw) :
+    diskInv (GF := GF) γ ∗ kmapStatic ∗ diskGeom γ pd pav pu ∗ headTok γ c.hd .inactive ∗
       ctxBytes curCtx (descAt pd c.hd) 16 (DFrac.own 1) c.d0 ∗
       ctxBytes curCtx (descAt pd c.md) 16 (DFrac.own 1) c.d1 ∗
       ctxBytes curCtx (descAt pd c.tl) 16 (DFrac.own 1) c.d2 ∗
@@ -1365,8 +1466,84 @@ structure DISK_ACC_ASSUMPTIONS : Prop where
         ctxBytes curCtx (descAt pd c.hd) 16 (DFrac.own (1 : Qp).half) c.d0 ∗
         ctxBytes curCtx (descAt pd c.md) 16 (DFrac.own (1 : Qp).half) c.d1 ∗
         ctxBytes curCtx (descAt pd c.tl) 16 (DFrac.own (1 : Qp).half) c.d2 ∗
-        ctxBytes curCtx c.hdrAddr 16 (DFrac.own (1 : Qp).half) c.hdr)
+        ctxBytes curCtx c.hdrAddr 16 (DFrac.own (1 : Qp).half) c.hdr) := by
+  unfold diskInv devInvR
+  iintro ⟨#Hinv, #HS, #Hgeom, Htok, Hd0, Hd1, Hd2, Hhdr, Hstat, Hbuf, Hblk⟩
+  icases diskGeom_cfg γ pd pav pu $$ Hgeom with ⟨%c0, #Hfr, %hg⟩
+  icases ctxBytes_split_dma curCtx (descAt pd c.hd) 16 c.d0 $$ Hd0 with ⟨Hr0, Hc0⟩
+  icases ctxBytes_split_dma curCtx (descAt pd c.md) 16 c.d1 $$ Hd1 with ⟨Hr1, Hc1⟩
+  icases ctxBytes_split_dma curCtx (descAt pd c.tl) 16 c.d2 $$ Hd2 with ⟨Hr2, Hc2⟩
+  icases ctxBytes_split_dma curCtx c.hdrAddr 16 c.hdr $$ Hhdr with ⟨Hrh, Hch⟩
+  icases dmaHalfAt_hdr_split c.hdrAddr c $$ Hrh with ⟨Hh0, Hh1, Hh2⟩
+  ihave Hstat2 : iprop(wordPointsTo (GF := GF) c.status 1 (DFrac.own 1) 0xff#8) $$ [Hstat]
+  · iapply (show wordAtN (GF := GF) curCtx c.status 1 (DFrac.own 1) 0xff#8 ⊢
+      wordPointsTo c.status 1 (DFrac.own 1) 0xff#8 from by rw [wordAtN_cur])
+    iexact Hstat
+  ihave Hsraw := wordPointsTo_dmaOwn c.status 1 0xff#8
+    (by rw [show c.status = aInfoStatus c.hd from rfl]; exact info_status_kmapRw c.hd hwf.1)
+      $$ HS Hstat2
+  ihave Hbraw := byteBuf_bufLease c data hlen hkm $$ HS Hbuf
+  ihave Hlease : iprop(chainLease (GF := GF) pd c)
+    $$ [Hr0 Hr1 Hr2 Hh0 Hh1 Hh2 Hsraw Hbraw]
+  · unfold chainLease
+    iframe Hr0 Hr1 Hr2 Hh0 Hh1 Hh2 Hsraw Hbraw
+  iinv Hinv with Hbody Hclose
+  icases Hbody with ⟨%v, >Hfrag, >Hproto⟩
+  imod diskProto_armHead γ c0 v pd c hg.1 hg.2.2.2.1 hwf $$
+    [Hfr Hproto Htok Hlease Hblk] with ⟨Hproto, Htok⟩
+  · iframe Hfr Hproto Htok Hlease
+    iexists bs
+    iexact Hblk
+  ihave Hcl := Hclose $$ [Hfrag Hproto]
+  case' _ =>
+    inext
+    iexists v
+    iframe Hfrag Hproto
+  imod Hcl
+  imodintro
+  iframe Htok Hc0 Hc1 Hc2 Hch
 
+/-- **The accessors whose obligations this port leaves open.**
+
+All five need the SAME missing piece: the COMPLETION-side accounting of
+the queue, which `Xv6/DiskInvDefs.lean`'s `diskLive` does not carry.  The
+pending side is there (`nr`-free: `lo ≤ np ≤ lo + NUM`, `queueOk`,
+`posOk`, `stageOk`, the serve permits), and `disk_publish` above is what
+it buys.  What is missing is, per position `p ∈ [nr, nc)` -- completed by
+the device and not yet read by the interrupt handler -- a ROW carrying
+
+* the head `h_p` and its chain, with the receipt at `.done c` (a THIRD
+  arm of `Xv6.HState`, which the device installs at the used-index write;
+  the driver's `collect` flips it back to `.inactive`).  Because the
+  DEVICE moves that value while the DRIVER holds a token, `headAuth`
+  and `headTok` cannot stay a plain ghost-var pair: the invariant must
+  own the whole variable and the driver an exclusive per-head claim
+  token beside a persistent "armed at generation g" record;
+* the status byte at `dmaOwnAt c.status 1 0#8` (`Virtio.statusOf r = 0`
+  for both request types xv6 issues);
+* the used element written at `usedElemAt pu (p % NUM)`;
+* the DMA timestamp bound `t_p` with `topLb t_p`, monotone in `p`, which
+  is what `MachCSL.ctxBytes_of_pushedFloor` needs to hand the
+  device-written bytes back at the driver's context;
+* and, beside the rows, the used-index cell's EXPLICIT history
+  (`histBytes (usedIdxAt pu) 2 own1 Hs` with `Hs` the pushed sequence
+  `wrap16 0, …, wrap16 nc` by `MachCSL.diskAgent`), plus `nr` as a ghost
+  HALF of `diskReadAt` so that `nc - nr ≤ NUM` is available.
+
+Adding the `.done` arm ripples through `Xv6/VirtioQueue.lean`
+(`isActive`, `queueOk`, `inflightOk`, `inFlightBlk`, `cachedOk`),
+`Xv6/DiskInvDefs.lean` (`headRes`, `slotBody`) and every device step of
+`Xv6/DiskInv.lean` (`complete` in particular, which must move the row and
+record `t`); that is the work these five are waiting on.  Nothing else is
+missing: the TIER arithmetic they also need -- sub-range splits and joins
+of `ctxBytes`/`histBytes`/`dmaOwn`/`dmaHalfAt`/`dmaOwnAt`, the `byteBuf`
+bridge -- is proved in `MachCSL/WpDmaCtx2.lean` and `Xv6/DiskTier.lean`.
+
+`disk_collect` needs one thing beyond that: the reverse of
+`Xv6.byteBuf_dmaOwn`, which asks for `inRam` of the buffer (a
+`wordPointsTo` carries it, a `dmaOwn` does not), so its statement will
+grow the same `kmapStatic`-style premises `disk_publish` now carries. -/
+structure DISK_ACC_ASSUMPTIONS : Prop where
   /-- **`disk.used->idx`, read** (the `lhu` of `virtio_disk_intr`'s loop
   test).  The used page is entirely the device's, and the invariant holds
   it as `dmaOwn` -- FULL ownership at an UNCONSTRAINED value -- so a read
