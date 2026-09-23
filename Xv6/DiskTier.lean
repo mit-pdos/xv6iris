@@ -620,11 +620,13 @@ moves are all `.inactive` beforehand, so by the clause itself none of
 them is an unread head; the head's own receipt only becomes MORE
 active. -/
 theorem unreadArmed_arm3 (st : Nat → HState) (c : Chain) (dl : List UsedRec) (nr : Nat)
+    (ring : Nat → Nat) (lo np : Nat) (stg : Option Nat)
     (hwf : c.wf) (hst : st c.hd = .inactive) (hstm : st c.md = .inactive)
-    (hstt : st c.tl = .inactive) (h : unreadArmed st dl nr) :
-    unreadArmed (armSt3 st c) dl nr := by
+    (hstt : st c.tl = .inactive) (h : unreadArmed st dl nr ring lo np stg) :
+    unreadArmed (armSt3 st c) dl nr ring lo np stg := by
   intro r hr hlt
-  obtain ⟨c', hc'⟩ := h r hr hlt
+  obtain ⟨⟨c', hc'⟩, hp, hs⟩ := h r hr hlt
+  refine ⟨?_, hp, hs⟩
   by_cases hhd : r.hd = c.hd
   · rw [hhd, armSt3_hd st c hwf]
     exact ⟨c, rfl⟩

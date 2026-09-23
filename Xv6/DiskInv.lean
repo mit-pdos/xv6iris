@@ -326,7 +326,8 @@ theorem diskProto_pop_live (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) (
       refine ⟨e1, ?_, by omega, queueOk_pop st ring lo np e4, posOk_pop pmap ring lo np e5,
         stageOk_pop stg ring lo np e5b,
         inflightOff_pop v st ring lo np stg h (v.seen + 1#16) e4 e5b (by omega)
-          (by rw [hri, hh]) e6, e7, e8, ?_, e10, e11⟩
+          (by rw [hri, hh]) e6, e7, e8, ?_, e10,
+        unreadArmed_pop st dl nr ring lo np stg e11⟩
       · show v.seen + 1#16 = wrap16 (lo + 1)
         rw [wrap16_succ, e2]
       · exact permOk_pop v pm st pn h c (v.seen + 1#16) (by omega)
@@ -683,8 +684,14 @@ theorem diskProto_usedIdx_acc (γ : DiskNames) (s : VirtioState) (h : BitVec 16)
     iframe Hm Ha Hr Hu Hav Hnc Hnp Hlo HnpM Hpos Hstg Hui' Hdn Hbs Htp' Hnr
     ipureintro
     obtain ⟨-, c, hcst, -, -⟩ := (inflightOff_ok s st ring lo np stg e6) h r hin
+    have hsome : (Virtio.phase s h).isSome = true := by
+      unfold Virtio.reqOf at hin
+      cases hp : Virtio.phase s h with
+      | none => rw [hp] at hin; exact absurd hin (by simp)
+      | some x => rfl
+    obtain ⟨-, -, hpos, hstg⟩ := e6.2 h hsome
     exact ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, usedOk_write dl dl0 nc M t h.toNat e10,
-      unreadArmed_write st dl nr (nc + 1) t h.toNat e11 ⟨c, hcst⟩⟩
+      unreadArmed_write st dl nr (nc + 1) t h.toNat ring lo np stg e11 ⟨c, hcst⟩ hpos hstg⟩
 
 /-- W3: the used index.  The write appends its entry -- the counter the
 device's `usedIdx` is about to reach, at the position the machine gives the

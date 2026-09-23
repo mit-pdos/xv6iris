@@ -1757,29 +1757,90 @@ Stated over the COUNTERS, not over indices into `dl`: `Xv6.headDone γ n
 i` hands out an entry `(n, t, i) ∈ dl`, and reading it off needs no log
 arithmetic that way. -/
 
-/-- **Every unread completion names an armed head.** -/
-def unreadArmed (st : Nat → HState) (dl : List UsedRec) (nr : Nat) : Prop :=
-  ∀ r ∈ dl, nr < r.cnt → ∃ c : Chain, st r.hd = HState.active c
+/-- **Every unread completion names an armed head, at no pending position
+and not staged** -- (P1) and (P2) of `Xv6/DiskAcc.lean`'s section head, in
+one predicate over the log, the receipts, the ring and the window.
 
-theorem unreadArmed_nil (st : Nat → HState) (nr : Nat) : unreadArmed st [] nr := by
+(P2) is what says an unread head cannot be POPPED again: it is at no
+position of `[lo, np)` and it is not the one the ring store has staged,
+so neither the pop nor the publication can reach it.  Together with
+`Xv6.inflightOff` -- an IN-FLIGHT head is at no pending position either --
+it is the whole of "a head with an unread completion is not served
+twice". -/
+def unreadArmed (st : Nat → HState) (dl : List UsedRec) (nr : Nat)
+    (ring : Nat → Nat) (lo np : Nat) (stg : Option Nat) : Prop :=
+  ∀ r ∈ dl, nr < r.cnt →
+    (∃ c : Chain, st r.hd = HState.active c) ∧
+    (∀ p, lo ≤ p → p < np → ring (p % NUM) ≠ r.hd) ∧ stg ≠ some r.hd
+
+/-- The armed head, read off. -/
+theorem unreadArmed_st (st : Nat → HState) (dl : List UsedRec) (nr : Nat)
+    (ring : Nat → Nat) (lo np : Nat) (stg : Option Nat)
+    (h : unreadArmed st dl nr ring lo np stg) (r : UsedRec) (hr : r ∈ dl) (hlt : nr < r.cnt) :
+    ∃ c : Chain, st r.hd = HState.active c := (h r hr hlt).1
+
+theorem unreadArmed_nil (st : Nat → HState) (nr : Nat) (ring : Nat → Nat) (lo np : Nat)
+    (stg : Option Nat) : unreadArmed st [] nr ring lo np stg := by
   intro r hr; exact absurd hr (by simp)
 
 /-- **The used-index write.**  The entry that joins the log names the head
-whose request has just completed, and that head is in flight, hence
-armed. -/
+whose request has just completed: that head is in flight, hence armed, at
+no pending position and not the staged one (`Xv6.inflightOff`). -/
 theorem unreadArmed_write (st : Nat → HState) (dl : List UsedRec) (nr nc t hd : Nat)
-    (h : unreadArmed st dl nr) (ha : ∃ c : Chain, st hd = HState.active c) :
-    unreadArmed st (dl ++ [(nc, t, hd)]) nr := by
+    (ring : Nat → Nat) (lo np : Nat) (stg : Option Nat)
+    (h : unreadArmed st dl nr ring lo np stg) (ha : ∃ c : Chain, st hd = HState.active c)
+    (hp : ∀ p, lo ≤ p → p < np → ring (p % NUM) ≠ hd) (hs : stg ≠ some hd) :
+    unreadArmed st (dl ++ [(nc, t, hd)]) nr ring lo np stg := by
   intro r hr hlt
   rcases List.mem_append.1 hr with hr | hr
   · exact h r hr hlt
   · have hre : r = (nc, t, hd) := by simpa using hr
-    rw [hre]; exact ha
+    rw [hre]; exact ⟨ha, hp, hs⟩
 
 /-- **The handler's deposit**: the unread window only ever shrinks. -/
 theorem unreadArmed_nr (st : Nat → HState) (dl : List UsedRec) (nr nr' : Nat)
-    (h : unreadArmed st dl nr) (hle : nr ≤ nr') : unreadArmed st dl nr' :=
+    (ring : Nat → Nat) (lo np : Nat) (stg : Option Nat)
+    (h : unreadArmed st dl nr ring lo np stg) (hle : nr ≤ nr') :
+    unreadArmed st dl nr' ring lo np stg :=
   fun r hr hlt => h r hr (by omega)
+
+/-- **The pop**: the pending window shrinks from below. -/
+theorem unreadArmed_pop (st : Nat → HState) (dl : List UsedRec) (nr : Nat)
+    (ring : Nat → Nat) (lo np : Nat) (stg : Option Nat)
+    (h : unreadArmed st dl nr ring lo np stg) :
+    unreadArmed st dl nr ring (lo + 1) np stg :=
+  fun r hr hlt => ⟨(h r hr hlt).1, fun p h1 h2 => (h r hr hlt).2.1 p (by omega) h2,
+    (h r hr hlt).2.2⟩
+
+/-- **The ring store.**  The head it stages is FREE, so by (P1) it is not
+an unread head; the cell it writes is `np % NUM`, which no pending
+position names (`Xv6.ring_mod_ne`, there is room). -/
+theorem unreadArmed_stage (st : Nat → HState) (dl : List UsedRec) (nr : Nat)
+    (ring : Nat → Nat) (lo np i : Nat) (stg : Option Nat) (hroom : np < lo + NUM)
+    (hfree : st i = HState.inactive) (h : unreadArmed st dl nr ring lo np stg) :
+    unreadArmed st dl nr (updN ring (np % NUM) i) lo np (some i) := by
+  intro r hr hlt
+  obtain ⟨⟨c, hc⟩, hp, _⟩ := h r hr hlt
+  refine ⟨⟨c, hc⟩, fun p h1 h2 => ?_, ?_⟩
+  · rw [updN_ne _ _ _ _ (ring_mod_ne lo np p h1 h2 hroom)]
+    exact hp p h1 h2
+  · intro he
+    rw [Option.some.inj he, hc] at hfree
+    exact absurd hfree (by simp)
+
+/-- **The publication.**  Position `np` joins the window with the STAGED
+head, which the clause above says is no unread head. -/
+theorem unreadArmed_publish (st : Nat → HState) (dl : List UsedRec) (nr : Nat)
+    (ring : Nat → Nat) (lo np i : Nat) (hcell : ring (np % NUM) = i)
+    (h : unreadArmed st dl nr ring lo np (some i)) :
+    unreadArmed st dl nr ring lo (np + 1) none := by
+  intro r hr hlt
+  obtain ⟨ha, hp, hs⟩ := h r hr hlt
+  refine ⟨ha, fun p h1 h2 => ?_, by simp⟩
+  by_cases hpn : p = np
+  · rw [hpn, hcell]
+    intro he; exact hs (by rw [he])
+  · exact hp p h1 (by omega)
 
 /-! ## The leases -/
 
@@ -1921,7 +1982,7 @@ def diskLive (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState)
     ⌜v.usedIdx = wrap16 nc ∧ v.seen = wrap16 lo ∧ lo ≤ np ∧ queueOk st ring lo np ∧
       posOk pmap ring lo np ∧ stageOk stg ring lo np ∧ inflightOff v st ring lo np stg ∧
       imgOk v m (inFlightBlk st) ∧ cachedOk v st ∧ permOk v pm st ∧ usedOk dl dl0 nc M ∧
-      unreadArmed st dl nr⌝
+      unreadArmed st dl nr ring lo np stg⌝
 
 /-- The dead arm: before `virtio_disk_init`, and never again after.
 
