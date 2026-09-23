@@ -20,7 +20,8 @@ console instance waits for its M3.
 
 ## A. The parser
 
-- [ ] **A1 `RefParse.v`** (pure; after `UkShParse`'s vocabulary or
+- [x] **A1 `RefParse.v`** (landed on branch `user-once/A`, `eee474d4c`; the
+  bridge file `RefParseBridge.v` is stated and being proved) -- (pure; after `UkShParse`'s vocabulary or
   replacing it): `ref_skipws`, `ref_gettoken`, `ref_peek`,
   `ref_parseredirs`, `ref_parseexec`, `ref_parsepipe`, `ref_parseline`,
   `ref_parsecmd`, `ref_nulcut`, `ushp_cat`, `ushp_room`, `ushp_nodes`;
@@ -29,9 +30,28 @@ console instance waits for its M3.
   left command); the three line-shape facts on `wl_line`; anti-vacuity by
   `vm_compute` on the three literal lines.  Exit: `UkShParseSym`'s and
   `UkShPipeLex`'s pure models are corollaries.
-- [ ] **A2a** `wp_ref_gettoken`, `wp_ref_peek` (re-statements of
-  `UkShParseTok`/`UkShParseLex`'s at the reference; `UkShPipeTok.
-  wp_kshp_gettoken_syms` and `UkShRedirGtk` fold in as the symbol cases).
+- [ ] **A2a** `wp_ref_gettoken`, `wp_ref_peek`.  READ OFF THE TREE
+  (2026-09-23): the three gettoken walks (`UkShParseTok.wp_kshp_gettoken`
+  under `ushp_no_symbols`, `UkShRedirGtk.wp_kshp_gettoken_sym` under
+  `ushs_gt_ok`, `UkShPipeTok.wp_kshp_gettoken_syms` under `ushq_sym_ok`)
+  are ONE statement with the premise and the three pure functions
+  (`ushp_/ushs_gettok_{res,end,fin}`) changed, and each is the same full
+  walk over a different DISPATCH lemma for the switch
+  (`wp_kshp_gtk_disp` / `_disp_ns` + `UkShRedirTok.wp_kshp_gtk_disp_gt` /
+  `_disp_bar` + `_disp_sym`).  `wp_kshp_peek` is already general (no shape
+  premise; result `ushp_peek_res`).  So A2a is: (i) the symbol scope
+  `ushq_sym_ok` and `ushq_bar` move down to `RefParse` (as
+  `ref_sym_scope`); (ii) the pure bridge `ref_gettoken len f off =
+  (ushs_gettok_res, k, ushs_gettok_end, ushs_gettok_fin)` at `k = off +
+  skipws` under `ref_sym_scope ∧ ref_nonnul`, and `ref_peek` vs
+  `ushp_peek_res`; (iii) the arm dispatch lemmas move into `UkShParseTok`
+  and ONE dispatch over `ref_sym_scope` replaces the four; (iv)
+  `wp_ref_gettoken` stated at `let '(ret,q,e,fin) := ref_gettoken len f
+  off in …` with `ref_nonnul` READ OFF `ustr`'s pure conjunct (no new
+  premise), proved as the widest landed walk rewritten; `wp_kshp_gettoken`
+  kept as its corollary (consumers: `UkShParseExec`, `UkShParseRedir`);
+  `UkShRedirTok`/`UkShRedirGtk`/`UkShPipeTok` reduced to corollaries until
+  A3 deletes them with their consumers.
 - [ ] **A2b** `wp_ref_parseredirs` (induction on the redirects consumed;
   `wp_kshp_parseredirs_ns`/`_gtn`/`_miss` are its cases).
 - [ ] **A2c** `wp_ref_parseexec` (the token-list induction; the turn hands
@@ -74,8 +94,13 @@ console instance waits for its M3.
   `UShPipeCatRound` as instances.  Exit: one echo entry, one cat round,
   three instance files each.
 
-## RESUME HERE
+## RESUME HERE (2026-09-23)
 
-Not started.  First: the owner's ruling on the design (route, order, and
-whether A starts before app-both's M2c lands — the files are disjoint, so
-it can).
+RULED by the owner: A starts now.  Branch `user-once/A` off `main` at
+`08033db62`.  A1's `RefParse.v` landed there (`eee474d4c`, seven
+`vm_compute` demos); `RefParseBridge.v` (18 statements: the fuel
+monotonicity, the symbol-free bridge both ways, the redirect and pipe
+bridges, the three line-shape facts on `ush_line_is`/`ushs_line_is`/
+`ushq_line_is`) is stated and elaborates; its proofs are with a subagent.
+Merge to `main` when the bridge is `Admitted`-free and the whole tree is
+green.  NEXT: A2a as read off above.

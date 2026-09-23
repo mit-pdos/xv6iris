@@ -229,15 +229,15 @@ Fixpoint ref_parsepipe (len : nat) (f : nat -> bv 8) (n : nat) (i : nat)
 
 (* parseline's `while (peek(ps, es, &)) { gettoken(); cmd = backcmd(cmd); }' *)
 Fixpoint ref_backs (len : nat) (f : nat -> bv 8) (n : nat) (i : nat)
-    (t : ushp_cmd) : ushp_cmd * nat :=
+    (t : ushp_cmd) : option (ushp_cmd * nat) :=
   match n with
-  | O => (t, i)
+  | O => None
   | S n' =>
       let '(amp, s) := ref_peek len f i [rb_amp] in
       if amp then
         let '(_, _, _, s1) := ref_gettoken len f s in
         ref_backs len f n' s1 (UshpBack t)
-      else (t, s)
+      else Some (t, s)
   end.
 
 (* parseline: `cmd = parsepipe(); while (peek &) ...; if (peek(ps, es,
@@ -249,15 +249,18 @@ Fixpoint ref_parseline (len : nat) (f : nat -> bv 8) (n : nat) (i : nat)
   | S n' =>
       match ref_parsepipe len f n' i with
       | Some (t, s) =>
-          let '(t1, s1) := ref_backs len f n' s t in
-          let '(semi, s2) := ref_peek len f s1 [rb_semi] in
-          if semi then
-            let '(_, _, _, s3) := ref_gettoken len f s2 in
-            match ref_parseline len f n' s3 with
-            | Some (r, s4) => Some (UshpList t1 r, s4)
-            | None => None
-            end
-          else Some (t1, s2)
+          match ref_backs len f n' s t with
+          | Some (t1, s1) =>
+              let '(semi, s2) := ref_peek len f s1 [rb_semi] in
+              if semi then
+                let '(_, _, _, s3) := ref_gettoken len f s2 in
+                match ref_parseline len f n' s3 with
+                | Some (r, s4) => Some (UshpList t1 r, s4)
+                | None => None
+                end
+              else Some (t1, s2)
+          | None => None
+          end
       | None => None
       end
   end.

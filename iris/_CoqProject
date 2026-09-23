@@ -1642,6 +1642,7 @@ UkShEcho.v
 UShLexRedir.v
 UkShPipeLex.v
 UkShPipesLex.v
+RefParseBridge.v
 UkShPipeTok.v
 UkShPipeParse.v
 UkShPipeCmd.v
