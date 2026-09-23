@@ -716,41 +716,27 @@ theorem status_write_lease (γ : DiskNames) (c : Chain) (pa : PAddr) (hpa : pa =
   iintro Hb2
   iframe Hb2 HP
 
-/-- W4: one sector of the data transfer. -/
-theorem data_write_lease (γ : DiskNames) (s : VirtioState) (h : BitVec 16) (r : VioReq)
-    (i : Nat) (hin : Virtio.reqOf s h = some r)
-    (w : BitVec (8 * Virtio.reqSectorLen r i)) :
-    diskProto (GF := GF) γ s ⊢
-      dmaWriteLease (Virtio.reqSectorAddr r i) (Virtio.reqSectorLen r i) w (diskProto γ s) := by
-  rcases Nat.eq_zero_or_pos (Virtio.reqSectorLen r i) with hz | hz
-  · exact dmaWriteLease_zero _ _ hz w _
-  iintro H
-  icases diskProto_chain_acc γ s h r hin $$ H with ⟨%c0, %c, %hp, Hcl, Hback⟩
-  obtain ⟨hreq, hhd, hwf, hcfg, hq⟩ := hp
-  subst hreq
-  obtain ⟨hi, hn⟩ := reqSectorLen_of_chain c i (by omega)
-  unfold chainLease
-  icases Hcl with ⟨H0, H1, H2, H3, H4, H5, Hbuf⟩
+/-- W4: one sector of the data transfer.  **The buffer is the SERVING
+TASK's** across the data phase (`Xv6.SByte.lent`), so the lease comes out
+of the task's own context and goes straight back into it: the invariant is
+not touched at all, which is what lets the value the write leaves behind
+reach the completion. -/
+theorem data_write_lease (γ : DiskNames) (c : Chain) (i : Nat) (hi : i < SPB)
+    (w : BitVec (8 * Virtio.reqSectorLen c.req i)) (P : IProp GF) :
+    iprop(bufLease (GF := GF) c ∗ P) ⊢
+      dmaWriteLease (Virtio.reqSectorAddr c.req i) (Virtio.reqSectorLen c.req i) w
+        (iprop(bufLease c ∗ P)) := by
+  have hn : Virtio.reqSectorLen (Chain.req c) i = Virtio.sectorSize :=
+    reqSectorLen_chain_lt c i hi
+  iintro ⟨Hbuf, HP⟩
   icases bufSector_acc c i hi $$ Hbuf with ⟨Hsec, Hsecb⟩
   iapply bufSector_lease c i (Virtio.reqSectorAddr (Chain.req c) i)
-    (Virtio.reqSectorLen (Chain.req c) i) rfl hn w (diskProto γ s)
+    (Virtio.reqSectorLen (Chain.req c) i) rfl hn w iprop(bufLease (GF := GF) c ∗ P)
   isplitl [Hsec]
   · iexact Hsec
   · iintro Hsec2
-    iapply Hback
-    isplitl [H0]
-    · iexact H0
-    isplitl [H1]
-    · iexact H1
-    isplitl [H2]
-    · iexact H2
-    isplitl [H3]
-    · iexact H3
-    isplitl [H4]
-    · iexact H4
-    isplitl [H5]
-    · iexact H5
-    · iapply Hsecb $$ Hsec2
+    iframe HP
+    iapply Hsecb $$ Hsec2
 
 /-- W2: the used-ring element.  **The row is the TASK's** between the
 latch and the used-index write (`Xv6.UElem.lent`), so this write touches
@@ -1675,46 +1661,46 @@ theorem chainLease_acc0 (pd : PAddr) (c : Chain) :
     chainLease (GF := GF) pd c ⊢ dmaHalfAt (descAt pd c.hd) 16 c.d0 ∗
       (dmaHalfAt (descAt pd c.hd) 16 c.d0 -∗ chainLease pd c) := by
   unfold chainLease
-  iintro ⟨H0, H1, H2, H3, H4, H5, H6⟩
+  iintro ⟨H0, H1, H2, H3, H4, H5⟩
   iframe H0
   iintro H0'
-  iframe H0' H1 H2 H3 H4 H5 H6
+  iframe H0' H1 H2 H3 H4 H5
 
 theorem chainLease_acc1 (pd : PAddr) (c : Chain) :
     chainLease (GF := GF) pd c ⊢ dmaHalfAt (descAt pd c.md) 16 c.d1 ∗
       (dmaHalfAt (descAt pd c.md) 16 c.d1 -∗ chainLease pd c) := by
   unfold chainLease
-  iintro ⟨H0, H1, H2, H3, H4, H5, H6⟩
+  iintro ⟨H0, H1, H2, H3, H4, H5⟩
   iframe H1
   iintro H1'
-  iframe H0 H1' H2 H3 H4 H5 H6
+  iframe H0 H1' H2 H3 H4 H5
 
 theorem chainLease_acc2 (pd : PAddr) (c : Chain) :
     chainLease (GF := GF) pd c ⊢ dmaHalfAt (descAt pd c.tl) 16 c.d2 ∗
       (dmaHalfAt (descAt pd c.tl) 16 c.d2 -∗ chainLease pd c) := by
   unfold chainLease
-  iintro ⟨H0, H1, H2, H3, H4, H5, H6⟩
+  iintro ⟨H0, H1, H2, H3, H4, H5⟩
   iframe H2
   iintro H2'
-  iframe H0 H1 H2' H3 H4 H5 H6
+  iframe H0 H1 H2' H3 H4 H5
 
 theorem chainLease_accType (pd : PAddr) (c : Chain) :
     chainLease (GF := GF) pd c ⊢ dmaHalfAt c.hdrAddr 4 c.req.type ∗
       (dmaHalfAt c.hdrAddr 4 c.req.type -∗ chainLease pd c) := by
   unfold chainLease
-  iintro ⟨H0, H1, H2, H3, H4, H5, H6⟩
+  iintro ⟨H0, H1, H2, H3, H4, H5⟩
   iframe H3
   iintro H3'
-  iframe H0 H1 H2 H3' H4 H5 H6
+  iframe H0 H1 H2 H3' H4 H5
 
 theorem chainLease_accSector (pd : PAddr) (c : Chain) :
     chainLease (GF := GF) pd c ⊢ dmaHalfAt (c.hdrAddr + 8#64) 8 c.sector ∗
       (dmaHalfAt (c.hdrAddr + 8#64) 8 c.sector -∗ chainLease pd c) := by
   unfold chainLease
-  iintro ⟨H0, H1, H2, H3, H4, H5, H6⟩
+  iintro ⟨H0, H1, H2, H3, H4, H5⟩
   iframe H5
   iintro H5'
-  iframe H0 H1 H2 H3 H4 H5' H6
+  iframe H0 H1 H2 H3 H4 H5'
 
 /-- **The fetch's reads are pinned.**  Whatever piece of the armed chain
 the device reads, the permit says the chain is still `c`, and the
@@ -1866,22 +1852,43 @@ theorem leaseL_stall (γ : DiskNames) (C : IProp GF) :
   unfold Virtio.stall DevM.await DevM.step DevM.lift
   exact DevM.LeaseL.step C C _ _ (fun s s' os hgs => by simp at hgs) (DevM.LeaseL.pure _ () true_intro)
 
-/-- `Virtio.xferIn h r i`: one sector of a read request's fill, in the
-serving task.  The write's lease comes out of the invariant and goes back
-into it at the same step. -/
-theorem leaseL_xferIn (γ : DiskNames) (C : IProp GF) (h : BitVec 16) (r : VioReq) (i : Nat)
-    (k : Unit → Virtio.VM Unit)
-    (hk : DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) iprop(True) C (k ())) :
-    DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) iprop(True) C
-      (DevM.bind (Virtio.xferIn h r i) k) := by
+/-- `Virtio.xferIn h c.req i`: one sector of a read request's fill, in
+the serving task.  The buffer is the TASK's own across the data phase
+(`Xv6.SByte.lent`), so the write's lease never touches the invariant and
+what the store leaves behind stays in the task's linear context. -/
+theorem leaseL_xferIn (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key : Nat) (c : Chain)
+    (v2 : VirtioState) (i : Nat) (hi : i < SPB) (k : Unit → Virtio.VM Unit)
+    (hk : DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) iprop(True)
+      iprop(serveCtx γ h c0 key c v2 (some (.fetched c.req)) none ∗
+        (dmaOwn c.status 1 ∗ (∃ bs, diskBlockQ γ c.blk bs) ∗ bufLease c)) (k ())) :
+    DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) iprop(True)
+      iprop(serveCtx γ h c0 key c v2 (some (.fetched c.req)) none ∗
+        (dmaOwn c.status 1 ∗ (∃ bs, diskBlockQ γ c.blk bs) ∗ bufLease c))
+      (DevM.bind (Virtio.xferIn h c.req i) k) := by
   unfold Virtio.xferIn
   simp only [bind, DevM.bind, DevM.get, DevM.lift, Pure.pure]
-  refine DevM.LeaseL.get C (X := Unit) (fun _ _ => C) _ (fun s => leaseL_get_keep γ C s)
-    (fun s _ => ?_)
-  unfold Virtio.reqSectorLen DevM.dmaWriteIf DevM.lift
+  refine DevM.LeaseL.get _ (X := Unit) (fun _ _ => _) _
+    (fun s => leaseL_get_keep γ _ s) (fun s _ => ?_)
+  unfold DevM.dmaWriteIf DevM.lift
   refine DevM.LeaseL.dmaWriteIf _ _ _ _ _ _ _ ?_ (fun s _ => leaseL_write_skip γ _ s) hk
-  intro s' hg
-  exact leaseL_write_frame γ s' C _ _ _ (data_write_lease γ s' h r i (of_decide_eq_true hg) _)
+  intro s' _
+  iintro ⟨⟨HC, Hst, Hq, Hbuf⟩, HR⟩
+  iapply (dmaWriteLease_mono (Virtio.reqSectorAddr (Chain.req c) i)
+    (Virtio.reqSectorLen (Chain.req c) i) _
+    iprop(bufLease (GF := GF) c ∗
+      (serveCtx γ h c0 key c v2 (some (.fetched c.req)) none ∗ dmaOwn c.status 1 ∗
+        (∃ bs, diskBlockQ γ c.blk bs) ∗ diskProto γ s'))
+    iprop(|==> (diskProto γ s' ∗
+      (serveCtx γ h c0 key c v2 (some (.fetched c.req)) none ∗
+        (dmaOwn c.status 1 ∗ (∃ bs, diskBlockQ γ c.blk bs) ∗ bufLease c))))
+    (by
+      iintro ⟨H1, H2, H3, H4, H5⟩
+      imodintro
+      iframe H1 H2 H3 H4 H5))
+  iapply data_write_lease γ c i hi _
+    iprop(serveCtx γ h c0 key c v2 (some (.fetched c.req)) none ∗ dmaOwn c.status 1 ∗
+      (∃ bs, diskBlockQ γ c.blk bs) ∗ diskProto γ s')
+  iframe Hbuf HC Hst Hq HR
 
 /-- `Virtio.xferOut h r i`: one sector of a write request's capture, in
 the serving task.  The serve permit is what says the capturing head is at
@@ -2040,11 +2047,11 @@ theorem leaseL_lend (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key : Nat
     iprop(serveCtx (GF := GF) γ h c0 key c s none none ∗ diskProto γ s1) ⊢
       |==> (diskProto γ (Virtio.setPhase s1 h (.fetched c.req)) ∗
         (serveCtx γ h c0 key c s (some (.fetched c.req)) none ∗
-          (dmaOwn c.status 1 ∗ ∃ bs, diskBlockQ γ c.blk bs))) := by
+          (dmaOwn c.status 1 ∗ (∃ bs, diskBlockQ γ c.blk bs) ∗ bufLease c))) := by
   iintro ⟨HC, HR⟩
   iapply leaseL_install_gen γ h c0 key c s s1 none none (.fetched c.req)
     (fun _ => SByte.lent) iprop(emp)
-    iprop(dmaOwn c.status 1 ∗ ∃ bs, diskBlockQ γ c.blk bs) hlive rfl
+    iprop(dmaOwn c.status 1 ∗ (∃ bs, diskBlockQ γ c.blk bs) ∗ bufLease c) hlive rfl
     (Or.inl (by rintro r ⟨⟩)) (by rintro r ⟨⟩)
     (fun _ hx => dryOk_setPhase s1 h _ (by rintro r ⟨⟩) hx)
     (fun ob _ => ⟨⟨fun _ => ⟨c.req, Or.inl rfl⟩, fun _ => rfl⟩,
@@ -2065,14 +2072,15 @@ in the task's context. -/
 theorem leaseL_take (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key : Nat) (c : Chain)
     (s s1 : VirtioState) (hlive : Virtio.live c0 = true) :
     iprop((serveCtx (GF := GF) γ h c0 key c s (some (.served c.req)) none ∗
-        ((∃ ts : Nat, dmaOwnT c.status 1 0#8 ts) ∗ ∃ bs, diskBlockQ γ c.blk bs)) ∗
-        diskProto γ s1) ⊢
+        ((∃ ts : Nat, dmaOwnT c.status 1 0#8 ts) ∗ (∃ bs, diskBlockQ γ c.blk bs) ∗
+          bufLease c)) ∗ diskProto γ s1) ⊢
       |==> (diskProto γ (Virtio.setPhase s1 h (.status c.req)) ∗
         serveCtx γ h c0 key c s (some (.status c.req)) none) := by
-  iintro ⟨⟨HC, ⟨%ts, Hb⟩, Hq⟩, HR⟩
+  iintro ⟨⟨HC, ⟨%ts, Hb⟩, Hq, Hbuf⟩, HR⟩
   imod leaseL_install_gen γ h c0 key c s s1 (some (.served c.req)) none (.status c.req)
       (fun _ => SByte.done ts)
-      iprop(dmaOwnT c.status 1 0#8 ts ∗ ∃ bs, diskBlockQ γ c.blk bs) iprop(emp) hlive rfl
+      iprop(dmaOwnT c.status 1 0#8 ts ∗ (∃ bs, diskBlockQ γ c.blk bs) ∗ bufLease c)
+      iprop(emp) hlive rfl
       (Or.inl (by rintro r ⟨⟩)) (by rintro r ⟨⟩)
       (fun _ hx => dryOk_setPhase s1 h _ (by rintro r ⟨⟩) hx)
       (fun ob _ => ⟨⟨fun he => absurd he (by simp), fun hx => by
@@ -2080,10 +2088,10 @@ theorem leaseL_take (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key : Nat
       (fun ob hob => by
         have hl : ob = SByte.lent := hob.1.2 ⟨c.req, Or.inr rfl⟩
         rw [hl, statusRes_lent, statusRes_done]
-        iintro ⟨⟨Hb, Hq⟩, _⟩
+        iintro ⟨⟨Hb, Hq, Hbuf⟩, _⟩
         imodintro
-        iframe Hb Hq) $$ [HC Hb Hq HR] with ⟨HR, HC, _⟩
-  · iframe HC Hb Hq HR
+        iframe Hb Hq Hbuf) $$ [HC Hb Hq Hbuf HR] with ⟨HR, HC, _⟩
+  · iframe HC Hb Hq Hbuf HR
   imodintro
   iframe HR HC
 
@@ -2092,20 +2100,20 @@ theorem leaseL_serveTail (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key 
     (hlive : Virtio.live c0 = true) (hqnum : c0.qnum.toNat = NUM) (hhd : c.hd = h.toNat) :
     DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) iprop(True)
       iprop(serveCtx γ h c0 key c s (some (.fetched c.req)) u0 ∗
-        (dmaOwn c.status 1 ∗ ∃ bs, diskBlockQ γ c.blk bs))
+        (dmaOwn c.status 1 ∗ (∃ bs, diskBlockQ γ c.blk bs) ∗ bufLease c))
       (serveTail h c.req) := by
   unfold serveTail
   simp only [bind, DevM.bind, DevM.modify, DevM.guard, DevM.step, DevM.lift,
     DevM.dmaWriteIf, DevM.dmaWriteStep, DevM.get, Pure.pure]
   refine DevM.LeaseL.step _
     iprop(serveCtx γ h c0 key c s (some (.served c.req)) none ∗
-      (dmaOwn c.status 1 ∗ ∃ bs, diskBlockQ γ c.blk bs)) _ _ ?_ ?_
+      (dmaOwn c.status 1 ∗ (∃ bs, diskBlockQ γ c.blk bs) ∗ bufLease c)) _ _ ?_ ?_
   · intro s1 s2 os hgs
     have hs2 : s2 = Virtio.setPhase s1 h (.served c.req) := by
       simp only [Option.some.injEq, Prod.mk.injEq] at hgs
       exact hgs.1.symm
     subst hs2
-    iintro ⟨⟨HC, Hb, Hq⟩, HR⟩
+    iintro ⟨⟨HC, Hb, Hq, Hbuf⟩, HR⟩
     imod leaseL_install γ h c0 key c s s1 (some (.fetched c.req)) u0 (.served c.req)
         hlive rfl (Or.inl (by rintro r ⟨⟩)) (by rintro r ⟨⟩)
         (fun _ hx => dryOk_setPhase s1 h _ (by rintro r ⟨⟩) hx)
@@ -2115,24 +2123,27 @@ theorem leaseL_serveTail (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key 
       $$ [HC HR] with ⟨HR, HC⟩
     · iframe HC HR
     imodintro
-    iframe HR HC Hb Hq
+    iframe HR HC Hb Hq Hbuf
   · refine DevM.LeaseL.dmaWriteIf _
       iprop(serveCtx γ h c0 key c s (some (.served c.req)) none ∗
-        ((∃ ts : Nat, dmaOwnT c.status 1 0#8 ts) ∗ ∃ bs, diskBlockQ γ c.blk bs))
+        ((∃ ts : Nat, dmaOwnT c.status 1 0#8 ts) ∗ (∃ bs, diskBlockQ γ c.blk bs) ∗
+          bufLease c))
       _ _ _ _ _ ?_ ?_ ?_
     · intro s1 hgg
-      iintro ⟨⟨HC, Hb, Hq⟩, HR⟩
+      iintro ⟨⟨HC, Hb, Hq, Hbuf⟩, HR⟩
       rw [statusOf_chain c]
       iapply dmaWriteLease_mono (Chain.req c).status 1 0#8
-        iprop((∃ ts : Nat, dmaOwnT c.status 1 0#8 ts) ∗ ((∃ bs, diskBlockQ γ c.blk bs) ∗
+        iprop((∃ ts : Nat, dmaOwnT c.status 1 0#8 ts) ∗ (((∃ bs, diskBlockQ γ c.blk bs) ∗
+          bufLease c) ∗
           (diskProto γ s1 ∗ serveCtx γ h c0 key c s (some (.served c.req)) none)))
         iprop(|==> (diskProto γ s1 ∗ (serveCtx γ h c0 key c s (some (.served c.req)) none ∗
-          ((∃ ts : Nat, dmaOwnT c.status 1 0#8 ts) ∗ ∃ bs, diskBlockQ γ c.blk bs))))
-        (by iintro ⟨H1, H4, H2, H3⟩; imodintro; iframe H1 H2 H3 H4)
+          ((∃ ts : Nat, dmaOwnT c.status 1 0#8 ts) ∗ (∃ bs, diskBlockQ γ c.blk bs) ∗
+            bufLease c))))
+        (by iintro ⟨H1, ⟨H4, H5⟩, H2, H3⟩; imodintro; iframe H1 H2 H3 H4 H5)
       iapply status_write_lease γ c (Chain.req c).status rfl
-        iprop((∃ bs, diskBlockQ γ c.blk bs) ∗
+        iprop(((∃ bs, diskBlockQ γ c.blk bs) ∗ bufLease c) ∗
           (diskProto γ s1 ∗ serveCtx γ h c0 key c s (some (.served c.req)) none)) 0#8
-      iframe Hb HR HC Hq
+      iframe Hb HR HC Hq Hbuf
     · intro s1 hgg
       iintro ⟨⟨HC, Hb⟩, HR⟩
       iapply (show iprop(serveCtx (GF := GF) γ h c0 key c s (some (.served c.req)) none ∗
@@ -2356,7 +2367,7 @@ theorem leaseL_serve (γ : DiskNames) (h : BitVec 16) :
     simp only [bind, DevM.bind, DevM.modify, DevM.step, DevM.lift, Pure.pure]
     refine DevM.LeaseL.step _
       iprop(serveCtx γ h xc0 xkey c s (some (.fetched c.req)) none ∗
-        (dmaOwn c.status 1 ∗ ∃ bs, diskBlockQ γ c.blk bs)) _ _ ?_ ?_
+        (dmaOwn c.status 1 ∗ (∃ bs, diskBlockQ γ c.blk bs) ∗ bufLease c)) _ _ ?_ ?_
     · intro s1 s2 os hgs
       have hs2 : s2 = Virtio.setPhase s1 h (.fetched c.req) := by
         simp only [Option.some.injEq, Prod.mk.injEq] at hgs
@@ -2366,7 +2377,7 @@ theorem leaseL_serve (γ : DiskNames) (h : BitVec 16) :
     · split
       · refine DevM.LeaseL.step _
           iprop(serveCtx γ h xc0 xkey c s (some (.fetched c.req)) none ∗
-            (dmaOwn c.status 1 ∗ ∃ bs, diskBlockQ γ c.blk bs)) _ _ ?_ ?_
+            (dmaOwn c.status 1 ∗ (∃ bs, diskBlockQ γ c.blk bs) ∗ bufLease c)) _ _ ?_ ?_
         · intro s1 s2 os hgs
           have hgs' := guard_step_inv _ s2 os hgs
           replace hgs' : (if s1.taken = none then some { s1 with taken := some h }
@@ -2387,12 +2398,15 @@ theorem leaseL_serve (γ : DiskNames) (h : BitVec 16) :
               rwa [reqSpan_chain c] at this)
             (fun i hi k hk =>
               leaseL_xferOut γ h xc0 xkey c s i
-                iprop(dmaOwn c.status 1 ∗ ∃ bs, diskBlockQ γ c.blk bs)
+                iprop(dmaOwn c.status 1 ∗ (∃ bs, diskBlockQ γ c.blk bs) ∗ bufLease c)
                 xhlive hty hi k hk) _
             (leaseL_serveTail γ h xc0 xkey c s _ xhlive xhqnum xhhd)
       · split
-        · exact leaseL_seqSectors γ _ _ (fun _ => True) _ (fun _ _ => trivial)
-            (fun i _ k hk => leaseL_xferIn γ _ h c.req i k hk) _
+        · exact leaseL_seqSectors γ _ _ (fun i => i < SPB) _
+            (fun i hi => by
+              have := List.mem_range.1 hi
+              rwa [reqSpan_chain c] at this)
+            (fun i hi k hk => leaseL_xferIn γ h xc0 xkey c s i hi k hk) _
             (leaseL_serveTail γ h xc0 xkey c s _ xhlive xhqnum xhhd)
         · exact leaseL_serveTail γ h xc0 xkey c s _ xhlive xhqnum xhhd
 

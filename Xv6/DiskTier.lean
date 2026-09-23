@@ -665,9 +665,9 @@ theorem statusRes_arm3 (γ : DiskNames) (st : Nat → HState) (sb : Nat → SByt
     (hwf : c.wf)
     (hst : st c.hd = .inactive) (hstm : st c.md = .inactive) (hstt : st c.tl = .inactive) :
     iprop([∗list] j ∈ List.range NUM, statusRes (GF := GF) γ (st j) (sb j)) ∗
-      dmaOwn c.status 1 ∗ (∃ bs, diskBlockQ γ c.blk bs) ⊢
+      dmaOwn c.status 1 ∗ (∃ bs, diskBlockQ γ c.blk bs) ∗ bufLease c ⊢
       [∗list] j ∈ List.range NUM, statusRes γ (armSt3 st c j) (updS sb c.hd SByte.free j) := by
-  iintro ⟨Hrows, Hb, Hq⟩
+  iintro ⟨Hrows, Hb, Hq, Hbuf⟩
   icases diskRange_acc (GF := GF) c.hd hwf.1 (fun j => statusRes γ (st j) (sb j))
       (fun j => statusRes γ (armSt3 st c j) (updS sb c.hd SByte.free j))
       (fun j hj => by
@@ -681,7 +681,7 @@ theorem statusRes_arm3 (γ : DiskNames) (st : Nat → HState) (sb : Nat → SByt
     with ⟨_, Hback⟩
   iapply Hback
   rw [armSt3_hd st c hwf, updS_self, statusRes_free]
-  iframe Hb Hq
+  iframe Hb Hq Hbuf
 
 /-! ## The arming epoch, as the driver's own moves keep it -/
 

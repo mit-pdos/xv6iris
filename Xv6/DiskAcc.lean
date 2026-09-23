@@ -1202,11 +1202,10 @@ theorem chainLease_claim_join [CurCtx] (ξ : CtxId) (pd : PAddr) (c : Chain) :
       ctxBytes ξ (descAt pd c.tl) 16 (DFrac.own 1) c.d2 ∗
       ctxBytes ξ c.hdrAddr 16 (DFrac.own 1) c.hdr ∗
       wordAtN ξ (aInfoB c.hd) 8 (DFrac.own 1) c.bp ∗
-      (∃ d : BitVec 32, wordAtN ξ (aBufDisk c.bp) 4 (DFrac.own 1) d ∗ claimDone γ c d) ∗
-      bufLease c := by
+      (∃ d : BitVec 32, wordAtN ξ (aBufDisk c.bp) 4 (DFrac.own 1) d ∗ claimDone γ c d) := by
   unfold chainLease claimRes
-  iintro ⟨⟨Hr0, Hr1, Hr2, Hh0, Hh1, Hh2, Hbuf⟩, Hc0, Hc1, Hc2, Hch, Hib, Hdsk⟩
-  iframe Hbuf Hib Hdsk
+  iintro ⟨⟨Hr0, Hr1, Hr2, Hh0, Hh1, Hh2⟩, Hc0, Hc1, Hc2, Hch, Hib, Hdsk⟩
+  iframe Hib Hdsk
   isplitl [Hr0 Hc0]
   · iapply ctxBytes_join_dma ξ (descAt pd c.hd) 16 c.d0
     iframe Hr0 Hc0
@@ -1916,14 +1915,15 @@ theorem diskProto_armHead (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) (p
     diskCfgFrozen (GF := GF) γ c0 ∗ diskProto γ v ∗ diskPub γ np ∗
       diskStage γ (some c.hd) ∗ headTok γ c.hd .inactive ∗
       headTok γ c.md .inactive ∗ headTok γ c.tl .inactive ∗
-      chainLease pd c ∗ dmaOwn c.status 1 ∗ (∃ bs : List (BitVec 8), diskBlock γ c.blk bs) ⊢
+      chainLease pd c ∗ dmaOwn c.status 1 ∗ bufLease c ∗
+      (∃ bs : List (BitVec 8), diskBlock γ c.blk bs) ⊢
       |==> (diskProto γ v ∗ diskPub γ np ∗ diskStage γ (some c.hd) ∗
         headTok γ c.hd (.active c) ∗
         headTok γ c.md (.member c.hd) ∗ headTok γ c.tl (.member c.hd)) := by
   subst hpd
   unfold diskProto
   iintro ⟨#Hfr0, ⟨%hc, %pn, %pm, Hpm, %hfr, Harm⟩, Hpub, Hstgd, Htok, Htokm, Htokt,
-    Hlease, Hsraw, Hblk⟩
+    Hlease, Hsraw, Hbraw, Hblk⟩
   icases Harm with ⟨Hd | ⟨%c0', #Hfr, %hc0, Hl⟩⟩
   · unfold diskDead
     icases Hd with ⟨%m, Hm, Hcfg, Hlo0, HnpM0, Hpos0, HstgA0, Hbs0, Hdn0, Hnr0, %hpure⟩
@@ -2027,9 +2027,9 @@ theorem diskProto_armHead (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) (p
     iexists (armSt3 st c), nc, np0, lo, ring, m, pmap, stg, b, M, dl, dl0, nr,
       (updS sb c.hd SByte.free)
     iframe Hm Ha Hr Hu Hav Hnc Hnp Hlo HnpM Hpos Hstg Hui Hdn Hbs Htp Hnr
-    isplitl [Hsb Hsraw HblkQ]
+    isplitl [Hsb Hsraw HblkQ Hbraw]
     · iapply statusRes_arm3 γ st sb c hwf hst hstm hstt
-      iframe Hsb Hsraw
+      iframe Hsb Hsraw Hbraw
       iexists bs0
       iexact HblkQ
     ipureintro
@@ -2096,15 +2096,15 @@ theorem disk_publish [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (c : Chain) (
       $$ HS Hstat2
   ihave Hbraw := byteBuf_bufLease c data hlen hkm $$ HS Hbuf
   ihave Hlease : iprop(chainLease (GF := GF) pd c)
-    $$ [Hr0 Hr1 Hr2 Hh0 Hh1 Hh2 Hbraw]
+    $$ [Hr0 Hr1 Hr2 Hh0 Hh1 Hh2]
   · unfold chainLease
-    iframe Hr0 Hr1 Hr2 Hh0 Hh1 Hh2 Hbraw
+    iframe Hr0 Hr1 Hr2 Hh0 Hh1 Hh2
   iinv Hinv with Hbody Hclose
   icases Hbody with ⟨%v, >Hfrag, >Hproto⟩
   imod diskProto_armHead γ c0 v pd c np hg.1 hg.2.2.2.1 hwf hep $$
-    [Hfr Hproto Hpub Hstgd Htok Htokm Htokt Hlease Hsraw Hblk]
+    [Hfr Hproto Hpub Hstgd Htok Htokm Htokt Hlease Hsraw Hbraw Hblk]
     with ⟨Hproto, Hpub, Hstgd, Htok, Htokm, Htokt⟩
-  · iframe Hfr Hproto Hpub Hstgd Htok Htokm Htokt Hlease Hsraw
+  · iframe Hfr Hproto Hpub Hstgd Htok Htokm Htokt Hlease Hsraw Hbraw
     iexists bs
     iexact Hblk
   ihave Hcl := Hclose $$ [Hfrag Hproto]
@@ -2528,19 +2528,19 @@ theorem diskProto_status_acc (γ : DiskNames) (q : Qp) (c0 : VirtioCfg) (v : Vir
     have hmem : ((n, t, c.hd, ep) : UsedRec) ∈ dl := List.IsPrefix.subset e10.1 hl0'
     obtain ⟨-, -, -, ts, hts, htle⟩ := e11.2.2 (n, t, c.hd, ep) hmem (by rw [hnn]; exact hlt)
     icases statusRes_upd γ st sb c.hd hwf.1 (sb c.hd) $$ Hsb with ⟨Hrow, Hsbback⟩
-    ihave Hrow : iprop(dmaOwnT (GF := GF) c.status 1 0#8 ts ∗ ∃ bs, diskBlockQ γ c.blk bs)
-      $$ [Hrow]
+    ihave Hrow : iprop(dmaOwnT (GF := GF) c.status 1 0#8 ts ∗
+        (∃ bs, diskBlockQ γ c.blk bs) ∗ bufLease c) $$ [Hrow]
     · rw [hst, hts, statusRes_done]
       iexact Hrow
-    icases Hrow with ⟨Hrow, HrowQ⟩
+    icases Hrow with ⟨Hrow, HrowQ, HrowB⟩
     iexists ts
     isplitl []
     · ipureintro; exact htle
     iframe Hrow
     iintro Hrow
-    ihave Hrow : iprop(statusRes (GF := GF) γ (st c.hd) (sb c.hd)) $$ [Hrow HrowQ]
+    ihave Hrow : iprop(statusRes (GF := GF) γ (st c.hd) (sb c.hd)) $$ [Hrow HrowQ HrowB]
     · rw [hst, hts, statusRes_done]
-      iframe Hrow HrowQ
+      iframe Hrow HrowQ HrowB
     ihave Hsb := Hsbback $$ Hrow
     rw [updS_id sb c.hd]
     iframe Htok Hnrd

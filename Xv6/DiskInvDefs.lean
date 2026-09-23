@@ -2745,6 +2745,28 @@ install -- whose permit has installed nothing, and so knows the phase
 only through `Xv6.permOk`'s `.popped` clause -- know that the byte is
 still the invariant's. -/
 
+/-- The address of sector `i` of a buffer. -/
+def sectorAddr (base : PAddr) (i : Nat) : PAddr :=
+  base + BitVec.ofNat 64 (Virtio.sectorSize * i)
+
+/-- The data buffer of a chain, WHILE IT IS IN FLIGHT: both of its sectors
+at full ownership, content UNCONSTRAINED.  The driver gets the buffer back
+when it collects the chain.
+
+Full ownership in both directions, though only a READ chain's buffer is
+ever written by the device: a half would do for a disk write, and IS what
+the buffer row will take, because the device's `MachCSL.Virtio.xferOut`
+only reads it (`MachCSL.dmaReadPin` is satisfied by a cell at any
+fraction).  It is full here because the row does not exist yet -- the
+content being unconstrained is exactly the gap `Xv6.disk_collect` is
+blocked on; see the section head of `Xv6/DiskAcc.lean`. -/
+def bufLease (c : Chain) : IProp GF := iprop%
+  [∗list] i ∈ List.range SPB, dmaOwn (sectorAddr c.data i) Virtio.sectorSize
+
+instance bufLease_timeless (c : Chain) : Timeless (bufLease (GF := GF) c) := by
+  unfold bufLease
+  infer_instance
+
 /-- Where one armed slot's status byte is. -/
 inductive SByte where
   /-- the invariant holds it, at no particular value -/
@@ -2765,28 +2787,29 @@ def statusRes (γ : DiskNames) (s : HState) (b : SByte) : IProp GF :=
   match s with
   | .active c =>
     match b with
-    | .free => iprop(dmaOwn c.status 1 ∗ ∃ bs, diskBlockQ γ c.blk bs)
+    | .free => iprop(dmaOwn c.status 1 ∗ (∃ bs, diskBlockQ γ c.blk bs) ∗ bufLease c)
     | .lent => iprop(emp)
-    | .done ts => iprop(dmaOwnT c.status 1 0#8 ts ∗ ∃ bs, diskBlockQ γ c.blk bs)
+    | .done ts =>
+      iprop(dmaOwnT c.status 1 0#8 ts ∗ (∃ bs, diskBlockQ γ c.blk bs) ∗ bufLease c)
   | _ => iprop(emp)
 
 theorem statusRes_free (γ : DiskNames) (c : Chain) :
     statusRes (GF := GF) γ (.active c) .free =
-      iprop(dmaOwn c.status 1 ∗ ∃ bs, diskBlockQ γ c.blk bs) := rfl
+      iprop(dmaOwn c.status 1 ∗ (∃ bs, diskBlockQ γ c.blk bs) ∗ bufLease c) := rfl
 theorem statusRes_lent (γ : DiskNames) (c : Chain) :
     statusRes (GF := GF) γ (.active c) .lent = iprop(emp) := rfl
 theorem statusRes_done (γ : DiskNames) (c : Chain) (ts : Nat) :
     statusRes (GF := GF) γ (.active c) (.done ts) =
-      iprop(dmaOwnT c.status 1 0#8 ts ∗ ∃ bs, diskBlockQ γ c.blk bs) := rfl
+      iprop(dmaOwnT c.status 1 0#8 ts ∗ (∃ bs, diskBlockQ γ c.blk bs) ∗ bufLease c) := rfl
 
 /-- The position of the device's write, read off the row. -/
 theorem statusRes_topLb (γ : DiskNames) (c : Chain) (ts : Nat) :
     statusRes (GF := GF) γ (.active c) (.done ts) ⊢
       topLb ts ∗ statusRes γ (.active c) (.done ts) := by
   rw [statusRes_done]
-  iintro ⟨Hb, Hq⟩
+  iintro ⟨Hb, Hq, Hbuf⟩
   icases dmaOwnT_topLb c.status 1 0#8 ts $$ Hb with ⟨#Ht, Hb⟩
-  iframe Ht Hb Hq
+  iframe Ht Hb Hq Hbuf
 
 theorem statusRes_inactive (γ : DiskNames) (b : SByte) :
     statusRes (GF := GF) γ .inactive b = iprop(emp) := rfl
@@ -2801,11 +2824,13 @@ instance statusRes_timeless (γ : DiskNames) (s : HState) (b : SByte) :
   | active c =>
     cases b with
     | free =>
-      show Timeless iprop(dmaOwn (GF := GF) c.status 1 ∗ ∃ bs, diskBlockQ γ c.blk bs)
+      show Timeless iprop(dmaOwn (GF := GF) c.status 1 ∗
+        (∃ bs, diskBlockQ γ c.blk bs) ∗ bufLease c)
       infer_instance
     | lent => show Timeless (iprop(emp) : IProp GF); infer_instance
     | done ts =>
-      show Timeless iprop(dmaOwnT (GF := GF) c.status 1 0#8 ts ∗ ∃ bs, diskBlockQ γ c.blk bs)
+      show Timeless iprop(dmaOwnT (GF := GF) c.status 1 0#8 ts ∗
+        (∃ bs, diskBlockQ γ c.blk bs) ∗ bufLease c)
       infer_instance
 
 /-- **The row comes out whole** wherever the invariant keeps it: the
@@ -2813,14 +2838,14 @@ status byte at own 1, and the quarter of the block's image fragment
 beside it. -/
 theorem statusRes_own (γ : DiskNames) (c : Chain) (b : SByte) (hb : b ≠ .lent) :
     statusRes (GF := GF) γ (.active c) b ⊢
-      iprop(dmaOwn c.status 1 ∗ ∃ bs, diskBlockQ γ c.blk bs) := by
+      iprop(dmaOwn c.status 1 ∗ (∃ bs, diskBlockQ γ c.blk bs) ∗ bufLease c) := by
   cases b with
   | free => rw [statusRes_free]
   | lent => exact absurd rfl hb
   | done ts =>
     rw [statusRes_done]
-    iintro ⟨Hb, Hq⟩
-    iframe Hq
+    iintro ⟨Hb, Hq, Hbuf⟩
+    iframe Hq Hbuf
     iapply dmaOwnT_dmaOwn c.status 1 0#8 ts $$ Hb
 
 /-- **Two full footprints over one byte are one too many**: what says a
@@ -2861,13 +2886,13 @@ theorem statusRes_not_lent (γ : DiskNames) (c : Chain) (b : SByte) :
   | lent => iintro _; ipureintro; rfl
   | free =>
     rw [statusRes_free]
-    iintro ⟨⟨H1, _⟩, H2⟩
+    iintro ⟨⟨H1, _, _⟩, H2⟩
     iapply false_elim
     iapply dmaOwn_excl1 c.status
     iframe H1 H2
   | done ts =>
     rw [statusRes_done]
-    iintro ⟨⟨H1, _⟩, H2⟩
+    iintro ⟨⟨H1, _, _⟩, H2⟩
     iapply false_elim
     iapply dmaOwn_excl1 c.status
     isplitl [H1]
@@ -3491,28 +3516,6 @@ theorem epOk_drop (v : VirtioState) (st : Nat → HState) (pm : RegMapF PermVal)
 
 /-! ## The leases -/
 
-/-- The address of sector `i` of a buffer. -/
-def sectorAddr (base : PAddr) (i : Nat) : PAddr :=
-  base + BitVec.ofNat 64 (Virtio.sectorSize * i)
-
-/-- The data buffer of a chain, WHILE IT IS IN FLIGHT: both of its sectors
-at full ownership, content UNCONSTRAINED.  The driver gets the buffer back
-when it collects the chain.
-
-Full ownership in both directions, though only a READ chain's buffer is
-ever written by the device: a half would do for a disk write, and IS what
-the buffer row will take, because the device's `MachCSL.Virtio.xferOut`
-only reads it (`MachCSL.dmaReadPin` is satisfied by a cell at any
-fraction).  It is full here because the row does not exist yet -- the
-content being unconstrained is exactly the gap `Xv6.disk_collect` is
-blocked on; see the section head of `Xv6/DiskAcc.lean`. -/
-def bufLease (c : Chain) : IProp GF := iprop%
-  [∗list] i ∈ List.range SPB, dmaOwn (sectorAddr c.data i) Virtio.sectorSize
-
-instance bufLease_timeless (c : Chain) : Timeless (bufLease (GF := GF) c) := by
-  unfold bufLease
-  infer_instance
-
 /-- Everything the device may touch on behalf of one armed chain. -/
 def chainLease (pd : PAddr) (c : Chain) : IProp GF := iprop%
   dmaHalfAt (descAt pd c.hd) 16 c.d0 ∗
@@ -3520,8 +3523,7 @@ def chainLease (pd : PAddr) (c : Chain) : IProp GF := iprop%
   dmaHalfAt (descAt pd c.tl) 16 c.d2 ∗
   dmaHalfAt c.hdrAddr 4 c.req.type ∗
   dmaHalfAt (c.hdrAddr + 4#64) 4 0#32 ∗
-  dmaHalfAt (c.hdrAddr + 8#64) 8 c.sector ∗
-  bufLease c
+  dmaHalfAt (c.hdrAddr + 8#64) 8 c.sector
 
 instance chainLease_timeless (pd : PAddr) (c : Chain) : Timeless (chainLease (GF := GF) pd c) := by
   unfold chainLease
