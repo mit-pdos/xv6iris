@@ -40,6 +40,7 @@ import MachCSL.CallConv
 import MachCSL.WpSmodeFrame
 import MachCSL.WpSmodeFrame8
 import MachCSL.WpSmodeFrame8b
+import MachCSL.WpSmodeFrame6
 import MachCSL.WpStagesM
 import MachCSL.WpGpr
 import MachCSL.GprLit
