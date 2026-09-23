@@ -2937,16 +2937,35 @@ structure DISK_ACC_ASSUMPTIONS : Prop where
   `Xv6.inFlightBlk`, and `Xv6.cachedOk` asks that every sector the
   write-back cache holds with DATA belong to a block that IS in flight.
   So the collect has to know the chain's own sectors are no longer
-  cached.  They are not: `Xv6.diskGeom` carries `Virtio.wce c0 = false`,
-  so `MachCSL.Virtio.completeOk` refused the completion gate until
-  `MachCSL.Virtio.reqCached` was false, and the only step that can cache
-  a sector again is a `MachCSL.Virtio.xferOut` of a request targeting that
-  block -- which no other chain can be, since a block in flight is
-  exclusively its chain's (`Xv6.headRes` holds its `Xv6.diskBlock`).
-  Making that an invariant clause wants the blocks of armed heads to be
-  DISTINCT as a pure fact, which the arm can mint out of the exclusive
-  fragments it already handles; the buffer row's coupling wants the same
-  fact, for the same reason.
+  cached.
+
+  THE BLOCKS ARE DISTINCT -- DONE, and not as a clause: `Xv6.headRes` of
+  an armed head holds its block's image fragment at `own 1`, so
+  `Xv6.headRes_blkInj` reads `Xv6.blkInj` straight off the row (through
+  `Xv6.bigSepL_two_acc` and `ghost_map_elem_ne`) wherever the invariant is
+  open, and `Xv6.inFlightBlk_free` is what it buys: freeing ONE receipt
+  leaves every OTHER armed head's block in flight.  No accessor has to
+  re-establish it.
+
+  WHAT IS STILL MISSING, and WHY IT IS THE BUFFER ROW'S PROBLEM.  The
+  completion gate alone does NOT drain the block.  `Xv6.diskGeom` carries
+  `Virtio.wce c0 = false`, so `MachCSL.Virtio.completeOk` refuses a
+  WRITE's completion while `MachCSL.Virtio.reqCached` holds -- but that is
+  tested at the `.pushed` INSTALL, two steps before the used-index write
+  that completes, and `MachCSL.Virtio.xferOut`'s guard is
+  `Virtio.reqOf v h = some r`, which STILL HOLDS at `.pushed`.  So a
+  capture of THIS chain may cache the block again between the gate and the
+  completion; the exclusivity above rules out every OTHER chain, not this
+  one.  (A READ's gate is `true` outright, so it says nothing at all.)
+  And `Virtio.xferOut` is a FORKED task whose `MachCSL.DevSig.LeaseV`
+  obligation is discharged from `iprop(True)`, so the re-capture is not
+  excluded by reachability either.
+
+  A re-capture writes the chain's OWN buffer bytes back into the cache,
+  so it is HARMLESS -- but only once those bytes are PINNED, which is
+  exactly (1).  Strengthening `Xv6.cachedOk` before the buffer row lands
+  is therefore not provable: the clause has to say what a cached sector's
+  CONTENT is, not merely whose block it is.
 
   (3) THE `.pushed` WINDOW -- GONE.  It used to be the real blocker:
   `Xv6.epDone_done` gave `Virtio.phase v c.hd = none ∨ wroteAt pm c.hd`,
