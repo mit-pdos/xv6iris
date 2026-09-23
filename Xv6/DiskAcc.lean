@@ -2696,15 +2696,35 @@ theorem disk_used_elem_read [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu :
     rw [hweq, hp.2.1, setWidth32_ofNat16 i hp.1]
   iexact Hdone
 
-/-- **The accessor whose obligation this port leaves open.**
+/-- **The accessor whose obligation this port leaves open**, and the two
+mechanisms it is still short of.
 
-`Xv6.disk_used_elem_read` and `Xv6.disk_status_read` are now PROVED, and
-what is left is `disk_collect`, which waits on the block snapshot of a
-read's transfer and on ruling out a `.lent` marker at the head being
-collected.  Its statement is stated against the vocabulary the completion
-side does provide -- `Xv6.headDone` for "this head's request has
-completed", `Xv6.diskWm` for the TSO credential -- so that it is SOUND as
-written and each premise names a resource a caller can hold. -/
+`Xv6.disk_used_elem_read` and `Xv6.disk_status_read` are proved, and the
+ARMING EPOCH -- the mechanism that says WHICH arming of a head a
+completion record names -- is now in the invariant (`Xv6.epOk`,
+`Xv6.Chain.ep`, `Xv6.UsedRec.ep`, `Xv6.headDoneE`, and the handler's mint
+`Xv6.disk_slot_epoch`).  What is left is `disk_collect`.  It is stated
+below with the epoch premise the mechanism supports; the three things
+that still stand between the statement and a proof are written out in
+`Xv6.DISK_ACC_ASSUMPTIONS.disk_collect`.
+
+WHAT THE EPOCH BUYS, AND WHY IT WAS NEEDED.  `Xv6.headDone γ n h` says
+head `h` completed at counter `n`, and a head outlives its armings: one
+that completed, was collected, was re-armed and is in flight again still
+carries the first record.  A collect resting on that record alone would
+take a chain back from under the device, which contradicts
+`Xv6.unreadArmed` -- so the OLD interface was not merely unproved, it was
+stated against a premise no invariant could support.  `Xv6.Chain.ep` is
+the queue POSITION the chain was published at; positions are never
+reused, so `Xv6.headDoneE γ n c.hd c.ep` names one arming and no other.
+`Xv6.epDone_done` is what the collect cashes from it: the head is out of
+flight, or it is the single head sitting between its used-index write and
+its `MachCSL.Virtio.complete`.
+
+THE SECOND DISJUNCT IS THE BLOCKER (see the field's documentation): the
+model splits the used-index DMA write from `MachCSL.Virtio.complete` into
+two device steps, and the driver can observe the first without the
+second. -/
 structure DISK_ACC_ASSUMPTIONS : Prop where
   /-- **`collect`**: the sleeper takes the chain back once `b->disk` is
   `0`.  All THREE descriptors return to the driver: the head's receipt
@@ -2714,58 +2734,103 @@ structure DISK_ACC_ASSUMPTIONS : Prop where
   hands in its halves (`Xv6.claimRes`) and the invariant's halves, out of
   `Xv6.chainLease`, are joined onto them, which is what `free_desc` needs
   (`Xv6.descCells` is `own 1`).  The status byte comes back out of the
-  head's STATUS ROW at the `0` the device wrote (`Xv6.statusRes`, which is
-  where it lives now -- `chainLease` no longer carries it), `b->data` at
-  the bytes it transferred, and the block's image fragment with them.
+  head's STATUS ROW at the `0` the device wrote (`Xv6.statusRes`),
+  `b->data` at the bytes it transferred, and the block's image fragment
+  with them.
 
-  Blocked two ways.  The status byte is no longer one of them: the row is
-  there, at its value and with the position of the device's write, and
-  `Xv6.disk_status_read` is proved off it.  What is left is (i) the
-  invariant's `bufLease` being `dmaOwn` -- the CONTENT of a read's
-  transfer is existential, so the bytes cannot be pinned to `blockView`
-  without the snapshot clause of the section head -- and (ii) ruling out
-  a `.lent` marker at the head being collected, which is the same (P3) /
-  linear-witness gap the section head sets out: a head whose task is
-  between its status write and its `.status` install has NO status byte
-  in the invariant, and only "every completion of this head has been
-  READ" plus the one-write-per-arming discipline says that cannot be the
-  head the sleeper is collecting.  The TSO credential is what
-  `ctxFloor curCtx T` beside `diskWm γ n T` stands for here.
+  THE PREMISE, AS IT NOW READS.  `Xv6.headDoneE γ n c.hd c.ep` is the
+  completion record of THIS arming: the used-index write that published
+  counter `n` reported the completion of the request published at queue
+  position `c.ep`, which is the position the chain `c` the receipt
+  carries was armed at.  `⌜n ≤ nr⌝` beside `Xv6.diskReadAt γ nr` says the
+  handler has READ that record, and `Xv6.headRead γ c.hd nr` says it has
+  read every OTHER record of the head too -- which is what keeps
+  `Xv6.unreadArmed`'s (P1) clause true when the receipt goes `.inactive`,
+  and is Rocq's `ord p u ∗ u < nr`.
 
-  THE READ PREMISE.  `Xv6.diskReadAt γ nr ∗ ⌜n ≤ nr⌝ ∗
-  Xv6.headRead γ c.hd nr` says every completion of this head has been READ
-  by the handler.  It is not decoration: it is what keeps a head with an
-  UNREAD completion from being collected and re-published, which is what
-  makes the unread completions' heads DISTINCT, which is the window bound
-  `dl.length - nr ≤ NUM` that `disk_used_elem_read` needs and the reason a
-  completed row survives at all (see the section head).  It is Rocq's
-  `ord p u ∗ u < nr`, carried there in `disk_res`'s claim row beside
-  `b->disk = 0`.  The payload has `diskReadAt γ nr` and `virtio_disk_rw`
-  collects under the lock, so the premise is available to P5/P6; what
-  P5/P6 must show is that the head is quiet, out of the wakeup (the
-  handler holds `vdisk_lock` across `b->disk = 0`, `wakeup(b)` and
-  `disk.used_idx += 1` alike).
+  WHERE THE PREMISE COMES FROM.  `Xv6.disk_slot_epoch` mints it, out of
+  the positioned record `Xv6.disk_used_elem_read` hands the handler and
+  the slot's receipt `Xv6.disk_slot_active` takes out of the lock payload:
+  while the entry is UNREAD, `Xv6.unreadArmed` says the chain armed at its
+  head is the one that completed, so the entry's epoch IS that chain's.
+  It is persistent from there on, so it survives the handler's
+  `b->disk = 0`, its `wakeup(b)`, and the sleeper's re-acquisition of the
+  lock.  WHAT IS STILL MISSING is the CHANNEL: the record has to reach the
+  sleeper, and the place for it is the claim row's `b->disk` cell, whose
+  value `Xv6.claimRes` leaves existential.  Rocq pins it -- `b->disk = 1`
+  while in flight, or `b->disk = 0` BESIDE the read evidence -- and that
+  is what turns the sleeper's `b->disk == 0` loop test into the right to
+  collect.  Carrying it here means `Xv6.claimRes` taking the payload's
+  watermark as a parameter and `virtio_disk_intr`'s `b->disk = 0` store
+  supplying the evidence it already holds; until then `disk_collect`
+  takes the record as an explicit premise.
 
-  WHY `⌜n ≤ nr⌝` ALONE WILL NOT DO, and why `Xv6.headRead` is there.
-  `Xv6.headDone` is persistent and names no ARMING: a head that completed,
-  was collected, was re-armed and has completed again still carries the
-  first, already-read record.  With only `⌜n ≤ nr⌝` this accessor would
-  let that head be collected while its SECOND request is still with the
-  device -- which contradicts `Xv6.unreadArmed`, a clause the invariant
-  now carries, so the interface would be inconsistent rather than merely
-  unproved.  `headRead γ c.hd nr` quantifies over every record of the
-  head and so pins the current arming.
+  (1) THE BUFFER ROW.  `Xv6.bufLease` is `Xv6.dmaOwn`: full ownership at
+  an UNCONSTRAINED value.  A read's transfer is exactly the content the
+  device chose, so nothing in the invariant pins `b->data` to anything and
+  the collect cannot produce `byteBuf c.data (own 1) data` with
+  `diskBlock γ c.blk data` beside it.  What it needs is the status row's
+  shape at `b->data`, per sector: a per-head marker travelling through
+  `Xv6.leaseL_xferIn` / `Xv6.leaseL_xferOut` and `Xv6.data_write_lease`
+  (the write arm's continuation is the channel -- see
+  `Xv6.status_write_lease`, which is the same trick one byte wide), with
+  the VALUE and a POSITION bound for the raw-to-context conversion
+  (`MachCSL.ctxBytes_of_pushedFloor` wants the write's position under the
+  payload's floor, and the two sector writes have two positions, so the
+  row wants `heads at or below ts`, not `Xv6.dmaOwnT`'s `heads exactly at
+  ts`).
 
-  `b->disk` COMES BACK TOO, at whatever the handler left there: the cell
-  joined `Xv6.claimRes` at the publication, because the sleeper is inside
-  `sleep` and cannot hold it while the request is in flight.  Its value is
-  existential for the same reason `claimRes`'s is (see there); the sleeper
-  has just READ it as `0` in its loop test, so it knows.
+  And for a READ chain the COUPLING to the image: the bytes the device
+  wrote are `MachCSL.Virtio.blockView v c.blk`, so the row's value has to
+  be tied to the block the invariant's own fragment names.  The clause
+  that makes it stable is that an in-flight READ chain's block cannot
+  move: `Xv6.cacheView` changes at that block only through a
+  `MachCSL.Virtio.xferOut` of a request targeting it, and a block in
+  flight is exclusively the chain's (`Xv6.headRes` holds its
+  `Xv6.diskBlock`).  For a WRITE chain the coupling is the other way and
+  comes from the completion gate: `Xv6.diskGeom` carries
+  `Virtio.wce c0 = false`, so `MachCSL.Virtio.completeOk` cannot fire
+  until the capture has drained to the durable image.
 
-  The `kmapStatic` premises are `disk_publish`'s, in reverse: the reverse
-  bridges `Xv6.ctxBytes_wordPointsTo` / `Xv6.ctxIdx_byteBuf` need `inRam`
-  of the buffer, which a `wordPointsTo` carries and a `dmaOwn` does
-  not. -/
+  (2) THE `.pushed` WINDOW -- THE REAL BLOCKER.  With the epoch in hand,
+  `Xv6.epDone_done` gives `Virtio.phase v c.hd = none ∨ wroteAt pm c.hd`.
+  The first disjunct is everything the collect wants.  The second is the
+  window between a serve task's used-index DMA write and its
+  `MachCSL.Virtio.complete`: the record is in the log (so the handler can
+  read it, report it and bump its watermark) while the head is still
+  `.pushed` and still holds its permit.  Freeing the receipt there breaks
+  three clauses -- `Xv6.permOk` (a permit pins its head to `.active c`),
+  `Xv6.inflightOk` and `Xv6.inflightOff` (an in-flight head is ACTIVE) --
+  and `Xv6.cachedOk` survives only because `wce c0 = false` has already
+  drained the capture.  So `disk_collect` is NOT provable as an atomic
+  view shift, and no premise the driver can hold rules the window out: the
+  counting arguments all fail, because `Xv6.disk_deposit` may bump the
+  watermark past the very entry the witness wrote.
+
+  It is an artefact of the model, not of the driver: a real device has no
+  state between publishing `used->idx` and being done with the head.  Two
+  ways out, both outside this file:
+
+  * make `MachCSL.Virtio.serve`'s last DMA write and its `complete` ONE
+    step of `MachCSL/Dev/Virtio.lean`, and redo that step's device-side
+    proof (`Xv6.diskProto_usedIdx_acc` and `Xv6.perm_complete` become
+    one); or
+  * let the invariant tolerate a freed head whose permit still carries the
+    witness -- an escape in `Xv6.permOk`, `Xv6.inflightOk` and
+    `Xv6.inflightOff` at the single head `wroteAt pm` names (`Xv6.wroteIdx`
+    and `Xv6.pushedUniq` make it unique), plus the POP's
+    `(phase popped h).isSome` branch, which becomes reachable once such a
+    head may be re-published.
+
+  THE TIER PLUMBING is all in place: `Xv6.ctxBytes_wordPointsTo` and
+  `Xv6.ctxIdx_byteBuf` are the reverse of `Xv6.disk_publish`'s
+  `Xv6.wordPointsTo_dmaOwn` / `Xv6.byteBuf_bufLease`, and
+  `MachCSL.ctxBytes_of_pushedFloor` is what turns a device-written raw
+  window into a context one once `Xv6.ctxFloor curCtx T` has passed the
+  write.  `Xv6.epOk_free` is the clause-side lemma for the receipt going
+  `.inactive`.  The `kmapStatic` premises are `disk_publish`'s, in
+  reverse: the reverse bridges need `MachCSL.inRam` of the buffer, which a
+  `wordPointsTo` carries and a `dmaOwn` does not. -/
   disk_collect : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
       [DiskG GF] [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (c : Chain) (n T nr : Nat),
     c.wf → n ≤ nr →
@@ -2773,7 +2838,7 @@ structure DISK_ACC_ASSUMPTIONS : Prop where
     diskInv (GF := GF) γ ∗ kmapStatic ∗ diskGeom γ pd pav pu ∗
       headTok γ c.hd (.active c) ∗ headTok γ c.md (.member c.hd) ∗
       headTok γ c.tl (.member c.hd) ∗ claimRes curCtx pd c ∗ diskReadAt γ nr ∗
-      headDone γ n c.hd ∗ headRead γ c.hd nr ∗ diskWm γ n T ∗ ctxFloor curCtx T ⊢
+      headDoneE γ n c.hd c.ep ∗ headRead γ c.hd nr ∗ diskWm γ n T ∗ ctxFloor curCtx T ⊢
       |={⊤}=> (headTok γ c.hd .inactive ∗ headTok γ c.md .inactive ∗
         headTok γ c.tl .inactive ∗ diskReadAt γ nr ∗
         ctxBytes curCtx (descAt pd c.hd) 16 (DFrac.own 1) c.d0 ∗
