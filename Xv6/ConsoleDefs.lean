@@ -16,6 +16,7 @@ future work here).
 -/
 import MachCSL.CallConv
 import MachCSL.Lock
+import MachCSL.KCtxMove
 import Xv6.Image
 import Xv6.UartInv
 
@@ -44,11 +45,25 @@ def consBody [CurCtx] : IProp GF := iprop%
     wordPointsTo consWAddr 4 (DFrac.own 1) w ∗
     wordPointsTo consEAddr 4 (DFrac.own 1) e
 
-/-- The payload as a function of the holder's context (constant). -/
-def consRes [CurCtx] : CtxId → IProp GF := fun _ => consBody
+/-- The payload as a function of the context that owns the cells: the
+lock's own until a winner takes it at its own (`lockPay`/`lock_pay_take`).
+It must NOT close over the ambient context, or the handle would not
+transport -- the shape `Xv6.ticksResAt`, `Xv6.diskRes` and
+`Xv6.procLockPay` have.  At the ambient context it IS the raw body
+(`consRes_cur`, `rfl`), so a holder still sees `consBody`. -/
+def consRes [CurCtx] : CtxId → IProp GF := fun ξ => @consBody hlc GF _ ⟨ξ, curTier⟩
+
+/-- The payload a holder takes is the raw body. -/
+theorem consRes_cur [CurCtx] : consRes (GF := GF) curCtx = consBody := rfl
+
+local instance ctxMorph_byteBufT (t : KTier) (a : BitVec 64) (dq : DFrac) (bs : List (BitVec 8)) :
+    CtxMorph (GF := GF) (fun ξ => @byteBuf hlc GF _ ⟨ξ, t⟩ a dq bs) :=
+  ctxMorph_bigSepL bs
+    (fun j b ξ => @wordPointsTo hlc GF _ ⟨ξ, t⟩ (a + BitVec.ofNat 64 j) 1 dq b)
+    (fun _ _ => instCtxMorphWordAt _ _ _ _ _)
 
 instance consRes_morph [CurCtx] : CtxMorph (GF := GF) consRes := by
-  unfold consRes; infer_instance
+  unfold consRes consBody; infer_instance
 
 /-- The credential of `cons.lock`. -/
 def isConsLock [CurCtx] (γc : GName) : IProp GF := isLock γc consAddr "cons" consRes

@@ -42,7 +42,8 @@ theorem kernelvec_br_ffffffffffffd120 : KA.«kernelvec» + 0xffffffffffffd120#64
 
 set_option maxHeartbeats 8000000 in
 /-- **`kernelvec` meets the handler contract**, given `kerneltrap`. -/
-theorem kernelvec_proof (KT : KERNELTRAP) : KERNELVEC := ⟨fun {hlc GF} _ _ Γ _ _ cpu₀ => by
+theorem kernelvec_proof (KT : KERNELTRAP) : KERNELVEC :=
+  ⟨fun {hlc GF} _ _ _ Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu bs _ _ cpu₀ => by
   suffices h : ⊢@{IProp GF} ∀ cpu : CPU, ihs ⟨cpu, kernelvecAddr⟩ by
     exact h.trans (by iintro H; iapply H $$ %cpu₀)
   iintro
@@ -55,13 +56,21 @@ theorem kernelvec_proof (KT : KERNELTRAP) : KERNELVEC := ⟨fun {hlc GF} _ _ Γ 
   iintro !> %X %k %pc %sc %⟨hwf, hs, hpc, hsc⟩ Hk Hpc Hcsrs Hstv #Henv Hclaim Hcont
   -- THE HANDLER'S ENVIRONMENT, at THIS trap's context: the proc table
   ihave #Hpinv : procsInv (GF := GF) Γ $$ [Henv]
-  case' _ => iapply procsInv_of_envAt' Γ $$ Henv
+  case' _ => iapply procsInv_of_envAt' Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu bs $$ Henv
   have hn0 : k.noff = 0 := (hwf.2.2.1 hs).1
   have hi : k.intena = true := (hwf.2.2.1 hs).2.1
   have hl : k.locks = [] := (hwf.2.2.1 hs).2.2.1
   have htr : trapRes true = 90 := rfl
   ihave Hk := kctxP_kctx X cpu k.trapped $$ Hk
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
+  -- the ambient tier is the interrupted bundle's: the kernel table
+  icases kctx_tier cpu k.trapped $$ Hk with ⟨%htc, Hk⟩
+  have hT : curTier = KTier.kpt := by
+    rw [← htc, KCtx.trapped_tier]; exact (hwf.2.2.1 hs).2.2.2
+  -- ...and devintr's credentials, out of the same environment
+  ihave #Hcaps : devintrCaps (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu bs $$ [Henv]
+  case' _ =>
+    iapply devintrCaps_of_envAt' Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu bs hT $$ Henv
   -- the handler's context, as a context of its own
   generalize hkt : k.trapped = kt
   have hsie : kt.sie = false := by rw [← hkt]; rfl
@@ -136,14 +145,16 @@ theorem kernelvec_proof (KT : KERNELTRAP) : KERNELVEC := ⟨fun {hlc GF} _ _ Γ 
   -- kerneltrap (its contract, unfolded, at the callee's context)
   have hkt' : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hspie' : k'.spie = true) (hspp' : k'.spp = true)
       (hnoff' : k'.noff = 0) (hlocks' : k'.locks = []) (htier' : k'.tier = KTier.kpt) (hK' : ktSlots ≤ k'.avail),
-      kctx cpu k' ∗ pcIs cpu KA.«kerneltrap» ∗ procsInv Γ ∗ trapCsrsAt cpu pc sc 0#64 ∗
+      kctx cpu k' ∗ pcIs cpu KA.«kerneltrap» ∗ procsInv Γ ∗
+      devintrCaps Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu bs ∗ trapCsrsAt cpu pc sc 0#64 ∗
       cpuClaim cpu k'.proc ∗ intrRes cpu ∗
       wpNext true k'.proc cpu (fun cpu' => iprop(∀ (R' : RegMap) (sc' tv' : BitVec 64),
         kctx cpu' (k'.withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ trapCsrsAt cpu' pc sc' tv' -∗
         cpuClaim cpu' k'.proc -∗ intrRes cpu' -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
       ⊢ wpLoop (GF := GF) cpu := by
     intro k' hsie' hspie' hspp' hnoff' hlocks' htier' hK'
-    have h := KT.wp_kerneltrap (hlc := hlc) (GF := GF) Γ cpu k' pc sc hsie' hspie' hspp' hnoff' hlocks' htier' hK' hsc hpc
+    have h := KT.wp_kerneltrap (hlc := hlc) (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu bs
+      cpu k' pc sc hsie' hspie' hspp' hnoff' hlocks' htier' hK' hsc hpc
     unfold wp_kerneltrap_body at h
     simp only [kerneltrapAddr] at h
     exact h
@@ -157,7 +168,7 @@ theorem kernelvec_proof (KT : KERNELTRAP) : KERNELVEC := ⟨fun {hlc GF} _ _ Γ 
     · ipureintro; exact kernelvecAddr_direct
     · imodintro; iapply IH
   have htier : kt.tier = KTier.kpt := by rw [← hkt]; exact (hwf.2.2.1 hs).2.2.2
-  iapply (hkt' _ ?hs ?hsp ?hpp ?hn ?hl ?ht ?hK) $$ [- $Hk $Hpc $Hpinv $Hcsrs $Hres]
+  iapply (hkt' _ ?hs ?hsp ?hpp ?hn ?hl ?ht ?hK) $$ [- $Hk $Hpc $Hpinv $Hcaps $Hcsrs $Hres]
   rotate_right 1
   k_norm
   isplitl [Hclaim]

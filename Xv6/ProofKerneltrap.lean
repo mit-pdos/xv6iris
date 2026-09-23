@@ -74,9 +74,10 @@ set_option maxHeartbeats 8000000 in
 /-- **`kerneltrap` meets its specification**, given `devintr`, `myproc` and
 `yield`. -/
 theorem kerneltrap_proof (DI : DEVINTR) (MP : MYPROC) (YI : YIELD) : KERNELTRAP :=
-  ⟨fun {hlc GF} _ _ _ Γ _ cpu k epc sc hsie hspie hspp hnoff hlocks htier hK hsc hepc => by
+  ⟨fun {hlc GF} _ _ _ _ Γ _ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu bs
+      cpu k epc sc hsie hspie hspp hnoff hlocks htier hK hsc hepc => by
   unfold wp_kerneltrap_body
-  iintro ⟨Hk, Hpc, #Hpinv, Hcsrs, Hclaim, Hres, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hpinv, #Hcaps, Hcsrs, Hclaim, Hres, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   icases trapCsrsAt_cases cpu _ _ _ $$ Hcsrs with ⟨Hsepc, Hscause, Hstval⟩
@@ -201,20 +202,25 @@ theorem kerneltrap_proof (DI : DEVINTR) (MP : MYPROC) (YI : YIELD) : KERNELTRAP 
   k_step (wp_s_jal cpu _ (KA.«kerneltrap» + 0x2a#64) false 2096712#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kerneltrap_br_fffffffffffffe72]
   iintro Hk Hpc
   have hdi : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hnoff' : k'.noff + 2 < 2 ^ 31) (hlocks' : k'.locks = [])
-      (hK' : devintrSlots ≤ k'.avail),
+      (htier' : k'.tier = KTier.kpt) (hK' : devintrSlots ≤ k'.avail),
       kctx cpu k' ∗ pcIs cpu KA.«devintr» ∗ Register.scause ↦ᵣ[cpu] sc ∗
+      devintrCaps Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu bs ∗
       (∀ R' : RegMap, kctx cpu (k'.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
         Register.scause ↦ᵣ[cpu] sc -∗ ⌜calleeSaved k'.regs R' ∧ R' 10#5 = devintrRet sc⌝ -∗ wpLoop cpu)
       ⊢ wpLoop (GF := GF) cpu := by
-    intro k' hsie' hnoff' hlocks' hK'
-    have h := DI.wp_devintr (hlc := hlc) (GF := GF) cpu k' sc (DFrac.own 1) hsie' hnoff' hlocks' hK' hsc
+    intro k' hsie' hnoff' hlocks' htier' hK'
+    have h := DI.wp_devintr (hlc := hlc) (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu bs
+      cpu k' sc hsie' hnoff' hlocks' htier' hK' hsc
     unfold wp_devintr_body at h
     simp only [devintrAddr] at h
     exact h
-  iapply (hdi _ ?hsD ?hnD ?hlD ?hKD) $$ [- $Hk $Hpc $Hscause]
+  iapply (hdi _ ?hsD ?hnD ?hlD ?htD ?hKD) $$ [- $Hk $Hpc $Hscause]
+  rotate_right 1
+  iframe #
   case hsD => k_norm
   case hnD => k_norm; omega
   case hlD => k_norm; exact hlocks
+  case htD => k_norm; exact htier
   case hKD => k_norm; unfold devintrSlots; omega
   iintro %R1 Hk Hpc Hscause %⟨hcs1, h10⟩
   have hret1 : jumpPc (KA.«kerneltrap» + 0x2e#64) = (KA.«kerneltrap» + 0x2e#64) := by decide

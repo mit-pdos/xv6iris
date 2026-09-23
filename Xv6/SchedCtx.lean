@@ -1522,8 +1522,10 @@ trap arrives at whatever context the interrupted hart runs, and
 `procsInv` is context-relative (every lock handle carries its creator's
 floor), so the invariant travels with the installed handler
 (`MachCSL.KCtx.intrResP`) as `MachGS.envP`, the ambient instance's
-environment family.  `EnvIs` is the client's choice of that family, the
-way `ClaimIs` is its choice of the claim. -/
+environment family.  The family itself -- the table beside devintr's
+credentials -- and the client's choice of it (`EnvIs`) live in
+`Xv6.HandlerEnv`, which can name `devintrCaps`; what belongs here is the
+table's own transport. -/
 
 /-- `procsInv` mentions the context only through its lock handles, so it
 transports along a domination. -/
@@ -1536,55 +1538,6 @@ instance instCtxMorphProcsInv (Γ : SchedNames) :
 /-- The tier is irrelevant to the table's invariant. -/
 theorem procsInv_toKpt (X : CurCtx) (Γ : SchedNames) :
     @procsInv hlc GF _ _ X Γ = @procsInv hlc GF _ _ ⟨X.curCtx, KTier.kpt⟩ Γ := rfl
-
-/-- **The client's choice, as a class**: the boot instantiates `MachGS`
-with `envP := fun ξ => procsInv Γ` (at ξ), and the instance is `rfl`. -/
-class EnvIs (GF : BundledGFunctors) [MachGS hlc GF] [Xv6G GF] (Γ : SchedNames) : Prop where
-  eq : ∀ ξ : CtxId, MachGS.envP (hlc := hlc) (GF := GF) ξ = @procsInv hlc GF _ _ ⟨ξ, KTier.kpt⟩ Γ
-
-/-- The environment family, spelled out. -/
-theorem envP_eq (Γ : SchedNames) [EnvIs (hlc := hlc) GF Γ] (ξ : CtxId) :
-    MachGS.envP (hlc := hlc) (GF := GF) ξ = @procsInv hlc GF _ _ ⟨ξ, KTier.kpt⟩ Γ := EnvIs.eq ξ
-
-/-- The environment's re-homing witness, discharged: `procsInv` transports. -/
-theorem envMorph_procsInv (Γ : SchedNames) [EnvIs (hlc := hlc) GF Γ] :
-    ⊢ envMorph (hlc := hlc) (GF := GF) := by
-  unfold envMorph
-  iintro !> %ξ %ξ' Hdom He
-  rw [envP_eq Γ ξ, envP_eq Γ ξ']
-  imod CtxMorph.morph (R := fun ζ => @procsInv hlc GF _ _ ⟨ζ, KTier.kpt⟩ Γ) ξ ξ'
-    $$ [$Hdom $He] with ⟨Hdom, He⟩
-  imodintro
-  iframe
-
-section
-variable (Γ : SchedNames) [EnvIs (hlc := hlc) GF Γ]
-
-/-- The table, out of the environment. -/
-theorem procsInv_of_envAt (ξ : CtxId) :
-    envAt (hlc := hlc) (GF := GF) ξ ⊢ @procsInv hlc GF _ _ ⟨ξ, KTier.kpt⟩ Γ := by
-  rw [← envP_eq Γ ξ]
-  exact envAt_env ξ
-
-/-- ...and back: the table IS the environment (with its witness). -/
-theorem envAt_of_procsInv (ξ : CtxId) :
-    @procsInv hlc GF _ _ ⟨ξ, KTier.kpt⟩ Γ ⊢ envAt (hlc := hlc) (GF := GF) ξ := by
-  iintro #H
-  iapply envAt_intro ξ
-  isplitl []
-  · rw [envP_eq Γ ξ]; iexact H
-  · iapply envMorph_procsInv Γ
-
-/-- The table at the AMBIENT context, out of the environment. -/
-theorem procsInv_of_envAt' [X : CurCtx] : envAt (hlc := hlc) (GF := GF) curCtx ⊢ procsInv Γ := by
-  rw [procsInv_toKpt X Γ]
-  exact procsInv_of_envAt Γ curCtx
-
-theorem envAt_of_procsInv' [X : CurCtx] : procsInv (GF := GF) Γ ⊢ envAt (hlc := hlc) (GF := GF) curCtx := by
-  rw [procsInv_toKpt X Γ]
-  exact envAt_of_procsInv Γ curCtx
-
-end
 
 end
 

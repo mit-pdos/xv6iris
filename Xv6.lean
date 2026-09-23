@@ -76,6 +76,7 @@ import Xv6.PrintkDefs
 import Xv6.ProofPrintk
 import Xv6.LinkPrintk
 import Xv6.SpecKerneltrap
+import Xv6.HandlerEnv
 import Xv6.SpecKernelvec
 import Xv6.ProofKernelvec
 import Xv6.LinkKernelvec
@@ -86,6 +87,8 @@ import Xv6.SpecKvminithart
 import Xv6.ProofKvminithart
 import Xv6.LinkKvminithart
 import Xv6.SpecDevintr
+import Xv6.ProofDevintr
+import Xv6.LinkDevintr
 import Xv6.SpecYield
 import Xv6.ProofKerneltrap
 import Xv6.LinkKerneltrap
