@@ -1367,7 +1367,7 @@ That is what makes the four DMA writes of a request usable at their
 VALUES.  `MachCSL.DevM.LeaseL`'s write arm is quantified over every state
 the guard fires at, and the machine may also SKIP a write whose guard is
 false; the arm therefore now produces a NEW context `C'`
-(`hlease : C ∗ R s ⊢ dmaWriteLease pa n w (R s ∗ C')`) with a `hfalse`
+(`hlease : C ∗ R s ⊢ dmaWriteLease pa n w (|==> (R s ∗ C'))`) with a `hfalse`
 obligation for the skip, and `Xv6.leaseL_serveTail` DISCHARGES `hfalse`
 for all three writes of the tail out of the permit.  Without that, the
 value a write leaves behind cannot reach the rest of the derivation at
@@ -1388,7 +1388,8 @@ proofs found are closed, and are no longer anyone's premise:
   premise is now redundant -- it is left in the frozen spec);
 * `Xv6.claimRes` carries `b->disk`, the cell the handler stores `0` into
   before `wakeup(b)` while the sleeper is inside `sleep`;
-* `Xv6.opsWin` -- the whole `disk.ops[i]` window -- is in the payload for
+* `Xv6.opsWin` -- the whole `disk.ops[i]` window -- and `Xv6.infoWin` --
+  `disk.info[i].b` and `disk.info[i].status` -- are in the payload for
   every slot that is free or a chain MEMBER, which is what gives
   `virtio_disk_rw`'s P3 something to format before it arms.
 
@@ -1442,48 +1443,60 @@ an unread head never re-enters the window.  (P4) falls out of (P2) at the
 pop and is what lets the `.served`/`.status` installs move a head's
 status marker without disturbing any row.
 
-(P3) -- unread completions have DISTINCT heads -- is NOT carried, and
-this is where the window bound `dl.length - nr ≤ NUM` comes from.  It
-does not follow from (P1)/(P2)/(P4) alone: what those rule out is a head
-being popped twice, and what is left over is one ARMING writing
-`used->idx` twice, which only the linear witness of (3) rules out.
+(P3) -- unread completions have DISTINCT heads -- IS carried now, as
+`Xv6.unreadInj`, beside `Xv6.unwritten`: an IN-FLIGHT head that has not
+made its used-index write has NO unread completion.  At the pop that is
+(P2); the used-index write is the only step that can break it, and it
+SETS the witness bit at the same moment, so the clause goes vacuous at
+that head instead of false.  `Xv6.unread_window` is the pigeonhole that
+follows: `dl.length ≤ nr + NUM`.
 
 (2) THE COLLECT PREMISE, SETTLED.  `Xv6.disk_collect` takes
 `Xv6.diskReadAt γ nr ∗ ⌜n ≤ nr⌝ ∗ Xv6.headRead γ c.hd nr`.  Nothing has
 changed here; see the note on the assumed statement below.
 
-(3) THE LOG'S ARITHMETIC -- HALF DONE.  `Xv6.usedOk` now carries
+(3) THE LOG'S ARITHMETIC -- DONE.  `Xv6.usedOk` carries
 `dl.Pairwise (a.cnt ≤ c.cnt ∧ a.pos ≤ c.pos)`: the log's POSITIONS are
 monotone, proved from `Xv6.dlTops_max` (the per-entry `topLb`s fused into
-one) through the lease's new `Kb`.  With it, an entry at a counter at or
-above `nr+1` is at a position at or above the entry at `nr+1`, which is
-half of what `disk_used_elem_read` needs to turn `Xv6.diskWm γ nc K` into
-`⌜t ≤ K⌝` for the record it returns.
+one) through the lease's `Kb`.  And `Xv6.cntOk` carries the COUNTERS'
+strictness, `dl[k].cnt = k + 1`, so an index into the log IS its counter
+minus one and a reader with a lower bound on the count finds the entry it
+is looking for (`Xv6.cntOk_mem`).
 
-WHAT IS MISSING IS THE COUNTERS' STRICTNESS, and it is the same missing
-thing as (P3): `Xv6.usedOk_write` appends `(nc + 1, t, hd)` and can only
-show `r.cnt ≤ nc + 1` for the old entries, not `r.cnt ≤ nc`, because
-nothing says this arming has not already written `used->idx`.  THE FIX,
-in the shape the status row now sets out:
+HOW THE STRICTNESS IS GOT.  `Xv6.PermVal`'s latched used index is an
+`Option (BitVec 16 × Bool)`: the `Bool` is the WITNESS BIT, `false` from
+the latch and `true` from the task's used-index write.  `Xv6.cntOk`
+couples it to the log -- `dl.length = nc + 1` exactly when some permit
+carries it (`Xv6.wroteIdx`) -- so at the write the task's own permit says
+`false`, a permit at `true` would be at a `.pushed` head
+(`Xv6.permOk`), hence at THIS head (`Xv6.pushedUniq`), hence THIS permit
+(`Xv6.permInj`), and therefore `dl.length = nc`.
 
-* `Xv6.PermVal` gains a fifth field, a `Bool` "this task has written its
-  used element" (no new ghost allocation -- `Xv6.diskInitGhosts` is
-  frozen, and the permit map is already there);
-* `diskLive` gains `ue : Nat → UElem` and the per-slot conjunct.  The
-  element write takes slot `ui.toNat % NUM` out of the invariant
-  (`.lent`) and into the task's context, and sets the permit's flag; the
-  used-index write puts it back at its value and position (`.done`);
-* the element write's obligation refutes `ue j = .lent` from its own
-  permit: a lending task is `.pushed` (`Xv6.pushedUniq` makes it unique,
-  `Xv6.permInj` makes it THIS permit) and this permit's flag is still
-  `false`;
-* the used-index write's obligation refutes a pre-existing entry at
-  counter `nc + 1` by `Xv6.dmaOwn_excl1`: such an entry's row would hold
-  slot `nc % NUM` at own 1, and the task holds it at own 1 too.
+The bit flips INSIDE the write's `MachCSL.dmaWriteLease` continuation,
+which is why that continuation now takes a view shift
+(`MachCSL.DevM.LeaseL.dmaWrite` asks for `|==> (R s ∗ C')`).  There is no
+other place to flip it: the value a write leaves behind cannot say the
+write happened -- a second write of the same value is
+indistinguishable -- and the next `.step` is too late, because the
+invariant has to be restored AT the store.
 
-That gives `dl.length = nc` at the write, hence `dl[k].cnt = k + 1`,
-hence (P3) and the window bound `dl.length - nr ≤ NUM`, hence the
-used-element row survives to be read.
+(3b) THE USED-RING ROWS -- DONE.  `Xv6.diskLive` carries
+`ue : Nat → UElem` and `Xv6.ueInv`.  A slot is `.free` (the invariant's,
+at no value), `.lent` (the serving task's, from its LATCH to its
+used-index write) or `.done w ts` (the invariant's, at the value the
+device wrote and the POSITION of that write); `Xv6.ueOk` says every
+UNREAD entry's row is `.done` at a word whose low half spells that
+entry's head, at a position at or below the entry's own used-index write.
+
+The LATCH is what lends the row, not the element write: absence is not
+provable, so at the element write a task could not show it has not
+already lent the row, whereas at the latch its permit still says
+`u = none` and `Xv6.ueLent` makes it the only candidate lender.  The row
+then travels latch -> element write -> index write in the task's own
+`MachCSL.DevM.LeaseL` context, which is the only channel by which the
+value the element write left behind can reach the moment the log entry is
+appended.  `Xv6.unread_window_lt` -- the pigeonhole with the serving head
+EXCLUDED -- is what says the slot the latch takes is no unread entry's.
 
 (4) THE TSO CREDENTIAL, SETTLED.  `Xv6.diskWm γ n F` says the hart's floor
 `F` has passed a used-index write publishing at least `n`.  It is a
@@ -2239,6 +2252,19 @@ structure DISK_ACC_ASSUMPTIONS : Prop where
   an eight-byte statement is not merely wider but UNUSABLE, because
   `usedElemAt pu j = pu + 4 + 8 * j` is never 8-aligned and no eight-byte
   load rule can fire there.
+
+  WHAT IS LEFT IS THE READ ITSELF.  Everything this accessor rests on is
+  now in the invariant: `Xv6.cntOk` puts the entry it must return at INDEX
+  `nr` of the log, `Xv6.ueOk` holds that entry's used-ring element at row
+  `nr % NUM` -- at the word the device wrote, whose low half spells the
+  head, and at a position at or below the entry's own used-index write --
+  and `Xv6.usedOk`'s monotone positions turn `Xv6.diskWm γ nc K` into
+  `⌜t ≤ K⌝`.  What has to be written is the `MachCSL.readAU` itself, in
+  the shape of `Xv6.disk_status_read`: FOUR bytes out of the row's EIGHT
+  (`MachCSL.histBytes_split_at` / `_join_at`, and the `nthByte` algebra
+  that says the low four bytes of `w` spell `BitVec.extractLsb' 0 32 w`),
+  and `Xv6.headDoneAt` minted off `Xv6.doneAuth` the way
+  `Xv6.disk_deposit` mints `Xv6.headDone`.
 
   WHAT IT RETURNS IS POSITIONED.  `Xv6.headDoneAt γ (nr+1) t i` names the
   POSITION `t` of the used-index write that reported the completion, and
