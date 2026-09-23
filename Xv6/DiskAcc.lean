@@ -1386,123 +1386,101 @@ proofs found are closed, and are no longer anyone's premise:
   `virtio_disk_rw`'s P3 something to format before it arms.
 
 -------------------------------------------------------------------------
-WHAT IS LEFT, AND WHY.  The three accessors below wait on the
-PER-COMPLETION ROWS, and those wait on one clause that is NOT yet there
-and that the rest of the design hangs off.
+WHAT IS LEFT, AND WHY.  One accessor of the three is PROVED
+(`Xv6.disk_status_read`, below); the other two wait on the rest of the
+per-completion rows, and those wait on ONE mechanism that is not yet
+there.
 
-(1) THE ROWS THEMSELVES.  Sketch, in the shape the rest of this file is
-written in:
+(1) THE ROWS.  The STATUS row is DONE and is the pattern the other two
+follow.  `Xv6.diskLive` carries a per-head marker `sb : Nat -> SByte` and
+a conjunct `[∗list] i, Xv6.statusRes (st i) (sb i)`: the invariant holds
+an armed head's status byte at own 1 up to `.fetched` (`.free`), NOTHING
+at `.served` (`.lent` -- the byte is in the serving task's linear
+context, lent to it by the `.served` install), and at the `0` the device
+wrote from `.status` on (`.done ts`).  `Xv6.sbOk` is the coupling, an IFF
+at `.lent`, and it travels inside `Xv6.unreadArmed` so that the row costs
+`diskLive` no new pure conjunct.
 
-* the status byte's PLACE is a function of the permit's phase -- the
-  invariant holds `dmaOwn c.status 1` up to `.fetched`, NOTHING at
-  `.served` (the byte is in the serving task's linear context, which is
-  where the write's `C'` puts it at its value), and
-  `dmaOwnAt c.status 1 0#8` from `.status` on (the `.step` that installs
-  `.status` hands it back).  A per-head marker `sb : Nat -> SByte` in
-  `diskLive` carries the same three states past the completion, and a
-  pure clause ties it to `Virtio.phase`;
-* the used ELEMENT is pinned by the LOG, not by a row: keep
-  `Xv6.usedLease` at values (`dmaOwnAt (usedElemAt pu j) 8 (uv j)`) and
-  add the clause `∀ k, nr ≤ k < dl.length → uv (k % NUM) = usedElemVal dl[k]`.
-  It needs `dl.length - nr ≤ NUM`, and the used-ELEMENT write needs
-  `nc - nr < NUM` so that the slot it overwrites is not one of them;
-* `b->data` is pinned the same way -- `bufLease` at values, re-pinned at
-  each `xferIn` write (the write may re-choose the invariant's existential
-  witness, so no ghost is needed for the bytes themselves).  What the
-  SNAPSHOT is for is the COUPLING to `Xv6.diskBlock`: add the clause "an
-  in-flight READ chain's image fragment is `blockView v c.blk`" (stable:
-  a read moves neither image nor cache, a drain preserves `cacheView`,
-  and two chains cannot hold the same block because `diskBlock` is
-  exclusive), and `MachCSL.Virtio.xferIn`'s `get` then knows the bytes it
-  is about to write are the fragment's.
+Two things made it work, and both are reusable:
 
-(1b) THE `pend` CLAUSES, AND THE FIRST OF THEM, WHICH IS NOW CARRIED.
-They are PURE -- they add no existential to `diskLive`, only conjuncts to
-its `⌜..⌝`, over the log `dl`, the watermark `nr`, the receipts `st`, the
-ring and the window `[lo, np)`:
+* `MachCSL.DevM.LeaseL`'s write arm is the ONLY channel by which the
+  value a DMA write leaves behind reaches a later step, so the byte
+  TRAVELS: `Xv6.leaseL_lend` hands it to the task, `Xv6.status_write_lease`
+  writes it out of the task's context, `Xv6.leaseL_take` returns it;
+* a VALUE is not enough for a racy reader.  `MachCSL.Hist.read` returns
+  the newest VISIBLE entry, so a row must keep the POSITION of the write
+  that put the value there: that is `Xv6.dmaOwnT`, and
+  `MachCSL.dmaWriteLease` now carries an ORDERING RECEIPT (a position
+  `Kb` the client holds a `MachCSL.topLb` for, and `⌜Kb < t⌝` out) which
+  is what proves the status write precedes the used-index write.
+
+The USED-ELEMENT row and the `b->data` row are the same shape: the
+element pinned at `(usedLen r) ++ h` with its position, `b->data` at the
+bytes transferred.  `Xv6.usedLease` must become slot-indexed
+(`.free`/`.lent`/`.done w ts`) exactly as `Xv6.statusRes` is head-indexed.
+
+(1b) THE `pend` CLAUSES.  (P1), (P2) and (P4) are CARRIED, all three
+inside `Xv6.unreadArmed`:
 
     (P1) ∀ r ∈ dl, nr < r.cnt → ∃ c, st r.hd = .active c
-    (P2) ∀ r ∈ dl, nr < r.cnt → ∀ p, lo ≤ p < np → ring (p % NUM) ≠ r.hd
-    (P3) ∀ r r' ∈ dl, nr < r.cnt → nr < r'.cnt → r ≠ r' → r.hd ≠ r'.hd
-    (P4) ∀ h, (Virtio.phase v h).isSome → ∀ r ∈ dl, nr < r.cnt → r.hd ≠ h.toNat
+    (P2) ∀ r ∈ dl, nr < r.cnt → (∀ p ∈ [lo,np), ring (p % NUM) ≠ r.hd)
+                                 ∧ stg ≠ some r.hd
+    (P4) `Xv6.pushedOff`: a head in flight at a phase before `.pushed`
+         has no unread completion
 
-(P1) IS `Xv6.unreadArmed`, and it is in `diskLive` now: it is what
-`Xv6.disk_slot_active` reads off, which is what turns a head out of the
-used ring into the `Xv6.headTok γ i (.active c)` the status read and the
-collect take.  Its own preservation needs nothing else -- the used-index
-write's head is in flight, hence armed (`Xv6.inflightOk`); the
-publication's three receipts are all `.inactive` beforehand, so by (P1)
-itself none of them is an unread head; `Xv6.disk_deposit` only shrinks
-the window (`Xv6.diskProto_nr_acc` is therefore restricted to a watermark
-that RISES).
+(P2) is what says an unread head can never be POPPED again: the ring
+store stages only a head whose receipt is `.inactive` (and by (P1) that
+is no unread head), and the publication cashes the staged-head clause, so
+an unread head never re-enters the window.  (P4) falls out of (P2) at the
+pop and is what lets the `.served`/`.status` installs move a head's
+status marker without disturbing any row.
 
-(P1) also forces a premise on `disk_collect`: see `Xv6.headRead` and the
-note on the assumed statement below.  (P2)--(P4), which the window bound
-and the distinctness of unread heads need, are not carried; at the
-used-index WRITE, (P3) for the new entry is (P4) for the head that is
-completing, and at `Xv6.disk_publish`, (P2) for the position that joins
-the window is (P1) read backwards.
+(P3) -- unread completions have DISTINCT heads -- is NOT carried, and
+this is where the window bound `dl.length - nr ≤ NUM` comes from.  It
+does not follow from (P1)/(P2)/(P4) alone: what those rule out is a head
+being popped twice, and what is left over is one ARMING writing
+`used->idx` twice, which only the linear witness of (3) rules out.
 
-(2) THE CLAUSE EVERYTHING HANGS OFF, AND THE STATEMENT CHANGE IT FORCES.
-Each of the three rows above must survive from the completion to the
-driver's `collect`, and the window bound needs the UNREAD completions'
-heads to be DISTINCT.  Both need:
+(2) THE COLLECT PREMISE, SETTLED.  `Xv6.disk_collect` takes
+`Xv6.diskReadAt γ nr ∗ ⌜n ≤ nr⌝ ∗ Xv6.headRead γ c.hd nr`.  Nothing has
+changed here; see the note on the assumed statement below.
 
-    a head with an UNREAD completion is not collected, hence not
-    re-published, hence not popped and not completed again.
+(3) THE LOG'S ARITHMETIC -- HALF DONE.  `Xv6.usedOk` now carries
+`dl.Pairwise (a.cnt ≤ c.cnt ∧ a.pos ≤ c.pos)`: the log's POSITIONS are
+monotone, proved from `Xv6.dlTops_max` (the per-entry `topLb`s fused into
+one) through the lease's new `Kb`.  With it, an entry at a counter at or
+above `nr+1` is at a position at or above the entry at `nr+1`, which is
+half of what `disk_used_elem_read` needs to turn `Xv6.diskWm γ nc K` into
+`⌜t ≤ K⌝` for the record it returns.
 
-Nothing establishes that today, because `disk_collect` as stated does not
-say the completion it reclaims has been READ.  It must: the premise
-`Xv6.diskReadAt γ nr ∗ ⌜n ≤ nr⌝` has been ADDED to the assumed statement
-below (it is Rocq's `ord p u ∗ u < nr`, which lives in that port's
-`disk_res` claim row beside `b->disk = 0`; the wakeup path of
-`virtio_disk_rw` is where P5/P6 must produce it -- the handler holds
-`vdisk_lock` across `b->disk = 0`, `wakeup(b)` AND `disk.used_idx += 1`,
-so a sleeper that re-acquires the lock always has `n ≤ nr`).
+WHAT IS MISSING IS THE COUNTERS' STRICTNESS, and it is the same missing
+thing as (P3): `Xv6.usedOk_write` appends `(nc + 1, t, hd)` and can only
+show `r.cnt ≤ nc + 1` for the old entries, not `r.cnt ≤ nc`, because
+nothing says this arming has not already written `used->idx`.  THE FIX,
+in the shape the status row now sets out:
 
-With it, the chain of clauses is:
+* `Xv6.PermVal` gains a fifth field, a `Bool` "this task has written its
+  used element" (no new ghost allocation -- `Xv6.diskInitGhosts` is
+  frozen, and the permit map is already there);
+* `diskLive` gains `ue : Nat → UElem` and the per-slot conjunct.  The
+  element write takes slot `ui.toNat % NUM` out of the invariant
+  (`.lent`) and into the task's context, and sets the permit's flag; the
+  used-index write puts it back at its value and position (`.done`);
+* the element write's obligation refutes `ue j = .lent` from its own
+  permit: a lending task is `.pushed` (`Xv6.pushedUniq` makes it unique,
+  `Xv6.permInj` makes it THIS permit) and this permit's flag is still
+  `false`;
+* the used-index write's obligation refutes a pre-existing entry at
+  counter `nc + 1` by `Xv6.dmaOwn_excl1`: such an entry's row would hold
+  slot `nc % NUM` at own 1, and the task holds it at own 1 too.
 
-    pend i          -- "head i has an unread completion", set at the
-                       used-index write, cleared by `disk_deposit`
-    st i = .inactive → pend i = false          (collect needs n ≤ nr)
-    pend i = true → i is at no position in [lo, np)   (so it cannot be
-                       popped again)
-    (Virtio.phase v h).isSome → h is at no position in [lo, np)
-
-The LAST of those is `Xv6.inflightOff`, and it IS now carried (it travels
-in `Xv6.inflightOk`'s slot of `diskLive`'s pure clause, so that it cost no
-new conjunct): an in-flight head is a descriptor of the queue, its
-receipt is ACTIVE, it is at no published, unpopped position and it is not
-the one the ring store has staged.  It is what says a head cannot be
-popped, and so completed, twice over one arming.  What is left of the
-chain is `pend` itself and the two clauses above it, which is where the
-`n ≤ nr` premise of `disk_collect` is cashed.
-
-(3) THE LOG'S ARITHMETIC.  `disk_used_elem_read` reads position `nr` and
-must find the entry whose counter is `nr + 1`, which needs
-`dl[k].cnt = k + 1` and `nc ≤ dl.length ≤ nc + 1`.  The upper bound needs
-to know that the task between its gate and its index write has not
-already written: the natural witness is the used ELEMENT slot itself,
-which that task holds at `own 1` in its context between the two writes
-(the `C'` the write arm now produces), so it cannot write twice.
-
-(3b) WHERE THE LOG ARITHMETIC MUST BE PROVED.  `usedOk` (in
-`Xv6/DiskInvDefs.lean`) carries the log's bookkeeping, and the two
-clauses `nc ≤ dl.length ≤ nc + 1` and `dl[k].cnt = k + 1` belong there --
-`usedOk_nil` and `usedOk_complete` take them for free.  The work is at
-`usedOk_write`, which appends `(nc + 1, t, hd)`: the new entry's index is
-`dl.length`, so `dl[k].cnt = k + 1` needs `dl.length = nc` EXACTLY at the
-write, i.e. that no earlier write is still outstanding.  Its only source
-is the writing task itself -- `Xv6.pushedUniq` plus the used-ELEMENT slot
-the task holds at `own 1` in its linear context between its two writes --
-which means the premise has to reach `Xv6.diskProto_usedIdx_acc`
-(`Xv6/DiskInv.lean`), whose only premise today is `Virtio.reqOf s h =
-some r`.
+That gives `dl.length = nc` at the write, hence `dl[k].cnt = k + 1`,
+hence (P3) and the window bound `dl.length - nr ≤ NUM`, hence the
+used-element row survives to be read.
 
 (4) THE TSO CREDENTIAL, SETTLED.  `Xv6.diskWm γ n F` says the hart's floor
-`F` has passed a used-index write publishing at least `n`.  It used to be
-a PREMISE with no way to establish it; it is now a THEOREM of the read,
-through `MachCSL/WpSmodeFenceFloor.lean`:
+`F` has passed a used-index write publishing at least `n`.  It is a
+THEOREM of the read, through `MachCSL/WpSmodeFenceFloor.lean`:
 
 * `MachCSL.readAUr` is `MachCSL.readAU` whose continuation ALSO receives
   `MachCSL.rviewLb cpu tvn` -- a ghost receipt that the reader's READ
@@ -1518,7 +1496,10 @@ NOTE on what the model does NOT support: a fence does NOT take the floor
 to the top of the store order (`MachCSL.fencePost` is
 `max tv (max pub rv)`, and `MachCSL/TsoMem.lean` is a relaxed read-read
 model), so `topLb T ∗ fence ⊢ viewLb cpu T` is unsound and the credential
-has to travel on the READ, not on the write's position. -/
+has to travel on the READ, not on the write's position.  What the model
+DOES support, and `MachCSL/WpSmodeFencePub.lean` now exposes, is the
+DRAIN edge: a hart's own store receipt `MachCSL.authoredBy T (hartAgent
+cpu)` becomes `viewLb cpu T` across a full fence. -/
 
 /-! ## Arming a head: the publication view shift
 

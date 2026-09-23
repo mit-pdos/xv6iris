@@ -111,22 +111,31 @@ needs -- `lo < np` -- has to cross device steps.  Two mechanisms carry it:
   (`MachCSL/WpDevDmaStepV.lean`).
 
 ---------------------------------------------------------------------
-WHAT IS NOT HERE, AND WHY.
+WHAT IS HERE, AND WHAT IS NOT.
 
-* No PER-COMPLETION ROWS on the completion side: the used-ring ELEMENT the
-  device wrote at each position, the completed request's status byte at a
-  known value, and the `topLb` bound on that request's DATA writes.  The
-  used-index cell's WRITE LOG is here (see below), and with it the
-  per-completion record `doneRec`/`headDone` and the handler's credential
-  `diskWm`; the rows are what the last three accessors of
-  `Xv6/DiskAcc.lean` still wait on.  The invariant now KNOWS the handler
-  watermark (`diskReadAt` is a ghost PAIR: the payload's half and
-  `diskReadAtAuth` inside the dead and live arms) and the exact PHASE of
-  every in-flight request (`permOk`, below), which is what the rows are
-  built on; the rows themselves, the window bound `dl.length - nr ≤ NUM`
-  and the one clause they all hang off -- "an in-flight head is at no
-  published, unpopped position" -- are still to come.  The section head
-  of `Xv6/DiskAcc.lean` sets the design out in full.
+* THE STATUS ROW IS HERE.  `diskLive` carries `sb : Nat -> SByte` and
+  `[∗list] i, statusRes (st i) (sb i)`: an armed head's
+  `disk.info[h].status` is the invariant's at own 1 up to `.fetched`
+  (`.free`), the SERVING TASK's at `.served` (`.lent`), and the
+  invariant's again at the `0` the device wrote from `.status` on
+  (`.done ts`, WITH the position of that write).  `sbOk` is the coupling;
+  it and the unread rows' clauses travel together in `unreadArmed`.
+  `Xv6.disk_status_read` is proved off it.
+* THE OTHER TWO PER-COMPLETION ROWS ARE NOT: the used-ring ELEMENT the
+  device wrote at each position, and the bytes of a request's DATA
+  transfer.  Both are the status row's shape one level up -- a per-SLOT
+  marker for the element, `bufLease` at values for the data -- and both
+  wait on the used-element slot's LINEAR WITNESS, which is also what
+  makes the log's counters strictly monotone and its unread window at
+  most `NUM` wide.  The section head of `Xv6/DiskAcc.lean` sets the
+  design out in full.
+* THE UNREAD ROWS' CLAUSES (P1), (P2) and (P4) are here, inside
+  `unreadArmed`: an unread completion's head is ARMED, at no published
+  unpopped position and not the staged one, its status byte is the
+  invariant's at zero at a position at or below the used-index write that
+  reported it, and a head in flight at a phase before `.pushed` has no
+  unread completion.  (P3) -- unread completions have DISTINCT heads --
+  is not, for the same reason.
 * The CONTENT of a disk read's data transfer is existential (`dmaOwn`,
   not `dmaOwnAt`).  The device computes the payload from a SNAPSHOT of its
   image taken at the task's `get` and writes it several steps later.  The
