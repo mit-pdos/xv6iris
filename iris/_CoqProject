@@ -1623,6 +1623,7 @@ UkShRedirGtk.v
 UkShRedirCmd.v
 UkShRedirs.v
 UkShRedirPr.v
+UkShArgs.v
 UkShRedirEx.v
 UkShRedirPex.v
 UkShRedirNul.v

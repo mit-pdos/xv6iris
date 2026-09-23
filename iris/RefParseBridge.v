@@ -50,46 +50,9 @@ Local Open Scope nat_scope.
 Lemma rb_bar_is_ushq : ushq_bar = rb_bar.
 Proof using. reflexivity. Qed.
 
-(* ---- the argument loop -------------------------------------------------- *)
-
-(* at the end of the line the loop stops with what it has *)
-Lemma ref_args_nul (len : nat) (f : nat -> bv 8) (n i : nat)
-    (toks : list (nat * nat)) (rs : list rredir) :
-  0 < n -> ref_skip len f i = len -> ref_args len f n i toks rs = Some (toks, rs, len).
-Proof using.
-  intros Hn Hs. destruct n as [| n ]; [ lia | ]. cbn [ref_args].
-  rewrite (ref_peek_end _ _ _ _ Hs ref_symtoks_stop). cbn beta iota.
-  rewrite (ref_gettoken_nul len f len (ref_skip_at_len len f)). cbn beta iota.
-  rewrite (bool_decide_eq_true_2 _ eq_refl). reflexivity.
-Qed.
-
-(* one turn of the loop on a word: the word is appended and parseredirs
-   runs at the cursor after it *)
-Lemma ref_args_step (len : nat) (f : nat -> bv 8) (n i s n0 : nat)
-    (acc : list (nat * nat)) (rs : list rredir) :
-  ref_nonnul len f -> i <= len -> ref_skip len f i = s -> s < len ->
-  ushp_is_sym (f s) = false -> ushp_toklen (len - s) s f = n0 ->
-  length acc < 9 ->
-  ref_args len f (S n) i acc rs
-  = match ref_redirs len f n (ref_skip len f (s + n0)) rs with
-    | Some (rs', s2) => ref_args len f n s2 (acc ++ [(s, s + n0)]) rs'
-    | None => None
-    end.
-Proof using.
-  intros Hnn Hi Hs Hlt Hsym Hn0 Hacc. cbn [ref_args].
-  rewrite (ref_peek_miss len f i [rb_bar; rb_rpar; rb_amp; rb_semi]);
-    [ | rewrite Hs; apply ref_at_notin; [ intros _; exact Hsym | exact ref_symtoks_stop ] ].
-  rewrite Hs. cbn beta iota.
-  assert (Hss : ref_skip len f s = s) by (rewrite <- Hs at 1; rewrite (ref_skip_idem _ _ _ Hi); exact Hs).
-  rewrite (ref_gettoken_word len f s s Hnn Hss Hlt Hsym). cbn beta iota zeta.
-  unfold ref_tokend. rewrite Hn0.
-  rewrite (bool_decide_eq_false_2 _ rt_word_ne_0), (bool_decide_eq_true_2 _ eq_refl).
-  cbn [negb].
-  rewrite (bool_decide_eq_false_2 (10 <= length (acc ++ [(s, s + n0)]))
-             ltac:(rewrite ushp_len_app1; lia)).
-  reflexivity.
-Qed.
-
+(* ---- the argument loop: [ref_args_nul] / [ref_args_step] moved down to
+   RefParseSym SS5 (the general parseexec walk, UkShArgs, sits below this
+   file) ---- *)
 (* ---- the & loop at the end of the line ---------------------------------- *)
 
 Lemma ref_backs_len (len : nat) (f : nat -> bv 8) (n : nat) (t : ushp_cmd) :
@@ -473,134 +436,10 @@ Qed.
 (* §3 THE REDIRECT LINE: [ushs_redir] + [ushs_toks] at the '>'              *)
 (* ===================================================================== *)
 
-(* at or below the one symbol, a symbol byte IS that symbol *)
-Lemma ushs_one_le_sym (len : nat) (f : nat -> bv 8) (p j : nat) :
-  ushs_one len f (Some p) -> j <= p -> ushp_is_sym (f j) = true -> f j = rb_gt.
-Proof using.
-  intros Hone Hj Hs. destruct (ushs_one_some_at _ _ _ Hone) as [ Hp Hgt ].
-  destruct Hone as [ H1 _ ]. injection (H1 j ltac:(lia) Hs) as <-.
-  rewrite Hgt. exact rb_gt_is_ushs.
-Qed.
-
-Lemma ref_at_notin_gt (len : nat) (f : nat -> bv 8) (p s : nat) (toks : list (bv 8)) :
-  ushs_one len f (Some p) -> s <= p -> ref_symtoks toks -> rb_gt ∉ toks ->
-  ref_at len f s ∉ toks.
-Proof using.
-  intros Hone Hs Hsym Hgt Hin. destruct (ushs_one_some_at _ _ _ Hone) as [ Hp _ ].
-  rewrite (ref_at_lt len f s ltac:(lia)) in Hin.
-  apply elem_of_list_lookup_1 in Hin as [ k Hk ].
-  pose proof (Forall_lookup_1 _ _ _ _ Hsym Hk) as Hb.
-  rewrite (ushs_one_le_sym len f p s Hone Hs Hb) in Hk.
-  exact (Hgt (elem_of_list_lookup_2 _ _ _ Hk)).
-Qed.
-
-(* on the redirect line the argument loop does NOT stop at the '>': '>' is
-   not in parseexec's stop set, so the [parseredirs] that follows the LAST
-   argument consumes `> file' and the loop then finds the line exhausted.
-   The redirect is appended to the ones consumed so far. *)
-Lemma ref_args_of_toks_redir (len : nat) (f : nat -> bv 8) (off p e : nat)
-    (toks acc : list (nat * nat)) (rs : list rredir) (n : nat) :
-  ref_nonnul len f ->
-  ushs_redir len f p e ->
-  off <= p ->
-  ushs_toks len f p off toks ->
-  0 < length toks ->
-  length acc + length toks < 10 ->
-  length toks + 1 < n ->
-  ref_args len f n off acc rs
-  = Some (acc ++ toks,
-          rs ++ [{| rr_q := S (S p); rr_eq := e; rr_mode := rr_mode_gt; rr_fd := 1 |}],
-          len).
-Proof using.
-  revert off acc rs n.
-  induction toks as [| tk rest IH ]; intros off acc rs n Hnn Hr Hoff Htoks Hpos Hlen Hn;
-    [ cbn in Hpos; lia | ].
-  pose proof (ushs_redir_lt _ _ _ _ Hr) as Hp.
-  pose proof (ushs_one_nosym_below _ _ _ (ushs_redir_one _ _ _ _ Hr)) as Hbelow.
-  destruct n as [| n ]; [ cbn in Hn; lia | ].
-  destruct (ushs_toks_cons_inv' len p off (ref_skip len f off)
-              (ushp_toklen (len - ref_skip len f off) (ref_skip len f off) f) f tk rest
-              eq_refl eq_refl Htoks) as (Hq & -> & Hrest).
-  set (s := ref_skip len f off) in *.
-  set (n0 := ushp_toklen (len - s) s f) in *.
-  assert (Hslt : s < len) by exact (ref_toklen_pos_lt len f s Hq).
-  assert (Hsn : s + n0 <= len) by (pose proof (ushp_toklen_le (len - s) s f); lia).
-  assert (Hsnp : s + n0 <= p) by exact (ushs_toks_le _ _ _ _ _ Hrest).
-  assert (Hsym : ushp_is_sym (f s) = false) by (apply Hbelow; lia).
-  cbn [length] in Hlen, Hn.
-  rewrite (ref_args_step len f n off s n0 acc rs Hnn ltac:(lia) eq_refl Hslt Hsym eq_refl ltac:(lia)).
-  set (s1 := ref_skip len f (s + n0)).
-  assert (Hs1 : s1 <= len) by exact (ref_skip_le len f (s + n0) Hsn).
-  assert (Hs1ge : s + n0 <= s1) by exact (ref_skip_ge len f (s + n0)).
-  assert (Hs1i : ref_skip len f s1 = s1) by exact (ref_skip_idem len f (s + n0) Hsn).
-  pose proof (ushs_toks_skip len p f (s + n0) rest Hsn Hrest) as Hrest1.
-  fold s1 in Hrest1.
-  assert (Hs1p : s1 <= p) by exact (ushs_toks_le _ _ _ _ _ Hrest1).
-  destruct rest as [| tk' rest' ].
-  - (* the last token: parseredirs finds the '>' *)
-    assert (Hs1eq : s1 = p).
-    { assert (Hnil : s1 + ushp_skipws (len - s1) s1 f = p)
-        by exact (ushs_toks_nil_inv _ _ _ _ Hrest1).
-      assert (Hk : ushp_skipws (len - s1) s1 f = 0) by exact (ushp_skipws_idem len (s + n0) f Hsn).
-      lia. }
-    rewrite (ref_redirs_gt len f p e n s1 rs Hnn Hr ltac:(rewrite Hs1i; exact Hs1eq) ltac:(lia)).
-    rewrite (ref_args_nul len f n len _ _ ltac:(lia) (ref_skip_at_len len f)). reflexivity.
-  - (* more tokens: the byte after the blanks is a word byte *)
-    destruct (ushs_toks_cons_inv' len p s1 (ref_skip len f s1)
-                (ushp_toklen (len - ref_skip len f s1) (ref_skip len f s1) f) f tk' rest'
-                eq_refl eq_refl Hrest1) as (Hq' & _ & Hrest').
-    rewrite Hs1i in Hq', Hrest'.
-    assert (Hs1lt : s1 < p) by (pose proof (ushs_toks_le _ _ _ _ _ Hrest'); lia).
-    rewrite (ref_redirs_miss len f n s1 rs ltac:(lia)).
-    2:{ rewrite Hs1i. apply ref_at_notin; [ intros _; apply Hbelow; lia | exact ref_symtoks_redir ]. }
-    rewrite Hs1i. cbn beta iota.
-    rewrite (IH s1 (acc ++ [(s, s + n0)]) rs n Hnn Hr Hs1p Hrest1 ltac:(cbn [length]; lia)
-               ltac:(rewrite ushp_len_app1; cbn [length] in *; lia) ltac:(cbn [length] in *; lia)).
-    rewrite <- app_assoc. reflexivity.
-Qed.
-
-(* parseexec on the redirect line: a leading redirect (no tokens) is
-   consumed by the parseredirs BEFORE the loop; otherwise by the one after
-   the last token.  Either way the same REDIR node, at the end of the line. *)
-Lemma ref_parseexec_redir (len : nat) (f : nat -> bv 8) (n off p e : nat)
-    (toks : list (nat * nat)) :
-  ref_nonnul len f -> ushs_redir len f p e -> off <= p ->
-  ushs_toks len f p off toks -> length toks < 10 -> length toks + 2 < n ->
-  ref_parseexec len f n off = Some (UshpRedir (UshpExec toks) (S (S p)) e rr_mode_gt 1, len).
-Proof using.
-  intros Hnn Hr Hoff Htoks Hlen Hn. unfold ref_parseexec.
-  pose proof (ushs_redir_lt _ _ _ _ Hr) as Hp.
-  pose proof (ushs_redir_one _ _ _ _ Hr) as Hone.
-  pose proof (ushs_one_nosym_below _ _ _ Hone) as Hbelow.
-  assert (Hoffl : off <= len) by lia.
-  pose proof (ushs_toks_skip len p f off toks Hoffl Htoks) as Htoks0.
-  set (s0 := ref_skip len f off) in *.
-  assert (Hs0p : s0 <= p) by exact (ushs_toks_le _ _ _ _ _ Htoks0).
-  assert (Hs0i : ref_skip len f s0 = s0) by exact (ref_skip_idem len f off Hoffl).
-  rewrite (ref_peek_miss len f off [rb_lpar]);
-    [ | apply (ref_at_notin_gt len f p); [ exact Hone | exact Hs0p | exact ref_symtoks_lpar | exact rb_gt_notin_lpar ] ].
-  fold s0. cbn beta iota.
-  destruct toks as [| tk rest ].
-  - (* no token: the leading parseredirs takes the redirect *)
-    assert (Hs0eq : s0 = p).
-    { assert (Hnil : s0 + ushp_skipws (len - s0) s0 f = p)
-        by exact (ushs_toks_nil_inv _ _ _ _ Htoks0).
-      assert (Hk : ushp_skipws (len - s0) s0 f = 0) by exact (ushp_skipws_idem len off f Hoffl).
-      lia. }
-    rewrite (ref_redirs_gt len f p e n s0 [] Hnn Hr ltac:(rewrite Hs0i; exact Hs0eq) ltac:(lia)).
-    rewrite (ref_args_nul len f n len _ _ ltac:(lia) (ref_skip_at_len len f)). reflexivity.
-  - destruct (ushs_toks_cons_inv' len p s0 (ref_skip len f s0)
-                (ushp_toklen (len - ref_skip len f s0) (ref_skip len f s0) f) f tk rest
-                eq_refl eq_refl Htoks0) as (Hq & _ & Hrest).
-    rewrite Hs0i in Hq, Hrest.
-    assert (Hs0lt : s0 < p) by (pose proof (ushs_toks_le _ _ _ _ _ Hrest); lia).
-    rewrite (ref_redirs_miss len f n s0 [] ltac:(lia)).
-    2:{ rewrite Hs0i. apply ref_at_notin; [ intros _; apply Hbelow; lia | exact ref_symtoks_redir ]. }
-    rewrite Hs0i. cbn beta iota.
-    rewrite (ref_args_of_toks_redir len f s0 p e (tk :: rest) [] [] n Hnn Hr Hs0p Htoks0
-               ltac:(cbn [length]; lia) ltac:(cbn [length] in *; lia) ltac:(lia)).
-    reflexivity.
-Qed.
+(* [ushs_one_le_sym], [ref_at_notin_gt], [ref_args_of_toks_redir] and
+   [ref_parseexec_redir] moved down to RefParseSym SS5: the redirect tier
+   (UkShRedirEx / UkShRedirPex) reads its corollaries off them and sits
+   below this file. *)
 
 Theorem ref_parsecmd_redir (len : nat) (f : nat -> bv 8) (p e : nat)
     (toks : list (nat * nat)) :

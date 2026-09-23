@@ -84,7 +84,18 @@ console instance waits for its M3.
   `ushp_malloc_ty_le 168` is what makes it close, `UkShMalloc` §7) -- at
   `k = length rs` here and `k = ushp_nodes t` at the parser theorem.
   Define it in `UkShParse` beside `ushp_malloc_ty_le`.
-- [ ] **A2c** `wp_ref_pex_loop`, `wp_ref_parseexec`.  READ OFF THE TREE
+- [x] **A2c** `wp_ref_pex_loop`, `wp_ref_parseexec` -- LANDED (`iris/UkShArgs.v`,
+  2,983 lines, before `UkShRedirEx`; the five twins reduced to corollaries in
+  place, statements byte-identical; net -4,800 lines; 44 s vs the 97 s of the
+  five it replaces).  AS LANDED: `wp_ref_parseexec`'s answer is OPEN (the
+  exec node + `ushp_redirs_at` chain, with `t = ref_wrap (UshpExec toks)
+  rs` a pure fact) because `ushp_tree`'s REDIR case drops the `p+168`/`t+40`
+  bounds the landed `_gt` statement carries, so no inverse of
+  `ushp_redir_close` exists; `wp_ref_parseexec_tree` is the closed form.
+  `ushp_cat t` is NOT a premise anywhere below nulterminate: under
+  `ref_sym_scope` it is implied.  The exit round `wp_ref_pex_exit` and the
+  loop guard their extras (`ushp_pex_gtk_in/out stop`, `ushp_pex_res rs`) as
+  A2b did.  As read off the tree
   (2026-09-23): the argument loop is walked THREE times with the same
   register invariant (s0..s11 pinned; `ushp_exec_pre s0 p done`, the
   cursor cell at `cur`, the q/eq cells at `fp-120`/`fp-128`; entry 0x622,
@@ -115,8 +126,41 @@ console instance waits for its M3.
   is not; if slower, split the loop turn from the loop as `UkShParse` was
   split.
 - [ ] **A2d** `wp_ref_parsepipe`/`parseline`/`parsecmd`/`nulterminate`;
-  the parser theorem at `ref_parsecmd … = Some t ∧ ushp_cat t`.  Exit:
-  `wp_kshp_parser` is the symbol-free corollary.
+  the parser theorem.  READ OFF THE TREE (2026-09-23): the top of the
+  parser is walked three times -- `UkShParseCmd` (parsepipe, parseline,
+  nulterminate, parsecmd, `wp_kshp_parser`; `UMalloc UMalloc'`),
+  `UkShRedirCm` + `UkShRedirPc` + `UkShRedirNul` (`_gt` of each, `UM0..UM2`,
+  `wp_kshp_parser_redir`), `UkShPipeCm` + `UkShPipeCmd` + `UkShPipeParse` +
+  `UkShPipeRight` (`_bar` of each, `UM0..UM3`, `wp_kshp_parser_pipe`).  The
+  only real TURN above parseexec is parsepipe's (`UkShPipeCm.
+  wp_kshp_parsepipe_bar`: the '|' gettoken, `pipecmd` -- one allocation,
+  `UkShPipeCmd` -- and the recursive parsepipe on the SUFFIX, which
+  `UkShPipeRight.wp_kshp_parsepipe_right` feeds the landed symbol-free
+  walk through `ustr_split` + `ushp_exec_at_rebase`); parseline never
+  turns in any landed shape (`&`/`;` are out of `ushp_cat`), parsecmd is
+  parseline + the leftovers peek + nulterminate, and nulterminate is a
+  RECURSION over the tree (`wp_kshp_nul_loop` at EXEC, `_redir` and
+  `_pipe` each one level, the jump-table row per constructor
+  `ushp_jrow_exec/redir/pipe`).  General statements: `wp_ref_parsepipe` at
+  `ref_parsepipe len f n i = Some (t, fin)` by induction on `t`'s pipe
+  spine (the '|' turn recurses at the suffix -- state the recursive call at
+  the reference on the SAME `(len, f)` with cursor `s2`, not on a re-based
+  string: `ref_parsepipe` is already cursor-indexed, so `ustr_split` and
+  `ushp_exec_at_rebase` become unnecessary -- check that `wp_ref_parseexec`
+  at cursor `s2` is what the recursive call needs); `wp_ref_parseline` at
+  `ref_parseline` (the `&`/`;` peeks miss from `ushp_cat`); `wp_ref_
+  nulterminate` by induction on `t` with `ref_nulcut t` the cut (the three
+  jump-table rows are its three cases; `ushp_nulfold` generalised to a fold
+  over `ref_nulcut`); `wp_ref_parsecmd` = THE PARSER THEOREM at
+  `ref_parsecmd len f = Some t ∧ ushp_cat t` answering `ushp_tree s0 p t`,
+  the line cut at `ref_nulcut t`, `ushp_malloc_chain (ushp_nodes t) UM
+  UM'`, room `ushp_room t`.  Corollaries: `wp_kshp_parser`,
+  `wp_kshp_parser_redir`, `wp_kshp_parser_pipe` exact; the `_gt`/`_bar`
+  twins reduced in place; `UkShPipeRight` retired (its finding -- the
+  suffix IS a `ustr` -- is what the cursor-indexed reference makes
+  automatic).  The seams (`UkShRedirSeam`, `UkShPipeSeam`: `ushp_tree` to
+  `UkShRun.ush_cmd`, and the child walks living in `UkShRedirSeam`) are
+  A3's.  Exit: `wp_kshp_parser` is the symbol-free corollary.
 - [ ] **A3** the consumers: `ushf_child_law_at`'s `Lp` at `ref_parsecmd
   … = Some t` (SLOT-WS paid); `UkShRedirBody`/`UkShRedirChild`/
   `UkShPipeRound`'s children at the general theorem; DELETE `UkShRedir
@@ -157,4 +201,4 @@ RULED by the owner: A starts now.  Branch `user-once/A` off `main` at
 monotonicity, the symbol-free bridge both ways, the redirect and pipe
 bridges, the three line-shape facts on `ush_line_is`/`ushs_line_is`/
 `ushq_line_is`) is stated and elaborates; its proofs are with a subagent.
-A1, A2a and A2b are on `main`.  NEXT: A2c as read off above (branch `user-once/A2c`).
+A1 and A2a-c are on `main`.  NEXT: A2d as read off above (branch `user-once/A2d`).
