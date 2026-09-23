@@ -3474,6 +3474,78 @@ there yet. -/
 def epRecInj (dl : List UsedRec) : Prop :=
   ∀ r ∈ dl, ∀ r' ∈ dl, r.hd = r'.hd → r.ep = r'.ep → r.cnt = r'.cnt
 
+/-- **A COMPLETED ARMING'S ROW.**  If the used-index write log holds a
+record of an armed head's CURRENT arming, that head's status row is
+`Xv6.SByte.done`, at a position at or below the record's own.
+
+It is `Xv6.unreadArmed`'s last conjunct with the UNREAD restriction
+lifted, and it is what `Xv6.disk_collect` cashes: the collect's record
+has been READ (its counter is at or below the handler's watermark), so
+`unreadArmed` says nothing about it, yet the sleeper must get its status
+byte back at the `0` the device wrote and its buffer at the bytes the
+transfer left.
+
+Every move keeps it.  A row only moves under a phase install, and an
+armed head at a phase is IN FLIGHT, which `Xv6.epDone` says has no record
+at its current epoch; the log only grows at the used-index write, which
+is the completion of a head whose row the `.status` install has already
+set (`Xv6.unreadArmed`'s own witness); and a freshly armed head's epoch
+is at or above the pop counter, which `Xv6.epLt` puts every record's
+below. -/
+def rowDone (st : Nat → HState) (sb : Nat → SByte) (dl : List UsedRec) : Prop :=
+  ∀ (i : Nat) (c : Chain), i < NUM → st i = HState.active c →
+    ∀ r ∈ dl, r.hd = i → r.ep = c.ep → ∃ ts : Nat, sb i = SByte.done ts ∧ ts ≤ r.pos
+
+theorem rowDone_none (st : Nat → HState) (sb : Nat → SByte) (dl : List UsedRec)
+    (hst : ∀ i, st i = HState.inactive) : rowDone st sb dl := by
+  intro i c _ hs
+  rw [hst i] at hs
+  exact absurd hs (by simp)
+
+/-- **A phase install** moves one row, and that head is IN FLIGHT. -/
+theorem rowDone_setPhase (v : VirtioState) (st : Nat → HState) (sb : Nat → SByte)
+    (dl : List UsedRec) (hd : BitVec 16) (nb : SByte)
+    (hin : (Virtio.phase v hd).isSome = true) (hep : epDone v st dl)
+    (h : rowDone st sb dl) : rowDone st (updS sb hd.toNat nb) dl := by
+  intro i c hi hst r hr hh he
+  by_cases hid : i = hd.toNat
+  · subst hid
+    exact absurd he (hep hd c hst hin r hr hh)
+  · obtain ⟨ts, hts, hle⟩ := h i c hi hst r hr hh he
+    exact ⟨ts, by rw [updS_ne sb hd.toNat nb i hid]; exact hts, hle⟩
+
+/-- **The used-index write** appends the record of the head it completes,
+whose row the `.status` install already set. -/
+theorem rowDone_write (st : Nat → HState) (sb : Nat → SByte) (dl : List UsedRec)
+    (hd : Nat) (c : Chain) (r0 : UsedRec) (ts : Nat)
+    (hst : st hd = HState.active c) (hr0 : r0.hd = hd) (hep : r0.ep = c.ep)
+    (hts : sb hd = SByte.done ts) (hle : ts ≤ r0.pos)
+    (h : rowDone st sb dl) : rowDone st sb (dl ++ [r0]) := by
+  intro i ci hi hsti r hr hh he
+  rcases List.mem_append.1 hr with hr' | hr'
+  · exact h i ci hi hsti r hr' hh he
+  · have hrr : r = r0 := by simpa using hr'
+    subst hrr
+    have : i = hd := by rw [← hh, hr0]
+    subst this
+    rw [hst] at hsti
+    cases hsti
+    exact ⟨ts, hts, hle⟩
+
+/-- **The publication** arms a head at a position no record has reached. -/
+theorem rowDone_arm (st : Nat → HState) (sb : Nat → SByte) (dl : List UsedRec)
+    (st' : Nat → HState) (sb' : Nat → SByte) (lo : Nat)
+    (hlt : epLt dl lo)
+    (hnew : ∀ i c, st' i = HState.active c →
+      (st i = HState.active c ∧ sb' i = sb i) ∨ lo ≤ c.ep)
+    (h : rowDone st sb dl) : rowDone st' sb' dl := by
+  intro i c hi hst r hr hh he
+  rcases hnew i c hst with ⟨hst0, hsb0⟩ | hle
+  · obtain ⟨ts, hts, hle'⟩ := h i c hi hst0 r hr hh he
+    exact ⟨ts, by rw [hsb0]; exact hts, hle'⟩
+  · have := hlt r hr
+    omega
+
 /-- The five clauses, as `Xv6.diskLive` carries them. -/
 def epOk (v : VirtioState) (st : Nat → HState) (pm : RegMapF PermVal) (dl : List UsedRec)
     (ring : Nat → Nat) (lo np : Nat) (stg : Option Nat) : Prop :=
@@ -4470,9 +4542,10 @@ def diskLive (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState)
     ([∗list] i ∈ List.range NUM, statusRes γ (st i) (sb i)) ∗
     ⌜v.usedIdx = wrap16 nc ∧ v.seen = wrap16 lo ∧ lo ≤ np ∧ queueOk st ring lo np ∧
       posOk pmap ring lo np ∧ stageOk stg ring lo np ∧ inflightOff v st ring lo np stg ∧
-      imgOk v m (inFlightBlk st) ∧ cachedOk v st ∧ permOk v pm st ∧ usedOk dl dl0 nc M ∧
+      imgOk v m (inFlightBlk st) ∧ permOk v pm st ∧ usedOk dl dl0 nc M ∧
       unreadArmed v st dl nr ring lo np stg sb ∧ cntOk pm dl nc ∧ p3Ok v pm dl nr ∧
-      ueInv pm dl nr ue ∧ epOk v st pm dl ring lo np stg ∧ dryOk v ∧ capOk v st sb⌝
+      ueInv pm dl nr ue ∧ epOk v st pm dl ring lo np stg ∧ dryOk v ∧ capOk v st sb ∧
+      rowDone st sb dl⌝
 
 /-- The dead arm: before `virtio_disk_init`, and never again after.
 

@@ -723,6 +723,32 @@ theorem capOk_arm3 (v : VirtioState) (st : Nat → HState) (c : Chain) (sb : Nat
         · exact Or.inl hx
         · exact Or.inr ⟨ts, by rw [updS_ne sb c.hd SByte.free j h1] at hts; exact hts⟩
 
+/-- **The publication** arms a head at a position no record has reached
+(`Xv6.epLt`), so no row the clause speaks of moves. -/
+theorem rowDone_arm3 (st : Nat → HState) (sb : Nat → SByte) (c : Chain) (lo : Nat)
+    (dl : List UsedRec) (hwf : c.wf)
+    (h1 : st c.hd = .inactive) (h2 : st c.md = .inactive) (h3 : st c.tl = .inactive)
+    (hle : lo ≤ c.ep) (hlt : epLt dl lo) (h : rowDone st sb dl) :
+    rowDone (armSt3 st c) (updS sb c.hd SByte.free) dl :=
+  rowDone_arm st sb dl (armSt3 st c) (updS sb c.hd SByte.free) lo hlt
+    (fun i ci hst => by
+      by_cases hi1 : i = c.hd
+      · subst hi1
+        rw [armSt3_hd st c hwf] at hst
+        injection hst with hcc
+        exact Or.inr (by rw [← hcc]; exact hle)
+      · by_cases hi2 : i = c.md
+        · subst hi2
+          rw [armSt3_md st c hwf] at hst
+          exact absurd hst (by simp)
+        · by_cases hi3 : i = c.tl
+          · subst hi3
+            rw [armSt3_tl st c] at hst
+            exact absurd hst (by simp)
+          · rw [armSt3_ne st c i hi1 hi2 hi3] at hst
+            exact Or.inl ⟨hst, updS_ne sb c.hd SByte.free i hi1⟩)
+    h
+
 theorem cachedOk_arm3 (st : Nat → HState) (c : Chain) (hwf : c.wf)
     (h1 : st c.hd = .inactive) (h2 : st c.md = .inactive) (h3 : st c.tl = .inactive)
     (v : VirtioState) (hx : cachedOk v st) : cachedOk v (armSt3 st c) :=
