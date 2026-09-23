@@ -314,41 +314,41 @@ theorem ec_copyin_call (CI : COPYIN) [CurCtx] (c : CPU) (k' : KCtx) (γl : GName
 
 /-! ## Opening and closing the private block -/
 
-/-- `procPriv` minus its address space and the two fields the call reads. -/
-def ecRest [CurCtx] (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) : IProp GF := iprop%
+/-- `procPrivExt` at the descriptor `P` minus its address space and the two
+fields the call reads. -/
+def ecRest [CurCtx] (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : UPtd) : IProp GF := iprop%
   wordPointsTo (pPid pa) 4 pidPriv pid ∗
   wordPointsTo (pKstack pa) 8 (DFrac.own 1) V.kstack ∗
   wordPointsTo (pTrapframe pa) 8 (DFrac.own 1) V.trapframe ∗
-  contextCells pa (DFrac.own 1) V.context ∗
   ofileCells pa (DFrac.own 1) V.ofile ∗
   wordPointsTo (pCwd pa) 8 (DFrac.own 1) V.cwd ∗
   pnameCells pa (DFrac.own 1) V.name ∗
-  tfPageAt V.upt.tfp V.tf
+  tfPageAt P.tfp V.tf
 
-theorem ec_priv_split [CurCtx] (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+theorem ec_priv_split [CurCtx] (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : UPtd)
     (M : Nat → List (BitVec 8)) :
-    procPriv (GF := GF) pa pid V M ⊢
-      ⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧ V.pagetable = pageAddr V.upt.root ∧
-         V.trapframe = pageAddr V.upt.tfp⌝ ∗
+    procPrivExt (GF := GF) pa pid V P M ⊢
+      ⌜V.sz.toNat ≤ uvmMaxsz ∧ V.pagetable = pageAddr P.root ∧
+         V.trapframe = pageAddr P.tfp⌝ ∗
       wordPointsTo (pSz pa) 8 (DFrac.own 1) V.sz ∗
       wordPointsTo (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
-      procPtAt V.upt M ∗ ecRest pa pid V := by
-  unfold procPriv ecRest procFields
-  iintro ⟨%hf, Hpid, ⟨Hks, Hszc, Hpgc, Htfc, Hctx, Hof, Hcwd, Hnm⟩, Hspace, Htfp⟩
+      procPtAt P M ∗ ecRest pa pid V P := by
+  unfold procPrivExt ecRest procFieldsNoctx
+  iintro ⟨%hf, Hpid, ⟨Hks, Hszc, Hpgc, Htfc, Hof, Hcwd, Hnm⟩, Hspace, Htfp⟩
   isplitl []
   · ipureintro; exact hf
   · iframe
 
-theorem ec_priv_close [CurCtx] (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
-    (M' : Nat → List (BitVec 8)) (hext : V.upt.ext P')
-    (hf : V.sz.toNat ≤ uvmMaxsz ∧ V.pagetable = pageAddr V.upt.root ∧
-      V.trapframe = pageAddr V.upt.tfp) :
+theorem ec_priv_close [CurCtx] (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P P' : UPtd)
+    (M' : Nat → List (BitVec 8)) (hext : P.ext P')
+    (hf : V.sz.toNat ≤ uvmMaxsz ∧ V.pagetable = pageAddr P.root ∧
+      V.trapframe = pageAddr P.tfp) :
     wordPointsTo (pSz pa) 8 (DFrac.own 1) V.sz ∗
     wordPointsTo (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
-    procPtAt P' M' ∗ ecRest pa pid V ⊢ procPrivExt (GF := GF) pa pid V P' M' := by
-  unfold procPrivExt ecRest procFields
+    procPtAt P' M' ∗ ecRest pa pid V P ⊢ procPrivExt (GF := GF) pa pid V P' M' := by
+  unfold procPrivExt ecRest procFieldsNoctx
   rw [hext.1, hext.2.1]
-  iintro ⟨Hszc, Hpgc, Hspace, Hpid, Hks, Htfc, Hctx, Hof, Hcwd, Hnm, Htfp⟩
+  iintro ⟨Hszc, Hpgc, Hspace, Hpid, Hks, Htfc, Hof, Hcwd, Hnm, Htfp⟩
   isplitl []
   · ipureintro; exact ⟨hf.1, hf.2.1, hf.2.2⟩
   · iframe
@@ -363,7 +363,7 @@ theorem either_copyout_br_fffffffffffff626 : KA.«either_copyout» + 0xfffffffff
 
 set_option maxHeartbeats 4000000 in
 theorem either_copyout_proof (MP : MYPROC) (CO : COPYOUT) (MM : MEMMOVE) : EITHER_COPYOUT :=
-  ⟨fun {hlc GF} _ _ _ cpu k γl γk j pid V M user dqs bs olds hj hproc hnoff hK hlk huser
+  ⟨fun {hlc GF} _ _ _ cpu k γl γk j pid V P M user dqs bs olds hj hproc hnoff hK hlk huser
       hlen hlen' holds => by
   unfold wp_either_copyout_body
   simp only [eitherCopyoutAddr]
@@ -440,7 +440,7 @@ theorem either_copyout_proof (MP : MYPROC) (CO : COPYOUT) (MM : MEMMOVE) : EITHE
     -- `user_dst != 0`: `copyout` into the process's address space
     have hpa : R1 10#5 = procAddr j := h10.trans (hproc rfl)
     simp only [reduceIte]
-    icases ec_priv_split (procAddr j) pid V M $$ Harm with ⟨%hfacts, Hsz, Hpg, Hspace, Hrest⟩
+    icases ec_priv_split (procAddr j) pid V P M $$ Harm with ⟨%hfacts, Hsz, Hpg, Hspace, Hrest⟩
     k_step_gen (wp_s_branch c14 _ (KA.«either_copyout» + 0x1c#64) true 32#13 9#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [e9, ec_beq_ne _ huser] next c15 hp15
@@ -469,7 +469,7 @@ theorem either_copyout_proof (MP : MYPROC) (CO : COPYOUT) (MM : MEMMOVE) : EITHE
     iintro Hk Hpc
     k_norm_g
     -- copyout(p->pagetable, p->sz, dst, src, len)
-    iapply (ec_copyout_call CO c21 _ γl γk V.upt M dqs bs ?hnC ?hKC ?hlC ?hrC ?hszC ?hlnC ?hl'C)
+    iapply (ec_copyout_call CO c21 _ γl γk P M dqs bs ?hnC ?hKC ?hlC ?hrC ?hszC ?hlnC ?hl'C)
       $$ [- $Hk $Hpc]
     rotate_right 1
     k_norm_g [e19]
@@ -477,7 +477,7 @@ theorem either_copyout_proof (MP : MYPROC) (CO : COPYOUT) (MM : MEMMOVE) : EITHE
     case hnC => k_norm_g; omega
     case hKC => k_norm_g; omega
     case hlC => k_norm_g; exact hlk
-    case hrC => k_norm_g; exact hfacts.2.2.1
+    case hrC => k_norm_g; exact hfacts.2.1
     case hszC => k_norm_g; unfold uvmMaxsz at hfacts; omega
     case hlnC => k_norm_g [e18]; exact hlen
     case hl'C => exact hlen'
@@ -508,18 +508,18 @@ theorem either_copyout_proof (MP : MYPROC) (CO : COPYOUT) (MM : MEMMOVE) : EITHE
     iintro %c23 HΦ %R3 Hk Hpc %hexit
     obtain ⟨x10, x1, x2, x8, x9, x18, x19, x20, xrest⟩ := hexit
     ihave Hout : (∃ (Q : UPtd) (N : Nat → List (BitVec 8)),
-        ⌜V.upt.ext Q ∧
-          ((R3 10#5 = 0#64 ∧ N = umemWrite (viewFaulted V.upt Q M) (k.regs 11#5).toNat bs) ∨
+        ⌜P.ext Q ∧
+          ((R3 10#5 = 0#64 ∧ N = umemWrite (viewFaulted P Q M) (k.regs 11#5).toNat bs) ∨
            (R3 10#5 = 18446744073709551615#64 ∧ ∃ d, d < bs.length ∧
-              N = umemWrite (viewFaulted V.upt Q M) (k.regs 11#5).toNat (List.take d bs)))⌝ ∗
+              N = umemWrite (viewFaulted P Q M) (k.regs 11#5).toNat (List.take d bs)))⌝ ∗
         procPrivExt (procAddr j) pid V Q N) $$ [Hsz Hpg Hspace Hrest]
     case' _ =>
       iexists P'
       iexists M'
       isplitl []
       · ipureintro; rw [x10]; exact hpost
-      · iapply (ec_priv_close (procAddr j) pid V P' M' hpost.1
-          ⟨hfacts.1, hfacts.2.2.1, hfacts.2.2.2⟩)
+      · iapply (ec_priv_close (procAddr j) pid V P P' M' hpost.1
+          ⟨hfacts.1, hfacts.2.1, hfacts.2.2⟩)
         simp only [pSz, pPagetable]
         iframe
     iapply HΦ $$ %spie2 %spp2 %R3
@@ -638,7 +638,7 @@ theorem either_copyin_br_fffffffffffff5da : KA.«either_copyin» + 0xfffffffffff
 
 set_option maxHeartbeats 4000000 in
 theorem either_copyin_proof (MP : MYPROC) (CI : COPYIN) (MM : MEMMOVE) : EITHER_COPYIN :=
-  ⟨fun {hlc GF} _ _ _ cpu k γl γk j pid V M user dqs bs old hj hproc hnoff hK hlk huser
+  ⟨fun {hlc GF} _ _ _ cpu k γl γk j pid V P M user dqs bs old hj hproc hnoff hK hlk huser
       hlen hlen' hbs => by
   unfold wp_either_copyin_body
   simp only [eitherCopyinAddr]
@@ -715,7 +715,7 @@ theorem either_copyin_proof (MP : MYPROC) (CI : COPYIN) (MM : MEMMOVE) : EITHER_
     -- `user_src != 0`: `copyin` from the process's address space
     have hpa : R1 10#5 = procAddr j := h10.trans (hproc rfl)
     simp only [reduceIte]
-    icases ec_priv_split (procAddr j) pid V M $$ Harm with ⟨%hfacts, Hsz, Hpg, Hspace, Hrest⟩
+    icases ec_priv_split (procAddr j) pid V P M $$ Harm with ⟨%hfacts, Hsz, Hpg, Hspace, Hrest⟩
     k_step_gen (wp_s_branch c14 _ (KA.«either_copyin» + 0x1c#64) true 32#13 9#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [e9, ec_beq_ne _ huser] next c15 hp15
@@ -744,7 +744,7 @@ theorem either_copyin_proof (MP : MYPROC) (CI : COPYIN) (MM : MEMMOVE) : EITHER_
     iintro Hk Hpc
     k_norm_g
     -- copyin(p->pagetable, p->sz, dst, src, len)
-    iapply (ec_copyin_call CI c21 _ γl γk V.upt M old ?hnC ?hKC ?hlC ?hrC ?hszC ?hlnC ?hl'C)
+    iapply (ec_copyin_call CI c21 _ γl γk P M old ?hnC ?hKC ?hlC ?hrC ?hszC ?hlnC ?hl'C)
       $$ [- $Hk $Hpc]
     rotate_right 1
     k_norm_g [e20]
@@ -752,7 +752,7 @@ theorem either_copyin_proof (MP : MYPROC) (CI : COPYIN) (MM : MEMMOVE) : EITHER_
     case hnC => k_norm_g; omega
     case hKC => k_norm_g; omega
     case hlC => k_norm_g; exact hlk
-    case hrC => k_norm_g; exact hfacts.2.2.1
+    case hrC => k_norm_g; exact hfacts.2.1
     case hszC => k_norm_g; unfold uvmMaxsz at hfacts; omega
     case hlnC => k_norm_g [e18]; exact hlen
     case hl'C => exact hlen'
@@ -783,12 +783,12 @@ theorem either_copyin_proof (MP : MYPROC) (CI : COPYIN) (MM : MEMMOVE) : EITHER_
     iintro %c23 HΦ %R3 Hk Hpc %hexit
     obtain ⟨x10, x1, x2, x8, x9, x18, x19, x20, xrest⟩ := hexit
     ihave Hout : (∃ (Q : UPtd) (cs : List (BitVec 8)),
-        ⌜V.upt.ext Q ∧
+        ⌜P.ext Q ∧
           ((R3 10#5 = 0#64 ∧
-              cs = umemRead (viewFaulted V.upt Q M) (k.regs 12#5).toNat old.length) ∨
+              cs = umemRead (viewFaulted P Q M) (k.regs 12#5).toNat old.length) ∨
            (R3 10#5 = 18446744073709551615#64 ∧ ∃ d, d ≤ old.length ∧
-              cs = umemRead (viewFaulted V.upt Q M) (k.regs 12#5).toNat d ++ old.drop d))⌝ ∗
-        procPrivExt (procAddr j) pid V Q (viewFaulted V.upt Q M) ∗
+              cs = umemRead (viewFaulted P Q M) (k.regs 12#5).toNat d ++ old.drop d))⌝ ∗
+        procPrivExt (procAddr j) pid V Q (viewFaulted P Q M) ∗
         byteBuf (k.regs 10#5) (DFrac.own 1) cs) $$ [Hsz Hpg Hspace Hrest Hold]
     case' _ =>
       iexists P'
@@ -796,8 +796,8 @@ theorem either_copyin_proof (MP : MYPROC) (CI : COPYIN) (MM : MEMMOVE) : EITHER_
       isplitl []
       · ipureintro; rw [x10]; exact hpost
       · isplitl [Hsz Hpg Hspace Hrest]
-        · iapply (ec_priv_close (procAddr j) pid V P' (viewFaulted V.upt P' M) hpost.1
-            ⟨hfacts.1, hfacts.2.2.1, hfacts.2.2.2⟩)
+        · iapply (ec_priv_close (procAddr j) pid V P P' (viewFaulted P P' M) hpost.1
+            ⟨hfacts.1, hfacts.2.1, hfacts.2.2⟩)
           simp only [pSz, pPagetable]
           iframe
         · k_norm_g [e20]

@@ -355,3 +355,5 @@ import Xv6.ProofUartintr
 import Xv6.ProofConsoleintr
 import Xv6.LinkConsoleintr
 import Xv6.LinkUartintr
+import Xv6.ProofConsolewrite
+import Xv6.LinkConsolewrite
