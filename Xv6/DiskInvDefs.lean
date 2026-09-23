@@ -161,7 +161,7 @@ class DiskG (GF : BundledGFunctors) where
   /-- the completion counter -/
   [mnG : MonoNatG GF]
   /-- the SERVE PERMITS (see `permTok`) -/
-  [gmPermG : GhostMapG GF Nat (BitVec 16 × Chain) RegMapF]
+  [gmPermG : GhostMapG GF Nat (BitVec 16 × Chain × Option VPhase × Option (BitVec 16)) RegMapF]
   /-- the PUBLISHED POSITIONS (see `posRec`): a monotone list of heads,
   one entry per position, from which a persistent per-position record may
   be taken at any time -/
@@ -1211,68 +1211,362 @@ The permits are a ghost map keyed by a serial number, so minting one is
 always possible -- `permFresh` keeps a bound above which the map is
 empty. -/
 
-/-- What a permit records: the head, and the CHAIN armed there. -/
-abbrev PermVal : Type := BitVec 16 × Chain
+/-- What a permit records: the head, the CHAIN armed there, whether the
+task has INSTALLED the request it parsed (so the device's in-flight map
+carries `c.req` at that head), and -- once the task has passed the
+completion gate -- the used index it LATCHED at the `get` that follows the
+gate, which is the index it will report at.
+
+The last two fields are the IN-FLIGHT BOOKKEEPING the completion side
+needs.  `MachCSL.DevM.LeaseL`'s DMA-write arm is quantified over every
+state the guard fires at, and the guard of each of a request's four
+writes is a fact about the device's in-flight map (`reqOf s h = some r`,
+`s.usedIdx = ui`).  Without a per-head record of those facts the
+derivation would have to cope with a state in which the write is SKIPPED,
+and then nothing at all is known about the bytes at its address.  A
+permit is exclusive and one per head (`Xv6.permInj`), so it is the
+natural place to keep them. -/
+abbrev PermVal : Type := BitVec 16 × Chain × Option VPhase × Option (BitVec 16)
 
 /-- The permits the invariant has handed out. -/
 def permAuth (γ : DiskNames) (pm : RegMapF PermVal) : IProp GF := γ.perm ↪●MAP pm
 
 /-- **A serve permit**: exclusive, and pins head `h`'s receipt to `.active c`. -/
-def permTok (γ : DiskNames) (k : Nat) (h : BitVec 16) (c : Chain) : IProp GF :=
-  γ.perm ↪◯MAP[k] ((h, c) : PermVal)
+def permTok (γ : DiskNames) (k : Nat) (h : BitVec 16) (c : Chain) (p : Option VPhase)
+    (u : Option (BitVec 16)) : IProp GF :=
+  γ.perm ↪◯MAP[k] ((h, c, p, u) : PermVal)
 
 /-- Every permit names a descriptor of the queue, armed with the chain it
-records. -/
-def permOk (pm : RegMapF PermVal) (st : Nat → HState) : Prop :=
-  ∀ k h c, PartialMap.get? pm k = some ((h, c) : PermVal) →
-    h.toNat < NUM ∧ st h.toNat = .active c
+records, and a head that is IN FLIGHT; once the task has installed the
+request it parsed, the device's map carries that request; and once it has
+latched the used index, the device's index is still there and the request
+has passed the completion gate. -/
+def permOk (v : VirtioState) (pm : RegMapF PermVal) (st : Nat → HState) : Prop :=
+  ∀ k h c p u, PartialMap.get? pm k = some ((h, c, p, u) : PermVal) →
+    h.toNat < NUM ∧ st h.toNat = .active c ∧ (Virtio.phase v h).isSome = true ∧
+    (∀ ph, p = some ph → Virtio.phase v h = some ph ∧ ph.req = some c.req) ∧
+    (∀ y, u = some y → v.usedIdx = y ∧ p = some (.pushed c.req))
 
-/-- Keys at or above `n` are free, so `n` is a key a permit may take. -/
-def permFresh (n : Nat) (pm : RegMapF PermVal) : Prop :=
-  ∀ k, n ≤ k → PartialMap.get? pm k = none
+/-- **One permit per head.**  A permit's head is in flight, and the pop
+refuses a head that is, so the map never holds two permits for one
+head. -/
+def permInj (pm : RegMapF PermVal) : Prop :=
+  ∀ k k' h c p u c' p' u', PartialMap.get? pm k = some ((h, c, p, u) : PermVal) →
+    PartialMap.get? pm k' = some ((h, c', p', u') : PermVal) → k = k'
+
+/-- **At most one request sits between its used element and its used
+index.**  The model's `MachCSL.Virtio.pushOk` guards the completion gate;
+this is what that guard maintains, and it is what says the device's used
+index cannot move under a task that has latched it. -/
+def pushedUniq (v : VirtioState) : Prop :=
+  ∀ (h h' : BitVec 16) (r r' : VioReq), Virtio.phase v h = some (.pushed r) →
+    Virtio.phase v h' = some (.pushed r') → h = h'
+
+/-! ### The phases, as the model moves them -/
+
+theorem phase_setPhase_self (v : VirtioState) (h : BitVec 16) (ph : VPhase) :
+    Virtio.phase (Virtio.setPhase v h ph) h = some ph := by
+  unfold Virtio.phase Virtio.setPhase
+  rw [Alist.get_set_eq]
+
+theorem phase_setPhase_other (v : VirtioState) (h k : BitVec 16) (ph : VPhase) (hk : k ≠ h) :
+    Virtio.phase (Virtio.setPhase v h ph) k = Virtio.phase v k := by
+  unfold Virtio.phase Virtio.setPhase
+  rw [Alist.get_set_ne _ _ _ _ hk]
+
+theorem phase_complete_self (v : VirtioState) (h : BitVec 16) :
+    Virtio.phase (Virtio.complete v h) h = none := by
+  unfold Virtio.phase Virtio.complete
+  rw [Alist.get_del_eq]
+
+theorem phase_complete_other (v : VirtioState) (h k : BitVec 16) (hk : k ≠ h) :
+    Virtio.phase (Virtio.complete v h) k = Virtio.phase v k := by
+  unfold Virtio.phase Virtio.complete
+  rw [Alist.get_del_ne _ _ _ hk]
+
+/-- What `MachCSL.Virtio.pushOk` says head by head. -/
+theorem pushOk_not_pushed (v : VirtioState) (hok : Virtio.pushOk v = true) (h : BitVec 16)
+    (r : VioReq) : Virtio.phase v h ≠ some (.pushed r) := by
+  intro hp
+  have hm : (h, (VPhase.pushed r)) ∈ v.inflight := Alist.get_mem _ _ _ hp
+  have := List.all_eq_true.1 hok _ hm
+  simp [VPhase.isPushed] at this
+
+/-! ### The permits, as the moves keep them honest -/
 
 /-- No permit at all: the dead arm, and the state the live flip starts from. -/
-theorem permOk_none (pm : RegMapF PermVal) (st : Nat → HState)
-    (h : permOk pm (fun _ => .inactive)) (k : Nat) (hh : BitVec 16) (c : Chain) :
-    PartialMap.get? pm k ≠ some ((hh, c) : PermVal) := by
+theorem permOk_none (v : VirtioState) (pm : RegMapF PermVal)
+    (h : permOk v pm (fun _ => .inactive)) (k : Nat) (hh : BitVec 16) (c : Chain)
+    (p : Option VPhase) (u : Option (BitVec 16)) :
+    PartialMap.get? pm k ≠ some ((hh, c, p, u) : PermVal) := by
   intro hget
-  have := (h k hh c hget).2
+  have := (h k hh c p u hget).2.1
   exact absurd this (by simp)
 
-theorem permOk_insert (pm : RegMapF PermVal) (st : Nat → HState) (k : Nat) (h : BitVec 16)
-    (c : Chain) (hlt : h.toNat < NUM) (hst : st h.toNat = .active c) (hok : permOk pm st) :
-    permOk (PartialMap.insert pm k ((h, c) : PermVal)) st := by
-  intro k' h' c' hget
-  by_cases hk : k = k'
-  · rw [get?_insert_eq hk] at hget
-    cases hget
-    exact ⟨hlt, hst⟩
-  · exact hok k' h' c' (by rwa [get?_insert_ne hk] at hget)
+/-- In the dead world no permit is out at all, so any state will do. -/
+theorem permOk_dead (v v' : VirtioState) (pm : RegMapF PermVal)
+    (hok : permOk v pm (fun _ => .inactive)) : permOk v' pm (fun _ => .inactive) := by
+  intro k h c p u hget
+  exact absurd hget (permOk_none v pm hok k h c p u)
 
-theorem permOk_delete (pm : RegMapF PermVal) (st : Nat → HState) (k : Nat) (hok : permOk pm st) :
-    permOk (PartialMap.delete pm k) st := by
-  intro k' h' c' hget
+theorem permOk_delete (v : VirtioState) (pm : RegMapF PermVal) (st : Nat → HState) (k : Nat)
+    (hok : permOk v pm st) : permOk v (PartialMap.delete pm k) st := by
+  intro k' h' c' p' u' hget
   by_cases hk : k = k'
   · rw [get?_delete_eq hk] at hget; exact absurd hget (by simp)
-  · exact hok k' h' c' (by rwa [get?_delete_ne hk] at hget)
+  · exact hok k' h' c' p' u' (by rwa [get?_delete_ne hk] at hget)
 
 /-- Arming a head no permit names keeps every permit honest. -/
-theorem permOk_arm (pm : RegMapF PermVal) (st : Nat → HState) (i : Nat) (c : Chain)
-    (hok : permOk pm st) (hfree : st i = .inactive) :
-    permOk pm (fun j => if j = i then .active c else st j) := by
-  intro k' h' c' hget
-  obtain ⟨hlt, hst⟩ := hok k' h' c' hget
-  refine ⟨hlt, ?_⟩
+theorem permOk_arm (v : VirtioState) (pm : RegMapF PermVal) (st : Nat → HState) (i : Nat)
+    (c : Chain) (hok : permOk v pm st) (hfree : st i = .inactive) :
+    permOk v pm (fun j => if j = i then .active c else st j) := by
+  intro k' h' c' p' u' hget
+  obtain ⟨hlt, hst, h3, h4, h5⟩ := hok k' h' c' p' u' hget
+  refine ⟨hlt, ?_, h3, h4, h5⟩
   have hne : h'.toNat ≠ i := by
     intro he; rw [he, hfree] at hst; exact absurd hst (by simp)
   simp only [if_neg hne]
   exact hst
 
+/-- A head that is NOT in flight has no permit out. -/
+theorem perm_none_of_notFlight (v : VirtioState) (pm : RegMapF PermVal) (st : Nat → HState)
+    (h : BitVec 16) (hnf : (Virtio.phase v h).isSome = false) (hok : permOk v pm st) :
+    ∀ k' c' p' u', PartialMap.get? pm k' ≠ some ((h, c', p', u') : PermVal) := by
+  intro k' c' p' u' hget
+  have := (hok k' h c' p' u' hget).2.2.1
+  rw [hnf] at this
+  exact absurd this (by simp)
+
+/-- **The pop**, as the permits see it: the head was not in flight, so no
+permit named it, and the new permit starts un-installed and un-latched. -/
+theorem permOk_pop (v : VirtioState) (pm : RegMapF PermVal) (st : Nat → HState) (k : Nat)
+    (h : BitVec 16) (c : Chain) (sn : BitVec 16) (hlt : h.toNat < NUM)
+    (hst : st h.toNat = .active c) (hnf : (Virtio.phase v h).isSome = false)
+    (hok : permOk v pm st) :
+    permOk { Virtio.setPhase v h .popped with seen := sn }
+      (PartialMap.insert pm k ((h, c, none, none) : PermVal)) st := by
+  have hph : ∀ x : BitVec 16, Virtio.phase { Virtio.setPhase v h .popped with seen := sn } x
+      = Virtio.phase (Virtio.setPhase v h .popped) x := fun _ => rfl
+  intro k' h' c' p' u' hget
+  by_cases hk : k = k'
+  · rw [get?_insert_eq hk] at hget
+    cases hget
+    exact ⟨hlt, hst, by rw [hph, phase_setPhase_self]; rfl, by simp, by simp⟩
+  · rw [get?_insert_ne hk] at hget
+    obtain ⟨p1, p2, p3, p4, p5⟩ := hok k' h' c' p' u' hget
+    have hne : h' ≠ h := by
+      intro he; subst he; rw [hnf] at p3; exact absurd p3 (by simp)
+    have hx : Virtio.phase { Virtio.setPhase v h .popped with seen := sn } h'
+        = Virtio.phase v h' := by rw [hph, phase_setPhase_other v h h' _ hne]
+    exact ⟨p1, p2, by rw [hx]; exact p3, fun ph hp => ⟨by rw [hx]; exact (p4 ph hp).1,
+      (p4 ph hp).2⟩, fun y hy => ⟨(p5 y hy).1, (p5 y hy).2⟩⟩
+
+/-- `pushedUniq` sees only the in-flight map. -/
+theorem pushedUniq_seen (v : VirtioState) (sn : BitVec 16) (hu : pushedUniq v) :
+    pushedUniq { v with seen := sn } := hu
+
+/-- **The install**: the task records the request it parsed at its own
+head, and the permit records the phase the device is now in.  Every other
+permit names another head (`Xv6.permInj`), which the move leaves alone. -/
+theorem permOk_install (v : VirtioState) (pm : RegMapF PermVal) (st : Nat → HState) (k : Nat)
+    (h : BitVec 16) (c : Chain) (p0 : Option VPhase) (u0 : Option (BitVec 16)) (ph : VPhase)
+    (hget : PartialMap.get? pm k = some ((h, c, p0, u0) : PermVal))
+    (hreq : ph.req = some c.req) (hok : permOk v pm st) (hinj : permInj pm) :
+    permOk (Virtio.setPhase v h ph)
+      (PartialMap.insert pm k ((h, c, some ph, none) : PermVal)) st := by
+  intro k' h' c' p' u' hget'
+  by_cases hk : k = k'
+  · rw [get?_insert_eq hk] at hget'
+    cases hget'
+    obtain ⟨hlt, hst, _, _, _⟩ := hok k h c p0 u0 hget
+    refine ⟨hlt, hst, by rw [phase_setPhase_self]; rfl, ?_, by simp⟩
+    intro ph' hph'
+    cases hph'
+    exact ⟨phase_setPhase_self v h ph, hreq⟩
+  · rw [get?_insert_ne hk] at hget'
+    obtain ⟨hlt, hst, h3, h4, h5⟩ := hok k' h' c' p' u' hget'
+    have hne : h' ≠ h := by
+      intro he; subst he; exact hk (hinj k k' h' c p0 u0 c' p' u' hget hget')
+    have hx : Virtio.phase (Virtio.setPhase v h ph) h' = Virtio.phase v h' :=
+      phase_setPhase_other v h h' ph hne
+    exact ⟨hlt, hst, by rw [hx]; exact h3, fun q hq => ⟨by rw [hx]; exact (h4 q hq).1,
+      (h4 q hq).2⟩, fun y hy => ⟨(h5 y hy).1, (h5 y hy).2⟩⟩
+
+/-- **The latch**: the task that has passed the completion gate reads the
+used index and records it.  The move changes nothing. -/
+theorem permOk_latch (v : VirtioState) (pm : RegMapF PermVal) (st : Nat → HState) (k : Nat)
+    (h : BitVec 16) (c : Chain) (u0 : Option (BitVec 16))
+    (hget : PartialMap.get? pm k = some ((h, c, some (.pushed c.req), u0) : PermVal))
+    (hok : permOk v pm st) :
+    permOk v (PartialMap.insert pm k ((h, c, some (.pushed c.req), some v.usedIdx) : PermVal))
+      st := by
+  intro k' h' c' p' u' hget'
+  by_cases hk : k = k'
+  · rw [get?_insert_eq hk] at hget'
+    cases hget'
+    obtain ⟨hlt, hst, h3, h4, _⟩ := hok k h c (some (.pushed c.req)) u0 hget
+    exact ⟨hlt, hst, h3, h4, by rintro y ⟨rfl⟩; exact ⟨rfl, rfl⟩⟩
+  · rw [get?_insert_ne hk] at hget'
+    exact hok k' h' c' p' u' hget'
+
+/-- **The completion**: the permit the completing task holds goes, and no
+other permit is disturbed -- the head leaves the in-flight map, and the
+used index moves, but a permit at that head would be this one
+(`Xv6.permInj`) and a LATCHED permit at another head would be pushed too
+(`Xv6.pushedUniq`). -/
+theorem permOk_complete (v : VirtioState) (pm : RegMapF PermVal) (st : Nat → HState) (k : Nat)
+    (h : BitVec 16) (c : Chain) (ui : BitVec 16)
+    (hget : PartialMap.get? pm k = some ((h, c, some (.pushed c.req), some ui) : PermVal))
+    (hok : permOk v pm st) (hinj : permInj pm) (hpu : pushedUniq v) :
+    permOk (Virtio.complete v h) (PartialMap.delete pm k) st := by
+  intro k' h' c' p' u' hget'
+  have hk : k ≠ k' := by
+    intro he; rw [get?_delete_eq he] at hget'; exact absurd hget' (by simp)
+  rw [get?_delete_ne hk] at hget'
+  obtain ⟨hlt, hst, h3, h4, h5⟩ := hok k' h' c' p' u' hget'
+  have hne : h' ≠ h := by
+    intro he; subst he
+    exact hk (hinj k k' h' c (some (.pushed c.req)) (some ui) c' p' u' hget hget')
+  have hx : Virtio.phase (Virtio.complete v h) h' = Virtio.phase v h' :=
+    phase_complete_other v h h' hne
+  refine ⟨hlt, hst, by rw [hx]; exact h3, fun q hq => ⟨by rw [hx]; exact (h4 q hq).1,
+    (h4 q hq).2⟩, ?_⟩
+  intro y hy
+  obtain ⟨_, hp⟩ := h5 y hy
+  have hph' := (h4 _ hp).1
+  have hph := (hok k h c (some (.pushed c.req)) (some ui) hget).2.2.2.1 _ rfl
+  exact absurd (hpu h' h c'.req c.req hph' hph.1) hne
+
+/-! ### `permInj` and `pushedUniq`, as the moves keep them -/
+
+theorem permInj_insert (pm : RegMapF PermVal) (k : Nat) (h : BitVec 16) (c c0 : Chain)
+    (p p0 : Option VPhase) (u u0 : Option (BitVec 16)) (hinj : permInj pm)
+    (hget : PartialMap.get? pm k = some ((h, c0, p0, u0) : PermVal)) :
+    permInj (PartialMap.insert pm k ((h, c, p, u) : PermVal)) := by
+  intro k1 k2 hh c1 p1 u1 c2 p2 u2 hg1 hg2
+  have key : ∀ k' c' p' u', PartialMap.get? (PartialMap.insert pm k ((h, c, p, u) : PermVal)) k'
+      = some ((hh, c', p', u') : PermVal) →
+      ∃ c'' p'' u'', PartialMap.get? pm k' = some ((hh, c'', p'', u'') : PermVal) := by
+    intro k' c' p' u' hg
+    by_cases hkk : k = k'
+    · rw [get?_insert_eq hkk] at hg
+      cases hg
+      exact ⟨c0, p0, u0, hkk ▸ hget⟩
+    · rw [get?_insert_ne hkk] at hg
+      exact ⟨c', p', u', hg⟩
+  obtain ⟨c1', p1', u1', hp1⟩ := key k1 c1 p1 u1 hg1
+  obtain ⟨c2', p2', u2', hp2⟩ := key k2 c2 p2 u2 hg2
+  exact hinj k1 k2 hh c1' p1' u1' c2' p2' u2' hp1 hp2
+
+theorem permInj_fresh (pm : RegMapF PermVal) (k : Nat) (h : BitVec 16) (c : Chain)
+    (hinj : permInj pm)
+    (hfree : ∀ k' c' p' u', PartialMap.get? pm k' ≠ some ((h, c', p', u') : PermVal)) :
+    permInj (PartialMap.insert pm k ((h, c, none, none) : PermVal)) := by
+  intro k1 k2 hh c1 p1 u1 c2 p2 u2 hg1 hg2
+  by_cases hk1 : k = k1
+  · by_cases hk2 : k = k2
+    · omega
+    · rw [get?_insert_eq hk1] at hg1
+      cases hg1
+      rw [get?_insert_ne hk2] at hg2
+      exact absurd hg2 (hfree k2 c2 p2 u2)
+  · rw [get?_insert_ne hk1] at hg1
+    by_cases hk2 : k = k2
+    · rw [get?_insert_eq hk2] at hg2
+      cases hg2
+      exact absurd hg1 (hfree k1 c1 p1 u1)
+    · rw [get?_insert_ne hk2] at hg2
+      exact hinj k1 k2 hh c1 p1 u1 c2 p2 u2 hg1 hg2
+
+theorem permInj_delete (pm : RegMapF PermVal) (k : Nat) (hinj : permInj pm) :
+    permInj (PartialMap.delete pm k) := by
+  intro k1 k2 hh c1 p1 u1 c2 p2 u2 hg1 hg2
+  have hn1 : k ≠ k1 := by
+    intro he; rw [get?_delete_eq he] at hg1; exact absurd hg1 (by simp)
+  have hn2 : k ≠ k2 := by
+    intro he; rw [get?_delete_eq he] at hg2; exact absurd hg2 (by simp)
+  rw [get?_delete_ne hn1] at hg1
+  rw [get?_delete_ne hn2] at hg2
+  exact hinj k1 k2 hh c1 p1 u1 c2 p2 u2 hg1 hg2
+
+theorem pushedUniq_none (v : VirtioState) (h : noInflight v) : pushedUniq v := by
+  intro hh hh' r r' hp _
+  have := h hh
+  unfold Virtio.reqOf at this
+  rw [hp] at this
+  exact absurd this (by simp [VPhase.req])
+
+theorem pushedUniq_setPhase (v : VirtioState) (h : BitVec 16) (ph : VPhase)
+    (hnp : ∀ r, ph ≠ .pushed r) (hu : pushedUniq v) : pushedUniq (Virtio.setPhase v h ph) := by
+  intro h1 h2 r1 r2 hp1 hp2
+  have key : ∀ (hx : BitVec 16) (rx : VioReq),
+      Virtio.phase (Virtio.setPhase v h ph) hx = some (.pushed rx) →
+      hx ≠ h ∧ Virtio.phase v hx = some (.pushed rx) := by
+    intro hx rx hpx
+    by_cases hxh : hx = h
+    · subst hxh
+      rw [phase_setPhase_self] at hpx
+      exact absurd (Option.some.inj hpx) (hnp rx)
+    · exact ⟨hxh, by rwa [phase_setPhase_other v h hx ph hxh] at hpx⟩
+  obtain ⟨_, k1⟩ := key h1 r1 hp1
+  obtain ⟨_, k2⟩ := key h2 r2 hp2
+  exact hu h1 h2 r1 r2 k1 k2
+
+theorem pushedUniq_pushed (v : VirtioState) (h : BitVec 16) (r : VioReq)
+    (hok : Virtio.pushOk v = true) : pushedUniq (Virtio.setPhase v h (.pushed r)) := by
+  intro h1 h2 r1 r2 hp1 hp2
+  have key : ∀ (hx : BitVec 16) (rx : VioReq),
+      Virtio.phase (Virtio.setPhase v h (.pushed r)) hx = some (.pushed rx) → hx = h := by
+    intro hx rx hpx
+    by_cases hxh : hx = h
+    · exact hxh
+    · rw [phase_setPhase_other v h hx _ hxh] at hpx
+      exact absurd hpx (pushOk_not_pushed v hok hx rx)
+  rw [key h1 r1 hp1, key h2 r2 hp2]
+
+theorem pushedUniq_complete (v : VirtioState) (h : BitVec 16) (hu : pushedUniq v) :
+    pushedUniq (Virtio.complete v h) := by
+  intro h1 h2 r1 r2 hp1 hp2
+  have key : ∀ (hx : BitVec 16) (rx : VioReq),
+      Virtio.phase (Virtio.complete v h) hx = some (.pushed rx) →
+      Virtio.phase v hx = some (.pushed rx) := by
+    intro hx rx hpx
+    by_cases hxh : hx = h
+    · subst hxh; rw [phase_complete_self] at hpx; exact absurd hpx (by simp)
+    · rwa [phase_complete_other v h hx hxh] at hpx
+  exact hu h1 h2 r1 r2 (key h1 r1 hp1) (key h2 r2 hp2)
+
+theorem pushedUniq_congr (v v' : VirtioState)
+    (hph : ∀ h, Virtio.phase v' h = Virtio.phase v h) (hu : pushedUniq v) : pushedUniq v' := by
+  intro h1 h2 r1 r2 hp1 hp2
+  exact hu h1 h2 r1 r2 (by rw [← hph h1]; exact hp1) (by rw [← hph h2]; exact hp2)
+
+theorem permOk_congr (v v' : VirtioState) (pm : RegMapF PermVal) (st : Nat → HState)
+    (hph : ∀ h, Virtio.phase v' h = Virtio.phase v h) (hidx : v'.usedIdx = v.usedIdx)
+    (hok : permOk v pm st) : permOk v' pm st := by
+  intro k h c p u hget
+  obtain ⟨h1, h2, h3, h4, h5⟩ := hok k h c p u hget
+  exact ⟨h1, h2, by rw [hph h]; exact h3,
+    fun q hq => ⟨by rw [hph h]; exact (h4 q hq).1, (h4 q hq).2⟩,
+    fun y hy => ⟨by rw [hidx]; exact (h5 y hy).1, (h5 y hy).2⟩⟩
+
+/-- Keys at or above `n` are free, so `n` is a key a permit may take. -/
+def permFresh (n : Nat) (pm : RegMapF PermVal) : Prop :=
+  ∀ k, n ≤ k → PartialMap.get? pm k = none
+
 theorem permFresh_insert (pm : RegMapF PermVal) (n : Nat) (h : BitVec 16) (c : Chain)
-    (hf : permFresh n pm) : permFresh (n + 1) (PartialMap.insert pm n ((h, c) : PermVal)) := by
+    (p : Option VPhase) (u : Option (BitVec 16)) (hf : permFresh n pm) :
+    permFresh (n + 1) (PartialMap.insert pm n ((h, c, p, u) : PermVal)) := by
   intro k hk
   rw [get?_insert_ne (by omega)]
   exact hf k (by omega)
+
+theorem permFresh_keep (pm : RegMapF PermVal) (n k : Nat) (h : BitVec 16) (c : Chain)
+    (p : Option VPhase) (u : Option (BitVec 16)) (hf : permFresh n pm) (hk : k < n) :
+    permFresh n (PartialMap.insert pm k ((h, c, p, u) : PermVal)) := by
+  intro k' hk'
+  rw [get?_insert_ne (by omega)]
+  exact hf k' hk'
 
 theorem permFresh_delete (pm : RegMapF PermVal) (n k : Nat) (hf : permFresh n pm) :
     permFresh n (PartialMap.delete pm k) := by
@@ -1280,6 +1574,14 @@ theorem permFresh_delete (pm : RegMapF PermVal) (n k : Nat) (hf : permFresh n pm
   by_cases hkk : k = k'
   · exact get?_delete_eq hkk
   · rw [get?_delete_ne hkk]; exact hf k' hk'
+
+/-- A permit's key is below the freshness bound. -/
+theorem permFresh_lt (pm : RegMapF PermVal) (n k : Nat) (h : BitVec 16) (c : Chain)
+    (p : Option VPhase) (u : Option (BitVec 16)) (hf : permFresh n pm)
+    (hget : PartialMap.get? pm k = some ((h, c, p, u) : PermVal)) : k < n := by
+  rcases Nat.lt_or_ge k n with hk | hk
+  · exact hk
+  · rw [hf k hk] at hget; exact absurd hget (by simp)
 
 /-! ## The leases -/
 
@@ -1420,7 +1722,7 @@ def diskLive (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState)
     dlTops dl ∗ diskReadAtAuth γ nr ∗
     ⌜v.usedIdx = wrap16 nc ∧ v.seen = wrap16 lo ∧ lo ≤ np ∧ queueOk st ring lo np ∧
       posOk pmap ring lo np ∧ stageOk stg ring lo np ∧ inflightOk v st ∧
-      imgOk v m (inFlightBlk st) ∧ cachedOk v st ∧ permOk pm st ∧ usedOk dl dl0 nc M⌝
+      imgOk v m (inFlightBlk st) ∧ cachedOk v st ∧ permOk v pm st ∧ usedOk dl dl0 nc M⌝
 
 /-- The dead arm: before `virtio_disk_init`, and never again after.
 
@@ -1445,13 +1747,14 @@ def diskDead (γ : DiskNames) (v : VirtioState) (pm : RegMapF PermVal) : IProp G
     imgAuth γ m ∗ diskCfgAuth γ v.cfg ∗ diskLoAuth γ 0 ∗ diskPubAuthM γ 0 ∗ posAuth γ [] ∗
     diskStageAuth γ none ∗ diskBaseAuth γ 0 ∗ doneAuth γ [] ∗ diskReadAtAuth γ 0 ∗
     ⌜Virtio.live v.cfg = false ∧ noInflight v ∧ v.cache = [] ∧ imgOk v m (fun _ => False) ∧
-      permOk pm (fun _ => .inactive) ∧ v.usedIdx = 0#16 ∧ v.seen = 0#16⌝
+      permOk v pm (fun _ => .inactive) ∧ v.usedIdx = 0#16 ∧ v.seen = 0#16⌝
 
 /-- **The disk protocol**, indexed by the device's own state: what sits
 beside the device's mirror inside `diskInv`. -/
 def diskProto (γ : DiskNames) (v : VirtioState) : IProp GF := iprop%
   ⌜cacheOk v⌝ ∗
-  ∃ (pn : Nat) (pm : RegMapF PermVal), permAuth γ pm ∗ ⌜permFresh pn pm⌝ ∗
+  ∃ (pn : Nat) (pm : RegMapF PermVal), permAuth γ pm ∗
+    ⌜permFresh pn pm ∧ permInj pm ∧ pushedUniq v⌝ ∗
     (diskDead γ v pm ∨
      ∃ c0 : VirtioCfg, diskCfgFrozen γ c0 ∗
        ⌜v.cfg = c0 ∧ Virtio.live c0 = true ∧ c0.qnum.toNat = NUM⌝ ∗ diskLive γ c0 v pm)

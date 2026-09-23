@@ -513,7 +513,15 @@ def body : VM Unit := do
         let popped ← DevM.get
         if (phase popped h).isSome then pure ()
         else
-          DevM.modify (fun v => { setPhase v h .popped with seen := v.seen + 1#16 })
+          -- the refusal is ATOMIC with the pop: the `get` above chooses the
+          -- branch, and the pop itself re-tests, so a head the device already
+          -- holds is never put in flight twice.  (Nothing can make the test
+          -- fail here -- only this loop pops -- so the guard never blocks; it
+          -- is there because a per-step logic can only read the state at the
+          -- step that moves it.)
+          DevM.guard (fun v =>
+            if (phase v h).isSome then none
+            else some { setPhase v h .popped with seen := v.seen + 1#16 })
           let _ ← DevM.fork (.serve h)
           pure ()
   else if k = 1 then

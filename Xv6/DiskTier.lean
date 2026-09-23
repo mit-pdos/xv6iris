@@ -445,9 +445,10 @@ theorem queueOk_arm (st : Nat → HState) (ring : Nat → Nat) (lo np : Nat) (i 
     (h : queueOk st ring lo np) (hfree : st i = .inactive) :
     queueOk (armSt st i c) ring lo np := queueOk_arm' st ring lo np i c h hfree
 
-theorem permOk_armSt (pm : RegMapF PermVal) (st : Nat → HState) (i : Nat) (c : Chain)
-    (hok : permOk pm st) (hfree : st i = .inactive) : permOk pm (armSt st i c) :=
-  permOk_arm pm st i c hok hfree
+theorem permOk_armSt (v : VirtioState) (pm : RegMapF PermVal) (st : Nat → HState) (i : Nat)
+    (c : Chain) (hok : permOk v pm st) (hfree : st i = .inactive) :
+    permOk v pm (armSt st i c) :=
+  permOk_arm v pm st i c hok hfree
 
 /-! ### Taking a MEMBER slot
 
@@ -507,11 +508,11 @@ theorem queueOk_mem (st : Nat → HState) (ring : Nat → Nat) (lo np : Nat) (i 
   rw [memSt_ne st i h _ hne]
   exact (hx.1 p h1 h2).2
 
-theorem permOk_mem (pm : RegMapF PermVal) (st : Nat → HState) (i h : Nat)
-    (hok : permOk pm st) (hfree : st i = .inactive) : permOk pm (memSt st i h) := by
-  intro k' h' c' hget
-  obtain ⟨hlt, hst⟩ := hok k' h' c' hget
-  refine ⟨hlt, ?_⟩
+theorem permOk_mem (v : VirtioState) (pm : RegMapF PermVal) (st : Nat → HState) (i h : Nat)
+    (hok : permOk v pm st) (hfree : st i = .inactive) : permOk v pm (memSt st i h) := by
+  intro k' h' c' b' u' hget
+  obtain ⟨hlt, hst, p3, p4, p5⟩ := hok k' h' c' b' u' hget
+  refine ⟨hlt, ?_, p3, p4, p5⟩
   have hne : h'.toNat ≠ i := by
     intro e; rw [e, hfree] at hst; exact absurd hst (by simp)
   rw [memSt_ne st i h _ hne]
@@ -591,9 +592,10 @@ theorem cachedOk_arm3 (st : Nat → HState) (c : Chain) (hwf : c.wf)
 
 theorem permOk_arm3 (st : Nat → HState) (c : Chain) (hwf : c.wf)
     (h1 : st c.hd = .inactive) (h2 : st c.md = .inactive) (h3 : st c.tl = .inactive)
-    (pm : RegMapF PermVal) (hx : permOk pm st) : permOk pm (armSt3 st c) :=
-  permOk_mem _ _ c.tl c.hd
-    (permOk_mem _ _ c.md c.hd (permOk_armSt pm st c.hd c hx h1) (armSt3_md_free st c hwf h2))
+    (v : VirtioState) (pm : RegMapF PermVal) (hx : permOk v pm st) :
+    permOk v pm (armSt3 st c) :=
+  permOk_mem v _ _ c.tl c.hd
+    (permOk_mem v _ _ c.md c.hd (permOk_armSt v pm st c.hd c hx h1) (armSt3_md_free st c hwf h2))
     (armSt3_tl_free st c hwf h3)
 
 /-! ## `struct disk` is kernel data -/

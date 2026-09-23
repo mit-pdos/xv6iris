@@ -368,13 +368,14 @@ theorem diskProto_dead_write (γ : DiskNames) (v v' : VirtioState) (c c' : Virti
     iexists pn, pm
     iframe Hpm
     isplitl []
-    · ipureintro; exact hfr
+    · ipureintro
+      exact ⟨hfr.1, hfr.2.1, pushedUniq_none v' hni⟩
     ileft
     iexists m
     rw [hcfg']
     iframe Hm Hcfg Hlo0 HnpM0 Hpos0 HstgA0 Hbs0 Hdn0 Hnr0
     ipureintro
-    refine ⟨hlive', hni, hcache, ?_, hp.2.2.2.2.1, hu, hs⟩
+    refine ⟨hlive', hni, hcache, ?_, permOk_dead v v' pm hp.2.2.2.2.1, hu, hs⟩
     intro bno bs hb
     rcases hp.2.2.2.1 bno bs hb with h | h
     · exact absurd h id
@@ -512,7 +513,8 @@ theorem disk_ack_write (γ : DiskNames) (msk : BitVec 32) :
   iintro %v'' %hwr Hfrag
   obtain rfl := Option.some.inj (hx.symm.trans hwr)
   imod Hmask
-  ihave Hproto := diskProto_congr_mem γ v { v with isr := v.isr &&& ~~~msk } rfl rfl rfl rfl rfl
+  ihave Hproto := diskProto_congr_mem γ v { v with isr := v.isr &&& ~~~msk } rfl rfl rfl
+    (fun _ => rfl) rfl rfl
     (fun _ h => h) (fun h => h) $$ Hproto
   ihave Hcl := Hclose $$ [Hfrag Hproto]
   case' _ =>
@@ -1545,7 +1547,7 @@ theorem diskProto_armHead (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) (p
       inflightOk_arm3 st c hwf hst hstm hstt v q7,
       imgOk_arm3 st c hwf hst hstm hstt v m q8,
       cachedOk_arm3 st c hwf hst hstm hstt v q9,
-      permOk_arm3 st c hwf hst hstm hstt pm q10, q11⟩
+      permOk_arm3 st c hwf hst hstm hstt v pm q10, q11⟩
 
 /-- **`publish`**: the view shift that arms head `c.hd` with the chain `c`,
 carried out between the ring-cell store and the `avail->idx` bump
