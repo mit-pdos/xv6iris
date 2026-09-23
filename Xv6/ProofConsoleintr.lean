@@ -172,15 +172,15 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx
 
 /-- The specification's postcondition, at this hart, with the trace already
 extended to `tr`. -/
-def ciPost (cpu : CPU) (k : KCtx) (γ : UartNames) (tr : List (BitVec 8)) : IProp GF := iprop%
+def cinPost (cpu : CPU) (k : KCtx) (γ : UartNames) (tr : List (BitVec 8)) : IProp GF := iprop%
   ∀ (R' : RegMap) (cs : List (BitVec 8)),
     kctx cpu (k.withRegs R') -∗ pcIs cpu (jumpPc (k.regs 1#5)) -∗
     ⌜calleeSaved k.regs R'⌝ -∗ uartSentSub γ (tr ++ cs) -∗ wpLoop cpu
 
 /-- Each `consputc` extends the trace; the continuation follows. -/
-theorem ciPost_shift (cpu : CPU) (k : KCtx) (γ : UartNames) (tr ds : List (BitVec 8)) :
-    ciPost (GF := GF) cpu k γ tr ⊢ ciPost cpu k γ (tr ++ ds) := by
-  unfold ciPost
+theorem cinPost_shift (cpu : CPU) (k : KCtx) (γ : UartNames) (tr ds : List (BitVec 8)) :
+    cinPost (GF := GF) cpu k γ tr ⊢ cinPost cpu k γ (tr ++ ds) := by
+  unfold cinPost
   iintro H %R' %cs Hk Hpc %hcs Hsub
   iapply H $$ %R' %(ds ++ cs) Hk Hpc %hcs
   iapply (show uartSentSub (GF := GF) γ (tr ++ ds ++ cs) ⊢ uartSentSub γ (tr ++ (ds ++ cs)) from by
@@ -290,7 +290,7 @@ theorem ci_tail (RE : RELEASE) (cpu : CPU) (k : KCtx) (γc : GName) (γ : UartNa
     kctx cpu ((ciK k).withRegs R) ∗ pcIs cpu (KA.«consoleintr» + 0x104#64) ∗
     isConsLock γc ∗ locked γc cpu ∗ consBody ∗
     frame6s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
-    uartSentSub γ tr ∗ ciPost cpu k γ tr
+    uartSentSub γ tr ∗ cinPost cpu k γ tr
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, #Hlk, Hlocked, Hbody, Hframe, #Hsub, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -341,7 +341,7 @@ theorem ci_tail (RE : RELEASE) (cpu : CPU) (k : KCtx) (γc : GName) (γ : UartNa
   inext
   iapply wpNext_off_intro
   iintro Hk Hpc
-  unfold ciPost
+  unfold cinPost
   iapply HΦ $$ %_ %([] : List (BitVec 8)) Hk Hpc
   · ipureintro
     unfold calleeSaved
@@ -384,7 +384,7 @@ theorem ci_wake (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames) (cpu : CPU) (k : 
     wordPointsTo consWAddr 4 (DFrac.own 1) w ∗
     wordPointsTo consEAddr 4 (DFrac.own 1) e ∗
     frame6s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
-    uartSentSub γ tr ∗ ciPost cpu k γ tr
+    uartSentSub γ tr ∗ cinPost cpu k γ tr
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, #Hpi, #Hlk, Hlocked, Hbuf, Hr, Hw, He, Hframe, #Hsub, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -469,7 +469,7 @@ theorem ci_nl (CP : CONSPUTC) (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames)
     wordPointsTo consWAddr 4 (DFrac.own 1) w ∗
     wordPointsTo consEAddr 4 (DFrac.own 1) e ∗
     frame6s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
-    uartSentSub γ tr ∗ ciPost cpu k γ tr
+    uartSentSub γ tr ∗ cinPost cpu k γ tr
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, #Hpi, #Hlk, Hlocked, #Hport, Hbuf, Hr, Hw, He, Hframe, #Hsub, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -503,7 +503,7 @@ theorem ci_nl (CP : CONSPUTC) (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames)
   unfold calleeSaved at hcs2
   k_norm_g at hcs2
   obtain ⟨d2, d8, d9, d18, d19, d20, d21, d22, d23, d24, d25, d26, d27⟩ := hcs2
-  ihave HΦ := ciPost_shift cpu k γ tr cs $$ HΦ
+  ihave HΦ := cinPost_shift cpu k γ tr cs $$ HΦ
   -- auipc a5,0x12 ; addi a5,a5,-172
   k_step (wp_s_auipc cpu _ (KA.«consoleintr» + 0x134#64) false 18#20 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -590,7 +590,7 @@ theorem ci_bs (CP : CONSPUTC) (RE : RELEASE)
     wordPointsTo consWAddr 4 (DFrac.own 1) w ∗
     wordPointsTo consEAddr 4 (DFrac.own 1) e ∗
     frame6s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
-    uartSentSub γ tr ∗ ciPost cpu k γ tr
+    uartSentSub γ tr ∗ cinPost cpu k γ tr
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, #Hlk, Hlocked, #Hport, Hbuf, Hr, Hw, He, Hframe, #Hsub, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -672,7 +672,7 @@ theorem ci_bs (CP : CONSPUTC) (RE : RELEASE)
     unfold calleeSaved at hcs2
     k_norm_g at hcs2
     obtain ⟨d2, d8, d9, d18, d19, d20, d21, d22, d23, d24, d25, d26, d27⟩ := hcs2
-    ihave HΦ := ciPost_shift cpu k γ tr cs $$ HΦ
+    ihave HΦ := cinPost_shift cpu k γ tr cs $$ HΦ
     -- j +0x104
     k_step (wp_s_j cpu _ (KA.«consoleintr» + 0x12c#64) true 2097112#21)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -718,7 +718,7 @@ theorem ci_echo (CP : CONSPUTC) (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames)
     wordPointsTo consWAddr 4 (DFrac.own 1) w ∗
     wordPointsTo consEAddr 4 (DFrac.own 1) e ∗
     frame6s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
-    uartSentSub γ tr ∗ ciPost cpu k γ tr
+    uartSentSub γ tr ∗ cinPost cpu k γ tr
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, #Hpi, #Hlk, Hlocked, #Hport, Hbuf, Hr, Hw, He, Hframe, #Hsub, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -752,7 +752,7 @@ theorem ci_echo (CP : CONSPUTC) (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames)
   unfold calleeSaved at hcs2
   k_norm_g at hcs2
   obtain ⟨d2, d8, d9, d18, d19, d20, d21, d22, d23, d24, d25, d26, d27⟩ := hcs2
-  ihave HΦ := ciPost_shift cpu k γ tr cs $$ HΦ
+  ihave HΦ := cinPost_shift cpu k γ tr cs $$ HΦ
   -- auipc a4,0x12 ; addi a4,a4,52
   k_step (wp_s_auipc cpu _ (KA.«consoleintr» + 0x54#64) false 18#20 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -965,7 +965,7 @@ theorem ci_kill_out (RE : RELEASE) (cpu : CPU) (k : KCtx) (γc : GName) (γ : Ua
     kctx cpu ((ciK k).withRegs R) ∗ pcIs cpu pc ∗
     isConsLock γc ∗ locked γc cpu ∗ consBody ∗
     ciFrameK (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5) ∗
-    uartSentSub γ tr ∗ ciPost cpu k γ tr
+    uartSentSub γ tr ∗ cinPost cpu k γ tr
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨#Hi0, #Hi2, #Hi4, Hk, Hpc, #Hlk, Hlocked, Hbody, Hframe, #Hsub, HΦ⟩
   have hsie : (ciK k).sie = false := rfl
@@ -1035,7 +1035,7 @@ def ciKillLoop (cpu : CPU) (k : KCtx) (γc : GName) (γ : UartNames) : IProp GF 
     wordPointsTo consWAddr 4 (DFrac.own 1) w -∗
     wordPointsTo consEAddr 4 (DFrac.own 1) e -∗
     ciFrameK (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5) -∗
-    uartSentSub γ tr -∗ ciPost cpu k γ tr -∗ wpLoop cpu)
+    uartSentSub γ tr -∗ cinPost cpu k γ tr -∗ wpLoop cpu)
 
 theorem ciKillLoop_elim (cpu : CPU) (k : KCtx) (γc : GName) (γ : UartNames) :
     ciKillLoop (GF := GF) cpu k γc γ ⊢
@@ -1048,7 +1048,7 @@ theorem ciKillLoop_elim (cpu : CPU) (k : KCtx) (γc : GName) (γ : UartNames) :
       wordPointsTo consWAddr 4 (DFrac.own 1) w -∗
       wordPointsTo consEAddr 4 (DFrac.own 1) e -∗
       ciFrameK (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5) -∗
-      uartSentSub γ tr -∗ ciPost cpu k γ tr -∗ wpLoop cpu := by
+      uartSentSub γ tr -∗ cinPost cpu k γ tr -∗ wpLoop cpu := by
   unfold ciKillLoop; iintro H; iexact H
 
 theorem ciKillLoop_intro (cpu : CPU) (k : KCtx) (γc : GName) (γ : UartNames) :
@@ -1061,7 +1061,7 @@ theorem ciKillLoop_intro (cpu : CPU) (k : KCtx) (γc : GName) (γ : UartNames) :
       wordPointsTo consWAddr 4 (DFrac.own 1) w -∗
       wordPointsTo consEAddr 4 (DFrac.own 1) e -∗
       ciFrameK (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5) -∗
-      uartSentSub γ tr -∗ ciPost cpu k γ tr -∗ wpLoop cpu) ⊢
+      uartSentSub γ tr -∗ cinPost cpu k γ tr -∗ wpLoop cpu) ⊢
     ciKillLoop (GF := GF) cpu k γc γ := by
   unfold ciKillLoop; iintro H; iexact H
 
@@ -1170,7 +1170,7 @@ theorem ci_kill_loop (CP : CONSPUTC) (RE : RELEASE) (cpu : CPU) (k : KCtx) (γc 
     unfold calleeSaved at hcs2
     k_norm_g at hcs2
     obtain ⟨d2, d8, d9, d18, d19, d20, d21, d22, d23, d24, d25, d26, d27⟩ := hcs2
-    ihave HΦ := ciPost_shift cpu k γ tr cs $$ HΦ
+    ihave HΦ := cinPost_shift cpu k γ tr cs $$ HΦ
     have g9 : R2 9#5 = KA.«cons» := d9.trans hR9
     -- lw a5,160(s1) ; lw a4,156(s1)
     k_step (wp_s_lw cpu _ (KA.«consoleintr» + 0xd2#64) false 160#12 15#5 9#5 (by decide) (by decide)
@@ -1252,7 +1252,7 @@ theorem ci_kill (CP : CONSPUTC) (RE : RELEASE)
     wordPointsTo consWAddr 4 (DFrac.own 1) w ∗
     wordPointsTo consEAddr 4 (DFrac.own 1) e ∗
     frame6s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
-    uartSentSub γ tr ∗ ciPost cpu k γ tr
+    uartSentSub γ tr ∗ cinPost cpu k γ tr
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, #Hlk, Hlocked, #Hport, Hbuf, Hr, Hw, He, Hframe, #Hsub, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -1367,7 +1367,7 @@ theorem ci_ring (CP : CONSPUTC) (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames)
     wordPointsTo consWAddr 4 (DFrac.own 1) w ∗
     wordPointsTo consEAddr 4 (DFrac.own 1) e ∗
     frame6s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
-    uartSentSub γ tr ∗ ciPost cpu k γ tr
+    uartSentSub γ tr ∗ cinPost cpu k γ tr
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, #Hpi, #Hlk, Hlocked, #Hport, Hbuf, Hr, Hw, He, Hframe, #Hsub, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -1486,8 +1486,8 @@ theorem ciPost_intro (cpu : CPU) (k : KCtx) (γ : UartNames) (bs : List (BitVec 
     iprop(∀ (R' : RegMap) (cs : List (BitVec 8)),
       kctx cpu (k.withRegs R') -∗ pcIs cpu (jumpPc (k.regs 1#5)) -∗
       ⌜calleeSaved k.regs R'⌝ -∗ uartSentSub γ (bs ++ cs) -∗ wpLoop cpu) ⊢
-    ciPost (GF := GF) cpu k γ bs := by
-  unfold ciPost; iintro H; iexact H
+    cinPost (GF := GF) cpu k γ bs := by
+  unfold cinPost; iintro H; iexact H
 
 set_option maxHeartbeats 8000000 in
 /-- **The four character tests**, from `+0x18` (just past `acquire`):
@@ -1503,7 +1503,7 @@ theorem ci_body (CP : CONSPUTC) (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames)
     kctx cpu ((ciK k).withRegs R) ∗ pcIs cpu (KA.«consoleintr» + 0x18#64) ∗
     procsInv Γ ∗ isConsLock γc ∗ locked γc cpu ∗ uartPort .uart0 γl γ ∗ consBody ∗
     frame6s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
-    uartSentSub γ tr ∗ ciPost cpu k γ tr
+    uartSentSub γ tr ∗ cinPost cpu k γ tr
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, #Hpi, #Hlk, Hlocked, #Hport, Hbody, Hframe, #Hsub, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
