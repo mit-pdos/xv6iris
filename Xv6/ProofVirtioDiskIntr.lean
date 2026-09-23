@@ -26,10 +26,11 @@ last read of `used->idx` returned, and the TSO credential
 `Xv6.diskWm γ m F` with the read receipt `MachCSL.rviewLb cpu F` the
 fence turns into a floor.
 
-Some arms of the completion side are not derivable from the frozen
-accessor statements as they stand; they are collected in
-`Xv6.DISK_INTR_EXTRA`, an explicit extra hypothesis of the theorem (see
-the doc comments there).
+One resource is still not derivable from the disk files: the handler's
+ENTRY credential, the fact that the floor it acquires the lock with has
+passed the used-index write that published its own watermark.  It is
+`Xv6.DISK_INTR_EXTRA.pay_wm`, an explicit extra hypothesis of the
+theorem, and its doc comment says exactly what is missing and why.
 -/
 import MachCSL.WpSmodeFrame
 import MachCSL.WpSmodeFrame12b
@@ -224,14 +225,15 @@ theorem vdis_wakeup (WK : WAKEUP) (Γ : SchedNames) (cpu : CPU) (k' : KCtx)
 
 end
 
-/-! ## The arms the frozen completion side does not (yet) provide
+/-! ## The arm the frozen completion side does not (yet) provide
 
-The resources this proof needs that are not derivable from the disk
-files as they stand are collected here.  Each is stated in the
-exact shape the proof consumes, and each is discharged by a resource the
-completion side is expected to grow (see the report accompanying this
-file); until then `virtio_disk_intr_proof` takes them as an explicit
-hypothesis. -/
+Four of the five resources this structure once carried are gone: the
+used page's `Xv6.pageRw` is in `Xv6.diskGeom`, the used element's read is
+`Xv6.DISK_ACC_ASSUMPTIONS.disk_used_elem_read` at the width the code
+uses, `b->disk` is in `Xv6.claimRes` (`Xv6.claimRes_bufDisk_acc`), and
+"a completed head is armed" is `Xv6.disk_slot_active`, proved from the
+invariant's `Xv6.unreadArmed`.  What is left is stated in the exact shape
+the proof consumes, with the reason it is still assumed. -/
 structure DISK_INTR_EXTRA : Prop where
   /-- **The handler's ENTRY credential.**  `Xv6.disk_used_idx_read` at the
   watermark `nr` consumes `Xv6.diskWm γ nr K` -- the fact that this hart's
