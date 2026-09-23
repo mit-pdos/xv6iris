@@ -347,3 +347,5 @@ import Xv6.ProofUartinit
 import Xv6.LinkUartinit
 import Xv6.LinkConsputc
 import Xv6.LinkPrputc
+import Xv6.ProofConsoleinit
+import Xv6.LinkConsoleinit

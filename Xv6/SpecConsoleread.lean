@@ -33,10 +33,10 @@ def consolereadAddr : BitVec 64 := KA.«consoleread»
 /-- The stack `consoleread`'s cone needs: its 12-slot frame over `either_copyout`'s. -/
 def consolereadSlots : Nat := 12 + eitherCopyoutSlots
 
-/-- `consoleread`'s result for `d` bytes delivered: `-1` (killed, nothing
-delivered) or `d`. -/
+/-- `consoleread`'s result for `d` bytes delivered: `-1` (the process was
+killed while waiting -- possibly after some bytes were delivered) or `d`. -/
 def consReadRet (d : Nat) (r : BitVec 64) : Prop :=
-  (r = -1#64 ∧ d = 0) ∨ r = BitVec.ofInt 64 d
+  r = -1#64 ∨ r = BitVec.ofInt 64 d
 
 /-- **WP of `consoleread`.**  `a0 = user_dst` (nonzero), `a1 = dst`, `a2 = n`. -/
 def wp_consoleread_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
