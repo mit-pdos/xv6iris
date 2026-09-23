@@ -100,6 +100,12 @@ pointer line per top-level and `design/` file and does NOT list `projects/` or
   refuses a QEMU without it). The distro package does not qualify. The source
   tree is `/shared/qemu-src`, installed to `/usr/local`; only
   `riscv64-softmmu` is built.
+- **`make -f CoqMakefile` does NOT notice a new `_CoqProject` row.**  The
+  generated makefile has no rule to regenerate itself, so after adding a
+  file run `coq_makefile -f _CoqProject -o CoqMakefile` (under the project
+  switch -- see the wrong-switch trap above) before the build; otherwise the
+  gate compiles nothing and reports success.  `vmbuild.sh`'s `rm -f
+  CoqMakefile` exists for this.
 - **Grep the build log for plain `Error`.** `make …; echo $?` masks make's exit,
   and the `File "…":`/`Error:` pair spans two lines. For "is anything left to
   compile", grep `ROCQ compile` — Rocq 9 does not print `COQC`, so a `grep -c

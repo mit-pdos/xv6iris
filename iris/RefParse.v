@@ -335,6 +335,27 @@ Fixpoint ushp_nodes (t : ushp_cmd) : nat :=
   end.
 
 (* ===================================================================== *)
+(* §5b THE SYMBOL SCOPE OF THE CATALOGUED gettoken                        *)
+(* ===================================================================== *)
+
+(* The walked arms of gettoken's switch: NUL, the word, the '|', and a '>'
+   that is not followed by another '>' (the '>>' arm and the other five
+   symbol arms are in the binary and not in any walk).  This is
+   [UkShPipeLex.ushq_sym_ok], stated here so a walk below that file can
+   name it; the general gettoken walk takes it as its ONE shape premise,
+   and the symbol-free and the redirect lines are its instances. *)
+Definition ref_sym_scope (len : nat) (f : nat -> bv 8) : Prop :=
+  forall j : nat, (j < len)%nat -> ushp_is_sym (f j) = true ->
+    f j = rb_bar
+    \/ (f j = rb_gt /\ (S j < len)%nat /\ f (S j) <> rb_gt).
+
+Lemma ref_sym_scope_nosym (len : nat) (f : nat -> bv 8) :
+  ushp_no_symbols len f -> ref_sym_scope len f.
+Proof.
+  intros Hns j Hj Hsym. rewrite (Hns j Hj) in Hsym. discriminate.
+Qed.
+
+(* ===================================================================== *)
 (* §6 ANTI-VACUITY: the three line shapes, computed                        *)
 (* ===================================================================== *)
 
