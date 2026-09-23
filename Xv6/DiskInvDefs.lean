@@ -273,6 +273,12 @@ theorem dmaOwnT_dmaOwn (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (ts : Nat) :
   iexists Hs
   iexact H
 
+theorem dmaOwnT_cases (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (ts : Nat) :
+    dmaOwnT (GF := GF) pa n w ts ⊢
+      ∃ Hs : Nat → Hist, histBytes pa n (fun _ => DFrac.own 1) Hs ∗ topLb ts ∗
+        ⌜headsAre Hs n w ∧ headsAtT Hs n ts⌝ := by
+  unfold dmaOwnT; iintro H; iexact H
+
 theorem dmaOwnT_topLb (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (ts : Nat) :
     dmaOwnT (GF := GF) pa n w ts ⊢ topLb ts ∗ dmaOwnT pa n w ts := by
   unfold dmaOwnT
@@ -1171,6 +1177,40 @@ def headDone (γ : DiskNames) (n h : Nat) : IProp GF := iprop%
 
 instance headDone_persistent (γ : DiskNames) (n h : Nat) :
     Persistent (headDone (GF := GF) γ n h) := by unfold headDone; infer_instance
+
+/-- **The completion record, WITH the position of the used-index write
+that made it.**  The status byte of a completed request is readable only
+by a hart whose floor has passed that write (`MachCSL.Hist.read` returns
+the newest VISIBLE entry), so the position has to travel with the record:
+`Xv6.disk_status_read` needs it, and `Xv6.disk_used_elem_read` -- where
+the log's arithmetic lives -- is what produces it. -/
+def headDoneAt (γ : DiskNames) (n t h : Nat) : IProp GF := iprop%
+  ∃ k : Nat, doneRec γ k (n, t, h)
+
+instance headDoneAt_persistent (γ : DiskNames) (n t h : Nat) :
+    Persistent (headDoneAt (GF := GF) γ n t h) := by unfold headDoneAt; infer_instance
+
+theorem headDoneAt_mk (γ : DiskNames) (n t h k : Nat) :
+    doneRec (GF := GF) γ k (n, t, h) ⊢ headDoneAt γ n t h := by
+  unfold headDoneAt
+  iintro H
+  iexists k
+  iexact H
+
+theorem headDoneAt_headDone (γ : DiskNames) (n t h : Nat) :
+    headDoneAt (GF := GF) γ n t h ⊢ headDone γ n h := by
+  unfold headDoneAt headDone
+  iintro ⟨%k, H⟩
+  iexists k, t
+  iexact H
+
+/-- The log entry a positioned record names. -/
+theorem headDoneAt_lookup (γ : DiskNames) (l : List UsedRec) (n t h : Nat) :
+    ⊢@{IProp GF} doneAuth γ l -∗ headDoneAt γ n t h -∗ ⌜((n, t, h) : UsedRec) ∈ l⌝ := by
+  unfold headDoneAt
+  iintro Hl ⟨%k, H⟩
+  ihave %hl := doneRec_lookup γ l k (n, t, h) $$ Hl H
+  ipureintro; exact List.mem_of_getElem? hl
 
 /-- **Every completion of head `h` has been READ** (by the handler, whose
 watermark is `nr`).  Persistent.

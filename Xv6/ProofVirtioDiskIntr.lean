@@ -711,8 +711,9 @@ theorem vdis_loop (HA : DISK_ACC_ASSUMPTIONS) (HE : DISK_INTR_EXTRA) (WK : WAKEU
   try (case hs => k_norm [vdisK_sie k])
   iintro %w1 Hk Hpc Hpost1
   case hb1 => k_norm [vdisK_sie k, vdis_usedElem_addr pu (nr % NUM)]
-  icases Hpost1 with ⟨Hnr, %i, %⟨hi, hw1⟩, #Hdone⟩
+  icases Hpost1 with ⟨Hnr, %i, %t1, %⟨hi, hw1, ht1⟩, #HdoneAt⟩
   subst hw1
+  ihave #Hdone := headDoneAt_headDone γ (nr + 1) t1 i $$ HdoneAt
   -- the slot of the completed head is armed
   icases vdisPay_slot γ pd pav i hi $$ Hpay with ⟨Hslot, Hback⟩
   unfold slotRes
@@ -741,7 +742,8 @@ theorem vdis_loop (HA : DISK_ACC_ASSUMPTIONS) (HE : DISK_INTR_EXTRA) (WK : WAKEU
   -- +0x5a  lbu a4,16(a4)  disk.info[id].status
   ihave #Hid2 := kmapStatic_rw c.status (vdis_status_kmap c.hd hi) $$ HS
   ihave #Hwm1 := diskWm_mono γ m (nr + 1) F F (by omega) (Nat.le_refl F) $$ Hwm
-  ihave HAU2 := HA.disk_status_read γ pd pav pu cpu F nr c $$ [Hinv Hgeom Hnr Htok Hdone Hwm1]
+  ihave HAU2 := disk_status_read γ pd pav pu cpu F nr t1 c hcwf ht1
+    $$ [Hinv Hgeom Hnr Htok HdoneAt]
   · iframe #; iframe
   k_step (wp_s_lbu_au cpu _ ?hs (KA.«virtio_disk_intr» + 0x5a#64) false 16#12 14#5 14#5
       (by decide) c.status ?hb2 (vdis_status_ram c.hd hi) F [] _)
