@@ -41,6 +41,7 @@ import MachCSL.WpSmodeFrame
 import MachCSL.WpSmodeFrame8
 import MachCSL.WpSmodeFrame8b
 import MachCSL.WpSmodeFrame6
+import MachCSL.WpSmodeFrame12
 import MachCSL.WpSmodeFrame16
 import MachCSL.WpStagesM
 import MachCSL.WpGpr
