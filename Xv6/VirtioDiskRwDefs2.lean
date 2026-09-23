@@ -80,35 +80,35 @@ def freeByte : HState → BitVec 8
 
 /-- The descriptor bytes a receipt carries (the slot without its `free`
 byte). -/
-def slotCells (ξ : CtxId) (pd : PAddr) (i : Nat) : HState → IProp GF
+def slotCells (γ : DiskNames) (ξ : CtxId) (pd : PAddr) (i : Nat) : HState → IProp GF
   | .inactive => freeSlotRes ξ pd i
-  | .active c => claimRes ξ pd c
+  | .active c => claimRes γ ξ pd c
   | .member _ => iprop(opsWin ξ i ∗ infoWin ξ i)
 
-theorem slotCells_inactive (ξ : CtxId) (pd : PAddr) (i : Nat) :
-    slotCells (GF := GF) ξ pd i .inactive = freeSlotRes ξ pd i := rfl
-theorem slotCells_active (ξ : CtxId) (pd : PAddr) (i : Nat) (c : Chain) :
-    slotCells (GF := GF) ξ pd i (.active c) = claimRes ξ pd c := rfl
-theorem slotCells_member (ξ : CtxId) (pd : PAddr) (i h : Nat) :
-    slotCells (GF := GF) ξ pd i (.member h) = iprop(opsWin ξ i ∗ infoWin ξ i) := rfl
+theorem slotCells_inactive (γ : DiskNames) (ξ : CtxId) (pd : PAddr) (i : Nat) :
+    slotCells (GF := GF) γ ξ pd i .inactive = freeSlotRes ξ pd i := rfl
+theorem slotCells_active (γ : DiskNames) (ξ : CtxId) (pd : PAddr) (i : Nat) (c : Chain) :
+    slotCells (GF := GF) γ ξ pd i (.active c) = claimRes γ ξ pd c := rfl
+theorem slotCells_member (γ : DiskNames) (ξ : CtxId) (pd : PAddr) (i h : Nat) :
+    slotCells (GF := GF) γ ξ pd i (.member h) = iprop(opsWin ξ i ∗ infoWin ξ i) := rfl
 
 theorem freeByte_inactive : freeByte .inactive = 1#8 := rfl
 theorem freeByte_active (c : Chain) : freeByte (.active c) = 0#8 := rfl
 theorem freeByte_member (h : Nat) : freeByte (.member h) = 0#8 := rfl
 
 /-- **The payload's slot body is its `free` byte beside its cells.** -/
-theorem slotBody_open (ξ : CtxId) (pd : PAddr) (i : Nat) (s : HState) :
-    slotBody (GF := GF) ξ pd i s ⊢
-      wordAtN ξ (aFree i) 1 (DFrac.own 1) (freeByte s) ∗ slotCells ξ pd i s := by
+theorem slotBody_open (γ : DiskNames) (ξ : CtxId) (pd : PAddr) (i : Nat) (s : HState) :
+    slotBody (GF := GF) γ ξ pd i s ⊢
+      wordAtN ξ (aFree i) 1 (DFrac.own 1) (freeByte s) ∗ slotCells γ ξ pd i s := by
   cases s with
   | inactive => rw [slotBody_inactive, freeByte_inactive, slotCells_inactive]
   | active c => rw [slotBody_active, freeByte_active, slotCells_active]
   | member hh =>
     rw [slotBody_member, freeByte_member, slotCells_member]
 
-theorem slotBody_close (ξ : CtxId) (pd : PAddr) (i : Nat) (s : HState) :
-    wordAtN (GF := GF) ξ (aFree i) 1 (DFrac.own 1) (freeByte s) ∗ slotCells ξ pd i s ⊢
-      slotBody ξ pd i s := by
+theorem slotBody_close (γ : DiskNames) (ξ : CtxId) (pd : PAddr) (i : Nat) (s : HState) :
+    wordAtN (GF := GF) ξ (aFree i) 1 (DFrac.own 1) (freeByte s) ∗ slotCells γ ξ pd i s ⊢
+      slotBody γ ξ pd i s := by
   cases s with
   | inactive => rw [slotBody_inactive, freeByte_inactive, slotCells_inactive]
   | active c => rw [slotBody_active, freeByte_active, slotCells_active]
@@ -134,11 +134,11 @@ theorem slotAlloc_true (γ : DiskNames) (ξ : CtxId) (pd : PAddr) (i : Nat) :
 def slotOpen (γ : DiskNames) (ξ : CtxId) (pd : PAddr) (i : Nat) (b : Bool) (v : BitVec 8) :
     IProp GF :=
   cond b iprop(⌜v = 0#8⌝)
-    iprop(∃ s : HState, ⌜v = freeByte s⌝ ∗ slotTok γ i s ∗ slotCells ξ pd i s)
+    iprop(∃ s : HState, ⌜v = freeByte s⌝ ∗ slotTok γ i s ∗ slotCells γ ξ pd i s)
 
 theorem slotOpen_false (γ : DiskNames) (ξ : CtxId) (pd : PAddr) (i : Nat) (v : BitVec 8) :
     slotOpen (GF := GF) γ ξ pd i false v =
-      iprop(∃ s : HState, ⌜v = freeByte s⌝ ∗ slotTok γ i s ∗ slotCells ξ pd i s) := rfl
+      iprop(∃ s : HState, ⌜v = freeByte s⌝ ∗ slotTok γ i s ∗ slotCells γ ξ pd i s) := rfl
 theorem slotOpen_true (γ : DiskNames) (ξ : CtxId) (pd : PAddr) (i : Nat) (v : BitVec 8) :
     slotOpen (GF := GF) γ ξ pd i true v = iprop(⌜v = 0#8⌝) := rfl
 
@@ -162,7 +162,7 @@ theorem slotAlloc_open (γ : DiskNames) (ξ : CtxId) (pd : PAddr) (i : Nat) (b :
     rw [slotAlloc_false]
     unfold slotRes
     iintro ⟨%s, H, Hb⟩
-    icases slotBody_open ξ pd i s $$ Hb with ⟨Hv, Hc⟩
+    icases slotBody_open γ ξ pd i s $$ Hb with ⟨Hv, Hc⟩
     iexists (freeByte s)
     isplitl []
     · ipureintro
@@ -198,7 +198,7 @@ theorem slotAlloc_shut (γ : DiskNames) (ξ : CtxId) (pd : PAddr) (i : Nat) (b :
     iexists s
     isplitl [H]
     · iexact H
-    iapply slotBody_close ξ pd i s
+    iapply slotBody_close γ ξ pd i s
     iframe Hv Hc
 
 /-- ... or taken: with the byte cleared, a slot whose byte read `1` is a
@@ -244,8 +244,8 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG 
 `tk = fun _ => false` it IS `Xv6.diskRes`. -/
 def diskResA (γ : DiskNames) (pd pav pu : PAddr) (ξ : CtxId) (tk : Nat → Bool) : IProp GF := iprop%
   ∃ (np nr : Nat) (stg : Option Nat) (ring : Nat → Nat),
-    diskPub γ np ∗ diskReadAt γ nr ∗ diskStage γ stg ∗ diskDoneLb γ nr ∗
-    diskPayWm γ nr ξ ∗
+    diskPub γ np ∗ diskReadAt γ nr ∗ diskReadLbAuth γ nr ∗ diskStage γ stg ∗
+    diskDoneLb γ nr ∗ diskPayWm γ nr ξ ∗
     wordAtN ξ aUsedIdx 2 (DFrac.own 1) (wrap16 nr) ∗
     ctxBytes ξ (availIdxAt pav) 2 (DFrac.own (1 : Qp).half) (wrap16 np) ∗
     ([∗list] j ∈ List.range NUM,
@@ -263,7 +263,7 @@ theorem diskResA_slot_acc (γ : DiskNames) (pd pav pu : PAddr) (ξ : CtxId) (tk 
       slotAlloc γ ξ pd i (tk i) ∗
       (∀ b : Bool, slotAlloc γ ξ pd i b -∗ diskResA γ pd pav pu ξ (updB tk i b)) := by
   unfold diskResA
-  iintro ⟨%np, %nr, %stg, %ring, Hp, Hr, Hs, Hlb, Hwmp, Hu, Hidx, Hring, Hsl⟩
+  iintro ⟨%np, %nr, %stg, %ring, Hp, Hr, Hrl, Hs, Hlb, Hwmp, Hu, Hidx, Hring, Hsl⟩
   icases bigSepL_upd_acc (GF := GF) (List.range NUM) i i (by rw [List.getElem?_range hi])
       (fun k => slotAlloc γ ξ pd k (tk k))
       (fun (b : Bool) k => slotAlloc γ ξ pd k (updB tk i b k))
@@ -279,7 +279,7 @@ theorem diskResA_slot_acc (γ : DiskNames) (pd pav pu : PAddr) (ξ : CtxId) (tk 
     rw [updB_self]) $$ Hc'
   ihave Hsl := Hback $$ %b Hc'
   iexists np, nr, stg, ring
-  iframe Hp Hr Hs Hlb Hwmp Hu Hidx Hring Hsl
+  iframe Hp Hr Hrl Hs Hlb Hwmp Hu Hidx Hring Hsl
 
 /-- **The `free` byte of slot `i`, read out of the mid-allocation
 payload.** -/
@@ -345,7 +345,7 @@ the slot re-enters the payload. -/
 theorem diskResA_give (γ : DiskNames) (pd pav pu : PAddr) (ξ : CtxId) (tk : Nat → Bool)
     (i : Nat) (s : HState) :
     slotTok (GF := GF) γ i s ∗ wordAtN ξ (aFree i) 1 (DFrac.own 1) (freeByte s) ∗
-    slotCells ξ pd i s ∗
+    slotCells γ ξ pd i s ∗
     (∀ b : Bool, slotAlloc γ ξ pd i b -∗ diskResA γ pd pav pu ξ (updB tk i b)) ⊢
       diskResA γ pd pav pu ξ (updB tk i false) := by
   iintro ⟨H, Hv, Hc, Hback⟩
@@ -355,7 +355,7 @@ theorem diskResA_give (γ : DiskNames) (pd pav pu : PAddr) (ξ : CtxId) (tk : Na
   iexists s
   isplitl [H]
   · iexact H
-  iapply slotBody_close ξ pd i s
+  iapply slotBody_close γ ξ pd i s
   iframe Hv Hc
 
 /-- Giving back a slot `free_desc` has just zeroed. -/

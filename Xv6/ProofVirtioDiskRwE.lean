@@ -218,7 +218,7 @@ theorem vdrw_P5_loop (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SL
     $$ [Hpay Hkh] with ⟨Hpay, Hth, Hcl⟩
   · iframe Hpay Hkh
   isimp only [slotCells_active] at Hcl
-  icases claimRes_disk_acc pd c $$ Hcl with ⟨%d, Hdsk, Hcback⟩
+  icases claimRes_disk_acc γ pd c $$ Hcl with ⟨%d, Hdsk, #Hdn, Hcback⟩
   k_step (wp_s_lw cpu2 _ (KA.«virtio_disk_rw» + 0x1ca#64) false 4#12 15#5 19#5 (by decide)
       (by decide) (DFrac.own 1) d)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -232,7 +232,9 @@ theorem vdrw_P5_loop (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SL
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [vdrwK_sie, h18_3, vdrw5_beq_one_eq]
     iintro Hk Hpc
-    ihave Hcl := Hcback $$ %1#32 Hdsk
+    ihave #Hone : iprop(claimDone (GF := GF) γ c 1#32) $$ []
+    · iapply claimDone_one γ c
+    ihave Hcl := Hcback $$ %1#32 Hdsk Hone
     icases headTok_toQ γ c.hd (.active c) $$ Hth with ⟨Hth, Hkh⟩
     ihave Hpay := diskResA_seat γ pd pav pu curCtx (updB (fun _ => false) c.hd true) c.hd hh
         (updB_self_true c.hd) (.active c) rfl $$ [Hpay Hth Hcl]
@@ -263,9 +265,10 @@ theorem vdrw_P5_loop (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SL
     · ipureintro
       refine ⟨?_, hcwf, hbp', hblk⟩
       exact hR6_3
-    iexists d
-    iframe Hdsk Hcback
-    ipureintro; exact hd1
+    icases claimDone_ne_one γ c d hd1 $$ Hdn with ⟨%hd0, #Hev⟩
+    subst hd0
+    ihave Hcl := Hcback $$ %0#32 Hdsk Hdn
+    iframe Hcl Hev
 
 set_option maxHeartbeats 8000000 in
 /-- **P5.**  From `Xv6.vdrwP4Exit` to `Xv6.vdrwP5Exit`. -/
@@ -300,7 +303,7 @@ theorem vdrw_P5 (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
     $$ [Hpay Hkh] with ⟨Hpay, Hth, Hcl⟩
   · iframe Hpay Hkh
   isimp only [slotCells_active] at Hcl
-  icases claimRes_disk_acc pd c $$ Hcl with ⟨%d, Hdsk, Hcback⟩
+  icases claimRes_disk_acc γ pd c $$ Hcl with ⟨%d, Hdsk, #Hdn, Hcback⟩
   -- +0x1a2  lw a5,4(s3)
   k_step (wp_s_lw cpu _ (KA.«virtio_disk_rw» + 0x1a2#64) false 4#12 15#5 19#5 (by decide)
       (by decide) (DFrac.own 1) d)
@@ -327,7 +330,9 @@ theorem vdrw_P5 (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [vdrwK_sie, ha1, vdrw5_bne_one_eq]
     iintro Hk Hpc
-    ihave Hcl := Hcback $$ %1#32 Hdsk
+    ihave #Hone : iprop(claimDone (GF := GF) γ c 1#32) $$ []
+    · iapply claimDone_one γ c
+    ihave Hcl := Hcback $$ %1#32 Hdsk Hone
     icases headTok_toQ γ c.hd (.active c) $$ Hth with ⟨Hth, Hkh⟩
     ihave Hpay := diskResA_seat γ pd pav pu curCtx (updB (fun _ => false) c.hd true) c.hd hh
         (updB_self_true c.hd) (.active c) rfl $$ [Hpay Hth Hcl]
@@ -365,9 +370,10 @@ theorem vdrw_P5 (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
       refine ⟨?_, hcwf, hbp, hblk⟩
       try simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
       try exact hR6
-    iexists d
-    iframe Hdsk Hcback
-    ipureintro; exact hd1
+    icases claimDone_ne_one γ c d hd1 $$ Hdn with ⟨%hd0, #Hev⟩
+    subst hd0
+    ihave Hcl := Hcback $$ %0#32 Hdsk Hdn
+    iframe Hcl Hev
 
 end
 

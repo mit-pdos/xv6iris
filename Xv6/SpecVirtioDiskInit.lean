@@ -90,7 +90,8 @@ the `DRIVER_OK` write deposits into the invariant and the lock payload
 def diskInitGhosts {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
     (γ : DiskNames) : IProp GF := iprop%
   ([∗list] i ∈ List.range NUM, headAuth γ i .inactive ∗ headTok γ i .inactive) ∗
-  diskPubAuth γ 0 ∗ diskPub γ 0 ∗ diskReadAt γ 0 ∗ diskStage γ none ∗ diskDoneAuth γ 0
+  diskPubAuth γ 0 ∗ diskPub γ 0 ∗ diskReadAt γ 0 ∗ diskReadLbAuth γ 0 ∗
+  diskStage γ none ∗ diskDoneAuth γ 0
 
 /-- **WP of `virtio_disk_init`.**  The invariant is DEAD on entry (the
 device was never programmed); `c0` is the configuration the tracker holds. -/

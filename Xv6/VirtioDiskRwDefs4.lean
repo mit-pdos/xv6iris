@@ -21,7 +21,7 @@ and P6 the collect
 
 ### WHAT THE LANDED SEAMS DO NOT SAY (`Xv6.VDRW_OPEN`)
 
-Two facts the phases need are not in the frozen vocabulary; each is a
+One fact the phases need is not in the frozen vocabulary; it is the one
 field of `Xv6.VDRW_OPEN`, stated so that the phase is otherwise complete
 and the field falls away with the frozen-file change its doc names.
 
@@ -32,14 +32,18 @@ that P3 stored into `b->disk` at `+0x16e`.  That USED to be a field
 and nothing between there and `+0x176` writes `a1`) and carried by P4
 (`+0x176 .. +0x1a2` writes only `a3`/`a4`/`a5`).
 
-* `Xv6.VDRW_OPEN.claim_done`.  `Xv6.claimRes` carries `b->disk` at an
-  EXISTENTIAL value (see its doc), so observing `b->disk /= 1` says
-  nothing.  Rocq's `claim_cells` pins it: `b->disk = 1` while the request
-  is in flight, or `b->disk = 0` beside the completion record of THIS
-  arming.  That record is exactly what
-  `Xv6.DISK_ACC_ASSUMPTIONS.disk_collect` takes as its premise
-  (`Xv6.headDoneE` at the chain's epoch, and `n <= nr` for the TSO
-  credential), so the field is the disjunction in accessor form.
+`Xv6.claimRes` USED to carry `b->disk` at an existential value, so that
+observing `b->disk /= 1` said nothing and `claim_done` had to be assumed.
+It now carries Rocq's `claim_cells` itself (`Xv6.claimDone`): `b->disk =
+1` while the request is in flight, or `b->disk = 0` beside the completion
+record of THIS arming (`Xv6.headDoneE` at the chain's epoch) and the
+persistent watermark bound `Xv6.diskReadLb` that says the handler has
+READ it.  `virtio_disk_intr` deposits the row at `disk.used_idx += 1`,
+two steps after its `b->disk = 0`, under one hold of `vdisk_lock`; P5
+cashes it at the loop test and P6 turns the bound into
+`Xv6.DISK_ACC_ASSUMPTIONS.disk_collect`'s `n <= nr` against the payload's
+own authority (`Xv6.diskReadLbAuth`, in `Xv6.diskRes`).
+
 * `Xv6.VDRW_OPEN.collect_pin`.  `disk_collect` hands `b->disk` and the
   block back at EXISTENTIAL values -- the invariant's `Xv6.bufLease` is
   `Xv6.dmaOwn`, the gap the section head of `Xv6/DiskAcc.lean` calls the
@@ -137,16 +141,16 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG 
 against, with the TSO credential beside it. -/
 theorem diskResA_readAt_acc (γ : DiskNames) (pd pav pu : PAddr) (ξ : CtxId) (tk : Nat → Bool) :
     diskResA (GF := GF) γ pd pav pu ξ tk ⊢ ∃ nr : Nat,
-      diskReadAt γ nr ∗ diskPayWm γ nr ξ ∗
-      (diskReadAt γ nr -∗ diskResA γ pd pav pu ξ tk) := by
+      diskReadAt γ nr ∗ diskPayWm γ nr ξ ∗ diskReadLbAuth γ nr ∗
+      (diskReadAt γ nr -∗ diskReadLbAuth γ nr -∗ diskResA γ pd pav pu ξ tk) := by
   iintro HR
   icases diskResA_open γ pd pav pu ξ tk $$ HR
-    with ⟨%np, %nr, %stg, %ring, Hp, Hr, Hs, Hlb, #Hwmp, Hu, Hidx, Hring, Hsl⟩
+    with ⟨%np, %nr, %stg, %ring, Hp, Hr, Hrl, Hs, Hlb, #Hwmp, Hu, Hidx, Hring, Hsl⟩
   iexists nr
-  iframe Hr Hwmp
-  iintro Hr
+  iframe Hr Hwmp Hrl
+  iintro Hr Hrl
   iapply diskResA_close γ pd pav pu ξ tk np nr stg ring
-  iframe Hp Hr Hs Hlb Hwmp Hu Hidx Hring Hsl
+  iframe Hp Hr Hrl Hs Hlb Hwmp Hu Hidx Hring Hsl
 
 /-- **Taking out a slot the caller holds a QUARTER of.**  The quarter and
 the payload's agree, the two join into the driver's half, and what stays
@@ -155,7 +159,7 @@ This is `Xv6.diskResA_take` for a slot that is already TAKEN. -/
 theorem diskResA_grabQ (γ : DiskNames) (pd pav pu : PAddr) (ξ : CtxId) (tk : Nat → Bool)
     (i : Nat) (s : HState) (hi : i < NUM) (htk : tk i = false) (hs : freeByte s = 0#8) :
     diskResA (GF := GF) γ pd pav pu ξ tk ∗ headTokQ γ i s ⊢
-      diskResA γ pd pav pu ξ (updB tk i true) ∗ headTok γ i s ∗ slotCells ξ pd i s := by
+      diskResA γ pd pav pu ξ (updB tk i true) ∗ headTok γ i s ∗ slotCells γ ξ pd i s := by
   iintro ⟨HR, Hq⟩
   icases diskResA_slot_acc γ pd pav pu ξ tk i hi $$ HR with ⟨Hs0, Hback⟩
   rw [htk, slotAlloc_false]
@@ -164,7 +168,7 @@ theorem diskResA_grabQ (γ : DiskNames) (pd pav pu : PAddr) (ξ : CtxId) (tk : N
   icases slotTok_quarter_join γ i s1 s $$ [Ht Hq] with ⟨%he, Ht⟩
   · iframe Ht Hq
   subst he
-  icases slotBody_open ξ pd i s1 $$ Hb with ⟨Hv, Hc⟩
+  icases slotBody_open γ ξ pd i s1 $$ Hb with ⟨Hv, Hc⟩
   isplitl [Hv Hback]
   · iapply Hback $$ %true
     rw [slotAlloc_true, ← hs]
@@ -174,21 +178,23 @@ theorem diskResA_grabQ (γ : DiskNames) (pd pav pu : PAddr) (ξ : CtxId) (tk : N
 /-- **`b->disk`, borrowed out of the claim and given back at whatever the
 loop test found.**  `Xv6.claimRes_bufDisk_acc` only takes the cell back
 at `0`; the sleeper's loop test also has to put it back at `1`. -/
-theorem claimRes_disk_acc (pd : PAddr) (c : Chain) :
-    claimRes (GF := GF) curCtx pd c ⊢ ∃ d : BitVec 32,
-      wordPointsTo (aBufDisk c.bp) 4 (DFrac.own 1) d ∗
-      (∀ d' : BitVec 32,
-        wordPointsTo (aBufDisk c.bp) 4 (DFrac.own 1) d' -∗ claimRes curCtx pd c) := by
+theorem claimRes_disk_acc (γ : DiskNames) (pd : PAddr) (c : Chain) :
+    claimRes (GF := GF) γ curCtx pd c ⊢ ∃ d : BitVec 32,
+      wordPointsTo (aBufDisk c.bp) 4 (DFrac.own 1) d ∗ claimDone γ c d ∗
+      (∀ d' : BitVec 32, wordPointsTo (aBufDisk c.bp) 4 (DFrac.own 1) d' -∗
+        claimDone γ c d' -∗ claimRes γ curCtx pd c) := by
   unfold claimRes
-  iintro ⟨H0, H1, H2, H3, Hb, %d, Hdsk⟩
+  iintro ⟨H0, H1, H2, H3, Hb, %d, Hdsk, #Hdn⟩
   iexists d
+  iframe Hdn
   isplitl [Hdsk]
   · iapply (show wordAtN (GF := GF) curCtx (aBufDisk c.bp) 4 (DFrac.own 1) d ⊢
       wordPointsTo (aBufDisk c.bp) 4 (DFrac.own 1) d from by rw [wordAtN_cur])
     iexact Hdsk
-  iintro %d' Hdsk2
+  iintro %d' Hdsk2 #Hdn2
   iframe H0 H1 H2 H3 Hb
   iexists d'
+  iframe Hdn2
   iapply (show wordPointsTo (GF := GF) (aBufDisk c.bp) 4 (DFrac.own 1) d' ⊢
     wordAtN curCtx (aBufDisk c.bp) 4 (DFrac.own 1) d' from by rw [wordAtN_cur])
   iexact Hdsk2
@@ -338,13 +344,14 @@ theorem vdrwP5Loop_self (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
 /-- **The seam between P5 and P6** (`virtio_disk_rw + 0x1d2`, the `lw` of
 `idx[0]`): the loop test has seen `b->disk /= 1`.
 
-The head's slot is still OPEN across the seam, because the value the
-sleeper read is what `Xv6.VDRW_OPEN.claim_done` turns into the collect's
-premises, and `Xv6.claimRes` would swallow it again: what the seam
-carries is the chain's row minus `b->disk` (as the accessor's wand), the
-cell itself at the value the test found, and the rest of the payload with
-the head marked TAKEN.  The middle's and the tail's quarters are
-untouched; P6 takes their slots out when it has the head's. -/
+The head's slot is still OPEN across the seam: the seam carries the
+chain's whole claim row (`Xv6.claimRes`, the cell back at the `0` the
+test found) BESIDE the evidence the test earned -- the epoch-indexed
+completion record of this arming and its persistent watermark bound,
+both PERSISTENT, which is why closing the row does not swallow them --
+and the rest of the payload with the head marked TAKEN.  The middle's and
+the tail's quarters are untouched; P6 takes their slots out when it has
+the head's. -/
 def vdrwP5Exit (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64)
     (bno : BitVec 32) (dataBuf dataDisk : List (BitVec 8)) (wr : Bool)
@@ -355,9 +362,7 @@ def vdrwP5Exit (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   vdrwCaps γ γl pd pav pu ∗ locked γl cpu ∗
   diskResA γ pd pav pu curCtx (updB (fun _ => false) c.hd true) ∗
   headTok γ c.hd (.active c) ∗
-  (∃ d : BitVec 32, ⌜d ≠ 1#32⌝ ∗ wordPointsTo (aBufDisk c.bp) 4 (DFrac.own 1) d ∗
-    (∀ d' : BitVec 32,
-      wordPointsTo (aBufDisk c.bp) 4 (DFrac.own 1) d' -∗ claimRes curCtx pd c)) ∗
+  claimRes γ curCtx pd c ∗ (∃ n : Nat, headDoneE γ n c.hd c.ep ∗ diskReadLb γ n) ∗
   headTokQ γ c.md (.member c.hd) ∗ headTokQ γ c.tl (.member c.hd) ∗
   wordPointsTo (aBufBlockno c.bp) 4 (DFrac.own 1) bno ∗
   vdrwSaved k ∗
@@ -397,9 +402,7 @@ theorem vdrwP5Exit_intro (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     vdrwCaps γ γl pd pav pu ∗ locked γl cpu ∗
     diskResA γ pd pav pu curCtx (updB (fun _ => false) c.hd true) ∗
     headTok γ c.hd (.active c) ∗
-    (∃ d : BitVec 32, ⌜d ≠ 1#32⌝ ∗ wordPointsTo (aBufDisk c.bp) 4 (DFrac.own 1) d ∗
-      (∀ d' : BitVec 32,
-        wordPointsTo (aBufDisk c.bp) 4 (DFrac.own 1) d' -∗ claimRes curCtx pd c)) ∗
+    claimRes γ curCtx pd c ∗ (∃ n : Nat, headDoneE γ n c.hd c.ep ∗ diskReadLb γ n) ∗
     headTokQ γ c.md (.member c.hd) ∗ headTokQ γ c.tl (.member c.hd) ∗
     wordPointsTo (aBufBlockno c.bp) 4 (DFrac.own 1) bno ∗
     vdrwSaved k ∗
@@ -424,28 +427,10 @@ end seam
 
 /-! ## What the landed seams and the frozen accessors do not say -/
 
-/-- **The three open facts of the completion wait.**  Each field is
-stated at the point of use, gives every resource back, and names the
-frozen-file change that retires it; the header of this file sets them
-out. -/
+/-- **The one open fact of the completion wait.**  It is stated at the
+point of use, gives every resource back, and names the frozen-file change
+that retires it; the header of this file sets it out. -/
 structure VDRW_OPEN : Prop where
-  /-- **Rocq's `claim_cells`**: while the chain is armed, `b->disk` is `1`,
-  or it is `0` and the handler has recorded the completion of THIS arming
-  (`Xv6.headDoneE` at the chain's epoch) at a counter it has read.
-  RETIRED BY: replacing `Xv6.claimRes`'s existential `d` with the
-  disjunction `d = 1 ∨ (d = 0 ∧ ∃ n, headDoneE γ n c.hd c.ep)` against the
-  payload's watermark -- which is what `Xv6.diskRes` would
-  have to thread into the slot, the way `Xv6.diskPayWm` threads the TSO
-  credential -- and `Xv6.virtio_disk_intr` restoring the row only after
-  `disk.used_idx += 1` (it already stores `b->disk = 0`, wakes and
-  deposits under one hold of `vdisk_lock`). -/
-  claim_done : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
-      [CurCtx] (γ : DiskNames) (c : Chain) (nr : Nat) (d : BitVec 32), d ≠ 1#32 →
-    diskInv (GF := GF) γ ∗ diskReadAt γ nr ∗ headTok γ c.hd (.active c) ∗
-      wordPointsTo (aBufDisk c.bp) 4 (DFrac.own 1) d ⊢
-      ⌜d = 0#32⌝ ∗ diskReadAt γ nr ∗ headTok γ c.hd (.active c) ∗
-        wordPointsTo (aBufDisk c.bp) 4 (DFrac.own 1) d ∗
-        (∃ n : Nat, ⌜n ≤ nr⌝ ∗ headDoneE γ n c.hd c.ep)
   /-- **The two EXISTENTIALS in `disk_collect`'s conclusion, pinned.**
   The accessor hands `b->disk` back at an existential value and `b->data`
   with the block's image fragment at one existential list; the spec's post

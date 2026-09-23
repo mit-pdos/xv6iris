@@ -222,7 +222,7 @@ theorem vdrw_P4 (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   -- the payload, sealed
   ihave Hpay := Hclose $$ %(np + 1) %c.hd %none Hpub Hstg Hidx Hring
   isimp only [← wordAtN_cur] at Hdsk
-  ihave Hclaim : iprop(claimRes (GF := GF) curCtx pd ({ c with ep := np } : Chain))
+  ihave Hclaim : iprop(claimRes (GF := GF) γ curCtx pd ({ c with ep := np } : Chain))
     $$ [Hc0 Hc1 Hc2 Hch Hib Hdsk]
   · unfold claimRes
     isimp only [Chain.withEp_hd, Chain.withEp_md, Chain.withEp_tl, Chain.withEp_data,
@@ -230,7 +230,9 @@ theorem vdrw_P4 (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       Chain.withEp_d0, Chain.withEp_d1, Chain.withEp_d2, Chain.withEp_hdr]
     iframe Hc0 Hc1 Hc2 Hch Hib
     iexists 1#32
-    iexact Hdsk
+    isplitl [Hdsk]
+    · iexact Hdsk
+    iapply claimDone_one γ ({ c with ep := np } : Chain)
   icases diskResSeal γ pd pav pu ({ c with ep := np } : Chain)
       ((Chain.withEp_wf c np).2 hcwf)
     $$ [Hpay Hth Hclaim Htm Hom Hinfm Htt Hot Hinft] with ⟨Hres, Hkh, Hkm, Hkt⟩

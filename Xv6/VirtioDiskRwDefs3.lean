@@ -237,8 +237,8 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG 
 theorem diskResA_open (γ : DiskNames) (pd pav pu : PAddr) (ξ : CtxId) (tk : Nat → Bool) :
     diskResA (GF := GF) γ pd pav pu ξ tk ⊢
       ∃ (np nr : Nat) (stg : Option Nat) (ring : Nat → Nat),
-      diskPub γ np ∗ diskReadAt γ nr ∗ diskStage γ stg ∗ diskDoneLb γ nr ∗
-      diskPayWm γ nr ξ ∗
+      diskPub γ np ∗ diskReadAt γ nr ∗ diskReadLbAuth γ nr ∗ diskStage γ stg ∗
+      diskDoneLb γ nr ∗ diskPayWm γ nr ξ ∗
       wordAtN ξ aUsedIdx 2 (DFrac.own 1) (wrap16 nr) ∗
       ctxBytes ξ (availIdxAt pav) 2 (DFrac.own (1 : Qp).half) (wrap16 np) ∗
       ([∗list] j ∈ List.range NUM,
@@ -250,8 +250,8 @@ theorem diskResA_open (γ : DiskNames) (pd pav pu : PAddr) (ξ : CtxId) (tk : Na
 
 theorem diskResA_close (γ : DiskNames) (pd pav pu : PAddr) (ξ : CtxId) (tk : Nat → Bool)
     (np nr : Nat) (stg : Option Nat) (ring : Nat → Nat) :
-    diskPub (GF := GF) γ np ∗ diskReadAt γ nr ∗ diskStage γ stg ∗ diskDoneLb γ nr ∗
-      diskPayWm γ nr ξ ∗
+    diskPub (GF := GF) γ np ∗ diskReadAt γ nr ∗ diskReadLbAuth γ nr ∗ diskStage γ stg ∗
+      diskDoneLb γ nr ∗ diskPayWm γ nr ξ ∗
       wordAtN ξ aUsedIdx 2 (DFrac.own 1) (wrap16 nr) ∗
       ctxBytes ξ (availIdxAt pav) 2 (DFrac.own (1 : Qp).half) (wrap16 np) ∗
       ([∗list] j ∈ List.range NUM,
@@ -263,12 +263,12 @@ theorem diskResA_close (γ : DiskNames) (pd pav pu : PAddr) (ξ : CtxId) (tk : N
   iexists np, nr, stg, ring
   iexact H
 
-theorem slotCells_active' (ξ : CtxId) (pd : PAddr) (c : Chain) :
-    claimRes (GF := GF) ξ pd c ⊢ slotCells ξ pd c.hd (.active c) := by
+theorem slotCells_active' (γ : DiskNames) (ξ : CtxId) (pd : PAddr) (c : Chain) :
+    claimRes (GF := GF) γ ξ pd c ⊢ slotCells γ ξ pd c.hd (.active c) := by
   rw [slotCells_active]
 
-theorem slotCells_member' (ξ : CtxId) (pd : PAddr) (i h : Nat) :
-    opsWin (GF := GF) ξ i ⊢ infoWin ξ i -∗ slotCells ξ pd i (.member h) := by
+theorem slotCells_member' (γ : DiskNames) (ξ : CtxId) (pd : PAddr) (i h : Nat) :
+    opsWin (GF := GF) ξ i ⊢ infoWin ξ i -∗ slotCells γ ξ pd i (.member h) := by
   rw [slotCells_member]
   iintro H1 H2
   iframe H1 H2
@@ -290,7 +290,7 @@ theorem diskResA_pub_open (γ : DiskNames) (pd pav pu : PAddr) (ξ : CtxId) (tk 
           diskResA γ pd pav pu ξ tk) := by
   iintro HR
   icases diskResA_open γ pd pav pu ξ tk $$ HR
-    with ⟨%np, %nr, %stg, %ring, Hp, Hr, Hs, Hlb, Hwmp, Hu, Hidx, Hring, Hsl⟩
+    with ⟨%np, %nr, %stg, %ring, Hp, Hr, Hrl, Hs, Hlb, Hwmp, Hu, Hidx, Hring, Hsl⟩
   icases bigSepL_upd_acc (GF := GF) (List.range NUM) (np % NUM) (np % NUM)
       (by rw [List.getElem?_range (mod_NUM_lt np)])
       (fun k => ctxBytes ξ (availRingAt pav k) 2 (DFrac.own (1 : Qp).half)
@@ -313,14 +313,14 @@ theorem diskResA_pub_open (γ : DiskNames) (pd pav pu : PAddr) (ξ : CtxId) (tk 
         (BitVec.ofNat 16 (updN ring (np % NUM) y (np % NUM))) from by rw [updN_self]) $$ Hc'
   ihave Hring := Hback $$ %y Hc'
   iapply diskResA_close γ pd pav pu ξ tk np' nr stg' (updN ring (np % NUM) y)
-  iframe Hp' Hr Hs' Hlb Hwmp Hu Hidx' Hring Hsl
+  iframe Hp' Hr Hrl Hs' Hlb Hwmp Hu Hidx' Hring Hsl
 
 /-- **Putting a TAKEN slot back at a new receipt.**  The byte is already
 `0` in the payload (`Xv6.slotAlloc _ _ _ _ true`), so all that comes back
 is the receipt and the slot's cells. -/
 theorem diskResA_seat (γ : DiskNames) (pd pav pu : PAddr) (ξ : CtxId) (tk : Nat → Bool)
     (i : Nat) (hi : i < NUM) (ht : tk i = true) (s : HState) (hs : freeByte s = 0#8) :
-    diskResA (GF := GF) γ pd pav pu ξ tk ∗ slotTok γ i s ∗ slotCells ξ pd i s ⊢
+    diskResA (GF := GF) γ pd pav pu ξ tk ∗ slotTok γ i s ∗ slotCells γ ξ pd i s ⊢
       diskResA γ pd pav pu ξ (updB tk i false) := by
   iintro ⟨HR, Htok, Hc⟩
   icases diskResA_slot_acc γ pd pav pu ξ tk i hi $$ HR with ⟨Hs0, Hback⟩
@@ -346,16 +346,16 @@ tail become members of it, and `Xv6.diskResA` at `Xv6.tk3 h m t` is
 `Xv6.diskRes` again. -/
 theorem diskResSeal (γ : DiskNames) (pd pav pu : PAddr) (c : Chain) (hwf : c.wf) :
     diskResA (GF := GF) γ pd pav pu curCtx (tk3 c.hd c.md c.tl) ∗
-      headTok γ c.hd (.active c) ∗ claimRes curCtx pd c ∗
+      headTok γ c.hd (.active c) ∗ claimRes γ curCtx pd c ∗
       headTok γ c.md (.member c.hd) ∗ opsWin curCtx c.md ∗ infoWin curCtx c.md ∗
       headTok γ c.tl (.member c.hd) ∗ opsWin curCtx c.tl ∗ infoWin curCtx c.tl ⊢
       diskRes γ pd pav pu curCtx ∗ headTokQ γ c.hd (.active c) ∗
       headTokQ γ c.md (.member c.hd) ∗ headTokQ γ c.tl (.member c.hd) := by
   obtain ⟨hh, hm, ht, e1, e2, e3, -⟩ := hwf
   iintro ⟨HR, Hth, Hch, Htm, Hcm, Him, Htt, Hct, Hit⟩
-  ihave Hch := slotCells_active' curCtx pd c $$ Hch
-  ihave Hcm := slotCells_member' curCtx pd c.md c.hd $$ Hcm Him
-  ihave Hct := slotCells_member' curCtx pd c.tl c.hd $$ Hct Hit
+  ihave Hch := slotCells_active' γ curCtx pd c $$ Hch
+  ihave Hcm := slotCells_member' γ curCtx pd c.md c.hd $$ Hcm Him
+  ihave Hct := slotCells_member' γ curCtx pd c.tl c.hd $$ Hct Hit
   icases headTok_toQ γ c.hd (.active c) $$ Hth with ⟨Hth, Hkh⟩
   icases headTok_toQ γ c.md (.member c.hd) $$ Htm with ⟨Htm, Hkm⟩
   icases headTok_toQ γ c.tl (.member c.hd) $$ Htt with ⟨Htt, Hkt⟩

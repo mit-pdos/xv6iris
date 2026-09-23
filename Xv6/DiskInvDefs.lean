@@ -209,6 +209,13 @@ structure DiskNames where
   lo : GName
   /-- the handler watermark (`disk.used_idx`) -/
   nr : GName
+  /-- the handler watermark AGAIN, as a MONOTONE counter: `nr` only grows,
+  and a persistent lower bound on it is the only thing that can carry
+  "the handler had read this completion" out of the interrupt handler and
+  into the claim row of a chain that is still armed (`Xv6.claimRes`).  The
+  AUTHORITY lives in the LOCK PAYLOAD beside `Xv6.diskReadAt`, because the
+  watermark moves only under `disk.vdisk_lock` -/
+  nrlb : GName
   /-- the head staged between the ring store and the index bump -/
   stage : GName
   /-- the serve permits -/
@@ -589,6 +596,61 @@ theorem diskDoneAuth_lb (γ : DiskNames) (n : Nat) :
     (by simp only [MaxNat.le_toNat]; omega) $$ H with ⟨H1, H2⟩
   imodintro
   iframe H1 H2
+
+/-- **The handler watermark, as a MONOTONE counter: the AUTHORITY**, which
+the lock payload holds beside `Xv6.diskReadAt` (the watermark moves only
+under `disk.vdisk_lock`, at `Xv6.disk_deposit`). -/
+def diskReadLbAuth (γ : DiskNames) (n : Nat) : IProp GF :=
+  MonoNat.auth_own γ.nrlb (DFrac.own 1) (.ofNat n)
+
+/-- **The handler has READ at least `n` completions** (persistent): Rocq's
+`u < nr` side of `claim_cells`, carried out of the handler's loop body and
+into the armed chain's claim row (`Xv6.claimRes`), where it survives the
+sleeper's park and its re-acquisition of the lock. -/
+def diskReadLb (γ : DiskNames) (n : Nat) : IProp GF := MonoNat.lb_own γ.nrlb (.ofNat n)
+
+instance diskReadLb_persistent (γ : DiskNames) (n : Nat) :
+    Persistent (diskReadLb (GF := GF) γ n) := by unfold diskReadLb; infer_instance
+
+instance diskReadLbAuth_timeless (γ : DiskNames) (n : Nat) :
+    Timeless (diskReadLbAuth (GF := GF) γ n) := by unfold diskReadLbAuth; infer_instance
+
+/-- The watermark's authority yields its persistent lower bound. -/
+theorem diskReadLbAuth_lb (γ : DiskNames) (n : Nat) :
+    diskReadLbAuth (GF := GF) γ n ⊢ |==> (diskReadLbAuth γ n ∗ diskReadLb γ n) := by
+  unfold diskReadLbAuth diskReadLb
+  iintro H
+  imod MonoNat.own_update γ.nrlb (.ofNat n) (.ofNat n)
+    (by simp only [MaxNat.le_toNat]; omega) $$ H with ⟨H1, H2⟩
+  imodintro
+  iframe H1 H2
+
+/-- **The watermark moves up**, and the new bound comes out with it. -/
+theorem diskReadLbAuth_bump (γ : DiskNames) (n m : Nat) (h : n ≤ m) :
+    diskReadLbAuth (GF := GF) γ n ⊢ |==> (diskReadLbAuth γ m ∗ diskReadLb γ m) := by
+  unfold diskReadLbAuth diskReadLb
+  iintro H
+  imod MonoNat.own_update γ.nrlb (.ofNat n) (.ofNat m)
+    (by simp only [MaxNat.le_toNat]; omega) $$ H with ⟨H1, H2⟩
+  imodintro
+  iframe H1 H2
+
+/-- ... and a bound the payload's authority has to honour. -/
+theorem diskReadLb_le (γ : DiskNames) (M n : Nat) :
+    ⊢@{IProp GF} diskReadLbAuth γ M -∗ diskReadLb γ n -∗ ⌜n ≤ M⌝ := by
+  unfold diskReadLbAuth diskReadLb
+  iintro H1 H2
+  ihave %h := MonoNat.auth_lb_own_valid γ.nrlb _ _ _ $$ H1 H2
+  ipureintro
+  simpa only [MaxNat.le_toNat] using h.2
+
+/-- The bound weakens. -/
+theorem diskReadLb_mono (γ : DiskNames) (m n : Nat) (h : n ≤ m) :
+    diskReadLb (GF := GF) γ m ⊢ diskReadLb γ n := by
+  unfold diskReadLb
+  iintro #H
+  iapply MonoNat.lb_own_le γ.nrlb (.ofNat m) (.ofNat n) (by simp only [MaxNat.le_toNat]; omega)
+  iexact H
 
 /-- The published count: the lock payload's half. -/
 def diskPubAuth (γ : DiskNames) (n : Nat) : IProp GF := γ.np ↪VAR{.own (1 : Qp).half} n
@@ -3979,6 +4041,52 @@ nothing for a free slot, because the accounting rules out a fetch there
 def freeSlotRes (ξ : CtxId) (pd : PAddr) (i : Nat) : IProp GF := iprop%
   ctxBytes ξ (descAt pd i) 16 (DFrac.own 1) 0 ∗ opsWin ξ i ∗ infoWin ξ i
 
+/-- **What `b->disk` says about the chain** (Rocq's `claim_cells`, the
+value side): `1` while the request is in flight, or `0` beside the
+evidence that THIS arming's completion has been READ -- the
+epoch-indexed record `Xv6.headDoneE γ n c.hd c.ep` and the persistent
+watermark bound `Xv6.diskReadLb γ n`.
+
+It is PERSISTENT and context-free, which is what lets the sleeper carry
+it out of the lock's payload, across its own loop test, and into
+`Xv6.disk_collect`'s premises. -/
+def claimDone (γ : DiskNames) (c : Chain) (d : BitVec 32) : IProp GF := iprop%
+  ⌜d = 1#32⌝ ∨ (⌜d = 0#32⌝ ∗ ∃ n : Nat, headDoneE γ n c.hd c.ep ∗ diskReadLb γ n)
+
+instance claimDone_persistent (γ : DiskNames) (c : Chain) (d : BitVec 32) :
+    Persistent (claimDone (GF := GF) γ c d) := by unfold claimDone; infer_instance
+
+/-- The in-flight arm. -/
+theorem claimDone_one (γ : DiskNames) (c : Chain) : ⊢ claimDone (GF := GF) γ c 1#32 := by
+  unfold claimDone
+  ileft
+  ipureintro; rfl
+
+/-- The completed arm. -/
+theorem claimDone_zero (γ : DiskNames) (c : Chain) (n : Nat) :
+    headDoneE (GF := GF) γ n c.hd c.ep ∗ diskReadLb γ n ⊢ claimDone γ c 0#32 := by
+  unfold claimDone
+  iintro ⟨#H1, #H2⟩
+  iright
+  isplitl []
+  · ipureintro; rfl
+  iexists n
+  iframe H1 H2
+
+/-- **What the sleeper's loop test earns**: `b->disk /= 1` means the
+completion of THIS arming is in the handler's read prefix. -/
+theorem claimDone_ne_one (γ : DiskNames) (c : Chain) (d : BitVec 32) (hd : d ≠ 1#32) :
+    claimDone (GF := GF) γ c d ⊢
+      ⌜d = 0#32⌝ ∗ ∃ n : Nat, headDoneE γ n c.hd c.ep ∗ diskReadLb γ n := by
+  unfold claimDone
+  iintro #H
+  icases H with ⟨%h1 | ⟨%h0, %n, #Hd, #Hl⟩⟩
+  · exact absurd h1 hd
+  · isplitl []
+    · ipureintro; exact h0
+    iexists n
+    iframe Hd Hl
+
 /-- An ARMED descriptor, on the driver's side: the other halves of the
 chain's three descriptor words and of its request header,
 `disk.info[hd].b` -- the `struct buf` the interrupt handler wakes -- and
@@ -3992,47 +4100,56 @@ the publication) is not available to anyone.  So the publication hands
 the cell over with the rest of the chain, and `Xv6.disk_collect` gives it
 back.
 
-The VALUE is existential.  Rocq's `claim_cells` pins it -- `b->disk = 1`
-while in flight, or `b->disk = 0` beside the evidence that the
-completion has been READ (`ord p u ∗ u < nr`) -- which is what lets the
-sleeper's loop test turn `b->disk == 0` into the right to collect.  That
-disjunction needs the payload's own watermark `nr` in scope at the slot
-(or a monotone lower-bound ghost for it), and it needs
-`virtio_disk_intr` to restore the row only AFTER `disk.used_idx += 1`,
-two steps later; until then `Xv6.disk_collect` takes the read evidence
-(`Xv6.headDone γ n c.hd`, `n ≤ nr`) as an explicit premise instead. -/
-def claimRes (ξ : CtxId) (pd : PAddr) (c : Chain) : IProp GF := iprop%
+THE VALUE IS PINNED, and that is Rocq's `claim_cells`: `b->disk = 1`
+while the request is in flight, or `b->disk = 0` beside the evidence that
+THIS arming's completion has been READ -- the epoch-indexed record
+`Xv6.headDoneE γ n c.hd c.ep` and the persistent watermark bound
+`Xv6.diskReadLb γ n`.  That is what lets the sleeper's loop test turn
+`b->disk /= 1` into the right to collect, and it is why
+`virtio_disk_intr` restores the row only AFTER `disk.used_idx += 1`: the
+handler stores `b->disk = 0` and wakes the sleeper with the payload OPEN
+(it holds the lock), and closes the row at the new watermark, where its
+own record's counter is the bound.
+
+The bound is a MONOTONE lower bound, not the payload's `nr` itself, so
+the row is stable under every later bump of the watermark and needs no
+re-proof when another slot's completion moves it. -/
+def claimRes (γ : DiskNames) (ξ : CtxId) (pd : PAddr) (c : Chain) : IProp GF := iprop%
   ctxBytes ξ (descAt pd c.hd) 16 (DFrac.own (1 : Qp).half) c.d0 ∗
   ctxBytes ξ (descAt pd c.md) 16 (DFrac.own (1 : Qp).half) c.d1 ∗
   ctxBytes ξ (descAt pd c.tl) 16 (DFrac.own (1 : Qp).half) c.d2 ∗
   ctxBytes ξ c.hdrAddr 16 (DFrac.own (1 : Qp).half) c.hdr ∗
   wordAtN ξ (aInfoB c.hd) 8 (DFrac.own 1) c.bp ∗
-  ∃ d : BitVec 32, wordAtN ξ (aBufDisk c.bp) 4 (DFrac.own 1) d
+  ∃ d : BitVec 32, wordAtN ξ (aBufDisk c.bp) 4 (DFrac.own 1) d ∗ claimDone γ c d
 
 /-- **`b->disk`, borrowed out of the claim and given back at `0`**: the
-handler's `b->disk = 0` before `wakeup(b)`. -/
-theorem claimRes_bufDisk_acc (pd : PAddr) (c : Chain) :
-    claimRes (GF := GF) curCtx pd c ⊢ ∃ d : BitVec 32,
+handler's `b->disk = 0` before `wakeup(b)`.  The row comes back only with
+the READ EVIDENCE beside it, which is what the handler earns two steps
+later, at `disk.used_idx += 1`. -/
+theorem claimRes_bufDisk_acc (γ : DiskNames) (pd : PAddr) (c : Chain) :
+    claimRes (GF := GF) γ curCtx pd c ⊢ ∃ d : BitVec 32,
       wordPointsTo (aBufDisk c.bp) 4 (DFrac.own 1) d ∗
-      (wordPointsTo (aBufDisk c.bp) 4 (DFrac.own 1) 0#32 -∗ claimRes curCtx pd c) := by
+      (∀ d' : BitVec 32, wordPointsTo (aBufDisk c.bp) 4 (DFrac.own 1) d' -∗
+        claimDone γ c d' -∗ claimRes γ curCtx pd c) := by
   unfold claimRes
-  iintro ⟨H0, H1, H2, H3, Hb, %d, Hdsk⟩
+  iintro ⟨H0, H1, H2, H3, Hb, %d, Hdsk, #Hdn⟩
   iexists d
   isplitl [Hdsk]
   · iapply (show wordAtN (GF := GF) curCtx (aBufDisk c.bp) 4 (DFrac.own 1) d ⊢
       wordPointsTo (aBufDisk c.bp) 4 (DFrac.own 1) d from by rw [wordAtN_cur])
     iexact Hdsk
-  iintro Hdsk2
+  iintro %d' Hdsk2 #Hdn2
   iframe H0 H1 H2 H3 Hb
-  iexists 0#32
-  iapply (show wordPointsTo (GF := GF) (aBufDisk c.bp) 4 (DFrac.own 1) 0#32 ⊢
-    wordAtN curCtx (aBufDisk c.bp) 4 (DFrac.own 1) 0#32 from by rw [wordAtN_cur])
+  iexists d'
+  iframe Hdn2
+  iapply (show wordPointsTo (GF := GF) (aBufDisk c.bp) 4 (DFrac.own 1) d' ⊢
+    wordAtN curCtx (aBufDisk c.bp) 4 (DFrac.own 1) d' from by rw [wordAtN_cur])
   iexact Hdsk2
 
 /-- One slot of the payload: `disk.free[i]` and whatever the receipt says. -/
-def slotBody (ξ : CtxId) (pd : PAddr) (i : Nat) : HState → IProp GF
+def slotBody (γ : DiskNames) (ξ : CtxId) (pd : PAddr) (i : Nat) : HState → IProp GF
   | .inactive => iprop(wordAtN ξ (aFree i) 1 (DFrac.own 1) 1#8 ∗ freeSlotRes ξ pd i)
-  | .active c => iprop(wordAtN ξ (aFree i) 1 (DFrac.own 1) 0#8 ∗ claimRes ξ pd c)
+  | .active c => iprop(wordAtN ξ (aFree i) 1 (DFrac.own 1) 0#8 ∗ claimRes γ ξ pd c)
   | .member _ => iprop(wordAtN ξ (aFree i) 1 (DFrac.own 1) 0#8 ∗ opsWin ξ i ∗ infoWin ξ i)
 
 /-- **The receipt the LOCK PAYLOAD keeps of slot `i`.**  A FREE slot's
@@ -4106,21 +4223,21 @@ theorem slotTok_quarter_join (γ : DiskNames) (i : Nat) (s s' : HState) :
 
 
 def slotRes (γ : DiskNames) (ξ : CtxId) (pd : PAddr) (i : Nat) : IProp GF := iprop%
-  ∃ s : HState, slotTok γ i s ∗ slotBody ξ pd i s
+  ∃ s : HState, slotTok γ i s ∗ slotBody γ ξ pd i s
 
-theorem slotBody_inactive (ξ : CtxId) (pd : PAddr) (i : Nat) :
-    slotBody (GF := GF) ξ pd i .inactive =
+theorem slotBody_inactive (γ : DiskNames) (ξ : CtxId) (pd : PAddr) (i : Nat) :
+    slotBody (GF := GF) γ ξ pd i .inactive =
       iprop(wordAtN ξ (aFree i) 1 (DFrac.own 1) 1#8 ∗ freeSlotRes ξ pd i) := rfl
 
-theorem slotBody_active (ξ : CtxId) (pd : PAddr) (i : Nat) (c : Chain) :
-    slotBody (GF := GF) ξ pd i (.active c) =
-      iprop(wordAtN ξ (aFree i) 1 (DFrac.own 1) 0#8 ∗ claimRes ξ pd c) := rfl
+theorem slotBody_active (γ : DiskNames) (ξ : CtxId) (pd : PAddr) (i : Nat) (c : Chain) :
+    slotBody (GF := GF) γ ξ pd i (.active c) =
+      iprop(wordAtN ξ (aFree i) 1 (DFrac.own 1) 0#8 ∗ claimRes γ ξ pd c) := rfl
 
 /-- A MEMBER slot on the driver's side: TAKEN (`disk.free[i] = 0`) and
 its own request header, which the chain does not use -- the descriptor's
 own words are the HEAD's `claimRes`. -/
-theorem slotBody_member (ξ : CtxId) (pd : PAddr) (i h : Nat) :
-    slotBody (GF := GF) ξ pd i (.member h) =
+theorem slotBody_member (γ : DiskNames) (ξ : CtxId) (pd : PAddr) (i h : Nat) :
+    slotBody (GF := GF) γ ξ pd i (.member h) =
       iprop(wordAtN ξ (aFree i) 1 (DFrac.own 1) 0#8 ∗ opsWin ξ i ∗ infoWin ξ i) := rfl
 
 /-- **The handler's ENTRY credential, carried by the LOCK PAYLOAD**
@@ -4174,23 +4291,23 @@ the bump goes through `Xv6.disk_deposit`), the staged head,
 with their receipts. -/
 def diskRes (γ : DiskNames) (pd pav pu : PAddr) (ξ : CtxId) : IProp GF := iprop%
   ∃ (np nr : Nat) (stg : Option Nat) (ring : Nat → Nat),
-    diskPub γ np ∗ diskReadAt γ nr ∗ diskStage γ stg ∗ diskDoneLb γ nr ∗
-    diskPayWm γ nr ξ ∗
+    diskPub γ np ∗ diskReadAt γ nr ∗ diskReadLbAuth γ nr ∗ diskStage γ stg ∗
+    diskDoneLb γ nr ∗ diskPayWm γ nr ξ ∗
     wordAtN ξ aUsedIdx 2 (DFrac.own 1) (wrap16 nr) ∗
     ctxBytes ξ (availIdxAt pav) 2 (DFrac.own (1 : Qp).half) (wrap16 np) ∗
     ([∗list] j ∈ List.range NUM,
       ctxBytes ξ (availRingAt pav j) 2 (DFrac.own (1 : Qp).half) (BitVec.ofNat 16 (ring j))) ∗
     ([∗list] i ∈ List.range NUM, slotRes γ ξ pd i)
 
-instance instCtxMorphSlotBody (pd : PAddr) (i : Nat) (s : HState) :
-    CtxMorph (GF := GF) (fun ξ => slotBody ξ pd i s) := by
+instance instCtxMorphSlotBody (γ : DiskNames) (pd : PAddr) (i : Nat) (s : HState) :
+    CtxMorph (GF := GF) (fun ξ => slotBody γ ξ pd i s) := by
   cases s with
   | inactive =>
     show CtxMorph (fun ξ => iprop(wordAtN ξ (aFree i) 1 (DFrac.own 1) 1#8 ∗ freeSlotRes ξ pd i))
     unfold freeSlotRes
     infer_instance
   | active c =>
-    show CtxMorph (fun ξ => iprop(wordAtN ξ (aFree i) 1 (DFrac.own 1) 0#8 ∗ claimRes ξ pd c))
+    show CtxMorph (fun ξ => iprop(wordAtN ξ (aFree i) 1 (DFrac.own 1) 0#8 ∗ claimRes γ ξ pd c))
     unfold claimRes
     infer_instance
   | member _ =>
@@ -4201,7 +4318,7 @@ instance instCtxMorphSlotBody (pd : PAddr) (i : Nat) (s : HState) :
 instance instCtxMorphSlotRes (γ : DiskNames) (pd : PAddr) (i : Nat) :
     CtxMorph (GF := GF) (fun ξ => slotRes γ ξ pd i) := by
   unfold slotRes
-  exact instCtxMorphExists (fun (s : HState) ξ => iprop(slotTok γ i s ∗ slotBody ξ pd i s))
+  exact instCtxMorphExists (fun (s : HState) ξ => iprop(slotTok γ i s ∗ slotBody γ ξ pd i s))
 
 instance instCtxMorphRingCells (pav : PAddr) (ring : Nat → Nat) :
     CtxMorph (GF := GF) (fun ξ => iprop([∗list] j ∈ List.range NUM,

@@ -247,33 +247,34 @@ def vdisPay (γ : DiskNames) (pd pav : PAddr) : IProp GF := iprop%
 
 theorem vdisPay_open (γ : DiskNames) (pd pav pu : PAddr) :
     diskRes (GF := GF) γ pd pav pu curCtx ⊢ ∃ nr : Nat,
-      diskReadAt γ nr ∗ diskDoneLb γ nr ∗ diskPayWm γ nr curCtx ∗
+      diskReadAt γ nr ∗ diskReadLbAuth γ nr ∗ diskDoneLb γ nr ∗ diskPayWm γ nr curCtx ∗
       wordPointsTo aUsedIdx 2 (DFrac.own 1) (wrap16 nr) ∗ vdisPay γ pd pav := by
   unfold vdisPay
   iintro H
   icases diskRes_open γ pd pav pu curCtx $$ H
-    with ⟨%np, %nr, %stg, %ring, Hp, Hr, Hs, Hlb, Hwmp, Hu, Hidx, Hring, Hsl⟩
+    with ⟨%np, %nr, %stg, %ring, Hp, Hr, Hrl, Hs, Hlb, Hwmp, Hu, Hidx, Hring, Hsl⟩
   ihave Hu : iprop(wordPointsTo (GF := GF) aUsedIdx 2 (DFrac.own 1) (wrap16 nr)) $$ [Hu]
   · iapply (show wordAtN (GF := GF) curCtx aUsedIdx 2 (DFrac.own 1) (wrap16 nr) ⊢
       wordPointsTo aUsedIdx 2 (DFrac.own 1) (wrap16 nr) from by rw [wordAtN_cur])
     iexact Hu
   iexists nr
-  iframe Hr Hlb Hwmp Hu
+  iframe Hr Hrl Hlb Hwmp Hu
   iexists np, stg, ring
   iframe Hp Hs Hidx Hring Hsl
 
 theorem vdisPay_close (γ : DiskNames) (pd pav pu : PAddr) (nr : Nat) :
-    diskReadAt (GF := GF) γ nr ∗ diskDoneLb γ nr ∗ diskPayWm γ nr curCtx ∗
+    diskReadAt (GF := GF) γ nr ∗ diskReadLbAuth γ nr ∗ diskDoneLb γ nr ∗
+      diskPayWm γ nr curCtx ∗
       wordPointsTo aUsedIdx 2 (DFrac.own 1) (wrap16 nr) ∗ vdisPay γ pd pav ⊢
       diskRes γ pd pav pu curCtx := by
   unfold vdisPay
-  iintro ⟨Hr, Hlb, #Hwmp, Hu, %np, %stg, %ring, Hp, Hs, Hidx, Hring, Hsl⟩
+  iintro ⟨Hr, Hrl, Hlb, #Hwmp, Hu, %np, %stg, %ring, Hp, Hs, Hidx, Hring, Hsl⟩
   ihave Hu : iprop(wordAtN (GF := GF) curCtx aUsedIdx 2 (DFrac.own 1) (wrap16 nr)) $$ [Hu]
   · iapply (show wordPointsTo (GF := GF) aUsedIdx 2 (DFrac.own 1) (wrap16 nr) ⊢
       wordAtN curCtx aUsedIdx 2 (DFrac.own 1) (wrap16 nr) from by rw [wordAtN_cur])
     iexact Hu
   iapply diskRes_close γ pd pav pu curCtx np nr stg ring
-  iframe Hp Hr Hs Hlb Hwmp Hu Hidx Hring Hsl
+  iframe Hp Hr Hrl Hs Hlb Hwmp Hu Hidx Hring Hsl
 
 /-- **The payload's credential, CASHED.**  The lock's payload carries
 `Xv6.diskPayWm γ nr curCtx` -- a `Xv6.diskWm` at a CONTEXT floor -- and
@@ -620,18 +621,18 @@ theorem vdis_geom_used (γ : DiskNames) (pd pav pu : PAddr) :
   iexact H4
 
 /-- `disk.info[hd].b`, borrowed out of the armed chain's claim. -/
-theorem vdis_claim_infob (pd : PAddr) (c : Chain) :
-    claimRes (GF := GF) curCtx pd c ⊢
+theorem vdis_claim_infob (γ : DiskNames) (pd : PAddr) (c : Chain) :
+    claimRes (GF := GF) γ curCtx pd c ⊢
       wordPointsTo (aInfoB c.hd) 8 (DFrac.own 1) c.bp ∗
-      (wordPointsTo (aInfoB c.hd) 8 (DFrac.own 1) c.bp -∗ claimRes curCtx pd c) := by
+      (wordPointsTo (aInfoB c.hd) 8 (DFrac.own 1) c.bp -∗ claimRes γ curCtx pd c) := by
   unfold claimRes
-  iintro ⟨H1, H2, H3, H4, H5, %d, Hd⟩
+  iintro ⟨H1, H2, H3, H4, H5, %d, Hd, #Hdn⟩
   isplitl [H5]
   · iapply (show wordAtN (GF := GF) curCtx (aInfoB c.hd) 8 (DFrac.own 1) c.bp ⊢
       wordPointsTo (aInfoB c.hd) 8 (DFrac.own 1) c.bp from by rw [wordAtN_cur])
     iexact H5
   · iintro H5'
-    iframe H1 H2 H3 H4 Hd
+    iframe H1 H2 H3 H4 Hd Hdn
     iapply (show wordPointsTo (GF := GF) (aInfoB c.hd) 8 (DFrac.own 1) c.bp ⊢
       wordAtN curCtx (aInfoB c.hd) 8 (DFrac.own 1) c.bp from by rw [wordAtN_cur])
     iexact H5'
@@ -649,7 +650,7 @@ theorem vdis_loop (HA : DISK_ACC_ASSUMPTIONS) (WK : WAKEUP)
       diskRes γ pd pav pu curCtx -∗ ⌜vdisPres k R⌝ -∗ wpLoop cpu)
     ⊢ ∀ (R : RegMap) (nr m F : Nat), kctx cpu ((vdisK k).withRegs R) -∗
       pcIs cpu (KA.«virtio_disk_intr» + 0x3e#64) -∗
-      locked γl cpu -∗ diskReadAt γ nr -∗
+      locked γl cpu -∗ diskReadAt γ nr -∗ diskReadLbAuth γ nr -∗
       wordPointsTo aUsedIdx 2 (DFrac.own 1) (wrap16 nr) -∗ vdisPay γ pd pav -∗
       diskDoneLb γ m -∗ rviewLb cpu F -∗ diskWm γ m F -∗
       ⌜vdisPres k R ∧ R 9#5 = KA.«disk» ∧ nr < m⌝ -∗ wpLoop (GF := GF) cpu := by
@@ -658,7 +659,7 @@ theorem vdis_loop (HA : DISK_ACC_ASSUMPTIONS) (WK : WAKEUP)
   unfold diskCaps
   iintro ⟨#HΓ, ⟨#Hinv, #Hgeom, #Hlck⟩, Hexit⟩
   iloeb as IH
-  iintro %R %nr %m %F Hk Hpc Hlocked Hnr Hui Hpay #Hlbm #Hrv #Hwm %⟨hpres, hR9, hnrm⟩
+  iintro %R %nr %m %F Hk Hpc Hlocked Hnr Hrl Hui Hpay #Hlbm #Hrv #Hwm %⟨hpres, hR9, hnrm⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_kmapStatic _ _ $$ Hk with ⟨#HS, Hk⟩
   -- +0x3e  fence iorw,iorw : the read watermark becomes the floor
@@ -719,6 +720,14 @@ theorem vdis_loop (HA : DISK_ACC_ASSUMPTIONS) (WK : WAKEUP)
   imodintro
   obtain ⟨c, rfl, hchd, hcwf⟩ := hst
   subst hchd
+  -- the ARMING EPOCH of the completion just read: minted while the entry
+  -- is still UNREAD, persistent from here on, and the evidence the claim
+  -- row will carry once `disk.used_idx += 1` has moved the watermark
+  iapply wpLoop_fupd
+  imod (disk_slot_epoch γ (slotQ (HState.active c)) c.hd (nr + 1) t1 nr c hi (by omega))
+    $$ [Hinv Htok HdoneAt Hnr] with ⟨Htok, Hnr, #Hep⟩
+  · iframe #; iframe
+  imodintro
   rw [slotBody_active]
   icases Hbody with ⟨Hfree, Hclaim⟩
   -- +0x50  slli a4,a5,4 ; +0x54  addi a4,a4,32 ; +0x58  add a4,a4,s1
@@ -769,7 +778,7 @@ theorem vdis_loop (HA : DISK_ACC_ASSUMPTIONS) (WK : WAKEUP)
     with [vdisK_sie k, hR9, diskIdx_addr' 32 c.hd]
   iintro Hk Hpc
   -- +0x68  ld a0,8(a5)    b = disk.info[id].b
-  icases vdis_claim_infob pd c $$ Hclaim with ⟨Hbp, Hbpback⟩
+  icases vdis_claim_infob γ pd c $$ Hclaim with ⟨Hbp, Hbpback⟩
   k_step (wp_s_ld cpu _ (KA.«virtio_disk_intr» + 0x68#64) true 8#12 10#5 15#5 (by decide)
       (by decide) (DFrac.own 1) c.bp)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -777,12 +786,11 @@ theorem vdis_loop (HA : DISK_ACC_ASSUMPTIONS) (WK : WAKEUP)
   iintro Hk Hpc Hbp
   ihave Hclaim := Hbpback $$ Hbp
   -- +0x6a  sw zero,4(a0)  b->disk = 0
-  icases claimRes_bufDisk_acc pd c $$ Hclaim with ⟨%dsk0, Hdsk, Hdback⟩
+  icases claimRes_bufDisk_acc γ pd c $$ Hclaim with ⟨%dsk0, Hdsk, Hdback⟩
   k_step (wp_s_sw cpu _ (KA.«virtio_disk_intr» + 0x6a#64) false 4#12 10#5 0#5 (by decide) dsk0)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [vdisK_sie k, vdis_bufdisk_addr c.bp]
   iintro Hk Hpc Hdsk
-  ihave Hclaim := Hdback $$ Hdsk
   -- +0x6e  jal wakeup
   k_step (wp_s_jal cpu _ (KA.«virtio_disk_intr» + 0x6e#64) false 2081772#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdisK_sie k, vdis_br_wakeup]
@@ -826,7 +834,12 @@ theorem vdis_loop (HA : DISK_ACC_ASSUMPTIONS) (WK : WAKEUP)
   iapply wpLoop_fupd
   imod (disk_deposit γ pd pav pu nr) $$ [Hinv Hgeom Hnr] with Hnr
   · iframe #; iframe
+  imod diskReadLbAuth_bump γ nr (nr + 1) (by omega) $$ Hrl with ⟨Hrl, #Hlbnr1⟩
   imodintro
+  -- the claim row goes back at `b->disk = 0` WITH the read evidence: the
+  -- watermark has passed this completion's counter
+  ihave #Hdn0 := claimDone_zero γ c (nr + 1) $$ [$Hep $Hlbnr1]
+  ihave Hclaim := Hdback $$ %0#32 Hdsk Hdn0
   -- +0x7c  sh a5,32(s1)
   k_step (wp_s_sh cpu _ (KA.«virtio_disk_intr» + 0x7c#64) false 32#12 9#5 15#5 (by decide)
       (wrap16 nr))
@@ -834,7 +847,7 @@ theorem vdis_loop (HA : DISK_ACC_ASSUMPTIONS) (WK : WAKEUP)
     with [vdisK_sie k, hR29, vdis_usedIdx, vdis_ext16 (wrap16 (nr + 1))]
   iintro Hk Hpc Hui
   -- the slot goes back into the payload
-  ihave Hslot : iprop(∃ s : HState, slotTok (GF := GF) γ c.hd s ∗ slotBody curCtx pd c.hd s)
+  ihave Hslot : iprop(∃ s : HState, slotTok (GF := GF) γ c.hd s ∗ slotBody γ curCtx pd c.hd s)
       $$ [Htok Hfree Hclaim]
   · iexists (HState.active c)
     isimp only [slotTok_eq]
@@ -884,8 +897,8 @@ theorem vdis_loop (HA : DISK_ACC_ASSUMPTIONS) (WK : WAKEUP)
     imod (vdis_payWm_mk γ cpu _ (nr + 1) F) $$ [Hk Hview Hwm1] with ⟨Hk, #Hwmp⟩
     · iframe Hk Hview Hwm1
     imodintro
-    ihave Hres := vdisPay_close γ pd pav pu (nr + 1) $$ [Hnr Hlbnr Hwmp Hui Hpay]
-    · iframe Hnr Hlbnr Hwmp Hui Hpay
+    ihave Hres := vdisPay_close γ pd pav pu (nr + 1) $$ [Hnr Hrl Hlbnr Hwmp Hui Hpay]
+    · iframe Hnr Hrl Hlbnr Hwmp Hui Hpay
     iapply Hexit $$ %_ Hk Hpc Hlocked Hres
     ipureintro
     repeat refine vdisPres_set _ _ _ _ ?_ (by decide)
@@ -901,7 +914,7 @@ theorem vdis_loop (HA : DISK_ACC_ASSUMPTIONS) (WK : WAKEUP)
       · exact h
       · exact absurd (show wrap16 m3 = wrap16 (nr + 1) from by
           rw [show m3 = nr + 1 from by omega]) hne3
-    iapply IH $$ Hexit %_ %(nr + 1) %m3 %F3 Hk Hpc Hlocked Hnr Hui Hpay Hlb3 Hrv3 Hwm3
+    iapply IH $$ Hexit %_ %(nr + 1) %m3 %F3 Hk Hpc Hlocked Hnr Hrl Hui Hpay Hlb3 Hrv3 Hwm3
     ipureintro
     refine ⟨?_, ?_, hlt3⟩
     · repeat refine vdisPres_set _ _ _ _ ?_ (by decide)
@@ -1037,7 +1050,7 @@ theorem virtio_disk_intr_proof (HA : DISK_ACC_ASSUMPTIONS)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdisK_sie k]
   iintro Hk Hpc
   -- open the payload at the handler watermark
-  icases vdisPay_open γ pd pav pu $$ Hres with ⟨%nr, Hnr, #Hlbnr, #Hwmp, Hui, Hpay⟩
+  icases vdisPay_open γ pd pav pu $$ Hres with ⟨%nr, Hnr, Hrl, #Hlbnr, #Hwmp, Hui, Hpay⟩
   -- the ENTRY credential, out of the payload: its context floor is under
   -- this hart's view, because this hart is running the context
   icases vdis_payWm_cash γ cpu _ nr $$ [Hk Hwmp] with ⟨Hk, %Kw, #Hview, #Hwm⟩
@@ -1078,8 +1091,8 @@ theorem virtio_disk_intr_proof (HA : DISK_ACC_ASSUMPTIONS)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [vdisK_sie k, vdis_beq_t (wrap16 nr) (wrap16 m0) heq0]
     iintro Hk Hpc
-    ihave Hres := vdisPay_close γ pd pav pu nr $$ [Hnr Hlbnr Hwmp Hui Hpay]
-    · iframe Hnr Hlbnr Hwmp Hui Hpay
+    ihave Hres := vdisPay_close γ pd pav pu nr $$ [Hnr Hrl Hlbnr Hwmp Hui Hpay]
+    · iframe Hnr Hrl Hlbnr Hwmp Hui Hpay
     iapply Hexit $$ %_ Hk Hpc Hlocked Hres
     ipureintro
     repeat refine vdisPres_set _ _ _ _ ?_ (by decide)
@@ -1097,7 +1110,7 @@ theorem virtio_disk_intr_proof (HA : DISK_ACC_ASSUMPTIONS)
     ihave Hloop := vdis_loop HA WK Γ cpu k γ γl pd pav pu hsie hnoff hK hlk htier hpu
       $$ [HΓ Hcaps Hexit]
     · iframe #; iframe
-    iapply Hloop $$ %_ %nr %m0 %F0 Hk Hpc Hlocked Hnr Hui Hpay Hlb0 Hrv0 Hwm0
+    iapply Hloop $$ %_ %nr %m0 %F0 Hk Hpc Hlocked Hnr Hrl Hui Hpay Hlb0 Hrv0 Hwm0
     ipureintro
     refine ⟨?_, ?_, hlt0⟩
     · repeat refine vdisPres_set _ _ _ _ ?_ (by decide)

@@ -1814,7 +1814,7 @@ theorem vdi_flipIn (WM : DISK_INIT_WM) (γ : DiskNames) (pd pav pu : BitVec 64)
     exact ⟨pageRw_of_pageValid pd hpvd, pageRw_of_pageValid pav hpva,
       pageRw_of_pageValid pu hpvu⟩
   icases HG with ⟨⟨⟨Hh0a, Hh0t⟩, ⟨Hh1a, Hh1t⟩, ⟨Hh2a, Hh2t⟩, ⟨Hh3a, Hh3t⟩, ⟨Hh4a, Hh4t⟩,
-    ⟨Hh5a, Hh5t⟩, ⟨Hh6a, Hh6t⟩, ⟨Hh7a, Hh7t⟩, _⟩, Hpa, Hpub, Hnr, Hstg, Hnc⟩
+    ⟨Hh5a, Hh5t⟩, ⟨Hh6a, Hh6t⟩, ⟨Hh7a, Hh7t⟩, _⟩, Hpa, Hpub, Hnr, Hrl, Hstg, Hnc⟩
   icases Hdesc with ⟨Hd0, Hd1, Hd2, Hd3, Hd4, Hd5, Hd6, Hd7, _⟩
   icases Hring with ⟨Hr0, Hr1, Hr2, Hr3, Hr4, Hr5, Hr6, Hr7, _⟩
   icases Helem with ⟨He0, He1, He2, He3, He4, He5, He6, He7, _⟩
@@ -1826,7 +1826,7 @@ theorem vdi_flipIn (WM : DISK_INIT_WM) (γ : DiskNames) (pd pav pu : BitVec 64)
   iframe Hh4a Hh4t Hf4 Hd4 Ho4 Hi4 Hh5a Hh5t Hf5 Hd5 Ho5 Hi5
   iframe Hh6a Hh6t Hf6 Hd6 Ho6 Hi6
   iframe Hh7a Hh7t Hf7 Hd7 Ho7 Hi7
-  iframe Hpa Hpub Hnr Hstg Hnc Hai Hr0 Hr1 Hr2 Hr3 Hr4 Hr5 Hr6 Hr7
+  iframe Hpa Hpub Hnr Hrl Hstg Hnc Hai Hr0 Hr1 Hr2 Hr3 Hr4 Hr5 Hr6 Hr7
   iframe Hue He0 He1 He2 He3 He4 He5 He6 He7 Hui Hd Ha Hu
   all_goals try iempintro
 

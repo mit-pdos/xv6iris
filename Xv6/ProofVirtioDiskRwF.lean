@@ -18,9 +18,9 @@ taken before the first instruction: it takes the head's claim and the
 three whole receipts and gives back the three descriptor windows at the
 context tier, the request header, `disk.info[h]`, `b->disk`, `b->data`
 and the block's image fragment.  What the sleeper reads out of its own
-loop test -- `b->disk /= 1` -- becomes the collect's premise through
-`Xv6.VDRW_OPEN.claim_done`, and the two existentials in the collect's
-conclusion are named by `Xv6.VDRW_OPEN.collect_pin`.
+loop test -- `b->disk /= 1` -- is already the collect's premise, carried
+across the seam by the claim row (`Xv6.claimDone`); the two existentials
+in the collect's conclusion are named by `Xv6.VDRW_OPEN.collect_pin`.
 
 `free_chain` is three turns of `Xv6.vdrw6_iter`, one per descriptor: the
 flags and the next index are read off the STILL-FORMATTED descriptor
@@ -230,7 +230,7 @@ theorem vdrw_P6 (HA : DISK_ACC_ASSUMPTIONS) (HO : VDRW_OPEN) (FD : FREE_DESC) (R
     unfold virtioDiskRwSlots sleepSlots at hK; omega
   unfold vdrwP5Exit
   iintro ⟨%⟨hR6, hcwf, hbp, hblk⟩, Hk, Hpc, #Hpi, Htc, Hcc, Hir, #Hcaps, Hlocked, Hpay, Hth,
-    ⟨%d, %hd1, Hdsk, Hcback⟩, Hkm, Hkt, Hbno, Hsv, Hidx, Hnext⟩
+    Hcl, ⟨%n, #Hdone, #Hlbn⟩, Hkm, Hkt, Hbno, Hsv, Hidx, Hnext⟩
   obtain ⟨hh, hmlt, htlt, hnhm, hnmt, hnht, -⟩ := id hcwf
   have hmne : c.md ≠ c.hd := Ne.symm hnhm
   have htne1 : c.tl ≠ c.hd := Ne.symm hnht
@@ -263,15 +263,11 @@ theorem vdrw_P6 (HA : DISK_ACC_ASSUMPTIONS) (HO : VDRW_OPEN) (FD : FREE_DESC) (R
   isimp only [slotCells_member] at Hct
   icases Hct with ⟨Hopt, Hint⟩
   isimp only [← tk3_eq] at Hpay
-  -- the watermark, and the completion evidence the loop test earns
+  -- the watermark, and the completion evidence the loop test earned: the
+  -- claim row's bound is under the payload's own authority
   icases diskResA_readAt_acc γ pd pav pu curCtx (tk3 c.hd c.md c.tl) $$ Hpay
-    with ⟨%nr, Hnr, #Hwm, Hpback⟩
-  icases HO.claim_done γ c nr d hd1 $$ [Hinv Hnr Hth Hdsk]
-    with ⟨%hd0, Hnr, Hth, Hdsk, %n, %hnle, #Hdone⟩
-  · iframe #
-    iframe
-  subst hd0
-  ihave Hcl := Hcback $$ %0#32 Hdsk
+    with ⟨%nr, Hnr, #Hwm, Hrl, Hpback⟩
+  ihave %hnle := diskReadLb_le γ nr n $$ Hrl Hlbn
   isimp only [diskPayWm] at Hwm
   icases Hwm with ⟨%T, #Hwm1, #Hfl⟩
   ihave #Hwmn := diskWm_mono γ nr n T T hnle (Nat.le_refl T) $$ Hwm1
@@ -284,7 +280,7 @@ theorem vdrw_P6 (HA : DISK_ACC_ASSUMPTIONS) (HO : VDRW_OPEN) (FD : FREE_DESC) (R
   · iframe #
     iframe
   imodintro
-  ihave Hpay := Hpback $$ Hnr
+  ihave Hpay := Hpback $$ Hnr Hrl
   icases HO.collect_pin γ c dataBuf dataDisk data dd $$ [Hinv Hdsk Hbuf Hblkd]
     with ⟨%⟨hdd, hdata⟩, Hdsk, Hbuf, Hblkd⟩
   · iframe #
