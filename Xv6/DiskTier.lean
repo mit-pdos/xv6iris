@@ -703,7 +703,7 @@ theorem epOk_arm3 (v : VirtioState) (st : Nat → HState) (c : Chain) (pm : RegM
     (h : epOk v st pm dl ring lo np (some i)) :
     epOk v (armSt3 st c) pm dl ring lo np (some i) := by
   subst hstg
-  obtain ⟨hpend, hlow, hperm, hdone⟩ := h
+  obtain ⟨hpend, hlow, hperm, hdone, hinj⟩ := h
   -- an armed slot of the new receipts is either the head, with `c`, or an old one
   have hcases : ∀ (j : Nat) (cc : Chain), armSt3 st c j = HState.active cc →
       (j = c.hd ∧ cc = c) ∨ (j ≠ c.hd ∧ st j = HState.active cc) := by
@@ -719,7 +719,7 @@ theorem epOk_arm3 (v : VirtioState) (st : Nat → HState) (c : Chain) (pm : RegM
         · rw [armSt3_ne st c j h1 h2 h3] at hj
           exact Or.inr ⟨h1, hj⟩
   refine ⟨⟨fun p h1 h2 cc hcc => ?_, fun j hj cc hcc => ?_⟩, hlow, hperm,
-    fun hh cc hsc hs hnw r hr hrh => ?_⟩
+    fun hh cc hsc hs hnw r hr hrh => ?_, hinj⟩
   · rcases hcases _ cc hcc with ⟨he, -⟩ | ⟨-, hold⟩
     · have hact := (hq.1 p h1 h2).2
       rw [he, hst] at hact
@@ -771,7 +771,7 @@ theorem epOk_free (v : VirtioState) (st : Nat → HState) (pm : RegMapF PermVal)
   ⟨⟨fun p h1 h2 cc hcc => h.1.1 p h1 h2 cc (hsub _ cc hcc),
       fun j hj cc hcc => h.1.2 j hj cc (hsub _ cc hcc)⟩,
     h.2.1, h.2.2.1,
-    fun hh cc hsc => h.2.2.2 hh cc (hsub _ cc hsc)⟩
+    fun hh cc hsc => h.2.2.2.1 hh cc (hsub _ cc hsc), h.2.2.2.2⟩
 
 /-! ## `struct disk` is kernel data -/
 

@@ -836,7 +836,9 @@ theorem diskProto_usedIdx_acc (γ : DiskNames) (s : VirtioState) (key : Nat) (h 
         hlow hlee hne,
       epOk_write s st pm dl ring lo np stg h cx (nc + 1) t key
         ((h, cx, some (.pushed cx.req), some (ui, true)) : PermVal)
-        ⟨some (.pushed cx.req), some (ui, false), hgetp⟩ (isWit_of h cx cx.req ui) rfl rfl e15⟩
+        ⟨some (.pushed cx.req), some (ui, false), hgetp⟩ (isWit_of h cx cx.req ui) rfl rfl
+        (e9 key h cx (some (.pushed cx.req)) (some (ui, false)) hgetp).2.1 hsome
+        (fun hx => hnw (wroteIdx_of_wroteAt pm h hx)) e15⟩
 
 /-- W3: the used index.  The write appends its entry -- the counter the
 device's `usedIdx` is about to reach, at the position the machine gives the

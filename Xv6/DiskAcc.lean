@@ -2860,10 +2860,19 @@ structure DISK_ACC_ASSUMPTIONS : Prop where
   counter `n` reported the completion of the request published at queue
   position `c.ep`, which is the position the chain `c` the receipt
   carries was armed at.  `⌜n ≤ nr⌝` beside `Xv6.diskReadAt γ nr` says the
-  handler has READ that record, and `Xv6.headRead γ c.hd nr` says it has
-  read every OTHER record of the head too -- which is what keeps
-  `Xv6.unreadArmed`'s (P1) clause true when the receipt goes `.inactive`,
-  and is Rocq's `ord p u ∗ u < nr`.
+  handler has READ that record, which is Rocq's `ord p u ∗ u < nr`.
+
+  THE PER-HEAD PREMISE IS GONE.  The interface used to ask for
+  `Xv6.headRead γ c.hd nr` as well -- "every record of this head has been
+  read" -- because freeing the receipt has to leave `Xv6.unreadArmed`'s
+  (P1) clause standing, and (P1) speaks of every unread record of the
+  head.  `Xv6.epRecInj_no_unread` now derives that from the epoch: an
+  unread record of an ARMED head belongs to that head's CURRENT arming
+  (the strengthened (P1)), one arming writes one record
+  (`Xv6.epRecInj`), and the record the caller hands in is that arming's
+  and is read.  So `headRead` -- which no caller could have discharged,
+  since it quantifies over every future record -- is redundant and has
+  been dropped.
 
   WHERE THE PREMISE COMES FROM.  `Xv6.disk_slot_epoch` mints it, out of
   the positioned record `Xv6.disk_used_elem_read` hands the handler and
@@ -2955,7 +2964,7 @@ structure DISK_ACC_ASSUMPTIONS : Prop where
     diskInv (GF := GF) γ ∗ kmapStatic ∗ diskGeom γ pd pav pu ∗
       headTok γ c.hd (.active c) ∗ headTok γ c.md (.member c.hd) ∗
       headTok γ c.tl (.member c.hd) ∗ claimRes curCtx pd c ∗ diskReadAt γ nr ∗
-      headDoneE γ n c.hd c.ep ∗ headRead γ c.hd nr ∗ diskWm γ n T ∗ ctxFloor curCtx T ⊢
+      headDoneE γ n c.hd c.ep ∗ diskWm γ n T ∗ ctxFloor curCtx T ⊢
       |={⊤}=> (headTok γ c.hd .inactive ∗ headTok γ c.md .inactive ∗
         headTok γ c.tl .inactive ∗ diskReadAt γ nr ∗
         ctxBytes curCtx (descAt pd c.hd) 16 (DFrac.own 1) c.d0 ∗
