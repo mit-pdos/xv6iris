@@ -19,8 +19,8 @@ supplies (`kalloc` cannot fail).  The caller brings the raw cells of
 `kalloc`'s environment with at least three pages, and the DEAD disk
 invariant with the driver's half of the configuration tracker; it gets the
 lock as `lkFresh` with `disk.vdisk_lock`'s payload assembled (`diskRes`),
-the persistent geometry (`diskGeom`, the frozen live configuration), and the
-driver's protocol tokens at zero.  Interrupts are off and the hart does not
+and the persistent geometry (`diskGeom`, the frozen live configuration);
+the driver's protocol tokens at zero ride inside the payload.  Interrupts are off and the hart does not
 move (`SIE` false; `main` on hart 0, before the scheduler).  Stack: its
 4-slot frame over `kalloc`'s 14.
 
@@ -72,7 +72,7 @@ def wp_virtio_disk_init_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc G
     kctx cpu' (k.withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     ⌜calleeSaved k.regs R'⌝ -∗
     kallocAvail γk (some (nb - 3)) -∗
-    diskGeom γ pd pav pu -∗ diskPub γ 0 -∗ diskReadAt γ 0 -∗ diskStage γ none -∗
+    diskGeom γ pd pav pu -∗
     wordPointsTo (aVdiskLock + 8#64) 8 (DFrac.own 1) KStr.«virtio_disk» -∗ lkFresh aVdiskLock -∗
     diskRes γ pd pav pu curCtx -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu

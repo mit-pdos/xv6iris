@@ -367,3 +367,4 @@ import Xv6.BufDefs
 import Xv6.SpecVirtioDiskInit
 import Xv6.SpecVirtioDiskRw
 import Xv6.SpecVirtioDiskIntr
+import Xv6.DiskAcc
