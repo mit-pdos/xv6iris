@@ -2008,26 +2008,26 @@ theorem disk_used_idx_read [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu : 
   obtain ⟨m, hwm, hmm, hdom⟩ :=
     usedIdx_read dl Hold b cpu tvn w htail (by omega) hok.2.2.2.1 hrd
   have hmle : m ≤ nc + 1 := by
-    rcases hmm with hz | ⟨t, hd, ht, _⟩
+    rcases hmm with hz | ⟨t, hd, ep, ht, _⟩
     · omega
-    · exact hok.2.1 (m, t, hd) ht
+    · exact hok.2.1 (m, t, hd, ep) ht
   have hnrm : nr ≤ m := by
-    rcases hmem with hz | ⟨m0, t, hd, hmt, hnm0, htK⟩
+    rcases hmem with hz | ⟨m0, t, hd, ep, hmt, hnm0, htK⟩
     · omega
-    · exact Nat.le_trans hnm0 (hdom (m0, t, hd) hmt (Nat.le_trans htK hKt))
+    · exact Nat.le_trans hnm0 (hdom (m0, t, hd, ep) hmt (Nat.le_trans htK hKt))
   imod diskDoneAuth_cash γ M m $$ Hnc with ⟨Hnc, #Hlb⟩
   ihave Hui := usedIdxCell_intro (usedIdxAt c0.used) b dl Hold htail $$ Hb
   have hach : m = 0 ∨ ∃ r ∈ dl, m ≤ r.1 := by
-    rcases hmm with hz | ⟨t, hd, ht, _⟩
+    rcases hmm with hz | ⟨t, hd, ep, ht, _⟩
     · exact Or.inl hz
-    · exact Or.inr ⟨(m, t, hd), ht, Nat.le_refl _⟩
+    · exact Or.inr ⟨(m, t, hd, ep), ht, Nat.le_refl _⟩
   -- the credential for the NEXT read: the entry the answer came from sits
   -- at a position THIS load's view has passed, so the fence that follows
   -- takes the hart's floor past it
   imod doneAuth_sync γ dl0 dl hok.1 $$ Hdn with Hdn
   ihave ⟨Hdn, #Hwm2⟩ : iprop(doneAuth γ dl ∗ diskWm γ m tvn) $$ [Hdn]
   · unfold diskWm
-    rcases hmm with hz | ⟨t, hd, ht, htt⟩
+    rcases hmm with hz | ⟨t, hd, ep, ht, htt⟩
     · iframe Hdn
       isplitl []
       · iexists b
@@ -2035,14 +2035,14 @@ theorem disk_used_idx_read [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu : 
         ipureintro; omega
       · ileft; ipureintro; exact hz
     · obtain ⟨k, hk⟩ := List.getElem?_of_mem ht
-      icases doneRec_get γ dl k (m, t, hd) hk $$ Hdn with ⟨Hdn, #Hrec⟩
+      icases doneRec_get γ dl k (m, t, hd, ep) hk $$ Hdn with ⟨Hdn, #Hrec⟩
       iframe Hdn
       isplitl []
       · iexists b
         iframe Hbs
         ipureintro; omega
       · iright
-        iexists k, m, t, hd
+        iexists k, m, t, hd, ep
         iframe Hrec
         ipureintro
         exact ⟨Nat.le_refl _, htt⟩
@@ -2122,11 +2122,11 @@ theorem diskProto_unreadArmed (γ : DiskNames) (q : Qp) (v : VirtioState) (i n n
     diskProto (GF := GF) γ v ∗ headTokF γ q i s ∗ headDone γ n i ∗ diskReadAt γ nrd ⊢
       ⌜∃ c : Chain, s = HState.active c ∧ c.hd = i ∧ c.wf⌝ := by
   unfold diskProto headDone
-  iintro ⟨⟨%hc, %pn, %pm, Hpm, %hfr, Harm⟩, Htok, ⟨%k, %t, #Hrec⟩, Hnrd⟩
+  iintro ⟨⟨%hc, %pn, %pm, Hpm, %hfr, Harm⟩, Htok, ⟨%k, %t, %ep, #Hrec⟩, Hnrd⟩
   icases Harm with ⟨Hd | ⟨%c0, #Hfr, %hc0, Hl⟩⟩
   · unfold diskDead
     icases Hd with ⟨%m, Hm, Hcfg, Hlo0, HnpM0, Hpos0, HstgA0, Hbs0, Hdn0, Hnr0, %hp⟩
-    ihave %hl := doneRec_lookup γ [] k (n, t, i) $$ Hdn0 Hrec
+    ihave %hl := doneRec_lookup γ [] k (n, t, i, ep) $$ Hdn0 Hrec
     exact absurd hl (by simp)
   · unfold diskLive
     icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, %nq, %sb, %ue,
@@ -2135,10 +2135,10 @@ theorem diskProto_unreadArmed (γ : DiskNames) (q : Qp) (v : VirtioState) (i n n
     obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12, e13, e14⟩ := hpure
     ihave %hst := headTokF_state γ q st i s hi $$ Ha Htok
     ihave %hnn := diskReadAt_agree γ nq nrd $$ Hnq Hnrd
-    ihave %hl := doneRec_lookup γ dl0 k (n, t, i) $$ Hdn Hrec
-    have hmem : ((n, t, i) : UsedRec) ∈ dl :=
+    ihave %hl := doneRec_lookup γ dl0 k (n, t, i, ep) $$ Hdn Hrec
+    have hmem : ((n, t, i, ep) : UsedRec) ∈ dl :=
       List.mem_of_getElem? (MonoList.prefix_getElem? e10.1 hl)
-    obtain ⟨c, hcst⟩ := (e11.2.2 (n, t, i) hmem (by rw [hnn]; exact hlt)).1
+    obtain ⟨c, hcst⟩ := (e11.2.2 (n, t, i, ep) hmem (by rw [hnn]; exact hlt)).1
     ihave %hwf := headRes_wf_of γ c0.desc st i c hi hcst $$ Hr
     ipureintro
     exact ⟨c, by rw [← hst, hcst], hwf.1, hwf.2⟩
@@ -2237,8 +2237,9 @@ theorem diskProto_status_acc (γ : DiskNames) (q : Qp) (c0 : VirtioCfg) (v : Vir
     ihave %hst := headTokF_state γ q st c.hd (.active c) hwf.1 $$ Ha Htok
     ihave %hnn := diskReadAt_agree γ nq nrd $$ Hnq Hnrd
     ihave %hl0 := headDoneAt_lookup γ dl0 n t c.hd $$ Hdn Hdone
-    have hmem : ((n, t, c.hd) : UsedRec) ∈ dl := List.IsPrefix.subset e10.1 hl0
-    obtain ⟨-, -, -, ts, hts, htle⟩ := e11.2.2 (n, t, c.hd) hmem (by rw [hnn]; exact hlt)
+    obtain ⟨ep, hl0'⟩ := hl0
+    have hmem : ((n, t, c.hd, ep) : UsedRec) ∈ dl := List.IsPrefix.subset e10.1 hl0'
+    obtain ⟨-, -, -, ts, hts, htle⟩ := e11.2.2 (n, t, c.hd, ep) hmem (by rw [hnn]; exact hlt)
     icases statusRes_upd st sb c.hd hwf.1 (sb c.hd) $$ Hsb with ⟨Hrow, Hsbback⟩
     ihave Hrow : iprop(dmaOwnT (GF := GF) c.status 1 0#8 ts) $$ [Hrow]
     · rw [hst, hts, statusRes_done]
@@ -2453,7 +2454,7 @@ theorem diskProto_ue_acc (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) (nr
     have hcnt : (dl[nr]'hnrlen).1 = nr + 1 := e12.1 nr hnrlen
     -- its position, bounded by the credential's
     have hposK : (dl[nr]'hnrlen).2.1 ≤ K := by
-      rcases hmem with hz | ⟨m1, t1, hd1, hmem1, hnm1, ht1⟩
+      rcases hmem with hz | ⟨m1, t1, hd1, ep1, hmem1, hnm1, ht1⟩
       · omega
       · obtain ⟨k1, hk1lt, hk1⟩ := List.getElem_of_mem hmem1
         have hc1 : (dl[k1]'hk1lt).1 = k1 + 1 := e12.1 k1 hk1lt
@@ -2465,18 +2466,18 @@ theorem diskProto_ue_acc (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) (nr
         omega
     -- the row, and the head it spells
     obtain ⟨w, ts, hue, hlow, htsp⟩ := e14.1 nr hnrlen (Nat.le_refl nr)
-    have hhdNUM : (dl[nr]'hnrlen).2.2 < NUM :=
+    have hhdNUM : (dl[nr]'hnrlen).2.2.1 < NUM :=
       e13.2.1 (dl[nr]'hnrlen) (List.getElem_mem hnrlen)
         (by show nr < (dl[nr]'hnrlen).1; omega)
-    obtain ⟨t, i, hri⟩ : ∃ t i : Nat, (dl[nr]'hnrlen) = ((nr + 1, t, i) : UsedRec) :=
-      ⟨(dl[nr]'hnrlen).2.1, (dl[nr]'hnrlen).2.2, by rw [← hcnt]⟩
+    obtain ⟨t, i, ep, hri⟩ : ∃ t i ep : Nat, (dl[nr]'hnrlen) = ((nr + 1, t, i, ep) : UsedRec) :=
+      ⟨(dl[nr]'hnrlen).2.1, (dl[nr]'hnrlen).2.2.1, (dl[nr]'hnrlen).2.2.2, by rw [← hcnt]⟩
     rw [hri] at hlow htsp hhdNUM hposK
     -- the completion record
     imod doneAuth_sync γ dl0 dl e10.1 $$ Hdn with Hdn
-    icases doneRec_get γ dl nr ((nr + 1, t, i) : UsedRec)
+    icases doneRec_get γ dl nr ((nr + 1, t, i, ep) : UsedRec)
       (by rw [List.getElem?_eq_getElem hnrlen, hri]) $$ Hdn with ⟨Hdn, #Hrec⟩
     ihave #Hdone : iprop(headDoneAt (GF := GF) γ (nr + 1) t i) $$ [Hrec]
-    · iapply headDoneAt_mk γ (nr + 1) t i nr
+    · iapply headDoneAt_mk γ (nr + 1) t i nr ep
       iexact Hrec
     icases ueRes_acc c0.used ue (nr % NUM) (mod_NUM_lt nr) $$ Hu with ⟨Hrow, Hback⟩
     ihave Hrow : iprop(dmaOwnT (GF := GF) (usedElemAt c0.used (nr % NUM)) 8 w ts) $$ [Hrow]

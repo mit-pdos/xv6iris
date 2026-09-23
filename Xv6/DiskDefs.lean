@@ -157,6 +157,19 @@ structure Chain where
   dwr : Bool
   sector : BitVec 64
   bp : BitVec 64
+  /-- **The ARMING EPOCH**: the queue POSITION the chain was published at
+  (`avail->idx` before the bump).  Positions are never reused, so this
+  number names THIS arming of `hd` and no other -- which is what a
+  completion record has to match to say that the request the sleeper is
+  waiting on, rather than some earlier request of the same descriptor,
+  is the one that completed.  It is a GHOST field: no cell of the queue
+  holds it, and none of `Xv6.Chain.d0`/`d1`/`d2`/`hdr`/`req`/`wf`
+  mentions it, so a chain and its re-armed successor format the same
+  bytes.  It defaults to `0` so that the code phases before the
+  publication -- which cannot know the position yet -- may name a chain
+  without naming an epoch (`Xv6.vdrwChain`), and the publisher replaces
+  it (`{c with ep := np}`). -/
+  ep : Nat := 0
   deriving DecidableEq, Repr, Inhabited
 
 namespace Chain

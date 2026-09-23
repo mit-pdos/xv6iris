@@ -183,7 +183,7 @@ class DiskG (GF : BundledGFunctors) where
   [mlPosG : MonoListG GF Nat]
   /-- the COMPLETION RECORDS (see `doneRec`): the lagging monotone list of
   the device's used-index writes -/
-  [mlDoneG : MonoListG GF (Nat × Nat × Nat)]
+  [mlDoneG : MonoListG GF (Nat × Nat × Nat × Nat)]
 
 attribute [reducible, instance] DiskG.gvCfgG DiskG.gvHeadG DiskG.gvStageG DiskG.gmImgG DiskG.mnG
 attribute [reducible, instance] DiskG.gmPermG
@@ -793,16 +793,30 @@ hand -- the handler's accessors -- catches the ghost list up and takes out
 the persistent record it needs (`Xv6.doneAuth_sync`). -/
 
 /-- One write of `used->idx`: the counter it published, the position of the
-write in the store order, and the descriptor HEAD whose completion it
-reported (the used-ring element of that position went with it). -/
-abbrev UsedRec : Type := Nat × Nat × Nat
+write in the store order, the descriptor HEAD whose completion it
+reported (the used-ring element of that position went with it), and the
+ARMING EPOCH of the request that completed -- the queue position the
+chain was published at (`Xv6.Chain.ep`).
+
+The epoch is what makes a record name ONE ARMING.  `Xv6.headDone` is
+persistent and says only that head `h` completed at counter `n`: a head
+that completed, was collected, was re-armed and is in flight again still
+carries that record, so a collect that rested on it alone would take a
+chain back from under the device.  Positions are never reused, so
+matching the record's epoch against the epoch of the chain the receipt
+`Xv6.HState.active c` carries pins the arming exactly
+(`Xv6.epDone`). -/
+abbrev UsedRec : Type := Nat × Nat × Nat × Nat
 
 /-- The counter a log entry published. -/
 abbrev UsedRec.cnt (r : UsedRec) : Nat := r.1
 /-- The position of the write in the store order. -/
 abbrev UsedRec.pos (r : UsedRec) : Nat := r.2.1
 /-- The descriptor head whose completion the write reported. -/
-abbrev UsedRec.hd (r : UsedRec) : Nat := r.2.2
+abbrev UsedRec.hd (r : UsedRec) : Nat := r.2.2.1
+/-- The ARMING EPOCH of the request the write reported: the queue
+position the chain was published at. -/
+abbrev UsedRec.ep (r : UsedRec) : Nat := r.2.2.2
 
 /-- The word entry a used-index write leaves in the cell's history. -/
 def usedEnt (r : UsedRec) : WEnt 2 := ⟨r.2.1, diskAgent, wrap16 r.1⟩
@@ -863,9 +877,9 @@ theorem usedOk_bump (dl dl0 : List UsedRec) (nc M m : Nat) (h : usedOk dl dl0 nc
     · exact Or.inr ⟨r, hr, hmr⟩
 
 /-- **The used-index write**: the counter `nc + 1` joins the log. -/
-theorem usedOk_write (dl dl0 : List UsedRec) (nc M t hd : Nat) (h : usedOk dl dl0 nc M)
+theorem usedOk_write (dl dl0 : List UsedRec) (nc M t hd ep : Nat) (h : usedOk dl dl0 nc M)
     (hpos : ∀ r ∈ dl, r.2.1 ≤ t) :
-    usedOk (dl ++ [(nc + 1, t, hd)]) dl0 nc M := by
+    usedOk (dl ++ [(nc + 1, t, hd, ep)]) dl0 nc M := by
   obtain ⟨hp, hb, hM, hpw, hach⟩ := h
   refine ⟨hp.trans (List.prefix_append dl _), ?_, hM, ?_, ?_⟩
   case refine_3 =>
@@ -875,11 +889,11 @@ theorem usedOk_write (dl dl0 : List UsedRec) (nc M t hd : Nat) (h : usedOk dl dl
   · intro r hr
     rcases List.mem_append.1 hr with hr | hr
     · exact hb r hr
-    · have : r = (nc + 1, t, hd) := by simpa using hr
+    · have : r = (nc + 1, t, hd, ep) := by simpa using hr
       simp [this]
   · refine List.pairwise_append.2 ⟨hpw, List.pairwise_singleton _ _, ?_⟩
     intro a ha c hc
-    have hce : c = (nc + 1, t, hd) := by simpa using hc
+    have hce : c = (nc + 1, t, hd, ep) := by simpa using hc
     rw [hce]
     exact ⟨hb a ha, hpos a ha⟩
 
@@ -920,10 +934,10 @@ instance usedIdxCell_timeless (pa : PAddr) (b : Nat) (dl : List UsedRec) :
 
 /-- **The used-index write, leased.**  The device's store appends its entry
 to the log; the position the machine gives it is the entry's timestamp. -/
-theorem usedIdxCell_lease (pa : PAddr) (b : Nat) (dl : List UsedRec) (m hd Kb : Nat)
+theorem usedIdxCell_lease (pa : PAddr) (b : Nat) (dl : List UsedRec) (m hd ep Kb : Nat)
     (R P : IProp GF)
     (hback : ∀ t : Nat, Kb < t →
-      iprop(usedIdxCell (GF := GF) pa b (dl ++ [(m, t, hd)]) ∗ topLb t ∗ R) ⊢ P) :
+      iprop(usedIdxCell (GF := GF) pa b (dl ++ [(m, t, hd, ep)]) ∗ topLb t ∗ R) ⊢ P) :
     usedIdxCell (GF := GF) pa b dl ∗ topLb Kb ∗ R ⊢ dmaWriteLease pa 2 (wrap16 m) P := by
   unfold usedIdxCell dmaWriteLease
   iintro ⟨⟨%Hold, Hb, %ht⟩, #Htlb, HR⟩
@@ -936,7 +950,7 @@ theorem usedIdxCell_lease (pa : PAddr) (b : Nat) (dl : List UsedRec) (m hd Kb : 
   · unfold usedIdxCell
     iexists Hold
     rw [WordHist.hist_push, show (⟨t, diskAgent, wrap16 m⟩ : WEnt 2) :: usedW dl
-        = usedW (dl ++ [(m, t, hd)]) from (usedW_snoc dl (m, t, hd)).symm]
+        = usedW (dl ++ [(m, t, hd, ep)]) from (usedW_snoc dl (m, t, hd, ep)).symm]
     iframe Hb2
     ipureintro; exact ht
   · iexact HR
@@ -1061,7 +1075,7 @@ theorem usedIdx_read (dl : List UsedRec) (Hold : Nat → Hist) (b : Nat) (cpu : 
     (tvn : Nat) (w : BitVec (8 * 2)) (htail : usedTailOk b Hold) (hb : b ≤ tvn)
     (hpw : dl.Pairwise (fun a c => a.1 ≤ c.1 ∧ a.2.1 ≤ c.2.1))
     (hrd : readsAre (hartAgent cpu) tvn ((usedW dl).hist Hold) 2 w) :
-    ∃ m : Nat, w = wrap16 m ∧ (m = 0 ∨ ∃ (t hd : Nat), (m, t, hd) ∈ dl ∧ t ≤ tvn) ∧
+    ∃ m : Nat, w = wrap16 m ∧ (m = 0 ∨ ∃ (t hd ep : Nat), (m, t, hd, ep) ∈ dl ∧ t ≤ tvn) ∧
       ∀ x ∈ dl, x.2.1 ≤ tvn → x.1 ≤ m := by
   cases hfr : dl.reverse.find? (fun x => decide (x.2.1 ≤ tvn)) with
   | none =>
@@ -1077,13 +1091,13 @@ theorem usedIdx_read (dl : List UsedRec) (Hold : Nat → Hist) (b : Nat) (cpu : 
     have hrt : r.2.1 ≤ tvn := by
       have := List.find?_eq_some_iff_append.1 hfr
       simpa only [decide_eq_true_eq] using this.1
-    refine ⟨r.1, ?_, Or.inr ⟨r.2.1, r.2.2, ?_, hrt⟩, ?_⟩
+    refine ⟨r.1, ?_, Or.inr ⟨r.2.1, r.2.2.1, r.2.2.2, ?_, hrt⟩, ?_⟩
     · have := usedIdx_read_some dl Hold cpu tvn w (usedEnt r)
         (by rw [usedW_find, hfr]; rfl) hrd
       rw [this]
       rfl
     · have := used_find_mem dl tvn r hfr
-      rwa [show (r.1, r.2.1, r.2.2) = r from rfl]
+      rwa [show (r.1, r.2.1, r.2.2.1, r.2.2.2) = r from rfl]
     · exact fun x hx ht => used_find_max dl tvn r hpw hfr x hx ht
 
 /-- The completion records the invariant has published: the LAGGING ghost
@@ -1286,7 +1300,7 @@ turns that read watermark into a floor
 (`MachCSL.wp_s_fence_rw_rw_floor`). -/
 def diskWm (γ : DiskNames) (n F : Nat) : IProp GF := iprop%
   (∃ b : Nat, diskBaseFrozen γ b ∗ ⌜b ≤ F⌝) ∗
-  (⌜n = 0⌝ ∨ ∃ (k m t hd : Nat), doneRec γ k (m, t, hd) ∗ ⌜n ≤ m ∧ t ≤ F⌝)
+  (⌜n = 0⌝ ∨ ∃ (k m t hd ep : Nat), doneRec γ k (m, t, hd, ep) ∗ ⌜n ≤ m ∧ t ≤ F⌝)
 
 instance diskWm_persistent (γ : DiskNames) (n F : Nat) :
     Persistent (diskWm (GF := GF) γ n F) := by unfold diskWm; infer_instance
@@ -1303,10 +1317,42 @@ used-ring element went with it).  Persistent -- and it is what the status
 and collect accessors must take as their premise, since neither is sound
 for a head whose request has NOT completed. -/
 def headDone (γ : DiskNames) (n h : Nat) : IProp GF := iprop%
-  ∃ (k t : Nat), doneRec γ k (n, t, h)
+  ∃ (k t ep : Nat), doneRec γ k (n, t, h, ep)
 
 instance headDone_persistent (γ : DiskNames) (n h : Nat) :
     Persistent (headDone (GF := GF) γ n h) := by unfold headDone; infer_instance
+
+/-- **The completion record of ONE ARMING**: the used-index write that
+published counter `n` reported the completion of the request published at
+queue position `ep` on descriptor head `h`.  Persistent.
+
+This is the premise `Xv6.disk_collect` needs and `Xv6.headDone` cannot
+give: a head carries the records of every arming it has ever had, and
+only the epoch says which of them is the one the sleeper published.
+Positions are never reused (`Xv6.epLt`, `Xv6.epPend`), so at most one
+arming of a head ever carries a given epoch. -/
+def headDoneE (γ : DiskNames) (n h ep : Nat) : IProp GF := iprop%
+  ∃ (k t : Nat), doneRec γ k (n, t, h, ep)
+
+instance headDoneE_persistent (γ : DiskNames) (n h ep : Nat) :
+    Persistent (headDoneE (GF := GF) γ n h ep) := by unfold headDoneE; infer_instance
+
+theorem headDoneE_headDone (γ : DiskNames) (n h ep : Nat) :
+    headDoneE (GF := GF) γ n h ep ⊢ headDone γ n h := by
+  unfold headDoneE headDone
+  iintro ⟨%k, %t, H⟩
+  iexists k, t, ep
+  iexact H
+
+/-- The log entry an epoch-indexed record names. -/
+theorem headDoneE_lookup (γ : DiskNames) (l : List UsedRec) (n h ep : Nat) :
+    ⊢@{IProp GF} doneAuth γ l -∗ headDoneE γ n h ep -∗
+      ⌜∃ t : Nat, ((n, t, h, ep) : UsedRec) ∈ l⌝ := by
+  unfold headDoneE
+  iintro Hl ⟨%k, %t, H⟩
+  ihave %hl := doneRec_lookup γ l k (n, t, h, ep) $$ Hl H
+  ipureintro
+  exact ⟨t, List.mem_of_getElem? hl⟩
 
 /-- **The completion record, WITH the position of the used-index write
 that made it.**  The status byte of a completed request is readable only
@@ -1315,32 +1361,42 @@ the newest VISIBLE entry), so the position has to travel with the record:
 `Xv6.disk_status_read` needs it, and `Xv6.disk_used_elem_read` -- where
 the log's arithmetic lives -- is what produces it. -/
 def headDoneAt (γ : DiskNames) (n t h : Nat) : IProp GF := iprop%
-  ∃ k : Nat, doneRec γ k (n, t, h)
+  ∃ (k ep : Nat), doneRec γ k (n, t, h, ep)
 
 instance headDoneAt_persistent (γ : DiskNames) (n t h : Nat) :
     Persistent (headDoneAt (GF := GF) γ n t h) := by unfold headDoneAt; infer_instance
 
-theorem headDoneAt_mk (γ : DiskNames) (n t h k : Nat) :
-    doneRec (GF := GF) γ k (n, t, h) ⊢ headDoneAt γ n t h := by
+theorem headDoneAt_mk (γ : DiskNames) (n t h k ep : Nat) :
+    doneRec (GF := GF) γ k (n, t, h, ep) ⊢ headDoneAt γ n t h := by
   unfold headDoneAt
   iintro H
-  iexists k
+  iexists k, ep
+  iexact H
+
+/-- The same, keeping the epoch: what the handler mints for the sleeper. -/
+theorem headDoneE_mk (γ : DiskNames) (n t h k ep : Nat) :
+    doneRec (GF := GF) γ k (n, t, h, ep) ⊢ headDoneE γ n h ep := by
+  unfold headDoneE
+  iintro H
+  iexists k, t
   iexact H
 
 theorem headDoneAt_headDone (γ : DiskNames) (n t h : Nat) :
     headDoneAt (GF := GF) γ n t h ⊢ headDone γ n h := by
   unfold headDoneAt headDone
-  iintro ⟨%k, H⟩
-  iexists k, t
+  iintro ⟨%k, %ep, H⟩
+  iexists k, t, ep
   iexact H
 
 /-- The log entry a positioned record names. -/
 theorem headDoneAt_lookup (γ : DiskNames) (l : List UsedRec) (n t h : Nat) :
-    ⊢@{IProp GF} doneAuth γ l -∗ headDoneAt γ n t h -∗ ⌜((n, t, h) : UsedRec) ∈ l⌝ := by
+    ⊢@{IProp GF} doneAuth γ l -∗ headDoneAt γ n t h -∗
+      ⌜∃ ep : Nat, ((n, t, h, ep) : UsedRec) ∈ l⌝ := by
   unfold headDoneAt
-  iintro Hl ⟨%k, H⟩
-  ihave %hl := doneRec_lookup γ l k (n, t, h) $$ Hl H
-  ipureintro; exact List.mem_of_getElem? hl
+  iintro Hl ⟨%k, %ep, H⟩
+  ihave %hl := doneRec_lookup γ l k (n, t, h, ep) $$ Hl H
+  ipureintro
+  exact ⟨ep, List.mem_of_getElem? hl⟩
 
 /-- **Every completion of head `h` has been READ** (by the handler, whose
 watermark is `nr`).  Persistent.
@@ -1388,10 +1444,10 @@ theorem diskWm_mono (γ : DiskNames) (n n' F F' : Nat) (hn : n' ≤ n) (hF : F �
   · iexists b
     iframe Hb
     ipureintro; omega
-  icases Hor with ⟨%hz | ⟨%k, %m, %t, %hd, #Hr, %hmt⟩⟩
+  icases Hor with ⟨%hz | ⟨%k, %m, %t, %hd, %ep, #Hr, %hmt⟩⟩
   · ileft; ipureintro; omega
   · iright
-    iexists k, m, t, hd
+    iexists k, m, t, hd, ep
     iframe Hr
     ipureintro
     exact ⟨by omega, by omega⟩
@@ -1400,14 +1456,14 @@ theorem diskWm_mono (γ : DiskNames) (n n' F F' : Nat) (hn : n' ≤ n) (hF : F �
 the watermark is in it, at a position the floor has passed. -/
 theorem diskWm_mem (γ : DiskNames) (nr F : Nat) (dl dl0 : List UsedRec) (hpre : dl0 <+: dl) :
     ⊢@{IProp GF} doneAuth γ dl0 -∗ diskWm γ nr F -∗
-      ⌜nr = 0 ∨ ∃ (m t hd : Nat), (m, t, hd) ∈ dl ∧ nr ≤ m ∧ t ≤ F⌝ := by
+      ⌜nr = 0 ∨ ∃ (m t hd ep : Nat), (m, t, hd, ep) ∈ dl ∧ nr ≤ m ∧ t ≤ F⌝ := by
   unfold diskWm
   iintro Hdn ⟨_, Hor⟩
-  icases Hor with ⟨%hz | ⟨%k, %m, %t, %hd, #Hr, %hmt⟩⟩
+  icases Hor with ⟨%hz | ⟨%k, %m, %t, %hd, %ep, #Hr, %hmt⟩⟩
   · ipureintro; exact Or.inl hz
-  · ihave %hl := doneRec_lookup γ dl0 k (m, t, hd) $$ Hdn Hr
+  · ihave %hl := doneRec_lookup γ dl0 k (m, t, hd, ep) $$ Hdn Hr
     ipureintro
-    exact Or.inr ⟨m, t, hd,
+    exact Or.inr ⟨m, t, hd, ep,
       List.mem_of_getElem? (MonoList.prefix_getElem? hpre hl), hmt.1, hmt.2⟩
 
 /-! ## The published count, monotonically
@@ -1927,9 +1983,9 @@ theorem cntOk_congr (pm pm' : RegMapF PermVal) (dl : List UsedRec) (nc : Nat)
 
 /-- **The used-index write**: the counter `nc + 1` joins the log, and the
 writing permit takes the witness. -/
-theorem cntOk_write (pm pm' : RegMapF PermVal) (dl : List UsedRec) (nc t hd : Nat)
+theorem cntOk_write (pm pm' : RegMapF PermVal) (dl : List UsedRec) (nc t hd ep : Nat)
     (h : cntOk pm dl nc) (hn : ¬ wroteIdx pm) (hw : wroteIdx pm') :
-    cntOk pm' (dl ++ [((nc + 1, t, hd) : UsedRec)]) nc := by
+    cntOk pm' (dl ++ [((nc + 1, t, hd, ep) : UsedRec)]) nc := by
   have hlen : dl.length = nc := h.2.2 hn
   refine ⟨?_, fun _ => by simp [hlen], fun hx => absurd hw hx⟩
   intro k hk
@@ -2123,12 +2179,13 @@ theorem p3Ok_setPhase (v : VirtioState) (pm : RegMapF PermVal) (dl : List UsedRe
 YET (it is in flight and its bit is still `false`), so the entry that
 joins the log keeps the unread heads distinct -- and the bit it sets
 makes the clause vacuous at that head from here on. -/
-theorem p3Ok_write (v : VirtioState) (pm : RegMapF PermVal) (dl : List UsedRec) (nr nc t : Nat)
+theorem p3Ok_write (v : VirtioState) (pm : RegMapF PermVal) (dl : List UsedRec)
+    (nr nc t ep : Nat)
     (hd : BitVec 16) (key : Nat) (x0 x1 : PermVal) (hlt : hd.toNat < NUM)
     (hget : PartialMap.get? pm key = some x0) (h0 : x0.1 = hd) (h1 : x1.1 = hd)
     (hw1 : isWit x1) (hnw : ¬ wroteIdx pm) (hfly : (Virtio.phase v hd).isSome = true)
     (h : p3Ok v pm dl nr) :
-    p3Ok v (PartialMap.insert pm key x1) (dl ++ [((nc, t, hd.toNat) : UsedRec)]) nr := by
+    p3Ok v (PartialMap.insert pm key x1) (dl ++ [((nc, t, hd.toNat, ep) : UsedRec)]) nr := by
   have hnone : ∀ hh : BitVec 16, ¬ wroteAt pm hh := fun hh hx => hnw (wroteIdx_of_wroteAt pm hh hx)
   have hfresh : ∀ e ∈ dl, nr < e.cnt → e.hd ≠ hd.toNat := h.1 hd hfly (hnone hd)
   have hiff : ∀ hh : BitVec 16, hh ≠ hd →
@@ -2141,24 +2198,24 @@ theorem p3Ok_write (v : VirtioState) (pm : RegMapF PermVal) (dl : List UsedRec) 
         wroteAt (PartialMap.insert pm key x1) hh) hnw'
     · rcases List.mem_append.1 he with he | he
       · exact h.1 hh hs (fun hx => hnw' ((hiff hh hhh).2 hx)) e he hltc
-      · have hre : e = ((nc, t, hd.toNat) : UsedRec) := by simpa using he
+      · have hre : e = ((nc, t, hd.toNat, ep) : UsedRec) := by simpa using he
         rw [hre]
         intro hq
         exact hhh ((BitVec.toNat_inj (x := hh) (y := hd)).1 hq.symm)
   · rcases List.mem_append.1 he with he | he
     · exact h.2.1 e he hltc
-    · have hre : e = ((nc, t, hd.toNat) : UsedRec) := by simpa using he
+    · have hre : e = ((nc, t, hd.toNat, ep) : UsedRec) := by simpa using he
       rw [hre]; exact hlt
   · rcases List.mem_append.1 ha with ha | ha <;> rcases List.mem_append.1 hb with hb | hb
     · exact h.2.2 a ha b hb h1' h2' heq
-    · have hre : b = ((nc, t, hd.toNat) : UsedRec) := by simpa using hb
+    · have hre : b = ((nc, t, hd.toNat, ep) : UsedRec) := by simpa using hb
       rw [hre] at heq h2' ⊢
       exact absurd heq (hfresh a ha h1')
-    · have hre : a = ((nc, t, hd.toNat) : UsedRec) := by simpa using ha
+    · have hre : a = ((nc, t, hd.toNat, ep) : UsedRec) := by simpa using ha
       rw [hre] at heq h1' ⊢
       exact absurd heq.symm (hfresh b hb h2')
-    · have hra : a = ((nc, t, hd.toNat) : UsedRec) := by simpa using ha
-      have hrb : b = ((nc, t, hd.toNat) : UsedRec) := by simpa using hb
+    · have hra : a = ((nc, t, hd.toNat, ep) : UsedRec) := by simpa using ha
+      have hrb : b = ((nc, t, hd.toNat, ep) : UsedRec) := by simpa using hb
       rw [hra, hrb]
 
 /-- **The completion**: the head leaves the in-flight map, and its permit
@@ -2181,7 +2238,7 @@ counters `nr+1 .. dl.length` (strict counters), their heads are distinct
 and are descriptors of the queue, and there are eight of those. -/
 theorem unread_window (pm : RegMapF PermVal) (dl : List UsedRec) (nr nc : Nat)
     (hc : cntOk pm dl nc) (hi : unreadInj dl nr) : dl.length ≤ nr + NUM := by
-  refine window_le_of_inj nr dl.length (fun k => (dl[k]?.getD ((0, 0, 0) : UsedRec)).hd)
+  refine window_le_of_inj nr dl.length (fun k => (dl[k]?.getD ((0, 0, 0, 0) : UsedRec)).hd)
     (fun p hp1 hp2 => ?_) (fun p q hp1 hp2 hq1 hq2 he => ?_)
   · simp only [List.getElem?_eq_getElem hp2, Option.getD_some]
     exact hi.1 (dl[p]'hp2) (List.getElem_mem hp2)
@@ -2246,7 +2303,7 @@ theorem unread_window_lt (v : VirtioState) (pm : RegMapF PermVal) (dl : List Use
     (hc : cntOk pm dl nc) (hp : p3Ok v pm dl nr) : dl.length < nr + NUM := by
   have hfresh : ∀ e ∈ dl, nr < e.cnt → e.hd ≠ hd.toNat := hp.1 hd hfly hnw
   refine window_lt_of_inj_excl nr dl.length
-    (fun k => (dl[k]?.getD ((0, 0, 0) : UsedRec)).hd) hd.toNat hhd
+    (fun k => (dl[k]?.getD ((0, 0, 0, 0) : UsedRec)).hd) hd.toNat hhd
     (fun p hp1 hp2 => ?_) (fun p hp1 hp2 => ?_) (fun p q hp1 hp2 hq1 hq2 he => ?_)
   · simp only [List.getElem?_eq_getElem hp2, Option.getD_some]
     exact hp.2.1 (dl[p]'hp2) (List.getElem_mem hp2)
@@ -2852,17 +2909,17 @@ whose request has just completed: it is in flight at `.pushed`, hence
 armed, at no pending position, not the staged one (`Xv6.inflightOff`) and
 with its status byte back in the invariant at zero (`Xv6.sbOk`). -/
 theorem unreadArmed_write (v : VirtioState) (st : Nat → HState) (dl : List UsedRec)
-    (nr nc t : Nat) (ring : Nat → Nat) (lo np : Nat) (stg : Option Nat) (sb : Nat → SByte)
+    (nr nc t ep : Nat) (ring : Nat → Nat) (lo np : Nat) (stg : Option Nat) (sb : Nat → SByte)
     (hd : BitVec 16) (r0 : VioReq) (ts : Nat) (hph : Virtio.phase v hd = some (.pushed r0))
     (hts : sb hd.toNat = SByte.done ts) (hle : ts ≤ t)
     (ha : ∃ c : Chain, st hd.toNat = HState.active c)
     (hp : ∀ p, lo ≤ p → p < np → ring (p % NUM) ≠ hd.toNat) (hs : stg ≠ some hd.toNat)
     (h : unreadArmed v st dl nr ring lo np stg sb) :
-    unreadArmed v st (dl ++ [(nc, t, hd.toNat)]) nr ring lo np stg sb := by
+    unreadArmed v st (dl ++ [(nc, t, hd.toNat, ep)]) nr ring lo np stg sb := by
   refine ⟨h.1, fun hh ph hpp hnp e he hlt => ?_, fun r hr hlt => ?_⟩
   · rcases List.mem_append.1 he with he | he
     · exact h.2.1 hh ph hpp hnp e he hlt
-    · have hre : e = (nc, t, hd.toNat) := by simpa using he
+    · have hre : e = (nc, t, hd.toNat, ep) := by simpa using he
       rw [hre]
       intro heq
       have : hh = hd := head_toNat_inj hh hd heq.symm
@@ -2871,7 +2928,7 @@ theorem unreadArmed_write (v : VirtioState) (st : Nat → HState) (dl : List Use
       exact absurd (Option.some.inj hpp).symm (hnp r0)
   · rcases List.mem_append.1 hr with hr | hr
     · exact h.2.2 r hr hlt
-    · have hre : r = (nc, t, hd.toNat) := by simpa using hr
+    · have hre : r = (nc, t, hd.toNat, ep) := by simpa using hr
       rw [hre]
       exact ⟨ha, hp, hs, ts, hts, hle⟩
 
@@ -3189,11 +3246,12 @@ theorem ueOk_lend (dl : List UsedRec) (nr nc : Nat) (ue : Nat → UElem) (h : ue
 
 /-- **The used-INDEX write** puts the row back at its value and position,
 and the entry it appends is the one that row belongs to. -/
-theorem ueOk_write (dl : List UsedRec) (nr nc t hd : Nat) (ue : Nat → UElem)
+theorem ueOk_write (dl : List UsedRec) (nr nc t hd ep : Nat) (ue : Nat → UElem)
     (w : BitVec (8 * 8)) (ts : Nat) (h : ueOk dl nr ue) (hlen : dl.length = nc)
     (hroom : dl.length < nr + NUM) (hlow : BitVec.extractLsb' 0 32 w = BitVec.setWidth 32 (BitVec.ofNat 16 hd))
     (hts : ts ≤ t) :
-    ueOk (dl ++ [((nc + 1, t, hd) : UsedRec)]) nr (updU ue (nc % NUM) (UElem.done w ts)) := by
+    ueOk (dl ++ [((nc + 1, t, hd, ep) : UsedRec)]) nr
+      (updU ue (nc % NUM) (UElem.done w ts)) := by
   intro k hk hk'
   rw [List.length_append, List.length_singleton, hlen] at hk
   by_cases hlt : k < dl.length
@@ -3306,7 +3364,7 @@ theorem ueLent_write (pm : RegMapF PermVal) (ue : Nat → UElem) (key : Nat) (h 
 /-- **The used-INDEX write**, on the rows: the lent row goes back at the
 value and position of the element write, the entry it belongs to joins
 the log, and the witness bit makes any other `.lent` impossible. -/
-theorem ueInv_write (pm : RegMapF PermVal) (dl : List UsedRec) (nr nc t : Nat)
+theorem ueInv_write (pm : RegMapF PermVal) (dl : List UsedRec) (nr nc t ep : Nat)
     (ue : Nat → UElem) (key : Nat) (h : BitVec 16) (c : Chain) (r : VioReq) (ui : BitVec 16)
     (w : BitVec (8 * 8)) (ts : Nat)
     (hin : ueInv pm dl nr ue) (hlen : dl.length = nc) (hroom : dl.length < nr + NUM)
@@ -3318,8 +3376,9 @@ theorem ueInv_write (pm : RegMapF PermVal) (dl : List UsedRec) (nr nc t : Nat)
         = some ((hh, cc, some (VPhase.pushed rr), some (uu, false)) : PermVal) →
       key' = key ∧ uu.toNat % NUM = ui.toNat % NUM) :
     ueInv (PartialMap.insert pm key ((h, c, some (VPhase.pushed r), some (ui, true)) : PermVal))
-      (dl ++ [((nc + 1, t, h.toNat) : UsedRec)]) nr (updU ue (nc % NUM) (UElem.done w ts)) := by
-  refine ⟨ueOk_write dl nr nc t h.toNat ue w ts hin.1 hlen hroom hlow hts, ?_⟩
+      (dl ++ [((nc + 1, t, h.toNat, ep) : UsedRec)]) nr
+      (updU ue (nc % NUM) (UElem.done w ts)) := by
+  refine ⟨ueOk_write dl nr nc t h.toNat ep ue w ts hin.1 hlen hroom hlow hts, ?_⟩
   have := ueLent_write pm ue key h c r ui (UElem.done w ts) (by simp) hne hin.2
   rwa [hmod] at this
 

@@ -682,7 +682,8 @@ theorem diskProto_usedIdx_acc (γ : DiskNames) (s : VirtioState) (key : Nat) (h 
       ∃ (b nc : Nat) (dl : List UsedRec),
       ⌜s.usedIdx = wrap16 nc⌝ ∗ usedIdxCell (usedIdxAt cc.used) b dl ∗
       ∃ tb : Nat, topLb tb ∗
-      (∀ t : Nat, ⌜tb < t⌝ -∗ usedIdxCell (usedIdxAt cc.used) b (dl ++ [(nc + 1, t, h.toNat)]) -∗
+      (∀ t : Nat, ⌜tb < t⌝ -∗
+        usedIdxCell (usedIdxAt cc.used) b (dl ++ [(nc + 1, t, h.toNat, cx.ep)]) -∗
         topLb t -∗ |==> (diskProto γ s ∗
           permTok γ key h cx (some (.pushed cx.req)) (some (ui, true)))) := by
   have hin : Virtio.reqOf s h = some r := by unfold Virtio.reqOf; rw [hph]; rfl
@@ -771,7 +772,7 @@ theorem diskProto_usedIdx_acc (γ : DiskNames) (s : VirtioState) (key : Nat) (h 
     have hlee : tse ≤ t := by omega
     have hpos : ∀ r ∈ dl, r.2.1 ≤ t := fun r hr => by
       have := maxPos_ge dl r hr; omega
-    ihave #Htp' := dlTops_snoc dl (nc + 1, t, h.toNat) $$ [$Htp $Htt]
+    ihave #Htp' := dlTops_snoc dl (nc + 1, t, h.toNat, cx.ep) $$ [$Htp $Htt]
     -- the row of slot `nc % NUM` is the task's, and goes back at its value
     icases ueRes_upd cc.used ue (ui.toNat % NUM) (mod_NUM_lt _) (UElem.done w tse) $$ Hu
       with ⟨Hrow0, Hueback⟩
@@ -803,27 +804,28 @@ theorem diskProto_usedIdx_acc (γ : DiskNames) (s : VirtioState) (key : Nat) (h 
     iframe Hfr
     isplitl []
     · ipureintro; exact hc0
-    iexists st, nc, np, lo, ring, m, pmap, stg, b, M, (dl ++ [(nc + 1, t, h.toNat)]), dl0, nr, sb,
+    iexists st, nc, np, lo, ring, m, pmap, stg, b, M, (dl ++ [(nc + 1, t, h.toNat, cx.ep)]),
+      dl0, nr, sb,
       (updU ue (ui.toNat % NUM) (UElem.done w tse))
     iframe Hm Ha Hr Hu Hav Hnc Hnp Hlo HnpM Hpos Hstg Hui' Hdn Hbs Htp' Hnr Hsb
     ipureintro
     obtain ⟨-, -, hpos', hstg⟩ := e6.2 h hsome
     exact ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8,
       permOk_mark s pm st key h cx ui false true hgetp e9,
-      usedOk_write dl dl0 nc M t h.toNat e10 hpos,
-      unreadArmed_write s st dl nr (nc + 1) t ring lo np stg sb h r ts hph hts hle
+      usedOk_write dl dl0 nc M t h.toNat cx.ep e10 hpos,
+      unreadArmed_write s st dl nr (nc + 1) t cx.ep ring lo np stg sb h r ts hph hts hle
         ⟨c, hcst⟩ hpos' hstg e11,
       cntOk_write pm
         (PartialMap.insert pm key ((h, cx, some (.pushed cx.req), some (ui, true)) : PermVal))
-        dl nc t h.toNat e12 hnw
+        dl nc t h.toNat cx.ep e12 hnw
         (wroteIdx_insert_wit pm key ((h, cx, some (.pushed cx.req), some (ui, true)) : PermVal)
           (isWit_of h cx cx.req ui)),
-      p3Ok_write s pm dl nr (nc + 1) t h key
+      p3Ok_write s pm dl nr (nc + 1) t cx.ep h key
         ((h, cx, some (.pushed cx.req), some (ui, false)) : PermVal)
         ((h, cx, some (.pushed cx.req), some (ui, true)) : PermVal)
         (e9 key h cx (some (.pushed cx.req)) (some (ui, false)) hgetp).1
         hgetp rfl rfl (isWit_of h cx cx.req ui) hnw hsome e13,
-      hmod ▸ ueInv_write pm dl nr nc t ue key h cx cx.req ui w tse e14 hlen hroom hmod
+      hmod ▸ ueInv_write pm dl nr nc t cx.ep ue key h cx cx.req ui w tse e14 hlen hroom hmod
         hlow hlee hne⟩
 
 /-- W3: the used index.  The write appends its entry -- the counter the
@@ -843,9 +845,9 @@ theorem usedIdx_write_lease (γ : DiskNames) (s : VirtioState) (key : Nat) (h : 
   icases diskProto_usedIdx_acc γ s key h cx ui r cc we tse hph hcc hlow $$ H
     with ⟨%b, %nc, %dl, %hidx, Hui, %tb, #Htts, Hback⟩
   rw [usedIdxAt_eq cc, show w = wrap16 (nc + 1) by rw [hw, hidx, wrap16_succ]]
-  iapply usedIdxCell_lease (usedIdxAt cc.used) b dl (nc + 1) h.toNat tb
+  iapply usedIdxCell_lease (usedIdxAt cc.used) b dl (nc + 1) h.toNat cx.ep tb
     iprop(∀ t : Nat, ⌜tb < t⌝ -∗
-      usedIdxCell (usedIdxAt cc.used) b (dl ++ [(nc + 1, t, h.toNat)]) -∗
+      usedIdxCell (usedIdxAt cc.used) b (dl ++ [(nc + 1, t, h.toNat, cx.ep)]) -∗
       topLb t -∗ |==> (diskProto γ s ∗
         permTok γ key h cx (some (.pushed cx.req)) (some (ui, true))))
     (iprop(|==> (diskProto γ s ∗
