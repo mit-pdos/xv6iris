@@ -2239,11 +2239,10 @@ credential -- so that each is SOUND as written and each premise names a
 resource a caller can hold. -/
 structure DISK_ACC_ASSUMPTIONS : Prop where
   /-- **`disk.used->ring[disk.used_idx % NUM].id`, read** (the `lw` of the
-  handler's loop).  Blocked on the used ring's own write log: nothing yet
-  says what the device wrote there, nor that the cell has not been
-  overwritten since -- the latter is the window bound `nc - nr ≤ NUM`, the
-  completion-side twin of `np - lo ≤ NUM`, which needs the per-position
-  rows.  What it returns is the completion record `Xv6.headDone`, the used
+  handler's loop).  No longer blocked on the invariant: the used ring's
+  write log and its per-slot rows are both there now (`Xv6.cntOk`,
+  `Xv6.ueOk`, `Xv6.unread_window`), and what is left is the
+  `MachCSL.readAU` itself -- see the note at the end of this docstring.  What it returns is the completion record `Xv6.headDone`, the used
   ring's twin of `Xv6.posRec`, which is what the status read below and
   `disk_collect` take as their premise.
 
