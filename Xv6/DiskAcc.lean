@@ -38,12 +38,15 @@ The file has five parts: the MMIO accessors of `virtio_disk_init` (all
 proved, including the `DRIVER_OK` store that flips the invariant to its
 live arm), the queue-memory accessors that need only the PENDING-side
 accounting (the avail page and `disk_publish`, also proved), the tier
-arithmetic those need (`Xv6/DiskTier.lean`, `MachCSL/WpDmaCtx2.lean`), the
-COMPLETION-side accessors the used-index WRITE LOG settles
-(`disk_used_idx_read` and `disk_deposit`, proved), and an assumed
-interface for the three that still need the PER-POSITION ROWS -- with the
-reason they are not there, and the fix they need, written out above
-`DISK_ACC_ASSUMPTIONS`.
+arithmetic those need (`Xv6/DiskTier.lean`, `MachCSL/WpDmaCtx2.lean`) --
+including the REVERSE bridges `Xv6.ctxBytes_join_dma`,
+`Xv6.dmaOwnT_ctxBytes` and `Xv6.chainLease_claim_join` that the collect
+takes the chain back through -- the COMPLETION-side accessors the
+used-index WRITE LOG settles (`disk_used_idx_read`, `disk_deposit`,
+`disk_used_elem_read`, `disk_status_read`, and the ARMING EPOCH's mint
+`disk_slot_epoch`, all proved), and an assumed interface for the ONE that
+is left, `disk_collect` -- with the three mechanisms it is still short of,
+and the fix each needs, written out above `DISK_ACC_ASSUMPTIONS`.
 -/
 import Xv6.DiskInv
 import MachCSL.WpDmaCtx
@@ -2918,7 +2921,22 @@ structure DISK_ACC_ASSUMPTIONS : Prop where
   `Virtio.wce c0 = false`, so `MachCSL.Virtio.completeOk` cannot fire
   until the capture has drained to the durable image.
 
-  (2) THE `.pushed` WINDOW -- THE REAL BLOCKER.  With the epoch in hand,
+  (2) THE CACHE, DRAINED.  Freeing the receipt takes `c.blk` out of
+  `Xv6.inFlightBlk`, and `Xv6.cachedOk` asks that every sector the
+  write-back cache holds with DATA belong to a block that IS in flight.
+  So the collect has to know the chain's own sectors are no longer
+  cached.  They are not: `Xv6.diskGeom` carries `Virtio.wce c0 = false`,
+  so `MachCSL.Virtio.completeOk` refused the completion gate until
+  `MachCSL.Virtio.reqCached` was false, and the only step that can cache
+  a sector again is a `MachCSL.Virtio.xferOut` of a request targeting that
+  block -- which no other chain can be, since a block in flight is
+  exclusively its chain's (`Xv6.headRes` holds its `Xv6.diskBlock`).
+  Making that an invariant clause wants the blocks of armed heads to be
+  DISTINCT as a pure fact, which the arm can mint out of the exclusive
+  fragments it already handles; the buffer row's coupling wants the same
+  fact, for the same reason.
+
+  (3) THE `.pushed` WINDOW -- THE REAL BLOCKER.  With the epoch in hand,
   `Xv6.epDone_done` gives `Virtio.phase v c.hd = none ∨ wroteAt pm c.hd`.
   The first disjunct is everything the collect wants.  The second is the
   window between a serve task's used-index DMA write and its
@@ -2948,13 +2966,15 @@ structure DISK_ACC_ASSUMPTIONS : Prop where
     `(phase popped h).isSome` branch, which becomes reachable once such a
     head may be re-published.
 
-  THE TIER PLUMBING is all in place: `Xv6.ctxBytes_wordPointsTo` and
-  `Xv6.ctxIdx_byteBuf` are the reverse of `Xv6.disk_publish`'s
-  `Xv6.wordPointsTo_dmaOwn` / `Xv6.byteBuf_bufLease`, and
-  `MachCSL.ctxBytes_of_pushedFloor` is what turns a device-written raw
-  window into a context one once `Xv6.ctxFloor curCtx T` has passed the
-  write.  `Xv6.epOk_free` is the clause-side lemma for the receipt going
-  `.inactive`.  The `kmapStatic` premises are `disk_publish`'s, in
+  THE TIER PLUMBING is all in place and PROVED: `Xv6.chainLease_claim_join` takes the
+  three descriptor windows and the request header back whole (the
+  invariant's raw halves and the driver's context halves are the same
+  ghost elements), `Xv6.dmaOwnT_ctxBytes` takes a DEVICE-written window
+  back once the payload's floor has passed the write -- the status byte
+  today, `b->data` once the row records its bytes -- and
+  `Xv6.ctxBytes_wordPointsTo` / `Xv6.ctxIdx_byteBuf` turn a context window
+  into the driver's `wordAtN` / `byteBuf`.  `Xv6.epOk_free` is the
+  clause-side lemma for the receipt going `.inactive`.  The `kmapStatic` premises are `disk_publish`'s, in
   reverse: the reverse bridges need `MachCSL.inRam` of the buffer, which a
   `wordPointsTo` carries and a `dmaOwn` does not. -/
   disk_collect : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
