@@ -392,3 +392,8 @@ import Xv6.LinkVirtioDiskInit
 import Xv6.ProofClockintr
 import Xv6.LinkClockintr
 import Xv6.DiskTier
+import Xv6.VirtioDiskRwDefs
+import Xv6.SpecFreeDesc
+import Xv6.ProofFreeDesc
+import Xv6.LinkFreeDesc
+import Xv6.ProofVirtioDiskRwA
