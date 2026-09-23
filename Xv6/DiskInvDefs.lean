@@ -2850,7 +2850,7 @@ def unreadArmed (v : VirtioState) (st : Nat → HState) (dl : List UsedRec) (nr 
     (ring : Nat → Nat) (lo np : Nat) (stg : Option Nat) (sb : Nat → SByte) : Prop :=
   sbOk v sb ∧ pushedOff v dl nr ∧
   ∀ r ∈ dl, nr < r.cnt →
-    (∃ c : Chain, st r.hd = HState.active c) ∧
+    (∃ c : Chain, st r.hd = HState.active c ∧ c.ep = r.ep) ∧
     (∀ p, lo ≤ p → p < np → ring (p % NUM) ≠ r.hd) ∧ stg ≠ some r.hd ∧
     ∃ ts : Nat, sb r.hd = SByte.done ts ∧ ts ≤ r.pos
 
@@ -2912,7 +2912,7 @@ theorem unreadArmed_write (v : VirtioState) (st : Nat → HState) (dl : List Use
     (nr nc t ep : Nat) (ring : Nat → Nat) (lo np : Nat) (stg : Option Nat) (sb : Nat → SByte)
     (hd : BitVec 16) (r0 : VioReq) (ts : Nat) (hph : Virtio.phase v hd = some (.pushed r0))
     (hts : sb hd.toNat = SByte.done ts) (hle : ts ≤ t)
-    (ha : ∃ c : Chain, st hd.toNat = HState.active c)
+    (ha : ∃ c : Chain, st hd.toNat = HState.active c ∧ c.ep = ep)
     (hp : ∀ p, lo ≤ p → p < np → ring (p % NUM) ≠ hd.toNat) (hs : stg ≠ some hd.toNat)
     (h : unreadArmed v st dl nr ring lo np stg sb) :
     unreadArmed v st (dl ++ [(nc, t, hd.toNat, ep)]) nr ring lo np stg sb := by
@@ -2981,8 +2981,8 @@ theorem unreadArmed_stage (v : VirtioState) (st : Nat → HState) (dl : List Use
     (h : unreadArmed v st dl nr ring lo np stg sb) :
     unreadArmed v st dl nr (updN ring (np % NUM) i) lo np (some i) sb := by
   refine ⟨h.1, h.2.1, fun r hr hlt => ?_⟩
-  obtain ⟨⟨c, hc⟩, hp, _, hsb⟩ := h.2.2 r hr hlt
-  refine ⟨⟨c, hc⟩, fun p h1 h2 => ?_, ?_, hsb⟩
+  obtain ⟨⟨c, hc, hce⟩, hp, _, hsb⟩ := h.2.2 r hr hlt
+  refine ⟨⟨c, hc, hce⟩, fun p h1 h2 => ?_, ?_, hsb⟩
   · rw [updN_ne _ _ _ _ (ring_mod_ne lo np p h1 h2 hroom)]
     exact hp p h1 h2
   · intro he

@@ -2156,7 +2156,7 @@ theorem diskProto_unreadArmed (γ : DiskNames) (q : Qp) (v : VirtioState) (i n n
     ihave %hl := doneRec_lookup γ dl0 k (n, t, i, ep) $$ Hdn Hrec
     have hmem : ((n, t, i, ep) : UsedRec) ∈ dl :=
       List.mem_of_getElem? (MonoList.prefix_getElem? e10.1 hl)
-    obtain ⟨c, hcst⟩ := (e11.2.2 (n, t, i, ep) hmem (by rw [hnn]; exact hlt)).1
+    obtain ⟨c, hcst, -⟩ := (e11.2.2 (n, t, i, ep) hmem (by rw [hnn]; exact hlt)).1
     ihave %hwf := headRes_wf_of γ c0.desc st i c hi hcst $$ Hr
     ipureintro
     exact ⟨c, by rw [← hst, hcst], hwf.1, hwf.2⟩
@@ -2183,6 +2183,76 @@ theorem disk_slot_active [CurCtx] (γ : DiskNames) (q : Qp) (i n nrd : Nat) (s :
   imodintro
   iframe Htok Hnrd
   ipureintro; exact hres
+
+/-- **An unread completion names THIS arming**, read off the live arm.
+
+`Xv6.unreadArmed` says an entry above the handler's watermark has an
+ARMED head; since the epoch went into the entry with it
+(`Xv6.diskProto_usedIdx_acc` stamps the writing chain's
+`Xv6.Chain.ep`), it says more: the chain armed there is the one that
+completed.  So a reader that holds the slot's receipt -- the handler,
+which takes it out of the lock payload with `Xv6.disk_slot_active` --
+learns the entry's epoch is its own chain's. -/
+theorem diskProto_rec_epoch (γ : DiskNames) (q : Qp) (v : VirtioState)
+    (i n t ep nrd k : Nat) (c : Chain) (hi : i < NUM) (hlt : nrd < n) :
+    diskProto (GF := GF) γ v ∗ headTokF γ q i (HState.active c) ∗
+      doneRec γ k ((n, t, i, ep) : UsedRec) ∗ diskReadAt γ nrd ⊢ ⌜ep = c.ep⌝ := by
+  unfold diskProto
+  iintro ⟨⟨%hc, %pn, %pm, Hpm, %hfr, Harm⟩, Htok, #Hrec, Hnrd⟩
+  icases Harm with ⟨Hd | ⟨%c0, #Hfr, %hc0, Hl⟩⟩
+  · unfold diskDead
+    icases Hd with ⟨%m, Hm, Hcfg, Hlo0, HnpM0, Hpos0, HstgA0, Hbs0, Hdn0, Hnr0, %hp⟩
+    ihave %hl := doneRec_lookup γ [] k (n, t, i, ep) $$ Hdn0 Hrec
+    exact absurd hl (by simp)
+  · unfold diskLive
+    icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, %nq, %sb, %ue,
+      Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, Hnq, Hsb,
+      %hpure⟩
+    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15⟩ := hpure
+    ihave %hst := headTokF_state γ q st i (HState.active c) hi $$ Ha Htok
+    ihave %hnn := diskReadAt_agree γ nq nrd $$ Hnq Hnrd
+    ihave %hl := doneRec_lookup γ dl0 k (n, t, i, ep) $$ Hdn Hrec
+    have hmem : ((n, t, i, ep) : UsedRec) ∈ dl :=
+      List.mem_of_getElem? (MonoList.prefix_getElem? e10.1 hl)
+    obtain ⟨c', hcst, hce⟩ := (e11.2.2 (n, t, i, ep) hmem (by rw [hnn]; exact hlt)).1
+    ipureintro
+    have hcc : c' = c := by
+      have hx : HState.active c' = HState.active c := by
+        rw [← hcst, show UsedRec.hd ((n, t, i, ep) : UsedRec) = i from rfl]
+        exact hst
+      exact (HState.active.injEq c' c ▸ hx : c' = c)
+    rw [← hcc]
+    exact hce.symm
+
+/-- **The handler's mint**: out of the positioned record it has just read
+and the receipt of the slot it names, the EPOCH-INDEXED record
+(`Xv6.headDoneE`) that `Xv6.disk_collect` takes as its premise.
+
+This is the one step that can be taken while the entry is still UNREAD,
+which is what pins the arming; from here on the record is persistent and
+the sleeper may cash it after any number of intervening steps. -/
+theorem disk_slot_epoch [CurCtx] (γ : DiskNames) (q : Qp) (i n t nrd : Nat) (c : Chain)
+    (hi : i < NUM) (hlt : nrd < n) :
+    diskInv (GF := GF) γ ∗ headTokF γ q i (HState.active c) ∗ headDoneAt γ n t i ∗
+      diskReadAt γ nrd ⊢
+      |={⊤}=> (headTokF γ q i (HState.active c) ∗ diskReadAt γ nrd ∗ headDoneE γ n i c.ep) := by
+  unfold diskInv devInvR headDoneAt
+  iintro ⟨#Hinv, Htok, ⟨%k, %ep, #Hrec⟩, Hnrd⟩
+  iinv Hinv with Hbody Hclose
+  icases Hbody with ⟨%v, >Hfrag, >Hproto⟩
+  ihave %hep := diskProto_rec_epoch γ q v i n t ep nrd k c hi hlt
+    $$ [$Hproto $Htok $Hrec $Hnrd]
+  ihave Hcl := Hclose $$ [Hfrag Hproto]
+  case' _ =>
+    inext
+    iexists v
+    iframe Hfrag Hproto
+  imod Hcl
+  imodintro
+  iframe Htok Hnrd
+  rw [← hep]
+  iapply headDoneE_mk γ n t i k ep
+  iexact Hrec
 
 /-- **`deposit`** (`disk.used_idx += 1`, the tail of `virtio_disk_intr`'s
 loop body): the handler advances its watermark past the completion it has

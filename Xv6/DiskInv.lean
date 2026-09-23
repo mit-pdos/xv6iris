@@ -820,7 +820,8 @@ theorem diskProto_usedIdx_acc (γ : DiskNames) (s : VirtioState) (key : Nat) (h 
       permOk_mark s pm st key h cx ui false true hgetp e9,
       usedOk_write dl dl0 nc M t h.toNat cx.ep e10 hpos,
       unreadArmed_write s st dl nr (nc + 1) t cx.ep ring lo np stg sb h r ts hph hts hle
-        ⟨c, hcst⟩ hpos' hstg e11,
+        ⟨cx, (e9 key h cx (some (.pushed cx.req)) (some (ui, false)) hgetp).2.1, rfl⟩
+        hpos' hstg e11,
       cntOk_write pm
         (PartialMap.insert pm key ((h, cx, some (.pushed cx.req), some (ui, true)) : PermVal))
         dl nc t h.toNat cx.ep e12 hnw
