@@ -129,7 +129,7 @@ theorem execSpecF_sb_au_gen [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (
   conf_cases HmConf
   swp_run 40
   iapply swp_bind
-  iapply (hpmp cpu dq _ 1 _ _ (by simp [kernelAccess]) hram)
+  iapply (hpmp cpu dq _ 1 _ _ (by simp [kernelAccess]) (pmpOk_of_inRam hram))
   iframe
   inext
   iintro Hpmpcfg_n Hpmpaddr_n

@@ -28,15 +28,26 @@ class Xv6G (GF : BundledGFunctors) where
   [gvCpuG : GhostVarG GF CPU]
   /-- the per-proc state mirror (`SchedCtx.pstateOwn`) -/
   [gvW32G : GhostVarG GF (BitVec 32)]
+  /-- the UART's divisor-latch flag (`UartInv.dlabAuth`) -/
+  [gvBoolG : GhostVarG GF Bool]
 
 attribute [instance] Xv6G.monoListG Xv6G.gvListG
-attribute [reducible, instance] Xv6G.gvNatG Xv6G.gvUnitG Xv6G.gvCpuG Xv6G.gvW32G
+attribute [reducible, instance] Xv6G.gvNatG Xv6G.gvUnitG Xv6G.gvCpuG Xv6G.gvW32G Xv6G.gvBoolG
 
-/-- The names of the console's ghosts: the accepted trace and the
-transmitter's half. -/
+/-- The names of one port's ghosts (the Rocq `UartNames.uart_names`, the
+subset the Lean port carries): the accepted trace (`mono_list` over
+`Uart.acc`), the transmitted prefix (`mono_list` over `u.out`), the
+transmit token (`ghost_var` halves over the accepted trace), the divisor
+latch (`ghost_var` over `Uart.dlab`, frozen once `uartinit` is done), and
+the receive column: the bytes that ever entered the FIFO (`mono_list`) and
+the popped count (`ghost_var` halves -- the popper's token). -/
 structure UartNames where
   acc : GName
+  out : GName
   tx : GName
+  dlab : GName
+  rxin : GName
+  rxpop : GName
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]

@@ -37,6 +37,28 @@ theorem matching_pma_ram (pa : BitVec 64) (n : Nat) (h : inRam pa n) (hn : 0 < n
     if_pos (by refine ⟨?_, ?_, ?_⟩ <;> bv_omega)]
   rfl
 
+/-- The I/O region of the platform's PMA table: `[0x2000000, 0x12000000)`,
+where the CLINT, the PLIC, the UARTs and the virtio window live. -/
+def ioRegion : PMA_Region := bootPMA[1]!
+
+/-- An access inside the I/O region matches it (and not the region before it). -/
+theorem matching_pma_io (pa : BitVec 64) (n : Nat) (h1 : 0x2000000 ≤ pa.toNat) (h2 : pa.toNat + n ≤ 0x12000000)
+    (hn : 0 < n) (hn' : n ≤ 16) :
+    matching_pma_region bootPMA (physaddr.Physaddr pa) n = some ioRegion := by
+  simp only [matching_pma_region, matching_pma_region_bits_range, bootPMA, ioRegion,
+    range_subset, zopz0zIzJ_u, zero_extend, bits_of_physaddr, to_bits, get_slice_int,
+    Sail.BitVec.zeroExtend, Sail.BitVec.toNatInt, BitVec.setWidth_eq, Bool.and_eq_true,
+    decide_eq_true_eq]
+  have hslice : BitVec.extractLsb' 0 64 (BitVec.ofInt (0 + 64 + 1) (n : Int)) = BitVec.ofNat 64 n := by
+    apply BitVec.eq_of_toNat_eq
+    simp only [BitVec.extractLsb'_toNat, BitVec.toNat_ofInt, Nat.shiftRight_zero, BitVec.toNat_ofNat]
+    omega
+  rw [hslice]
+  simp only [Int.ofNat_eq_natCast, Int.ofNat_le]
+  rw [if_neg (by intro hc; obtain ⟨c1, c2, c3⟩ := hc; bv_omega),
+    if_pos (by refine ⟨?_, ?_, ?_⟩ <;> bv_omega)]
+  rfl
+
 /-- The CLINT window's configured base and size. -/
 @[sail_facts] theorem plat_clint_base_eq : plat_clint_base = 0x2000000#64 := by decide
 @[sail_facts] theorem plat_clint_size_eq : plat_clint_size = 0xC0000#64 := by decide
@@ -47,6 +69,16 @@ theorem within_clint_ram (pa : BitVec 64) (n : Nat) (h : inRam pa n) :
     within_clint (physaddr.Physaddr pa) n = pure false := by
   obtain ⟨h1, h2⟩ := h
   simp only [ramBase, ramEnd] at h1 h2
+  simp only [within_clint, plat_have_clint, plat_clint_base_eq, plat_clint_size_eq, Sail.BitVec.toNatInt,
+    Functions.not, Bool.not_true, Bool.false_eq_true, if_false]
+  congr 1
+  simp only [Bool.and_eq_false_iff, decide_eq_false_iff_not, Int.not_le, Int.ofNat_eq_natCast]
+  bv_omega
+
+/-- An access past the CLINT window (the PLIC, the UARTs, the virtio window)
+is outside it. -/
+theorem within_clint_io (pa : BitVec 64) (n : Nat) (h : 0x20C0000 < pa.toNat) :
+    within_clint (physaddr.Physaddr pa) n = pure false := by
   simp only [within_clint, plat_have_clint, plat_clint_base_eq, plat_clint_size_eq, Sail.BitVec.toNatInt,
     Functions.not, Bool.not_true, Bool.false_eq_true, if_false]
   congr 1

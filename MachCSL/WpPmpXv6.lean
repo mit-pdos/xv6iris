@@ -43,11 +43,19 @@ theorem toNat_to_bits_small (width : Nat) (h : width < 2 ^ 64) :
   have : ((width : Int) % (2 ^ 65 : Nat)) = width := Int.emod_eq_of_lt (by omega) (by omega)
   rw [this, Int.toNat_natCast, Nat.mod_eq_of_lt h]
 
-/-- xv6's TOR entry 0 (words [0, 2^54), i.e. bytes [0, 2^56)) covers every RAM access. -/
-theorem pmpRangeMatch_xv6 (addr : BitVec 64) (width : Nat) (hram : inRam addr width) :
+/-- An access xv6's TOR entry 0 covers: the footprint lies below `2^56 - 4`
+(every RAM access, and every device-window access). -/
+def pmpOk (addr : BitVec 64) (width : Nat) : Prop :=
+  0 < addr.toNat + width ∧ addr.toNat + width ≤ 72057594037927932 ∧ addr.toNat < 72057594037927932
+
+theorem pmpOk_of_inRam {addr : BitVec 64} {width : Nat} (h : inRam addr width) : pmpOk addr width := by
+  simp only [inRam, ramBase, ramEnd] at h; unfold pmpOk; omega
+
+/-- xv6's TOR entry 0 (words [0, 2^54), i.e. bytes [0, 2^56)) covers every such access. -/
+theorem pmpRangeMatch_xv6 (addr : BitVec 64) (width : Nat) (hram : pmpOk addr width) :
     pmpRangeMatch 0 72057594037927932 addr.toNat
       (BitVec.extractLsb' 0 64 (BitVec.ofInt 65 (width : Int))).toNat = pmpAddrMatch.PMP_Match := by
-  simp only [inRam, ramBase, ramEnd] at hram
+  unfold pmpOk at hram
   rw [toNat_to_bits_small width (by omega)]
   unfold pmpRangeMatch
   split
@@ -58,7 +66,7 @@ theorem pmpRangeMatch_xv6 (addr : BitVec 64) (width : Nat) (hram : inRam addr wi
 
 /-- The same, in the form the symbolic executor meets it (before it unfolds
 the model's integer conversions); used as a rewriting hypothesis. -/
-theorem pmpRangeMatch_xv6' (addr : BitVec 64) (width : Nat) (hram : inRam addr width) :
+theorem pmpRangeMatch_xv6' (addr : BitVec 64) (width : Nat) (hram : pmpOk addr width) :
     pmpRangeMatch (Sail.BitVec.toNatInt (0#64) * 4).toNat
       (Sail.BitVec.toNatInt (0x3fffffffffffff#64) * 4).toNat
       (Sail.BitVec.toNatInt addr).toNat
@@ -77,7 +85,7 @@ passes the PMP check. -/
 theorem swp_pmpCheck_xv6 (cpu : CPU) (dq : DFrac) (addr : BitVec 64) (width : Nat)
     (acc : MemoryAccessType mem_payload) (Φ : Option ExceptionType → IProp GF)
     (hacc : kernelAccess acc)
-    (hram : inRam addr width) :
+    (hram : pmpOk addr width) :
     Register.pmpcfg_n ↦ᵣ[cpu]{dq} xv6Pmpcfg ∗ Register.pmpaddr_n ↦ᵣ[cpu]{dq} xv6Pmpaddr ∗
     ▷ (Register.pmpcfg_n ↦ᵣ[cpu]{dq} xv6Pmpcfg -∗ Register.pmpaddr_n ↦ᵣ[cpu]{dq} xv6Pmpaddr -∗ Φ none)
     ⊢ swp cpu (pmpCheck (physaddr.Physaddr addr) width acc Privilege.Machine) Φ := by
@@ -134,7 +142,7 @@ theorem pmpPassesM_xv6 (cpu : CPU) (dq : DFrac) (c : MConf) (hcfg : c.pmpcfg = x
     (haddr : c.pmpaddr = xv6Pmpaddr) : pmpPassesM (GF := GF) cpu dq c := by
   intro addr width acc Φ hacc hram
   rw [hcfg, haddr]
-  exact swp_pmpCheck_xv6 cpu dq addr width acc Φ hacc hram
+  exact swp_pmpCheck_xv6 cpu dq addr width acc Φ hacc (pmpOk_of_inRam hram)
 
 /-- A configuration with all PMP entries off passes, whatever its address table. -/
 theorem pmpPassesM_off_any (cpu : CPU) (dq : DFrac) (c : MConf) (hcfg : c.pmpcfg = bootPmpcfg) :

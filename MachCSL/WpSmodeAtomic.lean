@@ -209,7 +209,7 @@ macro "store_file_S_au_proof" lem:ident va:term:max n:num spl:term:max : tactic 
     conf_cases HmConf
     swp_run 40
     iapply swp_bind
-    iapply (hpmp cpu dq _ $n _ _ (by simp [kernelAccess]) hram)
+    iapply (hpmp cpu dq _ $n _ _ (by simp [kernelAccess]) (pmpOk_of_inRam hram))
     iframe
     inext
     iintro Hpmpcfg_n Hpmpaddr_n
@@ -314,7 +314,7 @@ theorem execSpecF_amoswap_w_aq [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (si
   conf_cases HmConf
   swp_run 40
   iapply swp_bind
-  iapply (hpmp cpu dq _ 4 _ _ (by simp [kernelAccess]) hram)
+  iapply (hpmp cpu dq _ 4 _ _ (by simp [kernelAccess]) (pmpOk_of_inRam hram))
   iframe
   inext
   iintro Hpmpcfg_n Hpmpaddr_n

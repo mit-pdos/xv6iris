@@ -52,7 +52,7 @@ set_option maxRecDepth 100000 in
 RAM passes the PMP check (entry 0 is TOR over all of memory, RWX). -/
 theorem swp_pmpCheck_xv6_S (cpu : CPU) (dq : DFrac) (addr : BitVec 64) (width : Nat)
     (acc : MemoryAccessType mem_payload) (Φ : Option ExceptionType → IProp GF)
-    (hacc : kernelAccess acc) (hram : inRam addr width) :
+    (hacc : kernelAccess acc) (hram : pmpOk addr width) :
     Register.pmpcfg_n ↦ᵣ[cpu]{dq} xv6Pmpcfg ∗ Register.pmpaddr_n ↦ᵣ[cpu]{dq} xv6Pmpaddr ∗
     ▷ (Register.pmpcfg_n ↦ᵣ[cpu]{dq} xv6Pmpcfg -∗ Register.pmpaddr_n ↦ᵣ[cpu]{dq} xv6Pmpaddr -∗ Φ none)
     ⊢ swp cpu (pmpCheck (physaddr.Physaddr addr) width acc Privilege.Supervisor) Φ := by
@@ -72,7 +72,7 @@ theorem swp_pmpCheck_xv6_S (cpu : CPU) (dq : DFrac) (addr : BitVec 64) (width : 
 /-- The PMP check passes, in supervisor mode, for every kernel access inside RAM. -/
 def pmpPassesS (cpu : CPU) (dq : DFrac) (c : MConf) : Prop :=
   ∀ (addr : BitVec 64) (width : Nat) (acc : MemoryAccessType mem_payload)
-    (Φ : Option ExceptionType → IProp GF), kernelAccess acc → inRam addr width →
+    (Φ : Option ExceptionType → IProp GF), kernelAccess acc → pmpOk addr width →
     Register.pmpcfg_n ↦ᵣ[cpu]{dq} c.pmpcfg ∗ Register.pmpaddr_n ↦ᵣ[cpu]{dq} c.pmpaddr ∗
     ▷ (Register.pmpcfg_n ↦ᵣ[cpu]{dq} c.pmpcfg -∗ Register.pmpaddr_n ↦ᵣ[cpu]{dq} c.pmpaddr -∗ Φ none)
     ⊢ swp cpu (pmpCheck (physaddr.Physaddr addr) width acc Privilege.Supervisor) Φ
@@ -117,7 +117,7 @@ macro "checked_mem_read_S_proof" pa:ident n:num hram:ident hal:ident : tactic =>
     unfold checked_mem_read
     swp_run 60
     iapply swp_bind
-    iapply (hpmp cpu dq $pa $n _ _ (by simp [kernelAccess]) $hram)
+    iapply (hpmp cpu dq $pa $n _ _ (by simp [kernelAccess]) (pmpOk_of_inRam $hram))
     iframe
     inext
     iintro Hpmpcfg_n Hpmpaddr_n

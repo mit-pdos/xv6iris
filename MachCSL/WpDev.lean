@@ -311,6 +311,32 @@ theorem machInterp_acc_dev (σ : MState) (d : DevId) :
   · show iprop(devAuth d s' ⊢ devAuthAt MachGS.era d ((σ.devs.set d s').st d))
     rw [DevStates.set_same]
 
+/-- `devOpStep_local`, with the state-moving arm exposing the update that
+moved it. -/
+theorem devOpStep_localR (gen : Nat) (d : DevId) (o : DevOp (DevSt d) (DevTask d)) (σ : MState)
+    (v : o.ret) (σ' : MState) (obs : List Obs) (efs : List Expr)
+    (hw : ∀ g pa n w, o ≠ .dmaWrite g pa n w) (hp : ∀ c mm b, o ≠ .setPin c mm b)
+    (hop : devOpStep gen d o σ v σ' obs efs) :
+    (∃ (g : DevSt d → Option (DevSt d × List DevObs)) (s' : DevSt d) (os : List DevObs),
+      o = .step g ∧ g (σ.devs.st d) = some (s', os) ∧ σ' = σ.setDev d s' ∧ efs = []) ∨
+    (σ' = σ ∧ efs = []) ∨
+    (∃ (rt : DevRt) (t : DevTask d) (tid' : TaskId),
+      σ' = σ.setRt d rt ∧ efs = [.dev gen d tid' ((devSig d).task t)]) := by
+  cases o with
+  | step g =>
+    obtain ⟨s', os, hg, rfl, _, rfl⟩ := hop
+    exact Or.inl ⟨g, s', os, rfl, hg, rfl, rfl⟩
+  | get => obtain ⟨_, rfl, _, rfl⟩ := hop; exact Or.inr (Or.inl ⟨rfl, rfl⟩)
+  | choose => obtain ⟨rfl, _, rfl⟩ := hop; exact Or.inr (Or.inl ⟨rfl, rfl⟩)
+  | dmaRead pa n => obtain ⟨_, rfl, _, rfl⟩ := hop; exact Or.inr (Or.inl ⟨rfl, rfl⟩)
+  | dmaWrite g pa n w => exact absurd rfl (hw g pa n w)
+  | sample src => obtain ⟨_, rfl, _, rfl⟩ := hop; exact Or.inr (Or.inl ⟨rfl, rfl⟩)
+  | setPin c mm b => exact absurd rfl (hp c mm b)
+  | fork t =>
+    obtain ⟨_, _, rfl, rfl⟩ := hop
+    exact Or.inr (Or.inr ⟨_, t, _, rfl, rfl⟩)
+  | join tid => obtain ⟨_, rfl, _, rfl⟩ := hop; exact Or.inr (Or.inl ⟨rfl, rfl⟩)
+
 theorem DevStates.set_self (ds : DevStates) (d : DevId) : ds.set d (ds.st d) = ds := by
   cases ds
   simp only [DevStates.set, DevStates.mk.injEq]
@@ -348,6 +374,26 @@ inductive DevM.Local {S T : Type} : DevM S T Unit → Prop
 /-- A device all of whose programs are local. -/
 def DevSig.Local (d : DevId) : Prop :=
   DevM.Local (devSig d).body ∧ ∀ t, DevM.Local ((devSig d).task t)
+
+/-- A local program whose every atomic state update stays inside `rel`:
+what a client's ghost state (kept beside the mirror in an invariant) has
+to be preserved by (`wpDev_localR`). -/
+inductive DevM.LocalR {S T : Type} (rel : S → S → Prop) : DevM S T Unit → Prop
+  | pure (a : Unit) : LocalR rel (.pure a)
+  | op (o : DevOp S T) (k : o.ret → DevM S T Unit)
+      (hw : ∀ g pa n w, o ≠ .dmaWrite g pa n w) (hp : ∀ c mm b, o ≠ .setPin c mm b)
+      (hs : ∀ g, o = .step g → ∀ s s' os, g s = some (s', os) → rel s s')
+      (hk : ∀ r, LocalR rel (k r)) : LocalR rel (.op o k)
+
+theorem DevM.LocalR.local {S T : Type} {rel : S → S → Prop} {m : DevM S T Unit} (h : DevM.LocalR rel m) :
+    DevM.Local m := by
+  induction h with
+  | pure a => exact .pure a
+  | op o k hw hp _ _ ih => exact .op o k hw hp ih
+
+/-- A device all of whose programs are local and step inside `rel`. -/
+def DevSig.LocalR (d : DevId) (rel : DevSt d → DevSt d → Prop) : Prop :=
+  DevM.LocalR rel (devSig d).body ∧ ∀ t, DevM.LocalR rel ((devSig d).task t)
 
 /-- The mirror invariant: the device's half at some state. -/
 def devInv (N : Namespace) (d : DevId) : IProp GF := inv N (∃ s : DevSt d, devFrag d s)
@@ -487,6 +533,126 @@ theorem wpDev_local (N : Namespace) (d : DevId) (hloc : DevSig.Local d) :
       rw [hσ]
       ihave Hcl := Hclose $$ [Hfrag]
       case' _ => inext; iexists (σ.devs.st d); iexact Hfrag
+      imod Hcl
+      imodintro
+      ihave Hσ := machInterp_acc_dev_self σ d $$ [Hσclose Hauth]
+      case' _ => iframe
+      iframe Hσ
+      isplitl []
+      · iapply hmk _ hm' $$ IH
+      · exact BigSepL.bigSepL_nil_intro
+
+/-- The mirror invariant with a client's ghost state `R` beside the mirror. -/
+def devInvR (N : Namespace) (d : DevId) (R : DevSt d → IProp GF) : IProp GF :=
+  inv N iprop(∃ s : DevSt d, devFrag d s ∗ R s)
+
+/-- `wpDev_local` for an invariant carrying `R`: the device's own updates
+stay inside `rel`, along which the client updates `R`. -/
+theorem wpDev_localR (N : Namespace) (d : DevId) (rel : DevSt d → DevSt d → Prop)
+    (R : DevSt d → IProp GF) [∀ s, Timeless (R s)] (hloc : DevSig.LocalR d rel)
+    (hR : ∀ s s', rel s s' → R s ⊢@{IProp GF} |==> R s') :
+    devInvR N d R ∗ genCert ⊢@{IProp GF} ∀ (tid : TaskId) (m : DevProg d), ⌜DevM.LocalR rel m⌝ →
+      devWP (genId (hlc := hlc) (GF := GF)) d tid m := by
+  unfold devInvR
+  iintro ⟨#Hinv, #Hcert⟩
+  iloeb as IH
+  iintro %tid %m %hm
+  iapply wpDev_elim d tid m
+  iframe Hcert
+  iapply wpDev_lift d tid m
+  iintro %σ Hσ
+  iinv Hinv with Hbody Hclose
+  icases Hbody with ⟨%s, >Hfrag, >HR⟩
+  icases machInterp_acc_dev σ d $$ Hσ with ⟨Hauth, Hσclose⟩
+  ihave %hs := devAgreeAt _ d (σ.devs.st d) s $$ [Hauth Hfrag]
+  case' _ => iframe
+  subst hs
+  iapply fupd_mask_intro LawfulSet.empty_subset
+  iintro Hmask
+  isplit
+  · ipureintro
+    exact devStep_total _ d tid m σ
+  inext
+  iintro %obs %m' %σ' %efs %hstep Hcred
+  imod Hmask
+  have hmk : ∀ (m'' : DevProg d), DevM.LocalR rel m'' →
+      ⊢@{IProp GF} (∀ (tid : TaskId) (m : DevProg d), ⌜DevM.LocalR rel m⌝ →
+        devWP (genId (hlc := hlc) (GF := GF)) d tid m) -∗ wpDev d tid m'' := by
+    intro m'' hm''
+    iintro IH
+    unfold wpDev
+    iintro _
+    iapply IH $$ %tid %m'' %hm''
+  cases m with
+  | pure a =>
+    obtain ⟨rfl, rfl, h⟩ := hstep
+    ihave Hcl := Hclose $$ [Hfrag HR]
+    case' _ => inext; iexists (σ.devs.st d); iframe Hfrag HR
+    imod Hcl
+    imodintro
+    ihave Hσ := machInterp_acc_dev_self σ d $$ [Hσclose Hauth]
+    case' _ => iframe
+    rcases h with ⟨_, rfl, rfl⟩ | ⟨_, rfl, hσ'⟩
+    · iframe Hσ
+      isplitl []
+      · iapply hmk _ hloc.1 $$ IH
+      · exact BigSepL.bigSepL_nil_intro
+    · rw [hσ']
+      isplitl [Hσ]
+      · split
+        · iexact Hσ
+        · rw [machInterp_setRt]; iexact Hσ
+      isplitl []
+      · iapply hmk _ (DevM.LocalR.pure ()) $$ IH
+      · exact BigSepL.bigSepL_nil_intro
+  | op o k =>
+    have hm' := hm
+    cases hm with
+    | op _ _ hw hp hs hk =>
+    rcases hstep with ⟨v, rfl, hop⟩ | ⟨hb, rfl, hσ, rfl, rfl⟩
+    · rcases devOpStep_localR _ d o σ v σ' obs efs hw hp hop with
+        ⟨g, s', os, rfl, hg, rfl, rfl⟩ | ⟨hσ, rfl⟩ | ⟨rt, t, tid', rfl, rfl⟩
+      · -- the device's own state moved inside `rel`: both halves and the client's ghosts follow
+        have hrel := hs g rfl _ _ _ hg
+        imod (devUpdateAt _ d (σ.devs.st d) (σ.devs.st d) s') $$ [Hauth Hfrag] with ⟨Hauth, Hfrag⟩
+        · iframe
+        imod (hR _ _ hrel) $$ HR with HR
+        ihave Hcl := Hclose $$ [Hfrag HR]
+        case' _ => inext; iexists s'; iframe Hfrag HR
+        imod Hcl
+        imodintro
+        isplitl [Hauth Hσclose]
+        · iapply Hσclose $$ %s' Hauth
+        isplitl []
+        · iapply hmk _ (hk v) $$ IH
+        · exact BigSepL.bigSepL_nil_intro
+      · rw [hσ]
+        ihave Hcl := Hclose $$ [Hfrag HR]
+        case' _ => inext; iexists (σ.devs.st d); iframe Hfrag HR
+        imod Hcl
+        imodintro
+        ihave Hσ := machInterp_acc_dev_self σ d $$ [Hσclose Hauth]
+        case' _ => iframe
+        iframe Hσ
+        isplitl []
+        · iapply hmk _ (hk v) $$ IH
+        · exact BigSepL.bigSepL_nil_intro
+      · ihave Hcl := Hclose $$ [Hfrag HR]
+        case' _ => inext; iexists (σ.devs.st d); iframe Hfrag HR
+        imod Hcl
+        imodintro
+        ihave Hσ := machInterp_acc_dev_self σ d $$ [Hσclose Hauth]
+        case' _ => iframe
+        isplitl [Hσ]
+        · rw [machInterp_setRt]; iexact Hσ
+        isplitl []
+        · iapply hmk _ (hk v) $$ IH
+        · iapply BigSepL.bigSepL_singleton.2
+          unfold devWP
+          iapply IH $$ %tid' %((devSig d).task t) %(hloc.2 t)
+    · rw [hσ]
+      ihave Hcl := Hclose $$ [Hfrag HR]
+      case' _ => inext; iexists (σ.devs.st d); iframe Hfrag HR
       imod Hcl
       imodintro
       ihave Hσ := machInterp_acc_dev_self σ d $$ [Hσclose Hauth]

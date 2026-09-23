@@ -82,7 +82,7 @@ macro "checked_mem_read_S_load_proof" pa:ident n:num hram:ident hal:ident : tact
     unfold checked_mem_read
     swp_run 60
     iapply swp_bind
-    iapply (hpmp cpu dq $pa $n _ _ (by simp [kernelAccess]) $hram)
+    iapply (hpmp cpu dq $pa $n _ _ (by simp [kernelAccess]) (pmpOk_of_inRam $hram))
     iframe
     inext
     iintro Hpmpcfg_n Hpmpaddr_n
@@ -143,7 +143,7 @@ macro "checked_mem_write_S_proof" pa:ident n:num hram:ident hal:ident : tactic =
     unfold checked_mem_write
     swp_run 60
     iapply swp_bind
-    iapply (hpmp cpu dq $pa $n _ _ (by simp [kernelAccess]) $hram)
+    iapply (hpmp cpu dq $pa $n _ _ (by simp [kernelAccess]) (pmpOk_of_inRam $hram))
     iframe
     inext
     iintro Hpmpcfg_n Hpmpaddr_n
@@ -350,7 +350,7 @@ macro "store_file_S_proof" lem:ident va:term:max n:num spl:term:max : tactic =>
     conf_cases HmConf
     swp_run 40
     iapply swp_bind
-    iapply (hpmp cpu dq _ $n _ _ (by simp [kernelAccess]) hram)
+    iapply (hpmp cpu dq _ $n _ _ (by simp [kernelAccess]) (pmpOk_of_inRam hram))
     iframe
     inext
     iintro Hpmpcfg_n Hpmpaddr_n

@@ -11,6 +11,7 @@ import MachCSL.Resources
 import MachCSL.Ctx
 import MachCSL.Wp
 import MachCSL.WpDev
+import MachCSL.WpSmodeDev
 import MachCSL.Power
 import MachCSL.SimpAttr
 import MachCSL.ModelFacts

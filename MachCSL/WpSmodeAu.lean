@@ -40,7 +40,7 @@ macro "checked_mem_S_au_prefix" pa:ident n:num hram:ident hal:ident : tactic =>
     have halign := is_aligned_paddr_of $pa $n (by decide) $hal
     swp_run 60
     iapply swp_bind
-    iapply (hpmp cpu dq $pa $n _ _ (by simp [kernelAccess]) $hram)
+    iapply (hpmp cpu dq $pa $n _ _ (by simp [kernelAccess]) (pmpOk_of_inRam $hram))
     iframe
     inext
     iintro Hpmpcfg_n Hpmpaddr_n
