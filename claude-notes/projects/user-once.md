@@ -177,7 +177,18 @@ console instance waits for its M3.
   automatic).  The seams (`UkShRedirSeam`, `UkShPipeSeam`: `ushp_tree` to
   `UkShRun.ush_cmd`, and the child walks living in `UkShRedirSeam`) are
   A3's.  Exit: `wp_kshp_parser` is the symbol-free corollary.
-- [ ] **A2e** the budget guard.  Guard the redirect turn's `8` in
+- [x] **A2e** the budget guard -- LANDED.  AS LANDED: the guard is on the TREE
+  (`RefParseSym.ref_has_redir t = true -> 8 <= nn`), since `rs` is bound only
+  in the continuation; rooms are STRUCTURAL (`ushp_pex_room t := 16 + (24 +
+  (if ref_has_redir t then 8 else 0))`, `ushp_pp_room (UshpPipe l r) := 6 +
+  max (pex_room l) (pp_room r)`), giving EXEC 60, REDIR 68, PIPE(e,e) 66 --
+  the landed pipe budgets (68) were two words looser than the exact stack,
+  so the `_bar` corollaries pass `nn := 2 + nn`; the proposed `52 + 8*ht`
+  was wrong (68/76 vs the true 66/72).  Four `_bar` statements are
+  corollaries; the OPEN `wp_kshp_parsepipe_bar` (a call premise at an
+  arbitrary `args`, no consumer) keeps a walk of the turn with its recursion
+  at `wp_ref_parsepipe`; `UkShPipeRight.v` DELETED.  Net -1,600.  The former
+  brief text:  Guard the redirect turn's `8` in
   `UkShArgs.wp_ref_pex_loop`/`wp_ref_parseexec`/`_tree` as A2b guards
   parseredirs (`rs' <> [] -> 8 <= nn`, i.e. no extra words at `UshpExec _`);
   then `ushp_pp_room (UshpExec _) = 46` and `ushp_room t = 52 + 8 *
@@ -244,4 +255,4 @@ RULED by the owner: A starts now.  Branch `user-once/A` off `main` at
 monotonicity, the symbol-free bridge both ways, the redirect and pipe
 bridges, the three line-shape facts on `ush_line_is`/`ushs_line_is`/
 `ushq_line_is`) is stated and elaborates; its proofs are with a subagent.
-A1 and A2a-d are on `main`.  NEXT: A2e (branch `user-once/A2e`), then A3.
+A1 and A2a-e are on `main`.  NEXT: A3 (branch `user-once/A3`), in two cuts: A3a the seam + the child walks at the general theorem; A3b the deletions and re-homing.

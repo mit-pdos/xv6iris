@@ -275,12 +275,13 @@ Section UkShRedirEx.
       by exact (ref_args_of_toks_redir len f cur gp fe rest done [] (length rest + 2)
                   Hnonul Hred (ushs_toks_le _ _ _ _ _ Htoks) Htoks Hpos Hcnt
                   ltac:(lia)).
-    iApply (UkShArgs.wp_ref_pex_loop N (Pex := Pex) dq dw dv s0 ps p fp len f nn
+    iApply (UkShArgs.wp_ref_pex_loop N (Pex := Pex) dq dw dv s0 ps p fp len f (8 + nn)
               (length rest + 2) done (done ++ rest) []
               ({| rr_q := S (S gp); rr_eq := fe; rr_mode := rr_mode_gt; rr_fd := 1 |} :: [])
               p cur len UMalloc UMalloc' h mc wq weq
               (ushs_gt_ok_scope len f (ushs_gt_ok_redir len f gp fe Hred)) Href
               (UkShRedirs.ushp_malloc_chain_1 N UMalloc UMalloc' ushp_malloc_ok)
+              (fun _ => ltac:(lia))
               Hs0 Hs64 Hps0 Hps8 Hpssz Hfp0 Hfp8 Hfpl Hfph Hp0 Hp8 Hpsz Hcur
               Hs0v Hs1v Hs2v Hs3v Hs4v Hs5v Hs6v Hs7v Hs8v Hs9v Hs10v Hs11v
               with "Hcode Hro HM [Hpay] Hnode [] Hcur Hq Heq Hstr Hws Hsy Hrun").

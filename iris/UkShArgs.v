@@ -60,6 +60,12 @@
 (*     form.  Allocations: [ushp_malloc_chain (ushp_nodes t)].             *)
 (*     [ushp_cat t] is NOT a premise: under [ref_sym_scope] every redirect *)
 (*     the reference consumes is the '>' one, so it is implied.           *)
+(* (4) THE BUDGET IS GUARDED as UkShRedirs guards parseredirs' turn: the   *)
+(*     loop runs at [24 + nn] with [rs' <> [] -> 8 <= nn], the function at *)
+(*     [16 + (24 + nn)] with [ref_has_redir t = true -> 8 <= nn] -- the    *)
+(*     redirect turn's eight words are owed exactly when a redirect was    *)
+(*     consumed, so the symbol-free and the pipe shapes are exact          *)
+(*     instances at [nn] and the redirect shape at [8 + nn] (A2e).         *)
 (* ===================================================================== *)
 From Stdlib Require Import ZArith Bool Lia List.
 From stdpp Require Import gmap bitvector.definitions.
@@ -659,6 +665,7 @@ Section UkShArgs.
     ref_sym_scope len f ->
     ref_args len f n cur done rs0 = Some (toks, rs0 ++ rs', fin) ->
     ushp_malloc_chain (length rs') UM UM' ->
+    (rs' <> [] -> (8 <= nn)%nat) ->
     0 <= s0 -> s0 + Z.of_nat len < Z64 ->
     0 < ps -> ps mod 8 = 0 -> ps + 8 < Z64 ->
     0 < fp - 128 -> (fp - 128) mod 8 = 0 -> 0 <= fp -> fp < Z64 ->
@@ -689,7 +696,7 @@ Section UkShArgs.
     ustr γd dq s0 len f -∗
     ustr γd dw ushp_whitespace 5 ushp_ws_f -∗
     ustr γd dv ushp_symbols 7 ushp_sym_f -∗
-    urun N h mc (mword_of_int 0x622) (24 + (8 + nn)) -∗
+    urun N h mc (mword_of_int 0x622) (24 + nn) -∗
     (∀ t : Z,
      ushp_exec_pre s0 p toks -∗
      ushp_redirs_at s0 t p (rs0 ++ rs') -∗
@@ -708,14 +715,14 @@ Section UkShArgs.
              mc' !!! Regidx r = mc !!! Regidx r ⌝ -∗
          ⌜ mc' !!! Regidx s2_idx = mword_of_int (Z.of_nat (length toks)) ⌝ -∗
          ⌜ mc' !!! Regidx s1_idx = mword_of_int t ⌝ -∗
-         urun N h' mc' (mword_of_int 0x662) (24 + (8 + nn)) -∗
+         urun N h' mc' (mword_of_int 0x662) (24 + nn) -∗
          mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
     intro n.
     induction n as [| n IH ];
       intros done toks rs0 rs' t0 cur fin UM UM' h mc wq weq
-        Hscope Href Hchain Hs0 Hs64 Hps0 Hps8 Hpssz
+        Hscope Href Hchain Hnn Hs0 Hs64 Hps0 Hps8 Hpssz
         Hfp0 Hfp8 Hfpl Hfph Hp0 Hp8 Hpsz Hcur
         Hs0v Hs1v Hs2v Hs3v Hs4v Hs5v Hs6v Hs7v Hs8v Hs9v Hs10v Hs11v;
       [ discriminate Href | ].
@@ -729,7 +736,7 @@ Section UkShArgs.
       assert (Hrs' : rs' = [])
         by (apply (app_inv_head rs0); rewrite app_nil_r; exact Hrs).
       subst rs'. cbn [length UkShRedirs.ushp_malloc_chain] in Hchain. subst UM'.
-      iApply (wp_ref_pex_exit dq dw dv s0 ps fp len f (8 + nn) cur h mc wq weq
+      iApply (wp_ref_pex_exit dq dw dv s0 ps fp len f nn cur h mc wq weq
                 true fin 0%nat 0%nat 0%nat Hcur Hpk
                 ltac:(intro E; discriminate E) ltac:(intro E; discriminate E)
                 Hs0 Hs64 Hps0 Hps8 Hpssz
@@ -750,7 +757,7 @@ Section UkShArgs.
       assert (Hrs' : rs' = [])
         by (apply (app_inv_head rs0); rewrite app_nil_r; exact Hrs).
       subst rs'. cbn [length UkShRedirs.ushp_malloc_chain] in Hchain. subst UM'.
-      iApply (wp_ref_pex_exit dq dw dv s0 ps fp len f (8 + nn) cur h mc wq weq
+      iApply (wp_ref_pex_exit dq dw dv s0 ps fp len f nn cur h mc wq weq
                 false s q e fin Hcur Hpk (fun _ => Hscope) (fun _ => Hgtk)
                 Hs0 Hs64 Hps0 Hps8 Hpssz
                 (fun _ => conj Hfp0 (conj Hfp8 (conj Hfpl Hfph))) Hs4v Hs5v Hs6v
@@ -787,7 +794,7 @@ Section UkShArgs.
       assert (Hfp64 : 0 <= fp < Z64) by lia.
       (* ---- 0x622  c.mv a2,s6 ---- *)
       iApply (wp_uk_cmv N h mc (mword_of_int 0x622) a2_idx
-                s6_idx (mword_of_int ushp_T_arg) (24 + (8 + nn))
+                s6_idx (mword_of_int ushp_T_arg) (24 + nn)
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 ltac:(vm_compute; discriminate)
                 ltac:(rewrite Hs6v; symmetry;
@@ -805,7 +812,7 @@ Section UkShArgs.
                      (ushp_cs_ne r a2_idx Hr ltac:(vm_compute; reflexivity)))).
       (* ---- 0x624  c.mv a1,s5 ---- *)
       iApply (wp_uk_cmv N h1 n1 (mword_of_int 0x624) a1_idx
-                s5_idx (mword_of_int (s0 + Z.of_nat len)) (24 + (8 + nn))
+                s5_idx (mword_of_int (s0 + Z.of_nat len)) (24 + nn)
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 ltac:(vm_compute; discriminate)
                 ltac:(rewrite (Hk1 s5_idx ltac:(vm_compute; reflexivity))
@@ -825,7 +832,7 @@ Section UkShArgs.
             exact (Hk1 r Hr)).
       (* ---- 0x626  c.mv a0,s4 ---- *)
       iApply (wp_uk_cmv N h2 n2 (mword_of_int 0x626) a0_idx
-                s4_idx (mword_of_int ps) (24 + (8 + nn))
+                s4_idx (mword_of_int ps) (24 + nn)
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 ltac:(vm_compute; discriminate)
                 ltac:(rewrite (Hk2 s4_idx ltac:(vm_compute; reflexivity))
@@ -844,7 +851,7 @@ Section UkShArgs.
       (* ---- 0x628  jal 448 <peek> ---- *)
       iApply (wp_uk_jal N h3 n3 (mword_of_int 0x628)
                 (mword_of_int 2096672 : mword 21) ra_idx
-                (mword_of_int 0x448) (mword_of_int 0x62c) (24 + (8 + nn))
+                (mword_of_int 0x448) (mword_of_int 0x62c) (24 + nn)
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 ltac:(vm_compute; discriminate)
                 ltac:(apply bv_eq; vm_compute; reflexivity)
@@ -892,7 +899,7 @@ Section UkShArgs.
       rewrite <- shpp_peek.
       iApply (wp_ref_peek h4 n4 dq dw true DfracDiscarded ps s0
                 ushp_T_arg len cur 4 f (ushp_lit ushp_T_arg)
-                (mword_of_int (s0 + Z.of_nat cur)) (14 + (8 + nn))
+                (mword_of_int (s0 + Z.of_nat cur)) (14 + nn)
                 [rb_bar; rb_rpar; rb_amp; rb_semi] false s
                 Ha0_4 Ha1_4 Ha2_4 Hcur eq_refl Hs0 Hs64
                 ltac:(unfold ushp_T_arg; lia)
@@ -909,7 +916,7 @@ Section UkShArgs.
       (* ---- 0x62c  c.bnez a0 -- NOT taken: the guard missed ---- *)
       iApply (wp_uk_cbnez N h5 n5 (mword_of_int 0x62c)
                 (mword_of_int 27 : mword 8) (mword_of_int 2 : mword 3)
-                a0_idx false (mword_of_int 0x662) (24 + (8 + nn))
+                a0_idx false (mword_of_int 0x662) (24 + nn)
                 ltac:(vm_compute; reflexivity)
                 ltac:(rewrite Ha0_5; vm_compute; reflexivity)
                 ltac:(apply bv_eq; vm_compute; reflexivity)
@@ -919,7 +926,7 @@ Section UkShArgs.
       iIntros (h6) "Hrun".
       (* ---- 0x62e..0x634  the four argument moves ---- *)
       iApply (wp_uk_cmv N h6 n5 (mword_of_int 0x62e) a3_idx
-                s8_idx (mword_of_int (fp - 128)) (24 + (8 + nn))
+                s8_idx (mword_of_int (fp - 128)) (24 + nn)
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 ltac:(vm_compute; discriminate)
                 ltac:(rewrite (Hk5 s8_idx ltac:(vm_compute; reflexivity))
@@ -937,7 +944,7 @@ Section UkShArgs.
                        (ushp_cs_ne r a3_idx Hr ltac:(vm_compute; reflexivity)));
             exact (Hk5 r Hr)).
       iApply (wp_uk_cmv N h7 n6 (mword_of_int 0x630) a2_idx
-                s7_idx (mword_of_int (fp - 120)) (24 + (8 + nn))
+                s7_idx (mword_of_int (fp - 120)) (24 + nn)
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 ltac:(vm_compute; discriminate)
                 ltac:(rewrite (Hk6 s7_idx ltac:(vm_compute; reflexivity))
@@ -955,7 +962,7 @@ Section UkShArgs.
                        (ushp_cs_ne r a2_idx Hr ltac:(vm_compute; reflexivity)));
             exact (Hk6 r Hr)).
       iApply (wp_uk_cmv N h8 n7 (mword_of_int 0x632) a1_idx
-                s5_idx (mword_of_int (s0 + Z.of_nat len)) (24 + (8 + nn))
+                s5_idx (mword_of_int (s0 + Z.of_nat len)) (24 + nn)
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 ltac:(vm_compute; discriminate)
                 ltac:(rewrite (Hk7 s5_idx ltac:(vm_compute; reflexivity))
@@ -974,7 +981,7 @@ Section UkShArgs.
                        (ushp_cs_ne r a1_idx Hr ltac:(vm_compute; reflexivity)));
             exact (Hk7 r Hr)).
       iApply (wp_uk_cmv N h9 n8 (mword_of_int 0x634) a0_idx
-                s4_idx (mword_of_int ps) (24 + (8 + nn))
+                s4_idx (mword_of_int ps) (24 + nn)
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 ltac:(vm_compute; discriminate)
                 ltac:(rewrite (Hk8 s4_idx ltac:(vm_compute; reflexivity))
@@ -993,7 +1000,7 @@ Section UkShArgs.
       (* ---- 0x636  jal 310 <gettoken> ---- *)
       iApply (wp_uk_jal N h10 n9 (mword_of_int 0x636)
                 (mword_of_int 2096346 : mword 21) ra_idx
-                (mword_of_int 0x310) (mword_of_int 0x63a) (24 + (8 + nn))
+                (mword_of_int 0x310) (mword_of_int 0x63a) (24 + nn)
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 ltac:(vm_compute; discriminate)
                 ltac:(apply bv_eq; vm_compute; reflexivity)
@@ -1052,7 +1059,7 @@ Section UkShArgs.
                       (mword_of_int (fp - 128) : mword 64))) | ].
       rewrite <- shpp_gettoken.
       iApply (wp_ref_gettoken h11 n10 dq dw dv ps (fp - 120) (fp - 128)
-                s0 len s f (mword_of_int (s0 + Z.of_nat s)) wq weq (14 + (8 + nn))
+                s0 len s f (mword_of_int (s0 + Z.of_nat s)) wq weq (14 + nn)
                 rt_word q e s1
                 Ha0_10 Ha1_10 Ha2_10 Ha3_10 Hsle eq_refl Hscope Hs0 Hs64
                 Hps0 Hps8 Hpssz Hgtk
@@ -1071,7 +1078,7 @@ Section UkShArgs.
       (* ---- 0x63a  c.beqz a0 -- NOT taken: a token came back ---- *)
       iApply (wp_uk_cbeqz N h12 n11 (mword_of_int 0x63a)
                 (mword_of_int 20 : mword 8) (mword_of_int 2 : mword 3)
-                a0_idx false (mword_of_int 0x662) (24 + (8 + nn))
+                a0_idx false (mword_of_int 0x662) (24 + nn)
                 ltac:(vm_compute; reflexivity)
                 ltac:(rewrite Ha0_11; vm_compute; reflexivity)
                 ltac:(apply bv_eq; vm_compute; reflexivity)
@@ -1082,7 +1089,7 @@ Section UkShArgs.
       (* ---- 0x63c  bne a0,s10 -- NOT taken: the token IS a word ---- *)
       iApply (wp_uk_btype N h13 n11 (mword_of_int 0x63c)
                 (mword_of_int 8140 : mword 13) s10_idx a0_idx BNE false
-                (mword_of_int 0x608) (24 + (8 + nn))
+                (mword_of_int 0x608) (24 + nn)
                 ltac:(cbn [uv_btaken]; rewrite Ha0_11
                         (Hk11 s10_idx ltac:(vm_compute; reflexivity)) Hs10v;
                       vm_compute; reflexivity)
@@ -1096,7 +1103,7 @@ Section UkShArgs.
         by (rewrite (Hk11 s0_idx ltac:(vm_compute; reflexivity)); exact Hs0v).
       iApply (wp_uk_ld N h14 n11 (mword_of_int 0x640)
                 (mword_of_int 3976 : mword 12) s0_idx a5_idx (DfracOwn 1)
-                (fp - 120) (mword_of_int (s0 + Z.of_nat q)) (24 + (8 + nn))
+                (fp - 120) (mword_of_int (s0 + Z.of_nat q)) (24 + nn)
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 ltac:(rewrite Hs0_11 (uint_moi fp Hfp64);
                       vm_compute uoff_i12; lia)
@@ -1130,7 +1137,7 @@ Section UkShArgs.
       iApply (wp_uk_sd N h15 n12 (mword_of_int 0x644)
                 (mword_of_int 0 : mword 12) s3_idx a5_idx
                 (p + 8 + 8 * Z.of_nat (length done)) (mword_of_int 0)
-                (24 + (8 + nn))
+                (24 + nn)
                 ltac:(rewrite Hs3_12
                         (uint_moi (p + 8 + 8 * Z.of_nat (length done))
                            ltac:(unfold Z64 in *; lia));
@@ -1147,7 +1154,7 @@ Section UkShArgs.
         by (rewrite (Hk12 s0_idx ltac:(vm_compute; reflexivity)); exact Hs0v).
       iApply (wp_uk_ld N h16 n12 (mword_of_int 0x648)
                 (mword_of_int 3968 : mword 12) s0_idx a5_idx (DfracOwn 1)
-                (fp - 128) (mword_of_int (s0 + Z.of_nat e)) (24 + (8 + nn))
+                (fp - 128) (mword_of_int (s0 + Z.of_nat e)) (24 + nn)
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 ltac:(rewrite Hs0_12 (uint_moi fp Hfp64);
                       vm_compute uoff_i12; lia)
@@ -1180,7 +1187,7 @@ Section UkShArgs.
       iApply (wp_uk_sd N h17 n13 (mword_of_int 0x64c)
                 (mword_of_int 80 : mword 12) s3_idx a5_idx
                 (p + 88 + 8 * Z.of_nat (length done)) (mword_of_int 0)
-                (24 + (8 + nn))
+                (24 + nn)
                 ltac:(rewrite Hs3_13
                         (uint_moi (p + 8 + 8 * Z.of_nat (length done))
                            ltac:(unfold Z64 in *; lia));
@@ -1201,7 +1208,7 @@ Section UkShArgs.
         by (apply bv_eq; vm_compute; reflexivity).
       iApply (wp_uk_caddiw N h18 n13 (mword_of_int 0x650)
                 (mword_of_int 1 : mword 6) s2_idx
-                (mword_of_int (Z.of_nat (length done) + 1)) (24 + (8 + nn))
+                (mword_of_int (Z.of_nat (length done) + 1)) (24 + nn)
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 ltac:(vm_compute; discriminate)
                 ltac:(rewrite Hs2_13 Esx; symmetry;
@@ -1229,7 +1236,7 @@ Section UkShArgs.
       (* ---- 0x652  bne s2,s9 -- TAKEN: MAXARGS is not reached ---- *)
       iApply (wp_uk_btype N h19 n14 (mword_of_int 0x652)
                 (mword_of_int 8130 : mword 13) s9_idx s2_idx BNE true
-                (mword_of_int 0x614) (24 + (8 + nn))
+                (mword_of_int 0x614) (24 + nn)
                 ltac:(cbn [uv_btaken]; rewrite Hs2_14
                         (Hk14 s9_idx ltac:(vm_compute; reflexivity)
                            ltac:(vm_compute; discriminate)) Hs9v;
@@ -1256,7 +1263,7 @@ Section UkShArgs.
       iApply (wp_uk_caddi N h20 n14 (mword_of_int 0x614)
                 (mword_of_int 8 : mword 6) s3_idx
                 (mword_of_int (p + 8 + 8 * Z.of_nat (length done) + 8))
-                (24 + (8 + nn))
+                (24 + nn)
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 ltac:(vm_compute; discriminate)
                 ltac:(rewrite Hs3_14 Esx8; symmetry; apply moi_add)
@@ -1276,7 +1283,7 @@ Section UkShArgs.
             exact (Hk14 r Hr Hr2)).
       (* ---- 0x616..0x61a  parseredirs(ret, ps, es) ---- *)
       iApply (wp_uk_cmv N h21 n15 (mword_of_int 0x616) a2_idx
-                s5_idx (mword_of_int (s0 + Z.of_nat len)) (24 + (8 + nn))
+                s5_idx (mword_of_int (s0 + Z.of_nat len)) (24 + nn)
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 ltac:(vm_compute; discriminate)
                 ltac:(rewrite (Hk15 s5_idx ltac:(vm_compute; reflexivity)
@@ -1299,7 +1306,7 @@ Section UkShArgs.
                           ltac:(vm_compute; reflexivity)));
             exact (Hk15 r Hr Hr2 Hr3)).
       iApply (wp_uk_cmv N h22 n16 (mword_of_int 0x618) a1_idx
-                s4_idx (mword_of_int ps) (24 + (8 + nn))
+                s4_idx (mword_of_int ps) (24 + nn)
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 ltac:(vm_compute; discriminate)
                 ltac:(rewrite (Hk16 s4_idx ltac:(vm_compute; reflexivity)
@@ -1320,7 +1327,7 @@ Section UkShArgs.
                           ltac:(vm_compute; reflexivity)));
             exact (Hk16 r Hr Hr2 Hr3)).
       iApply (wp_uk_cmv N h23 n17 (mword_of_int 0x61a) a0_idx
-                s1_idx (mword_of_int t0) (24 + (8 + nn))
+                s1_idx (mword_of_int t0) (24 + nn)
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 ltac:(vm_compute; discriminate)
                 ltac:(rewrite (Hk17 s1_idx ltac:(vm_compute; reflexivity)
@@ -1343,7 +1350,7 @@ Section UkShArgs.
       (* ---- 0x61c  jal 4ac <parseredirs> ---- *)
       iApply (wp_uk_jal N h24 n18 (mword_of_int 0x61c)
                 (mword_of_int 2096784 : mword 21) ra_idx
-                (mword_of_int 0x4ac) (mword_of_int 0x620) (24 + (8 + nn))
+                (mword_of_int 0x4ac) (mword_of_int 0x620) (24 + nn)
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 ltac:(vm_compute; discriminate)
                 ltac:(apply bv_eq; vm_compute; reflexivity)
@@ -1396,9 +1403,11 @@ Section UkShArgs.
          at the redirects it consumes, and nothing at none *)
       iDestruct (ushp_pex_res_lend rs1 dv Pex with "Hres1 Hsy") as "[Hrres Hback2]".
       iApply (wp_ref_parseredirs h25 n19 dq dw dv t0 ps s0 len s1 n s2 f rs1
-                UM UM1 (mword_of_int (s0 + Z.of_nat s1)) (8 + nn)
+                UM UM1 (mword_of_int (s0 + Z.of_nat s1)) nn
                 Ha0_19 Ha1_19 Ha2_19 Hs1 eq_refl Hrd Hchain1
-                (fun _ => Hscope) (fun _ => ltac:(lia)) Hs0 Hs64
+                (fun _ => Hscope)
+                (fun Hne => Hnn (app_ne_l rs1 rs'' Hne))
+                Hs0 Hs64
                 Hps0 Hps8 Hpssz
                 with "Hcode Hro HM Hrres Hcur Hstr Hws Hrun").
       iIntros (t1) "Hcur Hstr Hws Hat HM1 Hrres".
@@ -1414,7 +1423,7 @@ Section UkShArgs.
             exact (Hk19 r Hr Hr2 Hr3)).
       (* ---- 0x620  c.mv s1,a0 -- ret = what parseredirs returned ---- *)
       iApply (wp_uk_cmv N h26 n20 (mword_of_int 0x620) s1_idx
-                a0_idx (mword_of_int t1) (24 + (8 + nn))
+                a0_idx (mword_of_int t1) (24 + nn)
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 ltac:(vm_compute; discriminate)
                 ltac:(rewrite Ha0_20; symmetry; exact (ushp_mv_val t1))
@@ -1459,7 +1468,9 @@ Section UkShArgs.
                 h27 n21
                 (mword_of_int (s0 + Z.of_nat q))
                 (mword_of_int (s0 + Z.of_nat e))
-                Hscope Hrest Hchain2 Hs0 Hs64 Hps0 Hps8 Hpssz Hfp0 Hfp8 Hfpl Hfph
+                Hscope Hrest Hchain2
+                (fun Hne => Hnn (app_ne_r rs1 rs'' Hne))
+                Hs0 Hs64 Hps0 Hps8 Hpssz Hfp0 Hfp8 Hfpl Hfph
                 Hp0 Hp8 Hpsz Hs2
                 ltac:(rewrite (Hk21 s0_idx ltac:(vm_compute; reflexivity)
                                  ltac:(vm_compute; discriminate)
@@ -1578,6 +1589,7 @@ Section UkShArgs.
     ref_sym_scope len f ->
     ref_parseexec len f n off = Some (t, fin) ->
     ushp_malloc_chain (ushp_nodes t) UM UM' ->
+    (ref_has_redir t = true -> (8 <= nn)%nat) ->
     0 <= s0 -> s0 + Z.of_nat len < Z64 ->
     0 < ps -> ps mod 8 = 0 -> ps + 8 < Z64 ->
     shp_code γt -∗
@@ -1589,7 +1601,7 @@ Section UkShArgs.
     UM -∗
     □ (Pex -∗ ukn_pay N (-1)) -∗
     Pex -∗
-    urun N h m (mword_of_int ShSyms.parseexec) (16 + (24 + (8 + nn))) -∗
+    urun N h m (mword_of_int ShSyms.parseexec) (16 + (24 + nn)) -∗
     (∀ (root p : Z) (toks : list (nat * nat)) (rs : list rredir),
        ⌜ t = ref_wrap (UshpExec toks) rs ⌝ -∗
        ⌜ p + 168 < Z64 ⌝ -∗
@@ -1605,11 +1617,11 @@ Section UkShArgs.
            UM' -∗
            Pex -∗
            urun N h' m' (ret_pc (m !!! Regidx ra_idx))
-             (16 + (24 + (8 + nn))) -∗
+             (16 + (24 + nn)) -∗
            mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
-    intros Ha0 Ha1 Hoffle Hw0 Hscope Href Hchain Hs0 Hs64 Hps0 Hps8 Hpssz.
+    intros Ha0 Ha1 Hoffle Hw0 Hscope Href Hchain Hnn Hs0 Hs64 Hps0 Hps8 Hpssz.
     iIntros "#Hcode #Hro Hcur Hstr Hws Hsy HM #Hpx Hpay Hrun Hcont".
     (* ---- the reference's answer, taken apart: the '(' peek MISSED (a hit
        is [None]), parseredirs ran at the skipped cursor, then the loop ---- *)
@@ -1645,7 +1657,7 @@ Section UkShArgs.
       rewrite Em in Hr. exact Hr. }
     (* ---- 0x590  c.addi16sp sp,sp,-128 ---- *)
     iApply (wp_uk_caddi16sp_dn N h m (mword_of_int 0x590)
-              (mword_of_int 56 : mword 6) 16 (24 + (8 + nn))
+              (mword_of_int 56 : mword 6) 16 (24 + nn)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               with "[] Hrun").
     { iApply (uis_shp_590 with "Hcode"). }
@@ -1733,7 +1745,7 @@ Section UkShArgs.
                                             | 6%nat => 11
                                             | _ => 12 end) + 1)).
     (* ---- 0x592..0x59a  the FIRST five spills ---- *)
-    iApply (wp_kshp_spill spn (24 + (8 + nn)) [(ra_idx, mword_of_int 15 : mword 6);
+    iApply (wp_kshp_spill spn (24 + nn) [(ra_idx, mword_of_int 15 : mword 6);
                (s0_idx, mword_of_int 14 : mword 6);
                (s1_idx, mword_of_int 13 : mword 6);
                (s4_idx, mword_of_int 10 : mword 6);
@@ -1787,7 +1799,7 @@ Section UkShArgs.
       rewrite Ei. exact Hup. }
     iApply (wp_uk_caddi4spn N h2 m1 (mword_of_int 0x59c)
               (mword_of_int 0 : mword 3) (mword_of_int 32 : mword 8) s0_idx
-              sp0 (24 + (8 + nn))
+              sp0 (24 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; discriminate)
@@ -1804,7 +1816,7 @@ Section UkShArgs.
       symmetry. exact (moi_of_uint sp0). }
     (* ---- 0x59e  c.mv s4,a0 ---- *)
     iApply (wp_uk_cmv N h3 m2 (mword_of_int 0x59e) s4_idx a0_idx
-              (mword_of_int ps) (24 + (8 + nn))
+              (mword_of_int ps) (24 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
               ltac:(rewrite (Hm2 a0_idx ltac:(vm_compute; discriminate))
@@ -1820,7 +1832,7 @@ Section UkShArgs.
       by (intros q Hq; exact (upd_ne m2 (Regidx s4_idx) (Regidx q) _ Hq)).
     (* ---- 0x5a0  c.mv s5,a1 ---- *)
     iApply (wp_uk_cmv N h4 m3 (mword_of_int 0x5a0) s5_idx a1_idx
-              (mword_of_int (s0 + Z.of_nat len)) (24 + (8 + nn))
+              (mword_of_int (s0 + Z.of_nat len)) (24 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
               ltac:(rewrite (Hm3 a1_idx ltac:(vm_compute; discriminate))
@@ -1839,7 +1851,7 @@ Section UkShArgs.
     (* ---- 0x5a2  auipc a2,0x1 ---- *)
     iApply (wp_uk_auipc N h5 m4 (mword_of_int 0x5a2)
               (mword_of_int 1 : mword 20) a2_idx
-              (mword_of_int 0x15a2) (24 + (8 + nn))
+              (mword_of_int 0x15a2) (24 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
               ltac:(apply bv_eq; vm_compute; reflexivity)
@@ -1857,7 +1869,7 @@ Section UkShArgs.
     (* ---- 0x5a6  addi a2,a2,-682 -- the open-paren table ---- *)
     iApply (wp_uk_addi N h6 m5 (mword_of_int 0x5a6)
               (mword_of_int 3430 : mword 12) a2_idx a2_idx
-              (mword_of_int ushp_T_block) (24 + (8 + nn))
+              (mword_of_int ushp_T_block) (24 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Ha2_5; unfold ushp_T_block;
@@ -1874,7 +1886,7 @@ Section UkShArgs.
     (* ---- 0x5aa  jal 448 <peek> ---- *)
     iApply (wp_uk_jal N h7 m6 (mword_of_int 0x5aa)
               (mword_of_int 2096798 : mword 21) ra_idx
-              (mword_of_int 0x448) (mword_of_int 0x5ae) (24 + (8 + nn))
+              (mword_of_int 0x448) (mword_of_int 0x5ae) (24 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
               ltac:(apply bv_eq; vm_compute; reflexivity)
@@ -1916,7 +1928,7 @@ Section UkShArgs.
     rewrite <- shpp_peek.
     iApply (wp_ref_peek h8 m7 dq dw true DfracDiscarded ps s0
               ushp_T_block len off 1 f (ushp_lit ushp_T_block)
-              w0 (14 + (8 + nn)) [rb_lpar] false s
+              w0 (14 + nn) [rb_lpar] false s
               Ha0_7 Ha1_7 Ha2_7 Hoffle Hw0 Hs0 Hs64
               ltac:(unfold ushp_T_block; lia)
               ltac:(unfold ushp_T_block, Z64; lia) Hps0 Hps8 Hpssz
@@ -1931,7 +1943,7 @@ Section UkShArgs.
     (* ---- 0x5ae  c.bnez a0 -- NOT taken: this is not a block ---- *)
     iApply (wp_uk_cbnez N h9 m8 (mword_of_int 0x5ae)
               (mword_of_int 32 : mword 8) (mword_of_int 2 : mword 3)
-              a0_idx false (mword_of_int 0x5ee) (24 + (8 + nn))
+              a0_idx false (mword_of_int 0x5ee) (24 + nn)
               ltac:(vm_compute; reflexivity)
               ltac:(rewrite Ha0_8; vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
@@ -1965,7 +1977,7 @@ Section UkShArgs.
               (Hm4 q Hqs5) (Hm3 q Hqs4) (Hm2 q Hqs0) (Hm1 q Hsp).
       reflexivity. }
     (* ---- 0x5b0..0x5be  the OTHER eight spills ---- *)
-    iApply (wp_kshp_spill spn (24 + (8 + nn)) [(s2_idx, mword_of_int 12 : mword 6);
+    iApply (wp_kshp_spill spn (24 + nn) [(s2_idx, mword_of_int 12 : mword 6);
                (s3_idx, mword_of_int 11 : mword 6);
                (s6_idx, mword_of_int 8 : mword 6);
                (s7_idx, mword_of_int 7 : mword 6);
@@ -2016,7 +2028,7 @@ Section UkShArgs.
     iIntros "HslB" (h11) "Hrun". cbn [length].
     (* ---- 0x5c0  c.mv s2,a0 -- argc = 0, and a0 IS 0 ---- *)
     iApply (wp_uk_cmv N h11 m8 (mword_of_int 0x5c0) s2_idx a0_idx
-              (mword_of_int 0) (24 + (8 + nn))
+              (mword_of_int 0) (24 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Ha0_8; symmetry; exact (ushp_mv_val 0))
@@ -2031,7 +2043,7 @@ Section UkShArgs.
     (* ---- 0x5c2  jal 1d2 <execcmd> ---- *)
     iApply (wp_uk_jal N h12 m9 (mword_of_int 0x5c2)
               (mword_of_int 2096144 : mword 21) ra_idx
-              (mword_of_int 0x1d2) (mword_of_int 0x5c6) (24 + (8 + nn))
+              (mword_of_int 0x1d2) (mword_of_int 0x5c6) (24 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
               ltac:(apply bv_eq; vm_compute; reflexivity)
@@ -2050,7 +2062,7 @@ Section UkShArgs.
                  (regval_into_reg (mword_of_int 0x5c6 : mword 64))).
       apply bv_eq; vm_compute; reflexivity. }
     rewrite <- shpp_execcmd.
-    iApply (UkShParseLex.wp_kshp_execcmd N UM UM1 Hok0 h13 m10 s0 (10 + (8 + nn))
+    iApply (UkShParseLex.wp_kshp_execcmd N UM UM1 Hok0 h13 m10 s0 (10 + nn)
               with "Hcode HM Hpx Hpay Hrun").
     iIntros (h14 m11 p) "%Hcs1011 %Ha0_11 %Hpb Hnode HM' Hpay Hrun".
     rewrite Eret10.
@@ -2064,7 +2076,7 @@ Section UkShArgs.
       apply Z.mod_divide; [ lia | exact Hp16 ]. }
     (* ---- 0x5c6  c.mv s3,a0 ---- *)
     iApply (wp_uk_cmv N h14 m11 (mword_of_int 0x5c6) s3_idx a0_idx
-              (mword_of_int p) (24 + (8 + nn))
+              (mword_of_int p) (24 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Ha0_11; symmetry; exact (ushp_mv_val p))
@@ -2078,7 +2090,7 @@ Section UkShArgs.
       by (intros q Hq; exact (upd_ne m11 (Regidx s3_idx) (Regidx q) _ Hq)).
     (* ---- 0x5c8  c.mv s11,a0 ---- *)
     iApply (wp_uk_cmv N h15 m12 (mword_of_int 0x5c8) s11_idx
-              a0_idx (mword_of_int p) (24 + (8 + nn))
+              a0_idx (mword_of_int p) (24 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
               ltac:(rewrite (Hm12 a0_idx ltac:(vm_compute; discriminate))
@@ -2137,7 +2149,7 @@ Section UkShArgs.
               (Hm3 s0_idx ltac:(vm_compute; discriminate)). exact Hs0_2. }
     (* ---- 0x5ca  c.mv a2,s5 ---- *)
     iApply (wp_uk_cmv N h16 m13 (mword_of_int 0x5ca) a2_idx
-              s5_idx (mword_of_int (s0 + Z.of_nat len)) (24 + (8 + nn))
+              s5_idx (mword_of_int (s0 + Z.of_nat len)) (24 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Hs5_13; symmetry;
@@ -2154,7 +2166,7 @@ Section UkShArgs.
       by (intros q Hq; exact (upd_ne m13 (Regidx a2_idx) (Regidx q) _ Hq)).
     (* ---- 0x5cc  c.mv a1,s4 ---- *)
     iApply (wp_uk_cmv N h17 m14 (mword_of_int 0x5cc) a1_idx
-              s4_idx (mword_of_int ps) (24 + (8 + nn))
+              s4_idx (mword_of_int ps) (24 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
               ltac:(rewrite (Hm14 s4_idx ltac:(vm_compute; discriminate))
@@ -2170,7 +2182,7 @@ Section UkShArgs.
     (* ---- 0x5ce  jal 4ac <parseredirs> ---- *)
     iApply (wp_uk_jal N h18 m15 (mword_of_int 0x5ce)
               (mword_of_int 2096862 : mword 21) ra_idx
-              (mword_of_int 0x4ac) (mword_of_int 0x5d2) (24 + (8 + nn))
+              (mword_of_int 0x4ac) (mword_of_int 0x5d2) (24 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
               ltac:(apply bv_eq; vm_compute; reflexivity)
@@ -2210,9 +2222,11 @@ Section UkShArgs.
     rewrite <- shpp_parseredirs.
     iDestruct (ushp_redirs_res_of rs_l dv Pex with "Hpx Hsy Hpay") as "[Hrres Hback]".
     iApply (wp_ref_parseredirs h19 m16 dq dw dv p ps s0 len s n s1 f rs_l
-              UM1 UM2 (mword_of_int (s0 + Z.of_nat s)) (8 + nn)
+              UM1 UM2 (mword_of_int (s0 + Z.of_nat s)) nn
               Ha0_16 Ha1_16 Ha2_16 Hs eq_refl Erd Hch1
-              (fun _ => Hscope) (fun _ => ltac:(lia)) Hs0 Hs64
+              (fun _ => Hscope)
+              (fun Hne => Hnn (ref_has_redir_wrap _ _ (app_ne_l rs_l rs' Hne)))
+              Hs0 Hs64
               Hps0 Hps8 Hpssz
               with "Hcode Hro HM' Hrres Hcur Hstr Hws Hrun").
     iIntros (t0) "Hcur Hstr Hws Hrat HM2 Hrres".
@@ -2221,7 +2235,7 @@ Section UkShArgs.
     iDestruct ("Hback" with "Hrres") as "[Hsy Hpay]".
     (* ---- 0x5d2  c.mv s1,a0 -- ret = what parseredirs returned ---- *)
     iApply (wp_uk_cmv N h20 m17 (mword_of_int 0x5d2) s1_idx
-              a0_idx (mword_of_int t0) (24 + (8 + nn))
+              a0_idx (mword_of_int t0) (24 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Ha0_17; symmetry; exact (ushp_mv_val t0))
@@ -2248,7 +2262,7 @@ Section UkShArgs.
       by (apply bv_eq; vm_compute; reflexivity).
     iApply (wp_uk_caddi N h21 m18 (mword_of_int 0x5d4)
               (mword_of_int 8 : mword 6) s3_idx (mword_of_int (p + 8))
-              (24 + (8 + nn))
+              (24 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Hs3_18 Esx8; symmetry; apply moi_add)
@@ -2263,7 +2277,7 @@ Section UkShArgs.
     (* ---- 0x5d6/0x5da  the argument-loop table ---- *)
     iApply (wp_uk_auipc N h22 m19 (mword_of_int 0x5d6)
               (mword_of_int 1 : mword 20) s6_idx
-              (mword_of_int 0x15d6) (24 + (8 + nn))
+              (mword_of_int 0x15d6) (24 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
               ltac:(apply bv_eq; vm_compute; reflexivity)
@@ -2280,7 +2294,7 @@ Section UkShArgs.
                   (regval_into_reg (mword_of_int 0x15d6 : mword 64))).
     iApply (wp_uk_addi N h23 m20 (mword_of_int 0x5da)
               (mword_of_int 3410 : mword 12) s6_idx s6_idx
-              (mword_of_int ushp_T_arg) (24 + (8 + nn))
+              (mword_of_int ushp_T_arg) (24 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Hs6_20; unfold ushp_T_arg;
@@ -2306,7 +2320,7 @@ Section UkShArgs.
               (Hm14 s0_idx ltac:(vm_compute; discriminate)). exact Hs0_13. }
     iApply (wp_uk_addi N h24 m21 (mword_of_int 0x5de)
               (mword_of_int 3968 : mword 12) s0_idx s8_idx
-              (mword_of_int (uint sp0 - 128)) (24 + (8 + nn))
+              (mword_of_int (uint sp0 - 128)) (24 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Hs0_21;
@@ -2326,7 +2340,7 @@ Section UkShArgs.
       by (intros q Hq; exact (upd_ne m21 (Regidx s8_idx) (Regidx q) _ Hq)).
     iApply (wp_uk_addi N h25 m22 (mword_of_int 0x5e2)
               (mword_of_int 3976 : mword 12) s0_idx s7_idx
-              (mword_of_int (uint sp0 - 120)) (24 + (8 + nn))
+              (mword_of_int (uint sp0 - 120)) (24 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
               ltac:(rewrite (Hm22 s0_idx ltac:(vm_compute; discriminate))
@@ -2348,7 +2362,7 @@ Section UkShArgs.
     (* ---- 0x5e6/0x5ea  the two constants ---- *)
     iApply (wp_uk_li N h26 m23 (mword_of_int 0x5e6)
               (mword_of_int 97 : mword 12) s10_idx (mword_of_int 97)
-              (24 + (8 + nn))
+              (24 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
               ltac:(symmetry; exact (ushp_mv_val 97))
@@ -2361,7 +2375,7 @@ Section UkShArgs.
                      m24 !!! Regidx q = m23 !!! Regidx q)
       by (intros q Hq; exact (upd_ne m23 (Regidx s10_idx) (Regidx q) _ Hq)).
     iApply (wp_uk_cli N h27 m24 (mword_of_int 0x5ea)
-              (mword_of_int 10 : mword 6) s9_idx (24 + (8 + nn))
+              (mword_of_int 10 : mword 6) s9_idx (24 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
               with "[] Hrun").
@@ -2376,7 +2390,7 @@ Section UkShArgs.
       by (intros q Hq; exact (upd_ne m24 (Regidx s9_idx) (Regidx q) _ Hq)).
     (* ---- 0x5ec  c.j 0x622 -- into the loop ---- *)
     iApply (wp_uk_cj N h28 m25 (mword_of_int 0x5ec)
-              (mword_of_int 27 : mword 11) (mword_of_int 0x622) (24 + (8 + nn))
+              (mword_of_int 27 : mword 11) (mword_of_int 0x622) (24 + nn)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               with "[] Hrun").
@@ -2472,7 +2486,9 @@ Section UkShArgs.
     iDestruct (ushp_pex_res_of rs' Pex with "Hpx Hpay") as "[Hres Hback']".
     iApply (wp_ref_pex_loop dq dw dv s0 ps p (uint sp0) len f nn
               n (@nil (nat * nat)) toks rs_l rs' t0 s1 s2 UM2 UM' h29 m25 wq weq
-              Hscope Eargs Hch2 Hs0 Hs64 Hps0 Hps8 Hpssz
+              Hscope Eargs Hch2
+              (fun Hne => Hnn (ref_has_redir_wrap _ _ (app_ne_r rs_l rs' Hne)))
+              Hs0 Hs64 Hps0 Hps8 Hpssz
               ltac:(lia) Hsp8al ltac:(lia) ltac:(lia)
               Hp0 Hp8 ltac:(lia) Hs1
               ltac:(rewrite (Hk25 s0_idx ltac:(vm_compute; reflexivity)
@@ -2563,7 +2579,7 @@ Section UkShArgs.
     (* ---- 0x662  c.slli s2,s2,0x3 ---- *)
     iApply (wp_uk_cslli N h30 mf (mword_of_int 0x662)
               (mword_of_int 3 : mword 6) s2_idx
-              (mword_of_int (8 * Z.of_nat (length toks))) (24 + (8 + nn))
+              (mword_of_int (8 * Z.of_nat (length toks))) (24 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Hs2f'
@@ -2588,7 +2604,7 @@ Section UkShArgs.
     (* ---- 0x664  add a5,s11,s2 ---- *)
     iApply (wp_uk_add N h31 mg (mword_of_int 0x664)
               s11_idx s2_idx a5_idx
-              (mword_of_int (p + 8 * Z.of_nat (length toks))) (24 + (8 + nn))
+              (mword_of_int (p + 8 * Z.of_nat (length toks))) (24 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Hs2_g (Hmg s11_idx ltac:(vm_compute; discriminate))
@@ -2619,7 +2635,7 @@ Section UkShArgs.
     iApply (wp_uk_sd N h32 mh (mword_of_int 0x668)
               (mword_of_int 8 : mword 12) a5_idx x0_idx
               (p + 8 + 8 * Z.of_nat (length toks)) (mword_of_int 0)
-              (24 + (8 + nn))
+              (24 + nn)
               ltac:(rewrite Ha5_h
                       (uint_moi (p + 8 * Z.of_nat (length toks))
                          ltac:(unfold Z64 in *; lia));
@@ -2637,7 +2653,7 @@ Section UkShArgs.
     iApply (wp_uk_sd N h33 mh (mword_of_int 0x66c)
               (mword_of_int 88 : mword 12) a5_idx x0_idx
               (p + 88 + 8 * Z.of_nat (length toks)) (mword_of_int 0)
-              (24 + (8 + nn))
+              (24 + nn)
               ltac:(rewrite Ha5_h
                       (uint_moi (p + 8 * Z.of_nat (length toks))
                          ltac:(unfold Z64 in *; lia));
@@ -2653,7 +2669,7 @@ Section UkShArgs.
     assert (Hsp_h : mh !!! Regidx csp_rs1 = spn).
     { rewrite (Hmh csp_rs1 ltac:(vm_compute; discriminate))
               (Hmg csp_rs1 ltac:(vm_compute; discriminate)). exact Hsp_f. }
-    iApply (wp_kshp_restore spn (24 + (8 + nn)) [(s2_idx, mword_of_int 12 : mword 6);
+    iApply (wp_kshp_restore spn (24 + nn) [(s2_idx, mword_of_int 12 : mword 6);
                (s3_idx, mword_of_int 11 : mword 6);
                (s6_idx, mword_of_int 8 : mword 6);
                (s7_idx, mword_of_int 7 : mword 6);
@@ -2729,7 +2745,7 @@ Section UkShArgs.
                  ltac:(ushp_ne_vm)). exact Hsp_h. }
     (* ---- 0x680  c.j 0x5f8 -- into the common tail ---- *)
     iApply (wp_uk_cj N h35 mi (mword_of_int 0x680)
-              (mword_of_int 1980 : mword 11) (mword_of_int 0x5f8) (24 + (8 + nn))
+              (mword_of_int 1980 : mword 11) (mword_of_int 0x5f8) (24 + nn)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               with "[] Hrun").
@@ -2737,7 +2753,7 @@ Section UkShArgs.
     iIntros (h36) "Hrun".
     (* ---- 0x5f8  c.mv a0,s1 ---- *)
     iApply (wp_uk_cmv N h36 mi (mword_of_int 0x5f8) a0_idx
-              s1_idx (mword_of_int root) (24 + (8 + nn))
+              s1_idx (mword_of_int root) (24 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Hs1_i; symmetry; exact (ushp_mv_val root))
@@ -2752,7 +2768,7 @@ Section UkShArgs.
     assert (Hsp_j : mj !!! Regidx csp_rs1 = spn).
     { rewrite (Hmj csp_rs1 ltac:(vm_compute; discriminate)). exact Hsp_i. }
     (* ---- 0x5fa..0x602  the FIVE restores ---- *)
-    iApply (wp_kshp_restore spn (24 + (8 + nn)) [(ra_idx, mword_of_int 15 : mword 6);
+    iApply (wp_kshp_restore spn (24 + nn) [(ra_idx, mword_of_int 15 : mword 6);
                (s0_idx, mword_of_int 14 : mword 6);
                (s1_idx, mword_of_int 13 : mword 6);
                (s4_idx, mword_of_int 10 : mword 6);
@@ -2825,7 +2841,7 @@ Section UkShArgs.
     iDestruct "HslB" as "(B0 & B1 & B2 & B3 & B4 & B5 & B6 & B7 & _)".
     (* ---- 0x604  c.addi16sp sp,sp,128 -- THE POP ---- *)
     iApply (wp_uk_caddi16sp_up N h38 mk (mword_of_int 0x604)
-              (mword_of_int 8 : mword 6) 16 (24 + (8 + nn))
+              (mword_of_int 8 : mword 6) 16 (24 + nn)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               with "[] [A0 A1 A2 A3 A4 B0 B1 B2 B3 B4 B5 B6 B7 L0 Lq Leq Hbot]
                    Hrun").
@@ -2879,7 +2895,7 @@ Section UkShArgs.
     iApply (wp_uk_cjr N h39
               (<[Regidx csp_rs1 := regval_into_reg sp0]> mk)
               (mword_of_int 0x606) ra_idx (ret_pc (m !!! Regidx ra_idx))
-              (16 + (24 + (8 + nn)))
+              (16 + (24 + nn))
               ltac:(vm_compute; discriminate)
               ltac:(rewrite (upd_ne mk (Regidx csp_rs1) (Regidx ra_idx) _
                                ltac:(vm_compute; discriminate));
@@ -2994,6 +3010,7 @@ Section UkShArgs.
     ref_sym_scope len f ->
     ref_parseexec len f n off = Some (t, fin) ->
     ushp_malloc_chain (ushp_nodes t) UM UM' ->
+    (ref_has_redir t = true -> (8 <= nn)%nat) ->
     0 <= s0 -> s0 + Z.of_nat len < Z64 ->
     0 < ps -> ps mod 8 = 0 -> ps + 8 < Z64 ->
     shp_code γt -∗
@@ -3005,7 +3022,7 @@ Section UkShArgs.
     UM -∗
     □ (Pex -∗ ukn_pay N (-1)) -∗
     Pex -∗
-    urun N h m (mword_of_int ShSyms.parseexec) (16 + (24 + (8 + nn))) -∗
+    urun N h m (mword_of_int ShSyms.parseexec) (16 + (24 + nn)) -∗
     (∀ root : Z,
        ushp_tree s0 root t -∗
        uword γd ps (mword_of_int (s0 + Z.of_nat fin)) -∗
@@ -3018,14 +3035,14 @@ Section UkShArgs.
            UM' -∗
            Pex -∗
            urun N h' m' (ret_pc (m !!! Regidx ra_idx))
-             (16 + (24 + (8 + nn))) -∗
+             (16 + (24 + nn)) -∗
            mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
-    intros Ha0 Ha1 Hoffle Hw0 Hscope Href Hchain Hs0 Hs64 Hps0 Hps8 Hpssz.
+    intros Ha0 Ha1 Hoffle Hw0 Hscope Href Hchain Hnn Hs0 Hs64 Hps0 Hps8 Hpssz.
     iIntros "#Hcode #Hro Hcur Hstr Hws Hsy HM #Hpx Hpay Hrun Hcont".
     iApply (wp_ref_parseexec h m dq dw dv ps s0 len off n fin f w0 t UM UM' nn
-              Ha0 Ha1 Hoffle Hw0 Hscope Href Hchain Hs0 Hs64 Hps0 Hps8 Hpssz
+              Ha0 Ha1 Hoffle Hw0 Hscope Href Hchain Hnn Hs0 Hs64 Hps0 Hps8 Hpssz
               with "Hcode Hro Hcur Hstr Hws Hsy HM Hpx Hpay Hrun").
     iIntros (root p toks rs) "%Ht %Hp Hexec Hrat Hcur Hstr Hws Hsy". subst t.
     iIntros (h' m') "%Hcs %Ha0' HM' Hpay Hrun".

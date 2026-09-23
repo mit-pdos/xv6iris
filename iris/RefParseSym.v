@@ -757,6 +757,52 @@ Proof using.
   - unfold ref_wrap in IH. rewrite IH. cbn [ushp_nodes]. lia.
 Qed.
 
+(* ---- the top constructor of a wrapped command (A2e) --------------------- *)
+
+(* whether the answer is topped by a REDIR node: the redirect turn's eight
+   stack words are needed exactly when it is, so the parseexec budget is
+   guarded by this and not by the redirect list, which the caller does not
+   see until the answer arrives *)
+Definition ref_has_redir (t : ushp_cmd) : bool :=
+  match t with
+  | UshpRedir _ _ _ _ _ => true
+  | _ => false
+  end.
+
+(* a wrap either adds nothing or leaves a REDIR on top *)
+Lemma ref_wrap_redir_or (c : ushp_cmd) (rs : list rredir) :
+  ref_wrap c rs = c
+  \/ exists (c' : ushp_cmd) (q e : nat) (mode fd : Z), ref_wrap c rs = UshpRedir c' q e mode fd.
+Proof using.
+  revert c. induction rs as [| r rs IH ]; intro c.
+  - left. reflexivity.
+  - right.
+    change (ref_wrap c (r :: rs))
+      with (ref_wrap (UshpRedir c (rr_q r) (rr_eq r) (rr_mode r) (rr_fd r)) rs).
+    destruct (IH (UshpRedir c (rr_q r) (rr_eq r) (rr_mode r) (rr_fd r)))
+      as [ E | (c' & q & e & mode & fd & E) ].
+    + exists c, (rr_q r), (rr_eq r), (rr_mode r), (rr_fd r). exact E.
+    + exists c', q, e, mode, fd. exact E.
+Qed.
+
+Lemma ref_has_redir_wrap (c : ushp_cmd) (rs : list rredir) :
+  rs <> [] -> ref_has_redir (ref_wrap c rs) = true.
+Proof using.
+  intro Hne. destruct rs as [| r rs ]; [ exact (False_ind _ (Hne eq_refl)) | ].
+  change (ref_wrap c (r :: rs))
+    with (ref_wrap (UshpRedir c (rr_q r) (rr_eq r) (rr_mode r) (rr_fd r)) rs).
+  destruct (ref_wrap_redir_or (UshpRedir c (rr_q r) (rr_eq r) (rr_mode r) (rr_fd r)) rs)
+    as [ E | (c' & q & e & mode & fd & E) ]; rewrite E; reflexivity.
+Qed.
+
+(* the two halves of the redirect list parseexec consumes, each non-empty
+   only if the whole is *)
+Lemma app_ne_l {A : Type} (l1 l2 : list A) : l1 <> [] -> l1 ++ l2 <> [].
+Proof using. intros H E. apply H. destruct l1; [ reflexivity | discriminate E ]. Qed.
+
+Lemma app_ne_r {A : Type} (l1 l2 : list A) : l2 <> [] -> l1 ++ l2 <> [].
+Proof using. intros H E. apply H. destruct l1; [ exact E | discriminate E ]. Qed.
+
 (* ---- the redirect line ------------------------------------------------- *)
 
 (* at or below the one symbol, a symbol byte IS that symbol *)
@@ -1253,3 +1299,56 @@ Proof using.
   - cbn [ref_wrap fold_left]. rewrite app_nil_r. reflexivity.
   - rewrite ref_wrap_cons, IH. cbn [ref_nulcut]. rewrite <- app_assoc. reflexivity.
 Qed.
+
+(* ---- parseexec's answer, and one step of the two fuelled recursions ---- *)
+(* (moved down from UkShParser at A2e) *)
+
+(* parseexec's answer is always a wrapped exec node *)
+Lemma ref_parseexec_wrap_inv (len : nat) (f : nat -> bv 8) (n i : nat) (t : ushp_cmd) (fin : nat) :
+  ref_parseexec len f n i = Some (t, fin) ->
+  exists (toks : list (nat * nat)) (rs : list rredir), t = ref_wrap (UshpExec toks) rs.
+Proof using.
+  intro H. unfold ref_parseexec in H.
+  destruct (ref_peek len f i [rb_lpar]) as [ blk s ]. destruct blk; [ discriminate H | ].
+  destruct (ref_redirs len f n s []) as [[ rs1 s1 ] | ]; [ | discriminate H ].
+  destruct (ref_args len f n s1 [] rs1) as [[[ toks rs ] s2 ] | ]; [ | discriminate H ].
+  injection H as <- _. exists toks, rs. reflexivity.
+Qed.
+
+(* one step of the two fuelled recursions, as a rewrite: [cbn] on a
+   constructor fuel unfolds the INNER call too *)
+Lemma ref_parsepipe_S (len : nat) (f : nat -> bv 8) (n i : nat) :
+  ref_parsepipe len f (S n) i =
+  match ref_parseexec len f n i with
+  | Some (t, s) =>
+      let '(bar, s1) := ref_peek len f s [rb_bar] in
+      if bar then
+        let '(_, _, _, s2) := ref_gettoken len f s1 in
+        match ref_parsepipe len f n s2 with
+        | Some (r, s3) => Some (UshpPipe t r, s3)
+        | None => None
+        end
+      else Some (t, s1)
+  | None => None
+  end.
+Proof using. reflexivity. Qed.
+
+Lemma ref_parseline_S (len : nat) (f : nat -> bv 8) (n i : nat) :
+  ref_parseline len f (S n) i =
+  match ref_parsepipe len f n i with
+  | Some (t, s) =>
+      match ref_backs len f n s t with
+      | Some (t1, s1) =>
+          let '(semi, s2) := ref_peek len f s1 [rb_semi] in
+          if semi then
+            let '(_, _, _, s3) := ref_gettoken len f s2 in
+            match ref_parseline len f n s3 with
+            | Some (r, s4) => Some (UshpList t1 r, s4)
+            | None => None
+            end
+          else Some (t1, s2)
+      | None => None
+      end
+  | None => None
+  end.
+Proof using. reflexivity. Qed.
