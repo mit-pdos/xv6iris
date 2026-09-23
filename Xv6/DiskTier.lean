@@ -719,7 +719,7 @@ theorem epOk_arm3 (v : VirtioState) (st : Nat → HState) (c : Chain) (pm : RegM
         · rw [armSt3_ne st c j h1 h2 h3] at hj
           exact Or.inr ⟨h1, hj⟩
   refine ⟨⟨fun p h1 h2 cc hcc => ?_, fun j hj cc hcc => ?_⟩, hlow, hperm,
-    fun hh cc hsc hs hnw r hr hrh => ?_, hinj⟩
+    fun hh cc hsc hs r hr hrh => ?_, hinj⟩
   · rcases hcases _ cc hcc with ⟨he, -⟩ | ⟨-, hold⟩
     · have hact := (hq.1 p h1 h2).2
       rw [he, hst] at hact
@@ -732,7 +732,7 @@ theorem epOk_arm3 (v : VirtioState) (st : Nat → HState) (c : Chain) (pm : RegM
   · rcases hcases _ cc hsc with ⟨he, hcc⟩ | ⟨-, hold⟩
     · rw [hcc, hep]
       exact Nat.ne_of_lt (Nat.lt_of_lt_of_le (hlow r hr) hle)
-    · exact hdone hh cc hold hs hnw r hr hrh
+    · exact hdone hh cc hold hs r hr hrh
 
 /-- **The ring store STAGES a free head**: the cell it writes is at the
 position the bump will publish, which is at no PENDING position, and the
