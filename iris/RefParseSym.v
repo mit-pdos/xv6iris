@@ -341,3 +341,226 @@ Proof using.
   - rewrite (ref_at_ge len f k ltac:(lia)), (bool_decide_eq_false_2 (k < len) Hge).
     rewrite (bool_decide_eq_true_2 (ubyte0 = ubyte0) eq_refl). reflexivity.
 Qed.
+
+(* ===================================================================== *)
+(* §4 parseredirs: WHAT ONE TURN OF THE REFERENCE LOOP IS                  *)
+(* ===================================================================== *)
+
+(* The lemmas the general parseredirs walk (UkShRedirs.wp_ref_parseredirs)
+   reads its case split off: the accumulator is a prefix the loop never
+   looks at; a [Some ([], fin)] answer is a peek that missed at [fin]; a
+   [Some (r :: rs, fin)] answer under the symbol scope is a peek that hit
+   a '>', the '>' token, a word for the file name, and the loop again at
+   the word's end.  The three bridge lemmas at the bottom were
+   RefParseBridge's; they moved here because the walk sits below that
+   file.  The three of them come first: the inversions use [rredir_of_gt]. *)
+
+(* ---- parseredirs ------------------------------------------------------- *)
+
+(* no '<' or '>' under the cursor: no redirect, cursor at the skipped
+   position *)
+Lemma ref_redirs_miss (len : nat) (f : nat -> bv 8) (n i : nat) (acc : list rredir) :
+  0 < n -> ref_at len f (ref_skip len f i) ∉ [rb_lt; rb_gt] ->
+  ref_redirs len f n i acc = Some (acc, ref_skip len f i).
+Proof using.
+  intros Hn Hnotin. destruct n as [| n ]; [ lia | ]. cbn [ref_redirs].
+  rewrite (ref_peek_miss _ _ _ _ Hnotin). reflexivity.
+Qed.
+
+Lemma rredir_of_gt (q eq : nat) :
+  rredir_of (bv_unsigned rb_gt) q eq
+  = Some {| rr_q := q; rr_eq := eq; rr_mode := rr_mode_gt; rr_fd := 1 |}.
+Proof using. vm_compute. reflexivity. Qed.
+
+(* the canonical redirect under the cursor: `> file' is consumed, the
+   redirect appended, and the line is exhausted *)
+Lemma ref_redirs_gt (len : nat) (f : nat -> bv 8) (p e n i : nat) (acc : list rredir) :
+  ref_nonnul len f -> ushs_redir len f p e -> ref_skip len f i = p -> 1 < n ->
+  ref_redirs len f n i acc
+  = Some (acc ++ [{| rr_q := S (S p); rr_eq := e; rr_mode := rr_mode_gt; rr_fd := 1 |}], len).
+Proof using.
+  intros Hnn Hr Hs Hn. destruct n as [| [| n ]]; [ lia | lia | ].
+  pose proof (ushs_redir_lt _ _ _ _ Hr) as Hp.
+  pose proof (ushs_redir_sp_lt _ _ _ _ Hr) as Hsp.
+  pose proof (ushs_redir_gt _ _ _ _ Hr) as Hgt. rewrite rb_gt_is_ushs in Hgt.
+  assert (Hssp : S (S p) < len) by (destruct Hr as (_ & _ & _ & _ & H1 & H2 & _ & _); lia).
+  assert (He : e < len) by (destruct Hr as (_ & _ & _ & _ & _ & H2 & _ & _); lia).
+  assert (Hlo : S (S p) < e) by (destruct Hr as (_ & _ & _ & _ & H1 & _); lia).
+  destruct (ushs_redir_file_byte len f p e (S (S p)) Hr (conj (Nat.le_refl _) Hlo)) as [ Hfw Hfs ].
+  cbn [ref_redirs].
+  rewrite (ref_peek_hit len f i [rb_lt; rb_gt]);
+    [ | rewrite Hs, (ref_at_lt _ _ _ Hp); exact (Hnn p Hp)
+      | rewrite Hs, (ref_at_lt _ _ _ Hp), Hgt; exact rb_gt_in_redir ].
+  rewrite Hs. cbn beta iota.
+  (* the '>' *)
+  rewrite (ref_gettoken_gt len f p p Hnn (ref_skip_stop _ _ _ ltac:(rewrite Hgt; exact ushs_gt_not_ws)) Hp Hgt);
+    [ | rewrite (ref_at_lt _ _ _ Hsp), <- rb_gt_is_ushs; exact (ushs_redir_next _ _ _ _ Hr) ].
+  cbn beta iota.
+  assert (Hskip1 : ref_skip len f (S p) = S (S p)).
+  { unfold ref_skip. rewrite (ushs_skipws_after_gt _ _ _ _ Hr). lia. }
+  rewrite Hskip1.
+  (* the file name *)
+  rewrite (ref_gettoken_word len f (S (S p)) (S (S p)) Hnn (ref_skip_stop _ _ _ Hfw) Hssp Hfs).
+  cbn beta iota.
+  assert (Hend : ref_tokend len f (S (S p)) = e).
+  { unfold ref_tokend. rewrite (ushs_toklen_file _ _ _ _ Hr). lia. }
+  rewrite Hend.
+  assert (Hskip2 : ref_skip len f e = len).
+  { unfold ref_skip. rewrite (ushs_skipws_tail _ _ _ _ Hr). lia. }
+  rewrite Hskip2, (bool_decide_eq_true_2 _ eq_refl), rredir_of_gt.
+  (* the fuel [S (S n)] unfolded both turns: the second peek is at the end *)
+  rewrite (ref_peek_end _ _ _ _ (ref_skip_at_len len f) ref_symtoks_redir). reflexivity.
+Qed.
+
+Lemma rb_gt_ne_nul : rb_gt <> ubyte0.
+Proof using. vm_compute. discriminate. Qed.
+Lemma rb_bar_ne_lt : rb_bar <> rb_lt.
+Proof using. vm_compute. discriminate. Qed.
+Lemma ushp_is_sym_lt : ushp_is_sym rb_lt = true.
+Proof using. vm_compute. reflexivity. Qed.
+
+(* the accumulator is only ever appended to *)
+Lemma ref_redirs_acc (len : nat) (f : nat -> bv 8) (n i : nat) (acc : list rredir) :
+  ref_redirs len f n i acc
+  = match ref_redirs len f n i [] with
+    | Some (rs, s) => Some (acc ++ rs, s)
+    | None => None
+    end.
+Proof using.
+  revert i acc. induction n as [| n IH ]; intros i acc; [ reflexivity | ].
+  cbn [ref_redirs].
+  destruct (ref_peek len f i [rb_lt; rb_gt]) as [ hit s ].
+  destruct hit; [ | rewrite app_nil_r; reflexivity ].
+  destruct (ref_gettoken len f s) as [[[ tok q0 ] e0 ] s1 ].
+  destruct (ref_gettoken len f s1) as [[[ t2 q ] e ] s2 ].
+  destruct (bool_decide (t2 = rt_word)); [ | reflexivity ].
+  destruct (rredir_of tok q e) as [ r | ]; [ | reflexivity ].
+  rewrite (IH s2 (acc ++ [r])).
+  rewrite (IH s2 (@nil rredir ++ [r])).
+  destruct (ref_redirs len f n s2 []) as [[ rs s' ] | ]; [ | reflexivity ].
+  cbn [app]. rewrite <- app_assoc. reflexivity.
+Qed.
+
+(* the two answers of peek, read back *)
+Lemma ref_peek_hit_inv (len : nat) (f : nat -> bv 8) (i s : nat) (toks : list (bv 8)) :
+  ref_peek len f i toks = (true, s) ->
+  s = ref_skip len f i /\ ref_at len f s <> ubyte0 /\ ref_at len f s ∈ toks.
+Proof using.
+  unfold ref_peek. intro H. injection H as Hb Hs. subst s.
+  apply andb_true_iff in Hb as [ Hnn Hin ].
+  apply negb_true_iff, bool_decide_eq_false_1 in Hnn.
+  apply bool_decide_eq_true_1 in Hin.
+  auto.
+Qed.
+
+Lemma ref_peek_miss_inv (len : nat) (f : nat -> bv 8) (i s : nat) (toks : list (bv 8)) :
+  ref_peek len f i toks = (false, s) -> s = ref_skip len f i.
+Proof using. unfold ref_peek. intro H. injection H as _ Hs. exact (eq_sym Hs). Qed.
+
+(* gettoken leaves the cursor inside the line *)
+Lemma ref_gettoken_fin_le (len : nat) (f : nat -> bv 8) (i : nat) (ret : Z) (q e fin : nat) :
+  i <= len -> ref_gettoken len f i = (ret, q, e, fin) -> fin <= len.
+Proof using.
+  intros Hi H. unfold ref_gettoken in H.
+  set (s := ref_skip len f i) in H.
+  assert (Hs : s <= len) by exact (ref_skip_le len f i Hi).
+  destruct (bool_decide (ref_at len f s = ubyte0)) eqn:E0.
+  { injection H as _ _ _ <-. exact (ref_skip_le len f s Hs). }
+  apply bool_decide_eq_false_1 in E0.
+  assert (Hlt : s < len).
+  { destruct (lt_dec s len) as [ | Hge ]; [ assumption | ].
+    exfalso. apply E0. exact (ref_at_ge len f s ltac:(lia)). }
+  destruct (bool_decide (ref_at len f s = rb_gt)) eqn:E1.
+  - destruct (bool_decide (ref_at len f (S s) = rb_gt)) eqn:E2.
+    + injection H as _ _ _ <-.
+      apply bool_decide_eq_true_1 in E2.
+      assert (HSs : S s < len).
+      { destruct (lt_dec (S s) len) as [ | Hge ]; [ assumption | ].
+        exfalso. rewrite (ref_at_ge len f (S s) ltac:(lia)) in E2.
+        exact (rb_gt_ne_nul (eq_sym E2)). }
+      apply ref_skip_le. lia.
+    + injection H as _ _ _ <-. apply ref_skip_le. lia.
+  - destruct (ushp_is_sym (ref_at len f s)).
+    + injection H as _ _ _ <-. apply ref_skip_le. lia.
+    + injection H as _ _ _ <-. apply ref_skip_le.
+      unfold ref_tokend. pose proof (ushp_toklen_le (len - s) s f). lia.
+Qed.
+
+(* a peek that hit the redirect table under the scope hit a single '>' *)
+Lemma ref_redir_hit_gt (len : nat) (f : nat -> bv 8) (s : nat) :
+  ref_sym_scope len f -> ref_at len f s <> ubyte0 -> ref_at len f s ∈ [rb_lt; rb_gt] ->
+  s < len /\ f s = rb_gt /\ S s < len /\ f (S s) <> rb_gt.
+Proof using.
+  intros Hsc Hnn Hin.
+  assert (Hlt : s < len).
+  { destruct (lt_dec s len) as [ | Hge ]; [ assumption | ].
+    exfalso. apply Hnn. exact (ref_at_ge len f s ltac:(lia)). }
+  rewrite (ref_at_lt len f s Hlt) in Hin.
+  assert (Hsym : ushp_is_sym (f s) = true).
+  { apply elem_of_cons in Hin as [ -> | Hin ]; [ exact ushp_is_sym_lt | ].
+    apply elem_of_cons in Hin as [ -> | Hin ]; [ exact ushp_is_sym_gt | ].
+    exfalso. exact (not_elem_of_nil _ Hin). }
+  destruct (Hsc s Hlt Hsym) as [ Hbar | (Hgt & Hk1 & Hnext) ].
+  - exfalso. rewrite Hbar in Hin.
+    apply elem_of_cons in Hin as [ E | Hin ]; [ exact (rb_bar_ne_lt E) | ].
+    apply elem_of_cons in Hin as [ E | Hin ]; [ exact (rb_bar_ne_gt E) | ].
+    exact (not_elem_of_nil _ Hin).
+  - auto.
+Qed.
+
+(* ZERO turns: the first peek missed, and the cursor is where it stopped *)
+Lemma ref_redirs_nil_inv (len : nat) (f : nat -> bv 8) (n i fin : nat) :
+  ref_redirs len f n i [] = Some ([], fin) -> ref_peek len f i [rb_lt; rb_gt] = (false, fin).
+Proof using.
+  destruct n as [| n ]; [ discriminate | ]. cbn [ref_redirs].
+  destruct (ref_peek len f i [rb_lt; rb_gt]) as [ hit s ].
+  destruct hit; [ | intro H; injection H as <-; reflexivity ].
+  destruct (ref_gettoken len f s) as [[[ tok q0 ] e0 ] s1 ].
+  destruct (ref_gettoken len f s1) as [[[ t2 q ] e ] s2 ].
+  destruct (bool_decide (t2 = rt_word)); [ | discriminate ].
+  destruct (rredir_of tok q e) as [ r | ]; [ | discriminate ].
+  rewrite ref_redirs_acc.
+  destruct (ref_redirs len f n s2 []) as [[ rs s' ] | ]; [ | discriminate ].
+  intro H. injection H as H _. cbn [app] in H. discriminate H.
+Qed.
+
+(* ONE turn: the peek hit a single '>' at [s], the '>' token steps to [s1],
+   the file name is the word [[q, e)] ending at [s2], the redirect is the
+   '>' one, and the loop goes on at [s2] with one unit of fuel less *)
+Lemma ref_redirs_cons_inv (len : nat) (f : nat -> bv 8) (n i : nat)
+    (r : rredir) (rs : list rredir) (fin : nat) :
+  ref_sym_scope len f -> ref_nonnul len f -> i <= len ->
+  ref_redirs len f (S n) i [] = Some (r :: rs, fin) ->
+  exists s s1 q e s2 : nat,
+    ref_peek len f i [rb_lt; rb_gt] = (true, s) /\ s <= len
+    /\ ref_gettoken len f s = (bv_unsigned rb_gt, s, S s, s1) /\ s1 <= len
+    /\ ref_gettoken len f s1 = (rt_word, q, e, s2) /\ s2 <= len
+    /\ r = {| rr_q := q; rr_eq := e; rr_mode := rr_mode_gt; rr_fd := 1 |}
+    /\ ref_redirs len f n s2 [] = Some (rs, fin).
+Proof using.
+  intros Hsc Hnonul Hi H. cbn [ref_redirs] in H.
+  destruct (ref_peek len f i [rb_lt; rb_gt]) as [ hit s ] eqn:Epk.
+  destruct hit; [ | injection H as H _; discriminate H ].
+  destruct (ref_peek_hit_inv len f i s [rb_lt; rb_gt] Epk) as (Hs & Hnn & Hin).
+  destruct (ref_redir_hit_gt len f s Hsc Hnn Hin) as (Hlt & Hgt & HSs & Hnext).
+  assert (Hskip : ref_skip len f s = s) by (rewrite Hs; exact (ref_skip_idem len f i Hi)).
+  assert (Hnext' : ref_at len f (S s) <> rb_gt) by (rewrite (ref_at_lt len f (S s) HSs); exact Hnext).
+  pose proof (ref_gettoken_gt len f s s Hnonul Hskip Hlt Hgt Hnext') as E1.
+  rewrite E1 in H. cbn beta iota in H.
+  destruct (ref_gettoken len f (ref_skip len f (S s))) as [[[ t2 q ] e ] s2 ] eqn:E2.
+  destruct (bool_decide (t2 = rt_word)) eqn:Et2; [ | discriminate H ].
+  apply bool_decide_eq_true_1 in Et2. subst t2.
+  rewrite rredir_of_gt, ref_redirs_acc in H.
+  destruct (ref_redirs len f n s2 []) as [[ rs0 s' ] | ] eqn:Er; [ | discriminate H ].
+  cbn [app] in H. injection H as <- <- <-.
+  assert (Hs1 : ref_skip len f (S s) <= len) by (apply ref_skip_le; lia).
+  exists s, (ref_skip len f (S s)), q, e, s2.
+  refine (conj eq_refl (conj _ (conj E1 (conj Hs1 (conj E2 (conj _ (conj eq_refl Er))))))).
+  - lia.
+  - exact (ref_gettoken_fin_le len f _ _ _ _ _ Hs1 E2).
+Qed.
+
+Lemma ref_redirs_of_peek_miss (len : nat) (f : nat -> bv 8) (n i s : nat) (acc : list rredir) :
+  ref_peek len f i [rb_lt; rb_gt] = (false, s) -> ref_redirs len f (S n) i acc = Some (acc, s).
+Proof using. intro H. cbn [ref_redirs]. rewrite H. reflexivity. Qed.
+

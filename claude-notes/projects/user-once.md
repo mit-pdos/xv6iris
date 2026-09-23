@@ -55,7 +55,16 @@ console instance waits for its M3.
   kept as its corollary (consumers: `UkShParseExec`, `UkShParseRedir`);
   `UkShRedirTok`/`UkShRedirGtk`/`UkShPipeTok` reduced to corollaries until
   A3 deletes them with their consumers.
-- [ ] **A2b** `wp_ref_parseredirs`.  READ OFF THE TREE (2026-09-23): four
+- [x] **A2b** `wp_ref_parseredirs` -- LANDED (`iris/UkShRedirs.v`, placed BEFORE
+  `UkShRedirPr` so gtn/ns are corollaries in place; `UkShRedirPr.v` 2542->352,
+  `UkShPipePr.v` 683->129 lines; net -740; the general file compiles in half
+  the time of the two it replaces).  AS LANDED: the turn's extras (symbol
+  table, `Pex`, scope, eight words) are GUARDED by `rs <> []` /
+  `ushp_redirs_res rs` so the zero-turn landed statements come back exact;
+  `wp_ref_parseredirs_full` is the unconditional shape parseexec consumes;
+  `Forall (mode = gt /\ fd = 1)` is derived from `ref_sym_scope`, not a
+  premise; `ushp_malloc_chain` lives there until `UkShParse` is next edited.
+  As read off the tree (2026-09-23): four
   walks -- `UkShParseRedir.wp_kshp_parseredirs` (zero turns under
   `ushp_no_symbols`), `UkShRedirPr.wp_kshp_parseredirs_ns` (zero turns,
   the byte at the cursor no symbol), `UkShPipePr.wp_kshp_parseredirs_miss`
@@ -75,11 +84,36 @@ console instance waits for its M3.
   `ushp_malloc_ty_le 168` is what makes it close, `UkShMalloc` §7) -- at
   `k = length rs` here and `k = ushp_nodes t` at the parser theorem.
   Define it in `UkShParse` beside `ushp_malloc_ty_le`.
-- [ ] **A2c** `wp_ref_parseexec` (the token-list induction; the turn hands
-  back REDIR + exec node as `UkShRedirEx` does; `ushp_room`/`ushp_nodes`
-  replace the per-shape constants).  MEASURE against `UkShParseExec`'s
-  1 min 52 s — the frame's `big_sepL` cost is the same, the statement is
-  not; if the generic statement is slower, split as `UkShParse` was.
+- [ ] **A2c** `wp_ref_pex_loop`, `wp_ref_parseexec`.  READ OFF THE TREE
+  (2026-09-23): the argument loop is walked THREE times with the same
+  register invariant (s0..s11 pinned; `ushp_exec_pre s0 p done`, the
+  cursor cell at `cur`, the q/eq cells at `fp-120`/`fp-128`; entry 0x622,
+  exit 0x662) -- `UkShParseExec.wp_kshp_pex_loop` (`ushp_tokens`, ends at
+  `len`, s1 = p), `UkShRedirEx.wp_kshp_pex_loop_gt` (`ushs_toks` at the
+  '>', ends at `len` with s1 = the REDIR node `t` over `p`, one
+  allocation), `UkShPipeEx2.wp_kshp_pex_loop_bar` (`ushs_toks` at the '|',
+  ends AT the '|' with s1 = p) -- plus two exit rounds
+  (`UkShRedirEx.wp_kshp_pex_end`: cursor at `len`; `UkShPipeEx.
+  wp_kshp_pex_bar`: the byte is '|') and three whole-function forms
+  (`wp_kshp_parseexec`, `_gt` with `UM0 UM1 UM2`, `_bar` with `UM0 UM1`).
+  The general loop is stated at `ref_args len f n cur done rs0 = Some
+  (toks, rs, fin)`: invariant `ushp_exec_pre s0 p done ∗ ushp_redirs_at s0
+  t0 p rs0` with s1 = `t0`; post `∀ t, ushp_exec_pre s0 p toks ∗
+  ushp_redirs_at s0 t p rs`, cursor `fin`, s1 = `t`, `ushp_malloc_chain
+  (length rs - length rs0) UM UM'`; premise `ref_sym_scope`.  Both exits
+  come out of the equation (a stop-set byte: `_bar`'s round; NUL: `_end`'s
+  round), and each turn is `ref_args_step` (RefParseBridge) -- the
+  gettoken via `wp_ref_gettoken`, the two stores, the `parseredirs` via
+  A2b's `wp_ref_parseredirs` at the redirects it consumes.  The whole
+  function `wp_ref_parseexec` at `ref_parseexec len f n off = Some (t,
+  fin) ∧ ushp_cat t`: the '(' peek misses (from `ushp_cat`), `execcmd`,
+  the leading `parseredirs` (A2b), the loop, then the WRAP: `ushp_tree s0
+  root t` by `ushp_exec_pre_at` and `ushp_redir_close` folded along
+  `ref_wrap`; allocations `ushp_malloc_chain (ushp_nodes t) UM UM'`.  The
+  eight landed lemmas are corollaries.  MEASURE against `UkShParseExec`'s
+  1 min 52 s: the frame's `big_sepL` cost is the same and the statement
+  is not; if slower, split the loop turn from the loop as `UkShParse` was
+  split.
 - [ ] **A2d** `wp_ref_parsepipe`/`parseline`/`parsecmd`/`nulterminate`;
   the parser theorem at `ref_parsecmd … = Some t ∧ ushp_cat t`.  Exit:
   `wp_kshp_parser` is the symbol-free corollary.
@@ -123,4 +157,4 @@ RULED by the owner: A starts now.  Branch `user-once/A` off `main` at
 monotonicity, the symbol-free bridge both ways, the redirect and pipe
 bridges, the three line-shape facts on `ush_line_is`/`ushs_line_is`/
 `ushq_line_is`) is stated and elaborates; its proofs are with a subagent.
-A1 and A2a are on `main`.  NEXT: A2b as read off above (branch `user-once/A2b`).
+A1, A2a and A2b are on `main`.  NEXT: A2c as read off above (branch `user-once/A2c`).

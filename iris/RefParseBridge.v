@@ -50,63 +50,6 @@ Local Open Scope nat_scope.
 Lemma rb_bar_is_ushq : ushq_bar = rb_bar.
 Proof using. reflexivity. Qed.
 
-(* ---- parseredirs ------------------------------------------------------- *)
-
-(* no '<' or '>' under the cursor: no redirect, cursor at the skipped
-   position *)
-Lemma ref_redirs_miss (len : nat) (f : nat -> bv 8) (n i : nat) (acc : list rredir) :
-  0 < n -> ref_at len f (ref_skip len f i) ∉ [rb_lt; rb_gt] ->
-  ref_redirs len f n i acc = Some (acc, ref_skip len f i).
-Proof using.
-  intros Hn Hnotin. destruct n as [| n ]; [ lia | ]. cbn [ref_redirs].
-  rewrite (ref_peek_miss _ _ _ _ Hnotin). reflexivity.
-Qed.
-
-Lemma rredir_of_gt (q eq : nat) :
-  rredir_of (bv_unsigned rb_gt) q eq
-  = Some {| rr_q := q; rr_eq := eq; rr_mode := rr_mode_gt; rr_fd := 1 |}.
-Proof using. vm_compute. reflexivity. Qed.
-
-(* the canonical redirect under the cursor: `> file' is consumed, the
-   redirect appended, and the line is exhausted *)
-Lemma ref_redirs_gt (len : nat) (f : nat -> bv 8) (p e n i : nat) (acc : list rredir) :
-  ref_nonnul len f -> ushs_redir len f p e -> ref_skip len f i = p -> 1 < n ->
-  ref_redirs len f n i acc
-  = Some (acc ++ [{| rr_q := S (S p); rr_eq := e; rr_mode := rr_mode_gt; rr_fd := 1 |}], len).
-Proof using.
-  intros Hnn Hr Hs Hn. destruct n as [| [| n ]]; [ lia | lia | ].
-  pose proof (ushs_redir_lt _ _ _ _ Hr) as Hp.
-  pose proof (ushs_redir_sp_lt _ _ _ _ Hr) as Hsp.
-  pose proof (ushs_redir_gt _ _ _ _ Hr) as Hgt. rewrite rb_gt_is_ushs in Hgt.
-  assert (Hssp : S (S p) < len) by (destruct Hr as (_ & _ & _ & _ & H1 & H2 & _ & _); lia).
-  assert (He : e < len) by (destruct Hr as (_ & _ & _ & _ & _ & H2 & _ & _); lia).
-  assert (Hlo : S (S p) < e) by (destruct Hr as (_ & _ & _ & _ & H1 & _); lia).
-  destruct (ushs_redir_file_byte len f p e (S (S p)) Hr (conj (Nat.le_refl _) Hlo)) as [ Hfw Hfs ].
-  cbn [ref_redirs].
-  rewrite (ref_peek_hit len f i [rb_lt; rb_gt]);
-    [ | rewrite Hs, (ref_at_lt _ _ _ Hp); exact (Hnn p Hp)
-      | rewrite Hs, (ref_at_lt _ _ _ Hp), Hgt; exact rb_gt_in_redir ].
-  rewrite Hs. cbn beta iota.
-  (* the '>' *)
-  rewrite (ref_gettoken_gt len f p p Hnn (ref_skip_stop _ _ _ ltac:(rewrite Hgt; exact ushs_gt_not_ws)) Hp Hgt);
-    [ | rewrite (ref_at_lt _ _ _ Hsp), <- rb_gt_is_ushs; exact (ushs_redir_next _ _ _ _ Hr) ].
-  cbn beta iota.
-  assert (Hskip1 : ref_skip len f (S p) = S (S p)).
-  { unfold ref_skip. rewrite (ushs_skipws_after_gt _ _ _ _ Hr). lia. }
-  rewrite Hskip1.
-  (* the file name *)
-  rewrite (ref_gettoken_word len f (S (S p)) (S (S p)) Hnn (ref_skip_stop _ _ _ Hfw) Hssp Hfs).
-  cbn beta iota.
-  assert (Hend : ref_tokend len f (S (S p)) = e).
-  { unfold ref_tokend. rewrite (ushs_toklen_file _ _ _ _ Hr). lia. }
-  rewrite Hend.
-  assert (Hskip2 : ref_skip len f e = len).
-  { unfold ref_skip. rewrite (ushs_skipws_tail _ _ _ _ Hr). lia. }
-  rewrite Hskip2, (bool_decide_eq_true_2 _ eq_refl), rredir_of_gt.
-  (* the fuel [S (S n)] unfolded both turns: the second peek is at the end *)
-  rewrite (ref_peek_end _ _ _ _ (ref_skip_at_len len f) ref_symtoks_redir). reflexivity.
-Qed.
-
 (* ---- the argument loop -------------------------------------------------- *)
 
 (* at the end of the line the loop stops with what it has *)

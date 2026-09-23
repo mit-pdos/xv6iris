@@ -1621,6 +1621,7 @@ UkShParseCmd.v
 UkShRedirLex.v
 UkShRedirGtk.v
 UkShRedirCmd.v
+UkShRedirs.v
 UkShRedirPr.v
 UkShRedirEx.v
 UkShRedirPex.v
