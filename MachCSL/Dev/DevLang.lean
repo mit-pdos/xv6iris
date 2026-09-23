@@ -22,8 +22,13 @@ local state:
   machine's memory does not cover is unconstrained, as it is for real
   hardware), one write appended at the top as the disk agent (blocked
   while any hart reserves a byte of the footprint), performed only if the
-  guard `g` holds of the local state at that very step -- so a request the
-  driver has reset away can never write into memory afterwards.
+  STATE-UPDATING GUARD `g` answers (`g s = some s'`) -- so a request the
+  driver has reset away can never write into memory afterwards.  The
+  guard's answer is the state the device moves to AT THE WRITE: the store
+  and the local move are ONE transition, which is what lets a device
+  publish a value and record that it has published it atomically (the
+  virtio disk's used-index write and its `complete`).  `dmaWriteIf g` is
+  the derived form whose guard moves nothing.
 * `sample src` / `setPin cpu mmode b` -- the WIRES: the level a PLIC source
   is driving, and a hart's external-interrupt pin.
 * `fork t` / `join tid` -- a NEW TASK of the same device running the named
@@ -56,10 +61,11 @@ inductive DevOp (S T : Type) : Type where
   | choose
   /-- a bus-master read of `n` bytes at `pa` -/
   | dmaRead (pa : PAddr) (n : Nat)
-  /-- a bus-master write of `w` at `pa`, performed only if `g` holds of the
-  local state at that step (else a silent no-op): a request the driver
-  reset out from under the device writes nothing -/
-  | dmaWrite (g : S → Bool) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+  /-- a bus-master write of `w` at `pa`, performed only if the guard
+  ANSWERS at that step (`g s = some s'`, and the local state becomes `s'`
+  atomically with the store); a silent no-op when `g s = none`: a request
+  the driver reset out from under the device writes nothing -/
+  | dmaWrite (g : S → Option S) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
   /-- the level interrupt source `src` is driving -/
   | sample (src : IrqSrc)
   /-- drive hart `cpu`'s external-interrupt pin (`mmode`: the M pin, else the S pin) -/
@@ -149,10 +155,17 @@ def dmaRead (pa : PAddr) (n : Nat) : DevM S T (BitVec (8 * n)) := lift (.dmaRead
 
 /-- A bus-master write. -/
 def dmaWrite (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) : DevM S T Unit :=
-  lift (.dmaWrite (fun _ => true) pa n w)
+  lift (.dmaWrite (fun s => some s) pa n w)
 
-/-- A bus-master write, performed only if `g` holds at the step. -/
+/-- A bus-master write, performed only if `g` holds at the step; the local
+state does not move. -/
 def dmaWriteIf (g : S → Bool) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) : DevM S T Unit :=
+  lift (.dmaWrite (fun s => if g s then some s else none) pa n w)
+
+/-- A bus-master write that MOVES THE LOCAL STATE with it: `g s = some s'`
+performs the store and makes the state `s'` in the same transition, and
+`g s = none` blocks nothing and writes nothing.  The primitive form. -/
+def dmaWriteStep (g : S → Option S) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) : DevM S T Unit :=
   lift (.dmaWrite g pa n w)
 
 /-- The level of an interrupt source. -/

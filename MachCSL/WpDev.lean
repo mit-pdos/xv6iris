@@ -44,12 +44,13 @@ theorem devOpStep_or_blocked (gen : Nat) (d : DevId) (o : DevOp (DevSt d) (DevTa
     rw [hw j hj, hb]
     rfl
   | dmaWrite g pa n w =>
-    cases hg : g (σ.devs.st d)
-    · exact Or.inl ⟨(), _, _, _, rfl, rfl, Or.inr ⟨Or.inl hg, rfl⟩⟩
-    · by_cases hram : ramBytes pa n
+    cases hg : g (σ.devs.st d) with
+    | none => exact Or.inl ⟨(), _, _, _, rfl, rfl, Or.inr ⟨Or.inl hg, rfl⟩⟩
+    | some s' =>
+      by_cases hram : ramBytes pa n
       · by_cases hr : anyReserve σ.resv pa n
-        · exact Or.inr ⟨hg, hr⟩
-        · exact Or.inl ⟨(), _, _, _, rfl, rfl, Or.inl ⟨hg, hram, hr, rfl⟩⟩
+        · exact Or.inr ⟨by rw [hg]; rfl, hr⟩
+        · exact Or.inl ⟨(), _, _, _, rfl, rfl, Or.inl ⟨s', hg, hram, hr, rfl⟩⟩
       · exact Or.inl ⟨(), _, _, _, rfl, rfl, Or.inr ⟨Or.inr hram, rfl⟩⟩
   | sample src => exact Or.inl ⟨_, _, _, _, rfl, rfl, rfl, rfl⟩
   | setPin cpu mm b => exact Or.inl ⟨(), _, _, _, rfl, rfl, rfl⟩

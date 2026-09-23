@@ -38,8 +38,9 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
 
 /-- `devOpStep_localR` with the DMA write admitted: either the device's own
 state moved by a guarded update, or nothing moved, or one task was forked,
-or a guarded DMA write fired into a DRAM footprint no hart reserves.
-`.setPin` is still excluded. -/
+or a guarded DMA write fired into a DRAM footprint no hart reserves --
+which moves the device's own state TOO, to the guard's answer, in the same
+transition.  `.setPin` is still excluded. -/
 theorem devOpStep_dmaR (gen : Nat) (d : DevId) (o : DevOp (DevSt d) (DevTask d)) (σ : MState)
     (v : o.ret) (σ' : MState) (obs : List Obs) (efs : List Expr)
     (hp : ∀ c mm b, o ≠ .setPin c mm b) (hop : devOpStep gen d o σ v σ' obs efs) :
@@ -48,9 +49,11 @@ theorem devOpStep_dmaR (gen : Nat) (d : DevId) (o : DevOp (DevSt d) (DevTask d))
     (σ' = σ ∧ efs = []) ∨
     (∃ (rt : DevRt) (t : DevTask d) (tid' : TaskId),
       0 < rt.next ∧ σ' = σ.setRt d rt ∧ efs = [.dev gen d tid' ((devSig d).task t)]) ∨
-    (∃ (g : DevSt d → Bool) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)),
-      o = .dmaWrite g pa n w ∧ g (σ.devs.st d) = true ∧ ramBytes pa n ∧
-      ¬ anyReserve σ.resv pa n ∧ σ' = σ.storeDma pa n w ∧ obs = [] ∧ efs = []) := by
+    (∃ (g : DevSt d → Option (DevSt d)) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+        (s' : DevSt d),
+      o = .dmaWrite g pa n w ∧ g (σ.devs.st d) = some s' ∧ ramBytes pa n ∧
+      ¬ anyReserve σ.resv pa n ∧ σ' = (σ.storeDma pa n w).setDev d s' ∧
+      obs = [] ∧ efs = []) := by
   cases o with
   | step g =>
     obtain ⟨s', os, hg, rfl, _, rfl⟩ := hop
@@ -60,8 +63,8 @@ theorem devOpStep_dmaR (gen : Nat) (d : DevId) (o : DevOp (DevSt d) (DevTask d))
   | dmaRead pa n => obtain ⟨_, rfl, _, rfl⟩ := hop; exact Or.inr (Or.inl ⟨rfl, rfl⟩)
   | dmaWrite g pa n w =>
     obtain ⟨rfl, rfl, hcase⟩ := hop
-    rcases hcase with ⟨hg, hram, hnr, rfl⟩ | ⟨_, rfl⟩
-    · exact Or.inr (Or.inr (Or.inr ⟨g, pa, n, w, rfl, hg, hram, hnr, rfl, rfl, rfl⟩))
+    rcases hcase with ⟨s', hg, hram, hnr, rfl⟩ | ⟨_, rfl⟩
+    · exact Or.inr (Or.inr (Or.inr ⟨g, pa, n, w, s', rfl, hg, hram, hnr, rfl, rfl, rfl⟩))
     · exact Or.inr (Or.inl ⟨rfl, rfl⟩)
   | sample src => obtain ⟨_, rfl, _, rfl⟩ := hop; exact Or.inr (Or.inl ⟨rfl, rfl⟩)
   | setPin c mm b => exact absurd rfl (hp c mm b)
@@ -168,9 +171,12 @@ inductive DevM.Lease {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] {S T 
       (hpin : ∀ s, iprop(C ∗ R s) ⊢ dmaReadPin pa n (Q s) (R s))
       (hk : ∀ v, Lease rel R iprop(C ∗ ⌜∃ s, Q s v⌝) (k v)) :
       Lease rel R C (.op (.dmaRead pa n) k)
-  | dmaWrite (C : IProp GF) (g : S → Bool) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+  /-- The guarded DMA write.  The guard's answer is the state the device
+  moves to AT THE STORE, so the lease's continuation re-establishes the
+  invariant at the NEW state `s'`. -/
+  | dmaWrite (C : IProp GF) (g : S → Option S) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
       (k : Unit → DevM S T Unit)
-      (hlease : ∀ s, g s = true → (iprop(C ∗ R s) ⊢ dmaWriteLease pa n w (R s)))
+      (hlease : ∀ s s', g s = some s' → (iprop(C ∗ R s) ⊢ dmaWriteLease pa n w (R s')))
       (hk : Lease rel R C (k ())) : Lease rel R C (.op (.dmaWrite g pa n w) k)
 
 /-- A device whose root loop and every task carry a lease, starting from no
@@ -263,7 +269,7 @@ theorem wpDev_dma (N : Namespace) (d : DevId) (rel : DevSt d → DevSt d → Pro
       rcases hstep with ⟨v, rfl, hop⟩ | ⟨hb, rfl, hσ, rfl, rfl⟩
       · rcases devOpStep_dmaR _ d o σ v σ' obs efs hp hop with
           ⟨g, s', os, rfl, hgg, rfl, rfl⟩ | ⟨hσ, rfl⟩ | ⟨rt, t, tid', hrt, rfl, rfl⟩ |
-          ⟨g, pa, n, w, heq, _⟩
+          ⟨g, pa, n, w, s', heq, _⟩
         · -- the device's own state moved inside `rel`
           have hrel := hs g rfl _ _ _ hgg
           imod (devUpdateAt _ d (σ.devs.st d) (σ.devs.st d) s') $$ [Hauth Hfrag] with ⟨Hauth, Hfrag⟩
@@ -401,22 +407,27 @@ theorem wpDev_dma (N : Namespace) (d : DevId) (rel : DevSt d → DevSt d → Pro
       rcases hstep with ⟨v, rfl, hop⟩ | ⟨hb, rfl, hσ, rfl, rfl⟩
       · obtain ⟨rfl, rfl, hcase⟩ := hop
         cases v
-        rcases hcase with ⟨hgt, hram, hnr, rfl⟩ | ⟨_, hσn⟩
-        · -- the write fires
-          ihave Hσ := machInterp_acc_dev_self σ d $$ [Hσclose Hauth]
-          case' _ => iframe
-          ihave Hl : dmaWriteLease pa n w (R (σ.devs.st d)) $$ [HR]
-          · iapply hlease (σ.devs.st d) hgt $$ [HC HR]
+        rcases hcase with ⟨s', hgt, hram, hnr, rfl⟩ | ⟨_, hσn⟩
+        · -- the write fires, and the device's own state moves with it
+          rw [MState.storeDma_setDev]
+          imod (devUpdateAt _ d (σ.devs.st d) (σ.devs.st d) s') $$ [Hauth Hfrag]
+            with ⟨Hauth, Hfrag⟩
+          · iframe
+          ihave Hσ := Hσclose $$ %s' Hauth
+          ihave Hl : dmaWriteLease pa n w (R s') $$ [HR]
+          · iapply hlease (σ.devs.st d) s' hgt $$ [HC HR]
             iframe HC HR
-          icases dmaWriteLease_cases pa n w (R (σ.devs.st d)) $$ Hl
+          icases dmaWriteLease_cases pa n w (R s') $$ Hl
             with ⟨%Hs, %Kb, Hb, #Htlb, Hback⟩
-          ihave %hkb : ⌜Kb ≤ σ.top⌝ $$ [Hσ Htlb]
-          · iapply machInterp_topLb σ Kb
+          ihave %hkb : ⌜Kb ≤ (σ.setDev d s').top⌝ $$ [Hσ Htlb]
+          · iapply machInterp_topLb (σ.setDev d s') Kb
             iframe Hσ Htlb
-          imod machInterp_storeDma σ pa n Hs w hnr $$ [$Hσ $Hb] with ⟨Hσ, Hb, #Hau, #Htop⟩
-          ihave HR := Hback $$ %(σ.top + 1) Hb Hau Htop %(by omega : Kb < σ.top + 1)
+          imod machInterp_storeDma (σ.setDev d s') pa n Hs w hnr $$ [$Hσ $Hb]
+            with ⟨Hσ, Hb, #Hau, #Htop⟩
+          ihave HR := Hback $$ %((σ.setDev d s').top + 1) Hb Hau Htop
+            %(by omega : Kb < (σ.setDev d s').top + 1)
           ihave Hcl := Hclose $$ [Hfrag HR]
-          case' _ => inext; iexists (σ.devs.st d); iframe Hfrag HR
+          case' _ => inext; iexists s'; iframe Hfrag HR
           imod Hcl
           imodintro
           iframe Hσ
@@ -479,7 +490,12 @@ theorem lease_dmaWriteIf {S T : Type} (rel : S → S → Prop) (R : S → IProp 
     (g : S → Bool) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
     (hlease : ∀ s, g s = true → (iprop(C ∗ R s) ⊢ dmaWriteLease pa n w (R s))) :
     DevM.Lease rel R C (DevM.dmaWriteIf (T := T) g pa n w) :=
-  DevM.Lease.dmaWrite C g pa n w _ hlease (DevM.Lease.pure C ())
+  DevM.Lease.dmaWrite C _ pa n w _
+    (fun s s' hg => by
+      by_cases hb : g s
+      · rw [show s' = s from by simpa [hb] using hg.symm]; exact hlease s hb
+      · simp [hb] at hg)
+    (DevM.Lease.pure C ())
 
 /-- Sanity check B: the UARTs' body is `Lease`-derivable at the trivial
 relation and the trivial client state -- no DMA arm fires, so `DevM.Lease`

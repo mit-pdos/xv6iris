@@ -138,9 +138,9 @@ theorem DevM_bind_assoc {S T : Type} {α β : Type} (m : DevM S T α) (f : α �
   | op o k ih => exact congrArg (DevM.op o) (funext fun r => ih r)
 
 /-- The tail of `Virtio.serve`, after the data phase: the status byte,
-the completion gate, the used-ring element, the used index, and the
-completion.  Written out so that the three branches of the data phase can
-share one proof. -/
+the completion gate, the used-ring element, and the used index -- WHICH IS
+the completion, one transition.  Written out so that the three branches of
+the data phase can share one proof. -/
 def serveTail (h : BitVec 16) (r : VioReq) : Virtio.VM Unit := do
   DevM.modify (fun v => Virtio.setPhase v h (.served r))
   DevM.dmaWriteIf (fun v => decide (Virtio.reqOf v h = some r)) r.status 1 (Virtio.statusOf r)
@@ -154,9 +154,9 @@ def serveTail (h : BitVec 16) (r : VioReq) : Virtio.VM Unit := do
   DevM.dmaWriteIf (fun s => decide (Virtio.reqOf s h = some r) && decide (s.usedIdx = ui) &&
       decide (s.cfg = c)) (Virtio.usedElemAddr c ui) 8
     (Virtio.castW (by decide : 64 = 8 * 8) ((Virtio.usedLen r) ++ (r.head.setWidth 32)))
-  DevM.dmaWriteIf (fun s => decide (Virtio.reqOf s h = some r) && decide (s.usedIdx = ui) &&
-      decide (s.cfg = c)) (Virtio.usedIdxAddr c) 2 (ui + 1#16)
-  DevM.modify (fun v => Virtio.complete v h)
+  DevM.dmaWriteStep (fun s =>
+    if decide (Virtio.reqOf s h = some r) && decide (s.usedIdx = ui) && decide (s.cfg = c) then
+      some (Virtio.complete s h) else none) (Virtio.usedIdxAddr c) 2 (ui + 1#16)
 
 
 section
@@ -1701,21 +1701,29 @@ theorem leaseL_elem_write (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key
       diskProto γ s1)
   iframe Hb HC HR
 
-/-- **The used-index write, in the task's context.**  The permit comes
-out of `Xv6.serveCtx` with the witness bit `false` and goes back with it
-`true`; the flip is a ghost update, which the lease's continuation may
-now take. -/
+/-- **The used-index write IS the completion, in the task's context.**  The
+permit comes out of `Xv6.serveCtx` with the witness bit `false`; the
+write's continuation flips it to `true` (the row appended to the used-index
+cell's log, `nc` bumped) and then SPENDS it -- `Xv6.perm_complete` -- so
+what the store re-establishes is the protocol at `Virtio.complete s1 h`,
+the state the device is in as of that very step.  The task owes nothing
+afterwards: its context ends at `True`.
+
+There is no state, and no ghost-state configuration, in which the
+completion is published in memory while the head is still `.pushed` with
+its permit out: the two ghost updates are composed INSIDE the one
+transition. -/
 theorem leaseL_idx_write (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key : Nat)
     (c : Chain) (v2 s1 : VirtioState) (r : VioReq) (cc : VirtioCfg) (we : BitVec (8 * 8))
-    (tse : Nat) (hph : Virtio.phase s1 h = some (.pushed r)) (hcc : s1.cfg = cc)
+    (tse : Nat) (hlive : Virtio.live c0 = true)
+    (hph : Virtio.phase s1 h = some (.pushed r)) (hcc : s1.cfg = cc)
     (hlow : BitVec.extractLsb' 0 32 we = BitVec.setWidth 32 (BitVec.ofNat 16 h.toNat))
     (w : BitVec (8 * 2)) (hw : w = s1.usedIdx + 1#16) :
     iprop((serveCtx (GF := GF) γ h c0 key c v2 (some (.pushed c.req))
         (some (v2.usedIdx, false)) ∗
         dmaOwnT (usedElemAt cc.used (v2.usedIdx.toNat % NUM)) 8 we tse) ∗ diskProto γ s1) ⊢
       dmaWriteLease (Virtio.usedIdxAddr cc) 2 w
-        (iprop(|==> (diskProto γ s1 ∗
-          serveCtx γ h c0 key c v2 (some (.pushed c.req)) (some (v2.usedIdx, true))))) := by
+        (iprop(|==> (diskProto γ (Virtio.complete s1 h) ∗ True))) := by
   unfold serveCtx
   iintro ⟨⟨⟨#Hfr, %hcfg, Htok⟩, Hcell⟩, HR⟩
   ihave Hl := usedIdx_write_lease γ s1 key h c v2.usedIdx r cc we tse hph hcc hlow w hw
@@ -1730,15 +1738,15 @@ theorem leaseL_idx_write (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key 
     iprop((|==> (diskProto (GF := GF) γ s1 ∗
         permTok γ key h c (some (.pushed c.req)) (some (v2.usedIdx, true)))) ∗
       diskCfgFrozen γ c0)
-    iprop(|==> (diskProto (GF := GF) γ s1 ∗
-      (diskCfgFrozen γ c0 ∗ ⌜v2.cfg = c0⌝ ∗
-        permTok γ key h c (some (.pushed c.req)) (some (v2.usedIdx, true)))))
+    iprop(|==> (diskProto (GF := GF) γ (Virtio.complete s1 h) ∗ True))
     (by
       iintro ⟨H, #Hf⟩
       imod H with ⟨HR2, Ht2⟩
+      imod perm_complete γ c0 key h c v2.usedIdx s1 hlive $$ [$Hf $Ht2 $HR2] with HR2
       imodintro
-      iframe HR2 Ht2 Hf
-      ipureintro; exact hcfg))
+      isplitl [HR2]
+      · iexact HR2
+      · itrivial))
   iexact Hl
 
 /-- The DMA write the machine SKIPS (the guard did not fire): the context
@@ -1766,7 +1774,7 @@ theorem leaseL_xferIn (γ : DiskNames) (C : IProp GF) (h : BitVec 16) (i : Nat) 
   | none => exact DevM.LeaseL.pure _ () true_intro
   | some r =>
     unfold Virtio.reqSectorLen DevM.dmaWriteIf DevM.lift
-    refine DevM.LeaseL.dmaWrite _ _ _ _ _ _ _ ?_ (fun s _ => leaseL_write_skip γ _ s)
+    refine DevM.LeaseL.dmaWriteIf _ _ _ _ _ _ _ ?_ (fun s _ => leaseL_write_skip γ _ s)
       (DevM.LeaseL.pure _ () true_intro)
     intro s' hg
     exact leaseL_write_frame γ s' C _ _ _ (data_write_lease γ s' h r i (of_decide_eq_true hg) _)
@@ -1978,7 +1986,7 @@ theorem leaseL_serveTail (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key 
       (serveCtx γ h c0 key c s (some (.fetched c.req)) u0) (serveTail h c.req) := by
   unfold serveTail
   simp only [bind, DevM.bind, DevM.modify, DevM.guard, DevM.step, DevM.lift,
-    DevM.dmaWriteIf, DevM.get, Pure.pure]
+    DevM.dmaWriteIf, DevM.dmaWriteStep, DevM.get, Pure.pure]
   refine DevM.LeaseL.step _
     iprop(serveCtx γ h c0 key c s (some (.served c.req)) none ∗ dmaOwn c.status 1) _ _ ?_ ?_
   · intro s1 s2 os hgs
@@ -1987,7 +1995,7 @@ theorem leaseL_serveTail (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key 
       exact hgs.1.symm
     subst hs2
     exact leaseL_lend γ h c0 key c s s1 u0 hlive
-  · refine DevM.LeaseL.dmaWrite _
+  · refine DevM.LeaseL.dmaWriteIf _
       iprop(serveCtx γ h c0 key c s (some (.served c.req)) none ∗
         ∃ ts : Nat, dmaOwnT c.status 1 0#8 ts)
       _ _ _ _ _ ?_ ?_ ?_
@@ -2043,7 +2051,7 @@ theorem leaseL_serveTail (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key 
               iprop(serveCtx γ h c0 key c s1 (some (.pushed c.req)) (some (s1.usedIdx, false)) ∗
                 dmaOwn (usedElemAt c0.used (s1.usedIdx.toNat % NUM)) 8)) _
             (fun s1 => leaseL_latch γ h c0 key c s s1 none hlive rfl) (fun v2 _ => ?_)
-          refine DevM.LeaseL.dmaWrite _
+          refine DevM.LeaseL.dmaWriteIf _
             iprop(serveCtx γ h c0 key c v2 (some (.pushed c.req)) (some (v2.usedIdx, false)) ∗
               ∃ ts : Nat, dmaOwnT (usedElemAt c0.used (v2.usedIdx.toNat % NUM)) 8
                 (Virtio.castW (by decide : 64 = 8 * 8)
@@ -2069,50 +2077,45 @@ theorem leaseL_serveTail (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key 
               simp
             rw [hall] at hgg
             exact absurd hgg (by simp)
-          · refine DevM.LeaseL.dmaWrite _
-              (serveCtx γ h c0 key c v2 (some (.pushed c.req)) (some (v2.usedIdx, true)))
-              _ _ _ _ _ ?_ ?_ ?_
+          · -- THE USED-INDEX WRITE IS THE COMPLETION: one transition
+            refine DevM.LeaseL.dmaWrite _ iprop(True) _ _ _ _ _ ?_ ?_
+              (DevM.LeaseL.pure _ () true_intro)
+            · intro s1 s2 hgg
+              split at hgg
+              · rename_i hb
+                obtain rfl : s2 = Virtio.complete s1 h := by simpa using hgg.symm
+                simp only [Bool.and_eq_true, decide_eq_true_eq] at hb
+                iintro ⟨⟨HC, %tse, Hcell⟩, HR⟩
+                ihave HCR : iprop(serveCtx (GF := GF) γ h c0 key c v2 (some (.pushed c.req))
+                    (some (v2.usedIdx, false)) ∗ diskProto γ s1) $$ [HC HR]
+                · iframe HC HR
+                icases serveCtx_guard γ h c0 key c v2 s1 (some (.pushed c.req))
+                    (some (v2.usedIdx, false)) hlive $$ HCR with ⟨%hp, HC, HR⟩
+                rw [hp.1]
+                iapply leaseL_idx_write γ h c0 key c v2 s1 c.req c0 _ tse hlive
+                  (hp.2.2.1 _ rfl).1 hp.2.1 (usedElem_low c h hhd) _ (by rw [hb.1.2])
+                iframe HC Hcell HR
+              · exact absurd hgg (by simp)
             · intro s1 hgg
-              simp only [Bool.and_eq_true, decide_eq_true_eq] at hgg
-              iintro ⟨⟨HC, %tse, Hcell⟩, HR⟩
-              ihave HCR : iprop(serveCtx (GF := GF) γ h c0 key c v2 (some (.pushed c.req))
-                  (some (v2.usedIdx, false)) ∗ diskProto γ s1) $$ [HC HR]
-              · iframe HC HR
-              icases serveCtx_guard γ h c0 key c v2 s1 (some (.pushed c.req))
-                  (some (v2.usedIdx, false)) hlive $$ HCR with ⟨%hp, HC, HR⟩
-              rw [hp.1]
-              iapply leaseL_idx_write γ h c0 key c v2 s1 c.req c0 _ tse
-                (hp.2.2.1 _ rfl).1 hp.2.1 (usedElem_low c h hhd) _ (by rw [hgg.1.2])
-              iframe HC Hcell HR
-            · intro s1 hgg
-              iintro ⟨⟨HC, %tse0, Hb⟩, HR⟩
-              ihave HCR : iprop(serveCtx (GF := GF) γ h c0 key c v2 (some (.pushed c.req))
-                  (some (v2.usedIdx, false)) ∗ diskProto γ s1) $$ [HC HR]
-              · iframe HC HR
-              icases serveCtx_guard γ h c0 key c v2 s1 (some (.pushed c.req))
-                  (some (v2.usedIdx, false)) hlive $$ HCR with ⟨%hp, _⟩
-              exfalso
-              have hreq : Virtio.reqOf s1 h = some c.req := by
-                unfold Virtio.reqOf
-                rw [(hp.2.2.1 _ rfl).1]
-                exact (hp.2.2.1 _ rfl).2
-              have hall : (decide (Virtio.reqOf s1 h = some c.req) &&
-                  decide (s1.usedIdx = v2.usedIdx) && decide (s1.cfg = v2.cfg)) = true := by
-                rw [hreq, hp.2.2.2.1 _ rfl, hp.2.1, hp.1]
-                simp
-              rw [hall] at hgg
-              exact absurd hgg (by simp)
-            · refine DevM.LeaseL.step _ iprop(True) _ _ ?_ (DevM.LeaseL.pure _ () true_intro)
-              intro s1 s2 os hgs
-              have hs2 : s2 = Virtio.complete s1 h := by
-                simp only [Option.some.injEq, Prod.mk.injEq] at hgs
-                exact hgs.1.symm
-              subst hs2
-              unfold serveCtx
-              iintro ⟨⟨#Hfr, %hcfg, Htok⟩, HR⟩
-              imod perm_complete γ c0 key h c v2.usedIdx s1 hlive $$ [$Hfr $Htok $HR] with HR
-              imodintro
-              iframe HR
+              split at hgg
+              · exact absurd hgg (by simp)
+              · rename_i hb
+                iintro ⟨⟨HC, %tse0, Hb⟩, HR⟩
+                ihave HCR : iprop(serveCtx (GF := GF) γ h c0 key c v2 (some (.pushed c.req))
+                    (some (v2.usedIdx, false)) ∗ diskProto γ s1) $$ [HC HR]
+                · iframe HC HR
+                icases serveCtx_guard γ h c0 key c v2 s1 (some (.pushed c.req))
+                    (some (v2.usedIdx, false)) hlive $$ HCR with ⟨%hp, _⟩
+                exfalso
+                have hreq : Virtio.reqOf s1 h = some c.req := by
+                  unfold Virtio.reqOf
+                  rw [(hp.2.2.1 _ rfl).1]
+                  exact (hp.2.2.1 _ rfl).2
+                have hall : (decide (Virtio.reqOf s1 h = some c.req) &&
+                    decide (s1.usedIdx = v2.usedIdx) && decide (s1.cfg = v2.cfg)) = true := by
+                  rw [hreq, hp.2.2.2.1 _ rfl, hp.2.1, hp.1]
+                  simp
+                exact hb hall
 
 /-! ### The fetch -/
 

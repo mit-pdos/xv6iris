@@ -112,16 +112,40 @@ inductive DevM.LeaseV {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] {S T
       (hpin : ∀ s, iprop(C ∗ R s) ⊢ dmaReadPinV pa n (Q s) (fun w => iprop(R s ∗ C' w)))
       (hk : ∀ v, (∃ s, Q s v) → LeaseV R Lt Ce (C' v) (k v)) :
       LeaseV R Lt Ce C (.op (.dmaRead pa n) k)
-  | dmaWrite (C C' : IProp GF) (g : S → Bool) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+  /-- The guarded DMA write.  `g s = some s'` is the store AND the device's
+  own move in one transition, so the continuation re-establishes the
+  invariant at the NEW state `s'`. -/
+  | dmaWrite (C C' : IProp GF) (g : S → Option S) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
       (k : Unit → DevM S T Unit)
-      (hlease : ∀ s, g s = true →
-        (iprop(C ∗ R s) ⊢ dmaWriteLease pa n w (iprop(|==> (R s ∗ C')))))
-      (hfalse : ∀ s, g s = false → (iprop(C ∗ R s) ⊢ |==> (R s ∗ C')))
+      (hlease : ∀ s s', g s = some s' →
+        (iprop(C ∗ R s) ⊢ dmaWriteLease pa n w (iprop(|==> (R s' ∗ C')))))
+      (hfalse : ∀ s, g s = none → (iprop(C ∗ R s) ⊢ |==> (R s ∗ C')))
       (hk : LeaseV R Lt Ce C' (k ())) : LeaseV R Lt Ce C (.op (.dmaWrite g pa n w) k)
   /-- Forking: the context splits, and the new task gets `Lt t`. -/
   | fork (C C' : IProp GF) (t : T) (k : TaskId → DevM S T Unit)
       (hsplit : C ⊢ iprop(C' ∗ Lt t))
       (hk : ∀ tid, LeaseV R Lt Ce C' (k tid)) : LeaseV R Lt Ce C (.op (.fork t) k)
+
+/-- **The derived write whose guard moves nothing** (`DevM.dmaWriteIf`):
+the obligations in their state-preserving shape. -/
+theorem DevM.LeaseV.dmaWriteIf {S T : Type} {R : S → IProp GF} {Lt : T → IProp GF}
+    {Ce : IProp GF} (C C' : IProp GF) (g : S → Bool) (pa : PAddr) (n : Nat)
+    (w : BitVec (8 * n)) (k : Unit → DevM S T Unit)
+    (hlease : ∀ s, g s = true →
+      (iprop(C ∗ R s) ⊢ dmaWriteLease pa n w (iprop(|==> (R s ∗ C')))))
+    (hfalse : ∀ s, g s = false → (iprop(C ∗ R s) ⊢ |==> (R s ∗ C')))
+    (hk : DevM.LeaseV R Lt Ce C' (k ())) :
+    DevM.LeaseV R Lt Ce C (.op (.dmaWrite (fun s => if g s then some s else none) pa n w) k) :=
+  DevM.LeaseV.dmaWrite C C' _ pa n w k
+    (fun s s' hg => by
+      split at hg
+      · rename_i hb; cases hg; exact hlease s hb
+      · exact absurd hg (by simp))
+    (fun s hg => by
+      split at hg
+      · exact absurd hg (by simp)
+      · rename_i hb; exact hfalse s (by simpa using hb))
+    hk
 
 /-- A device whose ROOT LOOP is derivable from `Cr` and gives `Cr` back at
 the end of every iteration -- so the root may hold one exclusive resource
@@ -361,22 +385,28 @@ theorem wpDev_dmaV (N : Namespace) (d : DevId) (R : DevSt d → IProp GF) [∀ s
       rcases hstep with ⟨v, rfl, hop⟩ | ⟨hb, rfl, hσ, rfl, rfl⟩
       · obtain ⟨rfl, rfl, hcase⟩ := hop
         cases v
-        rcases hcase with ⟨hgt, hram, hnr, rfl⟩ | ⟨hsk, hσn⟩
-        · ihave Hσ := machInterp_acc_dev_self σ d $$ [Hσclose Hauth]
-          case' _ => iframe
-          ihave Hl : dmaWriteLease pa n w iprop(|==> (R (σ.devs.st d) ∗ C')) $$ [HC HR]
-          · iapply hlease (σ.devs.st d) hgt $$ [HC HR]
+        rcases hcase with ⟨s', hgt, hram, hnr, rfl⟩ | ⟨hsk, hσn⟩
+        · -- the write fires, and the device's own state moves with it
+          rw [MState.storeDma_setDev]
+          imod (devUpdateAt _ d (σ.devs.st d) (σ.devs.st d) s') $$ [Hauth Hfrag]
+            with ⟨Hauth, Hfrag⟩
+          · iframe
+          ihave Hσ := Hσclose $$ %s' Hauth
+          ihave Hl : dmaWriteLease pa n w iprop(|==> (R s' ∗ C')) $$ [HC HR]
+          · iapply hlease (σ.devs.st d) s' hgt $$ [HC HR]
             iframe HC HR
-          icases dmaWriteLease_cases pa n w iprop(|==> (R (σ.devs.st d) ∗ C')) $$ Hl
+          icases dmaWriteLease_cases pa n w iprop(|==> (R s' ∗ C')) $$ Hl
             with ⟨%Hs, %Kb, Hb, #Htlb, Hback⟩
-          ihave %hkb : ⌜Kb ≤ σ.top⌝ $$ [Hσ Htlb]
-          · iapply machInterp_topLb σ Kb
+          ihave %hkb : ⌜Kb ≤ (σ.setDev d s').top⌝ $$ [Hσ Htlb]
+          · iapply machInterp_topLb (σ.setDev d s') Kb
             iframe Hσ Htlb
-          imod machInterp_storeDma σ pa n Hs w hnr $$ [$Hσ $Hb] with ⟨Hσ, Hb, #Hau, #Htop⟩
-          ihave Hrc := Hback $$ %(σ.top + 1) Hb Hau Htop %(by omega : Kb < σ.top + 1)
+          imod machInterp_storeDma (σ.setDev d s') pa n Hs w hnr $$ [$Hσ $Hb]
+            with ⟨Hσ, Hb, #Hau, #Htop⟩
+          ihave Hrc := Hback $$ %((σ.setDev d s').top + 1) Hb Hau Htop
+            %(by omega : Kb < (σ.setDev d s').top + 1)
           imod Hrc with ⟨HR, HC⟩
           ihave Hcl := Hclose $$ [Hfrag HR]
-          case' _ => inext; iexists (σ.devs.st d); iframe Hfrag HR
+          case' _ => inext; iexists s'; iframe Hfrag HR
           imod Hcl
           imodintro
           iframe Hσ
@@ -384,14 +414,14 @@ theorem wpDev_dmaV (N : Namespace) (d : DevId) (R : DevSt d → IProp GF) [∀ s
           · iapply hmk _ _ hk $$ IH HC
           · exact BigSepL.bigSepL_nil_intro
         · rw [hσn]
-          have hgf : g (σ.devs.st d) = false ∨
-              (g (σ.devs.st d) = true ∧ ¬ ramBytes pa n) := by
+          have hgf : g (σ.devs.st d) = none ∨
+              (∃ s', g (σ.devs.st d) = some s' ∧ ¬ ramBytes pa n) := by
             rcases hsk with hgf | hnram
             · exact Or.inl hgf
             · cases hgb : g (σ.devs.st d) with
-              | false => exact Or.inl rfl
-              | true => exact Or.inr ⟨rfl, hnram⟩
-          rcases hgf with hgf | ⟨hgb, hnram⟩
+              | none => exact Or.inl rfl
+              | some s' => exact Or.inr ⟨s', rfl, hnram⟩
+          rcases hgf with hgf | ⟨s', hgb, hnram⟩
           · imod (hfalse (σ.devs.st d) hgf) $$ [HC HR] with ⟨HR, HC⟩
             · iframe HC HR
             ihave Hcl := Hclose $$ [Hfrag HR]
@@ -407,10 +437,10 @@ theorem wpDev_dmaV (N : Namespace) (d : DevId) (R : DevSt d → IProp GF) [∀ s
           · ihave %hram : ⌜ramBytes pa n⌝ $$ [HC HR Hauth Hσclose]
             · ihave Hσ := machInterp_acc_dev_self σ d $$ [Hσclose Hauth]
               case' _ => iframe
-              ihave Hl : dmaWriteLease pa n w iprop(|==> (R (σ.devs.st d) ∗ C')) $$ [HC HR]
-              · iapply hlease (σ.devs.st d) hgb $$ [HC HR]
+              ihave Hl : dmaWriteLease pa n w iprop(|==> (R s' ∗ C')) $$ [HC HR]
+              · iapply hlease (σ.devs.st d) s' hgb $$ [HC HR]
                 iframe HC HR
-              icases dmaWriteLease_cases pa n w iprop(|==> (R (σ.devs.st d) ∗ C')) $$ Hl
+              icases dmaWriteLease_cases pa n w iprop(|==> (R s' ∗ C')) $$ Hl
                 with ⟨%Hs, %Kb, Hb, _, _⟩
               icases Hσ with ⟨Hregs, Hmem, Hmm, Hdev⟩
               iapply histBytes_ramBytes σ pa n (fun _ => DFrac.own 1) Hs

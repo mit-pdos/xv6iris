@@ -29,7 +29,12 @@ THE GATES are the Rocq model's: a write completes only once its payload is
 captured (and, in write-through mode, drained); a flush once the cache is
 empty; the used-ring element and index of one request are written with no
 other request between its element and its index (`pushOk`); the index
-write is the last transaction of a request.  A malformed chain (a
+write is the last transaction of a request, AND IS ITS COMPLETION -- the
+store of the new used index and `complete` (the request leaves the
+in-flight map, `usedIdx` advances, the interrupt is raised, the latch
+frees) are ONE transition, as they are in the Rocq model.  That is what a
+driver proof needs: there is no state in which the completion is visible
+in memory while the device still holds the request.  A malformed chain (a
 descriptor off the queue, a wrong chain shape, a head the device already
 holds) STALLS the request forever -- the Rocq model's `DiskStepWild` arm
 made the device write anything anywhere instead; either way a driver proof
@@ -471,9 +476,12 @@ def serve (h : BitVec 16) : VM Unit := do
     DevM.dmaWriteIf (fun s => decide (reqOf s h = some r) && decide (s.usedIdx = ui) &&
         decide (s.cfg = c)) (usedElemAddr c ui) 8
       (castW (by decide : 64 = 8 * 8) ((usedLen r) ++ (r.head.setWidth 32)))
-    DevM.dmaWriteIf (fun s => decide (reqOf s h = some r) && decide (s.usedIdx = ui) &&
-        decide (s.cfg = c)) (usedIdxAddr c) 2 (ui + 1#16)
-    DevM.modify (fun v => complete v h)
+    -- the used index, AND the completion, in ONE transition: the store that
+    -- publishes the index is the step at which the request leaves the
+    -- in-flight map, `usedIdx` advances and the interrupt is raised
+    DevM.dmaWriteStep (fun s =>
+      if decide (reqOf s h = some r) && decide (s.usedIdx = ui) && decide (s.cfg = c) then
+        some (complete s h) else none) (usedIdxAddr c) 2 (ui + 1#16)
 
 /-- Sector `i` of a read request: written to the driver's buffer from the
 cache-overlaid image. -/

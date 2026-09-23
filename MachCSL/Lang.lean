@@ -173,6 +173,11 @@ def dmaView (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) : Prop :=
 abbrev MState.setDev (σ : MState) (d : DevId) (st : DevSt d) : MState :=
   { σ with devs := σ.devs.set d st }
 
+/-- A DMA write and a device's own move are on disjoint fields, so the one
+transition that does both may be read either way round. -/
+theorem MState.storeDma_setDev (σ : MState) (d : DevId) (st : DevSt d) (pa : PAddr) (n : Nat)
+    (w : BitVec (8 * n)) : (σ.storeDma pa n w).setDev d st = (σ.setDev d st).storeDma pa n w := rfl
+
 /-- Update one device's task bookkeeping. -/
 abbrev MState.setRt (σ : MState) (d : DevId) (rt : DevRt) : MState :=
   { σ with devrt := updCpu' σ.devrt d rt }
@@ -435,9 +440,10 @@ is answered with `v`, moving the state to `σ'`, emitting `obs` and forking
 * `step g`: the guarded update, with `g` answering;
 * `get`, `choose`: read the local state, any number;
 * `dmaRead`: any value consistent with the top of the order (`dmaView`);
-* `dmaWrite g`: appended at the top as the disk agent if `g` holds and the
-  footprint is DRAM (no hart may reserve a byte of it), a silent no-op
-  otherwise;
+* `dmaWrite g`: appended at the top as the disk agent if `g` ANSWERS
+  (`g s = some s'`) and the footprint is DRAM (no hart may reserve a byte
+  of it) -- and the device's own state becomes `s'` IN THE SAME
+  TRANSITION; a silent no-op otherwise;
 * `sample`: the level its device drives on the source;
 * `setPin`: the hart's `sig_meip`/`sig_seip` register;
 * `fork t`: the next task id, and the named subprogram as a new thread;
@@ -452,9 +458,9 @@ def devOpStep (gen : Nat) (d : DevId) (o : DevOp (DevSt d) (DevTask d)) (σ : MS
   | .dmaRead pa n => fun v σ' obs efs => dmaView σ pa n v ∧ σ' = σ ∧ obs = [] ∧ efs = []
   | .dmaWrite g pa n w => fun _ σ' obs efs =>
       obs = [] ∧ efs = [] ∧
-      ((g (σ.devs.st d) = true ∧ ramBytes pa n ∧ ¬ anyReserve σ.resv pa n ∧
-          σ' = σ.storeDma pa n w) ∨
-       ((g (σ.devs.st d) = false ∨ ¬ ramBytes pa n) ∧ σ' = σ))
+      ((∃ s', g (σ.devs.st d) = some s' ∧ ramBytes pa n ∧ ¬ anyReserve σ.resv pa n ∧
+          σ' = (σ.storeDma pa n w).setDev d s') ∨
+       ((g (σ.devs.st d) = none ∨ ¬ ramBytes pa n) ∧ σ' = σ))
   | .sample src => fun v σ' obs efs => v = devLevel σ.devs src ∧ σ' = σ ∧ obs = [] ∧ efs = []
   | .setPin cpu mmode b => fun _ σ' obs efs =>
       obs = [] ∧ efs = [] ∧
@@ -472,7 +478,7 @@ on an unfinished task. -/
 def devBlocked (d : DevId) (o : DevOp (DevSt d) (DevTask d)) (σ : MState) : Prop :=
   match o with
   | .step g => g (σ.devs.st d) = none
-  | .dmaWrite g pa n _ => g (σ.devs.st d) = true ∧ anyReserve σ.resv pa n
+  | .dmaWrite g pa n _ => (g (σ.devs.st d)).isSome ∧ anyReserve σ.resv pa n
   | .join tid => tid ∉ (σ.devrt d).done
   | _ => False
 
