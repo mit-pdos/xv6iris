@@ -1,0 +1,89 @@
+/-
+Specification of `virtio_disk_init` (kernel/virtio_disk.c), boot only (the
+Rocq `SpecVirtioDiskInit`, without crash permits):
+
+```
+initlock(&disk.vdisk_lock, "virtio_disk");
+check MAGIC/VERSION/DEVICE_ID/VENDOR_ID; reset; ACKNOWLEDGE; DRIVER;
+negotiate features (clear RO/SCSI/FLUSH/CONFIG_WCE/MQ/ANY_LAYOUT/EVENT_IDX/INDIRECT);
+FEATURES_OK (re-read); QUEUE_SEL 0; QUEUE_READY must be 0; QUEUE_NUM_MAX ≥ NUM;
+disk.desc/avail/used = kalloc() ×3, memset 0; QUEUE_NUM = NUM; the six address
+registers; QUEUE_READY = 1; free[i] = 1; DRIVER_OK.
+```
+
+Every panic path is refuted by the device model (the identification
+registers and `QUEUE_NUM_MAX = 1024` are constants, FEATURES_OK sticks,
+QUEUE_READY reads 0 after the reset) and by the three pages the caller
+supplies (`kalloc` cannot fail).  The caller brings the raw cells of
+`disk` the function writes (the lock, the three page pointers, `free[]`),
+`kalloc`'s environment with at least three pages, and the DEAD disk
+invariant with the driver's half of the configuration tracker; it gets the
+lock as `lkFresh` with `disk.vdisk_lock`'s payload assembled (`diskRes`),
+the persistent geometry (`diskGeom`, the frozen live configuration), and the
+driver's protocol tokens at zero.  Interrupts are off and the hart does not
+move (`SIE` false; `main` on hart 0, before the scheduler).  Stack: its
+4-slot frame over `kalloc`'s 14.
+
+Imports only definitional files.
+-/
+import MachCSL.CallConv
+import MachCSL.Lock
+import Xv6.Image
+import Xv6.KallocDefs
+import Xv6.DiskInvDefs
+
+namespace Xv6
+
+open Iris Iris.ProgramLogic Iris.BI Std MachCSL
+open LeanRV64D
+
+/-- Address of `virtio_disk_init`. -/
+def virtioDiskInitAddr : BitVec 64 := KA.«virtio_disk_init»
+
+/-- The stack `virtio_disk_init`'s cone needs: its 4-slot frame over `kalloc`'s 14. -/
+def virtioDiskInitSlots : Nat := 18
+
+/-- The raw `disk` cells `virtio_disk_init` writes: the lock's three cells,
+the three page pointers and the eight `free` bytes. -/
+def diskInitCells {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+    (vlock : BitVec 32) (vname vcpu pd0 pav0 pu0 : BitVec 64) (free0 : List (BitVec 8)) : IProp GF := iprop%
+  ⌜free0.length = NUM⌝ ∗
+  kmapId aVdiskLock ∗ kmapId (aVdiskLock + 16#64) ∗
+  wordPointsTo aVdiskLock 4 (DFrac.own 1) vlock ∗
+  wordPointsTo (aVdiskLock + 8#64) 8 (DFrac.own 1) vname ∗
+  wordPointsTo (aVdiskLock + 16#64) 8 (DFrac.own 1) vcpu ∗
+  wordPointsTo aDescPtr 8 (DFrac.own 1) pd0 ∗
+  wordPointsTo aAvailPtr 8 (DFrac.own 1) pav0 ∗
+  wordPointsTo aUsedPtr 8 (DFrac.own 1) pu0 ∗
+  byteBuf (aFree 0) (DFrac.own 1) free0
+
+/-- **WP of `virtio_disk_init`.**  The invariant is DEAD on entry (the
+device was never programmed); `c0` is the configuration the tracker holds. -/
+def wp_virtio_disk_init_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [CurCtx]
+    (cpu : CPU) (k : KCtx) (γ : DiskNames) (γkl : GName) (γk : KmemNames) (nb : Nat) (c0 : VirtioCfg)
+    (vlock : BitVec 32) (vname vcpu pd0 pav0 pu0 : BitVec 64) (free0 : List (BitVec 8))
+    (hsie : k.sie = false) (hK : virtioDiskInitSlots ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
+    (hlk : "kmem" ∉ k.locks) (hnb : 3 ≤ nb) (hdead : Virtio.live c0 = false) : Prop :=
+  kctx cpu k ∗ pcIs cpu virtioDiskInitAddr ∗
+  isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk (some nb) ∗
+  diskInv γ ∗ diskCfgOwn γ c0 ∗
+  diskInitCells vlock vname vcpu pd0 pav0 pu0 free0 ∗
+  wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ (R' : RegMap) (pd pav pu : BitVec 64),
+    kctx cpu' (k.withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+    ⌜calleeSaved k.regs R'⌝ -∗
+    kallocAvail γk (some (nb - 3)) -∗
+    diskGeom γ pd pav pu -∗ diskPub γ 0 -∗ diskReadAt γ 0 -∗ diskStage γ none -∗
+    wordPointsTo (aVdiskLock + 8#64) 8 (DFrac.own 1) KStr.«virtio_disk» -∗ lkFresh aVdiskLock -∗
+    diskRes γ pd pav pu curCtx -∗ wpLoop cpu'))
+  ⊢ wpLoop (GF := GF) cpu
+
+/-- The interface of `virtio_disk_init`. -/
+structure VIRTIO_DISK_INIT : Prop where
+  wp_virtio_disk_init : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [CurCtx]
+    (cpu : CPU) (k : KCtx) (γ : DiskNames) (γkl : GName) (γk : KmemNames) (nb : Nat) (c0 : VirtioCfg)
+    (vlock : BitVec 32) (vname vcpu pd0 pav0 pu0 : BitVec 64) (free0 : List (BitVec 8))
+    hsie hK hnoff hlk hnb hdead,
+    wp_virtio_disk_init_body (hlc := hlc) (GF := GF) cpu k γ γkl γk nb c0 vlock vname vcpu pd0 pav0 pu0 free0
+      hsie hK hnoff hlk hnb hdead
+
+end Xv6

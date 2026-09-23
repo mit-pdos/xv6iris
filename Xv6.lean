@@ -363,3 +363,7 @@ import Xv6.DiskDefs
 import Xv6.VirtioQueue
 import Xv6.DiskInvDefs
 import Xv6.DiskInv
+import Xv6.BufDefs
+import Xv6.SpecVirtioDiskInit
+import Xv6.SpecVirtioDiskRw
+import Xv6.SpecVirtioDiskIntr

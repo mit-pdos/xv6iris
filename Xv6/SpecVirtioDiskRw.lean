@@ -1,0 +1,91 @@
+/-
+Specification of `virtio_disk_rw` (kernel/virtio_disk.c): move block
+`b->blockno` between `b->data` and the disk (the Rocq `SpecVirtioDiskRw`,
+without crash permits).
+
+```
+void virtio_disk_rw(struct buf *b, int write) {
+  uint64 sector = b->blockno * (BSIZE / 512);
+  acquire(&disk.vdisk_lock);
+  int idx[3];
+  while (1) { if (alloc3_desc(idx) == 0) break; sleep_prepare(&disk.free[0]); release; sleep(); acquire; }
+  ... format the three-descriptor chain, ops[idx[0]], info[idx[0]].status = 0xff,
+  b->disk = 1, info[idx[0]].b = b, avail->ring[avail->idx % NUM] = idx[0], avail->idx += 1,
+  *R(QUEUE_NOTIFY) = 0;
+  while (b->disk == 1) { sleep_prepare(b); release; sleep(); acquire; }
+  info[idx[0]].b = 0; free_chain(idx[0]); release(&disk.vdisk_lock);
+}
+```
+
+The running thread is proc `j` (sleep's linkage); interrupts off, depth 0,
+no lock held.  The caller holds the disk's persistent credentials
+(`diskInv`, `diskGeom`, the lock), the buffer (`bufOwn`: block number,
+`disk` flag, data) and the block's image fragment; on return the buffer's
+`disk` flag is `0` and both the data and the image hold the transferred
+bytes: the buffer's for a write, the disk's for a read.  `blockno < 2^31`
+so the 32-bit sector doubling does not wrap.  Stack: the 12-slot frame
+over `sleep`'s 20.
+
+Imports only definitional files.
+-/
+import MachCSL.CallConv
+import MachCSL.Lock
+import Xv6.Image
+import Xv6.SchedCtx
+import Xv6.SpecSleep
+import Xv6.DiskInvDefs
+import Xv6.BufDefs
+
+namespace Xv6
+
+open Iris Iris.ProgramLogic Iris.BI Std MachCSL
+open LeanRV64D
+
+/-- Address of `virtio_disk_rw`. -/
+def virtioDiskRwAddr : BitVec 64 := KA.«virtio_disk_rw»
+
+/-- The stack `virtio_disk_rw`'s cone needs: its 12-slot frame over `sleep`'s. -/
+def virtioDiskRwSlots : Nat := 12 + sleepSlots
+
+/-- The disk's persistent credentials a driver caller holds. -/
+def diskCaps {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [CurCtx]
+    (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) : IProp GF := iprop%
+  diskInv γ ∗ diskGeom γ pd pav pu ∗ isLock γl aVdiskLock "virtio_disk" (diskRes γ pd pav pu)
+
+instance diskCaps_persistent {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [CurCtx]
+    (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) : Persistent (diskCaps (GF := GF) γ γl pd pav pu) := by
+  unfold diskCaps; infer_instance
+
+/-- **WP of `virtio_disk_rw`.**  `a0 = b`, `a1 = write` (nonzero: write). -/
+def wp_virtio_disk_rw_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
+    (bno dsk0 : BitVec 32) (dataBuf dataDisk : List (BitVec 8))
+    (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : virtioDiskRwSlots ≤ k.avail)
+    (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
+    (htier : k.tier = KTier.kpt)
+    (hbno : bno.toNat < 2 ^ 31) (hdata : dataDisk.length = BSIZE) : Prop :=
+  let wr : Bool := k.regs 11#5 ≠ 0#64
+  kctx cpu k ∗ pcIs cpu virtioDiskRwAddr ∗ procsInv Γ ∗
+  trapCsrs cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ∗
+  diskCaps γ γl pd pav pu ∗
+  bufOwn (k.regs 10#5) bno dsk0 dataBuf ∗ diskBlock γ bno.toNat dataDisk ∗
+  wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
+    ⌜calleeSaved k.regs R'⌝ -∗
+    kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+    trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
+    bufOwn (k.regs 10#5) bno 0#32 (if wr then dataBuf else dataDisk) -∗
+    diskBlock γ bno.toNat (if wr then dataBuf else dataDisk) -∗ wpLoop cpu'))
+  ⊢ wpLoop (GF := GF) cpu
+
+/-- The interface of `virtio_disk_rw`. -/
+structure VIRTIO_DISK_RW : Prop where
+  wp_virtio_disk_rw : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
+    (bno dsk0 : BitVec 32) (dataBuf dataDisk : List (BitVec 8))
+    hj hproc hK hsie hnoff hlocks htier hbno hdata,
+    wp_virtio_disk_rw_body (hlc := hlc) (GF := GF) Γ cpu k γ γl pd pav pu j bno dsk0 dataBuf dataDisk
+      hj hproc hK hsie hnoff hlocks htier hbno hdata
+
+end Xv6
