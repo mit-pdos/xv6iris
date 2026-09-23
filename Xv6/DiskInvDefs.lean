@@ -35,7 +35,14 @@ what sits beside the device's mirror inside `devInvR`:
 * the DEAD arm is the pre-`virtio_disk_init` world: the invariant holds
   its half of the configuration ghost, the device is not live, and
   nothing is in flight.  Every DMA-write obligation is vacuous there,
-  because each one is guarded on a request being in flight.
+  because each one is guarded on a request being in flight.  It carries
+  three further clauses that the LIVE FLIP consumes
+  (`Xv6.diskProto_flip`): no serve permit records an armed receipt
+  (`permOk pm (fun _ => .inactive)`), and `v.usedIdx = 0`, `v.seen = 0`.
+  All three are stable: a permit is only ever taken in the live world, and
+  the two counters move only in `Virtio.complete` and in `Virtio.body`'s
+  live branch, both of which carry a frozen configuration that refutes
+  this arm (`Xv6.diskProto_complete`, `Xv6.diskProto_pop_live`).
 * the ALIVE arm freezes the configuration: `diskCfgFrozen γ c0` is
   persistent, so once the driver has persisted its half the device's
   `v.cfg` is `c0` in every later state -- which is what makes the
@@ -93,6 +100,14 @@ WHAT IS NOT HERE, AND WHY.
   see the report.
 * No crash permits, no `Q`, no `disk_seq_permit` (the port drops Rocq's
   crash story), and no TSO floor rows (`fl0`/`fl1`/`flr`/`pos`).
+* The handler watermark `diskReadAt` and the staged head `diskStage` are
+  WHOLE ghost variables in the lock payload, not halves: the invariant
+  never mentions either, so there is nothing for a second half to agree
+  with, and the handler may bump its watermark with nothing else in hand.
+  `diskPub`/`diskPubAuth` stay split, because `avail->idx` is shared.
+* Why the queue accounting is still absent, and what it would take to add
+  it, is written out at the head of the assumed-interface section of
+  `Xv6/DiskAcc.lean`.
 -/
 import Xv6.VirtioQueue
 import Xv6.KallocDefs
@@ -148,6 +163,7 @@ structure DiskNames where
 
 /-- The disk invariant's namespace. -/
 def diskN : Namespace := ndot nroot "xv6disk"
+
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
@@ -338,20 +354,41 @@ def diskDoneLb (γ : DiskNames) (n : Nat) : IProp GF := MonoNat.lb_own γ.nc (.o
 instance diskDoneLb_persistent (γ : DiskNames) (n : Nat) :
     Persistent (diskDoneLb (GF := GF) γ n) := by unfold diskDoneLb; infer_instance
 
+/-- The completion counter yields its persistent lower bound. -/
+theorem diskDoneAuth_lb (γ : DiskNames) (n : Nat) :
+    diskDoneAuth (GF := GF) γ n ⊢ |==> (diskDoneAuth γ n ∗ diskDoneLb γ n) := by
+  unfold diskDoneAuth diskDoneLb
+  iintro H
+  imod MonoNat.own_update γ.nc (.ofNat n) (.ofNat n)
+    (by simp only [MaxNat.le_toNat]; omega) $$ H with ⟨H1, H2⟩
+  imodintro
+  iframe H1 H2
+
 /-- The published count: the lock payload's half. -/
 def diskPubAuth (γ : DiskNames) (n : Nat) : IProp GF := γ.np ↪VAR{.own (1 : Qp).half} n
 /-- The published count: the publisher's half (Rocq's `disk_pub`). -/
 def diskPub (γ : DiskNames) (n : Nat) : IProp GF := γ.np ↪VAR{.own (1 : Qp).half} n
-/-- The handler watermark (`disk.used_idx`), the payload's half. -/
-def diskReadAtAuth (γ : DiskNames) (n : Nat) : IProp GF := γ.nr ↪VAR{.own (1 : Qp).half} n
-/-- The handler watermark, the handler's half (Rocq's `disk_read_at`). -/
-def diskReadAt (γ : DiskNames) (n : Nat) : IProp GF := γ.nr ↪VAR{.own (1 : Qp).half} n
-/-- The head staged between the ring store and the `avail->idx` bump. -/
-def diskStageAuth (γ : DiskNames) (s : Option Nat) : IProp GF :=
-  γ.stage ↪VAR{.own (1 : Qp).half} s
-/-- The stage, the publisher's half (Rocq's `disk_stage`). -/
-def diskStage (γ : DiskNames) (s : Option Nat) : IProp GF :=
-  γ.stage ↪VAR{.own (1 : Qp).half} s
+/-- The handler watermark (`disk.used_idx`), Rocq's `disk_read_at`.  The
+INVARIANT never mentions it -- it is the driver's own count of the used
+elements it has consumed -- so the lock payload holds the whole ghost
+variable rather than a half, and the interrupt handler may bump it with
+nothing else in hand. -/
+def diskReadAt (γ : DiskNames) (n : Nat) : IProp GF := γ.nr ↪VAR{.own 1} n
+/-- The head staged between the ring store and the `avail->idx` bump
+(Rocq's `disk_stage`): again purely the driver's, so again whole. -/
+def diskStage (γ : DiskNames) (s : Option Nat) : IProp GF := γ.stage ↪VAR{.own 1} s
+
+theorem diskReadAt_update (γ : DiskNames) (n n' : Nat) :
+    diskReadAt (GF := GF) γ n ⊢ |==> diskReadAt γ n' := by
+  unfold diskReadAt
+  iintro H
+  iapply ghost_var_update n' γ.nr $$ H
+
+theorem diskStage_update (γ : DiskNames) (s s' : Option Nat) :
+    diskStage (GF := GF) γ s ⊢ |==> diskStage γ s' := by
+  unfold diskStage
+  iintro H
+  iapply ghost_var_update s' γ.stage $$ H
 
 /-! ## The serve permits
 
@@ -388,6 +425,10 @@ def permTok (γ : DiskNames) (k : Nat) (h : BitVec 16) (s : HState) : IProp GF :
 is free by definition. -/
 def hstateAt (st : Nat → HState) (h : BitVec 16) : HState :=
   if h.toNat < NUM then st h.toNat else .inactive
+
+@[simp] theorem hstateAt_inactive (h : BitVec 16) :
+    hstateAt (fun _ => .inactive) h = .inactive := by
+  unfold hstateAt; split <;> rfl
 
 /-- Every permit agrees with the receipt it names. -/
 def permOk (pm : RegMapF PermVal) (st : Nat → HState) : Prop :=
@@ -470,6 +511,13 @@ def headRes (γ : DiskNames) (pd : PAddr) (i : Nat) : HState → IProp GF
   | .inactive => dmaHalfAt (descAt pd i) 16 (0 : BitVec (8 * 16))
   | .active c => iprop(⌜c.hd = i ∧ c.wf⌝ ∗ chainLease pd c ∗ ∃ bs, diskBlock γ c.blk bs)
 
+theorem headRes_inactive (γ : DiskNames) (pd : PAddr) (i : Nat) :
+    headRes (GF := GF) γ pd i .inactive = dmaHalfAt (descAt pd i) 16 (0 : BitVec (8 * 16)) := rfl
+
+theorem headRes_active (γ : DiskNames) (pd : PAddr) (i : Nat) (c : Chain) :
+    headRes (GF := GF) γ pd i (.active c) =
+      iprop(⌜c.hd = i ∧ c.wf⌝ ∗ chainLease pd c ∗ ∃ bs, diskBlock γ c.blk bs) := rfl
+
 /-- The used ring is ENTIRELY the device's. -/
 def usedLease (pu : PAddr) : IProp GF := iprop%
   dmaOwn (usedIdxAt pu) 2 ∗ ([∗list] j ∈ List.range NUM, dmaOwn (usedElemAt pu j) 8)
@@ -536,17 +584,30 @@ def diskLive (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState)
     ⌜v.usedIdx = wrap16 nc ∧ inflightOk v st ∧ imgOk v m (inFlightBlk st) ∧ cachedOk v st ∧
       permOk pm st⌝
 
-/-- The dead arm: before `virtio_disk_init`, and never again after. -/
-def diskDead (γ : DiskNames) (v : VirtioState) : IProp GF := iprop%
+/-- The dead arm: before `virtio_disk_init`, and never again after.
+
+Three clauses beyond the obvious ones.  `permOk pm (fun _ => .inactive)`:
+no serve permit records an ARMED receipt, which is what lets the live flip
+install eight `.inactive` receipts without contradicting a permit that is
+still out (a permit at a dead device can only have been taken at a head
+that was free, and `permOk_delete` keeps the clause when one goes back).
+`v.usedIdx = 0` and `v.seen = 0`: the queue counters of a device that has
+never been live, which is what the live flip hands to `diskLive`'s
+`v.usedIdx = wrap16 nc` at `nc = 0`.  Both are restored by a RESET and
+moved by no step of the dead world: the used-index bump lives in
+`Virtio.complete`, and the pop in `Virtio.body`'s live branch, and both of
+those carry a frozen configuration that refutes this arm. -/
+def diskDead (γ : DiskNames) (v : VirtioState) (pm : RegMapF PermVal) : IProp GF := iprop%
   ∃ m : RegMapF (List (BitVec 8)), imgAuth γ m ∗ diskCfgAuth γ v.cfg ∗
-    ⌜Virtio.live v.cfg = false ∧ noInflight v ∧ v.cache = [] ∧ imgOk v m (fun _ => False)⌝
+    ⌜Virtio.live v.cfg = false ∧ noInflight v ∧ v.cache = [] ∧ imgOk v m (fun _ => False) ∧
+      permOk pm (fun _ => .inactive) ∧ v.usedIdx = 0#16 ∧ v.seen = 0#16⌝
 
 /-- **The disk protocol**, indexed by the device's own state: what sits
 beside the device's mirror inside `diskInv`. -/
 def diskProto (γ : DiskNames) (v : VirtioState) : IProp GF := iprop%
   ⌜cacheOk v⌝ ∗
   ∃ (pn : Nat) (pm : RegMapF PermVal), permAuth γ pm ∗ ⌜permFresh pn pm⌝ ∗
-    (diskDead γ v ∨
+    (diskDead γ v pm ∨
      ∃ c0 : VirtioCfg, diskCfgFrozen γ c0 ∗
        ⌜v.cfg = c0 ∧ Virtio.live c0 = true ∧ c0.qnum.toNat = NUM⌝ ∗ diskLive γ c0 v pm)
 
@@ -568,8 +629,8 @@ instance availLease_timeless (pav : PAddr) (np : Nat) (ring : Nat → Nat) :
 instance diskLive_timeless (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState)
     (pm : RegMapF PermVal) : Timeless (diskLive (GF := GF) γ c0 v pm) := by
   unfold diskLive headAuth diskDoneAuth diskPubAuth imgAuth; infer_instance
-instance diskDead_timeless (γ : DiskNames) (v : VirtioState) :
-    Timeless (diskDead (GF := GF) γ v) := by unfold diskDead diskCfgAuth imgAuth; infer_instance
+instance diskDead_timeless (γ : DiskNames) (v : VirtioState) (pm : RegMapF PermVal) :
+    Timeless (diskDead (GF := GF) γ v pm) := by unfold diskDead diskCfgAuth imgAuth; infer_instance
 
 instance permAuth_timeless (γ : DiskNames) (pm : RegMapF PermVal) :
     Timeless (permAuth (GF := GF) γ pm) := by unfold permAuth; infer_instance
@@ -631,6 +692,14 @@ def slotBody (ξ : CtxId) (pd : PAddr) (i : Nat) : HState → IProp GF
 def slotRes (γ : DiskNames) (ξ : CtxId) (pd : PAddr) (i : Nat) : IProp GF := iprop%
   ∃ s : HState, headTok γ i s ∗ slotBody ξ pd i s
 
+theorem slotBody_inactive (ξ : CtxId) (pd : PAddr) (i : Nat) :
+    slotBody (GF := GF) ξ pd i .inactive =
+      iprop(wordAtN ξ (aFree i) 1 (DFrac.own 1) 1#8 ∗ freeSlotRes ξ pd i) := rfl
+
+theorem slotBody_active (ξ : CtxId) (pd : PAddr) (i : Nat) (c : Chain) :
+    slotBody (GF := GF) ξ pd i (.active c) =
+      iprop(wordAtN ξ (aFree i) 1 (DFrac.own 1) 0#8 ∗ claimRes ξ pd c) := rfl
+
 /-- **The payload of `disk.vdisk_lock`** (Rocq's `disk_res`): the
 publisher's and the handler's halves of the counters, the staged head,
 `disk.used_idx` at the handler watermark, the driver's halves of
@@ -683,3 +752,4 @@ end payload
 end
 
 end Xv6
+

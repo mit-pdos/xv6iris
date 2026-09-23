@@ -33,6 +33,14 @@ cell, `avail->idx`) is split in halves: the invariant's half is a
   history the store pushed;
 * a driver READ of a cell that is ENTIRELY the device's (`used->idx`,
   `used->ring[..]`, `info[h].status`) opens the invariant with `readAU`.
+
+The file has three parts: the MMIO accessors of `virtio_disk_init` (all
+proved, including the `DRIVER_OK` store that flips the invariant to its
+live arm), the queue-memory accessors that need no queue accounting (the
+avail page, also proved), and an assumed interface for the seven
+accessors of `virtio_disk_rw`/`virtio_disk_intr` that do -- with the
+reason the accounting is not there, and the fix it needs, written out
+above `DISK_ACC_ASSUMPTIONS`.
 -/
 import Xv6.DiskInv
 import MachCSL.WpDmaCtx
@@ -221,7 +229,7 @@ the write-back cache is empty. -/
 theorem diskProto_dead_pure (γ : DiskNames) (v : VirtioState) (c : VirtioCfg)
     (hdead : Virtio.live c = false) :
     diskProto (GF := GF) γ v ∗ diskCfgOwn γ c ⊢
-      ⌜v.cfg = c ∧ noInflight v ∧ v.cache = []⌝ := by
+      ⌜v.cfg = c ∧ noInflight v ∧ v.cache = [] ∧ v.usedIdx = 0#16 ∧ v.seen = 0#16⌝ := by
   unfold diskProto
   iintro ⟨⟨%hco, %pn, %pm, Hpm, %hfr, Harm⟩, Htok⟩
   icases Harm with ⟨Hd | ⟨%c0, #Hfr, %hc0, Hl⟩⟩
@@ -229,7 +237,7 @@ theorem diskProto_dead_pure (γ : DiskNames) (v : VirtioState) (c : VirtioCfg)
     icases Hd with ⟨%m, Hm, Hcfg, %hp⟩
     ihave %he := diskCfg_auth_own_agree γ c v.cfg $$ Hcfg Htok
     ipureintro
-    exact ⟨he, hp.2.1, hp.2.2.1⟩
+    exact ⟨he, hp.2.1, hp.2.2.1, hp.2.2.2.2.2.1, hp.2.2.2.2.2.2⟩
   · ihave %he := diskCfg_frozen_own_agree γ c c0 $$ Hfr Htok
     rw [he] at hc0
     rw [hc0.2.1] at hdead
@@ -238,9 +246,11 @@ theorem diskProto_dead_pure (γ : DiskNames) (v : VirtioState) (c : VirtioCfg)
 theorem diskProto_dead_open (γ : DiskNames) (v : VirtioState) (c : VirtioCfg)
     (hdead : Virtio.live c = false) :
     diskProto (GF := GF) γ v ∗ diskCfgOwn γ c ⊢
-      ⌜v.cfg = c ∧ noInflight v ∧ v.cache = []⌝ ∗ (diskProto γ v ∗ diskCfgOwn γ c) := by
+      ⌜v.cfg = c ∧ noInflight v ∧ v.cache = [] ∧ v.usedIdx = 0#16 ∧ v.seen = 0#16⌝ ∗
+      (diskProto γ v ∗ diskCfgOwn γ c) := by
   iintro ⟨Hp, Htok⟩
-  ihave %hpure : ⌜v.cfg = c ∧ noInflight v ∧ v.cache = []⌝ $$ [Hp Htok]
+  ihave %hpure : ⌜v.cfg = c ∧ noInflight v ∧ v.cache = [] ∧ v.usedIdx = 0#16 ∧ v.seen = 0#16⌝
+      $$ [Hp Htok]
   · iapply diskProto_dead_pure γ v c hdead $$ [Hp Htok]
     iframe
   isplitl []
@@ -301,22 +311,25 @@ satisfies it (`deadWrite_cfg`, `deadWrite_reset` below). -/
 def deadWriteOk (off : Nat) (w : BitVec 32) (c c' : VirtioCfg) : Prop :=
   Virtio.live c' = false ∧
   ∀ v : VirtioState, v.cfg = c → v.cache = [] → noInflight v →
+    v.usedIdx = 0#16 → v.seen = 0#16 →
     ∃ v' : VirtioState, Virtio.write v off w = some v' ∧ v'.cfg = c' ∧ v'.cache = [] ∧
-      noInflight v' ∧ v'.disk = v.disk
+      noInflight v' ∧ v'.disk = v.disk ∧ v'.usedIdx = 0#16 ∧ v'.seen = 0#16
 
 /-- The ordinary case: the write only moves the configuration. -/
 theorem deadWrite_cfg (off : Nat) (w : BitVec 32) (c c' : VirtioCfg)
     (hlive : Virtio.live c' = false)
     (h : ∀ v : VirtioState, v.cfg = c → Virtio.write v off w = some { v with cfg := c' }) :
     deadWriteOk off w c c' := by
-  refine ⟨hlive, fun v hv hc hn => ⟨{ v with cfg := c' }, h v hv, rfl, hc, ?_, rfl⟩⟩
+  refine ⟨hlive, fun v hv hc hn hu hs =>
+    ⟨{ v with cfg := c' }, h v hv, rfl, hc, ?_, rfl, hu, hs⟩⟩
   intro k; exact hn k
 
 /-- The RESET (`*R(STATUS) = 0`): the configuration goes to `cfg0`, and
 the cache and the in-flight map -- already empty in the dead arm -- go
 with it. -/
 theorem deadWrite_reset (c : VirtioCfg) : deadWriteOk Virtio.offStatus 0#32 c Virtio.cfg0 := by
-  refine ⟨by decide, fun v hv hc hn => ⟨Virtio.reset v, vwrite_status_reset v, rfl, rfl, ?_, rfl⟩⟩
+  refine ⟨by decide, fun v hv hc hn hu hs =>
+    ⟨Virtio.reset v, vwrite_status_reset v, rfl, rfl, ?_, rfl, rfl, rfl⟩⟩
   intro k
   unfold Virtio.reqOf Virtio.phase Virtio.reset Virtio.alistGet
   rfl
@@ -325,7 +338,7 @@ theorem deadWrite_reset (c : VirtioCfg) : deadWriteOk Virtio.offStatus 0#32 c Vi
 theorem diskProto_dead_write (γ : DiskNames) (v v' : VirtioState) (c c' : VirtioCfg)
     (hdead : Virtio.live c = false) (hlive' : Virtio.live c' = false)
     (hcfg' : v'.cfg = c') (hcache : v'.cache = []) (hni : noInflight v')
-    (hdisk : v'.disk = v.disk) :
+    (hdisk : v'.disk = v.disk) (hu : v'.usedIdx = 0#16) (hs : v'.seen = 0#16) :
     diskProto (GF := GF) γ v ∗ diskCfgOwn γ c ⊢ |==> (diskProto γ v' ∗ diskCfgOwn γ c') := by
   unfold diskProto
   iintro ⟨⟨%hco, %pn, %pm, Hpm, %hfr, Harm⟩, Htok⟩
@@ -356,9 +369,9 @@ theorem diskProto_dead_write (γ : DiskNames) (v v' : VirtioState) (c c' : Virti
     rw [hcfg']
     iframe Hm Hcfg
     ipureintro
-    refine ⟨hlive', hni, hcache, ?_⟩
+    refine ⟨hlive', hni, hcache, ?_, hp.2.2.2.2.1, hu, hs⟩
     intro bno bs hb
-    rcases hp.2.2.2 bno bs hb with h | h
+    rcases hp.2.2.2.1 bno bs hb with h | h
     · exact absurd h id
     · exact Or.inr (by rw [h, hblk])
   · ihave %he := diskCfg_frozen_own_agree γ c c0 $$ Hfr Htok
@@ -379,7 +392,8 @@ theorem disk_reg_write_dead (γ : DiskNames) (c c' : VirtioCfg) (off : Nat) (w :
   icases Hbody with ⟨%v, >Hfrag, >Hproto⟩
   icases diskProto_dead_open γ v c hdead $$ [Hproto Htok] with ⟨%hpure, Hproto, Htok⟩
   · iframe
-  obtain ⟨v', hw, hcfg', hcache', hni', hdisk'⟩ := hok.2 v hpure.1 hpure.2.2 hpure.2.1
+  obtain ⟨v', hw, hcfg', hcache', hni', hdisk', hu', hs'⟩ :=
+    hok.2 v hpure.1 hpure.2.2.1 hpure.2.1 hpure.2.2.2.1 hpure.2.2.2.2
   have hx : (devSig .virtio).write v off 4 w = some v' := virtio_writeN4 v v' off w hw
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hmask
@@ -391,7 +405,8 @@ theorem disk_reg_write_dead (γ : DiskNames) (c c' : VirtioCfg) (off : Nat) (w :
   iintro %v'' %hwr Hfrag
   obtain rfl : v' = v'' := Option.some.inj (hx.symm.trans hwr)
   imod Hmask
-  imod diskProto_dead_write γ v v' c c' hdead hok.1 hcfg' hcache' hni' hdisk' $$ [Hproto Htok]
+  imod diskProto_dead_write γ v v' c c' hdead hok.1 hcfg' hcache' hni' hdisk' hu' hs'
+    $$ [Hproto Htok]
     with ⟨Hproto, Htok⟩
   · iframe
   ihave Hcl := Hclose $$ [Hfrag Hproto]
@@ -492,7 +507,7 @@ theorem disk_ack_write (γ : DiskNames) (msk : BitVec 32) :
   iintro %v'' %hwr Hfrag
   obtain rfl := Option.some.inj (hx.symm.trans hwr)
   imod Hmask
-  ihave Hproto := diskProto_congr_mem γ v { v with isr := v.isr &&& ~~~msk } rfl rfl rfl rfl
+  ihave Hproto := diskProto_congr_mem γ v { v with isr := v.isr &&& ~~~msk } rfl rfl rfl rfl rfl
     (fun _ h => h) (fun h => h) $$ Hproto
   ihave Hcl := Hclose $$ [Hfrag Hproto]
   case' _ =>
@@ -875,36 +890,193 @@ theorem diskRes_slot_acc (γ : DiskNames) [CurCtx] (pd pav pu : PAddr) (ξ : Ctx
   iapply diskRes_close γ pd pav pu ξ np nr stg ring
   iframe Hp Hr Hs Hlb Hu Hidx Hring Hsl
 
-/-! ## The obligations this port does not discharge
+/-! ## The live flip
 
-Everything above is PROVED.  What follows is stated but ASSUMED, as an
-interface (no `sorry`): each field is an accessor whose proof needs a
-clause the invariant of `Xv6/DiskInvDefs.lean` does not carry yet, and
-the docstring says which.  The common root is that `Xv6/DiskInv.lean`
-deliberately keeps the QUEUE ACCOUNTING (`Xv6.VQ.Ok`: `nr ≤ nc ≤ lo ≤ np`,
-"every un-popped position names an armed head") OUT of the invariant,
-because the device's `pop` and `complete` are admitted at every state; so
-the invariant cannot say what the used ring holds, nor that a head the
-driver is about to re-arm or zero is not about to be popped. -/
+`virtio_disk_init`'s last MMIO store -- `*R(STATUS) = ... | DRIVER_OK` --
+is the moment the device becomes live.  It is where the DEAD arm of the
+invariant is traded for the LIVE one: the driver hands over the three
+`kalloc`'d pages it has just zeroed and the eight receipts, and gets back
+the persistent geometry and the payload of `disk.vdisk_lock`.
 
-/-- What `virtio_disk_init` must have in hand at the `DRIVER_OK` store:
-BOTH halves of every ghost the live arm splits with the payload, and the
-three `kalloc`'d pages -- zeroed by `memset` -- at the context tier and
-full ownership. -/
+Three small tier moves do all the work:
+
+* a context window at `own 1` splits into the RAW HALF the invariant keeps
+  (`dmaHalfAt`, with its heads pinned) and the CONTEXT HALF the payload
+  keeps (`MachCSL.ctxBytes_split_raw`) -- that is how a descriptor and an
+  avail-ring cell end up shared;
+* a context window at `own 1` that the driver gives up ENTIRELY is a raw
+  window at `own 1`, which is `dmaOwn` -- that is the used page;
+* a cell is publishable (`diskWordPersist`), which is how the three page
+  pointers of `struct disk` become the persistent `diskGeom`. -/
+
+/-- A single byte cell is publishable. -/
+theorem diskCtxBytePersist (ξ : CtxId) (a : PAddr) (dq : DFrac) (v : BitVec 8) :
+    ctxByte (GF := GF) ξ a dq v ⊢ |==> ctxByte ξ a DFrac.discard v := by
+  unfold ctxByte
+  iintro ⟨%e, %H, Hpt, %hv, #Hkey⟩
+  imod (pointsTo_persist (l := a) (dq := dq) (v := (e :: H))) $$ Hpt with #Hpt
+  imodintro
+  iexists e, H
+  iframe Hpt Hkey
+  ipureintro; exact hv
+
+theorem diskCtxBytesPersist (ξ : CtxId) (pa : PAddr) (n : Nat) (dq : DFrac) (w : BitVec (8 * n)) :
+    ctxBytes (GF := GF) ξ pa n dq w ⊢ |==> ctxBytes ξ pa n DFrac.discard w := by
+  unfold ctxBytes
+  iintro H
+  ihave H' := BigSepL.bigSepL_mono
+    (fun {_ j} _ => diskCtxBytePersist ξ (pa + BitVec.ofNat 64 j) dq (nthByte w j)) $$ H
+  iapply BigSepL.bigSepL_bupd $$ H'
+
+/-- **A word is publishable**: give up the fraction, keep the value. -/
+theorem diskWordPersist [CurCtx] (va : PAddr) (n : Nat) (dq : DFrac) (w : BitVec (8 * n)) :
+    wordPointsTo (GF := GF) va n dq w ⊢ |==> wordPointsTo va n DFrac.discard w := by
+  unfold wordPointsTo
+  iintro ⟨%ppn, #Hcl, %hfacts, Hb⟩
+  imod (diskCtxBytesPersist curCtx (paOf ppn va) n dq w) $$ Hb with Hb
+  imodintro
+  iexists ppn
+  iframe Hb Hcl
+  ipureintro; exact hfacts
+
+/-- A context window at `own 1` is the invariant's raw half beside the
+driver's context half. -/
+theorem ctxBytes_split_dma (ξ : CtxId) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
+    ctxBytes (GF := GF) ξ pa n (DFrac.own 1) w ⊢
+      dmaHalfAt pa n w ∗ ctxBytes ξ pa n (DFrac.own (1 : Qp).half) w := by
+  iintro H
+  icases ctxBytes_split_raw ξ pa n w $$ H with ⟨%Hs, Hraw, %hh, Hctx⟩
+  iframe Hctx
+  unfold dmaHalfAt
+  iexists Hs
+  iframe Hraw
+  ipureintro; exact hh
+
+/-- A context window the driver gives up entirely is a full DMA footprint. -/
+theorem ctxBytes_dmaOwn (ξ : CtxId) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
+    ctxBytes (GF := GF) ξ pa n (DFrac.own 1) w ⊢ dmaOwn pa n :=
+  ctxBytes_forget ξ pa n (DFrac.own 1) w
+
+/-- Splitting a big separating conjunction in two. -/
+theorem bigSepL_sep2 {A : Type} (l : List A) (F P Q : Nat → A → IProp GF)
+    (h : ∀ k x, F k x ⊢ iprop(P k x ∗ Q k x)) :
+    iprop([∗list] k ↦ x ∈ l, F k x) ⊢
+      iprop(([∗list] k ↦ x ∈ l, P k x) ∗ ([∗list] k ↦ x ∈ l, Q k x)) :=
+  (BigSepL.bigSepL_mono_of_forall (Ψ := fun k x => iprop(P k x ∗ Q k x))
+    (fun {k x} => h k x)).trans BigSepL.bigSepL_sep_eqv.1
+
+/-- ... and in three. -/
+theorem bigSepL_sep3 {A : Type} (l : List A) (F P Q R : Nat → A → IProp GF)
+    (h : ∀ k x, F k x ⊢ iprop(P k x ∗ (Q k x ∗ R k x))) :
+    iprop([∗list] k ↦ x ∈ l, F k x) ⊢
+      iprop(([∗list] k ↦ x ∈ l, P k x) ∗
+        (([∗list] k ↦ x ∈ l, Q k x) ∗ ([∗list] k ↦ x ∈ l, R k x))) :=
+  (BigSepL.bigSepL_mono_of_forall (Ψ := fun k x => iprop(P k x ∗ (Q k x ∗ R k x)))
+    (fun {k x} => h k x)).trans
+      (BigSepL.bigSepL_sep_eqv.1.trans (sep_mono_right BigSepL.bigSepL_sep_eqv.1))
+
+/-- The receipts of the eight descriptors, all free. -/
+abbrev stInit : Nat → HState := fun _ => .inactive
+
+/-- The ring function of the empty queue. -/
+abbrev ringInit : Nat → Nat := fun _ => 0
+
+/-- **Freezing the configuration.**  The invariant's half and the driver's
+half together are the whole ghost variable, so the flip may move it to the
+live `c'` and then DISCARD it: after that no one can move it again, which
+is what makes a post-`DRIVER_OK` reset unprovable. -/
+theorem diskCfg_freeze (γ : DiskNames) (a b c' : VirtioCfg) :
+    diskCfgAuth (GF := GF) γ a ∗ diskCfgOwn γ b ⊢ |==> diskCfgFrozen γ c' := by
+  unfold diskCfgAuth diskCfgOwn diskCfgFrozen
+  iintro ⟨H1, H2⟩
+  imod ghost_var_update_halves c' γ.cfg a b $$ H1 H2 with ⟨H1, H2⟩
+  imod ghost_var_persist γ.cfg _ c' $$ H1 with #H1
+  imod ghost_var_persist γ.cfg _ c' $$ H2 with #H2
+  imodintro
+  iexact H1
+
+/-- What one descriptor slot costs the driver at the flip: both halves of
+its receipt, its `disk.free[i]` byte at `1`, and its sixteen zeroed bytes
+at full ownership. -/
+def diskSlotIn [CurCtx] (γ : DiskNames) (pd : PAddr) (i : Nat) : IProp GF := iprop%
+  headAuth γ i .inactive ∗ headTok γ i .inactive ∗
+  wordAtN curCtx (aFree i) 1 (DFrac.own 1) 1#8 ∗
+  ctxBytes curCtx (descAt pd i) 16 (DFrac.own 1) (0 : BitVec (8 * 16))
+
+/-- The slot splits three ways: the invariant's half of the receipt, the
+invariant's row (the raw half of the zeroed descriptor), and the payload's
+slot. -/
+theorem diskSlotIn_split [CurCtx] (γ : DiskNames) (pd : PAddr) (i : Nat) :
+    diskSlotIn (GF := GF) γ pd i ⊢
+      headAuth γ i .inactive ∗ (headRes γ pd i .inactive ∗ slotRes γ curCtx pd i) := by
+  unfold diskSlotIn
+  iintro ⟨Ha, Ht, Hf, Hd⟩
+  iframe Ha
+  icases ctxBytes_split_dma curCtx (descAt pd i) 16 (0 : BitVec (8 * 16)) $$ Hd
+    with ⟨Hraw, Hctx⟩
+  isplitl [Hraw]
+  · rw [headRes_inactive]
+    iexact Hraw
+  · unfold slotRes
+    iexists HState.inactive
+    rw [slotBody_inactive]
+    unfold freeSlotRes
+    iframe Ht Hf Hctx
+
+/-- The eight slots, split. -/
+theorem diskSlots_split [CurCtx] (γ : DiskNames) (pd : PAddr) :
+    iprop([∗list] i ∈ List.range NUM, diskSlotIn (GF := GF) γ pd i) ⊢
+      iprop(([∗list] i ∈ List.range NUM, headAuth γ i (stInit i)) ∗
+        (([∗list] i ∈ List.range NUM, headRes γ pd i (stInit i)) ∗
+         ([∗list] i ∈ List.range NUM, slotRes γ curCtx pd i))) :=
+  bigSepL_sep3 (List.range NUM) (fun _ i => diskSlotIn γ pd i)
+    (fun _ i => headAuth γ i (stInit i)) (fun _ i => headRes γ pd i (stInit i))
+    (fun _ i => slotRes γ curCtx pd i) (fun _ i => diskSlotIn_split γ pd i)
+
+/-- The eight avail-ring cells, split. -/
+theorem diskRing_split [CurCtx] (pav : PAddr) :
+    iprop([∗list] j ∈ List.range NUM,
+        ctxBytes (GF := GF) curCtx (availRingAt pav j) 2 (DFrac.own 1)
+          (BitVec.ofNat 16 (ringInit j))) ⊢
+      iprop(([∗list] j ∈ List.range NUM,
+          dmaHalfAt (availRingAt pav j) 2 (BitVec.ofNat 16 (ringInit j))) ∗
+        ([∗list] j ∈ List.range NUM,
+          ctxBytes curCtx (availRingAt pav j) 2 (DFrac.own (1 : Qp).half)
+            (BitVec.ofNat 16 (ringInit j)))) :=
+  bigSepL_sep2 (List.range NUM)
+    (fun _ j => ctxBytes curCtx (availRingAt pav j) 2 (DFrac.own 1)
+      (BitVec.ofNat 16 (ringInit j)))
+    (fun _ j => dmaHalfAt (availRingAt pav j) 2 (BitVec.ofNat 16 (ringInit j)))
+    (fun _ j => ctxBytes curCtx (availRingAt pav j) 2 (DFrac.own (1 : Qp).half)
+      (BitVec.ofNat 16 (ringInit j)))
+    (fun _ j => ctxBytes_split_dma curCtx (availRingAt pav j) 2
+      (BitVec.ofNat 16 (ringInit j)))
+
+/-- The eight used-ring elements: entirely the device's. -/
+theorem diskUsed_split [CurCtx] (pu : PAddr) :
+    iprop([∗list] j ∈ List.range NUM,
+        ctxBytes (GF := GF) curCtx (usedElemAt pu j) 8 (DFrac.own 1) (0 : BitVec (8 * 8))) ⊢
+      iprop([∗list] j ∈ List.range NUM, dmaOwn (usedElemAt pu j) 8) :=
+  BigSepL.bigSepL_mono_of_forall
+    (Ψ := fun _ (j : Nat) => dmaOwn (GF := GF) (usedElemAt pu j) 8)
+    (fun {_ j} => ctxBytes_dmaOwn curCtx (usedElemAt pu j) 8 (0 : BitVec (8 * 8)))
+
+/-- **What `virtio_disk_init` must have in hand at the `DRIVER_OK` store**:
+the eight descriptor slots (`diskSlotIn`: both halves of the receipt, the
+`free[i]` byte, the zeroed descriptor), both halves of the published
+count, the handler watermark and the stage, the completion counter, the
+avail page's index and ring cells, the whole used page, `disk.used_idx`,
+and the three page pointers of `struct disk`. -/
 def diskFlipIn [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) : IProp GF := iprop%
-  ([∗list] i ∈ List.range NUM, iprop(headAuth γ i .inactive ∗ headTok γ i .inactive)) ∗
-  diskPubAuth γ 0 ∗ diskPub γ 0 ∗ diskReadAtAuth γ 0 ∗ diskReadAt γ 0 ∗
-  diskStageAuth γ none ∗ diskStage γ none ∗ diskDoneAuth γ 0 ∗
-  ([∗list] i ∈ List.range NUM,
-    ctxBytes curCtx (descAt pd i) 16 (DFrac.own 1) (0 : BitVec (8 * 16))) ∗
-  ctxBytes curCtx (availIdxAt pav) 2 (DFrac.own 1) (0 : BitVec (8 * 2)) ∗
+  ([∗list] i ∈ List.range NUM, diskSlotIn γ pd i) ∗
+  diskPubAuth γ 0 ∗ diskPub γ 0 ∗ diskReadAt γ 0 ∗ diskStage γ none ∗ diskDoneAuth γ 0 ∗
+  ctxBytes curCtx (availIdxAt pav) 2 (DFrac.own 1) (wrap16 0) ∗
   ([∗list] j ∈ List.range NUM,
-    ctxBytes curCtx (availRingAt pav j) 2 (DFrac.own 1) (0 : BitVec (8 * 2))) ∗
+    ctxBytes curCtx (availRingAt pav j) 2 (DFrac.own 1) (BitVec.ofNat 16 (ringInit j))) ∗
   ctxBytes curCtx (usedIdxAt pu) 2 (DFrac.own 1) (0 : BitVec (8 * 2)) ∗
   ([∗list] j ∈ List.range NUM,
     ctxBytes curCtx (usedElemAt pu j) 8 (DFrac.own 1) (0 : BitVec (8 * 8))) ∗
   wordAtN curCtx aUsedIdx 2 (DFrac.own 1) (wrap16 0) ∗
-  ([∗list] i ∈ List.range NUM, wordAtN curCtx (aFree i) 1 (DFrac.own 1) 1#8) ∗
   wordPointsTo aDescPtr 8 (DFrac.own 1) pd ∗
   wordPointsTo aAvailPtr 8 (DFrac.own 1) pav ∗
   wordPointsTo aUsedPtr 8 (DFrac.own 1) pu
@@ -914,26 +1086,200 @@ def diskFlipIn [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) : IProp GF := iprop
 def diskFlipOut [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) : IProp GF := iprop%
   diskGeom γ pd pav pu ∗ diskRes γ pd pav pu curCtx
 
+set_option maxHeartbeats 1000000 in
+/-- **The flip, as a view shift on the protocol.**  The dead arm's
+configuration ghost is frozen at the live `c'` (so no later reset is
+provable), its image authority carries over unchanged, and the driver's
+pages become the live arm's leases. -/
+theorem diskProto_flip [CurCtx] (γ : DiskNames) (v : VirtioState) (c c' : VirtioCfg)
+    (hdead : Virtio.live c = false) (hlive : Virtio.live c' = true)
+    (hwce : Virtio.wce c' = false) (hqnum : c'.qnum.toNat = NUM) :
+    diskProto (GF := GF) γ v ∗ diskCfgOwn γ c ∗ diskFlipIn γ c'.desc c'.avail c'.used ⊢
+      |==> (diskProto γ { v with cfg := c' } ∗ diskFlipOut γ c'.desc c'.avail c'.used) := by
+  unfold diskProto
+  iintro ⟨⟨%hco, %pn, %pm, Hpm, %hfr, Harm⟩, Htok, HIn⟩
+  icases Harm with ⟨Hd | ⟨%c0, #Hfr0, %hc0, Hl⟩⟩
+  case _ =>
+    unfold diskDead
+    icases Hd with ⟨%m, Hm, Hcfg, %hp⟩
+    obtain ⟨p1, p2, p3, p4, p5, p6, p7⟩ := hp
+    imod diskCfg_freeze γ v.cfg c c' $$ [Hcfg Htok] with #Hfr
+    · iframe Hcfg Htok
+    unfold diskFlipIn
+    icases HIn with ⟨Hsl, Hpa, Hpub, Hnr, Hstg, Hnc, Hai, Hring, Hui, Hue, Hdui, Hq1, Hq2, Hq3⟩
+    icases diskSlots_split γ c'.desc $$ Hsl with ⟨Hauths, Hrows, Hslots⟩
+    icases diskRing_split c'.avail $$ Hring with ⟨HringR, HringC⟩
+    ihave HueR := diskUsed_split c'.used $$ Hue
+    ihave HuiR := ctxBytes_dmaOwn curCtx (usedIdxAt c'.used) 2 (0 : BitVec (8 * 2)) $$ Hui
+    icases ctxBytes_split_dma curCtx (availIdxAt c'.avail) 2 (wrap16 0) $$ Hai
+      with ⟨HaiR, HaiC⟩
+    imod diskDoneAuth_lb γ 0 $$ Hnc with ⟨Hnc, #Hlb⟩
+    imod diskWordPersist aDescPtr 8 _ c'.desc $$ Hq1 with #Hq1
+    imod diskWordPersist aAvailPtr 8 _ c'.avail $$ Hq2 with #Hq2
+    imod diskWordPersist aUsedPtr 8 _ c'.used $$ Hq3 with #Hq3
+    imodintro
+    isplitl [Hpm Hauths Hrows Hpa HaiR HringR HuiR HueR Hnc Hm]
+    · isplitl []
+      · ipureintro
+        intro e he
+        rw [show ({ v with cfg := c' } : VirtioState).cache = v.cache from rfl, p3] at he
+        exact absurd he (by simp)
+      iexists pn, pm
+      iframe Hpm
+      isplitl []
+      · ipureintro; exact hfr
+      iright
+      iexists c'
+      iframe Hfr
+      isplitl []
+      · ipureintro; exact ⟨rfl, hlive, hqnum⟩
+      unfold diskLive
+      iexists stInit, 0, 0, ringInit, m
+      iframe Hm Hauths Hrows Hnc Hpa
+      isplitl [HuiR HueR]
+      · unfold usedLease
+        iframe HuiR HueR
+      isplitl [HaiR HringR]
+      · unfold availLease
+        iframe HaiR HringR
+      ipureintro
+      refine ⟨p6, inflightOk_of_none _ _ p2, ?_, ?_, p5⟩
+      · intro bno bs hb
+        rcases p4 bno bs hb with hx | hx
+        · exact absurd hx id
+        · exact Or.inr hx
+      · intro e he hne
+        rw [show ({ v with cfg := c' } : VirtioState).cache = v.cache from rfl, p3] at he
+        exact absurd he (by simp)
+    · unfold diskFlipOut
+      isplitl []
+      · unfold diskGeom
+        iexists c'
+        iframe Hfr Hq1 Hq2 Hq3
+        ipureintro
+        exact ⟨rfl, rfl, rfl, hlive, hqnum, hwce⟩
+      unfold diskRes
+      iexists 0, 0, none, ringInit
+      iframe Hpub Hnr Hstg Hdui HaiC HringC Hslots
+      iexact Hlb
+  · ihave %he := diskCfg_frozen_own_agree γ c c0 $$ Hfr0 Htok
+    rw [he] at hc0
+    rw [hc0.2.1] at hdead
+    exact absurd hdead (by simp)
+
+/-- **The live flip** (`*R(STATUS) = ... | DRIVER_OK`, the last store of
+`virtio_disk_init`): the device goes live, the driver's configuration
+tracker is frozen (so no later reset is provable), and the queue pages it
+has zeroed become the invariant's leases and the lock's payload. -/
+theorem disk_driver_ok_write [CurCtx] (γ : DiskNames) (c c' : VirtioCfg) (w : BitVec 32)
+    (hdead : Virtio.live c = false) (hlive : Virtio.live c' = true)
+    (hwce : Virtio.wce c' = false) (hqnum : c'.qnum.toNat = NUM)
+    (hwr : ∀ v : VirtioState, v.cfg = c →
+      Virtio.write v Virtio.offStatus w = some { v with cfg := c' }) :
+    diskInv (GF := GF) γ ∗ diskCfgOwn γ c ∗ diskFlipIn γ c'.desc c'.avail c'.used ⊢
+      devWriteAU .virtio Virtio.offStatus 4 w (diskFlipOut γ c'.desc c'.avail c'.used) := by
+  unfold diskInv devInvR devWriteAU
+  iintro ⟨#Hinv, Htok, HIn⟩
+  iinv Hinv with Hbody Hclose
+  icases Hbody with ⟨%v, >Hfrag, >Hproto⟩
+  icases diskProto_dead_open γ v c hdead $$ [Hproto Htok] with ⟨%hpure, Hproto, Htok⟩
+  · iframe
+  have hx : (devSig .virtio).write v Virtio.offStatus 4 w = some { v with cfg := c' } :=
+    virtio_writeN4 v _ _ w (hwr v hpure.1)
+  iapply fupd_mask_intro LawfulSet.empty_subset
+  iintro Hmask
+  iexists v
+  iframe Hfrag
+  isplit
+  · ipureintro; rw [hx]; rfl
+  inext
+  iintro %v'' %hwrx Hfrag
+  obtain rfl : ({ v with cfg := c' } : VirtioState) = v'' := Option.some.inj (hx.symm.trans hwrx)
+  imod Hmask
+  imod diskProto_flip γ v c c' hdead hlive hwce hqnum $$ [Hproto Htok HIn] with ⟨Hproto, Hout⟩
+  · iframe Hproto Htok HIn
+  ihave Hcl := Hclose $$ [Hfrag Hproto]
+  case' _ =>
+    inext
+    iexists ({ v with cfg := c' } : VirtioState)
+    iframe Hfrag Hproto
+  imod Hcl
+  imodintro
+  iexact Hout
+
+/-! ## The obligations this port does not discharge
+
+Everything above is PROVED, and it is everything `virtio_disk_init` needs:
+`disk_reg_read_dead` for each of its loads, `disk_reg_write_dead` for each
+of its stores up to `QUEUE_READY = 1`, and `disk_driver_ok_write` for the
+`DRIVER_OK` store that ends it.  What follows is stated but ASSUMED, as an
+interface (no `sorry`): seven accessors of `virtio_disk_rw` and
+`virtio_disk_intr`.
+
+-------------------------------------------------------------------------
+WHY THEY ARE ALL BLOCKED ON ONE THING.  Every one of them needs the QUEUE
+ACCOUNTING -- the Rocq `vproto_ok`'s `nr ≤ nc ≤ lo ≤ np ≤ nc + NUM` with a
+row per published position -- inside `diskProto`.  The accounting cannot
+be MAINTAINED in this port, and the obstruction is one step of one device
+program.  `MachCSL.Virtio.body` pops like this:
+
+    let v  ← DevM.get                       -- G1
+    if live v.cfg then
+      let ai ← dma16 (availIdxAddr v.cfg)   -- R1   (ai = wrap16 np, pinned)
+      if v.seen ≠ ai then
+        let h ← dma16 (availRingAddr v.cfg v.seen)   -- R2 (h = ring cell, pinned)
+        let popped ← DevM.get               -- G2   (phase popped h = none)
+        if (phase popped h).isSome then pure () else
+          DevM.modify (fun v => { setPhase v h .popped with seen := v.seen + 1 })  -- M
+          DevM.fork (.serve h)
+
+The step `M` must re-establish the invariant at the state `s1` it runs
+at, and what it needs there is `lo < np` (so that position `lo` has a row,
+whose head is the `h` that `R2` read and whose receipt is `.active c`) and
+`phase s1 h = none` (so that the in-flight set really grows by one).  Both
+facts are available at the EARLIER states `G1`/`R1`/`G2` and at no later
+one: `v.seen` and `phase v h` are read at one state and used at another,
+and between the two the program logic must allow ANY interleaving.
+Operationally nothing can happen in between -- `seen` is written by no
+other program point, and the device's root loop is a single thread that
+runs `body` one iteration at a time -- but the logic cannot see that:
+
+* `MachCSL.DevM.LeaseL`'s `.get` arm must hand `R s` back in full, so the
+  root loop cannot TAKE an exclusive "pop right" out of the invariant and
+  hold it from `G2` to `M` (a ghost-map permit CAN be minted at a `.get`,
+  but minting is not exclusive: the invariant would have to rule out a
+  second permit, which is the same fact again);
+* `MachCSL.DevSig.LeaseL` starts the root loop from `True` at every
+  iteration (`wpDev_dmaL`'s `pure` case re-derives `body` with `True`), so
+  the right cannot be threaded ACROSS iterations either.
+
+THE MINIMAL FIX, for whoever picks this up.  Two changes, both outside
+these five files:
+
+1. a root-linear device loop lemma -- `DevM.LeaseL` with the `pure` arm
+   carrying `C ⊢ Cr` and `wpDev_dmaL` re-deriving the body from `Cr`, so
+   the root loop may hold one exclusive resource forever.  The disk would
+   take `Cr := ∃ lo, γ.lo ↪VAR{½} lo` with the invariant holding the other
+   half beside `⌜v.seen = wrap16 lo⌝`: then `lo` cannot move without the
+   root's half, which pins it from `G1` to `M`, and `np` and `nc` are
+   monotone (persistent lower bounds), which is all `lo < np` needs.
+2. that lemma's `.fork` case needs `(σ.devrt d).next ≠ rootTask`, which
+   `machInterp` does not track -- `DevRt.init.next = 1` and `next` only
+   grows (`MachCSL/Lang.lean:465`), so one well-formedness conjunct in the
+   machine interpretation closes it.
+
+An alternative fix with the same effect and no framework change is to make
+`Virtio.body`'s pop ONE step -- the Rocq model's shape, where the guard
+and the state change are the same transition -- i.e. fold the `avail->idx`
+and ring-cell reads into the `DevM.step`'s guard.  That is a change to
+`MachCSL/Dev/Virtio.lean`.
+
+Until then the seven accessors below are the honest interface.  Each
+docstring says what it needs BEYOND the accounting, so that the accounting
+is not the only thing standing between here and a proved driver. -/
+
 /-- The accessors whose obligations this port leaves open. -/
 structure DISK_ACC_ASSUMPTIONS : Prop where
-  /-- **The live flip** (`*R(STATUS) = ... | DRIVER_OK`, the last store of
-  `virtio_disk_init`).  Blocked on ONE clause: the live arm demands
-  `permOk pm st` with every receipt `.inactive`, and the DEAD arm says
-  nothing about the serve permits `pm`, so a permit recording an `.active`
-  receipt cannot be ruled out.  The fix is a dead-arm clause
-  `permOk pm (fun _ => .inactive)` -- preserved by `perm_drop`
-  (`permOk_delete`) and vacuous at allocation, where `pm = ∅` -- which
-  means threading a `pm` parameter through `diskDead` and re-proving the
-  nine sites of `Xv6/DiskInv.lean` that construct or destruct it. -/
-  disk_driver_ok_write : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
-      [DiskG GF] [CurCtx] (γ : DiskNames) (c c' : VirtioCfg) (pd pav pu : PAddr) (w : BitVec 32),
-    Virtio.live c = false → Virtio.live c' = true → Virtio.wce c' = false →
-    c'.qnum.toNat = NUM → c'.desc = pd → c'.avail = pav → c'.used = pu →
-    (∀ v : VirtioState, v.cfg = c → Virtio.write v Virtio.offStatus w =
-      some { v with cfg := c' }) →
-    diskInv (GF := GF) γ ∗ diskCfgOwn γ c ∗ diskFlipIn γ pd pav pu ⊢
-      devWriteAU .virtio Virtio.offStatus 4 w (diskFlipOut γ pd pav pu)
-
   /-- **`publish`**: the view shift that arms head `h` with the chain `c`,
   carried out at the `avail->idx` bump (`disk_avail_idx_write` does the
   bytes).  The chain's cells leave the payload for the invariant: the
@@ -941,8 +1287,13 @@ structure DISK_ACC_ASSUMPTIONS : Prop where
   `chainLease`, `info[h].status` and `b->data` go over at own 1, and the
   block's image fragment is deposited in the row.  Blocked on: showing
   that NO serve permit is out for `h` (`Xv6.permOk` would otherwise pin
-  the receipt to `.inactive`), which is exactly the `VQ.Ok` accounting the
-  invariant does not carry. -/
+  the receipt to `.inactive`).  With the accounting that is immediate --
+  a permit is taken at the POP, whose head is the armed head of an
+  unpopped position, so a permit never names an `.inactive` head -- and
+  without it there is nothing to say: a serve task that popped a stale
+  ring cell holds a permit on a free head for ever.  Everything else this
+  view shift does (the tier moves of the chain's cells) is the same
+  arithmetic as `Xv6.diskProto_flip`, which is proved. -/
   disk_publish : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
       [DiskG GF] [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (c : Chain)
       (bs data : List (BitVec 8)),
@@ -1031,11 +1382,15 @@ structure DISK_ACC_ASSUMPTIONS : Prop where
   opens the invariant -- but the invariant's row for a free slot
   (`headRes .inactive`) pins the half to SIXTEEN ZERO BYTES, and the
   descriptor passes through three intermediate values on the way there.
-  So `HState` needs a third arm for "being zeroed", and that arm must
+  So `HState` would need a third arm for "being zeroed", and that arm must
   still let `Xv6.leaseL_fetch_free` refute a fetch at the head -- which is
   only possible with the queue accounting that rules out a pop of a head
-  the driver has already reclaimed.  Stated here for the whole
-  sixteen-byte window, which is the shape the four stores compose to. -/
+  the driver has already reclaimed.  With the accounting this accessor
+  DISAPPEARS instead of being proved: a fetch at an unarmed head is then
+  unreachable, so `headRes .inactive` may be `emp`, the driver keeps the
+  whole free descriptor at the context tier, and `free_desc` becomes four
+  ordinary stores.  Stated here for the whole sixteen-byte window, which
+  is the shape the four stores compose to. -/
   disk_free_desc_write : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
       [DiskG GF] [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu : CPU) (i : Nat)
       (w0 : BitVec (8 * 16)),

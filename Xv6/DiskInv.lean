@@ -44,12 +44,28 @@ follows.
   has, so a `serve` task never has to cope with the dead arm, and every
   address it computes from the state at its `get` is `c0`'s.
 
+WHAT THE DEAD ARM COSTS.  `Xv6.diskDead` pins `v.usedIdx` and `v.seen` to
+zero (the live flip needs them at `nc = lo = 0`), so the two steps that
+move those two fields -- `Virtio.complete` at the end of `serve`, and the
+pop in `Virtio.body` -- may no longer be proved against an arbitrary arm:
+`diskProto_complete` and `diskProto_pop_live` take `diskCfgFrozen γ c0`
+with `Virtio.live c0 = true` and REFUTE the dead arm with it.  Both have
+it: the serving task carries the frozen configuration in its `serveCtx`,
+and `Virtio.body` pops only inside `if live v.cfg`, where the derivation
+already holds `diskUp γ`.
+
 WHAT THE DRIVER'S SIDE INHERITS.  A permit for `h` blocks every move of
 `h`'s receipt, so `publish` (arming) and `reclaim` will have to show that
 no permit for that head is out.  That is where the queue record's
 `nc ≤ lo ≤ np` accounting (`Xv6.VQ.Ok`) belongs: it is what rules out a
 pop of a head that is already in flight or was never armed, and so what
 bounds the permits on a head to the one `serve` task that is running.
+That accounting is NOT here, and cannot be maintained without a change
+outside these files: the pop's guard is checked at one state and its
+effect happens at another, and the logic has no way to say that the
+device's root loop is a single thread.  The argument, and the two-line
+fix it needs, are written out at the head of the assumed-interface
+section of `Xv6/DiskAcc.lean`.
 -/
 import Xv6.DiskInvDefs
 import MachCSL.WpDevDmaStep
@@ -71,6 +87,9 @@ theorem drain_usedIdx (v : VirtioState) (k : Nat) : (Virtio.drain v k).usedIdx =
   unfold Virtio.drain; cases Virtio.alistGet v.cache k <;> rfl
 
 theorem drain_inflight (v : VirtioState) (k : Nat) : (Virtio.drain v k).inflight = v.inflight := by
+  unfold Virtio.drain; cases Virtio.alistGet v.cache k <;> rfl
+
+theorem drain_seen (v : VirtioState) (k : Nat) : (Virtio.drain v k).seen = v.seen := by
   unfold Virtio.drain; cases Virtio.alistGet v.cache k <;> rfl
 
 theorem drain_reqOf (v : VirtioState) (k : Nat) (h : BitVec 16) :
@@ -145,7 +164,7 @@ used index, the image a read sees, and the requests in flight.  A move
 that leaves all four as they were (up to the stated implications) carries
 the protocol over unchanged. -/
 theorem diskProto_congr (γ : DiskNames) (v v' : VirtioState)
-    (hcfg : v'.cfg = v.cfg) (hidx : v'.usedIdx = v.usedIdx)
+    (hcfg : v'.cfg = v.cfg) (hidx : v'.usedIdx = v.usedIdx) (hseen : v'.seen = v.seen)
     (hview : Virtio.cacheView v' = Virtio.cacheView v)
     (hck : cacheOk v → cacheOk v')
     (hnil : v.cache = [] → v'.cache = [])
@@ -167,12 +186,12 @@ theorem diskProto_congr (γ : DiskNames) (v v' : VirtioState)
   · ileft
     unfold diskDead
     icases Hd with ⟨%m, Hm, Hcfg, %hpure⟩
-    obtain ⟨p1, p2, p3, p4⟩ := hpure
+    obtain ⟨p1, p2, p3, p4, p5, p6, p7⟩ := hpure
     iexists m
     rw [hcfg]
     iframe Hm Hcfg
     ipureintro
-    refine ⟨p1, hni p2, hnil p3, ?_⟩
+    refine ⟨p1, hni p2, hnil p3, ?_, p5, by rw [hidx]; exact p6, by rw [hseen]; exact p7⟩
     intro bno bs hb
     rcases p4 bno bs hb with h | h
     · exact absurd h id
@@ -196,12 +215,12 @@ theorem diskProto_congr (γ : DiskNames) (v v' : VirtioState)
 
 /-- The common case: the move touches neither the cache nor the image. -/
 theorem diskProto_congr_mem (γ : DiskNames) (v v' : VirtioState)
-    (hcfg : v'.cfg = v.cfg) (hidx : v'.usedIdx = v.usedIdx)
+    (hcfg : v'.cfg = v.cfg) (hidx : v'.usedIdx = v.usedIdx) (hseen : v'.seen = v.seen)
     (hcache : v'.cache = v.cache) (hdisk : v'.disk = v.disk)
     (hfl : ∀ st, inflightOk v st → inflightOk v' st)
     (hni : noInflight v → noInflight v') :
     diskProto (GF := GF) γ v ⊢ diskProto γ v' :=
-  diskProto_congr γ v v' hcfg hidx (by unfold Virtio.cacheView; rw [hcache, hdisk])
+  diskProto_congr γ v v' hcfg hidx hseen (by unfold Virtio.cacheView; rw [hcache, hdisk])
     (fun h => by unfold cacheOk at *; rw [hcache]; exact h)
     (fun h => by rw [hcache]; exact h)
     (fun st h => by unfold cachedOk at *; rw [hcache]; exact h)
@@ -215,18 +234,54 @@ theorem diskProto_cacheOk (γ : DiskNames) (v : VirtioState) :
 
 /-! ### The pop -/
 
-theorem diskProto_pop (γ : DiskNames) (v : VirtioState) (h : BitVec 16) (ph : VPhase)
-    (hph : ph.req = none) :
-    diskProto (GF := GF) γ v ⊢ diskProto γ { Virtio.setPhase v h ph with seen := v.seen + 1#16 } :=
-  diskProto_congr_mem γ v _ rfl rfl rfl rfl
-    (fun st hok k r hr => inflightOk_setPhase_none v st h ph hph hok k r hr)
-    (fun hn k => noInflight_setPhase_none v h ph hph hn k)
+theorem diskCfgFrozen_auth_agree (γ : DiskNames) (c c' : VirtioCfg) :
+    ⊢@{IProp GF} diskCfgFrozen γ c -∗ diskCfgAuth γ c' -∗ ⌜c = c'⌝ := by
+  unfold diskCfgFrozen diskCfgAuth
+  iintro H1 H2
+  ihave %h := ghost_var_agree γ.cfg _ _ _ _ $$ H1 H2
+  ipureintro; exact h
+
+/-- **The pop.**  It moves `v.seen`, which the DEAD arm pins to zero, so
+this one needs the frozen configuration: `Virtio.body` pops only in its
+live branch, and the derivation carries `diskUp γ` there. -/
+theorem diskProto_pop_live (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) (h : BitVec 16)
+    (ph : VPhase) (hlive : Virtio.live c0 = true) (hph : ph.req = none) :
+    diskCfgFrozen (GF := GF) γ c0 ∗ diskProto γ v ⊢
+      diskProto γ { Virtio.setPhase v h ph with seen := v.seen + 1#16 } := by
+  have hfl : ∀ st, inflightOk v st → inflightOk (Virtio.setPhase v h ph) st :=
+    fun st hok k r hr => inflightOk_setPhase_none v st h ph hph hok k r hr
+  unfold diskProto
+  iintro ⟨#Hfr0, %hc, %pn, %pm, Hpm, %hfr, Harm⟩
+  icases Harm with ⟨Hd | ⟨%c0', #Hfr, %hc0, Hl⟩⟩
+  · unfold diskDead
+    icases Hd with ⟨%m, Hm, Hcfg, %hpure⟩
+    ihave %heq := diskCfgFrozen_auth_agree γ c0 v.cfg $$ Hfr0 Hcfg
+    rw [heq, hpure.1] at hlive
+    exact absurd hlive (by simp)
+  · isplitl []
+    · ipureintro; exact hc
+    iexists pn, pm
+    iframe Hpm
+    isplitl []
+    · ipureintro; exact hfr
+    iright
+    iexists c0'
+    iframe Hfr
+    isplitl []
+    · ipureintro; exact hc0
+    unfold diskLive
+    icases Hl with ⟨%st, %nc, %np, %ring, %m, Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, %hpure⟩
+    obtain ⟨e1, e2, e3, e4, e5⟩ := hpure
+    iexists st, nc, np, ring, m
+    iframe Hm Ha Hr Hu Hav Hnc Hnp
+    ipureintro
+    exact ⟨e1, hfl st e2, e3, e4, e5⟩
 
 /-! ### The capture latch -/
 
 theorem diskProto_latch (γ : DiskNames) (v : VirtioState) (t : Option (BitVec 16)) :
     diskProto (GF := GF) γ v ⊢ diskProto γ { v with taken := t } :=
-  diskProto_congr_mem γ v _ rfl rfl rfl rfl (fun _ h => h) (fun h => h)
+  diskProto_congr_mem γ v _ rfl rfl rfl rfl rfl (fun _ h => h) (fun h => h)
 
 /-! ### The drain -/
 
@@ -235,7 +290,7 @@ theorem diskProto_drain (γ : DiskNames) (v : VirtioState) (k : Nat) :
   iintro H
   ihave %hc := diskProto_cacheOk γ v $$ H
   iapply diskProto_congr γ v (Virtio.drain v k) (drain_cfg v k) (drain_usedIdx v k)
-    (cacheView_drain v k hc)
+    (drain_seen v k) (cacheView_drain v k hc)
     (fun hok e he => hok e (drain_cache_mem v k e he))
     (fun hnil => by
       have : Virtio.alistGet v.cache k = none := by rw [hnil]; rfl
@@ -375,27 +430,20 @@ theorem diskProto_capture (γ : DiskNames) (v : VirtioState) (h : BitVec 16) (r 
 
 /-! ### The completion -/
 
-theorem diskProto_complete (γ : DiskNames) (v : VirtioState) (h : BitVec 16) :
-    diskProto (GF := GF) γ v ⊢ |==> diskProto γ (Virtio.complete v h) := by
+/-- **The completion.**  It bumps `v.usedIdx`, which the DEAD arm pins to
+zero, so this one needs the frozen configuration -- which the serving task
+carries in its `serveCtx`. -/
+theorem diskProto_complete (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) (h : BitVec 16)
+    (hlive : Virtio.live c0 = true) :
+    diskCfgFrozen (GF := GF) γ c0 ∗ diskProto γ v ⊢ |==> diskProto γ (Virtio.complete v h) := by
   unfold diskProto
-  iintro ⟨%hc, %pn, %pm, Hpm, %hfr, Harm⟩
-  icases Harm with ⟨Hd | ⟨%c0, #Hfr, %hc0, Hl⟩⟩
-  · imodintro
-    isplitl []
-    · ipureintro; exact hc
-    iexists pn, pm
-    iframe Hpm
-    isplitl []
-    · ipureintro; exact hfr
-    ileft
-    unfold diskDead
+  iintro ⟨#Hfr0, %hc, %pn, %pm, Hpm, %hfr, Harm⟩
+  icases Harm with ⟨Hd | ⟨%c0', #Hfr, %hc0, Hl⟩⟩
+  · unfold diskDead
     icases Hd with ⟨%m, Hm, Hcfg, %hpure⟩
-    obtain ⟨p1, p2, p3, p4⟩ := hpure
-    iexists m
-    rw [show (Virtio.complete v h).cfg = v.cfg from rfl]
-    iframe Hm Hcfg
-    ipureintro
-    exact ⟨p1, noInflight_complete v h p2, p3, p4⟩
+    ihave %heq := diskCfgFrozen_auth_agree γ c0 v.cfg $$ Hfr0 Hcfg
+    rw [heq, hpure.1] at hlive
+    exact absurd hlive (by simp)
   · unfold diskLive
     icases Hl with ⟨%st, %nc, %np, %ring, %m, Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, %hpure⟩
     obtain ⟨e1, e2, e3, e4, e5⟩ := hpure
@@ -410,7 +458,7 @@ theorem diskProto_complete (γ : DiskNames) (v : VirtioState) (h : BitVec 16) :
     isplitl []
     · ipureintro; exact hfr
     iright
-    iexists c0
+    iexists c0'
     iframe Hfr
     isplitl []
     · ipureintro; exact hc0
@@ -600,13 +648,6 @@ theorem usedIdx_write_lease (γ : DiskNames) (s : VirtioState) (h : BitVec 16) (
 The device-side counterpart of `Xv6.permTok`: how a task takes a permit,
 what it pins while it holds one, and how it gives it back. -/
 
-theorem diskCfgFrozen_auth_agree (γ : DiskNames) (c c' : VirtioCfg) :
-    ⊢@{IProp GF} diskCfgFrozen γ c -∗ diskCfgAuth γ c' -∗ ⌜c = c'⌝ := by
-  unfold diskCfgFrozen diskCfgAuth
-  iintro H1 H2
-  ihave %h := ghost_var_agree γ.cfg _ _ _ _ $$ H1 H2
-  ipureintro; exact h
-
 theorem permTok_lookup (γ : DiskNames) (pm : RegMapF PermVal) (k : Nat) (h : BitVec 16)
     (s0 : HState) :
     ⊢@{IProp GF} permAuth γ pm -∗ permTok γ k h s0 -∗
@@ -745,7 +786,14 @@ theorem perm_drop (γ : DiskNames) (k : Nat) (h : BitVec 16) (s0 : HState) (v : 
   isplitl []
   · ipureintro; exact permFresh_delete pm pn k hfr
   icases Harm with ⟨Hd | ⟨%c0, #Hfr, %hc0, Hl⟩⟩
-  · ileft; iexact Hd
+  · ileft
+    unfold diskDead
+    icases Hd with ⟨%m, Hm, Hcfg, %hpure⟩
+    obtain ⟨p1, p2, p3, p4, p5, p6, p7⟩ := hpure
+    iexists m
+    iframe Hm Hcfg
+    ipureintro
+    exact ⟨p1, p2, p3, p4, permOk_delete pm (fun _ => .inactive) k p5, p6, p7⟩
   · iright
     iexists c0
     iframe Hfr
@@ -886,13 +934,14 @@ theorem perm_install (γ : DiskNames) (c0 : VirtioCfg) (k : Nat) (h : BitVec 16)
     exact ⟨e1, inflightOk_setPhase_some v st h c ph hph hlt hst' hwf.1 e2, e3, e4, e5⟩
 
 /-- **The completion**, with the permit given back. -/
-theorem perm_complete (γ : DiskNames) (k : Nat) (h : BitVec 16) (s0 : HState) (hh : BitVec 16)
-    (v : VirtioState) :
-    permTok (GF := GF) γ k h s0 ∗ diskProto γ v ⊢ |==> diskProto γ (Virtio.complete v hh) := by
-  iintro ⟨Htok, H⟩
+theorem perm_complete (γ : DiskNames) (c0 : VirtioCfg) (k : Nat) (h : BitVec 16) (s0 : HState)
+    (hh : BitVec 16) (v : VirtioState) (hlive : Virtio.live c0 = true) :
+    diskCfgFrozen (GF := GF) γ c0 ∗ permTok γ k h s0 ∗ diskProto γ v ⊢
+      |==> diskProto γ (Virtio.complete v hh) := by
+  iintro ⟨#Hfr, Htok, H⟩
   ihave Hd := perm_drop γ k h s0 v $$ [$Htok $H]
   imod Hd with H
-  iapply diskProto_complete γ v hh $$ H
+  iapply diskProto_complete γ c0 v hh hlive $$ [$Hfr $H]
 
 /-! ## The task resources -/
 
@@ -927,8 +976,8 @@ theorem diskTaskRes_xferOut (γ : DiskNames) (h : BitVec 16) (i : Nat) :
   itrivial
 
 /-- Which arm the invariant is in, as a persistent fact. -/
-theorem diskDead_notlive (γ : DiskNames) (v : VirtioState) :
-    diskDead (GF := GF) γ v ⊢ ⌜Virtio.live v.cfg = false⌝ := by
+theorem diskDead_notlive (γ : DiskNames) (v : VirtioState) (pm : RegMapF PermVal) :
+    diskDead (GF := GF) γ v pm ⊢ ⌜Virtio.live v.cfg = false⌝ := by
   unfold diskDead
   iintro ⟨%m, _, _, %hp⟩
   ipureintro; exact hp.1
@@ -939,7 +988,7 @@ theorem diskProto_arm (γ : DiskNames) (s : VirtioState) :
   unfold diskProto
   iintro ⟨%hc, %pn, %pm, Hpm, %hfr, Harm⟩
   icases Harm with ⟨Hd | ⟨%c0, #Hfr, %hc0, Hl⟩⟩
-  · ihave %hdead := diskDead_notlive γ s $$ Hd
+  · ihave %hdead := diskDead_notlive γ s pm $$ Hd
     isplitl [Hpm Hd]
     · isplitl []
       · ipureintro; exact hc
@@ -1270,7 +1319,7 @@ theorem leaseL_serveTail (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key 
               subst hs2
               unfold serveCtx
               iintro ⟨⟨#Hfr, %hcfg, Htok⟩, HR⟩
-              imod perm_complete γ key h (.active c) h s1 $$ [$Htok $HR] with HR
+              imod perm_complete γ c0 key h (.active c) h s1 hlive $$ [$Hfr $Htok $HR] with HR
               imodintro
               iframe HR
 
@@ -1499,10 +1548,17 @@ theorem leaseL_body (γ : DiskNames) (C : IProp GF) :
                     simp only [Option.some.injEq, Prod.mk.injEq] at hgs
                     exact hgs.1.symm
                   subst hs2
-                  iintro ⟨HC, HR⟩
+                  unfold diskUp
+                  iintro ⟨#HC, HR⟩
+                  icases HC with ⟨%hf | ⟨%c0, #Hfr, %hl⟩⟩
+                  · rw [hlive] at hf; exact absurd hf (by simp)
                   imodintro
-                  iframe HC
-                  iapply diskProto_pop γ s1 _ .popped rfl $$ HR
+                  isplitl [HR]
+                  · iapply diskProto_pop_live γ c0 s1 _ .popped hl.1 rfl $$ [$Hfr $HR]
+                  · iright
+                    iexists c0
+                    iframe Hfr
+                    ipureintro; exact hl
                 · refine DevM.LeaseL.fork _ iprop(True) _ _ ?_ (fun _ => DevM.LeaseL.pure _ ())
                   rw [diskTaskRes_serve]
                   iintro Hor

@@ -70,6 +70,27 @@ theorem availRing_wrap (pav : PAddr) (n : Nat) :
 theorem wrap16_mod_lt (n : Nat) : (wrap16 n).toNat % NUM < NUM := by
   apply Nat.mod_lt; unfold NUM; omega
 
+/-- **Sixteen bits identify a counter inside a window of `2^16`.**  The
+queue's counters never run more than `NUM` apart, so the driver's and the
+device's 16-bit indices determine the natural numbers behind them --
+which is what turns `avail->idx != seen` and `used->idx != disk.used_idx`
+into `lo < np` and `nr < nc`. -/
+theorem wrap16_inj_window (a b : Nat) (hab : a ≤ b) (hw : b - a < 65536)
+    (h : wrap16 a = wrap16 b) : a = b := by
+  have h' : a % 65536 = b % 65536 := by rw [← wrap16_toNat, ← wrap16_toNat, h]
+  omega
+
+theorem wrap16_ne_of_lt (a b : Nat) (hab : a < b) (hw : b - a < 65536) :
+    wrap16 a ≠ wrap16 b := fun h => absurd (wrap16_inj_window a b (by omega) hw h) (by omega)
+
+/-- The contrapositive, as a pop or a handler loop uses it: two counters
+inside one window that disagree at sixteen bits disagree. -/
+theorem lt_of_wrap16_ne (a b : Nat) (hab : a ≤ b) (hw : b - a < 65536)
+    (h : wrap16 a ≠ wrap16 b) : a < b := by
+  rcases Nat.lt_or_ge a b with hlt | hge
+  · exact hlt
+  · exact absurd (by rw [show a = b from by omega]) h
+
 /-! ## The per-descriptor receipt -/
 
 /-- What a descriptor slot is: free (the driver owns and has zeroed it) or
