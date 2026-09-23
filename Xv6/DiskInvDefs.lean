@@ -3790,6 +3790,65 @@ theorem headRes_acc (γ : DiskNames) (pd : PAddr) (st : Nat → HState) (i : Nat
         [∗list] j ∈ List.range NUM, headRes γ pd j (st j)) :=
   BigSepL.bigSepL_mem_acc (Φ := fun j => headRes (GF := GF) γ pd j (st j)) (range_mem i NUM hi)
 
+/-- **Two DISTINCT entries of a big-op, borrowed at once.**  What an
+exclusivity argument between two indices needs: `bigSepL_delete_cond`
+opens one entry, and the residual it leaves is the big-op with that index
+blanked, whose lookup at any OTHER index is still the entry. -/
+theorem bigSepL_two_acc {α : Type _} (l : List α) (Φ : α → IProp GF)
+    (n m : Nat) (x y : α) (hn : l[n]? = some x) (hm : l[m]? = some y) (hnm : n ≠ m) :
+    ([∗list] z ∈ l, Φ z) ⊢ Φ x ∗ Φ y := by
+  iintro H
+  icases (BigSepL.bigSepL_delete_cond (Φ := fun (_ : Nat) (z : α) => Φ z) hn).1 $$ H
+    with ⟨Hn, Hrest⟩
+  iframe Hn
+  have hl := BigSepL.bigSepL_lookup
+    (Φ := fun (k : Nat) (z : α) => iprop(if k = n then emp else Φ z)) hm
+  rw [if_neg (Ne.symm hnm)] at hl
+  iapply hl
+  iexact Hrest
+
+/-- **The blocks of two DISTINCT armed heads differ**: each row holds its
+chain's image fragment at `own 1`, and a ghost-map element cannot be held
+twice at the same key. -/
+theorem headRes_blk_ne (γ : DiskNames) (pd : PAddr) (st : Nat → HState)
+    (i j : Nat) (c c' : Chain) (hi : i < NUM) (hj : j < NUM) (hij : i ≠ j)
+    (h1 : st i = .active c) (h2 : st j = .active c') :
+    ([∗list] k ∈ List.range NUM, headRes (GF := GF) γ pd k (st k)) ⊢ ⌜c.blk ≠ c'.blk⌝ := by
+  iintro H
+  icases bigSepL_two_acc (List.range NUM) (fun k => headRes (GF := GF) γ pd k (st k))
+      i j i j (List.getElem?_range hi) (List.getElem?_range hj) hij $$ H with ⟨H1, H2⟩
+  have e1 : headRes (GF := GF) γ pd i (st i) =
+      iprop(⌜c.hd = i ∧ c.wf⌝ ∗ chainLease pd c ∗ ∃ bs, diskBlock γ c.blk bs) := by
+    rw [h1, headRes_active]
+  have e2 : headRes (GF := GF) γ pd j (st j) =
+      iprop(⌜c'.hd = j ∧ c'.wf⌝ ∗ chainLease pd c' ∗ ∃ bs, diskBlock γ c'.blk bs) := by
+    rw [h2, headRes_active]
+  isimp only [e1] at H1
+  isimp only [e2] at H2
+  icases H1 with ⟨-, -, %bs, Hb⟩
+  icases H2 with ⟨-, -, %bs', Hb'⟩
+  iapply (show iprop(diskBlock (GF := GF) γ c.blk bs ∗ diskBlock γ c'.blk bs') ⊢
+      iprop(⌜c.blk ≠ c'.blk⌝) from by
+    unfold diskBlock
+    iintro ⟨H, H'⟩
+    iapply ghost_map_elem_ne γ.img c.blk c'.blk (DFrac.own 1) bs bs' $$ H H')
+  iframe Hb Hb'
+
+/-- ... so the whole row is INJECTIVE in the block. -/
+theorem headRes_blkInj (γ : DiskNames) (pd : PAddr) (st : Nat → HState) :
+    ([∗list] k ∈ List.range NUM, headRes (GF := GF) γ pd k (st k)) ⊢ ⌜blkInj st⌝ := by
+  by_cases h : blkInj st
+  · iintro _
+    ipureintro; exact h
+  · obtain ⟨i, j, c, c', hi, hj, hij, h1, h2, hblk⟩ :
+        ∃ (i j : Nat) (c c' : Chain), i < NUM ∧ j < NUM ∧ i ≠ j ∧
+          st i = .active c ∧ st j = .active c' ∧ c.blk = c'.blk :=
+      Classical.byContradiction fun hc =>
+        h (fun i j c c' hi hj hij h1 h2 heq => hc ⟨i, j, c, c', hi, hj, hij, h1, h2, heq⟩)
+    iintro H
+    ihave %hne := headRes_blk_ne γ pd st i j c c' hi hj hij h1 h2 $$ H
+    exact (hne hblk).elim
+
 theorem bufSector_acc (c : Chain) (i : Nat) (hi : i < SPB) :
     bufLease (GF := GF) c ⊢ dmaOwn (sectorAddr c.data i) Virtio.sectorSize ∗
       (dmaOwn (sectorAddr c.data i) Virtio.sectorSize -∗ bufLease c) := by

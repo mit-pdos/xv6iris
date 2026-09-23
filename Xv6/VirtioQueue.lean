@@ -762,6 +762,35 @@ device may move it and the ghost map's coupling exempts it. -/
 def inFlightBlk (st : Nat → HState) (bno : Nat) : Prop :=
   ∃ (i : Nat) (c : Chain), i < NUM ∧ st i = .active c ∧ c.blk = bno
 
+/-- **The blocks of armed heads are DISTINCT.**  A block in flight is
+EXCLUSIVELY its chain's: the invariant holds that block's image fragment
+inside the chain's row (`Xv6.headRes`), and a ghost-map fragment at `own
+1` cannot be held twice.  So the fact is not a clause anyone has to
+carry -- it is a THEOREM of the row (`Xv6.headRes_blkInj`) -- but it is
+what says that freeing one receipt leaves `Xv6.inFlightBlk` standing at
+every OTHER armed head's block, which is what the collect's
+cache-and-image reasoning needs. -/
+def blkInj (st : Nat → HState) : Prop :=
+  ∀ (i j : Nat) (c c' : Chain), i < NUM → j < NUM → i ≠ j →
+    st i = .active c → st j = .active c' → c.blk ≠ c'.blk
+
+/-- **Freeing one armed head leaves every other block in flight.**  This
+is the step `Xv6.cachedOk` and `Xv6.imgOk` need at the collect: a cached
+sector or an exempt fragment whose block is not the collected chain's is
+still named by the head that named it before. -/
+theorem inFlightBlk_free (st : Nat → HState) (i : Nat) (c : Chain) (bno : Nat)
+    (hinj : blkInj st) (hst : st i = .active c) (hne : bno ≠ c.blk)
+    (h : inFlightBlk st bno) :
+    inFlightBlk (fun j => if j = i then HState.inactive else st j) bno := by
+  obtain ⟨j, c', hj, hstj, hblk⟩ := h
+  have hji : j ≠ i := by
+    intro he
+    subst he
+    rw [hst] at hstj
+    cases hstj
+    exact hne hblk.symm
+  exact ⟨j, c', hj, by simp only [hji, if_false]; exact hstj, hblk⟩
+
 /-- Every sector the write-back cache holds with DATA belongs to a block
 that is in flight.  (An EMPTY entry is not data: `cacheView` falls through
 to the durable image for it, so it constrains nothing.)  This is what
