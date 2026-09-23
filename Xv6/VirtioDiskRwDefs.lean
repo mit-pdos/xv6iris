@@ -40,8 +40,7 @@ set_option linter.unusedSectionVars false
 
 /-- One page of RAM, page-aligned, identity-mapped read-write: what the
 driver needs of `disk.desc` to write a descriptor through it. -/
-def descPageRw (pd : PAddr) : Prop :=
-  inRam pd 4096 ∧ pd.toNat % 4096 = 0 ∧ kmapClass (vpnOf pd).toNat = some .rw
+def descPageRw (pd : PAddr) : Prop := pageRw pd
 
 /-- Every address of the page is in RAM, is at the offset it looks like,
 and lies on the page's (read-write) mapping. -/

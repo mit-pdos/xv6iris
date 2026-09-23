@@ -139,6 +139,7 @@ WHAT IS NOT HERE, AND WHY.
 -/
 import Xv6.VirtioQueue
 import Xv6.KallocDefs
+import Xv6.KernelMap
 import MachCSL.WpDevDma
 import MachCSL.WordHist
 
@@ -1936,19 +1937,50 @@ instance diskInv_persistent (γ : DiskNames) : Persistent (diskInv (GF := GF) γ
 section payload
 variable [CurCtx]
 
+/-- **A queue page**, as every load and store of it needs it: the whole
+4096 bytes are RAM, the page is page-aligned, and the kernel's identity
+map takes it to itself read-write.  All three queue pages come from
+`kalloc`, so all three have it (`Xv6.pageRw_of_pageValid`); it is
+`Xv6.descPageRw`, one layer down, where the arithmetic lemmas about it
+live. -/
+def pageRw (p : PAddr) : Prop :=
+  inRam p 4096 ∧ p.toNat % 4096 = 0 ∧ kmapClass (vpnOf p).toNat = some .rw
+
 /-- **The geometry**, persistent: the three page pointers of `struct disk`
-(read-only after `virtio_disk_init`) and the frozen configuration they
-were written into.  `wce c0 = false`: xv6 clears both `VIRTIO_BLK_F_FLUSH`
-and `VIRTIO_BLK_F_CONFIG_WCE` during feature negotiation, so the device is
-in write-THROUGH mode and a write request cannot complete before its
-payload has reached the durable image (`Virtio.completeOk`). -/
+(read-only after `virtio_disk_init`), the frozen configuration they were
+written into, and the fact that all three pages are `kalloc`'d,
+identity-mapped RAM.  `wce c0 = false`: xv6 clears both
+`VIRTIO_BLK_F_FLUSH` and `VIRTIO_BLK_F_CONFIG_WCE` during feature
+negotiation, so the device is in write-THROUGH mode and a write request
+cannot complete before its payload has reached the durable image
+(`Virtio.completeOk`).
+
+THE PAGE FACTS.  Every racy load of the used page that
+`virtio_disk_intr` makes -- `used->idx` and `used->ring[..].id` -- needs
+`MachCSL.inRam`, the alignment and the `MachCSL.kmapId` of its address,
+and the handler has no premise to get them from: it is handed the
+geometry and the lock, nothing else.  `virtio_disk_rw` takes the same
+fact about the DESCRIPTOR page as an explicit premise
+(`Xv6.descPageRw pd`); carrying all three here is what makes that premise
+redundant and the handler's loads possible at all.  They are minted at
+the live flip out of `Xv6.pageValid` of the three `kalloc`'d pages, which
+`Xv6.diskFlipIn` now carries. -/
 def diskGeom (γ : DiskNames) (pd pav pu : PAddr) : IProp GF := iprop%
   ∃ c0 : VirtioCfg, diskCfgFrozen γ c0 ∗
     ⌜c0.desc = pd ∧ c0.avail = pav ∧ c0.used = pu ∧ Virtio.live c0 = true ∧
-      c0.qnum.toNat = NUM ∧ Virtio.wce c0 = false⌝ ∗
+      c0.qnum.toNat = NUM ∧ Virtio.wce c0 = false ∧
+      pageRw pd ∧ pageRw pav ∧ pageRw pu⌝ ∗
     wordPointsTo aDescPtr 8 DFrac.discard pd ∗
     wordPointsTo aAvailPtr 8 DFrac.discard pav ∗
     wordPointsTo aUsedPtr 8 DFrac.discard pu
+
+/-- **The three pages, read off the geometry.** -/
+theorem diskGeom_pages (γ : DiskNames) (pd pav pu : PAddr) :
+    diskGeom (GF := GF) γ pd pav pu ⊢ ⌜pageRw pd ∧ pageRw pav ∧ pageRw pu⌝ := by
+  unfold diskGeom
+  iintro ⟨%c0, _, %hg, _, _, _⟩
+  ipureintro
+  exact hg.2.2.2.2.2.2
 
 instance diskGeom_persistent (γ : DiskNames) (pd pav pu : PAddr) :
     Persistent (diskGeom (GF := GF) γ pd pav pu) := by

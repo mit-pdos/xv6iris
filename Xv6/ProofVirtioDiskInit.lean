@@ -66,6 +66,30 @@ theorem vdi_kmapClass (p : BitVec 64) (hb : pageValid p) (off : Nat) (hoff : off
     · rfl
     · omega
 
+/-- **A `kalloc`'d page is a queue page.**  `Xv6.pageValid` gives the
+alignment and the two bounds; `Xv6.pageRw` asks for the same page as a
+`MachCSL.inRam` window and for its identity mapping, which is
+`vdi_kmapClass` at offset zero.  It is how `Xv6.diskFlipIn`'s page facts
+-- and so `Xv6.diskGeom`'s -- are established. -/
+theorem pageRw_of_pageValid (p : BitVec 64) (hb : pageValid p) : pageRw p := by
+  have hkm := vdi_kmapClass p hb 0 (by omega)
+  rw [show (BitVec.ofNat 64 0) = 0#64 from rfl, BitVec.add_zero] at hkm
+  obtain ⟨hal, hlo, hhi⟩ := hb
+  have hlo' : ¬ p.toNat < kernelEndAddr.toNat := fun h => hlo (BitVec.ult_iff_lt.2 h)
+  have hhi' : p.toNat < physTop.toNat := BitVec.ult_iff_lt.1 hhi
+  simp only [kernelEndAddr, physTop, BitVec.toNat_ofNat, Nat.reducePow] at hlo' hhi'
+  have hend : KA.«end».toNat = KernelSyms.«end» := rfl
+  have hend_lo : 0x80007 * 4096 ≤ KernelSyms.«end» := by decide
+  rw [hend] at hlo'
+  have h12 : BitVec.extractLsb' 0 12 p = 0#12 := by
+    revert hal; generalize p = x; intro hal; bv_decide
+  have hal' : p.toNat % 4096 = 0 := by
+    have h := congrArg BitVec.toNat h12
+    simpa [BitVec.extractLsb'_toNat] using h
+  refine ⟨⟨?_, ?_⟩, hal', hkm⟩
+  · unfold ramBase; omega
+  · unfold ramEnd; omega
+
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
@@ -1719,6 +1743,10 @@ theorem vdi_flipIn (γ : DiskNames) (pd pav pu : BitVec 64)
     wordAtN_cur, vdi_aFree0, vdi_aFree1, vdi_aFree2, vdi_aFree3, vdi_aFree4, vdi_aFree5,
     vdi_aFree6, vdi_aFree7, vdi_aUsedIdx, vdi_aDescPtr, vdi_aAvailPtr, vdi_aUsedPtr,
     wrap16, ringInit]
+  isplitl []
+  · ipureintro
+    exact ⟨pageRw_of_pageValid pd hpvd, pageRw_of_pageValid pav hpva,
+      pageRw_of_pageValid pu hpvu⟩
   icases HG with ⟨⟨⟨Hh0a, Hh0t⟩, ⟨Hh1a, Hh1t⟩, ⟨Hh2a, Hh2t⟩, ⟨Hh3a, Hh3t⟩, ⟨Hh4a, Hh4t⟩,
     ⟨Hh5a, Hh5t⟩, ⟨Hh6a, Hh6t⟩, ⟨Hh7a, Hh7t⟩, _⟩, Hpa, Hpub, Hnr, Hstg, Hnc⟩
   icases Hdesc with ⟨Hd0, Hd1, Hd2, Hd3, Hd4, Hd5, Hd6, Hd7, _⟩

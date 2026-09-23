@@ -233,19 +233,6 @@ completion side is expected to grow (see the report accompanying this
 file); until then `virtio_disk_intr_proof` takes them as an explicit
 hypothesis. -/
 structure DISK_INTR_EXTRA : Prop where
-  /-- **The used page is a `kalloc`'d, identity-mapped page.**
-  `Xv6.diskGeom` pins the three page POINTERS but says nothing about the
-  pages, and the handler's two racy loads of the used page
-  (`MachCSL.wp_s_lhu_aur` of `used->idx`, `MachCSL.wp_s_lw_au` of
-  `used->ring[..].id`) each need `MachCSL.inRam`, the alignment and
-  `MachCSL.kmapId` of their address.  `virtio_disk_rw` takes the same fact
-  about the DESCRIPTOR page as the premise `Xv6.descPageRw pd`; the
-  handler has no such premise, and the natural home for it is `diskGeom`
-  itself. -/
-  used_page : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
-      [CurCtx] (γ : DiskNames) (pd pav pu : PAddr),
-    diskGeom (GF := GF) γ pd pav pu ⊢ ⌜descPageRw pu⌝
-
   /-- **A completed head is an ARMED head.**  The handler reads a head `i`
   out of the used ring and must then produce the `Xv6.headTok γ i (.active c)`
   that `disk_status_read` and `disk_collect` take; all it holds is the
@@ -941,7 +928,8 @@ theorem virtio_disk_intr_proof (HA : DISK_ACC_ASSUMPTIONS) (HE : DISK_INTR_EXTRA
   iintro ⟨Hk, Hpc, #HΓ, #Hcaps, HΦ⟩
   ihave #Hinv := vdis_caps_inv γ γl pd pav pu $$ Hcaps
   ihave #Hgeom := vdis_caps_geom γ γl pd pav pu $$ Hcaps
-  ihave %hpu := HE.used_page γ pd pav pu $$ Hgeom
+  ihave %hpg := diskGeom_pages γ pd pav pu $$ Hgeom
+  have hpu : descPageRw pu := hpg.2.2
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_kmapStatic _ _ $$ Hk with ⟨#HS, Hk⟩

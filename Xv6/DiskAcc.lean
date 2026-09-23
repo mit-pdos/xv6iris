@@ -1133,8 +1133,17 @@ the eight descriptor slots (`diskSlotIn`: both halves of the receipt, the
 `free[i]` byte, the zeroed descriptor), both halves of the published
 count, the handler watermark and the stage, the completion counter, the
 avail page's index and ring cells, the whole used page, `disk.used_idx`,
-and the three page pointers of `struct disk`. -/
+the three page pointers of `struct disk` -- and the PURE fact that all
+three pages are `kalloc`'d, identity-mapped RAM (`Xv6.pageRw`).
+
+The page facts are not derivable from the windows: a `MachCSL.ctxBytes`
+window carries the history of each byte and its key, not the address's
+`MachCSL.inRam` or its place in the kernel map.  They come from
+`Xv6.pageValid` of the pages `kalloc` returned, and they are what makes
+`Xv6.diskGeom` able to hand `virtio_disk_intr` the `MachCSL.kmapId` of
+the used page it reads. -/
 def diskFlipIn [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) : IProp GF := iprop%
+  ⌜pageRw pd ∧ pageRw pav ∧ pageRw pu⌝ ∗
   ([∗list] i ∈ List.range NUM, diskSlotIn γ pd i) ∗
   diskPubAuth γ 0 ∗ diskPub γ 0 ∗ diskReadAt γ 0 ∗ diskStage γ none ∗ diskDoneAuth γ 0 ∗
   ctxBytes curCtx (availIdxAt pav) 2 (DFrac.own 1) (wrap16 0) ∗
@@ -1173,7 +1182,7 @@ theorem diskProto_flip [CurCtx] (γ : DiskNames) (v : VirtioState) (c c' : Virti
     imod diskCfg_freeze γ v.cfg c c' $$ [Hcfg Htok] with #Hfr
     · iframe Hcfg Htok
     unfold diskFlipIn
-    icases HIn with ⟨Hsl, Hpa, Hpub, Hnr, Hstg, Hnc, Hai, Hring, Hui, Hue, Hdui, Hq1, Hq2, Hq3⟩
+    icases HIn with ⟨%hpg, Hsl, Hpa, Hpub, Hnr, Hstg, Hnc, Hai, Hring, Hui, Hue, Hdui, Hq1, Hq2, Hq3⟩
     icases diskSlots_split γ c'.desc $$ Hsl with ⟨Hauths, Hrows, Hslots⟩
     icases diskRing_split c'.avail $$ Hring with ⟨HringR, HringC⟩
     ihave HueR := diskUsed_split c'.used $$ Hue
@@ -1230,7 +1239,7 @@ theorem diskProto_flip [CurCtx] (γ : DiskNames) (v : VirtioState) (c c' : Virti
         iexists c'
         iframe Hfr Hq1 Hq2 Hq3
         ipureintro
-        exact ⟨rfl, rfl, rfl, hlive, hqnum, hwce⟩
+        exact ⟨rfl, rfl, rfl, hlive, hqnum, hwce, hpg.1, hpg.2.1, hpg.2.2⟩
       unfold diskRes
       iexists 0, 0, none, ringInit
       iframe Hpub Hnr Hstg Hdui HaiC HringC Hslots
