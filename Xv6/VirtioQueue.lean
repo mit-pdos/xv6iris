@@ -756,11 +756,22 @@ theorem blockView_set_ne (v : VirtioState) (k : Nat) (bs : List (BitVec 8)) (bno
 
 /-! ## Blocks in flight -/
 
-/-- Block `bno` is the block of a chain that is currently armed: the
-invariant holds that block's image fragment inside the chain's row, so the
-device may move it and the ghost map's coupling exempts it. -/
+/-- Block `bno` is the block of an armed chain that is a DISK WRITE
+(`c.dwr = false`: the data descriptor is not device-writable): the
+invariant holds that block's image fragment inside the chain's row, and
+only such a chain can move the block -- its capture is the one step that
+writes the block's sectors into the write-back cache.
+
+The READ chains are deliberately NOT here.  An armed READ chain's block
+does not move at all: the only step that can move a block is
+`MachCSL.Virtio.xferOut`'s capture, which runs only on the WRITE branch of
+`MachCSL.Virtio.serve`, and by `Xv6.blkInj` the block it captures is its
+OWN.  So `Xv6.imgOk` pins an in-flight READ chain's image fragment to
+`Xv6.blockView` for the whole flight, which is what says that what the
+device fills the buffer with is the fragment the driver handed in and
+gets back. -/
 def inFlightBlk (st : Nat → HState) (bno : Nat) : Prop :=
-  ∃ (i : Nat) (c : Chain), i < NUM ∧ st i = .active c ∧ c.blk = bno
+  ∃ (i : Nat) (c : Chain), i < NUM ∧ st i = .active c ∧ c.dwr = false ∧ c.blk = bno
 
 /-- **The blocks of armed heads are DISTINCT.**  A block in flight is
 EXCLUSIVELY its chain's: the invariant holds that block's image fragment
@@ -782,14 +793,14 @@ theorem inFlightBlk_free (st : Nat → HState) (i : Nat) (c : Chain) (bno : Nat)
     (hinj : blkInj st) (hst : st i = .active c) (hne : bno ≠ c.blk)
     (h : inFlightBlk st bno) :
     inFlightBlk (fun j => if j = i then HState.inactive else st j) bno := by
-  obtain ⟨j, c', hj, hstj, hblk⟩ := h
+  obtain ⟨j, c', hj, hstj, hdw, hblk⟩ := h
   have hji : j ≠ i := by
     intro he
     subst he
     rw [hst] at hstj
     cases hstj
     exact hne hblk.symm
-  exact ⟨j, c', hj, by simp only [hji, if_false]; exact hstj, hblk⟩
+  exact ⟨j, c', hj, by simp only [hji, if_false]; exact hstj, hdw, hblk⟩
 
 /-- Every sector the write-back cache holds with DATA belongs to a block
 that is in flight.  (An EMPTY entry is not data: `cacheView` falls through

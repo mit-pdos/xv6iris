@@ -438,6 +438,7 @@ theorem capture_blk (c : Chain) (r : VioReq) (i : Nat) (hreq : r = c.req) (hwf :
 
 theorem diskProto_capture (γ : DiskNames) (v : VirtioState) (h : BitVec 16) (r : VioReq)
     (i : Nat) (bs : List (BitVec 8)) (hin : Virtio.reqOf v h = some r)
+    (hwr : r.type.toNat = Virtio.blkTOut)
     (hlen : bs.length = Virtio.reqSectorLen r i) :
     diskProto (GF := GF) γ v ⊢
       diskProto γ { v with cache := Virtio.alistSet v.cache (Virtio.reqKey r i) bs } := by
@@ -467,9 +468,18 @@ theorem diskProto_capture (γ : DiskNames) (v : VirtioState) (h : BitVec 16) (r 
     obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15⟩ := hpure
     obtain ⟨hlt, c, hst, hhd, hreq⟩ := e6.1 h r hin
     ihave %hwf := headRes_wf_of γ c0.desc st h.toNat c hlt hst $$ Hr
+    have hdwr : c.dwr = false := by
+      rw [hreq] at hwr
+      cases hd : c.dwr with
+      | false => rfl
+      | true =>
+        exfalso
+        rw [show (Chain.req c).type = (if c.dwr then BitVec.ofNat 32 Virtio.blkTIn
+          else BitVec.ofNat 32 Virtio.blkTOut) from rfl, hd, if_pos rfl] at hwr
+        exact absurd hwr (by decide)
     have hfly : Virtio.reqSectorLen r i ≠ 0 → inFlightBlk st (Virtio.reqKey r i / SPB) := by
       intro hn
-      exact ⟨h.toNat, c, hlt, hst, (capture_blk c r i hreq hwf.2 hn).symm⟩
+      exact ⟨h.toNat, c, hlt, hst, hdwr, (capture_blk c r i hreq hwf.2 hn).symm⟩
     have key : imgOk { v with cache := Virtio.alistSet v.cache (Virtio.reqKey r i) bs } m
           (inFlightBlk st) ∧
         cachedOk { v with cache := Virtio.alistSet v.cache (Virtio.reqKey r i) bs } st := by
@@ -1728,7 +1738,7 @@ theorem leaseL_xferIn (γ : DiskNames) (C : IProp GF) (h : BitVec 16) (r : VioRe
 /-- `Virtio.xferOut h r i`: one sector of a write request's capture, in
 the serving task. -/
 theorem leaseL_xferOut (γ : DiskNames) (C : IProp GF) (h : BitVec 16) (r : VioReq) (i : Nat)
-    (k : Unit → Virtio.VM Unit)
+    (hwr : r.type.toNat = Virtio.blkTOut) (k : Unit → Virtio.VM Unit)
     (hk : DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) iprop(True) C (k ())) :
     DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) iprop(True) C
       (DevM.bind (Virtio.xferOut h r i) k) := by
@@ -1754,7 +1764,7 @@ theorem leaseL_xferOut (γ : DiskNames) (C : IProp GF) (h : BitVec 16) (r : VioR
       iintro ⟨HC, HR⟩
       imodintro
       iframe HC
-      iapply diskProto_capture γ s1 h r i (bytesOf w) hc (by simp [bytesOf]) $$ HR
+      iapply diskProto_capture γ s1 h r i (bytesOf w) hc hwr (by simp [bytesOf]) $$ HR
     · rw [if_neg hc]
       iintro ⟨HC, HR⟩
       imodintro
@@ -2183,7 +2193,10 @@ theorem leaseL_serve (γ : DiskNames) (h : BitVec 16) :
             iframe HC
             iapply diskProto_latch γ s1 (some h) $$ HR
           · exact absurd hgs' (by simp)
-        · exact leaseL_seqSectors γ _ _ (fun i k hk => leaseL_xferOut γ _ h c.req i k hk) _ _
+        · rename_i hty
+          exact leaseL_seqSectors γ _ _
+            (fun i k hk => leaseL_xferOut γ _ h c.req i hty k hk)
+            _ _
             (leaseL_serveTail γ h xc0 xkey c s _ xhlive xhqnum xhhd)
       · split
         · exact leaseL_seqSectors γ _ _ (fun i k hk => leaseL_xferIn γ _ h c.req i k hk) _ _

@@ -3865,6 +3865,23 @@ chain's row) and the device is free to move it. -/
 def imgOk (v : VirtioState) (m : RegMapF (List (BitVec 8))) (P : Nat → Prop) : Prop :=
   ∀ bno bs, PartialMap.get? m bno = some bs → P bno ∨ bs = blockView v bno
 
+/-- **An armed READ chain's block is the image's.**  `Xv6.inFlightBlk`
+names only the WRITE chains, so `Xv6.imgOk`'s escape does not cover a
+read, and the fragment the invariant holds for an in-flight READ chain
+reads as `Xv6.blockView` at every state of the flight. -/
+theorem imgOk_read_blk (v : VirtioState) (m : RegMapF (List (BitVec 8)))
+    (st : Nat → HState) (i : Nat) (c : Chain) (bs : List (BitVec 8))
+    (hok : imgOk v m (inFlightBlk st)) (hi : i < NUM) (hst : st i = .active c)
+    (hdwr : c.dwr = true) (hinj : blkInj st)
+    (hget : PartialMap.get? m c.blk = some bs) : bs = blockView v c.blk := by
+  rcases hok c.blk bs hget with hfl | he
+  · obtain ⟨j, c', hj, hstj, hdw, hblk⟩ := hfl
+    by_cases hij : j = i
+    · subst hij; rw [hst] at hstj; cases hstj; rw [hdwr] at hdw; exact absurd hdw (by simp)
+    · exact absurd hblk (hinj j i c' c hj hi hij hstj hst)
+  · exact he
+
+
 /-- The live arm: the queue, the receipts, the leases. -/
 def diskLive (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState)
     (pm : RegMapF PermVal) : IProp GF := iprop%
