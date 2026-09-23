@@ -371,3 +371,16 @@ import Xv6.DiskAcc
 import Xv6.PlicPlan
 import Xv6.PlicInv
 import Xv6.SpecClockintr
+import Xv6.PlicPlanExtra
+import Xv6.SpecPlicinit
+import Xv6.SpecPlicinithart
+import Xv6.SpecPlicClaim
+import Xv6.SpecPlicComplete
+import Xv6.ProofPlicinit
+import Xv6.ProofPlicinithart
+import Xv6.ProofPlicClaim
+import Xv6.ProofPlicComplete
+import Xv6.LinkPlicinit
+import Xv6.LinkPlicinithart
+import Xv6.LinkPlicClaim
+import Xv6.LinkPlicComplete
