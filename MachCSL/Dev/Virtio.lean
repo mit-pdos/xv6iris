@@ -40,6 +40,22 @@ reads as anything (the Rocq `mem_view`).  DMA writes are appended at the
 top as the disk agent.  Every DMA write of a request is guarded on the
 request still being in flight, so a reset cannot be followed by a stray
 write.
+
+THE WRITE GUARDS PIN THE REQUEST, AND THE STAGED USED INDEX.  A stranded
+task holds the request record `r` it fetched; the guard of each of its DMA
+writes therefore asks for `reqOf v h = some r`, not merely for `h` to be in
+flight.  Without that, a device reset (`offStatus := 0` empties `inflight`)
+followed by a re-pop of the same head would let a stale `serve h` write at
+the addresses of the OLD request with the guard true, and the write's
+address would not be a function of the state at the write.  Likewise the
+used element and the used index are written at addresses computed from the
+snapshot (`ui`, `c`) taken at the `get` after the `.pushed` gate: the guards
+of those two writes ask for `v.usedIdx = ui` and `v.cfg = c`, so the address
+is pinned by the state at the write.  Operationally nothing is lost --
+`VPhase.req` never changes for a head that stays in flight, and `pushOk`
+already keeps `usedIdx` still between the gate and the index bump -- but a
+per-step program logic can only state a one-state obligation, so the facts
+have to be in the guard rather than in the argument.
 -/
 import MachCSL.Dev.DevLang
 
@@ -442,7 +458,7 @@ def serve (h : BitVec 16) : VM Unit := do
     else pure ()
     DevM.modify (fun v => setPhase v h (.served r))
     -- the status byte
-    DevM.dmaWriteIf (fun v => (phase v h).isSome) r.status 1 (statusOf r)
+    DevM.dmaWriteIf (fun v => decide (reqOf v h = some r)) r.status 1 (statusOf r)
     DevM.modify (fun v => setPhase v h (.status r))
     -- the report: wait for the completion gate and for the used ring to be free
     DevM.guard (fun v =>
@@ -450,10 +466,13 @@ def serve (h : BitVec 16) : VM Unit := do
       else none)
     let v ← DevM.get
     let ui := v.usedIdx
+    let c := v.cfg
     -- the used element: `id:4 len:4`, little-endian, so `len` is the high word
-    DevM.dmaWriteIf (fun v => (phase v h).isSome) (usedElemAddr v.cfg ui) 8
+    DevM.dmaWriteIf (fun s => decide (reqOf s h = some r) && decide (s.usedIdx = ui) &&
+        decide (s.cfg = c)) (usedElemAddr c ui) 8
       (castW (by decide : 64 = 8 * 8) ((usedLen r) ++ (r.head.setWidth 32)))
-    DevM.dmaWriteIf (fun v => (phase v h).isSome) (usedIdxAddr v.cfg) 2 (ui + 1#16)
+    DevM.dmaWriteIf (fun s => decide (reqOf s h = some r) && decide (s.usedIdx = ui) &&
+        decide (s.cfg = c)) (usedIdxAddr c) 2 (ui + 1#16)
     DevM.modify (fun v => complete v h)
 
 /-- Sector `i` of a read request: written to the driver's buffer from the
@@ -465,7 +484,7 @@ def xferIn (h : BitVec 16) (i : Nat) : VM Unit := do
   | some r =>
     let n := reqSectorLen r i
     let bs := diskRead (cacheView v) (sectorSize * reqKey r i) n
-    DevM.dmaWriteIf (fun v => (phase v h).isSome) (reqSectorAddr r i) n (bvOfBytes n bs)
+    DevM.dmaWriteIf (fun v => decide (reqOf v h = some r)) (reqSectorAddr r i) n (bvOfBytes n bs)
 
 /-- Sector `i` of a write request: read from the driver's buffer into the
 cache. -/
@@ -477,7 +496,8 @@ def xferOut (h : BitVec 16) (i : Nat) : VM Unit := do
     let n := reqSectorLen r i
     let w ← DevM.dmaRead (reqSectorAddr r i) n
     DevM.modify (fun v =>
-      if (phase v h).isSome then { v with cache := alistSet v.cache (reqKey r i) (bytesOf w) } else v)
+      if reqOf v h = some r then { v with cache := alistSet v.cache (reqKey r i) (bytesOf w) }
+      else v)
 
 /-- THE ROOT LOOP: pop the next available request and fork its service, or
 drain one cached sector to the medium, or do nothing. -/
