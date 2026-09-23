@@ -26,11 +26,14 @@ last read of `used->idx` returned, and the TSO credential
 `Xv6.diskWm γ m F` with the read receipt `MachCSL.rviewLb cpu F` the
 fence turns into a floor.
 
-One resource is still not derivable from the disk files: the handler's
-ENTRY credential, the fact that the floor it acquires the lock with has
-passed the used-index write that published its own watermark.  It is
-`Xv6.DISK_INTR_EXTRA.pay_wm`, an explicit extra hypothesis of the
-theorem, and its doc comment says exactly what is missing and why.
+The handler's ENTRY credential -- that the floor it acquires the lock
+with has passed the used-index write which published its own watermark --
+now comes OUT OF THE PAYLOAD: `Xv6.diskRes` carries
+`Xv6.diskPayWm γ nr ξ`, a `Xv6.diskWm` at a CONTEXT floor, and
+`Xv6.vdis_payWm_cash` turns it into a credential at this hart's own view
+(the holder is running the context, so its view has passed the context's
+floor).  `Xv6.vdis_payWm_mk` puts one back at the new watermark when the
+handler releases.
 -/
 import MachCSL.WpSmodeFrame
 import MachCSL.WpSmodeFrame12b
@@ -225,70 +228,6 @@ theorem vdis_wakeup (WK : WAKEUP) (Γ : SchedNames) (cpu : CPU) (k' : KCtx)
 
 end
 
-/-! ## The arm the frozen completion side does not (yet) provide
-
-Four of the five resources this structure once carried are gone: the
-used page's `Xv6.pageRw` is in `Xv6.diskGeom`, the used element's read is
-`Xv6.disk_used_elem_read` at the width the code
-uses, `b->disk` is in `Xv6.claimRes` (`Xv6.claimRes_bufDisk_acc`), and
-"a completed head is armed" is `Xv6.disk_slot_active`, proved from the
-invariant's `Xv6.unreadArmed`.  What is left is stated in the exact shape
-the proof consumes, with the reason it is still assumed. -/
-structure DISK_INTR_EXTRA : Prop where
-  /-- **The handler's ENTRY credential.**  `Xv6.disk_used_idx_read` at the
-  watermark `nr` consumes `Xv6.diskWm γ nr K` -- the fact that this hart's
-  floor has passed the stores that zeroed the used page and the
-  used-index write that published `nr`.  Every later iteration gets it
-  from the previous read; the FIRST one has to get it from the lock,
-  whose release-acquire edge is exactly what puts the new holder's floor
-  past the previous holder's deposit.
-
-  WHY IT IS STILL ASSUMED (checked, not guessed).  The intended fix is a
-  payload conjunct `∃ T, diskWm γ nr T ∗ ctxFloor ξ T`, and two of its
-  three sides do work:
-
-  * it TRANSPORTS: `MachCSL.instCtxMorphFloor` makes `fun ξ => ctxFloor ξ T`
-    a `MachCSL.CtxMorph`, so the conjunct survives the lock's handoffs;
-  * it is CASHED by `MachCSL.ownCtx_floor_view` (the holder's `ownCtx`
-    comes out of its `kctxL` by `MachCSL.kctx_token_acc`) into
-    `∃ K, viewLb cpu K ∗ ⌜T ≤ K⌝`, and `Xv6.diskWm_mono` carries the
-    credential up to `K`.  That is exactly this arm;
-  * it is RESTORED at each release by `MachCSL.ctx_absorb`, which turns
-    the hart's `viewLb cpu F` -- which `disk_used_idx_read` and the loop's
-    fence leave behind -- back into `ctxFloor curCtx F`.
-
-  What has no source is the MINT, at `Xv6.disk_driver_ok_write`.  The
-  flip freezes the base `b` of the used-index cell's log (the positions of
-  `virtio_disk_init`'s own `memset` stores, out of `Xv6.ctxBytes_tails`),
-  and `diskWm γ 0 T` requires `b ≤ T` with `ctxFloor curCtx T` -- i.e. the
-  initialising hart's floor past its OWN stores.
-
-  THE FENCE RULE IS NO LONGER WHAT IS MISSING.  It used to read here that
-  the model supports the drain edge (`MachCSL.fencePost` drains the hart's
-  `pub`) but that no rule exposes it, for want of a `pubLb` receipt.  That
-  was wrong: the receipt is the store's own `MachCSL.authoredBy`, which
-  `MachCSL.machInterp_store` hands out beside `MachCSL.topLb`, and
-  `MachCSL/WpSmodeFencePub.lean` now cashes it --
-  `MachCSL.wp_s_fence_iorw_iorw_pub` turns
-  `authoredBy T (hartAgent cpu)` into `MachCSL.viewLb cpu T` across
-  `__sync_synchronize()`, at both encodings.
-
-  What is left is PLUMBING through two FROZEN statements, and that is why
-  this arm stays.  (i) The payload conjunct `∃ T, diskWm γ nr T ∗
-  ctxFloor ξ T` is a change to `Xv6.diskRes`, and (ii) the mint needs the
-  `authoredBy` receipts of `virtio_disk_init`'s `memset` stores to reach
-  `Xv6.disk_driver_ok_write`, which `Xv6.diskFlipIn` does not carry --
-  `Xv6.ctxBytes_tails` keeps only the numeric bound `b`, not the
-  authorship.  Both are one-line additions to statements this task may not
-  touch; neither needs new model support.  The other route -- the lock's
-  own stamp, `MachCSL.lockPayWon`'s `ctxFloor curCtx T` -- is DISCARDED by
-  `Xv6.ACQUIRE`'s frozen statement, which hands out only an unrelated
-  `∃ K, viewLb cpu' K`. -/
-  pay_wm : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
-      [CurCtx] (γ : DiskNames) (cpu : CPU) (nr : Nat),
-    diskReadAt (GF := GF) γ nr ∗ (∃ K : Nat, viewLb cpu K) ⊢
-      diskReadAt γ nr ∗ ∃ K : Nat, viewLb cpu K ∗ diskWm γ nr K
-
 /-! ## The payload, opened around the watermark -/
 
 section pay
@@ -308,33 +247,75 @@ def vdisPay (γ : DiskNames) (pd pav : PAddr) : IProp GF := iprop%
 
 theorem vdisPay_open (γ : DiskNames) (pd pav pu : PAddr) :
     diskRes (GF := GF) γ pd pav pu curCtx ⊢ ∃ nr : Nat,
-      diskReadAt γ nr ∗ diskDoneLb γ nr ∗
+      diskReadAt γ nr ∗ diskDoneLb γ nr ∗ diskPayWm γ nr curCtx ∗
       wordPointsTo aUsedIdx 2 (DFrac.own 1) (wrap16 nr) ∗ vdisPay γ pd pav := by
   unfold vdisPay
   iintro H
   icases diskRes_open γ pd pav pu curCtx $$ H
-    with ⟨%np, %nr, %stg, %ring, Hp, Hr, Hs, Hlb, Hu, Hidx, Hring, Hsl⟩
+    with ⟨%np, %nr, %stg, %ring, Hp, Hr, Hs, Hlb, Hwmp, Hu, Hidx, Hring, Hsl⟩
   ihave Hu : iprop(wordPointsTo (GF := GF) aUsedIdx 2 (DFrac.own 1) (wrap16 nr)) $$ [Hu]
   · iapply (show wordAtN (GF := GF) curCtx aUsedIdx 2 (DFrac.own 1) (wrap16 nr) ⊢
       wordPointsTo aUsedIdx 2 (DFrac.own 1) (wrap16 nr) from by rw [wordAtN_cur])
     iexact Hu
   iexists nr
-  iframe Hr Hlb Hu
+  iframe Hr Hlb Hwmp Hu
   iexists np, stg, ring
   iframe Hp Hs Hidx Hring Hsl
 
 theorem vdisPay_close (γ : DiskNames) (pd pav pu : PAddr) (nr : Nat) :
-    diskReadAt (GF := GF) γ nr ∗ diskDoneLb γ nr ∗
+    diskReadAt (GF := GF) γ nr ∗ diskDoneLb γ nr ∗ diskPayWm γ nr curCtx ∗
       wordPointsTo aUsedIdx 2 (DFrac.own 1) (wrap16 nr) ∗ vdisPay γ pd pav ⊢
       diskRes γ pd pav pu curCtx := by
   unfold vdisPay
-  iintro ⟨Hr, Hlb, Hu, %np, %stg, %ring, Hp, Hs, Hidx, Hring, Hsl⟩
+  iintro ⟨Hr, Hlb, #Hwmp, Hu, %np, %stg, %ring, Hp, Hs, Hidx, Hring, Hsl⟩
   ihave Hu : iprop(wordAtN (GF := GF) curCtx aUsedIdx 2 (DFrac.own 1) (wrap16 nr)) $$ [Hu]
   · iapply (show wordPointsTo (GF := GF) aUsedIdx 2 (DFrac.own 1) (wrap16 nr) ⊢
       wordAtN curCtx aUsedIdx 2 (DFrac.own 1) (wrap16 nr) from by rw [wordAtN_cur])
     iexact Hu
   iapply diskRes_close γ pd pav pu curCtx np nr stg ring
-  iframe Hp Hr Hs Hlb Hu Hidx Hring Hsl
+  iframe Hp Hr Hs Hlb Hwmp Hu Hidx Hring Hsl
+
+/-- **The payload's credential, CASHED.**  The lock's payload carries
+`Xv6.diskPayWm γ nr curCtx` -- a `Xv6.diskWm` at a CONTEXT floor -- and
+the holder's `MachCSL.ownCtx`, which comes out of its `kctxL`
+(`MachCSL.kctx_token_acc`), says its own view has passed that floor
+(`MachCSL.ownCtx_floor_view`).  That is the handler's ENTRY credential:
+the one `Xv6.disk_used_idx_read` needs before the loop has run once. -/
+theorem vdis_payWm_cash [KernelGeom] [KernelImage GF] (γ : DiskNames) (cpu : CPU) (k : KCtx)
+    (n : Nat) :
+    kctx (GF := GF) cpu k ∗ diskPayWm γ n curCtx ⊢
+      kctx cpu k ∗ ∃ K : Nat, viewLb cpu K ∗ diskWm γ n K := by
+  iintro ⟨Hk, #Hp⟩
+  unfold diskPayWm
+  icases Hp with ⟨%T, #Hw, #Hfl⟩
+  icases kctx_token_acc cpu k $$ Hk with ⟨Hctx, Hback⟩
+  icases ownCtx_floor_view cpu curCtx T $$ [Hctx Hfl] with ⟨Hctx, %K, #Hv, %hle⟩
+  · iframe Hctx Hfl
+  ihave Hk := Hback $$ Hctx
+  iframe Hk
+  iexists K
+  iframe Hv
+  iapply diskWm_mono γ n n T K (Nat.le_refl n) hle
+  iexact Hw
+
+/-- ... and RESTORED.  The hart's floor -- which the loop's
+`__sync_synchronize()` has taken past the view the last `used->idx` read
+ran at -- becomes a CONTEXT floor (`MachCSL.ctx_absorb`), and the
+credential that read left behind rides back into the payload on it. -/
+theorem vdis_payWm_mk [KernelGeom] [KernelImage GF] (γ : DiskNames) (cpu : CPU) (k : KCtx)
+    (n F : Nat) :
+    kctx (GF := GF) cpu k ∗ viewLb cpu F ∗ diskWm γ n F ⊢
+      |==> (kctx cpu k ∗ diskPayWm γ n curCtx) := by
+  iintro ⟨Hk, #Hv, #Hw⟩
+  icases kctx_token_acc cpu k $$ Hk with ⟨Hctx, Hback⟩
+  imod ctx_absorb cpu curCtx F $$ [Hctx Hv] with ⟨Hctx, #Hfl⟩
+  · iframe Hctx Hv
+  imodintro
+  ihave Hk := Hback $$ Hctx
+  iframe Hk
+  unfold diskPayWm
+  iexists F
+  iframe Hw Hfl
 
 theorem vdisPay_slot (γ : DiskNames) (pd pav : PAddr) (i : Nat) (hi : i < NUM) :
     vdisPay (GF := GF) γ pd pav ⊢
@@ -656,7 +637,7 @@ theorem vdis_claim_infob (pd : PAddr) (c : Chain) :
     iexact H5'
 
 set_option maxHeartbeats 4000000 in
-theorem vdis_loop (HA : DISK_ACC_ASSUMPTIONS) (HE : DISK_INTR_EXTRA) (WK : WAKEUP)
+theorem vdis_loop (HA : DISK_ACC_ASSUMPTIONS) (WK : WAKEUP)
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName)
     (pd pav pu : BitVec 64)
     (hsie : k.sie = false) (hnoff : k.noff + 2 < 2 ^ 31) (hK : virtioDiskIntrSlots ≤ k.avail)
@@ -896,8 +877,15 @@ theorem vdis_loop (HA : DISK_ACC_ASSUMPTIONS) (HE : DISK_INTR_EXTRA) (WK : WAKEU
       with [vdisK_sie k, vdis_bne_f (wrap16 m3) (wrap16 (nr + 1)) heq3]
     iintro Hk Hpc
     ihave #Hlbnr := vdis_doneLb_le γ m (nr + 1) (by omega) $$ Hlbm
-    ihave Hres := vdisPay_close γ pd pav pu (nr + 1) $$ [Hnr Hlbnr Hui Hpay]
-    · iframe Hnr Hlbnr Hui Hpay
+    -- the credential goes back into the payload at the new watermark: the
+    -- loop's fence took this hart's floor past `F`, and `MachCSL.ctx_absorb`
+    -- makes that a CONTEXT floor
+    iapply wpLoop_fupd
+    imod (vdis_payWm_mk γ cpu _ (nr + 1) F) $$ [Hk Hview Hwm1] with ⟨Hk, #Hwmp⟩
+    · iframe Hk Hview Hwm1
+    imodintro
+    ihave Hres := vdisPay_close γ pd pav pu (nr + 1) $$ [Hnr Hlbnr Hwmp Hui Hpay]
+    · iframe Hnr Hlbnr Hwmp Hui Hpay
     iapply Hexit $$ %_ Hk Hpc Hlocked Hres
     ipureintro
     repeat refine vdisPres_set _ _ _ _ ?_ (by decide)
@@ -942,8 +930,8 @@ end
 set_option maxHeartbeats 4000000 in
 /-- **`virtio_disk_intr`**, from the interfaces of `acquire`, `release`
 and `wakeup`, the frozen accessor assumptions `Xv6.DISK_ACC_ASSUMPTIONS`
-and the residual completion-side arms of `Xv6.DISK_INTR_EXTRA`. -/
-theorem virtio_disk_intr_proof (HA : DISK_ACC_ASSUMPTIONS) (HE : DISK_INTR_EXTRA)
+and the frozen accessor assumption `Xv6.DISK_ACC_ASSUMPTIONS`. -/
+theorem virtio_disk_intr_proof (HA : DISK_ACC_ASSUMPTIONS)
     (AC : ACQUIRE) (RE : RELEASE) (WK : WAKEUP) : VIRTIO_DISK_INTR :=
   ⟨fun {hlc GF} _ _ _ _ Γ cpu k γ γl pd pav pu hsie hnoff hK hlk htier => by
   unfold wp_virtio_disk_intr_body
@@ -1049,9 +1037,11 @@ theorem virtio_disk_intr_proof (HA : DISK_ACC_ASSUMPTIONS) (HE : DISK_INTR_EXTRA
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdisK_sie k]
   iintro Hk Hpc
   -- open the payload at the handler watermark
-  icases vdisPay_open γ pd pav pu $$ Hres with ⟨%nr, Hnr, #Hlbnr, Hui, Hpay⟩
-  icases HE.pay_wm γ cpu nr $$ [Hnr Hview0] with ⟨Hnr, %Kw, #Hview, #Hwm⟩
-  · iframe Hnr Hview0
+  icases vdisPay_open γ pd pav pu $$ Hres with ⟨%nr, Hnr, #Hlbnr, #Hwmp, Hui, Hpay⟩
+  -- the ENTRY credential, out of the payload: its context floor is under
+  -- this hart's view, because this hart is running the context
+  icases vdis_payWm_cash γ cpu _ nr $$ [Hk Hwmp] with ⟨Hk, %Kw, #Hview, #Hwm⟩
+  · iframe Hk Hwmp
   -- +0x30  ld a5,16(s1)
   ihave Hup : iprop(wordPointsTo (GF := GF) aUsedPtr 8 DFrac.discard pu) $$ [Hgeom]
   · iapply vdis_geom_used γ pd pav pu
@@ -1088,8 +1078,8 @@ theorem virtio_disk_intr_proof (HA : DISK_ACC_ASSUMPTIONS) (HE : DISK_INTR_EXTRA
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [vdisK_sie k, vdis_beq_t (wrap16 nr) (wrap16 m0) heq0]
     iintro Hk Hpc
-    ihave Hres := vdisPay_close γ pd pav pu nr $$ [Hnr Hlbnr Hui Hpay]
-    · iframe Hnr Hlbnr Hui Hpay
+    ihave Hres := vdisPay_close γ pd pav pu nr $$ [Hnr Hlbnr Hwmp Hui Hpay]
+    · iframe Hnr Hlbnr Hwmp Hui Hpay
     iapply Hexit $$ %_ Hk Hpc Hlocked Hres
     ipureintro
     repeat refine vdisPres_set _ _ _ _ ?_ (by decide)
@@ -1104,7 +1094,7 @@ theorem virtio_disk_intr_proof (HA : DISK_ACC_ASSUMPTIONS) (HE : DISK_INTR_EXTRA
       rcases Nat.lt_or_ge nr m0 with h | h
       · exact h
       · exact absurd (show wrap16 nr = wrap16 m0 from by rw [show nr = m0 from by omega]) hne0
-    ihave Hloop := vdis_loop HA HE WK Γ cpu k γ γl pd pav pu hsie hnoff hK hlk htier hpu
+    ihave Hloop := vdis_loop HA WK Γ cpu k γ γl pd pav pu hsie hnoff hK hlk htier hpu
       $$ [HΓ Hcaps Hexit]
     · iframe #; iframe
     iapply Hloop $$ %_ %nr %m0 %F0 Hk Hpc Hlocked Hnr Hui Hpay Hlb0 Hrv0 Hwm0

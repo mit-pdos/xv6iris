@@ -2739,7 +2739,7 @@ the collect is what the handler's `b->disk = 0`/`wakeup` licenses and
 that happens only after the read.
 
 It is the first of the `pend` clauses of `Xv6/DiskAcc.lean`'s section
-head, and the one `Xv6.DISK_INTR_EXTRA.slot_active` asks for: the handler
+head, and the one `Xv6.disk_slot_active` gives: the handler
 reads a head out of the used ring and must produce that head's
 `Xv6.headTok γ i (.active c)` from the completion record alone.
 
@@ -3773,6 +3773,48 @@ theorem slotBody_member (ξ : CtxId) (pd : PAddr) (i h : Nat) :
     slotBody (GF := GF) ξ pd i (.member h) =
       iprop(wordAtN ξ (aFree i) 1 (DFrac.own 1) 0#8 ∗ opsWin ξ i ∗ infoWin ξ i) := rfl
 
+/-- **The handler's ENTRY credential, carried by the LOCK PAYLOAD**
+(Rocq's `disk_flr` in `disk_res`).  `Xv6.disk_used_idx_read` at the
+watermark `nr` consumes `Xv6.diskWm γ nr K` for a `K` the reading hart's
+floor has reached; every iteration after the first gets it from the
+previous read, and the FIRST one gets it from HERE -- the lock's
+release-acquire edge is exactly what puts the new holder's floor past the
+previous holder's deposit.
+
+It TRANSPORTS (`MachCSL.instCtxMorphFloor`), so it survives the lock's
+handoffs; it is CASHED by `MachCSL.ownCtx_floor_view` (the holder's
+`MachCSL.ownCtx` comes out of its `kctxL` by `MachCSL.kctx_token_acc`)
+into `∃ K, viewLb cpu K ∗ ⌜T ≤ K⌝`, with `Xv6.diskWm_mono` carrying the
+credential up to `K`; and it is RESTORED at each release by
+`MachCSL.ctx_absorb`, which turns the hart's `viewLb cpu F` -- which
+`disk_used_idx_read` and the loop's fence leave behind -- back into
+`ctxFloor curCtx F`. -/
+def diskPayWm (γ : DiskNames) (nr : Nat) (ξ : CtxId) : IProp GF := iprop%
+  ∃ T : Nat, diskWm γ nr T ∗ ctxFloor ξ T
+
+instance diskPayWm_persistent (γ : DiskNames) (nr : Nat) (ξ : CtxId) :
+    Persistent (diskPayWm (GF := GF) γ nr ξ) := by unfold diskPayWm; infer_instance
+
+/-- The credential at the base: a watermark of zero needs only a floor
+past the positions of the stores that zeroed the used page. -/
+theorem diskPayWm_zero (γ : DiskNames) (ξ : CtxId) (b : Nat) :
+    diskBaseFrozen (GF := GF) γ b ∗ ctxFloor ξ b ⊢ diskPayWm γ 0 ξ := by
+  unfold diskPayWm
+  iintro ⟨#Hb, #Hfl⟩
+  iexists b
+  iframe Hfl
+  iapply diskWm_zero γ b b (Nat.le_refl b)
+  iexact Hb
+
+theorem diskPayWm_mono (γ : DiskNames) (ξ : CtxId) (n n' : Nat) (h : n' ≤ n) :
+    diskPayWm (GF := GF) γ n ξ ⊢ diskPayWm γ n' ξ := by
+  unfold diskPayWm
+  iintro ⟨%T, #Hw, #Hfl⟩
+  iexists T
+  iframe Hfl
+  iapply diskWm_mono γ n n' T T h (Nat.le_refl T)
+  iexact Hw
+
 /-- **The payload of `disk.vdisk_lock`** (Rocq's `disk_res`): the
 publisher's and the handler's halves of the counters (the watermark
 included -- the invariant holds the other half, `Xv6.diskReadAtAuth`, and
@@ -3783,6 +3825,7 @@ with their receipts. -/
 def diskRes (γ : DiskNames) (pd pav pu : PAddr) (ξ : CtxId) : IProp GF := iprop%
   ∃ (np nr : Nat) (stg : Option Nat) (ring : Nat → Nat),
     diskPub γ np ∗ diskReadAt γ nr ∗ diskStage γ stg ∗ diskDoneLb γ nr ∗
+    diskPayWm γ nr ξ ∗
     wordAtN ξ aUsedIdx 2 (DFrac.own 1) (wrap16 nr) ∗
     ctxBytes ξ (availIdxAt pav) 2 (DFrac.own (1 : Qp).half) (wrap16 np) ∗
     ([∗list] j ∈ List.range NUM,
@@ -3820,6 +3863,11 @@ instance instCtxMorphRingCells (pav : PAddr) (ring : Nat → Nat) :
 instance instCtxMorphSlots (γ : DiskNames) (pd : PAddr) :
     CtxMorph (GF := GF) (fun ξ => iprop([∗list] i ∈ List.range NUM, slotRes γ ξ pd i)) :=
   ctxMorph_bigSepL _ (fun _ i ξ => slotRes γ ξ pd i) (fun _ _ => inferInstance)
+
+instance instCtxMorphPayWm (γ : DiskNames) (nr : Nat) :
+    CtxMorph (GF := GF) (fun ξ => diskPayWm γ nr ξ) := by
+  unfold diskPayWm
+  exact instCtxMorphExists (fun (T : Nat) ξ => iprop(diskWm γ nr T ∗ ctxFloor ξ T))
 
 instance instCtxMorphDiskRes (γ : DiskNames) (pd pav pu : PAddr) :
     CtxMorph (GF := GF) (diskRes γ pd pav pu) := by

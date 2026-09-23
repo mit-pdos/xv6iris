@@ -238,6 +238,7 @@ theorem diskResA_open (γ : DiskNames) (pd pav pu : PAddr) (ξ : CtxId) (tk : Na
     diskResA (GF := GF) γ pd pav pu ξ tk ⊢
       ∃ (np nr : Nat) (stg : Option Nat) (ring : Nat → Nat),
       diskPub γ np ∗ diskReadAt γ nr ∗ diskStage γ stg ∗ diskDoneLb γ nr ∗
+      diskPayWm γ nr ξ ∗
       wordAtN ξ aUsedIdx 2 (DFrac.own 1) (wrap16 nr) ∗
       ctxBytes ξ (availIdxAt pav) 2 (DFrac.own (1 : Qp).half) (wrap16 np) ∗
       ([∗list] j ∈ List.range NUM,
@@ -250,6 +251,7 @@ theorem diskResA_open (γ : DiskNames) (pd pav pu : PAddr) (ξ : CtxId) (tk : Na
 theorem diskResA_close (γ : DiskNames) (pd pav pu : PAddr) (ξ : CtxId) (tk : Nat → Bool)
     (np nr : Nat) (stg : Option Nat) (ring : Nat → Nat) :
     diskPub (GF := GF) γ np ∗ diskReadAt γ nr ∗ diskStage γ stg ∗ diskDoneLb γ nr ∗
+      diskPayWm γ nr ξ ∗
       wordAtN ξ aUsedIdx 2 (DFrac.own 1) (wrap16 nr) ∗
       ctxBytes ξ (availIdxAt pav) 2 (DFrac.own (1 : Qp).half) (wrap16 np) ∗
       ([∗list] j ∈ List.range NUM,
@@ -288,7 +290,7 @@ theorem diskResA_pub_open (γ : DiskNames) (pd pav pu : PAddr) (ξ : CtxId) (tk 
           diskResA γ pd pav pu ξ tk) := by
   iintro HR
   icases diskResA_open γ pd pav pu ξ tk $$ HR
-    with ⟨%np, %nr, %stg, %ring, Hp, Hr, Hs, Hlb, Hu, Hidx, Hring, Hsl⟩
+    with ⟨%np, %nr, %stg, %ring, Hp, Hr, Hs, Hlb, Hwmp, Hu, Hidx, Hring, Hsl⟩
   icases bigSepL_upd_acc (GF := GF) (List.range NUM) (np % NUM) (np % NUM)
       (by rw [List.getElem?_range (mod_NUM_lt np)])
       (fun k => ctxBytes ξ (availRingAt pav k) 2 (DFrac.own (1 : Qp).half)
@@ -311,7 +313,7 @@ theorem diskResA_pub_open (γ : DiskNames) (pd pav pu : PAddr) (ξ : CtxId) (tk 
         (BitVec.ofNat 16 (updN ring (np % NUM) y (np % NUM))) from by rw [updN_self]) $$ Hc'
   ihave Hring := Hback $$ %y Hc'
   iapply diskResA_close γ pd pav pu ξ tk np' nr stg' (updN ring (np % NUM) y)
-  iframe Hp' Hr Hs' Hlb Hu Hidx' Hring Hsl
+  iframe Hp' Hr Hs' Hlb Hwmp Hu Hidx' Hring Hsl
 
 /-- **Putting a TAKEN slot back at a new receipt.**  The byte is already
 `0` in the payload (`Xv6.slotAlloc _ _ _ _ true`), so all that comes back

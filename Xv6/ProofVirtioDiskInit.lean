@@ -1777,7 +1777,7 @@ set_option maxHeartbeats 2000000 in
 /-- **The flip's input**: the three zeroed pages, carved into the device's
 windows, beside the ghosts at zero, the eight `free[i] = 1` bytes,
 `disk.used_idx` and the three page pointers. -/
-theorem vdi_flipIn (γ : DiskNames) (pd pav pu : BitVec 64)
+theorem vdi_flipIn (WM : DISK_INIT_WM) (γ : DiskNames) (pd pav pu : BitVec 64)
     (hpvd : pageValid pd) (hpva : pageValid pav) (hpvu : pageValid pu) :
     kmapStatic (GF := GF) ∗ diskInitGhosts γ ∗
     byteBuf pd (DFrac.own 1) (List.replicate 4096 0#8) ∗
@@ -1803,6 +1803,7 @@ theorem vdi_flipIn (γ : DiskNames) (pd pav pu : BitVec 64)
   ihave Hdesc := vdi_carve_desc pd hpvd $$ HS Hbd
   icases vdi_carve_avail pav hpva $$ HS Hba with ⟨Hai, Hring⟩
   icases vdi_carve_used pu hpvu $$ HS Hbu with ⟨Hue, Helem⟩
+  ihave Hue := WM.used_idx_floor pu $$ Hue
   unfold diskInitGhosts diskFlipIn diskSlotIn
   simp only [vdi_range8, Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil,
     wordAtN_cur, vdi_aFree0, vdi_aFree1, vdi_aFree2, vdi_aFree3, vdi_aFree4, vdi_aFree5,
@@ -1846,7 +1847,7 @@ theorem vdi_flip_au (γ : DiskNames) (pd pav pu : BitVec 64) :
 set_option maxHeartbeats 4000000 in
 /-- **The last block**: `QUEUE_READY = 1`, `free[i] = 1` and the
 `DRIVER_OK` store that flips the invariant to its live arm. -/
-theorem vdi_finish (cpu : CPU) (k : KCtx) (R : RegMap) (γ : DiskNames)
+theorem vdi_finish (WM : DISK_INIT_WM) (cpu : CPU) (k : KCtx) (R : RegMap) (γ : DiskNames)
     (pd pav pu : BitVec 64) (v0 v1 v2 v3 v4 v5 v6 v7 : BitVec 8)
     (hsie : k.sie = false) (hR9 : R 9#5 = KA.«disk») (hR14 : R 14#5 = 0x10001000#64)
     (hR18 : R 18#5 = 11#64)
@@ -1921,7 +1922,7 @@ theorem vdi_finish (cpu : CPU) (k : KCtx) (R : RegMap) (γ : DiskNames)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR9]
   iintro Hk Hpc Hf7
   -- the flip's input, assembled
-  ihave HIn := vdi_flipIn γ pd pav pu hpvd hpva hpvu
+  ihave HIn := vdi_flipIn WM γ pd pav pu hpvd hpva hpvu
     $$ [HS HG Hbd Hba Hbu Hf0 Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hui Hops Hinf Hd Ha Hu]
   · iframe #
     iframe HG Hbd Hba Hbu Hf0 Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hui Hops Hinf Hd Ha Hu
@@ -1989,7 +1990,8 @@ end
 
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
-theorem virtio_disk_init_proof (IL : INITLOCK) (KAL : KALLOC) (MS : MEMSET) : VIRTIO_DISK_INIT :=
+theorem virtio_disk_init_proof (WM : DISK_INIT_WM) (IL : INITLOCK) (KAL : KALLOC)
+    (MS : MEMSET) : VIRTIO_DISK_INIT :=
   ⟨fun {hlc GF} _ _ _ _ cpu k γ γkl γk nb c0 vlock vname vcpu pd0 pav0 pu0 free0
       hsie hK hnoff hlk hnb hdead => by
   unfold wp_virtio_disk_init_body diskInitCells
@@ -2074,7 +2076,7 @@ theorem virtio_disk_init_proof (IL : INITLOCK) (KAL : KALLOC) (MS : MEMSET) : VI
     rw [h18_7, h18_6, h18_5, hp4 18#5 (by decide) (by decide)]
     exact hp3.2
   -- `QUEUE_READY`, `free[]` and the flip
-  iapply (vdi_finish cpu k _ γ pd pav pu v0 v1 v2 v3 v4 v5 v6 v7 hsie h9_7 h14_7 hR18
+  iapply (vdi_finish WM cpu k _ γ pd pav pu v0 v1 v2 v3 v4 v5 v6 v7 hsie h9_7 h14_7 hR18
     hpvd hpva hpvu)
   iframe Hinv Hk Hpc Htok HG Hbd Hba Hbu Hf0 Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hui Hops Hinf Hd Ha Hu
   iintro %R8 Hk Hpc Hgeom Hres %hp8

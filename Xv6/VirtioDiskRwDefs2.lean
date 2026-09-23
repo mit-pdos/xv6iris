@@ -245,6 +245,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG 
 def diskResA (γ : DiskNames) (pd pav pu : PAddr) (ξ : CtxId) (tk : Nat → Bool) : IProp GF := iprop%
   ∃ (np nr : Nat) (stg : Option Nat) (ring : Nat → Nat),
     diskPub γ np ∗ diskReadAt γ nr ∗ diskStage γ stg ∗ diskDoneLb γ nr ∗
+    diskPayWm γ nr ξ ∗
     wordAtN ξ aUsedIdx 2 (DFrac.own 1) (wrap16 nr) ∗
     ctxBytes ξ (availIdxAt pav) 2 (DFrac.own (1 : Qp).half) (wrap16 np) ∗
     ([∗list] j ∈ List.range NUM,
@@ -262,7 +263,7 @@ theorem diskResA_slot_acc (γ : DiskNames) (pd pav pu : PAddr) (ξ : CtxId) (tk 
       slotAlloc γ ξ pd i (tk i) ∗
       (∀ b : Bool, slotAlloc γ ξ pd i b -∗ diskResA γ pd pav pu ξ (updB tk i b)) := by
   unfold diskResA
-  iintro ⟨%np, %nr, %stg, %ring, Hp, Hr, Hs, Hlb, Hu, Hidx, Hring, Hsl⟩
+  iintro ⟨%np, %nr, %stg, %ring, Hp, Hr, Hs, Hlb, Hwmp, Hu, Hidx, Hring, Hsl⟩
   icases bigSepL_upd_acc (GF := GF) (List.range NUM) i i (by rw [List.getElem?_range hi])
       (fun k => slotAlloc γ ξ pd k (tk k))
       (fun (b : Bool) k => slotAlloc γ ξ pd k (updB tk i b k))
@@ -278,7 +279,7 @@ theorem diskResA_slot_acc (γ : DiskNames) (pd pav pu : PAddr) (ξ : CtxId) (tk 
     rw [updB_self]) $$ Hc'
   ihave Hsl := Hback $$ %b Hc'
   iexists np, nr, stg, ring
-  iframe Hp Hr Hs Hlb Hu Hidx Hring Hsl
+  iframe Hp Hr Hs Hlb Hwmp Hu Hidx Hring Hsl
 
 /-- **The `free` byte of slot `i`, read out of the mid-allocation
 payload.** -/

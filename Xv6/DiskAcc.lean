@@ -884,6 +884,7 @@ writes the avail page. -/
 theorem diskRes_open (γ : DiskNames) [CurCtx] (pd pav pu : PAddr) (ξ : CtxId) :
     diskRes (GF := GF) γ pd pav pu ξ ⊢ ∃ (np nr : Nat) (stg : Option Nat) (ring : Nat → Nat),
       diskPub γ np ∗ diskReadAt γ nr ∗ diskStage γ stg ∗ diskDoneLb γ nr ∗
+      diskPayWm γ nr ξ ∗
       wordAtN ξ aUsedIdx 2 (DFrac.own 1) (wrap16 nr) ∗
       ctxBytes ξ (availIdxAt pav) 2 (DFrac.own (1 : Qp).half) (wrap16 np) ∗
       ([∗list] j ∈ List.range NUM,
@@ -896,6 +897,7 @@ theorem diskRes_open (γ : DiskNames) [CurCtx] (pd pav pu : PAddr) (ξ : CtxId) 
 theorem diskRes_close (γ : DiskNames) [CurCtx] (pd pav pu : PAddr) (ξ : CtxId)
     (np nr : Nat) (stg : Option Nat) (ring : Nat → Nat) :
     diskPub (GF := GF) γ np ∗ diskReadAt γ nr ∗ diskStage γ stg ∗ diskDoneLb γ nr ∗
+      diskPayWm γ nr ξ ∗
       wordAtN ξ aUsedIdx 2 (DFrac.own 1) (wrap16 nr) ∗
       ctxBytes ξ (availIdxAt pav) 2 (DFrac.own (1 : Qp).half) (wrap16 np) ∗
       ([∗list] j ∈ List.range NUM,
@@ -917,12 +919,12 @@ theorem diskRes_availIdx_acc (γ : DiskNames) [CurCtx] (pd pav pu : PAddr) (ξ :
         ctxBytes ξ (availIdxAt pav) 2 (DFrac.own (1 : Qp).half) (wrap16 np') -∗
         diskRes γ pd pav pu ξ) := by
   iintro HR
-  icases diskRes_open γ pd pav pu ξ $$ HR with ⟨%np, %nr, %stg, %ring, Hp, Hr, Hs, Hlb, Hu, Hidx, Hring, Hsl⟩
+  icases diskRes_open γ pd pav pu ξ $$ HR with ⟨%np, %nr, %stg, %ring, Hp, Hr, Hs, Hlb, Hwmp, Hu, Hidx, Hring, Hsl⟩
   iexists np
   iframe Hp Hidx
   iintro %np' Hp' Hidx'
   iapply diskRes_close γ pd pav pu ξ np' nr stg ring
-  iframe Hp' Hr Hs Hlb Hu Hidx' Hring Hsl
+  iframe Hp' Hr Hs Hlb Hwmp Hu Hidx' Hring Hsl
 
 /-- One ring cell of the payload, borrowed and put back at a new value
 (the `sh` of `virtio_disk_rw` writes through it; the invariant's half goes
@@ -935,7 +937,7 @@ theorem diskRes_ring_acc (γ : DiskNames) [CurCtx] (pd pav pu : PAddr) (ξ : Ctx
         ctxBytes ξ (availRingAt pav j) 2 (DFrac.own (1 : Qp).half) (BitVec.ofNat 16 y) -∗
         diskRes γ pd pav pu ξ) := by
   iintro HR
-  icases diskRes_open γ pd pav pu ξ $$ HR with ⟨%np, %nr, %stg, %ring, Hp, Hr, Hs, Hlb, Hu, Hidx, Hring, Hsl⟩
+  icases diskRes_open γ pd pav pu ξ $$ HR with ⟨%np, %nr, %stg, %ring, Hp, Hr, Hs, Hlb, Hwmp, Hu, Hidx, Hring, Hsl⟩
   icases bigSepL_upd_acc (GF := GF) (List.range NUM) j j (by rw [List.getElem?_range hj])
       (fun k => ctxBytes ξ (availRingAt pav k) 2 (DFrac.own (1 : Qp).half) (BitVec.ofNat 16 (ring k)))
       (fun (y : Nat) k =>
@@ -956,7 +958,7 @@ theorem diskRes_ring_acc (γ : DiskNames) [CurCtx] (pd pav pu : PAddr) (ξ : Ctx
         (BitVec.ofNat 16 (updN ring j y j)) from by rw [updN_self]) $$ Hc'
   ihave Hring := Hback $$ %y Hc'
   iapply diskRes_close γ pd pav pu ξ np nr stg (updN ring j y)
-  iframe Hp' Hr Hs Hlb Hu Hidx Hring Hsl
+  iframe Hp' Hr Hs Hlb Hwmp Hu Hidx Hring Hsl
 
 /-- One descriptor slot of the payload, borrowed and put back (the `free[]`
 byte, the receipt and the chain's context cells). -/
@@ -965,14 +967,14 @@ theorem diskRes_slot_acc (γ : DiskNames) [CurCtx] (pd pav pu : PAddr) (ξ : Ctx
     diskRes (GF := GF) γ pd pav pu ξ ⊢
       slotRes γ ξ pd i ∗ (slotRes γ ξ pd i -∗ diskRes γ pd pav pu ξ) := by
   iintro HR
-  icases diskRes_open γ pd pav pu ξ $$ HR with ⟨%np, %nr, %stg, %ring, Hp, Hr, Hs, Hlb, Hu, Hidx, Hring, Hsl⟩
+  icases diskRes_open γ pd pav pu ξ $$ HR with ⟨%np, %nr, %stg, %ring, Hp, Hr, Hs, Hlb, Hwmp, Hu, Hidx, Hring, Hsl⟩
   icases BigSepL.bigSepL_mem_acc (Φ := fun i => slotRes (GF := GF) γ ξ pd i)
       (range_mem i NUM hi) $$ Hsl with ⟨Hi, Hback⟩
   iframe Hi
   iintro Hi'
   ihave Hsl := Hback $$ Hi'
   iapply diskRes_close γ pd pav pu ξ np nr stg ring
-  iframe Hp Hr Hs Hlb Hu Hidx Hring Hsl
+  iframe Hp Hr Hs Hlb Hwmp Hu Hidx Hring Hsl
 
 /-- **Any slot the caller has a QUARTER of**: its state is the caller's,
 by agreement, and the two quarters join into the driver's whole half.
@@ -1209,7 +1211,10 @@ theorem diskUsed_split [CurCtx] (pu : PAddr) :
 the eight descriptor slots (`diskSlotIn`: both halves of the receipt, the
 `free[i]` byte, the zeroed descriptor), both halves of the published
 count, the handler watermark and the stage, the completion counter, the
-avail page's index and ring cells, the whole used page, `disk.used_idx`,
+avail page's index and ring cells, the whole used page -- the used-index
+cell already as the invariant's empty write LOG, with a CONTEXT FLOOR past
+the positions of the stores that zeroed it (the handler's entry credential
+`Xv6.diskPayWm` is minted from that floor) -- `disk.used_idx`,
 the three page pointers of `struct disk` -- and the PURE fact that all
 three pages are `kalloc`'d, identity-mapped RAM (`Xv6.pageRw`).
 
@@ -1226,13 +1231,47 @@ def diskFlipIn [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) : IProp GF := iprop
   ctxBytes curCtx (availIdxAt pav) 2 (DFrac.own 1) (wrap16 0) ∗
   ([∗list] j ∈ List.range NUM,
     ctxBytes curCtx (availRingAt pav j) 2 (DFrac.own 1) (BitVec.ofNat 16 (ringInit j))) ∗
-  ctxBytes curCtx (usedIdxAt pu) 2 (DFrac.own 1) (0 : BitVec (8 * 2)) ∗
+  (∃ b : Nat, usedIdxCell (usedIdxAt pu) b [] ∗ ctxFloor curCtx b) ∗
   ([∗list] j ∈ List.range NUM,
     ctxBytes curCtx (usedElemAt pu j) 8 (DFrac.own 1) (0 : BitVec (8 * 8))) ∗
   wordAtN curCtx aUsedIdx 2 (DFrac.own 1) (wrap16 0) ∗
   wordPointsTo aDescPtr 8 (DFrac.own 1) pd ∗
   wordPointsTo aAvailPtr 8 (DFrac.own 1) pav ∗
   wordPointsTo aUsedPtr 8 (DFrac.own 1) pu
+
+/-- **The one TSO fact this port leaves open at BOOT.**
+
+`Xv6.diskFlipIn` asks for the used-index cell as the invariant's empty
+write log (`Xv6.usedIdxCell (usedIdxAt pu) b []`) TOGETHER WITH a context
+floor past `b` -- the positions of the stores that zeroed the cell.  The
+floor is what the handler's entry credential `Xv6.diskPayWm` is minted
+from, and it is what makes a racy `used->idx` read that sees no device
+write return the `0` the zeroing left: `MachCSL.Hist.read` returns the
+newest VISIBLE entry, and an entry the reader's view has not passed is
+not visible to it.
+
+`virtio_disk_init` cannot produce it from what it holds.  Its `memset` of
+the used page is its OWN store, and `Xv6.MEMSET`'s frozen postcondition
+returns the buffer at its value with no `MachCSL.authoredBy` and no
+position; the context key the store minted is therefore DIRTY at this
+hart (`MachCSL.dirtyOk`'s `h = cpu` case), not under the context's bound,
+and `virtio_disk_init` has no `__sync_synchronize()` after the memsets
+that could turn that authorship into a view
+(`MachCSL.wp_s_fence_iorw_iorw_pub`).  Raising the context's bound to the
+dirty watermark is `MachCSL.ctx_stamp`, which STAMPS the context -- it
+does not keep it running.
+
+The edge that makes it true on the real machine is `main()`'s
+`__sync_synchronize(); started = 1;` and the other harts' spin on
+`started`, which is outside `virtio_disk_init` and outside this file.
+Stated here, at the one place that needs it, rather than handed to the
+interrupt handler as a credential out of nowhere (which is what
+`DISK_INTR_EXTRA.pay_wm` used to be). -/
+structure DISK_INIT_WM : Prop where
+  used_idx_floor : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+      [CurCtx] (pu : PAddr),
+    ctxBytes (GF := GF) curCtx (usedIdxAt pu) 2 (DFrac.own 1) (0 : BitVec (8 * 2)) ⊢
+      ∃ b : Nat, usedIdxCell (usedIdxAt pu) b [] ∗ ctxFloor curCtx b
 
 /-- What comes out of the flip: the persistent geometry and the payload of
 `disk.vdisk_lock`. -/
@@ -1263,7 +1302,7 @@ theorem diskProto_flip [CurCtx] (γ : DiskNames) (v : VirtioState) (c c' : Virti
     icases diskSlots_split γ c'.desc $$ Hsl with ⟨Hauths, Hrows, Hslots⟩
     icases diskRing_split c'.avail $$ Hring with ⟨HringR, HringC⟩
     ihave HueR := diskUsed_split c'.used $$ Hue
-    icases ctxBytes_usedIdxCell curCtx (usedIdxAt c'.used) $$ Hui with ⟨%bb, HuiR⟩
+    icases Hui with ⟨%bb, HuiR, #Hflb⟩
     icases ctxBytes_split_dma curCtx (availIdxAt c'.avail) 2 (wrap16 0) $$ Hai
       with ⟨HaiR, HaiC⟩
     imod diskDoneAuth_lb γ 0 $$ Hnc with ⟨Hnc, #Hlb⟩
@@ -1327,8 +1366,9 @@ theorem diskProto_flip [CurCtx] (γ : DiskNames) (v : VirtioState) (c c' : Virti
         exact ⟨rfl, rfl, rfl, hlive, hqnum, hwce, hpg.1, hpg.2.1, hpg.2.2⟩
       unfold diskRes
       iexists 0, 0, none, ringInit
-      iframe Hpub Hnr Hstg Hdui HaiC HringC Hslots
-      iexact Hlb
+      iframe Hpub Hnr Hstg Hdui HaiC HringC Hslots Hlb
+      iapply diskPayWm_zero γ curCtx bb
+      iframe Hbs Hflb
   · ihave %he := diskCfg_frozen_own_agree γ c c0 $$ Hfr0 Htok
     rw [he] at hc0
     rw [hc0.2.1] at hdead
@@ -1385,8 +1425,8 @@ of its stores up to `QUEUE_READY = 1`, and `disk_driver_ok_write` for the
 publication point (`disk_publish`, below), and -- since the completion
 side landed -- the `used->idx` read and the watermark bump of
 `virtio_disk_intr` (`disk_used_idx_read`, `disk_deposit`, above).  What
-follows is stated but ASSUMED, as an interface (no `sorry`): three
-accessors of `virtio_disk_rw` and `virtio_disk_intr`.
+follows is stated but ASSUMED, as an interface (no `sorry`): ONE accessor,
+`disk_collect`.
 
 -------------------------------------------------------------------------
 WHAT THE QUEUE ACCOUNTING HAS SETTLED.  `Xv6/DiskInvDefs.lean`'s
