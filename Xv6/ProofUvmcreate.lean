@@ -30,11 +30,11 @@ theorem uc_u1 : BitVec.signExtend 64 (1#20 ++ 0#12) = 0x1000#64 := by decide
 theorem uc_extract0 : BitVec.extractLsb' 0 8 (0#64) = 0#8 := by decide
 
 /-- `ret` out of `kalloc` lands on the `c.mv s1,a0`. -/
-theorem uc_ret_119a : jumpPc 0x8000119a#64 = 0x8000119a#64 := by
+theorem uc_ret_119a : jumpPc 0x80001248#64 = 0x80001248#64 := by
   simp only [jumpPc, BitVec.reduceAnd]
 
 /-- `ret` out of `memset` lands on the `c.mv a0,s1`. -/
-theorem uc_ret_11a6 : jumpPc 0x800011a6#64 = 0x800011a6#64 := by
+theorem uc_ret_11a6 : jumpPc 0x80001254#64 = 0x80001254#64 := by
   simp only [jumpPc, BitVec.reduceAnd]
 
 theorem uc_withSpie_withSpie (k : KCtx) (a b c d : Bool) :
@@ -76,7 +76,7 @@ set_option maxHeartbeats 1000000 in
 theorem uc_kalloc_call (KA : KALLOC) [CurCtx] (c : CPU) (k' : KCtx)
     (γl : GName) (γk : KmemNames) (on : Option Nat)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 14 ≤ k'.avail) (hlk : "kmem" ∉ k'.locks) :
-    kctx c k' ∗ pcIs c 0x80000ae0#64 ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
+    kctx c k' ∗ pcIs c 0x80000b7e#64 ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
     kallocAvail γk on ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
@@ -92,7 +92,7 @@ set_option maxHeartbeats 1000000 in
 /-- `memset`'s contract as a rule. -/
 theorem uc_memset_call (MS : MEMSET) [CurCtx] (c : CPU) (k' : KCtx) (os : List (BitVec 8))
     (hK : 2 ≤ k'.avail) (hn : k'.regs 12#5 = BitVec.ofNat 64 4096) (hl : os.length = 4096) :
-    kctx c k' ∗ pcIs c 0x80000c7a#64 ∗ byteBuf (k'.regs 10#5) (DFrac.own 1) os ∗
+    kctx c k' ∗ pcIs c 0x80000d18#64 ∗ byteBuf (k'.regs 10#5) (DFrac.own 1) os ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ R' : RegMap,
       kctx cpu' (k'.withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       byteBuf (k'.regs 10#5) (DFrac.own 1)
@@ -117,7 +117,7 @@ theorem uvmcreate_proof (KA : KALLOC) (MS : MEMSET) : UVMCREATE :=
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   k_norm_g
   -- the prologue
-  iapply (wp_prologue4s1_gen cpu k 0x8000118c#64 (by omega))
+  iapply (wp_prologue4s1_gen cpu k 0x8000123a#64 (by omega))
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm_g
   iframe
@@ -125,7 +125,7 @@ theorem uvmcreate_proof (KA : KALLOC) (MS : MEMSET) : UVMCREATE :=
   iapply wpNext_intro_pin
   iintro %c1 %hp1 Hk Hpc Hframe
   -- jal ra, kalloc
-  k_step_gen (wp_s_jal c1 _ 0x80001196#64 false 2095434#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c1 _ 0x80001244#64 false 2095418#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c2 hp2
   iintro Hk Hpc
   iapply (uc_kalloc_call KA c2 _ γl γk on ?hn1 ?hK1 ?hl1) $$ [- $Hk $Hpc]
@@ -144,19 +144,19 @@ theorem uvmcreate_proof (KA : KALLOC) (MS : MEMSET) : UVMCREATE :=
   k_norm_g at hcs1
   obtain ⟨a2, a8, a9, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27⟩ := hcs1
   -- c.mv s1,a0
-  k_step_gen (wp_s_add c3 _ 0x8000119a#64 true 9#5 0#5 10#5 (by decide))
+  k_step_gen (wp_s_add c3 _ 0x80001248#64 true 9#5 0#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hp4
   iintro Hk Hpc
   unfold kallocPost
   icases HPost with ⟨⟨%hz, Hav⟩ | ⟨%hvalid, Hbuf, Hav⟩⟩
   · -- `kalloc` failed: `a0 = 0`, straight to the exit
     obtain ⟨hz0, hzero⟩ := hz
-    k_step_gen (wp_s_branch c4 _ 0x8000119c#64 true 10#13 10#5 0#5 (by decide) bop.BEQ)
+    k_step_gen (wp_s_branch c4 _ 0x8000124a#64 true 10#13 10#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [uc_beq_zero _ hz0] next c5 hp5
     iintro Hk Hpc
     -- c.mv a0,s1
-    k_step_gen (wp_s_add c5 _ 0x800011a6#64 true 10#5 0#5 9#5 (by decide))
+    k_step_gen (wp_s_add c5 _ 0x80001254#64 true 10#5 0#5 9#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c6 hp6
     iintro Hk Hpc
     have hpinF : k.sie = false ∨ k.proc = 0#64 → c6 = cpu := fun h =>
@@ -168,7 +168,7 @@ theorem uvmcreate_proof (KA : KALLOC) (MS : MEMSET) : UVMCREATE :=
         = (k.withSpie spie1 spp1).regs 2#5 + 0xFFFFFFFFFFFFFFE0#64 := by
       simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, KCtx.withSpie_regs]
       exact a2
-    iapply (wp_epilogue4s1_gen c6 (k.withSpie spie1 spp1) 0x800011a8#64 hKe
+    iapply (wp_epilogue4s1_gen c6 (k.withSpie spie1 spp1) 0x80001256#64 hKe
       ((R1.set 9#5 (R1 10#5)).set 10#5 (R1 10#5)) hR2e
       (k.regs 1#5) (k.regs 8#5) (k.regs 9#5)) $$ [- $Hk $Hpc]
     k_code (text_instr _ _ _ _ rfl rfl) Htext
@@ -197,17 +197,17 @@ theorem uvmcreate_proof (KA : KALLOC) (MS : MEMSET) : UVMCREATE :=
           | exact a24 | exact a25 | exact a26 | exact a27
   · -- `kalloc` succeeded: memset the page to zero
     have hne : R1 10#5 ≠ 0#64 := uc_page_ne_zero _ hvalid
-    k_step_gen (wp_s_branch c4 _ 0x8000119c#64 true 10#13 10#5 0#5 (by decide) bop.BEQ)
+    k_step_gen (wp_s_branch c4 _ 0x8000124a#64 true 10#13 10#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [uc_beq_ne _ hne] next c5 hp5
     iintro Hk Hpc
-    k_step_gen (wp_s_lui c5 _ 0x8000119e#64 true 1#20 12#5 (by decide))
+    k_step_gen (wp_s_lui c5 _ 0x8000124c#64 true 1#20 12#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [uc_u1] next c6 hp6
     iintro Hk Hpc
-    k_step_gen (wp_s_addi c6 _ 0x800011a0#64 true 0#12 11#5 0#5 (by decide))
+    k_step_gen (wp_s_addi c6 _ 0x8000124e#64 true 0#12 11#5 0#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c7 hp7
     iintro Hk Hpc
-    k_step_gen (wp_s_jal c7 _ 0x800011a2#64 false 2095832#21 1#5 (by decide))
+    k_step_gen (wp_s_jal c7 _ 0x80001250#64 false 2095816#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c8 hp8
     iintro Hk Hpc
     iapply (uc_memset_call MS c8 _ (List.replicate 4096 5#8) ?hK2 ?hn2 ?hl2) $$ [- $Hk $Hpc]
@@ -239,7 +239,7 @@ theorem uvmcreate_proof (KA : KALLOC) (MS : MEMSET) : UVMCREATE :=
       iapply (ptreeOwn_zeroNode 2 (DFrac.own 1) (BitVec.extractLsb' 12 44 (R1 10#5)))
       iexact Hnode
     -- c.mv a0,s1
-    k_step_gen (wp_s_add c9 _ 0x800011a6#64 true 10#5 0#5 9#5 (by decide))
+    k_step_gen (wp_s_add c9 _ 0x80001254#64 true 10#5 0#5 9#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c10 hp10
     iintro Hk Hpc
     have hpinF : k.sie = false ∨ k.proc = 0#64 → c10 = cpu := fun h =>
@@ -252,7 +252,7 @@ theorem uvmcreate_proof (KA : KALLOC) (MS : MEMSET) : UVMCREATE :=
         = (k.withSpie spie1 spp1).regs 2#5 + 0xFFFFFFFFFFFFFFE0#64 := by
       simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, KCtx.withSpie_regs]
       exact b2.trans a2
-    iapply (wp_epilogue4s1_gen c10 (k.withSpie spie1 spp1) 0x800011a8#64 hKe
+    iapply (wp_epilogue4s1_gen c10 (k.withSpie spie1 spp1) 0x80001256#64 hKe
       (R2.set 10#5 (R2 9#5)) hR2e (k.regs 1#5) (k.regs 8#5) (k.regs 9#5)) $$ [- $Hk $Hpc]
     k_code (text_instr _ _ _ _ rfl rfl) Htext
     k_norm_g

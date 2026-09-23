@@ -1,7 +1,7 @@
 /-
 Proof of `fdalloc`'s specification (`SpecFdalloc.FDALLOC`), given the
 interface of `myproc`.  Mirrors Rocq ProofFdalloc.v against the Lean image
-(`KernelSyms.fdalloc = 0x80004bac`).
+(`KernelSyms.fdalloc = 0x80004c6a`).
 
     static int fdalloc(struct file *f) {
       struct proc *p = myproc();
@@ -95,7 +95,7 @@ theorem fdFrees_eq_nil (fs : List (BitVec 64))
 
 /-! ## Constants the code computes -/
 
-theorem fda_ret_4bbc : jumpPc 0x80004bbc#64 = 0x80004bbc#64 := by simp only [jumpPc, BitVec.reduceAnd]
+theorem fda_ret_4bbc : jumpPc 0x80004c7a#64 = 0x80004c7a#64 := by simp only [jumpPc, BitVec.reduceAnd]
 
 theorem fda_add0 (x : BitVec 64) : x + BitVec.signExtend 64 0#12 = x := by simp
 theorem fda_add0' (x : BitVec 64) : x + 0#64 = x := by simp
@@ -205,7 +205,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG 
 
 theorem fda_myproc (MP : MYPROC) (c : CPU) (k' : KCtx)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 10 ≤ k'.avail) :
-    kctx c k' ∗ pcIs c 0x800018da#64 ∗
+    kctx c k' ∗ pcIs c 0x80001988#64 ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
@@ -216,7 +216,7 @@ theorem fda_myproc (MP : MYPROC) (c : CPU) (k' : KCtx)
   simp only [myprocAddr, KernelSyms.«myproc»] at h
   exact h
 
-/-! ## The shared tail: the epilogue at `0x80004bd4` -/
+/-! ## The shared tail: the epilogue at `0x80004c92` -/
 
 set_option maxHeartbeats 4000000 in
 /-- Both arms reach the epilogue with the result already in `a0`; the post
@@ -225,7 +225,7 @@ theorem fda_tail (c : CPU) (kb : KCtx) (hK : 4 ≤ kb.avail)
     (KR : RegMap) (hregs : kb.regs = KR)
     (R : RegMap) (hR2 : R 2#5 = KR 2#5 + 0xFFFFFFFFFFFFFFE0#64) (hpins : faPins kb R)
     (P : IProp GF) :
-    kctx c ((kb.pushed 4).withRegs R) ∗ pcIs c 0x80004bd4#64 ∗
+    kctx c ((kb.pushed 4).withRegs R) ∗ pcIs c 0x80004c92#64 ∗
     frame4s1 (KR 2#5) (KR 1#5) (KR 8#5) (KR 9#5) ∗ P ∗
     wpNext kb.sie kb.proc c (fun cpu' => iprop(∀ R'' : RegMap,
       kctx cpu' (kb.withRegs R'') -∗ pcIs cpu' (jumpPc (KR 1#5)) -∗
@@ -236,7 +236,7 @@ theorem fda_tail (c : CPU) (kb : KCtx) (hK : 4 ≤ kb.avail)
   subst hregs
   iintro ⟨Hk, Hpc, Hframe, HP, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
-  iapply (wp_epilogue4s1_gen c kb 0x80004bd4#64 hK R hR2 (kb.regs 1#5) (kb.regs 8#5) (kb.regs 9#5))
+  iapply (wp_epilogue4s1_gen c kb 0x80004c92#64 hK R hR2 (kb.regs 1#5) (kb.regs 8#5) (kb.regs 9#5))
     $$ [- $Hk $Hpc $Hframe]
   k_code (text_instr _ _ _ _ rfl rfl) HT
   k_norm_g
@@ -264,7 +264,7 @@ theorem fda_exit (cpu cr : CPU) (k : KCtx) (γ : FileNames) (γd : Nat → GName
     (spie spp : Bool) (hsp : k.sie = false → spie = k.spie ∧ spp = k.spp)
     (R : RegMap) (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64) (hpins : faPins k R)
     (r : BitVec 64) (h10 : R 10#5 = r) :
-    kctx cr (((k.withSpie spie spp).pushed 4).withRegs R) ∗ pcIs cr 0x80004bd4#64 ∗
+    kctx cr (((k.withSpie spie spp).pushed 4).withRegs R) ∗ pcIs cr 0x80004c92#64 ∗
     frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
     fdallocPost γ γd k.proc fs D kk r ∗
     wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie2 : Bool, ∀ spp2 : Bool, ∀ R' : RegMap,
@@ -284,7 +284,7 @@ theorem fda_exit (cpu cr : CPU) (k : KCtx) (γ : FileNames) (γd : Nat → GName
   · ipureintro; exact hfacts.1
   · rw [hfacts.2, h10]; iexact HP
 
-/-! ## The scan body at `0x80004bc6`, one descriptor -/
+/-! ## The scan body at `0x80004c84`, one descriptor -/
 
 set_option maxHeartbeats 16000000 in
 /-- Descriptor `fd` (`a5 = &p->ofile[fd]`, `a0 = fd`): `ld a4,0(a5)`; null →
@@ -299,7 +299,7 @@ theorem fda_body (cpu c : CPU) (k : KCtx) (γ : FileNames) (γd : Nat → GName)
     (h10 : R 10#5 = BitVec.ofNat 64 fd) (h12 : R 12#5 = k.proc) (h13 : R 13#5 = 16#64)
     (h15 : R 15#5 = pOfile k.proc fd) (hpins : faPins k R)
     (hbel : ∀ j, j < fd → fs[j]? ≠ some 0#64) :
-    kctx c (((k.withSpie spie spp).pushed 4).withRegs R) ∗ pcIs c 0x80004bc6#64 ∗
+    kctx c (((k.withSpie spie spp).pushed 4).withRegs R) ∗ pcIs c 0x80004c84#64 ∗
     procOfilesOwe γ γd k.proc fs D ∗
     frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
     wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie2 : Bool, ∀ spp2 : Bool, ∀ R' : RegMap,
@@ -312,7 +312,7 @@ theorem fda_body (cpu c : CPU) (k : KCtx) (γ : FileNames) (γd : Nat → GName)
         R' 10#5 = BitVec.ofNat 64 (fd + 1) ∧ R' 12#5 = k.proc ∧ R' 13#5 = 16#64 ∧
         R' 15#5 = pOfile k.proc (fd + 1) ∧ faPins k R' ∧
         (∀ j, j < fd + 1 → fs[j]? ≠ some 0#64)⌝ -∗
-      kctx c' (((k.withSpie spie spp).pushed 4).withRegs R') -∗ pcIs c' 0x80004bc6#64 -∗
+      kctx c' (((k.withSpie spie spp).pushed 4).withRegs R') -∗ pcIs c' 0x80004c84#64 -∗
       procOfilesOwe γ γd k.proc fs D -∗
       frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) -∗
       wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie2 : Bool, ∀ spp2 : Bool, ∀ R' : RegMap,
@@ -329,35 +329,35 @@ theorem fda_body (cpu c : CPU) (k : KCtx) (γ : FileNames) (γd : Nat → GName)
   obtain ⟨v, hv⟩ : ∃ v, fs[fd]? = some v := ⟨fs[fd], List.getElem?_eq_getElem hflt⟩
   icases procOfilesOwe_read γ γd k.proc fs D fd v hv $$ Howe with ⟨Hcell, Hcl⟩
   -- c.ld a4,0(a5)
-  k_step_gen (wp_s_ld c _ 0x80004bc6#64 true 0#12 14#5 15#5 (by decide) (by decide) (DFrac.own 1) v)
+  k_step_gen (wp_s_ld c _ 0x80004c84#64 true 0#12 14#5 15#5 (by decide) (by decide) (DFrac.own 1) v)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h15, fda_add0, fda_add0'] next c1 hp1
   iintro Hk Hpc Hcell
   ihave Howe := Hcl $$ Hcell
   by_cases hv0 : v = 0#64
-  · -- null: the branch is taken to 0x80004bde, the install arm
+  · -- null: the branch is taken to 0x80004c9c, the install arm
     subst hv0
-    k_step_gen (wp_s_branch c1 _ 0x80004bc8#64 true 22#13 14#5 0#5 (by decide) bop.BEQ)
+    k_step_gen (wp_s_branch c1 _ 0x80004c86#64 true 22#13 14#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fda_beq_00] next c2 hp2
     iintro Hk Hpc
     icases procOfilesOwe_install γ γd k.proc fs D fd (fnode kk) hv (fnode_nonzero kk hkk) $$ Howe
       with ⟨%hnin, Hcell, Hfds, Hauth, Hw⟩
     -- slli a5,a0,0x3 ; addi a5,a5,208 ; c.add a2,a2,a5
-    k_step_gen (wp_s_slli c2 _ 0x80004bde#64 false 3#6 15#5 10#5 (by decide))
+    k_step_gen (wp_s_slli c2 _ 0x80004c9c#64 false 3#6 15#5 10#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, fda_shl3] next c3 hp3
     iintro Hk Hpc
-    k_step_gen (wp_s_addi c3 _ 0x80004be2#64 false 208#12 15#5 15#5 (by decide))
+    k_step_gen (wp_s_addi c3 _ 0x80004ca0#64 false 208#12 15#5 15#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hp4
     iintro Hk Hpc
-    k_step_gen (wp_s_add c4 _ 0x80004be6#64 true 12#5 12#5 15#5 (by decide))
+    k_step_gen (wp_s_add c4 _ 0x80004ca4#64 true 12#5 12#5 15#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h12, fda_a2, fda_a2', fda_a2''] next c5 hp5
     iintro Hk Hpc
     -- c.sd s1,0(a2)
-    k_step_gen (wp_s_sd c5 _ 0x80004be8#64 true 0#12 12#5 9#5 (by decide) 0#64)
+    k_step_gen (wp_s_sd c5 _ 0x80004ca6#64 true 0#12 12#5 9#5 (by decide) 0#64)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, fda_add0, fda_add0'] next c6 hp6
     iintro Hk Hpc Hcell
     ihave Howe := Hw $$ Hcell
-    -- c.j 0x80004bd4
-    k_step_gen (wp_s_j c6 _ 0x80004bea#64 true 2097130#21)
+    -- c.j 0x80004c92
+    k_step_gen (wp_s_j c6 _ 0x80004ca8#64 true 2097130#21)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c7 hp7
     iintro Hk Hpc
     obtain ⟨l, hl⟩ := fdFrees_eq_cons fs fd hbel hv
@@ -381,14 +381,14 @@ theorem fda_body (cpu c : CPU) (k : KCtx) (γ : FileNames) (γd : Nat → GName)
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h10))
       $$ [- $Hk $Hpc $Hframe $Hpost $Hnext]
   · -- non-null: the branch is not taken; step the cursor
-    k_step_gen (wp_s_branch c1 _ 0x80004bc8#64 true 22#13 14#5 0#5 (by decide) bop.BEQ)
+    k_step_gen (wp_s_branch c1 _ 0x80004c86#64 true 22#13 14#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fda_beq_ne v hv0] next c2 hp2
     iintro Hk Hpc
-    k_step_gen (wp_s_addiw c2 _ 0x80004bca#64 true 1#12 10#5 10#5 (by decide))
+    k_step_gen (wp_s_addiw c2 _ 0x80004c88#64 true 1#12 10#5 10#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [h10, fda_incr fd hfd16, fda_incr' fd hfd16] next c3 hp3
     iintro Hk Hpc
-    k_step_gen (wp_s_addi c3 _ 0x80004bcc#64 true 8#12 15#5 15#5 (by decide))
+    k_step_gen (wp_s_addi c3 _ 0x80004c8a#64 true 8#12 15#5 15#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [h15, fda_ofile_step, fda_ofile_step'] next c4 hp4
     iintro Hk Hpc
@@ -404,12 +404,12 @@ theorem fda_body (cpu c : CPU) (k : KCtx) (γ : FileNames) (γd : Nat → GName)
     by_cases hlast : fd + 1 = NOFILE
     · -- the last descriptor: the branch is not taken, the full arm
       have hlast16 : fd + 1 = 16 := by unfold NOFILE at hlast; omega
-      k_step_gen (wp_s_branch c4 _ 0x80004bce#64 false 8184#13 10#5 13#5 (by decide) bop.BNE)
+      k_step_gen (wp_s_branch c4 _ 0x80004c8c#64 false 8184#13 10#5 13#5 (by decide) bop.BNE)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [h13, hlast16, fda_bne_end] next c5 hp5
       iintro Hk Hpc
       -- c.li a0,-1
-      k_step_gen (wp_s_addi c5 _ 0x80004bd2#64 true 4095#12 10#5 0#5 (by decide))
+      k_step_gen (wp_s_addi c5 _ 0x80004c90#64 true 4095#12 10#5 0#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fda_m1] next c6 hp6
       iintro Hk Hpc
       have hnil : fdFrees fs = [] := by
@@ -433,9 +433,9 @@ theorem fda_body (cpu c : CPU) (k : KCtx) (γ : FileNames) (γd : Nat → GName)
           0xFFFFFFFFFFFFFFFF#64
           (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_true]))
         $$ [- $Hk $Hpc $Hframe $Hpost $Hnext]
-    · -- more descriptors: the branch is taken back to 0x80004bc6
+    · -- more descriptors: the branch is taken back to 0x80004c84
       have hnext16 : fd + 1 < 16 := by unfold NOFILE at hfd hlast; omega
-      k_step_gen (wp_s_branch c4 _ 0x80004bce#64 false 8184#13 10#5 13#5 (by decide) bop.BNE)
+      k_step_gen (wp_s_branch c4 _ 0x80004c8c#64 false 8184#13 10#5 13#5 (by decide) bop.BNE)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [h13, fda_bne_lt (fd + 1) hnext16] next c5 hp5
       iintro Hk Hpc
@@ -461,7 +461,7 @@ theorem fda_scan (cpu : CPU) (k : KCtx) (γ : FileNames) (γd : Nat → GName) (
     R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64 → R 9#5 = fnode kk →
     R 10#5 = BitVec.ofNat 64 fd → R 12#5 = k.proc → R 13#5 = 16#64 →
     R 15#5 = pOfile k.proc fd → faPins k R → (∀ j, j < fd → fs[j]? ≠ some 0#64) →
-    kctx c (((k.withSpie spie spp).pushed 4).withRegs R) ∗ pcIs c 0x80004bc6#64 ∗
+    kctx c (((k.withSpie spie spp).pushed 4).withRegs R) ∗ pcIs c 0x80004c84#64 ∗
     procOfilesOwe γ γd k.proc fs D ∗
     frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
     wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie2 : Bool, ∀ spp2 : Bool, ∀ R' : RegMap,
@@ -500,7 +500,7 @@ theorem fdalloc_proof (MP : MYPROC) : FDALLOC := ⟨
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK4 : 4 ≤ k.avail := by unfold fdallocSlots at hK; omega
   -- the prologue
-  iapply (wp_prologue4s1_gen cpu k 0x80004bac#64 hK4)
+  iapply (wp_prologue4s1_gen cpu k 0x80004c6a#64 hK4)
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm_g
   iframe
@@ -508,10 +508,10 @@ theorem fdalloc_proof (MP : MYPROC) : FDALLOC := ⟨
   iapply wpNext_intro_pin
   iintro %c1 %hp1 Hk Hpc Hframe
   -- c.mv s1,a0 ; jal myproc
-  k_step_gen (wp_s_add c1 _ 0x80004bb6#64 true 9#5 0#5 10#5 (by decide))
+  k_step_gen (wp_s_add c1 _ 0x80004c74#64 true 9#5 0#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0] next c2 hp2
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c2 _ 0x80004bb8#64 false 2084130#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c2 _ 0x80004c76#64 false 2084114#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
   iintro Hk Hpc
   iapply (fda_myproc MP c3 _ ?hnm ?hKm) $$ [- $Hk $Hpc]
@@ -530,17 +530,17 @@ theorem fdalloc_proof (MP : MYPROC) : FDALLOC := ⟨
   k_norm_g at hcs1
   obtain ⟨b2, b8, b9, b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩ := hcs1
   -- c.mv a2,a0 ; addi a5,a0,208 ; c.li a0,0 ; c.li a3,16
-  k_step_gen (wp_s_add c _ 0x80004bbc#64 true 12#5 0#5 10#5 (by decide))
+  k_step_gen (wp_s_add c _ 0x80004c7a#64 true 12#5 0#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0m] next c5 hp5
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c5 _ 0x80004bbe#64 false 208#12 15#5 10#5 (by decide))
+  k_step_gen (wp_s_addi c5 _ 0x80004c7c#64 false 208#12 15#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [ha0m, fda_ofile0, fda_ofile0'] next c6 hp6
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c6 _ 0x80004bc2#64 true 0#12 10#5 0#5 (by decide))
+  k_step_gen (wp_s_addi c6 _ 0x80004c80#64 true 0#12 10#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fda_li0] next c7 hp7
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c7 _ 0x80004bc4#64 true 16#12 13#5 0#5 (by decide))
+  k_step_gen (wp_s_addi c7 _ 0x80004c82#64 true 16#12 13#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fda_li16] next c8 hp8
   iintro Hk Hpc
   have hpin8 : k.sie = false ∨ k.proc = 0#64 → c8 = cpu := fun h =>

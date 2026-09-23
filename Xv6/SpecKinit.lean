@@ -34,7 +34,7 @@ def kinitBase : BitVec 64 := 0x80024000#64
 /-- The pages between `PGROUNDUP(end)` and `PHYSTOP`. -/
 def kinitPages : Nat := 32732
 /-- The `"kmem"` literal `kinit` names the lock with. -/
-def kmemNameAddr : BitVec 64 := 0x80007040#64
+def kmemNameAddr : BitVec 64 := 0x80007048#64
 
 /-- The specification of `kinit`. -/
 def wp_kinit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]

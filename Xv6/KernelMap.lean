@@ -1,7 +1,7 @@
 /-
 xv6's static kernel mapping: what `kvmmake` always maps identically --
-the text (rx), the rest of RAM through PHYSTOP (rw), and the UART, VIRTIO
-and PLIC windows (rw) -- as the `KernelMap` instance the framework mints
+the text (rx), the rest of RAM through PHYSTOP (rw), and the two UART,
+VIRTIO and PLIC windows (rw) -- as the `KernelMap` instance the framework mints
 claims from at power-on.  The trampoline and the kernel stacks are not
 identity mappings and are inserted at the switch.
 -/
@@ -14,7 +14,8 @@ open MachCSL
 /-- The permission class of a virtual page in the static map. -/
 def kmapClass (k : Nat) : Option KPerm :=
   if 0x80000 ≤ k ∧ k < 0x80007 then some .rx
-  else if (0x80007 ≤ k ∧ k < 0x88000) ∨ (0x10000 ≤ k ∧ k < 0x10002) ∨ (0xC000 ≤ k ∧ k < 0xC400) then some .rw
+  else if (0x80007 ≤ k ∧ k < 0x88000) ∨ (0x10000 ≤ k ∧ k < 0x10002) ∨
+      (0x1000a ≤ k ∧ k < 0x1000b) ∨ (0xC000 ≤ k ∧ k < 0xC400) then some .rw
   else none
 
 /-- The identity leaf of page `k` at `perm`. -/
@@ -24,10 +25,10 @@ def idLeaf (k : Nat) (perm : KPerm) : BitVec 64 := kLeaf (idPpn (BitVec.ofNat 27
 def kmapRange (lo len : Nat) (perm : KPerm) : List (Nat × BitVec 64) :=
   (List.range len).map fun i => (lo + i, idLeaf (lo + i) perm)
 
-/-- The static entries: text, data + free RAM, UART + VIRTIO, PLIC. -/
+/-- The static entries: text, data + free RAM, UART0 + VIRTIO, UART1, PLIC. -/
 def kmapEntries : List (Nat × BitVec 64) :=
   kmapRange 0x80000 0x7 .rx ++ kmapRange 0x80007 0x7FF9 .rw ++
-  kmapRange 0x10000 0x2 .rw ++ kmapRange 0xC000 0x400 .rw
+  kmapRange 0x10000 0x2 .rw ++ kmapRange 0x1000a 0x1 .rw ++ kmapRange 0xC000 0x400 .rw
 
 /-- The static map. -/
 def kmapStaticMap : RegMapF (BitVec 64) := Std.ExtTreeMap.ofList kmapEntries compare
@@ -48,20 +49,22 @@ theorem mem_kmapEntries (k : Nat) (v : BitVec 64) :
   unfold kmapEntries kmapClass
   simp only [List.mem_append, mem_kmapRange]
   constructor
-  · rintro (((⟨h1, h2, rfl⟩ | ⟨h1, h2, rfl⟩) | ⟨h1, h2, rfl⟩) | ⟨h1, h2, rfl⟩)
+  · rintro ((((⟨h1, h2, rfl⟩ | ⟨h1, h2, rfl⟩) | ⟨h1, h2, rfl⟩) | ⟨h1, h2, rfl⟩) | ⟨h1, h2, rfl⟩)
     · exact ⟨.rx, by rw [if_pos ⟨h1, by omega⟩], rfl⟩
     · exact ⟨.rw, by rw [if_neg (by omega), if_pos (Or.inl ⟨h1, by omega⟩)], rfl⟩
     · exact ⟨.rw, by rw [if_neg (by omega), if_pos (Or.inr (Or.inl ⟨h1, by omega⟩))], rfl⟩
-    · exact ⟨.rw, by rw [if_neg (by omega), if_pos (Or.inr (Or.inr ⟨h1, by omega⟩))], rfl⟩
+    · exact ⟨.rw, by rw [if_neg (by omega), if_pos (Or.inr (Or.inr (Or.inl ⟨h1, by omega⟩)))], rfl⟩
+    · exact ⟨.rw, by rw [if_neg (by omega), if_pos (Or.inr (Or.inr (Or.inr ⟨h1, by omega⟩)))], rfl⟩
   · rintro ⟨perm, hc, rfl⟩
     split at hc
     · rename_i h
       cases hc
-      exact Or.inl (Or.inl (Or.inl ⟨h.1, by omega, rfl⟩))
+      exact Or.inl (Or.inl (Or.inl (Or.inl ⟨h.1, by omega, rfl⟩)))
     · split at hc
       · rename_i _ h
         cases hc
-        rcases h with h | h | h
+        rcases h with h | h | h | h
+        · exact Or.inl (Or.inl (Or.inl (Or.inr ⟨h.1, by omega, rfl⟩)))
         · exact Or.inl (Or.inl (Or.inr ⟨h.1, by omega, rfl⟩))
         · exact Or.inl (Or.inr ⟨h.1, by omega, rfl⟩)
         · exact Or.inr ⟨h.1, by omega, rfl⟩
@@ -89,10 +92,10 @@ theorem kmapEntries_distinct : kmapEntries.Pairwise (fun a b => ¬ compare a.1 b
     simp only at heq
     omega
   unfold kmapEntries
-  rw [List.pairwise_append, List.pairwise_append, List.pairwise_append]
-  refine ⟨⟨⟨hne _ (kmapRange_keys_lt _ _ _), hne _ (kmapRange_keys_lt _ _ _),
+  rw [List.pairwise_append, List.pairwise_append, List.pairwise_append, List.pairwise_append]
+  refine ⟨⟨⟨⟨hne _ (kmapRange_keys_lt _ _ _), hne _ (kmapRange_keys_lt _ _ _),
     hcross _ _ _ _ _ _ _ _ rfl rfl (by omega)⟩, hne _ (kmapRange_keys_lt _ _ _), ?_⟩,
-    hne _ (kmapRange_keys_lt _ _ _), ?_⟩
+    hne _ (kmapRange_keys_lt _ _ _), ?_⟩, hne _ (kmapRange_keys_lt _ _ _), ?_⟩
   · intro a ha b hb
     rcases List.mem_append.1 ha with ha | ha
     · exact hcross _ _ _ _ _ _ _ _ rfl rfl (by omega) a ha b hb
@@ -101,6 +104,14 @@ theorem kmapEntries_distinct : kmapEntries.Pairwise (fun a b => ¬ compare a.1 b
     rcases List.mem_append.1 ha with ha | ha
     · rcases List.mem_append.1 ha with ha | ha
       · exact hcross _ _ _ _ _ _ _ _ rfl rfl (by omega) a ha b hb
+      · exact hcross _ _ _ _ _ _ _ _ rfl rfl (by omega) a ha b hb
+    · exact hcross _ _ _ _ _ _ _ _ rfl rfl (by omega) a ha b hb
+  · intro a ha b hb
+    rcases List.mem_append.1 ha with ha | ha
+    · rcases List.mem_append.1 ha with ha | ha
+      · rcases List.mem_append.1 ha with ha | ha
+        · exact hcross _ _ _ _ _ _ _ _ rfl rfl (by omega) a ha b hb
+        · exact hcross _ _ _ _ _ _ _ _ rfl rfl (by omega) a ha b hb
       · exact hcross _ _ _ _ _ _ _ _ rfl rfl (by omega) a ha b hb
     · exact hcross _ _ _ _ _ _ _ _ rfl rfl (by omega) a ha b hb
 

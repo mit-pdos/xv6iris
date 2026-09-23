@@ -59,11 +59,11 @@ theorem wa_beq_neq {α : Type} (x y : BitVec 64) (h : x ≠ y) (p q : α) :
   rw [if_neg (by simp only [bcond, beq_iff_eq]; exact h)]
 
 /-- `ret` out of `walk` in `walkaddr`. -/
-theorem wa_ret_fc4 : jumpPc 0x80000fc4#64 = 0x80000fc4#64 := by
+theorem wa_ret_fc4 : jumpPc 0x80001062#64 = 0x80001062#64 := by
   simp only [jumpPc, BitVec.reduceAnd]
 
 /-- `ret` out of `walk` in `ismapped`. -/
-theorem wa_ret_148a : jumpPc 0x8000148a#64 = 0x8000148a#64 := by
+theorem wa_ret_148a : jumpPc 0x80001538#64 = 0x80001538#64 := by
   simp only [jumpPc, BitVec.reduceAnd]
 
 section
@@ -76,7 +76,7 @@ set_option maxHeartbeats 1000000 in
 theorem wa_walk_call (W : WALK_NOALLOC) [CurCtx] (c : CPU) (k' : KCtx) (dq : DFrac) (t : PTree)
     (hK : 8 ≤ k'.avail) (hroot : k'.regs 10#5 = pageAddr t.base)
     (hva : (k'.regs 11#5).toNat < 2 ^ 38) (halloc : k'.regs 12#5 = 0#64) (hwf : t.wfU 2) :
-    kctx c k' ∗ pcIs c 0x80000f10#64 ∗ ptreeOwn 2 dq t ∗
+    kctx c k' ∗ pcIs c 0x80000fae#64 ∗ ptreeOwn 2 dq t ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ R' : RegMap,
       kctx cpu' (k'.withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       ptreeOwn 2 dq t -∗
@@ -99,21 +99,21 @@ theorem walkaddr_proof (W : WALK_NOALLOC) : WALKADDR :=
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   k_norm_g
   -- c.li a5,-1 ; c.srli a5,0x1a   (a5 = MAXVA - 1)
-  k_step_gen (wp_s_addi cpu _ 0x80000faa#64 true 4095#12 15#5 0#5 (by decide))
+  k_step_gen (wp_s_addi cpu _ 0x80001048#64 true 4095#12 15#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c1 hp1
   iintro Hk Hpc
   k_norm_g [KCtx.setReg_eq_withRegs, KCtx.rget_zero]
-  k_step_gen (wp_s_srli c1 _ 0x80000fac#64 true 26#6 15#5 15#5 (by decide))
+  k_step_gen (wp_s_srli c1 _ 0x8000104a#64 true 26#6 15#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c2 hp2
   iintro Hk Hpc
   k_norm_g [KCtx.setReg_eq_withRegs, KCtx.rget_zero]
   by_cases hva : (k.regs 11#5).toNat < 2 ^ 38
   · -- `va < MAXVA`: the frame, then `walk`
-    k_step_gen (wp_s_branch c2 _ 0x80000fae#64 false 8#13 15#5 11#5 (by decide) bop.BGEU)
+    k_step_gen (wp_s_branch c2 _ 0x8000104c#64 false 8#13 15#5 11#5 (by decide) bop.BGEU)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
     iintro Hk Hpc
     k_norm_g [wa_bgeu_taken _ hva]
-    iapply (wp_prologue2_gen c3 (k.withRegs ((k.regs.set 15#5 18446744073709551615#64).set 15#5 274877906943#64)) 0x80000fb6#64 (by simp only [KCtx.withRegs_avail]; omega))
+    iapply (wp_prologue2_gen c3 (k.withRegs ((k.regs.set 15#5 18446744073709551615#64).set 15#5 274877906943#64)) 0x80001054#64 (by simp only [KCtx.withRegs_avail]; omega))
     k_code (text_instr _ _ _ _ rfl rfl) Htext
     k_norm_g
     iframe
@@ -121,10 +121,10 @@ theorem walkaddr_proof (W : WALK_NOALLOC) : WALKADDR :=
     iapply wpNext_intro_pin
     iintro %c4 %hp4 Hk Hpc Hframe
     -- c.li a2,0 ; jal ra, walk
-    k_step_gen (wp_s_addi c4 _ 0x80000fbe#64 true 0#12 12#5 0#5 (by decide))
+    k_step_gen (wp_s_addi c4 _ 0x8000105c#64 true 0#12 12#5 0#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c5 hp5
     iintro Hk Hpc
-    k_step_gen (wp_s_jal c5 _ 0x80000fc0#64 false 2096976#21 1#5 (by decide))
+    k_step_gen (wp_s_jal c5 _ 0x8000105e#64 false 2096976#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c6 hp6
     iintro Hk Hpc
     iapply (wa_walk_call W c6 _ dq t ?hKw ?hrw ?hvw ?haw hrep.1) $$ [- $Hk $Hpc]
@@ -155,12 +155,12 @@ theorem walkaddr_proof (W : WALK_NOALLOC) : WALKADDR :=
         · exact absurd (ha.symm.trans hz) (PtRun.walk_slot_ne_zero _ _ hpgt)
       have hgn : Iris.Std.PartialMap.get? L (vpnOf (k.regs 11#5)).toNat = none :=
         UPtWalkaddr.ptRep_get_none hrep _ (UPtWalkaddr.wfU_walk_none 2 t _ hrep.1 hnc)
-      k_step_gen (wp_s_branch c7 _ 0x80000fc4#64 true 16#13 10#5 0#5 (by decide) bop.BEQ)
+      k_step_gen (wp_s_branch c7 _ 0x80001062#64 true 16#13 10#5 0#5 (by decide) bop.BEQ)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [wa_beq_zero _ hz] next c8 hp8
       iintro Hk Hpc
       have hpinZ : k.sie = false ∨ k.proc = 0#64 → c8 = cpu := fun h => (hp8 h).trans (hpinW h)
-      iapply (wp_epilogue2_gen c8 (k.withRegs ((k.regs.set 15#5 18446744073709551615#64).set 15#5 274877906943#64)) 0x80000fd4#64
+      iapply (wp_epilogue2_gen c8 (k.withRegs ((k.regs.set 15#5 18446744073709551615#64).set 15#5 274877906943#64)) 0x80001072#64
         (by simp only [KCtx.withRegs_avail]; omega) R1 ?hR2a (k.regs 1#5) (k.regs 8#5))
         $$ [- $Hk $Hpc]
       rotate_right 1
@@ -198,24 +198,24 @@ theorem walkaddr_proof (W : WALK_NOALLOC) : WALKADDR :=
         rcases hret with ⟨h0, -⟩ | ⟨-, ha⟩
         · exact absurd h0 hz
         · exact ha
-      k_step_gen (wp_s_branch c7 _ 0x80000fc4#64 true 16#13 10#5 0#5 (by decide) bop.BEQ)
+      k_step_gen (wp_s_branch c7 _ 0x80001062#64 true 16#13 10#5 0#5 (by decide) bop.BEQ)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [wa_beq_ne _ hz] next c8 hp8
       iintro Hk Hpc
       icases UPtWalkaddr.ptreeOwn_read_leaf 2 dq t (vpnOf (k.regs 11#5)) hcomp $$ Htree
         with ⟨Hcell, Hclose⟩
-      k_step_gen (wp_s_ld c8 _ 0x80000fc6#64 true 0#12 15#5 10#5 (by decide) (by decide) dq
+      k_step_gen (wp_s_ld c8 _ 0x80001064#64 true 0#12 15#5 10#5 (by decide) (by decide) dq
           (t.entAt 2 (vpnOf (k.regs 11#5))))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [haddr] next c9 hp9
       iintro Hk Hpc Hcell
       ihave Htree := Hclose $$ Hcell
-      k_step_gen (wp_s_andi c9 _ 0x80000fc8#64 false 17#12 13#5 15#5 (by decide))
+      k_step_gen (wp_s_andi c9 _ 0x80001066#64 false 17#12 13#5 15#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c10 hp10
       iintro Hk Hpc
-      k_step_gen (wp_s_addi c10 _ 0x80000fcc#64 true 17#12 14#5 0#5 (by decide))
+      k_step_gen (wp_s_addi c10 _ 0x8000106a#64 true 17#12 14#5 0#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c11 hp11
       iintro Hk Hpc
-      k_step_gen (wp_s_addi c11 _ 0x80000fce#64 true 0#12 10#5 0#5 (by decide))
+      k_step_gen (wp_s_addi c11 _ 0x8000106c#64 true 0#12 10#5 0#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c12 hp12
       iintro Hk Hpc
       k_norm_g [KCtx.rget_zero]
@@ -228,24 +228,24 @@ theorem walkaddr_proof (W : WALK_NOALLOC) : WALKADDR :=
                 PTree.entAt 2 t (vpnOf (k.regs 11#5))) := by
           rw [PTree.walk_eq, if_neg hV0]
         obtain ⟨w, hgw, hadw⟩ := UPtWalkaddr.ptRep_get_some hrep _ _ _ hwalk
-        k_step_gen (wp_s_branch c12 _ 0x80000fd0#64 false 12#13 13#5 14#5 (by decide) bop.BEQ)
+        k_step_gen (wp_s_branch c12 _ 0x8000106e#64 false 12#13 13#5 14#5 (by decide) bop.BEQ)
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
           with [wa_beq_eq _ _ hvu] next c13 hp13
         iintro Hk Hpc
-        k_step_gen (wp_s_srli c13 _ 0x80000fdc#64 true 10#6 15#5 15#5 (by decide))
+        k_step_gen (wp_s_srli c13 _ 0x8000107a#64 true 10#6 15#5 15#5 (by decide))
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c14 hp14
         iintro Hk Hpc
-        k_step_gen (wp_s_slli c14 _ 0x80000fde#64 false 12#6 10#5 15#5 (by decide))
+        k_step_gen (wp_s_slli c14 _ 0x8000107c#64 false 12#6 10#5 15#5 (by decide))
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c15 hp15
         iintro Hk Hpc
-        k_step_gen (wp_s_j c15 _ 0x80000fe2#64 true 2097138#21)
+        k_step_gen (wp_s_j c15 _ 0x80001080#64 true 2097138#21)
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c16 hp16
         iintro Hk Hpc
         k_norm_g
         have hpinY : k.sie = false ∨ k.proc = 0#64 → c16 = cpu := fun h =>
           (hp16 h).trans ((hp15 h).trans ((hp14 h).trans ((hp13 h).trans ((hp12 h).trans
             ((hp11 h).trans ((hp10 h).trans ((hp9 h).trans ((hp8 h).trans (hpinW h)))))))))
-        iapply (wp_epilogue2_gen c16 (k.withRegs ((k.regs.set 15#5 18446744073709551615#64).set 15#5 274877906943#64)) 0x80000fd4#64
+        iapply (wp_epilogue2_gen c16 (k.withRegs ((k.regs.set 15#5 18446744073709551615#64).set 15#5 274877906943#64)) 0x80001072#64
           (by simp only [KCtx.withRegs_avail]; omega) _ ?hR2b (k.regs 1#5) (k.regs 8#5))
           $$ [- $Hk $Hpc]
         rotate_right 1
@@ -291,14 +291,14 @@ theorem walkaddr_proof (W : WALK_NOALLOC) : WALKADDR :=
             refine Or.inl ⟨rfl, Or.inr (Or.inr ⟨w, hgw, ?_⟩)⟩
             intro hc
             exact hvu (((UPtWalkaddr.pteAD_and17 hadw).trans ((UPtWalkaddr.pteVU_iff w).mp hc)))
-        k_step_gen (wp_s_branch c12 _ 0x80000fd0#64 false 12#13 13#5 14#5 (by decide) bop.BEQ)
+        k_step_gen (wp_s_branch c12 _ 0x8000106e#64 false 12#13 13#5 14#5 (by decide) bop.BEQ)
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
           with [wa_beq_neq _ _ hvu] next c13 hp13
         iintro Hk Hpc
         k_norm_g
         have hpinZ : k.sie = false ∨ k.proc = 0#64 → c13 = cpu := fun h =>
           (hp13 h).trans (hpinY h)
-        iapply (wp_epilogue2_gen c13 (k.withRegs ((k.regs.set 15#5 18446744073709551615#64).set 15#5 274877906943#64)) 0x80000fd4#64
+        iapply (wp_epilogue2_gen c13 (k.withRegs ((k.regs.set 15#5 18446744073709551615#64).set 15#5 274877906943#64)) 0x80001072#64
           (by simp only [KCtx.withRegs_avail]; omega) _ ?hR2c (k.regs 1#5) (k.regs 8#5))
           $$ [- $Hk $Hpc]
         rotate_right 1
@@ -325,14 +325,14 @@ theorem walkaddr_proof (W : WALK_NOALLOC) : WALKADDR :=
           simp only [KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, ite_false]
           exact a2
   · -- `va ≥ MAXVA`: `a0 = 0` and straight back
-    k_step_gen (wp_s_branch c2 _ 0x80000fae#64 false 8#13 15#5 11#5 (by decide) bop.BGEU)
+    k_step_gen (wp_s_branch c2 _ 0x8000104c#64 false 8#13 15#5 11#5 (by decide) bop.BGEU)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
     iintro Hk Hpc
     k_norm_g [wa_bgeu_fall _ hva]
-    k_step_gen (wp_s_addi c3 _ 0x80000fb2#64 true 0#12 10#5 0#5 (by decide))
+    k_step_gen (wp_s_addi c3 _ 0x80001050#64 true 0#12 10#5 0#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hp4
     iintro Hk Hpc
-    k_step_gen (wp_s_ret c4 _ 0x80000fb4#64 true 1#5)
+    k_step_gen (wp_s_ret c4 _ 0x80001052#64 true 1#5)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c5 hp5
     iintro Hk Hpc
     k_norm_g
@@ -361,7 +361,7 @@ theorem ismapped_proof (W : WALK_NOALLOC) : ISMAPPED :=
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   k_norm_g
   -- the two-slot frame
-  iapply (wp_prologue2_gen cpu k 0x8000147c#64 (by omega))
+  iapply (wp_prologue2_gen cpu k 0x8000152a#64 (by omega))
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm_g
   iframe
@@ -369,10 +369,10 @@ theorem ismapped_proof (W : WALK_NOALLOC) : ISMAPPED :=
   iapply wpNext_intro_pin
   iintro %c1 %hp1 Hk Hpc Hframe
   -- c.li a2,0 ; jal ra, walk
-  k_step_gen (wp_s_addi c1 _ 0x80001484#64 true 0#12 12#5 0#5 (by decide))
+  k_step_gen (wp_s_addi c1 _ 0x80001532#64 true 0#12 12#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c2 hp2
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c2 _ 0x80001486#64 false 2095754#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c2 _ 0x80001534#64 false 2095738#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
   iintro Hk Hpc
   iapply (wa_walk_call W c3 _ dq t ?hKw ?hrw ?hvw ?haw hrep.1) $$ [- $Hk $Hpc]
@@ -402,12 +402,12 @@ theorem ismapped_proof (W : WALK_NOALLOC) : ISMAPPED :=
       · exact absurd (ha.symm.trans hz) (PtRun.walk_slot_ne_zero _ _ hpgt)
     have hgn : Iris.Std.PartialMap.get? L (vpnOf (k.regs 11#5)).toNat = none :=
       UPtWalkaddr.ptRep_get_none hrep _ (UPtWalkaddr.wfU_walk_none 2 t _ hrep.1 hnc)
-    k_step_gen (wp_s_branch c4 _ 0x8000148a#64 true 6#13 10#5 0#5 (by decide) bop.BEQ)
+    k_step_gen (wp_s_branch c4 _ 0x80001538#64 true 6#13 10#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [wa_beq_zero _ hz] next c5 hp5
     iintro Hk Hpc
     have hpinZ : k.sie = false ∨ k.proc = 0#64 → c5 = cpu := fun h => (hp5 h).trans (hpinW h)
-    iapply (wp_epilogue2_gen c5 k 0x80001490#64 (by omega) R1 a2 (k.regs 1#5) (k.regs 8#5))
+    iapply (wp_epilogue2_gen c5 k 0x8000153e#64 (by omega) R1 a2 (k.regs 1#5) (k.regs 8#5))
       $$ [- $Hk $Hpc]
     k_code (text_instr _ _ _ _ rfl rfl) Htext
     k_norm_g
@@ -439,18 +439,18 @@ theorem ismapped_proof (W : WALK_NOALLOC) : ISMAPPED :=
       rcases hret with ⟨h0, -⟩ | ⟨-, ha⟩
       · exact absurd h0 hz
       · exact ha
-    k_step_gen (wp_s_branch c4 _ 0x8000148a#64 true 6#13 10#5 0#5 (by decide) bop.BEQ)
+    k_step_gen (wp_s_branch c4 _ 0x80001538#64 true 6#13 10#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [wa_beq_ne _ hz] next c5 hp5
     iintro Hk Hpc
     icases UPtWalkaddr.ptreeOwn_read_leaf 2 dq t (vpnOf (k.regs 11#5)) hcomp $$ Htree
       with ⟨Hcell, Hclose⟩
-    k_step_gen (wp_s_ld c5 _ 0x8000148c#64 true 0#12 10#5 10#5 (by decide) (by decide) dq
+    k_step_gen (wp_s_ld c5 _ 0x8000153a#64 true 0#12 10#5 10#5 (by decide) (by decide) dq
         (t.entAt 2 (vpnOf (k.regs 11#5))))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [haddr] next c6 hp6
     iintro Hk Hpc Hcell
     ihave Htree := Hclose $$ Hcell
-    k_step_gen (wp_s_andi c6 _ 0x8000148e#64 true 1#12 10#5 10#5 (by decide))
+    k_step_gen (wp_s_andi c6 _ 0x8000153c#64 true 1#12 10#5 10#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c7 hp7
     iintro Hk Hpc
     k_norm_g
@@ -473,7 +473,7 @@ theorem ismapped_proof (W : WALK_NOALLOC) : ISMAPPED :=
         rcases UPtWalkaddr.wfU_entAt 2 t _ hrep.1 hcomp with h | ⟨h, -⟩
         · exact absurd h hV0
         · exact UPtWalkaddr.and1_of_lsb h
-    iapply (wp_epilogue2_gen c7 k 0x80001490#64 (by omega) _ ?hR2d (k.regs 1#5) (k.regs 8#5))
+    iapply (wp_epilogue2_gen c7 k 0x8000153e#64 (by omega) _ ?hR2d (k.regs 1#5) (k.regs 8#5))
       $$ [- $Hk $Hpc]
     rotate_right 1
     k_code (text_instr _ _ _ _ rfl rfl) Htext

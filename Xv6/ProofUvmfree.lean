@@ -37,9 +37,9 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 /-! ## Arithmetic facts -/
 
 /-- `ret` out of `uvmunmap`, resp. out of `freewalk`. -/
-theorem uf_ret_13b6 : jumpPc 0x800013b6#64 = 0x800013b6#64 := by
+theorem uf_ret_13b6 : jumpPc 0x80001464#64 = 0x80001464#64 := by
   simp only [jumpPc, BitVec.reduceAnd]
-theorem uf_ret_139a : jumpPc 0x8000139a#64 = 0x8000139a#64 := by
+theorem uf_ret_139a : jumpPc 0x80001448#64 = 0x80001448#64 := by
   simp only [jumpPc, BitVec.reduceAnd]
 
 /-- `c.lui a5,0x1` is `4096`. -/
@@ -92,7 +92,7 @@ theorem uf_freewalk_call (FW : FREEWALK) [CurCtx] (c : CPU) (k' : KCtx)
     (hlk' : "kmem" ∉ k'.locks) (hroot' : k'.regs 10#5 = pageAddr t.base)
     (hwf' : t.wfU 2) (hnd' : t.pagesNodup 2) (hpg' : ∀ b ∈ t.pages 2, pageValid (pageAddr b))
     (hnl' : t.noLeaves 2) :
-    kctx c k' ∗ pcIs c 0x8000132a#64 ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
+    kctx c k' ∗ pcIs c 0x800013d8#64 ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
     kallocAvail γk none ∗ ptreeOwn 2 (DFrac.own 1) t ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie' : Bool, ∀ spp' : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie' = k'.spie ∧ spp' = k'.spp⌝ -∗
@@ -113,7 +113,7 @@ theorem uf_uvmunmap_call (UB : UVMUNMAP_BARE) [CurCtx] (c : CPU) (k' : KCtx)
     (hlk' : "kmem" ∉ k'.locks) (hwf' : uptWf P) (hroot' : k'.regs 10#5 = pageAddr P.root)
     (hal' : k'.regs 11#5 &&& 0xfff#64 = 0#64) (hn' : k'.regs 12#5 = BitVec.ofNat 64 n)
     (hrange' : (k'.regs 11#5).toNat + 4096 * n ≤ uvmMaxsz) (hfree' : k'.regs 13#5 ≠ 0#64) :
-    kctx c k' ∗ pcIs c 0x800011b2#64 ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
+    kctx c k' ∗ pcIs c 0x80001260#64 ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
     kallocAvail γk none ∗ ptOwnRep P.root P.um ∗ umPages P M ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie' : Bool, ∀ spp' : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie' = k'.spie ∧ spp' = k'.spp⌝ -∗
@@ -131,7 +131,7 @@ theorem uf_uvmunmap_call (UB : UVMUNMAP_BARE) [CurCtx] (c : CPU) (k' : KCtx)
 /-! ## The epilogue -/
 
 set_option maxHeartbeats 4000000 in
-/-- The epilogue at `0x8000139a`: restore `ra`, `s0`, `s1`, pop the frame,
+/-- The epilogue at `0x80001448`: restore `ra`, `s0`, `s1`, pop the frame,
 return to the caller. -/
 theorem uvmfree_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
     (hpin : k.sie = false ∨ k.proc = 0#64 → cur = cpu) (hK : 4 ≤ k.avail)
@@ -141,7 +141,7 @@ theorem uvmfree_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
     (h21 : R 21#5 = k.regs 21#5) (h22 : R 22#5 = k.regs 22#5) (h23 : R 23#5 = k.regs 23#5)
     (h24 : R 24#5 = k.regs 24#5) (h25 : R 25#5 = k.regs 25#5) (h26 : R 26#5 = k.regs 26#5)
     (h27 : R 27#5 = k.regs 27#5) :
-    kctx cur (((k.pushed 4).withSpie spie spp).withRegs R) ∗ pcIs cur 0x8000139a#64 ∗
+    kctx cur (((k.pushed 4).withSpie spie spp).withRegs R) ∗ pcIs cur 0x80001448#64 ∗
     frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
     wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie' : Bool, ∀ spp' : Bool, ∀ R' : RegMap,
       ⌜k.sie = false → spie' = k.spie ∧ spp' = k.spp⌝ -∗
@@ -153,25 +153,25 @@ theorem uvmfree_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK' : 4 ≤ (k.withSpie spie spp).avail := hK
   simp only [uf_pushed_withSpie]
-  k_step_gen (wp_s_ld cur _ 0x8000139a#64 true 24#12 1#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld cur _ 0x80001448#64 true 24#12 1#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 1#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c1 hp1
   iintro Hk Hpc F0
-  k_step_gen (wp_s_ld c1 _ 0x8000139c#64 true 16#12 8#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c1 _ 0x8000144a#64 true 16#12 8#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 8#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c2 hp2
   iintro Hk Hpc F1
-  k_step_gen (wp_s_ld c2 _ 0x8000139e#64 true 8#12 9#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c2 _ 0x8000144c#64 true 8#12 9#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 9#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c3 hp3
   iintro Hk Hpc F2
   ihave Hstack : stackOwn (k.regs 2#5) 4 $$ [F0 F1 F2 F3]
   case' _ => stack_cells; iframe
-  k_step_gen (wp_s_pop c3 _ 0x800013a0#64 true 32#12 4 imm_p32)
+  k_step_gen (wp_s_pop c3 _ 0x8000144e#64 true 32#12 4 imm_p32)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK', hR2] next c4 hp4
   iintro Hk Hpc
-  k_step_gen (wp_s_ret c4 _ 0x800013a2#64 true 1#5) from (text_instr _ _ _ _ rfl rfl) Htext
+  k_step_gen (wp_s_ret c4 _ 0x80001450#64 true 1#5) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc] next c5 hp5
   iintro Hk Hpc
   ihave HΦ' := wpNext_at _ _ _ c5 _
@@ -187,7 +187,7 @@ theorem uvmfree_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
 /-! ## The tail: `freewalk(pagetable)` and the epilogue -/
 
 set_option maxHeartbeats 4000000 in
-/-- At `0x80001394`, the table mapping nothing: free its node pages and
+/-- At `0x80001442`, the table mapping nothing: free its node pages and
 return. -/
 theorem uvmfree_tail (FW : FREEWALK) [CurCtx] (cpu cur : CPU) (k : KCtx)
     (γl : GName) (γk : KmemNames) (root : BitVec 44) (L : RegMapF (BitVec 64))
@@ -200,7 +200,7 @@ theorem uvmfree_tail (FW : FREEWALK) [CurCtx] (cpu cur : CPU) (k : KCtx)
     (h21 : R 21#5 = k.regs 21#5) (h22 : R 22#5 = k.regs 22#5) (h23 : R 23#5 = k.regs 23#5)
     (h24 : R 24#5 = k.regs 24#5) (h25 : R 25#5 = k.regs 25#5) (h26 : R 26#5 = k.regs 26#5)
     (h27 : R 27#5 = k.regs 27#5) :
-    kctx cur (((k.pushed 4).withSpie spie spp).withRegs R) ∗ pcIs cur 0x80001394#64 ∗
+    kctx cur (((k.pushed 4).withSpie spie spp).withRegs R) ∗ pcIs cur 0x80001442#64 ∗
     isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗ ptOwnRep root L ∗
     frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
     wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie' : Bool, ∀ spp' : Bool, ∀ R' : RegMap,
@@ -214,11 +214,11 @@ theorem uvmfree_tail (FW : FREEWALK) [CurCtx] (cpu cur : CPU) (k : KCtx)
   subst hbase
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- c.mv a0,s1
-  k_step_gen (wp_s_add cur _ 0x80001394#64 true 10#5 0#5 9#5 (by decide))
+  k_step_gen (wp_s_add cur _ 0x80001442#64 true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9] next c1 hp1
   iintro Hk Hpc
   -- jal ra, freewalk
-  k_step_gen (wp_s_jal c1 _ 0x80001396#64 false 2097044#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c1 _ 0x80001444#64 false 2097044#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c2 hp2
   iintro Hk Hpc
   iapply (uf_freewalk_call FW c2 _ γl γk t ?hn ?hKa ?hl ?hrt hrep.1 hrep.2.1 hrep.2.2.1
@@ -270,7 +270,7 @@ theorem uvmfree_proof (UB : UVMUNMAP_BARE) (FW : FREEWALK) : UVMFREE :=
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK4 : 4 ≤ k.avail := by simp only [uvmfreeSlots] at hK; omega
   -- the frame
-  iapply (wp_prologue4s1_gen cpu k 0x80001386#64 hK4)
+  iapply (wp_prologue4s1_gen cpu k 0x80001434#64 hK4)
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm_g
   iframe
@@ -278,11 +278,11 @@ theorem uvmfree_proof (UB : UVMUNMAP_BARE) (FW : FREEWALK) : UVMFREE :=
   iapply wpNext_intro_pin
   iintro %c1 %hp1 Hk Hpc Hframe
   -- c.mv s1,a0
-  k_step_gen (wp_s_add c1 _ 0x80001390#64 true 9#5 0#5 10#5 (by decide))
+  k_step_gen (wp_s_add c1 _ 0x8000143e#64 true 9#5 0#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hroot] next c2 hp2
   iintro Hk Hpc
   -- c.bnez a1 : sz > 0 ?
-  k_step_gen (wp_s_branch c2 _ 0x80001392#64 true 18#13 11#5 0#5 (by decide) bop.BNE)
+  k_step_gen (wp_s_branch c2 _ 0x80001440#64 true 18#13 11#5 0#5 (by decide) bop.BNE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [uf_ite_bne] next c3 hp3
   iintro Hk Hpc
   have hpin3 : k.sie = false ∨ k.proc = 0#64 → c3 = cpu :=
@@ -318,26 +318,26 @@ theorem uvmfree_proof (UB : UVMUNMAP_BARE) (FW : FREEWALK) : UVMFREE :=
     case e27 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
   · -- sz > 0: unmap the whole user region first
     rw [if_neg hsz0]
-    k_step_gen (wp_s_lui c3 _ 0x800013a4#64 true 1#20 15#5 (by decide))
+    k_step_gen (wp_s_lui c3 _ 0x80001452#64 true 1#20 15#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [uf_lui_4096] next c4 hp4
     iintro Hk Hpc
-    k_step_gen (wp_s_addi c4 _ 0x800013a6#64 true 4095#12 15#5 15#5 (by decide))
+    k_step_gen (wp_s_addi c4 _ 0x80001454#64 true 4095#12 15#5 15#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c5 hp5
     iintro Hk Hpc
-    k_step_gen (wp_s_add c5 _ 0x800013a8#64 true 11#5 11#5 15#5 (by decide))
+    k_step_gen (wp_s_add c5 _ 0x80001456#64 true 11#5 11#5 15#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c6 hp6
     iintro Hk Hpc
-    k_step_gen (wp_s_addi c6 _ 0x800013aa#64 true 1#12 13#5 0#5 (by decide))
+    k_step_gen (wp_s_addi c6 _ 0x80001458#64 true 1#12 13#5 0#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c7 hp7
     iintro Hk Hpc
-    k_step_gen (wp_s_srli c7 _ 0x800013ac#64 false 12#6 12#5 11#5 (by decide))
+    k_step_gen (wp_s_srli c7 _ 0x8000145a#64 false 12#6 12#5 11#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [uvmNp_shift (k.regs 11#5) hsz] next c8 hp8
     iintro Hk Hpc
-    k_step_gen (wp_s_addi c8 _ 0x800013b0#64 true 0#12 11#5 0#5 (by decide))
+    k_step_gen (wp_s_addi c8 _ 0x8000145e#64 true 0#12 11#5 0#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c9 hp9
     iintro Hk Hpc
-    k_step_gen (wp_s_jal c9 _ 0x800013b2#64 false 2096640#21 1#5 (by decide))
+    k_step_gen (wp_s_jal c9 _ 0x80001460#64 false 2096640#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c10 hp10
     iintro Hk Hpc
     -- uvmunmap(pagetable, 0, PGROUNDUP(sz)/PGSIZE, 1)
@@ -364,7 +364,7 @@ theorem uvmfree_proof (UB : UVMUNMAP_BARE) (FW : FREEWALK) : UVMFREE :=
     k_norm_g [hroot] at hcs1
     obtain ⟨e2, e8, e9, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩ := hcs1
     -- c.j
-    k_step_gen (wp_s_j c11 _ 0x800013b6#64 true 2097118#21)
+    k_step_gen (wp_s_j c11 _ 0x80001464#64 true 2097118#21)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c12 hp12
     iintro Hk Hpc
     have hempty : delRunL P.um 0 (uvmNp (k.regs 11#5)) = ∅ :=

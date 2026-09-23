@@ -1,6 +1,6 @@
 /-
 The kernel page table as `kvmmake` builds it (the Rocq `KvmMap.v`): the
-six identity/trampoline regions, then the 64 process kernel stacks, as
+seven identity/trampoline regions, then the 64 process kernel stacks, as
 runs of `PTree.mapRun` over the pages `kalloc` hands out.
 -/
 import Xv6.PtOwn
@@ -16,10 +16,12 @@ structure KvmRegion where
   perm : KPerm
   n : Nat
 
-/-- `kvmmake`'s six `kvmmap` calls, in order: UART0, VIRTIO0, PLIC, the
-kernel text, the rest of RAM, the trampoline. -/
+/-- `kvmmake`'s seven `kvmmap` calls, in order: UART0, UART1, VIRTIO0,
+PLIC, the kernel text, the rest of RAM, the trampoline.  UART1's page
+shares the level-1 and level-0 tables of UART0's, so it costs no node. -/
 def kvmRegions : List KvmRegion :=
-  [⟨0x10000#27, 0x10000#44, .rw, 1⟩, ⟨0x10001#27, 0x10001#44, .rw, 1⟩,
+  [⟨0x10000#27, 0x10000#44, .rw, 1⟩, ⟨0x1000a#27, 0x1000a#44, .rw, 1⟩,
+   ⟨0x10001#27, 0x10001#44, .rw, 1⟩,
    ⟨0xC000#27, 0xC000#44, .rw, 0x4000⟩, ⟨0x80000#27, 0x80000#44, .rx, 7⟩,
    ⟨0x80007#27, 0x80007#44, .rw, 0x7FF9⟩, ⟨0x3FFFFFF#27, 0x80006#44, .rx, 1⟩]
 

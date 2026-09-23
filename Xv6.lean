@@ -56,6 +56,7 @@ import Xv6.LinkRelease
 import Xv6.KernelData
 import Xv6.UartTrace
 import Xv6.SpecConsputc
+import Xv6.SpecPrputc
 import Xv6.SpecPrintint
 import Xv6.SpecPrintk
 import Xv6.PrintkDefs

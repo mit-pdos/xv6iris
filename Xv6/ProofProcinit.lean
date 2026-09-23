@@ -46,29 +46,29 @@ theorem pi_lui_4fa50 : BitVec.signExtend 64 (0x4fa50#20 ++ 0#12) = 0x4fa50000#64
 theorem pi_lui_4000 : BitVec.signExtend 64 (0x4000#20 ++ 0#12) = 0x4000000#64 := by bv_decide
 
 /-- `ret` out of `initlock` lands on the instruction after the `jal`. -/
-theorem pi_ret_1818 : jumpPc 0x80001818#64 = 0x80001818#64 := by
+theorem pi_ret_1818 : jumpPc 0x800018c6#64 = 0x800018c6#64 := by
   simp only [jumpPc, BitVec.reduceAnd]
-theorem pi_ret_182c : jumpPc 0x8000182c#64 = 0x8000182c#64 := by
+theorem pi_ret_182c : jumpPc 0x800018da#64 = 0x800018da#64 := by
   simp only [jumpPc, BitVec.reduceAnd]
-theorem pi_ret_1870 : jumpPc 0x80001870#64 = 0x80001870#64 := by
+theorem pi_ret_1870 : jumpPc 0x8000191e#64 = 0x8000191e#64 := by
   simp only [jumpPc, BitVec.reduceAnd]
 
 theorem pi_toNat (m : Nat) (h : m < 2 ^ 64) : (BitVec.ofNat 64 m).toNat = m := by
   simp only [BitVec.toNat_ofNat]
   omega
 
-theorem pi_procAddr_toNat (i : Nat) (hi : i ≤ 64) : (procAddr i).toNat = 2147559352 + 360 * i := by
-  rw [procAddr_eq, BitVec.toNat_add, pi_toNat (360 * i) (by omega), pi_toNat 2147559352 (by omega)]
+theorem pi_procAddr_toNat (i : Nat) (hi : i ≤ 64) : (procAddr i).toNat = 2147559520 + 360 * i := by
+  rw [procAddr_eq, BitVec.toNat_add, pi_toNat (360 * i) (by omega), pi_toNat 2147559520 (by omega)]
   exact Nat.mod_eq_of_lt (by omega)
 
 /-- `&proc[0]`. -/
-theorem pi_procAddr_zero : procAddr 0 = 2147559352#64 := by
+theorem pi_procAddr_zero : procAddr 0 = 2147559520#64 := by
   rw [procAddr_eq]
   rfl
 
 /-- The compiler's `(p - proc)` after the `sub`. -/
 theorem pi_h1 (i : Nat) :
-    procAddr i + 18446744071561992264#64 = BitVec.ofNat 64 (360 * i) := by
+    procAddr i + 18446744071561992096#64 = BitVec.ofNat 64 (360 * i) := by
   rw [procAddr_eq]
   generalize BitVec.ofNat 64 (360 * i) = y
   bv_omega
@@ -137,9 +137,9 @@ theorem pi_cursor (i : Nat) : procAddr i + 360#64 = procAddr (i + 1) := by
     BitVec.ofNat_add, BitVec.add_assoc]
 
 theorem pi_s1_eq (i : Nat) (hi : i < 64) :
-    (procAddr (i + 1) = 0x800181b8#64) ↔ i + 1 = 64 := by
+    (procAddr (i + 1) = 0x80018260#64) ↔ i + 1 = 64 := by
   have hval := pi_procAddr_toNat (i + 1) (by omega)
-  have hr : (0x800181b8#64).toNat = 2147582392 := pi_toNat 2147582392 (by omega)
+  have hr : (0x80018260#64).toNat = 2147582560 := pi_toNat 2147582560 (by omega)
   constructor
   · intro he
     have h := congrArg BitVec.toNat he
@@ -152,7 +152,7 @@ theorem pi_s1_eq (i : Nat) (hi : i < 64) :
 
 /-- The loop test `bne s1,s4`: taken until the last process. -/
 theorem pi_bne_last {α : Type} (i : Nat) (hi : i < 64) (p q : α) :
-    (if bcond bop.BNE (procAddr (i + 1)) 0x800181b8#64 then p else q)
+    (if bcond bop.BNE (procAddr (i + 1)) 0x80018260#64 then p else q)
       = if i + 1 = 64 then q else p := by
   by_cases he : i + 1 = 64
   · rw [if_pos he,
@@ -318,7 +318,7 @@ set_option maxHeartbeats 1000000 in
 theorem pi_initlock_call (IL : INITLOCK) [CurCtx] (c : CPU) (k' : KCtx)
     (vlock : BitVec 32) (vname vcpu : BitVec 64) (hK' : 2 ≤ k'.avail)
     (lk nm : BitVec 64) (h10 : k'.regs 10#5 = lk) (h11 : k'.regs 11#5 = nm) :
-    kctx c k' ∗ pcIs c 0x80000b3a#64 ∗
+    kctx c k' ∗ pcIs c 0x80000bd8#64 ∗
     kmapId lk ∗ kmapId (lk + 16#64) ∗
     wordPointsTo lk 4 (DFrac.own 1) vlock ∗
     wordPointsTo (lk + 8#64) 8 (DFrac.own 1) vname ∗
@@ -378,20 +378,20 @@ theorem pi_range_out_cons [CurCtx] (i n : Nat) :
 /-! ## One iteration -/
 
 set_option maxHeartbeats 4000000 in
-/-- The body at `0x80001868`: `initlock(&p->lock, "proc")`, `p->state =
+/-- The body at `0x80001916`: `initlock(&p->lock, "proc")`, `p->state =
 UNUSED`, `p->kstack = KSTACK(i)`, step the cursor and test for the last
 process. -/
 theorem pi_iter (IL : INITLOCK) [CurCtx] (k : KCtx) (hK : 10 ≤ k.avail)
     (i : Nat) (hi : i < 64) (R : RegMap)
     (h9 : R 9#5 = procAddr i) (h18 : R 18#5 = 5738987045154082725#64)
-    (h19 : R 19#5 = 274877902848#64) (h20 : R 20#5 = 0x800181b8#64)
-    (h21 : R 21#5 = 2147559352#64) (h22 : R 22#5 = procNameAddr)
+    (h19 : R 19#5 = 274877902848#64) (h20 : R 20#5 = 0x80018260#64)
+    (h21 : R 21#5 = 2147559520#64) (h22 : R 22#5 = procNameAddr)
     (cur : CPU) :
-    kctx cur ((k.pushed 8).withRegs R) ∗ pcIs cur 0x80001868#64 ∗
+    kctx cur ((k.pushed 8).withRegs R) ∗ pcIs cur 0x80001916#64 ∗
     procFieldsIn i ∗
     wpNext k.sie k.proc cur (fun cpu' => iprop(∀ R2 : RegMap,
       kctx cpu' ((k.pushed 8).withRegs R2) -∗
-      pcIs cpu' (if i + 1 = 64 then 0x80001892#64 else 0x80001868#64) -∗
+      pcIs cpu' (if i + 1 = 64 then 0x80001940#64 else 0x80001916#64) -∗
       procFieldsOut i -∗
       ⌜piKept R R2 ∧ R2 9#5 = procAddr (i + 1)⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cur := by
@@ -400,13 +400,13 @@ theorem pi_iter (IL : INITLOCK) [CurCtx] (k : KCtx) (hK : 10 ≤ k.avail)
   icases pi_in_open i $$ Hin with
     ⟨%vlock, %vname, %vcpu, %vstate, %vks, #Hid0, #Hid16, Hlk, Hnm, Hcp, Hst, Hks⟩
   -- c.mv a1,s6 ; c.mv a0,s1 ; jal ra, initlock
-  k_step_gen (wp_s_add cur _ 0x80001868#64 true 11#5 0#5 22#5 (by decide))
+  k_step_gen (wp_s_add cur _ 0x80001916#64 true 11#5 0#5 22#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h22] next c1 hp1
   iintro Hk Hpc
-  k_step_gen (wp_s_add c1 _ 0x8000186a#64 true 10#5 0#5 9#5 (by decide))
+  k_step_gen (wp_s_add c1 _ 0x80001918#64 true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9] next c2 hp2
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c2 _ 0x8000186c#64 false 2093774#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c2 _ 0x8000191a#64 false 2093758#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
   iintro Hk Hpc
   iapply (pi_initlock_call IL c3 _ vlock vname vcpu ?hKi (procAddr i) procNameAddr ?ha0 ?ha1)
@@ -427,46 +427,46 @@ theorem pi_iter (IL : INITLOCK) [CurCtx] (k : KCtx) (hK : 10 ≤ k.avail)
   have g9 : R1 9#5 = procAddr i := e9.trans h9
   have g18 : R1 18#5 = 5738987045154082725#64 := e18.trans h18
   have g19 : R1 19#5 = 274877902848#64 := e19.trans h19
-  have g20 : R1 20#5 = 0x800181b8#64 := e20.trans h20
-  have g21 : R1 21#5 = 2147559352#64 := e21.trans h21
+  have g20 : R1 20#5 = 0x80018260#64 := e20.trans h20
+  have g21 : R1 21#5 = 2147559520#64 := e21.trans h21
   -- sw zero,24(s1)
-  k_step_gen (wp_s_sw c4 _ 0x80001870#64 false 24#12 9#5 0#5 (by decide) vstate)
+  k_step_gen (wp_s_sw c4 _ 0x8000191e#64 false 24#12 9#5 0#5 (by decide) vstate)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g9] next c5 hp5
   iintro Hk Hpc Hst
   -- the address of KSTACK(i)
-  k_step_gen (wp_s_sub c5 _ 0x80001874#64 false 15#5 9#5 21#5 (by decide))
+  k_step_gen (wp_s_sub c5 _ 0x80001922#64 false 15#5 9#5 21#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [g9, g21, pi_h1 i] next c6 hp6
   iintro Hk Hpc
-  k_step_gen (wp_s_srai c6 _ 0x80001878#64 true 3#6 15#5 15#5 (by decide))
+  k_step_gen (wp_s_srai c6 _ 0x80001926#64 true 3#6 15#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pi_h2 i hi] next c7 hp7
   iintro Hk Hpc
-  k_step_gen (wp_s_mul c7 _ 0x8000187a#64 false 15#5 15#5 18#5 (by decide))
+  k_step_gen (wp_s_mul c7 _ 0x80001928#64 false 15#5 15#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g18, pi_h3 i hi] next c8 hp8
   iintro Hk Hpc
-  k_step_gen (wp_s_slli c8 _ 0x8000187e#64 true 13#6 15#5 15#5 (by decide))
+  k_step_gen (wp_s_slli c8 _ 0x8000192c#64 true 13#6 15#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pi_h4 i hi] next c9 hp9
   iintro Hk Hpc
-  k_step_gen (wp_s_lui c9 _ 0x80001880#64 true 2#20 14#5 (by decide))
+  k_step_gen (wp_s_lui c9 _ 0x8000192e#64 true 2#20 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c10 hp10
   iintro Hk Hpc
-  k_step_gen (wp_s_addw c10 _ 0x80001882#64 true 15#5 15#5 14#5 (by decide))
+  k_step_gen (wp_s_addw c10 _ 0x80001930#64 true 15#5 15#5 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [pi_h5 i hi, pi_h6, pi_h7 i hi, pi_h8 i hi] next c11 hp11
   iintro Hk Hpc
-  k_step_gen (wp_s_sub c11 _ 0x80001884#64 false 15#5 19#5 15#5 (by decide))
+  k_step_gen (wp_s_sub c11 _ 0x80001932#64 false 15#5 19#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g19, pi_h9 i] next c12 hp12
   iintro Hk Hpc
   -- c.sd a5,64(s1)
-  k_step_gen (wp_s_sd c12 _ 0x80001888#64 true 64#12 9#5 15#5 (by decide) vks)
+  k_step_gen (wp_s_sd c12 _ 0x80001936#64 true 64#12 9#5 15#5 (by decide) vks)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g9] next c13 hp13
   iintro Hk Hpc Hks
   -- addi s1,s1,360 ; bne s1,s4
-  k_step_gen (wp_s_addi c13 _ 0x8000188a#64 false 360#12 9#5 9#5 (by decide))
+  k_step_gen (wp_s_addi c13 _ 0x80001938#64 false 360#12 9#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [g9, pi_cursor i] next c14 hp14
   iintro Hk Hpc
-  k_step_gen (wp_s_branch c14 _ 0x8000188e#64 false 8154#13 9#5 20#5 (by decide) bop.BNE)
+  k_step_gen (wp_s_branch c14 _ 0x8000193c#64 false 8154#13 9#5 20#5 (by decide) bop.BNE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [g20, pi_bne_last i hi] next c15 hp15
   iintro Hk Hpc
@@ -508,18 +508,18 @@ theorem pi_lockInited_close [CurCtx] (lk nm : BitVec 64) :
 /-! ## The loop -/
 
 set_option maxHeartbeats 4000000 in
-/-- The loop from `0x80001868` with `i` processes done (`fuel + 1` left)
-runs to the epilogue at `0x80001892`. -/
+/-- The loop from `0x80001916` with `i` processes done (`fuel + 1` left)
+runs to the epilogue at `0x80001940`. -/
 theorem pi_loop (IL : INITLOCK) [CurCtx] (k : KCtx) (hK : 10 ≤ k.avail) (fuel : Nat) :
     ∀ (i : Nat) (_ : i + fuel + 1 = 64) (R : RegMap)
       (_ : R 9#5 = procAddr i) (_ : R 18#5 = 5738987045154082725#64)
-      (_ : R 19#5 = 274877902848#64) (_ : R 20#5 = 0x800181b8#64)
-      (_ : R 21#5 = 2147559352#64) (_ : R 22#5 = procNameAddr)
+      (_ : R 19#5 = 274877902848#64) (_ : R 20#5 = 0x80018260#64)
+      (_ : R 21#5 = 2147559520#64) (_ : R 22#5 = procNameAddr)
       (cur : CPU),
-    kctx cur ((k.pushed 8).withRegs R) ∗ pcIs cur 0x80001868#64 ∗
+    kctx cur ((k.pushed 8).withRegs R) ∗ pcIs cur 0x80001916#64 ∗
     ([∗list] j ∈ List.range' i (fuel + 1), procFieldsIn j) ∗
     wpNext k.sie k.proc cur (fun cpu' => iprop(∀ R2 : RegMap,
-      kctx cpu' ((k.pushed 8).withRegs R2) -∗ pcIs cpu' 0x80001892#64 -∗
+      kctx cpu' ((k.pushed 8).withRegs R2) -∗ pcIs cpu' 0x80001940#64 -∗
       ([∗list] j ∈ List.range' i (fuel + 1), procFieldsOut j) -∗
       ⌜piKept R R2⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cur := by
@@ -578,7 +578,7 @@ theorem procinit_proof (IL : INITLOCK) : PROCINIT :=
   have hK8 : 8 ≤ k.avail := by omega
   k_norm_g
   -- the prologue
-  iapply (pi_prologue cpu k 0x800017f0#64 hK8)
+  iapply (pi_prologue cpu k 0x8000189e#64 hK8)
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm_g
   iframe
@@ -586,19 +586,19 @@ theorem procinit_proof (IL : INITLOCK) : PROCINIT :=
   iapply wpNext_intro_pin
   iintro %c1 %hp1 Hk Hpc Hframe
   -- initlock(&pid_lock, "nextpid")
-  k_step_gen (wp_s_auipc c1 _ 0x80001804#64 false 6#20 11#5 (by decide))
+  k_step_gen (wp_s_auipc c1 _ 0x800018b2#64 false 6#20 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pi_u6] next c2 hp2
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c2 _ 0x80001808#64 false 2396#12 11#5 11#5 (by decide))
+  k_step_gen (wp_s_addi c2 _ 0x800018b6#64 false 2230#12 11#5 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
   iintro Hk Hpc
-  k_step_gen (wp_s_auipc c3 _ 0x8000180c#64 false 0x11#20 10#5 (by decide))
+  k_step_gen (wp_s_auipc c3 _ 0x800018ba#64 false 0x11#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pi_u11] next c4 hp4
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c4 _ 0x80001810#64 false 2940#12 10#5 10#5 (by decide))
+  k_step_gen (wp_s_addi c4 _ 0x800018be#64 false 2934#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c5 hp5
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c5 _ 0x80001814#64 false 2093862#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c5 _ 0x800018c2#64 false 2093846#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c6 hp6
   iintro Hk Hpc
   iapply (pi_initlock_call IL c6 _ vl1 vn1 vc1 ?hK1 pidLockAddr nextpidNameAddr ?ha0 ?ha1)
@@ -617,19 +617,19 @@ theorem procinit_proof (IL : INITLOCK) : PROCINIT :=
   k_norm_g at hcs1
   obtain ⟨a2, a8, a9, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27⟩ := hcs1
   -- initlock(&wait_lock, "wait_lock")
-  k_step_gen (wp_s_auipc cA _ 0x80001818#64 false 6#20 11#5 (by decide))
+  k_step_gen (wp_s_auipc cA _ 0x800018c6#64 false 6#20 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pi_u6] next c7 hp7
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c7 _ 0x8000181c#64 false 2384#12 11#5 11#5 (by decide))
+  k_step_gen (wp_s_addi c7 _ 0x800018ca#64 false 2218#12 11#5 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c8 hp8
   iintro Hk Hpc
-  k_step_gen (wp_s_auipc c8 _ 0x80001820#64 false 0x11#20 10#5 (by decide))
+  k_step_gen (wp_s_auipc c8 _ 0x800018ce#64 false 0x11#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pi_u11] next c9 hp9
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c9 _ 0x80001824#64 false 2944#12 10#5 10#5 (by decide))
+  k_step_gen (wp_s_addi c9 _ 0x800018d2#64 false 2938#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c10 hp10
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c10 _ 0x80001828#64 false 2093842#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c10 _ 0x800018d6#64 false 2093826#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c11 hp11
   iintro Hk Hpc
   iapply (pi_initlock_call IL c11 _ vl2 vn2 vc2 ?hK2 waitLockAddr waitLockNameAddr ?hb0 ?hb1)
@@ -648,58 +648,58 @@ theorem procinit_proof (IL : INITLOCK) : PROCINIT :=
   k_norm_g at hcs2
   obtain ⟨b2, b8, b9, b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩ := hcs2
   -- the cursor set-up
-  k_step_gen (wp_s_auipc cB _ 0x8000182c#64 false 0x11#20 9#5 (by decide))
+  k_step_gen (wp_s_auipc cB _ 0x800018da#64 false 0x11#20 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pi_u11] next c12 hp12
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c12 _ 0x80001830#64 false 3980#12 9#5 9#5 (by decide))
+  k_step_gen (wp_s_addi c12 _ 0x800018de#64 false 3974#12 9#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c13 hp13
   iintro Hk Hpc
-  k_step_gen (wp_s_auipc c13 _ 0x80001834#64 false 6#20 22#5 (by decide))
+  k_step_gen (wp_s_auipc c13 _ 0x800018e2#64 false 6#20 22#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pi_u6] next c14 hp14
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c14 _ 0x80001838#64 false 2372#12 22#5 22#5 (by decide))
+  k_step_gen (wp_s_addi c14 _ 0x800018e6#64 false 2206#12 22#5 22#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c15 hp15
   iintro Hk Hpc
-  k_step_gen (wp_s_add c15 _ 0x8000183c#64 true 21#5 0#5 9#5 (by decide))
+  k_step_gen (wp_s_add c15 _ 0x800018ea#64 true 21#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c16 hp16
   iintro Hk Hpc
-  k_step_gen (wp_s_lui c16 _ 0x8000183e#64 false 0xa5#20 15#5 (by decide))
+  k_step_gen (wp_s_lui c16 _ 0x800018ec#64 false 0xa5#20 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pi_lui_a5] next c17 hp17
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c17 _ 0x80001842#64 false 4005#12 15#5 15#5 (by decide))
+  k_step_gen (wp_s_addi c17 _ 0x800018f0#64 false 4005#12 15#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c18 hp18
   iintro Hk Hpc
-  k_step_gen (wp_s_slli c18 _ 0x80001846#64 true 12#6 15#5 15#5 (by decide))
+  k_step_gen (wp_s_slli c18 _ 0x800018f4#64 true 12#6 15#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c19 hp19
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c19 _ 0x80001848#64 false 4005#12 15#5 15#5 (by decide))
+  k_step_gen (wp_s_addi c19 _ 0x800018f6#64 false 4005#12 15#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c20 hp20
   iintro Hk Hpc
-  k_step_gen (wp_s_lui c20 _ 0x8000184c#64 false 0x4fa50#20 18#5 (by decide))
+  k_step_gen (wp_s_lui c20 _ 0x800018fa#64 false 0x4fa50#20 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pi_lui_4fa50] next c21 hp21
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c21 _ 0x80001850#64 false 2639#12 18#5 18#5 (by decide))
+  k_step_gen (wp_s_addi c21 _ 0x800018fe#64 false 2639#12 18#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c22 hp22
   iintro Hk Hpc
-  k_step_gen (wp_s_slli c22 _ 0x80001854#64 true 32#6 18#5 18#5 (by decide))
+  k_step_gen (wp_s_slli c22 _ 0x80001902#64 true 32#6 18#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c23 hp23
   iintro Hk Hpc
-  k_step_gen (wp_s_add c23 _ 0x80001856#64 true 18#5 18#5 15#5 (by decide))
+  k_step_gen (wp_s_add c23 _ 0x80001904#64 true 18#5 18#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c24 hp24
   iintro Hk Hpc
-  k_step_gen (wp_s_lui c24 _ 0x80001858#64 false 0x4000#20 19#5 (by decide))
+  k_step_gen (wp_s_lui c24 _ 0x80001906#64 false 0x4000#20 19#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pi_lui_4000] next c25 hp25
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c25 _ 0x8000185c#64 true 4095#12 19#5 19#5 (by decide))
+  k_step_gen (wp_s_addi c25 _ 0x8000190a#64 true 4095#12 19#5 19#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c26 hp26
   iintro Hk Hpc
-  k_step_gen (wp_s_slli c26 _ 0x8000185e#64 true 12#6 19#5 19#5 (by decide))
+  k_step_gen (wp_s_slli c26 _ 0x8000190c#64 true 12#6 19#5 19#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c27 hp27
   iintro Hk Hpc
-  k_step_gen (wp_s_auipc c27 _ 0x80001860#64 false 0x17#20 20#5 (by decide))
+  k_step_gen (wp_s_auipc c27 _ 0x8000190e#64 false 0x17#20 20#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pi_u17] next c28 hp28
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c28 _ 0x80001864#64 false 2392#12 20#5 20#5 (by decide))
+  k_step_gen (wp_s_addi c28 _ 0x80001912#64 false 2386#12 20#5 20#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c29 hp29
   iintro Hk Hpc
   -- the loop
@@ -724,7 +724,7 @@ theorem procinit_proof (IL : INITLOCK) : PROCINIT :=
     case' _ => iframe
     have hpinE : k.sie = false ∨ k.proc = 0#64 → cE = cpu := fun h =>
       (hpE h).trans ((hp29 h).trans ((hp28 h).trans ((hp27 h).trans ((hp26 h).trans ((hp25 h).trans ((hp24 h).trans ((hp23 h).trans ((hp22 h).trans ((hp21 h).trans ((hp20 h).trans ((hp19 h).trans ((hp18 h).trans ((hp17 h).trans ((hp16 h).trans ((hp15 h).trans ((hp14 h).trans ((hp13 h).trans ((hp12 h).trans ((hpB h).trans ((hp11 h).trans ((hp10 h).trans ((hp9 h).trans ((hp8 h).trans ((hp7 h).trans ((hpA h).trans ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans ((hp1 h))))))))))))))))))))))))))))))))
-    iapply (pi_epilogue cE k 0x80001892#64 hK8 R3 hk2 (k.regs 1#5) (k.regs 8#5) (k.regs 9#5)
+    iapply (pi_epilogue cE k 0x80001940#64 hK8 R3 hk2 (k.regs 1#5) (k.regs 8#5) (k.regs 9#5)
       (k.regs 18#5) (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5)) $$ [- $Hk $Hpc]
     k_code (text_instr _ _ _ _ rfl rfl) Htext
     k_norm_g

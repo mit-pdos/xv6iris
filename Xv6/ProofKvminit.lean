@@ -23,13 +23,13 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 
 /-! ## Arithmetic facts -/
 
-/-- `ret` out of `kvmmake` lands on the `auipc` at `0x8000117c`. -/
-theorem kvi_ret_117c : jumpPc 0x8000117c#64 = 0x8000117c#64 := by
+/-- `ret` out of `kvmmake` lands on the `auipc` at `0x8000122a`. -/
+theorem kvi_ret_117c : jumpPc 0x8000122a#64 = 0x8000122a#64 := by
   simp only [jumpPc, BitVec.reduceAnd]
 
-/-- `auipc a5,0x9 ; sd a0,252(a5)` at `0x8000117c`: `&kernel_pagetable`. -/
+/-- `auipc a5,0x9 ; sd a0,252(a5)` at `0x8000122a`: `&kernel_pagetable`. -/
 theorem kvi_root_117c :
-    0x8000117c#64 + (BitVec.signExtend 64 (9#20 ++ 0#12) + 252#64) = kernelPagetableAddr := by
+    0x8000122a#64 + (BitVec.signExtend 64 (9#20 ++ 0#12) + 270#64) = kernelPagetableAddr := by
   decide
 
 /-- The context algebra of the exit interrupt state. -/
@@ -47,7 +47,7 @@ theorem kvi_kvmmake_call (KV : KVMMAKE) [CurCtx] (c : CPU) (k' : KCtx)
     (γl : GName) (γk : KmemNames) (nb : Nat)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 48 ≤ k'.avail) (hlk : "kmem" ∉ k'.locks)
     (hcount : kvmmakeCount < nb) :
-    kctx c k' ∗ pcIs c 0x800010c2#64 ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
+    kctx c k' ∗ pcIs c 0x80001160#64 ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
     kallocAvail γk (some nb) ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool,
       ∀ (R' : RegMap) (t : PTree) (pas : Nat → BitVec 44),
@@ -73,7 +73,7 @@ theorem kvminit_proof (KV : KVMMAKE) : KVMINIT :=
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   k_norm_g
   -- the prologue
-  iapply (wp_prologue2_gen cpu k 0x80001170#64 (by omega))
+  iapply (wp_prologue2_gen cpu k 0x8000121e#64 (by omega))
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm_g
   iframe
@@ -81,7 +81,7 @@ theorem kvminit_proof (KV : KVMMAKE) : KVMINIT :=
   iapply wpNext_intro_pin
   iintro %c1 %hp1 Hk Hpc Hframe
   -- jal ra, kvmmake
-  k_step_gen (wp_s_jal c1 _ 0x80001178#64 false 2096970#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c1 _ 0x80001226#64 false 2096954#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c2 hp2
   iintro Hk Hpc
   have hpin2 : k.sie = false ∨ k.proc = 0#64 → c2 = cpu := fun h => (hp2 h).trans (hp1 h)
@@ -104,10 +104,10 @@ theorem kvminit_proof (KV : KVMMAKE) : KVMINIT :=
   k_norm_g at hcs
   obtain ⟨e2, e8, e9, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩ := hcs
   -- auipc a5,0x9 ; sd a0,252(a5) : kernel_pagetable = root
-  k_step_gen (wp_s_auipc c3 _ 0x8000117c#64 false 9#20 15#5 (by decide))
+  k_step_gen (wp_s_auipc c3 _ 0x8000122a#64 false 9#20 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hp4
   iintro Hk Hpc
-  k_step_gen (wp_s_sd c4 _ 0x80001180#64 false 252#12 15#5 10#5 (by decide) v0)
+  k_step_gen (wp_s_sd c4 _ 0x8000122e#64 false 270#12 15#5 10#5 (by decide) v0)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [kvi_root_117c, hroot] next c5 hp5
   iintro Hk Hpc Hword
@@ -117,10 +117,10 @@ theorem kvminit_proof (KV : KVMMAKE) : KVMINIT :=
   simp only [kvi_pushed_withSpie]
   have hK' : 2 ≤ (k.withSpie spie spp).avail := by
     simp only [KCtx.withSpie_avail]; omega
-  have hR2 : (R.set 15#5 (0x8000117c#64 + BitVec.signExtend 64 (9#20 ++ 0#12))) 2#5
+  have hR2 : (R.set 15#5 (0x8000122a#64 + BitVec.signExtend 64 (9#20 ++ 0#12))) 2#5
       = (k.withSpie spie spp).regs 2#5 + 0xFFFFFFFFFFFFFFF0#64 := by
     k_norm_g; exact e2
-  iapply (wp_epilogue2_gen c5 (k.withSpie spie spp) 0x80001184#64 hK' _ hR2
+  iapply (wp_epilogue2_gen c5 (k.withSpie spie spp) 0x80001232#64 hK' _ hR2
     (k.regs 1#5) (k.regs 8#5)) $$ [- $Hk $Hpc]
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm_g

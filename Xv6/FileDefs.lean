@@ -47,7 +47,7 @@ def FDSLOTS : Nat := NPROC * (NOFILE + FDSPARE)
 
 /-- `struct ftable { struct spinlock lock; struct file file[NFILE]; }`: the
 lock is the first member. -/
-def ftableAddr : BitVec 64 := 0x800224a0#64   -- `ftable` (no ELF symbol in KernelSyms; SpecFileinit's `ftableLockAddr`)
+def ftableAddr : BitVec 64 := 0x80022548#64   -- `ftable` (no ELF symbol in KernelSyms; SpecFileinit's `ftableLockAddr`)
 def fileStride : Nat := 40
 def fileBase : BitVec 64 := ftableAddr + 24#64
 /-- `&ftable.file[k]`. -/

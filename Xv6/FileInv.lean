@@ -16,16 +16,16 @@ set_option linter.unusedSectionVars false
 
 /-! ## Geometry facts -/
 
-theorem fnode_toNat (k : Nat) (hk : k ≤ NFILE) : (fnode k).toNat = 0x800224b8 + 40 * k := by
+theorem fnode_toNat (k : Nat) (hk : k ≤ NFILE) : (fnode k).toNat = 0x80022560 + 40 * k := by
   unfold fnode fileBase ftableAddr fileStride NFILE at *
   rw [BitVec.toNat_add, BitVec.toNat_ofNat, BitVec.toNat_add]
   simp only [BitVec.toNat_ofNat]
   omega
 
-theorem fnode_zero : fnode 0 = 0x800224b8#64 := by
+theorem fnode_zero : fnode 0 = 0x80022560#64 := by
   unfold fnode fileBase ftableAddr fileStride; decide
 
-theorem fnode_end : fnode NFILE = 0x80023458#64 := by
+theorem fnode_end : fnode NFILE = 0x80023500#64 := by
   unfold fnode fileBase ftableAddr fileStride NFILE; decide
 
 theorem fnode_succ (k : Nat) : fnode k + BitVec.signExtend 64 40#12 = fnode (k + 1) := by

@@ -1,7 +1,7 @@
 /-
 Proof of `filealloc`'s specification (`SpecFilealloc.FILEALLOC`), given the
 interfaces of `acquire` and `release`.  Mirrors Rocq ProofFilealloc.v
-against the Lean image (`KernelSyms.filealloc = 0x800040ba`).
+against the Lean image (`KernelSyms.filealloc = 0x80004178`).
 
     acquire(&ftable.lock)
       -> scan ftable.file[0..NFILE) for the first entry with ref == 0
@@ -13,7 +13,7 @@ is bounded.  Every entry the cursor passes is a referenced slot, read off the
 lock's resource and put back unchanged (`fslot_acc`); the branch at each
 step is decided by the slot's `ref` cell being `L.length` (zero iff free).
 The found arm runs the ALLOC ghost step (`file_alloc_step`) before
-`release`; both arms rejoin at the tail `fa_tail` (`0x8000410c`).
+`release`; both arms rejoin at the tail `fa_tail` (`0x800041ca`).
 -/
 import Xv6.SpecFilealloc
 import Xv6.FileInv
@@ -36,19 +36,19 @@ set_option linter.unusedVariables false
 
 /-! ## Constants the code computes -/
 
-theorem fa_ret_40d0 : jumpPc 0x800040d0#64 = 0x800040d0#64 := by simp only [jumpPc, BitVec.reduceAnd]
-theorem fa_ret_40f8 : jumpPc 0x800040f8#64 = 0x800040f8#64 := by simp only [jumpPc, BitVec.reduceAnd]
-theorem fa_ret_410c : jumpPc 0x8000410c#64 = 0x8000410c#64 := by simp only [jumpPc, BitVec.reduceAnd]
+theorem fa_ret_40d0 : jumpPc 0x8000418e#64 = 0x8000418e#64 := by simp only [jumpPc, BitVec.reduceAnd]
+theorem fa_ret_40f8 : jumpPc 0x800041b6#64 = 0x800041b6#64 := by simp only [jumpPc, BitVec.reduceAnd]
+theorem fa_ret_410c : jumpPc 0x800041ca#64 = 0x800041ca#64 := by simp only [jumpPc, BitVec.reduceAnd]
 
-theorem fa_lock_40c4 : 0x800040c4#64 + (BitVec.signExtend 64 (0x1e#20 ++ 0#12) + 988#64) = ftableAddr := by
+theorem fa_lock_40c4 : 0x80004182#64 + (BitVec.signExtend 64 (0x1e#20 ++ 0#12) + 966#64) = ftableAddr := by
   unfold ftableAddr; decide
-theorem fa_lock_40ec : 0x800040ec#64 + (BitVec.signExtend 64 (0x1e#20 ++ 0#12) + 948#64) = ftableAddr := by
+theorem fa_lock_40ec : 0x800041aa#64 + (BitVec.signExtend 64 (0x1e#20 ++ 0#12) + 926#64) = ftableAddr := by
   unfold ftableAddr; decide
-theorem fa_lock_4100 : 0x80004100#64 + (BitVec.signExtend 64 (0x1e#20 ++ 0#12) + 928#64) = ftableAddr := by
+theorem fa_lock_4100 : 0x800041be#64 + (BitVec.signExtend 64 (0x1e#20 ++ 0#12) + 906#64) = ftableAddr := by
   unfold ftableAddr; decide
-theorem fa_s1_40d0 : 0x800040d0#64 + (BitVec.signExtend 64 (0x1e#20 ++ 0#12) + 1000#64) = fnode 0 := by
+theorem fa_s1_40d0 : 0x8000418e#64 + (BitVec.signExtend 64 (0x1e#20 ++ 0#12) + 978#64) = fnode 0 := by
   rw [fnode_zero]; decide
-theorem fa_end_40d8 : 0x800040d8#64 + (BitVec.signExtend 64 (0x1f#20 ++ 0#12) + 896#64) = fnode NFILE := by
+theorem fa_end_40d8 : 0x80004196#64 + (BitVec.signExtend 64 (0x1f#20 ++ 0#12) + 874#64) = fnode NFILE := by
   rw [fnode_end]; decide
 theorem fa_beq_00 : bcond bop.BEQ 0#64 0#64 = true := by decide
 theorem fa_ext1 : BitVec.extractLsb' 0 32 (0#64 + BitVec.signExtend 64 1#12) = 1#32 := by decide
@@ -61,13 +61,13 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG 
 /-! ## The shared tail: `mv a0,s1` and the epilogue -/
 
 set_option maxHeartbeats 4000000 in
-/-- From `0x8000410c` at hart `c` with `s1 = v`: `mv a0,s1`, the epilogue,
+/-- From `0x800041ca` at hart `c` with `s1 = v`: `mv a0,s1`, the epilogue,
 and the caller's continuation (ProofKalloc.ka_tail). -/
 theorem fa_tail (c : CPU) (kb : KCtx) (hK : 4 ≤ kb.avail) (v : BitVec 64)
     (KR : RegMap) (hregs : kb.regs = KR)
     (R : RegMap) (hR2 : R 2#5 = KR 2#5 + 0xFFFFFFFFFFFFFFE0#64) (h9 : R 9#5 = v)
     (hcs : calleeSaved KR (((R.set 2#5 (KR 2#5)).set 8#5 (KR 8#5)).set 9#5 (KR 9#5))) :
-    kctx c ((kb.pushed 4).withRegs R) ∗ pcIs c 0x8000410c#64 ∗
+    kctx c ((kb.pushed 4).withRegs R) ∗ pcIs c 0x800041ca#64 ∗
     frame4s1 (KR 2#5) (KR 1#5) (KR 8#5) (KR 9#5) ∗
     wpNext kb.sie kb.proc c (fun cpu' => iprop(∀ R'' : RegMap,
       kctx cpu' (kb.withRegs R'') -∗ pcIs cpu' (jumpPc (KR 1#5)) -∗
@@ -76,10 +76,10 @@ theorem fa_tail (c : CPU) (kb : KCtx) (hK : 4 ≤ kb.avail) (v : BitVec 64)
   subst hregs
   iintro ⟨Hk, Hpc, Hframe, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
-  k_step_gen (wp_s_add c _ 0x8000410c#64 true 10#5 0#5 9#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT
+  k_step_gen (wp_s_add c _ 0x800041ca#64 true 10#5 0#5 9#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc] with [h9] next c1 hp1
   iintro Hk Hpc
-  iapply (wp_epilogue4s1_gen c1 kb 0x8000410e#64 hK (R.set 10#5 v)
+  iapply (wp_epilogue4s1_gen c1 kb 0x800041cc#64 hK (R.set 10#5 v)
     (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hR2)
     (kb.regs 1#5) (kb.regs 8#5) (kb.regs 9#5)) $$ [- $Hk $Hpc $Hframe]
   k_code (text_instr _ _ _ _ rfl rfl) HT
@@ -106,7 +106,7 @@ theorem fa_exit (cpu cr : CPU) (k : KCtx) (γ : FileNames) (hK : 4 ≤ k.avail)
     (spie spp : Bool) (hsp : k.sie = false → spie = k.spie ∧ spp = k.spp)
     (R : RegMap) (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64) (hpins : faPins k R)
     (v : BitVec 64) (h9 : R 9#5 = v) :
-    kctx cr (((k.withSpie spie spp).pushed 4).withRegs R) ∗ pcIs cr 0x8000410c#64 ∗
+    kctx cr (((k.withSpie spie spp).pushed 4).withRegs R) ∗ pcIs cr 0x800041ca#64 ∗
     frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗ fileallocPost γ v ∗
     wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie2 : Bool, ∀ spp2 : Bool, ∀ R' : RegMap,
       ⌜k.sie = false → spie2 = k.spie ∧ spp2 = k.spp⌝ -∗
@@ -126,7 +126,7 @@ theorem fa_exit (cpu cr : CPU) (k : KCtx) (γ : FileNames) (hK : 4 ≤ k.avail)
   · ipureintro; exact hfacts.2
   · rw [hfacts.1]; iexact Hpost
 
-/-! ## The scan body at `0x800040e0`, one entry -/
+/-! ## The scan body at `0x8000419e`, one entry -/
 
 set_option maxHeartbeats 16000000 in
 /-- Entry `kk` (`s1 = fnode kk`, `kk < NFILE`): `lw a5,4(s1)`; free → take
@@ -142,7 +142,7 @@ theorem fa_body (RE : RELEASE) (cpu c : CPU) (k : KCtx) (γl : GName) (γ : File
     (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64) (hpins : faPins k R)
     (hfresh : ∀ i, nx ≤ i → PartialMap.get? M i = none) (hok : ftableOk M Ls) :
     kctx c ((((k.pushOffAt spie spp).withLocks ("ftable" :: k.locks)).pushed 4).withRegs R) ∗
-    pcIs c 0x800040e0#64 ∗ isLock γl ftableAddr "ftable" (ftableResAt γ) ∗
+    pcIs c 0x8000419e#64 ∗ isLock γl ftableAddr "ftable" (ftableResAt γ) ∗
     locked γl c ∗ (γ.ref ↪●MAP M) ∗ ([∗list] j ∈ List.range NFILE, fslotAt γ curCtx j (Ls j)) ∗
     fdSlot γ ∗ frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
     sieArm c k.sie k.proc ∗
@@ -154,7 +154,7 @@ theorem fa_body (RE : RELEASE) (cpu c : CPU) (k : KCtx) (γl : GName) (γ : File
       ⌜R' 9#5 = fnode (kk + 1) ∧ R' 14#5 = fnode NFILE ∧ R' 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64 ∧
         faPins k R' ∧ ftableOk M Ls'⌝ -∗
       kctx c ((((k.pushOffAt spie spp).withLocks ("ftable" :: k.locks)).pushed 4).withRegs R') -∗
-      pcIs c 0x800040e0#64 -∗ locked γl c -∗ (γ.ref ↪●MAP M) -∗
+      pcIs c 0x8000419e#64 -∗ locked γl c -∗ (γ.ref ↪●MAP M) -∗
       ([∗list] j ∈ List.range NFILE, fslotAt γ curCtx j (Ls' j)) -∗ fdSlot γ -∗
       frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) -∗ sieArm c k.sie k.proc -∗
       wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie2 : Bool, ∀ spp2 : Bool, ∀ R' : RegMap,
@@ -177,7 +177,7 @@ theorem fa_body (RE : RELEASE) (cpu c : CPU) (k : KCtx) (γl : GName) (γ : File
       wordPointsTo (fnode kk + BitVec.signExtend 64 4#12) 4 (DFrac.own 1) (BitVec.ofNat 32 n) from by
     rw [wordAtN_cur, aFref_eq, hn]) $$ Href
   -- c.lw a5,4(s1)
-  k_step (wp_s_lw c _ 0x800040e0#64 true 4#12 15#5 9#5 (by decide) (by decide) (DFrac.own 1) (BitVec.ofNat 32 n))
+  k_step (wp_s_lw c _ 0x8000419e#64 true 4#12 15#5 9#5 (by decide) (by decide) (DFrac.own 1) (BitVec.ofNat 32 n))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9]
   iintro Hk Hpc Href
   ihave Href := (show wordPointsTo (GF := GF) (fnode kk + 4#64) 4 (DFrac.own 1) (BitVec.ofNat 32 n) ⊢
@@ -188,7 +188,7 @@ theorem fa_body (RE : RELEASE) (cpu c : CPU) (k : KCtx) (γl : GName) (γ : File
     -- free: c.beqz taken to 0x40fc.  f->ref = 1, the alloc step, release, return f
     simp only [List.length_nil] at hn
     subst hn
-    k_step (wp_s_branch c _ 0x800040e2#64 true 26#13 15#5 0#5 (by decide) bop.BEQ)
+    k_step (wp_s_branch c _ 0x800041a0#64 true 26#13 15#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fa_beqz_zero, fa_ref_zero, fa_beq_00]
     iintro Hk Hpc
     icases Hor with ⟨⟨%hfree, Hf, Hn, Hc⟩ | ⟨%hne, -⟩⟩
@@ -196,13 +196,13 @@ theorem fa_body (RE : RELEASE) (cpu c : CPU) (k : KCtx) (γl : GName) (γ : File
     · exact absurd rfl hne
     obtain ⟨-, hty⟩ := hfree
     -- c.li a5,1 ; c.sw a5,4(s1)
-    k_step (wp_s_addi c _ 0x800040fc#64 true 1#12 15#5 0#5 (by decide))
+    k_step (wp_s_addi c _ 0x800041ba#64 true 1#12 15#5 0#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
     ihave Href := (show wordAtN (GF := GF) curCtx (aFref kk) 4 (DFrac.own 1) (BitVec.ofNat 32 ([] : List (Nat × Qp)).length) ⊢
         wordPointsTo (fnode kk + BitVec.signExtend 64 4#12) 4 (DFrac.own 1) (BitVec.ofNat 32 0) from by
       rw [wordAtN_cur, aFref_eq]; rfl) $$ Href
-    k_step (wp_s_sw c _ 0x800040fe#64 true 4#12 9#5 15#5 (by decide) (BitVec.ofNat 32 0))
+    k_step (wp_s_sw c _ 0x800041bc#64 true 4#12 9#5 15#5 (by decide) (BitVec.ofNat 32 0))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, fa_ext1, fa_ext1']
     iintro Hk Hpc Href
     ihave Href := (show wordPointsTo (GF := GF) (fnode kk + 4#64) 4 (DFrac.own 1) 1#32 ⊢
@@ -239,13 +239,13 @@ theorem fa_body (RE : RELEASE) (cpu c : CPU) (k : KCtx) (γl : GName) (γ : File
       (ftableOk_alloc M Ls nx kk hkk hfresh hok hL) $$ [Ha Hs]
     case' _ => iframe
     -- auipc a0,0x1e ; addi a0,a0,928 ; jal release
-    k_step (wp_s_auipc c _ 0x80004100#64 false 0x1e#20 10#5 (by decide))
+    k_step (wp_s_auipc c _ 0x800041be#64 false 0x1e#20 10#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
-    k_step (wp_s_addi c _ 0x80004104#64 false 928#12 10#5 10#5 (by decide))
+    k_step (wp_s_addi c _ 0x800041c2#64 false 906#12 10#5 10#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fa_lock_4100]
     iintro Hk Hpc
-    k_step (wp_s_jal c _ 0x80004108#64 false 2083642#21 1#5 (by decide))
+    k_step (wp_s_jal c _ 0x800041c6#64 false 2083610#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
     iapply (fa_release RE c _ γl γ ?ha0 ?hsr ?hnr ?hKr k.sie ?hrr ?hor) $$ [- $Hk $Hpc $Hlocked $HR]
@@ -290,31 +290,31 @@ theorem fa_body (RE : RELEASE) (cpu c : CPU) (k : KCtx) (γl : GName) (γ : File
   | cons e t =>
     -- referenced: c.beqz not taken; addi s1,s1,40 ; bne s1,a4,0x40e0
     have hn0 : n ≠ 0 := by rw [← hn]; simp
-    k_step (wp_s_branch c _ 0x800040e2#64 true 26#13 15#5 0#5 (by decide) bop.BEQ)
+    k_step (wp_s_branch c _ 0x800041a0#64 true 26#13 15#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fa_beqz_nonzero n hn0 (hn ▸ hlt)]
     iintro Hk Hpc
     ihave Hslot := fslot_intro γ curCtx kk (e :: t) C pn q' hnd hlt $$ [Href Hhalves Hfdn Hor]
     case' _ => iframe
     ihave Hs := Hcl $$ %(e :: t) Hslot
     have hok' : ftableOk M (updAt Ls kk (e :: t)) := by rw [updAt_same Ls kk _ hL]; exact hok
-    k_step (wp_s_addi c _ 0x800040e4#64 false 40#12 9#5 9#5 (by decide))
+    k_step (wp_s_addi c _ 0x800041a2#64 false 40#12 9#5 9#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, fnode_succ, fnode_succ']
     iintro Hk Hpc
     by_cases hlast : kk + 1 = NFILE
     · -- the last entry: bne not taken, the full arm
-      k_step (wp_s_branch c _ 0x800040e8#64 false 8184#13 9#5 14#5 (by decide) bop.BNE)
+      k_step (wp_s_branch c _ 0x800041a6#64 false 8184#13 9#5 14#5 (by decide) bop.BNE)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h14, hlast, fa_bne_end_last]
       iintro Hk Hpc
       ihave HR := ftableRes_intro γ curCtx M nx (updAt Ls kk (e :: t)) hfresh hok' $$ [Ha Hs]
       case' _ => iframe
       -- auipc a0,0x1e ; addi a0,a0,948 ; jal release
-      k_step (wp_s_auipc c _ 0x800040ec#64 false 0x1e#20 10#5 (by decide))
+      k_step (wp_s_auipc c _ 0x800041aa#64 false 0x1e#20 10#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       iintro Hk Hpc
-      k_step (wp_s_addi c _ 0x800040f0#64 false 948#12 10#5 10#5 (by decide))
+      k_step (wp_s_addi c _ 0x800041ae#64 false 926#12 10#5 10#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fa_lock_40ec]
       iintro Hk Hpc
-      k_step (wp_s_jal c _ 0x800040f4#64 false 2083662#21 1#5 (by decide))
+      k_step (wp_s_jal c _ 0x800041b2#64 false 2083630#21 1#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       iintro Hk Hpc
       iapply (fa_release RE c _ γl γ ?ha0 ?hsr ?hnr ?hKr k.sie ?hrr ?hor) $$ [- $Hk $Hpc $Hlocked $HR]
@@ -342,10 +342,10 @@ theorem fa_body (RE : RELEASE) (cpu c : CPU) (k : KCtx) (γl : GName) (γ : File
       unfold calleeSaved at hcs4
       k_norm_g at hcs4
       obtain ⟨e2, e8, e9, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩ := hcs4
-      k_step_gen (wp_s_addi cr _ 0x800040f8#64 true 0#12 9#5 0#5 (by decide))
+      k_step_gen (wp_s_addi cr _ 0x800041b6#64 true 0#12 9#5 0#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next cs hps
       iintro Hk Hpc
-      k_step_gen (wp_s_j cs _ 0x800040fa#64 true 18#21)
+      k_step_gen (wp_s_j cs _ 0x800041b8#64 true 18#21)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next cj hpj
       iintro Hk Hpc
       have hpinj : k.sie = false ∨ k.proc = 0#64 → cj = cpu :=
@@ -369,7 +369,7 @@ theorem fa_body (RE : RELEASE) (cpu c : CPU) (k : KCtx) (γl : GName) (γ : File
           0#64 (by (simp only [RegMap.set_apply, BitVec.reduceEq, ite_true]) <;> first | rfl | decide))
         $$ [- $Hk $Hpc $Hframe $Hpost $Hnext]
     · -- more entries: bne taken, the loop continues at kk + 1
-      k_step (wp_s_branch c _ 0x800040e8#64 false 8184#13 9#5 14#5 (by decide) bop.BNE)
+      k_step (wp_s_branch c _ 0x800041a6#64 false 8184#13 9#5 14#5 (by decide) bop.BNE)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h14, fa_bne_end (kk + 1) (by omega)]
       iintro Hk Hpc
       iapply Hloop $$ %(by omega) %_ %(updAt Ls kk (e :: t)) [] Hk Hpc Hlocked Ha Hs Hfd Hframe Harm Hnext
@@ -390,7 +390,7 @@ theorem fa_scan (RE : RELEASE) (cpu c : CPU) (k : KCtx) (γl : GName) (γ : File
     R 9#5 = fnode kk → R 14#5 = fnode NFILE → R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64 → faPins k R →
     ftableOk M Ls →
     kctx c ((((k.pushOffAt spie spp).withLocks ("ftable" :: k.locks)).pushed 4).withRegs R) ∗
-    pcIs c 0x800040e0#64 ∗ isLock γl ftableAddr "ftable" (ftableResAt γ) ∗
+    pcIs c 0x8000419e#64 ∗ isLock γl ftableAddr "ftable" (ftableResAt γ) ∗
     locked γl c ∗ (γ.ref ↪●MAP M) ∗ ([∗list] j ∈ List.range NFILE, fslotAt γ curCtx j (Ls j)) ∗
     fdSlot γ ∗ frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
     sieArm c k.sie k.proc ∗
@@ -435,7 +435,7 @@ theorem filealloc_proof (AC : ACQUIRE) (RE : RELEASE) : FILEALLOC := ⟨
   ihave #Hlk := (show isFtable (GF := GF) γl γ ⊢ isLock γl ftableAddr "ftable" (ftableResAt γ) from by
     unfold isFtable; iintro H; iexact H) $$ Hft
   -- the prologue
-  iapply (wp_prologue4s1_gen cpu k 0x800040ba#64 hK4)
+  iapply (wp_prologue4s1_gen cpu k 0x80004178#64 hK4)
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm_g
   iframe
@@ -443,13 +443,13 @@ theorem filealloc_proof (AC : ACQUIRE) (RE : RELEASE) : FILEALLOC := ⟨
   iapply wpNext_intro_pin
   iintro %c1 %hp1 Hk Hpc Hframe
   -- auipc a0,0x1e ; addi a0,a0,988 ; jal acquire
-  k_step_gen (wp_s_auipc c1 _ 0x800040c4#64 false 0x1e#20 10#5 (by decide))
+  k_step_gen (wp_s_auipc c1 _ 0x80004182#64 false 0x1e#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c2 hp2
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c2 _ 0x800040c8#64 false 988#12 10#5 10#5 (by decide))
+  k_step_gen (wp_s_addi c2 _ 0x80004186#64 false 966#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fa_lock_40c4] next c3 hp3
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c3 _ 0x800040cc#64 false 2083566#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c3 _ 0x8000418a#64 false 2083534#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hp4
   iintro Hk Hpc
   iapply (fa_acquire AC c4 _ γl γ ?ha0 ?hna ?hKa ?hla) $$ [- $Hk $Hpc]
@@ -471,16 +471,16 @@ theorem filealloc_proof (AC : ACQUIRE) (RE : RELEASE) : FILEALLOC := ⟨
     (hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h))))
   have hsie : (k.pushOffAt spie spp).sie = false := rfl
   -- auipc s1,0x1e ; addi s1,s1,1000 ; auipc a4,0x1f ; addi a4,a4,896
-  k_step (wp_s_auipc c _ 0x800040d0#64 false 0x1e#20 9#5 (by decide))
+  k_step (wp_s_auipc c _ 0x8000418e#64 false 0x1e#20 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ 0x800040d4#64 false 1000#12 9#5 9#5 (by decide))
+  k_step (wp_s_addi c _ 0x80004192#64 false 978#12 9#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fa_s1_40d0]
   iintro Hk Hpc
-  k_step (wp_s_auipc c _ 0x800040d8#64 false 0x1f#20 14#5 (by decide))
+  k_step (wp_s_auipc c _ 0x80004196#64 false 0x1f#20 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ 0x800040dc#64 false 896#12 14#5 14#5 (by decide))
+  k_step (wp_s_addi c _ 0x8000419a#64 false 874#12 14#5 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fa_end_40d8]
   iintro Hk Hpc
   icases ftableRes_elim γ curCtx $$ HR with ⟨%M, %nx, %Ls, Ha, %⟨hfresh, hok⟩, Hs⟩

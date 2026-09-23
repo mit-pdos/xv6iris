@@ -41,7 +41,7 @@ open LeanRV64D
 def printkAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«printk»
 
 /-- `pr.lock` (`kernel/printf.c`): the lock is the object's first field. -/
-def prLock : BitVec 64 := 0x80012338#64
+def prLock : BitVec 64 := 0x800123f8#64
 
 /-! ## The format language -/
 
@@ -140,7 +140,7 @@ def wp_printk_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G G
     (hK : 48 ≤ k.avail)
     (hflen : f.length + 4 < 2 ^ 31)
     (hkinds : pkKinds f = descs.map PkArgDesc.kind) (hdlen : descs.length ≤ 7)
-    (hnoff : k.noff + 2 < 2 ^ 31) (hpr : "pr" ∉ k.locks) (huart : "uart" ∉ k.locks) : Prop :=
+    (hnoff : k.noff + 2 < 2 ^ 31) (hpr : "pr" ∉ k.locks) (huart : "uart1" ∉ k.locks) : Prop :=
   kctx cpu k ∗ pcIs cpu printkAddr ∗
   cstr (k.regs 10#5) dqf f ∗ pkDescs k.regs descs ∗
   isLock γpr prLock "pr" (fun _ => emp) ∗ isTxLock γl γd ∗ uartSentSub γd bs ∗

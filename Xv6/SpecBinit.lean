@@ -21,11 +21,11 @@ open LeanRV64D
 /-- Address of `binit`. -/
 def binitAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«binit»
 /-- `&bcache.lock`, its name, `&bcache.buf[i]`, `&bcache.head`, the `"buffer"` literal. -/
-def bcacheLockAddr : BitVec 64 := 0x800181d0#64
-def bcacheNameAddr : BitVec 64 := 0x800073b0#64
-def bufAddr (i : Nat) : BitVec 64 := 0x800181e8#64 + BitVec.ofNat 64 (1112 * i)
-def bcacheHeadAddr : BitVec 64 := 0x80020438#64
-def bufferNameAddr : BitVec 64 := 0x800073b8#64
+def bcacheLockAddr : BitVec 64 := 0x80018278#64
+def bcacheNameAddr : BitVec 64 := 0x800073b8#64
+def bufAddr (i : Nat) : BitVec 64 := 0x80018290#64 + BitVec.ofNat 64 (1112 * i)
+def bcacheHeadAddr : BitVec 64 := 0x800204e0#64
+def bufferNameAddr : BitVec 64 := 0x800073c0#64
 
 /-- The list after `binit`: `head.next = buf[29]`, `buf[i].next = buf[i-1]`
 (`buf[0].next = head`); `head.prev = buf[0]`, `buf[i].prev = buf[i+1]`

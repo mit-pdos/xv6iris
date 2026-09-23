@@ -45,9 +45,9 @@ theorem fw_imm_p48 : BitVec.signExtend 64 48#12 = 8#64 * BitVec.ofNat 64 6 := by
 theorem fw_lui_4096 : BitVec.signExtend 64 (1#20 ++ 0#12) = 4096#64 := by decide
 
 /-- `ret` out of the recursive call, resp. out of `kfree`. -/
-theorem fw_ret_136c : jumpPc 0x8000136c#64 = 0x8000136c#64 := by
+theorem fw_ret_136c : jumpPc 0x8000141a#64 = 0x8000141a#64 := by
   simp only [jumpPc, BitVec.reduceAnd]
-theorem fw_ret_1378 : jumpPc 0x80001378#64 = 0x80001378#64 := by
+theorem fw_ret_1378 : jumpPc 0x80001426#64 = 0x80001426#64 := by
   simp only [jumpPc, BitVec.reduceAnd]
 
 /-- The `V` bit of a pointer entry: set. -/
@@ -192,7 +192,7 @@ theorem fw_kfree_call (KF : KFREE) [CurCtx] (c : CPU) (k' : KCtx)
     (γl : GName) (γk : KmemNames)
     (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 14 ≤ k'.avail) (hlk' : "kmem" ∉ k'.locks)
     (hp : pageValid (k'.regs 10#5)) :
-    kctx c k' ∗ pcIs c 0x800009f8#64 ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
+    kctx c k' ∗ pcIs c 0x80000a96#64 ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
     pageOwn (k'.regs 10#5) ∗ kallocAvail γk none ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie' : Bool, ∀ spp' : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie' = k'.spie ∧ spp' = k'.spp⌝ -∗
@@ -212,7 +212,7 @@ theorem fw_rec_call (l' : Nat) (FW : FwAt l') [CurCtx] (c : CPU) (k' : KCtx)
     (hlk' : "kmem" ∉ k'.locks) (hroot' : k'.regs 10#5 = pageAddr u.base)
     (hwf' : u.wfU l') (hnd' : u.pagesNodup l') (hpg' : ∀ b ∈ u.pages l', pageValid (pageAddr b))
     (hnl' : u.noLeaves l') :
-    kctx c k' ∗ pcIs c 0x8000132a#64 ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
+    kctx c k' ∗ pcIs c 0x800013d8#64 ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
     kallocAvail γk none ∗ ptreeOwn l' (DFrac.own 1) u ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie' : Bool, ∀ spp' : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie' = k'.spie ∧ spp' = k'.spp⌝ -∗
@@ -227,7 +227,7 @@ theorem fw_rec_call (l' : Nat) (FW : FwAt l') [CurCtx] (c : CPU) (k' : KCtx)
 /-! ## The epilogue -/
 
 set_option maxHeartbeats 4000000 in
-/-- The epilogue at `0x80001378`: restore `ra`, `s0`, `s1`, `s2`, `s3`, pop
+/-- The epilogue at `0x80001426`: restore `ra`, `s0`, `s1`, `s2`, `s3`, pop
 the frame, return to the caller. -/
 theorem freewalk_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
     (hpin : k.sie = false ∨ k.proc = 0#64 → cur = cpu) (hK : 6 ≤ k.avail)
@@ -236,7 +236,7 @@ theorem freewalk_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
     (h20 : R 20#5 = k.regs 20#5) (h21 : R 21#5 = k.regs 21#5) (h22 : R 22#5 = k.regs 22#5)
     (h23 : R 23#5 = k.regs 23#5) (h24 : R 24#5 = k.regs 24#5) (h25 : R 25#5 = k.regs 25#5)
     (h26 : R 26#5 = k.regs 26#5) (h27 : R 27#5 = k.regs 27#5) (v5 : BitVec 64) :
-    kctx cur (((k.pushed 6).withSpie spie spp).withRegs R) ∗ pcIs cur 0x80001378#64 ∗
+    kctx cur (((k.pushed 6).withSpie spie spp).withRegs R) ∗ pcIs cur 0x80001426#64 ∗
     fwFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5) v5 ∗
     wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie' : Bool, ∀ spp' : Bool, ∀ R' : RegMap,
       ⌜k.sie = false → spie' = k.spie ∧ spp' = k.spp⌝ -∗
@@ -248,33 +248,33 @@ theorem freewalk_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK' : 6 ≤ (k.withSpie spie spp).avail := hK
   simp only [fw_pushed_withSpie]
-  k_step_gen (wp_s_ld cur _ 0x80001378#64 true 40#12 1#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld cur _ 0x80001426#64 true 40#12 1#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 1#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c1 hp1
   iintro Hk Hpc F0
-  k_step_gen (wp_s_ld c1 _ 0x8000137a#64 true 32#12 8#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c1 _ 0x80001428#64 true 32#12 8#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 8#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c2 hp2
   iintro Hk Hpc F1
-  k_step_gen (wp_s_ld c2 _ 0x8000137c#64 true 24#12 9#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c2 _ 0x8000142a#64 true 24#12 9#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 9#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c3 hp3
   iintro Hk Hpc F2
-  k_step_gen (wp_s_ld c3 _ 0x8000137e#64 true 16#12 18#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c3 _ 0x8000142c#64 true 16#12 18#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 18#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c4 hp4
   iintro Hk Hpc F3
-  k_step_gen (wp_s_ld c4 _ 0x80001380#64 true 8#12 19#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c4 _ 0x8000142e#64 true 8#12 19#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 19#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c5 hp5
   iintro Hk Hpc F4
   ihave Hstack : stackOwn (k.regs 2#5) 6 $$ [F0 F1 F2 F3 F4 F5]
   case' _ => stack_cells; iframe
-  k_step_gen (wp_s_pop c5 _ 0x80001382#64 true 48#12 6 fw_imm_p48)
+  k_step_gen (wp_s_pop c5 _ 0x80001430#64 true 48#12 6 fw_imm_p48)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK', hR2] next c6 hp6
   iintro Hk Hpc
-  k_step_gen (wp_s_ret c6 _ 0x80001384#64 true 1#5) from (text_instr _ _ _ _ rfl rfl) Htext
+  k_step_gen (wp_s_ret c6 _ 0x80001432#64 true 1#5) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc] next c7 hp7
   iintro Hk Hpc
   ihave HΦ' := wpNext_at _ _ _ c7 _
@@ -290,7 +290,7 @@ theorem freewalk_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
 /-! ## The tail: `kfree(pagetable)` -/
 
 set_option maxHeartbeats 4000000 in
-/-- At `0x80001372`: the node page, all its entries cleared, goes back to
+/-- At `0x80001420`: the node page, all its entries cleared, goes back to
 the allocator, then the epilogue. -/
 theorem freewalk_tail (KF : KFREE) [CurCtx] (cpu cur : CPU) (k : KCtx)
     (γl : GName) (γk : KmemNames) (t : PTree)
@@ -303,7 +303,7 @@ theorem freewalk_tail (KF : KFREE) [CurCtx] (cpu cur : CPU) (k : KCtx)
     (h20 : R 20#5 = k.regs 20#5) (h21 : R 21#5 = k.regs 21#5) (h22 : R 22#5 = k.regs 22#5)
     (h23 : R 23#5 = k.regs 23#5) (h24 : R 24#5 = k.regs 24#5) (h25 : R 25#5 = k.regs 25#5)
     (h26 : R 26#5 = k.regs 26#5) (h27 : R 27#5 = k.regs 27#5) (v5 : BitVec 64) :
-    kctx cur (((k.pushed 6).withSpie spie spp).withRegs R) ∗ pcIs cur 0x80001372#64 ∗
+    kctx cur (((k.pushed 6).withSpie spie spp).withRegs R) ∗ pcIs cur 0x80001420#64 ∗
     isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     pageOwn (pageAddr t.base) ∗
     fwFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5) v5 ∗
@@ -315,11 +315,11 @@ theorem freewalk_tail (KF : KFREE) [CurCtx] (cpu cur : CPU) (k : KCtx)
   iintro ⟨Hk, Hpc, #Hlk, #Hav, Hpage, Hframe, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- c.mv a0,s3 : the page
-  k_step_gen (wp_s_add cur _ 0x80001372#64 true 10#5 0#5 19#5 (by decide))
+  k_step_gen (wp_s_add cur _ 0x80001420#64 true 10#5 0#5 19#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h19] next c1 hp1
   iintro Hk Hpc
   -- jal ra, kfree
-  k_step_gen (wp_s_jal c1 _ 0x80001374#64 false 2094724#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c1 _ 0x80001422#64 false 2094708#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c2 hp2
   iintro Hk Hpc
   iapply (fw_kfree_call KF c2 _ γl γk ?hn ?hKa ?hl ?hpvg) $$ [- $Hk $Hpc]
@@ -355,28 +355,28 @@ theorem freewalk_tail (KF : KFREE) [CurCtx] (cpu cur : CPU) (k : KCtx)
 /-! ## Stepping the cursor -/
 
 set_option maxHeartbeats 4000000 in
-/-- At `0x8000134e`: the cursor moves on; the loop test decides whether the
+/-- At `0x800013fc`: the cursor moves on; the loop test decides whether the
 next entry or the tail comes next. -/
 theorem freewalk_next [CurCtx] (k : KCtx) (t : PTree) (i : Nat) (hi : i < 512)
     (spie spp : Bool) (R : RegMap)
     (h9 : R 9#5 = pageAddr t.base + BitVec.ofNat 64 (8 * i))
     (h18 : R 18#5 = pageAddr t.base + 4096#64) (cur : CPU) :
-    kctx cur (((k.pushed 6).withSpie spie spp).withRegs R) ∗ pcIs cur 0x8000134e#64 ∗
+    kctx cur (((k.pushed 6).withSpie spie spp).withRegs R) ∗ pcIs cur 0x800013fc#64 ∗
     wpNext k.sie k.proc cur (fun cpu' => iprop(∀ spie2 : Bool, ∀ spp2 : Bool, ∀ R2 : RegMap,
       ⌜k.sie = false → spie2 = spie ∧ spp2 = spp⌝ -∗
       kctx cpu' (((k.pushed 6).withSpie spie2 spp2).withRegs R2) -∗
-      pcIs cpu' (if i + 1 = 512 then 0x80001372#64 else 0x80001354#64) -∗
+      pcIs cpu' (if i + 1 = 512 then 0x80001420#64 else 0x80001402#64) -∗
       ⌜fwSaved R R2 ∧ R2 9#5 = pageAddr t.base + BitVec.ofNat 64 (8 * (i + 1))⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cur := by
   iintro ⟨Hk, Hpc, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- c.addi s1,8
-  k_step_gen (wp_s_addi cur _ 0x8000134e#64 true 8#12 9#5 9#5 (by decide))
+  k_step_gen (wp_s_addi cur _ 0x800013fc#64 true 8#12 9#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [h9, fw_step t.base i] next c1 hp1
   iintro Hk Hpc
   -- beq s1,s2
-  k_step_gen (wp_s_branch c1 _ 0x80001350#64 false 34#13 9#5 18#5 (by decide) bop.BEQ)
+  k_step_gen (wp_s_branch c1 _ 0x800013fe#64 false 34#13 9#5 18#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [h18, fw_branch_last t.base i hi] next c2 hp2
   iintro Hk Hpc
@@ -403,7 +403,7 @@ theorem fw_kids_none (lvl : Nat) (t : PTree) (j : BitVec 9) (hwf : t.wfU lvl)
     | some u => rw [hk] at hw; exact absurd (hw.1 ▸ h) (fw_kPtr_ne_zero u.base)
 
 set_option maxHeartbeats 4000000 in
-/-- The body at `0x80001354`: read entry `i`; a zero entry is skipped, a
+/-- The body at `0x80001402`: read entry `i`; a zero entry is skipped, a
 pointer entry is freed by the recursive call and then cleared. -/
 theorem freewalk_iter [CurCtx] (lvl : Nat) (t : PTree)
     (hlvl : lvl ≤ 2) (hwf : t.wfU lvl) (hnl : t.noLeaves lvl)
@@ -414,7 +414,7 @@ theorem freewalk_iter [CurCtx] (lvl : Nat) (t : PTree)
     (i : Nat) (hi : i < 512) (spie spp : Bool) (R : RegMap)
     (h9 : R 9#5 = pageAddr t.base + BitVec.ofNat 64 (8 * i))
     (h18 : R 18#5 = pageAddr t.base + 4096#64) (cur : CPU) :
-    kctx cur (((k.pushed 6).withSpie spie spp).withRegs R) ∗ pcIs cur 0x80001354#64 ∗
+    kctx cur (((k.pushed 6).withSpie spie spp).withRegs R) ∗ pcIs cur 0x80001402#64 ∗
     isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     wordPointsTo (pageAddr t.base + BitVec.ofNat 64 (8 * i)) 8 (DFrac.own 1)
       (t.ents (BitVec.ofNat 9 i)) ∗
@@ -422,7 +422,7 @@ theorem freewalk_iter [CurCtx] (lvl : Nat) (t : PTree)
     wpNext k.sie k.proc cur (fun cpu' => iprop(∀ spie2 : Bool, ∀ spp2 : Bool, ∀ R2 : RegMap,
       ⌜k.sie = false → spie2 = spie ∧ spp2 = spp⌝ -∗
       kctx cpu' (((k.pushed 6).withSpie spie2 spp2).withRegs R2) -∗
-      pcIs cpu' (if i + 1 = 512 then 0x80001372#64 else 0x80001354#64) -∗
+      pcIs cpu' (if i + 1 = 512 then 0x80001420#64 else 0x80001402#64) -∗
       wordPointsTo (pageAddr t.base + BitVec.ofNat 64 (8 * i)) 8 (DFrac.own 1) 0#64 -∗
       ⌜fwSaved R R2 ∧ R2 9#5 = pageAddr t.base + BitVec.ofNat 64 (8 * (i + 1))⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cur := by
@@ -432,14 +432,14 @@ theorem freewalk_iter [CurCtx] (lvl : Nat) (t : PTree)
   · -- an invalid entry: skipped
     rw [kidsAt_none lvl t _ (fw_kids_none lvl t _ hwf hz), hz]
     iclear Hkid
-    k_step_gen (wp_s_ld cur _ 0x80001354#64 true 0#12 15#5 9#5 (by decide) (by decide)
+    k_step_gen (wp_s_ld cur _ 0x80001402#64 true 0#12 15#5 9#5 (by decide) (by decide)
         (DFrac.own 1) 0#64)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9] next c1 hp1
     iintro Hk Hpc Hw
-    k_step_gen (wp_s_andi c1 _ 0x80001356#64 false 1#12 14#5 15#5 (by decide))
+    k_step_gen (wp_s_andi c1 _ 0x80001404#64 false 1#12 14#5 15#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c2 hp2
     iintro Hk Hpc
-    k_step_gen (wp_s_branch c2 _ 0x8000135a#64 true 8180#13 14#5 0#5 (by decide) bop.BEQ)
+    k_step_gen (wp_s_branch c2 _ 0x80001408#64 true 8180#13 14#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fw_ite_beq] next c3 hp3
     iintro Hk Hpc
     have hpin3 : k.sie = false ∨ k.proc = 0#64 → c3 = cur :=
@@ -464,31 +464,31 @@ theorem freewalk_iter [CurCtx] (lvl : Nat) (t : PTree)
     icases ptreeOwn_pagesNodup' l' u $$ Hkid with ⟨%hnd2, Hkid⟩
     have hupg : ∀ b ∈ u.pages l', pageValid (pageAddr b) :=
       fun b hb => hpg b (kid_mem_pages l' t u _ hkid b hb)
-    k_step_gen (wp_s_ld cur _ 0x80001354#64 true 0#12 15#5 9#5 (by decide) (by decide)
+    k_step_gen (wp_s_ld cur _ 0x80001402#64 true 0#12 15#5 9#5 (by decide) (by decide)
         (DFrac.own 1) (kPtr u.base))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9] next c1 hp1
     iintro Hk Hpc Hw
-    k_step_gen (wp_s_andi c1 _ 0x80001356#64 false 1#12 14#5 15#5 (by decide))
+    k_step_gen (wp_s_andi c1 _ 0x80001404#64 false 1#12 14#5 15#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fw_kPtr_valid] next c2 hp2
     iintro Hk Hpc
-    k_step_gen (wp_s_branch c2 _ 0x8000135a#64 true 8180#13 14#5 0#5 (by decide) bop.BEQ)
+    k_step_gen (wp_s_branch c2 _ 0x80001408#64 true 8180#13 14#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [fw_ite_beq, if_neg (show ¬ (1#64 : BitVec 64) = 0#64 by decide)] next c3 hp3
     iintro Hk Hpc
-    k_step_gen (wp_s_andi c3 _ 0x8000135c#64 false 14#12 14#5 15#5 (by decide))
+    k_step_gen (wp_s_andi c3 _ 0x8000140a#64 false 14#12 14#5 15#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fw_kPtr_nonleaf] next c4 hp4
     iintro Hk Hpc
-    k_step_gen (wp_s_branch c4 _ 0x80001360#64 true 8162#13 14#5 0#5 (by decide) bop.BNE)
+    k_step_gen (wp_s_branch c4 _ 0x8000140e#64 true 8162#13 14#5 0#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [fw_ite_bne, if_pos (show (0#64 : BitVec 64) = 0#64 from rfl)] next c5 hp5
     iintro Hk Hpc
-    k_step_gen (wp_s_srli c5 _ 0x80001362#64 true 10#6 15#5 15#5 (by decide))
+    k_step_gen (wp_s_srli c5 _ 0x80001410#64 true 10#6 15#5 15#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c6 hp6
     iintro Hk Hpc
-    k_step_gen (wp_s_slli c6 _ 0x80001364#64 false 12#6 10#5 15#5 (by decide))
+    k_step_gen (wp_s_slli c6 _ 0x80001412#64 false 12#6 10#5 15#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fw_ptr_page] next c7 hp7
     iintro Hk Hpc
-    k_step_gen (wp_s_jal c7 _ 0x80001368#64 false 2097090#21 1#5 (by decide))
+    k_step_gen (wp_s_jal c7 _ 0x80001416#64 false 2097090#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c8 hp8
     iintro Hk Hpc
     -- freewalk(child) at the level below
@@ -510,10 +510,10 @@ theorem freewalk_iter [CurCtx] (lvl : Nat) (t : PTree)
     k_norm_g [h9, h18] at hcs2
     obtain ⟨e2, e8, e9, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩ := hcs2
     -- sd zero,0(s1)
-    k_step_gen (wp_s_sd c9 _ 0x8000136c#64 false 0#12 9#5 0#5 (by decide) (kPtr u.base))
+    k_step_gen (wp_s_sd c9 _ 0x8000141a#64 false 0#12 9#5 0#5 (by decide) (kPtr u.base))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e9] next c10 hp10
     iintro Hk Hpc Hw
-    k_step_gen (wp_s_j c10 _ 0x80001370#64 true 2097118#21)
+    k_step_gen (wp_s_j c10 _ 0x8000141e#64 true 2097118#21)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c11 hp11
     iintro Hk Hpc
     have hpin11 : k.sie = false ∨ k.proc = 0#64 → c11 = cur := fun h =>
@@ -539,7 +539,7 @@ theorem freewalk_iter [CurCtx] (lvl : Nat) (t : PTree)
 /-! ## The loop -/
 
 set_option maxHeartbeats 4000000 in
-/-- The loop from `0x80001354` with the first `i` entries cleared runs to
+/-- The loop from `0x80001402` with the first `i` entries cleared runs to
 the caller's continuation.  The hart is quantified inside the induction. -/
 theorem freewalk_loop (KF : KFREE) [CurCtx] (lvl : Nat) (t : PTree)
     (hlvl : lvl ≤ 2) (hwf : t.wfU lvl) (hnl : t.noLeaves lvl)
@@ -556,7 +556,7 @@ theorem freewalk_loop (KF : KFREE) [CurCtx] (lvl : Nat) (t : PTree)
       (_ : R 20#5 = k.regs 20#5) (_ : R 21#5 = k.regs 21#5) (_ : R 22#5 = k.regs 22#5)
       (_ : R 23#5 = k.regs 23#5) (_ : R 24#5 = k.regs 24#5) (_ : R 25#5 = k.regs 25#5)
       (_ : R 26#5 = k.regs 26#5) (_ : R 27#5 = k.regs 27#5) (v5 : BitVec 64) (cur : CPU),
-    kctx cur (((k.pushed 6).withSpie spie spp).withRegs R) ∗ pcIs cur 0x80001354#64 ∗
+    kctx cur (((k.pushed 6).withSpie spie spp).withRegs R) ∗ pcIs cur 0x80001402#64 ∗
     isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     fwDone t.base i ∗ fwTodo lvl t i ∗
     fwFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5) v5 ∗
@@ -640,44 +640,44 @@ theorem freewalk_body (KF : KFREE) (lvl : Nat) (hrec : ∀ l', lvl = l' + 1 → 
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK6 : 6 ≤ k.avail := by simp only [freewalkSlots] at hK; omega
   -- the frame
-  k_step_gen (wp_s_push cpu _ 0x8000132a#64 true 4048#12 6 hK6 fw_imm_m48)
+  k_step_gen (wp_s_push cpu _ 0x800013d8#64 true 4048#12 6 hK6 fw_imm_m48)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c1 hp1
   iintro Hk Hpc Hstack
   irevert Hstack
   stack_cells
   iintro ⟨⟨%w0, F0⟩, ⟨%w1, F1⟩, ⟨%w2, F2⟩, ⟨%w3, F3⟩, ⟨%w4, F4⟩, ⟨%w5, F5⟩, _⟩
-  k_step_gen (wp_s_sd c1 _ 0x8000132c#64 true 40#12 2#5 1#5 (by decide) w0)
+  k_step_gen (wp_s_sd c1 _ 0x800013da#64 true 40#12 2#5 1#5 (by decide) w0)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c2 hp2
   iintro Hk Hpc F0
-  k_step_gen (wp_s_sd c2 _ 0x8000132e#64 true 32#12 2#5 8#5 (by decide) w1)
+  k_step_gen (wp_s_sd c2 _ 0x800013dc#64 true 32#12 2#5 8#5 (by decide) w1)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
   iintro Hk Hpc F1
-  k_step_gen (wp_s_sd c3 _ 0x80001330#64 true 24#12 2#5 9#5 (by decide) w2)
+  k_step_gen (wp_s_sd c3 _ 0x800013de#64 true 24#12 2#5 9#5 (by decide) w2)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hp4
   iintro Hk Hpc F2
-  k_step_gen (wp_s_sd c4 _ 0x80001332#64 true 16#12 2#5 18#5 (by decide) w3)
+  k_step_gen (wp_s_sd c4 _ 0x800013e0#64 true 16#12 2#5 18#5 (by decide) w3)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c5 hp5
   iintro Hk Hpc F3
-  k_step_gen (wp_s_sd c5 _ 0x80001334#64 true 8#12 2#5 19#5 (by decide) w4)
+  k_step_gen (wp_s_sd c5 _ 0x800013e2#64 true 8#12 2#5 19#5 (by decide) w4)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c6 hp6
   iintro Hk Hpc F4
-  k_step_gen (wp_s_addi c6 _ 0x80001336#64 true 48#12 8#5 2#5 (by decide))
+  k_step_gen (wp_s_addi c6 _ 0x800013e4#64 true 48#12 8#5 2#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c7 hp7
   iintro Hk Hpc
   -- s3 = s1 = pagetable ; s2 = pagetable + PGSIZE
-  k_step_gen (wp_s_add c7 _ 0x80001338#64 true 19#5 0#5 10#5 (by decide))
+  k_step_gen (wp_s_add c7 _ 0x800013e6#64 true 19#5 0#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hroot] next c8 hp8
   iintro Hk Hpc
-  k_step_gen (wp_s_add c8 _ 0x8000133a#64 true 9#5 0#5 10#5 (by decide))
+  k_step_gen (wp_s_add c8 _ 0x800013e8#64 true 9#5 0#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hroot] next c9 hp9
   iintro Hk Hpc
-  k_step_gen (wp_s_lui c9 _ 0x8000133c#64 true 1#20 18#5 (by decide))
+  k_step_gen (wp_s_lui c9 _ 0x800013ea#64 true 1#20 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fw_lui_4096] next c10 hp10
   iintro Hk Hpc
-  k_step_gen (wp_s_add c10 _ 0x8000133e#64 true 18#5 18#5 10#5 (by decide))
+  k_step_gen (wp_s_add c10 _ 0x800013ec#64 true 18#5 18#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hroot] next c11 hp11
   iintro Hk Hpc
-  k_step_gen (wp_s_j c11 _ 0x80001340#64 true 20#21)
+  k_step_gen (wp_s_j c11 _ 0x800013ee#64 true 20#21)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c12 hp12
   iintro Hk Hpc
   ihave Hframe := fwFrame_join (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5)

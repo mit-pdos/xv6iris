@@ -21,9 +21,9 @@ open LeanRV64D
 /-- Address of `trapinit`. -/
 def trapinitAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«trapinit»
 /-- `&tickslock`. -/
-def tickslockAddr : BitVec 64 := 0x800181b8#64
+def tickslockAddr : BitVec 64 := 0x80018260#64
 /-- The `"time"` literal. -/
-def timeNameAddr : BitVec 64 := 0x80007268#64
+def timeNameAddr : BitVec 64 := 0x80007270#64
 
 /-- The specification of `trapinit`. -/
 def wp_trapinit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]

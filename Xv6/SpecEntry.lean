@@ -23,7 +23,7 @@ open LeanRV64D
 def startAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«start»
 
 /-- The GOT slot `_entry` loads `sp` from; it holds the address of `stack0`. -/
-def stack0Slot : BitVec 64 := 0x8000a258#64
+def stack0Slot : BitVec 64 := 0x8000a318#64
 
 /-- **WP of `_entry` up to and including the `jal` to `start`.**
 

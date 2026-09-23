@@ -31,7 +31,7 @@ theorem ti_u5 : BitVec.signExtend 64 (5#20 ++ 0#12) = 0x5000#64 := by decide
 theorem ti_u16 : BitVec.signExtend 64 (0x16#20 ++ 0#12) = 0x16000#64 := by decide
 
 /-- `ret` out of `initlock` lands on the instruction after the `jal`. -/
-theorem ti_ret_2476 : jumpPc 0x80002476#64 = 0x80002476#64 := by
+theorem ti_ret_2476 : jumpPc 0x80002524#64 = 0x80002524#64 := by
   simp only [jumpPc, BitVec.reduceAnd]
 
 section
@@ -44,7 +44,7 @@ set_option maxHeartbeats 1000000 in
 theorem ti_initlock_call (IL : INITLOCK) [CurCtx] (c : CPU) (k' : KCtx)
     (vlock : BitVec 32) (vname vcpu : BitVec 64) (hK' : 2 ≤ k'.avail)
     (lk nm : BitVec 64) (h10 : k'.regs 10#5 = lk) (h11 : k'.regs 11#5 = nm) :
-    kctx c k' ∗ pcIs c 0x80000b3a#64 ∗
+    kctx c k' ∗ pcIs c 0x80000bd8#64 ∗
     kmapId lk ∗ kmapId (lk + 16#64) ∗
     wordPointsTo lk 4 (DFrac.own 1) vlock ∗
     wordPointsTo (lk + 8#64) 8 (DFrac.own 1) vname ∗
@@ -62,7 +62,7 @@ theorem ti_initlock_call (IL : INITLOCK) [CurCtx] (c : CPU) (k' : KCtx)
 /-! ## The epilogue -/
 
 set_option maxHeartbeats 4000000 in
-/-- The epilogue at `0x80002476`: restore `ra`, `s0`, pop the frame and
+/-- The epilogue at `0x80002524`: restore `ra`, `s0`, pop the frame and
 return to the caller with the name word and `lkFresh`. -/
 theorem trapinit_finish [CurCtx] (cpu c : CPU) (k : KCtx)
     (hpin : k.sie = false ∨ k.proc = 0#64 → c = cpu) (hK : 2 ≤ k.avail)
@@ -72,7 +72,7 @@ theorem trapinit_finish [CurCtx] (cpu c : CPU) (k : KCtx)
     (h21 : R 21#5 = k.regs 21#5) (h22 : R 22#5 = k.regs 22#5) (h23 : R 23#5 = k.regs 23#5)
     (h24 : R 24#5 = k.regs 24#5) (h25 : R 25#5 = k.regs 25#5) (h26 : R 26#5 = k.regs 26#5)
     (h27 : R 27#5 = k.regs 27#5) :
-    kctx c ((k.pushed 2).withRegs R) ∗ pcIs c 0x80002476#64 ∗
+    kctx c ((k.pushed 2).withRegs R) ∗ pcIs c 0x80002524#64 ∗
     frame2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) ∗
     wordPointsTo (tickslockAddr + 8#64) 8 (DFrac.own 1) timeNameAddr ∗
     lkFresh tickslockAddr ∗
@@ -83,7 +83,7 @@ theorem trapinit_finish [CurCtx] (cpu c : CPU) (k : KCtx)
     ⊢ wpLoop (GF := GF) c := by
   iintro ⟨Hk, Hpc, Hframe, Hwname, Hfresh, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
-  iapply (wp_epilogue2_gen c k 0x80002476#64 hK R hR2 (k.regs 1#5) (k.regs 8#5)) $$ [- $Hk $Hpc]
+  iapply (wp_epilogue2_gen c k 0x80002524#64 hK R hR2 (k.regs 1#5) (k.regs 8#5)) $$ [- $Hk $Hpc]
   k_code (text_instr _ _ _ _ rfl rfl) HT
   k_norm_g
   iframe
@@ -109,7 +109,7 @@ theorem trapinit_proof (IL : INITLOCK) : TRAPINIT :=
   simp only [trapinitAddr, KernelSyms.«trapinit»]
   k_norm_g
   -- prologue
-  iapply (wp_prologue2_gen cpu k 0x8000245a#64 (by omega))
+  iapply (wp_prologue2_gen cpu k 0x80002508#64 (by omega))
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm_g
   iframe
@@ -117,21 +117,21 @@ theorem trapinit_proof (IL : INITLOCK) : TRAPINIT :=
   iapply wpNext_intro_pin
   iintro %c1 %hp1 Hk Hpc Hframe
   -- a1 = "time"
-  k_step_gen (wp_s_auipc c1 _ 0x80002462#64 false 5#20 11#5 (by decide))
+  k_step_gen (wp_s_auipc c1 _ 0x80002510#64 false 5#20 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ti_u5] next c2 hp2
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c2 _ 0x80002466#64 false 3590#12 11#5 11#5 (by decide))
+  k_step_gen (wp_s_addi c2 _ 0x80002514#64 false 3424#12 11#5 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
   iintro Hk Hpc
   -- a0 = &tickslock
-  k_step_gen (wp_s_auipc c3 _ 0x8000246a#64 false 0x16#20 10#5 (by decide))
+  k_step_gen (wp_s_auipc c3 _ 0x80002518#64 false 0x16#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ti_u16] next c4 hp4
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c4 _ 0x8000246e#64 false 3406#12 10#5 10#5 (by decide))
+  k_step_gen (wp_s_addi c4 _ 0x8000251c#64 false 3400#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c5 hp5
   iintro Hk Hpc
   -- jal ra, initlock
-  k_step_gen (wp_s_jal c5 _ 0x80002472#64 false 2090696#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c5 _ 0x80002520#64 false 2090680#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c6 hp6
   iintro Hk Hpc
   have hpin6 : k.sie = false ∨ k.proc = 0#64 → c6 = cpu := fun h =>

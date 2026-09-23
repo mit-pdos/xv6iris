@@ -24,7 +24,7 @@ def wp_printint_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     (cpu : CPU) (k : KCtx) (γl : GName) (γd : UartNames) (bs : List (BitVec 8))
     (hsie : k.sie = false) (hK : 24 ≤ k.avail)
     (hbase : k.regs 11#5 = 10#64 ∨ k.regs 11#5 = 16#64)
-    (hnoff : k.noff + 1 < 2 ^ 31) (huart : "uart" ∉ k.locks) : Prop :=
+    (hnoff : k.noff + 1 < 2 ^ 31) (huart : "uart1" ∉ k.locks) : Prop :=
   kctx cpu k ∗ pcIs cpu printintAddr ∗ isTxLock γl γd ∗
   uartSentSub γd bs ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ (R' : RegMap) (cs : List (BitVec 8)),

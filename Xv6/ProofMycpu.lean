@@ -37,7 +37,7 @@ theorem hart_shift (cpu : CPU) :
 
 /-- `&cpus[hartid]` as the code computes it. -/
 theorem mycpu_addr (cpu : CPU) :
-    0x800123b8#64 + BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (hartId cpu)) <<< 7 = cpuAddr cpu := by
+    0x80012460#64 + BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (hartId cpu)) <<< 7 = cpuAddr cpu := by
   rw [hart_shift]
   rfl
 
@@ -49,34 +49,34 @@ theorem mycpu_proof : MYCPU := ⟨fun {hlc GF} _ _ {lent} cpu k hsie hK => by
   simp only [mycpuAddr, KernelSyms.«mycpu»]
   k_norm
   -- prologue
-  iapply (wp_prologue2 cpu k hsie 0x800018ba#64 hK)
+  iapply (wp_prologue2 cpu k hsie 0x80001968#64 hK)
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm
   iframe
   inext
   iintro Hk Hpc Hframe
   -- mv a5,tp
-  k_step (wp_s_add cpu _ 0x800018c2#64 true 15#5 0#5 4#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_add cpu _ 0x80001970#64 true 15#5 0#5 4#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- sext.w a5,a5
-  k_step (wp_s_addiw cpu _ 0x800018c4#64 true 0#12 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_addiw cpu _ 0x80001972#64 true 0#12 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- slli a5,a5,7
-  k_step (wp_s_slli cpu _ 0x800018c6#64 true 7#6 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_slli cpu _ 0x80001974#64 true 7#6 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- auipc a0,0x11
-  k_step (wp_s_auipc cpu _ 0x800018c8#64 false 17#20 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_auipc cpu _ 0x80001976#64 false 17#20 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [BitVec.reduceAppend]
   iintro Hk Hpc
   -- addi a0,a0,-1296
-  k_step (wp_s_addi cpu _ 0x800018cc#64 false 2800#12 10#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_addi cpu _ 0x8000197a#64 false 2794#12 10#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- add a0,a0,a5
-  k_step (wp_s_add cpu _ 0x800018d0#64 true 10#5 10#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_add cpu _ 0x8000197e#64 true 10#5 10#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [mycpu_addr]
   iintro Hk Hpc
   -- epilogue
-  iapply (wp_epilogue2 cpu k hsie 0x800018d2#64 hK _ ?hR2 (k.regs 1#5) (k.regs 8#5)) $$ [- $Hk $Hpc]
+  iapply (wp_epilogue2 cpu k hsie 0x80001980#64 hK _ ?hR2 (k.regs 1#5) (k.regs 8#5)) $$ [- $Hk $Hpc]
   rotate_right 1
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm

@@ -6,7 +6,7 @@ The shape follows the Rocq `ProofKalloc.v`: the four-slot frame (`ra`,
 `s0`, `s1`), `acquire(&kmem.lock)`, the freelist load and the `beqz` split
 (the empty chain releases and returns `0`; the non-empty chain unlinks the
 head, releases and fills the page with `5`s), and the shared tail at
-`0x80000b20` (`mv a0,s1` and the epilogue).
+`0x80000bbe` (`mv a0,s1` and the epilogue).
 
 `release` re-enables interrupts when the caller had them on, so everything
 past it -- the `memset` call and the tail -- runs at whichever hart the
@@ -41,45 +41,45 @@ theorem ka_ite_beq {α : Type _} (x : BitVec 64) (p q : α) :
     (if bcond bop.BEQ x 0#64 then p else q) = if x = 0#64 then p else q := by
   by_cases h : x = 0#64 <;> simp [bcond, h]
 
-/-- `auipc a0,0x12 ; addi a0,a0,-1922` at `0x80000aea`: `&kmem.lock`. -/
+/-- `auipc a0,0x12 ; addi a0,a0,-1922` at `0x80000b88`: `&kmem.lock`. -/
 theorem ka_lock_aea :
-    0x80000aea#64 + (BitVec.signExtend 64 (18#20 ++ 0#12) + 18446744073709549694#64) = kmemLockAddr := by
+    0x80000b88#64 + (BitVec.signExtend 64 (18#20 ++ 0#12) + 18446744073709549704#64) = kmemLockAddr := by
   decide
 
-/-- `auipc s1,0x12 ; ld s1,-1910(s1)` at `0x80000af6`: `&kmem.freelist`. -/
+/-- `auipc s1,0x12 ; ld s1,-1910(s1)` at `0x80000b94`: `&kmem.freelist`. -/
 theorem ka_free_af6 :
-    0x80000af6#64 + (BitVec.signExtend 64 (18#20 ++ 0#12) + 18446744073709549706#64) = kmemFreelistAddr := by
+    0x80000b94#64 + (BitVec.signExtend 64 (18#20 ++ 0#12) + 18446744073709549716#64) = kmemFreelistAddr := by
   decide
 
-/-- `auipc a4,0x12 ; sd a5,-1922(a4)` at `0x80000b02`: `&kmem.freelist`. -/
+/-- `auipc a4,0x12 ; sd a5,-1922(a4)` at `0x80000ba0`: `&kmem.freelist`. -/
 theorem ka_free_b02 :
-    0x80000b02#64 + (BitVec.signExtend 64 (18#20 ++ 0#12) + 18446744073709549694#64) = kmemFreelistAddr := by
+    0x80000ba0#64 + (BitVec.signExtend 64 (18#20 ++ 0#12) + 18446744073709549704#64) = kmemFreelistAddr := by
   decide
 
-/-- `auipc a0,0x12 ; addi a0,a0,-1954` at `0x80000b0a`: `&kmem.lock`. -/
+/-- `auipc a0,0x12 ; addi a0,a0,-1954` at `0x80000ba8`: `&kmem.lock`. -/
 theorem ka_lock_b0a :
-    0x80000b0a#64 + (BitVec.signExtend 64 (18#20 ++ 0#12) + 18446744073709549662#64) = kmemLockAddr := by
+    0x80000ba8#64 + (BitVec.signExtend 64 (18#20 ++ 0#12) + 18446744073709549672#64) = kmemLockAddr := by
   decide
 
-/-- `auipc a0,0x12 ; addi a0,a0,-1988` at `0x80000b2c`: `&kmem.lock`. -/
+/-- `auipc a0,0x12 ; addi a0,a0,-1988` at `0x80000bca`: `&kmem.lock`. -/
 theorem ka_lock_b2c :
-    0x80000b2c#64 + (BitVec.signExtend 64 (18#20 ++ 0#12) + 18446744073709549628#64) = kmemLockAddr := by
+    0x80000bca#64 + (BitVec.signExtend 64 (18#20 ++ 0#12) + 18446744073709549638#64) = kmemLockAddr := by
   decide
 
 /-- `lui a2,0x1` is `4096`. -/
 theorem ka_lui_4096 : BitVec.signExtend 64 (1#20 ++ 0#12) = BitVec.ofNat 64 4096 := by decide
 
 /-- The link registers of the calls. -/
-theorem ka_ret_b20 : jumpPc 0x80000b20#64 = 0x80000b20#64 := by
+theorem ka_ret_b20 : jumpPc 0x80000bbe#64 = 0x80000bbe#64 := by
   simp only [jumpPc, BitVec.reduceAnd]
 
-theorem ka_ret_af6 : jumpPc 0x80000af6#64 = 0x80000af6#64 := by
+theorem ka_ret_af6 : jumpPc 0x80000b94#64 = 0x80000b94#64 := by
   simp only [jumpPc, BitVec.reduceAnd]
 
-theorem ka_ret_b16 : jumpPc 0x80000b16#64 = 0x80000b16#64 := by
+theorem ka_ret_b16 : jumpPc 0x80000bb4#64 = 0x80000bb4#64 := by
   simp only [jumpPc, BitVec.reduceAnd]
 
-theorem ka_ret_b38 : jumpPc 0x80000b38#64 = 0x80000b38#64 := by
+theorem ka_ret_b38 : jumpPc 0x80000bd6#64 = 0x80000bd6#64 := by
   simp only [jumpPc, BitVec.reduceAnd]
 
 /-- A page of the allocator is 8-aligned. -/
@@ -147,7 +147,7 @@ theorem ka_calleeSaved_mk (KR R : RegMap)
 /-! ## The shared tail: `mv a0,s1` and the epilogue -/
 
 set_option maxHeartbeats 4000000 in
-/-- From `0x80000b20` at hart `c` with `s1 = v`: `mv a0,s1`, the epilogue,
+/-- From `0x80000bbe` at hart `c` with `s1 = v`: `mv a0,s1`, the epilogue,
 and the caller's continuation.  `kb` is the function's base context (the
 one a balanced `push_off`/`pop_off` pair left), `R` the current map. -/
 theorem ka_tail {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
@@ -155,7 +155,7 @@ theorem ka_tail {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (KR : RegMap) (hregs : kb.regs = KR)
     (R : RegMap) (hR2 : R 2#5 = KR 2#5 + 0xFFFFFFFFFFFFFFE0#64) (h9 : R 9#5 = v)
     (hcs : calleeSaved KR (((R.set 2#5 (KR 2#5)).set 8#5 (KR 8#5)).set 9#5 (KR 9#5))) :
-    kctx c ((kb.pushed 4).withRegs R) ∗ pcIs c 0x80000b20#64 ∗
+    kctx c ((kb.pushed 4).withRegs R) ∗ pcIs c 0x80000bbe#64 ∗
     frame4s1 (KR 2#5) (KR 1#5) (KR 8#5) (KR 9#5) ∗
     wpNext kb.sie kb.proc c (fun cpu' => iprop(∀ R'' : RegMap,
       kctx cpu' (kb.withRegs R'') -∗ pcIs cpu' (jumpPc (KR 1#5)) -∗
@@ -165,11 +165,11 @@ theorem ka_tail {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
   iintro ⟨Hk, Hpc, Hframe, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
   -- c.mv a0,s1
-  k_step_gen (wp_s_add c _ 0x80000b20#64 true 10#5 0#5 9#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT
+  k_step_gen (wp_s_add c _ 0x80000bbe#64 true 10#5 0#5 9#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc] with [h9] next c1 hp1
   iintro Hk Hpc
   -- the epilogue
-  iapply (wp_epilogue4s1_gen c1 kb 0x80000b22#64 hK (R.set 10#5 v)
+  iapply (wp_epilogue4s1_gen c1 kb 0x80000bc0#64 hK (R.set 10#5 v)
     (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hR2)
     (kb.regs 1#5) (kb.regs 8#5) (kb.regs 9#5)) $$ [- $Hk $Hpc $Hframe]
   k_code (text_instr _ _ _ _ rfl rfl) HT
@@ -190,7 +190,7 @@ theorem ka_tail {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
 /-! ## The non-empty exit: the `memset` call and the tail -/
 
 set_option maxHeartbeats 4000000 in
-/-- From `0x80000b16` at hart `c`, after `release`, with the page `p` owned:
+/-- From `0x80000bb4` at hart `c`, after `release`, with the page `p` owned:
 `memset(p, 5, 4096)` and the tail. -/
 theorem ka_memset_tail (MS : MEMSET) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (c : CPU) (kb : KCtx) (hK : 6 ≤ kb.avail) (p : BitVec 64)
@@ -198,7 +198,7 @@ theorem ka_memset_tail (MS : MEMSET) {hlc : HasLC} {GF : BundledGFunctors} [Mach
     (R : RegMap) (hR2 : R 2#5 = KR 2#5 + 0xFFFFFFFFFFFFFFE0#64) (h9 : R 9#5 = p)
     (hcs : calleeSaved KR (((R.set 2#5 (KR 2#5)).set 8#5 (KR 8#5)).set 9#5 (KR 9#5)))
     (olds : List (BitVec 8)) (hl : olds.length = 4096) :
-    kctx c ((kb.pushed 4).withRegs R) ∗ pcIs c 0x80000b16#64 ∗
+    kctx c ((kb.pushed 4).withRegs R) ∗ pcIs c 0x80000bb4#64 ∗
     frame4s1 (KR 2#5) (KR 1#5) (KR 8#5) (KR 9#5) ∗
     byteBuf p (DFrac.own 1) olds ∗
     wpNext kb.sie kb.proc c (fun cpu' => iprop(∀ R'' : RegMap,
@@ -212,7 +212,7 @@ theorem ka_memset_tail (MS : MEMSET) {hlc : HasLC} {GF : BundledGFunctors} [Mach
   have hms : ∀ (cc : CPU) (k' : KCtx) (os : List (BitVec 8)) (cb : BitVec 8)
       (hK' : 2 ≤ k'.avail) (hn : k'.regs 12#5 = BitVec.ofNat 64 4096)
       (hcb : BitVec.extractLsb' 0 8 (k'.regs 11#5) = cb) (hl' : os.length = 4096),
-      kctx cc k' ∗ pcIs cc 0x80000c7a#64 ∗ byteBuf (k'.regs 10#5) (DFrac.own 1) os ∗
+      kctx cc k' ∗ pcIs cc 0x80000d18#64 ∗ byteBuf (k'.regs 10#5) (DFrac.own 1) os ∗
       wpNext k'.sie k'.proc cc (fun cpu' => iprop(∀ R' : RegMap,
         kctx cpu' (k'.withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
         byteBuf (k'.regs 10#5) (DFrac.own 1) (List.replicate 4096 cb) -∗
@@ -225,16 +225,16 @@ theorem ka_memset_tail (MS : MEMSET) {hlc : HasLC} {GF : BundledGFunctors} [Mach
     simp only [memsetAddr, KernelSyms.«memset»] at h
     exact h
   -- c.lui a2,0x1 ; c.li a1,5 ; c.mv a0,s1 ; jal memset
-  k_step_gen (wp_s_lui c _ 0x80000b16#64 true 1#20 12#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT
+  k_step_gen (wp_s_lui c _ 0x80000bb4#64 true 1#20 12#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc] next c1 hp1
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c1 _ 0x80000b18#64 true 5#12 11#5 0#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT
+  k_step_gen (wp_s_addi c1 _ 0x80000bb6#64 true 5#12 11#5 0#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc] next c2 hp2
   iintro Hk Hpc
-  k_step_gen (wp_s_add c2 _ 0x80000b1a#64 true 10#5 0#5 9#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT
+  k_step_gen (wp_s_add c2 _ 0x80000bb8#64 true 10#5 0#5 9#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc] with [h9] next c3 hp3
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c3 _ 0x80000b1c#64 false 350#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT
+  k_step_gen (wp_s_jal c3 _ 0x80000bba#64 false 350#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc] next c4 hp4
   iintro Hk Hpc
   -- memset(p, 5, 4096)
@@ -290,7 +290,7 @@ theorem kalloc_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET) : KALLOC :=
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   have hK4 : 4 ≤ k.avail := by omega
   -- the prologue
-  iapply (wp_prologue4s1_gen cpu k 0x80000ae0#64 hK4)
+  iapply (wp_prologue4s1_gen cpu k 0x80000b7e#64 hK4)
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm_g
   iframe
@@ -298,17 +298,17 @@ theorem kalloc_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET) : KALLOC :=
   iapply wpNext_intro_pin
   iintro %c1 %hp1 Hk Hpc Hframe
   -- a0 = &kmem.lock ; jal acquire
-  k_step_gen (wp_s_auipc c1 _ 0x80000aea#64 false 18#20 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
+  k_step_gen (wp_s_auipc c1 _ 0x80000b88#64 false 18#20 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc] next c2 hp2
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c2 _ 0x80000aee#64 false 2174#12 10#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
+  k_step_gen (wp_s_addi c2 _ 0x80000b8c#64 false 2184#12 10#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc] with [ka_lock_aea] next c3 hp3
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c3 _ 0x80000af2#64 false 200#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
+  k_step_gen (wp_s_jal c3 _ 0x80000b90#64 false 200#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc] next c4 hp4
   iintro Hk Hpc
   have hac : ∀ (k' : KCtx) (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 10 ≤ k'.avail) (hs' : "kmem" ∉ k'.locks),
-      kctx c4 k' ∗ pcIs c4 0x80000bba#64 ∗ isLock γl (k'.regs 10#5) "kmem" (kmemRes γk) ∗
+      kctx c4 k' ∗ pcIs c4 0x80000c58#64 ∗ isLock γl (k'.regs 10#5) "kmem" (kmemRes γk) ∗
       wpNext k'.sie k'.proc c4 (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
         ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
         kctx cpu' (((k'.pushOffAt spie spp).withRegs R').withLocks ("kmem" :: k'.locks)) -∗
@@ -338,7 +338,7 @@ theorem kalloc_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET) : KALLOC :=
   have hre : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hnoff' : 1 ≤ k'.noff) (hK' : 10 ≤ k'.avail)
       (reen : Bool) (hreen : reen = (decide (k'.noff = 1) && k'.intena))
       (hon : reen = true → k'.tier = .kpt ∧ trapRes true + 6 ≤ k'.avail),
-      kctx c k' ∗ pcIs c 0x80000c42#64 ∗ isLock γl (k'.regs 10#5) "kmem" (kmemRes γk) ∗
+      kctx c k' ∗ pcIs c 0x80000ce0#64 ∗ isLock γl (k'.regs 10#5) "kmem" (kmemRes γk) ∗
       locked γl c ∗ kmemRes γk curCtx ∗ popArm c k' reen ∗
       wpNext (k'.popExit reen).sie k'.proc c (fun cpu' => iprop(∀ R' : RegMap,
         kctx cpu' (((k'.popExit reen).withRegs R').withLocks (k'.locks.filter (fun x => x ≠ "kmem"))) -∗
@@ -358,13 +358,13 @@ theorem kalloc_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET) : KALLOC :=
     iintro H
     iexact H) $$ HR with ⟨%head, %pages, Hfl, Hchain, Hauth⟩
   -- s1 = kmem.freelist
-  k_step (wp_s_auipc c _ 0x80000af6#64 false 18#20 9#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
+  k_step (wp_s_auipc c _ 0x80000b94#64 false 18#20 9#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_ld c _ 0x80000afa#64 false 2186#12 9#5 9#5 (by decide) (by decide) (DFrac.own 1) head)
+  k_step (wp_s_ld c _ 0x80000b98#64 false 2196#12 9#5 9#5 (by decide) (by decide) (DFrac.own 1) head)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ka_free_af6]
   iintro Hk Hpc Hfl
-  k_step (wp_s_branch c _ 0x80000afe#64 true 46#13 9#5 0#5 (by decide) bop.BEQ)
+  k_step (wp_s_branch c _ 0x80000b9c#64 true 46#13 9#5 0#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ka_ite_beq]
   iintro Hk Hpc
   cases pages with
@@ -374,13 +374,13 @@ theorem kalloc_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET) : KALLOC :=
     icases Hchain with %hhead
     subst hhead
     ihave Hpc := ka_pcIs_pos c _ _ _ (rfl : (0#64 : BitVec 64) = 0#64) $$ Hpc
-    k_step (wp_s_auipc c _ 0x80000b2c#64 false 18#20 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
+    k_step (wp_s_auipc c _ 0x80000bca#64 false 18#20 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc]
     iintro Hk Hpc
-    k_step (wp_s_addi c _ 0x80000b30#64 false 2108#12 10#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
+    k_step (wp_s_addi c _ 0x80000bce#64 false 2118#12 10#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc] with [ka_lock_b2c]
     iintro Hk Hpc
-    k_step (wp_s_jal c _ 0x80000b34#64 false 270#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
+    k_step (wp_s_jal c _ 0x80000bd2#64 false 270#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc]
     iintro Hk Hpc
     icases kmemAuth_agree' γk _ on $$ Hav Hauth with ⟨%hagree, Hav, Hauth⟩
@@ -414,7 +414,7 @@ theorem kalloc_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET) : KALLOC :=
     -- past `release`: the `j` to the shared tail
     iapply wpNext_intro_pin
     iintro %cr %hpr %R4 Hk Hpc %hcs4
-    k_step_gen (wp_s_j cr _ 0x80000b38#64 true 2097128#21) from (text_instr _ _ _ _ rfl rfl) Htext
+    k_step_gen (wp_s_j cr _ 0x80000bd6#64 true 2097128#21) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc] next cj hpj
     iintro Hk Hpc
     unfold calleeSaved at hcs2 hcs4
@@ -454,24 +454,24 @@ theorem kalloc_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET) : KALLOC :=
     ihave Hpc := ka_pcIs_neg c _ _ _ (ka_page_ne_zero pg hvalid) $$ Hpc
     simp only [wordAtN_cur, pageRestAt_cur]
     -- c.ld a5,0(s1) : r->next
-    k_step (wp_s_ld c _ 0x80000b00#64 true 0#12 15#5 9#5 (by decide) (by decide) (DFrac.own 1) nxt)
+    k_step (wp_s_ld c _ 0x80000b9e#64 true 0#12 15#5 9#5 (by decide) (by decide) (DFrac.own 1) nxt)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc Hword
     -- auipc a4,0x12 ; sd a5,-1922(a4) : kmem.freelist = r->next
-    k_step (wp_s_auipc c _ 0x80000b02#64 false 18#20 14#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
+    k_step (wp_s_auipc c _ 0x80000ba0#64 false 18#20 14#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc]
     iintro Hk Hpc
-    k_step (wp_s_sd c _ 0x80000b06#64 false 2174#12 14#5 15#5 (by decide) pg)
+    k_step (wp_s_sd c _ 0x80000ba4#64 false 2184#12 14#5 15#5 (by decide) pg)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ka_free_b02]
     iintro Hk Hpc Hfl
     -- a0 = &kmem.lock ; jal release
-    k_step (wp_s_auipc c _ 0x80000b0a#64 false 18#20 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
+    k_step (wp_s_auipc c _ 0x80000ba8#64 false 18#20 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc]
     iintro Hk Hpc
-    k_step (wp_s_addi c _ 0x80000b0e#64 false 2142#12 10#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
+    k_step (wp_s_addi c _ 0x80000bac#64 false 2152#12 10#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc] with [ka_lock_b0a]
     iintro Hk Hpc
-    k_step (wp_s_jal c _ 0x80000b12#64 false 304#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
+    k_step (wp_s_jal c _ 0x80000bb0#64 false 304#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc]
     iintro Hk Hpc
     -- one page fewer

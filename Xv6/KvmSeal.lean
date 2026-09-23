@@ -11,7 +11,7 @@ invariant, the mapping published.  Three steps:
   of `(address, value)` pairs the framework speaks of (`PTree.entries`);
 * `kvmTableOk_kptFacts` turns the builder's facts into `kptFacts`: the
   entry addresses are in RAM and 8-aligned because every node page is a
-  `pageValid` page, and every entry of the static map is one of the six
+  `pageValid` page, and every entry of the static map is one of the seven
   identity regions `kvmmake` maps;
 * `kctx_kptOn_seal` runs `MachCSL.kptOn_seal` under the kernel execution
   context (which carries the running context inside its `ctxTok`).
@@ -124,25 +124,29 @@ theorem region_hit (t : PTree) (r : KvmRegion) (hr : t.regionMapped r) (lo len :
 
 /-- **The builder's facts are the framework's facts.**  The entry addresses
 are aligned RAM words because every node page is an allocator page; every
-page of the static kernel map is in one of the six identity regions
+page of the static kernel map is in one of the seven identity regions
 `kvmmake` maps. -/
 theorem kvmTableOk_kptFacts (t : PTree) (pas : Nat → BitVec 44) (h : kvmTableOk t pas) :
     kptFacts t KernelMap.static := by
   obtain ⟨hwf, hnd, hpv, hreg, -, -, -⟩ := h
   have hm0 : (⟨0x10000#27, 0x10000#44, .rw, 1⟩ : KvmRegion) ∈ kvmRegions := by
     unfold kvmRegions; exact List.mem_cons_self
-  have hm1 : (⟨0x10001#27, 0x10001#44, .rw, 1⟩ : KvmRegion) ∈ kvmRegions := by
+  have hm0a : (⟨0x1000a#27, 0x1000a#44, .rw, 1⟩ : KvmRegion) ∈ kvmRegions := by
     unfold kvmRegions; exact List.mem_cons_of_mem _ List.mem_cons_self
-  have hm2 : (⟨0xC000#27, 0xC000#44, .rw, 0x4000⟩ : KvmRegion) ∈ kvmRegions := by
+  have hm1 : (⟨0x10001#27, 0x10001#44, .rw, 1⟩ : KvmRegion) ∈ kvmRegions := by
     unfold kvmRegions
     exact List.mem_cons_of_mem _ (List.mem_cons_of_mem _ List.mem_cons_self)
-  have hm3 : (⟨0x80000#27, 0x80000#44, .rx, 7⟩ : KvmRegion) ∈ kvmRegions := by
+  have hm2 : (⟨0xC000#27, 0xC000#44, .rw, 0x4000⟩ : KvmRegion) ∈ kvmRegions := by
     unfold kvmRegions
     exact List.mem_cons_of_mem _ (List.mem_cons_of_mem _ (List.mem_cons_of_mem _ List.mem_cons_self))
-  have hm4 : (⟨0x80007#27, 0x80007#44, .rw, 0x7FF9⟩ : KvmRegion) ∈ kvmRegions := by
+  have hm3 : (⟨0x80000#27, 0x80000#44, .rx, 7⟩ : KvmRegion) ∈ kvmRegions := by
     unfold kvmRegions
     exact List.mem_cons_of_mem _ (List.mem_cons_of_mem _ (List.mem_cons_of_mem _
       (List.mem_cons_of_mem _ List.mem_cons_self)))
+  have hm4 : (⟨0x80007#27, 0x80007#44, .rw, 0x7FF9⟩ : KvmRegion) ∈ kvmRegions := by
+    unfold kvmRegions
+    exact List.mem_cons_of_mem _ (List.mem_cons_of_mem _ (List.mem_cons_of_mem _
+      (List.mem_cons_of_mem _ (List.mem_cons_of_mem _ List.mem_cons_self))))
   refine ⟨hwf, hnd, ?_, ?_⟩
   · intro e he
     obtain ⟨b, hb, i, hi⟩ := entries_page 2 t e he
@@ -166,7 +170,7 @@ theorem kvmTableOk_kptFacts (t : PTree) (pas : Nat → BitVec 44) (h : kvmTableO
       · split at hc
         · rename_i hr'
           cases hc
-          rcases hr' with hr' | hr' | hr'
+          rcases hr' with hr' | hr' | hr' | hr'
           · exact region_hit t _ (hreg _ hm4) 0x80007 0x7FF9 .rw rfl rfl rfl (by decide)
               vpn.toNat hr'.1 (by omega) hk
           · rcases Nat.lt_or_ge vpn.toNat 0x10001 with hlt | hge
@@ -174,6 +178,8 @@ theorem kvmTableOk_kptFacts (t : PTree) (pas : Nat → BitVec 44) (h : kvmTableO
                 vpn.toNat hr'.1 (by omega) hk
             · exact region_hit t _ (hreg _ hm1) 0x10001 1 .rw rfl rfl rfl (by decide)
                 vpn.toNat hge (by omega) hk
+          · exact region_hit t _ (hreg _ hm0a) 0x1000a 1 .rw rfl rfl rfl (by decide)
+              vpn.toNat hr'.1 (by omega) hk
           · exact region_hit t _ (hreg _ hm2) 0xC000 0x400 .rw rfl rfl rfl (by decide)
               vpn.toNat hr'.1 (by omega) hk
         · cases hc

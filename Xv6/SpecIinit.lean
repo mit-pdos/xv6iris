@@ -17,10 +17,10 @@ open LeanRV64D
 /-- Address of `iinit`. -/
 def iinitAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«iinit»
 /-- `&itable.lock` and its name; `&itable.inode[i]` and the `"inode"` literal. -/
-def itableLockAddr : BitVec 64 := 0x800208b0#64
-def itableNameAddr : BitVec 64 := 0x80007440#64
-def inodeAddr (i : Nat) : BitVec 64 := 0x800208d8#64 + BitVec.ofNat 64 (136 * i)
-def inodeNameAddr : BitVec 64 := 0x80007448#64
+def itableLockAddr : BitVec 64 := 0x80020958#64
+def itableNameAddr : BitVec 64 := 0x80007448#64
+def inodeAddr (i : Nat) : BitVec 64 := 0x80020980#64 + BitVec.ofNat 64 (136 * i)
+def inodeNameAddr : BitVec 64 := 0x80007450#64
 
 /-- The specification of `iinit`. -/
 def wp_iinit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]

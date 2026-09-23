@@ -112,11 +112,11 @@ theorem parkOk_not_RUNNING {st : BitVec 32} (h : parkOk st) : st ≠ RUNNING := 
 
 /-! ## `&proc[j]` is injective -/
 
-theorem procAddr_toNat (j : Nat) (hj : j < NPROC) : (procAddr j).toNat = 2147559352 + 360 * j := by
+theorem procAddr_toNat (j : Nat) (hj : j < NPROC) : (procAddr j).toNat = 2147559520 + 360 * j := by
   have h1 : (BitVec.ofNat 64 (procSize * j)).toNat = 360 * j := by
     simp only [BitVec.toNat_ofNat, procSize]
     exact Nat.mod_eq_of_lt (by unfold NPROC at hj; omega)
-  have h2 : (procsAddr : BitVec 64).toNat = 2147559352 := by decide
+  have h2 : (procsAddr : BitVec 64).toNat = 2147559520 := by decide
   unfold procAddr
   rw [BitVec.toNat_add, h1, h2]
   exact Nat.mod_eq_of_lt (by unfold NPROC at hj; omega)
@@ -879,7 +879,7 @@ instance instCtxMorphProcHeld (Γ : SchedNames) (h : CPU) (j : Nat) (st : BitVec
 
 /-! ### Address disjointness: `cpus[]` and `proc[]` -/
 
-theorem cpuCtxAddr_toNat (h : CPU) : (cpuCtxAddr h).toNat = 2147558336 + 128 * h.val := by
+theorem cpuCtxAddr_toNat (h : CPU) : (cpuCtxAddr h).toNat = 2147558504 + 128 * h.val := by
   have hv : h.val < 8 := h.isLt
   unfold cpuCtxAddr cpuAddr
   show ((cpusAddr + BitVec.ofNat 64 (cpuSize * h.val)) + 8#64).toNat = _
@@ -887,13 +887,13 @@ theorem cpuCtxAddr_toNat (h : CPU) : (cpuCtxAddr h).toNat = 2147558336 + 128 * h
   have h1 : (BitVec.ofNat 64 (cpuSize * h.val)).toNat = 128 * h.val := by
     simp only [BitVec.toNat_ofNat, cpuSize]
     exact Nat.mod_eq_of_lt (by omega)
-  have h2 : (cpusAddr : BitVec 64).toNat = 2147558328 := by decide
+  have h2 : (cpusAddr : BitVec 64).toNat = 2147558496 := by decide
   have h3 : (8#64 : BitVec 64).toNat = 8 := by decide
   rw [h1, h2, h3, Nat.mod_eq_of_lt (by omega), Nat.mod_eq_of_lt (by omega)]
   omega
 
 theorem pContext0_toNat (j : Nat) (hj : j < NPROC) :
-    (pContext (procAddr j) 0).toNat = 2147559448 + 360 * j := by
+    (pContext (procAddr j) 0).toNat = 2147559616 + 360 * j := by
   unfold pContext
   simp only [Nat.mul_zero]
   rw [BitVec.toNat_add, BitVec.toNat_add, procAddr_toNat j hj]

@@ -814,9 +814,6 @@ theorem swp_csrr_time (cpu : CPU) (dq : DFrac) (rd : BitVec 5) (hrd : rd ≠ 0#5
 theorem mstatusWrite_xv6 : mstatusWrite 0xA00000000#64 0xA00000800#64 = 0xA00000800#64 := by decide
 theorem xv6_mstatus_MPP : BitVec.extractLsb' 11 2 0xA00000800#64 = 1#2 := by decide
 theorem xv6_mstatus_SXL : BitVec.extractLsb' 34 2 0xA00000800#64 = 2#2 := by decide
-/-- `w_mepc((uint64)main)`. -/
-theorem legalize_xepc_main : legalize_xepc 0x80000e30#64 = 0x80000e30#64 := by
-  simp only [legalize_xepc, sail_facts]; decide
 /-- `w_medeleg(0xffff)`: the delegatable bits. -/
 theorem legalize_medeleg_xv6 : legalize_medeleg 0#64 0xffff#64 = 0xb3ff#64 := by decide
 /-- `w_mideleg(0xffff)`: the supervisor interrupt bits (SSI, STI, SEI, LCOFI). -/

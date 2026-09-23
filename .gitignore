@@ -4,3 +4,4 @@
 /sail-riscv/
 .claude/worktrees/
 /xv6-riscv/
+__pycache__/

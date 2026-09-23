@@ -10,6 +10,7 @@ transmitter, of which a caller holds a persistent sublist witness
 transmitter's half of the trace.
 -/
 import MachCSL.Lock
+import MachCSL.Dev.DevIds
 import Xv6.Geom
 import Iris.BI.Lib.MonoList
 
@@ -74,12 +75,32 @@ theorem uartSentSub_nil (γ : UartNames) (bs : List (BitVec 8)) :
 /-- The transmitter's half of the trace: the `tx_lock`'s resource. -/
 def txRes (γ : UartNames) : IProp GF := iprop% ∃ l : List (BitVec 8), γ.tx ↪VAR{.own (1 : Qp).half} l
 
-/-- `tx_lock` (`kernel/uart.c`). -/
-def txLockAddr : BitVec 64 := 0x80012350#64
+/-- The index of a port in `uarts[]` (`kernel/uart.c`). -/
+def _root_.MachCSL.UartId.idx : UartId → Nat
+  | .uart0 => 0
+  | .uart1 => 1
 
-/-- The transmit lock, as the printing cone holds it (persistent). -/
-def isTxLock [CurCtx] (γl : GName) (γ : UartNames) : IProp GF :=
-  isLock γl txLockAddr "uart" (fun _ => txRes γ)
+/-- `&uarts[i].tx_lock` (`kernel/uart.c`: `struct uart` is 40 bytes, the
+lock at offset 16). -/
+def txLockAddr (i : UartId) : BitVec 64 :=
+  BitVec.ofNat 64 KernelSyms.«uarts» + BitVec.ofNat 64 (40 * i.idx + 16)
+
+/-- The name `uartinit` gives port `i`'s transmit lock. -/
+def txLockName : UartId → String
+  | .uart0 => "uart0"
+  | .uart1 => "uart1"
+
+/-- Port `i`'s transmit lock, as a printing cone holds it (persistent). -/
+def isTxLockAt [CurCtx] (i : UartId) (γl : GName) (γ : UartNames) : IProp GF :=
+  isLock γl (txLockAddr i) (txLockName i) (fun _ => txRes γ)
+
+instance isTxLockAt_persistent [CurCtx] (i : UartId) (γl : GName) (γ : UartNames) :
+    Persistent (isTxLockAt (GF := GF) i γl γ) := by
+  unfold isTxLockAt; infer_instance
+
+/-- The KERNEL port's transmit lock: what `printk`'s cone holds (`prputc`
+writes `uarts[1]`). -/
+def isTxLock [CurCtx] (γl : GName) (γ : UartNames) : IProp GF := isTxLockAt .uart1 γl γ
 
 instance isTxLock_persistent [CurCtx] (γl : GName) (γ : UartNames) : Persistent (isTxLock (GF := GF) γl γ) := by
   unfold isTxLock; infer_instance

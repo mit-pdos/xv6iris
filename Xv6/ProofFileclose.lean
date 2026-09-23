@@ -1,7 +1,7 @@
 /-
 Proof of `fileclose`'s specification (`SpecFileclose.FILECLOSE`), given the
 interfaces of `acquire`, `release` and `pipeclose`.  Mirrors Rocq
-ProofFileclose.v against the Lean image (`KernelSyms.fileclose = 0x8000415e`)
+ProofFileclose.v against the Lean image (`KernelSyms.fileclose = 0x8000421c`)
 for the closed and pipe file types.
 
     415e: addi sp,-64; sd ra/s0/s1; addi s0,sp,64       -- wp_prologue8s1_gen
@@ -38,16 +38,16 @@ set_option linter.unusedVariables false
 
 /-! ## Constants the code computes -/
 
-theorem fc_ret_4176 : jumpPc 0x80004176#64 = 0x80004176#64 := by simp only [jumpPc, BitVec.reduceAnd]
-theorem fc_ret_41b2 : jumpPc 0x800041b2#64 = 0x800041b2#64 := by simp only [jumpPc, BitVec.reduceAnd]
-theorem fc_ret_41ec : jumpPc 0x800041ec#64 = 0x800041ec#64 := by simp only [jumpPc, BitVec.reduceAnd]
-theorem fc_ret_41fe : jumpPc 0x800041fe#64 = 0x800041fe#64 := by simp only [jumpPc, BitVec.reduceAnd]
+theorem fc_ret_4176 : jumpPc 0x80004234#64 = 0x80004234#64 := by simp only [jumpPc, BitVec.reduceAnd]
+theorem fc_ret_41b2 : jumpPc 0x80004270#64 = 0x80004270#64 := by simp only [jumpPc, BitVec.reduceAnd]
+theorem fc_ret_41ec : jumpPc 0x800042aa#64 = 0x800042aa#64 := by simp only [jumpPc, BitVec.reduceAnd]
+theorem fc_ret_41fe : jumpPc 0x800042bc#64 = 0x800042bc#64 := by simp only [jumpPc, BitVec.reduceAnd]
 
-theorem fc_lock_416a : 0x8000416a#64 + (BitVec.signExtend 64 (0x1e#20 ++ 0#12) + 822#64) = ftableAddr := by
+theorem fc_lock_416a : 0x80004228#64 + (BitVec.signExtend 64 (0x1e#20 ++ 0#12) + 800#64) = ftableAddr := by
   unfold ftableAddr; decide
-theorem fc_lock_41a6 : 0x800041a6#64 + (BitVec.signExtend 64 (0x1e#20 ++ 0#12) + 762#64) = ftableAddr := by
+theorem fc_lock_41a6 : 0x80004264#64 + (BitVec.signExtend 64 (0x1e#20 ++ 0#12) + 740#64) = ftableAddr := by
   unfold ftableAddr; decide
-theorem fc_lock_41e0 : 0x800041e0#64 + (BitVec.signExtend 64 (0x1e#20 ++ 0#12) + 704#64) = ftableAddr := by
+theorem fc_lock_41e0 : 0x8000429e#64 + (BitVec.signExtend 64 (0x1e#20 ++ 0#12) + 682#64) = ftableAddr := by
   unfold ftableAddr; decide
 
 theorem fc_one : 0#64 + BitVec.signExtend 64 1#12 = 1#64 := by decide
@@ -144,14 +144,14 @@ theorem fc_frame_close (sp ra s0 s1 w4 w5 w6 w7 : BitVec 64) :
 
 /-! ## The callees -/
 
-/-- `pipeclose`'s contract at fileclose's call site (entry `0x8000455a`). -/
+/-- `pipeclose`'s contract at fileclose's call site (entry `0x80004618`). -/
 theorem fc_pipeclose (PC : PIPECLOSE) (Γ : SchedNames) (c : CPU) (k' : KCtx)
     (γl : GName) (γp : PipeNames) (w : Bool) (γkl : GName) (γk : KmemNames) (on : Option Nat)
     (hw : w = decide (k'.regs 11#5 ≠ 0#64))
     (hnoff : k'.noff + 2 < 2 ^ 31) (hK : pipecloseSlots ≤ k'.avail)
     (hpipe : "pipe" ∉ k'.locks) (hproc : "proc" ∉ k'.locks) (hkmem : "kmem" ∉ k'.locks)
     (htier : k'.tier = KTier.kpt) :
-    kctx c k' ∗ pcIs c 0x8000455a#64 ∗
+    kctx c k' ∗ pcIs c 0x80004618#64 ∗
     isPipe γl γp (k'.regs 10#5) ∗ pipeRef γp w 1 ∗
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk on ∗
     procsInv Γ ∗
@@ -166,14 +166,14 @@ theorem fc_pipeclose (PC : PIPECLOSE) (Γ : SchedNames) (c : CPU) (k' : KCtx)
   simp only [pipecloseAddr, KernelSyms.«pipeclose»] at h
   exact h
 
-/-! ## The tail: the epilogue at `0x800041ec` -/
+/-! ## The tail: the epilogue at `0x800042aa` -/
 
 theorem fc_tail (c : CPU) (kb : KCtx) (hK : 8 ≤ kb.avail)
     (KR : RegMap) (hregs : kb.regs = KR)
     (R : RegMap) (hR2 : R 2#5 = KR 2#5 + 0xFFFFFFFFFFFFFFC0#64)
     (hcs : calleeSaved KR ((((R.set 1#5 (KR 1#5)).set 8#5 (KR 8#5)).set 9#5 (KR 9#5)).set 2#5 (KR 2#5)))
     (P : IProp GF) :
-    kctx c ((kb.pushed 8).withRegs R) ∗ pcIs c 0x800041ec#64 ∗
+    kctx c ((kb.pushed 8).withRegs R) ∗ pcIs c 0x800042aa#64 ∗
     frame8s1 (KR 2#5) (KR 1#5) (KR 8#5) (KR 9#5) ∗ P ∗
     wpNext kb.sie kb.proc c (fun cpu' => iprop(∀ R'' : RegMap,
       kctx cpu' (kb.withRegs R'') -∗ pcIs cpu' (jumpPc (KR 1#5)) -∗
@@ -182,7 +182,7 @@ theorem fc_tail (c : CPU) (kb : KCtx) (hK : 8 ≤ kb.avail)
   subst hregs
   iintro ⟨Hk, Hpc, Hframe, HP, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
-  iapply (wp_epilogue8s1_gen c kb 0x800041ec#64 hK R hR2 (kb.regs 1#5) (kb.regs 8#5) (kb.regs 9#5))
+  iapply (wp_epilogue8s1_gen c kb 0x800042aa#64 hK R hR2 (kb.regs 1#5) (kb.regs 8#5) (kb.regs 9#5))
     $$ [- $Hk $Hpc $Hframe]
   k_code (text_instr _ _ _ _ rfl rfl) HT
   k_norm_g
@@ -200,7 +200,7 @@ theorem fc_exit (cpu cr : CPU) (k : KCtx) (γ : FileNames) (γk : KmemNames) (on
     (hpin : k.sie = false ∨ k.proc = 0#64 → cr = cpu)
     (spie spp : Bool) (hsp : k.sie = false → spie = k.spie ∧ spp = k.spp)
     (R : RegMap) (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFC0#64) (hpins : faPins k R) :
-    kctx cr (((k.withSpie spie spp).pushed 8).withRegs R) ∗ pcIs cr 0x800041ec#64 ∗
+    kctx cr (((k.withSpie spie spp).pushed 8).withRegs R) ∗ pcIs cr 0x800042aa#64 ∗
     frame8s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
     fdSlot γ ∗ fclosePost γk on st ∗
     wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie2 : Bool, ∀ spp2 : Bool, ∀ R' : RegMap,
@@ -226,7 +226,7 @@ theorem fc_exit (cpu cr : CPU) (k : KCtx) (γ : FileNames) (γk : KmemNames) (on
   · iexact Hfd
   · iexact Hpost
 
-/-! ## The last-reference arm, from `0x80004184` -/
+/-! ## The last-reference arm, from `0x80004242` -/
 
 set_option maxHeartbeats 16000000 in
 /-- After `--f->ref == 0` (the slot's list is now empty, the closer holds the
@@ -246,7 +246,7 @@ theorem fc_last (RE : RELEASE) (PC : PIPECLOSE) (Γ : SchedNames) (cpu c : CPU) 
     (hpins : faPins k R)
     (hfresh : ∀ i, nx ≤ i → PartialMap.get? M i = none) (hok : ftableOk M (updAt Ls kk [])) :
     kctx c ((((k.pushOffAt spie spp).withLocks ("ftable" :: k.locks)).pushed 8).withRegs R) ∗
-    pcIs c 0x80004184#64 ∗ isLock γl ftableAddr "ftable" (ftableResAt γ) ∗
+    pcIs c 0x80004242#64 ∗ isLock γl ftableAddr "ftable" (ftableResAt γ) ∗
     locked γl c ∗ (γ.ref ↪●MAP M) ∗
     (∀ L' : List (Nat × Qp), fslotAt γ curCtx kk L' -∗
       [∗list] j ∈ List.range NFILE, fslotAt γ curCtx j (updAt Ls kk L' j)) ∗
@@ -271,16 +271,16 @@ theorem fc_last (RE : RELEASE) (PC : PIPECLOSE) (Γ : SchedNames) (cpu c : CPU) 
   -- the frame's spare cells
   icases fc_frame_open _ _ _ _ $$ Hframe with ⟨Hra, Hs0, Hs1, ⟨%w4, Hc32⟩, ⟨%w5, Hc24⟩, ⟨%w6, Hc16⟩, ⟨%w7, Hc8⟩, Hc0⟩
   -- sd s2,32(sp) ; sd s3,24(sp) ; sd s4,16(sp) ; sd s5,8(sp)
-  k_step (wp_s_sd c _ 0x80004184#64 true 32#12 2#5 18#5 (by decide) w4)
+  k_step (wp_s_sd c _ 0x80004242#64 true 32#12 2#5 18#5 (by decide) w4)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2, fc_sp32, fc_sp32']
   iintro Hk Hpc Hc32
-  k_step (wp_s_sd c _ 0x80004186#64 true 24#12 2#5 19#5 (by decide) w5)
+  k_step (wp_s_sd c _ 0x80004244#64 true 24#12 2#5 19#5 (by decide) w5)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2, fc_sp24, fc_sp24']
   iintro Hk Hpc Hc24
-  k_step (wp_s_sd c _ 0x80004188#64 true 16#12 2#5 20#5 (by decide) w6)
+  k_step (wp_s_sd c _ 0x80004246#64 true 16#12 2#5 20#5 (by decide) w6)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2, fc_sp16, fc_sp16']
   iintro Hk Hpc Hc16
-  k_step (wp_s_sd c _ 0x8000418a#64 true 8#12 2#5 21#5 (by decide) w7)
+  k_step (wp_s_sd c _ 0x80004248#64 true 8#12 2#5 21#5 (by decide) w7)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2, fc_sp8, fc_sp8']
   iintro Hk Hpc Hc8
   -- ff = *f : lw s2,0(s1) ; lbu a5,9(s1) ; mv s3,a5 ; ld a5,16(s1) ; mv s4,a5 ; ld a5,24(s1) ; mv s5,a5
@@ -296,35 +296,35 @@ theorem fc_last (RE : RELEASE) (PC : PIPECLOSE) (Γ : SchedNames) (cpu c : CPU) 
     simp only [wordAtN_cur]
     rw [aFtype_eq, aFwritable_eq, aFpipe_eq, aFip_eq]) $$ Hf
   icases Hf with ⟨Hty, Hrd, Hwr, Hpp, Hip, Hmj, Hoff⟩
-  k_step (wp_s_lw c _ 0x8000418c#64 false 0#12 18#5 9#5 (by decide) (by decide) (DFrac.own 1) C.type)
+  k_step (wp_s_lw c _ 0x8000424a#64 false 0#12 18#5 9#5 (by decide) (by decide) (DFrac.own 1) C.type)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9]
   iintro Hk Hpc Hty
-  k_step (wp_s_lbu c _ 0x80004190#64 false 9#12 15#5 9#5 (by decide) (by decide) (DFrac.own 1) C.writable)
+  k_step (wp_s_lbu c _ 0x8000424e#64 false 9#12 15#5 9#5 (by decide) (by decide) (DFrac.own 1) C.writable)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9]
   iintro Hk Hpc Hwr
-  k_step (wp_s_add c _ 0x80004194#64 true 19#5 0#5 15#5 (by decide))
+  k_step (wp_s_add c _ 0x80004252#64 true 19#5 0#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_ld c _ 0x80004196#64 true 16#12 15#5 9#5 (by decide) (by decide) (DFrac.own 1) C.pipe)
+  k_step (wp_s_ld c _ 0x80004254#64 true 16#12 15#5 9#5 (by decide) (by decide) (DFrac.own 1) C.pipe)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9]
   iintro Hk Hpc Hpp
-  k_step (wp_s_add c _ 0x80004198#64 true 20#5 0#5 15#5 (by decide))
+  k_step (wp_s_add c _ 0x80004256#64 true 20#5 0#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_ld c _ 0x8000419a#64 true 24#12 15#5 9#5 (by decide) (by decide) (DFrac.own 1) C.ip)
+  k_step (wp_s_ld c _ 0x80004258#64 true 24#12 15#5 9#5 (by decide) (by decide) (DFrac.own 1) C.ip)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9]
   iintro Hk Hpc Hip
-  k_step (wp_s_add c _ 0x8000419c#64 true 21#5 0#5 15#5 (by decide))
+  k_step (wp_s_add c _ 0x8000425a#64 true 21#5 0#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- f->ref = 0 ; f->type = FD_NONE
   ihave Hrefc := (show wordAtN (GF := GF) curCtx (aFref kk) 4 (DFrac.own 1) (BitVec.ofNat 32 0) ⊢
       wordPointsTo (fnode kk + BitVec.signExtend 64 4#12) 4 (DFrac.own 1) (BitVec.ofNat 32 0) from by
     rw [wordAtN_cur, aFref_eq]) $$ Hrefc
-  k_step (wp_s_sw c _ 0x8000419e#64 false 4#12 9#5 0#5 (by decide) (BitVec.ofNat 32 0))
+  k_step (wp_s_sw c _ 0x8000425c#64 false 4#12 9#5 0#5 (by decide) (BitVec.ofNat 32 0))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, fc_ext0]
   iintro Hk Hpc Hrefc
-  k_step (wp_s_sw c _ 0x800041a2#64 false 0#12 9#5 0#5 (by decide) C.type)
+  k_step (wp_s_sw c _ 0x80004260#64 false 0#12 9#5 0#5 (by decide) C.type)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, fc_ext0]
   iintro Hk Hpc Hty
   -- the slot back, free
@@ -352,13 +352,13 @@ theorem fc_last (RE : RELEASE) (PC : PIPECLOSE) (Γ : SchedNames) (cpu c : CPU) 
   ihave HR := ftableRes_intro γ curCtx M nx (updAt Ls kk []) hfresh hok $$ [Ha Hs]
   case' _ => iframe
   -- auipc a0,0x1e ; addi a0,a0,762 ; jal release
-  k_step (wp_s_auipc c _ 0x800041a6#64 false 0x1e#20 10#5 (by decide))
+  k_step (wp_s_auipc c _ 0x80004264#64 false 0x1e#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ 0x800041aa#64 false 762#12 10#5 10#5 (by decide))
+  k_step (wp_s_addi c _ 0x80004268#64 false 740#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fc_lock_41a6]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ 0x800041ae#64 false 2083476#21 1#5 (by decide))
+  k_step (wp_s_jal c _ 0x8000426c#64 false 2083444#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   iapply (fa_release RE c _ γl γ ?ha0 ?hsr ?hnr ?hKr k.sie ?hrr ?hor) $$ [- $Hk $Hpc $Hlocked $HR]
@@ -388,7 +388,7 @@ theorem fc_last (RE : RELEASE) (PC : PIPECLOSE) (Γ : SchedNames) (cpu c : CPU) 
   k_norm_g at hcs4
   obtain ⟨e2, e8, e9, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩ := hcs4
   have hpinr : k.sie = false ∨ k.proc = 0#64 → cr = cpu := fun h => (hpr h).trans (hpin h)
-  k_step_gen (wp_s_addi cr _ 0x800041b2#64 true 1#12 15#5 0#5 (by decide))
+  k_step_gen (wp_s_addi cr _ 0x80004270#64 true 1#12 15#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c1 hp1
   iintro Hk Hpc
   have hty := fdstateOk_type _ _ _ _ hok2
@@ -396,31 +396,31 @@ theorem fc_last (RE : RELEASE) (PC : PIPECLOSE) (Γ : SchedNames) (cpu c : CPU) 
   | closed =>
     -- FD_NONE: beq not taken ; addiw a5,s2,-2 ; li a4,1 ; bgeu not taken ; restore ; j 41ec
     simp only [fdTypeCode] at hty
-    k_step_gen (wp_s_branch c1 _ 0x800041b4#64 false 66#13 18#5 15#5 (by decide) bop.BEQ)
+    k_step_gen (wp_s_branch c1 _ 0x80004272#64 false 66#13 18#5 15#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e18, hty, fc_one, fc_beq_none] next c2 hp2
     iintro Hk Hpc
-    k_step_gen (wp_s_addiw c2 _ 0x800041b8#64 false 4094#12 15#5 18#5 (by decide))
+    k_step_gen (wp_s_addiw c2 _ 0x80004276#64 false 4094#12 15#5 18#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
     iintro Hk Hpc
-    k_step_gen (wp_s_addi c3 _ 0x800041bc#64 true 1#12 14#5 0#5 (by decide))
+    k_step_gen (wp_s_addi c3 _ 0x8000427a#64 true 1#12 14#5 0#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hp4
     iintro Hk Hpc
-    k_step_gen (wp_s_branch c4 _ 0x800041be#64 false 74#13 14#5 15#5 (by decide) bop.BGEU)
+    k_step_gen (wp_s_branch c4 _ 0x8000427c#64 false 74#13 14#5 15#5 (by decide) bop.BGEU)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e18, hty, fc_one, fc_bgeu_none, fc_bgeu_none'] next c5 hp5
     iintro Hk Hpc
-    k_step_gen (wp_s_ld c5 _ 0x800041c2#64 true 32#12 18#5 2#5 (by decide) (by decide) (DFrac.own 1) (R 18#5))
+    k_step_gen (wp_s_ld c5 _ 0x80004280#64 true 32#12 18#5 2#5 (by decide) (by decide) (DFrac.own 1) (R 18#5))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e2, hR2, fc_sp32, fc_sp32'] next c6 hp6
     iintro Hk Hpc Hc32
-    k_step_gen (wp_s_ld c6 _ 0x800041c4#64 true 24#12 19#5 2#5 (by decide) (by decide) (DFrac.own 1) (R 19#5))
+    k_step_gen (wp_s_ld c6 _ 0x80004282#64 true 24#12 19#5 2#5 (by decide) (by decide) (DFrac.own 1) (R 19#5))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e2, hR2, fc_sp24, fc_sp24'] next c7 hp7
     iintro Hk Hpc Hc24
-    k_step_gen (wp_s_ld c7 _ 0x800041c6#64 true 16#12 20#5 2#5 (by decide) (by decide) (DFrac.own 1) (R 20#5))
+    k_step_gen (wp_s_ld c7 _ 0x80004284#64 true 16#12 20#5 2#5 (by decide) (by decide) (DFrac.own 1) (R 20#5))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e2, hR2, fc_sp16, fc_sp16'] next c8 hp8
     iintro Hk Hpc Hc16
-    k_step_gen (wp_s_ld c8 _ 0x800041c8#64 true 8#12 21#5 2#5 (by decide) (by decide) (DFrac.own 1) (R 21#5))
+    k_step_gen (wp_s_ld c8 _ 0x80004286#64 true 8#12 21#5 2#5 (by decide) (by decide) (DFrac.own 1) (R 21#5))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e2, hR2, fc_sp8, fc_sp8'] next c9 hp9
     iintro Hk Hpc Hc8
-    k_step_gen (wp_s_j c9 _ 0x800041ca#64 true 34#21)
+    k_step_gen (wp_s_j c9 _ 0x80004288#64 true 34#21)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next cj hpj
     iintro Hk Hpc
     have hpinj : k.sie = false ∨ k.proc = 0#64 → cj = cpu := fun h =>
@@ -453,16 +453,16 @@ theorem fc_last (RE : RELEASE) (PC : PIPECLOSE) (Γ : SchedNames) (cpu c : CPU) 
       -- FD_PIPE: beq taken ; mv a1,s3 ; mv a0,s4 ; jal pipeclose ; restore ; j 41ec
       simp only [fdTypeCode] at hty
       obtain ⟨-, hwr, -⟩ := hok2
-      k_step_gen (wp_s_branch c1 _ 0x800041b4#64 false 66#13 18#5 15#5 (by decide) bop.BEQ)
+      k_step_gen (wp_s_branch c1 _ 0x80004272#64 false 66#13 18#5 15#5 (by decide) bop.BEQ)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e18, hty, fc_one, fc_beq_pipe] next c2 hp2
       iintro Hk Hpc
-      k_step_gen (wp_s_add c2 _ 0x800041f6#64 true 11#5 0#5 19#5 (by decide))
+      k_step_gen (wp_s_add c2 _ 0x800042b4#64 true 11#5 0#5 19#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
       iintro Hk Hpc
-      k_step_gen (wp_s_add c3 _ 0x800041f8#64 true 10#5 0#5 20#5 (by decide))
+      k_step_gen (wp_s_add c3 _ 0x800042b6#64 true 10#5 0#5 20#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hp4
       iintro Hk Hpc
-      k_step_gen (wp_s_jal c4 _ 0x800041fa#64 false 864#21 1#5 (by decide))
+      k_step_gen (wp_s_jal c4 _ 0x800042b8#64 false 864#21 1#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c5 hp5
       iintro Hk Hpc
       icases fileCore_pipe 1 pn C hty $$ Hc with ⟨#Hpipe, Hpr⟩
@@ -492,19 +492,19 @@ theorem fc_last (RE : RELEASE) (PC : PIPECLOSE) (Γ : SchedNames) (cpu c : CPU) 
         obtain ⟨a, b⟩ := hsp2 h
         obtain ⟨a', b'⟩ := hsp h
         exact ⟨a.trans a', b.trans b'⟩
-      k_step_gen (wp_s_ld cp _ 0x800041fe#64 true 32#12 18#5 2#5 (by decide) (by decide) (DFrac.own 1) (R 18#5))
+      k_step_gen (wp_s_ld cp _ 0x800042bc#64 true 32#12 18#5 2#5 (by decide) (by decide) (DFrac.own 1) (R 18#5))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [f2, e2, hR2, fc_sp32, fc_sp32'] next c6 hp6
       iintro Hk Hpc Hc32
-      k_step_gen (wp_s_ld c6 _ 0x80004200#64 true 24#12 19#5 2#5 (by decide) (by decide) (DFrac.own 1) (R 19#5))
+      k_step_gen (wp_s_ld c6 _ 0x800042be#64 true 24#12 19#5 2#5 (by decide) (by decide) (DFrac.own 1) (R 19#5))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [f2, e2, hR2, fc_sp24, fc_sp24'] next c7 hp7
       iintro Hk Hpc Hc24
-      k_step_gen (wp_s_ld c7 _ 0x80004202#64 true 16#12 20#5 2#5 (by decide) (by decide) (DFrac.own 1) (R 20#5))
+      k_step_gen (wp_s_ld c7 _ 0x800042c0#64 true 16#12 20#5 2#5 (by decide) (by decide) (DFrac.own 1) (R 20#5))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [f2, e2, hR2, fc_sp16, fc_sp16'] next c8 hp8
       iintro Hk Hpc Hc16
-      k_step_gen (wp_s_ld c8 _ 0x80004204#64 true 8#12 21#5 2#5 (by decide) (by decide) (DFrac.own 1) (R 21#5))
+      k_step_gen (wp_s_ld c8 _ 0x800042c2#64 true 8#12 21#5 2#5 (by decide) (by decide) (DFrac.own 1) (R 21#5))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [f2, e2, hR2, fc_sp8, fc_sp8'] next c9 hp9
       iintro Hk Hpc Hc8
-      k_step_gen (wp_s_j c9 _ 0x80004206#64 true 2097126#21)
+      k_step_gen (wp_s_j c9 _ 0x800042c4#64 true 2097126#21)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next cj hpj
       iintro Hk Hpc
       have hpinj : k.sie = false ∨ k.proc = 0#64 → cj = cpu := fun h =>
@@ -547,24 +547,24 @@ theorem fileclose_proof (AC : ACQUIRE) (RE : RELEASE) (PC : PIPECLOSE) : FILECLO
   ihave #Hlk := (show isFtable (GF := GF) γl γ ⊢ isLock γl ftableAddr "ftable" (ftableResAt γ) from by
     unfold isFtable; iintro H; iexact H) $$ Hft
   -- the prologue ; c.mv s1,a0
-  iapply (wp_prologue8s1_gen cpu k 0x8000415e#64 hK8)
+  iapply (wp_prologue8s1_gen cpu k 0x8000421c#64 hK8)
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm_g
   iframe
   inext
   iapply wpNext_intro_pin
   iintro %c1 %hp1 Hk Hpc Hframe
-  k_step_gen (wp_s_add c1 _ 0x80004168#64 true 9#5 0#5 10#5 (by decide))
+  k_step_gen (wp_s_add c1 _ 0x80004226#64 true 9#5 0#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0] next c2 hp2
   iintro Hk Hpc
   -- auipc a0,0x1e ; addi a0,a0,822 ; jal acquire
-  k_step_gen (wp_s_auipc c2 _ 0x8000416a#64 false 0x1e#20 10#5 (by decide))
+  k_step_gen (wp_s_auipc c2 _ 0x80004228#64 false 0x1e#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c3 _ 0x8000416e#64 false 822#12 10#5 10#5 (by decide))
+  k_step_gen (wp_s_addi c3 _ 0x8000422c#64 false 800#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fc_lock_416a] next c4 hp4
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c4 _ 0x80004172#64 false 2083400#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c4 _ 0x80004230#64 false 2083368#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c5 hp5
   iintro Hk Hpc
   iapply (fa_acquire AC c5 _ γl γ ?ha0 ?hna ?hKa ?hla) $$ [- $Hk $Hpc]
@@ -608,16 +608,16 @@ theorem fileclose_proof (AC : ACQUIRE) (RE : RELEASE) (PC : PIPECLOSE) : FILECLO
       wordPointsTo (fnode kk + BitVec.signExtend 64 4#12) 4 (DFrac.own 1) (BitVec.ofNat 32 n) from by
     rw [wordAtN_cur, aFref_eq, hn]) $$ Hrefc
   -- c.lw a5,4(s1) ; blez a5 (dead) ; c.addiw a5,a5,-1 ; c.sw a5,4(s1)
-  k_step (wp_s_lw c _ 0x80004176#64 true 4#12 15#5 9#5 (by decide) (by decide) (DFrac.own 1) (BitVec.ofNat 32 n))
+  k_step (wp_s_lw c _ 0x80004234#64 true 4#12 15#5 9#5 (by decide) (by decide) (DFrac.own 1) (BitVec.ofNat 32 n))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9]
   iintro Hk Hpc Hrefc
-  k_step (wp_s_branch0 c _ 0x80004178#64 false 84#13 15#5 (by decide) bop.BGE)
+  k_step (wp_s_branch0 c _ 0x80004236#64 false 84#13 15#5 (by decide) bop.BGE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fd_bgtz n hn1 hlt']
   iintro Hk Hpc
-  k_step (wp_s_addiw c _ 0x8000417c#64 true 4095#12 15#5 15#5 (by decide))
+  k_step (wp_s_addiw c _ 0x8000423a#64 true 4095#12 15#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_sw c _ 0x8000417e#64 true 4#12 9#5 15#5 (by decide) (BitVec.ofNat 32 n))
+  k_step (wp_s_sw c _ 0x8000423c#64 true 4#12 9#5 15#5 (by decide) (BitVec.ofNat 32 n))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, fc_decr n hn1 hlt', fc_decr' n hn1 hlt']
   iintro Hk Hpc Hrefc
   -- the close ghost step
@@ -637,7 +637,7 @@ theorem fileclose_proof (AC : ACQUIRE) (RE : RELEASE) (PC : PIPECLOSE) : FILECLO
   by_cases hlast : s ++ t = []
   · -- the last reference: not taken
     have hn2 : n = 1 := by rw [hlast] at hlen2; simp at hlen2; omega
-    k_step (wp_s_branch0 c _ 0x80004180#64 false 96#13 15#5 (by decide) bop.BLT)
+    k_step (wp_s_branch0 c _ 0x8000423e#64 false 96#13 15#5 (by decide) bop.BLT)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [fc_bgtz n hn1 hlt', fc_bgtz' n hn1 hlt', decide_eq_false (show ¬ 2 ≤ n by omega)]
     iintro Hk Hpc
@@ -665,7 +665,7 @@ theorem fileclose_proof (AC : ACQUIRE) (RE : RELEASE) (PC : PIPECLOSE) : FILECLO
     have hn2 : 2 ≤ n := by
       have : (s ++ t).length ≠ 0 := by intro h; exact hlast (List.eq_nil_of_length_eq_zero h)
       omega
-    k_step (wp_s_branch0 c _ 0x80004180#64 false 96#13 15#5 (by decide) bop.BLT)
+    k_step (wp_s_branch0 c _ 0x8000423e#64 false 96#13 15#5 (by decide) bop.BLT)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [fc_bgtz n hn1 hlt', fc_bgtz' n hn1 hlt', decide_eq_true hn2]
     iintro Hk Hpc
@@ -686,13 +686,13 @@ theorem fileclose_proof (AC : ACQUIRE) (RE : RELEASE) (PC : PIPECLOSE) : FILECLO
     ihave HR := ftableRes_intro γ curCtx _ nx _ hfresh' hok' $$ [Ha Hs]
     case' _ => iframe
     -- auipc a0,0x1e ; addi a0,a0,704 ; jal release
-    k_step (wp_s_auipc c _ 0x800041e0#64 false 0x1e#20 10#5 (by decide))
+    k_step (wp_s_auipc c _ 0x8000429e#64 false 0x1e#20 10#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
-    k_step (wp_s_addi c _ 0x800041e4#64 false 704#12 10#5 10#5 (by decide))
+    k_step (wp_s_addi c _ 0x800042a2#64 false 682#12 10#5 10#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fc_lock_41e0]
     iintro Hk Hpc
-    k_step (wp_s_jal c _ 0x800041e8#64 false 2083418#21 1#5 (by decide))
+    k_step (wp_s_jal c _ 0x800042a6#64 false 2083386#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
     iapply (fa_release RE c _ γl γ ?ha0 ?hsr ?hnr ?hKr k.sie ?hrr ?hor) $$ [- $Hk $Hpc $Hlocked $HR]

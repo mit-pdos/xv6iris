@@ -41,11 +41,11 @@ theorem wk_toNat (m : Nat) (h : m < 2 ^ 64) : (BitVec.ofNat 64 m).toNat = m := b
 
 /-- `&proc[i]` as a number, up to and including the sentinel `&proc[NPROC]`. -/
 theorem wk_procAddr_toNat (j : Nat) (hj : j ≤ NPROC) :
-    (procAddr j).toNat = 2147559352 + 360 * j := by
+    (procAddr j).toNat = 2147559520 + 360 * j := by
   have h1 : (BitVec.ofNat 64 (procSize * j)).toNat = 360 * j := by
     simp only [BitVec.toNat_ofNat, procSize]
     exact Nat.mod_eq_of_lt (by unfold NPROC at hj; omega)
-  have h2 : (procsAddr : BitVec 64).toNat = 2147559352 := by decide
+  have h2 : (procsAddr : BitVec 64).toNat = 2147559520 := by decide
   unfold procAddr
   rw [BitVec.toNat_add, h1, h2]
   exact Nat.mod_eq_of_lt (by unfold NPROC at hj; omega)
@@ -56,21 +56,21 @@ theorem wk_cursor (i : Nat) : procAddr i + 360#64 = procAddr (i + 1) := by
   rw [show 360 * (i + 1) = 360 * i + 360 from by omega, BitVec.ofNat_add,
     show BitVec.ofNat 64 360 = 360#64 from rfl, BitVec.add_assoc]
 
-/-- The sentinel `&proc[NPROC] = 0x800181b8`. -/
-theorem wk_sentinel : procAddr NPROC = 0x800181b8#64 := by
+/-- The sentinel `&proc[NPROC] = 0x80018260`. -/
+theorem wk_sentinel : procAddr NPROC = 0x80018260#64 := by
   apply BitVec.eq_of_toNat_eq
   rw [wk_procAddr_toNat NPROC (Nat.le_refl _)]
   unfold NPROC
-  rw [wk_toNat 2147582392 (by omega)]
+  rw [wk_toNat 2147582560 (by omega)]
 
 /-- The loop test `beq s1,s3`: the scan stops exactly at the last slot. -/
 theorem wk_cursor_eq (i : Nat) (hi : i < NPROC) :
-    (procAddr (i + 1) = 0x800181b8#64) ↔ i + 1 = NPROC := by
+    (procAddr (i + 1) = 0x80018260#64) ↔ i + 1 = NPROC := by
   constructor
   · intro he
     have h := congrArg BitVec.toNat he
     rw [wk_procAddr_toNat (i + 1) (by unfold NPROC at hi ⊢; omega)] at h
-    have hr : (0x800181b8#64).toNat = 2147582392 := by decide
+    have hr : (0x80018260#64).toNat = 2147582560 := by decide
     rw [hr] at h
     unfold NPROC
     omega
@@ -80,7 +80,7 @@ theorem wk_cursor_eq (i : Nat) (hi : i < NPROC) :
 
 /-- The branch `beq s1,s3` at the end of an iteration. -/
 theorem wk_beq_last {α : Type} (i : Nat) (hi : i < NPROC) (p q : α) :
-    (if bcond bop.BEQ (procAddr (i + 1)) 0x800181b8#64 then p else q)
+    (if bcond bop.BEQ (procAddr (i + 1)) 0x80018260#64 then p else q)
       = if i + 1 = NPROC then p else q := by
   by_cases he : i + 1 = NPROC
   · rw [if_pos he, if_pos (by simp only [bcond, beq_iff_eq]; exact (wk_cursor_eq i hi).mpr he)]
@@ -171,7 +171,7 @@ set_option maxHeartbeats 1000000 in
 theorem wk_acquire (AC : ACQUIRE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (c : CPU) (k' : KCtx) (γ : GName) (Rp : CtxId → IProp GF) [CtxMorph Rp]
     (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 10 ≤ k'.avail) (hs' : "proc" ∉ k'.locks) :
-    kctx c k' ∗ pcIs c 0x80000bba#64 ∗ isLock γ (k'.regs 10#5) "proc" Rp ∗
+    kctx c k' ∗ pcIs c 0x80000c58#64 ∗ isLock γ (k'.regs 10#5) "proc" Rp ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' (((k'.pushOffAt spie spp).withRegs R').withLocks ("proc" :: k'.locks)) -∗
@@ -191,7 +191,7 @@ theorem wk_release (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS 
     (hsie' : k'.sie = false) (hnoff' : 1 ≤ k'.noff) (hK' : 10 ≤ k'.avail)
     (reen : Bool) (hreen : reen = (decide (k'.noff = 1) && k'.intena))
     (hon : reen = true → k'.tier = .kpt ∧ trapRes true + 6 ≤ k'.avail) :
-    kctx c k' ∗ pcIs c 0x80000c42#64 ∗ isLock γ (k'.regs 10#5) "proc" Rp ∗
+    kctx c k' ∗ pcIs c 0x80000ce0#64 ∗ isLock γ (k'.regs 10#5) "proc" Rp ∗
     locked γ c ∗ Rp curCtx ∗ popArm c k' reen ∗
     wpNext (k'.popExit reen).sie k'.proc c (fun cpu' => iprop(∀ R' : RegMap,
       kctx cpu' (((k'.popExit reen).withRegs R').withLocks (k'.locks.filter (fun x => x ≠ "proc"))) -∗
@@ -237,25 +237,25 @@ end
 /-! ## The release tail -/
 
 set_option maxHeartbeats 4000000 in
-/-- The stretch from `0x80001fbe` (`wakeup+0x2a`) that every arm of the body
+/-- The stretch from `0x8000206c` (`wakeup+0x2a`) that every arm of the body
 falls into: `release(&p->lock)`, the cursor step and the termination test.
 The lock is still held, so the hart is pinned up to the release. -/
 theorem wk_rel (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
     [CurCtx] (Γ : SchedNames) (k : KCtx) (hwf : k.wf) (hnoff : k.noff + 1 < 2 ^ 31)
     (hK : wakeupSlots ≤ k.avail) (hlk : "proc" ∉ k.locks)
     (i : Nat) (hi : i < NPROC) (spie spp spie1 spp1 : Bool) (R Rr : RegMap)
-    (hkept : wkKept R Rr) (h9 : Rr 9#5 = procAddr i) (h19 : Rr 19#5 = 0x800181b8#64)
+    (hkept : wkKept R Rr) (h9 : Rr 9#5 = procAddr i) (h19 : Rr 19#5 = 0x80018260#64)
     (hsp1 : k.sie = false → spie1 = spie ∧ spp1 = spp)
     (ξl : CtxId) (hxi : ξl = curCtx)
     (cur c : CPU) (hpin : k.sie = false ∨ k.proc = 0#64 → c = cur) :
     kctx c ((((k.pushOffAt spie1 spp1).withLocks ("proc" :: k.locks)).pushed 8).withRegs Rr) ∗
-    pcIs c 0x80001fbe#64 ∗
+    pcIs c 0x8000206c#64 ∗
     isLock (Γ.lock i) (procAddr i) "proc" (procLockPay Γ i) ∗
     locked (Γ.lock i) c ∗ procLockPay Γ i ξl ∗ sieArm c k.sie k.proc ∗
     wpNext k.sie k.proc cur (fun cpu' => iprop(∀ (spie2 spp2 : Bool) (R2 : RegMap),
       ⌜k.sie = false → spie2 = spie ∧ spp2 = spp⌝ -∗
       kctx cpu' (((k.withSpie spie2 spp2).pushed 8).withRegs R2) -∗
-      pcIs cpu' (if i + 1 = NPROC then 0x80001fe8#64 else 0x80001fcc#64) -∗
+      pcIs cpu' (if i + 1 = NPROC then 0x80002096#64 else 0x8000207a#64) -∗
       ⌜wkKept R R2 ∧ R2 9#5 = procAddr (i + 1)⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hxi
@@ -263,11 +263,11 @@ theorem wk_rel (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc 
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK8 : 8 ≤ k.avail := by unfold wakeupSlots at hK; omega
   -- c.mv a0,s1
-  k_step_gen (wp_s_add c _ 0x80001fbe#64 true 10#5 0#5 9#5 (by decide))
+  k_step_gen (wp_s_add c _ 0x8000206c#64 true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9] next c1 hq1
   iintro Hk Hpc
   -- jal ra, release
-  k_step_gen (wp_s_jal c1 _ 0x80001fc0#64 false 2092162#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c1 _ 0x8000206e#64 false 2092146#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c2 hq2
   iintro Hk Hpc
   have e1 : c1 = c := hq1 (Or.inl rfl)
@@ -298,7 +298,7 @@ theorem wk_rel (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc 
   -- past release: the cursor step and the test
   iapply wpNext_intro_pin
   iintro %c3 %hq3 %R3 Hk Hpc %hcs3
-  have hret : jumpPc 0x80001fc4#64 = 0x80001fc4#64 := by simp only [jumpPc, BitVec.reduceAnd]
+  have hret : jumpPc 0x80002072#64 = 0x80002072#64 := by simp only [jumpPc, BitVec.reduceAnd]
   k_norm_g [wk_withLocks_self, wk_filter_proc k.locks hlk,
     KCtx.pushOffAt_popExit k spie1 spp1 hwf, hK8, hret]
   unfold calleeSaved at hcs3
@@ -306,14 +306,14 @@ theorem wk_rel (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc 
   obtain ⟨d2, d8, d9, d18, d19, d20, d21, d22, d23, d24, d25, d26, d27⟩ := hcs3
   have hkept3 : wkKept Rr R3 := ⟨d2, d8, d18, d19, d20, d21, d22, d23, d24, d25, d26, d27⟩
   have h9' : R3 9#5 = procAddr i := d9.trans h9
-  have h19' : R3 19#5 = 0x800181b8#64 := d19.trans h19
+  have h19' : R3 19#5 = 0x80018260#64 := d19.trans h19
   -- addi s1,s1,360
-  k_step_gen (wp_s_addi c3 _ 0x80001fc4#64 false 360#12 9#5 9#5 (by decide))
+  k_step_gen (wp_s_addi c3 _ 0x80002072#64 false 360#12 9#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [h9', wk_cursor i] next c4 hq4
   iintro Hk Hpc
   -- beq s1,s3
-  k_step_gen (wp_s_branch c4 _ 0x80001fc8#64 false 32#13 9#5 19#5 (by decide) bop.BEQ)
+  k_step_gen (wp_s_branch c4 _ 0x80002076#64 false 32#13 9#5 19#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [h19', wk_beq_last i hi] next c5 hq5
   iintro Hk Hpc
@@ -331,7 +331,7 @@ theorem wk_rel (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc 
 /-! ## One iteration of the scan -/
 
 set_option maxHeartbeats 4000000 in
-/-- The body at `0x80001fcc` (`wakeup+0x38`) for slot `i`: `acquire(&p->lock)`,
+/-- The body at `0x8000207a` (`wakeup+0x38`) for slot `i`: `acquire(&p->lock)`,
 the chan test, the chan clear, the state test, the wake, and the release tail.
 The wake arm needs nothing from the running thread: at SLEEPING the lock owns
 both halves of the state mirror, so the scan may pass over the caller's own
@@ -342,15 +342,15 @@ theorem wk_iter (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFuncto
     (hwf : k.wf) (hnoff : k.noff + 1 < 2 ^ 31) (hK : wakeupSlots ≤ k.avail)
     (hlk : "proc" ∉ k.locks) (htier : k.tier = KTier.kpt)
     (i : Nat) (hi : i < NPROC) (spie spp : Bool) (R : RegMap)
-    (h9 : R 9#5 = procAddr i) (h18 : R 18#5 = chan) (h19 : R 19#5 = 0x800181b8#64)
+    (h9 : R 9#5 = procAddr i) (h18 : R 18#5 = chan) (h19 : R 19#5 = 0x80018260#64)
     (h20 : R 20#5 = 2#64) (h21 : R 21#5 = 3#64)
     (cur : CPU) :
-    kctx cur (((k.withSpie spie spp).pushed 8).withRegs R) ∗ pcIs cur 0x80001fcc#64 ∗
+    kctx cur (((k.withSpie spie spp).pushed 8).withRegs R) ∗ pcIs cur 0x8000207a#64 ∗
     procsInv Γ ∗
     wpNext k.sie k.proc cur (fun cpu' => iprop(∀ (spie2 spp2 : Bool) (R2 : RegMap),
       ⌜k.sie = false → spie2 = spie ∧ spp2 = spp⌝ -∗
       kctx cpu' (((k.withSpie spie2 spp2).pushed 8).withRegs R2) -∗
-      pcIs cpu' (if i + 1 = NPROC then 0x80001fe8#64 else 0x80001fcc#64) -∗
+      pcIs cpu' (if i + 1 = NPROC then 0x80002096#64 else 0x8000207a#64) -∗
       ⌜wkKept R R2 ∧ R2 9#5 = procAddr (i + 1)⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cur := by
   obtain ⟨ξ0, t0⟩ := X
@@ -363,11 +363,11 @@ theorem wk_iter (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFuncto
   have hK8 : 8 ≤ k.avail := by unfold wakeupSlots at hK; omega
   ihave #Hlk := procsInv_lookup Γ i hi $$ Hpinv
   -- c.mv a0,s1
-  k_step_gen (wp_s_add cur _ 0x80001fcc#64 true 10#5 0#5 9#5 (by decide))
+  k_step_gen (wp_s_add cur _ 0x8000207a#64 true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9] next c1 hp1
   iintro Hk Hpc
   -- jal ra, acquire
-  k_step_gen (wp_s_jal c1 _ 0x80001fce#64 false 2092012#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c1 _ 0x8000207c#64 false 2091996#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c2 hp2
   iintro Hk Hpc
   iapply (wk_acquire AC c2 _ (Γ.lock i) (procLockPay Γ i) ?hna ?hKa ?hla) $$ [- $Hk $Hpc]
@@ -380,7 +380,7 @@ theorem wk_iter (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFuncto
   -- past acquire: the payload in hand, the hart pinned until the release
   iapply wpNext_intro_pin
   iintro %c3 %hp3 %spie1 %spp1 %R1 %hsp1 Hk Hpc %hcs1 Hlocked HR _ Harm
-  have hret : jumpPc 0x80001fd2#64 = 0x80001fd2#64 := by simp only [jumpPc, BitVec.reduceAnd]
+  have hret : jumpPc 0x80002080#64 = 0x80002080#64 := by simp only [jumpPc, BitVec.reduceAnd]
   k_norm_g [KCtx.pushOffAt_withRegs, KCtx.pushOffAt_pushed, wk_withSpie_pushOffAt, hK8, hret]
   unfold calleeSaved at hcs1
   k_norm_g at hcs1
@@ -388,7 +388,7 @@ theorem wk_iter (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFuncto
   have hkept1 : wkKept R R1 := ⟨b2, b8, b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩
   have g9 : R1 9#5 = procAddr i := b9.trans h9
   have g18 : R1 18#5 = chan := b18.trans h18
-  have g19 : R1 19#5 = 0x800181b8#64 := b19.trans h19
+  have g19 : R1 19#5 = 0x80018260#64 := b19.trans h19
   have g20 : R1 20#5 = 2#64 := b20.trans h20
   have g21 : R1 21#5 = 3#64 := b21.trans h21
   have hpin3 : k.sie = false ∨ k.proc = 0#64 → c3 = cur := fun h =>
@@ -397,7 +397,7 @@ theorem wk_iter (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFuncto
   icases procLockRes_elim Γ ξ0 (procAddr i) $$ HR with
     ⟨%st, %ch, Hstate, Hpg, Hchan, ⟨%kl, %xs, %pid, Hrest⟩, Hslots⟩
   -- c.ld a5,32(s1): a5 := p->chan
-  k_step_gen (wp_s_ld c3 _ 0x80001fd2#64 true 32#12 15#5 9#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c3 _ 0x80002080#64 true 32#12 15#5 9#5 (by decide) (by decide)
       (DFrac.own 1) ch)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g9, pChan] next c4 hp4
   iintro Hk Hpc Hchan
@@ -406,20 +406,20 @@ theorem wk_iter (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFuncto
   by_cases hcm : ch = chan
   · -- the channel matches: clear the flag, then look at the state
     -- bne a5,s2 (not taken)
-    k_step_gen (wp_s_branch c4 _ 0x80001fd4#64 false 8170#13 15#5 18#5 (by decide) bop.BNE)
+    k_step_gen (wp_s_branch c4 _ 0x80002082#64 false 8170#13 15#5 18#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [g18, wk_bne_eq ch chan hcm] next c5 hp5
     iintro Hk Hpc
     have e5 : c5 = c4 := hp5 (Or.inl rfl)
     subst e5
     -- sd zero,32(s1): p->chan := 0
-    k_step_gen (wp_s_sd c5 _ 0x80001fd8#64 false 32#12 9#5 0#5 (by decide) ch)
+    k_step_gen (wp_s_sd c5 _ 0x80002086#64 false 32#12 9#5 0#5 (by decide) ch)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g9, pChan] next c6 hp6
     iintro Hk Hpc Hchan
     have e6 : c6 = c5 := hp6 (Or.inl rfl)
     subst e6
     -- c.lw a5,24(s1): a5 := sext(p->state)
-    k_step_gen (wp_s_lw c6 _ 0x80001fdc#64 true 24#12 15#5 9#5 (by decide) (by decide)
+    k_step_gen (wp_s_lw c6 _ 0x8000208a#64 true 24#12 15#5 9#5 (by decide) (by decide)
         (DFrac.own 1) st)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g9, pState] next c7 hp7
     iintro Hk Hpc Hstate
@@ -427,7 +427,7 @@ theorem wk_iter (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFuncto
     subst e7
     by_cases hst : BitVec.signExtend 64 st = 2#64
     · -- SLEEPING: wake it
-      k_step_gen (wp_s_branch c7 _ 0x80001fde#64 false 8160#13 15#5 20#5 (by decide) bop.BNE)
+      k_step_gen (wp_s_branch c7 _ 0x8000208c#64 false 8160#13 15#5 20#5 (by decide) bop.BNE)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [g20, wk_bne_eq (BitVec.signExtend 64 st) 2#64 hst] next c8 hp8
       iintro Hk Hpc
@@ -436,14 +436,14 @@ theorem wk_iter (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFuncto
       have hsl : st = SLEEPING := wk_sext_sleeping st hst
       subst hsl
       -- sw s5,24(s1): p->state := RUNNABLE
-      k_step_gen (wp_s_sw c8 _ 0x80001fe2#64 false 24#12 9#5 21#5 (by decide) SLEEPING)
+      k_step_gen (wp_s_sw c8 _ 0x80002090#64 false 24#12 9#5 21#5 (by decide) SLEEPING)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [g9, g21, pState] next c9 hp9
       iintro Hk Hpc Hstate
       have e9 : c9 = c8 := hp9 (Or.inl rfl)
       subst e9
       -- c.j the release tail
-      k_step_gen (wp_s_j c9 _ 0x80001fe6#64 true 2097112#21)
+      k_step_gen (wp_s_j c9 _ 0x80002094#64 true 2097112#21)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c10 hp10
       iintro Hk Hpc
       have e10 : c10 = c9 := hp10 (Or.inl rfl)
@@ -466,7 +466,7 @@ theorem wk_iter (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFuncto
       case hcr => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact g9
       case hsn => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact g19
     · -- not SLEEPING: the flag is cleared, the state stands
-      k_step_gen (wp_s_branch c7 _ 0x80001fde#64 false 8160#13 15#5 20#5 (by decide) bop.BNE)
+      k_step_gen (wp_s_branch c7 _ 0x8000208c#64 false 8160#13 15#5 20#5 (by decide) bop.BNE)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [g20, wk_bne_ne (BitVec.signExtend 64 st) 2#64 hst] next c8 hp8
       iintro Hk Hpc
@@ -487,7 +487,7 @@ theorem wk_iter (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFuncto
       case hcr2 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact g9
       case hsn2 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact g19
   · -- the channel does not match: nothing changes
-    k_step_gen (wp_s_branch c4 _ 0x80001fd4#64 false 8170#13 15#5 18#5 (by decide) bop.BNE)
+    k_step_gen (wp_s_branch c4 _ 0x80002082#64 false 8170#13 15#5 18#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [g18, wk_bne_ne ch chan hcm] next c5 hp5
     iintro Hk Hpc
@@ -511,8 +511,8 @@ theorem wk_iter (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFuncto
 /-! ## The loop -/
 
 set_option maxHeartbeats 4000000 in
-/-- The scan from `0x80001fcc` with `i` slots behind it (`i < NPROC`) runs to
-the epilogue at `0x80001fe8`.  A bounded loop: ordinary induction on a `fuel`
+/-- The scan from `0x8000207a` with `i` slots behind it (`i < NPROC`) runs to
+the epilogue at `0x80002096`.  A bounded loop: ordinary induction on a `fuel`
 bounding the iterations left, with the hart quantified inside (the thread may
 migrate at every interrupt window between two critical sections). -/
 theorem wk_loop (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors}
@@ -521,14 +521,14 @@ theorem wk_loop (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFuncto
     (hwf : k.wf) (hnoff : k.noff + 1 < 2 ^ 31) (hK : wakeupSlots ≤ k.avail)
     (hlk : "proc" ∉ k.locks) (htier : k.tier = KTier.kpt) (fuel : Nat) :
     ∀ (i : Nat) (_ : NPROC - i = fuel + 1) (spie spp : Bool) (R : RegMap)
-      (_ : R 9#5 = procAddr i) (_ : R 18#5 = chan) (_ : R 19#5 = 0x800181b8#64)
+      (_ : R 9#5 = procAddr i) (_ : R 18#5 = chan) (_ : R 19#5 = 0x80018260#64)
       (_ : R 20#5 = 2#64) (_ : R 21#5 = 3#64) (cur : CPU),
-    kctx cur (((k.withSpie spie spp).pushed 8).withRegs R) ∗ pcIs cur 0x80001fcc#64 ∗
+    kctx cur (((k.withSpie spie spp).pushed 8).withRegs R) ∗ pcIs cur 0x8000207a#64 ∗
     procsInv Γ ∗
     wpNext k.sie k.proc cur (fun cpu' => iprop(∀ (spie2 spp2 : Bool) (R2 : RegMap),
       ⌜k.sie = false → spie2 = spie ∧ spp2 = spp⌝ -∗
       kctx cpu' (((k.withSpie spie2 spp2).pushed 8).withRegs R2) -∗
-      pcIs cpu' 0x80001fe8#64 -∗ ⌜wkKept R R2⌝ -∗ wpLoop cpu'))
+      pcIs cpu' 0x80002096#64 -∗ ⌜wkKept R R2⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cur := by
   induction fuel with
   | zero =>
@@ -619,7 +619,7 @@ theorem wkFrame_join {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurC
   unfold wkFrame; iintro H; iexact H
 
 set_option maxHeartbeats 4000000 in
-/-- The epilogue at `0x80001fe8`: restore `ra`, `s0`, `s1`..`s5`, pop the
+/-- The epilogue at `0x80002096`: restore `ra`, `s0`, `s1`..`s5`, pop the
 frame, return. -/
 theorem wk_epi {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (cpu cur : CPU) (k : KCtx)
@@ -629,7 +629,7 @@ theorem wk_epi {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (h22 : R 22#5 = k.regs 22#5) (h23 : R 23#5 = k.regs 23#5) (h24 : R 24#5 = k.regs 24#5)
     (h25 : R 25#5 = k.regs 25#5) (h26 : R 26#5 = k.regs 26#5) (h27 : R 27#5 = k.regs 27#5)
     (w7 : BitVec 64) :
-    kctx cur (((k.withSpie spie spp).pushed 8).withRegs R) ∗ pcIs cur 0x80001fe8#64 ∗
+    kctx cur (((k.withSpie spie spp).pushed 8).withRegs R) ∗ pcIs cur 0x80002096#64 ∗
     wkFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) (k.regs 21#5) w7 ∗
     wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie' : Bool, ∀ spp' : Bool, ∀ R' : RegMap,
@@ -641,41 +641,41 @@ theorem wk_epi {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
   icases wkFrame_split _ _ _ _ _ _ _ _ _ $$ Hframe with ⟨F0, F1, F2, F3, F4, F5, F6, F7⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK' : 8 ≤ (k.withSpie spie spp).avail := hK
-  k_step_gen (wp_s_ld cur _ 0x80001fe8#64 true 56#12 1#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld cur _ 0x80002096#64 true 56#12 1#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 1#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c1 hq1
   iintro Hk Hpc F0
-  k_step_gen (wp_s_ld c1 _ 0x80001fea#64 true 48#12 8#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c1 _ 0x80002098#64 true 48#12 8#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 8#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c2 hq2
   iintro Hk Hpc F1
-  k_step_gen (wp_s_ld c2 _ 0x80001fec#64 true 40#12 9#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c2 _ 0x8000209a#64 true 40#12 9#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 9#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c3 hq3
   iintro Hk Hpc F2
-  k_step_gen (wp_s_ld c3 _ 0x80001fee#64 true 32#12 18#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c3 _ 0x8000209c#64 true 32#12 18#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 18#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c4 hq4
   iintro Hk Hpc F3
-  k_step_gen (wp_s_ld c4 _ 0x80001ff0#64 true 24#12 19#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c4 _ 0x8000209e#64 true 24#12 19#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 19#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c5 hq5
   iintro Hk Hpc F4
-  k_step_gen (wp_s_ld c5 _ 0x80001ff2#64 true 16#12 20#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c5 _ 0x800020a0#64 true 16#12 20#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 20#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c6 hq6
   iintro Hk Hpc F5
-  k_step_gen (wp_s_ld c6 _ 0x80001ff4#64 true 8#12 21#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c6 _ 0x800020a2#64 true 8#12 21#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 21#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c7 hq7
   iintro Hk Hpc F6
   ihave Hstack : stackOwn (k.regs 2#5) 8 $$ [F0 F1 F2 F3 F4 F5 F6 F7]
   case' _ => stack_cells; iframe
-  k_step_gen (wp_s_pop c7 _ 0x80001ff6#64 true 64#12 8 wk_imm_p64)
+  k_step_gen (wp_s_pop c7 _ 0x800020a4#64 true 64#12 8 wk_imm_p64)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK', hR2] next c8 hq8
   iintro Hk Hpc
-  k_step_gen (wp_s_ret c8 _ 0x80001ff8#64 true 1#5)
+  k_step_gen (wp_s_ret c8 _ 0x800020a6#64 true 1#5)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c9 hq9
   iintro Hk Hpc
   have hpinZ : k.sie = false ∨ k.proc = 0#64 → c9 = cpu := fun h =>
@@ -692,16 +692,16 @@ theorem wk_epi {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
 /-! ## The function -/
 
 /-- `&proc[0]`. -/
-theorem wk_procAddr_zero : procAddr 0 = 0x800127b8#64 := by decide
+theorem wk_procAddr_zero : procAddr 0 = 0x80012860#64 := by decide
 
 /-- `&proc`, folded out of `auipc s1,0x11; addi s1,s1,-2032`. -/
 theorem wk_proc0_addr :
-    0x80001fa8#64 + (BitVec.signExtend 64 (17#20 ++ 0#12) + 18446744073709549584#64)
-      = 0x800127b8#64 := by decide
+    0x80002056#64 + (BitVec.signExtend 64 (17#20 ++ 0#12) + 18446744073709549578#64)
+      = 0x80012860#64 := by decide
 
 /-- `&proc[NPROC]`, folded out of `auipc s3,0x16; addi s3,s3,516`. -/
 theorem wk_sent_addr :
-    0x80001fb4#64 + (BitVec.signExtend 64 (22#20 ++ 0#12) + 516#64) = 0x800181b8#64 := by decide
+    0x80002062#64 + (BitVec.signExtend 64 (22#20 ++ 0#12) + 510#64) = 0x80018260#64 := by decide
 
 set_option maxHeartbeats 4000000 in
 /-- **`wakeup` meets its specification.** -/
@@ -715,60 +715,60 @@ theorem wakeup_proof (AC : ACQUIRE) (RE : RELEASE) : WAKEUP :=
   have hK8 : 8 ≤ k.avail := by unfold wakeupSlots at hK; omega
   k_norm_g
   -- the prologue
-  k_step_gen (wp_s_push cpu _ 0x80001f94#64 true 4032#12 8 hK8 wk_imm_m64)
+  k_step_gen (wp_s_push cpu _ 0x80002042#64 true 4032#12 8 hK8 wk_imm_m64)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c1 hp1
   iintro Hk Hpc Hframe
   irevert Hframe
   stack_cells
   iintro ⟨⟨%w0, F0⟩, ⟨%w1, F1⟩, ⟨%w2, F2⟩, ⟨%w3, F3⟩, ⟨%w4, F4⟩, ⟨%w5, F5⟩, ⟨%w6, F6⟩,
     ⟨%w7, F7⟩, _⟩
-  k_step_gen (wp_s_sd c1 _ 0x80001f96#64 true 56#12 2#5 1#5 (by decide) w0)
+  k_step_gen (wp_s_sd c1 _ 0x80002044#64 true 56#12 2#5 1#5 (by decide) w0)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c2 hp2
   iintro Hk Hpc F0
-  k_step_gen (wp_s_sd c2 _ 0x80001f98#64 true 48#12 2#5 8#5 (by decide) w1)
+  k_step_gen (wp_s_sd c2 _ 0x80002046#64 true 48#12 2#5 8#5 (by decide) w1)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
   iintro Hk Hpc F1
-  k_step_gen (wp_s_sd c3 _ 0x80001f9a#64 true 40#12 2#5 9#5 (by decide) w2)
+  k_step_gen (wp_s_sd c3 _ 0x80002048#64 true 40#12 2#5 9#5 (by decide) w2)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hp4
   iintro Hk Hpc F2
-  k_step_gen (wp_s_sd c4 _ 0x80001f9c#64 true 32#12 2#5 18#5 (by decide) w3)
+  k_step_gen (wp_s_sd c4 _ 0x8000204a#64 true 32#12 2#5 18#5 (by decide) w3)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c5 hp5
   iintro Hk Hpc F3
-  k_step_gen (wp_s_sd c5 _ 0x80001f9e#64 true 24#12 2#5 19#5 (by decide) w4)
+  k_step_gen (wp_s_sd c5 _ 0x8000204c#64 true 24#12 2#5 19#5 (by decide) w4)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c6 hp6
   iintro Hk Hpc F4
-  k_step_gen (wp_s_sd c6 _ 0x80001fa0#64 true 16#12 2#5 20#5 (by decide) w5)
+  k_step_gen (wp_s_sd c6 _ 0x8000204e#64 true 16#12 2#5 20#5 (by decide) w5)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c7 hp7
   iintro Hk Hpc F5
-  k_step_gen (wp_s_sd c7 _ 0x80001fa2#64 true 8#12 2#5 21#5 (by decide) w6)
+  k_step_gen (wp_s_sd c7 _ 0x80002050#64 true 8#12 2#5 21#5 (by decide) w6)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c8 hp8
   iintro Hk Hpc F6
-  k_step_gen (wp_s_addi c8 _ 0x80001fa4#64 true 64#12 8#5 2#5 (by decide))
+  k_step_gen (wp_s_addi c8 _ 0x80002052#64 true 64#12 8#5 2#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c9 hp9
   iintro Hk Hpc
   -- the cursor set-up
-  k_step_gen (wp_s_add c9 _ 0x80001fa6#64 true 18#5 0#5 10#5 (by decide))
+  k_step_gen (wp_s_add c9 _ 0x80002054#64 true 18#5 0#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c10 hp10
   iintro Hk Hpc
-  k_step_gen (wp_s_auipc c10 _ 0x80001fa8#64 false 17#20 9#5 (by decide))
+  k_step_gen (wp_s_auipc c10 _ 0x80002056#64 false 17#20 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c11 hp11
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c11 _ 0x80001fac#64 false 2064#12 9#5 9#5 (by decide))
+  k_step_gen (wp_s_addi c11 _ 0x8000205a#64 false 2058#12 9#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [wk_proc0_addr] next c12 hp12
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c12 _ 0x80001fb0#64 true 2#12 20#5 0#5 (by decide))
+  k_step_gen (wp_s_addi c12 _ 0x8000205e#64 true 2#12 20#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c13 hp13
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c13 _ 0x80001fb2#64 true 3#12 21#5 0#5 (by decide))
+  k_step_gen (wp_s_addi c13 _ 0x80002060#64 true 3#12 21#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c14 hp14
   iintro Hk Hpc
-  k_step_gen (wp_s_auipc c14 _ 0x80001fb4#64 false 22#20 19#5 (by decide))
+  k_step_gen (wp_s_auipc c14 _ 0x80002062#64 false 22#20 19#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c15 hp15
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c15 _ 0x80001fb8#64 false 516#12 19#5 19#5 (by decide))
+  k_step_gen (wp_s_addi c15 _ 0x80002066#64 false 510#12 19#5 19#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [wk_sent_addr] next c16 hp16
   iintro Hk Hpc
-  k_step_gen (wp_s_j c16 _ 0x80001fbc#64 true 16#21)
+  k_step_gen (wp_s_j c16 _ 0x8000206a#64 true 16#21)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c17 hp17
   iintro Hk Hpc
   have hpin17 : k.sie = false ∨ k.proc = 0#64 → c17 = cpu := fun h =>
@@ -779,7 +779,7 @@ theorem wakeup_proof (AC : ACQUIRE) (RE : RELEASE) : WAKEUP :=
     k.spie k.spp _ ?g9 ?g18 ?g19 ?g20 ?g21 c17) $$ [- $Hk $Hpc]
   rotate_right 1
   · iframe #
-    -- the exit at 0x80001fe8 and the epilogue
+    -- the exit at 0x80002096 and the epilogue
     iapply wpNext_intro_pin
     iintro %cE %hpE %spie2 %spp2 %R2 %hsp2 Hk Hpc %hkept
     ihave Hframe := wkFrame_join (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5)

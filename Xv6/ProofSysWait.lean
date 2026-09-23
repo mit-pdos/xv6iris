@@ -1,7 +1,7 @@
 /-
 Proof of `sys_wait`'s specification (`SpecSysWait.SYSWAIT`), given the
 interfaces of `argaddr` and `kwait`.  Mirrors Rocq ProofSysWait.v against
-the Lean image (`KernelSyms.sys_wait = 0x80002972`).
+the Lean image (`KernelSyms.sys_wait = 0x80002a30`).
 
     2972: addi sp,-32; sd ra,24(sp); sd s0,16(sp); addi s0,sp,32   -- wp_prologue4s0_gen
     297a: a1 = &p (s0-24 = the whole slot at sp-24) ; a0 = 0 ; jal argaddr
@@ -30,8 +30,8 @@ set_option linter.unusedVariables false
 
 /-! ## Constants and register bookkeeping -/
 
-theorem sw_ret_2984 : jumpPc 0x80002984#64 = 0x80002984#64 := by simp only [jumpPc, BitVec.reduceAnd]
-theorem sw_ret_298c : jumpPc 0x8000298c#64 = 0x8000298c#64 := by simp only [jumpPc, BitVec.reduceAnd]
+theorem sw_ret_2984 : jumpPc 0x80002a42#64 = 0x80002a42#64 := by simp only [jumpPc, BitVec.reduceAnd]
+theorem sw_ret_298c : jumpPc 0x80002a4a#64 = 0x80002a4a#64 := by simp only [jumpPc, BitVec.reduceAnd]
 
 theorem sw_li0 : 0#64 + BitVec.signExtend 64 0#12 = 0#64 := by decide
 theorem sw_p_addr (x : BitVec 64) : x + BitVec.signExtend 64 4072#12 = x + 0xFFFFFFFFFFFFFFE8#64 := by bv_decide
@@ -70,7 +70,7 @@ theorem sw_argaddr (AA : ARGADDR) (c : CPU) (k' : KCtx) (i : Nat) (tfp : BitVec 
     (ws : List (BitVec 64)) (v : BitVec 64) (old : BitVec 64) (dqt : DFrac)
     (hi : i < NARG) (ha0 : k'.regs 10#5 = BitVec.ofNat 64 i) (hws : ws[tfArgIdx i]? = some v)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : argaddrSlots ≤ k'.avail) :
-    kctx c k' ∗ pcIs c 0x8000287c#64 ∗
+    kctx c k' ∗ pcIs c 0x8000293a#64 ∗
     wordPointsTo (pTrapframe k'.proc) 8 dqt (pageAddr tfp) ∗ tfPageAt tfp ws ∗
     wordPointsTo (k'.regs 11#5) 8 (DFrac.own 1) old ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
@@ -91,7 +91,7 @@ theorem sw_kwait (KW : KWAIT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : kwaitSlots ≤ k'.avail)
     (hsie : k'.sie = false) (hnoff : k'.noff = 0) (hlocks : k'.locks = [])
     (htier : k'.tier = KTier.kpt) :
-    kctx c k' ∗ pcIs c 0x800021aa#64 ∗ procsInv Γ ∗
+    kctx c k' ∗ pcIs c 0x80002258#64 ∗ procsInv Γ ∗
     trapCsrs c ∗ cpuClaim c k'.proc ∗ intrRes c ∗
     isLock γw waitLockAddr "wait_lock" waitLockPay ∗
     isLock γp pidLockAddr "nextpid" pidLockPay ∗
@@ -134,14 +134,14 @@ theorem sw_frame_close (sp ra s0 w1 w2 : BitVec 64) :
   · iexists w1; iexact H3
   iexists w2; iexact H4
 
-/-! ## The epilogue at `0x8000298c`, after `kwait` -/
+/-! ## The epilogue at `0x80002a4a`, after `kwait` -/
 
 set_option maxHeartbeats 4000000 in
-/-- The epilogue at `0x8000298c` over a generic frame base `kb`. -/
+/-- The epilogue at `0x80002a4a` over a generic frame base `kb`. -/
 theorem sw_tail (c : CPU) (kb : KCtx) (hK : 4 ≤ kb.avail)
     (KR : RegMap) (hregs : kb.regs = KR)
     (R : RegMap) (hR2 : R 2#5 = KR 2#5 + 0xFFFFFFFFFFFFFFE0#64) (P : IProp GF) :
-    kctx c ((kb.pushed 4).withRegs R) ∗ pcIs c 0x8000298c#64 ∗
+    kctx c ((kb.pushed 4).withRegs R) ∗ pcIs c 0x80002a4a#64 ∗
     frame4s0 (KR 2#5) (KR 1#5) (KR 8#5) ∗ P ∗
     wpNext kb.sie kb.proc c (fun cpu' => iprop(
       kctx cpu' (kb.withRegs (((R.set 1#5 (KR 1#5)).set 8#5 (KR 8#5)).set 2#5 (KR 2#5))) -∗
@@ -150,7 +150,7 @@ theorem sw_tail (c : CPU) (kb : KCtx) (hK : 4 ≤ kb.avail)
   subst hregs
   iintro ⟨Hk, Hpc, Hframe, HP, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
-  iapply (wp_epilogue4s0_gen c kb 0x8000298c#64 hK R hR2 (kb.regs 1#5) (kb.regs 8#5))
+  iapply (wp_epilogue4s0_gen c kb 0x80002a4a#64 hK R hR2 (kb.regs 1#5) (kb.regs 8#5))
     $$ [- $Hk $Hpc $Hframe]
   k_code (text_instr _ _ _ _ rfl rfl) HT
   k_norm_g
@@ -169,7 +169,7 @@ theorem sw_exit (cpu cr : CPU) (k : KCtx) (j : Nat) (pid : BitVec 32) (V : ProcP
     (spie spp : Bool) (R : RegMap) (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64)
     (hpins : swPins k R) (h10 : R 10#5 = BitVec.signExtend 64 rv)
     (hext : V.upt.ext P') (hd : d ≤ 4) (hans : kwaitAns rv v d) :
-    kctx cr (((k.withSpie spie spp).pushed 4).withRegs R) ∗ pcIs cr 0x8000298c#64 ∗
+    kctx cr (((k.withSpie spie spp).pushed 4).withRegs R) ∗ pcIs cr 0x80002a4a#64 ∗
     frame4s0 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) ∗
     trapCsrs cr ∗ cpuClaim cr k.proc ∗ intrRes cr ∗
     procPrivExtNoctxAt curCtx (procAddr j) pid V P'
@@ -245,7 +245,7 @@ theorem sys_wait_proof (AA : ARGADDR) (KW : KWAIT) : SYSWAIT := ⟨
   ihave Htf := (show wordPointsTo (GF := GF) (pTrapframe (procAddr j)) 8 (DFrac.own 1) V.trapframe ⊢
       wordPointsTo (pTrapframe k.proc) 8 (DFrac.own 1) (pageAddr V.upt.tfp) from by rw [hVb.2.2.2, hproc]) $$ Htf
   -- the prologue ; a1 = &p ; a0 = 0 ; jal argaddr
-  iapply (wp_prologue4s0_gen cpu k 0x80002972#64 hK4)
+  iapply (wp_prologue4s0_gen cpu k 0x80002a30#64 hK4)
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm_g
   iframe
@@ -253,13 +253,13 @@ theorem sys_wait_proof (AA : ARGADDR) (KW : KWAIT) : SYSWAIT := ⟨
   iapply wpNext_intro_pin
   iintro %c1 %hp1 Hk Hpc Hframe
   icases sw_frame_open _ _ _ $$ Hframe with ⟨Hra, Hs0, ⟨%w1, Hslot⟩, ⟨%w2, Hc2⟩⟩
-  k_step_gen (wp_s_addi c1 _ 0x8000297a#64 false 4072#12 11#5 8#5 (by decide))
+  k_step_gen (wp_s_addi c1 _ 0x80002a38#64 false 4072#12 11#5 8#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sw_p_addr] next c2 hp2
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c2 _ 0x8000297e#64 true 0#12 10#5 0#5 (by decide))
+  k_step_gen (wp_s_addi c2 _ 0x80002a3c#64 true 0#12 10#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sw_li0] next c3 hp3
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c3 _ 0x80002980#64 false 2096892#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c3 _ 0x80002a3e#64 false 2096892#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hp4
   iintro Hk Hpc
   iapply (sw_argaddr AA c4 _ 0 V.upt.tfp V.tf v w1 (DFrac.own 1) (by decide) ?ha0 hv ?hn ?hKa)
@@ -280,10 +280,10 @@ theorem sys_wait_proof (AA : ARGADDR) (KW : KWAIT) : SYSWAIT := ⟨
   obtain ⟨b2, b8, b9, b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩ := hcs1
   have hpin5 : k.sie = false ∨ k.proc = 0#64 → c5 = cpu := fun h =>
     (hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h))))
-  k_step_gen (wp_s_ld c5 _ 0x80002984#64 false 4072#12 10#5 8#5 (by decide) (by decide) (DFrac.own 1) v)
+  k_step_gen (wp_s_ld c5 _ 0x80002a42#64 false 4072#12 10#5 8#5 (by decide) (by decide) (DFrac.own 1) v)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [b8, sw_p_addr] next c6 hp6
   iintro Hk Hpc Hslot
-  k_step_gen (wp_s_jal c6 _ 0x80002988#64 false 2095138#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c6 _ 0x80002a46#64 false 2095122#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c7 hp7
   iintro Hk Hpc
   have hpin7 : k.sie = false ∨ k.proc = 0#64 → c7 = cpu := fun h =>

@@ -40,11 +40,11 @@ theorem rp_toNat (m : Nat) (h : m < 2 ^ 64) : (BitVec.ofNat 64 m).toNat = m := b
 
 /-- `&proc[i]` as a number, up to and including the sentinel `&proc[NPROC]`. -/
 theorem rp_procAddr_toNat (j : Nat) (hj : j ≤ NPROC) :
-    (procAddr j).toNat = 2147559352 + 360 * j := by
+    (procAddr j).toNat = 2147559520 + 360 * j := by
   have h1 : (BitVec.ofNat 64 (procSize * j)).toNat = 360 * j := by
     simp only [BitVec.toNat_ofNat, procSize]
     exact Nat.mod_eq_of_lt (by unfold NPROC at hj; omega)
-  have h2 : (procsAddr : BitVec 64).toNat = 2147559352 := by decide
+  have h2 : (procsAddr : BitVec 64).toNat = 2147559520 := by decide
   unfold procAddr
   rw [BitVec.toNat_add, h1, h2]
   exact Nat.mod_eq_of_lt (by unfold NPROC at hj; omega)
@@ -55,20 +55,20 @@ theorem rp_cursor (i : Nat) : procAddr i + 360#64 = procAddr (i + 1) := by
   rw [show 360 * (i + 1) = 360 * i + 360 from by omega, BitVec.ofNat_add,
     show BitVec.ofNat 64 360 = 360#64 from rfl, BitVec.add_assoc]
 
-theorem rp_sentinel : procAddr NPROC = 0x800181b8#64 := by
+theorem rp_sentinel : procAddr NPROC = 0x80018260#64 := by
   apply BitVec.eq_of_toNat_eq
   rw [rp_procAddr_toNat NPROC (Nat.le_refl _)]
   unfold NPROC
-  rw [rp_toNat 2147582392 (by omega)]
+  rw [rp_toNat 2147582560 (by omega)]
 
 /-- The loop test `beq s1,s3`: the scan stops exactly at the last slot. -/
 theorem rp_cursor_eq (i : Nat) (hi : i < NPROC) :
-    (procAddr (i + 1) = 0x800181b8#64) ↔ i + 1 = NPROC := by
+    (procAddr (i + 1) = 0x80018260#64) ↔ i + 1 = NPROC := by
   constructor
   · intro he
     have h := congrArg BitVec.toNat he
     rw [rp_procAddr_toNat (i + 1) (by unfold NPROC at hi ⊢; omega)] at h
-    have hr : (0x800181b8#64).toNat = 2147582392 := by decide
+    have hr : (0x80018260#64).toNat = 2147582560 := by decide
     rw [hr] at h
     unfold NPROC
     omega
@@ -78,7 +78,7 @@ theorem rp_cursor_eq (i : Nat) (hi : i < NPROC) :
 
 /-- The branch `beq s1,s3` at the end of an iteration. -/
 theorem rp_beq_last {α : Type} (i : Nat) (hi : i < NPROC) (p q : α) :
-    (if bcond bop.BEQ (procAddr (i + 1)) 0x800181b8#64 then p else q)
+    (if bcond bop.BEQ (procAddr (i + 1)) 0x80018260#64 then p else q)
       = if i + 1 = NPROC then p else q := by
   by_cases he : i + 1 = NPROC
   · rw [if_pos he, if_pos (by simp only [bcond, beq_iff_eq]; exact (rp_cursor_eq i hi).mpr he)]
@@ -87,7 +87,7 @@ theorem rp_beq_last {α : Type} (i : Nat) (hi : i < NPROC) (p q : α) :
       exact fun hc => he ((rp_cursor_eq i hi).mp hc))]
 
 /-- `&proc[0]`. -/
-theorem rp_procAddr_zero : procAddr 0 = 0x800127b8#64 := by decide
+theorem rp_procAddr_zero : procAddr 0 = 0x80012860#64 := by decide
 
 /-- Fold the `p->parent` address back into `pParent`. -/
 theorem rp_pParent_fold (i : Nat) : procAddr i + 56#64 = pParent (procAddr i) := by
@@ -228,7 +228,7 @@ theorem rp_wakeup (WK : WAKEUP) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hl
     [CurCtx] (Γ : SchedNames) (c : CPU) (k' : KCtx)
     (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : wakeupSlots ≤ k'.avail) (hlk' : "proc" ∉ k'.locks)
     (htier' : k'.tier = KTier.kpt) :
-    kctx c k' ∗ pcIs c 0x80001f94#64 ∗ procsInv Γ ∗
+    kctx c k' ∗ pcIs c 0x80002042#64 ∗ procsInv Γ ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
@@ -245,7 +245,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 /-! ## One iteration of the scan -/
 
 set_option maxHeartbeats 4000000 in
-/-- The body at `0x8000202e` (`reparent+0x34`) for slot `i`: read `pp->parent`,
+/-- The body at `0x800020dc` (`reparent+0x34`) for slot `i`: read `pp->parent`,
 compare with `p`, and on a hit set `pp->parent = initproc` and call
 `wakeup(initproc)`; then the cursor step and the termination test. -/
 theorem rp_iter (WK : WAKEUP) [X : CurCtx]
@@ -253,14 +253,14 @@ theorem rp_iter (WK : WAKEUP) [X : CurCtx]
     (hwf : k.wf) (hnoff : k.noff + 1 < 2 ^ 31) (hK : reparentSlots ≤ k.avail)
     (hlk : "proc" ∉ k.locks) (htier : k.tier = KTier.kpt)
     (i : Nat) (hi : i < NPROC) (spie spp : Bool) (R : RegMap)
-    (h9 : R 9#5 = procAddr i) (h18 : R 18#5 = p) (h19 : R 19#5 = 0x800181b8#64)
+    (h9 : R 9#5 = procAddr i) (h18 : R 18#5 = p) (h19 : R 19#5 = 0x80018260#64)
     (h20 : R 20#5 = initprocAddr) (cur : CPU) :
-    kctx cur (((k.withSpie spie spp).pushed 6).withRegs R) ∗ pcIs cur 0x8000202e#64 ∗
+    kctx cur (((k.withSpie spie spp).pushed 6).withRegs R) ∗ pcIs cur 0x800020dc#64 ∗
     procsInv Γ ∗ initprocIs ip ∗ waitResAt curCtx (reparentedUpto parents p ip i) ∗
     wpNext k.sie k.proc cur (fun cpu' => iprop(∀ (spie2 spp2 : Bool) (R2 : RegMap),
       ⌜k.sie = false → spie2 = spie ∧ spp2 = spp⌝ -∗
       kctx cpu' (((k.withSpie spie2 spp2).pushed 6).withRegs R2) -∗
-      pcIs cpu' (if i + 1 = NPROC then 0x80002040#64 else 0x8000202e#64) -∗
+      pcIs cpu' (if i + 1 = NPROC then 0x800020ee#64 else 0x800020dc#64) -∗
       waitResAt curCtx (reparentedUpto parents p ip (i + 1)) -∗
       ⌜rpKept R R2 ∧ R2 9#5 = procAddr (i + 1)⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cur := by
@@ -273,7 +273,7 @@ theorem rp_iter (WK : WAKEUP) [X : CurCtx]
     (reparentedUpto parents p ip i i) $$ Hword
   have hv0 : reparentedUpto parents p ip i i = parents i := reparentedUpto_read parents p ip i
   -- c.ld a5,56(s1): a5 := pp->parent
-  k_step_gen (wp_s_ld cur _ 0x8000202e#64 true 56#12 15#5 9#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld cur _ 0x800020dc#64 true 56#12 15#5 9#5 (by decide) (by decide)
       (DFrac.own 1) (reparentedUpto parents p ip i i))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, rp_pParent_fold] next c1 hp1
   iintro Hk Hpc Hword
@@ -281,13 +281,13 @@ theorem rp_iter (WK : WAKEUP) [X : CurCtx]
   · -- a hit: pp->parent = p
     have heqvp : reparentedUpto parents p ip i i = p := hv0.trans hcm
     -- bne a5,s2 (not taken)
-    k_step_gen (wp_s_branch c1 _ 0x80002030#64 false 8182#13 15#5 18#5 (by decide) bop.BNE)
+    k_step_gen (wp_s_branch c1 _ 0x800020de#64 false 8182#13 15#5 18#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [h18, rp_bne_eq (reparentedUpto parents p ip i i) p heqvp] next c2 hp2
     iintro Hk Hpc
     -- ld a0,0(s4): a0 := initproc (a persistent cell, framed by hand)
     ihave Hinitw := initprocIs_to_wp ip $$ Hinit
-    iapply (wp_s_ld c2 _ 0x80002034#64 false 0#12 10#5 20#5 (by decide) (by decide)
+    iapply (wp_s_ld c2 _ 0x800020e2#64 false 0#12 10#5 20#5 (by decide) (by decide)
         DFrac.discard ip) $$ [- $Hk $Hpc]
     rotate_right 1
     k_code (text_instr _ _ _ _ rfl rfl) Htext
@@ -300,7 +300,7 @@ theorem rp_iter (WK : WAKEUP) [X : CurCtx]
     k_norm_g [h20, rp_off0]
     iintro Hk Hpc Hinitw
     -- c.sd a0,56(s1): pp->parent := initproc
-    k_step_gen (wp_s_sd c3 _ 0x80002038#64 true 56#12 9#5 10#5 (by decide)
+    k_step_gen (wp_s_sd c3 _ 0x800020e6#64 true 56#12 9#5 10#5 (by decide)
         (reparentedUpto parents p ip i i))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, rp_pParent_fold] next c4 hp4
     iintro Hk Hpc Hword
@@ -309,7 +309,7 @@ theorem rp_iter (WK : WAKEUP) [X : CurCtx]
     ihave HW := Hback $$ %ip Hword
     ihave HW := waitResAt_eq curCtx _ _ (reparentedUpto_succ_match parents p ip i hcm) $$ HW
     -- jal ra, wakeup
-    k_step_gen (wp_s_jal c4 _ 0x8000203a#64 false 2096986#21 1#5 (by decide))
+    k_step_gen (wp_s_jal c4 _ 0x800020e8#64 false 2096986#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c5 hp5
     iintro Hk Hpc
     have hpinCall : k.sie = false ∨ k.proc = 0#64 → c5 = cur := fun h =>
@@ -328,25 +328,25 @@ theorem rp_iter (WK : WAKEUP) [X : CurCtx]
     -- past wakeup: fresh hart, registers callee-saved
     iapply wpNext_intro_pin
     iintro %cW %hpW %spieW %sppW %RW %hspW Hk Hpc %hcsW
-    have hret : jumpPc 0x8000203e#64 = 0x8000203e#64 := by simp only [jumpPc, BitVec.reduceAnd]
+    have hret : jumpPc 0x800020ec#64 = 0x800020ec#64 := by simp only [jumpPc, BitVec.reduceAnd]
     k_norm_g [rp_pushed_withSpie, rp_withSpie_over, hK6, hret]
     unfold calleeSaved at hcsW
     k_norm_g at hcsW
     obtain ⟨b2, b8, b9, b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩ := hcsW
     have g9 : RW 9#5 = procAddr i := b9.trans h9
-    have g19 : RW 19#5 = 0x800181b8#64 := b19.trans h19
+    have g19 : RW 19#5 = 0x80018260#64 := b19.trans h19
     have hpinW : k.sie = false ∨ k.proc = 0#64 → cW = cur := fun h => (hpW h).trans (hpinCall h)
-    -- c.j 0x80002026
-    k_step_gen (wp_s_j cW _ 0x8000203e#64 true 2097128#21)
+    -- c.j 0x800020d4
+    k_step_gen (wp_s_j cW _ 0x800020ec#64 true 2097128#21)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c6 hp6
     iintro Hk Hpc
     -- addi s1,s1,360
-    k_step_gen (wp_s_addi c6 _ 0x80002026#64 false 360#12 9#5 9#5 (by decide))
+    k_step_gen (wp_s_addi c6 _ 0x800020d4#64 false 360#12 9#5 9#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [g9, rp_cursor] next c7 hp7
     iintro Hk Hpc
     -- beq s1,s3
-    k_step_gen (wp_s_branch c7 _ 0x8000202a#64 false 22#13 9#5 19#5 (by decide) bop.BEQ)
+    k_step_gen (wp_s_branch c7 _ 0x800020d8#64 false 22#13 9#5 19#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [g19, rp_beq_last i hi] next c8 hp8
     iintro Hk Hpc
@@ -365,7 +365,7 @@ theorem rp_iter (WK : WAKEUP) [X : CurCtx]
   · -- a miss: pp->parent stays
     have hnevp : reparentedUpto parents p ip i i ≠ p := by rw [hv0]; exact hcm
     -- bne a5,s2 (taken)
-    k_step_gen (wp_s_branch c1 _ 0x80002030#64 false 8182#13 15#5 18#5 (by decide) bop.BNE)
+    k_step_gen (wp_s_branch c1 _ 0x800020de#64 false 8182#13 15#5 18#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [h18, rp_bne_ne (reparentedUpto parents p ip i i) p hnevp] next c2 hp2
     iintro Hk Hpc
@@ -375,12 +375,12 @@ theorem rp_iter (WK : WAKEUP) [X : CurCtx]
     ihave HW := Hback $$ %(reparentedUpto parents p ip i i) Hword
     ihave HW := waitResAt_eq curCtx _ _ (reparentedUpto_succ_nomatch parents p ip i hcm) $$ HW
     -- addi s1,s1,360
-    k_step_gen (wp_s_addi c2 _ 0x80002026#64 false 360#12 9#5 9#5 (by decide))
+    k_step_gen (wp_s_addi c2 _ 0x800020d4#64 false 360#12 9#5 9#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [h9, rp_cursor] next c3 hp3
     iintro Hk Hpc
     -- beq s1,s3
-    k_step_gen (wp_s_branch c3 _ 0x8000202a#64 false 22#13 9#5 19#5 (by decide) bop.BEQ)
+    k_step_gen (wp_s_branch c3 _ 0x800020d8#64 false 22#13 9#5 19#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [h19, rp_beq_last i hi] next c4 hp4
     iintro Hk Hpc
@@ -398,22 +398,22 @@ theorem rp_iter (WK : WAKEUP) [X : CurCtx]
 /-! ## The loop -/
 
 set_option maxHeartbeats 4000000 in
-/-- The scan from `0x8000202e` with `i` slots behind it runs to the epilogue
-at `0x80002040`.  A bounded loop by induction on a `fuel`, the hart quantified
+/-- The scan from `0x800020dc` with `i` slots behind it runs to the epilogue
+at `0x800020ee`.  A bounded loop by induction on a `fuel`, the hart quantified
 inside (the thread may migrate at every `wakeup`). -/
 theorem rp_loop (WK : WAKEUP) [CurCtx]
     (Γ : SchedNames) (k : KCtx) (parents : Nat → BitVec 64) (p ip : BitVec 64)
     (hwf : k.wf) (hnoff : k.noff + 1 < 2 ^ 31) (hK : reparentSlots ≤ k.avail)
     (hlk : "proc" ∉ k.locks) (htier : k.tier = KTier.kpt) (fuel : Nat) :
     ∀ (i : Nat) (_ : NPROC - i = fuel + 1) (spie spp : Bool) (R : RegMap)
-      (_ : R 9#5 = procAddr i) (_ : R 18#5 = p) (_ : R 19#5 = 0x800181b8#64)
+      (_ : R 9#5 = procAddr i) (_ : R 18#5 = p) (_ : R 19#5 = 0x80018260#64)
       (_ : R 20#5 = initprocAddr) (cur : CPU),
-    kctx cur (((k.withSpie spie spp).pushed 6).withRegs R) ∗ pcIs cur 0x8000202e#64 ∗
+    kctx cur (((k.withSpie spie spp).pushed 6).withRegs R) ∗ pcIs cur 0x800020dc#64 ∗
     procsInv Γ ∗ initprocIs ip ∗ waitResAt curCtx (reparentedUpto parents p ip i) ∗
     wpNext k.sie k.proc cur (fun cpu' => iprop(∀ (spie2 spp2 : Bool) (R2 : RegMap),
       ⌜k.sie = false → spie2 = spie ∧ spp2 = spp⌝ -∗
       kctx cpu' (((k.withSpie spie2 spp2).pushed 6).withRegs R2) -∗
-      pcIs cpu' 0x80002040#64 -∗
+      pcIs cpu' 0x800020ee#64 -∗
       waitResAt curCtx (reparentedUpto parents p ip NPROC) -∗
       ⌜rpKept R R2⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cur := by
@@ -499,7 +499,7 @@ theorem rpFrame_join [CurCtx] (sp v0 v1 v2 v3 v4 v5 : BitVec 64) :
   unfold rpFrame; iintro H; iexact H
 
 set_option maxHeartbeats 4000000 in
-/-- The epilogue at `0x80002040`: restore `ra`, `s0`, `s1`..`s4`, pop the
+/-- The epilogue at `0x800020ee`: restore `ra`, `s0`, `s1`..`s4`, pop the
 frame, return.  The payload passes through untouched. -/
 theorem rp_epi [CurCtx] (cpu cur : CPU) (k : KCtx) (rr : Nat → BitVec 64)
     (hpin : k.sie = false ∨ k.proc = 0#64 → cur = cpu) (hK : 6 ≤ k.avail)
@@ -508,7 +508,7 @@ theorem rp_epi [CurCtx] (cpu cur : CPU) (k : KCtx) (rr : Nat → BitVec 64)
     (h21 : R 21#5 = k.regs 21#5) (h22 : R 22#5 = k.regs 22#5) (h23 : R 23#5 = k.regs 23#5)
     (h24 : R 24#5 = k.regs 24#5) (h25 : R 25#5 = k.regs 25#5) (h26 : R 26#5 = k.regs 26#5)
     (h27 : R 27#5 = k.regs 27#5) :
-    kctx cur (((k.withSpie spie spp).pushed 6).withRegs R) ∗ pcIs cur 0x80002040#64 ∗
+    kctx cur (((k.withSpie spie spp).pushed 6).withRegs R) ∗ pcIs cur 0x800020ee#64 ∗
     rpFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) ∗ waitResAt curCtx rr ∗
     wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie' : Bool, ∀ spp' : Bool, ∀ R' : RegMap,
@@ -521,37 +521,37 @@ theorem rp_epi [CurCtx] (cpu cur : CPU) (k : KCtx) (rr : Nat → BitVec 64)
   icases rpFrame_split _ _ _ _ _ _ _ $$ Hframe with ⟨F0, F1, F2, F3, F4, F5⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK' : 6 ≤ (k.withSpie spie spp).avail := hK
-  k_step_gen (wp_s_ld cur _ 0x80002040#64 true 40#12 1#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld cur _ 0x800020ee#64 true 40#12 1#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 1#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c1 hq1
   iintro Hk Hpc F0
-  k_step_gen (wp_s_ld c1 _ 0x80002042#64 true 32#12 8#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c1 _ 0x800020f0#64 true 32#12 8#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 8#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c2 hq2
   iintro Hk Hpc F1
-  k_step_gen (wp_s_ld c2 _ 0x80002044#64 true 24#12 9#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c2 _ 0x800020f2#64 true 24#12 9#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 9#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c3 hq3
   iintro Hk Hpc F2
-  k_step_gen (wp_s_ld c3 _ 0x80002046#64 true 16#12 18#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c3 _ 0x800020f4#64 true 16#12 18#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 18#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c4 hq4
   iintro Hk Hpc F3
-  k_step_gen (wp_s_ld c4 _ 0x80002048#64 true 8#12 19#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c4 _ 0x800020f6#64 true 8#12 19#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 19#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c5 hq5
   iintro Hk Hpc F4
-  k_step_gen (wp_s_ld c5 _ 0x8000204a#64 true 0#12 20#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c5 _ 0x800020f8#64 true 0#12 20#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 20#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c6 hq6
   iintro Hk Hpc F5
   ihave Hstack : stackOwn (k.regs 2#5) 6 $$ [F0 F1 F2 F3 F4 F5]
   case' _ => stack_cells; iframe
-  k_step_gen (wp_s_pop c6 _ 0x8000204c#64 true 48#12 6 rp_imm_p48)
+  k_step_gen (wp_s_pop c6 _ 0x800020fa#64 true 48#12 6 rp_imm_p48)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK', hR2] next c7 hq7
   iintro Hk Hpc
-  k_step_gen (wp_s_ret c7 _ 0x8000204e#64 true 1#5)
+  k_step_gen (wp_s_ret c7 _ 0x800020fc#64 true 1#5)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c8 hq8
   iintro Hk Hpc
   have hpinZ : k.sie = false ∨ k.proc = 0#64 → c8 = cpu := fun h =>
@@ -569,17 +569,17 @@ theorem rp_epi [CurCtx] (cpu cur : CPU) (k : KCtx) (rr : Nat → BitVec 64)
 
 /-- `&proc[0]`, folded out of `auipc s1,0x10; addi s1,s1,1964`. -/
 theorem rp_proc0_addr :
-    0x8000200c#64 + (BitVec.signExtend 64 (16#20 ++ 0#12) + 1964#64) = 0x800127b8#64 := by decide
+    0x800020ba#64 + (BitVec.signExtend 64 (16#20 ++ 0#12) + 1958#64) = 0x80012860#64 := by decide
 
 /-- `&initproc`, folded out of `auipc s4,0x8; addi s4,s4,620`. -/
 theorem rp_init_addr :
-    0x80002014#64 + (BitVec.signExtend 64 (8#20 ++ 0#12) + 620#64) = 0x8000a280#64 := by decide
+    0x800020c2#64 + (BitVec.signExtend 64 (8#20 ++ 0#12) + 638#64) = 0x8000a340#64 := by decide
 
 /-- `&proc[NPROC]`, folded out of `auipc s3,0x16; addi s3,s3,412`. -/
 theorem rp_sent_addr :
-    0x8000201c#64 + (BitVec.signExtend 64 (22#20 ++ 0#12) + 412#64) = 0x800181b8#64 := by decide
+    0x800020ca#64 + (BitVec.signExtend 64 (22#20 ++ 0#12) + 406#64) = 0x80018260#64 := by decide
 
-theorem rp_init_addr_fold : initprocAddr = 0x8000a280#64 := rfl
+theorem rp_init_addr_fold : initprocAddr = 0x8000a340#64 := rfl
 
 set_option maxHeartbeats 8000000 in
 /-- **`reparent` meets its specification.** -/
@@ -593,56 +593,56 @@ theorem reparent_proof (WK : WAKEUP) : REPARENT :=
   have hK6 : 6 ≤ k.avail := by unfold reparentSlots at hK; omega
   k_norm_g
   -- the prologue
-  k_step_gen (wp_s_push cpu _ 0x80001ffa#64 true 4048#12 6 hK6 rp_imm_m48)
+  k_step_gen (wp_s_push cpu _ 0x800020a8#64 true 4048#12 6 hK6 rp_imm_m48)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c1 hp1
   iintro Hk Hpc Hframe
   irevert Hframe
   stack_cells
   iintro ⟨⟨%w0, F0⟩, ⟨%w1, F1⟩, ⟨%w2, F2⟩, ⟨%w3, F3⟩, ⟨%w4, F4⟩, ⟨%w5, F5⟩, _⟩
-  k_step_gen (wp_s_sd c1 _ 0x80001ffc#64 true 40#12 2#5 1#5 (by decide) w0)
+  k_step_gen (wp_s_sd c1 _ 0x800020aa#64 true 40#12 2#5 1#5 (by decide) w0)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c2 hp2
   iintro Hk Hpc F0
-  k_step_gen (wp_s_sd c2 _ 0x80001ffe#64 true 32#12 2#5 8#5 (by decide) w1)
+  k_step_gen (wp_s_sd c2 _ 0x800020ac#64 true 32#12 2#5 8#5 (by decide) w1)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
   iintro Hk Hpc F1
-  k_step_gen (wp_s_sd c3 _ 0x80002000#64 true 24#12 2#5 9#5 (by decide) w2)
+  k_step_gen (wp_s_sd c3 _ 0x800020ae#64 true 24#12 2#5 9#5 (by decide) w2)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hp4
   iintro Hk Hpc F2
-  k_step_gen (wp_s_sd c4 _ 0x80002002#64 true 16#12 2#5 18#5 (by decide) w3)
+  k_step_gen (wp_s_sd c4 _ 0x800020b0#64 true 16#12 2#5 18#5 (by decide) w3)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c5 hp5
   iintro Hk Hpc F3
-  k_step_gen (wp_s_sd c5 _ 0x80002004#64 true 8#12 2#5 19#5 (by decide) w4)
+  k_step_gen (wp_s_sd c5 _ 0x800020b2#64 true 8#12 2#5 19#5 (by decide) w4)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c6 hp6
   iintro Hk Hpc F4
-  k_step_gen (wp_s_sd c6 _ 0x80002006#64 true 0#12 2#5 20#5 (by decide) w5)
+  k_step_gen (wp_s_sd c6 _ 0x800020b4#64 true 0#12 2#5 20#5 (by decide) w5)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c7 hp7
   iintro Hk Hpc F5
-  k_step_gen (wp_s_addi c7 _ 0x80002008#64 true 48#12 8#5 2#5 (by decide))
+  k_step_gen (wp_s_addi c7 _ 0x800020b6#64 true 48#12 8#5 2#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c8 hp8
   iintro Hk Hpc
   -- the cursor set-up
-  k_step_gen (wp_s_add c8 _ 0x8000200a#64 true 18#5 0#5 10#5 (by decide))
+  k_step_gen (wp_s_add c8 _ 0x800020b8#64 true 18#5 0#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c9 hp9
   iintro Hk Hpc
-  k_step_gen (wp_s_auipc c9 _ 0x8000200c#64 false 16#20 9#5 (by decide))
+  k_step_gen (wp_s_auipc c9 _ 0x800020ba#64 false 16#20 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c10 hp10
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c10 _ 0x80002010#64 false 1964#12 9#5 9#5 (by decide))
+  k_step_gen (wp_s_addi c10 _ 0x800020be#64 false 1958#12 9#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [rp_proc0_addr] next c11 hp11
   iintro Hk Hpc
-  k_step_gen (wp_s_auipc c11 _ 0x80002014#64 false 8#20 20#5 (by decide))
+  k_step_gen (wp_s_auipc c11 _ 0x800020c2#64 false 8#20 20#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c12 hp12
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c12 _ 0x80002018#64 false 620#12 20#5 20#5 (by decide))
+  k_step_gen (wp_s_addi c12 _ 0x800020c6#64 false 638#12 20#5 20#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [rp_init_addr] next c13 hp13
   iintro Hk Hpc
-  k_step_gen (wp_s_auipc c13 _ 0x8000201c#64 false 22#20 19#5 (by decide))
+  k_step_gen (wp_s_auipc c13 _ 0x800020ca#64 false 22#20 19#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c14 hp14
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c14 _ 0x80002020#64 false 412#12 19#5 19#5 (by decide))
+  k_step_gen (wp_s_addi c14 _ 0x800020ce#64 false 406#12 19#5 19#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [rp_sent_addr] next c15 hp15
   iintro Hk Hpc
-  k_step_gen (wp_s_j c15 _ 0x80002024#64 true 10#21)
+  k_step_gen (wp_s_j c15 _ 0x800020d2#64 true 10#21)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c16 hp16
   iintro Hk Hpc
   have hpin16 : k.sie = false ∨ k.proc = 0#64 → c16 = cpu := fun h =>
@@ -658,7 +658,7 @@ theorem reparent_proof (WK : WAKEUP) : REPARENT :=
     k.spie k.spp _ ?g9 ?g18 ?g19 ?g20 c16) $$ [- $Hk $Hpc $HW]
   rotate_right 1
   · iframe #
-    -- the exit at 0x80002040 and the epilogue
+    -- the exit at 0x800020ee and the epilogue
     iapply wpNext_intro_pin
     iintro %cE %hpE %spie2 %spp2 %R2 %hsp2 Hk Hpc HW %hkept
     ihave Hframe := rpFrame_join (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5)

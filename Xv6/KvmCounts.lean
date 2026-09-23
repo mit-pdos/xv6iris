@@ -1,5 +1,5 @@
 /-
-The node counts of `kvmmake`'s six regions, evaluated on dummy trees
+The node counts of `kvmmake`'s seven regions, evaluated on dummy trees
 (`native_decide`: the counts depend only on a tree's pointer shape, which
 the real tree shares with the dummy one), the state carried between the
 calls (`sOk`: well formed, rooted at the allocated page, of the dummy
@@ -7,7 +7,7 @@ shape, with everything outside the regions mapped so far still unmapped),
 and the pure assembly of `kvmTableOk` from what the callees return.
 
 Kept apart from `Xv6/KvmLemmas.lean` because `native_decide` compiles and
-runs the six runs (about ten seconds).
+runs the seven runs (about ten seconds).
 -/
 import Xv6.KvmLemmas
 import Xv6.SpecKvmmake
@@ -31,16 +31,18 @@ theorem dsup_length : dsup.length = 64 := List.length_replicate
 -- against the projection of a run makes the kernel evaluate the run, which
 -- for the 16384-page region costs a minute.
 
-/-- The nodes each region creates on the dummy tree: `2 + 0 + 32 + 2 + 63
-+ 2 = 101`, the `kvmmakeNodes - 1` pages `kvmmake` takes from the
-allocator besides the root and the stacks. -/
+/-- The nodes each region creates on the dummy tree: `2 + 0 + 0 + 32 + 2 +
+63 + 2 = 101`, the `kvmmakeNodes - 1` pages `kvmmake` takes from the
+allocator besides the root and the stacks.  UART1 shares UART0's level-1
+and level-0 tables, so it creates none. -/
 theorem dcounts :
     ((PTree.zeroNode 0#44)).missingRun 0x10000#27 1 = 2 ∧
-    ((((PTree.zeroNode 0#44)).mapRun 0x10000#27 0x10000#44 (permBits KPerm.rw) 1 dsup).1).missingRun 0x10001#27 1 = 0 ∧
-    ((((((PTree.zeroNode 0#44)).mapRun 0x10000#27 0x10000#44 (permBits KPerm.rw) 1 dsup).1).mapRun 0x10001#27 0x10001#44 (permBits KPerm.rw) 1 dsup).1).missingRun 0xC000#27 0x4000 = 32 ∧
-    ((((((((PTree.zeroNode 0#44)).mapRun 0x10000#27 0x10000#44 (permBits KPerm.rw) 1 dsup).1).mapRun 0x10001#27 0x10001#44 (permBits KPerm.rw) 1 dsup).1).mapRun 0xC000#27 0xC000#44 (permBits KPerm.rw) 0x4000 dsup).1).missingRun 0x80000#27 7 = 2 ∧
-    ((((((((((PTree.zeroNode 0#44)).mapRun 0x10000#27 0x10000#44 (permBits KPerm.rw) 1 dsup).1).mapRun 0x10001#27 0x10001#44 (permBits KPerm.rw) 1 dsup).1).mapRun 0xC000#27 0xC000#44 (permBits KPerm.rw) 0x4000 dsup).1).mapRun 0x80000#27 0x80000#44 (permBits KPerm.rx) 7 dsup).1).missingRun 0x80007#27 0x7FF9 = 63 ∧
-    ((((((((((((PTree.zeroNode 0#44)).mapRun 0x10000#27 0x10000#44 (permBits KPerm.rw) 1 dsup).1).mapRun 0x10001#27 0x10001#44 (permBits KPerm.rw) 1 dsup).1).mapRun 0xC000#27 0xC000#44 (permBits KPerm.rw) 0x4000 dsup).1).mapRun 0x80000#27 0x80000#44 (permBits KPerm.rx) 7 dsup).1).mapRun 0x80007#27 0x80007#44 (permBits KPerm.rw) 0x7FF9 dsup).1).missingRun 0x3FFFFFF#27 1 = 2 := by
+    (((PTree.zeroNode 0#44).mapRun 0x10000#27 0x10000#44 (permBits KPerm.rw) 1 dsup).1).missingRun 0x1000a#27 1 = 0 ∧
+    ((((PTree.zeroNode 0#44).mapRun 0x10000#27 0x10000#44 (permBits KPerm.rw) 1 dsup).1.mapRun 0x1000a#27 0x1000a#44 (permBits KPerm.rw) 1 dsup).1).missingRun 0x10001#27 1 = 0 ∧
+    (((((PTree.zeroNode 0#44).mapRun 0x10000#27 0x10000#44 (permBits KPerm.rw) 1 dsup).1.mapRun 0x1000a#27 0x1000a#44 (permBits KPerm.rw) 1 dsup).1.mapRun 0x10001#27 0x10001#44 (permBits KPerm.rw) 1 dsup).1).missingRun 0xC000#27 0x4000 = 32 ∧
+    ((((((PTree.zeroNode 0#44).mapRun 0x10000#27 0x10000#44 (permBits KPerm.rw) 1 dsup).1.mapRun 0x1000a#27 0x1000a#44 (permBits KPerm.rw) 1 dsup).1.mapRun 0x10001#27 0x10001#44 (permBits KPerm.rw) 1 dsup).1.mapRun 0xC000#27 0xC000#44 (permBits KPerm.rw) 0x4000 dsup).1).missingRun 0x80000#27 7 = 2 ∧
+    (((((((PTree.zeroNode 0#44).mapRun 0x10000#27 0x10000#44 (permBits KPerm.rw) 1 dsup).1.mapRun 0x1000a#27 0x1000a#44 (permBits KPerm.rw) 1 dsup).1.mapRun 0x10001#27 0x10001#44 (permBits KPerm.rw) 1 dsup).1.mapRun 0xC000#27 0xC000#44 (permBits KPerm.rw) 0x4000 dsup).1.mapRun 0x80000#27 0x80000#44 (permBits KPerm.rx) 7 dsup).1).missingRun 0x80007#27 0x7FF9 = 63 ∧
+    ((((((((PTree.zeroNode 0#44).mapRun 0x10000#27 0x10000#44 (permBits KPerm.rw) 1 dsup).1.mapRun 0x1000a#27 0x1000a#44 (permBits KPerm.rw) 1 dsup).1.mapRun 0x10001#27 0x10001#44 (permBits KPerm.rw) 1 dsup).1.mapRun 0xC000#27 0xC000#44 (permBits KPerm.rw) 0x4000 dsup).1.mapRun 0x80000#27 0x80000#44 (permBits KPerm.rx) 7 dsup).1.mapRun 0x80007#27 0x80007#44 (permBits KPerm.rw) 0x7FF9 dsup).1).missingRun 0x3FFFFFF#27 1 = 2 := by
   native_decide
 
 /-! ## The state between the calls -/
@@ -130,7 +132,7 @@ theorem mapsTo_stacks_out (T : PTree) (pas : Nat → BitVec 44) (fs : List (BitV
 -- duplicates the tree at every step.
 attribute [local irreducible] MachCSL.PTree.mapRun MachCSL.PTree.mapStacks
 
-/-- What the six `kvmmap` calls leave behind, in the form the stacks need. -/
+/-- What the seven `kvmmap` calls leave behind, in the form the stacks need. -/
 def kvmSix (b : BitVec 44) (T : PTree) : Prop :=
   T.wf 2 ∧ T.base = b ∧ (∀ q ∈ T.pages 2, pageValid (pageAddr q)) ∧
   (∀ r ∈ kvmRegions, T.regionMapped r) ∧ T.complete 2 0x3FFFFFF#27 ∧
@@ -138,27 +140,30 @@ def kvmSix (b : BitVec 44) (T : PTree) : Prop :=
 
 set_option maxHeartbeats 1000000 in
 set_option maxRecDepth 8000 in
-/-- The six runs, from what `kvmmap` hands back: the tree is well formed,
+/-- The seven runs, from what `kvmmap` hands back: the tree is well formed,
 rooted at the allocated page, made of valid pages, maps every region, and
 the trampoline's mapping already completed the stacks' paths. -/
-theorem kvmmake_six (b : BitVec 44) (f1 f2 f3 f4 f5 f6 : List (BitVec 44))
-    (T0 T1 T2 T3 T4 T5 T6 : PTree)
+theorem kvmmake_six (b : BitVec 44) (f1 f1a f2 f3 f4 f5 f6 : List (BitVec 44))
+    (T0 T1 T1a T2 T3 T4 T5 T6 : PTree)
     (e0 : T0 = PTree.zeroNode b)
     (e1 : T1 = (T0.mapRun 0x10000#27 0x10000#44 (permBits KPerm.rw) 1 f1).1)
-    (e2 : T2 = (T1.mapRun 0x10001#27 0x10001#44 (permBits KPerm.rw) 1 f2).1)
+    (e1a : T1a = (T1.mapRun 0x1000a#27 0x1000a#44 (permBits KPerm.rw) 1 f1a).1)
+    (e2 : T2 = (T1a.mapRun 0x10001#27 0x10001#44 (permBits KPerm.rw) 1 f2).1)
     (e3 : T3 = (T2.mapRun 0xC000#27 0xC000#44 (permBits KPerm.rw) 0x4000 f3).1)
     (e4 : T4 = (T3.mapRun 0x80000#27 0x80000#44 (permBits KPerm.rx) 7 f4).1)
     (e5 : T5 = (T4.mapRun 0x80007#27 0x80007#44 (permBits KPerm.rw) 0x7FF9 f5).1)
     (e6 : T6 = (T5.mapRun 0x3FFFFFF#27 0x80006#44 (permBits KPerm.rx) 1 f6).1)
     (hb : pageValid (pageAddr b))
     (hv1 : ∀ q ∈ f1, pageValid (pageAddr q))
+    (hv1a : ∀ q ∈ f1a, pageValid (pageAddr q))
     (hv2 : ∀ q ∈ f2, pageValid (pageAddr q))
     (hv3 : ∀ q ∈ f3, pageValid (pageAddr q))
     (hv4 : ∀ q ∈ f4, pageValid (pageAddr q))
     (hv5 : ∀ q ∈ f5, pageValid (pageAddr q))
     (hv6 : ∀ q ∈ f6, pageValid (pageAddr q))
     (hc1 : (T0.mapRun 0x10000#27 0x10000#44 (permBits KPerm.rw) 1 f1).2.2 = 1)
-    (hc2 : (T1.mapRun 0x10001#27 0x10001#44 (permBits KPerm.rw) 1 f2).2.2 = 1)
+    (hc1a : (T1.mapRun 0x1000a#27 0x1000a#44 (permBits KPerm.rw) 1 f1a).2.2 = 1)
+    (hc2 : (T1a.mapRun 0x10001#27 0x10001#44 (permBits KPerm.rw) 1 f2).2.2 = 1)
     (hc3 : (T2.mapRun 0xC000#27 0xC000#44 (permBits KPerm.rw) 0x4000 f3).2.2 = 0x4000)
     (hc4 : (T3.mapRun 0x80000#27 0x80000#44 (permBits KPerm.rx) 7 f4).2.2 = 7)
     (hc5 : (T4.mapRun 0x80007#27 0x80007#44 (permBits KPerm.rw) 0x7FF9 f5).2.2 = 0x7FF9)
@@ -167,7 +172,8 @@ theorem kvmmake_six (b : BitVec 44) (f1 f2 f3 f4 f5 f6 : List (BitVec 44))
     kvmSix b T6 := by
   have hw0 : T0.wf 2 := by rw [e0]; exact zeroNode_wf b 2
   have hw1 : T1.wf 2 := by rw [e1]; exact wf_mapRun 1 T0 0x10000#27 0x10000#44 KPerm.rw f1 hw0
-  have hw2 : T2.wf 2 := by rw [e2]; exact wf_mapRun 1 T1 0x10001#27 0x10001#44 KPerm.rw f2 hw1
+  have hw1a : T1a.wf 2 := by rw [e1a]; exact wf_mapRun 1 T1 0x1000a#27 0x1000a#44 KPerm.rw f1a hw1
+  have hw2 : T2.wf 2 := by rw [e2]; exact wf_mapRun 1 T1a 0x10001#27 0x10001#44 KPerm.rw f2 hw1a
   have hw3 : T3.wf 2 := by rw [e3]; exact wf_mapRun 0x4000 T2 0xC000#27 0xC000#44 KPerm.rw f3 hw2
   have hw4 : T4.wf 2 := by rw [e4]; exact wf_mapRun 7 T3 0x80000#27 0x80000#44 KPerm.rx f4 hw3
   have hw5 : T5.wf 2 := by rw [e5]; exact wf_mapRun 0x7FF9 T4 0x80007#27 0x80007#44 KPerm.rw f5 hw4
@@ -175,8 +181,10 @@ theorem kvmmake_six (b : BitVec 44) (f1 f2 f3 f4 f5 f6 : List (BitVec 44))
   have hbs0 : T0.base = b := by rw [e0]; rfl
   have hbs1 : T1.base = b := by
     rw [e1, base_mapRun 1 T0 0x10000#27 0x10000#44 KPerm.rw f1]; exact hbs0
+  have hbs1a : T1a.base = b := by
+    rw [e1a, base_mapRun 1 T1 0x1000a#27 0x1000a#44 KPerm.rw f1a]; exact hbs1
   have hbs2 : T2.base = b := by
-    rw [e2, base_mapRun 1 T1 0x10001#27 0x10001#44 KPerm.rw f2]; exact hbs1
+    rw [e2, base_mapRun 1 T1a 0x10001#27 0x10001#44 KPerm.rw f2]; exact hbs1a
   have hbs3 : T3.base = b := by
     rw [e3, base_mapRun 0x4000 T2 0xC000#27 0xC000#44 KPerm.rw f3]; exact hbs2
   have hbs4 : T4.base = b := by
@@ -196,11 +204,17 @@ theorem kvmmake_six (b : BitVec 44) (f1 f2 f3 f4 f5 f6 : List (BitVec 44))
     rcases mem_pages_mapRun 1 T0 0x10000#27 0x10000#44 KPerm.rw f1 q hq with h | h
     · exact hq0 q h
     · exact hv1 q h
+  have hq1a : ∀ q ∈ T1a.pages 2, pageValid (pageAddr q) := by
+    intro q hq
+    rw [e1a] at hq
+    rcases mem_pages_mapRun 1 T1 0x1000a#27 0x1000a#44 KPerm.rw f1a q hq with h | h
+    · exact hq1 q h
+    · exact hv1a q h
   have hq2 : ∀ q ∈ T2.pages 2, pageValid (pageAddr q) := by
     intro q hq
     rw [e2] at hq
-    rcases mem_pages_mapRun 1 T1 0x10001#27 0x10001#44 KPerm.rw f2 q hq with h | h
-    · exact hq1 q h
+    rcases mem_pages_mapRun 1 T1a 0x10001#27 0x10001#44 KPerm.rw f2 q hq with h | h
+    · exact hq1a q h
     · exact hv2 q h
   have hq3 : ∀ q ∈ T3.pages 2, pageValid (pageAddr q) := by
     intro q hq
@@ -233,11 +247,16 @@ theorem kvmmake_six (b : BitVec 44) (f1 f2 f3 f4 f5 f6 : List (BitVec 44))
     intro i hi
     rw [e1]
     exact mapsTo_mapRun 1 T0 0x10000#27 0x10000#44 KPerm.rw f1 hw0 (by decide) hc1 i hi
+  have hm1_1a : ∀ i, i < 1 → T1a.mapsTo (0x10000#27 + BitVec.ofNat 27 i) (0x10000#44 + BitVec.ofNat 44 i) KPerm.rw := by
+    intro i hi
+    rw [e1a]
+    exact mapsTo_out 1 T1 0x1000a#27 0x1000a#44 KPerm.rw f1a hw1 0x10000#27 (0x10000#44 + BitVec.ofNat 44 i) KPerm.rw 1 i hi
+      (by decide) (by decide) (by decide) (hm1_1 i hi)
   have hm1_2 : ∀ i, i < 1 → T2.mapsTo (0x10000#27 + BitVec.ofNat 27 i) (0x10000#44 + BitVec.ofNat 44 i) KPerm.rw := by
     intro i hi
     rw [e2]
-    exact mapsTo_out 1 T1 0x10001#27 0x10001#44 KPerm.rw f2 hw1 0x10000#27 (0x10000#44 + BitVec.ofNat 44 i) KPerm.rw 1 i hi
-      (by decide) (by decide) (by decide) (hm1_1 i hi)
+    exact mapsTo_out 1 T1a 0x10001#27 0x10001#44 KPerm.rw f2 hw1a 0x10000#27 (0x10000#44 + BitVec.ofNat 44 i) KPerm.rw 1 i hi
+      (by decide) (by decide) (by decide) (hm1_1a i hi)
   have hm1_3 : ∀ i, i < 1 → T3.mapsTo (0x10000#27 + BitVec.ofNat 27 i) (0x10000#44 + BitVec.ofNat 44 i) KPerm.rw := by
     intro i hi
     rw [e3]
@@ -258,10 +277,39 @@ theorem kvmmake_six (b : BitVec 44) (f1 f2 f3 f4 f5 f6 : List (BitVec 44))
     rw [e6]
     exact mapsTo_out 1 T5 0x3FFFFFF#27 0x80006#44 KPerm.rx f6 hw5 0x10000#27 (0x10000#44 + BitVec.ofNat 44 i) KPerm.rw 1 i hi
       (by decide) (by decide) (by decide) (hm1_5 i hi)
+  have hm1a_1a : ∀ i, i < 1 → T1a.mapsTo (0x1000a#27 + BitVec.ofNat 27 i) (0x1000a#44 + BitVec.ofNat 44 i) KPerm.rw := by
+    intro i hi
+    rw [e1a]
+    exact mapsTo_mapRun 1 T1 0x1000a#27 0x1000a#44 KPerm.rw f1a hw1 (by decide) hc1a i hi
+  have hm1a_2 : ∀ i, i < 1 → T2.mapsTo (0x1000a#27 + BitVec.ofNat 27 i) (0x1000a#44 + BitVec.ofNat 44 i) KPerm.rw := by
+    intro i hi
+    rw [e2]
+    exact mapsTo_out 1 T1a 0x10001#27 0x10001#44 KPerm.rw f2 hw1a 0x1000a#27 (0x1000a#44 + BitVec.ofNat 44 i) KPerm.rw 1 i hi
+      (by decide) (by decide) (by decide) (hm1a_1a i hi)
+  have hm1a_3 : ∀ i, i < 1 → T3.mapsTo (0x1000a#27 + BitVec.ofNat 27 i) (0x1000a#44 + BitVec.ofNat 44 i) KPerm.rw := by
+    intro i hi
+    rw [e3]
+    exact mapsTo_out 0x4000 T2 0xC000#27 0xC000#44 KPerm.rw f3 hw2 0x1000a#27 (0x1000a#44 + BitVec.ofNat 44 i) KPerm.rw 1 i hi
+      (by decide) (by decide) (by decide) (hm1a_2 i hi)
+  have hm1a_4 : ∀ i, i < 1 → T4.mapsTo (0x1000a#27 + BitVec.ofNat 27 i) (0x1000a#44 + BitVec.ofNat 44 i) KPerm.rw := by
+    intro i hi
+    rw [e4]
+    exact mapsTo_out 7 T3 0x80000#27 0x80000#44 KPerm.rx f4 hw3 0x1000a#27 (0x1000a#44 + BitVec.ofNat 44 i) KPerm.rw 1 i hi
+      (by decide) (by decide) (by decide) (hm1a_3 i hi)
+  have hm1a_5 : ∀ i, i < 1 → T5.mapsTo (0x1000a#27 + BitVec.ofNat 27 i) (0x1000a#44 + BitVec.ofNat 44 i) KPerm.rw := by
+    intro i hi
+    rw [e5]
+    exact mapsTo_out 0x7FF9 T4 0x80007#27 0x80007#44 KPerm.rw f5 hw4 0x1000a#27 (0x1000a#44 + BitVec.ofNat 44 i) KPerm.rw 1 i hi
+      (by decide) (by decide) (by decide) (hm1a_4 i hi)
+  have hm1a_6 : ∀ i, i < 1 → T6.mapsTo (0x1000a#27 + BitVec.ofNat 27 i) (0x1000a#44 + BitVec.ofNat 44 i) KPerm.rw := by
+    intro i hi
+    rw [e6]
+    exact mapsTo_out 1 T5 0x3FFFFFF#27 0x80006#44 KPerm.rx f6 hw5 0x1000a#27 (0x1000a#44 + BitVec.ofNat 44 i) KPerm.rw 1 i hi
+      (by decide) (by decide) (by decide) (hm1a_5 i hi)
   have hm2_2 : ∀ i, i < 1 → T2.mapsTo (0x10001#27 + BitVec.ofNat 27 i) (0x10001#44 + BitVec.ofNat 44 i) KPerm.rw := by
     intro i hi
     rw [e2]
-    exact mapsTo_mapRun 1 T1 0x10001#27 0x10001#44 KPerm.rw f2 hw1 (by decide) hc2 i hi
+    exact mapsTo_mapRun 1 T1a 0x10001#27 0x10001#44 KPerm.rw f2 hw1a (by decide) hc2 i hi
   have hm2_3 : ∀ i, i < 1 → T3.mapsTo (0x10001#27 + BitVec.ofNat 27 i) (0x10001#44 + BitVec.ofNat 44 i) KPerm.rw := by
     intro i hi
     rw [e3]
@@ -332,8 +380,9 @@ theorem kvmmake_six (b : BitVec 44) (f1 f2 f3 f4 f5 f6 : List (BitVec 44))
   intro r hr
   simp only [kvmRegions, List.mem_cons, List.not_mem_nil, or_false] at hr
   unfold PTree.regionMapped
-  rcases hr with rfl | rfl | rfl | rfl | rfl | rfl
+  rcases hr with rfl | rfl | rfl | rfl | rfl | rfl | rfl
   · exact hm1_6
+  · exact hm1a_6
   · exact hm2_6
   · exact hm3_6
   · exact hm4_6
@@ -360,9 +409,11 @@ theorem kvmmake_table (b : BitVec 44) (T Tf : PTree) (pas : Nat → BitVec 44)
     have hr6 := hrm r hr
     simp only [kvmRegions, List.mem_cons, List.not_mem_nil, or_false] at hr
     unfold PTree.regionMapped at hr6 ⊢
-    rcases hr with rfl | rfl | rfl | rfl | rfl | rfl
+    rcases hr with rfl | rfl | rfl | rfl | rfl | rfl | rfl
     · exact fun i hi => mapsTo_stacks_out T pas fs hw hcs 0x10000#27 1 i hi (by decide) (by decide)
         (0x10000#44 + BitVec.ofNat 44 i) KPerm.rw (hr6 i hi)
+    · exact fun i hi => mapsTo_stacks_out T pas fs hw hcs 0x1000a#27 1 i hi (by decide) (by decide)
+        (0x1000a#44 + BitVec.ofNat 44 i) KPerm.rw (hr6 i hi)
     · exact fun i hi => mapsTo_stacks_out T pas fs hw hcs 0x10001#27 1 i hi (by decide) (by decide)
         (0x10001#44 + BitVec.ofNat 44 i) KPerm.rw (hr6 i hi)
     · exact fun i hi => mapsTo_stacks_out T pas fs hw hcs 0xC000#27 0x4000 i hi (by decide) (by decide)

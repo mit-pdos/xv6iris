@@ -32,7 +32,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 theorem isl_u3 : BitVec.signExtend 64 (3#20 ++ 0#12) = 0x3000#64 := by decide
 
 /-- `ret` out of `initlock` lands on the instruction after the `jal`. -/
-theorem isl_ret_3fa8 : jumpPc 0x80003fa8#64 = 0x80003fa8#64 := by
+theorem isl_ret_3fa8 : jumpPc 0x80004066#64 = 0x80004066#64 := by
   simp only [jumpPc, BitVec.reduceAnd]
 
 section
@@ -45,7 +45,7 @@ set_option maxHeartbeats 1000000 in
 theorem isl_initlock_call (IL : INITLOCK) [CurCtx] (c : CPU) (k' : KCtx)
     (vlock : BitVec 32) (vname vcpu : BitVec 64) (hK' : 2 ≤ k'.avail)
     (lk nm : BitVec 64) (h10 : k'.regs 10#5 = lk) (h11 : k'.regs 11#5 = nm) :
-    kctx c k' ∗ pcIs c 0x80000b3a#64 ∗
+    kctx c k' ∗ pcIs c 0x80000bd8#64 ∗
     kmapId lk ∗ kmapId (lk + 16#64) ∗
     wordPointsTo lk 4 (DFrac.own 1) vlock ∗
     wordPointsTo (lk + 8#64) 8 (DFrac.own 1) vname ∗
@@ -63,7 +63,7 @@ theorem isl_initlock_call (IL : INITLOCK) [CurCtx] (c : CPU) (k' : KCtx)
 /-! ## The field stores and the epilogue -/
 
 set_option maxHeartbeats 4000000 in
-/-- From `0x80003fa8`: `lk->name = name`, `lk->locked = 0`, `lk->pid = 0`,
+/-- From `0x80004066`: `lk->name = name`, `lk->locked = 0`, `lk->pid = 0`,
 then restore `ra`, `s0`, `s1`, `s2`, pop the frame and return. -/
 theorem initsleeplock_finish [CurCtx] (cpu c : CPU) (k : KCtx)
     (hpin : k.sie = false ∨ k.proc = 0#64 → c = cpu) (hK : 4 ≤ k.avail)
@@ -74,7 +74,7 @@ theorem initsleeplock_finish [CurCtx] (cpu c : CPU) (k : KCtx)
     (h24 : R 24#5 = k.regs 24#5) (h25 : R 25#5 = k.regs 25#5) (h26 : R 26#5 = k.regs 26#5)
     (h27 : R 27#5 = k.regs 27#5)
     (vlocked vpid : BitVec 32) (vn : BitVec 64) :
-    kctx c ((k.pushed 4).withRegs R) ∗ pcIs c 0x80003fa8#64 ∗
+    kctx c ((k.pushed 4).withRegs R) ∗ pcIs c 0x80004066#64 ∗
     frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     wordPointsTo (k.regs 10#5) 4 (DFrac.own 1) vlocked ∗
     wordPointsTo (k.regs 10#5 + 16#64) 8 (DFrac.own 1) sleepLockNameAddr ∗
@@ -89,21 +89,21 @@ theorem initsleeplock_finish [CurCtx] (cpu c : CPU) (k : KCtx)
   iintro ⟨Hk, Hpc, Hframe, Hlk0, Hwname, Hfresh, Hn, Hpid, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
   -- sd s2,32(s1)
-  k_step_gen (wp_s_sd c _ 0x80003fa8#64 false 32#12 9#5 18#5 (by decide) vn)
+  k_step_gen (wp_s_sd c _ 0x80004066#64 false 32#12 9#5 18#5 (by decide) vn)
     from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [h9, h18] next c1 hq1
   iintro Hk Hpc Hn
   -- sw zero,0(s1)
-  k_step_gen (wp_s_sw c1 _ 0x80003fac#64 false 0#12 9#5 0#5 (by decide) vlocked)
+  k_step_gen (wp_s_sw c1 _ 0x8000406a#64 false 0#12 9#5 0#5 (by decide) vlocked)
     from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [h9] next c2 hq2
   iintro Hk Hpc Hlk0
   -- sw zero,40(s1)
-  k_step_gen (wp_s_sw c2 _ 0x80003fb0#64 false 40#12 9#5 0#5 (by decide) vpid)
+  k_step_gen (wp_s_sw c2 _ 0x8000406e#64 false 40#12 9#5 0#5 (by decide) vpid)
     from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [h9] next c3 hq3
   iintro Hk Hpc Hpid
   have hpin3 : k.sie = false ∨ k.proc = 0#64 → c3 = cpu := fun h =>
     (hq3 h).trans ((hq2 h).trans ((hq1 h).trans (hpin h)))
   -- the epilogue
-  iapply (wp_epilogue4s2_gen c3 k 0x80003fb4#64 hK R hR2
+  iapply (wp_epilogue4s2_gen c3 k 0x80004072#64 hK R hR2
     (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5)) $$ [- $Hk $Hpc]
   k_code (text_instr _ _ _ _ rfl rfl) HT
   k_norm_g
@@ -136,7 +136,7 @@ theorem initsleeplock_proof (IL : INITLOCK) : INITSLEEPLOCK :=
   simp only [initsleeplockAddr, KernelSyms.«initsleeplock»]
   k_norm_g
   -- prologue
-  iapply (wp_prologue4s2_gen cpu k 0x80003f8a#64 (by omega))
+  iapply (wp_prologue4s2_gen cpu k 0x80004048#64 (by omega))
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm_g
   iframe
@@ -144,26 +144,26 @@ theorem initsleeplock_proof (IL : INITLOCK) : INITSLEEPLOCK :=
   iapply wpNext_intro_pin
   iintro %c1 %hp1 Hk Hpc Hframe
   -- mv s1,a0
-  k_step_gen (wp_s_add c1 _ 0x80003f96#64 true 9#5 0#5 10#5 (by decide))
+  k_step_gen (wp_s_add c1 _ 0x80004054#64 true 9#5 0#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c2 hp2
   iintro Hk Hpc
   -- mv s2,a1
-  k_step_gen (wp_s_add c2 _ 0x80003f98#64 true 18#5 0#5 11#5 (by decide))
+  k_step_gen (wp_s_add c2 _ 0x80004056#64 true 18#5 0#5 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
   iintro Hk Hpc
   -- a1 = "sleep lock"
-  k_step_gen (wp_s_auipc c3 _ 0x80003f9a#64 false 3#20 11#5 (by decide))
+  k_step_gen (wp_s_auipc c3 _ 0x80004058#64 false 3#20 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [isl_u3] next c4 hp4
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c4 _ 0x80003f9e#64 false 1486#12 11#5 11#5 (by decide))
+  k_step_gen (wp_s_addi c4 _ 0x8000405c#64 false 1304#12 11#5 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c5 hp5
   iintro Hk Hpc
   -- a0 = &lk->lk
-  k_step_gen (wp_s_addi c5 _ 0x80003fa2#64 true 8#12 10#5 10#5 (by decide))
+  k_step_gen (wp_s_addi c5 _ 0x80004060#64 true 8#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c6 hp6
   iintro Hk Hpc
   -- jal ra, initlock
-  k_step_gen (wp_s_jal c6 _ 0x80003fa4#64 false 2083734#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c6 _ 0x80004062#64 false 2083702#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c7 hp7
   iintro Hk Hpc
   have hpin7 : k.sie = false ∨ k.proc = 0#64 → c7 = cpu := fun h =>

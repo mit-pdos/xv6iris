@@ -20,7 +20,7 @@ into the whole variable `sched` demands.  Both come back out of the slot
 at the release.
 
 The two exits -- the `chan == 0` no-op and the park -- rejoin at
-`0x80001f84` with the SAME shape, so the tail (`sleep_tail`) is proved once
+`0x80002032` with the SAME shape, so the tail (`sleep_tail`) is proved once
 over a base context `kb`: the caller's own on the no-op path, and
 `sleepExitK` (the resuming hart's `SPIE`/`SPP` and kernel root) on the park
 path.
@@ -58,13 +58,13 @@ theorem sl_ite_beq {α : Type _} (x : BitVec 64) (p q : α) :
 theorem sl_pChan (pa : BitVec 64) : pa + 32#64 = pChan pa := rfl
 theorem sl_pState (pa : BitVec 64) : pa + 24#64 = pState pa := rfl
 
-theorem sl_ret_f72 : jumpPc 0x80001f72#64 = 0x80001f72#64 := by
+theorem sl_ret_f72 : jumpPc 0x80002020#64 = 0x80002020#64 := by
   simp only [jumpPc, BitVec.reduceAnd]
-theorem sl_ret_f78 : jumpPc 0x80001f78#64 = 0x80001f78#64 := by
+theorem sl_ret_f78 : jumpPc 0x80002026#64 = 0x80002026#64 := by
   simp only [jumpPc, BitVec.reduceAnd]
-theorem sl_ret_f84 : jumpPc 0x80001f84#64 = 0x80001f84#64 := by
+theorem sl_ret_f84 : jumpPc 0x80002032#64 = 0x80002032#64 := by
   simp only [jumpPc, BitVec.reduceAnd]
-theorem sl_ret_f8a : jumpPc 0x80001f8a#64 = 0x80001f8a#64 := by
+theorem sl_ret_f8a : jumpPc 0x80002038#64 = 0x80002038#64 := by
   simp only [jumpPc, BitVec.reduceAnd]
 
 theorem sl_pcIs_pos {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
@@ -146,7 +146,7 @@ end
 /-! ## The shared tail: `mv a0,s1`, `release` and the epilogue -/
 
 set_option maxHeartbeats 4000000 in
-/-- From `0x80001f84` on hart `h`, holding `p->lock` with the slot's
+/-- From `0x80002032` on hart `h`, holding `p->lock` with the slot's
 contents out at RUNNING: give the claim back to the caller. -/
 theorem sleep_tail (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
     [X : CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
@@ -157,7 +157,7 @@ theorem sleep_tail (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS 
     (R : RegMap) (hR2 : R 2#5 = kb.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64) (h9 : R 9#5 = procAddr j)
     (hhi : sl_savedHigh kb.regs R)
     (ch : BitVec 64) (kl xs pid : BitVec 32) :
-    kctx h (((kb.pushed 4).pushOff.withRegs R).withLocks ["proc"]) ∗ pcIs h 0x80001f84#64 ∗
+    kctx h (((kb.pushed 4).pushOff.withRegs R).withLocks ["proc"]) ∗ pcIs h 0x80002032#64 ∗
     procsInv Γ ∗ slotUsed Γ (procAddr j) ∗ locked (Γ.lock j) h ∗ pstateWhole Γ (procAddr j) RUNNING ∗
     wordPointsTo (pState (procAddr j)) 4 (DFrac.own 1) RUNNING ∗
     wordPointsTo (pChan (procAddr j)) 8 (DFrac.own 1) ch ∗
@@ -179,17 +179,17 @@ theorem sleep_tail (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS 
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   ihave #Hlk := procsInv_lookup Γ j hj $$ Hpinv
   -- mv a0,s1
-  k_step (wp_s_add h _ 0x80001f84#64 true 10#5 0#5 9#5 (by decide))
+  k_step (wp_s_add h _ 0x80002032#64 true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9]
   iintro Hk Hpc
   -- jal release
-  k_step (wp_s_jal h _ 0x80001f86#64 false 2092220#21 1#5 (by decide))
+  k_step (wp_s_jal h _ 0x80002034#64 false 2092204#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   have hre : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hnoff' : 1 ≤ k'.noff) (hK' : 10 ≤ k'.avail)
       (reen : Bool) (hreen : reen = (decide (k'.noff = 1) && k'.intena))
       (hon : reen = true → k'.tier = .kpt ∧ trapRes true + 6 ≤ k'.avail),
-      kctx h k' ∗ pcIs h 0x80000c42#64 ∗ isLock (Γ.lock j) (k'.regs 10#5) "proc" (procLockPay Γ j) ∗
+      kctx h k' ∗ pcIs h 0x80000ce0#64 ∗ isLock (Γ.lock j) (k'.regs 10#5) "proc" (procLockPay Γ j) ∗
       locked (Γ.lock j) h ∗ procLockPay Γ j curCtx ∗ popArm h k' reen ∗
       wpNext (k'.popExit reen).sie k'.proc h (fun cpu' => iprop(∀ R' : RegMap,
         kctx cpu' (((k'.popExit reen).withRegs R').withLocks (k'.locks.filter (fun x => x ≠ "proc"))) -∗
@@ -236,7 +236,7 @@ theorem sleep_tail (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS 
     subst hnoff
     subst hlocks
     rfl
-  iapply (wp_epilogue4s1 h kb hsie 0x80001f8a#64 (by omega) R4
+  iapply (wp_epilogue4s1 h kb hsie 0x80002038#64 (by omega) R4
     (by rw [r2]; k_norm; exact hR2) (kb.regs 1#5) (kb.regs 8#5) (kb.regs 9#5))
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm [hlk4]
@@ -280,19 +280,19 @@ theorem sleep_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : S
     rw [cpuClaim_eq Γ]; exact procClaim_elim Γ cpu j hj) $$ Hclaim
   icases Hclaim with ⟨Hpst2, Hhart⟩
   -- the prologue
-  iapply (wp_prologue4s1 cpu k hsie 0x80001f64#64 hK4)
+  iapply (wp_prologue4s1 cpu k hsie 0x80002012#64 hK4)
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm
   iframe
   inext
   iintro Hk Hpc Hframe
   -- jal myproc
-  k_step (wp_s_jal cpu _ 0x80001f6e#64 false 2095468#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ 0x8000201c#64 false 2095468#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   have hmp : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hnoff' : k'.noff + 1 < 2 ^ 31)
       (hK' : 10 ≤ k'.avail),
-      kctx cpu k' ∗ pcIs cpu 0x800018da#64 ∗
+      kctx cpu k' ∗ pcIs cpu 0x80001988#64 ∗
       (∀ R' : RegMap, kctx cpu (k'.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
         ⌜calleeSaved k'.regs R' ∧ R' 10#5 = k'.proc⌝ -∗ wpLoop cpu)
       ⊢ wpLoop (GF := GF) cpu := by
@@ -322,16 +322,16 @@ theorem sleep_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : S
   k_norm at hhiM
   obtain ⟨m2, m8, m9, m18, m19, m20, m21, m22, m23, m24, m25, m26, m27⟩ := hcsM
   -- mv s1,a0
-  k_step (wp_s_add cpu _ 0x80001f72#64 true 9#5 0#5 10#5 (by decide))
+  k_step (wp_s_add cpu _ 0x80002020#64 true 9#5 0#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10M, hproc]
   iintro Hk Hpc
   -- jal acquire
-  k_step (wp_s_jal cpu _ 0x80001f74#64 false 2092102#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ 0x80002022#64 false 2092086#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   have hac : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hnoff' : k'.noff + 1 < 2 ^ 31)
       (hK' : 10 ≤ k'.avail) (hs' : "proc" ∉ k'.locks),
-      kctx cpu k' ∗ pcIs cpu 0x80000bba#64 ∗
+      kctx cpu k' ∗ pcIs cpu 0x80000c58#64 ∗
       isLock (Γ.lock j) (k'.regs 10#5) "proc" (procLockPay Γ j) ∗
       (∀ R' : RegMap, kctx cpu ((k'.pushOff.withRegs R').withLocks ("proc" :: k'.locks)) -∗
         pcIs cpu (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗
@@ -387,11 +387,11 @@ theorem sleep_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : S
   ihave Hpsth := pstateAt_intro Γ j (1 : Qp).half RUNNING hj $$ Hpst2
   ihave Hpstw := sl_pstateWhole_intro Γ (procAddr j) $$ [$Hpstl $Hpsth]
   -- ld a5,32(s1)
-  k_step (wp_s_ld cpu _ 0x80001f78#64 true 32#12 15#5 9#5 (by decide) (by decide) (DFrac.own 1) ch)
+  k_step (wp_s_ld cpu _ 0x80002026#64 true 32#12 15#5 9#5 (by decide) (by decide) (DFrac.own 1) ch)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e9, sl_pChan]
   iintro Hk Hpc Hchan
   -- beqz a5
-  k_step (wp_s_branch cpu _ 0x80001f7a#64 true 10#13 15#5 0#5 (by decide) bop.BEQ)
+  k_step (wp_s_branch cpu _ 0x80002028#64 true 10#13 15#5 0#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sl_ite_beq]
   iintro Hk Hpc
   by_cases hch : ch = 0#64
@@ -424,11 +424,11 @@ theorem sleep_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : S
   · -- THE PARK: p->state = SLEEPING and into the scheduler
     ihave Hpc := sl_pcIs_neg cpu _ _ _ hch $$ Hpc
     -- li a5,2
-    k_step (wp_s_addi cpu _ 0x80001f7c#64 true 2#12 15#5 0#5 (by decide))
+    k_step (wp_s_addi cpu _ 0x8000202a#64 true 2#12 15#5 0#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
     -- sw a5,24(s1)
-    k_step (wp_s_sw cpu _ 0x80001f7e#64 true 24#12 9#5 15#5 (by decide) RUNNING)
+    k_step (wp_s_sw cpu _ 0x8000202c#64 true 24#12 9#5 15#5 (by decide) RUNNING)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [e9, sl_pState, sl_sleeping, sl_sleeping_lit]
     iintro Hk Hpc Hstate
@@ -437,7 +437,7 @@ theorem sleep_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : S
     imod pstateWhole_update Γ (procAddr j) RUNNING SLEEPING $$ Hpstw with Hpstw
     imodintro
     -- jal sched
-    k_step (wp_s_jal cpu _ 0x80001f80#64 false 2096832#21 1#5 (by decide))
+    k_step (wp_s_jal cpu _ 0x8000202e#64 false 2096832#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
     ihave Hheld := procHeldAt_intro Γ curCtx cpu j SLEEPING ch kl xs pid
@@ -445,7 +445,7 @@ theorem sleep_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : S
     have hsc : ∀ (k' : KCtx) (hK' : schedSlots ≤ k'.avail) (hs' : k'.sie = false)
         (hn' : k'.noff = 1) (hl' : k'.locks = ["proc"]) (ht' : k'.tier = KTier.kpt)
         (hp' : k'.proc = procAddr j),
-        kctx cpu k' ∗ pcIs cpu 0x80001e40#64 ∗ procsInv Γ ∗ procHeld Γ cpu j SLEEPING ch ∗
+        kctx cpu k' ∗ pcIs cpu 0x80001eee#64 ∗ procsInv Γ ∗ procHeld Γ cpu j SLEEPING ch ∗
         (stackOwn k'.sp k'.avail -∗ parkPay (procAddr j) SLEEPING) ∗ trapCsrs cpu ∗ intrRes cpu ∗
         ownCtxCells (pContext (procAddr j) 0) ∗ hartFull Γ j cpu ∗
         ▷ schedVcAt Γ cpu (cpuCtxAddr cpu) (procAddr j) ∗

@@ -17,7 +17,7 @@ namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
--- `&wait_lock` is `Xv6.waitLockAddr` (`Xv6/SpecProcinit.lean`, 0x800123a0);
+-- `&wait_lock` is `Xv6.waitLockAddr` (`Xv6/SpecProcinit.lean`, 0x80012448);
 -- the lock's name string is `"wait_lock"`.
 
 section

@@ -11,7 +11,7 @@ the interfaces of `devintr`, `myproc` and `yield`.
       w_sepc(sepc); w_sstatus(sstatus);
     }
 
-Three paths reach the tail at `0x80002718`: an external interrupt, a
+Three paths reach the tail at `0x800027d6`: an external interrupt, a
 timer interrupt with no process, and a timer interrupt after `yield` --
 the last on whichever hart the thread resumes on.  The tail (`csrw sepc`,
 `csrw sstatus`, the epilogue) is proved once, at any hart pinned to the
@@ -77,13 +77,13 @@ theorem kerneltrap_proof (DI : DEVINTR) (MP : MYPROC) (YI : YIELD) : KERNELTRAP 
   have hK' : 58 ≤ k.avail := by unfold ktSlots kvFrameSlots at hK; omega
   simp only [kerneltrapAddr, KernelSyms.«kerneltrap»]
   k_norm
-  -- the tail from 0x80002718: write sepc and sstatus back, the epilogue, at any hart the pinning allows
+  -- the tail from 0x800027d6: write sepc and sstatus back, the epilogue, at any hart the pinning allows
   have htail : ∀ (c : CPU) (_ : k.proc = 0#64 → c = cpu) (a b : Bool) (R : RegMap) (e' sc' tv' w5 : BitVec 64)
       (v : BitVec 64) (_ : sstatusFull false true true v)
       (_ : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64) (_ : R 9#5 = v) (_ : R 18#5 = epc)
       (_ : R 20#5 = k.regs 20#5 ∧ R 21#5 = k.regs 21#5 ∧ R 22#5 = k.regs 22#5 ∧ R 23#5 = k.regs 23#5 ∧
         R 24#5 = k.regs 24#5 ∧ R 25#5 = k.regs 25#5 ∧ R 26#5 = k.regs 26#5 ∧ R 27#5 = k.regs 27#5),
-      kernelText ∗ kctx c (((k.pushed 6).withSpie a b).withRegs R) ∗ pcIs c 0x80002718#64 ∗
+      kernelText ∗ kctx c (((k.pushed 6).withSpie a b).withRegs R) ∗ pcIs c 0x800027d6#64 ∗
       Register.sepc ↦ᵣ[c] e' ∗ Register.scause ↦ᵣ[c] sc' ∗ Register.stval ↦ᵣ[c] tv' ∗ cpuClaim c k.proc ∗ intrRes c ∗
       wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) (k.regs 1#5) ∗
       wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) (k.regs 8#5) ∗
@@ -99,39 +99,39 @@ theorem kerneltrap_proof (DI : DEVINTR) (MP : MYPROC) (YI : YIELD) : KERNELTRAP 
     iintro ⟨#Htext, Hk, Hpc, Hsepc, Hscause, Hstval, Hclaim, Hres, C0, C1, C2, C3, C4, C5, HΦ⟩
     have hsie' : (((k.pushed 6).withSpie a b).withRegs R).sie = false := hsie
     -- csrw sepc,s2
-    k_step (wp_s_csrw_sepc c _ ?hs 0x80002718#64 false 18#5 e' ?hv) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    k_step (wp_s_csrw_sepc c _ ?hs 0x800027d6#64 false 18#5 e' ?hv) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [hR18]
     case hv => k_norm; rw [hR18]; exact hepc
     iintro Hk Hpc Hsepc
     -- csrw sstatus,s1 : the pinned bits are the trap's again
-    k_step (wp_s_csrw_sstatus_off c _ ?hs 0x8000271c#64 false 9#5 true true ?hv) from (text_instr _ _ _ _ rfl rfl) Htext
+    k_step (wp_s_csrw_sstatus_off c _ ?hs 0x800027da#64 false 9#5 true true ?hv) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc] with [hR9, KCtx.withSpie_withSpie, KCtx.withSpie_self' (k.pushed 6) true true hspie.symm hspp.symm]
     case hv => k_norm; rw [hR9]; exact hv
     iintro Hk Hpc
     -- ld ra,40(sp) ; ld s0,32(sp) ; ld s1,24(sp) ; ld s2,16(sp) ; ld s3,8(sp)
-    k_step (wp_s_ld c _ 0x80002720#64 true 40#12 1#5 2#5 (by decide) (by decide) (DFrac.own 1) (k.regs 1#5)) from (text_instr _ _ _ _ rfl rfl) Htext
+    k_step (wp_s_ld c _ 0x800027de#64 true 40#12 1#5 2#5 (by decide) (by decide) (DFrac.own 1) (k.regs 1#5)) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc] with [hR2]
     iintro Hk Hpc C0
-    k_step (wp_s_ld c _ 0x80002722#64 true 32#12 8#5 2#5 (by decide) (by decide) (DFrac.own 1) (k.regs 8#5)) from (text_instr _ _ _ _ rfl rfl) Htext
+    k_step (wp_s_ld c _ 0x800027e0#64 true 32#12 8#5 2#5 (by decide) (by decide) (DFrac.own 1) (k.regs 8#5)) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc] with [hR2]
     iintro Hk Hpc C1
-    k_step (wp_s_ld c _ 0x80002724#64 true 24#12 9#5 2#5 (by decide) (by decide) (DFrac.own 1) (k.regs 9#5)) from (text_instr _ _ _ _ rfl rfl) Htext
+    k_step (wp_s_ld c _ 0x800027e2#64 true 24#12 9#5 2#5 (by decide) (by decide) (DFrac.own 1) (k.regs 9#5)) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc] with [hR2]
     iintro Hk Hpc C2
-    k_step (wp_s_ld c _ 0x80002726#64 true 16#12 18#5 2#5 (by decide) (by decide) (DFrac.own 1) (k.regs 18#5)) from (text_instr _ _ _ _ rfl rfl) Htext
+    k_step (wp_s_ld c _ 0x800027e4#64 true 16#12 18#5 2#5 (by decide) (by decide) (DFrac.own 1) (k.regs 18#5)) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc] with [hR2]
     iintro Hk Hpc C3
-    k_step (wp_s_ld c _ 0x80002728#64 true 8#12 19#5 2#5 (by decide) (by decide) (DFrac.own 1) (k.regs 19#5)) from (text_instr _ _ _ _ rfl rfl) Htext
+    k_step (wp_s_ld c _ 0x800027e6#64 true 8#12 19#5 2#5 (by decide) (by decide) (DFrac.own 1) (k.regs 19#5)) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc] with [hR2]
     iintro Hk Hpc C4
     -- addi sp,sp,48 ; ret
     ihave Hframe : stackOwn (k.regs 2#5) 6 $$ [C0 C1 C2 C3 C4 C5]
     case' _ => stack_cells; iframe
     have h6 : 6 ≤ k.avail := by omega
-    k_step (wp_s_pop c _ 0x8000272a#64 true 48#12 6 imm_p48) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    k_step (wp_s_pop c _ 0x800027e8#64 true 48#12 6 imm_p48) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [hR2, KCtx.pop_pushed _ _ _ h6, sp_restore48]
     iintro Hk Hpc
-    k_step (wp_s_ret c _ 0x8000272c#64 true 1#5) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    k_step (wp_s_ret c _ 0x800027ea#64 true 1#5) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
     ihave HΦ' := wpNext_at _ _ _ c _ (fun h => hpin (h.resolve_left (by decide))) $$ HΦ
     ihave Hcsrs : trapCsrsAt c epc sc' tv' $$ [Hsepc Hscause Hstval]
@@ -144,59 +144,59 @@ theorem kerneltrap_proof (DI : DEVINTR) (MP : MYPROC) (YI : YIELD) : KERNELTRAP 
       _root_.and_true]
     exact ⟨h20, h21, h22, h23, h24, h25, h26, h27⟩
   -- addi sp,sp,-48 ; sd ra,40(sp) ; sd s0,32(sp) ; sd s1,24(sp) ; sd s2,16(sp) ; sd s3,8(sp) ; addi s0,sp,48
-  k_step (wp_s_push cpu _ 0x800026e2#64 true 4048#12 6 (by omega) imm_m48) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_push cpu _ 0x800027a0#64 true 4048#12 6 (by omega) imm_m48) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc Hstk
   irevert Hstk
   stack_cells
   iintro ⟨⟨%w0, C0⟩, ⟨%w1, C1⟩, ⟨%w2, C2⟩, ⟨%w3, C3⟩, ⟨%w4, C4⟩, ⟨%w5, C5⟩, _⟩
-  k_step (wp_s_sd cpu _ 0x800026e4#64 true 40#12 2#5 1#5 (by decide) w0) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_sd cpu _ 0x800027a2#64 true 40#12 2#5 1#5 (by decide) w0) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc C0
-  k_step (wp_s_sd cpu _ 0x800026e6#64 true 32#12 2#5 8#5 (by decide) w1) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_sd cpu _ 0x800027a4#64 true 32#12 2#5 8#5 (by decide) w1) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc C1
-  k_step (wp_s_sd cpu _ 0x800026e8#64 true 24#12 2#5 9#5 (by decide) w2) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_sd cpu _ 0x800027a6#64 true 24#12 2#5 9#5 (by decide) w2) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc C2
-  k_step (wp_s_sd cpu _ 0x800026ea#64 true 16#12 2#5 18#5 (by decide) w3) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_sd cpu _ 0x800027a8#64 true 16#12 2#5 18#5 (by decide) w3) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc C3
-  k_step (wp_s_sd cpu _ 0x800026ec#64 true 8#12 2#5 19#5 (by decide) w4) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_sd cpu _ 0x800027aa#64 true 8#12 2#5 19#5 (by decide) w4) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc C4
-  k_step (wp_s_addi cpu _ 0x800026ee#64 true 48#12 8#5 2#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_addi cpu _ 0x800027ac#64 true 48#12 8#5 2#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- csrr s2,sepc ; csrr s1,sstatus ; csrr a5,scause ; mv s3,a5
-  k_step (wp_s_csrr_sepc cpu _ ?hs 0x800026f0#64 false 18#5 (by decide) epc hepc) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_csrr_sepc cpu _ ?hs 0x800027ae#64 false 18#5 (by decide) epc hepc) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc Hsepc
-  k_step (wp_s_csrr_sstatus_full cpu _ ?hs 0x800026f4#64 false 9#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_csrr_sstatus_full cpu _ ?hs 0x800027b2#64 false 9#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro %v %hv Hk Hpc
   k_norm at hv
-  k_step (wp_s_csrr_scause cpu _ ?hs 0x800026f8#64 false 15#5 (by decide) sc) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_csrr_scause cpu _ ?hs 0x800027b6#64 false 15#5 (by decide) sc) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc Hscause
-  k_step (wp_s_add cpu _ 0x800026fc#64 true 19#5 0#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_add cpu _ 0x800027ba#64 true 19#5 0#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- andi a5,s1,256 ; beqz a5 : not taken, the trap came from supervisor mode
   have hv' : sstatusFull false true true v := by simpa only [hsie, hspie, hspp] using hv
   have hspp' : v &&& 256#64 = 256#64 := and_256_of_spp v (by simpa using (hv'.2.1 rfl).2)
-  k_step (wp_s_andi cpu _ 0x800026fe#64 false 256#12 15#5 9#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_andi cpu _ 0x800027bc#64 false 256#12 15#5 9#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [hspp']
   iintro Hk Hpc
-  k_step (wp_s_branch cpu _ 0x80002702#64 true 44#13 15#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
+  k_step (wp_s_branch cpu _ 0x800027c0#64 true 44#13 15#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc] with [bcond_beq_256_0]
   iintro Hk Hpc
   -- csrr a5,sstatus ; andi a5,a5,2 ; bnez a5 : not taken, interrupts are off
-  k_step (wp_s_csrr_sstatus_full cpu _ ?hs 0x80002704#64 false 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_csrr_sstatus_full cpu _ ?hs 0x800027c2#64 false 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro %v2 %hv2 Hk Hpc
   k_norm at hv2
   have hsie2 : v2 &&& 2#64 = 0#64 := and_2_of_sie0 v2 (by simpa using hv2.1)
-  k_step (wp_s_andi cpu _ 0x80002708#64 true 2#12 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_andi cpu _ 0x800027c6#64 true 2#12 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [hsie2]
   iintro Hk Hpc
-  k_step (wp_s_branch cpu _ 0x8000270a#64 true 48#13 15#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) Htext
+  k_step (wp_s_branch cpu _ 0x800027c8#64 true 48#13 15#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc] with [bcond_bne_00_kt]
   iintro Hk Hpc
   -- jal devintr
-  k_step (wp_s_jal cpu _ 0x8000270c#64 false 2096728#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_jal cpu _ 0x800027ca#64 false 2096712#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   have hdi : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hnoff' : k'.noff + 2 < 2 ^ 31) (hlocks' : k'.locks = [])
       (hK' : devintrSlots ≤ k'.avail),
-      kctx cpu k' ∗ pcIs cpu 0x80002564#64 ∗ Register.scause ↦ᵣ[cpu] sc ∗
+      kctx cpu k' ∗ pcIs cpu 0x80002612#64 ∗ Register.scause ↦ᵣ[cpu] sc ∗
       (∀ R' : RegMap, kctx cpu (k'.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
         Register.scause ↦ᵣ[cpu] sc -∗ ⌜calleeSaved k'.regs R' ∧ R' 10#5 = devintrRet sc⌝ -∗ wpLoop cpu)
       ⊢ wpLoop (GF := GF) cpu := by
@@ -211,21 +211,21 @@ theorem kerneltrap_proof (DI : DEVINTR) (MP : MYPROC) (YI : YIELD) : KERNELTRAP 
   case hlD => k_norm; exact hlocks
   case hKD => k_norm; unfold devintrSlots; omega
   iintro %R1 Hk Hpc Hscause %⟨hcs1, h10⟩
-  have hret1 : jumpPc 0x80002710#64 = 0x80002710#64 := by decide
+  have hret1 : jumpPc 0x800027ce#64 = 0x800027ce#64 := by decide
   k_norm [hret1]
   unfold calleeSaved at hcs1
   k_norm at hcs1
   obtain ⟨c1_2, c1_8, c1_9, c1_18, c1_19, c1_20, c1_21, c1_22, c1_23, c1_24, c1_25, c1_26, c1_27⟩ := hcs1
   -- beqz a0 : not taken, devintr recognized the interrupt
-  k_step (wp_s_branch cpu _ 0x80002710#64 true 54#13 10#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
+  k_step (wp_s_branch cpu _ 0x800027ce#64 true 54#13 10#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc] with [h10, bcond_beq_dev_0]
   iintro Hk Hpc
   -- li a5,2 ; beq a0,a5
-  k_step (wp_s_addi cpu _ 0x80002712#64 true 2#12 15#5 0#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_addi cpu _ 0x800027d0#64 true 2#12 15#5 0#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   by_cases hext : sc = sCause InterruptType.I_S_External
   · -- an external interrupt: straight to the tail
-    k_step (wp_s_branch cpu _ 0x80002714#64 false 84#13 10#5 15#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
+    k_step (wp_s_branch cpu _ 0x800027d2#64 false 84#13 10#5 15#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc] with [h10, devintrRet_ext sc hext, bcond_beq_12]
     iintro Hk Pc
     ihave Hk := kctx_withSpie_of cpu (k.pushed 6) _ k.spie k.spp rfl rfl $$ Hk
@@ -240,14 +240,14 @@ theorem kerneltrap_proof (DI : DEVINTR) (MP : MYPROC) (YI : YIELD) : KERNELTRAP 
       simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
       exact ⟨c1_20, c1_21, c1_22, c1_23, c1_24, c1_25, c1_26, c1_27⟩
   · -- the timer: myproc, then yield if there is a process
-    k_step (wp_s_branch cpu _ 0x80002714#64 false 84#13 10#5 15#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
+    k_step (wp_s_branch cpu _ 0x800027d2#64 false 84#13 10#5 15#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc] with [h10, devintrRet_timer sc hext, bcond_beq_22]
     iintro Hk Hpc
     -- jal myproc
-    k_step (wp_s_jal cpu _ 0x80002768#64 false 2093426#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    k_step (wp_s_jal cpu _ 0x80002826#64 false 2093410#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
     have hmp : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 10 ≤ k'.avail),
-        kctx cpu k' ∗ pcIs cpu 0x800018da#64 ∗
+        kctx cpu k' ∗ pcIs cpu 0x80001988#64 ∗
         (∀ R' : RegMap, kctx cpu (k'.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
           ⌜calleeSaved k'.regs R' ∧ R' 10#5 = k'.proc⌝ -∗ wpLoop cpu)
         ⊢ wpLoop (GF := GF) cpu := by
@@ -269,7 +269,7 @@ theorem kerneltrap_proof (DI : DEVINTR) (MP : MYPROC) (YI : YIELD) : KERNELTRAP 
     case hnM => k_norm; omega
     case hKM => k_norm; omega
     iintro %R2 Hk Hpc %⟨hcs2, h10'⟩
-    have hret2 : jumpPc 0x8000276c#64 = 0x8000276c#64 := by decide
+    have hret2 : jumpPc 0x8000282a#64 = 0x8000282a#64 := by decide
     k_norm [hret2]
     unfold calleeSaved at hcs2
     k_norm at hcs2
@@ -278,7 +278,7 @@ theorem kerneltrap_proof (DI : DEVINTR) (MP : MYPROC) (YI : YIELD) : KERNELTRAP 
     by_cases hp0 : k.proc = 0#64
     · -- no process: back to the tail
       have h10'' : R2 10#5 = 0#64 := h10'.trans hp0
-      k_step (wp_s_branch cpu _ 0x8000276c#64 true 8108#13 10#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
+      k_step (wp_s_branch cpu _ 0x8000282a#64 true 8108#13 10#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
         $$ [- $Hk $Hpc] with [h10'', bcond_beq_00_kt]
       iintro Hk Pc
       ihave Hk := kctx_withSpie_of cpu (k.pushed 6) _ k.spie k.spp rfl rfl $$ Hk
@@ -303,17 +303,17 @@ theorem kerneltrap_proof (DI : DEVINTR) (MP : MYPROC) (YI : YIELD) : KERNELTRAP 
         try simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
         exact ⟨c1_20, c1_21, c1_22, c1_23, c1_24, c1_25, c1_26, c1_27⟩
     · -- a process: yield, then the tail at whichever hart the thread resumes on
-      k_step (wp_s_branch cpu _ 0x8000276c#64 true 8108#13 10#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
+      k_step (wp_s_branch cpu _ 0x8000282a#64 true 8108#13 10#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
         $$ [- $Hk $Hpc] with [h10', bcond_beq_ne0 k.proc hp0]
       iintro Hk Hpc
-      k_step (wp_s_jal cpu _ 0x8000276e#64 false 2094990#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+      k_step (wp_s_jal cpu _ 0x8000282c#64 false 2094974#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       iintro Hk Hpc
       -- THE CLAIM names the running slot: no proc-shape premise is needed
       icases cpuClaim_proc_shape Γ cpu k.proc hp0 $$ Hclaim with ⟨%jp, %⟨hjN, hpj⟩, Hclaim⟩
       have hyi : ∀ (k' : KCtx) (hj' : jp < NPROC) (hproc' : k'.proc = procAddr jp)
           (hK' : yieldSlots ≤ k'.avail) (hsie' : k'.sie = false) (hnoff' : k'.noff = 0)
           (hlocks' : k'.locks = []) (htier' : k'.tier = KTier.kpt),
-          kctx cpu k' ∗ pcIs cpu 0x80001efc#64 ∗ procsInv Γ ∗ trapCsrs cpu ∗ cpuClaim cpu k'.proc ∗
+          kctx cpu k' ∗ pcIs cpu 0x80001faa#64 ∗ procsInv Γ ∗ trapCsrs cpu ∗ cpuClaim cpu k'.proc ∗
           intrRes cpu ∗
           wpNext true k'.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
             kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
@@ -342,16 +342,16 @@ theorem kerneltrap_proof (DI : DEVINTR) (MP : MYPROC) (YI : YIELD) : KERNELTRAP 
       · iexact Hclaim
       iapply wpNext_intro_pin
       iintro %c1 %hp1 %a %b %R3 Hk Hpc Hcsrs Hclaim Hres %hcs3
-      have hret3 : jumpPc 0x80002772#64 = 0x80002772#64 := by decide
+      have hret3 : jumpPc 0x80002830#64 = 0x80002830#64 := by decide
       k_norm [hret3]
       unfold calleeSaved at hcs3
       k_norm at hcs3
       obtain ⟨c3_2, c3_8, c3_9, c3_18, c3_19, c3_20, c3_21, c3_22, c3_23, c3_24, c3_25, c3_26, c3_27⟩ := hcs3
       icases trapCsrs_cases c1 $$ Hcsrs with ⟨%e', %sc', %tv', Hcsrs⟩
       icases trapCsrsAt_cases c1 _ _ _ $$ Hcsrs with ⟨Hsepc, Hscause, Hstval⟩
-      -- j 0x80002718
+      -- j 0x800027d6
       have hsie3 : (((k.pushed 6).withSpie a b).withRegs R3).sie = false := hsie
-      k_step (wp_s_j c1 _ 0x80002772#64 true 2097062#21) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+      k_step (wp_s_j c1 _ 0x80002830#64 true 2097062#21) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       iintro Hk Pc
       iapply (htail c1 (fun h => hp1 (Or.inr h)) a b R3 e' sc' tv' w5 v hv' ?hR2c ?hR9c ?hR18c ?hcsc)
         $$ [- $Hk $Pc $Hsepc $Hscause $Hstval $Hclaim $Hres $C0 $C1 $C2 $C3 $C4 $C5 $HΦ]

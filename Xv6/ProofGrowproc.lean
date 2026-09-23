@@ -129,13 +129,13 @@ theorem gp_priv_intro (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (v : Bit
   iframe
 
 set_option maxHeartbeats 1000000 in
-/-- The epilogue at `0x80001c58`, shared by the five endings: `a0` is
+/-- The epilogue at `0x80001d06`, shared by the five endings: `a0` is
 already the return value. -/
 theorem gp_epi (c : CPU) (kb : KCtx) (hK : 4 ≤ kb.avail) (spie spp : Bool) (R : RegMap)
     (hR2 : R 2#5 = kb.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64)
     (hcs : calleeSaved kb.regs ((((R.set 2#5 (kb.regs 2#5)).set 8#5 (kb.regs 8#5)).set 9#5
       (kb.regs 9#5)).set 18#5 (kb.regs 18#5))) :
-    kctx c (((kb.pushed 4).withSpie spie spp).withRegs R) ∗ pcIs c 0x80001c58#64 ∗
+    kctx c (((kb.pushed 4).withSpie spie spp).withRegs R) ∗ pcIs c 0x80001d06#64 ∗
     frame4s2 (kb.regs 2#5) (kb.regs 1#5) (kb.regs 8#5) (kb.regs 9#5) (kb.regs 18#5) ∗
     wpNext kb.sie kb.proc c (fun cpu' => iprop(∀ R'' : RegMap,
       kctx cpu' ((kb.withSpie spie spp).withRegs R'') -∗ pcIs cpu' (jumpPc (kb.regs 1#5)) -∗
@@ -145,7 +145,7 @@ theorem gp_epi (c : CPU) (kb : KCtx) (hK : 4 ≤ kb.avail) (spie spp : Bool) (R 
   iintro ⟨Hk, Hpc, Hframe, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
   have hepi := wp_epilogue4s2_gen (GF := GF) (lent := false) c (kb.withSpie spie spp)
-    0x80001c58#64 (by exact hK) R (by simp only [KCtx.withSpie_regs]; exact hR2)
+    0x80001d06#64 (by exact hK) R (by simp only [KCtx.withSpie_regs]; exact hR2)
     (kb.regs 1#5) (kb.regs 8#5) (kb.regs 9#5) (kb.regs 18#5)
   simp only [KCtx.withSpie_regs, KCtx.withSpie_sie, KCtx.withSpie_proc] at hepi
   iapply hepi $$ [- $Hk $Hpc $Hframe]
@@ -175,7 +175,7 @@ theorem gp_store (c : CPU) (kb : KCtx) (hK : 4 ≤ kb.avail) (spie spp : Bool) (
     (h18 : R 18#5 = pa) (h11 : R 11#5 = v)
     (hcs : calleeSaved kb.regs ((((R.set 2#5 (kb.regs 2#5)).set 8#5 (kb.regs 8#5)).set 9#5
       (kb.regs 9#5)).set 18#5 (kb.regs 18#5))) :
-    kctx c (((kb.pushed 4).withSpie spie spp).withRegs R) ∗ pcIs c 0x80001c52#64 ∗
+    kctx c (((kb.pushed 4).withSpie spie spp).withRegs R) ∗ pcIs c 0x80001d00#64 ∗
     frame4s2 (kb.regs 2#5) (kb.regs 1#5) (kb.regs 8#5) (kb.regs 9#5) (kb.regs 18#5) ∗
     wordPointsTo (pSz pa) 8 (DFrac.own 1) old ∗
     wpNext kb.sie kb.proc c (fun cpu' => iprop(∀ R'' : RegMap,
@@ -185,11 +185,11 @@ theorem gp_store (c : CPU) (kb : KCtx) (hK : 4 ≤ kb.avail) (spie spp : Bool) (
     ⊢ wpLoop (GF := GF) c := by
   iintro ⟨Hk, Hpc, Hframe, Hsz, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
-  k_step_gen (wp_s_sd c _ 0x80001c52#64 false 72#12 18#5 11#5 (by decide) old)
+  k_step_gen (wp_s_sd c _ 0x80001d00#64 false 72#12 18#5 11#5 (by decide) old)
     from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
     with [KCtx.rget_eq, h18, h11, gp_sz_off] next c1 hp1
   iintro Hk Hpc Hsz
-  k_step_gen (wp_s_addi c1 _ 0x80001c56#64 true 0#12 10#5 0#5 (by decide))
+  k_step_gen (wp_s_addi c1 _ 0x80001d04#64 true 0#12 10#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] next c2 hp2
   iintro Hk Hpc
   have hpin : kb.sie = false ∨ kb.proc = 0#64 → c2 = c := fun h => (hp2 h).trans (hp1 h)
@@ -338,11 +338,11 @@ theorem gp_ok_shrink (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : BitVec 64
 
 /-! ## `growproc` -/
 
-theorem gp_ret_c2e : jumpPc 0x80001c2e#64 = 0x80001c2e#64 := by
+theorem gp_ret_c2e : jumpPc 0x80001cdc#64 = 0x80001cdc#64 := by
   simp only [jumpPc, BitVec.reduceAnd]
-theorem gp_ret_c4e : jumpPc 0x80001c4e#64 = 0x80001c4e#64 := by
+theorem gp_ret_c4e : jumpPc 0x80001cfc#64 = 0x80001cfc#64 := by
   simp only [jumpPc, BitVec.reduceAnd]
-theorem gp_ret_c72 : jumpPc 0x80001c72#64 = 0x80001c72#64 := by
+theorem gp_ret_c72 : jumpPc 0x80001d20#64 = 0x80001d20#64 := by
   simp only [jumpPc, BitVec.reduceAnd]
 theorem gp_slli_13 : (0x1FFFFFF#64) <<< (13 : Nat) = 0x3FFFFFE000#64 := by decide
 theorem gp_minus_one : BitVec.signExtend 64 (4095#12) = -1#64 := by decide
@@ -360,7 +360,7 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
   have hK4 : 4 ≤ k.avail := by unfold growprocSlots at hK; omega
   -- the callees, as rules
   have hmp : ∀ (cc : CPU) (k' : KCtx) (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 10 ≤ k'.avail),
-      kctx cc k' ∗ pcIs cc 0x800018da#64 ∗
+      kctx cc k' ∗ pcIs cc 0x80001988#64 ∗
       wpNext k'.sie k'.proc cc (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
         ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
         kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
@@ -377,7 +377,7 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
       (hnew' : (k'.regs 12#5).toNat ≤ uvmMaxsz) (hperm' : k'.regs 13#5 &&& ~~~0x3EE#64 = 0#64)
       (hfree' : ∀ i, i < uvmaNp (k'.regs 11#5) (k'.regs 12#5) →
         Iris.Std.PartialMap.get? P.um (uvmaVpn0 (k'.regs 11#5) + i) = none),
-      kctx cc k' ∗ pcIs cc 0x80001280#64 ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
+      kctx cc k' ∗ pcIs cc 0x8000132e#64 ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
       kallocAvail γk none ∗ procPtAt P M' ∗
       wpNext k'.sie k'.proc cc (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
         ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
@@ -399,7 +399,7 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
   have hud : ∀ (cc : CPU) (k' : KCtx) (P : UPtd) (M' : Nat → List (BitVec 8))
       (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : uvmdeallocSlots ≤ k'.avail) (hlk' : "kmem" ∉ k'.locks)
       (hroot' : k'.regs 10#5 = pageAddr P.root) (hold' : (k'.regs 11#5).toNat ≤ uvmMaxsz),
-      kctx cc k' ∗ pcIs cc 0x8000123c#64 ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
+      kctx cc k' ∗ pcIs cc 0x800012ea#64 ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
       kallocAvail γk none ∗ procPtAt P M' ∗
       wpNext k'.sie k'.proc cc (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
         ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
@@ -415,7 +415,7 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
     simp only [uvmdeallocAddr, KernelSyms.«uvmdealloc»] at h
     exact h
   -- the prologue
-  iapply (wp_prologue4s2_gen cpu k 0x80001c1c#64 hK4)
+  iapply (wp_prologue4s2_gen cpu k 0x80001cca#64 hK4)
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm_g
   iframe
@@ -423,11 +423,11 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
   iapply wpNext_intro_pin
   iintro %c1 %hp1 Hk Hpc Hframe
   -- c.mv s1,a0
-  k_step_gen (wp_s_add c1 _ 0x80001c28#64 true 9#5 0#5 10#5 (by decide))
+  k_step_gen (wp_s_add c1 _ 0x80001cd6#64 true 9#5 0#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c2 hp2
   iintro Hk Hpc
   -- jal myproc
-  k_step_gen (wp_s_jal c2 _ 0x80001c2a#64 false 2096304#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c2 _ 0x80001cd8#64 false 2096304#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
   iintro Hk Hpc
   iapply (hmp c3 _ ?hn1 ?hK1) $$ [- $Hk $Hpc]
@@ -444,11 +444,11 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
   obtain ⟨d2, d8, d9, d18, d19, d20, d21, d22, d23, d24, d25, d26, d27⟩ := hcs1
   rw [hproc] at h10_1
   -- c.mv s2,a0
-  k_step_gen (wp_s_add c4 _ 0x80001c2e#64 true 18#5 0#5 10#5 (by decide))
+  k_step_gen (wp_s_add c4 _ 0x80001cdc#64 true 18#5 0#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_eq, h10_1] next c5 hp5
   iintro Hk Hpc
   -- c.ld a1,72(a0)
-  k_step_gen (wp_s_ld c5 _ 0x80001c30#64 true 72#12 11#5 10#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c5 _ 0x80001cde#64 true 72#12 11#5 10#5 (by decide) (by decide)
       (DFrac.own 1) V.sz)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.rget_eq, h10_1, gp_sz_off] next c6 hp6
@@ -462,36 +462,36 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
       rw [BitVec.toNat_add, Nat.mod_eq_of_lt (by unfold uvmMaxsz at hszb; omega)]
     have hnint : (k.regs 10#5).toInt.toNat = (k.regs 10#5).toNat := by
       have h2 := BitVec.toInt_eq_toNat_cond (k.regs 10#5); omega
-    k_step_gen (wp_s_branch0 c6 _ 0x80001c32#64 false 50#13 9#5 (by decide) bop.BGE)
+    k_step_gen (wp_s_branch0 c6 _ 0x80001ce0#64 false 50#13 9#5 (by decide) bop.BGE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [KCtx.rget_eq, d9, bge0_neg _ hnpos] next c7 hp7
     iintro Hk Hpc
     -- add a2,s1,a1 ; a5 = TRAPFRAME
-    k_step_gen (wp_s_add c7 _ 0x80001c36#64 false 12#5 9#5 11#5 (by decide))
+    k_step_gen (wp_s_add c7 _ 0x80001ce4#64 false 12#5 9#5 11#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_eq, d9] next c8 hp8
     iintro Hk Hpc
-    k_step_gen (wp_s_lui c8 _ 0x80001c3a#64 false 8192#20 15#5 (by decide))
+    k_step_gen (wp_s_lui c8 _ 0x80001ce8#64 false 8192#20 15#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [gp_lui_2000] next c9 hp9
     iintro Hk Hpc
-    k_step_gen (wp_s_addi c9 _ 0x80001c3e#64 true 4095#12 15#5 15#5 (by decide))
+    k_step_gen (wp_s_addi c9 _ 0x80001cec#64 true 4095#12 15#5 15#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c10 hp10
     iintro Hk Hpc
-    k_step_gen (wp_s_slli c10 _ 0x80001c40#64 true 13#6 15#5 15#5 (by decide))
+    k_step_gen (wp_s_slli c10 _ 0x80001cee#64 true 13#6 15#5 15#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [gp_slli_13] next c11 hp11
     iintro Hk Hpc
     by_cases hbig : uvmMaxsz < (k.regs 10#5 + V.sz).toNat
     case pos =>
       -- sz + n > TRAPFRAME: -1, the space untouched
-      k_step_gen (wp_s_branch c11 _ 0x80001c42#64 false 52#13 15#5 12#5 (by decide) bop.BLTU)
+      k_step_gen (wp_s_branch c11 _ 0x80001cf0#64 false 52#13 15#5 12#5 (by decide) bop.BLTU)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [KCtx.rget_eq, d9,
           bltu_pos (0x3FFFFFE000#64) (k.regs 10#5 + V.sz)
             (by rw [gp_uvmMaxsz_toNat]; exact hbig)] next c12 hp12
       iintro Hk Hpc
-      k_step_gen (wp_s_addi c12 _ 0x80001c76#64 true 4095#12 10#5 0#5 (by decide))
+      k_step_gen (wp_s_addi c12 _ 0x80001d24#64 true 4095#12 10#5 0#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c13 hp13
       iintro Hk Hpc
-      k_step_gen (wp_s_j c13 _ 0x80001c78#64 true 2097120#21)
+      k_step_gen (wp_s_j c13 _ 0x80001d26#64 true 2097120#21)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c14 hp14
       iintro Hk Hpc
       have hpinA : k.sie = false ∨ k.proc = 0#64 → c14 = cpu := fun h =>
@@ -529,21 +529,21 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
             | exact d24 | exact d25 | exact d26 | exact d27
     case neg =>
       -- uvmalloc(p->pagetable, sz, sz + n, PTE_W)
-      k_step_gen (wp_s_branch c11 _ 0x80001c42#64 false 52#13 15#5 12#5 (by decide) bop.BLTU)
+      k_step_gen (wp_s_branch c11 _ 0x80001cf0#64 false 52#13 15#5 12#5 (by decide) bop.BLTU)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [KCtx.rget_eq, d9,
           bltu_neg (0x3FFFFFE000#64) (k.regs 10#5 + V.sz)
             (by rw [gp_uvmMaxsz_toNat]; exact hbig)] next c12 hp12
       iintro Hk Hpc
-      k_step_gen (wp_s_addi c12 _ 0x80001c46#64 true 4#12 13#5 0#5 (by decide))
+      k_step_gen (wp_s_addi c12 _ 0x80001cf4#64 true 4#12 13#5 0#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c13 hp13
       iintro Hk Hpc
-      k_step_gen (wp_s_ld c13 _ 0x80001c48#64 true 80#12 10#5 10#5 (by decide) (by decide)
+      k_step_gen (wp_s_ld c13 _ 0x80001cf6#64 true 80#12 10#5 10#5 (by decide) (by decide)
           (DFrac.own 1) V.pagetable)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [KCtx.rget_eq, h10_1, gp_pt_off] next c14 hp14
       iintro Hk Hpc Hpt
-      k_step_gen (wp_s_jal c14 _ 0x80001c4a#64 false 2094646#21 1#5 (by decide))
+      k_step_gen (wp_s_jal c14 _ 0x80001cf8#64 false 2094646#21 1#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c15 hp15
       iintro Hk Hpc
       iapply (hua c15 _ V.upt M ?hnU ?hKU ?hlU ?hrU ?hoU ?hwU ?hpU ?hfU) $$ [- $Hk $Hpc]
@@ -572,7 +572,7 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
         d26, d27, h10_1] at hcs2
       obtain ⟨e2, e8, e9, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩ := hcs2
       -- c.mv a1,a0
-      k_step_gen (wp_s_add c16 _ 0x80001c4e#64 true 11#5 0#5 10#5 (by decide))
+      k_step_gen (wp_s_add c16 _ 0x80001cfc#64 true 11#5 0#5 10#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c17 hp17
       iintro Hk Hpc
       have hpinB : k.sie = false ∨ k.proc = 0#64 → c17 = cpu := fun h =>
@@ -582,14 +582,14 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
           ((hp2 h).trans (hp1 h))))))))))))))))
       icases Hres with ⟨⟨%hz0, HP⟩ | ⟨%P', %M', %hokr, HP⟩⟩
       · -- out of memory: -1
-        k_step_gen (wp_s_branch c17 _ 0x80001c50#64 true 42#13 10#5 0#5 (by decide) bop.BEQ)
+        k_step_gen (wp_s_branch c17 _ 0x80001cfe#64 true 42#13 10#5 0#5 (by decide) bop.BEQ)
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
           with [KCtx.rget_eq, hz0, beq_pos (0#64) rfl] next c18 hp18
         iintro Hk Hpc
-        k_step_gen (wp_s_addi c18 _ 0x80001c7a#64 true 4095#12 10#5 0#5 (by decide))
+        k_step_gen (wp_s_addi c18 _ 0x80001d28#64 true 4095#12 10#5 0#5 (by decide))
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c19 hp19
         iintro Hk Hpc
-        k_step_gen (wp_s_j c19 _ 0x80001c7c#64 true 2097116#21)
+        k_step_gen (wp_s_j c19 _ 0x80001d2a#64 true 2097116#21)
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c20 hp20
         iintro Hk Hpc
         have hpinC : k.sie = false ∨ k.proc = 0#64 → c20 = cpu := fun h =>
@@ -630,7 +630,7 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
           intro hc
           have : (k.regs 10#5 + V.sz).toNat = 0 := by rw [hc]; rfl
           omega
-        k_step_gen (wp_s_branch c17 _ 0x80001c50#64 true 42#13 10#5 0#5 (by decide) bop.BEQ)
+        k_step_gen (wp_s_branch c17 _ 0x80001cfe#64 true 42#13 10#5 0#5 (by decide) bop.BEQ)
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
           with [KCtx.rget_eq, hr10, beq_neg (k.regs 10#5 + V.sz) hne0] next c18 hp18
         iintro Hk Hpc
@@ -669,14 +669,14 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
               | exact e24 | exact e25 | exact e26 | exact e27
   case neg =>
     -- n <= 0: bgez s1
-    k_step_gen (wp_s_branch0 c6 _ 0x80001c32#64 false 50#13 9#5 (by decide) bop.BGE)
+    k_step_gen (wp_s_branch0 c6 _ 0x80001ce0#64 false 50#13 9#5 (by decide) bop.BGE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [KCtx.rget_eq, d9, bge0_pos _ hnpos] next c7 hp7
     iintro Hk Hpc
     by_cases hnneg : (k.regs 10#5).toInt < 0
     case neg =>
       -- n = 0: p->sz = sz, return 0
-      k_step_gen (wp_s_branch c7 _ 0x80001c64#64 false 8174#13 9#5 0#5 (by decide) bop.BGE)
+      k_step_gen (wp_s_branch c7 _ 0x80001d12#64 false 8174#13 9#5 0#5 (by decide) bop.BGE)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [KCtx.rget_eq, d9, bge0'_pos _ hnneg] next c8 hp8
       iintro Hk Hpc
@@ -713,19 +713,19 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
             | exact d24 | exact d25 | exact d26 | exact d27
     case pos =>
       -- n < 0: uvmdealloc(p->pagetable, sz, sz + n)
-      k_step_gen (wp_s_branch c7 _ 0x80001c64#64 false 8174#13 9#5 0#5 (by decide) bop.BGE)
+      k_step_gen (wp_s_branch c7 _ 0x80001d12#64 false 8174#13 9#5 0#5 (by decide) bop.BGE)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [KCtx.rget_eq, d9, bge0'_neg _ hnneg] next c8 hp8
       iintro Hk Hpc
-      k_step_gen (wp_s_add c8 _ 0x80001c68#64 false 12#5 9#5 11#5 (by decide))
+      k_step_gen (wp_s_add c8 _ 0x80001d16#64 false 12#5 9#5 11#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_eq, d9] next c9 hp9
       iintro Hk Hpc
-      k_step_gen (wp_s_ld c9 _ 0x80001c6c#64 true 80#12 10#5 10#5 (by decide) (by decide)
+      k_step_gen (wp_s_ld c9 _ 0x80001d1a#64 true 80#12 10#5 10#5 (by decide) (by decide)
           (DFrac.own 1) V.pagetable)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [KCtx.rget_eq, h10_1, gp_pt_off] next c10 hp10
       iintro Hk Hpc Hpt
-      k_step_gen (wp_s_jal c10 _ 0x80001c6e#64 false 2094542#21 1#5 (by decide))
+      k_step_gen (wp_s_jal c10 _ 0x80001d1c#64 false 2094542#21 1#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c11 hp11
       iintro Hk Hpc
       iapply (hud c11 _ V.upt M ?hnD ?hKD ?hlD ?hrD ?hoD) $$ [- $Hk $Hpc]
@@ -749,11 +749,11 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
         BitVec.reduceEq, ite_true, ite_false, d2, d8, d9, d18, d19, d20, d21, d22, d23, d24, d25,
         d26, d27, h10_1] at hcs2 hr10
       obtain ⟨e2, e8, e9, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩ := hcs2
-      -- c.mv a1,a0 ; j 0x80001c52
-      k_step_gen (wp_s_add c12 _ 0x80001c72#64 true 11#5 0#5 10#5 (by decide))
+      -- c.mv a1,a0 ; j 0x80001d00
+      k_step_gen (wp_s_add c12 _ 0x80001d20#64 true 11#5 0#5 10#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c13 hp13
       iintro Hk Hpc
-      k_step_gen (wp_s_j c13 _ 0x80001c74#64 true 2097118#21)
+      k_step_gen (wp_s_j c13 _ 0x80001d22#64 true 2097118#21)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c14 hp14
       iintro Hk Hpc
       have hpinF : k.sie = false ∨ k.proc = 0#64 → c14 = cpu := fun h =>

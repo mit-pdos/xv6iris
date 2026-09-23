@@ -126,7 +126,7 @@ theorem co_sext_0 : BitVec.signExtend 64 0#12 = 0#64 := by decide
 theorem co_walkaddr_call (WA : WALKADDR) [Xv6G GF] [CurCtx]
     (c : CPU) (k' : KCtx) (dq : DFrac) (t : PTree) (L : RegMapF (BitVec 64))
     (hK' : 10 ≤ k'.avail) (hroot' : k'.regs 10#5 = pageAddr t.base) (hrep' : ptRep t L) :
-    kctx c k' ∗ pcIs c 0x80000faa#64 ∗ ptreeOwn 2 dq t ∗
+    kctx c k' ∗ pcIs c 0x80001048#64 ∗ ptreeOwn 2 dq t ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ R' : RegMap,
       kctx cpu' (k'.withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ptreeOwn 2 dq t -∗
       ⌜calleeSaved k'.regs R' ∧ walkaddrRet L (k'.regs 11#5) (R' 10#5)⌝ -∗ wpLoop cpu'))
@@ -140,7 +140,7 @@ theorem co_vmfault_call (VF : VMFAULT) [Xv6G GF] [CurCtx]
     (c : CPU) (k' : KCtx) (γl : GName) (γk : KmemNames) (P : UPtd) (M : Nat → List (BitVec 8))
     (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : vmfaultSlots ≤ k'.avail) (hlk' : "kmem" ∉ k'.locks)
     (hroot' : k'.regs 10#5 = pageAddr P.root) (hsz' : (k'.regs 11#5).toNat ≤ 2 ^ 38) :
-    kctx c k' ∗ pcIs c 0x80001498#64 ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
+    kctx c k' ∗ pcIs c 0x80001546#64 ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
     kallocAvail γk none ∗ procPtAt P M ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
@@ -162,7 +162,7 @@ theorem co_memmove_call (MM : MEMMOVE) [CurCtx]
     (c : CPU) (k' : KCtx) (cs olds : List (BitVec 8)) (n : Nat) (dqs : DFrac)
     (hK' : 2 ≤ k'.avail) (hn : k'.regs 12#5 = BitVec.ofNat 64 n) (hn32 : n < 2 ^ 32)
     (hls : cs.length = n) (hld : olds.length = n) :
-    kctx c k' ∗ pcIs c 0x80000cda#64 ∗
+    kctx c k' ∗ pcIs c 0x80000d78#64 ∗
     byteBuf (k'.regs 11#5) dqs cs ∗ byteBuf (k'.regs 10#5) (DFrac.own 1) olds ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ R' : RegMap,
       kctx cpu' (k'.withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗

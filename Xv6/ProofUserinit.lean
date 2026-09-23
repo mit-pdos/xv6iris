@@ -108,15 +108,15 @@ end
 
 /-! ## Address folds and small facts -/
 
-/-- `&initproc` from `auipc a5,0x8 ; sd a0,1680(a5)` at `0x80001bf0`. -/
+/-- `&initproc` from `auipc a5,0x8 ; sd a0,1680(a5)` at `0x80001c9e`. -/
 theorem ui_initproc_addr :
-    (0x80001bf0#64 : BitVec 64) + (BitVec.signExtend 64 (8#20 ++ (0#12 : BitVec 12)) + 1680#64)
+    (0x80001c9e#64 : BitVec 64) + (BitVec.signExtend 64 (8#20 ++ 0#12) + 1698#64)
       = initprocAddr := by decide
 
 /-- The link registers of the three calls. -/
-theorem ui_ret_bee : jumpPc 0x80001bee#64 = 0x80001bee#64 := by decide
-theorem ui_ret_c04 : jumpPc 0x80001c04#64 = 0x80001c04#64 := by decide
-theorem ui_ret_c12 : jumpPc 0x80001c12#64 = 0x80001c12#64 := by decide
+theorem ui_ret_bee : jumpPc 0x80001c9c#64 = 0x80001c9c#64 := by decide
+theorem ui_ret_c04 : jumpPc 0x80001cb2#64 = 0x80001cb2#64 := by decide
+theorem ui_ret_c12 : jumpPc 0x80001cc0#64 = 0x80001cc0#64 := by decide
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
@@ -164,13 +164,13 @@ section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
 
 set_option maxHeartbeats 1000000 in
-/-- `allocproc`'s contract at `0x80001ae0`. -/
+/-- `allocproc`'s contract at `0x80001b8e`. -/
 theorem ui_allocproc (AP : ALLOCPROC) (Γ : SchedNames) (c : CPU) (k' : KCtx)
     (γl γp : GName) (γk : KmemNames) (on pav : Option Nat)
     (hnoff : k'.noff + 2 < 2 ^ 31) (hK : allocprocSlots ≤ k'.avail)
     (hlk : "kmem" ∉ k'.locks) (hlp : "nextpid" ∉ k'.locks) (hlq : "proc" ∉ k'.locks)
     (htier : k'.tier = KTier.kpt) :
-    kctx c k' ∗ pcIs c 0x80001ae0#64 ∗ procsInv Γ ∗
+    kctx c k' ∗ pcIs c 0x80001b8e#64 ∗ procsInv Γ ∗
     isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ isLock γp pidLockAddr "nextpid" pidLockPay ∗
     kallocAvail γk on ∗ procsAvail Γ pav ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
@@ -204,13 +204,13 @@ theorem ui_nbcall (entry pcnum : BitVec 64) (heq : entry = pcnum) (FD : FsEntryN
   exact h
 
 set_option maxHeartbeats 1000000 in
-/-- `release`'s contract at `0x80000c42`, for `"proc"` at an explicit address. -/
+/-- `release`'s contract at `0x80000ce0`, for `"proc"` at an explicit address. -/
 theorem ui_release (RE : RELEASE) (c : CPU) (k' : KCtx) (γ : GName) (lk : BitVec 64)
     (haddr : k'.regs 10#5 = lk) (Rp : CtxId → IProp GF) [CtxMorph Rp]
     (hsie' : k'.sie = false) (hnoff' : 1 ≤ k'.noff) (hK' : 10 ≤ k'.avail)
     (reen : Bool) (hreen : reen = (decide (k'.noff = 1) && k'.intena))
     (hon : reen = true → k'.tier = .kpt ∧ trapRes true + 6 ≤ k'.avail) :
-    kctx c k' ∗ pcIs c 0x80000c42#64 ∗ isLock γ lk "proc" Rp ∗ locked γ c ∗ Rp curCtx ∗
+    kctx c k' ∗ pcIs c 0x80000ce0#64 ∗ isLock γ lk "proc" Rp ∗ locked γ c ∗ Rp curCtx ∗
     popArm c k' reen ∗
     wpNext (k'.popExit reen).sie k'.proc c (fun cpu' => iprop(∀ R' : RegMap,
       kctx cpu' (((k'.popExit reen).withRegs R').withLocks (k'.locks.filter (fun x => x ≠ "proc"))) -∗
@@ -234,7 +234,7 @@ theorem ui_filter_one : (["proc"] : List String).filter (fun x => x ≠ "proc") 
   simp
 
 
-/-! ## The publish, from `0x80001c04` -/
+/-! ## The publish, from `0x80001cb2` -/
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
@@ -251,12 +251,12 @@ theorem ui_finish [X : CurCtx] (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc :=
     (hs1 : kf.regs 9#5 = procAddr j)
     (hsie : kf.sie = false) (hnoff : kf.noff = 1) (hintena : kf.intena = false)
     (hlocks : kf.locks = ["proc"]) (htier : kf.tier = KTier.kpt) (hK : 10 ≤ kf.avail) :
-    kctx cpu kf ∗ pcIs cpu 0x80001c04#64 ∗ procsInv Γ ∗
+    kctx cpu kf ∗ pcIs cpu 0x80001cb2#64 ∗ procsInv Γ ∗
     procHeld Γ cpu j USED ch ∗ hartAtAny Γ (procAddr j) ∗ slotUsed Γ (procAddr j) ∗
     procPriv (procAddr j) pid V M ∗ stackOwn (V.kstack + 4096#64) 512 ∗
     (∀ R5 : RegMap,
       kctx cpu ((kf.popOff.withRegs R5).withLocks (kf.locks.filter (fun x => x ≠ "proc"))) -∗
-      pcIs cpu 0x80001c12#64 -∗ ⌜calleeSaved kf.regs R5⌝ -∗ wpLoop cpu)
+      pcIs cpu 0x80001cc0#64 -∗ ⌜calleeSaved kf.regs R5⌝ -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨ξ0, t0⟩ := X
   subst hct
@@ -270,7 +270,7 @@ theorem ui_finish [X : CurCtx] (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc :=
       wordPointsTo (procAddr j + 336#64) 8 (DFrac.own 1) V.cwd
       from by unfold pCwd; iintro H; iexact H) $$ Hcwd
   -- sd a0,336(s1) : p->cwd = namei("/")
-  k_step (wp_s_sd cpu _ 0x80001c04#64 false 336#12 9#5 10#5 (by decide) V.cwd)
+  k_step (wp_s_sd cpu _ 0x80001cb2#64 false 336#12 9#5 10#5 (by decide) V.cwd)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_eq, KCtx.setReg_eq_withRegs, hs1]
   iintro Hk Hpc Hcwd
   ihave Hcwd := (show wordPointsTo (GF := GF) (procAddr j + 336#64) 8 (DFrac.own 1) (kf.regs 10#5) ⊢
@@ -284,11 +284,11 @@ theorem ui_finish [X : CurCtx] (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc :=
       wordPointsTo (procAddr j + 24#64) 4 (DFrac.own 1) USED
       from by unfold pState; iintro H; iexact H) $$ HstateW
   -- c.li a5,3
-  k_step (wp_s_addi cpu _ 0x80001c08#64 true 3#12 15#5 0#5 (by decide))
+  k_step (wp_s_addi cpu _ 0x80001cb6#64 true 3#12 15#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_eq, KCtx.setReg_eq_withRegs, hs1]
   iintro Hk Hpc
   -- c.sw a5,24(s1) : p->state = RUNNABLE
-  k_step (wp_s_sw cpu _ 0x80001c0a#64 true 24#12 9#5 15#5 (by decide) USED)
+  k_step (wp_s_sw cpu _ 0x80001cb8#64 true 24#12 9#5 15#5 (by decide) USED)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_eq, KCtx.setReg_eq_withRegs, hs1]
   iintro Hk Hpc HstateW
   ihave HstateW := (show wordPointsTo (GF := GF) (procAddr j + 24#64) 4 (DFrac.own 1) (3#32) ⊢
@@ -308,11 +308,11 @@ theorem ui_finish [X : CurCtx] (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc :=
     iframe HstateW Hpsl Hchan Hrest Hslots
   ihave Hpay := (show procLockResAt (GF := GF) Γ ξ0 (procAddr j) ⊢ procLockPay Γ j ξ0
     from by unfold procLockPay; iintro H; iexact H) $$ Hpay
-  -- c.mv a0,s1 ; jal release (0x80001c0e -> 0x80000c42), ra := 0x80001c12
-  k_step (wp_s_add cpu _ 0x80001c0c#64 true 10#5 0#5 9#5 (by decide))
+  -- c.mv a0,s1 ; jal release (0x80001cbc -> 0x80000ce0), ra := 0x80001cc0
+  k_step (wp_s_add cpu _ 0x80001cba#64 true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_eq, KCtx.setReg_eq_withRegs, hs1]
   iintro Hk Hpc
-  k_step (wp_s_jal cpu _ 0x80001c0e#64 false 2093108#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ 0x80001cbc#64 false 2093092#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_eq, KCtx.setReg_eq_withRegs, hs1]
   iintro Hk Hpc
   iapply (ui_release RE cpu _ (Γ.lock j) (procAddr j) ?hRa (procLockPay Γ j)
@@ -339,7 +339,7 @@ theorem ui_finish [X : CurCtx] (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc :=
 
 end
 
-/-! ## From `0x80001bee`: `initproc = p` and `namei("/")` -/
+/-! ## From `0x80001c9c`: `initproc = p` and `namei("/")` -/
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
@@ -359,7 +359,7 @@ theorem ui_calleeSaved_trans {R R' R'' : RegMap} (h1 : calleeSaved R R') (h2 : c
     h2.2.2.2.2.2.2.2.2.2.2.2.2.trans h1.2.2.2.2.2.2.2.2.2.2.2.2⟩
 
 set_option maxHeartbeats 2000000 in
-/-- **From `0x80001bee`**: `s1 = p`, `initproc = p` (published), `a0 = "/"`,
+/-- **From `0x80001c9c`**: `s1 = p`, `initproc = p` (published), `a0 = "/"`,
 `namei`, then `ui_finish`. -/
 theorem ui_publish [X : CurCtx] (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     [FsEnv] [ForkretIs] (cpu : CPU) (kb : KCtx) (j : Nat) (ch : BitVec 64) (pid : BitVec 32)
@@ -369,13 +369,13 @@ theorem ui_publish [X : CurCtx] (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc :
     (ha0 : kb.regs 10#5 = procAddr j)
     (hsie : kb.sie = false) (hnoff : kb.noff = 1) (hintena : kb.intena = false)
     (hlocks : kb.locks = ["proc"]) (htier : kb.tier = KTier.kpt) (hK : fsSlots ≤ kb.avail) :
-    kctx cpu kb ∗ pcIs cpu 0x80001bee#64 ∗ procsInv Γ ∗
+    kctx cpu kb ∗ pcIs cpu 0x80001c9c#64 ∗ procsInv Γ ∗
     (∃ w : BitVec 64, wordPointsTo initprocAddr 8 (DFrac.own 1) w) ∗
     procHeld Γ cpu j USED ch ∗ hartAtAny Γ (procAddr j) ∗ slotUsed Γ (procAddr j) ∗
     procPriv (procAddr j) pid V M ∗ stackOwn (V.kstack + 4096#64) 512 ∗
     (∀ R5 : RegMap,
       kctx cpu ((kb.popOff.withRegs R5).withLocks (kb.locks.filter (fun x => x ≠ "proc"))) -∗
-      pcIs cpu 0x80001c12#64 -∗ ⌜calleeSaved (kb.regs.set 9#5 (procAddr j)) R5⌝ -∗
+      pcIs cpu 0x80001cc0#64 -∗ ⌜calleeSaved (kb.regs.set 9#5 (procAddr j)) R5⌝ -∗
       initprocIs (procAddr j) -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨ξ0, t0⟩ := X
@@ -384,17 +384,17 @@ theorem ui_publish [X : CurCtx] (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc :
   iintro ⟨Hk, Hpc, #Hpinv, ⟨%w0, Hinit⟩, Hheld, Hhart, #Hused, Hpriv, Hstack, Hcont⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- c.mv s1,a0 : s1 = p
-  k_step (wp_s_add cpu _ 0x80001bee#64 true 9#5 0#5 10#5 (by decide))
+  k_step (wp_s_add cpu _ 0x80001c9c#64 true 9#5 0#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.rget_eq, KCtx.setReg_eq_withRegs, ha0]
   iintro Hk Hpc
   -- auipc a5,0x8
-  k_step (wp_s_auipc cpu _ 0x80001bf0#64 false 8#20 15#5 (by decide))
+  k_step (wp_s_auipc cpu _ 0x80001c9e#64 false 8#20 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.rget_eq, KCtx.setReg_eq_withRegs, ha0]
   iintro Hk Hpc
   -- sd a0,1680(a5) : initproc = p
-  k_step (wp_s_sd cpu _ 0x80001bf4#64 false 1680#12 15#5 10#5 (by decide) w0)
+  k_step (wp_s_sd cpu _ 0x80001ca2#64 false 1698#12 15#5 10#5 (by decide) w0)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.rget_eq, KCtx.setReg_eq_withRegs, ha0, ui_initproc_addr]
   iintro Hk Hpc Hinit
@@ -403,20 +403,20 @@ theorem ui_publish [X : CurCtx] (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc :
   imod (initprocIs_publish (procAddr j)) $$ Hinit with #Hinitp
   imodintro
   -- auipc a0,0x5 ; addi a0,a0,1432 : a0 = "/"
-  k_step (wp_s_auipc cpu _ 0x80001bf8#64 false 5#20 10#5 (by decide))
+  k_step (wp_s_auipc cpu _ 0x80001ca6#64 false 5#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.rget_eq, KCtx.setReg_eq_withRegs]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ 0x80001bfc#64 false 1432#12 10#5 10#5 (by decide))
+  k_step (wp_s_addi cpu _ 0x80001caa#64 false 1266#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.rget_eq, KCtx.setReg_eq_withRegs]
   iintro Hk Hpc
-  -- jal namei (0x80001c00 -> 0x80003ac6), ra := 0x80001c04
-  k_step (wp_s_jal cpu _ 0x80001c00#64 false 7878#21 1#5 (by decide))
+  -- jal namei (0x80001cae -> 0x80003b84), ra := 0x80001cb2
+  k_step (wp_s_jal cpu _ 0x80001cae#64 false 7894#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.rget_eq, KCtx.setReg_eq_withRegs]
   iintro Hk Hpc
-  iapply (ui_nbcall nameiAddr 0x80003ac6#64 (by decide) FsEnv.nameiBoot Γ cpu _
+  iapply (ui_nbcall nameiAddr 0x80003b84#64 (by decide) FsEnv.nameiBoot Γ cpu _
       ?hKn ?hnn ?htn) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm [KCtx.setReg_eq_withRegs]
@@ -510,7 +510,7 @@ theorem userinit_proof (AP : ALLOCPROC) (RE : RELEASE) : USERINIT :=
     have hh := hK; unfold userinitSlots fsSlots at hh; omega
   have hK4 : 4 ≤ k.avail := by omega
   -- the prologue
-  iapply (wp_prologue4s1_gen cpu k 0x80001be0#64 hK4)
+  iapply (wp_prologue4s1_gen cpu k 0x80001c8e#64 hK4)
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm
   iframe
@@ -518,8 +518,8 @@ theorem userinit_proof (AP : ALLOCPROC) (RE : RELEASE) : USERINIT :=
   k_norm
   iapply wpNext_off_intro
   iintro Hk Hpc Hframe
-  -- jal allocproc (0x80001bea -> 0x80001ae0), ra := 0x80001bee
-  k_step (wp_s_jal cpu _ 0x80001bea#64 false 2096886#21 1#5 (by decide))
+  -- jal allocproc (0x80001c98 -> 0x80001b8e), ra := 0x80001c9c
+  k_step (wp_s_jal cpu _ 0x80001c98#64 false 2096886#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   iapply (ui_allocproc AP Γ cpu _ γl γp γk (some nb) (some (np + 1))
@@ -597,7 +597,7 @@ theorem userinit_proof (AP : ALLOCPROC) (RE : RELEASE) : USERINIT :=
       · exact h5.2.2.2.2.2.2.2.2.2.2.2.1.trans h2.2.2.2.2.2.2.2.2.2.2.2.1
       · exact h5.2.2.2.2.2.2.2.2.2.2.2.2.trans h2.2.2.2.2.2.2.2.2.2.2.2.2
     -- the epilogue
-    iapply (wp_epilogue4s1_gen cpu k 0x80001c12#64 hK4 R5 hR5_2
+    iapply (wp_epilogue4s1_gen cpu k 0x80001cc0#64 hK4 R5 hR5_2
       (k.regs 1#5) (k.regs 8#5) (k.regs 9#5)) $$ [- $Hk $Hpc $Hframe]
     rotate_right 1
     k_code (text_instr _ _ _ _ rfl rfl) Htext

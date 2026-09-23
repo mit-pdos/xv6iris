@@ -10,7 +10,7 @@ The shape: the six-slot frame (no schema of its own), the call to
 The list is described by its *nodes*: node `0` is `&head`, node `j + 1` is
 `&buf[j]` -- which is exactly `bufNextVal`.  After `i` buffers the loop
 holds, besides the buffers it has not touched, the head's `next` word (at
-`0x80020488`), the `prev` word of node `i` (still `&head`: the store that
+`0x80020530`), the `prev` word of node `i` (still `&head`: the store that
 overwrites it happens in the next iteration), and, for every `j < i`, the
 `prev` word of node `j` (now `&buf[j]`) together with buffer `j`'s
 sleeplock and `next` word.  At the end the two families are re-indexed into
@@ -40,13 +40,13 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 /-! ## Addresses and arithmetic -/
 
 /-- `&bcache.head.prev` and `&bcache.head.next`, as the code computes them
-(`s2 = 0x800201d0`, at `688` and `696`). -/
-theorem bi_headPrev : bcacheHeadAddr + 72#64 = 0x80020480#64 := by decide
-theorem bi_headNext : bcacheHeadAddr + 80#64 = 0x80020488#64 := by decide
+(`s2 = 0x80020278`, at `688` and `696`). -/
+theorem bi_headPrev : bcacheHeadAddr + 72#64 = 0x80020528#64 := by decide
+theorem bi_headNext : bcacheHeadAddr + 80#64 = 0x80020530#64 := by decide
 
 /-- Node `j` of the list: the head for `j = 0`, `&buf[j-1]` otherwise --
 the value `buf[j].next` ends up holding. -/
-theorem bi_node_zero : bufNextVal 0 = 0x80020438#64 := rfl
+theorem bi_node_zero : bufNextVal 0 = 0x800204e0#64 := rfl
 theorem bi_node_succ (j : Nat) : bufNextVal (j + 1) = bufAddr j := rfl
 
 /-- The immediates of the six-slot frame. -/
@@ -56,24 +56,24 @@ theorem bi_imm_p48 : BitVec.signExtend 64 48#12 = 8#64 * BitVec.ofNat 64 6 := by
   simp only [BitVec.reduceSignExtend, BitVec.reduceMul]
 
 /-- The four `auipc` constants. -/
-theorem bi_u5 : BitVec.signExtend 64 (5#20 ++ 0#12) = 0x5000#64 := by decide
+theorem bi_u5 : BitVec.signExtend 64 (4#20 ++ 0#12) = 0x4000#64 := by decide
 theorem bi_u15 : BitVec.signExtend 64 (0x15#20 ++ 0#12) = 0x15000#64 := by decide
 theorem bi_u1d : BitVec.signExtend 64 (0x1d#20 ++ 0#12) = 0x1d000#64 := by decide
 theorem bi_u1e : BitVec.signExtend 64 (0x1e#20 ++ 0#12) = 0x1e000#64 := by decide
 
 /-- `ret` out of `initlock` / `initsleeplock` lands after the `jal`. -/
-theorem bi_ret_b40 : jumpPc 0x80002b40#64 = 0x80002b40#64 := by
+theorem bi_ret_b40 : jumpPc 0x80002bfe#64 = 0x80002bfe#64 := by
   simp only [jumpPc, BitVec.reduceAnd]
-theorem bi_ret_b80 : jumpPc 0x80002b80#64 = 0x80002b80#64 := by
+theorem bi_ret_b80 : jumpPc 0x80002c3e#64 = 0x80002c3e#64 := by
   simp only [jumpPc, BitVec.reduceAnd]
 
 theorem bi_toNat (m : Nat) (h : m < 2 ^ 64) : (BitVec.ofNat 64 m).toNat = m := by
   simp only [BitVec.toNat_ofNat]
   omega
 
-theorem bi_bufAddr_toNat (m : Nat) (h : m ≤ 30) : (bufAddr m).toNat = 2147582440 + 1112 * m := by
+theorem bi_bufAddr_toNat (m : Nat) (h : m ≤ 30) : (bufAddr m).toNat = 2147582608 + 1112 * m := by
   unfold bufAddr
-  rw [BitVec.toNat_add, bi_toNat (1112 * m) (by omega), bi_toNat 2147582440 (by omega)]
+  rw [BitVec.toNat_add, bi_toNat (1112 * m) (by omega), bi_toNat 2147582608 (by omega)]
   exact Nat.mod_eq_of_lt (by omega)
 
 /-- The cursor one buffer on. -/
@@ -82,10 +82,10 @@ theorem bi_cursor (i : Nat) : bufAddr i + 1112#64 = bufAddr (i + 1) := by
   rw [show 1112 * (i + 1) = 1112 * i + 1112 from by omega, BitVec.ofNat_add, ← BitVec.add_assoc]
 
 /-- The loop runs while the cursor is below `&head`. -/
-theorem bi_s1_eq (i : Nat) (hi : i < 30) : (bufAddr (i + 1) = 0x80020438#64) ↔ i + 1 = 30 := by
-  have hl : (bufAddr (i + 1)).toNat = 2147582440 + 1112 * (i + 1) :=
+theorem bi_s1_eq (i : Nat) (hi : i < 30) : (bufAddr (i + 1) = 0x800204e0#64) ↔ i + 1 = 30 := by
+  have hl : (bufAddr (i + 1)).toNat = 2147582608 + 1112 * (i + 1) :=
     bi_bufAddr_toNat (i + 1) (by omega)
-  have hr : (0x80020438#64).toNat = 2147615800 := bi_toNat 2147615800 (by omega)
+  have hr : (0x800204e0#64).toNat = 2147615968 := bi_toNat 2147615968 (by omega)
   constructor
   · intro he
     have h := congrArg BitVec.toNat he
@@ -98,7 +98,7 @@ theorem bi_s1_eq (i : Nat) (hi : i < 30) : (bufAddr (i + 1) = 0x80020438#64) ↔
 
 /-- The loop test `bne s1,s3`: taken until the last buffer. -/
 theorem bi_bne_last {α : Type} (i : Nat) (hi : i < 30) (p q : α) :
-    (if bcond bop.BNE (bufAddr (i + 1)) 0x80020438#64 then p else q)
+    (if bcond bop.BNE (bufAddr (i + 1)) 0x800204e0#64 then p else q)
       = if i + 1 = 30 then q else p := by
   by_cases he : i + 1 = 30
   · rw [if_pos he,
@@ -195,10 +195,10 @@ theorem bi_merge [CurCtx] (n : Nat) :
 /-- The last buffer's `prev` word is the one still pending. -/
 theorem bi_out29 [CurCtx] :
     biRest (GF := GF) 29 ∗
-      wordPointsTo (bufAddr 29 + 72#64) 8 (DFrac.own 1) 0x80020438#64 ⊢
+      wordPointsTo (bufAddr 29 + 72#64) 8 (DFrac.own 1) 0x800204e0#64 ⊢
     bufOut (GF := GF) 29 := by
   unfold biRest bufOut
-  rw [show bufPrevVal 29 = 0x80020438#64 from rfl]
+  rw [show bufPrevVal 29 = 0x800204e0#64 from rfl]
   iintro ⟨⟨Hsl, Hnext⟩, Hpend⟩
   iframe
 
@@ -209,15 +209,15 @@ set_option maxHeartbeats 1000000 in
 theorem bi_finish [CurCtx] :
     ([∗list] j ∈ List.range 30, biPrevNode (GF := GF) j) ∗
     ([∗list] j ∈ List.range 30, biRest (GF := GF) j) ∗
-    wordPointsTo (bufAddr 29 + 72#64) 8 (DFrac.own 1) 0x80020438#64 ⊢
-    wordPointsTo 0x80020480#64 8 (DFrac.own 1) (bufAddr 0) ∗
+    wordPointsTo (bufAddr 29 + 72#64) 8 (DFrac.own 1) 0x800204e0#64 ⊢
+    wordPointsTo 0x80020528#64 8 (DFrac.own 1) (bufAddr 0) ∗
       ([∗list] j ∈ List.range 30, bufOut (GF := GF) j) := by
   iintro ⟨Hprev, Hrest, Hpend⟩
   -- node 0's prev word is `head.prev`
   icases bi_peel0 biPrevNode 29 $$ Hprev with ⟨Hhp, Hprev⟩
   isplitl [Hhp]
   · unfold biPrevNode
-    rw [show bufNextVal 0 + 72#64 = 0x80020480#64 from by decide]
+    rw [show bufNextVal 0 + 72#64 = 0x80020528#64 from by decide]
     iexact Hhp
   -- buffer 29 takes the pending cell; the others take node `j + 1`'s
   icases bi_unsnoc biRest 29 $$ Hrest with ⟨Hrest, Hrest29⟩
@@ -237,7 +237,7 @@ set_option maxHeartbeats 1000000 in
 theorem bi_initlock_call (IL : INITLOCK) [CurCtx] (c : CPU) (k' : KCtx)
     (vlock : BitVec 32) (vname vcpu : BitVec 64) (hK' : 2 ≤ k'.avail)
     (lk nm : BitVec 64) (h10 : k'.regs 10#5 = lk) (h11 : k'.regs 11#5 = nm) :
-    kctx c k' ∗ pcIs c 0x80000b3a#64 ∗
+    kctx c k' ∗ pcIs c 0x80000bd8#64 ∗
     kmapId lk ∗ kmapId (lk + 16#64) ∗
     wordPointsTo lk 4 (DFrac.own 1) vlock ∗
     wordPointsTo (lk + 8#64) 8 (DFrac.own 1) vname ∗
@@ -257,7 +257,7 @@ set_option maxHeartbeats 1000000 in
 theorem bi_initsleeplock_call (IS : INITSLEEPLOCK) [CurCtx] (c : CPU) (k' : KCtx)
     (hK' : 6 ≤ k'.avail) (lk nm : BitVec 64)
     (h10 : k'.regs 10#5 = lk) (h11 : k'.regs 11#5 = nm) :
-    kctx c k' ∗ pcIs c 0x80003f8a#64 ∗ sleepLockIn lk ∗
+    kctx c k' ∗ pcIs c 0x80004048#64 ∗ sleepLockIn lk ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ R' : RegMap,
       kctx cpu' (k'.withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       sleepLockInited lk nm -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
@@ -270,21 +270,21 @@ theorem bi_initsleeplock_call (IS : INITSLEEPLOCK) [CurCtx] (c : CPU) (k' : KCtx
 /-! ## One iteration -/
 
 set_option maxHeartbeats 4000000 in
-/-- The body at `0x80002b6c`: splice `&buf[i]` in after the head, initialise
+/-- The body at `0x80002c2a`: splice `&buf[i]` in after the head, initialise
 its sleeplock, step the cursor and test for the last buffer. -/
 theorem bi_iter (IS : INITSLEEPLOCK) [CurCtx] (k : KCtx) (hK : 12 ≤ k.avail)
     (i : Nat) (hi : i < 30) (R : RegMap)
-    (h9 : R 9#5 = bufAddr i) (h18 : R 18#5 = 0x800201d0#64)
-    (h19 : R 19#5 = 0x80020438#64) (h20 : R 20#5 = bufferNameAddr) (cur : CPU) :
-    kctx cur ((k.pushed 6).withRegs R) ∗ pcIs cur 0x80002b6c#64 ∗
-    wordPointsTo 0x80020488#64 8 (DFrac.own 1) (bufNextVal i) ∗
-    wordPointsTo (bufNextVal i + 72#64) 8 (DFrac.own 1) 0x80020438#64 ∗
+    (h9 : R 9#5 = bufAddr i) (h18 : R 18#5 = 0x80020278#64)
+    (h19 : R 19#5 = 0x800204e0#64) (h20 : R 20#5 = bufferNameAddr) (cur : CPU) :
+    kctx cur ((k.pushed 6).withRegs R) ∗ pcIs cur 0x80002c2a#64 ∗
+    wordPointsTo 0x80020530#64 8 (DFrac.own 1) (bufNextVal i) ∗
+    wordPointsTo (bufNextVal i + 72#64) 8 (DFrac.own 1) 0x800204e0#64 ∗
     bufIn i ∗
     wpNext k.sie k.proc cur (fun cpu' => iprop(∀ R2 : RegMap,
       kctx cpu' ((k.pushed 6).withRegs R2) -∗
-      pcIs cpu' (if i + 1 = 30 then 0x80002b92#64 else 0x80002b6c#64) -∗
-      wordPointsTo 0x80020488#64 8 (DFrac.own 1) (bufAddr i) -∗
-      wordPointsTo (bufAddr i + 72#64) 8 (DFrac.own 1) 0x80020438#64 -∗
+      pcIs cpu' (if i + 1 = 30 then 0x80002c50#64 else 0x80002c2a#64) -∗
+      wordPointsTo 0x80020530#64 8 (DFrac.own 1) (bufAddr i) -∗
+      wordPointsTo (bufAddr i + 72#64) 8 (DFrac.own 1) 0x800204e0#64 -∗
       biPrevNode i -∗ biRest i -∗
       ⌜biKept R R2 ∧ R2 9#5 = bufAddr (i + 1)⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cur := by
@@ -292,27 +292,27 @@ theorem bi_iter (IS : INITSLEEPLOCK) [CurCtx] (k : KCtx) (hK : 12 ≤ k.avail)
   iintro ⟨Hk, Hpc, Hhn, Hpend, ⟨%vprev, %vnext, Hsl, Hprev, Hnext⟩, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- ld a5,696(s2) : a5 = head.next
-  k_step_gen (wp_s_ld cur _ 0x80002b6c#64 false 696#12 15#5 18#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld cur _ 0x80002c2a#64 false 696#12 15#5 18#5 (by decide) (by decide)
       (DFrac.own 1) (bufNextVal i))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h18] next c1 hp1
   iintro Hk Hpc Hhn
   -- sd a5,80(s1) : b->next = head.next
-  k_step_gen (wp_s_sd c1 _ 0x80002b70#64 true 80#12 9#5 15#5 (by decide) vnext)
+  k_step_gen (wp_s_sd c1 _ 0x80002c2e#64 true 80#12 9#5 15#5 (by decide) vnext)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9] next c2 hp2
   iintro Hk Hpc Hnext
   -- sd s3,72(s1) : b->prev = &head
-  k_step_gen (wp_s_sd c2 _ 0x80002b72#64 false 72#12 9#5 19#5 (by decide) vprev)
+  k_step_gen (wp_s_sd c2 _ 0x80002c30#64 false 72#12 9#5 19#5 (by decide) vprev)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, h19] next c3 hp3
   iintro Hk Hpc Hprev
   -- a1 = "buffer" ; a0 = &b->lock
-  k_step_gen (wp_s_add c3 _ 0x80002b76#64 true 11#5 0#5 20#5 (by decide))
+  k_step_gen (wp_s_add c3 _ 0x80002c34#64 true 11#5 0#5 20#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h20] next c4 hp4
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c4 _ 0x80002b78#64 false 16#12 10#5 9#5 (by decide))
+  k_step_gen (wp_s_addi c4 _ 0x80002c36#64 false 16#12 10#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9] next c5 hp5
   iintro Hk Hpc
   -- jal ra, initsleeplock
-  k_step_gen (wp_s_jal c5 _ 0x80002b7c#64 false 5134#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c5 _ 0x80002c3a#64 false 5134#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c6 hp6
   iintro Hk Hpc
   iapply (bi_initsleeplock_call IS c6 _ ?hKi (bufAddr i + 16#64) bufferNameAddr ?ha0 ?ha1)
@@ -333,27 +333,27 @@ theorem bi_iter (IS : INITSLEEPLOCK) [CurCtx] (k : KCtx) (hK : 12 ≤ k.avail)
     exact hcs
   obtain ⟨e2, e8, e9, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩ := hcs'
   have f9 : R2 9#5 = bufAddr i := e9.trans h9
-  have f18 : R2 18#5 = 0x800201d0#64 := e18.trans h18
-  have f19 : R2 19#5 = 0x80020438#64 := e19.trans h19
+  have f18 : R2 18#5 = 0x80020278#64 := e18.trans h18
+  have f19 : R2 19#5 = 0x800204e0#64 := e19.trans h19
   -- ld a5,696(s2) : a5 = head.next
-  k_step_gen (wp_s_ld c7 _ 0x80002b80#64 false 696#12 15#5 18#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c7 _ 0x80002c3e#64 false 696#12 15#5 18#5 (by decide) (by decide)
       (DFrac.own 1) (bufNextVal i))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [f18] next c8 hp8
   iintro Hk Hpc Hhn
   -- sd s1,72(a5) : head.next->prev = b
-  k_step_gen (wp_s_sd c8 _ 0x80002b84#64 true 72#12 15#5 9#5 (by decide) 0x80020438#64)
+  k_step_gen (wp_s_sd c8 _ 0x80002c42#64 true 72#12 15#5 9#5 (by decide) 0x800204e0#64)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [f9] next c9 hp9
   iintro Hk Hpc Hpend
   -- sd s1,696(s2) : head.next = b
-  k_step_gen (wp_s_sd c9 _ 0x80002b86#64 false 696#12 18#5 9#5 (by decide) (bufNextVal i))
+  k_step_gen (wp_s_sd c9 _ 0x80002c44#64 false 696#12 18#5 9#5 (by decide) (bufNextVal i))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [f9, f18] next c10 hp10
   iintro Hk Hpc Hhn
   -- addi s1,s1,1112 : the cursor moves on
-  k_step_gen (wp_s_addi c10 _ 0x80002b8a#64 false 1112#12 9#5 9#5 (by decide))
+  k_step_gen (wp_s_addi c10 _ 0x80002c48#64 false 1112#12 9#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [f9, bi_cursor i] next c11 hp11
   iintro Hk Hpc
   -- bne s1,s3 : another buffer?
-  k_step_gen (wp_s_branch c11 _ 0x80002b8e#64 false 8158#13 9#5 19#5 (by decide) bop.BNE)
+  k_step_gen (wp_s_branch c11 _ 0x80002c4c#64 false 8158#13 9#5 19#5 (by decide) bop.BNE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [f19, bi_bne_last i hi] next c12 hp12
   iintro Hk Hpc
@@ -377,23 +377,23 @@ theorem bi_iter (IS : INITSLEEPLOCK) [CurCtx] (k : KCtx) (hK : 12 ≤ k.avail)
 /-! ## The loop -/
 
 set_option maxHeartbeats 4000000 in
-/-- The loop from `0x80002b6c` with `i` buffers spliced in (`fuel + 1` left)
-runs to the epilogue at `0x80002b92`.  The hart is quantified inside the
+/-- The loop from `0x80002c2a` with `i` buffers spliced in (`fuel + 1` left)
+runs to the epilogue at `0x80002c50`.  The hart is quantified inside the
 induction. -/
 theorem bi_loop (IS : INITSLEEPLOCK) [CurCtx] (k : KCtx) (hK : 12 ≤ k.avail) (fuel : Nat) :
     ∀ (i : Nat) (_ : i + (fuel + 1) = 30) (R : RegMap)
-      (_ : R 9#5 = bufAddr i) (_ : R 18#5 = 0x800201d0#64)
-      (_ : R 19#5 = 0x80020438#64) (_ : R 20#5 = bufferNameAddr) (cur : CPU),
-    kctx cur ((k.pushed 6).withRegs R) ∗ pcIs cur 0x80002b6c#64 ∗
-    wordPointsTo 0x80020488#64 8 (DFrac.own 1) (bufNextVal i) ∗
-    wordPointsTo (bufNextVal i + 72#64) 8 (DFrac.own 1) 0x80020438#64 ∗
+      (_ : R 9#5 = bufAddr i) (_ : R 18#5 = 0x80020278#64)
+      (_ : R 19#5 = 0x800204e0#64) (_ : R 20#5 = bufferNameAddr) (cur : CPU),
+    kctx cur ((k.pushed 6).withRegs R) ∗ pcIs cur 0x80002c2a#64 ∗
+    wordPointsTo 0x80020530#64 8 (DFrac.own 1) (bufNextVal i) ∗
+    wordPointsTo (bufNextVal i + 72#64) 8 (DFrac.own 1) 0x800204e0#64 ∗
     ([∗list] j ∈ List.range i, biPrevNode (GF := GF) j) ∗
     ([∗list] j ∈ List.range i, biRest (GF := GF) j) ∗
     ([∗list] j ∈ List.range' i (fuel + 1), bufIn (GF := GF) j) ∗
     wpNext k.sie k.proc cur (fun cpu' => iprop(∀ R2 : RegMap,
-      kctx cpu' ((k.pushed 6).withRegs R2) -∗ pcIs cpu' 0x80002b92#64 -∗
-      wordPointsTo 0x80020488#64 8 (DFrac.own 1) (bufAddr 29) -∗
-      wordPointsTo (bufAddr 29 + 72#64) 8 (DFrac.own 1) 0x80020438#64 -∗
+      kctx cpu' ((k.pushed 6).withRegs R2) -∗ pcIs cpu' 0x80002c50#64 -∗
+      wordPointsTo 0x80020530#64 8 (DFrac.own 1) (bufAddr 29) -∗
+      wordPointsTo (bufAddr 29 + 72#64) 8 (DFrac.own 1) 0x800204e0#64 -∗
       ([∗list] j ∈ List.range 30, biPrevNode (GF := GF) j) -∗
       ([∗list] j ∈ List.range 30, biRest (GF := GF) j) -∗
       ⌜biKept R R2⌝ -∗ wpLoop cpu'))
@@ -470,7 +470,7 @@ theorem biFrame_join [CurCtx] (sp v0 v1 v2 v3 v4 v5 : BitVec 64) :
   unfold biFrame; iintro H; iexact H
 
 set_option maxHeartbeats 4000000 in
-/-- The epilogue at `0x80002b92`: restore `ra`, `s0`, `s1`..`s4`, pop the
+/-- The epilogue at `0x80002c50`: restore `ra`, `s0`, `s1`..`s4`, pop the
 frame, return to the caller (carrying the body's resources `Q`). -/
 theorem bi_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
     (hpin : k.sie = false ∨ k.proc = 0#64 → cur = cpu) (hK : 6 ≤ k.avail)
@@ -478,7 +478,7 @@ theorem bi_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
     (h21 : R 21#5 = k.regs 21#5) (h22 : R 22#5 = k.regs 22#5) (h23 : R 23#5 = k.regs 23#5)
     (h24 : R 24#5 = k.regs 24#5) (h25 : R 25#5 = k.regs 25#5) (h26 : R 26#5 = k.regs 26#5)
     (h27 : R 27#5 = k.regs 27#5) (Q : IProp GF) :
-    kctx cur ((k.pushed 6).withRegs R) ∗ pcIs cur 0x80002b92#64 ∗
+    kctx cur ((k.pushed 6).withRegs R) ∗ pcIs cur 0x80002c50#64 ∗
     biFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) ∗ Q ∗
     wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ R' : RegMap,
@@ -488,37 +488,37 @@ theorem bi_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
   unfold biFrame
   iintro ⟨Hk, Hpc, ⟨F0, F1, F2, F3, F4, F5⟩, HQ, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  k_step_gen (wp_s_ld cur _ 0x80002b92#64 true 40#12 1#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld cur _ 0x80002c50#64 true 40#12 1#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 1#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c1 hp1
   iintro Hk Hpc F0
-  k_step_gen (wp_s_ld c1 _ 0x80002b94#64 true 32#12 8#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c1 _ 0x80002c52#64 true 32#12 8#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 8#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c2 hp2
   iintro Hk Hpc F1
-  k_step_gen (wp_s_ld c2 _ 0x80002b96#64 true 24#12 9#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c2 _ 0x80002c54#64 true 24#12 9#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 9#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c3 hp3
   iintro Hk Hpc F2
-  k_step_gen (wp_s_ld c3 _ 0x80002b98#64 true 16#12 18#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c3 _ 0x80002c56#64 true 16#12 18#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 18#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c4 hp4
   iintro Hk Hpc F3
-  k_step_gen (wp_s_ld c4 _ 0x80002b9a#64 true 8#12 19#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c4 _ 0x80002c58#64 true 8#12 19#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 19#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c5 hp5
   iintro Hk Hpc F4
-  k_step_gen (wp_s_ld c5 _ 0x80002b9c#64 true 0#12 20#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c5 _ 0x80002c5a#64 true 0#12 20#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 20#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c6 hp6
   iintro Hk Hpc F5
   ihave Hstack : stackOwn (k.regs 2#5) 6 $$ [F0 F1 F2 F3 F4 F5]
   case' _ => stack_cells; iframe
-  k_step_gen (wp_s_pop c6 _ 0x80002b9e#64 true 48#12 6 bi_imm_p48)
+  k_step_gen (wp_s_pop c6 _ 0x80002c5c#64 true 48#12 6 bi_imm_p48)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK, hR2] next c7 hp7
   iintro Hk Hpc
-  k_step_gen (wp_s_ret c7 _ 0x80002ba0#64 true 1#5)
+  k_step_gen (wp_s_ret c7 _ 0x80002c5e#64 true 1#5)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c8 hp8
   iintro Hk Hpc
   ihave HΦ' := wpNext_at _ _ _ c8 _ (fun h => (hp8 h).trans ((hp7 h).trans ((hp6 h).trans
@@ -535,14 +535,14 @@ theorem bi_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
 
 /-- The head's `prev` word, freshly stored, is node `0`'s. -/
 theorem bi_pend0 [CurCtx] :
-    wordPointsTo 0x80020480#64 8 (DFrac.own 1) 0x80020438#64 ⊢
-      wordPointsTo (GF := GF) (bufNextVal 0 + 72#64) 8 (DFrac.own 1) 0x80020438#64 := by
-  rw [show bufNextVal 0 + 72#64 = 0x80020480#64 from by decide]
+    wordPointsTo 0x80020528#64 8 (DFrac.own 1) 0x800204e0#64 ⊢
+      wordPointsTo (GF := GF) (bufNextVal 0 + 72#64) 8 (DFrac.own 1) 0x800204e0#64 := by
+  rw [show bufNextVal 0 + 72#64 = 0x80020528#64 from by decide]
 
 /-- The head's `next` word, freshly stored, holds node `0`. -/
 theorem bi_hn0 [CurCtx] :
-    wordPointsTo 0x80020488#64 8 (DFrac.own 1) 0x80020438#64 ⊢
-      wordPointsTo (GF := GF) 0x80020488#64 8 (DFrac.own 1) (bufNextVal 0) := by
+    wordPointsTo 0x80020530#64 8 (DFrac.own 1) 0x800204e0#64 ⊢
+      wordPointsTo (GF := GF) 0x80020530#64 8 (DFrac.own 1) (bufNextVal 0) := by
   rw [bi_node_zero]
 
 /-- The caller's list of buffers, as the loop wants it. -/
@@ -560,7 +560,7 @@ theorem bi_lockInited [CurCtx] :
 
 /-! ## The function -/
 
-theorem bi_buf0 : bufAddr 0 = 0x800181e8#64 := by decide
+theorem bi_buf0 : bufAddr 0 = 0x80018290#64 := by decide
 
 set_option maxHeartbeats 4000000 in
 theorem binit_proof (IL : INITLOCK) (IS : INITSLEEPLOCK) : BINIT :=
@@ -572,48 +572,48 @@ theorem binit_proof (IL : INITLOCK) (IS : INITSLEEPLOCK) : BINIT :=
   simp only [binitAddr, KernelSyms.«binit»]
   k_norm_g
   -- the frame
-  k_step_gen (wp_s_push cpu _ 0x80002b1c#64 true 4048#12 6 (by omega) bi_imm_m48)
+  k_step_gen (wp_s_push cpu _ 0x80002bda#64 true 4048#12 6 (by omega) bi_imm_m48)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c1 hp1
   iintro Hk Hpc Hframe
   irevert Hframe
   stack_cells
   iintro ⟨⟨%w0, F0⟩, ⟨%w1, F1⟩, ⟨%w2, F2⟩, ⟨%w3, F3⟩, ⟨%w4, F4⟩, ⟨%w5, F5⟩, _⟩
-  k_step_gen (wp_s_sd c1 _ 0x80002b1e#64 true 40#12 2#5 1#5 (by decide) w0)
+  k_step_gen (wp_s_sd c1 _ 0x80002bdc#64 true 40#12 2#5 1#5 (by decide) w0)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c2 hp2
   iintro Hk Hpc F0
-  k_step_gen (wp_s_sd c2 _ 0x80002b20#64 true 32#12 2#5 8#5 (by decide) w1)
+  k_step_gen (wp_s_sd c2 _ 0x80002bde#64 true 32#12 2#5 8#5 (by decide) w1)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
   iintro Hk Hpc F1
-  k_step_gen (wp_s_sd c3 _ 0x80002b22#64 true 24#12 2#5 9#5 (by decide) w2)
+  k_step_gen (wp_s_sd c3 _ 0x80002be0#64 true 24#12 2#5 9#5 (by decide) w2)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hp4
   iintro Hk Hpc F2
-  k_step_gen (wp_s_sd c4 _ 0x80002b24#64 true 16#12 2#5 18#5 (by decide) w3)
+  k_step_gen (wp_s_sd c4 _ 0x80002be2#64 true 16#12 2#5 18#5 (by decide) w3)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c5 hp5
   iintro Hk Hpc F3
-  k_step_gen (wp_s_sd c5 _ 0x80002b26#64 true 8#12 2#5 19#5 (by decide) w4)
+  k_step_gen (wp_s_sd c5 _ 0x80002be4#64 true 8#12 2#5 19#5 (by decide) w4)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c6 hp6
   iintro Hk Hpc F4
-  k_step_gen (wp_s_sd c6 _ 0x80002b28#64 true 0#12 2#5 20#5 (by decide) w5)
+  k_step_gen (wp_s_sd c6 _ 0x80002be6#64 true 0#12 2#5 20#5 (by decide) w5)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c7 hp7
   iintro Hk Hpc F5
-  k_step_gen (wp_s_addi c7 _ 0x80002b2a#64 true 48#12 8#5 2#5 (by decide))
+  k_step_gen (wp_s_addi c7 _ 0x80002be8#64 true 48#12 8#5 2#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c8 hp8
   iintro Hk Hpc
   -- a1 = "bcache" ; a0 = &bcache.lock
-  k_step_gen (wp_s_auipc c8 _ 0x80002b2c#64 false 5#20 11#5 (by decide))
+  k_step_gen (wp_s_auipc c8 _ 0x80002bea#64 false 4#20 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bi_u5] next c9 hp9
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c9 _ 0x80002b30#64 false 2180#12 11#5 11#5 (by decide))
+  k_step_gen (wp_s_addi c9 _ 0x80002bee#64 false 1998#12 11#5 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c10 hp10
   iintro Hk Hpc
-  k_step_gen (wp_s_auipc c10 _ 0x80002b34#64 false 0x15#20 10#5 (by decide))
+  k_step_gen (wp_s_auipc c10 _ 0x80002bf2#64 false 0x15#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bi_u15] next c11 hp11
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c11 _ 0x80002b38#64 false 1692#12 10#5 10#5 (by decide))
+  k_step_gen (wp_s_addi c11 _ 0x80002bf6#64 false 1670#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c12 hp12
   iintro Hk Hpc
   -- jal ra, initlock
-  k_step_gen (wp_s_jal c12 _ 0x80002b3c#64 false 2088958#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c12 _ 0x80002bfa#64 false 2088926#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c13 hp13
   iintro Hk Hpc
   have hpin13 : k.sie = false ∨ k.proc = 0#64 → c13 = cpu := fun h =>
@@ -639,42 +639,42 @@ theorem binit_proof (IL : INITLOCK) (IS : INITSLEEPLOCK) : BINIT :=
   ihave HLI := bi_lockInited (GF := GF) $$ [Hwname Hfresh]
   case' _ => iframe
   -- a5 = &bcache.buf[0] - 24 ; a4 = &bcache.head
-  k_step_gen (wp_s_auipc c14 _ 0x80002b40#64 false 0x1d#20 15#5 (by decide))
+  k_step_gen (wp_s_auipc c14 _ 0x80002bfe#64 false 0x1d#20 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bi_u1d] next c15 hp15
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c15 _ 0x80002b44#64 false 1680#12 15#5 15#5 (by decide))
+  k_step_gen (wp_s_addi c15 _ 0x80002c02#64 false 1658#12 15#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c16 hp16
   iintro Hk Hpc
-  k_step_gen (wp_s_auipc c16 _ 0x80002b48#64 false 0x1e#20 14#5 (by decide))
+  k_step_gen (wp_s_auipc c16 _ 0x80002c06#64 false 0x1e#20 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bi_u1e] next c17 hp17
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c17 _ 0x80002b4c#64 false 2288#12 14#5 14#5 (by decide))
+  k_step_gen (wp_s_addi c17 _ 0x80002c0a#64 false 2266#12 14#5 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c18 hp18
   iintro Hk Hpc
   -- head.prev = head.next = &head
-  k_step_gen (wp_s_sd c18 _ 0x80002b50#64 false 688#12 15#5 14#5 (by decide) vhp)
+  k_step_gen (wp_s_sd c18 _ 0x80002c0e#64 false 688#12 15#5 14#5 (by decide) vhp)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c19 hp19
   iintro Hk Hpc Hhp
-  k_step_gen (wp_s_sd c19 _ 0x80002b54#64 false 696#12 15#5 14#5 (by decide) vhn)
+  k_step_gen (wp_s_sd c19 _ 0x80002c12#64 false 696#12 15#5 14#5 (by decide) vhn)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c20 hp20
   iintro Hk Hpc Hhn
   -- the cursor and the three constants
-  k_step_gen (wp_s_auipc c20 _ 0x80002b58#64 false 0x15#20 9#5 (by decide))
+  k_step_gen (wp_s_auipc c20 _ 0x80002c16#64 false 0x15#20 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bi_u15] next c21 hp21
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c21 _ 0x80002b5c#64 false 1680#12 9#5 9#5 (by decide))
+  k_step_gen (wp_s_addi c21 _ 0x80002c1a#64 false 1658#12 9#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c22 hp22
   iintro Hk Hpc
-  k_step_gen (wp_s_add c22 _ 0x80002b60#64 true 18#5 0#5 15#5 (by decide))
+  k_step_gen (wp_s_add c22 _ 0x80002c1e#64 true 18#5 0#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c23 hp23
   iintro Hk Hpc
-  k_step_gen (wp_s_add c23 _ 0x80002b62#64 true 19#5 0#5 14#5 (by decide))
+  k_step_gen (wp_s_add c23 _ 0x80002c20#64 true 19#5 0#5 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c24 hp24
   iintro Hk Hpc
-  k_step_gen (wp_s_auipc c24 _ 0x80002b64#64 false 5#20 20#5 (by decide))
+  k_step_gen (wp_s_auipc c24 _ 0x80002c22#64 false 4#20 20#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bi_u5] next c25 hp25
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c25 _ 0x80002b68#64 false 2132#12 20#5 20#5 (by decide))
+  k_step_gen (wp_s_addi c25 _ 0x80002c26#64 false 1950#12 20#5 20#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c26 hp26
   iintro Hk Hpc
   have hpin26 : k.sie = false ∨ k.proc = 0#64 → c26 = c14 := fun h =>
@@ -697,7 +697,7 @@ theorem binit_proof (IL : INITLOCK) (IS : INITSLEEPLOCK) : BINIT :=
     · exact BigSepL.bigSepL_nil_intro
     isplitl []
     · exact BigSepL.bigSepL_nil_intro
-    -- the exit at 0x80002b92 and the epilogue
+    -- the exit at 0x80002c50 and the epilogue
     · iapply wpNext_intro_pin
       iintro %cE %hpE %R2 Hk Hpc Hhn Hpend Hnodes Hrests %hkept
       have hk2 : R2 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64 := by
@@ -739,8 +739,8 @@ theorem binit_proof (IL : INITLOCK) (IS : INITSLEEPLOCK) : BINIT :=
       case' _ => iframe
       iapply (bi_epi c26 cE k hpE (by omega) R2 hk2 hk21 hk22 hk23 hk24 hk25 hk26 hk27
         iprop(lockInited bcacheLockAddr bcacheNameAddr ∗
-          wordPointsTo 0x80020480#64 8 (DFrac.own 1) (bufAddr 0) ∗
-          wordPointsTo 0x80020488#64 8 (DFrac.own 1) (bufAddr 29) ∗
+          wordPointsTo 0x80020528#64 8 (DFrac.own 1) (bufAddr 0) ∗
+          wordPointsTo 0x80020530#64 8 (DFrac.own 1) (bufAddr 29) ∗
           ([∗list] j ∈ List.range 30, bufOut (GF := GF) j))) $$ [- $Hk $Hpc $Hframe]
       rotate_right 1
       · isplitl [HLI Hhp Hhn Hout]

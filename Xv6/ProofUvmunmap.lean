@@ -44,11 +44,11 @@ theorem un_imm_p64 : BitVec.signExtend 64 64#12 = 8#64 * BitVec.ofNat 64 8 := by
   simp only [BitVec.reduceSignExtend, BitVec.reduceMul]
 
 /-- `ret` out of `walk` lands on the instruction after the `jal`. -/
-theorem un_ret_120c : jumpPc 0x8000120c#64 = 0x8000120c#64 := by
+theorem un_ret_120c : jumpPc 0x800012ba#64 = 0x800012ba#64 := by
   simp only [jumpPc, BitVec.reduceAnd]
 
 /-- `ret` out of `kfree` lands on the instruction after the `jal`. -/
-theorem un_ret_1226 : jumpPc 0x80001226#64 = 0x80001226#64 := by
+theorem un_ret_1226 : jumpPc 0x800012d4#64 = 0x800012d4#64 := by
   simp only [jumpPc, BitVec.reduceAnd]
 
 /-- `c.lui s6,0x1` is `4096`. -/
@@ -204,7 +204,7 @@ set_option maxHeartbeats 1000000 in
 theorem un_walk_call (W : WALK_NOALLOC) [CurCtx] (c : CPU) (k' : KCtx) (dq : DFrac) (t : PTree)
     (hK' : 8 ≤ k'.avail) (hroot' : k'.regs 10#5 = pageAddr t.base)
     (hva' : (k'.regs 11#5).toNat < 2 ^ 38) (halloc' : k'.regs 12#5 = 0#64) (hwf' : t.wfU 2) :
-    kctx c k' ∗ pcIs c 0x80000f10#64 ∗ ptreeOwn 2 dq t ∗
+    kctx c k' ∗ pcIs c 0x80000fae#64 ∗ ptreeOwn 2 dq t ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ R' : RegMap,
       kctx cpu' (k'.withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ptreeOwn 2 dq t -∗
       ⌜calleeSaved k'.regs R' ∧ walkRet t (vpnOf (k'.regs 11#5)) (R' 10#5)⌝ -∗ wpLoop cpu'))
@@ -220,7 +220,7 @@ theorem un_kfree_call (KF : KFREE) [CurCtx] (c : CPU) (k' : KCtx)
     (γl : GName) (γk : KmemNames) (on' : Option Nat)
     (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 14 ≤ k'.avail) (hlk' : "kmem" ∉ k'.locks)
     (hp : pageValid (k'.regs 10#5)) :
-    kctx c k' ∗ pcIs c 0x800009f8#64 ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
+    kctx c k' ∗ pcIs c 0x80000a96#64 ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
     pageOwn (k'.regs 10#5) ∗ kallocAvail γk on' ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie' : Bool, ∀ spp' : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie' = k'.spie ∧ spp' = k'.spp⌝ -∗
@@ -235,7 +235,7 @@ theorem un_kfree_call (KF : KFREE) [CurCtx] (c : CPU) (k' : KCtx)
 /-! ## The epilogue -/
 
 set_option maxHeartbeats 4000000 in
-/-- The epilogue at `0x8000122a`: restore `s2`..`s6`, `ra`, `s0`, pop the
+/-- The epilogue at `0x800012d8`: restore `s2`..`s6`, `ra`, `s0`, pop the
 frame, return to the caller.  (The `s1` slot is not read here: the path
 with no page never wrote it.) -/
 theorem uvmunmap_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
@@ -245,7 +245,7 @@ theorem uvmunmap_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
     (h23 : R 23#5 = k.regs 23#5) (h24 : R 24#5 = k.regs 24#5) (h25 : R 25#5 = k.regs 25#5)
     (h26 : R 26#5 = k.regs 26#5) (h27 : R 27#5 = k.regs 27#5)
     (v2 : BitVec 64) (A B C : IProp GF) :
-    kctx cur (((k.pushed 8).withSpie spie spp).withRegs R) ∗ pcIs cur 0x8000122a#64 ∗
+    kctx cur (((k.pushed 8).withSpie spie spp).withRegs R) ∗ pcIs cur 0x800012d8#64 ∗
     unFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) v2 (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) ∗ A ∗ B ∗ C ∗
     wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ R' : RegMap,
@@ -257,41 +257,41 @@ theorem uvmunmap_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK' : 8 ≤ (k.withSpie spie spp).avail := hK
   simp only [un_pushed_withSpie]
-  k_step_gen (wp_s_ld cur _ 0x8000122a#64 true 32#12 18#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld cur _ 0x800012d8#64 true 32#12 18#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 18#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c1 hp1
   iintro Hk Hpc F3
-  k_step_gen (wp_s_ld c1 _ 0x8000122c#64 true 24#12 19#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c1 _ 0x800012da#64 true 24#12 19#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 19#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c2 hp2
   iintro Hk Hpc F4
-  k_step_gen (wp_s_ld c2 _ 0x8000122e#64 true 16#12 20#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c2 _ 0x800012dc#64 true 16#12 20#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 20#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c3 hp3
   iintro Hk Hpc F5
-  k_step_gen (wp_s_ld c3 _ 0x80001230#64 true 8#12 21#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c3 _ 0x800012de#64 true 8#12 21#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 21#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c4 hp4
   iintro Hk Hpc F6
-  k_step_gen (wp_s_ld c4 _ 0x80001232#64 true 0#12 22#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c4 _ 0x800012e0#64 true 0#12 22#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 22#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c5 hp5
   iintro Hk Hpc F7
-  k_step_gen (wp_s_ld c5 _ 0x80001234#64 true 56#12 1#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c5 _ 0x800012e2#64 true 56#12 1#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 1#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c6 hp6
   iintro Hk Hpc F0
-  k_step_gen (wp_s_ld c6 _ 0x80001236#64 true 48#12 8#5 2#5 (by decide) (by decide)
+  k_step_gen (wp_s_ld c6 _ 0x800012e4#64 true 48#12 8#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 8#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c7 hp7
   iintro Hk Hpc F1
   ihave Hstack : stackOwn (k.regs 2#5) 8 $$ [F0 F1 F2 F3 F4 F5 F6 F7]
   case' _ => stack_cells; iframe
-  k_step_gen (wp_s_pop c7 _ 0x80001238#64 true 64#12 8 un_imm_p64)
+  k_step_gen (wp_s_pop c7 _ 0x800012e6#64 true 64#12 8 un_imm_p64)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK', hR2] next c8 hp8
   iintro Hk Hpc
-  k_step_gen (wp_s_ret c8 _ 0x8000123a#64 true 1#5)
+  k_step_gen (wp_s_ret c8 _ 0x800012e8#64 true 1#5)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c9 hp9
   iintro Hk Hpc
   have hpinZ : k.sie = false ∨ k.proc = 0#64 → c9 = cpu := fun h =>
@@ -308,27 +308,27 @@ theorem uvmunmap_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
 /-! ## The tail of an iteration -/
 
 set_option maxHeartbeats 4000000 in
-/-- `a += PGSIZE` at `0x800011fc`, then the loop test. -/
+/-- `a += PGSIZE` at `0x800012aa`, then the loop test. -/
 theorem uvmunmap_tail [CurCtx] (k : KCtx) (va : BitVec 64) (n i : Nat) (hi : i < n)
     (hr : va.toNat + 4096 * n ≤ 2 ^ 38) (spie spp : Bool) (R : RegMap)
     (h18 : R 18#5 = va + BitVec.ofNat 64 (4096 * i))
     (h19 : R 19#5 = BitVec.ofNat 64 (4096 * n) + va)
     (h22 : R 22#5 = 4096#64) (A B C : IProp GF) (cur : CPU) :
-    kctx cur (((k.pushed 8).withSpie spie spp).withRegs R) ∗ pcIs cur 0x800011fc#64 ∗
+    kctx cur (((k.pushed 8).withSpie spie spp).withRegs R) ∗ pcIs cur 0x800012aa#64 ∗
     A ∗ B ∗ C ∗
     wpNext k.sie k.proc cur (fun cpu' => iprop(∀ R2 : RegMap,
       kctx cpu' (((k.pushed 8).withSpie spie spp).withRegs R2) -∗
-      pcIs cpu' (if i + 1 = n then 0x80001228#64 else 0x80001202#64) -∗ A -∗ B -∗ C -∗
+      pcIs cpu' (if i + 1 = n then 0x800012d6#64 else 0x800012b0#64) -∗ A -∗ B -∗ C -∗
       ⌜unKept R R2 ∧ R2 9#5 = R 9#5 ∧ R2 18#5 = va + BitVec.ofNat 64 (4096 * (i + 1))⌝ -∗
       wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cur := by
   iintro ⟨Hk, Hpc, HA, HB, HC, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  k_step_gen (wp_s_add cur _ 0x800011fc#64 true 18#5 18#5 22#5 (by decide))
+  k_step_gen (wp_s_add cur _ 0x800012aa#64 true 18#5 18#5 22#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [h18, h22, un_page_add va i] next c1 hp1
   iintro Hk Hpc
-  k_step_gen (wp_s_branch c1 _ 0x800011fe#64 false 42#13 18#5 19#5 (by decide) bop.BGEU)
+  k_step_gen (wp_s_branch c1 _ 0x800012ac#64 false 42#13 18#5 19#5 (by decide) bop.BGEU)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [h19, un_bgeu_step va n i hi hr] next c2 hp2
   iintro Hk Hpc
@@ -345,7 +345,7 @@ theorem calleeSaved_refl (R : RegMap) : calleeSaved R R :=
   ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
 
 set_option maxHeartbeats 4000000 in
-/-- The `do_free` test at `0x80001218` and, when it is set, `kfree(PTE2PA(*pte))`:
+/-- The `do_free` test at `0x800012c6` and, when it is set, `kfree(PTE2PA(*pte))`:
 the page comes out of the map of user pages.  At `do_free = 0` (`df = false`)
 nothing happens and the interrupt state is untouched. -/
 theorem uvmunmap_free_page (KF : KFREE) [CurCtx]
@@ -359,12 +359,12 @@ theorem uvmunmap_free_page (KF : KFREE) [CurCtx]
     (hdf : df = true → k.regs 13#5 ≠ 0#64) (hdf0 : df = false → k.regs 13#5 = 0#64)
     (spie spp : Bool) (R : RegMap) (h15 : R 15#5 = v) (h21 : R 21#5 = k.regs 13#5)
     (Res : IProp GF) (cur : CPU) :
-    kctx cur (((k.pushed 8).withSpie spie spp).withRegs R) ∗ pcIs cur 0x80001218#64 ∗
+    kctx cur (((k.pushed 8).withSpie spie spp).withRegs R) ∗ pcIs cur 0x800012c6#64 ∗
     umMap Qm M ∗ unFree df γl γk ∗ Res ∗
     wpNext k.sie k.proc cur (fun cpu' => iprop(∀ (spie2 spp2 : Bool) (R2 : RegMap),
       ⌜k.sie = false ∨ df = false → spie2 = spie ∧ spp2 = spp⌝ -∗
       kctx cpu' (((k.pushed 8).withSpie spie2 spp2).withRegs R2) -∗
-      pcIs cpu' 0x800011f8#64 -∗
+      pcIs cpu' 0x800012a6#64 -∗
       umMap (delete Qm key) M -∗ unFree df γl γk -∗ Res -∗
       ⌜calleeSaved R R2⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cur := by
@@ -373,7 +373,7 @@ theorem uvmunmap_free_page (KF : KFREE) [CurCtx]
   cases df with
   | false =>
     have h13 : k.regs 13#5 = 0#64 := hdf0 rfl
-    k_step_gen (wp_s_branch cur _ 0x80001218#64 false 8160#13 21#5 0#5 (by decide) bop.BEQ)
+    k_step_gen (wp_s_branch cur _ 0x800012c6#64 false 8160#13 21#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [h21, un_beq_zero _ h13] next c1 hp1
     iintro Hk Hpc
@@ -388,17 +388,17 @@ theorem uvmunmap_free_page (KF : KFREE) [CurCtx]
     simp only [unFree_true]
     icases Hfree with ⟨#HLk, Hav⟩
     icases umMap_take Qm M key w (hQ1 rfl) $$ Hum with ⟨Hpg, Hum⟩
-    k_step_gen (wp_s_branch cur _ 0x80001218#64 false 8160#13 21#5 0#5 (by decide) bop.BEQ)
+    k_step_gen (wp_s_branch cur _ 0x800012c6#64 false 8160#13 21#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [h21, un_beq_ne _ h13] next c1 hp1
     iintro Hk Hpc
-    k_step_gen (wp_s_srli c1 _ 0x8000121c#64 true 10#6 15#5 15#5 (by decide))
+    k_step_gen (wp_s_srli c1 _ 0x800012ca#64 true 10#6 15#5 15#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h15] next c2 hp2
     iintro Hk Hpc
-    k_step_gen (wp_s_slli c2 _ 0x8000121e#64 false 12#6 10#5 15#5 (by decide))
+    k_step_gen (wp_s_slli c2 _ 0x800012cc#64 false 12#6 10#5 15#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hpav] next c3 hp3
     iintro Hk Hpc
-    k_step_gen (wp_s_jal c3 _ 0x80001222#64 false 2095062#21 1#5 (by decide))
+    k_step_gen (wp_s_jal c3 _ 0x800012d0#64 false 2095046#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hp4
     iintro Hk Hpc
     iapply (un_kfree_call KF c4 _ γl γk none ?hn ?hKa ?hl ?hpv2) $$ [- $Hk $Hpc]
@@ -414,7 +414,7 @@ theorem uvmunmap_free_page (KF : KFREE) [CurCtx]
     iintro %c5 %hp5 %spie2 %spp2 %R2 %hsp2 Hk Hpc Hav %hcs2
     k_norm_g [un_withSpie_withSpie, un_ret_1226, un_availInc_none]
     icases kctx_kernelText _ _ $$ Hk with ⟨#Htext2, Hk⟩
-    k_step_gen (wp_s_j c5 _ 0x80001226#64 true 2097106#21)
+    k_step_gen (wp_s_j c5 _ 0x800012d4#64 true 2097106#21)
       from (text_instr _ _ _ _ rfl rfl) Htext2 $$ [- $Hk $Hpc] next c6 hp6
     iintro Hk Hpc
     have hpinZ : k.sie = false ∨ k.proc = 0#64 → c6 = cur := fun h =>
@@ -481,7 +481,7 @@ theorem ptOwnRep_intro [CurCtx] (root : BitVec 44) (L : RegMapF (BitVec 64)) (t 
 /-! ## One iteration -/
 
 set_option maxHeartbeats 4000000 in
-/-- The body at `0x80001202`: `walk(pagetable, a, 0)`; an incomplete path or
+/-- The body at `0x800012b0`: `walk(pagetable, a, 0)`; an incomplete path or
 an invalid entry is skipped, otherwise the page is freed (`do_free`) and the
 entry zeroed.  Either way the leaf map loses the key of this page. -/
 theorem uvmunmap_iter (W : WALK_NOALLOC) (KF : KFREE) [CurCtx]
@@ -504,12 +504,12 @@ theorem uvmunmap_iter (W : WALK_NOALLOC) (KF : KFREE) [CurCtx]
     (h21 : R 21#5 = k.regs 13#5)
     (h22 : R 22#5 = 4096#64)
     (cur : CPU) :
-    kctx cur (((k.pushed 8).withSpie spie spp).withRegs R) ∗ pcIs cur 0x80001202#64 ∗
+    kctx cur (((k.pushed 8).withSpie spie spp).withRegs R) ∗ pcIs cur 0x800012b0#64 ∗
     ptOwnRep root Lm ∗ umMap Qm M ∗ unFree df γl γk ∗
     wpNext k.sie k.proc cur (fun cpu' => iprop(∀ (spie2 spp2 : Bool) (R2 : RegMap),
       ⌜k.sie = false ∨ df = false → spie2 = spie ∧ spp2 = spp⌝ -∗
       kctx cpu' (((k.pushed 8).withSpie spie2 spp2).withRegs R2) -∗
-      pcIs cpu' (if i + 1 = n then 0x80001228#64 else 0x80001202#64) -∗
+      pcIs cpu' (if i + 1 = n then 0x800012d6#64 else 0x800012b0#64) -∗
       ptOwnRep root (delete Lm vi.toNat) -∗ umMap (delete Qm vi.toNat) M -∗ unFree df γl γk -∗
       ⌜unKept R R2 ∧ R2 18#5 = va + BitVec.ofNat 64 (4096 * (i + 1))⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cur := by
@@ -521,16 +521,16 @@ theorem uvmunmap_iter (W : WALK_NOALLOC) (KF : KFREE) [CurCtx]
     rw [un_toNat_add va _ (by omega)]; omega
   have hpg : ∀ b ∈ t.pages 2, pageValid (pageAddr b) := hrep.2.2.1
   -- c.li a2,0 ; c.mv a1,s2 ; c.mv a0,s4 ; jal walk
-  k_step_gen (wp_s_addi cur _ 0x80001202#64 true 0#12 12#5 0#5 (by decide))
+  k_step_gen (wp_s_addi cur _ 0x800012b0#64 true 0#12 12#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c1 hp1
   iintro Hk Hpc
-  k_step_gen (wp_s_add c1 _ 0x80001204#64 true 11#5 0#5 18#5 (by decide))
+  k_step_gen (wp_s_add c1 _ 0x800012b2#64 true 11#5 0#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h18] next c2 hp2
   iintro Hk Hpc
-  k_step_gen (wp_s_add c2 _ 0x80001206#64 true 10#5 0#5 20#5 (by decide))
+  k_step_gen (wp_s_add c2 _ 0x800012b4#64 true 10#5 0#5 20#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h20] next c3 hp3
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c3 _ 0x80001208#64 false 2096392#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c3 _ 0x800012b6#64 false 2096376#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hp4
   iintro Hk Hpc
   iapply (un_walk_call W c4 _ (DFrac.own 1) t ?hKa ?hro ?hv ?ha hrep.1) $$ [- $Hk $Hpc]
@@ -570,10 +570,10 @@ theorem uvmunmap_iter (W : WALK_NOALLOC) (KF : KFREE) [CurCtx]
       | true => rw [hQ1 hb]; exact hLn
       | false => exact hQ0 hb
     rw [delete_id Lm _ hLn, delete_id Qm _ hQn]
-    k_step_gen (wp_s_add c5 _ 0x8000120c#64 true 9#5 0#5 10#5 (by decide))
+    k_step_gen (wp_s_add c5 _ 0x800012ba#64 true 9#5 0#5 10#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c6 hp6
     iintro Hk Hpc
-    k_step_gen (wp_s_branch c6 _ 0x8000120e#64 true 8174#13 10#5 0#5 (by decide) bop.BEQ)
+    k_step_gen (wp_s_branch c6 _ 0x800012bc#64 true 8174#13 10#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [un_beq_zero _ hz] next c7 hp7
     iintro Hk Hpc
@@ -604,18 +604,18 @@ theorem uvmunmap_iter (W : WALK_NOALLOC) (KF : KFREE) [CurCtx]
       · exact absurd h0 hz
       · exact ha
     icases PtRun.ptreeOwn_leaf_acc 2 (DFrac.own 1) t vi hcomp $$ Hpt with ⟨Hcell, Hclose⟩
-    k_step_gen (wp_s_add c5 _ 0x8000120c#64 true 9#5 0#5 10#5 (by decide))
+    k_step_gen (wp_s_add c5 _ 0x800012ba#64 true 9#5 0#5 10#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [haddr] next c6 hp6
     iintro Hk Hpc
-    k_step_gen (wp_s_branch c6 _ 0x8000120e#64 true 8174#13 10#5 0#5 (by decide) bop.BEQ)
+    k_step_gen (wp_s_branch c6 _ 0x800012bc#64 true 8174#13 10#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [un_beq_ne _ hz] next c7 hp7
     iintro Hk Hpc
-    k_step_gen (wp_s_ld c7 _ 0x80001210#64 true 0#12 15#5 10#5 (by decide) (by decide)
+    k_step_gen (wp_s_ld c7 _ 0x800012be#64 true 0#12 15#5 10#5 (by decide) (by decide)
         (DFrac.own 1) (t.entAt 2 vi))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [haddr] next c8 hp8
     iintro Hk Hpc Hcell
-    k_step_gen (wp_s_andi c8 _ 0x80001212#64 false 1#12 14#5 15#5 (by decide))
+    k_step_gen (wp_s_andi c8 _ 0x800012c0#64 false 1#12 14#5 15#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c9 hp9
     iintro Hk Hpc
     have hpin9 : k.sie = false ∨ k.proc = 0#64 → c9 = cur := fun h =>
@@ -630,7 +630,7 @@ theorem uvmunmap_iter (W : WALK_NOALLOC) (KF : KFREE) [CurCtx]
         | true => rw [hQ1 hb]; exact hLn
         | false => exact hQ0 hb
       rw [delete_id Lm _ hLn, delete_id Qm _ hQn]
-      k_step_gen (wp_s_branch c9 _ 0x80001216#64 true 8166#13 14#5 0#5 (by decide) bop.BEQ)
+      k_step_gen (wp_s_branch c9 _ 0x800012c4#64 true 8166#13 14#5 0#5 (by decide) bop.BEQ)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [un_beq_zero _ hv] next c10 hp10
       iintro Hk Hpc
@@ -664,7 +664,7 @@ theorem uvmunmap_iter (W : WALK_NOALLOC) (KF : KFREE) [CurCtx]
         | some w => exact ⟨w, rfl⟩
         | none => exact absurd (hrep.2.2.2.2 vi hg) (by rw [hwalk]; simp)
       have hp2 : pte2pa (t.entAt 2 vi) = pte2pa w := pteAD_pte2pa (ptRep_entAt hrep vi w hw).2
-      k_step_gen (wp_s_branch c9 _ 0x80001216#64 true 8166#13 14#5 0#5 (by decide) bop.BEQ)
+      k_step_gen (wp_s_branch c9 _ 0x800012c4#64 true 8166#13 14#5 0#5 (by decide) bop.BEQ)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [un_beq_ne _ hv] next c10 hp10
       iintro Hk Hpc
@@ -681,7 +681,7 @@ theorem uvmunmap_iter (W : WALK_NOALLOC) (KF : KFREE) [CurCtx]
         have h9' : R3 9#5 = pteAddr (t.slot 2 vi).1 (vpnIdx vi 0) := by
           rw [f9]
           simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
-        k_step_gen (wp_s_sd c11 _ 0x800011f8#64 false 0#12 9#5 0#5 (by decide) (t.entAt 2 vi))
+        k_step_gen (wp_s_sd c11 _ 0x800012a6#64 false 0#12 9#5 0#5 (by decide) (t.entAt 2 vi))
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9'] next c12 hp12
         iintro Hk Hpc Hcell
         ihave Hpt := Hclose $$ %(0#64) Hcell
@@ -732,7 +732,7 @@ theorem uvmunmap_iter (W : WALK_NOALLOC) (KF : KFREE) [CurCtx]
 /-! ## The loop -/
 
 set_option maxHeartbeats 4000000 in
-/-- The loop from `0x80001202` with `i` pages done (`i < n`) runs to the
+/-- The loop from `0x800012b0` with `i` pages done (`i < n`) runs to the
 epilogue.  The hart is quantified inside the induction. -/
 theorem uvmunmap_loop (W : WALK_NOALLOC) (KF : KFREE) [CurCtx]
     (k : KCtx) (df : Bool) (γl : GName) (γk : KmemNames) (root : BitVec 44)
@@ -755,7 +755,7 @@ theorem uvmunmap_loop (W : WALK_NOALLOC) (KF : KFREE) [CurCtx]
       (_ : R 23#5 = k.regs 23#5) (_ : R 24#5 = k.regs 24#5) (_ : R 25#5 = k.regs 25#5)
       (_ : R 26#5 = k.regs 26#5) (_ : R 27#5 = k.regs 27#5)
       (cur : CPU),
-    kctx cur (((k.pushed 8).withSpie spie spp).withRegs R) ∗ pcIs cur 0x80001202#64 ∗
+    kctx cur (((k.pushed 8).withSpie spie spp).withRegs R) ∗ pcIs cur 0x800012b0#64 ∗
     ptOwnRep root (delRunL L vpn0 i) ∗ umMap (delRunL Q vpn0 i) M ∗ unFree df γl γk ∗
     unFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) ∗
@@ -786,7 +786,7 @@ theorem uvmunmap_loop (W : WALK_NOALLOC) (KF : KFREE) [CurCtx]
       icases unFrame_split _ _ _ _ _ _ _ _ _ $$ Hframe with ⟨F0, F1, F2, F3, F4, F5, F6, F7⟩
       icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
       have hR22 : R2 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFC0#64 := hkept.1.1.trans h2
-      k_step_gen (wp_s_ld c1 _ 0x80001228#64 true 40#12 9#5 2#5 (by decide) (by decide)
+      k_step_gen (wp_s_ld c1 _ 0x800012d6#64 true 40#12 9#5 2#5 (by decide) (by decide)
           (DFrac.own 1) (k.regs 9#5))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR22] next c2 hp2
       iintro Hk Hpc F2
@@ -918,64 +918,64 @@ theorem uvmunmap_gen (W : WALK_NOALLOC) (KF : KFREE) [CurCtx]
   have hvash : k.regs 11#5 <<< 52 = 0#64 := un_va_aligned _ hal
   k_norm_g
   -- the prologue
-  k_step_gen (wp_s_push cpu _ 0x800011b2#64 true 4032#12 8 hK8 un_imm_m64)
+  k_step_gen (wp_s_push cpu _ 0x80001260#64 true 4032#12 8 hK8 un_imm_m64)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c1 hp1
   iintro Hk Hpc Hframe
   irevert Hframe
   stack_cells
   iintro ⟨⟨%w0, F0⟩, ⟨%w1, F1⟩, ⟨%w2, F2⟩, ⟨%w3, F3⟩, ⟨%w4, F4⟩, ⟨%w5, F5⟩, ⟨%w6, F6⟩,
     ⟨%w7, F7⟩, _⟩
-  k_step_gen (wp_s_sd c1 _ 0x800011b4#64 true 56#12 2#5 1#5 (by decide) w0)
+  k_step_gen (wp_s_sd c1 _ 0x80001262#64 true 56#12 2#5 1#5 (by decide) w0)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c2 hp2
   iintro Hk Hpc F0
-  k_step_gen (wp_s_sd c2 _ 0x800011b6#64 true 48#12 2#5 8#5 (by decide) w1)
+  k_step_gen (wp_s_sd c2 _ 0x80001264#64 true 48#12 2#5 8#5 (by decide) w1)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
   iintro Hk Hpc F1
-  k_step_gen (wp_s_addi c3 _ 0x800011b8#64 true 64#12 8#5 2#5 (by decide))
+  k_step_gen (wp_s_addi c3 _ 0x80001266#64 true 64#12 8#5 2#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hp4
   iintro Hk Hpc
-  k_step_gen (wp_s_slli c4 _ 0x800011ba#64 false 52#6 15#5 11#5 (by decide))
+  k_step_gen (wp_s_slli c4 _ 0x80001268#64 false 52#6 15#5 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c5 hp5
   iintro Hk Hpc
-  k_step_gen (wp_s_branch c5 _ 0x800011be#64 true 34#13 15#5 0#5 (by decide) bop.BNE)
+  k_step_gen (wp_s_branch c5 _ 0x8000126c#64 true 34#13 15#5 0#5 (by decide) bop.BNE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [un_bne_zero _ hvash] next c6 hp6
   iintro Hk Hpc
-  k_step_gen (wp_s_sd c6 _ 0x800011c0#64 true 32#12 2#5 18#5 (by decide) w3)
+  k_step_gen (wp_s_sd c6 _ 0x8000126e#64 true 32#12 2#5 18#5 (by decide) w3)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c7 hp7
   iintro Hk Hpc F3
-  k_step_gen (wp_s_sd c7 _ 0x800011c2#64 true 24#12 2#5 19#5 (by decide) w4)
+  k_step_gen (wp_s_sd c7 _ 0x80001270#64 true 24#12 2#5 19#5 (by decide) w4)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c8 hp8
   iintro Hk Hpc F4
-  k_step_gen (wp_s_sd c8 _ 0x800011c4#64 true 16#12 2#5 20#5 (by decide) w5)
+  k_step_gen (wp_s_sd c8 _ 0x80001272#64 true 16#12 2#5 20#5 (by decide) w5)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c9 hp9
   iintro Hk Hpc F5
-  k_step_gen (wp_s_sd c9 _ 0x800011c6#64 true 8#12 2#5 21#5 (by decide) w6)
+  k_step_gen (wp_s_sd c9 _ 0x80001274#64 true 8#12 2#5 21#5 (by decide) w6)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c10 hp10
   iintro Hk Hpc F6
-  k_step_gen (wp_s_sd c10 _ 0x800011c8#64 true 0#12 2#5 22#5 (by decide) w7)
+  k_step_gen (wp_s_sd c10 _ 0x80001276#64 true 0#12 2#5 22#5 (by decide) w7)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c11 hp11
   iintro Hk Hpc F7
   -- the cursor
-  k_step_gen (wp_s_add c11 _ 0x800011ca#64 true 20#5 0#5 10#5 (by decide))
+  k_step_gen (wp_s_add c11 _ 0x80001278#64 true 20#5 0#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hroot] next c12 hp12
   iintro Hk Hpc
-  k_step_gen (wp_s_add c12 _ 0x800011cc#64 true 18#5 0#5 11#5 (by decide))
+  k_step_gen (wp_s_add c12 _ 0x8000127a#64 true 18#5 0#5 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c13 hp13
   iintro Hk Hpc
-  k_step_gen (wp_s_add c13 _ 0x800011ce#64 true 21#5 0#5 13#5 (by decide))
+  k_step_gen (wp_s_add c13 _ 0x8000127c#64 true 21#5 0#5 13#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c14 hp14
   iintro Hk Hpc
-  k_step_gen (wp_s_slli c14 _ 0x800011d0#64 true 12#6 12#5 12#5 (by decide))
+  k_step_gen (wp_s_slli c14 _ 0x8000127e#64 true 12#6 12#5 12#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hn, un_shl12 n] next c15 hp15
   iintro Hk Hpc
-  k_step_gen (wp_s_add c15 _ 0x800011d2#64 false 19#5 12#5 11#5 (by decide))
+  k_step_gen (wp_s_add c15 _ 0x80001280#64 false 19#5 12#5 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c16 hp16
   iintro Hk Hpc
-  k_step_gen (wp_s_lui c16 _ 0x800011d6#64 true 1#20 22#5 (by decide))
+  k_step_gen (wp_s_lui c16 _ 0x80001284#64 true 1#20 22#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [un_lui_4096] next c17 hp17
   iintro Hk Hpc
-  k_step_gen (wp_s_branch c17 _ 0x800011d8#64 false 82#13 11#5 19#5 (by decide) bop.BGEU)
+  k_step_gen (wp_s_branch c17 _ 0x80001286#64 false 82#13 11#5 19#5 (by decide) bop.BGEU)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [un_bgeu_entry (k.regs 11#5) n hr] next c18 hp18
   iintro Hk Hpc
@@ -1010,10 +1010,10 @@ theorem uvmunmap_gen (W : WALK_NOALLOC) (KF : KFREE) [CurCtx]
     case e27 => simp [RegMap.set_apply]
   · -- save `s1` and enter the loop
     rw [if_neg hn0]
-    k_step_gen (wp_s_sd c18 _ 0x800011dc#64 true 40#12 2#5 9#5 (by decide) w2)
+    k_step_gen (wp_s_sd c18 _ 0x8000128a#64 true 40#12 2#5 9#5 (by decide) w2)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c19 hp19
     iintro Hk Hpc F2
-    k_step_gen (wp_s_j c19 _ 0x800011de#64 true 36#21)
+    k_step_gen (wp_s_j c19 _ 0x8000128c#64 true 36#21)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c20 hp20
     iintro Hk Hpc
     ihave Hframe := unFrame_join (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5)

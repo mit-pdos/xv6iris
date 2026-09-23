@@ -16,8 +16,8 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
 /-- `&nextpid`, `&initproc` (`&pid_lock` is `Xv6/SpecProcinit.lean`'s
 `pidLockAddr`). -/
-def nextpidAddr : BitVec 64 := 0x8000a244#64
-def initprocAddr : BitVec 64 := 0x8000a280#64
+def nextpidAddr : BitVec 64 := 0x8000a2b4#64
+def initprocAddr : BitVec 64 := 0x8000a340#64
 /-- `PIDMAX`. -/
 def PIDMAX : Nat := 1000
 

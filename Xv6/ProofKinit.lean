@@ -35,9 +35,9 @@ theorem ki_u12 : BitVec.signExtend 64 (0x12#20 ++ 0#12) = 0x12000#64 := by decid
 theorem ki_u23 : BitVec.signExtend 64 (0x23#20 ++ 0#12) = 0x23000#64 := by decide
 
 /-- `ret` out of either callee lands on the instruction after the `jal`. -/
-theorem ki_ret_ac8 : jumpPc 0x80000ac8#64 = 0x80000ac8#64 := by
+theorem ki_ret_ac8 : jumpPc 0x80000b66#64 = 0x80000b66#64 := by
   simp only [jumpPc, BitVec.reduceAnd]
-theorem ki_ret_ad8 : jumpPc 0x80000ad8#64 = 0x80000ad8#64 := by
+theorem ki_ret_ad8 : jumpPc 0x80000b76#64 = 0x80000b76#64 := by
   simp only [jumpPc, BitVec.reduceAnd]
 
 /-- The context algebra of the exit interrupt state. -/
@@ -50,12 +50,12 @@ theorem ki_availAdd0 : availAdd (some 0) kinitPages = some kinitPages := by
 
 theorem kinitBase_toNat : kinitBase.toNat = 0x80024000 := rfl
 theorem ki_physTop_toNat : physTop.toNat = 0x88000000 := rfl
-theorem ki_kernelEnd_toNat : kernelEndAddr.toNat = 0x80023598 := rfl
+theorem ki_kernelEnd_toNat : kernelEndAddr.toNat = 0x80023640 := rfl
 theorem ki_stop_toNat : (0x88000000#64).toNat = 0x88000000 := rfl
 
 /-- The arguments `kinit` hands `freerange`: `end` and `PHYSTOP` delimit
 exactly `kinitPages` whole pages from `PGROUNDUP(end) = kinitBase`. -/
-theorem ki_hargs : freerangeArgs 0x80023598#64 0x88000000#64 kinitBase kinitPages := by
+theorem ki_hargs : freerangeArgs 0x80023640#64 0x88000000#64 kinitBase kinitPages := by
   refine ⟨by decide, ?_, ?_, ?_, ?_⟩ <;>
     simp only [kinitBase_toNat, kinitPages, ki_physTop_toNat, ki_kernelEnd_toNat, ki_stop_toNat] <;>
     omega
@@ -70,7 +70,7 @@ set_option maxHeartbeats 1000000 in
 theorem ki_initlock_call (IL : INITLOCK) [CurCtx] (c : CPU) (k' : KCtx)
     (vlock : BitVec 32) (vname vcpu : BitVec 64) (hK' : 2 ≤ k'.avail)
     (lk nm : BitVec 64) (h10 : k'.regs 10#5 = lk) (h11 : k'.regs 11#5 = nm) :
-    kctx c k' ∗ pcIs c 0x80000b3a#64 ∗
+    kctx c k' ∗ pcIs c 0x80000bd8#64 ∗
     kmapId lk ∗ kmapId (lk + 16#64) ∗
     wordPointsTo lk 4 (DFrac.own 1) vlock ∗
     wordPointsTo (lk + 8#64) 8 (DFrac.own 1) vname ∗
@@ -91,7 +91,7 @@ theorem ki_freerange_call (FR : FREERANGE) [CurCtx] (c : CPU) (k' : KCtx)
     (γl : GName) (γk : KmemNames) (on : Option Nat) (base : BitVec 64) (n : Nat)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 20 ≤ k'.avail) (hlk : "kmem" ∉ k'.locks)
     (hargs : freerangeArgs (k'.regs 10#5) (k'.regs 11#5) base n) :
-    kctx c k' ∗ pcIs c 0x80000a64#64 ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
+    kctx c k' ∗ pcIs c 0x80000b02#64 ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
     pageRange base n ∗ kallocAvail γk on ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
@@ -123,7 +123,7 @@ theorem ki_kmemRes_intro [CurCtx] (γk : KmemNames) :
 /-! ## The epilogue -/
 
 set_option maxHeartbeats 4000000 in
-/-- The epilogue at `0x80000ad8`: restore `ra`, `s0`, pop the frame, return
+/-- The epilogue at `0x80000b76`: restore `ra`, `s0`, pop the frame, return
 to the caller with the lock and the count. -/
 theorem kinit_finish [CurCtx] (cpu c : CPU) (k : KCtx)
     (hpin : k.sie = false ∨ k.proc = 0#64 → c = cpu) (hK : 2 ≤ k.avail)
@@ -135,7 +135,7 @@ theorem kinit_finish [CurCtx] (cpu c : CPU) (k : KCtx)
     (h21 : R 21#5 = k.regs 21#5) (h22 : R 22#5 = k.regs 22#5) (h23 : R 23#5 = k.regs 23#5)
     (h24 : R 24#5 = k.regs 24#5) (h25 : R 25#5 = k.regs 25#5) (h26 : R 26#5 = k.regs 26#5)
     (h27 : R 27#5 = k.regs 27#5) :
-    kctx c (((k.pushed 2).withSpie spie spp).withRegs R) ∗ pcIs c 0x80000ad8#64 ∗
+    kctx c (((k.pushed 2).withSpie spie spp).withRegs R) ∗ pcIs c 0x80000b76#64 ∗
     frame2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) ∗
     isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk (some kinitPages) ∗
     wordPointsTo (kmemLockAddr + 8#64) 8 (DFrac.own 1) kmemNameAddr ∗
@@ -152,7 +152,7 @@ theorem kinit_finish [CurCtx] (cpu c : CPU) (k : KCtx)
   simp only [ki_pushed_withSpie]
   have hK' : 2 ≤ (k.withSpie spie spp).avail := hK
   have hR2' : R 2#5 = (k.withSpie spie spp).regs 2#5 + 0xFFFFFFFFFFFFFFF0#64 := hR2
-  iapply (wp_epilogue2_gen c (k.withSpie spie spp) 0x80000ad8#64 hK' R hR2'
+  iapply (wp_epilogue2_gen c (k.withSpie spie spp) 0x80000b76#64 hK' R hR2'
     (k.regs 1#5) (k.regs 8#5)) $$ [- $Hk $Hpc]
   k_code (text_instr _ _ _ _ rfl rfl) HT
   k_norm_g
@@ -179,7 +179,7 @@ theorem kinit_proof (IL : INITLOCK) (FR : FREERANGE) : KINIT :=
   simp only [kinitAddr, KernelSyms.«kinit»]
   k_norm_g
   -- prologue
-  iapply (wp_prologue2_gen cpu k 0x80000aac#64 (by omega))
+  iapply (wp_prologue2_gen cpu k 0x80000b4a#64 (by omega))
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm_g
   iframe
@@ -187,21 +187,21 @@ theorem kinit_proof (IL : INITLOCK) (FR : FREERANGE) : KINIT :=
   iapply wpNext_intro_pin
   iintro %c1 %hp1 Hk Hpc Hframe
   -- a1 = "kmem"
-  k_step_gen (wp_s_auipc c1 _ 0x80000ab4#64 false 6#20 11#5 (by decide))
+  k_step_gen (wp_s_auipc c1 _ 0x80000b52#64 false 6#20 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ki_u6] next c2 hp2
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c2 _ 0x80000ab8#64 false 1420#12 11#5 11#5 (by decide))
+  k_step_gen (wp_s_addi c2 _ 0x80000b56#64 false 1270#12 11#5 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
   iintro Hk Hpc
   -- a0 = &kmem.lock
-  k_step_gen (wp_s_auipc c3 _ 0x80000abc#64 false 0x12#20 10#5 (by decide))
+  k_step_gen (wp_s_auipc c3 _ 0x80000b5a#64 false 0x12#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ki_u12] next c4 hp4
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c4 _ 0x80000ac0#64 false 2220#12 10#5 10#5 (by decide))
+  k_step_gen (wp_s_addi c4 _ 0x80000b5e#64 false 2230#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c5 hp5
   iintro Hk Hpc
   -- jal ra, initlock
-  k_step_gen (wp_s_jal c5 _ 0x80000ac4#64 false 118#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c5 _ 0x80000b62#64 false 118#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c6 hp6
   iintro Hk Hpc
   have hpin6 : k.sie = false ∨ k.proc = 0#64 → c6 = cpu := fun h =>
@@ -235,21 +235,21 @@ theorem kinit_proof (IL : INITLOCK) (FR : FREERANGE) : KINIT :=
     iframe
   imodintro
   -- a1 = PHYSTOP
-  k_step_gen (wp_s_addi c7 _ 0x80000ac8#64 true 17#12 11#5 0#5 (by decide))
+  k_step_gen (wp_s_addi c7 _ 0x80000b66#64 true 17#12 11#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c8 hp8
   iintro Hk Hpc
-  k_step_gen (wp_s_slli c8 _ 0x80000aca#64 true 27#6 11#5 11#5 (by decide))
+  k_step_gen (wp_s_slli c8 _ 0x80000b68#64 true 27#6 11#5 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c9 hp9
   iintro Hk Hpc
   -- a0 = end
-  k_step_gen (wp_s_auipc c9 _ 0x80000acc#64 false 0x23#20 10#5 (by decide))
+  k_step_gen (wp_s_auipc c9 _ 0x80000b6a#64 false 0x23#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ki_u23] next c10 hp10
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c10 _ 0x80000ad0#64 false 2764#12 10#5 10#5 (by decide))
+  k_step_gen (wp_s_addi c10 _ 0x80000b6e#64 false 2774#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c11 hp11
   iintro Hk Hpc
   -- jal ra, freerange
-  k_step_gen (wp_s_jal c11 _ 0x80000ad4#64 false 2097040#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c11 _ 0x80000b72#64 false 2097040#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c12 hp12
   iintro Hk Hpc
   have hpin12 : k.sie = false ∨ k.proc = 0#64 → c12 = cpu := fun h =>

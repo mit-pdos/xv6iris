@@ -12,7 +12,7 @@ index (dead here, the index is a `Nat` `i < 6`), `s1 <<= 2`, the table base
 comes out of `auipc/addi`, the entry is read with `c.lw` out of the image
 (`argraw_tbl_word`) and `c.jr` enters case `i` (`argrawEntry_target`).  Each
 case reads `p->trapframe` and then word `14 + i` of the trapframe page
-(`tfPage_word_acc`), and falls into the shared epilogue at `0x800027a0`.
+(`tfPage_word_acc`), and falls into the shared epilogue at `0x8000285e`.
 -/
 import Xv6.SpecArgraw
 import Xv6.SpecMyproc
@@ -32,13 +32,13 @@ set_option linter.unusedVariables false
 
 /-! ## Constants and register bookkeeping -/
 
-/-- `myproc` returns to `0x80002784`. -/
-theorem ar_ret_2784 : jumpPc 0x80002784#64 = 0x80002784#64 := by
+/-- `myproc` returns to `0x80002842`. -/
+theorem ar_ret_2784 : jumpPc 0x80002842#64 = 0x80002842#64 := by
   simp only [jumpPc, BitVec.reduceAnd]
 
 /-- `auipc a4,0x5 ; addi a4,a4,-20` is the table base. -/
 theorem ar_tbl_2790 :
-    0x8000278c#64 + (BitVec.signExtend 64 (0x5#20 ++ 0#12) + 0xFFFFFFFFFFFFFFEC#64) = argrawTbl := by
+    0x8000284a#64 + (BitVec.signExtend 64 (0x5#20 ++ 0#12) + 18446744073709551414#64) = argrawTbl := by
   unfold argrawTbl; decide
 
 /-- The index guard is dead: `5 <u i` is false for `i < 6`. -/
@@ -93,7 +93,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx
 
 theorem ar_myproc (MP : MYPROC) (c : CPU) (k' : KCtx)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 10 ≤ k'.avail) :
-    kctx c k' ∗ pcIs c 0x800018da#64 ∗
+    kctx c k' ∗ pcIs c 0x80001988#64 ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
@@ -104,14 +104,14 @@ theorem ar_myproc (MP : MYPROC) (c : CPU) (k' : KCtx)
   simp only [myprocAddr, KernelSyms.«myproc»] at h
   exact h
 
-/-! ## The shared epilogue at `0x800027a0` -/
+/-! ## The shared epilogue at `0x8000285e` -/
 
 set_option maxHeartbeats 4000000 in
 theorem ar_tail (c : CPU) (kb : KCtx) (hK : 4 ≤ kb.avail) (v : BitVec 64)
     (KR : RegMap) (hregs : kb.regs = KR)
     (R : RegMap) (hR2 : R 2#5 = KR 2#5 + 0xFFFFFFFFFFFFFFE0#64) (h10 : R 10#5 = v)
     (hcs : calleeSaved KR (((R.set 2#5 (KR 2#5)).set 8#5 (KR 8#5)).set 9#5 (KR 9#5))) :
-    kctx c ((kb.pushed 4).withRegs R) ∗ pcIs c 0x800027a0#64 ∗
+    kctx c ((kb.pushed 4).withRegs R) ∗ pcIs c 0x8000285e#64 ∗
     frame4s1 (KR 2#5) (KR 1#5) (KR 8#5) (KR 9#5) ∗
     wpNext kb.sie kb.proc c (fun cpu' => iprop(∀ R'' : RegMap,
       kctx cpu' (kb.withRegs R'') -∗ pcIs cpu' (jumpPc (KR 1#5)) -∗
@@ -120,7 +120,7 @@ theorem ar_tail (c : CPU) (kb : KCtx) (hK : 4 ≤ kb.avail) (v : BitVec 64)
   subst hregs
   iintro ⟨Hk, Hpc, Hframe, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
-  iapply (wp_epilogue4s1_gen c kb 0x800027a0#64 hK R hR2 (kb.regs 1#5) (kb.regs 8#5) (kb.regs 9#5))
+  iapply (wp_epilogue4s1_gen c kb 0x8000285e#64 hK R hR2 (kb.regs 1#5) (kb.regs 8#5) (kb.regs 9#5))
     $$ [- $Hk $Hpc $Hframe]
   k_code (text_instr _ _ _ _ rfl rfl) HT
   k_norm_g
@@ -147,7 +147,7 @@ theorem ar_exit (cpu cr : CPU) (k : KCtx) (tfp : BitVec 44) (ws : List (BitVec 6
     (spie spp : Bool) (hsp : k.sie = false → spie = k.spie ∧ spp = k.spp)
     (R : RegMap) (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64) (hpins : arPins k R)
     (h10 : R 10#5 = v) :
-    kctx cr (((k.withSpie spie spp).pushed 4).withRegs R) ∗ pcIs cr 0x800027a0#64 ∗
+    kctx cr (((k.withSpie spie spp).pushed 4).withRegs R) ∗ pcIs cr 0x8000285e#64 ∗
     frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
     wordPointsTo (pTrapframe k.proc) 8 dqt (pageAddr tfp) ∗ tfPageAt tfp ws ∗
     wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie2 : Bool, ∀ spp2 : Bool, ∀ R' : RegMap,
@@ -174,12 +174,12 @@ end
 
 /-! ## The case bodies' entry addresses -/
 
-theorem ar_case0 : argrawCase 0 = 0x8000279c#64 := rfl
-theorem ar_case1 : argrawCase 1 = 0x800027aa#64 := rfl
-theorem ar_case2 : argrawCase 2 = 0x800027b0#64 := rfl
-theorem ar_case3 : argrawCase 3 = 0x800027b6#64 := rfl
-theorem ar_case4 : argrawCase 4 = 0x800027bc#64 := rfl
-theorem ar_case5 : argrawCase 5 = 0x800027c2#64 := rfl
+theorem ar_case0 : argrawCase 0 = 0x8000285a#64 := rfl
+theorem ar_case1 : argrawCase 1 = 0x80002868#64 := rfl
+theorem ar_case2 : argrawCase 2 = 0x8000286e#64 := rfl
+theorem ar_case3 : argrawCase 3 = 0x80002874#64 := rfl
+theorem ar_case4 : argrawCase 4 = 0x8000287a#64 := rfl
+theorem ar_case5 : argrawCase 5 = 0x80002880#64 := rfl
 
 /-! ## The function -/
 
@@ -198,7 +198,7 @@ theorem argraw_proof (MP : MYPROC) : ARGRAW := ⟨
     unfold pTrapframe; iintro H; iexact H) $$ Htf
   ihave Hent := argraw_tbl_word i hi $$ Hstatic Hdata
   -- the prologue
-  iapply (wp_prologue4s1_gen cpu k 0x80002774#64 hK4)
+  iapply (wp_prologue4s1_gen cpu k 0x80002832#64 hK4)
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm_g
   iframe
@@ -206,10 +206,10 @@ theorem argraw_proof (MP : MYPROC) : ARGRAW := ⟨
   iapply wpNext_intro_pin
   iintro %c1 %hp1 Hk Hpc Hframe
   -- c.mv s1,a0 ; jal myproc
-  k_step_gen (wp_s_add c1 _ 0x8000277e#64 true 9#5 0#5 10#5 (by decide))
+  k_step_gen (wp_s_add c1 _ 0x8000283c#64 true 9#5 0#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0] next c2 hp2
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c2 _ 0x80002780#64 false 2093402#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c2 _ 0x8000283e#64 false 2093386#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
   iintro Hk Hpc
   iapply (ar_myproc MP c3 _ ?hnm ?hKm) $$ [- $Hk $Hpc]
@@ -229,27 +229,27 @@ theorem argraw_proof (MP : MYPROC) : ARGRAW := ⟨
   have q0 : k.sie = false ∨ k.proc = 0#64 → cm = cpu :=
     fun h => (hpm h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))
   -- c.li a5,5 ; bltu a5,s1 (dead)
-  k_step_gen (wp_s_addi cm _ 0x80002784#64 true 5#12 15#5 0#5 (by decide))
+  k_step_gen (wp_s_addi cm _ 0x80002842#64 true 5#12 15#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hp4
   iintro Hk Hpc
-  k_step_gen (wp_s_branch c4 _ 0x80002786#64 false 66#13 15#5 9#5 (by decide) bop.BLTU)
+  k_step_gen (wp_s_branch c4 _ 0x80002844#64 false 66#13 15#5 9#5 (by decide) bop.BLTU)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [b9, ar_bltu i hi] next c5 hp5
   iintro Hk Hpc
   -- c.slli s1,s1,2 ; auipc a4,0x5 ; addi a4,a4,-20 ; c.add s1,s1,a4
-  k_step_gen (wp_s_slli c5 _ 0x8000278a#64 true 2#6 9#5 9#5 (by decide))
+  k_step_gen (wp_s_slli c5 _ 0x80002848#64 true 2#6 9#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [b9] next c6 hp6
   iintro Hk Hpc
-  k_step_gen (wp_s_auipc c6 _ 0x8000278c#64 false 0x5#20 14#5 (by decide))
+  k_step_gen (wp_s_auipc c6 _ 0x8000284a#64 false 0x5#20 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c7 hp7
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c7 _ 0x80002790#64 false 4076#12 14#5 14#5 (by decide))
+  k_step_gen (wp_s_addi c7 _ 0x8000284e#64 false 3894#12 14#5 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ar_tbl_2790] next c8 hp8
   iintro Hk Hpc
-  k_step_gen (wp_s_add c8 _ 0x80002794#64 true 9#5 9#5 14#5 (by decide))
+  k_step_gen (wp_s_add c8 _ 0x80002852#64 true 9#5 9#5 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c9 hp9
   iintro Hk Hpc
   -- c.lw a5,0(s1) ; c.add a5,a5,a4 ; c.jr a5
-  iapply (wp_s_lw c9 _ 0x80002796#64 true 0#12 15#5 9#5 (by decide) (by decide)
+  iapply (wp_s_lw c9 _ 0x80002854#64 true 0#12 15#5 9#5 (by decide) (by decide)
       DFrac.discard (argrawEntry i)) $$ [- $Hk $Hpc]
   rotate_right 1
   k_code (text_instr _ _ _ _ rfl rfl) Htext
@@ -261,10 +261,10 @@ theorem argraw_proof (MP : MYPROC) : ARGRAW := ⟨
   iintro %c10 %hp10
   k_norm_g [ar_tbl_addr i hi]
   iintro Hk Hpc Hent
-  k_step_gen (wp_s_add c10 _ 0x80002798#64 true 15#5 15#5 14#5 (by decide))
+  k_step_gen (wp_s_add c10 _ 0x80002856#64 true 15#5 15#5 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c11 hp11
   iintro Hk Hpc
-  k_step_gen (wp_s_ret c11 _ 0x8000279a#64 true 15#5)
+  k_step_gen (wp_s_ret c11 _ 0x80002858#64 true 15#5)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [argrawEntry_target i hi] next c12 hp12
   iintro Hk Hpc
   have q1 : k.sie = false ∨ k.proc = 0#64 → c12 = cpu := fun h =>
@@ -278,10 +278,10 @@ theorem argraw_proof (MP : MYPROC) : ARGRAW := ⟨
     icases tfPage_word_acc tfp ws (tfArgIdx 0) v hws $$ Hpage with ⟨Hw, Hcl⟩
     ihave Hw := (show wordPointsTo (GF := GF) (pageAddr tfp + BitVec.ofNat 64 (8 * tfArgIdx 0)) 8 (DFrac.own 1) v ⊢
         wordPointsTo (pageAddr tfp + 112#64) 8 (DFrac.own 1) v from by rw [ea]) $$ Hw
-    k_step_gen (wp_s_ld c12 _ 0x8000279c#64 true 88#12 15#5 10#5 (by decide) (by decide) dqt (pageAddr tfp))
+    k_step_gen (wp_s_ld c12 _ 0x8000285a#64 true 88#12 15#5 10#5 (by decide) (by decide) dqt (pageAddr tfp))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0'] next d1 hq1
     iintro Hk Hpc Htf
-    k_step_gen (wp_s_ld d1 _ 0x8000279e#64 true 112#12 10#5 15#5 (by decide) (by decide) (DFrac.own 1) v)
+    k_step_gen (wp_s_ld d1 _ 0x8000285c#64 true 112#12 10#5 15#5 (by decide) (by decide) (DFrac.own 1) v)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next d2 hq2
     iintro Hk Hpc Hw
     ihave Hw := (show wordPointsTo (GF := GF) (pageAddr tfp + 112#64) 8 (DFrac.own 1) v ⊢
@@ -301,13 +301,13 @@ theorem argraw_proof (MP : MYPROC) : ARGRAW := ⟨
     icases tfPage_word_acc tfp ws (tfArgIdx 1) v hws $$ Hpage with ⟨Hw, Hcl⟩
     ihave Hw := (show wordPointsTo (GF := GF) (pageAddr tfp + BitVec.ofNat 64 (8 * tfArgIdx 1)) 8 (DFrac.own 1) v ⊢
         wordPointsTo (pageAddr tfp + 120#64) 8 (DFrac.own 1) v from by rw [ea]) $$ Hw
-    k_step_gen (wp_s_ld c12 _ 0x800027aa#64 true 88#12 15#5 10#5 (by decide) (by decide) dqt (pageAddr tfp))
+    k_step_gen (wp_s_ld c12 _ 0x80002868#64 true 88#12 15#5 10#5 (by decide) (by decide) dqt (pageAddr tfp))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0'] next d1 hq1
     iintro Hk Hpc Htf
-    k_step_gen (wp_s_ld d1 _ 0x800027ac#64 true 120#12 10#5 15#5 (by decide) (by decide) (DFrac.own 1) v)
+    k_step_gen (wp_s_ld d1 _ 0x8000286a#64 true 120#12 10#5 15#5 (by decide) (by decide) (DFrac.own 1) v)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next d2 hq2
     iintro Hk Hpc Hw
-    k_step_gen (wp_s_j d2 _ 0x800027ae#64 true 2097138#21)
+    k_step_gen (wp_s_j d2 _ 0x8000286c#64 true 2097138#21)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next d3 hq3
     iintro Hk Hpc
     ihave Hw := (show wordPointsTo (GF := GF) (pageAddr tfp + 120#64) 8 (DFrac.own 1) v ⊢
@@ -327,13 +327,13 @@ theorem argraw_proof (MP : MYPROC) : ARGRAW := ⟨
     icases tfPage_word_acc tfp ws (tfArgIdx 2) v hws $$ Hpage with ⟨Hw, Hcl⟩
     ihave Hw := (show wordPointsTo (GF := GF) (pageAddr tfp + BitVec.ofNat 64 (8 * tfArgIdx 2)) 8 (DFrac.own 1) v ⊢
         wordPointsTo (pageAddr tfp + 128#64) 8 (DFrac.own 1) v from by rw [ea]) $$ Hw
-    k_step_gen (wp_s_ld c12 _ 0x800027b0#64 true 88#12 15#5 10#5 (by decide) (by decide) dqt (pageAddr tfp))
+    k_step_gen (wp_s_ld c12 _ 0x8000286e#64 true 88#12 15#5 10#5 (by decide) (by decide) dqt (pageAddr tfp))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0'] next d1 hq1
     iintro Hk Hpc Htf
-    k_step_gen (wp_s_ld d1 _ 0x800027b2#64 true 128#12 10#5 15#5 (by decide) (by decide) (DFrac.own 1) v)
+    k_step_gen (wp_s_ld d1 _ 0x80002870#64 true 128#12 10#5 15#5 (by decide) (by decide) (DFrac.own 1) v)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next d2 hq2
     iintro Hk Hpc Hw
-    k_step_gen (wp_s_j d2 _ 0x800027b4#64 true 2097132#21)
+    k_step_gen (wp_s_j d2 _ 0x80002872#64 true 2097132#21)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next d3 hq3
     iintro Hk Hpc
     ihave Hw := (show wordPointsTo (GF := GF) (pageAddr tfp + 128#64) 8 (DFrac.own 1) v ⊢
@@ -353,13 +353,13 @@ theorem argraw_proof (MP : MYPROC) : ARGRAW := ⟨
     icases tfPage_word_acc tfp ws (tfArgIdx 3) v hws $$ Hpage with ⟨Hw, Hcl⟩
     ihave Hw := (show wordPointsTo (GF := GF) (pageAddr tfp + BitVec.ofNat 64 (8 * tfArgIdx 3)) 8 (DFrac.own 1) v ⊢
         wordPointsTo (pageAddr tfp + 136#64) 8 (DFrac.own 1) v from by rw [ea]) $$ Hw
-    k_step_gen (wp_s_ld c12 _ 0x800027b6#64 true 88#12 15#5 10#5 (by decide) (by decide) dqt (pageAddr tfp))
+    k_step_gen (wp_s_ld c12 _ 0x80002874#64 true 88#12 15#5 10#5 (by decide) (by decide) dqt (pageAddr tfp))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0'] next d1 hq1
     iintro Hk Hpc Htf
-    k_step_gen (wp_s_ld d1 _ 0x800027b8#64 true 136#12 10#5 15#5 (by decide) (by decide) (DFrac.own 1) v)
+    k_step_gen (wp_s_ld d1 _ 0x80002876#64 true 136#12 10#5 15#5 (by decide) (by decide) (DFrac.own 1) v)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next d2 hq2
     iintro Hk Hpc Hw
-    k_step_gen (wp_s_j d2 _ 0x800027ba#64 true 2097126#21)
+    k_step_gen (wp_s_j d2 _ 0x80002878#64 true 2097126#21)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next d3 hq3
     iintro Hk Hpc
     ihave Hw := (show wordPointsTo (GF := GF) (pageAddr tfp + 136#64) 8 (DFrac.own 1) v ⊢
@@ -379,13 +379,13 @@ theorem argraw_proof (MP : MYPROC) : ARGRAW := ⟨
     icases tfPage_word_acc tfp ws (tfArgIdx 4) v hws $$ Hpage with ⟨Hw, Hcl⟩
     ihave Hw := (show wordPointsTo (GF := GF) (pageAddr tfp + BitVec.ofNat 64 (8 * tfArgIdx 4)) 8 (DFrac.own 1) v ⊢
         wordPointsTo (pageAddr tfp + 144#64) 8 (DFrac.own 1) v from by rw [ea]) $$ Hw
-    k_step_gen (wp_s_ld c12 _ 0x800027bc#64 true 88#12 15#5 10#5 (by decide) (by decide) dqt (pageAddr tfp))
+    k_step_gen (wp_s_ld c12 _ 0x8000287a#64 true 88#12 15#5 10#5 (by decide) (by decide) dqt (pageAddr tfp))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0'] next d1 hq1
     iintro Hk Hpc Htf
-    k_step_gen (wp_s_ld d1 _ 0x800027be#64 true 144#12 10#5 15#5 (by decide) (by decide) (DFrac.own 1) v)
+    k_step_gen (wp_s_ld d1 _ 0x8000287c#64 true 144#12 10#5 15#5 (by decide) (by decide) (DFrac.own 1) v)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next d2 hq2
     iintro Hk Hpc Hw
-    k_step_gen (wp_s_j d2 _ 0x800027c0#64 true 2097120#21)
+    k_step_gen (wp_s_j d2 _ 0x8000287e#64 true 2097120#21)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next d3 hq3
     iintro Hk Hpc
     ihave Hw := (show wordPointsTo (GF := GF) (pageAddr tfp + 144#64) 8 (DFrac.own 1) v ⊢
@@ -405,13 +405,13 @@ theorem argraw_proof (MP : MYPROC) : ARGRAW := ⟨
     icases tfPage_word_acc tfp ws (tfArgIdx 5) v hws $$ Hpage with ⟨Hw, Hcl⟩
     ihave Hw := (show wordPointsTo (GF := GF) (pageAddr tfp + BitVec.ofNat 64 (8 * tfArgIdx 5)) 8 (DFrac.own 1) v ⊢
         wordPointsTo (pageAddr tfp + 152#64) 8 (DFrac.own 1) v from by rw [ea]) $$ Hw
-    k_step_gen (wp_s_ld c12 _ 0x800027c2#64 true 88#12 15#5 10#5 (by decide) (by decide) dqt (pageAddr tfp))
+    k_step_gen (wp_s_ld c12 _ 0x80002880#64 true 88#12 15#5 10#5 (by decide) (by decide) dqt (pageAddr tfp))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0'] next d1 hq1
     iintro Hk Hpc Htf
-    k_step_gen (wp_s_ld d1 _ 0x800027c4#64 true 152#12 10#5 15#5 (by decide) (by decide) (DFrac.own 1) v)
+    k_step_gen (wp_s_ld d1 _ 0x80002882#64 true 152#12 10#5 15#5 (by decide) (by decide) (DFrac.own 1) v)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next d2 hq2
     iintro Hk Hpc Hw
-    k_step_gen (wp_s_j d2 _ 0x800027c6#64 true 2097114#21)
+    k_step_gen (wp_s_j d2 _ 0x80002884#64 true 2097114#21)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next d3 hq3
     iintro Hk Hpc
     ihave Hw := (show wordPointsTo (GF := GF) (pageAddr tfp + 152#64) 8 (DFrac.own 1) v ⊢

@@ -47,11 +47,11 @@ theorem sp_ite_beq {α : Type _} (x : BitVec 64) (p q : α) :
 
 theorem sp_pChan (pa : BitVec 64) : pa + 32#64 = pChan pa := rfl
 
-theorem sp_ret_f3a : jumpPc 0x80001f3a#64 = 0x80001f3a#64 := by
+theorem sp_ret_f3a : jumpPc 0x80001fe8#64 = 0x80001fe8#64 := by
   simp only [jumpPc, BitVec.reduceAnd]
-theorem sp_ret_f40 : jumpPc 0x80001f40#64 = 0x80001f40#64 := by
+theorem sp_ret_f40 : jumpPc 0x80001fee#64 = 0x80001fee#64 := by
   simp only [jumpPc, BitVec.reduceAnd]
-theorem sp_ret_f4c : jumpPc 0x80001f4c#64 = 0x80001f4c#64 := by
+theorem sp_ret_f4c : jumpPc 0x80001ffa#64 = 0x80001ffa#64 := by
   simp only [jumpPc, BitVec.reduceAnd]
 
 theorem sp_pcIs_neg {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
@@ -92,7 +92,7 @@ theorem sleep_prepare_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) : SLEEP_
   have hK4 : 4 ≤ k.avail := by unfold sleepPrepareSlots at hK; omega
   ihave #Hlk := procsInv_lookup Γ j hj $$ Hpinv
   -- the prologue
-  iapply (wp_prologue4s2_gen cpu k 0x80001f28#64 hK4)
+  iapply (wp_prologue4s2_gen cpu k 0x80001fd6#64 hK4)
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm_g
   iframe
@@ -100,15 +100,15 @@ theorem sleep_prepare_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) : SLEEP_
   iapply wpNext_intro_pin
   iintro %c1 %hp1 Hk Hpc Hframe
   -- mv s1,a0
-  k_step_gen (wp_s_add c1 _ 0x80001f34#64 true 9#5 0#5 10#5 (by decide))
+  k_step_gen (wp_s_add c1 _ 0x80001fe2#64 true 9#5 0#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c2 hp2
   iintro Hk Hpc
   -- jal myproc
-  k_step_gen (wp_s_jal c2 _ 0x80001f36#64 false 2095524#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c2 _ 0x80001fe4#64 false 2095524#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
   iintro Hk Hpc
   have hmp : ∀ (cc : CPU) (k' : KCtx) (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 10 ≤ k'.avail),
-      kctx cc k' ∗ pcIs cc 0x800018da#64 ∗
+      kctx cc k' ∗ pcIs cc 0x80001988#64 ∗
       wpNext k'.sie k'.proc cc (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
         ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
         kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
@@ -133,16 +133,16 @@ theorem sleep_prepare_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) : SLEEP_
   k_norm_g at hcsM
   obtain ⟨m2, m8, m9, m18, m19, m20, m21, m22, m23, m24, m25, m26, m27⟩ := hcsM
   -- mv s2,a0
-  k_step_gen (wp_s_add c4 _ 0x80001f3a#64 true 18#5 0#5 10#5 (by decide))
+  k_step_gen (wp_s_add c4 _ 0x80001fe8#64 true 18#5 0#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10M, hproc] next c5 hp5
   iintro Hk Hpc
   -- jal acquire
-  k_step_gen (wp_s_jal c5 _ 0x80001f3c#64 false 2092158#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c5 _ 0x80001fea#64 false 2092142#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c6 hp6
   iintro Hk Hpc
   have hac : ∀ (cc : CPU) (k' : KCtx) (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 10 ≤ k'.avail)
       (hs' : "proc" ∉ k'.locks),
-      kctx cc k' ∗ pcIs cc 0x80000bba#64 ∗ isLock (Γ.lock j) (k'.regs 10#5) "proc" (procLockPay Γ j) ∗
+      kctx cc k' ∗ pcIs cc 0x80000c58#64 ∗ isLock (Γ.lock j) (k'.regs 10#5) "proc" (procLockPay Γ j) ∗
       wpNext k'.sie k'.proc cc (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
         ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
         kctx cpu' (((k'.pushOffAt spie spp).withRegs R').withLocks ("proc" :: k'.locks)) -∗
@@ -184,27 +184,27 @@ theorem sleep_prepare_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) : SLEEP_
   icases procLockRes_elim Γ curCtx (procAddr j) $$ HR with
     ⟨%st, %ch, Hstate, Hpstl, Hchan, ⟨%kl, %xs, %pid, Hrest⟩, Hslots⟩
   -- beqz s1: chan ≠ 0, so the panic is dead code
-  k_step (wp_s_branch c _ 0x80001f40#64 true 24#13 9#5 0#5 (by decide) bop.BEQ)
+  k_step (wp_s_branch c _ 0x80001fee#64 true 24#13 9#5 0#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e9, sp_ite_beq]
   iintro Hk Hpc
   ihave Hpc := sp_pcIs_neg c _ _ _ hchan $$ Hpc
   -- sd s1,32(s2): p->chan = chan
-  k_step (wp_s_sd c _ 0x80001f42#64 false 32#12 18#5 9#5 (by decide) ch)
+  k_step (wp_s_sd c _ 0x80001ff0#64 false 32#12 18#5 9#5 (by decide) ch)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e18, sp_pChan]
   iintro Hk Hpc Hchan
   k_norm [e9]
   -- mv a0,s2
-  k_step (wp_s_add c _ 0x80001f46#64 true 10#5 0#5 18#5 (by decide))
+  k_step (wp_s_add c _ 0x80001ff4#64 true 10#5 0#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e18]
   iintro Hk Hpc
   -- jal release
-  k_step (wp_s_jal c _ 0x80001f48#64 false 2092282#21 1#5 (by decide))
+  k_step (wp_s_jal c _ 0x80001ff6#64 false 2092266#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   have hre : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hnoff' : 1 ≤ k'.noff) (hK' : 10 ≤ k'.avail)
       (reen : Bool) (hreen : reen = (decide (k'.noff = 1) && k'.intena))
       (hon : reen = true → k'.tier = .kpt ∧ trapRes true + 6 ≤ k'.avail),
-      kctx c k' ∗ pcIs c 0x80000c42#64 ∗ isLock (Γ.lock j) (k'.regs 10#5) "proc" (procLockPay Γ j) ∗
+      kctx c k' ∗ pcIs c 0x80000ce0#64 ∗ isLock (Γ.lock j) (k'.regs 10#5) "proc" (procLockPay Γ j) ∗
       locked (Γ.lock j) c ∗ procLockPay Γ j curCtx ∗ popArm c k' reen ∗
       wpNext (k'.popExit reen).sie k'.proc c (fun cpu' => iprop(∀ R' : RegMap,
         kctx cpu' (((k'.popExit reen).withRegs R').withLocks (k'.locks.filter (fun x => x ≠ "proc"))) -∗
@@ -251,7 +251,7 @@ theorem sleep_prepare_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) : SLEEP_
   unfold calleeSaved at hcsR
   k_norm_g at hcsR
   obtain ⟨r2, r8, r9, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27⟩ := hcsR
-  iapply (wp_epilogue4s2_gen cr (k.withSpie spie spp) 0x80001f4c#64 (by
+  iapply (wp_epilogue4s2_gen cr (k.withSpie spie spp) 0x80001ffa#64 (by
       simp only [KCtx.withSpie_avail]; exact hK4) R4
     (by simp only [KCtx.withSpie_regs]; rw [r2]; exact e2)
     (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5))

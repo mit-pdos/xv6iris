@@ -53,7 +53,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG 
 theorem fa_acquire (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γl : GName) (γ : FileNames)
     (haddr : k'.regs 10#5 = ftableAddr)
     (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 10 ≤ k'.avail) (hs' : "ftable" ∉ k'.locks) :
-    kctx c k' ∗ pcIs c 0x80000bba#64 ∗ isLock γl ftableAddr "ftable" (ftableResAt γ) ∗
+    kctx c k' ∗ pcIs c 0x80000c58#64 ∗ isLock γl ftableAddr "ftable" (ftableResAt γ) ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' (((k'.pushOffAt spie spp).withRegs R').withLocks ("ftable" :: k'.locks)) -∗
@@ -72,7 +72,7 @@ theorem fa_release (RE : RELEASE) (c : CPU) (k' : KCtx) (γl : GName) (γ : File
     (hsie' : k'.sie = false) (hnoff' : 1 ≤ k'.noff) (hK' : 10 ≤ k'.avail)
     (reen : Bool) (hreen : reen = (decide (k'.noff = 1) && k'.intena))
     (hon : reen = true → k'.tier = .kpt ∧ trapRes true + 6 ≤ k'.avail) :
-    kctx c k' ∗ pcIs c 0x80000c42#64 ∗ isLock γl ftableAddr "ftable" (ftableResAt γ) ∗
+    kctx c k' ∗ pcIs c 0x80000ce0#64 ∗ isLock γl ftableAddr "ftable" (ftableResAt γ) ∗
     locked γl c ∗ ftableResAt γ curCtx ∗ popArm c k' reen ∗
     wpNext (k'.popExit reen).sie k'.proc c (fun cpu' => iprop(∀ R' : RegMap,
       kctx cpu' (((k'.popExit reen).withRegs R').withLocks (k'.locks.filter (fun x => x ≠ "ftable"))) -∗

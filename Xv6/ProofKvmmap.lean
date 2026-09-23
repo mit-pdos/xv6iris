@@ -24,8 +24,8 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 
 /-! ## Arithmetic facts -/
 
-/-- `ret` out of `mappages` lands on the `bnez` at `0x800010ac`. -/
-theorem kvm_ret_10ac : jumpPc 0x800010ac#64 = 0x800010ac#64 := by
+/-- `ret` out of `mappages` lands on the `bnez` at `0x8000114a`. -/
+theorem kvm_ret_10ac : jumpPc 0x8000114a#64 = 0x8000114a#64 := by
   simp only [jumpPc, BitVec.reduceAnd]
 
 /-- The `bnez a0` is not taken: `mappages` returned `0` in the counted mode. -/
@@ -54,7 +54,7 @@ theorem kvm_mappages_call (MP : MAPPAGES) [CurCtx] (c : CPU) (k' : KCtx)
     (hwf : t.wfU 2) (hnd : t.pagesNodup 2)
     (hpgt : ∀ b ∈ t.pages 2, pageValid (pageAddr b))
     (hcount : t.missingRun (vpnOf (k'.regs 11#5)) n < nb) :
-    kctx c k' ∗ pcIs c 0x80000fe4#64 ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
+    kctx c k' ∗ pcIs c 0x80001082#64 ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
     ptreeOwn 2 (DFrac.own 1) t ∗ kallocAvail γk (some nb) ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool,
       ∀ (R' : RegMap) (fresh : List (BitVec 44)),
@@ -87,7 +87,7 @@ theorem kvmmap_proof (MP : MAPPAGES) : KVMMAP :=
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   k_norm_g
   -- the prologue
-  iapply (wp_prologue2_gen cpu k 0x8000109a#64 (by omega))
+  iapply (wp_prologue2_gen cpu k 0x80001138#64 (by omega))
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm_g
   iframe
@@ -95,17 +95,17 @@ theorem kvmmap_proof (MP : MAPPAGES) : KVMMAP :=
   iapply wpNext_intro_pin
   iintro %c1 %hp1 Hk Hpc Hframe
   -- c.mv a5,a3 ; c.mv a3,a2 ; c.mv a2,a5 : swap `pa` and `sz`
-  k_step_gen (wp_s_add c1 _ 0x800010a2#64 true 15#5 0#5 13#5 (by decide))
+  k_step_gen (wp_s_add c1 _ 0x80001140#64 true 15#5 0#5 13#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c2 hp2
   iintro Hk Hpc
-  k_step_gen (wp_s_add c2 _ 0x800010a4#64 true 13#5 0#5 12#5 (by decide))
+  k_step_gen (wp_s_add c2 _ 0x80001142#64 true 13#5 0#5 12#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
   iintro Hk Hpc
-  k_step_gen (wp_s_add c3 _ 0x800010a6#64 true 12#5 0#5 15#5 (by decide))
+  k_step_gen (wp_s_add c3 _ 0x80001144#64 true 12#5 0#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hp4
   iintro Hk Hpc
   -- jal ra, mappages
-  k_step_gen (wp_s_jal c4 _ 0x800010a8#64 false 2096956#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c4 _ 0x80001146#64 false 2096956#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c5 hp5
   iintro Hk Hpc
   have hpin5 : k.sie = false ∨ k.proc = 0#64 → c5 = cpu := fun h =>
@@ -133,7 +133,7 @@ theorem kvmmap_proof (MP : MAPPAGES) : KVMMAP :=
   k_norm_g at hcs
   obtain ⟨e2, e8, e9, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩ := hcs
   -- c.bnez a0 : not taken
-  k_step_gen (wp_s_branch c6 _ 0x800010ac#64 true 10#13 10#5 0#5 (by decide) bop.BNE)
+  k_step_gen (wp_s_branch c6 _ 0x8000114a#64 true 10#13 10#5 0#5 (by decide) bop.BNE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [kvm_bne_zero _ hzero] next c7 hp7
   iintro Hk Hpc
@@ -144,7 +144,7 @@ theorem kvmmap_proof (MP : MAPPAGES) : KVMMAP :=
   have hK' : 2 ≤ (k.withSpie spie spp).avail := by
     simp only [KCtx.withSpie_avail]; omega
   have hR2 : R 2#5 = (k.withSpie spie spp).regs 2#5 + 0xFFFFFFFFFFFFFFF0#64 := e2
-  iapply (wp_epilogue2_gen c7 (k.withSpie spie spp) 0x800010ae#64 hK' R hR2
+  iapply (wp_epilogue2_gen c7 (k.withSpie spie spp) 0x8000114c#64 hK' R hR2
     (k.regs 1#5) (k.regs 8#5)) $$ [- $Hk $Hpc]
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm_g

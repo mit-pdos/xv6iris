@@ -141,7 +141,7 @@ theorem ss_pnameWf_set (cur : List (BitVec 8)) (p : Nat) (hlen : cur.length = 16
 /-! ## The copy loop -/
 
 set_option maxHeartbeats 4000000 in
-/-- The loop from `80000de6`, with the cursor at `k` (`k ≤ 15`), runs to
+/-- The loop from `80000e84`, with the cursor at `k` (`k ≤ 15`), runs to
 `80000df8` where the terminator is written: the destination is some 16-byte
 buffer, the cursor `a5` names a position `p ≤ 15`, and only the scratch
 registers changed.  The hart is quantified inside the induction. -/
@@ -150,10 +150,10 @@ theorem sscpy_loop (kb : KCtx) (dst src : BitVec 64) (bss : List (BitVec 8)) (dq
     ∀ (k : Nat) (_ : 15 - k = fuel) (_ : k ≤ 15) (cur : List (BitVec 8)) (_ : cur.length = 16)
       (R : RegMap) (_ : R 11#5 = src + BitVec.ofNat 64 k) (_ : R 13#5 = src + 15#64)
       (_ : R 15#5 = dst + BitVec.ofNat 64 k) (cpu : CPU),
-    kctx cpu (kb.withRegs R) ∗ pcIs cpu 0x80000de6#64 ∗
+    kctx cpu (kb.withRegs R) ∗ pcIs cpu 0x80000e84#64 ∗
     byteBuf dst (DFrac.own 1) cur ∗ byteBuf src dq bss ∗
     wpNext kb.sie kb.proc cpu (fun cpu' => iprop(∀ (R' : RegMap) (cur' : List (BitVec 8)) (p : Nat),
-      kctx cpu' (kb.withRegs R') -∗ pcIs cpu' 0x80000df8#64 -∗
+      kctx cpu' (kb.withRegs R') -∗ pcIs cpu' 0x80000e96#64 -∗
       byteBuf dst (DFrac.own 1) cur' -∗ byteBuf src dq bss -∗
       ⌜cur'.length = 16 ∧ R' 15#5 = dst + BitVec.ofNat 64 p ∧ p ≤ 15 ∧ ssKept R R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cpu := by
@@ -165,7 +165,7 @@ theorem sscpy_loop (kb : KCtx) (dst src : BitVec 64) (bss : List (BitVec 8)) (dq
     iintro ⟨Hk, Hpc, Hdst, Hsrc, HΦ⟩
     icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
     -- beq a1,a3 : taken (a1 = src + 15 = a3)
-    k_step_gen (wp_s_branch cpu _ 0x80000de6#64 false 18#13 11#5 13#5 (by decide) bop.BEQ)
+    k_step_gen (wp_s_branch cpu _ 0x80000e84#64 false 18#13 11#5 13#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
       with [h11, h13, ss_beq_ite src 15 (by omega)] next c1 hp1
     iintro Hk Hpc
@@ -179,16 +179,16 @@ theorem sscpy_loop (kb : KCtx) (dst src : BitVec 64) (bss : List (BitVec 8)) (dq
     iintro ⟨Hk, Hpc, Hdst, Hsrc, HΦ⟩
     icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
     -- beq a1,a3 : not taken
-    k_step_gen (wp_s_branch cpu _ 0x80000de6#64 false 18#13 11#5 13#5 (by decide) bop.BEQ)
+    k_step_gen (wp_s_branch cpu _ 0x80000e84#64 false 18#13 11#5 13#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
       with [h11, h13, ss_beq_ite src k (by omega), if_neg (show ¬ k = 15 by omega)] next c1 hp1
     iintro Hk Hpc
     -- addi a1,a1,1
-    k_step_gen (wp_s_addi c1 _ 0x80000dea#64 true 1#12 11#5 11#5 (by decide))
+    k_step_gen (wp_s_addi c1 _ 0x80000e88#64 true 1#12 11#5 11#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [h11, ss_succ src k] next c2 hp2
     iintro Hk Hpc
     -- addi a5,a5,1
-    k_step_gen (wp_s_addi c2 _ 0x80000dec#64 true 1#12 15#5 15#5 (by decide))
+    k_step_gen (wp_s_addi c2 _ 0x80000e8a#64 true 1#12 15#5 15#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [h15, ss_succ dst k] next c3 hp3
     iintro Hk Hpc
     -- lbu a4,-1(a1) : reads src[k]
@@ -197,7 +197,7 @@ theorem sscpy_loop (kb : KCtx) (dst src : BitVec 64) (bss : List (BitVec 8)) (dq
       exact ⟨bss[k], List.getElem?_eq_getElem this⟩
     obtain ⟨bk, hbk⟩ := hbk
     icases byteBuf_acc src dq bss k bk hbk $$ Hsrc with ⟨Hb, Hclose⟩
-    k_step_gen (wp_s_lbu c3 _ 0x80000dee#64 false 4095#12 14#5 11#5 (by decide) (by decide) dq bk)
+    k_step_gen (wp_s_lbu c3 _ 0x80000e8c#64 false 4095#12 14#5 11#5 (by decide) (by decide) dq bk)
       from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
       with [RegMap.set_apply, ss_pred src k] next c4 hp4
     iintro Hk Hpc Hb
@@ -208,13 +208,13 @@ theorem sscpy_loop (kb : KCtx) (dst src : BitVec 64) (bss : List (BitVec 8)) (dq
       exact ⟨cur[k], List.getElem?_eq_getElem this⟩
     obtain ⟨ok, hck⟩ := hck
     icases byteBuf_upd dst cur k ok hck $$ Hdst with ⟨Ho, Hclosed⟩
-    k_step_gen (wp_s_sb c4 _ 0x80000df2#64 false 4095#12 15#5 14#5 (by decide) ok)
+    k_step_gen (wp_s_sb c4 _ 0x80000e90#64 false 4095#12 15#5 14#5 (by decide) ok)
       from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
       with [RegMap.set_apply, ss_pred dst k, ss_extract] next c5 hp5
     iintro Hk Hpc Ho
     ihave Hdst := Hclosed $$ %_ Ho
-    -- bnez a4,80000de6
-    k_step_gen (wp_s_branch c5 _ 0x80000df6#64 true 8176#13 14#5 0#5 (by decide) bop.BNE)
+    -- bnez a4,80000e84
+    k_step_gen (wp_s_branch c5 _ 0x80000e94#64 true 8176#13 14#5 0#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
       with [RegMap.set_apply, ss_bnez_ite bk] next c6 hp6
     iintro Hk Hpc
@@ -222,8 +222,8 @@ theorem sscpy_loop (kb : KCtx) (dst src : BitVec 64) (bss : List (BitVec 8)) (dq
       fun h => (hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))))
     by_cases hbk0 : bk = 0#8
     · -- the byte is 0: exit to the terminator
-      ihave Hpc := (show pcIs (GF := GF) c6 (if bk = 0#8 then 0x80000df8#64 else 0x80000de6#64) ⊢
-          pcIs c6 0x80000df8#64 from by rw [if_pos hbk0]) $$ Hpc
+      ihave Hpc := (show pcIs (GF := GF) c6 (if bk = 0#8 then 0x80000e96#64 else 0x80000e84#64) ⊢
+          pcIs c6 0x80000e96#64 from by rw [if_pos hbk0]) $$ Hpc
       ihave HΦ' := wpNext_at _ _ _ c6 _ hpin6 $$ HΦ
       iapply HΦ' $$ %_ %(cur.set k bk) %(k + 1) Hk Hpc Hdst Hsrc
       ipureintro
@@ -231,8 +231,8 @@ theorem sscpy_loop (kb : KCtx) (dst src : BitVec 64) (bss : List (BitVec 8)) (dq
       · simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false, ite_true, ite_false, reduceIte]
       · exact ssKept_body R _ _ _
     · -- the byte is non-zero: loop
-      ihave Hpc := (show pcIs (GF := GF) c6 (if bk = 0#8 then 0x80000df8#64 else 0x80000de6#64) ⊢
-          pcIs c6 0x80000de6#64 from by rw [if_neg hbk0]) $$ Hpc
+      ihave Hpc := (show pcIs (GF := GF) c6 (if bk = 0#8 then 0x80000e96#64 else 0x80000e84#64) ⊢
+          pcIs c6 0x80000e84#64 from by rw [if_neg hbk0]) $$ Hpc
       ihave HΦ := wpNext_shift _ _ _ _ _ hpin6 $$ HΦ
       iapply (ih (k + 1) (by omega) (by omega) (cur.set k bk) (by rw [List.length_set]; exact hcur)
         (((R.set 11#5 (src + BitVec.ofNat 64 (k + 1))).set 15#5 (dst + BitVec.ofNat 64 (k + 1))).set 14#5
@@ -258,7 +258,7 @@ theorem safestrcpy_proof : SAFESTRCPY := ⟨fun {hlc GF} _ _ cpu k bsd bss dq hK
   simp only [safestrcpyAddr, KernelSyms.«safestrcpy»]
   k_norm_g
   -- prologue: ra, s0
-  iapply (wp_prologue2_gen cpu k 0x80000dce#64 hK)
+  iapply (wp_prologue2_gen cpu k 0x80000e6c#64 hK)
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm_g
   iframe
@@ -266,27 +266,27 @@ theorem safestrcpy_proof : SAFESTRCPY := ⟨fun {hlc GF} _ _ cpu k bsd bss dq hK
   iapply wpNext_intro_pin
   iintro %c1 %hp1 Hk Hpc Hframe
   -- blez a2,dfc : not taken
-  k_step_gen (wp_s_branch0 c1 _ 0x80000dd6#64 false 38#13 12#5 (by decide) bop.BGE)
+  k_step_gen (wp_s_branch0 c1 _ 0x80000e74#64 false 38#13 12#5 (by decide) bop.BGE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hn, ss_blez_ite] next c2 hp2
   iintro Hk Hpc
   -- addiw a3,a2,-1 : a3 = 15
-  k_step_gen (wp_s_addiw c2 _ 0x80000dda#64 false 4095#12 13#5 12#5 (by decide))
+  k_step_gen (wp_s_addiw c2 _ 0x80000e78#64 false 4095#12 13#5 12#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hn, ss_addiw] next c3 hp3
   iintro Hk Hpc
   -- slli a3,a3,32
-  k_step_gen (wp_s_slli c3 _ 0x80000dde#64 true 32#6 13#5 13#5 (by decide))
+  k_step_gen (wp_s_slli c3 _ 0x80000e7c#64 true 32#6 13#5 13#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [RegMap.set_apply] next c4 hp4
   iintro Hk Hpc
   -- srli a3,a3,32 : a3 = 15
-  k_step_gen (wp_s_srli c4 _ 0x80000de0#64 true 32#6 13#5 13#5 (by decide))
+  k_step_gen (wp_s_srli c4 _ 0x80000e7e#64 true 32#6 13#5 13#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [RegMap.set_apply, ss_a3] next c5 hp5
   iintro Hk Hpc
   -- add a3,a3,a1 : a3 = 15 + src
-  k_step_gen (wp_s_add c5 _ 0x80000de2#64 true 13#5 13#5 11#5 (by decide))
+  k_step_gen (wp_s_add c5 _ 0x80000e80#64 true 13#5 13#5 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [RegMap.set_apply] next c6 hp6
   iintro Hk Hpc
   -- mv a5,a0 : a5 = dst
-  k_step_gen (wp_s_add c6 _ 0x80000de4#64 true 15#5 0#5 10#5 (by decide))
+  k_step_gen (wp_s_add c6 _ 0x80000e82#64 true 15#5 0#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [RegMap.set_apply] next c7 hp7
   iintro Hk Hpc
   have hpinD : k.sie = false ∨ k.proc = 0#64 → c7 = cpu :=
@@ -312,7 +312,7 @@ theorem safestrcpy_proof : SAFESTRCPY := ⟨fun {hlc GF} _ _ cpu k bsd bss dq hK
     exact ⟨cur'[p], List.getElem?_eq_getElem this⟩
   obtain ⟨op, hcp⟩ := hcp
   icases byteBuf_upd (k.regs 10#5) cur' p op hcp $$ Hdst with ⟨Ho, Hclosed⟩
-  k_step_gen (wp_s_sb c8 _ 0x80000df8#64 false 0#12 15#5 0#5 (by decide) op)
+  k_step_gen (wp_s_sb c8 _ 0x80000e96#64 false 0#12 15#5 0#5 (by decide) op)
     from (text_instr _ _ _ _ rfl rfl) Htext2 $$ [- $Hk $Hpc]
     with [h15', BitVec.add_zero, ss_extract_zero] next c9 hp9
   iintro Hk Hpc Ho
@@ -331,7 +331,7 @@ theorem safestrcpy_proof : SAFESTRCPY := ⟨fun {hlc GF} _ _ cpu k bsd bss dq hK
     simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false, ite_true, ite_false, reduceIte,
       KCtx.pushed_regs, KCtx.withRegs_regs]
   -- epilogue: restore ra, s0, pop the frame, ret
-  iapply (wp_epilogue2_gen c9 k 0x80000dfc#64 hK R' hR2 (k.regs 1#5) (k.regs 8#5)) $$ [- $Hk $Hpc]
+  iapply (wp_epilogue2_gen c9 k 0x80000e9a#64 hK R' hR2 (k.regs 1#5) (k.regs 8#5)) $$ [- $Hk $Hpc]
   k_code (text_instr _ _ _ _ rfl rfl) Htext2
   k_norm_g
   iframe

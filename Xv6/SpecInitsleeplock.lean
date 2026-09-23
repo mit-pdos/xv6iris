@@ -20,7 +20,7 @@ open LeanRV64D
 /-- Address of `initsleeplock`. -/
 def initsleeplockAddr : BitVec 64 := BitVec.ofNat 64 KernelSyms.«initsleeplock»
 /-- The `"sleep lock"` literal. -/
-def sleepLockNameAddr : BitVec 64 := 0x80007568#64
+def sleepLockNameAddr : BitVec 64 := 0x80007570#64
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]

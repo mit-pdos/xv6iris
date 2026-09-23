@@ -49,7 +49,7 @@ theorem EntryProof : ENTRY where
     iintro HmBoot Hclock Hpc Hx2
     entry_norm
     -- 80000004: ld sp, 600(sp)
-    entry_step wp_m_ld_same cpu dq dq bootConf bootConf_ok _ false 600#12 2#5 (by decide) 0x8000a000#64 s0
+    entry_step wp_m_ld_same cpu dq dq bootConf bootConf_ok _ false 792#12 2#5 (by decide) 0x8000a000#64 s0
     iintro HmBoot Hclock Hpc Hx2 Htok Hslot
     entry_norm
     -- 80000008: c.lui a0, 0x1

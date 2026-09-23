@@ -201,7 +201,7 @@ theorem mixB_get_pred (bs olds : List (BitVec 8)) (i : Nat) (hi : 1 ≤ i) (hin 
 /-! ## The forward copy -/
 
 set_option maxHeartbeats 4000000 in
-/-- One iteration of the forward loop at `80000cf2`: byte `i` is copied;
+/-- One iteration of the forward loop at `80000d90`: byte `i` is copied;
 the continuation is at whichever hart the thread is on by then. -/
 theorem memmove_fwd_iter {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (kb : KCtx)
@@ -210,41 +210,41 @@ theorem memmove_fwd_iter {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     (i : Nat) (hi : i < n) (b : BitVec 8) (hb : bs[i]? = some b) (R : RegMap)
     (h11 : R 11#5 = s + BitVec.ofNat 64 i) (h14 : R 14#5 = d + BitVec.ofNat 64 i)
     (h15 : R 15#5 = s + BitVec.ofNat 64 n) :
-    kctx cpu (kb.withRegs R) ∗ pcIs cpu 0x80000cf2#64 ∗
+    kctx cpu (kb.withRegs R) ∗ pcIs cpu 0x80000d90#64 ∗
     byteBuf s dqs bs ∗ byteBuf d (DFrac.own 1) (mixF bs olds i) ∗
     wpNext kb.sie kb.proc cpu (fun cpu' => iprop(
       kctx cpu' (kb.withRegs (((R.set 11#5 (s + BitVec.ofNat 64 i + 1#64)).set 14#5 (d + BitVec.ofNat 64 i + 1#64)).set
         13#5 (BitVec.setWidth 64 b))) -∗
-      pcIs cpu' (if n = i + 1 then 0x80000d02#64 else 0x80000cf2#64) -∗
+      pcIs cpu' (if n = i + 1 then 0x80000da0#64 else 0x80000d90#64) -∗
       byteBuf s dqs bs -∗ byteBuf d (DFrac.own 1) (mixF bs olds (i + 1)) -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hsrc, Hdst, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
   obtain ⟨o, ho⟩ := mixF_get_self bs olds i (by omega) (by omega)
   -- addi a1,a1,1
-  k_step_gen (wp_s_addi cpu _ 0x80000cf2#64 true 1#12 11#5 11#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
+  k_step_gen (wp_s_addi cpu _ 0x80000d90#64 true 1#12 11#5 11#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
     with [h11] next c1 hp1
   iintro Hk Hpc
   -- addi a4,a4,1
-  k_step_gen (wp_s_addi c1 _ 0x80000cf4#64 true 1#12 14#5 14#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
+  k_step_gen (wp_s_addi c1 _ 0x80000d92#64 true 1#12 14#5 14#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
     with [h14] next c2 hp2
   iintro Hk Hpc
   -- lbu a3,-1(a1)
   icases byteBuf_acc s dqs bs i b hb $$ Hsrc with ⟨Hb, Hclose⟩
-  k_step_gen (wp_s_lbu c2 _ 0x80000cf6#64 false 4095#12 13#5 11#5 (by decide) (by decide) dqs b) from (text_instr _ _ _ _ rfl rfl) HT
+  k_step_gen (wp_s_lbu c2 _ 0x80000d94#64 false 4095#12 13#5 11#5 (by decide) (by decide) dqs b) from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc] next c3 hp3
   iintro Hk Hpc Hb
   ihave Hsrc := Hclose $$ Hb
   -- sb a3,-1(a4)
   icases byteBuf_upd d (mixF bs olds i) i o ho $$ Hdst with ⟨Ho, Hclose⟩
-  k_step_gen (wp_s_sb c3 _ 0x80000cfa#64 false 4095#12 14#5 13#5 (by decide) o) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
+  k_step_gen (wp_s_sb c3 _ 0x80000d98#64 false 4095#12 14#5 13#5 (by decide) o) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
     with [extractLsb'_setWidth8] next c4 hp4
   iintro Hk Hpc Ho
   ihave Hdst := Hclose $$ %b Ho
   ihave Hdst := (show byteBuf (GF := GF) d (DFrac.own 1) ((mixF bs olds i).set i b) ⊢
       byteBuf d (DFrac.own 1) (mixF bs olds (i + 1)) by rw [mixF_set bs olds i b hb (by omega)]) $$ Hdst
   -- bne a5,a1,cf2
-  k_step_gen (wp_s_branch c4 _ 0x80000cfe#64 false 8180#13 15#5 11#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) HT
+  k_step_gen (wp_s_branch c4 _ 0x80000d9c#64 false 8180#13 15#5 11#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc] with [h15, ite_bne_eq, add_ofNat_succ_eq_iff s n i hn32 (by omega)] next c5 hp5
   iintro Hk Hpc
   ihave HΦ' := wpNext_at _ _ _ c5 _
@@ -263,10 +263,10 @@ theorem memmove_fwd_loop {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     ∀ (i : Nat) (_ : n - i = c + 1) (R : RegMap)
       (_ : R 11#5 = s + BitVec.ofNat 64 i) (_ : R 14#5 = d + BitVec.ofNat 64 i) (_ : R 15#5 = s + BitVec.ofNat 64 n)
       (cpu : CPU),
-    kctx cpu (kb.withRegs R) ∗ pcIs cpu 0x80000cf2#64 ∗
+    kctx cpu (kb.withRegs R) ∗ pcIs cpu 0x80000d90#64 ∗
     byteBuf s dqs bs ∗ byteBuf d (DFrac.own 1) (mixF bs olds i) ∗
     wpNext kb.sie kb.proc cpu (fun cpu' => iprop(∀ R' : RegMap,
-      kctx cpu' (kb.withRegs R') -∗ pcIs cpu' 0x80000d02#64 -∗
+      kctx cpu' (kb.withRegs R') -∗ pcIs cpu' 0x80000da0#64 -∗
       byteBuf s dqs bs -∗ byteBuf d (DFrac.own 1) bs -∗
       ⌜∀ r, r ≠ 11#5 → r ≠ 13#5 → r ≠ 14#5 → R' r = R r⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cpu := by
@@ -314,19 +314,19 @@ theorem memmove_fwd_loop {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
 /-! ## The backward copy -/
 
 set_option maxHeartbeats 4000000 in
-/-- One iteration of the backward loop at `80000d28`: byte `i - 1` is copied. -/
+/-- One iteration of the backward loop at `80000dc6`: byte `i - 1` is copied. -/
 theorem memmove_bwd_iter {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (kb : KCtx)
     (s d : BitVec 64) (dqs : DFrac) (bs olds : List (BitVec 8)) (n : Nat)
     (hls : bs.length = n) (hld : olds.length = n) (hn32 : n < 2 ^ 32)
     (i : Nat) (hi1 : 1 ≤ i) (hin : i ≤ n) (b : BitVec 8) (hb : bs[i - 1]? = some b) (R : RegMap)
     (h14 : R 14#5 = s + BitVec.ofNat 64 i) (h13 : R 13#5 = d + BitVec.ofNat 64 i) (h15 : R 15#5 = s) :
-    kctx cpu (kb.withRegs R) ∗ pcIs cpu 0x80000d28#64 ∗
+    kctx cpu (kb.withRegs R) ∗ pcIs cpu 0x80000dc6#64 ∗
     byteBuf s dqs bs ∗ byteBuf d (DFrac.own 1) (mixB bs olds i) ∗
     wpNext kb.sie kb.proc cpu (fun cpu' => iprop(
       kctx cpu' (kb.withRegs (((R.set 14#5 (s + BitVec.ofNat 64 (i - 1))).set 13#5 (d + BitVec.ofNat 64 (i - 1))).set
         12#5 (BitVec.setWidth 64 b))) -∗
-      pcIs cpu' (if i - 1 = 0 then 0x80000d38#64 else 0x80000d28#64) -∗
+      pcIs cpu' (if i - 1 = 0 then 0x80000dd6#64 else 0x80000dc6#64) -∗
       byteBuf s dqs bs -∗ byteBuf d (DFrac.own 1) (mixB bs olds (i - 1)) -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hsrc, Hdst, HΦ⟩
@@ -334,29 +334,29 @@ theorem memmove_bwd_iter {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
   obtain ⟨o, ho⟩ := mixB_get_pred bs olds i hi1 (by omega) (by omega)
   have hneg := ofNat_add_neg1 i hi1 (by omega)
   -- addi a4,a4,-1
-  k_step_gen (wp_s_addi cpu _ 0x80000d28#64 true 4095#12 14#5 14#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
+  k_step_gen (wp_s_addi cpu _ 0x80000dc6#64 true 4095#12 14#5 14#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
     with [h14, hneg] next c1 hp1
   iintro Hk Hpc
   -- addi a3,a3,-1
-  k_step_gen (wp_s_addi c1 _ 0x80000d2a#64 true 4095#12 13#5 13#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
+  k_step_gen (wp_s_addi c1 _ 0x80000dc8#64 true 4095#12 13#5 13#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
     with [h13, hneg] next c2 hp2
   iintro Hk Hpc
   -- lbu a2,0(a4)
   icases byteBuf_acc s dqs bs (i - 1) b hb $$ Hsrc with ⟨Hb, Hclose⟩
-  k_step_gen (wp_s_lbu c2 _ 0x80000d2c#64 false 0#12 12#5 14#5 (by decide) (by decide) dqs b) from (text_instr _ _ _ _ rfl rfl) HT
+  k_step_gen (wp_s_lbu c2 _ 0x80000dca#64 false 0#12 12#5 14#5 (by decide) (by decide) dqs b) from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc] next c3 hp3
   iintro Hk Hpc Hb
   ihave Hsrc := Hclose $$ Hb
   -- sb a2,0(a3)
   icases byteBuf_upd d (mixB bs olds i) (i - 1) o ho $$ Hdst with ⟨Ho, Hclose⟩
-  k_step_gen (wp_s_sb c3 _ 0x80000d30#64 false 0#12 13#5 12#5 (by decide) o) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
+  k_step_gen (wp_s_sb c3 _ 0x80000dce#64 false 0#12 13#5 12#5 (by decide) o) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
     with [extractLsb'_setWidth8] next c4 hp4
   iintro Hk Hpc Ho
   ihave Hdst := Hclose $$ %b Ho
   ihave Hdst := (show byteBuf (GF := GF) d (DFrac.own 1) ((mixB bs olds i).set (i - 1) b) ⊢
       byteBuf d (DFrac.own 1) (mixB bs olds (i - 1)) by rw [mixB_set bs olds i hi1 b hb (by omega) (by omega)]) $$ Hdst
   -- bne a5,a4,d28
-  k_step_gen (wp_s_branch c4 _ 0x80000d34#64 false 8180#13 15#5 14#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) HT
+  k_step_gen (wp_s_branch c4 _ 0x80000dd2#64 false 8180#13 15#5 14#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc] with [h15, ite_bne_eq, self_eq_add_ofNat_iff s (i - 1) (by omega)] next c5 hp5
   iintro Hk Hpc
   ihave HΦ' := wpNext_at _ _ _ c5 _
@@ -374,10 +374,10 @@ theorem memmove_bwd_loop {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     (i : Nat) :
     ∀ (_ : 1 ≤ i) (_ : i ≤ n) (R : RegMap)
       (_ : R 14#5 = s + BitVec.ofNat 64 i) (_ : R 13#5 = d + BitVec.ofNat 64 i) (_ : R 15#5 = s) (cpu : CPU),
-    kctx cpu (kb.withRegs R) ∗ pcIs cpu 0x80000d28#64 ∗
+    kctx cpu (kb.withRegs R) ∗ pcIs cpu 0x80000dc6#64 ∗
     byteBuf s dqs bs ∗ byteBuf d (DFrac.own 1) (mixB bs olds i) ∗
     wpNext kb.sie kb.proc cpu (fun cpu' => iprop(∀ R' : RegMap,
-      kctx cpu' (kb.withRegs R') -∗ pcIs cpu' 0x80000d38#64 -∗
+      kctx cpu' (kb.withRegs R') -∗ pcIs cpu' 0x80000dd6#64 -∗
       byteBuf s dqs bs -∗ byteBuf d (DFrac.own 1) bs -∗
       ⌜∀ r, r ≠ 12#5 → r ≠ 13#5 → r ≠ 14#5 → R' r = R r⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cpu := by
@@ -429,7 +429,7 @@ theorem memmove_finish {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Cu
     (h10 : R' 10#5 = k.regs 10#5)
     (hcs : ∀ r : BitVec 5, r ≠ 2#5 → r ≠ 8#5 → r ≠ 10#5 → r ≠ 11#5 → r ≠ 12#5 → r ≠ 13#5 → r ≠ 14#5 → r ≠ 15#5 →
       R' r = k.regs r) :
-    kctx c ((k.pushed 2).withRegs R') ∗ pcIs c 0x80000d02#64 ∗
+    kctx c ((k.pushed 2).withRegs R') ∗ pcIs c 0x80000da0#64 ∗
     frame2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) ∗
     byteBuf (k.regs 11#5) dqs bs ∗ byteBuf (k.regs 10#5) (DFrac.own 1) bs ∗
     wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ R'' : RegMap,
@@ -439,7 +439,7 @@ theorem memmove_finish {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Cu
     ⊢ wpLoop (GF := GF) c := by
   iintro ⟨Hk, Hpc, Hframe, Hsrc, Hdst, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
-  iapply (wp_epilogue2_gen c k 0x80000d02#64 hK R' hR2 (k.regs 1#5) (k.regs 8#5)) $$ [- $Hk $Hpc]
+  iapply (wp_epilogue2_gen c k 0x80000da0#64 hK R' hR2 (k.regs 1#5) (k.regs 8#5)) $$ [- $Hk $Hpc]
   k_code (text_instr _ _ _ _ rfl rfl) HT
   k_norm_g
   iframe
@@ -476,7 +476,7 @@ theorem memmove_fwd_seg {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [C
     (hn1 : 1 ≤ n) (R : RegMap) (h10 : R 10#5 = k.regs 10#5) (h11 : R 11#5 = k.regs 11#5)
     (h12 : R 12#5 = BitVec.ofNat 64 n) (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFF0#64)
     (hRk : ∀ r : BitVec 5, r ≠ 2#5 → r ≠ 8#5 → r ≠ 13#5 → r ≠ 14#5 → R r = k.regs r) :
-    kctx c ((k.pushed 2).withRegs R) ∗ pcIs c 0x80000ce8#64 ∗
+    kctx c ((k.pushed 2).withRegs R) ∗ pcIs c 0x80000d86#64 ∗
     frame2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) ∗
     byteBuf (k.regs 11#5) dqs bs ∗ byteBuf (k.regs 10#5) (DFrac.own 1) olds ∗
     wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ R'' : RegMap,
@@ -487,18 +487,18 @@ theorem memmove_fwd_seg {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [C
   iintro ⟨Hk, Hpc, Hframe, Hsrc, Hdst, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
   -- slli a2,a2,32 ; srli a2,a2,32
-  k_step_gen (wp_s_slli c _ 0x80000ce8#64 true 32#6 12#5 12#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
+  k_step_gen (wp_s_slli c _ 0x80000d86#64 true 32#6 12#5 12#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
     with [h12] next c1 hp1
   iintro Hk Hpc
-  k_step_gen (wp_s_srli c1 _ 0x80000cea#64 true 32#6 12#5 12#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
+  k_step_gen (wp_s_srli c1 _ 0x80000d88#64 true 32#6 12#5 12#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
     with [shl_shr_32_ofNat n hn32] next c2 hp2
   iintro Hk Hpc
   -- add a5,a1,a2
-  k_step_gen (wp_s_add c2 _ 0x80000cec#64 false 15#5 11#5 12#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
+  k_step_gen (wp_s_add c2 _ 0x80000d8a#64 false 15#5 11#5 12#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
     with [h11] next c3 hp3
   iintro Hk Hpc
   -- mv a4,a0
-  k_step_gen (wp_s_add c3 _ 0x80000cf0#64 true 14#5 0#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
+  k_step_gen (wp_s_add c3 _ 0x80000d8e#64 true 14#5 0#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
     with [h10] next c4 hp4
   iintro Hk Hpc
   -- the loop
@@ -536,7 +536,7 @@ theorem memmove_proof : MEMMOVE := ⟨fun {hlc GF} _ _ cpu k bs olds n dqs hK hn
   simp only [memmoveAddr, KernelSyms.«memmove»]
   k_norm_g
   -- prologue
-  iapply (wp_prologue2_gen cpu k 0x80000cda#64 hK)
+  iapply (wp_prologue2_gen cpu k 0x80000d78#64 hK)
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm_g
   iframe
@@ -544,7 +544,7 @@ theorem memmove_proof : MEMMOVE := ⟨fun {hlc GF} _ _ cpu k bs olds n dqs hK hn
   iapply wpNext_intro_pin
   iintro %c1 %hp1 Hk Hpc Hframe
   -- beqz a2,d02
-  k_step_gen (wp_s_branch c1 _ 0x80000ce2#64 true 32#13 12#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
+  k_step_gen (wp_s_branch c1 _ 0x80000d80#64 true 32#13 12#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc] with [hn, ite_beq_ofNat' n hn32] next c2 hp2
   iintro Hk Hpc
   have hpin2 : k.sie = false ∨ k.proc = 0#64 → c2 = cpu := fun h => (hp2 h).trans (hp1 h)
@@ -564,7 +564,7 @@ theorem memmove_proof : MEMMOVE := ⟨fun {hlc GF} _ _ cpu k bs olds n dqs hK hn
   · simp only [hn0, ite_false]
     have hn1 : 1 ≤ n := by omega
     -- bltu a1,a0,d0a
-    k_step_gen (wp_s_branch c2 _ 0x80000ce4#64 false 38#13 11#5 10#5 (by decide) bop.BLTU) from (text_instr _ _ _ _ rfl rfl) Htext
+    k_step_gen (wp_s_branch c2 _ 0x80000d82#64 false 38#13 11#5 10#5 (by decide) bop.BLTU) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc] next c3 hp3
     iintro Hk Hpc
     have hpin3 : k.sie = false ∨ k.proc = 0#64 → c3 = cpu := fun h => (hp3 h).trans (hpin2 h)
@@ -572,17 +572,17 @@ theorem memmove_proof : MEMMOVE := ⟨fun {hlc GF} _ _ cpu k bs olds n dqs hK hn
     · -- src < dst
       simp only [hlt, ↓reduceIte]
       -- slli a3,a2,32 ; srli a3,a3,32 ; add a4,a1,a3
-      k_step_gen (wp_s_slli c3 _ 0x80000d0a#64 false 32#6 13#5 12#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+      k_step_gen (wp_s_slli c3 _ 0x80000da8#64 false 32#6 13#5 12#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [hn] next c4 hp4
       iintro Hk Hpc
-      k_step_gen (wp_s_srli c4 _ 0x80000d0e#64 true 32#6 13#5 13#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+      k_step_gen (wp_s_srli c4 _ 0x80000dac#64 true 32#6 13#5 13#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [shl_shr_32_ofNat n hn32] next c5 hp5
       iintro Hk Hpc
-      k_step_gen (wp_s_add c5 _ 0x80000d10#64 false 14#5 11#5 13#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+      k_step_gen (wp_s_add c5 _ 0x80000dae#64 false 14#5 11#5 13#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         next c6 hp6
       iintro Hk Hpc
       -- bgeu a0,a4,ce8
-      k_step_gen (wp_s_branch c6 _ 0x80000d14#64 false 8148#13 10#5 14#5 (by decide) bop.BGEU) from (text_instr _ _ _ _ rfl rfl) Htext
+      k_step_gen (wp_s_branch c6 _ 0x80000db2#64 false 8148#13 10#5 14#5 (by decide) bop.BGEU) from (text_instr _ _ _ _ rfl rfl) Htext
         $$ [- $Hk $Hpc] next c7 hp7
       iintro Hk Hpc
       have hpin7 : k.sie = false ∨ k.proc = 0#64 → c7 = cpu :=
@@ -602,22 +602,22 @@ theorem memmove_proof : MEMMOVE := ⟨fun {hlc GF} _ _ cpu k bs olds n dqs hK hn
       · -- dst < src + n: overlap, backward
         simp only [hge, Bool.false_eq_true, ↓reduceIte]
         have hcomm : BitVec.ofNat 64 n + k.regs 10#5 = k.regs 10#5 + BitVec.ofNat 64 n := BitVec.add_comm _ _
-        k_step_gen (wp_s_add c7 _ 0x80000d18#64 true 13#5 13#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+        k_step_gen (wp_s_add c7 _ 0x80000db6#64 true 13#5 13#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
           with [hcomm] next c8 hp8
         iintro Hk Hpc
-        k_step_gen (wp_s_addiw c8 _ 0x80000d1a#64 false 4095#12 15#5 12#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+        k_step_gen (wp_s_addiw c8 _ 0x80000db8#64 false 4095#12 15#5 12#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
           with [hn] next c9 hp9
         iintro Hk Hpc
-        k_step_gen (wp_s_slli c9 _ 0x80000d1e#64 true 32#6 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+        k_step_gen (wp_s_slli c9 _ 0x80000dbc#64 true 32#6 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
           next c10 hp10
         iintro Hk Hpc
-        k_step_gen (wp_s_srli c10 _ 0x80000d20#64 true 32#6 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+        k_step_gen (wp_s_srli c10 _ 0x80000dbe#64 true 32#6 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
           next c11 hp11
         iintro Hk Hpc
-        k_step_gen (wp_s_xori c11 _ 0x80000d22#64 false 4095#12 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+        k_step_gen (wp_s_xori c11 _ 0x80000dc0#64 false 4095#12 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
           next c12 hp12
         iintro Hk Hpc
-        k_step_gen (wp_s_add c12 _ 0x80000d26#64 true 15#5 15#5 14#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+        k_step_gen (wp_s_add c12 _ 0x80000dc4#64 true 15#5 15#5 14#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
           with [bwd_a5 (k.regs 11#5) n hn1 hn32] next c13 hp13
         iintro Hk Hpc
         have hpin13 : k.sie = false ∨ k.proc = 0#64 → c13 = cpu :=
@@ -635,7 +635,7 @@ theorem memmove_proof : MEMMOVE := ⟨fun {hlc GF} _ _ cpu k bs olds n dqs hK hn
         iapply wpNext_intro_pin
         iintro %c14 %hp14 %R' Hk Hpc Hsrc Hdst %hother
         -- j d02
-        k_step_gen (wp_s_j c14 _ 0x80000d38#64 true 2097098#21) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+        k_step_gen (wp_s_j c14 _ 0x80000dd6#64 true 2097098#21) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
           next c15 hp15
         iintro Hk Hpc
         iapply (memmove_finish cpu c15 k (fun h => (hp15 h).trans ((hp14 h).trans (hpin13 h))) hK bs dqs R'
