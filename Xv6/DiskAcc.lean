@@ -1653,30 +1653,32 @@ WHAT IS LEFT, AND WHY.  Two accessors of the three are PROVED
   transition (`MachCSL.DevOp.dmaWrite`'s state-updating guard), so there
   is no window in which the record exists and the head is still
   `.pushed`.
-* THE BUFFER ROW -- the remaining gap.  `Xv6.bufLease` is `Xv6.dmaOwn` --
-  the footprint at no value -- so the bytes a READ chain's transfer left
-  behind cannot be pinned to the block's image fragment, and
-  `disk_collect` has to hand the sleeper
+* THE BUFFER ROW -- the remaining gap, and much smaller than it was.
+  `Xv6.bufLease` is `Xv6.dmaOwn`: the footprint at NO value.  So the bytes
+  a READ chain's transfer left behind still cannot be pinned to the
+  block's image fragment, and `disk_collect` has to hand the sleeper
   `byteBuf c.data (own 1) data ∗ diskBlock γ c.blk data` at ONE `data`.
-  What it needs is the STATUS row's shape at `b->data`: a per-head marker
-  carried by the SERVING TASK across its data phase, so that the value
-  each sector transfer leaves behind reaches the completion, plus the
-  position the tier conversion to the context needs.  Two obstacles that
-  looked incidental turned out to be structural, and both are now gone
-  from the MODEL rather than worked around in the proof; see THE DATA
-  PHASE, below.
+  What the row already has, and what it still wants, is written out under
+  (1) below.
 
-(1) THE ROWS.  The STATUS row is DONE and is the pattern the buffer row
-follows.  `Xv6.diskLive` carries a per-head marker `sb : Nat -> SByte` and
-a conjunct `[∗list] i, Xv6.statusRes (st i) (sb i)`: the invariant holds
-an armed head's status byte at own 1 up to `.fetched` (`.free`), NOTHING
-at `.served` (`.lent` -- the byte is in the serving task's linear
-context, lent to it by the `.served` install), and at the `0` the device
-wrote from `.status` on (`.done ts`).  `Xv6.sbOk` is the coupling, an IFF
-at `.lent`, and it travels inside `Xv6.unreadArmed` so that the row costs
-`diskLive` no new pure conjunct.
+(1) THE SLOT ROW.  `Xv6.diskLive` carries a per-head marker
+`sb : Nat -> SByte` and a conjunct `[∗list] i, Xv6.statusRes γ (st i) (sb i)`,
+and that row now holds EVERYTHING of an armed head that the serving task
+needs: the status byte, a QUARTER of the block's image fragment, and the
+DATA BUFFER.  Its three states are
 
-Two things made it work, and both are reusable:
+* `.free` -- the invariant holds all three (the head is armed but no
+  serve task is out);
+* `.lent` -- the SERVING TASK holds all three, from its `.fetched`
+  install to its `.status` install, which is exactly the span of the DATA
+  PHASE (`Xv6.sbAt`);
+* `.done ts` -- the invariant holds them again, with the status byte at
+  the `0` the device wrote and the POSITION `ts` of that write.
+
+`Xv6.sbOk` is the coupling, an IFF at `.lent`, and it travels inside
+`Xv6.unreadArmed` so that the row costs `diskLive` no new pure conjunct.
+
+Four things make it work, and all four are in:
 
 * `MachCSL.DevM.LeaseL`'s write arm is the ONLY channel by which the
   value a DMA write leaves behind reaches a later step, so the byte
@@ -1687,72 +1689,57 @@ Two things made it work, and both are reusable:
   that put the value there: that is `Xv6.dmaOwnT`, and
   `MachCSL.dmaWriteLease` now carries an ORDERING RECEIPT (a position
   `Kb` the client holds a `MachCSL.topLb` for, and `⌜Kb < t⌝` out) which
-  is what proves the status write precedes the used-index write.
+  is what proves the status write precedes the used-index write;
+* the BUFFER is the task's own across the data phase, so
+  `Xv6.data_write_lease` is a lease out of the task's `Xv6.bufLease` with
+  the invariant untouched -- which is what lets the value each sector
+  write leaves behind reach the `.status` install instead of vanishing
+  into the invariant at the store;
+* the QUARTER of the image fragment (`Xv6.diskBlockQ`;
+  `Xv6.headRes` keeps `Xv6.diskBlockT`, three quarters, which is still
+  two too many for two armed heads to share a block) pins the block's
+  BYTES across states: `Xv6.diskProto_blockView` cashes it, through
+  `Xv6.imgOk_read_blk`, as `bs = blockView v c.blk` at EVERY state of the
+  flight.  That is the one cross-state fact the READ fill needs -- the
+  bytes it writes are the block's AT THE STORE, not merely at the `get`
+  that computed them -- and no pure predicate can carry it.
 
-The USED-ELEMENT row and the `b->data` row are the same shape: the
-element pinned at `(usedLen r) ++ h` with its position, `b->data` at the
-bytes transferred.  `Xv6.usedLease` must become slot-indexed
-(`.free`/`.lent`/`.done w ts`) exactly as `Xv6.statusRes` is head-indexed.
+WHAT IS LEFT, precisely:
 
-(1a) THE DATA PHASE, AND WHY THE MODEL HAD TO MOVE.  The row above rests
-on TWO cross-state facts, and a per-step program logic can state neither
-unless the step that needs it holds a RESOURCE that carries it:
-
-* the value a READ's fill writes is `MachCSL.Virtio.cacheView` at the
-  chain's block AT THE `get` that computed it; what the row must say is
-  that it is the block's content AT THE STORE, one or more machine steps
-  later;
-* a WRITE's capture writes into the cache the bytes its DMA READ
-  returned; what the row must say is that those bytes are the driver's
-  payload, which is the value the cell held AT THE READ.
-
-`MachCSL.Virtio.serve` used to FORK one task per sector for these and
-join them, and a forked task starts from `Xv6.diskTaskRes`, which for
-them was `iprop(True)`.  So there was no resource to carry either fact --
-and worse, `MachCSL.DevSig.LeaseV`'s obligation is per TASK NAME, not per
-reachable task, so the derivation had to cover `xferOut` AT A READ CHAIN
-(which would capture the driver's UNFILLED buffer into the write-back
-cache, moving a block that the collect must find unmoved) and `xferIn` AT
-A WRITE CHAIN (which would overwrite the payload with the old image).
-Neither is reachable -- `serve` forks them one per branch -- but nothing
-in the logic said so.  A third thing the fork cost: a JOIN is invisible
-to a per-step invariant, so at the completion the invariant could not
-know the data phase had run AT ALL, which is precisely what the collect
-has to know.
-
-The data phase therefore now runs IN the serving task, sector by sector
-(`MachCSL.Virtio.seqSectors`; every transaction is still its own machine
-step and still interleaves with every other request, every other device
-and every hart -- only the sectors of ONE request are ordered relative to
-each other, which no driver proof can observe).  That puts the transfers
-in the one place that holds the request's exclusive permit, so the row,
-the bytes and the request they belong to travel in one linear context,
-and it makes the two branch conditions available as premises
-(`Xv6.leaseL_xferOut` takes `r.type = VIRTIO_BLK_T_OUT`).
-
-(1b) THE READ COUPLING -- DONE, and it cost no clause.  `Xv6.inFlightBlk`
--- the escape of `Xv6.imgOk` and the obligation of `Xv6.cachedOk` -- now
-names only the DISK WRITES (`c.dwr = false`).  That is sound because the
-only step that moves a block is `MachCSL.Virtio.xferOut`'s capture, which
-after (1a) runs on the WRITE branch alone, and the block it captures is
-its own by `Xv6.blkInj`.  What it buys is `Xv6.imgOk_read_blk`: an armed
-READ chain's image fragment reads as `Xv6.blockView v c.blk` at EVERY
-state of the flight.  So the bytes the device fills the buffer with ARE
-the fragment the driver handed to `disk_publish` and gets back --
-`dataDisk`, which is what the frozen `Xv6.VIRTIO_DISK_RW` post asks for,
-and the answer to "does the image move under an in-flight READ".
-
-What is still missing is the CHANNEL that carries that value from the
-`get` to the store, and the resource shape of the row itself.  The
-channel the design wants is a FRACTION of the block's image fragment
-(`ghost_map` elements are fractional): `Xv6.headRes` keeps `own (3/4)` --
-still enough for `Xv6.headRes_blkInj`, since `3/4 + 3/4` is invalid --
-and the remaining quarter travels with the serving task from the POP to
-the `.status` install, pinning the fragment's value, hence (by
-`Xv6.imgOk_read_blk`) `blockView` at the chain's block, across every
-state of the data phase.  The WRITE side needs no such channel: the
-serving task holds the buffer itself, so the value its DMA read returns
-is pinned by its own resource.
+(i) `Xv6.SByte.done` must carry the transferred BYTES beside the
+    position, and the row's buffer arm must hold them at that value: for a
+    READ `Xv6.dmaOwnT`'s "heads exactly at `ts`" wants weakening to "heads
+    at or below `ts`", because the two sector writes have two positions
+    and the status write (whose `Kb < t` receipt dominates them both) is
+    the one bound the collect gets.  The fill must then RECORD the value:
+    `Xv6.leaseL_xferIn` unpacks the quarter at its `get` (so `bs` is fixed
+    across the get and the store: `MachCSL.DevM.LeaseL.get` may index its
+    continuation's context by a value of the derivation's choosing) and
+    cashes `Xv6.diskProto_blockView` at the store.  Since
+    `MachCSL.Virtio.reqSpan c.req = SPB = 2`
+    (`Xv6.reqSpan_chain`), the data phase can be UNROLLED rather than
+    carried through a context-indexed induction.
+(ii) A WRITE chain's buffer is never written by the device, so its `.done`
+    arm has no position to offer.  The cheapest shape is to keep it at the
+    CONTEXT tier: `MachCSL.ctxBytes ξ c.data BSIZE (own 1) w` is exactly
+    the full window at a value TOGETHER with its per-byte
+    `MachCSL.keyAt`s, which are persistent, and its `histBytes` still
+    answers the capture's `MachCSL.dmaReadPin`.  The context it belongs to
+    has to be named where the invariant can see it, which is a ghost field
+    of `Xv6.Chain` (like `Xv6.Chain.ep`; `MachCSL.CtxId` would have to
+    derive `Repr`, or `Chain` stop deriving it).  The alternative is a
+    `dmaHalfAt`/`ctxBytes (own ½)` split with the driver's half in
+    `Xv6.claimRes`, which costs the `virtio_disk_rw` proof a component.
+(iii) The CAPTURE's clause: `.lent` must count the sectors captured so far
+    with their values, so that the invariant can say that
+    `MachCSL.Virtio.cacheView` at each of them IS the driver's payload
+    (preserved by a DRAIN, which does not move `cacheView`, and by every
+    other chain's capture, which is at another block by `Xv6.blkInj`).
+    With `Xv6.dryOk` beside it, the completion then knows the DURABLE
+    image holds the payload, which is what lets it update the block's
+    fragment to `dataBuf` for a WRITE.
+(iv) `disk_collect` itself: the tier conversions are listed below and are
+    all proved.
 
 (1b) THE `pend` CLAUSES.  (P1), (P2) and (P4) are CARRIED, all three
 inside `Xv6.unreadArmed`:
@@ -2984,40 +2971,20 @@ structure DISK_ACC_ASSUMPTIONS : Prop where
   the collect cannot produce `byteBuf c.data (own 1) data` with
   `diskBlock γ c.blk data` beside it.
 
-  WHAT THE ROW LOOKS LIKE.  It rides on the STATUS row's marker rather
-  than adding an existential to `Xv6.diskLive`: `Xv6.SByte` becomes the
-  marker of the whole SLOT row -- the status byte, the data buffer, and
-  the quarter of the block's image fragment of (1b) above -- and its three
-  states become
+  WHAT THE ROW ALREADY IS.  `Xv6.statusRes` is the SLOT row: the status
+  byte, a QUARTER of the block's image fragment (`Xv6.diskBlockQ`) and the
+  data BUFFER, all three of them the invariant's at `.free` and at
+  `.done ts` and the SERVING TASK's at `.lent` -- which now spans the
+  whole DATA PHASE, from the `.fetched` install to the `.status` install
+  (`Xv6.sbAt`).  So the sector transfers are stores into the task's own
+  cells (`Xv6.data_write_lease`), and `Xv6.diskProto_blockView` turns the
+  quarter into `bs = MachCSL.Virtio.blockView v c.blk` at every state of
+  the flight, which is the one cross-state fact the READ fill needs.
 
-  * `.free`: the invariant holds all three.  No serving task exists
-    (`Xv6.sbAt` becomes `.lent ⟺ (Virtio.phase v h).isSome` up to the
-    `.status` install), so the lend moves from the `.served` install to
-    the POP;
-  * `.lent caps`: the SERVING TASK holds them, and `caps` records the
-    sectors its data phase has transferred so far, in order, with their
-    values -- which is what lets the invariant say, of a WRITE chain, that
-    `MachCSL.Virtio.cacheView` at each captured sector IS the driver's
-    payload (preserved by a DRAIN, which does not move `cacheView` at all,
-    and by every other chain's capture, which is at another block by
-    `Xv6.blkInj`);
-  * `.done ts`: the invariant holds them again, the buffer TRANSFERRED,
-    with every byte's write at a position AT OR BELOW `ts` -- the position
-    of the status write, which the task makes dominate its data phase by
-    handing `MachCSL.dmaWriteLease`'s ordering receipt the `Xv6.dmaOwnT`
-    positions the fills left it (`Kb < t`).  So the collect needs ONE
-    position bound, the status byte's, for the whole slot, and
-    `Xv6.dmaOwnT_ctxBytes` generalises to "heads at or below `ts`".
-
-  A WRITE chain's buffer is never written by the device, so its row keeps
-  it at the CONTEXT tier (`MachCSL.ctxBytes` at `own 1`, whose
-  `histBytes` answers the capture's `MachCSL.dmaReadPin` and whose
-  per-byte `MachCSL.keyAt` is persistent) and the collect hands it straight
-  back -- no position, and no change to `Xv6.claimRes` or to the
-  `virtio_disk_rw` proof's frame.  A READ chain's comes back through the
-  `dmaOwnT` route above.  The context the window belongs to has to be
-  named somewhere the invariant can see it, which is a field of
-  `Xv6.Chain` (a ghost field, like `Xv6.Chain.ep`).
+  WHAT IS LEFT is written out under (1) of this file's section head:
+  `Xv6.SByte.done` must carry the transferred bytes beside the position,
+  the fill must record them, a WRITE chain's buffer needs a return path
+  that asks for no position, and the capture needs its own clause.
 
   (2) THE CACHE, DRAINED.  Freeing the receipt takes `c.blk` out of
   `Xv6.inFlightBlk`, and `Xv6.cachedOk` asks that every sector the
