@@ -1142,6 +1142,14 @@ theorem leaseL_write_frame (γ : DiskNames) (s' : VirtioState) (C : IProp GF) (p
   · iapply hl $$ HR
   · iexact HC
 
+/-- The DMA write the machine SKIPS (the guard did not fire): the context
+travels unchanged. -/
+theorem leaseL_write_skip (γ : DiskNames) (C : IProp GF) (s : VirtioState) :
+    iprop(C ∗ diskProto (GF := GF) γ s) ⊢ |==> (diskProto γ s ∗ C) := by
+  iintro ⟨HC, HR⟩
+  imodintro
+  iframe HR HC
+
 /-- A stalled request: the guard never answers. -/
 theorem leaseL_stall (γ : DiskNames) (C : IProp GF) :
     DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) iprop(True) C Virtio.stall := by
@@ -1159,7 +1167,8 @@ theorem leaseL_xferIn (γ : DiskNames) (C : IProp GF) (h : BitVec 16) (i : Nat) 
   | none => exact DevM.LeaseL.pure _ () true_intro
   | some r =>
     unfold Virtio.reqSectorLen DevM.dmaWriteIf DevM.lift
-    refine DevM.LeaseL.dmaWrite _ _ _ _ _ _ ?_ (DevM.LeaseL.pure _ () true_intro)
+    refine DevM.LeaseL.dmaWrite _ _ _ _ _ _ _ ?_ (fun s _ => leaseL_write_skip γ _ s)
+      (DevM.LeaseL.pure _ () true_intro)
     intro s' hg
     exact leaseL_write_frame γ s' C _ _ _ (data_write_lease γ s' h r i (of_decide_eq_true hg) _)
 
@@ -1269,7 +1278,7 @@ theorem leaseL_serveTail (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key 
       exact hgs.1.symm
     subst hs2
     exact leaseL_install γ h c0 key c s s1 (.served c.req) hlive rfl
-  · refine DevM.LeaseL.dmaWrite _ _ _ _ _ _ ?_ ?_
+  · refine DevM.LeaseL.dmaWrite _ _ _ _ _ _ _ ?_ (fun s _ => leaseL_write_skip γ _ s) ?_
     · intro s1 hgg
       exact leaseL_write_frame γ s1 _ _ _ _
         (status_write_lease γ s1 h c.req (of_decide_eq_true hgg) _)
@@ -1295,12 +1304,12 @@ theorem leaseL_serveTail (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key 
         · refine DevM.LeaseL.get _ (X := Unit)
             (fun _ _ => serveCtx γ h c0 key c s) _
             (fun s1 => leaseL_get_keep γ _ s1) (fun v2 _ => ?_)
-          refine DevM.LeaseL.dmaWrite _ _ _ _ _ _ ?_ ?_
+          refine DevM.LeaseL.dmaWrite _ _ _ _ _ _ _ ?_ (fun s _ => leaseL_write_skip γ _ s) ?_
           · intro s1 hgg
             simp only [Bool.and_eq_true, decide_eq_true_eq] at hgg
             exact leaseL_write_frame γ s1 _ _ _ _
               (usedElem_write_lease γ s1 h c.req v2.cfg v2.usedIdx hgg.1.1 hgg.2 _)
-          · refine DevM.LeaseL.dmaWrite _ _ _ _ _ _ ?_ ?_
+          · refine DevM.LeaseL.dmaWrite _ _ _ _ _ _ _ ?_ (fun s _ => leaseL_write_skip γ _ s) ?_
             · intro s1 hgg
               simp only [Bool.and_eq_true, decide_eq_true_eq] at hgg
               exact leaseL_write_frame γ s1 _ _ _ _

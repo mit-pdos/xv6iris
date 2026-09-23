@@ -138,10 +138,19 @@ inductive DevM.LeaseL {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] {S T
       (hpin : ∀ s, iprop(C ∗ R s) ⊢ dmaReadPin pa n (Q s) (iprop(R s ∗ C)))
       (hk : ∀ v, (∃ s, Q s v) → LeaseL R Lt Ce C (k v)) :
       LeaseL R Lt Ce C (.op (.dmaRead pa n) k)
-  | dmaWrite (C : IProp GF) (g : S → Bool) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+  /-- The guarded DMA write.  The context may CHANGE across the store: the
+  lease's continuation is the only channel by which the value the device
+  just wrote can reach the rest of the derivation, so it hands back
+  `R s ∗ C'` rather than `R s ∗ C` -- which is what lets a later `.step`
+  put a byte the device wrote into the invariant AT ITS VALUE.  The
+  machine may also SKIP the store, when the guard does not fire; the
+  `hfalse` obligation is that case, and the `¬ ramBytes` case of
+  `devOpStep` is refuted by the lease's own footprint. -/
+  | dmaWrite (C C' : IProp GF) (g : S → Bool) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
       (k : Unit → DevM S T Unit)
-      (hlease : ∀ s, g s = true → (iprop(C ∗ R s) ⊢ dmaWriteLease pa n w (iprop(R s ∗ C))))
-      (hk : LeaseL R Lt Ce C (k ())) : LeaseL R Lt Ce C (.op (.dmaWrite g pa n w) k)
+      (hlease : ∀ s, g s = true → (iprop(C ∗ R s) ⊢ dmaWriteLease pa n w (iprop(R s ∗ C'))))
+      (hfalse : ∀ s, g s = false → (iprop(C ∗ R s) ⊢ |==> (R s ∗ C')))
+      (hk : LeaseL R Lt Ce C' (k ())) : LeaseL R Lt Ce C (.op (.dmaWrite g pa n w) k)
   /-- Forking: the context splits, and the new task gets `Lt t`. -/
   | fork (C C' : IProp GF) (t : T) (k : TaskId → DevM S T Unit)
       (hsplit : C ⊢ iprop(C' ∗ Lt t))
@@ -369,17 +378,17 @@ theorem wpDev_dmaL (N : Namespace) (d : DevId) (R : DevSt d → IProp GF) [∀ s
         isplitl [HC]
         · iapply hmk _ _ hm' $$ IH HC
         · exact BigSepL.bigSepL_nil_intro
-    | dmaWrite _ g pa n w _ hlease hk =>
+    | dmaWrite _ C' g pa n w _ hlease hfalse hk =>
       rcases hstep with ⟨v, rfl, hop⟩ | ⟨hb, rfl, hσ, rfl, rfl⟩
       · obtain ⟨rfl, rfl, hcase⟩ := hop
         cases v
-        rcases hcase with ⟨hgt, hram, hnr, rfl⟩ | ⟨_, hσn⟩
+        rcases hcase with ⟨hgt, hram, hnr, rfl⟩ | ⟨hsk, hσn⟩
         · ihave Hσ := machInterp_acc_dev_self σ d $$ [Hσclose Hauth]
           case' _ => iframe
-          ihave Hl : dmaWriteLease pa n w iprop(R (σ.devs.st d) ∗ C) $$ [HC HR]
+          ihave Hl : dmaWriteLease pa n w iprop(R (σ.devs.st d) ∗ C') $$ [HC HR]
           · iapply hlease (σ.devs.st d) hgt $$ [HC HR]
             iframe HC HR
-          icases dmaWriteLease_cases pa n w iprop(R (σ.devs.st d) ∗ C) $$ Hl with ⟨%Hs, Hb, Hback⟩
+          icases dmaWriteLease_cases pa n w iprop(R (σ.devs.st d) ∗ C') $$ Hl with ⟨%Hs, Hb, Hback⟩
           imod machInterp_storeDma σ pa n Hs w hnr $$ [$Hσ $Hb] with ⟨Hσ, Hb, #Hau, #Htop⟩
           ihave Hrc := Hback $$ %(σ.top + 1) Hb Hau Htop
           icases Hrc with ⟨HR, HC⟩
@@ -392,16 +401,40 @@ theorem wpDev_dmaL (N : Namespace) (d : DevId) (R : DevSt d → IProp GF) [∀ s
           · iapply hmk _ _ hk $$ IH HC
           · exact BigSepL.bigSepL_nil_intro
         · rw [hσn]
-          ihave Hcl := Hclose $$ [Hfrag HR]
-          case' _ => inext; iexists (σ.devs.st d); iframe Hfrag HR
-          imod Hcl
-          imodintro
-          ihave Hσ := machInterp_acc_dev_self σ d $$ [Hσclose Hauth]
-          case' _ => iframe
-          iframe Hσ
-          isplitl [HC]
-          · iapply hmk _ _ hk $$ IH HC
-          · exact BigSepL.bigSepL_nil_intro
+          -- either the guard did not fire (and `hfalse` moves the context),
+          -- or the footprint is not DRAM -- which the lease itself refutes
+          have hgf : g (σ.devs.st d) = false ∨
+              (g (σ.devs.st d) = true ∧ ¬ ramBytes pa n) := by
+            rcases hsk with hgf | hnram
+            · exact Or.inl hgf
+            · cases hgb : g (σ.devs.st d) with
+              | false => exact Or.inl rfl
+              | true => exact Or.inr ⟨rfl, hnram⟩
+          rcases hgf with hgf | ⟨hgb, hnram⟩
+          · imod (hfalse (σ.devs.st d) hgf) $$ [HC HR] with ⟨HR, HC⟩
+            · iframe HC HR
+            ihave Hcl := Hclose $$ [Hfrag HR]
+            case' _ => inext; iexists (σ.devs.st d); iframe Hfrag HR
+            imod Hcl
+            imodintro
+            ihave Hσ := machInterp_acc_dev_self σ d $$ [Hσclose Hauth]
+            case' _ => iframe
+            iframe Hσ
+            isplitl [HC]
+            · iapply hmk _ _ hk $$ IH HC
+            · exact BigSepL.bigSepL_nil_intro
+          · ihave %hram : ⌜ramBytes pa n⌝ $$ [HC HR Hauth Hσclose]
+            · ihave Hσ := machInterp_acc_dev_self σ d $$ [Hσclose Hauth]
+              case' _ => iframe
+              ihave Hl : dmaWriteLease pa n w iprop(R (σ.devs.st d) ∗ C') $$ [HC HR]
+              · iapply hlease (σ.devs.st d) hgb $$ [HC HR]
+                iframe HC HR
+              icases dmaWriteLease_cases pa n w iprop(R (σ.devs.st d) ∗ C') $$ Hl
+                with ⟨%Hs, Hb, _⟩
+              icases Hσ with ⟨Hregs, Hmem, Hmm, Hdev⟩
+              iapply histBytes_ramBytes σ pa n (fun _ => DFrac.own 1) Hs
+              iframe Hmem Hmm Hb
+            exact absurd hram hnram
       · rw [hσ]
         ihave Hcl := Hclose $$ [Hfrag HR]
         case' _ => inext; iexists (σ.devs.st d); iframe Hfrag HR
@@ -558,7 +591,8 @@ theorem leaseL_of_lease {S T : Type} (rel : S → S → Prop) (R : S → IProp G
         iexact HC
   | @dmaWrite C g pa n w k hlease hk ih =>
     intro D hD1 hD2
-    refine DevM.LeaseL.dmaWrite _ g pa n w _ (fun s hgs => ?_) (ih D hD1 hD2)
+    refine DevM.LeaseL.dmaWrite _ D g pa n w _ (fun s hgs => ?_)
+      (fun s _ => by iintro ⟨HD, HRs⟩; imodintro; iframe HRs HD) (ih D hD1 hD2)
     iintro ⟨HD, HRs⟩
     ihave #HC := hD1 $$ HD
     iapply dmaWriteLease_frame pa n w (R s) D
