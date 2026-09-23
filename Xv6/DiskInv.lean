@@ -846,7 +846,8 @@ theorem perm_chain_acc (γ : DiskNames) (c0 : VirtioCfg) (k : Nat) (h : BitVec 1
     diskCfgFrozen (GF := GF) γ c0 ∗ permTok γ k h c p u ∗ diskProto γ v ⊢
       ⌜v.cfg = c0 ∧ c.hd = h.toNat ∧ c.wf ∧ c0.qnum.toNat = NUM ∧
         (∀ ph, p = some ph → Virtio.phase v h = some ph ∧ ph.req = some c.req) ∧
-        (∀ y, u = some y → v.usedIdx = y ∧ p = some (.pushed c.req))⌝ ∗
+        (∀ y, u = some y → v.usedIdx = y ∧ p = some (.pushed c.req)) ∧
+        (p = none → Virtio.phase v h = some VPhase.popped)⌝ ∗
       chainLease c0.desc c ∗
       (chainLease c0.desc c -∗ (permTok γ k h c p u ∗ diskProto γ v)) := by
   iintro ⟨#Hfr, Htok, H⟩
@@ -858,7 +859,8 @@ theorem perm_chain_acc (γ : DiskNames) (c0 : VirtioCfg) (k : Nat) (h : BitVec 1
   icases headRes_acc' γ c0.desc st h.toNat (.active c) hlt hst' $$ Hr with ⟨He, Hrb⟩
   icases headRes_active_acc γ c0.desc h.toNat c $$ He with ⟨Hcl, Hclb⟩
   isplitl []
-  · ipureintro; exact ⟨hcfg.1, hwf.1, hwf.2, hcfg.2, hcl.2.2.2.1, hcl.2.2.2.2⟩
+  · ipureintro; exact ⟨hcfg.1, hwf.1, hwf.2, hcfg.2, hcl.2.2.2.1, hcl.2.2.2.2.1,
+      hcl.2.2.2.2.2⟩
   iframe Hcl
   iintro Hcl2
   iframe Htok
@@ -873,7 +875,8 @@ theorem perm_chain_wf (γ : DiskNames) (c0 : VirtioCfg) (k : Nat) (h : BitVec 16
     diskCfgFrozen (GF := GF) γ c0 ∗ permTok γ k h c p u ∗ diskProto γ v ⊢
       ⌜v.cfg = c0 ∧ c.hd = h.toNat ∧ c.wf ∧ c0.qnum.toNat = NUM ∧
         (∀ ph, p = some ph → Virtio.phase v h = some ph ∧ ph.req = some c.req) ∧
-        (∀ y, u = some y → v.usedIdx = y ∧ p = some (.pushed c.req))⌝ ∗
+        (∀ y, u = some y → v.usedIdx = y ∧ p = some (.pushed c.req)) ∧
+        (p = none → Virtio.phase v h = some VPhase.popped)⌝ ∗
         (permTok γ k h c p u ∗ diskProto γ v) := by
   iintro ⟨#Hfr, Htok, H⟩
   icases perm_chain_acc γ c0 k h c p u v hlive $$ [$Hfr $Htok $H] with ⟨%hp, Hcl, Hback⟩
@@ -1168,7 +1171,8 @@ theorem serveCtx_guard (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key : 
     serveCtx (GF := GF) γ h c0 key c s p u ∗ diskProto γ s' ⊢
       ⌜s.cfg = c0 ∧ s'.cfg = c0 ∧
         (∀ ph, p = some ph → Virtio.phase s' h = some ph ∧ ph.req = some c.req) ∧
-        (∀ y, u = some y → s'.usedIdx = y)⌝ ∗
+        (∀ y, u = some y → s'.usedIdx = y) ∧
+        (p = none → Virtio.phase s' h = some VPhase.popped)⌝ ∗
       (serveCtx γ h c0 key c s p u ∗ diskProto γ s') := by
   unfold serveCtx
   iintro ⟨⟨#Hfr, %hcfg, Htok⟩, HR⟩
@@ -1176,7 +1180,8 @@ theorem serveCtx_guard (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key : 
   iframe HR Htok Hfr
   isplitl []
   · ipureintro
-    exact ⟨hcfg, hp.1, hp.2.2.2.2.1, fun y hy => (hp.2.2.2.2.2 y hy).1⟩
+    exact ⟨hcfg, hp.1, hp.2.2.2.2.1, fun y hy => (hp.2.2.2.2.2.1 y hy).1,
+      hp.2.2.2.2.2.2⟩
   · ipureintro; exact hcfg
 
 /-- The request the permit's phase names is in flight. -/
@@ -1507,7 +1512,7 @@ theorem leaseL_serveTail (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key 
               exact (hp.2.2.1 _ rfl).2
             have hall : (decide (Virtio.reqOf s1 h = some c.req) &&
                 decide (s1.usedIdx = v2.usedIdx) && decide (s1.cfg = v2.cfg)) = true := by
-              rw [hreq, hp.2.2.2 _ rfl, hp.2.1, hp.1]
+              rw [hreq, hp.2.2.2.1 _ rfl, hp.2.1, hp.1]
               simp
             rw [hall] at hgg
             exact absurd hgg (by simp)
@@ -1530,7 +1535,7 @@ theorem leaseL_serveTail (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key 
                 exact (hp.2.2.1 _ rfl).2
               have hall : (decide (Virtio.reqOf s1 h = some c.req) &&
                   decide (s1.usedIdx = v2.usedIdx) && decide (s1.cfg = v2.cfg)) = true := by
-                rw [hreq, hp.2.2.2 _ rfl, hp.2.1, hp.1]
+                rw [hreq, hp.2.2.2.1 _ rfl, hp.2.1, hp.1]
                 simp
               rw [hall] at hgg
               exact absurd hgg (by simp)

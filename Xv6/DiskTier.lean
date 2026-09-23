@@ -511,8 +511,8 @@ theorem queueOk_mem (st : Nat → HState) (ring : Nat → Nat) (lo np : Nat) (i 
 theorem permOk_mem (v : VirtioState) (pm : RegMapF PermVal) (st : Nat → HState) (i h : Nat)
     (hok : permOk v pm st) (hfree : st i = .inactive) : permOk v pm (memSt st i h) := by
   intro k' h' c' b' u' hget
-  obtain ⟨hlt, hst, p3, p4, p5⟩ := hok k' h' c' b' u' hget
-  refine ⟨hlt, ?_, p3, p4, p5⟩
+  obtain ⟨hlt, hst, p3, p4, p5, p6⟩ := hok k' h' c' b' u' hget
+  refine ⟨hlt, ?_, p3, p4, p5, p6⟩
   have hne : h'.toNat ≠ i := by
     intro e; rw [e, hfree] at hst; exact absurd hst (by simp)
   rw [memSt_ne st i h _ hne]

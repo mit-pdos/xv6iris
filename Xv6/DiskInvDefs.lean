@@ -1275,7 +1275,8 @@ def permOk (v : VirtioState) (pm : RegMapF PermVal) (st : Nat → HState) : Prop
   ∀ k h c p u, PartialMap.get? pm k = some ((h, c, p, u) : PermVal) →
     h.toNat < NUM ∧ st h.toNat = .active c ∧ (Virtio.phase v h).isSome = true ∧
     (∀ ph, p = some ph → Virtio.phase v h = some ph ∧ ph.req = some c.req) ∧
-    (∀ y, u = some y → v.usedIdx = y ∧ p = some (.pushed c.req))
+    (∀ y, u = some y → v.usedIdx = y ∧ p = some (.pushed c.req)) ∧
+    (p = none → Virtio.phase v h = some VPhase.popped)
 
 /-- **One permit per head.**  A permit's head is in flight, and the pop
 refuses a head that is, so the map never holds two permits for one
@@ -1351,8 +1352,8 @@ theorem permOk_arm (v : VirtioState) (pm : RegMapF PermVal) (st : Nat → HState
     (c : Chain) (hok : permOk v pm st) (hfree : st i = .inactive) :
     permOk v pm (fun j => if j = i then .active c else st j) := by
   intro k' h' c' p' u' hget
-  obtain ⟨hlt, hst, h3, h4, h5⟩ := hok k' h' c' p' u' hget
-  refine ⟨hlt, ?_, h3, h4, h5⟩
+  obtain ⟨hlt, hst, h3, h4, h5, h6⟩ := hok k' h' c' p' u' hget
+  refine ⟨hlt, ?_, h3, h4, h5, h6⟩
   have hne : h'.toNat ≠ i := by
     intro he; rw [he, hfree] at hst; exact absurd hst (by simp)
   simp only [if_neg hne]
@@ -1381,15 +1382,17 @@ theorem permOk_pop (v : VirtioState) (pm : RegMapF PermVal) (st : Nat → HState
   by_cases hk : k = k'
   · rw [get?_insert_eq hk] at hget
     cases hget
-    exact ⟨hlt, hst, by rw [hph, phase_setPhase_self]; rfl, by simp, by simp⟩
+    exact ⟨hlt, hst, by rw [hph, phase_setPhase_self]; rfl, by simp, by simp,
+      fun _ => by rw [hph, phase_setPhase_self]⟩
   · rw [get?_insert_ne hk] at hget
-    obtain ⟨p1, p2, p3, p4, p5⟩ := hok k' h' c' p' u' hget
+    obtain ⟨p1, p2, p3, p4, p5, p6⟩ := hok k' h' c' p' u' hget
     have hne : h' ≠ h := by
       intro he; subst he; rw [hnf] at p3; exact absurd p3 (by simp)
     have hx : Virtio.phase { Virtio.setPhase v h .popped with seen := sn } h'
         = Virtio.phase v h' := by rw [hph, phase_setPhase_other v h h' _ hne]
     exact ⟨p1, p2, by rw [hx]; exact p3, fun ph hp => ⟨by rw [hx]; exact (p4 ph hp).1,
-      (p4 ph hp).2⟩, fun y hy => ⟨(p5 y hy).1, (p5 y hy).2⟩⟩
+      (p4 ph hp).2⟩, fun y hy => ⟨(p5 y hy).1, (p5 y hy).2⟩,
+      fun hp => by rw [hx]; exact p6 hp⟩
 
 /-- `pushedUniq` sees only the in-flight map. -/
 theorem pushedUniq_seen (v : VirtioState) (sn : BitVec 16) (hu : pushedUniq v) :
@@ -1408,19 +1411,20 @@ theorem permOk_install (v : VirtioState) (pm : RegMapF PermVal) (st : Nat → HS
   by_cases hk : k = k'
   · rw [get?_insert_eq hk] at hget'
     cases hget'
-    obtain ⟨hlt, hst, _, _, _⟩ := hok k h c p0 u0 hget
-    refine ⟨hlt, hst, by rw [phase_setPhase_self]; rfl, ?_, by simp⟩
+    obtain ⟨hlt, hst, _, _, _, _⟩ := hok k h c p0 u0 hget
+    refine ⟨hlt, hst, by rw [phase_setPhase_self]; rfl, ?_, by simp, by simp⟩
     intro ph' hph'
     cases hph'
     exact ⟨phase_setPhase_self v h ph, hreq⟩
   · rw [get?_insert_ne hk] at hget'
-    obtain ⟨hlt, hst, h3, h4, h5⟩ := hok k' h' c' p' u' hget'
+    obtain ⟨hlt, hst, h3, h4, h5, h6⟩ := hok k' h' c' p' u' hget'
     have hne : h' ≠ h := by
       intro he; subst he; exact hk (hinj k k' h' c p0 u0 c' p' u' hget hget')
     have hx : Virtio.phase (Virtio.setPhase v h ph) h' = Virtio.phase v h' :=
       phase_setPhase_other v h h' ph hne
     exact ⟨hlt, hst, by rw [hx]; exact h3, fun q hq => ⟨by rw [hx]; exact (h4 q hq).1,
-      (h4 q hq).2⟩, fun y hy => ⟨(h5 y hy).1, (h5 y hy).2⟩⟩
+      (h4 q hq).2⟩, fun y hy => ⟨(h5 y hy).1, (h5 y hy).2⟩,
+      fun hp => by rw [hx]; exact h6 hp⟩
 
 /-- **The latch**: the task that has passed the completion gate reads the
 used index and records it.  The move changes nothing. -/
@@ -1434,8 +1438,8 @@ theorem permOk_latch (v : VirtioState) (pm : RegMapF PermVal) (st : Nat → HSta
   by_cases hk : k = k'
   · rw [get?_insert_eq hk] at hget'
     cases hget'
-    obtain ⟨hlt, hst, h3, h4, _⟩ := hok k h c (some (.pushed c.req)) u0 hget
-    exact ⟨hlt, hst, h3, h4, by rintro y ⟨rfl⟩; exact ⟨rfl, rfl⟩⟩
+    obtain ⟨hlt, hst, h3, h4, _, _⟩ := hok k h c (some (.pushed c.req)) u0 hget
+    exact ⟨hlt, hst, h3, h4, by rintro y ⟨rfl⟩; exact ⟨rfl, rfl⟩, by simp⟩
   · rw [get?_insert_ne hk] at hget'
     exact hok k' h' c' p' u' hget'
 
@@ -1453,14 +1457,14 @@ theorem permOk_complete (v : VirtioState) (pm : RegMapF PermVal) (st : Nat → H
   have hk : k ≠ k' := by
     intro he; rw [get?_delete_eq he] at hget'; exact absurd hget' (by simp)
   rw [get?_delete_ne hk] at hget'
-  obtain ⟨hlt, hst, h3, h4, h5⟩ := hok k' h' c' p' u' hget'
+  obtain ⟨hlt, hst, h3, h4, h5, h6⟩ := hok k' h' c' p' u' hget'
   have hne : h' ≠ h := by
     intro he; subst he
     exact hk (hinj k k' h' c (some (.pushed c.req)) (some ui) c' p' u' hget hget')
   have hx : Virtio.phase (Virtio.complete v h) h' = Virtio.phase v h' :=
     phase_complete_other v h h' hne
   refine ⟨hlt, hst, by rw [hx]; exact h3, fun q hq => ⟨by rw [hx]; exact (h4 q hq).1,
-    (h4 q hq).2⟩, ?_⟩
+    (h4 q hq).2⟩, ?_, fun hp => by rw [hx]; exact h6 hp⟩
   intro y hy
   obtain ⟨_, hp⟩ := h5 y hy
   have hph' := (h4 _ hp).1
@@ -1575,10 +1579,11 @@ theorem permOk_congr (v v' : VirtioState) (pm : RegMapF PermVal) (st : Nat → H
     (hph : ∀ h, Virtio.phase v' h = Virtio.phase v h) (hidx : v'.usedIdx = v.usedIdx)
     (hok : permOk v pm st) : permOk v' pm st := by
   intro k h c p u hget
-  obtain ⟨h1, h2, h3, h4, h5⟩ := hok k h c p u hget
+  obtain ⟨h1, h2, h3, h4, h5, h6⟩ := hok k h c p u hget
   exact ⟨h1, h2, by rw [hph h]; exact h3,
     fun q hq => ⟨by rw [hph h]; exact (h4 q hq).1, (h4 q hq).2⟩,
-    fun y hy => ⟨by rw [hidx]; exact (h5 y hy).1, (h5 y hy).2⟩⟩
+    fun y hy => ⟨by rw [hidx]; exact (h5 y hy).1, (h5 y hy).2⟩,
+    fun hp => by rw [hph h]; exact h6 hp⟩
 
 /-- Keys at or above `n` are free, so `n` is a key a permit may take. -/
 def permFresh (n : Nat) (pm : RegMapF PermVal) : Prop :=
