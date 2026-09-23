@@ -10,11 +10,12 @@ import Xv6.ProofDevintr
 import Xv6.LinkPlicClaim
 import Xv6.LinkPlicComplete
 import Xv6.LinkUartintr
+import Xv6.LinkClockintr
 
 namespace Xv6
 
-/-- The proved `devintr` interface, given `virtio_disk_intr` and `clockintr`. -/
-theorem Devintr (VI : VIRTIO_DISK_INTR) (CI : CLOCKINTR) : DEVINTR :=
-  devintr_proof PlicClaim PlicComplete Uartintr VI CI
+/-- The proved `devintr` interface, given `virtio_disk_intr`. -/
+theorem Devintr (VI : VIRTIO_DISK_INTR) : DEVINTR :=
+  devintr_proof PlicClaim PlicComplete Uartintr VI Clockintr
 
 end Xv6

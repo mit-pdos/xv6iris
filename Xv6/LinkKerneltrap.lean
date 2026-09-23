@@ -12,7 +12,7 @@ namespace Xv6
 
 /-- The proved `kerneltrap` interface, given `virtio_disk_intr`,
 `clockintr` and `yield`. -/
-theorem Kerneltrap (VI : VIRTIO_DISK_INTR) (CI : CLOCKINTR) (YI : YIELD) : KERNELTRAP :=
-  kerneltrap_proof (Devintr VI CI) Myproc YI
+theorem Kerneltrap (VI : VIRTIO_DISK_INTR) (YI : YIELD) : KERNELTRAP :=
+  kerneltrap_proof (Devintr VI) Myproc YI
 
 end Xv6
