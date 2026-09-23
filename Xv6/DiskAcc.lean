@@ -633,7 +633,7 @@ theorem diskProto_avail_acc (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) 
     subst hcc
     unfold diskLive
     icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, %nr, %sb, Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, Hnr, Hsb, %hpure⟩
-    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11⟩ := hpure
+    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12⟩ := hpure
     iexists np, lo, ring, st, pmap, stg, dl, nr, sb
     isplitl []
     · ipureintro; exact ⟨e3, e4, e5, e5b, e6, e11⟩
@@ -654,7 +654,7 @@ theorem diskProto_avail_acc (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) 
     iframe Hm Ha' Hr Hu Hav' Hnc Hnp' Hlo HnpM' Hpos' Hstg' Hui Hdn Hbs Htp Hnr Hsb
     ipureintro
     exact ⟨e1, e2, hq.1, hq.2.1, hq.2.2.1, hq.2.2.2.1, hq.2.2.2.2.1, e7, e8, e9, e10,
-      hq.2.2.2.2.2⟩
+      hq.2.2.2.2.2, e12⟩
 
 /-- One receipt authority, read off the eight. -/
 theorem headAuth_acc (γ : DiskNames) (st : Nat → HState) (i : Nat) (hi : i < NUM) :
@@ -1237,7 +1237,8 @@ theorem diskProto_flip [CurCtx] (γ : DiskNames) (v : VirtioState) (c c' : Virti
           fun p q h1 h2 h3 h4 _ => absurd h2 (by omega)⟩,
         ⟨rfl, fun p h1 h2 => absurd h2 (by omega)⟩, stageOk_none ringInit 0 0,
         inflightOff_none _ stInit ringInit 0 0 none p2, ?_, ?_, p5, usedOk_nil 0,
-        unreadArmed_nil _ stInit 0 ringInit 0 0 none p2⟩
+        unreadArmed_nil _ stInit 0 ringInit 0 0 none p2,
+        cntOk_nil pm (not_wroteIdx_of_dead v pm p5)⟩
       · intro bno bs hb
         rcases p4 bno bs hb with hx | hx
         · exact absurd hx id
@@ -1682,7 +1683,7 @@ theorem diskProto_armHead (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) (p
       imgOk_arm3 st c hwf hst hstm hstt v m q8,
       cachedOk_arm3 st c hwf hst hstm hstt v q9,
       permOk_arm3 st c hwf hst hstm hstt v pm q10, q11,
-      unreadArmed_arm3 v st c dl nr ring lo np stg sb hwf hst hstm hstt q7 q12⟩
+      unreadArmed_arm3 v st c dl nr ring lo np stg sb hwf hst hstm hstt q7 q12.1, q12.2⟩
 
 /-- **`publish`**: the view shift that arms head `c.hd` with the chain `c`,
 carried out between the ring-cell store and the `avail->idx` bump
@@ -1785,7 +1786,7 @@ theorem diskProto_usedRead_acc (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioStat
     subst hcc
     unfold diskLive
     icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, %nr, %sb, Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, Hnr, Hsb, %hpure⟩
-    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11⟩ := hpure
+    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12⟩ := hpure
     iexists b, nc, M, dl, dl0
     isplitl []
     · ipureintro; exact e10
@@ -1805,7 +1806,7 @@ theorem diskProto_usedRead_acc (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioStat
     iexists st, nc, np, lo, ring, m, pmap, stg, b, M', dl, dl0', nr, sb
     iframe Hm Ha Hr Hu Hav Hnc' Hnp Hlo HnpM Hpos Hstg Hui' Hdn' Hbs Htp Hnr Hsb
     ipureintro
-    exact ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, hok, e11⟩
+    exact ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, hok, e11, e12⟩
 
 /-- **`disk.used->idx`, read** (the `lhu` of `virtio_disk_intr`'s loop
 test).  The answer is `wrap16 m` for a counter `m` the device has
@@ -1939,7 +1940,7 @@ theorem diskProto_nr_acc (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState)
     subst hcc
     unfold diskLive
     icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, %nr, %sb, Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, Hnr, Hsb, %hpure⟩
-    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11⟩ := hpure
+    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12⟩ := hpure
     iexists nr
     iframe Hnr
     iintro %nr' %hle Hnr'
@@ -1958,7 +1959,7 @@ theorem diskProto_nr_acc (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState)
     iframe Hm Ha Hr Hu Hav Hnc Hnp Hlo HnpM Hpos Hstg Hui Hdn Hbs Htp Hnr' Hsb
     ipureintro
     exact ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10,
-      unreadArmed_nr v st dl nr nr' ring lo np stg sb e11 hle⟩
+      unreadArmed_nr v st dl nr nr' ring lo np stg sb e11 hle, e12⟩
 
 /-- **A head with an UNREAD completion is ARMED**, read off the live arm.
 
@@ -1983,7 +1984,7 @@ theorem diskProto_unreadArmed (γ : DiskNames) (v : VirtioState) (i n nrd : Nat)
     icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, %nq, %sb,
       Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, Hnq, Hsb,
       %hpure⟩
-    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11⟩ := hpure
+    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12⟩ := hpure
     ihave %hst := headTok_state γ st i s hi $$ Ha Htok
     ihave %hnn := diskReadAt_agree γ nq nrd $$ Hnq Hnrd
     ihave %hl := doneRec_lookup γ dl0 k (n, t, i) $$ Hdn Hrec
@@ -2084,7 +2085,7 @@ theorem diskProto_status_acc (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState)
     icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, %nq, %sb,
       Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, Hnq, Hsb,
       %hpure⟩
-    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11⟩ := hpure
+    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12⟩ := hpure
     ihave %hst := headTok_state γ st c.hd (.active c) hwf.1 $$ Ha Htok
     ihave %hnn := diskReadAt_agree γ nq nrd $$ Hnq Hnrd
     ihave %hl0 := headDoneAt_lookup γ dl0 n t c.hd $$ Hdn Hdone
@@ -2119,7 +2120,7 @@ theorem diskProto_status_acc (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState)
     iexists st, nc, np, lo, ring, m, pmap, stg, b, M, dl, dl0, nq, sb
     iframe Hm Ha Hr Hu Hav Hnc Hnp Hlo HnpM Hpos Hstg Hui Hdn Hbs Htp Hnq Hsb
     ipureintro
-    exact ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11⟩
+    exact ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12⟩
 
 theorem nthByte_one (w : BitVec (8 * 1)) : nthByte w 0 = w := by
   simp [nthByte]

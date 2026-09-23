@@ -175,7 +175,8 @@ class DiskG (GF : BundledGFunctors) where
   /-- the completion counter -/
   [mnG : MonoNatG GF]
   /-- the SERVE PERMITS (see `permTok`) -/
-  [gmPermG : GhostMapG GF Nat (BitVec 16 × Chain × Option VPhase × Option (BitVec 16)) RegMapF]
+  [gmPermG : GhostMapG GF Nat
+    (BitVec 16 × Chain × Option VPhase × Option (BitVec 16 × Bool)) RegMapF]
   /-- the PUBLISHED POSITIONS (see `posRec`): a monotone list of heads,
   one entry per position, from which a persistent per-position record may
   be taken at any time -/
@@ -1420,14 +1421,14 @@ derivation would have to cope with a state in which the write is SKIPPED,
 and then nothing at all is known about the bytes at its address.  A
 permit is exclusive and one per head (`Xv6.permInj`), so it is the
 natural place to keep them. -/
-abbrev PermVal : Type := BitVec 16 × Chain × Option VPhase × Option (BitVec 16)
+abbrev PermVal : Type := BitVec 16 × Chain × Option VPhase × Option (BitVec 16 × Bool)
 
 /-- The permits the invariant has handed out. -/
 def permAuth (γ : DiskNames) (pm : RegMapF PermVal) : IProp GF := γ.perm ↪●MAP pm
 
 /-- **A serve permit**: exclusive, and pins head `h`'s receipt to `.active c`. -/
 def permTok (γ : DiskNames) (k : Nat) (h : BitVec 16) (c : Chain) (p : Option VPhase)
-    (u : Option (BitVec 16)) : IProp GF :=
+    (u : Option (BitVec 16 × Bool)) : IProp GF :=
   γ.perm ↪◯MAP[k] ((h, c, p, u) : PermVal)
 
 /-- Every permit names a descriptor of the queue, armed with the chain it
@@ -1439,7 +1440,7 @@ def permOk (v : VirtioState) (pm : RegMapF PermVal) (st : Nat → HState) : Prop
   ∀ k h c p u, PartialMap.get? pm k = some ((h, c, p, u) : PermVal) →
     h.toNat < NUM ∧ st h.toNat = .active c ∧ (Virtio.phase v h).isSome = true ∧
     (∀ ph, p = some ph → Virtio.phase v h = some ph ∧ ph.req = some c.req) ∧
-    (∀ y, u = some y → v.usedIdx = y ∧ p = some (.pushed c.req)) ∧
+    (∀ y, u = some y → v.usedIdx = y.1 ∧ p = some (.pushed c.req)) ∧
     (p = none → Virtio.phase v h = some VPhase.popped)
 
 /-- **One permit per head.**  A permit's head is in flight, and the pop
@@ -1492,7 +1493,7 @@ theorem pushOk_not_pushed (v : VirtioState) (hok : Virtio.pushOk v = true) (h : 
 /-- No permit at all: the dead arm, and the state the live flip starts from. -/
 theorem permOk_none (v : VirtioState) (pm : RegMapF PermVal)
     (h : permOk v pm (fun _ => .inactive)) (k : Nat) (hh : BitVec 16) (c : Chain)
-    (p : Option VPhase) (u : Option (BitVec 16)) :
+    (p : Option VPhase) (u : Option (BitVec 16 × Bool)) :
     PartialMap.get? pm k ≠ some ((hh, c, p, u) : PermVal) := by
   intro hget
   have := (h k hh c p u hget).2.1
@@ -1566,7 +1567,7 @@ theorem pushedUniq_seen (v : VirtioState) (sn : BitVec 16) (hu : pushedUniq v) :
 head, and the permit records the phase the device is now in.  Every other
 permit names another head (`Xv6.permInj`), which the move leaves alone. -/
 theorem permOk_install (v : VirtioState) (pm : RegMapF PermVal) (st : Nat → HState) (k : Nat)
-    (h : BitVec 16) (c : Chain) (p0 : Option VPhase) (u0 : Option (BitVec 16)) (ph : VPhase)
+    (h : BitVec 16) (c : Chain) (p0 : Option VPhase) (u0 : Option (BitVec 16 × Bool)) (ph : VPhase)
     (hget : PartialMap.get? pm k = some ((h, c, p0, u0) : PermVal))
     (hreq : ph.req = some c.req) (hok : permOk v pm st) (hinj : permInj pm) :
     permOk (Virtio.setPhase v h ph)
@@ -1593,10 +1594,11 @@ theorem permOk_install (v : VirtioState) (pm : RegMapF PermVal) (st : Nat → HS
 /-- **The latch**: the task that has passed the completion gate reads the
 used index and records it.  The move changes nothing. -/
 theorem permOk_latch (v : VirtioState) (pm : RegMapF PermVal) (st : Nat → HState) (k : Nat)
-    (h : BitVec 16) (c : Chain) (u0 : Option (BitVec 16))
+    (h : BitVec 16) (c : Chain) (u0 : Option (BitVec 16 × Bool))
     (hget : PartialMap.get? pm k = some ((h, c, some (.pushed c.req), u0) : PermVal))
     (hok : permOk v pm st) :
-    permOk v (PartialMap.insert pm k ((h, c, some (.pushed c.req), some v.usedIdx) : PermVal))
+    permOk v
+      (PartialMap.insert pm k ((h, c, some (.pushed c.req), some (v.usedIdx, false)) : PermVal))
       st := by
   intro k' h' c' p' u' hget'
   by_cases hk : k = k'
@@ -1607,13 +1609,30 @@ theorem permOk_latch (v : VirtioState) (pm : RegMapF PermVal) (st : Nat → HSta
   · rw [get?_insert_ne hk] at hget'
     exact hok k' h' c' p' u' hget'
 
+/-- **The used-index write**: the permit's latched index takes the
+witness bit, and nothing else about it moves. -/
+theorem permOk_mark (v : VirtioState) (pm : RegMapF PermVal) (st : Nat → HState) (k : Nat)
+    (h : BitVec 16) (c : Chain) (ui : BitVec 16) (bb bb' : Bool)
+    (hget : PartialMap.get? pm k = some ((h, c, some (.pushed c.req), some (ui, bb)) : PermVal))
+    (hok : permOk v pm st) :
+    permOk v
+      (PartialMap.insert pm k ((h, c, some (.pushed c.req), some (ui, bb')) : PermVal)) st := by
+  intro k' h' c' p' u' hget'
+  by_cases hk : k = k'
+  · rw [get?_insert_eq hk] at hget'
+    cases hget'
+    obtain ⟨hlt, hst, h3, h4, h5, -⟩ := hok k h c (some (.pushed c.req)) (some (ui, bb)) hget
+    exact ⟨hlt, hst, h3, h4, by rintro y ⟨rfl⟩; exact ⟨(h5 (ui, bb) rfl).1, rfl⟩, by simp⟩
+  · rw [get?_insert_ne hk] at hget'
+    exact hok k' h' c' p' u' hget'
+
 /-- **The completion**: the permit the completing task holds goes, and no
 other permit is disturbed -- the head leaves the in-flight map, and the
 used index moves, but a permit at that head would be this one
 (`Xv6.permInj`) and a LATCHED permit at another head would be pushed too
 (`Xv6.pushedUniq`). -/
 theorem permOk_complete (v : VirtioState) (pm : RegMapF PermVal) (st : Nat → HState) (k : Nat)
-    (h : BitVec 16) (c : Chain) (ui : BitVec 16)
+    (h : BitVec 16) (c : Chain) (ui : BitVec 16 × Bool)
     (hget : PartialMap.get? pm k = some ((h, c, some (.pushed c.req), some ui) : PermVal))
     (hok : permOk v pm st) (hinj : permInj pm) (hpu : pushedUniq v) :
     permOk (Virtio.complete v h) (PartialMap.delete pm k) st := by
@@ -1638,7 +1657,7 @@ theorem permOk_complete (v : VirtioState) (pm : RegMapF PermVal) (st : Nat → H
 /-! ### `permInj` and `pushedUniq`, as the moves keep them -/
 
 theorem permInj_insert (pm : RegMapF PermVal) (k : Nat) (h : BitVec 16) (c c0 : Chain)
-    (p p0 : Option VPhase) (u u0 : Option (BitVec 16)) (hinj : permInj pm)
+    (p p0 : Option VPhase) (u u0 : Option (BitVec 16 × Bool)) (hinj : permInj pm)
     (hget : PartialMap.get? pm k = some ((h, c0, p0, u0) : PermVal)) :
     permInj (PartialMap.insert pm k ((h, c, p, u) : PermVal)) := by
   intro k1 k2 hh c1 p1 u1 c2 p2 u2 hg1 hg2
@@ -1686,6 +1705,191 @@ theorem permInj_delete (pm : RegMapF PermVal) (k : Nat) (hinj : permInj pm) :
   rw [get?_delete_ne hn1] at hg1
   rw [get?_delete_ne hn2] at hg2
   exact hinj k1 k2 hh c1 p1 u1 c2 p2 u2 hg1 hg2
+
+/-! ### The used-index write's LINEAR WITNESS
+
+The log `dl` of the used-index cell grows by one entry per COMPLETION, and
+the device's own count `nc` grows one step LATER -- the DMA write of
+`used->idx` comes first and `MachCSL.Virtio.complete` after it.  So
+`dl.length` is `nc` or `nc + 1`, and which of the two it is cannot be read
+off the device's state: the completing head is at `MachCSL.VPhase.pushed`
+on both sides of its own write.
+
+A permit's latched index is that bit.  `Xv6.PermVal`'s fourth field is an
+`Option (BitVec 16 × Bool)`: `false` from the latch until the task's
+used-index write, `true` after it -- the flip happens IN the write's own
+`MachCSL.dmaWriteLease` continuation, which is why that continuation had
+to be allowed a view shift (`MachCSL.DevM.LeaseL.dmaWrite`).  `Xv6.cntOk`
+couples the bit to the log: `dl.length = nc + 1` exactly when some permit
+carries it.
+
+That is what makes the counters STRICT.  At the write the task's own
+permit still says `false`, and a permit that said `true` would be at a
+`.pushed` head (`Xv6.permOk`), hence at THIS head (`Xv6.pushedUniq`),
+hence THIS permit (`Xv6.permInj`) -- so `dl.length = nc`, every entry of
+`dl` is at a counter at most `nc`, and the entry the write appends is at
+`nc + 1`.  Inductively `dl[k].cnt = k + 1`, which is what a reader needs
+to find the entry at a counter it has a lower bound for. -/
+
+/-- A permit that has made its used-index write. -/
+def isWit (x : PermVal) : Prop :=
+  ∃ (r : VioReq) (ui : BitVec 16), x.2.2.1 = some (VPhase.pushed r) ∧ x.2.2.2 = some (ui, true)
+
+/-- **Some permit has made its used-index write** (and its
+`MachCSL.Virtio.complete` has not run yet). -/
+def wroteIdx (pm : RegMapF PermVal) : Prop :=
+  ∃ (key : Nat) (x : PermVal), PartialMap.get? pm key = some x ∧ isWit x
+
+theorem isWit_of (h : BitVec 16) (c : Chain) (r : VioReq) (ui : BitVec 16) :
+    isWit ((h, c, some (VPhase.pushed r), some (ui, true)) : PermVal) := ⟨r, ui, rfl, rfl⟩
+
+theorem not_isWit_false (h : BitVec 16) (c : Chain) (p : Option VPhase) (ui : BitVec 16) :
+    ¬ isWit ((h, c, p, some (ui, false)) : PermVal) := by
+  rintro ⟨r, ui', -, he⟩
+  simp only [Option.some.injEq, Prod.mk.injEq] at he
+  exact absurd he.2 (by simp)
+
+theorem not_isWit_none (h : BitVec 16) (c : Chain) (p : Option VPhase) :
+    ¬ isWit ((h, c, p, none) : PermVal) := by
+  rintro ⟨r, ui', -, he⟩
+  exact absurd he (by simp)
+
+theorem wroteIdx_insert (pm : RegMapF PermVal) (k : Nat) (x1 : PermVal)
+    (h0 : ∀ x, PartialMap.get? pm k = some x → ¬ isWit x) (h1 : ¬ isWit x1) :
+    wroteIdx (PartialMap.insert pm k x1) ↔ wroteIdx pm := by
+  constructor
+  · rintro ⟨key, x, hg, hx⟩
+    by_cases hk : k = key
+    · rw [get?_insert_eq hk] at hg
+      cases hg
+      exact absurd hx h1
+    · rw [get?_insert_ne hk] at hg
+      exact ⟨key, x, hg, hx⟩
+  · rintro ⟨key, x, hg, hx⟩
+    by_cases hk : k = key
+    · subst hk
+      exact absurd hx (h0 x hg)
+    · exact ⟨key, x, by rw [get?_insert_ne hk]; exact hg, hx⟩
+
+theorem wroteIdx_insert_wit (pm : RegMapF PermVal) (k : Nat) (x1 : PermVal) (h1 : isWit x1) :
+    wroteIdx (PartialMap.insert pm k x1) :=
+  ⟨k, x1, by rw [get?_insert_eq (rfl : k = k)], h1⟩
+
+theorem wroteIdx_of_delete (pm : RegMapF PermVal) (k : Nat)
+    (h : wroteIdx (PartialMap.delete pm k)) : wroteIdx pm := by
+  obtain ⟨key, x, hg, hx⟩ := h
+  have hk : k ≠ key := by
+    intro he; rw [get?_delete_eq he] at hg; exact absurd hg (by simp)
+  exact ⟨key, x, by rwa [get?_delete_ne hk] at hg, hx⟩
+
+/-- **The witness is unique, and it is the permit that made the write.**
+A permit at `true` is at a `.pushed` head (`Xv6.permOk`); a second
+`.pushed` head is the same head (`Xv6.pushedUniq`); a second permit at
+one head is the same permit (`Xv6.permInj`). -/
+theorem wroteIdx_eq (v : VirtioState) (pm : RegMapF PermVal) (st : Nat → HState) (k : Nat)
+    (h : BitVec 16) (c : Chain) (y : BitVec 16 × Bool)
+    (hget : PartialMap.get? pm k = some ((h, c, some (.pushed c.req), some y) : PermVal))
+    (hok : permOk v pm st) (hinj : permInj pm) (hpu : pushedUniq v)
+    (key : Nat) (x : PermVal) (hg : PartialMap.get? pm key = some x) (hx : isWit x) :
+    key = k ∧ x = ((h, c, some (.pushed c.req), some y) : PermVal) := by
+  obtain ⟨r0, ui0, hp0, hu0⟩ := hx
+  obtain ⟨h0, c0, p0, u0⟩ := x
+  simp only at hp0 hu0
+  subst hp0; subst hu0
+  have hph0 := (hok key h0 c0 (some (.pushed r0)) (some (ui0, true)) hg).2.2.2.1 _ rfl
+  have hph := (hok k h c (some (.pushed c.req)) (some y) hget).2.2.2.1 _ rfl
+  have hhe : h0 = h := hpu h0 h r0 c.req hph0.1 hph.1
+  subst hhe
+  have hke : key = k := hinj key k h0 c0 (some (.pushed r0)) (some (ui0, true)) c
+    (some (.pushed c.req)) (some y) hg hget
+  subst hke
+  rw [hget] at hg
+  exact ⟨rfl, (Option.some.inj hg).symm⟩
+
+theorem not_wroteIdx_of_false (v : VirtioState) (pm : RegMapF PermVal) (st : Nat → HState)
+    (k : Nat) (h : BitVec 16) (c : Chain) (ui : BitVec 16)
+    (hget : PartialMap.get? pm k = some ((h, c, some (.pushed c.req), some (ui, false)) : PermVal))
+    (hok : permOk v pm st) (hinj : permInj pm) (hpu : pushedUniq v) : ¬ wroteIdx pm := by
+  rintro ⟨key, x, hg, hx⟩
+  obtain ⟨-, rfl⟩ := wroteIdx_eq v pm st k h c (ui, false) hget hok hinj hpu key x hg hx
+  exact absurd hx (not_isWit_false h c (some (.pushed c.req)) ui)
+
+theorem not_wroteIdx_delete (v : VirtioState) (pm : RegMapF PermVal) (st : Nat → HState)
+    (k : Nat) (h : BitVec 16) (c : Chain) (y : BitVec 16 × Bool)
+    (hget : PartialMap.get? pm k = some ((h, c, some (.pushed c.req), some y) : PermVal))
+    (hok : permOk v pm st) (hinj : permInj pm) (hpu : pushedUniq v) :
+    ¬ wroteIdx (PartialMap.delete pm k) := by
+  rintro ⟨key, x, hg, hx⟩
+  have hk : k ≠ key := by
+    intro he; rw [get?_delete_eq he] at hg; exact absurd hg (by simp)
+  rw [get?_delete_ne hk] at hg
+  obtain ⟨he, -⟩ := wroteIdx_eq v pm st k h c y hget hok hinj hpu key x hg hx
+  exact hk he.symm
+
+/-- **The log's counters, exactly.**  Entry `k` reports completion `k+1`,
+and the log is one entry AHEAD of the device's count exactly while some
+permit carries the witness. -/
+def cntOk (pm : RegMapF PermVal) (dl : List UsedRec) (nc : Nat) : Prop :=
+  (∀ (k : Nat) (hk : k < dl.length), (dl[k]'hk).1 = k + 1) ∧
+  (wroteIdx pm → dl.length = nc + 1) ∧ (¬ wroteIdx pm → dl.length = nc)
+
+/-- **The dead arm has no permit at all**, so it carries no witness. -/
+theorem not_wroteIdx_of_dead (v : VirtioState) (pm : RegMapF PermVal)
+    (h : permOk v pm (fun _ => .inactive)) : ¬ wroteIdx pm := by
+  rintro ⟨key, x, hg, -⟩
+  obtain ⟨h0, c0, p0, u0⟩ := x
+  exact permOk_none v pm h key h0 c0 p0 u0 hg
+
+theorem cntOk_nil (pm : RegMapF PermVal) (hn : ¬ wroteIdx pm) : cntOk pm [] 0 :=
+  ⟨fun k hk => absurd hk (by simp), fun hw => absurd hw hn, fun _ => rfl⟩
+
+theorem cntOk_congr (pm pm' : RegMapF PermVal) (dl : List UsedRec) (nc : Nat)
+    (h : cntOk pm dl nc) (hi : wroteIdx pm ↔ wroteIdx pm') : cntOk pm' dl nc :=
+  ⟨h.1, fun hw => h.2.1 (hi.2 hw), fun hw => h.2.2 (fun hx => hw (hi.1 hx))⟩
+
+/-- **The used-index write**: the counter `nc + 1` joins the log, and the
+writing permit takes the witness. -/
+theorem cntOk_write (pm pm' : RegMapF PermVal) (dl : List UsedRec) (nc t hd : Nat)
+    (h : cntOk pm dl nc) (hn : ¬ wroteIdx pm) (hw : wroteIdx pm') :
+    cntOk pm' (dl ++ [((nc + 1, t, hd) : UsedRec)]) nc := by
+  have hlen : dl.length = nc := h.2.2 hn
+  refine ⟨?_, fun _ => by simp [hlen], fun hx => absurd hw hx⟩
+  intro k hk
+  rw [List.length_append, List.length_singleton, hlen] at hk
+  by_cases hlt : k < dl.length
+  · rw [List.getElem_append_left hlt]
+    exact h.1 k hlt
+  · have hke : k = dl.length := by omega
+    subst hke
+    rw [List.getElem_append_right (Nat.le_refl _)]
+    simp [hlen]
+
+/-- **The completion**: the device's count catches the log up, and the
+permit that carried the witness goes. -/
+theorem cntOk_complete (pm pm' : RegMapF PermVal) (dl : List UsedRec) (nc : Nat)
+    (h : cntOk pm dl nc) (hw : wroteIdx pm) (hn : ¬ wroteIdx pm') :
+    cntOk pm' dl (nc + 1) :=
+  ⟨h.1, fun hx => absurd hx hn, fun _ => h.2.1 hw⟩
+
+/-- **Every entry of the log is at a counter at most `nc`** while no
+permit carries the witness -- what the used-index write needs of the
+entries already there. -/
+theorem cntOk_le (pm : RegMapF PermVal) (dl : List UsedRec) (nc : Nat) (h : cntOk pm dl nc)
+    (hn : ¬ wroteIdx pm) (r : UsedRec) (hr : r ∈ dl) : r.1 ≤ nc := by
+  obtain ⟨k, hk, he⟩ := List.getElem_of_mem hr
+  have := h.1 k hk
+  have hlen := h.2.2 hn
+  rw [he] at this
+  omega
+
+/-- **The entry at a counter.**  With strict counters, an index into the
+log IS its counter minus one. -/
+theorem cntOk_mem (pm : RegMapF PermVal) (dl : List UsedRec) (nc k : Nat)
+    (h : cntOk pm dl nc) (hk : k < dl.length) : ((k + 1, (dl[k]'hk).2) : UsedRec) ∈ dl := by
+  have he : ((k + 1, (dl[k]'hk).2) : UsedRec) = dl[k]'hk := by
+    rw [← h.1 k hk]
+  rw [he]
+  exact List.getElem_mem hk
 
 theorem pushedUniq_none (v : VirtioState) (h : noInflight v) : pushedUniq v := by
   intro hh hh' r r' hp _
@@ -1754,14 +1958,14 @@ def permFresh (n : Nat) (pm : RegMapF PermVal) : Prop :=
   ∀ k, n ≤ k → PartialMap.get? pm k = none
 
 theorem permFresh_insert (pm : RegMapF PermVal) (n : Nat) (h : BitVec 16) (c : Chain)
-    (p : Option VPhase) (u : Option (BitVec 16)) (hf : permFresh n pm) :
+    (p : Option VPhase) (u : Option (BitVec 16 × Bool)) (hf : permFresh n pm) :
     permFresh (n + 1) (PartialMap.insert pm n ((h, c, p, u) : PermVal)) := by
   intro k hk
   rw [get?_insert_ne (by omega)]
   exact hf k (by omega)
 
 theorem permFresh_keep (pm : RegMapF PermVal) (n k : Nat) (h : BitVec 16) (c : Chain)
-    (p : Option VPhase) (u : Option (BitVec 16)) (hf : permFresh n pm) (hk : k < n) :
+    (p : Option VPhase) (u : Option (BitVec 16 × Bool)) (hf : permFresh n pm) (hk : k < n) :
     permFresh n (PartialMap.insert pm k ((h, c, p, u) : PermVal)) := by
   intro k' hk'
   rw [get?_insert_ne (by omega)]
@@ -1776,11 +1980,18 @@ theorem permFresh_delete (pm : RegMapF PermVal) (n k : Nat) (hf : permFresh n pm
 
 /-- A permit's key is below the freshness bound. -/
 theorem permFresh_lt (pm : RegMapF PermVal) (n k : Nat) (h : BitVec 16) (c : Chain)
-    (p : Option VPhase) (u : Option (BitVec 16)) (hf : permFresh n pm)
+    (p : Option VPhase) (u : Option (BitVec 16 × Bool)) (hf : permFresh n pm)
     (hget : PartialMap.get? pm k = some ((h, c, p, u) : PermVal)) : k < n := by
   rcases Nat.lt_or_ge k n with hk | hk
   · exact hk
   · rw [hf k hk] at hget; exact absurd hget (by simp)
+
+/-- A permit minted at a FRESH key cannot be the witness. -/
+theorem wroteIdx_insert_fresh (pm : RegMapF PermVal) (n : Nat) (x1 : PermVal)
+    (hf : permFresh n pm) (h1 : ¬ isWit x1) :
+    wroteIdx (PartialMap.insert pm n x1) ↔ wroteIdx pm :=
+  wroteIdx_insert pm n x1
+    (fun x hx => by rw [hf n (Nat.le_refl n)] at hx; exact absurd hx (by simp)) h1
 
 /-! ## An in-flight head is at no pending position
 
@@ -2525,7 +2736,7 @@ def diskLive (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState)
     ⌜v.usedIdx = wrap16 nc ∧ v.seen = wrap16 lo ∧ lo ≤ np ∧ queueOk st ring lo np ∧
       posOk pmap ring lo np ∧ stageOk stg ring lo np ∧ inflightOff v st ring lo np stg ∧
       imgOk v m (inFlightBlk st) ∧ cachedOk v st ∧ permOk v pm st ∧ usedOk dl dl0 nc M ∧
-      unreadArmed v st dl nr ring lo np stg sb⌝
+      unreadArmed v st dl nr ring lo np stg sb ∧ cntOk pm dl nc⌝
 
 /-- The dead arm: before `virtio_disk_init`, and never again after.
 

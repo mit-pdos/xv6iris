@@ -210,14 +210,14 @@ theorem diskProto_congr (γ : DiskNames) (v v' : VirtioState)
     · ipureintro; exact ⟨by rw [hcfg]; exact hc0'.1, hc0'.2.1, hc0'.2.2⟩
     unfold diskLive
     icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, %nr, %sb, Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, Hnr, Hsb, %hpure⟩
-    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11⟩ := hpure
+    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12⟩ := hpure
     iexists st, nc, np, lo, ring, m, pmap, stg, b, M, dl, dl0, nr, sb
     iframe Hm Ha Hr Hu Hav Hnc Hnp Hlo HnpM Hpos Hstg Hui Hdn Hbs Htp Hnr Hsb
     ipureintro
     refine ⟨by rw [hidx]; exact e1, by rw [hseen]; exact e2, e3, e4, e5, e5b,
       inflightOff_congr v v' st ring lo np stg hph (hfl st) e6, ?_, hcd st e8,
       permOk_congr v v' pm st hph hidx e9, e10,
-      unreadArmed_congr v v' st dl nr ring lo np stg sb hph e11⟩
+      unreadArmed_congr v v' st dl nr ring lo np stg sb hph e11, e12⟩
     intro bno bs hb
     rcases e7 bno bs hb with h | h
     · exact Or.inl h
@@ -283,7 +283,7 @@ theorem diskProto_pop_live (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) (
     exact absurd hlive (by simp)
   · unfold diskLive
     icases Hl with ⟨%st, %nc, %np, %lo', %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, %nr, %sb, Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, Hnr, Hsb, %hpure⟩
-    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11⟩ := hpure
+    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12⟩ := hpure
     ihave %hll := diskLo_agree γ lo' lo $$ Hlo Hlot
     subst lo'
     ihave %hlt := diskPubLb_le γ np (lo + 1) $$ HnpM Hlb
@@ -329,7 +329,10 @@ theorem diskProto_pop_live (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) (
         inflightOff_pop v st ring lo np stg h (v.seen + 1#16) e4 e5b (by omega)
           (by rw [hri, hh]) e6, e7, e8, ?_, e10,
         unreadArmed_pop v st dl nr ring lo np stg sb h (v.seen + 1#16) (by omega)
-          (by rw [hri, hh]) hnf e11⟩
+          (by rw [hri, hh]) hnf e11,
+        cntOk_congr pm (PartialMap.insert pm pn ((h, c, none, none) : PermVal)) dl nc e12
+          (wroteIdx_insert_fresh pm pn ((h, c, none, none) : PermVal) hfr.1
+            (not_isWit_none h c none)).symm⟩
       · show v.seen + 1#16 = wrap16 (lo + 1)
         rw [wrap16_succ, e2]
       · exact permOk_pop v pm st pn h c (v.seen + 1#16) (by omega)
@@ -445,7 +448,7 @@ theorem diskProto_capture (γ : DiskNames) (v : VirtioState) (h : BitVec 16) (r 
     exact absurd hin (by simp)
   · unfold diskLive
     icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, %nr, %sb, Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, Hnr, Hsb, %hpure⟩
-    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11⟩ := hpure
+    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12⟩ := hpure
     obtain ⟨hlt, c, hst, hhd, hreq⟩ := e6.1 h r hin
     ihave %hwf := headRes_wf_of γ c0.desc st h.toNat c hlt hst $$ Hr
     have hfly : Virtio.reqSectorLen r i ≠ 0 → inFlightBlk st (Virtio.reqKey r i / SPB) := by
@@ -491,7 +494,7 @@ theorem diskProto_capture (γ : DiskNames) (v : VirtioState) (h : BitVec 16) (r 
     ipureintro
     exact ⟨e1, e2, e3, e4, e5, e5b,
       inflightOff_congr v _ st ring lo np stg (fun _ => rfl) (fun hx k rr hr => hx k rr hr) e6,
-      key.1, key.2, e9, e10, e11⟩
+      key.1, key.2, e9, e10, e11, e12⟩
 
 /-! ### Opening the protocol at an in-flight head -/
 
@@ -516,7 +519,7 @@ theorem diskProto_chain_acc (γ : DiskNames) (s : VirtioState) (h : BitVec 16) (
     exact absurd hin (by simp)
   · unfold diskLive
     icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, %nr, %sb, Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, Hnr, Hsb, %hpure⟩
-    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11⟩ := hpure
+    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12⟩ := hpure
     obtain ⟨hlt, c, hst, hhd, hreq⟩ := e6.1 h r hin
     ihave %hwf := headRes_wf_of γ c0.desc st h.toNat c hlt hst $$ Hr
     icases headRes_acc' γ c0.desc st h.toNat (.active c) hlt hst $$ Hr with ⟨He, Hrback⟩
@@ -542,9 +545,19 @@ theorem diskProto_chain_acc (γ : DiskNames) (s : VirtioState) (h : BitVec 16) (
     isplitl [Hcl2 Hclb Hrback]
     · iapply Hrback
       iapply Hclb $$ Hcl2
-    · ipureintro; exact ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11⟩
+    · ipureintro; exact ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12⟩
 
 /-! ### The four DMA writes -/
+
+theorem permTok_lookup (γ : DiskNames) (pm : RegMapF PermVal) (k : Nat) (h : BitVec 16)
+    (c : Chain) (p : Option VPhase) (u : Option (BitVec 16 × Bool)) :
+    ⊢@{IProp GF} permAuth γ pm -∗ permTok γ k h c p u -∗
+      ⌜PartialMap.get? pm k = some ((h, c, p, u) : PermVal)⌝ := by
+  unfold permAuth permTok
+  iintro H1 H2
+  ihave %hg := ghost_map_lookup $$ H1 H2
+  ipureintro; exact hg
+
 
 theorem mod_NUM_lt (n : Nat) : n % NUM < NUM := Nat.mod_lt _ (by unfold NUM; omega)
 
@@ -643,17 +656,27 @@ theorem usedElem_write_lease (γ : DiskNames) (s : VirtioState) (h : BitVec 16) 
     · iexact Hcl
     · iapply Heb $$ He2
 
-/-- W3: the used index. -/
-theorem diskProto_usedIdx_acc (γ : DiskNames) (s : VirtioState) (h : BitVec 16) (r : VioReq)
-    (hph : Virtio.phase s h = some (.pushed r)) :
-    diskProto (GF := GF) γ s ⊢ ∃ (c0 : VirtioCfg) (b nc : Nat) (dl : List UsedRec),
+/-- W3: the used index.  **This is where the log's counters become
+STRICT.**  The writing task hands in its permit with the witness bit
+`false`; a permit at `true` would be at a `.pushed` head (`Xv6.permOk`),
+hence at THIS head (`Xv6.pushedUniq`), hence THIS permit
+(`Xv6.permInj`) -- so `Xv6.cntOk` gives `dl.length = nc`, the appended
+entry is at counter `nc + 1 = dl.length + 1`, and the permit comes back
+with the bit SET.  Setting it is a ghost update, which is why the
+lease's continuation is a `|==>`
+(`MachCSL.DevM.LeaseL.dmaWrite`). -/
+theorem diskProto_usedIdx_acc (γ : DiskNames) (s : VirtioState) (key : Nat) (h : BitVec 16)
+    (cx : Chain) (ui : BitVec 16) (r : VioReq) (hph : Virtio.phase s h = some (.pushed r)) :
+    permTok (GF := GF) γ key h cx (some (.pushed cx.req)) (some (ui, false)) ∗ diskProto γ s ⊢
+      ∃ (c0 : VirtioCfg) (b nc : Nat) (dl : List UsedRec),
       ⌜s.cfg = c0 ∧ s.usedIdx = wrap16 nc⌝ ∗ usedIdxCell (usedIdxAt c0.used) b dl ∗
       ∃ tb : Nat, topLb tb ∗
       (∀ t : Nat, ⌜tb < t⌝ -∗ usedIdxCell (usedIdxAt c0.used) b (dl ++ [(nc + 1, t, h.toNat)]) -∗
-        topLb t -∗ diskProto γ s) := by
+        topLb t -∗ |==> (diskProto γ s ∗
+          permTok γ key h cx (some (.pushed cx.req)) (some (ui, true)))) := by
   have hin : Virtio.reqOf s h = some r := by unfold Virtio.reqOf; rw [hph]; rfl
   unfold diskProto
-  iintro ⟨%hc, %pn, %pm, Hpm, %hfr, Harm⟩
+  iintro ⟨Htok, %hc, %pn, %pm, Hpm, %hfr, Harm⟩
   icases Harm with ⟨Hd | ⟨%c0, #Hfr, %hc0, Hl⟩⟩
   · unfold diskDead
     icases Hd with ⟨%m, Hm, Hcfg, Hlo0, HnpM0, Hpos0, HstgA0, Hbs0, Hdn0, Hnr0, %hpure⟩
@@ -662,7 +685,11 @@ theorem diskProto_usedIdx_acc (γ : DiskNames) (s : VirtioState) (h : BitVec 16)
     exact absurd hin (by simp)
   · unfold diskLive
     icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, %nr, %sb, Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, Hnr, Hsb, %hpure⟩
-    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11⟩ := hpure
+    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12⟩ := hpure
+    ihave %hgetp := permTok_lookup γ pm key h cx (some (.pushed cx.req)) (some (ui, false))
+      $$ Hpm Htok
+    have hnw : ¬ wroteIdx pm :=
+      not_wroteIdx_of_false s pm st key h cx ui hgetp e9 hfr.2.1 hfr.2.2
     obtain ⟨-, c, hcst, -, -⟩ := (inflightOff_ok s st ring lo np stg e6) h r hin
     obtain ⟨ts, hts⟩ := (e11.1 h).2 r (Or.inr hph)
     icases statusRes_acc st sb h.toNat
@@ -691,12 +718,23 @@ theorem diskProto_usedIdx_acc (γ : DiskNames) (s : VirtioState) (h : BitVec 16)
     have hpos : ∀ r ∈ dl, r.2.1 ≤ t := fun r hr => by
       have := maxPos_ge dl r hr; omega
     ihave #Htp' := dlTops_snoc dl (nc + 1, t, h.toNat) $$ [$Htp $Htt]
+    unfold permAuth permTok
+    imod ghost_map_update (V := PermVal)
+      ((h, cx, some (.pushed cx.req), some (ui, true)) : PermVal) $$ Hpm Htok
+      with ⟨Hpm, Htok⟩
+    imodintro
+    iframe Htok
     isplitl []
     · ipureintro; exact hc
-    iexists pn, pm
+    iexists pn,
+      (PartialMap.insert pm key ((h, cx, some (.pushed cx.req), some (ui, true)) : PermVal))
     iframe Hpm
     isplitl []
-    · ipureintro; exact hfr
+    · ipureintro
+      exact ⟨permFresh_keep pm pn key h cx (some (.pushed cx.req)) (some (ui, true)) hfr.1
+          (permFresh_lt pm pn key h cx (some (.pushed cx.req)) (some (ui, false)) hfr.1 hgetp),
+        permInj_insert pm key h cx cx (some (.pushed cx.req)) (some (.pushed cx.req))
+          (some (ui, true)) (some (ui, false)) hfr.2.1 hgetp, hfr.2.2⟩
     iright
     iexists c0
     iframe Hfr
@@ -711,20 +749,31 @@ theorem diskProto_usedIdx_acc (γ : DiskNames) (s : VirtioState) (h : BitVec 16)
       | none => rw [hp] at hin; exact absurd hin (by simp)
       | some x => rfl
     obtain ⟨-, -, hpos', hstg⟩ := e6.2 h hsome
-    exact ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9,
+    exact ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8,
+      permOk_mark s pm st key h cx ui false true hgetp e9,
       usedOk_write dl dl0 nc M t h.toNat e10 hpos,
       unreadArmed_write s st dl nr (nc + 1) t ring lo np stg sb h r ts hph hts hle
-        ⟨c, hcst⟩ hpos' hstg e11⟩
+        ⟨c, hcst⟩ hpos' hstg e11,
+      cntOk_write pm
+        (PartialMap.insert pm key ((h, cx, some (.pushed cx.req), some (ui, true)) : PermVal))
+        dl nc t h.toNat e12 hnw
+        (wroteIdx_insert_wit pm key ((h, cx, some (.pushed cx.req), some (ui, true)) : PermVal)
+          (isWit_of h cx cx.req ui))⟩
 
 /-- W3: the used index.  The write appends its entry -- the counter the
 device's `usedIdx` is about to reach, at the position the machine gives the
 store -- to the cell's LOG. -/
-theorem usedIdx_write_lease (γ : DiskNames) (s : VirtioState) (h : BitVec 16) (r : VioReq)
+theorem usedIdx_write_lease (γ : DiskNames) (s : VirtioState) (key : Nat) (h : BitVec 16)
+    (cx : Chain) (ui : BitVec 16) (r : VioReq)
     (cc : VirtioCfg) (hph : Virtio.phase s h = some (.pushed r)) (hcc : s.cfg = cc)
     (w : BitVec (8 * 2)) (hw : w = s.usedIdx + 1#16) :
-    diskProto (GF := GF) γ s ⊢ dmaWriteLease (Virtio.usedIdxAddr cc) 2 w (diskProto γ s) := by
+    iprop(permTok (GF := GF) γ key h cx (some (.pushed cx.req)) (some (ui, false)) ∗
+      diskProto γ s) ⊢
+      dmaWriteLease (Virtio.usedIdxAddr cc) 2 w
+        (iprop(|==> (diskProto γ s ∗
+          permTok γ key h cx (some (.pushed cx.req)) (some (ui, true))))) := by
   iintro H
-  icases diskProto_usedIdx_acc γ s h r hph $$ H
+  icases diskProto_usedIdx_acc γ s key h cx ui r hph $$ H
     with ⟨%c0, %b, %nc, %dl, %hp, Hui, %tb, #Htts, Hback⟩
   obtain ⟨hcfg, hidx⟩ := hp
   have hcc0 : cc = c0 := by rw [← hcc, hcfg]
@@ -733,8 +782,10 @@ theorem usedIdx_write_lease (γ : DiskNames) (s : VirtioState) (h : BitVec 16) (
   iapply usedIdxCell_lease (usedIdxAt cc.used) b dl (nc + 1) h.toNat tb
     iprop(∀ t : Nat, ⌜tb < t⌝ -∗
       usedIdxCell (usedIdxAt cc.used) b (dl ++ [(nc + 1, t, h.toNat)]) -∗
-      topLb t -∗ diskProto γ s)
-    (diskProto γ s)
+      topLb t -∗ |==> (diskProto γ s ∗
+        permTok γ key h cx (some (.pushed cx.req)) (some (ui, true))))
+    (iprop(|==> (diskProto γ s ∗
+      permTok γ key h cx (some (.pushed cx.req)) (some (ui, true)))))
     (fun t hkb => by
       iintro ⟨H1, #Ht, H2⟩
       iapply H2 $$ %t %hkb H1 Ht)
@@ -744,15 +795,6 @@ theorem usedIdx_write_lease (γ : DiskNames) (s : VirtioState) (h : BitVec 16) (
 
 The device-side counterpart of `Xv6.permTok`: how a task takes a permit,
 what it pins while it holds one, and how it gives it back. -/
-
-theorem permTok_lookup (γ : DiskNames) (pm : RegMapF PermVal) (k : Nat) (h : BitVec 16)
-    (c : Chain) (p : Option VPhase) (u : Option (BitVec 16)) :
-    ⊢@{IProp GF} permAuth γ pm -∗ permTok γ k h c p u -∗
-      ⌜PartialMap.get? pm k = some ((h, c, p, u) : PermVal)⌝ := by
-  unfold permAuth permTok
-  iintro H1 H2
-  ihave %hg := ghost_map_lookup $$ H1 H2
-  ipureintro; exact hg
 
 /-- A free slot's row is EMPTY: the accounting rules out a fetch there. -/
 theorem headRes_inactive_eq (γ : DiskNames) (pd : PAddr) (i : Nat) :
@@ -772,7 +814,8 @@ theorem diskProto_open_live (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState)
         ⌜permFresh pn pm ∧ permInj pm ∧ pushedUniq v ∧ permOk v pm st⌝ ∗ permAuth γ pm ∗
         ([∗list] i ∈ List.range NUM, headRes γ c0.desc i (st i)) ∗
         (∀ (pn' : Nat) (pm' : RegMapF PermVal),
-          ⌜permFresh pn' pm' ∧ permInj pm' ∧ pushedUniq v ∧ permOk v pm' st⌝ -∗
+          ⌜permFresh pn' pm' ∧ permInj pm' ∧ pushedUniq v ∧ permOk v pm' st ∧
+            (wroteIdx pm ↔ wroteIdx pm')⌝ -∗
           permAuth γ pm' -∗ ([∗list] i ∈ List.range NUM, headRes γ c0.desc i (st i)) -∗
           diskProto γ v) := by
   unfold diskProto
@@ -787,7 +830,7 @@ theorem diskProto_open_live (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState)
     subst hcc
     unfold diskLive
     icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, %nr, %sb, Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, Hnr, Hsb, %hpure⟩
-    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11⟩ := hpure
+    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12⟩ := hpure
     isplitl []
     · ipureintro; exact ⟨hc0.1, hc0.2.2⟩
     iexists pn, pm, st
@@ -809,15 +852,18 @@ theorem diskProto_open_live (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState)
     iexists st, nc, np, lo, ring, m, pmap, stg, b, M, dl, dl0, nr, sb
     iframe Hm Ha Hr' Hu Hav Hnc Hnp Hlo HnpM Hpos Hstg Hui Hdn Hbs Htp Hnr Hsb
     ipureintro
-    exact ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, hpure'.2.2.2, e10, e11⟩
+    exact ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, hpure'.2.2.2.1, e10, e11,
+      cntOk_congr pm pm' dl nc e12 hpure'.2.2.2.2⟩
 
 /-- **Giving a permit back**: always sound, and what `disk_collect` will
 need to have happened for the head it reclaims. -/
 theorem perm_drop (γ : DiskNames) (k : Nat) (h : BitVec 16) (c : Chain) (p : Option VPhase)
-    (u : Option (BitVec 16)) (v : VirtioState) :
+    (u : Option (BitVec 16 × Bool)) (v : VirtioState)
+    (hnw : ¬ isWit ((h, c, p, u) : PermVal)) :
     permTok (GF := GF) γ k h c p u ∗ diskProto γ v ⊢ |==> diskProto γ v := by
   unfold diskProto
   iintro ⟨Htok, %hc, %pn, %pm, Hpm, %hfr, Harm⟩
+  ihave %hgetd := permTok_lookup γ pm k h c p u $$ Hpm Htok
   unfold permAuth permTok
   imod ghost_map_delete (V := PermVal) k ((h, c, p, u) : PermVal) $$ Hpm Htok with Hpm
   imodintro
@@ -844,16 +890,26 @@ theorem perm_drop (γ : DiskNames) (k : Nat) (h : BitVec 16) (c : Chain) (p : Op
     · ipureintro; exact hc0
     unfold diskLive
     icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, %nr, %sb, Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, Hnr, Hsb, %hpure⟩
-    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11⟩ := hpure
+    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12⟩ := hpure
     iexists st, nc, np, lo, ring, m, pmap, stg, b, M, dl, dl0, nr, sb
     iframe Hm Ha Hr Hu Hav Hnc Hnp Hlo HnpM Hpos Hstg Hui Hdn Hbs Htp Hnr Hsb
     ipureintro
-    exact ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, permOk_delete v pm st k e9, e10, e11⟩
+    exact ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, permOk_delete v pm st k e9, e10, e11,
+      cntOk_congr pm (PartialMap.delete pm k) dl nc e12
+        ⟨fun hw => by
+            obtain ⟨key, x, hg, hx⟩ := hw
+            have hk : k ≠ key := by
+              rintro rfl
+              rw [hgetd] at hg
+              rcases Option.some.inj hg with rfl
+              exact absurd hx hnw
+            exact ⟨key, x, by rw [get?_delete_ne hk]; exact hg, hx⟩,
+          wroteIdx_of_delete pm k⟩⟩
 
 /-- What a permit says about the head it names: a descriptor of the queue,
 armed with the chain the permit records. -/
 theorem perm_state (γ : DiskNames) (v : VirtioState) (pm : RegMapF PermVal) (st : Nat → HState)
-    (k : Nat) (h : BitVec 16) (c : Chain) (p : Option VPhase) (u : Option (BitVec 16))
+    (k : Nat) (h : BitVec 16) (c : Chain) (p : Option VPhase) (u : Option (BitVec 16 × Bool))
     (hok : permOk v pm st) :
     ⊢@{IProp GF} permAuth γ pm -∗ permTok γ k h c p u -∗
       ⌜PartialMap.get? pm k = some ((h, c, p, u) : PermVal) ∧ h.toNat < NUM ∧
@@ -866,12 +922,12 @@ theorem perm_state (γ : DiskNames) (v : VirtioState) (pm : RegMapF PermVal) (st
 /-- **What a permit pins**: the chain's descriptors and header, at the
 addresses the fetch reads them from. -/
 theorem perm_chain_acc (γ : DiskNames) (c0 : VirtioCfg) (k : Nat) (h : BitVec 16) (c : Chain)
-    (p : Option VPhase) (u : Option (BitVec 16))
+    (p : Option VPhase) (u : Option (BitVec 16 × Bool))
     (v : VirtioState) (hlive : Virtio.live c0 = true) :
     diskCfgFrozen (GF := GF) γ c0 ∗ permTok γ k h c p u ∗ diskProto γ v ⊢
       ⌜v.cfg = c0 ∧ c.hd = h.toNat ∧ c.wf ∧ c0.qnum.toNat = NUM ∧
         (∀ ph, p = some ph → Virtio.phase v h = some ph ∧ ph.req = some c.req) ∧
-        (∀ y, u = some y → v.usedIdx = y ∧ p = some (.pushed c.req)) ∧
+        (∀ y, u = some y → v.usedIdx = y.1 ∧ p = some (.pushed c.req)) ∧
         (p = none → Virtio.phase v h = some VPhase.popped)⌝ ∗
       chainLease c0.desc c ∗
       (chainLease c0.desc c -∗ (permTok γ k h c p u ∗ diskProto γ v)) := by
@@ -889,18 +945,18 @@ theorem perm_chain_acc (γ : DiskNames) (c0 : VirtioCfg) (k : Nat) (h : BitVec 1
   iframe Hcl
   iintro Hcl2
   iframe Htok
-  iapply Hback $$ %pn %pm %hpp Hpm
+  iapply Hback $$ %pn %pm %⟨hpp.1, hpp.2.1, hpp.2.2.1, hpp.2.2.2, Iff.rfl⟩ Hpm
   iapply Hrb
   iapply Hclb $$ Hcl2
 
 /-- The chain a permit names, as a pure fact. -/
 theorem perm_chain_wf (γ : DiskNames) (c0 : VirtioCfg) (k : Nat) (h : BitVec 16) (c : Chain)
-    (p : Option VPhase) (u : Option (BitVec 16))
+    (p : Option VPhase) (u : Option (BitVec 16 × Bool))
     (v : VirtioState) (hlive : Virtio.live c0 = true) :
     diskCfgFrozen (GF := GF) γ c0 ∗ permTok γ k h c p u ∗ diskProto γ v ⊢
       ⌜v.cfg = c0 ∧ c.hd = h.toNat ∧ c.wf ∧ c0.qnum.toNat = NUM ∧
         (∀ ph, p = some ph → Virtio.phase v h = some ph ∧ ph.req = some c.req) ∧
-        (∀ y, u = some y → v.usedIdx = y ∧ p = some (.pushed c.req)) ∧
+        (∀ y, u = some y → v.usedIdx = y.1 ∧ p = some (.pushed c.req)) ∧
         (p = none → Virtio.phase v h = some VPhase.popped)⌝ ∗
         (permTok γ k h c p u ∗ diskProto γ v) := by
   iintro ⟨#Hfr, Htok, H⟩
@@ -930,7 +986,7 @@ pins the receipt of `h` to the chain whose descriptors it read.  The
 permit now RECORDS the phase the task installed, which is what lets the
 task's later DMA writes know their guards fire. -/
 theorem perm_install (γ : DiskNames) (c0 : VirtioCfg) (k : Nat) (h : BitVec 16) (c : Chain)
-    (p0 : Option VPhase) (u0 : Option (BitVec 16))
+    (p0 : Option VPhase) (u0 : Option (BitVec 16 × Bool))
     (v : VirtioState) (ph : VPhase) (sf : SByte → SByte) (A B : IProp GF)
     (hlive : Virtio.live c0 = true) (hph : ph.req = some c.req)
     (hpu : (∀ r, ph ≠ .pushed r) ∨ Virtio.pushOk v = true)
@@ -952,7 +1008,7 @@ theorem perm_install (γ : DiskNames) (c0 : VirtioCfg) (k : Nat) (h : BitVec 16)
     subst hcc
     unfold diskLive
     icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, %nr, %sb, Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, Hnr, Hsb, %hpure⟩
-    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11⟩ := hpure
+    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12⟩ := hpure
     ihave %hst := perm_state γ v pm st k h c p0 u0 e9 $$ Hpm Htok
     obtain ⟨hget, hlt, hst'⟩ := hst
     ihave %hwf := headRes_wf_of γ c0.desc st h.toNat c hlt hst' $$ Hr
@@ -1007,17 +1063,28 @@ theorem perm_install (γ : DiskNames) (c0 : VirtioCfg) (k : Nat) (h : BitVec 16)
         (inflightOk_setPhase_some v st h c ph hph hlt hst' hwf.1 e6.1) e6, e7, e8,
       permOk_install v pm st k h c p0 u0 ph hget hph e9 hfr.2.1, e10,
       unreadArmed_setPhase v st dl nr ring lo np stg sb h (p0.getD VPhase.popped) ph
-        (sf (sb h.toNat)) hph0 hnp0 (hsbf (sb h.toNat) hsb0) e11⟩
+        (sf (sb h.toNat)) hph0 hnp0 (hsbf (sb h.toNat) hsb0) e11,
+      cntOk_congr pm (PartialMap.insert pm k ((h, c, some ph, none) : PermVal)) dl nc e12
+        (wroteIdx_insert pm k ((h, c, some ph, none) : PermVal)
+          (fun x hx => by
+            rw [hget] at hx
+            rcases Option.some.inj hx with rfl
+            rintro ⟨r, ui, hp, -⟩
+            exact absurd (show p0.getD VPhase.popped = VPhase.pushed r by
+              simp only at hp; rw [hp]; rfl) (hnp0 r))
+          (not_isWit_none h c (some ph))).symm⟩
 
 /-- **The latch.**  The task that has passed the completion gate reads the
 used index at its own `get`; the permit records it, so the two writes that
 follow know the index has not moved (`Xv6.pushedUniq`: nothing else is
 between its element and its index). -/
 theorem perm_latch (γ : DiskNames) (c0 : VirtioCfg) (k : Nat) (h : BitVec 16) (c : Chain)
-    (u0 : Option (BitVec 16)) (v : VirtioState) (hlive : Virtio.live c0 = true) :
+    (u0 : Option (BitVec 16 × Bool)) (v : VirtioState) (hlive : Virtio.live c0 = true)
+    (hu0 : ¬ isWit ((h, c, some (.pushed c.req), u0) : PermVal)) :
     diskCfgFrozen (GF := GF) γ c0 ∗ permTok γ k h c (some (.pushed c.req)) u0 ∗
       diskProto γ v ⊢
-      |==> (diskProto γ v ∗ permTok γ k h c (some (.pushed c.req)) (some v.usedIdx)) := by
+      |==> (diskProto γ v ∗
+        permTok γ k h c (some (.pushed c.req)) (some (v.usedIdx, false))) := by
   unfold diskProto
   iintro ⟨#Hfr0, Htok, %hc, %pn, %pm, Hpm, %hfr, Harm⟩
   icases Harm with ⟨Hd | ⟨%c0', #Hfr, %hc0, Hl⟩⟩
@@ -1030,24 +1097,26 @@ theorem perm_latch (γ : DiskNames) (c0 : VirtioCfg) (k : Nat) (h : BitVec 16) (
     subst hcc
     unfold diskLive
     icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, %nr, %sb, Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, Hnr, Hsb, %hpure⟩
-    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11⟩ := hpure
+    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12⟩ := hpure
     ihave %hst := perm_state γ v pm st k h c (some (.pushed c.req)) u0 e9 $$ Hpm Htok
     obtain ⟨hget, hlt, hst'⟩ := hst
     unfold permAuth permTok
     imod ghost_map_update (V := PermVal)
-      ((h, c, some (.pushed c.req), some v.usedIdx) : PermVal) $$ Hpm Htok with ⟨Hpm, Htok⟩
+      ((h, c, some (.pushed c.req), some (v.usedIdx, false)) : PermVal) $$ Hpm Htok
+      with ⟨Hpm, Htok⟩
     imodintro
     iframe Htok
     isplitl []
     · ipureintro; exact hc
-    iexists pn, (PartialMap.insert pm k ((h, c, some (.pushed c.req), some v.usedIdx) : PermVal))
+    iexists pn,
+      (PartialMap.insert pm k ((h, c, some (.pushed c.req), some (v.usedIdx, false)) : PermVal))
     iframe Hpm
     isplitl []
     · ipureintro
-      exact ⟨permFresh_keep pm pn k h c (some (.pushed c.req)) (some v.usedIdx) hfr.1
+      exact ⟨permFresh_keep pm pn k h c (some (.pushed c.req)) (some (v.usedIdx, false)) hfr.1
           (permFresh_lt pm pn k h c (some (.pushed c.req)) u0 hfr.1 hget),
         permInj_insert pm k h c c (some (.pushed c.req)) (some (.pushed c.req))
-          (some v.usedIdx) u0 hfr.2.1 hget, hfr.2.2⟩
+          (some (v.usedIdx, false)) u0 hfr.2.1 hget, hfr.2.2⟩
     iright
     iexists c0
     iframe Hfr
@@ -1057,7 +1126,14 @@ theorem perm_latch (γ : DiskNames) (c0 : VirtioCfg) (k : Nat) (h : BitVec 16) (
     iframe Hm Ha Hr Hu Hav Hnc Hnp Hlo HnpM Hpos Hstg Hui Hdn Hbs Htp Hnr Hsb
     ipureintro
     exact ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8,
-      permOk_latch v pm st k h c u0 hget e9, e10, e11⟩
+      permOk_latch v pm st k h c u0 hget e9, e10, e11,
+      cntOk_congr pm
+        (PartialMap.insert pm k
+          ((h, c, some (.pushed c.req), some (v.usedIdx, false)) : PermVal)) dl nc e12
+        (wroteIdx_insert pm k
+          ((h, c, some (.pushed c.req), some (v.usedIdx, false)) : PermVal)
+          (fun x hx => by rw [hget] at hx; rcases Option.some.inj hx with rfl; exact hu0)
+          (not_isWit_false h c (some (.pushed c.req)) v.usedIdx)).symm⟩
 
 /-- **The completion**: the permit goes, the used index moves, and the
 head leaves the in-flight map.  It bumps `v.usedIdx`, which the DEAD arm
@@ -1065,7 +1141,7 @@ pins to zero, so it needs the frozen configuration -- which the serving
 task carries in its `serveCtx`. -/
 theorem perm_complete (γ : DiskNames) (c0 : VirtioCfg) (k : Nat) (h : BitVec 16) (c : Chain)
     (ui : BitVec 16) (v : VirtioState) (hlive : Virtio.live c0 = true) :
-    diskCfgFrozen (GF := GF) γ c0 ∗ permTok γ k h c (some (.pushed c.req)) (some ui) ∗
+    diskCfgFrozen (GF := GF) γ c0 ∗ permTok γ k h c (some (.pushed c.req)) (some (ui, true)) ∗
       diskProto γ v ⊢ |==> diskProto γ (Virtio.complete v h) := by
   unfold diskProto
   iintro ⟨#Hfr0, Htok, %hc, %pn, %pm, Hpm, %hfr, Harm⟩
@@ -1079,12 +1155,13 @@ theorem perm_complete (γ : DiskNames) (c0 : VirtioCfg) (k : Nat) (h : BitVec 16
     subst hcc
     unfold diskLive
     icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, %nr, %sb, Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, Hnr, Hsb, %hpure⟩
-    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11⟩ := hpure
-    ihave %hst := perm_state γ v pm st k h c (some (.pushed c.req)) (some ui) e9 $$ Hpm Htok
+    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12⟩ := hpure
+    ihave %hst := perm_state γ v pm st k h c (some (.pushed c.req)) (some (ui, true)) e9
+      $$ Hpm Htok
     obtain ⟨hget, hlt, hst'⟩ := hst
     unfold permAuth permTok
-    imod ghost_map_delete (V := PermVal) k ((h, c, some (.pushed c.req), some ui) : PermVal)
-      $$ Hpm Htok with Hpm
+    imod ghost_map_delete (V := PermVal) k
+      ((h, c, some (.pushed c.req), some (ui, true)) : PermVal) $$ Hpm Htok with Hpm
     imodintro
     isplitl []
     · ipureintro; exact hc
@@ -1103,10 +1180,13 @@ theorem perm_complete (γ : DiskNames) (c0 : VirtioCfg) (k : Nat) (h : BitVec 16
     iframe Hm Ha Hr Hu Hav Hnc Hnp Hlo HnpM Hpos Hstg Hui Hdn Hbs Htp Hnr Hsb
     ipureintro
     refine ⟨?_, e2, e3, e4, e5, e5b, inflightOff_complete v st ring lo np stg h e6, e7, e8,
-      permOk_complete v pm st k h c ui hget e9 hfr.2.1 hfr.2.2,
+      permOk_complete v pm st k h c (ui, true) hget e9 hfr.2.1 hfr.2.2,
       usedOk_complete dl dl0 nc M e10,
       unreadArmed_complete v st dl nr ring lo np stg sb h c.req
-        ((e9 k h c (some (.pushed c.req)) (some ui) hget).2.2.2.1 _ rfl).1 e11⟩
+        ((e9 k h c (some (.pushed c.req)) (some (ui, true)) hget).2.2.2.1 _ rfl).1 e11,
+      cntOk_complete pm (PartialMap.delete pm k) dl nc e12
+        ⟨k, _, hget, isWit_of h c c.req ui⟩
+        (not_wroteIdx_delete v pm st k h c (ui, true) hget e9 hfr.2.1 hfr.2.2)⟩
     show v.usedIdx + 1#16 = wrap16 (nc + 1)
     rw [wrap16_succ, e1]
 
@@ -1203,11 +1283,11 @@ structure ServeKnow (h : BitVec 16) where
 
 /-- The `serve` task's linear context. -/
 def serveCtx (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key : Nat) (c : Chain)
-    (s : VirtioState) (p : Option VPhase) (u : Option (BitVec 16)) : IProp GF := iprop%
+    (s : VirtioState) (p : Option VPhase) (u : Option (BitVec 16 × Bool)) : IProp GF := iprop%
   diskCfgFrozen γ c0 ∗ ⌜s.cfg = c0⌝ ∗ permTok γ key h c p u
 
 theorem serveCtx_cfg (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key : Nat) (c : Chain)
-    (s : VirtioState) (p : Option VPhase) (u : Option (BitVec 16)) :
+    (s : VirtioState) (p : Option VPhase) (u : Option (BitVec 16 × Bool)) :
     serveCtx (GF := GF) γ h c0 key c s p u ⊢ ⌜s.cfg = c0⌝ := by
   unfold serveCtx
   iintro ⟨_, %hcfg, _⟩
@@ -1216,12 +1296,12 @@ theorem serveCtx_cfg (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key : Na
 /-- **What the permit says at the state of a step**: the phase it records
 is the device's, so the guards of the task's DMA writes fire. -/
 theorem serveCtx_guard (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key : Nat) (c : Chain)
-    (s s' : VirtioState) (p : Option VPhase) (u : Option (BitVec 16))
+    (s s' : VirtioState) (p : Option VPhase) (u : Option (BitVec 16 × Bool))
     (hlive : Virtio.live c0 = true) :
     serveCtx (GF := GF) γ h c0 key c s p u ∗ diskProto γ s' ⊢
       ⌜s.cfg = c0 ∧ s'.cfg = c0 ∧
         (∀ ph, p = some ph → Virtio.phase s' h = some ph ∧ ph.req = some c.req) ∧
-        (∀ y, u = some y → s'.usedIdx = y) ∧
+        (∀ y, u = some y → s'.usedIdx = y.1) ∧
         (p = none → Virtio.phase s' h = some VPhase.popped)⌝ ∗
       (serveCtx γ h c0 key c s p u ∗ diskProto γ s') := by
   unfold serveCtx
@@ -1236,7 +1316,7 @@ theorem serveCtx_guard (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key : 
 
 /-- The request the permit's phase names is in flight. -/
 theorem serveCtx_req (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key : Nat) (c : Chain)
-    (s s' : VirtioState) (ph : VPhase) (u : Option (BitVec 16))
+    (s s' : VirtioState) (ph : VPhase) (u : Option (BitVec 16 × Bool))
     (hlive : Virtio.live c0 = true) :
     serveCtx (GF := GF) γ h c0 key c s (some ph) u ∗ diskProto γ s' ⊢
       ⌜Virtio.reqOf s' h = some c.req⌝ ∗
@@ -1300,7 +1380,7 @@ theorem chainLease_accSector (pd : PAddr) (c : Chain) :
 the device reads, the permit says the chain is still `c`, and the
 invariant holds a half of those bytes at the value the driver wrote. -/
 theorem serve_chain_pin (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key : Nat)
-    (c : Chain) (s s' : VirtioState) (p : Option VPhase) (u : Option (BitVec 16))
+    (c : Chain) (s s' : VirtioState) (p : Option VPhase) (u : Option (BitVec 16 × Bool))
     (n : Nat) (pa : PAddr) (w : BitVec (8 * n))
     (hlive : Virtio.live c0 = true)
     (hacc : chainLease (GF := GF) c0.desc c ⊢
@@ -1342,6 +1422,43 @@ theorem leaseL_write_frame (γ : DiskNames) (s' : VirtioState) (C : IProp GF) (p
   isplitl [HR]
   · iapply hl $$ HR
   · iexact HC
+
+/-- **The used-index write, in the task's context.**  The permit comes
+out of `Xv6.serveCtx` with the witness bit `false` and goes back with it
+`true`; the flip is a ghost update, which the lease's continuation may
+now take. -/
+theorem leaseL_idx_write (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key : Nat)
+    (c : Chain) (v2 s1 : VirtioState) (r : VioReq) (cc : VirtioCfg)
+    (hph : Virtio.phase s1 h = some (.pushed r)) (hcc : s1.cfg = cc)
+    (w : BitVec (8 * 2)) (hw : w = s1.usedIdx + 1#16) :
+    iprop(serveCtx (GF := GF) γ h c0 key c v2 (some (.pushed c.req))
+        (some (v2.usedIdx, false)) ∗ diskProto γ s1) ⊢
+      dmaWriteLease (Virtio.usedIdxAddr cc) 2 w
+        (iprop(|==> (diskProto γ s1 ∗
+          serveCtx γ h c0 key c v2 (some (.pushed c.req)) (some (v2.usedIdx, true))))) := by
+  unfold serveCtx
+  iintro ⟨⟨#Hfr, %hcfg, Htok⟩, HR⟩
+  ihave Hl := usedIdx_write_lease γ s1 key h c v2.usedIdx r cc hph hcc w hw $$ [Htok HR]
+  · iframe Htok HR
+  ihave Hl := dmaWriteLease_frame (Virtio.usedIdxAddr cc) 2 w
+      iprop(|==> (diskProto (GF := GF) γ s1 ∗
+        permTok γ key h c (some (.pushed c.req)) (some (v2.usedIdx, true))))
+      iprop(diskCfgFrozen (GF := GF) γ c0) $$ [Hl Hfr]
+  · iframe Hl Hfr
+  iapply (dmaWriteLease_mono (Virtio.usedIdxAddr cc) 2 w
+    iprop((|==> (diskProto (GF := GF) γ s1 ∗
+        permTok γ key h c (some (.pushed c.req)) (some (v2.usedIdx, true)))) ∗
+      diskCfgFrozen γ c0)
+    iprop(|==> (diskProto (GF := GF) γ s1 ∗
+      (diskCfgFrozen γ c0 ∗ ⌜v2.cfg = c0⌝ ∗
+        permTok γ key h c (some (.pushed c.req)) (some (v2.usedIdx, true)))))
+    (by
+      iintro ⟨H, #Hf⟩
+      imod H with ⟨HR2, Ht2⟩
+      imodintro
+      iframe HR2 Ht2 Hf
+      ipureintro; exact hcfg))
+  iexact Hl
 
 /-- The DMA write the machine SKIPS (the guard did not fire): the context
 travels unchanged. -/
@@ -1455,7 +1572,7 @@ theorem leaseL_forkJoinAll (γ : DiskNames) (C : IProp GF) (ts : List Virtio.VTa
 /-- Installing a phase that carries the request of the armed chain, with
 the status byte it moves (`A` in, `B` out). -/
 theorem leaseL_install_gen (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key : Nat)
-    (c : Chain) (s s1 : VirtioState) (p0 : Option VPhase) (u0 : Option (BitVec 16))
+    (c : Chain) (s s1 : VirtioState) (p0 : Option VPhase) (u0 : Option (BitVec 16 × Bool))
     (ph : VPhase) (sf : SByte → SByte) (A B : IProp GF)
     (hlive : Virtio.live c0 = true) (hph : ph.req = some c.req)
     (hpu : (∀ r, ph ≠ .pushed r) ∨ Virtio.pushOk s1 = true)
@@ -1476,7 +1593,7 @@ theorem leaseL_install_gen (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (ke
 
 /-- The common case: the phase moves and the status byte does not. -/
 theorem leaseL_install (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key : Nat) (c : Chain)
-    (s s1 : VirtioState) (p0 : Option VPhase) (u0 : Option (BitVec 16)) (ph : VPhase)
+    (s s1 : VirtioState) (p0 : Option VPhase) (u0 : Option (BitVec 16 × Bool)) (ph : VPhase)
     (hlive : Virtio.live c0 = true) (hph : ph.req = some c.req)
     (hpu : (∀ r, ph ≠ .pushed r) ∨ Virtio.pushOk s1 = true)
     (hnp0 : ∀ r, p0.getD VPhase.popped ≠ .pushed r)
@@ -1497,15 +1614,16 @@ theorem leaseL_install (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key : 
 /-- **The latch**: the `get` that follows the completion gate re-bases the
 task's context at the state it read, and records the used index there. -/
 theorem leaseL_latch (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key : Nat) (c : Chain)
-    (s s1 : VirtioState) (u0 : Option (BitVec 16)) (hlive : Virtio.live c0 = true) :
+    (s s1 : VirtioState) (u0 : Option (BitVec 16 × Bool)) (hlive : Virtio.live c0 = true)
+    (hu0 : ¬ isWit ((h, c, some (.pushed c.req), u0) : PermVal)) :
     iprop(serveCtx (GF := GF) γ h c0 key c s (some (.pushed c.req)) u0 ∗ diskProto γ s1) ⊢
       |==> (diskProto γ s1 ∗ ∃ _ : Unit,
-        serveCtx γ h c0 key c s1 (some (.pushed c.req)) (some s1.usedIdx)) := by
+        serveCtx γ h c0 key c s1 (some (.pushed c.req)) (some (s1.usedIdx, false))) := by
   unfold serveCtx
   iintro ⟨⟨#Hfr, %hcfg, Htok⟩, HR⟩
   icases perm_chain_wf γ c0 key h c (some (.pushed c.req)) u0 s1 hlive $$ [$Hfr $Htok $HR]
     with ⟨%hp, Htok, HR⟩
-  imod perm_latch γ c0 key h c u0 s1 hlive $$ [$Hfr $Htok $HR] with ⟨HR, Htok⟩
+  imod perm_latch γ c0 key h c u0 s1 hlive hu0 $$ [$Hfr $Htok $HR] with ⟨HR, Htok⟩
   imodintro
   iframe HR
   iexists ()
@@ -1515,7 +1633,7 @@ theorem leaseL_latch (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key : Na
 /-- A DMA write of a task that has installed its request: the guard cannot
 be false, because the permit says the request IS in flight. -/
 theorem leaseL_req_false (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key : Nat)
-    (c : Chain) (s s1 : VirtioState) (ph : VPhase) (u : Option (BitVec 16))
+    (c : Chain) (s s1 : VirtioState) (ph : VPhase) (u : Option (BitVec 16 × Bool))
     (hlive : Virtio.live c0 = true) (hg : Virtio.reqOf s1 h ≠ some c.req) (P : IProp GF) :
     iprop(serveCtx (GF := GF) γ h c0 key c s (some ph) u ∗ diskProto γ s1) ⊢ P := by
   iintro H
@@ -1526,7 +1644,7 @@ theorem leaseL_req_false (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key 
 it at own 1 up to `.fetched`, and the task takes it away for the one step
 at which its DMA write fires. -/
 theorem leaseL_lend (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key : Nat) (c : Chain)
-    (s s1 : VirtioState) (u0 : Option (BitVec 16)) (hlive : Virtio.live c0 = true) :
+    (s s1 : VirtioState) (u0 : Option (BitVec 16 × Bool)) (hlive : Virtio.live c0 = true) :
     iprop(serveCtx (GF := GF) γ h c0 key c s (some (.fetched c.req)) u0 ∗ diskProto γ s1) ⊢
       |==> (diskProto γ (Virtio.setPhase s1 h (.served c.req)) ∗
         (serveCtx γ h c0 key c s (some (.served c.req)) none ∗ dmaOwn c.status 1)) := by
@@ -1572,7 +1690,7 @@ theorem leaseL_take (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key : Nat
   iframe HR HC
 
 theorem leaseL_serveTail (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key : Nat)
-    (c : Chain) (s : VirtioState) (u0 : Option (BitVec 16))
+    (c : Chain) (s : VirtioState) (u0 : Option (BitVec 16 × Bool))
     (hlive : Virtio.live c0 = true) :
     DevM.LeaseL (diskProto (GF := GF) γ) (diskTaskRes γ) iprop(True)
       (serveCtx γ h c0 key c s (some (.fetched c.req)) u0) (serveTail h c.req) := by
@@ -1639,18 +1757,21 @@ theorem leaseL_serveTail (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key 
                 · obtain ⟨r, hr⟩ := hx; exact absurd hr (by simp))
           · exact absurd hgs' (by simp)
         · refine DevM.LeaseL.get _ (X := Unit)
-            (fun s1 _ => serveCtx γ h c0 key c s1 (some (.pushed c.req)) (some s1.usedIdx)) _
-            (fun s1 => leaseL_latch γ h c0 key c s s1 none hlive) (fun v2 _ => ?_)
+            (fun s1 _ =>
+              serveCtx γ h c0 key c s1 (some (.pushed c.req)) (some (s1.usedIdx, false))) _
+            (fun s1 => leaseL_latch γ h c0 key c s s1 none hlive
+              (not_isWit_none h c (some (.pushed c.req)))) (fun v2 _ => ?_)
           refine DevM.LeaseL.dmaWrite _
-            (serveCtx γ h c0 key c v2 (some (.pushed c.req)) (some v2.usedIdx)) _ _ _ _ _ ?_ ?_ ?_
+            (serveCtx γ h c0 key c v2 (some (.pushed c.req)) (some (v2.usedIdx, false)))
+            _ _ _ _ _ ?_ ?_ ?_
           · intro s1 hgg
             simp only [Bool.and_eq_true, decide_eq_true_eq] at hgg
             exact leaseL_write_frame γ s1 _ _ _ _
               (usedElem_write_lease γ s1 h c.req v2.cfg v2.usedIdx hgg.1.1 hgg.2 _)
           · intro s1 hgg
             iintro H
-            icases serveCtx_guard γ h c0 key c v2 s1 (some (.pushed c.req)) (some v2.usedIdx)
-                hlive $$ H with ⟨%hp, _⟩
+            icases serveCtx_guard γ h c0 key c v2 s1 (some (.pushed c.req))
+                (some (v2.usedIdx, false)) hlive $$ H with ⟨%hp, _⟩
             exfalso
             have hreq : Virtio.reqOf s1 h = some c.req := by
               unfold Virtio.reqOf
@@ -1663,21 +1784,20 @@ theorem leaseL_serveTail (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key 
             rw [hall] at hgg
             exact absurd hgg (by simp)
           · refine DevM.LeaseL.dmaWrite _
-              (serveCtx γ h c0 key c v2 (some (.pushed c.req)) (some v2.usedIdx))
+              (serveCtx γ h c0 key c v2 (some (.pushed c.req)) (some (v2.usedIdx, true)))
               _ _ _ _ _ ?_ ?_ ?_
             · intro s1 hgg
               simp only [Bool.and_eq_true, decide_eq_true_eq] at hgg
               iintro H
               icases serveCtx_guard γ h c0 key c v2 s1 (some (.pushed c.req))
-                  (some v2.usedIdx) hlive $$ H with ⟨%hp, Hrest⟩
-              iapply leaseL_write_frame γ s1 _ _ _ _
-                (usedIdx_write_lease γ s1 h c.req v2.cfg (hp.2.2.1 _ rfl).1 hgg.2 _
-                  (by rw [hgg.1.2]))
+                  (some (v2.usedIdx, false)) hlive $$ H with ⟨%hp, Hrest⟩
+              iapply leaseL_idx_write γ h c0 key c v2 s1 c.req v2.cfg (hp.2.2.1 _ rfl).1 hgg.2 _
+                (by rw [hgg.1.2])
               iexact Hrest
             · intro s1 hgg
               iintro H
-              icases serveCtx_guard γ h c0 key c v2 s1 (some (.pushed c.req)) (some v2.usedIdx)
-                  hlive $$ H with ⟨%hp, _⟩
+              icases serveCtx_guard γ h c0 key c v2 s1 (some (.pushed c.req))
+                  (some (v2.usedIdx, false)) hlive $$ H with ⟨%hp, _⟩
               exfalso
               have hreq : Virtio.reqOf s1 h = some c.req := by
                 unfold Virtio.reqOf
@@ -1714,7 +1834,7 @@ five reads is pinned by the permit to the bytes the driver wrote, so the
 request the device assembles is `c.req` -- which is what makes the install
 that follows legal. -/
 theorem leaseL_fetch_armed (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key : Nat)
-    (c : Chain) (s : VirtioState) (p : Option VPhase) (u : Option (BitVec 16))
+    (c : Chain) (s : VirtioState) (p : Option VPhase) (u : Option (BitVec 16 × Bool))
     (hlive : Virtio.live c0 = true) (hqnum : c0.qnum.toNat = NUM)
     (hhd : c.hd = h.toNat) (hwf : c.wf)
     (kf : Option VioReq → Virtio.VM Unit)
@@ -2048,7 +2168,7 @@ theorem diskProto_open_queue (γ : DiskNames) (c0 : VirtioCfg) (s : VirtioState)
     subst hcc
     unfold diskLive
     icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, %nr, %sb, Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, Hnr, Hsb, %hpure⟩
-    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11⟩ := hpure
+    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12⟩ := hpure
     iexists np, lo, ring, st, pmap
     isplitl []
     · ipureintro; exact ⟨hc0.1, hc0.2.2, e2, e3, e4, e5⟩
@@ -2067,7 +2187,7 @@ theorem diskProto_open_queue (γ : DiskNames) (c0 : VirtioCfg) (s : VirtioState)
     · ipureintro; exact hc0
     iexists st, nc, np, lo, ring, m, pmap, stg, b, M, dl, dl0, nr, sb
     iframe Hm Ha Hr Hu Hav' Hnc Hnp Hlo' HnpM' Hpos' Hstg Hui Hdn Hbs Htp Hnr Hsb
-    ipureintro; exact ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11⟩
+    ipureintro; exact ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12⟩
 
 /-- **The `avail->idx` pin.**  The invariant's half of the cell pins it to
 `wrap16 np`; what the read leaves in the loop's context is the ANSWER: if
