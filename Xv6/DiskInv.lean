@@ -210,14 +210,15 @@ theorem diskProto_congr (γ : DiskNames) (v v' : VirtioState)
     · ipureintro; exact ⟨by rw [hcfg]; exact hc0'.1, hc0'.2.1, hc0'.2.2⟩
     unfold diskLive
     icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, %nr, %sb, Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, Hnr, Hsb, %hpure⟩
-    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12⟩ := hpure
+    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12, e13⟩ := hpure
     iexists st, nc, np, lo, ring, m, pmap, stg, b, M, dl, dl0, nr, sb
     iframe Hm Ha Hr Hu Hav Hnc Hnp Hlo HnpM Hpos Hstg Hui Hdn Hbs Htp Hnr Hsb
     ipureintro
     refine ⟨by rw [hidx]; exact e1, by rw [hseen]; exact e2, e3, e4, e5, e5b,
       inflightOff_congr v v' st ring lo np stg hph (hfl st) e6, ?_, hcd st e8,
       permOk_congr v v' pm st hph hidx e9, e10,
-      unreadArmed_congr v v' st dl nr ring lo np stg sb hph e11, e12⟩
+      unreadArmed_congr v v' st dl nr ring lo np stg sb hph e11, e12,
+      p3Ok_congr v v' pm pm dl nr hph (fun _ => Iff.rfl) e13⟩
     intro bno bs hb
     rcases e7 bno bs hb with h | h
     · exact Or.inl h
@@ -283,7 +284,7 @@ theorem diskProto_pop_live (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) (
     exact absurd hlive (by simp)
   · unfold diskLive
     icases Hl with ⟨%st, %nc, %np, %lo', %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, %nr, %sb, Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, Hnr, Hsb, %hpure⟩
-    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12⟩ := hpure
+    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12, e13⟩ := hpure
     ihave %hll := diskLo_agree γ lo' lo $$ Hlo Hlot
     subst lo'
     ihave %hlt := diskPubLb_le γ np (lo + 1) $$ HnpM Hlb
@@ -332,7 +333,13 @@ theorem diskProto_pop_live (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) (
           (by rw [hri, hh]) hnf e11,
         cntOk_congr pm (PartialMap.insert pm pn ((h, c, none, none) : PermVal)) dl nc e12
           (wroteIdx_insert_fresh pm pn ((h, c, none, none) : PermVal) hfr.1
-            (not_isWit_none h c none)).symm⟩
+            (not_isWit_none h c none)).symm,
+        p3Ok_pop v pm dl nr h (v.seen + 1#16) pn ((h, c, none, none) : PermVal)
+          (not_isWit_none h c none) (hfr.1 pn (Nat.le_refl pn))
+          (fun e he hlt' heq =>
+            (e11.2.2 e he hlt').2.1 lo (Nat.le_refl lo) (by omega)
+              (by rw [hri, heq]; exact hh.symm))
+          e13⟩
       · show v.seen + 1#16 = wrap16 (lo + 1)
         rw [wrap16_succ, e2]
       · exact permOk_pop v pm st pn h c (v.seen + 1#16) (by omega)
@@ -448,7 +455,7 @@ theorem diskProto_capture (γ : DiskNames) (v : VirtioState) (h : BitVec 16) (r 
     exact absurd hin (by simp)
   · unfold diskLive
     icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, %nr, %sb, Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, Hnr, Hsb, %hpure⟩
-    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12⟩ := hpure
+    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12, e13⟩ := hpure
     obtain ⟨hlt, c, hst, hhd, hreq⟩ := e6.1 h r hin
     ihave %hwf := headRes_wf_of γ c0.desc st h.toNat c hlt hst $$ Hr
     have hfly : Virtio.reqSectorLen r i ≠ 0 → inFlightBlk st (Virtio.reqKey r i / SPB) := by
@@ -494,7 +501,8 @@ theorem diskProto_capture (γ : DiskNames) (v : VirtioState) (h : BitVec 16) (r 
     ipureintro
     exact ⟨e1, e2, e3, e4, e5, e5b,
       inflightOff_congr v _ st ring lo np stg (fun _ => rfl) (fun hx k rr hr => hx k rr hr) e6,
-      key.1, key.2, e9, e10, e11, e12⟩
+      key.1, key.2, e9, e10, e11, e12,
+      p3Ok_congr v _ pm pm dl nr (fun _ => rfl) (fun _ => Iff.rfl) e13⟩
 
 /-! ### Opening the protocol at an in-flight head -/
 
@@ -519,7 +527,7 @@ theorem diskProto_chain_acc (γ : DiskNames) (s : VirtioState) (h : BitVec 16) (
     exact absurd hin (by simp)
   · unfold diskLive
     icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, %nr, %sb, Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, Hnr, Hsb, %hpure⟩
-    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12⟩ := hpure
+    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12, e13⟩ := hpure
     obtain ⟨hlt, c, hst, hhd, hreq⟩ := e6.1 h r hin
     ihave %hwf := headRes_wf_of γ c0.desc st h.toNat c hlt hst $$ Hr
     icases headRes_acc' γ c0.desc st h.toNat (.active c) hlt hst $$ Hr with ⟨He, Hrback⟩
@@ -545,7 +553,7 @@ theorem diskProto_chain_acc (γ : DiskNames) (s : VirtioState) (h : BitVec 16) (
     isplitl [Hcl2 Hclb Hrback]
     · iapply Hrback
       iapply Hclb $$ Hcl2
-    · ipureintro; exact ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12⟩
+    · ipureintro; exact ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12, e13⟩
 
 /-! ### The four DMA writes -/
 
@@ -685,7 +693,7 @@ theorem diskProto_usedIdx_acc (γ : DiskNames) (s : VirtioState) (key : Nat) (h 
     exact absurd hin (by simp)
   · unfold diskLive
     icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, %nr, %sb, Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, Hnr, Hsb, %hpure⟩
-    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12⟩ := hpure
+    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12, e13⟩ := hpure
     ihave %hgetp := permTok_lookup γ pm key h cx (some (.pushed cx.req)) (some (ui, false))
       $$ Hpm Htok
     have hnw : ¬ wroteIdx pm :=
@@ -758,7 +766,12 @@ theorem diskProto_usedIdx_acc (γ : DiskNames) (s : VirtioState) (key : Nat) (h 
         (PartialMap.insert pm key ((h, cx, some (.pushed cx.req), some (ui, true)) : PermVal))
         dl nc t h.toNat e12 hnw
         (wroteIdx_insert_wit pm key ((h, cx, some (.pushed cx.req), some (ui, true)) : PermVal)
-          (isWit_of h cx cx.req ui))⟩
+          (isWit_of h cx cx.req ui)),
+      p3Ok_write s pm dl nr (nc + 1) t h key
+        ((h, cx, some (.pushed cx.req), some (ui, false)) : PermVal)
+        ((h, cx, some (.pushed cx.req), some (ui, true)) : PermVal)
+        (e9 key h cx (some (.pushed cx.req)) (some (ui, false)) hgetp).1
+        hgetp rfl rfl (isWit_of h cx cx.req ui) hnw hsome e13⟩
 
 /-- W3: the used index.  The write appends its entry -- the counter the
 device's `usedIdx` is about to reach, at the position the machine gives the
@@ -815,7 +828,7 @@ theorem diskProto_open_live (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState)
         ([∗list] i ∈ List.range NUM, headRes γ c0.desc i (st i)) ∗
         (∀ (pn' : Nat) (pm' : RegMapF PermVal),
           ⌜permFresh pn' pm' ∧ permInj pm' ∧ pushedUniq v ∧ permOk v pm' st ∧
-            (wroteIdx pm ↔ wroteIdx pm')⌝ -∗
+            (∀ hh : BitVec 16, wroteAt pm hh ↔ wroteAt pm' hh)⌝ -∗
           permAuth γ pm' -∗ ([∗list] i ∈ List.range NUM, headRes γ c0.desc i (st i)) -∗
           diskProto γ v) := by
   unfold diskProto
@@ -830,7 +843,7 @@ theorem diskProto_open_live (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState)
     subst hcc
     unfold diskLive
     icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, %nr, %sb, Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, Hnr, Hsb, %hpure⟩
-    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12⟩ := hpure
+    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12, e13⟩ := hpure
     isplitl []
     · ipureintro; exact ⟨hc0.1, hc0.2.2⟩
     iexists pn, pm, st
@@ -853,7 +866,9 @@ theorem diskProto_open_live (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState)
     iframe Hm Ha Hr' Hu Hav Hnc Hnp Hlo HnpM Hpos Hstg Hui Hdn Hbs Htp Hnr Hsb
     ipureintro
     exact ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, hpure'.2.2.2.1, e10, e11,
-      cntOk_congr pm pm' dl nc e12 hpure'.2.2.2.2⟩
+      cntOk_congr pm pm' dl nc e12 (wroteIdx_congr_of_wroteAt pm pm' hpure'.2.2.2.2),
+      p3Ok_congr v v pm pm' dl nr (fun _ => rfl)
+        (fun hh => (hpure'.2.2.2.2 hh).symm) e13⟩
 
 /-- **Giving a permit back**: always sound, and what `disk_collect` will
 need to have happened for the head it reclaims. -/
@@ -890,21 +905,16 @@ theorem perm_drop (γ : DiskNames) (k : Nat) (h : BitVec 16) (c : Chain) (p : Op
     · ipureintro; exact hc0
     unfold diskLive
     icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, %nr, %sb, Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, Hnr, Hsb, %hpure⟩
-    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12⟩ := hpure
+    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12, e13⟩ := hpure
     iexists st, nc, np, lo, ring, m, pmap, stg, b, M, dl, dl0, nr, sb
     iframe Hm Ha Hr Hu Hav Hnc Hnp Hlo HnpM Hpos Hstg Hui Hdn Hbs Htp Hnr Hsb
     ipureintro
     exact ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, permOk_delete v pm st k e9, e10, e11,
       cntOk_congr pm (PartialMap.delete pm k) dl nc e12
-        ⟨fun hw => by
-            obtain ⟨key, x, hg, hx⟩ := hw
-            have hk : k ≠ key := by
-              rintro rfl
-              rw [hgetd] at hg
-              rcases Option.some.inj hg with rfl
-              exact absurd hx hnw
-            exact ⟨key, x, by rw [get?_delete_ne hk]; exact hg, hx⟩,
-          wroteIdx_of_delete pm k⟩⟩
+        (wroteIdx_congr_of_wroteAt pm (PartialMap.delete pm k)
+          (fun hh => (wroteAt_delete_nonwit pm k _ hh hgetd hnw).symm)),
+      p3Ok_congr v v pm (PartialMap.delete pm k) dl nr (fun _ => rfl)
+        (fun hh => wroteAt_delete_nonwit pm k _ hh hgetd hnw) e13⟩
 
 /-- What a permit says about the head it names: a descriptor of the queue,
 armed with the chain the permit records. -/
@@ -945,7 +955,7 @@ theorem perm_chain_acc (γ : DiskNames) (c0 : VirtioCfg) (k : Nat) (h : BitVec 1
   iframe Hcl
   iintro Hcl2
   iframe Htok
-  iapply Hback $$ %pn %pm %⟨hpp.1, hpp.2.1, hpp.2.2.1, hpp.2.2.2, Iff.rfl⟩ Hpm
+  iapply Hback $$ %pn %pm %⟨hpp.1, hpp.2.1, hpp.2.2.1, hpp.2.2.2, fun _ => Iff.rfl⟩ Hpm
   iapply Hrb
   iapply Hclb $$ Hcl2
 
@@ -1008,10 +1018,29 @@ theorem perm_install (γ : DiskNames) (c0 : VirtioCfg) (k : Nat) (h : BitVec 16)
     subst hcc
     unfold diskLive
     icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, %nr, %sb, Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, Hnr, Hsb, %hpure⟩
-    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12⟩ := hpure
+    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12, e13⟩ := hpure
     ihave %hst := perm_state γ v pm st k h c p0 u0 e9 $$ Hpm Htok
     obtain ⟨hget, hlt, hst'⟩ := hst
     ihave %hwf := headRes_wf_of γ c0.desc st h.toNat c hlt hst' $$ Hr
+    have hnwk : ∀ x, PartialMap.get? pm k = some x → ¬ isWit x := by
+      intro x hx
+      rw [hget] at hx
+      rcases Option.some.inj hx with rfl
+      rintro ⟨r, ui, hp, -⟩
+      exact absurd (show p0.getD VPhase.popped = VPhase.pushed r by
+        simp only at hp; rw [hp]; rfl) (hnp0 r)
+    have hnw0 : ¬ wroteAt pm h := by
+      rintro ⟨key0, x, hg, hx, hh0⟩
+      obtain ⟨h0', c0', p0', u0'⟩ := x
+      simp only at hh0
+      subst hh0
+      obtain ⟨r0, ui0, hp0, hu0⟩ := hx
+      simp only at hp0 hu0
+      subst hp0; subst hu0
+      have hke : key0 = k := hfr.2.1 key0 k h0' c0' (some (.pushed r0)) (some (ui0, true))
+        c p0 u0 hg hget
+      subst hke
+      exact hnwk _ hg ⟨r0, ui0, rfl, rfl⟩
     have hph0 : Virtio.phase v h = some (p0.getD VPhase.popped) := by
       cases hp0 : p0 with
       | none => simpa [hp0] using (e9 k h c p0 u0 hget).2.2.2.2.2 (by rw [hp0])
@@ -1065,14 +1094,10 @@ theorem perm_install (γ : DiskNames) (c0 : VirtioCfg) (k : Nat) (h : BitVec 16)
       unreadArmed_setPhase v st dl nr ring lo np stg sb h (p0.getD VPhase.popped) ph
         (sf (sb h.toNat)) hph0 hnp0 (hsbf (sb h.toNat) hsb0) e11,
       cntOk_congr pm (PartialMap.insert pm k ((h, c, some ph, none) : PermVal)) dl nc e12
-        (wroteIdx_insert pm k ((h, c, some ph, none) : PermVal)
-          (fun x hx => by
-            rw [hget] at hx
-            rcases Option.some.inj hx with rfl
-            rintro ⟨r, ui, hp, -⟩
-            exact absurd (show p0.getD VPhase.popped = VPhase.pushed r by
-              simp only at hp; rw [hp]; rfl) (hnp0 r))
-          (not_isWit_none h c (some ph))).symm⟩
+        (wroteIdx_insert pm k ((h, c, some ph, none) : PermVal) hnwk
+          (not_isWit_none h c (some ph))).symm,
+      p3Ok_setPhase v pm dl nr h ph k ((h, c, some ph, none) : PermVal)
+        (not_isWit_none h c (some ph)) hnwk hnw0 (by rw [hph0]; rfl) e13⟩
 
 /-- **The latch.**  The task that has passed the completion gate reads the
 used index at its own `get`; the permit records it, so the two writes that
@@ -1097,9 +1122,14 @@ theorem perm_latch (γ : DiskNames) (c0 : VirtioCfg) (k : Nat) (h : BitVec 16) (
     subst hcc
     unfold diskLive
     icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, %nr, %sb, Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, Hnr, Hsb, %hpure⟩
-    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12⟩ := hpure
+    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12, e13⟩ := hpure
     ihave %hst := perm_state γ v pm st k h c (some (.pushed c.req)) u0 e9 $$ Hpm Htok
     obtain ⟨hget, hlt, hst'⟩ := hst
+    have hnwk : ∀ x, PartialMap.get? pm k = some x → ¬ isWit x := by
+      intro x hx
+      rw [hget] at hx
+      rcases Option.some.inj hx with rfl
+      exact hu0
     unfold permAuth permTok
     imod ghost_map_update (V := PermVal)
       ((h, c, some (.pushed c.req), some (v.usedIdx, false)) : PermVal) $$ Hpm Htok
@@ -1131,9 +1161,15 @@ theorem perm_latch (γ : DiskNames) (c0 : VirtioCfg) (k : Nat) (h : BitVec 16) (
         (PartialMap.insert pm k
           ((h, c, some (.pushed c.req), some (v.usedIdx, false)) : PermVal)) dl nc e12
         (wroteIdx_insert pm k
-          ((h, c, some (.pushed c.req), some (v.usedIdx, false)) : PermVal)
-          (fun x hx => by rw [hget] at hx; rcases Option.some.inj hx with rfl; exact hu0)
-          (not_isWit_false h c (some (.pushed c.req)) v.usedIdx)).symm⟩
+          ((h, c, some (.pushed c.req), some (v.usedIdx, false)) : PermVal) hnwk
+          (not_isWit_false h c (some (.pushed c.req)) v.usedIdx)).symm,
+      p3Ok_congr v v pm
+        (PartialMap.insert pm k
+          ((h, c, some (.pushed c.req), some (v.usedIdx, false)) : PermVal)) dl nr
+        (fun _ => rfl)
+        (fun hh => wroteAt_insert pm k
+          ((h, c, some (.pushed c.req), some (v.usedIdx, false)) : PermVal) hh hnwk
+          (not_isWit_false h c (some (.pushed c.req)) v.usedIdx)) e13⟩
 
 /-- **The completion**: the permit goes, the used index moves, and the
 head leaves the in-flight map.  It bumps `v.usedIdx`, which the DEAD arm
@@ -1155,7 +1191,7 @@ theorem perm_complete (γ : DiskNames) (c0 : VirtioCfg) (k : Nat) (h : BitVec 16
     subst hcc
     unfold diskLive
     icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, %nr, %sb, Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, Hnr, Hsb, %hpure⟩
-    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12⟩ := hpure
+    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12, e13⟩ := hpure
     ihave %hst := perm_state γ v pm st k h c (some (.pushed c.req)) (some (ui, true)) e9
       $$ Hpm Htok
     obtain ⟨hget, hlt, hst'⟩ := hst
@@ -1186,7 +1222,9 @@ theorem perm_complete (γ : DiskNames) (c0 : VirtioCfg) (k : Nat) (h : BitVec 16
         ((e9 k h c (some (.pushed c.req)) (some (ui, true)) hget).2.2.2.1 _ rfl).1 e11,
       cntOk_complete pm (PartialMap.delete pm k) dl nc e12
         ⟨k, _, hget, isWit_of h c c.req ui⟩
-        (not_wroteIdx_delete v pm st k h c (ui, true) hget e9 hfr.2.1 hfr.2.2)⟩
+        (not_wroteIdx_delete v pm st k h c (ui, true) hget e9 hfr.2.1 hfr.2.2),
+      p3Ok_complete v pm dl nr h k
+        ((h, c, some (.pushed c.req), some (ui, true)) : PermVal) hget rfl e13⟩
     show v.usedIdx + 1#16 = wrap16 (nc + 1)
     rw [wrap16_succ, e1]
 
@@ -2168,7 +2206,7 @@ theorem diskProto_open_queue (γ : DiskNames) (c0 : VirtioCfg) (s : VirtioState)
     subst hcc
     unfold diskLive
     icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, %nr, %sb, Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, Hnr, Hsb, %hpure⟩
-    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12⟩ := hpure
+    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12, e13⟩ := hpure
     iexists np, lo, ring, st, pmap
     isplitl []
     · ipureintro; exact ⟨hc0.1, hc0.2.2, e2, e3, e4, e5⟩
@@ -2187,7 +2225,7 @@ theorem diskProto_open_queue (γ : DiskNames) (c0 : VirtioCfg) (s : VirtioState)
     · ipureintro; exact hc0
     iexists st, nc, np, lo, ring, m, pmap, stg, b, M, dl, dl0, nr, sb
     iframe Hm Ha Hr Hu Hav' Hnc Hnp Hlo' HnpM' Hpos' Hstg Hui Hdn Hbs Htp Hnr Hsb
-    ipureintro; exact ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12⟩
+    ipureintro; exact ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11, e12, e13⟩
 
 /-- **The `avail->idx` pin.**  The invariant's half of the cell pins it to
 `wrap16 np`; what the read leaves in the loop's context is the ANSWER: if

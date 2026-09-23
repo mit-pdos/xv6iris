@@ -1882,6 +1882,240 @@ theorem cntOk_le (pm : RegMapF PermVal) (dl : List UsedRec) (nc : Nat) (h : cntO
   rw [he] at this
   omega
 
+/-! ### (P3): unread completions have DISTINCT heads
+
+The window bound `dl.length - nr ≤ NUM` -- the completion-side twin of
+`np ≤ lo + NUM` -- is a PIGEONHOLE over the eight descriptors, and what
+it needs is that no two UNREAD entries name the same head.
+
+That does not follow from (P1)/(P2)/(P4) alone: what those rule out is a
+head being POPPED twice while it has an unread completion, and what is
+left over is one arming writing `used->idx` twice.  The witness bit rules
+that out too.  `Xv6.unwritten` is the clause that carries it: an in-flight
+head that has NOT made its used-index write has NO unread completion.  At
+the pop that is (P2) (the head is at a pending position, and no unread
+head is); the write is the only step that can break it, and it SETS the
+bit at the same moment.  So at the write the head it names has no unread
+entry yet, which is exactly what keeps the unread heads distinct. -/
+
+/-- The permit at head `h` has made its used-index write. -/
+def wroteAt (pm : RegMapF PermVal) (h : BitVec 16) : Prop :=
+  ∃ (key : Nat) (x : PermVal), PartialMap.get? pm key = some x ∧ isWit x ∧ x.1 = h
+
+theorem wroteIdx_of_wroteAt (pm : RegMapF PermVal) (h : BitVec 16) (hw : wroteAt pm h) :
+    wroteIdx pm := by
+  obtain ⟨key, x, hg, hx, -⟩ := hw
+  exact ⟨key, x, hg, hx⟩
+
+theorem wroteIdx_iff_exists (pm : RegMapF PermVal) :
+    wroteIdx pm ↔ ∃ h : BitVec 16, wroteAt pm h := by
+  constructor
+  · rintro ⟨key, x, hg, hx⟩; exact ⟨x.1, key, x, hg, hx, rfl⟩
+  · rintro ⟨h, hw⟩; exact wroteIdx_of_wroteAt pm h hw
+
+theorem wroteIdx_congr_of_wroteAt (pm pm' : RegMapF PermVal)
+    (h : ∀ hh : BitVec 16, wroteAt pm hh ↔ wroteAt pm' hh) : wroteIdx pm ↔ wroteIdx pm' := by
+  rw [wroteIdx_iff_exists, wroteIdx_iff_exists]
+  exact ⟨fun ⟨hh, hx⟩ => ⟨hh, (h hh).1 hx⟩, fun ⟨hh, hx⟩ => ⟨hh, (h hh).2 hx⟩⟩
+
+theorem wroteAt_insert (pm : RegMapF PermVal) (k : Nat) (x1 : PermVal) (h : BitVec 16)
+    (h0 : ∀ x, PartialMap.get? pm k = some x → ¬ isWit x) (h1 : ¬ isWit x1) :
+    wroteAt (PartialMap.insert pm k x1) h ↔ wroteAt pm h := by
+  constructor
+  · rintro ⟨key, x, hg, hx, hh⟩
+    by_cases hk : k = key
+    · rw [get?_insert_eq hk] at hg; cases hg; exact absurd hx h1
+    · rw [get?_insert_ne hk] at hg; exact ⟨key, x, hg, hx, hh⟩
+  · rintro ⟨key, x, hg, hx, hh⟩
+    by_cases hk : k = key
+    · subst hk; exact absurd hx (h0 x hg)
+    · exact ⟨key, x, by rw [get?_insert_ne hk]; exact hg, hx, hh⟩
+
+/-- Replacing ONE permit disturbs no OTHER head's bit. -/
+theorem wroteAt_insert_other (pm : RegMapF PermVal) (k : Nat) (x0 x1 : PermVal) (h : BitVec 16)
+    (hget : PartialMap.get? pm k = some x0) (heq : x0.1 = x1.1) (hne : h ≠ x1.1) :
+    wroteAt (PartialMap.insert pm k x1) h ↔ wroteAt pm h := by
+  constructor
+  · rintro ⟨key, x, hg, hx, hh⟩
+    by_cases hk : k = key
+    · rw [get?_insert_eq hk] at hg; cases hg; exact absurd hh.symm hne
+    · rw [get?_insert_ne hk] at hg; exact ⟨key, x, hg, hx, hh⟩
+  · rintro ⟨key, x, hg, hx, hh⟩
+    by_cases hk : k = key
+    · subst hk; rw [hget] at hg; cases hg; rw [heq] at hh; exact absurd hh.symm hne
+    · exact ⟨key, x, by rw [get?_insert_ne hk]; exact hg, hx, hh⟩
+
+/-- Deleting ONE permit disturbs no OTHER head's bit. -/
+theorem wroteAt_delete_other (pm : RegMapF PermVal) (k : Nat) (x0 : PermVal) (h : BitVec 16)
+    (hget : PartialMap.get? pm k = some x0) (hne : h ≠ x0.1) :
+    wroteAt (PartialMap.delete pm k) h ↔ wroteAt pm h := by
+  constructor
+  · rintro ⟨key, x, hg, hx, hh⟩
+    have hk : k ≠ key := by
+      intro he; rw [get?_delete_eq he] at hg; exact absurd hg (by simp)
+    exact ⟨key, x, by rwa [get?_delete_ne hk] at hg, hx, hh⟩
+  · rintro ⟨key, x, hg, hx, hh⟩
+    have hk : k ≠ key := by
+      rintro rfl; rw [hget] at hg; cases hg; exact hne hh.symm
+    exact ⟨key, x, by rw [get?_delete_ne hk]; exact hg, hx, hh⟩
+
+/-- Deleting a permit that is NOT the witness disturbs no head's bit. -/
+theorem wroteAt_delete_nonwit (pm : RegMapF PermVal) (k : Nat) (x0 : PermVal) (h : BitVec 16)
+    (hget : PartialMap.get? pm k = some x0) (hnw : ¬ isWit x0) :
+    wroteAt (PartialMap.delete pm k) h ↔ wroteAt pm h := by
+  constructor
+  · rintro ⟨key, x, hg, hx, hh⟩
+    have hk : k ≠ key := by
+      intro he; rw [get?_delete_eq he] at hg; exact absurd hg (by simp)
+    exact ⟨key, x, by rwa [get?_delete_ne hk] at hg, hx, hh⟩
+  · rintro ⟨key, x, hg, hx, hh⟩
+    have hk : k ≠ key := by
+      rintro rfl; rw [hget] at hg; cases hg; exact absurd hx hnw
+    exact ⟨key, x, by rw [get?_delete_ne hk]; exact hg, hx, hh⟩
+
+/-- **An in-flight head that has not made its used-index write has no
+unread completion.** -/
+def unwritten (v : VirtioState) (pm : RegMapF PermVal) (dl : List UsedRec) (nr : Nat) : Prop :=
+  ∀ h : BitVec 16, (Virtio.phase v h).isSome = true → ¬ wroteAt pm h →
+    ∀ e ∈ dl, nr < e.cnt → e.hd ≠ h.toNat
+
+/-- **(P3)**: the unread entries' heads are descriptors of the queue, and
+they are DISTINCT. -/
+def unreadInj (dl : List UsedRec) (nr : Nat) : Prop :=
+  (∀ e ∈ dl, nr < e.cnt → e.hd < NUM) ∧
+  (∀ a ∈ dl, ∀ b ∈ dl, nr < a.cnt → nr < b.cnt → a.hd = b.hd → a.cnt = b.cnt)
+
+/-- The two clauses (P3) rests on, as `Xv6.diskLive` carries them. -/
+def p3Ok (v : VirtioState) (pm : RegMapF PermVal) (dl : List UsedRec) (nr : Nat) : Prop :=
+  unwritten v pm dl nr ∧ unreadInj dl nr
+
+theorem p3Ok_nil (v : VirtioState) (pm : RegMapF PermVal) (nr : Nat) : p3Ok v pm [] nr :=
+  ⟨fun _ _ _ e he => absurd he (by simp),
+    ⟨fun e he => absurd he (by simp), fun a ha => absurd ha (by simp)⟩⟩
+
+/-- The phases do not move and no permit's bit moves: the clause travels. -/
+theorem p3Ok_congr (v v' : VirtioState) (pm pm' : RegMapF PermVal) (dl : List UsedRec)
+    (nr : Nat) (hph : ∀ h : BitVec 16, Virtio.phase v' h = Virtio.phase v h)
+    (hpm : ∀ h : BitVec 16, wroteAt pm' h ↔ wroteAt pm h) (h : p3Ok v pm dl nr) :
+    p3Ok v' pm' dl nr :=
+  ⟨fun hh hs hnw => h.1 hh (by rw [← hph hh]; exact hs) (fun hx => hnw ((hpm hh).2 hx)), h.2⟩
+
+/-- **The handler's deposit**: the unread window only ever shrinks. -/
+theorem p3Ok_nr (v : VirtioState) (pm : RegMapF PermVal) (dl : List UsedRec) (nr nr' : Nat)
+    (h : p3Ok v pm dl nr) (hle : nr ≤ nr') : p3Ok v pm dl nr' :=
+  ⟨fun hh hs hnw e he hlt => h.1 hh hs hnw e he (by omega),
+    ⟨fun e he hlt => h.2.1 e he (by omega),
+      fun a ha b hb h1 h2 => h.2.2 a ha b hb (by omega) (by omega)⟩⟩
+
+/-- **The pop.**  The head it takes is at a pending position, so by (P2)
+it has no unread completion, and it was not in flight, so it has no
+permit at all. -/
+theorem p3Ok_pop (v : VirtioState) (pm : RegMapF PermVal) (dl : List UsedRec) (nr : Nat)
+    (hd : BitVec 16) (sn : BitVec 16) (pn : Nat) (x1 : PermVal) (hx1 : ¬ isWit x1)
+    (hfresh : PartialMap.get? pm pn = none)
+    (hnotHead : ∀ e ∈ dl, nr < e.cnt → e.hd ≠ hd.toNat)
+    (h : p3Ok v pm dl nr) :
+    p3Ok { Virtio.setPhase v hd .popped with seen := sn } (PartialMap.insert pm pn x1) dl nr := by
+  have hiff : ∀ hh : BitVec 16, wroteAt (PartialMap.insert pm pn x1) hh ↔ wroteAt pm hh :=
+    fun hh => wroteAt_insert pm pn x1 hh
+      (fun x hx => by rw [hfresh] at hx; exact absurd hx (by simp)) hx1
+  refine ⟨fun hh hs hnw e he hlt => ?_, h.2⟩
+  by_cases hhh : hh = hd
+  · subst hhh; exact hnotHead e he hlt
+  · have hs' : (Virtio.phase (Virtio.setPhase v hd .popped) hh).isSome = true := hs
+    rw [phase_setPhase_other v hd hh _ hhh] at hs'
+    exact h.1 hh hs' (fun hx => hnw ((hiff hh).2 hx)) e he hlt
+
+/-- **A phase install** at a head whose permit is not the witness. -/
+theorem p3Ok_setPhase (v : VirtioState) (pm : RegMapF PermVal) (dl : List UsedRec) (nr : Nat)
+    (hd : BitVec 16) (ph : VPhase) (k : Nat) (x1 : PermVal) (hx1 : ¬ isWit x1)
+    (h0 : ∀ x, PartialMap.get? pm k = some x → ¬ isWit x)
+    (hnw0 : ¬ wroteAt pm hd) (hfly : (Virtio.phase v hd).isSome = true)
+    (h : p3Ok v pm dl nr) :
+    p3Ok (Virtio.setPhase v hd ph) (PartialMap.insert pm k x1) dl nr := by
+  have hiff : ∀ hh : BitVec 16, wroteAt (PartialMap.insert pm k x1) hh ↔ wroteAt pm hh :=
+    fun hh => wroteAt_insert pm k x1 hh h0 hx1
+  refine ⟨fun hh hs hnw e he hlt => ?_, h.2⟩
+  by_cases hhh : hh = hd
+  · subst hhh; exact h.1 hh hfly hnw0 e he hlt
+  · refine h.1 hh (by rwa [phase_setPhase_other v hd hh _ hhh] at hs)
+      (fun hx => hnw ((hiff hh).2 hx)) e he hlt
+
+/-- **The used-index write.**  The head it names has no unread completion
+YET (it is in flight and its bit is still `false`), so the entry that
+joins the log keeps the unread heads distinct -- and the bit it sets
+makes the clause vacuous at that head from here on. -/
+theorem p3Ok_write (v : VirtioState) (pm : RegMapF PermVal) (dl : List UsedRec) (nr nc t : Nat)
+    (hd : BitVec 16) (key : Nat) (x0 x1 : PermVal) (hlt : hd.toNat < NUM)
+    (hget : PartialMap.get? pm key = some x0) (h0 : x0.1 = hd) (h1 : x1.1 = hd)
+    (hw1 : isWit x1) (hnw : ¬ wroteIdx pm) (hfly : (Virtio.phase v hd).isSome = true)
+    (h : p3Ok v pm dl nr) :
+    p3Ok v (PartialMap.insert pm key x1) (dl ++ [((nc, t, hd.toNat) : UsedRec)]) nr := by
+  have hnone : ∀ hh : BitVec 16, ¬ wroteAt pm hh := fun hh hx => hnw (wroteIdx_of_wroteAt pm hh hx)
+  have hfresh : ∀ e ∈ dl, nr < e.cnt → e.hd ≠ hd.toNat := h.1 hd hfly (hnone hd)
+  have hiff : ∀ hh : BitVec 16, hh ≠ hd →
+      (wroteAt (PartialMap.insert pm key x1) hh ↔ wroteAt pm hh) :=
+    fun hh hne => wroteAt_insert_other pm key x0 x1 hh hget (by rw [h0, h1]) (by rw [h1]; exact hne)
+  refine ⟨fun hh hs hnw' e he hltc => ?_, ⟨fun e he hltc => ?_, fun a ha b hb h1' h2' heq => ?_⟩⟩
+  · by_cases hhh : hh = hd
+    · subst hhh
+      exact absurd (⟨key, x1, by rw [get?_insert_eq (rfl : key = key)], hw1, h1⟩ :
+        wroteAt (PartialMap.insert pm key x1) hh) hnw'
+    · rcases List.mem_append.1 he with he | he
+      · exact h.1 hh hs (fun hx => hnw' ((hiff hh hhh).2 hx)) e he hltc
+      · have hre : e = ((nc, t, hd.toNat) : UsedRec) := by simpa using he
+        rw [hre]
+        intro hq
+        exact hhh ((BitVec.toNat_inj (x := hh) (y := hd)).1 hq.symm)
+  · rcases List.mem_append.1 he with he | he
+    · exact h.2.1 e he hltc
+    · have hre : e = ((nc, t, hd.toNat) : UsedRec) := by simpa using he
+      rw [hre]; exact hlt
+  · rcases List.mem_append.1 ha with ha | ha <;> rcases List.mem_append.1 hb with hb | hb
+    · exact h.2.2 a ha b hb h1' h2' heq
+    · have hre : b = ((nc, t, hd.toNat) : UsedRec) := by simpa using hb
+      rw [hre] at heq h2' ⊢
+      exact absurd heq (hfresh a ha h1')
+    · have hre : a = ((nc, t, hd.toNat) : UsedRec) := by simpa using ha
+      rw [hre] at heq h1' ⊢
+      exact absurd heq.symm (hfresh b hb h2')
+    · have hra : a = ((nc, t, hd.toNat) : UsedRec) := by simpa using ha
+      have hrb : b = ((nc, t, hd.toNat) : UsedRec) := by simpa using hb
+      rw [hra, hrb]
+
+/-- **The completion**: the head leaves the in-flight map, and its permit
+-- the only one whose bit was set -- goes with it. -/
+theorem p3Ok_complete (v : VirtioState) (pm : RegMapF PermVal) (dl : List UsedRec) (nr : Nat)
+    (hd : BitVec 16) (key : Nat) (x0 : PermVal) (hget : PartialMap.get? pm key = some x0)
+    (h0 : x0.1 = hd) (h : p3Ok v pm dl nr) :
+    p3Ok (Virtio.complete v hd) (PartialMap.delete pm key) dl nr := by
+  refine ⟨fun hh hs hnw e he hlt => ?_, h.2⟩
+  by_cases hhh : hh = hd
+  · subst hhh
+    rw [phase_complete_self] at hs
+    exact absurd hs (by simp)
+  · rw [phase_complete_other v hd hh hhh] at hs
+    refine h.1 hh hs (fun hx => hnw ?_) e he hlt
+    exact (wroteAt_delete_other pm key x0 hh hget (by rw [h0]; exact hhh)).2 hx
+
+/-- **THE WINDOW BOUND** `dl.length - nr ≤ NUM`: the unread entries sit at
+counters `nr+1 .. dl.length` (strict counters), their heads are distinct
+and are descriptors of the queue, and there are eight of those. -/
+theorem unread_window (pm : RegMapF PermVal) (dl : List UsedRec) (nr nc : Nat)
+    (hc : cntOk pm dl nc) (hi : unreadInj dl nr) : dl.length ≤ nr + NUM := by
+  refine window_le_of_inj nr dl.length (fun k => (dl[k]?.getD ((0, 0, 0) : UsedRec)).hd)
+    (fun p hp1 hp2 => ?_) (fun p q hp1 hp2 hq1 hq2 he => ?_)
+  · simp only [List.getElem?_eq_getElem hp2, Option.getD_some]
+    exact hi.1 (dl[p]'hp2) (List.getElem_mem hp2)
+      (by show nr < (dl[p]'hp2).1; rw [hc.1 p hp2]; omega)
+  · simp only [List.getElem?_eq_getElem hp2, List.getElem?_eq_getElem hq2,
+      Option.getD_some] at he
+    have := hi.2 (dl[p]'hp2) (List.getElem_mem hp2) (dl[q]'hq2) (List.getElem_mem hq2)
+      (by show nr < (dl[p]'hp2).1; rw [hc.1 p hp2]; omega)
+      (by show nr < (dl[q]'hq2).1; rw [hc.1 q hq2]; omega) he
+    have hthis : p + 1 = q + 1 := by rw [← hc.1 p hp2, ← hc.1 q hq2]; exact this
+    omega
+
 /-- **The entry at a counter.**  With strict counters, an index into the
 log IS its counter minus one. -/
 theorem cntOk_mem (pm : RegMapF PermVal) (dl : List UsedRec) (nc k : Nat)
@@ -2736,7 +2970,7 @@ def diskLive (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState)
     ⌜v.usedIdx = wrap16 nc ∧ v.seen = wrap16 lo ∧ lo ≤ np ∧ queueOk st ring lo np ∧
       posOk pmap ring lo np ∧ stageOk stg ring lo np ∧ inflightOff v st ring lo np stg ∧
       imgOk v m (inFlightBlk st) ∧ cachedOk v st ∧ permOk v pm st ∧ usedOk dl dl0 nc M ∧
-      unreadArmed v st dl nr ring lo np stg sb ∧ cntOk pm dl nc⌝
+      unreadArmed v st dl nr ring lo np stg sb ∧ cntOk pm dl nc ∧ p3Ok v pm dl nr⌝
 
 /-- The dead arm: before `virtio_disk_init`, and never again after.
 
