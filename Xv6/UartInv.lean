@@ -867,4 +867,60 @@ instance isTxLock_persistent [CurCtx] (γl : GName) (γ : UartNames) : Persisten
 
 end
 
+/-! ## The port's ONE-SHOT
+
+`Xv6.PlicInv` allocates the PLIC's invariant at POWER-ON, when no port has
+been initialised and there is no `rxTok` anywhere; the slot of a PLIC
+source may therefore be in one of two regimes, and `UartNames.init` is the
+ghost that says which:
+
+* `uartPreinit γ` -- the whole ghost variable at `false`: the port has not
+  been through `uartinit`, so the PLIC slot of its source carries nothing;
+* `uartInited γ` -- the SAME variable, persistently at `true`: `uartinit`
+  has run, so the slot carries the port's receive token whenever the source
+  is pending and unclaimed.
+
+The two are contradictory (`uartPreinit_inited_False`), and the boot client
+flips the regime once, irreversibly, with `uartPreinit_deposit`.  Nothing
+in the `uartinit` cone mentions either: the flip happens beside it. -/
+
+section
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+
+/-- Port `γ`'s one-shot, unfired: an EXCLUSIVE whole (the boot client's). -/
+def uartPreinit (γ : UartNames) : IProp GF := γ.init ↪VAR{.own 1} false
+
+/-- Port `γ`'s one-shot, fired: persistent, and freely duplicated by every
+client of the PLIC's slots. -/
+def uartInited (γ : UartNames) : IProp GF := γ.init ↪VAR{.discard} true
+
+instance uartInited_persistent (γ : UartNames) : Persistent (uartInited (GF := GF) γ) := by
+  unfold uartInited; infer_instance
+
+instance uartPreinit_timeless (γ : UartNames) : Timeless (uartPreinit (GF := GF) γ) := by
+  unfold uartPreinit; infer_instance
+
+instance uartInited_timeless (γ : UartNames) : Timeless (uartInited (GF := GF) γ) := by
+  unfold uartInited; infer_instance
+
+/-- The two regimes exclude each other: the ghost variable cannot be both
+`false` and `true`. -/
+theorem uartPreinit_inited_False (γ : UartNames) :
+    uartPreinit (GF := GF) γ ∗ uartInited γ ⊢ False := by
+  unfold uartPreinit uartInited
+  iintro ⟨H1, H2⟩
+  ihave %h := ghost_var_agree γ.init false (.own 1) true .discard $$ H1 H2
+  exact absurd h (by decide)
+
+/-- **The flip**: the boot client spends the whole variable and mints the
+persistent marker.  One-way: after this no update is possible. -/
+theorem uartPreinit_deposit (γ : UartNames) :
+    uartPreinit (GF := GF) γ ⊢ |==> uartInited γ := by
+  unfold uartPreinit uartInited
+  iintro H
+  imod (ghost_var_update true γ.init false) $$ H with H
+  iapply ghost_var_persist γ.init (.own 1) true $$ H
+
+end
+
 end Xv6

@@ -40,7 +40,8 @@ subset the Lean port carries): the accepted trace (`mono_list` over
 transmit token (`ghost_var` halves over the accepted trace), the divisor
 latch (`ghost_var` over `Uart.dlab`, frozen once `uartinit` is done), and
 the receive column: the bytes that ever entered the FIFO (`mono_list`) and
-the popped count (`ghost_var` halves -- the popper's token). -/
+the popped count (`ghost_var` halves -- the popper's token), and the
+one-shot that says whether `uartinit` has run (`ghost_var` over `Bool`). -/
 structure UartNames where
   acc : GName
   out : GName
@@ -48,6 +49,12 @@ structure UartNames where
   dlab : GName
   rxin : GName
   rxpop : GName
+  /-- the port's ONE-SHOT: `false` while the port is still pre-`uartinit`
+  (`UartInv.uartPreinit`, an exclusive whole), persistently `true` once
+  `uartinit` has run and the receive token exists
+  (`UartInv.uartInited`).  It lets the PLIC's invariant be allocated at
+  power-on, before there is any `rxTok` to put in its slots. -/
+  init : GName
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
