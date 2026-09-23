@@ -59,6 +59,8 @@ import Xv6.UartModel
 import Xv6.UartInv
 import Xv6.SpecUartputcSync
 import Xv6.SpecUartinit
+import Xv6.ProofUartputcSync
+import Xv6.LinkUartputcSync
 import Xv6.ConsoleDefs
 import Xv6.SpecUartwrite
 import Xv6.SpecConsoleintr
@@ -337,3 +339,11 @@ import Xv6.ProofUserinit
 import Xv6.LinkUserinit
 import Xv6.ProofProcdump
 import Xv6.LinkProcdump
+import Xv6.ProofConsputc
+import Xv6.ProofPrputc
+import Xv6.ProofUartinitone
+import Xv6.LinkUartinitone
+import Xv6.ProofUartinit
+import Xv6.LinkUartinit
+import Xv6.LinkConsputc
+import Xv6.LinkPrputc
