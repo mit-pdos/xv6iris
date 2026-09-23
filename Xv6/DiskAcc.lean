@@ -632,7 +632,7 @@ theorem diskProto_avail_acc (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) 
     subst hcc
     unfold diskLive
     icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, %nr, Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, Hnr, %hpure⟩
-    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10⟩ := hpure
+    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11⟩ := hpure
     iexists np, lo, ring, st, pmap, stg
     isplitl []
     · ipureintro; exact ⟨e3, e4, e5, e5b, e6⟩
@@ -652,7 +652,7 @@ theorem diskProto_avail_acc (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) 
     iexists st, nc, np', lo, ring', m, pmap', stg', b, M, dl, dl0, nr
     iframe Hm Ha' Hr Hu Hav' Hnc Hnp' Hlo HnpM' Hpos' Hstg' Hui Hdn Hbs Htp Hnr
     ipureintro
-    exact ⟨e1, e2, hq.1, hq.2.1, hq.2.2.1, hq.2.2.2.1, hq.2.2.2.2, e7, e8, e9, e10⟩
+    exact ⟨e1, e2, hq.1, hq.2.1, hq.2.2.1, hq.2.2.2.1, hq.2.2.2.2, e7, e8, e9, e10, e11⟩
 
 /-- One receipt authority, read off the eight. -/
 theorem headAuth_acc (γ : DiskNames) (st : Nat → HState) (i : Nat) (hi : i < NUM) :
@@ -1228,7 +1228,8 @@ theorem diskProto_flip [CurCtx] (γ : DiskNames) (v : VirtioState) (c c' : Virti
       refine ⟨p6, p7, Nat.le_refl 0, ⟨fun p h1 h2 => absurd h2 (by omega),
           fun p q h1 h2 h3 h4 _ => absurd h2 (by omega)⟩,
         ⟨rfl, fun p h1 h2 => absurd h2 (by omega)⟩, stageOk_none ringInit 0 0,
-        inflightOff_none _ stInit ringInit 0 0 none p2, ?_, ?_, p5, usedOk_nil 0⟩
+        inflightOff_none _ stInit ringInit 0 0 none p2, ?_, ?_, p5, usedOk_nil 0,
+        unreadArmed_nil stInit 0⟩
       · intro bno bs hb
         rcases p4 bno bs hb with hx | hx
         · exact absurd hx id
@@ -1408,25 +1409,32 @@ written in:
   exclusive), and `MachCSL.Virtio.xferIn`'s `get` then knows the bytes it
   is about to write are the fragment's.
 
-(1b) WHAT THE ROWS' CONSUMERS NOW ASK FOR, EXACTLY.  The three clauses
-the `pend` chain below needs are PURE -- they add no existential to
-`diskLive`, only conjuncts to its `⌜..⌝`, over the log `dl`, the
-watermark `nr`, the receipts `st`, the ring and the window `[lo, np)`:
+(1b) THE `pend` CLAUSES, AND THE FIRST OF THEM, WHICH IS NOW CARRIED.
+They are PURE -- they add no existential to `diskLive`, only conjuncts to
+its `⌜..⌝`, over the log `dl`, the watermark `nr`, the receipts `st`, the
+ring and the window `[lo, np)`:
 
-    (P1) ∀ k, nr ≤ k < dl.length → ∃ c, st dl[k].hd = .active c
-    (P2) ∀ k, nr ≤ k < dl.length → ∀ p, lo ≤ p < np → ring (p % NUM) ≠ dl[k].hd
-    (P3) ∀ k k', nr ≤ k < k' < dl.length → dl[k].hd ≠ dl[k'].hd
-    (P4) ∀ h, (Virtio.phase v h).isSome → ∀ k, nr ≤ k < dl.length → dl[k].hd ≠ h.toNat
+    (P1) ∀ r ∈ dl, nr < r.cnt → ∃ c, st r.hd = .active c
+    (P2) ∀ r ∈ dl, nr < r.cnt → ∀ p, lo ≤ p < np → ring (p % NUM) ≠ r.hd
+    (P3) ∀ r r' ∈ dl, nr < r.cnt → nr < r'.cnt → r ≠ r' → r.hd ≠ r'.hd
+    (P4) ∀ h, (Virtio.phase v h).isSome → ∀ r ∈ dl, nr < r.cnt → r.hd ≠ h.toNat
 
-(P1) is what `Xv6.DISK_INTR_EXTRA.slot_active` asks for, and with the log
-arithmetic (3) it is what turns `Xv6.headDone γ n i` with `nr < n` into
-"slot `i` is armed".  They close under each step in the obvious way, and
-the two that are not obvious are: at the used-index WRITE, (P3) for the
-new entry is (P4) for the head that is completing; and at
-`Xv6.disk_publish`, (P2) for the position that joins the window is (P1)
-read backwards -- the publisher holds `headTok γ c.hd .inactive`, so
-`c.hd` is at no unread index.  `disk_deposit` and the POP only SHRINK the
-ranges the four clauses quantify over.
+(P1) IS `Xv6.unreadArmed`, and it is in `diskLive` now: it is what
+`Xv6.disk_slot_active` reads off, which is what turns a head out of the
+used ring into the `Xv6.headTok γ i (.active c)` the status read and the
+collect take.  Its own preservation needs nothing else -- the used-index
+write's head is in flight, hence armed (`Xv6.inflightOk`); the
+publication's three receipts are all `.inactive` beforehand, so by (P1)
+itself none of them is an unread head; `Xv6.disk_deposit` only shrinks
+the window (`Xv6.diskProto_nr_acc` is therefore restricted to a watermark
+that RISES).
+
+(P1) also forces a premise on `disk_collect`: see `Xv6.headRead` and the
+note on the assumed statement below.  (P2)--(P4), which the window bound
+and the distinctness of unread heads need, are not carried; at the
+used-index WRITE, (P3) for the new entry is (P4) for the head that is
+completing, and at `Xv6.disk_publish`, (P2) for the position that joins
+the window is (P1) read backwards.
 
 (2) THE CLAUSE EVERYTHING HANGS OFF, AND THE STATEMENT CHANGE IT FORCES.
 Each of the three rows above must survive from the completion to the
@@ -1587,7 +1595,7 @@ theorem diskProto_armHead (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) (p
     unfold diskLive
     icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, %nr,
       Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, Hnr, %hpure⟩
-    obtain ⟨q1, q2, q3, q4, q5, q6, q7, q8, q9, q10, q11⟩ := hpure
+    obtain ⟨q1, q2, q3, q4, q5, q6, q7, q8, q9, q10, q11, q12⟩ := hpure
     ihave %hst := headTok_state γ st c.hd .inactive hwf.1 $$ Ha Htok
     ihave %hstm := headTok_state γ st c.md .inactive hwf.2.1 $$ Ha Htokm
     ihave %hstt := headTok_state γ st c.tl .inactive hwf.2.2.1 $$ Ha Htokt
@@ -1680,7 +1688,8 @@ theorem diskProto_armHead (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) (p
         (armSt3_active st c hwf hstm hstt) q7,
       imgOk_arm3 st c hwf hst hstm hstt v m q8,
       cachedOk_arm3 st c hwf hst hstm hstt v q9,
-      permOk_arm3 st c hwf hst hstm hstt v pm q10, q11⟩
+      permOk_arm3 st c hwf hst hstm hstt v pm q10, q11,
+      unreadArmed_arm3 st c dl nr hwf hst hstm hstt q12⟩
 
 /-- **`publish`**: the view shift that arms head `c.hd` with the chain `c`,
 carried out between the ring-cell store and the `avail->idx` bump
@@ -1783,7 +1792,7 @@ theorem diskProto_usedRead_acc (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioStat
     subst hcc
     unfold diskLive
     icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, %nr, Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, Hnr, %hpure⟩
-    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10⟩ := hpure
+    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11⟩ := hpure
     iexists b, nc, M, dl, dl0
     isplitl []
     · ipureintro; exact e10
@@ -1803,7 +1812,7 @@ theorem diskProto_usedRead_acc (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioStat
     iexists st, nc, np, lo, ring, m, pmap, stg, b, M', dl, dl0', nr
     iframe Hm Ha Hr Hu Hav Hnc' Hnp Hlo HnpM Hpos Hstg Hui' Hdn' Hbs Htp Hnr
     ipureintro
-    exact ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, hok⟩
+    exact ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, hok, e11⟩
 
 /-- **`disk.used->idx`, read** (the `lhu` of `virtio_disk_intr`'s loop
 test).  The answer is `wrap16 m` for a counter `m` the device has
@@ -1912,14 +1921,19 @@ theorem disk_used_idx_read [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu : 
   iframe Hlb Hrv Hwm2
 
 /-- **The handler watermark, borrowed out of the live arm.**  The
-invariant's half of `γ.nr` comes out and any value may go back: it is the
-hook the PER-POSITION ROWS will hang on (they are indexed by `[nr, ..)`,
-so moving `nr` is what retires a row). -/
+invariant's half of `γ.nr` comes out and any LATER value may go back: it
+is the hook the PER-POSITION ROWS hang on (they are indexed by
+`[nr, ..)`, so moving `nr` up is what retires a row).
+
+The watermark may only RISE: `Xv6.unreadArmed` is a claim about the
+entries above `nr`, so lowering it would ask for receipts that were
+collected long ago.  `Xv6.disk_deposit`, the only client, moves it by
+one. -/
 theorem diskProto_nr_acc (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState)
     (hlive : Virtio.live c0 = true) :
     diskCfgFrozen (GF := GF) γ c0 ∗ diskProto γ v ⊢
       ∃ nr : Nat, diskReadAtAuth γ nr ∗
-        (∀ nr' : Nat, diskReadAtAuth γ nr' -∗ diskProto γ v) := by
+        (∀ nr' : Nat, ⌜nr ≤ nr'⌝ -∗ diskReadAtAuth γ nr' -∗ diskProto γ v) := by
   unfold diskProto
   iintro ⟨#Hfr0, %hc, %pn, %pm, Hpm, %hfr, Harm⟩
   icases Harm with ⟨Hd | ⟨%c0', #Hfr, %hc0, Hl⟩⟩
@@ -1932,9 +1946,10 @@ theorem diskProto_nr_acc (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState)
     subst hcc
     unfold diskLive
     icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, %nr, Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, Hnr, %hpure⟩
+    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11⟩ := hpure
     iexists nr
     iframe Hnr
-    iintro %nr' Hnr'
+    iintro %nr' %hle Hnr'
     isplitl []
     · ipureintro; exact hc
     iexists pn, pm
@@ -1949,7 +1964,64 @@ theorem diskProto_nr_acc (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState)
     iexists st, nc, np, lo, ring, m, pmap, stg, b, M, dl, dl0, nr'
     iframe Hm Ha Hr Hu Hav Hnc Hnp Hlo HnpM Hpos Hstg Hui Hdn Hbs Htp Hnr'
     ipureintro
-    exact hpure
+    exact ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10,
+      unreadArmed_nr st dl nr nr' e11 hle⟩
+
+/-- **A head with an UNREAD completion is ARMED**, read off the live arm.
+
+`Xv6.headDone γ n i` places an entry `(n, t, i)` in the used-index write
+log, and `Xv6.unreadArmed` says an entry whose counter is above the
+handler's watermark names a head whose receipt is still `.active`.  The
+premise `nr < n` is what makes the claim true at all: `headDone` is
+persistent, so a head that completed, was collected and was freed still
+carries the record. -/
+theorem diskProto_unreadArmed (γ : DiskNames) (v : VirtioState) (i n nrd : Nat) (s : HState)
+    (hi : i < NUM) (hlt : nrd < n) :
+    diskProto (GF := GF) γ v ∗ headTok γ i s ∗ headDone γ n i ∗ diskReadAt γ nrd ⊢
+      ⌜∃ c : Chain, s = HState.active c ∧ c.hd = i ∧ c.wf⌝ := by
+  unfold diskProto headDone
+  iintro ⟨⟨%hc, %pn, %pm, Hpm, %hfr, Harm⟩, Htok, ⟨%k, %t, #Hrec⟩, Hnrd⟩
+  icases Harm with ⟨Hd | ⟨%c0, #Hfr, %hc0, Hl⟩⟩
+  · unfold diskDead
+    icases Hd with ⟨%m, Hm, Hcfg, Hlo0, HnpM0, Hpos0, HstgA0, Hbs0, Hdn0, Hnr0, %hp⟩
+    ihave %hl := doneRec_lookup γ [] k (n, t, i) $$ Hdn0 Hrec
+    exact absurd hl (by simp)
+  · unfold diskLive
+    icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, %nq,
+      Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, Hnq, %hpure⟩
+    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10, e11⟩ := hpure
+    ihave %hst := headTok_state γ st i s hi $$ Ha Htok
+    ihave %hnn := diskReadAt_agree γ nq nrd $$ Hnq Hnrd
+    ihave %hl := doneRec_lookup γ dl0 k (n, t, i) $$ Hdn Hrec
+    have hmem : ((n, t, i) : UsedRec) ∈ dl :=
+      List.mem_of_getElem? (MonoList.prefix_getElem? e10.1 hl)
+    obtain ⟨c, hcst⟩ := e11 (n, t, i) hmem (by rw [hnn]; exact hlt)
+    ihave %hwf := headRes_wf_of γ c0.desc st i c hi hcst $$ Hr
+    ipureintro
+    exact ⟨c, by rw [← hst, hcst], hwf.1, hwf.2⟩
+
+/-- **A completed head is an armed head** (`Xv6.slot_active`): the handler
+reads a head out of the used ring and produces that head's receipt as
+`.active c`.  It opens the invariant only to read a pure fact off it. -/
+theorem disk_slot_active [CurCtx] (γ : DiskNames) (i n nrd : Nat) (s : HState)
+    (hi : i < NUM) (hlt : nrd < n) :
+    diskInv (GF := GF) γ ∗ headTok γ i s ∗ headDone γ n i ∗ diskReadAt γ nrd ⊢
+      |={⊤}=> (headTok γ i s ∗ diskReadAt γ nrd ∗
+        ⌜∃ c : Chain, s = HState.active c ∧ c.hd = i ∧ c.wf⌝) := by
+  unfold diskInv devInvR
+  iintro ⟨#Hinv, Htok, #Hdone, Hnrd⟩
+  iinv Hinv with Hbody Hclose
+  icases Hbody with ⟨%v, >Hfrag, >Hproto⟩
+  ihave %hres := diskProto_unreadArmed γ v i n nrd s hi hlt $$ [$Hproto $Htok $Hdone $Hnrd]
+  ihave Hcl := Hclose $$ [Hfrag Hproto]
+  case' _ =>
+    inext
+    iexists v
+    iframe Hfrag Hproto
+  imod Hcl
+  imodintro
+  iframe Htok Hnrd
+  ipureintro; exact hres
 
 /-- **`deposit`** (`disk.used_idx += 1`, the tail of `virtio_disk_intr`'s
 loop body): the handler advances its watermark past the completion it has
@@ -1975,7 +2047,7 @@ theorem disk_deposit [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (nr : Nat) :
   subst hnn
   imod diskReadAt_update γ nr0 nr0 (nr0 + 1) $$ [Hnr0 Hnr] with ⟨Hnr0, Hnr⟩
   · iframe Hnr0 Hnr
-  ihave Hproto := Hback $$ %(nr0 + 1) Hnr0
+  ihave Hproto := Hback $$ %(nr0 + 1) %(by omega : nr0 ≤ nr0 + 1) Hnr0
   ihave Hcl := Hclose $$ [Hfrag Hproto]
   case' _ =>
     inext
@@ -2054,18 +2126,29 @@ structure DISK_ACC_ASSUMPTIONS : Prop where
   credential, which is what `ctxFloor curCtx T` beside `diskWm γ n T`
   stands for here.
 
-  THE READ PREMISE.  `Xv6.diskReadAt γ nr ∗ ⌜n ≤ nr⌝` says the completion
-  this reclaims has been READ by the handler.  It is not decoration: it is
-  what keeps a head with an UNREAD completion from being collected and
-  re-published, which is what makes the unread completions' heads
-  DISTINCT, which is the window bound `dl.length - nr ≤ NUM` that
-  `disk_used_elem_read` needs and the reason a completed row survives at
-  all (see the section head).  It is Rocq's `ord p u ∗ u < nr`, carried
-  there in `disk_res`'s claim row beside `b->disk = 0`.  The payload has
-  `diskReadAt γ nr` and `virtio_disk_rw` collects under the lock, so the
-  premise is available to P5/P6; what P5/P6 must show is `n ≤ nr`, out of
-  the wakeup (the handler holds `vdisk_lock` across `b->disk = 0`,
-  `wakeup(b)` and `disk.used_idx += 1` alike).
+  THE READ PREMISE.  `Xv6.diskReadAt γ nr ∗ ⌜n ≤ nr⌝ ∗
+  Xv6.headRead γ c.hd nr` says every completion of this head has been READ
+  by the handler.  It is not decoration: it is what keeps a head with an
+  UNREAD completion from being collected and re-published, which is what
+  makes the unread completions' heads DISTINCT, which is the window bound
+  `dl.length - nr ≤ NUM` that `disk_used_elem_read` needs and the reason a
+  completed row survives at all (see the section head).  It is Rocq's
+  `ord p u ∗ u < nr`, carried there in `disk_res`'s claim row beside
+  `b->disk = 0`.  The payload has `diskReadAt γ nr` and `virtio_disk_rw`
+  collects under the lock, so the premise is available to P5/P6; what
+  P5/P6 must show is that the head is quiet, out of the wakeup (the
+  handler holds `vdisk_lock` across `b->disk = 0`, `wakeup(b)` and
+  `disk.used_idx += 1` alike).
+
+  WHY `⌜n ≤ nr⌝` ALONE WILL NOT DO, and why `Xv6.headRead` is there.
+  `Xv6.headDone` is persistent and names no ARMING: a head that completed,
+  was collected, was re-armed and has completed again still carries the
+  first, already-read record.  With only `⌜n ≤ nr⌝` this accessor would
+  let that head be collected while its SECOND request is still with the
+  device -- which contradicts `Xv6.unreadArmed`, a clause the invariant
+  now carries, so the interface would be inconsistent rather than merely
+  unproved.  `headRead γ c.hd nr` quantifies over every record of the
+  head and so pins the current arming.
 
   `b->disk` COMES BACK TOO, at whatever the handler left there: the cell
   joined `Xv6.claimRes` at the publication, because the sleeper is inside
@@ -2084,7 +2167,7 @@ structure DISK_ACC_ASSUMPTIONS : Prop where
     diskInv (GF := GF) γ ∗ kmapStatic ∗ diskGeom γ pd pav pu ∗
       headTok γ c.hd (.active c) ∗ headTok γ c.md (.member c.hd) ∗
       headTok γ c.tl (.member c.hd) ∗ claimRes curCtx pd c ∗ diskReadAt γ nr ∗
-      headDone γ n c.hd ∗ diskWm γ n T ∗ ctxFloor curCtx T ⊢
+      headDone γ n c.hd ∗ headRead γ c.hd nr ∗ diskWm γ n T ∗ ctxFloor curCtx T ⊢
       |={⊤}=> (headTok γ c.hd .inactive ∗ headTok γ c.md .inactive ∗
         headTok γ c.tl .inactive ∗ diskReadAt γ nr ∗
         ctxBytes curCtx (descAt pd c.hd) 16 (DFrac.own 1) c.d0 ∗

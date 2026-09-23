@@ -1099,6 +1099,31 @@ def headDone (γ : DiskNames) (n h : Nat) : IProp GF := iprop%
 instance headDone_persistent (γ : DiskNames) (n h : Nat) :
     Persistent (headDone (GF := GF) γ n h) := by unfold headDone; infer_instance
 
+/-- **Every completion of head `h` has been READ** (by the handler, whose
+watermark is `nr`).  Persistent.
+
+`Xv6.headDone` is persistent and says nothing about WHICH arming of `h`
+completed, so a head that completed, was collected, was re-armed and has
+completed AGAIN still carries the old record -- and that old record is
+`≤ nr`.  Collecting on the strength of it would take a chain back while
+its request is still with the device, and would contradict
+`Xv6.unreadArmed`.  This is the premise that rules it out, and it is what
+Rocq carries as the request's OWN order (`ord p u ∗ u < nr`, a
+PER-REQUEST record) rather than as a per-head one; a per-claim record is
+what this port will have to grow for `Xv6.disk_collect` to be provable
+rather than assumed. -/
+def headRead (γ : DiskNames) (h nr : Nat) : IProp GF := iprop%
+  □ (∀ n : Nat, headDone γ n h -∗ ⌜n ≤ nr⌝)
+
+instance headRead_persistent (γ : DiskNames) (h nr : Nat) :
+    Persistent (headRead (GF := GF) γ h nr) := by unfold headRead; infer_instance
+
+theorem headRead_le (γ : DiskNames) (h nr n : Nat) :
+    headRead (GF := GF) γ h nr ∗ headDone γ n h ⊢ ⌜n ≤ nr⌝ := by
+  unfold headRead
+  iintro ⟨#H, #Hd⟩
+  iapply H $$ %n Hd
+
 /-- **The credential at the base**: a watermark of zero needs only the
 bound on the zeroing stores. -/
 theorem diskWm_zero (γ : DiskNames) (F b : Nat) (hb : b ≤ F) :
@@ -1714,6 +1739,48 @@ theorem inflightOff_publish (v : VirtioState) (st : Nat → HState) (ring : Nat 
     intro he
     exact (hx.2 h' hs).2.2.2 (by rw [he])
 
+/-! ## An unread completion names an armed head
+
+The handler's watermark `nr` splits the used-index write log in two: the
+entries at counters `≤ nr` are completions it has COLLECTED, the entries
+above are completions it has not yet seen.  An unread entry's head is
+still ARMED -- `virtio_disk_rw` cannot have taken the chain back, because
+the collect is what the handler's `b->disk = 0`/`wakeup` licenses and
+that happens only after the read.
+
+It is the first of the `pend` clauses of `Xv6/DiskAcc.lean`'s section
+head, and the one `Xv6.DISK_INTR_EXTRA.slot_active` asks for: the handler
+reads a head out of the used ring and must produce that head's
+`Xv6.headTok γ i (.active c)` from the completion record alone.
+
+Stated over the COUNTERS, not over indices into `dl`: `Xv6.headDone γ n
+i` hands out an entry `(n, t, i) ∈ dl`, and reading it off needs no log
+arithmetic that way. -/
+
+/-- **Every unread completion names an armed head.** -/
+def unreadArmed (st : Nat → HState) (dl : List UsedRec) (nr : Nat) : Prop :=
+  ∀ r ∈ dl, nr < r.cnt → ∃ c : Chain, st r.hd = HState.active c
+
+theorem unreadArmed_nil (st : Nat → HState) (nr : Nat) : unreadArmed st [] nr := by
+  intro r hr; exact absurd hr (by simp)
+
+/-- **The used-index write.**  The entry that joins the log names the head
+whose request has just completed, and that head is in flight, hence
+armed. -/
+theorem unreadArmed_write (st : Nat → HState) (dl : List UsedRec) (nr nc t hd : Nat)
+    (h : unreadArmed st dl nr) (ha : ∃ c : Chain, st hd = HState.active c) :
+    unreadArmed st (dl ++ [(nc, t, hd)]) nr := by
+  intro r hr hlt
+  rcases List.mem_append.1 hr with hr | hr
+  · exact h r hr hlt
+  · have hre : r = (nc, t, hd) := by simpa using hr
+    rw [hre]; exact ha
+
+/-- **The handler's deposit**: the unread window only ever shrinks. -/
+theorem unreadArmed_nr (st : Nat → HState) (dl : List UsedRec) (nr nr' : Nat)
+    (h : unreadArmed st dl nr) (hle : nr ≤ nr') : unreadArmed st dl nr' :=
+  fun r hr hlt => h r hr (by omega)
+
 /-! ## The leases -/
 
 /-- The address of sector `i` of a buffer. -/
@@ -1853,7 +1920,8 @@ def diskLive (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState)
     dlTops dl ∗ diskReadAtAuth γ nr ∗
     ⌜v.usedIdx = wrap16 nc ∧ v.seen = wrap16 lo ∧ lo ≤ np ∧ queueOk st ring lo np ∧
       posOk pmap ring lo np ∧ stageOk stg ring lo np ∧ inflightOff v st ring lo np stg ∧
-      imgOk v m (inFlightBlk st) ∧ cachedOk v st ∧ permOk v pm st ∧ usedOk dl dl0 nc M⌝
+      imgOk v m (inFlightBlk st) ∧ cachedOk v st ∧ permOk v pm st ∧ usedOk dl dl0 nc M ∧
+      unreadArmed st dl nr⌝
 
 /-- The dead arm: before `virtio_disk_init`, and never again after.
 

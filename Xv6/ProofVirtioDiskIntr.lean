@@ -233,32 +233,6 @@ completion side is expected to grow (see the report accompanying this
 file); until then `virtio_disk_intr_proof` takes them as an explicit
 hypothesis. -/
 structure DISK_INTR_EXTRA : Prop where
-  /-- **A head with an UNREAD completion is an ARMED head.**  The handler
-  reads a head `i` out of the used ring and must then produce the
-  `Xv6.headTok γ i (.active c)` that `disk_status_read` and `disk_collect`
-  take; all it holds is the payload's own receipt for slot `i`
-  (`Xv6.slotRes`) and the completion record `Xv6.headDone γ n i`.
-
-  THE UNREAD PREMISE IS NOT DECORATION.  `headDone` is persistent, so a
-  head that completed, was collected and was freed still carries every
-  record it ever earned; without `Xv6.diskReadAt γ nr ∗ ⌜nr < n⌝` the
-  conclusion is simply FALSE for such a head (its receipt is `.inactive`).
-  With it the claim is the first link of the chain the section head of
-  `Xv6/DiskAcc.lean` calls `pend`: a completion at or above the handler's
-  watermark has not been collected, so its head is still armed.  What the
-  invariant must carry for it is the pure clause
-
-      ∀ k, nr ≤ k < dl.length → ∃ c, st dl[k].hd = .active c
-
-  beside the log arithmetic `dl[k].cnt = k + 1` that turns `Xv6.headDone
-  γ n i` into an index `k = n - 1` of `dl`. -/
-  slot_active : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
-      [CurCtx] (γ : DiskNames) (i n nr : Nat) (s : HState),
-    nr < n →
-    diskInv (GF := GF) γ ∗ headTok γ i s ∗ headDone γ n i ∗ diskReadAt γ nr ⊢
-      |={⊤}=> (headTok γ i s ∗ diskReadAt γ nr ∗
-        ⌜∃ c : Chain, s = HState.active c ∧ c.hd = i ∧ c.wf⌝)
-
   /-- **The handler's ENTRY credential.**  `Xv6.disk_used_idx_read` at the
   watermark `nr` consumes `Xv6.diskWm γ nr K` -- the fact that this hart's
   floor has passed the stores that zeroed the used page and the
@@ -742,7 +716,7 @@ theorem vdis_loop (HA : DISK_ACC_ASSUMPTIONS) (HE : DISK_INTR_EXTRA) (WK : WAKEU
   unfold slotRes
   icases Hslot with ⟨%st, Htok, Hbody⟩
   iapply wpLoop_fupd
-  imod (HE.slot_active γ i (nr + 1) nr st (by omega)) $$ [Hinv Htok Hdone Hnr]
+  imod (disk_slot_active γ i (nr + 1) nr st hi (by omega)) $$ [Hinv Htok Hdone Hnr]
     with ⟨Htok, Hnr, %hst⟩
   · iframe #; iframe
   imodintro

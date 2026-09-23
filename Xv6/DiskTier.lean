@@ -615,6 +615,26 @@ theorem permOk_arm3 (st : Nat → HState) (c : Chain) (hwf : c.wf)
     (permOk_mem v _ _ c.md c.hd (permOk_armSt v pm st c.hd c hx h1) (armSt3_md_free st c hwf h2))
     (armSt3_tl_free st c hwf h3)
 
+/-- **Arming a chain preserves it.**  The three receipts the publication
+moves are all `.inactive` beforehand, so by the clause itself none of
+them is an unread head; the head's own receipt only becomes MORE
+active. -/
+theorem unreadArmed_arm3 (st : Nat → HState) (c : Chain) (dl : List UsedRec) (nr : Nat)
+    (hwf : c.wf) (hst : st c.hd = .inactive) (hstm : st c.md = .inactive)
+    (hstt : st c.tl = .inactive) (h : unreadArmed st dl nr) :
+    unreadArmed (armSt3 st c) dl nr := by
+  intro r hr hlt
+  obtain ⟨c', hc'⟩ := h r hr hlt
+  by_cases hhd : r.hd = c.hd
+  · rw [hhd, armSt3_hd st c hwf]
+    exact ⟨c, rfl⟩
+  · have hmd : r.hd ≠ c.md := by
+      intro he; rw [he, hstm] at hc'; exact absurd hc' (by simp)
+    have htl : r.hd ≠ c.tl := by
+      intro he; rw [he, hstt] at hc'; exact absurd hc' (by simp)
+    rw [armSt3_ne st c r.hd hhd hmd htl]
+    exact ⟨c', hc'⟩
+
 /-! ## `struct disk` is kernel data -/
 
 theorem info_status_kmapRw (i : Nat) (hi : i < NUM) :
