@@ -648,8 +648,8 @@ theorem diskProto_usedIdx_acc (γ : DiskNames) (s : VirtioState) (h : BitVec 16)
     (hph : Virtio.phase s h = some (.pushed r)) :
     diskProto (GF := GF) γ s ⊢ ∃ (c0 : VirtioCfg) (b nc : Nat) (dl : List UsedRec),
       ⌜s.cfg = c0 ∧ s.usedIdx = wrap16 nc⌝ ∗ usedIdxCell (usedIdxAt c0.used) b dl ∗
-      ∃ ts : Nat, topLb ts ∗
-      (∀ t : Nat, ⌜ts ≤ t⌝ -∗ usedIdxCell (usedIdxAt c0.used) b (dl ++ [(nc + 1, t, h.toNat)]) -∗
+      ∃ tb : Nat, topLb tb ∗
+      (∀ t : Nat, ⌜tb < t⌝ -∗ usedIdxCell (usedIdxAt c0.used) b (dl ++ [(nc + 1, t, h.toNat)]) -∗
         topLb t -∗ diskProto γ s) := by
   have hin : Virtio.reqOf s h = some r := by unfold Virtio.reqOf; rw [hph]; rfl
   unfold diskProto
@@ -679,10 +679,17 @@ theorem diskProto_usedIdx_acc (γ : DiskNames) (s : VirtioState) (h : BitVec 16)
     isplitl []
     · ipureintro; exact ⟨hc0.1, e1⟩
     iframe Hui
-    iexists ts
+    ihave #Htmax := dlTops_max dl $$ Htp
+    iexists (max ts (maxPos dl))
     isplitl []
-    · iexact Htts
-    iintro %t %hle Hui' #Htt
+    · iapply topLb_max ts (maxPos dl)
+      isplitl []
+      · iexact Htts
+      · iexact Htmax
+    iintro %t %hlt Hui' #Htt
+    have hle : ts ≤ t := by omega
+    have hpos : ∀ r ∈ dl, r.2.1 ≤ t := fun r hr => by
+      have := maxPos_ge dl r hr; omega
     ihave #Htp' := dlTops_snoc dl (nc + 1, t, h.toNat) $$ [$Htp $Htt]
     isplitl []
     · ipureintro; exact hc
@@ -703,10 +710,11 @@ theorem diskProto_usedIdx_acc (γ : DiskNames) (s : VirtioState) (h : BitVec 16)
       cases hp : Virtio.phase s h with
       | none => rw [hp] at hin; exact absurd hin (by simp)
       | some x => rfl
-    obtain ⟨-, -, hpos, hstg⟩ := e6.2 h hsome
-    exact ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, usedOk_write dl dl0 nc M t h.toNat e10,
+    obtain ⟨-, -, hpos', hstg⟩ := e6.2 h hsome
+    exact ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9,
+      usedOk_write dl dl0 nc M t h.toNat e10 hpos,
       unreadArmed_write s st dl nr (nc + 1) t ring lo np stg sb h r ts hph hts hle
-        ⟨c, hcst⟩ hpos hstg e11⟩
+        ⟨c, hcst⟩ hpos' hstg e11⟩
 
 /-- W3: the used index.  The write appends its entry -- the counter the
 device's `usedIdx` is about to reach, at the position the machine gives the
@@ -717,19 +725,19 @@ theorem usedIdx_write_lease (γ : DiskNames) (s : VirtioState) (h : BitVec 16) (
     diskProto (GF := GF) γ s ⊢ dmaWriteLease (Virtio.usedIdxAddr cc) 2 w (diskProto γ s) := by
   iintro H
   icases diskProto_usedIdx_acc γ s h r hph $$ H
-    with ⟨%c0, %b, %nc, %dl, %hp, Hui, %ts, #Htts, Hback⟩
+    with ⟨%c0, %b, %nc, %dl, %hp, Hui, %tb, #Htts, Hback⟩
   obtain ⟨hcfg, hidx⟩ := hp
   have hcc0 : cc = c0 := by rw [← hcc, hcfg]
   subst hcc0
   rw [usedIdxAt_eq cc, show w = wrap16 (nc + 1) by rw [hw, hidx, wrap16_succ]]
-  iapply usedIdxCell_lease (usedIdxAt cc.used) b dl (nc + 1) h.toNat ts
-    iprop(∀ t : Nat, ⌜ts ≤ t⌝ -∗
+  iapply usedIdxCell_lease (usedIdxAt cc.used) b dl (nc + 1) h.toNat tb
+    iprop(∀ t : Nat, ⌜tb < t⌝ -∗
       usedIdxCell (usedIdxAt cc.used) b (dl ++ [(nc + 1, t, h.toNat)]) -∗
       topLb t -∗ diskProto γ s)
     (diskProto γ s)
     (fun t hkb => by
       iintro ⟨H1, #Ht, H2⟩
-      iapply H2 $$ %t %(Nat.le_of_lt hkb) H1 Ht)
+      iapply H2 $$ %t %hkb H1 Ht)
   iframe Hui Htts Hback
 
 /-! ## The serve permit

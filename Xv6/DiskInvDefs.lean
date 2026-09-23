@@ -747,7 +747,7 @@ list that lags it, `M` the monotone counter a reader may cash, `nc` the
 device's completion count. -/
 def usedOk (dl dl0 : List UsedRec) (nc M : Nat) : Prop :=
   dl0 <+: dl ∧ (∀ r ∈ dl, r.1 ≤ nc + 1) ∧ M ≤ nc + 1 ∧
-  dl.Pairwise (fun a c => a.1 ≤ c.1) ∧ (M = 0 ∨ ∃ r ∈ dl, M ≤ r.1)
+  dl.Pairwise (fun a c => a.1 ≤ c.1 ∧ a.2.1 ≤ c.2.1) ∧ (M = 0 ∨ ∃ r ∈ dl, M ≤ r.1)
 
 theorem usedOk_nil (nc : Nat) : usedOk [] [] nc 0 :=
   ⟨List.prefix_rfl, fun r hr => absurd hr (by simp), by omega, List.Pairwise.nil, Or.inl rfl⟩
@@ -775,7 +775,8 @@ theorem usedOk_bump (dl dl0 : List UsedRec) (nc M m : Nat) (h : usedOk dl dl0 nc
     · exact Or.inr ⟨r, hr, hmr⟩
 
 /-- **The used-index write**: the counter `nc + 1` joins the log. -/
-theorem usedOk_write (dl dl0 : List UsedRec) (nc M t hd : Nat) (h : usedOk dl dl0 nc M) :
+theorem usedOk_write (dl dl0 : List UsedRec) (nc M t hd : Nat) (h : usedOk dl dl0 nc M)
+    (hpos : ∀ r ∈ dl, r.2.1 ≤ t) :
     usedOk (dl ++ [(nc + 1, t, hd)]) dl0 nc M := by
   obtain ⟨hp, hb, hM, hpw, hach⟩ := h
   refine ⟨hp.trans (List.prefix_append dl _), ?_, hM, ?_, ?_⟩
@@ -790,21 +791,21 @@ theorem usedOk_write (dl dl0 : List UsedRec) (nc M t hd : Nat) (h : usedOk dl dl
       simp [this]
   · refine List.pairwise_append.2 ⟨hpw, List.pairwise_singleton _ _, ?_⟩
     intro a ha c hc
-    have : c = (nc + 1, t, hd) := by simpa using hc
-    rw [this]
-    exact hb a ha
+    have hce : c = (nc + 1, t, hd) := by simpa using hc
+    rw [hce]
+    exact ⟨hb a ha, hpos a ha⟩
 
 /-- **The largest counter a reader can see.**  The log never decreases, so
 the newest entry a reader's view reaches dominates every entry it
 reaches. -/
 theorem used_find_max (dl : List UsedRec) (tvn : Nat) (r : UsedRec)
-    (hpw : dl.Pairwise (fun a c => a.1 ≤ c.1))
+    (hpw : dl.Pairwise (fun a c => a.1 ≤ c.1 ∧ a.2.1 ≤ c.2.1))
     (hf : dl.reverse.find? (fun x => decide (x.2.1 ≤ tvn)) = some r)
     (x : UsedRec) (hx : x ∈ dl) (ht : x.2.1 ≤ tvn) : x.1 ≤ r.1 := by
   obtain ⟨hvis, L1, L2, hW, hL1⟩ := List.find?_eq_some_iff_append.1 hf
   have hprev : dl.reverse.Pairwise (fun a c => c.1 ≤ a.1) := by
     rw [List.pairwise_reverse]
-    exact hpw
+    exact hpw.imp (fun h => h.1)
   rw [hW] at hprev
   have hx' : x ∈ L1 ++ r :: L2 := by rw [← hW]; exact List.mem_reverse.2 hx
   rcases List.mem_append.1 hx' with h | h
@@ -970,7 +971,7 @@ write that published its own watermark reads a counter at least as
 large. -/
 theorem usedIdx_read (dl : List UsedRec) (Hold : Nat → Hist) (b : Nat) (cpu : CPU)
     (tvn : Nat) (w : BitVec (8 * 2)) (htail : usedTailOk b Hold) (hb : b ≤ tvn)
-    (hpw : dl.Pairwise (fun a c => a.1 ≤ c.1))
+    (hpw : dl.Pairwise (fun a c => a.1 ≤ c.1 ∧ a.2.1 ≤ c.2.1))
     (hrd : readsAre (hartAgent cpu) tvn ((usedW dl).hist Hold) 2 w) :
     ∃ m : Nat, w = wrap16 m ∧ (m = 0 ∨ ∃ (t hd : Nat), (m, t, hd) ∈ dl ∧ t ≤ tvn) ∧
       ∀ x ∈ dl, x.2.1 ≤ tvn → x.1 ≤ m := by
@@ -1057,6 +1058,47 @@ theorem dlTops_snoc (dl : List UsedRec) (r : UsedRec) :
   iintro H
   iapply BigSepL.bigSepL_snoc.2
   iexact H
+
+/-- The largest position the log holds. -/
+def maxPos : List UsedRec → Nat
+  | [] => 0
+  | r :: l => max r.2.1 (maxPos l)
+
+theorem maxPos_ge (dl : List UsedRec) : ∀ r ∈ dl, r.2.1 ≤ maxPos dl := by
+  induction dl with
+  | nil => intro r hr; exact absurd hr (by simp)
+  | cons a l ih =>
+    intro r hr
+    rcases List.mem_cons.1 hr with rfl | hr
+    · exact Nat.le_max_left _ _
+    · exact Nat.le_trans (ih r hr) (Nat.le_max_right _ _)
+
+/-- **The log's positions, bounded by ONE receipt.**  `Xv6.dlTops` holds a
+`MachCSL.topLb` per entry; this fuses them, so that the next used-index
+write can be given a `MachCSL.dmaWriteLease` bound (`Kb`) that dominates
+every position already in the log -- which is what makes the log's
+positions MONOTONE. -/
+theorem dlTops_max (dl : List UsedRec) : dlTops (GF := GF) dl ⊢ topLb (maxPos dl) := by
+  induction dl with
+  | nil =>
+    iintro _
+    show ⊢ topLbAt _ 0
+    iapply topLbAt_0
+  | cons a l ih =>
+    iintro H
+    ihave H := (show dlTops (GF := GF) (a :: l) ⊢
+        iprop(topLb a.2.1 ∗ dlTops l) from by
+      unfold dlTops
+      iintro H
+      iapply BigSepL.bigSepL_cons.1 $$ H) $$ H
+    icases H with ⟨#Ha, Hl⟩
+    ihave #Hl := ih $$ Hl
+    iapply topLb_le (max a.2.1 (maxPos l)) (maxPos (a :: l))
+      (show maxPos (a :: l) ≤ max a.2.1 (maxPos l) from Nat.le_refl _)
+    iapply topLb_max a.2.1 (maxPos l)
+    isplitl []
+    · iexact Ha
+    · iexact Hl
 
 theorem dlTops_mem (dl : List UsedRec) (r : UsedRec) (h : r ∈ dl) :
     dlTops (GF := GF) dl ⊢ topLb r.2.1 := by
