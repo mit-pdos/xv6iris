@@ -113,7 +113,7 @@ needs -- `lo < np` -- has to cross device steps.  Two mechanisms carry it:
 ---------------------------------------------------------------------
 WHAT IS NOT HERE, AND WHY.
 
-* No PER-POSITION ROWS on the completion side: the used-ring ELEMENT the
+* No PER-COMPLETION ROWS on the completion side: the used-ring ELEMENT the
   device wrote at each position, the completed request's status byte at a
   known value, and the `topLb` bound on that request's DATA writes.  The
   used-index cell's WRITE LOG is here (see below), and with it the
@@ -121,15 +121,19 @@ WHAT IS NOT HERE, AND WHY.
   `diskWm`; the rows are what the last three accessors of
   `Xv6/DiskAcc.lean` still wait on.  The invariant now KNOWS the handler
   watermark (`diskReadAt` is a ghost PAIR: the payload's half and
-  `diskReadAtAuth` inside the dead and live arms), which is what the rows
-  and the window bound `nc - nr <= NUM` are indexed by; the rows
-  themselves, and that bound, are still to come.
+  `diskReadAtAuth` inside the dead and live arms) and the exact PHASE of
+  every in-flight request (`permOk`, below), which is what the rows are
+  built on; the rows themselves, the window bound `dl.length - nr ≤ NUM`
+  and the one clause they all hang off -- "an in-flight head is at no
+  published, unpopped position" -- are still to come.  The section head
+  of `Xv6/DiskAcc.lean` sets the design out in full.
 * The CONTENT of a disk read's data transfer is existential (`dmaOwn`,
   not `dmaOwnAt`).  The device computes the payload from a SNAPSHOT of its
-  image taken at the task's `get` and writes it several steps later; a
-  per-step lease has no way to say the image did not move in between.
-  Making it precise needs a persistent, generation-keyed snapshot of the
-  block.
+  image taken at the task's `get` and writes it several steps later.  The
+  bytes themselves are not the problem -- a DMA write may re-choose the
+  invariant's existential witness, so `bufLease` can be kept at values --
+  the COUPLING to `Xv6.diskBlock` is: it needs the clause "an in-flight
+  READ chain's image fragment is `blockView v c.blk`".
 * No crash permits, no `Q`, no `disk_seq_permit` (the port drops Rocq's
   crash story), and no TSO floor rows (`fl0`/`fl1`/`flr`/`pos`).
 -/

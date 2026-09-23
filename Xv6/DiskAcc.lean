@@ -1325,35 +1325,104 @@ it reported.  Out of it come
   iteration of the handler's loop to the next by `disk_deposit`.
 
 -------------------------------------------------------------------------
-WHAT IS LEFT, AND WHY.  Two things, and the three accessors below wait on
-one or both.
+WHAT THE IN-FLIGHT BOOKKEEPING HAS SETTLED.  `Xv6.permOk` is now
+STATE-INDEXED: a permit records the PHASE its task installed
+(`MachCSL.VPhase`) and, once the task is past the completion gate, the
+used index it LATCHED there, and the invariant says both are the device's
+own.  Beside it `Xv6.permInj` (one permit per head) and `Xv6.pushedUniq`
+(at most one request between its used element and its used index -- what
+`MachCSL.Virtio.pushOk` guards) close the accounting.
 
-(1) THE PER-POSITION ROWS.  The invariant still holds nothing about a
-COMPLETED request beyond the log: the used-ring ELEMENT the device wrote
-at `nr % NUM`, the status byte at `dmaOwnAt c.status 1 0#8`, and the
-`topLb` of the request's data writes all belong in a row for each
-completed, unread position.  The invariant now KNOWS the handler watermark
--- `diskReadAt` is a ghost PAIR (`Xv6.diskReadAtAuth` in the dead and live
-arms), the bump goes through `Xv6.disk_deposit`, and
-`Xv6.diskProto_nr_acc` is the hook the rows will hang on -- but the rows
-themselves, and the window bound that says position `nr`'s used-ring cell
-has not been overwritten (the completion-side twin of `np - lo ≤ NUM`),
-are still to come.
+That is what makes the four DMA writes of a request usable at their
+VALUES.  `MachCSL.DevM.LeaseL`'s write arm is quantified over every state
+the guard fires at, and the machine may also SKIP a write whose guard is
+false; the arm therefore now produces a NEW context `C'`
+(`hlease : C ∗ R s ⊢ dmaWriteLease pa n w (R s ∗ C')`) with a `hfalse`
+obligation for the skip, and `Xv6.leaseL_serveTail` DISCHARGES `hfalse`
+for all three writes of the tail out of the permit.  Without that, the
+value a write leaves behind cannot reach the rest of the derivation at
+all: `dmaWriteLease`'s continuation is the only channel, and the model's
+`.served -> .status` step happens AFTER the store.
 
-A CAVEAT the bound has to respect: `nc` LAGS the write log by one write.
-`usedIdx_write_lease` appends `(nc + 1, t, h)` to the log at a state whose
-`v.usedIdx` is still `wrap16 nc`, and only the `Virtio.complete` that
-follows bumps `nc`.  So `nr ≤ nc` is NOT an invariant -- a handler that
-reads in that window bumps its watermark to `nc + 1` -- and the window
-bound has to be stated against the LOG (`dl`), not against `nc`.  It also needs `Virtio.complete` to know the status byte
-was written, which is a phase-tracking clause (`pushOk`) the port does not
-carry.  Note that the device CANNOT allocate ghost state
-(`MachCSL.dmaWriteLease`'s continuation is a plain wand), so every row the
-device creates has to be built the way the write log is: a pure list the
-device grows alone, with a LAGGING ghost a client catches up inside a view
-shift.
+`MachCSL.Virtio.body`'s pop re-tests `(phase v h).isSome` AT the step that
+pops (a `DevM.guard`), not only at the `get` before it, which is what
+keeps one permit per head.
 
-(2) THE TSO CREDENTIAL, SETTLED.  `Xv6.diskWm γ n F` says the hart's floor
+-------------------------------------------------------------------------
+WHAT IS LEFT, AND WHY.  The three accessors below wait on the
+PER-COMPLETION ROWS, and those wait on one clause that is NOT yet there
+and that the rest of the design hangs off.
+
+(1) THE ROWS THEMSELVES.  Sketch, in the shape the rest of this file is
+written in:
+
+* the status byte's PLACE is a function of the permit's phase -- the
+  invariant holds `dmaOwn c.status 1` up to `.fetched`, NOTHING at
+  `.served` (the byte is in the serving task's linear context, which is
+  where the write's `C'` puts it at its value), and
+  `dmaOwnAt c.status 1 0#8` from `.status` on (the `.step` that installs
+  `.status` hands it back).  A per-head marker `sb : Nat -> SByte` in
+  `diskLive` carries the same three states past the completion, and a
+  pure clause ties it to `Virtio.phase`;
+* the used ELEMENT is pinned by the LOG, not by a row: keep
+  `Xv6.usedLease` at values (`dmaOwnAt (usedElemAt pu j) 8 (uv j)`) and
+  add the clause `∀ k, nr ≤ k < dl.length → uv (k % NUM) = usedElemVal dl[k]`.
+  It needs `dl.length - nr ≤ NUM`, and the used-ELEMENT write needs
+  `nc - nr < NUM` so that the slot it overwrites is not one of them;
+* `b->data` is pinned the same way -- `bufLease` at values, re-pinned at
+  each `xferIn` write (the write may re-choose the invariant's existential
+  witness, so no ghost is needed for the bytes themselves).  What the
+  SNAPSHOT is for is the COUPLING to `Xv6.diskBlock`: add the clause "an
+  in-flight READ chain's image fragment is `blockView v c.blk`" (stable:
+  a read moves neither image nor cache, a drain preserves `cacheView`,
+  and two chains cannot hold the same block because `diskBlock` is
+  exclusive), and `MachCSL.Virtio.xferIn`'s `get` then knows the bytes it
+  is about to write are the fragment's.
+
+(2) THE CLAUSE EVERYTHING HANGS OFF, AND THE STATEMENT CHANGE IT FORCES.
+Each of the three rows above must survive from the completion to the
+driver's `collect`, and the window bound needs the UNREAD completions'
+heads to be DISTINCT.  Both need:
+
+    a head with an UNREAD completion is not collected, hence not
+    re-published, hence not popped and not completed again.
+
+Nothing establishes that today, because `disk_collect` as stated does not
+say the completion it reclaims has been READ.  It must: the premise
+`Xv6.diskReadAt γ nr ∗ ⌜n ≤ nr⌝` has been ADDED to the assumed statement
+below (it is Rocq's `ord p u ∗ u < nr`, which lives in that port's
+`disk_res` claim row beside `b->disk = 0`; the wakeup path of
+`virtio_disk_rw` is where P5/P6 must produce it -- the handler holds
+`vdisk_lock` across `b->disk = 0`, `wakeup(b)` AND `disk.used_idx += 1`,
+so a sleeper that re-acquires the lock always has `n ≤ nr`).
+
+With it, the chain of clauses is:
+
+    pend i          -- "head i has an unread completion", set at the
+                       used-index write, cleared by `disk_deposit`
+    st i = .inactive → pend i = false          (collect needs n ≤ nr)
+    pend i = true → i is at no position in [lo, np)   (so it cannot be
+                       popped again)
+    (Virtio.phase v h).isSome → h is at no position in [lo, np)
+
+The LAST of those is the one new clause of `diskLive` that the port does
+not carry -- "an in-flight head is at no published, unpopped position".
+It is preserved by publish (an `.inactive` head is not in flight, by
+`inflightOk`), by the pop (the window shrinks past the head it takes) and
+by the completion, and it is what the used-element write needs to know
+that the head it is completing was popped.  Adding it means threading one
+more conjunct through every `diskLive` destructuring in
+`Xv6/DiskInv.lean` and `Xv6/DiskAcc.lean`.
+
+(3) THE LOG'S ARITHMETIC.  `disk_used_elem_read` reads position `nr` and
+must find the entry whose counter is `nr + 1`, which needs
+`dl[k].cnt = k + 1` and `nc ≤ dl.length ≤ nc + 1`.  The upper bound needs
+to know that the task between its gate and its index write has not
+already written: the natural witness is the used ELEMENT slot itself,
+which that task holds at `own 1` in its context between the two writes
+(the `C'` the write arm now produces), so it cannot write twice.
+
+(4) THE TSO CREDENTIAL, SETTLED.  `Xv6.diskWm γ n F` says the hart's floor
 `F` has passed a used-index write publishing at least `n`.  It used to be
 a PREMISE with no way to establish it; it is now a THEOREM of the read,
 through `MachCSL/WpSmodeFenceFloor.lean`:
@@ -1907,28 +1976,41 @@ structure DISK_ACC_ASSUMPTIONS : Prop where
   device wrote, `b->data` at the bytes it transferred, and the block's
   image fragment with them.
 
-  Blocked three ways: on the per-position row (to own the device's writes
-  at a known value and to carry the `topLb` of them), on the invariant's
-  `bufLease` being `dmaOwn` -- the CONTENT of a read's transfer is
-  existential, so the bytes cannot be pinned to `blockView` without a
-  generation-keyed snapshot of the block (see `Xv6/DiskInvDefs.lean`'s
-  header) -- and on the TSO credential, which is what `ctxFloor curCtx T`
-  beside `diskWm γ n T` stands for here.
+  Blocked three ways: on the per-completion row (to own the device's
+  writes at a known value and to carry the `topLb` of them), on the
+  invariant's `bufLease` being `dmaOwn` -- the CONTENT of a read's
+  transfer is existential, so the bytes cannot be pinned to `blockView`
+  without the snapshot clause of the section head -- and on the TSO
+  credential, which is what `ctxFloor curCtx T` beside `diskWm γ n T`
+  stands for here.
+
+  THE READ PREMISE.  `Xv6.diskReadAt γ nr ∗ ⌜n ≤ nr⌝` says the completion
+  this reclaims has been READ by the handler.  It is not decoration: it is
+  what keeps a head with an UNREAD completion from being collected and
+  re-published, which is what makes the unread completions' heads
+  DISTINCT, which is the window bound `dl.length - nr ≤ NUM` that
+  `disk_used_elem_read` needs and the reason a completed row survives at
+  all (see the section head).  It is Rocq's `ord p u ∗ u < nr`, carried
+  there in `disk_res`'s claim row beside `b->disk = 0`.  The payload has
+  `diskReadAt γ nr` and `virtio_disk_rw` collects under the lock, so the
+  premise is available to P5/P6; what P5/P6 must show is `n ≤ nr`, out of
+  the wakeup (the handler holds `vdisk_lock` across `b->disk = 0`,
+  `wakeup(b)` and `disk.used_idx += 1` alike).
 
   The `kmapStatic` premises are `disk_publish`'s, in reverse: the reverse
   bridges `Xv6.ctxBytes_wordPointsTo` / `Xv6.ctxIdx_byteBuf` need `inRam`
   of the buffer, which a `wordPointsTo` carries and a `dmaOwn` does
   not. -/
   disk_collect : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
-      [DiskG GF] [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (c : Chain) (n T : Nat),
-    c.wf →
+      [DiskG GF] [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (c : Chain) (n T nr : Nat),
+    c.wf → n ≤ nr →
     (∀ j, j < BSIZE → kmapClass (vpnOf (c.data + BitVec.ofNat 64 j)).toNat = some .rw) →
     diskInv (GF := GF) γ ∗ kmapStatic ∗ diskGeom γ pd pav pu ∗
       headTok γ c.hd (.active c) ∗ headTok γ c.md (.member c.hd) ∗
-      headTok γ c.tl (.member c.hd) ∗ claimRes curCtx pd c ∗
+      headTok γ c.tl (.member c.hd) ∗ claimRes curCtx pd c ∗ diskReadAt γ nr ∗
       headDone γ n c.hd ∗ diskWm γ n T ∗ ctxFloor curCtx T ⊢
       |={⊤}=> (headTok γ c.hd .inactive ∗ headTok γ c.md .inactive ∗
-        headTok γ c.tl .inactive ∗
+        headTok γ c.tl .inactive ∗ diskReadAt γ nr ∗
         ctxBytes curCtx (descAt pd c.hd) 16 (DFrac.own 1) c.d0 ∗
         ctxBytes curCtx (descAt pd c.md) 16 (DFrac.own 1) c.d1 ∗
         ctxBytes curCtx (descAt pd c.tl) 16 (DFrac.own 1) c.d2 ∗
