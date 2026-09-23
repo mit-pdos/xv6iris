@@ -304,6 +304,56 @@ theorem vdi_bb_cut (p : BitVec 64) (c : BitVec 8) (off m n tot off2 : Nat)
   rw [ofNat64_add off m, ← BitVec.add_assoc]
   exact (byteBuf_replicate_split (p + BitVec.ofNat 64 off) (DFrac.own 1) c m n).1
 
+/-- A kernel cell is a context window: the page's identity claim makes
+the virtual and the physical address the same. -/
+theorem vdi_word_ctx (va : BitVec 64) (n : Nat) (dq : DFrac) (w : BitVec (8 * n))
+    (hkm : kmapClass (vpnOf va).toNat = some .rw) :
+    kmapStatic (GF := GF) ⊢ wordPointsTo va n dq w -∗ ctxBytes curCtx va n dq w := by
+  iintro #HS H
+  ihave #Hid := kmapStatic_rw va hkm $$ HS
+  ihave Hp := wordPointsTo_phys va n dq w $$ Hid H
+  icases pwordPointsTo_cases va n dq w $$ Hp with ⟨%-, Hb⟩
+  iexact Hb
+
+/-- **One `disk.ops[i]` window**, out of the two eight-byte bss cells the
+caller supplies: the sixteen bytes the driver's P3 formats and the head
+descriptor points at (`Xv6.opsWin`). -/
+theorem vdi_ops_win (i : Nat) (hi : i < NUM) :
+    kmapStatic (GF := GF) ⊢
+      wordPointsTo (aOps i) 8 (DFrac.own 1) (0 : BitVec (8 * 8)) -∗
+      wordPointsTo (aOpsSector i) 8 (DFrac.own 1) (0 : BitVec (8 * 8)) -∗
+      opsWin curCtx i := by
+  have e1 : (BitVec.extractLsb' 0 (8 * 8) (0 : BitVec (8 * 16)) : BitVec (8 * 8))
+      = (0 : BitVec (8 * 8)) := by simp
+  have e2 : (BitVec.extractLsb' (8 * 8) (8 * 8) (0 : BitVec (8 * 16)) : BitVec (8 * 8))
+      = (0 : BitVec (8 * 8)) := by simp
+  iintro #HS H1 H2
+  ihave H1 := vdi_word_ctx (aOps i) 8 (DFrac.own 1) 0 (ops_kmapRw i hi) $$ HS H1
+  ihave H2 := vdi_word_ctx (aOpsSector i) 8 (DFrac.own 1) 0 (opsSector_kmapRw i hi) $$ HS H2
+  unfold opsWin
+  iexists (0 : BitVec (8 * 16))
+  iapply ctxBytes_join_at curCtx (aOps i) 8 8 (DFrac.own 1) (0 : BitVec (8 * 16))
+  rw [e1, e2, aOps_sector_off i]
+  iframe H1 H2
+
+/-- All eight `disk.ops[i]` windows. -/
+theorem vdi_ops_wins :
+    kmapStatic (GF := GF) ⊢
+      (iprop([∗list] i ∈ List.range NUM,
+        wordPointsTo (aOps i) 8 (DFrac.own 1) (0 : BitVec (8 * 8)) ∗
+        wordPointsTo (aOpsSector i) 8 (DFrac.own 1) (0 : BitVec (8 * 8)))) -∗
+      [∗list] i ∈ List.range NUM, opsWin curCtx i := by
+  iintro #HS H
+  iapply (BigSepL.bigSepL_impl (l := List.range NUM)
+    (Φ := fun (_k : Nat) (i : Nat) => iprop(
+      wordPointsTo (GF := GF) (aOps i) 8 (DFrac.own 1) (0 : BitVec (8 * 8)) ∗
+      wordPointsTo (aOpsSector i) 8 (DFrac.own 1) (0 : BitVec (8 * 8))))
+    (Ψ := fun (_k : Nat) (i : Nat) => opsWin (GF := GF) curCtx i)) $$ H
+  imodintro
+  iintro %k %x %hget ⟨H1, H2⟩
+  obtain ⟨rfl, hk⟩ := vdi_range_get hget
+  iapply vdi_ops_win x hk $$ HS H1 H2
+
 /-- One window of a zeroed `kalloc`'d page, as raw context bytes. -/
 theorem vdi_chunk (p : BitVec 64) (hpv : pageValid p) (base sz : Nat) (hb : base + sz ≤ 4096) :
     kmapStatic (GF := GF) ⊢
@@ -1730,11 +1780,12 @@ theorem vdi_flipIn (γ : DiskNames) (pd pav pu : BitVec 64)
     wordPointsTo (KA.«disk» + 30#64) 1 (DFrac.own 1) 1#8 ∗
     wordPointsTo (KA.«disk» + 31#64) 1 (DFrac.own 1) 1#8 ∗
     wordPointsTo (KA.«disk» + 32#64) 2 (DFrac.own 1) (0 : BitVec (8 * 2)) ∗
+    ([∗list] i ∈ List.range NUM, opsWin curCtx i) ∗
     wordPointsTo KA.«disk» 8 (DFrac.own 1) pd ∗
     wordPointsTo (KA.«disk» + 8#64) 8 (DFrac.own 1) pav ∗
     wordPointsTo (KA.«disk» + 16#64) 8 (DFrac.own 1) pu
     ⊢ diskFlipIn γ pd pav pu := by
-  iintro ⟨#HS, HG, Hbd, Hba, Hbu, Hf0, Hf1, Hf2, Hf3, Hf4, Hf5, Hf6, Hf7, Hui, Hd, Ha, Hu⟩
+  iintro ⟨#HS, HG, Hbd, Hba, Hbu, Hf0, Hf1, Hf2, Hf3, Hf4, Hf5, Hf6, Hf7, Hui, Hops, Hd, Ha, Hu⟩
   ihave Hdesc := vdi_carve_desc pd hpvd $$ HS Hbd
   icases vdi_carve_avail pav hpva $$ HS Hba with ⟨Hai, Hring⟩
   icases vdi_carve_used pu hpvu $$ HS Hbu with ⟨Hue, Helem⟩
@@ -1752,8 +1803,11 @@ theorem vdi_flipIn (γ : DiskNames) (pd pav pu : BitVec 64)
   icases Hdesc with ⟨Hd0, Hd1, Hd2, Hd3, Hd4, Hd5, Hd6, Hd7, _⟩
   icases Hring with ⟨Hr0, Hr1, Hr2, Hr3, Hr4, Hr5, Hr6, Hr7, _⟩
   icases Helem with ⟨He0, He1, He2, He3, He4, He5, He6, He7, _⟩
-  iframe Hh0a Hh0t Hf0 Hd0 Hh1a Hh1t Hf1 Hd1 Hh2a Hh2t Hf2 Hd2 Hh3a Hh3t Hf3 Hd3
-  iframe Hh4a Hh4t Hf4 Hd4 Hh5a Hh5t Hf5 Hd5 Hh6a Hh6t Hf6 Hd6 Hh7a Hh7t Hf7 Hd7
+  icases Hops with ⟨Ho0, Ho1, Ho2, Ho3, Ho4, Ho5, Ho6, Ho7, _⟩
+  iframe Hh0a Hh0t Hf0 Hd0 Ho0 Hh1a Hh1t Hf1 Hd1 Ho1 Hh2a Hh2t Hf2 Hd2 Ho2
+  iframe Hh3a Hh3t Hf3 Hd3 Ho3
+  iframe Hh4a Hh4t Hf4 Hd4 Ho4 Hh5a Hh5t Hf5 Hd5 Ho5 Hh6a Hh6t Hf6 Hd6 Ho6
+  iframe Hh7a Hh7t Hf7 Hd7 Ho7
   iframe Hpa Hpub Hnr Hstg Hnc Hai Hr0 Hr1 Hr2 Hr3 Hr4 Hr5 Hr6 Hr7
   iframe Hue He0 He1 He2 He3 He4 He5 He6 He7 Hui Hd Ha Hu
   all_goals try iempintro
@@ -1795,6 +1849,7 @@ theorem vdi_finish (cpu : CPU) (k : KCtx) (R : RegMap) (γ : DiskNames)
     wordPointsTo (KA.«disk» + 30#64) 1 (DFrac.own 1) v6 ∗
     wordPointsTo (KA.«disk» + 31#64) 1 (DFrac.own 1) v7 ∗
     wordPointsTo (KA.«disk» + 32#64) 2 (DFrac.own 1) (0 : BitVec (8 * 2)) ∗
+    ([∗list] i ∈ List.range NUM, opsWin curCtx i) ∗
     wordPointsTo KA.«disk» 8 (DFrac.own 1) pd ∗
     wordPointsTo (KA.«disk» + 8#64) 8 (DFrac.own 1) pav ∗
     wordPointsTo (KA.«disk» + 16#64) 8 (DFrac.own 1) pu ∗
@@ -1804,7 +1859,7 @@ theorem vdi_finish (cpu : CPU) (k : KCtx) (R : RegMap) (γ : DiskNames)
       ⌜R' 2#5 = R 2#5 ∧ vdiKept R R'⌝ -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨#Hinv, Hk, Hpc, Htok, HG, Hbd, Hba, Hbu,
-    Hf0, Hf1, Hf2, Hf3, Hf4, Hf5, Hf6, Hf7, Hui, Hd, Ha, Hu, HΦ⟩
+    Hf0, Hf1, Hf2, Hf3, Hf4, Hf5, Hf6, Hf7, Hui, Hops, Hd, Ha, Hu, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_kmapStatic _ _ $$ Hk with ⟨#HS, Hk⟩
   -- +0x148  li a5,1 ; +0x14a  sw a5,68(a4)   QUEUE_READY := 1
@@ -1849,9 +1904,9 @@ theorem vdi_finish (cpu : CPU) (k : KCtx) (R : RegMap) (γ : DiskNames)
   iintro Hk Hpc Hf7
   -- the flip's input, assembled
   ihave HIn := vdi_flipIn γ pd pav pu hpvd hpva hpvu
-    $$ [HS HG Hbd Hba Hbu Hf0 Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hui Hd Ha Hu]
+    $$ [HS HG Hbd Hba Hbu Hf0 Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hui Hops Hd Ha Hu]
   · iframe #
-    iframe HG Hbd Hba Hbu Hf0 Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hui Hd Ha Hu
+    iframe HG Hbd Hba Hbu Hf0 Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hui Hops Hd Ha Hu
   -- +0x16c  ori s2,s2,4 ; +0x170  sw s2,112(a4)   STATUS |= DRIVER_OK
   k_step (wp_s_ori cpu _ (KA.«virtio_disk_init» + 0x16c#64) false 4#12 18#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -1922,11 +1977,13 @@ theorem virtio_disk_init_proof (IL : INITLOCK) (KAL : KALLOC) (MS : MEMSET) : VI
   unfold wp_virtio_disk_init_body diskInitCells
   simp only [virtioDiskInitAddr, vdi_aDescPtr, vdi_aAvailPtr, vdi_aUsedPtr, vdi_aUsedIdx]
   iintro ⟨Hk, Hpc, #Hlock, Hav, #Hinv, Htok, HG,
-    ⟨%hfree, #Hidl, #Hidl16, Hwlock, Hwname, Hwcpu, Hd, Ha, Hu, Hfree, Hui⟩, HΦ⟩
+    ⟨%hfree, Hopsc, #Hidl, #Hidl16, Hwlock, Hwname, Hwcpu, Hd, Ha, Hu, Hfree, Hui⟩, HΦ⟩
   ihave HΦ := wpNext_self k.sie k.proc cpu _ $$ HΦ
   icases vdi_free_split free0 hfree $$ Hfree with
     ⟨%v0, %v1, %v2, %v3, %v4, %v5, %v6, %v7, Hf0, Hf1, Hf2, Hf3, Hf4, Hf5, Hf6, Hf7⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
+  icases kctx_kmapStatic _ _ $$ Hk with ⟨#HSt, Hk⟩
+  ihave Hops := vdi_ops_wins $$ HSt Hopsc
   have hKa : 18 ≤ k.avail := by
     have h := hK; unfold virtioDiskInitSlots at h; omega
   k_norm
@@ -2000,7 +2057,7 @@ theorem virtio_disk_init_proof (IL : INITLOCK) (KAL : KALLOC) (MS : MEMSET) : VI
   -- `QUEUE_READY`, `free[]` and the flip
   iapply (vdi_finish cpu k _ γ pd pav pu v0 v1 v2 v3 v4 v5 v6 v7 hsie h9_7 h14_7 hR18
     hpvd hpva hpvu)
-  iframe Hinv Hk Hpc Htok HG Hbd Hba Hbu Hf0 Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hui Hd Ha Hu
+  iframe Hinv Hk Hpc Htok HG Hbd Hba Hbu Hf0 Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hui Hops Hd Ha Hu
   iintro %R8 Hk Hpc Hgeom Hres %hp8
   obtain ⟨h2_8, hk8⟩ := hp8
   -- the epilogue

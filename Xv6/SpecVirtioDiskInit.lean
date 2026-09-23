@@ -46,10 +46,22 @@ def virtioDiskInitAddr : BitVec 64 := KA.«virtio_disk_init»
 def virtioDiskInitSlots : Nat := 18
 
 /-- The raw `disk` cells `virtio_disk_init` writes: the lock's three cells,
-the three page pointers and the eight `free` bytes. -/
+the three page pointers and the eight `free` bytes -- plus the eight
+`disk.ops[i]` request headers at their bss value `0`.
+
+THE `ops` WINDOWS.  `virtio_disk_init` does not touch `disk.ops`, but the
+lock payload it builds must own them: `virtio_disk_rw` formats
+`disk.ops[h]` BEFORE it arms the chain, and the window it writes is the
+one the head descriptor points at (`Xv6.opsWin`, in `Xv6.freeSlotRes`).
+They are taken as the two eight-byte halves the driver's own stores use
+(`type`/`reserved` and `sector`), each at the bss `0` -- `aOps i` is only
+8-aligned, so there is no sixteen-byte cell to ask for. -/
 def diskInitCells {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (vlock : BitVec 32) (vname vcpu pd0 pav0 pu0 : BitVec 64) (free0 : List (BitVec 8)) : IProp GF := iprop%
   ⌜free0.length = NUM⌝ ∗
+  ([∗list] i ∈ List.range NUM,
+    wordPointsTo (aOps i) 8 (DFrac.own 1) (0 : BitVec (8 * 8)) ∗
+    wordPointsTo (aOpsSector i) 8 (DFrac.own 1) (0 : BitVec (8 * 8))) ∗
   kmapId aVdiskLock ∗ kmapId (aVdiskLock + 16#64) ∗
   wordPointsTo aVdiskLock 4 (DFrac.own 1) vlock ∗
   wordPointsTo (aVdiskLock + 8#64) 8 (DFrac.own 1) vname ∗

@@ -83,14 +83,14 @@ byte). -/
 def slotCells (ξ : CtxId) (pd : PAddr) (i : Nat) : HState → IProp GF
   | .inactive => freeSlotRes ξ pd i
   | .active c => claimRes ξ pd c
-  | .member _ => iprop(emp)
+  | .member _ => opsWin ξ i
 
 theorem slotCells_inactive (ξ : CtxId) (pd : PAddr) (i : Nat) :
     slotCells (GF := GF) ξ pd i .inactive = freeSlotRes ξ pd i := rfl
 theorem slotCells_active (ξ : CtxId) (pd : PAddr) (i : Nat) (c : Chain) :
     slotCells (GF := GF) ξ pd i (.active c) = claimRes ξ pd c := rfl
 theorem slotCells_member (ξ : CtxId) (pd : PAddr) (i h : Nat) :
-    slotCells (GF := GF) ξ pd i (.member h) = iprop(emp) := rfl
+    slotCells (GF := GF) ξ pd i (.member h) = opsWin ξ i := rfl
 
 theorem freeByte_inactive : freeByte .inactive = 1#8 := rfl
 theorem freeByte_active (c : Chain) : freeByte (.active c) = 0#8 := rfl
@@ -105,8 +105,6 @@ theorem slotBody_open (ξ : CtxId) (pd : PAddr) (i : Nat) (s : HState) :
   | active c => rw [slotBody_active, freeByte_active, slotCells_active]
   | member hh =>
     rw [slotBody_member, freeByte_member, slotCells_member]
-    iintro H
-    iframe H
 
 theorem slotBody_close (ξ : CtxId) (pd : PAddr) (i : Nat) (s : HState) :
     wordAtN (GF := GF) ξ (aFree i) 1 (DFrac.own 1) (freeByte s) ∗ slotCells ξ pd i s ⊢
@@ -116,7 +114,6 @@ theorem slotBody_close (ξ : CtxId) (pd : PAddr) (i : Nat) (s : HState) :
   | active c => rw [slotBody_active, freeByte_active, slotCells_active]
   | member hh =>
     rw [slotBody_member, freeByte_member, slotCells_member]
-    iintro ⟨H, -⟩; iexact H
 
 /-- What the driver keeps of a descriptor it has taken: the receipt and
 the sixteen zero bytes, owned whole. -/
@@ -322,8 +319,22 @@ theorem diskResA_take (γ : DiskNames) (pd pav pu : PAddr) (ξ : CtxId) (tk : Na
     iexact Hs
   · iexact Hout
 
-theorem freeSlotRes_eq (ξ : CtxId) (pd : PAddr) (i : Nat) :
-    freeSlotRes (GF := GF) ξ pd i = ctxBytes ξ (descAt pd i) 16 (DFrac.own 1) 0 := rfl
+/-- **A free slot's cells, split**: the zeroed descriptor `free_desc`
+wrote, and the slot's own request header window (`Xv6.opsWin`), which
+`free_desc` does not touch. -/
+theorem freeSlotRes_split (ξ : CtxId) (pd : PAddr) (i : Nat) :
+    freeSlotRes (GF := GF) ξ pd i ⊢
+      ctxBytes ξ (descAt pd i) 16 (DFrac.own 1) 0 ∗ opsWin ξ i := by
+  unfold freeSlotRes
+  iintro ⟨H1, H2⟩
+  iframe H1 H2
+
+theorem freeSlotRes_join (ξ : CtxId) (pd : PAddr) (i : Nat) :
+    ctxBytes (GF := GF) ξ (descAt pd i) 16 (DFrac.own 1) 0 ⊢
+      opsWin ξ i -∗ freeSlotRes ξ pd i := by
+  unfold freeSlotRes
+  iintro H1 H2
+  iframe H1 H2
 
 /-- **Giving a taken slot back**: with its receipt and its cells in hand,
 the slot re-enters the payload. -/

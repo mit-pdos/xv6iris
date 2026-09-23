@@ -623,6 +623,23 @@ theorem info_status_kmapRw (i : Nat) (hi : i < NUM) :
     unfold NUM at hi; omega
   rcases h with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide
 
+theorem ops_kmapRw (i : Nat) (hi : i < NUM) :
+    kmapClass (vpnOf (aOps i)).toNat = some .rw := by
+  have h : i = 0 ∨ i = 1 ∨ i = 2 ∨ i = 3 ∨ i = 4 ∨ i = 5 ∨ i = 6 ∨ i = 7 := by
+    unfold NUM at hi; omega
+  rcases h with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide
+
+theorem opsSector_kmapRw (i : Nat) (hi : i < NUM) :
+    kmapClass (vpnOf (aOpsSector i)).toNat = some .rw := by
+  have h : i = 0 ∨ i = 1 ∨ i = 2 ∨ i = 3 ∨ i = 4 ∨ i = 5 ∨ i = 6 ∨ i = 7 := by
+    unfold NUM at hi; omega
+  rcases h with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide
+
+/-- `&disk.ops[i].sector` is eight bytes into `&disk.ops[i]`. -/
+theorem aOps_sector_off (i : Nat) : aOps i + BitVec.ofNat 64 8 = aOpsSector i := by
+  unfold aOps aOpsSector diskAddr
+  rw [BitVec.add_assoc, ← BitVec.ofNat_add]
+
 end
 
 end Xv6

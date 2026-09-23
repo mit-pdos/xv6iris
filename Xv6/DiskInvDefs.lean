@@ -1986,11 +1986,33 @@ instance diskGeom_persistent (γ : DiskNames) (pd pav pu : PAddr) :
     Persistent (diskGeom (GF := GF) γ pd pav pu) := by
   unfold diskGeom diskCfgFrozen wordPointsTo; infer_instance
 
+/-- **The request header of slot `i`** (`disk.ops[i]`), whole, on the
+driver's side, at whatever it happens to hold.
+
+`disk.ops[i]` is the sixteen-byte `virtio_blk_req` the driver formats
+BEFORE it arms the chain (`buf0->type/reserved/sector`, the three stores
+of `virtio_disk_rw`'s P3), and it is the window the head descriptor
+points at -- `Xv6.Chain.hdrAddr c = aOps c.hd`.  So it must be in the
+payload for every slot the chain does not own: whole for a slot that is
+FREE or a MEMBER of some chain, and split into the invariant's raw half
+(inside `Xv6.chainLease`, as the three fields the device's `fetch` reads)
+and the driver's context half (inside `Xv6.claimRes`) for the HEAD of an
+armed chain.  The value is existential: nothing reads it until the
+formatting overwrites it. -/
+def opsWin (ξ : CtxId) (i : Nat) : IProp GF := iprop%
+  ∃ w : BitVec (8 * 16), ctxBytes ξ (aOps i) 16 (DFrac.own 1) w
+
+instance instCtxMorphOpsWin (i : Nat) : CtxMorph (GF := GF) (fun ξ => opsWin ξ i) := by
+  unfold opsWin
+  exact instCtxMorphExists (fun (w : BitVec (8 * 16)) ξ =>
+    ctxBytes ξ (aOps i) 16 (DFrac.own 1) w)
+
 /-- A FREE descriptor, on the driver's side: `free_desc` zeroed its
-sixteen bytes, and the driver holds ALL of them -- the invariant holds
-nothing for a free slot, because the accounting rules out a fetch there. -/
+sixteen bytes and the driver holds ALL of them -- the invariant holds
+nothing for a free slot, because the accounting rules out a fetch there
+-- and the slot's request header (`Xv6.opsWin`) with them. -/
 def freeSlotRes (ξ : CtxId) (pd : PAddr) (i : Nat) : IProp GF := iprop%
-  ctxBytes ξ (descAt pd i) 16 (DFrac.own 1) 0
+  ctxBytes ξ (descAt pd i) 16 (DFrac.own 1) 0 ∗ opsWin ξ i
 
 /-- An ARMED descriptor, on the driver's side: the other halves of the
 chain's three descriptor words and of its request header,
@@ -2046,7 +2068,7 @@ theorem claimRes_bufDisk_acc (pd : PAddr) (c : Chain) :
 def slotBody (ξ : CtxId) (pd : PAddr) (i : Nat) : HState → IProp GF
   | .inactive => iprop(wordAtN ξ (aFree i) 1 (DFrac.own 1) 1#8 ∗ freeSlotRes ξ pd i)
   | .active c => iprop(wordAtN ξ (aFree i) 1 (DFrac.own 1) 0#8 ∗ claimRes ξ pd c)
-  | .member _ => iprop(wordAtN ξ (aFree i) 1 (DFrac.own 1) 0#8)
+  | .member _ => iprop(wordAtN ξ (aFree i) 1 (DFrac.own 1) 0#8 ∗ opsWin ξ i)
 
 def slotRes (γ : DiskNames) (ξ : CtxId) (pd : PAddr) (i : Nat) : IProp GF := iprop%
   ∃ s : HState, headTok γ i s ∗ slotBody ξ pd i s
@@ -2060,10 +2082,11 @@ theorem slotBody_active (ξ : CtxId) (pd : PAddr) (i : Nat) (c : Chain) :
       iprop(wordAtN ξ (aFree i) 1 (DFrac.own 1) 0#8 ∗ claimRes ξ pd c) := rfl
 
 /-- A MEMBER slot on the driver's side: TAKEN (`disk.free[i] = 0`) and
-nothing else -- the descriptor's own words are the HEAD's `claimRes`. -/
+its own request header, which the chain does not use -- the descriptor's
+own words are the HEAD's `claimRes`. -/
 theorem slotBody_member (ξ : CtxId) (pd : PAddr) (i h : Nat) :
     slotBody (GF := GF) ξ pd i (.member h) =
-      iprop(wordAtN ξ (aFree i) 1 (DFrac.own 1) 0#8) := rfl
+      iprop(wordAtN ξ (aFree i) 1 (DFrac.own 1) 0#8 ∗ opsWin ξ i) := rfl
 
 /-- **The payload of `disk.vdisk_lock`** (Rocq's `disk_res`): the
 publisher's and the handler's halves of the counters (the watermark
@@ -2093,7 +2116,7 @@ instance instCtxMorphSlotBody (pd : PAddr) (i : Nat) (s : HState) :
     unfold claimRes
     infer_instance
   | member _ =>
-    show CtxMorph (fun ξ => iprop(wordAtN ξ (aFree i) 1 (DFrac.own 1) 0#8))
+    show CtxMorph (fun ξ => iprop(wordAtN ξ (aFree i) 1 (DFrac.own 1) 0#8 ∗ opsWin ξ i))
     infer_instance
 
 instance instCtxMorphSlotRes (γ : DiskNames) (pd : PAddr) (i : Nat) :
