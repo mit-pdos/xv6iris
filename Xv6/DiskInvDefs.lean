@@ -3412,12 +3412,16 @@ def sectorAddr (base : PAddr) (i : Nat) : PAddr :=
   base + BitVec.ofNat 64 (Virtio.sectorSize * i)
 
 /-- The data buffer of a chain, WHILE IT IS IN FLIGHT: both of its sectors
-at full ownership, content unconstrained.  Full ownership in both
-directions, not a half for a disk write: `DevSig.Lease` asks for a
-derivation for EVERY task name, so `VTask.xferIn h i` -- the fill of a
-read -- must be covered even at a head that carries a write chain, and
-its DMA write needs the bytes at own 1.  The driver gets the buffer back
-when it collects the chain. -/
+at full ownership, content UNCONSTRAINED.  The driver gets the buffer back
+when it collects the chain.
+
+Full ownership in both directions, though only a READ chain's buffer is
+ever written by the device: a half would do for a disk write, and IS what
+the buffer row will take, because the device's `MachCSL.Virtio.xferOut`
+only reads it (`MachCSL.dmaReadPin` is satisfied by a cell at any
+fraction).  It is full here because the row does not exist yet -- the
+content being unconstrained is exactly the gap `Xv6.disk_collect` is
+blocked on; see the section head of `Xv6/DiskAcc.lean`. -/
 def bufLease (c : Chain) : IProp GF := iprop%
   [∗list] i ∈ List.range SPB, dmaOwn (sectorAddr c.data i) Virtio.sectorSize
 
