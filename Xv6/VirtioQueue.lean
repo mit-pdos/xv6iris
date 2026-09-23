@@ -519,12 +519,18 @@ def inflightOk (v : VirtioState) (st : Nat → HState) : Prop :=
   ∀ (h : BitVec 16) (r : VioReq), Virtio.reqOf v h = some r →
     h.toNat < NUM ∧ ∃ c : Chain, st h.toNat = .active c ∧ c.hd = h.toNat ∧ r = c.req
 
-/-- No request at all is in flight: the pre-live arm of the invariant. -/
-def noInflight (v : VirtioState) : Prop := ∀ h : BitVec 16, Virtio.reqOf v h = none
+/-- Nothing at all is in flight: the pre-live arm of the invariant.  It is
+the PHASE map that is empty, not merely the requests -- a `.popped` head
+carries no request but IS in flight, and the live flip needs to know that
+the world it starts from has none. -/
+def noInflight (v : VirtioState) : Prop := ∀ h : BitVec 16, Virtio.phase v h = none
 
 theorem inflightOk_of_none (v : VirtioState) (st : Nat → HState) (h : noInflight v) :
     inflightOk v st := by
-  intro hd r hr; rw [h hd] at hr; exact absurd hr (by simp)
+  intro hd r hr
+  unfold Virtio.reqOf at hr
+  rw [h hd] at hr
+  exact absurd hr (by simp)
 
 /-! ## Association lists (the model's `alistGet`/`alistSet`/`alistDel`) -/
 
@@ -627,13 +633,6 @@ theorem inflightOk_setPhase_none (v : VirtioState) (st : Nat → HState) (h : Bi
   · subst hk; rw [reqOf_setPhase_self, hph] at hr; exact absurd hr (by simp)
   · exact hok k r (by rwa [reqOf_setPhase_other v h k ph hk] at hr)
 
-theorem noInflight_setPhase_none (v : VirtioState) (h : BitVec 16) (ph : VPhase)
-    (hph : ph.req = none) (hn : noInflight v) : noInflight (Virtio.setPhase v h ph) := by
-  intro k
-  by_cases hk : k = h
-  · subst hk; rw [reqOf_setPhase_self, hph]
-  · rw [reqOf_setPhase_other v h k ph hk]; exact hn k
-
 theorem inflightOk_complete (v : VirtioState) (st : Nat → HState) (h : BitVec 16)
     (hok : inflightOk v st) : inflightOk (Virtio.complete v h) st := by
   intro k r hr
@@ -641,12 +640,22 @@ theorem inflightOk_complete (v : VirtioState) (st : Nat → HState) (h : BitVec 
   · subst hk; rw [reqOf_complete_self] at hr; exact absurd hr (by simp)
   · exact hok k r (by rwa [reqOf_complete_other v h k hk] at hr)
 
+theorem phase_complete_self' (v : VirtioState) (h : BitVec 16) :
+    Virtio.phase (Virtio.complete v h) h = none := by
+  unfold Virtio.phase Virtio.complete
+  rw [Alist.get_del_eq]
+
+theorem phase_complete_other' (v : VirtioState) (h k : BitVec 16) (hk : k ≠ h) :
+    Virtio.phase (Virtio.complete v h) k = Virtio.phase v k := by
+  unfold Virtio.phase Virtio.complete
+  rw [Alist.get_del_ne _ _ _ hk]
+
 theorem noInflight_complete (v : VirtioState) (h : BitVec 16) (hn : noInflight v) :
     noInflight (Virtio.complete v h) := by
   intro k
   by_cases hk : k = h
-  · rw [hk]; exact reqOf_complete_self v h
-  · rw [reqOf_complete_other v h k hk]; exact hn k
+  · rw [hk]; exact phase_complete_self' v h
+  · rw [phase_complete_other' v h k hk]; exact hn k
 
 /-! ## The image the driver sees -/
 

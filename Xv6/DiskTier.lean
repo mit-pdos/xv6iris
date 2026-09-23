@@ -558,6 +558,23 @@ theorem armSt3_tl_free (st : Nat → HState) (c : Chain) (hwf : c.wf)
   rw [memSt_ne _ _ _ _ (Ne.symm hwf.2.2.2.2.1), armSt_ne _ _ _ _ (Ne.symm hwf.2.2.2.2.2.1)]
   exact h
 
+/-- An ACTIVE receipt stays active: the three slots the publication takes
+were free. -/
+theorem armSt3_active (st : Nat → HState) (c : Chain) (hwf : c.wf)
+    (h2 : st c.md = .inactive) (h3 : st c.tl = .inactive) (i : Nat)
+    (hi : (st i).isActive = true) : (armSt3 st c i).isActive = true := by
+  unfold armSt3
+  by_cases hit : i = c.tl
+  · subst hit; rw [h3] at hi; exact absurd hi (by simp [HState.isActive])
+  by_cases him : i = c.md
+  · subst him; rw [h2] at hi; exact absurd hi (by simp [HState.isActive])
+  by_cases hih : i = c.hd
+  · subst hih
+    rw [memSt_ne _ _ _ _ hit, memSt_ne _ _ _ _ him, armSt_self]
+    simp [HState.isActive]
+  · rw [memSt_ne _ _ _ _ hit, memSt_ne _ _ _ _ him, armSt_ne _ _ _ _ hih]
+    exact hi
+
 theorem queueOk_arm3 (st : Nat → HState) (c : Chain) (hwf : c.wf)
     (h1 : st c.hd = .inactive) (h2 : st c.md = .inactive) (h3 : st c.tl = .inactive)
     (ring : Nat → Nat) (lo np : Nat) (hx : queueOk st ring lo np) :

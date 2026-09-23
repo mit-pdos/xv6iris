@@ -1587,6 +1587,132 @@ theorem permFresh_lt (pm : RegMapF PermVal) (n k : Nat) (h : BitVec 16) (c : Cha
   · exact hk
   · rw [hf k hk] at hget; exact absurd hget (by simp)
 
+/-! ## An in-flight head is at no pending position
+
+The clause the whole completion side hangs off.  A head the device holds
+was POPPED, so its position is below `lo`; it cannot be at a published,
+unpopped position, and it cannot be the one the ring store has STAGED.
+That is what says a head cannot be popped, and so completed, twice over
+one arming -- which is what makes the unread completions' heads distinct,
+which is the window bound the used ring needs.
+
+It travels in `Xv6.inflightOk`'s slot of `Xv6.diskLive`'s pure clause, so
+that adding it costs no new conjunct. -/
+
+/-- `Xv6.inflightOk`, and: an in-flight head is at no published, unpopped
+position and is not the staged one. -/
+def inflightOff (v : VirtioState) (st : Nat → HState) (ring : Nat → Nat) (lo np : Nat)
+    (stg : Option Nat) : Prop :=
+  inflightOk v st ∧
+  ∀ h : BitVec 16, (Virtio.phase v h).isSome = true →
+    h.toNat < NUM ∧ (st h.toNat).isActive = true ∧
+    (∀ p, lo ≤ p → p < np → ring (p % NUM) ≠ h.toNat) ∧ stg ≠ some h.toNat
+
+theorem inflightOff_ok (v : VirtioState) (st : Nat → HState) (ring : Nat → Nat) (lo np : Nat)
+    (stg : Option Nat) (h : inflightOff v st ring lo np stg) : inflightOk v st := h.1
+
+/-- Nothing in flight: the state the live flip starts from. -/
+theorem inflightOff_none (v : VirtioState) (st : Nat → HState) (ring : Nat → Nat)
+    (lo np : Nat) (stg : Option Nat) (hni : noInflight v) : inflightOff v st ring lo np stg := by
+  refine ⟨inflightOk_of_none v st hni, fun h hs => ?_⟩
+  rw [hni h] at hs
+  exact absurd hs (by simp)
+
+/-- The phases do not move, and neither do the ring and the window. -/
+theorem inflightOff_congr (v v' : VirtioState) (st : Nat → HState) (ring : Nat → Nat)
+    (lo np : Nat) (stg : Option Nat)
+    (hph : ∀ h : BitVec 16, Virtio.phase v' h = Virtio.phase v h)
+    (hfl : inflightOk v st → inflightOk v' st) (hx : inflightOff v st ring lo np stg) :
+    inflightOff v' st ring lo np stg :=
+  ⟨hfl hx.1, fun h hs => hx.2 h (by rw [← hph h]; exact hs)⟩
+
+/-- Only the receipts move. -/
+theorem inflightOff_st (v : VirtioState) (st st' : Nat → HState) (ring : Nat → Nat)
+    (lo np : Nat) (stg : Option Nat) (hfl : inflightOk v st')
+    (hpres : ∀ i, (st i).isActive = true → (st' i).isActive = true)
+    (hx : inflightOff v st ring lo np stg) : inflightOff v st' ring lo np stg :=
+  ⟨hfl, fun h hs => ⟨(hx.2 h hs).1, hpres _ (hx.2 h hs).2.1, (hx.2 h hs).2.2.1,
+    (hx.2 h hs).2.2.2⟩⟩
+
+/-- **The pop.**  The head it takes leaves the window, and the injectivity
+of `Xv6.queueOk` says it is at no other pending position; `Xv6.stageOk`
+says it is not the staged one. -/
+theorem inflightOff_pop (v : VirtioState) (st : Nat → HState) (ring : Nat → Nat)
+    (lo np : Nat) (stg : Option Nat) (h : BitVec 16) (sn : BitVec 16)
+    (hq : queueOk st ring lo np) (hsg : stageOk stg ring lo np) (hlt : lo < np)
+    (hhd : ring (lo % NUM) = h.toNat) (hx : inflightOff v st ring lo np stg) :
+    inflightOff { Virtio.setPhase v h .popped with seen := sn } st ring (lo + 1) np stg := by
+  refine ⟨inflightOk_setPhase_none v st h .popped rfl hx.1, fun h' hs => ?_⟩
+  have hph : Virtio.phase { Virtio.setPhase v h .popped with seen := sn } h'
+      = Virtio.phase (Virtio.setPhase v h .popped) h' := rfl
+  by_cases hhh : h' = h
+  · subst hhh
+    obtain ⟨hlt', hact⟩ := queueOk_head st ring lo np hq hlt
+    rw [hhd] at hlt' hact
+    refine ⟨hlt', hact, fun p hp1 hp2 he => ?_, ?_⟩
+    · have := hq.2 p lo (by omega) hp2 (Nat.le_refl lo) hlt (by rw [he, hhd])
+      omega
+    · intro hsome
+      obtain ⟨_, _, _, h4⟩ := hsg _ hsome
+      exact h4 lo (Nat.le_refl lo) hlt (by rw [hhd])
+  · rw [hph, phase_setPhase_other v h h' _ hhh] at hs
+    exact ⟨(hx.2 h' hs).1, (hx.2 h' hs).2.1,
+      fun p hp1 hp2 => (hx.2 h' hs).2.2.1 p (by omega) hp2, (hx.2 h' hs).2.2.2⟩
+
+/-- Installing a phase at a head that is ALREADY in flight. -/
+theorem inflightOff_setPhase (v : VirtioState) (st : Nat → HState) (ring : Nat → Nat)
+    (lo np : Nat) (stg : Option Nat) (h : BitVec 16) (ph : VPhase)
+    (hin : (Virtio.phase v h).isSome = true) (hfl : inflightOk (Virtio.setPhase v h ph) st)
+    (hx : inflightOff v st ring lo np stg) :
+    inflightOff (Virtio.setPhase v h ph) st ring lo np stg := by
+  refine ⟨hfl, fun h' hs => ?_⟩
+  by_cases hhh : h' = h
+  · subst hhh; exact hx.2 h' hin
+  · rw [phase_setPhase_other v h h' ph hhh] at hs
+    exact hx.2 h' hs
+
+/-- The completion takes a head OUT of flight. -/
+theorem inflightOff_complete (v : VirtioState) (st : Nat → HState) (ring : Nat → Nat)
+    (lo np : Nat) (stg : Option Nat) (h : BitVec 16) (hx : inflightOff v st ring lo np stg) :
+    inflightOff (Virtio.complete v h) st ring lo np stg := by
+  refine ⟨inflightOk_complete v st h hx.1, fun h' hs => ?_⟩
+  by_cases hhh : h' = h
+  · subst hhh; rw [phase_complete_self] at hs; exact absurd hs (by simp)
+  · rw [phase_complete_other v h h' hhh] at hs
+    exact hx.2 h' hs
+
+/-- **The ring store.**  The staging cell is outside the window (there is
+room), and the head it stages is FREE, so it is in flight nowhere. -/
+theorem inflightOff_stage (v : VirtioState) (st : Nat → HState) (ring : Nat → Nat)
+    (lo np i : Nat) (stg : Option Nat) (hq : queueOk st ring lo np) (hi : i < NUM)
+    (hfree : st i = .inactive) (hx : inflightOff v st ring lo np stg) :
+    inflightOff v st (updN ring (np % NUM) i) lo np (some i) := by
+  have hroom : np < lo + NUM := queueOk_room st ring lo np i hq hi hfree
+  refine ⟨hx.1, fun h' hs => ⟨(hx.2 h' hs).1, (hx.2 h' hs).2.1, fun p hp1 hp2 => ?_, ?_⟩⟩
+  · rw [updN_ne _ _ _ _ (ring_mod_ne lo np p hp1 hp2 hroom)]
+    exact (hx.2 h' hs).2.2.1 p hp1 hp2
+  · intro he
+    have hii : i = h'.toNat := by simpa using he
+    have hact := (hx.2 h' hs).2.1
+    rw [← hii, hfree] at hact
+    exact absurd hact (by simp [HState.isActive])
+
+/-- **The publication.**  Position `np` joins the window with the staged
+head, which the ring store established is in flight nowhere. -/
+theorem inflightOff_publish (v : VirtioState) (st : Nat → HState) (ring : Nat → Nat)
+    (lo np i : Nat) (hsg : stageOk (some i) ring lo np)
+    (hx : inflightOff v st ring lo np (some i)) :
+    inflightOff v st ring lo (np + 1) none := by
+  refine ⟨hx.1, fun h' hs => ⟨(hx.2 h' hs).1, (hx.2 h' hs).2.1, fun p hp1 hp2 => ?_, by simp⟩⟩
+  rcases Nat.lt_or_ge p np with hlt | hge
+  · exact (hx.2 h' hs).2.2.1 p hp1 hlt
+  · have hpn : p = np := by omega
+    subst hpn
+    obtain ⟨_, _, h3, _⟩ := hsg i rfl
+    rw [h3]
+    intro he
+    exact (hx.2 h' hs).2.2.2 (by rw [he])
+
 /-! ## The leases -/
 
 /-- The address of sector `i` of a buffer. -/
@@ -1725,7 +1851,7 @@ def diskLive (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState)
     usedIdxCell (usedIdxAt c0.used) b dl ∗ doneAuth γ dl0 ∗ diskBaseFrozen γ b ∗
     dlTops dl ∗ diskReadAtAuth γ nr ∗
     ⌜v.usedIdx = wrap16 nc ∧ v.seen = wrap16 lo ∧ lo ≤ np ∧ queueOk st ring lo np ∧
-      posOk pmap ring lo np ∧ stageOk stg ring lo np ∧ inflightOk v st ∧
+      posOk pmap ring lo np ∧ stageOk stg ring lo np ∧ inflightOff v st ring lo np stg ∧
       imgOk v m (inFlightBlk st) ∧ cachedOk v st ∧ permOk v pm st ∧ usedOk dl dl0 nc M⌝
 
 /-- The dead arm: before `virtio_disk_init`, and never again after.

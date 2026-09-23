@@ -336,7 +336,7 @@ theorem deadWrite_reset (c : VirtioCfg) : deadWriteOk Virtio.offStatus 0#32 c Vi
   refine ⟨by decide, fun v hv hc hn hu hs =>
     ⟨Virtio.reset v, vwrite_status_reset v, rfl, rfl, ?_, rfl, rfl, rfl⟩⟩
   intro k
-  unfold Virtio.reqOf Virtio.phase Virtio.reset Virtio.alistGet
+  unfold Virtio.phase Virtio.reset Virtio.alistGet
   rfl
 
 /-- **The protocol's dead arm moves with the tracker.** -/
@@ -609,12 +609,13 @@ theorem diskProto_avail_acc (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) 
     diskCfgFrozen (GF := GF) γ c0 ∗ diskProto γ v ⊢
       ∃ (np lo : Nat) (ring : Nat → Nat) (st : Nat → HState) (pmap : List Nat)
         (stg : Option Nat),
-        ⌜lo ≤ np ∧ queueOk st ring lo np ∧ posOk pmap ring lo np ∧ stageOk stg ring lo np⌝ ∗
+        ⌜lo ≤ np ∧ queueOk st ring lo np ∧ posOk pmap ring lo np ∧ stageOk stg ring lo np ∧
+          inflightOff v st ring lo np stg⌝ ∗
         availLease pav np ring ∗ diskPubAuth γ np ∗ diskPubAuthM γ np ∗ posAuth γ pmap ∗
         diskStageAuth γ stg ∗ ([∗list] i ∈ List.range NUM, headAuth γ i (st i)) ∗
         (∀ (np' : Nat) (ring' : Nat → Nat) (pmap' : List Nat) (stg' : Option Nat),
           ⌜lo ≤ np' ∧ queueOk st ring' lo np' ∧ posOk pmap' ring' lo np' ∧
-            stageOk stg' ring' lo np'⌝ -∗
+            stageOk stg' ring' lo np' ∧ inflightOff v st ring' lo np' stg'⌝ -∗
           availLease pav np' ring' -∗ diskPubAuth γ np' -∗ diskPubAuthM γ np' -∗
           posAuth γ pmap' -∗ diskStageAuth γ stg' -∗
           ([∗list] i ∈ List.range NUM, headAuth γ i (st i)) -∗ diskProto γ v) := by
@@ -634,7 +635,7 @@ theorem diskProto_avail_acc (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) 
     obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10⟩ := hpure
     iexists np, lo, ring, st, pmap, stg
     isplitl []
-    · ipureintro; exact ⟨e3, e4, e5, e5b⟩
+    · ipureintro; exact ⟨e3, e4, e5, e5b, e6⟩
     iframe Hav Hnp HnpM Hpos Hstg Ha
     iintro %np' %ring' %pmap' %stg' %hq Hav' Hnp' HnpM' Hpos' Hstg' Ha'
     isplitl []
@@ -651,7 +652,7 @@ theorem diskProto_avail_acc (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) 
     iexists st, nc, np', lo, ring', m, pmap', stg', b, M, dl, dl0, nr
     iframe Hm Ha' Hr Hu Hav' Hnc Hnp' Hlo HnpM' Hpos' Hstg' Hui Hdn Hbs Htp Hnr
     ipureintro
-    exact ⟨e1, e2, hq.1, hq.2.1, hq.2.2.1, hq.2.2.2, e6, e7, e8, e9, e10⟩
+    exact ⟨e1, e2, hq.1, hq.2.1, hq.2.2.1, hq.2.2.2.1, hq.2.2.2.2, e7, e8, e9, e10⟩
 
 /-- One receipt authority, read off the eight. -/
 theorem headAuth_acc (γ : DiskNames) (st : Nat → HState) (i : Nat) (hi : i < NUM) :
@@ -758,7 +759,8 @@ theorem disk_ring_write [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu : CPU
   ihave Hproto := Hback $$ %np0 %(updN ring (np0 % NUM) h.toNat) %pmap %(some h.toNat)
     %(⟨hq.1, queueOk_setcell st ring lo np0 h.toNat hq.2.1 hroom,
        posOk_setcell pmap ring lo np0 h.toNat hq.2.2.1 hroom,
-       stageOk_set st ring lo np0 h.toNat hq.2.1 hh hst⟩)
+       stageOk_set st ring lo np0 h.toNat hq.2.1 hh hst,
+       inflightOff_stage v st ring lo np0 h.toNat stg hq.2.1 hh hst hq.2.2.2.2⟩)
     Hav Hpa HpaM Hpos HstgA Hheads
   ihave Hcl := Hclose $$ [Hfrag Hproto]
   case' _ =>
@@ -816,7 +818,7 @@ theorem disk_avail_idx_write [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu 
   · iapply diskPub_agree γ np0 np $$ Hpa Hpub
   subst hnp
   ihave %hsg := diskStage_agree γ stg (some i) $$ HstgA Hstg
-  obtain ⟨hi, hroom, hcell, hfresh⟩ := hq.2.2.2 i (by rw [hsg])
+  obtain ⟨hi, hroom, hcell, hfresh⟩ := hq.2.2.2.1 i (by rw [hsg])
   ihave %hst := headTok_state γ st i (.active c) hi $$ Hheads Htok
   have hact : (st (ring (np0 % NUM))).isActive = true := by
     rw [hcell, hst]; rfl
@@ -842,7 +844,8 @@ theorem disk_avail_idx_write [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu 
   ihave Hproto := Hback $$ %(np0 + 1) %ring %(pmap ++ [ring (np0 % NUM)]) %none
     %(⟨by omega, queueOk_extend st ring lo np0 hq.2.1 (by rw [hcell]; exact hi)
         (by intro p h1 h2; rw [hcell]; exact hfresh p h1 h2) hact,
-       posOk_extend pmap ring lo np0 hq.2.2.1, stageOk_none ring lo (np0 + 1)⟩)
+       posOk_extend pmap ring lo np0 hq.2.2.1, stageOk_none ring lo (np0 + 1),
+       inflightOff_publish v st ring lo np0 i (hsg ▸ hq.2.2.2.1) (hsg ▸ hq.2.2.2.2)⟩)
     Hav Hpa HpaM Hpos HstgA Hheads
   ihave Hcl := Hclose $$ [Hfrag Hproto]
   case' _ =>
@@ -1213,7 +1216,7 @@ theorem diskProto_flip [CurCtx] (γ : DiskNames) (v : VirtioState) (c c' : Virti
       refine ⟨p6, p7, Nat.le_refl 0, ⟨fun p h1 h2 => absurd h2 (by omega),
           fun p q h1 h2 h3 h4 _ => absurd h2 (by omega)⟩,
         ⟨rfl, fun p h1 h2 => absurd h2 (by omega)⟩, stageOk_none ringInit 0 0,
-        inflightOk_of_none _ _ p2, ?_, ?_, p5, usedOk_nil 0⟩
+        inflightOff_none _ stInit ringInit 0 0 none p2, ?_, ?_, p5, usedOk_nil 0⟩
       · intro bno bs hb
         rcases p4 bno bs hb with hx | hx
         · exact absurd hx id
@@ -1405,14 +1408,14 @@ With it, the chain of clauses is:
                        popped again)
     (Virtio.phase v h).isSome → h is at no position in [lo, np)
 
-The LAST of those is the one new clause of `diskLive` that the port does
-not carry -- "an in-flight head is at no published, unpopped position".
-It is preserved by publish (an `.inactive` head is not in flight, by
-`inflightOk`), by the pop (the window shrinks past the head it takes) and
-by the completion, and it is what the used-element write needs to know
-that the head it is completing was popped.  Adding it means threading one
-more conjunct through every `diskLive` destructuring in
-`Xv6/DiskInv.lean` and `Xv6/DiskAcc.lean`.
+The LAST of those is `Xv6.inflightOff`, and it IS now carried (it travels
+in `Xv6.inflightOk`'s slot of `diskLive`'s pure clause, so that it cost no
+new conjunct): an in-flight head is a descriptor of the queue, its
+receipt is ACTIVE, it is at no published, unpopped position and it is not
+the one the ring store has staged.  It is what says a head cannot be
+popped, and so completed, twice over one arming.  What is left of the
+chain is `pend` itself and the two clauses above it, which is where the
+`n ≤ nr` premise of `disk_collect` is cashed.
 
 (3) THE LOG'S ARITHMETIC.  `disk_used_elem_read` reads position `nr` and
 must find the entry whose counter is `nr + 1`, which needs
@@ -1613,7 +1616,9 @@ theorem diskProto_armHead (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) (p
     ipureintro
     exact ⟨q1, q2, q3,
       queueOk_arm3 st c hwf hst hstm hstt ring lo np q4, q5, q6,
-      inflightOk_arm3 st c hwf hst hstm hstt v q7,
+      inflightOff_st v st (armSt3 st c) ring lo np stg
+        (inflightOk_arm3 st c hwf hst hstm hstt v q7.1)
+        (armSt3_active st c hwf hstm hstt) q7,
       imgOk_arm3 st c hwf hst hstm hstt v m q8,
       cachedOk_arm3 st c hwf hst hstm hstt v q9,
       permOk_arm3 st c hwf hst hstm hstt v pm q10, q11⟩

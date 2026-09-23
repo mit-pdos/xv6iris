@@ -215,7 +215,8 @@ theorem diskProto_congr (γ : DiskNames) (v v' : VirtioState)
     iframe Hm Ha Hr Hu Hav Hnc Hnp Hlo HnpM Hpos Hstg Hui Hdn Hbs Htp Hnr
     ipureintro
     refine ⟨by rw [hidx]; exact e1, by rw [hseen]; exact e2, e3, e4, e5, e5b,
-      hfl st e6, ?_, hcd st e8, permOk_congr v v' pm st hph hidx e9, e10⟩
+      inflightOff_congr v v' st ring lo np stg hph (hfl st) e6, ?_, hcd st e8,
+      permOk_congr v v' pm st hph hidx e9, e10⟩
     intro bno bs hb
     rcases e7 bno bs hb with h | h
     · exact Or.inl h
@@ -323,7 +324,9 @@ theorem diskProto_pop_live (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) (
       iframe Hm Ha Hr Hu Hav Hnc Hnp Hlo HnpM Hpos Hstg Hui Hdn Hbs Htp Hnr
       ipureintro
       refine ⟨e1, ?_, by omega, queueOk_pop st ring lo np e4, posOk_pop pmap ring lo np e5,
-        stageOk_pop stg ring lo np e5b, hfl st e6, e7, e8, ?_, e10⟩
+        stageOk_pop stg ring lo np e5b,
+        inflightOff_pop v st ring lo np stg h (v.seen + 1#16) e4 e5b (by omega)
+          (by rw [hri, hh]) e6, e7, e8, ?_, e10⟩
       · show v.seen + 1#16 = wrap16 (lo + 1)
         rw [wrap16_succ, e2]
       · exact permOk_pop v pm st pn h c (v.seen + 1#16) (by omega)
@@ -353,7 +356,7 @@ theorem diskProto_drain (γ : DiskNames) (v : VirtioState) (k : Nat) :
       unfold Virtio.drain; rw [this]; exact hnil)
     (fun st hok e he => hok e (drain_cache_mem v k e he))
     (fun st hok kk r hr => hok kk r (by rwa [drain_reqOf] at hr))
-    (fun hn kk => by rw [drain_reqOf]; exact hn kk) $$ H
+    (fun hn kk => by unfold Virtio.phase; rw [drain_inflight]; exact hn kk) $$ H
 
 /-! ### Reading one descriptor slot -/
 
@@ -434,12 +437,13 @@ theorem diskProto_capture (γ : DiskNames) (v : VirtioState) (h : BitVec 16) (r 
   · unfold diskDead
     icases Hd with ⟨%m, Hm, Hcfg, Hlo0, HnpM0, Hpos0, HstgA0, Hbs0, Hdn0, Hnr0, %hpure⟩
     obtain ⟨p1, p2, p3, p4⟩ := hpure
+    unfold Virtio.reqOf at hin
     rw [p2 h] at hin
     exact absurd hin (by simp)
   · unfold diskLive
     icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, %nr, Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, Hnr, %hpure⟩
     obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10⟩ := hpure
-    obtain ⟨hlt, c, hst, hhd, hreq⟩ := e6 h r hin
+    obtain ⟨hlt, c, hst, hhd, hreq⟩ := e6.1 h r hin
     ihave %hwf := headRes_wf_of γ c0.desc st h.toNat c hlt hst $$ Hr
     have hfly : Virtio.reqSectorLen r i ≠ 0 → inFlightBlk st (Virtio.reqKey r i / SPB) := by
       intro hn
@@ -482,7 +486,9 @@ theorem diskProto_capture (γ : DiskNames) (v : VirtioState) (h : BitVec 16) (r 
     iexists st, nc, np, lo, ring, m, pmap, stg, b, M, dl, dl0, nr
     iframe Hm Ha Hr Hu Hav Hnc Hnp Hlo HnpM Hpos Hstg Hui Hdn Hbs Htp Hnr
     ipureintro
-    exact ⟨e1, e2, e3, e4, e5, e5b, fun k rr hr => e6 k rr hr, key.1, key.2, e9, e10⟩
+    exact ⟨e1, e2, e3, e4, e5, e5b,
+      inflightOff_congr v _ st ring lo np stg (fun _ => rfl) (fun hx k rr hr => hx k rr hr) e6,
+      key.1, key.2, e9, e10⟩
 
 /-! ### Opening the protocol at an in-flight head -/
 
@@ -502,12 +508,13 @@ theorem diskProto_chain_acc (γ : DiskNames) (s : VirtioState) (h : BitVec 16) (
   icases Harm with ⟨Hd | ⟨%c0, #Hfr, %hc0, Hl⟩⟩
   · unfold diskDead
     icases Hd with ⟨%m, Hm, Hcfg, Hlo0, HnpM0, Hpos0, HstgA0, Hbs0, Hdn0, Hnr0, %hpure⟩
+    unfold Virtio.reqOf at hin
     rw [hpure.2.1 h] at hin
     exact absurd hin (by simp)
   · unfold diskLive
     icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, %nr, Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, Hnr, %hpure⟩
     obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e8, e9, e10⟩ := hpure
-    obtain ⟨hlt, c, hst, hhd, hreq⟩ := e6 h r hin
+    obtain ⟨hlt, c, hst, hhd, hreq⟩ := e6.1 h r hin
     ihave %hwf := headRes_wf_of γ c0.desc st h.toNat c hlt hst $$ Hr
     icases headRes_acc' γ c0.desc st h.toNat (.active c) hlt hst $$ Hr with ⟨He, Hrback⟩
     icases headRes_active_acc γ c0.desc h.toNat c $$ He with ⟨Hcl, Hclb⟩
@@ -649,6 +656,7 @@ theorem diskProto_usedIdx_acc (γ : DiskNames) (s : VirtioState) (h : BitVec 16)
   icases Harm with ⟨Hd | ⟨%c0, #Hfr, %hc0, Hl⟩⟩
   · unfold diskDead
     icases Hd with ⟨%m, Hm, Hcfg, Hlo0, HnpM0, Hpos0, HstgA0, Hbs0, Hdn0, Hnr0, %hpure⟩
+    unfold Virtio.reqOf at hin
     rw [hpure.2.1 h] at hin
     exact absurd hin (by simp)
   · unfold diskLive
@@ -937,7 +945,8 @@ theorem perm_install (γ : DiskNames) (c0 : VirtioCfg) (k : Nat) (h : BitVec 16)
     iframe Hm Ha Hr Hu Hav Hnc Hnp Hlo HnpM Hpos Hstg Hui Hdn Hbs Htp Hnr
     ipureintro
     exact ⟨e1, e2, e3, e4, e5, e5b,
-      inflightOk_setPhase_some v st h c ph hph hlt hst' hwf.1 e6, e7, e8,
+      inflightOff_setPhase v st ring lo np stg h ph (e9 k h c p0 u0 hget).2.2.1
+        (inflightOk_setPhase_some v st h c ph hph hlt hst' hwf.1 e6.1) e6, e7, e8,
       permOk_install v pm st k h c p0 u0 ph hget hph e9 hfr.2.1, e10⟩
 
 /-- **The latch.**  The task that has passed the completion gate reads the
@@ -1033,7 +1042,7 @@ theorem perm_complete (γ : DiskNames) (c0 : VirtioCfg) (k : Nat) (h : BitVec 16
     iexists st, nc + 1, np, lo, ring, m, pmap, stg, b, M, dl, dl0, nr
     iframe Hm Ha Hr Hu Hav Hnc Hnp Hlo HnpM Hpos Hstg Hui Hdn Hbs Htp Hnr
     ipureintro
-    refine ⟨?_, e2, e3, e4, e5, e5b, inflightOk_complete v st h e6, e7, e8,
+    refine ⟨?_, e2, e3, e4, e5, e5b, inflightOff_complete v st ring lo np stg h e6, e7, e8,
       permOk_complete v pm st k h c ui hget e9 hfr.2.1 hfr.2.2, usedOk_complete dl dl0 nc M e10⟩
     show v.usedIdx + 1#16 = wrap16 (nc + 1)
     rw [wrap16_succ, e1]
