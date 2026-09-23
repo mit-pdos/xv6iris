@@ -401,3 +401,6 @@ import Xv6.VirtioDiskRwDefs2
 import Xv6.ProofVirtioDiskRwB
 import Xv6.ProofVirtioDiskIntr
 import Xv6.LinkVirtioDiskIntr
+import Xv6.VirtioDiskRwDefs3
+import Xv6.ProofVirtioDiskRwC
+import Xv6.ProofVirtioDiskRwD
