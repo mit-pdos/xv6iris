@@ -246,6 +246,249 @@ theorem pop_Ok (q : VQ) (h : q.Ok) (hlt : q.lo < q.np) : q.pop.Ok := by
 
 end VQ
 
+/-! ## The pending window
+
+The positions the driver has PUBLISHED and the device has not yet POPPED,
+`[lo, np)`, each carry an ARMED descriptor head, and distinct positions
+carry distinct heads (a head is armed at one position at a time: the
+driver arms it at `publish` and only reclaims it after its request has
+been reported).  Since there are only `NUM` descriptors, that BOUNDS THE
+WINDOW -- `np ≤ lo + NUM` -- which is what makes the device's sixteen-bit
+`avail->idx` determine `np`: `wrap16 lo ≠ wrap16 np` then forces
+`lo < np`, so a pop always lands on a published position. -/
+
+/-- Distinct naturals below `n` are at most `n` (the pigeonhole the window
+bound needs; `Xv6.nodup_lt_length_le` is the same fact for the file
+table, and lives in a file this one may not import). -/
+theorem queue_nodup_length_le : ∀ (n : Nat) (l : List Nat), l.Nodup → (∀ i ∈ l, i < n) →
+    l.length ≤ n := by
+  intro n
+  induction n with
+  | zero =>
+    intro l _ hb
+    cases l with
+    | nil => simp
+    | cons a t => exact absurd (hb a (List.mem_cons_self)) (Nat.not_lt_zero a)
+  | succ n ih =>
+    intro l hn hb
+    by_cases hmem : n ∈ l
+    · have hp : l.Perm (n :: l.erase n) := List.perm_cons_erase hmem
+      have hlen : l.length = (l.erase n).length + 1 := by rw [hp.length_eq]; rfl
+      have hb' : ∀ i ∈ l.erase n, i < n := by
+        intro i hi
+        have h1 := hb i (List.mem_of_mem_erase hi)
+        have hne : i ≠ n := by
+          intro e; subst e; exact hn.not_mem_erase hi
+        omega
+      have := ih _ (hn.erase n) hb'
+      omega
+    · have hb' : ∀ i ∈ l, i < n := fun i hi => by
+        have := hb i hi
+        have : i ≠ n := fun e => hmem (e ▸ hi)
+        omega
+      have := ih l hn hb'
+      omega
+
+/-- `List.map` of a function injective ON the list keeps `Nodup`. -/
+theorem queue_nodup_map_on {α β : Type} (f : α → β) (l : List α)
+    (H : ∀ x ∈ l, ∀ y ∈ l, f x = f y → x = y) (d : l.Nodup) : (l.map f).Nodup := by
+  induction l with
+  | nil => simp
+  | cons a t ih =>
+    rw [List.nodup_cons] at d
+    rw [List.map_cons, List.nodup_cons]
+    refine ⟨?_, ih ?_ d.2⟩
+    · intro hm
+      obtain ⟨y, hy, hfy⟩ := List.mem_map.1 hm
+      have hay : a = y := H a List.mem_cons_self y (List.mem_cons_of_mem _ hy) hfy.symm
+      exact d.1 (hay ▸ hy)
+    · exact fun x hx y hy he =>
+        H x (List.mem_cons_of_mem _ hx) y (List.mem_cons_of_mem _ hy) he
+
+/-- **An injection of a window of positions into the descriptors bounds
+the window.** -/
+theorem window_le_of_inj (lo np : Nat) (f : Nat → Nat)
+    (hlt : ∀ p, lo ≤ p → p < np → f p < NUM)
+    (hinj : ∀ p q, lo ≤ p → p < np → lo ≤ q → q < np → f p = f q → p = q) :
+    np ≤ lo + NUM := by
+  by_cases hle : np ≤ lo
+  · have : 0 < NUM := by unfold NUM; omega
+    omega
+  have hmem : ∀ j, j ∈ List.range (np - lo) → lo ≤ lo + j ∧ lo + j < np := by
+    intro j hj
+    have := List.mem_range.1 hj
+    omega
+  have hnd : ((List.range (np - lo)).map (fun j => f (lo + j))).Nodup := by
+    refine queue_nodup_map_on _ _ ?_ (List.nodup_range)
+    intro x hx y hy he
+    obtain ⟨hx1, hx2⟩ := hmem x hx
+    obtain ⟨hy1, hy2⟩ := hmem y hy
+    have := hinj (lo + x) (lo + y) hx1 hx2 hy1 hy2 he
+    omega
+  have hb : ∀ i ∈ (List.range (np - lo)).map (fun j => f (lo + j)), i < NUM := by
+    intro i hi
+    obtain ⟨j, hj, rfl⟩ := List.mem_map.1 hi
+    obtain ⟨h1, h2⟩ := hmem j hj
+    exact hlt _ h1 h2
+  have := queue_nodup_length_le NUM _ hnd hb
+  simp only [List.length_map, List.length_range] at this
+  omega
+
+/-- Inside a window narrower than `NUM`, distinct positions have distinct
+ring cells. -/
+theorem ring_mod_ne (lo np p : Nat) (h1 : lo ≤ p) (h2 : p < np) (h3 : np < lo + NUM) :
+    p % NUM ≠ np % NUM := by
+  unfold NUM at *
+  omega
+
+/-- **The pending window**: every published, unpopped position names an
+armed descriptor, and distinct positions name distinct descriptors. -/
+def queueOk (st : Nat → HState) (ring : Nat → Nat) (lo np : Nat) : Prop :=
+  (∀ p, lo ≤ p → p < np → ring (p % NUM) < NUM ∧ (st (ring (p % NUM))).isActive = true) ∧
+  (∀ p q, lo ≤ p → p < np → lo ≤ q → q < np → ring (p % NUM) = ring (q % NUM) → p = q)
+
+theorem queueOk_window (st : Nat → HState) (ring : Nat → Nat) (lo np : Nat)
+    (h : queueOk st ring lo np) : np ≤ lo + NUM :=
+  window_le_of_inj lo np (fun p => ring (p % NUM)) (fun p h1 h2 => (h.1 p h1 h2).1) h.2
+
+/-- The armed head of the position the device is about to pop. -/
+theorem queueOk_head (st : Nat → HState) (ring : Nat → Nat) (lo np : Nat)
+    (h : queueOk st ring lo np) (hlt : lo < np) :
+    ring (lo % NUM) < NUM ∧ (st (ring (lo % NUM))).isActive = true :=
+  h.1 lo (Nat.le_refl lo) hlt
+
+/-- The window shrinks when the device pops. -/
+theorem queueOk_pop (st : Nat → HState) (ring : Nat → Nat) (lo np : Nat)
+    (h : queueOk st ring lo np) : queueOk st ring (lo + 1) np :=
+  ⟨fun p h1 h2 => h.1 p (by omega) h2, fun p q h1 h2 h3 h4 => h.2 p q (by omega) h2 (by omega) h4⟩
+
+/-- One ring cell, updated. -/
+def updN (f : Nat → Nat) (j x : Nat) : Nat → Nat := fun k => if k = j then x else f k
+
+@[simp] theorem updN_self (f : Nat → Nat) (j x : Nat) : updN f j x j = x := by
+  simp [updN]
+
+theorem updN_ne (f : Nat → Nat) (j x k : Nat) (h : k ≠ j) : updN f j x k = f k := by
+  simp [updN, h]
+
+/-- **There is room for one more.**  The pending positions' heads are
+armed and distinct, and `i` is FREE, so they are at most `NUM - 1`. -/
+theorem queueOk_room (st : Nat → HState) (ring : Nat → Nat) (lo np : Nat) (i : Nat)
+    (h : queueOk st ring lo np) (hi : i < NUM) (hfree : st i = .inactive) : np < lo + NUM := by
+  have hne : ∀ p, lo ≤ p → p < np → ring (p % NUM) ≠ i := by
+    intro p h1 h2 he
+    have hact := (h.1 p h1 h2).2
+    rw [he, hfree] at hact
+    exact absurd hact (by simp [HState.isActive])
+  have hinj : ∀ p q, lo ≤ p → p < np + 1 → lo ≤ q → q < np + 1 →
+      (fun p => if p = np then i else ring (p % NUM)) p =
+      (fun p => if p = np then i else ring (p % NUM)) q → p = q := by
+    intro p q hp1 hp2 hq1 hq2 he
+    by_cases hpn : p = np <;> by_cases hqn : q = np
+    · omega
+    · simp only [if_pos hpn, if_neg hqn] at he
+      exact absurd he.symm (hne q hq1 (by omega))
+    · simp only [if_neg hpn, if_pos hqn] at he
+      exact absurd he (hne p hp1 (by omega))
+    · simp only [if_neg hpn, if_neg hqn] at he
+      exact h.2 p q hp1 (by omega) hq1 (by omega) he
+  have hltf : ∀ p, lo ≤ p → p < np + 1 →
+      (fun p => if p = np then i else ring (p % NUM)) p < NUM := by
+    intro p hp1 hp2
+    by_cases hpn : p = np
+    · simpa only [if_pos hpn] using hi
+    · simpa only [if_neg hpn] using (h.1 p hp1 (by omega)).1
+  have := window_le_of_inj lo (np + 1) _ hltf hinj
+  omega
+
+/-- **Writing the staging cell** `np % NUM` disturbs no pending position:
+inside a window narrower than `NUM` the residues are distinct. -/
+theorem queueOk_setcell (st : Nat → HState) (ring : Nat → Nat) (lo np x : Nat)
+    (h : queueOk st ring lo np) (hlt : np < lo + NUM) :
+    queueOk st (updN ring (np % NUM) x) lo np := by
+  constructor
+  · intro p h1 h2
+    rw [updN_ne _ _ _ _ (ring_mod_ne lo np p h1 h2 hlt)]
+    exact h.1 p h1 h2
+  · intro p q hp1 hp2 hq1 hq2 he
+    rw [updN_ne _ _ _ _ (ring_mod_ne lo np p hp1 hp2 hlt),
+      updN_ne _ _ _ _ (ring_mod_ne lo np q hq1 hq2 hlt)] at he
+    exact h.2 p q hp1 hp2 hq1 hq2 he
+
+/-- **Publishing position `np`**: the staging cell already holds an armed
+head that no pending position names, so the window simply grows by one. -/
+theorem queueOk_extend (st : Nat → HState) (ring : Nat → Nat) (lo np : Nat)
+    (h : queueOk st ring lo np) (hi : ring (np % NUM) < NUM)
+    (hfresh : ∀ p, lo ≤ p → p < np → ring (p % NUM) ≠ ring (np % NUM))
+    (hact : (st (ring (np % NUM))).isActive = true) : queueOk st ring lo (np + 1) := by
+  constructor
+  · intro p h1 h2
+    by_cases hpn : p = np
+    · rw [hpn]; exact ⟨hi, hact⟩
+    · exact h.1 p h1 (by omega)
+  · intro p q hp1 hp2 hq1 hq2 he
+    by_cases hpn : p = np <;> by_cases hqn : q = np
+    · omega
+    · rw [hpn] at he
+      exact absurd he.symm (hfresh q hq1 (by omega))
+    · rw [hqn] at he
+      exact absurd he (hfresh p hp1 (by omega))
+    · exact h.2 p q hp1 (by omega) hq1 (by omega) he
+
+/-- Arming a head that no pending position names keeps the window. -/
+theorem queueOk_arm' (st : Nat → HState) (ring : Nat → Nat) (lo np : Nat) (i : Nat) (c : Chain)
+    (h : queueOk st ring lo np) (hfree : st i = .inactive) :
+    queueOk (fun j => if j = i then .active c else st j) ring lo np := by
+  refine ⟨fun p h1 h2 => ⟨(h.1 p h1 h2).1, ?_⟩, h.2⟩
+  have hne : ring (p % NUM) ≠ i := by
+    intro he
+    have hact := (h.1 p h1 h2).2
+    rw [he, hfree] at hact
+    exact absurd hact (by simp [HState.isActive])
+  simp only [if_neg hne]
+  exact (h.1 p h1 h2).2
+
+/-! ### The staged head
+
+Between the ring-cell store and the `avail->idx` bump, `virtio_disk_rw`
+has written the head of the position it is ABOUT to publish into the
+staging cell `np % NUM`.  The invariant records that in a ghost whose
+other half is the driver's `diskStage`, because the two facts the bump
+needs -- that there IS room (`np < lo + NUM`, which only the FREE head at
+the ring store could prove) and that the staging cell holds `i` -- are
+about the state at the RING STORE, and nothing else can restore them at
+the bump.  Both survive: `np` cannot move while the publisher holds the
+lock, and `lo` only grows. -/
+def stageOk (stg : Option Nat) (ring : Nat → Nat) (lo np : Nat) : Prop :=
+  ∀ i, stg = some i → i < NUM ∧ np < lo + NUM ∧ ring (np % NUM) = i ∧
+    ∀ p, lo ≤ p → p < np → ring (p % NUM) ≠ i
+
+theorem stageOk_none (ring : Nat → Nat) (lo np : Nat) : stageOk none ring lo np := by
+  intro i h; exact absurd h (by simp)
+
+theorem stageOk_pop (stg : Option Nat) (ring : Nat → Nat) (lo np : Nat)
+    (h : stageOk stg ring lo np) : stageOk stg ring (lo + 1) np := by
+  intro i hi
+  obtain ⟨h1, h2, h3, h4⟩ := h i hi
+  exact ⟨h1, by omega, h3, fun p hp1 hp2 => h4 p (by omega) hp2⟩
+
+/-- Staging head `i` at the ring store: `i` is free, so it is at no
+pending position, and there is room. -/
+theorem stageOk_set (st : Nat → HState) (ring : Nat → Nat) (lo np i : Nat)
+    (h : queueOk st ring lo np) (hi : i < NUM) (hfree : st i = .inactive) :
+    stageOk (some i) (updN ring (np % NUM) i) lo np := by
+  have hlt := queueOk_room st ring lo np i h hi hfree
+  intro i' hi'
+  have hii : i' = i := by simpa using hi'.symm
+  rw [hii]
+  refine ⟨hi, hlt, updN_self ring (np % NUM) i, ?_⟩
+  intro p hp1 hp2
+  rw [updN_ne _ _ _ _ (ring_mod_ne lo np p hp1 hp2 hlt)]
+  intro he
+  have hact := (h.1 p hp1 hp2).2
+  rw [he, hfree] at hact
+  exact absurd hact (by simp [HState.isActive])
+
 /-! ## The coupling to the device's state -/
 
 /-- **Every request the device holds is the chain armed at that head.**
