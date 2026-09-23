@@ -1,9 +1,7 @@
 /-
 Link `kerneltrap`: the proof instance clients import.  kerneltrap calls
 `devintr`, `myproc` and `yield`; devintr and myproc are closed with their
-linked interfaces, so what is left open is exactly the disk handler's
-assumed accessor (`Xv6.DISK_ACC_ASSUMPTIONS`) and
-`yield`.
+linked interfaces, so what is left open is exactly `yield`.
 -/
 import Xv6.ProofKerneltrap
 import Xv6.LinkDevintr
@@ -11,10 +9,8 @@ import Xv6.LinkMyproc
 
 namespace Xv6
 
-/-- The proved `kerneltrap` interface, given the disk handler's assumed
-accessor interface, its extra arms, and `yield`. -/
-theorem Kerneltrap (HA : DISK_ACC_ASSUMPTIONS) (YI : YIELD) :
-    KERNELTRAP :=
-  kerneltrap_proof (Devintr HA) Myproc YI
+/-- The proved `kerneltrap` interface, given `yield`. -/
+theorem Kerneltrap (YI : YIELD) : KERNELTRAP :=
+  kerneltrap_proof Devintr Myproc YI
 
 end Xv6

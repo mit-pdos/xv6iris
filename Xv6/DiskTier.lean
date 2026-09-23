@@ -357,6 +357,35 @@ theorem byteBuf_dmaOwn (a : BitVec 64) (n : Nat) (bs : List (BitVec 8)) (hn : bs
     exact histBytes_of_bytes curCtx a (DFrac.own 1) (fun j => bs.getD j 0#8) n)
   iexact Hc
 
+/-- **A byte buffer's bytes are DRAM**: `MachCSL.wordPointsTo` carries the
+fact, and the kernel map's identity claim moves it from the physical
+address to the virtual one.  `Xv6.disk_collect` needs it to hand the
+window back as a `MachCSL.byteBuf`, and only the caller -- who held the
+buffer before the publication -- can supply it. -/
+theorem byteBuf_inRam (a : BitVec 64) (bs : List (BitVec 8)) (dq : DFrac)
+    (hkm : ∀ j, j < bs.length → kmapClass (vpnOf (a + BitVec.ofNat 64 j)).toNat = some .rw) :
+    kmapStatic (GF := GF) ⊢ byteBuf a dq bs -∗
+      ⌜∀ j, j < bs.length → inRam (a + BitVec.ofNat 64 j) 1⌝ := by
+  by_cases h : ∀ j, j < bs.length → inRam (a + BitVec.ofNat 64 j) 1
+  · iintro _ _
+    ipureintro; exact h
+  · obtain ⟨j, hj, hnr⟩ : ∃ j, j < bs.length ∧ ¬ inRam (a + BitVec.ofNat 64 j) 1 :=
+      Classical.byContradiction fun hc =>
+        h (fun j hj => Classical.byContradiction fun hr => hc ⟨j, hj, hr⟩)
+    iintro #HS H
+    unfold byteBuf
+    obtain ⟨b, hb⟩ : ∃ b, bs[j]? = some b := by
+      rw [List.getElem?_eq_getElem hj]
+      exact ⟨bs[j], rfl⟩
+    icases (BigSepL.bigSepL_lookup_acc
+        (Φ := fun (k : Nat) (x : BitVec 8) =>
+          wordPointsTo (GF := GF) (a + BitVec.ofNat 64 k) 1 dq x) hb).1
+      $$ H with ⟨Hj, -⟩
+    ihave #Hid := kmapStatic_rw (a + BitVec.ofNat 64 j) (hkm j hj) $$ HS
+    ihave Hp := wordPointsTo_phys (a + BitVec.ofNat 64 j) 1 dq b $$ Hid Hj
+    icases pwordPointsTo_cases (a + BitVec.ofNat 64 j) 1 dq b $$ Hp with ⟨%hf, -⟩
+    exact absurd hf.1 hnr
+
 /-- **The data buffer, handed to the device.** -/
 theorem byteBuf_bufLease (c : Chain) (data : List (BitVec 8)) (hd : data.length = BSIZE)
     (hkm : ∀ j, j < BSIZE → kmapClass (vpnOf (c.data + BitVec.ofNat 64 j)).toNat = some .rw) :
@@ -831,6 +860,164 @@ theorem statusRes_arm3 (γ : DiskNames) (st : Nat → HState) (sb : Nat → SByt
   iapply Hback
   rw [armSt3_hd st c hwf, updS_self, statusRes_free]
   iframe Hb Hq Hbuf
+
+/-! ## Giving a slot back: the collect's side of the pure clauses
+
+`Xv6.disk_collect` frees THREE receipts -- the head and its two members --
+and every pure clause of `Xv6.diskLive` has to survive.  Each clause that
+looks at the receipts asks the same thing of the slot being freed: that
+NOTHING names it.  The four conditions below are exactly that list, and
+the collect discharges each out of the invariant itself: the arming
+epoch puts the head at no pending position (`Xv6.epPend` against
+`Xv6.epLt`), the completion record puts it out of flight
+(`Xv6.epDone_done`), a head out of flight has no permit
+(`Xv6.perm_none_of_notFlight`) and no unread completion
+(`Xv6.epRecInj_no_unread`); and a MEMBER is named by none of the four,
+because each of them would make the slot `.active`. -/
+
+/-- The receipts, with slot `i` given back. -/
+def freeSt (st : Nat → HState) (i : Nat) : Nat → HState :=
+  fun j => if j = i then .inactive else st j
+
+@[simp] theorem freeSt_self (st : Nat → HState) (i : Nat) : freeSt st i i = .inactive := by
+  simp [freeSt]
+
+theorem freeSt_ne (st : Nat → HState) (i j : Nat) (h : j ≠ i) : freeSt st i j = st j := by
+  simp [freeSt, h]
+
+theorem freeSt_active (st : Nat → HState) (i j : Nat) (c : Chain)
+    (h : freeSt st i j = .active c) : j ≠ i ∧ st j = .active c := by
+  by_cases hj : j = i
+  · rw [hj, freeSt_self] at h; exact absurd h (by simp)
+  · exact ⟨hj, by rw [← freeSt_ne st i j hj]; exact h⟩
+
+theorem freeSt_isActive (st : Nat → HState) (i j : Nat)
+    (h : (freeSt st i j).isActive = true) : j ≠ i ∧ (st j).isActive = true := by
+  by_cases hj : j = i
+  · rw [hj, freeSt_self] at h; exact absurd h (by simp [HState.isActive])
+  · exact ⟨hj, by rw [← freeSt_ne st i j hj]; exact h⟩
+
+theorem blkInj_free (st : Nat → HState) (i : Nat) (h : blkInj st) : blkInj (freeSt st i) := by
+  intro j j' cj cj' hj hj' hne hst hst'
+  exact h j j' cj cj' hj hj' hne (freeSt_active st i j cj hst).2 (freeSt_active st i j' cj' hst').2
+
+/-- The three receipts of a chain, all given back. -/
+def freeSt3 (st : Nat → HState) (c : Chain) : Nat → HState :=
+  freeSt (freeSt (freeSt st c.hd) c.md) c.tl
+
+theorem freeSt3_hd (st : Nat → HState) (c : Chain) (hwf : c.wf) :
+    freeSt3 st c c.hd = .inactive := by
+  unfold freeSt3
+  rw [freeSt_ne _ _ _ hwf.2.2.2.2.2.1, freeSt_ne _ _ _ hwf.2.2.2.1, freeSt_self]
+
+theorem freeSt3_md (st : Nat → HState) (c : Chain) (hwf : c.wf) :
+    freeSt3 st c c.md = .inactive := by
+  unfold freeSt3
+  rw [freeSt_ne _ _ _ hwf.2.2.2.2.1, freeSt_self]
+
+theorem freeSt3_tl (st : Nat → HState) (c : Chain) : freeSt3 st c c.tl = .inactive := by
+  unfold freeSt3; rw [freeSt_self]
+
+theorem freeSt3_ne (st : Nat → HState) (c : Chain) (j : Nat)
+    (h1 : j ≠ c.hd) (h2 : j ≠ c.md) (h3 : j ≠ c.tl) : freeSt3 st c j = st j := by
+  unfold freeSt3
+  rw [freeSt_ne _ _ _ h3, freeSt_ne _ _ _ h2, freeSt_ne _ _ _ h1]
+
+/-- Freeing a MEMBER slot does not touch the blocks in flight. -/
+theorem inFlightBlk_freeMem (st : Nat → HState) (i h' : Nat) (hmem : st i = .member h')
+    (bno : Nat) (h : inFlightBlk st bno) : inFlightBlk (freeSt st i) bno := by
+  obtain ⟨j, c, hj, hst, hdw, hblk⟩ := h
+  have hne : j ≠ i := by intro he; rw [he, hmem] at hst; exact absurd hst (by simp)
+  exact ⟨j, c, hj, by rw [freeSt_ne st i j hne]; exact hst, hdw, hblk⟩
+
+theorem imgOk_freeMem (v : VirtioState) (m : RegMapF (List (BitVec 8))) (st : Nat → HState)
+    (i h' : Nat) (hmem : st i = .member h') (h : imgOk v m (inFlightBlk st)) :
+    imgOk v m (inFlightBlk (freeSt st i)) := by
+  intro bno bs hb
+  rcases h bno bs hb with hx | hx
+  · exact Or.inl (inFlightBlk_freeMem st i h' hmem bno hx)
+  · exact Or.inr hx
+
+/-- **Freeing the HEAD**: the block leaves the escape, so the fragment
+the invariant holds for it must be the device's image of the block --
+which is exactly what `Xv6.disk_collect` hands the sleeper. -/
+theorem imgOk_freeHd (v : VirtioState) (m : RegMapF (List (BitVec 8))) (st : Nat → HState)
+    (i : Nat) (c : Chain) (hinj : blkInj st) (hst : st i = .active c)
+    (hb : ∀ bs, PartialMap.get? m c.blk = some bs → bs = blockView v c.blk)
+    (h : imgOk v m (inFlightBlk st)) : imgOk v m (inFlightBlk (freeSt st i)) := by
+  intro bno bs hbn
+  by_cases hbc : bno = c.blk
+  · subst hbc
+    exact Or.inr (hb bs hbn)
+  · rcases h bno bs hbn with hx | hx
+    · exact Or.inl (inFlightBlk_free st i c bno hinj hst hbc hx)
+    · exact Or.inr hx
+
+/-- **A slot nothing names may be given back**, and every pure clause of
+the live arm survives. -/
+theorem diskLive_pure_free (v : VirtioState) (st : Nat → HState) (pm : RegMapF PermVal)
+    (dl dl0 : List UsedRec) (nr : Nat) (ring : Nat → Nat) (lo np : Nat) (stg : Option Nat)
+    (sb : Nat → SByte) (m : RegMapF (List (BitVec 8))) (pmap : List Nat) (nc M : Nat)
+    (ue : Nat → UElem) (i : Nat)
+    (hpos : ∀ p, lo ≤ p → p < np → ring (p % NUM) ≠ i)
+    (hfly : ∀ h : BitVec 16, (Virtio.phase v h).isSome = true → h.toNat ≠ i)
+    (hperm : ∀ k (hh : BitVec 16) (cc : Chain) (p : Option VPhase)
+      (u : Option (BitVec 16 × Bool)),
+      PartialMap.get? pm k = some ((hh, cc, p, u) : PermVal) → hh.toNat ≠ i)
+    (hunr : ∀ r ∈ dl, nr < r.cnt → r.hd ≠ i)
+    (himg : imgOk v m (inFlightBlk (freeSt st i)))
+    (h : v.usedIdx = wrap16 nc ∧ v.seen = wrap16 lo ∧ lo ≤ np ∧ queueOk st ring lo np ∧
+      posOk pmap ring lo np ∧ stageOk stg ring lo np ∧ inflightOff v st ring lo np stg ∧
+      imgOk v m (inFlightBlk st) ∧ permOk v pm st ∧ usedOk dl dl0 nc M ∧
+      unreadArmed v st dl nr ring lo np stg sb ∧ cntOk pm dl nc ∧ p3Ok v pm dl nr ∧
+      ueInv pm dl nr ue ∧ epOk v st pm dl ring lo np stg ∧ dryOk v ∧ capOk v st sb ∧
+      rowDone st sb dl) :
+    v.usedIdx = wrap16 nc ∧ v.seen = wrap16 lo ∧ lo ≤ np ∧
+      queueOk (freeSt st i) ring lo np ∧
+      posOk pmap ring lo np ∧ stageOk stg ring lo np ∧
+      inflightOff v (freeSt st i) ring lo np stg ∧
+      imgOk v m (inFlightBlk (freeSt st i)) ∧ permOk v pm (freeSt st i) ∧
+      usedOk dl dl0 nc M ∧
+      unreadArmed v (freeSt st i) dl nr ring lo np stg sb ∧ cntOk pm dl nc ∧
+      p3Ok v pm dl nr ∧ ueInv pm dl nr ue ∧
+      epOk v (freeSt st i) pm dl ring lo np stg ∧ dryOk v ∧ capOk v (freeSt st i) sb ∧
+      rowDone (freeSt st i) sb dl := by
+  obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e9, e10, e11, e12, e13, e14, e15, e16, e17, e18⟩ := h
+  refine ⟨e1, e2, e3, ?_, e5, e5b, ?_, himg, ?_, e10, ?_, e12, e13, e14, ?_, e16, ?_, ?_⟩
+  · refine ⟨fun p h1 h2 => ?_, e4.2⟩
+    refine ⟨(e4.1 p h1 h2).1, ?_⟩
+    rw [freeSt_ne st i _ (hpos p h1 h2)]
+    exact (e4.1 p h1 h2).2
+  · refine ⟨fun hh r hr => ?_, fun hh hs => ?_⟩
+    · have hso : (Virtio.phase v hh).isSome = true := by
+        unfold Virtio.reqOf at hr
+        cases hp : Virtio.phase v hh with
+        | none => rw [hp] at hr; exact absurd hr (by simp)
+        | some _ => rfl
+      obtain ⟨hlt, cc, hst, hhd, hrq⟩ := e6.1 hh r hr
+      exact ⟨hlt, cc, by rw [freeSt_ne st i _ (hfly hh hso)]; exact hst, hhd, hrq⟩
+    · obtain ⟨h1, h2, h3, h4⟩ := e6.2 hh hs
+      exact ⟨h1, by rw [freeSt_ne st i _ (hfly hh hs)]; exact h2, h3, h4⟩
+  · intro k hh cc p u hg
+    obtain ⟨h1, h2, h3, h4, h5, h6⟩ := e9 k hh cc p u hg
+    exact ⟨h1, by rw [freeSt_ne st i _ (hperm k hh cc p u hg)]; exact h2, h3, h4, h5, h6⟩
+  · refine ⟨e11.1, e11.2.1, fun r hr hlt => ?_⟩
+    obtain ⟨⟨cc, hcc, hce⟩, hp, hs, hsb⟩ := e11.2.2 r hr hlt
+    exact ⟨⟨cc, by rw [freeSt_ne st i _ (hunr r hr hlt)]; exact hcc, hce⟩, hp, hs, hsb⟩
+  · refine ⟨⟨fun p h1 h2 cc hst => ?_, fun j hj cc hst => ?_⟩, e15.2.1, e15.2.2.1,
+      fun hh cc hst hs => ?_, e15.2.2.2.2⟩
+    · rw [freeSt_ne st i _ (hpos p h1 h2)] at hst
+      exact e15.1.1 p h1 h2 cc hst
+    · obtain ⟨hne, hst'⟩ := freeSt_active st i j cc hst
+      exact e15.1.2 j hj cc hst'
+    · obtain ⟨hne, hst'⟩ := freeSt_active st i hh.toNat cc hst
+      exact e15.2.2.2.1 hh cc hst' hs
+  · intro j cc hj hst hdw hx
+    obtain ⟨hne, hst'⟩ := freeSt_active st i j cc hst
+    exact e17 j cc hj hst' hdw hx
+  · intro j cc hj hst r hr hh he
+    obtain ⟨hne, hst'⟩ := freeSt_active st i j cc hst
+    exact e18 j cc hj hst' r hr hh he
 
 /-! ## The arming epoch, as the driver's own moves keep it -/
 

@@ -13,14 +13,17 @@ test has seen `b->disk /= 1`) to the caller's continuation.
     +0x210 auipc/addi a0,&vdisk_lock ; jal release
     +0x21c the twelve-slot epilogue
 
-The collect (`Xv6.DISK_ACC_ASSUMPTIONS.disk_collect`) is a view shift,
-taken before the first instruction: it takes the head's claim and the
-three whole receipts and gives back the three descriptor windows at the
-context tier, the request header, `disk.info[h]`, `b->disk`, `b->data`
-and the block's image fragment.  What the sleeper reads out of its own
-loop test -- `b->disk /= 1` -- is already the collect's premise, carried
-across the seam by the claim row (`Xv6.claimDone`); the two existentials
-in the collect's conclusion are named by `Xv6.VDRW_OPEN.collect_pin`.
+The collect (`Xv6.disk_collect`) is a view shift, taken before the first
+instruction: it takes the head's claim and the three whole receipts and
+gives back the three descriptor windows at the context tier, the request
+header, `disk.info[h]`, `b->disk` at the `0` the handler wrote, `b->data`
+and the block's image fragment -- the last two at ONE list of bytes,
+`Xv6.Chain.pay`, the payload the publication stamped into the chain.
+What the sleeper read out of its own loop test -- `b->disk /= 1` -- is
+already the collect's premise, carried across the seam by the claim row
+at that known value (`Xv6.claimResD`, `Xv6.claimDone`), and `hpay` is
+where the phase learns that the payload IS the caller's
+`if wr then dataBuf else dataDisk`.
 
 `free_chain` is three turns of `Xv6.vdrw6_iter`, one per descriptor: the
 flags and the next index are read off the STILL-FORMATTED descriptor
@@ -212,7 +215,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG 
 
 set_option maxHeartbeats 32000000 in
 /-- **P6.**  From `Xv6.vdrwP5Exit` to the caller's continuation. -/
-theorem vdrw_P6 (HA : DISK_ACC_ASSUMPTIONS) (HO : VDRW_OPEN) (FD : FREE_DESC) (RE : RELEASE)
+theorem vdrw_P6 (FD : FREE_DESC) (RE : RELEASE)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64)
     (bno : BitVec 32) (dataBuf dataDisk : List (BitVec 8)) (wr : Bool) (c : Chain)
@@ -220,6 +223,8 @@ theorem vdrw_P6 (HA : DISK_ACC_ASSUMPTIONS) (HO : VDRW_OPEN) (FD : FREE_DESC) (R
     (hK : virtioDiskRwSlots ≤ k.avail) (hsie : k.sie = false) (hnoff : k.noff = 0)
     (hlocks : k.locks = []) (htier : k.tier = KTier.kpt) (hintena : k.intena = false)
     (hwf : k.wf) (hpd : descPageRw pd) (hdwr : c.dwr = !wr)
+    (hctx : c.ctx = curCtx) (hpay : c.pay = if c.dwr then dataDisk else dataBuf)
+    (hram : ∀ j, j < BSIZE → inRam (aBufData (k.regs 10#5) + BitVec.ofNat 64 j) 1)
     (hkm : ∀ j, j < BSIZE →
       kmapClass (vpnOf (aBufData (k.regs 10#5) + BitVec.ofNat 64 j)).toNat = some .rw) :
     vdrwP5Exit Γ cpu k γ γl pd pav pu bno dataBuf dataDisk wr c y R ⊢ wpLoop (GF := GF) cpu := by
@@ -242,6 +247,10 @@ theorem vdrw_P6 (HA : DISK_ACC_ASSUMPTIONS) (HO : VDRW_OPEN) (FD : FREE_DESC) (R
   have hkmc : ∀ j, j < BSIZE →
       kmapClass (vpnOf (c.data + BitVec.ofNat 64 j)).toNat = some .rw := by
     rw [hcd]; exact hkm
+  have hramc : ∀ j, j < BSIZE → inRam (c.data + BitVec.ofNat 64 j) 1 := by
+    rw [hcd]; exact hram
+  have hlen : (if c.dwr then dataDisk else dataBuf).length = BSIZE := by
+    rw [← hpay]; exact Chain.pay_length c
   have hlkKK : (vdrwK k).locks = ["virtio_disk"] := by
     rw [vdrwK_locks, hlocks]
   ihave #Hinv := vdrwCaps_inv γ γl pd pav pu $$ Hcaps
@@ -273,20 +282,14 @@ theorem vdrw_P6 (HA : DISK_ACC_ASSUMPTIONS) (HO : VDRW_OPEN) (FD : FREE_DESC) (R
   ihave #Hwmn := diskWm_mono γ nr n T T hnle (Nat.le_refl T) $$ Hwm1
   -- the collect
   iapply wpLoop_fupd
-  imod HA.disk_collect γ pd pav pu c n T nr hcwf hnle hkmc
+  imod disk_collect γ pd pav pu c n T nr hcwf hnle hctx hramc hkmc
     $$ [Hinv HS Hgeom Hth Htm Htt Hcl Hnr Hdone Hwmn Hfl]
-    with ⟨Hth, Htm, Htt, Hnr, Hc0, Hc1, Hc2, Hch, Hib, ⟨%dd, Hdsk⟩, Hst,
-      ⟨%data, %hlen, Hbuf, Hblkd⟩⟩
+    with ⟨Hth, Htm, Htt, Hnr, Hc0, Hc1, Hc2, Hch, Hib, Hdsk, Hst, Hbuf, Hblkd⟩
   · iframe #
     iframe
   imodintro
   ihave Hpay := Hpback $$ Hnr Hrl
-  icases HO.collect_pin γ c dataBuf dataDisk data dd $$ [Hinv Hdsk Hbuf Hblkd]
-    with ⟨%⟨hdd, hdata⟩, Hdsk, Hbuf, Hblkd⟩
-  · iframe #
-    iframe
-  subst hdd
-  subst hdata
+  isimp only [hpay] at Hbuf Hblkd
   -- the cells the code writes and reads
   isimp only [wordAtN_cur] at Hib Hst Hdsk
   icases idxCells_elim (k.regs 2#5) (BitVec.ofNat 32 c.hd) (BitVec.ofNat 32 c.md)

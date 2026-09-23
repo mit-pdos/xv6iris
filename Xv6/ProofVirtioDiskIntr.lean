@@ -2,7 +2,7 @@
 Proof of `virtio_disk_intr`'s specification
 (`SpecVirtioDiskIntr.VIRTIO_DISK_INTR`), given the interfaces of
 `acquire`, `release` and `wakeup` and the accessor assumptions
-`Xv6.DISK_ACC_ASSUMPTIONS`.
+`Xv6/DiskAcc.lean`.
 
     void virtio_disk_intr() {
       acquire(&disk.vdisk_lock);
@@ -638,7 +638,7 @@ theorem vdis_claim_infob (γ : DiskNames) (pd : PAddr) (c : Chain) :
     iexact H5'
 
 set_option maxHeartbeats 4000000 in
-theorem vdis_loop (HA : DISK_ACC_ASSUMPTIONS) (WK : WAKEUP)
+theorem vdis_loop (WK : WAKEUP)
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName)
     (pd pav pu : BitVec 64)
     (hsie : k.sie = false) (hnoff : k.noff + 2 < 2 ^ 31) (hK : virtioDiskIntrSlots ≤ k.avail)
@@ -942,9 +942,8 @@ end
 
 set_option maxHeartbeats 4000000 in
 /-- **`virtio_disk_intr`**, from the interfaces of `acquire`, `release`
-and `wakeup`, the frozen accessor assumptions `Xv6.DISK_ACC_ASSUMPTIONS`
-and the frozen accessor assumption `Xv6.DISK_ACC_ASSUMPTIONS`. -/
-theorem virtio_disk_intr_proof (HA : DISK_ACC_ASSUMPTIONS)
+and `wakeup`. -/
+theorem virtio_disk_intr_proof
     (AC : ACQUIRE) (RE : RELEASE) (WK : WAKEUP) : VIRTIO_DISK_INTR :=
   ⟨fun {hlc GF} _ _ _ _ Γ cpu k γ γl pd pav pu hsie hnoff hK hlk htier => by
   unfold wp_virtio_disk_intr_body
@@ -1107,7 +1106,7 @@ theorem virtio_disk_intr_proof (HA : DISK_ACC_ASSUMPTIONS)
       rcases Nat.lt_or_ge nr m0 with h | h
       · exact h
       · exact absurd (show wrap16 nr = wrap16 m0 from by rw [show nr = m0 from by omega]) hne0
-    ihave Hloop := vdis_loop HA WK Γ cpu k γ γl pd pav pu hsie hnoff hK hlk htier hpu
+    ihave Hloop := vdis_loop WK Γ cpu k γ γl pd pav pu hsie hnoff hK hlk htier hpu
       $$ [HΓ Hcaps Hexit]
     · iframe #; iframe
     iapply Hloop $$ %_ %nr %m0 %F0 Hk Hpc Hlocked Hnr Hrl Hui Hpay Hlb0 Hrv0 Hwm0

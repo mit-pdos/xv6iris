@@ -234,7 +234,9 @@ theorem vdrw_P5_loop (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SL
     iintro Hk Hpc
     ihave #Hone : iprop(claimDone (GF := GF) γ c 1#32) $$ []
     · iapply claimDone_one γ c
-    ihave Hcl := Hcback $$ %1#32 Hdsk Hone
+    ihave HclD := Hcback $$ %1#32 Hdsk
+    ihave Hcl := claimResD_claimRes γ curCtx pd c 1#32 $$ [HclD Hone]
+    · iframe HclD Hone
     icases headTok_toQ γ c.hd (.active c) $$ Hth with ⟨Hth, Hkh⟩
     ihave Hpay := diskResA_seat γ pd pav pu curCtx (updB (fun _ => false) c.hd true) c.hd hh
         (updB_self_true c.hd) (.active c) rfl $$ [Hpay Hth Hcl]
@@ -267,7 +269,7 @@ theorem vdrw_P5_loop (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SL
       exact hR6_3
     icases claimDone_ne_one γ c d hd1 $$ Hdn with ⟨%hd0, #Hev⟩
     subst hd0
-    ihave Hcl := Hcback $$ %0#32 Hdsk Hdn
+    ihave Hcl := Hcback $$ %0#32 Hdsk
     iframe Hcl Hev
 
 set_option maxHeartbeats 8000000 in
@@ -332,7 +334,9 @@ theorem vdrw_P5 (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
     iintro Hk Hpc
     ihave #Hone : iprop(claimDone (GF := GF) γ c 1#32) $$ []
     · iapply claimDone_one γ c
-    ihave Hcl := Hcback $$ %1#32 Hdsk Hone
+    ihave HclD := Hcback $$ %1#32 Hdsk
+    ihave Hcl := claimResD_claimRes γ curCtx pd c 1#32 $$ [HclD Hone]
+    · iframe HclD Hone
     icases headTok_toQ γ c.hd (.active c) $$ Hth with ⟨Hth, Hkh⟩
     ihave Hpay := diskResA_seat γ pd pav pu curCtx (updB (fun _ => false) c.hd true) c.hd hh
         (updB_self_true c.hd) (.active c) rfl $$ [Hpay Hth Hcl]
@@ -372,7 +376,7 @@ theorem vdrw_P5 (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
       try exact hR6
     icases claimDone_ne_one γ c d hd1 $$ Hdn with ⟨%hd0, #Hev⟩
     subst hd0
-    ihave Hcl := Hcback $$ %0#32 Hdsk Hdn
+    ihave Hcl := Hcback $$ %0#32 Hdsk
     iframe Hcl Hev
 
 end

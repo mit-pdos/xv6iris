@@ -1,9 +1,8 @@
 /-
 Link `devintr`: the proof instance clients import.  `devintr` calls
 `plic_claim`, `plic_complete`, `uartintr`, `virtio_disk_intr` and
-`clockintr`; all five are closed with their linked
-interfaces; what stays open is the disk handler's assumed accessor
-interface (`Xv6.DISK_ACC_ASSUMPTIONS`).
+`clockintr`; all five are closed with their linked interfaces, and
+nothing stays open.
 -/
 import Xv6.ProofDevintr
 import Xv6.LinkPlicClaim
@@ -14,9 +13,8 @@ import Xv6.LinkClockintr
 
 namespace Xv6
 
-/-- The proved `devintr` interface, given the disk handler's assumed
-accessor interface and its extra arms. -/
-theorem Devintr (HA : DISK_ACC_ASSUMPTIONS) : DEVINTR :=
-  devintr_proof PlicClaim PlicComplete Uartintr (VirtioDiskIntr HA) Clockintr
+/-- The proved `devintr` interface. -/
+theorem Devintr : DEVINTR :=
+  devintr_proof PlicClaim PlicComplete Uartintr VirtioDiskIntr Clockintr
 
 end Xv6

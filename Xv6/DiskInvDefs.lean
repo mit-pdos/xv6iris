@@ -2194,6 +2194,36 @@ def cntOk (pm : RegMapF PermVal) (dl : List UsedRec) (nc : Nat) : Prop :=
   (∀ (k : Nat) (hk : k < dl.length), (dl[k]'hk).1 = k + 1) ∧
   (wroteIdx pm → dl.length = nc + 1) ∧ (¬ wroteIdx pm → dl.length = nc)
 
+/-- Every log entry's counter is at least one: the counters ARE the
+indices, shifted by one. -/
+theorem cntOk_pos (pm : RegMapF PermVal) (dl : List UsedRec) (nc : Nat) (h : cntOk pm dl nc)
+    (r : UsedRec) (hr : r ∈ dl) : 1 ≤ r.cnt := by
+  obtain ⟨k, hk, hkr⟩ := List.getElem_of_mem hr
+  have hx : r.cnt = k + 1 := by rw [← hkr]; exact h.1 k hk
+  omega
+
+/-- **The log's positions follow its counters.**  The counters are the
+indices (`Xv6.cntOk`) and the positions are monotone along the list
+(`Xv6.usedOk`), so a record at a lower counter was written at a lower
+position -- which is what lets `Xv6.disk_collect` carry the floor of the
+completion the handler READ down to the status write of the completion
+the sleeper is waiting on. -/
+theorem usedOk_pos_le (pm : RegMapF PermVal) (dl dl0 : List UsedRec) (nc M : Nat)
+    (hu : usedOk dl dl0 nc M) (hc : cntOk pm dl nc) (r r' : UsedRec)
+    (hr : r ∈ dl) (hr' : r' ∈ dl) (hle : r.cnt ≤ r'.cnt) : r.pos ≤ r'.pos := by
+  obtain ⟨k, hk, hkr⟩ := List.getElem_of_mem hr
+  obtain ⟨k', hk', hkr'⟩ := List.getElem_of_mem hr'
+  have hc1 : r.cnt = k + 1 := by rw [← hkr]; exact hc.1 k hk
+  have hc2 : r'.cnt = k' + 1 := by rw [← hkr']; exact hc.1 k' hk'
+  rcases Nat.lt_or_ge k k' with hlt | hge
+  · have hp := (List.pairwise_iff_getElem.1 hu.2.2.2.1) k k' hk hk' hlt
+    rw [hkr, hkr'] at hp
+    exact hp.2
+  · have hkk : k = k' := by omega
+    subst hkk
+    rw [← hkr, ← hkr']
+    exact Nat.le_refl _
+
 /-- **The dead arm has no permit at all**, so it carries no witness. -/
 theorem not_wroteIdx_of_dead (v : VirtioState) (pm : RegMapF PermVal)
     (h : permOk v pm (fun _ => .inactive)) : ¬ wroteIdx pm := by
@@ -4846,6 +4876,36 @@ def claimRes (γ : DiskNames) (ξ : CtxId) (pd : PAddr) (c : Chain) : IProp GF :
   ctxBytes ξ c.hdrAddr 16 (DFrac.own (1 : Qp).half) c.hdr ∗
   wordAtN ξ (aInfoB c.hd) 8 (DFrac.own 1) c.bp ∗
   ∃ d : BitVec 32, wordAtN ξ (aBufDisk c.bp) 4 (DFrac.own 1) d ∗ claimDone γ c d
+
+/-- **The claim row at a KNOWN `b->disk`.**  The completion wait's loop
+test reads the cell, and the exit knows the value it read: `0`, by
+`Xv6.claimDone_ne_one`.  `Xv6.disk_collect` takes the row in this shape,
+so that the cell it hands the sleeper back is the `0` the handler wrote
+and not an existential the caller has to identify. -/
+def claimResD (γ : DiskNames) (ξ : CtxId) (pd : PAddr) (c : Chain) (d : BitVec 32) :
+    IProp GF := iprop%
+  ctxBytes ξ (descAt pd c.hd) 16 (DFrac.own (1 : Qp).half) c.d0 ∗
+  ctxBytes ξ (descAt pd c.md) 16 (DFrac.own (1 : Qp).half) c.d1 ∗
+  ctxBytes ξ (descAt pd c.tl) 16 (DFrac.own (1 : Qp).half) c.d2 ∗
+  ctxBytes ξ c.hdrAddr 16 (DFrac.own (1 : Qp).half) c.hdr ∗
+  wordAtN ξ (aInfoB c.hd) 8 (DFrac.own 1) c.bp ∗
+  wordAtN ξ (aBufDisk c.bp) 4 (DFrac.own 1) d
+
+theorem claimResD_claimRes (γ : DiskNames) (ξ : CtxId) (pd : PAddr) (c : Chain)
+    (d : BitVec 32) :
+    iprop(claimResD (GF := GF) γ ξ pd c d ∗ claimDone γ c d) ⊢ claimRes γ ξ pd c := by
+  unfold claimResD claimRes
+  iintro ⟨⟨H0, H1, H2, H3, Hb, Hd⟩, #Hdn⟩
+  iframe H0 H1 H2 H3 Hb
+  iexists d
+  iframe Hd Hdn
+
+theorem claimRes_claimResD (γ : DiskNames) (ξ : CtxId) (pd : PAddr) (c : Chain) :
+    claimRes (GF := GF) γ ξ pd c ⊢ ∃ d : BitVec 32, claimResD γ ξ pd c d ∗ claimDone γ c d := by
+  unfold claimResD claimRes
+  iintro ⟨H0, H1, H2, H3, Hb, %d, Hd, #Hdn⟩
+  iexists d
+  iframe H0 H1 H2 H3 Hb Hd Hdn
 
 /-- **`b->disk`, borrowed out of the claim and given back at `0`**: the
 handler's `b->disk = 0` before `wakeup(b)`.  The row comes back only with
