@@ -13,7 +13,7 @@ Imports only definitional files (never a `Code*` or `Proof*` file).
 import MachCSL.CallConv
 import Xv6.Image
 import Xv6.Geom
-import Xv6.UartTrace
+import Xv6.UartInv
 
 namespace Xv6
 

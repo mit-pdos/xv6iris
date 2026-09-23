@@ -57,6 +57,15 @@ import Xv6.KernelData
 import Xv6.UartTrace
 import Xv6.UartModel
 import Xv6.UartInv
+import Xv6.SpecUartputcSync
+import Xv6.SpecUartinit
+import Xv6.ConsoleDefs
+import Xv6.SpecUartwrite
+import Xv6.SpecConsoleintr
+import Xv6.SpecUartintr
+import Xv6.SpecConsolewrite
+import Xv6.SpecConsoleread
+import Xv6.SpecConsoleinit
 import Xv6.SpecConsputc
 import Xv6.SpecPrputc
 import Xv6.SpecPrintint

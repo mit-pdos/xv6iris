@@ -858,6 +858,13 @@ instance uartPort_persistent [CurCtx] (i : UartId) (γl : GName) (γ : UartNames
     Persistent (uartPort (GF := GF) i γl γ) := by
   unfold uartPort; infer_instance
 
+/-- The KERNEL port's bundle: what `printk`'s cone holds (`prputc` writes
+`uarts[1]`). -/
+def isTxLock [CurCtx] (γl : GName) (γ : UartNames) : IProp GF := uartPort .uart1 γl γ
+
+instance isTxLock_persistent [CurCtx] (γl : GName) (γ : UartNames) : Persistent (isTxLock (GF := GF) γl γ) := by
+  unfold isTxLock; infer_instance
+
 end
 
 end Xv6
