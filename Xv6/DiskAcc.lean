@@ -34,15 +34,16 @@ cell, `avail->idx`) is split in halves: the invariant's half is a
 * a driver READ of a cell that is ENTIRELY the device's (`used->idx`,
   `used->ring[..]`, `info[h].status`) opens the invariant with `readAU`.
 
-The file has four parts: the MMIO accessors of `virtio_disk_init` (all
+The file has five parts: the MMIO accessors of `virtio_disk_init` (all
 proved, including the `DRIVER_OK` store that flips the invariant to its
 live arm), the queue-memory accessors that need only the PENDING-side
 accounting (the avail page and `disk_publish`, also proved), the tier
-arithmetic those need (`Xv6/DiskTier.lean`, `MachCSL/WpDmaCtx2.lean`), and
-an assumed interface for the five accessors of
-`virtio_disk_rw`/`virtio_disk_intr` that need the COMPLETION-side
-accounting -- with the reason it is not there, and the fix it needs,
-written out above `DISK_ACC_ASSUMPTIONS`.
+arithmetic those need (`Xv6/DiskTier.lean`, `MachCSL/WpDmaCtx2.lean`), the
+COMPLETION-side accessors the used-index WRITE LOG settles
+(`disk_used_idx_read` and `disk_deposit`, proved), and an assumed
+interface for the three that still need the PER-POSITION ROWS -- with the
+reason they are not there, and the fix they need, written out above
+`DISK_ACC_ASSUMPTIONS`.
 -/
 import Xv6.DiskInv
 import MachCSL.WpDmaCtx
