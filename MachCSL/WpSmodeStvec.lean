@@ -22,6 +22,12 @@ variable {lent : Bool}
 
 @[sail_facts] theorem csr_name_map_forwards_stvec : csr_name_map_forwards 0x105#12 = pure "stvec" := rfl
 
+-- the `write_CSR` arm, so the leaf never unfolds the model's whole match
+-- (the unfolded body costs the kernel ~10 s).  Not a `sail_facts`: callers
+-- stop in front of `write_CSR 0x105` and apply `swp_write_CSR_stvec`.
+theorem write_CSR_stvec (v : BitVec 64) : write_CSR 0x105#12 v =
+    (do let r ← set_stvec v; pure (.Ok r)) := rfl
+
 /-- A direct-mode vector's mode field. -/
 theorem tvec_mode_direct (v : BitVec 64) (hd : stvecDirect v) :
     trapVectorMode_forwards (_get_Mtvec_Mode v) = TrapVectorMode.TV_Direct := by
@@ -55,7 +61,8 @@ theorem swp_write_CSR_stvec (cpu : CPU) (dq : DFrac) (o v : BitVec 64) (hd : stv
     ▷ (Register.misa ↦ᵣ[cpu]{dq} 0x800000000014112D#64 -∗ Register.stvec ↦ᵣ[cpu] v -∗ Φ (.Ok v))
     ⊢ swp cpu (write_CSR 0x105#12 v) Φ := by
   iintro ⟨Hmisa, Hstvec, HΦ⟩
-  swp_run 3
+  rw [write_CSR_stvec]
+  swp_run 2
   iapply swp_bind
   iapply swp_bind
   iapply (swp_legalize_tvec_direct cpu o v hd)

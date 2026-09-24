@@ -20,6 +20,17 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 @[sail_facts] theorem csr_name_map_backwards_sstatus : csr_name_map_backwards "sstatus" = pure 0x100#12 := rfl
 @[sail_facts] theorem csr_name_write_callback_sstatus (v : BitVec 64) : csr_name_write_callback "sstatus" v = pure () := rfl
 
+-- the `read_CSR` / `write_CSR` arms, so the executor never unfolds the
+-- model's whole match (the unfolded body costs the kernel 5-10 s per proof).
+-- The write arm is NOT a `sail_facts`: callers stop in front of
+-- `write_CSR 0x100` and apply `swp_write_CSR_sstatus`, and opening it in
+-- the normaliser executes `legalize_sstatus` symbolically (minutes).
+@[sail_facts] theorem read_CSR_sstatus : read_CSR 0x100#12 =
+    (do let x ← readReg Register.mstatus; pure (Sail.BitVec.extractLsb (lower_mstatus x) 63 0)) := rfl
+theorem write_CSR_sstatus (v : BitVec 64) : write_CSR 0x100#12 v =
+    (do let o ← readReg Register.mstatus; let n ← legalize_sstatus o v; writeReg Register.mstatus n
+        let r ← readReg Register.mstatus; pure (.Ok (Sail.BitVec.extractLsb (lower_mstatus r) 63 0))) := rfl
+
 /-! ### The legalised write -/
 
 /-- `lift_sstatus` leaves `MPP` alone. -/
@@ -440,7 +451,8 @@ theorem swp_write_CSR_sstatus (cpu : CPU) (dq : DFrac) (o v : BitVec 64)
         Φ (.Ok (lower_mstatus (mstatusLegalize o (lift_sstatus o (Mk_Sstatus (zero_extend (m := 64) v)))))))
     ⊢ swp cpu (write_CSR 0x100#12 v) Φ := by
   iintro ⟨Hmisa, Hmstatus, HΦ⟩
-  swp_run 3
+  rw [write_CSR_sstatus]
+  swp_run 2
   iapply swp_bind
   iapply (swp_legalize_mstatus cpu dq o _ (by rw [lift_sstatus_mpp]; exact hmpp))
   iframe Hmisa
