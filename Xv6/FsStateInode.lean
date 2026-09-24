@@ -59,34 +59,16 @@ to other inodes are carried as tokens, never as an equation.
 * helper: `range_lookup` (`List.range`'s lookup; Rocq uses stdpp's
   `lookup_seq`).
 
-## WHAT IS DEFERRED, AND WHY
+## WHAT LIVES IN `Xv6/FsStateInodeOwned.lean`
 
-1. **Everything over the LINK RA** (Rocq `FsStateLink.v`: `link_tok`,
-   `link_auth`, `link_tok_elem`, `link_auth_elem`, `fsLinkUR`, `γlink`,
-   `link_auth_zero_retype`, `own_gather_map_opt` ...), none of which
-   exists in this port (`Xv6/FsStateDefs.lean` deviation 1: `FsViewNames`
-   has no `γlink` / `γtop` yet):
-   `ent_tok_at`, `ent_tok`, `ent_toks`, `ent_toks_nodot`, `ent_elem`,
-   `link_elem_node`, `ent_toks_x`, `inode_ghost`, `inode_owned`,
-   `inode_owned_split`, `inode_owned_local`, `gamma_q_inode_ghost`,
-   `gamma_q_inode_owned`, `inode_ghost_of`, the `ent_tok*` / `ent_toks*` /
-   `inode_ghost` / `inode_owned` `Timeless` instances,
-   `ent_toks_cong_ent`, `ent_toks_dset_ext`, `ent_toks_not_dir`,
-   `ent_toks_x_not_dir`, `ent_toks_nrec0`, `ent_toks_x_nrec0`, §6
-   (`ent_toks_choose`, `ent_toks_of_at`, `inode_link_pack` / `_gather` /
-   `_scatter` / `_iff`, `inode_ghost_iff`), `inode_owned_bare_move`
-   (§7), §8's `ent_toks_delete`, `ent_toks_insert`, `ent_tok_self_ne`,
-   `ent_tok_dd_ne`, `ent_toks_dot_take`, `ent_tok_of_link`,
-   `ent_tok_orph_up`, `ent_tok_open`, `ent_tok_ne`, `ent_tok_dotdot`,
-   `ent_tok_dot`, `ent_toks_orphan`, and §8b's `ent_toks_x_intro`.
-2. **Everything over the register's value type `ity`** (Rocq
-   `Xv6Cameras.ity`), even where pure: `fn_ity_ok`, `fn_ity_ok_ex`,
-   `ent_ty_ok`, `node_ent_ok`, `ent_ty_ok_dot` / `_dot_none` / `_dot_read`
-   / `_dotdot` / `_name` / `_name_read` / `_dd_ne`.  This port's `Ity` is
-   currently a hoisted copy in `Xv6/InodeRegionDefs.lean`, which IMPORTS
-   this file, so it cannot be named here; it is moving to wave 0d's
-   `IcacheRefDefs` / `Xv6Cameras`.  These land with the link RA (item 1)
-   or as soon as `Ity` sits in a module below this one.
+Everything over the LINK RA (`Xv6/FsStateLink.lean`) or the register's
+value type `Ity` (`Xv6/IcacheRefDefs.lean`): Rocq's `ent_tok_at`,
+`ent_tok`, `ent_toks(_nodot/_x)`, `ent_elem`, `link_elem_node`,
+`inode_ghost`, `inode_owned`, `fn_ity_ok`, `ent_ty_ok`, `node_ent_ok`,
+their instances and lemmas, §6 (`ent_toks_choose` .. `inode_ghost_iff`),
+and the `ent_tok*` moves of §8/8b.  That file imports this one, so this
+file stays RA-free and below `FsStateLink`; its header lists the Rocq
+lemmas it drops (`inode_owned_bare_move`, `ent_toks_insert`, ...).
 
 ## Dropped/simplified vs Rocq
 
@@ -966,9 +948,9 @@ end InodeOwned
 /-! ## 4.  The link-accounting READINGS of a node (fs-state.md §6.5)
 
 The pure half of Rocq's §4: the readings the type register's fragments are
-stated over.  The fragments themselves (`ent_tok`, `ent_toks`, ...) and
-the clauses over the register's value type (`fn_ity_ok`, `ent_ty_ok`, ...)
-are DEFERRED (header). -/
+stated over.  The fragments themselves (`entTok`, `entToks`, ...) and
+the clauses over the register's value type (`fnItyOk`, `entTyOk`, ...)
+are in `Xv6/FsStateInodeOwned.lean`. -/
 
 /-- THE MULTIPLICITY: one unit per COUNTED dirent, plus the `"."` a LIVE
 directory holds in its own bundle -- the `+1` xv6 deliberately does not

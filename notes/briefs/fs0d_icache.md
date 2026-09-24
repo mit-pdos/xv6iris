@@ -207,18 +207,18 @@ Deps name batch items; "gate" = §1 plus the in-flight files.
   approves it before B4/C4. (This note is the only non-Xv6 file A10 writes.)
 
 **Batch B (8)**
-- B1 InodeRegionSlot (KEY TYPES: the icache/escrow maps — `IcacheG.regG`/`pcrpG`, `regionPending`, `committedA` — are `Nat`-keyed; the region map `IregMapF` stays `Int`-keyed for the negative marker `imarkKey`. Rocq uses `Z` for both, so bridge at the seam with `z.toNat` under `0 ≤ z`, stated once as helper lemmas, not ad hoc) — A1, A2, A3.
-- B2 FsAbsDefs + AppCfg + AppInv — A4, A2 (FsTopG).
-- B3 FsStateInodeOwned (NOTE: this is now the REST of FsStateInode.v — the link-camera parts (`ent_tok*`, `inode_ghost`, `inode_owned`, §6, §8/8b) AND the `ity`-typed parts (`fn_ity_ok(_ex)`, `ent_ty_ok`, `node_ent_ok`; `Ity` is now in IcacheRefDefs, which does not import FsStateInode) — edit Xv6/FsStateInode.lean, see its DEFERRED header) — A3, A4, A5.
-- B4 IcacheRef — A1, A8, A6, A10.
-- B5 IcacheInvAlg — A8.
-- B6 EscrowInode — A1, A2.
-- B7 FsStateEraPure — A4.
+- [DONE] B1 InodeRegionSlot (KEY TYPES: the icache/escrow maps — `IcacheG.regG`/`pcrpG`, `regionPending`, `committedA` — are `Nat`-keyed; the region map `IregMapF` stays `Int`-keyed for the negative marker `imarkKey`. Rocq uses `Z` for both, so bridge at the seam with `z.toNat` under `0 ≤ z`, stated once as helper lemmas, not ad hoc) — A1, A2, A3.
+- [DONE] B2 FsAbsDefs + AppCfg + AppInv — A4, A2 (FsTopG).
+- [DONE] B3 FsStateInodeOwned (NOTE: this is now the REST of FsStateInode.v — the link-camera parts (`ent_tok*`, `inode_ghost`, `inode_owned`, §6, §8/8b) AND the `ity`-typed parts (`fn_ity_ok(_ex)`, `ent_ty_ok`, `node_ent_ok`; `Ity` is now in IcacheRefDefs, which does not import FsStateInode) — edit Xv6/FsStateInode.lean, see its DEFERRED header) — A3, A4, A5.
+- B4 IcacheRef (CtxBox generalised: use `reference`/`stampsFrag`/`StampMap`/`qsum`/`maxStamp`/hooked forms from MachCSL/CtxBox.lean; `IcboxG.stampsG : ElemG GF (StampsRF IcBid)`; `icBoxRaw_allocAt` feeds `boxAllocAt`) — A1, A8, A6, A10.
+- [DONE] B5 IcacheInvAlg — A8.
+- [DONE] B6 EscrowInode — A1, A2.
+- [DONE] B7 FsStateEraPure — A4.
 - B8 [SUPERSEDED — part of the CtxBox generalisation] MachCSL/CtxBoxQOps — A6.
 
 **Batch C (5)**
-- C1 InodeRegionInv — B1, B2, A4, A5.
-- C2 FsStateEraRes — B3, B7, A2.
+- C1 InodeRegionInv (NOTE from B2: `appBody` holds `γfs.top ↪●MAP{DFrac.own (1 : Qp).half} I`; `ftop_body` must hold the kernel's half at the same `(1 : Qp).half` spelling so the halves join) — B1, B2, A4, A5.
+- C2 FsStateEraRes (NOTE from B7: FsStateEraPure dropped `inode_ok_data_ext` because its only consumer `inode_owned_era_era_node_ok` (FsStateEra.v:1962) is listed dead in §5 — re-verify that; if you keep it, port `inode_ok_data_ext` (6 lines) too. Rocq's FsStateEra `dir_nrec_bound` is `dirNrec_boundMax` in Lean. `DOT_dot_name` was dropped as a duplicate: use `DOT_dot`. Start at `Section EraRes`, line 1022, with `big_sepL_seq_map`) — B3, B7, A2.
 - C3 IcacheHeld — B4.
 - C4 IcacheInvRef — B5, B4, A1, A10.
 - C5 OffBox — B8, A7.
@@ -262,6 +262,11 @@ Every Lean file keeps the Rocq file's header prose for its sections, plus its ow
 cleanups.
 
 ## 5. Gunk candidates (per file)
+
+**CAUTION (batch B):** this list is NOT authoritative. B2 found entries marked dead that have live
+consumers (`abs_tree`, `apath_at_tree` are used in FsAbs.v; `app_top_update` by InodeRegion.v and the
+FsAbs*Fire files). Every agent must re-grep all of /shared/xv6rocq/iris (comment-stripped, incl.
+Spec*/Proof*/FsAbs*) before dropping anything listed here.
 
 Method: I traced reachability from every declaration in every OTHER /shared/xv6rocq/iris/*.v file,
 with comments stripped and instances excluded. **"checked, 0 uses"** = no declaration anywhere in

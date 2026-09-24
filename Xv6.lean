@@ -555,3 +555,11 @@ import Xv6.FsStateTop
 import Xv6.FsStateLink
 import Xv6.IcacheRefLink
 import Xv6.IcacheRefGhost
+import Xv6.InodeRegionSlot
+import Xv6.FsAbsDefs
+import Xv6.AppCfg
+import Xv6.AppInv
+import Xv6.FsStateInodeOwned
+import Xv6.IcacheInvAlg
+import Xv6.EscrowInode
+import Xv6.FsStateEraPure

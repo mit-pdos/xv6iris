@@ -504,4 +504,35 @@ theorem ownScatter_mapOpt {K V : Type _} {M : Type _ → Type _} [LawfulFiniteMa
 
 end Gather
 
+/-! ### The gather/scatter forms AT THE REGISTER'S OWN CAMERA
+
+`ownGather_mapOpt` / `ownScatter_mapOpt` take `[URFunctorContractive F]
+[ElemG GF F]`; `FsLinkG.fsLinkInG` is an `ElemG` at
+`OFunctor.constOF_RFunctorContractive`, and instance search finds a
+different (PartialMap) `URFunctorContractive` for `constOF FsLinkUR`, so the
+two do not meet by search.  They are definitionally equal at
+`OFunctor.constOF_URFunctorContractive`; these two specialisations pass it
+once, so callers never have to. -/
+
+section LinkGather
+variable {GF : BundledGFunctors} [FsLinkG GF]
+
+theorem linkGather_mapOpt {K V : Type _} {M : Type _ → Type _} [LawfulFiniteMap M K]
+    [DecidableEq K] (γ : GName) (f : K → V → FsLinkUR) (p : K → V → Bool)
+    (m : M V) (x : FsLinkUR) :
+    iOwn (GF := GF) (F := constOF FsLinkUR) γ x ∗
+        ([∗map] k ↦ v ∈ m, if p k v then emp else iOwn (GF := GF) (F := constOF FsLinkUR) γ (f k v)) ⊢
+      iOwn (GF := GF) (F := constOF FsLinkUR) γ (x • [^ CMRA.op map] k ↦ v ∈ m, (if p k v then UCMRA.unit else f k v)) :=
+  @ownGather_mapOpt GF (constOF FsLinkUR) OFunctor.constOF_URFunctorContractive FsLinkG.fsLinkInG
+    K V M _ _ γ f p m x
+
+theorem linkScatter_mapOpt {K V : Type _} {M : Type _ → Type _} [LawfulFiniteMap M K]
+    (γ : GName) (f : K → V → FsLinkUR) (p : K → V → Bool) (m : M V) :
+    iOwn (GF := GF) (F := constOF FsLinkUR) γ ([^ CMRA.op map] k ↦ v ∈ m, (if p k v then UCMRA.unit else f k v)) ⊢
+      [∗map] k ↦ v ∈ m, if p k v then emp else iOwn (GF := GF) (F := constOF FsLinkUR) γ (f k v) :=
+  @ownScatter_mapOpt GF (constOF FsLinkUR) OFunctor.constOF_URFunctorContractive FsLinkG.fsLinkInG
+    K V M _ γ f p m
+
+end LinkGather
+
 end Xv6
