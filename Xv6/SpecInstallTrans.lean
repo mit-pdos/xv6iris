@@ -42,21 +42,13 @@ pure premise `L !! w = Some (Lw i)` against `fsCacheAuth`.
   logged contents (`itRecL`), nothing is pinned (the `bunpin` is skipped)
   and the `printk` arm inside the loop body runs.
 
-**THE COMMIT ARM IS PREMISED AWAY IN THIS PORT** (`hrecovering` below),
-and this is the log port's single biggest gap.  `bunpin`'s Lean contract
-(`Xv6/SpecBunpin.lean`) consumes `Xv6.bref γ kk dev bno` -- a token
-indexed by the BUFFER SLOT `kk` -- while the WAL pins a BLOCK: the slot a
-block is cached at is chosen by `bget` inside `bread` and is not exposed
-by `Xv6/SpecBread.lean`'s post, so a caller holding a pin taken by an
-earlier `log_write` cannot show it is the pin of the buffer this `bread`
-returned.  In Rocq the pin is not a slot token at all: it is the
-`bv_dirty` half of the block's TRAVELLING PAYLOAD
-(`BioDefs.bio_view`), which rides the buffer wherever it is cached --
-the same payload hook whose absence `Xv6/FsBlocks.lean` documents.
-Closing the gap means adding the two payload hooks to `Xv6.BioView` /
-`Xv6.bufPay` and re-proving the five bio functions; until then only the
-recovering arm -- `initlog`'s, which is the harder loop (it also runs the
-`printk`) -- is provable, and `end_op` is blocked on the same hook.
+**BOTH ARMS ARE PROVED.**  The commit arm's `bunpin` gets its
+`Xv6.bref` out of the buffer's own TRAVELLING PAYLOAD: `Xv6.bufPay`'s
+dirty arm parks a real reference beside `BioView.dirty`, so a `bread` of
+a pinned block hands the committer the very pin `log_write`'s `bpin`
+minted -- which is what lets `bunpin`'s slot-indexed contract play the
+WAL's block-indexed pin.  The client view is `Xv6.fsView` (the premises
+`hcl`/`hdt` below say so), exactly Rocq's `fs_view γfs γd dev cov`.
 
 Two further deviations from Rocq, both forced: the CRASH PERMIT generator
 `□ (∀ i w, … -∗ ▷ R i -∗ disk_seq_permit …)` and its threaded `R` are
@@ -87,6 +79,11 @@ covered block's client half, and the L update is what moves it" (Rocq
 `initlog`, the recovering arm's only caller, has them: at boot nobody
 above the log layer holds a home block's client half yet.  The commit
 arm's rows are untouched.
+
+**Deviation in spelling (reported).**  Rocq runs the bio layer at
+`fs_view γfs γd dev cov` literally; this port keeps the client view `V` a
+parameter and says the same thing with `hcl : V.clean = fsMclean γfs` and
+`hdt : V.dirty = fsMdirty γfs`.
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
@@ -233,8 +230,6 @@ def wp_install_trans_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
     (hcommit : recovering = false →
       ∀ (i : Nat) (w : BitVec 32), W[i]? = some w → PartialMap.get? L w.toNat = some (Lw i))
     (hpin : recovering = true → ∀ w ∈ W, PartialMap.get? D w.toNat = some false)
-    -- THE COMMIT ARM IS NOT AVAILABLE IN THIS PORT: see the file header.
-    (hrecovering : recovering = true)
     (hpd : descPageRw pd) : Prop :=
   kctx cpu k ∗ pcIs cpu installTransAddr ∗ procsInv Γ ∗
   trapCsrs cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ∗
@@ -274,10 +269,10 @@ structure INSTALL_TRANS : Prop where
     (recovering : Bool) (n : Nat) (W : List (BitVec 32)) (Lw : Nat → List (BitVec 8))
     (L : BlockMap) (D : RegMapF Bool) (pidv : BitVec 32) (dqp : DFrac)
     hj hproc hK hsie hnoff hlocks htier hgeom hdev hcl hdt ha0 hn hnodup hhome hlen hcommit hpin
-    hrecovering hpd,
+    hpd,
     wp_install_trans_body (hlc := hlc) (GF := GF) Γ cpu k γl γb V γdl γfs pd pav pu j
       logstart dev recovering n W Lw L D pidv dqp
       hj hproc hK hsie hnoff hlocks htier hgeom hdev hcl hdt ha0 hn hnodup hhome hlen hcommit hpin
-      hrecovering hpd
+      hpd
 
 end Xv6
