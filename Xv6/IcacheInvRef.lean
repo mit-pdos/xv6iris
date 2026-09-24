@@ -112,9 +112,10 @@ itable.lock's payload.
 * `pinwSlot_intro_norm`, `pinwSlot_live_cases`/`_intro`,
   `itableBody_cases`/`_intro` (the open/reclose steps every accessor
   repeats; Rocq inlines them), `qp_one_add_not_le` (Rocq
-  `Qp.not_add_le_l 1`), `qpSub_half_sum`, and the private
-  `frzsel_halves`/`_unhalves`, `liveGenlo_gather3`/`_scatter3` (Rocq's
-  inline `Qp.div_2` rewrites).
+  `Qp.not_add_le_l 1`), `qpSub_half_sum`, `frzsel_halves` /
+  `liveGenlo_gather3` (public: IcacheInvStore's last close reuses them) and
+  the private `frzsel_unhalves` / `liveGenlo_scatter3` (Rocq's inline
+  `Qp.div_2` rewrites).
 
 ## Dropped/simplified vs Rocq (uses grep-checked over ALL of
 ## `/shared/xv6rocq/iris/*.v`, comments stripped)
@@ -764,7 +765,7 @@ theorem frz_slot_kill_pinw [Icfg] (Eo : CoPset) (k : Nat) (qs s' : Qp) (g : GNam
       exact (qp_one_add_not_le s' hb).elim
 
 /-- The whole selector, from the arm's `½` and the park's `½`. -/
-private theorem frzsel_halves [Icfg] (k : Nat) (b : Bool) :
+theorem frzsel_halves [Icfg] (k : Nat) (b : Bool) :
     frzsel (GF := GF) k (1 : Qp).half b ∗ frzsel k (1 : Qp).half b ⊢ frzsel k 1 b := by
   have h := frzsel_join (GF := GF) k (1 : Qp).half (1 : Qp).half b
   rw [Qp.half_add_half] at h
@@ -778,7 +779,7 @@ private theorem frzsel_unhalves [Icfg] (k : Nat) (b : Bool) :
 
 /-- The whole liveness unit gathered from the reference's `q`, the pool
 residual `c` and the escrow's `½`. -/
-private theorem liveGenlo_gather3 [Icfg] (k : Nat) (q c : Qp) (g : GName) (lo : Nat)
+theorem liveGenlo_gather3 [Icfg] (k : Nat) (q c : Qp) (g : GName) (lo : Nat)
     (hc : qpSub (1 : Qp).half q = some c) :
     liveGenlo (GF := GF) k q g lo ∗ liveGenlo k c g lo ∗ liveGenlo k (1 : Qp).half g lo ⊢
       liveGenlo k 1 g lo := by

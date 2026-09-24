@@ -47,11 +47,10 @@ needs the transports -- needs the pointer-keyed forms too.
 4. **Wands are entailments; `zero_reg` is `0#64`** (`ientry_ne_zero`).
 5. **Binders**: those of `Xv6/IcacheRef.lean` §4e (`[MachGS] [Xv6G]
    [IcacheG] [SleepLockG] [IcboxG]`), `[Icfg]`/`[CurCtx]` per declaration.
-6. **Timeless instances** by `unfold; infer_instance`.  Added (Rocq infers
-   them through the definitions): `inodeRefGenlo_timeless`,
-   `inodeShrGenlo_timeless` -- `Xv6/IcacheRef.lean` states the `_gen` forms'
-   instances but not these; they belong there (reported), stated here to
-   avoid editing a landed file.
+6. **Timeless instances** by `unfold; infer_instance`.  (The `_genlo`
+   forms' `inodeRefGenlo_timeless` / `inodeShrGenlo_timeless`, which Rocq
+   infers through the definitions, are stated in `Xv6/IcacheRef.lean`
+   beside the `_gen` forms'.)
 7. **The ∃-context wrapper** (`inode_held_short_any`) is GONE in Rocq too
    (the header note at Rocq 403); nothing to port.
 
@@ -159,15 +158,6 @@ theorem inodeHeldTy_forget [Icfg] [CurCtx] (v : BitVec 64) (ty : BitVec 16) :
   isplitr
   · ipureintro; exact hle
   · iexact Hfl
-
-/-- (Rocq infers these through the definitions; Lean needs them stated --
-`Xv6/IcacheRef.lean` has the `_gen` forms' but not the `_genlo` ones.) -/
-instance inodeRefGenlo_timeless [Icfg] [CurCtx] (k : Nat) (q : Qp) (dev inum : BitVec 32)
-    (g : GName) (lo : Nat) : Timeless (inodeRefGenlo (GF := GF) k q dev inum g lo) := by
-  unfold inodeRefGenlo; infer_instance
-instance inodeShrGenlo_timeless [Icfg] [CurCtx] (k : Nat) (s : Qp) (dev inum : BitVec 32)
-    (g : GName) (lo : Nat) : Timeless (inodeShrGenlo (GF := GF) k s dev inum g lo) := by
-  unfold inodeShrGenlo; infer_instance
 
 instance inodeHeldTy_timeless [Icfg] [CurCtx] (v : BitVec 64) (ty : BitVec 16) :
     Timeless (inodeHeldTy (GF := GF) v ty) := by

@@ -854,6 +854,14 @@ instance inodeRefShortGen_timeless [Icfg] [CurCtx] (k : Nat) (qt qi : Qp)
     Timeless (inodeRefShortGen (GF := GF) k qt qi dev inum g) := by
   unfold inodeRefShortGen; infer_instance
 
+/-- (Rocq infers these through the definitions; Lean needs them stated.) -/
+instance inodeRefGenlo_timeless [Icfg] [CurCtx] (k : Nat) (q : Qp) (dev inum : BitVec 32)
+    (g : GName) (lo : Nat) : Timeless (inodeRefGenlo (GF := GF) k q dev inum g lo) := by
+  unfold inodeRefGenlo; infer_instance
+instance inodeShrGenlo_timeless [Icfg] [CurCtx] (k : Nat) (s : Qp) (dev inum : BitVec 32)
+    (g : GName) (lo : Nat) : Timeless (inodeShrGenlo (GF := GF) k s dev inum g lo) := by
+  unfold inodeShrGenlo; infer_instance
+
 /-! ### THE FLAVOURED REFERENCE PACKAGE (SIMP-2, ghost-simplification.md §5.1)
 
 Not a new invention: `inode_held` has been the package since item 7a-wire
@@ -890,7 +898,7 @@ def inodeRefpShort [Icfg] [CurCtx] (k : Nat) (qt qi : Qp) (dev inum : BitVec 32)
   iprop(inodeRefShort k qt qi dev inum ∗ runitAny inum.toNat)
 
 /-- THE CLAIM PACKAGE -- `SpecIalloc`'s receipt, whole.  Its elim is
-`InodeRegion.inode_claimed_to_ClaimK`: the pair after the reference IS
+`InodeRegionWithdraw.inodeClaimed_to_claimK`: the pair after the reference IS
 `ireg_wd_lic (ClaimK ty)`, exactly what create's fill presents to ilock.
 THE TRANSACTION RIDES IN THE RECEIPT (durable-disk C-5), LAST so no
 destructuring pattern moves: `t` and `qt` are the claiming transaction and

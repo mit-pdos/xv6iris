@@ -57,11 +57,15 @@ record facts + the two data facts.  Of `blkmapWf`'s five conjuncts, three
 are `InodeLocal` (`bmw_ofLocal`); the other two are NOT, by design
 (fs-state.md §0):
 
-  - INJECTIVITY is the `∗`: `inode_owned_era_slot_inj` (FsStateEraRes)
-    reads it off the block big-op, with no clause.
+  - INJECTIVITY is the `∗`: Rocq's `inode_owned_era_slot_inj` reads it off
+    the block big-op, with no clause.
   - COVERAGE (`fsHome cov ls b`) is a consequence of OWNING the run,
     produced against the log's byte invariant -- a fupd at `logN`, not a
-    pure fact (`inode_owned_era_home`).
+    pure fact (Rocq's `inode_owned_era_home`).
+
+  Rocq's `inode_owned_era_slot_inj` / `inode_owned_era_home` (FsStateEra.v
+  1440-1666; not ported, dead in Rocq: payloads carry `inodeOk` as a pure
+  conjunct, see Xv6/FsStateEraRes.lean's header).
 
 Two further facts a caller of `inodeOk` has that `InodeLocal` does NOT
 imply: `diType ≠ 0` ("this inode is allocated", the checked-out payload's
@@ -424,8 +428,10 @@ theorem inodeSized_ofLocal (i : Nat) (n : FsNode) (hl : InodeLocal i n) :
 OWNERSHIP -- not a clause -- produces (see the header): the
 coverage/log-disjointness pair and the injectivity, both supplied here as
 the last two conjuncts of `blkmapWf` (deviation 3: coverage is `fsHome`).
-A caller reads them off `inode_owned_era_home` and
-`inode_owned_era_slot_inj` (FsStateEraRes).  Rocq's `inode_ok_of_local`. -/
+A caller would read them off Rocq's `inode_owned_era_slot_inj` /
+`inode_owned_era_home` (FsStateEra.v 1440-1666; not ported, dead in Rocq:
+payloads carry `inodeOk` as a pure conjunct, see Xv6/FsStateEraRes.lean's
+header).  Rocq's `inode_ok_of_local`. -/
 theorem inodeOk_ofLocal (i : Nat) (n : FsNode) (cov : ExtTreeSet Nat compare) (ls : Nat)
     (hl : InodeLocal i n)
     (hcov : ∀ k, k ≤ MAXFILE → (bmSlot (bmOf n) k).toNat ≠ 0 →

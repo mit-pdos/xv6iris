@@ -12,8 +12,10 @@ stand OUTSIDE `Section InodeRegion` -- lines 1-1275:
       clause `iregRefOk`, type/nlink stability, the type names, (L4)'s
       arithmetic and the marker's key.
 
-`Section InodeRegion` itself (lines 1281-5578) is `Xv6/InodeRegion.lean`'s,
-which records what of it is ported and what waits for wave 0d.
+`Section InodeRegion` itself (lines 1281-5578) is `Xv6/InodeRegion.lean`'s
+(the pure-stated part) and InodeRegionSlot / InodeRegionInv /
+InodeRegionMovers / InodeRegionWithdraw / InodeRegionLink (the rest);
+`Xv6/InodeRegion.lean`'s header maps each Rocq range to its file.
 
 ## THE FILE'S STORY (Rocq's header, abridged -- read it whole in the `.v`)
 
@@ -77,7 +79,8 @@ is a `Nat` (Rocq `Z`), because `InodeLocal` takes the inum as a `Nat`
 Nothing.  Every lemma of lines 1-1275 is ported with Rocq's statement;
 the dead-looking ones were grepped across `/shared/xv6rocq/iris/*.v` and
 all have a consumer, either in a later file
-or in `InodeRegion.v`'s own deferred `Section InodeRegion`.
+or in `InodeRegion.v`'s own `Section InodeRegion` (ported across the files
+named above).
 -/
 import Xv6.FsStateInode
 import Xv6.IcacheRefLink

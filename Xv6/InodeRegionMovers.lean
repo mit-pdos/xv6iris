@@ -87,14 +87,12 @@ is what `InodeRegionDefs.iregBi_lt` takes.
   Iupdate, ...}, IgetLic, IcacheInv, IcacheEscrow, EscrowDeposit,
   FsCollect).
 
-NEW private helpers (Rocq's inline steps): `mvKey` (`Hkey` at `Nat`),
-`mvLogN` (`subseteq_difference_r` + `logN_iregN_disj`), `mvCouple_lookup`
-(`Hdeq`), `mvCouple_insert` / `mvAgree_insert` (`lookup_insert(_ne)` +
-`ireg_key_inj` at the re-close), `mvSet_self` (`list_insert_id`).  They are
-`private` because the sibling files `InodeRegionWithdraw` /
-`InodeRegionLink` (written concurrently) carry public copies of the same
-arithmetic (`iregSlotKey` / `iregKey_nat`, `logN_sub_diff_iregN`,
-`iregCouple_set`); the three should be merged into `InodeRegionInv`.
+NEW private helper (Rocq's inline step): `mvSet_self` (`list_insert_id`).
+The rest of the movers' arithmetic -- `iregSlotKey` (`Hkey` at `Nat`),
+`logN_sub_diff_iregN`, `iregCouple_lookup` (`Hdeq`), `iregCouple_set`
+(`lookup_insert(_ne)` + `ireg_key_inj` at the re-close) -- is shared with
+InodeRegionWithdraw / InodeRegionLink / EscrowDeposit and lives in
+`InodeRegionInv` §0b.
 -/
 import Xv6.InodeRegionInv
 
@@ -104,55 +102,8 @@ open Iris Iris.BI Iris.ProofMode Iris.Std Iris.Algebra MachCSL
 
 set_option linter.unusedSectionVars false
 
-/-! ## 0.  Pure helpers (Rocq's inline `Hkey` / `lookup_insert(_ne)` /
-`ireg_key_inj` / `list_insert_id` steps) -/
-
-/-- Rocq's inline `Hkey`, at the `Nat` slot key. -/
-private theorem mvKey (inum : BitVec 32) : 16 * iregBi inum + islot inum = inum.toNat := by
-  unfold iregBi islot
-  omega
-
-/-- `logN` is still open inside the region's opening. -/
-private theorem mvLogN (E : CoPset) (hEl : (↑logN : CoPset) ⊆ E) :
-    (↑logN : CoPset) ⊆ E \ ↑iregN := by
-  intro p hp
-  rw [CoPset.in_diff]
-  exact ⟨hEl p hp, fun hc => logN_iregN_disj p ⟨hp, hc⟩⟩
-
-/-- The coupling names the region's record at the caller's slot. -/
-private theorem mvCouple_lookup (m : IregMapF Dinode) (inum : BitVec 32) (ds : List Dinode)
-    (dn : Dinode) (hcp : iregCouple m (iregBi inum) ds)
-    (hm : PartialMap.get? m (inum.toNat : Int) = some dn) : ds[islot inum]! = dn := by
-  have hc := hcp (islot inum) (islot_lt inum)
-  rw [← iregKey_split, hm] at hc
-  exact (Option.some.inj hc).symm
-
-/-- The coupling after the one-slot write. -/
-private theorem mvCouple_insert (m : IregMapF Dinode) (inum : BitVec 32) (ds : List Dinode)
-    (dn' : Dinode) (hlen : ds.length = 16) (hcp : iregCouple m (iregBi inum) ds) :
-    iregCouple (PartialMap.insert m (inum.toNat : Int) dn') (iregBi inum)
-      (ds.set (islot inum) dn') := by
-  have hsl := islot_lt inum
-  intro i hi
-  by_cases hii : i = islot inum
-  · subst hii
-    rw [get?_insert_eq (by rw [iregKey_split]), getElem!_set_self ds _ dn' (by omega)]
-  · rw [get?_insert_ne (by rw [iregKey_split]; omega), getElem!_set_ne ds _ i dn' hii]
-    exact hcp i hi
-
-/-- Other blocks' keys never collide with this inum's. -/
-private theorem mvAgree_insert (m : IregMapF Dinode) (inum : BitVec 32) (dn' : Dinode) :
-    ∀ j i : Nat, j ≠ iregBi inum → i < 16 →
-      PartialMap.get? (PartialMap.insert m (inum.toNat : Int) dn') (16 * (j : Int) + (i : Int)) =
-        PartialMap.get? m (16 * (j : Int) + (i : Int)) := by
-  intro j i hj hi
-  have hsl := islot_lt inum
-  rw [get?_insert_ne]
-  intro h
-  apply hj
-  unfold iregBi
-  unfold islot at hsl
-  omega
+/-! ## 0.  Pure helper (Rocq's inline `list_insert_id` step; the rest is
+`InodeRegionInv` §0b) -/
 
 /-- Rocq's `list_insert_id`. -/
 private theorem mvSet_self (ds : List Dinode) (i : Nat) (h : i < ds.length) :
@@ -206,7 +157,7 @@ theorem iregBody_slot_open [Icfg] (γi : GName) (γfs : FsNames) (inodestart nib
   unfold iregBlk
   icases Hblk with ⟨%ds, %hwf, %hcp, Hrec, Hsls⟩
   have hslacc := iregSlots_acc_upd (GF := GF) γfs γi (iregBi inum) ds (islot inum) hsl hwf.1
-  rw [mvKey] at hslacc
+  rw [iregSlotKey] at hslacc
   ihave ⟨Hslot, Hslback⟩ := hslacc $$ Hsls
   iexists m, ds
   iframe Ha Hrec Hslot Hreg Hback Hslback
@@ -289,7 +240,7 @@ theorem iregRecs_acc_inum (γfs : FsNames) (inodestart : Nat) (inum : BitVec 32)
         iregRecs γfs inodestart (iregBi inum) (ds.set (islot inum) d')) := by
   have h := iregRecs_acc_upd (GF := GF) γfs inodestart (iregBi inum) ds (islot inum)
     (islot_lt inum) hlen
-  rw [mvKey] at h
+  rw [iregSlotKey] at h
   refine h.trans (sep_mono (recOwnedAt_IBLOCK _ inodestart inum _).1 ?_)
   refine forall_mono fun d' => ?_
   exact wand_mono_left (recOwnedAt_IBLOCK _ inodestart inum d').2
@@ -322,11 +273,11 @@ theorem iregRead [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames) (inodestart 
     ⟨%m, %ds, %hwf, %hcp, Ha, Hrec, Hslot, Hrest, Hclose⟩
   unfold dinodeAt
   ihave %hm := ghost_map_lookup $$ Ha Hdn
-  have hdeq := mvCouple_lookup m inum ds dn hcp hm
+  have hdeq := iregCouple_lookup m inum ds dn hcp hm
   ihave Hfsb := iregRecs_to_blk γfs inodestart (iregBi inum) ds hwf $$ Hrec
   rw [iregBi_iblock] at hb
   subst hb
-  imod fsBytes_agree_any (E \ ↑iregN) γfs _ _ _ (mvLogN E hEl) $$ Hby Hfsb Hhalf with
+  imod fsBytes_agree_any (E \ ↑iregN) γfs _ _ _ (logN_sub_diff_iregN E hEl) $$ Hby Hfsb Hhalf with
     ⟨%hbytes, Hfsb, Hhalf⟩
   ihave Hrec := iregRecs_of_blk γfs inodestart (iregBi inum) ds hwf $$ Hfsb
   imod Hclose $$ [Ha Hrec Hslot Hrest]
@@ -358,7 +309,7 @@ theorem iregObs_mint [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames) (inodest
     ⟨%m, %ds, %hwf, %hcp, Ha, Hrec, Hslot, Hrest, Hclose⟩
   unfold dinodeAt
   ihave %hm := ghost_map_lookup $$ Ha Hdn
-  have hdeq := mvCouple_lookup m inum ds dn hcp hm
+  have hdeq := iregCouple_lookup m inum ds dn hcp hm
   subst hdeq
   unfold iregSlot
   icases Hslot with ⟨Hs, Hep, Hlnk⟩
@@ -391,7 +342,7 @@ theorem iregObs_use [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames) (inodesta
     ⟨%m, %ds, %hwf, %hcp, Ha, Hrec, Hslot, Hrest, Hclose⟩
   unfold dinodeAt
   ihave %hm := ghost_map_lookup $$ Ha Hdn
-  have hdeq := mvCouple_lookup m inum ds dn hcp hm
+  have hdeq := iregCouple_lookup m inum ds dn hcp hm
   subst hdeq
   unfold iregSlot
   icases Hslot with ⟨Hs, Hep, Hlnk⟩
@@ -435,7 +386,7 @@ theorem iregRead_blk [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames) (inodest
   unfold iregBlk
   icases Hblk with ⟨%ds, %hwf, %hcp, Hrec, Hsl⟩
   ihave Hfsb := iregRecs_to_blk γfs inodestart bi ds hwf $$ Hrec
-  imod fsBytes_agree_any (E \ ↑iregN) γfs _ _ _ (mvLogN E hEl) $$ Hby Hfsb Hhalf with
+  imod fsBytes_agree_any (E \ ↑iregN) γfs _ _ _ (logN_sub_diff_iregN E hEl) $$ Hby Hfsb Hhalf with
     ⟨%hbytes, Hfsb, Hhalf⟩
   ihave Hrec := iregRecs_of_blk γfs inodestart bi ds hwf $$ Hfsb
   imod Hclose $$ [Ha Hreg Hrec Hsl Hback]
@@ -498,7 +449,7 @@ theorem iregWrite_au [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames) (inodest
   -- own fragment is what reads it off the authority.
   unfold dinodeAt
   ihave %hm := ghost_map_lookup $$ Ha Hdn
-  have hdeq := mvCouple_lookup m inum ds dn hcp hm
+  have hdeq := iregCouple_lookup m inum ds dn hcp hm
   subst hdeq
   have hdnwf := iregBlkSlot ds (islot inum) hwf hsl
   have hwfi := diblkWf_insert ds (islot inum) dn' hwf hdn'
@@ -556,9 +507,10 @@ theorem iregWrite_au [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames) (inodest
     iframe Hmk
     ipureintro
     exact ⟨hnz, ht2.2⟩
+  have hcs := iregCouple_set m ds inum dn' hlen hcp
   imod Hclose $$ [Ha Hrec Hslot Hrest]
-  · iapply (iregSlotRest_close γi γfs inodestart nib inum m _ ds dn' (mvAgree_insert m inum dn')
-      hwfi (mvCouple_insert m inum ds dn' hlen hcp)) $$ Hrest Ha Hrec Hslot
+  · iapply (iregSlotRest_close γi γfs inodestart nib inum m _ ds dn' hcs.2 hwfi hcs.1) $$
+      Hrest Ha Hrec Hslot
   imodintro
   iexact Hdn
 
@@ -720,9 +672,10 @@ theorem iregClaim_au [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames) (inodest
       exact Or.inr ⟨hfr, by simp⟩
     icases Htp with ⟨%n0, %hn0z, Hn0⟩
     iapply iregTopPark_nz γfs inum.toNat dn' n0 hfr.1 (fun _ => hn0z) $$ Hn0
+  have hcs := iregCouple_set m ds inum dn' hlen hcp
   imod Hclose $$ [Ha Hrec Hslot Hrest]
-  · iapply (iregSlotRest_close γi γfs inodestart nib inum m _ ds dn' (mvAgree_insert m inum dn')
-      hwfi (mvCouple_insert m inum ds dn' hlen hcp)) $$ Hrest Ha Hrec Hslot
+  · iapply (iregSlotRest_close γi γfs inodestart nib inum m _ ds dn' hcs.2 hwfi hcs.1) $$
+      Hrest Ha Hrec Hslot
   imodintro
   iexact Hcl
 
@@ -774,7 +727,7 @@ theorem iregFreeze_au [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames) (inodes
     ⟨%m, %ds, %hwf, %hcp, Ha, Hrec, Hslot, Hrest, Hclose⟩
   unfold dinodeAt
   ihave %hm := ghost_map_lookup $$ Ha Hdn
-  have hdeq := mvCouple_lookup m inum ds dn hcp hm
+  have hdeq := iregCouple_lookup m inum ds dn hcp hm
   subst hdeq
   unfold iregSlot
   icases Hslot with

@@ -39,13 +39,16 @@ As `Xv6/InodeRegionSlot.lean`: every per-inum predicate takes `z : Nat`, so
 the movers instantiate it at `inum.toNat`; the type register's tokens are
 read at `((inum.toNat : Nat) : Int)` (`FsStateLink` is `Int`-keyed) and the
 region's ghost map at the same cast (`dinodeAt`).  The block/slot
-arithmetic `16 * iregBi inum + islot inum = inum.toNat` is `iregKey_nat`
-below (the `Nat` face of `InodeRegionDefs.iregKey_split`).
+arithmetic `16 * iregBi inum + islot inum = inum.toNat` is
+`InodeRegionInv.iregSlotKey` (the `Nat` face of
+`InodeRegionDefs.iregKey_split`).  The inum-in-region premise is
+`(inum.toNat : Int) < 16 * (nib : Int)`, the shape `iregBi_lt` takes (as
+InodeRegionWithdraw / InodeRegionMovers).
 
 ## DEVIATIONS from Rocq
 
 1. **Keys** as above; `bv_unsigned inum < 16 * Z.of_nat nib` is
-   `inum.toNat < 16 * nib` (`Nat`).
+   `(inum.toNat : Int) < 16 * (nib : Int)`.
 2. `bv_unsigned` is `.toNat`; `add_vec (di_nlink dn) (mword_of_int 1)` is
    `dn.diNlink + 1#16`; `mword_of_int 32767` is `32767#16`;
    `take 64 (drop k bsl)` is `(bsl.drop k).take 64`; `Z.of_nat (64 * islot
@@ -85,9 +88,11 @@ below (the `Nat` face of `InodeRegionDefs.iregKey_split`).
   which is exactly that composition.
 
 NEW helpers (no Rocq declaration; each is an inline Rocq step, see
-deviation 4): `iregKey_nat`, `iregCouple_set`, `iregRec_acc`,
-`iregSlot_marked_open`, `iregSlot_marked_close`, `iregWriteLink_pure`,
-`iregWriteUnlink_pure`, `iregLnk_raise` (the raise's inline `iAssert`).
+deviation 4): `iregRec_acc`, `iregSlot_marked_open`,
+`iregSlot_marked_close`, `iregWriteLink_pure`, `iregWriteUnlink_pure`,
+`iregLnk_raise` (the raise's inline `iAssert`).  The key arithmetic and the
+coupling's lookup / one-slot update (`iregSlotKey`, `iregCouple_lookup`,
+`iregCouple_set`) are shared with the other movers: `InodeRegionInv` §0b.
 -/
 import Xv6.InodeRegionInv
 
@@ -96,39 +101,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std Iris.Algebra MachCSL
 
 set_option linter.unusedSectionVars false
-
-/-! ## 0.  The key arithmetic and the coupling's one-slot update -/
-
-/-- The block/slot split of an inum, at `Nat` (the `Nat` face of
-`iregKey_split`). -/
-theorem iregKey_nat (inum : BitVec 32) : 16 * iregBi inum + islot inum = inum.toNat := by
-  unfold iregBi islot
-  omega
-
-/-- The coupling after the one-slot write `m[inum := dn']` / `ds[islot inum
-:= dn']`, and the other blocks' keys untouched (Rocq's inline
-`lookup_insert(_ne)` / `ireg_key_inj` steps at the re-close). -/
-theorem iregCouple_set (m : IregMapF Dinode) (ds : List Dinode) (inum : BitVec 32)
-    (dn' : Dinode) (hlen : ds.length = 16) (hcp : iregCouple m (iregBi inum) ds) :
-    iregCouple (PartialMap.insert m (inum.toNat : Int) dn') (iregBi inum)
-        (ds.set (islot inum) dn') ∧
-      ∀ j i : Nat, j ≠ iregBi inum → i < 16 →
-        PartialMap.get? (PartialMap.insert m (inum.toNat : Int) dn')
-            (16 * (j : Int) + (i : Int)) =
-          PartialMap.get? m (16 * (j : Int) + (i : Int)) := by
-  have hsl := islot_lt inum
-  refine ⟨fun i hi => ?_, fun j i hj hi => ?_⟩
-  · by_cases hii : i = islot inum
-    · subst hii
-      rw [get?_insert_eq (by rw [iregKey_split]), getElem!_set_self ds _ dn' (by omega)]
-    · rw [get?_insert_ne (by rw [iregKey_split]; omega), getElem!_set_ne ds _ i dn' hii]
-      exact hcp i hi
-  · rw [get?_insert_ne]
-    intro h
-    apply hj
-    unfold iregBi
-    unfold islot at hsl
-    omega
 
 /-! ## 1.  THE FREEZE PIN's PRICE AND ITS READER -/
 
@@ -197,7 +169,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [Icach
 
 theorem iregRec_acc [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames) (inodestart nib : Nat)
     (inum : BitVec 32) (dn : Dinode) (hE : (↑iregN : CoPset) ⊆ E)
-    (hin : inum.toNat < 16 * nib) :
+    (hin : (inum.toNat : Int) < 16 * (nib : Int)) :
     ⊢@{IProp GF} iregInv (hlc := hlc) γi γfs inodestart nib -∗ dinodeAt γi inum dn -∗
       |={E, E \ ↑iregN}=> (⌜dinodeWf dn⌝ ∗ dinodeAt γi inum dn ∗
         FsView.byteRange (fsGammaL γfs) (IBLOCK inum inodestart) (64 * islot inum)
@@ -214,7 +186,7 @@ theorem iregRec_acc [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames) (inodesta
     (P := iregBody (GF := GF) γi γfs inodestart nib) hE) $$ Hiinv with ⟨Hbody, Hclose⟩
   unfold iregBody
   icases Hbody with ⟨%m, Ha, Hblks, Hreg⟩
-  have hbi : iregBi inum < nib := by unfold iregBi; omega
+  have hbi : iregBi inum < nib := iregBi_lt inum nib hin
   ihave ⟨Hblk, Hback⟩ := iregBlks_acc_upd γi γfs inodestart m nib (iregBi inum) hbi $$ Hblks
   unfold iregBlk
   icases Hblk with ⟨%ds, %hwf, %hcp, Hrec, Hsls⟩
@@ -222,16 +194,13 @@ theorem iregRec_acc [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames) (inodesta
   have hsl := islot_lt inum
   unfold dinodeAt
   ihave %hm := ghost_map_lookup $$ Ha Hdn
-  have hdeq : ds[islot inum]! = dn := by
-    have hc := hcp (islot inum) hsl
-    rw [← iregKey_split, hm] at hc
-    exact (Option.some.inj hc).symm
+  have hdeq : ds[islot inum]! = dn := iregCouple_lookup m inum ds dn hcp hm
   have hdnwf : dinodeWf dn := hdeq ▸ iregBlkSlot ds (islot inum) hwf hsl
   have hrecacc := iregRecs_acc_upd (GF := GF) γfs inodestart (iregBi inum) ds (islot inum)
     hsl hlen
-  rw [iregKey_nat, hdeq] at hrecacc
+  rw [iregSlotKey, hdeq] at hrecacc
   have hslacc := iregSlots_acc_upd (GF := GF) γfs γi (iregBi inum) ds (islot inum) hsl hlen
-  rw [iregKey_nat, hdeq] at hslacc
+  rw [iregSlotKey, hdeq] at hslacc
   ihave ⟨Hrun, Hrecback⟩ := hrecacc $$ Hrec
   ihave ⟨Hslot, Hslback⟩ := hslacc $$ Hsls
   imodintro
@@ -448,7 +417,8 @@ antecedent is absurd at `dn'` (`iregEp_mono`). -/
 theorem iregWriteLink_reg [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames)
     (inodestart nib : Nat) (inum : BitVec 32) (dn dn' : Dinode) (bsl : List (BitVec 8))
     (pin : Bool) (oty : Option Ity)
-    (hE : (↑iregN : CoPset) ⊆ E) (hin : inum.toNat < 16 * nib) (hdn' : dinodeWf dn')
+    (hE : (↑iregN : CoPset) ⊆ E) (hin : (inum.toNat : Int) < 16 * (nib : Int))
+    (hdn' : dinodeWf dn')
     (hnz : dn'.diType.toNat ≠ 0) (hstab : diTypeStable dn' dn)
     (hbump : dn'.diNlink = dn.diNlink + 1#16) (hgrd : dn.diNlink ≠ 32767#16)
     (hup : ∀ v : Ity, oty = some v → iregMult dn = 0 ∧ iregRegOk dn'.diType.toNat v) :
@@ -534,7 +504,8 @@ pin is vacuous (the MARKED arm's `c = none`). -/
 theorem iregWriteUnlink_reg [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames)
     (inodestart nib : Nat) (inum : BitVec 32) (dn dn' : Dinode) (bsl : List (BitVec 8))
     (uty : Ity)
-    (hE : (↑iregN : CoPset) ⊆ E) (hin : inum.toNat < 16 * nib) (hdn' : dinodeWf dn')
+    (hE : (↑iregN : CoPset) ⊆ E) (hin : (inum.toNat : Int) < 16 * (nib : Int))
+    (hdn' : dinodeWf dn')
     (hnz : dn'.diType.toNat ≠ 0) (hstab : diTypeStable dn' dn)
     (hnl : dn.diNlink.toNat = dn'.diNlink.toNat + 1) :
     ⊢@{IProp GF} iregInv (hlc := hlc) γi γfs inodestart nib -∗ dinodeAt γi inum dn -∗

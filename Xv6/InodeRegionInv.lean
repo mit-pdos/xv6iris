@@ -116,7 +116,12 @@ does inline): `getElem!_set_self` / `getElem!_set_ne` (Rocq
 `iregArm_fresh` (`is_fresh (dom A)`), `iregParked_retag` /
 `iregParked_elem` / `iregParked_txPins` / `map_eq_empty_inv` (the inline
 big-op and `fmap_empty_inv` steps of `ireg_disarm` / `ireg_release` /
-`ireg_clean_acc`), `ftopN_appN_disj` (`solve_ndisj`).
+`ireg_clean_acc`), `ftopN_appN_disj` (`solve_ndisj`); `iregSlotKey` (`Hkey`
+at `Nat`), `logN_sub_diff_iregN` (`subseteq_difference_r` +
+`logN_iregN_disj`), `iregCouple_lookup` (`Hdeq`), `iregCouple_set`
+(`lookup_insert(_ne)` + `ireg_key_inj` at a mover's re-close) -- the per-inum
+movers' shared arithmetic (§0b), hoisted here from InodeRegionWithdraw /
+InodeRegionLink / InodeRegionMovers, which each carried a copy.
 -/
 import Xv6.InodeRegionSlot
 import Xv6.AppInv
@@ -144,6 +149,61 @@ theorem getElem!_set_ne {α : Type _} [Inhabited α] (l : List α) (i j : Nat) (
 
 theorem range_getElem? {n i : Nat} (h : i < n) : (List.range n)[i]? = some i := by
   simp [h]
+
+/-! ## 0b.  Slot-key arithmetic and the coupling's one-slot update
+
+Rocq's inline `Hkey` / `lookup_insert(_ne)` / `ireg_key_inj` /
+`subseteq_difference_r` steps, shared by every per-inum mover
+(InodeRegionMovers / InodeRegionWithdraw / InodeRegionLink /
+EscrowDeposit / IcacheInvFrz). -/
+
+/-- Rocq's inline `Hkey`, at the `Nat` slot key: block `iregBi inum`'s slot
+`islot inum` IS the inum (the `Nat` face of `iregKey_split`). -/
+theorem iregSlotKey (inum : BitVec 32) : 16 * iregBi inum + islot inum = inum.toNat := by
+  unfold iregBi islot
+  omega
+
+/-- The byte view's open fits inside the region's (Rocq's inline
+`subseteq_difference_r` + `logN_iregN_disj`). -/
+theorem logN_sub_diff_iregN (E : CoPset) (hEl : (↑logN : CoPset) ⊆ E) :
+    (↑logN : CoPset) ⊆ E \ ↑iregN := by
+  intro p hp
+  rw [CoPset.in_diff]
+  exact ⟨hEl p hp, fun hc => logN_iregN_disj p ⟨hp, hc⟩⟩
+
+/-- The coupling names the region's record at the caller's slot (Rocq's
+inline `Hcp (islot inum) Hsl; rewrite -ireg_key_split`, `Hdeq`). -/
+theorem iregCouple_lookup (m : IregMapF Dinode) (inum : BitVec 32) (ds : List Dinode)
+    (dn : Dinode) (hcp : iregCouple m (iregBi inum) ds)
+    (hm : PartialMap.get? m (inum.toNat : Int) = some dn) : ds[islot inum]! = dn := by
+  have hc := hcp (islot inum) (islot_lt inum)
+  rw [← iregKey_split, hm] at hc
+  exact (Option.some.inj hc).symm
+
+/-- The coupling after the one-slot write `m[inum := dn']` / `ds[islot inum
+:= dn']`, and the other blocks' keys untouched (Rocq's inline
+`lookup_insert(_ne)` / `ireg_key_inj` steps at the re-close). -/
+theorem iregCouple_set (m : IregMapF Dinode) (ds : List Dinode) (inum : BitVec 32)
+    (dn' : Dinode) (hlen : ds.length = 16) (hcp : iregCouple m (iregBi inum) ds) :
+    iregCouple (PartialMap.insert m (inum.toNat : Int) dn') (iregBi inum)
+        (ds.set (islot inum) dn') ∧
+      ∀ j i : Nat, j ≠ iregBi inum → i < 16 →
+        PartialMap.get? (PartialMap.insert m (inum.toNat : Int) dn')
+            (16 * (j : Int) + (i : Int)) =
+          PartialMap.get? m (16 * (j : Int) + (i : Int)) := by
+  have hsl := islot_lt inum
+  refine ⟨fun i hi => ?_, fun j i hj hi => ?_⟩
+  · by_cases hii : i = islot inum
+    · subst hii
+      rw [get?_insert_eq (by rw [iregKey_split]), getElem!_set_self ds _ dn' (by omega)]
+    · rw [get?_insert_ne (by rw [iregKey_split]; omega), getElem!_set_ne ds _ i dn' hii]
+      exact hcp i hi
+  · rw [get?_insert_ne]
+    intro h
+    apply hj
+    unfold iregBi
+    unfold islot at hsl
+    omega
 
 /-! ## 1.  THE REGION's BYTE UNIT: SIXTEEN RECORD RUNS, NOT ONE BLOCK
 (durable-disk 2b-inode-1)

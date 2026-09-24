@@ -2,8 +2,11 @@
 **THE INODE REGION: THE PER-INUM FRAGMENT, THE MARKER, AND THE SLOT'S PURE
 CLAUSES.**  A port of the part of Rocq `InodeRegion.v`'s
 `Section InodeRegion` (`/shared/xv6rocq/iris/InodeRegion.v`, lines
-1281-5578) that can be STATED before wave 0d (the icache) lands.  The pure
-prefix (lines 1-1275) is `Xv6/InodeRegionDefs.lean`'s.
+1281-5578) that could be STATED before wave 0d (the icache) landed.  The
+pure prefix (lines 1-1275) is `Xv6/InodeRegionDefs.lean`'s; the rest of the
+section, deferred at the time, is now ported in InodeRegionSlot /
+InodeRegionInv / InodeRegionMovers / InodeRegionWithdraw / InodeRegionLink
+(see "FORMERLY DEFERRED" below).
 
 What is here, in Rocq order:
 
@@ -22,7 +25,7 @@ What is here, in Rocq order:
 * lines 4724-4755: ilock's per-index withdraw pieces `iregWdTy`,
   `ilkFills`, `ilkPost`, `ilkPost_fill`.
 
-## DEFERRED TO WAVE 0d, AND WHY (the brief's premise does not hold)
+## FORMERLY DEFERRED TO WAVE 0d, AND WHY (now ported; see the list's file tags)
 
 The wave brief says InodeRegion.v "imports IcacheRef/EscrowDefs but
 (checked) uses nothing from them".  That is NOT so.  `ireg_slot` -- the
@@ -43,51 +46,60 @@ every mover -- is a conjunction of:
                   ambient `icfg` class;
   `ireg_lnk`      `FsStateLink.link_auth` / `link_tok` (the type register);
   `ireg_recs`     `FsStateInode.rec_owned_at` (Rocq FsStateInode §3,
-                  deferred by wave 0c-1);
+                  deferred by wave 0c-1 at the time; now
+                  `FsStateInode.recOwnedAt`);
 
 and `ireg_inv` adds `ftop_inv` (over `icfg_lk`, `ireg_arm_ent`, `tx_pin`,
 `inode_local` -- the last is wave 0c-3) and `AppInv.app_inv`.  None of
 `icfg`, `IcacheRef`, `IcacheRefDefs`, `TxPin`, `FsStateLink`, `FsState`,
-`EscrowDefs`, `AppCfg`/`AppInv` exists in this port, and together they are
+`EscrowDefs`, `AppCfg`/`AppInv` existed in the port when this file was
+written (all have landed since), and together they are
 most of wave 0d plus the app layer -- far past "minimal definitions".
 Porting any of them here would pre-empt 0d's design of `Icfg` and the
 icache cameras, so, per the brief, the lemmas are deferred rather than
 weakened.  The DEFERRED list, by Rocq line (every one needs at least one
-of the names above):
+of the names above).  ALL OF IT IS NOW PORTED, in the file named in
+brackets after each item:
 
 * receipts: `iblk_of`, `iblk_of_IBLOCK`, `izrcpt`, `ireg_ep`, `nlz_obs`,
   their instances, `ireg_ep_intro` / `_mono` / `_mint` / `_use` / `_open`
-  (1595-1724);
+  (1595-1724) [InodeRegionSlot];
 * freeze mirror / shelter: `ireg_frzc` (+ `_intro`, `_off_acc`,
   `_off_intro`), `ireg_fpin`, `ireg_fsh` (+ `_off`, `_pre`, `_post_acc`,
-  `_no_ops`, `_boot_off`, `_step`) (1760-1928);
+  `_no_ops`, `_boot_off`, `_step`) (1760-1928) [InodeRegionSlot];
 * the ledger bundle: `ireg_rcol` (+ `_intro`, `_stable`, `_freeze_agree`,
-  `_claim_agree`, `_mint`, `_spend`, `_mint_ok`) (1969-2103);
+  `_claim_agree`, `_mint`, `_spend`, `_mint_ok`) (1969-2103)
+  [InodeRegionSlot];
 * the type register: `ireg_keep`, `ireg_lnk_at`, `ireg_lnk` and all
-  `ireg_lnk_*` (2246-2489);
-* the top park: `ireg_top_park` (+ `_nz`, `_free`, `_open`) (2522-2575);
+  `ireg_lnk_*` (2246-2489) [InodeRegionSlot];
+* the top park: `ireg_top_park` (+ `_nz`, `_free`, `_open`) (2522-2575)
+  [InodeRegionSlot];
 * the claim share: `ireg_cpin` (+ `_none`, `_some`, `_no_ops`), `ireg_shp`
-  (+ `_intro`, `_split`, `_none`) (2606-2660);
-* the slot: `ireg_slot`, `ireg_slot_intro` (2662-2759);
+  (+ `_intro`, `_split`, `_none`) (2606-2660) [InodeRegionSlot];
+* the slot: `ireg_slot`, `ireg_slot_intro` (2662-2759) [InodeRegionSlot];
 * the byte unit: `rec_owned_at_IBLOCK`, `ireg_recs` (+ `_blk`, `_to_blk`,
-  `_of_blk`, `_acc_upd`) (2793-2888);
+  `_of_blk`, `_acc_upd`) (2793-2888) [InodeRegionInv];
 * the body: `ireg_blk`, `ireg_registry` (+ `_from_map`), `ireg_body`,
-  `ireg_bytes` (2890-2974);
+  `ireg_bytes` (2890-2974) [InodeRegionInv];
 * the top map: `ireg_parked`, `ireg_armed`, `ftop_clean` (+ `_empty`),
   `ftop_body`, `ftop_inv`, `ftop_alloc`, `ireg_arm`, `ireg_disarm`,
-  `ireg_release`, `ireg_clean_acc` (3047-3270);
+  `ireg_release`, `ireg_clean_acc` (3047-3270) [InodeRegionInv];
 * the invariant: `ireg_reg`, `ireg_inv`, their projections
   (`ireg_inv_reg` / `_of` / `_bytes` / `_ftop`, `ireg_reg_app`,
-  `ireg_inv_app`), `appN_sub_ftop`, `ftopN_sub_app` (3275-3339);
-* the retags `ireg_top_retag_*` (3370-3490);
+  `ireg_inv_app`), `appN_sub_ftop`, `ftopN_sub_app` (3275-3339)
+  [InodeRegionInv];
+* the retags `ireg_top_retag_*` (3370-3490) [InodeRegionInv];
 * the accessors and movers: `ireg_blk_mono`, `ireg_blks_acc_upd`,
   `ireg_slots_acc_upd`, `ireg_read`, `ireg_obs_mint`, `ireg_obs_use`,
   `ireg_read_blk`, `ireg_write_au`, `ireg_claim_au`, `ireg_freeze_au`,
-  `ireg_frzm_read`, `ireg_frz_pin_read` (3499-4650);
+  `ireg_frzm_read`, `ireg_frz_pin_read` (3499-4650) [`ireg_blk_mono` /
+  `ireg_blks_acc_upd` / `ireg_slots_acc_upd`: InodeRegionInv; the rest:
+  InodeRegionMovers];
 * the withdraw: `ireg_wd_lic`, `ireg_wd_back`, `inode_claimed_to_ClaimK`,
-  `ireg_withdraw`, `ireg_claim_no_out` (4675-5030);
+  `ireg_withdraw`, `ireg_claim_no_out` (4675-5030) [InodeRegionWithdraw];
 * the link movers: `ireg_link_pin`, `ireg_link_pin_read`,
-  `ireg_write_link_reg`, `ireg_write_unlink_reg` (5040-5578).
+  `ireg_write_link_reg`, `ireg_write_unlink_reg` (5040-5578)
+  [InodeRegionLink].
 
 ## DEVIATIONS from Rocq
 
@@ -277,8 +289,8 @@ theorem iregTyOk_stable (dn' dn : Dinode) (hs : diTypeStable dn' dn) (h : iregLi
 
 /-! ## THE LINK-COUNTING RA's MULTIPLICITY (durable-disk 2b-inode-4)
 
-The per-inum authority itself (`ireg_lnk`) is deferred with
-`FsStateLink`; the arithmetic it is stated over is here. -/
+The per-inum authority itself (`ireg_lnk`) is `Xv6/InodeRegionSlot.lean`'s
+(over `FsStateLink`); the arithmetic it is stated over is here. -/
 
 def iregNl (d : Dinode) : Nat := d.diNlink.toNat
 
@@ -354,8 +366,8 @@ theorem iregRegOk_ex (ty : Nat) : ∃ v, iregRegOk ty v := by
 
 /-! ## THE CLAIM BOX'S PARKED TRANSACTION (durable-disk C-5), pure half
 
-`ireg_cpin` itself (a `TxPin.tx_pin_o` over `ln_tx icfg_log`) is deferred
-with `TxPin`/`icfg`. -/
+`ireg_cpin` itself (a `TxPin.tx_pin_o` over `ln_tx icfg_log`) is
+`Xv6/InodeRegionSlot.lean`'s. -/
 
 /-- WHICH TRANSACTION THE COLUMN PINS: the value's second field at a live
 claim, nothing at an empty or invalid one (the `invalid` arm is killed by
@@ -370,7 +382,7 @@ def ctyPin (c : CtyUR) : Option (Nat × Qp) :=
 def iregN : Namespace := ndot nroot "ireg"
 
 /-- The era's top map's own invariant's namespace (the invariant, `ftop_inv`,
-is deferred). -/
+is `Xv6/InodeRegionInv.lean`'s). -/
 def ftopN : Namespace := ndot nroot "ftop"
 
 /-- `logN` and `iregN` are distinct namespaces, so a reader that has one
@@ -390,7 +402,8 @@ theorem iregBlkSlot (ds : List Dinode) (i : Nat) (hwf : diblkWf ds) (hi : i < 16
 /-! ## ilock's withdraw, per licence index (the pure half)
 
 `ireg_wd_lic` / `ireg_wd_back` (over `IcacheRef.iclaim` / `runit_*` /
-`ity_shot`) and `ireg_withdraw` are deferred with the icache. -/
+`ity_shot`) and `ireg_withdraw` are `Xv6/InodeRegionWithdraw.lean`'s
+(`iregWdLic` / `iregWdBack` / `iregWithdraw`). -/
 
 /-- ...what the claim arm BUYS, which is the whole point of item 7. -/
 def iregWdTy (o : Ilkc) (d : Dinode) : Prop :=

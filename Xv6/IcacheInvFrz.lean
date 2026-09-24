@@ -115,7 +115,7 @@ Z.of_nat nib` is `(inum.toNat : Int) < 16 * (nib : Int)` (what
   inline `assert (Hmok' : ireg_frzm_ok (frz_bit ph') …)`),
   `iregClaimOk_frz_step` (Rocq's inline `assert (Hclm' : …)` in
   `ireg_icnt_frz_acc`: the claim clause across a phase step).
-* REUSED rather than restated: `InodeRegionWithdraw.logN_sub_diff_iregN`
+* REUSED rather than restated: `InodeRegionInv.logN_sub_diff_iregN`
   (Rocq's inline `subseteq_difference_r` + `logN_iregN_disj`),
   `IgetLic.inameCouple_lookup` (`Hcp (islot inum) Hsl; rewrite
   -ireg_key_split`), `InodeRegionMovers.iregInv_slot_acc` /

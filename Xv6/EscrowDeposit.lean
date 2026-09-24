@@ -70,7 +70,7 @@ Exactly Rocq's nesting, with Rocq's left-nested `E ∖ A ∖ B` written
    inline `inv_acc` + `ireg_blks_acc_upd` + `ireg_slots_acc_upd` + `Hkey`
    rewrite) and the run is `iregRecs_acc_inum` (Rocq's `ireg_recs_acc_upd`
    read at `rec_owned_at_IBLOCK`); the re-close is `iregSlotRest_close` at
-   `InodeRegionLink.iregCouple_set`'s two facts (Rocq's inline
+   `InodeRegionInv.iregCouple_set`'s two facts (Rocq's inline
    `lookup_insert(_ne)` / `ireg_key_inj` steps).  The deposit is the one
    mover that touches the REGISTRY, which `iregSlotRest` holds, so the new
    helper `iregSlotRest_registry` lends it out and takes it back.
@@ -99,15 +99,14 @@ kept as prose only (see above).
 `ipoolInv`, `ipoolN` (IcacheEscrowPool/PoolMove); `crpElem`, `regFull`,
 `regHalf`, `regSplit`, `regionPending`, `committedA`, `redeemTicketA`
 (EscrowDefs); `iregInv`, `iregInv_ftop`/`_app`, `iregRegistry`,
-`iregTopRetag_same` (InodeRegionInv); `iregInv_slot_acc`,
-`iregRecs_acc_inum`, `iregSlotRest(_close)` (InodeRegionMovers);
-`iregCouple_set` (InodeRegionLink); the slot vocabulary of InodeRegionSlot;
+`iregTopRetag_same`, `iregCouple_lookup`, `iregCouple_set` (InodeRegionInv);
+`iregInv_slot_acc`, `iregRecs_acc_inum`, `iregSlotRest(_close)`
+(InodeRegionMovers); the slot vocabulary of InodeRegionSlot;
 `link_freeze_step` (IcacheRefLink); `absOf_none`/`absOf_bare` (FsAbsDefs);
 `fnBare_freeNode`/`inodeLocal_freeNode`/`iregRefOk_*`/`iregFrzOk_off`
 (InodeRegionDefs).
 -/
 import Xv6.IcacheEscrowPoolMove
-import Xv6.InodeRegionLink
 
 namespace Xv6
 
@@ -236,10 +235,7 @@ theorem iregFreeDeposit_au [Icfg] (E : CoPset) (icn : IcNames) (γi : GName) (γ
   -- `diblk_bytes_inj` used to do through the block's bytes
   unfold dinodeAt
   ihave %hm := ghost_map_lookup $$ Ha Hdn
-  have hdeq : ds[islot inum]! = dn := by
-    have hc := hcp (islot inum) hsl
-    rw [← iregKey_split, hm] at hc
-    exact (Option.some.inj hc).symm
+  have hdeq : ds[islot inum]! = dn := iregCouple_lookup m inum ds dn hcp hm
   subst hdeq
   have hdnwf := iregBlkSlot ds (islot inum) hwf hsl
   have hwfi := diblkWf_insert ds (islot inum) dn' hwf hdn'

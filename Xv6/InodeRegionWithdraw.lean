@@ -105,9 +105,9 @@ live, `grep -w` over `/shared/xv6rocq/iris/*.v`): `ireg_wd_lic` /
 `ireg_wd_back` (SpecIlock, ProofIlock, ProofCreateFreshTy),
 `inode_claimed_to_ClaimK` (ProofCreateFreshTy), `ireg_withdraw`
 (ProofIlock), `ireg_claim_no_out` (ProofIlock).  NEW helpers:
-`iregSlotKey`, `iregSlot_atKey`, `iregWithdraw_conv`, `iregWithdraw_body`
-(deviation 2), `logN_sub_diff_iregN` (Rocq's inline
-`subseteq_difference_r` step).
+`iregSlot_atKey`, `iregWithdraw_conv`, `iregWithdraw_body` (deviation 2).
+The shared arithmetic `iregSlotKey` / `logN_sub_diff_iregN` (Rocq's inline
+`Hkey` / `subseteq_difference_r` steps) is `InodeRegionInv` §0b.
 -/
 import Xv6.InodeRegionInv
 import Xv6.IcacheRef
@@ -118,21 +118,7 @@ open Iris Iris.BI Iris.ProofMode Iris.Std Iris.Algebra MachCSL
 
 set_option linter.unusedSectionVars false
 
-/-! ## 0.  Arithmetic helpers -/
-
-/-- Rocq's inline `Hkey`, at the `Nat` slot key: block `iregBi inum`'s slot
-`islot inum` IS the inum. -/
-theorem iregSlotKey (inum : BitVec 32) : 16 * iregBi inum + islot inum = inum.toNat := by
-  unfold iregBi islot
-  omega
-
-/-- The byte view's open fits inside the region's (Rocq's inline
-`subseteq_difference_r` + `logN_iregN_disj`). -/
-theorem logN_sub_diff_iregN (E : CoPset) (hEl : (↑logN : CoPset) ⊆ E) :
-    (↑logN : CoPset) ⊆ E \ ↑iregN := by
-  intro p hp
-  rw [CoPset.in_diff]
-  exact ⟨hEl p hp, fun hc => logN_iregN_disj p ⟨hp, hc⟩⟩
+/-! ## 0.  The slot key at the inum (`iregSlotKey` is `InodeRegionInv` §0b) -/
 
 /-- The slot accessor's key, re-read at the inum (Rocq's
 `iEval (rewrite Hkey) in "Hslot"`). -/

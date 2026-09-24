@@ -102,9 +102,6 @@ Rocq's text.  The caller does the store, per the design note:
   `iCombine` + `mono_nat_own_update`), `pinw_post_bump` (the post's rows
   re-bound to `max tstp tst'` -- Rocq's `big_sepL_mono` -- the stamps bumped
   and the receipts joined).
-* `liveGenlo_unit` and `frzsel_whole`: the unit / whole-selector
-  reassemblies (IcacheInvRef's `liveGenlo_gather3` / `frzsel_halves` are
-  private; making them public would be an edit to that file).
 * `iregFrzOk_close` / `frzBit_close`: the last close's `Hstep` and
   `frz_bit` side conditions, phase-generic (Rocq inlines them twice).
 
@@ -432,14 +429,6 @@ theorem pinwArm_frz [Icfg] (k : Nat) (qt : Qp) (g : GName) (lo : Nat) :
     · iframe
     cases hb
   · iframe Hfull Hselh Hsel
-
-/-- The whole selector from two halves (IcacheInvRef's `frzsel_halves` is
-private). -/
-theorem frzsel_whole [Icfg] (k : Nat) (b : Bool) :
-    frzsel (GF := GF) k (1 : Qp).half b ∗ frzsel k (1 : Qp).half b ⊢ frzsel k 1 b := by
-  have h := frzsel_join (GF := GF) k (1 : Qp).half (1 : Qp).half b
-  rw [Qp.half_add_half] at h
-  exact h
 
 end Ghost
 
@@ -885,23 +874,6 @@ theorem iref_alloc_pinw_install [Icfg] (Eo : CoPset) (γi : GName) (γfs : FsNam
   iframe Hstout Hllb
   ipureintro; exact Nat.le_max_right _ _
 
-/-- The liveness unit reassembled from the closer's `qt`, the pool
-residual `c` and the escrow's returned `½` (Rocq's two inline
-`live_genlo_join`s + `Qp.div_2`; IcacheInvRef's `liveGenlo_gather3` is
-private). -/
-theorem liveGenlo_unit [Icfg] (k : Nat) (qt c : Qp) (g : GName) (lo : Nat)
-    (hc : qpSub (1 : Qp).half qt = some c) :
-    liveGenlo (GF := GF) k qt g lo ∗ liveGenlo k c g lo ∗ liveGenlo k (1 : Qp).half g lo ⊢
-      liveGenlo k 1 g lo := by
-  have e := qpSub_half_sum hc
-  iintro ⟨Hq, Hc, Hh⟩
-  ihave Hqc := liveGenlo_join k qt c g lo $$ [Hq Hc]
-  · iframe
-  ihave Hone := liveGenlo_join k (qt + c) (1 : Qp).half g lo $$ [Hqc Hh]
-  · iframe
-  rw [e] at *
-  iexact Hone
-
 /-- The last close's phase step is admissible from any phase: it lands at
 count zero, never at `FrzPre`, and keeps the unfrozen column unfrozen
 (Rocq's inline `assert (Hstep : …)` via `ireg_frz_ok_phase`). -/
@@ -969,9 +941,9 @@ theorem iref_close_last_store_pinw_au [Icfg] (Eo : CoPset) (γi : GName) (γfs :
   iframe Hpin
   iintro %P HP
   -- the liveness unit reassembles and parks in the free arm
-  ihave Hfull := liveGenlo_unit k qt c g0 lo0 hc $$ [Hlv Hres Hesc]
+  ihave Hfull := liveGenlo_gather3 k qt c g0 lo0 hc $$ [Hlv Hres Hesc]
   · iframe
-  ihave Hself := frzsel_whole k false $$ [Hselh Hsel]
+  ihave Hself := frzsel_halves k false $$ [Hselh Hsel]
   · iframe
   -- the auth delete
   imod iref_close_last_step_noarm M k qt hMk $$ [Hauth Hf Hsh Hislot] with ⟨Hauth, Hislot⟩
@@ -1036,7 +1008,7 @@ theorem iref_close_last_frz_store_pinw_au [Icfg] (Eo : CoPset) (γi : GName) (γ
   iframe Hpin
   iintro %P HP
   -- the selector comes home whole and flips OFF
-  ihave Hself := frzsel_whole k true $$ [Hselh Hsel]
+  ihave Hself := frzsel_halves k true $$ [Hselh Hsel]
   · iframe
   imod frzsel_flip k true false $$ Hself with Hself
   -- the auth delete
