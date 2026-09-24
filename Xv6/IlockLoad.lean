@@ -19,43 +19,6 @@ set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
-section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
-  [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx]
-
-/-- `bread` at its call site. -/
-theorem ilk_bread (BD : BREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (c : CPU) (k' : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView GF) (γdl : GName)
-    (pd pav pu : BitVec 64) (j : Nat) (pidv dev bno : BitVec 32) (dqp : DFrac)
-    (pj : BitVec 64) (hpj : k'.proc = pj)
-    (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : breadSlots ≤ k'.avail)
-    (hsie : k'.sie = false) (hnoff : k'.noff = 0) (hlocks : k'.locks = [])
-    (htier : k'.tier = KTier.kpt)
-    (hbno : bno.toNat < 2 ^ 31) (hcov : bno.toNat ∈ V.cov) (hdev : dev = V.dev)
-    (hpd : descPageRw pd)
-    (ha0 : k'.regs 10#5 = BitVec.signExtend 64 dev)
-    (ha1 : k'.regs 11#5 = BitVec.signExtend 64 bno) :
-    kctx c k' ∗ pcIs c KA.«bread» ∗ procsInv Γ ∗
-    trapCsrs c ∗ cpuClaim c pj ∗ intrRes c ∗
-    bioCtx γl γ V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
-    wordPointsTo (pPid pj) 4 dqp pidv ∗ bslot γ ∗
-    wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (kb : Nat)
-        (bs bsd : List (BitVec 8)) (d : Bool),
-      ⌜calleeSaved k'.regs R' ∧ R' 10#5 = bnode kb⌝ -∗
-      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      trapCsrs cpu' -∗ cpuClaim cpu' pj -∗ intrRes cpu' -∗
-      wordPointsTo (pPid pj) 4 dqp pidv -∗
-      bioLocked γ V kb pidv dev bno bs bsd d -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  subst hpj
-  have h := BD.wp_bread (hlc := hlc) (GF := GF) Γ c k' γl γ V γdl pd pav pu j pidv dev bno dqp
-    hj hproc hK hsie hnoff hlocks htier hbno hcov hdev hpd ha0 ha1
-  unfold wp_bread_body at h
-  simp only [breadAddr] at h
-  exact h
-
-end
-
 /-- A slot of a well-formed block is a well-formed record. -/
 theorem il_dnwf (ds : List Dinode) (hwf : diblkWf ds) (inum : BitVec 32) :
     dinodeWf ds[islot inum]! := by
@@ -122,7 +85,7 @@ theorem il_load (BD : BREAD) (MM : MEMMOVE) (BL : BRELSE) (PA : PANIC) : IlLoad 
   iintro Hk Hpc
   ihave #Hdc' := (show diskCaps (GF := GF) fscDisk fscDlock pd pav pu ⊢
       diskCaps (fsView (GF := GF) fscFs fscDisk icfgDev fscCov).gd fscDlock pd pav pu from .rfl) $$ Hdc
-  iapply (ilk_bread BD Γ c _ γl fscBio (fsView fscFs fscDisk icfgDev fscCov) fscDlock pd pav pu j
+  iapply (bread_call BD Γ c _ γl fscBio (fsView fscFs fscDisk icfgDev fscCov) fscDlock pd pav pu j
       pidv icfgDev (BitVec.ofNat 32 (IBLOCK inum icfgIst)) dqp k.proc (by k_norm_g) hj ?dproc ?dK
       ?dsie ?dnoff ?dlocks ?dtier ?dbno ?dcov rfl hpd ?da0 ?da1)
     $$ [- $Hk $Hpc $Hpi $Htc $Hcl $Hir $Hbc $Hdc' $Hpe $Hpid $Hbsl]

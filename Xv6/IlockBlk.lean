@@ -26,14 +26,6 @@ set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
-/-! ## Pure readings -/
-
-/-- Giving slot `k` back at its own record leaves the block as it was. -/
-theorem il_set_self (ds : List Dinode) (k : Nat) (hk : k < ds.length) :
-    ds.set k ds[k]! = ds := by
-  rw [getElem!_of_getElem? (List.getElem?_eq_getElem hk)]
-  exact List.set_getElem_self hk
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsBlocksG GF]
 
@@ -61,18 +53,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Bcache
   [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF]
   [FsLinkG GF] [Appcfg GF]
 
-/-- The handle's slot index, keeping the handle. -/
-theorem il_hold_k [CurCtx] (γ : BcacheNames) (V : BioView GF) (kb : Nat)
-    (pidv dev bno : BitVec 32) (bs bsd : List (BitVec 8)) :
-    bufHold0 (GF := GF) γ V kb pidv dev bno bs bsd ⊢
-      ⌜kb < NBUF⌝ ∗ bufHold0 γ V kb pidv dev bno bs bsd := by
-  unfold bufHold0
-  iintro ⟨%hp, H⟩
-  isplitr
-  · ipureintro; exact hp.1
-  · iframe H
-    ipureintro; exact hp
-
 set_option maxHeartbeats 8000000 in
 /-- **THE BLOCK, OPENED** (Rocq 1088-1395). -/
 theorem il_blk_open [Icfg] [Fscfg] [CurCtx] (kb : Nat) (pidv : BitVec 32) (inum : BitVec 32)
@@ -94,7 +74,7 @@ theorem il_blk_open [Icfg] [Fscfg] [CurCtx] (kb : Nat) (pidv : BitVec 32) (inum 
   have hin : (inum.toNat : Int) < 16 * (icfgNib : Int) := by omega
   iintro ⟨#Hireg, Hlk, Hpool, Hcl, Hpend⟩
   icases (bioLocked_split _ _ kb pidv icfgDev _ bs bsd db).1 $$ Hlk with ⟨Hhold, Hpay⟩
-  icases il_hold_k _ _ kb pidv icfgDev _ bs bsd $$ Hhold with ⟨%hkb, Hhold⟩
+  icases dsHold_k_keep _ _ kb pidv icfgDev _ bs bsd $$ Hhold with ⟨%hkb, Hhold⟩
   icases dsHeld_L fscBio fscFs fscDisk icfgDev fscCov kb icfgDev
     (BitVec.ofNat 32 (IBLOCK inum icfgIst)) bs bsd db $$ Hpay with ⟨HL, Hpback⟩
   rw [hbno]
@@ -123,7 +103,7 @@ theorem il_blk_open [Icfg] [Fscfg] [CurCtx] (kb : Nat) (pidv : BitVec 32) (inum 
     rw [getElem!_of_getElem? (List.getElem?_eq_getElem hlen)]
     exact List.getElem_mem hlen
   ihave Hby := Hsback $$ %ds[islot inum]! %hwfk Hslot
-  rw [il_set_self ds (islot inum) hlen]
+  rw [dsSet_self ds (islot inum) hlen]
   ihave Hown := Hbyback $$ %ds %hwf Hby
   ihave Hhold := Hhback $$ %(diblkBytes ds) Hown
   iapply (bioLocked_split _ _ kb pidv icfgDev _ (diblkBytes ds) bsd db).2

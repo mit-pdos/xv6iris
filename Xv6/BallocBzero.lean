@@ -104,7 +104,8 @@ theorem ba_bzero_fill (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET)
   k_step (wp_s_jal c2 _ (KA.«balloc» + 0x60#64) false 2088548#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ba_br_memset]
   iintro Hk Hpc
-  iapply (ba_memset MS c2 _ bs2 (aBufData (bnode kk2)) ?mdst ?mK ?mn ?m11 hlen2)
+  iapply (memset_zero_call MS c2 _ bs2 (aBufData (bnode kk2)) BSIZE (by unfold BSIZE; omega)
+      ?mdst ?mK ?mn ?m11 hlen2)
     $$ [- $Hk $Hpc $Hby]
   rotate_right 1
   k_norm_g [ba_ret_64]
@@ -130,9 +131,10 @@ theorem ba_bzero_fill (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET)
   k_step (wp_s_jal c3 _ (KA.«balloc» + 0x66#64) false 4182#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ba_br_logwrite]
   iintro Hk Hpc
-  iapply (ba_log_write_gen LW c3 _ γ γl γb V γfs logstart dev kk2 pidv (BitVec.ofNat 32 bi)
-      bi hbno (List.replicate BSIZE 0#8) bs2 bsd2 d2 (if cr then u + 1 else u) (bmapstart :: Sb)
-      ?wK ?wnoff ?wlk ?wbc ?wtier hkk2 ?wa0 hdev hcl hdt ?whome)
+  iapply (log_write_gen_call LW c3 _ γ γl γb V γfs logstart dev kk2 pidv (BitVec.ofNat 32 bi)
+      bi hbno (List.replicate BSIZE 0#8) bs2 bsd2 d2 (if cr then u + 1 else u) false
+      (bmapstart :: Sb) ?wK ?wnoff ?wlk ?wbc ?wtier hkk2 ?wa0 hdev hcl hdt ?whome
+      (fun h => absurd h (by decide)))
     $$ [- $Hk $Hpc $Hbc $Hlc $Hsl2 $Hop $HfsbD $Hhold $Hpay]
   rotate_right 1
   k_norm_g [ba_ret_6a]
@@ -159,7 +161,7 @@ theorem ba_bzero_fill (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET)
   k_step (wp_s_jal c4 _ (KA.«balloc» + 0x6c#64) false 2096808#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ba_br_brelse]
   iintro Hk Hpc
-  iapply (ba_brelse BE Γ c4 _ γl γb V kk2 pidv dev (BitVec.ofNat 32 bi) dqp
+  iapply (brelse_call BE Γ c4 _ γl γb V kk2 pidv dev (BitVec.ofNat 32 bi) dqp
       (List.replicate BSIZE 0#8) bsd2 true k.proc (by k_norm_g)
       ?rnoff ?rK ?rlk ?rsl ?rp ?rtier hkk2 ?ra0)
     $$ [- $Hk $Hpc $Hpi $Hbc $Hpid $Hlk]
@@ -256,7 +258,7 @@ theorem ba_bzero (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET)
   k_step (wp_s_jal c _ (KA.«balloc» + 0x50#64) false 2096572#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ba_br_bread]
   iintro Hk Hpc
-  iapply (ba_bread BR Γ c _ γl γb V γdl pd pav pu j pidv dev (BitVec.ofNat 32 bi) dqp k.proc
+  iapply (bread_call BR Γ c _ γl γb V γdl pd pav pu j pidv dev (BitVec.ofNat 32 bi) dqp k.proc
       (by k_norm_g) hj ?dproc ?dK ?dsie ?dnoff ?dlocks ?dtier ?dbno ?dcov hdev hpd ?da0 ?da1)
     $$ [- $Hk $Hpc $Hpi $Htc $Hcl $Hir $Hbc $Hdc $Hpe $Hpid $Hsl1]
   rotate_right 1

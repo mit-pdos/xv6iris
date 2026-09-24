@@ -1,8 +1,9 @@
 /-
 `bfree`'s own vocabulary (Rocq `ProofBfree.v` 66–545): the pure arithmetic
 of the block number and the bit, the constants the code computes, the
-payload's machinery half, and the three callees restated at their call
-sites.  Everything here is closed over plain `Nat` / `BitVec` facts or is
+payload's machinery half, and `log_write` restated at its call site
+(`bread` / `brelse` are the shared `Xv6.bread_call` / `Xv6.brelse_call`,
+`Xv6/FsCallSites.lean`).  Everything here is closed over plain `Nat` / `BitVec` facts or is
 a one-screen ghost move; the instruction walks are in
 `Xv6/ProofBfree.lean` (`+0x00 .. +0x1c`), `Xv6/BfreeMid.lean`
 (`+0x20 .. +0x46`) and `Xv6/BfreeTail.lean` (`+0x4a ..`).
@@ -31,6 +32,7 @@ import Xv6.SpecBfree
 import Xv6.CodeTactics
 import Xv6.DinodeSlot
 import MachCSL.WpSmodeLh
+import Xv6.FsCallSites
 
 namespace Xv6
 
@@ -226,65 +228,6 @@ theorem bf_pay_L (γ : BcacheNames) (γfs : FsNames) (V : BioView GF)
 end
 
 /-! ## The three callees, at their call sites -/
-
-section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
-  [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx]
-
-theorem bf_bread (BD : BREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (c : CPU) (k' : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView GF) (γdl : GName)
-    (pd pav pu : BitVec 64) (j : Nat) (pidv dev bno : BitVec 32) (dqp : DFrac)
-    (pj : BitVec 64) (hpj : k'.proc = pj)
-    (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : breadSlots ≤ k'.avail)
-    (hsie : k'.sie = false) (hnoff : k'.noff = 0) (hlocks : k'.locks = [])
-    (htier : k'.tier = KTier.kpt)
-    (hbno : bno.toNat < 2 ^ 31) (hcov : bno.toNat ∈ V.cov) (hdev : dev = V.dev)
-    (hpd : descPageRw pd)
-    (ha0 : k'.regs 10#5 = BitVec.signExtend 64 dev)
-    (ha1 : k'.regs 11#5 = BitVec.signExtend 64 bno) :
-    kctx c k' ∗ pcIs c KA.«bread» ∗ procsInv Γ ∗
-    trapCsrs c ∗ cpuClaim c pj ∗ intrRes c ∗
-    bioCtx γl γ V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
-    wordPointsTo (pPid pj) 4 dqp pidv ∗ bslot γ ∗
-    wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (kk : Nat)
-        (bs bsd : List (BitVec 8)) (d : Bool),
-      ⌜calleeSaved k'.regs R' ∧ R' 10#5 = bnode kk⌝ -∗
-      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      trapCsrs cpu' -∗ cpuClaim cpu' pj -∗ intrRes cpu' -∗
-      wordPointsTo (pPid pj) 4 dqp pidv -∗
-      bioLocked γ V kk pidv dev bno bs bsd d -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  subst hpj
-  have h := BD.wp_bread (hlc := hlc) (GF := GF) Γ c k' γl γ V γdl pd pav pu j pidv dev bno dqp
-    hj hproc hK hsie hnoff hlocks htier hbno hcov hdev hpd ha0 ha1
-  unfold wp_bread_body at h
-  simp only [breadAddr] at h
-  exact h
-
-theorem bf_brelse (BE : BRELSE) (Γ : SchedNames)
-    (c : CPU) (k' : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView GF) (kk : Nat)
-    (pidv dev bno : BitVec 32) (dqp : DFrac) (bs bsd : List (BitVec 8)) (d : Bool)
-    (pj : BitVec 64) (hpj : k'.proc = pj)
-    (hnoff : k'.noff + 2 < 2 ^ 31) (hK : brelseSlots ≤ k'.avail)
-    (hlk : "bcache" ∉ k'.locks) (hsl : "sleep lock" ∉ k'.locks) (hp : "proc" ∉ k'.locks)
-    (htier : k'.tier = KTier.kpt) (hkk : kk < NBUF) (ha0 : k'.regs 10#5 = bnode kk) :
-    kctx c k' ∗ pcIs c KA.«brelse» ∗ procsInv Γ ∗
-    bioCtx γl γ V ∗ wordPointsTo (pPid pj) 4 dqp pidv ∗
-    bioLocked γ V kk pidv dev bno bs bsd d ∗
-    wpNext k'.sie pj c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
-      ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
-      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      ⌜calleeSaved k'.regs R'⌝ -∗ wordPointsTo (pPid pj) 4 dqp pidv -∗
-      bslot γ -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  subst hpj
-  have h := BE.wp_brelse (hlc := hlc) (GF := GF) Γ c k' γl γ V kk pidv dev bno dqp bs bsd d
-    hnoff hK hlk hsl hp htier hkk ha0
-  unfold wp_brelse_body at h
-  simp only [brelseAddr] at h
-  exact h
-
-end
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]

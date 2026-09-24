@@ -24,6 +24,7 @@ Lean's `MEMSET` post is already `List.replicate n (low byte of a1)`.
 -/
 import Xv6.SpecIalloc
 import Xv6.DinodeSlot
+import Xv6.FsCallSitesF
 
 namespace Xv6
 
@@ -205,23 +206,6 @@ what the `sh` does to `dislot`'s first cell. -/
 theorem ialloc_fresh_of_zero (ty : BitVec 16) :
     iallocFresh ty = ⟨ty, iallocDzero.diMajor, iallocDzero.diMinor, iallocDzero.diNlink, iallocDzero.diSize,
       iallocDzero.diAddrs⟩ := rfl
-
-/-- The claim's record-granular shape obligation (Rocq's `Hsplice`, from
-`diblk_bytes_splice`). -/
-theorem ialloc_shape (ds : List Dinode) (inum : BitVec 32) (ty : BitVec 16) (hds : diblkWf ds) :
-    (diblkBytes (ds.set (islot inum) (iallocFresh ty))).length = BSIZE →
-      (diblkBytes ds).length = BSIZE →
-      (dinodeBytes (iallocFresh ty)).length = 64 ∧
-        diblkBytes (ds.set (islot inum) (iallocFresh ty))
-          = blkSplice (64 * islot inum) (dinodeBytes (iallocFresh ty)) (diblkBytes ds) :=
-  fun _ _ => ⟨dinodeBytes_length _ (iallocFresh_wf ty),
-    diblkBytes_splice ds (islot inum) (iallocFresh ty) hds (iallocFresh_wf ty) (islot_lt inum)⟩
-
-/-- Giving slot `k` back at its own record leaves the block as it was. -/
-theorem ialloc_set_self (ds : List Dinode) (k : Nat) (hk : k < ds.length) :
-    ds.set k ds[k]! = ds := by
-  rw [getElem!_of_getElem? (List.getElem?_eq_getElem hk)]
-  exact List.set_getElem_self hk
 
 /-- Slot `k`'s record is well formed. -/
 theorem ialloc_slot_wf (ds : List Dinode) (k : Nat) (hwf : diblkWf ds) (hk : k < 16) :

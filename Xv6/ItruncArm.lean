@@ -97,85 +97,9 @@ theorem itrunc_map_ind (γfs : FsNames) (ip : BitVec 64) (bm : Blkmap)
   rw [hi]
   iframe Hc Hi Hb
 
-/-- Rocq's `bio_locked_kbound`: the handle knows its own slot bound. -/
-theorem itrunc_hold_k (γ : BcacheNames) (V : BioView GF) (kk : Nat)
-    (pidv dev bno : BitVec 32) (bs bsd : List (BitVec 8)) :
-    bufHold0 (GF := GF) γ V kk pidv dev bno bs bsd ⊢
-      ⌜kk < NBUF⌝ ∗ bufHold0 γ V kk pidv dev bno bs bsd := by
-  unfold bufHold0
-  iintro ⟨%hp, H⟩
-  isplitl []
-  · ipureintro; exact hp.1
-  · iframe H; ipureintro; exact hp
-
 end
 
 /-! ## The callees at their call sites -/
-
-section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
-  [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [Fscfg] [Icfg] [CurCtx]
-
-/-- `bread` at the ambient view (a copy of iupdate's `iu_bread`, a stage-file
-lemma of another function: promotion candidate). -/
-theorem itrunc_bread (BD : BREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (c : CPU) (k' : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
-    (pidv bno : BitVec 32) (dqp : DFrac) (pj : BitVec 64) (hpj : k'.proc = pj)
-    (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : breadSlots ≤ k'.avail)
-    (hsie : k'.sie = false) (hnoff : k'.noff = 0) (hlocks : k'.locks = [])
-    (htier : k'.tier = KTier.kpt)
-    (hbno : bno.toNat < 2 ^ 31) (hcov : bno.toNat ∈ fscCov) (hpd : descPageRw pd)
-    (ha0 : k'.regs 10#5 = BitVec.signExtend 64 icfgDev)
-    (ha1 : k'.regs 11#5 = BitVec.signExtend 64 bno) :
-    kctx c k' ∗ pcIs c KA.«bread» ∗ procsInv Γ ∗
-    trapCsrs c ∗ cpuClaim c pj ∗ intrRes c ∗
-    bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
-    diskCaps fscDisk fscDlock pd pav pu ∗ panicEnv ∗
-    wordPointsTo (pPid pj) 4 dqp pidv ∗ bslots fscBio 1 ∗
-    wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (kk : Nat)
-        (bs bsd : List (BitVec 8)) (d : Bool),
-      ⌜calleeSaved k'.regs R' ∧ R' 10#5 = bnode kk⌝ -∗
-      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      trapCsrs cpu' -∗ cpuClaim cpu' pj -∗ intrRes cpu' -∗
-      wordPointsTo (pPid pj) 4 dqp pidv -∗
-      bioLocked fscBio (fsView fscFs fscDisk icfgDev fscCov) kk pidv icfgDev bno bs bsd d -∗
-      wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  subst hpj
-  have h := BD.wp_bread (hlc := hlc) (GF := GF) Γ c k' γl fscBio
-    (fsView fscFs fscDisk icfgDev fscCov) fscDlock pd pav pu j pidv icfgDev bno dqp
-    hj hproc hK hsie hnoff hlocks htier hbno hcov rfl hpd ha0 ha1
-  unfold wp_bread_body bslot at h
-  simp only [breadAddr] at h
-  exact h
-
-/-- `brelse` at the ambient view (a copy of iupdate's `iu_brelse`:
-promotion candidate). -/
-theorem itrunc_brelse (BE : BRELSE) (Γ : SchedNames)
-    (c : CPU) (k' : KCtx) (γl : GName) (kk : Nat)
-    (pidv bno : BitVec 32) (dqp : DFrac) (bs bsd : List (BitVec 8)) (d : Bool)
-    (pj : BitVec 64) (hpj : k'.proc = pj)
-    (hnoff : k'.noff + 2 < 2 ^ 31) (hK : brelseSlots ≤ k'.avail)
-    (hlk : "bcache" ∉ k'.locks) (hsl : "sleep lock" ∉ k'.locks) (hp : "proc" ∉ k'.locks)
-    (htier : k'.tier = KTier.kpt) (hkk : kk < NBUF) (ha0 : k'.regs 10#5 = bnode kk) :
-    kctx c k' ∗ pcIs c KA.«brelse» ∗ procsInv Γ ∗
-    bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗ wordPointsTo (pPid pj) 4 dqp pidv ∗
-    bioLocked fscBio (fsView fscFs fscDisk icfgDev fscCov) kk pidv icfgDev bno bs bsd d ∗
-    wpNext k'.sie pj c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
-      ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
-      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      ⌜calleeSaved k'.regs R'⌝ -∗ wordPointsTo (pPid pj) 4 dqp pidv -∗
-      bslots fscBio 1 -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  subst hpj
-  have h := BE.wp_brelse (hlc := hlc) (GF := GF) Γ c k' γl fscBio
-    (fsView fscFs fscDisk icfgDev fscCov) kk pidv icfgDev bno dqp bs bsd d
-    hnoff hK hlk hsl hp htier hkk ha0
-  unfold wp_brelse_body bslot at h
-  simp only [brelseAddr] at h
-  exact h
-
-end
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
@@ -266,7 +190,7 @@ theorem itrunc_arm_rest (BF : BFREE) (BE : BRELSE) (Γ : SchedNames) [ClaimIs (h
   k_step (wp_s_jal c _ (KA.«itrunc» + 0x7c#64) false 2095366#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [itrunc_br_brelse]
   iintro Hk Hpc
-  iapply (itrunc_brelse BE Γ c _ γl kk pidv bm.bmInd dqp (indBytes bm.bmEnt) bsd d k.proc
+  iapply (brelse_callF BE Γ c _ γl kk pidv bm.bmInd dqp (indBytes bm.bmEnt) bsd d k.proc
       (by k_norm_g) ?rnoff ?rK ?rlk ?rsl ?rp ?rtier hkk ?ra0)
     $$ [- $Hk $Hpc $Hpi $Hbc $Hpid $Hlk]
   rotate_right 1
@@ -350,6 +274,7 @@ theorem itrunc_arm_rest (BF : BFREE) (BE : BRELSE) (Γ : SchedNames) [ClaimIs (h
   ihave Hframe := itrunc_frame_join (GF := GF) (k.regs 2#5) (k.regs 1#5) (k.regs 8#5)
     (k.regs 9#5) (k.regs 18#5) (k.regs 19#5) (k.regs 20#5) $$ [H5 Hs0]
   · iframe
+  ihave Hsl1 := (show bslot (GF := GF) fscBio ⊢ bslots fscBio 1 from .rfl) $$ Hsl1
   ihave Hsl := dsSlots_join fscBio 2 1 $$ Hsl Hsl1
   have hexit' := hexit c4 spie4 spp4 (R4.set 20#5 (k.regs 20#5)) hpin4 ?xp ?x19
   unfold itJPre at hexit'
@@ -437,7 +362,8 @@ theorem itrunc_arm (BR : BREAD) (BF : BFREE) (BE : BRELSE) (Γ : SchedNames)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [itrunc_br_bread]
   iintro Hk Hpc
   icases dsSlots_split fscBio 1 2 $$ Hsl with ⟨Hsl1, Hsl⟩
-  iapply (itrunc_bread BR Γ c _ γl pd pav pu j pidv bm.bmInd dqp k.proc (by k_norm_g) hj ?dproc
+  ihave Hsl1 := (show bslots (GF := GF) fscBio 1 ⊢ bslot fscBio from .rfl) $$ Hsl1
+  iapply (bread_callF BR Γ c _ γl pd pav pu j pidv bm.bmInd dqp k.proc (by k_norm_g) hj ?dproc
       ?dK ?dsie ?dnoff ?dlocks ?dtier hib31 hhome.1 hpd ?da0 ?da1)
     $$ [- $Hk $Hpc $Hpi $Htc $Hcl $Hir $Hbc $Hdc $Hpe $Hpid $Hsl1]
   rotate_right 1
@@ -463,7 +389,7 @@ theorem itrunc_arm (BR : BREAD) (BF : BFREE) (BE : BRELSE) (Γ : SchedNames)
   obtain ⟨e2, e8, e9, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩ := hcsa
   icases (bioLocked_split fscBio (fsView fscFs fscDisk icfgDev fscCov) kk pidv icfgDev bm.bmInd
     bs0 bsd0 d0).1 $$ Hlocked with ⟨Hhold, Hpay⟩
-  icases itrunc_hold_k fscBio (fsView fscFs fscDisk icfgDev fscCov) kk pidv icfgDev bm.bmInd bs0
+  icases dsHold_k_keep fscBio (fsView fscFs fscDisk icfgDev fscCov) kk pidv icfgDev bm.bmInd bs0
     bsd0 $$ Hhold with ⟨%hkk, Hhold⟩
   -- THE COUPLING: the handle's bytes ARE the logged content of the block
   ihave #Hany := logCtx_bytesAny icfgLog fscBio fscFs fscCov fscLogst icfgDev $$ Hlc

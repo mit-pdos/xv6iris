@@ -217,7 +217,7 @@ theorem ba_setup (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET) (PK :
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ba_br_bread]
   iintro Hk Hpc
   icases ba_slots_split2 γb $$ Hsl with ⟨Hsl1, Hsl2⟩
-  iapply (ba_bread BR Γ cpu _ γl γb V γdl pd pav pu j pidv dev (BitVec.ofNat 32 bmapstart) dqp
+  iapply (bread_call BR Γ cpu _ γl γb V γdl pd pav pu j pidv dev (BitVec.ofNat 32 bmapstart) dqp
       k.proc (by k_norm_g) hj ?dproc ?dK ?dsie ?dnoff ?dlocks ?dtier ?dbno ?dcov hdev hpd
       ?da0 ?da1)
     $$ [- $Hk $Hpc $Hpi $Htc $Hcl $Hir $Hbc $Hdc $Hpe $Hpid $Hsl1]

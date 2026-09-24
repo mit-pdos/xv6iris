@@ -72,7 +72,7 @@ theorem iu_mm (LW : LOG_WRITE) (BE : BRELSE) (MM : MEMMOVE)
     bslot fscBio ∗ logEpochLb icfgLog v ∗
     logCredit icfgLog cru Sb e0 (IBLOCK inum icfgIst) ∗
     logOpSe icfgLog (u + 1) Sb e0 ∗
-    iuRegionAu inum dn ds e0 Pout ∗
+    dislotWriteAu inum dn ds e0 Pout ∗
     -- the slot's five scalar cells, already at the NEW record; the addrs
     -- window still at the OLD one
     wordPointsTo sa 2 (DFrac.own 1) dn.diType ∗
@@ -193,7 +193,7 @@ theorem iu_copy (LW : LOG_WRITE) (BE : BRELSE) (MM : MEMMOVE)
     bslot fscBio ∗ logEpochLb icfgLog v ∗
     logCredit icfgLog cru Sb e0 (IBLOCK inum icfgIst) ∗
     logOpSe icfgLog (u + 1) Sb e0 ∗
-    iuRegionAu inum dn ds e0 Pout ∗
+    dislotWriteAu inum dn ds e0 Pout ∗
     -- the OLD record's slot, at its base `sa`
     dislot sa dold ∗
     -- ...and the way back to the handle, at ANY new record
@@ -505,7 +505,7 @@ theorem iu_main (BD : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MM : MEMMOVE)
   k_step (wp_s_jal c1 _ (KA.«iupdate» + 0x20#64) false 2095612#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iu_br_bread]
   iintro Hk Hpc
-  iapply (iu_bread BD Γ c1 _ γl pd pav pu j pidv (BitVec.ofNat 32 (IBLOCK inum icfgIst)) dqp
+  iapply (bread_callF BD Γ c1 _ γl pd pav pu j pidv (BitVec.ofNat 32 (IBLOCK inum icfgIst)) dqp
       k.proc (by k_norm_g) hj ?dproc ?dK ?dsie ?dnoff ?dlocks ?dtier ?dbno ?dcov hpd ?da0 ?da1)
     $$ [- $Hk $Hpc $Hpi $Htc $Hcl $Hir $Hbc $Hdc $Hpe $Hpid $Hsl1]
   rotate_right 1

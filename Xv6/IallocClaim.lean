@@ -218,7 +218,7 @@ theorem ialloc_claim_rel (BE : BRELSE) (IG : IGET) [Fscfg] [Icfg] [CurCtx] (Γ :
   k_step (wp_s_jal c _ (KA.«ialloc» + 0xa0#64) false 2095936#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ialloc_br_brelse]
   iintro Hk Hpc
-  iapply (ialloc_brelse BE Γ c _ γl kk pidv (BitVec.ofNat 32 (IBLOCK inum icfgIst)) dqp bs bsd true
+  iapply (brelse_callF BE Γ c _ γl kk pidv (BitVec.ofNat 32 (IBLOCK inum icfgIst)) dqp bs bsd true
       k.proc (by k_norm_g) ?rnoff ?rK ?rlk ?rsl ?rp ?rtier hkk ?ra0)
     $$ [- $Hk $Hpc $Hpi $Hbc $Hpid $Hlk]
   rotate_right 1
@@ -328,8 +328,9 @@ theorem ialloc_claim_lw (LW : LOG_WRITE) (BE : BRELSE) (IG : IGET) [Fscfg] [Icfg
   k_step (wp_s_jal c _ (KA.«ialloc» + 0x9a#64) false 3310#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ialloc_br_logwrite]
   iintro Hk Hpc
-  iapply (ialloc_log_write LW c _ γl kk pidv inum ty ds bsd d0 u Sb e0 (iclaim inum.toNat ty t qt)
-      ?lK ?lnoff ?llk ?lbc ?ltier hkk ?la0 hbnoN hhome hwf)
+  iapply (dislot_log_write LW c _ γl kk pidv inum (iallocFresh ty) ds bsd d0 u false Sb e0 0
+      (iclaim inum.toNat ty t qt) ?lK ?lnoff ?llk ?lbc ?ltier hkk ?la0 hbnoN hhome hwf
+      (iallocFresh_wf ty))
     $$ [- $Hk $Hpc $Hbc $Hlc $Hsl $Hlb0 $Hcrd $Hop $Hau $Hhold $Hpay]
   rotate_right 1
   k_norm_g [ialloc_ret_9e]
@@ -465,8 +466,9 @@ theorem ialloc_claim (MS : MEMSET) (LW : LOG_WRITE) (BE : BRELSE) (IG : IGET) [F
   k_step (wp_s_jal c _ (KA.«ialloc» + 0x90#64) false 2087680#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ialloc_br_memset]
   iintro Hk Hpc
-  iapply (ialloc_memset MS c _ (dinodeBytes ds[islot inum]!)
-      (aBufData (bnode kk) + BitVec.ofNat 64 (64 * islot inum)) ?mdst ?mK ?mn ?m11 hlen)
+  iapply (memset_zero_call MS c _ (dinodeBytes ds[islot inum]!)
+      (aBufData (bnode kk) + BitVec.ofNat 64 (64 * islot inum)) 64 (by omega)
+      ?mdst ?mK ?mn ?m11 hlen)
     $$ [- $Hk $Hpc $Hwin]
   rotate_right 1
   k_norm_g [ialloc_ret_94]

@@ -3,7 +3,10 @@
 `IallocDefs`, plus the callee call sites): the 64-byte frame, the register
 facts the stage lemmas thread, the two arms as ONE resource (`iallocArms`), the
 client continuation named (`iallocCont`), the claim's atomic update
-(`iallocClaimAu` / `ialloc_claim_au`), and each callee's contract at its call site.
+(`ialloc_claim_au`, into the shared `Xv6.dislotWriteAu`), and the callees'
+contracts at their call sites that are ialloc's own (`iget`, the sleep
+lock; `bread` / `brelse` / `log_write` / `memset` / `printk` are the shared
+`Xv6/FsCallSites.lean` / `Xv6/FsCallSitesF.lean` forms).
 
 The stages: `Xv6/IallocTail.lean` (epilogue, no-inodes arm),
 `Xv6/IallocClaim.lean` (+0x88 .. +0xba), `Xv6/IallocScan.lean`
@@ -19,11 +22,11 @@ The stages: `Xv6/IallocTail.lean` (epilogue, no-inodes arm),
    `Xv6.inodeClaimed` (Rocq packs its three constituents in `ia_cont`,
    after the epilogue; `inodeClaimed_intro` is `.rfl`, so the pack point
    moves nothing).
-3. `iu_log_write` (IupdateSteps) is RESTATED here as `ialloc_log_write`, at
-   `dn = iallocFresh ty`, as Rocq's ProofIalloc restates its call
-   (coordinator decision 3): a stage file may not import another
-   function's.  Promotion candidate (with `iuRegionAu`, whose ialloc
-   instance is `iallocClaimAu`).
+3. Rocq's ProofIalloc restates iupdate's `log_write` call at
+   `dn = iallocFresh ty`; this port once did too (`ialloc_log_write`,
+   `iallocClaimAu`), and both are now the shared
+   `Xv6.dislot_log_write` / `Xv6.dislotWriteAu` (`Xv6/FsCallSitesF.lean`)
+   at `dn = iallocFresh ty`, `cr = false`, `vlb = 0`.
 4. `ia_held_L` is `Xv6.dsHeld_L`; `ia_win_acc` is `Xv6.diblkSlot_acc`
    followed by `Xv6.dislot_bytes` (brief §3.2).
 -/
@@ -202,24 +205,6 @@ section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
-/-- THE GHOST STEP ITSELF, at the sixteen-dinode list the scan learned at its
-own bread: `LOG_WRITE.wp_log_write_au_range`'s atomic-update premise at the
-claimed record's window (`off := 64 * islot inum`, `len := 64`,
-`subNew := dinodeBytes (iallocFresh ty)`), with the payout `Pout` (the
-`iuRegionAu` of IupdateSteps at `dn = iallocFresh ty`, restated). -/
-def iallocClaimAu [Fscfg] [Icfg] (inum : BitVec 32) (ty : BitVec 16) (ds : List Dinode) (e0 : Nat)
-    (Pout : IProp GF) : IProp GF :=
-  iprop(|={⊤, ⊤ \ ↑iregN}=> ∃ (subOld : List (BitVec 8)) (v' : Nat),
-    ⌜subOld.length = 64⌝ ∗
-    byteRange fscFs.bytes (IBLOCK inum icfgIst) (64 * islot inum) subOld ∗
-    logEpochLb icfgLog v' ∗
-    (⌜(diblkBytes ds).length = BSIZE ∧ (dinodeBytes (iallocFresh ty)).length = 64 ∧
-        subOld = ((diblkBytes ds).drop (64 * islot inum)).take 64⌝ -∗
-      loggedAt icfgLog e0 (IBLOCK inum icfgIst) -∗ ⌜v' ≤ e0⌝ -∗
-      byteRange fscFs.bytes (IBLOCK inum icfgIst) (64 * islot inum)
-        (dinodeBytes (iallocFresh ty)) -∗
-      |={⊤ \ ↑iregN, ⊤}=> Pout))
-
 /-- **THE CLAIM** (Rocq 1532–1536): `lwAuRec` ∘ `iregClaim_au`.  No resource
 in beyond the persistent region and seal and the transaction's share; the
 `c`-column receipt `iclaim` out. -/
@@ -230,8 +215,8 @@ theorem ialloc_claim_au [Fscfg] [Icfg] (inum : BitVec 32) (ty : BitVec 16) (ds :
     (htyk : iregTyOk (iallocFresh ty)) :
     iregInv (hlc := hlc) (GF := GF) fscIreg fscFs icfgIst icfgNib ⊢
       iregOpen -∗ txPin icfgLog t qt -∗
-      iallocClaimAu inum ty ds e0 (iclaim inum.toNat ty t qt) := by
-  unfold iallocClaimAu
+      dislotWriteAu inum (iallocFresh ty) ds e0 (iclaim inum.toNat ty t qt) := by
+  unfold dislotWriteAu
   iintro #Hinv #Hopen Htx
   iapply lwAuRec icfgLog fscFs (IBLOCK inum icfgIst) (⊤ \ ↑iregN) (islot inum) (diblkBytes ds)
     (dinodeBytes (iallocFresh ty)) (iclaim inum.toNat ty t qt) e0
@@ -243,202 +228,6 @@ theorem ialloc_claim_au [Fscfg] [Icfg] (inum : BitVec 32) (ty : BitVec 16) (ds :
 end
 
 /-! ## The callees, at their call sites (at the ambient view) -/
-
-section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
-  [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [CurCtx]
-
-set_option maxHeartbeats 1000000 in
-theorem ialloc_bread [Fscfg] [Icfg] (BD : BREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (c : CPU) (k' : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
-    (pidv bno : BitVec 32) (dqp : DFrac) (pj : BitVec 64) (hpj : k'.proc = pj)
-    (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : breadSlots ≤ k'.avail)
-    (hsie : k'.sie = false) (hnoff : k'.noff = 0) (hlocks : k'.locks = [])
-    (htier : k'.tier = KTier.kpt)
-    (hbno : bno.toNat < 2 ^ 31) (hcov : bno.toNat ∈ fscCov) (hpd : descPageRw pd)
-    (ha0 : k'.regs 10#5 = BitVec.signExtend 64 icfgDev)
-    (ha1 : k'.regs 11#5 = BitVec.signExtend 64 bno) :
-    kctx c k' ∗ pcIs c KA.«bread» ∗ procsInv Γ ∗
-    trapCsrs c ∗ cpuClaim c pj ∗ intrRes c ∗
-    bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
-    diskCaps fscDisk fscDlock pd pav pu ∗ panicEnv ∗
-    wordPointsTo (pPid pj) 4 dqp pidv ∗ bslot fscBio ∗
-    wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (kk : Nat)
-        (bs bsd : List (BitVec 8)) (d : Bool),
-      ⌜calleeSaved k'.regs R' ∧ R' 10#5 = bnode kk⌝ -∗
-      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      trapCsrs cpu' -∗ cpuClaim cpu' pj -∗ intrRes cpu' -∗
-      wordPointsTo (pPid pj) 4 dqp pidv -∗
-      bioLocked fscBio (fsView fscFs fscDisk icfgDev fscCov) kk pidv icfgDev bno bs bsd d -∗
-      wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  subst hpj
-  have h := BD.wp_bread (hlc := hlc) (GF := GF) Γ c k' γl fscBio
-    (fsView fscFs fscDisk icfgDev fscCov) fscDlock pd pav pu j pidv icfgDev bno dqp
-    hj hproc hK hsie hnoff hlocks htier hbno hcov rfl hpd ha0 ha1
-  unfold wp_bread_body at h
-  simp only [breadAddr] at h
-  exact h
-
-set_option maxHeartbeats 1000000 in
-theorem ialloc_brelse [Fscfg] [Icfg] (BE : BRELSE) (Γ : SchedNames)
-    (c : CPU) (k' : KCtx) (γl : GName) (kk : Nat)
-    (pidv bno : BitVec 32) (dqp : DFrac) (bs bsd : List (BitVec 8)) (d : Bool)
-    (pj : BitVec 64) (hpj : k'.proc = pj)
-    (hnoff : k'.noff + 2 < 2 ^ 31) (hK : brelseSlots ≤ k'.avail)
-    (hlk : "bcache" ∉ k'.locks) (hsl : "sleep lock" ∉ k'.locks) (hp : "proc" ∉ k'.locks)
-    (htier : k'.tier = KTier.kpt) (hkk : kk < NBUF) (ha0 : k'.regs 10#5 = bnode kk) :
-    kctx c k' ∗ pcIs c KA.«brelse» ∗ procsInv Γ ∗
-    bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗ wordPointsTo (pPid pj) 4 dqp pidv ∗
-    bioLocked fscBio (fsView fscFs fscDisk icfgDev fscCov) kk pidv icfgDev bno bs bsd d ∗
-    wpNext k'.sie pj c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
-      ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
-      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      ⌜calleeSaved k'.regs R'⌝ -∗ wordPointsTo (pPid pj) 4 dqp pidv -∗
-      bslot fscBio -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  subst hpj
-  have h := BE.wp_brelse (hlc := hlc) (GF := GF) Γ c k' γl fscBio
-    (fsView fscFs fscDisk icfgDev fscCov) kk pidv icfgDev bno dqp bs bsd d
-    hnoff hK hlk hsl hp htier hkk ha0
-  unfold wp_brelse_body at h
-  simp only [brelseAddr] at h
-  exact h
-
-end
-
-section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
-  [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
-
-set_option maxHeartbeats 1000000 in
-/-- `log_write(bp)` at `+0x9a` (Rocq 1506): the byte-range, credited form at
-the claimed record's window, with the claim's atomic update as the ghost
-step -- `iu_log_write` (IupdateSteps) restated at `dn = iallocFresh ty`,
-`cr = false` (ialloc's spend is unconditional) and `vlb = 0` (no receipt is
-owed), as the brief and coordinator decision 3 say. -/
-theorem ialloc_log_write [Fscfg] [Icfg] [IregG GF] (LW : LOG_WRITE)
-    (c : CPU) (k' : KCtx) (γl : GName)
-    (kk : Nat) (pidv : BitVec 32) (inum : BitVec 32) (ty : BitVec 16) (ds : List Dinode)
-    (bsd : List (BitVec 8)) (d : Bool) (u : Nat)
-    (Sb : List Nat) (e0 : Nat) (Pout : IProp GF)
-    (hK : logWriteSlots ≤ k'.avail) (hnoff : k'.noff + 2 < 2 ^ 31)
-    (hlk : "log" ∉ k'.locks) (hbc : "bcache" ∉ k'.locks) (htier : k'.tier = KTier.kpt)
-    (hkk : kk < NBUF) (ha0 : k'.regs 10#5 = bnode kk)
-    (hbnoN : (BitVec.ofNat 32 (IBLOCK inum icfgIst)).toNat = IBLOCK inum icfgIst)
-    (hhome : fsHome fscCov fscLogst (IBLOCK inum icfgIst))
-    (hds : diblkWf ds) :
-    kctx c k' ∗ pcIs c KA.«log_write» ∗
-    bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
-    logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
-    bslot fscBio ∗ logEpochLb icfgLog 0 ∗
-    logCredit icfgLog false Sb e0 (IBLOCK inum icfgIst) ∗
-    logOpSe icfgLog (u + 1) Sb e0 ∗
-    iallocClaimAu inum ty ds e0 Pout ∗
-    bufHold0 fscBio (fsView fscFs fscDisk icfgDev fscCov) kk pidv icfgDev
-      (BitVec.ofNat 32 (IBLOCK inum icfgIst)) (diblkBytes (ds.set (islot inum) (iallocFresh ty)))
-      bsd ∗
-    bioPay fscBio (fsView fscFs fscDisk icfgDev fscCov) kk icfgDev
-      (BitVec.ofNat 32 (IBLOCK inum icfgIst)) (diblkBytes ds) bsd d ∗
-    wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
-      ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
-      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      ⌜calleeSaved k'.regs R'⌝ -∗
-      logOpSwe icfgLog u (IBLOCK inum icfgIst :: Sb) (IBLOCK inum icfgIst) 0 e0 -∗
-      Pout -∗
-      bioLocked fscBio (fsView fscFs fscDisk icfgDev fscCov) kk pidv icfgDev
-        (BitVec.ofNat 32 (IBLOCK inum icfgIst))
-        (diblkBytes (ds.set (islot inum) (iallocFresh ty))) bsd true -∗
-      bslot fscBio -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  have h := LW.wp_log_write_au_range (hlc := hlc) (GF := GF) c k' icfgLog γl fscBio
-    (fsView fscFs fscDisk icfgDev fscCov) fscFs fscLogst icfgDev kk pidv
-    (BitVec.ofNat 32 (IBLOCK inum icfgIst)) (diblkBytes (ds.set (islot inum) (iallocFresh ty)))
-    (diblkBytes ds) bsd d u (64 * islot inum) 64 (dinodeBytes (iallocFresh ty)) false Sb e0 0
-    (⊤ \ ↑iregN) Pout
-    hK hnoff hlk hbc htier hkk ha0 rfl rfl rfl
-    (by rw [hbnoN]; exact hhome) (logN_sub_diff_iregN ⊤ logN_top)
-    (lwRecWindow (islot inum) (islot_lt inum)) (by omega) (ialloc_shape ds inum ty hds)
-  unfold wp_log_write_au_range_body at h
-  simp only [logWriteAddr, Bool.false_eq_true, if_false] at h
-  rw [hbnoN] at h
-  unfold iallocClaimAu
-  exact h
-
-end
-
-section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
-
-set_option maxHeartbeats 1000000 in
-/-- `memset(dip, 0, 64)` at `+0x90`. -/
-theorem ialloc_memset (MS : MEMSET) (c : CPU) (k' : KCtx) (olds : List (BitVec 8)) (dst : BitVec 64)
-    (hdst : k'.regs 10#5 = dst) (hK : 2 ≤ k'.avail)
-    (hn : k'.regs 12#5 = BitVec.ofNat 64 64) (h11 : k'.regs 11#5 = 0#64)
-    (hl : olds.length = 64) :
-    kctx c k' ∗ pcIs c KA.«memset» ∗ byteBuf dst (DFrac.own 1) olds ∗
-    wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ R' : RegMap,
-      kctx cpu' (k'.withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      byteBuf dst (DFrac.own 1) (List.replicate 64 0#8) -∗
-      ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  subst hdst
-  have h := MS.wp_memset (hlc := hlc) (GF := GF) c k' olds 64 hK hn (by omega) hl
-  unfold wp_memset_body at h
-  simp only [memsetAddr, h11] at h
-  iintro ⟨Hk, Hpc, Hb, Hn⟩
-  iapply h
-  iframe Hk Hpc Hb
-  iapply wpNext_mono _ _ _ _ _ $$ Hn
-  iintro %c' H %R' Hk Hpc Hb %hcs
-  iapply H $$ %R' Hk Hpc [Hb]
-  · have hz : BitVec.extractLsb' 0 8 (0#64) = 0#8 := by decide
-    rw [hz]
-    iexact Hb
-  · ipureintro; exact hcs.1
-
-end
-
-section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
-
-set_option maxHeartbeats 1000000 in
-/-- `printk("ialloc: no inodes\n")` at `+0x7a` (Rocq 1043): no varargs, the
-credentials are `panicEnv`'s, the trace witness is dropped. -/
-theorem ialloc_printk (PK : PRINTK) (c : CPU) (k' : KCtx)
-    (hK : 52 ≤ k'.avail) (hnoff : k'.noff + 2 < 2 ^ 31)
-    (hpr : "pr" ∉ k'.locks) (huart : "uart1" ∉ k'.locks)
-    (ha0 : k'.regs 10#5 = KStr.«ialloc: no inodes\n») :
-    kctx c k' ∗ pcIs c KA.«printk» ∗
-    cstr KStr.«ialloc: no inodes\n» DFrac.discard iallocFmtStr ∗ panicEnv ∗
-    wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
-      ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
-      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  iintro ⟨Hk, Hpc, Hf, #Hpe, HΦ⟩
-  icases (show panicEnv (GF := GF) ⊢ ∃ (γpr γlp : GName) (γd : UartNames),
-      isLock γpr prLock "pr" (fun _ => emp) ∗ isTxLock γlp γd ∗ uartSentSub γd [] from by
-    unfold panicEnv; iintro H; iexact H) $$ Hpe with ⟨%γpr, %γlp, %γd, #Hlk, #Htx, #Hsent⟩
-  have h := PK.wp_printk (hlc := hlc) (GF := GF) c k' γpr γlp γd [] DFrac.discard iallocFmtStr
-    [] hK (by unfold iallocFmtStr; decide) (by rw [ialloc_pkKinds]; rfl) (by decide) hnoff hpr huart
-  unfold wp_printk_body at h
-  simp only [printkAddr, ha0] at h
-  iapply h
-  iframe Hk Hpc Hf
-  iframe #
-  isplitl []
-  · unfold pkDescs
-    simp only [Iris.Algebra.BigOpL.bigOpL_nil]
-    iempintro
-  iapply wpNext_mono _ _ _ _ _ $$ HΦ
-  iintro %cpu' HΦ %spie %spp %R' %cs %hsp Hk Hpc %hcs Hf2 Hd2 Hsent2
-  iclear Hf2
-  iclear Hd2
-  iclear Hsent2
-  iapply HΦ $$ %spie %spp %R' %hsp Hk Hpc %hcs.1
-
-end
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]

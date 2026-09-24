@@ -24,36 +24,6 @@ set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
-section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
-  [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx]
-
-/-- `brelse` at its call site. -/
-theorem ilk_brelse (BE : BRELSE) (Γ : SchedNames)
-    (c : CPU) (k' : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView GF) (kb : Nat)
-    (pidv dev bno : BitVec 32) (dqp : DFrac) (bs bsd : List (BitVec 8)) (d : Bool)
-    (pj : BitVec 64) (hpj : k'.proc = pj)
-    (hnoff : k'.noff + 2 < 2 ^ 31) (hK : brelseSlots ≤ k'.avail)
-    (hlk : "bcache" ∉ k'.locks) (hsl : "sleep lock" ∉ k'.locks) (hp : "proc" ∉ k'.locks)
-    (htier : k'.tier = KTier.kpt) (hkb : kb < NBUF) (ha0 : k'.regs 10#5 = bnode kb) :
-    kctx c k' ∗ pcIs c KA.«brelse» ∗ procsInv Γ ∗
-    bioCtx γl γ V ∗ wordPointsTo (pPid pj) 4 dqp pidv ∗
-    bioLocked γ V kb pidv dev bno bs bsd d ∗
-    wpNext k'.sie pj c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
-      ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
-      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      ⌜calleeSaved k'.regs R'⌝ -∗ wordPointsTo (pPid pj) 4 dqp pidv -∗
-      bslot γ -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  subst hpj
-  have h := BE.wp_brelse (hlc := hlc) (GF := GF) Γ c k' γl γ V kb pidv dev bno dqp bs bsd d
-    hnoff hK hlk hsl hp htier hkb ha0
-  unfold wp_brelse_body at h
-  simp only [brelseAddr] at h
-  exact h
-
-end
-
 set_option maxHeartbeats 16000000 in
 /-- **`+0x8e .. +0xaa`** (Rocq 1921-2234). -/
 theorem il_fin (BL : BRELSE) (PA : PANIC)
@@ -103,7 +73,7 @@ theorem il_fin (BL : BRELSE) (PA : PANIC)
   k_step (wp_s_jal c _ (KA.«ilock» + 0x90#64) false 2095584#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ilk_br_brelse]
   iintro Hk Hpc
-  iapply (ilk_brelse BL Γ c _ γl fscBio _ kb pidv icfgDev bno dqp bs bsd db k.proc (by k_norm_g)
+  iapply (brelse_call BL Γ c _ γl fscBio _ kb pidv icfgDev bno dqp bs bsd db k.proc (by k_norm_g)
       ?rnoff ?rK ?rlk ?rsl ?rp ?rtier hkb ?ra0)
     $$ [- $Hk $Hpc $Hpi $Hbc $Hpid $Hlk]
   rotate_right 1

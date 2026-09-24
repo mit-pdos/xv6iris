@@ -110,7 +110,7 @@ theorem bm_ind_read (BR : BREAD) (BE : BRELSE) (ak : Option BmAlloc)
   k_step (wp_s_jal c _ (KA.«bmap» + 0x68#64) false 2096008#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bm_br_bread]
   iintro Hk Hpc
-  iapply (bm_bread BR Γ c _ γl γb V γdl pd pav pu j pidv dev bmI.bmInd dqp k.proc (by k_norm_g)
+  iapply (bread_call BR Γ c _ γl γb V γdl pd pav pu j pidv dev bmI.bmInd dqp k.proc (by k_norm_g)
       hj ?dproc ?dK ?dsie ?dnoff ?dlocks ?dtier hi31 hihome.1 hdev hpd ?da0 ?da1)
     $$ [- $Hk $Hpc $Hpi $Htc $Hcl $Hir $Hbc $Hdc $Hpe $Hpid $Hsl]
   rotate_right 1

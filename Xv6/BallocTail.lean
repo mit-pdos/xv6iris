@@ -241,7 +241,8 @@ theorem ba_out (PK : PRINTK) (c cpu : CPU) (k : KCtx) (spie spp : Bool) (R : Reg
   k_step (wp_s_jal c _ (KA.«balloc» + 0xfe#64) false 2086356#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ba_br_printk]
   iintro Hk Hpc
-  iapply (ba_printk PK c _ ?pK ?pnoff ?ppr ?puart ?pa0) $$ [- $Hk $Hpc $Hfmt $Hpe]
+  iapply (printk_msg_call PK c _ _ baFmtStr (by unfold baFmtStr; decide) ba_pkKinds
+      ?pK ?pnoff ?ppr ?puart ?pa0) $$ [- $Hk $Hpc $Hfmt $Hpe]
   rotate_right 1
   k_norm_g [ba_ret_102]
   iframe #
@@ -325,7 +326,7 @@ theorem ba_exhaust (BE : BRELSE) (PK : PRINTK) (Γ : SchedNames) (c cpu : CPU) (
   k_step (wp_s_jal c _ (KA.«balloc» + 0x8c#64) false 2096776#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ba_br_brelse]
   iintro Hk Hpc
-  iapply (ba_brelse BE Γ c _ γl γb V kk pidv dev bno dqp bs bsd d k.proc (by k_norm_g)
+  iapply (brelse_call BE Γ c _ γl γb V kk pidv dev bno dqp bs bsd d k.proc (by k_norm_g)
       ?rnoff ?rK ?rlk ?rsl ?rp ?rtier hkk ?ra0)
     $$ [- $Hk $Hpc $Hpi $Hbc $Hpid $Hlk]
   rotate_right 1

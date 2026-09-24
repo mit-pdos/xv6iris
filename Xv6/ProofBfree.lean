@@ -99,7 +99,7 @@ theorem bfree_proof (BD : BREAD) (LW : LOG_WRITE) (BE : BRELSE) : BFREE := ⟨
   k_step (wp_s_jal c1 _ (KA.«bfree» + 0x1c#64) false 2096192#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bf_br_bread]
   iintro Hk Hpc
-  iapply (bf_bread BD Γ c1 _ γl γb V γdl pd pav pu j pidv dev (BitVec.ofNat 32 bmapstart) dqp
+  iapply (bread_call BD Γ c1 _ γl γb V γdl pd pav pu j pidv dev (BitVec.ofNat 32 bmapstart) dqp
       k.proc (by k_norm_g) hj ?dproc ?dK ?dsie ?dnoff ?dlocks ?dtier ?dbno ?dcov hdev hpd
       ?da0 ?da1)
     $$ [- $Hk $Hpc $Hpi $Htc $Hcl $Hir $Hbc $Hdc $Hpe $Hpid $Hsl]

@@ -187,7 +187,7 @@ theorem bm_ind_alloc_ok (LW : LOG_WRITE) (BE : BRELSE) (Γ : SchedNames) (c cpu 
   iintro Hk Hpc
   ihave Hfsbi := fsblockQ_1_of γfs.bytes (DFrac.own 1) _ _ rfl $$ Hind
   icases bslots_uncons γb 1 $$ Hsl2 with ⟨Hsl1, Hslr⟩
-  iapply (bm_log_write_gen LW c _ a.baLog γl γb V γfs logstart dev kk pidv bmI.bmInd
+  iapply (log_write_gen_call LW c _ a.baLog γl γb V γfs logstart dev kk pidv bmI.bmInd
       bmI.bmInd.toNat rfl (indBytes (bmI.bmEnt.set q blk)) (indBytes bmI.bmEnt) bsd d w cri
       (blk.toNat :: a.baBms :: SbI) ?wK ?wnoff ?wlk ?wbc ?wtier hkk ?wa0 hdev hcl hdt hihome ?wcr)
     $$ [- $Hk $Hpc $Hbc $Hlc $Hsl1 $Hop $Hfsbi $Hhold $Hpay]

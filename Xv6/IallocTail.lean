@@ -177,7 +177,8 @@ theorem ialloc_out (PK : PRINTK) [Fscfg] [Icfg] [CurCtx] (c cpu : CPU) (k : KCtx
   k_step (wp_s_jal c _ (KA.«ialloc» + 0x7a#64) false 2085668#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ialloc_br_printk]
   iintro Hk Hpc
-  iapply (ialloc_printk PK c _ ?pK ?pnoff ?ppr ?puart ?pa0) $$ [- $Hk $Hpc $Hfmt $Hpe]
+  iapply (printk_msg_call PK c _ _ iallocFmtStr (by unfold iallocFmtStr; decide) ialloc_pkKinds
+      ?pK ?pnoff ?ppr ?puart ?pa0) $$ [- $Hk $Hpc $Hfmt $Hpe]
   rotate_right 1
   k_norm_g [ialloc_ret_7e]
   iframe #

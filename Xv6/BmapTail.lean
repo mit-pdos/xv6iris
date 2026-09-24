@@ -123,7 +123,7 @@ theorem bm_release (BE : BRELSE) (Γ : SchedNames) (c cpu : CPU) (k : KCtx) (spi
   k_step (wp_s_jal c _ (KA.«bmap» + 0x84#64) false 2096244#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bm_br_brelse]
   iintro Hk Hpc
-  iapply (bm_brelse BE Γ c _ γl γb V kk pidv dev ibn dqp bsX bsdX dX k.proc (by k_norm_g)
+  iapply (brelse_call BE Γ c _ γl γb V kk pidv dev ibn dqp bsX bsdX dX k.proc (by k_norm_g)
       ?rnoff ?rK ?rlk ?rsl ?rp ?rtier hkk ?ra0)
     $$ [- $Hk $Hpc $Hpi $Hbc $Hpid $Hlk]
   rotate_right 1

@@ -66,6 +66,7 @@ import Xv6.SpecBread
 import Xv6.SpecBwrite
 import Xv6.SpecBrelse
 import Xv6.SpecMemmove
+import Xv6.FsCallSites
 
 namespace Xv6
 
@@ -146,36 +147,6 @@ theorem eo_wk (WK : WAKEUP) (Γ : SchedNames) (c : CPU) (k' : KCtx)
   simp only [wakeupAddr] at h
   exact h
 
-theorem eo_bread (BR : BREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (c : CPU) (k' : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
-    (pd pav pu : BitVec 64) (j : Nat) (pidv dev bno : BitVec 32) (dqp : DFrac)
-    (pj : BitVec 64) (hpj : k'.proc = pj)
-    (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : breadSlots ≤ k'.avail)
-    (hsie : k'.sie = false) (hnoff : k'.noff = 0) (hlocks : k'.locks = [])
-    (htier : k'.tier = KTier.kpt)
-    (hbno : bno.toNat < 2 ^ 31) (hcov : bno.toNat ∈ V.cov) (hdev : dev = V.dev)
-    (hpd : descPageRw pd)
-    (ha0 : k'.regs 10#5 = BitVec.signExtend 64 dev)
-    (ha1 : k'.regs 11#5 = BitVec.signExtend 64 bno) :
-    kctx c k' ∗ pcIs c KA.«bread» ∗ procsInv Γ ∗
-    trapCsrs c ∗ cpuClaim c pj ∗ intrRes c ∗
-    bioCtx γl γb V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
-    wordPointsTo (pPid pj) 4 dqp pidv ∗ bslot γb ∗
-    wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (kk : Nat)
-        (bs bsd : List (BitVec 8)) (d : Bool),
-      ⌜calleeSaved k'.regs R' ∧ R' 10#5 = bnode kk⌝ -∗
-      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      trapCsrs cpu' -∗ cpuClaim cpu' pj -∗ intrRes cpu' -∗
-      wordPointsTo (pPid pj) 4 dqp pidv -∗
-      bioLocked γb V kk pidv dev bno bs bsd d -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  subst hpj
-  have h := BR.wp_bread (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl pd pav pu j pidv dev bno dqp
-    hj hproc hK hsie hnoff hlocks htier hbno hcov hdev hpd ha0 ha1
-  unfold wp_bread_body at h
-  simp only [breadAddr] at h
-  exact h
-
 theorem eo_bwrite (BW : BWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (c : CPU) (k' : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j kk : Nat)
@@ -203,30 +174,6 @@ theorem eo_bwrite (BW : BWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     pidv dev bno dqp bs bsd hj hproc hK hsie hnoff hlocks htier hkk ha0 hbno hbsd hpd
   unfold wp_bwrite_body at h
   simp only [bwriteAddr] at h
-  exact h
-
-theorem eo_brelse (BE : BRELSE) (Γ : SchedNames)
-    (c : CPU) (k' : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (kk : Nat)
-    (pidv dev bno : BitVec 32) (dqp : DFrac) (bs bsd : List (BitVec 8)) (d : Bool)
-    (pj : BitVec 64) (hpj : k'.proc = pj)
-    (hnoff : k'.noff + 2 < 2 ^ 31) (hK : brelseSlots ≤ k'.avail)
-    (hlk : "bcache" ∉ k'.locks) (hsl : "sleep lock" ∉ k'.locks) (hp : "proc" ∉ k'.locks)
-    (htier : k'.tier = KTier.kpt)
-    (hkk : kk < NBUF) (ha0 : k'.regs 10#5 = bnode kk) :
-    kctx c k' ∗ pcIs c KA.«brelse» ∗ procsInv Γ ∗
-    bioCtx γl γb V ∗ wordPointsTo (pPid pj) 4 dqp pidv ∗
-    bioLocked γb V kk pidv dev bno bs bsd d ∗
-    wpNext k'.sie pj c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
-      ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
-      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      ⌜calleeSaved k'.regs R'⌝ -∗ wordPointsTo (pPid pj) 4 dqp pidv -∗
-      bslot γb -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  subst hpj
-  have h := BE.wp_brelse (hlc := hlc) (GF := GF) Γ c k' γl γb V kk pidv dev bno dqp bs bsd d
-    hnoff hK hlk hsl hp htier hkk ha0
-  unfold wp_brelse_body at h
-  simp only [brelseAddr] at h
   exact h
 
 theorem eo_memmove (MM : MEMMOVE) (c : CPU) (k' : KCtx)
@@ -1033,7 +980,6 @@ theorem eo_dirty_to_map (γfs : FsNames) (W : List (BitVec 32)) (v : Bool) :
 
 end
 
-
 /-! ## Context normalisation inside the frame -/
 
 theorem eo_spie_pushed (k : KCtx) (m : Nat) (a b c d : Bool) :
@@ -1349,7 +1295,6 @@ theorem eo_commit (WH : WRITE_HEAD) (IT : INSTALL_TRANS) (AC : ACQUIRE) (RE : RE
 
 end
 
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
@@ -1562,7 +1507,7 @@ theorem eo_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
   k_step (wp_s_jal c _ (KA.«end_op» + 0xc2#64) false 2092464#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, eo_br_bread]
   iintro Hk Hpc
-  iapply (eo_bread BR Γ c _ γl γb V γdl pd pav pu j pidv dev
+  iapply (bread_call BR Γ c _ γl γb V γdl pd pav pu j pidv dev
       (BitVec.ofNat 32 (logSlotBno ls t)) dqp k.proc (by k_norm_g) hj ?qproc ?qK ?qsie ?qnoff
       ?qlocks ?qtier ?qbno ?qcov hdev hpd ?qa0 ?qa1)
     $$ [- $Hk $Hpc $Hpi $Htc $Hcl $Hir $Hbc $Hdc $Hpe $Hpid $Hu1]
@@ -1615,7 +1560,7 @@ theorem eo_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
   k_step (wp_s_jal c1 _ (KA.«end_op» + 0xd0#64) false 2092450#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, eo_br_bread]
   iintro Hk Hpc
-  iapply (eo_bread BR Γ c1 _ γl γb V γdl pd pav pu j pidv dev wt dqp k.proc (by k_norm_g)
+  iapply (bread_call BR Γ c1 _ γl γb V γdl pd pav pu j pidv dev wt dqp k.proc (by k_norm_g)
       hj ?rproc ?rK ?rsie ?rnoff ?rlocks ?rtier hbw hcovw hdev hpd ?ra0 ?ra1)
     $$ [- $Hk $Hpc $Hpi $Htc $Hcl $Hir $Hbc $Hdc $Hpe $Hpid $Hu2]
   rotate_right 1
@@ -1749,7 +1694,7 @@ theorem eo_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
   k_step (wp_s_jal c3 _ (KA.«end_op» + 0xee#64) false 2092684#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, eo_br_brelse]
   iintro Hk Hpc
-  iapply (eo_brelse BE Γ c3 _ γl γb V kkD pidv dev wt dqp bsD bsdD dD k.proc (by k_norm_g)
+  iapply (brelse_call BE Γ c3 _ γl γb V kkD pidv dev wt dqp bsD bsdD dD k.proc (by k_norm_g)
       ?enoff ?eK ?elk ?esl ?ep ?etier hpD.1 ?ea0)
     $$ [- $Hk $Hpc $Hpi $Hbc $Hpid $HlockD]
   rotate_right 1
@@ -1783,7 +1728,7 @@ theorem eo_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
   k_step (wp_s_jal c3 _ (KA.«end_op» + 0xf4#64) false 2092678#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, eo_br_brelse]
   iintro Hk Hpc
-  iapply (eo_brelse BE Γ c3 _ γl γb V kkL pidv dev (BitVec.ofNat 32 (logSlotBno ls t)) dqp
+  iapply (brelse_call BE Γ c3 _ γl γb V kkL pidv dev (BitVec.ofNat 32 (logSlotBno ls t)) dqp
       bsD bsD dL k.proc (by k_norm_g) ?fnoff ?fK ?flk ?fsl ?fp ?ftier hpL.1 ?fa0)
     $$ [- $Hk $Hpc $Hpi $Hbc $Hpid $HlockL]
   rotate_right 1
@@ -1911,7 +1856,6 @@ theorem eo_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
     case hfx => exact hfix8
 
 end
-
 
 /-! ## The loop, closed by Löb at the head `+0xb4` -/
 
@@ -2373,7 +2317,6 @@ theorem eo_entry (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
         (BitVec.ofNat 64 (out - 1)) hK hsie hnoff hlocks htier hintena
         (hpins R1 _ _ _ _ hR1))
       $$ [- $Hk $Hpc $Hpi $Htc $Hcc $Hir $Hctx $Hlocked $Hpay $Hfr $Hjk $Hpid $Hnext]
-
 
 end
 

@@ -7,6 +7,7 @@ import Xv6.BufEscrow
 import Xv6.BcacheLock
 import Xv6.CodeTactics
 import MachCSL.ByteWord4
+import Xv6.FsCallSites
 
 namespace Xv6
 
@@ -475,36 +476,6 @@ section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx]
 
-theorem wh_bread (BD : BREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (c : CPU) (k' : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView GF) (γdl : GName)
-    (pd pav pu : BitVec 64) (j : Nat) (pidv dev bno : BitVec 32) (dqp : DFrac)
-    (pj : BitVec 64) (hpj : k'.proc = pj)
-    (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : breadSlots ≤ k'.avail)
-    (hsie : k'.sie = false) (hnoff : k'.noff = 0) (hlocks : k'.locks = [])
-    (htier : k'.tier = KTier.kpt)
-    (hbno : bno.toNat < 2 ^ 31) (hcov : bno.toNat ∈ V.cov) (hdev : dev = V.dev)
-    (hpd : descPageRw pd)
-    (ha0 : k'.regs 10#5 = BitVec.signExtend 64 dev)
-    (ha1 : k'.regs 11#5 = BitVec.signExtend 64 bno) :
-    kctx c k' ∗ pcIs c KA.«bread» ∗ procsInv Γ ∗
-    trapCsrs c ∗ cpuClaim c pj ∗ intrRes c ∗
-    bioCtx γl γ V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
-    wordPointsTo (pPid pj) 4 dqp pidv ∗ bslot γ ∗
-    wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (kk : Nat)
-        (bs bsd : List (BitVec 8)) (d : Bool),
-      ⌜calleeSaved k'.regs R' ∧ R' 10#5 = bnode kk⌝ -∗
-      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      trapCsrs cpu' -∗ cpuClaim cpu' pj -∗ intrRes cpu' -∗
-      wordPointsTo (pPid pj) 4 dqp pidv -∗
-      bioLocked γ V kk pidv dev bno bs bsd d -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  subst hpj
-  have h := BD.wp_bread (hlc := hlc) (GF := GF) Γ c k' γl γ V γdl pd pav pu j pidv dev bno dqp
-    hj hproc hK hsie hnoff hlocks htier hbno hcov hdev hpd ha0 ha1
-  unfold wp_bread_body at h
-  simp only [breadAddr] at h
-  exact h
-
 theorem wh_bwrite (BW : BWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (c : CPU) (k' : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j kk : Nat) (pidv dev bno : BitVec 32) (dqp : DFrac)
@@ -531,29 +502,6 @@ theorem wh_bwrite (BW : BWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     bs bsd hj hproc hK hsie hnoff hlocks htier hkk ha0 hbno hbsd hpd
   unfold wp_bwrite_body at h
   simp only [bwriteAddr] at h
-  exact h
-
-theorem wh_brelse (BE : BRELSE) (Γ : SchedNames)
-    (c : CPU) (k' : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView GF) (kk : Nat)
-    (pidv dev bno : BitVec 32) (dqp : DFrac) (bs bsd : List (BitVec 8)) (d : Bool)
-    (pj : BitVec 64) (hpj : k'.proc = pj)
-    (hnoff : k'.noff + 2 < 2 ^ 31) (hK : brelseSlots ≤ k'.avail)
-    (hlk : "bcache" ∉ k'.locks) (hsl : "sleep lock" ∉ k'.locks) (hp : "proc" ∉ k'.locks)
-    (htier : k'.tier = KTier.kpt) (hkk : kk < NBUF) (ha0 : k'.regs 10#5 = bnode kk) :
-    kctx c k' ∗ pcIs c KA.«brelse» ∗ procsInv Γ ∗
-    bioCtx γl γ V ∗ wordPointsTo (pPid pj) 4 dqp pidv ∗
-    bioLocked γ V kk pidv dev bno bs bsd d ∗
-    wpNext k'.sie pj c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
-      ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
-      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      ⌜calleeSaved k'.regs R'⌝ -∗ wordPointsTo (pPid pj) 4 dqp pidv -∗
-      bslot γ -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  subst hpj
-  have h := BE.wp_brelse (hlc := hlc) (GF := GF) Γ c k' γl γ V kk pidv dev bno dqp bs bsd d
-    hnoff hK hlk hsl hp htier hkk ha0
-  unfold wp_brelse_body at h
-  simp only [brelseAddr] at h
   exact h
 
 end
@@ -671,7 +619,7 @@ theorem wh_tail (BW : BWRITE) (BE : BRELSE)
   · iframe HpL HpD Hextra
   ihave Hhold := (bioLocked_split γb V kk pidv dev bno bs' bs' d0).2 $$ [Hhold Hpay]
   · iframe Hhold Hpay
-  iapply (wh_brelse BE Γ c2 _ γl γb V kk pidv dev bno dqp bs' bs' d0 k.proc (by k_norm_g)
+  iapply (brelse_call BE Γ c2 _ γl γb V kk pidv dev bno dqp bs' bs' d0 k.proc (by k_norm_g)
       ?rnoff ?rK ?rlk ?rsl ?rp ?rtier hkk ?ra0)
     $$ [- $Hk $Hpc $Hpi $Hbc $Hpid $Hhold]
   rotate_right 1
@@ -814,7 +762,7 @@ theorem writeHead_proof (BD : BREAD) (BW : BWRITE) (BE : BRELSE) : WRITE_HEAD :=
   k_step (wp_s_jal c1 _ (KA.«write_head» + 0x1c#64) false 2093198#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [wh_br_bread]
   iintro Hk Hpc
-  iapply (wh_bread BD Γ c1 _ γl γb V γdl pd pav pu j pidv dev (BitVec.ofNat 32 logstart) dqp
+  iapply (bread_call BD Γ c1 _ γl γb V γdl pd pav pu j pidv dev (BitVec.ofNat 32 logstart) dqp
       k.proc (by k_norm_g) hj ?dproc ?dK ?dsie ?dnoff ?dlocks ?dtier ?dbno ?dcov hdev hpd
       ?da0 ?da1)
     $$ [- $Hk $Hpc $Hpi $Htc $Hcl $Hir $Hbc $Hdc $Hpe $Hpid $Hslot]

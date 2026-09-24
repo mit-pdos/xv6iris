@@ -37,11 +37,13 @@ any").  Three things hang off it:
    lemmas `bmLedgerOk_id` / `_direct` / `_headInd` / `_tail` below, proved
    once over their own small contexts (Rocq's own reason for naming them:
    `set_solver` in a proof-mode context costs minutes).
-5. The callee wrappers (`bm_bread`, `bm_brelse`, `bm_balloc`,
-   `bm_log_write_gen`) and the view lemma `bm_view_eq` are COPIES of
-   `Xv6/BallocDefs.lean`'s `ba_bread` / `ba_brelse` / `ba_log_write_gen` /
-   `bioView_eq_fsView` (a stage file may not import another function's);
-   promotion candidates.
+5. The callee wrappers `bread` / `brelse` / `log_write` are the shared
+   `Xv6.bread_call` / `Xv6.brelse_call` / `Xv6.log_write_gen_call`
+   (`Xv6/FsCallSites.lean`; formerly `bm_bread` / `bm_brelse` /
+   `bm_log_write_gen`, copies of BallocDefs').  `bm_balloc` and the view
+   lemma `bm_view_eq` (a copy of `Xv6/BallocDefs.lean`'s
+   `bioView_eq_fsView`: a stage file may not import another function's)
+   stay here; promotion candidates.
 -/
 import Xv6.SpecBmap
 import Xv6.DinodeSlot
@@ -49,6 +51,7 @@ import Xv6.BlkmapBuf
 import Xv6.CodeTactics
 import Xv6.BmapParts
 import MachCSL.WpSmodeFrame6c
+import Xv6.FsCallSites
 
 namespace Xv6
 
@@ -215,7 +218,6 @@ theorem bmOut_alloc (ak : Option BmAlloc) (cr : Bool) (cov : ExtTreeSet Nat comp
   by_cases h : i = fbn
   · subst h; exact absurd hz hnz'
   · exact hag i hi h
-
 
 /-! ## The three installs, as pure facts about the new map
 
@@ -504,101 +506,7 @@ end
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
-  [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx]
-
-set_option maxHeartbeats 1000000 in
-theorem bm_bread (BR : BREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (c : CPU) (k' : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
-    (pd pav pu : BitVec 64) (j : Nat) (pidv dev bno : BitVec 32) (dqp : DFrac)
-    (pj : BitVec 64) (hpj : k'.proc = pj)
-    (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : breadSlots ≤ k'.avail)
-    (hsie : k'.sie = false) (hnoff : k'.noff = 0) (hlocks : k'.locks = [])
-    (htier : k'.tier = KTier.kpt)
-    (hbno : bno.toNat < 2 ^ 31) (hcov : bno.toNat ∈ V.cov) (hdev : dev = V.dev)
-    (hpd : descPageRw pd)
-    (ha0 : k'.regs 10#5 = BitVec.signExtend 64 dev)
-    (ha1 : k'.regs 11#5 = BitVec.signExtend 64 bno) :
-    kctx c k' ∗ pcIs c KA.«bread» ∗ procsInv Γ ∗
-    trapCsrs c ∗ cpuClaim c pj ∗ intrRes c ∗
-    bioCtx γl γb V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
-    wordPointsTo (pPid pj) 4 dqp pidv ∗ bslot γb ∗
-    wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (kk : Nat)
-        (bs bsd : List (BitVec 8)) (d : Bool),
-      ⌜calleeSaved k'.regs R' ∧ R' 10#5 = bnode kk⌝ -∗
-      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      trapCsrs cpu' -∗ cpuClaim cpu' pj -∗ intrRes cpu' -∗
-      wordPointsTo (pPid pj) 4 dqp pidv -∗
-      bioLocked γb V kk pidv dev bno bs bsd d -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  subst hpj
-  have h := BR.wp_bread (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl pd pav pu j pidv dev bno dqp
-    hj hproc hK hsie hnoff hlocks htier hbno hcov hdev hpd ha0 ha1
-  unfold wp_bread_body at h
-  simp only [breadAddr] at h
-  exact h
-
-set_option maxHeartbeats 1000000 in
-theorem bm_brelse (BE : BRELSE) (Γ : SchedNames)
-    (c : CPU) (k' : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (kk : Nat)
-    (pidv dev bno : BitVec 32) (dqp : DFrac) (bs bsd : List (BitVec 8)) (d : Bool)
-    (pj : BitVec 64) (hpj : k'.proc = pj)
-    (hnoff : k'.noff + 2 < 2 ^ 31) (hK : brelseSlots ≤ k'.avail)
-    (hlk : "bcache" ∉ k'.locks) (hsl : "sleep lock" ∉ k'.locks) (hp : "proc" ∉ k'.locks)
-    (htier : k'.tier = KTier.kpt) (hkk : kk < NBUF) (ha0 : k'.regs 10#5 = bnode kk) :
-    kctx c k' ∗ pcIs c KA.«brelse» ∗ procsInv Γ ∗
-    bioCtx γl γb V ∗ wordPointsTo (pPid pj) 4 dqp pidv ∗
-    bioLocked γb V kk pidv dev bno bs bsd d ∗
-    wpNext k'.sie pj c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
-      ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
-      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      ⌜calleeSaved k'.regs R'⌝ -∗ wordPointsTo (pPid pj) 4 dqp pidv -∗
-      bslot γb -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  subst hpj
-  have h := BE.wp_brelse (hlc := hlc) (GF := GF) Γ c k' γl γb V kk pidv dev bno dqp bs bsd d
-    hnoff hK hlk hsl hp htier hkk ha0
-  unfold wp_brelse_body at h
-  simp only [brelseAddr] at h
-  exact h
-
-end
-
-section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
-
-set_option maxHeartbeats 1000000 in
-/-- `log_write(bp)` of the INDIRECT block at `+0xac`: the held, credited
-form (Rocq's `log_write_contract` at 1974). -/
-theorem bm_log_write_gen (LW : LOG_WRITE)
-    (c : CPU) (k' : KCtx) (γ : LogNames) (γl : GName) (γb : BcacheNames) (V : BioView GF)
-    (γfs : FsNames) (logstart : Nat) (dev : BitVec 32)
-    (kk : Nat) (pidv bno : BitVec 32) (b : Nat) (hb : bno.toNat = b)
-    (bs bsl bsd : List (BitVec 8)) (d : Bool) (u : Nat) (cr : Bool) (Sb : List Nat)
-    (hK : logWriteSlots ≤ k'.avail) (hnoff : k'.noff + 2 < 2 ^ 31)
-    (hlk : "log" ∉ k'.locks) (hbc : "bcache" ∉ k'.locks) (htier : k'.tier = KTier.kpt)
-    (hkk : kk < NBUF) (ha0 : k'.regs 10#5 = bnode kk)
-    (hdev : dev = V.dev) (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs)
-    (hhome : fsHome V.cov logstart b) (hcredit : cr = true → b ∈ Sb) :
-    kctx c k' ∗ pcIs c KA.«log_write» ∗
-    bioCtx γl γb V ∗ logCtx γ γb γfs V.cov logstart dev ∗
-    bslot γb ∗ logOpS γ (u + 1) Sb ∗ fsblock γfs.bytes b bsl ∗
-    bufHold0 γb V kk pidv dev bno bs bsd ∗ bioPay γb V kk dev bno bsl bsd d ∗
-    wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
-      ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
-      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      ⌜calleeSaved k'.regs R'⌝ -∗
-      logOpS γ (if cr then u + 1 else u) (b :: Sb) -∗
-      fsblock γfs.bytes b bs -∗
-      bioLocked γb V kk pidv dev bno bs bsd true -∗
-      bslot γb -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  subst hb
-  have h := LW.wp_log_write_gen (hlc := hlc) (GF := GF) c k' γ γl γb V γfs logstart dev kk pidv
-    bno bs bsl bsd d u cr Sb hK hnoff hlk hbc htier hkk ha0 hdev hcl hdt hhome hcredit
-  unfold wp_log_write_gen_body at h
-  simp only [logWriteAddr] at h
-  exact h
 
 set_option maxHeartbeats 1000000 in
 /-- `balloc(ip->dev)` at `+0x2a` / `+0x50` / `+0x9e`: the credited form

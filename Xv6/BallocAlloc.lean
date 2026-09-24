@@ -178,7 +178,7 @@ theorem ba_alloc (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET)
   k_step (wp_s_jal c1 _ (KA.«balloc» + 0x48#64) false 2096844#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ba_br_brelse]
   iintro Hk Hpc
-  iapply (ba_brelse BE Γ c1 _ γl γb V kk pidv dev (BitVec.ofNat 32 bmapstart) dqp
+  iapply (brelse_call BE Γ c1 _ γl γb V kk pidv dev (BitVec.ofNat 32 bmapstart) dqp
       (bitmapBytes (used ∪ {bi})) bsd true k.proc (by k_norm_g)
       ?rnoff ?rK ?rlk ?rsl ?rp ?rtier hkk ?ra0)
     $$ [- $Hk $Hpc $Hpi $Hbc $Hpid $Hlk]

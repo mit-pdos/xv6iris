@@ -60,7 +60,7 @@ theorem iu_tail (LW : LOG_WRITE) (BE : BRELSE)
     bslot fscBio ∗ logEpochLb icfgLog v ∗
     logCredit icfgLog cru Sb e0 (IBLOCK inum icfgIst) ∗
     logOpSe icfgLog (u + 1) Sb e0 ∗
-    iuRegionAu inum dn ds e0 Pout ∗
+    dislotWriteAu inum dn ds e0 Pout ∗
     bufHold0 fscBio (fsView fscFs fscDisk icfgDev fscCov) kk pidv icfgDev
       (BitVec.ofNat 32 (IBLOCK inum icfgIst)) (diblkBytes (ds.set (islot inum) dn)) bsd ∗
     bioPay fscBio (fsView fscFs fscDisk icfgDev fscCov) kk icfgDev
@@ -84,8 +84,8 @@ theorem iu_tail (LW : LOG_WRITE) (BE : BRELSE)
   k_step (wp_s_jal c _ (KA.«iupdate» + 0x68#64) false 3172#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iu_br_logwrite]
   iintro Hk Hpc
-  iapply (iu_log_write LW c _ γl kk pidv inum dn ds bsd d0 u cru Sb e0 v Pout
-      ?lK ?lnoff ?llk ?lbc ?ltier hkk ?la0 hgeom hcov hlog hds hdn)
+  iapply (dislot_log_write LW c _ γl kk pidv inum dn ds bsd d0 u cru Sb e0 v Pout
+      ?lK ?lnoff ?llk ?lbc ?ltier hkk ?la0 (iu_bno inum hgeom hcov).1 ⟨hcov, hlog⟩ hds hdn)
     $$ [- $Hk $Hpc $Hbc $Hlc $Hsl $Hvlb $Hcrd $Hop $Hau $Hhold $Hpay]
   rotate_right 1
   k_norm_g [iu_ret_6c]
@@ -115,7 +115,7 @@ theorem iu_tail (LW : LOG_WRITE) (BE : BRELSE)
   k_step (wp_s_jal c2 _ (KA.«iupdate» + 0x6e#64) false 2095798#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iu_br_brelse]
   iintro Hk Hpc
-  iapply (iu_brelse BE Γ c2 _ γl kk pidv (BitVec.ofNat 32 (IBLOCK inum icfgIst)) dqp
+  iapply (brelse_callF BE Γ c2 _ γl kk pidv (BitVec.ofNat 32 (IBLOCK inum icfgIst)) dqp
       (diblkBytes (ds.set (islot inum) dn)) bsd true k.proc (by k_norm_g)
       ?rnoff ?rK ?rlk ?rsl ?rp ?rtier hkk ?ra0)
     $$ [- $Hk $Hpc $Hpi $Hbc $Hpid $Hlocked]

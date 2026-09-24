@@ -142,7 +142,7 @@ theorem bf_tail (LW : LOG_WRITE) (BE : BRELSE)
   k_step (wp_s_jal c2 _ (KA.«bfree» + 0x50#64) false 2096404#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bf_br_brelse]
   iintro Hk Hpc
-  iapply (bf_brelse BE Γ c2 _ γl γb V kk pidv dev bnoB dqp (bitmapBytes (used \ {bi})) bsd true
+  iapply (brelse_call BE Γ c2 _ γl γb V kk pidv dev bnoB dqp (bitmapBytes (used \ {bi})) bsd true
       k.proc (by k_norm_g) ?rnoff ?rK ?rlk ?rsl ?rp ?rtier hkk ?ra0)
     $$ [- $Hk $Hpc $Hpi $Hbc $Hpid $Hlk]
   rotate_right 1

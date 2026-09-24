@@ -599,6 +599,13 @@ theorem dislotAcc [CurCtx] (a : BitVec 64) (d : Dinode) (hal : dislotAlign a) :
   rw [BiEntails.to_eq (dislot_bytes a d' hal)]
   iexact H'
 
+/-- Giving slot `k` back at its own record leaves the block as it was
+(shared by `ilock` and `ialloc`). -/
+theorem dsSet_self (ds : List Dinode) (k : Nat) (hk : k < ds.length) :
+    ds.set k ds[k]! = ds := by
+  rw [getElem!_of_getElem? (List.getElem?_eq_getElem hk)]
+  exact List.set_getElem_self hk
+
 /-- Borrow dinode slot `k` out of a whole block's byte image, and give it
 back AT A NEW DINODE (Rocq's `diblk_slot_acc`). -/
 theorem diblkSlot_acc [CurCtx] (a : BitVec 64) (ds : List Dinode) (k : Nat)
@@ -681,6 +688,19 @@ theorem dsHold_k [CurCtx] (γ : BcacheNames) (V : BioView GF) (k : Nat)
   iintro ⟨%hp, -⟩
   ipureintro
   exact hp.1
+
+/-- `dsHold_k`, keeping the handle (Rocq's `bio_locked_kbound`; shared by
+`ilock`, `ialloc` and `itrunc`). -/
+theorem dsHold_k_keep [CurCtx] (γ : BcacheNames) (V : BioView GF) (k : Nat)
+    (pidv dev bno : BitVec 32) (bs bsd : List (BitVec 8)) :
+    bufHold0 (GF := GF) γ V k pidv dev bno bs bsd ⊢
+      ⌜k < NBUF⌝ ∗ bufHold0 γ V k pidv dev bno bs bsd := by
+  unfold bufHold0
+  iintro ⟨%hp, H⟩
+  isplitr
+  · ipureintro; exact hp.1
+  · iframe H
+    ipureintro; exact hp
 
 /-- The buffer's byte list carries its length. -/
 theorem bufOwn_len [CurCtx] (b : BitVec 64) (bno dsk : BitVec 32) (data : List (BitVec 8)) :

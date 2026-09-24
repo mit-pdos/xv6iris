@@ -49,21 +49,23 @@ it_ent_state\|inode_blocks_take\|inode_blocks_to_ent_res\|it_frame'
   `Xv6.itrunc_ent_beq`, stated directly on the machine words and closed by
   `omega` over `toNat`; `it_neqz_*` are `Xv6.bm_nez_*` (`Xv6/BlkmapBuf.lean`).
 * `blk_res_nz`/`ind_res_nz` are the landed `Xv6.blkRes_run`/`Xv6.indBlk_nz`;
-  `bio_locked_kbound` is `Xv6.itrunc_hold_k` (`Xv6/ItruncArm.lean`).
+  `bio_locked_kbound` is `Xv6.dsHold_k_keep` (`Xv6/DinodeSlot.lean`).
 * `it_sub_union_l` / `it_in_union_sing` (Rocq's `set_solver` dodges) are
   `List.mem_cons_of_mem` / `List.mem_cons_self` inline at the join.
 
 **Copied from other functions' stage files (promotion candidates):**
-`Xv6.itrunc_calleeSaved_epi` (= `bd_calleeSaved_epi`, BreadTail),
-`Xv6.itrunc_bread` / `Xv6.itrunc_brelse` (= `iu_bread` / `iu_brelse`,
-IupdateSteps); `Xv6.itrunc_view_gd` / `_cov` are the `rfl` projections of
-`Xv6.fsView` that `FsBlocks.lean` has only for `clean`/`dirty`.
+`Xv6.itrunc_calleeSaved_epi` (= `bd_calleeSaved_epi`, BreadTail);
+`Xv6.itrunc_view_gd` / `_cov` are the `rfl` projections of
+`Xv6.fsView` that `FsBlocks.lean` has only for `clean`/`dirty`.  (The
+former copies `itrunc_bread` / `itrunc_brelse` are the shared
+`Xv6.bread_callF` / `Xv6.brelse_callF`, `Xv6/FsCallSitesF.lean`.)
 -/
 import Xv6.SpecItrunc
 import Xv6.BlkmapBuf
 import Xv6.DinodeSlot
 import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame6c
+import Xv6.FsCallSitesF
 
 namespace Xv6
 

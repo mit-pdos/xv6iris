@@ -21,6 +21,7 @@ import Xv6.SpecBalloc
 import Xv6.DinodeSlot
 import Xv6.CodeTactics
 import Xv6.BallocParts
+import Xv6.FsCallSites
 
 namespace Xv6
 
@@ -251,67 +252,6 @@ end
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
-  [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx]
-
-set_option maxHeartbeats 1000000 in
-theorem ba_bread (BR : BREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (c : CPU) (k' : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
-    (pd pav pu : BitVec 64) (j : Nat) (pidv dev bno : BitVec 32) (dqp : DFrac)
-    (pj : BitVec 64) (hpj : k'.proc = pj)
-    (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : breadSlots ≤ k'.avail)
-    (hsie : k'.sie = false) (hnoff : k'.noff = 0) (hlocks : k'.locks = [])
-    (htier : k'.tier = KTier.kpt)
-    (hbno : bno.toNat < 2 ^ 31) (hcov : bno.toNat ∈ V.cov) (hdev : dev = V.dev)
-    (hpd : descPageRw pd)
-    (ha0 : k'.regs 10#5 = BitVec.signExtend 64 dev)
-    (ha1 : k'.regs 11#5 = BitVec.signExtend 64 bno) :
-    kctx c k' ∗ pcIs c KA.«bread» ∗ procsInv Γ ∗
-    trapCsrs c ∗ cpuClaim c pj ∗ intrRes c ∗
-    bioCtx γl γb V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
-    wordPointsTo (pPid pj) 4 dqp pidv ∗ bslot γb ∗
-    wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (kk : Nat)
-        (bs bsd : List (BitVec 8)) (d : Bool),
-      ⌜calleeSaved k'.regs R' ∧ R' 10#5 = bnode kk⌝ -∗
-      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      trapCsrs cpu' -∗ cpuClaim cpu' pj -∗ intrRes cpu' -∗
-      wordPointsTo (pPid pj) 4 dqp pidv -∗
-      bioLocked γb V kk pidv dev bno bs bsd d -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  subst hpj
-  have h := BR.wp_bread (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl pd pav pu j pidv dev bno dqp
-    hj hproc hK hsie hnoff hlocks htier hbno hcov hdev hpd ha0 ha1
-  unfold wp_bread_body at h
-  simp only [breadAddr] at h
-  exact h
-
-set_option maxHeartbeats 1000000 in
-theorem ba_brelse (BE : BRELSE) (Γ : SchedNames)
-    (c : CPU) (k' : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (kk : Nat)
-    (pidv dev bno : BitVec 32) (dqp : DFrac) (bs bsd : List (BitVec 8)) (d : Bool)
-    (pj : BitVec 64) (hpj : k'.proc = pj)
-    (hnoff : k'.noff + 2 < 2 ^ 31) (hK : brelseSlots ≤ k'.avail)
-    (hlk : "bcache" ∉ k'.locks) (hsl : "sleep lock" ∉ k'.locks) (hp : "proc" ∉ k'.locks)
-    (htier : k'.tier = KTier.kpt) (hkk : kk < NBUF) (ha0 : k'.regs 10#5 = bnode kk) :
-    kctx c k' ∗ pcIs c KA.«brelse» ∗ procsInv Γ ∗
-    bioCtx γl γb V ∗ wordPointsTo (pPid pj) 4 dqp pidv ∗
-    bioLocked γb V kk pidv dev bno bs bsd d ∗
-    wpNext k'.sie pj c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
-      ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
-      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      ⌜calleeSaved k'.regs R'⌝ -∗ wordPointsTo (pPid pj) 4 dqp pidv -∗
-      bslot γb -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  subst hpj
-  have h := BE.wp_brelse (hlc := hlc) (GF := GF) Γ c k' γl γb V kk pidv dev bno dqp bs bsd d
-    hnoff hK hlk hsl hp htier hkk ha0
-  unfold wp_brelse_body at h
-  simp only [brelseAddr] at h
-  exact h
-
-end
-
-section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 set_option maxHeartbeats 1000000 in
@@ -354,72 +294,10 @@ theorem ba_log_write_au (LW : LOG_WRITE)
   simp only [logWriteAddr] at h
   exact h
 
-set_option maxHeartbeats 1000000 in
-/-- `log_write(bp)` of the ZEROED block at `+0x66`: the held, credited form,
-at `cr = false`. -/
-theorem ba_log_write_gen (LW : LOG_WRITE)
-    (c : CPU) (k' : KCtx) (γ : LogNames) (γl : GName) (γb : BcacheNames) (V : BioView GF)
-    (γfs : FsNames) (logstart : Nat) (dev : BitVec 32)
-    (kk : Nat) (pidv bno : BitVec 32) (b : Nat) (hb : bno.toNat = b)
-    (bs bsl bsd : List (BitVec 8)) (d : Bool) (u : Nat)
-    (Sb : List Nat)
-    (hK : logWriteSlots ≤ k'.avail) (hnoff : k'.noff + 2 < 2 ^ 31)
-    (hlk : "log" ∉ k'.locks) (hbc : "bcache" ∉ k'.locks) (htier : k'.tier = KTier.kpt)
-    (hkk : kk < NBUF) (ha0 : k'.regs 10#5 = bnode kk)
-    (hdev : dev = V.dev) (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs)
-    (hhome : fsHome V.cov logstart b) :
-    kctx c k' ∗ pcIs c KA.«log_write» ∗
-    bioCtx γl γb V ∗ logCtx γ γb γfs V.cov logstart dev ∗
-    bslot γb ∗ logOpS γ (u + 1) Sb ∗ fsblock γfs.bytes b bsl ∗
-    bufHold0 γb V kk pidv dev bno bs bsd ∗ bioPay γb V kk dev bno bsl bsd d ∗
-    wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
-      ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
-      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      ⌜calleeSaved k'.regs R'⌝ -∗
-      logOpS γ u (b :: Sb) -∗
-      fsblock γfs.bytes b bs -∗
-      bioLocked γb V kk pidv dev bno bs bsd true -∗
-      bslot γb -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  subst hb
-  have h := LW.wp_log_write_gen (hlc := hlc) (GF := GF) c k' γ γl γb V γfs logstart dev kk pidv
-    bno bs bsl bsd d u false Sb hK hnoff hlk hbc htier hkk ha0 hdev hcl hdt hhome
-    (fun h => absurd h (by decide))
-  unfold wp_log_write_gen_body at h
-  simp only [logWriteAddr, Bool.false_eq_true, if_false] at h
-  exact h
-
 end
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
-
-set_option maxHeartbeats 1000000 in
-/-- `memset(bp->data, 0, BSIZE)` at `+0x60` (the inlined bzero). -/
-theorem ba_memset (MS : MEMSET) (c : CPU) (k' : KCtx) (olds : List (BitVec 8)) (dst : BitVec 64)
-    (hdst : k'.regs 10#5 = dst) (hK : 2 ≤ k'.avail)
-    (hn : k'.regs 12#5 = BitVec.ofNat 64 BSIZE) (h11 : k'.regs 11#5 = 0#64)
-    (hl : olds.length = BSIZE) :
-    kctx c k' ∗ pcIs c KA.«memset» ∗ byteBuf dst (DFrac.own 1) olds ∗
-    wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ R' : RegMap,
-      kctx cpu' (k'.withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      byteBuf dst (DFrac.own 1) (List.replicate BSIZE 0#8) -∗
-      ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  subst hdst
-  have h := MS.wp_memset (hlc := hlc) (GF := GF) c k' olds BSIZE hK hn (by unfold BSIZE; omega) hl
-  unfold wp_memset_body at h
-  simp only [memsetAddr, h11] at h
-  iintro ⟨Hk, Hpc, Hb, Hn⟩
-  iapply h
-  iframe Hk Hpc Hb
-  iapply wpNext_mono _ _ _ _ _ $$ Hn
-  iintro %c' H %R' Hk Hpc Hb %hcs
-  iapply H $$ %R' Hk Hpc [Hb]
-  · have hz : BitVec.extractLsb' 0 8 (0#64) = 0#8 := by decide
-    rw [hz]
-    iexact Hb
-  · ipureintro; exact hcs.1
 
 /-- `"balloc: out of blocks\n"` (22 bytes plus the NUL). -/
 def baFmtStr : List (BitVec 8) :=
@@ -441,47 +319,6 @@ theorem ba_cstr_fmt :
 /-- Rocq's `ba_msg_fmt`: no directives, so no varargs. -/
 theorem ba_pkKinds : pkKinds baFmtStr = [] := by
   unfold baFmtStr; decide
-
-end
-
-section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
-
-set_option maxHeartbeats 1000000 in
-/-- `printk("balloc: out of blocks\n")` at `+0xfe`: no varargs, the
-credentials are `panicEnv`'s, the trace witness is dropped. -/
-theorem ba_printk (PK : PRINTK) (c : CPU) (k' : KCtx)
-    (hK : 52 ≤ k'.avail) (hnoff : k'.noff + 2 < 2 ^ 31)
-    (hpr : "pr" ∉ k'.locks) (huart : "uart1" ∉ k'.locks)
-    (ha0 : k'.regs 10#5 = KStr.«balloc: out of blocks\n») :
-    kctx c k' ∗ pcIs c KA.«printk» ∗
-    cstr KStr.«balloc: out of blocks\n» DFrac.discard baFmtStr ∗ panicEnv ∗
-    wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
-      ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
-      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  iintro ⟨Hk, Hpc, Hf, #Hpe, HΦ⟩
-  icases (show panicEnv (GF := GF) ⊢ ∃ (γpr γlp : GName) (γd : UartNames),
-      isLock γpr prLock "pr" (fun _ => emp) ∗ isTxLock γlp γd ∗ uartSentSub γd [] from by
-    unfold panicEnv; iintro H; iexact H) $$ Hpe with ⟨%γpr, %γlp, %γd, #Hlk, #Htx, #Hsent⟩
-  have h := PK.wp_printk (hlc := hlc) (GF := GF) c k' γpr γlp γd [] DFrac.discard baFmtStr
-    [] hK (by unfold baFmtStr; decide) (by rw [ba_pkKinds]; rfl) (by decide) hnoff hpr huart
-  unfold wp_printk_body at h
-  simp only [printkAddr, ha0] at h
-  iapply h
-  iframe Hk Hpc Hf
-  iframe #
-  isplitl []
-  · unfold pkDescs
-    simp only [Iris.Algebra.BigOpL.bigOpL_nil]
-    iempintro
-  iapply wpNext_mono _ _ _ _ _ $$ HΦ
-  iintro %cpu' HΦ %spie %spp %R' %cs %hsp Hk Hpc %hcs Hf2 Hd2 Hsent2
-  iclear Hf2
-  iclear Hd2
-  iclear Hsent2
-  iapply HΦ $$ %spie %spp %R' %hsp Hk Hpc %hcs.1
 
 end
 

@@ -56,18 +56,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [Appcfg GF]
 
-/-- The handle's slot index, keeping the handle. -/
-theorem ialloc_hold_k [CurCtx] (γ : BcacheNames) (V : BioView GF) (kb : Nat)
-    (pidv dev bno : BitVec 32) (bs bsd : List (BitVec 8)) :
-    bufHold0 (GF := GF) γ V kb pidv dev bno bs bsd ⊢
-      ⌜kb < NBUF⌝ ∗ bufHold0 γ V kb pidv dev bno bs bsd := by
-  unfold bufHold0
-  iintro ⟨%hp, H⟩
-  isplitr
-  · ipureintro; exact hp.1
-  · iframe H
-    ipureintro; exact hp
-
 set_option maxHeartbeats 8000000 in
 /-- **THE BLOCK, DECODED THROUGH THE REGION** (Rocq 2271–2557): the bytes
 bread returned are `diblkBytes ds` for a well-formed `ds`, and the slot's
@@ -90,7 +78,7 @@ theorem ialloc_blk_open [Icfg] [Fscfg] [CurCtx] (kk : Nat) (pidv inum : BitVec 3
   have hin : (inum.toNat : Int) < 16 * (icfgNib : Int) := by omega
   iintro ⟨#Hireg, Hlk⟩
   icases (bioLocked_split _ _ kk pidv icfgDev _ bs bsd d).1 $$ Hlk with ⟨Hhold, Hpay⟩
-  icases ialloc_hold_k _ _ kk pidv icfgDev _ bs bsd $$ Hhold with ⟨%hkk, Hhold⟩
+  icases dsHold_k_keep _ _ kk pidv icfgDev _ bs bsd $$ Hhold with ⟨%hkk, Hhold⟩
   icases dsHeld_L fscBio fscFs fscDisk icfgDev fscCov kk icfgDev
     (BitVec.ofNat 32 (IBLOCK inum icfgIst)) bs bsd d $$ Hpay with ⟨HL, Hpback⟩
   rw [hbno]
@@ -114,7 +102,7 @@ theorem ialloc_blk_open [Icfg] [Fscfg] [CurCtx] (kk : Nat) (pidv inum : BitVec 3
   have hlen : islot inum < ds.length := by rw [hwf.1]; exact hk
   ihave Hby := Hsback $$ %ds[islot inum]! %(ialloc_slot_wf ds _ hwf hk) [H0 H2 H4 H6 H8 Ha]
   · iframe
-  rw [ialloc_set_self ds (islot inum) hlen]
+  rw [dsSet_self ds (islot inum) hlen]
   ihave Hown := Hbyback $$ %ds %hwf Hby
   ihave Hhold := Hhback $$ %(diblkBytes ds) Hown
   iapply (bioLocked_split _ _ kk pidv icfgDev _ (diblkBytes ds) bsd d).2
@@ -186,7 +174,7 @@ theorem ialloc_scan_next (BE : BRELSE) (PK : PRINTK) [Fscfg] [Icfg] [CurCtx]
   k_step (wp_s_jal c _ (KA.«ialloc» + 0x54#64) false 2096012#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ialloc_br_brelse]
   iintro Hk Hpc
-  iapply (ialloc_brelse BE Γ c _ γl kk pidv bno dqp bs bsd d k.proc (by k_norm_g)
+  iapply (brelse_callF BE Γ c _ γl kk pidv bno dqp bs bsd d k.proc (by k_norm_g)
       ?rnoff ?rK ?rlk ?rsl ?rp ?rtier hkk ?ra0)
     $$ [- $Hk $Hpc $Hpi $Hbc $Hpid $Hlk]
   rotate_right 1
@@ -431,7 +419,7 @@ theorem ialloc_scan_head (BD : BREAD) (MS : MEMSET) (LW : LOG_WRITE) (BE : BRELS
   k_step (wp_s_jal c _ (KA.«ialloc» + 0x3c#64) false 2095772#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ialloc_br_bread]
   iintro Hk Hpc
-  iapply (ialloc_bread BD Γ c _ γl pd pav pu j pidv (BitVec.ofNat 32 (IBLOCK (BitVec.ofNat 32 n) icfgIst))
+  iapply (bread_callF BD Γ c _ γl pd pav pu j pidv (BitVec.ofNat 32 (IBLOCK (BitVec.ofNat 32 n) icfgIst))
       dqp k.proc (by k_norm_g) hj ?dproc ?dK ?dsie ?dnoff ?dlocks ?dtier ?dbno ?dcov hpd ?da0 ?da1)
     $$ [- $Hk $Hpc $Hpi $Htc $Hcl $Hir $Hbc $Hdc $Hpe $Hpid $Hsl1]
   rotate_right 1

@@ -34,6 +34,7 @@ recovering arm BOTH are `emp` beyond the log slot's own half.
 import Xv6.SpecInstallTrans
 import Xv6.KernelData
 import Xv6.CodeTactics
+import Xv6.FsCallSites
 
 namespace Xv6
 
@@ -206,7 +207,6 @@ theorem it_cstr_fmt [CurCtx] :
   iapply cstr_intro KStr.«recovering tail %d dst %d\n» DFrac.discard itFmtStr
     (by unfold nonul itFmtStr; decide +kernel)
   iapply (kernelData_buf KStr.«recovering tail %d dst %d\n» (itFmtStr ++ [0#8]) (by decide +kernel)) $$ HS H
-
 
 theorem it_pkKinds : pkKinds itFmtStr = [PkKind.num, PkKind.num] := by
   unfold itFmtStr; decide
@@ -404,38 +404,6 @@ theorem it_printk (PK : PRINTK) (c : CPU) (k' : KCtx)
   all_goals first | (ipureintro; trivial) | iempintro
 
 set_option maxHeartbeats 1000000 in
-/-- `bread(dev, bno)` at `+0x7e` and `+0x8c`. -/
-theorem it_bread (BR : BREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (c : CPU) (k' : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
-    (pd pav pu : BitVec 64) (j : Nat) (pidv dev bno : BitVec 32) (dqp : DFrac)
-    (pj : BitVec 64) (hpj : k'.proc = pj)
-    (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : breadSlots ≤ k'.avail)
-    (hsie : k'.sie = false) (hnoff : k'.noff = 0) (hlocks : k'.locks = [])
-    (htier : k'.tier = KTier.kpt)
-    (hbno : bno.toNat < 2 ^ 31) (hcov : bno.toNat ∈ V.cov) (hdev : dev = V.dev)
-    (hpd : descPageRw pd)
-    (ha0 : k'.regs 10#5 = BitVec.signExtend 64 dev)
-    (ha1 : k'.regs 11#5 = BitVec.signExtend 64 bno) :
-    kctx c k' ∗ pcIs c KA.«bread» ∗ procsInv Γ ∗
-    trapCsrs c ∗ cpuClaim c pj ∗ intrRes c ∗
-    bioCtx γl γb V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
-    wordPointsTo (pPid pj) 4 dqp pidv ∗ bslot γb ∗
-    wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (kk : Nat)
-        (bs bsd : List (BitVec 8)) (d : Bool),
-      ⌜calleeSaved k'.regs R' ∧ R' 10#5 = bnode kk⌝ -∗
-      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      trapCsrs cpu' -∗ cpuClaim cpu' pj -∗ intrRes cpu' -∗
-      wordPointsTo (pPid pj) 4 dqp pidv -∗
-      bioLocked γb V kk pidv dev bno bs bsd d -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  subst hpj
-  have h := BR.wp_bread (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl pd pav pu j pidv dev bno dqp
-    hj hproc hK hsie hnoff hlocks htier hbno hcov hdev hpd ha0 ha1
-  unfold wp_bread_body at h
-  simp only [breadAddr] at h
-  exact h
-
-set_option maxHeartbeats 1000000 in
 /-- `bwrite(dbuf)` at `+0xa2`. -/
 theorem it_bwrite (BW : BWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (c : CPU) (k' : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
@@ -464,32 +432,6 @@ theorem it_bwrite (BW : BWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     pidv dev bno dqp bs bsd hj hproc hK hsie hnoff hlocks htier hkk ha0 hbno hbsd hpd
   unfold wp_bwrite_body at h
   simp only [bwriteAddr] at h
-  exact h
-
-set_option maxHeartbeats 1000000 in
-/-- `brelse(b)` at `+0x56` and `+0x5c`. -/
-theorem it_brelse (BE : BRELSE) (Γ : SchedNames)
-    (c : CPU) (k' : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (kk : Nat)
-    (pidv dev bno : BitVec 32) (dqp : DFrac) (bs bsd : List (BitVec 8)) (d : Bool)
-    (pj : BitVec 64) (hpj : k'.proc = pj)
-    (hnoff : k'.noff + 2 < 2 ^ 31) (hK : brelseSlots ≤ k'.avail)
-    (hlk : "bcache" ∉ k'.locks) (hsl : "sleep lock" ∉ k'.locks) (hp : "proc" ∉ k'.locks)
-    (htier : k'.tier = KTier.kpt)
-    (hkk : kk < NBUF) (ha0 : k'.regs 10#5 = bnode kk) :
-    kctx c k' ∗ pcIs c KA.«brelse» ∗ procsInv Γ ∗
-    bioCtx γl γb V ∗ wordPointsTo (pPid pj) 4 dqp pidv ∗
-    bioLocked γb V kk pidv dev bno bs bsd d ∗
-    wpNext k'.sie pj c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
-      ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
-      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      ⌜calleeSaved k'.regs R'⌝ -∗ wordPointsTo (pPid pj) 4 dqp pidv -∗
-      bslot γb -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  subst hpj
-  have h := BE.wp_brelse (hlc := hlc) (GF := GF) Γ c k' γl γb V kk pidv dev bno dqp bs bsd d
-    hnoff hK hlk hsl hp htier hkk ha0
-  unfold wp_brelse_body at h
-  simp only [brelseAddr] at h
   exact h
 
 set_option maxHeartbeats 1000000 in
@@ -949,7 +891,6 @@ theorem it_ctx_collapse (k : KCtx) (m : Nat) (a b c d : Bool) (R R' : RegMap) :
     ((((k.withSpie a b).pushed m).withRegs R).withSpie c d).withRegs R' =
       ((k.withSpie c d).pushed m).withRegs R' := rfl
 
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [CurCtx]
@@ -1130,7 +1071,7 @@ theorem it_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE) (PK : PR
   k_step (wp_s_jal c _ (KA.«install_trans» + 0x7e#64) false 2093006#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [it_br_bread]
   iintro Hk Hpc
-  iapply (it_bread BR Γ c _ γl γb V γdl pd pav pu j pidv dev (BitVec.ofNat 32 (logSlotBno logstart t))
+  iapply (bread_call BR Γ c _ γl γb V γdl pd pav pu j pidv dev (BitVec.ofNat 32 (logSlotBno logstart t))
       dqp k.proc (by k_norm_g) hj ?qproc ?qK ?qsie ?qnoff ?qlocks ?qtier ?qbno ?qcov hdev hpd ?qa0 ?qa1)
     $$ [- $Hk $Hpc $Hpinv $Htc $Hcl $Hir $Hbc $Hdc $Hpe $Hpid $Hsl1]
   rotate_right 1
@@ -1190,7 +1131,7 @@ theorem it_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE) (PK : PR
   k_step (wp_s_jal c1 _ (KA.«install_trans» + 0x8c#64) false 2092992#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [it_br_bread]
   iintro Hk Hpc
-  iapply (it_bread BR Γ c1 _ γl γb V γdl pd pav pu j pidv dev wt
+  iapply (bread_call BR Γ c1 _ γl γb V γdl pd pav pu j pidv dev wt
       dqp k.proc (by k_norm_g) hj ?rproc ?rK ?rsie ?rnoff ?rlocks ?rtier hbw hcovw hdev hpd ?ra0 ?ra1)
     $$ [- $Hk $Hpc $Hpinv $Htc $Hcl $Hir $Hbc $Hdc $Hpe $Hpid $Hsl2]
   rotate_right 1
@@ -1376,7 +1317,7 @@ theorem it_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE) (PK : PR
   k_step (wp_s_jal c3 _ (KA.«install_trans» + 0x56#64) false 2093310#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [it_br_brelse]
   iintro Hk Hpc
-  iapply (it_brelse BE Γ c3 _ γl γb V kkL pidv dev (BitVec.ofNat 32 (logSlotBno logstart t)) dqp
+  iapply (brelse_call BE Γ c3 _ γl γb V kkL pidv dev (BitVec.ofNat 32 (logSlotBno logstart t)) dqp
       (Lw t) bsdL dL k.proc (by k_norm_g) ?enoff ?eK ?elk ?esl ?ep ?etier hpL.1 ?ea0)
     $$ [- $Hk $Hpc $Hpinv $Hbc $Hpid $HbufL]
   rotate_right 1
@@ -1410,7 +1351,7 @@ theorem it_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE) (PK : PR
   k_step (wp_s_jal c3 _ (KA.«install_trans» + 0x5c#64) false 2093304#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [it_br_brelse]
   iintro Hk Hpc
-  iapply (it_brelse BE Γ c3 _ γl γb V kkD pidv dev wt dqp (Lw t) (Lw t) false
+  iapply (brelse_call BE Γ c3 _ γl γb V kkD pidv dev wt dqp (Lw t) (Lw t) false
       k.proc (by k_norm_g) ?fnoff ?fK ?flk ?fsl ?fp ?ftier hpD.1 ?fa0)
     $$ [- $Hk $Hpc $Hpinv $Hbc $Hpid $HbufD]
   rotate_right 1
@@ -1639,7 +1580,7 @@ theorem it_body_commit (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE) (M
   k_step (wp_s_jal c _ (KA.«install_trans» + 0x7e#64) false 2093006#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [it_br_bread]
   iintro Hk Hpc
-  iapply (it_bread BR Γ c _ γl γb V γdl pd pav pu j pidv dev (BitVec.ofNat 32 (logSlotBno logstart t))
+  iapply (bread_call BR Γ c _ γl γb V γdl pd pav pu j pidv dev (BitVec.ofNat 32 (logSlotBno logstart t))
       dqp k.proc (by k_norm_g) hj ?qproc ?qK ?qsie ?qnoff ?qlocks ?qtier ?qbno ?qcov hdev hpd ?qa0 ?qa1)
     $$ [- $Hk $Hpc $Hpinv $Htc $Hcl $Hir $Hbc $Hdc $Hpe $Hpid $Hsl1]
   rotate_right 1
@@ -1699,7 +1640,7 @@ theorem it_body_commit (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE) (M
   k_step (wp_s_jal c1 _ (KA.«install_trans» + 0x8c#64) false 2092992#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [it_br_bread]
   iintro Hk Hpc
-  iapply (it_bread BR Γ c1 _ γl γb V γdl pd pav pu j pidv dev wt
+  iapply (bread_call BR Γ c1 _ γl γb V γdl pd pav pu j pidv dev wt
       dqp k.proc (by k_norm_g) hj ?rproc ?rK ?rsie ?rnoff ?rlocks ?rtier hbw hcovw hdev hpd ?ra0 ?ra1)
     $$ [- $Hk $Hpc $Hpinv $Htc $Hcl $Hir $Hbc $Hdc $Hpe $Hpid $Hsl2]
   rotate_right 1
@@ -1893,7 +1834,7 @@ theorem it_body_commit (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE) (M
   k_step (wp_s_jal c3 _ (KA.«install_trans» + 0x56#64) false 2093310#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [it_br_brelse]
   iintro Hk Hpc
-  iapply (it_brelse BE Γ c3 _ γl γb V kkL pidv dev (BitVec.ofNat 32 (logSlotBno logstart t)) dqp
+  iapply (brelse_call BE Γ c3 _ γl γb V kkL pidv dev (BitVec.ofNat 32 (logSlotBno logstart t)) dqp
       (Lw t) bsdL dL k.proc (by k_norm_g) ?enoff ?eK ?elk ?esl ?ep ?etier hpL.1 ?ea0)
     $$ [- $Hk $Hpc $Hpinv $Hbc $Hpid $HbufL]
   rotate_right 1
@@ -1927,7 +1868,7 @@ theorem it_body_commit (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE) (M
   k_step (wp_s_jal c3 _ (KA.«install_trans» + 0x5c#64) false 2093304#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [it_br_brelse]
   iintro Hk Hpc
-  iapply (it_brelse BE Γ c3 _ γl γb V kkD pidv dev wt dqp (Lw t) (Lw t) false
+  iapply (brelse_call BE Γ c3 _ γl γb V kkD pidv dev wt dqp (Lw t) (Lw t) false
       k.proc (by k_norm_g) ?fnoff ?fK ?flk ?fsl ?fp ?ftier hpD.1 ?fa0)
     $$ [- $Hk $Hpc $Hpinv $Hbc $Hpid $HbufD]
   rotate_right 1

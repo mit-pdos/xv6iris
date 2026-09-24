@@ -540,6 +540,8 @@ import Xv6.InodeInv
 import Xv6.InodeLock
 import Xv6.FsWords
 import Xv6.DinodeSlot
+import Xv6.FsCallSites
+import Xv6.FsCallSitesF
 import Xv6.DirView
 import Xv6.FsTree
 import Xv6.IcacheRefDefs
