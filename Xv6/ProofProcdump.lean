@@ -39,14 +39,8 @@ set_option maxRecDepth 100000 in
 theorem pd_cstr_pdNl [CurCtx] :
     kmapStatic (GF := GF) ⊢ kernelData -∗ cstr KStr.«\n» DFrac.discard pdNlStr := by
   iintro #HS #H
-  ihave #B0 := kernelData_byte 128 KernelStr.«\n» 0x0a rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B1 := kernelData_byte 129 (KernelStr.«\n» + 0x1) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  iapply cstr_intro KStr.«\n» DFrac.discard pdNlStr (by unfold nonul pdNlStr; decide)
-  unfold byteBuf pdNlStr
-  simp only [List.cons_append, List.nil_append, Iris.Algebra.BigOpL.bigOpL_cons,
-    Iris.Algebra.BigOpL.bigOpL_nil, Nat.reduceAdd, Nat.zero_add, BitVec.reduceAdd, BitVec.ofNat_add, k_addr, BitVec.reduceOfNat, BitVec.add_zero]
-  iframe #
-  all_goals iempintro
+  iapply cstr_intro KStr.«\n» DFrac.discard pdNlStr (by unfold nonul pdNlStr; decide +kernel)
+  iapply (kernelData_buf KStr.«\n» (pdNlStr ++ [0#8]) (by decide +kernel)) $$ HS H
 
 /-- `???` at `0x80007228`. -/
 def pdQStr : List (BitVec 8) := [0x3f#8, 0x3f#8, 0x3f#8]
@@ -55,16 +49,8 @@ set_option maxRecDepth 100000 in
 theorem pd_cstr_pdQ [CurCtx] :
     kmapStatic (GF := GF) ⊢ kernelData -∗ cstr KStr.«???» DFrac.discard pdQStr := by
   iintro #HS #H
-  ihave #B0 := kernelData_byte 552 KernelStr.«???» 0x3f rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B1 := kernelData_byte 553 (KernelStr.«???» + 0x1) 0x3f rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B2 := kernelData_byte 554 (KernelStr.«???» + 0x2) 0x3f rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B3 := kernelData_byte 555 (KernelStr.«???» + 0x3) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  iapply cstr_intro KStr.«???» DFrac.discard pdQStr (by unfold nonul pdQStr; decide)
-  unfold byteBuf pdQStr
-  simp only [List.cons_append, List.nil_append, Iris.Algebra.BigOpL.bigOpL_cons,
-    Iris.Algebra.BigOpL.bigOpL_nil, Nat.reduceAdd, Nat.zero_add, BitVec.reduceAdd, BitVec.ofNat_add, k_addr, BitVec.reduceOfNat, BitVec.add_zero]
-  iframe #
-  all_goals iempintro
+  iapply cstr_intro KStr.«???» DFrac.discard pdQStr (by unfold nonul pdQStr; decide +kernel)
+  iapply (kernelData_buf KStr.«???» (pdQStr ++ [0#8]) (by decide +kernel)) $$ HS H
 
 /-- `%d %s %s` at `0x80007230`. -/
 def pdFmtStr : List (BitVec 8) := [0x25#8, 0x64#8, 0x20#8, 0x25#8, 0x73#8, 0x20#8, 0x25#8, 0x73#8]
@@ -73,21 +59,8 @@ set_option maxRecDepth 100000 in
 theorem pd_cstr_pdFmt [CurCtx] :
     kmapStatic (GF := GF) ⊢ kernelData -∗ cstr KStr.«%d %s %s» DFrac.discard pdFmtStr := by
   iintro #HS #H
-  ihave #B0 := kernelData_byte 560 KernelStr.«%d %s %s» 0x25 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B1 := kernelData_byte 561 (KernelStr.«%d %s %s» + 0x1) 0x64 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B2 := kernelData_byte 562 (KernelStr.«%d %s %s» + 0x2) 0x20 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B3 := kernelData_byte 563 (KernelStr.«%d %s %s» + 0x3) 0x25 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B4 := kernelData_byte 564 (KernelStr.«%d %s %s» + 0x4) 0x73 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B5 := kernelData_byte 565 (KernelStr.«%d %s %s» + 0x5) 0x20 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B6 := kernelData_byte 566 (KernelStr.«%d %s %s» + 0x6) 0x25 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B7 := kernelData_byte 567 (KernelStr.«%d %s %s» + 0x7) 0x73 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B8 := kernelData_byte 568 (KernelStr.«%d %s %s» + 0x8) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  iapply cstr_intro KStr.«%d %s %s» DFrac.discard pdFmtStr (by unfold nonul pdFmtStr; decide)
-  unfold byteBuf pdFmtStr
-  simp only [List.cons_append, List.nil_append, Iris.Algebra.BigOpL.bigOpL_cons,
-    Iris.Algebra.BigOpL.bigOpL_nil, Nat.reduceAdd, Nat.zero_add, BitVec.reduceAdd, BitVec.ofNat_add, k_addr, BitVec.reduceOfNat, BitVec.add_zero]
-  iframe #
-  all_goals iempintro
+  iapply cstr_intro KStr.«%d %s %s» DFrac.discard pdFmtStr (by unfold nonul pdFmtStr; decide +kernel)
+  iapply (kernelData_buf KStr.«%d %s %s» (pdFmtStr ++ [0#8]) (by decide +kernel)) $$ HS H
 
 /-- `states[1]` at `0x80007248`. -/
 def pdS1Str : List (BitVec 8) := [0x75#8, 0x73#8, 0x65#8, 0x64#8]
@@ -96,17 +69,8 @@ set_option maxRecDepth 100000 in
 theorem pd_cstr_pdS1 [CurCtx] :
     kmapStatic (GF := GF) ⊢ kernelData -∗ cstr KStr.«used» DFrac.discard pdS1Str := by
   iintro #HS #H
-  ihave #B0 := kernelData_byte 584 KernelStr.«used» 0x75 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B1 := kernelData_byte 585 (KernelStr.«used» + 0x1) 0x73 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B2 := kernelData_byte 586 (KernelStr.«used» + 0x2) 0x65 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B3 := kernelData_byte 587 (KernelStr.«used» + 0x3) 0x64 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B4 := kernelData_byte 588 (KernelStr.«used» + 0x4) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  iapply cstr_intro KStr.«used» DFrac.discard pdS1Str (by unfold nonul pdS1Str; decide)
-  unfold byteBuf pdS1Str
-  simp only [List.cons_append, List.nil_append, Iris.Algebra.BigOpL.bigOpL_cons,
-    Iris.Algebra.BigOpL.bigOpL_nil, Nat.reduceAdd, Nat.zero_add, BitVec.reduceAdd, BitVec.ofNat_add, k_addr, BitVec.reduceOfNat, BitVec.add_zero]
-  iframe #
-  all_goals iempintro
+  iapply cstr_intro KStr.«used» DFrac.discard pdS1Str (by unfold nonul pdS1Str; decide +kernel)
+  iapply (kernelData_buf KStr.«used» (pdS1Str ++ [0#8]) (by decide +kernel)) $$ HS H
 
 /-- `states[2]` at `0x80007250`. -/
 def pdS2Str : List (BitVec 8) := [0x73#8, 0x6c#8, 0x65#8, 0x65#8, 0x70#8, 0x20#8]
@@ -115,19 +79,8 @@ set_option maxRecDepth 100000 in
 theorem pd_cstr_pdS2 [CurCtx] :
     kmapStatic (GF := GF) ⊢ kernelData -∗ cstr KStr.«sleep » DFrac.discard pdS2Str := by
   iintro #HS #H
-  ihave #B0 := kernelData_byte 592 KernelStr.«sleep » 0x73 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B1 := kernelData_byte 593 (KernelStr.«sleep » + 0x1) 0x6c rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B2 := kernelData_byte 594 (KernelStr.«sleep » + 0x2) 0x65 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B3 := kernelData_byte 595 (KernelStr.«sleep » + 0x3) 0x65 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B4 := kernelData_byte 596 (KernelStr.«sleep » + 0x4) 0x70 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B5 := kernelData_byte 597 (KernelStr.«sleep » + 0x5) 0x20 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B6 := kernelData_byte 598 (KernelStr.«sleep » + 0x6) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  iapply cstr_intro KStr.«sleep » DFrac.discard pdS2Str (by unfold nonul pdS2Str; decide)
-  unfold byteBuf pdS2Str
-  simp only [List.cons_append, List.nil_append, Iris.Algebra.BigOpL.bigOpL_cons,
-    Iris.Algebra.BigOpL.bigOpL_nil, Nat.reduceAdd, Nat.zero_add, BitVec.reduceAdd, BitVec.ofNat_add, k_addr, BitVec.reduceOfNat, BitVec.add_zero]
-  iframe #
-  all_goals iempintro
+  iapply cstr_intro KStr.«sleep » DFrac.discard pdS2Str (by unfold nonul pdS2Str; decide +kernel)
+  iapply (kernelData_buf KStr.«sleep » (pdS2Str ++ [0#8]) (by decide +kernel)) $$ HS H
 
 /-- `states[3]` at `0x80007258`. -/
 def pdS3Str : List (BitVec 8) := [0x72#8, 0x75#8, 0x6e#8, 0x62#8, 0x6c#8, 0x65#8]
@@ -136,19 +89,8 @@ set_option maxRecDepth 100000 in
 theorem pd_cstr_pdS3 [CurCtx] :
     kmapStatic (GF := GF) ⊢ kernelData -∗ cstr KStr.«runble» DFrac.discard pdS3Str := by
   iintro #HS #H
-  ihave #B0 := kernelData_byte 600 KernelStr.«runble» 0x72 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B1 := kernelData_byte 601 (KernelStr.«runble» + 0x1) 0x75 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B2 := kernelData_byte 602 (KernelStr.«runble» + 0x2) 0x6e rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B3 := kernelData_byte 603 (KernelStr.«runble» + 0x3) 0x62 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B4 := kernelData_byte 604 (KernelStr.«runble» + 0x4) 0x6c rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B5 := kernelData_byte 605 (KernelStr.«runble» + 0x5) 0x65 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B6 := kernelData_byte 606 (KernelStr.«runble» + 0x6) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  iapply cstr_intro KStr.«runble» DFrac.discard pdS3Str (by unfold nonul pdS3Str; decide)
-  unfold byteBuf pdS3Str
-  simp only [List.cons_append, List.nil_append, Iris.Algebra.BigOpL.bigOpL_cons,
-    Iris.Algebra.BigOpL.bigOpL_nil, Nat.reduceAdd, Nat.zero_add, BitVec.reduceAdd, BitVec.ofNat_add, k_addr, BitVec.reduceOfNat, BitVec.add_zero]
-  iframe #
-  all_goals iempintro
+  iapply cstr_intro KStr.«runble» DFrac.discard pdS3Str (by unfold nonul pdS3Str; decide +kernel)
+  iapply (kernelData_buf KStr.«runble» (pdS3Str ++ [0#8]) (by decide +kernel)) $$ HS H
 
 /-- `states[4]` at `0x80007260`. -/
 def pdS4Str : List (BitVec 8) := [0x72#8, 0x75#8, 0x6e#8, 0x20#8, 0x20#8, 0x20#8]
@@ -157,19 +99,8 @@ set_option maxRecDepth 100000 in
 theorem pd_cstr_pdS4 [CurCtx] :
     kmapStatic (GF := GF) ⊢ kernelData -∗ cstr KStr.«run   » DFrac.discard pdS4Str := by
   iintro #HS #H
-  ihave #B0 := kernelData_byte 608 KernelStr.«run   » 0x72 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B1 := kernelData_byte 609 (KernelStr.«run   » + 0x1) 0x75 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B2 := kernelData_byte 610 (KernelStr.«run   » + 0x2) 0x6e rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B3 := kernelData_byte 611 (KernelStr.«run   » + 0x3) 0x20 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B4 := kernelData_byte 612 (KernelStr.«run   » + 0x4) 0x20 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B5 := kernelData_byte 613 (KernelStr.«run   » + 0x5) 0x20 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B6 := kernelData_byte 614 (KernelStr.«run   » + 0x6) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  iapply cstr_intro KStr.«run   » DFrac.discard pdS4Str (by unfold nonul pdS4Str; decide)
-  unfold byteBuf pdS4Str
-  simp only [List.cons_append, List.nil_append, Iris.Algebra.BigOpL.bigOpL_cons,
-    Iris.Algebra.BigOpL.bigOpL_nil, Nat.reduceAdd, Nat.zero_add, BitVec.reduceAdd, BitVec.ofNat_add, k_addr, BitVec.reduceOfNat, BitVec.add_zero]
-  iframe #
-  all_goals iempintro
+  iapply cstr_intro KStr.«run   » DFrac.discard pdS4Str (by unfold nonul pdS4Str; decide +kernel)
+  iapply (kernelData_buf KStr.«run   » (pdS4Str ++ [0#8]) (by decide +kernel)) $$ HS H
 
 /-- `states[5]` at `0x80007268`. -/
 def pdS5Str : List (BitVec 8) := [0x7a#8, 0x6f#8, 0x6d#8, 0x62#8, 0x69#8, 0x65#8]
@@ -178,134 +109,63 @@ set_option maxRecDepth 100000 in
 theorem pd_cstr_pdS5 [CurCtx] :
     kmapStatic (GF := GF) ⊢ kernelData -∗ cstr KStr.«zombie» DFrac.discard pdS5Str := by
   iintro #HS #H
-  ihave #B0 := kernelData_byte 616 KernelStr.«zombie» 0x7a rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B1 := kernelData_byte 617 (KernelStr.«zombie» + 0x1) 0x6f rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B2 := kernelData_byte 618 (KernelStr.«zombie» + 0x2) 0x6d rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B3 := kernelData_byte 619 (KernelStr.«zombie» + 0x3) 0x62 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B4 := kernelData_byte 620 (KernelStr.«zombie» + 0x4) 0x69 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B5 := kernelData_byte 621 (KernelStr.«zombie» + 0x5) 0x65 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B6 := kernelData_byte 622 (KernelStr.«zombie» + 0x6) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  iapply cstr_intro KStr.«zombie» DFrac.discard pdS5Str (by unfold nonul pdS5Str; decide)
-  unfold byteBuf pdS5Str
-  simp only [List.cons_append, List.nil_append, Iris.Algebra.BigOpL.bigOpL_cons,
-    Iris.Algebra.BigOpL.bigOpL_nil, Nat.reduceAdd, Nat.zero_add, BitVec.reduceAdd, BitVec.ofNat_add, k_addr, BitVec.reduceOfNat, BitVec.add_zero]
-  iframe #
-  all_goals iempintro
+  iapply cstr_intro KStr.«zombie» DFrac.discard pdS5Str (by unfold nonul pdS5Str; decide +kernel)
+  iapply (kernelData_buf KStr.«zombie» (pdS5Str ++ [0#8]) (by decide +kernel)) $$ HS H
 
 set_option maxRecDepth 100000 in
 /-- `states[1]` out of the table at `0x80007758`. -/
 theorem pd_tbl1 [CurCtx] :
     kmapStatic (GF := GF) ⊢ kernelData -∗ wordPointsTo (KA.«states_0» + 0x8#64) 8 DFrac.discard KStr.«used» := by
   iintro #HS #H
-  ihave #B0 := kernelData_byte 1880 (KernelSyms.«states_0» + 0x8) 0x48 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B1 := kernelData_byte 1881 (KernelSyms.«states_0» + 0x9) 0x72 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B2 := kernelData_byte 1882 (KernelSyms.«states_0» + 0xa) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B3 := kernelData_byte 1883 (KernelSyms.«states_0» + 0xb) 0x80 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B4 := kernelData_byte 1884 (KernelSyms.«states_0» + 0xc) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B5 := kernelData_byte 1885 (KernelSyms.«states_0» + 0xd) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B6 := kernelData_byte 1886 (KernelSyms.«states_0» + 0xe) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B7 := kernelData_byte 1887 (KernelSyms.«states_0» + 0xf) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
   iapply (show wordPointsTo (GF := GF) (KA.«states_0» + 0x8#64) 8 DFrac.discard
       (bytesToWord [0x48#8, 0x72#8, 0x00#8, 0x80#8, 0x00#8, 0x00#8, 0x00#8, 0x00#8]) ⊢
       wordPointsTo (KA.«states_0» + 0x8#64) 8 DFrac.discard KStr.«used» from by rfl)
   iapply wordPointsTo_of_bytes (KA.«states_0» + 0x8#64) DFrac.discard _ rfl (by decide)
-  unfold byteBuf
-  simp only [Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil,
-    Nat.reduceAdd, Nat.zero_add, BitVec.add_assoc, BitVec.reduceAdd, BitVec.ofNat_add, k_addr, BitVec.reduceOfNat, BitVec.add_zero]
-  iframe #
-  all_goals iempintro
+  iapply (kernelData_buf (KA.«states_0» + 0x8#64) [0x48#8, 0x72#8, 0x00#8, 0x80#8, 0x00#8, 0x00#8, 0x00#8, 0x00#8] (by decide +kernel)) $$ HS H
 
 set_option maxRecDepth 100000 in
 /-- `states[2]` out of the table at `0x80007760`. -/
 theorem pd_tbl2 [CurCtx] :
     kmapStatic (GF := GF) ⊢ kernelData -∗ wordPointsTo (KA.«states_0» + 0x10#64) 8 DFrac.discard KStr.«sleep » := by
   iintro #HS #H
-  ihave #B0 := kernelData_byte 1888 (KernelSyms.«states_0» + 0x10) 0x50 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B1 := kernelData_byte 1889 (KernelSyms.«states_0» + 0x11) 0x72 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B2 := kernelData_byte 1890 (KernelSyms.«states_0» + 0x12) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B3 := kernelData_byte 1891 (KernelSyms.«states_0» + 0x13) 0x80 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B4 := kernelData_byte 1892 (KernelSyms.«states_0» + 0x14) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B5 := kernelData_byte 1893 (KernelSyms.«states_0» + 0x15) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B6 := kernelData_byte 1894 (KernelSyms.«states_0» + 0x16) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B7 := kernelData_byte 1895 (KernelSyms.«states_0» + 0x17) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
   iapply (show wordPointsTo (GF := GF) (KA.«states_0» + 0x10#64) 8 DFrac.discard
       (bytesToWord [0x50#8, 0x72#8, 0x00#8, 0x80#8, 0x00#8, 0x00#8, 0x00#8, 0x00#8]) ⊢
       wordPointsTo (KA.«states_0» + 0x10#64) 8 DFrac.discard KStr.«sleep » from by rfl)
   iapply wordPointsTo_of_bytes (KA.«states_0» + 0x10#64) DFrac.discard _ rfl (by decide)
-  unfold byteBuf
-  simp only [Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil,
-    Nat.reduceAdd, Nat.zero_add, BitVec.add_assoc, BitVec.reduceAdd, BitVec.ofNat_add, k_addr, BitVec.reduceOfNat, BitVec.add_zero]
-  iframe #
-  all_goals iempintro
+  iapply (kernelData_buf (KA.«states_0» + 0x10#64) [0x50#8, 0x72#8, 0x00#8, 0x80#8, 0x00#8, 0x00#8, 0x00#8, 0x00#8] (by decide +kernel)) $$ HS H
 
 set_option maxRecDepth 100000 in
 /-- `states[3]` out of the table at `0x80007768`. -/
 theorem pd_tbl3 [CurCtx] :
     kmapStatic (GF := GF) ⊢ kernelData -∗ wordPointsTo (KA.«states_0» + 0x18#64) 8 DFrac.discard KStr.«runble» := by
   iintro #HS #H
-  ihave #B0 := kernelData_byte 1896 (KernelSyms.«states_0» + 0x18) 0x58 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B1 := kernelData_byte 1897 (KernelSyms.«states_0» + 0x19) 0x72 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B2 := kernelData_byte 1898 (KernelSyms.«states_0» + 0x1a) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B3 := kernelData_byte 1899 (KernelSyms.«states_0» + 0x1b) 0x80 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B4 := kernelData_byte 1900 (KernelSyms.«states_0» + 0x1c) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B5 := kernelData_byte 1901 (KernelSyms.«states_0» + 0x1d) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B6 := kernelData_byte 1902 (KernelSyms.«states_0» + 0x1e) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B7 := kernelData_byte 1903 (KernelSyms.«states_0» + 0x1f) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
   iapply (show wordPointsTo (GF := GF) (KA.«states_0» + 0x18#64) 8 DFrac.discard
       (bytesToWord [0x58#8, 0x72#8, 0x00#8, 0x80#8, 0x00#8, 0x00#8, 0x00#8, 0x00#8]) ⊢
       wordPointsTo (KA.«states_0» + 0x18#64) 8 DFrac.discard KStr.«runble» from by rfl)
   iapply wordPointsTo_of_bytes (KA.«states_0» + 0x18#64) DFrac.discard _ rfl (by decide)
-  unfold byteBuf
-  simp only [Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil,
-    Nat.reduceAdd, Nat.zero_add, BitVec.add_assoc, BitVec.reduceAdd, BitVec.ofNat_add, k_addr, BitVec.reduceOfNat, BitVec.add_zero]
-  iframe #
-  all_goals iempintro
+  iapply (kernelData_buf (KA.«states_0» + 0x18#64) [0x58#8, 0x72#8, 0x00#8, 0x80#8, 0x00#8, 0x00#8, 0x00#8, 0x00#8] (by decide +kernel)) $$ HS H
 
 set_option maxRecDepth 100000 in
 /-- `states[4]` out of the table at `0x80007770`. -/
 theorem pd_tbl4 [CurCtx] :
     kmapStatic (GF := GF) ⊢ kernelData -∗ wordPointsTo (KA.«states_0» + 0x20#64) 8 DFrac.discard KStr.«run   » := by
   iintro #HS #H
-  ihave #B0 := kernelData_byte 1904 (KernelSyms.«states_0» + 0x20) 0x60 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B1 := kernelData_byte 1905 (KernelSyms.«states_0» + 0x21) 0x72 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B2 := kernelData_byte 1906 (KernelSyms.«states_0» + 0x22) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B3 := kernelData_byte 1907 (KernelSyms.«states_0» + 0x23) 0x80 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B4 := kernelData_byte 1908 (KernelSyms.«states_0» + 0x24) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B5 := kernelData_byte 1909 (KernelSyms.«states_0» + 0x25) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B6 := kernelData_byte 1910 (KernelSyms.«states_0» + 0x26) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B7 := kernelData_byte 1911 (KernelSyms.«states_0» + 0x27) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
   iapply (show wordPointsTo (GF := GF) (KA.«states_0» + 0x20#64) 8 DFrac.discard
       (bytesToWord [0x60#8, 0x72#8, 0x00#8, 0x80#8, 0x00#8, 0x00#8, 0x00#8, 0x00#8]) ⊢
       wordPointsTo (KA.«states_0» + 0x20#64) 8 DFrac.discard KStr.«run   » from by rfl)
   iapply wordPointsTo_of_bytes (KA.«states_0» + 0x20#64) DFrac.discard _ rfl (by decide)
-  unfold byteBuf
-  simp only [Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil,
-    Nat.reduceAdd, Nat.zero_add, BitVec.add_assoc, BitVec.reduceAdd, BitVec.ofNat_add, k_addr, BitVec.reduceOfNat, BitVec.add_zero]
-  iframe #
-  all_goals iempintro
+  iapply (kernelData_buf (KA.«states_0» + 0x20#64) [0x60#8, 0x72#8, 0x00#8, 0x80#8, 0x00#8, 0x00#8, 0x00#8, 0x00#8] (by decide +kernel)) $$ HS H
 
 set_option maxRecDepth 100000 in
 /-- `states[5]` out of the table at `0x80007778`. -/
 theorem pd_tbl5 [CurCtx] :
     kmapStatic (GF := GF) ⊢ kernelData -∗ wordPointsTo (KA.«states_0» + 0x28#64) 8 DFrac.discard KStr.«zombie» := by
   iintro #HS #H
-  ihave #B0 := kernelData_byte 1912 (KernelSyms.«states_0» + 0x28) 0x68 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B1 := kernelData_byte 1913 (KernelSyms.«states_0» + 0x29) 0x72 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B2 := kernelData_byte 1914 (KernelSyms.«states_0» + 0x2a) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B3 := kernelData_byte 1915 (KernelSyms.«states_0» + 0x2b) 0x80 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B4 := kernelData_byte 1916 (KernelSyms.«states_0» + 0x2c) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B5 := kernelData_byte 1917 (KernelSyms.«states_0» + 0x2d) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B6 := kernelData_byte 1918 (KernelSyms.«states_0» + 0x2e) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B7 := kernelData_byte 1919 (KernelSyms.«states_0» + 0x2f) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
   iapply (show wordPointsTo (GF := GF) (KA.«states_0» + 0x28#64) 8 DFrac.discard
       (bytesToWord [0x68#8, 0x72#8, 0x00#8, 0x80#8, 0x00#8, 0x00#8, 0x00#8, 0x00#8]) ⊢
       wordPointsTo (KA.«states_0» + 0x28#64) 8 DFrac.discard KStr.«zombie» from by rfl)
   iapply wordPointsTo_of_bytes (KA.«states_0» + 0x28#64) DFrac.discard _ rfl (by decide)
-  unfold byteBuf
-  simp only [Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil,
-    Nat.reduceAdd, Nat.zero_add, BitVec.add_assoc, BitVec.reduceAdd, BitVec.ofNat_add, k_addr, BitVec.reduceOfNat, BitVec.add_zero]
-  iframe #
-  all_goals iempintro
+  iapply (kernelData_buf (KA.«states_0» + 0x28#64) [0x68#8, 0x72#8, 0x00#8, 0x80#8, 0x00#8, 0x00#8, 0x00#8, 0x00#8] (by decide +kernel)) $$ HS H
 
 /-! ## Arithmetic -/
 

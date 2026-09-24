@@ -191,30 +191,8 @@ set_option maxRecDepth 100000 in
 theorem bd_cstr_msg [CurCtx] :
     kmapStatic (GF := GF) ⊢ kernelData -∗ cstr KStr.«bget: no buffers» DFrac.discard bdMsgStr := by
   iintro #HS #H
-  ihave #B0 := kernelData_byte 968 KernelStr.«bget: no buffers» 0x62 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B1 := kernelData_byte 969 (KernelStr.«bget: no buffers» + 0x1) 0x67 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B2 := kernelData_byte 970 (KernelStr.«bget: no buffers» + 0x2) 0x65 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B3 := kernelData_byte 971 (KernelStr.«bget: no buffers» + 0x3) 0x74 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B4 := kernelData_byte 972 (KernelStr.«bget: no buffers» + 0x4) 0x3a rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B5 := kernelData_byte 973 (KernelStr.«bget: no buffers» + 0x5) 0x20 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B6 := kernelData_byte 974 (KernelStr.«bget: no buffers» + 0x6) 0x6e rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B7 := kernelData_byte 975 (KernelStr.«bget: no buffers» + 0x7) 0x6f rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B8 := kernelData_byte 976 (KernelStr.«bget: no buffers» + 0x8) 0x20 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B9 := kernelData_byte 977 (KernelStr.«bget: no buffers» + 0x9) 0x62 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B10 := kernelData_byte 978 (KernelStr.«bget: no buffers» + 0xa) 0x75 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B11 := kernelData_byte 979 (KernelStr.«bget: no buffers» + 0xb) 0x66 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B12 := kernelData_byte 980 (KernelStr.«bget: no buffers» + 0xc) 0x66 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B13 := kernelData_byte 981 (KernelStr.«bget: no buffers» + 0xd) 0x65 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B14 := kernelData_byte 982 (KernelStr.«bget: no buffers» + 0xe) 0x72 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B15 := kernelData_byte 983 (KernelStr.«bget: no buffers» + 0xf) 0x73 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B16 := kernelData_byte 984 (KernelStr.«bget: no buffers» + 0x10) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  iapply cstr_intro KStr.«bget: no buffers» DFrac.discard bdMsgStr (by unfold nonul bdMsgStr; decide)
-  unfold byteBuf bdMsgStr
-  simp only [List.cons_append, List.nil_append, Iris.Algebra.BigOpL.bigOpL_cons,
-    Iris.Algebra.BigOpL.bigOpL_nil, Nat.reduceAdd, Nat.zero_add, BitVec.reduceAdd,
-    BitVec.ofNat_add, k_addr, BitVec.reduceOfNat, BitVec.add_zero]
-  iframe #
-  all_goals iempintro
+  iapply cstr_intro KStr.«bget: no buffers» DFrac.discard bdMsgStr (by unfold nonul bdMsgStr; decide +kernel)
+  iapply (kernelData_buf KStr.«bget: no buffers» (bdMsgStr ++ [0#8]) (by decide +kernel)) $$ HS H
 
 end
 

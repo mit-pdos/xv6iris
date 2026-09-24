@@ -43,37 +43,15 @@ set_option maxRecDepth 100000 in
 theorem pn_cstr_pfx [CurCtx] :
     kmapStatic (GF := GF) ⊢ kernelData -∗ cstr KStr.«panic: » DFrac.discard pnPfxStr := by
   iintro #HS #H
-  ihave #B0 := kernelData_byte 24 KernelStr.«panic: » 0x70 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B1 := kernelData_byte 25 (KernelStr.«panic: » + 0x1) 0x61 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B2 := kernelData_byte 26 (KernelStr.«panic: » + 0x2) 0x6e rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B3 := kernelData_byte 27 (KernelStr.«panic: » + 0x3) 0x69 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B4 := kernelData_byte 28 (KernelStr.«panic: » + 0x4) 0x63 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B5 := kernelData_byte 29 (KernelStr.«panic: » + 0x5) 0x3a rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B6 := kernelData_byte 30 (KernelStr.«panic: » + 0x6) 0x20 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B7 := kernelData_byte 31 (KernelStr.«panic: » + 0x7) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  iapply cstr_intro KStr.«panic: » DFrac.discard pnPfxStr (by unfold nonul pnPfxStr; decide)
-  unfold byteBuf pnPfxStr
-  simp only [List.cons_append, List.nil_append, Iris.Algebra.BigOpL.bigOpL_cons,
-    Iris.Algebra.BigOpL.bigOpL_nil, Nat.reduceAdd, Nat.zero_add, BitVec.reduceAdd,
-    BitVec.ofNat_add, k_addr, BitVec.reduceOfNat, BitVec.add_zero]
-  iframe #
-  all_goals iempintro
+  iapply cstr_intro KStr.«panic: » DFrac.discard pnPfxStr (by unfold nonul pnPfxStr; decide +kernel)
+  iapply (kernelData_buf KStr.«panic: » (pnPfxStr ++ [0#8]) (by decide +kernel)) $$ HS H
 
 set_option maxRecDepth 100000 in
 theorem pn_cstr_fmt [CurCtx] :
     kmapStatic (GF := GF) ⊢ kernelData -∗ cstr KStr.«%s\n» DFrac.discard pnFmtStr := by
   iintro #HS #H
-  ihave #B0 := kernelData_byte 32 KernelStr.«%s\n» 0x25 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B1 := kernelData_byte 33 (KernelStr.«%s\n» + 0x1) 0x73 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B2 := kernelData_byte 34 (KernelStr.«%s\n» + 0x2) 0x0a rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B3 := kernelData_byte 35 (KernelStr.«%s\n» + 0x3) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  iapply cstr_intro KStr.«%s\n» DFrac.discard pnFmtStr (by unfold nonul pnFmtStr; decide)
-  unfold byteBuf pnFmtStr
-  simp only [List.cons_append, List.nil_append, Iris.Algebra.BigOpL.bigOpL_cons,
-    Iris.Algebra.BigOpL.bigOpL_nil, Nat.reduceAdd, Nat.zero_add, BitVec.reduceAdd,
-    BitVec.ofNat_add, k_addr, BitVec.reduceOfNat, BitVec.add_zero]
-  iframe #
-  all_goals iempintro
+  iapply cstr_intro KStr.«%s\n» DFrac.discard pnFmtStr (by unfold nonul pnFmtStr; decide +kernel)
+  iapply (kernelData_buf KStr.«%s\n» (pnFmtStr ++ [0#8]) (by decide +kernel)) $$ HS H
 
 end
 

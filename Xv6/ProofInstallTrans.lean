@@ -203,41 +203,9 @@ theorem it_cstr_fmt [CurCtx] :
     kmapStatic (GF := GF) ⊢ kernelData -∗
       cstr KStr.«recovering tail %d dst %d\n» DFrac.discard itFmtStr := by
   iintro #HS #H
-  ihave #B0 := kernelData_byte 1280 KernelStr.«recovering tail %d dst %d\n» 0x72 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B1 := kernelData_byte 1281 (KernelStr.«recovering tail %d dst %d\n» + 0x1) 0x65 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B2 := kernelData_byte 1282 (KernelStr.«recovering tail %d dst %d\n» + 0x2) 0x63 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B3 := kernelData_byte 1283 (KernelStr.«recovering tail %d dst %d\n» + 0x3) 0x6f rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B4 := kernelData_byte 1284 (KernelStr.«recovering tail %d dst %d\n» + 0x4) 0x76 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B5 := kernelData_byte 1285 (KernelStr.«recovering tail %d dst %d\n» + 0x5) 0x65 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B6 := kernelData_byte 1286 (KernelStr.«recovering tail %d dst %d\n» + 0x6) 0x72 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B7 := kernelData_byte 1287 (KernelStr.«recovering tail %d dst %d\n» + 0x7) 0x69 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B8 := kernelData_byte 1288 (KernelStr.«recovering tail %d dst %d\n» + 0x8) 0x6e rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B9 := kernelData_byte 1289 (KernelStr.«recovering tail %d dst %d\n» + 0x9) 0x67 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B10 := kernelData_byte 1290 (KernelStr.«recovering tail %d dst %d\n» + 0xa) 0x20 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B11 := kernelData_byte 1291 (KernelStr.«recovering tail %d dst %d\n» + 0xb) 0x74 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B12 := kernelData_byte 1292 (KernelStr.«recovering tail %d dst %d\n» + 0xc) 0x61 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B13 := kernelData_byte 1293 (KernelStr.«recovering tail %d dst %d\n» + 0xd) 0x69 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B14 := kernelData_byte 1294 (KernelStr.«recovering tail %d dst %d\n» + 0xe) 0x6c rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B15 := kernelData_byte 1295 (KernelStr.«recovering tail %d dst %d\n» + 0xf) 0x20 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B16 := kernelData_byte 1296 (KernelStr.«recovering tail %d dst %d\n» + 0x10) 0x25 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B17 := kernelData_byte 1297 (KernelStr.«recovering tail %d dst %d\n» + 0x11) 0x64 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B18 := kernelData_byte 1298 (KernelStr.«recovering tail %d dst %d\n» + 0x12) 0x20 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B19 := kernelData_byte 1299 (KernelStr.«recovering tail %d dst %d\n» + 0x13) 0x64 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B20 := kernelData_byte 1300 (KernelStr.«recovering tail %d dst %d\n» + 0x14) 0x73 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B21 := kernelData_byte 1301 (KernelStr.«recovering tail %d dst %d\n» + 0x15) 0x74 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B22 := kernelData_byte 1302 (KernelStr.«recovering tail %d dst %d\n» + 0x16) 0x20 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B23 := kernelData_byte 1303 (KernelStr.«recovering tail %d dst %d\n» + 0x17) 0x25 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B24 := kernelData_byte 1304 (KernelStr.«recovering tail %d dst %d\n» + 0x18) 0x64 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B25 := kernelData_byte 1305 (KernelStr.«recovering tail %d dst %d\n» + 0x19) 0x0a rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
-  ihave #B26 := kernelData_byte 1306 (KernelStr.«recovering tail %d dst %d\n» + 0x1a) 0x00 rfl (by unfold inRam ramBase ramEnd; decide) (by decide) $$ HS H
   iapply cstr_intro KStr.«recovering tail %d dst %d\n» DFrac.discard itFmtStr
-    (by unfold nonul itFmtStr; decide)
-  unfold byteBuf itFmtStr
-  simp only [List.cons_append, List.nil_append, Iris.Algebra.BigOpL.bigOpL_cons,
-    Iris.Algebra.BigOpL.bigOpL_nil, Nat.reduceAdd, Nat.zero_add, BitVec.reduceAdd,
-    BitVec.ofNat_add, k_addr, BitVec.reduceOfNat, BitVec.add_zero]
-  iframe #
-  all_goals iempintro
+    (by unfold nonul itFmtStr; decide +kernel)
+  iapply (kernelData_buf KStr.«recovering tail %d dst %d\n» (itFmtStr ++ [0#8]) (by decide +kernel)) $$ HS H
 
 
 theorem it_pkKinds : pkKinds itFmtStr = [PkKind.num, PkKind.num] := by
