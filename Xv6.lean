@@ -566,3 +566,5 @@ import Xv6.FsStateEraPure
 import Xv6.FsStateEraRes
 import Xv6.InodeRegionInv
 import Xv6.IcacheRef
+import Xv6.OffBoxCam
+import Xv6.OffBox

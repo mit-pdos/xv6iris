@@ -221,7 +221,7 @@ Deps name batch items; "gate" = §1 plus the in-flight files.
 - [DONE] C2 FsStateEraRes (NOTE from B7: FsStateEraPure dropped `inode_ok_data_ext` because its only consumer `inode_owned_era_era_node_ok` (FsStateEra.v:1962) is listed dead in §5 — re-verify that; if you keep it, port `inode_ok_data_ext` (6 lines) too. Rocq's FsStateEra `dir_nrec_bound` is `dirNrec_boundMax` in Lean. `DOT_dot_name` was dropped as a duplicate: use `DOT_dot`. Start at `Section EraRes`, line 1022, with `big_sepL_seq_map`) — B3, B7, A2.
 - C3 IcacheHeld — B4.
 - C4 IcacheInvRef — B5, B4, A1, A10.
-- C5 OffBox — B8, A7.
+- [DONE] C5 OffBox — B8, A7.
 
 **Batch D (6)**
 - D1 InodeRegionMovers — C1.
