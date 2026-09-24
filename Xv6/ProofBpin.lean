@@ -11,6 +11,7 @@ which is what bounds the count and makes the unchecked `++` faithful.  The
 shape is `filedup`'s, minus the `blez` panic arm and the `mv a0,s1` return.
 -/
 import Xv6.SpecBpin
+import Xv6.BufEscrow
 import Xv6.BcacheLock
 
 namespace Xv6
@@ -74,16 +75,17 @@ end
 
 set_option maxHeartbeats 16000000 in
 theorem bpin_proof (AC : ACQUIRE) (RE : RELEASE) : BPIN := ⟨
-  fun {hlc GF} _ _ _ _ cpu k γl γ kk hnoff hK hlk hkk ha0 => by
+  fun {hlc GF} _ _ _ _ _ _ cpu k γl γ γd kk hnoff hK hlk hkk ha0 => by
   unfold wp_bpin_body
   simp only [bpinAddr]
   iintro ⟨Hk, Hpc, #Hbc, Hsl, Hnext⟩
+  ihave #Hbox := bioCtx_box γl γ γd kk hkk $$ Hbc
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   have hK4 : 4 ≤ k.avail := by omega
   have hfilt := bc_filter_bcache k.locks hlk
-  ihave #Hlk := (show isBcache (GF := GF) γl γ ⊢ isLock γl bcacheLockAddr "bcache" (bcacheResAt γ) from by
-    unfold isBcache; iintro H; iexact H) $$ Hbc
+  ihave #Hlk := (show bioCtx (GF := GF) γl γ γd ⊢ isLock γl bcacheLockAddr "bcache" (bcacheResAt γ) from by
+    unfold bioCtx isBcache; iintro ⟨H, -, -⟩; iexact H) $$ Hbc
   -- the prologue ; c.mv s1,a0
   iapply (wp_prologue4s1_gen cpu k KA.«bpin» hK4)
   k_code (text_instr _ _ _ _ rfl rfl) Htext
@@ -129,7 +131,10 @@ theorem bpin_proof (AC : ACQUIRE) (RE : RELEASE) : BPIN := ⟨
   -- the cache open; borrow slot kk
   icases bcacheRes_elim γ curCtx $$ HR with ⟨%M, %nx, %Ls, %ord, Ha, %⟨hfresh, hok, hord⟩, Hlru, Hkey, Hs⟩
   icases bslot_upd_acc γ curCtx Ls kk hkk $$ Hs with ⟨Hsl0, Hcl⟩
-  icases bslotAt_elim γ curCtx kk (Ls kk) $$ Hsl0 with ⟨%⟨hnd, hlt⟩, Hrefc, Hhalves, Hslots⟩
+  icases bslotAt_elim γ curCtx kk (Ls kk) $$ Hsl0 with ⟨%⟨hnd, hlt⟩, Hrefc, Hhalves, Hslots, Hcnt⟩
+  icases bkey_acc γ curCtx kk hkk $$ Hkey with ⟨Hkey0, Hkcl⟩
+  icases bkeyAt_elim γ curCtx kk $$ Hkey0 with ⟨%dev, %bno, Hkd, Hkb, Hregs⟩
+  icases bufSlotRegs_elim (γ.box kk) dev bno $$ Hregs with ⟨%r, %hrid, Hrd, #Htd⟩
   obtain ⟨n, hn⟩ : ∃ n, (Ls kk).length = n := ⟨_, rfl⟩
   have hlen : (nx :: Ls kk).length = n + 1 := by simp only [List.length_cons, hn]
   ihave Hrefc := (show wordAtN (GF := GF) curCtx (aBufRefcnt (bnode kk)) 4 (DFrac.own 1)
@@ -151,12 +156,23 @@ theorem bpin_proof (AC : ACQUIRE) (RE : RELEASE) : BPIN := ⟨
       wordAtN curCtx (aBufRefcnt (bnode kk)) 4 (DFrac.own 1)
         (BitVec.ofNat 32 (nx :: Ls kk).length) from by
     rw [wordAtN_cur, aBufRefcnt_eq', hlen, bc_ofNat32_succ]) $$ Hrefc
-  -- the pin ghost step
-  iapply wpLoop_bupd
+  -- the pin ghost step: the cache's reference and the escrow's, together
+  iapply wpLoop_fupd
   ihave Hup := bref_alloc_step γ M nx kk (Ls kk) hfresh $$ [Ha Hhalves]
   case' _ => iframe
   imod Hup with ⟨Ha, Href, Hhalves', %hnx⟩
+  imod bufEscrow_refIncr γd (γ.box kk) kk (1 : Qp).half (1 : Qp).half r (Ls kk).length ⊤
+      bioxN_top hrid.1 $$ [Hbox Hrd Hcnt] with ⟨Hrd, Hcnt, ⟨%Tb, Hbref⟩⟩
+  · iframe Hbox Hrd Hcnt
+  ihave Hbref := (show (boxRef (GF := GF) (γ.box kk) r.ident Tb) ⊢
+      ∃ T : Nat, boxRef (γ.box kk) ((dev, bno) : BufId) T from by
+    rw [hrid.2.2]; iintro H; iexists Tb; iexact H) $$ Hbref
   imodintro
+  ihave Hregs := bufSlotRegs_intro (γ.box kk) r dev bno hrid.1 hrid.2.1 hrid.2.2 $$ [Hrd Htd]
+  case' _ => iframe Hrd Htd
+  ihave Hkey0 := bkeyAt_intro γ curCtx kk dev bno $$ [Hkd Hkb Hregs]
+  case' _ => iframe
+  ihave Hkey := Hkcl $$ Hkey0
   -- the slot unit joins the supply
   ihave Hslots := (show bslot (GF := GF) γ ∗ bslots γ (Ls kk).length ⊢ bslots γ (nx :: Ls kk).length from by
     rw [hlen, hn]; exact bslots_cons γ n) $$ [Hsl Hslots]
@@ -167,7 +183,9 @@ theorem bpin_proof (AC : ACQUIRE) (RE : RELEASE) : BPIN := ⟨
     unfold BSLOTS at hbound
     omega
   have hnd' : (nx :: Ls kk).Nodup := List.nodup_cons.2 ⟨hnx, hnd⟩
-  ihave Hslot := bslotAt_intro γ curCtx kk (nx :: Ls kk) hnd' hlt' $$ [Hrefc Hhalves' Hslots]
+  ihave Hcnt := (show cntHalf (GF := GF) (γ.box kk) ((Ls kk).length + 1) ⊢
+      cntHalf (γ.box kk) (nx :: Ls kk).length from by rw [List.length_cons]) $$ Hcnt
+  ihave Hslot := bslotAt_intro γ curCtx kk (nx :: Ls kk) hnd' hlt' $$ [Hrefc Hhalves' Hslots Hcnt]
   case' _ => iframe
   ihave Hs := Hcl $$ %(nx :: Ls kk) Hslot
   ihave HR := bcacheRes_intro γ curCtx _ (nx + 1) _ ord
@@ -219,8 +237,10 @@ theorem bpin_proof (AC : ACQUIRE) (RE : RELEASE) : BPIN := ⟨
   ihave Hnext := wpNext_shift _ _ _ _ _ hpinr $$ Hnext
   iapply wpNext_mono _ _ _ _ _ $$ Hnext
   iintro %cc H %R'' Hk Hpc %hcs
-  iapply H $$ %spie %spp %R'' %hsp Hk Hpc [] [Href]
+  iapply H $$ %spie %spp %R'' %hsp Hk Hpc [] %dev %bno [Href Hbref]
   · ipureintro; exact hcs
-  · iexact Href⟩
+  · unfold bref
+    iframe Href
+    iexact Hbref⟩
 
 end Xv6

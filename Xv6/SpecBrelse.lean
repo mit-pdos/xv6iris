@@ -21,15 +21,18 @@ The `unreachable` arm is dead (token + `pid` agreement, as in `bwrite`).
 The body calls `releasesleep`, which wakes every process sleeping on the
 lock, so `wakeup`'s resource (`procsInv`) is threaded through.
 
-**Deviation from Rocq (reported).**  Rocq's proof parks the buffer's
-travelling content (`valid`, `dev`, the rw bundle and the block's image
-fragment) back into the per-buffer ESCROW at the first instruction, so that
-a waiter's `acquiresleep` finds it.  This port does not build the escrow
-(see the header of `Xv6/BcacheInv.lean`), so the proof DISCARDS that part of
-the handle instead.  The contract below is Rocq's verbatim -- nothing is
-weakened or assumed here -- but the buffer-cache invariant it rests on is
-weaker than Rocq's: a released buffer's content is not recoverable, which is
-exactly what `bread` would need.
+**Statement change (reported).**  The separate `Xv6.bref` argument is gone:
+the chain's count fragment and the escrow's CHECKOUT handle now ride inside
+`Xv6.bufHold0` (Rocq's `bstok`, inside `bio_hold0`), which is where Rocq
+keeps them and what makes the first instruction's park available.  The
+credential is `Xv6.bioCtx γl γ γd`, which now carries the thirty escrows.
+
+**Deviation from Rocq (reported).**  Rocq's proof parks the content into the
+escrow at the first instruction and hands the park's register half to the
+HOOKED `releasesleep` (`wp_releasesleep_genin_sconf`), which mints the
+payload's floor from the `llb` the park returns.  This port has no hooked
+release, so `Xv6.bufSlpBox` carries the `MachCSL.topLb` receipt and no
+floor; the park and the decrement are otherwise Rocq's.
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
@@ -59,8 +62,8 @@ def wp_brelse_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G G
     (htier : k.tier = KTier.kpt)
     (hkk : kk < NBUF) (ha0 : k.regs 10#5 = bnode kk) : Prop :=
   kctx cpu k ∗ pcIs cpu brelseAddr ∗ procsInv Γ ∗
-  bioCtx γl γ ∗ wordPointsTo (pPid k.proc) 4 dqp pidv ∗
-  bufHold0 γ γd kk pidv dev bno bs bsd ∗ bref γ kk ∗
+  bioCtx γl γ γd ∗ wordPointsTo (pPid k.proc) 4 dqp pidv ∗
+  bufHold0 γ γd kk pidv dev bno bs bsd ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
     ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗

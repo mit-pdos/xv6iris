@@ -51,25 +51,42 @@ holder/holder agreement, and a per-reference fraction would have to be
 carved out of, and accounted in, slot `k`'s reference list.  The cache-side
 half (`bkeyAt`) is the minimal form `bread`'s scan actually needs.
 
-**What is NOT here: the per-buffer ESCROW.**  Rocq's `BioInv.v` parks a
-released buffer's travelling content (`valid`, `dev`, the rw bundle and the
-block's image fragment) in a namespace invariant -- an escrow -- because two
-facts force it: a blocked waiter's `acquiresleep` can return before the
-releaser's `refcnt--` runs, and `bget`'s miss path rewrites
-`dev`/`blockno`/`valid` under `bcache.lock` ALONE.  Neither the `bcache` lock
-nor the buffer's sleeplock can be the handover point, so the content must
-travel through a resource that is openable atomically at any instruction.  At
-TSO that is `CtxBox.v` (1775 lines of generic transit box) over the stamped /
-parked contexts; the Lean analogue would be built over
-`MachCSL.ctxStamped` / `MachCSL.ctxParked` / `MachCSL.CtxMorph`
-(`MachCSL/CtxLaws.lean`), and is not attempted here.
+**THE PER-BUFFER ESCROW, WIRED IN.**  Rocq's `BioInv.v` parks a released
+buffer's travelling content (`valid`, `dev`, the rw bundle and the block's
+image fragment) in a namespace invariant -- an escrow -- because two facts
+force it: a blocked waiter's `acquiresleep` can return before the releaser's
+`refcnt--` runs, and `bget`'s miss path rewrites `dev`/`blockno`/`valid`
+under `bcache.lock` ALONE.  The escrow itself is `MachCSL.CtxBox` over the
+stamped contexts (`Xv6/BufEscrow.lean`); this file seats its three
+registers:
 
-Consequently `bufSlp` (buffer `k`'s sleeplock payload) is EXACTLY the
-checkout token, as in Rocq, but nothing holds the parked content: `brelse`
-discards it (its contract is still Rocq's -- see `Xv6/SpecBrelse.lean`), and
-`bread` -- which must PRODUCE a `bufHold0` out of the cache -- cannot be
-proved against this invariant at all.  Building the escrow is the whole
-remaining job for `bread`.
+* the COUNT half rides slot `k`'s row (`bslotAt`), tied to the very list `L`
+  whose length is `b->refcnt` -- so `cntHalf = b->refcnt` by construction;
+* the L1 (drop) register's other half rides the key row (`bkeyAt`), at the
+  identity the slot's `dev`/`blockno` cells name (Rocq's `bslot_regs` inside
+  `bio_slot_res2`);
+* the L2 (park) register's other half rides the buffer's SLEEPLOCK payload
+  (`bufSlpBox`, Rocq's `bslp`), so the party that holds the sleeplock is the
+  party that may move it.
+
+A reference is therefore `Xv6.bref γ k dev bno`: the count half AND a box
+reference at the identity (Rocq's `bref` minus the key fraction), and the
+HELD handle `Xv6.bufHold0` carries the count half and the box's checkout
+handle `MachCSL.l2Hold` (Rocq's `bstok`).
+
+**What is still missing for `bread` (reported).**  Two of the escrow's six
+operations -- `Xv6.bufEscrow_take` (the checkout) and `Xv6.bufEscrow_withdraw`
+(the L1 window) -- consume a `MachCSL.ctxFloor` of the CALLER's context
+covering the box's stamp.  In Rocq that floor is minted by the LOCK HOOK:
+`WpLock.lock_hook_llb` lets a releaser hand the payload in unfloored at a
+stamp it only holds an `llb` (`MachCSL.topLb`) for, and
+`wp_acquiresleep_genl_llb` cashes an `llb` into a floor at the acquire
+position.  This port's `release`/`acquire`/`acquiresleep` rules have no such
+hook (`MachCSL.acqPost` hands out `∃ K, viewLb cpu K` with `K` unconstrained),
+so no floor at a box stamp is obtainable.  Everything the four proved bio
+functions need is floor-free -- the rows below carry `topLb` receipts only,
+exactly as Rocq's `bslot_regs`/`bslp` do -- and `bread` is blocked on the
+hook alone.
 -/
 import Xv6.SpecBinit
 import Xv6.BufDefs
@@ -78,6 +95,7 @@ import Xv6.KallocDefs
 import Xv6.SleepLockDefs
 import Xv6.PrintkDefs
 import MachCSL.Lock
+import MachCSL.CtxBox
 
 namespace Xv6
 
@@ -165,6 +183,22 @@ theorem blast_app_mid (d a : BitVec 64) (l1 l2 : List (BitVec 64)) :
     blast (l1 ++ a :: l2) d = blast l2 a := by
   rw [blast_app]; rfl
 
+/-! ## The escrow's indices
+
+The transit box (`MachCSL.CtxBox`) at the buffer cache is instantiated at
+`Id := (dev, blockno)` and `X := the data bytes` (Rocq `BioInv.v`'s
+`bio_id` / `bio_x`). -/
+
+/-- The escrow's identity: the pair `(dev, blockno)` the buffer currently
+names (Rocq's `bio_id`). -/
+abbrev BufId : Type := BitVec 32 × BitVec 32
+
+/-- The escrow's shared witness: the buffer's data bytes (Rocq's `bio_x`). -/
+abbrev BufX : Type := List (BitVec 8)
+
+/-- The escrow invariants' namespace (Rocq's `bioxN`). -/
+def bioxN : Namespace := ndot nroot "xv6biox"
+
 /-! ## Ghost names -/
 
 /-- The supply of buffer-cache references (Rocq `BioDefs.BSLOTS`). -/
@@ -178,14 +212,22 @@ structure BcacheNames where
   slot : GName
   slk : Nat → GName × GName
   own : Nat → GName
+  /-- buffer `k`'s ESCROW names (Rocq's `bn_box`). -/
+  box : Nat → BoxNames
 
-/-- The ghost libraries the buffer cache uses (Rocq's `bioG`/`bioslotG`). -/
+/-- The ghost libraries the buffer cache uses (Rocq's `bioG`/`bioslotG`,
+with the escrow's `boxG` folded in -- Rocq `BioInv.v`'s `bioboxG`). -/
 class BcacheG (GF : BundledGFunctors) where
   [gmRefG : GhostMapG GF Nat Nat RegMapF]
   [gmSlotG : GhostMapG GF Nat Unit RegMapF]
   [gvOwnG : GhostVarG GF Unit]
+  [gmStm : GhostMapG GF Nat (BufId × Nat) RegMapF]
+  [gvCnt : GhostVarG GF Nat]
+  [gvSlotd : GhostVarG GF (SlotReg BufId BufX)]
+  [gvSlotp : GhostVarG GF (L2Reg BufId)]
 
 attribute [reducible, instance] BcacheG.gmRefG BcacheG.gmSlotG BcacheG.gvOwnG
+  BcacheG.gmStm BcacheG.gvCnt BcacheG.gvSlotd BcacheG.gvSlotp
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [BcacheG GF] [CurCtx]
@@ -479,9 +521,13 @@ def brefTok (γ : BcacheNames) (k : Nat) : IProp GF := iprop%
 def brefRest (γ : BcacheNames) (k : Nat) (id : Nat) : IProp GF :=
   γ.ref ↪◯MAP[id]{.own (1 : Qp).half} k
 
-/-- **A buffer-cache reference on slot `k`** (Rocq's `bref`, minus the
-`dev`/`blockno` fraction -- see the file header). -/
-def bref (γ : BcacheNames) (k : Nat) : IProp GF := brefTok γ k
+/-- **A buffer-cache reference on slot `k` at the identity `(dev, bno)`**
+(Rocq's `bref`, minus the `dev`/`blockno` fraction -- see the file header):
+the count half AND a reference of the buffer's ESCROW, minted at whatever
+stamp the box stood at.  The two travel together: one keeps `b->refcnt`
+honest, the other is what `refcnt--` burns in the box. -/
+def bref (γ : BcacheNames) (k : Nat) (dev bno : BitVec 32) : IProp GF := iprop%
+  brefTok γ k ∗ ∃ T : Nat, boxRef (γ.box k) ((dev, bno) : BufId) T
 
 /-! ## The slot supply -/
 
@@ -492,6 +538,28 @@ def bslots (γ : BcacheNames) (n : Nat) : IProp GF := iprop%
 
 /-- One unit: the right to hold one buffer-cache reference. -/
 def bslot (γ : BcacheNames) : IProp GF := bslots γ 1
+
+/-! ## The escrow's L1 row
+
+**THE L1 ROW** (Rocq's `bslot_regs`): the drop register's other half,
+closed, at the identity the slot's key cells name, with the store-order
+receipt of the floor it records.  Context-free: nothing in it is a memory
+cell, so it rides any context unchanged.
+
+**Deviation (reported).**  Rocq's row also carries the resource-level floor
+slot `tl` with `sr_td r ≤ tl` and `bcache_res2` carries `ctx_floor ξ tl`;
+that floor can only be re-established at each release by the LOCK HOOK
+(`lock_hook_llb`), which this port has no rule for (file header).  Since the
+floor is consumed only by `bufEscrow_withdraw` -- `bread`'s recycle -- and
+by nothing the four proved bio functions do, the row here keeps the `topLb`
+receipt alone. -/
+def bufSlotRegs (γbk : BoxNames) (dev bno : BitVec 32) : IProp GF := iprop%
+  ∃ r : SlotReg BufId BufX,
+    slotdHalf γbk r ∗ ⌜r.win = false ∧ r.x = none ∧ r.ident = ((dev, bno) : BufId)⌝ ∗
+      topLb r.td
+
+/-- The escrow invariants sit inside the top mask. -/
+theorem bioxN_top : (↑bioxN : CoPset) ⊆ ⊤ := CoPset.subseteq_top
 
 /-! ## The `bcache.lock` resource -/
 
@@ -515,7 +583,8 @@ their other halves, and one slot token each. -/
 def bslotAt (γ : BcacheNames) (ξ : CtxId) (k : Nat) (L : List Nat) : IProp GF := iprop%
   ⌜L.Nodup ∧ L.length < 2 ^ 31⌝ ∗
   wordAtN ξ (aBufRefcnt (bnode k)) 4 (DFrac.own 1) (BitVec.ofNat 32 L.length) ∗
-  ([∗list] id ∈ L, brefRest γ k id) ∗ bslots γ L.length
+  ([∗list] id ∈ L, brefRest γ k id) ∗ bslots γ L.length ∗
+  cntHalf (γ.box k) L.length
 
 /-- **Buffer `k`'s KEY half** (the cache's share of Rocq's `b_dev`/`b_blockno`
 fractions): a HALF of `b->dev` and a HALF of `b->blockno`, at whatever the
@@ -537,10 +606,11 @@ half.  (Rocq instead hands each individual reference a real fraction
 without opening the lock.  This port keeps `Xv6.bref` ghost-only -- see the
 file header -- because nothing it proves needs holder/holder agreement, and
 the fraction bookkeeping would have to ride the slot's reference list.) -/
-def bkeyAt (ξ : CtxId) (k : Nat) : IProp GF := iprop%
+def bkeyAt (γ : BcacheNames) (ξ : CtxId) (k : Nat) : IProp GF := iprop%
   ∃ (dev : BitVec 32) (bno : BitVec 32),
     wordAtN ξ (aBufDev (bnode k)) 4 (DFrac.own (1 : Qp).half) dev ∗
-    wordAtN ξ (aBufBlockno (bnode k)) 4 (DFrac.own (1 : Qp).half) bno
+    wordAtN ξ (aBufBlockno (bnode k)) 4 (DFrac.own (1 : Qp).half) bno ∗
+    bufSlotRegs (γ.box k) dev bno
 
 /-- **The `bcache.lock` resource** (Rocq's `bcache_res`): the count
 authority, the LRU cycle over a permutation of the thirty buffers, every
@@ -550,14 +620,15 @@ def bcacheResAt (γ : BcacheNames) (ξ : CtxId) : IProp GF := iprop%
     (γ.ref ↪●MAP M) ∗
     ⌜(∀ i, nx ≤ i → PartialMap.get? M i = none) ∧ bcacheOk M Ls ∧ ord.Perm (List.range NBUF)⌝ ∗
     bcacheLruAt ξ bhead (ord.map bnode) ∗
-    ([∗list] k ∈ List.range NBUF, bkeyAt ξ k) ∗
+    ([∗list] k ∈ List.range NBUF, bkeyAt γ ξ k) ∗
     ([∗list] k ∈ List.range NBUF, bslotAt γ ξ k (Ls k))
 
 instance instCtxMorphBslotAt (γ : BcacheNames) (k : Nat) (L : List Nat) :
     CtxMorph (GF := GF) (fun ξ => bslotAt γ ξ k L) := by
   unfold bslotAt; infer_instance
 
-instance instCtxMorphBkeyAt (k : Nat) : CtxMorph (GF := GF) (fun ξ => bkeyAt ξ k) := by
+instance instCtxMorphBkeyAt (γ : BcacheNames) (k : Nat) :
+    CtxMorph (GF := GF) (fun ξ => bkeyAt γ ξ k) := by
   unfold bkeyAt
   refine @instCtxMorphExists _ _ _ _ _ (fun dev => ?_)
   refine @instCtxMorphExists _ _ _ _ _ (fun bno => ?_)
@@ -573,7 +644,7 @@ instance instCtxMorphBcacheResAt (γ : BcacheNames) :
   have h := ctxMorph_bigSepL (GF := GF) (List.range NBUF)
     (fun _ k ξ => bslotAt γ ξ k (Ls k)) (fun _ k => instCtxMorphBslotAt γ k (Ls k))
   have h2 := ctxMorph_bigSepL (GF := GF) (List.range NBUF)
-    (fun _ k ξ => bkeyAt ξ k) (fun _ k => instCtxMorphBkeyAt k)
+    (fun _ k ξ => bkeyAt γ ξ k) (fun _ k => instCtxMorphBkeyAt γ k)
   infer_instance
 
 /-- **The buffer cache** (persistent): the lock over its resource. -/
@@ -646,40 +717,146 @@ theorem bufTok_excl (γ : BcacheNames) (k : Nat) :
   ihave %hv := ghost_var_valid_2 _ _ _ _ _ $$ H1 H2
   exact absurd (DFrac.valid_own_op hv.1) (by simp)
 
-/-- Buffer `k`'s sleeplock payload: EXACTLY the checkout token (Rocq's
-`bslp`; the travelling content rides the escrow, which this port does not
-build -- see the file header and the report). -/
-def bufSlp (γ : BcacheNames) (k : Nat) : CtxId → IProp GF := fun _ => bufTok γ k
+instance wordAtN_timeless (ξ : CtxId) (a : BitVec 64) (n : Nat) (dq : DFrac)
+    (w : BitVec (8 * n)) : Timeless (wordAtN (GF := GF) ξ a n dq w) := by
+  unfold wordAtN; infer_instance
+
+/-! ## The escrow's payload family
+
+The box (`MachCSL.CtxBox`) at buffer `k`, instantiated: the HEADER is what
+the `bcache.lock` side reads and rewrites (`valid` in full, the two key
+cells at the caller's fractions, and the block's image fragment at the
+identity they name), the REST is the pinned `disk` flag and the 1024 data
+bytes, and both ghost residues are `emp` (Rocq instantiates `CtxBox` with
+`Q1 := λ _, emp`, `Q2 := emp`: the bcache keeps no residue while the bundle
+is out).  The lemmas over it are `Xv6/BufEscrow.lean`. -/
+
+/-- **THE TRAVELLING PAYLOAD** at an identity (Rocq's `buf_pay`, with the
+pool and the log layer's clean/dirty distinction dropped): the block's
+disk-image fragment, OWED ONLY WHEN THE BUFFER IS VALID.
+
+Rocq indexes `buf_hdr` by the boolean `valid` and lets the payload depend on
+it; the same dependence is what makes a cache of thirty INVALID buffers --
+what `binit` leaves behind, all of them naming block `0` -- consistent: an
+invalid buffer owes no fragment, so no block is claimed thirty times.
+Ghost, so context-free. -/
+def bufPayV (γd : DiskNames) (i : BufId) (v : BitVec 32) : IProp GF := iprop%
+  ⌜v = 0#32⌝ ∨ ∃ bsd : List (BitVec 8), diskBlock γd i.2.toNat bsd
+
+instance bufPayV_timeless (γd : DiskNames) (i : BufId) (v : BitVec 32) :
+    Timeless (bufPayV (GF := GF) γd i v) := by
+  unfold bufPayV diskBlock; infer_instance
+
+/-- **THE HEADER** (Rocq's `buf_hdr`): the cells the `bcache.lock` side reads
+and rewrites -- `valid` in full, and the two key cells at the caller's
+fractions -- beside the payload at the identity and validity they name. -/
+def bufHdr (γd : DiskNames) (k : Nat) (qd qb : Qp) (i : BufId) (_x : BufX)
+    (ξ : CtxId) : IProp GF := iprop%
+  ∃ v : BitVec 32,
+    wordAtN ξ (aBufValid (bnode k)) 4 (DFrac.own 1) v ∗
+    wordAtN ξ (aBufDev (bnode k)) 4 (DFrac.own qd) i.1 ∗
+    wordAtN ξ (aBufBlockno (bnode k)) 4 (DFrac.own qb) i.2 ∗
+    bufPayV γd i v
+
+/-- **THE REST** (Rocq's `buf_rest`): the pinned `disk` flag and the data. -/
+def bufRest (k : Nat) (x : BufX) (ξ : CtxId) : IProp GF := iprop%
+  ⌜x.length = BSIZE⌝ ∗
+  wordAtN ξ (aBufDisk (bnode k)) 4 (DFrac.own 1) 0#32 ∗
+  ([∗list] j ↦ b ∈ x, wordAtN ξ (aBufData (bnode k) + BitVec.ofNat 64 j) 1 (DFrac.own 1) b)
+
+/-- The box's payload family at buffer `k`. -/
+def bufBoxPay (γd : DiskNames) (k : Nat) (qd qb : Qp) : BoxPay GF BufId BufX where
+  hdr := bufHdr γd k qd qb
+  rest := bufRest k
+  q1 := fun _ => iprop(emp)
+  q2 := iprop(emp)
+
+instance bufHdr_morph (γd : DiskNames) (k : Nat) (qd qb : Qp) (i : BufId) (x : BufX) :
+    CtxMorph (GF := GF) (bufHdr γd k qd qb i x) := by
+  unfold bufHdr
+  refine @instCtxMorphExists _ _ _ _ _ (fun v => ?_)
+  infer_instance
+
+instance bufRest_morph (k : Nat) (x : BufX) : CtxMorph (GF := GF) (bufRest k x) := by
+  unfold bufRest
+  have h := ctxMorph_bigSepL (GF := GF) x
+    (fun j b ξ => wordAtN ξ (aBufData (bnode k) + BitVec.ofNat 64 j) 1 (DFrac.own 1) b)
+    (fun j b => instCtxMorphWordAtN _ _ _ _)
+  infer_instance
+
+instance bufHdr_timeless (γd : DiskNames) (k : Nat) (qd qb : Qp) (i : BufId) (x : BufX)
+    (ξ : CtxId) : Timeless (bufHdr (GF := GF) γd k qd qb i x ξ) := by
+  unfold bufHdr; infer_instance
+
+instance bufRest_timeless (k : Nat) (x : BufX) (ξ : CtxId) :
+    Timeless (bufRest (GF := GF) k x ξ) := by unfold bufRest; infer_instance
+
+instance bufBoxPay_ok (γd : DiskNames) (k : Nat) (qd qb : Qp) :
+    BoxPayOk (bufBoxPay (GF := GF) γd k qd qb) where
+  hdrMorph i x := bufHdr_morph γd k qd qb i x
+  restMorph x := bufRest_morph k x
+  hdrTimeless i x ξ := bufHdr_timeless γd k qd qb i x ξ
+  restTimeless x ξ := bufRest_timeless k x ξ
+  q1Timeless _ := by unfold bufBoxPay; infer_instance
+  q2Timeless := by unfold bufBoxPay; infer_instance
+
+/-- **BUFFER `k`'s ESCROW** (Rocq's `buf_box`), persistent. -/
+def bufBox (γd : DiskNames) (γbk : BoxNames) (k : Nat) (qd qb : Qp) : IProp GF :=
+  isBox (bufBoxPay γd k qd qb) (ndot bioxN k) γbk
+
+instance bufBox_persistent (γd : DiskNames) (γbk : BoxNames) (k : Nat) (qd qb : Qp) :
+    Persistent (bufBox (GF := GF) γd γbk k qd qb) := by unfold bufBox; infer_instance
+
+/-- Buffer `k`'s sleeplock payload (Rocq's `bslp`): the checkout token AND
+the escrow's L2 (park) register half, at rest.  Context-free, as the L1 row
+is, and for the same reason -- see the deviation note at `bufSlotRegs`:
+Rocq's `bslp` also carries `TsoCtx.ctx_floor ξ (lr_tp s)`, re-minted at each
+`releasesleep` by the LOCK HOOK this port has no rule for. -/
+def bufSlpBox (γ : BcacheNames) (k : Nat) : CtxId → IProp GF := fun _ => iprop(
+  bufTok γ k ∗ ∃ s : L2Reg BufId, slotpHalf (γ.box k) s ∗ ⌜s.hold = none⌝ ∗ topLb s.tp)
 
 instance instCtxMorphBufSlp (γ : BcacheNames) (k : Nat) :
-    CtxMorph (GF := GF) (bufSlp γ k) := instCtxMorphConst _
+    CtxMorph (GF := GF) (bufSlpBox γ k) := instCtxMorphConst _
 
 /-- Buffer `k`'s sleeplock (persistent). -/
 def isBufSlk (γ : BcacheNames) (k : Nat) : IProp GF :=
-  isSleeplock (γ.slk k).1 (γ.slk k).2 (aBufLock (bnode k)) (bufSlp γ k)
+  isSleeplock (γ.slk k).1 (γ.slk k).2 (aBufLock (bnode k)) (bufSlpBox γ k)
 
 instance isBufSlk_persistent (γ : BcacheNames) (k : Nat) :
     Persistent (isBufSlk (GF := GF) γ k) := by
   unfold isBufSlk; infer_instance
 
 /-- **The buffer cache's persistent credentials** (Rocq's `bio_ctx`): the
-`bcache` lock over its resource, and the thirty buffer sleeplocks. -/
-def bioCtx (γl : GName) (γ : BcacheNames) : IProp GF := iprop%
-  isBcache γl γ ∗ [∗list] k ∈ List.range NBUF, isBufSlk γ k
+`bcache` lock over its resource, the thirty buffer sleeplocks, and the
+thirty ESCROWS. -/
+def bioCtx (γl : GName) (γ : BcacheNames) (γd : DiskNames) : IProp GF := iprop%
+  isBcache γl γ ∗ ([∗list] k ∈ List.range NBUF, isBufSlk γ k) ∗
+  ([∗list] k ∈ List.range NBUF, bufBox γd (γ.box k) k (1 : Qp).half (1 : Qp).half)
 
-instance bioCtx_persistent (γl : GName) (γ : BcacheNames) :
-    Persistent (bioCtx (GF := GF) γl γ) := by
+instance bioCtx_persistent (γl : GName) (γ : BcacheNames) (γd : DiskNames) :
+    Persistent (bioCtx (GF := GF) γl γ γd) := by
   unfold bioCtx; infer_instance
 
-theorem bioCtx_lock (γl : GName) (γ : BcacheNames) : bioCtx (GF := GF) γl γ ⊢ isBcache γl γ := by
-  unfold bioCtx; iintro ⟨H, -⟩; iexact H
+theorem bioCtx_lock (γl : GName) (γ : BcacheNames) (γd : DiskNames) :
+    bioCtx (GF := GF) γl γ γd ⊢ isBcache γl γ := by
+  unfold bioCtx; iintro ⟨H, -, -⟩; iexact H
 
-theorem bioCtx_buf (γl : GName) (γ : BcacheNames) (k : Nat) (hk : k < NBUF) :
-    bioCtx (GF := GF) γl γ ⊢ isBufSlk γ k := by
+theorem bioCtx_buf (γl : GName) (γ : BcacheNames) (γd : DiskNames) (k : Nat) (hk : k < NBUF) :
+    bioCtx (GF := GF) γl γ γd ⊢ isBufSlk γ k := by
   have hget : (List.range NBUF)[k]? = some k := by rw [List.getElem?_range hk]
   unfold bioCtx
-  iintro ⟨-, H⟩
+  iintro ⟨-, H, -⟩
   icases BigSepL.bigSepL_lookup_acc (Φ := fun _ j => isBufSlk (GF := GF) γ j) hget $$ H with ⟨Hk, -⟩
+  iexact Hk
+
+theorem bioCtx_box (γl : GName) (γ : BcacheNames) (γd : DiskNames) (k : Nat) (hk : k < NBUF) :
+    bioCtx (GF := GF) γl γ γd ⊢ bufBox γd (γ.box k) k (1 : Qp).half (1 : Qp).half := by
+  have hget : (List.range NBUF)[k]? = some k := by rw [List.getElem?_range hk]
+  unfold bioCtx
+  iintro ⟨-, -, H⟩
+  icases BigSepL.bigSepL_lookup_acc
+    (Φ := fun _ j => bufBox (GF := GF) γd (γ.box j) j (1 : Qp).half (1 : Qp).half) hget $$ H
+    with ⟨Hk, -⟩
   iexact Hk
 
 /-- **The HELD buffer, payload aside** (Rocq's `bio_hold0`): the sleeplock
@@ -695,6 +872,7 @@ def bufHold0 (γ : BcacheNames) (γd : DiskNames) (k : Nat)
     (pidv dev bno : BitVec 32) (bs bsd : List (BitVec 8)) : IProp GF := iprop%
   ⌜k < NBUF⌝ ∗
   sleeplockedQ (γ.slk k).2 1 (aBufLock (bnode k)) pidv ∗ bufTok γ k ∗
+  brefTok γ k ∗ (∃ id : Nat, l2Hold (γ.box k) ((dev, bno) : BufId) id) ∗
   wordPointsTo (aBufValid (bnode k)) 4 (DFrac.own 1) 1#32 ∗
   wordPointsTo (aBufDev (bnode k)) 4 (DFrac.own (1 : Qp).half) dev ∗
   bufOwn (bnode k) bno 0#32 bs ∗
@@ -844,7 +1022,7 @@ theorem bcacheRes_elim (γ : BcacheNames) (ξ : CtxId) :
       (γ.ref ↪●MAP M) ∗
       ⌜(∀ i, nx ≤ i → PartialMap.get? M i = none) ∧ bcacheOk M Ls ∧ ord.Perm (List.range NBUF)⌝ ∗
       bcacheLruAt ξ bhead (ord.map bnode) ∗
-      ([∗list] k ∈ List.range NBUF, bkeyAt ξ k) ∗
+      ([∗list] k ∈ List.range NBUF, bkeyAt γ ξ k) ∗
       ([∗list] k ∈ List.range NBUF, bslotAt γ ξ k (Ls k)) := by
   unfold bcacheResAt; iintro H; iexact H
 
@@ -853,13 +1031,43 @@ theorem bcacheRes_intro (γ : BcacheNames) (ξ : CtxId) (M : RegMapF Nat) (nx : 
     (hfresh : ∀ i, nx ≤ i → PartialMap.get? M i = none) (hok : bcacheOk M Ls)
     (hord : ord.Perm (List.range NBUF)) :
     (γ.ref ↪●MAP M) ∗ bcacheLruAt (GF := GF) ξ bhead (ord.map bnode) ∗
-    ([∗list] k ∈ List.range NBUF, bkeyAt ξ k) ∗
+    ([∗list] k ∈ List.range NBUF, bkeyAt γ ξ k) ∗
     ([∗list] k ∈ List.range NBUF, bslotAt γ ξ k (Ls k)) ⊢ bcacheResAt γ ξ := by
   unfold bcacheResAt
   iintro ⟨Ha, Hl, Hkey, Hs⟩
   iexists M, nx, Ls, ord
   iframe Ha Hl Hkey Hs
   ipureintro; exact ⟨hfresh, hok, hord⟩
+
+theorem bkeyAt_elim (γ : BcacheNames) (ξ : CtxId) (k : Nat) :
+    bkeyAt (GF := GF) γ ξ k ⊢ ∃ (dev : BitVec 32) (bno : BitVec 32),
+      wordAtN ξ (aBufDev (bnode k)) 4 (DFrac.own (1 : Qp).half) dev ∗
+      wordAtN ξ (aBufBlockno (bnode k)) 4 (DFrac.own (1 : Qp).half) bno ∗
+      bufSlotRegs (γ.box k) dev bno := by
+  unfold bkeyAt; iintro H; iexact H
+
+theorem bkeyAt_intro (γ : BcacheNames) (ξ : CtxId) (k : Nat) (dev bno : BitVec 32) :
+    wordAtN (GF := GF) ξ (aBufDev (bnode k)) 4 (DFrac.own (1 : Qp).half) dev ∗
+    wordAtN ξ (aBufBlockno (bnode k)) 4 (DFrac.own (1 : Qp).half) bno ∗
+    bufSlotRegs (γ.box k) dev bno ⊢ bkeyAt γ ξ k := by
+  unfold bkeyAt; iintro H; iexists dev, bno; iexact H
+
+/-- Borrow buffer `k`'s key row (its two key halves and the escrow's L1
+register half) out of the cache's big-sep, to put it back. -/
+theorem bkey_acc (γ : BcacheNames) (ξ : CtxId) (k : Nat) (hk : k < NBUF) :
+    ([∗list] j ∈ List.range NBUF, bkeyAt (GF := GF) γ ξ j) ⊢
+      bkeyAt γ ξ k ∗ (bkeyAt γ ξ k -∗ [∗list] j ∈ List.range NBUF, bkeyAt γ ξ j) := by
+  have hget : (List.range NBUF)[k]? = some k := by rw [List.getElem?_range hk]
+  iintro H
+  icases BigSepL.bigSepL_lookup_acc_impl (Φ := fun _ j => bkeyAt (GF := GF) γ ξ j) hget $$ H
+    with ⟨Hk, Hcl⟩
+  iframe Hk
+  iintro Hk'
+  iapply Hcl $$ %(fun _ j => bkeyAt (GF := GF) γ ξ j) [] [Hk']
+  · imodintro
+    iintro %i %y %hy %hne Hy
+    iexact Hy
+  · iexact Hk'
 
 /-- Borrow slot `k` out of the cache's big-sep, to put it back with a NEW
 list. -/
@@ -892,16 +1100,18 @@ theorem bslotAt_elim (γ : BcacheNames) (ξ : CtxId) (k : Nat) (L : List Nat) :
     bslotAt (GF := GF) γ ξ k L ⊢
       ⌜L.Nodup ∧ L.length < 2 ^ 31⌝ ∗
       wordAtN ξ (aBufRefcnt (bnode k)) 4 (DFrac.own 1) (BitVec.ofNat 32 L.length) ∗
-      ([∗list] id ∈ L, brefRest γ k id) ∗ bslots γ L.length := by
+      ([∗list] id ∈ L, brefRest γ k id) ∗ bslots γ L.length ∗
+      cntHalf (γ.box k) L.length := by
   unfold bslotAt; iintro H; iexact H
 
 theorem bslotAt_intro (γ : BcacheNames) (ξ : CtxId) (k : Nat) (L : List Nat)
     (hnd : L.Nodup) (hlt : L.length < 2 ^ 31) :
     wordAtN (GF := GF) ξ (aBufRefcnt (bnode k)) 4 (DFrac.own 1) (BitVec.ofNat 32 L.length) ∗
-    ([∗list] id ∈ L, brefRest γ k id) ∗ bslots γ L.length ⊢ bslotAt γ ξ k L := by
+    ([∗list] id ∈ L, brefRest γ k id) ∗ bslots γ L.length ∗
+    cntHalf (γ.box k) L.length ⊢ bslotAt γ ξ k L := by
   unfold bslotAt
-  iintro ⟨H1, H2, H3⟩
-  iframe H1 H2 H3
+  iintro ⟨H1, H2, H3, H4⟩
+  iframe H1 H2 H3 H4
   ipureintro; exact ⟨hnd, hlt⟩
 
 /-! ## The slot supply -/
@@ -1037,11 +1247,11 @@ theorem bpin_fresh (M : RegMapF Nat) (nx k : Nat)
   exact hfresh i (by omega)
 
 /-- **`bpin`'s ghost step**: a fresh reference `nx ↦ k` is minted; the caller
-keeps one half (`bref`), the lock the other. -/
+keeps one half (`brefTok`, the count half of `bref`), the lock the other. -/
 theorem bref_alloc_step (γ : BcacheNames) (M : RegMapF Nat) (nx k : Nat) (L : List Nat)
     (hfresh : ∀ i, nx ≤ i → PartialMap.get? M i = none) :
     (γ.ref ↪●MAP M) ∗ ([∗list] id ∈ L, brefRest (GF := GF) γ k id) ⊢
-      |==> ((γ.ref ↪●MAP (PartialMap.insert M nx k)) ∗ bref γ k ∗
+      |==> ((γ.ref ↪●MAP (PartialMap.insert M nx k)) ∗ brefTok γ k ∗
         ([∗list] id ∈ nx :: L, brefRest γ k id) ∗ ⌜nx ∉ L⌝) := by
   iintro ⟨Ha, Hl⟩
   icases brefRest_keys γ M k L $$ [Ha Hl] with ⟨Ha, Hl, %hkeys⟩
@@ -1056,7 +1266,7 @@ theorem bref_alloc_step (γ : BcacheNames) (M : RegMapF Nat) (nx k : Nat) (L : L
   iframe Ha
   ihave ⟨He1, He2⟩ := bref_halves γ nx k $$ He
   isplitl [He1]
-  · unfold bref brefTok; iexists nx; iexact He1
+  · unfold brefTok; iexists nx; iexact He1
   isplitl [He2 Hl]
   · iapply BigSepL.bigSepL_cons.2
     iframe Hl

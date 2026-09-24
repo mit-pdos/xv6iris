@@ -13,6 +13,7 @@ caller's own `p->pid` cell agrees, so `holdingsleep` returns 1 and the
 both come back at the buffer's bytes: the write-through.
 -/
 import Xv6.SpecBwrite
+import Xv6.BufEscrow
 import Xv6.SpecHoldingsleep
 import Xv6.BcacheLock
 import Xv6.CodeTactics
@@ -62,7 +63,7 @@ theorem bw_holdingsleep (HS : HOLDINGSLEEP) (c : CPU) (k' : KCtx) (γ : BcacheNa
     ⊢ wpLoop (GF := GF) c := by
   subst hpj
   have h := HS.wp_holdingsleep (hlc := hlc) (GF := GF) c k' (γ.slk kk).1 (γ.slk kk).2
-    (bufSlp γ kk) 1 pidv dqp hnoff hK hs htier
+    (bufSlpBox γ kk) 1 pidv dqp hnoff hK hs htier
   unfold wp_holdingsleep_body at h
   simp only [holdingsleepAddr] at h
   rw [haddr] at h
@@ -113,14 +114,16 @@ theorem bwrite_proof (HS : HOLDINGSLEEP) (VR : VIRTIO_DISK_RW) : BWRITE := ⟨
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   have hK4 : 4 ≤ k.avail := by unfold bwriteSlots virtioDiskRwSlots sleepSlots at hK; omega
-  ihave #Hslk := bioCtx_buf γl γ kk hkk $$ Hbc
+  ihave #Hslk := bioCtx_buf γl γ γd kk hkk $$ Hbc
   icases (show bufHold0 (GF := GF) γ γd kk pidv dev bno bs bsd ⊢
       sleeplockedQ (γ.slk kk).2 1 (aBufLock (bnode kk)) pidv ∗ bufTok γ kk ∗
+      brefTok γ kk ∗ (∃ id : Nat, l2Hold (γ.box kk) ((dev, bno) : BufId) id) ∗
       wordPointsTo (aBufValid (bnode kk)) 4 (DFrac.own 1) 1#32 ∗
       wordPointsTo (aBufDev (bnode kk)) 4 (DFrac.own (1 : Qp).half) dev ∗
       bufOwn (bnode kk) bno 0#32 bs ∗ diskBlock γd bno.toNat bsd from by
-    unfold bufHold0; iintro ⟨-, H1, H2, H3, H4, H5, H6⟩; iframe H1 H2 H3 H4 H5 H6) $$ Hhold
-    with ⟨Hsl, Htok, Hval, Hdev, Hbuf, Hblk⟩
+    unfold bufHold0; iintro ⟨-, H1, H2, H7, H8, H3, H4, H5, H6⟩
+    iframe H1 H2 H7 H8 H3 H4 H5 H6) $$ Hhold
+    with ⟨Hsl, Htok, Hrt, Hhd, Hval, Hdev, Hbuf, Hblk⟩
   -- the prologue ; c.mv s1,a0 ; c.addi a0,a0,16 ; jal holdingsleep
   iapply (wp_prologue4s1_gen cpu k KA.«bwrite» hK4)
   k_code (text_instr _ _ _ _ rfl rfl) Htext
@@ -214,7 +217,8 @@ theorem bwrite_proof (HS : HOLDINGSLEEP) (VR : VIRTIO_DISK_RW) : BWRITE := ⟨
   have hc4 : c4 = c3 := hp4 (Or.inl (by k_norm))
   subst hc4
   ihave HΦ := wpNext_at true k.proc c2 c4 _ (fun hh => hp3 hh) $$ Hnext
-  iapply HΦ $$ %spie2 %spp2 %_ [] Hk Hpc [Htc] [Hcl] [Hir] [Hpid] [Hsl Htok Hval Hdev Hbuf Hblk]
+  iapply HΦ $$ %spie2 %spp2 %_ [] Hk Hpc [Htc] [Hcl] [Hir] [Hpid]
+    [Hsl Htok Hrt Hhd Hval Hdev Hbuf Hblk]
   · ipureintro
     exact bc_calleeSaved_epi k.regs R2
       (e18.trans b18) (e19.trans b19) (e20.trans b20) (e21.trans b21) (e22.trans b22)
@@ -226,6 +230,6 @@ theorem bwrite_proof (HS : HOLDINGSLEEP) (VR : VIRTIO_DISK_RW) : BWRITE := ⟨
   · unfold bufHold0
     isplitl []
     · ipureintro; exact hkk
-    iframe Hsl Htok Hval Hdev Hbuf Hblk⟩
+    iframe Hsl Htok Hrt Hhd Hval Hdev Hbuf Hblk⟩
 
 end Xv6

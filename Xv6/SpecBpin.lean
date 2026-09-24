@@ -17,13 +17,22 @@ legally mints the first reference.  4 frame slots plus `acquire`'s 10.
 
 The Rocq post is `∃ q dev bno, bref bn k q dev bno`: the reference also
 carries a fraction of `b->dev`/`b->blockno`.  This port's `bref` is the
-count fragment alone -- see the header of `Xv6/BcacheInv.lean`.
+count fragment beside the ESCROW's reference at the identity the cache
+records -- see the header of `Xv6/BcacheInv.lean`; the key fraction is the
+only part Rocq has and this does not.
+
+**Statement change (reported).**  The credential is now the whole
+`Xv6.bioCtx` (Rocq's `bio_ctx`, which is what Rocq's `wp_bpin` takes) rather
+than `Xv6.isBcache` alone: the `refcnt++` must step the escrow's count
+register beside the cache's, so buffer `k`'s box has to be in scope.  The
+disk names `γd` come with it.
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import MachCSL.WpSmodeFrame
 import MachCSL.Lock
 import Xv6.BcacheInv
+import Xv6.DiskInvDefs
 
 namespace Xv6
 
@@ -34,21 +43,25 @@ open LeanRV64D
 def bpinAddr : BitVec 64 := KA.«bpin»
 
 /-- **WP of `bpin(b = a0)`**. -/
-def wp_bpin_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [BcacheG GF] [CurCtx]
-    (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (kk : Nat)
+def wp_bpin_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [BcacheG GF]
+    [SleepLockG GF] [DiskG GF] [CurCtx]
+    (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (γd : DiskNames) (kk : Nat)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 14 ≤ k.avail) (hlk : "bcache" ∉ k.locks)
     (hkk : kk < NBUF) (ha0 : k.regs 10#5 = bnode kk) : Prop :=
-  kctx cpu k ∗ pcIs cpu bpinAddr ∗ isBcache γl γ ∗ bslot γ ∗
+  kctx cpu k ∗ pcIs cpu bpinAddr ∗ bioCtx γl γ γd ∗ bslot γ ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
     ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-    ⌜calleeSaved k.regs R'⌝ -∗ bref γ kk -∗ wpLoop cpu'))
+    ⌜calleeSaved k.regs R'⌝ -∗ ∀ dev : BitVec 32, ∀ bno : BitVec 32,
+      bref γ kk dev bno -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `bpin`. -/
 structure BPIN : Prop where
-  wp_bpin : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [BcacheG GF] [CurCtx]
-    (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (kk : Nat) hnoff hK hlk hkk ha0,
-    wp_bpin_body (hlc := hlc) (GF := GF) cpu k γl γ kk hnoff hK hlk hkk ha0
+  wp_bpin : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [BcacheG GF]
+    [SleepLockG GF] [DiskG GF] [CurCtx]
+    (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (γd : DiskNames) (kk : Nat)
+    hnoff hK hlk hkk ha0,
+    wp_bpin_body (hlc := hlc) (GF := GF) cpu k γl γ γd kk hnoff hK hlk hkk ha0
 
 end Xv6

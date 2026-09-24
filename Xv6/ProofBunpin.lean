@@ -12,6 +12,7 @@ goes down by one; the slot unit it was holding comes back out
 (`bslots_uncons`).  `bpin`'s proof with the two steps reversed.
 -/
 import Xv6.SpecBunpin
+import Xv6.BufEscrow
 import Xv6.BcacheLock
 
 namespace Xv6
@@ -75,16 +76,20 @@ end
 
 set_option maxHeartbeats 16000000 in
 theorem bunpin_proof (AC : ACQUIRE) (RE : RELEASE) : BUNPIN := ⟨
-  fun {hlc GF} _ _ _ _ cpu k γl γ kk hnoff hK hlk hkk ha0 => by
+  fun {hlc GF} _ _ _ _ _ _ cpu k γl γ γd kk dev bno hnoff hK hlk hkk ha0 => by
   unfold wp_bunpin_body
   simp only [bunpinAddr]
   iintro ⟨Hk, Hpc, #Hbc, Href, Hnext⟩
+  ihave #Hbox := bioCtx_box γl γ γd kk hkk $$ Hbc
+  icases (show bref (GF := GF) γ kk dev bno ⊢
+      brefTok γ kk ∗ ∃ T : Nat, boxRef (γ.box kk) ((dev, bno) : BufId) T from by
+    unfold bref; iintro H; iexact H) $$ Href with ⟨Href, ⟨%T0, Hbref⟩⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   have hK4 : 4 ≤ k.avail := by omega
   have hfilt := bc_filter_bcache k.locks hlk
-  ihave #Hlk := (show isBcache (GF := GF) γl γ ⊢ isLock γl bcacheLockAddr "bcache" (bcacheResAt γ) from by
-    unfold isBcache; iintro H; iexact H) $$ Hbc
+  ihave #Hlk := (show bioCtx (GF := GF) γl γ γd ⊢ isLock γl bcacheLockAddr "bcache" (bcacheResAt γ) from by
+    unfold bioCtx isBcache; iintro ⟨H, -, -⟩; iexact H) $$ Hbc
   -- the prologue ; c.mv s1,a0
   iapply (wp_prologue4s1_gen cpu k KA.«bunpin» hK4)
   k_code (text_instr _ _ _ _ rfl rfl) Htext
@@ -129,15 +134,18 @@ theorem bunpin_proof (AC : ACQUIRE) (RE : RELEASE) : BUNPIN := ⟨
   have hpins : bcPins k R1 := ⟨b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩
   -- the cache open; our reference is in slot kk's list
   icases bcacheRes_elim γ curCtx $$ HR with ⟨%M, %nx, %Ls, %ord, Ha, %⟨hfresh, hok, hord⟩, Hlru, Hkey, Hs⟩
-  icases (show bref (GF := GF) γ kk ⊢ ∃ id : Nat, γ.ref ↪◯MAP[id]{.own (1 : Qp).half} kk from by
-    unfold bref brefTok; iintro H; iexact H) $$ Href with ⟨%id, He⟩
+  icases (show brefTok (GF := GF) γ kk ⊢ ∃ id : Nat, γ.ref ↪◯MAP[id]{.own (1 : Qp).half} kk from by
+    unfold brefTok; iintro H; iexact H) $$ Href with ⟨%id, He⟩
   ihave %hget := ghost_map_lookup $$ Ha He
   obtain ⟨-, hmem⟩ := hok id kk hget
   obtain ⟨s, t, hL⟩ := List.append_of_mem hmem
   icases bslot_upd_acc γ curCtx Ls kk hkk $$ Hs with ⟨Hsl0, Hcl⟩
   ihave Hsl0 := (show bslotAt (GF := GF) γ curCtx kk (Ls kk) ⊢ bslotAt γ curCtx kk (s ++ id :: t) from by
     rw [hL]) $$ Hsl0
-  icases bslotAt_elim γ curCtx kk (s ++ id :: t) $$ Hsl0 with ⟨%⟨hnd, hlt⟩, Hrefc, Hhalves, Hslots⟩
+  icases bslotAt_elim γ curCtx kk (s ++ id :: t) $$ Hsl0 with ⟨%⟨hnd, hlt⟩, Hrefc, Hhalves, Hslots, Hcnt⟩
+  icases bkey_acc γ curCtx kk hkk $$ Hkey with ⟨Hkey0, Hkcl⟩
+  icases bkeyAt_elim γ curCtx kk $$ Hkey0 with ⟨%dv, %bn, Hkd, Hkb, Hregs⟩
+  icases bufSlotRegs_elim (γ.box kk) dv bn $$ Hregs with ⟨%r, %hrid, Hrd, #Htd⟩
   obtain ⟨n, hn⟩ : ∃ n, (s ++ id :: t).length = n := ⟨_, rfl⟩
   have hn1 : 1 ≤ n := by rw [← hn]; simp only [List.length_append, List.length_cons]; omega
   have hlen2 : (s ++ t).length = n - 1 := by
@@ -163,12 +171,28 @@ theorem bunpin_proof (AC : ACQUIRE) (RE : RELEASE) : BUNPIN := ⟨
       wordAtN curCtx (aBufRefcnt (bnode kk)) 4 (DFrac.own 1)
         (BitVec.ofNat 32 (s ++ t).length) from by
     rw [wordAtN_cur, aBufRefcnt_eq', hlen2]) $$ Hrefc
-  -- the unpin ghost step
-  iapply wpLoop_bupd
+  -- the unpin ghost step: the cache's reference and the escrow's, together
+  have hcnt1 : (s ++ id :: t).length = (s ++ t).length + 1 := by
+    simp only [List.length_append, List.length_cons]; omega
+  ihave Hcnt := (show cntHalf (GF := GF) (γ.box kk) (s ++ id :: t).length ⊢
+      cntHalf (γ.box kk) ((s ++ t).length + 1) from by rw [hcnt1]) $$ Hcnt
+  iapply wpLoop_fupd
   ihave Hup := bref_free_step γ M s t id kk $$ [Ha He Hhalves]
   case' _ => iframe
   imod Hup with ⟨Ha, Hhalves'⟩
+  imod bufEscrow_refDecr γd (γ.box kk) kk (1 : Qp).half (1 : Qp).half r (s ++ t).length
+      ((dev, bno) : BufId) T0 ⊤ bioxN_top hrid.1 $$ [Hbox Hrd Htd Hcnt Hbref]
+    with ⟨Hrd, Hcnt, #Htd'⟩
+  · iframe Hbox Hrd Hcnt Hbref
+    iexact Htd
   imodintro
+  ihave Hregs := bufSlotRegs_intro (γ.box kk)
+      (⟨max r.td T0, false, r.ident, r.x⟩ : SlotReg BufId BufX) dv bn rfl hrid.2.1 hrid.2.2
+    $$ [Hrd Htd']
+  case' _ => iframe Hrd Htd'
+  ihave Hkey0 := bkeyAt_intro γ curCtx kk dv bn $$ [Hkd Hkb Hregs]
+  case' _ => iframe Hkd Hkb Hregs
+  ihave Hkey := Hkcl $$ Hkey0
   -- the slot unit comes back
   ihave ⟨Hsl, Hslots⟩ := (show bslots (GF := GF) γ (s ++ id :: t).length ⊢
       bslot γ ∗ bslots γ (s ++ t).length from by
@@ -178,7 +202,7 @@ theorem bunpin_proof (AC : ACQUIRE) (RE : RELEASE) : BUNPIN := ⟨
     exact bslots_uncons γ (n - 1)) $$ Hslots
   have hnd' : (s ++ t).Nodup := bunpin_nodup s t id hnd
   have hlt' : (s ++ t).length < 2 ^ 31 := by rw [hlen2]; omega
-  ihave Hslot := bslotAt_intro γ curCtx kk (s ++ t) hnd' hlt' $$ [Hrefc Hhalves' Hslots]
+  ihave Hslot := bslotAt_intro γ curCtx kk (s ++ t) hnd' hlt' $$ [Hrefc Hhalves' Hslots Hcnt]
   case' _ => iframe
   ihave Hs := Hcl $$ %(s ++ t) Hslot
   ihave HR := bcacheRes_intro γ curCtx _ nx _ ord

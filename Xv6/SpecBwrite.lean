@@ -60,7 +60,7 @@ def wp_bwrite_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G G
     (hbno : bno.toNat < 2 ^ 31) (hbsd : bsd.length = BSIZE) (hpd : descPageRw pd) : Prop :=
   kctx cpu k ∗ pcIs cpu bwriteAddr ∗ procsInv Γ ∗
   trapCsrs cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ∗
-  bioCtx γl γ ∗ diskCaps γd γdl pd pav pu ∗
+  bioCtx γl γ γd ∗ diskCaps γd γdl pd pav pu ∗
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
   bufHold0 γ γd kk pidv dev bno bs bsd ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
