@@ -73,8 +73,8 @@ reason).
 5. **`FsGeomOk` carries the block layer's clauses and the bitmap clause.**
    Rocq's `FsReady.fs_geom_ok` is the whole record of pure premises stated
    at the fields; the bitmap clause is `fgoBitmap` (`Xv6.bitmapGeomOk`,
-   from `Xv6/BitmapInv.lean`), and the inode clauses arrive with the inode
-   layer.  The point of stating them at the
+   from `Xv6/BitmapInv.lean`), the inode-region clause is `fgoIreg`
+   (`Xv6.iregBlocksOk`), and the icache clauses arrive with the icache layer.  The point of stating them at the
    ambient fields is that a contract which took them as parameters would
    have to re-state all of it.
 6. `fsc_kpages` is a `GName × GName` pair, spelled out rather than hidden
@@ -92,6 +92,7 @@ the three files that BUILD an instance and tie its fields to an era's
 image numbers -- are deferred whole (design note §5).
 -/
 import Xv6.BitmapInv
+import Xv6.InodeInv
 import Xv6.UartTrace
 
 namespace Xv6
@@ -132,9 +133,13 @@ class Fscfg where
   fscSize : Nat
   /-- how many inodes mkfs made. -/
   fscNinodes : Nat
+  /-- where the inode region starts (`sb.inodestart`). -/
+  fscInodestart : Nat
+  /-- the inode region's ghosts. -/
+  fscIreg : GName
 
 export Fscfg (fscPrintk fscKalloc fscKpages fscUart fscDisk fscDlock fscBio fscFs
-              fscLog fscCov fscLogst fscBmapstart fscSize fscNinodes)
+              fscLog fscCov fscLogst fscBmapstart fscSize fscNinodes fscInodestart fscIreg)
 
 /-- Rocq `FsReady.fs_geom_ok`, the BLOCK-LAYER half (deviation 5).  Every
 clause is stated at the ambient fields, which is the whole point. -/
@@ -147,6 +152,9 @@ structure FsGeomOk [Fscfg] : Prop where
   /-- ...and the bitmap's geometry premises (`Xv6.bitmapGeomOk`): one
   bitmap block, and that block is a covered home block. -/
   fgoBitmap : bitmapGeomOk fscCov fscLogst fscBmapstart fscSize
+  /-- ...and the inode region's block geometry (`Xv6.iregBlocksOk`): every
+  inode block of the region is a covered home block. -/
+  fgoIreg : iregBlocksOk fscInodestart fscNinodes fscCov fscLogst
 
 /-- The block-number bounds every interior `bread` needs, off the geometry
 bundle (`Xv6.covOk` is `logGeomOk`'s first clause). -/
