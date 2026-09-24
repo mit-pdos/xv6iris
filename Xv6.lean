@@ -494,3 +494,6 @@ import Xv6.ProofWriteHead
 import Xv6.LinkWriteHead
 import Xv6.ProofInstallTrans
 import Xv6.LinkInstallTrans
+import Xv6.LogLedger
+import Xv6.ProofBeginOp
+import Xv6.LinkBeginOp
