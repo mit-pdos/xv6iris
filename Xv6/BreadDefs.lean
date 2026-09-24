@@ -446,34 +446,6 @@ theorem bd_withSpie_proc (k : KCtx) (a b : Bool) : (k.withSpie a b).proc = k.pro
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
 
-/-- The two halves of a key cell, joined into the full cell the recycler
-writes (and split again for the deposit). -/
-theorem bd_word_join [CurCtx] (a : BitVec 64) (w1 w2 : BitVec 32) :
-    wordPointsTo (GF := GF) a 4 (DFrac.own (1 : Qp).half) w1 ∗
-    wordPointsTo a 4 (DFrac.own (1 : Qp).half) w2 ⊢
-      wordPointsTo a 4 (DFrac.own 1) w1 ∗ ⌜w1 = w2⌝ := by
-  have h := wordAtN_merge (GF := GF) curCtx a 4 (1 : Qp).half (1 : Qp).half w1 w2
-  rw [Qp.half_add_half] at h
-  simp only [wordAtN_cur] at h
-  exact h
-
-theorem bd_word_join' [CurCtx] (a : BitVec 64) (w : BitVec 32) :
-    wordPointsTo (GF := GF) a 4 (DFrac.own (1 : Qp).half) w ∗
-    wordPointsTo a 4 (DFrac.own (1 : Qp).half) w ⊢ wordPointsTo a 4 (DFrac.own 1) w := by
-  iintro H
-  icases bd_word_join a w w $$ H with ⟨H, -⟩
-  iexact H
-
-theorem bd_word_split [CurCtx] (a : BitVec 64) (w : BitVec 32) :
-    wordPointsTo (GF := GF) a 4 (DFrac.own 1) w ⊢
-      wordPointsTo a 4 (DFrac.own (1 : Qp).half) w ∗
-      wordPointsTo a 4 (DFrac.own (1 : Qp).half) w := by
-  have h := wordAtN_split (GF := GF) curCtx a 4 (1 : Qp).half (1 : Qp).half w
-  rw [Qp.half_add_half] at h
-  simp only [wordAtN_cur] at h
-  exact h
-
-
 end
 
 end Xv6

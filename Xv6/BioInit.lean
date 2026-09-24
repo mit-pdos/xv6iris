@@ -255,6 +255,85 @@ theorem bd_funAllocK {A : Type} [Inhabited A] (Q : Nat → IProp GF) (P : Nat �
       simp only [reduceIte]
       iexact Ha
 
+/-- The choice combinator: a per-index existential over a big-op becomes one
+function (`bd_funAlloc`'s modality-free twin). -/
+theorem bd_funChoose {A : Type} [Inhabited A] (P : Nat → A → IProp GF) :
+    ∀ n : Nat, (([∗list] j ∈ List.range n, ∃ a : A, P j a) ⊢
+      ∃ f : Nat → A, [∗list] j ∈ List.range n, P j (f j)) := by
+  intro n
+  induction n with
+  | zero =>
+    iintro -
+    iexists (fun _ => (default : A))
+    simp only [List.range_zero]
+    iapply BigSepL.bigSepL_nil.2
+    itrivial
+  | succ n ih =>
+    rw [List.range_succ]
+    iintro H
+    icases BigSepL.bigSepL_append.1 $$ H with ⟨H1, H2⟩
+    icases ih $$ H1 with ⟨%f, Hf⟩
+    icases BigSepL.bigSepL_singleton.1 $$ H2 with ⟨%a, Ha⟩
+    iexists (fun j => if j = n then a else f j)
+    iapply BigSepL.bigSepL_append.2
+    isplitl [Hf]
+    · iapply bigSepL_range_congr (fun j => P j (f j))
+        (fun j => P j (if j = n then a else f j)) n (fun j hj => by rw [if_neg (by omega)])
+      iexact Hf
+    · iapply BigSepL.bigSepL_singleton.2
+      simp only [reduceIte]
+      iexact Ha
+
+/-! ## The `.bss` cells `binit` never touches -/
+
+/-- Buffer `i`'s untouched `.bss` fields (Rocq `bio_init`'s per-buffer
+premise): `valid`, `disk`, `dev`, `blockno`, `refcnt` and the 1024 data
+bytes, all zero. -/
+def bdBss (ξ : CtxId) (i : Nat) : IProp GF := iprop%
+  wordAtN ξ (aBufValid (bnode i)) 4 (DFrac.own 1) 0#32 ∗
+  wordAtN ξ (aBufDisk (bnode i)) 4 (DFrac.own 1) 0#32 ∗
+  wordAtN ξ (aBufDev (bnode i)) 4 (DFrac.own 1) 0#32 ∗
+  wordAtN ξ (aBufBlockno (bnode i)) 4 (DFrac.own 1) 0#32 ∗
+  wordAtN ξ (aBufRefcnt (bnode i)) 4 (DFrac.own 1) 0#32 ∗
+  (∃ bs : List (BitVec 8), ⌜bs.length = BSIZE⌝ ∗
+    [∗list] j ↦ b ∈ bs, wordAtN ξ (aBufData (bnode i) + BitVec.ofNat 64 j) 1 (DFrac.own 1) b)
+
+/-- The cells, split the way the cache wants them: the travelling content at
+the box's fractions, the cache's own halves of the two key cells, and the
+`refcnt` cell for the slot row.  The payload is `emp` -- block `0` is
+uncovered, which is the whole reason thirty buffers may all name it. -/
+theorem bd_bss_split (V : BioView) (i : Nat) (hcov0 : (0#32 : BitVec 32).toNat ∉ V.cov) :
+    bdBss (GF := GF) curCtx i ⊢
+      (∃ bs : List (BitVec 8),
+        bufTravelV V i (1 : Qp).half (1 : Qp).half 0#32 0#32 0#32 bs) ∗
+      wordAtN curCtx (aBufDev (bnode i)) 4 (DFrac.own (1 : Qp).half) 0#32 ∗
+      wordAtN curCtx (aBufBlockno (bnode i)) 4 (DFrac.own (1 : Qp).half) 0#32 ∗
+      wordAtN curCtx (aBufRefcnt (bnode i)) 4 (DFrac.own 1) 0#32 := by
+  unfold bdBss
+  iintro ⟨Hv, Hdk, Hd, Hb, Hrc, ⟨%bs, %hlen, Hdata⟩⟩
+  ihave Hd := (show wordAtN (GF := GF) curCtx (aBufDev (bnode i)) 4 (DFrac.own 1) 0#32 ⊢
+      wordPointsTo (aBufDev (bnode i)) 4 (DFrac.own 1) 0#32 from by rw [wordAtN_cur]) $$ Hd
+  ihave Hb := (show wordAtN (GF := GF) curCtx (aBufBlockno (bnode i)) 4 (DFrac.own 1) 0#32 ⊢
+      wordPointsTo (aBufBlockno (bnode i)) 4 (DFrac.own 1) 0#32 from by rw [wordAtN_cur]) $$ Hb
+  icases bd_word_split (aBufDev (bnode i)) 0#32 $$ Hd with ⟨Hd1, Hd2⟩
+  icases bd_word_split (aBufBlockno (bnode i)) 0#32 $$ Hb with ⟨Hb1, Hb2⟩
+  ihave Hd2 := (show wordPointsTo (GF := GF) (aBufDev (bnode i)) 4
+        (DFrac.own (1 : Qp).half) 0#32 ⊢
+      wordAtN curCtx (aBufDev (bnode i)) 4 (DFrac.own (1 : Qp).half) 0#32 from by
+    rw [wordAtN_cur]) $$ Hd2
+  ihave Hb2 := (show wordPointsTo (GF := GF) (aBufBlockno (bnode i)) 4
+        (DFrac.own (1 : Qp).half) 0#32 ⊢
+      wordAtN curCtx (aBufBlockno (bnode i)) 4 (DFrac.own (1 : Qp).half) 0#32 from by
+    rw [wordAtN_cur]) $$ Hb2
+  iframe Hd2 Hb2 Hrc
+  iexists bs
+  unfold bufTravelV byteBuf
+  simp only [wordAtN_cur]
+  isplitl []
+  · ipureintro; exact ⟨hlen, Or.inl trivial⟩
+  iframe Hv Hd1 Hb1 Hdk Hdata
+  iapply bufPay_uncov V 0#32 0#32 0#32 bs hcov0
+
 end
 
 end Xv6
