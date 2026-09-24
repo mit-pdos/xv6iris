@@ -592,3 +592,4 @@ import Xv6.IcacheTable
 import Xv6.SpecNamecmp
 import Xv6.ProofNamecmp
 import Xv6.LinkNamecmp
+import Xv6.IcachePinwLw
