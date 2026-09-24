@@ -178,14 +178,13 @@ theorem bd_fwd (c : CPU) (kc : KCtx) (hsie : kc.sie = false)
       bdFwdRegs dev bno kk Rc → bdOther R0 Rc →
       (kctx c (kc.withRegs Rc) ∗ pcIs c (KA.«bread» + 0x3c#64) ∗
         bdScan γ V tl M Ls ord devs bnos ∗
-        (∀ (kk2 : Nat) (Rc2 : RegMap),
-          ⌜kk2 < NBUF ∧ devs kk2 = dev ∧ bnos kk2 = bno ∧
-            bdFwdRegs dev bno kk2 Rc2 ∧ bdOther R0 Rc2⌝ -∗
-          kctx c (kc.withRegs Rc2) -∗ pcIs c (KA.«bread» + 0x48#64) -∗
-          bdScan γ V tl M Ls ord devs bnos -∗ wpLoop c) ∗
-        (∀ Rc2 : RegMap,
-          ⌜(∀ i, i < NBUF → ¬(devs i = dev ∧ bnos i = bno)) ∧ bdOther R0 Rc2⌝ -∗
-          kctx c (kc.withRegs Rc2) -∗ pcIs c (KA.«bread» + 0x64#64) -∗
+        (∀ (kk2 : Nat) (Rc2 : RegMap) (pc2 : BitVec 64) (hit : Bool),
+          ⌜(hit = true → kk2 < NBUF ∧ devs kk2 = dev ∧ bnos kk2 = bno ∧
+              bdFwdRegs dev bno kk2 Rc2) ∧
+            (hit = false → ∀ i, i < NBUF → ¬(devs i = dev ∧ bnos i = bno)) ∧
+            pc2 = (if hit then KA.«bread» + 0x48#64 else KA.«bread» + 0x64#64) ∧
+            bdOther R0 Rc2⌝ -∗
+          kctx c (kc.withRegs Rc2) -∗ pcIs c pc2 -∗
           bdScan γ V tl M Ls ord devs bnos -∗ wpLoop c)
         ⊢ wpLoop (GF := GF) c) := by
   intro rest
@@ -193,7 +192,7 @@ theorem bd_fwd (c : CPU) (kc : KCtx) (hsie : kc.sie = false)
   | nil =>
     intro o1 kk Rc hsplit hmiss hregs hoth
     have hkk : kk < NBUF := bd_ord_lt ord hord kk (by rw [hsplit]; simp)
-    iintro ⟨Hk, Hpc, Hscan, Hhit, Hmiss'⟩
+    iintro ⟨Hk, Hpc, Hscan, Hcont⟩
     iapply (bd_fwd_step c kc hsie γ V tl M Ls ord devs bnos dev bno R0 Rc kk hkk hregs hoth)
     iframe Hk Hpc Hscan
     iintro %Rc2 %pc2 %hit %hp Hk Hpc Hscan
@@ -202,9 +201,10 @@ theorem bd_fwd (c : CPU) (kc : KCtx) (hsie : kc.sie = false)
       obtain ⟨hiff, hpc2, hregs2, hoth2⟩ := hp
       have hpc' : pc2 = KA.«bread» + 0x48#64 := by rw [hpc2]; simp
       subst hpc'
-      iapply Hhit $$ %kk %Rc2 [] Hk Hpc Hscan
+      iapply Hcont $$ %kk %Rc2 %(KA.«bread» + 0x48#64) %true [] Hk Hpc Hscan
       ipureintro
-      exact ⟨hkk, (hiff.1 rfl).1, (hiff.1 rfl).2, hregs2, hoth2⟩
+      exact ⟨fun _ => ⟨hkk, (hiff.1 rfl).1, (hiff.1 rfl).2, hregs2⟩,
+        fun h => absurd h (by decide), rfl, hoth2⟩
     | false =>
       obtain ⟨hiff, hpc2, hregs2, hoth2⟩ := hp
       have hpc' : pc2 = KA.«bread» + 0x36#64 := by rw [hpc2]; simp
@@ -246,10 +246,10 @@ theorem bd_fwd (c : CPU) (kc : KCtx) (hsie : kc.sie = false)
         with [g14, bd_beq_eq, bd_t_miss2]
       iintro Hk Hpc
       k_norm
-      iapply Hmiss' $$ %_ [] Hk Hpc Hscan
+      iapply Hcont $$ %kk %_ %(KA.«bread» + 0x64#64) %false [] Hk Hpc Hscan
       ipureintro
-      refine ⟨?_, ?_⟩
-      · intro i hi hc
+      refine ⟨fun h => absurd h (by decide), ?_, rfl, ?_⟩
+      · intro _ i hi hc
         have : i ∈ ord := (hord.mem_iff).2 (List.mem_range.2 hi)
         rw [hsplit] at this
         simp only [List.mem_append, List.mem_cons, List.not_mem_nil, or_false] at this
@@ -261,7 +261,7 @@ theorem bd_fwd (c : CPU) (kc : KCtx) (hsie : kc.sie = false)
     intro o1 kk Rc hsplit hmiss hregs hoth
     have hkk : kk < NBUF := bd_ord_lt ord hord kk (by rw [hsplit]; simp)
     have hk2 : k2 < NBUF := bd_ord_lt ord hord k2 (by rw [hsplit]; simp)
-    iintro ⟨Hk, Hpc, Hscan, Hhit, Hmiss'⟩
+    iintro ⟨Hk, Hpc, Hscan, Hcont⟩
     iapply (bd_fwd_step c kc hsie γ V tl M Ls ord devs bnos dev bno R0 Rc kk hkk hregs hoth)
     iframe Hk Hpc Hscan
     iintro %Rc2 %pc2 %hit %hp Hk Hpc Hscan
@@ -270,9 +270,10 @@ theorem bd_fwd (c : CPU) (kc : KCtx) (hsie : kc.sie = false)
       obtain ⟨hiff, hpc2, hregs2, hoth2⟩ := hp
       have hpc' : pc2 = KA.«bread» + 0x48#64 := by rw [hpc2]; simp
       subst hpc'
-      iapply Hhit $$ %kk %Rc2 [] Hk Hpc Hscan
+      iapply Hcont $$ %kk %Rc2 %(KA.«bread» + 0x48#64) %true [] Hk Hpc Hscan
       ipureintro
-      exact ⟨hkk, (hiff.1 rfl).1, (hiff.1 rfl).2, hregs2, hoth2⟩
+      exact ⟨fun _ => ⟨hkk, (hiff.1 rfl).1, (hiff.1 rfl).2, hregs2⟩,
+        fun h => absurd h (by decide), rfl, hoth2⟩
     | false =>
       obtain ⟨hiff, hpc2, hregs2, hoth2⟩ := hp
       have hpc' : pc2 = KA.«bread» + 0x36#64 := by rw [hpc2]; simp
@@ -324,7 +325,7 @@ theorem bd_fwd (c : CPU) (kc : KCtx) (hsie : kc.sie = false)
                 | (simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; rfl)
                 | (simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; assumption))
         (bdOther_set R0 Rc2 hoth2 9#5 _ (Or.inl rfl)))
-      iframe Hk Hpc Hscan Hhit Hmiss'
+      iframe Hk Hpc Hscan Hcont
 
 set_option maxHeartbeats 8000000 in
 /-- One iteration's `refcnt` test, from `bread+0x7a`. -/
@@ -412,12 +413,11 @@ theorem bd_bwd (c : CPU) (kc : KCtx) (hsie : kc.sie = false)
       ord = o1 ++ kk :: o2 → bdFwdRegs dev bno kk Rc → bdOther R0 Rc →
       (kctx c (kc.withRegs Rc) ∗ pcIs c (KA.«bread» + 0x7a#64) ∗
         bdScan γ V tl M Ls ord devs bnos ∗
-        (∀ (kk2 : Nat) (Rc2 : RegMap),
-          ⌜kk2 < NBUF ∧ Ls kk2 = [] ∧ bdFwdRegs dev bno kk2 Rc2 ∧ bdOther R0 Rc2⌝ -∗
-          kctx c (kc.withRegs Rc2) -∗ pcIs c (KA.«bread» + 0x90#64) -∗
-          bdScan γ V tl M Ls ord devs bnos -∗ wpLoop c) ∗
-        (∀ Rc2 : RegMap, ⌜bdOther R0 Rc2⌝ -∗
-          kctx c (kc.withRegs Rc2) -∗ pcIs c (KA.«bread» + 0x84#64) -∗
+        (∀ (kk2 : Nat) (Rc2 : RegMap) (pc2 : BitVec 64) (found : Bool),
+          ⌜(found = true → kk2 < NBUF ∧ Ls kk2 = [] ∧ bdFwdRegs dev bno kk2 Rc2) ∧
+            pc2 = (if found then KA.«bread» + 0x90#64 else KA.«bread» + 0x84#64) ∧
+            bdOther R0 Rc2⌝ -∗
+          kctx c (kc.withRegs Rc2) -∗ pcIs c pc2 -∗
           bdScan γ V tl M Ls ord devs bnos -∗ wpLoop c)
         ⊢ wpLoop (GF := GF) c) := by
   intro o1
@@ -425,7 +425,7 @@ theorem bd_bwd (c : CPU) (kc : KCtx) (hsie : kc.sie = false)
   | nil =>
     intro o2 kk Rc hsplit hregs hoth
     have hkk : kk < NBUF := bd_ord_lt ord hord kk (by rw [hsplit]; simp)
-    iintro ⟨Hk, Hpc, Hscan, Hrec, Hpan⟩
+    iintro ⟨Hk, Hpc, Hscan, Hcont2⟩
     iapply (bd_bwd_step c kc hsie γ V tl M Ls ord devs bnos dev bno R0 Rc kk hkk hregs hoth)
     iframe Hk Hpc Hscan
     iintro %Rc2 %pc2 %zero %hp Hk Hpc Hscan
@@ -434,8 +434,8 @@ theorem bd_bwd (c : CPU) (kc : KCtx) (hsie : kc.sie = false)
       obtain ⟨hiff, hpc2, hregs2, hoth2⟩ := hp
       have hpc' : pc2 = KA.«bread» + 0x90#64 := by rw [hpc2]; simp
       subst hpc'
-      iapply Hrec $$ %kk %Rc2 [] Hk Hpc Hscan
-      ipureintro; exact ⟨hkk, hiff.1 rfl, hregs2, hoth2⟩
+      iapply Hcont2 $$ %kk %Rc2 %(KA.«bread» + 0x90#64) %true [] Hk Hpc Hscan
+      ipureintro; exact ⟨fun _ => ⟨hkk, hiff.1 rfl, hregs2⟩, rfl, hoth2⟩
     | false =>
       obtain ⟨hiff, hpc2, hregs2, hoth2⟩ := hp
       have hpc' : pc2 = KA.«bread» + 0x7e#64 := by rw [hpc2]; simp
@@ -474,14 +474,15 @@ theorem bd_bwd (c : CPU) (kc : KCtx) (hsie : kc.sie = false)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g14, bd_bne_eq]
       iintro Hk Hpc
       k_norm
-      iapply Hpan $$ %_ [] Hk Hpc Hscan
+      iapply Hcont2 $$ %kk %_ %(KA.«bread» + 0x84#64) %false [] Hk Hpc Hscan
       ipureintro
-      exact bdOther_set R0 Rc2 hoth2 9#5 _ (Or.inl rfl)
+      exact ⟨fun h => absurd h (by decide), rfl,
+        bdOther_set R0 Rc2 hoth2 9#5 _ (Or.inl rfl)⟩
   | append_singleton o1' kj ih =>
     intro o2 kk Rc hsplit hregs hoth
     have hkk : kk < NBUF := bd_ord_lt ord hord kk (by rw [hsplit]; simp)
     have hkj : kj < NBUF := bd_ord_lt ord hord kj (by rw [hsplit]; simp)
-    iintro ⟨Hk, Hpc, Hscan, Hrec, Hpan⟩
+    iintro ⟨Hk, Hpc, Hscan, Hcont2⟩
     iapply (bd_bwd_step c kc hsie γ V tl M Ls ord devs bnos dev bno R0 Rc kk hkk hregs hoth)
     iframe Hk Hpc Hscan
     iintro %Rc2 %pc2 %zero %hp Hk Hpc Hscan
@@ -490,8 +491,8 @@ theorem bd_bwd (c : CPU) (kc : KCtx) (hsie : kc.sie = false)
       obtain ⟨hiff, hpc2, hregs2, hoth2⟩ := hp
       have hpc' : pc2 = KA.«bread» + 0x90#64 := by rw [hpc2]; simp
       subst hpc'
-      iapply Hrec $$ %kk %Rc2 [] Hk Hpc Hscan
-      ipureintro; exact ⟨hkk, hiff.1 rfl, hregs2, hoth2⟩
+      iapply Hcont2 $$ %kk %Rc2 %(KA.«bread» + 0x90#64) %true [] Hk Hpc Hscan
+      ipureintro; exact ⟨fun _ => ⟨hkk, hiff.1 rfl, hregs2⟩, rfl, hoth2⟩
     | false =>
       obtain ⟨hiff, hpc2, hregs2, hoth2⟩ := hp
       have hpc' : pc2 = KA.«bread» + 0x7e#64 := by rw [hpc2]; simp
@@ -536,7 +537,7 @@ theorem bd_bwd (c : CPU) (kc : KCtx) (hsie : kc.sie = false)
                 | (simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; rfl)
                 | (simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; assumption))
         (bdOther_set R0 Rc2 hoth2 9#5 _ (Or.inl rfl)))
-      iframe Hk Hpc Hscan Hrec Hpan
+      iframe Hk Hpc Hscan Hcont2
 
 set_option maxHeartbeats 16000000 in
 /-- **THE HIT**, from `bread+0x48`: `b->refcnt++`, release, `acquiresleep`,
