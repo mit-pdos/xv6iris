@@ -117,25 +117,6 @@ theorem iu_ext32 (w : BitVec 32) : BitVec.extractLsb' 0 32 (BitVec.signExtend 64
 theorem iu_disp (a : BitVec 64) (d : Nat) (h : d < 2048) :
     a + BitVec.signExtend 64 (BitVec.ofNat 12 d) = a + BitVec.ofNat 64 d := dsDisp a d h
 
-theorem iu_add_add (a : BitVec 64) (m n : Nat) :
-    a + BitVec.ofNat 64 m + BitVec.ofNat 64 n = a + BitVec.ofNat 64 (m + n) := by
-  apply BitVec.eq_of_toNat_eq
-  simp only [BitVec.toNat_add, BitVec.toNat_ofNat]
-  omega
-
-/-- The slot's five field cells are aligned (Rocq's `dislot_align` at
-bread's buffer, from `iu_align`). -/
-theorem iu_slot_align (kk q : Nat) (hkk : kk < NBUF) (hq : q < 16) :
-    dislotAlign (aBufData (bnode kk) + BitVec.ofNat 64 (64 * q)) := by
-  unfold dislotAlign
-  refine ⟨?_, ?_, ?_, ?_, ?_⟩
-  · have := dsAlign kk q 0 2 hkk hq (by omega) (Or.inl rfl) rfl
-    simpa using this
-  · rw [iu_add_add]; exact dsAlign kk q 2 2 hkk hq (by omega) (Or.inl rfl) rfl
-  · rw [iu_add_add]; exact dsAlign kk q 4 2 hkk hq (by omega) (Or.inl rfl) rfl
-  · rw [iu_add_add]; exact dsAlign kk q 6 2 hkk hq (by omega) (Or.inl rfl) rfl
-  · rw [iu_add_add]; exact dsAlign kk q 8 4 hkk hq (by omega) (Or.inr rfl) rfl
-
 /-- The record-granular shape obligation `log_write`'s range form takes
 (Rocq's `Hsplice`, from `diblk_bytes_splice`). -/
 theorem iu_shape (ds : List Dinode) (inum : BitVec 32) (dn : Dinode) (hds : diblkWf ds)

@@ -247,22 +247,6 @@ theorem ialloc_shape (ds : List Dinode) (inum : BitVec 32) (ty : BitVec 16) (hds
   fun _ _ => ⟨dinodeBytes_length _ (iallocFresh_wf ty),
     diblkBytes_splice ds (islot inum) (iallocFresh ty) hds (iallocFresh_wf ty) (islot_lt inum)⟩
 
-/-- The slot's five cells are aligned (the `iu_slot_align` of IupdateSteps,
-restated: a stage file may not import another function's). -/
-theorem ialloc_slot_align (kk q : Nat) (hkk : kk < NBUF) (hq : q < 16) :
-    dislotAlign (aBufData (bnode kk) + BitVec.ofNat 64 (64 * q)) := by
-  have hadd : ∀ m : Nat, aBufData (bnode kk) + BitVec.ofNat 64 (64 * q) + BitVec.ofNat 64 m
-      = aBufData (bnode kk) + BitVec.ofNat 64 (64 * q + m) := by
-    intro m
-    rw [BitVec.add_assoc, ← BitVec.ofNat_add]
-  refine ⟨?_, ?_, ?_, ?_, ?_⟩
-  · have h := dsAlign kk q 0 2 hkk hq (by omega) (Or.inl rfl) (by omega)
-    simpa using h
-  · rw [hadd]; exact dsAlign kk q 2 2 hkk hq (by omega) (Or.inl rfl) (by omega)
-  · rw [hadd]; exact dsAlign kk q 4 2 hkk hq (by omega) (Or.inl rfl) (by omega)
-  · rw [hadd]; exact dsAlign kk q 6 2 hkk hq (by omega) (Or.inl rfl) (by omega)
-  · rw [hadd]; exact dsAlign kk q 8 4 hkk hq (by omega) (Or.inr rfl) (by omega)
-
 /-- Giving slot `k` back at its own record leaves the block as it was. -/
 theorem ialloc_set_self (ds : List Dinode) (k : Nat) (hk : k < ds.length) :
     ds.set k ds[k]! = ds := by

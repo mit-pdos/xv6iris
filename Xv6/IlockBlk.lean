@@ -33,21 +33,6 @@ theorem il_ext16 (w : BitVec 16) : BitVec.extractLsb' 0 16 (BitVec.signExtend 64
 theorem il_ext32 (w : BitVec 32) : BitVec.extractLsb' 0 32 (BitVec.signExtend 64 w) = w := by
   bv_decide
 
-/-- The slot's five cells are aligned (Rocq 1377-1391, `iu_align` five times). -/
-theorem il_slot_align (kb q : Nat) (hkb : kb < NBUF) (hq : q < 16) :
-    dislotAlign (aBufData (bnode kb) + BitVec.ofNat 64 (64 * q)) := by
-  have hadd : ∀ m : Nat, aBufData (bnode kb) + BitVec.ofNat 64 (64 * q) + BitVec.ofNat 64 m
-      = aBufData (bnode kb) + BitVec.ofNat 64 (64 * q + m) := by
-    intro m
-    rw [BitVec.add_assoc, ← BitVec.ofNat_add]
-  refine ⟨?_, ?_, ?_, ?_, ?_⟩
-  · have h := dsAlign kb q 0 2 hkb hq (by omega) (Or.inl rfl) (by omega)
-    simpa using h
-  · rw [hadd]; exact dsAlign kb q 2 2 hkb hq (by omega) (Or.inl rfl) (by omega)
-  · rw [hadd]; exact dsAlign kb q 4 2 hkb hq (by omega) (Or.inl rfl) (by omega)
-  · rw [hadd]; exact dsAlign kb q 6 2 hkb hq (by omega) (Or.inl rfl) (by omega)
-  · rw [hadd]; exact dsAlign kb q 8 4 hkb hq (by omega) (Or.inr rfl) (by omega)
-
 /-- Giving slot `k` back at its own record leaves the block as it was. -/
 theorem il_set_self (ds : List Dinode) (k : Nat) (hk : k < ds.length) :
     ds.set k ds[k]! = ds := by
@@ -130,8 +115,7 @@ theorem il_blk_open [Icfg] [Fscfg] [CurCtx] (kb : Nat) (pidv : BitVec 32) (inum 
   icases dsHold_swap fscBio _ kb pidv icfgDev _ (diblkBytes ds) bsd $$ Hhold with ⟨Hown, Hhback⟩
   icases dsBuf_bytes (bnode kb) _ 0#32 ds hwf $$ Hown with ⟨Hby, Hbyback⟩
   have hk := islot_lt inum
-  icases diblkSlot_acc (aBufData (bnode kb)) ds (islot inum) hwf hk
-    (il_slot_align kb (islot inum) hkb hk) $$ Hby with ⟨Hslot, Hsback⟩
+  icases diblkSlot_acc_buf kb (islot inum) ds hkb hk hwf $$ Hby with ⟨Hslot, Hsback⟩
   imodintro
   iexists ds
   iframe Hrest Hshot Hslot

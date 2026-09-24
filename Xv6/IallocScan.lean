@@ -102,8 +102,7 @@ theorem ialloc_blk_open [Icfg] [Fscfg] [CurCtx] (kk : Nat) (pidv inum : BitVec 3
   icases dsHold_swap fscBio _ kk pidv icfgDev _ (diblkBytes ds) bsd $$ Hhold with ⟨Hown, Hhback⟩
   icases dsBuf_bytes (bnode kk) _ 0#32 ds hwf $$ Hown with ⟨Hby, Hbyback⟩
   have hk := islot_lt inum
-  icases diblkSlot_acc (aBufData (bnode kk)) ds (islot inum) hwf hk
-    (ialloc_slot_align kk (islot inum) hkk hk) $$ Hby with ⟨Hslot, Hsback⟩
+  icases diblkSlot_acc_buf kk (islot inum) ds hkk hk hwf $$ Hby with ⟨Hslot, Hsback⟩
   unfold dislot
   icases Hslot with ⟨H0, H2, H4, H6, H8, Ha⟩
   imodintro

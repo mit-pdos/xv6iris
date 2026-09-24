@@ -437,7 +437,7 @@ theorem ialloc_claim (MS : MEMSET) (LW : LOG_WRITE) (BE : BRELSE) (IG : IGET) [F
   have hpsw : ∀ (K : KCtx) (m : Nat) (a b : Bool),
       (K.pushed m).withSpie a b = (K.withSpie a b).pushed m := fun _ _ _ _ => rfl
   have hsl := islot_lt inum
-  have hal := ialloc_slot_align kk (islot inum) hkk hsl
+  have hal := dislotAlign_buf kk (islot inum) hkk hsl
   have hlen : (dinodeBytes ds[islot inum]!).length = 64 :=
     dinodeBytes_length _ (ialloc_slot_wf ds _ hwf hsl)
   obtain ⟨a2, a20, a21, a22, p23, p24, p25, p26, p27⟩ := id hb
@@ -449,7 +449,7 @@ theorem ialloc_claim (MS : MEMSET) (LW : LOG_WRITE) (BE : BRELSE) (IG : IGET) [F
   icases dsHold_swap fscBio _ kk pidv icfgDev _ (diblkBytes ds) bsd $$ Hhold with
     ⟨Hown, Hhback⟩
   icases dsBuf_bytes (bnode kk) _ 0#32 ds hwf $$ Hown with ⟨Hby, Hbyback⟩
-  icases diblkSlot_acc (aBufData (bnode kk)) ds (islot inum) hwf hsl hal $$ Hby with
+  icases diblkSlot_acc_buf kk (islot inum) ds hkk hsl hwf $$ Hby with
     ⟨Hslot, Hsback⟩
   ihave Hwin := (dislot_bytes _ _ hal).2 $$ Hslot
   -- +0x88  li a2,64 ; +0x8c  c.li a1,0 ; +0x8e  c.mv a0,s3 ; +0x90  jal memset

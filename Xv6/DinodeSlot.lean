@@ -631,6 +631,33 @@ theorem diblkSlot_acc [CurCtx] (a : BitVec 64) (ds : List Dinode) (k : Nat)
     BiEntails.to_eq (dislot_bytes (a + BitVec.ofNat 64 (64 * k)) d hal)]
   iframe Hpre Hslot Hsuf
 
+/-- Slot `k` of a bcache buffer is aligned (Rocq's `dislot_align` at bread's
+buffer: `iu_align` five times).  Shared by `iupdate`, `ilock` and `ialloc`. -/
+theorem dislotAlign_buf (kk k : Nat) (hkk : kk < NBUF) (hk : k < 16) :
+    dislotAlign (aBufData (bnode kk) + BitVec.ofNat 64 (64 * k)) := by
+  have hadd : ∀ m : Nat, aBufData (bnode kk) + BitVec.ofNat 64 (64 * k) + BitVec.ofNat 64 m
+      = aBufData (bnode kk) + BitVec.ofNat 64 (64 * k + m) := by
+    intro m
+    rw [BitVec.add_assoc, ← BitVec.ofNat_add]
+  refine ⟨?_, ?_, ?_, ?_, ?_⟩
+  · have h := dsAlign kk k 0 2 hkk hk (by omega) (Or.inl rfl) (by omega)
+    simpa using h
+  · rw [hadd]; exact dsAlign kk k 2 2 hkk hk (by omega) (Or.inl rfl) (by omega)
+  · rw [hadd]; exact dsAlign kk k 4 2 hkk hk (by omega) (Or.inl rfl) (by omega)
+  · rw [hadd]; exact dsAlign kk k 6 2 hkk hk (by omega) (Or.inl rfl) (by omega)
+  · rw [hadd]; exact dsAlign kk k 8 4 hkk hk (by omega) (Or.inr rfl) (by omega)
+
+/-- `diblkSlot_acc` at a bcache buffer, its alignment discharged
+(`dislotAlign_buf`). -/
+theorem diblkSlot_acc_buf [CurCtx] (kk k : Nat) (ds : List Dinode) (hkk : kk < NBUF)
+    (hk : k < 16) (hwf : diblkWf ds) :
+    byteBuf (GF := GF) (aBufData (bnode kk)) (DFrac.own 1) (diblkBytes ds) ⊢
+      iprop(dislot (aBufData (bnode kk) + BitVec.ofNat 64 (64 * k)) ds[k]! ∗
+        (∀ d : Dinode, ⌜dinodeWf d⌝ -∗
+          dislot (aBufData (bnode kk) + BitVec.ofNat 64 (64 * k)) d -∗
+          byteBuf (aBufData (bnode kk)) (DFrac.own 1) (diblkBytes (ds.set k d)))) :=
+  diblkSlot_acc _ ds k hwf hk (dislotAlign_buf kk k hkk hk)
+
 end
 
 /-! # (4) The handle

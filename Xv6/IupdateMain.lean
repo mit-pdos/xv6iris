@@ -348,8 +348,7 @@ theorem iu_body (LW : LOG_WRITE) (BE : BRELSE) (MM : MEMMOVE)
   -- the slot, out of the handle's bytes, with ONE way back at any record
   icases iu_hold_open _ _ _ _ _ _ _ _ $$ Hhold with ⟨%hkk, Hown, Hholdback⟩
   icases dsBuf_bytes (bnode kk) _ 0#32 ds hds $$ Hown with ⟨Hby, Hbyback⟩
-  icases diblkSlot_acc (aBufData (bnode kk)) ds (islot inum) hds (islot_lt inum)
-    (iu_slot_align kk (islot inum) hkk (islot_lt inum)) $$ Hby with ⟨Hslot, Hslotback⟩
+  icases diblkSlot_acc_buf kk (islot inum) ds hkk (islot_lt inum) hds $$ Hby with ⟨Hslot, Hslotback⟩
   ihave Hback : (∀ d : Dinode, ⌜dinodeWf d⌝ -∗
       dislot (aBufData (bnode kk) + BitVec.ofNat 64 (64 * islot inum)) d -∗
       bufHold0 fscBio (fsView fscFs fscDisk icfgDev fscCov) kk pidv icfgDev
