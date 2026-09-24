@@ -366,11 +366,13 @@ theorem fp_dormant_intro [CurCtx] (pa : BitVec 64) (V : ProcPriv) (nm : List (Bi
   iintro ⟨Hpid, Hsz, Hpt, Htf, Hks, Hctx, Hof, Hcwd, Hnm, Hst⟩
   isplitl []
   · ipureintro; exact Or.inl rfl
-  iexists ({ V with sz := 0#64, pagetable := 0#64, trapframe := 0#64, name := nm }), 0#32
+  -- the zeroed block is at the lazy bit SET (Rocq freeproc's dormant block:
+  -- `proc_dormant`'s `pv_lazy V = true`, a ghost write -- no cell moves)
+  iexists ({ V with sz := 0#64, pagetable := 0#64, trapframe := 0#64, name := nm, pvLazy := true }), 0#32
   rw [if_pos (rfl : UNUSED = UNUSED)]
   isplitl []
   · ipureintro
-    refine ⟨hof, hcwd, ?_⟩
+    refine ⟨hof, hcwd, ?_, rfl⟩
     simp only [uvmMaxsz]
     decide
   iframe Hpid Hks Hsz Hpt Htf Hctx Hof Hcwd Hst

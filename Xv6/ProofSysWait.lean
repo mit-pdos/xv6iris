@@ -243,9 +243,9 @@ theorem sys_wait_proof (AA : ARGADDR) (KW : KWAIT) : SYSWAIT := ⟨
        ofileCells (procAddr j) (DFrac.own 1) V.ofile ∗
        wordPointsTo (pCwd (procAddr j)) 8 (DFrac.own 1) V.cwd ∗
        pnameCells (procAddr j) (DFrac.own 1) V.name) ∗
-      procPtAt V.upt M ∗ tfPageAt V.upt.tfp V.tf
+      procPtAt V.upt M ∗ tfPageAt V.upt.tfp V.tf ∗ ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝
       from by unfold procPrivNoctxAt procFieldsNoctx; iintro H; iexact H) $$ Hblk
-    with ⟨%hVb, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hof, Hcwd, Hnm⟩, HPt, HTf⟩
+    with ⟨%hVb, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hof, Hcwd, Hnm⟩, HPt, HTf, %hlz⟩
   ihave Htf := (show wordPointsTo (GF := GF) (pTrapframe (procAddr j)) 8 (DFrac.own 1) V.trapframe ⊢
       wordPointsTo (pTrapframe k.proc) 8 (DFrac.own 1) (pageAddr V.upt.tfp) from by rw [hVb.2.2.2, hproc]) $$ Htf
   -- the prologue ; a1 = &p ; a0 = 0 ; jal argaddr
@@ -301,7 +301,7 @@ theorem sys_wait_proof (AA : ARGADDR) (KW : KWAIT) : SYSWAIT := ⟨
   case' _ =>
     unfold procPrivNoctxAt procFieldsNoctx
     iframe Hpid Hks Hsz Hpg Htf Hof Hcwd Hnm HPt HTf
-    ipureintro; exact hVb
+    ipureintro; exact ⟨hVb, hlz⟩
   ihave Hframe := sw_frame_close (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) v w2 $$ [Hra Hs0 Hslot Hc2]
   case' _ => iframe
   iapply (sw_kwait KW Γ cpu _ γw γp γl γk j pid V M hj ?hpr ?hKw ?hs ?hn2 ?hl ?ht) $$ [- $Hk $Hpc]

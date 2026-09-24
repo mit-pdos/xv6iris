@@ -295,6 +295,7 @@ import Xv6.LinkProcPagetable
 import Xv6.ProofProcFreepagetable
 import Xv6.LinkProcFreepagetable
 import Xv6.UPtAllocLemmas
+import Xv6.LazyFree
 import Xv6.ProofGrowproc
 import Xv6.LinkGrowproc
 import Xv6.ProofUvmcopy

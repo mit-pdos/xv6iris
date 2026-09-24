@@ -1284,17 +1284,17 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 theorem ap_dormant_unused_elim [CurCtx] (pa : BitVec 64) :
     procDormant (GF := GF) pa UNUSED ⊢
       ∃ (V : ProcPriv), ⌜V.ofile = List.replicate NOFILE 0#64 ∧ V.cwd = 0#64 ∧
-        V.pagetable = 0#64 ∧ V.trapframe = 0#64 ∧ V.sz = 0#64⌝ ∗
+        V.pagetable = 0#64 ∧ V.trapframe = 0#64 ∧ V.sz = 0#64 ∧ V.pvLazy = true⌝ ∗
       wordPointsTo (pPid pa) 4 pidPriv 0#32 ∗ procFields pa (DFrac.own 1) V ∗
       stackOwn (V.kstack + 4096#64) 512 := by
   unfold procDormant dormantSpace
-  iintro ⟨_, %V, %pidd, %⟨hof, hcwd, _⟩, Hpid, Hfields, Hspace⟩
+  iintro ⟨_, %V, %pidd, %⟨hof, hcwd, _, hlz⟩, Hpid, Hfields, Hspace⟩
   rw [if_pos (rfl : UNUSED = UNUSED)]
   icases Hspace with ⟨%⟨hpt, htf, hsz, hpd⟩, Hstack⟩
   subst hpd
   iexists V
   isplitl []
-  · ipureintro; exact ⟨hof, hcwd, hpt, htf, hsz⟩
+  · ipureintro; exact ⟨hof, hcwd, hpt, htf, hsz, hlz⟩
   iframe Hpid Hfields Hstack
 
 set_option maxHeartbeats 1000000 in
@@ -1802,7 +1802,7 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
   -- open the dormant block and the pid word's three fractions
   icases ap_slots_unused_elim Γ ξ0 (procAddr n) $$ Hslots with ⟨Hdorm, Hhart, Hpavarm⟩
   icases ap_dormant_unused_elim (procAddr n) $$ Hdorm with
-    ⟨%V0, %⟨hV0of, hV0cwd, hV0pt, hV0tf, hV0sz⟩, Hpriv, Hfields, Hstack⟩
+    ⟨%V0, %⟨hV0of, hV0cwd, hV0pt, hV0tf, hV0sz, hV0lz⟩, Hpriv, Hfields, Hstack⟩
   icases (show procPubRest (GF := GF) (procAddr n) kl xs pid0 ⊢
       wordPointsTo (pKilled (procAddr n)) 4 (DFrac.own 1) kl ∗
         wordPointsTo (pXstate (procAddr n)) 4 (DFrac.own 1) xs ∗
@@ -2432,6 +2432,7 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
         have hVum : V.upt.um = ∅ := by rw [hVdef]
         have hVtfw : V.tf = ws := by rw [hVdef]
         have hVupt : V.upt = { root := root, tfp := BitVec.extractLsb' 12 44 (Rk 10#5), um := ∅ } := by rw [hVdef]
+        have hVlz : V.pvLazy = true := by rw [hVdef]; exact hV0lz
         -- procFields V
         ihave Hfields : procFields (GF := GF) (procAddr n) (DFrac.own 1) V
           $$ [Hkstack Hsz Hpagetable Htrapframe Hctx Hofile Hcwd Hname]
@@ -2459,6 +2460,9 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
             · rw [hVtf, hVtfp, hpa2]
           rw [hVupt, hVtfw]
           iframe HpidPriv Hfields Hppt Htfpage
+          -- the dormant block's lazy bit is SET, where the claim is vacuous
+          -- (Rocq `proc_priv_nocwd_intro`'s third premise)
+          ipureintro; intro h; rw [hVlz] at h; cases h
         -- normalise the free-page count to availSub on 4
         have hgeq : availSub on 4 = availSub (availDec on) procPagetableNodes := by
           unfold procPagetableNodes

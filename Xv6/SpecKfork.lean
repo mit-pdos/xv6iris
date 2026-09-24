@@ -29,6 +29,12 @@ parent's `sz`, files and cwd are not touched.  Everything the child gets
 before the first `release(&np->lock)`, and nothing of it reaches the
 caller: what the caller gets back is a pid.
 
+THE CHILD INHERITS THE PARENT'S LAZY BIT (Rocq `ProofKforkB6`'s close):
+`uvmcopy` maps a child page wherever the parent has one below the break,
+so the parent's `lazyFree` claim transfers (`LazyFree.lazyFree_uvmcopy`,
+Rocq `lazy_free_dom`); the dormant block allocproc handed out was at
+`true`.
+
 THE CHILD'S RECORD is `Xv6/ForkretRecord.lean`'s: `allocproc` leaves the
 save area at `[forkret, kstack + PGSIZE, 0 x 12]`, and the creator owes
 the slot a parked record before it may release the lock, which is why

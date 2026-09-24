@@ -25,6 +25,7 @@ words), stated at the kernel-page-table context; `gp_priv_elim`/
 `gp_priv_intro` read it at the ambient one, which `kctx_tier` + `htier`
 show is that context (`curTier = kpt`).
 -/
+import Xv6.LazyFree
 import MachCSL.WpSmodeFrame
 import Xv6.SpecGrowproc
 import Xv6.SpecMyproc
@@ -110,6 +111,7 @@ theorem gp_priv_elim (htc : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec 
     procPrivNoctxAt (GF := GF) curCtx pa pid V M ⊢
       ⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧
         V.pagetable = pageAddr V.upt.root ∧ V.trapframe = pageAddr V.upt.tfp⌝ ∗
+      ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝ ∗
       wordPointsTo (pSz pa) 8 (DFrac.own 1) V.sz ∗
       wordPointsTo (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
       procPtAt V.upt M ∗ gpRest pa pid V := by
@@ -117,16 +119,18 @@ theorem gp_priv_elim (htc : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec 
   simp only at htc
   subst htc
   unfold procPrivNoctxAt procFieldsNoctx gpRest
-  iintro ⟨%hf, Hpid, ⟨Hks, Hsz, Hpt, Htf, Hof, Hcwd, Hnm⟩, HP, Htp⟩
+  iintro ⟨%hf, Hpid, ⟨Hks, Hsz, Hpt, Htf, Hof, Hcwd, Hnm⟩, HP, Htp, %hlz⟩
   isplitl []
   · ipureintro; exact hf
+  isplitl []
+  · ipureintro; exact hlz
   iframe
 
 theorem gp_priv_intro (htc : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (v : BitVec 64)
     (P' : UPtd) (M' : Nat → List (BitVec 8))
     (hf : v.toNat ≤ uvmMaxsz ∧ umBelow v P' ∧
       V.pagetable = pageAddr P'.root ∧ V.trapframe = pageAddr P'.tfp)
-    (htfp : P'.tfp = V.upt.tfp) :
+    (htfp : P'.tfp = V.upt.tfp) (hlz : V.pvLazy = false → lazyFree P'.um v) :
     wordPointsTo (pSz pa) 8 (DFrac.own 1) v ∗
     wordPointsTo (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
     procPtAt P' M' ∗ gpRest (GF := GF) pa pid V ⊢
@@ -141,6 +145,23 @@ theorem gp_priv_intro (htc : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec
   · ipureintro
     exact ⟨hf.1, hf.2.1, hf.2.2.1, by rw [← htfp]; exact hf.2.2.2⟩
   iframe
+  ipureintro; exact hlz
+
+/-- THE SHRINK keeps the fill empty (Rocq `lazy_free_del_run`, as
+`ProofGrowproc`'s shrink arm reads it): uvmdealloc's run starts at
+`PGROUNDUP` of the new break, and the break did not rise. -/
+theorem gp_lazy_shrink (P : UPtd) (sz new : BitVec 64) (h : lazyFree P.um sz) :
+    lazyFree (P.delRun (pgRoundUpN new.toNat / 4096) (uvmdNp sz new)).um (uvmdRsz sz new) := by
+  obtain ⟨q, hq⟩ := UPtAlloc.pgRoundUpN_dvd new.toNat
+  apply LazyFree.lazyFree_delRun _ sz
+  · unfold uvmdRsz; split <;> omega
+  · unfold uvmdRsz
+    split
+    · rw [hq]; omega
+    · rename_i hge
+      have := UPtAlloc.pgRoundUpN_le (show sz.toNat ≤ new.toNat by omega)
+      omega
+  · exact h
 
 set_option maxHeartbeats 1000000 in
 /-- The epilogue at `0x80001d06`, shared by the five endings: `a0` is
@@ -378,7 +399,7 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
   icases kctx_tier _ _ $$ Hk with ⟨%hct, Hk⟩
   have htc : curTier = KTier.kpt := by rw [← hct]; exact htier
   icases gp_priv_elim htc (procAddr j) pid V M $$ Hpv with
-    ⟨%⟨hszb, hbelow, hroot, htfb⟩, Hsz, Hpt, HP, Hrest⟩
+    ⟨%⟨hszb, hbelow, hroot, htfb⟩, %hlz0, Hsz, Hpt, HP, Hrest⟩
   have hK4 : 4 ≤ k.avail := by unfold growprocSlots at hK; omega
   -- the callees, as rules
   have hmp : ∀ (cc : CPU) (k' : KCtx) (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 10 ≤ k'.avail),
@@ -536,7 +557,7 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
             simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
             decide
           · rw [← gp_priv_eta V]
-            iapply gp_priv_intro htc (procAddr j) pid V V.sz V.upt M ⟨hszb, hbelow, hroot, htfb⟩ rfl
+            iapply gp_priv_intro htc (procAddr j) pid V V.sz V.upt M ⟨hszb, hbelow, hroot, htfb⟩ rfl hlz0
             iframe
         · ipureintro; exact hposta.2
       case hR2a => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact d2
@@ -631,7 +652,7 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
               simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
               decide
             · rw [← gp_priv_eta V]
-              iapply gp_priv_intro htc (procAddr j) pid V V.sz V.upt M ⟨hszb, hbelow, hroot, htfb⟩ rfl
+              iapply gp_priv_intro htc (procAddr j) pid V V.sz V.upt M ⟨hszb, hbelow, hroot, htfb⟩ rfl hlz0
               iframe
           · ipureintro; exact hpostb.2
         case hR2b => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact e2
@@ -674,6 +695,7 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
                 ⟨by omega, GrowProc.umBelow_grow V.sz (k.regs 10#5 + V.sz) 4#64 V.upt P' M M'
                     hbelow (by omega) hok,
                  by rw [hroot, hok.1.1], by rw [htfb, hok.1.2.1]⟩ hok.1.2.1
+                (fun h => LazyFree.lazyFree_uvmalloc hok (hlz0 h))
               iframe
           · ipureintro; exact hpostc.2
         case hR2c => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact e2
@@ -717,7 +739,7 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
             exact gp_ok_same V M (k.regs 10#5) (R'' 10#5) (fun _ => hpostd.1)
               (fun h => absurd h (by omega)) hnneg
           · rw [← gp_priv_eta V]
-            iapply gp_priv_intro htc (procAddr j) pid V V.sz V.upt M ⟨hszb, hbelow, hroot, htfb⟩ rfl
+            iapply gp_priv_intro htc (procAddr j) pid V V.sz V.upt M ⟨hszb, hbelow, hroot, htfb⟩ rfl hlz0
             iframe
         · ipureintro; exact hpostd.2
       case hR2d => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact d2
@@ -799,6 +821,7 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
           · iapply gp_priv_intro htc (procAddr j) pid V (uvmdRsz V.sz (k.regs 10#5 + V.sz)) _ M
               ⟨by unfold uvmdRsz; split <;> omega,
                GrowProc.umBelow_shrink V.sz (k.regs 10#5 + V.sz) V.upt hbelow, hroot, htfb⟩ rfl
+              (fun h => gp_lazy_shrink V.upt V.sz (k.regs 10#5 + V.sz) (hlz0 h))
             iframe
         · ipureintro; exact hposte.2
       case hR2e => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact e2

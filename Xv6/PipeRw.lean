@@ -14,6 +14,7 @@ import Xv6.PipeInvDefs
 import Xv6.SchedCtx
 import Xv6.UMem
 import Xv6.UMemLemmas
+import Xv6.LazyFree
 import Xv6.PrintkDefs
 
 namespace Xv6
@@ -185,7 +186,8 @@ def pwRest (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) : IProp GF := iprop
   @ofileCells hlc GF _ ⟨curCtx, KTier.kpt⟩ pa (DFrac.own 1) V.ofile ∗
   @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pCwd pa) 8 (DFrac.own 1) V.cwd ∗
   @pnameCells hlc GF _ ⟨curCtx, KTier.kpt⟩ pa (DFrac.own 1) V.name ∗
-  @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf
+  @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf ∗
+  ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝
 
 theorem pw_priv_split (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) :
@@ -211,10 +213,11 @@ theorem pw_priv_close (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UP
       procPrivExtNoctxAt (GF := GF) curCtx pa pid V P' M' := by
   unfold procPrivExtNoctxAt pwRest procFieldsNoctx
   rw [hext.1.1, hext.1.2.1]
-  iintro ⟨Hszc, Hpgc, Hspace, Hpid, Hks, Htfc, Hof, Hcwd, Hnm, Htfp⟩
+  iintro ⟨Hszc, Hpgc, Hspace, Hpid, Hks, Htfc, Hof, Hcwd, Hnm, Htfp, %hlz⟩
   isplitl []
   · ipureintro; exact ⟨hf.1, UMemL.umBelow_extSz hf.2.1 hext, hf.2.2.1, hf.2.2.2⟩
   · iframe
+    ipureintro; exact fun h => LazyFree.lazyFree_extSz hext (hlz h)
 
 /-! ## One byte of the pipe's data buffer -/
 
@@ -438,7 +441,8 @@ def pwRestExt (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : UPtd) : IPr
   @ofileCells hlc GF _ ⟨curCtx, KTier.kpt⟩ pa (DFrac.own 1) V.ofile ∗
   @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pCwd pa) 8 (DFrac.own 1) V.cwd ∗
   @pnameCells hlc GF _ ⟨curCtx, KTier.kpt⟩ pa (DFrac.own 1) V.name ∗
-  @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P.tfp V.tf
+  @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P.tfp V.tf ∗
+  ⌜V.pvLazy = false → lazyFree P.um V.sz⌝
 
 theorem pw_privExt_split (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : UPtd)
     (M' : Nat → List (BitVec 8)) :
@@ -464,10 +468,11 @@ theorem pw_privExt_close (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P P'
       procPrivExtNoctxAt (GF := GF) curCtx pa pid V P' M'' := by
   unfold procPrivExtNoctxAt pwRestExt procFieldsNoctx
   rw [hext.1.1, hext.1.2.1]
-  iintro ⟨Hszc, Hpgc, Hspace, Hpid, Hks, Htfc, Hof, Hcwd, Hnm, Htfp⟩
+  iintro ⟨Hszc, Hpgc, Hspace, Hpid, Hks, Htfc, Hof, Hcwd, Hnm, Htfp, %hlz⟩
   isplitl []
   · ipureintro; exact ⟨hf.1, UMemL.umBelow_extSz hf.2.1 hext, hf.2.2.1, hf.2.2.2⟩
   · iframe
+    ipureintro; exact fun h => LazyFree.lazyFree_extSz hext (hlz h)
 
 
 /-! ## Branch conditions and counter updates, in the normalized literal forms -/

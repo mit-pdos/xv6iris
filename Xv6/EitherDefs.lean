@@ -33,6 +33,7 @@ import Xv6.ProcDefs
 import Xv6.SchedCtx
 import Xv6.UMem
 import Xv6.UMemLemmas
+import Xv6.LazyFree
 import Xv6.Image
 import Xv6.Geom
 import Xv6.SpecMyproc
@@ -69,7 +70,8 @@ def procPrivRun (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
   wordPointsTo (pPid pa) 4 pidPriv pid ∗
   procFieldsNoctx pa (DFrac.own 1) V ∗
   procPtAt V.upt M ∗
-  tfPageAt V.upt.tfp V.tf
+  tfPageAt V.upt.tfp V.tf ∗
+  ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝
 
 /-- `procPrivRun` is `procPrivNoctxAt` at the kernel-page-table context. -/
 theorem procPrivRun_eq (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
@@ -86,7 +88,8 @@ def procPrivExt (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
   wordPointsTo (pPid pa) 4 pidPriv pid ∗
   procFieldsNoctx pa (DFrac.own 1) V ∗
   procPtAt P' M' ∗
-  tfPageAt P'.tfp V.tf
+  tfPageAt P'.tfp V.tf ∗
+  ⌜V.pvLazy = false → lazyFree P'.um V.sz⌝
 
 /-- ... which IS the running block at the new descriptor. -/
 theorem procPrivExt_eq_run (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
@@ -358,7 +361,8 @@ def ecRest [CurCtx] (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : UPtd)
   ofileCells pa (DFrac.own 1) V.ofile ∗
   wordPointsTo (pCwd pa) 8 (DFrac.own 1) V.cwd ∗
   pnameCells pa (DFrac.own 1) V.name ∗
-  tfPageAt P.tfp V.tf
+  tfPageAt P.tfp V.tf ∗
+  ⌜V.pvLazy = false → lazyFree P.um V.sz⌝
 
 theorem ec_priv_split [CurCtx] (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : UPtd)
     (M : Nat → List (BitVec 8)) :
@@ -383,10 +387,11 @@ theorem ec_priv_close [CurCtx] (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     procPtAt P' M' ∗ ecRest pa pid V P ⊢ procPrivExt (GF := GF) pa pid V P' M' := by
   unfold procPrivExt ecRest procFieldsNoctx
   rw [hext.1.1, hext.1.2.1]
-  iintro ⟨Hszc, Hpgc, Hspace, Hpid, Hks, Htfc, Hof, Hcwd, Hnm, Htfp⟩
+  iintro ⟨Hszc, Hpgc, Hspace, Hpid, Hks, Htfc, Hof, Hcwd, Hnm, Htfp, %hlz⟩
   isplitl []
   · ipureintro; exact ⟨hf.1, UMemL.umBelow_extSz hf.2.2.2 hext, hf.2.1, hf.2.2.1⟩
   · iframe
+    ipureintro; exact fun h => LazyFree.lazyFree_extSz hext (hlz h)
 
 
 end

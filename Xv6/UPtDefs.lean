@@ -106,6 +106,16 @@ def uptWf (P : UPtd) : Prop :=
 def umBelow (sz : BitVec 64) (P : UPtd) : Prop :=
   ∀ k w, Iris.Std.PartialMap.get? P.um k = some w → k * 4096 < pgRoundUpN sz.toNat
 
+/-- **The fill is empty** (Rocq `UserPerm.lazy_free`, `live_pages sz ⊆ dom
+um`): every page below `PGROUNDUP(sz)` is in the table, so no page of the
+process is one the kernel has promised and `vmfault` has yet to map.  What
+`ProcPriv.pvLazy = false` claims (the private block carries
+`V.pvLazy = false → lazyFree V.upt.um V.sz`).  Keyed by `vpn.toNat`, as
+`umBelow` is; under the block's `sz ≤ uvmMaxsz` it is Rocq's `mword 27`
+statement. -/
+def lazyFree (um : RegMapF (BitVec 64)) (sz : BitVec 64) : Prop :=
+  ∀ k, k * 4096 < pgRoundUpN sz.toNat → (Iris.Std.PartialMap.get? um k).isSome
+
 /-- `P` with `vpn` mapped to the page at `r` with `perm` (`mappages`' leaf). -/
 def UPtd.insertLeaf (P : UPtd) (vpn : Nat) (r : BitVec 64) (perm : BitVec 64) : UPtd :=
   { P with um := Iris.Std.PartialMap.insert P.um vpn (uLeaf (BitVec.extractLsb' 12 44 r) perm) }
@@ -151,7 +161,7 @@ def UPtd.ext (P P' : UPtd) : Prop :=
 `ProcPtOwn.uptd_ext_sz`): same root and trapframe, more leaves, every
 GAINED leaf below `sz` and `vmfault`'s own read/write user leaf.  What the
 user-copy functions promise about the table their lazy faults grew, so a
-caller keeps `umBelow` across them. -/
+caller keeps `umBelow` (and, by `P.ext P'` alone, `lazyFree`) across them. -/
 def UPtd.extSz (sz : BitVec 64) (P P' : UPtd) : Prop :=
   P.ext P' ∧
   (∀ k w, Iris.Std.PartialMap.get? P.um k = none → Iris.Std.PartialMap.get? P'.um k = some w →

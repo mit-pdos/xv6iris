@@ -317,9 +317,9 @@ theorem argfd_proof (AI : ARGINT) (MP : MYPROC) : ARGFD := ⟨
        wordPointsTo (pTrapframe pa) 8 (DFrac.own 1) V.trapframe ∗
        wordPointsTo (pCwd pa) 8 (DFrac.own 1) V.cwd ∗
        pnameCells pa (DFrac.own 1) V.name) ∗
-      procPtAt V.upt M ∗ tfPageAt V.upt.tfp V.tf
+      procPtAt V.upt M ∗ tfPageAt V.upt.tfp V.tf ∗ ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝
       from by unfold procPrivCoreNoctxAt procFieldsNoOfile; iintro H; iexact H) $$ Hcore
-    with ⟨%hVb, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm⟩, HPt, HTf⟩
+    with ⟨%hVb, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm⟩, HPt, HTf, %hlz⟩
   ihave Htf := (show wordPointsTo (GF := GF) (pTrapframe pa) 8 (DFrac.own 1) V.trapframe ⊢
       wordPointsTo (pTrapframe k.proc) 8 (DFrac.own 1) (pageAddr V.upt.tfp) from by rw [hVb.2.2.2, hproc]) $$ Htf
   -- the prologue ; mv s2,a1 ; mv s1,a2 ; addi a1,s0,-36
@@ -391,7 +391,7 @@ theorem argfd_proof (AI : ARGINT) (MP : MYPROC) : ARGFD := ⟨
   case' _ =>
     unfold procPrivCoreNoctxAt procFieldsNoOfile
     iframe Hpid Hks Hsz Hpg Htf Hcwd Hnm HPt HTf
-    ipureintro; exact hVb
+    ipureintro; exact ⟨hVb, hlz⟩
   by_cases hr : 0 ≤ argZ v ∧ argZ v < 16
   · -- in range: bltu falls through ; jal myproc
     k_step_gen (wp_s_branch c8 _ (KA.«argfd» + 0x1e#64) false 52#13 15#5 14#5 (by decide) bop.BLTU)

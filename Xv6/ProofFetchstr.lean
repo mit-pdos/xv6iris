@@ -20,6 +20,7 @@ meet: the string copyinstr read (`umemStr ... = some s`) is `pl ++ [0]` with
 `pl` NUL-free (`fetchstr_umemStr`), which is strlen's `cstr` precondition on
 the front of the buffer (`byteBuf_append`), and strlen answers `|pl|`.
 -/
+import Xv6.LazyFree
 import Xv6.SpecFetchstr
 import Xv6.SpecMyproc
 import Xv6.SpecStrlen
@@ -133,7 +134,8 @@ def fetchstrRest [CurCtx] (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P :
   wordPointsTo (pTrapframe pa) 8 (DFrac.own 1) V.trapframe ∗
   wordPointsTo (pCwd pa) 8 (DFrac.own 1) V.cwd ∗
   pnameCells pa (DFrac.own 1) V.name ∗
-  tfPageAt P.tfp V.tf
+  tfPageAt P.tfp V.tf ∗
+  ⌜V.pvLazy = false → lazyFree P.um V.sz⌝
 
 theorem fetchstr_priv_split [X : CurCtx] (ξ : CtxId) (hX : X = ⟨ξ, KTier.kpt⟩) (pa : BitVec 64)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
@@ -162,13 +164,15 @@ theorem fetchstr_priv_close [X : CurCtx] (ξ : CtxId) (hX : X = ⟨ξ, KTier.kpt
   letI : CurCtx := ⟨ξ, KTier.kpt⟩
   show _ ⊢ iprop(⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz P' ∧ V.pagetable = pageAddr P'.root ∧
       V.trapframe = pageAddr P'.tfp⌝ ∗ wordPointsTo (pPid pa) 4 pidPriv pid ∗
-    procFieldsNoOfile pa (DFrac.own 1) V ∗ procPtAt P' M' ∗ tfPageAt P'.tfp V.tf)
+    procFieldsNoOfile pa (DFrac.own 1) V ∗ procPtAt P' M' ∗ tfPageAt P'.tfp V.tf ∗
+    ⌜V.pvLazy = false → lazyFree P'.um V.sz⌝)
   unfold fetchstrRest procFieldsNoOfile
   rw [hext.1.1, hext.1.2.1]
-  iintro ⟨Hsz, Hpg, Hpt, Hpid, Hks, Htf, Hcwd, Hnm, Htfp⟩
+  iintro ⟨Hsz, Hpg, Hpt, Hpid, Hks, Htf, Hcwd, Hnm, Htfp, %hlz⟩
   isplitl []
   · ipureintro; exact ⟨hf.1, UMemL.umBelow_extSz hf.2.1 hext, hf.2.2.1, hf.2.2.2⟩
   · iframe
+    ipureintro; exact fun h => LazyFree.lazyFree_extSz hext (hlz h)
 
 variable [CurCtx]
 

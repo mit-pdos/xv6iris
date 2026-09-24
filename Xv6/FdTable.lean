@@ -447,7 +447,8 @@ def procPrivCoreNoctxAt (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : Pro
   @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗
   @procFieldsNoOfile hlc GF _ ⟨ξ, KTier.kpt⟩ pa (DFrac.own 1) V ∗
   @procPtAt hlc GF _ ⟨ξ, KTier.kpt⟩ V.upt M ∗
-  @tfPageAt hlc GF _ ⟨ξ, KTier.kpt⟩ V.upt.tfp V.tf
+  @tfPageAt hlc GF _ ⟨ξ, KTier.kpt⟩ V.upt.tfp V.tf ∗
+  ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝
 
 theorem procPrivNoctxAt_split (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) :
@@ -455,12 +456,16 @@ theorem procPrivNoctxAt_split (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V
       procPrivCoreNoctxAt ξ pa pid V M ∗ @ofileCells hlc GF _ ⟨ξ, KTier.kpt⟩ pa (DFrac.own 1) V.ofile := by
   unfold procPrivNoctxAt procPrivCoreNoctxAt procFieldsNoctx procFieldsNoOfile
   constructor
-  · iintro ⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hof, Hcwd, Hnm⟩, Hpt, Htfp⟩
+  · iintro ⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hof, Hcwd, Hnm⟩, Hpt, Htfp, %hlz⟩
     iframe Hpid Hk Hs Hpg Htf Hof Hcwd Hnm Hpt Htfp
-    ipureintro; exact h
-  · iintro ⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm⟩, Hpt, Htfp⟩, Hof⟩
+    isplitl []
+    · ipureintro; exact h
+    · ipureintro; exact hlz
+  · iintro ⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm⟩, Hpt, Htfp, %hlz⟩, Hof⟩
     iframe Hpid Hk Hs Hpg Htf Hof Hcwd Hnm Hpt Htfp
-    ipureintro; exact h
+    isplitl []
+    · ipureintro; exact h
+    · ipureintro; exact hlz
 
 /-- The core does not mention the array, so it survives any store into it. -/
 theorem procPrivCoreNoctxAt_ofile (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)

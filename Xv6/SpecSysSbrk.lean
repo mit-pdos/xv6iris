@@ -24,7 +24,12 @@ TWO PATHS, AND THE LAZY ONE IS WHY THE COHERENCE INVARIANT IS AN
 INEQUALITY (Rocq's header).  The eager path is `growproc`, so the contract
 reuses `growprocOk` at a return value of 0 rather than restating its arms.
 The lazy path raises `p->sz` and maps NOTHING: the private block's
-`umBelow` conjunct survives by monotonicity (`umBelow_mono`).
+`umBelow` conjunct survives by monotonicity (`umBelow_mono`), and the lazy
+bit is RAISED (Rocq's `lz' = true`, the one write of `ProcPriv.pvLazy`):
+the break rose over an untouched table, which is exactly a hole, so the
+claim `lazyFree` becomes vacuous.  The eager path and every failure keep
+the bit (growproc maps the run it grows by and lowers the break below what
+it unmaps).
 
 WHAT THE CALLER LEARNS.  Failure is total: `-1` means neither the size nor
 the table (nor the view) moved, on all three failure arms (growproc's, and
@@ -40,10 +45,9 @@ about that block's own trapframe record, as in `SpecSysWait`; the proof
 splits the trapframe fraction and page out for the two `argint` calls and
 puts them back.
 
-LAZINESS AT THE VIEW.  The Lean block has no `pv_lazy` bit (Rocq's
-`ProcDefs.pv_lazy`, lane LAZY-FLAG): the Lean view `M` is per-page and
-pages not in the table are zero-filled by `viewFaulted` when `vmfault`
-maps them, so the lazy arm leaves `M` equal.
+LAZINESS AT THE VIEW.  The Lean view `M` is per-page and pages not in the
+table are zero-filled by `viewFaulted` when `vmfault` maps them, so the
+lazy arm leaves `M` equal (Rocq's `umem_grow` exposes the same zeros).
 
 Interrupts may be on (`wpNext`, as `growproc`); `kmem` must not be held
 (growproc's uvmalloc takes it).
@@ -85,7 +89,7 @@ def sysSbrkOk (V V' : ProcPriv) (M M' : Nat → List (BitVec 8)) (v0 v1 r : BitV
      -- LAZY: the size alone moves, inside the user region, without wrapping
      (¬ sysSbrkEager v1 ∧ 0 ≤ (sysSbrkArg v0).toInt ∧
        V.sz.toNat + (sysSbrkArg v0).toInt.toNat ≤ uvmMaxsz ∧
-       V' = { V with sz := V.sz + sysSbrkArg v0 } ∧
+       V' = { V with sz := V.sz + sysSbrkArg v0, pvLazy := true } ∧
        V.sz.toNat ≤ (V.sz + sysSbrkArg v0).toNat ∧ M' = M)))
 
 /-- **WP of `sys_sbrk()`**, at either `SIE`. -/

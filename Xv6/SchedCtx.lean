@@ -518,11 +518,13 @@ def procFieldsNoctx (pa : BitVec 64) (dq : DFrac) (V : ProcPriv) : IProp GF := i
   pnameCells pa dq V.name
 
 /-- `procDormant` minus its context cells (a ZOMBIE still carries its
-address space and trapframe page). -/
+address space and trapframe page); the lazy bit SET, as in `procDormant`
+(`kexit`'s park raises it). -/
 def procDormantNoctx (pa : BitVec 64) (st : BitVec 32) : IProp GF := iprop%
   ⌜st = UNUSED ∨ st = ZOMBIE⌝ ∗
   ∃ (V : ProcPriv) (pid : BitVec 32),
-    ⌜V.ofile = List.replicate NOFILE 0#64 ∧ V.cwd = 0#64 ∧ V.sz.toNat ≤ uvmMaxsz⌝ ∗
+    ⌜V.ofile = List.replicate NOFILE 0#64 ∧ V.cwd = 0#64 ∧ V.sz.toNat ≤ uvmMaxsz ∧
+      V.pvLazy = true⌝ ∗
     wordPointsTo (pPid pa) 4 pidPriv pid ∗
     procFieldsNoctx pa (DFrac.own 1) V ∗
     dormantSpace st V pid
@@ -546,6 +548,17 @@ theorem contextCells_to_ctxCells (pa : BitVec 64) (ws : List (BitVec 64)) :
 theorem ctxCells_to_contextCells (pa : BitVec 64) (ws : List (BitVec 64)) :
     ctxCells (GF := GF) (pContext pa 0) ws ⊢ contextCells pa (DFrac.own 1) ws := by
   rw [contextCells_ctxCells]
+
+/-- The lazy bit is not a cell (Rocq `upd_lazy`): writing it moves none of
+the block's resources. -/
+theorem procFieldsNoctx_pvLazy (pa : BitVec 64) (dq : DFrac) (V : ProcPriv) (b : Bool) :
+    procFieldsNoctx (GF := GF) pa dq { V with pvLazy := b } = procFieldsNoctx pa dq V := rfl
+
+theorem procFields_pvLazy (pa : BitVec 64) (dq : DFrac) (V : ProcPriv) (b : Bool) :
+    procFields (GF := GF) pa dq { V with pvLazy := b } = procFields pa dq V := rfl
+
+theorem dormantSpace_pvLazy (st : BitVec 32) (V : ProcPriv) (b : Bool) (pid : BitVec 32) :
+    dormantSpace (GF := GF) st { V with pvLazy := b } pid = dormantSpace st V pid := rfl
 
 /-- `dormantSpace` does not look at the saved context. -/
 theorem dormantSpace_context (st : BitVec 32) (V : ProcPriv) (vs : List (BitVec 64))
@@ -755,7 +768,8 @@ instance instCtxMorphProcDormantNoctx (tier : KTier) (pa : BitVec 64) (st : BitV
   @instCtxMorphSep hlc GF _ (fun _ => iprop(⌜st = UNUSED ∨ st = ZOMBIE⌝)) _ (instCtxMorphConst _)
     (@instCtxMorphExists hlc GF _ _
       (fun (V : ProcPriv) ξ => iprop(∃ pid : BitVec 32,
-        ⌜V.ofile = List.replicate NOFILE 0#64 ∧ V.cwd = 0#64 ∧ V.sz.toNat ≤ uvmMaxsz⌝ ∗
+        ⌜V.ofile = List.replicate NOFILE 0#64 ∧ V.cwd = 0#64 ∧ V.sz.toNat ≤ uvmMaxsz ∧
+      V.pvLazy = true⌝ ∗
         @wordPointsTo hlc GF _ ⟨ξ, tier⟩ (pPid pa) 4 pidPriv pid ∗
         @procFieldsNoctx hlc GF _ ⟨ξ, tier⟩ pa (DFrac.own 1) V ∗
         @dormantSpace hlc GF _ ⟨ξ, tier⟩ st V pid))
@@ -769,7 +783,9 @@ instance instCtxMorphProcDormantNoctx (tier : KTier) (pa : BitVec 64) (st : BitV
 running process's block, whose save area lives in the lock's RUNNING arm,
 not here).  The four current-process syscalls take THIS, never the full
 `procPriv` -- the save area is owned by `runSlotAt` and read out of
-`p->lock` only where a `swtch` needs it (`kexit`; cf. `yield`). -/
+`p->lock` only where a `swtch` needs it (`kexit`; cf. `yield`).  Its last
+conjunct is what the lazy bit claims (`ProcPriv.pvLazy`, at Rocq
+`proc_priv_core`'s place). -/
 def procPrivNoctxAt (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) : IProp GF := iprop%
   ⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧
@@ -777,7 +793,8 @@ def procPrivNoctxAt (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPri
   @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗
   @procFieldsNoctx hlc GF _ ⟨ξ, KTier.kpt⟩ pa (DFrac.own 1) V ∗
   @procPtAt hlc GF _ ⟨ξ, KTier.kpt⟩ V.upt M ∗
-  @tfPageAt hlc GF _ ⟨ξ, KTier.kpt⟩ V.upt.tfp V.tf
+  @tfPageAt hlc GF _ ⟨ξ, KTier.kpt⟩ V.upt.tfp V.tf ∗
+  ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝
 
 instance instCtxMorphProcPrivNoctxAt (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) :
@@ -787,7 +804,7 @@ instance instCtxMorphProcPrivNoctxAt (pa : BitVec 64) (pid : BitVec 32) (V : Pro
     (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
       (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphProcFieldsNoctx _ _ _ _)
         (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphProcPtAt _ _ _)
-          (instCtxMorphTfPageAt _ _ _))))
+          (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphTfPageAt _ _ _) (instCtxMorphConst _)))))
 
 /-- The running block at an explicit descriptor `P'` (`EitherDefs.procPrivExt`
 ctx-free): the table `copyout`/`copyin`'s lazy faults grew, named rather than
@@ -802,7 +819,8 @@ def procPrivExtNoctxAt (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : Proc
   @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗
   @procFieldsNoctx hlc GF _ ⟨ξ, KTier.kpt⟩ pa (DFrac.own 1) V ∗
   @procPtAt hlc GF _ ⟨ξ, KTier.kpt⟩ P' M' ∗
-  @tfPageAt hlc GF _ ⟨ξ, KTier.kpt⟩ P'.tfp V.tf
+  @tfPageAt hlc GF _ ⟨ξ, KTier.kpt⟩ P'.tfp V.tf ∗
+  ⌜V.pvLazy = false → lazyFree P'.um V.sz⌝
 
 theorem procPrivExtNoctxAt_eq (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (P' : UPtd) (M' : Nat → List (BitVec 8)) :
@@ -840,7 +858,8 @@ instance instCtxMorphProcDormant (tier : KTier) (pa : BitVec 64) (st : BitVec 32
   @instCtxMorphSep hlc GF _ (fun _ => iprop(⌜st = UNUSED ∨ st = ZOMBIE⌝)) _ (instCtxMorphConst _)
     (@instCtxMorphExists hlc GF _ _
       (fun (V : ProcPriv) ξ => iprop(∃ pid : BitVec 32,
-        ⌜V.ofile = List.replicate NOFILE 0#64 ∧ V.cwd = 0#64 ∧ V.sz.toNat ≤ uvmMaxsz⌝ ∗
+        ⌜V.ofile = List.replicate NOFILE 0#64 ∧ V.cwd = 0#64 ∧ V.sz.toNat ≤ uvmMaxsz ∧
+      V.pvLazy = true⌝ ∗
         @wordPointsTo hlc GF _ ⟨ξ, tier⟩ (pPid pa) 4 pidPriv pid ∗
         @procFields hlc GF _ ⟨ξ, tier⟩ pa (DFrac.own 1) V ∗
         @dormantSpace hlc GF _ ⟨ξ, tier⟩ st V pid))

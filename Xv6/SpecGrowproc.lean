@@ -9,6 +9,12 @@ running process's private block WITHOUT the 14 context words, which the
 lock's RUNNING arm owns) -- the same block the current-process syscalls
 (`sys_sbrk`, its one caller) hold.
 
+THE LAZY BIT is kept (`growprocOk`'s `V'` is `V` with `sz` and `upt`
+replaced, Rocq's `pv_lazy V` unchanged): the grow maps exactly the run that
+became live and the shrink unmaps only above the new break, so the block's
+`V.pvLazy = false → lazyFree` claim is re-established on every arm (Rocq
+`ProofGrowproc`: `lazy_free_of_covered`, `lazy_free_del_run`).
+
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import MachCSL.WpSmodeFrame

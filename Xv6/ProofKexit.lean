@@ -117,12 +117,16 @@ theorem kx_dormant_build (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : Pr
       @stackOwn hlc GF _ ⟨ξ, KTier.kpt⟩ (V.kstack + 4096#64) 512 ⊢
       @procDormantNoctx hlc GF _ ⟨ξ, KTier.kpt⟩ pa ZOMBIE := by
   unfold procPrivNoctxAt procDormantNoctx
-  iintro ⟨⟨%hpure, Hpid, Hfields, Hpt, Htf⟩, Hstk⟩
+  iintro ⟨⟨%hpure, Hpid, Hfields, Hpt, Htf, -⟩, Hstk⟩
   isplitl []
   · ipureintro; right; rfl
-  iexists V, pid
+  -- THE PARK RAISES THE LAZY BIT (Rocq `proc_priv_to_dormant_zombie`'s
+  -- `upd_lazy (us_V U) true`): a dormant block sits at `true`, where the
+  -- claim is vacuous; the bit is not a cell, so nothing else moves.
+  iexists { V with pvLazy := true }, pid
+  simp only [procFieldsNoctx_pvLazy, dormantSpace_pvLazy]
   isplitl []
-  · ipureintro; exact ⟨hof, hcwd, hpure.1⟩
+  · ipureintro; exact ⟨hof, hcwd, hpure.1, trivial⟩
   iframe Hpid Hfields
   unfold dormantSpace
   rw [if_neg (by decide : ¬ (ZOMBIE = UNUSED))]
@@ -553,6 +557,7 @@ theorem kx_rest (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP) (SC 
     (status : BitVec 64) (spval : BitVec 64) (availval : Nat)
     (hV : V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧
       V.pagetable = pageAddr V.upt.root ∧ V.trapframe = pageAddr V.upt.tfp)
+    (hlz : V.pvLazy = false → lazyFree V.upt.um V.sz)
     (hinit : procAddr j ≠ ip)
     (c : CPU) (k : KCtx) (hf : kxFrame k j status spval availval) :
     kctx c k ∗ pcIs c (KA.«kexit» + 0x4c#64) ∗ procsInv Γ ∗ trapCsrs c ∗ cpuClaim c (procAddr j) ∗ intrRes c ∗
@@ -942,7 +947,8 @@ theorem kx_rest (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP) (SC 
     iintro ⟨Hpid, Hks, Hsz, Hpg, Htf, Hcwd, Hname, Hofile, HPt, HTf⟩
     isplitl []
     · ipureintro; exact hV
-    iframe) $$ [$Hpid $Hks $Hsz $Hpg $Htf $Hcwd $Hname $Hofile $HPt $HTf]
+    iframe
+    ipureintro; exact hlz) $$ [$Hpid $Hks $Hsz $Hpg $Htf $Hcwd $Hname $Hofile $HPt $HTf]
   ihave Hwand : (stackOwn (GF := GF) spval availval -∗ parkPay (procAddr j) ZOMBIE)
     $$ [Hpriv Hframe Hcloser]
   case' _ =>
@@ -1040,9 +1046,9 @@ theorem kexit_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) 
          ([∗list] i ↦ f ∈ V.ofile, wordPointsTo (pOfile (procAddr j) i) 8 (DFrac.own 1) f)) ∗
        wordPointsTo (pCwd (procAddr j)) 8 (DFrac.own 1) V.cwd ∗
        pnameCells (procAddr j) (DFrac.own 1) V.name) ∗
-      procPtAt V.upt M ∗ tfPageAt V.upt.tfp V.tf from by
+      procPtAt V.upt M ∗ tfPageAt V.upt.tfp V.tf ∗ ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝ from by
     unfold procPrivNoctxAt procFieldsNoctx ofileCells; iintro H; iexact H) $$ Hpriv
-    with ⟨%hVpure, Hpid, ⟨Hks, Hsz, Hpg, Htf, ⟨%hoflen, Hbig⟩, Hcwd, Hname⟩, HPt, HTf⟩
+    with ⟨%hVpure, Hpid, ⟨Hks, Hsz, Hpg, Htf, ⟨%hoflen, Hbig⟩, Hcwd, Hname⟩, HPt, HTf, %hlz⟩
   -- the prologue: c.addi16sp sp,-48 ; six sd ; c.addi4spn s0,sp,48
   k_step (wp_s_push cpu _ KA.«kexit» true 4048#12 6 hK6 kx_imm_m48)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -1175,7 +1181,7 @@ theorem kexit_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) 
           stackOwn (V.kstack + 4096#64) 512) ∗
         isLock γw waitLockAddr "wait_lock" waitLockPay ∗ initprocIs ip)
       (fun c' kk hkk => kx_rest AC RE RP WU SC Γ γw j hj pid V M ip (k.regs 10#5)
-        (k.regs 2#5 - 8#64 * BitVec.ofNat 64 6) (k.avail - 6) hVpure hinit c' kk hkk)
+        (k.regs 2#5 - 8#64 * BitVec.ofNat 64 6) (k.avail - 6) hVpure hlz hinit c' kk hkk)
       15 0 (by decide) cpu _ V.ofile ?hkframe ?h9 hoflen (fun i hi => absurd hi (Nat.not_lt_zero i)))
     $$ [- $Hk $Hpc $Hpinv $Htc $Hclaim $Hres $Hbig $Hpid $Hks $Hsz $Hpg $Htf $Hcwd $Hname
         $HPt $HTf $Hframe $Hcloser $Hwl $Hinit]

@@ -112,6 +112,20 @@ structure ProcPriv where
   cwd : BitVec 64
   /-- the 16 bytes of `p->name` -/
   name : List (BitVec 8)
+  /-- **The lazy-page bit** (Rocq `ProcDefs.pv_lazy`): "this process MAY
+  have pages the kernel has promised and not yet mapped".  What it MEANS is
+  the claim every live block carries beside `umBelow`:
+
+    `V.pvLazy = false → lazyFree V.upt.um V.sz`
+
+  i.e. at `false` every page below the break is in the table.  STORED, not
+  computed (Rocq's reason: `vmfault` maps pages across a trap the process
+  cannot see, so a computed verdict would move where a stored one does
+  not), and monotone the safe way: `true` promises nothing, so only
+  `sys_sbrk`'s lazy grow has to raise it, and a dormant slot sits at
+  `true`.  Not a cell: nothing in `struct proc` stores it and `procFields`
+  does not mention it.  LAST in the record, as in Rocq. -/
+  pvLazy : Bool
 
 /-- `p->name` is a C string: a NUL somewhere in its 16 bytes (Rocq `pname_wf`). -/
 def pnameWf (bs : List (BitVec 8)) : Prop := bs.length = PNAMELEN ∧ ∃ j, j < PNAMELEN ∧ bs[j]? = some 0#8
@@ -150,8 +164,9 @@ def pidLockQ : DFrac := DFrac.own (Qp.half (Qp.half 1))
 
 /-- The private block of a running process (Rocq `proc_priv_bare`, and
 `proc_priv_core` minus the cwd inode reference): the size bounds, half of
-`p->pid`, the private fields, the address space at the view `M` and the
-trapframe page. -/
+`p->pid`, the private fields, the address space at the view `M`, the
+trapframe page, and -- at Rocq `proc_priv_core`'s place, after the
+trapframe page -- what the lazy bit claims (`ProcPriv.pvLazy`). -/
 def procPriv (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
     IProp GF := iprop%
   ⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧
@@ -159,7 +174,8 @@ def procPriv (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List
   wordPointsTo (pPid pa) 4 pidPriv pid ∗
   procFields pa (DFrac.own 1) V ∗
   procPtAt V.upt M ∗
-  tfPageAt V.upt.tfp V.tf
+  tfPageAt V.upt.tfp V.tf ∗
+  ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝
 
 /-! ## The public part (Rocq `SchedCtx.proc_pub`, `proc_held`) -/
 
@@ -195,11 +211,15 @@ def dormantSpace (st : BitVec 32) (V : ProcPriv) (pid : BitVec 32) : IProp GF :=
 existential values, no open files, no cwd (Rocq `proc_dormant`; its file
 descriptor / inode / buffer allowances are not ported).  A ZOMBIE keeps
 its address space and trapframe page until `wait` reaps it; `freeproc`
-empties them and the slot becomes UNUSED. -/
+empties them and the slot becomes UNUSED.  The lazy bit is SET (Rocq
+`proc_dormant`'s `pv_lazy V = true`): the block invariant's claim is vacuous
+there, which is what lets `allocproc` hand out an empty table with nothing
+to prove; `freeproc` and `kexit`'s park write it (it is not a cell). -/
 def procDormant (pa : BitVec 64) (st : BitVec 32) : IProp GF := iprop%
   ⌜st = UNUSED ∨ st = ZOMBIE⌝ ∗
   ∃ (V : ProcPriv) (pid : BitVec 32),
-    ⌜V.ofile = List.replicate NOFILE 0#64 ∧ V.cwd = 0#64 ∧ V.sz.toNat ≤ uvmMaxsz⌝ ∗
+    ⌜V.ofile = List.replicate NOFILE 0#64 ∧ V.cwd = 0#64 ∧ V.sz.toNat ≤ uvmMaxsz ∧
+      V.pvLazy = true⌝ ∗
     wordPointsTo (pPid pa) 4 pidPriv pid ∗
     procFields pa (DFrac.own 1) V ∗
     dormantSpace st V pid

@@ -11,6 +11,7 @@ THE FRAME (`addi sp,sp,-64`, `ra`/`s0`/`s1` saved; `s0` = the entry `sp`):
 `sysPipeFrame` is `frame8s1` with those cells named (`rf`/`wf` kept apart:
 they are pipealloc's out-parameters).
 -/
+import Xv6.LazyFree
 import Xv6.SpecSysPipe
 import Xv6.SpecMyproc
 import Xv6.ArgLemmas
@@ -466,7 +467,8 @@ def sysPipeCoreRest (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) : IProp GF
   @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pTrapframe pa) 8 (DFrac.own 1) V.trapframe ∗
   @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pCwd pa) 8 (DFrac.own 1) V.cwd ∗
   @pnameCells hlc GF _ ⟨curCtx, KTier.kpt⟩ pa (DFrac.own 1) V.name ∗
-  @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf
+  @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf ∗
+  ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝
 
 /-- The trapframe cell and page `argaddr` reads, out and back. -/
 theorem sys_pipe_core_tf (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
@@ -477,13 +479,15 @@ theorem sys_pipe_core_tf (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : 
       (@wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pTrapframe pa) 8 (DFrac.own 1) V.trapframe -∗
         @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf -∗ procPrivCoreNoctxAt curCtx pa pid V M) := by
   unfold procPrivCoreNoctxAt procFieldsNoOfile
-  iintro ⟨%hf, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm⟩, Hpt, Htfp⟩
+  iintro ⟨%hf, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm⟩, Hpt, Htfp, %hlz⟩
   iframe Htf Htfp
   isplitl []
   · ipureintro; exact hf.2.2.2
   iintro Htf Htfp
   iframe Hpid Hks Hsz Hpg Htf Hcwd Hnm Hpt Htfp
-  ipureintro; exact hf
+  isplitl []
+  · ipureintro; exact hf
+  · ipureintro; exact hlz
 
 theorem sys_pipe_core_split (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
     procPrivCoreNoctxAt (GF := GF) curCtx pa pid V M ⊢
@@ -507,7 +511,8 @@ def sysPipeCoreExt (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
   @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗
   @procFieldsNoOfile hlc GF _ ⟨curCtx, KTier.kpt⟩ pa (DFrac.own 1) V ∗
   @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P' M' ∗
-  @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P'.tfp V.tf
+  @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P'.tfp V.tf ∗
+  ⌜V.pvLazy = false → lazyFree P'.um V.sz⌝
 
 theorem sysPipeCoreExt_eq (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
     (M' : Nat → List (BitVec 8)) :
@@ -525,9 +530,11 @@ theorem sys_pipe_core_ext (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' 
       sysPipeCoreExt pa pid V P' M' := by
   unfold sysPipeCoreExt sysPipeCoreRest procFieldsNoOfile
   rw [hext.1.1, hext.1.2.1]
-  iintro ⟨Hsz, Hpg, Hpt, Hpid, Hks, Htf, Hcwd, Hnm, Htfp⟩
+  iintro ⟨Hsz, Hpg, Hpt, Hpid, Hks, Htf, Hcwd, Hnm, Htfp, %hlz⟩
   iframe Hsz Hpg Hpt Hpid Hks Htf Hcwd Hnm Htfp
-  ipureintro; exact ⟨hf.1, UMemL.umBelow_extSz hf.2.1 hext, hf.2.2.1, hf.2.2.2⟩
+  isplitl []
+  · ipureintro; exact ⟨hf.1, UMemL.umBelow_extSz hf.2.1 hext, hf.2.2.1, hf.2.2.2⟩
+  · ipureintro; exact fun h => LazyFree.lazyFree_extSz hext (hlz h)
 
 /-- Close at the entry space (no copyout ran). -/
 theorem sys_pipe_core_join (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))

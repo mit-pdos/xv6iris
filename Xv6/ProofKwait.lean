@@ -45,6 +45,7 @@ The outer driver is `kw_scan` (the 64-slot fuel scan via `kw_slot`, model
 `wpNext true` crossing), and `kw_loop` (the `iloeb` outer loop, model
 `ap_pidloop`), wired to the loop head at `(KernelSyms.«kwait» + 0xee)`.
 -/
+import Xv6.LazyFree
 import MachCSL.WpSmodeFrame
 import MachCSL.ByteWord
 import Xv6.UPtLemmas
@@ -364,7 +365,7 @@ theorem kw_dormant_freeprocIn (pa : BitVec 64) :
       ∃ (V : ProcPriv) (pid : BitVec 32) (M : Nat → List (BitVec 8)),
         freeprocIn pa pid V M := by
   unfold procDormant
-  iintro ⟨%_, %V, %pid, %⟨hof, hcwd, hsz⟩, Hpid, Hfields, Hspace⟩
+  iintro ⟨%_, %V, %pid, %⟨hof, hcwd, hsz, -⟩, Hpid, Hfields, Hspace⟩
   unfold dormantSpace
   rw [if_neg (by decide : ¬ (ZOMBIE = UNUSED))]
   icases Hspace with ⟨%M, %⟨hpt, htf, humb⟩, Hpt, Htf, Hstack⟩
@@ -449,7 +450,8 @@ def kwRest (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) : IProp GF := iprop
   @ofileCells hlc GF _ ⟨curCtx, KTier.kpt⟩ pa (DFrac.own 1) V.ofile ∗
   @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pCwd pa) 8 (DFrac.own 1) V.cwd ∗
   @pnameCells hlc GF _ ⟨curCtx, KTier.kpt⟩ pa (DFrac.own 1) V.name ∗
-  @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf
+  @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf ∗
+  ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝
 
 /-- Split off the two fields `copyout` reads and the address space it grows;
 `⟨curCtx, kpt⟩` is the ambient context, so these cells are `copyout`'s. -/
@@ -478,10 +480,11 @@ theorem kw_priv_close (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UP
       procPrivExtNoctxAt (GF := GF) curCtx pa pid V P' M' := by
   unfold procPrivExtNoctxAt kwRest procFieldsNoctx
   rw [hext.1.1, hext.1.2.1]
-  iintro ⟨Hszc, Hpgc, Hspace, Hpid, Hks, Htfc, Hof, Hcwd, Hnm, Htfp⟩
+  iintro ⟨Hszc, Hpgc, Hspace, Hpid, Hks, Htfc, Hof, Hcwd, Hnm, Htfp, %hlz⟩
   isplitl []
   · ipureintro; exact ⟨hf.1, UMemL.umBelow_extSz hf.2.1 hext, hf.2.2.1, hf.2.2.2⟩
   · iframe
+    ipureintro; exact fun h => LazyFree.lazyFree_extSz hext (hlz h)
 
 end
 

@@ -11,6 +11,7 @@ The block is split for argraw only (`argstr_priv_split`: the `p->trapframe` cell
 and the trapframe page) and closed again before fetchstr, which takes it
 whole; fetchstr's post is argstr's, at the address argraw returned.
 -/
+import Xv6.LazyFree
 import Xv6.SpecArgstr
 import Xv6.CodeTactics
 
@@ -66,7 +67,8 @@ def argstrRest [CurCtx] (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : U
   wordPointsTo (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
   wordPointsTo (pCwd pa) 8 (DFrac.own 1) V.cwd ∗
   pnameCells pa (DFrac.own 1) V.name ∗
-  procPtAt P M
+  procPtAt P M ∗
+  ⌜V.pvLazy = false → lazyFree P.um V.sz⌝
 
 theorem argstr_priv_split [X : CurCtx] (ξ : CtxId) (hX : X = ⟨ξ, KTier.kpt⟩) (pa : BitVec 64)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
@@ -77,12 +79,13 @@ theorem argstr_priv_split [X : CurCtx] (ξ : CtxId) (hX : X = ⟨ξ, KTier.kpt�
       tfPageAt V.upt.tfp V.tf ∗ argstrRest pa pid V V.upt M := by
   subst hX
   unfold procPrivCoreNoctxAt argstrRest procFieldsNoOfile
-  iintro ⟨%hf, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm⟩, Hpt, Htfp⟩
+  iintro ⟨%hf, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm⟩, Hpt, Htfp, %hlz⟩
   obtain ⟨h1, h0, h2, h3⟩ := hf
   rw [h3]
   isplitl []
   · ipureintro; exact ⟨h1, h0, h2, rfl⟩
   · iframe
+    ipureintro; exact hlz
 
 theorem argstr_priv_close [X : CurCtx] (ξ : CtxId) (hX : X = ⟨ξ, KTier.kpt⟩) (pa : BitVec 64)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
@@ -94,10 +97,11 @@ theorem argstr_priv_close [X : CurCtx] (ξ : CtxId) (hX : X = ⟨ξ, KTier.kpt�
   unfold procPrivCoreNoctxAt argstrRest procFieldsNoOfile
   obtain ⟨h1, h0, h2, h3⟩ := hf
   rw [← h3]
-  iintro ⟨Htf, Htfp, Hpid, Hks, Hsz, Hpg, Hcwd, Hnm, Hpt⟩
+  iintro ⟨Htf, Htfp, Hpid, Hks, Hsz, Hpg, Hcwd, Hnm, Hpt, %hlz⟩
   isplitl []
   · ipureintro; exact ⟨h1, h0, h2, rfl⟩
   · iframe
+    ipureintro; exact hlz
 
 variable [CurCtx]
 
