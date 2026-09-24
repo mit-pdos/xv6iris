@@ -4,6 +4,11 @@ grown (`uvmalloc`, refused above `TRAPFRAME` or when the allocator is
 dry, `-1`) or shrunk (`uvmdealloc`), `p->sz` updated.  Uncounted; needs
 46 slots (4 + `uvmalloc`'s 42).
 
+The block is `procPrivNoctxAt curCtx` (Rocq `ProcInv.proc_priv`: the
+running process's private block WITHOUT the 14 context words, which the
+lock's RUNNING arm owns) -- the same block the current-process syscalls
+(`sys_sbrk`, its one caller) hold.
+
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import MachCSL.WpSmodeFrame
@@ -41,12 +46,12 @@ def wp_growproc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : growprocSlots ≤ k.avail) (hlk : "kmem" ∉ k.locks)
     (htier : k.tier = KTier.kpt) : Prop :=
   kctx cpu k ∗ pcIs cpu growprocAddr ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
-  procPriv (procAddr j) pid V M ∗
+  procPrivNoctxAt curCtx (procAddr j) pid V M ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
     ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     (∃ (V' : ProcPriv) (M' : Nat → List (BitVec 8)),
-      ⌜growprocOk V V' M M' (k.regs 10#5) (R' 10#5)⌝ ∗ procPriv (procAddr j) pid V' M') -∗
+      ⌜growprocOk V V' M M' (k.regs 10#5) (R' 10#5)⌝ ∗ procPrivNoctxAt curCtx (procAddr j) pid V' M') -∗
     ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 

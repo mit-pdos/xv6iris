@@ -693,3 +693,6 @@ import Xv6.LinkFetchstr
 import Xv6.SpecArgstr
 import Xv6.ProofArgstr
 import Xv6.LinkArgstr
+import Xv6.SpecSysSbrk
+import Xv6.ProofSysSbrk
+import Xv6.LinkSysSbrk
