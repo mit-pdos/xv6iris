@@ -1753,3 +1753,5 @@ PipesFire.v
 UShPipesDefs.v
 UShPipesStage.v
 UShPipesNode.v
+PipesLedPure.v
+PipesOut.v
