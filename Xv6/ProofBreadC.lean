@@ -538,6 +538,220 @@ theorem bd_bwd (c : CPU) (kc : KCtx) (hsie : kc.sie = false)
         (bdOther_set R0 Rc2 hoth2 9#5 _ (Or.inl rfl)))
       iframe Hk Hpc Hscan Hrec Hpan
 
+set_option maxHeartbeats 16000000 in
+/-- **THE HIT**, from `bread+0x48`: `b->refcnt++`, release, `acquiresleep`,
+and on to the join at `bread+0xb4`.
+
+`kc` is the critical section's context (bread's body context with
+`bcache.lock`'s `push_off` on top); `hpopk` is what the release's `pop_off`
+restores, which the caller discharges at the concrete context. -/
+theorem bd_hit (RE : RELEASE_HOOK) (AS : ACQUIRESLEEP_LLB) (VR : VIRTIO_DISK_RW)
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (c cpu : CPU) (k0 kc : KCtx) (spa spb : Bool) (R0 Rc : RegMap)
+    (γl : GName) (γ : BcacheNames) (V : BioView) (γdl : GName) (pd pav pu : BitVec 64)
+    (j kk tl : Nat) (M : RegMapF Nat) (nx : Nat) (Ls : Nat → List Nat) (ord : List Nat)
+    (devs bnos : Nat → BitVec 32) (pidv dev bno : BitVec 32) (dqp : DFrac)
+    (hj : j < NPROC) (hproc : k0.proc = procAddr j) (hK : breadSlots ≤ k0.avail)
+    (hsie0 : k0.sie = false) (hnoff : k0.noff = 0) (hlocks : k0.locks = [])
+    (htier : k0.tier = KTier.kpt)
+    (hsie : kc.sie = false) (hcnoff : 1 ≤ kc.noff) (hcav : panicSlots ≤ kc.avail)
+    (hcreen : (decide (kc.noff = 1) && kc.intena) = false)
+    (hpopk : ∀ R' : RegMap,
+      ((kc.popExit false).withLocks
+          (List.filter (fun x => decide (x ≠ "bcache")) kc.locks)).withRegs R'
+      = ((k0.withSpie spa spb).pushed 6).withRegs R')
+    (hbno : bno.toNat < 2 ^ 31) (hcov : bno.toNat ∈ V.cov) (hdev : dev = V.dev)
+    (hpd : descPageRw pd) (hkk : kk < NBUF) (hdv : devs kk = dev) (hbn : bnos kk = bno)
+    (hfresh : ∀ i, nx ≤ i → PartialMap.get? M i = none) (hok : bcacheOk M Ls)
+    (hord : ord.Perm (List.range NBUF)) (hinj : bcacheInj V bnos) (hdevp : bcacheDev V devs bnos)
+    (hregs : bdFwdRegs dev bno kk Rc) (hoth : bdOther R0 Rc)
+    (hR2 : R0 2#5 = k0.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64) (hpins : bdPins k0 R0)
+    (hpin : true = false ∨ k0.proc = 0#64 → c = cpu) :
+    kctx c (kc.withRegs Rc) ∗ pcIs c (KA.«bread» + 0x48#64) ∗
+    bdScan γ V tl M Ls ord devs bnos ∗ ctxFloor curCtx tl ∗ topLb tl ∗ locked γl c ∗
+    bioCtx γl γ V ∗ diskCaps V.gd γdl pd pav pu ∗ bslot γ ∗
+    frame6s3 (k0.regs 2#5) (k0.regs 1#5) (k0.regs 8#5) (k0.regs 9#5)
+      (k0.regs 18#5) (k0.regs 19#5) ∗
+    procsInv Γ ∗ trapCsrs c ∗ cpuClaim c k0.proc ∗ intrRes c ∗
+    wordPointsTo (pPid k0.proc) 4 dqp pidv ∗
+    wpNext true k0.proc cpu (fun cpu' => iprop(∀ (spie2 spp2 : Bool) (R' : RegMap) (kk2 : Nat)
+        (bs2 : List (BitVec 8)),
+      ⌜calleeSaved k0.regs R' ∧ R' 10#5 = bnode kk2⌝ -∗
+      kctx cpu' ((k0.withSpie spie2 spp2).withRegs R') -∗ pcIs cpu' (jumpPc (k0.regs 1#5)) -∗
+      trapCsrs cpu' -∗ cpuClaim cpu' k0.proc -∗ intrRes cpu' -∗
+      wordPointsTo (pPid k0.proc) 4 dqp pidv -∗
+      bufHold0 γ V kk2 pidv dev bno bs2 bs2 -∗ wpLoop cpu'))
+    ⊢ wpLoop (GF := GF) c := by
+  obtain ⟨h9, h14, h18, h19⟩ := hregs
+  iintro ⟨Hk, Hpc, Hscan, #Hfl, #Htl, Hlocked, #Hbc, #Hdc, Hsl, Hframe, Hpi, Htc, Hcl, Hir,
+    Hpid, Hnext⟩
+  icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
+  ihave #Hpi := (show procsInv (GF := GF) Γ ⊢ procsInv Γ from by iintro H; iexact H) $$ Hpi
+  ihave #Hbox := bioCtx_box γl γ V kk hkk $$ Hbc
+  ihave #Hslk := bioCtx_buf γl γ V kk hkk $$ Hbc
+  ihave #Hlk := (show bioCtx (GF := GF) γl γ V ⊢
+      isLock γl bcacheLockAddr "bcache" (bcacheResAt γ V) from by
+    unfold bioCtx isBcache; iintro ⟨H, -, -⟩; iexact H) $$ Hbc
+  icases bdScan_unpack γ V tl M Ls ord devs bnos $$ Hscan with ⟨Ha, Hlru, Hpool, Hkey, Hs⟩
+  icases bslot_upd_acc γ curCtx Ls kk hkk $$ Hs with ⟨Hsl0, Hcl2⟩
+  icases bslotAt_elim γ curCtx kk (Ls kk) $$ Hsl0
+    with ⟨%⟨hnd, hlt⟩, Hrefc, Hhalves, Hslots, Hcnt⟩
+  icases bkey_acc γ curCtx tl devs bnos kk hkk $$ Hkey with ⟨Hkey0, Hkcl⟩
+  icases bkeyAt_elim γ curCtx tl kk (devs kk) (bnos kk) $$ Hkey0 with ⟨Hkd, Hkb, Hkr⟩
+  icases bufSlotRegs_elim (γ.box kk) tl (devs kk) (bnos kk) $$ Hkr
+    with ⟨%r, %⟨hrid, hrtl⟩, Hrd, #Htd⟩
+  obtain ⟨n, hn⟩ : ∃ n, (Ls kk).length = n := ⟨_, rfl⟩
+  have hlen : (nx :: Ls kk).length = n + 1 := by simp only [List.length_cons, hn]
+  ihave Hrefc := (show wordAtN (GF := GF) curCtx (aBufRefcnt (bnode kk)) 4 (DFrac.own 1)
+        (BitVec.ofNat 32 (Ls kk).length) ⊢
+      wordPointsTo (bnode kk + BitVec.signExtend 64 64#12) 4 (DFrac.own 1)
+        (BitVec.ofNat 32 n) from by
+    rw [wordAtN_cur, aBufRefcnt_eq, hn]) $$ Hrefc
+  -- c.lw a5,64(s1) ; c.addiw a5,a5,1 ; c.sw a5,64(s1)
+  k_step (wp_s_lw c _ (KA.«bread» + 0x48#64) true 64#12 15#5 9#5 (by decide) (by decide)
+      (DFrac.own 1) (BitVec.ofNat 32 n))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9]
+  iintro Hk Hpc Hrefc
+  k_step (wp_s_addiw c _ (KA.«bread» + 0x4a#64) true 1#12 15#5 15#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  iintro Hk Hpc
+  k_step (wp_s_sw c _ (KA.«bread» + 0x4c#64) true 64#12 9#5 15#5 (by decide)
+      (BitVec.ofNat 32 n))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, bc_incr n, bc_incr' n]
+  iintro Hk Hpc Hrefc
+  ihave Hrefc := (show wordPointsTo (GF := GF) (bnode kk + 64#64) 4 (DFrac.own 1)
+        (BitVec.ofNat 32 n + 1#32) ⊢
+      wordAtN curCtx (aBufRefcnt (bnode kk)) 4 (DFrac.own 1)
+        (BitVec.ofNat 32 (nx :: Ls kk).length) from by
+    rw [wordAtN_cur, aBufRefcnt_eq', hlen, bc_ofNat32_succ]) $$ Hrefc
+  -- the pin ghost step
+  iapply wpLoop_fupd
+  ihave Hup := bref_alloc_step γ M nx kk (Ls kk) hfresh $$ [Ha Hhalves]
+  case' _ => iframe
+  imod Hup with ⟨Ha, Href, Hhalves', %hnx⟩
+  imod bufEscrow_refIncr V (γ.box kk) kk (1 : Qp).half (1 : Qp).half r (Ls kk).length ⊤
+      bioxN_top hrid.1 $$ [Hbox Hrd Hcnt] with ⟨Hrd, Hcnt, ⟨%Tb, Hbref⟩⟩
+  · iframe Hbox Hrd Hcnt
+  ihave Hbref := (show (boxRef (GF := GF) (γ.box kk) r.ident Tb) ⊢
+      boxRef (γ.box kk) ((dev, bno) : BufId) Tb from by
+    rw [hrid.2.2, hdv, hbn]) $$ Hbref
+  imodintro
+  icases boxRef_topLb (γ.box kk) ((dev, bno) : BufId) Tb $$ Hbref with ⟨Hbref, #Htb⟩
+  ihave Hkr := bufSlotRegs_intro (γ.box kk) r tl (devs kk) (bnos kk)
+    hrid.1 hrid.2.1 hrid.2.2 hrtl $$ [Hrd Htd]
+  case' _ => iframe Hrd Htd
+  ihave Hkey0 := bkeyAt_intro γ curCtx tl kk (devs kk) (bnos kk) $$ [Hkd Hkb Hkr]
+  case' _ => iframe Hkd Hkb Hkr
+  ihave Hkey := Hkcl $$ Hkey0
+  ihave Hslots := (show bslot (GF := GF) γ ∗ bslots γ (Ls kk).length ⊢
+      bslots γ (nx :: Ls kk).length from by
+    rw [hlen, hn]; exact bslots_cons γ n) $$ [Hsl Hslots]
+  case' _ => iframe
+  icases bslots_bound γ _ $$ Hslots with ⟨Hslots, %hbound⟩
+  have hlt' : (nx :: Ls kk).length < 2 ^ 31 := by
+    rw [hlen] at hbound ⊢
+    unfold BSLOTS at hbound
+    omega
+  have hnd' : (nx :: Ls kk).Nodup := List.nodup_cons.2 ⟨hnx, hnd⟩
+  ihave Hcnt := (show cntHalf (GF := GF) (γ.box kk) ((Ls kk).length + 1) ⊢
+      cntHalf (γ.box kk) (nx :: Ls kk).length from by rw [List.length_cons]) $$ Hcnt
+  ihave Hslot := bslotAt_intro γ curCtx kk (nx :: Ls kk) hnd' hlt'
+    $$ [Hrefc Hhalves' Hslots Hcnt]
+  case' _ => iframe
+  ihave Hs := Hcl2 $$ %(nx :: Ls kk) Hslot
+  ihave Hsc0 := bdScan_pack γ V tl (PartialMap.insert M nx kk) (updAtB Ls kk (nx :: Ls kk))
+    ord devs bnos $$ [Ha Hlru Hpool Hkey Hs]
+  case' _ => iframe Ha Hlru Hpool Hkey Hs
+  ihave Hscan := bdScan_close γ V tl (PartialMap.insert M nx kk) (nx + 1)
+    (updAtB Ls kk (nx :: Ls kk)) ord devs bnos
+    (bpin_fresh M nx kk hfresh) (bpin_bcacheOk M Ls nx kk hkk hok) hord hinj hdevp $$ Hsc0
+  -- auipc a0,0x15 ; addi a0,a0,1482 ; jal release
+  k_step (wp_s_auipc c _ (KA.«bread» + 0x4e#64) false 0x15#20 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  iintro Hk Hpc
+  k_step (wp_s_addi c _ (KA.«bread» + 0x52#64) false 1482#12 10#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bd_lock]
+  iintro Hk Hpc
+  k_step (wp_s_jal c _ (KA.«bread» + 0x56#64) false 2089002#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bd_br_rel]
+  iintro Hk Hpc
+  iapply (bc_release_hook RE c _ γl γ V tl ?ra ?rs ?rn ?rK false ?rr ?ro)
+    $$ [- $Hk $Hpc $Hlk $Hlocked $Htl $Hscan]
+  rotate_right 1
+  k_norm [hpopk, bd_ret_5a]
+  iframe #
+  case ra => k_norm
+  case rs => k_norm
+  case rn => k_norm; omega
+  case rK => k_norm; unfold panicSlots at hcav; omega
+  case rr => k_norm; exact hcreen.symm
+  case ro => intro h; exact absurd h (by decide)
+  isplitl []
+  · rw [popArm_false]; iempintro
+  -- past the release
+  iapply wpNext_intro_pin
+  iintro %c2 %hp2 %R1 Hk Hpc %hcs1
+  have hc2 : c2 = c := hp2 (Or.inl (by first | rfl | (k_norm; exact hsie)))
+  subst hc2
+  k_norm [hpopk, bd_ret_5a]
+  have hsie : k0.sie = false := hsie0
+  unfold calleeSaved at hcs1
+  k_norm at hcs1
+  obtain ⟨b2, b8, b9, b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩ := hcs1
+  have g9 : R1 9#5 = bnode kk := by
+    rw [b9]
+    first
+      | exact h9
+      | (simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h9)
+  -- addi a0,s1,16 ; jal acquiresleep
+  k_step (wp_s_addi c2 _ (KA.«bread» + 0x5a#64) false 16#12 10#5 9#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g9, aBufLock_sext]
+  iintro Hk Hpc
+  k_step (wp_s_jal c2 _ (KA.«bread» + 0x5e#64) false 5056#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bd_br_aslp]
+  iintro Hk Hpc
+  iapply (bd_aslp AS Γ c2 _ γ kk Tb j pidv dqp k0.proc (by k_norm [bd_withSpie_proc]) ?aa ?aj ?ap ?aK ?asi ?an ?alk ?atr)
+    $$ [- $Hk $Hpc $Hpi $Htc $Hcl $Hir $Hslk $Htb $Hpid]
+  rotate_right 1
+  k_norm [bd_ret_62]
+  iframe #
+  case aa => k_norm; exact aBufLock_eq' _
+  case aj => exact hj
+  case ap => k_norm; exact hproc
+  case aK => k_norm; unfold breadSlots panicSlots acquiresleepSlots sleepSlots at *; omega
+  case asi => k_norm
+  case an => k_norm; exact hnoff
+  case alk => k_norm; exact hlocks
+  case atr => k_norm; exact htier
+  -- past acquiresleep: the join
+  iapply wpNext_intro_pin
+  iintro %c3 %hp3 %spie3 %spp3 %R2 %hcs2 Hk Hpc Htc Hcl Hir Hsl2 Hslp Hfl2 Hpid
+  k_norm [bd_ret_62, bd_push_withSpie]
+  unfold calleeSaved at hcs2
+  k_norm at hcs2
+  obtain ⟨e2, e8, e9, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩ := hcs2
+  k_step (wp_s_j c3 _ (KA.«bread» + 0x62#64) true 82#21)
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bd_t_join]
+  iintro Hk Hpc
+  k_norm
+  have hpin3 : true = false ∨ k0.proc = 0#64 → c3 = cpu := fun hh => (hp3 hh).trans (hpin hh)
+  iapply (bd_tail VR Γ c3 cpu k0 spie3 spp3 γl γ V γdl pd pav pu j kk Tb pidv dev bno dqp R2
+      hj hproc hK hsie hnoff hlocks htier hbno hcov hdev hpd hkk
+      ((e2.trans b2).trans ((hoth 2#5 (by decide) (by decide)).trans hR2))
+      (e9.trans g9)
+      (by obtain ⟨q20, q21, q22, q23, q24, q25, q26, q27⟩ := hpins
+          exact ⟨(e20.trans b20).trans ((hoth 20#5 (by decide) (by decide)).trans q20),
+            (e21.trans b21).trans ((hoth 21#5 (by decide) (by decide)).trans q21),
+            (e22.trans b22).trans ((hoth 22#5 (by decide) (by decide)).trans q22),
+            (e23.trans b23).trans ((hoth 23#5 (by decide) (by decide)).trans q23),
+            (e24.trans b24).trans ((hoth 24#5 (by decide) (by decide)).trans q24),
+            (e25.trans b25).trans ((hoth 25#5 (by decide) (by decide)).trans q25),
+            (e26.trans b26).trans ((hoth 26#5 (by decide) (by decide)).trans q26),
+            (e27.trans b27).trans ((hoth 27#5 (by decide) (by decide)).trans q27)⟩)
+      hpin3)
+  iframe Hk Hpc Hframe Hpi Htc Hcl Hir Hpid Hbox Hdc Hsl2 Hslp Hfl2 Hbref Href Hnext
+
+
 end
 
 end Xv6

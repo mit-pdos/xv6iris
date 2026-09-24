@@ -277,20 +277,22 @@ carries becomes the hart-free `MachCSL.ctxFloor curCtx T` the escrow's
 checkout wants. -/
 theorem bd_aslp (AS : ACQUIRESLEEP_LLB) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (c : CPU) (k' : KCtx) (γ : BcacheNames) (kk T j : Nat) (pid : BitVec 32) (dqp : DFrac)
+    (pj : BitVec 64) (hpj : k'.proc = pj)
     (haddr : k'.regs 10#5 = aBufLock (bnode kk))
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : acquiresleepSlots ≤ k'.avail)
     (hsie : k'.sie = false) (hnoff : k'.noff = 0) (hlocks : k'.locks = [])
     (htier : k'.tier = KTier.kpt) :
     kctx c k' ∗ pcIs c KA.«acquiresleep» ∗ procsInv Γ ∗
-    trapCsrs c ∗ cpuClaim c k'.proc ∗ intrRes c ∗
-    isBufSlk γ kk ∗ topLb T ∗ wordPointsTo (pPid k'.proc) 4 dqp pid ∗
-    wpNext true k'.proc c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
+    trapCsrs c ∗ cpuClaim c pj ∗ intrRes c ∗
+    isBufSlk γ kk ∗ topLb T ∗ wordPointsTo (pPid pj) 4 dqp pid ∗
+    wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      trapCsrs cpu' -∗ cpuClaim cpu' k'.proc -∗ intrRes cpu' -∗
+      trapCsrs cpu' -∗ cpuClaim cpu' pj -∗ intrRes cpu' -∗
       sleeplockedQ (γ.slk kk).2 1 (aBufLock (bnode kk)) pid -∗ bufSlpBox γ kk curCtx -∗
-      ctxFloor curCtx T -∗ wordPointsTo (pPid k'.proc) 4 dqp pid -∗ wpLoop cpu'))
+      ctxFloor curCtx T -∗ wordPointsTo (pPid pj) 4 dqp pid -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
+  subst hpj
   have h := AS.wp_acquiresleep_gen_llb (hlc := hlc) (GF := GF) Γ c k' (γ.slk kk).1 (γ.slk kk).2
     (bufSlpBox γ kk) slUntracked 1 j pid dqp T hj hproc hK hsie hnoff hlocks htier
   unfold wp_acquiresleep_gen_llb_body at h
