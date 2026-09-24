@@ -545,3 +545,13 @@ import Xv6.IrefSlots
 import Xv6.InodeRef
 import Xv6.InodeRegionDefs
 import Xv6.InodeRegion
+import Xv6.FileGeom
+import Xv6.IcacheBootDecode
+import Xv6.OffGv
+import Xv6.FileOffCell
+import Xv6.EscrowDefs
+import Xv6.TxPin
+import Xv6.FsStateTop
+import Xv6.FsStateLink
+import Xv6.IcacheRefLink
+import Xv6.IcacheRefGhost

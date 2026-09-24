@@ -81,18 +81,15 @@ Rocq's, over the same algebra.
 
 Nothing.
 
-## IMPORT NOTE (for the coordinator)
+## IMPORT NOTE
 
-`NFILE` lives in `Xv6/FileDefs.lean`, which is a HEAVY file (the ftable
-predicates), not a light geometry file like Rocq's `FdSlots.v`.  Rocq's
-`FileInvDefs.file_core` names `iref_frac` for an FD_INODE file, so when
-the file table's inode arm lands `Xv6/FileDefs.lean` will want to import
-this file -- which imports `Xv6/FileDefs.lean` for `NFILE`.  Moving
-`NFILE` (and `FDSPARE`/`FDSLOTS`) to a light file breaks that cycle before
-it forms.
+`NFILE` comes from the light `Xv6/FileGeom.lean` (Rocq's `FdSlots.v`
+role), not the heavy `Xv6/FileDefs.lean`: when the file table's inode arm
+lands, `FileDefs` will import this file (Rocq's `file_core` names
+`iref_frac`), and that must not be a cycle.
 -/
 import Xv6.ProcDefs
-import Xv6.FileDefs
+import Xv6.FileGeom
 import Iris.Algebra.Auth
 import Iris.Algebra.UFrac
 import Iris.BI.Lib.Fractional

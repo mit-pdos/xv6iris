@@ -39,9 +39,8 @@ the region holds the per-inum MARKER (`imarkKey`) in its place.
 1. **The icache ledger's column values** (`Frzidx`, `Frz`, `FrzUR`,
    `Ctyval`, `CtyUR`, `Ity` from Rocq `Xv6Cameras.v`; `frzIspre` /
    `frzPreb` from `IcacheRefDefs.v`) are imported from
-   `Xv6/IcacheRefDefs.lean`.  Only `rup` / `rcup` (Rocq `IcacheRef.v`) are
-   still hoisted here, because the pure pins of §2b are stated over them;
-   **move them to IcacheRef when it lands.**
+   `Xv6/IcacheRefDefs.lean`; `rup` / `rcup` (Rocq `IcacheRef.v`) are
+   imported from `Xv6/IcacheRefLink.lean`.
 2. **`bv_unsigned` IS `.toNat`**, the port's standing rule (`FsStateInode`
    deviation 3), so every `0 <= _` side condition vanishes and
    `di_nlink_nonneg` is `Nat.zero_le` (kept: `IcacheEscrow.v` cites it).
@@ -81,7 +80,7 @@ all have a consumer, either in a later file
 or in `InodeRegion.v`'s own deferred `Section InodeRegion`.
 -/
 import Xv6.FsStateInode
-import Xv6.IcacheRefDefs
+import Xv6.IcacheRefLink
 import Xv6.FsBytes
 import Iris.Algebra.Excl
 import Iris.Algebra.Frac
@@ -92,15 +91,8 @@ open Iris Iris.Std MachCSL
 
 /-! ## 0.  The icache ledger's column VALUES are `Xv6/IcacheRefDefs.lean`'s
 (`Frzidx`, `Frz`, `FrzUR`, `Ctyval`, `CtyUR`, `Ity`, `frzIspre`, `frzPreb`);
-only IcacheRef's `rup` / `rcup` are still hoisted here (deviation 1). -/
+`rup` / `rcup` are `Xv6/IcacheRefLink.lean`'s. -/
 
-/-- Rocq `IcacheRef.rup`: the PLAIN reference column after a mint of
-flavour `b` (`false` = plain). -/
-def rup (b : Bool) (r : Nat) : Nat := if b then r else r + 1
-
-/-- Rocq `IcacheRef.rcup`: the CLAIM-flavoured column after a mint of
-flavour `b` (`true` = claim). -/
-def rcup (b : Bool) (rc : Nat) : Nat := if b then rc + 1 else rc
 
 /-! ## 1.  THE ENCODING IS INJECTIVE ON WELL-FORMED LISTS (§12.3) -/
 

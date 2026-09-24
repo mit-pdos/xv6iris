@@ -89,6 +89,23 @@ is live.
   is in `1..IREFSLOTS`". That is the one place where 0d cannot port literally. A10 below settles it
   before B4/C4 start.
 
+- **P3 — DONE (batch-A merge): `Xv6/FileGeom.lean`.** Move `NFILE`, `FDSPARE`/`FDSLOTS`,
+  `ftableAddr`, `fileStride`, `fileBase`, `fnode`, `aFtype`…`aFmajor` out of Xv6/FileDefs.lean into a
+  light file imported by FileDefs, FileOffCell and IrefSlots (Rocq's FdSlots.v split; avoids the cycle
+  FileDefs → OffBox → FileOffCell → FileDefs once the file table's inode arm lands).
+- **W7 follow-up (not 0d):** the file table's off conjunct. Lean `fileFieldsAt` gives every reference a
+  VALUED fractional share of `f->off` (`∃ off, wordAtN ξ (aFoff k) 4 (DFrac.own q) off`; FileFrac,
+  ProofFileclose:300, ProofPipealloc:569/581). Rocq `FileInvDefs.file_core_off` = the off box for
+  FD_INODE, `off_free k q` (alignment + unvalued bytes) otherwise. Replace when the file layer is
+  re-ported (wave 7), after C5 OffBox.
+
+- **KEY-TYPE SEAM (standing rule).** Rocq keys inums by `Z` everywhere. In Lean, the region map
+  (`IregMapF`, Int for the negative marker) and the link camera (`FsStateLink`, `FsLinkMapF`) are
+  `Int`-keyed; the icache/escrow cameras (`IcacheG`, `regionPending`, `committedA`) and FsStateInode's
+  dirent targets are `Nat`. Do NOT introduce a third convention. Where a file meets both, state the
+  bridge ONCE as named lemmas (e.g. `z.toNat` under `0 ≤ z`, `(n : Int)` casts) in the lowest file
+  that sees both, and reuse them.
+
 ## 2. Per-Rocq-file facts
 
 Legend: [L] ported in Lean (file name), [F] in flight, [P] partial in Lean, [-] not in Lean (who
@@ -172,17 +189,17 @@ mass-box camera class→A6, `IcboxG`→B4, `OffboxG` (+ its box instance)→A7 (
 Deps name batch items; "gate" = §1 plus the in-flight files.
 
 **Batch A (10 parallel)**
-- A1 IcacheRefLink — gate.
-- A2 EscrowDefs + TxPin + FsStateTop — gate, P1.
-- A3 FsStateLink — gate, P1.
+- [DONE] A1 IcacheRefLink — gate.
+- [DONE] A2 EscrowDefs + TxPin + FsStateTop — gate, P1.
+- [DONE] A3 FsStateLink — gate, P1.
 - A4 [DONE — Xv6/FsStateInode.lean now has `InodeLocal`, `inodeLocal_bare`, `dirEntries`, `fnIsDir`, `fnNrec`; `inodeLocal_freeNode` is in InodeRegionDefs] FsStateInodeLocal — gate (DirView, FsTree).
 - A5 [DONE — `recOwned`/`recOwnedAt`/`inodePhi`/`inodeDat`/`indOwned` and their lemmas are in Xv6/FsStateInode.lean] FsStateRecOwned — gate.
 - A6 [SUPERSEDED — D3 decided: CtxBox.lean is generalised in place by a separate worktree agent] MachCSL/CtxBoxQ — D3. Port Rocq CtxBox.v literally. Reuse MachCSL/CtxBox.lean's proofs where
   the unit-mass version already did the work. (This file and B8's are an explicit exception to
   fs0_common's "only under Xv6/" rule. Build with `timeout 1800 lake build MachCSL.CtxBoxQ`.)
-- A7 OffGv + FileOffCell — gate.
-- A8 IcacheRefGhost — gate.
-- A9 IcacheBootDecode (pure 1024-byte ↔ 16 dinodes decode) — gate.
+- [DONE] A7 OffGv + FileOffCell — gate.
+- [DONE] A8 IcacheRefGhost — gate.
+- [DONE] A9 IcacheBootDecode (pure 1024-byte ↔ 16 dinodes decode) — gate.
 - A10 [DONE — notes/fs0d-pinw-design.md, option (b) approved] **pinw design spike** (no Lean file). Read IcacheInv §5, IcacheRef 1276–1426, IcachePinwObl,
   MemClaim.v, and MachCSL/WordHist.lean + Lock.lean. Write notes/fs0d-pinw-design.md: the Lean
   shapes of `iref_pin_rows`/`pinw_slot`/`iref_claims`/`cred_floor`/`live_fracc`/`iref_set_read`
@@ -190,7 +207,7 @@ Deps name batch items; "gate" = §1 plus the in-flight files.
   approves it before B4/C4. (This note is the only non-Xv6 file A10 writes.)
 
 **Batch B (8)**
-- B1 InodeRegionSlot — A1, A2, A3.
+- B1 InodeRegionSlot (KEY TYPES: the icache/escrow maps — `IcacheG.regG`/`pcrpG`, `regionPending`, `committedA` — are `Nat`-keyed; the region map `IregMapF` stays `Int`-keyed for the negative marker `imarkKey`. Rocq uses `Z` for both, so bridge at the seam with `z.toNat` under `0 ≤ z`, stated once as helper lemmas, not ad hoc) — A1, A2, A3.
 - B2 FsAbsDefs + AppCfg + AppInv — A4, A2 (FsTopG).
 - B3 FsStateInodeOwned (NOTE: this is now the REST of FsStateInode.v — the link-camera parts (`ent_tok*`, `inode_ghost`, `inode_owned`, §6, §8/8b) AND the `ity`-typed parts (`fn_ity_ok(_ex)`, `ent_ty_ok`, `node_ent_ok`; `Ity` is now in IcacheRefDefs, which does not import FsStateInode) — edit Xv6/FsStateInode.lean, see its DEFERRED header) — A3, A4, A5.
 - B4 IcacheRef — A1, A8, A6, A10.
