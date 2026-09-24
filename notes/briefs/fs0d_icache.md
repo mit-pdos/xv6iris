@@ -232,7 +232,7 @@ Deps name batch items; "gate" = §1 plus the in-flight files.
 - [DONE] D6 FsStateEraResB — C2 (leaf; nothing in 0d waits on it).
 
 **Batch E (2)**
-- E1 IgetLic — D1, B1, C1, A3.
+- [DONE] E1 IgetLic — D1, B1, C1, A3.
 - [DONE] E2 IcacheEscrowDep — D4.
 
 **Batch F (3)**

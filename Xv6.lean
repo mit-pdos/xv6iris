@@ -576,3 +576,4 @@ import Xv6.InodeRegionWithdraw
 import Xv6.InodeRegionMovers
 import Xv6.IcacheEscrowDep
 import Xv6.IcacheInvRef
+import Xv6.IgetLic
