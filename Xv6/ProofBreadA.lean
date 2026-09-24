@@ -216,6 +216,22 @@ def bdScan (γ : BcacheNames) (V : BioView) (tl : Nat) (M : RegMapF Nat) (Ls : N
   (γ.ref ↪●MAP M) ∗ bcacheLruAt curCtx bhead (ord.map bnode) ∗ bioPool V bnos ∗
   bkeyAll γ curCtx tl devs bnos ∗ ([∗list] k ∈ List.range NBUF, bslotAt γ curCtx k (Ls k))
 
+theorem bdScan_unpack (γ : BcacheNames) (V : BioView) (tl : Nat) (M : RegMapF Nat)
+    (Ls : Nat → List Nat) (ord : List Nat) (devs bnos : Nat → BitVec 32) :
+    bdScan (GF := GF) γ V tl M Ls ord devs bnos ⊢
+      (γ.ref ↪●MAP M) ∗ bcacheLruAt curCtx bhead (ord.map bnode) ∗ bioPool V bnos ∗
+      bkeyAll γ curCtx tl devs bnos ∗
+      ([∗list] k ∈ List.range NBUF, bslotAt γ curCtx k (Ls k)) := by
+  unfold bdScan; iintro H; iexact H
+
+theorem bdScan_pack (γ : BcacheNames) (V : BioView) (tl : Nat) (M : RegMapF Nat)
+    (Ls : Nat → List Nat) (ord : List Nat) (devs bnos : Nat → BitVec 32) :
+    (γ.ref ↪●MAP M) ∗ bcacheLruAt (GF := GF) curCtx bhead (ord.map bnode) ∗ bioPool V bnos ∗
+    bkeyAll γ curCtx tl devs bnos ∗
+    ([∗list] k ∈ List.range NBUF, bslotAt γ curCtx k (Ls k)) ⊢
+      bdScan γ V tl M Ls ord devs bnos := by
+  unfold bdScan; iintro H; iexact H
+
 theorem bdScan_open (γ : BcacheNames) (V : BioView) (tl : Nat) :
     bcacheScanAt (GF := GF) γ V curCtx tl ⊢
       ∃ (M : RegMapF Nat) (nx : Nat) (Ls : Nat → List Nat) (ord : List Nat)
@@ -337,6 +353,34 @@ theorem bd_sext_zero (v : BitVec 32) : (BitVec.signExtend 64 v = 0#64) ↔ (v = 
   · intro h
     exact bd_sext_inj v 0#32 (by rw [h]; decide)
   · intro h; rw [h]; decide
+
+theorem bd_dev_eq (a : BitVec 64) : aBufDev a = a + BitVec.signExtend 64 8#12 := by
+  unfold aBufDev bOffDev; congr 1
+theorem bd_bno_eq (a : BitVec 64) : aBufBlockno a = a + BitVec.signExtend 64 12#12 := by
+  unfold aBufBlockno bOffBlockno; congr 1
+theorem bd_prev_eq (a : BitVec 64) : bPrev a = a + BitVec.signExtend 64 72#12 := by
+  unfold bPrev; congr 1
+theorem bd_next_eq (a : BitVec 64) : bNext a = a + BitVec.signExtend 64 80#12 := by
+  unfold bNext; congr 1
+
+theorem bd_dev_eq' (a : BitVec 64) : aBufDev a = a + 8#64 := by
+  unfold aBufDev bOffDev; congr 1
+theorem bd_bno_eq' (a : BitVec 64) : aBufBlockno a = a + 12#64 := by
+  unfold aBufBlockno bOffBlockno; congr 1
+theorem bd_prev_eq' (a : BitVec 64) : bPrev a = a + 72#64 := by unfold bPrev; congr 1
+theorem bd_next_eq' (a : BitVec 64) : bNext a = a + 80#64 := by unfold bNext; congr 1
+
+theorem bd_bne_of_eq (a b : BitVec 32) (h : a = b) :
+    bcond bop.BNE (BitVec.signExtend 64 a) (BitVec.signExtend 64 b) = false := by
+  rw [h]; simp [bcond]
+theorem bd_bne_of_ne (a b : BitVec 32) (h : a ≠ b) :
+    bcond bop.BNE (BitVec.signExtend 64 a) (BitVec.signExtend 64 b) = true := by
+  simp [bcond, bd_sext_ne a b h]
+
+theorem bd_bne_eq (a : BitVec 64) : bcond bop.BNE a a = false := by simp [bcond]
+theorem bd_bne_ne (a b : BitVec 64) (h : a ≠ b) : bcond bop.BNE a b = true := by simp [bcond, h]
+theorem bd_beq_eq (a : BitVec 64) : bcond bop.BEQ a a = true := by simp [bcond]
+theorem bd_beq_ne (a b : BitVec 64) (h : a ≠ b) : bcond bop.BEQ a b = false := by simp [bcond, h]
 
 theorem bd_beqz_zero : bcond bop.BEQ 0#64 0#64 = true := by decide
 theorem bd_beqz_one : bcond bop.BEQ 1#64 0#64 = false := by decide
