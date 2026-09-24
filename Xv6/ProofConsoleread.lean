@@ -485,7 +485,7 @@ theorem cr_copyout (EC : EITHER_COPYOUT) (c : CPU) (k' : KCtx) (γl : GName) (γ
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       byteBuf (k'.regs 12#5) (DFrac.own 1) [b] -∗
       (∃ (P' : UPtd) (M' : Nat → List (BitVec 8)),
-        ⌜P.ext P' ∧
+        ⌜P.extSz V.sz P' ∧
           ((R' 10#5 = 0#64 ∧ M' = umemWrite (viewFaulted P P' Mi) (k'.regs 11#5).toNat [b]) ∨
            (R' 10#5 = -1#64 ∧ ∃ d, d < [b].length ∧
               M' = umemWrite (viewFaulted P P' Mi) (k'.regs 11#5).toNat ([b].take d)))⌝ ∗
@@ -531,32 +531,32 @@ def crPost (k : KCtx) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (n : Int) : CPU → IProp GF :=
   fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd)
     (M' : Nat → List (BitVec 8)) (d : Nat),
-    ⌜calleeSaved k.regs R' ∧ V.upt.ext P' ∧ (d : Int) ≤ max 0 n ∧ consReadRet d (R' 10#5) ∧
+    ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧ (d : Int) ≤ max 0 n ∧ consReadRet d (R' 10#5) ∧
       UMemL.umemUntouched (viewFaulted V.upt P' M) M' (k.regs 11#5) d⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
-    procPrivExtNoctxAt curCtx (procAddr j) pid V P' M' -∗ wpLoop cpu')
+    procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' } M' -∗ wpLoop cpu')
 
 theorem crPost_elim (k : KCtx) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (n : Int) (cpu' : CPU) :
     crPost (GF := GF) k j pid V M n cpu' ⊢
     ∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd) (M' : Nat → List (BitVec 8)) (d : Nat),
-      ⌜calleeSaved k.regs R' ∧ V.upt.ext P' ∧ (d : Int) ≤ max 0 n ∧ consReadRet d (R' 10#5) ∧
+      ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧ (d : Int) ≤ max 0 n ∧ consReadRet d (R' 10#5) ∧
         UMemL.umemUntouched (viewFaulted V.upt P' M) M' (k.regs 11#5) d⌝ -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
       trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
-      procPrivExtNoctxAt curCtx (procAddr j) pid V P' M' -∗ wpLoop cpu' := by
+      procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' } M' -∗ wpLoop cpu' := by
   unfold crPost; iintro H; iexact H
 
 theorem cr_post_of_spec (cpu : CPU) (k : KCtx) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (n : Int) :
     wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd)
       (M' : Nat → List (BitVec 8)) (d : Nat),
-      ⌜calleeSaved k.regs R' ∧ V.upt.ext P' ∧ (d : Int) ≤ max 0 n ∧ consReadRet d (R' 10#5) ∧
+      ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧ (d : Int) ≤ max 0 n ∧ consReadRet d (R' 10#5) ∧
         UMemL.umemUntouched (viewFaulted V.upt P' M) M' (k.regs 11#5) d⌝ -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
       trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
-      procPrivExtNoctxAt curCtx (procAddr j) pid V P' M' -∗ wpLoop cpu'))
+      procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' } M' -∗ wpLoop cpu'))
     ⊢ wpNext true k.proc cpu (crPost (GF := GF) k j pid V M n) := by
   unfold crPost; iintro H; iexact H
 
@@ -564,11 +564,11 @@ theorem cr_post_at (cpu c : CPU) (k : KCtx) (j : Nat) (pid : BitVec 32) (V : Pro
     (M : Nat → List (BitVec 8)) (n : Int) (hj : j < NPROC) (hkproc : k.proc = procAddr j) :
     wpNext true k.proc cpu (crPost (GF := GF) k j pid V M n) ⊢
       ∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd) (M' : Nat → List (BitVec 8)) (d : Nat),
-      ⌜calleeSaved k.regs R' ∧ V.upt.ext P' ∧ (d : Int) ≤ max 0 n ∧ consReadRet d (R' 10#5) ∧
+      ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧ (d : Int) ≤ max 0 n ∧ consReadRet d (R' 10#5) ∧
         UMemL.umemUntouched (viewFaulted V.upt P' M) M' (k.regs 11#5) d⌝ -∗
       kctx c ((k.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k.regs 1#5)) -∗
       trapCsrs c -∗ cpuClaim c k.proc -∗ intrRes c -∗
-      procPrivExtNoctxAt curCtx (procAddr j) pid V P' M' -∗ wpLoop c := by
+      procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' } M' -∗ wpLoop c := by
   iintro H
   ihave H := wpNext_at true k.proc cpu c _
     (fun h => h.elim (fun h => absurd h (by decide))
@@ -584,7 +584,7 @@ theorem cr_epi (cpu cE : CPU) (k : KCtx) (j : Nat) (pid : BitVec 32) (V : ProcPr
     (spie spp : Bool) (R : RegMap) (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFA0#64)
     (h21 : R 21#5 = k.regs 21#5) (h24 : R 24#5 = k.regs 24#5) (h25 : R 25#5 = k.regs 25#5)
     (h26 : R 26#5 = k.regs 26#5) (h27 : R 27#5 = k.regs 27#5)
-    (hrv : consReadRet d (R 10#5)) (hd : (d : Int) ≤ max 0 n) (hext : V.upt.ext P')
+    (hrv : consReadRet d (R 10#5)) (hd : (d : Int) ≤ max 0 n) (hext : V.upt.extSz V.sz P')
     (hun : UMemL.umemUntouched (viewFaulted V.upt P' M) M' (k.regs 11#5) d)
     (v6 v9 v10 v11 : BitVec 64) :
     kctx cE (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cE (KA.«consoleread» + 0xce#64) ∗
@@ -610,6 +610,7 @@ theorem cr_epi (cpu cE : CPU) (k : KCtx) (j : Nat) (pid : BitVec 32) (V : ProcPr
   iapply wpNext_off_intro
   iintro Hk Hpc
   ihave HK := cr_post_at cpu cE k j pid V M n hj hkproc $$ Hnext
+  ihave Hpriv := procPrivExtNoctx_close curCtx (procAddr j) pid V P' _ $$ Hpriv
   iapply HK $$ %spie %spp %_ %P' %M' %d [] Hk Hpc Htc Hcl Hir Hpriv
   ipureintro
   refine ⟨?_, hext, hd, ?_, hun⟩
@@ -634,7 +635,7 @@ theorem cr_exit (RE : RELEASE) (cpu c : CPU) (k kb : KCtx) (hb : CrBase k kb) (�
     (v3 v7 : BitVec 64) (h19 : R 19#5 = v3) (h23 : R 23#5 = v7)
     (hret : BitVec.signExtend 64 (BitVec.extractLsb' 0 32 v7 + -BitVec.extractLsb' 0 32 v3)
       = BitVec.ofInt 64 (d : Int))
-    (hd : (d : Int) ≤ max 0 n) (hext : V.upt.ext P')
+    (hd : (d : Int) ≤ max 0 n) (hext : V.upt.extSz V.sz P')
     (hun : UMemL.umemUntouched (viewFaulted V.upt P' M) M' (k.regs 11#5) d)
     (v6 v9 v10 v11 : BitVec 64) :
     kctx c (((kb.pushOffAt a b).withLocks ["cons"]).withRegs R) ∗
@@ -717,7 +718,7 @@ theorem cr_minus1 (RE : RELEASE) (cpu c : CPU) (k kb : KCtx) (hb : CrBase k kb) 
     (a b : Bool) (R : RegMap) (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFA0#64)
     (h21 : R 21#5 = k.regs 21#5) (h24 : R 24#5 = k.regs 24#5) (h25 : R 25#5 = k.regs 25#5)
     (h26 : R 26#5 = k.regs 26#5) (h27 : R 27#5 = k.regs 27#5)
-    (hd : (d : Int) ≤ max 0 n) (hext : V.upt.ext P')
+    (hd : (d : Int) ≤ max 0 n) (hext : V.upt.extSz V.sz P')
     (hun : UMemL.umemUntouched (viewFaulted V.upt P' M) M' (k.regs 11#5) d)
     (v6 v9 v10 v11 : BitVec 64) :
     kctx c (((kb.pushOffAt a b).withLocks ["cons"]).withRegs R) ∗
@@ -798,7 +799,7 @@ theorem cr_priv_to [X : CurCtx] (h : curTier = KTier.kpt) (pa : BitVec 64) (pid 
   obtain ⟨ξ, t⟩ := X
   simp only at h
   subst h
-  rw [procPrivExt_eq]
+  rw [procPrivExt_eq, procPrivExtNoctxAt_eq]
   iintro H; iexact H
 
 theorem cr_priv_from [X : CurCtx] (h : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec 32)
@@ -807,7 +808,7 @@ theorem cr_priv_from [X : CurCtx] (h : curTier = KTier.kpt) (pa : BitVec 64) (pi
   obtain ⟨ξ, t⟩ := X
   simp only at h
   subst h
-  rw [procPrivExt_eq]
+  rw [procPrivExt_eq, procPrivExtNoctxAt_eq]
   iintro H; iexact H
 
 /-! ## The outer loop's invariant at `+0x38` -/
@@ -821,7 +822,7 @@ def crLoop (cpu : CPU) (k kb : KCtx) (γc : GName) (j : Nat) (pid : BitVec 32)
   ∀ (cur : CPU) (a b : Bool) (R : RegMap) (d : Nat) (P : UPtd) (Mi : Nat → List (BitVec 8))
     (v6 v9 v10 v11 : BitVec 64),
     ⌜crFix k N R ∧ R 19#5 = BitVec.ofNat 64 (N - d) ∧ R 20#5 = k.regs 11#5 + BitVec.ofNat 64 d ∧
-      R 21#5 = k.regs 21#5 ∧ d ≤ N ∧ N - d < m ∧ V.upt.ext P ∧
+      R 21#5 = k.regs 21#5 ∧ d ≤ N ∧ N - d < m ∧ V.upt.extSz V.sz P ∧
       UMemL.umemUntouched (viewFaulted V.upt P M) Mi (k.regs 11#5) d⌝ -∗
     kctx cur (((kb.pushOffAt a b).withLocks ["cons"]).withRegs R) -∗
     pcIs cur (KA.«consoleread» + 0x38#64) -∗
@@ -838,7 +839,7 @@ theorem crLoop_elim (cpu : CPU) (k kb : KCtx) (γc : GName) (j : Nat) (pid : Bit
     ∀ (cur : CPU) (a b : Bool) (R : RegMap) (d : Nat) (P : UPtd) (Mi : Nat → List (BitVec 8))
       (v6 v9 v10 v11 : BitVec 64),
       ⌜crFix k N R ∧ R 19#5 = BitVec.ofNat 64 (N - d) ∧ R 20#5 = k.regs 11#5 + BitVec.ofNat 64 d ∧
-        R 21#5 = k.regs 21#5 ∧ d ≤ N ∧ N - d < m ∧ V.upt.ext P ∧
+        R 21#5 = k.regs 21#5 ∧ d ≤ N ∧ N - d < m ∧ V.upt.extSz V.sz P ∧
         UMemL.umemUntouched (viewFaulted V.upt P M) Mi (k.regs 11#5) d⌝ -∗
       kctx cur (((kb.pushOffAt a b).withLocks ["cons"]).withRegs R) -∗
       pcIs cur (KA.«consoleread» + 0x38#64) -∗
@@ -855,7 +856,7 @@ theorem crLoop_intro (cpu : CPU) (k kb : KCtx) (γc : GName) (j : Nat) (pid : Bi
     (∀ (cur : CPU) (a b : Bool) (R : RegMap) (d : Nat) (P : UPtd) (Mi : Nat → List (BitVec 8))
       (v6 v9 v10 v11 : BitVec 64),
       ⌜crFix k N R ∧ R 19#5 = BitVec.ofNat 64 (N - d) ∧ R 20#5 = k.regs 11#5 + BitVec.ofNat 64 d ∧
-        R 21#5 = k.regs 21#5 ∧ d ≤ N ∧ N - d < m ∧ V.upt.ext P ∧
+        R 21#5 = k.regs 21#5 ∧ d ≤ N ∧ N - d < m ∧ V.upt.extSz V.sz P ∧
         UMemL.umemUntouched (viewFaulted V.upt P M) Mi (k.regs 11#5) d⌝ -∗
       kctx cur (((kb.pushOffAt a b).withLocks ["cons"]).withRegs R) -∗
       pcIs cur (KA.«consoleread» + 0x38#64) -∗
@@ -879,7 +880,7 @@ theorem cr_ctrld (RE : RELEASE) (cpu c : CPU) (k kb : KCtx) (hb : CrBase k kb) (
     (hj : j < NPROC) (hkproc : k.proc = procAddr j) (hksie : k.sie = false)
     (hK : consolereadSlots ≤ k.avail)
     (hnN : n = (N : Int)) (hN : N < 2 ^ 31) (hdN : d < N)
-    (hext : V.upt.ext P)
+    (hext : V.upt.extSz V.sz P)
     (hun : UMemL.umemUntouched (viewFaulted V.upt P M) Mi (k.regs 11#5) d)
     (a b : Bool) (R : RegMap) (hfix : crFix k N R)
     (h19 : R 19#5 = BitVec.ofNat 64 (N - d)) (r : BitVec 32) (h15 : R 15#5 = BitVec.signExtend 64 r)
@@ -999,7 +1000,7 @@ theorem cr_consume (RE : RELEASE) (EC : EITHER_COPYOUT)
     (hK : consolereadSlots ≤ k.avail) (hkt : k.tier = KTier.kpt)
     (huser : k.regs 10#5 ≠ 0#64)
     (hnN : n = (N : Int)) (hN : N < 2 ^ 31) (hdN : d < N) (hbud : N - d ≤ m)
-    (hext : V.upt.ext P)
+    (hext : V.upt.extSz V.sz P)
     (hun : UMemL.umemUntouched (viewFaulted V.upt P M) Mi (k.regs 11#5) d)
     (a b : Bool) (R : RegMap) (hfix : crFix k N R)
     (h19 : R 19#5 = BitVec.ofNat 64 (N - d)) (h20 : R 20#5 = k.regs 11#5 + BitVec.ofNat 64 d)
@@ -1149,7 +1150,7 @@ theorem cr_consume (RE : RELEASE) (EC : EITHER_COPYOUT)
     hcsC.2.2.2.2.2.2.1.trans
       (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true])
   obtain ⟨q2, q8, q9, q18, q22, q23, q24, q25, q26, q27⟩ := id hfixC
-  have hext' : V.upt.ext P2 := UMemL.ext_trans hext hext2
+  have hext' : V.upt.extSz V.sz P2 := UMemL.extSz_trans hext hext2
   ihave Hch := pw_byteBuf_one_elim _ _ _ $$ Hcbuf
   ihave Hf10 := Hchcl $$ %buf[(BitVec.signExtend 64 r &&& 127#64).toNat] Hch
   ihave Hpriv := cr_priv_from htc (procAddr j) pid V P2 M2 $$ HprivE
@@ -1167,7 +1168,7 @@ theorem cr_consume (RE : RELEASE) (EC : EITHER_COPYOUT)
     simp only [List.take_zero, UMemL.umemWrite_nil] at hM2
     subst hM2
     have hun2 : UMemL.umemUntouched (viewFaulted V.upt P2 M) (viewFaulted P P2 Mi) (k.regs 11#5) d :=
-      UMemL.umemUntouched_view M Mi _ d hext hext2 hun
+      UMemL.umemUntouched_view M Mi _ d hext.1 hext2.1 hun
     k_step (wp_s_branch c _ (KA.«consoleread» + 0xae#64) false 76#13 10#5 15#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [hr1, pw_m1_lit, pw_beq_m1, pw_beq_m1']
@@ -1202,7 +1203,7 @@ theorem cr_consume (RE : RELEASE) (EC : EITHER_COPYOUT)
   have hun2 : UMemL.umemUntouched (viewFaulted V.upt P2 M)
       (umemWrite (viewFaulted P P2 Mi) (k.regs 11#5 + BitVec.ofNat 64 d).toNat
         [buf[(BitVec.signExtend 64 r &&& 127#64).toNat]]) (k.regs 11#5) (d + 1) :=
-    UMemL.umemUntouched_write _ _ _ d _ (UMemL.umemUntouched_view M Mi _ d hext hext2 hun)
+    UMemL.umemUntouched_write _ _ _ d _ (UMemL.umemUntouched_view M Mi _ d hext.1 hext2.1 hun)
   k_step (wp_s_branch c _ (KA.«consoleread» + 0xae#64) false 76#13 10#5 15#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [hr0, pw_m1_lit, pw_beq_0]
@@ -1318,7 +1319,7 @@ def crEmpty (cpu : CPU) (k kb : KCtx) (γc : GName) (j : Nat) (pid : BitVec 32)
   ∀ (cur : CPU) (a b : Bool) (R : RegMap) (d : Nat) (P : UPtd) (Mi : Nat → List (BitVec 8))
     (v6 v9 v10 v11 : BitVec 64),
     ⌜crFix k N R ∧ R 19#5 = BitVec.ofNat 64 (N - d) ∧ R 20#5 = k.regs 11#5 + BitVec.ofNat 64 d ∧
-      R 21#5 = k.regs 21#5 ∧ d < N ∧ N - d ≤ m ∧ V.upt.ext P ∧
+      R 21#5 = k.regs 21#5 ∧ d < N ∧ N - d ≤ m ∧ V.upt.extSz V.sz P ∧
       UMemL.umemUntouched (viewFaulted V.upt P M) Mi (k.regs 11#5) d⌝ -∗
     kctx cur (((kb.pushOffAt a b).withLocks ["cons"]).withRegs R) -∗
     pcIs cur (KA.«consoleread» + 0x48#64) -∗
@@ -1336,7 +1337,7 @@ theorem crEmpty_elim (cpu : CPU) (k kb : KCtx) (γc : GName) (j : Nat) (pid : Bi
     ∀ (cur : CPU) (a b : Bool) (R : RegMap) (d : Nat) (P : UPtd) (Mi : Nat → List (BitVec 8))
       (v6 v9 v10 v11 : BitVec 64),
       ⌜crFix k N R ∧ R 19#5 = BitVec.ofNat 64 (N - d) ∧ R 20#5 = k.regs 11#5 + BitVec.ofNat 64 d ∧
-        R 21#5 = k.regs 21#5 ∧ d < N ∧ N - d ≤ m ∧ V.upt.ext P ∧
+        R 21#5 = k.regs 21#5 ∧ d < N ∧ N - d ≤ m ∧ V.upt.extSz V.sz P ∧
         UMemL.umemUntouched (viewFaulted V.upt P M) Mi (k.regs 11#5) d⌝ -∗
       kctx cur (((kb.pushOffAt a b).withLocks ["cons"]).withRegs R) -∗
       pcIs cur (KA.«consoleread» + 0x48#64) -∗
@@ -1354,7 +1355,7 @@ theorem crEmpty_intro (cpu : CPU) (k kb : KCtx) (γc : GName) (j : Nat) (pid : B
     (∀ (cur : CPU) (a b : Bool) (R : RegMap) (d : Nat) (P : UPtd) (Mi : Nat → List (BitVec 8))
       (v6 v9 v10 v11 : BitVec 64),
       ⌜crFix k N R ∧ R 19#5 = BitVec.ofNat 64 (N - d) ∧ R 20#5 = k.regs 11#5 + BitVec.ofNat 64 d ∧
-        R 21#5 = k.regs 21#5 ∧ d < N ∧ N - d ≤ m ∧ V.upt.ext P ∧
+        R 21#5 = k.regs 21#5 ∧ d < N ∧ N - d ≤ m ∧ V.upt.extSz V.sz P ∧
         UMemL.umemUntouched (viewFaulted V.upt P M) Mi (k.regs 11#5) d⌝ -∗
       kctx cur (((kb.pushOffAt a b).withLocks ["cons"]).withRegs R) -∗
       pcIs cur (KA.«consoleread» + 0x48#64) -∗
@@ -1387,7 +1388,7 @@ theorem cr_empty_body (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
     (hK : consolereadSlots ≤ k.avail) (hkt : k.tier = KTier.kpt)
     (huser : k.regs 10#5 ≠ 0#64)
     (hnN : n = (N : Int)) (hN : N < 2 ^ 31) (hdN : d < N) (hbud : N - d ≤ m)
-    (hext : V.upt.ext P)
+    (hext : V.upt.extSz V.sz P)
     (hun : UMemL.umemUntouched (viewFaulted V.upt P M) Mi (k.regs 11#5) d)
     (a b : Bool) (R : RegMap) (hfix : crFix k N R)
     (h19 : R 19#5 = BitVec.ofNat 64 (N - d)) (h20 : R 20#5 = k.regs 11#5 + BitVec.ofNat 64 d)
@@ -1695,7 +1696,7 @@ theorem cr_outer_body (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
     (hK : consolereadSlots ≤ k.avail) (hkt : k.tier = KTier.kpt)
     (huser : k.regs 10#5 ≠ 0#64)
     (hnN : n = (N : Int)) (hN : N < 2 ^ 31) (hdN : d ≤ N) (hbud : N - d ≤ m)
-    (hext : V.upt.ext P)
+    (hext : V.upt.extSz V.sz P)
     (hun : UMemL.umemUntouched (viewFaulted V.upt P M) Mi (k.regs 11#5) d)
     (a b : Bool) (R : RegMap) (hfix : crFix k N R)
     (h19 : R 19#5 = BitVec.ofNat 64 (N - d)) (h20 : R 20#5 = k.regs 11#5 + BitVec.ofNat 64 d)
@@ -1884,7 +1885,7 @@ theorem cr_start (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
       rw [cr_subw_zero]; first | rfl | decide | simp
     iapply (cr_exit RE cpu c k kb hb γc j pid V M n V.upt M 0 hj hkproc hksie hK a b R
         hp2 hp21 hp24 hp25 hp26 hp27 (BitVec.ofInt 64 n) (BitVec.ofInt 64 n) hp19 hp23 hret0
-        (by omega) (UMemL.ext_refl _) hunt v6 v9 v10 v11)
+        (by omega) (UMemL.extSz_refl _ _) hunt v6 v9 v10 v11)
       $$ [- $Hk $Hpc $Hlocked $Hbody $Hframe $Htc $Hcl $Hir $Hpriv $Hnext]
     iframe #
   -- a nonnegative count: run the loop with the budget `n`
@@ -1900,7 +1901,7 @@ theorem cr_start (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
     Hk Hpc Htc Hcl Hir Hlocked Hbody Hpriv Hframe Hnext
   ipureintro
   refine ⟨⟨hp2, hp8, hp9, hp18, hp22, ?_, hp24, hp25, hp26, hp27⟩, ?_, ?_, hp21,
-    by omega, by omega, UMemL.ext_refl _, hunt⟩
+    by omega, by omega, UMemL.extSz_refl _ _, hunt⟩
   · rw [hp23]; exact hval
   · rw [hp19, Nat.sub_zero]; exact hval
   · rw [hp20]; exact cr_addr_zero _

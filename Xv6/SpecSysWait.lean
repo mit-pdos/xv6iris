@@ -57,11 +57,11 @@ def wp_sys_wait_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   procPrivNoctxAt curCtx (procAddr j) pid V M ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd)
     (rv xw : BitVec 32) (d : Nat),
-    ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.ext P' ∧ d ≤ 4 ∧
+    ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
       kwaitAns rv v d⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
-    procPrivExtNoctxAt curCtx (procAddr j) pid V P'
+    procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' }
       (umemWrite (viewFaulted V.upt P' M) v.toNat ((xstateBytes xw).take d)) -∗
     wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu

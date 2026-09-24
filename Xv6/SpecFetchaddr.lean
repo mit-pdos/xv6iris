@@ -19,9 +19,9 @@ it reads `p->sz` and `p->pagetable` off `myproc()` -- whose body is a call
 to `copyin`, which is stated one tier down over the bare page table.  As
 in `SpecEitherCopyin` (the Lean template for exactly this bridge), the
 block travels as `EitherDefs.procPrivExt` at the descriptor `P` the caller
-has already grown to, and comes back at `P'` with `P.ext P'`: `sys_exec`
+has already grown to, and comes back at `P'` with `P.extSz V.sz P'`: `sys_exec`
 calls `fetchaddr` in a loop, so the contract must be re-enterable after a
-first call faulted a page in (see `EitherDefs`' `umBelow` seam).  The size
+first call faulted a page in (see `EitherDefs`' descriptor form).  The size
 bound `p->sz ≤ uvmMaxsz` is NOT a premise: it lives in the block, and the
 proof pays `copyin`'s `psz ≤ 2^38` out of it (Rocq: likewise).
 
@@ -86,7 +86,7 @@ def wp_fetchaddr_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
     ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     (∃ (P' : UPtd) (w : BitVec 64),
-      ⌜P.ext P' ∧ fetchaddrAns (viewFaulted P P' M) (k.regs 10#5) V.sz oldv (R' 10#5) w⌝ ∗
+      ⌜P.extSz V.sz P' ∧ fetchaddrAns (viewFaulted P P' M) (k.regs 10#5) V.sz oldv (R' 10#5) w⌝ ∗
       procPrivExt (procAddr j) pid V P' (viewFaulted P P' M) ∗
       wordPointsTo (k.regs 11#5) 8 (DFrac.own 1) w) -∗
     ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))

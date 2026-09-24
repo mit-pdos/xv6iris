@@ -35,7 +35,7 @@ def wp_copyout_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G 
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     byteBuf (k.regs 13#5) dqs bs -∗
     (∃ (P' : UPtd) (M' : Nat → List (BitVec 8)),
-      ⌜P.ext P' ∧
+      ⌜P.extSz (k.regs 11#5) P' ∧
         ((R' 10#5 = 0#64 ∧ M' = umemWrite (viewFaulted P P' M) (k.regs 12#5).toNat bs) ∨
          (R' 10#5 = -1#64 ∧ ∃ d, d < bs.length ∧
             M' = umemWrite (viewFaulted P P' M) (k.regs 12#5).toNat (bs.take d)))⌝ ∗

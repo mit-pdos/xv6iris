@@ -99,11 +99,11 @@ theorem sw_kwait (KW : KWAIT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     procPrivNoctxAt curCtx (procAddr j) pid V M ∗
     wpNext true k'.proc c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd)
       (rv xw : BitVec 32) (d : Nat),
-      ⌜calleeSaved k'.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.ext P' ∧ d ≤ 4 ∧
+      ⌜calleeSaved k'.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
         kwaitAns rv (k'.regs 10#5) d⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       trapCsrs cpu' -∗ cpuClaim cpu' k'.proc -∗ intrRes cpu' -∗
-      procPrivExtNoctxAt curCtx (procAddr j) pid V P'
+      procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' }
         (umemWrite (viewFaulted V.upt P' M) (k'.regs 10#5).toNat ((xstateBytes xw).take d)) -∗
       wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
@@ -168,19 +168,19 @@ theorem sw_exit (cpu cr : CPU) (k : KCtx) (j : Nat) (pid : BitVec 32) (V : ProcP
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : 4 ≤ k.avail) (hsie : k.sie = false)
     (spie spp : Bool) (R : RegMap) (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64)
     (hpins : swPins k R) (h10 : R 10#5 = BitVec.signExtend 64 rv)
-    (hext : V.upt.ext P') (hd : d ≤ 4) (hans : kwaitAns rv v d) :
+    (hext : V.upt.extSz V.sz P') (hd : d ≤ 4) (hans : kwaitAns rv v d) :
     kctx cr (((k.withSpie spie spp).pushed 4).withRegs R) ∗ pcIs cr (KA.«sys_wait» + 0x1a#64) ∗
     frame4s0 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) ∗
     trapCsrs cr ∗ cpuClaim cr k.proc ∗ intrRes cr ∗
-    procPrivExtNoctxAt curCtx (procAddr j) pid V P'
+    procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' }
       (umemWrite (viewFaulted V.upt P' M) v.toNat ((xstateBytes xw).take d)) ∗
     wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd)
       (rv xw : BitVec 32) (d : Nat),
-      ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.ext P' ∧ d ≤ 4 ∧
+      ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
         kwaitAns rv v d⌝ -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
       trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
-      procPrivExtNoctxAt curCtx (procAddr j) pid V P'
+      procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' }
         (umemWrite (viewFaulted V.upt P' M) v.toNat ((xstateBytes xw).take d)) -∗
       wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cr := by
@@ -189,7 +189,7 @@ theorem sw_exit (cpu cr : CPU) (k : KCtx) (j : Nat) (pid : BitVec 32) (V : ProcP
   iapply (sw_tail cr (k.withSpie spie spp) (by simp only [KCtx.withSpie_avail]; exact hK)
       k.regs rfl R hR2
       iprop(trapCsrs cr ∗ cpuClaim cr k.proc ∗ intrRes cr ∗
-        procPrivExtNoctxAt curCtx (procAddr j) pid V P'
+        procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' }
           (umemWrite (viewFaulted V.upt P' M) v.toNat ((xstateBytes xw).take d))))
     $$ [- $Hk $Hpc $Hframe]
   isplitl [Htc Hcl Hir Hblk]

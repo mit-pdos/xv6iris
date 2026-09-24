@@ -202,18 +202,18 @@ theorem pw_priv_split (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
   · iframe
 
 theorem pw_priv_close (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
-    (M' : Nat → List (BitVec 8)) (hext : V.upt.ext P')
-    (hf : V.sz.toNat ≤ uvmMaxsz ∧ V.pagetable = pageAddr V.upt.root ∧
+    (M' : Nat → List (BitVec 8)) (hext : V.upt.extSz V.sz P')
+    (hf : V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧ V.pagetable = pageAddr V.upt.root ∧
       V.trapframe = pageAddr V.upt.tfp) :
     @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz ∗
     @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
     @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P' M' ∗ pwRest pa pid V ⊢
       procPrivExtNoctxAt (GF := GF) curCtx pa pid V P' M' := by
   unfold procPrivExtNoctxAt pwRest procFieldsNoctx
-  rw [hext.1, hext.2.1]
+  rw [hext.1.1, hext.1.2.1]
   iintro ⟨Hszc, Hpgc, Hspace, Hpid, Hks, Htfc, Hof, Hcwd, Hnm, Htfp⟩
   isplitl []
-  · ipureintro; exact ⟨hf.1, hf.2.1, hf.2.2⟩
+  · ipureintro; exact ⟨hf.1, UMemL.umBelow_extSz hf.2.1 hext, hf.2.2.1, hf.2.2.2⟩
   · iframe
 
 /-! ## One byte of the pipe's data buffer -/
@@ -443,7 +443,8 @@ def pwRestExt (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : UPtd) : IPr
 theorem pw_privExt_split (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : UPtd)
     (M' : Nat → List (BitVec 8)) :
     procPrivExtNoctxAt (GF := GF) curCtx pa pid V P M' ⊢
-      ⌜V.sz.toNat ≤ uvmMaxsz ∧ V.pagetable = pageAddr P.root ∧ V.trapframe = pageAddr P.tfp⌝ ∗
+      ⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz P ∧ V.pagetable = pageAddr P.root ∧
+        V.trapframe = pageAddr P.tfp⌝ ∗
       @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz ∗
       @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
       @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P M' ∗ pwRestExt pa pid V P := by
@@ -454,17 +455,18 @@ theorem pw_privExt_split (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : 
   · iframe
 
 theorem pw_privExt_close (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P P' : UPtd)
-    (M'' : Nat → List (BitVec 8)) (hext : P.ext P')
-    (hf : V.sz.toNat ≤ uvmMaxsz ∧ V.pagetable = pageAddr P.root ∧ V.trapframe = pageAddr P.tfp) :
+    (M'' : Nat → List (BitVec 8)) (hext : P.extSz V.sz P')
+    (hf : V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz P ∧ V.pagetable = pageAddr P.root ∧
+      V.trapframe = pageAddr P.tfp) :
     @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz ∗
     @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
     @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P' M'' ∗ pwRestExt pa pid V P ⊢
       procPrivExtNoctxAt (GF := GF) curCtx pa pid V P' M'' := by
   unfold procPrivExtNoctxAt pwRestExt procFieldsNoctx
-  rw [hext.1, hext.2.1]
+  rw [hext.1.1, hext.1.2.1]
   iintro ⟨Hszc, Hpgc, Hspace, Hpid, Hks, Htfc, Hof, Hcwd, Hnm, Htfp⟩
   isplitl []
-  · ipureintro; exact ⟨hf.1, hf.2.1, hf.2.2⟩
+  · ipureintro; exact ⟨hf.1, UMemL.umBelow_extSz hf.2.1 hext, hf.2.2.1, hf.2.2.2⟩
   · iframe
 
 

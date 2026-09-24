@@ -47,7 +47,7 @@ theorem ec_copyout_call (CO : COPYOUT) [CurCtx] (c : CPU) (k' : KCtx) (γl : GNa
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       byteBuf (k'.regs 13#5) dqs bs -∗
       (∃ (P' : UPtd) (M' : Nat → List (BitVec 8)),
-        ⌜P.ext P' ∧
+        ⌜P.extSz (k'.regs 11#5) P' ∧
           ((R' 10#5 = 0#64 ∧ M' = umemWrite (viewFaulted P P' M) (k'.regs 12#5).toNat bs) ∨
            (R' 10#5 = -1#64 ∧ ∃ d, d < bs.length ∧
               M' = umemWrite (viewFaulted P P' M) (k'.regs 12#5).toNat (bs.take d)))⌝ ∗
@@ -215,7 +215,7 @@ theorem either_copyout_proof (MP : MYPROC) (CO : COPYOUT) (MM : MEMMOVE) : EITHE
     iintro %c23 HΦ %R3 Hk Hpc %hexit
     obtain ⟨x10, x1, x2, x8, x9, x18, x19, x20, xrest⟩ := hexit
     ihave Hout : (∃ (Q : UPtd) (N : Nat → List (BitVec 8)),
-        ⌜P.ext Q ∧
+        ⌜P.extSz V.sz Q ∧
           ((R3 10#5 = 0#64 ∧ N = umemWrite (viewFaulted P Q M) (k.regs 11#5).toNat bs) ∨
            (R3 10#5 = 18446744073709551615#64 ∧ ∃ d, d < bs.length ∧
               N = umemWrite (viewFaulted P Q M) (k.regs 11#5).toNat (List.take d bs)))⌝ ∗
@@ -226,7 +226,7 @@ theorem either_copyout_proof (MP : MYPROC) (CO : COPYOUT) (MM : MEMMOVE) : EITHE
       isplitl []
       · ipureintro; rw [x10]; exact hpost
       · iapply (ec_priv_close (procAddr j) pid V P P' M' hpost.1
-          ⟨hfacts.1, hfacts.2.1, hfacts.2.2⟩)
+          hfacts)
         simp only [pSz, pPagetable]
         iframe
     iapply HΦ $$ %spie2 %spp2 %R3

@@ -46,7 +46,7 @@ theorem sys_pipe_stage_f (FC : FILECLOSE) (Γ : SchedNames) (cpu c : CPU) (k : K
     (k0 k1 fd0 fd1 : Nat) (hk0 : k0 < NFILE) (hk1 : k1 < NFILE) (hfd0 : fd0 < 16) (hfd1 : fd1 < 16)
     (hz0 : V.ofile[fd0]? = some 0#64) (hz1 : V.ofile[fd1]? = some 0#64) (hne : fd0 ≠ fd1)
     (l : List Nat) (hfrees : fdFrees V.ofile = fd0 :: fd1 :: l)
-    (P1 P2 : UPtd) (M1 M2 : Nat → List (BitVec 8)) (hext1 : V.upt.ext P1) (hext2 : P1.ext P2)
+    (P1 P2 : UPtd) (M1 M2 : Nat → List (BitVec 8)) (hext1 : V.upt.extSz V.sz P1) (hext2 : P1.extSz V.sz P2)
     (hM1 : M1 = umemWrite (viewFaulted V.upt P1 M) v.toNat (sysPipeFdBytes fd0))
     (hr2 : (R 10#5 = 0#64 ∧ M2 = umemWrite (viewFaulted P1 P2 M1) (v + 4#64).toNat (sysPipeFdBytes fd1)) ∨
       (R 10#5 = -1#64 ∧ ∃ d, d < (sysPipeFdBytes fd1).length ∧
@@ -116,14 +116,15 @@ theorem sys_pipe_stage_f (FC : FILECLOSE) (Γ : SchedNames) (cpu c : CPU) (k : K
       (.open true false .pipe) (by simp) hl0 hk0 (by intro h; cases h) $$ [Howe Hr0 Ha0]
     · iframe
     ihave Hcore := (show sysPipeCoreExt (GF := GF) pa pid V P2 M2 ⊢
-        sysPipeCoreExt pa pid { V with ofile := (V.ofile.set fd0 (fnode k0)).set fd1 (fnode k1) } P2 M2 from
+        procPrivCoreNoctxAt curCtx pa pid
+          { V with ofile := (V.ofile.set fd0 (fnode k0)).set fd1 (fnode k1), upt := P2 } M2 from
       .rfl) $$ Hcore
     ihave Hpost : sysPipePost (GF := GF) γ γd pa pid V M sts v 0#64 $$ [Hcore Howe Hfrag]
     case' _ =>
       unfold sysPipePost
       iright; iright
       iexists fd0, fd1, l, k0, k1, P2, M2
-      unfold sysPipePrivExt procOfiles
+      unfold procPrivFd procOfiles
       iframe Hcore Howe Hfrag
       ipureintro
       exact ⟨rfl, hfrees, hne, hst0, hst1, P1, hext1, hext2, by rw [hM2, hM1]⟩
@@ -158,8 +159,8 @@ theorem sys_pipe_stage_e {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     (k0 k1 fd0 fd1 : Nat) (hk0 : k0 < NFILE) (hk1 : k1 < NFILE) (hfd0 : fd0 < 16) (hfd1 : fd1 < 16)
     (hz0 : V.ofile[fd0]? = some 0#64) (hz1 : V.ofile[fd1]? = some 0#64) (hne : fd0 ≠ fd1)
     (l : List Nat) (hfrees : fdFrees V.ofile = fd0 :: fd1 :: l)
-    (P1 : UPtd) (M1 : Nat → List (BitVec 8)) (hext1 : V.upt.ext P1)
-    (hf : V.sz.toNat ≤ uvmMaxsz ∧ V.pagetable = pageAddr V.upt.root ∧ V.trapframe = pageAddr V.upt.tfp)
+    (P1 : UPtd) (M1 : Nat → List (BitVec 8)) (hext1 : V.upt.extSz V.sz P1)
+    (hf : V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧ V.pagetable = pageAddr V.upt.root ∧ V.trapframe = pageAddr V.upt.tfp)
     (hr1 : (R 10#5 = 0#64 ∧ M1 = umemWrite (viewFaulted V.upt P1 M) v.toNat (sysPipeFdBytes fd0)) ∨
       (R 10#5 = -1#64 ∧ ∃ d, d < (sysPipeFdBytes fd0).length ∧
         M1 = umemWrite (viewFaulted V.upt P1 M) v.toNat ((sysPipeFdBytes fd0).take d)))
@@ -228,7 +229,7 @@ theorem sys_pipe_stage_e {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     case hn => k_norm_g; omega
     case hKc => k_norm_g; unfold sysPipeSlots at hK; omega
     case hl => k_norm_g; exact hkmem
-    case hroot => k_norm_g; rw [hf.2.1, hext1.1]
+    case hroot => k_norm_g; rw [hf.2.2.1, hext1.1.1]
     case hsz => k_norm_g; have := hf.1; unfold uvmMaxsz at this; omega
     case hlen => k_norm_g; rfl
     iapply wpNext_intro_pin
@@ -244,7 +245,7 @@ theorem sys_pipe_stage_e {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     obtain ⟨hpins2, h9'⟩ := sys_pipe_pins_call k _ R2 hpins0 hcs2
     ihave Hc1 := (sys_pipe_fd1_bytes (k.regs 2#5) hal fd1).2 $$ Hb1
     ihave Hfr := Hfrw $$ %(BitVec.ofNat 32 fd1) Hc1
-    ihave Hcore := sys_pipe_core_ext pa pid V P2 M2 (UMemL.ext_trans hext1 hext2) hf $$ [Hsz Hpg Hpt Hrest]
+    ihave Hcore := sys_pipe_core_ext pa pid V P2 M2 (UMemL.extSz_trans hext1 hext2) hf $$ [Hsz Hpg Hpt Hrest]
     · iframe
     have hsp2' : k.sie = false → spie2 = k.spie ∧ spp2 = k.spp := fun h =>
       ⟨(hsp2 h).1.trans (hsp h).1, (hsp2 h).2.trans (hsp h).2⟩
@@ -265,7 +266,7 @@ theorem sys_pipe_stage_e {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     · iframe
     iapply (sys_pipe_unfd2 FC Γ cpu c1 k γl γ γd pa pid V M sts v γkl γk spie spp R k0 k1 fd0 fd1 hk0 hk1
         hfd0 hfd1 hz0 hz1 hne l d 0 P1 M1
-        ⟨hfrees, Or.inl ⟨by simpa using hd, rfl⟩, P1, hext1, UMemL.ext_refl P1, by
+        ⟨hfrees, Or.inl ⟨by simpa using hd, rfl⟩, P1, hext1, UMemL.extSz_refl _ P1, by
           rw [List.take_zero, UMemL.umemWrite_nil, UMemL.viewFaulted_self, hM1]⟩
         htier hnoff hK hlk hplk hprc hkmem hpin1 hsp hpins h9 v)
       $$ [- $Hk $Hpc $Hfr $Hrf $Hwf $Hr0 $Hr1 $Hcore $Howe $Hu0 $Ha0 $Hu1 $Ha1 $Hfrag $Hnext]
@@ -400,7 +401,7 @@ theorem sys_pipe_stage_d {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
       (hp9 h).trans ((hp8 h).trans ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans
         ((hp3 h).trans ((hp2 h).trans ((hp1 h).trans (hpin h)))))))))
     iapply (sys_pipe_stage_e rfl FC CO Γ cpu c9 k γl γ γd pa pid V M sts v γkl γk spie2 spp2 R2 k0 k1 fd0 fd1
-        hk0 hk1 hfd0 hfd1 hz0 hz1 hne l hfrees P1 M1 hext1 ⟨hf.1, hf.2.2.1, hf.2.2.2⟩ hr1
+        hk0 hk1 hfd0 hfd1 hz0 hz1 hne l hfrees P1 M1 hext1 hf hr1
         htier hnoff hK hlk hplk hprc hkmem hpin9 hsp2' hpins2
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] at h9'; exact h9'.trans h9))
       $$ [- $Hk $Hpc $Hfr $Hrf $Hwf $Hr0 $Hr1 $Hsz $Hpg $Hpt $Hrest $Howe $Hu0 $Ha0 $Hu1 $Ha1 $Hfrag $Hnext]

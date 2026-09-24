@@ -42,12 +42,9 @@ DEVIATIONS FROM ROCQ:
     `viewFaulted`, and the post composes the two such writes (the
     intermediate descriptor is existential) instead of proving the
     adjacent-window merge Rocq's `umem_wr_app` provides.
-  * THE BLOCK AFTER A COPYOUT DROPS `umBelow` (`sysPipePrivExt`): the Lean
-    `COPYOUT` promises only `P.ext P'`, not Rocq's `uptd_ext_sz`, so the
-    size bound on the gained leaves cannot be re-established -- exactly
-    `procPrivExtNoctxAt`'s treatment in `sys_wait`/`kwait`, with the fd
-    table split off as in `procPrivFd`.  The first arm, where no copyout
-    ran, keeps the whole `procPrivFd`.
+  (The block after a copyout is Rocq's: `procPrivFd` at `{ V with upt :=
+  P' }`, the grown table under `uptd_ext_sz (pv_sz V)` -- `sysPipeMem`'s
+  two `extSz` steps -- so `umBelow` survives.)
   * THE PAGE COUNT IS THE UNCOUNTED MODE (`kallocAvail γk none`, Rocq's
     `kalloc_env γa None`): copyout's vmfault needs it, and `none` is
     persistent, so it is not returned (the caller keeps its copy).
@@ -83,31 +80,16 @@ def sysPipeFdBytes (fd : Nat) : List (BitVec 8) := wordToBytes4 (BitVec.ofNat 32
 @[simp] theorem sysPipeFdBytes_length (fd : Nat) : (sysPipeFdBytes fd).length = 4 := rfl
 
 /-- The user image after the two `copyout`s of `b0` at `v` and `b1` at
-`v + 4`: each grows the address space (`P ⊆ P1 ⊆ P'`) and writes its bytes
-over the view with the new pages zeroed. -/
-def sysPipeMem (P : UPtd) (M : Nat → List (BitVec 8)) (v : BitVec 64) (b0 b1 : List (BitVec 8))
-    (P' : UPtd) (M' : Nat → List (BitVec 8)) : Prop :=
-  ∃ P1 : UPtd, P.ext P1 ∧ P1.ext P' ∧
+`v + 4`: each grows the address space under the break `sz` (`P ⊆ P1 ⊆ P'`,
+Rocq's `uptd_ext_sz`) and writes its bytes over the view with the new pages
+zeroed. -/
+def sysPipeMem (sz : BitVec 64) (P : UPtd) (M : Nat → List (BitVec 8)) (v : BitVec 64)
+    (b0 b1 : List (BitVec 8)) (P' : UPtd) (M' : Nat → List (BitVec 8)) : Prop :=
+  ∃ P1 : UPtd, P.extSz sz P1 ∧ P1.extSz sz P' ∧
     M' = umemWrite (viewFaulted P1 P' (umemWrite (viewFaulted P P1 M) v.toNat b0)) (v + 4#64).toNat b1
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [CurCtx]
-
-/-- `procPrivCoreNoctxAt` once `copyout` grew the space to `P'`: the size
-bound on the leaves dropped (`procPrivExtNoctxAt`'s shape, without the fd
-table). -/
-def sysPipeCoreExt (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
-    (M' : Nat → List (BitVec 8)) : IProp GF := iprop%
-  ⌜V.sz.toNat ≤ uvmMaxsz ∧ V.pagetable = pageAddr P'.root ∧ V.trapframe = pageAddr P'.tfp⌝ ∗
-  @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗
-  @procFieldsNoOfile hlc GF _ ⟨curCtx, KTier.kpt⟩ pa (DFrac.own 1) V ∗
-  @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P' M' ∗
-  @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P'.tfp V.tf
-
-/-- The fd-aware block at the grown space (`procPrivFd` with `sysPipeCoreExt`). -/
-def sysPipePrivExt (γ : FileNames) (γd : Nat → GName) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (P' : UPtd) (M' : Nat → List (BitVec 8)) : IProp GF := iprop%
-  sysPipeCoreExt pa pid V P' M' ∗ procOfiles γ γd pa V.ofile
 
 /-- sys_pipe's result, keyed by the returned `a0`. -/
 def sysPipePost (γ : FileNames) (γd : Nat → GName) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
@@ -116,13 +98,13 @@ def sysPipePost (γ : FileNames) (γd : Nat → GName) (pa : BitVec 64) (pid : B
   (∃ (fd0 fd1 : Nat) (l : List Nat) (d0 d1 : Nat) (P' : UPtd) (M' : Nat → List (BitVec 8)),
     ⌜r = 0xFFFFFFFFFFFFFFFF#64 ∧ fdFrees V.ofile = fd0 :: fd1 :: l ∧
       ((d0 < 4 ∧ d1 = 0) ∨ (d0 = 4 ∧ d1 < 4)) ∧
-      sysPipeMem V.upt M v ((sysPipeFdBytes fd0).take d0) ((sysPipeFdBytes fd1).take d1) P' M'⌝ ∗
-    sysPipePrivExt γ γd pa pid V P' M' ∗ fdFrags γd sts) ∨
+      sysPipeMem V.sz V.upt M v ((sysPipeFdBytes fd0).take d0) ((sysPipeFdBytes fd1).take d1) P' M'⌝ ∗
+    procPrivFd γ γd pa pid { V with upt := P' } M' ∗ fdFrags γd sts) ∨
   (∃ (fd0 fd1 : Nat) (l : List Nat) (k0 k1 : Nat) (P' : UPtd) (M' : Nat → List (BitVec 8)),
     ⌜r = 0#64 ∧ fdFrees V.ofile = fd0 :: fd1 :: l ∧ fd0 ≠ fd1 ∧
       sts[fd0]? = some .closed ∧ sts[fd1]? = some .closed ∧
-      sysPipeMem V.upt M v (sysPipeFdBytes fd0) (sysPipeFdBytes fd1) P' M'⌝ ∗
-    sysPipePrivExt γ γd pa pid { V with ofile := (V.ofile.set fd0 (fnode k0)).set fd1 (fnode k1) } P' M' ∗
+      sysPipeMem V.sz V.upt M v (sysPipeFdBytes fd0) (sysPipeFdBytes fd1) P' M'⌝ ∗
+    procPrivFd γ γd pa pid { V with ofile := (V.ofile.set fd0 (fnode k0)).set fd1 (fnode k1), upt := P' } M' ∗
     fdFrags γd ((sts.set fd0 (.open true false .pipe)).set fd1 (.open false true .pipe)))
 
 /-- What sys_pipe's caller resumes with. -/

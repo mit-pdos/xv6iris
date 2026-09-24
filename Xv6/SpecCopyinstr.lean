@@ -34,7 +34,7 @@ def wp_copyinstr_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
     ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     (∃ (P' : UPtd) (bs' : List (BitVec 8)),
-      ⌜P.ext P' ∧
+      ⌜P.extSz (k.regs 11#5) P' ∧
         ((R' 10#5 = 0#64 ∧ ∃ s, umemStr (viewFaulted P P' M) (k.regs 13#5).toNat old.length = some s ∧
             bs' = s ++ old.drop s.length) ∨
          (R' 10#5 = -1#64 ∧ ∃ d, d ≤ old.length ∧

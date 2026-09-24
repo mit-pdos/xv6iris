@@ -288,7 +288,7 @@ theorem sys_pipe_copyout (CO : COPYOUT) (c : CPU) (k' : KCtx) (γl : GName) (γk
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       byteBuf (k'.regs 13#5) (DFrac.own 1) bs -∗
       (∃ (P' : UPtd) (M' : Nat → List (BitVec 8)),
-        ⌜P.ext P' ∧
+        ⌜P.extSz (k'.regs 11#5) P' ∧
           ((R' 10#5 = 0#64 ∧ M' = umemWrite (viewFaulted P P' M) (k'.regs 12#5).toNat bs) ∨
            (R' 10#5 = -1#64 ∧ ∃ d, d < bs.length ∧
               M' = umemWrite (viewFaulted P P' M) (k'.regs 12#5).toNat (bs.take d)))⌝ ∗
@@ -497,19 +497,37 @@ theorem sys_pipe_core_split (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M
   iframe Hpid Hks Hsz Hpg Htf Hcwd Hnm Hpt Htfp
   ipureintro; exact hf
 
+/-- `procPrivCoreNoctxAt` at the descriptor `copyout` grew the space to
+(`EitherDefs.procPrivExt`'s descriptor form, fd-free): the same resource as
+the core at `{ V with upt := P' }` (`sysPipeCoreExt_eq`). -/
+def sysPipeCoreExt (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
+    (M' : Nat → List (BitVec 8)) : IProp GF := iprop%
+  ⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz P' ∧
+    V.pagetable = pageAddr P'.root ∧ V.trapframe = pageAddr P'.tfp⌝ ∗
+  @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗
+  @procFieldsNoOfile hlc GF _ ⟨curCtx, KTier.kpt⟩ pa (DFrac.own 1) V ∗
+  @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P' M' ∗
+  @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P'.tfp V.tf
+
+theorem sysPipeCoreExt_eq (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
+    (M' : Nat → List (BitVec 8)) :
+    sysPipeCoreExt (GF := GF) pa pid V P' M' = procPrivCoreNoctxAt curCtx pa pid { V with upt := P' } M' :=
+  rfl
+
 /-- Close at the grown space. -/
 theorem sys_pipe_core_ext (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
-    (M' : Nat → List (BitVec 8)) (hext : V.upt.ext P')
-    (hf : V.sz.toNat ≤ uvmMaxsz ∧ V.pagetable = pageAddr V.upt.root ∧ V.trapframe = pageAddr V.upt.tfp) :
+    (M' : Nat → List (BitVec 8)) (hext : V.upt.extSz V.sz P')
+    (hf : V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧ V.pagetable = pageAddr V.upt.root ∧
+      V.trapframe = pageAddr V.upt.tfp) :
     @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz ∗
     @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
     @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P' M' ∗ sysPipeCoreRest pa pid V ⊢
       sysPipeCoreExt pa pid V P' M' := by
   unfold sysPipeCoreExt sysPipeCoreRest procFieldsNoOfile
-  rw [hext.1, hext.2.1]
+  rw [hext.1.1, hext.1.2.1]
   iintro ⟨Hsz, Hpg, Hpt, Hpid, Hks, Htf, Hcwd, Hnm, Htfp⟩
   iframe Hsz Hpg Hpt Hpid Hks Htf Hcwd Hnm Htfp
-  ipureintro; exact hf
+  ipureintro; exact ⟨hf.1, UMemL.umBelow_extSz hf.2.1 hext, hf.2.2.1, hf.2.2.2⟩
 
 /-- Close at the entry space (no copyout ran). -/
 theorem sys_pipe_core_join (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))

@@ -20,7 +20,7 @@ crosses `sleep`'s hart-generic return.
 THE IMAGE DOES NOT MOVE: pipewrite only READS user memory (one byte per
 round through `copyin`), so the process block comes back at the caller's own
 `M` with only the faulted pages zeroed (`viewFaulted`) and the DESCRIPTOR
-grown (`V.upt.ext P'`).  The pipe's CONTENTS stay existential (`pipeResAt`
+grown (`V.upt.extSz V.sz P'`).  The pipe's CONTENTS stay existential (`pipeResAt`
 hides the byte window), so nothing about them is promised.
 
 Stack: pipewrite's own 14 slots over copyin's 50 (`pipewriteSlots = 64`).
@@ -64,11 +64,11 @@ def wp_pipewrite_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
   isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
   procPrivNoctxAt curCtx (procAddr j) pid V M ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd),
-    ⌜calleeSaved k.regs R' ∧ V.upt.ext P' ∧ pipeRwRet n (R' 10#5)⌝ -∗
+    ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧ pipeRwRet n (R' 10#5)⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
     pipeRef γp w q -∗
-    procPrivExtNoctxAt curCtx (procAddr j) pid V P' (viewFaulted V.upt P' M) -∗ wpLoop cpu'))
+    procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' } (viewFaulted V.upt P' M) -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `pipewrite`. -/

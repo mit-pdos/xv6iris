@@ -147,6 +147,18 @@ def UPtd.ext (P P' : UPtd) : Prop :=
   P'.root = P.root ∧ P'.tfp = P.tfp ∧
   ∀ k w, Iris.Std.PartialMap.get? P.um k = some w → Iris.Std.PartialMap.get? P'.um k = some w
 
+/-- `P ⊆ P'` with the break `sz` bounding what was gained (Rocq
+`ProcPtOwn.uptd_ext_sz`): same root and trapframe, more leaves, every
+GAINED leaf below `sz` and `vmfault`'s own read/write user leaf.  What the
+user-copy functions promise about the table their lazy faults grew, so a
+caller keeps `umBelow` across them. -/
+def UPtd.extSz (sz : BitVec 64) (P P' : UPtd) : Prop :=
+  P.ext P' ∧
+  (∀ k w, Iris.Std.PartialMap.get? P.um k = none → Iris.Std.PartialMap.get? P'.um k = some w →
+    k * 4096 < sz.toNat) ∧
+  (∀ k w, Iris.Std.PartialMap.get? P.um k = none → Iris.Std.PartialMap.get? P'.um k = some w →
+    ∃ r : BitVec 64, w = uLeaf (BitVec.extractLsb' 12 44 r) (PTE_W ||| PTE_U ||| PTE_R))
+
 /-- The view with page `k` zeroed. -/
 def viewZero (M : Nat → List (BitVec 8)) (k : Nat) : Nat → List (BitVec 8) :=
   fun k' => if k' = k then List.replicate 4096 0#8 else M k'

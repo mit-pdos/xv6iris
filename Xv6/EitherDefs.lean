@@ -9,14 +9,15 @@ Both functions are the same 31-instruction block with `a0`/`a1` swapped and
 a different callee, so everything here except the two entry addresses, the
 two slot counts and the calls to `copyout` / `copyin` is common to them.
 
-THE `umBelow` SEAM: `COPYOUT`/`COPYIN` promise only `P.ext P'` about the
-descriptor the lazy faults grew (the Rocq prototype's `uptd_ext_sz` also
-records that every gained leaf lies below `psz`), so the size bound
-`umBelow V.sz P'` that `procPrivRun` carries cannot be re-established there.
-The user arm therefore hands the private block back as `procPrivExt`,
-which is `procPrivRun` minus exactly that conjunct; `procPrivExt_close`
-turns it back into `procPrivRun` for a caller that knows the bound, and
-`procPriv_to_ext` is the entry weakening.
+THE DESCRIPTOR FORM: the user arm takes and returns the block as
+`procPrivExt pa pid V P`, the running block with its table named
+EXPLICITLY (`P`) rather than read off `V.upt` -- the same resource as
+`procPrivRun pa pid { V with upt := P }` (`procPrivExt_eq_run`, by `rfl`), so
+a caller that copies in a loop re-enters with the table the last call
+grew.  `COPYOUT`/`COPYIN` promise `P.extSz psz P'` (Rocq
+`ProcPtOwn.uptd_ext_sz`): every gained leaf lies below the break, so the
+block comes back WHOLE -- `umBelow V.sz P'` included -- as Rocq's
+`SpecEitherCopyin` hands back `proc_priv_core p pid (us_upt U P')`.
 
 THE RUNNING BLOCK IS CTX-FREE (`procPrivRun` = `SchedCtx.procPrivNoctxAt`):
 the user arm asks for `procPriv` MINUS the context save area, which a
@@ -31,6 +32,7 @@ import MachCSL.Lock
 import Xv6.ProcDefs
 import Xv6.SchedCtx
 import Xv6.UMem
+import Xv6.UMemLemmas
 import Xv6.Image
 import Xv6.Geom
 import Xv6.SpecMyproc
@@ -74,47 +76,42 @@ theorem procPrivRun_eq (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : Proc
     (M : Nat → List (BitVec 8)) :
     @procPrivRun hlc GF _ ⟨ξ, KTier.kpt⟩ pa pid V M = procPrivNoctxAt (GF := GF) ξ pa pid V M := rfl
 
-/-- The private block of a running process whose address space has grown
-to `P'` (the lazy pages `vmfault` filled in under `copyout`/`copyin`):
-`procPrivRun` with `umBelow V.sz V.upt` dropped and the table at `P'`. -/
+/-- The private block of a running process at the descriptor `P'` (the
+table the lazy pages `vmfault` filled in under `copyout`/`copyin` grew
+to): `procPrivRun` with the table named explicitly. -/
 def procPrivExt (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
     (M' : Nat → List (BitVec 8)) : IProp GF := iprop%
-  ⌜V.sz.toNat ≤ uvmMaxsz ∧ V.pagetable = pageAddr P'.root ∧ V.trapframe = pageAddr P'.tfp⌝ ∗
+  ⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz P' ∧
+    V.pagetable = pageAddr P'.root ∧ V.trapframe = pageAddr P'.tfp⌝ ∗
   wordPointsTo (pPid pa) 4 pidPriv pid ∗
   procFieldsNoctx pa (DFrac.own 1) V ∗
   procPtAt P' M' ∗
   tfPageAt P'.tfp V.tf
 
-/-- ... and it is `procPrivExtNoctxAt` there. -/
+/-- ... which IS the running block at the new descriptor. -/
+theorem procPrivExt_eq_run (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
+    (M' : Nat → List (BitVec 8)) :
+    procPrivExt (GF := GF) pa pid V P' M' = procPrivRun pa pid { V with upt := P' } M' := rfl
+
+/-- ... and, at the kernel-page-table context, `procPrivNoctxAt` there. -/
 theorem procPrivExt_eq (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
     (M' : Nat → List (BitVec 8)) :
     @procPrivExt hlc GF _ ⟨ξ, KTier.kpt⟩ pa pid V P' M' =
-      procPrivExtNoctxAt (GF := GF) ξ pa pid V P' M' := rfl
+      procPrivNoctxAt (GF := GF) ξ pa pid { V with upt := P' } M' := rfl
 
 /-- The block, at its own descriptor. -/
 theorem procPriv_to_ext (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) :
-    procPrivRun (GF := GF) pa pid V M ⊢ procPrivExt pa pid V V.upt M := by
-  unfold procPrivRun procPrivExt
-  iintro ⟨%hf, Hpid, Hfields, Hpt, Htf⟩
-  isplitl []
-  · ipureintro; exact ⟨hf.1, hf.2.2.1, hf.2.2.2⟩
-  · iframe
+    procPrivRun (GF := GF) pa pid V M ⊢ procPrivExt pa pid V V.upt M := .rfl
 
 /-- The fields do not mention the address space. -/
 theorem procFields_upt (pa : BitVec 64) (dq : DFrac) (V : ProcPriv) (P' : UPtd) :
     procFieldsNoctx (GF := GF) pa dq { V with upt := P' } = procFieldsNoctx pa dq V := rfl
 
-/-- ... and back, for a caller that knows the size bound. -/
+/-- ... and back. -/
 theorem procPrivExt_close (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
-    (M' : Nat → List (BitVec 8)) (h : umBelow V.sz P') :
-    procPrivExt (GF := GF) pa pid V P' M' ⊢ procPrivRun pa pid { V with upt := P' } M' := by
-  unfold procPrivRun procPrivExt
-  simp only [procFieldsNoctx]
-  iintro ⟨%hf, Hpid, Hfields, Hpt, Htf⟩
-  isplitl []
-  · ipureintro; exact ⟨hf.1, h, hf.2.1, hf.2.2⟩
-  · iframe
+    (M' : Nat → List (BitVec 8)) :
+    procPrivExt (GF := GF) pa pid V P' M' ⊢ procPrivRun pa pid { V with upt := P' } M' := .rfl
 
 end
 
@@ -367,28 +364,28 @@ theorem ec_priv_split [CurCtx] (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) :
     procPrivExt (GF := GF) pa pid V P M ⊢
       ⌜V.sz.toNat ≤ uvmMaxsz ∧ V.pagetable = pageAddr P.root ∧
-         V.trapframe = pageAddr P.tfp⌝ ∗
+         V.trapframe = pageAddr P.tfp ∧ umBelow V.sz P⌝ ∗
       wordPointsTo (pSz pa) 8 (DFrac.own 1) V.sz ∗
       wordPointsTo (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
       procPtAt P M ∗ ecRest pa pid V P := by
   unfold procPrivExt ecRest procFieldsNoctx
   iintro ⟨%hf, Hpid, ⟨Hks, Hszc, Hpgc, Htfc, Hof, Hcwd, Hnm⟩, Hspace, Htfp⟩
   isplitl []
-  · ipureintro; exact hf
+  · ipureintro; exact ⟨hf.1, hf.2.2.1, hf.2.2.2, hf.2.1⟩
   · iframe
 
 theorem ec_priv_close [CurCtx] (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P P' : UPtd)
-    (M' : Nat → List (BitVec 8)) (hext : P.ext P')
+    (M' : Nat → List (BitVec 8)) (hext : P.extSz V.sz P')
     (hf : V.sz.toNat ≤ uvmMaxsz ∧ V.pagetable = pageAddr P.root ∧
-      V.trapframe = pageAddr P.tfp) :
+      V.trapframe = pageAddr P.tfp ∧ umBelow V.sz P) :
     wordPointsTo (pSz pa) 8 (DFrac.own 1) V.sz ∗
     wordPointsTo (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
     procPtAt P' M' ∗ ecRest pa pid V P ⊢ procPrivExt (GF := GF) pa pid V P' M' := by
   unfold procPrivExt ecRest procFieldsNoctx
-  rw [hext.1, hext.2.1]
+  rw [hext.1.1, hext.1.2.1]
   iintro ⟨Hszc, Hpgc, Hspace, Hpid, Hks, Htfc, Hof, Hcwd, Hnm, Htfp⟩
   isplitl []
-  · ipureintro; exact ⟨hf.1, hf.2.1, hf.2.2⟩
+  · ipureintro; exact ⟨hf.1, UMemL.umBelow_extSz hf.2.2.2 hext, hf.2.1, hf.2.2.1⟩
   · iframe
 
 

@@ -539,6 +539,62 @@ theorem ext_insertLeaf (P : UPtd) (vpn : Nat) (r perm : BitVec 64)
     exact absurd hk (by rw [hn]; simp)
   · rw [LawfulPartialMap.get?_insert_ne hc]; exact hk
 
+/-! ## Extension under a break (Rocq `ProcPtOwn.uptd_ext_sz`) -/
+
+theorem extSz_ext {sz : BitVec 64} {P P' : UPtd} (h : P.extSz sz P') : P.ext P' := h.1
+
+theorem extSz_refl (sz : BitVec 64) (P : UPtd) : P.extSz sz P :=
+  ⟨ext_refl P, fun _ _ hn hs => (by rw [hn] at hs; cases hs),
+    fun _ _ hn hs => (by rw [hn] at hs; cases hs)⟩
+
+theorem extSz_trans {sz : BitVec 64} {P Q R : UPtd} (h1 : P.extSz sz Q) (h2 : Q.extSz sz R) :
+    P.extSz sz R := by
+  obtain ⟨he1, hb1, hl1⟩ := h1
+  obtain ⟨he2, hb2, hl2⟩ := h2
+  refine ⟨ext_trans he1 he2, ?_, ?_⟩
+  · intro k w hn hs
+    cases hq : get? Q.um k with
+    | some w' => exact hb1 k w' hn hq
+    | none => exact hb2 k w hq hs
+  · intro k w hn hs
+    cases hq : get? Q.um k with
+    | some w' =>
+      have hr := he2.2.2 k w' hq
+      rw [hr] at hs
+      have e : w' = w := Option.some.inj hs
+      subst e
+      exact hl1 k w' hn hq
+    | none => exact hl2 k w hq hs
+
+/-- A weaker break is still a bound. -/
+theorem extSz_mono {sz sz' : BitVec 64} {P P' : UPtd} (hle : sz.toNat ≤ sz'.toNat)
+    (h : P.extSz sz P') : P.extSz sz' P' :=
+  ⟨h.1, fun k w hn hs => Nat.lt_of_lt_of_le (h.2.1 k w hn hs) hle, h.2.2⟩
+
+/-- `vmfault`'s move, the only way a table grows under a user copy. -/
+theorem extSz_insertLeaf (sz : BitVec 64) (P : UPtd) (vpn : Nat) (r : BitVec 64)
+    (hn : get? P.um vpn = none) (hlt : vpn * 4096 < sz.toNat) :
+    P.extSz sz (P.insertLeaf vpn r (PTE_W ||| PTE_U ||| PTE_R)) := by
+  refine ⟨ext_insertLeaf P vpn r _ hn, ?_, ?_⟩ <;> intro k w hk hs <;>
+    simp only [UPtd.insertLeaf] at hs <;> by_cases hc : vpn = k
+  · subst hc; exact hlt
+  · rw [LawfulPartialMap.get?_insert_ne hc] at hs; rw [hk] at hs; cases hs
+  · subst hc; rw [LawfulPartialMap.get?_insert_eq rfl] at hs; cases hs; exact ⟨r, rfl⟩
+  · rw [LawfulPartialMap.get?_insert_ne hc] at hs; rw [hk] at hs; cases hs
+
+/-- The break bound survives an extension under it (what Rocq's
+`proc_priv_copy` closes with). -/
+theorem umBelow_extSz {sz : BitVec 64} {P P' : UPtd} (hb : umBelow sz P) (h : P.extSz sz P') :
+    umBelow sz P' := by
+  intro k w hk
+  cases h0 : get? P.um k with
+  | some w0 =>
+    exact hb k w0 h0
+  | none =>
+    have := h.2.1 k w h0 hk
+    have hge : sz.toNat ≤ pgRoundUpN sz.toNat := by unfold pgRoundUpN; omega
+    omega
+
 theorem insertLeaf_get (P : UPtd) (vpn : Nat) (r perm : BitVec 64) :
     get? (P.insertLeaf vpn r perm).um vpn = some (uLeaf (BitVec.extractLsb' 12 44 r) perm) := by
   simp only [UPtd.insertLeaf]

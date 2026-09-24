@@ -319,7 +319,7 @@ theorem sys_pipe_unfd2 (FC : FILECLOSE) (Γ : SchedNames) (cpu c : CPU) (k : KCt
     (hz0 : V.ofile[fd0]? = some 0#64) (hz1 : V.ofile[fd1]? = some 0#64) (hne : fd0 ≠ fd1)
     (l : List Nat) (d0 d1 : Nat) (P' : UPtd) (M' : Nat → List (BitVec 8))
     (harm : fdFrees V.ofile = fd0 :: fd1 :: l ∧ ((d0 < 4 ∧ d1 = 0) ∨ (d0 = 4 ∧ d1 < 4)) ∧
-      sysPipeMem V.upt M v ((sysPipeFdBytes fd0).take d0) ((sysPipeFdBytes fd1).take d1) P' M')
+      sysPipeMem V.sz V.upt M v ((sysPipeFdBytes fd0).take d0) ((sysPipeFdBytes fd1).take d1) P' M')
     (htier : k.tier = KTier.kpt) (hnoff : k.noff + 2 < 2 ^ 31) (hK : sysPipeSlots ≤ k.avail)
     (hlk : "ftable" ∉ k.locks) (hplk : "pipe" ∉ k.locks) (hprc : "proc" ∉ k.locks) (hkmem : "kmem" ∉ k.locks)
     (hpin : k.sie = false ∨ k.proc = 0#64 → c = cpu) (hsp : k.sie = false → spie = k.spie ∧ spp = k.spp)
@@ -403,7 +403,7 @@ theorem sys_pipe_unfd2 (FC : FILECLOSE) (Γ : SchedNames) (cpu c : CPU) (k : KCt
   iapply (sys_pipe_close2_a0 FC Γ cpu c10 k γl γ γd pa pid V M sts v γkl γk spie spp _ k0 k1
       (.open true false .pipe) (.open false true .pipe) trivial trivial hk0 hk1 htier hnoff hK hlk hplk hprc hkmem
       hpin10 hsp (by sys_pipe_pins hpins) fa (BitVec.ofNat 32 fd0) (BitVec.ofNat 32 fd1)
-      iprop(sysPipePrivExt γ γd pa pid V P' M' ∗ fdFrags γd sts)
+      iprop(procPrivFd γ γd pa pid { V with upt := P' } M' ∗ fdFrags γd sts)
       (by
         unfold sysPipePost
         iintro ⟨Hb, Hf⟩
@@ -412,7 +412,8 @@ theorem sys_pipe_unfd2 (FC : FILECLOSE) (Γ : SchedNames) (cpu c : CPU) (k : KCt
         iframe Hb Hf
         ipureintro; exact ⟨rfl, harm⟩))
     $$ [- $Hk $Hpc $Hfr $Hrf $Hwf $Hr0 $Hr1 $Hnext]
-  unfold sysPipePrivExt procOfiles
+  unfold procPrivFd procOfiles
+  rw [sysPipeCoreExt_eq] at *
   iframe Hcore Howe Hfrag
   iframe #
 

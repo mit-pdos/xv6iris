@@ -17,12 +17,14 @@ back.  The user arm mirrors `Xv6/SpecCopyin.lean`'s success / `-1` arms
 with the return value `0` (the code returns the flag register itself).
 The frame is 48 bytes (six slots), so `either_copyin` needs 6 + 44 slots.
 
-The private block travels as `procPrivExt` (see `Xv6/EitherDefs.lean` for
-the `umBelow` seam and the ctx-free running block).
+The private block travels as `procPrivExt` (see `Xv6/EitherDefs.lean`:
+the block at an explicit descriptor, and the ctx-free running block).
 
 AND THE USER ARM IS DESCRIPTOR-RELATIVE, like `SpecCopyin`'s: it takes the
 block at the descriptor `P` its caller has already grown to and hands it
-back at `P'` with `P.ext P'`, so a caller that copies in a LOOP
+back at `P'` with `P.extSz V.sz P'` (Rocq `uptd_ext_sz (pv_sz V)`: what
+the lazy faults gained lies below the break, so the block comes back
+whole), so a caller that copies in a LOOP
 (`consolewrite`'s 32-byte chunks) can re-enter it -- `procPrivRun` pins
 `P = V.upt` and cannot be rebuilt once the first call has faulted a page in.
 
@@ -61,7 +63,7 @@ def wp_either_copyin_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     (if user then
       (∃ (P' : UPtd) (bs' : List (BitVec 8)),
-        ⌜P.ext P' ∧
+        ⌜P.extSz V.sz P' ∧
           ((R' 10#5 = 0#64 ∧ bs' = umemRead (viewFaulted P P' M) (k.regs 12#5).toNat old.length) ∨
            (R' 10#5 = -1#64 ∧ ∃ d, d ≤ old.length ∧
               bs' = umemRead (viewFaulted P P' M) (k.regs 12#5).toNat d ++ old.drop d))⌝ ∗

@@ -46,7 +46,7 @@ theorem ec_copyin_call (CI : COPYIN) [CurCtx] (c : CPU) (k' : KCtx) (γl : GName
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       (∃ (P' : UPtd) (bs' : List (BitVec 8)),
-        ⌜P.ext P' ∧
+        ⌜P.extSz (k'.regs 11#5) P' ∧
           ((R' 10#5 = 0#64 ∧ bs' = umemRead (viewFaulted P P' M) (k'.regs 13#5).toNat old.length) ∨
            (R' 10#5 = -1#64 ∧ ∃ d, d ≤ old.length ∧
               bs' = umemRead (viewFaulted P P' M) (k'.regs 13#5).toNat d ++ old.drop d))⌝ ∗
@@ -214,7 +214,7 @@ theorem either_copyin_proof (MP : MYPROC) (CI : COPYIN) (MM : MEMMOVE) : EITHER_
     iintro %c23 HΦ %R3 Hk Hpc %hexit
     obtain ⟨x10, x1, x2, x8, x9, x18, x19, x20, xrest⟩ := hexit
     ihave Hout : (∃ (Q : UPtd) (cs : List (BitVec 8)),
-        ⌜P.ext Q ∧
+        ⌜P.extSz V.sz Q ∧
           ((R3 10#5 = 0#64 ∧
               cs = umemRead (viewFaulted P Q M) (k.regs 12#5).toNat old.length) ∨
            (R3 10#5 = 18446744073709551615#64 ∧ ∃ d, d ≤ old.length ∧
@@ -228,7 +228,7 @@ theorem either_copyin_proof (MP : MYPROC) (CI : COPYIN) (MM : MEMMOVE) : EITHER_
       · ipureintro; rw [x10]; exact hpost
       · isplitl [Hsz Hpg Hspace Hrest]
         · iapply (ec_priv_close (procAddr j) pid V P P' (viewFaulted P P' M) hpost.1
-            ⟨hfacts.1, hfacts.2.1, hfacts.2.2⟩)
+            hfacts)
           simp only [pSz, pPagetable]
           iframe
         · k_norm_g [e20]

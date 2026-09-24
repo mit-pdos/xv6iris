@@ -57,7 +57,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 
 /-! ## The block, opened at the trapframe -/
 
-/-- `fetchstrPriv` minus the `p->trapframe` cell and the trapframe page. -/
+/-- The core block (at descriptor `P`) minus the `p->trapframe` cell and the trapframe page. -/
 def argstrRest [CurCtx] (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : UPtd)
     (M : Nat → List (BitVec 8)) : IProp GF := iprop%
   wordPointsTo (pPid pa) 4 pidPriv pid ∗
@@ -69,32 +69,34 @@ def argstrRest [CurCtx] (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : U
   procPtAt P M
 
 theorem argstr_priv_split [X : CurCtx] (ξ : CtxId) (hX : X = ⟨ξ, KTier.kpt⟩) (pa : BitVec 64)
-    (pid : BitVec 32) (V : ProcPriv) (P : UPtd) (M : Nat → List (BitVec 8)) :
-    fetchstrPriv (GF := GF) ξ pa pid V P M ⊢
-      ⌜V.sz.toNat ≤ uvmMaxsz ∧ V.pagetable = pageAddr P.root ∧ V.trapframe = pageAddr P.tfp⌝ ∗
-      wordPointsTo (pTrapframe pa) 8 (DFrac.own 1) (pageAddr P.tfp) ∗
-      tfPageAt P.tfp V.tf ∗ argstrRest pa pid V P M := by
+    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
+    procPrivCoreNoctxAt (GF := GF) ξ pa pid V M ⊢
+      ⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧ V.pagetable = pageAddr V.upt.root ∧
+        V.trapframe = pageAddr V.upt.tfp⌝ ∗
+      wordPointsTo (pTrapframe pa) 8 (DFrac.own 1) (pageAddr V.upt.tfp) ∗
+      tfPageAt V.upt.tfp V.tf ∗ argstrRest pa pid V V.upt M := by
   subst hX
-  unfold fetchstrPriv argstrRest procFieldsNoOfile
+  unfold procPrivCoreNoctxAt argstrRest procFieldsNoOfile
   iintro ⟨%hf, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm⟩, Hpt, Htfp⟩
-  obtain ⟨h1, h2, h3⟩ := hf
+  obtain ⟨h1, h0, h2, h3⟩ := hf
   rw [h3]
   isplitl []
-  · ipureintro; exact ⟨h1, h2, rfl⟩
+  · ipureintro; exact ⟨h1, h0, h2, rfl⟩
   · iframe
 
 theorem argstr_priv_close [X : CurCtx] (ξ : CtxId) (hX : X = ⟨ξ, KTier.kpt⟩) (pa : BitVec 64)
-    (pid : BitVec 32) (V : ProcPriv) (P : UPtd) (M : Nat → List (BitVec 8))
-    (hf : V.sz.toNat ≤ uvmMaxsz ∧ V.pagetable = pageAddr P.root ∧ V.trapframe = pageAddr P.tfp) :
-    wordPointsTo (pTrapframe pa) 8 (DFrac.own 1) (pageAddr P.tfp) ∗
-    tfPageAt P.tfp V.tf ∗ argstrRest pa pid V P M ⊢ fetchstrPriv (GF := GF) ξ pa pid V P M := by
+    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
+    (hf : V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧ V.pagetable = pageAddr V.upt.root ∧
+      V.trapframe = pageAddr V.upt.tfp) :
+    wordPointsTo (pTrapframe pa) 8 (DFrac.own 1) (pageAddr V.upt.tfp) ∗
+    tfPageAt V.upt.tfp V.tf ∗ argstrRest pa pid V V.upt M ⊢ procPrivCoreNoctxAt (GF := GF) ξ pa pid V M := by
   subst hX
-  unfold fetchstrPriv argstrRest procFieldsNoOfile
-  obtain ⟨h1, h2, h3⟩ := hf
+  unfold procPrivCoreNoctxAt argstrRest procFieldsNoOfile
+  obtain ⟨h1, h0, h2, h3⟩ := hf
   rw [← h3]
   iintro ⟨Htf, Htfp, Hpid, Hks, Hsz, Hpg, Hcwd, Hnm, Hpt⟩
   isplitl []
-  · ipureintro; exact ⟨h1, h2, rfl⟩
+  · ipureintro; exact ⟨h1, h0, h2, rfl⟩
   · iframe
 
 variable [CurCtx]
@@ -121,24 +123,25 @@ theorem argstr_argraw (AR : ARGRAW) (c : CPU) (k' : KCtx) (i : Nat) (tfp : BitVe
 
 set_option maxHeartbeats 1000000 in
 theorem argstr_fetchstr (FS : FETCHSTR) (c : CPU) (k' : KCtx) (γl : GName) (γk : KmemNames)
-    (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : UPtd) (M : Nat → List (BitVec 8))
+    (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (old : List (BitVec 8))
     (hproc : k'.proc = pa) (htier : k'.tier = KTier.kpt)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : fetchstrSlots ≤ k'.avail) (hlk : "kmem" ∉ k'.locks)
     (hmax : k'.regs 12#5 = BitVec.ofNat 64 old.length) (hmax' : old.length < 2 ^ 31) :
     kctx c k' ∗ pcIs c KA.«fetchstr» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-    kallocAvail γk none ∗ fetchstrPriv curCtx pa pid V P M ∗
+    kallocAvail γk none ∗ procPrivCoreNoctxAt curCtx pa pid V M ∗
     byteBuf (k'.regs 11#5) (DFrac.own 1) old ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       (∃ (P' : UPtd) (bs : List (BitVec 8)),
-        ⌜P.ext P' ∧ fetchstrRet (viewFaulted P P' M) (k'.regs 10#5).toNat old bs (R' 10#5)⌝ ∗
-        fetchstrPriv curCtx pa pid V P' (viewFaulted P P' M) ∗
+        ⌜V.upt.extSz V.sz P' ∧
+          fetchstrRet (viewFaulted V.upt P' M) (k'.regs 10#5).toNat old bs (R' 10#5)⌝ ∗
+        procPrivCoreNoctxAt curCtx pa pid { V with upt := P' } (viewFaulted V.upt P' M) ∗
         byteBuf (k'.regs 11#5) (DFrac.own 1) bs) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := FS.wp_fetchstr (hlc := hlc) (GF := GF) c k' γl γk pa pid V P M old
+  have h := FS.wp_fetchstr (hlc := hlc) (GF := GF) c k' γl γk pa pid V M old
     hproc htier hnoff hK hlk hmax hmax'
   unfold wp_fetchstr_body at h
   simp only [fetchstrAddr] at h
@@ -187,7 +190,7 @@ end
 
 set_option maxHeartbeats 16000000 in
 theorem argstr_proof (AR : ARGRAW) (FS : FETCHSTR) : ARGSTR :=
-  ⟨fun {hlc GF} _ _ X cpu k γl γk pa pid V P M i v old hi ha0 hv hproc htier hnoff hK hlk hmax
+  ⟨fun {hlc GF} _ _ X cpu k γl γk pa pid V M i v old hi ha0 hv hproc htier hnoff hK hlk hmax
       hmax' => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
@@ -200,7 +203,7 @@ theorem argstr_proof (AR : ARGRAW) (FS : FETCHSTR) : ARGSTR :=
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK60 : 60 ≤ k.avail := hK
   have hK4 : 4 ≤ k.avail := by omega
-  icases argstr_priv_split (GF := GF) ξ0 rfl pa pid V P M $$ Hpriv with ⟨%hfacts, Htf, Htfp, Hrest⟩
+  icases argstr_priv_split (GF := GF) ξ0 rfl pa pid V M $$ Hpriv with ⟨%hfacts, Htf, Htfp, Hrest⟩
   -- the prologue
   iapply (wp_prologue4s2_gen cpu k KA.«argstr» hK4)
   k_code (text_instr _ _ _ _ rfl rfl) Htext
@@ -221,9 +224,9 @@ theorem argstr_proof (AR : ARGRAW) (FS : FETCHSTR) : ARGSTR :=
   iintro Hk Hpc
   k_norm_g
   -- argraw(n)
-  ihave Htf := (show wordPointsTo (GF := GF) (pTrapframe pa) 8 (DFrac.own 1) (pageAddr P.tfp) ⊢
-      wordPointsTo (pTrapframe k.proc) 8 (DFrac.own 1) (pageAddr P.tfp) from by rw [hproc]) $$ Htf
-  iapply (argstr_argraw AR c4 _ i P.tfp V.tf v (DFrac.own 1) hi ?ha0 hv ?hnA ?hKA) $$ [- $Hk $Hpc]
+  ihave Htf := (show wordPointsTo (GF := GF) (pTrapframe pa) 8 (DFrac.own 1) (pageAddr V.upt.tfp) ⊢
+      wordPointsTo (pTrapframe k.proc) 8 (DFrac.own 1) (pageAddr V.upt.tfp) from by rw [hproc]) $$ Htf
+  iapply (argstr_argraw AR c4 _ i V.upt.tfp V.tf v (DFrac.own 1) hi ?ha0 hv ?hnA ?hKA) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g
   iframe Htf Htfp
@@ -238,9 +241,9 @@ theorem argstr_proof (AR : ARGRAW) (FS : FETCHSTR) : ARGSTR :=
   k_norm_g at hcs1
   obtain ⟨e2, e8, e9, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩ := hcs1
   k_norm_g
-  ihave Htf := (show wordPointsTo (GF := GF) (pTrapframe k.proc) 8 (DFrac.own 1) (pageAddr P.tfp) ⊢
-      wordPointsTo (pTrapframe pa) 8 (DFrac.own 1) (pageAddr P.tfp) from by rw [hproc]) $$ Htf
-  ihave Hpriv := argstr_priv_close (GF := GF) ξ0 rfl pa pid V P M hfacts $$ [Htf Htfp Hrest]
+  ihave Htf := (show wordPointsTo (GF := GF) (pTrapframe k.proc) 8 (DFrac.own 1) (pageAddr V.upt.tfp) ⊢
+      wordPointsTo (pTrapframe pa) 8 (DFrac.own 1) (pageAddr V.upt.tfp) from by rw [hproc]) $$ Htf
+  ihave Hpriv := argstr_priv_close (GF := GF) ξ0 rfl pa pid V M hfacts $$ [Htf Htfp Hrest]
   case' _ => iframe
   -- mv a2,s1 ; mv a1,s2 ; jal fetchstr
   k_step_gen (wp_s_add c5 _ (KA.«argstr» + 0x14#64) true 12#5 0#5 9#5 (by decide))
@@ -254,7 +257,7 @@ theorem argstr_proof (AR : ARGRAW) (FS : FETCHSTR) : ARGSTR :=
   iintro Hk Hpc
   k_norm_g
   -- fetchstr(addr, buf, max)
-  iapply (argstr_fetchstr FS c8 _ γl γk pa pid V P M old ?hpF ?htF ?hnF ?hKF ?hlF ?hmF hmax')
+  iapply (argstr_fetchstr FS c8 _ γl γk pa pid V M old ?hpF ?htF ?hnF ?hKF ?hlF ?hmF hmax')
     $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g [e18]
@@ -275,8 +278,8 @@ theorem argstr_proof (AR : ARGRAW) (FS : FETCHSTR) : ARGSTR :=
   rw [argstr_withSpie_twice, argstr_pushed_withSpie]
   iapply (argstr_exit cpu c9 k
       (fun r => iprop(∃ (Q' : UPtd) (cs : List (BitVec 8)),
-        ⌜P.ext Q' ∧ fetchstrRet (viewFaulted P Q' M) v.toNat old cs r⌝ ∗
-        fetchstrPriv curCtx pa pid V Q' (viewFaulted P Q' M) ∗ byteBuf (k.regs 11#5) (DFrac.own 1) cs))
+        ⌜V.upt.extSz V.sz Q' ∧ fetchstrRet (viewFaulted V.upt Q' M) v.toNat old cs r⌝ ∗
+        procPrivCoreNoctxAt curCtx pa pid { V with upt := Q' } (viewFaulted V.upt Q' M) ∗ byteBuf (k.regs 11#5) (DFrac.own 1) cs))
       hK4
       (fun h => (hp9 h).trans ((hp8 h).trans ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans
         ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))))))))

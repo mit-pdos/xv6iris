@@ -45,9 +45,10 @@ which this port does not carry -- `kwaitAns` keeps only what is provable
 without them, and it is enough to tell a `-1` apart from a reap whose
 status did reach the caller.
 
-THE `umBelow` SEAM (`Xv6/EitherDefs.lean`): `copyout` promises only
-`V.upt.ext P'` about the descriptor its lazy faults grew, so the block
-comes back as `procPrivExt`, which is `procPriv` minus the size bound.
+THE BLOCK COMES BACK WHOLE at the descriptor `copyout`'s lazy faults grew
+(Rocq: `uptd_ext_sz (pv_sz V)` and `proc_priv (us_upt U P')`): `copyout`
+promises `V.upt.extSz V.sz P'`, every gained leaf below the break, so
+`umBelow` survives.
 
 It SLEEPS (the shape of `Xv6/SpecSleep.lean`): the thread may park and
 come back on another hart, so the trap CSRs, the claim and the installed
@@ -105,11 +106,11 @@ def wp_kwait_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
   procPrivNoctxAt curCtx (procAddr j) pid V M ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd)
     (rv xw : BitVec 32) (d : Nat),
-    ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.ext P' ∧ d ≤ 4 ∧
+    ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
       kwaitAns rv (k.regs 10#5) d⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
-    procPrivExtNoctxAt curCtx (procAddr j) pid V P'
+    procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' }
       (umemWrite (viewFaulted V.upt P' M) (k.regs 10#5).toNat ((xstateBytes xw).take d)) -∗
     wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
