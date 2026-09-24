@@ -1513,7 +1513,6 @@ ExecWords.v
 FileDisc.v
 FileDiscDec.v
 PipeDisc.v
-PipeUline.v
 PipeDiscDec.v
 PipesDisc.v
 PipesDiscDec.v
@@ -1638,9 +1637,6 @@ UkShPipesSeam.v
 UkShPipesCmd.v
 UkShPipesRound.v
 UkShPipePaid.v
-UkShPipeRound.v
-UShPipeChild.v
-UShPipeExit.v
 UkShRedirBody.v
 UInitCons.v
 UConsOpen.v
@@ -1660,7 +1656,6 @@ UkConsOut.v
 UkWriteCons.v
 UkWriteFile.v
 UkWritePipe.v
-UkPipeMoves.v
 UkWriteClosed.v
 UInitBanner.v
 UInitDiag.v
@@ -1726,14 +1721,10 @@ PipeBoth.v
 PipeBothN.v
 PipeOutN.v
 PipeOutNEv.v
-PipeForkGap.v
 PipeLinkInst.v
-PipeStageInst.v
-UShPipeRound.v
 UkShCat.v
 UShCatPay.v
 UShPipeCatSlot.v
-PipeReadInst.v
 UInitPipe.v
 UInitPipeAdequacy.v
 UShPipeRound2.v
@@ -1741,12 +1732,6 @@ UkShPipeFork.v
 UkShPipeWait.v
 UkShPipeForkTwin.v
 UShPipeAssembly.v
-UShPipeCatRound.v
-UkPipeConsOut.v
-UkPipeIface.v
-UShPipeLawRes.v
-UShPipeLaw.v
-UkPipeEntries.v
 UkPipesIface.v
 UkPipesEntries.v
 PipesFire.v
