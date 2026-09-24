@@ -696,3 +696,10 @@ import Xv6.LinkArgstr
 import Xv6.SpecSysSbrk
 import Xv6.ProofSysSbrk
 import Xv6.LinkSysSbrk
+import Xv6.SpecSysPipe
+import Xv6.SysPipeParts
+import Xv6.SysPipeTails
+import Xv6.SysPipeCopy
+import Xv6.SysPipeAlloc
+import Xv6.ProofSysPipe
+import Xv6.LinkSysPipe
