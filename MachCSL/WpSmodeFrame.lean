@@ -35,6 +35,48 @@ theorem imm_m16 : BitVec.signExtend 64 4080#12 = -(8#64 * BitVec.ofNat 64 2) := 
 theorem imm_p16 : BitVec.signExtend 64 16#12 = 8#64 * BitVec.ofNat 64 2 := by
   simp only [BitVec.reduceSignExtend, BitVec.reduceMul]
 
+-- The lemmas and simprocs `k_norm` normalises with (see `k_norm_simps`).
+attribute [k_norm_simps]
+  KCtx.push_eq KCtx.setReg_withRegs KCtx.withRegs_withRegs KCtx.rget_withRegs' KCtx.sp_withRegs
+  KCtx.sp_eq RegMap.set_apply KCtx.pushed_regs KCtx.pushed_sie KCtx.pushed_avail KCtx.pushed_noff
+  KCtx.pushed_intena KCtx.pushed_locks KCtx.pushed_tier KCtx.pushed_root KCtx.pushed_proc
+  KCtx.withRegs_regs KCtx.withRegs_sie KCtx.withRegs_avail KCtx.withRegs_noff KCtx.withRegs_intena
+  KCtx.withRegs_locks KCtx.withRegs_tier KCtx.withRegs_root KCtx.withRegs_proc
+  KCtx.pushOff_withRegs KCtx.popOff_withRegs KCtx.pushOff_pushed KCtx.popOff_pushed
+  KCtx.popOff_pushOff KCtx.pushOff_sie KCtx.pushOff_tier KCtx.pushOff_proc KCtx.pushOff_avail
+  KCtx.pushOff_noff KCtx.pushOff_intena KCtx.pushOff_locks KCtx.pushOff_root KCtx.pushOff_regs
+  KCtx.pushOff_sp KCtx.popOff_sie KCtx.popOff_tier KCtx.popOff_proc KCtx.popOff_avail
+  KCtx.popOff_noff KCtx.popOff_intena KCtx.popOff_locks KCtx.popOff_root KCtx.popOff_regs
+  KCtx.popOff_sp KCtx.withRegs_withLocks KCtx.pushed_withLocks KCtx.pushOff_withLocks
+  KCtx.popOff_withLocks KCtx.withLocks_withLocks KCtx.setReg_withLocks KCtx.rget_withLocks
+  KCtx.withLocks_self KCtx.withLocks_regs KCtx.withLocks_sie KCtx.withLocks_avail
+  KCtx.withLocks_noff KCtx.withLocks_intena KCtx.withLocks_locks KCtx.withLocks_tier
+  KCtx.withLocks_root KCtx.withLocks_proc KCtx.sp_withLocks BitVec.reduceEq ite_true ite_false
+  instrLen BitVec.sub_eq_add_neg BitVec.reduceNeg BitVec.add_assoc BitVec.reduceAdd
+  BitVec.add_zero BitVec.zero_add BitVec.reduceMul BitVec.reduceOfNat BitVec.ofNat_add
+  BitVec.reduceSignExtend BitVec.reduceAppend BitVec.reduceSetWidth BitVec.reduceExtractLsb'
+  BitVec.reduceAnd BitVec.reduceOr BitVec.reduceXOr BitVec.reduceNot BitVec.reduceShiftLeft
+  BitVec.reduceHShiftLeft BitVec.reduceHShiftRight BitVec.toNat_ofNat Nat.reducePow Nat.reduceMod
+  Bool.false_eq_true KCtx.pushed_spie KCtx.pushed_spp KCtx.withRegs_spie KCtx.withRegs_spp
+  KCtx.pushOff_spie KCtx.pushOff_spp KCtx.popOff_spie KCtx.popOff_spp KCtx.withLocks_spie
+  KCtx.withLocks_spp KCtx.intrOff_regs KCtx.intrOff_sie KCtx.intrOff_spie KCtx.intrOff_spp
+  KCtx.intrOff_avail KCtx.intrOff_noff KCtx.intrOff_intena KCtx.intrOff_locks KCtx.intrOff_tier
+  KCtx.intrOff_root KCtx.intrOff_proc KCtx.intrOff_sp KCtx.pushOffB_regs KCtx.pushOffB_sie
+  KCtx.pushOffB_spie KCtx.pushOffB_spp KCtx.pushOffB_avail KCtx.pushOffB_noff KCtx.pushOffB_intena
+  KCtx.pushOffB_locks KCtx.pushOffB_tier KCtx.pushOffB_root KCtx.pushOffB_proc KCtx.pushOffB_sp
+  KCtx.pushOffAt_regs KCtx.pushOffAt_sie KCtx.pushOffAt_spie KCtx.pushOffAt_spp
+  KCtx.pushOffAt_avail KCtx.pushOffAt_noff KCtx.pushOffAt_intena KCtx.pushOffAt_locks
+  KCtx.pushOffAt_tier KCtx.pushOffAt_root KCtx.pushOffAt_proc KCtx.pushOffAt_sp KCtx.intrOn_regs
+  KCtx.intrOn_sie KCtx.intrOn_spie KCtx.intrOn_spp KCtx.intrOn_avail KCtx.intrOn_noff
+  KCtx.intrOn_intena KCtx.intrOn_locks KCtx.intrOn_tier KCtx.intrOn_root KCtx.intrOn_proc
+  KCtx.intrOn_sp KCtx.popExit_regs KCtx.popExit_sie KCtx.popExit_spie KCtx.popExit_spp
+  KCtx.popExit_avail KCtx.popExit_noff KCtx.popExit_intena KCtx.popExit_locks KCtx.popExit_tier
+  KCtx.popExit_root KCtx.popExit_proc KCtx.popExit_sp KCtx.popExit_withRegs KCtx.popExit_withLocks
+  KCtx.popExit_pushed KCtx.intrOn_withRegs KCtx.intrOn_withLocks KCtx.intrOn_pushed Bool.or_false
+  Bool.false_or KCtx.withSpie_regs KCtx.withSpie_sie KCtx.withSpie_spie KCtx.withSpie_spp
+  KCtx.withSpie_avail KCtx.withSpie_noff KCtx.withSpie_intena KCtx.withSpie_locks
+  KCtx.withSpie_tier KCtx.withSpie_root KCtx.withSpie_proc KCtx.withSpie_sp KCtx.withSpie_withRegs
+
 /-- Normalise: contexts to `(k.pushed m).withRegs R`, reads to map
 applications decided on literal indices, the instruction lengths, literal
 arithmetic; optionally with extra lemmas, optionally at a hypothesis.
@@ -57,86 +99,10 @@ macro_rules
   | `(tactic| k_norm_g at $h:ident) => `(tactic| k_norm_g [] at $h:ident)
   | `(tactic| k_norm_g [$extra:term,*]) => do
     let lems ← extra.getElems.mapM fun l => `(Lean.Parser.Tactic.simpLemma| $l:term)
-    `(tactic| try simp only [KCtx.push_eq, KCtx.setReg_withRegs, KCtx.withRegs_withRegs, KCtx.rget_withRegs',
-      KCtx.sp_withRegs, KCtx.sp_eq, RegMap.set_apply,
-      KCtx.pushed_regs, KCtx.pushed_sie, KCtx.pushed_avail, KCtx.pushed_noff, KCtx.pushed_intena,
-      KCtx.pushed_locks, KCtx.pushed_tier, KCtx.pushed_root, KCtx.pushed_proc,
-      KCtx.withRegs_regs, KCtx.withRegs_sie, KCtx.withRegs_avail, KCtx.withRegs_noff, KCtx.withRegs_intena,
-      KCtx.withRegs_locks, KCtx.withRegs_tier, KCtx.withRegs_root, KCtx.withRegs_proc,
-      KCtx.pushOff_withRegs, KCtx.popOff_withRegs, KCtx.pushOff_pushed, KCtx.popOff_pushed, KCtx.popOff_pushOff,
-      KCtx.pushOff_sie, KCtx.pushOff_tier, KCtx.pushOff_proc, KCtx.pushOff_avail, KCtx.pushOff_noff, KCtx.pushOff_intena,
-      KCtx.pushOff_locks, KCtx.pushOff_root, KCtx.pushOff_regs, KCtx.pushOff_sp,
-      KCtx.popOff_sie, KCtx.popOff_tier, KCtx.popOff_proc, KCtx.popOff_avail, KCtx.popOff_noff, KCtx.popOff_intena,
-      KCtx.popOff_locks, KCtx.popOff_root, KCtx.popOff_regs, KCtx.popOff_sp,
-      KCtx.withRegs_withLocks, KCtx.pushed_withLocks, KCtx.pushOff_withLocks, KCtx.popOff_withLocks,
-      KCtx.withLocks_withLocks, KCtx.setReg_withLocks, KCtx.rget_withLocks, KCtx.withLocks_self,
-      KCtx.withLocks_regs, KCtx.withLocks_sie, KCtx.withLocks_avail, KCtx.withLocks_noff, KCtx.withLocks_intena,
-      KCtx.withLocks_locks, KCtx.withLocks_tier, KCtx.withLocks_root, KCtx.withLocks_proc, KCtx.sp_withLocks,
-      BitVec.reduceEq, ite_true, ite_false, instrLen,
-      BitVec.sub_eq_add_neg, BitVec.reduceNeg, BitVec.add_assoc, BitVec.reduceAdd, BitVec.add_zero,
-      BitVec.zero_add, BitVec.reduceMul, BitVec.reduceOfNat, BitVec.ofNat_add, k_addr, BitVec.reduceSignExtend, BitVec.reduceAppend, BitVec.reduceSetWidth,
-      BitVec.reduceExtractLsb', BitVec.reduceAnd, BitVec.reduceOr, BitVec.reduceXOr, BitVec.reduceNot,
-      BitVec.reduceShiftLeft, BitVec.reduceHShiftLeft, BitVec.reduceHShiftRight,
-      BitVec.toNat_ofNat, Nat.reducePow, Nat.reduceMod, Bool.false_eq_true,
-      KCtx.pushed_spie, KCtx.pushed_spp, KCtx.withRegs_spie, KCtx.withRegs_spp, KCtx.pushOff_spie, KCtx.pushOff_spp,
-      KCtx.popOff_spie, KCtx.popOff_spp, KCtx.withLocks_spie, KCtx.withLocks_spp,
-      KCtx.intrOff_regs, KCtx.intrOff_sie, KCtx.intrOff_spie, KCtx.intrOff_spp, KCtx.intrOff_avail, KCtx.intrOff_noff,
-      KCtx.intrOff_intena, KCtx.intrOff_locks, KCtx.intrOff_tier, KCtx.intrOff_root, KCtx.intrOff_proc, KCtx.intrOff_sp,
-      KCtx.pushOffB_regs, KCtx.pushOffB_sie, KCtx.pushOffB_spie, KCtx.pushOffB_spp, KCtx.pushOffB_avail, KCtx.pushOffB_noff,
-      KCtx.pushOffB_intena, KCtx.pushOffB_locks, KCtx.pushOffB_tier, KCtx.pushOffB_root, KCtx.pushOffB_proc, KCtx.pushOffB_sp,
-      KCtx.pushOffAt_regs, KCtx.pushOffAt_sie, KCtx.pushOffAt_spie, KCtx.pushOffAt_spp, KCtx.pushOffAt_avail,
-      KCtx.pushOffAt_noff, KCtx.pushOffAt_intena, KCtx.pushOffAt_locks, KCtx.pushOffAt_tier, KCtx.pushOffAt_root,
-      KCtx.pushOffAt_proc, KCtx.pushOffAt_sp,
-      KCtx.intrOn_regs, KCtx.intrOn_sie, KCtx.intrOn_spie, KCtx.intrOn_spp, KCtx.intrOn_avail, KCtx.intrOn_noff,
-      KCtx.intrOn_intena, KCtx.intrOn_locks, KCtx.intrOn_tier, KCtx.intrOn_root, KCtx.intrOn_proc, KCtx.intrOn_sp,
-      KCtx.popExit_regs, KCtx.popExit_sie, KCtx.popExit_spie, KCtx.popExit_spp, KCtx.popExit_avail, KCtx.popExit_noff,
-      KCtx.popExit_intena, KCtx.popExit_locks, KCtx.popExit_tier, KCtx.popExit_root, KCtx.popExit_proc, KCtx.popExit_sp,
-      KCtx.popExit_withRegs, KCtx.popExit_withLocks, KCtx.popExit_pushed, KCtx.intrOn_withRegs, KCtx.intrOn_withLocks,
-      KCtx.intrOn_pushed, Bool.or_false, Bool.false_or,
-      KCtx.withSpie_regs, KCtx.withSpie_sie, KCtx.withSpie_spie, KCtx.withSpie_spp, KCtx.withSpie_avail,
-      KCtx.withSpie_noff, KCtx.withSpie_intena, KCtx.withSpie_locks, KCtx.withSpie_tier, KCtx.withSpie_root,
-      KCtx.withSpie_proc, KCtx.withSpie_sp, KCtx.withSpie_withRegs, $lems,*])
+    `(tactic| try simp only [k_norm_simps, k_addr, $lems,*])
   | `(tactic| k_norm_g [$extra:term,*] at $h:ident) => do
     let lems ← extra.getElems.mapM fun l => `(Lean.Parser.Tactic.simpLemma| $l:term)
-    `(tactic| try simp only [KCtx.push_eq, KCtx.setReg_withRegs, KCtx.withRegs_withRegs, KCtx.rget_withRegs',
-      KCtx.sp_withRegs, KCtx.sp_eq, RegMap.set_apply,
-      KCtx.pushed_regs, KCtx.pushed_sie, KCtx.pushed_avail, KCtx.pushed_noff, KCtx.pushed_intena,
-      KCtx.pushed_locks, KCtx.pushed_tier, KCtx.pushed_root, KCtx.pushed_proc,
-      KCtx.withRegs_regs, KCtx.withRegs_sie, KCtx.withRegs_avail, KCtx.withRegs_noff, KCtx.withRegs_intena,
-      KCtx.withRegs_locks, KCtx.withRegs_tier, KCtx.withRegs_root, KCtx.withRegs_proc,
-      KCtx.pushOff_withRegs, KCtx.popOff_withRegs, KCtx.pushOff_pushed, KCtx.popOff_pushed, KCtx.popOff_pushOff,
-      KCtx.pushOff_sie, KCtx.pushOff_tier, KCtx.pushOff_proc, KCtx.pushOff_avail, KCtx.pushOff_noff, KCtx.pushOff_intena,
-      KCtx.pushOff_locks, KCtx.pushOff_root, KCtx.pushOff_regs, KCtx.pushOff_sp,
-      KCtx.popOff_sie, KCtx.popOff_tier, KCtx.popOff_proc, KCtx.popOff_avail, KCtx.popOff_noff, KCtx.popOff_intena,
-      KCtx.popOff_locks, KCtx.popOff_root, KCtx.popOff_regs, KCtx.popOff_sp,
-      KCtx.withRegs_withLocks, KCtx.pushed_withLocks, KCtx.pushOff_withLocks, KCtx.popOff_withLocks,
-      KCtx.withLocks_withLocks, KCtx.setReg_withLocks, KCtx.rget_withLocks, KCtx.withLocks_self,
-      KCtx.withLocks_regs, KCtx.withLocks_sie, KCtx.withLocks_avail, KCtx.withLocks_noff, KCtx.withLocks_intena,
-      KCtx.withLocks_locks, KCtx.withLocks_tier, KCtx.withLocks_root, KCtx.withLocks_proc, KCtx.sp_withLocks,
-      BitVec.reduceEq, ite_true, ite_false, instrLen,
-      BitVec.sub_eq_add_neg, BitVec.reduceNeg, BitVec.add_assoc, BitVec.reduceAdd, BitVec.add_zero,
-      BitVec.zero_add, BitVec.reduceMul, BitVec.reduceOfNat, BitVec.ofNat_add, k_addr, BitVec.reduceSignExtend, BitVec.reduceAppend, BitVec.reduceSetWidth,
-      BitVec.reduceExtractLsb', BitVec.reduceAnd, BitVec.reduceOr, BitVec.reduceXOr, BitVec.reduceNot,
-      BitVec.reduceShiftLeft, BitVec.reduceHShiftLeft, BitVec.reduceHShiftRight,
-      BitVec.toNat_ofNat, Nat.reducePow, Nat.reduceMod, Bool.false_eq_true,
-      KCtx.pushed_spie, KCtx.pushed_spp, KCtx.withRegs_spie, KCtx.withRegs_spp, KCtx.pushOff_spie, KCtx.pushOff_spp,
-      KCtx.popOff_spie, KCtx.popOff_spp, KCtx.withLocks_spie, KCtx.withLocks_spp,
-      KCtx.intrOff_regs, KCtx.intrOff_sie, KCtx.intrOff_spie, KCtx.intrOff_spp, KCtx.intrOff_avail, KCtx.intrOff_noff,
-      KCtx.intrOff_intena, KCtx.intrOff_locks, KCtx.intrOff_tier, KCtx.intrOff_root, KCtx.intrOff_proc, KCtx.intrOff_sp,
-      KCtx.pushOffB_regs, KCtx.pushOffB_sie, KCtx.pushOffB_spie, KCtx.pushOffB_spp, KCtx.pushOffB_avail, KCtx.pushOffB_noff,
-      KCtx.pushOffB_intena, KCtx.pushOffB_locks, KCtx.pushOffB_tier, KCtx.pushOffB_root, KCtx.pushOffB_proc, KCtx.pushOffB_sp,
-      KCtx.pushOffAt_regs, KCtx.pushOffAt_sie, KCtx.pushOffAt_spie, KCtx.pushOffAt_spp, KCtx.pushOffAt_avail,
-      KCtx.pushOffAt_noff, KCtx.pushOffAt_intena, KCtx.pushOffAt_locks, KCtx.pushOffAt_tier, KCtx.pushOffAt_root,
-      KCtx.pushOffAt_proc, KCtx.pushOffAt_sp,
-      KCtx.intrOn_regs, KCtx.intrOn_sie, KCtx.intrOn_spie, KCtx.intrOn_spp, KCtx.intrOn_avail, KCtx.intrOn_noff,
-      KCtx.intrOn_intena, KCtx.intrOn_locks, KCtx.intrOn_tier, KCtx.intrOn_root, KCtx.intrOn_proc, KCtx.intrOn_sp,
-      KCtx.popExit_regs, KCtx.popExit_sie, KCtx.popExit_spie, KCtx.popExit_spp, KCtx.popExit_avail, KCtx.popExit_noff,
-      KCtx.popExit_intena, KCtx.popExit_locks, KCtx.popExit_tier, KCtx.popExit_root, KCtx.popExit_proc, KCtx.popExit_sp,
-      KCtx.popExit_withRegs, KCtx.popExit_withLocks, KCtx.popExit_pushed, KCtx.intrOn_withRegs, KCtx.intrOn_withLocks,
-      KCtx.intrOn_pushed, Bool.or_false, Bool.false_or,
-      KCtx.withSpie_regs, KCtx.withSpie_sie, KCtx.withSpie_spie, KCtx.withSpie_spp, KCtx.withSpie_avail,
-      KCtx.withSpie_noff, KCtx.withSpie_intena, KCtx.withSpie_locks, KCtx.withSpie_tier, KCtx.withSpie_root,
-      KCtx.withSpie_proc, KCtx.withSpie_sp, KCtx.withSpie_withRegs, $lems,*] at $h:ident)
+    `(tactic| try simp only [k_norm_simps, k_addr, $lems,*] at $h:ident)
 
 set_option hygiene false in
 macro_rules
