@@ -50,6 +50,31 @@ references, and withdraw/deposit at count zero):
   the block's `Xv6.diskBlock` image fragment, which is what `Xv6.bufHold0`
   carries, and the recycler must therefore present the NEW block's fragment
   and takes the old one away.
+
+  **WHAT THIS COSTS `bread`** (reported).  `Xv6.bufPayV` ties the fragment
+  to the VALID BIT -- a valid buffer owes the fragment, an invalid one owes
+  nothing -- which is what lets thirty invalid buffers all naming block `0`
+  coexist at `binit`.  Rocq ties it to COVERAGE instead (`buf_pay`: a
+  covered buffer owes `disk_block` when valid and the block's POOL bundle
+  when invalid; an uncovered blockno -- block `0` in practice -- owes
+  nothing), and that difference is exactly what `bread`'s fill arm needs: a
+  holder that finds `b->valid == 0` after `acquiresleep` must have the
+  block's fragment to hand to `virtio_disk_rw`, and it holds no lock at
+  that point, so the fragment can only have come out of the escrow.  With
+  the validity tie it is not there.  The fragment cannot come from
+  `bread`'s caller either: `Xv6.diskBlock` is a whole ghost-map element, so
+  a precondition carrying it would be UNSATISFIABLE whenever the block is
+  already cached -- i.e. on every hit.
+
+  So `bread` needs, BEFORE its own proof: a coverage set and device on the
+  cache's side (Rocq's `bv_cov`/`bv_dev`), `bufPayV` re-indexed on coverage
+  rather than on `valid`, the cached blocknos exposed at the resource level
+  (Rocq's `bnos`, tied to `Xv6.bkeyAt`'s existentials, with the
+  injectivity and device rows), `Xv6.bioPool` inside `Xv6.bcacheScanAt`,
+  and the one-shot exchange at the recycle (Rocq's `bio_pool_recycle`).
+  The four proved bio functions then move with it (`Xv6.bufHold0` gains
+  Rocq's `⌜covered⌝ ∗ ⌜dev = _⌝`).  Nothing in that list touches the lock
+  edges: the floors are in place.
 * the two floor-consuming operations, `bufEscrow_take` and
   `bufEscrow_withdraw`, each want a `MachCSL.ctxFloor` of the CALLER's
   context covering the box's stamp.  Those floors ride the payload rows
@@ -393,6 +418,69 @@ theorem bufEscrow_refDecr (γd : DiskNames) (γbk : BoxNames) (k : Nat) (qd qb :
   unfold bufBox
   iapply boxRefDecr (bufBoxPay γd k qd qb) (ndot bioxN k) γbk r c i T0 E
     (nclose_subseteq' k hE) hw $$ [$Hbox $Hrd $Htd $Hc $Href]
+
+/-! ## The two floor-consuming operations, AT THE BIO ROWS
+
+The floors the box's checkout and L1 window want are exactly what the two
+lock edges now pay out, and these are the forms `bread` calls: nothing is
+left to supply. -/
+
+/-- **THE CHECKOUT, AS `bread` RUNS IT**: with the buffer's sleeplock held
+(so the L2 row `Xv6.bufSlpBox` is in hand, carrying the park register's own
+floor) and a reference whose stamp the ACQUIRE EDGE has floored
+(`Xv6.ACQUIRESLEEP_LLB` turns the reference's `MachCSL.topLb T0` into
+`MachCSL.ctxFloor curCtx T0`), the whole bundle comes out. -/
+theorem bufEscrow_takeHeld (γ : BcacheNames) (γd : DiskNames) (k : Nat) (cpu : CPU)
+    (dev bno : BitVec 32) (T0 : Nat) (E : CoPset) (hE : ↑bioxN ⊆ E) :
+    bufBox γd (γ.box k) k (1 : Qp).half (1 : Qp).half ∗ ownCtx cpu curCtx ∗ ctxFloor curCtx T0 ∗
+      boxRef (GF := GF) (γ.box k) ((dev, bno) : BufId) T0 ∗ bufSlpBox γ k curCtx ⊢
+      |={E}=> (ownCtx cpu curCtx ∗ bufTok γ k ∗
+        (∃ (v : BitVec 32) (bs : List (BitVec 8)),
+          bufTravelV (GF := GF) γd k (1 : Qp).half (1 : Qp).half dev bno v bs) ∗
+        ∃ id : Nat, l2Hold (GF := GF) (γ.box k) ((dev, bno) : BufId) id) := by
+  iintro ⟨#Hbox, Hrun, #Hfl0, Href, Hslp⟩
+  icases bufSlpBox_elim γ k curCtx $$ Hslp with ⟨Htok, %s, Hrp, %hs, #Hflp⟩
+  imod bufEscrow_take γd (γ.box k) k (1 : Qp).half (1 : Qp).half cpu dev bno T0 s T0 s.tp
+      E hE hs (Nat.le_refl _) (Nat.le_refl _) $$ [Hbox Hrun Hfl0 Hflp Href Hrp]
+    with ⟨Hrun, Htrav, Hhold⟩
+  · iframe Hbox Hrun Href Hrp
+    isplit
+    · iexact Hfl0
+    · iexact Hflp
+  imodintro
+  iframe Hrun Htok Htrav Hhold
+
+/-- **THE L1 WINDOW, AS `bread`'s RECYCLER RUNS IT**: under `bcache.lock`
+at `refcnt == 0`, the key row's stamp is under the resource's floor slot
+(`Xv6.bufSlotRegs`'s `⌜r.td ≤ tl⌝` beside `Xv6.bcacheResAt`'s
+`MachCSL.ctxFloor ξ tl`), so the header comes out and the old block's
+fragment with it. -/
+theorem bufEscrow_withdrawKey (γ : BcacheNames) (γd : DiskNames) (k : Nat) (cpu : CPU)
+    (tl : Nat) (dev bno : BitVec 32) (E : CoPset) (hE : ↑bioxN ⊆ E) :
+    bufBox γd (γ.box k) k (1 : Qp).half (1 : Qp).half ∗ ownCtx cpu curCtx ∗ ctxFloor curCtx tl ∗
+      bufSlotRegs (GF := GF) (γ.box k) tl dev bno ∗ cntHalf (GF := GF) (γ.box k) 0 ⊢
+      |={E}=> (ownCtx cpu curCtx ∗ cntHalf (GF := GF) (γ.box k) 0 ∗
+        ∃ (td : Nat) (x0 : BufX) (T0 : Nat), ⌜T0 ≤ tl⌝ ∗
+          slotdHalf (GF := GF) (γ.box k)
+            (⟨td, true, ((dev, bno) : BufId), some (x0, T0)⟩ : SlotReg BufId BufX) ∗
+          bufHeaderAt γd k (1 : Qp).half (1 : Qp).half dev bno) := by
+  iintro ⟨#Hbox, Hrun, #Hfl, Hregs, Hc⟩
+  icases bufSlotRegs_elim (γ.box k) tl dev bno $$ Hregs with ⟨%r, %⟨hrid, hrtl⟩, Hrd, -⟩
+  obtain ⟨rtd, rwin, rident, rx⟩ := r
+  obtain ⟨hw, hx, hi⟩ := hrid
+  simp only at hw hx hi hrtl
+  subst hi
+  imod bufEscrow_withdraw γd (γ.box k) k (1 : Qp).half (1 : Qp).half cpu
+      (⟨rtd, rwin, ((dev, bno) : BufId), rx⟩ : SlotReg BufId BufX) tl E hE hw hrtl
+      $$ [Hbox Hrun Hfl Hrd Hc] with ⟨Hrun, Hc, ⟨%x0, %T0, %hT0, Hrd, Hhdr⟩⟩
+  · iframe Hbox Hrun Hrd Hc
+    iexact Hfl
+  imodintro
+  iframe Hrun Hc
+  iexists rtd, x0, T0
+  isplit
+  · ipureintro; exact hT0
+  iframe Hrd Hhdr
 
 /-! ## Allocation, from the `.bss` cells -/
 
