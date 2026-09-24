@@ -656,3 +656,11 @@ import Xv6.LinkSysKill
 import Xv6.SpecSysExit
 import Xv6.ProofSysExit
 import Xv6.LinkSysExit
+import Xv6.SpecIalloc
+import Xv6.IallocParts
+import Xv6.IallocDefs
+import Xv6.IallocTail
+import Xv6.IallocClaim
+import Xv6.IallocScan
+import Xv6.ProofIalloc
+import Xv6.LinkIalloc
