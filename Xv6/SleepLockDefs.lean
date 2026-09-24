@@ -418,6 +418,51 @@ theorem kctx_newSleeplock [CurCtx] {lent : Bool} (cpu : CPU) (k : KCtx) (slk nam
   unfold isSleeplockGen
   iexact Hlk
 
+
+set_option maxHeartbeats 1000000 in
+/-- Rocq `SleepLock.sl_fresh_new_genl` (at `own_context`, any mask): a
+sleeplock is born from `initsleeplock`'s output, the resource at the
+creator's context, and a fresh ghost -- `Xv6.kctx_newSleeplock`'s body at
+`ownCtx` (`MachCSL.newlock_of_fresh`) rather than at the kernel context.
+Rocq's `sl_fresh slk s` is `sleepLockInited slk name` beside the inner
+lock's two identity claims; its returned `slh_auth γ None` (the tracked
+end, which `icache_boot_at` discards) has no counterpart: Lean's tracked
+deposit `slDep` is over the idle holder pair `slHauth`, not a fresh `slh`
+authority. -/
+theorem slFresh_newGenl [CurCtx] (cpu : CPU) (E : CoPset) (slk name : BitVec 64)
+    (R : CtxId → IProp GF) [CtxMorph R] (H : Qp → IProp GF) :
+    sleepLockInited slk name ∗ kmapId (slLk slk) ∗ kmapId (slLk slk + 16#64) ∗
+      ownCtx cpu curCtx ∗ R curCtx ⊢
+      |={E}=> (ownCtx cpu curCtx ∗ ∃ γl γ : GName, isSleeplockGen (GF := GF) γl γ slk R H) := by
+  unfold sleepLockInited lockInited
+  iintro ⟨⟨Hw, ⟨Hnm, Hfresh⟩, Hn, Hpid⟩, #Hcl, #Hcl', Hrun, HR⟩
+  imod slh_ghost_alloc (GF := GF) with ⟨%γ, Ha, Ht⟩
+  ihave Hpid := (show wordPointsTo (GF := GF) (slk + 40#64) 4 (DFrac.own 1) 0#32 ⊢
+      wordPointsTo (slPid slk) 4 (DFrac.own 1) 0#32 from by unfold slPid; iintro H; iexact H) $$ Hpid
+  ihave Htq := sleeplockedQ_intro γ 1 slk 0#32 $$ [Ht Hpid]
+  case' _ => iframe
+  ihave Hnm := (show wordPointsTo (GF := GF) (slk + 8#64 + 8#64) 8 (DFrac.own 1) sleepLockNameAddr ⊢
+      wordPointsTo (slLk slk + 8#64) 8 (DFrac.own 1) sleepLockNameAddr from by
+    unfold slLk; iintro H; iexact H) $$ Hnm
+  ihave Hn := (show wordPointsTo (GF := GF) (slk + 32#64) 8 (DFrac.own 1) name ⊢
+      wordPointsTo (slNameField slk) 8 (DFrac.own 1) name from by
+    unfold slNameField; iintro H; iexact H) $$ Hn
+  ihave Hbody := slBody_intro_free γ slk R H sleepLockNameAddr name 1 $$ [Hnm Hn Hw Htq Ha HR]
+  case' _ => iframe
+  ihave Hfresh := (show lkFresh (GF := GF) (slk + 8#64) ⊢ lkFresh (slLk slk) from by
+    unfold slLk; iintro H; iexact H) $$ Hfresh
+  imod newlock_of_fresh cpu (slLk slk) "sleep lock" (slBody γ slk R H) E
+    $$ [Hrun Hbody Hfresh] with ⟨Hrun, ⟨%γl, #Hlk⟩⟩
+  · iframe Hrun Hbody Hfresh
+    isplit
+    · iexact Hcl
+    · iexact Hcl'
+  imodintro
+  iframe Hrun
+  iexists γl, γ
+  unfold isSleeplockGen
+  iexact Hlk
+
 end
 
 /-! ## The counting half: shares of the "may hold" right (tracked sleeplocks)

@@ -32,6 +32,7 @@ created with `MachCSL.kctx_newlock_hook` over `Xv6.bcacheRes_fold_in`.
 -/
 import Xv6.BufEscrow
 import MachCSL.LockBornHook
+import MachCSL.BigSepLib
 
 namespace Xv6
 
@@ -245,35 +246,6 @@ theorem bd_funAllocK {A : Type} [Inhabited A] (Q : Nat → IProp GF) (P : Nat �
     · iframe Hk H2
     imodintro
     iframe Hk
-    iexists (fun j => if j = n then a else f j)
-    iapply BigSepL.bigSepL_append.2
-    isplitl [Hf]
-    · iapply bigSepL_range_congr (fun j => P j (f j))
-        (fun j => P j (if j = n then a else f j)) n (fun j hj => by rw [if_neg (by omega)])
-      iexact Hf
-    · iapply BigSepL.bigSepL_singleton.2
-      simp only [reduceIte]
-      iexact Ha
-
-/-- The choice combinator: a per-index existential over a big-op becomes one
-function (`bd_funAlloc`'s modality-free twin). -/
-theorem bd_funChoose {A : Type} [Inhabited A] (P : Nat → A → IProp GF) :
-    ∀ n : Nat, (([∗list] j ∈ List.range n, ∃ a : A, P j a) ⊢
-      ∃ f : Nat → A, [∗list] j ∈ List.range n, P j (f j)) := by
-  intro n
-  induction n with
-  | zero =>
-    iintro -
-    iexists (fun _ => (default : A))
-    simp only [List.range_zero]
-    iapply BigSepL.bigSepL_nil.2
-    itrivial
-  | succ n ih =>
-    rw [List.range_succ]
-    iintro H
-    icases BigSepL.bigSepL_append.1 $$ H with ⟨H1, H2⟩
-    icases ih $$ H1 with ⟨%f, Hf⟩
-    icases BigSepL.bigSepL_singleton.1 $$ H2 with ⟨%a, Ha⟩
     iexists (fun j => if j = n then a else f j)
     iapply BigSepL.bigSepL_append.2
     isplitl [Hf]
@@ -532,7 +504,7 @@ theorem bioInit (cpu : CPU) (k : KCtx) (V : BioView GF) (hcov0 : (0 : Nat) ∉ V
   icases BigSepL.bigSepL_sep_eqv.1 $$ Hbss with ⟨Htrav, Hbss⟩
   icases BigSepL.bigSepL_sep_eqv.1 $$ Hbss with ⟨Hdev, Hbss⟩
   icases BigSepL.bigSepL_sep_eqv.1 $$ Hbss with ⟨Hbno, Hrefc⟩
-  icases bd_funChoose (fun i bs => bufTravelV (GF := GF) γ V i (1 : Qp).half (1 : Qp).half
+  icases funOfBig (fun i bs => bufTravelV (GF := GF) γ V i (1 : Qp).half (1 : Qp).half
     0#32 0#32 0#32 bs) NBUF $$ Htrav with ⟨%bsf, Htrav⟩
   -- **THE THIRTY ESCROWS**
   icases kctx_token_acc cpu k $$ Hk with ⟨Hctx, Hkback⟩

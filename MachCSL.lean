@@ -104,5 +104,6 @@ import MachCSL.WpSmodeFencePub
 import MachCSL.CtxBox
 import MachCSL.WpSmodeFrame6c
 import MachCSL.LockBornHook
+import MachCSL.BigSepLib
 import MachCSL.ByteWord4
 import MachCSL.WpSmodeDivRem
