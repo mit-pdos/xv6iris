@@ -469,6 +469,75 @@ theorem bcacheLru_unlink (ξ : CtxId) (h a : BitVec 64) (l1 l2 : List (BitVec 64
   iapply bsegAt_app_join ξ h l1 l2 h
   iframe Hs1 Hs2
 
+/-! ### Read accessors: one link cell out of the cycle
+
+`bread`'s two scans read one `next` (forward) or `prev` (backward) link per
+iteration and put it straight back; nothing is unlinked.  These are the
+read-only twins of `Xv6.bcacheLru_unlink`. -/
+
+/-- The `next` cell of an interior node, borrowed and returned. -/
+theorem bcacheLru_next_acc (ξ : CtxId) (h a : BitVec 64) (l1 l2 : List (BitVec 64)) :
+    bcacheLruAt (GF := GF) ξ h (l1 ++ a :: l2) ⊢
+      wordAtN ξ (bNext a) 8 (DFrac.own 1) (bhd h l2) ∗
+      (wordAtN ξ (bNext a) 8 (DFrac.own 1) (bhd h l2) -∗ bcacheLruAt ξ h (l1 ++ a :: l2)) := by
+  unfold bcacheLruAt
+  iintro ⟨Hhn, Hhp, Hseg⟩
+  icases bsegAt_app_split ξ h l1 (a :: l2) h $$ Hseg with ⟨Hs1, Hs2⟩
+  icases (show bsegAt (GF := GF) ξ h (blast l1 h) (a :: l2) ⊢
+      wordAtN ξ (bPrev a) 8 (DFrac.own 1) (blast l1 h) ∗
+      wordAtN ξ (bNext a) 8 (DFrac.own 1) (bhd h l2) ∗ bsegAt ξ h a l2 from by
+    rw [bsegAt_cons ξ h (blast l1 h) a l2]) $$ Hs2 with ⟨Hap, Han, Hs2⟩
+  iframe Han
+  iintro Han
+  iframe Hhn Hhp
+  iapply bsegAt_app_join ξ h l1 (a :: l2) h
+  iframe Hs1
+  rw [bsegAt_cons ξ h (blast l1 h) a l2]
+  iframe Hap Han Hs2
+
+/-- The `prev` cell of an interior node, borrowed and returned. -/
+theorem bcacheLru_prev_acc (ξ : CtxId) (h a : BitVec 64) (l1 l2 : List (BitVec 64)) :
+    bcacheLruAt (GF := GF) ξ h (l1 ++ a :: l2) ⊢
+      wordAtN ξ (bPrev a) 8 (DFrac.own 1) (blast l1 h) ∗
+      (wordAtN ξ (bPrev a) 8 (DFrac.own 1) (blast l1 h) -∗ bcacheLruAt ξ h (l1 ++ a :: l2)) := by
+  unfold bcacheLruAt
+  iintro ⟨Hhn, Hhp, Hseg⟩
+  icases bsegAt_app_split ξ h l1 (a :: l2) h $$ Hseg with ⟨Hs1, Hs2⟩
+  icases (show bsegAt (GF := GF) ξ h (blast l1 h) (a :: l2) ⊢
+      wordAtN ξ (bPrev a) 8 (DFrac.own 1) (blast l1 h) ∗
+      wordAtN ξ (bNext a) 8 (DFrac.own 1) (bhd h l2) ∗ bsegAt ξ h a l2 from by
+    rw [bsegAt_cons ξ h (blast l1 h) a l2]) $$ Hs2 with ⟨Hap, Han, Hs2⟩
+  iframe Hap
+  iintro Hap
+  iframe Hhn Hhp
+  iapply bsegAt_app_join ξ h l1 (a :: l2) h
+  iframe Hs1
+  rw [bsegAt_cons ξ h (blast l1 h) a l2]
+  iframe Hap Han Hs2
+
+/-- The head sentinel's own `next`, borrowed and returned (the forward
+scan's first load). -/
+theorem bcacheLru_headNext_acc (ξ : CtxId) (h : BitVec 64) (l : List (BitVec 64)) :
+    bcacheLruAt (GF := GF) ξ h l ⊢
+      wordAtN ξ (bNext h) 8 (DFrac.own 1) (bhd h l) ∗
+      (wordAtN ξ (bNext h) 8 (DFrac.own 1) (bhd h l) -∗ bcacheLruAt ξ h l) := by
+  unfold bcacheLruAt
+  iintro ⟨Hhn, Hhp, Hseg⟩
+  iframe Hhn
+  iintro Hhn
+  iframe Hhn Hhp Hseg
+
+/-- The head sentinel's own `prev` (the backward scan's first load). -/
+theorem bcacheLru_headPrev_acc (ξ : CtxId) (h : BitVec 64) (l : List (BitVec 64)) :
+    bcacheLruAt (GF := GF) ξ h l ⊢
+      wordAtN ξ (bPrev h) 8 (DFrac.own 1) (blast l h) ∗
+      (wordAtN ξ (bPrev h) 8 (DFrac.own 1) (blast l h) -∗ bcacheLruAt ξ h l) := by
+  unfold bcacheLruAt
+  iintro ⟨Hhn, Hhp, Hseg⟩
+  iframe Hhp
+  iintro Hhp
+  iframe Hhn Hhp Hseg
+
 /-! ### The two operations at the ambient context (the leaf spelling) -/
 
 theorem bcacheLru_unlink_cur (h a : BitVec 64) (l1 l2 : List (BitVec 64)) :
@@ -740,6 +809,29 @@ theorem bufData_toNat (k m : Nat) (hk : k < NBUF) (hm : m < BSIZE) :
   rw [BitVec.toNat_add, BitVec.toNat_add, BitVec.toNat_ofNat, BitVec.toNat_ofNat, hbn]
   omega
 
+/-- Buffer `k` is not the head sentinel: the array ends 1112 bytes short
+of it.  What the two scans' exit tests turn on. -/
+theorem bnode_ne_bhead (k : Nat) (hk : k < NBUF) : bnode k ≠ bhead := by
+  intro h
+  have h1 := bnode_toNat k hk
+  have h2 : bhead.toNat = KernelSyms.«bcache» + 0x8268 := by
+    unfold bhead bcacheHeadAddr
+    have hb : KA.«bcache».toNat = KernelSyms.«bcache» := rfl
+    have : KernelSyms.«bcache» = 0x80018278 := rfl
+    rw [BitVec.toNat_add, hb, this]
+    decide
+  rw [h] at h1
+  rw [h2] at h1
+  have hk' : k < 30 := by unfold NBUF at hk; exact hk
+  omega
+
+/-- ...and distinct buffers are distinct addresses. -/
+theorem bnode_inj (i j : Nat) (hi : i < NBUF) (hj : j < NBUF) (h : bnode i = bnode j) : i = j := by
+  have h1 := bnode_toNat i hi
+  have h2 := bnode_toNat j hj
+  rw [h] at h1
+  omega
+
 theorem bufData_kmapRw (k m : Nat) (hk : k < NBUF) (hm : m < BSIZE) :
     kmapClass (vpnOf (aBufData (bnode k) + BitVec.ofNat 64 m)).toNat = some .rw := by
   have ha := bufData_toNat k m hk hm
@@ -801,6 +893,7 @@ after `acquiresleep` still have the block's fragment to hand
 def bufHdr (V : BioView) (k : Nat) (qd qb : Qp) (i : BufId) (x : BufX)
     (ξ : CtxId) : IProp GF := iprop%
   ∃ v : BitVec 32,
+    ⌜v = 0#32 ∨ v = 1#32⌝ ∗
     wordAtN ξ (aBufValid (bnode k)) 4 (DFrac.own 1) v ∗
     wordAtN ξ (aBufDev (bnode k)) 4 (DFrac.own qd) i.1 ∗
     wordAtN ξ (aBufBlockno (bnode k)) 4 (DFrac.own qb) i.2 ∗
@@ -946,7 +1039,7 @@ the other halves stay under `bcache.lock` forever, in `bkeyAt`, because
 included -- holding `bcache.lock` alone. -/
 def bufHold0 (γ : BcacheNames) (V : BioView) (k : Nat)
     (pidv dev bno : BitVec 32) (bs bsd : List (BitVec 8)) : IProp GF := iprop%
-  ⌜k < NBUF ∧ bno.toNat ∈ V.cov ∧ dev = V.dev⌝ ∗
+  ⌜k < NBUF ∧ bno.toNat ∈ V.cov ∧ dev = V.dev ∧ bs.length = BSIZE ∧ bsd.length = BSIZE⌝ ∗
   sleeplockedQ (γ.slk k).2 1 (aBufLock (bnode k)) pidv ∗ bufTok γ k ∗
   brefTok γ k ∗ (∃ id : Nat, l2Hold (γ.box k) ((dev, bno) : BufId) id) ∗
   wordPointsTo (aBufValid (bnode k)) 4 (DFrac.own 1) 1#32 ∗

@@ -100,3 +100,4 @@ import MachCSL.WpSmodeFenceFloor
 import MachCSL.WpSmodeFenceFloor2
 import MachCSL.WpSmodeFencePub
 import MachCSL.CtxBox
+import MachCSL.WpSmodeFrame6c

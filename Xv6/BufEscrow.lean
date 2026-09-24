@@ -113,7 +113,7 @@ arm -- a holder at `valid == 0`, holding no lock -- able to hand
 `virtio_disk_rw` the fragment. -/
 def bufTravelV (V : BioView) (k : Nat) (qd qb : Qp) (dev bno v : BitVec 32)
     (bs : List (BitVec 8)) : IProp GF := iprop%
-  ⌜bs.length = BSIZE⌝ ∗
+  ⌜bs.length = BSIZE ∧ (v = 0#32 ∨ v = 1#32)⌝ ∗
   wordPointsTo (aBufValid (bnode k)) 4 (DFrac.own 1) v ∗
   wordPointsTo (aBufDev (bnode k)) 4 (DFrac.own qd) dev ∗
   wordPointsTo (aBufBlockno (bnode k)) 4 (DFrac.own qb) bno ∗
@@ -124,7 +124,7 @@ def bufTravelV (V : BioView) (k : Nat) (qd qb : Qp) (dev bno v : BitVec 32)
 /-- The same with the fragment NAMED: what a holder of a valid buffer has. -/
 def bufTravel (V : BioView) (k : Nat) (qd qb : Qp) (dev bno v : BitVec 32)
     (bs bsd : List (BitVec 8)) : IProp GF := iprop%
-  ⌜bs.length = BSIZE⌝ ∗
+  ⌜bs.length = BSIZE ∧ bsd.length = BSIZE ∧ (v = 0#32 ∨ v = 1#32)⌝ ∗
   wordPointsTo (aBufValid (bnode k)) 4 (DFrac.own 1) v ∗
   wordPointsTo (aBufDev (bnode k)) 4 (DFrac.own qd) dev ∗
   wordPointsTo (aBufBlockno (bnode k)) 4 (DFrac.own qb) bno ∗
@@ -139,15 +139,18 @@ theorem bufTravel_travelV (V : BioView) (k : Nat) (qd qb : Qp) (dev bno v : BitV
   unfold bufTravel bufTravelV
   iintro ⟨%hlen, Hv, Hd, Hb, Hdk, Hdata, Hpay⟩
   isplit
-  · ipureintro; exact hlen
+  · ipureintro; exact ⟨hlen.1, hlen.2.2⟩
   iframe Hv Hd Hb Hdk Hdata
   by_cases hv : v = 0#32
   · iapply bufPay_of_pool V dev bno v bs hcov hdev hv
     unfold poolBlk
     iexists bsd
-    iexact Hpay
-  · rw [hclean hv] at *
-    iapply bufPay_of_valid V dev bno v bs hcov hdev hv
+    isplitl []
+    · ipureintro; exact hlen.2.1
+    · iexact Hpay
+  · have hcl := hclean hv
+    iapply bufPay_of_valid V dev bno v bs hcov hdev hlen.1
+    rw [← hcl]
     iexact Hpay
 
 /-- The reverse: a COVERED buffer's travelling content has the fragment, and
@@ -165,22 +168,22 @@ theorem bufTravelV_travel (V : BioView) (k : Nat) (qd qb : Qp) (dev bno v : BitV
     isplitr [Hv Hd Hb Hdk Hdata Hpay]
     · ipureintro; exact hdev
     unfold poolBlk
-    icases Hpay with ⟨%bsd, Hpay⟩
+    icases Hpay with ⟨%bsd, %hbl, Hpay⟩
     iexists bsd
     isplitl []
     · ipureintro; intro h; exact absurd hv h
     isplit
-    · ipureintro; exact hlen
+    · ipureintro; exact ⟨hlen.1, hbl, hlen.2⟩
     iframe Hv Hd Hb Hdk Hdata
     iexact Hpay
   · icases bufPay_valid V dev bno v bs hcov hv $$ Hpay with ⟨%hdev, Hpay⟩
     isplitr [Hv Hd Hb Hdk Hdata Hpay]
-    · ipureintro; exact hdev
+    · ipureintro; exact hdev.1
     iexists bs
     isplitl []
     · ipureintro; intro _; rfl
     isplit
-    · ipureintro; exact hlen
+    · ipureintro; exact ⟨hlen.1, hlen.1, hlen.2⟩
     iframe Hv Hd Hb Hdk Hdata
     iexact Hpay
 
@@ -195,10 +198,12 @@ theorem bufTravelV_inArm (V : BioView) (k : Nat) (qd qb : Qp) (dev bno v : BitVe
   iexists bs
   isplitl [Hv Hd Hb Hpay]
   · iexists v
+    isplitl []
+    · ipureintro; exact hlen.2
     iframe Hv Hd Hb
     iexact Hpay
   · isplit
-    · ipureintro; exact hlen
+    · ipureintro; exact hlen.1
     iframe Hdk
     iexact Hdata
 
@@ -208,10 +213,10 @@ theorem inArm_bufTravelV (V : BioView) (k : Nat) (qd qb : Qp) (dev bno : BitVec 
       ∃ (v : BitVec 32) (bs : List (BitVec 8)), bufTravelV V k qd qb dev bno v bs := by
   unfold bufTravelV inArm bufBoxPay bufHdr bufRest byteBuf
   simp only [wordAtN_cur]
-  iintro ⟨%x, ⟨%v, Hv, Hd, Hb, Hpay⟩, ⟨%hlen, Hdk, Hdata⟩⟩
+  iintro ⟨%x, ⟨%v, %hv01, Hv, Hd, Hb, Hpay⟩, ⟨%hlen, Hdk, Hdata⟩⟩
   iexists v, x
   isplit
-  · ipureintro; exact hlen
+  · ipureintro; exact ⟨hlen, hv01⟩
   iframe Hv Hd Hb Hdk Hdata
   iexact Hpay
 
@@ -225,7 +230,7 @@ sleeplock row, the chain's two tokens, and `bufTravel` beside them. -/
 theorem bufHold0_travel (γ : BcacheNames) (V : BioView) (k : Nat)
     (pidv dev bno : BitVec 32) (bs bsd : List (BitVec 8)) :
     bufHold0 (GF := GF) γ V k pidv dev bno bs bsd ⊢
-      ⌜k < NBUF ∧ bno.toNat ∈ V.cov ∧ dev = V.dev⌝ ∗
+      ⌜k < NBUF ∧ bno.toNat ∈ V.cov ∧ dev = V.dev ∧ bs.length = BSIZE ∧ bsd.length = BSIZE⌝ ∗
         sleeplockedQ (γ.slk k).2 1 (aBufLock (bnode k)) pidv ∗ bufTok γ k ∗
         brefTok γ k ∗ (∃ id : Nat, l2Hold (γ.box k) ((dev, bno) : BufId) id) ∗
         bufTravel V k (1 : Qp).half (1 : Qp).half dev bno 1#32 bs bsd := by
@@ -235,7 +240,7 @@ theorem bufHold0_travel (γ : BcacheNames) (V : BioView) (k : Nat)
   · ipureintro; exact hk
   iframe Hsl Htok Hrt Hhold
   isplit
-  · ipureintro; exact hlen
+  · ipureintro; exact ⟨hk.2.2.2.1, hk.2.2.2.2, Or.inr rfl⟩
   iframe Hv Hd Hb Hdk Hdata
   iexact Hpay
 
@@ -249,11 +254,11 @@ theorem bufHold0_of_travel (γ : BcacheNames) (V : BioView) (k : Nat)
   unfold bufHold0 bufTravel bufOwn
   iintro ⟨Hsl, Htok, Hrt, Hhold, %hlen, Hv, Hd, Hb, Hdk, Hdata, Hpay⟩
   isplit
-  · ipureintro; exact ⟨hk, hcov, hdev⟩
+  · ipureintro; exact ⟨hk, hcov, hdev, hlen.1, hlen.2.1⟩
   iframe Hsl Htok Hrt Hhold Hv Hd
   isplitl [Hb Hdk Hdata]
   · isplit
-    · ipureintro; exact hlen
+    · ipureintro; exact hlen.1
     iframe Hb Hdk
     iexact Hdata
   · iexact Hpay
@@ -320,6 +325,7 @@ theorem bufSlpBox_elim (γ : BcacheNames) (k : Nat) (ξ : CtxId) :
 def bufHeaderAt (V : BioView) (k : Nat) (qd qb : Qp) (dev bno : BitVec 32)
     (x : BufX) : IProp GF := iprop%
   ∃ v : BitVec 32,
+    ⌜v = 0#32 ∨ v = 1#32⌝ ∗
     wordPointsTo (aBufValid (bnode k)) 4 (DFrac.own 1) v ∗
     wordPointsTo (aBufDev (bnode k)) 4 (DFrac.own qd) dev ∗
     wordPointsTo (aBufBlockno (bnode k)) 4 (DFrac.own qb) bno ∗

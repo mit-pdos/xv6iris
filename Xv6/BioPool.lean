@@ -117,87 +117,96 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG 
 /-! ## The payloads -/
 
 /-- **ONE UNCACHED COVERED BLOCK'S POOL BUNDLE** (Rocq's `pool_blk`): the
-block's disk-image fragment.  (Rocq pairs it with the client view's `clean`
-payload at the same content; this port has no log layer, so the fragment is
-all of it.) -/
+block's disk-image fragment, at a full block's worth of bytes.  (Rocq pairs
+it with the client view's `clean` payload at the same content; this port has
+no log layer, so the fragment is all of it.) -/
 def poolBlk (V : BioView) (b : Nat) : IProp GF := iprop%
-  ∃ bs : List (BitVec 8), diskBlock V.gd b bs
+  ∃ bs : List (BitVec 8), ⌜bs.length = BSIZE⌝ ∗ diskBlock V.gd b bs
 
 instance poolBlk_timeless (V : BioView) (b : Nat) : Timeless (poolBlk (GF := GF) V b) := by
   unfold poolBlk diskBlock; infer_instance
 
 /-- **THE TRAVELLING PAYLOAD** at an identity (Rocq's `buf_pay`): a COVERED
 buffer is on the view's device and owes the block's fragment -- AT ITS OWN
-BYTES when it is valid, out of the POOL when it is not; an uncovered blockno
-owes nothing.
+BYTES when it is valid, at whatever the disk holds when it is not; an
+uncovered blockno owes nothing.
 
-This is Rocq's definition with the log layer dropped: its valid arm is
+This is Rocq's definition with the log layer dropped.  Its valid arm is
 `∃ bsd d, disk_block bsd ∗ bio_pay …`, and at `d = false` (the only arm this
 port has, there being no log) `bio_pay` is `bv_clean bsl ∗ ⌜bsd = bsl⌝` --
-so the fragment's bytes ARE the buffer's bytes, which is exactly what makes
+so the fragment's bytes ARE the buffer's bytes, which is what makes
 `bread`'s post say something about the data.  Its invalid arm is `pool_blk`
-verbatim.
+verbatim.  The two are spelled here as ONE existential with the tie under
+the valid test.
 
 Note what is NOT here: any dependence of the COVERAGE test on `v`.  That is
-the point -- an invalid covered buffer still owes a fragment (from the
-pool), which is what `bread`'s fill arm hands `virtio_disk_rw`. -/
+the point -- an invalid covered buffer still owes a fragment, which is what
+`bread`'s fill arm hands `virtio_disk_rw`. -/
 def bufPay (V : BioView) (i : BufId) (v : BitVec 32) (x : BufX) : IProp GF :=
   if i.2.toNat ∈ V.cov then
-    iprop(⌜i.1 = V.dev⌝ ∗ (if v = 0#32 then poolBlk V i.2.toNat else diskBlock V.gd i.2.toNat x))
+    iprop(⌜i.1 = V.dev⌝ ∗ ∃ bsd : List (BitVec 8),
+      ⌜bsd.length = BSIZE ∧ (v ≠ 0#32 → bsd = x)⌝ ∗ diskBlock V.gd i.2.toNat bsd)
   else iprop(emp)
 
 instance bufPay_timeless (V : BioView) (i : BufId) (v : BitVec 32) (x : BufX) :
     Timeless (bufPay (GF := GF) V i v x) := by
-  unfold bufPay poolBlk diskBlock
-  split
-  · split <;> infer_instance
-  · infer_instance
+  unfold bufPay diskBlock
+  split <;> infer_instance
 
-/-- A covered buffer's payload always yields the block's fragment (the valid
-arm at the buffer's own bytes, the invalid arm out of the pool). -/
+/-- A covered buffer's payload always yields the block's pool bundle. -/
 theorem bufPay_cov (V : BioView) (dev bno v : BitVec 32) (x : BufX)
     (hcov : bno.toNat ∈ V.cov) :
     bufPay (GF := GF) V ((dev, bno) : BufId) v x ⊢ ⌜dev = V.dev⌝ ∗ poolBlk V bno.toNat := by
-  unfold bufPay
+  unfold bufPay poolBlk
   rw [if_pos hcov]
-  iintro ⟨%hd, H⟩
+  iintro ⟨%hd, %bsd, %hb, H⟩
   isplitr [H]
   · ipureintro; exact hd
-  by_cases hv : v = 0#32
-  · rw [if_pos hv]; iexact H
-  · rw [if_neg hv]
-    unfold poolBlk
-    iexists x
-    iexact H
+  iexists bsd
+  iframe H
+  ipureintro; exact hb.1
 
 /-- A VALID covered buffer's payload is the fragment AT ITS OWN BYTES: what
 `bread` returns and what `brelse` must present. -/
 theorem bufPay_valid (V : BioView) (dev bno v : BitVec 32) (x : BufX)
     (hcov : bno.toNat ∈ V.cov) (hv : v ≠ 0#32) :
-    bufPay (GF := GF) V ((dev, bno) : BufId) v x ⊢ ⌜dev = V.dev⌝ ∗ diskBlock V.gd bno.toNat x := by
+    bufPay (GF := GF) V ((dev, bno) : BufId) v x ⊢
+      ⌜dev = V.dev ∧ x.length = BSIZE⌝ ∗ diskBlock V.gd bno.toNat x := by
   unfold bufPay
-  rw [if_pos hcov, if_neg hv]
+  rw [if_pos hcov]
+  iintro ⟨%hd, %bsd, %hb, H⟩
+  obtain ⟨hlen, hx⟩ := hb
+  have hxx := hx hv
+  subst hxx
+  isplitr [H]
+  · ipureintro; exact ⟨hd, hlen⟩
+  · iexact H
 
 theorem bufPay_of_valid (V : BioView) (dev bno v : BitVec 32) (x : BufX)
-    (hcov : bno.toNat ∈ V.cov) (hdev : dev = V.dev) (hv : v ≠ 0#32) :
+    (hcov : bno.toNat ∈ V.cov) (hdev : dev = V.dev) (hlen : x.length = BSIZE) :
     diskBlock (GF := GF) V.gd bno.toNat x ⊢ bufPay V ((dev, bno) : BufId) v x := by
   unfold bufPay
-  rw [if_pos hcov, if_neg hv]
+  rw [if_pos hcov]
   iintro H
   isplitr [H]
   · ipureintro; exact hdev
-  · iexact H
+  iexists x
+  iframe H
+  ipureintro; exact ⟨hlen, fun _ => rfl⟩
 
 /-- ...and the invalid arm, out of the pool. -/
 theorem bufPay_of_pool (V : BioView) (dev bno v : BitVec 32) (x : BufX)
     (hcov : bno.toNat ∈ V.cov) (hdev : dev = V.dev) (hv : v = 0#32) :
     poolBlk (GF := GF) V bno.toNat ⊢ bufPay V ((dev, bno) : BufId) v x := by
-  unfold bufPay
-  rw [if_pos hcov, if_pos hv]
-  iintro H
+  unfold bufPay poolBlk
+  rw [if_pos hcov]
+  iintro ⟨%bsd, %hb, H⟩
   isplitr [H]
   · ipureintro; exact hdev
-  · iexact H
+  iexists bsd
+  iframe H
+  ipureintro
+  exact ⟨hb, fun h => absurd hv h⟩
 
 /-- An uncovered blockno owes nothing (what `binit`'s thirty buffers, all
 naming block `0`, present). -/

@@ -116,7 +116,7 @@ theorem bwrite_proof (HS : HOLDINGSLEEP) (VR : VIRTIO_DISK_RW) : BWRITE := ⟨
   have hK4 : 4 ≤ k.avail := by unfold bwriteSlots virtioDiskRwSlots sleepSlots at hK; omega
   ihave #Hslk := bioCtx_buf γl γ V kk hkk $$ Hbc
   icases (show bufHold0 (GF := GF) γ V kk pidv dev bno bs bsd ⊢
-      ⌜kk < NBUF ∧ bno.toNat ∈ V.cov ∧ dev = V.dev⌝ ∗
+      ⌜kk < NBUF ∧ bno.toNat ∈ V.cov ∧ dev = V.dev ∧ bs.length = BSIZE ∧ bsd.length = BSIZE⌝ ∗
       sleeplockedQ (γ.slk kk).2 1 (aBufLock (bnode kk)) pidv ∗ bufTok γ kk ∗
       brefTok γ kk ∗ (∃ id : Nat, l2Hold (γ.box kk) ((dev, bno) : BufId) id) ∗
       wordPointsTo (aBufValid (bnode kk)) 4 (DFrac.own 1) 1#32 ∗
@@ -232,7 +232,8 @@ theorem bwrite_proof (HS : HOLDINGSLEEP) (VR : VIRTIO_DISK_RW) : BWRITE := ⟨
   · iexact Hpid
   · unfold bufHold0
     isplitl []
-    · ipureintro; exact hpure
+    · ipureintro
+      exact ⟨hpure.1, hpure.2.1, hpure.2.2.1, hpure.2.2.2.1, hpure.2.2.2.1⟩
     iframe Hsl Htok Hrt Hhd Hval Hdev Hbuf Hblk⟩
 
 end Xv6

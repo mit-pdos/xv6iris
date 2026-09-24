@@ -231,7 +231,7 @@ theorem brelse_proof (HS : HOLDINGSLEEP) (RS : RELEASESLEEP_HOOK) (AC : ACQUIRE)
   icases bufHold0_travel γ V kk pidv dev bno bs bs $$ Hhold
     with ⟨%hpure, Hsl, Htok, Hrt, ⟨%idh, Hhd⟩, Htrav⟩
   ihave Htrav := bufTravel_travelV V kk (1 : Qp).half (1 : Qp).half dev bno 1#32 bs bs
-    hpure.2.1 hpure.2.2 (fun _ => rfl) $$ Htrav
+    hpure.2.1 hpure.2.2.1 (fun _ => rfl) $$ Htrav
   iapply wpLoop_fupd
   icases kctx_token_acc cpu k $$ Hk with ⟨Hctx, Hkback⟩
   imod bufEscrow_deposit V (γ.box kk) kk (1 : Qp).half (1 : Qp).half cpu dev bno 1#32 bs idh
