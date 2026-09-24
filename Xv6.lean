@@ -468,3 +468,6 @@ import Xv6.ProofBrelse
 import Xv6.LinkBrelse
 import Xv6.BufEscrow
 import Xv6.BioPool
+import Xv6.SpecPanic
+import Xv6.ProofPanic
+import Xv6.LinkPanic
