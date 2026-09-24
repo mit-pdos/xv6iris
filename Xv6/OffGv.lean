@@ -43,10 +43,9 @@ Lean mapping: Rocq `Z` → `Int`; `1/2` → `(1 : Qp).half`; `off_gv` →
 Rocq's `Xv6Cameras.offboxG` has five members: `offbox_stampsG`,
 `offbox_slotdG`, `offbox_slotpG`, `offbox_setG` (the box part) and
 `offbox_offG` (this file's shadow).  This file defines the class with ONLY the
-shadow member; the box members are added by the OffBox port (wave 0d C5),
-over the generalised `MachCSL/CtxBox.lean` (stamps `ElemG GF (StampsRF _)`,
-the two register ghost variables); it still needs a gset-authority camera
-(see Xv6/IcacheRefDefs.lean deviation 6), which is not here yet.
+shadow member; the box members (stamps, the two registers, the published-set
+authority) are `Xv6.OffboxBoxG` in `Xv6/OffBoxCam.lean`, over the generalised
+`MachCSL/CtxBox.lean`.
 
 ## Dropped/simplified vs Rocq
 

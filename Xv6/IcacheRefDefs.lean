@@ -60,10 +60,10 @@ itself, and the `slh_auth (icfg_isl k) (fst <$> M !! k)` tie reads the
 map's fraction column directly; re-encoding would change every one of those
 statements, which the port's rules forbid without the whole picture.
 
-The camera the port genuinely LACKS is `authR (gsetUR box_names)` (Rocq
-`Xv6Cameras.offboxG.offbox_setG`, the off box's published-set authority):
-this port has no gset-authority library (`Xv6/LogDefs.lean` records the same
-gap) and `MachCSL.BoxNames` has no set structure.  See deviation 6.
+The off box's published-set authority (Rocq `authR (gsetUR box_names)`,
+`Xv6Cameras.offboxG.offbox_setG`) is `Xv6.OffSetUR` in `Xv6/OffBoxCam.lean`
+(iris-lean's `Auth (LeibnizSet _)` over `ExtTreeSet BoxNames compare`), with
+its class `Xv6.OffboxBoxG`.  See deviation 6.
 
 ## DEVIATIONS from Rocq
 
@@ -111,17 +111,15 @@ gap) and `MachCSL.BoxNames` has no set structure.  See deviation 6.
    `MachCSL.boxAllocAt` consumes (`Xv6.icBoxRaw_allocAt`).  The count ghost
    is `Xv6G.gvNatG`'s (Rocq pins `kalloc_count_inG`, the kernel's shared
    `ghost_varG Σ nat`).
-6. **`icfg_off` IS SUPPLIED, NOT MINTED.**  The off box's set camera is
-   missing (see above), so `icfgAlloc` takes the fifty set names as an
-   argument `foff` and returns `⌜icfgOff = foff⌝` in place of Rocq's
-   `[∗ list] k ∈ seq 0 NINODE, own (icfg_off k) (● ∅)`, and
-   `icfg_off_fun_alloc` is not ported.  When the camera exists, restore the
-   row (IcacheBoot consumes it as `OffBox.off_set_auth off_cfg k ∅`).
-7. **`icfg_log` DUPLICATES `Fscfg.fscLog`** for the moment: Rocq keeps the
-   log's names here only; `Xv6/FsCfgDefs.lean` deviation 2 parks them in
-   `Fscfg` "until the icache lands".  Likewise `icfgIst` (Rocq `icfg_ist`,
-   879 uses) and `Fscfg.fscInodestart` name the same number.  Both are
-   reported for the coordinator to reconcile.
+6. **`icfg_off`'s boot row is Rocq's**: `icfgAlloc` (under
+   `[OffboxBoxG GF]`) mints the fifty set authorities empty, `[∗list] k ∈
+   List.range NINODE, iOwn (icfgOff k) (● valid ∅)` (Rocq `[∗ list] k ∈ seq
+   0 NINODE, own (icfg_off k) (● ∅)`), by `icfgOffFunAlloc`.  IcacheBoot
+   consumes each row as `Xv6.offSetAuth offCfg k ∅` (Xv6/OffBox.lean), which
+   unfolds to it.
+7. **`icfg_log` / `icfg_ist` / `icfg_nib` / `icfg_dev` live HERE only**, as in
+   Rocq: `Fscfg` (Xv6/FsCfgDefs.lean) does not duplicate them (its interim
+   `fscLog` / `fscInodestart` were removed in wave 0d).
 8. **`gset_to_gmap_singletons` is stated at `P.toList`** (the port's
    `ExtTreeSet` has no big-op); the Rocq lemma's `[^op set] z ∈ P` is
    `[^ CMRA.op list] z ∈ P.toList`, and it is an EQUATION (`RegMapF` is
@@ -162,8 +160,8 @@ gap) and `MachCSL.BoxNames` has no set structure.  See deviation 6.
   `icfg_box_fun_alloc` (used only by `icfg_alloc`, grep-checked) lose their
   start index `j` (always `0` at the one use) and share one generic
   allocator `icFunAlloc`.
-* `icfg_off_fun_alloc` (used only by `icfg_alloc`) is not ported
-  (deviation 6).
+* `icfg_off_fun_alloc` (used only by `icfg_alloc`) loses its start index
+  `j` like the other family allocators (`icfgOffFunAlloc`).
 * Rocq's `Section IcacheLink` / `IcacheRegime` split of `Context`s is
   flattened: `[Icfg]` is a per-declaration binder (the `Fscfg` rule,
   `Xv6/FsCfgDefs.lean` deviation 4).
@@ -182,6 +180,7 @@ import Iris.Algebra.Heap
 import Iris.Algebra.Numbers
 import Iris.Algebra.Lib.DFracAgree
 import Iris.BI.Lib.MonoNat
+import Xv6.OffBoxCam
 
 namespace Xv6
 
@@ -1014,6 +1013,20 @@ theorem icBoxRaw_allocAt [Xv6G GF] [IcboxG GF] (γb : BoxNames) :
   iexists (default : SlotReg IcBid IcX)
   iexact Hd
 
+/-- The off set family: one empty authority per inode slot (r25 shapes).
+Rocq `icfg_off_fun_alloc`. -/
+theorem icfgOffFunAlloc [OffboxBoxG GF] (n : Nat) :
+    ⊢@{IProp GF} |==> ∃ f : Nat → GName,
+      [∗list] k ∈ List.range n, iOwn (F := constOF OffSetUR) (f k) (● (LeibnizSet.valid (∅ : OffSet))) :=
+  icFunAlloc 0 (fun _ γ => iOwn (F := constOF OffSetUR) γ (● (LeibnizSet.valid (∅ : OffSet))))
+    (fun _ => by
+      imod iOwn_alloc (GF := GF) (F := constOF OffSetUR) (● (LeibnizSet.valid (∅ : OffSet)))
+        with ⟨%γ, H⟩
+      · exact Auth.auth_valid.mpr trivial
+      imodintro
+      iexists γ
+      iexact H) n
+
 /-- **ALLOCATING THE CLASS**, for a boot that wants to CREATE the authority
 rather than assume it: the class is inhabited at any device and region
 size, with the count authority freshly minted at the empty table.  This is
@@ -1022,14 +1035,14 @@ what `IcacheBoot.icache_boot` takes as its authority premise.
 THE LEDGER'S BOOT MAPS ARE ARGUMENTS (design §20.6's boot row): their
 contents are a fact about the mkfs IMAGE, and a gname is only usable by
 `IcacheBoot` if the very allocation that mints it also mints the map.
-`icfgOff` is SUPPLIED (deviation 6). -/
-theorem icfgAlloc [Xv6G GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF]
+The off box's set names come out EMPTY (r25 shapes): the authorities go
+into `ic_slp` at IcacheBoot (`Xv6.offSetAuth offCfg k ∅`). -/
+theorem icfgAlloc [Xv6G GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [OffboxBoxG GF]
     (dv : BitVec 32) (nib : Nat) (LM : LinkUR) (CM : IcntUR) (BM : FrzmUR)
-    (γlog : LogNames) (ist : Nat) (foff : Nat → GName)
+    (γlog : LogNames) (ist : Nat)
     (hLM : ✓ LM) (hCM : ✓ CM) (hBM : ✓ BM) :
     ⊢@{IProp GF} |==> ∃ (I : Icfg) (g0 : GName), iprop(
       ⌜I.icfgDev = dv⌝ ∗ ⌜I.icfgNib = nib⌝ ∗ ⌜I.icfgLog = γlog⌝ ∗ ⌜I.icfgIst = ist⌝ ∗
-      ⌜I.icfgOff = foff⌝ ∗
       iOwn (F := constOF IcacheUR) I.icfgIref (● (∅ : RegMapF (Qp × PosNat))) ∗
       iOwn (F := constOF IliveUR) I.icfgLive (liveBootMap g0) ∗
       iOwn (F := constOF LinkUR) I.icfgLink LM ∗
@@ -1050,7 +1063,9 @@ theorem icfgAlloc [Xv6G GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF]
       (I.icfgPext ↪VAR (∅ : ExtTreeSet Nat compare)) ∗
       iOwn (F := constOF HpnUR) I.icfgHpn hpnBootMap ∗
       (I.icfgPtrn ↪VAR (∅ : RegMapF (Nat × Qp))) ∗
-      (I.icfgPcrp ↪●MAP (∅ : RegMapF Icorpse))) := by
+      (I.icfgPcrp ↪●MAP (∅ : RegMapF Icorpse)) ∗
+      ([∗list] k ∈ List.range NINODE,
+        iOwn (F := constOF OffSetUR) (I.icfgOff k) (● (LeibnizSet.valid (∅ : OffSet))))) := by
   imod iepFunAlloc (16 * nib) with ⟨%fep, Hep⟩
   imod islFunAlloc NINODE with ⟨%fisl, Hisl⟩
   imod monoSlotFunAlloc NINODE with ⟨%feplo, Heplo⟩
@@ -1082,6 +1097,7 @@ theorem icfgAlloc [Xv6G GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF]
   imod (ghost_map_alloc_empty (GF := GF) (K := Nat) (V := Icorpse) (H := RegMapF))
     with ⟨%γpcrp, Hpcrp⟩
   imod icfgBoxFunAlloc NINODE with ⟨%fbox, Hbox⟩
+  imod icfgOffFunAlloc NINODE with ⟨%foff, Hoff⟩
   imodintro
   iexists ({ icfgIref := γ, icfgDev := dv, icfgNib := nib, icfgLive := γl, icfgLink := γlk,
              icfgLog := γlog, icfgIst := ist, icfgIep := fep, icfgIsl := fisl,
@@ -1091,7 +1107,6 @@ theorem icfgAlloc [Xv6G GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF]
              icfgBox := fbox, icfgOff := foff } : Icfg), g0
   -- BUILD the bundle, do not frame it (Rocq's note: each row is one
   -- syntactic check)
-  isplitr; · ipureintro; rfl
   isplitr; · ipureintro; rfl
   isplitr; · ipureintro; rfl
   isplitr; · ipureintro; rfl
@@ -1113,7 +1128,8 @@ theorem icfgAlloc [Xv6G GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF]
   isplitl [Hpext]; · iexact Hpext
   isplitl [Hhpn]; · iexact Hhpn
   isplitl [Hptrn]; · iexact Hptrn
-  iexact Hpcrp
+  isplitl [Hpcrp]; · iexact Hpcrp
+  iexact Hoff
 
 end Alloc
 
