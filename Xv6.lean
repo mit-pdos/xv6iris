@@ -647,3 +647,6 @@ import Xv6.BallocMain
 import Xv6.ProofBalloc
 import Xv6.LinkBalloc
 import Xv6.BlkmapBuf
+import Xv6.SpecSysFork
+import Xv6.ProofSysFork
+import Xv6.LinkSysFork
