@@ -687,3 +687,9 @@ import Xv6.BmapMain
 import Xv6.ProofBmap
 import Xv6.LinkBmap
 import Xv6.LinkBmapNoalloc
+import Xv6.SpecFetchstr
+import Xv6.ProofFetchstr
+import Xv6.LinkFetchstr
+import Xv6.SpecArgstr
+import Xv6.ProofArgstr
+import Xv6.LinkArgstr
