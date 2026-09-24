@@ -241,7 +241,7 @@ Deps name batch items; "gate" = §1 plus the in-flight files.
 - [DONE] F3 IcacheBoxAmb — D4, E2, C4.
 
 **Batch G (4)**
-- G1 IcacheInvStore — F1 (leaf).
+- [DONE] G1 IcacheInvStore — F1 (leaf).
 - G2 IcacheBox — F2, F3, C5, B8.
 - G3 EscrowDeposit — F2, C1, B2, B6, C4.
 - G4 IcacheBootRegion — F2, C1, B2, C2, D4.
