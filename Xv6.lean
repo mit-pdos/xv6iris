@@ -480,3 +480,17 @@ import Xv6.LinkBread
 import Xv6.BioInit
 import Xv6.ProofPrintint
 import Xv6.LinkPrintint
+import Xv6.LogDefs
+import Xv6.FsBlocks
+import Xv6.LogInv
+import Xv6.SpecWriteHead
+import Xv6.SpecInstallTrans
+import Xv6.SpecInitlog
+import Xv6.SpecBeginOp
+import Xv6.SpecEndOp
+import Xv6.SpecLogWrite
+import Xv6.SpecSysSync
+import Xv6.ProofWriteHead
+import Xv6.LinkWriteHead
+import Xv6.ProofInstallTrans
+import Xv6.LinkInstallTrans
