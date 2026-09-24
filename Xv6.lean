@@ -601,3 +601,9 @@ import Xv6.SpecIdup
 import Xv6.IdupCore
 import Xv6.ProofIdup
 import Xv6.LinkIdup
+import Xv6.SpecBfree
+import Xv6.BfreeParts
+import Xv6.BfreeTail
+import Xv6.BfreeMid
+import Xv6.ProofBfree
+import Xv6.LinkBfree
