@@ -533,3 +533,8 @@ import Xv6.WriteiBudget
 import Xv6.FsStateBitmap
 import Xv6.BitmapInv
 import Xv6.WriteiBudgetBitmap
+import Xv6.FsNode
+import Xv6.FsStateInode
+import Xv6.InodeInv
+import Xv6.InodeLock
+import Xv6.DinodeSlot
