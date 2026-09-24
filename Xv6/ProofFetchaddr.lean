@@ -248,32 +248,6 @@ theorem fetchaddr_tail [CurCtx] (c : CPU) (k : KCtx) (hK : 4 ≤ k.avail) (spie 
 
 /-! ## The callees, at their entry addresses -/
 
-set_option maxHeartbeats 1000000 in
-/-- `copyin`'s contract as a rule. -/
-theorem fetchaddr_copyin_call (CI : COPYIN) [CurCtx] (c : CPU) (k' : KCtx) (γl : GName)
-    (γk : KmemNames) (P : UPtd) (M : Nat → List (BitVec 8)) (old : List (BitVec 8))
-    (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 50 ≤ k'.avail) (hlk : "kmem" ∉ k'.locks)
-    (hroot : k'.regs 10#5 = pageAddr P.root) (hsz : (k'.regs 11#5).toNat ≤ 2 ^ 38)
-    (hlen : k'.regs 14#5 = BitVec.ofNat 64 old.length) (hlen' : old.length < 2 ^ 63) :
-    kctx c k' ∗ pcIs c KA.«copyin» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-    kallocAvail γk none ∗ procPtAt P M ∗ byteBuf (k'.regs 12#5) (DFrac.own 1) old ∗
-    wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
-      ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
-      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      (∃ (P' : UPtd) (bs' : List (BitVec 8)),
-        ⌜P.extSz (k'.regs 11#5) P' ∧
-          ((R' 10#5 = 0#64 ∧ bs' = umemRead (viewFaulted P P' M) (k'.regs 13#5).toNat old.length) ∨
-           (R' 10#5 = -1#64 ∧ ∃ d, d ≤ old.length ∧
-              bs' = umemRead (viewFaulted P P' M) (k'.regs 13#5).toNat d ++ old.drop d))⌝ ∗
-        procPtAt P' (viewFaulted P P' M) ∗ byteBuf (k'.regs 12#5) (DFrac.own 1) bs') -∗
-      ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  have h := CI.wp_copyin (hlc := hlc) (GF := GF) c k' γl γk P M old hnoff hK hlk hroot hsz hlen hlen'
-  unfold wp_copyin_body at h
-  simp only [copyinAddr] at h
-  exact h
-
-
 /-! ## `fetchaddr` -/
 
 set_option maxHeartbeats 4000000 in
@@ -464,7 +438,7 @@ theorem fetchaddr_proof (MP : MYPROC) (CI : COPYIN) : FETCHADDR :=
       k_norm_g
       icases fetchaddr_word_to_bytes (k.regs 11#5) oldv $$ Hip with ⟨%hal, Hbuf⟩
       -- copyin(p->pagetable, p->sz, ip, addr, 8)
-      iapply (fetchaddr_copyin_call CI c19 _ γl γk P M (wordToBytes oldv) ?hnC ?hKC ?hlC ?hrC ?hszC
+      iapply (ec_copyin_call CI c19 _ γl γk P M (wordToBytes oldv) ?hnC ?hKC ?hlC ?hrC ?hszC
         ?hlnC ?hl'C) $$ [- $Hk $Hpc]
       rotate_right 1
       k_norm_g [e18]

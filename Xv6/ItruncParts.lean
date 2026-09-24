@@ -54,11 +54,12 @@ it_ent_state\|inode_blocks_take\|inode_blocks_to_ent_res\|it_frame'
   `List.mem_cons_of_mem` / `List.mem_cons_self` inline at the join.
 
 **Copied from other functions' stage files (promotion candidates):**
-`Xv6.itrunc_calleeSaved_epi` (= `bd_calleeSaved_epi`, BreadTail);
-`Xv6.itrunc_view_gd` / `_cov` are the `rfl` projections of
-`Xv6.fsView` that `FsBlocks.lean` has only for `clean`/`dirty`.  (The
-former copies `itrunc_bread` / `itrunc_brelse` are the shared
-`Xv6.bread_callF` / `Xv6.brelse_callF`, `Xv6/FsCallSitesF.lean`.)
+none left.  (The former copies `itrunc_bread` / `itrunc_brelse` are the shared
+`Xv6.bread_callF` / `Xv6.brelse_callF`, `Xv6/FsCallSitesF.lean`;
+`itrunc_calleeSaved_epi`, bread's `bd_calleeSaved_epi` restated, is the
+shared `MachCSL.calleeSaved_epi6s3`, `MachCSL/WpSmodeFrame6c.lean`; the
+`rfl` projections `itrunc_view_gd` / `_cov` are `Xv6.fsView_gd` / `_cov`,
+`Xv6/FsBlocks.lean`, beside `fsView_clean` / `_dirty`.)
 -/
 import Xv6.SpecItrunc
 import Xv6.BlkmapBuf
@@ -174,23 +175,6 @@ macro "itpins_tac" : tactic =>
                | apply itPins_set _ _ _ _ (by decide)
                | apply itPins4_set _ _ _ _ (by decide))
              assumption))
-
-/-- The epilogue's register map is callee-saved against the entry map: the
-frame restores `ra`, `s0`..`s3` and `sp`, and `s4..s11` were never touched
-(a copy of bread's `bd_calleeSaved_epi`, a stage-file lemma of another
-function: promotion candidate). -/
-theorem itrunc_calleeSaved_epi (KR R : RegMap)
-    (h20 : R 20#5 = KR 20#5) (h21 : R 21#5 = KR 21#5) (h22 : R 22#5 = KR 22#5)
-    (h23 : R 23#5 = KR 23#5) (h24 : R 24#5 = KR 24#5) (h25 : R 25#5 = KR 25#5)
-    (h26 : R 26#5 = KR 26#5) (h27 : R 27#5 = KR 27#5) :
-    calleeSaved KR ((((((R.set 1#5 (KR 1#5)).set 8#5 (KR 8#5)).set 9#5 (KR 9#5)).set 18#5
-      (KR 18#5)).set 19#5 (KR 19#5)).set 2#5 (KR 2#5)) := by
-  unfold calleeSaved
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;>
-    first
-      | rfl
-      | assumption
 
 /-! ## The cursors (Rocq's `it_dir_cursor`, `it_dir_limit`, `b_data_cursor`,
 and the injectivity the two `beq` exits need) -/
@@ -474,14 +458,6 @@ end
 
 /-! ## (4) The callees at their call sites -/
 
-theorem itrunc_view_gd {GF : BundledGFunctors} [Xv6G GF] [FsBlocksG GF] (γfs : FsNames) (gd : DiskNames)
-    (dev : BitVec 32) (cov : ExtTreeSet Nat compare) :
-    (fsView (GF := GF) γfs gd dev cov).gd = gd := rfl
-
-theorem itrunc_view_cov {GF : BundledGFunctors} [Xv6G GF] [FsBlocksG GF] (γfs : FsNames) (gd : DiskNames)
-    (dev : BitVec 32) (cov : ExtTreeSet Nat compare) :
-    (fsView (GF := GF) γfs gd dev cov).cov = cov := rfl
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [Fscfg] [Icfg] [CurCtx]
@@ -530,7 +506,7 @@ theorem itrunc_bfree (BF : BFREE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     fscSize icfgDev bno bs u' cr Sq e0 pidv dqp dqb hj hproc hK hsie hnoff hlocks htier hgeom hbg
     rfl rfl rfl hbno hbs hpd ha0 ha1
   unfold wp_bfree_body at h
-  simp only [bfreeAddr, itrunc_view_gd, itrunc_view_cov] at h
+  simp only [bfreeAddr, fsView_gd, fsView_cov] at h
   iapply h
   iframe Hk Hpc Hpi Htc Hcl Hir Hbc Hdc Hpe Hlc Hsb Hbmi Hfsb Hpid Hsl Hcred Hop
   iapply wpNext_mono _ _ _ _ _ $$ Hnext

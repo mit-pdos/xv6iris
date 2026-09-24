@@ -33,32 +33,6 @@ set_option maxRecDepth 8000
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 
-set_option maxHeartbeats 1000000 in
-/-- `copyin`'s contract as a rule. -/
-theorem ec_copyin_call (CI : COPYIN) [CurCtx] (c : CPU) (k' : KCtx) (γl : GName) (γk : KmemNames)
-    (P : UPtd) (M : Nat → List (BitVec 8)) (old : List (BitVec 8))
-    (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 50 ≤ k'.avail) (hlk : "kmem" ∉ k'.locks)
-    (hroot : k'.regs 10#5 = pageAddr P.root) (hsz : (k'.regs 11#5).toNat ≤ 2 ^ 38)
-    (hlen : k'.regs 14#5 = BitVec.ofNat 64 old.length) (hlen' : old.length < 2 ^ 63) :
-    kctx c k' ∗ pcIs c KA.«copyin» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-    kallocAvail γk none ∗ procPtAt P M ∗ byteBuf (k'.regs 12#5) (DFrac.own 1) old ∗
-    wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
-      ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
-      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      (∃ (P' : UPtd) (bs' : List (BitVec 8)),
-        ⌜P.extSz (k'.regs 11#5) P' ∧
-          ((R' 10#5 = 0#64 ∧ bs' = umemRead (viewFaulted P P' M) (k'.regs 13#5).toNat old.length) ∨
-           (R' 10#5 = -1#64 ∧ ∃ d, d ≤ old.length ∧
-              bs' = umemRead (viewFaulted P P' M) (k'.regs 13#5).toNat d ++ old.drop d))⌝ ∗
-        procPtAt P' (viewFaulted P P' M) ∗ byteBuf (k'.regs 12#5) (DFrac.own 1) bs') -∗
-      ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  have h := CI.wp_copyin (hlc := hlc) (GF := GF) c k' γl γk P M old hnoff hK hlk hroot hsz hlen hlen'
-  unfold wp_copyin_body at h
-  simp only [copyinAddr] at h
-  exact h
-
-
 /-! ## `either_copyin` -/
 
 theorem either_copyin_br_ffffffffffffe9ca : KA.«either_copyin» + 0xffffffffffffe9ca#64 = KA.«memmove» := by decide

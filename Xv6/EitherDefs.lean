@@ -2,8 +2,10 @@
 Shared definitions for `either_copyout` and `either_copyin` (kernel/proc.c):
 the private block of the currently running thread (`procPrivRun`), its
 address-space-extended form (`procPrivExt`), and the pieces both proofs
-share -- the six-slot frame `ecFrame`, its exit `ecExit`, the `myproc` and
-`memmove` call rules, and the `ecRest` split of the private block.
+share -- the six-slot frame `ecFrame`, its exit `ecExit`, the `myproc`,
+`memmove` and `copyin` call rules (`copyin`'s also serves `fetchaddr`, whose
+copy `fetchaddr_copyin_call` it replaced), and the `ecRest` split of the
+private block.
 
 Both functions are the same 31-instruction block with `a0`/`a1` swapped and
 a different callee, so everything here except the two entry addresses, the
@@ -38,6 +40,7 @@ import Xv6.Image
 import Xv6.Geom
 import Xv6.SpecMyproc
 import Xv6.SpecMemmove
+import Xv6.SpecCopyin
 import Xv6.CodeTactics
 
 namespace Xv6
@@ -347,6 +350,32 @@ theorem ec_memmove_call (MM : MEMMOVE) [CurCtx] (c : CPU) (k' : KCtx) (bs olds :
   have h := MM.wp_memmove (hlc := hlc) (GF := GF) c k' bs olds n dqs hK hn hn32 hls hld
   unfold wp_memmove_body at h
   simp only [memmoveAddr] at h
+  exact h
+
+set_option maxHeartbeats 1000000 in
+/-- `copyin`'s contract as a rule (shared by `either_copyin` and `fetchaddr`;
+formerly also ProofFetchaddr's `fetchaddr_copyin_call`). -/
+theorem ec_copyin_call (CI : COPYIN) [CurCtx] (c : CPU) (k' : KCtx) (γl : GName) (γk : KmemNames)
+    (P : UPtd) (M : Nat → List (BitVec 8)) (old : List (BitVec 8))
+    (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 50 ≤ k'.avail) (hlk : "kmem" ∉ k'.locks)
+    (hroot : k'.regs 10#5 = pageAddr P.root) (hsz : (k'.regs 11#5).toNat ≤ 2 ^ 38)
+    (hlen : k'.regs 14#5 = BitVec.ofNat 64 old.length) (hlen' : old.length < 2 ^ 63) :
+    kctx c k' ∗ pcIs c KA.«copyin» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
+    kallocAvail γk none ∗ procPtAt P M ∗ byteBuf (k'.regs 12#5) (DFrac.own 1) old ∗
+    wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
+      ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
+      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
+      (∃ (P' : UPtd) (bs' : List (BitVec 8)),
+        ⌜P.extSz (k'.regs 11#5) P' ∧
+          ((R' 10#5 = 0#64 ∧ bs' = umemRead (viewFaulted P P' M) (k'.regs 13#5).toNat old.length) ∨
+           (R' 10#5 = -1#64 ∧ ∃ d, d ≤ old.length ∧
+              bs' = umemRead (viewFaulted P P' M) (k'.regs 13#5).toNat d ++ old.drop d))⌝ ∗
+        procPtAt P' (viewFaulted P P' M) ∗ byteBuf (k'.regs 12#5) (DFrac.own 1) bs') -∗
+      ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
+    ⊢ wpLoop (GF := GF) c := by
+  have h := CI.wp_copyin (hlc := hlc) (GF := GF) c k' γl γk P M old hnoff hK hlk hroot hsz hlen hlen'
+  unfold wp_copyin_body at h
+  simp only [copyinAddr] at h
   exact h
 
 

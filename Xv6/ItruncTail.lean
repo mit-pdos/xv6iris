@@ -232,7 +232,7 @@ theorem itrunc_tail (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
   iapply HΦ $$ %spie2 %spp2 %_ [] Hk Hpc Htc Hcl Hir Hpid Hidev Hinum Hsb Hsi Hmeta Hmap Hblk Hdn
     Hsl Hop
   ipureintro
-  exact itrunc_calleeSaved_epi k.regs R2 (e20.trans r20) (e21.trans r21) (e22.trans r22)
+  exact calleeSaved_epi6s3 k.regs R2 (e20.trans r20) (e21.trans r21) (e22.trans r22)
     (e23.trans r23) (e24.trans r24) (e25.trans r25) (e26.trans r26) (e27.trans r27)
 
 set_option maxHeartbeats 4000000 in

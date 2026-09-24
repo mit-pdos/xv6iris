@@ -38,22 +38,6 @@ theorem bdPins_cs (k : KCtx) (R R' : RegMap) (h : bdPins k R) (hcs : calleeSaved
   exact ⟨c20.trans a20, c21.trans a21, c22.trans a22, c23.trans a23,
     c24.trans a24, c25.trans a25, c26.trans a26, c27.trans a27⟩
 
-/-- The epilogue's register map is callee-saved against the entry map: the
-frame restores `ra`, `s0`, `s1`, `s2`, `s3` and `sp`, and `s4..s11` were
-never touched. -/
-theorem bd_calleeSaved_epi (KR R : RegMap)
-    (h20 : R 20#5 = KR 20#5) (h21 : R 21#5 = KR 21#5) (h22 : R 22#5 = KR 22#5)
-    (h23 : R 23#5 = KR 23#5) (h24 : R 24#5 = KR 24#5) (h25 : R 25#5 = KR 25#5)
-    (h26 : R 26#5 = KR 26#5) (h27 : R 27#5 = KR 27#5) :
-    calleeSaved KR ((((((R.set 1#5 (KR 1#5)).set 8#5 (KR 8#5)).set 9#5 (KR 9#5)).set 18#5
-      (KR 18#5)).set 19#5 (KR 19#5)).set 2#5 (KR 2#5)) := by
-  unfold calleeSaved
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;>
-    first
-      | rfl
-      | assumption
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [BcacheG GF]
 variable [SleepLockG GF] [DiskG GF] [CurCtx]
@@ -112,7 +96,7 @@ theorem bd_ret (c cpu : CPU) (k0 : KCtx) (sp1 sp2 : Bool)
   ihave HΦ := wpNext_at true k0.proc cpu c2 _ hpin $$ Hnext
   iapply HΦ $$ %sp1 %sp2 %_ %kk %bs %bsd %d [] Hk Hpc Htc Hcl Hir Hpid Hhold
   ipureintro
-  refine ⟨bd_calleeSaved_epi k0.regs (R.set 10#5 (bnode kk)) ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_, ?_⟩ <;>
+  refine ⟨calleeSaved_epi6s3 k0.regs (R.set 10#5 (bnode kk)) ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_, ?_⟩ <;>
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;>
     first
       | assumption

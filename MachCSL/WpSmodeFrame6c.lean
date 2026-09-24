@@ -129,4 +129,22 @@ theorem wp_epilogue6s3_gen [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k
 
 end
 
+/-- The register map after `frame6s3`'s epilogue is callee-saved against the
+entry map: the frame restores `ra`, `s0`, `s1`, `s2`, `s3` and `sp`, and
+`s4..s11` must merely come back from the body untouched.  Shared by every
+function with this frame (`bread`, `itrunc`, `initlog`; formerly
+`bd_calleeSaved_epi`, `itrunc_calleeSaved_epi`, `il_calleeSaved_epi`). -/
+theorem calleeSaved_epi6s3 (KR R : RegMap)
+    (h20 : R 20#5 = KR 20#5) (h21 : R 21#5 = KR 21#5) (h22 : R 22#5 = KR 22#5)
+    (h23 : R 23#5 = KR 23#5) (h24 : R 24#5 = KR 24#5) (h25 : R 25#5 = KR 25#5)
+    (h26 : R 26#5 = KR 26#5) (h27 : R 27#5 = KR 27#5) :
+    calleeSaved KR ((((((R.set 1#5 (KR 1#5)).set 8#5 (KR 8#5)).set 9#5 (KR 9#5)).set 18#5
+      (KR 18#5)).set 19#5 (KR 19#5)).set 2#5 (KR 2#5)) := by
+  unfold calleeSaved
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
+    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;>
+    first
+      | rfl
+      | assumption
+
 end MachCSL

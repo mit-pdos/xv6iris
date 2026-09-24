@@ -142,6 +142,15 @@ def fsView (γfs : FsNames) (gd : DiskNames) (dev : BitVec 32)
 @[simp] theorem fsView_dirty (γfs : FsNames) (gd : DiskNames) (dev : BitVec 32)
     (cov : Std.ExtTreeSet Nat compare) :
     (fsView (GF := GF) γfs gd dev cov).dirty = fsMdirty γfs := rfl
+/-- The view's disk names (formerly itrunc's `itrunc_view_gd`; not `@[simp]`,
+so as not to change what an unrestricted `simp` does elsewhere). -/
+theorem fsView_gd (γfs : FsNames) (gd : DiskNames) (dev : BitVec 32)
+    (cov : Std.ExtTreeSet Nat compare) :
+    (fsView (GF := GF) γfs gd dev cov).gd = gd := rfl
+/-- The view's coverage (formerly itrunc's `itrunc_view_cov`). -/
+theorem fsView_cov (γfs : FsNames) (gd : DiskNames) (dev : BitVec 32)
+    (cov : Std.ExtTreeSet Nat compare) :
+    (fsView (GF := GF) γfs gd dev cov).cov = cov := rfl
 
 /-- What a caller of `bread` learns on contact: its own client half against
 the handle's machinery half pins the returned bytes (Rocq's

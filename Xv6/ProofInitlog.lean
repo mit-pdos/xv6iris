@@ -130,22 +130,6 @@ theorem il_hdr_roundtrip (bs : List (BitVec 8)) (hl : 4 ≤ bs.length) :
   rw [MachCSL.wordToBytes4_bytesToWord4 _ h4]
   simp
 
-/-- The epilogue's register map is callee-saved against the entry's:
-`initlog` saves `ra`, `s0`, `s1`, `s2` and `s3`, so only `s4 .. s11` have
-to come back untouched from the callees. -/
-theorem il_calleeSaved_epi (KR R : RegMap)
-    (h20 : R 20#5 = KR 20#5) (h21 : R 21#5 = KR 21#5) (h22 : R 22#5 = KR 22#5)
-    (h23 : R 23#5 = KR 23#5) (h24 : R 24#5 = KR 24#5) (h25 : R 25#5 = KR 25#5)
-    (h26 : R 26#5 = KR 26#5) (h27 : R 27#5 = KR 27#5) :
-    calleeSaved KR ((((((R.set 1#5 (KR 1#5)).set 8#5 (KR 8#5)).set 9#5 (KR 9#5)).set 18#5
-      (KR 18#5)).set 19#5 (KR 19#5)).set 2#5 (KR 2#5)) := by
-  unfold calleeSaved
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;>
-    first
-      | rfl
-      | assumption
-
 /-! ## The buffer's header word -/
 
 section
@@ -513,7 +497,7 @@ theorem il_seal (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   ihave HΦ := wpNext_at true k.proc cpu c2 _ hpin $$ Hnext
   iapply HΦ $$ %spie1 %spp1 %_ %γlk [] Hk Hpc [Htc] [Hcl] [Hir] [Hpid] [Hsb] [Hwork] [Hctx]
   · ipureintro
-    exact il_calleeSaved_epi k.regs R p20 p21 p22 p23 p24 p25 p26 p27
+    exact calleeSaved_epi6s3 k.regs R p20 p21 p22 p23 p24 p25 p26 p27
   · iexact Htc
   · iexact Hcl
   · iexact Hir
