@@ -286,6 +286,13 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   per-stage outcome model `PipesDisc`, and the cut plan C1-C9 with
   `echo | cat` as the n = 1 corollary.
 
+- **[`union.md`](design/union.md)** — THE UNION APPLICATION (C9/M5,
+  proposal of record): the state moves into the line model's range
+  condition, the union model `ulm` over the file and pipeline lines
+  (`cat f | cat^n` reads its content at the round's state), one handler
+  merging the file and N-stage registries, the claim `gcl ulm ∨ popenU`,
+  one top theorem, and the cut plan C9a-C9h with the audit re-anchoring.
+
 - **[`contexts.md`](design/contexts.md)** — CONTEXTS (`TsoCtx.v`): the three
   tokens (running, stamped, parked under a context), the one domination
   relation and its four mints, `CtxMorph` as the only transport class with
