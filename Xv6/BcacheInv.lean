@@ -798,13 +798,13 @@ at the recycle), but the PAYLOAD no longer depends on it: `Xv6.bufPay` is
 indexed on COVERAGE, which is what lets a holder that finds `valid == 0`
 after `acquiresleep` still have the block's fragment to hand
 `virtio_disk_rw`.  See `Xv6/BioPool.lean`'s header. -/
-def bufHdr (V : BioView) (k : Nat) (qd qb : Qp) (i : BufId) (_x : BufX)
+def bufHdr (V : BioView) (k : Nat) (qd qb : Qp) (i : BufId) (x : BufX)
     (ξ : CtxId) : IProp GF := iprop%
   ∃ v : BitVec 32,
     wordAtN ξ (aBufValid (bnode k)) 4 (DFrac.own 1) v ∗
     wordAtN ξ (aBufDev (bnode k)) 4 (DFrac.own qd) i.1 ∗
     wordAtN ξ (aBufBlockno (bnode k)) 4 (DFrac.own qb) i.2 ∗
-    bufPay V i
+    bufPay V i v x
 
 /-- **THE REST** (Rocq's `buf_rest`): the pinned `disk` flag and the data. -/
 def bufRest (k : Nat) (x : BufX) (ξ : CtxId) : IProp GF := iprop%

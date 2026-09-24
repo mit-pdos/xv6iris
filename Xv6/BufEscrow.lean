@@ -119,7 +119,7 @@ def bufTravelV (V : BioView) (k : Nat) (qd qb : Qp) (dev bno v : BitVec 32)
   wordPointsTo (aBufBlockno (bnode k)) 4 (DFrac.own qb) bno ∗
   wordPointsTo (aBufDisk (bnode k)) 4 (DFrac.own 1) 0#32 ∗
   byteBuf (aBufData (bnode k)) (DFrac.own 1) bs ∗
-  bufPay V ((dev, bno) : BufId)
+  bufPay V ((dev, bno) : BufId) v bs
 
 /-- The same with the fragment NAMED: what a holder of a valid buffer has. -/
 def bufTravel (V : BioView) (k : Nat) (qd qb : Qp) (dev bno v : BitVec 32)
@@ -133,17 +133,22 @@ def bufTravel (V : BioView) (k : Nat) (qd qb : Qp) (dev bno v : BitVec 32)
   diskBlock V.gd bno.toNat bsd
 
 theorem bufTravel_travelV (V : BioView) (k : Nat) (qd qb : Qp) (dev bno v : BitVec 32)
-    (bs bsd : List (BitVec 8)) (hcov : bno.toNat ∈ V.cov) (hdev : dev = V.dev) :
+    (bs bsd : List (BitVec 8)) (hcov : bno.toNat ∈ V.cov) (hdev : dev = V.dev)
+    (hclean : v ≠ 0#32 → bsd = bs) :
     bufTravel (GF := GF) V k qd qb dev bno v bs bsd ⊢ bufTravelV V k qd qb dev bno v bs := by
   unfold bufTravel bufTravelV
   iintro ⟨%hlen, Hv, Hd, Hb, Hdk, Hdata, Hpay⟩
   isplit
   · ipureintro; exact hlen
   iframe Hv Hd Hb Hdk Hdata
-  iapply bufPay_of_cov V dev bno hcov hdev
-  unfold poolBlk
-  iexists bsd
-  iexact Hpay
+  by_cases hv : v = 0#32
+  · iapply bufPay_of_pool V dev bno v bs hcov hdev hv
+    unfold poolBlk
+    iexists bsd
+    iexact Hpay
+  · rw [hclean hv] at *
+    iapply bufPay_of_valid V dev bno v bs hcov hdev hv
+    iexact Hpay
 
 /-- The reverse: a COVERED buffer's travelling content has the fragment, and
 naming it is what `bread`'s fill arm does before calling
@@ -151,19 +156,33 @@ naming it is what `bread`'s fill arm does before calling
 theorem bufTravelV_travel (V : BioView) (k : Nat) (qd qb : Qp) (dev bno v : BitVec 32)
     (bs : List (BitVec 8)) (hcov : bno.toNat ∈ V.cov) :
     bufTravelV (GF := GF) V k qd qb dev bno v bs ⊢
-      ⌜dev = V.dev⌝ ∗ ∃ bsd : List (BitVec 8), bufTravel V k qd qb dev bno v bs bsd := by
+      ⌜dev = V.dev⌝ ∗ ∃ bsd : List (BitVec 8),
+        ⌜v ≠ 0#32 → bsd = bs⌝ ∗ bufTravel V k qd qb dev bno v bs bsd := by
   unfold bufTravel bufTravelV
   iintro ⟨%hlen, Hv, Hd, Hb, Hdk, Hdata, Hpay⟩
-  icases bufPay_cov V dev bno hcov $$ Hpay with ⟨%hdev, Hpay⟩
-  isplitr [Hv Hd Hb Hdk Hdata Hpay]
-  · ipureintro; exact hdev
-  unfold poolBlk
-  icases Hpay with ⟨%bsd, Hpay⟩
-  iexists bsd
-  isplit
-  · ipureintro; exact hlen
-  iframe Hv Hd Hb Hdk Hdata
-  iexact Hpay
+  by_cases hv : v = 0#32
+  · icases bufPay_cov V dev bno v bs hcov $$ Hpay with ⟨%hdev, Hpay⟩
+    isplitr [Hv Hd Hb Hdk Hdata Hpay]
+    · ipureintro; exact hdev
+    unfold poolBlk
+    icases Hpay with ⟨%bsd, Hpay⟩
+    iexists bsd
+    isplitl []
+    · ipureintro; intro h; exact absurd hv h
+    isplit
+    · ipureintro; exact hlen
+    iframe Hv Hd Hb Hdk Hdata
+    iexact Hpay
+  · icases bufPay_valid V dev bno v bs hcov hv $$ Hpay with ⟨%hdev, Hpay⟩
+    isplitr [Hv Hd Hb Hdk Hdata Hpay]
+    · ipureintro; exact hdev
+    iexists bs
+    isplitl []
+    · ipureintro; intro _; rfl
+    isplit
+    · ipureintro; exact hlen
+    iframe Hv Hd Hb Hdk Hdata
+    iexact Hpay
 
 /-- The content, folded into the box's `IN` arm at the holder's context. -/
 theorem bufTravelV_inArm (V : BioView) (k : Nat) (qd qb : Qp) (dev bno v : BitVec 32)
@@ -298,16 +317,17 @@ theorem bufSlpBox_elim (γ : BcacheNames) (k : Nat) (ξ : CtxId) :
 /-- The header at the holder's own context, spelled in `wordPointsTo` (what
 `bget`'s miss path receives from `bufEscrow_withdraw` and hands back to
 `bufEscrow_recycle`). -/
-def bufHeaderAt (V : BioView) (k : Nat) (qd qb : Qp) (dev bno : BitVec 32) : IProp GF := iprop%
+def bufHeaderAt (V : BioView) (k : Nat) (qd qb : Qp) (dev bno : BitVec 32)
+    (x : BufX) : IProp GF := iprop%
   ∃ v : BitVec 32,
     wordPointsTo (aBufValid (bnode k)) 4 (DFrac.own 1) v ∗
     wordPointsTo (aBufDev (bnode k)) 4 (DFrac.own qd) dev ∗
     wordPointsTo (aBufBlockno (bnode k)) 4 (DFrac.own qb) bno ∗
-    bufPay V ((dev, bno) : BufId)
+    bufPay V ((dev, bno) : BufId) v x
 
 theorem bufHeaderAt_hdr (V : BioView) (k : Nat) (qd qb : Qp) (dev bno : BitVec 32)
     (x : BufX) :
-    bufHeaderAt (GF := GF) V k qd qb dev bno ⊣⊢ bufHdr V k qd qb (dev, bno) x curCtx := by
+    bufHeaderAt (GF := GF) V k qd qb dev bno x ⊣⊢ bufHdr V k qd qb (dev, bno) x curCtx := by
   unfold bufHeaderAt bufHdr
   simp only [wordAtN_cur]
   constructor
@@ -377,7 +397,7 @@ theorem bufEscrow_withdraw (V : BioView) (γbk : BoxNames) (k : Nat) (qd qb : Qp
       |={E}=> (ownCtx cpu curCtx ∗ cntHalf (GF := GF) γbk 0 ∗
         ∃ (x0 : BufX) (T0 : Nat), ⌜T0 ≤ Kd⌝ ∗
           slotdHalf (GF := GF) γbk (⟨r.td, true, r.ident, some (x0, T0)⟩ : SlotReg BufId BufX) ∗
-          bufHeaderAt V k qd qb r.ident.1 r.ident.2) := by
+          bufHeaderAt V k qd qb r.ident.1 r.ident.2 x0) := by
   iintro ⟨#Hbox, Hrun, #Hfld, Hrd, Hc⟩
   unfold bufBox
   imod boxWithdrawL1 (bufBoxPay V k qd qb) (ndot bioxN k) γbk cpu curCtx r Kd E
@@ -405,7 +425,7 @@ theorem bufEscrow_recycle (V : BioView) (γbk : BoxNames) (k : Nat) (qd qb : Qp)
     (cpu : CPU) (r : SlotReg BufId BufX) (dev' bno' : BitVec 32) (x0 : BufX) (T0 : Nat)
     (E : CoPset) (hE : ↑bioxN ⊆ E) (hw : r.win = true) (hx : r.x = some (x0, T0)) :
     bufBox V γbk k qd qb ∗ ownCtx cpu curCtx ∗ slotdHalf (GF := GF) γbk r ∗ cntHalf (GF := GF) γbk 0 ∗
-      bufHeaderAt V k qd qb dev' bno' ⊢
+      bufHeaderAt V k qd qb dev' bno' x0 ⊢
       |={E}=> (ownCtx cpu curCtx ∗ ∃ T' : Nat,
         slotdHalf (GF := GF) γbk (⟨T', false, (dev', bno'), none⟩ : SlotReg BufId BufX) ∗
         cntHalf (GF := GF) γbk 1 ∗ boxRef (GF := GF) γbk (dev', bno') T' ∗ topLb T') := by
@@ -491,7 +511,7 @@ theorem bufEscrow_withdrawKey (γ : BcacheNames) (V : BioView) (k : Nat) (cpu : 
         ∃ (td : Nat) (x0 : BufX) (T0 : Nat), ⌜T0 ≤ tl⌝ ∗
           slotdHalf (GF := GF) (γ.box k)
             (⟨td, true, ((dev, bno) : BufId), some (x0, T0)⟩ : SlotReg BufId BufX) ∗
-          bufHeaderAt V k (1 : Qp).half (1 : Qp).half dev bno) := by
+          bufHeaderAt V k (1 : Qp).half (1 : Qp).half dev bno x0) := by
   iintro ⟨#Hbox, Hrun, #Hfl, Hregs, Hc⟩
   icases bufSlotRegs_elim (γ.box k) tl dev bno $$ Hregs with ⟨%r, %⟨hrid, hrtl⟩, Hrd, -⟩
   obtain ⟨rtd, rwin, rident, rx⟩ := r

@@ -210,7 +210,7 @@ end
 set_option maxHeartbeats 16000000 in
 theorem brelse_proof (HS : HOLDINGSLEEP) (RS : RELEASESLEEP_HOOK) (AC : ACQUIRE)
     (RE : RELEASE_HOOK) : BRELSE := ⟨
-  fun {hlc GF} _ _ _ _ _ _ Γ cpu k γl γ V kk pidv dev bno dqp bs bsd
+  fun {hlc GF} _ _ _ _ _ _ Γ cpu k γl γ V kk pidv dev bno dqp bs
     hnoff hK hlk hsl hp htier hkk ha0 => by
   unfold wp_brelse_body
   simp only [brelseAddr]
@@ -228,10 +228,10 @@ theorem brelse_proof (HS : HOLDINGSLEEP) (RS : RELEASESLEEP_HOOK) (AC : ACQUIRE)
   -- (Rocq `ProofBrelse.v`'s `bbox_park`).  It must be complete BEFORE
   -- `releasesleep`: a blocked waiter's `acquiresleep` can return the moment
   -- the sleeplock frees.
-  icases bufHold0_travel γ V kk pidv dev bno bs bsd $$ Hhold
+  icases bufHold0_travel γ V kk pidv dev bno bs bs $$ Hhold
     with ⟨%hpure, Hsl, Htok, Hrt, ⟨%idh, Hhd⟩, Htrav⟩
-  ihave Htrav := bufTravel_travelV V kk (1 : Qp).half (1 : Qp).half dev bno 1#32 bs bsd
-    hpure.2.1 hpure.2.2 $$ Htrav
+  ihave Htrav := bufTravel_travelV V kk (1 : Qp).half (1 : Qp).half dev bno 1#32 bs bs
+    hpure.2.1 hpure.2.2 (fun _ => rfl) $$ Htrav
   iapply wpLoop_fupd
   icases kctx_token_acc cpu k $$ Hk with ⟨Hctx, Hkback⟩
   imod bufEscrow_deposit V (γ.box kk) kk (1 : Qp).half (1 : Qp).half cpu dev bno 1#32 bs idh
