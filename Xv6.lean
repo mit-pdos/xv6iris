@@ -569,3 +569,4 @@ import Xv6.IcacheRef
 import Xv6.OffBoxCam
 import Xv6.OffBox
 import Xv6.InodeRegionLink
+import Xv6.FsStateEraResB
