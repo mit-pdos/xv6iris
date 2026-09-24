@@ -707,3 +707,8 @@ import Xv6.LinkSysPipe
 import Xv6.SpecFlags2perm
 import Xv6.ProofFlags2perm
 import Xv6.LinkFlags2perm
+import Xv6.SpecPrepareReturn
+import Xv6.PrepareReturnRules
+import Xv6.PrepareReturnStores
+import Xv6.ProofPrepareReturn
+import Xv6.LinkPrepareReturn
