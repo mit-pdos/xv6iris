@@ -49,7 +49,6 @@ Require Import CtxIdDefs.
 Require Import SpecConsoleintr.
 From stdpp Require Import list.
 Local Open Scope list_scope.
-Set Default Timeout 60.
 
 Section pipes_links.
   Context {Σ : gFunctors}.

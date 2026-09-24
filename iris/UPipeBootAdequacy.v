@@ -20,10 +20,11 @@
 (* both of the file application's own entries ([fileAppSigma] -- the     *)
 (* deed and the typed-line list -- and [fileOutSigma] -- the per-era     *)
 (* boot-state map).  [pipeSigma] is the ECHO application's list plus the *)
-(* pipe protocol's cameras ([PipeProto.pipeProtoSigma]): the pipeline    *)
-(* stage is [EchoOut]'s ghost algebra with [PipeDisc.sessp] for          *)
-(* [EchoDisc.sess] and the claim is echo's with a PERSISTENT,            *)
-(* instance-free /cat conjunct (lane PIPE-CLAIM).                        *)
+(* pipe protocol's cameras ([PipeProto.pipeProtoSigma]) and the N-stage  *)
+(* round's registry and mode ghosts ([UkPipesIface]): the pipeline stage *)
+(* is [EchoOut]'s ghost algebra at the line model [PipesDisc.pipes_lmE]  *)
+(* and the claim is echo's with a PERSISTENT, instance-free /cat         *)
+(* conjunct (lane PIPE-CLAIM).                                           *)
 (*                                                                       *)
 (* IS [Hprog] SATISFIABLE?  The file twin's two witnesses are this       *)
 (* file's as well ([App.app_triv_init_boot] at the generic application   *)
@@ -67,7 +68,6 @@ Require Import FsImgCheck.
 Require Import FsImgDisk.
 Require Import App.                (* [xv6_app_adequacy] and the record *)
 Require Import InodeInv.           (* [ROOTINO] *)
-Require Import PipeDisc.           (* [pipe_phi] -- the conclusion, spelled out *)
 Require Import EchoOut.            (* [echoOutG] / [echoOutSigma] *)
 Require Import PipeProto.          (* [pipeProtoSigma]: the pipe protocol's cameras -- every round mints a pipe's ghosts *)
 Require Import PipeOut.            (* [pipeOutG] / [pipeOutSigma] -- NOT dead:
@@ -76,7 +76,10 @@ Require Import PipeOut.            (* [pipeOutG] / [pipeOutSigma] -- NOT dead:
                                       an unbound variable, not an error *)
 Require Import PipeProto.          (* [pipeProtoSigma]: the protocol's functors *)
 Require Import AppPipe.            (* [app_pipe] and its ten discharged laws *)
-Require UkPipeIface.               (* [pifRegSig]: the tree route's device registry *)
+Require Import ObsTrace.           (* [cycles_of] *)
+Require Import LineModel.          (* [lm_disc] / [lm_good_out]: the conclusion, spelled out *)
+Require Import PipesDisc.          (* [pipes_lmE]: the model the claim is born at *)
+Require UkPipesIface.              (* [pnsRegSig] / [pipesNSig]: the N-stage round's registry and mode ghosts *)
 
 Local Open Scope Z_scope.
 
@@ -169,14 +172,15 @@ End PipeAdequacy.
 (*                                                                       *)
 (*  WHAT IT DOES NOT CLOSE, and cannot: [Hdisk] and [Hprog].              *)
 (*                                                                       *)
-(*  THE CONCLUSION MENTIONS NO IRIS.  [PipeDisc.pipe_phi] does not depend *)
-(*  on [Sigma], so it is spelled out here rather than left behind the     *)
-(*  record.  What it says: IF the console input kept the PIPELINE         *)
-(*  discipline ([PipeDisc.disc_p] -- the user types lines of the two      *)
-(*  shapes `echo w1 ... wn' and `echo w1 ... wn | cat', waiting for the   *)
-(*  prompt and for each byte's echo), THEN each cycle's console output is *)
-(*  a prefix of the transcript its input calls for.  A reader needs no    *)
-(*  separation logic to read it; [PipeDisc.v] is the whole specification. *)
+(*  THE CONCLUSION MENTIONS NO IRIS: [LineModel.lm_disc] and              *)
+(*  [lm_good_out] at [PipesDisc.pipes_lmE] do not depend on [Sigma], so   *)
+(*  they are spelled out here rather than left behind the record.  What   *)
+(*  it says: IF the console input kept the PIPELINE discipline (the user  *)
+(*  types lines [echo w1 .. wn] and [echo w1 .. wn | cat | .. | cat] with *)
+(*  any number of cats, waiting for the prompt and for each byte's echo), *)
+(*  THEN each cycle's console output is a prefix of the transcript its    *)
+(*  input calls for.  [LineModel.v] and [PipesDisc.v] are the whole       *)
+(*  specification.                                                        *)
 (* ===================================================================== *)
 
 (* the shell's line-choice list *)
@@ -196,7 +200,8 @@ Definition pipeΣ : gFunctors :=
    ; PipeProto.pipeProtoΣ (* the pipe PROTOCOL's cameras: cursors, the shots,
                             the side tokens -- every round mints one pipe's
                             (lane SH-PIPE-ROUND-14 found them missing)     *)
-   ; UkPipeIface.pifRegΣ (* the tree route's device registry (REPOINT-PIPE) *)
+   ; UkPipesIface.pnsRegΣ (* the N-stage round's per-process registry (C6) *)
+   ; UkPipesIface.pipesNΣ (* the N-writer family's mode ghosts (C5) *)
    ].
 
 Corollary pipe_adequacy_pipeΣ
@@ -208,7 +213,7 @@ Corollary pipe_adequacy_pipeΣ
     language.nsteps n ([PowerLoopE : language.expr riscv_lang], g)
       κs (t2, g2) ->
     (forall e2, e2 ∈ t2 -> language.reducible (Λ := riscv_lang) e2 g2)
-    /\ PipeDisc.pipe_phi κs.
+    /\ (lm_disc pipes_lmE κs -> Forall (lm_good_out pipes_lmE tt) (cycles_of κs)).
 Proof.
   assert (Himg : fs_boot_image_wf (v_disk (g.(gdev).(dvirtio))) XV6_DISK_BYTES
                    fsimg_sb fsimg_nib fsimg_cov)

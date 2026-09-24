@@ -14,9 +14,11 @@
    /echo only.  [app_fixed], [app_cl] and [app_names] are still [AppEcho]'s
    own names, and [app_boot] is [echo_boot] under the name [pipe_boot] (the
    console key or flag reads no file-system pin).  What is new besides the
-   claim is the CONSOLE half: [app_R] is [PipeOut.pipe_led], [app_ifc] is
+   claim is the CONSOLE half: [app_R] is [PipesOut.pipesE_led], [app_ifc] is
    the pipeline tag / taint / claim / licence, and [app_phi] is
-   [PipeDisc.pipe_phi].
+   the N-stage model's conclusion (cut C8: the claim is born at
+   [PipesDisc.pipes_lmE], the typed lines [echo ws] and
+   [echo ws | cat | ... | cat]).
 
    ONE THING IS A SECTION HYPOTHESIS AND IS NOT DISCHARGED HERE:
    [al_programs], lane SH-PIPE-ROUND's (the first process's exec bundle).
@@ -69,17 +71,23 @@ Require Import EchoOut.
 Require Import AppEcho.
 Require Import AppPipeClaim.
 Require Import PipeOut.
-Require Import PipeLinks.
+Require Import LineModel.
+Require Import PipesDisc.
+Require Import PipeOutN PipeOutNEv.
+Require Import PipesOut.
+Require Import PipesLinks.
+Require Import PipesDecE.
 Local Open Scope Z_scope.
 
 (* ====================================================================== *)
 (*  1.  THE CONCLUSION                                                     *)
 (*                                                                        *)
-(*  [PipeDisc.pipe_phi] VERBATIM.  Like [AppEcho.echo_phi] it reads the    *)
-(*  trace alone, so the state argument is dropped.                         *)
+(*  [LineModel]'s conclusion at [PipesDisc.pipes_lmE]: a disciplined     *)
+(*  history's every cycle is a good output.  Like [AppEcho.echo_phi] it   *)
+(*  reads the trace alone, so the state argument is dropped.              *)
 (* ====================================================================== *)
 Definition pipe_phi : gstate -> list mobs -> Prop :=
-  fun _ h => PipeDisc.pipe_phi h.
+  fun _ h => lm_disc pipes_lmE h -> Forall (lm_good_out pipes_lmE tt) (cycles_of h).
 
 Section PipeApp.
   Context {Σ : gFunctors}.
@@ -88,12 +96,12 @@ Section PipeApp.
   (* ---- the four fields that are resources ---- *)
 
   Definition pipe_R (c : pipe_gn) (h : list mobs) : iProp Σ :=
-    pipe_led c h.
+    pipesE_led c h.
 
   Global Instance pipe_R_timeless c h : Timeless (pipe_R c h).
   Proof using . rewrite /pipe_R. apply _. Qed.
 
-  Definition pipe_tag (c : pipe_gn) (h : list mobs) : iProp Σ := ptag c h.
+  Definition pipe_tag (c : pipe_gn) (h : list mobs) : iProp Σ := ptagE c h.
 
   Global Instance pipe_tag_persistent c h : Persistent (pipe_tag c h).
   Proof using . rewrite /pipe_tag. apply _. Qed.
@@ -111,7 +119,7 @@ Section PipeApp.
   Proof using . rewrite /pipe_kill. apply _. Qed.
 
   Definition pipe_cons (c : pipe_gn)
-    : nat -> list mobs -> LogEntryDefs.cons_hist -> iProp Σ := pecl c.
+    : nat -> list mobs -> LogEntryDefs.cons_hist -> iProp Σ := peclE c.
 
   Global Instance pipe_cons_timeless c k h H : Timeless (pipe_cons c k h H).
   Proof using . rewrite /pipe_cons. apply _. Qed.
@@ -128,7 +136,7 @@ Section PipeApp.
            pipe_cons c k h H ==∗ pipe_cons c k h (ConsLog.cons_step H ev)).
   Proof using . 
     rewrite /pipe_cons /pipe_kill. iIntros "#Ht !>" (k h H ev) "Ho".
-    iApply (pecl_sup c k h H ev with "Ht Ho").
+    iApply (pecl'_sup c (fun _ => None) adm_echo pipes_lm_echo_laws k h H ev with "Ht Ho").
   Qed.
 
   Definition pipe_ifc (c : pipe_gn) : app_iface Σ :=
@@ -180,7 +188,7 @@ Section PipeApp.
     iIntros "#Hs".
     iDestruct (pipe_taint_of_sup (pgn_cl c) r with "Hs") as "#Ht".
     iIntros "!>" (k h H ev) "Ho".
-    iApply (pecl_sup c k h H ev with "Ht Ho").
+    iApply (pecl'_sup c (fun _ => None) adm_echo pipes_lm_echo_laws k h H ev with "Ht Ho").
   Qed.
 
   Lemma pipe_al_R0 (c : app_fixed app_pipe) :
@@ -188,7 +196,7 @@ Section PipeApp.
   Proof using .
     cbn [app_pipe app_fixed app_cl app_R] in c |- *.
     iIntros "Hc". iModIntro. rewrite /pipe_R.
-    iApply (pipe_led_init c with "Hc").
+    iApply (pipesE_led_init c with "Hc").
   Qed.
 
   Lemma pipe_al_pow (c : app_fixed app_pipe) (h : list mobs) (on : bool)
@@ -205,7 +213,7 @@ Section PipeApp.
     rewrite /app_cons.
     cbn [app_pipe app_fixed app_R pipe_R app_ifc pipe_ifc ai_cons pipe_cons
          app_turn pipe_turn] in c |- *.
-    iApply (pipe_led_pow c h on).
+    iApply (pipesE_led_pow c h on).
   Qed.
 
   (* the two UART arms, at the theorem's literal shape *)
@@ -234,10 +242,10 @@ Section PipeApp.
       in c |- *.
     iIntros "!>" (h b u u' ho H)
       "%Htxp %Hlp %Hsh %Hwi %Hwo %Hbt %Hpo %Hacc Ho Hg Hled".
-    iAssert (|==> (if i is Uart0 then pecl c (S gen_id) ho H else emp)
+    iAssert (|==> (if i is Uart0 then peclE c (S gen_id) ho H else emp)
                   ∗ (echo_taint (pgn_cl c)
                      ∨ ⌜i = Uart0 ->
-                        good_out_p (open_seg h ++ [ObsUartOut i b])⌝))%I
+                        lm_good_out pipes_lmE tt (open_seg h ++ [ObsUartOut i b])⌝))%I
       with "[Ho]" as ">[Ho Hgo]".
     { destruct i; last first.
       { iModIntro. iFrame "Ho". iRight. iPureIntro. discriminate. }
@@ -256,14 +264,14 @@ Section PipeApp.
         replace (obs_wire Uart0 [ObsUartOut Uart0 b]) with [b] by reflexivity.
         intros Hz. apply (f_equal length) in Hz.
         rewrite length_app in Hz. cbn [length] in Hz. lia. }
-      iDestruct (pecl_drain c (S gen_id) h ho H
+      iDestruct (pecl'_drain c (fun _ => None) adm_echo pipes_lm_echo_laws (S gen_id) h ho H
                    (open_seg h ++ [ObsUartOut Uart0 b])
                    Hsh Hbt Hpo Hins ltac:(rewrite Hacc; exact Hpre) Hne
                    with "Ho") as "[Ho Hgo]".
       iModIntro. iFrame "Ho".
       iDestruct "Hgo" as "[HT | %Hg]"; [by iLeft |].
       iRight. iPureIntro. by intros _. }
-    iMod (pipe_led_tx c h i b Hsh with "Hgo Hled") as "Hled".
+    iMod (pipesE_led_tx c h i b Hsh with "Hgo Hled") as "Hled".
     iModIntro. iFrame "Ho Hg Hled".
   Qed.
 
@@ -284,8 +292,8 @@ Section PipeApp.
     intros _ _. rewrite /app_tag.
     cbn [app_pipe app_fixed app_R pipe_R app_ifc pipe_ifc ai_tag] in c |- *.
     iIntros "!>" (h b u u') "_ %Hsh _ Hg Hled".
-    iMod (pipe_led_rx c h i b Hsh with "Hled") as "[Hled Htag]".
-    iModIntro. iFrame "Hg Hled". rewrite /pipe_tag /ptag.
+    iMod (pipesE_led_rx c h i b Hsh with "Hled") as "[Hled Htag]".
+    iModIntro. iFrame "Hg Hled". rewrite /pipe_tag /ptagE.
     iSplitR; [| iExact "Htag"].
     iPureIntro. eapply trace_shape_snoc; [exact Hsh | reflexivity].
   Qed.
@@ -307,7 +315,7 @@ Section PipeApp.
   Proof using .
     cbn [app_pipe app_fixed app_ifc] in c |- *.
     intros Hiface.
-    iApply (PipeLinks.pipe_happ_echo c (HRg := HR)).
+    iApply (PipesLinks.pipes_happ_echo c (HRg := HR)).
     - rewrite /riscv_cons_res Hiface. by cbn [pipe_ifc ai_cons pipe_cons].
     - rewrite /riscv_rx_tag Hiface. by cbn [pipe_ifc ai_tag pipe_tag].
   Qed.
@@ -354,7 +362,7 @@ Section PipeApp.
   Proof using .
     cbn [app_pipe app_fixed app_R app_phi] in c |- *.
     rewrite /pipe_R /pipe_phi. iIntros "H".
-    iApply (pipe_led_phi c h with "H").
+    iApply (pipesE_led_phi c h with "H").
   Qed.
 
 End PipeApp.

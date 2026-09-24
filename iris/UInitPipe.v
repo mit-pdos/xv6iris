@@ -1,49 +1,25 @@
 (* ===================================================================== *)
-(*  UInitPipe.v -- THE PIPELINE APPLICATION'S [al_programs]               *)
-(*  (lane PIPE-CC): [UInitBoot.echo_Hinit_boot]'s twin at [AppPipe.       *)
-(*  app_pipe], and the line that takes [UPipeBootAdequacy.               *)
-(*  pipe_adequacy_pipeSigma] down to ONE premise about the machine.       *)
+(*  UInitPipe.v -- THE PIPELINE APPLICATION'S [al_programs] AT THE        *)
+(*  N-STAGE MODEL (cut C8): [UInitBoot.echo_Hinit_boot]'s twin at         *)
+(*  [AppPipe.app_pipe], whose claim is born at [PipesDisc.pipes_lmE].     *)
 (*                                                                       *)
 (*  WHAT IS HERE, in the order the assembly needs it:                     *)
 (*                                                                       *)
-(*   S1  the pipeline era's readings of its own credential families --    *)
-(*       [ush_wc_inp] / [ush_wb_inp] at [PipeLinkInst]'s pair, and the    *)
-(*       lend's conversion at the shell's entry.  [UShLine.               *)
-(*       ush_wc_inp_lcred] / [ush_wb_inp_ban] are echo's twins; the       *)
-(*       first is a fact about [PipeLinksLine]'s families and the other   *)
-(*       two are [LinkRec] fields.                                        *)
+(*   S1  the era's readings of its own credential families --             *)
+(*       [ush_wc_inp] / [ush_wb_inp] at [PipesLinkInst]'s pair, the lend's *)
+(*       conversion at the shell's entry, and the read law at the widened *)
+(*       credential [UkShPipesFork.pterm_wcN].                            *)
 (*   S2  [pipe_cons_in_of_Cns] and [pipe_cons_sup_of_sh_slot] --          *)
 (*       [UInitBoot]'s two era-specific seam lemmas at the pipe claim and *)
-(*       at [UInitSh]'s [_at] forms (an arbitrary input discipline and an *)
-(*       arbitrary line constructor), because the pipeline era's are      *)
-(*       [PipeDisc.disc_input_p] and [PipeUline.ush_line_pipe].           *)
-(*   S3  [pipe_cc] -- the era's [UserConsole.cons_cred] -- and            *)
-(*       [pipe_cc_holds], its ten laws.                                   *)
-(*   S4  [pipe_Hinit_boot]: /init's exec bundle at the pipeline record,   *)
-(*       modulo the ONE premise lane SH-PIPE-ROUND-4 owes                 *)
-(*       ([UShPipeRound.sh_pipe_child_law]).                              *)
-(*   S5  [pipe_prog_law_of_child] and the CLOSED COROLLARY.               *)
-(*                                                                       *)
-(*  THE ONE PREMISE, AND ITS SHAPE.  [UShPipeRound.sh_pipe_child_law] is  *)
-(*  [UkShFork.ushf_child_law_at] at the pipe line's shape; after its       *)
-(*  section closes it depends on the fixed part [g] and on the classes    *)
-(*  alone -- no [γp], no [r], no record equation -- so what this file      *)
-(*  takes is                                                              *)
-(*                                                                       *)
-(*     forall HR GEN HBs HFd HIr HPav HWc HF (c : pipe_gn),               *)
-(*       ⊢ sh_pipe_child_law c                                            *)
-(*                                                                       *)
-(*  i.e. [pipe_prog_law]'s own binder list with [c] and nothing else.      *)
-(*                                                                       *)
-(*  WHY THE COROLLARY IS HERE AND NOT IN [UPipeBootAdequacy.v].           *)
-(*  That file carries the ADEQUACY cone and deliberately not the program  *)
-(*  tier (its header says why, and [UInitBoot.v]'s says what happens when  *)
-(*  the two are mixed); it also DEFINES [pipe_prog_law], which this file   *)
-(*  discharges, so the dependency cannot be turned round.  The restated    *)
-(*  corollary therefore lives here, one [Require] below it, and            *)
-(*  [iris/PipeAssumptions.v] audits THIS one -- a strictly larger cone     *)
-(*  than the old target's, since it now walks the whole program tier as    *)
-(*  well.                                                                 *)
+(*       at [UInitSh]'s [_at] forms.                                      *)
+(*   S3  [pipes_cc] -- the era's [UserConsole.cons_cred] -- and            *)
+(*       [pipes_cc_holds], its ten laws, at the discipline                 *)
+(*       [lm_disc_input pipes_lmE] and the line constructor                *)
+(*       [PipesUline.ush_line_pipes].                                     *)
+(*   S4  [pipes_Hinit_boot]: /init's exec bundle at the pipeline record,  *)
+(*       with NO premise: the round's child law is proved                  *)
+(*       ([UShPipesLaw.pipes_child_law], spent by                          *)
+(*       [UShPipesRound.sh_round_holds_pipes]).                            *)
 (* ===================================================================== *)
 From Stdlib Require Import ZArith List.
 From stdpp Require Import gmap list bitvector.definitions.
@@ -113,25 +89,23 @@ Require Import UInitBoot.          (* [init_deps_of_laws] / [init_boot_bundle_of
 (* ---- the pipeline era's own layers ---- *)
 Require Import LinkRec.
 Require Import ReadRec.
-Require Import PipeDisc.
-Require Import PipeOutPure.
+Require Import LineModel.
+Require Import LineModelLinks.
+Require Import PipesDisc.
 Require Import PipeOut.
-Require Import PipeLinks.
-Require Import PipeLinksLine.
-Require Import PipeHooks.         (* S0 of [PipeLinksLine], moved *)
-Require Import PipeLinkInst.
+Require Import PipeOutN PipeOutNEv PipesOut.
+Require Import PipesLinks.
 Require Import GenLinksLine.
-Require Import PipeBoth.        (* [pwc_lpr2], the record's lk_lpr since SH-PIPE-ROUND-4 *)
-Require Import PipeReadInst.
-Require Import PipeUline.
+Require Import PipesLinkInst.
+Require Import PipesStageInst.
+Require Import PipesUline.
 Require Import AppPipeClaim.
 Require Import AppPipeCons.
 Require Import UInitConsPipe.
-Require Import UShPipeRound.
-Require Import PipeProto.          (* [pipeProtoG]: the protocol's ghosts *)
-Require Import UShPipeLaw.         (* the child law's DISCHARGE (SH-PIPE-ROUND-14) *)
-Require UkPipeIface.               (* [pifRegG]: the binder below needs it in scope *)
-Require Import UkShPipeFork.   (* [pterm_wc] -- design SS4.3p's WIDENED era credential *)
+Require Import PipeProto.
+Require Import UkPipesIface.
+Require Import UkShPipesFork.
+Require Import UShPipesRound.
 Require Import UShPipeCatSlot.  (* [pipe_sh_cat_slot] -- the /cat pin, off
                                    the era equation (lane SH-PIPE-ROUND-6) *)
 Require Import AppPipe.
@@ -143,9 +117,7 @@ Local Open Scope Z_scope.
 
 (* ===================================================================== *)
 (*  S1/S2  THE ERA'S SEAM, at [UInitBoot]'s Section-1 binder list          *)
-(*         VERBATIM (a shorter one makes Coq synthesise an instance and    *)
-(*         the elaboration explodes -- that file's own note) plus the      *)
-(*         pipeline class.                                                 *)
+(*         VERBATIM plus the pipeline classes.                             *)
 (* ===================================================================== *)
 
 Section UInitPipeSeam.
@@ -157,158 +129,65 @@ Section UInitPipeSeam.
   Context `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
   Context `{!uartGhostG Σ}.
-  (* the pipeline application's own class (lane PIPE-2W-2) *)
-  Context `{!pipeOutG Σ}.
+  Context `{!pipeOutG Σ, !pipesNG Σ}.
 
-  (* =================================================================== *)
-  (*  S1  THE TWO READINGS OF THE FAMILIES' INPUT, at the pipe record     *)
-  (*                                                                     *)
-  (*  [UShLine]'s seam between /init's position-indexed payload and sh's  *)
-  (*  input-indexed credential has to identify the two inputs, and a      *)
-  (*  LENGTH alone does not ([EchoOut.inp_lb_agree]): what identifies     *)
-  (*  them is that both are lower bounds of the same era's echoed list.   *)
-  (*  So each family owes its input on its untainted arm.                 *)
-  (*                                                                     *)
-  (*  The banner-owed one is a [LinkRec] FIELD ([lk_ban_inp]).  The       *)
-  (*  boundary one is not, and cannot be: [lk_lcred] is an existential    *)
-  (*  over [lk_lpr], whose four indices are four different families, so   *)
-  (*  the reading is a fact about the ERA's spelling of them.  At the     *)
-  (*  pipeline era all six arms are ONE shape -- a witness triple, the    *)
-  (*  turn, the two lower bounds and the input, or the taint -- so the    *)
-  (*  six proofs are one tactic.                                         *)
-  (* =================================================================== *)
   Context (g : pipe_gn).
   Local Notation γ := (pgn_cl g).
   Local Notation T := (echo_taint γ).
-  Local Notation PI := (pipe_link_inst_at g).
+  Local Notation PI := (pipes_link_inst_at g).
+  Local Notation GP := (pipes_params g).
 
-  (* THE SAME EIGHT LINES FOUR TIMES, and NOT an [Ltac]: the reconstruction
-     names the witnesses the destructuring bound, and an [Ltac] body cannot
-     mention an identifier a tactic inside it introduces at run time ("The
-     reference ps was not found"). *)
-  Local Lemma pwc_pro_inp (k : nat) (v : era_pins) (I : list (bv 8)) :
-    pwc_pro g k v I -∗ pwc_pro g k v I ∗ (inp_lb v I ∨ T).
-  Proof using .
-    rewrite pwc_pro_view. iIntros "[Hl | #HT]"; last first.
-    { iSplit; [ iRight; iExact "HT" | iRight; iExact "HT" ]. }
-    iDestruct "Hl" as (ps cs P) "(%Hw & Ht & #Hps & #Hcs & #HE)".
-    iSplitL "Ht".
-    - iLeft. iExists ps, cs, P. iFrame "Ht Hps Hcs HE". by iPureIntro.
-    - iLeft. iExact "HE".
-  Qed.
+  #[local] Instance pis_T_pers0 : Persistent T | 0 := echo_taint_persistent γ.
 
-  Local Lemma pwc_blk_inp (k : nat) (v : era_pins) (I : list (bv 8))
-      (a i : nat) :
-    pwc_blk g k v I a i -∗ pwc_blk g k v I a i ∗ (inp_lb v I ∨ T).
-  Proof using .
-    rewrite pwc_blk_view. iIntros "[Hl | #HT]"; last first.
-    { iSplit; [ iRight; iExact "HT" | iRight; iExact "HT" ]. }
-    iDestruct "Hl" as (ps cs P) "(%Hw & Ht & #Hps & #Hcs & #HE)".
-    iSplitL "Ht".
-    - iLeft. iExists ps, cs, P. iFrame "Ht Hps Hcs HE". by iPureIntro.
-    - iLeft. iExact "HE".
-  Qed.
-
-  Local Lemma pwc_sp_t_inp (k : nat) (v : era_pins) (I : list (bv 8)) :
-    pwc_sp_t g k v I -∗ pwc_sp_t g k v I ∗ (inp_lb v I ∨ T).
-  Proof using .
-    rewrite pwc_sp_t_view. iIntros "[Hl | #HT]"; last first.
-    { iSplit; [ iRight; iExact "HT" | iRight; iExact "HT" ]. }
-    iDestruct "Hl" as (ps cs P) "(%Hw & Ht & #Hps & #Hcs & #HE)".
-    iSplitL "Ht".
-    - iLeft. iExists ps, cs, P. iFrame "Ht Hps Hcs HE". by iPureIntro.
-    - iLeft. iExact "HE".
-  Qed.
-
-  Local Lemma pwc_open_t_inp (k : nat) (v : era_pins) (I : list (bv 8)) :
-    pwc_open_t g k v I -∗ pwc_open_t g k v I ∗ (inp_lb v I ∨ T).
-  Proof using .
-    rewrite pwc_open_t_view. iIntros "[Hl | #HT]"; last first.
-    { iSplit; [ iRight; iExact "HT" | iRight; iExact "HT" ]. }
-    iDestruct "Hl" as (ps cs P) "(%Hw & Ht & #Hps & #Hcs & #HE)".
-    iSplitL "Ht".
-    - iLeft. iExists ps, cs, P. iFrame "Ht Hps Hcs HE". by iPureIntro.
-    - iLeft. iExact "HE".
-  Qed.
-
-  Local Lemma pwc_line_inp (k : nat) (v : era_pins) (I : list (bv 8)) :
-    pwc_line g k v I -∗ pwc_line g k v I ∗ (inp_lb v I ∨ T).
-  Proof using .
-    rewrite /pwc_line. iIntros "[Hp | Hq]".
-    - iDestruct (pwc_pro_inp k v I with "Hp") as "[Hp Hi]".
-      iSplitL "Hp"; [ by iLeft | iExact "Hi" ].
-    - iDestruct "Hq" as (a) "[%Ha Hp]".
-      rewrite /pwc_post.
-      iDestruct (pwc_blk_inp k v I a (length (pab I a) - 2)%nat with "Hp")
-        as "[Hp Hi]".
-      iSplitL "Hp"; [ | iExact "Hi" ].
-      iRight. iExists a. iSplitR; [ by iPureIntro | ]. iExact "Hp".
-  Qed.
-
-  (* ...AND THE TWO-WRITER BLOCK (lane SH-PIPE-ROUND-4's R1): the record's
-     [lk_lpr] is [PipeBoth.pwc_lpr2], whose index 0 is the WIDENED boundary
-     credential [pwc_line2] with the unfiled two-writer block as its third
-     arm; that arm carries the input prefix too. *)
-  Local Lemma pwc_blk2_inp (k : nat) (v : era_pins) (I R : list (bv 8))
-      (sel : list bool) (c1 c2 : nat) (tm : bool) :
-    PipeBoth.pwc_blk2 g k v I R sel c1 c2 tm -∗
-    PipeBoth.pwc_blk2 g k v I R sel c1 c2 tm ∗ (inp_lb v I ∨ T).
-  Proof using .
-    rewrite /PipeBoth.pwc_blk2. iIntros "[Hl | #HT]"; last first.
-    { iSplit; [ iRight; iExact "HT" | iRight; iExact "HT" ]. }
-    iDestruct "Hl" as (ps cs P) "(%Hw & %Htl & Ht & #Hps & #Hcs & Hled & #HE)".
-    iSplitL "Ht Hled".
-    - iLeft. iExists ps, cs, P. iFrame "Ht Hps Hcs Hled HE". by iPureIntro.
-    - iLeft. iExact "HE".
-  Qed.
-
-  Local Lemma pwc_line2_inp (k : nat) (v : era_pins) (I : list (bv 8)) :
-    PipeBoth.pwc_line2 g k v I -∗
-    PipeBoth.pwc_line2 g k v I ∗ (inp_lb v I ∨ T).
-  Proof using .
-    rewrite pwc_line2_view /pipe_X. iIntros "[Hp | [Hq | Hb]]".
-    - iDestruct (pwc_pro_inp k v I with "Hp") as "[Hp Hi]".
-      iSplitL "Hp"; [ by iLeft | iExact "Hi" ].
-    - iDestruct "Hq" as (a) "[%Ha Hp]".
-      rewrite /pwc_post.
-      iDestruct (pwc_blk_inp k v I a (length (pab I a) - 2)%nat with "Hp")
-        as "[Hp Hi]".
-      iSplitL "Hp"; [ | iExact "Hi" ].
-      iRight; iLeft. iExists a. iSplitR; [ by iPureIntro | ]. iExact "Hp".
-    - iDestruct "Hb" as (R sel c1 c2 a) "(%Hc & %Hn & Hp)".
-      iDestruct (pwc_blk2_inp k v I R sel c1 c2 false with "Hp") as "[Hp Hi]".
-      iSplitL "Hp"; [ | iExact "Hi" ].
-      iRight; iRight. iExists R, sel, c1, c2, a.
-      iSplitR; [ by iPureIntro | ]. iSplitR; [ by iPureIntro | ]. iExact "Hp".
-  Qed.
-
-  Local Lemma pwc_lpr_inp (k : nat) (v : era_pins) (I : list (bv 8))
-      (p : nat) :
-    PipeBoth.pwc_lpr2 g k v I p -∗
-    PipeBoth.pwc_lpr2 g k v I p ∗ (inp_lb v I ∨ T).
+  (* =================================================================== *)
+  (*  S1  THE READINGS OF THE FAMILIES' INPUT                             *)
+  (*                                                                     *)
+  (*  Every arm of every family of the generic record at [pipes_lmE]      *)
+  (*  carries the input's lower bound ([gcur], or the block family's      *)
+  (*  fourth conjunct, or the filed round's [pwc_blkN]), or the taint;    *)
+  (*  the head arm is [False] at this record.  The reading is persistent, *)
+  (*  so the credential comes back whole ([bi.persistent_entails_r]).     *)
+  (* =================================================================== *)
+  Local Lemma pis_lpr_inp (k : nat) (v : era_pins) (I : list (bv 8)) (p : nat) :
+    gwc_lpr pipes_lmE GP (pipes_X g) k v I p ⊢ inp_lb v I ∨ T.
   Proof using .
     destruct p as [| [| [| p']]]; cbn [gwc_lpr].
-    - exact (pwc_line2_inp k v I).
-    - exact (pwc_sp_t_inp k v I).
-    - exact (pwc_open_t_inp k v I).
-    - exact (pwc_blk_inp k v I 0%nat 0%nat).
+    - rewrite /gwc_line /gwc_pro /gwc_post /gcur /pipes_X /pwc_blkN.
+      cbn [gH gT pipes_params]. rewrite /pipes_H.
+      iIntros "[[Hl | [[] | #HT]] | [Hq | Hx]]".
+      + iDestruct "Hl" as (ps cs s P) "(_ & _ & _ & _ & #HE & _)". by iLeft.
+      + by iRight.
+      + iDestruct "Hq" as (a) "[_ [Hl | #HT]]"; [| by iRight].
+        iDestruct "Hl" as (ps cs s P) "(_ & _ & _ & _ & #HE & _)". by iLeft.
+      + iDestruct "Hx" as (pre) "[_ [Hl | #HT]]"; [| by iRight].
+        iDestruct "Hl" as (ps cs P) "(_ & _ & _ & _ & _ & _ & #HE)". by iLeft.
+    - rewrite /gwc_sp_t /gcur. cbn [gT pipes_params].
+      iIntros "[Hl | #HT]"; [| by iRight].
+      iDestruct "Hl" as (ps cs s P) "(_ & _ & _ & _ & #HE & _)". by iLeft.
+    - rewrite /gwc_open_t /gcur. cbn [gT pipes_params].
+      iIntros "[Hl | #HT]"; [| by iRight].
+      iDestruct "Hl" as (ps cs s P) "(_ & _ & _ & _ & #HE & _)". by iLeft.
+    - rewrite /gwc_blk. cbn [gT pipes_params].
+      iIntros "[Hl | #HT]"; [| by iRight].
+      iDestruct "Hl" as (ps cs s P) "(_ & _ & _ & _ & #HE & _)". by iLeft.
   Qed.
 
-  (* [UShLine.ush_wc_inp_lcred]'s pipe twin *)
-  Lemma pipe_wc_inp : UShLine.ush_wc_inp γ T (pipe_Wcl_at g).
+  (* [UShLine.ush_wc_inp_lcred]'s twin at the record *)
+  Lemma pipes_wc_inp : UShLine.ush_wc_inp γ T (pipes_Wcl_at g).
   Proof using .
-    intros I p. rewrite /pipe_Wcl_at (pipe_inst_lcred g (S gen_id) I p).
+    intros I p. iIntros "H".
+    iApply (bi.persistent_entails_r with "H").
+    rewrite /pipes_Wcl_at (pipes_inst_lcred g (S gen_id) I p).
     iIntros "H". iDestruct "H" as (v) "[#Hpin Hc]".
-    iDestruct (pwc_lpr_inp (S gen_id) v I p with "Hc") as "[Hc Hi]".
-    iSplitL "Hc"; [ iExists v; iFrame "Hpin Hc" | ].
-    iDestruct "Hi" as "[HE | HT]";
-      [ iLeft; iExists v; iFrame "Hpin HE" | iRight; iExact "HT" ].
+    iDestruct (pis_lpr_inp (S gen_id) v I p with "Hc") as "[#HE | #HT]".
+    - iLeft. iExists v. by iFrame "Hpin HE".
+    - by iRight.
   Qed.
 
-  (* [UShLine.ush_wb_inp_ban]'s pipe twin, off the record's own field *)
-  Lemma pipe_wb_inp : UShLine.ush_wb_inp γ T (pipe_Wbl_at g).
+  (* [UShLine.ush_wb_inp_ban]'s twin, off the record's own field *)
+  Lemma pipes_wb_inp : UShLine.ush_wb_inp γ T (pipes_Wbl_at g).
   Proof using .
-    intros I. rewrite /pipe_Wbl_at.
+    intros I. rewrite /pipes_Wbl_at.
     iIntros "H". iDestruct "H" as (v) "[#Hpin Hb]".
     iDestruct (lk_ban_inp PI (S gen_id) v I with "Hb") as "[Hb Hi]".
     iSplitL "Hb"; [ iExists v; iFrame "Hpin Hb" | ].
@@ -317,50 +196,51 @@ Section UInitPipeSeam.
     iLeft. iSplitR; [ | by iPureIntro ]. iExists v. iFrame "Hpin HE".
   Qed.
 
-  (* THE LEND'S CONVERSION AT THE SHELL'S ENTRY (the tenth law): /init's
-     round-open credential IS a boundary credential.  Generic in the
-     record, unlike echo's [Hpw], because the pipeline era's prologue
-     family is the record's [lk_pban] and not a spelled-out shape. *)
-  Lemma pipe_wp_line (n : nat) :
+  (* a prologue credential at the record is a boundary credential: at an
+     ABSTRACT record, so that nothing reduces the projections *)
+  Local Lemma pis_lcred_of_pban (L : LinkRec Σ) (k : nat) (v : era_pins)
+      (I : list (bv 8)) :
+    lk_pin L k v -∗ lk_pban L k v I -∗ lk_lcred L k I 0%nat.
+  Proof using .
+    iIntros "#Hpin Hc". rewrite /lk_lcred. iExists v. iFrame "Hpin".
+    rewrite (lk_lpr_0 L).
+    iApply (lk_line_of_pro L k v I). iApply (lk_pro_of_pban L k v I with "Hc").
+  Qed.
+
+  (* THE LEND'S CONVERSION AT THE SHELL'S ENTRY (the tenth law) *)
+  Lemma pipes_wp_line (n : nat) :
     ⊢ UInitDiag.kinit_pro_at PI n -∗
-      ∃ I : list (bv 8), ⌜length I = n⌝ ∗ pipe_Wcl_at g I 0%nat.
+      ∃ I : list (bv 8), ⌜length I = n⌝ ∗ pipes_Wcl_at g I 0%nat.
   Proof using .
     iIntros "H". rewrite /UInitDiag.kinit_pro_at.
     iDestruct "H" as (v I) "(%Hlen & #Hpin & Hc)".
     iExists I. iSplitR; [ by iPureIntro | ].
-    rewrite /pipe_Wcl_at /lk_lcred. iExists v. iFrame "Hpin".
-    rewrite (lk_lpr_0 PI (S gen_id) v I).
-    iApply (lk_line_of_pro PI (S gen_id) v I).
-    iApply (lk_pro_of_pban PI (S gen_id) v I with "Hc").
+    rewrite /pipes_Wcl_at.
+    iApply (pis_lcred_of_pban PI (S gen_id) v I with "Hpin Hc").
   Qed.
 
-  (* the pieces' pin IS the record's, at this instance *)
-  Lemma pipe_ep_refl (v : era_pins) :
+  Lemma pipes_ep_refl (v : era_pins) :
     ⊢ era_pin γ (S gen_id) v -∗ lk_epin PI (S gen_id) v.
   Proof using . by iIntros "$". Qed.
 
-  Lemma pipe_pin_refl (v : era_pins) :
+  Lemma pipes_pin_refl (v : era_pins) :
     ⊢ era_pin γ (S gen_id) v -∗ lk_pin PI (S gen_id) v.
   Proof using . by iIntros "$". Qed.
 
-  (* ...AND THE READ LAW AT THE WIDENED CREDENTIAL (design SS4.3p): the
-     era runs at [UkShPipeFork.pterm_wc g], whose terminal arm a delivered
-     line REFUTES -- [pterm_wc_read_of] on the landed law and the pipeline
-     era's own [pterm_read_law] ([UShPipeRound.pipe_pterm_read_law], off
-     the mid-line pieces' reader residue). *)
-  Lemma pipe_wc_read_t (γp : gname) :
+  (* ...AND THE READ LAW AT THE WIDENED CREDENTIAL: a delivered line
+     refutes the terminal arm ([UShPipesRound.pipes_pterm_read_law]) *)
+  Lemma pipes_wc_read_t (γp : gname) :
     forall I l : list (bv 8), wl_nl ∉ l ->
       ⊢ UShLine.ush_mid_at (lk_rres PI) γ γp (I ++ l ++ [wl_nl])%list -∗
-        UkShPipeFork.pterm_wc g I 2%nat ={⊤}=∗
+        pterm_wcN g I 2%nat ={⊤}=∗
         UShLine.ush_mid_at (lk_rres PI) γ γp (I ++ l ++ [wl_nl])%list
-        ∗ UkShPipeFork.pterm_wc g (I ++ l ++ [wl_nl])%list 3%nat.
+        ∗ pterm_wcN g (I ++ l ++ [wl_nl])%list 3%nat.
   Proof using .
-    apply (UkShPipeFork.pterm_wc_read_of g
-             (UShLine.ush_mid_at (lk_rres PI) γ γp)
-             (UShPipeRound.pipe_pterm_read_law g γp)).
+    apply (pterm_wcN_read_of g (UShLine.ush_mid_at (lk_rres PI) γ γp)
+             (pipes_pterm_read_law g γp)).
     intros I l Hnl. iIntros "Hm Hc". iModIntro.
     iApply (UShLine.ush_mid_wc_read_t_at PI γ γp (S gen_id) I l Hnl
-              pipe_ep_refl with "Hm Hc").
+              pipes_ep_refl with "Hm Hc").
   Qed.
 
   (* =================================================================== *)
@@ -497,9 +377,9 @@ Section UInitPipeSeam.
 End UInitPipeSeam.
 
 (* ===================================================================== *)
-(*  S3/S4/S5  THE CREDENTIAL, THE BUNDLE AND THE THEOREM                  *)
+(*  S3/S4  THE CREDENTIAL AND THE BUNDLE                                  *)
 (*  ([UInitBoot]'s [Section EchoInitBoot] binder list, verbatim, plus the  *)
-(*  pipeline class.)                                                      *)
+(*  pipeline classes.)                                                    *)
 (* ===================================================================== *)
 Section PipeInitBoot.
   Context {Σ : gFunctors}.
@@ -507,33 +387,12 @@ Section PipeInitBoot.
   Context `{!inG Σ (mono_listR (leibnizO Z))}.
   Context `{!echoOutG Σ}.
   Context `{!pipeOutG Σ}.
-  (* THE PROTOCOL'S GHOSTS (lane SH-PIPE-ROUND-14).  Nothing ABOVE this
-     line uses them -- [sh_pipe_child_law_all]'s Prop does not mention
-     [pipeProtoG], so its type does NOT move and neither
-     [pipe_prog_law_of_child] nor [pipe_adequacy_pipeSigma_of_child] does
-     -- but the DISCHARGE below allocates a [pnames] record
-     ([UShPipeLaw.pl_round_alloc] through [PipeProto.pipe_names_alloc])
-     and so needs the class.  See the lane's Findings: the functor list
-     [UPipeBootAdequacy.pipeSigma] does NOT contain [pipeProtoSigma], so
-     [pipeProtoG pipeSigma] has no instance and the discharge is stated at
-     the extended list in [UInitPipeAdequacy.v]. *)
-  Context `{!pipeProtoG Σ}.
-  (* ...AND THE TREE-ROUTE ENTRIES' DEVICE REGISTRY (lane REPOINT-PIPE):
-     the discharge's two children allocate one inside the exec slot
-     ([UkPipeEntries.pe_cat_image_entry_qc_alloc] /
-     [pe_echo_image_entry_alloc]).  Like [pipeProtoG], [sh_pipe_child_law_all]'s
-     Prop does not mention it. *)
-  Context `{HpifR : !UkPipeIface.pifRegG Σ}.
+  (* THE ROUND'S GHOSTS: the pipe protocol, the per-process registry and
+     the N-writer family's modes -- the child law allocates all three *)
+  Context `{!pipeProtoG Σ, !pnsRegG Σ, !pipesNG Σ}.
 
-  (* NAME THE LEAF, DO NOT SEARCH ([UShPipeRound.v]'s measured note, and
-     it is the one that bites here): [iIntros "#H"] / [iAssert ... as "#H"]
-     on [PipeLinks.pipe_links g] -- six [box]-wands behind ONE transparent
-     definition -- sends the [Persistent] search into the wand chain and
-     in a file with this cone it does not come back.  The bundle HAS a
-     [Global Instance]; the hint net does not reach it. *)
-  #[local] Instance pipe_links_pers0 `{!riscvGS Σ} (g : pipe_gn) :
-    Persistent (PipeLinks.pipe_links g) | 0
-    := PipeLinks.pipe_links_persistent g.
+  #[local] Instance pipes_links_pers0 `{!riscvGS Σ} (g : pipe_gn) :
+    Persistent (pipes_links g) | 0 := pipes_links_persistent g.
   #[local] Instance pipe_T_pers0 (g : pipe_gn) :
     Persistent (echo_taint (pgn_cl g)) | 0
     := echo_taint_persistent (pgn_cl g).
@@ -541,29 +400,16 @@ Section PipeInitBoot.
     Timeless (echo_taint (pgn_cl g)) | 0
     := echo_taint_timeless (pgn_cl g).
 
-
   (* =================================================================== *)
   (*  S3  THE APPLICATION'S CONSOLE CREDENTIAL                            *)
-  (*                                                                     *)
-  (*  [UInitBoot.echo_cc]'s twin.  Every one of the five families is a    *)
-  (*  READING OF THE RECORD and none is spelled out: the lend is the      *)
-  (*  lease's read side at the record's residue, the mid-line pieces are  *)
-  (*  the same at that residue, the loop's write credential and the       *)
-  (*  banner-owed one are [PipeLinkInst]'s [UShRound]-facing pair, and    *)
-  (*  the round-open one is [UInitDiag]'s generic prologue family.  That  *)
-  (*  is what makes [pipe_cc_holds] below ten applications rather than    *)
-  (*  ten proofs.                                                        *)
   (* =================================================================== *)
-  Lemma pipe_cc_rd_timeless (HR : riscvGS Σ) (GEN : GenId)
+  Lemma pipes_cc_rd_timeless (HR : riscvGS Σ) (GEN : GenId)
       `{HBs : !bioslotG Σ, HFd : !fdslotG Σ, HIr : !irefslotG Σ,
         HPav : !pavG Σ, HWc : !wchG Σ, HF : !fileG Σ}
       (g : pipe_gn) :
     forall i : nat,
-      Timeless (UShLine.ush_rd_pin_at (lk_rres (pipe_link_inst_at g))
+      Timeless (UShLine.ush_rd_pin_at (lk_rres (pipes_link_inst_at g))
                   (pgn_cl g) i).
-  (* NAME THE LEAVES: a bare [apply _] at this altitude searches the
-     tree's 455 [Timeless] instances ([UInitBoot.echo_cc_wb_timeless]'s
-     measured note). *)
   Proof using .
     intro i. rewrite /UShLine.ush_rd_pin_at.
     apply bi.exist_timeless; intro v.
@@ -572,58 +418,43 @@ Section PipeInitBoot.
     apply bi.sep_timeless; [ apply era_pin_timeless | ].
     apply bi.sep_timeless; [ apply _ | ].
     apply bi.sep_timeless; [ apply inp_lb_timeless | ].
-    apply (lk_rres_tl (pipe_link_inst_at g)).
+    apply (lk_rres_tl (pipes_link_inst_at g)).
   Qed.
 
-  Lemma pipe_cc_wb_timeless (HR : riscvGS Σ) (GEN : GenId)
+  Lemma pipes_cc_wb_timeless (HR : riscvGS Σ) (GEN : GenId)
       `{HBs : !bioslotG Σ, HFd : !fdslotG Σ, HIr : !irefslotG Σ,
         HPav : !pavG Σ, HWc : !wchG Σ, HF : !fileG Σ}
       (g : pipe_gn) :
-    forall I : list (bv 8), Timeless (pipe_Wbl_at g I).
-  Proof using . intro I. apply pipe_Wbl_at_timeless. Qed.
+    forall I : list (bv 8), Timeless (pipes_Wbl_at g I).
+  Proof using . intro I. apply pipes_Wbl_at_timeless. Qed.
 
-  Definition pipe_cc (HR : riscvGS Σ) (GEN : GenId)
+  (* THE ERA'S WRITE CREDENTIAL IS THE WIDENED ONE: the terminal and the
+     committed round reach the prompt inside the loop's own credential *)
+  Definition pipes_cc (HR : riscvGS Σ) (GEN : GenId)
       `{HBs : !bioslotG Σ, HFd : !fdslotG Σ, HIr : !irefslotG Σ,
         HPav : !pavG Σ, HWc : !wchG Σ, HF : !fileG Σ}
       (g : pipe_gn) : cons_cred Σ :=
     MkConsCred
-      (UShLine.ush_rd_pin_at (lk_rres (pipe_link_inst_at g)) (pgn_cl g))
-      (pipe_cc_rd_timeless HR GEN g)
-      (UShLine.ush_mid_at (lk_rres (pipe_link_inst_at g)) (pgn_cl g))
-      (* THE ERA'S WRITE CREDENTIAL IS THE WIDENED ONE (design SS4.3p;
-         lane SH-PIPE-ROUND-7).  The terminal round of a pipeline line --
-         a [fork1] that failed inside runcmd -- comes back to sh in the
-         child's exit payload and can only reach the prompt inside the
-         LOOP'S OWN credential, because the fork arm's re-entry at 0x938
-         has no continuation but [UkShLoop.ushl_head].  No arm of
-         [lk_lcred] can carry it (PIPE-STAGE-3, PIPE-STAGE-5 SS3), so the
-         credential the era runs at is [pterm_wc] and not [pipe_Wcl_at]:
-         they agree at index 3 -- the only index the loop's BODY sees
-         ([UkShPipeFork.pterm_wc_3]) -- and differ at 0, 1, 2, where the
-         prompt is written. *)
-      (UkShPipeFork.pterm_wc g)
-      (pipe_Wbl_at g) (pipe_cc_wb_timeless HR GEN g)
-      (UInitDiag.kinit_pro_at (pipe_link_inst_at g)).
+      (UShLine.ush_rd_pin_at (lk_rres (pipes_link_inst_at g)) (pgn_cl g))
+      (pipes_cc_rd_timeless HR GEN g)
+      (UShLine.ush_mid_at (lk_rres (pipes_link_inst_at g)) (pgn_cl g))
+      (pterm_wcN g)
+      (pipes_Wbl_at g) (pipes_cc_wb_timeless HR GEN g)
+      (UInitDiag.kinit_pro_at (pipes_link_inst_at g)).
 
-  (* ...AND THE TEN LAWS.  [UInitBoot.echo_cc_holds]'s structure exactly,
-     with the era's five discipline readings named: [PipeDisc.
-     disc_input_p] and [PipeUline.ush_line_pipe] are the pipeline era's
-     discipline and line constructor, and [UShPipeRound] carries the three
-     proofs that bridge them. *)
-  Lemma pipe_cc_holds (HR : riscvGS Σ) (GEN : GenId)
+  (* ...AND THE TEN LAWS *)
+  Lemma pipes_cc_holds (HR : riscvGS Σ) (GEN : GenId)
       `{HBs : !bioslotG Σ, HFd : !fdslotG Σ, HIr : !irefslotG Σ,
         HPav : !pavG Σ, HWc : !wchG Σ, HF : !fileG Σ}
       (g : pipe_gn) (r : echo_names) :
     @file_app Σ HF = MkAppcfg echo_names (pipe_pred (pgn_cl g)) r ->
-    (⊢ PipeLinks.pipe_links g) ->
+    (⊢ pipes_links g) ->
     UInitSh.cons_cred_holds_at fsc_cons (echo_taint (pgn_cl g))
-      PipeDisc.disc_input_p UShPipeRound.ushq_disc_snoc_ncr
-      PipeDisc.disc_input_p_rest_short
-      PipeUline.ush_line_pipe UShPipeRound.ushq_disc_line_pipe
-      (pipe_cc HR GEN g).
+      (lm_disc_input pipes_lmE) psq_disc_snoc_ncr psq_disc_rest_short
+      ush_line_pipes psq_disc_line
+      (pipes_cc HR GEN g).
   Proof using .
     intros Heq Hlkp.
-    (* THE TWO READINGS OF THE SUPPLY, at Coq level *)
     assert (Htsw : ⊢ echo_taint (pgn_cl g) -∗ app_sup).
     { rewrite /app_sup. rewrite Heq.
       cbn [AppCfg.app_pred AppCfg.app_run AppCfg.app_names].
@@ -632,89 +463,76 @@ Section PipeInitBoot.
     { rewrite /app_sup. rewrite Heq.
       cbn [AppCfg.app_pred AppCfg.app_run AppCfg.app_names].
       iIntros "#Hs". iApply (pipe_taint_of_sup (pgn_cl g) r with "Hs"). }
-    pose proof (pipe_wc_inp g) as Hwci.
-    pose proof (pipe_wb_inp g) as Hwbi.
-    rewrite /UInitSh.cons_cred_holds_at /pipe_cc /=.
+    pose proof (pipes_wc_inp g) as Hwci.
+    pose proof (pipes_wb_inp g) as Hwbi.
+    rewrite /UInitSh.cons_cred_holds_at /pipes_cc /=.
     split_and!.
     (* (1) sh's read leaf, at the pipeline discipline *)
     - intros γp N l Hpeq.
-      exact (UShLine.ush_read_recv_leaf_holds_at (pipe_read_inst g)
-               (pgn_cl g) (pipe_Wbl_at g) N γp l Hpeq Hstw Htsw
-               (pipe_pin_refl g) Hlkp).
+      exact (UShLine.ush_read_recv_leaf_holds_at (pipes_read_inst g)
+               (pgn_cl g) (pipes_Wbl_at g) N γp l Hpeq Hstw Htsw
+               (pipes_pin_refl g) Hlkp).
     (* (2) the lease, off the position *)
     - intros γp N i Hpeq.
-      exact (UShLine.ush_lease_of_at (lk_rres (pipe_link_inst_at g))
-               (pgn_cl g) (echo_taint (pgn_cl g)) (pipe_Wbl_at g) N γp i
+      exact (UShLine.ush_lease_of_at (lk_rres (pipes_link_inst_at g))
+               (pgn_cl g) (echo_taint (pgn_cl g)) (pipes_Wbl_at g) N γp i
                Hpeq).
     (* (3) ...and back together under the taint *)
     - intros γp N I Hpeq.
-      exact (UShLine.ush_at_of_mid_taint_at (lk_rres (pipe_link_inst_at g))
-               (pgn_cl g) (echo_taint (pgn_cl g)) (pipe_Wbl_at g) N γp I
+      exact (UShLine.ush_at_of_mid_taint_at (lk_rres (pipes_link_inst_at g))
+               (pgn_cl g) (echo_taint (pgn_cl g)) (pipes_Wbl_at g) N γp I
                Hpeq).
     (* (4) ...and with the banner-owed credential *)
     - intros γp N I Hpeq.
-      exact (UShLine.ush_at_of_mid_wb_at (lk_rres (pipe_link_inst_at g))
-               (pgn_cl g) (echo_taint (pgn_cl g)) (pipe_Wbl_at g) N γp I
+      exact (UShLine.ush_at_of_mid_wb_at (lk_rres (pipes_link_inst_at g))
+               (pgn_cl g) (echo_taint (pgn_cl g)) (pipes_Wbl_at g) N γp I
                Hpeq Hwbi).
-    (* (5) the write credential's step at the read, AT THE WIDENED
-       CREDENTIAL (design SS4.3p): the terminal arm is refuted by the
-       round's frozen resolution against the reader's own residue. *)
-    - intros γp I l Hnl. exact (pipe_wc_read_t g γp I l Hnl).
+    (* (5) the write credential's step at the read, at the widened
+       credential: the terminal arm is refuted *)
+    - intros γp I l Hnl. exact (pipes_wc_read_t g γp I l Hnl).
     (* (6) the banner-owed credential is a boundary credential *)
-    - intros I. exact (UkShPipeFork.pterm_wb_wc g I).
+    - intros I. exact (pterm_wbN_wc g I).
     (* (7) a block owed is one too *)
-    - intros I. exact (UkShPipeFork.pterm_wc_blk_line g I).
+    - intros I. exact (pterm_wcN_blk_line g I).
     (* (8) a line read at an unwritten prompt is the taint *)
     - intros γp I l Hnl.
-      exact (UShLine.ush_wb_read_holds_at (pipe_link_inst_at g) (pgn_cl g)
-               γp (S gen_id) I l Hnl (pipe_ep_refl g)).
-    (* (9) the cursor's boundary, at the widened credential: the reading
-       [UShLine.ush_wc_inp] is the ONE of the ten that does not transfer
-       for free, and [UkShPipeFork.pterm_wc_inp_of] pays it out of the
-       [inp_lb] conjunct [pterm_shape] carries (design SS4.3p (a)). *)
+      exact (UShLine.ush_wb_read_holds_at (pipes_link_inst_at g) (pgn_cl g)
+               γp (S gen_id) I l Hnl (pipes_ep_refl g)).
+    (* (9) the cursor's boundary, at the widened credential *)
     - intros γp N l i Hpeq.
-      exact (UShLine.ush_posb_of_lend_at (lk_rres (pipe_link_inst_at g))
+      exact (UShLine.ush_posb_of_lend_at (lk_rres (pipes_link_inst_at g))
                (pgn_cl g) (echo_taint (pgn_cl g)) N γp
-               (UkShPipeFork.pterm_wc g) (pipe_Wbl_at g) l i Hpeq
-               (UkShPipeFork.pterm_wc_inp_of g Hwci) Hwbi).
+               (pterm_wcN g) (pipes_Wbl_at g) l i Hpeq
+               (pterm_wcN_inp_of g Hwci) Hwbi).
     (* (10) the lend's conversion at the shell's entry *)
     - intros n. iIntros "H".
-      iDestruct (pipe_wp_line g n with "H") as (I) "[%Hlen Hc]".
+      iDestruct (pipes_wp_line g n with "H") as (I) "[%Hlen Hc]".
       iExists I. iSplitR; [ by iPureIntro | ].
-      iApply (UkShPipeFork.pterm_wc_of g I 0%nat with "Hc").
+      iApply (pterm_wcN_of g I 0%nat with "Hc").
   Qed.
 
   (* =================================================================== *)
   (*  S4  /init's EXEC BUNDLE AT THE PIPELINE RECORD                      *)
-  (*                                                                     *)
-  (*  [UInitBoot.echo_Hinit_boot], line for line, with four               *)
-  (*  substitutions and NOTHING else: the claim's accessors are           *)
-  (*  [AppPipeCons]'s, the console dance is [UInitConsPipe]'s, the        *)
-  (*  credential is [pipe_cc] and the shell's TAIL is                     *)
-  (*  [UShPipeRound.sh_round_holds_pipe] where echo's was                 *)
-  (*  [UShRest.sh_rest_holds].  That last one is the ONE premise: it      *)
-  (*  spends [sh_pipe_child_law].                                        *)
   (* =================================================================== *)
-  Lemma pipe_Hinit_boot
+  Lemma pipes_Hinit_boot
       (HR : riscvGS Σ) (GEN : GenId)
       `{HBs : !bioslotG Σ, HFd : !fdslotG Σ, HIr : !irefslotG Σ,
         HPav : !pavG Σ, HWc : !wchG Σ, HF : !fileG Σ}
       (g : pipe_gn) (r : echo_names) :
-    (⊢ UShPipeRound.sh_pipe_child_law g) ->
     @file_app Σ HF = MkAppcfg echo_names (pipe_pred (pgn_cl g)) r ->
     @riscvF_app_iface Σ (@riscv_fixedGS Σ HR) = pipe_ifc g ->
     ⊢ app_inv fsc_fs -∗ pipe_boot (pgn_cl g) (S gen_id) r -∗
       pturn g (S gen_id) -∗
       |==> init_boot_bundle (bv_unsigned InodeInv.ROOTINO) fdt0.
-  Proof using HU pipeProtoG0 HpifR.
-    intros Hchild Heq Hiface.
+  Proof using HU pipeProtoG0 pnsRegG0 pipesNG0.
+    intros Heq Hiface.
     (* the three projections, off the one equation *)
-    assert (Htag : @riscv_rx_tag Σ (@riscv_fixedGS Σ HR) = ptag g)
+    assert (Htag : @riscv_rx_tag Σ (@riscv_fixedGS Σ HR) = ptagE g)
       by (rewrite /riscv_rx_tag Hiface; by cbn [pipe_ifc ai_tag pipe_tag]).
     assert (Hkill : @app_taint Σ (@riscv_fixedGS Σ HR)
                     = echo_taint (pgn_cl g))
       by (rewrite /app_taint Hiface; by cbn [pipe_ifc ai_kill pipe_kill]).
-    assert (Hcons : @riscv_cons_res Σ (@riscv_fixedGS Σ HR) = pecl g)
+    assert (Hcons : @riscv_cons_res Σ (@riscv_fixedGS Σ HR) = peclE g)
       by (rewrite /riscv_cons_res Hiface; by cbn [pipe_ifc ai_cons pipe_cons]).
     assert (Hktaint : ⊢ app_taint -∗ echo_taint (pgn_cl g)).
     { rewrite Hkill. iIntros "#H". iExact "H". }
@@ -777,29 +595,18 @@ Section PipeInitBoot.
         iApply (udepw_law_of_sup (PSx := uprogSG_free) 17
                   (or_intror eq_refl)).
         iApply ("Hsup" with "HT"). }
-    (* ...AND sh's OWN FREE WRITE LAW UNDER THE TAINT (design SS4.3z item
-       3): [UkSh.sh_deps] IS [udepw_law 16], and the pipeline round's
-       [panic("fork")] chain goes out on it when the lend carries no input
-       bound.  It is the first bullet of [Hdp] above, read at sh's name --
-       and it can only be built HERE, where the era equation and [r] are. *)
-    iAssert (□ (echo_taint (pgn_cl g) -∗ UkSh.sh_deps (PS := uprogSG_free)))%I
-      as "#Hshdp".
-    { iModIntro. iIntros "#HT". rewrite /UkSh.sh_deps.
-      iApply (udepw_law_of_sup_write (PSx := uprogSG_free) with "[] []").
-      - iApply ("Hsup" with "HT").
-      - rewrite Hkill. iExact "HT". }
     (* ---- the tag's reading, at the PIPELINE discipline ---- *)
     iAssert (UkSh.ush_tag_law (echo_taint (pgn_cl g))) as "#Htg".
     { iApply (UkSh.ush_tag_law_of_at (echo_taint (pgn_cl g))
-                PipeDisc.disc_p UShPipeRound.ushq_disc_no_ctrl_d).
+                (lm_disc pipes_lmE) psq_disc_no_ctrl_d).
       rewrite /UkSh.ush_tag_law_at. iIntros "!>" (h) "Hr".
-      rewrite Htag /ptag.
+      rewrite Htag /ptagE.
       iDestruct "Hr" as "[_ Hr]". iExact "Hr". }
     (* THE LINKS, ONCE *)
-    iAssert (PipeLinks.pipe_links g) as "#Hlks";
-      [ iApply (PipeLinks.pipe_links_holds g Hcons) | ].
-    assert (Hlkp : ⊢ PipeLinks.pipe_links g)
-      by (iApply (PipeLinks.pipe_links_holds g Hcons)).
+    iAssert (pipes_links g) as "#Hlks";
+      [ iApply (pipes_links_holds g Hcons) | ].
+    assert (Hlkp : ⊢ pipes_links g)
+      by (iApply (pipes_links_holds g Hcons)).
     (* ---- /echo's PINNED ENTRY ---- *)
     iAssert (UShEcho.sh_echo_slot (echo_taint (pgn_cl g))) as "#Hslot".
     { iApply UShEcho.sh_echo_slot_of_fs_pure_holds.
@@ -818,7 +625,7 @@ Section PipeInitBoot.
            era's round, and the tag ---- *)
     (* LINEAR, NOT [#Hsh], and it is the lane's third wedge: an
        [iAssert ... as "#H"] raises [Persistent P] on its STATEMENT, and
-       here that is [Persistent (sh_pay_at ush_line_pipe T (pipe_cc …)
+       here that is [Persistent (sh_pay_at ush_line_pipes T (pipes_cc ..)
        sh_Rsh 0)], whose search descends into [UkSh.ush_rest_l_at]'s wand
        tower and does not come back (measured, twice, with the named
        instance and the [Typeclasses Opaque] seal both in place).  The
@@ -827,48 +634,45 @@ Section PipeInitBoot.
        needs it duplicated here.  [with "[]"]: it is built from the
        intuitionistic context alone, so the round's [Hb]/[Hturn] stay. *)
     iAssert (UInitSh.init_sh_slot (echo_taint (pgn_cl g))
-               (UInitSh.sh_pay_at PipeUline.ush_line_pipe
-                  (echo_taint (pgn_cl g)) (pipe_cc HR GEN g)
+               (UInitSh.sh_pay_at ush_line_pipes
+                  (echo_taint (pgn_cl g)) (pipes_cc HR GEN g)
                   UInitSh.sh_Rsh 0%nat))%I with "[]" as "Hsh".
     { rewrite /UInitSh.init_sh_slot /UInitSh.init_sh_slot_core.
       iSplitR; [ iExact "Hinv" | ]. iSplitR; [ iExact "Hfs" | ].
       iSplitR; [ iExact "Hmint" | ].
-      iApply (UInitSh.sh_pay_of_parts_at PipeUline.ush_line_pipe
-                (echo_taint (pgn_cl g)) (pipe_cc HR GEN g)
+      iApply (UInitSh.sh_pay_of_parts_at ush_line_pipes
+                (echo_taint (pgn_cl g)) (pipes_cc HR GEN g)
                 UInitSh.sh_Rsh 0%nat
                 with "[] [] Htg");
         [ iApply UInitSh.sh_pay_state_holds | ].
       iIntros (γp N).
-      iApply (UShPipeRound.sh_round_holds_pipe g r Hcons Hkill Heq γp N
-                with "Hlks [] Hslot Hcat Hpine Hshdp []").
-      - iApply (udep_free).
-      - iApply Hchild. }
-    (* ...AND THE PROMPT'S LAW AT EVERY LINE BOUNDARY, off the links *)
-    (* ...AT THE WIDENED CREDENTIAL (design SS4.3p): the landed law on the
-       left arm and the terminal round's two prompt bytes on the right
-       ([UkShPipeFork.pterm_prompt_law], off PIPE-STAGE-3's steps). *)
-    (* ...AT THE WIDENED CREDENTIAL (design SS4.3p).  The law is built one
-       file down ([UShPipeRound.pipe_sh_prompt_law_t]), where the section
+      iApply (sh_round_holds_pipes g Hcons Hkill r Heq γp N
+                with "Hlks [] Hslot Hcat Hpine").
+      iApply (udep_free). }
+    (* ...AND THE PROMPT'S LAW AT EVERY LINE BOUNDARY, off the links, AT
+       THE WIDENED CREDENTIAL: the record's law on the first arm, the
+       terminal round's two prompt bytes and the committed round's filing
+       on the other two.  The law is built one file down
+       ([UShPipesRound.pipes_sh_prompt_law_t]), where the section
        carries ONE instance set beside the record equation; at THIS lemma,
        which takes [HR] and [GEN] explicitly, the wand's two sides are
        elaborated at different [uprogSG] instances and the proofmode's
        [IntoWand] does not come back (measured: 1h28m). *)
     iAssert (UShKernel.sh_prompt_law (PS := uprogSG_free)
-               (UkShPipeFork.pterm_wc g))%I as "#Hplaw".
-    { iApply (UShPipeRound.pipe_sh_prompt_law_t g Hcons with "Hlks"). }
+               (pterm_wcN g))%I as "#Hplaw".
+    { iApply (pipes_sh_prompt_law_t g Hcons with "Hlks"). }
     (* ---- the supply as a wand from the console credential ---- *)
     iAssert (UkInit.init_cons_sup fsc_cons (echo_taint (pgn_cl g))
                (init_cons_cred (echo_taint (pgn_cl g)) r) init_cons_fd
-               (pipe_cc HR GEN g))%I as "#Hxs".
+               (pipes_cc HR GEN g))%I as "#Hxs".
     { iApply (pipe_cons_sup_of_sh_slot g r
-                PipeDisc.disc_input_p UShPipeRound.ushq_disc_snoc_ncr
-                PipeDisc.disc_input_p_rest_short
-                PipeUline.ush_line_pipe UShPipeRound.ushq_disc_line_pipe
-                fsc_cons init_cons_fd (pipe_cc HR GEN g)
+                (lm_disc_input pipes_lmE) psq_disc_snoc_ncr psq_disc_rest_short
+                ush_line_pipes psq_disc_line
+                fsc_cons init_cons_fd (pipes_cc HR GEN g)
                 UInitSh.sh_Rsh 0%nat Heq (fun k H => H)
                 ltac:(vm_compute; discriminate)
                 ltac:(reflexivity)
-                (pipe_cc_holds HR GEN g r Heq Hlkp)
+                (pipes_cc_holds HR GEN g r Heq Hlkp)
                 with "[] [] Hplaw Hsh").
       - iApply (udep_free).
       - iModIntro. iIntros "#HT".
@@ -903,12 +707,12 @@ Section PipeInitBoot.
                     (echo_taint (pgn_cl g))
                     (init_cons_cred (echo_taint (pgn_cl g)) r)
                     fsc_cons init_cons_fd
-                    (pipe_cc HR GEN g)
+                    (pipes_cc HR GEN g)
                     -∗ uslot W'))%I as "#Hcon".
     { iApply (UInitKernel.init_boot_con (PS := uprogSG_free)
                 (echo_taint (pgn_cl g))
                 (init_cons_cred (echo_taint (pgn_cl g)) r) init_cons_fd
-                (pipe_cc HR GEN g)
+                (pipes_cc HR GEN g)
                 fsc_cons
                 1%nat (fun _ => 5%nat) (fun _ => init_boot_bytes) fdt0 0%nat
                 init_cons_fd_ne
@@ -924,39 +728,38 @@ Section PipeInitBoot.
               (UInitKernel.init_boot_pay (PS := uprogSG_free)
                  (echo_taint (pgn_cl g))
                  (init_cons_cred (echo_taint (pgn_cl g)) r) fsc_cons
-                 init_cons_fd (pipe_cc HR GEN g))
+                 init_cons_fd (pipes_cc HR GEN g))
               with "Hcl Hinv Hcon [] [Hdn Hturn]").
     - iIntros "!>" (W') "#Ht Hp".
       iApply ("Hmint" $! True%I W' with "Ht Hp []").
       iModIntro. iIntros "_". done.
     - iIntros "Hrd". rewrite /UInitKernel.init_boot_pay.
       (* THE READER'S RECEIPT RESIDUE AT COUNT ZERO, at the record's own
-         residue ([PipeLinksLine.pwc_rres]) *)
+         residue ([GenLinksLine.gwc_rres]) *)
       iAssert (∃ v0 : era_pins, era_pin (pgn_cl g) (S gen_id) v0
-                 ∗ pwc_rres v0 [])%I
+                 ∗ gwc_rres pipes_lmE (pipes_params g) v0 [])%I
         with "[Hturn]" as "(%v0 & #Hpin0 & #Hres0)".
       { rewrite /pturn /EchoOut.eturn.
         iDestruct "Hturn" as (v0) "(#Hpin0 & Htn & _ & #Hcs0 & #Hps0 & _)".
-        iExists v0. iFrame "Hpin0". rewrite /pwc_rres.
-        iExists [], []. iEval (rewrite /EchoOut.turn) in "Htn".
+        iExists v0. iFrame "Hpin0". rewrite /gwc_rres.
+        iExists [], [], tt. iEval (rewrite /EchoOut.turn) in "Htn".
         iDestruct (mono_nat_lb_own_get with "Htn") as "#Hlb0".
-        assert (E0 : length (proc_before_p [] [] ([] : list (bv 8))) = 0%nat)
-          by (rewrite proc_before_p_nil; reflexivity).
-        rewrite E0. iFrame "Hlb0 Hps0 Hcs0". iPureIntro.
-        exact PipeOut.rd_stage_p_0. }
-      iDestruct (UInitBanner.kinit_ban0_of_eturn_at (pipe_link_inst_at g)
+        rewrite (lm_proc_before_nil pipes_lmE). cbn [length].
+        iSplitR; [iPureIntro; exact (lm_rd_stage_0 pipes_lmE) |].
+        iFrame "Hlb0 Hps0 Hcs0". }
+      iDestruct (UInitBanner.kinit_ban0_of_eturn_at (pipes_link_inst_at g)
                    with "[Hturn]")
         as "[Hdl Hbn]";
-        [ rewrite (pipe_inst_turn g) /pturn_pre; iExact "Hturn" | ].
+        [ rewrite (pipes_inst_turn g); iExact "Hturn" | ].
       (* THE THREE LAWS, at the record *)
       iDestruct (UInitDiag.kinit_banner_law_pro_holds_at
-                   (pipe_link_inst_at g) (PS := uprogSG_free)
+                   (pipes_link_inst_at g) (PS := uprogSG_free)
                    with "Hlks") as "#Hblaw".
       iDestruct (UInitDiag.kinit_execfail_law_holds_at
-                   (pipe_link_inst_at g) (PS := uprogSG_free)
+                   (pipes_link_inst_at g) (PS := uprogSG_free)
                    with "Hlks") as "#Hxlaw".
       iDestruct (UInitDiag.kinit_forkfail_law_holds_at
-                   (pipe_link_inst_at g) (PS := uprogSG_free)
+                   (pipes_link_inst_at g) (PS := uprogSG_free)
                    with "Hlks") as "#Hflaw".
       iSplitL "Hdn"; [ iExact "Hdn" | ].
       iSplitL "Hrd"; [ rewrite ucons_reader_eq; iExact "Hrd" | ].
@@ -964,25 +767,25 @@ Section PipeInitBoot.
       { rewrite /UInitBanner.kinit_dl0_at.
         iDestruct "Hdl" as (v) "(#Hpin & Hdl & #HE)".
         iDestruct (era_pin_agree with "Hpin0 Hpin") as %<-.
-        rewrite /pipe_cc /=. rewrite /UShLine.ush_rd_pin_at.
+        rewrite /pipes_cc /=. rewrite /UShLine.ush_rd_pin_at.
         iExists v0, []. iSplitR;
           [ iPureIntro; split; [ reflexivity | exact rest_of_nil ] | ].
         iFrame "Hpin0 Hdl HE Hres0". }
       (* the banner-owed family and the record's [cc_wbn] are ONE family *)
       iAssert (□ (∀ n : nat,
-                    UInitBanner.kinit_ban_at (pipe_link_inst_at g) n -∗
-                    UserConsole.cc_wbn (pipe_cc HR GEN g) n))%I as "#Hbto".
+                    UInitBanner.kinit_ban_at (pipes_link_inst_at g) n -∗
+                    UserConsole.cc_wbn (pipes_cc HR GEN g) n))%I as "#Hbto".
       { iIntros "!>" (n) "Hb".
         rewrite /UInitBanner.kinit_ban_at /UserConsole.cc_wbn
-                /pipe_cc /pipe_Wbl_at /=.
+                /pipes_cc /pipes_Wbl_at /=.
         iDestruct "Hb" as (v I) "(%Hlen & #Hpin & Hb)".
         iExists I. iSplitR; [ by iPureIntro | ]. iExists v. iFrame "Hpin Hb". }
-      iAssert (□ (∀ n : nat, UserConsole.cc_wbn (pipe_cc HR GEN g) n -∗
-                    UInitBanner.kinit_ban_at (pipe_link_inst_at g) n))%I
+      iAssert (□ (∀ n : nat, UserConsole.cc_wbn (pipes_cc HR GEN g) n -∗
+                    UInitBanner.kinit_ban_at (pipes_link_inst_at g) n))%I
         as "#Hbfr".
       { iIntros "!>" (n) "Hb".
         rewrite /UInitBanner.kinit_ban_at /UserConsole.cc_wbn
-                /pipe_cc /pipe_Wbl_at /=.
+                /pipes_cc /pipes_Wbl_at /=.
         iDestruct "Hb" as (I) "[%Hlen Hb]".
         iDestruct "Hb" as (v) "[#Hpin Hb]".
         iExists v, I. iSplitR; [ by iPureIntro | ]. iFrame "Hpin Hb". }
@@ -1001,58 +804,4 @@ Section PipeInitBoot.
       iApply ("Hbto" with "Hrt").
   Qed.
 
-  (* =================================================================== *)
-  (*  S5  THE ONE PREMISE, NAMED ONCE                                     *)
-  (*                                                                     *)
-  (*  [UShPipeRound.sh_pipe_child_law]'s own binder list after its        *)
-  (*  section closes -- the classes, the generation and the fixed part,   *)
-  (*  and NOTHING else: no [γp], no [r], no record equation, no           *)
-  (*  [CurCtx].  [UInitPipeAdequacy.pipe_prog_law_of_child] is what       *)
-  (*  spends it.                                                          *)
-  (* =================================================================== *)
-  (* ...AND IT TAKES THE RECORD EQUATION (design SS4.3z item 1, lane
-     SH-PIPE-ROUND-11 finding (8)).  Stated at an ARBITRARY [riscvGS Σ]
-     the Prop is UNPROVABLE: every console step of the round is
-     [PipeBoth.pblk2_cstep_L]/[_R], each of which takes
-     [Hcons : riscv_cons_res (riscv_fixedGS HR) = pecl c], and that
-     equation is [pipe_ifc]'s own field -- false at an arbitrary [HR].
-     So the ONE hypothesis is the interface equation, which costs the
-     consumer NOTHING: [pipe_prog_law_of_child] already receives
-     [Hiface] from [pipe_prog_law]'s own binder list, and
-     [pipe_Hinit_boot] already derives [Hcons]/[Htag]/[Hkill] from it.
-     AND THE ERA'S RECORD EQUATION on [file_app] (lane REPOINT-PIPE): the
-     two children now run the TREE-ROUTE entries, whose instance
-     ([UkPipeIface.pipe_iface]) is stated at it; it costs the consumer
-     nothing either -- [pipe_prog_law] binds [r] and the equation beside
-     [Hiface], and [pipe_Hinit_boot] already takes both. *)
-  Definition sh_pipe_child_law_all : Prop :=
-    forall (HR : riscvGS Σ) (GEN : GenId)
-           (HBs : bioslotG Σ) (HFd : fdslotG Σ) (HIr : irefslotG Σ)
-           (HPav : pavG Σ) (HWc : wchG Σ) (HF : fileG Σ)
-           (c : pipe_gn) (r : echo_names),
-      @file_app Σ HF = MkAppcfg echo_names (pipe_pred (pgn_cl c)) r ->
-      @riscvF_app_iface Σ (@riscv_fixedGS Σ HR) = pipe_ifc c ->
-      ⊢ UShPipeRound.sh_pipe_child_law c.
-
-  (* =================================================================== *)
-  (*  S6  ...AND IT IS DISCHARGED (lane SH-PIPE-ROUND-14)                 *)
-  (*                                                                     *)
-  (*  [UShPipeLaw.pl_child_law] is the whole round: the protocol's names  *)
-  (*  and the two-writer family's three cursors minted at the child law's *)
-  (*  own [mWP] entry, the registrar, the four-way split, the two         *)
-  (*  diagnostics and the three continuations.  All this lemma does is    *)
-  (*  project the record equation into the two the round is stated at.    *)
-  (* =================================================================== *)
-  Theorem sh_pipe_child_law_all_holds : sh_pipe_child_law_all.
-  Proof using HU HX pipeProtoG0 HpifR.
-    intros HR GEN HBs HFd HIr HPav HWc HF c r Heq Hiface.
-    assert (Hkill : @app_taint Σ (@riscv_fixedGS Σ HR)
-                    = echo_taint (pgn_cl c))
-      by (rewrite /app_taint Hiface; by cbn [pipe_ifc ai_kill pipe_kill]).
-    assert (Hcons : @riscv_cons_res Σ (@riscv_fixedGS Σ HR) = pecl c)
-      by (rewrite /riscv_cons_res Hiface; by cbn [pipe_ifc ai_cons pipe_cons]).
-    exact (UShPipeLaw.pl_child_law c Hcons Hkill r Heq).
-  Qed.
-
 End PipeInitBoot.
-

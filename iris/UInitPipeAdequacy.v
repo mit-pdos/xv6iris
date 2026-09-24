@@ -8,8 +8,9 @@
 (*  [UPipeBootAdequacy.pipe_prog_law] needs to even ELABORATE (its class  *)
 (*  binders are [riscvGpreS] and the five [*GpreS]) -- into that one      *)
 (*  blows the elaboration up.  So this file carries the adequacy cone     *)
-(*  and takes exactly TWO things from the assembly:                       *)
-(*  [UInitPipe.pipe_Hinit_boot] and [UInitPipe.sh_pipe_child_law_all].     *)
+(*  and takes exactly ONE thing from the assembly:                        *)
+(*  [UInitPipe.pipes_Hinit_boot] (cut C8: the round's child law is        *)
+(*  proved, so /init's bundle has no premise left).                       *)
 (*                                                                       *)
 (*  WHY [UPipeBootAdequacy.v] IS NOT EDITED INSTEAD.  It DEFINES          *)
 (*  [pipe_prog_law], which this file discharges; making it take the child *)
@@ -53,15 +54,15 @@ Require Import FsImgCheck.
 Require Import FsImgDisk.
 Require Import App.
 Require Import InodeInv.
-Require Import EchoDisc.            (* [disc] / [good_out]: the echo corollary *)
-Require Import PipeDisc.
+Require Import LineModel.           (* [lm_disc] / [lm_good_out]: the conclusion *)
+Require Import PipesDisc.           (* [pipes_lmE]: the model the claim is born at *)
 Require Import EchoOut.
 Require Import PipeOut.
 Require Import AppPipe.
 Require Import PipeProto.           (* [pipeProtoG]: the protocol's ghosts *)
 Require Import UPipeBootAdequacy.   (* [pipe_prog_law] / [pipeSigma] *)
-Require Import UInitPipe.           (* [pipe_Hinit_boot] / the premise *)
-Require PipeProto UkPipeIface.      (* the two binders below: the echo child at the console runs the tree route *)
+Require Import UInitPipe.           (* [pipes_Hinit_boot] *)
+Require Import UkPipesIface.        (* [pnsRegG] / [pipesNG]: the N-stage round's classes *)
 
 Local Open Scope Z_scope.
 
@@ -72,23 +73,19 @@ Section PipeProgLaw.
   Context `{HU : !ufdG Σ}.
   Context `{!echoOutG Σ, !inG Σ (mono_listR (leibnizO Z))}.
   Context `{!pipeOutG Σ}.
-  (* the protocol's class and the device registry: [pipe_Hinit_boot]'s
-     round runs the echo child at the console on the tree route (lane
-     PIPECONS-EXIT) *)
-  Context `{HpP : !PipeProto.pipeProtoG Σ, HpifR : !UkPipeIface.pifRegG Σ}.
+  (* the round's ghosts: the pipe protocol, the per-process registry and
+     the N-writer family's modes *)
+  Context `{HpP : !PipeProto.pipeProtoG Σ, HpR : !pnsRegG Σ, HpN : !pipesNG Σ}.
 
-  Theorem pipe_prog_law_of_child :
-    sh_pipe_child_law_all -> pipe_prog_law (Σ := Σ).
-  (* POINTWISE, and through the record's [cbn], for a measured reason: the record's fields ARE [AppPipe]'s definitions, but
-     unification does not delta-unfold a record literal for them, and an
-     [exact] of the whole term asks for one conversion of two [box]-heavy
-     bundles at once. *)
-  Proof using HU HpP HpifR.
-    intros Hchild HR GEN HBs HFd HIr HPav HWc HF c r Heq Hiface Hgen.
+  Theorem pipe_prog_law_holds : pipe_prog_law (Σ := Σ).
+  (* POINTWISE, and through the record's [cbn], for a measured reason: the
+     record's fields ARE [AppPipe]'s definitions, but unification does not
+     delta-unfold a record literal for them. *)
+  Proof using HU HpP HpR HpN.
+    intros HR GEN HBs HFd HIr HPav HWc HF c r Heq Hiface Hgen.
     cbn [app_pipe app_names app_pred app_ifc] in Heq, Hiface.
     iIntros "#Hinv Hb Hturn".
-    iApply (pipe_Hinit_boot HR GEN c r
-              (Hchild HR GEN HBs HFd HIr HPav HWc HF c r Heq Hiface) Heq Hiface
+    iApply (pipes_Hinit_boot HR GEN c r Heq Hiface
               with "Hinv [Hb] [Hturn]").
     - cbn [app_pipe app_boot]. iExact "Hb".
     - cbn [app_pipe app_turn pipe_turn]. iExact "Hturn".
@@ -98,12 +95,16 @@ End PipeProgLaw.
 
 (* ===================================================================== *)
 (*  THE THEOREM -- [UPipeBootAdequacy.pipe_adequacy_pipeSigma] with its    *)
-(*  [Hprog] discharged by the child law ([UInitPipe.                       *)
-(*  sh_pipe_child_law_all_holds], lane SH-PIPE-ROUND-14): no premise of    *)
-(*  its own, the functor list the concrete [pipeSigma] (so every ghost     *)
-(*  class is realised by [subG] and the statement is not vacuous), the    *)
-(*  disk the literal mkfs image, and a conclusion that mentions no Iris -- *)
-(*  [PipeDisc.pipe_phi] is the whole specification.                        *)
+(*  [Hprog] discharged ([pipe_prog_law_holds]): no premise of its own, the *)
+(*  functor list the concrete [pipeSigma] (so every ghost class is         *)
+(*  realised by [subG] and the statement is not vacuous), the disk the     *)
+(*  literal mkfs image, and a conclusion that mentions no Iris --          *)
+(*  [LineModel.lm_disc] / [lm_good_out] at [PipesDisc.pipes_lmE] are the   *)
+(*  whole specification: IF the console input kept the pipeline            *)
+(*  discipline (typed lines [echo w1 .. wn] and                            *)
+(*  [echo w1 .. wn | cat | .. | cat], any number of cats), THEN every      *)
+(*  cycle's console output is a prefix of the transcript its input calls   *)
+(*  for.                                                                   *)
 (* ===================================================================== *)
 Theorem pipe_adequacy_pipeΣ_final
     (gst : gstate)
@@ -113,7 +114,7 @@ Theorem pipe_adequacy_pipeΣ_final
     language.nsteps n ([PowerLoopE : language.expr riscv_lang], gst)
       κs (t2, g2) ->
     (forall e2, e2 ∈ t2 -> language.reducible (Λ := riscv_lang) e2 g2)
-    /\ PipeDisc.pipe_phi κs.
+    /\ (lm_disc pipes_lmE κs -> Forall (lm_good_out pipes_lmE tt) (cycles_of κs)).
 Proof.
   assert (Himg : fs_boot_image_wf (v_disk (gst.(gdev).(dvirtio)))
                    XV6_DISK_BYTES fsimg_sb fsimg_nib fsimg_cov)
@@ -122,30 +123,7 @@ Proof.
     by (rewrite Hdisk; reflexivity).
   intros n κs t2 g2 Hn.
   exact (pipe_adequacy_at_img (Σ := pipeΣ)
-           (pipe_prog_law_of_child (Σ := pipeΣ) sh_pipe_child_law_all_holds)
+           (pipe_prog_law_holds (Σ := pipeΣ))
            gst fsimg_sb fsimg_nib fsimg_cov Hgen0 Hpow0 Himg Hdk
            eq_refl eq_refl n κs t2 g2 Hn).
-Qed.
-
-(* ===================================================================== *)
-(*  THE ECHO APPLICATION'S THEOREM IS A COROLLARY (design app-pipe.md     *)
-(*  SS0.2): an echo-disciplined history is pipe-disciplined, and at an    *)
-(*  echo-only input the pipeline conclusion reads back as                 *)
-(*  [EchoDisc.good_out] ([PipeDisc.pipe_phi_echo]).  Same premises, same  *)
-(*  cone, so [iris/PipeAssumptions.v] is this theorem's audit too.        *)
-(* ===================================================================== *)
-Corollary echo_adequacy
-    (gst : gstate)
-    (Hgen0 : gst.(ggen) = 0%nat) (Hpow0 : gst.(gpow) = false)
-    (Hdisk : v_disk (gst.(gdev).(dvirtio)) = FsImgDisk.fsimg_dk) :
-  forall (n : nat) (κs : list mobs) t2 g2,
-    language.nsteps n ([PowerLoopE : language.expr riscv_lang], gst)
-      κs (t2, g2) ->
-    (forall e2, e2 ∈ t2 -> language.reducible (Λ := riscv_lang) e2 g2)
-    /\ (disc κs -> Forall good_out (cycles_of κs)).
-Proof.
-  intros n κs t2 g2 Hn.
-  destruct (pipe_adequacy_pipeΣ_final gst Hgen0 Hpow0 Hdisk n κs t2 g2 Hn)
-    as [Hsafe Hphi].
-  split; [exact Hsafe | exact (pipe_phi_echo κs Hphi)].
 Qed.
