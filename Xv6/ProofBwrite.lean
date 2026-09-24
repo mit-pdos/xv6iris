@@ -118,7 +118,7 @@ theorem bwrite_proof (HS : HOLDINGSLEEP) (VR : VIRTIO_DISK_RW) : BWRITE := ⟨
   icases (show bufHold0 (GF := GF) γ V kk pidv dev bno bs bsd ⊢
       ⌜kk < NBUF ∧ bno.toNat ∈ V.cov ∧ dev = V.dev ∧ bs.length = BSIZE ∧ bsd.length = BSIZE⌝ ∗
       sleeplockedQ (γ.slk kk).2 1 (aBufLock (bnode kk)) pidv ∗ bufTok γ kk ∗
-      brefTok γ kk ∗ (∃ id : Nat, l2Hold (γ.box kk) ((dev, bno) : BufId) id) ∗
+      brefTok γ kk ∗ (∃ t : Nat, l2Hold (γ.box kk) ((dev, bno) : BufId) (unitStamp (dev, bno) t)) ∗
       wordPointsTo (aBufValid (bnode kk)) 4 (DFrac.own 1) 1#32 ∗
       wordPointsTo (aBufDev (bnode kk)) 4 (DFrac.own (1 : Qp).half) dev ∗
       bufOwn (bnode kk) bno 0#32 bs ∗ diskBlock V.gd bno.toNat bsd from by

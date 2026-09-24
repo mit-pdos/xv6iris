@@ -212,13 +212,13 @@ class BcacheG (GF : BundledGFunctors) where
   [gmRefG : GhostMapG GF Nat Nat RegMapF]
   [gmSlotG : GhostMapG GF Nat Unit RegMapF]
   [gvOwnG : GhostVarG GF Unit]
-  [gmStm : GhostMapG GF Nat (BufId × Nat) RegMapF]
+  [stmG : ElemG GF (StampsRF BufId)]
   [gvCnt : GhostVarG GF Nat]
   [gvSlotd : GhostVarG GF (SlotReg BufId BufX)]
   [gvSlotp : GhostVarG GF (L2Reg BufId)]
 
 attribute [reducible, instance] BcacheG.gmRefG BcacheG.gmSlotG BcacheG.gvOwnG
-  BcacheG.gmStm BcacheG.gvCnt BcacheG.gvSlotd BcacheG.gvSlotp
+  BcacheG.stmG BcacheG.gvCnt BcacheG.gvSlotd BcacheG.gvSlotp
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [BcacheG GF]
@@ -582,6 +582,24 @@ def brefTok (γ : BcacheNames) (k : Nat) : IProp GF := iprop%
 def brefRest (γ : BcacheNames) (k : Nat) (id : Nat) : IProp GF :=
   γ.ref ↪◯MAP[id]{.own (1 : Qp).half} k
 
+/-- **A COUNTED REFERENCE of a buffer's escrow**, minted at stamp `T` (the
+body of Rocq's `bref_ghost`: `CtxBox.reference (bn_box bn k) (dev, bno)
+{[((dev, bno), t) := 1%Qp]}`): the bcache instantiates the box with UNIT
+singletons everywhere. -/
+def boxRef (γbk : BoxNames) (i : BufId) (T : Nat) : IProp GF :=
+  reference γbk i (unitStamp i T)
+
+instance boxRef_timeless (γbk : BoxNames) (i : BufId) (T : Nat) :
+    Timeless (boxRef (GF := GF) γbk i T) := by unfold boxRef; infer_instance
+
+/-- A reference's store-order receipt, peeled off (persistent). -/
+theorem boxRef_topLb (γbk : BoxNames) (i : BufId) (T : Nat) :
+    boxRef (GF := GF) γbk i T ⊢ boxRef γbk i T ∗ topLb T := by
+  unfold boxRef
+  have h := reference_topLb (GF := GF) γbk i (unitStamp i T)
+  rw [maxStamp_unitStamp] at h
+  exact h
+
 /-- **A buffer-cache reference on slot `k` at the identity `(dev, bno)`**
 (Rocq's `bref`, minus the `dev`/`blockno` fraction -- see the file header):
 the count half AND a reference of the buffer's ESCROW, minted at whatever
@@ -592,7 +610,7 @@ def bref (γ : BcacheNames) (k : Nat) (dev bno : BitVec 32) : IProp GF := iprop%
 
 instance bref_timeless (γ : BcacheNames) (k : Nat) (dev bno : BitVec 32) :
     Timeless (bref (GF := GF) γ k dev bno) := by
-  unfold bref brefTok boxRef; infer_instance
+  unfold bref brefTok; infer_instance
 
 /-! ## The travelling payloads (Rocq `BioInv.v`'s `bio_pay` / `buf_pay`)
 
@@ -1315,7 +1333,7 @@ def bufHold0 (γ : BcacheNames) (V : BioView GF) (k : Nat)
     (pidv dev bno : BitVec 32) (bs bsd : List (BitVec 8)) : IProp GF := iprop%
   ⌜k < NBUF ∧ bno.toNat ∈ V.cov ∧ dev = V.dev ∧ bs.length = BSIZE ∧ bsd.length = BSIZE⌝ ∗
   sleeplockedQ (γ.slk k).2 1 (aBufLock (bnode k)) pidv ∗ bufTok γ k ∗
-  brefTok γ k ∗ (∃ id : Nat, l2Hold (γ.box k) ((dev, bno) : BufId) id) ∗
+  brefTok γ k ∗ (∃ t : Nat, l2Hold (γ.box k) ((dev, bno) : BufId) (unitStamp (dev, bno) t)) ∗
   wordPointsTo (aBufValid (bnode k)) 4 (DFrac.own 1) 1#32 ∗
   wordPointsTo (aBufDev (bnode k)) 4 (DFrac.own (1 : Qp).half) dev ∗
   bufOwn (bnode k) bno 0#32 bs ∗
