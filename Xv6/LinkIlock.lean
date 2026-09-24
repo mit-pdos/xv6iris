@@ -1,0 +1,28 @@
+/-
+`ilock` meets its specification, closed with the proved `acquiresleep`
+(the store-order form), `bread`, `memmove`, `brelse` and `panic` (Rocq
+`LinkIlock.v`: all callees PROVEN).
+-/
+import Xv6.ProofIlock
+import Xv6.LinkAcquiresleep
+import Xv6.LinkBread
+import Xv6.LinkMemmove
+import Xv6.LinkBrelse
+import Xv6.LinkPanic
+import Xv6.LinkAcquire
+import Xv6.LinkRelease
+import Xv6.LinkMyproc
+import Xv6.LinkSleep
+import Xv6.LinkSleepPrepare
+import Xv6.LinkSched
+
+namespace Xv6
+
+/-- The proved `ilock` interface. -/
+theorem Ilock : ILOCK :=
+  ilock_proof
+    (AcquiresleepLlb AcquireLlb Release Myproc
+      (SleepPrepare Myproc Acquire Release) (Sleep Myproc Acquire Release Sched))
+    Bread Memmove Brelse Panic
+
+end Xv6

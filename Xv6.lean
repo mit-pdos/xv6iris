@@ -616,3 +616,15 @@ import Xv6.IupdateTail
 import Xv6.IupdateMain
 import Xv6.ProofIupdate
 import Xv6.LinkIupdate
+import Xv6.SpecIlock
+import Xv6.IlockFill
+import Xv6.IlockParts
+import Xv6.IlockEpi
+import Xv6.IlockCheckout
+import Xv6.IlockMain
+import Xv6.IlockBlk
+import Xv6.IlockFin
+import Xv6.IlockMid
+import Xv6.IlockLoad
+import Xv6.ProofIlock
+import Xv6.LinkIlock
