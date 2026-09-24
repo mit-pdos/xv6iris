@@ -129,12 +129,14 @@ theorem bpin_proof (AC : ACQUIRE) (RE : RELEASE) : BPIN := ⟨
   have h9 : R1 9#5 = bnode kk := b9
   have hpins : bcPins k R1 := ⟨b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩
   -- the cache open; borrow slot kk
-  icases bcacheRes_elim γ curCtx $$ HR with ⟨%M, %nx, %Ls, %ord, Ha, %⟨hfresh, hok, hord⟩, Hlru, Hkey, Hs⟩
+  icases bcacheRes_elim γ curCtx $$ HR with ⟨%tl, #Hfl, #Htl, Hscan⟩
+  icases bcacheScan_elim γ curCtx tl $$ Hscan
+    with ⟨%M, %nx, %Ls, %ord, Ha, %⟨hfresh, hok, hord⟩, Hlru, Hkey, Hs⟩
   icases bslot_upd_acc γ curCtx Ls kk hkk $$ Hs with ⟨Hsl0, Hcl⟩
   icases bslotAt_elim γ curCtx kk (Ls kk) $$ Hsl0 with ⟨%⟨hnd, hlt⟩, Hrefc, Hhalves, Hslots, Hcnt⟩
-  icases bkey_acc γ curCtx kk hkk $$ Hkey with ⟨Hkey0, Hkcl⟩
-  icases bkeyAt_elim γ curCtx kk $$ Hkey0 with ⟨%dev, %bno, Hkd, Hkb, Hregs⟩
-  icases bufSlotRegs_elim (γ.box kk) dev bno $$ Hregs with ⟨%r, %hrid, Hrd, #Htd⟩
+  icases bkey_acc γ curCtx tl kk hkk $$ Hkey with ⟨Hkey0, Hkcl⟩
+  icases bkeyAt_elim γ curCtx tl kk $$ Hkey0 with ⟨%dev, %bno, Hkd, Hkb, Hregs⟩
+  icases bufSlotRegs_elim (γ.box kk) tl dev bno $$ Hregs with ⟨%r, %⟨hrid, hrtl⟩, Hrd, #Htd⟩
   obtain ⟨n, hn⟩ : ∃ n, (Ls kk).length = n := ⟨_, rfl⟩
   have hlen : (nx :: Ls kk).length = n + 1 := by simp only [List.length_cons, hn]
   ihave Hrefc := (show wordAtN (GF := GF) curCtx (aBufRefcnt (bnode kk)) 4 (DFrac.own 1)
@@ -168,9 +170,9 @@ theorem bpin_proof (AC : ACQUIRE) (RE : RELEASE) : BPIN := ⟨
       ∃ T : Nat, boxRef (γ.box kk) ((dev, bno) : BufId) T from by
     rw [hrid.2.2]; iintro H; iexists Tb; iexact H) $$ Hbref
   imodintro
-  ihave Hregs := bufSlotRegs_intro (γ.box kk) r dev bno hrid.1 hrid.2.1 hrid.2.2 $$ [Hrd Htd]
+  ihave Hregs := bufSlotRegs_intro (γ.box kk) r tl dev bno hrid.1 hrid.2.1 hrid.2.2 hrtl $$ [Hrd Htd]
   case' _ => iframe Hrd Htd
-  ihave Hkey0 := bkeyAt_intro γ curCtx kk dev bno $$ [Hkd Hkb Hregs]
+  ihave Hkey0 := bkeyAt_intro γ curCtx tl kk dev bno $$ [Hkd Hkb Hregs]
   case' _ => iframe
   ihave Hkey := Hkcl $$ Hkey0
   -- the slot unit joins the supply
@@ -188,9 +190,11 @@ theorem bpin_proof (AC : ACQUIRE) (RE : RELEASE) : BPIN := ⟨
   ihave Hslot := bslotAt_intro γ curCtx kk (nx :: Ls kk) hnd' hlt' $$ [Hrefc Hhalves' Hslots Hcnt]
   case' _ => iframe
   ihave Hs := Hcl $$ %(nx :: Ls kk) Hslot
-  ihave HR := bcacheRes_intro γ curCtx _ (nx + 1) _ ord
+  ihave Hscan := bcacheScan_intro γ curCtx tl _ (nx + 1) _ ord
     (bpin_fresh M nx kk hfresh) (bpin_bcacheOk M Ls nx kk hkk hok) hord $$ [Ha Hlru Hkey Hs]
   case' _ => iframe
+  ihave HR := bcacheRes_intro_at γ curCtx tl $$ [Hfl Htl Hscan]
+  case' _ => iframe Hfl Htl Hscan
   -- auipc a0,0x15 ; addi a0,a0,1134 ; jal release
   k_step (wp_s_auipc c _ (KA.«bpin» + 0x1e#64) false 0x15#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]

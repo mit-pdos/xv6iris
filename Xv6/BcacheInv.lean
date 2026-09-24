@@ -546,17 +546,18 @@ closed, at the identity the slot's key cells name, with the store-order
 receipt of the floor it records.  Context-free: nothing in it is a memory
 cell, so it rides any context unchanged.
 
-**Deviation (reported).**  Rocq's row also carries the resource-level floor
-slot `tl` with `sr_td r ≤ tl` and `bcache_res2` carries `ctx_floor ξ tl`;
-that floor can only be re-established at each release by the LOCK HOOK
-(`lock_hook_llb`), which this port has no rule for (file header).  Since the
-floor is consumed only by `bufEscrow_withdraw` -- `bread`'s recycle -- and
-by nothing the four proved bio functions do, the row here keeps the `topLb`
-receipt alone. -/
-def bufSlotRegs (γbk : BoxNames) (dev bno : BitVec 32) : IProp GF := iprop%
+As in Rocq, the row is bounded by the RESOURCE-LEVEL floor slot `tl`
+(`⌜r.td ≤ tl⌝`): `Xv6.bcacheResAt` carries `MachCSL.ctxFloor ξ tl` once for
+all thirty rows, so a holder that needs a floor over one row's stamp
+(`Xv6.bufEscrow_withdraw`, `bread`'s recycle) cashes the resource's.  The
+floor is re-minted at every release by the LOCK HOOK
+(`MachCSL.lockHook_llb` over `Xv6.bcacheRes_fold_in`), which is the only
+way a row whose stamp rose past the releaser's view (`refcnt--`'s
+`Xv6.bufEscrow_refDecr`) can be put back. -/
+def bufSlotRegs (γbk : BoxNames) (tl : Nat) (dev bno : BitVec 32) : IProp GF := iprop%
   ∃ r : SlotReg BufId BufX,
     slotdHalf γbk r ∗ ⌜r.win = false ∧ r.x = none ∧ r.ident = ((dev, bno) : BufId)⌝ ∗
-      topLb r.td
+      topLb r.td ∗ ⌜r.td ≤ tl⌝
 
 /-- The escrow invariants sit inside the top mask. -/
 theorem bioxN_top : (↑bioxN : CoPset) ⊆ ⊤ := CoPset.subseteq_top
@@ -606,37 +607,50 @@ half.  (Rocq instead hands each individual reference a real fraction
 without opening the lock.  This port keeps `Xv6.bref` ghost-only -- see the
 file header -- because nothing it proves needs holder/holder agreement, and
 the fraction bookkeeping would have to ride the slot's reference list.) -/
-def bkeyAt (γ : BcacheNames) (ξ : CtxId) (k : Nat) : IProp GF := iprop%
+def bkeyAt (γ : BcacheNames) (ξ : CtxId) (tl : Nat) (k : Nat) : IProp GF := iprop%
   ∃ (dev : BitVec 32) (bno : BitVec 32),
     wordAtN ξ (aBufDev (bnode k)) 4 (DFrac.own (1 : Qp).half) dev ∗
     wordAtN ξ (aBufBlockno (bnode k)) 4 (DFrac.own (1 : Qp).half) bno ∗
-    bufSlotRegs (γ.box k) dev bno
+    bufSlotRegs (γ.box k) tl dev bno
 
-/-- **The `bcache.lock` resource** (Rocq's `bcache_res`): the count
-authority, the LRU cycle over a permutation of the thirty buffers, every
-slot's row, and a half of every buffer's `dev`/`blockno`. -/
-def bcacheResAt (γ : BcacheNames) (ξ : CtxId) : IProp GF := iprop%
+/-- **The `bcache.lock` resource, UNFLOORED** (Rocq's `bcache_scan2`): the
+count authority, the LRU cycle over a permutation of the thirty buffers,
+every slot's row, and a half of every buffer's `dev`/`blockno` -- all of it
+bounded by the floor slot `tl`, but without the floor itself.  This is the
+shape a releaser can present (it only ever holds `MachCSL.topLb tl`); the
+hook turns it into the resource proper at the lock's own stamped context. -/
+def bcacheScanAt (γ : BcacheNames) (ξ : CtxId) (tl : Nat) : IProp GF := iprop%
   ∃ (M : RegMapF Nat) (nx : Nat) (Ls : Nat → List Nat) (ord : List Nat),
     (γ.ref ↪●MAP M) ∗
     ⌜(∀ i, nx ≤ i → PartialMap.get? M i = none) ∧ bcacheOk M Ls ∧ ord.Perm (List.range NBUF)⌝ ∗
     bcacheLruAt ξ bhead (ord.map bnode) ∗
-    ([∗list] k ∈ List.range NBUF, bkeyAt γ ξ k) ∗
+    ([∗list] k ∈ List.range NBUF, bkeyAt γ ξ tl k) ∗
     ([∗list] k ∈ List.range NBUF, bslotAt γ ξ k (Ls k))
+
+/-- The releaser's form of the payload (Rocq's `Rdep`): the unfloored body
+beside the store-order receipt of its floor slot. -/
+def bcacheResIn (γ : BcacheNames) (tl : Nat) : CtxId → IProp GF := fun ξ => iprop(
+  topLb tl ∗ bcacheScanAt γ ξ tl)
+
+/-- **The `bcache.lock` resource** (Rocq's `bcache_res2`): the unfloored
+body at a floor slot, WITH the floor. -/
+def bcacheResAt (γ : BcacheNames) (ξ : CtxId) : IProp GF := iprop%
+  ∃ tl : Nat, ctxFloor ξ tl ∗ topLb tl ∗ bcacheScanAt γ ξ tl
 
 instance instCtxMorphBslotAt (γ : BcacheNames) (k : Nat) (L : List Nat) :
     CtxMorph (GF := GF) (fun ξ => bslotAt γ ξ k L) := by
   unfold bslotAt; infer_instance
 
-instance instCtxMorphBkeyAt (γ : BcacheNames) (k : Nat) :
-    CtxMorph (GF := GF) (fun ξ => bkeyAt γ ξ k) := by
+instance instCtxMorphBkeyAt (γ : BcacheNames) (tl : Nat) (k : Nat) :
+    CtxMorph (GF := GF) (fun ξ => bkeyAt γ ξ tl k) := by
   unfold bkeyAt
   refine @instCtxMorphExists _ _ _ _ _ (fun dev => ?_)
   refine @instCtxMorphExists _ _ _ _ _ (fun bno => ?_)
   infer_instance
 
-instance instCtxMorphBcacheResAt (γ : BcacheNames) :
-    CtxMorph (GF := GF) (bcacheResAt γ) := by
-  unfold bcacheResAt
+instance instCtxMorphBcacheScanAt (γ : BcacheNames) (tl : Nat) :
+    CtxMorph (GF := GF) (fun ξ => bcacheScanAt γ ξ tl) := by
+  unfold bcacheScanAt
   refine @instCtxMorphExists _ _ _ _ _ (fun M => ?_)
   refine @instCtxMorphExists _ _ _ _ _ (fun nx => ?_)
   refine @instCtxMorphExists _ _ _ _ _ (fun Ls => ?_)
@@ -644,8 +658,34 @@ instance instCtxMorphBcacheResAt (γ : BcacheNames) :
   have h := ctxMorph_bigSepL (GF := GF) (List.range NBUF)
     (fun _ k ξ => bslotAt γ ξ k (Ls k)) (fun _ k => instCtxMorphBslotAt γ k (Ls k))
   have h2 := ctxMorph_bigSepL (GF := GF) (List.range NBUF)
-    (fun _ k ξ => bkeyAt γ ξ k) (fun _ k => instCtxMorphBkeyAt γ k)
+    (fun _ k ξ => bkeyAt γ ξ tl k) (fun _ k => instCtxMorphBkeyAt γ tl k)
   infer_instance
+
+instance instCtxMorphBcacheResIn (γ : BcacheNames) (tl : Nat) :
+    CtxMorph (GF := GF) (bcacheResIn γ tl) := by
+  unfold bcacheResIn
+  exact @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) (instCtxMorphBcacheScanAt γ tl)
+
+instance instCtxMorphBcacheResAt (γ : BcacheNames) :
+    CtxMorph (GF := GF) (bcacheResAt γ) := by
+  unfold bcacheResAt
+  refine @instCtxMorphExists _ _ _ _ _ (fun tl => ?_)
+  exact @instCtxMorphSep hlc GF _ _ _ (instCtxMorphFloor tl)
+    (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) (instCtxMorphBcacheScanAt γ tl))
+
+/-- **THE HOOK'S FOLD** (Rocq's `bcache_res2_fold_in`): the releaser's
+unfloored body plus the floor the hook mints at the lock's own stamped
+context IS the resource. -/
+theorem bcacheRes_fold_in (γ : BcacheNames) (tl : Nat) :
+    ∀ ξ : CtxId, bcacheResIn (GF := GF) γ tl ξ ∗ ctxFloor ξ tl ⊢ bcacheResAt γ ξ := by
+  intro ξ
+  unfold bcacheResIn bcacheResAt
+  iintro ⟨⟨#Htl, Hs⟩, #Hfl⟩
+  iexists tl
+  iframe Hs
+  isplit
+  · iexact Hfl
+  · iexact Htl
 
 /-- **The buffer cache** (persistent): the lock over its resource. -/
 def isBcache (γl : GName) (γ : BcacheNames) : IProp GF :=
@@ -808,15 +848,43 @@ instance bufBox_persistent (γd : DiskNames) (γbk : BoxNames) (k : Nat) (qd qb 
     Persistent (bufBox (GF := GF) γd γbk k qd qb) := by unfold bufBox; infer_instance
 
 /-- Buffer `k`'s sleeplock payload (Rocq's `bslp`): the checkout token AND
-the escrow's L2 (park) register half, at rest.  Context-free, as the L1 row
-is, and for the same reason -- see the deviation note at `bufSlotRegs`:
-Rocq's `bslp` also carries `TsoCtx.ctx_floor ξ (lr_tp s)`, re-minted at each
-`releasesleep` by the LOCK HOOK this port has no rule for. -/
-def bufSlpBox (γ : BcacheNames) (k : Nat) : CtxId → IProp GF := fun _ => iprop(
-  bufTok γ k ∗ ∃ s : L2Reg BufId, slotpHalf (γ.box k) s ∗ ⌜s.hold = none⌝ ∗ topLb s.tp)
+the escrow's L2 (park) register half, at rest, WITH the floor over the
+register's stamp -- which is what `bread`'s `Xv6.bufEscrow_take` cashes
+(row (C) of the box's pure rows).  The floor cannot be minted by the
+releaser (it only holds `MachCSL.topLb`), so `releasesleep` deposits the
+UNFLOORED row `Xv6.bufSlpDep` and the LOCK HOOK
+(`MachCSL.lockHook_llb` over `Xv6.bufSlp_fold_in`, lifted through
+`Xv6.slBody_hook`) completes it at the inner spinlock's stamped context. -/
+def bufSlpBox (γ : BcacheNames) (k : Nat) : CtxId → IProp GF := fun ξ => iprop(
+  bufTok γ k ∗ ∃ s : L2Reg BufId, slotpHalf (γ.box k) s ∗ ⌜s.hold = none⌝ ∗ ctxFloor ξ s.tp)
+
+/-- The releaser's unfloored row (Rocq's `bslp_dep`), at a KNOWN park stamp. -/
+def bufSlpDep (γ : BcacheNames) (k T' : Nat) : CtxId → IProp GF := fun _ => iprop(
+  bufTok γ k ∗ slotpHalf (γ.box k) (⟨T', none⟩ : L2Reg BufId))
+
+instance instCtxMorphBufSlpDep (γ : BcacheNames) (k T' : Nat) :
+    CtxMorph (GF := GF) (bufSlpDep γ k T') := instCtxMorphConst _
 
 instance instCtxMorphBufSlp (γ : BcacheNames) (k : Nat) :
-    CtxMorph (GF := GF) (bufSlpBox γ k) := instCtxMorphConst _
+    CtxMorph (GF := GF) (bufSlpBox γ k) := by
+  unfold bufSlpBox
+  refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) ?_
+  refine @instCtxMorphExists _ _ _ _ _ (fun s => ?_)
+  exact @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
+    (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) (instCtxMorphFloor s.tp))
+
+/-- **THE SLEEPLOCK HOOK'S FOLD** (Rocq's `bslp_fold`). -/
+theorem bufSlp_fold_in (γ : BcacheNames) (k T' : Nat) :
+    ∀ ξ : CtxId, bufSlpDep (GF := GF) γ k T' ξ ∗ ctxFloor ξ T' ⊢ bufSlpBox γ k ξ := by
+  intro ξ
+  unfold bufSlpDep bufSlpBox
+  iintro ⟨⟨Htok, Hrp⟩, #Hfl⟩
+  iframe Htok
+  iexists (⟨T', none⟩ : L2Reg BufId)
+  iframe Hrp
+  isplit
+  · ipureintro; rfl
+  · iexact Hfl
 
 /-- Buffer `k`'s sleeplock (persistent). -/
 def isBufSlk (γ : BcacheNames) (k : Nat) : IProp GF :=
@@ -1018,52 +1086,95 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Bcache
 /-! ## Opening the cache and one slot -/
 
 theorem bcacheRes_elim (γ : BcacheNames) (ξ : CtxId) :
-    bcacheResAt (GF := GF) γ ξ ⊢ ∃ (M : RegMapF Nat) (nx : Nat) (Ls : Nat → List Nat) (ord : List Nat),
+    bcacheResAt (GF := GF) γ ξ ⊢ ∃ tl : Nat, ctxFloor ξ tl ∗ topLb tl ∗ bcacheScanAt γ ξ tl := by
+  unfold bcacheResAt; iintro H; iexact H
+
+theorem bcacheRes_intro_at (γ : BcacheNames) (ξ : CtxId) (tl : Nat) :
+    ctxFloor (GF := GF) ξ tl ∗ topLb tl ∗ bcacheScanAt γ ξ tl ⊢ bcacheResAt γ ξ := by
+  unfold bcacheResAt; iintro H; iexists tl; iexact H
+
+theorem bcacheResIn_intro (γ : BcacheNames) (ξ : CtxId) (tl : Nat) :
+    topLb (GF := GF) tl ∗ bcacheScanAt γ ξ tl ⊢ bcacheResIn γ tl ξ := by
+  unfold bcacheResIn; iintro H; iexact H
+
+theorem bcacheScan_elim (γ : BcacheNames) (ξ : CtxId) (tl : Nat) :
+    bcacheScanAt (GF := GF) γ ξ tl ⊢
+      ∃ (M : RegMapF Nat) (nx : Nat) (Ls : Nat → List Nat) (ord : List Nat),
       (γ.ref ↪●MAP M) ∗
       ⌜(∀ i, nx ≤ i → PartialMap.get? M i = none) ∧ bcacheOk M Ls ∧ ord.Perm (List.range NBUF)⌝ ∗
       bcacheLruAt ξ bhead (ord.map bnode) ∗
-      ([∗list] k ∈ List.range NBUF, bkeyAt γ ξ k) ∗
+      ([∗list] k ∈ List.range NBUF, bkeyAt γ ξ tl k) ∗
       ([∗list] k ∈ List.range NBUF, bslotAt γ ξ k (Ls k)) := by
-  unfold bcacheResAt; iintro H; iexact H
+  unfold bcacheScanAt; iintro H; iexact H
 
-theorem bcacheRes_intro (γ : BcacheNames) (ξ : CtxId) (M : RegMapF Nat) (nx : Nat)
+theorem bcacheScan_intro (γ : BcacheNames) (ξ : CtxId) (tl : Nat) (M : RegMapF Nat) (nx : Nat)
     (Ls : Nat → List Nat) (ord : List Nat)
     (hfresh : ∀ i, nx ≤ i → PartialMap.get? M i = none) (hok : bcacheOk M Ls)
     (hord : ord.Perm (List.range NBUF)) :
     (γ.ref ↪●MAP M) ∗ bcacheLruAt (GF := GF) ξ bhead (ord.map bnode) ∗
-    ([∗list] k ∈ List.range NBUF, bkeyAt γ ξ k) ∗
-    ([∗list] k ∈ List.range NBUF, bslotAt γ ξ k (Ls k)) ⊢ bcacheResAt γ ξ := by
-  unfold bcacheResAt
+    ([∗list] k ∈ List.range NBUF, bkeyAt γ ξ tl k) ∗
+    ([∗list] k ∈ List.range NBUF, bslotAt γ ξ k (Ls k)) ⊢ bcacheScanAt γ ξ tl := by
+  unfold bcacheScanAt
   iintro ⟨Ha, Hl, Hkey, Hs⟩
   iexists M, nx, Ls, ord
   iframe Ha Hl Hkey Hs
   ipureintro; exact ⟨hfresh, hok, hord⟩
 
-theorem bkeyAt_elim (γ : BcacheNames) (ξ : CtxId) (k : Nat) :
-    bkeyAt (GF := GF) γ ξ k ⊢ ∃ (dev : BitVec 32) (bno : BitVec 32),
+theorem bufSlotRegs_mono (γbk : BoxNames) (tl tl' : Nat) (h : tl ≤ tl') (dev bno : BitVec 32) :
+    bufSlotRegs (GF := GF) γbk tl dev bno ⊢ bufSlotRegs γbk tl' dev bno := by
+  unfold bufSlotRegs
+  iintro ⟨%r, Hrd, %hr, #Htd, %hle⟩
+  iexists r
+  iframe Hrd
+  isplit
+  · ipureintro; exact hr
+  isplit
+  · iexact Htd
+  · ipureintro; omega
+
+theorem bkeyAt_mono (γ : BcacheNames) (ξ : CtxId) (tl tl' : Nat) (h : tl ≤ tl') (k : Nat) :
+    bkeyAt (GF := GF) γ ξ tl k ⊢ bkeyAt γ ξ tl' k := by
+  unfold bkeyAt
+  iintro ⟨%dev, %bno, Hd, Hb, Hr⟩
+  iexists dev, bno
+  iframe Hd Hb
+  iapply bufSlotRegs_mono (γ.box k) tl tl' h dev bno $$ Hr
+
+/-- The floor slot is a BOUND, so a bigger one keeps every row (Rocq's
+`bcache_scan2_floor_mono`): what a `refcnt--` needs, since the decrement
+raises one L1 register's stamp past the slot the payload came in at. -/
+theorem bkeyAll_mono (γ : BcacheNames) (ξ : CtxId) (tl tl' : Nat) (h : tl ≤ tl') :
+    ([∗list] k ∈ List.range NBUF, bkeyAt (GF := GF) γ ξ tl k) ⊢
+      [∗list] k ∈ List.range NBUF, bkeyAt γ ξ tl' k := by
+  iintro H
+  iapply BigSepL.bigSepL_mono_of_forall (Φ := fun _ k => bkeyAt (GF := GF) γ ξ tl k)
+    (Ψ := fun _ k => bkeyAt (GF := GF) γ ξ tl' k) (fun {_ k} => bkeyAt_mono γ ξ tl tl' h k) $$ H
+
+theorem bkeyAt_elim (γ : BcacheNames) (ξ : CtxId) (tl : Nat) (k : Nat) :
+    bkeyAt (GF := GF) γ ξ tl k ⊢ ∃ (dev : BitVec 32) (bno : BitVec 32),
       wordAtN ξ (aBufDev (bnode k)) 4 (DFrac.own (1 : Qp).half) dev ∗
       wordAtN ξ (aBufBlockno (bnode k)) 4 (DFrac.own (1 : Qp).half) bno ∗
-      bufSlotRegs (γ.box k) dev bno := by
+      bufSlotRegs (γ.box k) tl dev bno := by
   unfold bkeyAt; iintro H; iexact H
 
-theorem bkeyAt_intro (γ : BcacheNames) (ξ : CtxId) (k : Nat) (dev bno : BitVec 32) :
+theorem bkeyAt_intro (γ : BcacheNames) (ξ : CtxId) (tl : Nat) (k : Nat) (dev bno : BitVec 32) :
     wordAtN (GF := GF) ξ (aBufDev (bnode k)) 4 (DFrac.own (1 : Qp).half) dev ∗
     wordAtN ξ (aBufBlockno (bnode k)) 4 (DFrac.own (1 : Qp).half) bno ∗
-    bufSlotRegs (γ.box k) dev bno ⊢ bkeyAt γ ξ k := by
+    bufSlotRegs (γ.box k) tl dev bno ⊢ bkeyAt γ ξ tl k := by
   unfold bkeyAt; iintro H; iexists dev, bno; iexact H
 
 /-- Borrow buffer `k`'s key row (its two key halves and the escrow's L1
 register half) out of the cache's big-sep, to put it back. -/
-theorem bkey_acc (γ : BcacheNames) (ξ : CtxId) (k : Nat) (hk : k < NBUF) :
-    ([∗list] j ∈ List.range NBUF, bkeyAt (GF := GF) γ ξ j) ⊢
-      bkeyAt γ ξ k ∗ (bkeyAt γ ξ k -∗ [∗list] j ∈ List.range NBUF, bkeyAt γ ξ j) := by
+theorem bkey_acc (γ : BcacheNames) (ξ : CtxId) (tl : Nat) (k : Nat) (hk : k < NBUF) :
+    ([∗list] j ∈ List.range NBUF, bkeyAt (GF := GF) γ ξ tl j) ⊢
+      bkeyAt γ ξ tl k ∗ (bkeyAt γ ξ tl k -∗ [∗list] j ∈ List.range NBUF, bkeyAt γ ξ tl j) := by
   have hget : (List.range NBUF)[k]? = some k := by rw [List.getElem?_range hk]
   iintro H
-  icases BigSepL.bigSepL_lookup_acc_impl (Φ := fun _ j => bkeyAt (GF := GF) γ ξ j) hget $$ H
+  icases BigSepL.bigSepL_lookup_acc_impl (Φ := fun _ j => bkeyAt (GF := GF) γ ξ tl j) hget $$ H
     with ⟨Hk, Hcl⟩
   iframe Hk
   iintro Hk'
-  iapply Hcl $$ %(fun _ j => bkeyAt (GF := GF) γ ξ j) [] [Hk']
+  iapply Hcl $$ %(fun _ j => bkeyAt (GF := GF) γ ξ tl j) [] [Hk']
   · imodintro
     iintro %i %y %hy %hne Hy
     iexact Hy

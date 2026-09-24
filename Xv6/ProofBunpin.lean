@@ -75,7 +75,7 @@ end
 /-! ## The function -/
 
 set_option maxHeartbeats 16000000 in
-theorem bunpin_proof (AC : ACQUIRE) (RE : RELEASE) : BUNPIN := ⟨
+theorem bunpin_proof (AC : ACQUIRE) (RE : RELEASE_HOOK) : BUNPIN := ⟨
   fun {hlc GF} _ _ _ _ _ _ cpu k γl γ γd kk dev bno hnoff hK hlk hkk ha0 => by
   unfold wp_bunpin_body
   simp only [bunpinAddr]
@@ -84,6 +84,7 @@ theorem bunpin_proof (AC : ACQUIRE) (RE : RELEASE) : BUNPIN := ⟨
   icases (show bref (GF := GF) γ kk dev bno ⊢
       brefTok γ kk ∗ ∃ T : Nat, boxRef (γ.box kk) ((dev, bno) : BufId) T from by
     unfold bref; iintro H; iexact H) $$ Href with ⟨Href, ⟨%T0, Hbref⟩⟩
+  icases boxRef_topLb (γ.box kk) ((dev, bno) : BufId) T0 $$ Hbref with ⟨Hbref, #HT0⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   have hK4 : 4 ≤ k.avail := by omega
@@ -133,7 +134,21 @@ theorem bunpin_proof (AC : ACQUIRE) (RE : RELEASE) : BUNPIN := ⟨
   have h9 : R1 9#5 = bnode kk := b9
   have hpins : bcPins k R1 := ⟨b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩
   -- the cache open; our reference is in slot kk's list
-  icases bcacheRes_elim γ curCtx $$ HR with ⟨%M, %nx, %Ls, %ord, Ha, %⟨hfresh, hok, hord⟩, Hlru, Hkey, Hs⟩
+  icases bcacheRes_elim γ curCtx $$ HR with ⟨%tl0, -, #Htl0, Hscan⟩
+  icases bcacheScan_elim γ curCtx tl0 $$ Hscan
+    with ⟨%M, %nx, %Ls, %ord, Ha, %⟨hfresh, hok, hord⟩, Hlru, Hkey, Hs⟩
+  -- RAISE THE FLOOR SLOT to cover the stamp `refcnt--` will fold into the
+  -- L1 register; the hooked release is what puts a raised slot back
+  obtain ⟨tl, htl_def⟩ : ∃ tl, tl = max tl0 T0 := ⟨_, rfl⟩
+  have htl0 : tl0 ≤ tl := by omega
+  have htlT : T0 ≤ tl := by omega
+  ihave #Htl : topLb tl $$ [Htl0 HT0]
+  · rw [htl_def]
+    iapply topLb_max tl0 T0
+    isplit
+    · iexact Htl0
+    · iexact HT0
+  ihave Hkey := bkeyAll_mono γ curCtx tl0 tl htl0 $$ Hkey
   icases (show brefTok (GF := GF) γ kk ⊢ ∃ id : Nat, γ.ref ↪◯MAP[id]{.own (1 : Qp).half} kk from by
     unfold brefTok; iintro H; iexact H) $$ Href with ⟨%id, He⟩
   ihave %hget := ghost_map_lookup $$ Ha He
@@ -143,9 +158,9 @@ theorem bunpin_proof (AC : ACQUIRE) (RE : RELEASE) : BUNPIN := ⟨
   ihave Hsl0 := (show bslotAt (GF := GF) γ curCtx kk (Ls kk) ⊢ bslotAt γ curCtx kk (s ++ id :: t) from by
     rw [hL]) $$ Hsl0
   icases bslotAt_elim γ curCtx kk (s ++ id :: t) $$ Hsl0 with ⟨%⟨hnd, hlt⟩, Hrefc, Hhalves, Hslots, Hcnt⟩
-  icases bkey_acc γ curCtx kk hkk $$ Hkey with ⟨Hkey0, Hkcl⟩
-  icases bkeyAt_elim γ curCtx kk $$ Hkey0 with ⟨%dv, %bn, Hkd, Hkb, Hregs⟩
-  icases bufSlotRegs_elim (γ.box kk) dv bn $$ Hregs with ⟨%r, %hrid, Hrd, #Htd⟩
+  icases bkey_acc γ curCtx tl kk hkk $$ Hkey with ⟨Hkey0, Hkcl⟩
+  icases bkeyAt_elim γ curCtx tl kk $$ Hkey0 with ⟨%dv, %bn, Hkd, Hkb, Hregs⟩
+  icases bufSlotRegs_elim (γ.box kk) tl dv bn $$ Hregs with ⟨%r, %⟨hrid, hrtl⟩, Hrd, #Htd⟩
   obtain ⟨n, hn⟩ : ∃ n, (s ++ id :: t).length = n := ⟨_, rfl⟩
   have hn1 : 1 ≤ n := by rw [← hn]; simp only [List.length_append, List.length_cons]; omega
   have hlen2 : (s ++ t).length = n - 1 := by
@@ -187,10 +202,11 @@ theorem bunpin_proof (AC : ACQUIRE) (RE : RELEASE) : BUNPIN := ⟨
     iexact Htd
   imodintro
   ihave Hregs := bufSlotRegs_intro (γ.box kk)
-      (⟨max r.td T0, false, r.ident, r.x⟩ : SlotReg BufId BufX) dv bn rfl hrid.2.1 hrid.2.2
+      (⟨max r.td T0, false, r.ident, r.x⟩ : SlotReg BufId BufX) tl dv bn rfl hrid.2.1 hrid.2.2
+      (by show max r.td T0 ≤ tl; omega)
     $$ [Hrd Htd']
   case' _ => iframe Hrd Htd'
-  ihave Hkey0 := bkeyAt_intro γ curCtx kk dv bn $$ [Hkd Hkb Hregs]
+  ihave Hkey0 := bkeyAt_intro γ curCtx tl kk dv bn $$ [Hkd Hkb Hregs]
   case' _ => iframe Hkd Hkb Hregs
   ihave Hkey := Hkcl $$ Hkey0
   -- the slot unit comes back
@@ -205,7 +221,7 @@ theorem bunpin_proof (AC : ACQUIRE) (RE : RELEASE) : BUNPIN := ⟨
   ihave Hslot := bslotAt_intro γ curCtx kk (s ++ t) hnd' hlt' $$ [Hrefc Hhalves' Hslots Hcnt]
   case' _ => iframe
   ihave Hs := Hcl $$ %(s ++ t) Hslot
-  ihave HR := bcacheRes_intro γ curCtx _ nx _ ord
+  ihave Hscan := bcacheScan_intro γ curCtx tl _ nx _ ord
     (bunpin_fresh M nx id hfresh) (bunpin_bcacheOk M Ls s t id kk hok hL hnd) hord $$ [Ha Hlru Hkey Hs]
   case' _ => iframe
   -- auipc a0,0x15 ; addi a0,a0,1082 ; jal release
@@ -218,7 +234,8 @@ theorem bunpin_proof (AC : ACQUIRE) (RE : RELEASE) : BUNPIN := ⟨
   k_step (wp_s_jal c _ (KA.«bunpin» + 0x26#64) false 2088602#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bu_br_rel]
   iintro Hk Hpc
-  iapply (bc_release RE c _ γl γ ?ha0 ?hsr ?hnr ?hKr k.sie ?hrr ?hor) $$ [- $Hk $Hpc $Hlocked $HR]
+  iapply (bc_release_hook RE c _ γl γ tl ?ha0 ?hsr ?hnr ?hKr k.sie ?hrr ?hor)
+    $$ [- $Hk $Hpc $Hlocked $Htl $Hscan]
   rotate_right 1
   k_norm_g [hfilt, KCtx.pushOffAt_popExit k spie spp hwf, hkb, hK4, bu_ret_2a]
   iframe #

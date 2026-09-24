@@ -51,11 +51,11 @@ references, and withdraw/deposit at count zero):
   carries, and the recycler must therefore present the NEW block's fragment
   and takes the old one away.
 * the two floor-consuming operations, `bufEscrow_take` and
-  `bufEscrow_withdraw`, are unusable in this port as it stands: each wants a
-  `MachCSL.ctxFloor` of the CALLER's context covering the box's stamp, and
-  no rule here mints one from a `MachCSL.topLb` (see the report note in the
-  header of `Xv6/BcacheInv.lean`).  They are stated and proved; `bread` is
-  what needs them.
+  `bufEscrow_withdraw`, each want a `MachCSL.ctxFloor` of the CALLER's
+  context covering the box's stamp.  Those floors ride the payload rows
+  (`Xv6.bcacheResAt`'s floor slot, `Xv6.bufSlpBox`'s park floor) and the
+  acquire edge (`Xv6.ACQUIRESLEEP_LLB`); see the header of
+  `Xv6/BcacheInv.lean`.  `bread` is what consumes them.
 -/
 import Xv6.BcacheInv
 import MachCSL.CtxBox
@@ -189,33 +189,37 @@ theorem bufHold0_of_travel (γ : BcacheNames) (γd : DiskNames) (k : Nat)
 /-! ## The two payload rows, folded and unfolded -/
 
 /-- The L1 row, built from the register half and its receipt. -/
-theorem bufSlotRegs_intro (γbk : BoxNames) (r : SlotReg BufId BufX) (dev bno : BitVec 32)
-    (hw : r.win = false) (hx : r.x = none) (hi : r.ident = ((dev, bno) : BufId)) :
-    slotdHalf (GF := GF) γbk r ∗ topLb r.td ⊢ bufSlotRegs γbk dev bno := by
+theorem bufSlotRegs_intro (γbk : BoxNames) (r : SlotReg BufId BufX) (tl : Nat) (dev bno : BitVec 32)
+    (hw : r.win = false) (hx : r.x = none) (hi : r.ident = ((dev, bno) : BufId)) (htl : r.td ≤ tl) :
+    slotdHalf (GF := GF) γbk r ∗ topLb r.td ⊢ bufSlotRegs γbk tl dev bno := by
   unfold bufSlotRegs
   iintro ⟨Hrd, #Htd⟩
   iexists r
   iframe Hrd
   isplit
   · ipureintro; exact ⟨hw, hx, hi⟩
+  isplit
   · iexact Htd
+  · ipureintro; exact htl
 
-theorem bufSlotRegs_elim (γbk : BoxNames) (dev bno : BitVec 32) :
-    bufSlotRegs (GF := GF) γbk dev bno ⊢
+theorem bufSlotRegs_elim (γbk : BoxNames) (tl : Nat) (dev bno : BitVec 32) :
+    bufSlotRegs (GF := GF) γbk tl dev bno ⊢
       ∃ r : SlotReg BufId BufX,
-        ⌜r.win = false ∧ r.x = none ∧ r.ident = ((dev, bno) : BufId)⌝ ∗
+        ⌜(r.win = false ∧ r.x = none ∧ r.ident = ((dev, bno) : BufId)) ∧ r.td ≤ tl⌝ ∗
         slotdHalf γbk r ∗ topLb r.td := by
   unfold bufSlotRegs
-  iintro ⟨%r, Hrd, %hr, #Htd⟩
+  iintro ⟨%r, Hrd, %hr, #Htd, %htl⟩
   iexists r
   isplit
-  · ipureintro; exact hr
+  · ipureintro; exact ⟨hr, htl⟩
   iframe Hrd
   iexact Htd
 
-/-- The sleeplock payload, built from the park register's half. -/
+/-- The sleeplock payload, built from the park register's half AND the
+floor over its stamp; a releaser that has only the `MachCSL.topLb` builds
+`Xv6.bufSlpDep` instead and lets the lock hook finish it. -/
 theorem bufSlpBox_intro (γ : BcacheNames) (k T' : Nat) :
-    bufTok (GF := GF) γ k ∗ slotpHalf (γ.box k) (⟨T', none⟩ : L2Reg BufId) ∗ topLb T' ⊢
+    bufTok (GF := GF) γ k ∗ slotpHalf (γ.box k) (⟨T', none⟩ : L2Reg BufId) ∗ ctxFloor curCtx T' ⊢
       bufSlpBox γ k curCtx := by
   unfold bufSlpBox
   iintro ⟨Htok, Hrp, #Htp⟩
@@ -226,9 +230,14 @@ theorem bufSlpBox_intro (γ : BcacheNames) (k T' : Nat) :
   · ipureintro; rfl
   · iexact Htp
 
+theorem bufSlpDep_intro (γ : BcacheNames) (k T' : Nat) (ξ : CtxId) :
+    bufTok (GF := GF) γ k ∗ slotpHalf (γ.box k) (⟨T', none⟩ : L2Reg BufId) ⊢
+      bufSlpDep γ k T' ξ := by
+  unfold bufSlpDep; iintro H; iexact H
+
 theorem bufSlpBox_elim (γ : BcacheNames) (k : Nat) (ξ : CtxId) :
     bufSlpBox (GF := GF) γ k ξ ⊢
-      bufTok γ k ∗ ∃ s : L2Reg BufId, slotpHalf (γ.box k) s ∗ ⌜s.hold = none⌝ ∗ topLb s.tp := by
+      bufTok γ k ∗ ∃ s : L2Reg BufId, slotpHalf (γ.box k) s ∗ ⌜s.hold = none⌝ ∗ ctxFloor ξ s.tp := by
   unfold bufSlpBox; iintro H; iexact H
 
 /-! ## The header, as the `bcache.lock` side holds it -/
@@ -420,8 +429,10 @@ row for `bcache.lock`'s `Xv6.bkeyAt`, the count half for its `Xv6.bslotAt`
 buffer's sleeplock payload `Xv6.bufSlpBox`. -/
 def bufBoxRow (γd : DiskNames) (γbk : BoxNames) (k : Nat) (qd qb : Qp)
     (dev bno : BitVec 32) : IProp GF := iprop%
-  bufBox γd γbk k qd qb ∗ bufSlotRegs γbk dev bno ∗ cntHalf γbk 0 ∗
-  slotpHalf γbk (⟨0, none⟩ : L2Reg BufId)
+  bufBox γd γbk k qd qb ∗
+  (∃ r : SlotReg BufId BufX,
+    slotdHalf γbk r ∗ ⌜r.win = false ∧ r.x = none ∧ r.ident = ((dev, bno) : BufId)⌝ ∗ topLb r.td) ∗
+  cntHalf γbk 0 ∗ slotpHalf γbk (⟨0, none⟩ : L2Reg BufId)
 
 theorem bufEscrow_allocRow (γd : DiskNames) (k : Nat) (qd qb : Qp) (cpu : CPU)
     (dev bno v : BitVec 32) (bs : List (BitVec 8)) (E : CoPset) :
@@ -438,10 +449,11 @@ theorem bufEscrow_allocRow (γd : DiskNames) (k : Nat) (qd qb : Qp) (cpu : CPU)
   isplit
   · iexact Hbox
   iframe Hc Hrp
-  iapply bufSlotRegs_intro γbk (⟨Tb, false, (dev, bno), none⟩ : SlotReg BufId BufX) dev bno
-    rfl rfl rfl
+  iexists (⟨Tb, false, (dev, bno), none⟩ : SlotReg BufId BufX)
   iframe Hrd
-  iexact Htb
+  isplit
+  · ipureintro; exact ⟨rfl, rfl, rfl⟩
+  · iexact Htb
 
 /-- A big-sep over `List.range n` only sees indices below `n`. -/
 theorem bigSepL_range_congr (Φ Ψ : Nat → IProp GF) :

@@ -27,12 +27,13 @@ the chain's count fragment and the escrow's CHECKOUT handle now ride inside
 keeps them and what makes the first instruction's park available.  The
 credential is `Xv6.bioCtx γl γ γd`, which now carries the thirty escrows.
 
-**Deviation from Rocq (reported).**  Rocq's proof parks the content into the
-escrow at the first instruction and hands the park's register half to the
-HOOKED `releasesleep` (`wp_releasesleep_genin_sconf`), which mints the
-payload's floor from the `llb` the park returns.  This port has no hooked
-release, so `Xv6.bufSlpBox` carries the `MachCSL.topLb` receipt and no
-floor; the park and the decrement are otherwise Rocq's.
+As in Rocq, the proof parks the content into the escrow at the first
+instruction and hands the park's register half to the HOOKED `releasesleep`
+(`Xv6.RELEASESLEEP_HOOK`, Rocq's `wp_releasesleep_genin_sconf`), which mints
+the payload's floor from the `MachCSL.topLb` the park returns; and the
+`refcnt--` releases `bcache.lock` through `Xv6.bc_release_hook`, because the
+decrement folds the burned reference's stamp into the L1 register and so
+RAISES the resource's floor slot.
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/

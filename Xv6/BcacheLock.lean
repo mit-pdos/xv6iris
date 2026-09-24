@@ -112,6 +112,39 @@ theorem bc_release (RE : RELEASE) (c : CPU) (k' : KCtx) (γl : GName) (γ : Bcac
   rw [haddr] at h
   exact h
 
+/-- **The HOOKED release of `bcache.lock`** (Rocq's `bcache_res2`'s
+`lock_hook_llb` instance): the releaser presents the UNFLOORED body at a
+floor slot `tl` it holds a store-order receipt for, and the hook mints
+`MachCSL.ctxFloor ξ tl` at the lock's own stamped context.  This is the
+only way to put the resource back when a `refcnt--` has raised one L1
+register's stamp past the releaser's own view. -/
+theorem bc_release_hook (RE : RELEASE_HOOK) (c : CPU) (k' : KCtx) (γl : GName) (γ : BcacheNames)
+    (tl : Nat) (haddr : k'.regs 10#5 = bcacheLockAddr)
+    (hsie' : k'.sie = false) (hnoff' : 1 ≤ k'.noff) (hK' : 10 ≤ k'.avail)
+    (reen : Bool) (hreen : reen = (decide (k'.noff = 1) && k'.intena))
+    (hon : reen = true → k'.tier = .kpt ∧ trapRes true + 6 ≤ k'.avail) :
+    kctx c k' ∗ pcIs c KA.«release» ∗ isLock γl bcacheLockAddr "bcache" (bcacheResAt γ) ∗
+    locked γl c ∗ topLb tl ∗ bcacheScanAt γ curCtx tl ∗ popArm c k' reen ∗
+    wpNext (k'.popExit reen).sie k'.proc c (fun cpu' => iprop(∀ R' : RegMap,
+      kctx cpu' (((k'.popExit reen).withRegs R').withLocks (k'.locks.filter (fun x => x ≠ "bcache"))) -∗
+      pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
+    ⊢ wpLoop (GF := GF) c := by
+  have h := RE.wp_release_hook (hlc := hlc) (GF := GF) c k' γl "bcache" (bcacheResAt γ)
+    (bcacheResIn γ tl) hsie' hnoff' hK' reen hreen hon
+  unfold wp_release_hook_body at h
+  simp only [releaseAddr] at h
+  rw [haddr] at h
+  iintro ⟨Hk, Hpc, #Hlk, Hlocked, #Htl, Hscan, Harm, HΦ⟩
+  iapply h
+  iframe Hk Hpc Hlk Hlocked Harm HΦ
+  isplitl [Hscan]
+  · iapply bcacheResIn_intro γ curCtx tl
+    isplit
+    · iexact Htl
+    · iexact Hscan
+  · iapply lockHook_llb (bcacheResIn γ tl) (bcacheResAt γ) tl (bcacheRes_fold_in γ tl)
+    iexact Htl
+
 end
 
 end Xv6

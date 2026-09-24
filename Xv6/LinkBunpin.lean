@@ -8,6 +8,6 @@ import Xv6.LinkRelease
 
 namespace Xv6
 
-theorem Bunpin : BUNPIN := bunpin_proof Acquire Release
+theorem Bunpin : BUNPIN := bunpin_proof Acquire ReleaseHook
 
 end Xv6

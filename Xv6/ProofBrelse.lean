@@ -68,7 +68,7 @@ theorem br_holdingsleep (HS : HOLDINGSLEEP) (c : CPU) (k' : KCtx) (γ : BcacheNa
   unfold isBufSlk
   exact h
 
-theorem br_releasesleep (RS : RELEASESLEEP) (Γ : SchedNames) (c : CPU) (k' : KCtx)
+theorem br_releasesleep (RS : RELEASESLEEP_HOOK) (Γ : SchedNames) (c : CPU) (k' : KCtx)
     (γ : BcacheNames) (kk : Nat) (pidv : BitVec 32) (T' : Nat)
     (haddr : k'.regs 10#5 = aBufLock (bnode kk))
     (hnoff : k'.noff + 2 < 2 ^ 31) (hK : releasesleepSlots ≤ k'.avail)
@@ -81,23 +81,29 @@ theorem br_releasesleep (RS : RELEASESLEEP) (Γ : SchedNames) (c : CPU) (k' : KC
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := RS.wp_releasesleep (hlc := hlc) (GF := GF) Γ c k' (γ.slk kk).1 (γ.slk kk).2
-    (bufSlpBox γ kk) 1 pidv hnoff hK hs hp htier
-  unfold wp_releasesleep_body at h
+  have h := RS.wp_releasesleep_gen_hook (hlc := hlc) (GF := GF) Γ c k' (γ.slk kk).1 (γ.slk kk).2
+    (bufSlpBox γ kk) (bufSlpDep γ kk T') slUntracked 1 pidv hnoff hK hs hp htier
+  unfold wp_releasesleep_gen_hook_body at h
   simp only [releasesleepAddr] at h
   rw [haddr] at h
-  unfold isBufSlk
+  unfold isBufSlk isSleeplock
   iintro ⟨Hk, Hpc, Hpi, #Hslk, Hsl, Htok, Hrp, #Htop, Hnext⟩
   iapply h
-  iframe Hk Hpc Hpi Hslk Hsl Hnext
-  iapply bufSlpBox_intro γ kk T'
-  iframe Htok Hrp
-  iexact Htop
+  iframe Hk Hpc Hpi Hslk Hsl
+  isplitl [Htok Hrp]
+  · iapply bufSlpDep_intro γ kk T' curCtx
+    iframe Htok Hrp
+  isplitl []
+  · iapply lockHook_llb (bufSlpDep γ kk T') (bufSlpBox γ kk) T' (bufSlp_fold_in γ kk T')
+    iexact Htop
+  iapply wpNext_mono _ _ _ _ _ $$ Hnext
+  iintro %c' HΦ %spie %spp %R' %hsp Hk Hpc %hcs -
+  iapply HΦ $$ %spie %spp %R' %hsp Hk Hpc %hcs
 
 /-! ## The common tail: `release(&bcache.lock)` and the epilogue -/
 
-theorem br_tail (RE : RELEASE) (cpu c : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames)
-    (spie2 spp2 spie3 spp3 : Bool) (R : RegMap) (dqp : DFrac) (pidv : BitVec 32)
+theorem br_tail (RE : RELEASE_HOOK) (cpu c : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames)
+    (tl : Nat) (spie2 spp2 spie3 spp3 : Bool) (R : RegMap) (dqp : DFrac) (pidv : BitVec 32)
     (hwf : k.wf) (hK4 : 4 ≤ k.avail) (hK : 14 ≤ k.avail) (hlk : "bcache" ∉ k.locks)
     (hnoff : k.noff + 2 < 2 ^ 31)
     (hpin : k.sie = false ∨ k.proc = 0#64 → c = cpu)
@@ -109,7 +115,8 @@ theorem br_tail (RE : RELEASE) (cpu c : CPU) (k : KCtx) (γl : GName) (γ : Bcac
     kctx c (((((k.pushed 4).withSpie spie2 spp2).pushOffAt spie3 spp3).withLocks
         ("bcache" :: k.locks)).withRegs R) ∗
     pcIs c (KA.«brelse» + 0x60#64) ∗
-    isLock γl bcacheLockAddr "bcache" (bcacheResAt γ) ∗ locked γl c ∗ bcacheResAt γ curCtx ∗
+    isLock γl bcacheLockAddr "bcache" (bcacheResAt γ) ∗ locked γl c ∗
+    topLb tl ∗ bcacheScanAt γ curCtx tl ∗
     sieArm c k.sie k.proc ∗
     frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗ bslot γ ∗
@@ -119,7 +126,7 @@ theorem br_tail (RE : RELEASE) (cpu c : CPU) (k : KCtx) (γl : GName) (γ : Bcac
       ⌜calleeSaved k.regs R'⌝ -∗ wordPointsTo (pPid k.proc) 4 dqp pidv -∗
       bslot γ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  iintro ⟨Hk, Hpc, #Hlk, Hlocked, HR, Harm, Hframe, Hpid, Hbslot, Hnext⟩
+  iintro ⟨Hk, Hpc, #Hlk, Hlocked, #Htl, Hscan, Harm, Hframe, Hpid, Hbslot, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hfilt := bc_filter_bcache k.locks hlk
   have hpw : ∀ a b : Bool, (k.pushed 4).withSpie a b = (k.withSpie a b).pushed 4 := fun _ _ => rfl
@@ -142,7 +149,8 @@ theorem br_tail (RE : RELEASE) (cpu c : CPU) (k : KCtx) (γl : GName) (γ : Bcac
   k_step (wp_s_jal c _ (KA.«brelse» + 0x68#64) false 2088720#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [br_br_rel]
   iintro Hk Hpc
-  iapply (bc_release RE c _ γl γ ?ra ?rs ?rn ?rK k.sie ?rr ?ro) $$ [- $Hk $Hpc $Hlocked $HR]
+  iapply (bc_release_hook RE c _ γl γ tl ?ra ?rs ?rn ?rK k.sie ?rr ?ro)
+    $$ [- $Hk $Hpc $Hlocked $Htl $Hscan]
   rotate_right 1
   k_norm_g [hfilt, hpe, hpop, hkb, hK4, br_ret_6c]
   iframe #
@@ -200,7 +208,8 @@ end
 /-! ## The function -/
 
 set_option maxHeartbeats 16000000 in
-theorem brelse_proof (HS : HOLDINGSLEEP) (RS : RELEASESLEEP) (AC : ACQUIRE) (RE : RELEASE) : BRELSE := ⟨
+theorem brelse_proof (HS : HOLDINGSLEEP) (RS : RELEASESLEEP_HOOK) (AC : ACQUIRE)
+    (RE : RELEASE_HOOK) : BRELSE := ⟨
   fun {hlc GF} _ _ _ _ _ _ Γ cpu k γl γ γd kk pidv dev bno dqp bs bsd
     hnoff hK hlk hsl hp htier hkk ha0 => by
   unfold wp_brelse_body
@@ -339,7 +348,21 @@ theorem brelse_proof (HS : HOLDINGSLEEP) (RS : RELEASESLEEP) (AC : ACQUIRE) (RE 
     obtain ⟨w1, w2⟩ := hsp1 h
     exact ⟨u1.trans (v1.trans w1), u2.trans (v2.trans w2)⟩
   -- the cache open; our reference is in slot kk's list
-  icases bcacheRes_elim γ curCtx $$ HR with ⟨%M, %nx, %Ls, %ord, Ha, %⟨hfresh, hok, hord⟩, Hlru, Hkey, Hs⟩
+  icases bcacheRes_elim γ curCtx $$ HR with ⟨%tl0, -, #Htl0, Hscan⟩
+  icases bcacheScan_elim γ curCtx tl0 $$ Hscan
+    with ⟨%M, %nx, %Ls, %ord, Ha, %⟨hfresh, hok, hord⟩, Hlru, Hkey, Hs⟩
+  -- RAISE THE FLOOR SLOT over the stamp `refcnt--` folds into the L1
+  -- register; the hooked release is what puts a raised slot back
+  obtain ⟨tl, htl_def⟩ : ∃ tl, tl = max tl0 T' := ⟨_, rfl⟩
+  have htl0 : tl0 ≤ tl := by omega
+  have htlT : T' ≤ tl := by omega
+  ihave #Htl : topLb tl $$ [Htl0 HtopT]
+  · rw [htl_def]
+    iapply topLb_max tl0 T'
+    isplit
+    · iexact Htl0
+    · iexact HtopT
+  ihave Hkey := bkeyAll_mono γ curCtx tl0 tl htl0 $$ Hkey
   icases (show brefTok (GF := GF) γ kk ⊢ ∃ id : Nat, γ.ref ↪◯MAP[id]{.own (1 : Qp).half} kk from by
     unfold brefTok; iintro H; iexact H) $$ Hrt with ⟨%id, He⟩
   ihave %hget := ghost_map_lookup $$ Ha He
@@ -350,9 +373,9 @@ theorem brelse_proof (HS : HOLDINGSLEEP) (RS : RELEASESLEEP) (AC : ACQUIRE) (RE 
     rw [hL]) $$ Hsl0
   icases bslotAt_elim γ curCtx kk (ls1 ++ id :: ls2) $$ Hsl0
     with ⟨%⟨hnd, hlt⟩, Hrefc, Hhalves, Hslots, Hcnt⟩
-  icases bkey_acc γ curCtx kk hkk $$ Hkey with ⟨Hkey0, Hkcl⟩
-  icases bkeyAt_elim γ curCtx kk $$ Hkey0 with ⟨%dv, %bn, Hkd, Hkb, Hregs⟩
-  icases bufSlotRegs_elim (γ.box kk) dv bn $$ Hregs with ⟨%r, %hrid, Hrd, #Htd⟩
+  icases bkey_acc γ curCtx tl kk hkk $$ Hkey with ⟨Hkey0, Hkcl⟩
+  icases bkeyAt_elim γ curCtx tl kk $$ Hkey0 with ⟨%dv, %bn, Hkd, Hkb, Hregs⟩
+  icases bufSlotRegs_elim (γ.box kk) tl dv bn $$ Hregs with ⟨%r, %⟨hrid, hrtl⟩, Hrd, #Htd⟩
   obtain ⟨n, hn⟩ : ∃ n, (ls1 ++ id :: ls2).length = n := ⟨_, rfl⟩
   have hn1 : 1 ≤ n := by rw [← hn]; simp only [List.length_append, List.length_cons]; omega
   have hlen2 : (ls1 ++ ls2).length = n - 1 := by
@@ -395,10 +418,11 @@ theorem brelse_proof (HS : HOLDINGSLEEP) (RS : RELEASESLEEP) (AC : ACQUIRE) (RE 
     iexact Htd
   imodintro
   ihave Hregs := bufSlotRegs_intro (γ.box kk)
-      (⟨max r.td T', false, r.ident, r.x⟩ : SlotReg BufId BufX) dv bn rfl hrid.2.1 hrid.2.2
+      (⟨max r.td T', false, r.ident, r.x⟩ : SlotReg BufId BufX) tl dv bn rfl hrid.2.1 hrid.2.2
+      (by show max r.td T' ≤ tl; omega)
     $$ [Hrd Htd']
   case' _ => iframe Hrd Htd'
-  ihave Hkey0 := bkeyAt_intro γ curCtx kk dv bn $$ [Hkd Hkb Hregs]
+  ihave Hkey0 := bkeyAt_intro γ curCtx tl kk dv bn $$ [Hkd Hkb Hregs]
   case' _ => iframe Hkd Hkb Hregs
   ihave Hkey := Hkcl $$ Hkey0
   ihave ⟨Hbslot, Hslots⟩ := (show bslots (GF := GF) γ (ls1 ++ id :: ls2).length ⊢
@@ -492,11 +516,11 @@ theorem brelse_proof (HS : HOLDINGSLEEP) (RS : RELEASESLEEP) (AC : ACQUIRE) (RE 
           (bnode kk :: (o1.map bnode ++ o2.map bnode)) ⊢
         bcacheLruAt curCtx bhead (List.map bnode (kk :: (o1 ++ o2))) from by
       simp) $$ Hlru
-    ihave HR := bcacheRes_intro γ curCtx _ nx _ (kk :: (o1 ++ o2))
+    ihave Hscan := bcacheScan_intro γ curCtx tl _ nx _ (kk :: (o1 ++ o2))
       (bunpin_fresh M nx id hfresh) (bunpin_bcacheOk M Ls ls1 ls2 id kk hok hL hnd)
       (bcacheOrd_rot o1 o2 kk hord) $$ [Ha Hlru Hkey Hs]
     case' _ => iframe
-    iapply (br_tail RE cpu c k γl γ spie2 spp2 spie3 spp3 _ dqp pidv hwf hK4 (by
+    iapply (br_tail RE cpu c k γl γ tl spie2 spp2 spie3 spp3 _ dqp pidv hwf hK4 (by
         unfold brelseSlots releasesleepSlots wakeupSlots at hK; omega) hlk hnoff hpin hsp3'
         (by k_norm_g; exact e2.trans (d2.trans b2))
         (by k_norm_g; exact e19.trans (d19.trans b19))
@@ -508,17 +532,17 @@ theorem brelse_proof (HS : HOLDINGSLEEP) (RS : RELEASESLEEP) (AC : ACQUIRE) (RE 
         (by k_norm_g; exact e25.trans (d25.trans b25))
         (by k_norm_g; exact e26.trans (d26.trans b26))
         (by k_norm_g; exact e27.trans (d27.trans b27)))
-      $$ [- $Hk $Hpc $Hlk $Hlocked $HR $Harm $Hframe $Hpid $Hbslot $Hnext]
+      $$ [- $Hk $Hpc $Hlk $Hlocked $Htl $Hscan $Harm $Hframe $Hpid $Hbslot $Hnext]
   · have hdz : decide (n - 1 ≠ 0) = true := by simp [hz]
     k_step (wp_s_branch c _ (KA.«brelse» + 0x32#64) true 46#13 15#5 0#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [hwr, bc_sext_decr' n hn1 hlt1, bc_bnez (n - 1) hlt2, hdz, br_bnz_tgt]
     iintro Hk Hpc
-    ihave HR := bcacheRes_intro γ curCtx _ nx _ ord
+    ihave Hscan := bcacheScan_intro γ curCtx tl _ nx _ ord
       (bunpin_fresh M nx id hfresh) (bunpin_bcacheOk M Ls ls1 ls2 id kk hok hL hnd) hord
       $$ [Ha Hlru Hkey Hs]
     case' _ => iframe
-    iapply (br_tail RE cpu c k γl γ spie2 spp2 spie3 spp3 _ dqp pidv hwf hK4 (by
+    iapply (br_tail RE cpu c k γl γ tl spie2 spp2 spie3 spp3 _ dqp pidv hwf hK4 (by
         unfold brelseSlots releasesleepSlots wakeupSlots at hK; omega) hlk hnoff hpin hsp3'
         (by k_norm_g; exact e2.trans (d2.trans b2))
         (by k_norm_g; exact e19.trans (d19.trans b19))
@@ -530,6 +554,6 @@ theorem brelse_proof (HS : HOLDINGSLEEP) (RS : RELEASESLEEP) (AC : ACQUIRE) (RE 
         (by k_norm_g; exact e25.trans (d25.trans b25))
         (by k_norm_g; exact e26.trans (d26.trans b26))
         (by k_norm_g; exact e27.trans (d27.trans b27)))
-      $$ [- $Hk $Hpc $Hlk $Hlocked $HR $Harm $Hframe $Hpid $Hbslot $Hnext]⟩
+      $$ [- $Hk $Hpc $Hlk $Hlocked $Htl $Hscan $Harm $Hframe $Hpid $Hbslot $Hnext]⟩
 
 end Xv6

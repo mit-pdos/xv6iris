@@ -14,6 +14,6 @@ namespace Xv6
 
 theorem Brelse : BRELSE :=
   brelse_proof (Holdingsleep Acquire Release Myproc)
-    (Releasesleep Acquire ReleaseHook Wakeup) Acquire Release
+    (ReleasesleepHook Acquire ReleaseHook Wakeup) Acquire ReleaseHook
 
 end Xv6

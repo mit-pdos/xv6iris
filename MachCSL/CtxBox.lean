@@ -307,6 +307,17 @@ holder take the bundle out. -/
 def boxRef (γ : BoxNames) (i : Id) (T : Nat) : IProp GF := iprop%
   ∃ id : Nat, stampElem (Id := Id) γ id (i, T) ∗ topLb T
 
+/-- A reference's store-order receipt, peeled off (persistent). -/
+theorem boxRef_topLb (γ : BoxNames) (i : Id) (T : Nat) :
+    boxRef (GF := GF) γ i T ⊢ boxRef γ i T ∗ topLb T := by
+  unfold boxRef
+  iintro ⟨%id, Hel, #HT⟩
+  isplitl [Hel]
+  · iexists id
+    iframe Hel
+    iexact HT
+  · iexact HT
+
 /-- **THE L2 HOLDER'S HANDLE** (Rocq's `l2_hold`): the L2 register half,
 naming exactly the reference the checkout parked -- so the park can take it
 back. -/
