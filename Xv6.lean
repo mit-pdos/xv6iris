@@ -538,3 +538,10 @@ import Xv6.FsStateInode
 import Xv6.InodeInv
 import Xv6.InodeLock
 import Xv6.DinodeSlot
+import Xv6.DirView
+import Xv6.FsTree
+import Xv6.IcacheRefDefs
+import Xv6.IrefSlots
+import Xv6.InodeRef
+import Xv6.InodeRegionDefs
+import Xv6.InodeRegion

@@ -9,6 +9,18 @@ same lemma statements, same proof structure. Do not redesign. If a Rocq definiti
 odd, it is odd for a reason recorded in its header comment — copy the reason into the Lean
 docstring.
 
+**Cleanup is welcome; reinvention is not** (user, Sept 24 2026): "some cleanup is helpful, as
+there is a fair bit of gunk accumulated in the Rocq proofs, but the big ideas should be taken
+from there." Keep Rocq's definitions, invariants, spec shapes and proof strategy. Drop dead
+lemmas, duplicate helpers, historical workaround shims and unused parameters/conjuncts — but
+only after grepping /shared/xv6rocq/iris for downstream uses. List each cleanup in the file
+header ("Dropped/simplified vs Rocq: …, reason"). Never weaken a statement a later wave uses.
+Only simplify with the FULL picture (user): "it's not a good idea to simplify without having
+the full picture or plan, because then the risk is, the simplification will turn out to be at
+odds with some later part of the proof/spec." Before any cleanup, trace the item through ALL
+later Rocq files (defs, specs, proofs of the fs functions); if you cannot confirm the simplified
+form serves every consumer, keep the Rocq form. Record the checked uses in the header.
+
 ## Where things are
 - Rocq sources: /shared/xv6rocq/iris/<File>.v (ignore /shared/xv6rocq/.claude/worktrees/*).
 - The survey note: /shared/lean-xv6/notes/fs-rocq-summary.md (1.5 MB; grep it by section
