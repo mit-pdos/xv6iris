@@ -21,18 +21,17 @@ existential, because no caller can know either.  The potential
 `u + unpaid F Sb` is what stays put across a `log_write` of a block of
 `F`, which is what makes a loop invariant possible.
 
-**THE ONE THING THAT CANNOT YET BE USED, and why that is fine.**
-`logAmort_present` is IDEMPOTENT -- `u` is the same going in and coming
-out, whichever arm of the write runs -- and that is the whole point of the
-amortisation: with every `log_write` spending a unit, `itrunc`'s 269
-`bfree`s would cost 269 against `MAXOPBLOCKS = 10`.  Cashing it needs
-`log_write`'s CREDITED arm, which `Xv6/SpecLogWrite.lean` does not have
-(its own deviation note 2 records the gap: "This port always spends it ...
-a credited caller simply pays a unit it need not have").  The algebra is
-stated here, in Rocq's exact shape, so that adding the `cr` arm to
-`SpecLogWrite`/`ProofLogWrite` is the only work left -- and that addition
-needs ZERO new `LogInv` lemmas (`logCreditUse`, `logRecordStep`,
-`logAbsorbStep` are all present).
+**IDEMPOTENCE, AND WHERE IT IS CASHED.**  `logAmort_present` is
+IDEMPOTENT -- `u` is the same going in and coming out, whichever arm of the
+write runs -- and that is the whole point of the amortisation: with every
+`log_write` spending a unit, `itrunc`'s 269 `bfree`s would cost 269
+against `MAXOPBLOCKS = 10`.  It is cashed by `log_write`'s CREDITED arm:
+`Xv6.LOG_WRITE.wp_log_write_gen` takes exactly the
+`⌜cr = true → b ∈ Sb⌝ ∗ logOpS γ (v + 1) Sb` this lemma hands out and
+returns the `logOpS γ (if cr then v + 1 else v) (b :: Sb)` its wand takes
+back; the atomic-update form `wp_log_write_au` does the same at the
+epoch-named entry (`Xv6.logOpS_named`, `Xv6.logCredit_own`,
+`Xv6.logOpSwe_opSe`, `Xv6.logOpSe_opS`).
 
 **DEVIATIONS from Rocq, all forced by the port's standing `gset Z` →
 `List Nat` deviation (`Xv6/LogDefs.lean`).**
@@ -57,17 +56,6 @@ needs ZERO new `LogInv` lemmas (`logCreditUse`, `logRecordStep`,
    `∀ x ∈ Sb, x ∈ Sb'`**, the shape `logOpSw`'s consumers already use.
 5. `S u` is `u + 1` and `S (S u)` is `u + 2`, the port's arithmetic
    spelling.
-6. **`logAmort_elim` DOES NOT CITE `Xv6.logOpS_opb`.**  That lemma is
-   Rocq's `log_opS_opb` and it is already in `Xv6/LogInv.lean`, but Lean's
-   section-variable inclusion has given it five instance binders it does
-   not use (`Xv6G` / `BcacheG` / `DiskG` / `FsBlocksG` / `CurCtx`), which
-   would propagate onto every statement in this file and from there onto
-   `writei`'s contracts.  This file's section carries `[LogG GF]` alone --
-   which is all `logOpS` and `logOpb` themselves need -- and re-proves the
-   one-line step inline.  THE FIX BELONGS IN `LogInv.lean` (give
-   `logOpS_opb`, `logOpSe_opS`, `logOpS_named` their own `{GF} [LogG GF]`
-   binders rather than the section's) and is NOT made here, because this
-   wave edits no existing file.
 -/
 import Xv6.LogInv
 
@@ -199,12 +187,7 @@ theorem logAmort_elim (γ : LogNames) (F : List Nat) (u : Nat) :
   iexists v
   isplitr [H]
   · ipureintro; omega
-  · -- `Xv6.logOpS_opb` is this step's Rocq lemma and it is already in the
-    -- tree, but `Xv6/LogInv.lean`'s section gives it five spurious instance
-    -- binders (`Xv6G`/`BcacheG`/`DiskG`/`FsBlocksG`/`CurCtx`) that would
-    -- propagate to every statement in this file; the step is one line.
-    unfold logOpb
-    iexists Sb
+  · iapply logOpS_opb γ v Sb
     iexact H
 
 /-- Fewer free units is weaker. -/

@@ -214,14 +214,20 @@ instance logOpb_timeless (γ : LogNames) (u : Nat) :
 instance logOp_timeless (γ : LogNames) (u : Nat) :
     Timeless (logOp (GF := GF) γ u) := by unfold logOp; infer_instance
 
+/- The three ledger re-packagings below carry `[LogG GF]` alone (the
+section's other instance binders are omitted): `Xv6/WriteiBudget.lean`'s
+`logAmort` family, stated over `[LogG GF]` only, cites them. -/
+omit [Xv6G GF] [BcacheG GF] [DiskG GF] [FsBlocksG GF] [CurCtx] in
 theorem logOpSe_opS (γ : LogNames) (u : Nat) (Sb : List Nat) (e0 : Nat) :
     logOpSe (GF := GF) γ u Sb e0 ⊢ logOpS γ u Sb := by
   unfold logOpS; iintro H; iexists e0; iexact H
 
+omit [Xv6G GF] [BcacheG GF] [DiskG GF] [FsBlocksG GF] [CurCtx] in
 theorem logOpS_named (γ : LogNames) (u : Nat) (Sb : List Nat) :
     logOpS (GF := GF) γ u Sb ⊢ ∃ e0 : Nat, logOpSe γ u Sb e0 := by
   unfold logOpS; iintro H; iexact H
 
+omit [Xv6G GF] [BcacheG GF] [DiskG GF] [FsBlocksG GF] [CurCtx] in
 theorem logOpS_opb (γ : LogNames) (u : Nat) (Sb : List Nat) :
     logOpS (GF := GF) γ u Sb ⊢ logOpb γ u := by
   unfold logOpb; iintro H; iexists Sb; iexact H

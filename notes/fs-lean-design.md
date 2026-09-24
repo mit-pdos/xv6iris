@@ -990,6 +990,16 @@ theorem unpaid_sublist (F F' Sb : List Nat) (h : F'.Sublist F) : unpaid F' Sb �
 
 ### 4.3 What DOES block the budget: `log_write` has no credited arm
 
+**[DONE]** `Xv6/SpecLogWrite.lean` now carries the credited arm: the proved
+contract is the atomic-update form `wp_log_write_au` (Rocq's
+`wp_log_write_au_body`, whole-block: `logCredit` + `logOpSe γ (u+1) Sb e0`
+in, `logOpSwe γ (if cr then u+1 else u) (bno :: Sb) bno vlb e0` out), with
+the held `wp_log_write_gen` (Rocq's `gen`, the `logAmort_present` shape)
+and the original `wp_log_write` derived from it; `lwAu_lb0` adapts
+`bitmapFreeAu`/`bitmapAllocAu`.  Still missing: the byte-range AU
+(`wp_log_write_au_range`), which the inode wave needs.  The text below is
+the pre-change analysis.
+
 `Xv6/SpecLogWrite.lean`'s own deviation note 2 records it:
 
 > NO ABSORPTION CREDIT ARGUMENT (`cr`).  Rocq hands the budget unit BACK on the
