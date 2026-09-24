@@ -45,7 +45,7 @@ which this port does not carry -- `kwaitAns` keeps only what is provable
 without them, and it is enough to tell a `-1` apart from a reap whose
 status did reach the caller.
 
-THE `umBelow` SEAM (`Xv6/SpecEither.lean`): `copyout` promises only
+THE `umBelow` SEAM (`Xv6/EitherDefs.lean`): `copyout` promises only
 `V.upt.ext P'` about the descriptor its lazy faults grew, so the block
 comes back as `procPrivExt`, which is `procPriv` minus the size bound.
 
@@ -58,7 +58,7 @@ Imports only definitional files (never a `Code*` or `Proof*` file).
 import Xv6.SchedCtx
 import Xv6.WaitLock
 import Xv6.PidLock
-import Xv6.SpecEither
+import Xv6.SpecEitherCopyout
 import Xv6.SpecCopyout
 import Xv6.SpecFreeproc
 import Xv6.SpecSleep

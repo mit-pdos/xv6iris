@@ -31,7 +31,7 @@ import Xv6.UartInv
 import Xv6.KallocDefs
 import Xv6.SchedCtx
 import Xv6.UMem
-import Xv6.SpecEither
+import Xv6.SpecEitherCopyin
 import Xv6.SpecUartwrite
 
 namespace Xv6

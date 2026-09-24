@@ -1,6 +1,6 @@
 /-
 Proof of `consolewrite`'s specification (`SpecConsolewrite.CONSOLEWRITE`),
-given the interfaces of `either_copyin` (`SpecEither.EITHER_COPYIN`) and
+given the interfaces of `either_copyin` (`SpecEitherCopyin.EITHER_COPYIN`) and
 `uartwrite` (`SpecUartwrite.UARTWRITE`).
 
 ```

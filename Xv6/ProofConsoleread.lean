@@ -35,7 +35,7 @@ import Xv6.SpecMyproc
 import Xv6.SpecKilled
 import Xv6.SpecSleepPrepare
 import Xv6.SpecSleep
-import Xv6.SpecEither
+import Xv6.SpecEitherCopyout
 import Xv6.PipeRw
 import Xv6.CodeTactics
 

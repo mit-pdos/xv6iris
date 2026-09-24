@@ -7,7 +7,7 @@ import MachCSL.ByteWord
 import MachCSL.WpLock
 import Xv6.SpecFreeproc
 import Xv6.SpecKfree
-import Xv6.SpecProcPagetable
+import Xv6.SpecProcFreepagetable
 import Xv6.SpecAcquire
 import Xv6.SpecRelease
 import Xv6.PtOwnLemmas

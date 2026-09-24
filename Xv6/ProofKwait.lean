@@ -441,7 +441,7 @@ section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
 
 /-- `procPrivNoctx` minus its address space and the `pagetable`/`sz` fields
-`copyout` reads (the ctx-free analogue of `ProofEither.ecRest`). -/
+`copyout` reads (the ctx-free analogue of `EitherDefs.ecRest`). -/
 def kwRest (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) : IProp GF := iprop%
   @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗
   @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pKstack pa) 8 (DFrac.own 1) V.kstack ∗

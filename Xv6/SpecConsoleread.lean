@@ -19,7 +19,7 @@ import Xv6.KallocDefs
 import Xv6.SchedCtx
 import Xv6.UMem
 import Xv6.UMemWindow
-import Xv6.SpecEither
+import Xv6.SpecEitherCopyout
 import Xv6.SpecSleep
 
 namespace Xv6

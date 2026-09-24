@@ -1,7 +1,6 @@
 /-
-`vmfault`'s and `uvmclear`'s interfaces, from their proofs and the
-interfaces of the callees (`ismapped`, `kalloc`, `kfree`, `memset`, the
-uncounted `mappages`, and `walk`).
+`vmfault`'s interface, from its proof and the interfaces of the callees
+(`ismapped`, `kalloc`, `kfree`, `memset` and the uncounted `mappages`).
 -/
 import Xv6.ProofVmfault
 
@@ -12,8 +11,5 @@ namespace Xv6
 theorem Vmfault (IM : ISMAPPED) (KAL : KALLOC) (KF : KFREE) (MS : MEMSET)
     (MA : MAPPAGES_ANY) : VMFAULT :=
   vmfault_proof IM KAL KF MS MA
-
-/-- `uvmclear` meets its specification, given non-allocating `walk`. -/
-theorem Uvmclear (W : WALK_NOALLOC) : UVMCLEAR := uvmclear_proof W
 
 end Xv6

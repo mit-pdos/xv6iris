@@ -4,7 +4,7 @@ calls `either_copyin` and `uartwrite`; both are closed with their linked
 interfaces (`copyin` still takes `walkaddr`/`vmfault` as parameters).
 -/
 import Xv6.ProofConsolewrite
-import Xv6.LinkEither
+import Xv6.LinkEitherCopyin
 import Xv6.LinkUartwrite
 import Xv6.LinkMyproc
 import Xv6.LinkMemmove

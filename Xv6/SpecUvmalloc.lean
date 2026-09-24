@@ -1,10 +1,8 @@
 /-
-Specifications of `uvmalloc` and `uvmdealloc` (kernel/vm.c), over an
-address space (uncounted mode).  `uvmalloc(pt, oldsz, newsz, xperm)`
-maps zeroed pages from `PGROUNDUP(oldsz)` to `newsz` at
-`PTE_R|PTE_U|xperm`, or fails with `0` leaving the space as it was;
-needs 42 slots.  `uvmdealloc(pt, oldsz, newsz)` frees the pages above
-`PGROUNDUP(newsz)`; needs 26 slots.
+Specification of `uvmalloc` (kernel/vm.c), over an address space
+(uncounted mode).  `uvmalloc(pt, oldsz, newsz, xperm)` maps zeroed pages
+from `PGROUNDUP(oldsz)` to `newsz` at `PTE_R|PTE_U|xperm`, or fails with
+`0` leaving the space as it was; needs 42 slots.
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
@@ -20,9 +18,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 def uvmallocAddr : BitVec 64 := KA.«uvmalloc»
-def uvmdeallocAddr : BitVec 64 := KA.«uvmdealloc»
 def uvmallocSlots : Nat := 42
-def uvmdeallocSlots : Nat := 26
 
 /-- The first vpn of the run `uvmalloc` maps. -/
 def uvmaVpn0 (oldsz : BitVec 64) : Nat := pgRoundUpN oldsz.toNat / 4096
@@ -62,23 +58,5 @@ structure UVMALLOC : Prop where
   wp_uvmalloc : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γl : GName) (γk : KmemNames) (P : UPtd) (M : Nat → List (BitVec 8)) hnoff hK hlk hroot hold hnew hperm hfree,
     wp_uvmalloc_body (hlc := hlc) (GF := GF) cpu k γl γk P M hnoff hK hlk hroot hold hnew hperm hfree
-
-def wp_uvmdealloc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
-    (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (P : UPtd) (M : Nat → List (BitVec 8))
-    (hnoff : k.noff + 1 < 2 ^ 31) (hK : uvmdeallocSlots ≤ k.avail) (hlk : "kmem" ∉ k.locks)
-    (hroot : k.regs 10#5 = pageAddr P.root) (hold : (k.regs 11#5).toNat ≤ uvmMaxsz) : Prop :=
-  kctx cpu k ∗ pcIs cpu uvmdeallocAddr ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
-  procPtAt P M ∗
-  wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
-    ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
-    kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-    procPtAt (P.delRun (pgRoundUpN (k.regs 12#5).toNat / 4096) (uvmdNp (k.regs 11#5) (k.regs 12#5))) M -∗
-    ⌜calleeSaved k.regs R' ∧ R' 10#5 = uvmdRsz (k.regs 11#5) (k.regs 12#5)⌝ -∗ wpLoop cpu'))
-  ⊢ wpLoop (GF := GF) cpu
-
-structure UVMDEALLOC : Prop where
-  wp_uvmdealloc : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx] (cpu : CPU) (k : KCtx)
-    (γl : GName) (γk : KmemNames) (P : UPtd) (M : Nat → List (BitVec 8)) hnoff hK hlk hroot hold,
-    wp_uvmdealloc_body (hlc := hlc) (GF := GF) cpu k γl γk P M hnoff hK hlk hroot hold
 
 end Xv6

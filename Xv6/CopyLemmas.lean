@@ -209,6 +209,58 @@ theorem ci_li_one : (0#64 : BitVec 64) + BitVec.signExtend 64 1#12 = 1#64 := by 
 theorem ci_umemRead_zero (M : Nat → List (BitVec 8)) (va : Nat) : umemRead M va 0 = [] := by
   simp only [umemRead, List.range_zero, List.map_nil]
 
+
+/-! ## Address folds in `k_norm`'s normal form
+
+`k_norm` now carries `BitVec.ofNat_add`, so `BitVec.ofNat 64 (A + d)` never
+survives as such: it is split into `BitVec.ofNat 64 A + BitVec.ofNat 64 d`
+(and `BitVec.add_assoc` then re-associates).  These are the page-offset folds
+stated on the shapes the normaliser actually leaves. -/
+
+theorem co_offB (A d : Nat) (hA64 : A + d < 2 ^ 64) :
+    BitVec.ofNat 64 A + BitVec.ofNat 64 d + -BitVec.ofNat 64 ((A + d) / 4096 * 4096)
+      = BitVec.ofNat 64 ((A + d) % 4096) := by
+  rw [← BitVec.sub_eq_add_neg, ← BitVec.ofNat_add, co_ofNat_sub (A + d) _ (by omega) hA64]
+  congr 1
+  omega
+
+theorem co_offB' (A d : Nat) (hA64 : A + d < 2 ^ 64) :
+    BitVec.ofNat 64 A + (BitVec.ofNat 64 d + -BitVec.ofNat 64 ((A + d) / 4096 * 4096))
+      = BitVec.ofNat 64 ((A + d) % 4096) := by
+  rw [← BitVec.add_assoc]; exact co_offB A d hA64
+
+theorem co_addSplit (b : BitVec 64) (x y : Nat) :
+    b + (BitVec.ofNat 64 x + BitVec.ofNat 64 y) = b + BitVec.ofNat 64 (x + y) := by
+  rw [co_ofNat_add]
+
+theorem co_nval (A d : Nat) (hA64 : A + d < 2 ^ 64) :
+    BitVec.ofNat 64 ((A + d) / 4096 * 4096) + (-(BitVec.ofNat 64 A + BitVec.ofNat 64 d) + 4096#64)
+      = BitVec.ofNat 64 (4096 - (A + d) % 4096) := by
+  rw [← BitVec.ofNat_add]; exact co_n_val3 (A + d) hA64
+
+theorem co_ofNat_eq_iff (a b : Nat) (ha : a < 2 ^ 64) (hb : b < 2 ^ 64) :
+    BitVec.ofNat 64 a = BitVec.ofNat 64 b ↔ a = b := by
+  rw [BitVec.toNat_eq, BitVec.toNat_ofNat, BitVec.toNat_ofNat, Nat.mod_eq_of_lt ha,
+    Nat.mod_eq_of_lt hb]
+
+/-! ## Branch folding -/
+
+theorem co_ite_beq {α : Type _} (x y : BitVec 64) (p q : α) :
+    (if bcond bop.BEQ x y then p else q) = if x = y then p else q := by
+  by_cases h : x = y <;> simp [bcond, h]
+
+theorem co_ite_bne {α : Type _} (x y : BitVec 64) (p q : α) :
+    (if bcond bop.BNE x y then p else q) = if x = y then q else p := by
+  by_cases h : x = y <;> simp [bcond, h]
+
+theorem co_ite_bltu {α : Type _} (x y : BitVec 64) (p q : α) :
+    (if bcond bop.BLTU x y then p else q) = if x.toNat < y.toNat then p else q := by
+  by_cases h : x.toNat < y.toNat <;> simp [bcond, BitVec.ult, h]
+
+theorem co_ite_bgeu {α : Type _} (x y : BitVec 64) (p q : α) :
+    (if bcond bop.BGEU x y then p else q) = if x.toNat < y.toNat then q else p := by
+  by_cases h : x.toNat < y.toNat <;> simp [bcond, BitVec.ult, h]
+
 end
 
 end Xv6

@@ -11,7 +11,7 @@ import MachCSL.WpSmodeFrame
 import MachCSL.WpSmodeDev
 import MachCSL.WpSmodeSltu
 import MachCSL.Lock
-import Xv6.SpecUartinit
+import Xv6.SpecUartinitone
 import Xv6.SpecInitlock
 import Xv6.CodeTactics
 

@@ -12,7 +12,7 @@ import Xv6.LinkKilled
 import Xv6.LinkSleepPrepare
 import Xv6.LinkSleep
 import Xv6.LinkSched
-import Xv6.LinkEither
+import Xv6.LinkEitherCopyout
 import Xv6.LinkMemmove
 
 namespace Xv6

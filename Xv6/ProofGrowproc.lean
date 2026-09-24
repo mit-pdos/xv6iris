@@ -25,6 +25,7 @@ import MachCSL.WpSmodeFrame
 import Xv6.SpecGrowproc
 import Xv6.SpecMyproc
 import Xv6.SpecUvmalloc
+import Xv6.SpecUvmdealloc
 import Xv6.UPtAllocLemmas
 import Xv6.UPtLemmas
 import Xv6.CodeTactics
