@@ -16,9 +16,12 @@ It lives in the definitional layer (no `Code*`/`Proof*` import) so that
 `Xv6/ProofInitlog.lean` reads as the instruction walk it is; the file it
 would otherwise belong to (`Xv6/LogInv.lean`) is owned by another agent.
 
-**THE RESIDUAL IS ALSO HERE** (`Xv6.LogHdrCleanTie`), because the Link file
-has to name it: see its own comment, and `Xv6/ProofInitlog.lean`'s header
-for the audit.
+**THE ONE REMAINING RESIDUAL IS ALSO HERE** (`Xv6.LogTxAuthBridge`),
+because the Link file has to name it: see its own comment, and
+`Xv6/ProofInitlog.lean`'s header for the audit.  The header block's clean
+tie -- what used to be a second named hypothesis here -- is now DISCHARGED
+in `Xv6/ProofInitlog.lean` (`Xv6.il_pay_agree`) off the bio layer's payload
+hooks, against `Xv6/SpecInitlog.lean`'s boot premise `hdrN bsHdr = 0`.
 -/
 import Xv6.LogInv
 
@@ -155,16 +158,6 @@ def LogTxAuthBridge : Prop :=
     logFreeTok (GF := GF) γ ⊢
       (γ.ops ↪●MAP (∅ : RegMapF OpEntry)) ∗ logEpochAuth γ 1 ∗
       logRegAuth γ (∅ : RegMapF (Nat × Nat)) ∗ (γ.tx ↪●MAP (∅ : RegMapF Unit))
-
-/-- **THE FACT `Xv6.SpecInitlog`'s PRECONDITION DOES NOT SUPPLY.**  The
-block-image fragment a `bread` hands back IS the block's logged content
-(Rocq `ProofInitlog.v`'s `il_pay_agree`), and the log header's logged
-content decodes CLEAN (Rocq `SpecFsinit.v`'s premise (g)). -/
-def LogHdrCleanTie : Prop :=
-  ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
-    [FsBlocksG GF] [CurCtx]
-    (gd : DiskNames) (γfs : FsNames) (b : Nat) (bs bsc : List (BitVec 8)),
-    diskBlock (GF := GF) gd b bs ⊢ fsChalf γfs b bsc -∗ ⌜bs = bsc ∧ hdrN bs = 0⌝
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]

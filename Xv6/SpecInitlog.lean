@@ -29,6 +29,17 @@ write set is bounded by the region, duplicate-free, and names covered HOME
 blocks.  At a clean image the decode is empty and all three are trivial;
 at a real crash they are what a durable header invariant would deliver.
 
+It is also given that the header IS clean -- `hhdr0 : hdrN bsHdr = 0`.
+That is Rocq `SpecFsinit.v`'s premise (g), and this port needs it for the
+same reason Rocq's `fsinit` does plus one of its own: the recovering arm
+of `Xv6/SpecInstallTrans.lean` takes each replayed entry's HOME block
+client half, and this precondition hands out client halves only for the
+log's own region, so a NON-empty recovery is not specifiable here.  The
+bytes `bread` hands back at the header block are tied to `bsHdr` by the
+bio layer's payload hooks and the two view premises `hcl`/`hdt` (Rocq's
+`il_pay_agree`), so `hhdr0` is a statement about the resource the caller
+already owns, not a fresh assumption about the buffer cache.
+
 **Deviations, all the log port's standing ones** (see `Xv6/LogInv.lean`):
 the crash seam, the era certificate, the era's born-true mirror, the byte
 view's row and exception handle, block 1's park and the file system's
@@ -39,11 +50,10 @@ them, while this port's lock library mints the lock's own name at the seal
 (`MachCSL.kctx_newlock`), so the post existentially binds that one name
 (`Xv6.LogNames.withLk`) and the other four are the caller's.
 
-**Stated, not proved**, for the reason `Xv6/SpecEndOp.lean` gives: its
-inlined `recover_from_log` calls `install_trans(1)` -- which IS provable
-here -- and `write_head`, but sealing the lock also needs a
-`MachCSL.CtxMorph` instance for `Xv6.logResAt`, which this wave does not
-build.
+One further deviation in spelling, shared with every other log spec: Rocq
+runs the bio layer at `fs_view γfs γd dev cov` literally, while this port
+keeps the client view `V` a parameter and says the same thing with
+`hcl : V.clean = fsMclean γfs` and `hdt : V.dirty = fsMdirty γfs`.
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
@@ -80,11 +90,14 @@ def wp_initlog_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G 
     (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
     (htier : k.tier = KTier.kpt)
     (hgeom : logGeomOk V.cov logstart) (hdev : dev = V.dev)
+    (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs)
     (ha0 : k.regs 10#5 = BitVec.signExtend 64 dev) (ha1 : k.regs 11#5 = sb)
     -- the on-disk header's well-formedness
     (hhdrLen : (hdrDec bsHdr).1 ≤ LOGBLOCKS)
     (hhdrNodup : (hdrDec bsHdr).2.Nodup)
     (hhdrHome : ∀ b ∈ (hdrDec bsHdr).2, fsHome V.cov logstart b)
+    -- ...and, at boot, that it is CLEAN (Rocq `SpecFsinit.v`'s premise (g))
+    (hhdr0 : hdrN bsHdr = 0)
     -- nothing is pinned in a fresh era
     (hclean : ∀ b ∈ V.cov, PartialMap.get? D b = some false)
     (hpd : descPageRw pd) : Prop :=
@@ -139,11 +152,11 @@ structure INITLOG : Prop where
     (bsHdr : List (BitVec 8)) (L : BlockMap) (D : RegMapF Bool)
     (vlock : BitVec 32) (vname vcpu : BitVec 64) (vStart vDev vNc vN : BitVec 32)
     (pidv : BitVec 32) (dqp dqs : DFrac)
-    hj hproc hK hsie hnoff hlocks htier hgeom hdev ha0 ha1 hhdrLen hhdrNodup hhdrHome
-    hclean hpd,
+    hj hproc hK hsie hnoff hlocks htier hgeom hdev hcl hdt ha0 ha1
+    hhdrLen hhdrNodup hhdrHome hhdr0 hclean hpd,
     wp_initlog_body (hlc := hlc) (GF := GF) Γ cpu k γ γl γb V γdl γfs pd pav pu j
       logstart dev sb bsHdr L D vlock vname vcpu vStart vDev vNc vN pidv dqp dqs
-      hj hproc hK hsie hnoff hlocks htier hgeom hdev ha0 ha1 hhdrLen hhdrNodup hhdrHome
-      hclean hpd
+      hj hproc hK hsie hnoff hlocks htier hgeom hdev hcl hdt ha0 ha1
+      hhdrLen hhdrNodup hhdrHome hhdr0 hclean hpd
 
 end Xv6

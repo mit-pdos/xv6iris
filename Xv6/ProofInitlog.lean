@@ -27,30 +27,33 @@ that is what `install_trans` and `write_head` take: both run with NO lock
 held -- they are the committer's helpers -- so they cannot be given
 `Xv6.logCtx`, which does not exist until the last instruction has run.
 
-**WHAT THIS PROOF ASSUMES, AND WHY.**  Two named hypotheses, both defined
+**THE HEADER'S CLEAN TIE IS NOW PROVED**, not assumed.  `bread`'s post is
+`Xv6.bioLocked`, whose payload half (`Xv6.bioPay`) carries the CLIENT
+VIEW's content at the block -- clean arm `V.clean bno bs ∗ ⌜bsd = bs⌝`,
+dirty arm `V.dirty bno bs ∗ bref` -- so with `hcl`/`hdt` (the premises
+every log spec carries: `V.clean = fsMclean γfs`, `V.dirty = fsMdirty
+γfs`) the bytes agree with the header block's `Xv6.fsChalf` on EITHER
+polarity.  That is Rocq `ProofInitlog.v`'s `il_pay_agree`, and it is
+`Xv6.il_pay_agree` below.  The other half -- that the header's content
+DECODES CLEAN -- is a genuine boot premise, Rocq `SpecFsinit.v`'s (g), and
+it now sits in `Xv6/SpecInitlog.lean`'s precondition as
+`hhdr0 : hdrN bsHdr = 0`; at `n = 0` the write set is empty, the copy loop
+at `+0x52` is dead and the `blez` at `+0x40` is proved taken.  (It is
+still forced here rather than derived, because this port's
+`Xv6/SpecInstallTrans.lean` recovering arm takes each entry's HOME block
+CLIENT HALF -- its own deviation -- and `SpecInitlog`'s precondition hands
+out client halves only for the log's own region.)
+
+**WHAT THIS PROOF STILL ASSUMES, AND WHY.**  One named hypothesis, defined
 and argued in `Xv6/LogBoot.lean`:
 
-* `Xv6.LogHdrCleanTie` -- the bytes `bread` hands back at the log header
-  are the header block's LOGGED content, and that content decodes clean.
-  The first half is Rocq `ProofInitlog.v`'s `il_pay_agree`, which holds
-  there because a buffer's travelling payload IS `bio_view.bv_clean`; this
-  port's `Xv6.bufPay` carries the disk-image fragment instead, and
-  `Xv6/FsBlocks.lean` records the missing tie as "the single largest
-  residual of the log port".  The second half is Rocq `SpecFsinit.v`'s
-  premise (g) `hdr_n bs_hdr = 0`, and it is forced here by a DIFFERENT
-  residual: this port's `Xv6/SpecInstallTrans.lean` recovering arm takes
-  each entry's HOME block CLIENT HALF (its own forced deviation), and
-  `SpecInitlog`'s precondition hands out client halves only for the log's
-  own region.  At `n = 0` the write set is empty and the question does not
-  arise; the copy loop at `+0x52` is then dead and the `blez` at `+0x40`
-  is proved taken.
 * `Xv6.LogTxAuthBridge` -- a plain instance-resolution DEFECT in the
   definitional layer (`BcacheG.gmSlotG` and `LogG.gmTx` are the same
   `GhostMapG` type, and `logResAt` picks the first while `logFreeTok`
   picks the second).  See its comment for the one-line fix.
 
-Neither is a Lean-refutable statement: both are entailments about
-resources this port's ghost state does not relate.
+It is not a Lean-refutable statement: it is an entailment between two
+spellings of the same authority that instance resolution picks apart.
 -/
 import Xv6.SpecInitlog
 import Xv6.LogBoot
@@ -187,7 +190,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [CurCtx]
 
 /-- Open the held buffer at its data bytes (Rocq's `bio_locked` unfold). -/
-theorem il_hold_bytes (γ : BcacheNames) (V : BioView) (kk : Nat) (pidv dev bno : BitVec 32)
+theorem il_hold_bytes (γ : BcacheNames) (V : BioView GF) (kk : Nat) (pidv dev bno : BitVec 32)
     (bs bsd : List (BitVec 8)) :
     bufHold0 (GF := GF) γ V kk pidv dev bno bs bsd ⊢
       ⌜kk < NBUF ∧ bno.toNat ∈ V.cov ∧ dev = V.dev ∧ bs.length = BSIZE ∧ bsd.length = BSIZE⌝ ∗
@@ -210,19 +213,31 @@ theorem il_hold_bytes (γ : BcacheNames) (V : BioView) (kk : Nat) (pidv dev bno 
   · ipureintro; exact hl'
   iframe Hb Hd Hby'
 
-/-- **THE RESIDUAL, CASHED**: the handle's block-image fragment against the
-header block's client half (Rocq's `il_pay_agree`, plus the clean-header
-premise Rocq's `SpecFsinit` carries). -/
-theorem il_hold_clean (hclean : LogHdrCleanTie) (γ : BcacheNames) (γfs : FsNames)
-    (V : BioView) (kk : Nat) (pidv dev bno : BitVec 32) (b : Nat) (hb : bno.toNat = b)
-    (bs bsc : List (BitVec 8)) :
-    bufHold0 (GF := GF) γ V kk pidv dev bno bs bs ⊢ fsChalf γfs b bsc -∗
-      ⌜bs = bsc ∧ hdrN bs = 0⌝ := by
+/-- **THE PAYLOAD HOOK, CASHED** (Rocq `ProofInitlog.v`'s `il_pay_agree`).
+The travelling payload a `bread` hands back at a covered block IS the
+client view's content at that block, on EITHER polarity; with the view
+instantiated at the file system's (`hcl`/`hdt`, the premises every log spec
+carries), that content is the block's `Xv6.fsChalf`, so the bytes agree. -/
+theorem il_pay_agree (γ : BcacheNames) (γfs : FsNames)
+    (V : BioView GF) (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs)
+    (kk : Nat) (dev bno : BitVec 32) (b : Nat) (hb : bno.toNat = b)
+    (bs bsd bsc : List (BitVec 8)) (d : Bool) :
+    bioPay (GF := GF) γ V kk dev bno bs bsd d ⊢ fsChalf γfs b bsc -∗ ⌜bs = bsc⌝ := by
   subst hb
-  unfold bufHold0
-  iintro ⟨%hp, Hsl, Htok, Hrt, Hhd, Hval, Hdev, Hown, Hblk⟩ Hc
-  ihave %h := hclean V.gd γfs bno.toNat bs bsc $$ Hblk Hc
-  ipureintro; exact h
+  unfold bioPay
+  cases d with
+  | false =>
+    simp only [Bool.false_eq_true, if_false, hcl]
+    iintro ⟨Hm, %he⟩ Hc
+    ihave %h := fsChalf_mclean_agree γfs bno.toNat bsc bs $$ [Hc Hm]
+    case' _ => iframe Hc Hm
+    ipureintro; exact h
+  | true =>
+    simp only [if_true, hdt]
+    iintro ⟨Hm, Hr⟩ Hc
+    ihave %h := fsChalf_mdirty_agree γfs bno.toNat bsc bs $$ [Hc Hm]
+    case' _ => iframe Hc Hm
+    ipureintro; exact h
 
 end
 
@@ -260,7 +275,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx]
 
 theorem il_bread (BD : BREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (c : CPU) (k' : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView) (γdl : GName)
+    (c : CPU) (k' : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (pidv dev bno : BitVec 32) (dqp : DFrac)
     (pj : BitVec 64) (hpj : k'.proc = pj)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : breadSlots ≤ k'.avail)
@@ -275,12 +290,12 @@ theorem il_bread (BD : BREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     bioCtx γl γ V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
     wordPointsTo (pPid pj) 4 dqp pidv ∗ bslot γ ∗
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (kk : Nat)
-        (bs : List (BitVec 8)),
+        (bs bsd : List (BitVec 8)) (d : Bool),
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = bnode kk⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       trapCsrs cpu' -∗ cpuClaim cpu' pj -∗ intrRes cpu' -∗
       wordPointsTo (pPid pj) 4 dqp pidv -∗
-      bufHold0 γ V kk pidv dev bno bs bs -∗ wpLoop cpu'))
+      bioLocked γ V kk pidv dev bno bs bsd d -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hpj
   have h := BD.wp_bread (hlc := hlc) (GF := GF) Γ c k' γl γ V γdl pd pav pu j pidv dev bno dqp
@@ -290,15 +305,15 @@ theorem il_bread (BD : BREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   exact h
 
 theorem il_brelse (BE : BRELSE) (Γ : SchedNames)
-    (c : CPU) (k' : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView) (kk : Nat)
-    (pidv dev bno : BitVec 32) (dqp : DFrac) (bs : List (BitVec 8)) (pj : BitVec 64)
-    (hpj : k'.proc = pj)
+    (c : CPU) (k' : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView GF) (kk : Nat)
+    (pidv dev bno : BitVec 32) (dqp : DFrac) (bs bsd : List (BitVec 8)) (d : Bool)
+    (pj : BitVec 64) (hpj : k'.proc = pj)
     (hnoff : k'.noff + 2 < 2 ^ 31) (hK : brelseSlots ≤ k'.avail)
     (hlk : "bcache" ∉ k'.locks) (hsl : "sleep lock" ∉ k'.locks) (hp : "proc" ∉ k'.locks)
     (htier : k'.tier = KTier.kpt) (hkk : kk < NBUF) (ha0 : k'.regs 10#5 = bnode kk) :
     kctx c k' ∗ pcIs c KA.«brelse» ∗ procsInv Γ ∗
     bioCtx γl γ V ∗ wordPointsTo (pPid pj) 4 dqp pidv ∗
-    bufHold0 γ V kk pidv dev bno bs bs ∗
+    bioLocked γ V kk pidv dev bno bs bsd d ∗
     wpNext k'.sie pj c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
@@ -306,7 +321,7 @@ theorem il_brelse (BE : BRELSE) (Γ : SchedNames)
       bslot γ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hpj
-  have h := BE.wp_brelse (hlc := hlc) (GF := GF) Γ c k' γl γ V kk pidv dev bno dqp bs
+  have h := BE.wp_brelse (hlc := hlc) (GF := GF) Γ c k' γl γ V kk pidv dev bno dqp bs bsd d
     hnoff hK hlk hsl hp htier hkk ha0
   unfold wp_brelse_body at h
   simp only [brelseAddr] at h
@@ -323,7 +338,7 @@ set_option maxHeartbeats 2000000 in
 `log.lh.n = 0`, so the loop is dead, the logged view and the pin authority
 do not move, and the two slot units come straight back. -/
 theorem il_install_trans (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (c : CPU) (k' : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView) (γdl : GName)
+    (c : CPU) (k' : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (γfs : FsNames) (pd pav pu : BitVec 64) (j : Nat) (logstart : Nat) (dev : BitVec 32)
     (L : BlockMap) (D : RegMapF Bool) (pidv : BitVec 32) (dqp : DFrac)
     (pj : BitVec 64) (hpj : k'.proc = pj)
@@ -331,6 +346,7 @@ theorem il_install_trans (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs (hlc :=
     (hsie : k'.sie = false) (hnoff : k'.noff = 0) (hlocks : k'.locks = [])
     (htier : k'.tier = KTier.kpt)
     (hgeom : logGeomOk V.cov logstart) (hdev : dev = V.dev)
+    (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs)
     (ha0 : k'.regs 10#5 = 1#64) (hpd : descPageRw pd) :
     kctx c k' ∗ pcIs c KA.«install_trans» ∗ procsInv Γ ∗
     trapCsrs c ∗ cpuClaim c pj ∗ intrRes c ∗
@@ -350,7 +366,7 @@ theorem il_install_trans (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs (hlc :=
   subst hpj
   have h := IT.wp_install_trans (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl γfs pd pav pu j
     logstart dev true 0 ([] : List (BitVec 32)) (fun _ => List.replicate BSIZE 0#8) L D pidv dqp
-    hj hproc hK hsie hnoff hlocks htier hgeom hdev
+    hj hproc hK hsie hnoff hlocks htier hgeom hdev hcl hdt
     (by simp only [if_true]; exact ha0)
     ⟨rfl, by unfold LOGBLOCKS; omega⟩
     (by intro i k'' v v' hv; simp at hv)
@@ -358,7 +374,7 @@ theorem il_install_trans (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs (hlc :=
     (by intro i; simp)
     (by intro hb; exact absurd hb (by simp))
     (by intro _ w hw; exact absurd hw List.not_mem_nil)
-    rfl hpd
+    hpd
   unfold wp_install_trans_body at h
   simp only [installTransAddr, if_true, itRecL_nil, Nat.add_zero] at h
   iintro ⟨Hk, Hpc, #Hpi, Htc, Hcl, Hir, #Hbc, #Hdc, #Hpe, #Hfr, Hpid, HlhN, HL, HD, Hsl, Hnext⟩
@@ -380,14 +396,15 @@ theorem il_install_trans (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs (hlc :=
 set_option maxHeartbeats 2000000 in
 /-- `write_head()` AT THE EMPTY WRITE SET. -/
 theorem il_write_head (WH : WRITE_HEAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (c : CPU) (k' : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView) (γdl : GName)
+    (c : CPU) (k' : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (γfs : FsNames) (pd pav pu : BitVec 64) (j : Nat) (logstart : Nat) (dev : BitVec 32)
     (L : BlockMap) (pidv : BitVec 32) (dqp : DFrac)
     (pj : BitVec 64) (hpj : k'.proc = pj)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : writeHeadSlots ≤ k'.avail)
     (hsie : k'.sie = false) (hnoff : k'.noff = 0) (hlocks : k'.locks = [])
     (htier : k'.tier = KTier.kpt)
-    (hgeom : logGeomOk V.cov logstart) (hdev : dev = V.dev) (hpd : descPageRw pd) :
+    (hgeom : logGeomOk V.cov logstart) (hdev : dev = V.dev)
+    (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs) (hpd : descPageRw pd) :
     kctx c k' ∗ pcIs c KA.«write_head» ∗ procsInv Γ ∗
     trapCsrs c ∗ cpuClaim c pj ∗ intrRes c ∗
     bioCtx γl γb V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
@@ -409,7 +426,8 @@ theorem il_write_head (WH : WRITE_HEAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
   subst hpj
   have h := WH.wp_write_head (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl γfs pd pav pu j
     logstart dev 0 ([] : List (BitVec 32)) L pidv dqp
-    hj hproc hK hsie hnoff hlocks htier hgeom hdev ⟨rfl, by unfold LOGBLOCKS; omega⟩ hpd
+    hj hproc hK hsie hnoff hlocks htier hgeom hdev hcl hdt
+    ⟨rfl, by unfold LOGBLOCKS; omega⟩ hpd
   unfold wp_write_head_body at h
   simp only [writeHeadAddr] at h
   iintro ⟨Hk, Hpc, #Hpi, Htc, Hcl, Hir, #Hbc, #Hdc, #Hpe, #Hfr, Hpid, HlhN, HL, Hch, Hsl,
@@ -467,7 +485,7 @@ the raw cells and the block-view material (`Xv6/LogBoot.lean`), SEAL the
 the caller back `Xv6.logCtx`. -/
 theorem il_seal (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (hbridge : LogTxAuthBridge)
     (cpu c : CPU) (k : KCtx) (spie1 spp1 : Bool) (R : RegMap)
-    (γ : LogNames) (γb : BcacheNames) (γfs : FsNames) (V : BioView)
+    (γ : LogNames) (γb : BcacheNames) (γfs : FsNames) (V : BioView GF)
     (logstart : Nat) (dev pidv vNc : BitVec 32) (sb : BitVec 64) (dqp dqs : DFrac)
     (L : BlockMap) (D : RegMapF Bool) (bsh : List (BitVec 8))
     (hK : 6 ≤ k.avail) (hsie : k.sie = false)
@@ -569,13 +587,13 @@ section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
 set_option maxHeartbeats 32000000 in
-theorem initlog_proof (hdrtie : LogHdrCleanTie) (hbridge : LogTxAuthBridge)
+theorem initlog_proof (hbridge : LogTxAuthBridge)
     (IL : INITLOCK) (BD : BREAD) (BE : BRELSE) (IT : INSTALL_TRANS) (WH : WRITE_HEAD) :
     INITLOG := ⟨
   fun {hlc GF} _ _ _ _ _ _ _ _ Γ _ cpu k γ γl γb V γdl γfs pd pav pu j logstart dev sb
     bsHdr L D vlock vname vcpu vStart vDev vNc vN pidv dqp dqs
-    hj hproc hK hsie hnoff hlocks htier hgeom hdev ha0 ha1 hhdrLen hhdrNodup hhdrHome
-    hpinned hpd => by
+    hj hproc hK hsie hnoff hlocks htier hgeom hdev hcl hdt ha0 ha1
+    hhdrLen hhdrNodup hhdrHome hhdr0 hpinned hpd => by
   have hcovhdr : logstart ∈ V.cov := hgeom.2 logstart (logRegion_hdr logstart)
   have hls31 : logstart < 2 ^ 31 := (hgeom.1 logstart hcovhdr).2
   have hbnoNat : (BitVec.ofNat 32 logstart).toNat = logstart := by
@@ -699,19 +717,21 @@ theorem initlog_proof (hdrtie : LogHdrCleanTie) (hbridge : LogTxAuthBridge)
   case da1 => k_norm_g
   -- ===== back from bread: read_head =====
   iapply wpNext_intro_pin
-  iintro %c3 %hp3 %spie3 %spp3 %R2 %kk %bs %hcs2 Hk Hpc Htc Hcl Hir Hpid Hhold
+  iintro %c3 %hp3 %spie3 %spp3 %R2 %kk %bs %bsd %dd %hcs2 Hk Hpc Htc Hcl Hir Hpid Hlocked
   k_norm_g [il_ret_3a, hww, hpsw]
   obtain ⟨hcsb, ha0kk⟩ := hcs2
   unfold calleeSaved at hcsb
   k_norm_g at hcsb
   obtain ⟨b2, b8, b9, b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩ := hcsb
-  -- THE RESIDUAL, CASHED: the bread'd bytes are the header's logged content,
-  -- and it decodes clean
-  ihave %htie := il_hold_clean hdrtie γb γfs V kk pidv dev (BitVec.ofNat 32 logstart)
-      (logHdrBno logstart) hbnoNat bs bsHdr $$ Hhold Hhdr
-  obtain ⟨hbseq, hbs0⟩ := htie
+  -- THE PAYLOAD HOOK, CASHED: the bread'd bytes ARE the header block's
+  -- logged content, and `hhdr0` says that content decodes clean
+  icases (bioLocked_split γb V kk pidv dev (BitVec.ofNat 32 logstart) bs bsd dd).1
+    $$ Hlocked with ⟨Hhold, Hpay⟩
+  ihave %hbseq := il_pay_agree γb γfs V hcl hdt kk dev (BitVec.ofNat 32 logstart)
+      (logHdrBno logstart) hbnoNat bs bsd bsHdr dd $$ Hpay Hhdr
+  have hbs0 : hdrN bs = 0 := by rw [hbseq]; exact hhdr0
   -- +0x3a  c.lw a2,88(a0) : lh.n := hb->n  ( = 0 )
-  icases il_hold_bytes γb V kk pidv dev (BitVec.ofNat 32 logstart) bs bs $$ Hhold
+  icases il_hold_bytes γb V kk pidv dev (BitVec.ofNat 32 logstart) bs bsd $$ Hhold
     with ⟨%hpure, Hby, Hhclose⟩
   obtain ⟨hkk, -, -, hlen, -⟩ := hpure
   have hlen4 : 4 ≤ bs.length := by rw [hlen]; unfold BSIZE; omega
@@ -736,6 +756,9 @@ theorem initlog_proof (hdrtie : LogHdrCleanTie) (hbridge : LogTxAuthBridge)
       byteBuf (aBufData (bnode kk)) (DFrac.own 1) bs from by
     rw [il_hdr_roundtrip bs hlen4]) $$ Hby
   ihave Hhold := Hhclose $$ %bs %hlen Hby
+  ihave Hlocked := (bioLocked_split γb V kk pidv dev (BitVec.ofNat 32 logstart)
+      bs bsd dd).2 $$ [Hhold Hpay]
+  case' _ => iframe Hhold Hpay
   -- +0x3c  sw a2,44(s2)
   k_step (wp_s_sw c3 _ (KA.«initlog» + 0x3c#64) false 44#12 18#5 12#5 (by decide) vN)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [b18, a18', il_lhN, il_ext0]
@@ -748,9 +771,9 @@ theorem initlog_proof (hdrtie : LogHdrCleanTie) (hbridge : LogTxAuthBridge)
   k_step (wp_s_jal c3 _ (KA.«initlog» + 0x5e#64) false 2093098#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [il_br_brelse]
   iintro Hk Hpc
-  iapply (il_brelse BE Γ c3 _ γl γb V kk pidv dev (BitVec.ofNat 32 logstart) dqp bs k.proc
-      (by k_norm_g) ?rnoff ?rK ?rlk ?rsl ?rp ?rtier hkk ?ra0)
-    $$ [- $Hk $Hpc $Hpi $Hbc $Hpid $Hhold]
+  iapply (il_brelse BE Γ c3 _ γl γb V kk pidv dev (BitVec.ofNat 32 logstart) dqp bs bsd dd
+      k.proc (by k_norm_g) ?rnoff ?rK ?rlk ?rsl ?rp ?rtier hkk ?ra0)
+    $$ [- $Hk $Hpc $Hpi $Hbc $Hpid $Hlocked]
   rotate_right 1
   k_norm_g [il_ret_62]
   iframe #
@@ -784,7 +807,8 @@ theorem initlog_proof (hdrtie : LogHdrCleanTie) (hbridge : LogTxAuthBridge)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [il_br_install]
   iintro Hk Hpc
   iapply (il_install_trans IT Γ c4 _ γl γb V γdl γfs pd pav pu j logstart dev L D pidv dqp
-      k.proc (by k_norm_g) hj ?tproc ?tK ?tsie ?tnoff ?tlocks ?ttier hgeom hdev ?ta0 hpd)
+      k.proc (by k_norm_g) hj ?tproc ?tK ?tsie ?tnoff ?tlocks ?ttier hgeom hdev hcl hdt
+      ?ta0 hpd)
     $$ [- $Hk $Hpc $Hpi $Htc $Hcl $Hir $Hbc $Hdc $Hpe $Hfroz $Hpid $HlhN $HL $HD $Hs2]
   rotate_right 1
   k_norm_g [il_ret_68]
@@ -819,7 +843,7 @@ theorem initlog_proof (hdrtie : LogHdrCleanTie) (hbridge : LogTxAuthBridge)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [il_br_writehead]
   iintro Hk Hpc
   iapply (il_write_head WH Γ c5 _ γl γb V γdl γfs pd pav pu j logstart dev L pidv dqp
-      k.proc (by k_norm_g) hj ?wproc ?wK ?wsie ?wnoff ?wlocks ?wtier hgeom hdev hpd)
+      k.proc (by k_norm_g) hj ?wproc ?wK ?wsie ?wnoff ?wlocks ?wtier hgeom hdev hcl hdt hpd)
     $$ [- $Hk $Hpc $Hpi $Htc $Hcl $Hir $Hbc $Hdc $Hpe $Hfroz $Hpid $HlhN $HL $Hch $Hu1]
   rotate_right 1
   k_norm_g [il_ret_74]
