@@ -313,6 +313,28 @@ theorem fsblock_update_any (E : CoPset) (γ : FsNames) (L : BlockMap) (b : Nat)
   iapply fsblock_update E γ.bytes γ.cache γ.exc homeL Xv L b bs bsNew bs' hE hlnew
     $$ Hinv Hseal Ha Hfb Hm
 
+/-- **...AND AT BYTE-RANGE GRANULARITY** (Rocq's `byte_range_log_update`,
+read at the row `Xv6.logCtx` carries): `log_write`'s ghost step for a
+writer that owns only `subOld` at `off` (`Xv6.byteRange_log_update`).  The
+other bytes of the block are LEARNED from the tie; the new cache content
+is the splice. -/
+theorem byteRange_log_update_any (E : CoPset) (γ : FsNames) (L : BlockMap) (b off : Nat)
+    (subOld subNew bsOld : List (BitVec 8))
+    (hE : (↑logN : CoPset) ⊆ E) (hoff : off + subOld.length ≤ BSIZE)
+    (hpos : 0 < subOld.length)
+    (hshape : bsOld.length = BSIZE → subNew.length = subOld.length) :
+    fsBytesAny (GF := GF) γ -∗ fsCacheAuth γ L -∗ byteRange γ.bytes b off subOld -∗
+      (γ.cache ↪◯MAP[b]{DFrac.own (1 : Qp).half} bsOld) -∗
+      |={E}=> (⌜PartialMap.get? L b = some bsOld ∧ bsOld.length = BSIZE ∧
+                 subOld = (bsOld.drop off).take subOld.length⌝ ∗
+        fsCacheAuth γ (PartialMap.insert L b (blkSplice off subNew bsOld)) ∗
+        byteRange γ.bytes b off subNew ∗
+        (γ.cache ↪◯MAP[b]{DFrac.own (1 : Qp).half} (blkSplice off subNew bsOld))) := by
+  unfold fsBytesAny fsBytesRow fsBytesAt fsCacheAuth
+  iintro ⟨⟨%homeL, %Xv, #Hinv⟩, #Hseal⟩ Ha Hr Hm
+  iapply byteRange_log_update E γ.bytes γ.cache γ.exc homeL Xv L b off subOld subNew bsOld
+    hE hoff hpos hshape $$ Hinv Hseal Ha Hr Hm
+
 /-- **THE RECOVERING INSTALL'S GHOST STEP**, at `Xv6.fsCacheAuth` (Rocq's
 `fsblock_install_exc`).  Needs NO byte run: the byte view was minted at the
 committed view, so it already reads the logged value at `b`; what moves is

@@ -30,10 +30,13 @@ abstracted into ONE proposition `Q` (`Xv6.lw_scan`): the loop reads
 invariant.  Its two exits are the ABSORB index (`i < n` with
 `W[i] = b->blockno`) and the APPEND fall-through (`i = n`).
 
-WHAT IS PROVED is the atomic-update, credited contract
-(`Xv6.logWrite_au`, Rocq's `wp_log_write_au`); the two held contracts are
-derived from it at the end of the file (`Xv6.lw_gen_of_au`,
-`Xv6.lw_held_of_au`), as Rocq derives `wp_log_write_gene`/`_gen`/`_sconf`.
+WHAT IS PROVED is the byte-range atomic-update, credited contract
+(`Xv6.logWrite_au_range`, Rocq's `wp_log_write_au_range`); the whole-block
+AU form is its instance at `off := 0`, `len := BSIZE` (`Xv6.lw_au_of_range`,
+through `Xv6.lwAuWhole`, Rocq's `wp_log_write_au`), and the two held
+contracts are derived from that at the end of the file
+(`Xv6.lw_gen_of_au`, `Xv6.lw_held_of_au`), as Rocq derives
+`wp_log_write_gene`/`_gen`/`_sconf`.
 
 THE CREDIT (Rocq's `ProofLogWrite.v`, the `Hled` block and `Hcrmem`).
 Right after the lock's payload is opened, `Xv6.logAbsorbStep` pins the
@@ -49,10 +52,12 @@ THE GHOST STEP.  Both arms record the block in the op's set -- spending a
 unit (`Xv6.logSpendStep`) unless credited (`Xv6.logRecordStep`), the two
 unified as `Xv6.lw_ledger` -- mint a registry row at the current epoch
 (`Xv6.logMintLogged`), FIRE THE CALLER'S ATOMIC UPDATE, and move the
-logged view (`Xv6.fsblock_update_any`, at the update's mask `Efs`) off the
-surrendered run and the payload's machinery half; the agreement pins the
-surrendered content to `bsl`, and the closing wand, handed that equation,
-the witness and the anchor's comparison, pays out `Φfsb`.  The append arm
+logged view (`Xv6.byteRange_log_update_any`, at the update's mask `Efs`)
+off the surrendered sub-range and the payload's machinery half; the tie
+identifies the surrendered bytes with the slice of `bsl` at `off`, the
+caller's shape premise identifies the splice with `bs`, and the closing
+wand, handed those facts, the witness and the anchor's comparison, pays
+out `Φfsb`.  The append arm
 additionally flips the block's pin (`Xv6.fsDirty_flip`), grows `W`/`LB` by
 the block, takes the junk slot `lh.block[n]` out of the header's spare run
 and hands one pool unit back in place of the one `bpin` absorbed.
@@ -1278,11 +1283,14 @@ theorem lw_closeA (γ : LogNames) (γb : BcacheNames) (γfs : FsNames) (V : BioV
     (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (dev : BitVec 32)
     (kk : Nat) (pidv bno : BitVec 32) (bs bsl bsd : List (BitVec 8))
     (u v e0 E out n i0 nxo nxt nxl : Nat) (Sb LB : List Nat) (cr : Bool)
-    (Efs : CoPset) (Φfsb : IProp GF)
+    (Efs : CoPset) (Φfsb : IProp GF) (off len : Nat) (subNew : List (BitVec 8))
     (om : RegMapF OpEntry) (X : RegMapF (Nat × Nat)) (T : RegMapF Unit)
     (W : List (BitVec 32)) (L : BlockMap) (D : RegMapF Bool) (nc : BitVec 32)
     (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs)
     (hlogE : (↑logN : CoPset) ⊆ Efs)
+    (hwin : off + len ≤ BSIZE) (hpos : 0 < len)
+    (hshape : bs.length = BSIZE → bsl.length = BSIZE →
+      subNew.length = len ∧ bs = blkSplice off subNew bsl)
     (hlen : (FiniteMap.toList om).length = out)
     (hbud : ∀ i e, PartialMap.get? om i = some e → e.bud ≤ MAXOPBLOCKS)
     (hout3 : out ≤ 3)
@@ -1315,10 +1323,12 @@ theorem lw_closeA (γ : LogNames) (γb : BcacheNames) (γfs : FsNames) (V : BioV
        fsChalf γfs (logSlotBno ls j) bsx) ∗
     bslots γb ((LOGBLOCKS - n) + 2) ∗
     bslot γb ∗ logOpSe γ (u + 1) Sb e0 ∗
-    (|={⊤, Efs}=> ∃ (bsl' : List (BitVec 8)) (v' : Nat),
-       fsblock γfs.bytes bno.toNat bsl' ∗ logEpochLb γ v' ∗
-       (⌜bsl' = bsl⌝ -∗ loggedAt γ e0 bno.toNat -∗ ⌜v' ≤ e0⌝ -∗
-        fsblock γfs.bytes bno.toNat bs -∗ |={Efs, ⊤}=> Φfsb)) ∗
+    (|={⊤, Efs}=> ∃ (subOld : List (BitVec 8)) (v' : Nat),
+       ⌜subOld.length = len⌝ ∗ byteRange γfs.bytes bno.toNat off subOld ∗
+       logEpochLb γ v' ∗
+       (⌜bsl.length = BSIZE ∧ subNew.length = len ∧ subOld = (bsl.drop off).take len⌝ -∗
+        loggedAt γ e0 bno.toNat -∗ ⌜v' ≤ e0⌝ -∗
+        byteRange γfs.bytes bno.toNat off subNew -∗ |={Efs, ⊤}=> Φfsb)) ∗
     bufHold0 γb V kk pidv dev bno bs bsd ∗ bioPay γb V kk dev bno bsl bsd true ∗
     logEpochLb γ v ∗ fsBytesAny γfs
     ⊢ |={⊤}=> (logResAt (GF := GF) γ γb γfs cov ls curCtx ∗
@@ -1338,13 +1348,25 @@ theorem lw_closeA (γ : LogNames) (γb : BcacheNames) (γfs : FsNames) (V : BioV
   -- the registry row, minted BEFORE the update fires: its closing wand takes it
   imod (logMintLogged γ X nxl e0 bno.toNat hfreshl) $$ Hreg with ⟨Hreg, #Hwit⟩
   -- THE ATOMIC UPDATE FIRES: the caller's run, and its own anchor
-  imod Hau with ⟨%bsl', %v', Hch, #Hlb', Hcl⟩
+  imod Hau with ⟨%subOld, %v', %hlsub, Hch, #Hlb', Hcl⟩
   ihave %hv' := logEpochLb_le γ e0 v' $$ Hep Hlb'
   -- the logged view moves to the caller's bytes, at the byte view; the
   -- payload half pins the surrendered content
-  imod (fsblock_update_any Efs γfs L bno.toNat bsl' bs bsl hlogE hlbs) $$ Hrow HLa Hch Hmc
-    with ⟨%hup, HLa, Hch, Hmc⟩
-  ihave HΦ := Hcl $$ %(hup.1.symm) Hwit %hv' Hch
+  imod (byteRange_log_update_any Efs γfs L bno.toNat off subOld subNew bsl hlogE
+      (by omega) (by omega) (fun hl => by have := (hshape hlbs hl).1; omega))
+    $$ Hrow HLa Hch Hmc with ⟨%hup, HLa, Hch, Hmc⟩
+  obtain ⟨-, hlbsl, hslice⟩ := hup
+  obtain ⟨hlsn, hbsp⟩ := hshape hlbs hlbsl
+  rw [hlsub] at hslice
+  -- the splice IS the buffer's bytes: what everything downstream is stated at
+  ihave HLa := (show fsCacheAuth γfs (PartialMap.insert L bno.toNat (blkSplice off subNew bsl))
+      ⊢@{IProp GF} fsCacheAuth γfs (PartialMap.insert L bno.toNat bs) from by
+    rw [← hbsp]) $$ HLa
+  ihave Hmc := (show (γfs.cache ↪◯MAP[bno.toNat]{DFrac.own (1 : Qp).half}
+        (blkSplice off subNew bsl))
+      ⊢@{IProp GF} (γfs.cache ↪◯MAP[bno.toNat]{DFrac.own (1 : Qp).half} bs) from by
+    rw [← hbsp]) $$ Hmc
+  ihave HΦ := Hcl $$ %⟨hlbsl, hlsn, hslice⟩ Hwit %hv' Hch
   imod HΦ
   imodintro
   have hinx : i < nxo := lw_key_lt om nxo i _ hfresho hik
@@ -1453,11 +1475,14 @@ theorem lw_closeB (γ : LogNames) (γb : BcacheNames) (γfs : FsNames) (V : BioV
     (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (dev : BitVec 32)
     (kk : Nat) (pidv bno : BitVec 32) (bs bsl bsd : List (BitVec 8))
     (u v e0 E out n i0 nxo nxt nxl : Nat) (Sb LB : List Nat) (cr : Bool)
-    (Efs : CoPset) (Φfsb : IProp GF)
+    (Efs : CoPset) (Φfsb : IProp GF) (off len : Nat) (subNew : List (BitVec 8))
     (om : RegMapF OpEntry) (X : RegMapF (Nat × Nat)) (T : RegMapF Unit)
     (W : List (BitVec 32)) (L : BlockMap) (D : RegMapF Bool) (nc : BitVec 32)
     (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs)
-    (hhome : fsHome cov ls bno.toNat) (hlogE : (↑logN : CoPset) ⊆ Efs) (hcrf : cr = false)
+    (hhome : fsHome cov ls bno.toNat) (hlogE : (↑logN : CoPset) ⊆ Efs)
+    (hwin : off + len ≤ BSIZE) (hpos : 0 < len)
+    (hshape : bs.length = BSIZE → bsl.length = BSIZE →
+      subNew.length = len ∧ bs = blkSplice off subNew bsl) (hcrf : cr = false)
     (hlen : (FiniteMap.toList om).length = out)
     (hbud : ∀ i e, PartialMap.get? om i = some e → e.bud ≤ MAXOPBLOCKS)
     (hout3 : out ≤ 3)
@@ -1491,10 +1516,12 @@ theorem lw_closeB (γ : LogNames) (γb : BcacheNames) (γfs : FsNames) (V : BioV
        fsChalf γfs (logSlotBno ls j) bsx) ∗
     bslots γb ((LOGBLOCKS - n) + 2) ∗
     logOpSe γ (u + 1) Sb e0 ∗
-    (|={⊤, Efs}=> ∃ (bsl' : List (BitVec 8)) (v' : Nat),
-       fsblock γfs.bytes bno.toNat bsl' ∗ logEpochLb γ v' ∗
-       (⌜bsl' = bsl⌝ -∗ loggedAt γ e0 bno.toNat -∗ ⌜v' ≤ e0⌝ -∗
-        fsblock γfs.bytes bno.toNat bs -∗ |={Efs, ⊤}=> Φfsb)) ∗
+    (|={⊤, Efs}=> ∃ (subOld : List (BitVec 8)) (v' : Nat),
+       ⌜subOld.length = len⌝ ∗ byteRange γfs.bytes bno.toNat off subOld ∗
+       logEpochLb γ v' ∗
+       (⌜bsl.length = BSIZE ∧ subNew.length = len ∧ subOld = (bsl.drop off).take len⌝ -∗
+        loggedAt γ e0 bno.toNat -∗ ⌜v' ≤ e0⌝ -∗
+        byteRange γfs.bytes bno.toNat off subNew -∗ |={Efs, ⊤}=> Φfsb)) ∗
     bufHold0 γb V kk pidv dev bno bs bsd ∗ bioPay γb V kk dev bno bsl bsd false ∗
     bref γb kk dev bno ∗ logEpochLb γ v ∗ fsBytesAny γfs
     ⊢ |={⊤}=> (logResAt (GF := GF) γ γb γfs cov ls curCtx ∗
@@ -1522,11 +1549,23 @@ theorem lw_closeB (γ : LogNames) (γb : BcacheNames) (γfs : FsNames) (V : BioV
   imod (logSpendStep γ om u Sb e0 bno.toNat) $$ Hops Hope with ⟨%i, %hik, Hops, Hope⟩
   imod (logMintLogged γ X nxl e0 bno.toNat hfreshl) $$ Hreg with ⟨Hreg, #Hwit⟩
   -- the caller's atomic update fires and the logged view moves (see `lw_closeA`)
-  imod Hau with ⟨%bsl', %v', Hch, #Hlb', Hcl⟩
+  imod Hau with ⟨%subOld, %v', %hlsub, Hch, #Hlb', Hcl⟩
   ihave %hv' := logEpochLb_le γ e0 v' $$ Hep Hlb'
-  imod (fsblock_update_any Efs γfs L bno.toNat bsl' bs bsl hlogE hlbs) $$ Hrow HLa Hch Hmc
-    with ⟨%hup, HLa, Hch, Hmc⟩
-  ihave HΦ := Hcl $$ %(hup.1.symm) Hwit %hv' Hch
+  imod (byteRange_log_update_any Efs γfs L bno.toNat off subOld subNew bsl hlogE
+      (by omega) (by omega) (fun hl => by have := (hshape hlbs hl).1; omega))
+    $$ Hrow HLa Hch Hmc with ⟨%hup, HLa, Hch, Hmc⟩
+  obtain ⟨-, hlbsl, hslice⟩ := hup
+  obtain ⟨hlsn, hbsp⟩ := hshape hlbs hlbsl
+  rw [hlsub] at hslice
+  -- the splice IS the buffer's bytes: what everything downstream is stated at
+  ihave HLa := (show fsCacheAuth γfs (PartialMap.insert L bno.toNat (blkSplice off subNew bsl))
+      ⊢@{IProp GF} fsCacheAuth γfs (PartialMap.insert L bno.toNat bs) from by
+    rw [← hbsp]) $$ HLa
+  ihave Hmc := (show (γfs.cache ↪◯MAP[bno.toNat]{DFrac.own (1 : Qp).half}
+        (blkSplice off subNew bsl))
+      ⊢@{IProp GF} (γfs.cache ↪◯MAP[bno.toNat]{DFrac.own (1 : Qp).half} bs) from by
+    rw [← hbsp]) $$ Hmc
+  ihave HΦ := Hcl $$ %⟨hlbsl, hlsn, hslice⟩ Hwit %hv' Hch
   imod HΦ
   imodintro
   have hinx : i < nxo := lw_key_lt om nxo i _ hfresho hik
@@ -1765,19 +1804,22 @@ end
 /-! ## The function -/
 
 set_option maxHeartbeats 40000000 in
-theorem logWrite_au (AC : ACQUIRE) (RE : RELEASE) (BP : BPIN) :
+theorem logWrite_au_range (AC : ACQUIRE) (RE : RELEASE) (BP : BPIN) :
     ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γl : GName) (γb : BcacheNames) (V : BioView GF)
     (γfs : FsNames) (logstart : Nat) (dev : BitVec 32)
     (kk : Nat) (pidv bno : BitVec 32) (bs bsl bsd : List (BitVec 8)) (d : Bool) (u : Nat)
+    (off len : Nat) (subNew : List (BitVec 8))
     (cr : Bool) (Sb : List Nat) (e0 vlb : Nat) (Efs : CoPset) (Φfsb : IProp GF)
-    hK hnoff hlk hbc htier hkk ha0 hdev hcl hdt hhome hlogE,
-    wp_log_write_au_body (hlc := hlc) (GF := GF) cpu k γ γl γb V γfs logstart dev kk pidv bno
-      bs bsl bsd d u cr Sb e0 vlb Efs Φfsb hK hnoff hlk hbc htier hkk ha0 hdev hcl hdt hhome hlogE := by
+    hK hnoff hlk hbc htier hkk ha0 hdev hcl hdt hhome hlogE hwin hpos hshape,
+    wp_log_write_au_range_body (hlc := hlc) (GF := GF) cpu k γ γl γb V γfs logstart dev kk pidv
+      bno bs bsl bsd d u off len subNew cr Sb e0 vlb Efs Φfsb hK hnoff hlk hbc htier hkk ha0 hdev
+      hcl hdt hhome hlogE hwin hpos hshape := by
   intro hlc GF _ _ _ _ _ _ _ _ cpu k γ γl γb V γfs logstart dev kk pidv bno bs bsl bsd d u
-    cr Sb e0 v Efs Φfsb hK hnoff hlk hbc htier hkk ha0 hdev hcl hdt hhome hlogE
-  unfold wp_log_write_au_body
+    off len subNew cr Sb e0 v Efs Φfsb hK hnoff hlk hbc htier hkk ha0 hdev hcl hdt hhome hlogE
+    hwin hpos hshape
+  unfold wp_log_write_au_range_body
   simp only [logWriteAddr]
   have hK18 : 18 ≤ k.avail := by unfold logWriteSlots at hK; omega
   have hK4 : 4 ≤ k.avail := by omega
@@ -1948,7 +1990,8 @@ theorem logWrite_au (AC : ACQUIRE) (RE : RELEASE) (BP : BPIN) :
       | true => exact absurd (hcrLB rfl) hnotLB
     iapply wpLoop_fupd
     imod (lw_closeB γ γb γfs V V.cov logstart dev kk pidv bno bs bsl bsd u v e0 E out n i0
-        nxo nxt nxl Sb LB cr Efs Φfsb om X T W L D nc hcl hdt hhome hlogE hcrf hlen hbud hout3
+        nxo nxt nxl Sb LB cr Efs Φfsb off len subNew om X T W L D nc hcl hdt hhome hlogE hwin hpos
+        hshape hcrf hlen hbud hout3
         hfresho hE hfreshl
         hlive hcap hfresht hTlen hsum hsets hregLB h1 h2 h3 h4 hi0 he0E hnotLB hnlt)
       $$ [Hout Hcmt Hnc Hops Hep Hreg Htxa Hn Hblk Hcell Hjunk HLa HDa Hdrt Hhdr Hslots Hpool
@@ -2033,7 +2076,8 @@ theorem logWrite_au (AC : ACQUIRE) (RE : RELEASE) (BP : BPIN) :
       isimp only [show (decide (bno.toNat ∈ LB)) = true from decide_eq_true hinLB] at Hpay
       iapply wpLoop_fupd
       imod (lw_closeA γ γb γfs V V.cov logstart dev kk pidv bno bs bsl bsd u v e0 E out n i0
-          nxo nxt nxl Sb LB cr Efs Φfsb om X T W L D nc hcl hdt hlogE hlen hbud hout3 hfresho hE
+          nxo nxt nxl Sb LB cr Efs Φfsb off len subNew om X T W L D nc hcl hdt hlogE hwin hpos hshape
+          hlen hbud hout3 hfresho hE
           hfreshl
           hlive hcap hfresht hTlen hsum hsets hregLB h1 h2 h3 h4 hi0 he0E hinLB)
         $$ [Hout Hcmt Hnc Hops Hep Hreg Htxa Hn Hblk Hjunk HLa HDa Hdrt Hhdr Hslots Hpool
@@ -2083,7 +2127,8 @@ theorem logWrite_au (AC : ACQUIRE) (RE : RELEASE) (BP : BPIN) :
         | true => exact absurd (hcrLB rfl) hnotLB
       iapply wpLoop_fupd
       imod (lw_closeB γ γb γfs V V.cov logstart dev kk pidv bno bs bsl bsd u v e0 E out i' i0
-          nxo nxt nxl Sb LB cr Efs Φfsb om X T W L D nc hcl hdt hhome hlogE hcrf hlen hbud hout3
+          nxo nxt nxl Sb LB cr Efs Φfsb off len subNew om X T W L D nc hcl hdt hhome hlogE hwin hpos
+        hshape hcrf hlen hbud hout3
         hfresho hE hfreshl
           hlive hcap hfresht hTlen hsum hsets hregLB h1 h2 h3 h4 hi0 he0E hnotLB hnlt)
         $$ [Hout Hcmt Hnc Hops Hep Hreg Htxa Hn Hblk Hcell Hjunk HLa HDa Hdrt Hhdr Hslots Hpool
@@ -2111,6 +2156,39 @@ the two steps of Rocq's chain, composed. -/
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+
+/-- **THE WHOLE-BLOCK AU FORM** (Rocq's `wp_log_write_au`), the range
+form's instance at `off := 0`, `len := BSIZE`, `subNew := bs`.  Its two
+side conditions are guarded by the block's width, which is precisely why
+they are: a caller of THIS form knows `bs.length = BSIZE` only from inside
+the handle, and this derivation never opens one.  `Xv6.lwAuWhole` does the
+same for the fupd. -/
+theorem lw_au_of_range (cpu : CPU) (k : KCtx) (γ : LogNames) (γl : GName) (γb : BcacheNames)
+    (V : BioView GF) (γfs : FsNames) (logstart : Nat) (dev : BitVec 32)
+    (kk : Nat) (pidv bno : BitVec 32) (bs bsl bsd : List (BitVec 8)) (d : Bool) (u : Nat)
+    (cr : Bool) (Sb : List Nat) (e0 vlb : Nat) (Efs : CoPset) (Φfsb : IProp GF)
+    (hK : logWriteSlots ≤ k.avail) (hnoff : k.noff + 2 < 2 ^ 31)
+    (hlk : "log" ∉ k.locks) (hbc : "bcache" ∉ k.locks) (htier : k.tier = KTier.kpt)
+    (hkk : kk < NBUF) (ha0 : k.regs 10#5 = bnode kk)
+    (hdev : dev = V.dev) (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs)
+    (hhome : fsHome V.cov logstart bno.toNat) (hlogE : (↑logN : CoPset) ⊆ Efs)
+    (hrange : ∀ hshape, wp_log_write_au_range_body cpu k γ γl γb V γfs logstart dev kk pidv bno
+      bs bsl bsd d u 0 BSIZE bs cr Sb e0 vlb Efs Φfsb hK hnoff hlk hbc htier hkk ha0 hdev hcl hdt
+      hhome hlogE (by omega) BSIZE_pos hshape) :
+    wp_log_write_au_body cpu k γ γl γb V γfs logstart dev kk pidv bno bs bsl bsd d u cr Sb
+      e0 vlb Efs Φfsb hK hnoff hlk hbc htier hkk ha0 hdev hcl hdt hhome hlogE := by
+  have h := hrange (fun hlb hlbsl =>
+    ⟨hlb, (blkSplice_whole bs bsl (by rw [hlb, hlbsl])).symm⟩)
+  unfold wp_log_write_au_range_body at h
+  unfold wp_log_write_au_body
+  iintro ⟨Hk, Hpc, #Hbio, #Hctx, Hsl, #Hlb, #Hcred, Hope, Hau, Hhold, Hpay, Hnext⟩
+  iapply h
+  iframe Hk Hpc Hbio Hctx Hsl Hcred Hope Hhold Hpay Hnext
+  -- the anchor is framed by hand: `iframe` would also instantiate the
+  -- fupd's own existential anchor with it
+  isplitr
+  · iexact Hlb
+  iapply lwAuWhole γ γfs bno.toNat Efs bs bsl Φfsb e0 $$ Hau
 
 /-- **THE HELD, CREDITED FORM** (Rocq's `wp_log_write_gen`, via
 `wp_log_write_gene`): the caller's epoch is opened here
@@ -2210,10 +2288,30 @@ theorem lw_held_of_au (cpu : CPU) (k : KCtx) (γ : LogNames) (γl : GName) (γb 
 
 end
 
-/-- `log_write` meets all three of its contracts, given `acquire`,
-`release` and `bpin`: the atomic-update form by the whole-function proof,
-the two held forms by derivation from it. -/
+theorem logWrite_au (AC : ACQUIRE) (RE : RELEASE) (BP : BPIN) :
+    ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+    (cpu : CPU) (k : KCtx) (γ : LogNames) (γl : GName) (γb : BcacheNames) (V : BioView GF)
+    (γfs : FsNames) (logstart : Nat) (dev : BitVec 32)
+    (kk : Nat) (pidv bno : BitVec 32) (bs bsl bsd : List (BitVec 8)) (d : Bool) (u : Nat)
+    (cr : Bool) (Sb : List Nat) (e0 vlb : Nat) (Efs : CoPset) (Φfsb : IProp GF)
+    hK hnoff hlk hbc htier hkk ha0 hdev hcl hdt hhome hlogE,
+    wp_log_write_au_body (hlc := hlc) (GF := GF) cpu k γ γl γb V γfs logstart dev kk pidv bno
+      bs bsl bsd d u cr Sb e0 vlb Efs Φfsb hK hnoff hlk hbc htier hkk ha0 hdev hcl hdt hhome
+      hlogE :=
+  fun {hlc GF} _ _ _ _ _ _ _ _ cpu k γ γl γb V γfs logstart dev kk pidv bno bs bsl bsd d u cr Sb
+      e0 vlb Efs Φfsb hK hnoff hlk hbc htier hkk ha0 hdev hcl hdt hhome hlogE =>
+    lw_au_of_range cpu k γ γl γb V γfs logstart dev kk pidv bno bs bsl bsd d u cr Sb e0 vlb Efs
+      Φfsb hK hnoff hlk hbc htier hkk ha0 hdev hcl hdt hhome hlogE
+      (fun hshape => logWrite_au_range AC RE BP cpu k γ γl γb V γfs logstart dev kk pidv bno
+        bs bsl bsd d u 0 BSIZE bs cr Sb e0 vlb Efs Φfsb hK hnoff hlk hbc htier hkk ha0 hdev hcl
+        hdt hhome hlogE _ _ hshape)
+
+/-- `log_write` meets all four of its contracts, given `acquire`,
+`release` and `bpin`: the byte-range atomic-update form by the
+whole-function proof, the rest by derivation from it. -/
 theorem logWrite_proof (AC : ACQUIRE) (RE : RELEASE) (BP : BPIN) : LOG_WRITE where
+  wp_log_write_au_range := logWrite_au_range AC RE BP
   wp_log_write_au := logWrite_au AC RE BP
   wp_log_write_gen := fun {hlc GF} _ _ _ _ _ _ _ _ cpu k γ γl γb V γfs logstart dev kk pidv bno
       bs bsl bsd d u cr Sb hK hnoff hlk hbc htier hkk ha0 hdev hcl hdt hhome hcredit =>

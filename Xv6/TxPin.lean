@@ -68,6 +68,10 @@ conclusion names `LogInv.log_tx`, which lives above this leaf.
 6. `txPin_elem` is an EQUATION (`rfl`) where Rocq states `⊣⊢` (proved by
    `done`); strictly stronger, and it is what a caller rewriting with it
    wants.
+7. `logTx_halve` / `logTx_join` are Rocq `LogInv.log_tx_halve` /
+   `log_tx_join` (LogInv.v:836/844), hosted HERE (wave 1, W1-TX) because
+   `Xv6.logTx` is a `LogDefs` definition this leaf already sees; their
+   halves are spelled `txPin γ t ½` (= Rocq's raw element, `txPin_elem`).
 
 ## Dropped/simplified vs Rocq
 
@@ -173,6 +177,42 @@ theorem txPins_noOps {K : Type _} {H : Type _ → Type _} [LawfulFiniteMap H K]
 definition by hand. -/
 theorem txPin_elem (γ : LogNames) (t : Nat) (q : Qp) :
     txPin (GF := GF) γ t q = (γ.tx ↪◯MAP[t]{.own q} ()) := rfl
+
+/-! ## THE TOKEN, HALVED ACROSS A HELD WRITE LOCK
+
+Rocq `LogInv.log_tx_halve` / `log_tx_join` (LogInv.v:836/844).  A
+transactional `ilock` parks a SHARE of the transaction's element in the
+escrow's write arm, so that `end_op` -- which consumes the WHOLE element --
+cannot commit while the inode is write-locked.  The id has to come OUT of
+`Xv6.logTx`'s existential for the arm to name it, because an
+existentially-keyed share can never be rejoined; it goes back in at the
+join, so nothing above these two lines ever sees an id.
+
+Stated over `txPin` (Rocq states the raw `t ↪[ln_tx γ]{#(1/2)} ()`; the two
+are the same term, `txPin_elem`).  They live here rather than in
+`Xv6/LogInv.lean` because `Xv6.logTx` is a `Xv6/LogDefs.lean` definition,
+which this leaf already imports. -/
+
+theorem logTx_halve (γ : LogNames) :
+    logTx (GF := GF) γ ⊢ ∃ t : Nat, txPin γ t (1 : Qp).half ∗ txPin γ t (1 : Qp).half := by
+  unfold logTx txPin
+  iintro ⟨%t, Ht⟩
+  iexists t
+  have h := (ghost_map_elem_fractional (GF := GF) γ.tx t ()).fractional
+    (1 : Qp).half (1 : Qp).half
+  rw [Qp.half_add_half] at h
+  iapply h.1 $$ Ht
+
+theorem logTx_join (γ : LogNames) (t : Nat) :
+    txPin (GF := GF) γ t (1 : Qp).half ⊢ txPin γ t (1 : Qp).half -∗ logTx γ := by
+  unfold logTx txPin
+  iintro H1 H2
+  iexists t
+  have h := (ghost_map_elem_fractional (GF := GF) γ.tx t ()).fractional
+    (1 : Qp).half (1 : Qp).half
+  rw [Qp.half_add_half] at h
+  iapply h.2
+  iframe H1 H2
 
 end TxPin
 
