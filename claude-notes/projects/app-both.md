@@ -1241,3 +1241,13 @@ M2 -- `GenLinksLine.v`, the twelve families over an `lmodel`, a cursor
 and a state-witness family, with the per-shape block arm hook; read
 `FileLinksLine.v`/`PipeLinksLine.v` side by side first and write the
 family-shape table into this file before coding.
+
+PIPELINES OF ARBITRARY LENGTH LANDED (2026-09-24, cuts C1-C8, design
+design/pipes-general.md): the pipeline application's top theorem
+`pipe_adequacy_pipeΣ_final` now covers `echo ws | cat | … | cat` for any
+number of cats, at the N-stage model `pipes_lmE`, with no input
+restriction (owner rulings: loose corner B, `echo fork | cat | cat`
+allowed, no bridge back).  NEXT: C9 -- M5's union: `cat f` as a producer
+(the file and pipe devices in one application), then the leftover
+one-pipe sweep.
+

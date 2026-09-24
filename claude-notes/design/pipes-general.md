@@ -140,7 +140,23 @@ C7b (ffc439760, VM pc7bmerge1, audits 13/13/14/14):
 number of cats) pays its round's payload, with NO firing premise.  The
 caller supplies `Hline : lineN fc adm I = LPipes (PrEcho ws) nc` (the
 model's line is the parsed command) and `pns_short L`, plus the stage
-and ledger facts; C8 wires it into the application.  The pipeline's exclusions are caller premises
+and ledger facts; C8 wires it into the application.  C8 LANDED (f667adfbf/eb7d2c74e, VM
+pc8merge1, audits 13/13/14/14, pipe list unchanged): the pipeline
+application runs at `pipes_lmE`; `pipe_adequacy_pipeΣ_final` is restated
+with NO new premise -- for every run from power-on, every thread
+reducible, and `lm_disc pipes_lmE κs -> Forall (lm_good_out pipes_lmE tt)
+(cycles_of κs)`; the typed-line discipline admits `echo ws` and `echo ws
+| cat | … | cat` (n >= 1; the 100-byte line caps n at 15);
+`PipesDecE.v` decides `lm_disc pipes_lmE`; `UShPipesLaw`/`UShPipesRound`
+(the loop dispatches a pipe line to the N-stage walk).  15 one-pipe files
+deleted (9562 lines).  STILL ALIVE (the N-stage code uses them):
+`UShPipeAssembly` (`pipe_round_answers`, `wp_kshr_exit0_paid`,
+`ush_fork_ans_grows`) and through it `UShPipeRound2`, `PipeLinkInst`,
+`PipeLinks(Line)`, `PipeBoth`, the old `UkShPipeFork`; `PipeDisc`/
+`PipeOutPure`/`PipeBothPure`/`PipeHooks`/`PipeDiscDec` via `PipeOut`;
+the one-bar parse files (used by the N-stage parser) -- a later sweep
+moves those lemmas and deletes them.  `echo_adequacy` dropped (no
+bridge back).  The pipeline's exclusions are caller premises
 (`fire_okN`/`silence_okN`), discharged in C6/C7 from the flow chain.
 
 # Design: arbitrary pipelines `P0 | cat | … | cat` by induction on the command tree
