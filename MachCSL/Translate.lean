@@ -157,6 +157,8 @@ theorem signExtend_extract64 (va : BitVec 64) : BitVec.signExtend 64 (BitVec.ext
   bv_decide
 
 set_option maxHeartbeats 4000000 in
+-- the linter walks the 12-case `swp_run` info tree: 10 s, a third of the file
+set_option linter.unusedVariables false in
 /-- The effective-address transform of a kernel access at either tier:
 pointer masking is off (`menvcfg.PMM = 0`), the address is untouched. -/
 theorem swp_transform_effective_address_S [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)

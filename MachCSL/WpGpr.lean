@@ -57,9 +57,12 @@ def gpr (cpu : CPU) (i : BitVec 5) (dq : DFrac) (v : BitVec 64) : IProp GF :=
 
 /-- The script that discharges one concrete register-number case of the rules
 below: expose the register cell, run the model's `match`, apply the
-read/write rule, hand the cell to the continuation. -/
+read/write rule, hand the cell to the continuation.  `dsimp`, not `simp`: the
+goal holds the model's 32-arm `wX`/`rX` match, and `simp`'s congruence proof
+over it cost ~0.7 s per case (62 cases). -/
 macro "gpr_case " h:ident : tactic =>
-  `(tactic| (simp only [gpr, Sail.BitVec.toNatInt, BitVec.toNat_ofNat, Nat.reduceMod, Int.ofNat_eq_natCast, Int.toNat_natCast];
+  `(tactic| (dsimp only [gpr, BitVec.reduceToNat, Sail.BitVec.toNatInt, BitVec.toNat_ofNat, Nat.reduceMod,
+               Int.ofNat_eq_natCast, Int.toNat_natCast];
              swp_run 12; try (iapply $h:ident; iframe)))
 
 set_option maxHeartbeats 4000000 in

@@ -87,8 +87,9 @@ theorem TextTree.find?_addr : ∀ (t : Kernel.TextTree) (a : Nat) (k : Kernel.KI
       · simp only [Option.some.injEq] at h; subst h; omega
 
 set_option maxRecDepth 100000 in
-/-- The search tree is the kernel text. -/
-theorem textTree_toList : Kernel.textTree.toList = Kernel.text := by rfl
+/-- The search tree is the kernel text.  Checked by the kernel alone: `rfl`
+also unifies the two 8700-element lists in the elaborator (22 s vs 13 s). -/
+theorem textTree_toList : Kernel.textTree.toList = Kernel.text := by decide +kernel
 
 /-- The bytes of the instruction the tree finds at `a` (`instrBytes k`, unfolded). -/
 theorem kernelText_find (a : Nat) (k : Kernel.KInstr) (h : Kernel.textTree.find? a = some k) :
