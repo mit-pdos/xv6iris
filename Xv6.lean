@@ -520,3 +520,4 @@ import Xv6.CstringInv
 import Xv6.DirentEnc
 import Xv6.PathElems
 import Xv6.ArgPath
+import Xv6.FsBytes

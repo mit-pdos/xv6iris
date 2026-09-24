@@ -22,13 +22,17 @@ Both maps are therefore split in HALVES, as in Rocq: the CLIENT half
 (`Xv6.fsChalf`, `Xv6.fsDirtyHalf`) is what the log side and the file system
 above hold, and the MACHINERY half rides the buffer.
 
-Not ported from `FsBlocks.v`: the BYTE view (`fs_bytes`, `bytes_tie`,
-`bytes_dom`, `fs_bytes_inv`, `exc_own`/`exc_sealed`) -- that layer belongs
-to the file system ABOVE the log (it is what `readi`/`writei` read), it has
-no client in this port, and `LogInv`'s only use of it is to park a row for
-the file system's own crossings.
+THE BYTE VIEW (`fs_bytes`, `bytes_tie`, `bytes_dom`, `fs_bytes_inv`,
+`exc_own`/`exc_sealed`) IS IN `Xv6/FsBytes.lean`, `Xv6/FsBytesMap.lean`,
+`Xv6/FsBytesInv.lean` and `Xv6/FsBytesMint.lean`.  It is a SEPARATE ghost
+map (`FsNames.bytes`, keyed by BYTE ADDRESS, at FULL ownership) with its own
+invariant at `Xv6.fsbN`, and `Xv6.fsChalf` is completely unchanged by it:
+what changed is only WHO HOLDS a home block's parked half -- the byte
+invariant does.  The names live here because `fs_names` is Rocq's record
+and every client projects it.
 -/
 import Xv6.LogDefs
+import Xv6.FsBytes
 
 namespace Xv6
 
@@ -36,16 +40,35 @@ open Iris Iris.BI Iris.ProofMode Std MachCSL
 
 set_option linter.unusedSectionVars false
 
-/-- Rocq's `fs_names`, the two members the WAL uses. -/
+/-- Rocq's `fs_names`, minus its two abstract-state gnames (`fs_link` /
+`fs_top`), which Rocq itself documents as belonging one level up: "Nothing
+stated over the byte view ALONE reads them" (`FsBytesGamma.v`). -/
 structure FsNames where
   /-- the logged view: block ↦ its logical content -/
   cache : GName
   /-- the pinned set: block ↦ "the log holds a pin on this block" -/
   dirty : GName
+  /-- **THE LOGGED VIEW `L`, KEYED BY BYTE ADDRESS** (Rocq's `fs_bytes`).
+  Its elements are FULL, hence EXCLUSIVE, and every home block's owner above
+  the log holds `Xv6.fsblock γfs.bytes b bs` where it used to hold the parked
+  cache half.  Tied to `cache` inside `Xv6.fsBytesInv`, which is also where
+  the home blocks' parked cache halves now live. -/
+  bytes : GName
+  /-- **THE BYTE VIEW'S EXCEPTION SET** (Rocq's `fs_exc`).  LAST, so no
+  positional application of the constructor moves. -/
+  exc : GName
 
 /-- The ghost libraries the block view needs (the `fsLogG` members
-`LogInv` names). -/
-class FsBlocksG (GF : BundledGFunctors) where
+`LogInv` names).
+
+**IT EXTENDS `Xv6.FsBytesG`**, which is the one deviation from Rocq's
+packaging: Rocq has a single `fsLogG` class carrying all four maps, and
+this port had split the byte view's two into their own class.  Making
+`FsBlocksG` the *extension* keeps the split (the byte-view files state
+their theory over `FsBytesG` alone, exactly as Rocq's `FsBytes` section
+does) while costing not one `[FsBytesG GF]` binder at the ~20 log-layer
+files that already carry `[FsBlocksG GF]`. -/
+class FsBlocksG (GF : BundledGFunctors) extends FsBytesG GF where
   [gmCache : GhostMapG GF Nat (List (BitVec 8)) RegMapF]
   [gmDirty : GhostMapG GF Nat Bool RegMapF]
 
@@ -259,12 +282,21 @@ theorem fsDirty_flip (γfs : FsNames) (D : RegMapF Bool) (b : Nat) (v v' vNew : 
 def fsFreeTok (γfs : FsNames) : IProp GF :=
   iprop(fsCacheAuth γfs ∅ ∗ fsDirtyAuth γfs ∅)
 
+/-- The genesis of the four ghost names.  The BYTE view's two are minted
+here as bare names -- the byte view's own authorities are born inside
+`Xv6.fsAlloc` (`Xv6/FsBytesMint.lean`), Rocq's `fs_alloc`, which is what
+the era actually calls; this lemma is the block layer's own free-state
+statement and says nothing about them. -/
 theorem fsGhostAlloc : ⊢ |==> (∃ γfs : FsNames, fsFreeTok (GF := GF) γfs) := by
   imod (ghost_map_alloc_empty (GF := GF) (K := Nat) (V := List (BitVec 8)) (H := RegMapF))
     with ⟨%γc, Hc⟩
   imod (ghost_map_alloc_empty (GF := GF) (K := Nat) (V := Bool) (H := RegMapF)) with ⟨%γd, Hd⟩
+  imod (ghost_map_alloc_empty (GF := GF) (K := Nat) (V := BitVec 8) (H := RegMapF))
+    with ⟨%γL, -⟩
+  imod (ghost_map_alloc_empty (GF := GF) (K := Nat) (V := List Nat) (H := RegMapF))
+    with ⟨%γX, -⟩
   imodintro
-  iexists ⟨γc, γd⟩
+  iexists ⟨γc, γd, γL, γX⟩
   unfold fsFreeTok fsCacheAuth fsDirtyAuth
   iframe Hc Hd
 
