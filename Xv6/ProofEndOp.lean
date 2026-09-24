@@ -339,4 +339,452 @@ theorem eo_it (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
 
 end
 
+/-! ## The epilogue, shared by both arms -/
+
+section
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+
+/-- Two cache authorities cannot coexist.  This is what refutes the
+`committing = 0` arm at the commit's re-acquire: the committer HOLDS the
+batch, so the lock's payload cannot also carry one. -/
+theorem eo_cache_excl (γfs : FsNames) (L L' : BlockMap) :
+    fsCacheAuth (GF := GF) γfs L ⊢ fsCacheAuth γfs L' -∗ ⌜False⌝ := by
+  unfold fsCacheAuth
+  iintro H1 H2
+  ihave ⟨%hv, -⟩ := ghost_map_auth_valid_2 $$ H1 H2
+  ipureintro
+  exact absurd (DFrac.valid_own_op hv) (by simp)
+
+/-- ...and the batch carries one. -/
+theorem eo_state_cache (γb : BcacheNames) (γfs : FsNames)
+    (cov : Std.ExtTreeSet Nat compare) (ls n : Nat) (LB : List Nat) (pend : Nat → Prop)
+    (ξ : CtxId) :
+    logStateAt (GF := GF) γb γfs cov ls n LB pend ξ ⊢ ∃ L : BlockMap, fsCacheAuth γfs L := by
+  unfold logStateAt
+  iintro ⟨%W, %L, %D, -, -, -, -, -, -, -, HL, -, -, -, -, -⟩
+  iexists L
+  iexact HL
+
+set_option maxHeartbeats 8000000 in
+/-- **The epilogue** at `+0x92 .. +0x9c`: restore `ra`/`s0`/`s1`/`s2`, pop
+and return.  Entered from the tail's `c.j` at `+0x66` and by falling out of
+the non-committer's `release` at `+0x8e`; `s3`/`s4`/`s5` are back at the
+caller's values on both. -/
+theorem eo_exit (c : CPU) (k : KCtx) (pidv : BitVec 32) (dqp : DFrac) (R : RegMap)
+    (hK : endOpSlots ≤ k.avail) (hsie : k.sie = false)
+    (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFC0#64)
+    (h19 : R 19#5 = k.regs 19#5) (h20 : R 20#5 = k.regs 20#5) (h21 : R 21#5 = k.regs 21#5)
+    (h22 : R 22#5 = k.regs 22#5) (h23 : R 23#5 = k.regs 23#5) (h24 : R 24#5 = k.regs 24#5)
+    (h25 : R 25#5 = k.regs 25#5) (h26 : R 26#5 = k.regs 26#5) (h27 : R 27#5 = k.regs 27#5) :
+    kctx c ((k.pushed 8).withRegs R) ∗ pcIs c (KA.«end_op» + 0x92#64) ∗
+    trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
+    wordPointsTo (pPid k.proc) 4 dqp pidv ∗
+    eoFrame4 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
+    eoFrameJ (k.regs 2#5) ∗
+    wpNext true k.proc c (eoPost k pidv dqp)
+    ⊢ wpLoop (GF := GF) c := by
+  have hK8 : 8 ≤ k.avail := by
+    unfold endOpSlots installTransSlots breadSlots panicSlots at hK; omega
+  iintro ⟨Hk, Hpc, Htc, Hcc, Hir, Hpid, Hfr, Hjk, Hnext⟩
+  icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
+  iapply (eo_epilogue c k hK8 R hR2 (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5))
+    $$ [- $Hk $Hpc $Hfr $Hjk]
+  k_code (text_instr _ _ _ _ rfl rfl) Htext
+  k_norm_g
+  iframe
+  inext
+  k_norm [hsie]
+  iapply wpNext_off_intro
+  iintro Hk Hpc
+  ihave Hpost := wpNext_self true k.proc c _ $$ Hnext
+  ihave Hpost := eoPost_elim k pidv dqp c $$ Hpost
+  ihave Hk := eo_kctx_ws c k _ $$ Hk
+  iapply Hpost $$ %(k.spie) %(k.spp) %_ [] Hk Hpc Htc Hcc Hir Hpid
+  · ipureintro
+    exact eo_calleeSaved_epi k.regs R h19 h20 h21 h22 h23 h24 h25 h26 h27
+
+end
+
+/-! ## The non-committer's arm
+
+`+0x7a .. +0x90`: `wakeup(&log)`, `release(&log.lock)`, and fall into the
+epilogue.  The op has already retired (the store at `+0x20` and the ledger
+step with it), so this stretch moves no ghost at all. -/
+
+section
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+
+theorem eoK_withSpie (k : KCtx) : (eoK k).withSpie k.spie k.spp = eoK k := rfl
+
+set_option maxHeartbeats 16000000 in
+theorem eo_fast (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (c : CPU) (k : KCtx) (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
+    (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (dev : BitVec 32)
+    (pidv : BitVec 32) (dqp : DFrac) (R : RegMap) (r9 r18 : BitVec 64)
+    (hK : endOpSlots ≤ k.avail) (hsie : k.sie = false) (hnoff : k.noff = 0)
+    (hlocks : k.locks = []) (htier : k.tier = KTier.kpt) (hintena : k.intena = false)
+    (hR : eoPins k R r9 r18 (k.regs 19#5) (k.regs 20#5) (k.regs 21#5)) :
+    kctx c ((eoK k).withRegs R) ∗ pcIs c (KA.«end_op» + 0x7a#64) ∗
+    procsInv Γ ∗ trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
+    logCtx γ γb γfs cov ls dev ∗ locked γ.lk c ∗ logResAt γ γb γfs cov ls curCtx ∗
+    eoFrame4 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
+    eoFrameJ (k.regs 2#5) ∗
+    wordPointsTo (pPid k.proc) 4 dqp pidv ∗
+    wpNext true k.proc c (eoPost k pidv dqp)
+    ⊢ wpLoop (GF := GF) c := by
+  have hK8 : 8 ≤ k.avail := by
+    unfold endOpSlots installTransSlots breadSlots panicSlots at hK; omega
+  have hKi : 72 ≤ k.avail - 8 := by
+    unfold endOpSlots installTransSlots breadSlots panicSlots at hK; omega
+  have hlkn : ("log" : String) ∉ k.locks := by rw [hlocks]; simp
+  iintro ⟨Hk, Hpc, #Hpi, Htc, Hcc, Hir, #Hctx, Hlocked, Hpay, Hfr, Hjk, Hpid, Hnext⟩
+  icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
+  -- +0x7a auipc a0,0x1e ; +0x7e addi a0,a0,1432 ; +0x82 jal wakeup
+  k_step (wp_s_auipc c _ (KA.«end_op» + 0x7a#64) false 0x1e#20 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie k]
+  iintro Hk Hpc
+  k_step (wp_s_addi c _ (KA.«end_op» + 0x7e#64) false 1432#12 10#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie k, eo_log]
+  iintro Hk Hpc
+  k_step (wp_s_jal c _ (KA.«end_op» + 0x82#64) false 2089426#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie k, eo_br_wk]
+  iintro Hk Hpc
+  iapply (eo_wk WK Γ c _ ?hnw ?hKw ?hlw ?htw) $$ [- $Hk $Hpc]
+  rotate_right 1
+  k_norm [eoK_sie k, eo_ret_86]
+  iframe #
+  case hnw => k_norm [eoK_noff k, hnoff]; omega
+  case hKw => k_norm [eoK_avail k hsie]; unfold wakeupSlots; omega
+  case hlw => k_norm [eoK_locks k, hlocks]; simp
+  case htw => k_norm [eoK_tier k, htier]
+  iapply wpNext_off_intro
+  iintro %sw %pw %R1 %hspw Hk Hpc %hcsw
+  k_norm [eoK_sie k] at hspw
+  obtain ⟨ew1, ew2⟩ := hspw trivial
+  subst ew1; subst ew2
+  k_norm [eo_ret_86, eoK_spie k, eoK_spp k, eoK_withSpie k]
+  have hR1 : eoPins k R1 r9 r18 (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) := by
+    k_norm at hcsw
+    refine eoPins_cs k _ R1 _ _ _ _ _ ?_ hcsw
+    obtain ⟨q2, q8, q9, q18, q19, q20, q21, q22, q23, q24, q25, q26, q27⟩ := id hR
+    refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
+      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] <;>
+      first
+        | exact q2
+        | exact q8
+        | exact q9
+        | exact q18
+        | exact q19
+        | exact q20
+        | exact q21
+        | exact q22
+        | exact q23
+        | exact q24
+        | exact q25
+        | exact q26
+        | exact q27
+  -- +0x86 auipc a0,0x1e ; +0x8a addi a0,a0,1420 ; +0x8e jal release
+  k_step (wp_s_auipc c _ (KA.«end_op» + 0x86#64) false 0x1e#20 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie k]
+  iintro Hk Hpc
+  k_step (wp_s_addi c _ (KA.«end_op» + 0x8a#64) false 1420#12 10#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie k, eo_log]
+  iintro Hk Hpc
+  k_step (wp_s_jal c _ (KA.«end_op» + 0x8e#64) false 2084452#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie k, eo_br_rel]
+  iintro Hk Hpc
+  iapply (eo_re RE c _ γ γb γfs cov ls dev ?ha0r ?hsr ?hnr ?hKr ?hrr)
+    $$ [- $Hk $Hpc $Hlocked $Hpay]
+  rotate_right 1
+  k_norm [eoK_sie k, eo_ret_92, eoK_locks k, eoK_popExit k hsie hlkn]
+  iframe #
+  case ha0r => k_norm
+  case hsr => k_norm [eoK_sie k]
+  case hnr => k_norm [eoK_noff k]; omega
+  case hKr => k_norm [eoK_avail k hsie]; omega
+  case hrr => k_norm [eoK_noff k, eoK_intena k]; simp [hnoff, hintena]
+  k_norm [eoK_sie k]
+  iapply wpNext_off_intro
+  iintro %R2 Hk Hpc %hcsr
+  k_norm [eoK_sie k, eo_ret_92, eoK_locks k, eoK_popExit k hsie hlkn]
+  have hR2 : eoPins k R2 r9 r18 (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) := by
+    k_norm at hcsr
+    refine eoPins_cs k _ R2 _ _ _ _ _ ?_ hcsr
+    obtain ⟨q2, q8, q9, q18, q19, q20, q21, q22, q23, q24, q25, q26, q27⟩ := id hR1
+    refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
+      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] <;>
+      first
+        | exact q2
+        | exact q8
+        | exact q9
+        | exact q18
+        | exact q19
+        | exact q20
+        | exact q21
+        | exact q22
+        | exact q23
+        | exact q24
+        | exact q25
+        | exact q26
+        | exact q27
+  obtain ⟨p2, p8, p9, p18, p19, p20, p21, p22, p23, p24, p25, p26, p27⟩ := id hR2
+  iapply (eo_exit c k pidv dqp R2 hK hsie p2 p19 p20 p21 p22 p23 p24 p25 p26 p27)
+    $$ [- $Hk $Hpc $Htc $Hcc $Hir $Hpid $Hfr $Hjk $Hnext]
+
+end
+
+/-! ## The tail
+
+`+0x42 .. +0x66`: re-acquire, `committing := 0`, `ncommit++`, `wakeup`,
+DEPOSIT the emptied batch, `release`, and the `c.j` into the epilogue.
+Entered from the `n = 0` fall-through at `+0x3e` AND, through the `c.j` at
+`+0x120`, from the commit body -- in both cases holding the batch re-formed
+at `n = 0`.
+
+THE EPOCH BUMPS HERE (Rocq's `log_epoch_bump`).  It is what revokes every
+`Xv6.loggedAt` witness of the batch just committed: the registry's rows are
+all at epochs `≤ E`, so at `E + 1` none of them can name a block of the new
+(empty) header -- which is exactly `logResAt`'s third registry clause. -/
+
+section
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+
+theorem eo_word_ex (a : BitVec 64) (v : BitVec 32) :
+    wordPointsTo (GF := GF) a 4 (DFrac.own 1) v ⊢
+      ∃ u : BitVec 32, wordPointsTo a 4 (DFrac.own 1) u := by
+  iintro H; iexists v; iexact H
+
+set_option maxHeartbeats 40000000 in
+theorem eo_tail (AC : ACQUIRE) (RE : RELEASE) (WK : WAKEUP)
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (c : CPU) (k : KCtx) (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
+    (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (dev : BitVec 32)
+    (L : BlockMap) (D : RegMapF Bool) (Lw : Nat → List (BitVec 8)) (t : Nat)
+    (pidv : BitVec 32) (dqp : DFrac) (R : RegMap) (r9 r18 : BitVec 64)
+    (hK : endOpSlots ≤ k.avail) (hsie : k.sie = false) (hnoff : k.noff = 0)
+    (hlocks : k.locks = []) (htier : k.tier = KTier.kpt) (hintena : k.intena = false)
+    (ht : t ≤ LOGBLOCKS)
+    (hR : eoPins k R r9 r18 (k.regs 19#5) (k.regs 20#5) (k.regs 21#5)) :
+    kctx c ((k.pushed 8).withRegs R) ∗ pcIs c (KA.«end_op» + 0x42#64) ∗
+    procsInv Γ ∗ trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
+    logCtx γ γb γfs cov ls dev ∗
+    eoOpen γb γfs cov ls 0 [] L D Lw t ∗
+    eoFrame4 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
+    eoFrameJ (k.regs 2#5) ∗
+    wordPointsTo (pPid k.proc) 4 dqp pidv ∗
+    wpNext true k.proc c (eoPost k pidv dqp)
+    ⊢ wpLoop (GF := GF) c := by
+  have hK8 : 8 ≤ k.avail := by
+    unfold endOpSlots installTransSlots breadSlots panicSlots at hK; omega
+  have hKi : 72 ≤ k.avail - 8 := by
+    unfold endOpSlots installTransSlots breadSlots panicSlots at hK; omega
+  have hlkn : ("log" : String) ∉ k.locks := by rw [hlocks]; simp
+  iintro ⟨Hk, Hpc, #Hpi, Htc, Hcc, Hir, #Hctx, Hopen, Hfr, Hjk, Hpid, Hnext⟩
+  icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
+  obtain ⟨q2, q8, q9, q18, q19, q20, q21, q22, q23, q24, q25, q26, q27⟩ := id hR
+  -- +0x42 auipc s1,0x1e ; +0x46 addi s1,s1,1488 ; +0x4a mv a0,s1 ; +0x4c jal acquire
+  k_step (wp_s_auipc c _ (KA.«end_op» + 0x42#64) false 0x1e#20 9#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie]
+  iintro Hk Hpc
+  k_step (wp_s_addi c _ (KA.«end_op» + 0x46#64) false 1488#12 9#5 9#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, eo_log]
+  iintro Hk Hpc
+  k_step (wp_s_add c _ (KA.«end_op» + 0x4a#64) true 10#5 0#5 9#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, KCtx.rget_zero]
+  iintro Hk Hpc
+  k_step (wp_s_jal c _ (KA.«end_op» + 0x4c#64) false 2084382#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, eo_br_acq]
+  iintro Hk Hpc
+  iapply (eo_ac AC c _ γ γb γfs cov ls dev ?ha0 ?hna ?hKa ?hla) $$ [- $Hk $Hpc]
+  rotate_right 1
+  k_norm [hsie, eo_ret_50]
+  iframe #
+  case ha0 => k_norm
+  case hna => k_norm [hnoff]; omega
+  case hKa => k_norm; omega
+  case hla => k_norm [hlocks]; simp
+  iapply wpNext_off_intro
+  iintro %s0 %p0 %R1 %hsp0 Hk Hpc %hcs0 Hlocked Hpay - -
+  k_norm [hsie] at hsp0
+  obtain ⟨e1, e2⟩ := hsp0 trivial
+  subst e1; subst e2
+  k_norm [hsie, eo_ret_50, KCtx.pushOffAt_withRegs, eoK_fold k hK8]
+  have hR1 : eoPins k R1 logAddr r18 (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) := by
+    k_norm at hcs0
+    refine eoPins_cs k _ R1 _ _ _ _ _ ?_ hcs0
+    refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
+      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;>
+      first
+        | exact q2
+        | exact q8
+        | rfl
+        | exact q18
+        | exact q19
+        | exact q20
+        | exact q21
+        | exact q22
+        | exact q23
+        | exact q24
+        | exact q25
+        | exact q26
+        | exact q27
+  obtain ⟨p2, p8, p9, p18, p19, p20, p21, p22, p23, p24, p25, p26, p27⟩ := id hR1
+  -- the lock's payload, opened: the committing flag must be SET (we set it)
+  icases eo_res_elim γ γb γfs cov ls curCtx $$ Hpay
+    with ⟨%out, %nc, %om, %E, %X, %T, %nxo, %nxt, %nxl,
+      Hout, Hnc, Hops, Hep, Hreg, Htx,
+      %hlen, %hbud, %hout3, %hfresho, %hE, %hfreshl, %hlive, %hcap, %hfresht, %hTlen, Harm⟩
+  isimp only [wordAtN_cur] at Hout
+  isimp only [wordAtN_cur] at Hnc
+  icases Harm with ⟨⟨Hcmt, Hbatch⟩ | ⟨Hcmt, %hout0⟩⟩
+  · -- IMPOSSIBLE: the batch is in our hand, so the payload cannot hold one
+    ihave Hauth := (show eoOpen (GF := GF) γb γfs cov ls 0 [] L D Lw t ⊢
+        fsCacheAuth γfs L from by
+      unfold eoOpen
+      iintro ⟨-, -, -, H4, -, -, -, -, -, -⟩
+      iexact H4) $$ Hopen
+    icases eoBatch_elim γ γb γfs cov ls om E X curCtx $$ Hbatch
+      with ⟨%n2, %LB2, -, -, -, Hst⟩
+    icases eo_state_cache γb γfs cov ls n2 LB2 (opPending om) curCtx $$ Hst with ⟨%L2, Hauth2⟩
+    ihave %hF := eo_cache_excl γfs L L2 $$ Hauth Hauth2
+    exact hF.elim
+  -- the committing flag is set; `out = 0`, so the ledger is empty
+  isimp only [wordAtN_cur] at Hcmt
+  subst hout0
+  have hom0 : FiniteMap.toList om = [] := List.eq_nil_of_length_eq_zero hlen
+  have hsum0 : opSum om = 0 := by rw [opSum_eq, hom0]; rfl
+  have hempty : ∀ (i : Nat) (e : OpEntry), PartialMap.get? om i ≠ some e :=
+    eo_map_empty om hlen
+  -- +0x50 sw zero,32(s1)
+  k_step (wp_s_sw c _ (KA.«end_op» + 0x50#64) false 32#12 9#5 0#5 (by decide) (1#32 : BitVec 32))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    with [eoK_sie k, p9, eo_o_cmt, KCtx.rget_zero]
+  iintro Hk Hpc Hcmt
+  -- +0x54 lw a5,40(s1) ; +0x56 addiw a5,a5,1 ; +0x58 sw a5,40(s1)
+  k_step (wp_s_lw c _ (KA.«end_op» + 0x54#64) true 40#12 15#5 9#5 (by decide) (by decide)
+      (DFrac.own 1) nc)
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie k, p9, eo_o_nc]
+  iintro Hk Hpc Hnc
+  k_step (wp_s_addiw c _ (KA.«end_op» + 0x56#64) true 1#12 15#5 15#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie k]
+  iintro Hk Hpc
+  k_step (wp_s_sw c _ (KA.«end_op» + 0x58#64) true 40#12 9#5 15#5 (by decide) nc)
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie k, p9, eo_o_nc]
+  iintro Hk Hpc Hnc
+  icases eo_word_ex lNcommit _ $$ Hnc with ⟨%ncv, Hnc⟩
+  -- THE EPOCH BUMPS
+  iapply wpLoop_bupd
+  imod logEpochBump γ E $$ Hep with Hep
+  imodintro
+  -- the batch goes back, at n = 0
+  ihave Hst := eoOpen_to_batch γb γfs cov ls L D Lw t ht (opPending om) $$ Hopen
+  ihave Hbatch := eoBatch_intro γ γb γfs cov ls om (E + 1) X curCtx 0 ([] : List Nat)
+    (opPending om) (by rw [hsum0]; unfold LOGBLOCKS; omega)
+    (fun i e hi => absurd hi (hempty i e))
+    (fun i p hp hE1 => absurd (hcap i p hp) (by omega)) $$ Hst
+  isimp only [← wordAtN_cur] at Hout
+  isimp only [← wordAtN_cur] at Hcmt
+  isimp only [← wordAtN_cur] at Hnc
+  ihave Hpay := eo_res_intro_f γ γb γfs cov ls curCtx 0 ncv om (E + 1) X T nxo nxt nxl
+    hlen hbud (by omega) hfresho (by omega) hfreshl
+    (fun i e hi => absurd hi (hempty i e))
+    (fun i p hp => le_trans (hcap i p hp) (by omega)) hfresht hTlen
+    $$ [Hout Hcmt Hnc Hops Hep Hreg Htx Hbatch]
+  case' _ => iframe Hout Hcmt Hnc Hops Hep Hreg Htx Hbatch
+  -- +0x5a mv a0,s1 ; +0x5c jal wakeup
+  k_step (wp_s_add c _ (KA.«end_op» + 0x5a#64) true 10#5 0#5 9#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    with [eoK_sie k, KCtx.rget_zero, p9]
+  iintro Hk Hpc
+  k_step (wp_s_jal c _ (KA.«end_op» + 0x5c#64) false 2089464#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie k, eo_br_wk]
+  iintro Hk Hpc
+  iapply (eo_wk WK Γ c _ ?hnw ?hKw ?hlw ?htw) $$ [- $Hk $Hpc]
+  rotate_right 1
+  k_norm [eoK_sie k, eo_ret_60]
+  iframe #
+  case hnw => k_norm [eoK_noff k, hnoff]; omega
+  case hKw => k_norm [eoK_avail k hsie]; unfold wakeupSlots; omega
+  case hlw => k_norm [eoK_locks k, hlocks]; simp
+  case htw => k_norm [eoK_tier k, htier]
+  iapply wpNext_off_intro
+  iintro %sw %pw %R2 %hspw Hk Hpc %hcsw
+  k_norm [eoK_sie k] at hspw
+  obtain ⟨ew1, ew2⟩ := hspw trivial
+  subst ew1; subst ew2
+  k_norm [eo_ret_60, eoK_spie k, eoK_spp k, eoK_withSpie k]
+  have hR2 : eoPins k R2 logAddr r18 (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) := by
+    k_norm at hcsw
+    refine eoPins_cs k _ R2 _ _ _ _ _ ?_ hcsw
+    refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
+      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;>
+      first
+        | exact p2
+        | exact p8
+        | exact p9
+        | exact p18
+        | exact p19
+        | exact p20
+        | exact p21
+        | exact p22
+        | exact p23
+        | exact p24
+        | exact p25
+        | exact p26
+        | exact p27
+  obtain ⟨u2, u8, u9, u18, u19, u20, u21, u22, u23, u24, u25, u26, u27⟩ := id hR2
+  -- +0x60 mv a0,s1 ; +0x62 jal release
+  k_step (wp_s_add c _ (KA.«end_op» + 0x60#64) true 10#5 0#5 9#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    with [eoK_sie k, KCtx.rget_zero, u9]
+  iintro Hk Hpc
+  k_step (wp_s_jal c _ (KA.«end_op» + 0x62#64) false 2084496#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie k, eo_br_rel]
+  iintro Hk Hpc
+  iapply (eo_re RE c _ γ γb γfs cov ls dev ?ha0r ?hsr ?hnr ?hKr ?hrr)
+    $$ [- $Hk $Hpc $Hlocked $Hpay]
+  rotate_right 1
+  k_norm [eoK_sie k, eo_ret_66, eoK_locks k, eoK_popExit k hsie hlkn]
+  iframe #
+  case ha0r => k_norm
+  case hsr => k_norm [eoK_sie k]
+  case hnr => k_norm [eoK_noff k]; omega
+  case hKr => k_norm [eoK_avail k hsie]; omega
+  case hrr => k_norm [eoK_noff k, eoK_intena k]; simp [hnoff, hintena]
+  k_norm [eoK_sie k]
+  iapply wpNext_off_intro
+  iintro %R3 Hk Hpc %hcsr
+  k_norm [eoK_sie k, eo_ret_66, eoK_locks k, eoK_popExit k hsie hlkn]
+  have hR3 : eoPins k R3 logAddr r18 (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) := by
+    k_norm at hcsr
+    refine eoPins_cs k _ R3 _ _ _ _ _ ?_ hcsr
+    refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
+      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;>
+      first
+        | exact u2
+        | exact u8
+        | exact u9
+        | exact u18
+        | exact u19
+        | exact u20
+        | exact u21
+        | exact u22
+        | exact u23
+        | exact u24
+        | exact u25
+        | exact u26
+        | exact u27
+  obtain ⟨v2, v8, v9, v18, v19, v20, v21, v22, v23, v24, v25, v26, v27⟩ := id hR3
+  -- +0x66 j +0x92
+  k_step (wp_s_j c _ (KA.«end_op» + 0x66#64) true 44#21)
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie]
+  iintro Hk Hpc
+  iapply (eo_exit c k pidv dqp R3 hK hsie v2 v19 v20 v21 v22 v23 v24 v25 v26 v27)
+    $$ [- $Hk $Hpc $Htc $Hcc $Hir $Hpid $Hfr $Hjk $Hnext]
+
+end
+
 end Xv6
