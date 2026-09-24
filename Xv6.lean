@@ -646,3 +646,4 @@ import Xv6.BallocScan
 import Xv6.BallocMain
 import Xv6.ProofBalloc
 import Xv6.LinkBalloc
+import Xv6.BlkmapBuf
