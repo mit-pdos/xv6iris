@@ -157,7 +157,10 @@ theorem iref_readAU (Rocq iref_read_obl ∘ iref_load_pinw_au) :
   -- WordHist.read_cases_vis, irefSet_read on the entry/v0.
 
 theorem iref_readAU_locked (Rocq iref_read_locked_all ∘ iref_load_locked_pinw_au) :
-  itableInv ∗ itableHalf M ∗ istmp ½ tst ∗ ⌜M.get? k = some _⌝ ∗ ⌜tst ≤ K ∨ (tst, hartAgent cpu) ∈ ts⌝ ⊢
+  -- CORRECTED (D5, IcachePinwObl): floor arm ONLY. The authorship arm is unprovable (the rows bound the
+  -- head's POSITION by tst; a fragment at tst says nothing about an earlier head). Rocq's
+  -- iref_read_locked_obl also takes only ctx_floor tl with tst ≤ tl, which is what its callers pass.
+  itableInv ∗ itableHalf M ∗ istmp ½ tst ∗ ⌜M.get? k = some _⌝ ∗ ⌜tst ≤ K⌝ ⊢
     readAU cpu (iRef (ientry k)) 4 K ts (fun w => iprop(⌜w = irefWord M k⌝ ∗ itableHalf M ∗ istmp ½ tst))
   -- needs the NEW pure lemma below
 theorem WordHist.read_head : tailOk n lo v0 Hold → (head of W, or the tails if W = [], visible to h at tvn) →
