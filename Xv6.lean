@@ -628,3 +628,11 @@ import Xv6.IlockMid
 import Xv6.IlockLoad
 import Xv6.ProofIlock
 import Xv6.LinkIlock
+import Xv6.SpecIget
+import Xv6.IgetParts
+import Xv6.IgetTail
+import Xv6.IgetRecycle
+import Xv6.IgetHit
+import Xv6.IgetScan
+import Xv6.ProofIget
+import Xv6.LinkIget
