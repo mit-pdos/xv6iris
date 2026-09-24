@@ -14,9 +14,9 @@ migrate inside either: every step is a `k_step` at a FIXED `cpu`, and the
 only thing that moves is the cursor.  Each carries the OPEN form
 (`Xv6.bdScan`) and hands it back untouched to whichever continuation it
 exits through, which is what lets the exit facts be STATEMENTS ABOUT
-`devs`/`bnos` -- see `Xv6/ProofBreadA.lean`'s header.
+`devs`/`bnos` -- see `Xv6/BreadDefs.lean`'s header.
 -/
-import Xv6.ProofBreadB
+import Xv6.BreadTail
 
 namespace Xv6
 

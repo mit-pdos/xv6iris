@@ -472,8 +472,8 @@ import Xv6.SpecPanic
 import Xv6.ProofPanic
 import Xv6.LinkPanic
 import Xv6.SpecBread
-import Xv6.ProofBreadA
-import Xv6.ProofBreadB
-import Xv6.ProofBreadC
+import Xv6.BreadDefs
+import Xv6.BreadTail
+import Xv6.BreadScan
 import Xv6.ProofBread
 import Xv6.LinkBread

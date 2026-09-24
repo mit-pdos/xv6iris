@@ -11,7 +11,7 @@ reference's stamp has been floored by the acquire edge, and the whole
 travelling bundle comes out of the escrow.  The valid test then reads the
 cell that came out with it.
 -/
-import Xv6.ProofBreadA
+import Xv6.BreadDefs
 import MachCSL.WpSmodeFrame6c
 
 namespace Xv6

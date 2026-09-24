@@ -10,12 +10,12 @@ Proof of `bread`'s contract (`Xv6.BREAD`), given the interfaces of
 
 This file is the ASSEMBLY: the six-slot prologue, the two arguments into
 `s2`/`s3`, `acquire(&bcache.lock)`, the forward scan's two set-up loads, and
-then the four pieces proved in `Xv6/ProofBreadB.lean` and
-`Xv6/ProofBreadC.lean` -- the hit scan, the hit's `refcnt++`, the recycle
+then the four pieces proved in `Xv6/BreadTail.lean` and
+`Xv6/BreadScan.lean` -- the hit scan, the hit's `refcnt++`, the recycle
 scan (whose empty exit is the `"bget: no buffers"` panic) and the recycle --
 all of which funnel into the join at `bread+0xb4`.
 -/
-import Xv6.ProofBreadC
+import Xv6.BreadScan
 
 namespace Xv6
 
