@@ -1896,4 +1896,73 @@ theorem eo_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
 
 end
 
+
+/-! ## The loop, closed by Löb at the head `+0xb4` -/
+
+section
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+
+set_option maxHeartbeats 16000000 in
+theorem eo_loop (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
+    (WH : WRITE_HEAD) (IT : INSTALL_TRANS) (AC : ACQUIRE) (RE : RELEASE) (WK : WAKEUP)
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γ : LogNames) (γl : GName) (γb : BcacheNames) (V : BioView GF)
+    (γdl : GName) (γfs : FsNames) (pd pav pu : BitVec 64) (j ls n : Nat) (dev : BitVec 32)
+    (W : List (BitVec 32)) (pidv : BitVec 32) (dqp : DFrac)
+    (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : endOpSlots ≤ k.avail)
+    (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
+    (htier : k.tier = KTier.kpt) (hintena : k.intena = false)
+    (hgeom : logGeomOk V.cov ls) (hdev : dev = V.dev)
+    (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs)
+    (hnW : n = W.length) (hnL : n ≤ LOGBLOCKS)
+    (hnodup : (W.map (fun w => w.toNat)).Nodup)
+    (hhome : ∀ w ∈ W, fsHome V.cov ls w.toNat) (hpd : descPageRw pd) :
+    procsInv (GF := GF) Γ -∗ bioCtx γl γb V -∗ diskCaps V.gd γdl pd pav pu -∗ panicEnv -∗
+    logCtx γ γb γfs V.cov ls dev -∗
+    eoLoopInv Γ cpu k γb γfs V.cov ls n W pidv dqp := by
+  iintro #Hpi #Hbc #Hdc #Hpe #Hctx
+  iloeb as IH
+  iapply eoLoopInv_intro
+  iintro %c %a %b %R %t %L %D %Lw %s9 %s19 %⟨hfix, htn, hLw, hLwlen⟩ Hk Hpc Htc Hcl Hir Hpid
+    Hopen Hfr HfrS HΦ
+  iapply (eo_body BR BW BE MM WH IT AC RE WK Γ cpu c k γ γl γb V γdl γfs pd pav pu j ls n dev
+      W pidv dqp hj hproc hK hsie hnoff hlocks htier hintena hgeom hdev hcl hdt hnW hnL
+      hnodup hhome hpd a b R t L D Lw s9 s19 hfix htn hLw hLwlen)
+    $$ [- $Hk $Hpc $Htc $Hcl $Hir $Hpid $Hopen $Hfr $HfrS $HΦ $IH]
+  iframe #
+
+end
+
+/-! ## The entry and the accounting critical section
+
+`+0x00 .. +0x3e`, plus the commit arm's set-up at `+0x9e .. +0xb0`. -/
+
+section
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+
+/-- The token in hand is a LIVE ledger entry, so the outstanding count is
+at least one -- which is what kills the `"log.committing"` panic. -/
+theorem eo_out_pos (γ : LogNames) (om : RegMapF OpEntry) (u : Nat) :
+    (γ.ops ↪●MAP om) ⊢ logOpb (GF := GF) γ u -∗ ⌜1 ≤ (FiniteMap.toList om).length⌝ := by
+  unfold logOpb logOpS logOpSe
+  iintro H ⟨%Sb, %e0, ⟨%i, He⟩, -, -⟩
+  ihave %hlk := ghost_map_lookup $$ H He
+  ipureintro
+  have hmem := (toListP_get om i ((u, Sb, e0) : OpEntry)).2 hlk
+  cases hL : FiniteMap.toList om with
+  | nil => simp [hL] at hmem
+  | cons x xs => simp [hL]
+
+/-- `bnez s2` on the decremented outstanding count. -/
+theorem eo_bnez_out (m : Nat) (h1 : 1 ≤ m) (h2 : m ≤ 2) :
+    bcond bop.BNE (BitVec.ofNat 64 m) 0#64 = true := by
+  have h : m = 1 ∨ m = 2 := by omega
+  rcases h with rfl | rfl <;> decide
+
+theorem eo_bnez_zero : bcond bop.BNE (BitVec.ofNat 64 0) 0#64 = false := by decide
+
+end
+
 end Xv6
