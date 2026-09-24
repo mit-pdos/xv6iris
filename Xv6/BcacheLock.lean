@@ -80,7 +80,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Bcache
 variable [DiskG GF] [CurCtx]
 
 theorem bc_acquire (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γl : GName) (γ : BcacheNames)
-    (V : BioView)
+    (V : BioView GF)
     (haddr : k'.regs 10#5 = bcacheLockAddr)
     (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 10 ≤ k'.avail) (hs' : "bcache" ∉ k'.locks) :
     kctx c k' ∗ pcIs c KA.«acquire» ∗ isLock γl bcacheLockAddr "bcache" (bcacheResAt γ V) ∗
@@ -98,7 +98,7 @@ theorem bc_acquire (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γl : GName) (γ : Bcac
   exact h
 
 theorem bc_release (RE : RELEASE) (c : CPU) (k' : KCtx) (γl : GName) (γ : BcacheNames)
-    (V : BioView)
+    (V : BioView GF)
     (haddr : k'.regs 10#5 = bcacheLockAddr)
     (hsie' : k'.sie = false) (hnoff' : 1 ≤ k'.noff) (hK' : 10 ≤ k'.avail)
     (reen : Bool) (hreen : reen = (decide (k'.noff = 1) && k'.intena))
@@ -122,7 +122,7 @@ floor slot `tl` it holds a store-order receipt for, and the hook mints
 only way to put the resource back when a `refcnt--` has raised one L1
 register's stamp past the releaser's own view. -/
 theorem bc_release_hook (RE : RELEASE_HOOK) (c : CPU) (k' : KCtx) (γl : GName) (γ : BcacheNames)
-    (V : BioView) (tl : Nat) (haddr : k'.regs 10#5 = bcacheLockAddr)
+    (V : BioView GF) (tl : Nat) (haddr : k'.regs 10#5 = bcacheLockAddr)
     (hsie' : k'.sie = false) (hnoff' : 1 ≤ k'.noff) (hK' : 10 ≤ k'.avail)
     (reen : Bool) (hreen : reen = (decide (k'.noff = 1) && k'.intena))
     (hon : reen = true → k'.tier = .kpt ∧ trapRes true + 6 ≤ k'.avail) :

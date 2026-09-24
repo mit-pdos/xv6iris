@@ -29,11 +29,12 @@ covered block not claimed by a buffer keeps its fragment in the POOL, inside
 `bcache.lock`'s resource; the recycle moves one fragment out of the pool (the
 block being installed) and one back in (the block being evicted).
 
-Without a log layer this port's `pool_blk` and the valid arm of Rocq's
-`buf_pay` coincide -- both are just `∃ bs, diskBlock`, since Rocq's
-`bv_clean`/`bv_dirty` payloads and `bio_pay`'s clean/dirty split are the log
-layer's and are dropped here.  So `Xv6.bufPay` does not mention the valid
-bit at all, which is the whole point.
+Rocq's two opaque payload hooks `bv_clean`/`bv_dirty` are part of
+`Xv6.BioView` (see its docstring), so `Xv6.poolBlk` is Rocq's `pool_blk`
+verbatim -- the block's disk fragment beside the view's CLEAN payload at the
+same content, "uncached implies clean".  The travelling payload itself
+(`bio_pay`, `buf_pay`) is in `Xv6/BcacheInv.lean`, because its dirty arm
+parks a real `Xv6.bref`.
 
 **Deviation in spelling (reported).**  Rocq writes the pool as a big-op over
 the SET DIFFERENCE `bv_cov V ∖ bcache_cached bnos`; this file writes it as a
@@ -69,18 +70,36 @@ abbrev BufX : Type := List (BitVec 8)
 def bioxN : Namespace := ndot nroot "xv6biox"
 
 /-- **THE CLIENT VIEW** the whole bio layer is parametric over (Rocq
-`BioDefs.bio_view`, minus the log layer's `bv_clean`/`bv_dirty`): the disk
-ghost the covered blocks' fragments live at, the ONE covered device, and the
-covered block-number range.  `cov` must not contain `0` -- `binit` leaves
-every buffer's blockno cell at `0` -- which is what `Xv6.bioInit` takes as a
-premise. -/
-structure BioView where
+`BioDefs.bio_view`): the disk ghost the covered blocks' fragments live at,
+the ONE covered device, the covered block-number range, and the TWO OPAQUE
+PER-BLOCK PAYLOADS -- `clean b bs` ("`bs` is block `b`'s logical content and
+the disk home cell agrees") and `dirty b bs` ("`bs` is block `b`'s logical
+content and the block is pinned by a log reference").  `cov` must not contain
+`0` -- `binit` leaves every buffer's blockno cell at `0` -- which is what
+`Xv6.bioInit` takes as a premise.
+
+Bio only MOVES the payloads -- pool → escrow → handle and back -- and never
+converts clean ↔ dirty; holders do that with their own (log-layer) ghosts.
+The payloads ride an escrow opened inside atomic updates, so no step is
+available to absorb a later: both carry their own `Timeless` proof, exactly
+as Rocq's `bv_clean_tl`/`bv_dirty_tl` do. -/
+structure BioView (GF : BundledGFunctors) where
   /-- the disk ghost (Rocq's `bv_gd`) -/
   gd : DiskNames
   /-- the one device the view speaks for (Rocq's `bv_dev`) -/
   dev : BitVec 32
   /-- the covered block numbers (Rocq's `bv_cov`) -/
   cov : Std.ExtTreeSet Nat compare
+  /-- the CLEAN payload (Rocq's `bv_clean`) -/
+  clean : Nat → List (BitVec 8) → IProp GF
+  /-- the DIRTY payload (Rocq's `bv_dirty`) -/
+  dirty : Nat → List (BitVec 8) → IProp GF
+  /-- Rocq's `bv_clean_tl` -/
+  cleanTL : ∀ b bs, Timeless (clean b bs)
+  /-- Rocq's `bv_dirty_tl` -/
+  dirtyTL : ∀ b bs, Timeless (dirty b bs)
+
+attribute [instance] BioView.cleanTL BioView.dirtyTL
 
 /-! ## The cached blocknos -/
 
@@ -116,123 +135,15 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG 
 
 /-! ## The payloads -/
 
-/-- **ONE UNCACHED COVERED BLOCK'S POOL BUNDLE** (Rocq's `pool_blk`): the
-block's disk-image fragment, at a full block's worth of bytes.  (Rocq pairs
-it with the client view's `clean` payload at the same content; this port has
-no log layer, so the fragment is all of it.) -/
-def poolBlk (V : BioView) (b : Nat) : IProp GF := iprop%
-  ∃ bs : List (BitVec 8), ⌜bs.length = BSIZE⌝ ∗ diskBlock V.gd b bs
+/-- **ONE UNCACHED COVERED BLOCK'S POOL BUNDLE** (Rocq's `pool_blk`): its
+disk cell and its CLEAN payload at the same content -- uncached implies
+clean, because the dirty arm parks a real `Xv6.bref` and a referenced buffer
+is never evicted. -/
+def poolBlk (V : BioView GF) (b : Nat) : IProp GF := iprop%
+  ∃ bs : List (BitVec 8), ⌜bs.length = BSIZE⌝ ∗ diskBlock V.gd b bs ∗ V.clean b bs
 
-instance poolBlk_timeless (V : BioView) (b : Nat) : Timeless (poolBlk (GF := GF) V b) := by
+instance poolBlk_timeless (V : BioView GF) (b : Nat) : Timeless (poolBlk (GF := GF) V b) := by
   unfold poolBlk diskBlock; infer_instance
-
-/-- **THE TRAVELLING PAYLOAD** at an identity (Rocq's `buf_pay`): a COVERED
-buffer is on the view's device and owes the block's fragment -- AT ITS OWN
-BYTES when it is valid, at whatever the disk holds when it is not; an
-uncovered blockno owes nothing.
-
-This is Rocq's definition with the log layer dropped.  Its valid arm is
-`∃ bsd d, disk_block bsd ∗ bio_pay …`, and at `d = false` (the only arm this
-port has, there being no log) `bio_pay` is `bv_clean bsl ∗ ⌜bsd = bsl⌝` --
-so the fragment's bytes ARE the buffer's bytes, which is what makes
-`bread`'s post say something about the data.  Its invalid arm is `pool_blk`
-verbatim.  The two are spelled here as ONE existential with the tie under
-the valid test.
-
-Note what is NOT here: any dependence of the COVERAGE test on `v`.  That is
-the point -- an invalid covered buffer still owes a fragment, which is what
-`bread`'s fill arm hands `virtio_disk_rw`. -/
-def bufPay (V : BioView) (i : BufId) (v : BitVec 32) (x : BufX) : IProp GF :=
-  if i.2.toNat ∈ V.cov then
-    iprop(⌜i.1 = V.dev⌝ ∗ ∃ bsd : List (BitVec 8),
-      ⌜bsd.length = BSIZE ∧ (v ≠ 0#32 → bsd = x)⌝ ∗ diskBlock V.gd i.2.toNat bsd)
-  else iprop(emp)
-
-instance bufPay_timeless (V : BioView) (i : BufId) (v : BitVec 32) (x : BufX) :
-    Timeless (bufPay (GF := GF) V i v x) := by
-  unfold bufPay diskBlock
-  split <;> infer_instance
-
-/-- A covered buffer's payload always yields the block's pool bundle. -/
-theorem bufPay_cov (V : BioView) (dev bno v : BitVec 32) (x : BufX)
-    (hcov : bno.toNat ∈ V.cov) :
-    bufPay (GF := GF) V ((dev, bno) : BufId) v x ⊢ ⌜dev = V.dev⌝ ∗ poolBlk V bno.toNat := by
-  unfold bufPay poolBlk
-  rw [if_pos hcov]
-  iintro ⟨%hd, %bsd, %hb, H⟩
-  isplitr [H]
-  · ipureintro; exact hd
-  iexists bsd
-  iframe H
-  ipureintro; exact hb.1
-
-/-- A VALID covered buffer's payload is the fragment AT ITS OWN BYTES: what
-`bread` returns and what `brelse` must present. -/
-theorem bufPay_valid (V : BioView) (dev bno v : BitVec 32) (x : BufX)
-    (hcov : bno.toNat ∈ V.cov) (hv : v ≠ 0#32) :
-    bufPay (GF := GF) V ((dev, bno) : BufId) v x ⊢
-      ⌜dev = V.dev ∧ x.length = BSIZE⌝ ∗ diskBlock V.gd bno.toNat x := by
-  unfold bufPay
-  rw [if_pos hcov]
-  iintro ⟨%hd, %bsd, %hb, H⟩
-  obtain ⟨hlen, hx⟩ := hb
-  have hxx := hx hv
-  subst hxx
-  isplitr [H]
-  · ipureintro; exact ⟨hd, hlen⟩
-  · iexact H
-
-theorem bufPay_of_valid (V : BioView) (dev bno v : BitVec 32) (x : BufX)
-    (hcov : bno.toNat ∈ V.cov) (hdev : dev = V.dev) (hlen : x.length = BSIZE) :
-    diskBlock (GF := GF) V.gd bno.toNat x ⊢ bufPay V ((dev, bno) : BufId) v x := by
-  unfold bufPay
-  rw [if_pos hcov]
-  iintro H
-  isplitr [H]
-  · ipureintro; exact hdev
-  iexists x
-  iframe H
-  ipureintro; exact ⟨hlen, fun _ => rfl⟩
-
-/-- ...and the invalid arm, out of the pool. -/
-theorem bufPay_of_pool (V : BioView) (dev bno v : BitVec 32) (x : BufX)
-    (hcov : bno.toNat ∈ V.cov) (hdev : dev = V.dev) (hv : v = 0#32) :
-    poolBlk (GF := GF) V bno.toNat ⊢ bufPay V ((dev, bno) : BufId) v x := by
-  unfold bufPay poolBlk
-  rw [if_pos hcov]
-  iintro ⟨%bsd, %hb, H⟩
-  isplitr [H]
-  · ipureintro; exact hdev
-  iexists bsd
-  iframe H
-  ipureintro
-  exact ⟨hb, fun h => absurd hv h⟩
-
-/-- An uncovered blockno owes nothing (what `binit`'s thirty buffers, all
-naming block `0`, present). -/
-theorem bufPay_uncov (V : BioView) (dev bno v : BitVec 32) (x : BufX)
-    (hcov : bno.toNat ∉ V.cov) :
-    ⊢ bufPay (GF := GF) V ((dev, bno) : BufId) v x := by
-  unfold bufPay
-  rw [if_neg hcov]
-  iempintro
-
-/-- The payload, unpacked on the coverage test. -/
-theorem bufPay_elim (V : BioView) (dev bno v : BitVec 32) (x : BufX) :
-    bufPay (GF := GF) V ((dev, bno) : BufId) v x ⊢
-      (⌜bno.toNat ∈ V.cov ∧ dev = V.dev⌝ ∗ poolBlk V bno.toNat) ∨ ⌜bno.toNat ∉ V.cov⌝ := by
-  by_cases hcov : bno.toNat ∈ V.cov
-  · iintro H
-    icases bufPay_cov V dev bno v x hcov $$ H with ⟨%hd, H⟩
-    ileft
-    isplitr [H]
-    · ipureintro; exact ⟨hcov, hd⟩
-    · iexact H
-  · unfold bufPay
-    rw [if_neg hcov]
-    iintro _
-    iright
-    ipureintro; exact hcov
 
 /-! ## The pool -/
 
@@ -240,16 +151,16 @@ theorem bufPay_elim (V : BioView) (dev bno v : BitVec 32) (x : BufX) :
 claims keeps its fragment here, inside `bcache.lock`'s resource -- which is
 where it must be, because every cached/uncached transition happens under that
 lock. -/
-def bioPool (V : BioView) (bnos : Nat → BitVec 32) : IProp GF :=
+def bioPool (V : BioView GF) (bnos : Nat → BitVec 32) : IProp GF :=
   iprop([∗set] b ∈ V.cov, (if bcached bnos b then iprop(emp) else poolBlk V b))
 
-theorem bioPool_intro (V : BioView) (bnos : Nat → BitVec 32) :
+theorem bioPool_intro (V : BioView GF) (bnos : Nat → BitVec 32) :
     (iprop([∗set] b ∈ V.cov, (if bcached bnos b then iprop(emp) else poolBlk (GF := GF) V b))) ⊢
       bioPool V bnos := by
   unfold bioPool; iintro H; iexact H
 
 /-- The pool depends on `bnos` only through `Xv6.bcached`. -/
-theorem bioPool_congr (V : BioView) (bnos bnos' : Nat → BitVec 32)
+theorem bioPool_congr (V : BioView GF) (bnos bnos' : Nat → BitVec 32)
     (h : ∀ b, b ∈ V.cov → bcached bnos b = bcached bnos' b) :
     bioPool (GF := GF) V bnos ⊢ bioPool V bnos' := by
   unfold bioPool
@@ -261,7 +172,7 @@ the `b->blockno` store: slot `k`'s claim moves from `old` to `B`, so `B`'s
 bundle leaves the pool (into the recycler's hand, and from there into the
 escrow's header at the deposit) and `old`'s bundle -- the one the evicted
 header carried -- comes back in, when `old` is covered at all. -/
-theorem bioPool_recycle (V : BioView) (bnos bnos' : Nat → BitVec 32) (k : Nat) (old B : BitVec 32)
+theorem bioPool_recycle (V : BioView GF) (bnos bnos' : Nat → BitVec 32) (k : Nat) (old B : BitVec 32)
     (hk : k < NBUF) (hold : bnos k = old) (hnew : bnos' k = B)
     (hother : ∀ j, j ≠ k → bnos' j = bnos j)
     (hcovB : B.toNat ∈ V.cov)

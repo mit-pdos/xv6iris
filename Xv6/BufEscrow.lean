@@ -141,7 +141,7 @@ Note the payload no longer turns on `v`: `Xv6.bufPay` is indexed on
 COVERAGE (`Xv6/BioPool.lean`), which is exactly what makes `bread`'s fill
 arm -- a holder at `valid == 0`, holding no lock -- able to hand
 `virtio_disk_rw` the fragment. -/
-def bufTravelV (V : BioView) (k : Nat) (qd qb : Qp) (dev bno v : BitVec 32)
+def bufTravelV (γ : BcacheNames) (V : BioView GF) (k : Nat) (qd qb : Qp) (dev bno v : BitVec 32)
     (bs : List (BitVec 8)) : IProp GF := iprop%
   ⌜bs.length = BSIZE ∧ (v = 0#32 ∨ v = 1#32)⌝ ∗
   wordPointsTo (aBufValid (bnode k)) 4 (DFrac.own 1) v ∗
@@ -149,79 +149,95 @@ def bufTravelV (V : BioView) (k : Nat) (qd qb : Qp) (dev bno v : BitVec 32)
   wordPointsTo (aBufBlockno (bnode k)) 4 (DFrac.own qb) bno ∗
   wordPointsTo (aBufDisk (bnode k)) 4 (DFrac.own 1) 0#32 ∗
   byteBuf (aBufData (bnode k)) (DFrac.own 1) bs ∗
-  bufPay V ((dev, bno) : BufId) v bs
+  bufPay γ V k ((dev, bno) : BufId) v bs
 
-/-- The same with the fragment NAMED: what a holder of a valid buffer has. -/
-def bufTravel (V : BioView) (k : Nat) (qd qb : Qp) (dev bno v : BitVec 32)
-    (bs bsd : List (BitVec 8)) : IProp GF := iprop%
+/-- The same with the FRAGMENT AND THE PAYLOAD NAMED: what a holder of a
+buffer has, Rocq's `bio_held` minus the sleeplock row.  `bsl` is the block's
+LOGICAL content (the payload's index) and `bsd` is what the disk cell holds;
+on the clean arm the two agree, on the dirty arm they need not.  At
+`v = 0#32` the buffer's own bytes `bs` are garbage and the logical content
+is the disk's, so the caller supplies `d = false`. -/
+def bufTravel (γ : BcacheNames) (V : BioView GF) (k : Nat) (qd qb : Qp) (dev bno v : BitVec 32)
+    (bs bsl bsd : List (BitVec 8)) (d : Bool) : IProp GF := iprop%
   ⌜bs.length = BSIZE ∧ bsd.length = BSIZE ∧ (v = 0#32 ∨ v = 1#32)⌝ ∗
   wordPointsTo (aBufValid (bnode k)) 4 (DFrac.own 1) v ∗
   wordPointsTo (aBufDev (bnode k)) 4 (DFrac.own qd) dev ∗
   wordPointsTo (aBufBlockno (bnode k)) 4 (DFrac.own qb) bno ∗
   wordPointsTo (aBufDisk (bnode k)) 4 (DFrac.own 1) 0#32 ∗
   byteBuf (aBufData (bnode k)) (DFrac.own 1) bs ∗
-  diskBlock V.gd bno.toNat bsd
+  diskBlock V.gd bno.toNat bsd ∗
+  bioPay γ V k dev bno bsl bsd d
 
-theorem bufTravel_travelV (V : BioView) (k : Nat) (qd qb : Qp) (dev bno v : BitVec 32)
-    (bs bsd : List (BitVec 8)) (hcov : bno.toNat ∈ V.cov) (hdev : dev = V.dev)
-    (hclean : v ≠ 0#32 → bsd = bs) :
-    bufTravel (GF := GF) V k qd qb dev bno v bs bsd ⊢ bufTravelV V k qd qb dev bno v bs := by
+theorem bufTravel_travelV (γ : BcacheNames) (V : BioView GF) (k : Nat) (qd qb : Qp)
+    (dev bno v : BitVec 32) (bs bsl bsd : List (BitVec 8)) (d : Bool)
+    (hcov : bno.toNat ∈ V.cov) (hdev : dev = V.dev)
+    (hclean : v ≠ 0#32 → bsl = bs) (hzero : v = 0#32 → d = false) :
+    bufTravel (GF := GF) γ V k qd qb dev bno v bs bsl bsd d ⊢
+      bufTravelV γ V k qd qb dev bno v bs := by
   unfold bufTravel bufTravelV
-  iintro ⟨%hlen, Hv, Hd, Hb, Hdk, Hdata, Hpay⟩
+  iintro ⟨%hlen, Hv, Hd, Hb, Hdk, Hdata, Hblk, Hpay⟩
   isplit
   · ipureintro; exact ⟨hlen.1, hlen.2.2⟩
   iframe Hv Hd Hb Hdk Hdata
   by_cases hv : v = 0#32
-  · iapply bufPay_of_pool V dev bno v bs hcov hdev hv
+  · have hd0 := hzero hv
+    subst hd0
+    iapply bufPay_of_pool γ V k dev bno v bs hcov hdev hv
+    icases bioPay_clean_elim γ V k dev bno bsl bsd $$ Hpay with ⟨%hbe, Hcl⟩
+    subst hbe
     unfold poolBlk
     iexists bsd
     isplitl []
     · ipureintro; exact hlen.2.1
-    · iexact Hpay
+    iframe Hblk Hcl
   · have hcl := hclean hv
-    iapply bufPay_of_valid V dev bno v bs hcov hdev hlen.1
-    rw [← hcl]
-    iexact Hpay
+    subst hcl
+    iapply bufPay_of_valid γ V k dev bno v bsl bsd d hcov hdev hv hlen.2.1
+    iframe Hblk Hpay
 
-/-- The reverse: a COVERED buffer's travelling content has the fragment, and
-naming it is what `bread`'s fill arm does before calling
+/-- The reverse: a COVERED buffer's travelling content has the fragment and
+the payload, and naming them is what `bread`'s fill arm does before calling
 `virtio_disk_rw`. -/
-theorem bufTravelV_travel (V : BioView) (k : Nat) (qd qb : Qp) (dev bno v : BitVec 32)
-    (bs : List (BitVec 8)) (hcov : bno.toNat ∈ V.cov) :
-    bufTravelV (GF := GF) V k qd qb dev bno v bs ⊢
-      ⌜dev = V.dev⌝ ∗ ∃ bsd : List (BitVec 8),
-        ⌜v ≠ 0#32 → bsd = bs⌝ ∗ bufTravel V k qd qb dev bno v bs bsd := by
+theorem bufTravelV_travel (γ : BcacheNames) (V : BioView GF) (k : Nat) (qd qb : Qp)
+    (dev bno v : BitVec 32) (bs : List (BitVec 8)) (hcov : bno.toNat ∈ V.cov) :
+    bufTravelV (GF := GF) γ V k qd qb dev bno v bs ⊢
+      ⌜dev = V.dev⌝ ∗ ∃ (bsl bsd : List (BitVec 8)) (d : Bool),
+        ⌜(v ≠ 0#32 → bsl = bs) ∧ (v = 0#32 → d = false)⌝ ∗
+        bufTravel γ V k qd qb dev bno v bs bsl bsd d := by
   unfold bufTravel bufTravelV
   iintro ⟨%hlen, Hv, Hd, Hb, Hdk, Hdata, Hpay⟩
   by_cases hv : v = 0#32
-  · icases bufPay_cov V dev bno v bs hcov $$ Hpay with ⟨%hdev, Hpay⟩
+  · icases bufPay_invalid γ V k dev bno v bs hcov hv $$ Hpay with ⟨%hdev, Hpay⟩
     isplitr [Hv Hd Hb Hdk Hdata Hpay]
     · ipureintro; exact hdev
     unfold poolBlk
-    icases Hpay with ⟨%bsd, %hbl, Hpay⟩
-    iexists bsd
+    icases Hpay with ⟨%bsd, %hbl, Hblk, Hcl⟩
+    iexists bsd, bsd, false
     isplitl []
-    · ipureintro; intro h; exact absurd hv h
+    · ipureintro
+      exact ⟨fun h => absurd hv h, fun _ => rfl⟩
     isplit
     · ipureintro; exact ⟨hlen.1, hbl, hlen.2⟩
-    iframe Hv Hd Hb Hdk Hdata
-    iexact Hpay
-  · icases bufPay_valid V dev bno v bs hcov hv $$ Hpay with ⟨%hdev, Hpay⟩
-    isplitr [Hv Hd Hb Hdk Hdata Hpay]
-    · ipureintro; exact hdev.1
-    iexists bs
+    iframe Hv Hd Hb Hdk Hdata Hblk
+    iapply bioPay_clean γ V k dev bno bsd
+    iexact Hcl
+  · icases bufPay_valid γ V k dev bno v bs hcov hv $$ Hpay with
+      ⟨%hdev, %bsd, %d, %hbl, Hblk, Hpay⟩
+    isplitr [Hv Hd Hb Hdk Hdata Hblk Hpay]
+    · ipureintro; exact hdev
+    iexists bs, bsd, d
     isplitl []
-    · ipureintro; intro _; rfl
+    · ipureintro
+      exact ⟨fun _ => rfl, fun h => absurd h hv⟩
     isplit
-    · ipureintro; exact ⟨hlen.1, hlen.1, hlen.2⟩
-    iframe Hv Hd Hb Hdk Hdata
-    iexact Hpay
+    · ipureintro; exact ⟨hlen.1, hbl, hlen.2⟩
+    iframe Hv Hd Hb Hdk Hdata Hblk Hpay
 
 /-- The content, folded into the box's `IN` arm at the holder's context. -/
-theorem bufTravelV_inArm (V : BioView) (k : Nat) (qd qb : Qp) (dev bno v : BitVec 32)
+theorem bufTravelV_inArm (γ : BcacheNames) (V : BioView GF) (k : Nat) (qd qb : Qp) (dev bno v : BitVec 32)
     (bs : List (BitVec 8)) :
-    bufTravelV (GF := GF) V k qd qb dev bno v bs ⊢
-      inArm (bufBoxPay V k qd qb) (dev, bno) curCtx := by
+    bufTravelV (GF := GF) γ V k qd qb dev bno v bs ⊢
+      inArm (bufBoxPay γ V k qd qb) (dev, bno) curCtx := by
   unfold bufTravelV inArm bufBoxPay bufHdr bufRest byteBuf
   simp only [wordAtN_cur]
   iintro ⟨%hlen, Hv, Hd, Hb, Hdk, Hdata, Hpay⟩
@@ -238,9 +254,9 @@ theorem bufTravelV_inArm (V : BioView) (k : Nat) (qd qb : Qp) (dev bno v : BitVe
     iexact Hdata
 
 /-- ...and unfolded back out of it. -/
-theorem inArm_bufTravelV (V : BioView) (k : Nat) (qd qb : Qp) (dev bno : BitVec 32) :
-    inArm (bufBoxPay (GF := GF) V k qd qb) (dev, bno) curCtx ⊢
-      ∃ (v : BitVec 32) (bs : List (BitVec 8)), bufTravelV V k qd qb dev bno v bs := by
+theorem inArm_bufTravelV (γ : BcacheNames) (V : BioView GF) (k : Nat) (qd qb : Qp) (dev bno : BitVec 32) :
+    inArm (bufBoxPay (GF := GF) γ V k qd qb) (dev, bno) curCtx ⊢
+      ∃ (v : BitVec 32) (bs : List (BitVec 8)), bufTravelV γ V k qd qb dev bno v bs := by
   unfold bufTravelV inArm bufBoxPay bufHdr bufRest byteBuf
   simp only [wordAtN_cur]
   iintro ⟨%x, ⟨%v, %hv01, Hv, Hd, Hb, Hpay⟩, ⟨%hlen, Hdk, Hdata⟩⟩
@@ -257,40 +273,42 @@ theorem inArm_bufTravelV (V : BioView) (k : Nat) (qd qb : Qp) (dev bno : BitVec 
 `Xv6.bkeyAt`), `blockno` at a half inside `Xv6.bufOwn` -- it is the
 sleeplock row, the chain's two tokens, and `bufTravel` beside them. -/
 
-theorem bufHold0_travel (γ : BcacheNames) (V : BioView) (k : Nat)
-    (pidv dev bno : BitVec 32) (bs bsd : List (BitVec 8)) :
-    bufHold0 (GF := GF) γ V k pidv dev bno bs bsd ⊢
+theorem bufHold0_travel (γ : BcacheNames) (V : BioView GF) (k : Nat)
+    (pidv dev bno : BitVec 32) (bs bsl bsd : List (BitVec 8)) (d : Bool) :
+    bufHold0 (GF := GF) γ V k pidv dev bno bs bsd ∗ bioPay γ V k dev bno bsl bsd d ⊢
       ⌜k < NBUF ∧ bno.toNat ∈ V.cov ∧ dev = V.dev ∧ bs.length = BSIZE ∧ bsd.length = BSIZE⌝ ∗
         sleeplockedQ (γ.slk k).2 1 (aBufLock (bnode k)) pidv ∗ bufTok γ k ∗
         brefTok γ k ∗ (∃ id : Nat, l2Hold (γ.box k) ((dev, bno) : BufId) id) ∗
-        bufTravel V k (1 : Qp).half (1 : Qp).half dev bno 1#32 bs bsd := by
+        bufTravel γ V k (1 : Qp).half (1 : Qp).half dev bno 1#32 bs bsl bsd d := by
   unfold bufHold0 bufTravel bufOwn
-  iintro ⟨%hk, Hsl, Htok, Hrt, Hhold, Hv, Hd, ⟨%hlen, Hb, Hdk, Hdata⟩, Hpay⟩
+  iintro ⟨⟨%hk, Hsl, Htok, Hrt, Hhold, Hv, Hd, ⟨%hlen, Hb, Hdk, Hdata⟩, Hblk⟩, Hpay⟩
   isplit
   · ipureintro; exact hk
   iframe Hsl Htok Hrt Hhold
   isplit
   · ipureintro; exact ⟨hk.2.2.2.1, hk.2.2.2.2, Or.inr rfl⟩
-  iframe Hv Hd Hb Hdk Hdata
+  iframe Hv Hd Hb Hdk Hdata Hblk
   iexact Hpay
 
-theorem bufHold0_of_travel (γ : BcacheNames) (V : BioView) (k : Nat)
-    (pidv dev bno : BitVec 32) (bs bsd : List (BitVec 8)) (hk : k < NBUF)
+theorem bufHold0_of_travel (γ : BcacheNames) (V : BioView GF) (k : Nat)
+    (pidv dev bno : BitVec 32) (bs bsl bsd : List (BitVec 8)) (d : Bool) (hk : k < NBUF)
     (hcov : bno.toNat ∈ V.cov) (hdev : dev = V.dev) :
     sleeplockedQ (GF := GF) (γ.slk k).2 1 (aBufLock (bnode k)) pidv ∗ bufTok γ k ∗
       brefTok γ k ∗ (∃ id : Nat, l2Hold (γ.box k) ((dev, bno) : BufId) id) ∗
-      bufTravel V k (1 : Qp).half (1 : Qp).half dev bno 1#32 bs bsd ⊢
-      bufHold0 γ V k pidv dev bno bs bsd := by
+      bufTravel γ V k (1 : Qp).half (1 : Qp).half dev bno 1#32 bs bsl bsd d ⊢
+      bufHold0 γ V k pidv dev bno bs bsd ∗ bioPay γ V k dev bno bsl bsd d := by
   unfold bufHold0 bufTravel bufOwn
-  iintro ⟨Hsl, Htok, Hrt, Hhold, %hlen, Hv, Hd, Hb, Hdk, Hdata, Hpay⟩
-  isplit
-  · ipureintro; exact ⟨hk, hcov, hdev, hlen.1, hlen.2.1⟩
-  iframe Hsl Htok Hrt Hhold Hv Hd
-  isplitl [Hb Hdk Hdata]
+  iintro ⟨Hsl, Htok, Hrt, Hhold, %hlen, Hv, Hd, Hb, Hdk, Hdata, Hblk, Hpay⟩
+  isplitr [Hpay]
   · isplit
-    · ipureintro; exact hlen.1
-    iframe Hb Hdk
-    iexact Hdata
+    · ipureintro; exact ⟨hk, hcov, hdev, hlen.1, hlen.2.1⟩
+    iframe Hsl Htok Hrt Hhold Hv Hd
+    isplitl [Hb Hdk Hdata]
+    · isplit
+      · ipureintro; exact hlen.1
+      iframe Hb Hdk
+      iexact Hdata
+    · iexact Hblk
   · iexact Hpay
 
 /-! ## The two payload rows, folded and unfolded -/
@@ -352,18 +370,18 @@ theorem bufSlpBox_elim (γ : BcacheNames) (k : Nat) (ξ : CtxId) :
 /-- The header at the holder's own context, spelled in `wordPointsTo` (what
 `bget`'s miss path receives from `bufEscrow_withdraw` and hands back to
 `bufEscrow_recycle`). -/
-def bufHeaderAt (V : BioView) (k : Nat) (qd qb : Qp) (dev bno : BitVec 32)
+def bufHeaderAt (γ : BcacheNames) (V : BioView GF) (k : Nat) (qd qb : Qp) (dev bno : BitVec 32)
     (x : BufX) : IProp GF := iprop%
   ∃ v : BitVec 32,
     ⌜v = 0#32 ∨ v = 1#32⌝ ∗
     wordPointsTo (aBufValid (bnode k)) 4 (DFrac.own 1) v ∗
     wordPointsTo (aBufDev (bnode k)) 4 (DFrac.own qd) dev ∗
     wordPointsTo (aBufBlockno (bnode k)) 4 (DFrac.own qb) bno ∗
-    bufPay V ((dev, bno) : BufId) v x
+    bufPay γ V k ((dev, bno) : BufId) v x
 
-theorem bufHeaderAt_hdr (V : BioView) (k : Nat) (qd qb : Qp) (dev bno : BitVec 32)
+theorem bufHeaderAt_hdr (γ : BcacheNames) (V : BioView GF) (k : Nat) (qd qb : Qp) (dev bno : BitVec 32)
     (x : BufX) :
-    bufHeaderAt (GF := GF) V k qd qb dev bno x ⊣⊢ bufHdr V k qd qb (dev, bno) x curCtx := by
+    bufHeaderAt (GF := GF) γ V k qd qb dev bno x ⊣⊢ bufHdr γ V k qd qb (dev, bno) x curCtx := by
   unfold bufHeaderAt bufHdr
   simp only [wordAtN_cur]
   constructor
@@ -375,19 +393,19 @@ theorem bufHeaderAt_hdr (V : BioView) (k : Nat) (qd qb : Qp) (dev bno : BitVec 3
 /-- **THE DEPOSIT** (Rocq's `bbox_park`): `brelse`'s first instruction hands
 the travelling content back to the escrow, at the identity its reference
 names, and takes the reference back MINTED AT THE NEW STAMP. -/
-theorem bufEscrow_deposit (V : BioView) (γbk : BoxNames) (k : Nat) (qd qb : Qp)
+theorem bufEscrow_deposit (γ : BcacheNames) (V : BioView GF) (γbk : BoxNames) (k : Nat) (qd qb : Qp)
     (cpu : CPU) (dev bno v : BitVec 32) (bs : List (BitVec 8)) (id : Nat)
     (E : CoPset) (hE : ↑bioxN ⊆ E) :
-    bufBox V γbk k qd qb ∗ ownCtx cpu curCtx ∗ bufTravelV V k qd qb dev bno v bs ∗
+    bufBox γ V γbk k qd qb ∗ ownCtx cpu curCtx ∗ bufTravelV γ V k qd qb dev bno v bs ∗
       l2Hold (GF := GF) γbk (dev, bno) id ⊢
       |={E}=> (ownCtx cpu curCtx ∗ ∃ T' : Nat,
         slotpHalf (GF := GF) γbk (⟨T', none⟩ : L2Reg BufId) ∗ boxRef (GF := GF) γbk (dev, bno) T' ∗ topLb T') := by
   iintro ⟨#Hbox, Hrun, Htrav, Hhold⟩
   unfold bufBox
-  imod boxPark (bufBoxPay V k qd qb) (ndot bioxN k) γbk cpu curCtx (dev, bno) id E
+  imod boxPark (bufBoxPay γ V k qd qb) (ndot bioxN k) γbk cpu curCtx (dev, bno) id E
       (nclose_subseteq' k hE) $$ [Hbox Hrun Htrav Hhold] with ⟨Hrun, -, H⟩
   · iframe Hbox Hrun Hhold
-    iapply bufTravelV_inArm V k qd qb dev bno v bs
+    iapply bufTravelV_inArm γ V k qd qb dev bno v bs
     iexact Htrav
   imodintro
   iframe Hrun
@@ -397,17 +415,17 @@ theorem bufEscrow_deposit (V : BioView) (γbk : BoxNames) (k : Nat) (qd qb : Qp)
 `acquiresleep` -- the whole bundle comes out of the escrow into the caller's
 context, against the reference `bget` minted, and the reference's element
 goes into the box for the park to take back. -/
-theorem bufEscrow_take (V : BioView) (γbk : BoxNames) (k : Nat) (qd qb : Qp)
+theorem bufEscrow_take (γ : BcacheNames) (V : BioView GF) (γbk : BoxNames) (k : Nat) (qd qb : Qp)
     (cpu : CPU) (dev bno : BitVec 32) (T0 : Nat) (s0 : L2Reg BufId) (Kt Kp : Nat)
     (E : CoPset) (hE : ↑bioxN ⊆ E) (hs : s0.hold = none) (hKt : T0 ≤ Kt) (hKp : s0.tp ≤ Kp) :
-    bufBox V γbk k qd qb ∗ ownCtx cpu curCtx ∗ ctxFloor curCtx Kt ∗ ctxFloor curCtx Kp ∗
+    bufBox γ V γbk k qd qb ∗ ownCtx cpu curCtx ∗ ctxFloor curCtx Kt ∗ ctxFloor curCtx Kp ∗
       boxRef (GF := GF) γbk (dev, bno) T0 ∗ slotpHalf (GF := GF) γbk s0 ⊢
       |={E}=> (ownCtx cpu curCtx ∗
-        (∃ (v : BitVec 32) (bs : List (BitVec 8)), bufTravelV (GF := GF) V k qd qb dev bno v bs) ∗
+        (∃ (v : BitVec 32) (bs : List (BitVec 8)), bufTravelV (GF := GF) γ V k qd qb dev bno v bs) ∗
         ∃ id : Nat, l2Hold (GF := GF) γbk (dev, bno) id) := by
   iintro ⟨#Hbox, Hrun, #Hflt, #Hflp, Href, Hrp⟩
   unfold bufBox
-  imod boxCheckout (bufBoxPay V k qd qb) (ndot bioxN k) γbk cpu curCtx (dev, bno) T0 s0
+  imod boxCheckout (bufBoxPay γ V k qd qb) (ndot bioxN k) γbk cpu curCtx (dev, bno) T0 s0
       Kt Kp E (nclose_subseteq' k hE) hs hKt hKp $$ [Hbox Hrun Hflt Hflp Href Hrp]
     with ⟨Hrun, Hin, Hhold⟩
   · iframe Hbox Hrun Href Hrp
@@ -419,24 +437,24 @@ theorem bufEscrow_take (V : BioView) (γbk : BoxNames) (k : Nat) (qd qb : Qp)
       itrivial
   imodintro
   iframe Hrun Hhold
-  iapply inArm_bufTravelV V k qd qb dev bno
+  iapply inArm_bufTravelV γ V k qd qb dev bno
   iexact Hin
 
 /-- **THE WINDOW OPENS** (Rocq's `bbox_withdraw_L1`): at `refcnt == 0`, under
 `bcache.lock`, the recycler takes the header out of the escrow -- the rest of
 the bundle stays parked -- so that it may rewrite `dev`/`blockno`/`valid`. -/
-theorem bufEscrow_withdraw (V : BioView) (γbk : BoxNames) (k : Nat) (qd qb : Qp)
+theorem bufEscrow_withdraw (γ : BcacheNames) (V : BioView GF) (γbk : BoxNames) (k : Nat) (qd qb : Qp)
     (cpu : CPU) (r : SlotReg BufId BufX) (Kd : Nat) (E : CoPset) (hE : ↑bioxN ⊆ E)
     (hw : r.win = false) (hKd : r.td ≤ Kd) :
-    bufBox V γbk k qd qb ∗ ownCtx cpu curCtx ∗ ctxFloor curCtx Kd ∗
+    bufBox γ V γbk k qd qb ∗ ownCtx cpu curCtx ∗ ctxFloor curCtx Kd ∗
       slotdHalf (GF := GF) γbk r ∗ cntHalf (GF := GF) γbk 0 ⊢
       |={E}=> (ownCtx cpu curCtx ∗ cntHalf (GF := GF) γbk 0 ∗
         ∃ (x0 : BufX) (T0 : Nat), ⌜T0 ≤ Kd⌝ ∗
           slotdHalf (GF := GF) γbk (⟨r.td, true, r.ident, some (x0, T0)⟩ : SlotReg BufId BufX) ∗
-          bufHeaderAt V k qd qb r.ident.1 r.ident.2 x0) := by
+          bufHeaderAt γ V k qd qb r.ident.1 r.ident.2 x0) := by
   iintro ⟨#Hbox, Hrun, #Hfld, Hrd, Hc⟩
   unfold bufBox
-  imod boxWithdrawL1 (bufBoxPay V k qd qb) (ndot bioxN k) γbk cpu curCtx r Kd E
+  imod boxWithdrawL1 (bufBoxPay γ V k qd qb) (ndot bioxN k) γbk cpu curCtx r Kd E
       (nclose_subseteq' k hE) hw hKd $$ [Hbox Hrun Hfld Hrd Hc]
     with ⟨Hrun, Hc, ⟨%x0, %T0, %hT0, Hrd, Hhdr⟩⟩
   · iframe Hbox Hrun Hrd Hc
@@ -451,27 +469,27 @@ theorem bufEscrow_withdraw (V : BioView) (γbk : BoxNames) (k : Nat) (qd qb : Qp
   isplit
   · ipureintro; exact hT0
   iframe Hrd
-  iapply (bufHeaderAt_hdr V k qd qb r.ident.1 r.ident.2 x0).2
+  iapply (bufHeaderAt_hdr γ V k qd qb r.ident.1 r.ident.2 x0).2
   iexact Hhdr
 
 /-- **THE WINDOW CLOSES** (Rocq's `bbox_deposit_L1`): the header goes back at
 the NEW identity, and the chain's first reference is minted at the new
 stamp -- which is the reference `bget`'s caller will check out with. -/
-theorem bufEscrow_recycle (V : BioView) (γbk : BoxNames) (k : Nat) (qd qb : Qp)
+theorem bufEscrow_recycle (γ : BcacheNames) (V : BioView GF) (γbk : BoxNames) (k : Nat) (qd qb : Qp)
     (cpu : CPU) (r : SlotReg BufId BufX) (dev' bno' : BitVec 32) (x0 : BufX) (T0 : Nat)
     (E : CoPset) (hE : ↑bioxN ⊆ E) (hw : r.win = true) (hx : r.x = some (x0, T0)) :
-    bufBox V γbk k qd qb ∗ ownCtx cpu curCtx ∗ slotdHalf (GF := GF) γbk r ∗ cntHalf (GF := GF) γbk 0 ∗
-      bufHeaderAt V k qd qb dev' bno' x0 ⊢
+    bufBox γ V γbk k qd qb ∗ ownCtx cpu curCtx ∗ slotdHalf (GF := GF) γbk r ∗ cntHalf (GF := GF) γbk 0 ∗
+      bufHeaderAt γ V k qd qb dev' bno' x0 ⊢
       |={E}=> (ownCtx cpu curCtx ∗ ∃ T' : Nat,
         slotdHalf (GF := GF) γbk (⟨T', false, (dev', bno'), none⟩ : SlotReg BufId BufX) ∗
         cntHalf (GF := GF) γbk 1 ∗ boxRef (GF := GF) γbk (dev', bno') T' ∗ topLb T') := by
   iintro ⟨#Hbox, Hrun, Hrd, Hc, Hhdr⟩
   unfold bufBox
-  imod boxDepositL1 (bufBoxPay V k qd qb) (ndot bioxN k) γbk cpu curCtx r (dev', bno') x0 T0 E
+  imod boxDepositL1 (bufBoxPay γ V k qd qb) (ndot bioxN k) γbk cpu curCtx r (dev', bno') x0 T0 E
       (nclose_subseteq' k hE) hw hx $$ [Hbox Hrun Hrd Hc Hhdr] with ⟨Hrun, -, H⟩
   · iframe Hbox Hrun Hrd Hc
     simp only [bufBoxPay]
-    iapply (bufHeaderAt_hdr V k qd qb dev' bno' x0).1
+    iapply (bufHeaderAt_hdr γ V k qd qb dev' bno' x0).1
     iexact Hhdr
   imodintro
   iframe Hrun
@@ -479,28 +497,28 @@ theorem bufEscrow_recycle (V : BioView) (γbk : BoxNames) (k : Nat) (qd qb : Qp)
 
 /-- **`refcnt++`** (Rocq's `bbox_ref_incr`): a reference at the identity the
 L1 register records, minted at the escrow's current stamp. -/
-theorem bufEscrow_refIncr (V : BioView) (γbk : BoxNames) (k : Nat) (qd qb : Qp)
+theorem bufEscrow_refIncr (γ : BcacheNames) (V : BioView GF) (γbk : BoxNames) (k : Nat) (qd qb : Qp)
     (r : SlotReg BufId BufX) (c : Nat) (E : CoPset) (hE : ↑bioxN ⊆ E) (hw : r.win = false) :
-    bufBox V γbk k qd qb ∗ slotdHalf (GF := GF) γbk r ∗ cntHalf (GF := GF) γbk c ⊢
+    bufBox γ V γbk k qd qb ∗ slotdHalf (GF := GF) γbk r ∗ cntHalf (GF := GF) γbk c ⊢
       |={E}=> (slotdHalf (GF := GF) γbk r ∗ cntHalf (GF := GF) γbk (c + 1) ∗ ∃ T : Nat, boxRef (GF := GF) γbk r.ident T) := by
   iintro ⟨#Hbox, Hrd, Hc⟩
   unfold bufBox
-  iapply boxRefIncr (bufBoxPay V k qd qb) (ndot bioxN k) γbk r c E
+  iapply boxRefIncr (bufBoxPay γ V k qd qb) (ndot bioxN k) γbk r c E
     (nclose_subseteq' k hE) hw $$ [$Hbox $Hrd $Hc]
 
 /-- **`refcnt--`** (Rocq's `bbox_ref_decr`): the reference is burned and the
 L1 floor register joins its stamp, so that the next withdrawal's cover
 (row D) still holds. -/
-theorem bufEscrow_refDecr (V : BioView) (γbk : BoxNames) (k : Nat) (qd qb : Qp)
+theorem bufEscrow_refDecr (γ : BcacheNames) (V : BioView GF) (γbk : BoxNames) (k : Nat) (qd qb : Qp)
     (r : SlotReg BufId BufX) (c : Nat) (i : BufId) (T0 : Nat) (E : CoPset)
     (hE : ↑bioxN ⊆ E) (hw : r.win = false) :
-    bufBox V γbk k qd qb ∗ slotdHalf (GF := GF) γbk r ∗ topLb r.td ∗ cntHalf (GF := GF) γbk (c + 1) ∗
+    bufBox γ V γbk k qd qb ∗ slotdHalf (GF := GF) γbk r ∗ topLb r.td ∗ cntHalf (GF := GF) γbk (c + 1) ∗
       boxRef (GF := GF) γbk i T0 ⊢
       |={E}=> (slotdHalf (GF := GF) γbk (⟨max r.td T0, false, r.ident, r.x⟩ : SlotReg BufId BufX) ∗
         cntHalf (GF := GF) γbk c ∗ topLb (max r.td T0)) := by
   iintro ⟨#Hbox, Hrd, #Htd, Hc, Href⟩
   unfold bufBox
-  iapply boxRefDecr (bufBoxPay V k qd qb) (ndot bioxN k) γbk r c i T0 E
+  iapply boxRefDecr (bufBoxPay γ V k qd qb) (ndot bioxN k) γbk r c i T0 E
     (nclose_subseteq' k hE) hw $$ [$Hbox $Hrd $Htd $Hc $Href]
 
 /-! ## The two floor-consuming operations, AT THE BIO ROWS
@@ -514,17 +532,17 @@ left to supply. -/
 floor) and a reference whose stamp the ACQUIRE EDGE has floored
 (`Xv6.ACQUIRESLEEP_LLB` turns the reference's `MachCSL.topLb T0` into
 `MachCSL.ctxFloor curCtx T0`), the whole bundle comes out. -/
-theorem bufEscrow_takeHeld (γ : BcacheNames) (V : BioView) (k : Nat) (cpu : CPU)
+theorem bufEscrow_takeHeld (γ : BcacheNames) (V : BioView GF) (k : Nat) (cpu : CPU)
     (dev bno : BitVec 32) (T0 : Nat) (E : CoPset) (hE : ↑bioxN ⊆ E) :
-    bufBox V (γ.box k) k (1 : Qp).half (1 : Qp).half ∗ ownCtx cpu curCtx ∗ ctxFloor curCtx T0 ∗
+    bufBox γ V (γ.box k) k (1 : Qp).half (1 : Qp).half ∗ ownCtx cpu curCtx ∗ ctxFloor curCtx T0 ∗
       boxRef (GF := GF) (γ.box k) ((dev, bno) : BufId) T0 ∗ bufSlpBox γ k curCtx ⊢
       |={E}=> (ownCtx cpu curCtx ∗ bufTok γ k ∗
         (∃ (v : BitVec 32) (bs : List (BitVec 8)),
-          bufTravelV (GF := GF) V k (1 : Qp).half (1 : Qp).half dev bno v bs) ∗
+          bufTravelV (GF := GF) γ V k (1 : Qp).half (1 : Qp).half dev bno v bs) ∗
         ∃ id : Nat, l2Hold (GF := GF) (γ.box k) ((dev, bno) : BufId) id) := by
   iintro ⟨#Hbox, Hrun, #Hfl0, Href, Hslp⟩
   icases bufSlpBox_elim γ k curCtx $$ Hslp with ⟨Htok, %s, Hrp, %hs, #Hflp⟩
-  imod bufEscrow_take V (γ.box k) k (1 : Qp).half (1 : Qp).half cpu dev bno T0 s T0 s.tp
+  imod bufEscrow_take γ V (γ.box k) k (1 : Qp).half (1 : Qp).half cpu dev bno T0 s T0 s.tp
       E hE hs (Nat.le_refl _) (Nat.le_refl _) $$ [Hbox Hrun Hfl0 Hflp Href Hrp]
     with ⟨Hrun, Htrav, Hhold⟩
   · iframe Hbox Hrun Href Hrp
@@ -539,22 +557,22 @@ at `refcnt == 0`, the key row's stamp is under the resource's floor slot
 (`Xv6.bufSlotRegs`'s `⌜r.td ≤ tl⌝` beside `Xv6.bcacheResAt`'s
 `MachCSL.ctxFloor ξ tl`), so the header comes out and the old block's
 fragment with it. -/
-theorem bufEscrow_withdrawKey (γ : BcacheNames) (V : BioView) (k : Nat) (cpu : CPU)
+theorem bufEscrow_withdrawKey (γ : BcacheNames) (V : BioView GF) (k : Nat) (cpu : CPU)
     (tl : Nat) (dev bno : BitVec 32) (E : CoPset) (hE : ↑bioxN ⊆ E) :
-    bufBox V (γ.box k) k (1 : Qp).half (1 : Qp).half ∗ ownCtx cpu curCtx ∗ ctxFloor curCtx tl ∗
+    bufBox γ V (γ.box k) k (1 : Qp).half (1 : Qp).half ∗ ownCtx cpu curCtx ∗ ctxFloor curCtx tl ∗
       bufSlotRegs (GF := GF) (γ.box k) tl dev bno ∗ cntHalf (GF := GF) (γ.box k) 0 ⊢
       |={E}=> (ownCtx cpu curCtx ∗ cntHalf (GF := GF) (γ.box k) 0 ∗
         ∃ (td : Nat) (x0 : BufX) (T0 : Nat), ⌜T0 ≤ tl⌝ ∗
           slotdHalf (GF := GF) (γ.box k)
             (⟨td, true, ((dev, bno) : BufId), some (x0, T0)⟩ : SlotReg BufId BufX) ∗
-          bufHeaderAt V k (1 : Qp).half (1 : Qp).half dev bno x0) := by
+          bufHeaderAt γ V k (1 : Qp).half (1 : Qp).half dev bno x0) := by
   iintro ⟨#Hbox, Hrun, #Hfl, Hregs, Hc⟩
   icases bufSlotRegs_elim (γ.box k) tl dev bno $$ Hregs with ⟨%r, %⟨hrid, hrtl⟩, Hrd, -⟩
   obtain ⟨rtd, rwin, rident, rx⟩ := r
   obtain ⟨hw, hx, hi⟩ := hrid
   simp only at hw hx hi hrtl
   subst hi
-  imod bufEscrow_withdraw V (γ.box k) k (1 : Qp).half (1 : Qp).half cpu
+  imod bufEscrow_withdraw γ V (γ.box k) k (1 : Qp).half (1 : Qp).half cpu
       (⟨rtd, rwin, ((dev, bno) : BufId), rx⟩ : SlotReg BufId BufX) tl E hE hw hrtl
       $$ [Hbox Hrun Hfl Hrd Hc] with ⟨Hrun, Hc, ⟨%x0, %T0, %hT0, Hrd, Hhdr⟩⟩
   · iframe Hbox Hrun Hrd Hc
@@ -566,29 +584,75 @@ theorem bufEscrow_withdrawKey (γ : BcacheNames) (V : BioView) (k : Nat) (cpu : 
   · ipureintro; exact hT0
   iframe Hrd Hhdr
 
-/-! ## Allocation, from the `.bss` cells -/
+/-! ## Allocation, from the `.bss` cells
 
-/-- **THE ESCROW OF ONE BUFFER, BORN** out of the raw cells `binit` owns:
-the content moves into a fresh twin context, which is stamped, and the
-invariant is allocated over it.  The caller keeps both payload rows -- the
-L1 register half (with its receipt) and the L2 register half -- to seat in
-`bcache.lock`'s resource and in the buffer's sleeplock.
+**GNAMES BEFORE THE RECORD** (Rocq `BioInv.v`'s `bio_init`).  The escrow's
+payload mentions `Xv6.BcacheNames` -- through `Xv6.bufPay`'s dirty arm,
+which parks a real `Xv6.bref` -- so the box INVARIANT cannot be sealed
+before the names record exists.  Rocq's way out, ported here: mint the box's
+four ghosts as a bare `Nat → MachCSL.BoxNames` function FIRST
+(`Xv6.bufBoxRaw`), assemble `Xv6.BcacheNames` over it, and only then seal
+each buffer's invariant with `MachCSL.boxAllocAt` (`Xv6.bufEscrow_allocAt`,
+Rocq's `buf_box_alloc`). -/
 
-At `binit` the caller passes `v = 0` and the LEFT arm of `Xv6.bufPayV`: an
-invalid buffer owes no disk fragment, which is what lets thirty buffers all
-naming block `0` coexist. -/
-theorem bufEscrow_alloc (V : BioView) (k : Nat) (qd qb : Qp) (cpu : CPU)
-    (dev bno v : BitVec 32) (bs : List (BitVec 8)) (E : CoPset) :
-    ownCtx cpu curCtx ∗ bufTravelV V k qd qb dev bno v bs ⊢
-      |={E}=> (ownCtx cpu curCtx ∗ ∃ (γbk : BoxNames) (Tb : Nat),
-        bufBox V γbk k qd qb ∗
+instance : Inhabited BoxNames := ⟨⟨0, 0, 0, 0⟩⟩
+
+/-- **ONE BUFFER'S BOX GHOSTS, BEFORE ITS INVARIANT** (the four per-buffer
+families Rocq's `bio_init` allocates with `seq_fun_alloc`), exactly what
+`MachCSL.boxAllocAt` consumes. -/
+def bufBoxRaw (γbk : BoxNames) : IProp GF := iprop%
+  stampsAuth (Id := BufId) γbk (∅ : RegMapF (BufId × Nat)) ∗ (γbk.cnt ↪VAR (0 : Nat)) ∗
+  (∃ r0 : SlotReg BufId BufX, γbk.slotd ↪VAR r0) ∗
+  slotpHalf γbk (⟨0, none⟩ : L2Reg BufId)
+
+/-- The L2 register's OTHER half comes out beside the raw bundle: it is what
+the buffer's SLEEPLOCK is sealed over (`Xv6.bufSlpRaw`), and the sleeplocks
+must exist before `Xv6.BcacheNames` does. -/
+theorem bufBoxRaw_alloc :
+    ⊢ |==> ∃ γbk : BoxNames,
+      bufBoxRaw (GF := GF) γbk ∗ slotpHalf (GF := GF) γbk (⟨0, none⟩ : L2Reg BufId) := by
+  imod ghost_map_alloc_empty (GF := GF) (K := Nat) (V := BufId × Nat) (H := RegMapF)
+    with ⟨%g1, Hst⟩
+  imod ghost_var_alloc (GF := GF) (0 : Nat) with ⟨%g2, Hcnt⟩
+  imod ghost_var_alloc (GF := GF) (default : SlotReg BufId BufX) with ⟨%g3, Hrd⟩
+  imod ghost_var_alloc (GF := GF) (⟨0, none⟩ : L2Reg BufId) with ⟨%g4, Hrp⟩
+  imodintro
+  iexists (⟨g1, g2, g3, g4⟩ : BoxNames)
+  icases ghostVar_halves (⟨g1, g2, g3, g4⟩ : BoxNames).slotp (⟨0, none⟩ : L2Reg BufId)
+    $$ Hrp with ⟨Hrp1, Hrp2⟩
+  unfold bufBoxRaw stampsAuth slotpHalf
+  iframe Hst Hcnt Hrp1 Hrp2
+  iexists (default : SlotReg BufId BufX)
+  iexact Hrd
+
+/-- **THE ESCROW OF ONE BUFFER, BORN** out of the raw cells `binit` owns and
+the box's already-minted ghosts (Rocq's `buf_box_alloc`): the content moves
+into a fresh twin context, which is stamped, and the invariant is allocated
+over it.  The caller keeps both payload rows -- the L1 register half (with
+its receipt) and the L2 register half -- to seat in `bcache.lock`'s resource
+and in the buffer's sleeplock.
+
+At `binit` the caller passes `v = 0` and an UNCOVERED blockno, so the
+payload is `emp`: that is what lets thirty buffers all naming block `0`
+coexist. -/
+theorem bufEscrow_allocAt (γ : BcacheNames) (V : BioView GF) (γbk : BoxNames) (k : Nat)
+    (qd qb : Qp) (cpu : CPU) (dev bno v : BitVec 32) (bs : List (BitVec 8)) (E : CoPset) :
+    bufBoxRaw (GF := GF) γbk ∗ ownCtx cpu curCtx ∗
+      bufTravelV γ V k qd qb dev bno v bs ⊢
+      |={E}=> (ownCtx cpu curCtx ∗ ∃ Tb : Nat,
+        bufBox γ V γbk k qd qb ∗
         slotdHalf (GF := GF) γbk (⟨Tb, false, (dev, bno), none⟩ : SlotReg BufId BufX) ∗ topLb Tb ∗
-        cntHalf (GF := GF) γbk 0 ∗ slotpHalf (GF := GF) γbk (⟨0, none⟩ : L2Reg BufId)) := by
-  iintro ⟨Hrun, Htrav⟩
-  imod boxAlloc (bufBoxPay V k qd qb) (ndot bioxN k) cpu curCtx (dev, bno) E
-      $$ [Hrun Htrav] with ⟨Hrun, H⟩
-  · iframe Hrun
-    iapply bufTravelV_inArm V k qd qb dev bno v bs
+        cntHalf (GF := GF) γbk 0) := by
+  iintro ⟨Hraw, Hrun, Htrav⟩
+  icases (show bufBoxRaw (GF := GF) γbk ⊢
+      stampsAuth (Id := BufId) γbk (∅ : RegMapF (BufId × Nat)) ∗ (γbk.cnt ↪VAR (0 : Nat)) ∗
+      (∃ r0 : SlotReg BufId BufX, γbk.slotd ↪VAR r0) ∗
+      slotpHalf γbk (⟨0, none⟩ : L2Reg BufId) from by
+    unfold bufBoxRaw; iintro H; iexact H) $$ Hraw with ⟨Hst, Hcnt, Hrd, Hrp⟩
+  imod boxAllocAtHalves (bufBoxPay γ V k qd qb) (ndot bioxN k) γbk cpu curCtx (dev, bno) E
+      $$ [Hst Hcnt Hrd Hrp Hrun Htrav] with ⟨Hrun, H⟩
+  · iframe Hst Hcnt Hrd Hrp Hrun
+    iapply bufTravelV_inArm γ V k qd qb dev bno v bs
     iexact Htrav
   imodintro
   iframe Hrun
@@ -599,28 +663,28 @@ theorem bufEscrow_alloc (V : BioView) (k : Nat) (qd qb : Qp) (cpu : CPU)
 row for `bcache.lock`'s `Xv6.bkeyAt`, the count half for its `Xv6.bslotAt`
 (at zero -- `b->refcnt` is zero at boot), and the L2 register half for the
 buffer's sleeplock payload `Xv6.bufSlpBox`. -/
-def bufBoxRow (V : BioView) (γbk : BoxNames) (k : Nat) (qd qb : Qp)
+def bufBoxRow (γ : BcacheNames) (V : BioView GF) (γbk : BoxNames) (k : Nat) (qd qb : Qp)
     (dev bno : BitVec 32) : IProp GF := iprop%
-  bufBox V γbk k qd qb ∗
+  bufBox γ V γbk k qd qb ∗
   (∃ r : SlotReg BufId BufX,
     slotdHalf γbk r ∗ ⌜r.win = false ∧ r.x = none ∧ r.ident = ((dev, bno) : BufId)⌝ ∗ topLb r.td) ∗
-  cntHalf γbk 0 ∗ slotpHalf γbk (⟨0, none⟩ : L2Reg BufId)
+  cntHalf γbk 0
 
-theorem bufEscrow_allocRow (V : BioView) (k : Nat) (qd qb : Qp) (cpu : CPU)
-    (dev bno v : BitVec 32) (bs : List (BitVec 8)) (E : CoPset) :
-    ownCtx cpu curCtx ∗ bufTravelV (GF := GF) V k qd qb dev bno v bs ⊢
-      |={E}=> (ownCtx cpu curCtx ∗ ∃ γbk : BoxNames, bufBoxRow V γbk k qd qb dev bno) := by
-  iintro ⟨Hrun, Htrav⟩
-  imod bufEscrow_alloc V k qd qb cpu dev bno v bs E $$ [Hrun Htrav]
-    with ⟨Hrun, ⟨%γbk, %Tb, #Hbox, Hrd, #Htb, Hc, Hrp⟩⟩
-  · iframe Hrun Htrav
+theorem bufEscrow_allocRowAt (γ : BcacheNames) (V : BioView GF) (γbk : BoxNames) (k : Nat)
+    (qd qb : Qp) (cpu : CPU) (dev bno v : BitVec 32) (bs : List (BitVec 8)) (E : CoPset) :
+    bufBoxRaw (GF := GF) γbk ∗ ownCtx cpu curCtx ∗
+      bufTravelV (GF := GF) γ V k qd qb dev bno v bs ⊢
+      |={E}=> (ownCtx cpu curCtx ∗ bufBoxRow γ V γbk k qd qb dev bno) := by
+  iintro ⟨Hraw, Hrun, Htrav⟩
+  imod bufEscrow_allocAt γ V γbk k qd qb cpu dev bno v bs E $$ [Hraw Hrun Htrav]
+    with ⟨Hrun, ⟨%Tb, #Hbox, Hrd, #Htb, Hc⟩⟩
+  · iframe Hraw Hrun Htrav
   imodintro
   iframe Hrun
-  iexists γbk
   unfold bufBoxRow
   isplit
   · iexact Hbox
-  iframe Hc Hrp
+  iframe Hc
   iexists (⟨Tb, false, (dev, bno), none⟩ : SlotReg BufId BufX)
   iframe Hrd
   isplit
@@ -654,12 +718,12 @@ theorem bigSepL_range_congr (Φ Ψ : Nat → IProp GF) :
 
 /-- **THE THIRTY ESCROWS, BORN TOGETHER** (the fold Rocq's `bio_init` runs
 over `seq 0 NBUF`): every buffer's raw travelling content goes into its own
-box, and the caller comes away with a `box : Nat → BoxNames` for
-`Xv6.BcacheNames` and every buffer's three rows.
+box, at the box ghosts `bx` the caller minted BEFORE assembling
+`Xv6.BcacheNames`, and the caller comes away with every buffer's three rows.
 
-At `binit` the natural instance is `v k = 0` with `Xv6.bufPayV`'s LEFT arm:
-nothing owes a disk fragment, which is what lets thirty buffers all naming
-block `0` coexist.
+At `binit` the natural instance is `v k = 0` at the uncovered blockno `0`:
+nothing owes a disk fragment or a payload, which is what lets thirty buffers
+all naming block `0` coexist.
 
 **WHAT `binit`'s POST LACKS** (reported).  `Xv6.wp_binit_body`'s `bufOut i`
 hands back only the three things `binit` writes: the initialised sleeplock
@@ -668,52 +732,43 @@ hands back only the three things `binit` writes: the initialised sleeplock
 `bioInit` must take, per buffer, as EXTRA inputs beside `binit`'s post:
 `b->valid` (`+0`), `b->disk` (`+4`), `b->dev` (`+8`), `b->blockno` (`+12`),
 `b->refcnt` (`+64`) and the 1024 data bytes (`+88`) -- all zero out of
-`.bss`.  `Xv6.bufTravelV` at `v = 0` is exactly the first six of those minus
-`refcnt`, which stays behind in `Xv6.bslotAt`.  Beyond this fold, a full
-`bioInit` still owes: the thirty sleeplocks re-sealed over `Xv6.bufSlpBox`
-(Rocq's "gnames before the record" dance -- the checkout tokens first, then
-the sleeplocks, then the `Xv6.BcacheNames` record), the reference/slot
-authorities with `Xv6.bslots γ BSLOTS`, the LRU cycle out of `binit`'s
-`prev`/`next` values (`Xv6.bcacheLru_splice`), and `Xv6.isBcache` over the
-assembled `Xv6.bcacheResAt`. -/
-theorem bufEscrow_allocAll (V : BioView) (qd qb : Qp) (cpu : CPU)
+`.bss`. -/
+theorem bufEscrow_allocAllAt (γ : BcacheNames) (V : BioView GF) (bx : Nat → BoxNames)
+    (qd qb : Qp) (cpu : CPU)
     (dev bno v : Nat → BitVec 32) (bs : Nat → List (BitVec 8)) (E : CoPset) :
     ∀ n : Nat,
-      ownCtx cpu curCtx ∗
-        ([∗list] k ∈ List.range n, bufTravelV (GF := GF) V k qd qb (dev k) (bno k) (v k) (bs k)) ⊢
-      |={E}=> (ownCtx cpu curCtx ∗ ∃ bx : Nat → BoxNames,
-        [∗list] k ∈ List.range n, bufBoxRow V (bx k) k qd qb (dev k) (bno k)) := by
+      ownCtx cpu curCtx ∗ ([∗list] k ∈ List.range n, bufBoxRaw (GF := GF) (bx k)) ∗
+        ([∗list] k ∈ List.range n,
+          bufTravelV (GF := GF) γ V k qd qb (dev k) (bno k) (v k) (bs k)) ⊢
+      |={E}=> (ownCtx cpu curCtx ∗
+        [∗list] k ∈ List.range n, bufBoxRow γ V (bx k) k qd qb (dev k) (bno k)) := by
   intro n
   induction n with
   | zero =>
-      iintro ⟨Hrun, -⟩
+      iintro ⟨Hrun, -, -⟩
       imodintro
       iframe Hrun
-      iexists (fun _ => (⟨0, 0, 0, 0⟩ : BoxNames))
       simp only [List.range_zero]
       iapply BigSepL.bigSepL_nil.2
       itrivial
   | succ n ih =>
       rw [List.range_succ]
-      iintro ⟨Hrun, H⟩
+      iintro ⟨Hrun, Hr, H⟩
+      icases BigSepL.bigSepL_append.1 $$ Hr with ⟨Hr1, Hr2⟩
       icases BigSepL.bigSepL_append.1 $$ H with ⟨H1, H2⟩
-      imod ih $$ [Hrun H1] with ⟨Hrun, ⟨%bx0, Hrows⟩⟩
-      · iframe Hrun H1
+      imod ih $$ [Hrun Hr1 H1] with ⟨Hrun, Hrows⟩
+      · iframe Hrun Hr1 H1
       ihave H2 := BigSepL.bigSepL_singleton.1 $$ H2
-      imod bufEscrow_allocRow V n qd qb cpu (dev n) (bno n) (v n) (bs n) E $$ [Hrun H2]
-        with ⟨Hrun, ⟨%γbn, Hrow⟩⟩
-      · iframe Hrun H2
+      ihave Hr2 := BigSepL.bigSepL_singleton.1 $$ Hr2
+      imod bufEscrow_allocRowAt γ V (bx n) n qd qb cpu (dev n) (bno n) (v n) (bs n) E
+        $$ [Hr2 Hrun H2] with ⟨Hrun, Hrow⟩
+      · iframe Hr2 Hrun H2
       imodintro
       iframe Hrun
-      iexists (fun j => if j = n then γbn else bx0 j)
       iapply BigSepL.bigSepL_append.2
       isplitl [Hrows]
-      · iapply bigSepL_range_congr
-          (fun k => bufBoxRow V (bx0 k) k qd qb (dev k) (bno k))
-          (fun k => bufBoxRow V (if k = n then γbn else bx0 k) k qd qb (dev k) (bno k))
-          n (fun k hk => by rw [if_neg (by omega)]) $$ Hrows
+      · iexact Hrows
       · iapply BigSepL.bigSepL_singleton.2
-        simp only [reduceIte]
         iexact Hrow
 
 end

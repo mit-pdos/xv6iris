@@ -1222,6 +1222,54 @@ theorem boxAllocAt (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace) (γ : BoxNa
   · iexact Hinv
   · iexact HtopTb
 
+/-- Rocq's `box_alloc_at_halves`: `boxAllocAt` with the L2 (park) register's
+OTHER HALF ALREADY SPENT.  The caller mints the register's ghost before the
+box exists and hands one half to whoever parks it -- at the buffer cache,
+that is the buffer's sleeplock, whose payload names the register -- so only
+the box's own half is left to give.  Everything else is `boxAllocAt`. -/
+theorem boxAllocAtHalves (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace) (γ : BoxNames)
+    (cpu : CPU) (ξ : CtxId) (i0 : Id) (E : CoPset) :
+    stampsAuth γ (∅ : RegMapF (Id × Nat)) ∗ (γ.cnt ↪VAR (0 : Nat)) ∗
+      (∃ r0 : SlotReg Id X, γ.slotd ↪VAR r0) ∗ slotpHalf γ (⟨0, none⟩ : L2Reg Id) ∗
+      ownCtx cpu ξ ∗ inArm P i0 ξ ⊢
+      |={E}=> (ownCtx cpu ξ ∗ ∃ Tb : Nat, isBox P N γ ∗
+        slotdHalf γ (⟨Tb, false, i0, none⟩ : SlotReg Id X) ∗ topLb Tb ∗ cntHalf γ 0) := by
+  iintro ⟨Hst, Hcnt, Hrd, Hrp, Hrun, Hin⟩
+  icases Hrd with ⟨%r0, Hrd⟩
+  imod ownCtx_new cpu ξ $$ Hrun with ⟨Hrun, ⟨%ξb, Hξb⟩⟩
+  imod ctx_move (inArm P i0) cpu ξ ξb $$ [$Hrun $Hξb $Hin] with ⟨Hrun, Hξb, Hin⟩
+  imod ctx_stamp cpu ξb $$ Hξb with ⟨%Tb, Hpk, -⟩
+  ihave ⟨#HtopTb, Hpk⟩ := ctxStamped_topLb ξb Tb $$ Hpk
+  imod ghost_var_update (⟨Tb, false, i0, none⟩ : SlotReg Id X) γ.slotd r0 $$ Hrd with Hrd
+  icases ghostVar_halves γ.cnt (0 : Nat) $$ Hcnt with ⟨Hc, Hc0⟩
+  icases ghostVar_halves γ.slotd (⟨Tb, false, i0, none⟩ : SlotReg Id X) $$ Hrd with ⟨Hrd, Hrd0⟩
+  imod inv_alloc N E (boxBody P γ) $$ [Hpk Hst Hc Hrd Hrp Hin] with #Hinv
+  · inext
+    unfold boxBody
+    iexists Tb, ξb, (∅ : RegMapF (Id × Nat)), ([] : List Nat), 0,
+      (⟨Tb, false, i0, none⟩ : SlotReg Id X), (⟨0, none⟩ : L2Reg Id)
+    iframe Hpk
+    unfold stampsAuth cntHalf slotdHalf slotpHalf
+    iframe Hst Hc Hrd Hrp
+    isplit
+    · ipureintro
+      refine ⟨by simp, by simp, ?_, ?_, ?_, ?_⟩
+      · intro j; rw [get?_empty]; simp
+      · intro j v hv; rw [get?_empty] at hv; cases hv
+      · left; intro j v hv; rw [get?_empty] at hv; cases hv
+      · left; exact Nat.le_refl _
+    iapply boxArm_in_intro P γ Tb ξb ([] : List Nat) 0
+      (⟨Tb, false, i0, none⟩ : SlotReg Id X) (⟨0, none⟩ : L2Reg Id) rfl rfl
+    iexact Hin
+  imodintro
+  iframe Hrun
+  iexists Tb
+  unfold isBox cntHalf slotdHalf
+  iframe Hrd0 Hc0
+  isplit
+  · iexact Hinv
+  · iexact HtopTb
+
 /-- Rocq's `box_alloc`: the names are allocated too. -/
 theorem boxAlloc (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace)
     (cpu : CPU) (ξ : CtxId) (i0 : Id) (E : CoPset) :

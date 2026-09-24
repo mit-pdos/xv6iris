@@ -116,7 +116,7 @@ bnos i ≠ bno` -- which alone does NOT say the block is uncached.  The DEV
 PIN closes it: a slot claiming a covered block is on the view's device, and
 the request is too, so the `dev` disjunct is impossible at the requested
 block and the `blockno` disjunct is what remains. -/
-theorem bd_miss_of_tie (V : BioView) (devs bnos : Nat → BitVec 32) (dev bno : BitVec 32)
+theorem bd_miss_of_tie (V : BioView GF) (devs bnos : Nat → BitVec 32) (dev bno : BitVec 32)
     (hdevp : bcacheDev V devs bnos) (hcov : bno.toNat ∈ V.cov) (hdev : dev = V.dev)
     (hmiss : ∀ j, j < NBUF → ¬(devs j = dev ∧ bnos j = bno)) :
     ∀ j, j < NBUF → (bnos j).toNat ≠ bno.toNat := by
@@ -129,7 +129,7 @@ theorem bd_miss_of_tie (V : BioView) (devs bnos : Nat → BitVec 32) (dev bno : 
 /-- The covered-blockno INJECTIVITY, re-established at the recycle: slot `k`'s
 claim moves to the requested block, every other slot's is untouched, and the
 miss fact kills the only new pair. -/
-theorem bd_inj_upd (V : BioView) (bnos : Nat → BitVec 32) (k : Nat) (B : BitVec 32)
+theorem bd_inj_upd (V : BioView GF) (bnos : Nat → BitVec 32) (k : Nat) (B : BitVec 32)
     (hinj : bcacheInj V bnos) (hmissB : ∀ j, j < NBUF → (bnos j).toNat ≠ B.toNat) :
     bcacheInj V (updAtF bnos k B) := by
   intro k1 k2 hk1 hk2 hcov heq
@@ -146,7 +146,7 @@ theorem bd_inj_upd (V : BioView) (bnos : Nat → BitVec 32) (k : Nat) (B : BitVe
     exact hinj k1 k2 hk1 hk2 hcov heq
 
 /-- The DEV PIN survives the recycle: slot `k`'s new device IS the view's. -/
-theorem bd_devpin_upd (V : BioView) (devs bnos : Nat → BitVec 32) (k : Nat) (D B : BitVec 32)
+theorem bd_devpin_upd (V : BioView GF) (devs bnos : Nat → BitVec 32) (k : Nat) (D B : BitVec 32)
     (hdevp : bcacheDev V devs bnos) (hD : D = V.dev) :
     bcacheDev V (updAtF devs k D) (updAtF bnos k B) := by
   intro j hj hcov
@@ -171,7 +171,7 @@ theorem bd_ord_ne_nil (ord : List Nat) (hord : ord.Perm (List.range NBUF)) : ord
   exact absurd this.symm (by unfold NBUF; decide)
 
 /-- The evicted block's own uniqueness premise, out of the injectivity. -/
-theorem bd_old_unique (V : BioView) (bnos : Nat → BitVec 32) (k : Nat) (hk : k < NBUF)
+theorem bd_old_unique (V : BioView GF) (bnos : Nat → BitVec 32) (k : Nat) (hk : k < NBUF)
     (hinj : bcacheInj V bnos) :
     (bnos k).toNat ∈ V.cov → ∀ j, j < NBUF → j ≠ k → (bnos j).toNat ≠ (bnos k).toNat := by
   intro hcov j hj hjk he
@@ -226,12 +226,12 @@ variable [DiskG GF] [CurCtx]
 
 /-- Rocq's `bcache_scan2` with its six existentials NAMED: what both scans
 carry across their iterations. -/
-def bdScan (γ : BcacheNames) (V : BioView) (tl : Nat) (M : RegMapF Nat) (Ls : Nat → List Nat)
+def bdScan (γ : BcacheNames) (V : BioView GF) (tl : Nat) (M : RegMapF Nat) (Ls : Nat → List Nat)
     (ord : List Nat) (devs bnos : Nat → BitVec 32) : IProp GF := iprop%
   (γ.ref ↪●MAP M) ∗ bcacheLruAt curCtx bhead (ord.map bnode) ∗ bioPool V bnos ∗
   bkeyAll γ curCtx tl devs bnos ∗ ([∗list] k ∈ List.range NBUF, bslotAt γ curCtx k (Ls k))
 
-theorem bdScan_unpack (γ : BcacheNames) (V : BioView) (tl : Nat) (M : RegMapF Nat)
+theorem bdScan_unpack (γ : BcacheNames) (V : BioView GF) (tl : Nat) (M : RegMapF Nat)
     (Ls : Nat → List Nat) (ord : List Nat) (devs bnos : Nat → BitVec 32) :
     bdScan (GF := GF) γ V tl M Ls ord devs bnos ⊢
       (γ.ref ↪●MAP M) ∗ bcacheLruAt curCtx bhead (ord.map bnode) ∗ bioPool V bnos ∗
@@ -239,7 +239,7 @@ theorem bdScan_unpack (γ : BcacheNames) (V : BioView) (tl : Nat) (M : RegMapF N
       ([∗list] k ∈ List.range NBUF, bslotAt γ curCtx k (Ls k)) := by
   unfold bdScan; iintro H; iexact H
 
-theorem bdScan_pack (γ : BcacheNames) (V : BioView) (tl : Nat) (M : RegMapF Nat)
+theorem bdScan_pack (γ : BcacheNames) (V : BioView GF) (tl : Nat) (M : RegMapF Nat)
     (Ls : Nat → List Nat) (ord : List Nat) (devs bnos : Nat → BitVec 32) :
     (γ.ref ↪●MAP M) ∗ bcacheLruAt (GF := GF) curCtx bhead (ord.map bnode) ∗ bioPool V bnos ∗
     bkeyAll γ curCtx tl devs bnos ∗
@@ -247,7 +247,7 @@ theorem bdScan_pack (γ : BcacheNames) (V : BioView) (tl : Nat) (M : RegMapF Nat
       bdScan γ V tl M Ls ord devs bnos := by
   unfold bdScan; iintro H; iexact H
 
-theorem bdScan_open (γ : BcacheNames) (V : BioView) (tl : Nat) :
+theorem bdScan_open (γ : BcacheNames) (V : BioView GF) (tl : Nat) :
     bcacheScanAt (GF := GF) γ V curCtx tl ⊢
       ∃ (M : RegMapF Nat) (nx : Nat) (Ls : Nat → List Nat) (ord : List Nat)
         (devs bnos : Nat → BitVec 32),
@@ -263,7 +263,7 @@ theorem bdScan_open (γ : BcacheNames) (V : BioView) (tl : Nat) :
   unfold bdScan
   iframe Ha Hlru Hpool Hkey Hs
 
-theorem bdScan_close (γ : BcacheNames) (V : BioView) (tl : Nat) (M : RegMapF Nat) (nx : Nat)
+theorem bdScan_close (γ : BcacheNames) (V : BioView GF) (tl : Nat) (M : RegMapF Nat) (nx : Nat)
     (Ls : Nat → List Nat) (ord : List Nat) (devs bnos : Nat → BitVec 32)
     (hfresh : ∀ i, nx ≤ i → PartialMap.get? M i = none) (hok : bcacheOk M Ls)
     (hord : ord.Perm (List.range NBUF)) (hinj : bcacheInj V bnos) (hdevp : bcacheDev V devs bnos) :

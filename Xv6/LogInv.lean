@@ -744,6 +744,220 @@ theorem logEpochBump (γ : LogNames) (E : Nat) :
   imodintro
   iexact Ha
 
+
+end
+
+/-! ## The bio payload, read through the logged view
+
+Rocq `ProofInstallTrans.v`'s `it_pay_*` family, and `ProofWriteHead`'s use
+of the same: what `Xv6.bioPay` says once the bio layer is run at
+`Xv6.fsView` (the two hypotheses `hcl`/`hdt` below say exactly that -- see
+the deviation note in `Xv6/SpecInstallTrans.lean`).  These are the only
+place the log layer opens the travelling payload.
+
+They are stated in their OWN section: they need the buffer cache and the
+block maps but not the log's own ghosts, and their consumers
+(`Xv6/ProofWriteHead.lean`, `Xv6/ProofInstallTrans.lean`'s helper lemmas)
+do not all carry `Xv6.LogG`. -/
+
+section
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable [BcacheG GF] [DiskG GF] [FsBlocksG GF] [CurCtx]
+
+/-- The payload's logical content, read off a CLIENT half (Rocq's
+`it_pay_bs`).  Pure conclusion, so the payload survives. -/
+theorem fsPay_bs (γb : BcacheNames) (γfs : FsNames) (V : BioView GF)
+    (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs)
+    (k : Nat) (dv bno : BitVec 32) (bsl bsd bs0 : List (BitVec 8)) (d : Bool) :
+    fsChalf (GF := GF) γfs bno.toNat bs0 ⊢ bioPay γb V k dv bno bsl bsd d -∗ ⌜bsl = bs0⌝ := by
+  unfold bioPay
+  cases d with
+  | true =>
+    rw [hdt]
+    simp only [if_true]
+    iintro Hc ⟨Hm, -⟩
+    iapply fsChalf_mdirty_agree γfs bno.toNat bs0 bsl
+    iframe Hc Hm
+  | false =>
+    rw [hcl]
+    simp only [Bool.false_eq_true, if_false]
+    iintro Hc ⟨Hm, -⟩
+    iapply fsChalf_mclean_agree γfs bno.toNat bs0 bsl
+    iframe Hc Hm
+
+/-- **THE COMMITTER'S OWN WITNESS** (Rocq's `it_pay_bs_auth`): a home
+block's client half is unobtainable on the committer's side, so its bytes
+are read out of the AUTHORITY instead. -/
+theorem fsPay_bs_auth (γb : BcacheNames) (γfs : FsNames) (V : BioView GF)
+    (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs)
+    (k : Nat) (dv bno : BitVec 32) (bsl bsd : List (BitVec 8)) (d : Bool) (L : BlockMap) :
+    fsCacheAuth (GF := GF) γfs L ⊢ bioPay γb V k dv bno bsl bsd d -∗
+      ⌜PartialMap.get? L bno.toNat = some bsl⌝ := by
+  unfold bioPay fsCacheAuth
+  cases d with
+  | true =>
+    rw [hdt]
+    simp only [if_true]
+    unfold fsMdirty
+    iintro Ha ⟨⟨Hm, -⟩, -⟩
+    ihave %h := ghost_map_lookup $$ Ha Hm
+    ipureintro; exact h
+  | false =>
+    rw [hcl]
+    simp only [Bool.false_eq_true, if_false]
+    unfold fsMclean
+    iintro Ha ⟨⟨Hm, -⟩, -⟩
+    ihave %h := ghost_map_lookup $$ Ha Hm
+    ipureintro; exact h
+
+/-- The payload's POLARITY, read off a client dirty half (Rocq's
+`it_pay_d`). -/
+theorem fsPay_d (γb : BcacheNames) (γfs : FsNames) (V : BioView GF)
+    (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs)
+    (k : Nat) (dv bno : BitVec 32) (bsl bsd : List (BitVec 8)) (d db : Bool) :
+    fsDirtyHalf (GF := GF) γfs bno.toNat db ⊢ bioPay γb V k dv bno bsl bsd d -∗ ⌜d = db⌝ := by
+  unfold bioPay fsDirtyHalf
+  cases d with
+  | true =>
+    rw [hdt]
+    simp only [if_true]
+    unfold fsMdirty
+    iintro Hc ⟨⟨-, Hm⟩, -⟩
+    iapply ghost_map_elem_agree γfs.dirty bno.toNat (.own (1 : Qp).half) (.own (1 : Qp).half)
+      true db
+    iframe Hm Hc
+  | false =>
+    rw [hcl]
+    simp only [Bool.false_eq_true, if_false]
+    unfold fsMclean
+    iintro Hc ⟨⟨-, Hm⟩, -⟩
+    iapply ghost_map_elem_agree γfs.dirty bno.toNat (.own (1 : Qp).half) (.own (1 : Qp).half)
+      false db
+    iframe Hm Hc
+
+/-- ...and off the AUTHORITY, which is what the recovering arm holds
+(Rocq's `it_pay_d_auth`). -/
+theorem fsPay_d_auth (γb : BcacheNames) (γfs : FsNames) (V : BioView GF)
+    (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs)
+    (k : Nat) (dv bno : BitVec 32) (bsl bsd : List (BitVec 8)) (d : Bool) (D : RegMapF Bool) :
+    fsDirtyAuth (GF := GF) γfs D ⊢ bioPay γb V k dv bno bsl bsd d -∗
+      ⌜PartialMap.get? D bno.toNat = some d⌝ := by
+  unfold bioPay fsDirtyAuth
+  cases d with
+  | true =>
+    rw [hdt]
+    simp only [if_true]
+    unfold fsMdirty
+    iintro Ha ⟨⟨-, Hm⟩, -⟩
+    ihave %h := ghost_map_lookup $$ Ha Hm
+    ipureintro; exact h
+  | false =>
+    rw [hcl]
+    simp only [Bool.false_eq_true, if_false]
+    unfold fsMclean
+    iintro Ha ⟨⟨-, Hm⟩, -⟩
+    ihave %h := ghost_map_lookup $$ Ha Hm
+    ipureintro; exact h
+
+/-- The DIRTY payload taken apart: the two machinery halves and the PIN
+(Rocq's `it_pay_open`). -/
+theorem fsPay_open (γb : BcacheNames) (γfs : FsNames) (V : BioView GF)
+    (hdt : V.dirty = fsMdirty γfs)
+    (k : Nat) (dv bno : BitVec 32) (bsl bsd : List (BitVec 8)) :
+    bioPay (GF := GF) γb V k dv bno bsl bsd true ⊢
+      (γfs.cache ↪◯MAP[bno.toNat]{.own (1 : Qp).half} bsl) ∗
+      (γfs.dirty ↪◯MAP[bno.toNat]{.own (1 : Qp).half} true) ∗ bref γb k dv bno := by
+  unfold bioPay
+  rw [hdt]
+  simp only [if_true]
+  unfold fsMdirty
+  iintro ⟨⟨H1, H2⟩, H3⟩
+  iframe H1 H2 H3
+
+/-- The CLEAN payload taken apart (Rocq's `it_pay_open_clean`). -/
+theorem fsPay_open_clean (γb : BcacheNames) (γfs : FsNames) (V : BioView GF)
+    (hcl : V.clean = fsMclean γfs)
+    (k : Nat) (dv bno : BitVec 32) (bsl bsd : List (BitVec 8)) :
+    bioPay (GF := GF) γb V k dv bno bsl bsd false ⊢
+      ⌜bsd = bsl⌝ ∗ (γfs.cache ↪◯MAP[bno.toNat]{.own (1 : Qp).half} bsl) ∗
+      (γfs.dirty ↪◯MAP[bno.toNat]{.own (1 : Qp).half} false) := by
+  unfold bioPay
+  rw [hcl]
+  simp only [Bool.false_eq_true, if_false]
+  unfold fsMclean
+  iintro ⟨⟨H1, H2⟩, %he⟩
+  isplitr [H1 H2]
+  · ipureintro; exact he
+  · iframe H1 H2
+
+/-- The payload split into pieces that survive a content-changing WRITE
+(Rocq `ProofWriteHead.v`'s `wh_pay_split`): the two machinery halves, and
+the pin when there is one.  The polarity `d` rides through unexamined. -/
+theorem fsPay_split (γb : BcacheNames) (γfs : FsNames) (V : BioView GF)
+    (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs)
+    (k : Nat) (dv bno : BitVec 32) (bsl bsd : List (BitVec 8)) (d : Bool) :
+    bioPay (GF := GF) γb V k dv bno bsl bsd d ⊢
+      (γfs.cache ↪◯MAP[bno.toNat]{.own (1 : Qp).half} bsl) ∗
+      (γfs.dirty ↪◯MAP[bno.toNat]{.own (1 : Qp).half} d) ∗
+      (if d then bref γb k dv bno else iprop(emp)) := by
+  unfold bioPay
+  cases d with
+  | true =>
+    rw [hdt]
+    simp only [if_true]
+    unfold fsMdirty
+    iintro ⟨⟨H1, H2⟩, H3⟩
+    iframe H1 H2 H3
+  | false =>
+    rw [hcl]
+    simp only [Bool.false_eq_true, if_false]
+    unfold fsMclean
+    iintro ⟨⟨H1, H2⟩, -⟩
+    iframe H1 H2
+
+/-- ...and re-paired at the written bytes, once the `bwrite` has made the
+disk cell equal to them (Rocq's `wh_pay_mk`). -/
+theorem fsPay_mk (γb : BcacheNames) (γfs : FsNames) (V : BioView GF)
+    (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs)
+    (k : Nat) (dv bno : BitVec 32) (bs : List (BitVec 8)) (d : Bool) :
+    (γfs.cache ↪◯MAP[bno.toNat]{.own (1 : Qp).half} bs) ∗
+    (γfs.dirty ↪◯MAP[bno.toNat]{.own (1 : Qp).half} d) ∗
+    (if d then bref γb k dv bno else iprop(emp)) ⊢
+      bioPay (GF := GF) γb V k dv bno bs bs d := by
+  unfold bioPay
+  cases d with
+  | true =>
+    rw [hdt]
+    simp only [if_true]
+    unfold fsMdirty
+    iintro ⟨H1, H2, H3⟩
+    iframe H1 H2 H3
+  | false =>
+    rw [hcl]
+    simp only [Bool.false_eq_true, if_false]
+    unfold fsMclean
+    iintro ⟨H1, H2, -⟩
+    isplitl [H1 H2]
+    · iframe H1 H2
+    · ipureintro; trivial
+
+/-- ...and re-formed CLEAN, once the write has made disk = bytes (Rocq's
+`it_pay_clean`). -/
+theorem fsPay_clean (γb : BcacheNames) (γfs : FsNames) (V : BioView GF)
+    (hcl : V.clean = fsMclean γfs)
+    (k : Nat) (dv bno : BitVec 32) (bsl : List (BitVec 8)) :
+    (γfs.cache ↪◯MAP[bno.toNat]{.own (1 : Qp).half} bsl) ∗
+    (γfs.dirty ↪◯MAP[bno.toNat]{.own (1 : Qp).half} false) ⊢
+      bioPay (GF := GF) γb V k dv bno bsl bsl false := by
+  unfold bioPay
+  rw [hcl]
+  simp only [Bool.false_eq_true, if_false]
+  unfold fsMclean
+  iintro ⟨H1, H2⟩
+  isplitl [H1 H2]
+  · iframe H1 H2
+  · ipureintro; trivial
+
 end
 
 end Xv6

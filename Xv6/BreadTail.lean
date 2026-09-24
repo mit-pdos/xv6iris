@@ -67,8 +67,8 @@ whatever `SPIE`/`SPP` its callees' balanced `push_off`/`pop_off` pairs left
 mentions. -/
 theorem bd_ret (c cpu : CPU) (k0 : KCtx) (sp1 sp2 : Bool)
     (hK : 6 ≤ k0.avail) (hsie : k0.sie = false)
-    (γ : BcacheNames) (V : BioView) (kk : Nat) (pidv dev bno : BitVec 32) (dqp : DFrac)
-    (bs : List (BitVec 8)) (R : RegMap)
+    (γ : BcacheNames) (V : BioView GF) (kk : Nat) (pidv dev bno : BitVec 32) (dqp : DFrac)
+    (bs bsd : List (BitVec 8)) (d : Bool) (R : RegMap)
     (hR2 : R 2#5 = k0.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64) (h9 : R 9#5 = bnode kk)
     (hpins : bdPins k0 R)
     (hpin : true = false ∨ k0.proc = 0#64 → c = cpu) :
@@ -77,14 +77,14 @@ theorem bd_ret (c cpu : CPU) (k0 : KCtx) (sp1 sp2 : Bool)
       (k0.regs 18#5) (k0.regs 19#5) ∗
     trapCsrs c ∗ cpuClaim c k0.proc ∗ intrRes c ∗
     wordPointsTo (pPid k0.proc) 4 dqp pidv ∗
-    bufHold0 γ V kk pidv dev bno bs bs ∗
+    bioLocked γ V kk pidv dev bno bs bsd d ∗
     wpNext true k0.proc cpu (fun cpu' => iprop(∀ (spie2 spp2 : Bool) (R' : RegMap) (kk2 : Nat)
-        (bs2 : List (BitVec 8)),
+        (bs2 bsd2 : List (BitVec 8)) (d2 : Bool),
       ⌜calleeSaved k0.regs R' ∧ R' 10#5 = bnode kk2⌝ -∗
       kctx cpu' ((k0.withSpie spie2 spp2).withRegs R') -∗ pcIs cpu' (jumpPc (k0.regs 1#5)) -∗
       trapCsrs cpu' -∗ cpuClaim cpu' k0.proc -∗ intrRes cpu' -∗
       wordPointsTo (pPid k0.proc) 4 dqp pidv -∗
-      bufHold0 γ V kk2 pidv dev bno bs2 bs2 -∗ wpLoop cpu'))
+      bioLocked γ V kk2 pidv dev bno bs2 bsd2 d2 -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   obtain ⟨p20, p21, p22, p23, p24, p25, p26, p27⟩ := hpins
   iintro ⟨Hk, Hpc, Hframe, Htc, Hcl, Hir, Hpid, Hhold, Hnext⟩
@@ -110,7 +110,7 @@ theorem bd_ret (c cpu : CPU) (k0 : KCtx) (sp1 sp2 : Bool)
   subst hc2
   k_norm
   ihave HΦ := wpNext_at true k0.proc cpu c2 _ hpin $$ Hnext
-  iapply HΦ $$ %sp1 %sp2 %_ %kk %bs [] Hk Hpc Htc Hcl Hir Hpid Hhold
+  iapply HΦ $$ %sp1 %sp2 %_ %kk %bs %bsd %d [] Hk Hpc Htc Hcl Hir Hpid Hhold
   ipureintro
   refine ⟨bd_calleeSaved_epi k0.regs (R.set 10#5 (bnode kk)) ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_, ?_⟩ <;>
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;>
@@ -121,7 +121,7 @@ theorem bd_ret (c cpu : CPU) (k0 : KCtx) (sp1 sp2 : Bool)
 set_option maxHeartbeats 2000000 in
 /-- `virtio_disk_rw(b, 0)` at the fill arm's call site. -/
 theorem bd_vdr (VR : VIRTIO_DISK_RW) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (c : CPU) (k' : KCtx) (V : BioView) (γdl : GName) (pd pav pu : BitVec 64) (j kk : Nat)
+    (c : CPU) (k' : KCtx) (V : BioView GF) (γdl : GName) (pd pav pu : BitVec 64) (j kk : Nat)
     (bno : BitVec 32) (bs bsd : List (BitVec 8)) (pj : BitVec 64) (hpj : k'.proc = pj)
     (ha0 : k'.regs 10#5 = bnode kk) (ha1 : k'.regs 11#5 = 0#64)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : virtioDiskRwSlots ≤ k'.avail)
@@ -155,7 +155,7 @@ set_option maxHeartbeats 8000000 in
 `b->valid`, fill through `virtio_disk_rw` if it is clear, and return. -/
 theorem bd_tail (VR : VIRTIO_DISK_RW) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (c cpu : CPU) (k0 : KCtx) (sp1 sp2 : Bool)
-    (γl : GName) (γ : BcacheNames) (V : BioView) (γdl : GName) (pd pav pu : BitVec 64)
+    (γl : GName) (γ : BcacheNames) (V : BioView GF) (γdl : GName) (pd pav pu : BitVec 64)
     (j kk T : Nat) (pidv dev bno : BitVec 32) (dqp : DFrac) (R : RegMap)
     (hj : j < NPROC) (hproc : k0.proc = procAddr j) (hK : breadSlots ≤ k0.avail)
     (hsie : k0.sie = false) (hnoff : k0.noff = 0) (hlocks : k0.locks = [])
@@ -170,16 +170,16 @@ theorem bd_tail (VR : VIRTIO_DISK_RW) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
       (k0.regs 18#5) (k0.regs 19#5) ∗
     procsInv Γ ∗ trapCsrs c ∗ cpuClaim c k0.proc ∗ intrRes c ∗
     wordPointsTo (pPid k0.proc) 4 dqp pidv ∗
-    bufBox V (γ.box kk) kk (1 : Qp).half (1 : Qp).half ∗ diskCaps V.gd γdl pd pav pu ∗
+    bufBox γ V (γ.box kk) kk (1 : Qp).half (1 : Qp).half ∗ diskCaps V.gd γdl pd pav pu ∗
     sleeplockedQ (γ.slk kk).2 1 (aBufLock (bnode kk)) pidv ∗ bufSlpBox γ kk curCtx ∗
     ctxFloor curCtx T ∗ boxRef (γ.box kk) ((dev, bno) : BufId) T ∗ brefTok γ kk ∗
     wpNext true k0.proc cpu (fun cpu' => iprop(∀ (spie2 spp2 : Bool) (R' : RegMap) (kk2 : Nat)
-        (bs2 : List (BitVec 8)),
+        (bs2 bsd2 : List (BitVec 8)) (d2 : Bool),
       ⌜calleeSaved k0.regs R' ∧ R' 10#5 = bnode kk2⌝ -∗
       kctx cpu' ((k0.withSpie spie2 spp2).withRegs R') -∗ pcIs cpu' (jumpPc (k0.regs 1#5)) -∗
       trapCsrs cpu' -∗ cpuClaim cpu' k0.proc -∗ intrRes cpu' -∗
       wordPointsTo (pPid k0.proc) 4 dqp pidv -∗
-      bufHold0 γ V kk2 pidv dev bno bs2 bs2 -∗ wpLoop cpu'))
+      bioLocked γ V kk2 pidv dev bno bs2 bsd2 d2 -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   iintro ⟨Hk, Hpc, Hframe, Hpi, Htc, Hcl, Hir, Hpid, #Hbox, #Hdc, Hsl, Hslp, #Hfl, Href, Hrt,
     Hnext⟩
@@ -194,14 +194,14 @@ theorem bd_tail (VR : VIRTIO_DISK_RW) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
   imodintro
   ihave Hk := Hkback $$ Hctx
   -- the cells the bundle carries
-  icases (show bufTravelV (GF := GF) V kk (1 : Qp).half (1 : Qp).half dev bno v bs ⊢
+  icases (show bufTravelV (GF := GF) γ V kk (1 : Qp).half (1 : Qp).half dev bno v bs ⊢
       ⌜bs.length = BSIZE ∧ (v = 0#32 ∨ v = 1#32)⌝ ∗
       wordPointsTo (aBufValid (bnode kk)) 4 (DFrac.own 1) v ∗
       wordPointsTo (aBufDev (bnode kk)) 4 (DFrac.own (1 : Qp).half) dev ∗
       wordPointsTo (aBufBlockno (bnode kk)) 4 (DFrac.own (1 : Qp).half) bno ∗
       wordPointsTo (aBufDisk (bnode kk)) 4 (DFrac.own 1) 0#32 ∗
       byteBuf (aBufData (bnode kk)) (DFrac.own 1) bs ∗
-      bufPay V ((dev, bno) : BufId) v bs from by
+      bufPay γ V kk ((dev, bno) : BufId) v bs from by
     unfold bufTravelV; iintro H; iexact H) $$ Htrav
     with ⟨%hbs, Hvalid, Hdv, Hbn, Hdisk, Hdata, Hpay⟩
   ihave Hvalid := (show wordPointsTo (GF := GF) (aBufValid (bnode kk)) 4 (DFrac.own 1) v ⊢
@@ -218,10 +218,11 @@ theorem bd_tail (VR : VIRTIO_DISK_RW) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
     k_step (wp_s_branch c _ (KA.«bread» + 0xb6#64) true 18#13 15#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bd_beqz_zero, bd_t_fill]
     iintro Hk Hpc
-    icases bufPay_cov V dev bno 0#32 bs hcov $$ Hpay with ⟨-, Hpool⟩
+    icases bufPay_invalid γ V kk dev bno 0#32 bs hcov rfl $$ Hpay with ⟨-, Hpool⟩
     icases (show poolBlk (GF := GF) V bno.toNat ⊢
-        ∃ bsd : List (BitVec 8), ⌜bsd.length = BSIZE⌝ ∗ diskBlock V.gd bno.toNat bsd from by
-      unfold poolBlk; iintro H; iexact H) $$ Hpool with ⟨%bsd, %hbsd, Hblk⟩
+        ∃ bsd : List (BitVec 8), ⌜bsd.length = BSIZE⌝ ∗ diskBlock V.gd bno.toNat bsd ∗
+          V.clean bno.toNat bsd from by
+      unfold poolBlk; iintro H; iexact H) $$ Hpool with ⟨%bsd, %hbsd, Hblk, Hcln⟩
     ihave Hown : bufOwn (GF := GF) (bnode kk) bno 0#32 bs $$ [Hbn Hdisk Hdata]
     · unfold bufOwn
       isplitl []
@@ -279,19 +280,26 @@ theorem bd_tail (VR : VIRTIO_DISK_RW) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
         wordPointsTo (aBufDisk (bnode kk)) 4 (DFrac.own 1) 0#32 ∗
         byteBuf (aBufData (bnode kk)) (DFrac.own 1) bsd from by
       unfold bufOwn; iintro H; iexact H) $$ Hown with ⟨-, Hbn, Hdisk, Hdata⟩
-    ihave Htrav2 : bufTravel (GF := GF) V kk (1 : Qp).half (1 : Qp).half dev bno 1#32 bsd bsd
-      $$ [Hvalid Hdv Hbn Hdisk Hdata Hblk]
+    ihave Htrav2 : bufTravel (GF := GF) γ V kk (1 : Qp).half (1 : Qp).half dev bno 1#32
+        bsd bsd bsd false
+      $$ [Hvalid Hdv Hbn Hdisk Hdata Hblk Hcln]
     · unfold bufTravel
       isplitl []
       · ipureintro; exact ⟨hbsd, hbsd, Or.inr rfl⟩
       iframe Hvalid Hdv Hbn Hdisk Hdata Hblk
-    ihave Hhold := bufHold0_of_travel γ V kk pidv dev bno bsd bsd hkk hcov hdev
+      iapply bioPay_clean γ V kk dev bno bsd
+      iexact Hcln
+    ihave Hhold := bufHold0_of_travel γ V kk pidv dev bno bsd bsd bsd false hkk hcov hdev
       $$ [Hsl Htok Hrt Hhd Htrav2]
     · iframe Hsl Htok Hrt Htrav2
       iexists idh
       iexact Hhd
+    ihave Hhold := (show iprop(bufHold0 (GF := GF) γ V kk pidv dev bno bsd bsd ∗
+          bioPay γ V kk dev bno bsd bsd false) ⊢
+        bioLocked γ V kk pidv dev bno bsd bsd false from by
+      unfold bioLocked; iintro H; iexact H) $$ Hhold
     have hpin3 : true = false ∨ k0.proc = 0#64 → c3 = cpu := fun hh => (hp3 hh).trans (hpin hh)
-    iapply (bd_ret c3 cpu k0 spie3 spp3 hK6 hsie γ V kk pidv dev bno dqp bsd
+    iapply (bd_ret c3 cpu k0 spie3 spp3 hK6 hsie γ V kk pidv dev bno dqp bsd bsd false
         (R3.set 15#5 1#64)
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact e2.trans hR2)
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact g9)
@@ -311,22 +319,28 @@ theorem bd_tail (VR : VIRTIO_DISK_RW) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bd_beqz_one]
     iintro Hk Hpc
     k_norm
-    icases bufPay_valid V dev bno 1#32 bs hcov (by decide) $$ Hpay with ⟨-, Hblk⟩
+    icases bufPay_valid γ V kk dev bno 1#32 bs hcov (by decide) $$ Hpay with
+      ⟨-, %bsd, %d, %hbsd, Hblk, Hpay⟩
     ihave Hvalid := (show wordPointsTo (GF := GF) (bnode kk) 4 (DFrac.own 1) 1#32 ⊢
         wordPointsTo (aBufValid (bnode kk)) 4 (DFrac.own 1) 1#32 from by
       rw [bd_valid_eq]) $$ Hvalid
-    ihave Htrav2 : bufTravel (GF := GF) V kk (1 : Qp).half (1 : Qp).half dev bno 1#32 bs bs
-      $$ [Hvalid Hdv Hbn Hdisk Hdata Hblk]
+    ihave Htrav2 : bufTravel (GF := GF) γ V kk (1 : Qp).half (1 : Qp).half dev bno 1#32
+        bs bs bsd d
+      $$ [Hvalid Hdv Hbn Hdisk Hdata Hblk Hpay]
     · unfold bufTravel
       isplitl []
-      · ipureintro; exact ⟨hbs.1, hbs.1, Or.inr rfl⟩
-      iframe Hvalid Hdv Hbn Hdisk Hdata Hblk
-    ihave Hhold := bufHold0_of_travel γ V kk pidv dev bno bs bs hkk hcov hdev
+      · ipureintro; exact ⟨hbs.1, hbsd, Or.inr rfl⟩
+      iframe Hvalid Hdv Hbn Hdisk Hdata Hblk Hpay
+    ihave Hhold := bufHold0_of_travel γ V kk pidv dev bno bs bs bsd d hkk hcov hdev
       $$ [Hsl Htok Hrt Hhd Htrav2]
     · iframe Hsl Htok Hrt Htrav2
       iexists idh
       iexact Hhd
-    iapply (bd_ret c cpu k0 sp1 sp2 hK6 hsie γ V kk pidv dev bno dqp bs
+    ihave Hhold := (show iprop(bufHold0 (GF := GF) γ V kk pidv dev bno bs bsd ∗
+          bioPay γ V kk dev bno bs bsd d) ⊢
+        bioLocked γ V kk pidv dev bno bs bsd d from by
+      unfold bioLocked; iintro H; iexact H) $$ Hhold
+    iapply (bd_ret c cpu k0 sp1 sp2 hK6 hsie γ V kk pidv dev bno dqp bs bsd d
         (R.set 15#5 1#64)
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hR2)
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h9)

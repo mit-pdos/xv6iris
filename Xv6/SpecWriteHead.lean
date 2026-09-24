@@ -36,15 +36,17 @@ the header's `int n` field -- and the FULL on-disk encoding
 durable state this write commits to, so at `n > 0` this `bwrite` is THE
 COMMIT POINT.
 
-**Two deviations from Rocq, both forced (see `Xv6/LogInv.lean`'s header
-for the whole audit).**  (1) Rocq's contract carries a CRASH PERMIT family
-`∀ bs', ⌜…⌝ -∗ disk_seq_permit gen_id (Some (1024 * hdr, bs')) (Q bs')`
+**Deviations from Rocq.**  (1) Rocq's contract carries a CRASH PERMIT
+family `∀ bs', ⌜…⌝ -∗ disk_seq_permit gen_id (Some (1024 * hdr, bs')) (Q bs')`
 and hands `▷ Q bs'` back from the DMA completion; this port's disk layer
 has no crash permits at all (`Xv6/DiskInvDefs.lean`), and `Xv6.SpecBwrite`
-produces no receipt, so the family and `Q` are dropped.  (2) The logged
-view is ghost-only here: nothing ties `fsCacheAuth`/`fsChalf` to what the
-buffer or the disk holds, because this port's `bufPay` carries the disk
-fragment rather than the log's payload -- see `Xv6/FsBlocks.lean`.
+produces no receipt, so the family and `Q` are dropped.  (2) Rocq runs the
+bio layer at `fs_view γfs γd dev cov` LITERALLY; this port keeps the
+client view `V` a parameter and says the same thing with the two premises
+`hcl`/`hdt` (`V.clean = fsMclean γfs`, `V.dirty = fsMdirty γfs`).  That is
+what ties the header block's `fsChalf` to what the buffer holds -- the
+payload's machinery half comes out of the handle `bread` returns and moves
+with the client half at the `Xv6.fsCache_update`.
 
 `write_head` sleeps (`bread`, `bwrite`, `brelse`), so it threads the full
 running-process bundle exactly as `Xv6/SpecBread.lean` does, plus the disk
@@ -74,13 +76,14 @@ def writeHeadSlots : Nat := 4 + breadSlots
 def wp_write_head_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView) (γdl : GName)
+    (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (γfs : FsNames) (pd pav pu : BitVec 64) (j : Nat) (logstart : Nat) (dev : BitVec 32)
     (n : Nat) (W : List (BitVec 32)) (L : BlockMap) (pidv : BitVec 32) (dqp : DFrac)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : writeHeadSlots ≤ k.avail)
     (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
     (htier : k.tier = KTier.kpt)
     (hgeom : logGeomOk V.cov logstart) (hdev : dev = V.dev)
+    (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs)
     (hn : n = W.length ∧ n ≤ LOGBLOCKS) (hpd : descPageRw pd) : Prop :=
   kctx cpu k ∗ pcIs cpu writeHeadAddr ∗ procsInv Γ ∗
   trapCsrs cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ∗
@@ -112,11 +115,11 @@ structure WRITE_HEAD : Prop where
   wp_write_head : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView) (γdl : GName)
+    (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (γfs : FsNames) (pd pav pu : BitVec 64) (j : Nat) (logstart : Nat) (dev : BitVec 32)
     (n : Nat) (W : List (BitVec 32)) (L : BlockMap) (pidv : BitVec 32) (dqp : DFrac)
-    hj hproc hK hsie hnoff hlocks htier hgeom hdev hn hpd,
+    hj hproc hK hsie hnoff hlocks htier hgeom hdev hcl hdt hn hpd,
     wp_write_head_body (hlc := hlc) (GF := GF) Γ cpu k γl γb V γdl γfs pd pav pu j
-      logstart dev n W L pidv dqp hj hproc hK hsie hnoff hlocks htier hgeom hdev hn hpd
+      logstart dev n W L pidv dqp hj hproc hK hsie hnoff hlocks htier hgeom hdev hcl hdt hn hpd
 
 end Xv6

@@ -68,7 +68,7 @@ set_option maxHeartbeats 8000000 in
 /-- One iteration's compare, from `bread+0x3c`: `b->dev == dev &&
 b->blockno == blockno`.  Either arm leaves the scan resource untouched. -/
 theorem bd_fwd_step (c : CPU) (kc : KCtx) (hsie : kc.sie = false)
-    (γ : BcacheNames) (V : BioView) (tl : Nat) (M : RegMapF Nat) (Ls : Nat → List Nat)
+    (γ : BcacheNames) (V : BioView GF) (tl : Nat) (M : RegMapF Nat) (Ls : Nat → List Nat)
     (ord : List Nat) (devs bnos : Nat → BitVec 32) (dev bno : BitVec 32)
     (R0 Rc : RegMap) (kk : Nat) (hkk : kk < NBUF)
     (hregs : bdFwdRegs dev bno kk Rc) (hoth : bdOther R0 Rc) :
@@ -178,7 +178,7 @@ set_option maxHeartbeats 8000000 in
 /-- **THE HIT SCAN**, from `bread+0x3c` with the cursor on buffer `kk`, by
 induction on the buffers still to visit. -/
 theorem bd_fwd (c : CPU) (kc : KCtx) (hsie : kc.sie = false)
-    (γ : BcacheNames) (V : BioView) (tl : Nat) (M : RegMapF Nat) (Ls : Nat → List Nat)
+    (γ : BcacheNames) (V : BioView GF) (tl : Nat) (M : RegMapF Nat) (Ls : Nat → List Nat)
     (ord : List Nat) (devs bnos : Nat → BitVec 32) (dev bno : BitVec 32)
     (hord : ord.Perm (List.range NBUF)) (R0 : RegMap) :
     ∀ (rest o1 : List Nat) (kk : Nat) (Rc : RegMap),
@@ -339,7 +339,7 @@ theorem bd_fwd (c : CPU) (kc : KCtx) (hsie : kc.sie = false)
 set_option maxHeartbeats 8000000 in
 /-- One iteration's `refcnt` test, from `bread+0x7a`. -/
 theorem bd_bwd_step (c : CPU) (kc : KCtx) (hsie : kc.sie = false)
-    (γ : BcacheNames) (V : BioView) (tl : Nat) (M : RegMapF Nat) (Ls : Nat → List Nat)
+    (γ : BcacheNames) (V : BioView GF) (tl : Nat) (M : RegMapF Nat) (Ls : Nat → List Nat)
     (ord : List Nat) (devs bnos : Nat → BitVec 32) (dev bno : BitVec 32)
     (R0 Rc : RegMap) (kk : Nat) (hkk : kk < NBUF)
     (hregs : bdFwdRegs dev bno kk Rc) (hoth : bdOther R0 Rc) :
@@ -415,7 +415,7 @@ set_option maxHeartbeats 8000000 in
 by induction on the buffers still to visit -- backwards, so the recursion is
 on the prefix of the LRU order. -/
 theorem bd_bwd (c : CPU) (kc : KCtx) (hsie : kc.sie = false)
-    (γ : BcacheNames) (V : BioView) (tl : Nat) (M : RegMapF Nat) (Ls : Nat → List Nat)
+    (γ : BcacheNames) (V : BioView GF) (tl : Nat) (M : RegMapF Nat) (Ls : Nat → List Nat)
     (ord : List Nat) (devs bnos : Nat → BitVec 32) (dev bno : BitVec 32)
     (hord : ord.Perm (List.range NBUF)) (R0 : RegMap) :
     ∀ (o1 o2 : List Nat) (kk : Nat) (Rc : RegMap),
@@ -558,7 +558,7 @@ restores, which the caller discharges at the concrete context. -/
 theorem bd_hit (RE : RELEASE_HOOK) (AS : ACQUIRESLEEP_LLB) (VR : VIRTIO_DISK_RW)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (c cpu : CPU) (k0 kc : KCtx) (spa spb : Bool) (R0 Rc : RegMap)
-    (γl : GName) (γ : BcacheNames) (V : BioView) (γdl : GName) (pd pav pu : BitVec 64)
+    (γl : GName) (γ : BcacheNames) (V : BioView GF) (γdl : GName) (pd pav pu : BitVec 64)
     (j kk tl : Nat) (M : RegMapF Nat) (nx : Nat) (Ls : Nat → List Nat) (ord : List Nat)
     (devs bnos : Nat → BitVec 32) (pidv dev bno : BitVec 32) (dqp : DFrac)
     (hj : j < NPROC) (hproc : k0.proc = procAddr j) (hK : breadSlots ≤ k0.avail)
@@ -585,12 +585,12 @@ theorem bd_hit (RE : RELEASE_HOOK) (AS : ACQUIRESLEEP_LLB) (VR : VIRTIO_DISK_RW)
     procsInv Γ ∗ trapCsrs c ∗ cpuClaim c k0.proc ∗ intrRes c ∗
     wordPointsTo (pPid k0.proc) 4 dqp pidv ∗
     wpNext true k0.proc cpu (fun cpu' => iprop(∀ (spie2 spp2 : Bool) (R' : RegMap) (kk2 : Nat)
-        (bs2 : List (BitVec 8)),
+        (bs2 bsd2 : List (BitVec 8)) (d2 : Bool),
       ⌜calleeSaved k0.regs R' ∧ R' 10#5 = bnode kk2⌝ -∗
       kctx cpu' ((k0.withSpie spie2 spp2).withRegs R') -∗ pcIs cpu' (jumpPc (k0.regs 1#5)) -∗
       trapCsrs cpu' -∗ cpuClaim cpu' k0.proc -∗ intrRes cpu' -∗
       wordPointsTo (pPid k0.proc) 4 dqp pidv -∗
-      bufHold0 γ V kk2 pidv dev bno bs2 bs2 -∗ wpLoop cpu'))
+      bioLocked γ V kk2 pidv dev bno bs2 bsd2 d2 -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   obtain ⟨h9, h14, h18, h19⟩ := hregs
   iintro ⟨Hk, Hpc, Hscan, #Hfl, #Htl, Hlocked, #Hbc, #Hdc, Hsl, Hframe, Hpi, Htc, Hcl, Hir,
@@ -639,7 +639,7 @@ theorem bd_hit (RE : RELEASE_HOOK) (AS : ACQUIRESLEEP_LLB) (VR : VIRTIO_DISK_RW)
   ihave Hup := bref_alloc_step γ M nx kk (Ls kk) hfresh $$ [Ha Hhalves]
   case' _ => iframe
   imod Hup with ⟨Ha, Href, Hhalves', %hnx⟩
-  imod bufEscrow_refIncr V (γ.box kk) kk (1 : Qp).half (1 : Qp).half r (Ls kk).length ⊤
+  imod bufEscrow_refIncr γ V (γ.box kk) kk (1 : Qp).half (1 : Qp).half r (Ls kk).length ⊤
       bioxN_top hrid.1 $$ [Hbox Hrd Hcnt] with ⟨Hrd, Hcnt, ⟨%Tb, Hbref⟩⟩
   · iframe Hbox Hrd Hcnt
   ihave Hbref := (show (boxRef (GF := GF) (γ.box kk) r.ident Tb) ⊢
@@ -775,7 +775,7 @@ being evicted -- when it is covered at all -- comes back in
 theorem bd_recyc (RE : RELEASE_HOOK) (AS : ACQUIRESLEEP_LLB) (VR : VIRTIO_DISK_RW)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (c cpu : CPU) (k0 kc : KCtx) (spa spb : Bool) (R0 Rc : RegMap)
-    (γl : GName) (γ : BcacheNames) (V : BioView) (γdl : GName) (pd pav pu : BitVec 64)
+    (γl : GName) (γ : BcacheNames) (V : BioView GF) (γdl : GName) (pd pav pu : BitVec 64)
     (j kk tl : Nat) (M : RegMapF Nat) (nx : Nat) (Ls : Nat → List Nat) (ord : List Nat)
     (devs bnos : Nat → BitVec 32) (pidv dev bno : BitVec 32) (dqp : DFrac)
     (hj : j < NPROC) (hproc : k0.proc = procAddr j) (hK : breadSlots ≤ k0.avail)
@@ -803,12 +803,12 @@ theorem bd_recyc (RE : RELEASE_HOOK) (AS : ACQUIRESLEEP_LLB) (VR : VIRTIO_DISK_R
     procsInv Γ ∗ trapCsrs c ∗ cpuClaim c k0.proc ∗ intrRes c ∗
     wordPointsTo (pPid k0.proc) 4 dqp pidv ∗
     wpNext true k0.proc cpu (fun cpu' => iprop(∀ (spie2 spp2 : Bool) (R' : RegMap) (kk2 : Nat)
-        (bs2 : List (BitVec 8)),
+        (bs2 bsd2 : List (BitVec 8)) (d2 : Bool),
       ⌜calleeSaved k0.regs R' ∧ R' 10#5 = bnode kk2⌝ -∗
       kctx cpu' ((k0.withSpie spie2 spp2).withRegs R') -∗ pcIs cpu' (jumpPc (k0.regs 1#5)) -∗
       trapCsrs cpu' -∗ cpuClaim cpu' k0.proc -∗ intrRes cpu' -∗
       wordPointsTo (pPid k0.proc) 4 dqp pidv -∗
-      bufHold0 γ V kk2 pidv dev bno bs2 bs2 -∗ wpLoop cpu'))
+      bioLocked γ V kk2 pidv dev bno bs2 bsd2 d2 -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   obtain ⟨h9, h14, h18, h19⟩ := hregs
   iintro ⟨Hk, Hpc, Hscan, #Hfl, #Htl, Hlocked, #Hbc, #Hdc, Hsl, Hframe, Hpi, Htc, Hcl, Hir,
@@ -836,12 +836,12 @@ theorem bd_recyc (RE : RELEASE_HOOK) (AS : ACQUIRESLEEP_LLB) (VR : VIRTIO_DISK_R
     iexact Hfl
   imodintro
   ihave Hk := Hkback $$ Hctx
-  icases (show bufHeaderAt (GF := GF) V kk (1 : Qp).half (1 : Qp).half (devs kk) (bnos kk) x0 ⊢
+  icases (show bufHeaderAt (GF := GF) γ V kk (1 : Qp).half (1 : Qp).half (devs kk) (bnos kk) x0 ⊢
       ∃ v0 : BitVec 32, ⌜v0 = 0#32 ∨ v0 = 1#32⌝ ∗
         wordPointsTo (aBufValid (bnode kk)) 4 (DFrac.own 1) v0 ∗
         wordPointsTo (aBufDev (bnode kk)) 4 (DFrac.own (1 : Qp).half) (devs kk) ∗
         wordPointsTo (aBufBlockno (bnode kk)) 4 (DFrac.own (1 : Qp).half) (bnos kk) ∗
-        bufPay V ((devs kk, bnos kk) : BufId) v0 x0 from by
+        bufPay γ V kk ((devs kk, bnos kk) : BufId) v0 x0 from by
     unfold bufHeaderAt; iintro H; iexact H) $$ Hhdr
     with ⟨%v0, %hv01, Hvalid, Hdev2, Hbno2, Hpay⟩
   -- the two key cells are WHOLE while the window is open
@@ -894,16 +894,22 @@ theorem bd_recyc (RE : RELEASE_HOOK) (AS : ACQUIRESLEEP_LLB) (VR : VIRTIO_DISK_R
   icases bioPool_recycle V bnos (updAtF bnos kk bno) kk (bnos kk) bno hkk rfl
       (updAtF_self bnos kk bno) (fun i hi => updAtF_ne bnos kk i bno hi) hcov hmissB holdu
       $$ Hpool with ⟨HpoolB, Hpback⟩
-  ihave Hold : (if (bnos kk).toNat ∈ V.cov then poolBlk (GF := GF) V (bnos kk).toNat
-      else iprop(emp)) $$ [Hpay]
-  · by_cases hoc : (bnos kk).toNat ∈ V.cov
-    · rw [if_pos hoc]
-      icases bufPay_cov V (devs kk) (bnos kk) v0 x0 hoc $$ Hpay with ⟨-, H⟩
+  icases bufPay_evict γ V M Ls kk hok hLs (devs kk) (bnos kk) v0 x0 $$ [Ha Hpay]
+    with ⟨Ha, Hev⟩
+  · iframe Ha Hpay
+  have hconv : (if (bnos kk).toNat ∈ V.cov
+        then iprop(⌜devs kk = V.dev⌝ ∗ poolBlk (GF := GF) V (bnos kk).toNat)
+        else iprop(emp)) ⊢
+      (if (bnos kk).toNat ∈ V.cov then poolBlk (GF := GF) V (bnos kk).toNat
+       else iprop(emp)) := by
+    by_cases hoc : (bnos kk).toNat ∈ V.cov
+    · rw [if_pos hoc, if_pos hoc]
+      iintro ⟨-, H⟩
       iexact H
-    · rw [if_neg hoc]
-      iempintro
+    · rw [if_neg hoc, if_neg hoc]
+  ihave Hold := hconv $$ Hev
   ihave Hpool := Hpback $$ Hold
-  ihave Hpay' := bufPay_of_pool V dev bno 0#32 x0 hcov hdev rfl $$ HpoolB
+  ihave Hpay' := bufPay_of_pool γ V kk dev bno 0#32 x0 hcov hdev rfl $$ HpoolB
   -- the key cells go back to halves and the header is deposited at the new key
   ihave Hdevf := (show wordPointsTo (GF := GF) (bnode kk + 8#64) 4 (DFrac.own 1) dev ⊢
       wordPointsTo (aBufDev (bnode kk)) 4 (DFrac.own 1) dev from by
@@ -916,7 +922,7 @@ theorem bd_recyc (RE : RELEASE_HOOK) (AS : ACQUIRESLEEP_LLB) (VR : VIRTIO_DISK_R
     rw [bd_valid_eq]) $$ Hvalid
   icases bd_word_split (aBufDev (bnode kk)) dev $$ Hdevf with ⟨Hd1, Hd2⟩
   icases bd_word_split (aBufBlockno (bnode kk)) bno $$ Hbnof with ⟨Hb1, Hb2⟩
-  ihave Hhdr' : bufHeaderAt (GF := GF) V kk (1 : Qp).half (1 : Qp).half dev bno x0
+  ihave Hhdr' : bufHeaderAt (GF := GF) γ V kk (1 : Qp).half (1 : Qp).half dev bno x0
     $$ [Hvalid Hd1 Hb1 Hpay']
   · unfold bufHeaderAt
     iexists 0#32
@@ -926,7 +932,7 @@ theorem bd_recyc (RE : RELEASE_HOOK) (AS : ACQUIRESLEEP_LLB) (VR : VIRTIO_DISK_R
   -- **THE WINDOW CLOSES**
   iapply wpLoop_fupd
   icases kctx_token_acc c _ $$ Hk with ⟨Hctx, Hkback⟩
-  imod bufEscrow_recycle V (γ.box kk) kk (1 : Qp).half (1 : Qp).half c
+  imod bufEscrow_recycle γ V (γ.box kk) kk (1 : Qp).half (1 : Qp).half c
       (⟨td, true, ((devs kk, bnos kk) : BufId), some (x0, T0)⟩ : SlotReg BufId BufX)
       dev bno x0 T0 ⊤ bioxN_top rfl rfl $$ [Hbox Hctx Hrd Hcnt Hhdr']
     with ⟨Hctx, ⟨%T', Hrd', Hcnt', Hbref, #HT'⟩⟩

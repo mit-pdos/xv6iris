@@ -590,6 +590,154 @@ honest, the other is what `refcnt--` burns in the box. -/
 def bref (γ : BcacheNames) (k : Nat) (dev bno : BitVec 32) : IProp GF := iprop%
   brefTok γ k ∗ ∃ T : Nat, boxRef (γ.box k) ((dev, bno) : BufId) T
 
+instance bref_timeless (γ : BcacheNames) (k : Nat) (dev bno : BitVec 32) :
+    Timeless (bref (GF := GF) γ k dev bno) := by
+  unfold bref brefTok boxRef; infer_instance
+
+/-! ## The travelling payloads (Rocq `BioInv.v`'s `bio_pay` / `buf_pay`)
+
+`Xv6/BioPool.lean` holds the view and the pool bundle; the two payloads live
+HERE because the DIRTY arm parks a real `Xv6.bref`, and that is the fact
+which lets the recycler's authority refute "dirty" at eviction: only clean,
+disk-agreeing content ever returns to the pool. -/
+
+/-- **A HELD COVERED BLOCK'S PAYLOAD** (Rocq's `bio_pay`): the logical
+content `bsl` against the disk cell's value `bsd`, keyed by the dirty flag.
+CLEAN ties the disk to the logical content; DIRTY parks the pinning
+reference instead.
+
+**Deviation (reported).**  Rocq's dirty arm is `∃ q, bref bn k q dev bno` --
+its `bref` carries a real fraction `q` of the `dev`/`blockno` cells.  This
+port's `Xv6.bref` is ghost-only (the file header's standing deviation), so
+the arm is the bare reference with no fraction to quantify. -/
+def bioPay (γ : BcacheNames) (V : BioView GF) (k : Nat) (dev bno : BitVec 32)
+    (bsl bsd : List (BitVec 8)) (d : Bool) : IProp GF :=
+  if d then iprop(V.dirty bno.toNat bsl ∗ bref γ k dev bno)
+  else iprop(V.clean bno.toNat bsl ∗ ⌜bsd = bsl⌝)
+
+instance bioPay_timeless (γ : BcacheNames) (V : BioView GF) (k : Nat) (dev bno : BitVec 32)
+    (bsl bsd : List (BitVec 8)) (d : Bool) :
+    Timeless (bioPay (GF := GF) γ V k dev bno bsl bsd d) := by
+  unfold bioPay; split <;> infer_instance
+
+/-- The CLEAN arm, folded. -/
+theorem bioPay_clean (γ : BcacheNames) (V : BioView GF) (k : Nat) (dev bno : BitVec 32)
+    (bsl : List (BitVec 8)) :
+    V.clean bno.toNat bsl ⊢ bioPay (GF := GF) γ V k dev bno bsl bsl false := by
+  unfold bioPay
+  simp only [Bool.false_eq_true, if_false]
+  iintro H
+  isplitl [H]
+  · iexact H
+  · ipureintro; trivial
+
+/-- ...and unfolded: on the clean arm the disk cell AGREES with the logical
+content. -/
+theorem bioPay_clean_elim (γ : BcacheNames) (V : BioView GF) (k : Nat) (dev bno : BitVec 32)
+    (bsl bsd : List (BitVec 8)) :
+    bioPay (GF := GF) γ V k dev bno bsl bsd false ⊢ ⌜bsd = bsl⌝ ∗ V.clean bno.toNat bsl := by
+  unfold bioPay
+  simp only [Bool.false_eq_true, if_false]
+  iintro ⟨H, %he⟩
+  isplitr [H]
+  · ipureintro; exact he
+  · iexact H
+
+/-- The DIRTY arm, folded: the pin IS a real reference to the buffer. -/
+theorem bioPay_dirty (γ : BcacheNames) (V : BioView GF) (k : Nat) (dev bno : BitVec 32)
+    (bsl bsd : List (BitVec 8)) :
+    V.dirty bno.toNat bsl ∗ bref γ k dev bno ⊢
+      bioPay (GF := GF) γ V k dev bno bsl bsd true := by
+  unfold bioPay
+  simp only [if_true]
+  iintro H; iexact H
+
+/-- ...and unfolded. -/
+theorem bioPay_dirty_elim (γ : BcacheNames) (V : BioView GF) (k : Nat) (dev bno : BitVec 32)
+    (bsl bsd : List (BitVec 8)) :
+    bioPay (GF := GF) γ V k dev bno bsl bsd true ⊢
+      V.dirty bno.toNat bsl ∗ bref γ k dev bno := by
+  unfold bioPay
+  simp only [if_true]
+  iintro H; iexact H
+
+/-- **THE PAYLOAD A PARKED BUFFER CARRIES** (Rocq's `buf_pay`), keyed on its
+valid bit: a VALID covered buffer's bytes ARE the logical content (with the
+block's disk cell alongside); an INVALID covered buffer carries the block's
+pool bundle, so that WHOEVER wins the sleeplock race after a recycle finds
+the fragment the fill needs.  Uncovered blocknos (only block `0` in
+practice -- `binit`'s zeroed cells) carry nothing. -/
+def bufPay (γ : BcacheNames) (V : BioView GF) (k : Nat) (i : BufId) (v : BitVec 32)
+    (x : BufX) : IProp GF :=
+  if i.2.toNat ∈ V.cov then
+    iprop(⌜i.1 = V.dev⌝ ∗
+      (if v = 0#32 then poolBlk V i.2.toNat
+       else iprop(∃ (bsd : List (BitVec 8)) (d : Bool), ⌜bsd.length = BSIZE⌝ ∗
+         diskBlock V.gd i.2.toNat bsd ∗ bioPay γ V k i.1 i.2 x bsd d)))
+  else iprop(emp)
+
+instance bufPay_timeless (γ : BcacheNames) (V : BioView GF) (k : Nat) (i : BufId)
+    (v : BitVec 32) (x : BufX) : Timeless (bufPay (GF := GF) γ V k i v x) := by
+  unfold bufPay diskBlock
+  split
+  · split <;> infer_instance
+  · infer_instance
+
+/-- An uncovered blockno owes nothing (what `binit`'s thirty buffers, all
+naming block `0`, present). -/
+theorem bufPay_uncov (γ : BcacheNames) (V : BioView GF) (k : Nat) (dev bno v : BitVec 32)
+    (x : BufX) (hcov : bno.toNat ∉ V.cov) :
+    ⊢ bufPay (GF := GF) γ V k ((dev, bno) : BufId) v x := by
+  unfold bufPay
+  rw [if_neg hcov]
+  iempintro
+
+/-- The INVALID covered arm, unpacked: the block's pool bundle. -/
+theorem bufPay_invalid (γ : BcacheNames) (V : BioView GF) (k : Nat) (dev bno v : BitVec 32)
+    (x : BufX) (hcov : bno.toNat ∈ V.cov) (hv : v = 0#32) :
+    bufPay (GF := GF) γ V k ((dev, bno) : BufId) v x ⊢
+      ⌜dev = V.dev⌝ ∗ poolBlk V bno.toNat := by
+  unfold bufPay
+  rw [if_pos hcov, if_pos hv]
+
+/-- ...and back in, out of the pool. -/
+theorem bufPay_of_pool (γ : BcacheNames) (V : BioView GF) (k : Nat) (dev bno v : BitVec 32)
+    (x : BufX) (hcov : bno.toNat ∈ V.cov) (hdev : dev = V.dev) (hv : v = 0#32) :
+    poolBlk (GF := GF) V bno.toNat ⊢ bufPay γ V k ((dev, bno) : BufId) v x := by
+  unfold bufPay
+  rw [if_pos hcov, if_pos hv]
+  iintro H
+  isplitr [H]
+  · ipureintro; exact hdev
+  · iexact H
+
+/-- A VALID covered buffer's payload, unpacked: the disk cell beside the
+held payload at the buffer's own bytes. -/
+theorem bufPay_valid (γ : BcacheNames) (V : BioView GF) (k : Nat) (dev bno v : BitVec 32)
+    (x : BufX) (hcov : bno.toNat ∈ V.cov) (hv : v ≠ 0#32) :
+    bufPay (GF := GF) γ V k ((dev, bno) : BufId) v x ⊢
+      ⌜dev = V.dev⌝ ∗ ∃ (bsd : List (BitVec 8)) (d : Bool), ⌜bsd.length = BSIZE⌝ ∗
+        diskBlock V.gd bno.toNat bsd ∗ bioPay γ V k dev bno x bsd d := by
+  unfold bufPay
+  rw [if_pos hcov, if_neg hv]
+
+/-- ...and back in. -/
+theorem bufPay_of_valid (γ : BcacheNames) (V : BioView GF) (k : Nat) (dev bno v : BitVec 32)
+    (x : BufX) (bsd : List (BitVec 8)) (d : Bool)
+    (hcov : bno.toNat ∈ V.cov) (hdev : dev = V.dev) (hv : v ≠ 0#32)
+    (hlen : bsd.length = BSIZE) :
+    diskBlock (GF := GF) V.gd bno.toNat bsd ∗ bioPay γ V k dev bno x bsd d ⊢
+      bufPay γ V k ((dev, bno) : BufId) v x := by
+  unfold bufPay
+  rw [if_pos hcov, if_neg hv]
+  iintro ⟨H1, H2⟩
+  isplitr [H1 H2]
+  · ipureintro; exact hdev
+  iexists bsd, d
+  isplitl []
+  · ipureintro; exact hlen
+  · iframe H1 H2
+
 /-! ## The slot supply -/
 
 /-- `n` units: `n` distinct slot tokens, all minted at boot with keys below
@@ -683,14 +831,78 @@ bookkeeping sound -- a covered block's fragment lives in exactly one place,
 either the one buffer that claims it or the pool -- and `bread`'s miss scan
 re-establishes it at the recycle (its exit fact is "no buffer holds the
 requested block"). -/
-def bcacheInj (V : BioView) (bnos : Nat → BitVec 32) : Prop :=
+def bcacheInj (V : BioView GF) (bnos : Nat → BitVec 32) : Prop :=
   ∀ k1 k2, k1 < NBUF → k2 < NBUF → (bnos k1).toNat ∈ V.cov →
     (bnos k1).toNat = (bnos k2).toNat → k1 = k2
 
 /-- **A COVERED BUFFER IS ON THE VIEW'S DEVICE** (Rocq's `bcache_scan2`
 row). -/
-def bcacheDev (V : BioView) (devs bnos : Nat → BitVec 32) : Prop :=
+def bcacheDev (V : BioView GF) (devs bnos : Nat → BitVec 32) : Prop :=
   ∀ k, k < NBUF → (bnos k).toNat ∈ V.cov → devs k = V.dev
+
+/-! ## The eviction lemma
+
+Rocq's `bref_tok_free_absurd` / `buf_pay_evict`: at `refcnt == 0` the count
+AUTHORITY refutes the parked payload's DIRTY arm (which holds a real
+`Xv6.bref`), so only clean, disk-agreeing content ever returns to the
+pool. -/
+
+/-- A reference to a buffer the authority records no reference for is
+absurd (Rocq's `bref_tok_free_absurd`). -/
+theorem bref_free_absurd (γ : BcacheNames) (M : RegMapF Nat) (Ls : Nat → List Nat) (k : Nat)
+    (hok : bcacheOk M Ls) (hnil : Ls k = []) (dev bno : BitVec 32) :
+    (γ.ref ↪●MAP M) ∗ bref (GF := GF) γ k dev bno ⊢ False := by
+  iintro ⟨Ha, Hr⟩
+  icases (show bref (GF := GF) γ k dev bno ⊢
+      (∃ id : Nat, γ.ref ↪◯MAP[id]{.own (1 : Qp).half} k) ∗
+      (∃ T : Nat, boxRef (γ.box k) ((dev, bno) : BufId) T) from by
+    unfold bref brefTok; iintro H; iexact H) $$ Hr with ⟨⟨%id, He⟩, -⟩
+  ihave %hget := ghost_map_lookup $$ Ha He
+  have h := (hok id k hget).2
+  rw [hnil] at h
+  exact absurd h List.not_mem_nil
+
+/-- **THE EVICTION** (Rocq's `buf_pay_evict`): the recycler holds the count
+authority at a buffer with no outstanding reference, so the parked payload
+cannot be DIRTY; a covered buffer therefore yields the block's pool bundle
+whatever its valid bit says. -/
+theorem bufPay_evict (γ : BcacheNames) (V : BioView GF) (M : RegMapF Nat) (Ls : Nat → List Nat)
+    (k : Nat) (hok : bcacheOk M Ls) (hnil : Ls k = [])
+    (dev bno v : BitVec 32) (x : BufX) :
+    (γ.ref ↪●MAP M) ∗ bufPay (GF := GF) γ V k ((dev, bno) : BufId) v x ⊢
+      (γ.ref ↪●MAP M) ∗
+      (if bno.toNat ∈ V.cov then iprop(⌜dev = V.dev⌝ ∗ poolBlk V bno.toNat)
+       else iprop(emp)) := by
+  by_cases hcov : bno.toNat ∈ V.cov
+  · rw [if_pos hcov]
+    by_cases hv : v = 0#32
+    · iintro ⟨Ha, Hpay⟩
+      iframe Ha
+      iapply bufPay_invalid γ V k dev bno v x hcov hv
+      iexact Hpay
+    · iintro ⟨Ha, Hpay⟩
+      icases bufPay_valid γ V k dev bno v x hcov hv $$ Hpay with
+        ⟨%hdev, %bsd, %d, %hlen, Hblk, Hpay⟩
+      cases d with
+      | true =>
+        icases bioPay_dirty_elim γ V k dev bno x bsd $$ Hpay with ⟨-, Hr⟩
+        iexfalso
+        iapply bref_free_absurd γ M Ls k hok hnil dev bno
+        iframe Ha Hr
+      | false =>
+        icases bioPay_clean_elim γ V k dev bno x bsd $$ Hpay with ⟨%he, Hcl⟩
+        subst he
+        iframe Ha
+        isplitr [Hblk Hcl]
+        · ipureintro; exact hdev
+        unfold poolBlk
+        iexists bsd
+        isplitl []
+        · ipureintro; exact hlen
+        iframe Hblk Hcl
+  · rw [if_neg hcov]
+    iintro ⟨Ha, -⟩
+    iframe Ha
 
 /-- **The `bcache.lock` resource, UNFLOORED** (Rocq's `bcache_scan2`): the
 count authority, the LRU cycle over a permutation of the thirty buffers,
@@ -698,7 +910,7 @@ every slot's row, and a half of every buffer's `dev`/`blockno` -- all of it
 bounded by the floor slot `tl`, but without the floor itself.  This is the
 shape a releaser can present (it only ever holds `MachCSL.topLb tl`); the
 hook turns it into the resource proper at the lock's own stamped context. -/
-def bcacheScanAt (γ : BcacheNames) (V : BioView) (ξ : CtxId) (tl : Nat) : IProp GF := iprop%
+def bcacheScanAt (γ : BcacheNames) (V : BioView GF) (ξ : CtxId) (tl : Nat) : IProp GF := iprop%
   ∃ (M : RegMapF Nat) (nx : Nat) (Ls : Nat → List Nat) (ord : List Nat)
     (devs bnos : Nat → BitVec 32),
     (γ.ref ↪●MAP M) ∗
@@ -711,12 +923,12 @@ def bcacheScanAt (γ : BcacheNames) (V : BioView) (ξ : CtxId) (tl : Nat) : IPro
 
 /-- The releaser's form of the payload (Rocq's `Rdep`): the unfloored body
 beside the store-order receipt of its floor slot. -/
-def bcacheResIn (γ : BcacheNames) (V : BioView) (tl : Nat) : CtxId → IProp GF := fun ξ => iprop(
+def bcacheResIn (γ : BcacheNames) (V : BioView GF) (tl : Nat) : CtxId → IProp GF := fun ξ => iprop(
   topLb tl ∗ bcacheScanAt γ V ξ tl)
 
 /-- **The `bcache.lock` resource** (Rocq's `bcache_res2`): the unfloored
 body at a floor slot, WITH the floor. -/
-def bcacheResAt (γ : BcacheNames) (V : BioView) (ξ : CtxId) : IProp GF := iprop%
+def bcacheResAt (γ : BcacheNames) (V : BioView GF) (ξ : CtxId) : IProp GF := iprop%
   ∃ tl : Nat, ctxFloor ξ tl ∗ topLb tl ∗ bcacheScanAt γ V ξ tl
 
 instance instCtxMorphBslotAt (γ : BcacheNames) (k : Nat) (L : List Nat) :
@@ -734,7 +946,7 @@ instance instCtxMorphBkeyAll (γ : BcacheNames) (tl : Nat) (devs bnos : Nat → 
     (fun _ k ξ => bkeyAt γ ξ tl k (devs k) (bnos k))
     (fun _ k => instCtxMorphBkeyAt γ tl k (devs k) (bnos k))
 
-instance instCtxMorphBcacheScanAt (γ : BcacheNames) (V : BioView) (tl : Nat) :
+instance instCtxMorphBcacheScanAt (γ : BcacheNames) (V : BioView GF) (tl : Nat) :
     CtxMorph (GF := GF) (fun ξ => bcacheScanAt γ V ξ tl) := by
   unfold bcacheScanAt
   refine @instCtxMorphExists _ _ _ _ _ (fun M => ?_)
@@ -748,12 +960,12 @@ instance instCtxMorphBcacheScanAt (γ : BcacheNames) (V : BioView) (tl : Nat) :
   have h2 := instCtxMorphBkeyAll (GF := GF) γ tl devs bnos
   infer_instance
 
-instance instCtxMorphBcacheResIn (γ : BcacheNames) (V : BioView) (tl : Nat) :
+instance instCtxMorphBcacheResIn (γ : BcacheNames) (V : BioView GF) (tl : Nat) :
     CtxMorph (GF := GF) (bcacheResIn γ V tl) := by
   unfold bcacheResIn
   exact @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) (instCtxMorphBcacheScanAt γ V tl)
 
-instance instCtxMorphBcacheResAt (γ : BcacheNames) (V : BioView) :
+instance instCtxMorphBcacheResAt (γ : BcacheNames) (V : BioView GF) :
     CtxMorph (GF := GF) (bcacheResAt γ V) := by
   unfold bcacheResAt
   refine @instCtxMorphExists _ _ _ _ _ (fun tl => ?_)
@@ -763,7 +975,7 @@ instance instCtxMorphBcacheResAt (γ : BcacheNames) (V : BioView) :
 /-- **THE HOOK'S FOLD** (Rocq's `bcache_res2_fold_in`): the releaser's
 unfloored body plus the floor the hook mints at the lock's own stamped
 context IS the resource. -/
-theorem bcacheRes_fold_in (γ : BcacheNames) (V : BioView) (tl : Nat) :
+theorem bcacheRes_fold_in (γ : BcacheNames) (V : BioView GF) (tl : Nat) :
     ∀ ξ : CtxId, bcacheResIn (GF := GF) γ V tl ξ ∗ ctxFloor ξ tl ⊢ bcacheResAt γ V ξ := by
   intro ξ
   unfold bcacheResIn bcacheResAt
@@ -775,10 +987,10 @@ theorem bcacheRes_fold_in (γ : BcacheNames) (V : BioView) (tl : Nat) :
   · iexact Htl
 
 /-- **The buffer cache** (persistent): the lock over its resource. -/
-def isBcache (γl : GName) (γ : BcacheNames) (V : BioView) : IProp GF :=
+def isBcache (γl : GName) (γ : BcacheNames) (V : BioView GF) : IProp GF :=
   isLock γl bcacheLockAddr "bcache" (bcacheResAt γ V)
 
-instance isBcache_persistent (γl : GName) (γ : BcacheNames) (V : BioView) :
+instance isBcache_persistent (γl : GName) (γ : BcacheNames) (V : BioView GF) :
     Persistent (isBcache (GF := GF) γl γ V) := by
   unfold isBcache; infer_instance
 
@@ -917,14 +1129,14 @@ at the recycle), but the PAYLOAD no longer depends on it: `Xv6.bufPay` is
 indexed on COVERAGE, which is what lets a holder that finds `valid == 0`
 after `acquiresleep` still have the block's fragment to hand
 `virtio_disk_rw`.  See `Xv6/BioPool.lean`'s header. -/
-def bufHdr (V : BioView) (k : Nat) (qd qb : Qp) (i : BufId) (x : BufX)
+def bufHdr (γ : BcacheNames) (V : BioView GF) (k : Nat) (qd qb : Qp) (i : BufId) (x : BufX)
     (ξ : CtxId) : IProp GF := iprop%
   ∃ v : BitVec 32,
     ⌜v = 0#32 ∨ v = 1#32⌝ ∗
     wordAtN ξ (aBufValid (bnode k)) 4 (DFrac.own 1) v ∗
     wordAtN ξ (aBufDev (bnode k)) 4 (DFrac.own qd) i.1 ∗
     wordAtN ξ (aBufBlockno (bnode k)) 4 (DFrac.own qb) i.2 ∗
-    bufPay V i v x
+    bufPay γ V k i v x
 
 /-- **THE REST** (Rocq's `buf_rest`): the pinned `disk` flag and the data. -/
 def bufRest (k : Nat) (x : BufX) (ξ : CtxId) : IProp GF := iprop%
@@ -933,14 +1145,14 @@ def bufRest (k : Nat) (x : BufX) (ξ : CtxId) : IProp GF := iprop%
   ([∗list] j ↦ b ∈ x, wordAtN ξ (aBufData (bnode k) + BitVec.ofNat 64 j) 1 (DFrac.own 1) b)
 
 /-- The box's payload family at buffer `k`. -/
-def bufBoxPay (V : BioView) (k : Nat) (qd qb : Qp) : BoxPay GF BufId BufX where
-  hdr := bufHdr V k qd qb
+def bufBoxPay (γ : BcacheNames) (V : BioView GF) (k : Nat) (qd qb : Qp) : BoxPay GF BufId BufX where
+  hdr := bufHdr γ V k qd qb
   rest := bufRest k
   q1 := fun _ => iprop(emp)
   q2 := iprop(emp)
 
-instance bufHdr_morph (V : BioView) (k : Nat) (qd qb : Qp) (i : BufId) (x : BufX) :
-    CtxMorph (GF := GF) (bufHdr V k qd qb i x) := by
+instance bufHdr_morph (γ : BcacheNames) (V : BioView GF) (k : Nat) (qd qb : Qp) (i : BufId) (x : BufX) :
+    CtxMorph (GF := GF) (bufHdr γ V k qd qb i x) := by
   unfold bufHdr
   refine @instCtxMorphExists _ _ _ _ _ (fun v => ?_)
   infer_instance
@@ -952,28 +1164,28 @@ instance bufRest_morph (k : Nat) (x : BufX) : CtxMorph (GF := GF) (bufRest k x) 
     (fun j b => instCtxMorphWordAtN _ _ _ _)
   infer_instance
 
-instance bufHdr_timeless (V : BioView) (k : Nat) (qd qb : Qp) (i : BufId) (x : BufX)
-    (ξ : CtxId) : Timeless (bufHdr (GF := GF) V k qd qb i x ξ) := by
+instance bufHdr_timeless (γ : BcacheNames) (V : BioView GF) (k : Nat) (qd qb : Qp) (i : BufId) (x : BufX)
+    (ξ : CtxId) : Timeless (bufHdr (GF := GF) γ V k qd qb i x ξ) := by
   unfold bufHdr; infer_instance
 
 instance bufRest_timeless (k : Nat) (x : BufX) (ξ : CtxId) :
     Timeless (bufRest (GF := GF) k x ξ) := by unfold bufRest; infer_instance
 
-instance bufBoxPay_ok (V : BioView) (k : Nat) (qd qb : Qp) :
-    BoxPayOk (bufBoxPay (GF := GF) V k qd qb) where
-  hdrMorph i x := bufHdr_morph V k qd qb i x
+instance bufBoxPay_ok (γ : BcacheNames) (V : BioView GF) (k : Nat) (qd qb : Qp) :
+    BoxPayOk (bufBoxPay (GF := GF) γ V k qd qb) where
+  hdrMorph i x := bufHdr_morph γ V k qd qb i x
   restMorph x := bufRest_morph k x
-  hdrTimeless i x ξ := bufHdr_timeless V k qd qb i x ξ
+  hdrTimeless i x ξ := bufHdr_timeless γ V k qd qb i x ξ
   restTimeless x ξ := bufRest_timeless k x ξ
   q1Timeless _ := by unfold bufBoxPay; infer_instance
   q2Timeless := by unfold bufBoxPay; infer_instance
 
 /-- **BUFFER `k`'s ESCROW** (Rocq's `buf_box`), persistent. -/
-def bufBox (V : BioView) (γbk : BoxNames) (k : Nat) (qd qb : Qp) : IProp GF :=
-  isBox (bufBoxPay V k qd qb) (ndot bioxN k) γbk
+def bufBox (γ : BcacheNames) (V : BioView GF) (γbk : BoxNames) (k : Nat) (qd qb : Qp) : IProp GF :=
+  isBox (bufBoxPay γ V k qd qb) (ndot bioxN k) γbk
 
-instance bufBox_persistent (V : BioView) (γbk : BoxNames) (k : Nat) (qd qb : Qp) :
-    Persistent (bufBox (GF := GF) V γbk k qd qb) := by unfold bufBox; infer_instance
+instance bufBox_persistent (γ : BcacheNames) (V : BioView GF) (γbk : BoxNames) (k : Nat) (qd qb : Qp) :
+    Persistent (bufBox (GF := GF) γ V γbk k qd qb) := by unfold bufBox; infer_instance
 
 /-- Buffer `k`'s sleeplock payload (Rocq's `bslp`): the checkout token AND
 the escrow's L2 (park) register half, at rest, WITH the floor over the
@@ -1060,19 +1272,19 @@ instance isBufSlk_persistent (γ : BcacheNames) (k : Nat) :
 /-- **The buffer cache's persistent credentials** (Rocq's `bio_ctx`): the
 `bcache` lock over its resource, the thirty buffer sleeplocks, and the
 thirty ESCROWS. -/
-def bioCtx (γl : GName) (γ : BcacheNames) (V : BioView) : IProp GF := iprop%
+def bioCtx (γl : GName) (γ : BcacheNames) (V : BioView GF) : IProp GF := iprop%
   isBcache γl γ V ∗ ([∗list] k ∈ List.range NBUF, isBufSlk γ k) ∗
-  ([∗list] k ∈ List.range NBUF, bufBox V (γ.box k) k (1 : Qp).half (1 : Qp).half)
+  ([∗list] k ∈ List.range NBUF, bufBox γ V (γ.box k) k (1 : Qp).half (1 : Qp).half)
 
-instance bioCtx_persistent (γl : GName) (γ : BcacheNames) (V : BioView) :
+instance bioCtx_persistent (γl : GName) (γ : BcacheNames) (V : BioView GF) :
     Persistent (bioCtx (GF := GF) γl γ V) := by
   unfold bioCtx; infer_instance
 
-theorem bioCtx_lock (γl : GName) (γ : BcacheNames) (V : BioView) :
+theorem bioCtx_lock (γl : GName) (γ : BcacheNames) (V : BioView GF) :
     bioCtx (GF := GF) γl γ V ⊢ isBcache γl γ V := by
   unfold bioCtx; iintro ⟨H, -, -⟩; iexact H
 
-theorem bioCtx_buf (γl : GName) (γ : BcacheNames) (V : BioView) (k : Nat) (hk : k < NBUF) :
+theorem bioCtx_buf (γl : GName) (γ : BcacheNames) (V : BioView GF) (k : Nat) (hk : k < NBUF) :
     bioCtx (GF := GF) γl γ V ⊢ isBufSlk γ k := by
   have hget : (List.range NBUF)[k]? = some k := by rw [List.getElem?_range hk]
   unfold bioCtx
@@ -1080,13 +1292,13 @@ theorem bioCtx_buf (γl : GName) (γ : BcacheNames) (V : BioView) (k : Nat) (hk 
   icases BigSepL.bigSepL_lookup_acc (Φ := fun _ j => isBufSlk (GF := GF) γ j) hget $$ H with ⟨Hk, -⟩
   iexact Hk
 
-theorem bioCtx_box (γl : GName) (γ : BcacheNames) (V : BioView) (k : Nat) (hk : k < NBUF) :
-    bioCtx (GF := GF) γl γ V ⊢ bufBox V (γ.box k) k (1 : Qp).half (1 : Qp).half := by
+theorem bioCtx_box (γl : GName) (γ : BcacheNames) (V : BioView GF) (k : Nat) (hk : k < NBUF) :
+    bioCtx (GF := GF) γl γ V ⊢ bufBox γ V (γ.box k) k (1 : Qp).half (1 : Qp).half := by
   have hget : (List.range NBUF)[k]? = some k := by rw [List.getElem?_range hk]
   unfold bioCtx
   iintro ⟨-, -, H⟩
   icases BigSepL.bigSepL_lookup_acc
-    (Φ := fun _ j => bufBox (GF := GF) V (γ.box j) j (1 : Qp).half (1 : Qp).half) hget $$ H
+    (Φ := fun _ j => bufBox (GF := GF) γ V (γ.box j) j (1 : Qp).half (1 : Qp).half) hget $$ H
     with ⟨Hk, -⟩
   iexact Hk
 
@@ -1099,7 +1311,7 @@ As in Rocq, `dev` is held at a HALF (and so, inside `bufOwn`, is `blockno`):
 the other halves stay under `bcache.lock` forever, in `bkeyAt`, because
 `bget`'s scan reads the key cells of every buffer -- checked-out ones
 included -- holding `bcache.lock` alone. -/
-def bufHold0 (γ : BcacheNames) (V : BioView) (k : Nat)
+def bufHold0 (γ : BcacheNames) (V : BioView GF) (k : Nat)
     (pidv dev bno : BitVec 32) (bs bsd : List (BitVec 8)) : IProp GF := iprop%
   ⌜k < NBUF ∧ bno.toNat ∈ V.cov ∧ dev = V.dev ∧ bs.length = BSIZE ∧ bsd.length = BSIZE⌝ ∗
   sleeplockedQ (γ.slk k).2 1 (aBufLock (bnode k)) pidv ∗ bufTok γ k ∗
@@ -1108,6 +1320,26 @@ def bufHold0 (γ : BcacheNames) (V : BioView) (k : Nat)
   wordPointsTo (aBufDev (bnode k)) 4 (DFrac.own (1 : Qp).half) dev ∗
   bufOwn (bnode k) bno 0#32 bs ∗
   diskBlock V.gd bno.toNat bsd
+
+/-- **THE LOCKED BUFFER** (Rocq's `bio_locked`, i.e. its `bio_held` at
+`bsl = bs`): the handle beside the block's travelling PAYLOAD at the
+buffer's own bytes.  This is what `bread` hands back and what `brelse`
+demands -- the bytes must BE the block's logical content (unmodified since
+the `bread`, or re-indexed by `log_write`), or the handle cannot be formed
+and the park swap is unavailable. -/
+def bioLocked (γ : BcacheNames) (V : BioView GF) (k : Nat)
+    (pidv dev bno : BitVec 32) (bs bsd : List (BitVec 8)) (d : Bool) : IProp GF :=
+  iprop(bufHold0 γ V k pidv dev bno bs bsd ∗ bioPay γ V k dev bno bs bsd d)
+
+/-- Rocq's `bio_held_split`, at `bsl = bs`. -/
+theorem bioLocked_split (γ : BcacheNames) (V : BioView GF) (k : Nat)
+    (pidv dev bno : BitVec 32) (bs bsd : List (BitVec 8)) (d : Bool) :
+    bioLocked (GF := GF) γ V k pidv dev bno bs bsd d ⊣⊢
+      bufHold0 γ V k pidv dev bno bs bsd ∗ bioPay γ V k dev bno bs bsd d := by
+  unfold bioLocked
+  constructor
+  · iintro H; iexact H
+  · iintro H; iexact H
 
 end
 
@@ -1249,20 +1481,20 @@ variable [DiskG GF] [CurCtx]
 
 /-! ## Opening the cache and one slot -/
 
-theorem bcacheRes_elim (γ : BcacheNames) (V : BioView) (ξ : CtxId) :
+theorem bcacheRes_elim (γ : BcacheNames) (V : BioView GF) (ξ : CtxId) :
     bcacheResAt (GF := GF) γ V ξ ⊢
       ∃ tl : Nat, ctxFloor ξ tl ∗ topLb tl ∗ bcacheScanAt γ V ξ tl := by
   unfold bcacheResAt; iintro H; iexact H
 
-theorem bcacheRes_intro_at (γ : BcacheNames) (V : BioView) (ξ : CtxId) (tl : Nat) :
+theorem bcacheRes_intro_at (γ : BcacheNames) (V : BioView GF) (ξ : CtxId) (tl : Nat) :
     ctxFloor (GF := GF) ξ tl ∗ topLb tl ∗ bcacheScanAt γ V ξ tl ⊢ bcacheResAt γ V ξ := by
   unfold bcacheResAt; iintro H; iexists tl; iexact H
 
-theorem bcacheResIn_intro (γ : BcacheNames) (V : BioView) (ξ : CtxId) (tl : Nat) :
+theorem bcacheResIn_intro (γ : BcacheNames) (V : BioView GF) (ξ : CtxId) (tl : Nat) :
     topLb (GF := GF) tl ∗ bcacheScanAt γ V ξ tl ⊢ bcacheResIn γ V tl ξ := by
   unfold bcacheResIn; iintro H; iexact H
 
-theorem bcacheScan_elim (γ : BcacheNames) (V : BioView) (ξ : CtxId) (tl : Nat) :
+theorem bcacheScan_elim (γ : BcacheNames) (V : BioView GF) (ξ : CtxId) (tl : Nat) :
     bcacheScanAt (GF := GF) γ V ξ tl ⊢
       ∃ (M : RegMapF Nat) (nx : Nat) (Ls : Nat → List Nat) (ord : List Nat)
         (devs bnos : Nat → BitVec 32),
@@ -1275,7 +1507,7 @@ theorem bcacheScan_elim (γ : BcacheNames) (V : BioView) (ξ : CtxId) (tl : Nat)
       ([∗list] k ∈ List.range NBUF, bslotAt γ ξ k (Ls k)) := by
   unfold bcacheScanAt; iintro H; iexact H
 
-theorem bcacheScan_intro (γ : BcacheNames) (V : BioView) (ξ : CtxId) (tl : Nat)
+theorem bcacheScan_intro (γ : BcacheNames) (V : BioView GF) (ξ : CtxId) (tl : Nat)
     (M : RegMapF Nat) (nx : Nat)
     (Ls : Nat → List Nat) (ord : List Nat) (devs bnos : Nat → BitVec 32)
     (hfresh : ∀ i, nx ≤ i → PartialMap.get? M i = none) (hok : bcacheOk M Ls)
