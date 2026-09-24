@@ -156,6 +156,20 @@ theorem bd_devpin_upd (V : BioView) (devs bnos : Nat → BitVec 32) (k : Nat) (D
     rw [updAtF_ne bnos k j B h] at hcov
     exact hdevp j hj hcov
 
+/-- A nonempty list, split at its last element (the backward scan's start). -/
+theorem bd_split_last (l : List Nat) (h : l ≠ []) : ∃ l1 a, l = l1 ++ [a] := by
+  induction l using FromMathlib.List.reverseRec with
+  | nil => exact absurd rfl h
+  | append_singleton l1 a _ => exact ⟨l1, a, rfl⟩
+
+/-- The LRU order is nonempty: it lists all thirty buffers. -/
+theorem bd_ord_ne_nil (ord : List Nat) (hord : ord.Perm (List.range NBUF)) : ord ≠ [] := by
+  intro h
+  have := hord.length_eq
+  rw [h] at this
+  simp only [List.length_nil, List.length_range] at this
+  exact absurd this.symm (by unfold NBUF; decide)
+
 /-- The evicted block's own uniqueness premise, out of the injectivity. -/
 theorem bd_old_unique (V : BioView) (bnos : Nat → BitVec 32) (k : Nat) (hk : k < NBUF)
     (hinj : bcacheInj V bnos) :
@@ -422,6 +436,9 @@ theorem bd_ctx_norm (k : KCtx) (a b a' b' : Bool) (n : Nat) (R R' : RegMap) :
 
 theorem bd_push_withSpie (k : KCtx) (a b a' b' : Bool) (n : Nat) :
     ((k.withSpie a b).pushed n).withSpie a' b' = (k.withSpie a' b').pushed n := rfl
+
+theorem bd_ps_wl (k : KCtx) (a b : Bool) (n : Nat) :
+    ((k.pushed n).withSpie a b).withLocks k.locks = (k.withSpie a b).pushed n := rfl
 
 theorem bd_withSpie_regs (k : KCtx) (a b : Bool) : (k.withSpie a b).regs = k.regs := rfl
 theorem bd_withSpie_proc (k : KCtx) (a b : Bool) : (k.withSpie a b).proc = k.proc := rfl

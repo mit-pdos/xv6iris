@@ -35,21 +35,30 @@ def bdFwdRegs (dev bno : BitVec 32) (kk : Nat) (R : RegMap) : Prop :=
   R 9#5 = bnode kk ∧ R 14#5 = bhead ∧ R 18#5 = BitVec.signExtend 64 dev ∧
   R 19#5 = BitVec.signExtend 64 bno
 
-/-- Everything but the cursor and the scratch register is untouched. -/
-def bdOther (R0 R : RegMap) : Prop := ∀ i, i ≠ 9#5 → i ≠ 15#5 → R i = R0 i
+/-- What the scan must not disturb: the frame pointer and the callee-saved
+registers the epilogue does not restore.  (`s1`, `a4` and `a5` -- the cursor,
+the sentinel and the scratch -- are the ones it moves; `s2`/`s3` carry the
+arguments and are tracked by `Xv6.bdFwdRegs`.) -/
+def bdOther (R0 R : RegMap) : Prop :=
+  R 2#5 = R0 2#5 ∧ R 18#5 = R0 18#5 ∧ R 19#5 = R0 19#5 ∧
+  R 20#5 = R0 20#5 ∧ R 21#5 = R0 21#5 ∧ R 22#5 = R0 22#5 ∧
+  R 23#5 = R0 23#5 ∧ R 24#5 = R0 24#5 ∧ R 25#5 = R0 25#5 ∧ R 26#5 = R0 26#5 ∧
+  R 27#5 = R0 27#5
 
-theorem bdOther_refl (R0 : RegMap) : bdOther R0 R0 := fun _ _ _ => rfl
-
-theorem bdOther_trans (R0 R1 R2 : RegMap) (h1 : bdOther R0 R1) (h2 : bdOther R1 R2) :
-    bdOther R0 R2 := fun i a b => (h2 i a b).trans (h1 i a b)
+theorem bdOther_refl (R0 : RegMap) : bdOther R0 R0 :=
+  ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
 
 theorem bdOther_set (R0 R : RegMap) (h : bdOther R0 R) (i : BitVec 5) (v : BitVec 64)
-    (hi : i = 9#5 ∨ i = 15#5) : bdOther R0 (R.set i v) := by
-  intro j a b
-  rw [RegMap.set_apply]
-  have : ¬ (j = i) := by rcases hi with rfl | rfl <;> assumption
-  rw [if_neg this]
-  exact h j a b
+    (hi : i = 9#5 ∨ i = 14#5 ∨ i = 15#5) : bdOther R0 (R.set i v) := by
+  obtain ⟨a2, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27⟩ := h
+  rcases hi with rfl | rfl | rfl <;>
+    refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
+      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] <;> assumption
+
+/-- A call's callee-saved guarantee is enough. -/
+theorem bdOther_of_cs (R0 R : RegMap) (h : calleeSaved R0 R) : bdOther R0 R := by
+  obtain ⟨c2, c8, c9, c18, c19, c20, c21, c22, c23, c24, c25, c26, c27⟩ := h
+  exact ⟨c2, c18, c19, c20, c21, c22, c23, c24, c25, c26, c27⟩
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [BcacheG GF]
@@ -125,8 +134,8 @@ theorem bd_fwd_step (c : CPU) (kc : KCtx) (hsie : kc.sie = false)
       ipureintro
       refine ⟨⟨fun _ => ⟨hdv, hbn⟩, fun _ => rfl⟩, rfl, ⟨?_, ?_, ?_, ?_⟩, ?_⟩ <;>
         first
-          | exact bdOther_set R0 Rc hoth 15#5 _ (Or.inr rfl)
-          | exact bdOther_set R0 _ (bdOther_set R0 Rc hoth 15#5 _ (Or.inr rfl)) 15#5 _ (Or.inr rfl)
+          | exact bdOther_set R0 Rc hoth 15#5 _ (Or.inr (Or.inr rfl))
+          | exact bdOther_set R0 _ (bdOther_set R0 Rc hoth 15#5 _ (Or.inr (Or.inr rfl))) 15#5 _ (Or.inr (Or.inr rfl))
           | assumption
           | (simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; assumption)
     · -- the block number differs: back edge
@@ -140,8 +149,8 @@ theorem bd_fwd_step (c : CPU) (kc : KCtx) (hsie : kc.sie = false)
       refine ⟨⟨fun h => absurd h (by decide), fun hc => absurd hc.2 hbn⟩, rfl,
         ⟨?_, ?_, ?_, ?_⟩, ?_⟩ <;>
         first
-          | exact bdOther_set R0 Rc hoth 15#5 _ (Or.inr rfl)
-          | exact bdOther_set R0 _ (bdOther_set R0 Rc hoth 15#5 _ (Or.inr rfl)) 15#5 _ (Or.inr rfl)
+          | exact bdOther_set R0 Rc hoth 15#5 _ (Or.inr (Or.inr rfl))
+          | exact bdOther_set R0 _ (bdOther_set R0 Rc hoth 15#5 _ (Or.inr (Or.inr rfl))) 15#5 _ (Or.inr (Or.inr rfl))
           | assumption
           | (simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; assumption)
   · -- the device differs: back edge
@@ -160,8 +169,8 @@ theorem bd_fwd_step (c : CPU) (kc : KCtx) (hsie : kc.sie = false)
     refine ⟨⟨fun h => absurd h (by decide), fun hc => absurd hc.1 hdv⟩, rfl,
       ⟨?_, ?_, ?_, ?_⟩, ?_⟩ <;>
       first
-        | exact bdOther_set R0 Rc hoth 15#5 _ (Or.inr rfl)
-        | exact bdOther_set R0 _ (bdOther_set R0 Rc hoth 15#5 _ (Or.inr rfl)) 15#5 _ (Or.inr rfl)
+        | exact bdOther_set R0 Rc hoth 15#5 _ (Or.inr (Or.inr rfl))
+        | exact bdOther_set R0 _ (bdOther_set R0 Rc hoth 15#5 _ (Or.inr (Or.inr rfl))) 15#5 _ (Or.inr (Or.inr rfl))
         | assumption
         | (simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; assumption)
 
@@ -384,7 +393,7 @@ theorem bd_bwd_step (c : CPU) (kc : KCtx) (hsie : kc.sie = false)
     refine ⟨⟨fun _ => List.eq_nil_of_length_eq_zero hz, fun _ => rfl⟩, by simp [hz, bd_beqz_zero],
       ⟨?_, ?_, ?_, ?_⟩, ?_⟩ <;>
       first
-        | exact bdOther_set R0 Rc hoth 15#5 _ (Or.inr rfl)
+        | exact bdOther_set R0 Rc hoth 15#5 _ (Or.inr (Or.inr rfl))
         | assumption
         | (simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; assumption)
   · k_step (wp_s_branch c _ (KA.«bread» + 0x7c#64) true 20#13 15#5 0#5 (by decide) bop.BEQ)
@@ -397,7 +406,7 @@ theorem bd_bwd_step (c : CPU) (kc : KCtx) (hsie : kc.sie = false)
     refine ⟨⟨fun h => absurd h (by decide), fun he => absurd (by rw [he]; rfl) hz⟩, by simp [hz, bd_beqz_zero],
       ⟨?_, ?_, ?_, ?_⟩, ?_⟩ <;>
       first
-        | exact bdOther_set R0 Rc hoth 15#5 _ (Or.inr rfl)
+        | exact bdOther_set R0 Rc hoth 15#5 _ (Or.inr (Or.inr rfl))
         | assumption
         | (simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; assumption)
 
@@ -738,17 +747,17 @@ theorem bd_hit (RE : RELEASE_HOOK) (AS : ACQUIRESLEEP_LLB) (VR : VIRTIO_DISK_RW)
   have hpin3 : true = false ∨ k0.proc = 0#64 → c3 = cpu := fun hh => (hp3 hh).trans (hpin hh)
   iapply (bd_tail VR Γ c3 cpu k0 spie3 spp3 γl γ V γdl pd pav pu j kk Tb pidv dev bno dqp R2
       hj hproc hK hsie hnoff hlocks htier hbno hcov hdev hpd hkk
-      ((e2.trans b2).trans ((hoth 2#5 (by decide) (by decide)).trans hR2))
+      ((e2.trans b2).trans (hoth.1.trans hR2))
       (e9.trans g9)
       (by obtain ⟨q20, q21, q22, q23, q24, q25, q26, q27⟩ := hpins
-          exact ⟨(e20.trans b20).trans ((hoth 20#5 (by decide) (by decide)).trans q20),
-            (e21.trans b21).trans ((hoth 21#5 (by decide) (by decide)).trans q21),
-            (e22.trans b22).trans ((hoth 22#5 (by decide) (by decide)).trans q22),
-            (e23.trans b23).trans ((hoth 23#5 (by decide) (by decide)).trans q23),
-            (e24.trans b24).trans ((hoth 24#5 (by decide) (by decide)).trans q24),
-            (e25.trans b25).trans ((hoth 25#5 (by decide) (by decide)).trans q25),
-            (e26.trans b26).trans ((hoth 26#5 (by decide) (by decide)).trans q26),
-            (e27.trans b27).trans ((hoth 27#5 (by decide) (by decide)).trans q27)⟩)
+          exact ⟨(e20.trans b20).trans (hoth.2.2.2.1.trans q20),
+            (e21.trans b21).trans (hoth.2.2.2.2.1.trans q21),
+            (e22.trans b22).trans (hoth.2.2.2.2.2.1.trans q22),
+            (e23.trans b23).trans (hoth.2.2.2.2.2.2.1.trans q23),
+            (e24.trans b24).trans (hoth.2.2.2.2.2.2.2.1.trans q24),
+            (e25.trans b25).trans (hoth.2.2.2.2.2.2.2.2.1.trans q25),
+            (e26.trans b26).trans (hoth.2.2.2.2.2.2.2.2.2.1.trans q26),
+            (e27.trans b27).trans (hoth.2.2.2.2.2.2.2.2.2.2.trans q27)⟩)
       hpin3)
   iframe Hk Hpc Hframe Hpi Htc Hcl Hir Hpid Hbox Hdc Hsl2 Hslp Hfl2 Hbref Href Hnext
 
@@ -1054,17 +1063,17 @@ theorem bd_recyc (RE : RELEASE_HOOK) (AS : ACQUIRESLEEP_LLB) (VR : VIRTIO_DISK_R
   have hpin3 : true = false ∨ k0.proc = 0#64 → c3 = cpu := fun hh => (hp3 hh).trans (hpin hh)
   iapply (bd_tail VR Γ c3 cpu k0 spie3 spp3 γl γ V γdl pd pav pu j kk T' pidv dev bno dqp R2
       hj hproc hK hsie hnoff hlocks htier hbno hcov hdev hpd hkk
-      ((e2.trans b2).trans ((hoth 2#5 (by decide) (by decide)).trans hR2))
+      ((e2.trans b2).trans (hoth.1.trans hR2))
       (e9.trans g9)
       (by obtain ⟨q20, q21, q22, q23, q24, q25, q26, q27⟩ := hpins
-          exact ⟨(e20.trans b20).trans ((hoth 20#5 (by decide) (by decide)).trans q20),
-            (e21.trans b21).trans ((hoth 21#5 (by decide) (by decide)).trans q21),
-            (e22.trans b22).trans ((hoth 22#5 (by decide) (by decide)).trans q22),
-            (e23.trans b23).trans ((hoth 23#5 (by decide) (by decide)).trans q23),
-            (e24.trans b24).trans ((hoth 24#5 (by decide) (by decide)).trans q24),
-            (e25.trans b25).trans ((hoth 25#5 (by decide) (by decide)).trans q25),
-            (e26.trans b26).trans ((hoth 26#5 (by decide) (by decide)).trans q26),
-            (e27.trans b27).trans ((hoth 27#5 (by decide) (by decide)).trans q27)⟩)
+          exact ⟨(e20.trans b20).trans (hoth.2.2.2.1.trans q20),
+            (e21.trans b21).trans (hoth.2.2.2.2.1.trans q21),
+            (e22.trans b22).trans (hoth.2.2.2.2.2.1.trans q22),
+            (e23.trans b23).trans (hoth.2.2.2.2.2.2.1.trans q23),
+            (e24.trans b24).trans (hoth.2.2.2.2.2.2.2.1.trans q24),
+            (e25.trans b25).trans (hoth.2.2.2.2.2.2.2.2.1.trans q25),
+            (e26.trans b26).trans (hoth.2.2.2.2.2.2.2.2.2.1.trans q26),
+            (e27.trans b27).trans (hoth.2.2.2.2.2.2.2.2.2.2.trans q27)⟩)
       hpin3)
   iframe Hk Hpc Hframe Hpi Htc Hcl Hir Hpid Hbox Hdc Hsl2 Hslp Hfl2 Hbref Href Hnext
 
