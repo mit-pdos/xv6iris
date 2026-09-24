@@ -3,12 +3,12 @@
 plus the proof-local set/budget algebra of `ProofBmap.v`'s `BmapKit`).
 Iris-free.
 
-* The register facts the code computes: `bm_sext32` (the uint argument),
-  `bm_slli32_srli30` (`slli 32; srli 30` is `4 *`), `bm_addiw_m12`
-  (`bn - NDIRECT`), `bm_sext_zero`, `bm_ext_sext` (`sw` stores the low
-  word), the two `bltu` tests (`bm_bltu11`, `bm_bltu255`: the second is the
+* The register facts the code computes: `bm_slli32_srli30` (`slli 32;
+  srli 30` is `4 *`), `bm_addiw_m12` (`bn - NDIRECT`), the two `bltu` tests (`bm_bltu11`, `bm_bltu255`: the second is the
   DEAD `unreachable` test) and the zero tests (`Xv6.bm_eqz_*` /
-  `Xv6.bm_nez_*`, shared, in `Xv6/BlkmapBuf.lean`).
+  `Xv6.bm_nez_*`, shared, in `Xv6/BlkmapBuf.lean`).  Rocq's `bm_sext32`
+  (the uint argument), `bm_sext_zero` and the `sw` fact are the shared
+  `Xv6.fw_sext32` / `Xv6.fw_sext_zero` / `Xv6.fw_ext32` (`Xv6/FsWords.lean`).
 * The address facts: the callee targets and return addresses, and the
   entry cell `aBufData (bnode kk) + 4q` (`bm_cell_addr`: Rocq's
   `bm_data_addr` / `bm_slot_addr` / `bm_off0` in the one shape the
@@ -24,30 +24,13 @@ have no counterpart (`BitVec` needs none).  Rocq's `bm_cells_insert_dir` /
 import Xv6.FsGeom
 import MachCSL.WpSmodeFrame
 import Xv6.DiskDefs
+import Xv6.FsWords
 
 namespace Xv6
 
 open LeanRV64D MachCSL
 
 /-! ## Register arithmetic -/
-
-/-- The uint argument, sign-extended as the RV64 ABI passes it (Rocq's
-`bm_sext32`). -/
-theorem bm_sext32 (a : Nat) (h : a < 2 ^ 31) :
-    BitVec.signExtend 64 (BitVec.ofNat 32 a) = BitVec.ofNat 64 a := by
-  rw [BitVec.signExtend_eq_setWidth_of_msb_false
-    (by rw [BitVec.msb_eq_decide]; simp [BitVec.toNat_ofNat]; omega)]
-  bv_omega
-
-/-- The zero return value, sign-extended (Rocq's `bm_sext_zero`). -/
-theorem bm_sext_zero (rv : BitVec 32) (h : rv.toNat = 0) : BitVec.signExtend 64 rv = 0#64 := by
-  have : rv = 0#32 := BitVec.eq_of_toNat_eq (by simp [h])
-  subst this
-  decide
-
-/-- `sw` of a sign-extended word stores the word. -/
-theorem bm_ext_sext (w : BitVec 32) : BitVec.extractLsb' 0 32 (BitVec.signExtend 64 w) = w := by
-  bv_decide
 
 /-- `slli a5,a1,0x20 ; srli a1,a5,0x1e` is `4 *` on a 32-bit value (Rocq's
 `bm_slli32_srli30`). -/
@@ -75,7 +58,7 @@ theorem bm_addiw_m12 (x : Nat) (h1 : 12 ≤ x) (h2 : x < 2 ^ 31) :
     apply BitVec.eq_of_toNat_eq
     simp [BitVec.toNat_ofNat]
   rw [e2]
-  exact bm_sext32 (x - 12) (by omega)
+  exact fw_sext32 (x - 12) (by omega)
 
 /-- `addiw a5,a1,-12`, as the normaliser leaves it (the immediate reduced). -/
 theorem bm_addiw_m12' (x : Nat) (h1 : 12 ≤ x) (h2 : x < 2 ^ 31) :

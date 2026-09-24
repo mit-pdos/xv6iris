@@ -175,7 +175,7 @@ theorem bm_ind_alloc_ok (LW : LOG_WRITE) (BE : BRELSE) (Γ : SchedNames) (c cpu 
   iintro Hk Hpc
   -- +0xa6  sw a0,0(s3) : a[q] = blk
   k_step (wp_s_sw c _ (KA.«bmap» + 0xa6#64) false 0#12 19#5 10#5 (by decide) bmI.bmEnt[q]!)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h19, h10, bm_ext_sext]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h19, h10, fw_ext32]
   iintro Hk Hpc Hcell
   ihave Hhold := Hcb $$ %blk Hcell
   -- +0xaa  c.mv a0,s4 ; +0xac  jal log_write  (the held, credited form)

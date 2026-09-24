@@ -73,32 +73,6 @@ theorem ialloc_slots (a : Nat) (h : iallocSlots ≤ a) :
     wakeupSlots at *
   omega
 
-/-! ## Small-word bridges (restated from `Xv6/BallocParts.lean`'s `ba_w32`,
-`ba_sext32`, `ba_bgeu_nat`, `ba_succ64`: a stage file may not import another
-function's -- promotion candidates) -/
-
-/-- The low word of a small 64-bit value. -/
-theorem ialloc_w32 (a : Nat) (h : a < 2 ^ 31) :
-    BitVec.extractLsb' 0 32 (BitVec.ofNat 64 a) = BitVec.ofNat 32 a := by
-  apply BitVec.eq_of_toNat_eq
-  rw [BitVec.extractLsb'_toNat]
-  simp only [Nat.shiftRight_zero, BitVec.toNat_ofNat]
-  omega
-
-/-- The sign extension of a small 32-bit value. -/
-theorem ialloc_sext32 (a : Nat) (h : a < 2 ^ 31) :
-    BitVec.signExtend 64 (BitVec.ofNat 32 a) = BitVec.ofNat 64 a := by
-  rw [BitVec.signExtend_eq_setWidth_of_msb_false
-    (by rw [BitVec.msb_eq_decide]; simp [BitVec.toNat_ofNat]; omega)]
-  bv_omega
-
-/-- `bgeu` between two small naturals. -/
-theorem ialloc_bgeu_nat (a b : Nat) (ha : a < 2 ^ 64) (hb : b < 2 ^ 64) :
-    bcond bop.BGEU (BitVec.ofNat 64 a) (BitVec.ofNat 64 b) = decide (b ≤ a) := by
-  show (!(BitVec.ofNat 64 a).ult (BitVec.ofNat 64 b)) = decide (b ≤ a)
-  simp only [BitVec.ult, BitVec.toNat_ofNat, Nat.mod_eq_of_lt ha, Nat.mod_eq_of_lt hb]
-  by_cases h : b ≤ a <;> simp [h] <;> omega
-
 /-! ## The scan's arithmetic (inum as a `Nat`, `s2 = ofNat 64 n`) -/
 
 /-- The claimed inum's value. -/
@@ -137,7 +111,7 @@ theorem ialloc_bno [Fscfg] [Icfg] (n : Nat) (hn : (BitVec.ofNat 32 n).toNat < 16
 
 /-- The sign extension of the 32-bit block number (bread's `a1`). -/
 theorem ialloc_sext_bno (b : Nat) (h : b < 2 ^ 31) :
-    BitVec.ofNat 64 b = BitVec.signExtend 64 (BitVec.ofNat 32 b) := (ialloc_sext32 b h).symm
+    BitVec.ofNat 64 b = BitVec.signExtend 64 (BitVec.ofNat 32 b) := (fw_sext32 b h).symm
 
 /-- `andi a5,s2,15` (the BASE encoding): the slot index. -/
 theorem ialloc_andi15 (n : Nat) (h : n < 2 ^ 31) :
@@ -172,7 +146,7 @@ theorem ialloc_succ' (n m : Nat) (hm : m = n + 1) (h : m < 2 ^ 64) :
 /-- `sext.w` of a small 64-bit value. -/
 theorem ialloc_sextw (n : Nat) (h : n < 2 ^ 31) :
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 n)) = BitVec.ofNat 64 n := by
-  rw [ialloc_w32 n h]; exact ialloc_sext32 n h
+  rw [fw_w32 n h]; exact fw_sext32 n h
 
 theorem ialloc_sextw' (n : Nat) (h : n < 2 ^ 31) :
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 n + BitVec.signExtend 64 0#12))
@@ -204,20 +178,16 @@ theorem ialloc_sextw_toNat' (inum : BitVec 32) :
 theorem ialloc_bltu (n nin : Nat) (hn : n < 2 ^ 31) (hnin : nin < 2 ^ 31) :
     bcond bop.BLTU (BitVec.ofNat 64 n) (BitVec.signExtend 64 (BitVec.ofNat 32 nin)) =
       decide (n < nin) := by
-  rw [ialloc_sext32 nin hnin]
+  rw [fw_sext32 nin hnin]
   exact dsBltu n nin (by omega) (by omega)
 
 /-- `bgeu a5,a4` at `+0x12`: NOT taken, from `1 < ninodes` (the dead
 empty-region arm). -/
 theorem ialloc_bgeu_dead (nin : Nat) (h1 : 1 < nin) (hnin : nin < 2 ^ 31) :
     bcond bop.BGEU 1#64 (BitVec.signExtend 64 (BitVec.ofNat 32 nin)) = false := by
-  rw [ialloc_sext32 nin hnin, show (1#64 : BitVec 64) = BitVec.ofNat 64 1 from rfl,
-    ialloc_bgeu_nat 1 nin (by omega) (by omega)]
+  rw [fw_sext32 nin hnin, show (1#64 : BitVec 64) = BitVec.ofNat 64 1 from rfl,
+    fw_bgeu_nat 1 nin (by omega) (by omega)]
   simp; omega
-
-/-- `lh`/`sh` move a halfword unchanged. -/
-theorem ialloc_ext16 (w : BitVec 16) : BitVec.extractLsb' 0 16 (BitVec.signExtend 64 w) = w := by
-  bv_decide
 
 /-! ## The zero record and the fresh one (Rocq's `ia_dzero`, `ia_dzero_bytes`,
 `ia_fresh_of_zero`) -/

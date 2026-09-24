@@ -168,7 +168,7 @@ theorem baArms_post (γ : LogNames) (γfs : FsNames) (cov : ExtTreeSet Nat compa
   · ileft
     iframe Hop
     ipureintro
-    rw [ha0, ba_sext_zero rv h0]
+    rw [ha0, fw_sext_zero rv h0]
   · iright
     iexists rv
     iframe Hfsb Hop

@@ -35,8 +35,6 @@ theorem ba_lui2 : BitVec.signExtend 64 (2#20 ++ 0#12) = 0x2000#64 := by decide
 theorem ba_sraiw13_0 : BitVec.signExtend 64 ((BitVec.extractLsb' 0 32 (0#64)).sshiftRight 13) =
     0#64 := by decide
 theorem ba_ret_ac : jumpPc (KA.«balloc» + 0xac#64) = KA.«balloc» + 0xac#64 := by decide
-theorem ba_ext_sext (w : BitVec 32) : BitVec.extractLsb' 0 32 (BitVec.signExtend 64 w) = w := by
-  bv_decide
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
@@ -209,7 +207,7 @@ theorem ba_setup (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET) (PK :
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ba_bm_addr]
   iintro Hk Hpc Hbms
   k_step (wp_s_addw cpu _ (KA.«balloc» + 0xa4#64) true 11#5 11#5 15#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ba_ext_sext]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fw_ext32]
   iintro Hk Hpc
   -- +0xa6  mv a0,s7 ; +0xa8  jal bread
   k_step (wp_s_add cpu _ (KA.«balloc» + 0xa6#64) true 10#5 0#5 23#5 (by decide))

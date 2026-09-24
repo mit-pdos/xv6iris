@@ -78,7 +78,7 @@ theorem ba_bzero_fill (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET)
   have hK10 : 10 ≤ k.avail := by unfold ballocSlots at hK; omega
   have hbno : (BitVec.ofNat 32 bi).toNat = bi := by
     simp only [BitVec.toNat_ofNat]; omega
-  have hsx : BitVec.signExtend 64 (BitVec.ofNat 32 bi) = BitVec.ofNat 64 bi := ba_sext32 bi hbi31
+  have hsx : BitVec.signExtend 64 (BitVec.ofNat 32 bi) = BitVec.ofNat 64 bi := fw_sext32 bi hbi31
   obtain ⟨s2, a2, a18, a19, a20, a21, a22, a23, a24, hp⟩ := hb
   iintro ⟨Hk, Hpc, Hframe, #Hpi, #Hbc, #Hlc, Htc, Hcl, Hir, Hpid, Hsz, Hbms, Hsl2, Hop, HfsbD,
     Hhold, Hpay, Hnext⟩
@@ -240,7 +240,7 @@ theorem ba_bzero (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET)
   have hK10 : 10 ≤ k.avail := by unfold ballocSlots at hK; omega
   have hbno : (BitVec.ofNat 32 bi).toNat = bi := by
     simp only [BitVec.toNat_ofNat]; omega
-  have hsx : BitVec.signExtend 64 (BitVec.ofNat 32 bi) = BitVec.ofNat 64 bi := ba_sext32 bi hbi31
+  have hsx : BitVec.signExtend 64 (BitVec.ofNat 32 bi) = BitVec.ofNat 64 bi := fw_sext32 bi hbi31
   obtain ⟨a2, a18, a19, a20, a21, a22, a23, a24, hp⟩ := hb
   iintro ⟨Hk, Hpc, Hframe, #Hpe, #Hpi, #Hbc, #Hdc, #Hlc, Htc, Hcl, Hir, Hpid, Hsz, Hbms, Hsl,
     Hop, HfsbD, Hnext⟩

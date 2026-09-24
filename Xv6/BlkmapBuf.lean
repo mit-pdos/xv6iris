@@ -12,7 +12,9 @@ consumers share need a DEFINITIONAL home; this is it (coordinator decision
 rest of `ProofBmapParts.v` (`bm_slli32_srli30`, `bm_addiw_m12`, `bm_sext32`,
 `bm_uint_moi`, `bm_sext_zero`, `bm_data_addr`, `bm_slot_addr`, `bm_off0`,
 `bm_cells_insert_*`, `bm_slots_*`, `bm_held_swap` / `bm_held_k`) stays with
-bmap (`BmapParts.lean`) or already exists (`Xv6.dsDataAddr`, `Xv6.dsOff0`,
+bmap (`BmapParts.lean`), is shared with the other fs functions
+(`Xv6.fw_sext32`, `Xv6.fw_sext_zero`: `Xv6/FsWords.lean`) or already exists
+(`Xv6.dsDataAddr`, `Xv6.dsOff0`,
 `Xv6.dsSlots_split` / `_join`, `Xv6.dsHold_swap` / `_k`,
 `Xv6.bmCells_set_dir` / `_ind`).
 

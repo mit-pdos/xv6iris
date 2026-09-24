@@ -51,7 +51,7 @@ theorem ba_a_size : KA.«balloc» + 0x1dae8#64 = sbSizeAddr := by unfold sbSizeA
 first dead arm). -/
 theorem ba_beqz_size (size : Nat) (h0 : 0 < size) (h : size < 2 ^ 31) :
     bcond bop.BEQ (BitVec.signExtend 64 (BitVec.ofNat 32 size)) 0#64 = false := by
-  rw [ba_sext32 size h]
+  rw [fw_sext32 size h]
   show (BitVec.ofNat 64 size == 0#64) = false
   have : BitVec.ofNat 64 size ≠ 0#64 := by
     intro he

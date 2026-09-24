@@ -134,7 +134,7 @@ theorem bm_head_ok (BA : BALLOC) (LW : LOG_WRITE) (BR : BREAD) (BE : BRELSE)
   ihave Hframe := Hfback $$ %(k.regs 20#5) Hf6
   -- +0x5a  sw a0,128(s2) : ip->addrs[NDIRECT] = blk ; +0x5e  c.j +0x62
   k_step (wp_s_sw c _ (KA.«bmap» + 0x5a#64) false 128#12 18#5 10#5 (by decide) bm.bmInd)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h18, h10, bm_ind_addr, bm_ext_sext]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h18, h10, bm_ind_addr, fw_ext32]
   iintro Hk Hpc Hcell
   k_step (wp_s_j c _ (KA.«bmap» + 0x5e#64) true 4#21)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]

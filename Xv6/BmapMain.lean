@@ -96,7 +96,7 @@ theorem bm_core (BR : BREAD) (BE : BRELSE) (ak : Option BmAlloc)
   by_cases hdir : fbn < NDIRECT
   · k_step (wp_s_branch c1 _ (KA.«bmap» + 0x12#64) false 38#13 15#5 11#5 (by decide) bop.BLTU)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [ha1, bm_sext32 fbn hf31, bm_bltu11 fbn (by omega),
+      with [ha1, fw_sext32 fbn hf31, bm_bltu11 fbn (by omega),
         show decide (11 < fbn) = false from decide_eq_false (by unfold NDIRECT at hdir; omega)]
     iintro Hk Hpc
     iapply (bm_direct ak hba Γ c1 c1 k k.spie k.spp _ γl γb V γdl pd pav pu j γfs logstart dev ip
@@ -108,10 +108,10 @@ theorem bm_core (BR : BREAD) (BE : BRELSE) (ak : Option BmAlloc)
       refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
         simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
     all_goals (simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;>
-      first | exact ha0 | exact (ha1.trans (bm_sext32 fbn hf31)) | rfl)
+      first | exact ha0 | exact (ha1.trans (fw_sext32 fbn hf31)) | rfl)
   · k_step (wp_s_branch c1 _ (KA.«bmap» + 0x12#64) false 38#13 15#5 11#5 (by decide) bop.BLTU)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [ha1, bm_sext32 fbn hf31, bm_bltu11 fbn (by omega),
+      with [ha1, fw_sext32 fbn hf31, bm_bltu11 fbn (by omega),
         show decide (11 < fbn) = true from decide_eq_true (by unfold NDIRECT at hdir; omega)]
     iintro Hk Hpc
     iapply (bm_head BR BE ak hba hlw Γ c1 c1 k k.spie k.spp _ γl γb V γdl pd pav pu j γfs logstart
@@ -123,7 +123,7 @@ theorem bm_core (BR : BREAD) (BE : BRELSE) (ak : Option BmAlloc)
       refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
         simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
     all_goals (simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;>
-      first | exact ha0 | exact (ha1.trans (bm_sext32 fbn hf31)) | rfl)
+      first | exact ha0 | exact (ha1.trans (fw_sext32 fbn hf31)) | rfl)
 
 end
 

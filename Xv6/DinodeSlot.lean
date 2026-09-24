@@ -95,6 +95,7 @@ import Xv6.InodeInv
 import Xv6.BcacheInv
 import Xv6.FsBytesMint
 import Xv6.PrintkDefs
+import Xv6.FsWords
 
 namespace Xv6
 

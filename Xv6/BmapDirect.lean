@@ -99,7 +99,7 @@ theorem bm_direct_ok (c cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap)
   iintro Hk Hpc
   -- +0x32  sw a0,80(s3) : ip->addrs[bn] = blk ; +0x36  c.j +0x8a
   k_step (wp_s_sw c _ (KA.«bmap» + 0x32#64) false 80#12 19#5 10#5 (by decide) (blkmapGet bm fbn))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h19, h10, bm_dir_addr, bm_ext_sext]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h19, h10, bm_dir_addr, fw_ext32]
   iintro Hk Hpc Hcell
   k_step (wp_s_j c _ (KA.«bmap» + 0x36#64) true 84#21)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]

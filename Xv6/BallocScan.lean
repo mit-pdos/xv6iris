@@ -154,9 +154,9 @@ theorem ba_scan_next (BE : BRELSE) (PK : PRINTK)
       refine ⟨?_, ?_, ?_, ?_⟩
       · ba_body_tac
       · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
-        exact ba_succ64 bi (by omega)
+        exact fw_succ64 bi (by omega)
       · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
-        exact ba_succ64 bi (by omega)
+        exact fw_succ64 bi (by omega)
       · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]; exact h10
 
 set_option maxHeartbeats 16000000 in

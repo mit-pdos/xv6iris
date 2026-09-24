@@ -107,12 +107,6 @@ theorem iu_andi (inum : BitVec 32) :
     BitVec.signExtend 64 inum &&& BitVec.signExtend 64 15#12 = BitVec.ofNat 64 (islot inum) := by
   rw [dsAndi15, dsSext_mod16]; rfl
 
-/-- `lh`/`sh` and `lw`/`sw` move a field unchanged. -/
-theorem iu_ext16 (w : BitVec 16) : BitVec.extractLsb' 0 16 (BitVec.signExtend 64 w) = w := by
-  bv_decide
-theorem iu_ext32 (w : BitVec 32) : BitVec.extractLsb' 0 32 (BitVec.signExtend 64 w) = w := by
-  bv_decide
-
 /-- The field cells' displacements, off the slot's base. -/
 theorem iu_disp (a : BitVec 64) (d : Nat) (h : d < 2048) :
     a + BitVec.signExtend 64 (BitVec.ofNat 12 d) = a + BitVec.ofNat 64 d := dsDisp a d h

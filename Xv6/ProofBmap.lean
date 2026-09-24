@@ -61,7 +61,7 @@ theorem bm_arm_a0 (R' : RegMap) (rv w : BitVec 32) (ha0 : R' 10#5 = BitVec.signE
     (harm : (rv.toNat = 0 ∧ w.toNat = 0) ∨ (rv = w ∧ w.toNat ≠ 0)) :
     (R' 10#5 = 0#64 ∧ w.toNat = 0) ∨ (R' 10#5 = BitVec.signExtend 64 w ∧ w.toNat ≠ 0) := by
   rcases harm with ⟨h0, hw⟩ | ⟨he, hw⟩
-  · exact Or.inl ⟨ha0.trans (bm_sext_zero rv h0), hw⟩
+  · exact Or.inl ⟨ha0.trans (fw_sext_zero rv h0), hw⟩
   · exact Or.inr ⟨by rw [ha0, he], hw⟩
 
 /-- The core's ledger at a kit, read as `wp_bmap_gen`'s clauses (a)-(e). -/

@@ -6,7 +6,7 @@ five field copies disk → inode, and the 52-byte `memmove` of the block map
 The slot arithmetic is `Xv6/DinodeSlot.lean`'s, read in the normal form the
 rules produce (`il_andi15`, `il_slli6`).  The four halfword copies go
 `lh`→`sh` (the `sh` stores `trunc16 ∘ sext64` = the halfword,
-`il_ext16`), the size `lw`→`sw` (`il_ext32`).  The buffer is only READ:
+`fw_ext16`), the size `lw`→`sw` (`fw_ext32`).  The buffer is only READ:
 the slot's six pieces go back unchanged (Rocq 1907-1920), which is what
 the opened block's back wand (`Xv6.il_blk_open`) takes.
 -/
@@ -130,7 +130,7 @@ theorem il_mid (MM : MEMMOVE) (BL : BRELSE) (PA : PANIC)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc Hd0
   k_step (wp_s_sh c _ (KA.«ilock» + 0x60#64) false 68#12 9#5 15#5 (by decide) d0.diType)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hs1, iType, il_ext16]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hs1, iType, fw_ext16]
   iintro Hk Hpc Hty
   -- major : lh a5,2(a1) ; sh a5,70(s1)
   k_step (wp_s_lh c _ (KA.«ilock» + 0x64#64) false 2#12 15#5 11#5 (by decide) (by decide)
@@ -138,7 +138,7 @@ theorem il_mid (MM : MEMMOVE) (BL : BRELSE) (PA : PANIC)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc Hd2
   k_step (wp_s_sh c _ (KA.«ilock» + 0x68#64) false 70#12 9#5 15#5 (by decide) d0.diMajor)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hs1, iMajor, il_ext16]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hs1, iMajor, fw_ext16]
   iintro Hk Hpc Hmaj
   -- minor : lh a5,4(a1) ; sh a5,72(s1)
   k_step (wp_s_lh c _ (KA.«ilock» + 0x6c#64) false 4#12 15#5 11#5 (by decide) (by decide)
@@ -146,7 +146,7 @@ theorem il_mid (MM : MEMMOVE) (BL : BRELSE) (PA : PANIC)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc Hd4
   k_step (wp_s_sh c _ (KA.«ilock» + 0x70#64) false 72#12 9#5 15#5 (by decide) d0.diMinor)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hs1, iMinor, il_ext16]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hs1, iMinor, fw_ext16]
   iintro Hk Hpc Hmin
   -- nlink : lh a5,6(a1) ; sh a5,74(s1)
   k_step (wp_s_lh c _ (KA.«ilock» + 0x74#64) false 6#12 15#5 11#5 (by decide) (by decide)
@@ -154,7 +154,7 @@ theorem il_mid (MM : MEMMOVE) (BL : BRELSE) (PA : PANIC)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc Hd6
   k_step (wp_s_sh c _ (KA.«ilock» + 0x78#64) false 74#12 9#5 15#5 (by decide) d0.diNlink)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hs1, iNlink, il_ext16]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hs1, iNlink, fw_ext16]
   iintro Hk Hpc Hnl
   -- size : c.lw a5,8(a1) ; c.sw a5,76(s1)
   k_step (wp_s_lw c _ (KA.«ilock» + 0x7c#64) true 8#12 15#5 11#5 (by decide) (by decide)
@@ -162,7 +162,7 @@ theorem il_mid (MM : MEMMOVE) (BL : BRELSE) (PA : PANIC)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc Hd8
   k_step (wp_s_sw c _ (KA.«ilock» + 0x7e#64) true 76#12 9#5 15#5 (by decide) d0.diSize)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hs1, iSize, il_ext32]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hs1, iSize, fw_ext32]
   iintro Hk Hpc Hsz
   -- the memmove: +0x80 li a2,52 ; +0x84 c.addi a1,12 ; +0x86 addi a0,s1,80 ; +0x8a jal
   k_step (wp_s_addi c _ (KA.«ilock» + 0x80#64) false 52#12 12#5 0#5 (by decide))

@@ -491,7 +491,7 @@ theorem ialloc_claim (MS : MEMSET) (LW : LOG_WRITE) (BE : BRELSE) (IG : IGET) [F
   -- +0x94  sh s6,0(s3)
   k_step (wp_s_sh c1 _ (KA.«ialloc» + 0x94#64) false 0#12 19#5 22#5 (by decide) 0#16)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [b19, h19, b22, a22, ialloc_ext16]
+    with [b19, h19, b22, a22, fw_ext16]
   iintro Hk Hpc Hty0
   -- the slot now holds `iallocFresh ty`: the block, the buffer, the handle
   ihave Hd := Hdback $$ Hty0

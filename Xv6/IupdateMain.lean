@@ -224,7 +224,7 @@ theorem iu_copy (LW : LOG_WRITE) (BE : BRELSE) (MM : MEMMOVE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hs1]
   iintro Hk Hpc Hty
   k_step (wp_s_sh c _ (KA.«iupdate» + 0x36#64) false 0#12 15#5 14#5 (by decide) dold.diType)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha5, iu_ext16]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha5, fw_ext16]
   iintro Hk Hpc Hd0
   -- major : lh a4,70(s1) ; sh a4,2(a5)
   k_step (wp_s_lh c _ (KA.«iupdate» + 0x3a#64) false 70#12 14#5 9#5 (by decide) (by decide)
@@ -232,7 +232,7 @@ theorem iu_copy (LW : LOG_WRITE) (BE : BRELSE) (MM : MEMMOVE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hs1]
   iintro Hk Hpc Hmaj
   k_step (wp_s_sh c _ (KA.«iupdate» + 0x3e#64) false 2#12 15#5 14#5 (by decide) dold.diMajor)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha5, iu_ext16]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha5, fw_ext16]
   iintro Hk Hpc Hd2
   -- minor : lh a4,72(s1) ; sh a4,4(a5)
   k_step (wp_s_lh c _ (KA.«iupdate» + 0x42#64) false 72#12 14#5 9#5 (by decide) (by decide)
@@ -240,7 +240,7 @@ theorem iu_copy (LW : LOG_WRITE) (BE : BRELSE) (MM : MEMMOVE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hs1]
   iintro Hk Hpc Hmin
   k_step (wp_s_sh c _ (KA.«iupdate» + 0x46#64) false 4#12 15#5 14#5 (by decide) dold.diMinor)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha5, iu_ext16]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha5, fw_ext16]
   iintro Hk Hpc Hd4
   -- nlink : lh a4,74(s1) ; sh a4,6(a5)
   k_step (wp_s_lh c _ (KA.«iupdate» + 0x4a#64) false 74#12 14#5 9#5 (by decide) (by decide)
@@ -248,7 +248,7 @@ theorem iu_copy (LW : LOG_WRITE) (BE : BRELSE) (MM : MEMMOVE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hs1]
   iintro Hk Hpc Hnl
   k_step (wp_s_sh c _ (KA.«iupdate» + 0x4e#64) false 6#12 15#5 14#5 (by decide) dold.diNlink)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha5, iu_ext16]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha5, fw_ext16]
   iintro Hk Hpc Hd6
   -- size : c.lw a4,76(s1) ; c.sw a4,8(a5)
   k_step (wp_s_lw c _ (KA.«iupdate» + 0x52#64) true 76#12 14#5 9#5 (by decide) (by decide)
@@ -256,7 +256,7 @@ theorem iu_copy (LW : LOG_WRITE) (BE : BRELSE) (MM : MEMMOVE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hs1]
   iintro Hk Hpc Hsz
   k_step (wp_s_sw c _ (KA.«iupdate» + 0x54#64) true 8#12 15#5 14#5 (by decide) dold.diSize)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha5, iu_ext32]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha5, fw_ext32]
   iintro Hk Hpc Hd8
   ihave HF := iu_cells_close ip inum dn bm dqd dqn dqs $$ [Hidev Hinum Hty Hmaj Hmin Hnl Hsz
     Hmap Hsb]

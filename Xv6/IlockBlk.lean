@@ -28,11 +28,6 @@ set_option linter.unusedVariables false
 
 /-! ## Pure readings -/
 
-theorem il_ext16 (w : BitVec 16) : BitVec.extractLsb' 0 16 (BitVec.signExtend 64 w) = w := by
-  bv_decide
-theorem il_ext32 (w : BitVec 32) : BitVec.extractLsb' 0 32 (BitVec.signExtend 64 w) = w := by
-  bv_decide
-
 /-- Giving slot `k` back at its own record leaves the block as it was. -/
 theorem il_set_self (ds : List Dinode) (k : Nat) (hk : k < ds.length) :
     ds.set k ds[k]! = ds := by
