@@ -495,7 +495,7 @@ theorem il_seal (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     frame6s3 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5) ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     wordPointsTo (sb + 20#64) 4 dqs (BitVec.ofNat 32 logstart) ∗
-    logFrozen logstart dev ∗
+    logFrozen logstart dev ∗ fsBytesAnyAt γfs (fsHomeList V.cov logstart) ∗
     kmapId logAddr ∗ kmapId (logAddr + 16#64) ∗ lkFresh logAddr ∗
     logFreeTok γ ∗
     wordPointsTo lOut 4 (DFrac.own 1) 0#32 ∗
@@ -519,7 +519,7 @@ theorem il_seal (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       bslots γb 2 -∗
       logCtx (γ.withLk γlk) γb γfs V.cov logstart dev -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  iintro ⟨Hk, Hpc, Htc, Hcl, Hir, Hframe, Hpid, Hsb, #Hfroz, #Hm1, #Hm2, Hfresh, Htok,
+  iintro ⟨Hk, Hpc, Htc, Hcl, Hir, Hframe, Hpid, Hsb, #Hfroz, #Hrow, #Hm1, #Hm2, Hfresh, Htok,
     Hout, Hcmt, Hnc, HlhN, Hjunk, HL, HD, Hd, Hhdr, Hslots, Hpool, Hwork, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- the boot pack
@@ -536,8 +536,8 @@ theorem il_seal (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   · iframe Hm1 Hm2
     iframe
   imodintro
-  ihave #Hctx := logCtx_mk γ γlk γb γfs V.cov logstart dev $$ [Hlk Hfroz]
-  case' _ => iframe Hlk Hfroz
+  ihave #Hctx := logCtx_mk γ γlk γb γfs V.cov logstart dev $$ [Hlk Hfroz Hrow]
+  case' _ => iframe Hlk Hfroz Hrow
   -- the epilogue
   ihave Hframe := (show frame6s3 (GF := GF) (k.regs 2#5) (k.regs 1#5) (k.regs 8#5)
         (k.regs 9#5) (k.regs 18#5) (k.regs 19#5) ⊢
@@ -601,7 +601,7 @@ theorem initlog_proof
       (K.pushed m).withSpie a b = (K.withSpie a b).pushed m := fun _ _ _ _ => rfl
   unfold wp_initlog_body
   simp only [initlogAddr]
-  iintro ⟨Hk, Hpc, #Hpi, Htc, Hcl, Hir, #Hbc, #Hdc, #Hpe, Hpid, Htok, Hsb, #Hm1, #Hm2,
+  iintro ⟨Hk, Hpc, #Hpi, Htc, Hcl, Hir, #Hbc, #Hdc, #Hpe, Hpid, #Hrow, Htok, Hsb, #Hm1, #Hm2,
     Hlock, Hname, Hcpu, HlStart, HlDev, Hout, Hcmt, Hnc, HlhN, Hjunk, HL, HD, Hd, Hhdr,
     Hslots, Hpool0, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -873,7 +873,7 @@ theorem initlog_proof
       ((g26.trans f26).trans ((d26.trans b26).trans a26'))
       ((g27.trans f27).trans ((d27.trans b27).trans a27'))
       (fun hh => (hp6 hh).trans ((hp5 hh).trans (hp3 hh))))
-    $$ [- $Hk $Hpc $Htc $Hcl $Hir $Hframe $Hpid $Hsb $Hfroz $Hm1 $Hm2 $Hfresh $Htok
+    $$ [- $Hk $Hpc $Htc $Hcl $Hir $Hframe $Hpid $Hsb $Hfroz $Hrow $Hm1 $Hm2 $Hfresh $Htok
          $Hout $Hcmt $Hnc $HlhN $Hjunk $HL $HD $Hd $Hch $Hslots $Hpool $Hs2 $Hnext]
   k_norm_g
   try (iframe #)⟩

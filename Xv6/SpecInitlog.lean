@@ -105,6 +105,10 @@ def wp_initlog_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G 
   trapCsrs cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ∗
   bioCtx γl γb V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
+  -- THE BYTE VIEW'S SEALED ROW, which `Xv6.logCtx` carries out (Rocq's
+  -- `log_ctx` third conjunct).  The era's byte invariant at the home set,
+  -- plus the certificate that its exception set is empty.
+  fsBytesAnyAt γfs (fsHomeList V.cov logstart) ∗
   -- the four ghost names, at their genesis values
   logFreeTok γ ∗
   -- the superblock field, read once

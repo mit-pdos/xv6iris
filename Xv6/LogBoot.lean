@@ -99,12 +99,14 @@ theorem logResAt_withLk (γ : LogNames) (γlk : GName) (γb : BcacheNames) (γfs
     logResAt (GF := GF) (γ.withLk γlk) γb γfs cov logstart
       = logResAt γ γb γfs cov logstart := rfl
 
-/-- The persistent bundle `initlog` returns, out of the sealed lock and the
-two frozen cells. -/
+/-- The persistent bundle `initlog` returns, out of the sealed lock, the
+two frozen cells and THE BYTE VIEW'S SEALED ROW (`Xv6.logCtx`'s third
+conjunct: the invariant at the era's home set plus `initlog`'s own
+certificate that the exception set is empty). -/
 theorem logCtx_mk (γ : LogNames) (γlk : GName) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (logstart : Nat) (dev : BitVec 32) :
     isLock γlk logAddr "log" (logResAt (GF := GF) γ γb γfs cov logstart) ∗
-    logFrozen logstart dev
+    logFrozen logstart dev ∗ fsBytesAnyAt γfs (fsHomeList cov logstart)
     ⊢ logCtx (γ.withLk γlk) γb γfs cov logstart dev := by
   unfold logCtx
   rw [show (γ.withLk γlk).lk = γlk from rfl, logResAt_withLk γ γlk γb γfs cov logstart]

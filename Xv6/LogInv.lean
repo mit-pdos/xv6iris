@@ -65,6 +65,7 @@ are not, and nothing below `begin_op`/`log_write`/`end_op` consumes them
 (neither `write_head` nor `install_trans` mentions the ledger).
 -/
 import Xv6.FsBlocks
+import Xv6.FsBytesMint
 import Xv6.BcacheInv
 import Xv6.Image
 import MachCSL.Lock
@@ -516,11 +517,23 @@ def logFrozen (logstart : Nat) (dev : BitVec 32) : IProp GF := iprop%
 instance logFrozen_persistent (logstart : Nat) (dev : BitVec 32) :
     Persistent (logFrozen (GF := GF) logstart dev) := by unfold logFrozen; infer_instance
 
-/-- Rocq's `log_ctx`, minus the file system's four parked rows (see the
-file header). -/
+/-- Rocq's `log_ctx`, minus the file system's parked rows that this port
+does not have (see the file header) -- but WITH the byte view's.
+
+**THE BYTE VIEW'S ROW RIDES HERE** (Rocq `log_ctx`'s
+`fs_bytes_at γfs (fs_home_set cov logstart) ∗ … ∗ exc_sealed (fs_exc γfs)`,
+i.e. exactly `Xv6.fsBytesAnyAt`).  Every home block's owner above the log
+now holds the EXCLUSIVE `Xv6.fsblock` rather than the cache's parked half,
+so the auth-free half/half agreement a `bread` client used to close by
+entailment is gone: it opens THIS invariant instead.  It rides `logCtx`
+because `logCtx` is already threaded to `log_write` and already carries
+`cov` and `logstart`, so **not one call site moves**.  The SEAL half of it
+is `initlog`'s certificate that recovery is done, so no crossing above the
+WAL takes a membership premise. -/
 def logCtx (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (logstart : Nat) (dev : BitVec 32) : IProp GF := iprop%
-  isLock γ.lk logAddr "log" (logResAt γ γb γfs cov logstart) ∗ logFrozen logstart dev
+  isLock γ.lk logAddr "log" (logResAt γ γb γfs cov logstart) ∗ logFrozen logstart dev ∗
+  fsBytesAnyAt γfs (fsHomeList cov logstart)
 
 instance logCtx_persistent (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (logstart : Nat) (dev : BitVec 32) :
@@ -536,7 +549,32 @@ theorem logCtx_lock (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
 theorem logCtx_frozen (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (logstart : Nat) (dev : BitVec 32) :
     logCtx (GF := GF) γ γb γfs cov logstart dev ⊢ logFrozen logstart dev := by
-  unfold logCtx; iintro ⟨-, H⟩; iexact H
+  unfold logCtx; iintro ⟨-, H, -⟩; iexact H
+
+/-- **The byte view's row, off the context every log function threads**
+(Rocq's `log_ctx_bytes` + `log_ctx_seal`, together). -/
+theorem logCtx_bytes (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
+    (cov : Std.ExtTreeSet Nat compare) (logstart : Nat) (dev : BitVec 32) :
+    logCtx (GF := GF) γ γb γfs cov logstart dev ⊢
+      fsBytesAnyAt γfs (fsHomeList cov logstart) := by
+  unfold logCtx; iintro ⟨-, -, H⟩; iexact H
+
+/-- ...and the home-set-free form every `bread` client above takes (Rocq's
+`log_ctx_bytes_any`). -/
+theorem logCtx_bytesAny (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
+    (cov : Std.ExtTreeSet Nat compare) (logstart : Nat) (dev : BitVec 32) :
+    logCtx (GF := GF) γ γb γfs cov logstart dev ⊢ fsBytesAny γfs := by
+  iintro H
+  iapply fsBytesAnyAt_any γfs (fsHomeList cov logstart)
+  iapply logCtx_bytes γ γb γfs cov logstart dev $$ H
+
+/-- **THE SEAL**, off the same context (Rocq's `log_ctx_seal`). -/
+theorem logCtx_seal (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
+    (cov : Std.ExtTreeSet Nat compare) (logstart : Nat) (dev : BitVec 32) :
+    logCtx (GF := GF) γ γb γfs cov logstart dev ⊢ excSealed γfs.exc := by
+  iintro H
+  iapply fsBytesAnyAt_seal γfs (fsHomeList cov logstart)
+  iapply logCtx_bytes γ γb γfs cov logstart dev $$ H
 
 /-! ## The ledger transitions -/
 
