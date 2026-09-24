@@ -446,3 +446,9 @@ import Xv6.LinkSysGetpid
 import Xv6.SpecSysUptime
 import Xv6.ProofSysUptime
 import Xv6.LinkSysUptime
+import Xv6.SpecStrncmp
+import Xv6.ProofStrncmp
+import Xv6.LinkStrncmp
+import Xv6.SpecStrncpy
+import Xv6.ProofStrncpy
+import Xv6.LinkStrncpy
