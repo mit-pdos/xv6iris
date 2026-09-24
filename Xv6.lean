@@ -580,3 +580,5 @@ import Xv6.IgetLic
 import Xv6.IcachePinwObl
 import Xv6.IcacheBoxAmb
 import Xv6.IcacheInvFrz
+import Xv6.IcacheEscrowPool
+import Xv6.IcacheEscrowPoolMove

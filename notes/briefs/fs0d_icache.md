@@ -237,7 +237,7 @@ Deps name batch items; "gate" = §1 plus the in-flight files.
 
 **Batch F (3)**
 - [DONE] F1 IcacheInvFrz — E1, D1, C4.
-- F2 IcacheEscrowPool — D4, E1, C1, B6.
+- [DONE] F2 IcacheEscrowPool (+ IcacheEscrowPoolMove) — D4, E1, C1, B6.
 - [DONE] F3 IcacheBoxAmb — D4, E2, C4.
 
 **Batch G (4)**
