@@ -87,9 +87,99 @@ Require Import UkEchoTree UkCatTree.
 Require Import UkHandler.
 Require Import UkShMain UkShEcho UShEcho UkShCat.
 Require Import UkTreeEntry.
-Require Import UkPipeEntries.   (* the pure argv bridges [pe_cat_1w_args], [pe_line_len], [pe_drop1_ne] *)
 Require Import UkPipesIface.
 Local Open Scope Z_scope.
+(* THE PURE ARGV BRIDGES (moved from the one-pipe [UkPipeEntries], cut C8) *)
+(* the words' line after the command fits a C int *)
+Lemma pe_line_len (ws : list (list (bv 8))) :
+  EchoDisc.line_ok ws -> Z.of_nat (length (wl_line (drop 1 ws))) < 2 ^ 31.
+Proof using .
+  intros Hok. pose proof (EchoDisc.line_ok_len ws Hok) as Hl.
+  unfold EchoDisc.line_max in Hl.
+  assert (Hcons : forall (w : list (bv 8)) (r : list (list (bv 8))),
+             (length (wl_line r) <= length (wl_line (w :: r)))%nat).
+  { intros w r. rewrite !wl_line_length wl_body_cons length_app.
+    destruct r as [| w' r'].
+    - cbn. lia.
+    - rewrite wl_tail_cons. cbn [length]. lia. }
+  assert (Hle : (length (wl_line (drop 1 ws)) <= length (wl_line ws))%nat).
+  { destruct ws as [| w r]; [reflexivity |].
+    replace (drop 1 (w :: r)) with r by reflexivity. apply Hcons. }
+  lia.
+Qed.
+
+Lemma pe_drop1_ne (ws : list (list (bv 8))) :
+  EchoDisc.line_ok ws -> drop 1 ws <> [].
+Proof using .
+  intros Hok Hd. pose proof (EchoDisc.line_ok_ge2 ws Hok) as H2.
+  apply (f_equal length) in Hd. rewrite length_drop in Hd. cbn in Hd. lia.
+Qed.
+
+(* THE LANDED CAT ENTRY'S ARGV, READ AS THE TREE ENTRY'S: the token
+   [(a, b)] of sh's node is the one-word line [[cmd_cat]] at the string's
+   own address.  The word-list reading bounds the node's two addresses by
+   [2 ^ 38]; the landed one by the machine word, so the bound is a premise. *)
+Lemma pe_cat_1w_args (a b : nat) (Mn : gmap Z (bv 8)) (sv t : Z)
+    (gn : nat -> bv 8) :
+  0 < t < 2 ^ 38 ->
+  0 < sv + Z.of_nat a < 2 ^ 38 ->
+  UkShCat.cat_argv_bytes a b gn ->
+  uargv_img Mn (t + 8) (UkShMain.ush_args sv gn (UkShCat.cat_toks a b)) ->
+  exec_ok [UkShCat.cmd_cat]
+  /\ UShEcho.echo_node_img [UkShCat.cmd_cat] Mn (sv + Z.of_nat a) t
+       (fun j : nat => gn (a + j)%nat)
+  /\ UkShEcho.echo_argv_bytes [UkShCat.cmd_cat] (fun j : nat => gn (a + j)%nat).
+Proof using .
+  intros Ht Hs Hbytes Himg.
+  pose proof (UkShCat.cat_argv_bytes_end a b gn Hbytes) as Hb3.
+  destruct Hbytes as (_ & Hin & Hnul).
+  rewrite UkShCat.cmd_cat_len in Hin.
+  pose proof (UkShCat.cat_cmd_args_lookup a b sv gn Hb3) as Hlk.
+  destruct Himg as (_ & _ & _ & Hptr & Hterm & Hrow).
+  assert (Hoff : UkShEcho.echo_off [UkShCat.cmd_cat] 0 = 0%nat) by reflexivity.
+  assert (Halen : UkShEcho.echo_alen [UkShCat.cmd_cat] 0 = 3%nat)
+    by exact UkShCat.cmd_cat_len.
+  split_and!.
+  - apply (bool_decide_unpack _). vm_compute. exact I.
+  - rewrite /UShEcho.echo_node_img. cbn [length]. split_and!.
+    + lia.
+    + lia.
+    + intros i Hi. assert (i = 0%nat) as -> by lia. rewrite Hoff. lia.
+    + intros i Hi k Hk. assert (i = 0%nat) as -> by lia. rewrite Hoff.
+      pose proof (Hptr 0%nat _ Hlk k Hk) as Hp.
+      cbn [UserHeap.ua_ptr] in Hp. revert Hp.
+      match goal with |- ?l1 = ?r1 -> ?l2 = ?r2 =>
+        assert (El : l1 = l2) by (f_equal; lia);
+        assert (Er : r1 = r2) by (f_equal; f_equal; lia) end.
+      intros Hp. congruence.
+    + intros k Hk. pose proof (Hterm k Hk) as Hp.
+      rewrite UkShMain.ush_args_length in Hp. exact Hp.
+    + intros i Hi j Hj. assert (i = 0%nat) as -> by lia.
+      rewrite Halen in Hj. rewrite ?Hoff.
+      pose proof (Hrow 0%nat _ Hlk j ltac:(cbn [UserHeap.ua_len]; lia)) as Hp.
+      cbn [UserHeap.ua_ptr UserHeap.ua_bytes] in Hp. revert Hp.
+      match goal with |- ?l1 = ?r1 -> ?l2 = ?r2 =>
+        assert (El : l1 = l2) by (f_equal; lia);
+        assert (Er : r1 = r2) by (f_equal; f_equal; lia) end.
+      intros Hp. congruence.
+    + intros i Hi. assert (i = 0%nat) as -> by lia. rewrite ?Hoff ?Halen.
+      pose proof (Hrow 0%nat _ Hlk 3%nat ltac:(cbn [UserHeap.ua_len]; lia)) as Hp.
+      cbn [UserHeap.ua_ptr UserHeap.ua_bytes] in Hp.
+      rewrite <- Hnul, Hb3. revert Hp.
+      match goal with |- ?l1 = ?r1 -> ?l2 = ?r2 =>
+        assert (El : l1 = l2) by (f_equal; lia);
+        assert (Er : r1 = r2) by (f_equal; f_equal; lia) end.
+      intros Hp. congruence.
+  - split.
+    + intros i j Hi Hj. cbn [length] in Hi. assert (i = 0%nat) as -> by lia.
+      rewrite Halen in Hj. rewrite ?Hoff. cbn [Nat.add].
+      rewrite (Hin j Hj).
+      do 3 (destruct j as [| j]; [reflexivity |]). lia.
+    + intros i Hi. cbn [length] in Hi. assert (i = 0%nat) as -> by lia.
+      rewrite ?Hoff ?Halen. cbn [Nat.add]. rewrite <- Hb3. exact Hnul.
+Qed.
+
+
 Import Defs.
 
 (* ===================================================================== *)

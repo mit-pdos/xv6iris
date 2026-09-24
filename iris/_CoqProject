@@ -1761,3 +1761,5 @@ PipesStageInst.v
 UkShPipesFork.v
 PipesUline.v
 PipesCut.v
+UShPipesLaw.v
+UShPipesRound.v

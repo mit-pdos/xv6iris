@@ -344,3 +344,11 @@ Proof using.
     pose proof (rtoks_cats_concat_lookup (S n) (length (wl_body ws) + 3) i Hi) as Hl.
     exact (UkShParseCmd.ushp_nulfold_hit _ _ i _ Hl).
 Qed.
+
+(* a lookup in a [map], as the option's *)
+Lemma map_lookup_fmap {A B : Type} (f : A -> B) (l : list A) (k : nat) :
+  map f l !! k = f <$> (l !! k).
+Proof using.
+  revert k. induction l as [| x l IH]; intros [| k]; [done | done | done |].
+  exact (IH k).
+Qed.
