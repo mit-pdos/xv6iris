@@ -75,10 +75,10 @@ end
 
 set_option maxHeartbeats 16000000 in
 theorem bpin_proof (AC : ACQUIRE) (RE : RELEASE) : BPIN := ⟨
-  fun {hlc GF} _ _ _ _ _ _ cpu k γl γ V kk hnoff hK hlk hkk ha0 => by
+  fun {hlc GF} _ _ _ _ _ _ cpu k γl γ V kk dev bno hnoff hK hlk hkk ha0 => by
   unfold wp_bpin_body
   simp only [bpinAddr]
-  iintro ⟨Hk, Hpc, #Hbc, Hsl, Hnext⟩
+  iintro ⟨Hk, Hpc, #Hbc, Hsl, Hdevc, Hbnoc, Hnext⟩
   ihave #Hbox := bioCtx_box γl γ V kk hkk $$ Hbc
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
@@ -137,6 +137,22 @@ theorem bpin_proof (AC : ACQUIRE) (RE : RELEASE) : BPIN := ⟨
   icases bslotAt_elim γ curCtx kk (Ls kk) $$ Hsl0 with ⟨%⟨hnd, hlt⟩, Hrefc, Hhalves, Hslots, Hcnt⟩
   icases bkey_acc γ curCtx tl devs bnos kk hkk $$ Hkey with ⟨Hkey0, Hkcl⟩
   icases bkeyAt_elim γ curCtx tl kk (devs kk) (bnos kk) $$ Hkey0 with ⟨Hkd, Hkb, Hregs⟩
+  -- the caller's key halves pin the identity the cache records
+  ihave %hdveq := wordAtN_agree curCtx (aBufDev (bnode kk)) 4 (1 : Qp).half (1 : Qp).half
+    (devs kk) dev $$ [Hkd Hdevc]
+  · iframe Hkd
+    iapply (show wordPointsTo (GF := GF) (aBufDev (bnode kk)) 4 (DFrac.own (1 : Qp).half) dev ⊢
+        wordAtN curCtx (aBufDev (bnode kk)) 4 (DFrac.own (1 : Qp).half) dev from by
+      rw [wordAtN_cur])
+    iexact Hdevc
+  ihave %hbneq := wordAtN_agree curCtx (aBufBlockno (bnode kk)) 4 (1 : Qp).half (1 : Qp).half
+    (bnos kk) bno $$ [Hkb Hbnoc]
+  · iframe Hkb
+    iapply (show wordPointsTo (GF := GF) (aBufBlockno (bnode kk)) 4
+          (DFrac.own (1 : Qp).half) bno ⊢
+        wordAtN curCtx (aBufBlockno (bnode kk)) 4 (DFrac.own (1 : Qp).half) bno from by
+      rw [wordAtN_cur])
+    iexact Hbnoc
   icases bufSlotRegs_elim (γ.box kk) tl (devs kk) (bnos kk) $$ Hregs with ⟨%r, %⟨hrid, hrtl⟩, Hrd, #Htd⟩
   obtain ⟨n, hn⟩ : ∃ n, (Ls kk).length = n := ⟨_, rfl⟩
   have hlen : (nx :: Ls kk).length = n + 1 := by simp only [List.length_cons, hn]
@@ -168,8 +184,8 @@ theorem bpin_proof (AC : ACQUIRE) (RE : RELEASE) : BPIN := ⟨
       bioxN_top hrid.1 $$ [Hbox Hrd Hcnt] with ⟨Hrd, Hcnt, ⟨%Tb, Hbref⟩⟩
   · iframe Hbox Hrd Hcnt
   ihave Hbref := (show (boxRef (GF := GF) (γ.box kk) r.ident Tb) ⊢
-      ∃ T : Nat, boxRef (γ.box kk) (((devs kk), (bnos kk)) : BufId) T from by
-    rw [hrid.2.2]; iintro H; iexists Tb; iexact H) $$ Hbref
+      ∃ T : Nat, boxRef (γ.box kk) ((dev, bno) : BufId) T from by
+    rw [hrid.2.2, hdveq, hbneq]; iintro H; iexists Tb; iexact H) $$ Hbref
   imodintro
   ihave Hregs := bufSlotRegs_intro (γ.box kk) r tl (devs kk) (bnos kk) hrid.1 hrid.2.1 hrid.2.2 hrtl $$ [Hrd Htd]
   case' _ => iframe Hrd Htd
@@ -243,7 +259,7 @@ theorem bpin_proof (AC : ACQUIRE) (RE : RELEASE) : BPIN := ⟨
   ihave Hnext := wpNext_shift _ _ _ _ _ hpinr $$ Hnext
   iapply wpNext_mono _ _ _ _ _ $$ Hnext
   iintro %cc H %R'' Hk Hpc %hcs
-  iapply H $$ %spie %spp %R'' %hsp Hk Hpc [] %(devs kk) %(bnos kk) [Href Hbref]
+  iapply H $$ %spie %spp %R'' %hsp Hk Hpc [] Hdevc Hbnoc [Href Hbref]
   · ipureintro; exact hcs
   · unfold bref
     iframe Href
