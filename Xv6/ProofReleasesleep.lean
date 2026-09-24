@@ -106,26 +106,29 @@ theorem rsl_wakeup (WK : WAKEUP) (Γ : SchedNames) (c : CPU) (k' : KCtx)
   exact h
 
 /-- `release` of the sleeplock's inner spinlock (entry `0x80000ce0`). -/
-theorem rsl_release (RE : RELEASE) (c : CPU) (k' : KCtx) (γl γ : GName) (slk : BitVec 64)
-    (Rp : CtxId → IProp GF) [CtxMorph Rp] (H : Qp → IProp GF)
+theorem rsl_release (RE : RELEASE_HOOK) (c : CPU) (k' : KCtx) (γl γ : GName) (slk : BitVec 64)
+    (Rp Rin : CtxId → IProp GF) [CtxMorph Rp] [CtxMorph Rin] (H : Qp → IProp GF)
     (ha0 : k'.regs 10#5 = slLk slk)
     (hsie : k'.sie = false) (hnoff : 1 ≤ k'.noff) (hK : 10 ≤ k'.avail)
     (reen : Bool) (hreen : reen = (decide (k'.noff = 1) && k'.intena))
     (hon : reen = true → k'.tier = .kpt ∧ trapRes true + 6 ≤ k'.avail) :
     kctx c k' ∗ pcIs c KA.«release» ∗ isSleeplockGen γl γ slk Rp H ∗
-    locked γl c ∗ slBody γ slk Rp H curCtx ∗ popArm c k' reen ∗
+    locked γl c ∗ slBody γ slk Rin H curCtx ∗ lockCtxHook Rp Rin ∗ popArm c k' reen ∗
     wpNext (k'.popExit reen).sie k'.proc c (fun cpu' => iprop(∀ R' : RegMap,
       kctx cpu' (((k'.popExit reen).withRegs R').withLocks
         (k'.locks.filter (fun x => x ≠ "sleep lock"))) -∗
       pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := RE.wp_release (hlc := hlc) (GF := GF) c k' γl "sleep lock" (slBody γ slk Rp H)
-    hsie hnoff hK reen hreen hon
-  unfold wp_release_body at h
+  have h := RE.wp_release_hook (hlc := hlc) (GF := GF) c k' γl "sleep lock" (slBody γ slk Rp H)
+    (slBody γ slk Rin H) hsie hnoff hK reen hreen hon
+  unfold wp_release_hook_body at h
   simp only [releaseAddr] at h
   rw [ha0] at h
   unfold isSleeplockGen
-  exact h
+  iintro ⟨Hk, Hpc, #Hlk, Hlocked, Hbody, Hhook, Harm, HPhi⟩
+  iapply h
+  iframe Hk Hpc Hlk Hlocked Hbody Harm HPhi
+  iapply slBody_hook γ slk Rp Rin H $$ Hhook
 
 /-! ## The epilogue -/
 
@@ -175,8 +178,9 @@ theorem releasesleep_br_ffffffffffffcc0e : KA.«releasesleep» + 0xffffffffffffc
 set_option maxHeartbeats 4000000 in
 /-- From `0x800040f8`: put the inner spinlock down (depositing the rebuilt
 FREE payload) and return with the deposit `H q`. -/
-theorem rsl_rel (RE : RELEASE) (cpu c : CPU) (k : KCtx)
-    (γl γ : GName) (slk : BitVec 64) (Rp : CtxId → IProp GF) [CtxMorph Rp] (H : Qp → IProp GF) (q : Qp)
+theorem rsl_rel (RE : RELEASE_HOOK) (cpu c : CPU) (k : KCtx)
+    (γl γ : GName) (slk : BitVec 64) (Rp Rin : CtxId → IProp GF) [CtxMorph Rp] [CtxMorph Rin]
+    (H : Qp → IProp GF) (q : Qp)
     (hwf : k.wf) (hK : releasesleepSlots ≤ k.avail) (hs : "sleep lock" ∉ k.locks)
     (spie spp : Bool) (hsp : k.sie = false → spie = k.spie ∧ spp = k.spp)
     (hpin : k.sie = false ∨ k.proc = 0#64 → c = cpu)
@@ -187,7 +191,7 @@ theorem rsl_rel (RE : RELEASE) (cpu c : CPU) (k : KCtx)
     kctx c ((((k.pushOffAt spie spp).withLocks ("sleep lock" :: k.locks)).pushed 4).withRegs R2) ∗
     pcIs c (KA.«releasesleep» + 0x26#64) ∗
     isSleeplockGen γl γ slk Rp H ∗
-    locked γl c ∗ slBody γ slk Rp H curCtx ∗
+    locked γl c ∗ slBody γ slk Rin H curCtx ∗ lockCtxHook Rp Rin ∗
     frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     H q ∗ sieArm c k.sie k.proc ∗
     wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie2 : Bool, ∀ spp2 : Bool, ∀ R' : RegMap,
@@ -195,7 +199,7 @@ theorem rsl_rel (RE : RELEASE) (cpu c : CPU) (k : KCtx)
       kctx cpu' ((k.withSpie spie2 spp2).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
       ⌜calleeSaved k.regs R'⌝ -∗ H q -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  iintro ⟨Hk, Hpc, #Hsl, Hlocked, Hbody, Hframe, HH, Harm, HPhi⟩
+  iintro ⟨Hk, Hpc, #Hsl, Hlocked, Hbody, Hhook, Hframe, HH, Harm, HPhi⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK4 : 4 ≤ k.avail := by unfold releasesleepSlots wakeupSlots at hK; omega
   have hsie : (k.pushOffAt spie spp).sie = false := rfl
@@ -207,8 +211,8 @@ theorem rsl_rel (RE : RELEASE) (cpu c : CPU) (k : KCtx)
   k_step (wp_s_jal c _ (KA.«releasesleep» + 0x28#64) false 2083814#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [releasesleep_br_ffffffffffffcc0e]
   iintro Hk Hpc
-  iapply (rsl_release RE c _ γl γ slk Rp H ?ha0 ?hsr ?hnr ?hKr k.sie ?hrr ?hor)
-    $$ [- $Hk $Hpc $Hlocked $Hbody]
+  iapply (rsl_release RE c _ γl γ slk Rp Rin H ?ha0 ?hsr ?hnr ?hKr k.sie ?hrr ?hor)
+    $$ [- $Hk $Hpc $Hlocked $Hbody $Hhook]
   rotate_right 1
   k_norm_g [rsl_withLocks_self, rsl_filter_sleep k.locks hs,
     KCtx.pushOffAt_popExit k spie spp hwf, hK4, hR18, rsl_ret_4040]
@@ -249,8 +253,9 @@ the HOLDER: clear the `locked` word and the pid field, rebuild the FREE
 payload, `wakeup(lk)`, then `rsl_rel`. -/
 theorem releasesleep_br_ffffffffffffdf70 : KA.«releasesleep» + 0xffffffffffffdf70#64 = KA.«wakeup» := by decide
 
-theorem rsl_mid (WK : WAKEUP) (RE : RELEASE) (Γ : SchedNames) (cpu c : CPU) (k : KCtx)
-    (γl γ : GName) (slk : BitVec 64) (Rp : CtxId → IProp GF) [CtxMorph Rp] (H : Qp → IProp GF) (q : Qp)
+theorem rsl_mid (WK : WAKEUP) (RE : RELEASE_HOOK) (Γ : SchedNames) (cpu c : CPU) (k : KCtx)
+    (γl γ : GName) (slk : BitVec 64) (Rp Rin : CtxId → IProp GF) [CtxMorph Rp] [CtxMorph Rin]
+    (H : Qp → IProp GF) (q : Qp)
     (pid : BitVec 32) (v : BitVec 32) (vln vn : BitVec 64)
     (hwf : k.wf) (hnoff : k.noff + 2 < 2 ^ 31) (hK : releasesleepSlots ≤ k.avail)
     (hs : "sleep lock" ∉ k.locks) (hp : "proc" ∉ k.locks) (htier : k.tier = KTier.kpt)
@@ -267,7 +272,7 @@ theorem rsl_mid (WK : WAKEUP) (RE : RELEASE) (Γ : SchedNames) (cpu c : CPU) (k 
     wordPointsTo (slLk slk + 8#64) 8 (DFrac.own 1) vln ∗
     wordPointsTo (slNameField slk) 8 (DFrac.own 1) vn ∗
     wordPointsTo slk 4 (DFrac.own 1) v ∗
-    sleeplockedQ γ q slk pid ∗ slHauth γ q ∗ H q ∗ Rp curCtx ∗
+    sleeplockedQ γ q slk pid ∗ slHauth γ q ∗ H q ∗ Rin curCtx ∗ lockCtxHook Rp Rin ∗
     frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     sieArm c k.sie k.proc ∗
     wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie2 : Bool, ∀ spp2 : Bool, ∀ R' : RegMap,
@@ -275,7 +280,7 @@ theorem rsl_mid (WK : WAKEUP) (RE : RELEASE) (Γ : SchedNames) (cpu c : CPU) (k 
       kctx cpu' ((k.withSpie spie2 spp2).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
       ⌜calleeSaved k.regs R'⌝ -∗ H q -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  iintro ⟨Hk, Hpc, Hpi, #Hsl, Hlocked, H1, H2, H3, Ht, Ha, HH, HR, Hframe, Harm, HPhi⟩
+  iintro ⟨Hk, Hpc, Hpi, #Hsl, Hlocked, H1, H2, H3, Ht, Ha, HH, HR, Hhook, Hframe, Harm, HPhi⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK4 : 4 ≤ k.avail := by unfold releasesleepSlots wakeupSlots at hK; omega
   have hsie : (k.pushOffAt spie spp).sie = false := rfl
@@ -293,7 +298,7 @@ theorem rsl_mid (WK : WAKEUP) (RE : RELEASE) (Γ : SchedNames) (cpu c : CPU) (k 
   ihave Hpid := (show wordPointsTo (GF := GF) (slk + 40#64) 4 (DFrac.own 1) 0#32 ⊢
       wordPointsTo (slPid slk) 4 (DFrac.own 1) 0#32 from by rw [rsl_slPid_eq]) $$ Hpid
   ihave Ht := Hcl $$ %(0#32) Hpid
-  ihave Hbody := slBody_intro_free γ slk Rp H vln vn q $$ [H1 H2 H3 Ht Ha HR]
+  ihave Hbody := slBody_intro_free γ slk Rin H vln vn q $$ [H1 H2 H3 Ht Ha HR]
   case' _ => iframe
   -- c.mv a0,s1 ; jal wakeup
   k_step (wp_s_add c _ (KA.«releasesleep» + 0x20#64) true 10#5 0#5 9#5 (by decide))
@@ -325,11 +330,11 @@ theorem rsl_mid (WK : WAKEUP) (RE : RELEASE) (Γ : SchedNames) (cpu c : CPU) (k 
   unfold calleeSaved at hcs3
   k_norm_g at hcs3
   obtain ⟨d2, d8, d9, d18, d19, d20, d21, d22, d23, d24, d25, d26, d27⟩ := hcs3
-  iapply (rsl_rel RE cpu _ k γl γ slk Rp H q hwf hK hs spie spp hsp hpin R3
+  iapply (rsl_rel RE cpu _ k γl γ slk Rp Rin H q hwf hK hs spie spp hsp hpin R3
       (d18.trans hR18) (d2.trans hR2) (d19.trans h19) (d20.trans h20) (d21.trans h21)
       (d22.trans h22) (d23.trans h23) (d24.trans h24) (d25.trans h25) (d26.trans h26)
       (d27.trans h27))
-    $$ [- $Hk $Hpc $Hlocked $Hbody $Hframe $HH $Harm $HPhi]
+    $$ [- $Hk $Hpc $Hlocked $Hbody $Hhook $Hframe $HH $Harm $HPhi]
   iframe #
 
 end
@@ -339,13 +344,14 @@ end
 theorem releasesleep_br_ffffffffffffcb86 : KA.«releasesleep» + 0xffffffffffffcb86#64 = KA.«acquire» := by decide
 
 set_option maxHeartbeats 16000000 in
-theorem releasesleep_proof (AC : ACQUIRE) (RE : RELEASE) (WK : WAKEUP) : RELEASESLEEP := ⟨
-  fun {hlc GF} _ _ _ X Γ cpu k γl γ Rp _ H q pid hnoff hK hs hp htier => by
+theorem releasesleep_hook_proof (AC : ACQUIRE) (RE : RELEASE_HOOK) (WK : WAKEUP) :
+    RELEASESLEEP_HOOK := ⟨
+  fun {hlc GF} _ _ _ X Γ cpu k γl γ Rp Rin _ _ H q pid hnoff hK hs hp htier => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
-  unfold wp_releasesleep_gen_body
+  unfold wp_releasesleep_gen_hook_body
   simp only [releasesleepAddr]
-  iintro ⟨Hk, Hpc, Hpi, #Hsl, Ht, HR, HPhi⟩
+  iintro ⟨Hk, Hpc, Hpi, #Hsl, Ht, HR, Hhook, HPhi⟩
   icases kctx_tier cpu k $$ Hk with ⟨%hct, Hk⟩
   have ht0 : t0 = KTier.kpt := hct.symm.trans htier
   subst ht0
@@ -397,9 +403,9 @@ theorem releasesleep_proof (AC : ACQUIRE) (RE : RELEASE) (WK : WAKEUP) : RELEASE
   icases slBody_open_held γ (k.regs 10#5) Rp H q pid $$ [Hbody Ht]
     with ⟨Ht, Ha, HH, %v, %vln, %vn, %hv, H1, H2, H3⟩
   · iframe
-  iapply (rsl_mid WK RE Γ cpu c k γl γ (k.regs 10#5) Rp H q pid v vln vn hwf hnoff hK hs hp htier
+  iapply (rsl_mid WK RE Γ cpu c k γl γ (k.regs 10#5) Rp Rin H q pid v vln vn hwf hnoff hK hs hp htier
       spie spp hsp hpin6 R1 b9 b18 b2 b19 b20 b21 b22 b23 b24 b25 b26 b27)
-    $$ [- $Hk $Hpc $Hpi $Hlocked $H1 $H2 $H3 $Ht $Ha $HH $HR $Hframe $Harm $HPhi]
+    $$ [- $Hk $Hpc $Hpi $Hlocked $H1 $H2 $H3 $Ht $Ha $HH $HR $Hhook $Hframe $Harm $HPhi]
   iframe #⟩
 
 end Xv6

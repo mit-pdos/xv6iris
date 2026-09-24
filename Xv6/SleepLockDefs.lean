@@ -255,6 +255,38 @@ theorem slBody_elim [CurCtx] (γ : GName) (slk : BitVec 64) (R : CtxId → IProp
   simp only [wordAtN_cur, sleeplockedQAt_cur]
   iintro H; iexact H
 
+/-- **THE SLEEPLOCK'S HOOK TRANSPORT**: a hook on the client payload is a
+hook on the whole inner-spinlock body.  The held arm carries no client
+payload, so it passes through at the stamp it arrived with; the free arm
+runs the client's hook where the body sits -- at the spinlock's own stamped
+context, the one place a floor above the releaser's view can be minted
+(`MachCSL.lockHook_llb`). -/
+theorem slBody_hook [CurCtx] (γ : GName) (slk : BitVec 64) (R Rin : CtxId → IProp GF)
+    (H : Qp → IProp GF) :
+    lockCtxHook (GF := GF) R Rin ⊢ lockCtxHook (slBody γ slk R H) (slBody γ slk Rin H) := by
+  unfold lockCtxHook
+  iintro Hhook %ξ %T Hst Hbody
+  unfold slBody
+  icases Hbody with ⟨%v, %vln, %vn, H1, H2, H3, ⟨%hv, Hfree, HR⟩ | Hheld⟩
+  · ihave Hres := Hhook $$ %ξ %T Hst HR
+    imod Hres with ⟨%T', Hst, HR⟩
+    imodintro
+    iexists T'
+    iframe Hst
+    iexists v, vln, vn
+    iframe H1 H2 H3
+    ileft
+    isplitl []
+    · ipureintro; exact hv
+    iframe Hfree HR
+  · imodintro
+    iexists T
+    iframe Hst
+    iexists v, vln, vn
+    iframe H1 H2 H3
+    iright
+    iexact Hheld
+
 /-- ...and built in the held state. -/
 theorem slBody_intro_held [CurCtx] (γ : GName) (slk : BitVec 64) (R : CtxId → IProp GF) (H : Qp → IProp GF)
     (v : BitVec 32) (vln vn : BitVec 64) (q : Qp) (hv : v ≠ 0#32) :

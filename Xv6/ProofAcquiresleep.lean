@@ -183,6 +183,26 @@ theorem aslPost_of_spec (cpu : CPU) (k : KCtx) (γ : GName) (Rp : CtxId → IPro
     ⊢ wpNext true k.proc cpu (aslPost (GF := GF) k γ Rp q slk pid dqp) := by
   unfold aslPost; iintro H; iexact H
 
+/-- The store-order post, with the floor already cashed, is the ordinary
+post: the floor is persistent and hart-free, so it survives the wait
+loop's parks and is simply handed on at the return. -/
+theorem aslPost_of_spec_llb (cpu : CPU) (k : KCtx) (γ : GName) (Rp : CtxId → IProp GF) (q : Qp)
+    (slk : BitVec 64) (pid : BitVec 32) (dqp : DFrac) (tl : Nat) :
+    ctxFloor (GF := GF) curCtx tl ∗
+    wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
+      ⌜calleeSaved k.regs R'⌝ -∗
+      kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+      trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
+      sleeplockedQ γ q slk pid -∗ Rp curCtx -∗ ctxFloor curCtx tl -∗
+      wordPointsTo (pPid k.proc) 4 dqp pid -∗ wpLoop cpu'))
+    ⊢ wpNext true k.proc cpu (aslPost (GF := GF) k γ Rp q slk pid dqp) := by
+  unfold aslPost
+  iintro ⟨#Hfl, H⟩
+  iapply wpNext_mono $$ H
+  iintro %cpu' HK %spie %spp %R' %hcs Hk Hpc Htc Hcl Hir Ht HR Hpid
+  iapply HK $$ %spie %spp %R' %hcs Hk Hpc Htc Hcl Hir Ht HR [] Hpid
+  iexact Hfl
+
 /-- The post is claimable at any hart: `k.proc ≠ 0`. -/
 theorem aslPost_at (cpu c : CPU) (k : KCtx) (γ : GName) (Rp : CtxId → IProp GF) (q : Qp)
     (slk : BitVec 64) (pid : BitVec 32) (dqp : DFrac) (j : Nat)
@@ -226,6 +246,26 @@ theorem asl_acquire (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γl : GName) (lk : Bit
     ⊢ wpLoop (GF := GF) c := by
   have h := AC.wp_acquire (hlc := hlc) (GF := GF) c k' γl "sleep lock" Rp hnoff hK hs
   unfold wp_acquire_body at h
+  simp only [acquireAddr] at h
+  rw [ha0] at h
+  exact h
+
+set_option maxHeartbeats 1000000 in
+/-- The entry `acquire`, in its store-order form: the caller's `topLb tl`
+comes back as a view receipt past `tl` at the winning AMO. -/
+theorem asl_acquire_llb (AC : ACQUIRE_LLB) (c : CPU) (k' : KCtx) (γl : GName) (lk : BitVec 64)
+    (Rp : CtxId → IProp GF) [CtxMorph Rp] (tl : Nat) (ha0 : k'.regs 10#5 = lk)
+    (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 10 ≤ k'.avail) (hs : "sleep lock" ∉ k'.locks) :
+    kctx c k' ∗ pcIs c KA.«acquire» ∗ isLock γl lk "sleep lock" Rp ∗ topLb tl ∗
+    wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
+      ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
+      kctx cpu' (((k'.pushOffAt spie spp).withRegs R').withLocks ("sleep lock" :: k'.locks)) -∗
+      pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗
+      locked γl cpu' -∗ Rp curCtx -∗ (∃ K : Nat, viewLb cpu' K ∗ ⌜tl ≤ K⌝) -∗
+      sieArm cpu' k'.sie k'.proc -∗ wpLoop cpu'))
+    ⊢ wpLoop (GF := GF) c := by
+  have h := AC.wp_acquire_llb (hlc := hlc) (GF := GF) c k' γl "sleep lock" Rp tl hnoff hK hs
+  unfold wp_acquire_llb_body at h
   simp only [acquireAddr] at h
   rw [ha0] at h
   exact h
@@ -711,15 +751,16 @@ end
 set_option maxHeartbeats 32000000 in
 set_option maxRecDepth 20000 in
 /-- **`acquiresleep` meets its specification.** -/
-theorem acquiresleep_proof (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (SP : SLEEP_PREPARE)
-    (SL : SLEEP) : ACQUIRESLEEP := ⟨
-  fun {hlc GF} _ _ _ X Γ _ cpu k γl γ Rp _ Hd q j pid dqp
+theorem acquiresleep_llb_proof (ACL : ACQUIRE_LLB) (RE : RELEASE) (MP : MYPROC) (SP : SLEEP_PREPARE)
+    (SL : SLEEP) : ACQUIRESLEEP_LLB := ⟨
+  fun {hlc GF} _ _ _ X Γ _ cpu k γl γ Rp _ Hd q j pid dqp tl
       hj hproc hK hsie hnoff hlocks htier => by
+  have AC : ACQUIRE := ACL.toACQUIRE
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
-  unfold wp_acquiresleep_gen_body
+  unfold wp_acquiresleep_gen_llb_body
   simp only [acquiresleepAddr]
-  iintro ⟨Hk, Hpc, #Hpinv, Htc, Hcl, Hir, #Hsl, HHq, Hpid, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hpinv, Htc, Hcl, Hir, #Hsl, HHq, #Htl, Hpid, HΦ⟩
   icases kctx_tier cpu k $$ Hk with ⟨%hct, Hk⟩
   have ht0 : t0 = KTier.kpt := hct.symm.trans htier
   subst ht0
@@ -735,7 +776,6 @@ theorem acquiresleep_proof (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (SP : SLE
   ihave %hok := asl_lock_ok γl (k.regs 10#5 + 8#64) "sleep lock" (slBody γ (k.regs 10#5) Rp Hd)
     $$ Hlk
   have hslk : k.regs 10#5 ≠ 0#64 := asl_slk_nz _ hok
-  ihave HΦ := aslPost_of_spec cpu k γ Rp q (k.regs 10#5) pid dqp $$ HΦ
   -- the prologue
   iapply (wp_prologue4s2_gen cpu k KA.«acquiresleep» hK4)
   k_code (text_instr _ _ _ _ rfl rfl) Htext
@@ -757,12 +797,20 @@ theorem acquiresleep_proof (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (SP : SLE
   k_step (wp_s_jal cpu _ (KA.«acquiresleep» + 0x14#64) false 2083782#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [acquiresleep_br_ffffffffffffcbda]
   iintro Hk Hpc
-  iapply (asl_acquire AC cpu _ γl (k.regs 10#5 + 8#64) (slBody γ (k.regs 10#5) Rp Hd)
-      ?ha0a ?hna ?hKa ?hla) $$ [- $Hk $Hpc $Hlk]
+  iapply (asl_acquire_llb ACL cpu _ γl (k.regs 10#5 + 8#64) (slBody γ (k.regs 10#5) Rp Hd) tl
+      ?ha0a ?hna ?hKa ?hla) $$ [- $Hk $Hpc $Hlk $Htl]
   rotate_right 1
   · k_norm_g [hsie]
     iapply wpNext_off_intro
-    iintro %spieA %sppA %RA %hspA Hk Hpc %hcsA Hlocked Hpay _ Harm
+    iintro %spieA %sppA %RA %hspA Hk Hpc %hcsA Hlocked Hpay Hview Harm
+    -- CASH THE ACQUIRE EDGE'S RECEIPT: the hart-free floor at `tl`
+    icases Hview with ⟨%Kv, #Hv, %hKv⟩
+    iapply wpLoop_bupd
+    imod kctx_floor_of_view cpu _ Kv $$ [$Hk $Hv] with ⟨Hk, #HflK⟩
+    ihave #Hfl := ctxFloor_le curCtx Kv tl hKv $$ HflK
+    ihave HΦ := aslPost_of_spec_llb cpu k γ Rp q (k.regs 10#5) pid dqp tl $$ [Hfl HΦ]
+    case' _ => iframe Hfl HΦ
+    imodintro
     icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
     k_norm_g [aslj_3fd8, KCtx.pushOffAt_withRegs, KCtx.withRegs_withLocks,
       KCtx.withRegs_withRegs, hlocks]

@@ -298,6 +298,23 @@ theorem kctx_token_acc [X : CurCtx] [KernelGeom] [KernelImage GF] {lent : Bool} 
     iframe Hctx Hfrag
   · iexact Hro
 
+/-- **THE FLOOR A VIEW RECEIPT BUYS**: the hart's running token is inside
+its `kctxL`, so a view receipt of that hart raises the running context's
+bound outright (`MachCSL.ctx_absorb`).  This is how a caller cashes the
+acquire edge's receipt (`MachCSL.acqPost`'s `∃ K, viewLb cpu K ∗ ⌜tl ≤ K⌝`)
+into the hart-free `ctxFloor curCtx tl` that a transit box's checkout
+wants. -/
+theorem kctx_floor_of_view [CurCtx] [KernelGeom] [KernelImage GF] {lent : Bool}
+    (cpu : CPU) (k : KCtx) (K : Nat) :
+    kctxL (GF := GF) lent cpu k ∗ viewLb cpu K ⊢ |==> (kctxL lent cpu k ∗ ctxFloor curCtx K) := by
+  iintro ⟨Hk, #HK⟩
+  icases kctx_token_acc cpu k $$ Hk with ⟨Hcur, Hback⟩
+  imod ctx_absorb cpu curCtx K $$ [$Hcur $HK] with ⟨Hcur, #Hfl⟩
+  imodintro
+  isplitl [Hcur Hback]
+  · iapply Hback $$ Hcur
+  · iexact Hfl
+
 /-- Move a payload from a parked context `ξ` to the running one. -/
 theorem kctx_move_in [CurCtx] [KernelGeom] [KernelImage GF] {lent : Bool}
     (R : CtxId → IProp GF) [CtxMorph R] (cpu : CPU) (k : KCtx) (ξ : CtxId) :

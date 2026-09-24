@@ -109,6 +109,62 @@ theorem ACQUIRESLEEP.wp_acquiresleep (A : ACQUIRESLEEP) {hlc : HasLC} {GF : Bund
   unfold slUntracked
   iempintro
 
+/-! ## The store-order (`llb`) form (Rocq `wp_acquiresleep_genl_llb_sconf`)
+
+`acquiresleep`'s entry `acquire` mints a view receipt AT ITS AMO
+(`MachCSL.acqPost`), so any store-order receipt `MachCSL.topLb tl` the
+caller held BEFORE the call is under that position.  Cashed against the
+hart's running token (`MachCSL.kctx_floor_of_view`) it becomes the
+HART-FREE `MachCSL.ctxFloor curCtx tl`, which survives the wait loop's
+parks and migrations -- and which is exactly what a transit box's checkout
+wants of a reference minted before the sleeplock was taken (Rocq
+`bbox_checkout`'s row (C), i.e. `Xv6.bufEscrow_take`'s `hKt`).
+
+`wp_acquiresleep_gen_body` is the `tl := 0` instance, derived below. -/
+def wp_acquiresleep_gen_llb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [SleepLockG GF]
+    [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γl γ : GName) (R : CtxId → IProp GF) [CtxMorph R] (H : Qp → IProp GF) (q : Qp)
+    (j : Nat) (pid : BitVec 32) (dqp : DFrac) (tl : Nat)
+    (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : acquiresleepSlots ≤ k.avail)
+    (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
+    (htier : k.tier = KTier.kpt) : Prop :=
+  kctx cpu k ∗ pcIs cpu acquiresleepAddr ∗ procsInv Γ ∗
+  trapCsrs cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ∗
+  isSleeplockGen γl γ (k.regs 10#5) R H ∗ H q ∗ topLb tl ∗
+  wordPointsTo (pPid k.proc) 4 dqp pid ∗
+  wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
+    ⌜calleeSaved k.regs R'⌝ -∗
+    kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+    trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
+    sleeplockedQ γ q (k.regs 10#5) pid -∗ R curCtx -∗ ctxFloor curCtx tl -∗
+    wordPointsTo (pPid k.proc) 4 dqp pid -∗ wpLoop cpu'))
+  ⊢ wpLoop (GF := GF) cpu
+
+/-- The store-order interface of `acquiresleep`. -/
+structure ACQUIRESLEEP_LLB : Prop where
+  wp_acquiresleep_gen_llb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [SleepLockG GF]
+    [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γl γ : GName) (R : CtxId → IProp GF) [CtxMorph R] (H : Qp → IProp GF) (q : Qp)
+    (j : Nat) (pid : BitVec 32) (dqp : DFrac) (tl : Nat) hj hproc hK hsie hnoff hlocks htier,
+    wp_acquiresleep_gen_llb_body (hlc := hlc) (GF := GF) Γ cpu k γl γ R H q j pid dqp tl
+      hj hproc hK hsie hnoff hlocks htier
+
+/-- `ACQUIRESLEEP` is the `tl := 0` instance. -/
+theorem ACQUIRESLEEP_LLB.toACQUIRESLEEP (A : ACQUIRESLEEP_LLB) : ACQUIRESLEEP := ⟨by
+  intro hlc GF _ _ _ _ Γ _ cpu k γl γ R _ H q j pid dqp hj hproc hK hsie hnoff hlocks htier
+  have h := A.wp_acquiresleep_gen_llb (hlc := hlc) (GF := GF) Γ cpu k γl γ R H q j pid dqp 0
+    hj hproc hK hsie hnoff hlocks htier
+  unfold wp_acquiresleep_gen_llb_body at h
+  unfold wp_acquiresleep_gen_body
+  iintro ⟨Hk, Hpc, Hpi, Htc, Hcl, Hir, Hsl, HH, Hpid, Hnext⟩
+  iapply h
+  iframe Hk Hpc Hpi Htc Hcl Hir Hsl HH Hpid
+  isplitl []
+  · iapply topLbAt_0
+  iapply wpNext_mono $$ Hnext
+  iintro %cpu' HK %spie %spp %R' %hcs Hk Hpc Htc Hcl Hir Ht HR - Hpid
+  iapply HK $$ %spie %spp %R' %hcs Hk Hpc Htc Hcl Hir Ht HR Hpid⟩
+
 /-! ## The NON-BLOCKING nested contract (Rocq `wp_acquiresleep_nb_body`)
 
 A BLOCKING `acquiresleep`'s wait loop reaches `sleep_prepare`, which
