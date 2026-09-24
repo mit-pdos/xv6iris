@@ -47,8 +47,7 @@ reason).
 **DEVIATIONS from Rocq, all deliberate.**
 
 1. **FIELDS ROCQ HAS AND THIS PORT DOES NOT**, each with the layer it
-   names: `fsc_ireg` / `fsc_ic` / `fsc_itlock` (the inode layer -- there is
-   no `InodeRegion`/`IcacheRef` in this port yet), `fsc_fol` (the file
+   names: `fsc_fol` (the file
    table's off-borrow liveness counter; this port's file table keys
    liveness differently, `Xv6/FileFrac.lean`), and `fsc_cons` (the console
    ring's `cons_names`; this port's console is `Xv6/ConsoleDefs.lean` and
@@ -56,10 +55,12 @@ reason).
    INSTANCE sites, of which there will be exactly one -- the boot mint --
    so growing it incrementally is cheap; contrast Rocq, where retrofitting
    ambience was a whole-tree sweep.
-2. **`fsc_log` RIDES HERE.**  Rocq keeps the log's four gnames in
-   `IcacheRefDefs.icfg` (`icfg_log`) and this file does not duplicate
-   them.  This port has no `Icfg` yet, so `fscLog` is a field here and
-   moves to `Icfg` when the icache lands.
+2. **The inode cache's four numbers are NOT here**, as in Rocq: the log's
+   gnames, the inode-region start, the inode-block count and the device
+   are `Icfg`'s (`icfgLog`, `icfgIst`, `icfgNib`, `icfgDev`,
+   `Xv6/IcacheRefDefs.lean`).  (An earlier revision parked `fscLog` /
+   `fscInodestart` here before `Icfg` existed; removed in wave 0d.)
+   Rocq's `fgo_ist_nn` (`0 <= icfg_ist`) is vacuous at `Nat` and dropped.
 3. **EVERY FIELD IS PREFIXED `fsc`**, which is Rocq's own `fsc_`
    convention transliterated.  The reason is a real collision: the short
    names `cov`, `size`, `log`, `disk` are taken (`BioView.cov`,
@@ -93,6 +94,7 @@ image numbers -- are deferred whole (design note §5).
 -/
 import Xv6.BitmapInv
 import Xv6.InodeInv
+import Xv6.IcacheRefDefs
 import Xv6.UartTrace
 
 namespace Xv6
@@ -119,8 +121,6 @@ class Fscfg where
   fscBio : BcacheNames
   /-- ...and the logged-view / dirty / byte / exception ghosts. -/
   fscFs : FsNames
-  /-- the log's five gnames (deviation 2). -/
-  fscLog : LogNames
   /-- the image's block geometry: which blocks the fs covers.  Pure data,
   ambient for the same reason the gnames are. -/
   fscCov : ExtTreeSet Nat compare
@@ -133,17 +133,24 @@ class Fscfg where
   fscSize : Nat
   /-- how many inodes mkfs made. -/
   fscNinodes : Nat
-  /-- where the inode region starts (`sb.inodestart`). -/
-  fscInodestart : Nat
-  /-- the inode region's ghosts. -/
+  /-- the inode region's authority (Rocq `fsc_ireg`)... -/
   fscIreg : GName
+  /-- ...the icache's three per-entry escrow families (Rocq `fsc_ic`)... -/
+  fscIc : IcNames
+  /-- ...and the "itable" spinlock (Rocq `fsc_itlock`). -/
+  fscItlock : GName
 
 export Fscfg (fscPrintk fscKalloc fscKpages fscUart fscDisk fscDlock fscBio fscFs
-              fscLog fscCov fscLogst fscBmapstart fscSize fscNinodes fscInodestart fscIreg)
+              fscCov fscLogst fscBmapstart fscSize fscNinodes fscIreg fscIc fscItlock)
 
-/-- Rocq `FsReady.fs_geom_ok`, the BLOCK-LAYER half (deviation 5).  Every
-clause is stated at the ambient fields, which is the whole point. -/
-structure FsGeomOk [Fscfg] : Prop where
+/-- Rocq `FsReady.fs_geom_ok` (deviation 5).  Every clause is stated at
+the ambient fields (`Fscfg`, and `Icfg` for the four numbers the inode
+cache owns), which is the whole point. -/
+structure FsGeomOk [Fscfg] [Icfg] : Prop where
+  /-- the icache's device is the root device (Rocq `fgo_rootdev`). -/
+  fgoRootdev : icfgDev = BitVec.ofNat 32 ROOTDEV
+  /-- there is at least one inode block (Rocq `fgo_nib_pos`). -/
+  fgoNibPos : 0 < icfgNib
   /-- the log's own storage is covered (`Xv6.logGeomOk`). -/
   fgoLog : logGeomOk fscCov fscLogst
   /-- ...and every covered block is inside the image the superblock
@@ -154,14 +161,20 @@ structure FsGeomOk [Fscfg] : Prop where
   fgoBitmap : bitmapGeomOk fscCov fscLogst fscBmapstart fscSize
   /-- ...and the inode region's block geometry (`Xv6.iregBlocksOk`): every
   inode block of the region is a covered home block. -/
-  fgoIreg : iregBlocksOk fscInodestart fscNinodes fscCov fscLogst
+  fgoIreg : iregBlocksOk icfgIst icfgNib fscCov fscLogst
+  /-- the inode count's bounds (Rocq `fgo_nin_lo` / `_hi` / `_31`)... -/
+  fgoNinLo : 1 < fscNinodes
+  fgoNinHi : fscNinodes ≤ 16 * icfgNib
+  fgoNin31 : fscNinodes < 2 ^ 31
+  /-- ...and every inum fits a `ushort` (Rocq `fgo_ushort`). -/
+  fgoUshort : 16 * icfgNib ≤ 2 ^ 16
 
 /-- The block-number bounds every interior `bread` needs, off the geometry
 bundle (`Xv6.covOk` is `logGeomOk`'s first clause). -/
-theorem FsGeomOk.covOk [Fscfg] (h : FsGeomOk) : covOk fscCov := h.fgoLog.1
+theorem FsGeomOk.covOk [Fscfg] [Icfg] (h : FsGeomOk) : covOk fscCov := h.fgoLog.1
 
 /-- ...and the log region is covered. -/
-theorem FsGeomOk.logCov [Fscfg] (h : FsGeomOk) :
+theorem FsGeomOk.logCov [Fscfg] [Icfg] (h : FsGeomOk) :
     ∀ b, logRegion fscLogst b = true → b ∈ fscCov := h.fgoLog.2
 
 end Xv6

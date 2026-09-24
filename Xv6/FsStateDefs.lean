@@ -42,13 +42,10 @@ config-class dependency):
 
 **DEVIATIONS from Rocq, with reasons.**
 
-1. **`fs_view_names` LOSES ITS TWO ABSTRACT-STATE GNAMES** (`γlink`,
-   `γtop`).  Rocq itself certifies this is sound: "Nothing stated over the
-   byte view ALONE reads them -- `[FsStateBitmap.free_bitmap_at]` ... does
-   not, and `[free_bitmap_at_gname]` is that fact" (`FsBytesGamma.v`).
-   They name the link-counting family and the top-level abstract map,
-   which belong to the abstract-state layer this port has not reached; the
-   record grows when that layer lands, and only `fsGammaL` changes.
+1. **`fs_view_names` carries Rocq's two abstract-state gnames** (`link`,
+   `top` = Rocq `γlink`/`γtop`) since wave 0d (they were dropped at first;
+   restored with the abstract-state layer).  Nothing stated over the byte
+   view ALONE reads them (`freeBitmapAt_gname` is that fact).
 2. **BYTE AND BLOCK ADDRESSES ARE `Nat`**, not `Z` (the port's standing
    log-layer deviation, `Xv6/LogDefs.lean`).
 3. **THE SHAPES LIVE IN THE `Xv6.FsView` NAMESPACE.**  Rocq's
@@ -105,6 +102,10 @@ site; `phi` is the same dodge. -/
 structure FsViewNames (GF : BundledGFunctors) where
   /-- byte ownership, BY BYTE ADDRESS, at a share -/
   phi : DFrac → Nat → BitVec 8 → IProp GF
+  /-- the link-counting family (Rocq `γlink`, `FsStateLink`) -/
+  link : GName
+  /-- the top-level abstract map (Rocq `γtop`, `FsState`) -/
+  top : GName
 
 /-- The exclusivity law of the concrete instances, as a hypothesis
 (deviation 5).  The fraction-aware form: two owners of one byte hold a
@@ -287,7 +288,7 @@ quantifies over), so exclusivity is always read at `Γ` with a
 `¬ ✓ (dq • dq)` side condition. -/
 
 def gammaQ (Γ : FsViewNames GF) (dq : DFrac) : FsViewNames GF :=
-  { phi := fun _ a v => Γ.phi dq a v }
+  { Γ with phi := fun _ a v => Γ.phi dq a v }
 
 theorem gammaQ_byteRange (Γ : FsViewNames GF) (dq : DFrac) (b off : Nat)
     (bs : List (BitVec 8)) :

@@ -46,13 +46,8 @@ header, verbatim):
    (`BigSepL.bigSepL_filterMap`), so `freePool_intro` comes out as an
    EQUALITY (`freePool_eq_freeSet`) where Rocq states only `⊢`; the Rocq
    direction is kept under Rocq's name.
-4. **`freeBitmapAt_gname` IS VACUOUS HERE.**  Rocq's lemma says the
-   bitmap piece of a view depends on `fsΦ` alone -- i.e. not on the two
-   abstract-state gnames `γlink`/`γtop`.  `Xv6.FsViewNames`
-   (`Xv6/FsStateDefs.lean` deviation 1) has no such fields, so the
-   statement degenerates to "rebuilding the record changes nothing", which
-   is `rfl`.  It is kept under Rocq's name because it is the fact
-   `FsBytesGamma.v` cites when it certifies dropping those two gnames.
+4. `freeBitmapAt_gname` is Rocq's: the bitmap piece of a view depends on
+   `phi` alone, not on the abstract-state gnames `link`/`top`.
 5. **`freePool_give` KEEPS ITS `phiExcl` PARAMETER** although the Lean
    proof does not need it: Rocq derives `b ∈ u` there with
    `free_pool_used` and then never uses it (the pool element it drops is
@@ -128,8 +123,8 @@ theorem freeBitmap_unfold (Γ : FsViewNames GF) (sb : FsSb) (u : BitSet) :
 
 /-- Rocq's `free_bitmap_at_gname` (deviation 4): the bitmap piece of a
 view depends on `phi` alone. -/
-theorem freeBitmapAt_gname (Γ : FsViewNames GF) (bms nb : Nat) (u : BitSet) :
-    freeBitmapAt Γ bms nb u ⊣⊢ freeBitmapAt { phi := Γ.phi } bms nb u := .rfl
+theorem freeBitmapAt_gname (Γ : FsViewNames GF) (g t : GName) (bms nb : Nat) (u : BitSet) :
+    freeBitmapAt Γ bms nb u ⊣⊢ freeBitmapAt { phi := Γ.phi, link := g, top := t } bms nb u := .rfl
 
 instance poolElt_timeless (Γ : FsViewNames GF) [GTimeless Γ] (u : BitSet) (b : Nat) :
     Timeless (poolElt Γ u b) := by

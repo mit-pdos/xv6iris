@@ -29,13 +29,8 @@ stated once, here, and never re-derived at a use site.  The Lean twins are
 
 **DEVIATIONS.**
 
-1. **`fsGammaL` HAS NO `γlink` / `γtop` TO FILL IN.**  Rocq's
-   `fs_gamma_L` reads `FsBlocks.fs_link` and `fs_top`, the two abstract-state
-   gnames; `Xv6.FsViewNames` drops them (`Xv6/FsStateDefs.lean` deviation 1)
-   and `Xv6.FsNames` never had them.  Rocq itself certifies this is sound:
-   "Nothing stated over the byte view ALONE reads them."  When the
-   abstract-state layer lands, the record and this one definition grow
-   together and nothing else moves.
+1. `fsGammaL` fills `link` / `top` from `FsNames.link` / `top`, exactly as
+   Rocq's `fs_gamma_L` reads `FsBlocks.fs_link` / `fs_top`.
 2. Rocq's `fs_gamma_L_excl` / `_frac` are `Lemma`s about `phi_excl` /
    `phi_frac`; here they are the same, with `phiExcl` in the wand form
    `Xv6/FsStateDefs.lean` deviation 5 records.
@@ -54,7 +49,7 @@ variable {GF : BundledGFunctors} [FsBytesG GF]
 
 /-- Rocq's `fs_gamma_L`: the LOGGED instance of the abstract view. -/
 def fsGammaL (γfs : FsNames) : FsViewNames GF :=
-  { phi := fun dq a v => γfs.bytes ↪◯MAP[a]{dq} v }
+  { phi := fun dq a v => γfs.bytes ↪◯MAP[a]{dq} v, link := γfs.link, top := γfs.top }
 
 theorem fsGammaL_phi (γfs : FsNames) (dq : DFrac) (a : Nat) (v : BitVec 8) :
     (fsGammaL (GF := GF) γfs).phi dq a v = (γfs.bytes ↪◯MAP[a]{dq} v) := rfl

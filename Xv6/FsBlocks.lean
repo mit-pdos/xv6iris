@@ -54,6 +54,12 @@ structure FsNames where
   cache half.  Tied to `cache` inside `Xv6.fsBytesInv`, which is also where
   the home blocks' parked cache halves now live. -/
   bytes : GName
+  /-- the link-counting family (Rocq `fs_link`, `FsStateLink.linkUR`).  A
+  bare `GName` on purpose: this is the BLOCK layer and must not name the
+  abstract-state cameras; `Xv6.fsGammaL` reads it as the era's `link`. -/
+  link : GName
+  /-- the top-level abstract map (Rocq `fs_top`, `Nat → FsNode`). -/
+  top : GName
   /-- **THE BYTE VIEW'S EXCEPTION SET** (Rocq's `fs_exc`).  LAST, so no
   positional application of the constructor moves. -/
   exc : GName
@@ -282,12 +288,15 @@ theorem fsDirty_flip (γfs : FsNames) (D : RegMapF Bool) (b : Nat) (v v' vNew : 
 def fsFreeTok (γfs : FsNames) : IProp GF :=
   iprop(fsCacheAuth γfs ∅ ∗ fsDirtyAuth γfs ∅)
 
-/-- The genesis of the four ghost names.  The BYTE view's two are minted
+/-- The genesis of the block layer's ghost names.  The abstract-state
+names `link` / `top` are PARAMETERS (allocated one level up, as Rocq's
+`fs_alloc (γlk γtp : gname)` takes them).  The BYTE view's two are minted
 here as bare names -- the byte view's own authorities are born inside
 `Xv6.fsAlloc` (`Xv6/FsBytesMint.lean`), Rocq's `fs_alloc`, which is what
 the era actually calls; this lemma is the block layer's own free-state
 statement and says nothing about them. -/
-theorem fsGhostAlloc : ⊢ |==> (∃ γfs : FsNames, fsFreeTok (GF := GF) γfs) := by
+theorem fsGhostAlloc (γlk γtp : GName) :
+    ⊢ |==> (∃ γfs : FsNames, ⌜γfs.link = γlk ∧ γfs.top = γtp⌝ ∗ fsFreeTok (GF := GF) γfs) := by
   imod (ghost_map_alloc_empty (GF := GF) (K := Nat) (V := List (BitVec 8)) (H := RegMapF))
     with ⟨%γc, Hc⟩
   imod (ghost_map_alloc_empty (GF := GF) (K := Nat) (V := Bool) (H := RegMapF)) with ⟨%γd, Hd⟩
@@ -296,8 +305,10 @@ theorem fsGhostAlloc : ⊢ |==> (∃ γfs : FsNames, fsFreeTok (GF := GF) γfs) 
   imod (ghost_map_alloc_empty (GF := GF) (K := Nat) (V := List Nat) (H := RegMapF))
     with ⟨%γX, -⟩
   imodintro
-  iexists ⟨γc, γd, γL, γX⟩
+  iexists ⟨γc, γd, γL, γlk, γtp, γX⟩
   unfold fsFreeTok fsCacheAuth fsDirtyAuth
+  isplitr
+  · ipureintro; exact ⟨rfl, rfl⟩
   iframe Hc Hd
 
 end

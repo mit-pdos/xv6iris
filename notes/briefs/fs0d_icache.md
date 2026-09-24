@@ -56,13 +56,13 @@ is live.
 
 ## 1. Coordinator gate before batch A (edits to existing files; agents must not make them)
 
-- **P1 (needed by A2/A3/B6): the abstract-state gnames.** Xv6/FsStateDefs.lean deviation 1 dropped
+- **P1 — DONE (coordinator, Sept 24 2026).** `FsNames.link/top`, `FsViewNames.link/top`, `fsGammaL` fills them, `fsGhostAlloc (γlk γtp)` takes them as parameters (Rocq `fs_alloc`). Original text: **P1 (needed by A2/A3/B6): the abstract-state gnames.** Xv6/FsStateDefs.lean deviation 1 dropped
   `γlink`/`γtop`, saying "the record grows when that layer lands". This wave is that layer. The
   change: `FsNames` (Xv6/FsBlocks.lean) gains `link : GName` and `top : GName` after `exc` (it has
   no constructor sites). `FsViewNames` gains `link top : GName`. `fsGammaL` fills them from
   `γfs.link`/`γfs.top`. The two other `{ phi := … }` sites (FsStateDefs.lean:290,
   FsStateBitmap.lean:132) become `{ Γ with phi := … }`. Rocq: `fs_link`/`fs_top`, `γlink`/`γtop`.
-- **P2: `Fscfg`.** Add `fscIc : IcNames` and `fscItlock : GName` (Rocq `fsc_ic`/`fsc_itlock`,
+- **P2 — DONE (coordinator).** `Fscfg` gained `fscIc`/`fscItlock`; the duplicates `fscLog`/`fscInodestart` are REMOVED (Rocq keeps them in `icfg` only: use `icfgLog`/`icfgIst`/`icfgNib`/`icfgDev`); `FsGeomOk [Fscfg] [Icfg]` now has Rocq's full clause list (`fgoRootdev`, `fgoNibPos`, `fgoIreg` over `icfgIst icfgNib` — the old one wrongly used the inode count —, `fgoNinLo/Hi/31`, `fgoUshort`; `fgo_ist_nn` vacuous at Nat). Original text: **P2: `Fscfg`.** Add `fscIc : IcNames` and `fscItlock : GName` (Rocq `fsc_ic`/`fsc_itlock`,
   FsCfg.v:129–130), importing Xv6.IcacheRefDefs. Later, add the icache clauses of Rocq
   `fs_geom_ok`: `fgo_rootdev`, `fgo_nib_pos`, `fgo_nin_lo`/`_hi`/`_31`, `fgo_ushort`. Settle ONE
   source of truth for the two duplicates. Lean has `fscInodestart` where Rocq has `icfg_ist`. Lean's
@@ -78,7 +78,7 @@ is live.
   instantiating unit masses as Rocq's bcache does. One box, as in Rocq; NO separate CtxBoxQ. This
   is done by a coordinator-run worktree agent before B4; A6/B8 below are therefore that agent's
   work, not batch items.
-- **D4 (blocks B4's `cred_floor`/`live_fracc`, C4, D5): the racy `ref` read.** Rocq A6.145 puts the
+- **D4 — DECIDED (coordinator, on the A10 spike): OPTION (b), re-express over `wordCell`; read notes/fs0d-pinw-design.md and follow it (it lists every changed statement, §7).** Original text: **D4 (blocks B4's `cred_floor`/`live_fracc`, C4, D5): the racy `ref` read.** Rocq A6.145 puts the
   50 `ip->ref` words under a TSO word-set PIN (`TsoCtx.phys_ledger_pinw`, `TsoMemPa.TsPinw`,
   `CtxPinw.ledger_read_pinw_latest`, `MemClaim.wordw_claim`). The (g, lo) epoch rides the liveness
   slice (`live_genlo`, `cred_floor`, `icfg_istmp`). **None of that exists in Lean.** Lean's
@@ -175,15 +175,15 @@ Deps name batch items; "gate" = §1 plus the in-flight files.
 - A1 IcacheRefLink — gate.
 - A2 EscrowDefs + TxPin + FsStateTop — gate, P1.
 - A3 FsStateLink — gate, P1.
-- A4 FsStateInodeLocal — gate (DirView, FsTree).
-- A5 FsStateRecOwned — gate.
+- A4 [DONE — Xv6/FsStateInode.lean now has `InodeLocal`, `inodeLocal_bare`, `dirEntries`, `fnIsDir`, `fnNrec`; `inodeLocal_freeNode` is in InodeRegionDefs] FsStateInodeLocal — gate (DirView, FsTree).
+- A5 [DONE — `recOwned`/`recOwnedAt`/`inodePhi`/`inodeDat`/`indOwned` and their lemmas are in Xv6/FsStateInode.lean] FsStateRecOwned — gate.
 - A6 [SUPERSEDED — D3 decided: CtxBox.lean is generalised in place by a separate worktree agent] MachCSL/CtxBoxQ — D3. Port Rocq CtxBox.v literally. Reuse MachCSL/CtxBox.lean's proofs where
   the unit-mass version already did the work. (This file and B8's are an explicit exception to
   fs0_common's "only under Xv6/" rule. Build with `timeout 1800 lake build MachCSL.CtxBoxQ`.)
 - A7 OffGv + FileOffCell — gate.
 - A8 IcacheRefGhost — gate.
 - A9 IcacheBootDecode (pure 1024-byte ↔ 16 dinodes decode) — gate.
-- A10 **pinw design spike** (no Lean file). Read IcacheInv §5, IcacheRef 1276–1426, IcachePinwObl,
+- A10 [DONE — notes/fs0d-pinw-design.md, option (b) approved] **pinw design spike** (no Lean file). Read IcacheInv §5, IcacheRef 1276–1426, IcachePinwObl,
   MemClaim.v, and MachCSL/WordHist.lean + Lock.lean. Write notes/fs0d-pinw-design.md: the Lean
   shapes of `iref_pin_rows`/`pinw_slot`/`iref_claims`/`cred_floor`/`live_fracc`/`iref_set_read`
   over `wordCell`, and which Rocq lemmas become trivial or change statement. The coordinator
@@ -192,7 +192,7 @@ Deps name batch items; "gate" = §1 plus the in-flight files.
 **Batch B (8)**
 - B1 InodeRegionSlot — A1, A2, A3.
 - B2 FsAbsDefs + AppCfg + AppInv — A4, A2 (FsTopG).
-- B3 FsStateInodeOwned — A3, A4, A5.
+- B3 FsStateInodeOwned (NOTE: this is now the REST of FsStateInode.v — the link-camera parts (`ent_tok*`, `inode_ghost`, `inode_owned`, §6, §8/8b) AND the `ity`-typed parts (`fn_ity_ok(_ex)`, `ent_ty_ok`, `node_ent_ok`; `Ity` is now in IcacheRefDefs, which does not import FsStateInode) — edit Xv6/FsStateInode.lean, see its DEFERRED header) — A3, A4, A5.
 - B4 IcacheRef — A1, A8, A6, A10.
 - B5 IcacheInvAlg — A8.
 - B6 EscrowInode — A1, A2.
