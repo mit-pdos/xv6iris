@@ -210,7 +210,7 @@ Deps name batch items; "gate" = §1 plus the in-flight files.
 - [DONE] B1 InodeRegionSlot (KEY TYPES: the icache/escrow maps — `IcacheG.regG`/`pcrpG`, `regionPending`, `committedA` — are `Nat`-keyed; the region map `IregMapF` stays `Int`-keyed for the negative marker `imarkKey`. Rocq uses `Z` for both, so bridge at the seam with `z.toNat` under `0 ≤ z`, stated once as helper lemmas, not ad hoc) — A1, A2, A3.
 - [DONE] B2 FsAbsDefs + AppCfg + AppInv — A4, A2 (FsTopG).
 - [DONE] B3 FsStateInodeOwned (NOTE: this is now the REST of FsStateInode.v — the link-camera parts (`ent_tok*`, `inode_ghost`, `inode_owned`, §6, §8/8b) AND the `ity`-typed parts (`fn_ity_ok(_ex)`, `ent_ty_ok`, `node_ent_ok`; `Ity` is now in IcacheRefDefs, which does not import FsStateInode) — edit Xv6/FsStateInode.lean, see its DEFERRED header) — A3, A4, A5.
-- B4 IcacheRef (CtxBox generalised: use `reference`/`stampsFrag`/`StampMap`/`qsum`/`maxStamp`/hooked forms from MachCSL/CtxBox.lean; `IcboxG.stampsG : ElemG GF (StampsRF IcBid)`; `icBoxRaw_allocAt` feeds `boxAllocAt`) — A1, A8, A6, A10.
+- [DONE] B4 IcacheRef (CtxBox generalised: use `reference`/`stampsFrag`/`StampMap`/`qsum`/`maxStamp`/hooked forms from MachCSL/CtxBox.lean; `IcboxG.stampsG : ElemG GF (StampsRF IcBid)`; `icBoxRaw_allocAt` feeds `boxAllocAt`) — A1, A8, A6, A10.
 - [DONE] B5 IcacheInvAlg — A8.
 - [DONE] B6 EscrowInode — A1, A2.
 - [DONE] B7 FsStateEraPure — A4.
