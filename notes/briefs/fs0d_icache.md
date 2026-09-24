@@ -248,7 +248,7 @@ Deps name batch items; "gate" = §1 plus the in-flight files.
 
 **Batch H (2)**
 - H1 IcacheTable — G2, C3, C4.
-- H2 IcacheCover — G2, B7.
+- [DONE] H2 IcacheCover — G2, B7.
 
 **Batch I (1)**
 - I1 IcacheBootTable — H1, G4, C5. It is consumed only by the deferred boot kits (FsCfgKits/FsCfgSnap).
