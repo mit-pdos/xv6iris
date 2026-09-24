@@ -911,7 +911,7 @@ Section pipes_events.
     iDestruct "Hpw" as "[Hx | #HT]"; last first.
     { iModIntro. iSplitR; [by iApply (pecl'_taint with "HT") | by iRight]. }
     iDestruct "Hx" as (ps cs P) "(%Hw & #Hpin & Htn & #Hps & #Hcs & _ & #HE)".
-    pose proof Hw as (Hpp & Hr & Hn & HP).
+    pose proof Hw as ((Hpp & Hr & Hn & HP) & _).
     assert (HneI : I <> []) by (intros ->; rewrite nlines_nil in Hn; lia).
     replace (P + length (@nil (bv 8)))%nat with P by (cbn [length]; lia).
     rewrite pecl'_gen. iDestruct "Hcl" as "[Hc | Hp]"; last first.

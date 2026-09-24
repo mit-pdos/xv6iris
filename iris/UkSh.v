@@ -552,7 +552,7 @@ Proof.
   intro Hok.
   assert (Hval : bv_unsigned (FileDisc.line_bytes lu !!! 0%nat) = 101%Z
                  \/ bv_unsigned (FileDisc.line_bytes lu !!! 0%nat) = 99%Z).
-  { destruct lu as [ws | ws | | ws]; cbn [FileDisc.uline_ok] in Hok.
+  { destruct lu as [ws | ws | | ws npc]; cbn [FileDisc.uline_ok] in Hok.
     - left. rewrite FileDisc.line_bytes_echo.
       exact (line_ok_head_byte0 ws Hok).
     - left.
@@ -572,9 +572,9 @@ Proof.
       left.
       pose proof (ush_wl_body_pos ws (proj1 Hok)) as Hwb.
       rewrite FileDisc.line_bytes_body. cbn [FileDisc.line_body].
-      rewrite (wl_lta_app_l (wl_body ws ++ FileDisc.suf_barcat) [wl_nl] 0%nat
+      rewrite (wl_lta_app_l (wl_body ws ++ FileDisc.suf_barcats npc) [wl_nl] 0%nat
                  ltac:(rewrite length_app; lia)).
-      rewrite (wl_lta_app_l (wl_body ws) FileDisc.suf_barcat 0%nat Hwb).
+      rewrite (wl_lta_app_l (wl_body ws) (FileDisc.suf_barcats npc) 0%nat Hwb).
       pose proof (line_ok_head_byte0 ws (proj1 Hok)) as Hh.
       rewrite /wl_line (wl_lta_app_l (wl_body ws) [wl_nl] 0%nat Hwb) in Hh.
       exact Hh. }
@@ -7298,7 +7298,17 @@ Section UkSh.
      [UkShParseCmd.wp_kshp_parser] asks [60 + nn]).  The echo tier carries
      the eight unspent: a child law is [∀ n], so more room is the same law
      at a bigger [n] and no landed walk moved. *)
-  Definition ush_Dbody : nat := 88%nat.
+  (* ...AND THE PIPELINE'S ROOM (cut C8): a pipeline's right spine nests
+     one [runcmd] frame (6 words) per stage in the forked child, and the
+     longest line the buffer holds carries 15 bare cats, so the child's
+     room is 60 words more than the redirect's.  The body's frame is the
+     same 88; [ush_Dpipe] is carried beside it, and a child law may spend
+     up to [68 + ush_Dpipe] of what the fork hands it. *)
+  Definition ush_Dpipe : nat := 60%nat.
+  Definition ush_Dbody : nat := 148%nat.
+
+  Lemma ush_Dbody_split : ush_Dbody = (88 + ush_Dpipe)%nat.
+  Proof using. reflexivity. Qed.
 
   (* [R] IS WHAT A TURN CARRIES AND DOES NOT CREATE, and it is abstract
      here on purpose.  Stages 1-2 carried the five constants, the

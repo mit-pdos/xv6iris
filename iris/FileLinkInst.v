@@ -252,7 +252,7 @@ Section sh_round_facing.
   Qed.
 
   Definition file_stage_inst : StageRec FI :=
-    MkStageRec FI file_cur_inst fi_lend_stage fi_apr0.
+    MkStageRec FI file_cur_inst (fun _ => 0%nat) fi_lend_stage fi_apr0.
 End sh_round_facing.
 
 (* ===================================================================== *)
@@ -387,7 +387,7 @@ Section file_link_inst_at.
   Qed.
 
   Definition file_stage_inst_at : StageRec FIs :=
-    MkStageRec FIs file_cur_inst_at fi_lend_stage_at fi_apr0_at.
+    MkStageRec FIs file_cur_inst_at (fun _ => 0%nat) fi_lend_stage_at fi_apr0_at.
 End file_link_inst_at.
 
 (* ...and the converse: the unindexed families ARE the existential

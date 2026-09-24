@@ -371,12 +371,12 @@ Definition ralt_def (l : uline) : nat :=
   | LEchoF _ => ralt_enc RFExec
   | LCat => ralt_enc RCRan
   (* the DEAD arm: [LPipe] admits [LCat]'s five, so it defaults the same *)
-  | LPipe _ => ralt_enc RCRan
+  | LPipe _ _ => ralt_enc RCRan
   end.
 
 Lemma ralt_def_ok (l : uline) : ralt_ok l (ralt_dec (ralt_def l)).
 Proof using.
-  destruct l as [ws | ws | | ws]; cbn [ralt_def].
+  destruct l as [ws | ws | | ws npc]; cbn [ralt_def].
   - rewrite (ralt_dec_lt4 0%nat ltac:(lia)). rewrite /ralt_ok. lia.
   - by rewrite ralt_dec_enc.
   - by rewrite ralt_dec_enc.
@@ -624,7 +624,7 @@ Proof using.
   destruct a as [k | sel | | | | | | | | | |]; rewrite /cont.
   - assert (Hk : (k < 4)%nat).
     { destruct Ha as [Ha | Heq]; [| injection Heq as <-; lia].
-      destruct l as [ws | ws | | ws];
+      destruct l as [ws | ws | | ws npc];
         [exact Ha | by destruct Ha | by destruct Ha | by destruct Ha]. }
     exact (line_alts_of_nonnil (uline_ws l) k Hk).
   - exact Hpr.
@@ -647,7 +647,7 @@ Qed.
        index is the same at its own list and at the padded one. ---- *)
 Lemma ralt_panic_def (l : uline) : ralt_panic (ralt_dec (ralt_def l)) = false.
 Proof using.
-  destruct l as [ws | ws | | ws]; cbn [ralt_def].
+  destruct l as [ws | ws | | ws npc]; cbn [ralt_def].
   - rewrite (ralt_dec_lt4 0%nat ltac:(lia)). by vm_compute.
   - rewrite ralt_dec_enc. by vm_compute.
   - rewrite ralt_dec_enc. by vm_compute.

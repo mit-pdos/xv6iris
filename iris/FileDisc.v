@@ -114,11 +114,17 @@ Definition fd_w_bar : list (bv 8) := sb "|"%string.
 Definition fd_w_cat : list (bv 8) := sb "cat"%string.
 Definition suf_barcat : list (bv 8) := sb " | cat"%string.
 
+(* [n] times the suffix, and its [n] times two words (cut C8: the pipeline
+   is [echo ws] followed by [n] bare cats) *)
+Definition suf_barcats (n : nat) : list (bv 8) := concat (replicate n suf_barcat).
+Definition w_barcats (n : nat) : list (list (bv 8)) :=
+  concat (replicate n [fd_w_bar; fd_w_cat]).
+
 Inductive uline :=
   | LEcho (ws : list (list (bv 8)))
   | LEchoF (ws : list (list (bv 8)))
   | LCat
-  | LPipe (ws : list (list (bv 8))).
+  | LPipe (ws : list (list (bv 8))) (n : nat).
 
 Global Instance uline_eq_dec : EqDecision uline.
 Proof using. solve_decision. Defined.
@@ -149,7 +155,7 @@ Definition uline_ws (l : uline) : list (list (bv 8)) :=
      ([uline_ws lu = wl_words (rest_of I)]); [PipeDisc.pline_ws] is the
      LEFT command's alone and cannot be reused here.  The two words are
      the bar and [cat]; [uline_ws_pipe] below is the equation. *)
-  | LPipe ws => ws ++ [fd_w_bar; fd_w_cat]
+  | LPipe ws n => ws ++ w_barcats n
   end.
 
 (* THE BODY the console cut keeps, and the LINE the user typed: the body
@@ -160,7 +166,7 @@ Definition line_body (l : uline) : list (bv 8) :=
   | LEcho ws => wl_body ws
   | LEchoF ws => wl_body ws ++ suf_gtf
   | LCat => cmd_cat_f
-  | LPipe ws => wl_body ws ++ suf_barcat
+  | LPipe ws n => wl_body ws ++ suf_barcats n
   end.
 
 Definition line_bytes (l : uline) : list (bv 8) := line_body l ++ [wl_nl].
@@ -176,7 +182,8 @@ Definition uline_ok (l : uline) : Prop :=
   | LEcho ws => line_ok ws
   | LEchoF ws => line_ok ws /\ (length (line_bytes (LEchoF ws)) < line_max)%nat
   | LCat => True
-  | LPipe ws => line_ok ws /\ (length (line_bytes (LPipe ws)) < line_max)%nat
+  | LPipe ws n =>
+      line_ok ws /\ (1 <= n)%nat /\ (length (line_bytes (LPipe ws n)) < line_max)%nat
   end.
 
 Global Instance uline_ok_dec l : Decision (uline_ok l).
@@ -214,15 +221,79 @@ Qed.
 Lemma wl_words_barcat : wl_words suf_barcat = [] :: [fd_w_bar; fd_w_cat].
 Proof using. apply (bool_decide_unpack _). vm_compute. exact I. Qed.
 
-Lemma uline_ws_pipe (ws : list (list (bv 8))) :
-  line_ok ws -> wl_words (line_body (LPipe ws)) = uline_ws (LPipe ws).
+Lemma suf_barcats_S (n : nat) : suf_barcats (S n) = suf_barcat ++ suf_barcats n.
+Proof using. reflexivity. Qed.
+
+Lemma w_barcats_S (n : nat) : w_barcats (S n) = [fd_w_bar; fd_w_cat] ++ w_barcats n.
+Proof using. reflexivity. Qed.
+
+Lemma w_barcats_comm (n : nat) :
+  w_barcats n ++ [fd_w_bar; fd_w_cat] = [fd_w_bar; fd_w_cat] ++ w_barcats n.
+Proof using.
+  induction n as [| n IH]; [reflexivity |].
+  rewrite w_barcats_S -app_assoc IH. reflexivity.
+Qed.
+
+Lemma w_barcats_S_r (n : nat) : w_barcats (S n) = w_barcats n ++ [fd_w_bar; fd_w_cat].
+Proof using. rewrite w_barcats_S w_barcats_comm. reflexivity. Qed.
+
+Lemma suf_barcat_eq : suf_barcat = wl_sp :: fd_bar :: wl_sp :: fd_w_cat.
+Proof using. by vm_compute. Qed.
+
+Lemma fd_w_bar_eq : fd_w_bar = [fd_bar].
+Proof using. by vm_compute. Qed.
+
+Lemma fd_bar_ne_sp : fd_bar <> wl_sp.
+Proof using. by vm_compute. Qed.
+
+Lemma fd_w_cat_alnum : Forall wl_alnum fd_w_cat.
+Proof using. apply (bool_decide_unpack _). vm_compute. exact I. Qed.
+
+(* the suffix in front of a tail that starts a fresh word *)
+Lemma wl_words_barcat_app (L : list (bv 8)) (R : list (list (bv 8))) :
+  wl_words L = [] :: R ->
+  wl_words (suf_barcat ++ L) = [] :: fd_w_bar :: fd_w_cat :: R.
+Proof using.
+  intros HL. rewrite suf_barcat_eq. cbn [app].
+  rewrite wl_words_cons_sp.
+  rewrite (wl_words_cons_other_cons fd_bar (wl_sp :: fd_w_cat ++ L) [] (fd_w_cat :: R)
+             fd_bar_ne_sp); [by rewrite fd_w_bar_eq |].
+  rewrite wl_words_cons_sp.
+  rewrite (wl_words_prepend fd_w_cat L [] R fd_w_cat_alnum HL) app_nil_r.
+  reflexivity.
+Qed.
+
+Lemma wl_words_barcats (n : nat) :
+  wl_words (suf_barcats (S n)) = [] :: w_barcats (S n).
+Proof using.
+  induction n as [| n IH].
+  - rewrite (_ : suf_barcats 1 = suf_barcat);
+      [| by unfold suf_barcats; cbn [replicate concat]; apply app_nil_r].
+    rewrite (_ : w_barcats 1 = [fd_w_bar; fd_w_cat]);
+      [| by unfold w_barcats; cbn [replicate concat app]].
+    exact wl_words_barcat.
+  - rewrite suf_barcats_S (wl_words_barcat_app _ _ IH). reflexivity.
+Qed.
+
+Lemma w_barcats_length (n : nat) : length (w_barcats n) = (2 * n)%nat.
+Proof using.
+  induction n as [| n IH]; [reflexivity |].
+  rewrite w_barcats_S length_app IH. cbn [length]. lia.
+Qed.
+
+Lemma uline_ws_pipe (ws : list (list (bv 8))) (n : nat) :
+  line_ok ws -> wl_words (line_body (LPipe ws n)) = uline_ws (LPipe ws n).
 Proof using.
   intro Hok.
   assert (Hne : ws <> []).
   { pose proof (line_ok_pos ws Hok) as Hp.
     destruct ws as [| w r]; [cbn [length] in Hp; lia | discriminate]. }
-  exact (fd_wl_words_body_app ws suf_barcat [fd_w_bar; fd_w_cat]
-           (line_ok_wf _ Hok) Hne wl_words_barcat).
+  destruct n as [| n].
+  - cbn [line_body uline_ws]. unfold suf_barcats, w_barcats.
+    cbn [replicate concat]. rewrite !app_nil_r.
+    exact (wl_words_body ws (line_ok_wf _ Hok)).
+  - exact (fd_wl_words_body_app ws (suf_barcats (S n)) (w_barcats (S n))
+             (line_ok_wf _ Hok) Hne (wl_words_barcats n)).
 Qed.
 
 (* ...and the redirect line's, the same way (RULING SLOT-WS, option B) *)
@@ -336,16 +407,16 @@ Definition lines_of (I : list (bv 8)) : list uline := uline_of <$> bodies_of I.
    what they meant.  This is the fact that makes every [LPipe] arm added
    below a DEAD arm, and it is the guard the three round-trip lemmas
    carry. *)
-Definition uline_nopipe (l : uline) : Prop := forall ws, l <> LPipe ws.
+Definition uline_nopipe (l : uline) : Prop := forall ws n, l <> LPipe ws n.
 
 Lemma uline_nopipe_echo ws : uline_nopipe (LEcho ws).
-Proof using. intros ws' H. discriminate H. Qed.
+Proof using. intros ws' n H. discriminate H. Qed.
 Lemma uline_nopipe_echof ws : uline_nopipe (LEchoF ws).
-Proof using. intros ws' H. discriminate H. Qed.
+Proof using. intros ws' n H. discriminate H. Qed.
 Lemma uline_nopipe_cat : uline_nopipe LCat.
-Proof using. intros ws' H. discriminate H. Qed.
+Proof using. intros ws' n H. discriminate H. Qed.
 
-Lemma parse_line_not_pipe b ws : parse_line b <> Some (LPipe ws).
+Lemma parse_line_not_pipe b ws n : parse_line b <> Some (LPipe ws n).
 Proof using.
   rewrite /parse_line. case_decide as Hc; [discriminate |].
   destruct (strip_gtf b) as [c |]; case_decide; discriminate.
@@ -353,10 +424,10 @@ Qed.
 
 Lemma uline_of_nopipe b : uline_nopipe (uline_of b).
 Proof using.
-  intros ws Heq.
+  intros ws n Heq.
   destruct (parse_line b) as [l |] eqn:Hp; rewrite /uline_of Hp in Heq;
     cbn in Heq; [| discriminate Heq].
-  rewrite Heq in Hp. exact (parse_line_not_pipe b ws Hp).
+  rewrite Heq in Hp. exact (parse_line_not_pipe b ws n Hp).
 Qed.
 
 Lemma lines_of_nopipe I l : l ∈ lines_of I -> uline_nopipe l.
@@ -434,7 +505,7 @@ Qed.
 Lemma parse_line_body l :
   uline_nopipe l -> uline_ok l -> parse_line (line_body l) = Some l.
 Proof using.
-  intro Hnp. destruct l as [ws | ws | | ws]; [| | | by destruct (Hnp ws eq_refl)].
+  intro Hnp. destruct l as [ws | ws | | ws npc]; [| | | by destruct (Hnp ws npc eq_refl)].
   - (* LEcho *)
     intro Hok. rewrite /line_body /parse_line.
     rewrite decide_False; last first.
@@ -492,12 +563,12 @@ Proof using.
   intro Hfb. destruct (fbody_ok_line b Hfb) as [Hok Hb].
   transitivity (wl_words (line_body (uline_of b)));
     [ | exact (f_equal wl_words (eq_sym Hb)) ].
-  revert Hok. generalize (uline_of b). intros [ws | ws | | ws] Hok.
+  revert Hok. generalize (uline_of b). intros [ws | ws | | ws npc] Hok.
   - cbn [uline_ws line_body]. symmetry.
     exact (wl_words_body ws (line_ok_wf _ Hok)).
   - symmetry. exact (uline_ws_gtf ws (proj1 Hok)).
   - reflexivity.
-  - symmetry. exact (uline_ws_pipe ws (proj1 Hok)).
+  - symmetry. exact (uline_ws_pipe ws npc (proj1 Hok)).
 Qed.
 
 Lemma fbody_ok_of l : uline_nopipe l -> uline_ok l -> fbody_ok (line_body l).
@@ -527,7 +598,7 @@ Lemma fline_ok_cat_words (b : list (bv 8)) :
   fline_ok b -> wl_words b = uline_ws LCat -> uline_of b = LCat.
 Proof using.
   intros (l & Hok & ->) Hw.
-  destruct l as [ws' | ws' | | ws'].
+  destruct l as [ws' | ws' | | ws' npc'].
   - exfalso. cbn [line_body] in Hw.
     rewrite (wl_words_body ws' (line_ok_wf _ Hok)) in Hw.
     pose proof (line_ok_head ws' Hok) as Hh. rewrite Hw in Hh.
@@ -538,11 +609,11 @@ Proof using.
     cbn [uline_ws]. rewrite length_app.
     pose proof (line_ok_ge2 ws' Hok') as H2.
     vm_compute (length (wl_words cmd_cat_f)). cbn [length]. lia.
-  - apply uline_of_body; [ intros w Hp; discriminate Hp | exact Hok ].
-  - exfalso. destruct Hok as [Hok' _].
-    rewrite (uline_ws_pipe ws' Hok') in Hw.
+  - apply uline_of_body; [ intros w ? Hp; discriminate Hp | exact Hok ].
+  - exfalso. destruct Hok as (Hok' & Hn1 & _).
+    rewrite (uline_ws_pipe ws' npc' Hok') in Hw.
     apply (f_equal length) in Hw. revert Hw.
-    cbn [uline_ws]. rewrite length_app.
+    cbn [uline_ws]. rewrite length_app w_barcats_length.
     pose proof (line_ok_ge2 ws' Hok') as H2.
     vm_compute (length (wl_words cmd_cat_f)). cbn [length]. lia.
 Qed.
@@ -560,7 +631,7 @@ Lemma fline_ok_redir_words (b : list (bv 8)) (ws : list (list (bv 8)))
   uline_of b = LEchoF ws /\ file = fname_f.
 Proof using.
   intros (l & Hok & ->) Hws Hw.
-  destruct l as [ws' | ws' | | ws'].
+  destruct l as [ws' | ws' | | ws' npc'].
   - (* LEcho: its words are alphanumeric, and `>' is not *)
     exfalso. cbn [line_body] in Hw.
     rewrite (wl_words_body ws' (line_ok_wf _ Hok)) in Hw.
@@ -582,18 +653,20 @@ Proof using.
     apply app_inj_tail in Hw as [Hw ->].
     apply app_inj_tail in Hw as [-> _].
     split; [ | reflexivity ].
-    apply uline_of_body; [ intros w Hp; discriminate Hp | by split ].
+    apply uline_of_body; [ intros w ? Hp; discriminate Hp | by split ].
   - (* LCat: two words, so the command would have none *)
     exfalso. cbn [line_body] in Hw.
     apply (f_equal length) in Hw. rewrite length_app in Hw.
     pose proof (line_ok_pos ws Hws) as Hp.
     revert Hw. vm_compute (length (wl_words cmd_cat_f)). cbn [length]. lia.
   - (* LPipe: the word before the last is the bar *)
-    exfalso. destruct Hok as [Hok' _].
-    rewrite (uline_ws_pipe ws' Hok') in Hw. cbn [uline_ws] in Hw.
-    replace (ws' ++ [fd_w_bar; fd_w_cat])
-      with ((ws' ++ [fd_w_bar]) ++ [fd_w_cat]) in Hw
-      by (rewrite -app_assoc; reflexivity).
+    exfalso. destruct Hok as (Hok' & Hn1 & _).
+    rewrite (uline_ws_pipe ws' npc' Hok') in Hw. cbn [uline_ws] in Hw.
+    destruct npc' as [| m]; [lia |].
+    rewrite w_barcats_S_r in Hw.
+    replace (ws' ++ w_barcats m ++ [fd_w_bar; fd_w_cat])
+      with (((ws' ++ w_barcats m) ++ [fd_w_bar]) ++ [fd_w_cat]) in Hw
+      by (rewrite -!app_assoc; reflexivity).
     replace (ws ++ [fd_w_gt; file])
       with ((ws ++ [fd_w_gt]) ++ [file]) in Hw
       by (rewrite -app_assoc; reflexivity).
@@ -612,8 +685,8 @@ Lemma fbody_ok_bytes b : fbody_ok b -> Forall fbody_byte b.
 Proof using.
   intro Hb. destruct (fbody_ok_line b Hb) as [Hok Heq].
   pose proof (uline_of_nopipe b) as Hnp. rewrite Heq.
-  destruct (uline_of b) as [ws | ws | | ws]; rewrite /line_body;
-    [| | | by destruct (Hnp ws eq_refl)].
+  destruct (uline_of b) as [ws | ws | | ws npc]; rewrite /line_body;
+    [| | | by destruct (Hnp ws npc eq_refl)].
   - apply Forall_impl with (P := wl_body_byte);
       [exact (wl_body_bytes ws (line_ok_wf _ Hok)) | exact fbody_byte_of_body].
   - apply Forall_app. split; [| exact suf_gtf_bytes].
@@ -627,7 +700,7 @@ Lemma fbody_ok_short b : fbody_ok b -> (S (length b) < line_max)%nat.
 Proof using.
   intro Hb. destruct (fbody_ok_line b Hb) as [Hok Heq].
   pose proof (uline_of_nopipe b) as Hnp. rewrite Heq.
-  destruct (uline_of b) as [ws | ws | | ws]; [| | | by destruct (Hnp ws eq_refl)].
+  destruct (uline_of b) as [ws | ws | | ws npc]; [| | | by destruct (Hnp ws npc eq_refl)].
   - pose proof (line_ok_len ws Hok) as Hl.
     rewrite wl_line_length in Hl. rewrite /line_body. lia.
   - destruct Hok as [_ Hl].
@@ -645,6 +718,13 @@ Lemma suf_barcat_bytes :
   Forall (fun b => fbody_byte b \/ b = fd_bar) suf_barcat.
 Proof using. apply (bool_decide_unpack _). vm_compute. exact I. Qed.
 
+Lemma suf_barcats_bytes (n : nat) :
+  Forall (fun b => fbody_byte b \/ b = fd_bar) (suf_barcats n).
+Proof using.
+  induction n as [| n IH]; [constructor |].
+  rewrite suf_barcats_S. apply Forall_app. split; [exact suf_barcat_bytes | exact IH].
+Qed.
+
 Lemma line_bytes_bytes l :
   uline_ok l ->
   Forall (fun b => fbody_byte b \/ b = fd_bar \/ b = wl_nl) (line_bytes l).
@@ -652,7 +732,7 @@ Proof using.
   intro Hok.
   rewrite line_bytes_body. apply Forall_app. split;
     [| apply Forall_singleton; by right; right].
-  destruct l as [ws | ws | | ws]; rewrite /line_body.
+  destruct l as [ws | ws | | ws npc]; rewrite /line_body.
   - apply Forall_impl with (P := wl_body_byte);
       [exact (wl_body_bytes ws (line_ok_wf _ Hok)) |].
     intros b Hb. left. exact (fbody_byte_of_body b Hb).
@@ -668,7 +748,7 @@ Proof using.
         [exact (wl_body_bytes ws (line_ok_wf _ (proj1 Hok))) |].
       intros b Hb. left. exact (fbody_byte_of_body b Hb).
     + apply Forall_impl with (P := fun b => fbody_byte b \/ b = fd_bar);
-        [exact suf_barcat_bytes |].
+        [exact (suf_barcats_bytes npc) |].
       intros b [Hb | Hb]; [by left | by right; left].
 Qed.
 
@@ -1005,7 +1085,7 @@ Definition ralt_ok (l : uline) (a : ralt) : Prop :=
      [FileHooks.fpan_of]/[fexf_of]/[fnoc_of]) agree with [LCat]'s arm
      verbatim, and so costs each landed proof one copied line.  The PIPE
      application reads its own [PipeDisc.palt_ok]/[pcont], never these. *)
-  | LPipe _ =>
+  | LPipe _ _ =>
       match a with
       | RCRan | RCNoOpen | RCExec | RCSilent | RCFork => True
       | _ => False
@@ -1056,7 +1136,7 @@ Definition cont (s : fstate) (l : uline) (a : ralt) : list (bv 8) :=
 
 Lemma fstate_ok_fsm s l a : fstate_ok s -> uline_ok l -> ralt_ok l a -> fstate_ok (fsm s l a).
 Proof using.
-  intros Hs Hl Ha. destruct l as [ws | ws | | ws]; [exact Hs | | exact Hs | exact Hs].
+  intros Hs Hl Ha. destruct l as [ws | ws | | ws npc]; [exact Hs | | exact Hs | exact Hs].
   destruct a; try exact Hs; try (by left; constructor).
   - destruct Hl as [Hok _]. exact (fcont_ok_subseq ws sel Hok Ha).
   - destruct s as [bs |]; [exact Hs | by left; constructor].
@@ -1120,7 +1200,7 @@ Proof using.
   destruct a; rewrite /cont.
   - (* REcho: the echo application's four, minus the panic one *)
     rewrite /ralt_panic in Hp. apply bool_decide_eq_false in Hp.
-    rewrite /ralt_ok in Ha. destruct l as [ws | ws | | ws]; [| done | done | done].
+    rewrite /ralt_ok in Ha. destruct l as [ws | ws | | ws npc]; [| done | done | done].
     destruct a as [| [| [| [| a]]]]; [| | | done | exfalso; lia].
     + exists (wl_line (drop 1 ws)). rewrite line_alts_of_0.
       split; [reflexivity |].
@@ -1733,7 +1813,7 @@ Proof using.
   destruct (bodies_of I !! i) as [b |] eqn:Hb; [| discriminate].
   cbn in Hi. injection Hi as <-.
   destruct (fbody_ok_line b (disc_input_f_body I i b Hd Hb)) as [Hok _].
-  destruct (uline_of b) as [ws' | ws' | | ws']; try discriminate.
+  destruct (uline_of b) as [ws' | ws' | | ws' npc']; try discriminate.
   injection Hws as <-. exact (proj1 Hok).
 Qed.
 
@@ -2001,8 +2081,8 @@ Lemma fbody_ok_echo (b : list (bv 8)) :
 Proof using.
   intros Hfb Hok.
   pose proof (fbody_ok_line b Hfb) as [Hlok Hbody].
-  destruct (uline_of b) as [ws | ws | | ws] eqn:Hu;
-    [| | | by destruct (uline_of_nopipe b ws Hu)].
+  destruct (uline_of b) as [ws | ws | | ws npc] eqn:Hu;
+    [| | | by destruct (uline_of_nopipe b ws npc Hu)].
   - (* LEcho: the body IS [wl_body ws], so the words are [ws] *)
     rewrite /uline_ok in Hlok. rewrite /line_body in Hbody.
     rewrite Hbody (wl_words_body ws (line_ok_wf _ Hlok)). reflexivity.
@@ -2027,7 +2107,7 @@ Lemma fline_ok_echo (b : list (bv 8)) :
   fline_ok b -> line_ok (wl_words b) -> uline_of b = LEcho (wl_words b).
 Proof using.
   intros [l [Hlok ->]] Hok.
-  destruct l as [ws | ws | | ws].
+  destruct l as [ws | ws | | ws npc].
   - rewrite /line_body in Hok |- *.
     rewrite (wl_words_body ws (line_ok_wf _ Hlok)).
     exact (uline_of_body (LEcho ws) (uline_nopipe_echo ws) Hlok).
@@ -2042,6 +2122,8 @@ Proof using.
     pose proof (wl_words_alnum_body _ (wl_wf_alnum _ (line_ok_wf _ Hok)))
       as Hbb.
     rewrite /line_body in Hbb. apply Forall_app in Hbb as [_ Hsuf].
+    destruct Hlok as (_ & Hn1 & _). destruct npc as [| m]; [lia |].
+    rewrite suf_barcats_S in Hsuf. apply Forall_app in Hsuf as [Hsuf _].
     exact (fd_bar_not_body
              (proj1 (Forall_forall _ _) Hsuf fd_bar suf_barcat_bar)).
 Qed.

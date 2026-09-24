@@ -1755,3 +1755,9 @@ UShPipesStage.v
 UShPipesNode.v
 PipesLedPure.v
 PipesOut.v
+PipesLinks.v
+PipesLinkInst.v
+PipesStageInst.v
+UkShPipesFork.v
+PipesUline.v
+PipesCut.v

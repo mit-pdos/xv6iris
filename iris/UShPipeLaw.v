@@ -74,6 +74,7 @@ Require Import EchoDisc.
 Require Import FileDisc.
 Require Import PipeDisc.
 Require Import PipeUline.
+Require PipesUline.
 Require Import PipeNames.
 Require Import PipeQueue.
 Require Import PipeReg.
@@ -144,48 +145,10 @@ Local Open Scope Z_scope.
 Lemma fline_ok_pipe_words (b : list (bv 8)) (ws : list (list (bv 8))) :
   FileDisc.fline_ok b -> EchoDisc.line_ok ws ->
   wl_words b = ws ++ [FileDisc.fd_w_bar; FileDisc.fd_w_cat] ->
-  b = FileDisc.line_body (FileDisc.LPipe ws).
+  b = FileDisc.line_body (FileDisc.LPipe ws 1).
 Proof using.
-  intros (l & Hok & ->) Hws Hw.
-  destruct l as [ws' | ws' | | ws'].
-  - (* LEcho: its words are alphanumeric, and the bar is not *)
-    exfalso. cbn [FileDisc.line_body] in Hw.
-    rewrite (wl_words_body ws' (line_ok_wf _ Hok)) in Hw.
-    pose proof (line_ok_wf _ Hok) as Hwf. rewrite Hw in Hwf.
-    apply Forall_app in Hwf as [_ Hwf].
-    apply Forall_cons_1 in Hwf as [[_ Hbar] _].
-    apply Forall_cons_1 in Hbar as [Hbar _].
-    revert Hbar. rewrite /wl_alnum. vm_compute. intros [H | [H | H]];
-      destruct H as [H1 H2]; first [ by apply H1 | by apply H2 ].
-  - (* LEchoF: the two suffixes line up and `>' is not the bar *)
-    exfalso. destruct Hok as [Hok' Hlen].
-    rewrite (FileDisc.uline_ws_gtf ws' Hok') in Hw. cbn [FileDisc.uline_ws] in Hw.
-    replace (ws' ++ [FileDisc.fd_w_gt; FileDisc.fname_f])
-      with ((ws' ++ [FileDisc.fd_w_gt]) ++ [FileDisc.fname_f]) in Hw
-      by (rewrite -app_assoc; reflexivity).
-    replace (ws ++ [FileDisc.fd_w_bar; FileDisc.fd_w_cat])
-      with ((ws ++ [FileDisc.fd_w_bar]) ++ [FileDisc.fd_w_cat]) in Hw
-      by (rewrite -app_assoc; reflexivity).
-    apply app_inj_tail in Hw as [Hw _].
-    apply app_inj_tail in Hw as [_ Hgt]. discriminate Hgt.
-  - (* LCat: two words, so the command would have none *)
-    exfalso. cbn [FileDisc.line_body] in Hw.
-    apply (f_equal length) in Hw. rewrite length_app in Hw.
-    pose proof (line_ok_pos ws Hws) as Hp.
-    revert Hw. vm_compute (length (wl_words FileDisc.cmd_cat_f)).
-    cbn [length]. lia.
-  - (* LPipe: the words determine the command *)
-    destruct Hok as [Hok' Hlen].
-    rewrite (FileDisc.uline_ws_pipe ws' Hok') in Hw.
-    cbn [FileDisc.uline_ws] in Hw.
-    replace (ws' ++ [FileDisc.fd_w_bar; FileDisc.fd_w_cat])
-      with ((ws' ++ [FileDisc.fd_w_bar]) ++ [FileDisc.fd_w_cat]) in Hw
-      by (rewrite -app_assoc; reflexivity).
-    replace (ws ++ [FileDisc.fd_w_bar; FileDisc.fd_w_cat])
-      with ((ws ++ [FileDisc.fd_w_bar]) ++ [FileDisc.fd_w_cat]) in Hw
-      by (rewrite -app_assoc; reflexivity).
-    apply app_inj_tail in Hw as [Hw _].
-    apply app_inj_tail in Hw as [-> _]. reflexivity.
+  intros Hf Hws Hw.
+  exact (PipesUline.fline_ok_pipes_words b ws 1 Hf Hws ltac:(lia) Hw).
 Qed.
 
 (* ...AND THE READING THE ROUND TAKES: the input's last line IS the

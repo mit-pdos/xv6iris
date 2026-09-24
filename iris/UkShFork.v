@@ -499,7 +499,7 @@ Section UkShFork.
        UserFd.ustd γfd l -∗
        Pex -∗
        urun N h' m' (mword_of_int ShSyms.panic)
-         (UkShDiag.ush_Dg + (74 + n)) -∗
+         (UkShDiag.ush_Dg + (74 + (UkSh.ush_Dpipe + n))) -∗
        mWP (Loop : expr riscv_lang)) -∗
     (* THE CHILD, at 0x9c0 *)
     (∀ (N' : uk_names Σ) (hB : CpuId) (mA : regfile) (γ' : gname),
@@ -526,7 +526,7 @@ Section UkShFork.
        UkSh.ush_pid N' -∗
        UkShMalloc.ushm_fresh N' sz -∗
        urun N' hB mA (mword_of_int 0x9c0)
-         (68 + (8 + (UkShDiag.ush_Dg + n))) -∗
+         (68 + (8 + (UkShDiag.ush_Dg + (UkSh.ush_Dpipe + n)))) -∗
        mWP (Loop : expr riscv_lang)) -∗
     (* THE PARENT'S RE-ENTRY: the head's slot out of what the fork and the
        wait left, and what fork1 borrowed back.  The fork went out at the
@@ -573,14 +573,14 @@ Section UkShFork.
       by (intros q Hq; exact (upd_ne m (Regidx ra_idx) (Regidx q) _ Hq)).
     (* ---- fork1() ---- *)
     replace (16 + (UkSh.ush_Dbody + n))%nat
-      with (2 + (UkShDiag.ush_Dg + (74 + n)))%nat
-      by (unfold UkShDiag.ush_Dg, UkSh.ush_Dbody; lia).
+      with (2 + (UkShDiag.ush_Dg + (74 + (UkSh.ush_Dpipe + n))))%nat
+      by (unfold UkShDiag.ush_Dg, UkSh.ush_Dbody, UkSh.ush_Dpipe; lia).
     (* THE CHILDREN SET IS OPENED FOR THE FORK-WAIT WINDOW (lane IO-LEAF,
        M3a) and closed again at the loop head: the fork MINTS the token at
        the generation that joined it, and the wait REPORTS what the reap
        left.  THE PAYLOAD AND THE LEND ARE THE CALLER'S (step 4). *)
     iApply (UkShDiag.wp_kshr_fork1_final N (ushf_pay f)
-              sz l ∅ h1 m1 (74 + n) FsImg.ROOTINO ∅ Q Rc Pex HQc
+              sz l ∅ h1 m1 (74 + (UkSh.ush_Dpipe + n)) FsImg.ROOTINO ∅ Q Rc Pex HQc
               with "Hcode Hro [Hdat Hbuf] Hsz Hustd Hcwd Hch [] HRc Hkw
                     Hlease Hrun").
     { rewrite /ushf_pay.
@@ -638,7 +638,7 @@ Section UkShFork.
       iApply (wp_uk_cbeqz N hA mA (mword_of_int 0x930)
                 (mword_of_int 72 : mword 8) (mword_of_int 2 : mword 3) a0_idx
                 false (mword_of_int 0x9c0)
-                (2 + (UkShDiag.ush_Dg + (74 + n)))
+                (2 + (UkShDiag.ush_Dg + (74 + (UkSh.ush_Dpipe + n))))
                 ltac:(vm_compute; reflexivity)
                 ltac:(rewrite Ha0A; symmetry; exact (ushf_eqv_false rA HrA))
                 ltac:(apply bv_eq; vm_compute; reflexivity)
@@ -652,7 +652,7 @@ Section UkShFork.
       (* ---- 0x932  c.li a0,0 ---- *)
       iApply (wp_uk_cli N hB mA (mword_of_int 0x932)
                 (mword_of_int 0 : mword 6) a0_idx
-                (2 + (UkShDiag.ush_Dg + (74 + n)))
+                (2 + (UkShDiag.ush_Dg + (74 + (UkSh.ush_Dpipe + n))))
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 ltac:(vm_compute; discriminate) with "[] Hrun").
       { iApply (uis_shk_932 with "Hcode"). }
@@ -672,7 +672,7 @@ Section UkShFork.
       iApply (wp_uk_jal N hC mB (mword_of_int 0x934)
                 (mword_of_int 858 : mword 21) ra_idx
                 (mword_of_int ShSyms.wait) (mword_of_int 0x938)
-                (2 + (UkShDiag.ush_Dg + (74 + n)))
+                (2 + (UkShDiag.ush_Dg + (74 + (UkSh.ush_Dpipe + n))))
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 ltac:(vm_compute; discriminate)
                 ltac:(apply bv_eq; vm_compute; reflexivity)
@@ -693,7 +693,7 @@ Section UkShFork.
       (* ---- wait((int * )0), AT sh's OWN PID (step 4) ---- *)
       iDestruct "Hpid" as (pid) "[%Hpid1 Hpid]".
       iApply (UkShRun.wp_kshr_wait_pid Hpsok_free N hD mC
-                (2 + (UkShDiag.ush_Dg + (74 + n))) Sw pid Ha0_C
+                (2 + (UkShDiag.ush_Dg + (74 + (UkSh.ush_Dpipe + n)))) Sw pid Ha0_C
                 with "Hcode Hrun Hch Hpid").
       iIntros (hE ret Sw' pidv) "%Hpv Hpid %Hneg1 Hans Hrun Hch".
       (* THE SET IS EMPTY AGAIN (lane EXEC-SEAM): the wait reaped the one
@@ -741,9 +741,9 @@ Section UkShFork.
         - rewrite (HkeepD s4_idx ltac:(vm_compute; reflexivity)). exact Hs4.
         - rewrite (HkeepD s5_idx ltac:(vm_compute; reflexivity)). exact Hs5.
         - rewrite (HkeepD s6_idx ltac:(vm_compute; reflexivity)). exact Hs6. }
-      replace (2 + (UkShDiag.ush_Dg + (74 + n)))%nat
+      replace (2 + (UkShDiag.ush_Dg + (74 + (UkSh.ush_Dpipe + n))))%nat
         with (16 + (UkSh.ush_Dbody + n))%nat
-        by (unfold UkShDiag.ush_Dg, UkSh.ush_Dbody; lia).
+        by (unfold UkShDiag.ush_Dg, UkSh.ush_Dbody, UkSh.ush_Dpipe; lia).
       (* THE RE-ENTRY: the head's slot out of what the fork and the wait
          left (the caller's law), and the head *)
       iMod ("Hre" $! Sw Sw' ret pidv with "[%] [%] Hfans Hans Hlease") as "Hpos";
@@ -761,7 +761,7 @@ Section UkShFork.
       iApply (wp_uk_cbeqz N' hA mA (mword_of_int 0x930)
                 (mword_of_int 72 : mword 8) (mword_of_int 2 : mword 3) a0_idx
                 true (mword_of_int 0x9c0)
-                (2 + (UkShDiag.ush_Dg + (74 + n)))
+                (2 + (UkShDiag.ush_Dg + (74 + (UkSh.ush_Dpipe + n))))
                 ltac:(vm_compute; reflexivity)
                 ltac:(rewrite Ha0A; symmetry;
                       rewrite (moi_eq_zero 0 ltac:(unfold Z64; lia));
@@ -783,9 +783,9 @@ Section UkShFork.
                       = (mword_of_int (sh_buf + Z.of_nat k) : mword 64)).
       { rewrite (HcsA s1_idx ltac:(vm_compute; reflexivity)).
         rewrite (Hm1 s1_idx ltac:(vm_compute; discriminate)). exact Hs1. }
-      replace (2 + (UkShDiag.ush_Dg + (74 + n)))%nat
-        with (68 + (8 + (UkShDiag.ush_Dg + n)))%nat
-        by (unfold UkShDiag.ush_Dg; lia).
+      replace (2 + (UkShDiag.ush_Dg + (74 + (UkSh.ush_Dpipe + n))))%nat
+        with (68 + (8 + (UkShDiag.ush_Dg + (UkSh.ush_Dpipe + n))))%nat
+        by (unfold UkShDiag.ush_Dg, UkSh.ush_Dbody, UkSh.ush_Dpipe; lia).
       iApply ("Hchild" $! N' hB mA γ' with "[%] [%] Hmy HRc Hcode' Hro' Hjt'
                 Hline Hws Hsy Hustd Hcwd Hch Hpid' Hfresh Hrun");
         [ exact Hpeq' | exact Hs1_A ].
@@ -821,7 +821,7 @@ Section UkShFork.
       (h : CpuId) (m : regfile) (f : nat -> bv 8) (k len : nat)
       (ws : list (list (bv 8)))
       (sz : Z) (l : list fdstate) (n : nat) :
-    (Dc <= 68)%nat ->
+    (Dc <= 68 + UkSh.ush_Dpipe)%nat ->
     UkSh.ush_regs m ->
     m !!! Regidx s1_idx = mword_of_int (sh_buf + Z.of_nat k) ->
     (forall j : nat, (j < len)%nat -> f (k + j)%nat <> ubyte0) ->
@@ -912,7 +912,7 @@ Section UkShFork.
            banner-owed credential they leave ([ush_at_of_pm_wb]). *)
         iIntros (Sc h' m' r) "%Hmsg %Hr1 Hans Hustd' Hpm' Hrun'".
         iDestruct "Hans" as "[(_ & _ & HRc) | Hpid']".
-        * iApply (UkShDiag.wp_kshd_panic_paid N Wc Wb l h' m' (74 + n) np
+        * iApply (UkShDiag.wp_kshd_panic_paid N Wc Wb l h' m' (74 + (UkSh.ush_Dpipe + n)) np
                     (proj2 (proj2 Hrow)) Hmsg
                     with "Hplaw Hcode Hro Hustd' HRc [Hpm'] Hrun'").
           iIntros "_ Hwb".
@@ -935,12 +935,12 @@ Section UkShFork.
            [ush_Dbody] less its own frames -- and a law that spends [Dc] of
            it is that same run at [68 - Dc + n]. *)
         iRevert "Hrun'".
-        replace (68 + (8 + (UkShDiag.ush_Dg + n)))%nat
-          with (Dc + (8 + (UkShDiag.ush_Dg + (68 - Dc + n))))%nat by lia.
+        replace (68 + (8 + (UkShDiag.ush_Dg + (UkSh.ush_Dpipe + n))))%nat
+          with (Dc + (8 + (UkShDiag.ush_Dg + (68 + UkSh.ush_Dpipe - Dc + n))))%nat by lia.
         iIntros "Hrun'".
         iApply ("Hchl" $! N' hB mA DfracDiscarded DfracDiscarded
                   (sh_buf + Z.of_nat k) len ws (fun j : nat => f (k + j)%nat)
-                  sz l (68 - Dc + n)%nat np
+                  sz l (68 + UkSh.ush_Dpipe - Dc + n)%nat np
                   with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                         Hcode' [] []
                         Hjt' Hline' Hws Hsy Hustd' Hcwd' Hch' Hpid' Hfresh HRc
@@ -1031,7 +1031,7 @@ Section UkShFork.
       (h : CpuId) (m : regfile) (f : nat -> bv 8) (k len : nat)
       (ws : list (list (bv 8)))
       (sz : Z) (l : list fdstate) (n : nat) :
-    (Dc <= 68)%nat ->
+    (Dc <= 68 + UkSh.ush_Dpipe)%nat ->
     (forall (ws' : list (list (bv 8))) (g : nat -> bv 8) (k' len' : nat),
        Lp ws' g k' len' -> bv_unsigned (g k') = 101%Z) ->
     UkSh.ush_regs m ->

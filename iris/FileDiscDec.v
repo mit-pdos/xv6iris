@@ -181,7 +181,7 @@ Definition ralt_fix_cands (l : uline) : list ralt :=
   | LEchoF _ => [RFExec; RFOpenU; RFOpenM; RFSilent; RFFork]
   | LCat => [RCRan; RCNoOpen; RCExec; RCSilent; RCFork]
   (* the DEAD arm: [FileDisc.ralt_ok] gives [LPipe] exactly [LCat]'s five *)
-  | LPipe _ => [RCRan; RCNoOpen; RCExec; RCSilent; RCFork]
+  | LPipe _ _ => [RCRan; RCNoOpen; RCExec; RCSilent; RCFork]
   end.
 
 Definition ralt_cands (l : uline) : list nat :=
@@ -195,7 +195,7 @@ Definition ralt_cands (l : uline) : list nat :=
 
 Lemma ralt_fix_cands_ok l : Forall (ralt_ok l) (ralt_fix_cands l).
 Proof using.
-  destruct l as [ws | ws | | ws]; cbn [ralt_fix_cands].
+  destruct l as [ws | ws | | ws npc]; cbn [ralt_fix_cands].
   - repeat (constructor; [cbn [ralt_ok]; lia |]). constructor.
   - repeat (constructor; [exact I |]). constructor.
   - repeat (constructor; [exact I |]). constructor.
@@ -211,7 +211,7 @@ Proof using.
   - apply elem_of_list_fmap in Hin as (a & -> & Ha).
     rewrite ralt_dec_enc.
     exact (proj1 (Forall_forall _ _) (ralt_fix_cands_ok l) a Ha).
-  - destruct l as [ws | ws | | ws]; try (by apply elem_of_nil in Hin).
+  - destruct l as [ws | ws | | ws npc]; try (by apply elem_of_nil in Hin).
     apply elem_of_list_fmap in Hin as (sel & -> & Hsel).
     rewrite ralt_dec_enc. cbn [ralt_ok].
     by apply (sel_ok_cands (echo_chunks ws) sel).
@@ -221,7 +221,7 @@ Lemma ralt_cands_canon l c :
   ralt_ok l (ralt_dec c) -> ralt_enc (ralt_dec c) ∈ ralt_cands l.
 Proof using.
   intro H. rewrite /ralt_cands elem_of_app.
-  destruct l as [ws | ws | | ws];
+  destruct l as [ws | ws | | ws npc];
     destruct (ralt_dec c) as [k | sel | | | | | | | | | |];
     cbn [ralt_ok] in H; try done.
   - left. apply elem_of_list_fmap. exists (REcho k). split; [reflexivity |].
@@ -438,7 +438,7 @@ Proof using.
   induction i as [| i IH]; [by left |].
   cbn [fstate_upto]. destruct IH as [[Hu Hv] | He]; [| by rewrite He; right].
   rewrite Hu Hv.
-  destruct (uline_of (bs !!! i)) as [ws | ws | | ws]; [by left | | by left | by left].
+  destruct (uline_of (bs !!! i)) as [ws | ws | | ws npc]; [by left | | by left | by left].
   destruct (ralt_at cs i) as [k | sel | | | | | | | | | |];
     cbn [fsm]; try (by left); try (by right).
   destruct s as [b0 |]; [by left | by right].

@@ -138,7 +138,7 @@ Section UShEchoPayGen.
     (forall I0 : list (bv 8), Timeless (Hold I0)) ->
     (forall (I0 : list (bv 8)) (v0 : era_pins),
        ck_lineok (sk_cur St) I0 ->
-       ⊢ lk_pin L (S gen_id) v0 -∗ lk_post L (S gen_id) v0 I0 0%nat -∗
+       ⊢ lk_pin L (S gen_id) v0 -∗ lk_post L (S gen_id) v0 I0 (sk_code St I0) -∗
          Hold I0 -∗ Wc I0 0%nat) ->
     (forall (I0 : list (bv 8)) (v0 : era_pins),
        ⊢ lk_pin L (S gen_id) v0 -∗ lk_T L -∗ Wc I0 0%nat) ->
@@ -260,7 +260,7 @@ Section UShEchoPayGen.
          Hold I0 -∗ Wc I0 3%nat) ->
     (forall (I0 : list (bv 8)) (v0 : era_pins),
        ck_lineok (sk_cur St) I0 ->
-       ⊢ lk_pin L (S gen_id) v0 -∗ lk_post L (S gen_id) v0 I0 0%nat -∗
+       ⊢ lk_pin L (S gen_id) v0 -∗ lk_post L (S gen_id) v0 I0 (sk_code St I0) -∗
          Hold I0 -∗ Wc I0 0%nat) ->
     (forall (I0 : list (bv 8)) (v0 : era_pins),
        ⊢ lk_pin L (S gen_id) v0 -∗ lk_T L -∗ Wc I0 0%nat) ->
@@ -347,7 +347,7 @@ Section UShEchoPayGen.
          Hold I0 -∗ Wc I0 3%nat) ->
     (forall (I0 : list (bv 8)) (v0 : era_pins),
        ck_lineok (sk_cur St) I0 ->
-       ⊢ lk_pin L (S gen_id) v0 -∗ lk_post L (S gen_id) v0 I0 0%nat -∗
+       ⊢ lk_pin L (S gen_id) v0 -∗ lk_post L (S gen_id) v0 I0 (sk_code St I0) -∗
          Hold I0 -∗ Wc I0 0%nat) ->
     (forall (I0 : list (bv 8)) (v0 : era_pins),
        ⊢ lk_pin L (S gen_id) v0 -∗ lk_T L -∗ Wc I0 0%nat) ->
@@ -394,11 +394,11 @@ Section UShEchoPayGen.
   Local Lemma lkw_wc0 (Hold : list (bv 8) -> iProp Σ) (I0 : list (bv 8))
       (v0 : era_pins) :
     ck_lineok (sk_cur St) I0 ->
-    ⊢ lk_pin L (S gen_id) v0 -∗ lk_post L (S gen_id) v0 I0 0%nat -∗
+    ⊢ lk_pin L (S gen_id) v0 -∗ lk_post L (S gen_id) v0 I0 (sk_code St I0) -∗
       Hold I0 -∗ (lk_lcred L (S gen_id) I0 0%nat ∗ Hold I0).
   Proof using St.
     intro Hlok. iIntros "#Hp Hc HR". iFrame "HR".
-    iApply (lk_lcred_of_post_a L (S gen_id) I0 0%nat v0 (sk_apr0 St I0 Hlok)
+    iApply (lk_lcred_of_post_a L (S gen_id) I0 (sk_code St I0) v0 (sk_apr0 St I0 Hlok)
               with "Hp Hc").
   Qed.
 

@@ -886,9 +886,10 @@ Section pipes_out_n.
   Definition lineN (I : list (bv 8)) : pline' :=
     lm_of PM (bodies_of I !!! (nlines I - 1)%nat).
 
-  (* the writer's stage at a block: [LineModel.lm_wr_blk] *)
+  (* the writer's stage at a block: [LineModel.lm_wr_blk_t] -- the block
+     and the prologue's settled tail, which the prompt's filing needs *)
   Definition wr_blkN (ps cs : list nat) (I : list (bv 8)) (P : nat) : Prop :=
-    lm_wr_blk PM ps cs tt I P.
+    lm_wr_blk_t PM ps cs tt I P.
 
   (* THE ROUND'S LEDGER, as the family holds it: nothing before the first
      byte, the writer's half and the ledger's bound after *)
@@ -952,7 +953,7 @@ Section pipes_out_n.
     { iModIntro. iSplitR; [by iApply pecl'_taint |].
       iSplitR; [rewrite /pwc_blkN; by iRight | iRight; rewrite /ptkN; by iRight]. }
     iDestruct "Hx" as (ps cs P) "(%Hw & #Hpin & Htn & #Hps & #Hcs & Hled & #HE)".
-    pose proof Hw as (Hpp & Hr & Hn & HP).
+    pose proof Hw as ((Hpp & Hr & Hn & HP) & _).
     assert (Hne : I <> []) by (intros ->; rewrite nlines_nil in Hn; lia).
     iDestruct "Hled" as "[%Hnil | Hled]".
     - (* THE BLOCK'S FIRST BYTE: the round opens *)
@@ -1038,7 +1039,7 @@ Section pipes_out_n.
     iDestruct "Hpw" as "[Hx | #HT]"; last first.
     { iModIntro. iSplitR; [by iApply pecl'_taint | by iRight]. }
     iDestruct "Hx" as (ps cs P) "(%Hw & #Hpin & Htn & #Hps & #Hcs & Hled & #HE)".
-    pose proof Hw as (Hpp & Hr & Hn & HP).
+    pose proof Hw as ((Hpp & Hr & Hn & HP) & _).
     assert (HneI : I <> []) by (intros ->; rewrite nlines_nil in Hn; lia).
     iDestruct "Hled" as "[%Hnil | Hled]"; [by destruct (Hne Hnil) |].
     iDestruct "Hled" as (w gb) "(#Hpera & Hcur & #Hrlb)".

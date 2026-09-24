@@ -77,7 +77,7 @@ Lemma pipe_body_ok_of_fline (b : list (bv 8)) :
   FileDisc.fline_ok b -> line_ok (wl_words b) -> body_ok b.
 Proof using.
   intros [l [Hlok ->]] Hok.
-  destruct l as [ws | ws | | ws].
+  destruct l as [ws | ws | | ws npc].
   - (* LEcho: the body IS [wl_body ws] *)
     rewrite /FileDisc.line_body in Hok |- *.
     rewrite /FileDisc.uline_ok in Hlok.
@@ -95,6 +95,8 @@ Proof using.
     pose proof (wl_words_alnum_body _ (wl_wf_alnum _ (line_ok_wf _ Hok)))
       as Hbb.
     rewrite /FileDisc.line_body in Hbb. apply Forall_app in Hbb as [_ Hsuf].
+    destruct Hlok as (_ & Hn1 & _). destruct npc as [| m]; [lia |].
+    rewrite FileDisc.suf_barcats_S in Hsuf. apply Forall_app in Hsuf as [Hsuf _].
     exact (FileDisc.fd_bar_not_body
              (pipe_forall_in _ _ _ Hsuf FileDisc.suf_barcat_bar)).
 Qed.
@@ -235,7 +237,7 @@ Section pipe_stage_inst.
   Qed.
 
   Definition pipe_stage_inst_at : StageRec PI :=
-    MkStageRec PI pipe_cur_inst pi_lend_stage pi_apr0.
+    MkStageRec PI pipe_cur_inst (fun _ => 0%nat) pi_lend_stage pi_apr0.
 
   (* =================================================================== *)
   (*  THE DEFINITIONAL CHECK ([LinkRec]'s / [PipeLinkInst]'s pattern).    *)

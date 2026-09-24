@@ -182,6 +182,12 @@ Section stagerec.
 
   Record StageRec (L : LinkRec Σ) := MkStageRec {
     sk_cur : CurRec L;
+    (* THE CODE THE PROGRAM'S CURSOR FILES at input [I]: the alternative
+       whose continuation is the program's own output.  [0] at the echo
+       and file models, whose code [0] IS that output; the N-stage
+       pipeline model encodes the block itself ([PipesDisc.plalt_code
+       (PLRun _)]), so its code is a function of the line (cut C8). *)
+    sk_code : list (bv 8) -> nat;
     (* WHAT SH'S FORK LENDS ITS CHILD, OPENED.  [LinkRec.lk_lend] is the
        era's lend as a credential; this is the same thing as a STAGE, the
        cursor at offset zero, and -- persistently, so that it survives the
@@ -201,7 +207,7 @@ Section stagerec.
            ∗ ck_cur L sk_cur k v st 0%nat
            ∗ □ (ck_cur L sk_cur k v st
                   (length (wl_line (drop 1 (last_ws I)))) -∗
-                lk_post L k v I 0%nat))
+                lk_post L k v I (sk_code I)))
         ∨ lk_T L;
     (* ...AND THAT ALTERNATIVE ENDS WITH THE SHELL'S PROMPT, which is what
        makes the block a BOUNDARY credential when the child exits
@@ -209,7 +215,7 @@ Section stagerec.
     (* ...AND IT IS THE SAME GUARD (the program stream): at an era with
        more than one line shape, alternative 0 is admissible only at the
        lines the cursor is about. *)
-    sk_apr0 : forall I : list (bv 8), ck_lineok L sk_cur I -> lk_apr L I 0%nat;
+    sk_apr0 : forall I : list (bv 8), ck_lineok L sk_cur I -> lk_apr L I (sk_code I);
   }.
 
 End stagerec.
@@ -224,6 +230,7 @@ Global Arguments ck_cur {_ _ _ _} _ _ _ _ _.
 Global Arguments ck_cur_tl {_ _ _ _} _ _ _ _ _.
 Global Arguments ck_step {_ _ _ _} _ _ _ _ _ _ _ _.
 Global Arguments sk_cur {_ _ _ _} _.
+Global Arguments sk_code {_ _ _ _} _ _.
 Global Arguments sk_lend_stage {_ _ _ _} _ _ _ _ _.
 Global Arguments sk_apr0 {_ _ _ _} _ _.
 Global Arguments MkCurRec {_ _ _} _.
@@ -392,7 +399,7 @@ Section echo_stage_inst.
   Proof using . intros _. lia. Qed.
 
   Definition echo_stage_inst : StageRec LE :=
-    MkStageRec LE echo_cur_inst ei_lend_stage ei_apr0.
+    MkStageRec LE echo_cur_inst (fun _ => 0%nat) ei_lend_stage ei_apr0.
 
   (* =================================================================== *)
   (*  THE DEFINITIONAL CHECK (LinkRec's).  If any of these ever needs a   *)

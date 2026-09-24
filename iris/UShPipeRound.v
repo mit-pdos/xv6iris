@@ -876,13 +876,13 @@ Section UShPipeRound.
      transport through [PipeUline]'s three projections. *)
   Lemma ushq_lp_of_at (ws : list (list (bv 8))) (f : nat -> bv 8)
       (k len : nat) :
-    UkSh.ush_line_at (FileDisc.LPipe ws) f k len ->
-    ushq_lp (FileDisc.uline_ws (FileDisc.LPipe ws))
+    UkSh.ush_line_at (FileDisc.LPipe ws 1) f k len ->
+    ushq_lp (FileDisc.uline_ws (FileDisc.LPipe ws 1))
       (fun j : nat => f (k + j)%nat) 0%nat len.
   Proof using .
     intros (Hok & Hlen & Hby). exists ws.
     split; [ reflexivity | ].
-    assert (Hb : FileDisc.line_bytes (FileDisc.LPipe ws)
+    assert (Hb : FileDisc.line_bytes (FileDisc.LPipe ws 1)
                  = PipeDisc.line_bytes (PipeDisc.LPipe ws))
       by exact (PipeUline.line_bytes_of_pline (PipeDisc.LPipe ws)).
     rewrite /UkShPipeRound.ushq_line_at. split_and!.
@@ -1031,7 +1031,7 @@ Section UShPipeRound.
       iApply (UkShPipeForkTwin.wp_kshm_body_pipe (PS := uprogSG_free)
                 (SG := uexecSG_xv6) N γp T Wct Wbf Pm (fun k0 H => H)
                 ushq_lp 68 h m f k len
-                (FileDisc.uline_ws (FileDisc.LPipe ws)) sz l n
+                (FileDisc.uline_ws (FileDisc.LPipe ws 1)) sz l n
                 ltac:(lia) ushq_lp0
                 Hregs Hs1 Ha5 Hnn Hnul Hkl2
                 (ushq_lp_of_at ws f k len Hlat)

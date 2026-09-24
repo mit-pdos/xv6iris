@@ -436,7 +436,7 @@ Section UkShRedirBody.
       (Dc : nat)
       (h : CpuId) (m : regfile) (f : nat -> bv 8) (k len : nat)
       (sz : Z) (l : list fdstate) (n : nat) :
-    (Dc <= 68)%nat ->
+    (Dc <= 68 + UkSh.ush_Dpipe)%nat ->
     UkSh.ush_regs m ->
     m !!! Regidx s1_idx = mword_of_int (sh_buf + Z.of_nat k) ->
     m !!! Regidx a5_idx = mword_of_int (bv_unsigned (f k)) ->
@@ -652,7 +652,7 @@ Section UkShRedirBody.
     iIntros "!>" (lu h m f k len l n)
       "%Hd %Hlat %Hregs %Hs1 %Ha5 %Hnn %Hnul %Hkl2 %Hpm1 %Hpmwb %Hfd0
        #Hgen #Hcode #Hjt Hhead Hstd Hdat Hsz Hbuf Hrun".
-    destruct lu as [ ws | ws | | ws]; [| | | by destruct (Hd ws eq_refl) ].
+    destruct lu as [ ws | ws | | ws npc]; [| | | by destruct (Hd ws npc eq_refl) ].
     - (* [echo a b] -- the landed walk *)
       iApply ("Hecho" $! (LEcho ws) h m f k len l n with
                 "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hgen Hcode Hjt

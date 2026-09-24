@@ -40,7 +40,7 @@ Local Open Scope Z_scope.
 Definition uline_of_pline (l : PipeDisc.pline) : FileDisc.uline :=
   match l with
   | PipeDisc.LEcho ws => FileDisc.LEcho ws
-  | PipeDisc.LPipe ws => FileDisc.LPipe ws
+  | PipeDisc.LPipe ws => FileDisc.LPipe ws 1
   end.
 
 Lemma uline_of_pline_inj : Inj eq eq uline_of_pline.
@@ -66,11 +66,16 @@ Proof using. by destruct l as [ws | ws]. Qed.
 (* (2) ...and so does ADMISSIBILITY, in both directions *)
 Lemma uline_ok_of_pline (l : PipeDisc.pline) :
   PipeDisc.pline_ok l -> FileDisc.uline_ok (uline_of_pline l).
-Proof using. by destruct l as [ws | ws]. Qed.
+Proof using.
+  destruct l as [ws | ws]; [done |]. intros [H1 H2].
+  split; [exact H1 | split; [lia | exact H2]].
+Qed.
 
 Lemma pline_ok_of_uline (l : PipeDisc.pline) :
   FileDisc.uline_ok (uline_of_pline l) -> PipeDisc.pline_ok l.
-Proof using. by destruct l as [ws | ws]. Qed.
+Proof using.
+  destruct l as [ws | ws]; [done |]. intros (H1 & _ & H2). split; [exact H1 | exact H2].
+Qed.
 
 (* (3) THE WORDS.  This is the one that is NOT a conversion, and it is the
    one [UkSh]'s [Hdsc_line] is about: its conclusion is
@@ -87,7 +92,7 @@ Proof using.
   destruct l as [ws | ws].
   - intro Hok. cbn [uline_of_pline FileDisc.uline_ws PipeDisc.line_body].
     symmetry. exact (wl_words_body ws (line_ok_wf _ Hok)).
-  - intros [Hok _]. symmetry. exact (FileDisc.uline_ws_pipe ws Hok).
+  - intros [Hok _]. symmetry. exact (FileDisc.uline_ws_pipe ws 1 Hok).
 Qed.
 
 (* ...and the left command's words are still there, as the prefix they are *)
@@ -115,7 +120,7 @@ Lemma ush_line_pipe_not_file (l : FileDisc.uline) :
   ush_line_pipe l ->
   FileDisc.uline_nopipe l -> exists ws, l = FileDisc.LEcho ws.
 Proof using.
-  intros [[ws | ws] ->] Hnp; [ by exists ws | by destruct (Hnp ws eq_refl) ].
+  intros [[ws | ws] ->] Hnp; [ by exists ws | by destruct (Hnp ws 1%nat eq_refl) ].
 Qed.
 
 (* ===================================================================== *)
