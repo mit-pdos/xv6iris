@@ -1169,6 +1169,15 @@ theorem lw_append (BP : BPIN) (c : CPU) (k : KCtx) (a b : Bool) (R : RegMap) (kk
   repeat refine lw_cs_set _ _ ?_ _ _ (by decide)
   exact ⟨g2, g8, g9, g18, g19, g20, g21, g22, g23, g24, g25, g26, g27⟩
 
+/-- The held buffer's width, off the handle (what `Xv6.fsblock_update_any`
+asks of the new content). -/
+theorem lw_hold_len (γ : BcacheNames) (V : BioView GF) (kk : Nat)
+    (pidv dev bno : BitVec 32) (bs bsd : List (BitVec 8)) :
+    bufHold0 (GF := GF) γ V kk pidv dev bno bs bsd ⊢ ⌜bs.length = BSIZE⌝ := by
+  unfold bufHold0
+  iintro ⟨%hp, -⟩
+  ipureintro; exact hp.2.2.2.1
+
 /-! ## The ABSORB arm's ghost step
 
 The block is already in `lh.block[]`, so the header does not move: the
@@ -1214,22 +1223,26 @@ theorem lw_closeA (γ : LogNames) (γb : BcacheNames) (γfs : FsNames) (V : BioV
     ([∗list] j ∈ List.range LOGBLOCKS, ∃ bsx : List (BitVec 8),
        fsChalf γfs (logSlotBno ls j) bsx) ∗
     bslots γb ((LOGBLOCKS - n) + 2) ∗
-    bslot γb ∗ logOpSe γ (u + 1) Sb e0 ∗ logTx γ ∗ fsChalf γfs bno.toNat bsl ∗
+    bslot γb ∗ logOpSe γ (u + 1) Sb e0 ∗ logTx γ ∗ fsblock γfs.bytes bno.toNat bsl ∗
     bufHold0 γb V kk pidv dev bno bs bsd ∗ bioPay γb V kk dev bno bsl bsd true ∗
-    logEpochLb γ v
-    ⊢ |==> (logResAt (GF := GF) γ γb γfs cov ls curCtx ∗
+    logEpochLb γ v ∗ fsBytesAny γfs
+    ⊢ |={⊤}=> (logResAt (GF := GF) γ γb γfs cov ls curCtx ∗
         logOpSw γ u (bno.toNat :: Sb) bno.toNat v ∗ logTx γ ∗
-        fsChalf γfs bno.toNat bs ∗ bioLocked γb V kk pidv dev bno bs bsd true ∗ bslot γb) := by
+        fsblock γfs.bytes bno.toNat bs ∗
+        bioLocked γb V kk pidv dev bno bs bsd true ∗ bslot γb) := by
   iintro ⟨Hout, Hcmt, Hnc, Hops, Hep, Hreg, Htxa, Hn, Hblk, Hjunk, HLa, HDa, Hdrt, Hhdr,
-    Hslots, Hpool, Hsl, Hope, Htx1, Hch, Hhold, Hpay, #Hlb⟩
+    Hslots, Hpool, Hsl, Hope, Htx1, Hch, Hhold, Hpay, #Hlb, #Hrow⟩
   subst he0E
   -- the caller's anchor rides out ordered against the entry's epoch
   ihave %hvE := logEpochLb_le γ e0 v $$ Hep Hlb
   -- the payload, opened
   icases fsPay_split γb γfs V hcl hdt kk dev bno bsl bsd true $$ Hpay with ⟨Hmc, Hmd, Href⟩
   isimp only [if_true] at Href
-  -- the logged view moves to the caller's bytes
-  imod (fsCache_update γfs L bno.toNat bsl bs bsl) $$ HLa Hch Hmc
+  -- the logged view moves to the caller's bytes -- AT THE BYTE VIEW, which
+  -- is the one crossing the re-keying changed (Rocq's `byte_range_log_update`
+  -- at its whole-block corollary)
+  ihave %hlbs := lw_hold_len γb V kk pidv dev bno bs bsd $$ Hhold
+  imod (fsblock_update_any ⊤ γfs L bno.toNat bsl bs bsl logN_top hlbs) $$ Hrow HLa Hch Hmc
     with ⟨%hup, HLa, Hch, Hmc⟩
   -- the budget unit burns and the block joins this op's set
   imod (logSpendStep γ om u Sb e0 bno.toNat) $$ Hops Hope with ⟨%i, %hik, Hops, Hope⟩
@@ -1381,14 +1394,15 @@ theorem lw_closeB (γ : LogNames) (γb : BcacheNames) (γfs : FsNames) (V : BioV
     ([∗list] j ∈ List.range LOGBLOCKS, ∃ bsx : List (BitVec 8),
        fsChalf γfs (logSlotBno ls j) bsx) ∗
     bslots γb ((LOGBLOCKS - n) + 2) ∗
-    logOpSe γ (u + 1) Sb e0 ∗ logTx γ ∗ fsChalf γfs bno.toNat bsl ∗
+    logOpSe γ (u + 1) Sb e0 ∗ logTx γ ∗ fsblock γfs.bytes bno.toNat bsl ∗
     bufHold0 γb V kk pidv dev bno bs bsd ∗ bioPay γb V kk dev bno bsl bsd false ∗
-    bref γb kk dev bno ∗ logEpochLb γ v
-    ⊢ |==> (logResAt (GF := GF) γ γb γfs cov ls curCtx ∗
+    bref γb kk dev bno ∗ logEpochLb γ v ∗ fsBytesAny γfs
+    ⊢ |={⊤}=> (logResAt (GF := GF) γ γb γfs cov ls curCtx ∗
         logOpSw γ u (bno.toNat :: Sb) bno.toNat v ∗ logTx γ ∗
-        fsChalf γfs bno.toNat bs ∗ bioLocked γb V kk pidv dev bno bs bsd true ∗ bslot γb) := by
+        fsblock γfs.bytes bno.toNat bs ∗
+        bioLocked γb V kk pidv dev bno bs bsd true ∗ bslot γb) := by
   iintro ⟨Hout, Hcmt, Hnc, Hops, Hep, Hreg, Htxa, Hn, Hblk, Hcell, Hjunk, HLa, HDa, Hdrt, Hhdr,
-    Hslots, Hpool, Hope, Htx1, Hch, Hhold, Hpay, Href, #Hlb⟩
+    Hslots, Hpool, Hope, Htx1, Hch, Hhold, Hpay, Href, #Hlb, #Hrow⟩
   subst he0E
   have hmem : bno.toNat ∈ cov.toList := (Std.ExtTreeSet.mem_toList).2 hhome.1
   have hsumge : u + 1 ≤ opSum om := lw_opSum_ge om i0 _ hi0
@@ -1402,8 +1416,9 @@ theorem lw_closeB (γ : LogNames) (γb : BcacheNames) (γfs : FsNames) (V : BioV
   imod (fsDirty_flip γfs D bno.toNat false false true) $$ HDa Hdb Hmd
     with ⟨-, HDa, Hdb, Hmd⟩
   ihave Hdrt := Hdcl $$ Hdb
-  -- the logged view moves to the caller's bytes
-  imod (fsCache_update γfs L bno.toNat bsl bs bsl) $$ HLa Hch Hmc
+  -- the logged view moves to the caller's bytes (see `lw_closeA`)
+  ihave %hlbs := lw_hold_len γb V kk pidv dev bno bs bsd $$ Hhold
+  imod (fsblock_update_any ⊤ γfs L bno.toNat bsl bs bsl logN_top hlbs) $$ Hrow HLa Hch Hmc
     with ⟨-, HLa, Hch, Hmc⟩
   -- the budget unit burns and the block joins this op's set
   imod (logSpendStep γ om u Sb e0 bno.toNat) $$ Hops Hope with ⟨%i, %hik, Hops, Hope⟩
@@ -1618,7 +1633,7 @@ theorem lw_finish (RE : RELEASE) (c : CPU) (k : KCtx) (a b : Bool) (R : RegMap) 
     logCtx γ γb γfs V.cov ls dev ∗ locked γ.lk c ∗ logResAt γ γb γfs V.cov ls curCtx ∗
     sieArm c k.sie k.proc ∗
     frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
-    logOpSw γ u Sb' bno.toNat v ∗ logTx γ ∗ fsChalf γfs bno.toNat bs ∗
+    logOpSw γ u Sb' bno.toNat v ∗ logTx γ ∗ fsblock γfs.bytes bno.toNat bs ∗
     bioLocked γb V kk pidv dev bno bs bsd true ∗ bslot γb ∗
     wpNext k.sie k.proc c (fun cpu' =>
       iprop(∀ (spie spp : Bool) (R' : RegMap) (Sb : List Nat),
@@ -1626,7 +1641,7 @@ theorem lw_finish (RE : RELEASE) (c : CPU) (k : KCtx) (a b : Bool) (R : RegMap) 
         kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
         ⌜calleeSaved k.regs R'⌝ -∗
         logOpSw γ u Sb bno.toNat v -∗ logTx γ -∗
-        fsChalf γfs bno.toNat bs -∗
+        fsblock γfs.bytes bno.toNat bs -∗
         bioLocked γb V kk pidv dev bno bs bsd true -∗
         bslot γb -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
@@ -1655,6 +1670,7 @@ theorem logWrite_proof (AC : ACQUIRE) (RE : RELEASE) (BP : BPIN) : LOG_WRITE := 
   have hK18 : 18 ≤ k.avail := by unfold logWriteSlots at hK; omega
   have hK4 : 4 ≤ k.avail := by omega
   iintro ⟨Hk, Hpc, #Hbio, #Hctx, #Hlb, Hsl, Hop, Hch, Hhold, Hpay, Hnext⟩
+  ihave #Hrow := logCtx_bytesAny γ γb γfs V.cov logstart dev $$ Hctx
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- the prologue
@@ -1812,10 +1828,11 @@ theorem logWrite_proof (AC : ACQUIRE) (RE : RELEASE) (BP : BPIN) : LOG_WRITE := 
         nxo nxt nxl Sb LB om X T W L D nc hcl hdt hhome hlen hbud hout3 hfresho hE hfreshl
         hlive hcap hfresht hTlen hsum hsets hregLB h1 h2 h3 h4 hi0 he0E hnotLB hnlt)
       $$ [Hout Hcmt Hnc Hops Hep Hreg Htxa Hn Hblk Hcell Hjunk HLa HDa Hdrt Hhdr Hslots Hpool
-        Hope Htx1 Hch Hhold Hpay Href Hlb]
+        Hope Htx1 Hch Hhold Hpay Href Hlb Hrow]
       with ⟨Hres, Hopsw, Htx1, Hch, Hlk2, Hsl⟩
     · iframe Hout Hcmt Hnc Hops Hep Hreg Htxa Hn Hblk Hcell Hjunk HLa HDa Hdrt Hhdr Hslots
         Hpool Hope Htx1 Hch Hhold Hpay Href Hlb
+      iframe Hrow
     imodintro
     iapply (lw_finish RE c k spie spp R5 kk γ γb γfs V logstart dev pidv bno bs bsd u v
       (bno.toNat :: Sb) hK hwf hlk hR5 hsp)
@@ -1894,10 +1911,11 @@ theorem logWrite_proof (AC : ACQUIRE) (RE : RELEASE) (BP : BPIN) : LOG_WRITE := 
           nxo nxt nxl Sb LB om X T W L D nc hcl hdt hlen hbud hout3 hfresho hE hfreshl
           hlive hcap hfresht hTlen hsum hsets hregLB h1 h2 h3 h4 hi0 he0E hinLB)
         $$ [Hout Hcmt Hnc Hops Hep Hreg Htxa Hn Hblk Hjunk HLa HDa Hdrt Hhdr Hslots Hpool
-          Hsl Hope Htx1 Hch Hhold Hpay Hlb]
+          Hsl Hope Htx1 Hch Hhold Hpay Hlb Hrow]
         with ⟨Hres, Hopsw, Htx1, Hch, Hlk2, Hsl⟩
       · iframe Hout Hcmt Hnc Hops Hep Hreg Htxa Hn Hblk Hjunk HLa HDa Hdrt Hhdr Hslots Hpool
           Hsl Hope Htx1 Hch Hhold Hpay Hlb
+        iframe Hrow
       imodintro
       iapply (lw_finish RE c k spie spp R5 kk γ γb γfs V logstart dev pidv bno bs bsd u v
         (bno.toNat :: Sb) hK hwf hlk hR5 hsp)
@@ -1936,10 +1954,11 @@ theorem logWrite_proof (AC : ACQUIRE) (RE : RELEASE) (BP : BPIN) : LOG_WRITE := 
           nxo nxt nxl Sb LB om X T W L D nc hcl hdt hhome hlen hbud hout3 hfresho hE hfreshl
           hlive hcap hfresht hTlen hsum hsets hregLB h1 h2 h3 h4 hi0 he0E hnotLB hnlt)
         $$ [Hout Hcmt Hnc Hops Hep Hreg Htxa Hn Hblk Hcell Hjunk HLa HDa Hdrt Hhdr Hslots Hpool
-          Hope Htx1 Hch Hhold Hpay Href Hlb]
+          Hope Htx1 Hch Hhold Hpay Href Hlb Hrow]
         with ⟨Hres, Hopsw, Htx1, Hch, Hlk2, Hsl⟩
       · iframe Hout Hcmt Hnc Hops Hep Hreg Htxa Hn Hblk Hcell Hjunk HLa HDa Hdrt Hhdr Hslots
           Hpool Hope Htx1 Hch Hhold Hpay Href Hlb
+        iframe Hrow
       imodintro
       iapply (lw_finish RE c k spie spp R6 kk γ γb γfs V logstart dev pidv bno bs bsd u v
         (bno.toNat :: Sb) hK hwf hlk hR6 hsp)

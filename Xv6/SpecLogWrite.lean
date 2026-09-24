@@ -47,11 +47,16 @@ a caller with no receipt to build passes `v := 0`.
 
 **Deviations from Rocq, reported.**
 
-1. NO BYTE VIEW.  Rocq's contract moves `fsblock (fs_bytes γfs)`; this
-   port has no byte view, so the block's content moves at the CACHE level
-   (`Xv6.fsChalf`), which is the pre-byte-view Rocq shape.  There is
-   likewise no atomic-update form (`wp_log_write_au_body`): with no byte
-   view there is no invariant for the caller's half to live in.
+1. THE HELD FORM ONLY.  The block's content moves at the BYTE view
+   (`Xv6.fsblock γfs.bytes`), exactly as Rocq's contract does; what is not
+   ported is Rocq's ATOMIC-UPDATE form (`wp_log_write_au_body`), of which
+   Rocq's held form `wp_log_write_gen_body` is the degenerate instance
+   (`Efs := ⊤`, `Φfsb := fsblock (fs_bytes γfs) (uint bno) bs`, "the fupd is
+   two `iModIntro`s" -- `SpecLogWrite.v:216`).  Only the inode region needs
+   the AU form ("a dinode block's client half lives in the inode REGION's
+   invariant and can never sit in a caller's hands across a call"), so it
+   arrives with the inode wave, restated as the primitive with THIS form
+   re-derived from it -- Rocq's layering, arrived at in the other order.
 2. NO ABSORPTION CREDIT ARGUMENT (`cr`).  Rocq hands the budget unit BACK
    on the credited absorb path (`log_opS γ (if cr then S u else u)`).
    This port always spends it -- which is sound for the same reason
@@ -107,8 +112,10 @@ def wp_log_write_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
   bslot γb ∗
   -- one unit of this operation's reservation, spent unconditionally
   logOp γ (u + 1) ∗
-  -- the caller's own view of the block, at its OLD content
-  fsChalf γfs bno.toNat bsl ∗
+  -- the caller's own view of the block, at its OLD content: the EXCLUSIVE
+  -- byte run, since `hhome` says `bno` is a home block and a home block's
+  -- parked cache half lives inside `Xv6.fsBytesInv`
+  fsblock γfs.bytes bno.toNat bsl ∗
   -- the checked-out buffer, whose bytes the caller has typically edited,
   -- beside its travelling payload -- still indexed at `bsl` (Rocq's
   -- `bio_held`, which is `bio_locked` off its index)
@@ -120,7 +127,7 @@ def wp_log_write_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
     -- the unit is gone, and the append receipt comes back
     logOpSw γ u Sb bno.toNat v -∗ logTx γ -∗
     -- the logged view of the block is now the bytes the caller wrote
-    fsChalf γfs bno.toNat bs -∗
+    fsblock γfs.bytes bno.toNat bs -∗
     -- ...and the handle is re-indexed at those bytes and DIRTY: brelse-able
     bioLocked γb V kk pidv dev bno bs bsd true -∗
     -- the slot unit comes back UNCONDITIONALLY (the append path's n++

@@ -125,6 +125,24 @@ theorem fsBytes_agree_any (E : CoPset) (γ : FsNames) (b : Nat)
   rw [fsblock_1]
   exact fsBytes_agree_any_q E γ (DFrac.own 1) b bs bsm hE
 
+/-- **THE DROP-IN FOR `Xv6.fsCache_update` AT A HOME BLOCK** (Rocq's
+`fsblock_update`, read at the row `Xv6.logCtx` carries).  The shape is
+`fsCache_update`'s with `fsChalf` replaced by `fsblock`, `|==>` by
+`|={E}=>`, and the persistent row added -- which is why the call sites are
+one-line edits. -/
+theorem fsblock_update_any (E : CoPset) (γ : FsNames) (L : BlockMap) (b : Nat)
+    (bs bsNew bs' : List (BitVec 8)) (hE : (↑logN : CoPset) ⊆ E)
+    (hlnew : bsNew.length = BSIZE) :
+    fsBytesAny (GF := GF) γ -∗ fsCacheAuth γ L -∗ fsblock γ.bytes b bs -∗
+      (γ.cache ↪◯MAP[b]{DFrac.own (1 : Qp).half} bs') -∗
+      |={E}=> (⌜bs' = bs ∧ PartialMap.get? L b = some bs⌝ ∗
+        fsCacheAuth γ (PartialMap.insert L b bsNew) ∗ fsblock γ.bytes b bsNew ∗
+        (γ.cache ↪◯MAP[b]{DFrac.own (1 : Qp).half} bsNew)) := by
+  unfold fsBytesAny fsBytesRow fsBytesAt fsCacheAuth
+  iintro ⟨⟨%homeL, %Xv, #Hinv⟩, #Hseal⟩ Ha Hfb Hm
+  iapply fsblock_update E γ.bytes γ.cache γ.exc homeL Xv L b bs bsNew bs' hE hlnew
+    $$ Hinv Hseal Ha Hfb Hm
+
 /-- ...and the home-block reading, at the row. -/
 theorem fsblock_home_any (E : CoPset) (γ : FsNames) (homeL : List Nat) (b : Nat)
     (bs : List (BitVec 8)) (hE : (↑logN : CoPset) ⊆ E) :
