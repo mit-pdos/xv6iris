@@ -127,7 +127,7 @@ theorem bpin_proof (AC : ACQUIRE) (RE : RELEASE) : BPIN := ⟨
   have h9 : R1 9#5 = bnode kk := b9
   have hpins : bcPins k R1 := ⟨b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩
   -- the cache open; borrow slot kk
-  icases bcacheRes_elim γ curCtx $$ HR with ⟨%M, %nx, %Ls, %ord, Ha, %⟨hfresh, hok, hord⟩, Hlru, Hs⟩
+  icases bcacheRes_elim γ curCtx $$ HR with ⟨%M, %nx, %Ls, %ord, Ha, %⟨hfresh, hok, hord⟩, Hlru, Hkey, Hs⟩
   icases bslot_upd_acc γ curCtx Ls kk hkk $$ Hs with ⟨Hsl0, Hcl⟩
   icases bslotAt_elim γ curCtx kk (Ls kk) $$ Hsl0 with ⟨%⟨hnd, hlt⟩, Hrefc, Hhalves, Hslots⟩
   obtain ⟨n, hn⟩ : ∃ n, (Ls kk).length = n := ⟨_, rfl⟩
@@ -171,7 +171,7 @@ theorem bpin_proof (AC : ACQUIRE) (RE : RELEASE) : BPIN := ⟨
   case' _ => iframe
   ihave Hs := Hcl $$ %(nx :: Ls kk) Hslot
   ihave HR := bcacheRes_intro γ curCtx _ (nx + 1) _ ord
-    (bpin_fresh M nx kk hfresh) (bpin_bcacheOk M Ls nx kk hkk hok) hord $$ [Ha Hlru Hs]
+    (bpin_fresh M nx kk hfresh) (bpin_bcacheOk M Ls nx kk hkk hok) hord $$ [Ha Hlru Hkey Hs]
   case' _ => iframe
   -- auipc a0,0x15 ; addi a0,a0,1134 ; jal release
   k_step (wp_s_auipc c _ (KA.«bpin» + 0x1e#64) false 0x15#20 10#5 (by decide))

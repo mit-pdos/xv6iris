@@ -64,7 +64,7 @@ theorem virtio_disk_rw_proof
     icases kctx_kmapStatic _ _ $$ Hk with ⟨#HS, Hk⟩
     icases (show bufOwn (GF := GF) (k.regs 10#5) bno dsk0 dataBuf ⊢
         ⌜dataBuf.length = BSIZE⌝ ∗
-        wordPointsTo (aBufBlockno (k.regs 10#5)) 4 (DFrac.own 1) bno ∗
+        wordPointsTo (aBufBlockno (k.regs 10#5)) 4 (DFrac.own (1 : Qp).half) bno ∗
         wordPointsTo (aBufDisk (k.regs 10#5)) 4 (DFrac.own 1) dsk0 ∗
         byteBuf (aBufData (k.regs 10#5)) (DFrac.own 1) dataBuf from by
       unfold bufOwn

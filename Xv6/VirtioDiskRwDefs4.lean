@@ -194,7 +194,7 @@ theorem claimRes_disk_acc (γ : DiskNames) (pd : PAddr) (c : Chain) :
 /-- The caller's buffer, reassembled. -/
 theorem bufOwn_intro (b : BitVec 64) (bno dsk : BitVec 32) (data : List (BitVec 8))
     (hlen : data.length = BSIZE) :
-    wordPointsTo (GF := GF) (aBufBlockno b) 4 (DFrac.own 1) bno ∗
+    wordPointsTo (GF := GF) (aBufBlockno b) 4 (DFrac.own (1 : Qp).half) bno ∗
     wordPointsTo (aBufDisk b) 4 (DFrac.own 1) dsk ∗
     byteBuf (aBufData b) (DFrac.own 1) data ⊢ bufOwn b bno dsk data := by
   unfold bufOwn
@@ -285,7 +285,7 @@ def vdrwP5Loop (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   vdrwCaps γ γl pd pav pu ∗ locked γl cpu ∗ diskRes γ pd pav pu curCtx ∗
   headTokQ γ c.hd (.active c) ∗ headTokQ γ c.md (.member c.hd) ∗
   headTokQ γ c.tl (.member c.hd) ∗
-  wordPointsTo (aBufBlockno c.bp) 4 (DFrac.own 1) bno ∗
+  wordPointsTo (aBufBlockno c.bp) 4 (DFrac.own (1 : Qp).half) bno ∗
   vdrwSaved k ∗
   idxCells (k.regs 2#5) (BitVec.ofNat 32 c.hd) (BitVec.ofNat 32 c.md) (BitVec.ofNat 32 c.tl) y ∗
   wpNext true k.proc cpu (vdrwPostK k γ bno wr dataBuf dataDisk)
@@ -356,7 +356,7 @@ def vdrwP5Exit (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   headTok γ c.hd (.active c) ∗
   claimResD γ curCtx pd c 0#32 ∗ (∃ n : Nat, headDoneE γ n c.hd c.ep ∗ diskReadLb γ n) ∗
   headTokQ γ c.md (.member c.hd) ∗ headTokQ γ c.tl (.member c.hd) ∗
-  wordPointsTo (aBufBlockno c.bp) 4 (DFrac.own 1) bno ∗
+  wordPointsTo (aBufBlockno c.bp) 4 (DFrac.own (1 : Qp).half) bno ∗
   vdrwSaved k ∗
   idxCells (k.regs 2#5) (BitVec.ofNat 32 c.hd) (BitVec.ofNat 32 c.md) (BitVec.ofNat 32 c.tl) y ∗
   wpNext true k.proc cpu (vdrwPostK k γ bno wr dataBuf dataDisk)
@@ -373,7 +373,7 @@ theorem vdrwP5Loop_intro (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     vdrwCaps γ γl pd pav pu ∗ locked γl cpu ∗ diskRes γ pd pav pu curCtx ∗
     headTokQ γ c.hd (.active c) ∗ headTokQ γ c.md (.member c.hd) ∗
     headTokQ γ c.tl (.member c.hd) ∗
-    wordPointsTo (aBufBlockno c.bp) 4 (DFrac.own 1) bno ∗
+    wordPointsTo (aBufBlockno c.bp) 4 (DFrac.own (1 : Qp).half) bno ∗
     vdrwSaved k ∗
     idxCells (k.regs 2#5) (BitVec.ofNat 32 c.hd) (BitVec.ofNat 32 c.md)
       (BitVec.ofNat 32 c.tl) y ∗
@@ -396,7 +396,7 @@ theorem vdrwP5Exit_intro (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     headTok γ c.hd (.active c) ∗
     claimResD γ curCtx pd c 0#32 ∗ (∃ n : Nat, headDoneE γ n c.hd c.ep ∗ diskReadLb γ n) ∗
     headTokQ γ c.md (.member c.hd) ∗ headTokQ γ c.tl (.member c.hd) ∗
-    wordPointsTo (aBufBlockno c.bp) 4 (DFrac.own 1) bno ∗
+    wordPointsTo (aBufBlockno c.bp) 4 (DFrac.own (1 : Qp).half) bno ∗
     vdrwSaved k ∗
     idxCells (k.regs 2#5) (BitVec.ofNat 32 c.hd) (BitVec.ofNat 32 c.md)
       (BitVec.ofNat 32 c.tl) y ∗

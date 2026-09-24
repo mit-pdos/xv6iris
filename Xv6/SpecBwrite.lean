@@ -14,7 +14,9 @@ the handle comes back with its disk value equal to its bytes.  The handle is
 the payload-less `bufHold0` (Rocq `bio_hold0`): a content-changing write has
 logical ≠ disk on one side of the call whatever the order of the ghost
 update and the write, so the "clean" tie cannot appear in `bwrite`'s pre or
-post; the caller holds the payload aside across the call.
+post; the caller holds the payload aside across the call.  Note that
+`bufHold0` holds `b->dev` and `b->blockno` at a HALF each (the `bcache`
+lock's `bkeyAt` rows hold the others); `bwrite` only carries them.
 
 The `unreachable` arm is dead: `bufHold0` carries the sleeplock token and
 the holder's `pid` field, and the caller's own `p->pid` cell agrees, so

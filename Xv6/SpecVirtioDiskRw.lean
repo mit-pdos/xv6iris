@@ -19,8 +19,10 @@ void virtio_disk_rw(struct buf *b, int write) {
 
 The running thread is proc `j` (sleep's linkage); interrupts off, depth 0,
 no lock held.  The caller holds the disk's persistent credentials
-(`diskInv`, `diskGeom`, the lock), the buffer (`bufOwn`: block number,
-`disk` flag, data) and the block's image fragment; on return the buffer's
+(`diskInv`, `diskGeom`, the lock), the buffer (`bufOwn`: the block number at
+a HALF -- rw only READS it, and the bcache lock keeps the other half so
+`bget` can scan -- the `disk` flag and the data at full) and the block's
+image fragment; on return the buffer's
 `disk` flag is `0` and both the data and the image hold the transferred
 bytes: the buffer's for a write, the disk's for a read.  `blockno < 2^31`
 so the 32-bit sector doubling does not wrap.  Stack: the 12-slot frame

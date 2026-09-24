@@ -33,18 +33,23 @@ reference costs one `bslot` -- the finite supply (`BSLOTS` distinct keyed
 tokens) that makes the unchecked `b->refcnt++` overflow-free, exactly as
 `fdSlot` does for `f->ref++`.
 
-**Deviation from Rocq (reported).**  Rocq's `bref` also carries a real
-fraction of the buffer's `dev`/`blockno` cells, so that two holders agree on
-the key with no extra ghost, and the bcache resource retains the rest -- which
-is what lets `bget`'s scan read every buffer's `dev`/`blockno` under
-`bcache.lock` alone.  That is not possible against this port's
-`Xv6.bufOwn`, which takes `b->blockno` at `DFrac.own 1` (Rocq's `buf_own`
-takes it at `1/2`, read-only, for precisely this reason): a checked-out
-buffer's `blockno` cell is entirely inside the handle, so no fraction of it
-can also sit under `bcache.lock`.  `bref` is therefore the count fragment
-alone, and the `dev`/`blockno` cells are owned on the handle side only.
-Weakening `Xv6.bufOwn` to a half (and re-proving `virtio_disk_rw`, which only
-READS `b->blockno`) is what `bread`'s scan will need.
+**The key cells.**  `bget` walks the LRU cycle under `bcache.lock` ALONE and
+reads `b->dev`/`b->blockno` of every buffer -- including buffers checked out
+to a sleeplock holder that may be inside `virtio_disk_rw` at that very
+moment.  So a HALF of each buffer's `dev` and `blockno` sits in the lock's
+resource at all times (`bkeyAt`, one row per buffer, values existential), and
+the other half rides the handle: `Xv6.bufOwn` takes `b->blockno` at `1/2`
+read-only (exactly Rocq's `buf_own`) and `bufHold0` takes `b->dev` at `1/2`.
+Combining the two halves is what makes a holder and the scanner agree on the
+key.
+
+**Deviation from Rocq (reported).**  Rocq splits the cache's share further:
+each individual reference carries a real fraction, `bref bn k q dev bno`, so
+that two HOLDERS agree on the key without opening the lock.  This port's
+`bref` is the count fragment alone -- nothing proved here needs
+holder/holder agreement, and a per-reference fraction would have to be
+carved out of, and accounted in, slot `k`'s reference list.  The cache-side
+half (`bkeyAt`) is the minimal form `bread`'s scan actually needs.
 
 **What is NOT here: the per-buffer ESCROW.**  Rocq's `BioInv.v` parks a
 released buffer's travelling content (`valid`, `dev`, the rw bundle and the
@@ -512,19 +517,51 @@ def bslotAt (γ : BcacheNames) (ξ : CtxId) (k : Nat) (L : List Nat) : IProp GF 
   wordAtN ξ (aBufRefcnt (bnode k)) 4 (DFrac.own 1) (BitVec.ofNat 32 L.length) ∗
   ([∗list] id ∈ L, brefRest γ k id) ∗ bslots γ L.length
 
+/-- **Buffer `k`'s KEY half** (the cache's share of Rocq's `b_dev`/`b_blockno`
+fractions): a HALF of `b->dev` and a HALF of `b->blockno`, at whatever the
+cells currently say.
+
+This is the resource `bget`'s scan needs.  `bget` walks the whole LRU cycle
+under `bcache.lock` ALONE and reads `b->dev`/`b->blockno` of EVERY buffer,
+including buffers that are checked out to a sleeplock holder -- possibly one
+that is inside `virtio_disk_rw` right now.  So a half of each key cell must
+sit in the lock's resource at ALL times, which is exactly why `Xv6.bufOwn`
+(and hence `bufHold0`) takes `blockno`, and `bufHold0` takes `dev`, at a half
+and read-only.  Putting the two halves back together (a holder's and the
+cache's) is also what makes holder and scanner AGREE on the key.
+
+The values are existential here: only the scan's read, not the invariant,
+cares what they are; a holder learns agreement by combining with its own
+half.  (Rocq instead hands each individual reference a real fraction
+`bref bn k q dev bno` out of the slot's share, so that two holders agree
+without opening the lock.  This port keeps `Xv6.bref` ghost-only -- see the
+file header -- because nothing it proves needs holder/holder agreement, and
+the fraction bookkeeping would have to ride the slot's reference list.) -/
+def bkeyAt (ξ : CtxId) (k : Nat) : IProp GF := iprop%
+  ∃ (dev : BitVec 32) (bno : BitVec 32),
+    wordAtN ξ (aBufDev (bnode k)) 4 (DFrac.own (1 : Qp).half) dev ∗
+    wordAtN ξ (aBufBlockno (bnode k)) 4 (DFrac.own (1 : Qp).half) bno
+
 /-- **The `bcache.lock` resource** (Rocq's `bcache_res`): the count
-authority, the LRU cycle over a permutation of the thirty buffers, and every
-slot's row. -/
+authority, the LRU cycle over a permutation of the thirty buffers, every
+slot's row, and a half of every buffer's `dev`/`blockno`. -/
 def bcacheResAt (γ : BcacheNames) (ξ : CtxId) : IProp GF := iprop%
   ∃ (M : RegMapF Nat) (nx : Nat) (Ls : Nat → List Nat) (ord : List Nat),
     (γ.ref ↪●MAP M) ∗
     ⌜(∀ i, nx ≤ i → PartialMap.get? M i = none) ∧ bcacheOk M Ls ∧ ord.Perm (List.range NBUF)⌝ ∗
     bcacheLruAt ξ bhead (ord.map bnode) ∗
+    ([∗list] k ∈ List.range NBUF, bkeyAt ξ k) ∗
     ([∗list] k ∈ List.range NBUF, bslotAt γ ξ k (Ls k))
 
 instance instCtxMorphBslotAt (γ : BcacheNames) (k : Nat) (L : List Nat) :
     CtxMorph (GF := GF) (fun ξ => bslotAt γ ξ k L) := by
   unfold bslotAt; infer_instance
+
+instance instCtxMorphBkeyAt (k : Nat) : CtxMorph (GF := GF) (fun ξ => bkeyAt ξ k) := by
+  unfold bkeyAt
+  refine @instCtxMorphExists _ _ _ _ _ (fun dev => ?_)
+  refine @instCtxMorphExists _ _ _ _ _ (fun bno => ?_)
+  infer_instance
 
 instance instCtxMorphBcacheResAt (γ : BcacheNames) :
     CtxMorph (GF := GF) (bcacheResAt γ) := by
@@ -535,6 +572,8 @@ instance instCtxMorphBcacheResAt (γ : BcacheNames) :
   refine @instCtxMorphExists _ _ _ _ _ (fun ord => ?_)
   have h := ctxMorph_bigSepL (GF := GF) (List.range NBUF)
     (fun _ k ξ => bslotAt γ ξ k (Ls k)) (fun _ k => instCtxMorphBslotAt γ k (Ls k))
+  have h2 := ctxMorph_bigSepL (GF := GF) (List.range NBUF)
+    (fun _ k ξ => bkeyAt ξ k) (fun _ k => instCtxMorphBkeyAt k)
   infer_instance
 
 /-- **The buffer cache** (persistent): the lock over its resource. -/
@@ -648,14 +687,16 @@ held with its `pid` field, the checkout token, `valid` set, the `dev` cell,
 the rw bundle (`blockno`, the pinned `disk` flag, the bytes) and the block's
 image fragment.  This is what `bwrite` consumes and returns.
 
-Rocq keeps `dev` at a half (the bcache resource retains the other); here the
-whole cell rides the handle -- see the file header. -/
+As in Rocq, `dev` is held at a HALF (and so, inside `bufOwn`, is `blockno`):
+the other halves stay under `bcache.lock` forever, in `bkeyAt`, because
+`bget`'s scan reads the key cells of every buffer -- checked-out ones
+included -- holding `bcache.lock` alone. -/
 def bufHold0 (γ : BcacheNames) (γd : DiskNames) (k : Nat)
     (pidv dev bno : BitVec 32) (bs bsd : List (BitVec 8)) : IProp GF := iprop%
   ⌜k < NBUF⌝ ∗
   sleeplockedQ (γ.slk k).2 1 (aBufLock (bnode k)) pidv ∗ bufTok γ k ∗
   wordPointsTo (aBufValid (bnode k)) 4 (DFrac.own 1) 1#32 ∗
-  wordPointsTo (aBufDev (bnode k)) 4 (DFrac.own 1) dev ∗
+  wordPointsTo (aBufDev (bnode k)) 4 (DFrac.own (1 : Qp).half) dev ∗
   bufOwn (bnode k) bno 0#32 bs ∗
   diskBlock γd bno.toNat bsd
 
@@ -803,6 +844,7 @@ theorem bcacheRes_elim (γ : BcacheNames) (ξ : CtxId) :
       (γ.ref ↪●MAP M) ∗
       ⌜(∀ i, nx ≤ i → PartialMap.get? M i = none) ∧ bcacheOk M Ls ∧ ord.Perm (List.range NBUF)⌝ ∗
       bcacheLruAt ξ bhead (ord.map bnode) ∗
+      ([∗list] k ∈ List.range NBUF, bkeyAt ξ k) ∗
       ([∗list] k ∈ List.range NBUF, bslotAt γ ξ k (Ls k)) := by
   unfold bcacheResAt; iintro H; iexact H
 
@@ -811,11 +853,12 @@ theorem bcacheRes_intro (γ : BcacheNames) (ξ : CtxId) (M : RegMapF Nat) (nx : 
     (hfresh : ∀ i, nx ≤ i → PartialMap.get? M i = none) (hok : bcacheOk M Ls)
     (hord : ord.Perm (List.range NBUF)) :
     (γ.ref ↪●MAP M) ∗ bcacheLruAt (GF := GF) ξ bhead (ord.map bnode) ∗
+    ([∗list] k ∈ List.range NBUF, bkeyAt ξ k) ∗
     ([∗list] k ∈ List.range NBUF, bslotAt γ ξ k (Ls k)) ⊢ bcacheResAt γ ξ := by
   unfold bcacheResAt
-  iintro ⟨Ha, Hl, Hs⟩
+  iintro ⟨Ha, Hl, Hkey, Hs⟩
   iexists M, nx, Ls, ord
-  iframe Ha Hl Hs
+  iframe Ha Hl Hkey Hs
   ipureintro; exact ⟨hfresh, hok, hord⟩
 
 /-- Borrow slot `k` out of the cache's big-sep, to put it back with a NEW

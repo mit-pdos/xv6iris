@@ -128,7 +128,7 @@ theorem bunpin_proof (AC : ACQUIRE) (RE : RELEASE) : BUNPIN := ⟨
   have h9 : R1 9#5 = bnode kk := b9
   have hpins : bcPins k R1 := ⟨b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩
   -- the cache open; our reference is in slot kk's list
-  icases bcacheRes_elim γ curCtx $$ HR with ⟨%M, %nx, %Ls, %ord, Ha, %⟨hfresh, hok, hord⟩, Hlru, Hs⟩
+  icases bcacheRes_elim γ curCtx $$ HR with ⟨%M, %nx, %Ls, %ord, Ha, %⟨hfresh, hok, hord⟩, Hlru, Hkey, Hs⟩
   icases (show bref (GF := GF) γ kk ⊢ ∃ id : Nat, γ.ref ↪◯MAP[id]{.own (1 : Qp).half} kk from by
     unfold bref brefTok; iintro H; iexact H) $$ Href with ⟨%id, He⟩
   ihave %hget := ghost_map_lookup $$ Ha He
@@ -182,7 +182,7 @@ theorem bunpin_proof (AC : ACQUIRE) (RE : RELEASE) : BUNPIN := ⟨
   case' _ => iframe
   ihave Hs := Hcl $$ %(s ++ t) Hslot
   ihave HR := bcacheRes_intro γ curCtx _ nx _ ord
-    (bunpin_fresh M nx id hfresh) (bunpin_bcacheOk M Ls s t id kk hok hL hnd) hord $$ [Ha Hlru Hs]
+    (bunpin_fresh M nx id hfresh) (bunpin_bcacheOk M Ls s t id kk hok hL hnd) hord $$ [Ha Hlru Hkey Hs]
   case' _ => iframe
   -- auipc a0,0x15 ; addi a0,a0,1082 ; jal release
   k_step (wp_s_auipc c _ (KA.«bunpin» + 0x1e#64) false 0x15#20 10#5 (by decide))

@@ -121,7 +121,7 @@ theorem vdrw_P1 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] 
   iintro Hk Hpc
   -- lw s7,12(a0)
   k_step (wp_s_lw cpu _ (KA.«virtio_disk_rw» + 0x1c#64) false 12#12 23#5 10#5 (by decide)
-      (by decide) (DFrac.own 1) bno)
+      (by decide) (DFrac.own (1 : Qp).half) bno)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdrw_bno_addr (k.regs 10#5)]
   iintro Hk Hpc Hbno
   -- slliw s7,s7,1 ; slli s7,s7,32 ; srli s7,s7,32

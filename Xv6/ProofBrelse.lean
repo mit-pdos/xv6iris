@@ -319,7 +319,7 @@ theorem brelse_proof (HS : HOLDINGSLEEP) (RS : RELEASESLEEP) (AC : ACQUIRE) (RE 
     obtain ⟨w1, w2⟩ := hsp1 h
     exact ⟨u1.trans (v1.trans w1), u2.trans (v2.trans w2)⟩
   -- the cache open; our reference is in slot kk's list
-  icases bcacheRes_elim γ curCtx $$ HR with ⟨%M, %nx, %Ls, %ord, Ha, %⟨hfresh, hok, hord⟩, Hlru, Hs⟩
+  icases bcacheRes_elim γ curCtx $$ HR with ⟨%M, %nx, %Ls, %ord, Ha, %⟨hfresh, hok, hord⟩, Hlru, Hkey, Hs⟩
   icases (show bref (GF := GF) γ kk ⊢ ∃ id : Nat, γ.ref ↪◯MAP[id]{.own (1 : Qp).half} kk from by
     unfold bref brefTok; iintro H; iexact H) $$ Href with ⟨%id, He⟩
   ihave %hget := ghost_map_lookup $$ Ha He
@@ -454,7 +454,7 @@ theorem brelse_proof (HS : HOLDINGSLEEP) (RS : RELEASESLEEP) (AC : ACQUIRE) (RE 
       simp) $$ Hlru
     ihave HR := bcacheRes_intro γ curCtx _ nx _ (kk :: (o1 ++ o2))
       (bunpin_fresh M nx id hfresh) (bunpin_bcacheOk M Ls ls1 ls2 id kk hok hL hnd)
-      (bcacheOrd_rot o1 o2 kk hord) $$ [Ha Hlru Hs]
+      (bcacheOrd_rot o1 o2 kk hord) $$ [Ha Hlru Hkey Hs]
     case' _ => iframe
     iapply (br_tail RE cpu c k γl γ spie2 spp2 spie3 spp3 _ dqp pidv hwf hK4 (by
         unfold brelseSlots releasesleepSlots wakeupSlots at hK; omega) hlk hnoff hpin hsp3'
@@ -476,7 +476,7 @@ theorem brelse_proof (HS : HOLDINGSLEEP) (RS : RELEASESLEEP) (AC : ACQUIRE) (RE 
     iintro Hk Hpc
     ihave HR := bcacheRes_intro γ curCtx _ nx _ ord
       (bunpin_fresh M nx id hfresh) (bunpin_bcacheOk M Ls ls1 ls2 id kk hok hL hnd) hord
-      $$ [Ha Hlru Hs]
+      $$ [Ha Hlru Hkey Hs]
     case' _ => iframe
     iapply (br_tail RE cpu c k γl γ spie2 spp2 spie3 spp3 _ dqp pidv hwf hK4 (by
         unfold brelseSlots releasesleepSlots wakeupSlots at hK; omega) hlk hnoff hpin hsp3'

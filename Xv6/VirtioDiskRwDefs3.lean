@@ -483,7 +483,7 @@ def vdrwP3Exit (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   byteBuf c.data (DFrac.own 1) dataBuf ∗ diskBlock γ bno.toNat dataDisk ∗
   wordAtN curCtx (aInfoB c.hd) 8 (DFrac.own 1) c.bp ∗
   wordPointsTo (aBufDisk c.bp) 4 (DFrac.own 1) 1#32 ∗
-  wordPointsTo (aBufBlockno c.bp) 4 (DFrac.own 1) bno ∗
+  wordPointsTo (aBufBlockno c.bp) 4 (DFrac.own (1 : Qp).half) bno ∗
   opsWin curCtx c.md ∗ opsWin curCtx c.tl ∗
   infoWin curCtx c.md ∗ infoWin curCtx c.tl ∗
   vdrwSaved k ∗
@@ -515,7 +515,7 @@ def vdrwP4Exit (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   vdrwCaps γ γl pd pav pu ∗ locked γl cpu ∗ diskRes γ pd pav pu curCtx ∗
   headTokQ γ c.hd (.active c) ∗ headTokQ γ c.md (.member c.hd) ∗
   headTokQ γ c.tl (.member c.hd) ∗
-  wordPointsTo (aBufBlockno c.bp) 4 (DFrac.own 1) bno ∗
+  wordPointsTo (aBufBlockno c.bp) 4 (DFrac.own (1 : Qp).half) bno ∗
   vdrwSaved k ∗
   idxCells (k.regs 2#5) (BitVec.ofNat 32 c.hd) (BitVec.ofNat 32 c.md) (BitVec.ofNat 32 c.tl) y ∗
   wpNext true k.proc cpu (vdrwPostK k γ bno wr dataBuf dataDisk)
