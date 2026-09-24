@@ -217,8 +217,8 @@ Deps name batch items; "gate" = §1 plus the in-flight files.
 - B8 [SUPERSEDED — part of the CtxBox generalisation] MachCSL/CtxBoxQOps — A6.
 
 **Batch C (5)**
-- C1 InodeRegionInv (NOTE from B2: `appBody` holds `γfs.top ↪●MAP{DFrac.own (1 : Qp).half} I`; `ftop_body` must hold the kernel's half at the same `(1 : Qp).half` spelling so the halves join) — B1, B2, A4, A5.
-- C2 FsStateEraRes (NOTE from B7: FsStateEraPure dropped `inode_ok_data_ext` because its only consumer `inode_owned_era_era_node_ok` (FsStateEra.v:1962) is listed dead in §5 — re-verify that; if you keep it, port `inode_ok_data_ext` (6 lines) too. Rocq's FsStateEra `dir_nrec_bound` is `dirNrec_boundMax` in Lean. `DOT_dot_name` was dropped as a duplicate: use `DOT_dot`. Start at `Section EraRes`, line 1022, with `big_sepL_seq_map`) — B3, B7, A2.
+- [DONE] C1 InodeRegionInv (NOTE from B2: `appBody` holds `γfs.top ↪●MAP{DFrac.own (1 : Qp).half} I`; `ftop_body` must hold the kernel's half at the same `(1 : Qp).half` spelling so the halves join) — B1, B2, A4, A5.
+- [DONE] C2 FsStateEraRes (NOTE from B7: FsStateEraPure dropped `inode_ok_data_ext` because its only consumer `inode_owned_era_era_node_ok` (FsStateEra.v:1962) is listed dead in §5 — re-verify that; if you keep it, port `inode_ok_data_ext` (6 lines) too. Rocq's FsStateEra `dir_nrec_bound` is `dirNrec_boundMax` in Lean. `DOT_dot_name` was dropped as a duplicate: use `DOT_dot`. Start at `Section EraRes`, line 1022, with `big_sepL_seq_map`) — B3, B7, A2.
 - C3 IcacheHeld — B4.
 - C4 IcacheInvRef — B5, B4, A1, A10.
 - C5 OffBox — B8, A7.
