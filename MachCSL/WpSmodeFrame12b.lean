@@ -20,7 +20,10 @@ Because `idx[]` is written a WORD at a time this file also supplies
   `wp_s_sh` -- the accessor flavours of both widths were already in
   `MachCSL.WpSmodeAuRules`, the owned ones were not;
 * `execSpecF_slliw` / `wp_s_slliw` (`slliw` is the 32-bit shift
-  `virtio_disk_rw` doubles the block number with).
+  `virtio_disk_rw` doubles the block number with), and its right-shift
+  siblings `execSpecF_srliw` / `wp_s_srliw` (fs.c: `iupdate`/`ilock`/`iput`
+  divide by `IPB`, `readi`/`writei` by `BSIZE`, `bfree` by `BPB`) and
+  `execSpecF_sraiw` / `wp_s_sraiw` (fs.c: `balloc`'s `b / BPB` and `bi % 8`).
 
 The `fence rw,rw` of the publication needs no new rule:
 `MachCSL.wp_s_fence_rw_rw` (MachCSL/WpLock.lean) is already the
@@ -252,6 +255,67 @@ theorem wp_s_slliw [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
     ⊢ wpLoop cpu :=
   wpLoop_k_setReg cpu k pc _ is_rvc _ rd hrd _
     (fun cpu' c _ _ _ => execSpecF_slliw cpu' (DFrac.own 1) c pc _ shamt rd rs1 hrd.1 (tpPin cpu' k.regs))
+
+/-! ## `srliw` / `sraiw` -/
+
+set_option maxHeartbeats 4000000 in
+/-- `srliw rd, rs1, shamt`: the logical 32-bit right shift, sign-extended. -/
+theorem execSpecF_srliw (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVec 64)
+    (shamt : BitVec 5) (rd rs1 : BitVec 5) (hrd : rd ≠ 0#5) (R : RegMap)
+    (p : Privilege := Privilege.Supervisor) :
+    execSpecPP (GF := GF) cpu dq p c p c
+      (instruction.SHIFTIWOP (shamt, regidx.Regidx rs1, regidx.Regidx rd, sopw.SRLIW))
+      pc npc₀ npc₀ (gprFile cpu R)
+      (gprFile cpu (RegMap.set R rd
+        (BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (RegMap.get R rs1) >>> shamt.toNat)))) := by
+  intro Φ
+  iintro ⟨HmConf, HPC, HnextPC, HF, HΦ⟩
+  conf_cases HmConf
+  alu_file_r1 hrd
+
+/-- `srliw rd, rs1, shamt`. -/
+theorem wp_s_srliw [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
+    (pc : BitVec 64) (is_rvc : Bool) (shamt : BitVec 5) (rd rs1 : BitVec 5) (hrd : rdOk rd) :
+    instr (GF := GF) pc is_rvc
+      (instruction.SHIFTIWOP (shamt, regidx.Regidx rs1, regidx.Regidx rd, sopw.SRLIW)) ∗
+    kctxL lent cpu k ∗ pcIs cpu pc ∗
+    ▷ wpNext k.sie k.proc cpu (fun cpu' =>
+        iprop(kctxL lent cpu' (k.setReg rd
+            (BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (k.rget cpu' rs1) >>> shamt.toNat))) -∗
+          pcIs cpu' (pc + instrLen is_rvc) -∗ wpLoop cpu'))
+    ⊢ wpLoop cpu :=
+  wpLoop_k_setReg cpu k pc _ is_rvc _ rd hrd _
+    (fun cpu' c _ _ _ => execSpecF_srliw cpu' (DFrac.own 1) c pc _ shamt rd rs1 hrd.1 (tpPin cpu' k.regs))
+
+set_option maxHeartbeats 4000000 in
+/-- `sraiw rd, rs1, shamt`: the arithmetic 32-bit right shift, sign-extended. -/
+theorem execSpecF_sraiw (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVec 64)
+    (shamt : BitVec 5) (rd rs1 : BitVec 5) (hrd : rd ≠ 0#5) (R : RegMap)
+    (p : Privilege := Privilege.Supervisor) :
+    execSpecPP (GF := GF) cpu dq p c p c
+      (instruction.SHIFTIWOP (shamt, regidx.Regidx rs1, regidx.Regidx rd, sopw.SRAIW))
+      pc npc₀ npc₀ (gprFile cpu R)
+      (gprFile cpu (RegMap.set R rd
+        (BitVec.signExtend 64 (shift_bits_right_arith (BitVec.extractLsb' 0 32 (RegMap.get R rs1)) shamt)))) := by
+  intro Φ
+  iintro ⟨HmConf, HPC, HnextPC, HF, HΦ⟩
+  conf_cases HmConf
+  alu_file_r1 hrd
+
+/-- `sraiw rd, rs1, shamt` (the Sail `shift_bits_right_arith` of the execute
+stage is `sshiftRight` by `shamt.toNat` definitionally, as in `wp_s_srai`). -/
+theorem wp_s_sraiw [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
+    (pc : BitVec 64) (is_rvc : Bool) (shamt : BitVec 5) (rd rs1 : BitVec 5) (hrd : rdOk rd) :
+    instr (GF := GF) pc is_rvc
+      (instruction.SHIFTIWOP (shamt, regidx.Regidx rs1, regidx.Regidx rd, sopw.SRAIW)) ∗
+    kctxL lent cpu k ∗ pcIs cpu pc ∗
+    ▷ wpNext k.sie k.proc cpu (fun cpu' =>
+        iprop(kctxL lent cpu' (k.setReg rd
+            (BitVec.signExtend 64 ((BitVec.extractLsb' 0 32 (k.rget cpu' rs1)).sshiftRight shamt.toNat))) -∗
+          pcIs cpu' (pc + instrLen is_rvc) -∗ wpLoop cpu'))
+    ⊢ wpLoop cpu :=
+  wpLoop_k_setReg cpu k pc _ is_rvc _ rd hrd _
+    (fun cpu' c _ _ _ => execSpecF_sraiw cpu' (DFrac.own 1) c pc _ shamt rd rs1 hrd.1 (tpPin cpu' k.regs))
 
 /-! ## The frame -/
 

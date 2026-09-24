@@ -47,8 +47,8 @@ Five groups, as in Rocq:
    So each Rocq lemma is ported at the same CONTENT in that vocabulary;
    the `dsSrliw4` / `dsSrli4` pair keeps Rocq's warning that the `srliw`
    reading truncates to 32 bits first and the `srli` one does not.
-   (`srliw` itself has no `wp_s_*` rule in `MachCSL` yet; the shape is
-   `slliw`'s, `MachCSL.wp_s_slliw`, with `>>>` for `<<<`.)
+   (`srliw`'s rule is `MachCSL.wp_s_srliw`, `slliw`'s shape with `>>>`
+   for `<<<`; `dsSrliw4` is stated in its output form.)
 2. **`pa_add a n` IS `a + BitVec.ofNat 64 n`**, so Rocq's
    `iu_pa_add_moi` / `iu_slot_addr` are `rfl` and are not restated.
 3. **THE BYTE WINDOW IS NAMED BY A LIST** (`MachCSL.byteBuf`;
