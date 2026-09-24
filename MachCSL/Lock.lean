@@ -399,6 +399,64 @@ theorem lock_pay_intro [CurCtx] (cpu : CPU) (R : CtxId → IProp GF) [CtxMorph R
   iexists ξL, T
   iframe Hst HR
 
+/-! ## The release hook
+
+Rocq `WpLock.lock_ctx_hook` / `lock_hook_id` / `lock_hook_llb`.  A releaser
+finishes its payload AT THE LOCK'S STAMPED CONTEXT: given the record just
+stamped and the payload it moved in, the hook may RAISE the stamp and hands
+back the payload in the shape the invariant states.  The identity is the
+ordinary release; the floor fold (`MachCSL.lockHook_llb`) is the reason a
+hook exists at all -- a payload row `ctxFloor ξ tl` ABOVE the releaser's own
+view can be minted only on a hartless record, so the one moment it can be
+minted is here, between the stamp and the store.  The next winner cashes the
+row against its own running token, after `MachCSL.lock_pay_take` has moved
+the payload to it. -/
+def lockCtxHook (R Rin : CtxId → IProp GF) : IProp GF := iprop%
+  ∀ (ξ : CtxId) (T : Nat), ctxStamped ξ T -∗ Rin ξ ==∗ (∃ T' : Nat, ctxStamped ξ T' ∗ R ξ)
+
+/-- The identity hook: the ordinary release. -/
+theorem lockHook_id (R : CtxId → IProp GF) : ⊢ lockCtxHook (GF := GF) R R := by
+  unfold lockCtxHook
+  iintro
+  iintro %ξ %T Hs HR
+  imodintro
+  iexists T
+  iframe Hs HR
+
+/-- **THE FLOOR FOLD**: the record's stamp rises to a store-order receipt
+the releaser holds (`MachCSL.ctxStamped_raise` -- a stamped context has no
+hart), and the floor that comes back completes the payload's row. -/
+theorem lockHook_llb (Rin R : CtxId → IProp GF) (tl : Nat)
+    (hfold : ∀ ξ : CtxId, Rin ξ ∗ ctxFloor ξ tl ⊢ R ξ) :
+    topLb (GF := GF) tl ⊢ lockCtxHook R Rin := by
+  unfold lockCtxHook
+  iintro #Htl %ξ %T Hs HR
+  imod ctxStamped_raise ξ T tl $$ [$Htl $Hs] with ⟨Hs, #Hfl⟩
+  imodintro
+  iexists (max T tl)
+  iframe Hs
+  iapply hfold ξ
+  iframe HR
+  iexact Hfl
+
+/-- The releaser's move, HOOKED: resume the lock's context, move `Rin` into
+it, stamp it, and run the hook there.  `MachCSL.lock_pay_intro` is the
+identity instance. -/
+theorem lock_pay_intro_hook [CurCtx] (cpu : CPU) (R Rin : CtxId → IProp GF) [CtxMorph Rin] :
+    ownCtx cpu curCtx ∗ lockCtxHeld ∗ Rin curCtx ∗ lockCtxHook R Rin ⊢
+      |==> (ownCtx cpu curCtx ∗ lockPay R) := by
+  unfold lockCtxHeld lockPay lockCtxHook
+  iintro ⟨Hrun, ⟨%ξL, Hpk⟩, HR, Hhook⟩
+  imod ctx_resume cpu ξL curCtx $$ [$Hrun $Hpk] with ⟨Hrun, HξL⟩
+  imod ctx_move Rin cpu curCtx ξL $$ [$Hrun $HξL $HR] with ⟨Hrun, HξL, HR⟩
+  imod ctx_stamp cpu ξL $$ HξL with ⟨%T, Hst, _⟩
+  ihave Hres := Hhook $$ %ξL %T Hst HR
+  imod Hres with ⟨%T', Hst, HR⟩
+  imodintro
+  iframe Hrun
+  iexists ξL, T'
+  iframe Hst HR
+
 theorem viewLbAt_lb (E : EraGS GF) (cpu : CPU) (K : Nat) :
     viewLbAt E cpu K ⊢@{IProp GF} MonoNat.lb_own (E.viewName cpu) (.ofNat K) := by
   unfold viewLbAt

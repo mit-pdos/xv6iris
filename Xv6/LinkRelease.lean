@@ -8,7 +8,10 @@ import Xv6.LinkPopoff
 
 namespace Xv6
 
-/-- The proved `release` interface. -/
-theorem Release : RELEASE := release_proof Holding Popoff
+/-- The proved HOOKED `release` interface (the primitive form). -/
+theorem ReleaseHook : RELEASE_HOOK := release_hook_proof Holding Popoff
+
+/-- The proved `release` interface: the identity-hook instance. -/
+theorem Release : RELEASE := ReleaseHook.toRELEASE
 
 end Xv6

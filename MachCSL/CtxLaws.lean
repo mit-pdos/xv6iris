@@ -543,6 +543,40 @@ theorem ctx_unstamp (cpu : CPU) (ξ : CtxId) (T K : Nat) (hTK : T ≤ K) :
     exact ⟨hD k h hk, Or.inl (hD k h hk)⟩
   · iexact Hels
 
+/-- **A STAMPED CONTEXT'S STAMP RISES AT A STORE-ORDER RECEIPT** (Rocq
+`TsoCtx.ctx_stamped_raise`).  A stamped context has no hart, so raising its
+bound falsifies nothing: every clean fact is still under the (larger) stamp,
+and the dirty positions were under the old one.  What comes out beside it is
+the FLOOR a payload row needs -- this is the one mint of a `ctxFloor` above
+the minter's own view, and the reason the lock hook (`MachCSL.lockHook_llb`)
+can run only between the stamp and the release store. -/
+theorem ctxStamped_raise (ξ : CtxId) (T T' : Nat) :
+    topLb (GF := GF) T' ∗ ctxStamped ξ T ⊢
+      |==> (ctxStamped ξ (max T T') ∗ ctxFloor ξ T') := by
+  iintro ⟨#HT', Hst⟩
+  icases ctxStamped_cases ξ T $$ Hst with ⟨%D, Hat, #HT, %hD, #Hels⟩
+  unfold ctxAt
+  icases Hat with ⟨Hb, Hd⟩
+  imod MonoNat.own_update _ (.ofNat T) (.ofNat (max T T')) (by simp only [MaxNat.le_toNat]; omega)
+    $$ Hb with ⟨Hb, #Hlb⟩
+  imodintro
+  isplitl [Hb Hd]
+  · unfold ctxStamped ctxAt
+    iexists D
+    iframe Hb Hd
+    isplit
+    · iapply topLb_max T T'
+      isplit
+      · iexact HT
+      · iexact HT'
+    isplit
+    · ipureintro; intro k h hk; have := hD k h hk; omega
+    · iexact Hels
+  · unfold ctxFloor
+    iright
+    iapply MonoNat.lb_own_le _ (.ofNat (max T T')) (.ofNat T') (by simp only [MaxNat.le_toNat]; omega)
+    iexact Hlb
+
 /-! ## Registration: the same-hart mints -/
 
 /-- The pure facts a domination body yields against the dominator's

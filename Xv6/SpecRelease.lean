@@ -151,4 +151,49 @@ structure RELEASE_REFUTE : Prop where
     hrefuteCore hrefuteHalf hsie hnoff hK reen hreen hon,
     wp_release_refute_body (hlc := hlc) (GF := GF) cpu k γ s R D hrefuteCore hrefuteHalf hsie hnoff hK reen hreen hon
 
+/-! ## The HOOKED form
+
+Rocq `WpLock.lock_ctx_hook`.  A releaser's payload is finished AT THE
+LOCK'S OWN STAMPED CONTEXT: `release` moves `Rin` out of the caller's
+context into the lock's, stamps it, and then runs the caller's hook there,
+which may raise the stamp and hands back `R` -- the shape `isLock`
+promises.  The identity hook is the ordinary `release`
+(`MachCSL.lockHook_id`, and `RELEASE` below is that instance).
+
+The reason the hook exists: a payload row `MachCSL.ctxFloor ξ tl` ABOVE the
+releaser's own view can be minted only on a hartless record
+(`MachCSL.ctxStamped_raise`), so the one moment it can be minted is here,
+between the stamp and the word store.  `MachCSL.lockHook_llb` is that
+instance, and it is how the buffer cache's lock payload carries the floor
+its next holder needs (Rocq `BioInv.bcache_res2_fold_in`). -/
+def wp_release_hook_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+    (cpu : CPU) (k : KCtx) (γ : GName) (s : String) (R Rin : CtxId → IProp GF) [CtxMorph Rin]
+    (hsie : k.sie = false)
+    (hnoff : 1 ≤ k.noff) (hK : 10 ≤ k.avail)
+    (reen : Bool) (hreen : reen = (decide (k.noff = 1) && k.intena))
+    (hon : reen = true → k.tier = .kpt ∧ trapRes true + 6 ≤ k.avail) : Prop :=
+  kctx cpu k ∗ pcIs cpu releaseAddr ∗ isLock γ (k.regs 10#5) s R ∗
+  locked γ cpu ∗ Rin curCtx ∗ lockCtxHook R Rin ∗ popArm cpu k reen ∗
+  wpNext (k.popExit reen).sie k.proc cpu (fun cpu' => iprop(∀ R' : RegMap,
+    kctx cpu' (((k.popExit reen).withRegs R').withLocks (k.locks.filter (fun x => x ≠ s))) -∗
+    pcIs cpu' (jumpPc (k.regs 1#5)) -∗ ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
+  ⊢ wpLoop (GF := GF) cpu
+
+/-- The hooked interface of `release`. -/
+structure RELEASE_HOOK : Prop where
+  wp_release_hook : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx] (cpu : CPU) (k : KCtx)
+    (γ : GName) (s : String) (R Rin : CtxId → IProp GF) [CtxMorph Rin] hsie hnoff hK reen hreen hon,
+    wp_release_hook_body (hlc := hlc) (GF := GF) cpu k γ s R Rin hsie hnoff hK reen hreen hon
+
+/-- `RELEASE` is the identity-hook instance. -/
+theorem RELEASE_HOOK.toRELEASE (A : RELEASE_HOOK) : RELEASE := ⟨by
+  intro hlc GF _ _ cpu k γ s R _ hsie hnoff hK reen hreen hon
+  have h := A.wp_release_hook (hlc := hlc) (GF := GF) cpu k γ s R R hsie hnoff hK reen hreen hon
+  unfold wp_release_hook_body at h
+  unfold wp_release_body
+  iintro ⟨Hk, Hpc, #Hlk, Hlocked, HR, Harm, HΦ⟩
+  iapply h
+  iframe Hk Hpc Hlk Hlocked HR Harm HΦ
+  iapply lockHook_id R⟩
+
 end Xv6
