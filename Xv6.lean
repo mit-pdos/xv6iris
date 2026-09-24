@@ -521,3 +521,4 @@ import Xv6.DirentEnc
 import Xv6.PathElems
 import Xv6.ArgPath
 import Xv6.FsBytes
+import Xv6.FsBytesMap
