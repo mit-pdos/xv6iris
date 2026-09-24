@@ -50,7 +50,7 @@ def bwriteSlots : Nat := 4 + virtioDiskRwSlots
 def wp_bwrite_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (γd : DiskNames) (γdl : GName)
+    (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (kk : Nat)
     (pidv dev bno : BitVec 32) (dqp : DFrac) (bs bsd : List (BitVec 8))
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : bwriteSlots ≤ k.avail)
@@ -60,15 +60,15 @@ def wp_bwrite_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G G
     (hbno : bno.toNat < 2 ^ 31) (hbsd : bsd.length = BSIZE) (hpd : descPageRw pd) : Prop :=
   kctx cpu k ∗ pcIs cpu bwriteAddr ∗ procsInv Γ ∗
   trapCsrs cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ∗
-  bioCtx γl γ γd ∗ diskCaps γd γdl pd pav pu ∗
+  bioCtx γl γ V ∗ diskCaps V.gd γdl pd pav pu ∗
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
-  bufHold0 γ γd kk pidv dev bno bs bsd ∗
+  bufHold0 γ V kk pidv dev bno bs bsd ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
     ⌜calleeSaved k.regs R'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
-    bufHold0 γ γd kk pidv dev bno bs bs -∗ wpLoop cpu'))
+    bufHold0 γ V kk pidv dev bno bs bs -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `bwrite`. -/
@@ -76,11 +76,11 @@ structure BWRITE : Prop where
   wp_bwrite : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (γd : DiskNames) (γdl : GName)
+    (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (kk : Nat)
     (pidv dev bno : BitVec 32) (dqp : DFrac) (bs bsd : List (BitVec 8))
     hj hproc hK hsie hnoff hlocks htier hkk ha0 hbno hbsd hpd,
-    wp_bwrite_body (hlc := hlc) (GF := GF) Γ cpu k γl γ γd γdl pd pav pu j kk
+    wp_bwrite_body (hlc := hlc) (GF := GF) Γ cpu k γl γ V γdl pd pav pu j kk
       pidv dev bno dqp bs bsd hj hproc hK hsie hnoff hlocks htier hkk ha0 hbno hbsd hpd
 
 end Xv6

@@ -467,3 +467,4 @@ import Xv6.SpecBrelse
 import Xv6.ProofBrelse
 import Xv6.LinkBrelse
 import Xv6.BufEscrow
+import Xv6.BioPool

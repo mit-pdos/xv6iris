@@ -25,7 +25,7 @@ lock, so `wakeup`'s resource (`procsInv`) is threaded through.
 the chain's count fragment and the escrow's CHECKOUT handle now ride inside
 `Xv6.bufHold0` (Rocq's `bstok`, inside `bio_hold0`), which is where Rocq
 keeps them and what makes the first instruction's park available.  The
-credential is `Xv6.bioCtx γl γ γd`, which now carries the thirty escrows.
+credential is `Xv6.bioCtx γl γ V`, which now carries the thirty escrows.
 
 As in Rocq, the proof parks the content into the escrow at the first
 instruction and hands the park's register half to the HOOKED `releasesleep`
@@ -56,15 +56,15 @@ def brelseSlots : Nat := 4 + releasesleepSlots
 /-- **WP of `brelse(b = a0)`**. -/
 def wp_brelse_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx] (Γ : SchedNames)
-    (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (γd : DiskNames) (kk : Nat)
+    (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView) (kk : Nat)
     (pidv dev bno : BitVec 32) (dqp : DFrac) (bs bsd : List (BitVec 8))
     (hnoff : k.noff + 2 < 2 ^ 31) (hK : brelseSlots ≤ k.avail)
     (hlk : "bcache" ∉ k.locks) (hsl : "sleep lock" ∉ k.locks) (hp : "proc" ∉ k.locks)
     (htier : k.tier = KTier.kpt)
     (hkk : kk < NBUF) (ha0 : k.regs 10#5 = bnode kk) : Prop :=
   kctx cpu k ∗ pcIs cpu brelseAddr ∗ procsInv Γ ∗
-  bioCtx γl γ γd ∗ wordPointsTo (pPid k.proc) 4 dqp pidv ∗
-  bufHold0 γ γd kk pidv dev bno bs bsd ∗
+  bioCtx γl γ V ∗ wordPointsTo (pPid k.proc) 4 dqp pidv ∗
+  bufHold0 γ V kk pidv dev bno bs bsd ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
     ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
@@ -76,10 +76,10 @@ def wp_brelse_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G G
 structure BRELSE : Prop where
   wp_brelse : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx] (Γ : SchedNames)
-    (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (γd : DiskNames) (kk : Nat)
+    (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView) (kk : Nat)
     (pidv dev bno : BitVec 32) (dqp : DFrac) (bs bsd : List (BitVec 8))
     hnoff hK hlk hsl hp htier hkk ha0,
-    wp_brelse_body (hlc := hlc) (GF := GF) Γ cpu k γl γ γd kk pidv dev bno dqp bs bsd
+    wp_brelse_body (hlc := hlc) (GF := GF) Γ cpu k γl γ V kk pidv dev bno dqp bs bsd
       hnoff hK hlk hsl hp htier hkk ha0
 
 end Xv6

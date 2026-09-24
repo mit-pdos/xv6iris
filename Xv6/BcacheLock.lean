@@ -76,37 +76,40 @@ theorem bcPins_cs (k : KCtx) (R R' : RegMap) (h : bcPins k R) (hcs : calleeSaved
     c24.trans a24, c25.trans a25, c26.trans a26, c27.trans a27⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [BcacheG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [BcacheG GF]
+variable [DiskG GF] [CurCtx]
 
 theorem bc_acquire (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γl : GName) (γ : BcacheNames)
+    (V : BioView)
     (haddr : k'.regs 10#5 = bcacheLockAddr)
     (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 10 ≤ k'.avail) (hs' : "bcache" ∉ k'.locks) :
-    kctx c k' ∗ pcIs c KA.«acquire» ∗ isLock γl bcacheLockAddr "bcache" (bcacheResAt γ) ∗
+    kctx c k' ∗ pcIs c KA.«acquire» ∗ isLock γl bcacheLockAddr "bcache" (bcacheResAt γ V) ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' (((k'.pushOffAt spie spp).withRegs R').withLocks ("bcache" :: k'.locks)) -∗
       pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗
-      locked γl cpu' -∗ bcacheResAt γ curCtx -∗ (∃ K : Nat, viewLb cpu' K) -∗
+      locked γl cpu' -∗ bcacheResAt γ V curCtx -∗ (∃ K : Nat, viewLb cpu' K) -∗
       sieArm cpu' k'.sie k'.proc -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := AC.wp_acquire (hlc := hlc) (GF := GF) c k' γl "bcache" (bcacheResAt γ) hnoff' hK' hs'
+  have h := AC.wp_acquire (hlc := hlc) (GF := GF) c k' γl "bcache" (bcacheResAt γ V) hnoff' hK' hs'
   unfold wp_acquire_body at h
   simp only [acquireAddr] at h
   rw [haddr] at h
   exact h
 
 theorem bc_release (RE : RELEASE) (c : CPU) (k' : KCtx) (γl : GName) (γ : BcacheNames)
+    (V : BioView)
     (haddr : k'.regs 10#5 = bcacheLockAddr)
     (hsie' : k'.sie = false) (hnoff' : 1 ≤ k'.noff) (hK' : 10 ≤ k'.avail)
     (reen : Bool) (hreen : reen = (decide (k'.noff = 1) && k'.intena))
     (hon : reen = true → k'.tier = .kpt ∧ trapRes true + 6 ≤ k'.avail) :
-    kctx c k' ∗ pcIs c KA.«release» ∗ isLock γl bcacheLockAddr "bcache" (bcacheResAt γ) ∗
-    locked γl c ∗ bcacheResAt γ curCtx ∗ popArm c k' reen ∗
+    kctx c k' ∗ pcIs c KA.«release» ∗ isLock γl bcacheLockAddr "bcache" (bcacheResAt γ V) ∗
+    locked γl c ∗ bcacheResAt γ V curCtx ∗ popArm c k' reen ∗
     wpNext (k'.popExit reen).sie k'.proc c (fun cpu' => iprop(∀ R' : RegMap,
       kctx cpu' (((k'.popExit reen).withRegs R').withLocks (k'.locks.filter (fun x => x ≠ "bcache"))) -∗
       pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := RE.wp_release (hlc := hlc) (GF := GF) c k' γl "bcache" (bcacheResAt γ) hsie' hnoff' hK' reen hreen hon
+  have h := RE.wp_release (hlc := hlc) (GF := GF) c k' γl "bcache" (bcacheResAt γ V) hsie' hnoff' hK' reen hreen hon
   unfold wp_release_body at h
   simp only [releaseAddr] at h
   rw [haddr] at h
@@ -119,18 +122,18 @@ floor slot `tl` it holds a store-order receipt for, and the hook mints
 only way to put the resource back when a `refcnt--` has raised one L1
 register's stamp past the releaser's own view. -/
 theorem bc_release_hook (RE : RELEASE_HOOK) (c : CPU) (k' : KCtx) (γl : GName) (γ : BcacheNames)
-    (tl : Nat) (haddr : k'.regs 10#5 = bcacheLockAddr)
+    (V : BioView) (tl : Nat) (haddr : k'.regs 10#5 = bcacheLockAddr)
     (hsie' : k'.sie = false) (hnoff' : 1 ≤ k'.noff) (hK' : 10 ≤ k'.avail)
     (reen : Bool) (hreen : reen = (decide (k'.noff = 1) && k'.intena))
     (hon : reen = true → k'.tier = .kpt ∧ trapRes true + 6 ≤ k'.avail) :
-    kctx c k' ∗ pcIs c KA.«release» ∗ isLock γl bcacheLockAddr "bcache" (bcacheResAt γ) ∗
-    locked γl c ∗ topLb tl ∗ bcacheScanAt γ curCtx tl ∗ popArm c k' reen ∗
+    kctx c k' ∗ pcIs c KA.«release» ∗ isLock γl bcacheLockAddr "bcache" (bcacheResAt γ V) ∗
+    locked γl c ∗ topLb tl ∗ bcacheScanAt γ V curCtx tl ∗ popArm c k' reen ∗
     wpNext (k'.popExit reen).sie k'.proc c (fun cpu' => iprop(∀ R' : RegMap,
       kctx cpu' (((k'.popExit reen).withRegs R').withLocks (k'.locks.filter (fun x => x ≠ "bcache"))) -∗
       pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := RE.wp_release_hook (hlc := hlc) (GF := GF) c k' γl "bcache" (bcacheResAt γ)
-    (bcacheResIn γ tl) hsie' hnoff' hK' reen hreen hon
+  have h := RE.wp_release_hook (hlc := hlc) (GF := GF) c k' γl "bcache" (bcacheResAt γ V)
+    (bcacheResIn γ V tl) hsie' hnoff' hK' reen hreen hon
   unfold wp_release_hook_body at h
   simp only [releaseAddr] at h
   rw [haddr] at h
@@ -138,11 +141,11 @@ theorem bc_release_hook (RE : RELEASE_HOOK) (c : CPU) (k' : KCtx) (γl : GName) 
   iapply h
   iframe Hk Hpc Hlk Hlocked Harm HΦ
   isplitl [Hscan]
-  · iapply bcacheResIn_intro γ curCtx tl
+  · iapply bcacheResIn_intro γ V curCtx tl
     isplit
     · iexact Htl
     · iexact Hscan
-  · iapply lockHook_llb (bcacheResIn γ tl) (bcacheResAt γ) tl (bcacheRes_fold_in γ tl)
+  · iapply lockHook_llb (bcacheResIn γ V tl) (bcacheResAt γ V) tl (bcacheRes_fold_in γ V tl)
     iexact Htl
 
 end

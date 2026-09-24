@@ -38,11 +38,11 @@ def bunpinAddr : BitVec 64 := KA.«bunpin»
 /-- **WP of `bunpin(b = a0)`**. -/
 def wp_bunpin_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [BcacheG GF]
     [SleepLockG GF] [DiskG GF] [CurCtx]
-    (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (γd : DiskNames) (kk : Nat)
+    (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView) (kk : Nat)
     (dev bno : BitVec 32)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 14 ≤ k.avail) (hlk : "bcache" ∉ k.locks)
     (hkk : kk < NBUF) (ha0 : k.regs 10#5 = bnode kk) : Prop :=
-  kctx cpu k ∗ pcIs cpu bunpinAddr ∗ bioCtx γl γ γd ∗ bref γ kk dev bno ∗
+  kctx cpu k ∗ pcIs cpu bunpinAddr ∗ bioCtx γl γ V ∗ bref γ kk dev bno ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
     ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
@@ -53,8 +53,8 @@ def wp_bunpin_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G G
 structure BUNPIN : Prop where
   wp_bunpin : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [BcacheG GF]
     [SleepLockG GF] [DiskG GF] [CurCtx]
-    (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (γd : DiskNames) (kk : Nat)
+    (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView) (kk : Nat)
     (dev bno : BitVec 32) hnoff hK hlk hkk ha0,
-    wp_bunpin_body (hlc := hlc) (GF := GF) cpu k γl γ γd kk dev bno hnoff hK hlk hkk ha0
+    wp_bunpin_body (hlc := hlc) (GF := GF) cpu k γl γ V kk dev bno hnoff hK hlk hkk ha0
 
 end Xv6
