@@ -75,7 +75,8 @@ their own: `NINODE`/`ISLOTSZ`/`ientry` are `Xv6/FsGeom.lean` /
    wand, as Rocq's.
 4. **Section binders.**  Rocq's `Section IcacheGhost` binds `xv6G`, `icfg`,
    `appcfg` and `CurCtx`; nothing ported here mentions an `appcfg` or a
-   context, so the Lean section binds `[IcacheG GF] [SleepLockG GF]` and
+   context, so the Lean section binds `[IcacheG GF] [Xv6G GF] [SleepLockG GF]`
+   (`Xv6G` for the shared `Auth (Option UFrac)` camera `slhTok` lives in) and
    takes `[Icfg]` per declaration (`Xv6/IcacheRefDefs.lean`'s rule).  Lean
    would otherwise add the unused instances to every theorem.
 5. **Added helper `PosNat.succ`** (Rocq `Pos.succ`) with `PosNat.succ_val`,
@@ -324,7 +325,7 @@ theorem irefSet_read (w : BitVec 32) (h : irefSet w) : 0 < w.toNat ∧ w.toNat <
 /-! ### The sleeplock share's authority, and the two authority halves -/
 
 section IcacheGhost
-variable {GF : BundledGFunctors} [IcacheG GF] [SleepLockG GF]
+variable {GF : BundledGFunctors} [IcacheG GF] [Xv6G GF] [SleepLockG GF]
 
 /-! THE SLEEPLOCK SHARE'S AUTHORITY, PER SLOT.  `irefTok k q` carries
 `slhTok (icfgIsl k) q` -- a q-share of "somebody may hold slot `k`'s

@@ -53,12 +53,13 @@ shares, `none` being the AUTHORITATIVE ZERO. -/
 abbrev SlhRF : COFE.OFunctorPre := constOF (Auth (Option UFrac))
 
 /-- The ghost state of the sleeplock layer: one `Qp` ghost variable per lock
-(the holder token / deposit authority pair) and the counting camera. -/
+(the holder token / deposit authority pair).  The counting camera `SlhRF`
+is the SHARED `Xv6G.authUfracG` (one instance per camera type; the iref-slot
+supply, `Xv6.IrefslotRF`, is the same camera under its own name). -/
 class SleepLockG (GF : BundledGFunctors) where
   [gvSlhG : GhostVarG GF Qp]
-  [slhG : ElemG GF SlhRF]
 
-attribute [reducible, instance] SleepLockG.gvSlhG SleepLockG.slhG
+attribute [reducible, instance] SleepLockG.gvSlhG
 
 /-! ## Geometry, in the exact instruction address forms -/
 
@@ -439,7 +440,7 @@ def slhOf : Option Qp → Option UFrac := Option.map uf
 @[simp] theorem slhOf_some (q : Qp) : slhOf (some q) = some (uf q) := rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [SleepLockG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [SleepLockG GF]
 
 /-- A `q`-share of the right to hold the sleeplock. -/
 def slhTok (γ : GName) (q : Qp) : IProp GF := iOwn (F := SlhRF) γ (◯ (some (uf q) : Option UFrac))

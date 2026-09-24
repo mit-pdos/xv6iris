@@ -33,7 +33,8 @@ in the wave brief's file plan beside this section, is Rocq line 162, in
    binder whose variables are in scope: the liveness pool and the selector
    take only `[IcacheG GF]` (Rocq's `lockG` binder is unused by them), and
    the reference token (`irefTok`, which names `slhTok`) additionally takes
-   `[SleepLockG GF]`.  `[Icfg]` is a per-declaration binder
+   `[Xv6G GF] [SleepLockG GF]` (`Xv6G` carries `slhTok`'s shared camera).
+   `[Icfg]` is a per-declaration binder
    (`Xv6/IcacheRefDefs.lean`'s rule).
 6. **`live_boot_split`** reads the SEALED `liveBootMap` through
    `liveBootMap_eq` (`Xv6/IcacheRefDefs.lean` deviation 11); its per-slot
@@ -424,7 +425,7 @@ end IcacheRefGhost
 /-! ## The reference token (needs the sleeplock share; deviation 5) -/
 
 section IcacheRefTok
-variable {GF : BundledGFunctors} [IcacheG GF] [SleepLockG GF]
+variable {GF : BundledGFunctors} [IcacheG GF] [Xv6G GF] [SleepLockG GF]
 
 /-- ONE reference to slot `k`, holding fraction `q` of its identity -- the
 count fragment AND the matching liveness slice, canonically paired (see the

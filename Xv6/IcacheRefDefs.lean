@@ -976,7 +976,7 @@ theorem monoSlotFunAlloc (n : Nat) :
 
 /-- The per-slot sleeplock "may hold" counters at their authoritative zero,
 which is what `itable_body` parks for a free slot (deviation 4). -/
-theorem islFunAlloc [SleepLockG GF] (n : Nat) :
+theorem islFunAlloc [Xv6G GF] [SleepLockG GF] (n : Nat) :
     ⊢@{IProp GF} |==> ∃ f : Nat → GName,
       [∗list] k ∈ List.range n, slhAuth (f k) none :=
   icFunAlloc 0 (fun _ γ => slhAuth γ none) (fun _ => slhAuth_alloc) n

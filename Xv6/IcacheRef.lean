@@ -252,7 +252,7 @@ theorem inodeIdent_halve [CurCtx] (k : Nat) (q : Qp) (dev inum : BitVec 32) :
 end Ident
 
 section SlhHalve
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [SleepLockG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [SleepLockG GF]
 
 theorem slhTok_halve_i [Icfg] (k : Nat) (q : Qp) :
     slhTok (GF := GF) (icfgIsl k) q ⊢ slhTok (icfgIsl k) q.half ∗ slhTok (icfgIsl k) q.half := by

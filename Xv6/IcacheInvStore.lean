@@ -268,7 +268,7 @@ theorem ic_close_last_lu (M : RegMapF (Qp × PosNat)) (k : Nat) (qt : Qp)
 the two arm moves) -/
 
 section Ghost
-variable {GF : BundledGFunctors} [IcacheG GF] [SleepLockG GF]
+variable {GF : BundledGFunctors} [IcacheG GF] [Xv6G GF] [SleepLockG GF]
 
 /-- Rocq `iref_close_step_noarm`: the departing reference's share goes back
 into the outstanding total, exactly as its fraction does. -/
@@ -498,7 +498,7 @@ theorem qp_valid_of_lt_half {q : Qp} (h : q < (1 : Qp).half) : ✓ q := by
   exact Qp.valid_iff.mpr (by grind)
 
 section Open
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [SleepLockG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [SleepLockG GF]
 
 /-- Every mover's first five Rocq lines, and its last: open `icacheN`, meet
 the lock's map half against the invariant's (`itable_half_agree`), take

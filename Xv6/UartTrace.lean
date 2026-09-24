@@ -13,6 +13,8 @@ import MachCSL.Lock
 import MachCSL.Dev.DevIds
 import Xv6.Geom
 import Iris.BI.Lib.MonoList
+import Iris.Algebra.Auth
+import Iris.Algebra.UFrac
 
 namespace Xv6
 
@@ -41,10 +43,15 @@ class Xv6G (GF : BundledGFunctors) where
   /-- THE ONE `Nat ↦ block bytes` ghost-map camera: the disk image
   (`DiskNames.img`) and the log's logged view (`FsNames.cache`) -/
   [gmBlkG : GhostMapG GF Nat (List (BitVec 8)) RegMapF]
+  /-- THE ONE `Auth (Option UFrac)` camera (Rocq's `authUR (optionUR
+  ufracR)`): a tracked sleeplock's "may hold" counter (`Xv6.SlhRF`,
+  per-lock names) and the iref-slot supply (`Xv6.IrefslotRF`,
+  `IrefslotG.irefslotName`) -/
+  [authUfracG : ElemG GF (constOF (Auth (Option UFrac)))]
 
 attribute [instance] Xv6G.monoListG Xv6G.gvListG
 attribute [reducible, instance] Xv6G.gvNatG Xv6G.gvUnitG Xv6G.gvCpuG Xv6G.gvW32G Xv6G.gvBoolG
-attribute [reducible, instance] Xv6G.gmUnitG Xv6G.gmBlkG
+attribute [reducible, instance] Xv6G.gmUnitG Xv6G.gmBlkG Xv6G.authUfracG
 
 /-- The names of one port's ghosts (the Rocq `UartNames.uart_names`, the
 subset the Lean port carries): the accepted trace (`mono_list` over

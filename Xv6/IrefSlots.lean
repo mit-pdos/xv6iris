@@ -60,18 +60,16 @@ Rocq's, over the same algebra.
    premise); a caller holding the icache's `PosNat` count passes `.val`.
 2. **`pos_to_Qp (Pos.of_succ_nat k)` is `natQp k`**, the rational `k + 1`
    as a `Qp`, since iris-lean's `Qp` is `{q : Rat // 0 < q}`.
-3. **THE CAMERA COLLIDES, BY SHAPE, WITH `SleepLockG.slhG`.**
+3. **THE CAMERA IS SHARED WITH THE SLEEPLOCK'S COUNTER.**
    `IrefslotRF` and `Xv6.SlhRF` are both `constOF (Auth (Option UFrac))`,
-   so a file binding both `IrefslotG` and `SleepLockG` has two
-   `ElemG GF (constOF (Auth (Option UFrac)))` instances.  Every predicate
-   below is a DEFINITION elaborated inside a section that sees only
-   `IrefslotG`, which pins its instance; callers must go through
-   `irefFrac` / `irefSlots` / `irefSlotsAuth` and never write the raw
-   `iOwn`.
+   and there is ONE instance of that camera, `Xv6G.authUfracG` (one
+   capacity per camera type, as Rocq's `inG`); the supply's ghost NAME
+   (`IrefslotG.irefslotName`) keeps it apart from every sleeplock's.
 4. `seq 0 n` is `List.range n`.
-5. The class carries the NAME, as Rocq's does (`irefslot_name`), and
-   `IrefslotGpreS` is the capacity alone; `irefslotΣ` / `subG_irefslotΣ`
-   have no counterpart (iris-lean resolves `ElemG` directly).
+5. The class carries the NAME, as Rocq's does (`irefslot_name`).  Rocq's
+   `irefslotGpreS` (the capacity alone) is `Xv6G` itself, which carries
+   the shared camera; `irefslotΣ` / `subG_irefslotΣ` have no counterpart
+   (iris-lean resolves `ElemG` directly).
 6. Rocq's curried wands `iref_slots_auth -∗ iref_slots n -∗ ⌜_⌝` are
    stated `irefSlotsAuth ∗ irefSlots n ⊢ ⌜_⌝` (the port's idiom), and the
    split/combine pairs as `⊢` entailments; equivalent.
@@ -89,6 +87,7 @@ lands, `FileDefs` will import this file (Rocq's `file_core` names
 -/
 import Xv6.ProcDefs
 import Xv6.FileGeom
+import Xv6.UartTrace
 import Iris.Algebra.Auth
 import Iris.Algebra.UFrac
 import Iris.BI.Lib.Fractional
@@ -186,27 +185,15 @@ theorem natUfrac_incl (n m : Nat) (h : natUfrac n ≼ natUfrac m) : n ≤ m := b
         have := Rat.natCast_le_natCast.mp hle
         omega
 
-/-- The capacity (Rocq `irefslotGpreS`). -/
-class IrefslotGpreS (GF : BundledGFunctors) where
-  [irefslotPreInG : ElemG GF IrefslotRF]
-
-attribute [reducible, instance] IrefslotGpreS.irefslotPreInG
-
 /-- As in `FdSlots`, the ghost NAME lives in the class: there is exactly one
 iref-slot supply per system, and threading a `γ` would drag a filesystem
 ghost name through `ProcInv.proc_dormant` and every scheduler spec purely
 so that an empty cwd can hold a token. -/
 class IrefslotG (GF : BundledGFunctors) where
-  [irefslotInG : ElemG GF IrefslotRF]
   irefslotName : GName
 
-attribute [reducible, instance] IrefslotG.irefslotInG
-
-instance irefslotG_preS {GF : BundledGFunctors} [IrefslotG GF] : IrefslotGpreS GF :=
-  ⟨⟩
-
 section IrefSlots
-variable {GF : BundledGFunctors} [IrefslotG GF]
+variable {GF : BundledGFunctors} [Xv6G GF] [IrefslotG GF]
 
 /-- A SHARE of the supply.  `irefFrac 1` is one whole unit; a share below
 one is what an ftable entry's fraction of a file carries, and the shares of
@@ -365,9 +352,9 @@ end IrefSlots
 /-- Boot: mint the supply and hand every unit out.  CREATES the `IrefslotG`
 instance, so it sits outside the section.  The authority goes to the
 itable; the `IREFSLOTS` units go to the proc and file layers. -/
-theorem irefSlots_alloc {GF : BundledGFunctors} [IrefslotGpreS GF] :
+theorem irefSlots_alloc {GF : BundledGFunctors} [Xv6G GF] :
     ⊢@{IProp GF} |==> ∃ I : IrefslotG GF,
-      @irefSlotsAuth GF I ∗ @irefSlots GF I IREFSLOTS := by
+      @irefSlotsAuth GF _ I ∗ @irefSlots GF _ I IREFSLOTS := by
   imod iOwn_alloc (F := IrefslotRF) (GF := GF)
       ((● natUfrac IREFSLOTS : IrefslotUR) • ◯ natUfrac IREFSLOTS) with ⟨%γ, H⟩
   · exact Auth.auth_both_valid_discrete.mpr ⟨CMRA.inc_refl _, by simp [IREFSLOTS, natUfrac]; trivial⟩

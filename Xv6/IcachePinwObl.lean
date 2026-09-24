@@ -75,7 +75,7 @@ window's head, so the read is the LATEST value, exactly `irefWord M k`
 ## Binders
 
 `[MachGS hlc GF] [IcacheG GF] [Icfg] [CurCtx]` (Rocq `riscvGS`, `xv6G`,
-`icfg`, `CurCtx`); the locked builder adds `[SleepLockG GF]` (Rocq `lockG`
+`icfg`, `CurCtx`); the locked builder adds `[Xv6G GF] [SleepLockG GF]` (Rocq `lockG`
 inside `xv6G`: `itableHalf_agree` needs it).  Rocq's `GenId` binder is
 unused by every statement here (dropped).  Rocq's `CpuId` (`cpu_id`) is the
 explicit `cpu : CPU`.
@@ -185,7 +185,7 @@ theorem irefPin_read_head (W : WordHist 4) (Hold : Nat → Hist) (h : Agent) (tv
 The payload's floor row covers every stamp in the window (`tst ≤ K`), so
 the read is the LATEST value -- exactly `irefWord M k` -- at every view the
 load may choose.  The map half and the stamp half come back untouched. -/
-theorem iref_readAU_locked [SleepLockG GF] [Icfg] (cpu : CPU) (M : RegMapF (Qp × PosNat))
+theorem iref_readAU_locked [Xv6G GF] [SleepLockG GF] [Icfg] (cpu : CPU) (M : RegMapF (Qp × PosNat))
     (k tst K : Nat) (ts : List (Nat × Agent)) (hk : k < NINODE)
     (his : ∃ v, PartialMap.get? M k = some v) (htK : tst ≤ K) :
     itableInv (hlc := hlc) (GF := GF) ∗ ([∗list] p ∈ ts, authoredBy p.1 p.2) ∗

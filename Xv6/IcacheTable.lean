@@ -309,7 +309,7 @@ def islotEmpty [Icfg] [CurCtx] (ξ : CtxId) (cn : IcNames) (k : Nat) : IProp GF 
     islotFreeAtCtx ξ k dev inum ∗ icId cn k (1 : Qp).half false dev inum ∗ icPinRest k)
 
 section Live
-variable [IrefslotG GF]
+variable [Xv6G GF] [IrefslotG GF]
 
 /-- `islot2`'s LIVE arm (deviation 2): the retained identity share, the
 slot's `n` iref-slot units, the table's `true` half of the identification
@@ -381,7 +381,7 @@ instance islotEmpty_morph [Icfg] [CurCtx] (cn : IcNames) (k : Nat) :
   exact @instCtxMorphSep hlc GF _ _ _ (islotFreeAtCtx_morph k dev inum) (instCtxMorphConst _)
 
 /-- Rocq's `islot2_morph`. -/
-instance islot2_morph [IrefslotG GF] [Icfg] [CurCtx] (cn : IcNames) (M : RegMapF (Qp × PosNat))
+instance islot2_morph [Xv6G GF] [IrefslotG GF] [Icfg] [CurCtx] (cn : IcNames) (M : RegMapF (Qp × PosNat))
     (ci : RegMapF (BitVec 32 × BitVec 32)) (k : Nat) :
     CtxMorph (GF := GF) (fun ξ => islot2 ξ cn M ci k) := by
   unfold islot2
