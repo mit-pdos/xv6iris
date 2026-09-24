@@ -225,7 +225,7 @@ Deps name batch items; "gate" = §1 plus the in-flight files.
 
 **Batch D (6)**
 - D1 InodeRegionMovers — C1.
-- D2 InodeRegionWithdraw — C1, B4.
+- [DONE] D2 InodeRegionWithdraw — C1, B4.
 - [DONE] D3 InodeRegionLink — C1.
 - [DONE] D4 IcacheEscrowTok — C2, B4, B6, A2.
 - D5 IcachePinwObl — C4.
