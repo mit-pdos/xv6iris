@@ -675,3 +675,15 @@ import Xv6.LinkItrunc
 import Xv6.SpecFetchaddr
 import Xv6.ProofFetchaddr
 import Xv6.LinkFetchaddr
+import Xv6.SpecBmap
+import Xv6.BmapParts
+import Xv6.BmapDefs
+import Xv6.BmapTail
+import Xv6.BmapIndAlloc
+import Xv6.BmapIndRead
+import Xv6.BmapDirect
+import Xv6.BmapHead
+import Xv6.BmapMain
+import Xv6.ProofBmap
+import Xv6.LinkBmap
+import Xv6.LinkBmapNoalloc
