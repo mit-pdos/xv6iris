@@ -80,11 +80,13 @@ theorem mp_leaf (x : BitVec 64) (perm : BitVec 64) (h : x.toNat < 2 ^ 56) :
   bv_decide
 
 /-- `va + c + (pa - va) = pa + c` in `BitVec 64` (a commutative-group
-identity).  Stated with `c` abstract so `bv_decide` proves it in one shot;
+identity).  Stated with `c` abstract so it is one small linear goal;
 inlining `c = ofNat (4096*i)` makes `bv_omega` feed omega a `% 2^64` goal
-with the `4096*i` literal, which is the ~70s hot spot in `mappages_iter`. -/
+with the `4096*i` literal, which is the ~70s hot spot in `mappages_iter`.
+`bv_omega`, not `bv_decide`: bit-blasting the adders took ~5 s and hit the
+SAT solver's wall-clock timeout under a loaded parallel build. -/
 theorem mp_addr_id (va pa c : BitVec 64) : va + c + (pa - va) = pa + c := by
-  bv_decide
+  bv_omega
 
 /-- A branch on a value known to be zero / nonzero. -/
 theorem mp_beq_ne {α : Type} (x : BitVec 64) (h : x ≠ 0#64) (p q : α) :
