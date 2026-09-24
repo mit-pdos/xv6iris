@@ -326,6 +326,218 @@ theorem bd_fwd (c : CPU) (kc : KCtx) (hsie : kc.sie = false)
         (bdOther_set R0 Rc2 hoth2 9#5 _ (Or.inl rfl)))
       iframe Hk Hpc Hscan Hhit Hmiss'
 
+set_option maxHeartbeats 8000000 in
+/-- One iteration's `refcnt` test, from `bread+0x7a`. -/
+theorem bd_bwd_step (c : CPU) (kc : KCtx) (hsie : kc.sie = false)
+    (γ : BcacheNames) (V : BioView) (tl : Nat) (M : RegMapF Nat) (Ls : Nat → List Nat)
+    (ord : List Nat) (devs bnos : Nat → BitVec 32) (dev bno : BitVec 32)
+    (R0 Rc : RegMap) (kk : Nat) (hkk : kk < NBUF)
+    (hregs : bdFwdRegs dev bno kk Rc) (hoth : bdOther R0 Rc) :
+    kctx c (kc.withRegs Rc) ∗ pcIs c (KA.«bread» + 0x7a#64) ∗
+    bdScan γ V tl M Ls ord devs bnos ∗
+    (∀ (Rc2 : RegMap) (pc2 : BitVec 64) (zero : Bool),
+      ⌜(zero = true ↔ Ls kk = []) ∧
+        pc2 = (if zero then KA.«bread» + 0x90#64 else KA.«bread» + 0x7e#64) ∧
+        bdFwdRegs dev bno kk Rc2 ∧ bdOther R0 Rc2⌝ -∗
+      kctx c (kc.withRegs Rc2) -∗ pcIs c pc2 -∗
+      bdScan γ V tl M Ls ord devs bnos -∗ wpLoop c)
+    ⊢ wpLoop (GF := GF) c := by
+  obtain ⟨h9, h14, h18, h19⟩ := hregs
+  iintro ⟨Hk, Hpc, Hscan, Hcont⟩
+  icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
+  icases bdScan_unpack γ V tl M Ls ord devs bnos $$ Hscan with ⟨Ha, Hlru, Hpool, Hkey, Hs⟩
+  icases bslot_upd_acc γ curCtx Ls kk hkk $$ Hs with ⟨Hsl0, Hcl⟩
+  icases bslotAt_elim γ curCtx kk (Ls kk) $$ Hsl0
+    with ⟨%⟨hnd, hlt⟩, Hrefc, Hhalves, Hslots, Hcnt⟩
+  ihave Hrefc := (show wordAtN (GF := GF) curCtx (aBufRefcnt (bnode kk)) 4 (DFrac.own 1)
+        (BitVec.ofNat 32 (Ls kk).length) ⊢
+      wordPointsTo (bnode kk + 64#64) 4 (DFrac.own 1) (BitVec.ofNat 32 (Ls kk).length) from by
+    rw [wordAtN_cur, aBufRefcnt_eq']) $$ Hrefc
+  -- c.lw a5,64(s1)
+  k_step (wp_s_lw c _ (KA.«bread» + 0x7a#64) true 64#12 15#5 9#5 (by decide) (by decide)
+      (DFrac.own 1) (BitVec.ofNat 32 (Ls kk).length))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9]
+  iintro Hk Hpc Hrefc
+  ihave Hrefc := (show wordPointsTo (GF := GF) (bnode kk + 64#64) 4 (DFrac.own 1)
+        (BitVec.ofNat 32 (Ls kk).length) ⊢
+      wordAtN curCtx (aBufRefcnt (bnode kk)) 4 (DFrac.own 1)
+        (BitVec.ofNat 32 (Ls kk).length) from by
+    rw [wordAtN_cur, aBufRefcnt_eq']) $$ Hrefc
+  ihave Hsl0 := bslotAt_intro γ curCtx kk (Ls kk) hnd hlt $$ [Hrefc Hhalves Hslots Hcnt]
+  case' _ => iframe Hrefc Hhalves Hslots Hcnt
+  ihave Hs := Hcl $$ %(Ls kk) Hsl0
+  ihave Hs := (show ([∗list] j ∈ List.range NBUF, bslotAt (GF := GF) γ curCtx j
+        (updAtB Ls kk (Ls kk) j)) ⊢
+      [∗list] j ∈ List.range NBUF, bslotAt γ curCtx j (Ls j) from by
+    rw [updAtB_id]) $$ Hs
+  ihave Hscan := bdScan_pack γ V tl M Ls ord devs bnos $$ [Ha Hlru Hpool Hkey Hs]
+  case' _ => iframe Ha Hlru Hpool Hkey Hs
+  by_cases hz : (Ls kk).length = 0
+  · k_step (wp_s_branch c _ (KA.«bread» + 0x7c#64) true 20#13 15#5 0#5 (by decide) bop.BEQ)
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+      with [bd_beqz_refcnt _ hlt, hz, bd_t_recyc]
+    iintro Hk Hpc
+    k_norm
+    iapply Hcont $$ %_ %_ %true [] Hk Hpc Hscan
+    ipureintro
+    refine ⟨⟨fun _ => List.eq_nil_of_length_eq_zero hz, fun _ => rfl⟩, by simp [hz, bd_beqz_zero],
+      ⟨?_, ?_, ?_, ?_⟩, ?_⟩ <;>
+      first
+        | exact bdOther_set R0 Rc hoth 15#5 _ (Or.inr rfl)
+        | assumption
+        | (simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; assumption)
+  · k_step (wp_s_branch c _ (KA.«bread» + 0x7c#64) true 20#13 15#5 0#5 (by decide) bop.BEQ)
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+      with [bd_beqz_refcnt _ hlt, hz]
+    iintro Hk Hpc
+    k_norm
+    iapply Hcont $$ %_ %_ %false [] Hk Hpc Hscan
+    ipureintro
+    refine ⟨⟨fun h => absurd h (by decide), fun he => absurd (by rw [he]; rfl) hz⟩, by simp [hz, bd_beqz_zero],
+      ⟨?_, ?_, ?_, ?_⟩, ?_⟩ <;>
+      first
+        | exact bdOther_set R0 Rc hoth 15#5 _ (Or.inr rfl)
+        | assumption
+        | (simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; assumption)
+
+set_option maxHeartbeats 8000000 in
+/-- **THE RECYCLE SCAN**, from `bread+0x7a` with the cursor on buffer `kk`,
+by induction on the buffers still to visit -- backwards, so the recursion is
+on the prefix of the LRU order. -/
+theorem bd_bwd (c : CPU) (kc : KCtx) (hsie : kc.sie = false)
+    (γ : BcacheNames) (V : BioView) (tl : Nat) (M : RegMapF Nat) (Ls : Nat → List Nat)
+    (ord : List Nat) (devs bnos : Nat → BitVec 32) (dev bno : BitVec 32)
+    (hord : ord.Perm (List.range NBUF)) (R0 : RegMap) :
+    ∀ (o1 o2 : List Nat) (kk : Nat) (Rc : RegMap),
+      ord = o1 ++ kk :: o2 → bdFwdRegs dev bno kk Rc → bdOther R0 Rc →
+      (kctx c (kc.withRegs Rc) ∗ pcIs c (KA.«bread» + 0x7a#64) ∗
+        bdScan γ V tl M Ls ord devs bnos ∗
+        (∀ (kk2 : Nat) (Rc2 : RegMap),
+          ⌜kk2 < NBUF ∧ Ls kk2 = [] ∧ bdFwdRegs dev bno kk2 Rc2 ∧ bdOther R0 Rc2⌝ -∗
+          kctx c (kc.withRegs Rc2) -∗ pcIs c (KA.«bread» + 0x90#64) -∗
+          bdScan γ V tl M Ls ord devs bnos -∗ wpLoop c) ∗
+        (∀ Rc2 : RegMap, ⌜bdOther R0 Rc2⌝ -∗
+          kctx c (kc.withRegs Rc2) -∗ pcIs c (KA.«bread» + 0x84#64) -∗
+          bdScan γ V tl M Ls ord devs bnos -∗ wpLoop c)
+        ⊢ wpLoop (GF := GF) c) := by
+  intro o1
+  induction o1 using FromMathlib.List.reverseRec with
+  | nil =>
+    intro o2 kk Rc hsplit hregs hoth
+    have hkk : kk < NBUF := bd_ord_lt ord hord kk (by rw [hsplit]; simp)
+    iintro ⟨Hk, Hpc, Hscan, Hrec, Hpan⟩
+    iapply (bd_bwd_step c kc hsie γ V tl M Ls ord devs bnos dev bno R0 Rc kk hkk hregs hoth)
+    iframe Hk Hpc Hscan
+    iintro %Rc2 %pc2 %zero %hp Hk Hpc Hscan
+    cases zero with
+    | true =>
+      obtain ⟨hiff, hpc2, hregs2, hoth2⟩ := hp
+      have hpc' : pc2 = KA.«bread» + 0x90#64 := by rw [hpc2]; simp
+      subst hpc'
+      iapply Hrec $$ %kk %Rc2 [] Hk Hpc Hscan
+      ipureintro; exact ⟨hkk, hiff.1 rfl, hregs2, hoth2⟩
+    | false =>
+      obtain ⟨hiff, hpc2, hregs2, hoth2⟩ := hp
+      have hpc' : pc2 = KA.«bread» + 0x7e#64 := by rw [hpc2]; simp
+      subst hpc'
+      obtain ⟨g9, g14, g18, g19⟩ := hregs2
+      icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
+      icases bdScan_unpack γ V tl M Ls ord devs bnos $$ Hscan with ⟨Ha, Hlru, Hpool, Hkey, Hs⟩
+      have hmp : ord.map bnode = ([] : List Nat).map bnode ++ bnode kk :: o2.map bnode := by
+        rw [hsplit]; simp
+      ihave Hlru := (show bcacheLruAt (GF := GF) curCtx bhead (ord.map bnode) ⊢
+          bcacheLruAt curCtx bhead
+            (([] : List Nat).map bnode ++ bnode kk :: o2.map bnode) from by
+        rw [hmp]) $$ Hlru
+      icases bcacheLru_prev_acc curCtx bhead (bnode kk) (([] : List Nat).map bnode)
+        (o2.map bnode) $$ Hlru with ⟨Hpv, Hlcl⟩
+      ihave Hpv := (show wordAtN (GF := GF) curCtx (bPrev (bnode kk)) 8 (DFrac.own 1)
+            (blast (([] : List Nat).map bnode) bhead) ⊢
+          wordPointsTo (bnode kk + 72#64) 8 (DFrac.own 1) bhead from by
+        rw [wordAtN_cur, bd_prev_eq']; rfl) $$ Hpv
+      k_step (wp_s_ld c _ (KA.«bread» + 0x7e#64) true 72#12 9#5 9#5 (by decide) (by decide)
+          (DFrac.own 1) bhead)
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g9]
+      iintro Hk Hpc Hpv
+      ihave Hpv := (show wordPointsTo (GF := GF) (bnode kk + 72#64) 8 (DFrac.own 1) bhead ⊢
+          wordAtN curCtx (bPrev (bnode kk)) 8 (DFrac.own 1)
+            (blast (([] : List Nat).map bnode) bhead) from by
+        rw [wordAtN_cur, bd_prev_eq']; rfl) $$ Hpv
+      ihave Hlru := Hlcl $$ Hpv
+      ihave Hlru := (show bcacheLruAt (GF := GF) curCtx bhead
+            (([] : List Nat).map bnode ++ bnode kk :: o2.map bnode) ⊢
+          bcacheLruAt curCtx bhead (ord.map bnode) from by rw [hmp]) $$ Hlru
+      ihave Hscan := bdScan_pack γ V tl M Ls ord devs bnos $$ [Ha Hlru Hpool Hkey Hs]
+      case' _ => iframe Ha Hlru Hpool Hkey Hs
+      -- bne s1,a4 : the cursor is the sentinel, so every buffer is pinned
+      k_step (wp_s_branch c _ (KA.«bread» + 0x80#64) false 8186#13 9#5 14#5 (by decide) bop.BNE)
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g14, bd_bne_eq]
+      iintro Hk Hpc
+      k_norm
+      iapply Hpan $$ %_ [] Hk Hpc Hscan
+      ipureintro
+      exact bdOther_set R0 Rc2 hoth2 9#5 _ (Or.inl rfl)
+  | append_singleton o1' kj ih =>
+    intro o2 kk Rc hsplit hregs hoth
+    have hkk : kk < NBUF := bd_ord_lt ord hord kk (by rw [hsplit]; simp)
+    have hkj : kj < NBUF := bd_ord_lt ord hord kj (by rw [hsplit]; simp)
+    iintro ⟨Hk, Hpc, Hscan, Hrec, Hpan⟩
+    iapply (bd_bwd_step c kc hsie γ V tl M Ls ord devs bnos dev bno R0 Rc kk hkk hregs hoth)
+    iframe Hk Hpc Hscan
+    iintro %Rc2 %pc2 %zero %hp Hk Hpc Hscan
+    cases zero with
+    | true =>
+      obtain ⟨hiff, hpc2, hregs2, hoth2⟩ := hp
+      have hpc' : pc2 = KA.«bread» + 0x90#64 := by rw [hpc2]; simp
+      subst hpc'
+      iapply Hrec $$ %kk %Rc2 [] Hk Hpc Hscan
+      ipureintro; exact ⟨hkk, hiff.1 rfl, hregs2, hoth2⟩
+    | false =>
+      obtain ⟨hiff, hpc2, hregs2, hoth2⟩ := hp
+      have hpc' : pc2 = KA.«bread» + 0x7e#64 := by rw [hpc2]; simp
+      subst hpc'
+      obtain ⟨g9, g14, g18, g19⟩ := hregs2
+      icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
+      icases bdScan_unpack γ V tl M Ls ord devs bnos $$ Hscan with ⟨Ha, Hlru, Hpool, Hkey, Hs⟩
+      have hmp : ord.map bnode
+          = (o1' ++ [kj]).map bnode ++ bnode kk :: o2.map bnode := by rw [hsplit]; simp
+      ihave Hlru := (show bcacheLruAt (GF := GF) curCtx bhead (ord.map bnode) ⊢
+          bcacheLruAt curCtx bhead
+            ((o1' ++ [kj]).map bnode ++ bnode kk :: o2.map bnode) from by rw [hmp]) $$ Hlru
+      icases bcacheLru_prev_acc curCtx bhead (bnode kk) ((o1' ++ [kj]).map bnode)
+        (o2.map bnode) $$ Hlru with ⟨Hpv, Hlcl⟩
+      ihave Hpv := (show wordAtN (GF := GF) curCtx (bPrev (bnode kk)) 8 (DFrac.own 1)
+            (blast ((o1' ++ [kj]).map bnode) bhead) ⊢
+          wordPointsTo (bnode kk + 72#64) 8 (DFrac.own 1) (bnode kj) from by
+        rw [wordAtN_cur, bd_prev_eq', bd_blast_map]) $$ Hpv
+      k_step (wp_s_ld c _ (KA.«bread» + 0x7e#64) true 72#12 9#5 9#5 (by decide) (by decide)
+          (DFrac.own 1) (bnode kj))
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g9]
+      iintro Hk Hpc Hpv
+      ihave Hpv := (show wordPointsTo (GF := GF) (bnode kk + 72#64) 8 (DFrac.own 1) (bnode kj) ⊢
+          wordAtN curCtx (bPrev (bnode kk)) 8 (DFrac.own 1)
+            (blast ((o1' ++ [kj]).map bnode) bhead) from by
+        rw [wordAtN_cur, bd_prev_eq', bd_blast_map]) $$ Hpv
+      ihave Hlru := Hlcl $$ Hpv
+      ihave Hlru := (show bcacheLruAt (GF := GF) curCtx bhead
+            ((o1' ++ [kj]).map bnode ++ bnode kk :: o2.map bnode) ⊢
+          bcacheLruAt curCtx bhead (ord.map bnode) from by rw [hmp]) $$ Hlru
+      ihave Hscan := bdScan_pack γ V tl M Ls ord devs bnos $$ [Ha Hlru Hpool Hkey Hs]
+      case' _ => iframe Ha Hlru Hpool Hkey Hs
+      -- bne s1,a4 : the cursor is a real buffer, so the loop goes round
+      k_step (wp_s_branch c _ (KA.«bread» + 0x80#64) false 8186#13 9#5 14#5 (by decide) bop.BNE)
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+        with [g14, bd_bne_ne _ _ (bnode_ne_bhead kj hkj), bd_t_bwd]
+      iintro Hk Hpc
+      k_norm
+      iapply (ih (kk :: o2) kj _ (by rw [hsplit]; simp)
+        (by refine ⟨?_, ?_, ?_, ?_⟩ <;>
+              first
+                | (simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; rfl)
+                | (simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; assumption))
+        (bdOther_set R0 Rc2 hoth2 9#5 _ (Or.inl rfl)))
+      iframe Hk Hpc Hscan Hrec Hpan
+
 end
 
 end Xv6

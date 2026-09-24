@@ -382,6 +382,24 @@ theorem bd_bne_ne (a b : BitVec 64) (h : a ≠ b) : bcond bop.BNE a b = true := 
 theorem bd_beq_eq (a : BitVec 64) : bcond bop.BEQ a a = true := by simp [bcond]
 theorem bd_beq_ne (a b : BitVec 64) (h : a ≠ b) : bcond bop.BEQ a b = false := by simp [bcond, h]
 
+/-- `beqz a5` on a slot-backed count: taken exactly at zero. -/
+theorem bd_beqz_refcnt (m : Nat) (h : m < 2 ^ 31) :
+    bcond bop.BEQ (BitVec.signExtend 64 (BitVec.ofNat 32 m)) 0#64 = decide (m = 0) := by
+  by_cases hm : m = 0
+  · subst hm; decide
+  · rw [bcond_beq_eq, beq_eq_false_iff_ne.mpr (bc_refcnt_nonzero m hm h),
+      decide_eq_false (show ¬(m = 0) from hm)]
+
+theorem updAtB_id (Ls : Nat → List Nat) (k : Nat) : updAtB Ls k (Ls k) = Ls := by
+  funext j; unfold updAtB; by_cases h : j = k <;> simp [h]
+
+theorem bd_blast_map (l : List Nat) (a : Nat) (d : BitVec 64) :
+    blast ((l ++ [a]).map bnode) d = bnode a := by
+  simp only [List.map_append, List.map_cons, List.map_nil]
+  rw [blast_app]; rfl
+
+theorem bd_blast_nil (d : BitVec 64) : blast (([] : List Nat).map bnode) d = d := rfl
+
 theorem bd_beqz_zero : bcond bop.BEQ 0#64 0#64 = true := by decide
 theorem bd_beqz_one : bcond bop.BEQ 1#64 0#64 = false := by decide
 
