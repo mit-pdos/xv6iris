@@ -13,6 +13,7 @@ follows could not hand back a reference at the REQUESTED key.  So both scans
 carry `Xv6.bdScan` and only the release path closes it.
 -/
 import Xv6.SpecBread
+import Xv6.WordFrac
 import Xv6.BufEscrow
 import Xv6.BcacheLock
 import Xv6.SpecAcquiresleep
@@ -402,6 +403,14 @@ theorem bd_blast_map (l : List Nat) (a : Nat) (d : BitVec 64) :
 
 theorem bd_blast_nil (d : BitVec 64) : blast (([] : List Nat).map bnode) d = d := rfl
 
+/-- What a `sw` of a sign-extended `uint` argument stores. -/
+theorem bd_ext_sext (a : BitVec 32) : BitVec.extractLsb' 0 32 (BitVec.signExtend 64 a) = a := by
+  bv_decide
+theorem bd_ext_zero : BitVec.extractLsb' 0 32 (0#64 : BitVec 64) = 0#32 := by decide
+theorem bd_ext_one : BitVec.extractLsb' 0 32 (BitVec.signExtend 64 (1#12 : BitVec 12))
+    = BitVec.ofNat 32 1 := by decide
+theorem bd_ext_one' : BitVec.extractLsb' 0 32 (1#64 : BitVec 64) = BitVec.ofNat 32 1 := by decide
+
 theorem bd_beqz_zero : bcond bop.BEQ 0#64 0#64 = true := by decide
 theorem bd_beqz_one : bcond bop.BEQ 1#64 0#64 = false := by decide
 
@@ -416,5 +425,38 @@ theorem bd_push_withSpie (k : KCtx) (a b a' b' : Bool) (n : Nat) :
 
 theorem bd_withSpie_regs (k : KCtx) (a b : Bool) : (k.withSpie a b).regs = k.regs := rfl
 theorem bd_withSpie_proc (k : KCtx) (a b : Bool) : (k.withSpie a b).proc = k.proc := rfl
+
+section
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+
+/-- The two halves of a key cell, joined into the full cell the recycler
+writes (and split again for the deposit). -/
+theorem bd_word_join [CurCtx] (a : BitVec 64) (w1 w2 : BitVec 32) :
+    wordPointsTo (GF := GF) a 4 (DFrac.own (1 : Qp).half) w1 ∗
+    wordPointsTo a 4 (DFrac.own (1 : Qp).half) w2 ⊢
+      wordPointsTo a 4 (DFrac.own 1) w1 ∗ ⌜w1 = w2⌝ := by
+  have h := wordAtN_merge (GF := GF) curCtx a 4 (1 : Qp).half (1 : Qp).half w1 w2
+  rw [Qp.half_add_half] at h
+  simp only [wordAtN_cur] at h
+  exact h
+
+theorem bd_word_join' [CurCtx] (a : BitVec 64) (w : BitVec 32) :
+    wordPointsTo (GF := GF) a 4 (DFrac.own (1 : Qp).half) w ∗
+    wordPointsTo a 4 (DFrac.own (1 : Qp).half) w ⊢ wordPointsTo a 4 (DFrac.own 1) w := by
+  iintro H
+  icases bd_word_join a w w $$ H with ⟨H, -⟩
+  iexact H
+
+theorem bd_word_split [CurCtx] (a : BitVec 64) (w : BitVec 32) :
+    wordPointsTo (GF := GF) a 4 (DFrac.own 1) w ⊢
+      wordPointsTo a 4 (DFrac.own (1 : Qp).half) w ∗
+      wordPointsTo a 4 (DFrac.own (1 : Qp).half) w := by
+  have h := wordAtN_split (GF := GF) curCtx a 4 (1 : Qp).half (1 : Qp).half w
+  rw [Qp.half_add_half] at h
+  simp only [wordAtN_cur] at h
+  exact h
+
+
+end
 
 end Xv6

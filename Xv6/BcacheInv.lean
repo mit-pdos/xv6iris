@@ -1296,6 +1296,44 @@ theorem bkey_acc (γ : BcacheNames) (ξ : CtxId) (tl : Nat) (devs bnos : Nat →
     iexact Hy
   · iexact Hk'
 
+/-- Borrow buffer `k`'s key row to put it back AT A NEW KEY AND A RAISED
+FLOOR SLOT -- what `bread`'s recycler needs (Rocq's
+`bio_slot_devbno_acc2` composed with `bcache_scan2_floor_mono`): the
+deposit's stamp may sit above the slot the resource came in at, and the
+other rows ride up with it. -/
+theorem bkey_upd_acc_mono (γ : BcacheNames) (ξ : CtxId) (tl : Nat) (devs bnos : Nat → BitVec 32)
+    (k : Nat) (hk : k < NBUF) :
+    bkeyAll (GF := GF) γ ξ tl devs bnos ⊢
+      bkeyAt γ ξ tl k (devs k) (bnos k) ∗
+      (∀ tl' : Nat, ∀ dev' : BitVec 32, ∀ bno' : BitVec 32, ⌜tl ≤ tl'⌝ -∗
+        bkeyAt γ ξ tl' k dev' bno' -∗
+        bkeyAll γ ξ tl' (updAtF devs k dev') (updAtF bnos k bno')) := by
+  have hget : (List.range NBUF)[k]? = some k := by rw [List.getElem?_range hk]
+  unfold bkeyAll
+  iintro H
+  icases BigSepL.bigSepL_lookup_acc_impl
+    (Φ := fun _ j => bkeyAt (GF := GF) γ ξ tl j (devs j) (bnos j)) hget $$ H
+    with ⟨Hk, Hcl⟩
+  iframe Hk
+  iintro %tl' %dev' %bno' %hle Hk'
+  iapply Hcl $$ %(fun _ j => bkeyAt (GF := GF) γ ξ tl' j
+    (updAtF devs k dev' j) (updAtF bnos k bno' j)) [] [Hk']
+  · imodintro
+    iintro %i %y %hy %hne Hy
+    have hik : y ≠ k := by
+      by_cases hi : i < NBUF
+      · rw [List.getElem?_range hi] at hy; cases hy; exact hne
+      · rw [List.getElem?_eq_none (by simp; omega)] at hy; cases hy
+    ihave Hy := (show bkeyAt (GF := GF) γ ξ tl y (devs y) (bnos y) ⊢
+        bkeyAt γ ξ tl' y (updAtF devs k dev' y) (updAtF bnos k bno' y) from by
+      rw [updAtF_ne devs k y dev' hik, updAtF_ne bnos k y bno' hik]
+      exact bkeyAt_mono γ ξ tl tl' hle y (devs y) (bnos y)) $$ Hy
+    iexact Hy
+  · ihave Hk' := (show bkeyAt (GF := GF) γ ξ tl' k dev' bno' ⊢
+        bkeyAt γ ξ tl' k (updAtF devs k dev' k) (updAtF bnos k bno' k) from by
+      rw [updAtF_self devs k dev', updAtF_self bnos k bno']) $$ Hk'
+    iexact Hk'
+
 /-- Borrow buffer `k`'s key row to put it back AT A NEW KEY -- what `bread`'s
 recycler needs (Rocq's `bio_slot_devbno_acc2`). -/
 theorem bkey_upd_acc (γ : BcacheNames) (ξ : CtxId) (tl : Nat) (devs bnos : Nat → BitVec 32)

@@ -751,6 +751,321 @@ theorem bd_hit (RE : RELEASE_HOOK) (AS : ACQUIRESLEEP_LLB) (VR : VIRTIO_DISK_RW)
       hpin3)
   iframe Hk Hpc Hframe Hpi Htc Hcl Hir Hpid Hbox Hdc Hsl2 Hslp Hfl2 Hbref Href Hnext
 
+set_option maxHeartbeats 32000000 in
+/-- **THE RECYCLE**, from `bread+0x90`: the three field rewrites, the
+`refcnt = 1`, the release and `acquiresleep`.
+
+The escrow's L1 WINDOW is what makes the three stores legal: at `refcnt == 0`
+the header comes out of the box (`Xv6.bufEscrow_withdrawKey`), the two key
+cells are whole while the window is open, and the deposit at the new
+identity (`Xv6.bufEscrow_recycle`) mints the chain's first reference.  The
+POOL moves with it: the block being installed leaves the pool and the block
+being evicted -- when it is covered at all -- comes back in
+(`Xv6.bioPool_recycle`). -/
+theorem bd_recyc (RE : RELEASE_HOOK) (AS : ACQUIRESLEEP_LLB) (VR : VIRTIO_DISK_RW)
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (c cpu : CPU) (k0 kc : KCtx) (spa spb : Bool) (R0 Rc : RegMap)
+    (γl : GName) (γ : BcacheNames) (V : BioView) (γdl : GName) (pd pav pu : BitVec 64)
+    (j kk tl : Nat) (M : RegMapF Nat) (nx : Nat) (Ls : Nat → List Nat) (ord : List Nat)
+    (devs bnos : Nat → BitVec 32) (pidv dev bno : BitVec 32) (dqp : DFrac)
+    (hj : j < NPROC) (hproc : k0.proc = procAddr j) (hK : breadSlots ≤ k0.avail)
+    (hsie0 : k0.sie = false) (hnoff : k0.noff = 0) (hlocks : k0.locks = [])
+    (htier : k0.tier = KTier.kpt)
+    (hsie : kc.sie = false) (hcnoff : 1 ≤ kc.noff) (hcav : panicSlots ≤ kc.avail)
+    (hcreen : (decide (kc.noff = 1) && kc.intena) = false)
+    (hpopk : ∀ R' : RegMap,
+      ((kc.popExit false).withLocks
+          (List.filter (fun x => decide (x ≠ "bcache")) kc.locks)).withRegs R'
+      = ((k0.withSpie spa spb).pushed 6).withRegs R')
+    (hbno : bno.toNat < 2 ^ 31) (hcov : bno.toNat ∈ V.cov) (hdev : dev = V.dev)
+    (hpd : descPageRw pd) (hkk : kk < NBUF) (hLs : Ls kk = [])
+    (hmiss : ∀ i, i < NBUF → ¬(devs i = dev ∧ bnos i = bno))
+    (hfresh : ∀ i, nx ≤ i → PartialMap.get? M i = none) (hok : bcacheOk M Ls)
+    (hord : ord.Perm (List.range NBUF)) (hinj : bcacheInj V bnos) (hdevp : bcacheDev V devs bnos)
+    (hregs : bdFwdRegs dev bno kk Rc) (hoth : bdOther R0 Rc)
+    (hR2 : R0 2#5 = k0.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64) (hpins : bdPins k0 R0)
+    (hpin : true = false ∨ k0.proc = 0#64 → c = cpu) :
+    kctx c (kc.withRegs Rc) ∗ pcIs c (KA.«bread» + 0x90#64) ∗
+    bdScan γ V tl M Ls ord devs bnos ∗ ctxFloor curCtx tl ∗ topLb tl ∗ locked γl c ∗
+    bioCtx γl γ V ∗ diskCaps V.gd γdl pd pav pu ∗ bslot γ ∗
+    frame6s3 (k0.regs 2#5) (k0.regs 1#5) (k0.regs 8#5) (k0.regs 9#5)
+      (k0.regs 18#5) (k0.regs 19#5) ∗
+    procsInv Γ ∗ trapCsrs c ∗ cpuClaim c k0.proc ∗ intrRes c ∗
+    wordPointsTo (pPid k0.proc) 4 dqp pidv ∗
+    wpNext true k0.proc cpu (fun cpu' => iprop(∀ (spie2 spp2 : Bool) (R' : RegMap) (kk2 : Nat)
+        (bs2 : List (BitVec 8)),
+      ⌜calleeSaved k0.regs R' ∧ R' 10#5 = bnode kk2⌝ -∗
+      kctx cpu' ((k0.withSpie spie2 spp2).withRegs R') -∗ pcIs cpu' (jumpPc (k0.regs 1#5)) -∗
+      trapCsrs cpu' -∗ cpuClaim cpu' k0.proc -∗ intrRes cpu' -∗
+      wordPointsTo (pPid k0.proc) 4 dqp pidv -∗
+      bufHold0 γ V kk2 pidv dev bno bs2 bs2 -∗ wpLoop cpu'))
+    ⊢ wpLoop (GF := GF) c := by
+  obtain ⟨h9, h14, h18, h19⟩ := hregs
+  iintro ⟨Hk, Hpc, Hscan, #Hfl, #Htl, Hlocked, #Hbc, #Hdc, Hsl, Hframe, Hpi, Htc, Hcl, Hir,
+    Hpid, Hnext⟩
+  icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
+  ihave #Hpi := (show procsInv (GF := GF) Γ ⊢ procsInv Γ from by iintro H; iexact H) $$ Hpi
+  ihave #Hbox := bioCtx_box γl γ V kk hkk $$ Hbc
+  ihave #Hslk := bioCtx_buf γl γ V kk hkk $$ Hbc
+  ihave #Hlk := (show bioCtx (GF := GF) γl γ V ⊢
+      isLock γl bcacheLockAddr "bcache" (bcacheResAt γ V) from by
+    unfold bioCtx isBcache; iintro ⟨H, -, -⟩; iexact H) $$ Hbc
+  icases bdScan_unpack γ V tl M Ls ord devs bnos $$ Hscan with ⟨Ha, Hlru, Hpool, Hkey, Hs⟩
+  icases bkey_upd_acc_mono γ curCtx tl devs bnos kk hkk $$ Hkey with ⟨Hkey0, Hkcl⟩
+  icases bkeyAt_elim γ curCtx tl kk (devs kk) (bnos kk) $$ Hkey0 with ⟨Hkd, Hkb, Hkr⟩
+  icases bslot_upd_acc γ curCtx Ls kk hkk $$ Hs with ⟨Hsl0, Hcl2⟩
+  ihave Hsl0 := (show bslotAt (GF := GF) γ curCtx kk (Ls kk) ⊢
+      bslotAt γ curCtx kk [] from by rw [hLs]) $$ Hsl0
+  icases bslotAt_elim γ curCtx kk [] $$ Hsl0 with ⟨-, Hrefc, Hhalves, Hslots, Hcnt⟩
+  -- **THE WINDOW OPENS**
+  iapply wpLoop_fupd
+  icases kctx_token_acc c (kc.withRegs Rc) $$ Hk with ⟨Hctx, Hkback⟩
+  imod bufEscrow_withdrawKey γ V kk c tl (devs kk) (bnos kk) ⊤ bioxN_top
+      $$ [Hbox Hctx Hfl Hkr Hcnt] with ⟨Hctx, Hcnt, ⟨%td, %x0, %T0, %hT0, Hrd, Hhdr⟩⟩
+  · iframe Hbox Hctx Hkr Hcnt
+    iexact Hfl
+  imodintro
+  ihave Hk := Hkback $$ Hctx
+  icases (show bufHeaderAt (GF := GF) V kk (1 : Qp).half (1 : Qp).half (devs kk) (bnos kk) x0 ⊢
+      ∃ v0 : BitVec 32, ⌜v0 = 0#32 ∨ v0 = 1#32⌝ ∗
+        wordPointsTo (aBufValid (bnode kk)) 4 (DFrac.own 1) v0 ∗
+        wordPointsTo (aBufDev (bnode kk)) 4 (DFrac.own (1 : Qp).half) (devs kk) ∗
+        wordPointsTo (aBufBlockno (bnode kk)) 4 (DFrac.own (1 : Qp).half) (bnos kk) ∗
+        bufPay V ((devs kk, bnos kk) : BufId) v0 x0 from by
+    unfold bufHeaderAt; iintro H; iexact H) $$ Hhdr
+    with ⟨%v0, %hv01, Hvalid, Hdev2, Hbno2, Hpay⟩
+  -- the two key cells are WHOLE while the window is open
+  ihave Hkd1 := (show wordAtN (GF := GF) curCtx (aBufDev (bnode kk)) 4
+        (DFrac.own (1 : Qp).half) (devs kk) ⊢
+      wordPointsTo (aBufDev (bnode kk)) 4 (DFrac.own (1 : Qp).half) (devs kk) from by
+    rw [wordAtN_cur]) $$ Hkd
+  ihave Hkb1 := (show wordAtN (GF := GF) curCtx (aBufBlockno (bnode kk)) 4
+        (DFrac.own (1 : Qp).half) (bnos kk) ⊢
+      wordPointsTo (aBufBlockno (bnode kk)) 4 (DFrac.own (1 : Qp).half) (bnos kk) from by
+    rw [wordAtN_cur]) $$ Hkb
+  ihave Hdevf := bd_word_join' (aBufDev (bnode kk)) (devs kk) $$ [Hkd1 Hdev2]
+  case' _ => iframe Hkd1 Hdev2
+  ihave Hbnof := bd_word_join' (aBufBlockno (bnode kk)) (bnos kk) $$ [Hkb1 Hbno2]
+  case' _ => iframe Hkb1 Hbno2
+  ihave Hdevf := (show wordPointsTo (GF := GF) (aBufDev (bnode kk)) 4 (DFrac.own 1) (devs kk) ⊢
+      wordPointsTo (bnode kk + 8#64) 4 (DFrac.own 1) (devs kk) from by
+    rw [bd_dev_eq']) $$ Hdevf
+  ihave Hbnof := (show wordPointsTo (GF := GF) (aBufBlockno (bnode kk)) 4 (DFrac.own 1)
+        (bnos kk) ⊢
+      wordPointsTo (bnode kk + 12#64) 4 (DFrac.own 1) (bnos kk) from by
+    rw [bd_bno_eq']) $$ Hbnof
+  ihave Hvalid := (show wordPointsTo (GF := GF) (aBufValid (bnode kk)) 4 (DFrac.own 1) v0 ⊢
+      wordPointsTo (bnode kk) 4 (DFrac.own 1) v0 from by rw [bd_valid_eq]) $$ Hvalid
+  ihave Hrefc := (show wordAtN (GF := GF) curCtx (aBufRefcnt (bnode kk)) 4 (DFrac.own 1)
+        (BitVec.ofNat 32 ([] : List Nat).length) ⊢
+      wordPointsTo (bnode kk + 64#64) 4 (DFrac.own 1) (BitVec.ofNat 32 0) from by
+    rw [wordAtN_cur, aBufRefcnt_eq', List.length_nil]) $$ Hrefc
+  -- sw s2,8(s1) ; sw s3,12(s1) ; sw zero,0(s1) ; li a5,1 ; sw a5,64(s1)
+  k_step (wp_s_sw c _ (KA.«bread» + 0x90#64) false 8#12 9#5 18#5 (by decide) (devs kk))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, h18, bd_ext_sext]
+  iintro Hk Hpc Hdevf
+  k_step (wp_s_sw c _ (KA.«bread» + 0x94#64) false 12#12 9#5 19#5 (by decide) (bnos kk))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, h19, bd_ext_sext]
+  iintro Hk Hpc Hbnof
+  k_step (wp_s_sw c _ (KA.«bread» + 0x98#64) false 0#12 9#5 0#5 (by decide) v0)
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, bd_ext_zero]
+  iintro Hk Hpc Hvalid
+  k_step (wp_s_addi c _ (KA.«bread» + 0x9c#64) true 1#12 15#5 0#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  iintro Hk Hpc
+  k_step (wp_s_sw c _ (KA.«bread» + 0x9e#64) true 64#12 9#5 15#5 (by decide)
+      (BitVec.ofNat 32 0))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, bd_ext_one, bd_ext_one']
+  iintro Hk Hpc Hrefc
+  -- **THE POOL EXCHANGE**
+  have hmissB : ∀ i, i < NBUF → (bnos i).toNat ≠ bno.toNat :=
+    bd_miss_of_tie V devs bnos dev bno hdevp hcov hdev hmiss
+  have holdu := bd_old_unique V bnos kk hkk hinj
+  icases bioPool_recycle V bnos (updAtF bnos kk bno) kk (bnos kk) bno hkk rfl
+      (updAtF_self bnos kk bno) (fun i hi => updAtF_ne bnos kk i bno hi) hcov hmissB holdu
+      $$ Hpool with ⟨HpoolB, Hpback⟩
+  ihave Hold : (if (bnos kk).toNat ∈ V.cov then poolBlk (GF := GF) V (bnos kk).toNat
+      else iprop(emp)) $$ [Hpay]
+  · by_cases hoc : (bnos kk).toNat ∈ V.cov
+    · rw [if_pos hoc]
+      icases bufPay_cov V (devs kk) (bnos kk) v0 x0 hoc $$ Hpay with ⟨-, H⟩
+      iexact H
+    · rw [if_neg hoc]
+      iempintro
+  ihave Hpool := Hpback $$ Hold
+  ihave Hpay' := bufPay_of_pool V dev bno 0#32 x0 hcov hdev rfl $$ HpoolB
+  -- the key cells go back to halves and the header is deposited at the new key
+  ihave Hdevf := (show wordPointsTo (GF := GF) (bnode kk + 8#64) 4 (DFrac.own 1) dev ⊢
+      wordPointsTo (aBufDev (bnode kk)) 4 (DFrac.own 1) dev from by
+    rw [bd_dev_eq']) $$ Hdevf
+  ihave Hbnof := (show wordPointsTo (GF := GF) (bnode kk + 12#64) 4 (DFrac.own 1) bno ⊢
+      wordPointsTo (aBufBlockno (bnode kk)) 4 (DFrac.own 1) bno from by
+    rw [bd_bno_eq']) $$ Hbnof
+  ihave Hvalid := (show wordPointsTo (GF := GF) (bnode kk) 4 (DFrac.own 1) 0#32 ⊢
+      wordPointsTo (aBufValid (bnode kk)) 4 (DFrac.own 1) 0#32 from by
+    rw [bd_valid_eq]) $$ Hvalid
+  icases bd_word_split (aBufDev (bnode kk)) dev $$ Hdevf with ⟨Hd1, Hd2⟩
+  icases bd_word_split (aBufBlockno (bnode kk)) bno $$ Hbnof with ⟨Hb1, Hb2⟩
+  ihave Hhdr' : bufHeaderAt (GF := GF) V kk (1 : Qp).half (1 : Qp).half dev bno x0
+    $$ [Hvalid Hd1 Hb1 Hpay']
+  · unfold bufHeaderAt
+    iexists 0#32
+    isplitl []
+    · ipureintro; exact Or.inl rfl
+    iframe Hvalid Hd1 Hb1 Hpay'
+  -- **THE WINDOW CLOSES**
+  iapply wpLoop_fupd
+  icases kctx_token_acc c _ $$ Hk with ⟨Hctx, Hkback⟩
+  imod bufEscrow_recycle V (γ.box kk) kk (1 : Qp).half (1 : Qp).half c
+      (⟨td, true, ((devs kk, bnos kk) : BufId), some (x0, T0)⟩ : SlotReg BufId BufX)
+      dev bno x0 T0 ⊤ bioxN_top rfl rfl $$ [Hbox Hctx Hrd Hcnt Hhdr']
+    with ⟨Hctx, ⟨%T', Hrd', Hcnt', Hbref, #HT'⟩⟩
+  · iframe Hbox Hctx Hrd Hcnt Hhdr'
+  imodintro
+  ihave Hk := Hkback $$ Hctx
+  -- **THE FLOOR SLOT RISES** over the deposit's stamp
+  obtain ⟨tl2, htl2⟩ : ∃ t, t = max tl T' := ⟨_, rfl⟩
+  have htlle : tl ≤ tl2 := by omega
+  have htl2T : T' ≤ tl2 := by omega
+  ihave #Htl2 : topLb (GF := GF) tl2 $$ [Htl HT']
+  · rw [htl2]
+    iapply topLb_max tl T'
+    isplit
+    · iexact Htl
+    · iexact HT'
+  ihave Hkr' := bufSlotRegs_intro (γ.box kk)
+    (⟨T', false, ((dev, bno) : BufId), none⟩ : SlotReg BufId BufX) tl2 dev bno
+    rfl rfl rfl htl2T $$ [Hrd' HT']
+  case' _ => iframe Hrd' HT'
+  ihave Hd2 := (show wordPointsTo (GF := GF) (aBufDev (bnode kk)) 4
+        (DFrac.own (1 : Qp).half) dev ⊢
+      wordAtN curCtx (aBufDev (bnode kk)) 4 (DFrac.own (1 : Qp).half) dev from by
+    rw [wordAtN_cur]) $$ Hd2
+  ihave Hb2 := (show wordPointsTo (GF := GF) (aBufBlockno (bnode kk)) 4
+        (DFrac.own (1 : Qp).half) bno ⊢
+      wordAtN curCtx (aBufBlockno (bnode kk)) 4 (DFrac.own (1 : Qp).half) bno from by
+    rw [wordAtN_cur]) $$ Hb2
+  ihave Hkey0' := bkeyAt_intro γ curCtx tl2 kk dev bno $$ [Hd2 Hb2 Hkr']
+  case' _ => iframe Hd2 Hb2 Hkr'
+  ihave Hkey := Hkcl $$ %tl2 %dev %bno %htlle Hkey0'
+  -- **THE FIRST REFERENCE**, at `refcnt = 1`
+  iapply wpLoop_fupd
+  ihave Hup := bref_alloc_step γ M nx kk [] hfresh $$ [Ha Hhalves]
+  case' _ => iframe
+  imod Hup with ⟨Ha, Href, Hhalves', %hnx⟩
+  imodintro
+  ihave Hslots := (show bslot (GF := GF) γ ∗ bslots γ ([] : List Nat).length ⊢
+      bslots γ ([nx] : List Nat).length from by
+    simp only [List.length_nil, List.length_cons]
+    exact bslots_cons γ 0) $$ [Hsl Hslots]
+  case' _ => iframe
+  icases bslots_bound γ _ $$ Hslots with ⟨Hslots, %hbound⟩
+  ihave Hrefc := (show wordPointsTo (GF := GF) (bnode kk + 64#64) 4 (DFrac.own 1)
+        (BitVec.ofNat 32 1) ⊢
+      wordAtN curCtx (aBufRefcnt (bnode kk)) 4 (DFrac.own 1)
+        (BitVec.ofNat 32 ([nx] : List Nat).length) from by
+    rw [wordAtN_cur, aBufRefcnt_eq', List.length_cons, List.length_nil]) $$ Hrefc
+  ihave Hcnt' := (show cntHalf (GF := GF) (γ.box kk) 1 ⊢
+      cntHalf (γ.box kk) ([nx] : List Nat).length from by
+    rw [List.length_cons, List.length_nil]) $$ Hcnt'
+  ihave Hslot := bslotAt_intro γ curCtx kk [nx] (by simp)
+    (by simp only [List.length_cons, List.length_nil]; omega)
+    $$ [Hrefc Hhalves' Hslots Hcnt']
+  case' _ => iframe
+  ihave Hs := Hcl2 $$ %([nx] : List Nat) Hslot
+  ihave Hsc0 := bdScan_pack γ V tl2 (PartialMap.insert M nx kk) (updAtB Ls kk [nx]) ord
+    (updAtF devs kk dev) (updAtF bnos kk bno) $$ [Ha Hlru Hpool Hkey Hs]
+  case' _ => iframe Ha Hlru Hpool Hkey Hs
+  ihave Hscan := bdScan_close γ V tl2 (PartialMap.insert M nx kk) (nx + 1)
+    (updAtB Ls kk [nx]) ord (updAtF devs kk dev) (updAtF bnos kk bno)
+    (bpin_fresh M nx kk hfresh)
+    (by rw [show ([nx] : List Nat) = nx :: Ls kk from by rw [hLs]]
+        exact bpin_bcacheOk M Ls nx kk hkk hok)
+    hord (bd_inj_upd V bnos kk bno hinj hmissB)
+    (bd_devpin_upd V devs bnos kk dev bno hdevp hdev) $$ Hsc0
+  -- auipc a0,0x15 ; addi a0,a0,1400 ; jal release
+  k_step (wp_s_auipc c _ (KA.«bread» + 0xa0#64) false 0x15#20 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  iintro Hk Hpc
+  k_step (wp_s_addi c _ (KA.«bread» + 0xa4#64) false 1400#12 10#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bd_lock]
+  iintro Hk Hpc
+  k_step (wp_s_jal c _ (KA.«bread» + 0xa8#64) false 2088920#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bd_br_rel]
+  iintro Hk Hpc
+  iapply (bc_release_hook RE c _ γl γ V tl2 ?ra ?rs ?rn ?rK false ?rr ?ro)
+    $$ [- $Hk $Hpc $Hlk $Hlocked $Htl2 $Hscan]
+  rotate_right 1
+  k_norm [hpopk, bd_ret_ac]
+  iframe #
+  case ra => k_norm
+  case rs => k_norm
+  case rn => k_norm; omega
+  case rK => k_norm; unfold panicSlots at hcav; omega
+  case rr => k_norm; exact hcreen.symm
+  case ro => intro h; exact absurd h (by decide)
+  isplitl []
+  · rw [popArm_false]; iempintro
+  -- past the release
+  iapply wpNext_intro_pin
+  iintro %c2 %hp2 %R1 Hk Hpc %hcs1
+  have hc2 : c2 = c := hp2 (Or.inl (by first | rfl | (k_norm; exact hsie)))
+  subst hc2
+  k_norm [hpopk, bd_ret_ac]
+  have hsie : k0.sie = false := hsie0
+  unfold calleeSaved at hcs1
+  k_norm at hcs1
+  obtain ⟨b2, b8, b9, b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩ := hcs1
+  have g9 : R1 9#5 = bnode kk := by
+    rw [b9]
+    first
+      | exact h9
+      | (simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h9)
+  icases boxRef_topLb (γ.box kk) ((dev, bno) : BufId) T' $$ Hbref with ⟨Hbref, #Htb⟩
+  -- addi a0,s1,16 ; jal acquiresleep
+  k_step (wp_s_addi c2 _ (KA.«bread» + 0xac#64) false 16#12 10#5 9#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g9, aBufLock_sext]
+  iintro Hk Hpc
+  k_step (wp_s_jal c2 _ (KA.«bread» + 0xb0#64) false 4974#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bd_br_aslp]
+  iintro Hk Hpc
+  iapply (bd_aslp AS Γ c2 _ γ kk T' j pidv dqp k0.proc (by k_norm [bd_withSpie_proc])
+      ?aa ?aj ?ap ?aK ?asi ?an ?alk ?atr)
+    $$ [- $Hk $Hpc $Hpi $Htc $Hcl $Hir $Hslk $Htb $Hpid]
+  rotate_right 1
+  k_norm [bd_ret_b4]
+  iframe #
+  case aa => k_norm; exact aBufLock_eq' _
+  case aj => exact hj
+  case ap => k_norm; exact hproc
+  case aK => k_norm; unfold breadSlots panicSlots acquiresleepSlots sleepSlots at *; omega
+  case asi => k_norm
+  case an => k_norm; exact hnoff
+  case alk => k_norm; exact hlocks
+  case atr => k_norm; exact htier
+  -- past acquiresleep: the join
+  iapply wpNext_intro_pin
+  iintro %c3 %hp3 %spie3 %spp3 %R2 %hcs2 Hk Hpc Htc Hcl Hir Hsl2 Hslp Hfl2 Hpid
+  k_norm [bd_ret_b4, bd_push_withSpie]
+  unfold calleeSaved at hcs2
+  k_norm at hcs2
+  obtain ⟨e2, e8, e9, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩ := hcs2
+  have hpin3 : true = false ∨ k0.proc = 0#64 → c3 = cpu := fun hh => (hp3 hh).trans (hpin hh)
+  iapply (bd_tail VR Γ c3 cpu k0 spie3 spp3 γl γ V γdl pd pav pu j kk T' pidv dev bno dqp R2
+      hj hproc hK hsie hnoff hlocks htier hbno hcov hdev hpd hkk
+      ((e2.trans b2).trans ((hoth 2#5 (by decide) (by decide)).trans hR2))
+      (e9.trans g9)
+      (by obtain ⟨q20, q21, q22, q23, q24, q25, q26, q27⟩ := hpins
+          exact ⟨(e20.trans b20).trans ((hoth 20#5 (by decide) (by decide)).trans q20),
+            (e21.trans b21).trans ((hoth 21#5 (by decide) (by decide)).trans q21),
+            (e22.trans b22).trans ((hoth 22#5 (by decide) (by decide)).trans q22),
+            (e23.trans b23).trans ((hoth 23#5 (by decide) (by decide)).trans q23),
+            (e24.trans b24).trans ((hoth 24#5 (by decide) (by decide)).trans q24),
+            (e25.trans b25).trans ((hoth 25#5 (by decide) (by decide)).trans q25),
+            (e26.trans b26).trans ((hoth 26#5 (by decide) (by decide)).trans q26),
+            (e27.trans b27).trans ((hoth 27#5 (by decide) (by decide)).trans q27)⟩)
+      hpin3)
+  iframe Hk Hpc Hframe Hpi Htc Hcl Hir Hpid Hbox Hdc Hsl2 Hslp Hfl2 Hbref Href Hnext
 
 end
 
