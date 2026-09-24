@@ -588,3 +588,4 @@ import Xv6.IcacheBootRegion
 import Xv6.IcacheBox
 import Xv6.IcacheBoxSites
 import Xv6.IcacheCover
+import Xv6.IcacheTable

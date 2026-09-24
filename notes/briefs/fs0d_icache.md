@@ -247,7 +247,7 @@ Deps name batch items; "gate" = §1 plus the in-flight files.
 - [DONE] G4 IcacheBootRegion — F2, C1, B2, C2, D4.
 
 **Batch H (2)**
-- H1 IcacheTable — G2, C3, C4.
+- [DONE] H1 IcacheTable — G2, C3, C4.
 - [DONE] H2 IcacheCover — G2, B7.
 
 **Batch I (1)**
