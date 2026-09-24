@@ -51,9 +51,9 @@ set_option linter.unusedVariables false
 /-! ## The code's constants -/
 
 theorem il_br_acq : KA.«ilock» + 0xd86#64 = KA.«acquiresleep» := by decide
-theorem il_br_bread : KA.«ilock» + 0xfffffffffffff968#64 = KA.«bread» := by decide
+theorem ilk_br_bread : KA.«ilock» + 0xfffffffffffff968#64 = KA.«bread» := by decide
 theorem il_br_memmove : KA.«ilock» + 0xffffffffffffda80#64 = KA.«memmove» := by decide
-theorem il_br_brelse : KA.«ilock» + 0xfffffffffffffa70#64 = KA.«brelse» := by decide
+theorem ilk_br_brelse : KA.«ilock» + 0xfffffffffffffa70#64 = KA.«brelse» := by decide
 theorem il_br_panic : KA.«ilock» + 0xffffffffffffd540#64 = KA.«panic» := by decide
 theorem il_t_valid : KA.«ilock» + 0x1c#64 + BitVec.signExtend 64 26#13 = KA.«ilock» + 0x36#64 := by
   decide
@@ -167,7 +167,7 @@ theorem ilPins5_of6 (k : KCtx) (R : RegMap) (h : ilPins6 k R) :
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false] <;> assumption
 
 /-- The epilogue's callee-saved conclusion. -/
-theorem il_calleeSaved_epi (k : KCtx) (R : RegMap) (h : ilPins5 k R) :
+theorem ilk_calleeSaved_epi (k : KCtx) (R : RegMap) (h : ilPins5 k R) :
     calleeSaved k.regs ((((R.set 1#5 (k.regs 1#5)).set 8#5 (k.regs 8#5)).set 9#5 (k.regs 9#5)).set 2#5
       (k.regs 2#5)) := by
   obtain ⟨h18, h19, h20, h21, h22, h23, h24, h25, h26, h27⟩ := h

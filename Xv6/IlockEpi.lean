@@ -89,7 +89,7 @@ theorem il_epi [Fscfg] [Icfg] [CurCtx] (cpu c : CPU) (k : KCtx) (spie spp : Bool
   iapply HΦ $$ %spie %spp %_ %dn %bm %filled [] Hfl Hk Hpc Htc Hcl Hir Hpid Hsb Hsl Hslk Hdep Hoff
     Hidev Hinum Hval Hload Hshot Hfoff [] Hwb []
   · ipureintro
-    exact il_calleeSaved_epi k R hpins
+    exact ilk_calleeSaved_epi k R hpins
   · ipureintro; exact hfr
   · ipureintro; exact hpost
 

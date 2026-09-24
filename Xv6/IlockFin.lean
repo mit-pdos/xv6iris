@@ -29,7 +29,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx]
 
 /-- `brelse` at its call site. -/
-theorem il_brelse (BE : BRELSE) (Γ : SchedNames)
+theorem ilk_brelse (BE : BRELSE) (Γ : SchedNames)
     (c : CPU) (k' : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView GF) (kb : Nat)
     (pidv dev bno : BitVec 32) (dqp : DFrac) (bs bsd : List (BitVec 8)) (d : Bool)
     (pj : BitVec 64) (hpj : k'.proc = pj)
@@ -101,9 +101,9 @@ theorem il_fin (BL : BRELSE) (PA : PANIC)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hs2]
   iintro Hk Hpc
   k_step (wp_s_jal c _ (KA.«ilock» + 0x90#64) false 2095584#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [il_br_brelse]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ilk_br_brelse]
   iintro Hk Hpc
-  iapply (il_brelse BL Γ c _ γl fscBio _ kb pidv icfgDev bno dqp bs bsd db k.proc (by k_norm_g)
+  iapply (ilk_brelse BL Γ c _ γl fscBio _ kb pidv icfgDev bno dqp bs bsd db k.proc (by k_norm_g)
       ?rnoff ?rK ?rlk ?rsl ?rp ?rtier hkb ?ra0)
     $$ [- $Hk $Hpc $Hpi $Hbc $Hpid $Hlk]
   rotate_right 1

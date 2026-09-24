@@ -63,14 +63,15 @@ import Xv6.InodeRegionInv
 import Xv6.FsCfgDefs
 import Xv6.SpecAcquire
 import Xv6.SpecRelease
+import Xv6.FsEnv
 
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
-/-- Address of `idup`. -/
-def idupAddr : BitVec 64 := KA.«idup»
+/- `idupAddr` (= `KA.«idup»`) is `Xv6/FsEnv.lean`'s; when wave 7 retires
+FsEnv's abstract entries, move it here. -/
 
 /-- idup's stack budget (Rocq `K_idup`): its own 4-slot frame over
 acquire's/release's 10. -/

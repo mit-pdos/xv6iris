@@ -24,7 +24,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx]
 
 /-- `bread` at its call site. -/
-theorem il_bread (BD : BREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem ilk_bread (BD : BREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (c : CPU) (k' : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (pidv dev bno : BitVec 32) (dqp : DFrac)
     (pj : BitVec 64) (hpj : k'.proc = pj)
@@ -118,11 +118,11 @@ theorem il_load (BD : BREAD) (MM : MEMMOVE) (BL : BRELSE) (PA : PANIC) : IlLoad 
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hs1, iDev]
   iintro Hk Hpc Hidev
   k_step (wp_s_jal c _ (KA.«ilock» + 0x4a#64) false 2095390#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [il_br_bread]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ilk_br_bread]
   iintro Hk Hpc
   ihave #Hdc' := (show diskCaps (GF := GF) fscDisk fscDlock pd pav pu ⊢
       diskCaps (fsView (GF := GF) fscFs fscDisk icfgDev fscCov).gd fscDlock pd pav pu from .rfl) $$ Hdc
-  iapply (il_bread BD Γ c _ γl fscBio (fsView fscFs fscDisk icfgDev fscCov) fscDlock pd pav pu j
+  iapply (ilk_bread BD Γ c _ γl fscBio (fsView fscFs fscDisk icfgDev fscCov) fscDlock pd pav pu j
       pidv icfgDev (BitVec.ofNat 32 (IBLOCK inum icfgIst)) dqp k.proc (by k_norm_g) hj ?dproc ?dK
       ?dsie ?dnoff ?dlocks ?dtier ?dbno ?dcov rfl hpd ?da0 ?da1)
     $$ [- $Hk $Hpc $Hpi $Htc $Hcl $Hir $Hbc $Hdc' $Hpe $Hpid $Hbsl]
