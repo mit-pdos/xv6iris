@@ -672,3 +672,6 @@ import Xv6.ItruncELoop
 import Xv6.ItruncArm
 import Xv6.ProofItrunc
 import Xv6.LinkItrunc
+import Xv6.SpecFetchaddr
+import Xv6.ProofFetchaddr
+import Xv6.LinkFetchaddr
