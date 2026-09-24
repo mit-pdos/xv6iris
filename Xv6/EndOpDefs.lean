@@ -995,7 +995,7 @@ theorem eo_res_elim (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
         (X : RegMapF (Nat × Nat)) (T : RegMapF Unit) (nxo nxt nxl : Nat),
       wordAtN ξ lOut 4 (DFrac.own 1) (BitVec.ofNat 32 out) ∗
       wordAtN ξ lNcommit 4 (DFrac.own 1) nc ∗
-      (γ.ops ↪●MAP om) ∗ logEpochAuth γ E ∗ logRegAuth γ X ∗ (γ.tx ↪●MAP T) ∗
+      (γ.ops ↪●MAP om) ∗ logEpochAuth γ E ∗ logRegAuth γ X ∗ logTxAuth γ T ∗
       ⌜(FiniteMap.toList om).length = out⌝ ∗
       ⌜∀ i e, PartialMap.get? om i = some e → e.bud ≤ MAXOPBLOCKS⌝ ∗ ⌜out ≤ 3⌝ ∗
       ⌜∀ i, nxo ≤ i → PartialMap.get? om i = none⌝ ∗ ⌜1 ≤ E⌝ ∗
@@ -1063,7 +1063,7 @@ theorem eo_res_intro (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     wordAtN ξ lOut 4 (DFrac.own 1) (BitVec.ofNat 32 out) ∗
     wordAtN ξ lCmt 4 (DFrac.own 1) (if cmt then 1#32 else 0#32) ∗
     wordAtN ξ lNcommit 4 (DFrac.own 1) nc ∗
-    (γ.ops ↪●MAP om) ∗ logEpochAuth γ E ∗ logRegAuth γ X ∗ (γ.tx ↪●MAP T) ∗
+    (γ.ops ↪●MAP om) ∗ logEpochAuth γ E ∗ logRegAuth γ X ∗ logTxAuth γ T ∗
     (if cmt then iprop(emp) else eoBatch γ γb γfs cov ls om E X ξ)
     ⊢ logResAt (GF := GF) γ γb γfs cov ls ξ := by
   unfold logResAt eoBatch
@@ -1108,7 +1108,7 @@ theorem eo_res_intro_f (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     wordAtN ξ lOut 4 (DFrac.own 1) (BitVec.ofNat 32 out) ∗
     wordAtN ξ lCmt 4 (DFrac.own 1) (0#32 : BitVec 32) ∗
     wordAtN ξ lNcommit 4 (DFrac.own 1) nc ∗
-    (γ.ops ↪●MAP om) ∗ logEpochAuth γ E ∗ logRegAuth γ X ∗ (γ.tx ↪●MAP T) ∗
+    (γ.ops ↪●MAP om) ∗ logEpochAuth γ E ∗ logRegAuth γ X ∗ logTxAuth γ T ∗
     eoBatch γ γb γfs cov ls om E X ξ
     ⊢ logResAt (GF := GF) γ γb γfs cov ls ξ :=
   eo_res_intro γ γb γfs cov ls ξ out false nc om E X T nxo nxt nxl hlen
@@ -1133,7 +1133,7 @@ theorem eo_res_intro_t (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     wordAtN ξ lOut 4 (DFrac.own 1) (BitVec.ofNat 32 out) ∗
     wordAtN ξ lCmt 4 (DFrac.own 1) (1#32 : BitVec 32) ∗
     wordAtN ξ lNcommit 4 (DFrac.own 1) nc ∗
-    (γ.ops ↪●MAP om) ∗ logEpochAuth γ E ∗ logRegAuth γ X ∗ (γ.tx ↪●MAP T)
+    (γ.ops ↪●MAP om) ∗ logEpochAuth γ E ∗ logRegAuth γ X ∗ logTxAuth γ T
     ⊢ logResAt (GF := GF) γ γb γfs cov ls ξ := by
   iintro ⟨Hout, Hcmt, Hnc, Hops, Hep, Hreg, Htx⟩
   iapply (eo_res_intro γ γb γfs cov ls ξ out true nc om E X T nxo nxt nxl hlen

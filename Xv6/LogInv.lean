@@ -201,13 +201,6 @@ def logOpS (γ : LogNames) (u : Nat) (Sb : List Nat) : IProp GF :=
 /-- The form every existing caller uses (Rocq's `log_opb`). -/
 def logOpb (γ : LogNames) (u : Nat) : IProp GF := iprop(∃ Sb : List Nat, logOpS γ u Sb)
 
-/-- **THE OPEN TRANSACTION** (Rocq's `log_tx`): one element per
-transaction that is open right now, at the unit value -- the element says
-only that its id EXISTS.  Minted by `begin_op`, consumed whole by
-`end_op`; the id is existential and no client ever names it, because
-`logRes` ties the ledger to the transactions by CARDINALITY. -/
-def logTx (γ : LogNames) : IProp GF := iprop(∃ t : Nat, γ.tx ↪◯MAP[t] ())
-
 /-- Rocq's `log_op`. -/
 def logOp (γ : LogNames) (u : Nat) : IProp GF := iprop(logOpb γ u ∗ logTx γ)
 
@@ -217,8 +210,6 @@ instance logOpS_timeless (γ : LogNames) (u : Nat) (Sb : List Nat) :
     Timeless (logOpS (GF := GF) γ u Sb) := by unfold logOpS; infer_instance
 instance logOpb_timeless (γ : LogNames) (u : Nat) :
     Timeless (logOpb (GF := GF) γ u) := by unfold logOpb; infer_instance
-instance logTx_timeless (γ : LogNames) : Timeless (logTx (GF := GF) γ) := by
-  unfold logTx; infer_instance
 instance logOp_timeless (γ : LogNames) (u : Nat) :
     Timeless (logOp (GF := GF) γ u) := by unfold logOp; infer_instance
 
@@ -434,7 +425,7 @@ def logResAt (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     logRegAuth γ X ∗ ⌜∀ i, nxl ≤ i → PartialMap.get? X i = none⌝ ∗
     ⌜∀ i e, PartialMap.get? om i = some e → e.ep = E⌝ ∗
     ⌜∀ i p, PartialMap.get? X i = some p → p.1 ≤ E⌝ ∗
-    (γ.tx ↪●MAP T) ∗ ⌜∀ i, nxt ≤ i → PartialMap.get? T i = none⌝ ∗
+    logTxAuth γ T ∗ ⌜∀ i, nxt ≤ i → PartialMap.get? T i = none⌝ ∗
     -- ...and the transactions are tied to the ledger the same way: a
     -- retiring transaction never names its id, so nothing can relate it to
     -- the ledger entry the same `end_op` retires, and both retires drop
@@ -645,34 +636,6 @@ theorem logEndStep (γ : LogNames) (om : RegMapF OpEntry) (u : Nat) :
     $$ H He with Ha
   imodintro
   iexists i, Sb, e0
-  isplitr [Ha]
-  · ipureintro; exact hlk
-  · iexact Ha
-
-/-- **`begin_op`'s transaction mint** (Rocq's `log_tx_mint`). -/
-theorem logTxMint (γ : LogNames) (T : RegMapF Unit) (nxt : Nat)
-    (hfresh : ∀ i, nxt ≤ i → PartialMap.get? T i = none) :
-    (γ.tx ↪●MAP T) ⊢ |==> ((γ.tx ↪●MAP PartialMap.insert T nxt ()) ∗ logTx (GF := GF) γ) := by
-  iintro H
-  imod (ghost_map_insert (γ := γ.tx) (m := T) nxt () (hfresh nxt (Nat.le_refl _))) $$ H
-    with ⟨Ha, He⟩
-  imodintro
-  iframe Ha
-  unfold logTx
-  iexists nxt
-  iexact He
-
-/-- **`end_op`'s transaction retire** (Rocq's `log_tx_retire`): the id is
-never named -- the tie is CARDINALITY. -/
-theorem logTxRetire (γ : LogNames) (T : RegMapF Unit) :
-    (γ.tx ↪●MAP T) ⊢ logTx (GF := GF) γ -∗
-      |==> (∃ t : Nat, ⌜PartialMap.get? T t = some ()⌝ ∗ (γ.tx ↪●MAP PartialMap.delete T t)) := by
-  unfold logTx
-  iintro H ⟨%t, He⟩
-  ihave %hlk := ghost_map_lookup $$ H He
-  imod (ghost_map_delete (γ := γ.tx) (m := T) (k := t) (v := ())) $$ H He with Ha
-  imodintro
-  iexists t
   isplitr [Ha]
   · ipureintro; exact hlk
   · iexact Ha

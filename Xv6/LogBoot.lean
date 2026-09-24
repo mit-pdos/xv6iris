@@ -16,10 +16,11 @@ It lives in the definitional layer (no `Code*`/`Proof*` import) so that
 `Xv6/ProofInitlog.lean` reads as the instruction walk it is; the file it
 would otherwise belong to (`Xv6/LogInv.lean`) is owned by another agent.
 
-**THE ONE REMAINING RESIDUAL IS ALSO HERE** (`Xv6.LogTxAuthBridge`),
-because the Link file has to name it: see its own comment, and
-`Xv6/ProofInitlog.lean`'s header for the audit.  The header block's clean
-tie -- what used to be a second named hypothesis here -- is now DISCHARGED
+The former `LogTxAuthBridge` residual (a `GhostMapG` instance collision
+between `BcacheG.gmSlotG` and `LogG.gmTx`) is GONE: `Xv6/LogDefs.lean` now
+names the transaction authority (`Xv6.logTxAuth`) and every statement goes
+through it.  The header block's clean tie -- what used to be a second named
+hypothesis here -- is DISCHARGED
 in `Xv6/ProofInitlog.lean` (`Xv6.il_pay_agree`) off the bio layer's payload
 hooks, against `Xv6/SpecInitlog.lean`'s boot premise `hdrN bsHdr = 0`.
 -/
@@ -134,31 +135,6 @@ Both are stated at the Iris level, as ONE entailment, so that neither is a
 Lean-refutable claim about lists: what it says is a fact about resources
 this port's ghost state does not relate, not a false arithmetic. -/
 
-/-- **AN INSTANCE-RESOLUTION DEFECT IN THE DEFINITIONAL LAYER, NOT A DESIGN
-RESIDUAL** -- and a one-line fix in a file this agent may not edit.
-
-`Xv6.BcacheG.gmSlotG` and `Xv6.LogG.gmTx` are BOTH
-`GhostMapG GF Nat Unit RegMapF`.  `Xv6.logResAt` and `Xv6.logTx` are
-elaborated in `Xv6/LogInv.lean`, where `BcacheG` is in scope and wins, so
-their `γ.tx ↪●MAP _` is at `BcacheG.gmSlotG`; `Xv6.logFreeTok` is
-elaborated in `Xv6/LogDefs.lean`, where only `LogG` is in scope, so ITS
-`γ.tx ↪●MAP ∅` is at `LogG.gmTx`.  The log layer is internally consistent
-(every `logTx` move is at `BcacheG.gmSlotG`); the only statement out of
-step is the genesis token, and `initlog` -- its only consumer -- is the
-only place the mismatch can bite.
-
-THE FIX, for whoever owns `Xv6/LogDefs.lean`: give the transaction
-authority a NAME there (`def logTxAuth (γ) (T) := γ.tx ↪●MAP T`) and use
-that name in `logFreeTok` and in `Xv6/LogInv.lean`'s `logResAt` / `logTx`,
-exactly as `logRegAuth` and `logEpochAuth` already are -- both of those
-are immune for precisely that reason.  Then this hypothesis is `.rfl`. -/
-def LogTxAuthBridge : Prop :=
-  ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
-    [BcacheG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx] (γ : LogNames),
-    logFreeTok (GF := GF) γ ⊢
-      (γ.ops ↪●MAP (∅ : RegMapF OpEntry)) ∗ logEpochAuth γ 1 ∗
-      logRegAuth γ (∅ : RegMapF (Nat × Nat)) ∗ (γ.tx ↪●MAP (∅ : RegMapF Unit))
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 variable [BcacheG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
@@ -248,8 +224,7 @@ epoch at ONE (`Xv6.logFreeTok`'s value, and the `1 ≤ E` clause is
 established here, at the only place the counter is set rather than bumped),
 and the batch is the pack above. -/
 theorem logResAt_boot (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
-    (cov : Std.ExtTreeSet Nat compare) (logstart : Nat) (nc : BitVec 32)
-    (hbridge : LogTxAuthBridge) :
+    (cov : Std.ExtTreeSet Nat compare) (logstart : Nat) (nc : BitVec 32) :
     wordPointsTo (GF := GF) lOut 4 (DFrac.own 1) 0#32 ∗
     wordPointsTo lCmt 4 (DFrac.own 1) 0#32 ∗
     wordPointsTo lNcommit 4 (DFrac.own 1) nc ∗
@@ -258,7 +233,10 @@ theorem logResAt_boot (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     ⊢ logResAt (GF := GF) γ γb γfs cov logstart curCtx := by
   unfold logResAt
   iintro ⟨Hout, Hcmt, Hnc, Htok, Hbatch⟩
-  ihave ⟨Hops, Hep, Hreg, Htx⟩ := hbridge (GF := GF) γ $$ Htok
+  ihave ⟨Hops, Hep, Hreg, Htx⟩ := (show logFreeTok (GF := GF) γ ⊢
+      (γ.ops ↪●MAP (∅ : RegMapF OpEntry)) ∗ logEpochAuth γ 1 ∗
+      logRegAuth γ (∅ : RegMapF (Nat × Nat)) ∗ logTxAuth γ (∅ : RegMapF Unit) from by
+    unfold logFreeTok; iintro H; iexact H) $$ Htok
   ihave Hout := (show wordPointsTo (GF := GF) lOut 4 (DFrac.own 1) 0#32 ⊢
       wordAtN curCtx lOut 4 (DFrac.own 1) 0#32 from by rw [wordAtN_cur]) $$ Hout
   ihave Hcmt := (show wordPointsTo (GF := GF) lCmt 4 (DFrac.own 1) 0#32 ⊢

@@ -44,16 +44,11 @@ still forced here rather than derived, because this port's
 CLIENT HALF -- its own deviation -- and `SpecInitlog`'s precondition hands
 out client halves only for the log's own region.)
 
-**WHAT THIS PROOF STILL ASSUMES, AND WHY.**  One named hypothesis, defined
-and argued in `Xv6/LogBoot.lean`:
-
-* `Xv6.LogTxAuthBridge` -- a plain instance-resolution DEFECT in the
-  definitional layer (`BcacheG.gmSlotG` and `LogG.gmTx` are the same
-  `GhostMapG` type, and `logResAt` picks the first while `logFreeTok`
-  picks the second).  See its comment for the one-line fix.
-
-It is not a Lean-refutable statement: it is an entailment between two
-spellings of the same authority that instance resolution picks apart.
+**THIS PROOF ASSUMES NOTHING BEYOND ITS CALLEES' CONTRACTS.**  The former
+`LogTxAuthBridge` hypothesis (a `GhostMapG` instance collision between
+`BcacheG.gmSlotG` and `LogG.gmTx`) is retired: `Xv6/LogDefs.lean` names the
+transaction authority (`Xv6.logTxAuth`) and `logFreeTok`, `logResAt` and
+every log proof go through that name.
 -/
 import Xv6.SpecInitlog
 import Xv6.LogBoot
@@ -483,7 +478,7 @@ set_option maxHeartbeats 8000000 in
 the raw cells and the block-view material (`Xv6/LogBoot.lean`), SEAL the
 "log" spinlock over it (`MachCSL.kctx_newlock`), run the epilogue and hand
 the caller back `Xv6.logCtx`. -/
-theorem il_seal (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (hbridge : LogTxAuthBridge)
+theorem il_seal (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu c : CPU) (k : KCtx) (spie1 spp1 : Bool) (R : RegMap)
     (γ : LogNames) (γb : BcacheNames) (γfs : FsNames) (V : BioView GF)
     (logstart : Nat) (dev pidv vNc : BitVec 32) (sb : BitVec 64) (dqp dqs : DFrac)
@@ -531,7 +526,7 @@ theorem il_seal (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (hbridge : LogTxA
   ihave Hbatch := logStateAt_boot γb γfs V.cov logstart (opPending (∅ : RegMapF OpEntry))
       L D bsh $$ [HlhN Hjunk HL HD Hd Hhdr Hslots Hpool]
   case' _ => iframe
-  ihave Hres := logResAt_boot γ γb γfs V.cov logstart vNc hbridge
+  ihave Hres := logResAt_boot γ γb γfs V.cov logstart vNc
       $$ [Hout Hcmt Hnc Htok Hbatch]
   case' _ => iframe
   -- the seal
@@ -587,7 +582,7 @@ section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
 set_option maxHeartbeats 32000000 in
-theorem initlog_proof (hbridge : LogTxAuthBridge)
+theorem initlog_proof
     (IL : INITLOCK) (BD : BREAD) (BE : BRELSE) (IT : INSTALL_TRANS) (WH : WRITE_HEAD) :
     INITLOG := ⟨
   fun {hlc GF} _ _ _ _ _ _ _ _ Γ _ cpu k γ γl γb V γdl γfs pd pav pu j logstart dev sb
@@ -866,7 +861,7 @@ theorem initlog_proof (hbridge : LogTxAuthBridge)
   obtain ⟨g2, g8, g9, g18, g19, g20, g21, g22, g23, g24, g25, g26, g27⟩ := hcs5
   ihave Hs2 := il_slots_join2 γb $$ [Hu1 Hu2]
   case' _ => iframe
-  iapply (il_seal Γ hbridge c2 c6 k spie6 spp6 R5 γ γb γfs V logstart dev pidv vNc sb dqp dqs
+  iapply (il_seal Γ c2 c6 k spie6 spp6 R5 γ γb γfs V logstart dev pidv vNc sb dqp dqs
       (PartialMap.insert L (logHdrBno logstart) bs') D bs' hK6 hsie
       ((g2.trans f2).trans ((d2.trans b2).trans a2'))
       ((g20.trans f20).trans ((d20.trans b20).trans a20'))

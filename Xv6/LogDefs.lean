@@ -553,6 +553,59 @@ theorem logMintLogged (γ : LogNames) (X : RegMapF (Nat × Nat)) (nx e b : Nat)
   iexists nx
   iexact Hf
 
+/-! ## The transactions -/
+
+/-- **THE TRANSACTION AUTHORITY, NAMED** (as `logRegAuth` and
+`logEpochAuth` are).  `LogG.gmTx` and `BcacheG.gmSlotG` are the same
+`GhostMapG GF Nat Unit RegMapF` type; a raw `γ.tx ↪●MAP T` elaborated where
+both are in scope picks whichever instance wins, so every statement about the
+transactions goes through this name, which pins `LogG.gmTx`. -/
+def logTxAuth (γ : LogNames) (T : RegMapF Unit) : IProp GF := γ.tx ↪●MAP T
+
+instance logTxAuth_timeless (γ : LogNames) (T : RegMapF Unit) :
+    Timeless (logTxAuth (GF := GF) γ T) := by unfold logTxAuth; infer_instance
+
+/-- **THE OPEN TRANSACTION** (Rocq's `log_tx`): one element per
+transaction that is open right now, at the unit value -- the element says
+only that its id EXISTS.  Minted by `begin_op`, consumed whole by
+`end_op`; the id is existential and no client ever names it, because
+`logRes` ties the ledger to the transactions by CARDINALITY. -/
+def logTx (γ : LogNames) : IProp GF := iprop(∃ t : Nat, γ.tx ↪◯MAP[t] ())
+
+instance logTx_timeless (γ : LogNames) : Timeless (logTx (GF := GF) γ) := by
+  unfold logTx; infer_instance
+
+/-- **`begin_op`'s transaction mint** (Rocq's `log_tx_mint`). -/
+theorem logTxMint (γ : LogNames) (T : RegMapF Unit) (nxt : Nat)
+    (hfresh : ∀ i, nxt ≤ i → PartialMap.get? T i = none) :
+    logTxAuth (GF := GF) γ T ⊢
+      |==> (logTxAuth γ (PartialMap.insert T nxt ()) ∗ logTx (GF := GF) γ) := by
+  unfold logTxAuth
+  iintro H
+  imod (ghost_map_insert (γ := γ.tx) (m := T) nxt () (hfresh nxt (Nat.le_refl _))) $$ H
+    with ⟨Ha, He⟩
+  imodintro
+  iframe Ha
+  unfold logTx
+  iexists nxt
+  iexact He
+
+/-- **`end_op`'s transaction retire** (Rocq's `log_tx_retire`): the id is
+never named -- the tie is CARDINALITY. -/
+theorem logTxRetire (γ : LogNames) (T : RegMapF Unit) :
+    logTxAuth (GF := GF) γ T ⊢ logTx (GF := GF) γ -∗
+      |==> (∃ t : Nat, ⌜PartialMap.get? T t = some ()⌝ ∗
+        logTxAuth γ (PartialMap.delete T t)) := by
+  unfold logTxAuth logTx
+  iintro H ⟨%t, He⟩
+  ihave %hlk := ghost_map_lookup $$ H He
+  imod (ghost_map_delete (γ := γ.tx) (m := T) (k := t) (v := ())) $$ H He with Ha
+  imodintro
+  iexists t
+  isplitr [Ha]
+  · ipureintro; exact hlk
+  · iexact Ha
+
 /-- **THE FOUR GNAMES' FREE STATE, AS ONE TOKEN** (Rocq's `log_free_tok`):
 the names at their GENESIS VALUES, in exactly the shape `Xv6.logResAt`
 wants them.  GENESIS IS EPOCH ONE, not zero: the region receipt's "never
@@ -565,9 +618,9 @@ not here: this port's lock library mints the lock's ghost name at the
 seal (`MachCSL.kctx_newlock`), so there is nothing to hand in. -/
 def logFreeTok (γ : LogNames) : IProp GF := iprop%
   (γ.ops ↪●MAP (∅ : RegMapF OpEntry)) ∗
-  MonoNat.auth_own γ.ep (DFrac.own 1) (.ofNat 1) ∗
-  (γ.lg ↪●MAP (∅ : RegMapF (Nat × Nat))) ∗
-  (γ.tx ↪●MAP (∅ : RegMapF Unit))
+  logEpochAuth γ 1 ∗
+  logRegAuth γ (∅ : RegMapF (Nat × Nat)) ∗
+  logTxAuth γ (∅ : RegMapF Unit)
 
 theorem logGhostAlloc (γlk : GName) :
     ⊢ |==> (∃ γ : LogNames, ⌜γ.lk = γlk⌝ ∗ logFreeTok (GF := GF) γ) := by
@@ -582,7 +635,7 @@ theorem logGhostAlloc (γlk : GName) :
   iexists ⟨γlk, γo, γe, γg, γt⟩
   isplitr [Ho He Hg Ht]
   · ipureintro; rfl
-  unfold logFreeTok
+  unfold logFreeTok logEpochAuth logRegAuth logTxAuth
   iframe Ho He Hg Ht
 
 /-- ...and using one (Rocq's `logged_at_in`). -/

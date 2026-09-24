@@ -2,13 +2,10 @@
 `initlog` meets its specification, closed with the proved `initlock`,
 `bread`, `brelse`, `install_trans` (recovering arm) and `write_head`.
 
-**IT IS NOT CLOSED IN ONE NAMED HYPOTHESIS**, and cannot be until the file
-it belongs to changes; `Xv6/ProofInitlog.lean`'s header and the definition
-in `Xv6/LogBoot.lean` say exactly why.
-
-* `Xv6.LogTxAuthBridge` -- a `GhostMapG` instance collision between
-  `BcacheG.gmSlotG` and `LogG.gmTx`; one line in `Xv6/LogDefs.lean` and
-  `Xv6/LogInv.lean` retires it.
+**CLOSED WITH NO NAMED HYPOTHESIS.**  The former `LogTxAuthBridge` (a
+`GhostMapG` instance collision between `BcacheG.gmSlotG` and `LogG.gmTx`) is
+retired by naming the transaction authority in `Xv6/LogDefs.lean`
+(`Xv6.logTxAuth`).
 
 The header block's clean tie -- the second hypothesis this file used to
 carry -- is GONE: the bio layer's payload hooks (`Xv6.bioLocked` /
@@ -25,8 +22,8 @@ import Xv6.LinkWriteHead
 
 namespace Xv6
 
-/-- The proved `initlog` interface, modulo the one residual. -/
-theorem Initlog (hbridge : LogTxAuthBridge) : INITLOG :=
-  initlog_proof hbridge Initlock Bread Brelse InstallTrans WriteHead
+/-- The proved `initlog` interface. -/
+theorem Initlog : INITLOG :=
+  initlog_proof Initlock Bread Brelse InstallTrans WriteHead
 
 end Xv6
