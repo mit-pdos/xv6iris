@@ -41,6 +41,11 @@ keep the Rocq form.
 
 ## 1. Templates and idioms (read before writing)
 
+**LAYERING (tools/check_layering.sh; learned in wave 1):** a Proof*/Link* file must NOT import another
+Proof*/Link* file, and no non-Proof file may import a Proof file. Multi-file proofs: stage/part files
+are named WITHOUT the Proof prefix (`BallocParts.lean`, `IgetTail.lean`; cf. PipeRw.lean, WaitLock.lean),
+import only Spec/definitional files and each other, and exactly ONE `Proof<Fn>.lean` imports them.
+
 - **The fs.c template.** `Xv6/SpecIinit.lean`, `Xv6/ProofIinit.lean` and `Xv6/LinkIinit.lean`
   (iinit is proved). The shape:
   - `def wp_<f>_body … (hK : N ≤ k.avail) … : Prop := kctx cpu k ∗ pcIs cpu <f>Addr ∗ … ∗ wpNext k.sie k.proc cpu (fun cpu' => …) ⊢ wpLoop cpu`

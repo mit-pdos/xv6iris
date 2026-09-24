@@ -596,3 +596,4 @@ import Xv6.IcachePinwLw
 import Xv6.SpecStati
 import Xv6.ProofStati
 import Xv6.LinkStati
+import Xv6.IcacheBootTable

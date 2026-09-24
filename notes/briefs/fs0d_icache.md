@@ -251,7 +251,7 @@ Deps name batch items; "gate" = §1 plus the in-flight files.
 - [DONE] H2 IcacheCover — G2, B7.
 
 **Batch I (1)**
-- I1 IcacheBootTable — H1, G4, C5. It is consumed only by the deferred boot kits (FsCfgKits/FsCfgSnap).
+- [DONE] I1 IcacheBootTable — H1, G4, C5. It is consumed only by the deferred boot kits (FsCfgKits/FsCfgSnap).
   It may be deferred if the WpLockAt/SepThread/MemClaim analogues are not there. `icache_boot` is
   superseded by `icache_boot_at` (§5).
 
