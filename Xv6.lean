@@ -650,3 +650,6 @@ import Xv6.BlkmapBuf
 import Xv6.SpecSysFork
 import Xv6.ProofSysFork
 import Xv6.LinkSysFork
+import Xv6.SpecSysKill
+import Xv6.ProofSysKill
+import Xv6.LinkSysKill
