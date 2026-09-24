@@ -334,6 +334,358 @@ theorem bd_bss_split (V : BioView) (i : Nat) (hcov0 : (0#32 : BitVec 32).toNat �
   iframe Hv Hd1 Hb1 Hdk Hdata
   iapply bufPay_uncov V 0#32 0#32 0#32 bs hcov0
 
+/-! ## The thirty boot rows, at one floor slot -/
+
+/-- The escrows' boot rows, split into the four columns the cache seats them
+in, at the MAXIMUM of their boot stamps (Rocq's `big_sepL_llb_max`). -/
+theorem bd_rows_split (V : BioView) (bx : Nat → BoxNames) :
+    ∀ n : Nat,
+      (([∗list] j ∈ List.range n, bufBoxRow (GF := GF) V (bx j) j
+          (1 : Qp).half (1 : Qp).half 0#32 0#32) ⊢
+        ∃ tl : Nat, topLb tl ∗
+          ([∗list] j ∈ List.range n, bufBox V (bx j) j (1 : Qp).half (1 : Qp).half) ∗
+          ([∗list] j ∈ List.range n, bufSlotRegs (bx j) tl 0#32 0#32) ∗
+          ([∗list] j ∈ List.range n, cntHalf (bx j) 0) ∗
+          ([∗list] j ∈ List.range n, slotpHalf (bx j) (⟨0, none⟩ : L2Reg BufId))) := by
+  intro n
+  induction n with
+  | zero =>
+    iintro -
+    iexists 0
+    isplitl []
+    · iapply topLbAt_0
+    simp only [List.range_zero]
+    isplitl []
+    · iapply BigSepL.bigSepL_nil.2; itrivial
+    isplitl []
+    · iapply BigSepL.bigSepL_nil.2; itrivial
+    isplitl []
+    · iapply BigSepL.bigSepL_nil.2; itrivial
+    · iapply BigSepL.bigSepL_nil.2; itrivial
+  | succ n ih =>
+    rw [List.range_succ]
+    iintro H
+    icases BigSepL.bigSepL_append.1 $$ H with ⟨H1, H2⟩
+    icases ih $$ H1 with ⟨%tl, #Htl, Hbx, Hrg, Hc, Hp⟩
+    ihave H2 := BigSepL.bigSepL_singleton.1 $$ H2
+    icases (show bufBoxRow (GF := GF) V (bx n) n (1 : Qp).half (1 : Qp).half 0#32 0#32 ⊢
+        bufBox V (bx n) n (1 : Qp).half (1 : Qp).half ∗
+        (∃ r : SlotReg BufId BufX, slotdHalf (bx n) r ∗
+          ⌜r.win = false ∧ r.x = none ∧ r.ident = ((0#32, 0#32) : BufId)⌝ ∗ topLb r.td) ∗
+        cntHalf (bx n) 0 ∗ slotpHalf (bx n) (⟨0, none⟩ : L2Reg BufId) from by
+      unfold bufBoxRow; iintro H; iexact H) $$ H2 with ⟨#Hbn, ⟨%r, Hrd, %hr, #Htd⟩, Hcn, Hpn⟩
+    iexists (max tl r.td)
+    isplitl []
+    · iapply topLb_max tl r.td
+      isplit
+      · iexact Htl
+      · iexact Htd
+    isplitl [Hbx]
+    · iapply BigSepL.bigSepL_append.2
+      isplitl [Hbx]
+      · iexact Hbx
+      · iapply BigSepL.bigSepL_singleton.2
+        iexact Hbn
+    isplitl [Hrg Hrd]
+    · iapply BigSepL.bigSepL_append.2
+      isplitl [Hrg]
+      · iapply BigSepL.bigSepL_mono_of_forall
+          (Φ := fun _ j => bufSlotRegs (GF := GF) (bx j) tl 0#32 0#32)
+          (Ψ := fun _ j => bufSlotRegs (GF := GF) (bx j) (max tl r.td) 0#32 0#32)
+          (fun {_ j} => bufSlotRegs_mono (bx j) tl (max tl r.td) (by omega) 0#32 0#32) $$ Hrg
+      · iapply BigSepL.bigSepL_singleton.2
+        ihave Hrg' := bufSlotRegs_intro (bx n) r (max tl r.td) 0#32 0#32 hr.1 hr.2.1 hr.2.2
+          (by omega) $$ [Hrd Htd]
+        case' _ => iframe Hrd Htd
+        iexact Hrg'
+    isplitl [Hc Hcn]
+    · iapply BigSepL.bigSepL_append.2
+      isplitl [Hc]
+      · iexact Hc
+      · iapply BigSepL.bigSepL_singleton.2
+        iexact Hcn
+    · iapply BigSepL.bigSepL_append.2
+      isplitl [Hp]
+      · iexact Hp
+      · iapply BigSepL.bigSepL_singleton.2
+        iexact Hpn
+
+/-- The pool at boot: no buffer caches anything (every blockno cell is `0`,
+which the view does not cover). -/
+theorem bioPool_boot (V : BioView) (h0 : (0 : Nat) ∉ V.cov) :
+    (iprop([∗set] b ∈ V.cov, poolBlk (GF := GF) V b)) ⊢ bioPool V (fun _ => 0#32) := by
+  unfold bioPool
+  refine BigSepS.bigSepS_mono (fun {b} hb => ?_)
+  have hb0 : (0#32 : BitVec 32).toNat = 0 := by decide
+  rw [not_bcached (fun _ => 0#32) b (fun j _ he => h0 (by rw [← hb0, he]; exact hb))]
+  simp only [Bool.false_eq_true, if_false]
+  exact .rfl
+
+/-! ## The kernel map at the buffers' sleeplocks -/
+
+theorem bd_slk_addr (j : Nat) : slLk (aBufLock (bnode j)) = bnode j + BitVec.ofNat 64 24 := by
+  unfold slLk aBufLock bOffLock
+  rw [BitVec.add_assoc]
+  congr 1
+
+theorem bd_slk_addr16 (j : Nat) :
+    slLk (aBufLock (bnode j)) + 16#64 = bnode j + BitVec.ofNat 64 40 := by
+  rw [bd_slk_addr, BitVec.add_assoc]
+  congr 1
+
+theorem bd_kmap_all (n : Nat) (hn : n ≤ NBUF) :
+    kmapStatic (GF := GF) ⊢ [∗list] j ∈ List.range n,
+      (kmapId (slLk (aBufLock (bnode j))) ∗ kmapId (slLk (aBufLock (bnode j)) + 16#64)) := by
+  induction n with
+  | zero =>
+    simp only [List.range_zero]
+    iintro -
+    iapply BigSepL.bigSepL_nil.2
+    itrivial
+  | succ n ih =>
+    rw [List.range_succ]
+    iintro #HS
+    iapply BigSepL.bigSepL_append.2
+    isplitl []
+    · iapply ih (by omega)
+      iexact HS
+    iapply BigSepL.bigSepL_singleton.2
+    isplitl []
+    · rw [bd_slk_addr n]
+      iapply kmapStatic_rw _ (bnode_off_kmapRw n 24 (by omega) (by decide))
+      iexact HS
+    · rw [bd_slk_addr16 n]
+      iapply kmapStatic_rw _ (bnode_off_kmapRw n 40 (by omega) (by decide))
+      iexact HS
+
+/-! ## The whole cache, born -/
+
+set_option maxHeartbeats 16000000 in
+/-- **THE BUFFER CACHE, BORN** (Rocq's `bio_init`). -/
+theorem bioInit (cpu : CPU) (k : KCtx) (V : BioView) (hcov0 : (0 : Nat) ∉ V.cov) :
+    kctx cpu k ∗ lkFresh bcacheLockAddr ∗
+    wordAtN curCtx (bNext bhead) 8 (DFrac.own 1) (bufAddr (NBUF - 1)) ∗
+    wordAtN curCtx (bPrev bhead) 8 (DFrac.own 1) (bufAddr 0) ∗
+    ([∗list] i ∈ List.range NBUF, sleepLockInited (aBufLock (bnode i)) bufferNameAddr) ∗
+    ([∗list] i ∈ List.range NBUF, bdLinks curCtx i) ∗
+    ([∗list] i ∈ List.range NBUF, bdBss curCtx i) ∗
+    ([∗set] b ∈ V.cov, poolBlk V b)
+    ⊢ |={⊤}=> (kctx (GF := GF) cpu k ∗
+      ∃ (γl : GName) (γ : BcacheNames), bioCtx γl γ V ∗ bslots γ BSLOTS) := by
+  iintro ⟨Hk, Hfresh, Hhn, Hhp, Hslki, Hlinks, Hbss, Hpool⟩
+  icases kctx_kmapStatic _ _ $$ Hk with ⟨#HS, Hk⟩
+  ihave Hpool := bioPool_boot V hcov0 $$ Hpool
+  ihave Hlru := bd_lru_boot curCtx $$ [Hhn Hhp Hlinks]
+  case' _ => iframe Hhn Hhp Hlinks
+  -- the `.bss` cells, split the way the cache seats them
+  have hc0 : (0#32 : BitVec 32).toNat ∉ V.cov := by
+    rw [show (0#32 : BitVec 32).toNat = 0 from by decide]; exact hcov0
+  ihave Hbss := BigSepL.bigSepL_mono_of_forall
+    (Φ := fun _ i => bdBss (GF := GF) curCtx i)
+    (Ψ := fun _ i => iprop((∃ bs : List (BitVec 8),
+        bufTravelV V i (1 : Qp).half (1 : Qp).half 0#32 0#32 0#32 bs) ∗
+      wordAtN curCtx (aBufDev (bnode i)) 4 (DFrac.own (1 : Qp).half) 0#32 ∗
+      wordAtN curCtx (aBufBlockno (bnode i)) 4 (DFrac.own (1 : Qp).half) 0#32 ∗
+      wordAtN curCtx (aBufRefcnt (bnode i)) 4 (DFrac.own 1) 0#32))
+    (fun {_ i} => bd_bss_split V i hc0) $$ Hbss
+  icases BigSepL.bigSepL_sep_eqv.1 $$ Hbss with ⟨Htrav, Hbss⟩
+  icases BigSepL.bigSepL_sep_eqv.1 $$ Hbss with ⟨Hdev, Hbss⟩
+  icases BigSepL.bigSepL_sep_eqv.1 $$ Hbss with ⟨Hbno, Hrefc⟩
+  icases bd_funChoose (fun i bs => bufTravelV (GF := GF) V i (1 : Qp).half (1 : Qp).half
+    0#32 0#32 0#32 bs) NBUF $$ Htrav with ⟨%bsf, Htrav⟩
+  -- **THE THIRTY ESCROWS**
+  icases kctx_token_acc cpu k $$ Hk with ⟨Hctx, Hkback⟩
+  imod bufEscrow_allocAll V (1 : Qp).half (1 : Qp).half cpu (fun _ => 0#32) (fun _ => 0#32)
+      (fun _ => 0#32) bsf ⊤ NBUF $$ [Hctx Htrav] with ⟨Hctx, ⟨%bx, Hrows⟩⟩
+  · iframe Hctx Htrav
+  ihave Hk := Hkback $$ Hctx
+  icases bd_rows_split V bx NBUF $$ Hrows with ⟨%tl, #Htl, Hbox, Hrg, Hcnt, Hslotp⟩
+  -- the checkout tokens
+  imod bd_funAlloc (fun (_ : Nat) (γo : GName) => iprop(γo ↪VAR{DFrac.own (1 : Qp)} ()))
+      (fun _ => ghost_var_alloc (GF := GF) (() : Unit)) NBUF with ⟨%fown, Htoks⟩
+  -- **THE THIRTY SLEEPLOCKS**, sealed over the RAW row
+  ihave #Hkm := bd_kmap_all NBUF (Nat.le_refl _) $$ HS
+  ihave Hq := BigSepL.bigSepL_sep_eqv.2 $$ [Hslki Htoks]
+  case' _ => iframe Hslki Htoks
+  ihave Hq := BigSepL.bigSepL_sep_eqv.2 $$ [Hq Hslotp]
+  case' _ => iframe Hq Hslotp
+  ihave Hq := BigSepL.bigSepL_sep_eqv.2 $$ [Hq Hkm]
+  case' _ => iframe Hq Hkm
+  imod bd_funAllocK
+      (fun j => iprop(((sleepLockInited (aBufLock (bnode j)) bufferNameAddr ∗
+          (fown j ↪VAR{DFrac.own (1 : Qp)} ())) ∗
+          slotpHalf (bx j) (⟨0, none⟩ : L2Reg BufId)) ∗
+        (kmapId (slLk (aBufLock (bnode j))) ∗ kmapId (slLk (aBufLock (bnode j)) + 16#64))))
+      (fun j (p : GName × GName) => isSleeplockGen p.1 p.2 (aBufLock (bnode j))
+        (bufSlpRaw (fown j) (bx j)) slUntracked)
+      cpu k
+      (fun j => by
+        iintro ⟨Hk, ⟨⟨Hsli, Htok⟩, Hpp⟩, #Hm1, #Hm2⟩
+        imod kctx_newSleeplock cpu k (aBufLock (bnode j)) bufferNameAddr
+            (bufSlpRaw (fown j) (bx j)) slUntracked $$ [Hk Hsli Hm1 Hm2 Htok Hpp]
+          with ⟨Hk, ⟨%γa, %γb, #Hsl⟩⟩
+        · iframe Hk Hsli Hm1 Hm2
+          iapply bufSlpRaw_boot (fown j) (bx j) curCtx
+          iframe Htok Hpp
+        imodintro
+        iframe Hk
+        iexists ((γa, γb) : GName × GName)
+        iexact Hsl)
+      NBUF $$ [Hk Hq] with ⟨Hk, ⟨%fslk, Hslks⟩⟩
+  · iframe Hk Hq
+  -- **THE NAMES RECORD**, now that every ghost exists
+  imod (ghost_map_alloc_empty (GF := GF) (K := Nat) (V := Nat) (H := RegMapF))
+    with ⟨%γref, Ha⟩
+  imod (ghost_map_alloc_empty (GF := GF) (K := Nat) (V := Unit) (H := RegMapF))
+    with ⟨%γslot, Hsa⟩
+  obtain ⟨γ, h1, h2, h3, h4, h5⟩ : ∃ g : BcacheNames,
+      g.ref = γref ∧ g.slot = γslot ∧ g.slk = fslk ∧ g.own = fown ∧ g.box = bx :=
+    ⟨⟨γref, γslot, fslk, fown, bx⟩, rfl, rfl, rfl, rfl, rfl⟩
+  rw [← h1, ← h2, ← h3, ← h4, ← h5]
+  -- the slot supply
+  imod bslots_build γ BSLOTS (Nat.le_refl _) ∅ (fun i _ => get?_empty i) $$ Hsa
+    with ⟨%Msl, -, -, Hsl⟩
+  -- the key rows
+  ihave Hkey := BigSepL.bigSepL_sep_eqv.2 $$ [Hdev Hbno]
+  case' _ => iframe Hdev Hbno
+  ihave Hkey := BigSepL.bigSepL_sep_eqv.2 $$ [Hkey Hrg]
+  case' _ => iframe Hkey Hrg
+  ihave Hkey := BigSepL.bigSepL_mono_of_forall
+    (Φ := fun _ j => iprop((wordAtN (GF := GF) curCtx (aBufDev (bnode j)) 4
+          (DFrac.own (1 : Qp).half) 0#32 ∗
+        wordAtN curCtx (aBufBlockno (bnode j)) 4 (DFrac.own (1 : Qp).half) 0#32) ∗
+      bufSlotRegs (γ.box j) tl 0#32 0#32))
+    (Ψ := fun _ j => bkeyAt (GF := GF) γ curCtx tl j 0#32 0#32)
+    (fun {_ j} => by
+      iintro ⟨⟨H1, H2⟩, H3⟩
+      iapply bkeyAt_intro γ curCtx tl j 0#32 0#32
+      iframe H1 H2 H3) $$ Hkey
+  ihave Hkey := (show ([∗list] j ∈ List.range NBUF,
+        bkeyAt (GF := GF) γ curCtx tl j 0#32 0#32) ⊢
+      bkeyAll γ curCtx tl (fun _ => 0#32) (fun _ => 0#32) from by
+    unfold bkeyAll; iintro H; iexact H) $$ Hkey
+  -- the slot rows
+  ihave Hs := BigSepL.bigSepL_sep_eqv.2 $$ [Hrefc Hcnt]
+  case' _ => iframe Hrefc Hcnt
+  ihave Hs := BigSepL.bigSepL_mono_of_forall
+    (Φ := fun _ j => iprop(wordAtN (GF := GF) curCtx (aBufRefcnt (bnode j)) 4
+        (DFrac.own 1) 0#32 ∗ cntHalf (γ.box j) 0))
+    (Ψ := fun _ j => bslotAt (GF := GF) γ curCtx j [])
+    (fun {_ j} => by
+      iintro ⟨H1, H2⟩
+      iapply bslotAt_intro γ curCtx j [] (by simp) (by simp)
+      isplitl [H1]
+      · iexact H1
+      isplitl []
+      · iapply BigSepL.bigSepL_nil.2; itrivial
+      isplitl []
+      · iapply bslots_zero
+      · iexact H2) $$ Hs
+  -- the resource
+  ihave Hscan := bcacheScan_intro γ V curCtx tl ∅ 0 (fun _ => []) (List.range NBUF).reverse
+    (fun _ => 0#32) (fun _ => 0#32) (fun i _ => get?_empty i)
+    (fun i v hv => by rw [get?_empty i] at hv; cases hv)
+    (List.reverse_perm _)
+    (fun k1 k2 _ _ hc _ => absurd hc hc0)
+    (fun k0 _ hc => absurd hc hc0) $$ [Ha Hlru Hpool Hkey Hs]
+  case' _ => iframe Ha Hlru Hpool Hkey Hs
+  ihave Hin := bcacheResIn_intro γ V curCtx tl $$ [Htl Hscan]
+  case' _ => iframe Htl Hscan
+  ihave #Hhook := lockHook_llb (bcacheResIn γ V tl) (bcacheResAt γ V) tl
+    (bcacheRes_fold_in γ V tl) $$ Htl
+  ihave #Hm1 := kmapStatic_rw bcacheLockAddr (by decide) $$ HS
+  ihave #Hm2 := kmapStatic_rw (bcacheLockAddr + 16#64) (by decide) $$ HS
+  imod kctx_newlock_hook cpu k bcacheLockAddr "bcache" (bcacheResAt γ V) (bcacheResIn γ V tl)
+    $$ [Hk Hin Hhook Hfresh Hm1 Hm2] with ⟨Hk, ⟨%γl, #Hlk⟩⟩
+  · iframe Hk Hin Hhook Hfresh Hm1 Hm2
+  imodintro
+  iframe Hk
+  iexists γl, γ
+  isplitl [Hbox Hslks]
+  · unfold bioCtx isBcache
+    isplitl []
+    · iexact Hlk
+    isplitl [Hslks]
+    · iapply BigSepL.bigSepL_mono_of_forall
+        (Φ := fun _ j => isSleeplockGen (GF := GF) (γ.slk j).1 (γ.slk j).2 (aBufLock (bnode j))
+          (bufSlpRaw (γ.own j) (γ.box j)) slUntracked)
+        (Ψ := fun _ j => isBufSlk (GF := GF) γ j)
+        (fun {_ j} => by unfold isBufSlk isSleeplock bufSlpBox bufSlpRaw bufTok; iintro H; iexact H) $$ Hslks
+    · iexact Hbox
+  · iexact Hsl
+
+/-! ## ...as `binit` leaves it
+
+The premises above, in the exact shape `Xv6.wp_binit_body`'s post hands
+them over -- plus `Xv6.bdBss`, the `.bss` cells `binit` never touches and its
+contract therefore never mentions, which the boot chain owns. -/
+
+theorem bd_bufOut_split (i : Nat) :
+    bufOut (GF := GF) i ⊢
+      sleepLockInited (aBufLock (bnode i)) bufferNameAddr ∗ bdLinks curCtx i := by
+  unfold bufOut bdLinks
+  simp only [wordAtN_cur]
+  iintro ⟨Hsl, Hp, Hn⟩
+  ihave Hsl := (show sleepLockInited (GF := GF) (bufAddr i + 16#64) bufferNameAddr ⊢
+      sleepLockInited (aBufLock (bnode i)) bufferNameAddr from by
+    rw [show aBufLock (bnode i) = bufAddr i + 16#64 from by
+      unfold aBufLock bOffLock bnode; congr 1]) $$ Hsl
+  ihave Hp := (show wordPointsTo (GF := GF) (bufAddr i + 72#64) 8 (DFrac.own 1) (bufPrevVal i) ⊢
+      wordPointsTo (bPrev (bnode i)) 8 (DFrac.own 1) (bufPrevVal i) from by
+    rw [show bPrev (bnode i) = bufAddr i + 72#64 from rfl]) $$ Hp
+  ihave Hn := (show wordPointsTo (GF := GF) (bufAddr i + 80#64) 8 (DFrac.own 1) (bufNextVal i) ⊢
+      wordPointsTo (bNext (bnode i)) 8 (DFrac.own 1) (bufNextVal i) from by
+    rw [show bNext (bnode i) = bufAddr i + 80#64 from rfl]) $$ Hn
+  iframe Hsl Hp Hn
+
+set_option maxHeartbeats 16000000 in
+/-- **THE BUFFER CACHE, BORN OUT OF `binit`'s POST.**
+
+Everything but `Xv6.bdBss` is `Xv6.wp_binit_body`'s postcondition verbatim.
+`bdBss` is what that post LACKS and cannot supply: `binit` writes only the
+sleeplock, `prev` and `next`, so `b->valid`, `b->disk`, `b->dev`,
+`b->blockno`, `b->refcnt` and the 1024 data bytes are `.bss` cells it never
+touches -- the boot chain's to hand over, which is why `Xv6.SpecBinit` does
+not grow. -/
+theorem bioInit_of_binit (cpu : CPU) (k : KCtx) (V : BioView) (hcov0 : (0 : Nat) ∉ V.cov) :
+    kctx cpu k ∗ lockInited bcacheLockAddr bcacheNameAddr ∗
+    wordPointsTo (bcacheHeadAddr + 72#64) 8 (DFrac.own 1) (bufAddr 0) ∗
+    wordPointsTo (bcacheHeadAddr + 80#64) 8 (DFrac.own 1) (bufAddr 29) ∗
+    ([∗list] i ∈ List.range 30, bufOut i) ∗
+    ([∗list] i ∈ List.range NBUF, bdBss curCtx i) ∗
+    ([∗set] b ∈ V.cov, poolBlk V b)
+    ⊢ |={⊤}=> (kctx (GF := GF) cpu k ∗
+      ∃ (γl : GName) (γ : BcacheNames), bioCtx γl γ V ∗ bslots γ BSLOTS) := by
+  iintro ⟨Hk, Hli, Hhp, Hhn, Hout, Hbss, Hpool⟩
+  icases (show lockInited (GF := GF) bcacheLockAddr bcacheNameAddr ⊢
+      wordPointsTo (bcacheLockAddr + 8#64) 8 (DFrac.own 1) bcacheNameAddr ∗
+      lkFresh bcacheLockAddr from by
+    unfold lockInited; iintro H; iexact H) $$ Hli with ⟨-, Hfresh⟩
+  ihave Hout := BigSepL.bigSepL_mono_of_forall
+    (Φ := fun _ i => bufOut (GF := GF) i)
+    (Ψ := fun _ i => iprop(sleepLockInited (aBufLock (bnode i)) bufferNameAddr ∗
+      bdLinks curCtx i))
+    (fun {_ i} => bd_bufOut_split i) $$ Hout
+  ihave Hout := (show ([∗list] i ∈ List.range 30,
+        (iprop(sleepLockInited (GF := GF) (aBufLock (bnode i)) bufferNameAddr ∗
+          bdLinks curCtx i))) ⊢
+      [∗list] i ∈ List.range NBUF,
+        (iprop(sleepLockInited (GF := GF) (aBufLock (bnode i)) bufferNameAddr ∗
+          bdLinks curCtx i)) from by
+    rw [show NBUF = 30 from rfl]) $$ Hout
+  icases BigSepL.bigSepL_sep_eqv.1 $$ Hout with ⟨Hslki, Hlinks⟩
+  ihave Hhn := (show wordPointsTo (GF := GF) (bcacheHeadAddr + 80#64) 8 (DFrac.own 1)
+        (bufAddr 29) ⊢
+      wordAtN curCtx (bNext bhead) 8 (DFrac.own 1) (bufAddr (NBUF - 1)) from by
+    rw [wordAtN_cur, show bNext bhead = bcacheHeadAddr + 80#64 from rfl,
+      show NBUF - 1 = 29 from rfl]) $$ Hhn
+  ihave Hhp := (show wordPointsTo (GF := GF) (bcacheHeadAddr + 72#64) 8 (DFrac.own 1)
+        (bufAddr 0) ⊢
+      wordAtN curCtx (bPrev bhead) 8 (DFrac.own 1) (bufAddr 0) from by
+    rw [wordAtN_cur, show bPrev bhead = bcacheHeadAddr + 72#64 from rfl]) $$ Hhp
+  iapply bioInit cpu k V hcov0
+  iframe Hk Hfresh Hhn Hhp Hslki Hlinks Hbss Hpool
+
 end
 
 end Xv6

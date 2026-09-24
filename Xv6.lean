@@ -477,3 +477,4 @@ import Xv6.BreadTail
 import Xv6.BreadScan
 import Xv6.ProofBread
 import Xv6.LinkBread
+import Xv6.BioInit
