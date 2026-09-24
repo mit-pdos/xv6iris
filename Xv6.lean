@@ -568,3 +568,4 @@ import Xv6.InodeRegionInv
 import Xv6.IcacheRef
 import Xv6.OffBoxCam
 import Xv6.OffBox
+import Xv6.InodeRegionLink
