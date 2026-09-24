@@ -336,6 +336,7 @@ theorem il_install_trans (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs (hlc :=
     (c : CPU) (k' : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (γfs : FsNames) (pd pav pu : BitVec 64) (j : Nat) (logstart : Nat) (dev : BitVec 32)
     (L : BlockMap) (D : RegMapF Bool) (pidv : BitVec 32) (dqp : DFrac)
+    (homeL : List Nat) (Xv : Nat → List (BitVec 8)) (Xexc : List Nat)
     (pj : BitVec 64) (hpj : k'.proc = pj)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : installTransSlots ≤ k'.avail)
     (hsie : k'.sie = false) (hnoff : k'.noff = 0) (hlocks : k'.locks = [])
@@ -347,8 +348,10 @@ theorem il_install_trans (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs (hlc :=
     trapCsrs c ∗ cpuClaim c pj ∗ intrRes c ∗
     bioCtx γl γb V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
     logFrozen logstart dev ∗
+    fsBytesInv γfs.bytes γfs.cache γfs.exc homeL Xv ∗
     wordPointsTo (pPid pj) 4 dqp pidv ∗
     wordPointsTo lhNAddr 4 (DFrac.own 1) 0#32 ∗
+    excOwn γfs.exc Xexc ∗
     fsCacheAuth γfs L ∗ fsDirtyAuth γfs D ∗ bslots γb 2 ∗
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
@@ -356,11 +359,13 @@ theorem il_install_trans (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs (hlc :=
       trapCsrs cpu' -∗ cpuClaim cpu' pj -∗ intrRes cpu' -∗
       wordPointsTo (pPid pj) 4 dqp pidv -∗
       wordPointsTo lhNAddr 4 (DFrac.own 1) 0#32 -∗
+      excOwn γfs.exc Xexc -∗
       fsCacheAuth γfs L -∗ fsDirtyAuth γfs D -∗ bslots γb 2 -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hpj
   have h := IT.wp_install_trans (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl γfs pd pav pu j
     logstart dev true 0 ([] : List (BitVec 32)) (fun _ => List.replicate BSIZE 0#8) L D pidv dqp
+    homeL Xv Xexc
     hj hproc hK hsie hnoff hlocks htier hgeom hdev hcl hdt
     (by simp only [if_true]; exact ha0)
     ⟨rfl, by unfold LOGBLOCKS; omega⟩
@@ -369,24 +374,27 @@ theorem il_install_trans (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs (hlc :=
     (by intro i; simp)
     (by intro hb; exact absurd hb (by simp))
     (by intro _ w hw; exact absurd hw List.not_mem_nil)
+    (by intro _ i w hw; simp at hw)
     hpd
   unfold wp_install_trans_body at h
-  simp only [installTransAddr, if_true, itRecL_nil, Nat.add_zero] at h
-  iintro ⟨Hk, Hpc, #Hpi, Htc, Hcl, Hir, #Hbc, #Hdc, #Hpe, #Hfr, Hpid, HlhN, HL, HD, Hsl, Hnext⟩
+  simp only [installTransAddr, if_true, itRecL_nil, Nat.add_zero, List.map_nil,
+    excDelMany_nil] at h
+  iintro ⟨Hk, Hpc, #Hpi, Htc, Hcl, Hir, #Hbc, #Hdc, #Hpe, #Hfr, #Hbinv, Hpid, HlhN, Hexc,
+    HL, HD, Hsl, Hnext⟩
   iapply h
-  iframe Hk Hpc Hpi Htc Hcl Hir Hbc Hdc Hpe Hfr Hpid
+  iframe Hk Hpc Hpi Htc Hcl Hir Hbc Hdc Hpe Hfr Hpid Hbinv
   isplitl [HlhN]
   · iexact HlhN
-  isplitr [HL HD Hsl Hnext]
+  isplitr [Hexc HL HD Hsl Hnext]
   · iapply BigSepL.bigSepL_nil.2; iempintro
-  iframe HL HD
+  iframe Hexc HL HD
   isplitr [Hsl Hnext]
   · iapply BigSepL.bigSepL_nil.2; iempintro
   iframe Hsl
   iapply wpNext_intro_pin
-  iintro %cpu2 %hp2 %spie %spp %R' %hcs Hk Hpc Htc Hcl Hir Hpid HlhN - HL HD - Hsl
+  iintro %cpu2 %hp2 %spie %spp %R' %hcs Hk Hpc Htc Hcl Hir Hpid HlhN - Hexc HL HD - Hsl
   ihave Hn := wpNext_at true k'.proc c cpu2 _ hp2 $$ Hnext
-  iapply Hn $$ %spie %spp %R' %hcs Hk Hpc Htc Hcl Hir Hpid HlhN HL HD Hsl
+  iapply Hn $$ %spie %spp %R' %hcs Hk Hpc Htc Hcl Hir Hpid HlhN Hexc HL HD Hsl
 
 set_option maxHeartbeats 2000000 in
 /-- `write_head()` AT THE EMPTY WRITE SET. -/
@@ -601,9 +609,19 @@ theorem initlog_proof
       (K.pushed m).withSpie a b = (K.withSpie a b).pushed m := fun _ _ _ _ => rfl
   unfold wp_initlog_body
   simp only [initlogAddr]
-  iintro ⟨Hk, Hpc, #Hpi, Htc, Hcl, Hir, #Hbc, #Hdc, #Hpe, Hpid, #Hrow, Htok, Hsb, #Hm1, #Hm2,
-    Hlock, Hname, Hcpu, HlStart, HlDev, Hout, Hcmt, Hnc, HlhN, Hjunk, HL, HD, Hd, Hhdr,
-    Hslots, Hpool0, Hnext⟩
+  iintro ⟨Hk, Hpc, #Hpi, Htc, Hcl, Hir, #Hbc, #Hdc, #Hpe, Hpid, #Hat, Hexc, Htok, Hsb,
+    #Hm1, #Hm2, Hlock, Hname, Hcpu, HlStart, HlDev, Hout, Hcmt, Hnc, HlhN, Hjunk, HL, HD, Hd,
+    Hhdr, Hslots, Hpool0, Hnext⟩
+  icases (show fsBytesAt (GF := GF) γfs (fsHomeList V.cov logstart) ⊢
+      ∃ Xv : Nat → List (BitVec 8),
+        fsBytesInv γfs.bytes γfs.cache γfs.exc (fsHomeList V.cov logstart) Xv from by
+    unfold fsBytesAt; iintro H; iexact H) $$ Hat with ⟨%Xv, #Hbinv⟩
+  -- THE EXCEPTION SET IS EMPTY at a clean header (see the `hhdr0` note in
+  -- `Xv6/SpecInitlog.lean`), so the handle the recovering install hands back
+  -- can be SEALED, which is what builds `Xv6.logCtx`'s byte-view row.
+  ihave Hexc := (show excOwn (GF := GF) γfs.exc (hdrDec bsHdr).2 ⊢
+      excOwn γfs.exc ([] : List Nat) from by
+    rw [show (hdrDec bsHdr).2 = ([] : List Nat) from by rw [hdrDec_zero bsHdr hhdr0]]) $$ Hexc
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases il_slots_split γb $$ Hpool0 with ⟨Hu1, Hu2, Hpool⟩
   -- ===== the prologue =====
@@ -802,9 +820,11 @@ theorem initlog_proof
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [il_br_install]
   iintro Hk Hpc
   iapply (il_install_trans IT Γ c4 _ γl γb V γdl γfs pd pav pu j logstart dev L D pidv dqp
+      (fsHomeList V.cov logstart) Xv ([] : List Nat)
       k.proc (by k_norm_g) hj ?tproc ?tK ?tsie ?tnoff ?tlocks ?ttier hgeom hdev hcl hdt
       ?ta0 hpd)
-    $$ [- $Hk $Hpc $Hpi $Htc $Hcl $Hir $Hbc $Hdc $Hpe $Hfroz $Hpid $HlhN $HL $HD $Hs2]
+    $$ [- $Hk $Hpc $Hpi $Htc $Hcl $Hir $Hbc $Hdc $Hpe $Hfroz $Hbinv $Hpid $HlhN $Hexc $HL $HD
+         $Hs2]
   rotate_right 1
   k_norm_g [il_ret_68]
   iframe #
@@ -817,7 +837,7 @@ theorem initlog_proof
   case ta0 => k_norm_g
   -- ===== back from install_trans =====
   iapply wpNext_intro_pin
-  iintro %c5 %hp5 %spie5 %spp5 %R4 %hcs4 Hk Hpc Htc Hcl Hir Hpid HlhN HL HD Hs2
+  iintro %c5 %hp5 %spie5 %spp5 %R4 %hcs4 Hk Hpc Htc Hcl Hir Hpid HlhN Hexc HL HD Hs2
   k_norm_g [il_ret_68, hww, hpsw]
   unfold calleeSaved at hcs4
   k_norm_g at hcs4
@@ -861,6 +881,14 @@ theorem initlog_proof
   obtain ⟨g2, g8, g9, g18, g19, g20, g21, g22, g23, g24, g25, g26, g27⟩ := hcs5
   ihave Hs2 := il_slots_join2 γb $$ [Hu1 Hu2]
   case' _ => iframe
+  -- **THE SEAL OF THE EXCEPTION SET** (Rocq's `exc_seal`): recovery is over,
+  -- the handle is spent at `[]`, and the discarded element is the permanent
+  -- certificate `Xv6.logCtx` carries.
+  iapply wpLoop_bupd
+  ihave Hsealed := excSeal (GF := GF) γfs.exc $$ Hexc
+  imod Hsealed with #Hseal
+  imodintro
+  ihave #Hrow := fsBytesAnyAt_of γfs (fsHomeList V.cov logstart) $$ Hat Hseal
   iapply (il_seal Γ c2 c6 k spie6 spp6 R5 γ γb γfs V logstart dev pidv vNc sb dqp dqs
       (PartialMap.insert L (logHdrBno logstart) bs') D bs' hK6 hsie
       ((g2.trans f2).trans ((d2.trans b2).trans a2'))

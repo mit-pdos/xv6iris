@@ -82,6 +82,27 @@ def excDelMany (X : List Nat) (bs : List Nat) : List Nat :=
   rw [List.mem_filter]
   simp
 
+/-- The recovering `install_trans` removes the whole write set, one entry at
+a time; these are the two steps of that bookkeeping. -/
+@[simp] theorem excDelMany_nil (X : List Nat) : excDelMany X [] = X := by
+  unfold excDelMany; simp
+
+theorem excDel_excDelMany (X l : List Nat) (b : Nat) :
+    excDel (excDelMany X l) b = excDelMany X (l ++ [b]) := by
+  unfold excDel excDelMany
+  rw [List.filter_filter]
+  refine List.filter_congr ?_
+  intro x _
+  by_cases h1 : x ∈ l <;> by_cases h2 : x = b <;> simp [h1, h2]
+
+/-- ...and the residue is EMPTY when every exception has been landed, which
+is what lets `initlog` seal. -/
+theorem excDelMany_eq_nil (X l : List Nat) (h : ∀ b ∈ X, b ∈ l) : excDelMany X l = [] := by
+  unfold excDelMany
+  rw [List.filter_eq_nil_iff]
+  intro a ha
+  simp [h a ha]
+
 /-! ## The four pure clauses -/
 
 /-- `L` resides exactly the byte range of the covered (home) blocks. -/

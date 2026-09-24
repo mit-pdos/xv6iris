@@ -50,35 +50,31 @@ minted -- which is what lets `bunpin`'s slot-indexed contract play the
 WAL's block-indexed pin.  The client view is `Xv6.fsView` (the premises
 `hcl`/`hdt` below say so), exactly Rocq's `fs_view γfs γd dev cov`.
 
-Two further deviations from Rocq, both forced: the CRASH PERMIT generator
+One further deviation from Rocq, forced: the CRASH PERMIT generator
 `□ (∀ i w, … -∗ ▷ R i -∗ disk_seq_permit …)` and its threaded `R` are
-dropped (this port's disk layer has no crash permits), and so are the byte
-view's rows (`fs_bytes_inv`, `exc_own`) -- that layer belongs to the file
-system above the log and does not exist here.
+dropped (this port's disk layer has no crash permits).
 
-**THE RECOVERING ARM TAKES THE HOME BLOCKS' CLIENT HALVES** (third forced
-deviation, made while proving `Xv6/ProofInstallTrans.lean`).  Rocq's
-per-entry row is `emp` on the recovering arm because Rocq moves the home
-block's logged content through `FsBlocks.fsblock_install_exc`, off the
-BYTE VIEW's rows (`fs_bytes_inv` + `exc_own Xexc`) that the paragraph
-above records as unported -- there is no byte view here, so that route
-does not exist.  With the row at `emp` the post's
-`fsCacheAuth γfs (itRecL W Lw L)` would be UNPROVABLE: `Xv6.fsCache_update`
-is the only move of the logged view, and it wants the home block's own
-`fsChalf`.  So the recovering arm's row is Rocq's own reading of what that
-arm holds -- "recovery: the home block's CLIENT half, at whatever the
-crash left there (`Bh i`) -- at boot the log layer still holds every
-covered block's client half, and the L update is what moves it" (Rocq
-`SpecInstallTrans.v`) -- spelled as a resource:
+**THE RECOVERING ARM'S PER-ENTRY ROW IS `emp`, AS IN ROCQ**, and the byte
+view is how it gets by with that.  The recovering install is the ONE place
+in the tree where a HOME block's owner-side resource moves from outside the
+file system: recovery installs the on-disk log's write set over the home
+blocks, so their content really does change and both content maps have to
+follow it.  `Xv6.fsblock_install_exc` moves the CACHE with no byte run and
+no client half -- the byte view does NOT move (it was minted at the
+committed view, so it already reads the logged value at `b`); what moves is
+the cache map, from the crashed bytes to `Xv b`, exactly what the home
+`bwrite` just put on the disk, and THAT is what makes the tie true at `b`
+again.  The machinery half it takes comes out of the buffer this pass just
+`bread`; the parked half comes out of `Xv6.fsBytesInv` inside the fupd and
+goes back inside it.
 
-    (if recovering then (∃ bh, fsChalf γfs w.toNat bh)
-     else fsDirtyHalf γfs w.toNat true)      -- precondition
-    (if recovering then fsChalf γfs w.toNat (Lw i)
-     else fsDirtyHalf γfs w.toNat false)     -- postcondition
-
-`initlog`, the recovering arm's only caller, has them: at boot nobody
-above the log layer holds a home block's client half yet.  The commit
-arm's rows are untouched.
+The price is two pure premises and a threaded handle (Rocq
+`SpecInstallTrans.v:321,382,398,458`): `hxexc` says the exception set names
+every entry at the slot's logged content, `Xv6.excOwn γfs.exc Xexc` comes in
+on the recovering arm only, and the post hands it back at the RESIDUE
+`Xv6.excDelMany Xexc (W.map toNat)` -- which is `[]` when the caller is
+`initlog`, and is what lets `initlog` SEAL.  The commit arm moves nothing
+there (the tie already holds) and supplies `emp` throughout.
 
 **Deviation in spelling (reported).**  Rocq runs the bio layer at
 `fs_view γfs γd dev cov` literally; this port keeps the client view `V` a
@@ -89,6 +85,7 @@ Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import MachCSL.WpSmodeFrame
 import Xv6.LogInv
+import Xv6.FsBytesMint
 import Xv6.SpecBread
 import Xv6.SpecBwrite
 import Xv6.SpecBrelse
@@ -216,6 +213,7 @@ def wp_install_trans_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
     (γfs : FsNames) (pd pav pu : BitVec 64) (j : Nat) (logstart : Nat) (dev : BitVec 32)
     (recovering : Bool) (n : Nat) (W : List (BitVec 32)) (Lw : Nat → List (BitVec 8))
     (L : BlockMap) (D : RegMapF Bool) (pidv : BitVec 32) (dqp : DFrac)
+    (homeL : List Nat) (Xv : Nat → List (BitVec 8)) (Xexc : List Nat)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : installTransSlots ≤ k.avail)
     (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
     (htier : k.tier = KTier.kpt)
@@ -230,6 +228,13 @@ def wp_install_trans_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
     (hcommit : recovering = false →
       ∀ (i : Nat) (w : BitVec 32), W[i]? = some w → PartialMap.get? L w.toNat = some (Lw i))
     (hpin : recovering = true → ∀ w ∈ W, PartialMap.get? D w.toNat = some false)
+    -- THE EXCEPTION SET NAMES EVERY ENTRY, AT THE SLOT'S LOGGED VALUE: it is
+    -- the on-disk header's write set -- the blocks whose byte view was minted
+    -- at the committed view while the cache still reads the crashed disk --
+    -- and `Xv` is what the byte view holds there, which is exactly what this
+    -- pass is about to write.
+    (hxexc : recovering = true → ∀ (i : Nat) (w : BitVec 32), W[i]? = some w →
+      w.toNat ∈ Xexc ∧ Xv w.toNat = Lw i)
     (hpd : descPageRw pd) : Prop :=
   kctx cpu k ∗ pcIs cpu installTransAddr ∗ procsInv Γ ∗
   trapCsrs cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ∗
@@ -239,10 +244,15 @@ def wp_install_trans_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
   -- the in-memory header, READ ONLY (the write set it walks)
   wordPointsTo lhNAddr 4 (DFrac.own 1) (BitVec.ofNat 32 n) ∗
   ([∗list] i ↦ w ∈ W, wordPointsTo (lhBlock i) 4 (DFrac.own 1) w) ∗
+  -- THE BYTE VIEW'S ROW: only the recovering arm uses it, and it is
+  -- persistent, so both callers have one (end_op off `Xv6.logCtx`, initlog
+  -- off its own precondition)
+  fsBytesInv γfs.bytes γfs.cache γfs.exc homeL Xv ∗
+  -- ...and THE WAL'S EXCEPTION HANDLE, on the recovering arm only
+  (if recovering then excOwn γfs.exc Xexc else iprop(emp)) ∗
   fsCacheAuth γfs L ∗ fsDirtyAuth γfs D ∗
   ([∗list] i ↦ w ∈ W, fsChalf γfs (logSlotBno logstart i) (Lw i) ∗
-     (if recovering then iprop(∃ bh : List (BitVec 8), fsChalf γfs w.toNat bh)
-      else fsDirtyHalf γfs w.toNat true)) ∗
+     (if recovering then iprop(emp) else fsDirtyHalf γfs w.toNat true)) ∗
   bslots γb 2 ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
     ⌜calleeSaved k.regs R'⌝ -∗
@@ -251,11 +261,14 @@ def wp_install_trans_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
     wordPointsTo lhNAddr 4 (DFrac.own 1) (BitVec.ofNat 32 n) -∗
     ([∗list] i ↦ w ∈ W, wordPointsTo (lhBlock i) 4 (DFrac.own 1) w) -∗
+    -- the exception set's RESIDUE: every entry has been landed, so the WAL's
+    -- handle comes back at `Xexc` minus the whole write set
+    (if recovering then excOwn γfs.exc (excDelMany Xexc (W.map (fun w => w.toNat)))
+     else iprop(emp)) -∗
     fsCacheAuth γfs (if recovering then itRecL W Lw L else L) -∗
     fsDirtyAuth γfs (if recovering then D else dirtyClear D (W.map (fun w => w.toNat))) -∗
     ([∗list] i ↦ w ∈ W, fsChalf γfs (logSlotBno logstart i) (Lw i) ∗
-       (if recovering then fsChalf γfs w.toNat (Lw i)
-        else fsDirtyHalf γfs w.toNat false)) -∗
+       (if recovering then iprop(emp) else fsDirtyHalf γfs w.toNat false)) -∗
     bslots γb (2 + (if recovering then 0 else W.length)) -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
@@ -268,11 +281,12 @@ structure INSTALL_TRANS : Prop where
     (γfs : FsNames) (pd pav pu : BitVec 64) (j : Nat) (logstart : Nat) (dev : BitVec 32)
     (recovering : Bool) (n : Nat) (W : List (BitVec 32)) (Lw : Nat → List (BitVec 8))
     (L : BlockMap) (D : RegMapF Bool) (pidv : BitVec 32) (dqp : DFrac)
+    (homeL : List Nat) (Xv : Nat → List (BitVec 8)) (Xexc : List Nat)
     hj hproc hK hsie hnoff hlocks htier hgeom hdev hcl hdt ha0 hn hnodup hhome hlen hcommit hpin
-    hpd,
+    hxexc hpd,
     wp_install_trans_body (hlc := hlc) (GF := GF) Γ cpu k γl γb V γdl γfs pd pav pu j
-      logstart dev recovering n W Lw L D pidv dqp
+      logstart dev recovering n W Lw L D pidv dqp homeL Xv Xexc
       hj hproc hK hsie hnoff hlocks htier hgeom hdev hcl hdt ha0 hn hnodup hhome hlen hcommit hpin
-      hpd
+      hxexc hpd
 
 end Xv6

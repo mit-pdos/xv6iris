@@ -19,12 +19,17 @@ The shape, from the disassembly:
   is DEAD on this arm (`bnez s6` at `+0xa6` is always taken);
 * `+0xb2` the epilogue.
 
-The per-entry ghost step is `Xv6.fsCache_update` at the home block: the
-logged view's authority moves from `itRecLUpto W Lw L t` to
-`itRecLUpto W Lw L (t+1)`, which `itRecLUpto_succ` identifies with the
-insert at `W[t]`.  The loop invariant splits the per-entry rows at the
-cursor: `W.take t` already moved (`itRowPost`), `W.drop t` not yet
-(`itRowPre`).
+The per-entry ghost step is `Xv6.fsblock_install_exc` at the home block:
+the CACHE authority moves from `itRecLUpto W Lw L t` to
+`itRecLUpto W Lw L (t+1)` -- which `itRecLUpto_succ` identifies with the
+insert at `W[t]`, once the exception row's `Xv W[t] = Lw t` is used -- and
+the byte view does NOT move (it was minted at the committed view, so it
+already reads the logged value there).  So the step needs NO byte run and
+no client half; what it does take is the WAL's exception handle, and the
+loop threads it at `Xv6.itExcAt`, shrinking it one landed block at a time.
+The loop invariant splits the per-entry rows at the cursor: `W.take t`
+already moved (`itRowPost`), `W.drop t` not yet (`itRowPre`); on the
+recovering arm BOTH are `emp` beyond the log slot's own half.
 -/
 import Xv6.SpecInstallTrans
 import Xv6.KernelData
@@ -573,15 +578,33 @@ def itRowPre (γfs : FsNames) (recovering : Bool) (logstart : Nat)
     (Lw : Nat → List (BitVec 8))
     (i : Nat) (w : BitVec 32) : IProp GF := iprop%
   fsChalf γfs (logSlotBno logstart i) (Lw i) ∗
-  (if recovering then iprop(∃ bh : List (BitVec 8), fsChalf γfs w.toNat bh)
-   else fsDirtyHalf γfs w.toNat true)
+  (if recovering then iprop(emp) else fsDirtyHalf γfs w.toNat true)
 
-/-- ...and after: the home block now reads the slot's logged content. -/
+/-- ...and after: at commit time the pin is cleared; at RECOVERY the row is
+`emp` on both sides, because the home block's content moves inside
+`Xv6.fsBytesInv` (see `Xv6.itExcAt` and the ghost step in `Xv6.it_body`). -/
 def itRowPost (γfs : FsNames) (recovering : Bool) (logstart : Nat)
     (Lw : Nat → List (BitVec 8))
     (i : Nat) (w : BitVec 32) : IProp GF := iprop%
   fsChalf γfs (logSlotBno logstart i) (Lw i) ∗
-  (if recovering then fsChalf γfs w.toNat (Lw i) else fsDirtyHalf γfs w.toNat false)
+  (if recovering then iprop(emp) else fsDirtyHalf γfs w.toNat false)
+
+/-- **THE WAL'S EXCEPTION HANDLE, AT THE CURSOR** (Rocq's threaded
+`exc_own (fs_exc γfs) (Xexc ∖ …)`): the recovering pass shrinks the byte
+view's exception set one landed block at a time, and this is the resource
+that records how far it has got.  `emp` on the commit arm, which moves
+nothing there. -/
+def itExcAt (γfs : FsNames) (recovering : Bool) (Xexc : List Nat)
+    (Wl : List Nat) : IProp GF :=
+  if recovering then excOwn γfs.exc (excDelMany Xexc Wl) else iprop(emp)
+
+/-- On the COMMIT arm the handle is `emp` at every cursor, so the cursor is
+free. -/
+theorem itExcAt_false (γfs : FsNames) (Xexc l l' : List Nat) :
+    itExcAt (GF := GF) γfs false Xexc l ⊢ itExcAt γfs false Xexc l' := by
+  unfold itExcAt
+  simp only [Bool.false_eq_true, if_false]
+  iintro H; iexact H
 
 set_option maxRecDepth 100000 in
 /-- The cursor's shift when the loop steps. -/
@@ -748,7 +771,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 /-- The caller's continuation, named. -/
 def itPost (k : KCtx) (γb : BcacheNames) (γfs : FsNames) (recovering : Bool) (logstart n : Nat)
     (W : List (BitVec 32)) (Lw : Nat → List (BitVec 8)) (L : BlockMap) (D : RegMapF Bool)
-    (pidv : BitVec 32) (dqp : DFrac) : CPU → IProp GF := fun cpu' => iprop(
+    (pidv : BitVec 32) (dqp : DFrac) (Xexc : List Nat) : CPU → IProp GF := fun cpu' => iprop(
   ∀ (spie spp : Bool) (R' : RegMap),
     ⌜calleeSaved k.regs R'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
@@ -756,6 +779,7 @@ def itPost (k : KCtx) (γb : BcacheNames) (γfs : FsNames) (recovering : Bool) (
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
     wordPointsTo lhNAddr 4 (DFrac.own 1) (BitVec.ofNat 32 n) -∗
     ([∗list] i ↦ w ∈ W, wordPointsTo (lhBlock i) 4 (DFrac.own 1) w) -∗
+    itExcAt γfs recovering Xexc (W.map (fun w => w.toNat)) -∗
     fsCacheAuth γfs (if recovering then itRecL W Lw L else L) -∗
     fsDirtyAuth γfs (if recovering then D else dirtyClear D (W.map (fun w => w.toNat))) -∗
     ([∗list] i ↦ w ∈ W, itRowPost γfs recovering logstart Lw i w) -∗
@@ -764,8 +788,8 @@ def itPost (k : KCtx) (γb : BcacheNames) (γfs : FsNames) (recovering : Bool) (
 theorem itPost_elim (k : KCtx) (γb : BcacheNames) (γfs : FsNames) (recovering : Bool)
     (logstart n : Nat)
     (W : List (BitVec 32)) (Lw : Nat → List (BitVec 8)) (L : BlockMap) (D : RegMapF Bool)
-    (pidv : BitVec 32) (dqp : DFrac) (cpu' : CPU) :
-    itPost (GF := GF) k γb γfs recovering logstart n W Lw L D pidv dqp cpu' ⊢
+    (pidv : BitVec 32) (dqp : DFrac) (Xexc : List Nat) (cpu' : CPU) :
+    itPost (GF := GF) k γb γfs recovering logstart n W Lw L D pidv dqp Xexc cpu' ⊢
     ∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k.regs R'⌝ -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
@@ -773,7 +797,8 @@ theorem itPost_elim (k : KCtx) (γb : BcacheNames) (γfs : FsNames) (recovering 
       wordPointsTo (pPid k.proc) 4 dqp pidv -∗
       wordPointsTo lhNAddr 4 (DFrac.own 1) (BitVec.ofNat 32 n) -∗
       ([∗list] i ↦ w ∈ W, wordPointsTo (lhBlock i) 4 (DFrac.own 1) w) -∗
-      fsCacheAuth γfs (if recovering then itRecL W Lw L else L) -∗
+      itExcAt γfs recovering Xexc (W.map (fun w => w.toNat)) -∗
+    fsCacheAuth γfs (if recovering then itRecL W Lw L else L) -∗
       fsDirtyAuth γfs (if recovering then D else dirtyClear D (W.map (fun w => w.toNat))) -∗
       ([∗list] i ↦ w ∈ W, itRowPost γfs recovering logstart Lw i w) -∗
       bslots γb (2 + (if recovering then 0 else W.length)) -∗ wpLoop cpu' := by
@@ -784,8 +809,9 @@ pin is vacuous). -/
 theorem it_post_at (cpu c : CPU) (k : KCtx) (γb : BcacheNames) (γfs : FsNames)
     (recovering : Bool) (logstart n j : Nat)
     (W : List (BitVec 32)) (Lw : Nat → List (BitVec 8)) (L : BlockMap) (D : RegMapF Bool)
-    (pidv : BitVec 32) (dqp : DFrac) (hj : j < NPROC) (hproc : k.proc = procAddr j) :
-    wpNext true k.proc cpu (itPost (GF := GF) k γb γfs recovering logstart n W Lw L D pidv dqp) ⊢
+    (pidv : BitVec 32) (dqp : DFrac) (Xexc : List Nat)
+    (hj : j < NPROC) (hproc : k.proc = procAddr j) :
+    wpNext true k.proc cpu (itPost (GF := GF) k γb γfs recovering logstart n W Lw L D pidv dqp Xexc) ⊢
     ∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k.regs R'⌝ -∗
       kctx c ((k.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k.regs 1#5)) -∗
@@ -793,7 +819,8 @@ theorem it_post_at (cpu c : CPU) (k : KCtx) (γb : BcacheNames) (γfs : FsNames)
       wordPointsTo (pPid k.proc) 4 dqp pidv -∗
       wordPointsTo lhNAddr 4 (DFrac.own 1) (BitVec.ofNat 32 n) -∗
       ([∗list] i ↦ w ∈ W, wordPointsTo (lhBlock i) 4 (DFrac.own 1) w) -∗
-      fsCacheAuth γfs (if recovering then itRecL W Lw L else L) -∗
+      itExcAt γfs recovering Xexc (W.map (fun w => w.toNat)) -∗
+    fsCacheAuth γfs (if recovering then itRecL W Lw L else L) -∗
       fsDirtyAuth γfs (if recovering then D else dirtyClear D (W.map (fun w => w.toNat))) -∗
       ([∗list] i ↦ w ∈ W, itRowPost γfs recovering logstart Lw i w) -∗
       bslots γb (2 + (if recovering then 0 else W.length)) -∗ wpLoop c := by
@@ -814,7 +841,7 @@ set_option maxHeartbeats 4000000 in
 everything the pass produced. -/
 theorem it_exit (cpu c : CPU) (k : KCtx) (γb : BcacheNames) (γfs : FsNames)
     (recovering : Bool) (logstart n j t : Nat) (W : List (BitVec 32)) (Lw : Nat → List (BitVec 8))
-    (L : BlockMap) (D : RegMapF Bool) (pidv : BitVec 32) (dqp : DFrac)
+    (L : BlockMap) (D : RegMapF Bool) (pidv : BitVec 32) (dqp : DFrac) (Xexc : List Nat)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hsie : k.sie = false)
     (hK : 10 ≤ k.avail) (a b : Bool) (R : RegMap) (hfix : itFix k recovering t R) :
     kctx c (((k.withSpie a b).pushed 10).withRegs R) ∗
@@ -823,15 +850,17 @@ theorem it_exit (cpu c : CPU) (k : KCtx) (γb : BcacheNames) (γfs : FsNames)
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     wordPointsTo lhNAddr 4 (DFrac.own 1) (BitVec.ofNat 32 n) ∗
     ([∗list] i ↦ w ∈ W, wordPointsTo (lhBlock i) 4 (DFrac.own 1) w) ∗
+    itExcAt γfs recovering Xexc (W.map (fun w => w.toNat)) ∗
     fsCacheAuth γfs (if recovering then itRecL W Lw L else L) ∗
     fsDirtyAuth γfs (if recovering then D else dirtyClear D (W.map (fun w => w.toNat))) ∗
     ([∗list] i ↦ w ∈ W, itRowPost γfs recovering logstart Lw i w) ∗
     bslots γb (2 + (if recovering then 0 else W.length)) ∗
     itFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5) ∗
-    wpNext true k.proc cpu (itPost k γb γfs recovering logstart n W Lw L D pidv dqp)
+    wpNext true k.proc cpu (itPost k γb γfs recovering logstart n W Lw L D pidv dqp Xexc)
     ⊢ wpLoop (GF := GF) c := by
-  iintro ⟨Hk, Hpc, Htc, Hcl, Hir, Hpid, HlhN, Hlhb, Hauth, Hdirty, Hrows, Hslots, Hframe, HΦ⟩
+  iintro ⟨Hk, Hpc, Htc, Hcl, Hir, Hpid, HlhN, Hlhb, Hexc, Hauth, Hdirty, Hrows, Hslots,
+    Hframe, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   obtain ⟨g2, g8, g19, g20, g21, g22, g23, g24, g25, g26, g27⟩ := id hfix
   ihave Hframe := (show itFrame (GF := GF) (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5)
@@ -853,8 +882,8 @@ theorem it_exit (cpu c : CPU) (k : KCtx) (γb : BcacheNames) (γfs : FsNames)
   iapply wpNext_off_intro
   iintro Hk Hpc
   k_norm_g
-  ihave HΦ := it_post_at cpu c k γb γfs recovering logstart n j W Lw L D pidv dqp hj hproc $$ HΦ
-  iapply HΦ $$ %a %b %_ [] Hk Hpc Htc Hcl Hir Hpid HlhN Hlhb Hauth Hdirty Hrows Hslots
+  ihave HΦ := it_post_at cpu c k γb γfs recovering logstart n j W Lw L D pidv dqp Xexc hj hproc $$ HΦ
+  iapply HΦ $$ %a %b %_ [] Hk Hpc Htc Hcl Hir Hpid HlhN Hlhb Hexc Hauth Hdirty Hrows Hslots
   ipureintro
   unfold calleeSaved
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
@@ -873,7 +902,7 @@ per-entry rows split at `t`, the two slot units and the frame. -/
 def itLoopInv (cpu : CPU) (k : KCtx) (γb : BcacheNames) (γfs : FsNames) (recovering : Bool)
     (logstart n : Nat)
     (W : List (BitVec 32)) (Lw : Nat → List (BitVec 8)) (L : BlockMap) (D : RegMapF Bool)
-    (pidv : BitVec 32) (dqp : DFrac) : IProp GF := iprop(
+    (pidv : BitVec 32) (dqp : DFrac) (Xexc : List Nat) : IProp GF := iprop(
   ∀ (c : CPU) (a b : Bool) (R : RegMap) (t : Nat),
     ⌜itFix k recovering t R ∧ t < n⌝ -∗
     kctx c (((k.withSpie a b).pushed 10).withRegs R) -∗
@@ -882,19 +911,20 @@ def itLoopInv (cpu : CPU) (k : KCtx) (γb : BcacheNames) (γfs : FsNames) (recov
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
     wordPointsTo lhNAddr 4 (DFrac.own 1) (BitVec.ofNat 32 n) -∗
     ([∗list] i ↦ w ∈ W, wordPointsTo (lhBlock i) 4 (DFrac.own 1) w) -∗
+    itExcAt γfs recovering Xexc ((W.take t).map (fun w => w.toNat)) -∗
     fsCacheAuth γfs (itLat recovering W Lw L t) -∗ fsDirtyAuth γfs (itDat recovering D W t) -∗
     ([∗list] i ↦ w ∈ W.take t, itRowPost γfs recovering logstart Lw i w) -∗
     ([∗list] i ↦ w ∈ W.drop t, itRowPre γfs recovering logstart Lw (t + i) w) -∗
     bslots γb (2 + (if recovering then 0 else t)) -∗
     itFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5) -∗
-    wpNext true k.proc cpu (itPost k γb γfs recovering logstart n W Lw L D pidv dqp) -∗ wpLoop c)
+    wpNext true k.proc cpu (itPost k γb γfs recovering logstart n W Lw L D pidv dqp Xexc) -∗ wpLoop c)
 
 theorem itLoopInv_elim (cpu : CPU) (k : KCtx) (γb : BcacheNames) (γfs : FsNames)
     (recovering : Bool) (logstart n : Nat)
     (W : List (BitVec 32)) (Lw : Nat → List (BitVec 8)) (L : BlockMap) (D : RegMapF Bool)
-    (pidv : BitVec 32) (dqp : DFrac) :
-    itLoopInv (GF := GF) cpu k γb γfs recovering logstart n W Lw L D pidv dqp ⊢
+    (pidv : BitVec 32) (dqp : DFrac) (Xexc : List Nat) :
+    itLoopInv (GF := GF) cpu k γb γfs recovering logstart n W Lw L D pidv dqp Xexc ⊢
   ∀ (c : CPU) (a b : Bool) (R : RegMap) (t : Nat),
     ⌜itFix k recovering t R ∧ t < n⌝ -∗
     kctx c (((k.withSpie a b).pushed 10).withRegs R) -∗
@@ -903,19 +933,20 @@ theorem itLoopInv_elim (cpu : CPU) (k : KCtx) (γb : BcacheNames) (γfs : FsName
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
     wordPointsTo lhNAddr 4 (DFrac.own 1) (BitVec.ofNat 32 n) -∗
     ([∗list] i ↦ w ∈ W, wordPointsTo (lhBlock i) 4 (DFrac.own 1) w) -∗
+    itExcAt γfs recovering Xexc ((W.take t).map (fun w => w.toNat)) -∗
     fsCacheAuth γfs (itLat recovering W Lw L t) -∗ fsDirtyAuth γfs (itDat recovering D W t) -∗
     ([∗list] i ↦ w ∈ W.take t, itRowPost γfs recovering logstart Lw i w) -∗
     ([∗list] i ↦ w ∈ W.drop t, itRowPre γfs recovering logstart Lw (t + i) w) -∗
     bslots γb (2 + (if recovering then 0 else t)) -∗
     itFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5) -∗
-    wpNext true k.proc cpu (itPost k γb γfs recovering logstart n W Lw L D pidv dqp) -∗ wpLoop c := by
+    wpNext true k.proc cpu (itPost k γb γfs recovering logstart n W Lw L D pidv dqp Xexc) -∗ wpLoop c := by
   unfold itLoopInv; iintro H; iexact H
 
 theorem itLoopInv_intro (cpu : CPU) (k : KCtx) (γb : BcacheNames) (γfs : FsNames)
     (recovering : Bool) (logstart n : Nat)
     (W : List (BitVec 32)) (Lw : Nat → List (BitVec 8)) (L : BlockMap) (D : RegMapF Bool)
-    (pidv : BitVec 32) (dqp : DFrac) :
+    (pidv : BitVec 32) (dqp : DFrac) (Xexc : List Nat) :
     (∀ (c : CPU) (a b : Bool) (R : RegMap) (t : Nat),
     ⌜itFix k recovering t R ∧ t < n⌝ -∗
     kctx c (((k.withSpie a b).pushed 10).withRegs R) -∗
@@ -924,14 +955,15 @@ theorem itLoopInv_intro (cpu : CPU) (k : KCtx) (γb : BcacheNames) (γfs : FsNam
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
     wordPointsTo lhNAddr 4 (DFrac.own 1) (BitVec.ofNat 32 n) -∗
     ([∗list] i ↦ w ∈ W, wordPointsTo (lhBlock i) 4 (DFrac.own 1) w) -∗
+    itExcAt γfs recovering Xexc ((W.take t).map (fun w => w.toNat)) -∗
     fsCacheAuth γfs (itLat recovering W Lw L t) -∗ fsDirtyAuth γfs (itDat recovering D W t) -∗
     ([∗list] i ↦ w ∈ W.take t, itRowPost γfs recovering logstart Lw i w) -∗
     ([∗list] i ↦ w ∈ W.drop t, itRowPre γfs recovering logstart Lw (t + i) w) -∗
     bslots γb (2 + (if recovering then 0 else t)) -∗
     itFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5) -∗
-    wpNext true k.proc cpu (itPost k γb γfs recovering logstart n W Lw L D pidv dqp) -∗ wpLoop c) ⊢
-      itLoopInv (GF := GF) cpu k γb γfs recovering logstart n W Lw L D pidv dqp := by
+    wpNext true k.proc cpu (itPost k γb γfs recovering logstart n W Lw L D pidv dqp Xexc) -∗ wpLoop c) ⊢
+      itLoopInv (GF := GF) cpu k γb γfs recovering logstart n W Lw L D pidv dqp Xexc := by
   unfold itLoopInv; iintro H; iexact H
 
 end
@@ -983,6 +1015,7 @@ theorem it_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE) (PK : PR
     (recovering : Bool)
     (W : List (BitVec 32)) (Lw : Nat → List (BitVec 8)) (L : BlockMap) (D : RegMapF Bool)
     (pidv : BitVec 32) (dqp : DFrac)
+    (homeL : List Nat) (Xv : Nat → List (BitVec 8)) (Xexc : List Nat)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : installTransSlots ≤ k.avail)
     (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
     (htier : k.tier = KTier.kpt)
@@ -992,29 +1025,34 @@ theorem it_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE) (PK : PR
     (hhome : ∀ w ∈ W, fsHome V.cov logstart w.toNat)
     (hLwlen : ∀ i, (Lw i).length = BSIZE)
     (hpinD : ∀ w ∈ W, PartialMap.get? D w.toNat = some false) (hpd : descPageRw pd)
+    (hnodup : ∀ (i k' : Nat) (v v' : BitVec 32), W[i]? = some v → W[k']? = some v' →
+      v.toNat = v'.toNat → i = k')
+    (hxexc : ∀ (i : Nat) (w : BitVec 32), W[i]? = some w →
+      w.toNat ∈ Xexc ∧ Xv w.toNat = Lw i)
     (hrec : recovering = true)
     (a b : Bool) (R : RegMap) (t : Nat) (hfix : itFix k recovering t R) (htn : t < n) :
     kctx c (((k.withSpie a b).pushed 10).withRegs R) ∗
     pcIs c (KA.«install_trans» + 0x6c#64) ∗
     procsInv Γ ∗ bioCtx γl γb V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
-    logFrozen logstart dev ∗
+    logFrozen logstart dev ∗ fsBytesInv γfs.bytes γfs.cache γfs.exc homeL Xv ∗
     trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     wordPointsTo lhNAddr 4 (DFrac.own 1) (BitVec.ofNat 32 n) ∗
     ([∗list] i ↦ w ∈ W, wordPointsTo (lhBlock i) 4 (DFrac.own 1) w) ∗
+    itExcAt γfs recovering Xexc ((W.take t).map (fun w => w.toNat)) ∗
     fsCacheAuth γfs (itLat recovering W Lw L t) ∗ fsDirtyAuth γfs (itDat recovering D W t) ∗
     ([∗list] i ↦ w ∈ W.take t, itRowPost γfs recovering logstart Lw i w) ∗
     ([∗list] i ↦ w ∈ W.drop t, itRowPre γfs recovering logstart Lw (t + i) w) ∗
     bslots γb (2 + (if recovering then 0 else t)) ∗
     itFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5) ∗
-    wpNext true k.proc cpu (itPost k γb γfs recovering logstart n W Lw L D pidv dqp) ∗
-    ▷ itLoopInv cpu k γb γfs recovering logstart n W Lw L D pidv dqp
+    wpNext true k.proc cpu (itPost k γb γfs recovering logstart n W Lw L D pidv dqp Xexc) ∗
+    ▷ itLoopInv cpu k γb γfs recovering logstart n W Lw L D pidv dqp Xexc
     ⊢ wpLoop (GF := GF) c := by
   subst hrec
   simp only [itLat, itDat, if_true, Nat.add_zero]
-  iintro ⟨Hk, Hpc, #Hpinv, #Hbc, #Hdc, #Hpe, #Hfroz, Htc, Hcl, Hir, Hpid, HlhN, Hlhb,
-    Hauth, Hdirty, Hdone, Htodo, Hslots, Hframe, HΦ, IH⟩
+  iintro ⟨Hk, Hpc, #Hpinv, #Hbc, #Hdc, #Hpe, #Hfroz, #Hbinv, Htc, Hcl, Hir, Hpid, HlhN, Hlhb,
+    Hexc, Hauth, Hdirty, Hdone, Htodo, Hslots, Hframe, HΦ, IH⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_kmapStatic _ _ $$ Hk with ⟨#HS, Hk⟩
   icases kctx_kernelData _ _ $$ Hk with ⟨#HD, Hk⟩
@@ -1040,10 +1078,9 @@ theorem it_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE) (PK : PR
   -- entry `t`'s row, peeled off (the ghost step itself waits for the two
   -- breads: the payload's machinery halves are what move)
   icases itRow_uncons γfs true logstart Lw W t wt htlen hwteq $$ Htodo with ⟨Hrow, Htodo⟩
-  icases (show itRowPre (GF := GF) γfs true logstart Lw t wt ⊢
-      fsChalf γfs (logSlotBno logstart t) (Lw t) ∗
-      (∃ bh : List (BitVec 8), fsChalf γfs wt.toNat bh) from by
-    unfold itRowPre; simp only [if_true]; iintro H; iexact H) $$ Hrow with ⟨Hslot, ⟨%bh, Hhome⟩⟩
+  ihave Hslot := (show itRowPre (GF := GF) γfs true logstart Lw t wt ⊢
+      fsChalf γfs (logSlotBno logstart t) (Lw t) from by
+    unfold itRowPre; simp only [if_true]; iintro ⟨H, -⟩; iexact H) $$ Hrow
   -- the header word of this entry
   icases BigSepL.bigSepL_insert_acc (Φ := fun (i : Nat) (w : BitVec 32) =>
     wordPointsTo (GF := GF) (lhBlock i) 4 (DFrac.own 1) w) hwt $$ Hlhb with ⟨Hcell, Hclose⟩
@@ -1223,20 +1260,51 @@ theorem it_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE) (PK : PR
     exact Option.some.inj hpw
   subst hdDf
   icases fsPay_open_clean γb γfs V hcl kkD dev wt bsD bsdD $$ HpayD with ⟨-, HmL, HmD⟩
-  iapply wpLoop_bupd
-  imod fsCache_update γfs (itRecLUpto W Lw L t) wt.toNat bh (Lw t) bsD $$ Hauth Hhome HmL
-    with ⟨-, Hauth, Hhome, HmL⟩
+  -- THE EXCEPTION SET NAMES THIS ENTRY, and `Xv` reads the slot's content
+  obtain ⟨hwtX, hwtXv⟩ := hxexc t wt hwt
+  have hwtnot : wt.toNat ∉ ((W.take t).map (fun w => w.toNat)) := by
+    intro hin
+    obtain ⟨v, hv, hveq⟩ := List.mem_map.1 hin
+    obtain ⟨i, hi⟩ := List.mem_iff_getElem?.1 hv
+    rw [List.getElem?_take] at hi
+    by_cases hit : i < t
+    · rw [if_pos hit] at hi
+      exact absurd (hnodup t i wt v hwt hi hveq.symm) (by omega)
+    · rw [if_neg hit] at hi; cases hi
+  have hmemX : wt.toNat ∈ excDelMany Xexc ((W.take t).map (fun w => w.toNat)) :=
+    (mem_excDelMany _ _ _).2 ⟨hwtX, hwtnot⟩
+  ihave Hexc := (show itExcAt (GF := GF) γfs true Xexc ((W.take t).map (fun w => w.toNat)) ⊢
+      excOwn γfs.exc (excDelMany Xexc ((W.take t).map (fun w => w.toNat))) from by
+    unfold itExcAt; simp only [if_true]; iintro H; iexact H) $$ Hexc
+  iapply wpLoop_fupd
+  imod (fsblock_install_exc_at ⊤ γfs homeL Xv (itRecLUpto W Lw L t)
+      (excDelMany Xexc ((W.take t).map (fun w => w.toNat))) wt.toNat bsD logN_top hmemX
+      (by rw [hwtXv]; exact hLwlen t)) $$ Hbinv Hexc Hauth HmL
+    with ⟨-, Hexc, Hauth, HmL⟩
   imodintro
   ihave Hauth := (show fsCacheAuth (GF := GF) γfs
-      (PartialMap.insert (itRecLUpto W Lw L t) wt.toNat (Lw t)) ⊢
+      (PartialMap.insert (itRecLUpto W Lw L t) wt.toNat (Xv wt.toNat)) ⊢
       fsCacheAuth γfs (itRecLUpto W Lw L (t + 1)) from by
-    rw [itRecLUpto_succ W Lw L t wt hwt]) $$ Hauth
-  ihave Hrow2 := (show fsChalf (GF := GF) γfs (logSlotBno logstart t) (Lw t) ∗
-      fsChalf γfs wt.toNat (Lw t) ⊢ itRowPost γfs true logstart Lw t wt from by
+    rw [hwtXv, itRecLUpto_succ W Lw L t wt hwt]) $$ Hauth
+  ihave HmL := (show (γfs.cache ↪◯MAP[wt.toNat]{DFrac.own (1 : Qp).half} (Xv wt.toNat))
+      ⊢@{IProp GF} (γfs.cache ↪◯MAP[wt.toNat]{DFrac.own (1 : Qp).half} (Lw t)) from by
+    rw [hwtXv]) $$ HmL
+  ihave Hexc := (show excOwn (GF := GF) γfs.exc
+      (excDel (excDelMany Xexc ((W.take t).map (fun w => w.toNat))) wt.toNat) ⊢
+      itExcAt γfs true Xexc ((W.take (t + 1)).map (fun w => w.toNat)) from by
+    unfold itExcAt
+    simp only [if_true]
+    rw [excDel_excDelMany, show (W.take t).map (fun w => w.toNat) ++ [wt.toNat]
+      = (W.take (t + 1)).map (fun w => w.toNat) from by
+      rw [List.take_succ_eq_append_getElem htlen, hwteq, List.map_append]; rfl]) $$ Hexc
+  ihave Hrow2 := (show fsChalf (GF := GF) γfs (logSlotBno logstart t) (Lw t) ⊢
+      itRowPost γfs true logstart Lw t wt from by
     unfold itRowPost
     simp only [if_true]
-    iintro H; iexact H) $$ [Hslot Hhome]
-  case' _ => iframe
+    iintro H
+    isplitl [H]
+    · iexact H
+    · iempintro) $$ Hslot
   ihave Hdone2 := itRow_snoc γfs true logstart Lw W t wt htlen hwteq $$ [Hdone Hrow2]
   case' _ => iframe
   -- +0x90  mv s1,a0 ; mv a2,s7 ; addi a1,s2,88 ; addi a0,a0,88 ; jal memmove
@@ -1447,15 +1515,19 @@ theorem it_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE) (PK : PR
     ihave Hdone3 := (show ([∗list] i ↦ w ∈ W.take (t + 1), itRowPost (GF := GF) γfs true logstart Lw i w) ⊢
         [∗list] i ↦ w ∈ W, itRowPost γfs true logstart Lw i w from by
       rw [show W.take (t + 1) = W from by rw [htn1, hnW]; exact List.take_length]) $$ Hdone2
-    iapply (it_exit cpu c3 k γb γfs true logstart n j (t + 1) W Lw L D pidv dqp hj hproc hsie
+    ihave Hexc3 := (show itExcAt (GF := GF) γfs true Xexc ((W.take (t + 1)).map (fun w => w.toNat))
+        ⊢ itExcAt γfs true Xexc (W.map (fun w => w.toNat)) from by
+      rw [show W.take (t + 1) = W from by rw [htn1, hnW]; exact List.take_length]) $$ Hexc
+    iapply (it_exit cpu c3 k γb γfs true logstart n j (t + 1) W Lw L D pidv dqp Xexc hj hproc hsie
         (by unfold installTransSlots breadSlots panicSlots at hK; omega) spie5 spp5 _ hfix6)
-      $$ [- $Hk $Hpc $Htc $Hcl $Hir $Hpid $HlhN $Hlhb $Hauth $Hdirty $Hdone3 $Hslots3 $Hframe $HΦ]
+      $$ [- $Hk $Hpc $Htc $Hcl $Hir $Hpid $HlhN $Hlhb $Hexc3 $Hauth $Hdirty $Hdone3 $Hslots3
+          $Hframe $HΦ]
   · -- more entries: back to the head
     k_step (wp_s_branch c3 _ (KA.«install_trans» + 0x68#64) false 74#13 19#5 15#5 (by decide) bop.BGE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [it_sext32 n hn31, it_bge_add t 1 n (by omega) (by omega), decide_eq_false hdone]
     iintro Hk Hpc
-    ihave IH' := itLoopInv_elim cpu k γb γfs true logstart n W Lw L D pidv dqp $$ IH
+    ihave IH' := itLoopInv_elim cpu k γb γfs true logstart n W Lw L D pidv dqp Xexc $$ IH
     ihave Hauth := (show fsCacheAuth (GF := GF) γfs (itRecLUpto W Lw L (t + 1)) ⊢
         fsCacheAuth γfs (itLat true W Lw L (t + 1)) from by
       simp only [itLat, if_true]
@@ -1469,7 +1541,7 @@ theorem it_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE) (PK : PR
       simp only [if_true, Nat.add_zero]
       iintro H; iexact H) $$ Hslots3
     iapply IH' $$ %c3 %spie5 %spp5 %_ %(t + 1) [] Hk Hpc Htc Hcl Hir Hpid HlhN Hlhb
-      Hauth Hdirty Hdone2 Htodo Hslots3 Hframe HΦ
+      Hexc Hauth Hdirty Hdone2 Htodo Hslots3 Hframe HΦ
     ipureintro
     exact ⟨hfix6, by omega⟩
 
@@ -1486,6 +1558,7 @@ theorem it_body_commit (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE) (M
     (recovering : Bool)
     (W : List (BitVec 32)) (Lw : Nat → List (BitVec 8)) (L : BlockMap) (D : RegMapF Bool)
     (pidv : BitVec 32) (dqp : DFrac)
+    (homeL : List Nat) (Xv : Nat → List (BitVec 8)) (Xexc : List Nat)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : installTransSlots ≤ k.avail)
     (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
     (htier : k.tier = KTier.kpt)
@@ -1502,24 +1575,25 @@ theorem it_body_commit (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE) (M
     kctx c (((k.withSpie a b).pushed 10).withRegs R) ∗
     pcIs c (KA.«install_trans» + 0x6c#64) ∗
     procsInv Γ ∗ bioCtx γl γb V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
-    logFrozen logstart dev ∗
+    logFrozen logstart dev ∗ fsBytesInv γfs.bytes γfs.cache γfs.exc homeL Xv ∗
     trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     wordPointsTo lhNAddr 4 (DFrac.own 1) (BitVec.ofNat 32 n) ∗
     ([∗list] i ↦ w ∈ W, wordPointsTo (lhBlock i) 4 (DFrac.own 1) w) ∗
+    itExcAt γfs recovering Xexc ((W.take t).map (fun w => w.toNat)) ∗
     fsCacheAuth γfs (itLat recovering W Lw L t) ∗ fsDirtyAuth γfs (itDat recovering D W t) ∗
     ([∗list] i ↦ w ∈ W.take t, itRowPost γfs recovering logstart Lw i w) ∗
     ([∗list] i ↦ w ∈ W.drop t, itRowPre γfs recovering logstart Lw (t + i) w) ∗
     bslots γb (2 + (if recovering then 0 else t)) ∗
     itFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5) ∗
-    wpNext true k.proc cpu (itPost k γb γfs recovering logstart n W Lw L D pidv dqp) ∗
-    ▷ itLoopInv cpu k γb γfs recovering logstart n W Lw L D pidv dqp
+    wpNext true k.proc cpu (itPost k γb γfs recovering logstart n W Lw L D pidv dqp Xexc) ∗
+    ▷ itLoopInv cpu k γb γfs recovering logstart n W Lw L D pidv dqp Xexc
     ⊢ wpLoop (GF := GF) c := by
   subst hrec
   simp only [itLat, itDat, Bool.false_eq_true, if_false]
-  iintro ⟨Hk, Hpc, #Hpinv, #Hbc, #Hdc, #Hpe, #Hfroz, Htc, Hcl, Hir, Hpid, HlhN, Hlhb,
-    Hauth, Hdirty, Hdone, Htodo, Hslots, Hframe, HΦ, IH⟩
+  iintro ⟨Hk, Hpc, #Hpinv, #Hbc, #Hdc, #Hpe, #Hfroz, #Hbinv, Htc, Hcl, Hir, Hpid, HlhN, Hlhb,
+    Hexc, Hauth, Hdirty, Hdone, Htodo, Hslots, Hframe, HΦ, IH⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_kmapStatic _ _ $$ Hk with ⟨#HS, Hk⟩
   icases kctx_kernelData _ _ $$ Hk with ⟨#HD, Hk⟩
@@ -1963,15 +2037,20 @@ theorem it_body_commit (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE) (M
     ihave Hdone3 := (show ([∗list] i ↦ w ∈ W.take (t + 1), itRowPost (GF := GF) γfs false logstart Lw i w) ⊢
         [∗list] i ↦ w ∈ W, itRowPost γfs false logstart Lw i w from by
       rw [show W.take (t + 1) = W from by rw [htn1, hnW]; exact List.take_length]) $$ Hdone2
-    iapply (it_exit cpu c3 k γb γfs false logstart n j (t + 1) W Lw L D pidv dqp hj hproc hsie
+    ihave Hexc3 := itExcAt_false γfs Xexc ((W.take t).map (fun w => w.toNat))
+      (W.map (fun w => w.toNat)) $$ Hexc
+    iapply (it_exit cpu c3 k γb γfs false logstart n j (t + 1) W Lw L D pidv dqp Xexc hj hproc hsie
         (by unfold installTransSlots breadSlots panicSlots at hK; omega) spie5 spp5 _ hfix6)
-      $$ [- $Hk $Hpc $Htc $Hcl $Hir $Hpid $HlhN $Hlhb $Hauth $Hdirty $Hdone3 $Hslots3 $Hframe $HΦ]
+      $$ [- $Hk $Hpc $Htc $Hcl $Hir $Hpid $HlhN $Hlhb $Hexc3 $Hauth $Hdirty $Hdone3 $Hslots3
+          $Hframe $HΦ]
   · -- more entries: back to the head
     k_step (wp_s_branch c3 _ (KA.«install_trans» + 0x68#64) false 74#13 19#5 15#5 (by decide) bop.BGE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [it_sext32 n hn31, it_bge_add t 1 n (by omega) (by omega), decide_eq_false hdone]
     iintro Hk Hpc
-    ihave IH' := itLoopInv_elim cpu k γb γfs false logstart n W Lw L D pidv dqp $$ IH
+    ihave IH' := itLoopInv_elim cpu k γb γfs false logstart n W Lw L D pidv dqp Xexc $$ IH
+    ihave Hexc := itExcAt_false γfs Xexc ((W.take t).map (fun w => w.toNat))
+      ((W.take (t + 1)).map (fun w => w.toNat)) $$ Hexc
     ihave Hauth := (show fsCacheAuth (GF := GF) γfs L ⊢
         fsCacheAuth γfs (itLat false W Lw L (t + 1)) from by
       simp only [itLat, Bool.false_eq_true, if_false]
@@ -1986,7 +2065,7 @@ theorem it_body_commit (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE) (M
       simp only [Bool.false_eq_true, if_false]
       iintro H; iexact H) $$ Hslots3
     iapply IH' $$ %c3 %spie5 %spp5 %_ %(t + 1) [] Hk Hpc Htc Hcl Hir Hpid HlhN Hlhb
-      Hauth Hdirty Hdone2 Htodo Hslots3 Hframe HΦ
+      Hexc Hauth Hdirty Hdone2 Htodo Hslots3 Hframe HΦ
     ipureintro
     exact ⟨hfix6, by omega⟩
 
@@ -2006,6 +2085,7 @@ theorem it_loop (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE) (PK : PR
     (recovering : Bool)
     (W : List (BitVec 32)) (Lw : Nat → List (BitVec 8)) (L : BlockMap) (D : RegMapF Bool)
     (pidv : BitVec 32) (dqp : DFrac)
+    (homeL : List Nat) (Xv : Nat → List (BitVec 8)) (Xexc : List Nat)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : installTransSlots ≤ k.avail)
     (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
     (htier : k.tier = KTier.kpt)
@@ -2015,19 +2095,23 @@ theorem it_loop (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE) (PK : PR
     (hhome : ∀ w ∈ W, fsHome V.cov logstart w.toNat)
     (hLwlen : ∀ i, (Lw i).length = BSIZE)
     (hpinD : ∀ w ∈ W, PartialMap.get? D w.toNat = some false) (hpd : descPageRw pd)
+    (hnodup : ∀ (i k' : Nat) (v v' : BitVec 32), W[i]? = some v → W[k']? = some v' →
+      v.toNat = v'.toNat → i = k')
+    (hxexc : ∀ (i : Nat) (w : BitVec 32), W[i]? = some w →
+      w.toNat ∈ Xexc ∧ Xv w.toNat = Lw i)
     (hrec : recovering = true) :
     procsInv (GF := GF) Γ -∗ bioCtx γl γb V -∗ diskCaps V.gd γdl pd pav pu -∗ panicEnv -∗
-    logFrozen logstart dev -∗
-    itLoopInv cpu k γb γfs recovering logstart n W Lw L D pidv dqp := by
-  iintro #Hpinv #Hbc #Hdc #Hpe #Hfroz
+    logFrozen logstart dev -∗ fsBytesInv γfs.bytes γfs.cache γfs.exc homeL Xv -∗
+    itLoopInv cpu k γb γfs recovering logstart n W Lw L D pidv dqp Xexc := by
+  iintro #Hpinv #Hbc #Hdc #Hpe #Hfroz #Hbinv
   iloeb as IH
   iapply itLoopInv_intro
-  iintro %c %a %b %R %t %⟨hfix, htn⟩ Hk Hpc Htc Hcl Hir Hpid HlhN Hlhb Hauth Hdirty Hdone
+  iintro %c %a %b %R %t %⟨hfix, htn⟩ Hk Hpc Htc Hcl Hir Hpid HlhN Hlhb Hexc Hauth Hdirty Hdone
     Htodo Hslots Hframe HΦ
   iapply (it_body BR BW BE MM PK Γ cpu c k γl γb V γdl γfs pd pav pu j logstart n dev
-      recovering W Lw L D pidv dqp hj hproc hK hsie hnoff hlocks htier hgeom hdev hcl hdt
-      hnW hnL hhome hLwlen hpinD hpd hrec a b R t hfix htn)
-    $$ [- $Hk $Hpc $Htc $Hcl $Hir $Hpid $HlhN $Hlhb $Hauth $Hdirty $Hdone $Htodo $Hslots
+      recovering W Lw L D pidv dqp homeL Xv Xexc hj hproc hK hsie hnoff hlocks htier hgeom hdev
+      hcl hdt hnW hnL hhome hLwlen hpinD hpd hnodup hxexc hrec a b R t hfix htn)
+    $$ [- $Hk $Hpc $Htc $Hcl $Hir $Hpid $HlhN $Hlhb $Hexc $Hauth $Hdirty $Hdone $Htodo $Hslots
         $Hframe $HΦ $IH]
   iframe #
 
@@ -2039,6 +2123,7 @@ theorem it_loop_commit (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE) (M
     (recovering : Bool)
     (W : List (BitVec 32)) (Lw : Nat → List (BitVec 8)) (L : BlockMap) (D : RegMapF Bool)
     (pidv : BitVec 32) (dqp : DFrac)
+    (homeL : List Nat) (Xv : Nat → List (BitVec 8)) (Xexc : List Nat)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : installTransSlots ≤ k.avail)
     (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
     (htier : k.tier = KTier.kpt)
@@ -2052,17 +2137,17 @@ theorem it_loop_commit (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE) (M
       PartialMap.get? L w.toNat = some (Lw i))
     (hrec : recovering = false) :
     procsInv (GF := GF) Γ -∗ bioCtx γl γb V -∗ diskCaps V.gd γdl pd pav pu -∗ panicEnv -∗
-    logFrozen logstart dev -∗
-    itLoopInv cpu k γb γfs recovering logstart n W Lw L D pidv dqp := by
-  iintro #Hpinv #Hbc #Hdc #Hpe #Hfroz
+    logFrozen logstart dev -∗ fsBytesInv γfs.bytes γfs.cache γfs.exc homeL Xv -∗
+    itLoopInv cpu k γb γfs recovering logstart n W Lw L D pidv dqp Xexc := by
+  iintro #Hpinv #Hbc #Hdc #Hpe #Hfroz #Hbinv
   iloeb as IH
   iapply itLoopInv_intro
-  iintro %c %a %b %R %t %⟨hfix, htn⟩ Hk Hpc Htc Hcl Hir Hpid HlhN Hlhb Hauth Hdirty Hdone
+  iintro %c %a %b %R %t %⟨hfix, htn⟩ Hk Hpc Htc Hcl Hir Hpid HlhN Hlhb Hexc Hauth Hdirty Hdone
     Htodo Hslots Hframe HΦ
   iapply (it_body_commit BR BU BW BE MM PK Γ cpu c k γl γb V γdl γfs pd pav pu j logstart n dev
-      recovering W Lw L D pidv dqp hj hproc hK hsie hnoff hlocks htier hgeom hdev hcl hdt
-      hnW hnL hhome hLwlen hpd hcommitD hrec a b R t hfix htn)
-    $$ [- $Hk $Hpc $Htc $Hcl $Hir $Hpid $HlhN $Hlhb $Hauth $Hdirty $Hdone $Htodo $Hslots
+      recovering W Lw L D pidv dqp homeL Xv Xexc hj hproc hK hsie hnoff hlocks htier hgeom hdev
+      hcl hdt hnW hnL hhome hLwlen hpd hcommitD hrec a b R t hfix htn)
+    $$ [- $Hk $Hpc $Htc $Hcl $Hir $Hpid $HlhN $Hlhb $Hexc $Hauth $Hdirty $Hdone $Htodo $Hslots
         $Hframe $HΦ $IH]
   iframe #
 
@@ -2076,12 +2161,12 @@ set_option maxHeartbeats 16000000 in
 theorem installTrans_proof (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE)
     (MM : MEMMOVE) (PK : PRINTK) : INSTALL_TRANS := ⟨
   fun {hlc GF} _ _ _ _ _ _ _ _ Γ _ cpu k γl γb V γdl γfs pd pav pu j logstart dev recovering n
-      W Lw L D pidv dqp hj hproc hK hsie hnoff hlocks htier hgeom hdev hcl2 hdt2 ha0 hn hnodup
-      hhome hlen hcommit hpin hpd => by
+      W Lw L D pidv dqp homeL Xv Xexc hj hproc hK hsie hnoff hlocks htier hgeom hdev hcl2 hdt2
+      ha0 hn hnodup hhome hlen hcommit hpin hxexc hpd => by
   unfold wp_install_trans_body
   simp only [installTransAddr]
   iintro ⟨Hk, Hpc, #Hpinv, Htc, Hcl, Hir, #Hbc, #Hdc, #Hpe, #Hfroz, Hpid, HlhN, Hlhb,
-    Hauth, Hdirty, Hrows, Hslots, HΦ⟩
+    #Hbinv, Hexc, Hauth, Hdirty, Hrows, Hslots, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   obtain ⟨hnW, hnL⟩ := hn
   have hn31 : n < 2 ^ 31 := by unfold LOGBLOCKS at hnL; omega
@@ -2096,13 +2181,15 @@ theorem installTrans_proof (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE
       wordPointsTo (pPid k.proc) 4 dqp pidv -∗
       wordPointsTo lhNAddr 4 (DFrac.own 1) (BitVec.ofNat 32 n) -∗
       ([∗list] i ↦ w ∈ W, wordPointsTo (lhBlock i) 4 (DFrac.own 1) w) -∗
+      (if recovering then excOwn γfs.exc (excDelMany Xexc (W.map (fun w => w.toNat)))
+       else iprop(emp)) -∗
       fsCacheAuth γfs (if recovering then itRecL W Lw L else L) -∗
       fsDirtyAuth γfs (if recovering then D else dirtyClear D (W.map (fun w => w.toNat))) -∗
       ([∗list] i ↦ w ∈ W, fsChalf γfs (logSlotBno logstart i) (Lw i) ∗
-        (if recovering then fsChalf γfs w.toNat (Lw i) else fsDirtyHalf γfs w.toNat false)) -∗
+        (if recovering then iprop(emp) else fsDirtyHalf γfs w.toNat false)) -∗
       bslots γb (2 + (if recovering then 0 else W.length)) -∗ wpLoop cpu')) ⊢
-      wpNext true k.proc cpu (itPost k γb γfs recovering logstart n W Lw L D pidv dqp) from by
-    unfold itPost itRowPost; iintro H; iexact H) $$ HΦ
+      wpNext true k.proc cpu (itPost k γb γfs recovering logstart n W Lw L D pidv dqp Xexc) from by
+    unfold itPost itRowPost itExcAt; iintro H; iexact H) $$ HΦ
   -- +0x00  auipc a5,0x1f ; lw a5,-2024(a5) ; blez a5
   k_step (wp_s_auipc cpu _ KA.«install_trans» false 0x1f#20 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.setReg_eq_withRegs]
@@ -2127,7 +2214,7 @@ theorem installTrans_proof (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE
     k_step (wp_s_ret cpu _ (KA.«install_trans» + 0xca#64) true 1#5)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.setReg_eq_withRegs]
     iintro Hk Hpc
-    ihave HΦ := it_post_at cpu cpu k γb γfs recovering logstart n j [] Lw L D pidv dqp hj hproc $$ HΦ
+    ihave HΦ := it_post_at cpu cpu k γb γfs recovering logstart n j [] Lw L D pidv dqp Xexc hj hproc $$ HΦ
     ihave Hauth := (show fsCacheAuth (GF := GF) γfs L ⊢
         fsCacheAuth γfs (if recovering then itRecL ([] : List (BitVec 32)) Lw L else L) from by
       cases recovering with
@@ -2150,15 +2237,20 @@ theorem installTrans_proof (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE
         iintro H; iexact H) $$ Hslots
     ihave Hrows := (show ([∗list] i ↦ w ∈ ([] : List (BitVec 32)),
           fsChalf (GF := GF) γfs (logSlotBno logstart i) (Lw i) ∗
-          (if recovering then iprop(∃ bh : List (BitVec 8), fsChalf γfs w.toNat bh)
-           else fsDirtyHalf γfs w.toNat true)) ⊢
+          (if recovering then iprop(emp) else fsDirtyHalf γfs w.toNat true)) ⊢
         [∗list] i ↦ w ∈ ([] : List (BitVec 32)), itRowPost γfs recovering logstart Lw i w from by
       iintro H
       iclear H
       iapply BigSepL.bigSepL_nil.2
       iempintro) $$ Hrows
+    ihave Hexc := (show (if recovering then excOwn (GF := GF) γfs.exc Xexc else iprop(emp)) ⊢
+        itExcAt γfs recovering Xexc (([] : List (BitVec 32)).map (fun w => w.toNat)) from by
+      unfold itExcAt
+      simp only [List.map_nil, excDelMany_nil]
+      iintro H; iexact H) $$ Hexc
     rw [it_ctx_spie0 k]
-    iapply HΦ $$ %(k.spie) %(k.spp) %_ [] Hk Hpc Htc Hcl Hir Hpid HlhN Hlhb Hauth Hdirty Hrows Hslots
+    iapply HΦ $$ %(k.spie) %(k.spp) %_ [] Hk Hpc Htc Hcl Hir Hpid HlhN Hlhb Hexc Hauth Hdirty
+      Hrows Hslots
     ipureintro
     unfold calleeSaved
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
@@ -2210,8 +2302,7 @@ theorem installTrans_proof (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE
     iintro Hk Hpc
     -- the rows at the cursor 0
     ihave Hrows := (show ([∗list] i ↦ w ∈ W, fsChalf (GF := GF) γfs (logSlotBno logstart i) (Lw i) ∗
-        (if recovering then iprop(∃ bh : List (BitVec 8), fsChalf γfs w.toNat bh)
-         else fsDirtyHalf γfs w.toNat true)) ⊢
+        (if recovering then iprop(emp) else fsDirtyHalf γfs w.toNat true)) ⊢
         [∗list] i ↦ w ∈ W.drop 0, itRowPre γfs recovering logstart Lw (0 + i) w from by
       rw [List.drop_zero]
       refine BigSepL.bigSepL_mono ?_
@@ -2219,24 +2310,24 @@ theorem installTrans_proof (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE
       rw [Nat.zero_add]
       unfold itRowPre
       iintro H; iexact H) $$ Hrows
-    ihave IH : itLoopInv (GF := GF) cpu k γb γfs recovering logstart n W Lw L D pidv dqp
-      $$ [Hpinv Hbc Hdc Hpe Hfroz]
+    ihave IH : itLoopInv (GF := GF) cpu k γb γfs recovering logstart n W Lw L D pidv dqp Xexc
+      $$ [Hpinv Hbc Hdc Hpe Hfroz Hbinv]
     · cases hr : recovering with
       | true =>
         subst hr
         ihave IH0 := it_loop BR BW BE MM PK Γ cpu k γl γb V γdl γfs pd pav pu j logstart n dev
-          true W Lw L D pidv dqp hj hproc hK hsie hnoff hlocks htier hgeom hdev hcl2 hdt2
-          hnW hnL hhome hlen (hpin rfl) hpd rfl
-          $$ Hpinv Hbc Hdc Hpe Hfroz
+          true W Lw L D pidv dqp homeL Xv Xexc hj hproc hK hsie hnoff hlocks htier hgeom hdev
+          hcl2 hdt2 hnW hnL hhome hlen (hpin rfl) hpd hnodup (hxexc rfl) rfl
+          $$ Hpinv Hbc Hdc Hpe Hfroz Hbinv
         iexact IH0
       | false =>
         subst hr
         ihave IH0 := it_loop_commit BR BU BW BE MM PK Γ cpu k γl γb V γdl γfs pd pav pu j
-          logstart n dev false W Lw L D pidv dqp hj hproc hK hsie hnoff hlocks htier hgeom hdev
-          hcl2 hdt2 hnW hnL hhome hlen hpd (hcommit rfl) rfl
-          $$ Hpinv Hbc Hdc Hpe Hfroz
+          logstart n dev false W Lw L D pidv dqp homeL Xv Xexc hj hproc hK hsie hnoff hlocks htier
+          hgeom hdev hcl2 hdt2 hnW hnL hhome hlen hpd (hcommit rfl) rfl
+          $$ Hpinv Hbc Hdc Hpe Hfroz Hbinv
         iexact IH0
-    ihave IH := itLoopInv_elim cpu k γb γfs recovering logstart n W Lw L D pidv dqp $$ IH
+    ihave IH := itLoopInv_elim cpu k γb γfs recovering logstart n W Lw L D pidv dqp Xexc $$ IH
     ihave Hauth := (show fsCacheAuth (GF := GF) γfs L ⊢
         fsCacheAuth γfs (itLat recovering W Lw L 0) from by
       rw [itLat_zero]) $$ Hauth
@@ -2247,9 +2338,14 @@ theorem installTrans_proof (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE
         bslots γb (2 + (if recovering then 0 else 0)) from by
       simp only [ite_self, Nat.add_zero]
       iintro H; iexact H) $$ Hslots
+    ihave Hexc := (show (if recovering then excOwn (GF := GF) γfs.exc Xexc else iprop(emp)) ⊢
+        itExcAt γfs recovering Xexc ((W.take 0).map (fun w => w.toNat)) from by
+      unfold itExcAt
+      simp only [List.take_zero, List.map_nil, excDelMany_nil]
+      iintro H; iexact H) $$ Hexc
     rw [it_ctx_pushed0 k 10]
-    iapply IH $$ %cpu %(k.spie) %(k.spp) %_ %0 [] Hk Hpc Htc Hcl Hir Hpid HlhN Hlhb Hauth Hdirty
-      [] Hrows Hslots Hframe HΦ
+    iapply IH $$ %cpu %(k.spie) %(k.spp) %_ %0 [] Hk Hpc Htc Hcl Hir Hpid HlhN Hlhb Hexc Hauth
+      Hdirty [] Hrows Hslots Hframe HΦ
     · ipureintro
       refine ⟨⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩, by omega⟩ <;>
         simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false] <;>

@@ -123,19 +123,19 @@ carries the DISK IMAGE fragment instead (`Xv6/FsBlocks.lean`, "the tie to
 the buffer cache is MISSING"), so the bytes `bread` returns and the header
 block's `Xv6.fsChalf` content are two unrelated ghosts.
 
-The second half of the same statement is Rocq's `SpecFsinit` premise (g),
-`hdr_n bs_hdr = 0`: this port's `Xv6/SpecInstallTrans.lean` recovering arm
-takes each entry's HOME block CLIENT HALF (a forced deviation recorded
-there, because with Rocq's `emp` row the post's `fsCacheAuth (itRecL ...)`
-would be unprovable), and `SpecInitlog`'s precondition supplies client
-halves only for the log's own region.  At `hdr_n = 0` the write set is
-empty and the question does not arise; at `n > 0` the caller would have to
-hand the pending home blocks' halves in, which is precisely the premise
-Rocq's `SpecFsinit` still carries.
-
-Both are stated at the Iris level, as ONE entailment, so that neither is a
+It is stated at the Iris level, as ONE entailment, so that it is not a
 Lean-refutable claim about lists: what it says is a fact about resources
-this port's ghost state does not relate, not a false arithmetic. -/
+this port's ghost state does not relate, not a false arithmetic.
+
+(The OTHER half of this section -- the claim that the recovering
+`install_trans` needed each entry's HOME block client half, so that
+`SpecInitlog` could not be specified at `hdr_n > 0` -- is GONE.  The byte
+view is in: the recovering arm's per-entry row is Rocq's `emp` and the home
+block's content moves inside `Xv6.fsBytesInv` through
+`Xv6.fsblock_install_exc`.  `SpecInitlog` still carries
+`hhdr0 : hdrN bsHdr = 0`, but for a different and purely PROOF-side reason,
+recorded in `Xv6/SpecInitlog.lean`: this port's `initlog` walk is written at
+the empty write set throughout.) -/
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]

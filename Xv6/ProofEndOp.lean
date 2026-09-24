@@ -293,6 +293,7 @@ theorem eo_it (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
     (γfs : FsNames) (pd pav pu : BitVec 64) (j logstart : Nat) (dev : BitVec 32)
     (n : Nat) (W : List (BitVec 32)) (Lw : Nat → List (BitVec 8))
     (L : BlockMap) (D : RegMapF Bool) (pidv : BitVec 32) (dqp : DFrac)
+    (homeL : List Nat) (Xv : Nat → List (BitVec 8)) (Xexc : List Nat)
     (pj : BitVec 64) (hpj : k'.proc = pj)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : installTransSlots ≤ k'.avail)
     (hsie : k'.sie = false) (hnoff : k'.noff = 0) (hlocks : k'.locks = [])
@@ -315,6 +316,8 @@ theorem eo_it (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
     wordPointsTo (pPid pj) 4 dqp pidv ∗
     wordPointsTo lhNAddr 4 (DFrac.own 1) (BitVec.ofNat 32 n) ∗
     ([∗list] i ↦ w ∈ W, wordPointsTo (lhBlock i) 4 (DFrac.own 1) w) ∗
+    fsBytesInv γfs.bytes γfs.cache γfs.exc homeL Xv ∗
+    iprop(emp) ∗
     fsCacheAuth γfs L ∗ fsDirtyAuth γfs D ∗
     ([∗list] i ↦ w ∈ W, fsChalf γfs (logSlotBno logstart i) (Lw i) ∗
        fsDirtyHalf γfs w.toNat true) ∗
@@ -326,6 +329,7 @@ theorem eo_it (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
       wordPointsTo (pPid pj) 4 dqp pidv -∗
       wordPointsTo lhNAddr 4 (DFrac.own 1) (BitVec.ofNat 32 n) -∗
       ([∗list] i ↦ w ∈ W, wordPointsTo (lhBlock i) 4 (DFrac.own 1) w) -∗
+      iprop(emp) -∗
       fsCacheAuth γfs L -∗
       fsDirtyAuth γfs (dirtyClear D (W.map (fun w => w.toNat))) -∗
       ([∗list] i ↦ w ∈ W, fsChalf γfs (logSlotBno logstart i) (Lw i) ∗
@@ -334,9 +338,10 @@ theorem eo_it (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
     ⊢ wpLoop (GF := GF) c := by
   subst hpj
   have h := IT.wp_install_trans (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl γfs pd pav pu j
-    logstart dev false n W Lw L D pidv dqp hj hproc hK hsie hnoff hlocks htier hgeom hdev
+    logstart dev false n W Lw L D pidv dqp homeL Xv Xexc
+    hj hproc hK hsie hnoff hlocks htier hgeom hdev
     hcl hdt (by simp only [Bool.false_eq_true, if_false]; exact ha0) hn hnodup hhome hlen
-    (fun _ => hcommit) (by simp) hpd
+    (fun _ => hcommit) (by simp) (by simp) hpd
   unfold wp_install_trans_body at h
   simp only [installTransAddr, Bool.false_eq_true, if_false] at h
   exact h
@@ -1087,6 +1092,15 @@ theorem eo_commit (WH : WRITE_HEAD) (IT : INSTALL_TRANS) (AC : ACQUIRE) (RE : RE
   iintro ⟨Hk, Hpc, #Hpi, #Hbc, #Hdc, #Hpe, #Hctx, Htc, Hcl, Hir, Hpid, Hopen, Hfr, HfrS, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   ihave #Hfroz := logCtx_frozen γ γb γfs V.cov ls dev $$ Hctx
+  -- the byte view's invariant, off the context every log function threads
+  icases (show logCtx (GF := GF) γ γb γfs V.cov ls dev ⊢
+      ∃ Xv : Nat → List (BitVec 8),
+        fsBytesInv γfs.bytes γfs.cache γfs.exc (fsHomeList V.cov ls) Xv from by
+    iintro H
+    ihave H := logCtx_bytes γ γb γfs V.cov ls dev $$ H
+    ihave H := fsBytesAnyAt_at γfs (fsHomeList V.cov ls) $$ H
+    unfold fsBytesAt
+    iexact H) $$ Hctx with ⟨%Xv, #Hbinv⟩
   icases eoOpen_elim γb γfs V.cov ls n W L D Lw n $$ Hopen
     with ⟨HlhN, Hblk, Hjunk, Hauth, Hdirty, Hcov, Hhdr, Hdone, Hrest, Hpool⟩
   -- one slot unit for the first `write_head`
@@ -1143,11 +1157,12 @@ theorem eo_commit (WH : WRITE_HEAD) (IT : INSTALL_TRANS) (AC : ACQUIRE) (RE : RE
   ihave Hrows := eo_rows_pack γfs ls W Lw true $$ [Hdone Hdirt]
   case' _ => iframe Hdone Hdirt
   iapply (eo_it IT Γ c1 _ γl γb V γdl γfs pd pav pu j ls dev n W Lw
-      (PartialMap.insert L (logHdrBno ls) bs1) D pidv dqp k.proc (by k_norm_g)
+      (PartialMap.insert L (logHdrBno ls) bs1) D pidv dqp
+      (fsHomeList V.cov ls) Xv ([] : List Nat) k.proc (by k_norm_g)
       hj ?iproc ?iK ?isie ?inoff ?ilocks ?itier hgeom hdev hcl hdt ?ia0 ⟨hnW, hnL⟩
       (eo_nodup_inj W hnodup) hhome hLwlen ?icommit hpd)
-    $$ [- $Hk $Hpc $Hpi $Htc $Hcl $Hir $Hbc $Hdc $Hpe $Hfroz $Hpid $HlhN $Hblk $Hauth $Hdirty
-        $Hrows $Hu12]
+    $$ [- $Hk $Hpc $Hpi $Htc $Hcl $Hir $Hbc $Hdc $Hpe $Hfroz $Hbinv $Hpid $HlhN $Hblk $Hauth
+        $Hdirty $Hrows $Hu12]
   rotate_right 1
   k_norm_g [eo_ret_10e]
   iframe #
@@ -1163,7 +1178,8 @@ theorem eo_commit (WH : WRITE_HEAD) (IT : INSTALL_TRANS) (AC : ACQUIRE) (RE : RE
     rw [get?_insert_ne (hhdrne i w hw)]
     exact hLw i w hw
   iapply wpNext_intro_pin
-  iintro %c2 %hq2 %sp2 %pp2 %R2 %hcs2 Hk Hpc Htc Hcl Hir Hpid HlhN Hblk Hauth Hdirty Hrows Hu12
+  iintro %c2 %hq2 %sp2 %pp2 %R2 %hcs2 Hk Hpc Htc Hcl Hir Hpid HlhN Hblk - Hauth Hdirty Hrows
+    Hu12
   k_norm_g [eo_ret_10e, eo_ctx_collapse, eo_spie_pushed]
   have hfix2 : eoPins k R2 s9 (BitVec.ofNat 64 n) s19 logAddr (lhBlock n) := by
     k_norm at hcs2

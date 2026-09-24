@@ -29,21 +29,34 @@ write set is bounded by the region, duplicate-free, and names covered HOME
 blocks.  At a clean image the decode is empty and all three are trivial;
 at a real crash they are what a durable header invariant would deliver.
 
-It is also given that the header IS clean -- `hhdr0 : hdrN bsHdr = 0`.
-That is Rocq `SpecFsinit.v`'s premise (g), and this port needs it for the
-same reason Rocq's `fsinit` does plus one of its own: the recovering arm
-of `Xv6/SpecInstallTrans.lean` takes each replayed entry's HOME block
-client half, and this precondition hands out client halves only for the
-log's own region, so a NON-empty recovery is not specifiable here.  The
-bytes `bread` hands back at the header block are tied to `bsHdr` by the
-bio layer's payload hooks and the two view premises `hcl`/`hdt` (Rocq's
-`il_pay_agree`), so `hhdr0` is a statement about the resource the caller
-already owns, not a fresh assumption about the buffer cache.
+WHAT IT SEALS.  `initlog` takes the byte view's invariant at the era's
+home set and the WAL's EXCEPTION HANDLE at the on-disk header's write set
+(Rocq `SpecInitlog.v:352`'s `exc_own (fs_exc γfs) (list_to_set
+(hdr_dec bs_hdr).2)`), threads the handle through the recovering
+`install_trans`, and SEALS the residue -- which is what puts
+`Xv6.fsBytesAnyAt` into the `Xv6.logCtx` it hands back, and hence what gives
+every later reader of the tie its membership-premise-free crossing.
+
+**`hhdr0 : hdrN bsHdr = 0` IS STILL HERE, and the reason has changed.**
+Rocq drops this premise (`SpecFsinit.v`'s (g)) exactly when the byte view
+goes in: "it is `[∅]` while the era's mint still reads the RAW home blocks;
+opening that window is what deletes `SpecFsinit`'s clean-header premise."
+That resource obstacle is GONE here too -- the recovering arm's per-entry
+row is Rocq's `emp` and `Xv6.fsblock_install_exc` moves the home block's
+content with no client half.  What remains is purely PROOF-side and local
+to this file's neighbour: `Xv6/ProofInitlog.lean`'s recovery walk is written
+at the EMPTY write set throughout (`Xv6.il_install_trans` is stated at
+`n = 0`, and the `read_head` inlining is proved only for a clean header), so
+specifying `initlog` at `hdrN bsHdr > 0` would mean re-proving that walk at a
+general `n` -- a separate piece of work, not a byte-view one.  At
+`hdrN bsHdr = 0` the decoded write set is `[]` (`Xv6.hdrDec_zero`), so the
+handle comes in at `[]` and `Xv6.excSeal` fires immediately after the
+install.
 
 **Deviations, all the log port's standing ones** (see `Xv6/LogInv.lean`):
-the crash seam, the era certificate, the era's born-true mirror, the byte
-view's row and exception handle, block 1's park and the file system's
-snapshot law are all dropped with the layers they belong to.  One further
+the crash seam, the era certificate, the era's born-true mirror, block 1's
+park and the file system's snapshot law are all dropped with the layers
+they belong to.  One further
 deviation is local to this port: Rocq's contract is an `_at` form in all
 five ghost names because the file system's configuration record names
 them, while this port's lock library mints the lock's own name at the seal
@@ -105,10 +118,16 @@ def wp_initlog_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G 
   trapCsrs cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ∗
   bioCtx γl γb V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
-  -- THE BYTE VIEW'S SEALED ROW, which `Xv6.logCtx` carries out (Rocq's
-  -- `log_ctx` third conjunct).  The era's byte invariant at the home set,
-  -- plus the certificate that its exception set is empty.
-  fsBytesAnyAt γfs (fsHomeList V.cov logstart) ∗
+  -- THE BYTE VIEW'S ROW AND THE WAL'S EXCEPTION HANDLE (Rocq
+  -- `SpecInitlog.v:352`).  `initlog` is the function that SEALS the handle
+  -- and so builds `Xv6.logCtx`'s third conjunct: the invariant at the era's
+  -- home set, plus the certificate that its exception set is empty.  The
+  -- handle comes in at the ON-DISK HEADER'S WRITE SET -- the home blocks
+  -- whose byte view was minted at the committed view while the cache still
+  -- reads the crashed disk -- and the recovering `install_trans` shrinks it
+  -- entry by entry.
+  fsBytesAt γfs (fsHomeList V.cov logstart) ∗
+  excOwn γfs.exc (hdrDec bsHdr).2 ∗
   -- the four ghost names, at their genesis values
   logFreeTok γ ∗
   -- the superblock field, read once

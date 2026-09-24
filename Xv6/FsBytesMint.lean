@@ -46,6 +46,10 @@ def fsBytesAt (γ : FsNames) (homeL : List Nat) : IProp GF :=
 instance fsBytesAt_persistent (γ : FsNames) (homeL : List Nat) :
     Persistent (fsBytesAt (GF := GF) γ homeL) := by unfold fsBytesAt; infer_instance
 
+theorem fsBytesAt_of (γ : FsNames) (homeL : List Nat) (Xv : Nat → List (BitVec 8)) :
+    fsBytesInv (GF := GF) γ.bytes γ.cache γ.exc homeL Xv ⊢ fsBytesAt γ homeL := by
+  unfold fsBytesAt; iintro H; iexists Xv; iexact H
+
 /-- THE ROW ITSELF, minted at PowerOn: it says only that SOME byte-view
 invariant over `γ` exists. -/
 def fsBytesRow (γ : FsNames) : IProp GF :=
@@ -142,6 +146,25 @@ theorem fsblock_update_any (E : CoPset) (γ : FsNames) (L : BlockMap) (b : Nat)
   iintro ⟨⟨%homeL, %Xv, #Hinv⟩, #Hseal⟩ Ha Hfb Hm
   iapply fsblock_update E γ.bytes γ.cache γ.exc homeL Xv L b bs bsNew bs' hE hlnew
     $$ Hinv Hseal Ha Hfb Hm
+
+/-- **THE RECOVERING INSTALL'S GHOST STEP**, at `Xv6.fsCacheAuth` (Rocq's
+`fsblock_install_exc`).  Needs NO byte run: the byte view was minted at the
+committed view, so it already reads the logged value at `b`; what moves is
+the CACHE map, from the crashed bytes to `Xv b` -- exactly what the home
+`bwrite` just put on the disk. -/
+theorem fsblock_install_exc_at (E : CoPset) (γ : FsNames) (homeL : List Nat)
+    (Xv : Nat → List (BitVec 8)) (L : BlockMap) (X : List Nat) (b : Nat)
+    (bsm : List (BitVec 8)) (hE : (↑logN : CoPset) ⊆ E) (hb : b ∈ X)
+    (hlen : (Xv b).length = BSIZE) :
+    fsBytesInv (GF := GF) γ.bytes γ.cache γ.exc homeL Xv -∗ excOwn γ.exc X -∗
+      fsCacheAuth γ L -∗ (γ.cache ↪◯MAP[b]{DFrac.own (1 : Qp).half} bsm) -∗
+      |={E}=> (⌜PartialMap.get? L b = some bsm⌝ ∗ excOwn γ.exc (excDel X b) ∗
+        fsCacheAuth γ (PartialMap.insert L b (Xv b)) ∗
+        (γ.cache ↪◯MAP[b]{DFrac.own (1 : Qp).half} (Xv b))) := by
+  unfold fsCacheAuth
+  iintro #Hinv Hxo Ha Hm
+  iapply fsblock_install_exc E γ.bytes γ.cache γ.exc homeL Xv L X b bsm hE hb hlen
+    $$ Hinv Hxo Ha Hm
 
 /-- ...and the home-block reading, at the row. -/
 theorem fsblock_home_any (E : CoPset) (γ : FsNames) (homeL : List Nat) (b : Nat)
