@@ -500,3 +500,10 @@ import Xv6.LinkBeginOp
 import Xv6.LogBoot
 import Xv6.ProofInitlog
 import Xv6.LinkInitlog
+import Xv6.ProofSysSync
+import Xv6.LinkSysSync
+import Xv6.ProofLogWrite
+import Xv6.LinkLogWrite
+import Xv6.EndOpDefs
+import Xv6.ProofEndOp
+import Xv6.LinkEndOp
