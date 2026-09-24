@@ -177,6 +177,25 @@ theorem byteRange_map (gL : GName) (b off : Nat) (bs : List (BitVec 8)) :
       [∗map] a ↦ v ∈ mapSeq (b * BSZ + off) bs, gL ↪◯MAP[a] v :=
   byteRangeQ_map gL (DFrac.own 1) b off bs
 
+/-- A freshly minted run IS a block (the mint's output shape; the index
+shift is Rocq's `assert (Hz : b * BSZ + Z.of_nat k = b * BSZ + 0 + Z.of_nat k)`
+inside `byte_map_grow`). -/
+theorem fsblock_of_mapSeq (gL : GName) (b : Nat) (bs : List (BitVec 8))
+    (hlen : bs.length = BSIZE) :
+    ([∗map] a ↦ v ∈ mapSeq (b * BSZ) bs, gL ↪◯MAP[a] v) ⊢ fsblock (GF := GF) gL b bs := by
+  iintro H
+  unfold mapSeq
+  ihave H := (BigSepM.bigSepM_map_seq (PROP := IProp GF)
+    (Φ := fun a v => iprop(gL ↪◯MAP[a] v)) (start := b * BSZ) (l := bs)).1 $$ H
+  unfold fsblock byteRange byteRangeQ
+  isplitl []
+  · ipureintro; exact hlen
+  · ihave H := BigSepL.bigSepL_mono (PROP := IProp GF)
+      (Φ := fun (k : Nat) (v : BitVec 8) => iprop(gL ↪◯MAP[b * BSZ + k] v))
+      (Ψ := fun (k : Nat) (v : BitVec 8) => iprop(gL ↪◯MAP[b * BSZ + 0 + k] v))
+      (fun {k v} _ => by rw [show b * BSZ + 0 + k = b * BSZ + k from by omega]) $$ H
+    iexact H
+
 /-! ## What the authority says about an owned run -/
 
 /-- Rocq's `byte_range_q_lookup`.  AGREEMENT NEEDS NO SHARE: this is the
