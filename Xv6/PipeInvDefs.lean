@@ -90,7 +90,7 @@ theorem pipeCount_incr_w (nr nw : BitVec 32)
     (hok : pipeCountOk nr nw) (hne : nw ≠ nr + 512#32) :
     pipeCountOk nr (nw + 1#32) := by
   unfold pipeCountOk pipeCount at *
-  bv_decide
+  bv_omega
 
 /-- piperead's decrement, licensed by the failed empty test: `nr ≠ nw` means
 the count is nonzero, so `nread++` keeps it in range. -/
@@ -98,7 +98,7 @@ theorem pipeCount_decr_r (nr nw : BitVec 32)
     (hok : pipeCountOk nr nw) (hne : nr ≠ nw) :
     pipeCountOk (nr + 1#32) nw := by
   unfold pipeCountOk pipeCount at *
-  bv_decide
+  bv_omega
 
 /-- The return-value range piperead and pipewrite share: `-1`, or a count
 between `0` and `n` (with `n` clamped at `0`). -/

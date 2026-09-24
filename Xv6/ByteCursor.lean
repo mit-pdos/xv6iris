@@ -174,7 +174,7 @@ theorem paAddCmpBound (p : BitVec 64) (len j : Nat) (hlen : len < 2 ^ 64) (hj : 
 
 /-- The general shape behind `paAddDiff`: the base cancels. -/
 private theorem bcSubAddAdd (p x y : BitVec 64) : (p + x) - (p + y) = x - y := by
-  bv_decide
+  bv_omega
 
 /-- `BitVec.ofNat`'s subtraction, below the modulus.  (`Xv6.co_ofNat_sub` in
 `Xv6/CopyLemmas.lean` is the same fact; it is restated `private` here so
@@ -199,7 +199,7 @@ copyinstr's inner loop keeps `a2 = src - dst` and forms the source address as
 theorem paAddDelta (x p : BitVec 64) (i : Nat) :
     (x - p) + (p + BitVec.ofNat 64 i) = x + BitVec.ofNat 64 i := by
   have h : ∀ u v w : BitVec 64, (u - v) + (v + w) = u + w := by
-    intro u v w; bv_decide
+    intro u v w; bv_omega
   exact h x p _
 
 /-- The SOURCE pointer copyinstr forms, `(pa0 + srcva) - va0`: whatever the
@@ -209,7 +209,7 @@ caller knows it. -/
 theorem paAddOfDiff (q c v : BitVec 64) (off : Nat) (h : c - v = BitVec.ofNat 64 off) :
     (q + c) - v = q + BitVec.ofNat 64 off := by
   have hg : ∀ u x y : BitVec 64, (u + x) - y = u + (x - y) := by
-    intro u x y; bv_decide
+    intro u x y; bv_omega
   rw [hg, h]
 
 /-! ## The byte a loop just loaded, tested against zero -/

@@ -187,7 +187,7 @@ theorem co_n_val3 (a : Nat) (ha : a < 2 ^ 64) :
       = BitVec.ofNat 64 (a / 4096 * 4096) + BitVec.ofNat 64 (a % 4096) := by
     rw [co_ofNat_add]; congr 1; omega
   have h : ∀ x y : BitVec 64, x + (-(x + y) + 4096#64) = 4096#64 - y := by
-    intro x y; bv_decide
+    intro x y; bv_omega
   rw [h1, h, show (4096#64 : BitVec 64) = BitVec.ofNat 64 4096 from rfl,
     co_ofNat_sub 4096 _ (by omega) (by omega)]
 
