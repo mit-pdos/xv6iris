@@ -585,7 +585,7 @@ theorem kx_rest (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP) (SC 
   iintro Hk Hpc
   have hf1 : kxFrame (k.setReg 1#5 (KA.«kexit» + 0x50#64)) j status spval availval :=
     kx_setReg_frame k j status spval 1#5 _ hf (by decide) (by decide) (by decide) (by decide)
-  iapply (kx_fs beginOpAddr KA.«begin_op» rfl FsEnv.begin_op Γ status spval availval c
+  iapply (kx_fs fsBeginOpAddr KA.«begin_op» rfl FsEnv.begin_op Γ status spval availval c
     (k.setReg 1#5 (KA.«kexit» + 0x50#64)) j hj hf1) $$ [- $Hk $Hpc $Hpinv $Htc $Hclaim $Hres]
   iapply wpNext_intro_pin
   iintro %c1 %hpin1
@@ -625,7 +625,7 @@ theorem kx_rest (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP) (SC 
   iintro Hk Hpc
   have hf2a := kx_setReg_frame _ j status spval 1#5 (KA.«kexit» + 0x5c#64) hf2
     (by decide) (by decide) (by decide) (by decide)
-  iapply (kx_fs endOpAddr KA.«end_op» rfl FsEnv.end_op Γ status spval availval c2 _ j hj ?hfe)
+  iapply (kx_fs fsEndOpAddr KA.«end_op» rfl FsEnv.end_op Γ status spval availval c2 _ j hj ?hfe)
     $$ [- $Hk $Hpc $Hpinv $Htc $Hclaim $Hres]
   case hfe => exact hf2a
   iapply wpNext_intro_pin

@@ -27,8 +27,8 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 def filecloseAddr : BitVec 64 := KA.«fileclose»
-def beginOpAddr : BitVec 64 := KA.«begin_op»
-def endOpAddr : BitVec 64 := KA.«end_op»
+def fsBeginOpAddr : BitVec 64 := KA.«begin_op»
+def fsEndOpAddr : BitVec 64 := KA.«end_op»
 def iputAddr : BitVec 64 := KA.«iput»
 def nameiAddr : BitVec 64 := KA.«namei»
 def filedupAddr : BitVec 64 := KA.«filedup»
@@ -89,8 +89,8 @@ def FsEntry (entry : BitVec 64) : Prop :=
 /-- **The file-system boundary** (assumed). -/
 class FsEnv : Prop where
   fileclose : FsEntry filecloseAddr
-  begin_op : FsEntry beginOpAddr
-  end_op : FsEntry endOpAddr
+  begin_op : FsEntry fsBeginOpAddr
+  end_op : FsEntry fsEndOpAddr
   iput : FsEntry iputAddr
   namei : FsEntry nameiAddr
   filedup : FsEntryNB filedupAddr
