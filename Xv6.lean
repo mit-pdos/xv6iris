@@ -524,3 +524,9 @@ import Xv6.FsBytes
 import Xv6.FsBytesMap
 import Xv6.FsBytesInv
 import Xv6.FsBytesMint
+import Xv6.FsImg
+import Xv6.FsCfgDefs
+import Xv6.FsStateDefs
+import Xv6.FsBytesGamma
+import Xv6.SbPark
+import Xv6.WriteiBudget
