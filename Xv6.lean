@@ -664,3 +664,11 @@ import Xv6.IallocClaim
 import Xv6.IallocScan
 import Xv6.ProofIalloc
 import Xv6.LinkIalloc
+import Xv6.SpecItrunc
+import Xv6.ItruncParts
+import Xv6.ItruncTail
+import Xv6.ItruncDirect
+import Xv6.ItruncELoop
+import Xv6.ItruncArm
+import Xv6.ProofItrunc
+import Xv6.LinkItrunc
