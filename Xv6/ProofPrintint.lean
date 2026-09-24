@@ -199,7 +199,7 @@ three slots below `s2`'s carved into `buf`'s 24 bytes. -/
 
 /-- The named cells of `printint`'s frame: `ra`, `s0`, `s2`, the lazily used
 `s1` slot and the unused bottom slot.  (`buf`'s three slots are `piBuf`.) -/
-def piFrame (sp ra s0 s2 : BitVec 64) : IProp GF := iprop%
+def pintFrame (sp ra s0 s2 : BitVec 64) : IProp GF := iprop%
   wordPointsTo (sp + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) ra ∗
   wordPointsTo (sp + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) s0 ∗
   (∃ w : BitVec 64, wordPointsTo (sp + 0xFFFFFFFFFFFFFFE8#64) 8 (DFrac.own 1) w) ∗
@@ -208,11 +208,11 @@ def piFrame (sp ra s0 s2 : BitVec 64) : IProp GF := iprop%
 
 /-- The lazily used `s1` slot, out of the frame and back. -/
 theorem piFrame_s1_acc (sp ra s0 s2 : BitVec 64) :
-    piFrame (GF := GF) sp ra s0 s2 ⊢
+    pintFrame (GF := GF) sp ra s0 s2 ⊢
       (∃ w : BitVec 64, wordPointsTo (sp + 0xFFFFFFFFFFFFFFE8#64) 8 (DFrac.own 1) w) ∗
       (∀ v : BitVec 64, wordPointsTo (sp + 0xFFFFFFFFFFFFFFE8#64) 8 (DFrac.own 1) v -∗
-        piFrame sp ra s0 s2) := by
-  unfold piFrame
+        pintFrame sp ra s0 s2) := by
+  unfold pintFrame
   iintro ⟨H1, H2, H3, H4, H5⟩
   iframe H3
   iintro %v Hv
@@ -235,7 +235,7 @@ theorem wp_pi_prologue (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     ▷ (kctxL lent cpu ((k.pushed 8).withRegs
           ((k.regs.set 2#5 (k.regs 2#5 + 0xFFFFFFFFFFFFFFC0#64)).set 8#5 (k.regs 2#5))) -∗
         pcIs cpu (pc + 10#64) -∗
-        piFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 18#5) -∗
+        pintFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 18#5) -∗
         piBuf (k.regs 2#5 + 0xFFFFFFFFFFFFFFC8#64) -∗ wpLoop cpu)
     ⊢ wpLoop cpu := by
   iintro ⟨#Hi0, #Hi2, #Hi4, #Hi6, #Hi8, Hk, Hpc, HΦ⟩
@@ -255,7 +255,7 @@ theorem wp_pi_prologue (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
   iintro Hk Hpc
   k_norm
   iapply HΦ $$ Hk Hpc [Hf8 Hf16 Hf24 Hf32 Hf64] [Hf40 Hf48 Hf56]
-  · unfold piFrame
+  · unfold pintFrame
     iframe Hf8 Hf16 Hf32
     isplitl [Hf24]
     · iexists w₃; iexact Hf24
@@ -276,11 +276,11 @@ theorem wp_pi_epilogue (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     instr (GF := GF) (pc + 6#64) true (instruction.ITYPE (64#12, regidx.Regidx 2#5, regidx.Regidx 2#5, iop.ADDI)) ∗
     instr (GF := GF) (pc + 8#64) true (instruction.JALR (0#12, regidx.Regidx 1#5, regidx.Regidx 0#5)) ∗
     kctxL lent cpu ((k.pushed 8).withRegs R) ∗ pcIs cpu pc ∗
-    piFrame (k.regs 2#5) ra s0 s2 ∗ piBuf (k.regs 2#5 + 0xFFFFFFFFFFFFFFC8#64) ∗
+    pintFrame (k.regs 2#5) ra s0 s2 ∗ piBuf (k.regs 2#5 + 0xFFFFFFFFFFFFFFC8#64) ∗
     ▷ (kctxL lent cpu (k.withRegs ((((R.set 1#5 ra).set 8#5 s0).set 18#5 s2).set 2#5 (k.regs 2#5))) -∗
         pcIs cpu (jumpPc ra) -∗ wpLoop cpu)
     ⊢ wpLoop cpu := by
-  unfold piFrame
+  unfold pintFrame
   iintro ⟨#Hi0, #Hi2, #Hi4, #Hi6, #Hi8, Hk, Hpc, ⟨Hf8, Hf16, ⟨%w₃, Hf24⟩, Hf32, ⟨%w₈, Hf64⟩⟩,
     Hbuf, HΦ⟩
   icases piBuf_elim (k.regs 2#5 + 0xFFFFFFFFFFFFFFC8#64) (k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64)
@@ -787,7 +787,7 @@ theorem pi_out (PP : PRPUTC) [Xv6G GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = fa
     (hR18 : R 18#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFC8#64)
     (hsv : piSaved k.regs R) :
     kctx cpu ((k.pushed 8).withRegs R) ∗ pcIs cpu (KA.«printint» + 0x5c#64) ∗
-    piFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 18#5) ∗
+    pintFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 18#5) ∗
     piBuf (k.regs 2#5 + 0xFFFFFFFFFFFFFFC8#64) ∗ isTxLock γl γd ∗ uartSentSub γd bs ∗
     (∀ (R' : RegMap) (cs : List (BitVec 8)), kctx cpu (k.withRegs R') -∗
       pcIs cpu (jumpPc (k.regs 1#5)) -∗ ⌜calleeSaved k.regs R'⌝ -∗
@@ -914,7 +914,7 @@ theorem pi_setup (PP : PRPUTC) [Xv6G GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = 
       R r = ((k.regs.set 2#5 (k.regs 2#5 + 0xFFFFFFFFFFFFFFC0#64)).set 8#5 (k.regs 2#5)) r)
     (ht1 : R 6#5 = 0#64 ∨ R 6#5 = 1#64) :
     kctx cpu ((k.pushed 8).withRegs R) ∗ pcIs cpu (KA.«printint» + 0x12#64) ∗
-    piFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 18#5) ∗
+    pintFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 18#5) ∗
     piBuf (k.regs 2#5 + 0xFFFFFFFFFFFFFFC8#64) ∗
     byteBuf KA.«digits» DFrac.discard digitsStr ∗ isTxLock γl γd ∗ uartSentSub γd bs ∗
     (∀ (R' : RegMap) (cs : List (BitVec 8)), kctx cpu (k.withRegs R') -∗
