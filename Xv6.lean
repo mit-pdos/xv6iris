@@ -610,3 +610,9 @@ import Xv6.LinkBfree
 import Xv6.SpecIunlock
 import Xv6.ProofIunlock
 import Xv6.LinkIunlock
+import Xv6.SpecIupdate
+import Xv6.IupdateSteps
+import Xv6.IupdateTail
+import Xv6.IupdateMain
+import Xv6.ProofIupdate
+import Xv6.LinkIupdate
