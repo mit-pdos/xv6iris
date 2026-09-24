@@ -103,7 +103,7 @@ theorem br_releasesleep (RS : RELEASESLEEP_HOOK) (Γ : SchedNames) (c : CPU) (k'
 /-! ## The common tail: `release(&bcache.lock)` and the epilogue -/
 
 theorem br_tail (RE : RELEASE_HOOK) (cpu c : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames)
-    (V : BioView) (tl : Nat) (spie2 spp2 spie3 spp3 : Bool) (R : RegMap) (dqp : DFrac) (pidv : BitVec 32)
+    (V : BioView GF) (tl : Nat) (spie2 spp2 spie3 spp3 : Bool) (R : RegMap) (dqp : DFrac) (pidv : BitVec 32)
     (hwf : k.wf) (hK4 : 4 ≤ k.avail) (hK : 14 ≤ k.avail) (hlk : "bcache" ∉ k.locks)
     (hnoff : k.noff + 2 < 2 ^ 31)
     (hpin : k.sie = false ∨ k.proc = 0#64 → c = cpu)
@@ -210,11 +210,12 @@ end
 set_option maxHeartbeats 16000000 in
 theorem brelse_proof (HS : HOLDINGSLEEP) (RS : RELEASESLEEP_HOOK) (AC : ACQUIRE)
     (RE : RELEASE_HOOK) : BRELSE := ⟨
-  fun {hlc GF} _ _ _ _ _ _ Γ cpu k γl γ V kk pidv dev bno dqp bs
+  fun {hlc GF} _ _ _ _ _ _ Γ cpu k γl γ V kk pidv dev bno dqp bs bsd d
     hnoff hK hlk hsl hp htier hkk ha0 => by
   unfold wp_brelse_body
   simp only [brelseAddr]
-  iintro ⟨Hk, Hpc, Hpi, #Hbc, Hpid, Hhold, Hnext⟩
+  iintro ⟨Hk, Hpc, Hpi, #Hbc, Hpid, Hlocked, Hnext⟩
+  icases bioLocked_split γ V kk pidv dev bno bs bsd d |>.1 $$ Hlocked with ⟨Hhold, Hpay⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   have hK4 : 4 ≤ k.avail := by unfold brelseSlots releasesleepSlots wakeupSlots at hK; omega
@@ -228,13 +229,14 @@ theorem brelse_proof (HS : HOLDINGSLEEP) (RS : RELEASESLEEP_HOOK) (AC : ACQUIRE)
   -- (Rocq `ProofBrelse.v`'s `bbox_park`).  It must be complete BEFORE
   -- `releasesleep`: a blocked waiter's `acquiresleep` can return the moment
   -- the sleeplock frees.
-  icases bufHold0_travel γ V kk pidv dev bno bs bs $$ Hhold
+  icases bufHold0_travel γ V kk pidv dev bno bs bs bsd d $$ [Hhold Hpay]
     with ⟨%hpure, Hsl, Htok, Hrt, ⟨%idh, Hhd⟩, Htrav⟩
-  ihave Htrav := bufTravel_travelV V kk (1 : Qp).half (1 : Qp).half dev bno 1#32 bs bs
-    hpure.2.1 hpure.2.2.1 (fun _ => rfl) $$ Htrav
+  · iframe Hhold Hpay
+  ihave Htrav := bufTravel_travelV γ V kk (1 : Qp).half (1 : Qp).half dev bno 1#32 bs bs bsd d
+    hpure.2.1 hpure.2.2.1 (fun _ => rfl) (fun h => absurd h (by decide)) $$ Htrav
   iapply wpLoop_fupd
   icases kctx_token_acc cpu k $$ Hk with ⟨Hctx, Hkback⟩
-  imod bufEscrow_deposit V (γ.box kk) kk (1 : Qp).half (1 : Qp).half cpu dev bno 1#32 bs idh
+  imod bufEscrow_deposit γ V (γ.box kk) kk (1 : Qp).half (1 : Qp).half cpu dev bno 1#32 bs idh
       ⊤ bioxN_top $$ [Hbox Hctx Htrav Hhd] with ⟨Hctx, ⟨%T', Hrp, Hbref, #HtopT⟩⟩
   · iframe Hbox Hctx Htrav Hhd
   imodintro
@@ -413,7 +415,7 @@ theorem brelse_proof (HS : HOLDINGSLEEP) (RS : RELEASESLEEP_HOOK) (AC : ACQUIRE)
   ihave Hup := bref_free_step γ M ls1 ls2 id kk $$ [Ha He Hhalves]
   case' _ => iframe
   imod Hup with ⟨Ha, Hhalves'⟩
-  imod bufEscrow_refDecr V (γ.box kk) kk (1 : Qp).half (1 : Qp).half r (ls1 ++ ls2).length
+  imod bufEscrow_refDecr γ V (γ.box kk) kk (1 : Qp).half (1 : Qp).half r (ls1 ++ ls2).length
       ((dev, bno) : BufId) T' ⊤ bioxN_top hrid.1 $$ [Hbox Hrd Htd Hcnt Hbref]
     with ⟨Hrd, Hcnt, #Htd'⟩
   · iframe Hbox Hrd Hcnt Hbref

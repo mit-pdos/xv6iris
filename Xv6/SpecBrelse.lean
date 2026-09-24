@@ -21,11 +21,13 @@ The `unreachable` arm is dead (token + `pid` agreement, as in `bwrite`).
 The body calls `releasesleep`, which wakes every process sleeping on the
 lock, so `wakeup`'s resource (`procsInv`) is threaded through.
 
-**Statement change (reported).**  The handle is at `bsd = bs`: the buffer
-being released is CLEAN, its bytes being the block's image (Rocq's
-`bio_locked`, i.e. `bio_held` at `bsl = bs` on the clean arm, which is the
-only arm this port has).  That is what the escrow's valid payload asserts
-(`Xv6.bufPay`), and it is what `bread` hands back.
+**The obligation is `Xv6.bioLocked`** (Rocq's `bio_locked`, i.e. its
+`bio_held` at `bsl = bs`), NOT the bare handle: the bytes must be the
+block's LOGICAL content -- unmodified since the `bread`, or re-indexed by
+`log_write` -- because that is what the escrow's valid payload
+(`Xv6.bufPay`) asserts and what the park swap needs.  The disk image `bsd`
+and the dirty flag `d` are free: a dirty buffer's disk cell need not agree
+with its bytes.
 
 **Statement change (reported).**  The separate `Xv6.bref` argument is gone:
 the chain's count fragment and the escrow's CHECKOUT handle now ride inside
@@ -62,15 +64,15 @@ def brelseSlots : Nat := 4 + releasesleepSlots
 /-- **WP of `brelse(b = a0)`**. -/
 def wp_brelse_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx] (Γ : SchedNames)
-    (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView) (kk : Nat)
-    (pidv dev bno : BitVec 32) (dqp : DFrac) (bs : List (BitVec 8))
+    (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView GF) (kk : Nat)
+    (pidv dev bno : BitVec 32) (dqp : DFrac) (bs bsd : List (BitVec 8)) (d : Bool)
     (hnoff : k.noff + 2 < 2 ^ 31) (hK : brelseSlots ≤ k.avail)
     (hlk : "bcache" ∉ k.locks) (hsl : "sleep lock" ∉ k.locks) (hp : "proc" ∉ k.locks)
     (htier : k.tier = KTier.kpt)
     (hkk : kk < NBUF) (ha0 : k.regs 10#5 = bnode kk) : Prop :=
   kctx cpu k ∗ pcIs cpu brelseAddr ∗ procsInv Γ ∗
   bioCtx γl γ V ∗ wordPointsTo (pPid k.proc) 4 dqp pidv ∗
-  bufHold0 γ V kk pidv dev bno bs bs ∗
+  bioLocked γ V kk pidv dev bno bs bsd d ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
     ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
@@ -82,10 +84,10 @@ def wp_brelse_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G G
 structure BRELSE : Prop where
   wp_brelse : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx] (Γ : SchedNames)
-    (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView) (kk : Nat)
-    (pidv dev bno : BitVec 32) (dqp : DFrac) (bs : List (BitVec 8))
+    (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView GF) (kk : Nat)
+    (pidv dev bno : BitVec 32) (dqp : DFrac) (bs bsd : List (BitVec 8)) (d : Bool)
     hnoff hK hlk hsl hp htier hkk ha0,
-    wp_brelse_body (hlc := hlc) (GF := GF) Γ cpu k γl γ V kk pidv dev bno dqp bs
+    wp_brelse_body (hlc := hlc) (GF := GF) Γ cpu k γl γ V kk pidv dev bno dqp bs bsd d
       hnoff hK hlk hsl hp htier hkk ha0
 
 end Xv6

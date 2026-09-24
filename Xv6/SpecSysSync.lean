@@ -49,7 +49,7 @@ def sysSyncSlots : Nat := 4 + sleepSlots
 def wp_sys_sync_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γ : LogNames) (γb : BcacheNames) (V : BioView)
+    (cpu : CPU) (k : KCtx) (γ : LogNames) (γb : BcacheNames) (V : BioView GF)
     (γfs : FsNames) (j : Nat) (logstart : Nat) (dev : BitVec 32) (e : Nat)
     (pidv : BitVec 32) (dqp : DFrac)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : sysSyncSlots ≤ k.avail)
@@ -73,7 +73,7 @@ structure SYS_SYNC : Prop where
   wp_sys_sync : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γ : LogNames) (γb : BcacheNames) (V : BioView)
+    (cpu : CPU) (k : KCtx) (γ : LogNames) (γb : BcacheNames) (V : BioView GF)
     (γfs : FsNames) (j : Nat) (logstart : Nat) (dev : BitVec 32) (e : Nat)
     (pidv : BitVec 32) (dqp : DFrac) hj hproc hK hsie hnoff hlocks htier,
     wp_sys_sync_body (hlc := hlc) (GF := GF) Γ cpu k γ γb V γfs j logstart dev e pidv dqp

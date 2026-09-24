@@ -28,17 +28,14 @@ logged, minted at exactly that epoch -- the currency the ABSORPTION CREDIT
 in as a lower bound and rides out ordered against the entry's epoch;
 a caller with no receipt to build passes `v := 0`.
 
-**Two deviations, both the log port's standing ones.**  (1) Rocq's
-contract moves the byte view (`fsblock (fs_bytes γfs)`); this port has no
-byte view, so the block's content moves at the CACHE level
-(`Xv6.fsChalf`), which is the pre-byte-view Rocq shape.  (2) The `bpin`
-the append arm performs yields this port's `Xv6.bref` -- a token indexed
-by the BUFFER SLOT -- and the batch has nowhere to put it: Rocq's pin is
-the `bv_dirty` half of the block's travelling payload, a hook this port's
-`Xv6.BioView` does not have (see `Xv6/SpecInstallTrans.lean`'s header).
-The contract below states the pin as Rocq does -- the log-side pin flips
-to `true` -- and `log_write` is therefore stated, not proved: the append
-arm cannot be closed until the hook exists.
+**One deviation, the log port's standing one.**  Rocq's contract moves
+the byte view (`fsblock (fs_bytes γfs)`); this port has no byte view, so
+the block's content moves at the CACHE level (`Xv6.fsChalf`), which is
+the pre-byte-view Rocq shape.  The `bpin` the append arm performs now has
+somewhere to put its `Xv6.bref`: `Xv6.bufPay`'s DIRTY arm parks it beside
+`BioView.dirty` (= `Xv6.fsMdirty`), exactly as Rocq does, which is what
+`install_trans`'s `bunpin` later takes back out.  `log_write` is still
+stated, not proved.
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
@@ -63,7 +60,7 @@ def logWriteSlots : Nat := 4 + panicSlots
 /-- **WP of `log_write(b = a0)`**. -/
 def wp_log_write_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
-    (cpu : CPU) (k : KCtx) (γ : LogNames) (γl : GName) (γb : BcacheNames) (V : BioView)
+    (cpu : CPU) (k : KCtx) (γ : LogNames) (γl : GName) (γb : BcacheNames) (V : BioView GF)
     (γfs : FsNames) (logstart : Nat) (dev : BitVec 32)
     (kk : Nat) (pidv bno : BitVec 32) (bs bsl bsd : List (BitVec 8)) (u v : Nat)
     (dqp : DFrac)
@@ -105,7 +102,7 @@ def wp_log_write_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
 structure LOG_WRITE : Prop where
   wp_log_write : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
-    (cpu : CPU) (k : KCtx) (γ : LogNames) (γl : GName) (γb : BcacheNames) (V : BioView)
+    (cpu : CPU) (k : KCtx) (γ : LogNames) (γl : GName) (γb : BcacheNames) (V : BioView GF)
     (γfs : FsNames) (logstart : Nat) (dev : BitVec 32)
     (kk : Nat) (pidv bno : BitVec 32) (bs bsl bsd : List (BitVec 8)) (u v : Nat) (dqp : DFrac)
     hK hnoff hlk hbc htier hkk ha0 hdev hhome,

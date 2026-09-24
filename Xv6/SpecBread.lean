@@ -15,9 +15,11 @@ sections.
 
 **The contract.**  One `Xv6.bslot` in, a locked buffer out: the buffer's
 sleeplock held, `valid = 1`, `disk = 0`, `dev`/`blockno` pinned to the
-request, and the data bytes EQUAL TO THE BLOCK'S DISK IMAGE -- the handle
-is `Xv6.bufHold0 γ V kk pidv dev bno bs bs`, Rocq's `bio_locked` (its
-`bio_held` at `bsl = bs` on the clean arm, the only arm this port has).
+request, and the data bytes ARE THE BLOCK'S LOGICAL CONTENT -- the handle
+is `Xv6.bioLocked γ V kk pidv dev bno bs bsd d`, Rocq's `bio_locked` (its
+`bio_held` at `bsl = bs`): the client view's payload at the buffer's own
+bytes, clean (`d = false`, the disk image `bsd` agreeing) or dirty
+(`d = true`, the log's pin parked inside).
 
 No `Xv6.diskBlock` crosses the interface on the way IN: the covered range's
 fragments live inside the bio layer (pool, escrow, handles), which is also
@@ -38,11 +40,10 @@ threads the full running-process bundle and its crossing is the literal
   contract carries `Xv6.panicEnv` -- the credentials `panic`'s two `printk`
   calls need -- and the proof is parametric in `Xv6.PANIC`, exactly as
   Rocq's `BreadProof` is a functor over `Panic`.
-* Rocq's `bio_locked` carries the log layer's opaque payload
-  (`bv_clean`/`bv_dirty`) so that a caller which knows the block's logical
-  content learns the returned bytes by agreement.  This port has no log
-  layer, so the payload IS the disk fragment and the caller learns the
-  bytes directly.
+* As in Rocq, `bio_locked` carries the client view's opaque payload
+  (`BioView.clean`/`BioView.dirty`) so that a caller which knows the
+  block's logical content learns the returned bytes by agreement; the
+  disk image `bsd` and the polarity `d` come out existentially.
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
@@ -70,7 +71,7 @@ def breadSlots : Nat := 6 + panicSlots
 def wp_bread_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView) (γdl : GName)
+    (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (pidv dev bno : BitVec 32) (dqp : DFrac)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : breadSlots ≤ k.avail)
     (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
@@ -84,12 +85,12 @@ def wp_bread_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
   bioCtx γl γ V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗ bslot γ ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (kk : Nat)
-      (bs : List (BitVec 8)),
+      (bs bsd : List (BitVec 8)) (d : Bool),
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = bnode kk⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
-    bufHold0 γ V kk pidv dev bno bs bs -∗ wpLoop cpu'))
+    bioLocked γ V kk pidv dev bno bs bsd d -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `bread`. -/
@@ -97,7 +98,7 @@ structure BREAD : Prop where
   wp_bread : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView) (γdl : GName)
+    (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (pidv dev bno : BitVec 32) (dqp : DFrac)
     hj hproc hK hsie hnoff hlocks htier hbno hcov hdev hpd ha0 ha1,
     wp_bread_body (hlc := hlc) (GF := GF) Γ cpu k γl γ V γdl pd pav pu j pidv dev bno dqp

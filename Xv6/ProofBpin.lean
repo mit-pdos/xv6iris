@@ -164,7 +164,7 @@ theorem bpin_proof (AC : ACQUIRE) (RE : RELEASE) : BPIN := ⟨
   ihave Hup := bref_alloc_step γ M nx kk (Ls kk) hfresh $$ [Ha Hhalves]
   case' _ => iframe
   imod Hup with ⟨Ha, Href, Hhalves', %hnx⟩
-  imod bufEscrow_refIncr V (γ.box kk) kk (1 : Qp).half (1 : Qp).half r (Ls kk).length ⊤
+  imod bufEscrow_refIncr γ V (γ.box kk) kk (1 : Qp).half (1 : Qp).half r (Ls kk).length ⊤
       bioxN_top hrid.1 $$ [Hbox Hrd Hcnt] with ⟨Hrd, Hcnt, ⟨%Tb, Hbref⟩⟩
   · iframe Hbox Hrd Hcnt
   ihave Hbref := (show (boxRef (GF := GF) (γ.box kk) r.ident Tb) ⊢

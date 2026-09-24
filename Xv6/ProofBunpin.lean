@@ -196,7 +196,7 @@ theorem bunpin_proof (AC : ACQUIRE) (RE : RELEASE_HOOK) : BUNPIN := ⟨
   ihave Hup := bref_free_step γ M s t id kk $$ [Ha He Hhalves]
   case' _ => iframe
   imod Hup with ⟨Ha, Hhalves'⟩
-  imod bufEscrow_refDecr V (γ.box kk) kk (1 : Qp).half (1 : Qp).half r (s ++ t).length
+  imod bufEscrow_refDecr γ V (γ.box kk) kk (1 : Qp).half (1 : Qp).half r (s ++ t).length
       ((dev, bno) : BufId) T0 ⊤ bioxN_top hrid.1 $$ [Hbox Hrd Htd Hcnt Hbref]
     with ⟨Hrd, Hcnt, #Htd'⟩
   · iframe Hbox Hrd Hcnt Hbref

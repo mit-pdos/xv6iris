@@ -45,7 +45,7 @@ def bpinAddr : BitVec 64 := KA.«bpin»
 /-- **WP of `bpin(b = a0)`**. -/
 def wp_bpin_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [BcacheG GF]
     [SleepLockG GF] [DiskG GF] [CurCtx]
-    (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView) (kk : Nat)
+    (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView GF) (kk : Nat)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 14 ≤ k.avail) (hlk : "bcache" ∉ k.locks)
     (hkk : kk < NBUF) (ha0 : k.regs 10#5 = bnode kk) : Prop :=
   kctx cpu k ∗ pcIs cpu bpinAddr ∗ bioCtx γl γ V ∗ bslot γ ∗
@@ -60,7 +60,7 @@ def wp_bpin_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 structure BPIN : Prop where
   wp_bpin : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [BcacheG GF]
     [SleepLockG GF] [DiskG GF] [CurCtx]
-    (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView) (kk : Nat)
+    (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView GF) (kk : Nat)
     hnoff hK hlk hkk ha0,
     wp_bpin_body (hlc := hlc) (GF := GF) cpu k γl γ V kk hnoff hK hlk hkk ha0
 

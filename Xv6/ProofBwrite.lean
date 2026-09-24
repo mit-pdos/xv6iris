@@ -71,7 +71,7 @@ theorem bw_holdingsleep (HS : HOLDINGSLEEP) (c : CPU) (k' : KCtx) (γ : BcacheNa
   exact h
 
 theorem bw_vdr (VR : VIRTIO_DISK_RW) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (c : CPU) (k' : KCtx) (V : BioView) (γdl : GName) (pd pav pu : BitVec 64) (j kk : Nat)
+    (c : CPU) (k' : KCtx) (V : BioView GF) (γdl : GName) (pd pav pu : BitVec 64) (j kk : Nat)
     (bno : BitVec 32) (bs bsd : List (BitVec 8)) (pj : BitVec 64) (hpj : k'.proc = pj)
     (ha0 : k'.regs 10#5 = bnode kk) (ha1 : k'.regs 11#5 = 1#64)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : virtioDiskRwSlots ≤ k'.avail)

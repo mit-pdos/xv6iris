@@ -302,10 +302,10 @@ def bdBss (ξ : CtxId) (i : Nat) : IProp GF := iprop%
 the box's fractions, the cache's own halves of the two key cells, and the
 `refcnt` cell for the slot row.  The payload is `emp` -- block `0` is
 uncovered, which is the whole reason thirty buffers may all name it. -/
-theorem bd_bss_split (V : BioView) (i : Nat) (hcov0 : (0#32 : BitVec 32).toNat ∉ V.cov) :
+theorem bd_bss_split (γ : BcacheNames) (V : BioView GF) (i : Nat) (hcov0 : (0#32 : BitVec 32).toNat ∉ V.cov) :
     bdBss (GF := GF) curCtx i ⊢
       (∃ bs : List (BitVec 8),
-        bufTravelV V i (1 : Qp).half (1 : Qp).half 0#32 0#32 0#32 bs) ∗
+        bufTravelV γ V i (1 : Qp).half (1 : Qp).half 0#32 0#32 0#32 bs) ∗
       wordAtN curCtx (aBufDev (bnode i)) 4 (DFrac.own (1 : Qp).half) 0#32 ∗
       wordAtN curCtx (aBufBlockno (bnode i)) 4 (DFrac.own (1 : Qp).half) 0#32 ∗
       wordAtN curCtx (aBufRefcnt (bnode i)) 4 (DFrac.own 1) 0#32 := by
@@ -332,21 +332,20 @@ theorem bd_bss_split (V : BioView) (i : Nat) (hcov0 : (0#32 : BitVec 32).toNat �
   isplitl []
   · ipureintro; exact ⟨hlen, Or.inl trivial⟩
   iframe Hv Hd1 Hb1 Hdk Hdata
-  iapply bufPay_uncov V 0#32 0#32 0#32 bs hcov0
+  iapply bufPay_uncov γ V i 0#32 0#32 0#32 bs hcov0
 
 /-! ## The thirty boot rows, at one floor slot -/
 
 /-- The escrows' boot rows, split into the four columns the cache seats them
 in, at the MAXIMUM of their boot stamps (Rocq's `big_sepL_llb_max`). -/
-theorem bd_rows_split (V : BioView) (bx : Nat → BoxNames) :
+theorem bd_rows_split (γ : BcacheNames) (V : BioView GF) (bx : Nat → BoxNames) :
     ∀ n : Nat,
-      (([∗list] j ∈ List.range n, bufBoxRow (GF := GF) V (bx j) j
+      (([∗list] j ∈ List.range n, bufBoxRow (GF := GF) γ V (bx j) j
           (1 : Qp).half (1 : Qp).half 0#32 0#32) ⊢
         ∃ tl : Nat, topLb tl ∗
-          ([∗list] j ∈ List.range n, bufBox V (bx j) j (1 : Qp).half (1 : Qp).half) ∗
+          ([∗list] j ∈ List.range n, bufBox γ V (bx j) j (1 : Qp).half (1 : Qp).half) ∗
           ([∗list] j ∈ List.range n, bufSlotRegs (bx j) tl 0#32 0#32) ∗
-          ([∗list] j ∈ List.range n, cntHalf (bx j) 0) ∗
-          ([∗list] j ∈ List.range n, slotpHalf (bx j) (⟨0, none⟩ : L2Reg BufId))) := by
+          ([∗list] j ∈ List.range n, cntHalf (bx j) 0)) := by
   intro n
   induction n with
   | zero =>
@@ -359,21 +358,19 @@ theorem bd_rows_split (V : BioView) (bx : Nat → BoxNames) :
     · iapply BigSepL.bigSepL_nil.2; itrivial
     isplitl []
     · iapply BigSepL.bigSepL_nil.2; itrivial
-    isplitl []
-    · iapply BigSepL.bigSepL_nil.2; itrivial
     · iapply BigSepL.bigSepL_nil.2; itrivial
   | succ n ih =>
     rw [List.range_succ]
     iintro H
     icases BigSepL.bigSepL_append.1 $$ H with ⟨H1, H2⟩
-    icases ih $$ H1 with ⟨%tl, #Htl, Hbx, Hrg, Hc, Hp⟩
+    icases ih $$ H1 with ⟨%tl, #Htl, Hbx, Hrg, Hc⟩
     ihave H2 := BigSepL.bigSepL_singleton.1 $$ H2
-    icases (show bufBoxRow (GF := GF) V (bx n) n (1 : Qp).half (1 : Qp).half 0#32 0#32 ⊢
-        bufBox V (bx n) n (1 : Qp).half (1 : Qp).half ∗
+    icases (show bufBoxRow (GF := GF) γ V (bx n) n (1 : Qp).half (1 : Qp).half 0#32 0#32 ⊢
+        bufBox γ V (bx n) n (1 : Qp).half (1 : Qp).half ∗
         (∃ r : SlotReg BufId BufX, slotdHalf (bx n) r ∗
           ⌜r.win = false ∧ r.x = none ∧ r.ident = ((0#32, 0#32) : BufId)⌝ ∗ topLb r.td) ∗
-        cntHalf (bx n) 0 ∗ slotpHalf (bx n) (⟨0, none⟩ : L2Reg BufId) from by
-      unfold bufBoxRow; iintro H; iexact H) $$ H2 with ⟨#Hbn, ⟨%r, Hrd, %hr, #Htd⟩, Hcn, Hpn⟩
+        cntHalf (bx n) 0 from by
+      unfold bufBoxRow; iintro H; iexact H) $$ H2 with ⟨#Hbn, ⟨%r, Hrd, %hr, #Htd⟩, Hcn⟩
     iexists (max tl r.td)
     isplitl []
     · iapply topLb_max tl r.td
@@ -398,21 +395,15 @@ theorem bd_rows_split (V : BioView) (bx : Nat → BoxNames) :
           (by omega) $$ [Hrd Htd]
         case' _ => iframe Hrd Htd
         iexact Hrg'
-    isplitl [Hc Hcn]
     · iapply BigSepL.bigSepL_append.2
       isplitl [Hc]
       · iexact Hc
       · iapply BigSepL.bigSepL_singleton.2
         iexact Hcn
-    · iapply BigSepL.bigSepL_append.2
-      isplitl [Hp]
-      · iexact Hp
-      · iapply BigSepL.bigSepL_singleton.2
-        iexact Hpn
 
 /-- The pool at boot: no buffer caches anything (every blockno cell is `0`,
 which the view does not cover). -/
-theorem bioPool_boot (V : BioView) (h0 : (0 : Nat) ∉ V.cov) :
+theorem bioPool_boot (V : BioView GF) (h0 : (0 : Nat) ∉ V.cov) :
     (iprop([∗set] b ∈ V.cov, poolBlk (GF := GF) V b)) ⊢ bioPool V (fun _ => 0#32) := by
   unfold bioPool
   refine BigSepS.bigSepS_mono (fun {b} hb => ?_)
@@ -462,7 +453,7 @@ theorem bd_kmap_all (n : Nat) (hn : n ≤ NBUF) :
 
 set_option maxHeartbeats 16000000 in
 /-- **THE BUFFER CACHE, BORN** (Rocq's `bio_init`). -/
-theorem bioInit (cpu : CPU) (k : KCtx) (V : BioView) (hcov0 : (0 : Nat) ∉ V.cov) :
+theorem bioInit (cpu : CPU) (k : KCtx) (V : BioView GF) (hcov0 : (0 : Nat) ∉ V.cov) :
     kctx cpu k ∗ lkFresh bcacheLockAddr ∗
     wordAtN curCtx (bNext bhead) 8 (DFrac.own 1) (bufAddr (NBUF - 1)) ∗
     wordAtN curCtx (bPrev bhead) 8 (DFrac.own 1) (bufAddr 0) ∗
@@ -477,29 +468,15 @@ theorem bioInit (cpu : CPU) (k : KCtx) (V : BioView) (hcov0 : (0 : Nat) ∉ V.co
   ihave Hpool := bioPool_boot V hcov0 $$ Hpool
   ihave Hlru := bd_lru_boot curCtx $$ [Hhn Hhp Hlinks]
   case' _ => iframe Hhn Hhp Hlinks
-  -- the `.bss` cells, split the way the cache seats them
   have hc0 : (0#32 : BitVec 32).toNat ∉ V.cov := by
     rw [show (0#32 : BitVec 32).toNat = 0 from by decide]; exact hcov0
-  ihave Hbss := BigSepL.bigSepL_mono_of_forall
-    (Φ := fun _ i => bdBss (GF := GF) curCtx i)
-    (Ψ := fun _ i => iprop((∃ bs : List (BitVec 8),
-        bufTravelV V i (1 : Qp).half (1 : Qp).half 0#32 0#32 0#32 bs) ∗
-      wordAtN curCtx (aBufDev (bnode i)) 4 (DFrac.own (1 : Qp).half) 0#32 ∗
-      wordAtN curCtx (aBufBlockno (bnode i)) 4 (DFrac.own (1 : Qp).half) 0#32 ∗
-      wordAtN curCtx (aBufRefcnt (bnode i)) 4 (DFrac.own 1) 0#32))
-    (fun {_ i} => bd_bss_split V i hc0) $$ Hbss
-  icases BigSepL.bigSepL_sep_eqv.1 $$ Hbss with ⟨Htrav, Hbss⟩
-  icases BigSepL.bigSepL_sep_eqv.1 $$ Hbss with ⟨Hdev, Hbss⟩
-  icases BigSepL.bigSepL_sep_eqv.1 $$ Hbss with ⟨Hbno, Hrefc⟩
-  icases bd_funChoose (fun i bs => bufTravelV (GF := GF) V i (1 : Qp).half (1 : Qp).half
-    0#32 0#32 0#32 bs) NBUF $$ Htrav with ⟨%bsf, Htrav⟩
-  -- **THE THIRTY ESCROWS**
-  icases kctx_token_acc cpu k $$ Hk with ⟨Hctx, Hkback⟩
-  imod bufEscrow_allocAll V (1 : Qp).half (1 : Qp).half cpu (fun _ => 0#32) (fun _ => 0#32)
-      (fun _ => 0#32) bsf ⊤ NBUF $$ [Hctx Htrav] with ⟨Hctx, ⟨%bx, Hrows⟩⟩
-  · iframe Hctx Htrav
-  ihave Hk := Hkback $$ Hctx
-  icases bd_rows_split V bx NBUF $$ Hrows with ⟨%tl, #Htl, Hbox, Hrg, Hcnt, Hslotp⟩
+  -- **THE BOX GHOSTS, BEFORE THE NAMES RECORD** (Rocq's four `seq_fun_alloc`
+  -- families): the escrows' payload mentions `BcacheNames`, so the box names
+  -- must exist -- and the sleeplocks be sealed over them -- before it does.
+  imod bd_funAlloc (fun (_ : Nat) (γbk : BoxNames) => iprop(bufBoxRaw (GF := GF) γbk ∗
+      slotpHalf (GF := GF) γbk (⟨0, none⟩ : L2Reg BufId)))
+      (fun _ => bufBoxRaw_alloc) NBUF with ⟨%bx, Hbraw⟩
+  icases BigSepL.bigSepL_sep_eqv.1 $$ Hbraw with ⟨Hbraw, Hslotp⟩
   -- the checkout tokens
   imod bd_funAlloc (fun (_ : Nat) (γo : GName) => iprop(γo ↪VAR{DFrac.own (1 : Qp)} ()))
       (fun _ => ghost_var_alloc (GF := GF) (() : Unit)) NBUF with ⟨%fown, Htoks⟩
@@ -542,6 +519,28 @@ theorem bioInit (cpu : CPU) (k : KCtx) (V : BioView) (hcov0 : (0 : Nat) ∉ V.co
       g.ref = γref ∧ g.slot = γslot ∧ g.slk = fslk ∧ g.own = fown ∧ g.box = bx :=
     ⟨⟨γref, γslot, fslk, fown, bx⟩, rfl, rfl, rfl, rfl, rfl⟩
   rw [← h1, ← h2, ← h3, ← h4, ← h5]
+  -- the `.bss` cells, split the way the cache seats them (the travelling
+  -- payload names `γ`, so this waits for the record)
+  ihave Hbss := BigSepL.bigSepL_mono_of_forall
+    (Φ := fun _ i => bdBss (GF := GF) curCtx i)
+    (Ψ := fun _ i => iprop((∃ bs : List (BitVec 8),
+        bufTravelV γ V i (1 : Qp).half (1 : Qp).half 0#32 0#32 0#32 bs) ∗
+      wordAtN curCtx (aBufDev (bnode i)) 4 (DFrac.own (1 : Qp).half) 0#32 ∗
+      wordAtN curCtx (aBufBlockno (bnode i)) 4 (DFrac.own (1 : Qp).half) 0#32 ∗
+      wordAtN curCtx (aBufRefcnt (bnode i)) 4 (DFrac.own 1) 0#32))
+    (fun {_ i} => bd_bss_split γ V i hc0) $$ Hbss
+  icases BigSepL.bigSepL_sep_eqv.1 $$ Hbss with ⟨Htrav, Hbss⟩
+  icases BigSepL.bigSepL_sep_eqv.1 $$ Hbss with ⟨Hdev, Hbss⟩
+  icases BigSepL.bigSepL_sep_eqv.1 $$ Hbss with ⟨Hbno, Hrefc⟩
+  icases bd_funChoose (fun i bs => bufTravelV (GF := GF) γ V i (1 : Qp).half (1 : Qp).half
+    0#32 0#32 0#32 bs) NBUF $$ Htrav with ⟨%bsf, Htrav⟩
+  -- **THE THIRTY ESCROWS**
+  icases kctx_token_acc cpu k $$ Hk with ⟨Hctx, Hkback⟩
+  imod bufEscrow_allocAllAt γ V γ.box (1 : Qp).half (1 : Qp).half cpu (fun _ => 0#32)
+      (fun _ => 0#32) (fun _ => 0#32) bsf ⊤ NBUF $$ [Hctx Hbraw Htrav] with ⟨Hctx, Hrows⟩
+  · iframe Hctx Hbraw Htrav
+  ihave Hk := Hkback $$ Hctx
+  icases bd_rows_split γ V γ.box NBUF $$ Hrows with ⟨%tl, #Htl, Hbox, Hrg, Hcnt⟩
   -- the slot supply
   imod bslots_build γ BSLOTS (Nat.le_refl _) ∅ (fun i _ => get?_empty i) $$ Hsa
     with ⟨%Msl, -, -, Hsl⟩
@@ -647,7 +646,7 @@ sleeplock, `prev` and `next`, so `b->valid`, `b->disk`, `b->dev`,
 `b->blockno`, `b->refcnt` and the 1024 data bytes are `.bss` cells it never
 touches -- the boot chain's to hand over, which is why `Xv6.SpecBinit` does
 not grow. -/
-theorem bioInit_of_binit (cpu : CPU) (k : KCtx) (V : BioView) (hcov0 : (0 : Nat) ∉ V.cov) :
+theorem bioInit_of_binit (cpu : CPU) (k : KCtx) (V : BioView GF) (hcov0 : (0 : Nat) ∉ V.cov) :
     kctx cpu k ∗ lockInited bcacheLockAddr bcacheNameAddr ∗
     wordPointsTo (bcacheHeadAddr + 72#64) 8 (DFrac.own 1) (bufAddr 0) ∗
     wordPointsTo (bcacheHeadAddr + 80#64) 8 (DFrac.own 1) (bufAddr 29) ∗
