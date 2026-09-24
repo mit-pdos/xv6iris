@@ -704,3 +704,6 @@ import Xv6.SysPipeCopy
 import Xv6.SysPipeAlloc
 import Xv6.ProofSysPipe
 import Xv6.LinkSysPipe
+import Xv6.SpecFlags2perm
+import Xv6.ProofFlags2perm
+import Xv6.LinkFlags2perm
