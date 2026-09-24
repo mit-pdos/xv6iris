@@ -452,3 +452,17 @@ import Xv6.LinkStrncmp
 import Xv6.SpecStrncpy
 import Xv6.ProofStrncpy
 import Xv6.LinkStrncpy
+import Xv6.BcacheInv
+import Xv6.BcacheLock
+import Xv6.SpecBpin
+import Xv6.ProofBpin
+import Xv6.LinkBpin
+import Xv6.SpecBunpin
+import Xv6.ProofBunpin
+import Xv6.LinkBunpin
+import Xv6.SpecBwrite
+import Xv6.ProofBwrite
+import Xv6.LinkBwrite
+import Xv6.SpecBrelse
+import Xv6.ProofBrelse
+import Xv6.LinkBrelse
