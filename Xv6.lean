@@ -440,3 +440,9 @@ import Xv6.VirtioDiskRwDefs4
 import Xv6.ProofVirtioDiskRwE
 import Xv6.ProofVirtioDiskRwF
 import Xv6.LinkVirtioDiskRw
+import Xv6.SpecSysGetpid
+import Xv6.ProofSysGetpid
+import Xv6.LinkSysGetpid
+import Xv6.SpecSysUptime
+import Xv6.ProofSysUptime
+import Xv6.LinkSysUptime
