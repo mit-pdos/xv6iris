@@ -233,7 +233,7 @@ Deps name batch items; "gate" = §1 plus the in-flight files.
 
 **Batch E (2)**
 - E1 IgetLic — D1, B1, C1, A3.
-- E2 IcacheEscrowDep — D4.
+- [DONE] E2 IcacheEscrowDep — D4.
 
 **Batch F (3)**
 - F1 IcacheInvFrz — E1, D1, C4.

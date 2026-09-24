@@ -574,3 +574,4 @@ import Xv6.IcacheEscrowTok
 import Xv6.IcacheHeld
 import Xv6.InodeRegionWithdraw
 import Xv6.InodeRegionMovers
+import Xv6.IcacheEscrowDep
