@@ -653,3 +653,6 @@ import Xv6.LinkSysFork
 import Xv6.SpecSysKill
 import Xv6.ProofSysKill
 import Xv6.LinkSysKill
+import Xv6.SpecSysExit
+import Xv6.ProofSysExit
+import Xv6.LinkSysExit
