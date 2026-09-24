@@ -597,3 +597,7 @@ import Xv6.SpecStati
 import Xv6.ProofStati
 import Xv6.LinkStati
 import Xv6.IcacheBootTable
+import Xv6.SpecIdup
+import Xv6.IdupCore
+import Xv6.ProofIdup
+import Xv6.LinkIdup

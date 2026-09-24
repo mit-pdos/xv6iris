@@ -377,19 +377,22 @@ theorem irefPinRows_mono (k : Nat) (w : BitVec 32) (lo tst tst' : Nat) (h : tst 
 
 /-- THE MEMBER STORE (Rocq `pinw_write_c`, `pinw_ok1_app_member`): the
 window's histories go out to a `MachCSL.writeAU`, and a store of a member
-`w'` at `t` comes back as the rows at `w'`, re-bound to `max tst t`. -/
-theorem irefPinRows_push (k : Nat) (w w' : BitVec 32) (lo tst t : Nat) (h : Agent)
+`w'` at `t` comes back as the rows at `w'`, re-bound to `max tst t`.  The
+position `t` and author `h` are bound INSIDE the wand: `writeAU` names them
+only after the histories are handed over (`∃ Hs, … ∗ ▷ ∀ t, …`). -/
+theorem irefPinRows_push (k : Nat) (w w' : BitVec 32) (lo tst : Nat)
     (hw' : irefSet w') :
     irefPinRows (GF := GF) k w lo tst ⊢ ∃ Hs : Nat → Hist,
       histBytes (iRef (ientry k)) 4 (fun _ => DFrac.own 1) Hs ∗
-      (histBytes (iRef (ientry k)) 4 (fun _ => DFrac.own 1) (pushed (n := 4) Hs t h w') -∗
+      (∀ (t : Nat) (h : Agent),
+        histBytes (iRef (ientry k)) 4 (fun _ => DFrac.own 1) (pushed (n := 4) Hs t h w') -∗
         irefPinRows k w' lo (max tst t)) := by
   unfold irefPinRows
   iintro ⟨%v0, %W, Hc, %⟨h1, h2, -, -⟩⟩
   icases wordCell_cases _ 4 lo v0 W $$ Hc with ⟨%Hold, Hb, %htail⟩
   iexists W.hist Hold
   iframe Hb
-  iintro Hb
+  iintro %t %h Hb
   iexists v0, (⟨t, h, w'⟩ :: W)
   isplitl [Hb]
   · iapply wordCell_push _ 4 lo v0 W Hold htail t h w'
