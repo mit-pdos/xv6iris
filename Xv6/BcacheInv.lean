@@ -832,6 +832,33 @@ theorem bnode_inj (i j : Nat) (hi : i < NBUF) (hj : j < NBUF) (h : bnode i = bno
   rw [h] at h1
   omega
 
+/-- Any field of buffer `k` is kernel read-write data: `bcache` is a `.bss`
+object inside the kernel's identity window and the array's stride is 1112. -/
+theorem bnode_off_toNat (k m : Nat) (hk : k < NBUF) (hm : m < 1112) :
+    (bnode k + BitVec.ofNat 64 m).toNat = (KernelSyms.«bcache» + 0x18) + 1112 * k + m := by
+  have hbn := bnode_toNat k hk
+  have hbc : KernelSyms.«bcache» = 0x80018278 := rfl
+  unfold NBUF at hk
+  rw [BitVec.toNat_add, BitVec.toNat_ofNat, hbn]
+  omega
+
+theorem bnode_off_kmapRw (k m : Nat) (hk : k < NBUF) (hm : m < 1112) :
+    kmapClass (vpnOf (bnode k + BitVec.ofNat 64 m)).toNat = some .rw := by
+  have ha := bnode_off_toNat k m hk hm
+  have hbc : KernelSyms.«bcache» = 0x80018278 := rfl
+  rw [hbc] at ha
+  have hk' : k < 30 := by unfold NBUF at hk; exact hk
+  have hv : (vpnOf (bnode k + BitVec.ofNat 64 m)).toNat
+      = (bnode k + BitVec.ofNat 64 m).toNat / 4096 % 134217728 := by
+    simp only [vpnOf, BitVec.extractLsb'_toNat, Nat.reducePow, Nat.shiftRight_eq_div_pow]
+  rw [hv, ha]
+  have hq : (2147582584 + 24 + 1112 * k + m) / 4096 < 134217728 := by omega
+  rw [Nat.mod_eq_of_lt hq]
+  have hlo : 0x80007 ≤ (2147582584 + 24 + 1112 * k + m) / 4096 := by omega
+  have hhi : (2147582584 + 24 + 1112 * k + m) / 4096 < 0x88000 := by omega
+  unfold kmapClass
+  rw [if_neg (by omega), if_pos (Or.inl ⟨hlo, hhi⟩)]
+
 theorem bufData_kmapRw (k m : Nat) (hk : k < NBUF) (hm : m < BSIZE) :
     kmapClass (vpnOf (aBufData (bnode k) + BitVec.ofNat 64 m)).toNat = some .rw := by
   have ha := bufData_toNat k m hk hm
@@ -958,6 +985,41 @@ UNFLOORED row `Xv6.bufSlpDep` and the LOCK HOOK
 `Xv6.slBody_hook`) completes it at the inner spinlock's stamped context. -/
 def bufSlpBox (γ : BcacheNames) (k : Nat) : CtxId → IProp GF := fun ξ => iprop(
   bufTok γ k ∗ ∃ s : L2Reg BufId, slotpHalf (γ.box k) s ∗ ⌜s.hold = none⌝ ∗ ctxFloor ξ s.tp)
+
+/-- **THE SAME ROW, BEFORE THE NAMES RECORD EXISTS** (Rocq's `bslp_raw`).
+`Xv6.bioInit` must seal the thirty sleeplocks over this payload, but the
+payload names buffer `k`'s checkout token and its escrow -- so those ghosts
+are allocated FIRST, as bare `Nat → _` functions, the locks are sealed over
+the raw form, and only then is `Xv6.BcacheNames` assembled.  The two forms
+are the same proposition (`Xv6.bufSlpBox_raw`). -/
+def bufSlpRaw (γo : GName) (γbk : BoxNames) : CtxId → IProp GF := fun ξ => iprop(
+  (γo ↪VAR{.own (1 : Qp)} ()) ∗
+  ∃ s : L2Reg BufId, slotpHalf γbk s ∗ ⌜s.hold = none⌝ ∗ ctxFloor ξ s.tp)
+
+theorem bufSlpBox_raw (γ : BcacheNames) (k : Nat) :
+    bufSlpBox (GF := GF) γ k = bufSlpRaw (γ.own k) (γ.box k) := rfl
+
+instance instCtxMorphBufSlpRaw (γo : GName) (γbk : BoxNames) :
+    CtxMorph (GF := GF) (bufSlpRaw γo γbk) := by
+  unfold bufSlpRaw
+  refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) ?_
+  refine @instCtxMorphExists _ _ _ _ _ (fun s => ?_)
+  exact @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
+    (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) (instCtxMorphFloor s.tp))
+
+/-- The raw row at the boot stamp: the checkout token and the park register
+at rest, with the free floor. -/
+theorem bufSlpRaw_boot (γo : GName) (γbk : BoxNames) (ξ : CtxId) :
+    (γo ↪VAR{.own (1 : Qp)} ()) ∗ slotpHalf (GF := GF) γbk (⟨0, none⟩ : L2Reg BufId) ⊢
+      bufSlpRaw γo γbk ξ := by
+  unfold bufSlpRaw
+  iintro ⟨Ht, Hrp⟩
+  iframe Ht
+  iexists (⟨0, none⟩ : L2Reg BufId)
+  iframe Hrp
+  isplit
+  · ipureintro; rfl
+  · iapply ctxFloor_0
 
 /-- The releaser's unfloored row (Rocq's `bslp_dep`), at a KNOWN park stamp. -/
 def bufSlpDep (γ : BcacheNames) (k T' : Nat) : CtxId → IProp GF := fun _ => iprop(
