@@ -70,11 +70,11 @@ reason).
    `theorem` in a file including the pure `omega`-shaped ones, and then a
    caller with no instance cannot apply them.  Give the binder per
    declaration.
-5. **`FsGeomOk` carries the block layer's two clauses only.**  Rocq's
-   `FsReady.fs_geom_ok` is the whole record of pure premises stated at the
-   fields; the bitmap clause (`bitmap_geom_ok fsc_cov fsc_logst
-   fsc_bmapstart fsc_size`) arrives with `Xv6/BitmapInv.lean`, and the
-   inode clauses with the inode layer.  The point of stating them at the
+5. **`FsGeomOk` carries the block layer's clauses and the bitmap clause.**
+   Rocq's `FsReady.fs_geom_ok` is the whole record of pure premises stated
+   at the fields; the bitmap clause is `fgoBitmap` (`Xv6.bitmapGeomOk`,
+   from `Xv6/BitmapInv.lean`), and the inode clauses arrive with the inode
+   layer.  The point of stating them at the
    ambient fields is that a contract which took them as parameters would
    have to re-state all of it.
 6. `fsc_kpages` is a `GName × GName` pair, spelled out rather than hidden
@@ -91,7 +91,7 @@ disk's geometry instead.  `FsCfgBoot.v` / `FsCfgKits.v` / `FsCfgSnap.v` --
 the three files that BUILD an instance and tie its fields to an era's
 image numbers -- are deferred whole (design note §5).
 -/
-import Xv6.LogInv
+import Xv6.BitmapInv
 import Xv6.UartTrace
 
 namespace Xv6
@@ -144,6 +144,9 @@ structure FsGeomOk [Fscfg] : Prop where
   /-- ...and every covered block is inside the image the superblock
   declares. -/
   fgoCovBelow : ∀ b ∈ fscCov, b < fscSize
+  /-- ...and the bitmap's geometry premises (`Xv6.bitmapGeomOk`): one
+  bitmap block, and that block is a covered home block. -/
+  fgoBitmap : bitmapGeomOk fscCov fscLogst fscBmapstart fscSize
 
 /-- The block-number bounds every interior `bread` needs, off the geometry
 bundle (`Xv6.covOk` is `logGeomOk`'s first clause). -/

@@ -530,3 +530,6 @@ import Xv6.FsStateDefs
 import Xv6.FsBytesGamma
 import Xv6.SbPark
 import Xv6.WriteiBudget
+import Xv6.FsStateBitmap
+import Xv6.BitmapInv
+import Xv6.WriteiBudgetBitmap
