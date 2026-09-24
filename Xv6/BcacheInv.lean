@@ -141,6 +141,15 @@ theorem aBufLock_sext (a : BitVec 64) : a + BitVec.signExtend 64 16#12 = aBufLoc
 theorem aBufLock_eq' (a : BitVec 64) : a + 16#64 = aBufLock a := by
   unfold aBufLock bOffLock; congr 1
 
+/-- `f` with slot `k` moved (the key rows' twin of `Xv6.updAtB`). -/
+def updAtF (f : Nat → BitVec 32) (k : Nat) (v : BitVec 32) : Nat → BitVec 32 :=
+  fun j => if j = k then v else f j
+
+@[simp] theorem updAtF_self (f : Nat → BitVec 32) (k : Nat) (v : BitVec 32) :
+    updAtF f k v k = v := by unfold updAtF; simp
+theorem updAtF_ne (f : Nat → BitVec 32) (k j : Nat) (v : BitVec 32) (h : j ≠ k) :
+    updAtF f k v j = f j := by unfold updAtF; simp [h]
+
 /-! ## Pure list facts
 
 `bhd d l` / `blast l d` are Rocq's `List.hd`/`List.last`: the node after /
@@ -667,15 +676,6 @@ def bkeyAt (γ : BcacheNames) (ξ : CtxId) (tl : Nat) (k : Nat) (dev bno : BitVe
 /-- Every buffer's key row, at the scan's device/blockno assignment. -/
 def bkeyAll (γ : BcacheNames) (ξ : CtxId) (tl : Nat) (devs bnos : Nat → BitVec 32) : IProp GF :=
   iprop([∗list] k ∈ List.range NBUF, bkeyAt γ ξ tl k (devs k) (bnos k))
-
-/-- `f` with slot `k` moved (the key rows' twin of `Xv6.updAtB`). -/
-def updAtF (f : Nat → BitVec 32) (k : Nat) (v : BitVec 32) : Nat → BitVec 32 :=
-  fun j => if j = k then v else f j
-
-@[simp] theorem updAtF_self (f : Nat → BitVec 32) (k : Nat) (v : BitVec 32) :
-    updAtF f k v k = v := by unfold updAtF; simp
-theorem updAtF_ne (f : Nat → BitVec 32) (k j : Nat) (v : BitVec 32) (h : j ≠ k) :
-    updAtF f k v j = f j := by unfold updAtF; simp [h]
 
 /-- **THE COVERED BLOCKNOS ARE INJECTIVE** (Rocq's `bcache_scan2` row): two
 buffers never claim the same COVERED block.  This is what makes the pool's
