@@ -102,18 +102,15 @@ gap) and `MachCSL.BoxNames` has no set structure.  See deviation 6.
    DEPOSIT is slot-keyed"); `FsCfgKits.v` only threads the row;
    `IcacheInv` / `IcacheEscrow` / `ProofIunlock` / `ProofKexecTail` name
    `slh_tok (icfg_isl k)` / `slh_auth (icfg_isl k)` only.
-5. **THE ICACHE BOX IS THIS PORT'S BOX.**  `icfg_box k`'s boot row is
-   `MachCSL/CtxBox.lean`'s ghosts at their boot values (`stampsAuth _ ∅`, the
-   count, both registers) -- that box's stamp camera is a ghost map of UNIT
-   references, not Rocq's `authR (gmapUR (ic_bid * nat) ufracR)`
-   (`MachCSL/CtxBox.lean`'s header).  **Flag for IcacheRef:** Rocq's
-   `IcacheRef.ic_stamps` / `ic_ref_stamps_split` / `ic_ref_stamps_carve`
-   split a reference's stamp MASS (`μ : Qc`), which that box cannot
-   express; `MachCSL/CtxBox.lean` will need its masses back (and its
-   icache hooks: `box_checkout_split`, `box_park_join`, ...) before
-   `IcacheRef` can be ported, and this row changes with it.  The count
-   ghost is `Xv6G.gvNatG`'s (Rocq pins `kalloc_count_inG`, the kernel's
-   shared `ghost_varG Σ nat`).
+5. **THE ICACHE BOX IS THIS PORT'S BOX** (`MachCSL/CtxBox.lean`, Rocq's
+   `CtxBox.v` in full: stamped-share masses, hooks).  `icfg_box k`'s boot
+   row is that box's ghosts at their boot values, exactly Rocq's
+   `icfg_box_fun_alloc` row -- the stamps authority at `∅`
+   (`stampsAuth _ (∅ : StampMap IcBid)`, Rocq's `own (bx_stamps _) (● ∅)`),
+   the count at `0`, both registers at their inhabitants -- which is what
+   `MachCSL.boxAllocAt` consumes (`Xv6.icBoxRaw_allocAt`).  The count ghost
+   is `Xv6G.gvNatG`'s (Rocq pins `kalloc_count_inG`, the kernel's shared
+   `ghost_varG Σ nat`).
 6. **`icfg_off` IS SUPPLIED, NOT MINTED.**  The off box's set camera is
    missing (see above), so `icfgAlloc` takes the fifty set names as an
    argument `foff` and returns `⌜icfgOff = foff⌝` in place of Rocq's
@@ -421,7 +418,7 @@ attribute [reducible, instance] IcacheG.irefG IcacheG.idG IcacheG.liveG IcacheG.
 stamps at `IcBid`, the two register ghost variables.  The count member is
 the kernel's shared `GhostVarG GF Nat` (`Xv6G.gvNatG`; deviation 5). -/
 class IcboxG (GF : BundledGFunctors) where
-  [stampsG : GhostMapG GF Nat (IcBid × Nat) RegMapF]
+  [stampsG : ElemG GF (StampsRF IcBid)]
   [slotdG : GhostVarG GF (SlotReg IcBid IcX)]
   [slotpG : GhostVarG GF (L2Reg IcBid)]
 
@@ -987,7 +984,7 @@ theorem islFunAlloc [SleepLockG GF] (n : Nat) :
 
 /-- One slot's box ghosts, whole, at their boot values (deviation 5). -/
 def icBoxRaw [Xv6G GF] [IcboxG GF] (γb : BoxNames) : IProp GF := iprop%
-  stampsAuth (Id := IcBid) γb (∅ : RegMapF (IcBid × Nat)) ∗ (γb.cnt ↪VAR (0 : Nat)) ∗
+  stampsAuth γb (∅ : StampMap IcBid) ∗ (γb.cnt ↪VAR (0 : Nat)) ∗
   (γb.slotd ↪VAR (default : SlotReg IcBid IcX)) ∗ (γb.slotp ↪VAR (default : L2Reg IcBid))
 
 /-- The per-slot box names, minted as one family (bio_init's pattern). -/
@@ -995,8 +992,7 @@ theorem icfgBoxFunAlloc [Xv6G GF] [IcboxG GF] (n : Nat) :
     ⊢@{IProp GF} |==> ∃ f : Nat → BoxNames, [∗list] k ∈ List.range n, icBoxRaw (f k) :=
   icFunAlloc ⟨0, 0, 0, 0⟩ (fun _ γb => icBoxRaw γb)
     (fun _ => by
-      imod ghost_map_alloc_empty (GF := GF) (K := Nat) (V := IcBid × Nat) (H := RegMapF)
-        with ⟨%g1, Hst⟩
+      imod stampsAuth_alloc (GF := GF) (Id := IcBid) with ⟨%g1, Hst⟩
       imod ghost_var_alloc (GF := GF) (0 : Nat) with ⟨%g2, Hcnt⟩
       imod ghost_var_alloc (GF := GF) (default : SlotReg IcBid IcX) with ⟨%g3, Hd⟩
       imod ghost_var_alloc (GF := GF) (default : L2Reg IcBid) with ⟨%g4, Hp⟩
@@ -1004,6 +1000,19 @@ theorem icfgBoxFunAlloc [Xv6G GF] [IcboxG GF] (n : Nat) :
       iexists (⟨g1, g2, g3, g4⟩ : BoxNames)
       unfold icBoxRaw stampsAuth
       iframe Hst Hcnt Hd Hp) n
+
+/-- A slot's raw box ghosts are exactly `MachCSL.boxAllocAt`'s ghost
+premises (Rocq's `box_alloc_at` takes the same four rows). -/
+theorem icBoxRaw_allocAt [Xv6G GF] [IcboxG GF] (γb : BoxNames) :
+    icBoxRaw (GF := GF) γb ⊢
+      stampsAuth γb (∅ : StampMap IcBid) ∗ (γb.cnt ↪VAR (0 : Nat)) ∗
+        (∃ r0 : SlotReg IcBid IcX, γb.slotd ↪VAR r0) ∗
+        (γb.slotp ↪VAR (⟨0, none⟩ : L2Reg IcBid)) := by
+  unfold icBoxRaw
+  iintro ⟨Hst, Hc, Hd, Hp⟩
+  iframe Hst Hc Hp
+  iexists (default : SlotReg IcBid IcX)
+  iexact Hd
 
 /-- **ALLOCATING THE CLASS**, for a boot that wants to CREATE the authority
 rather than assume it: the class is inhabited at any device and region

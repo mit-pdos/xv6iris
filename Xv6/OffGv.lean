@@ -44,8 +44,9 @@ Rocq's `Xv6Cameras.offboxG` has five members: `offbox_stampsG`,
 `offbox_slotdG`, `offbox_slotpG`, `offbox_setG` (the box part) and
 `offbox_offG` (this file's shadow).  This file defines the class with ONLY the
 shadow member; the box members are added by the OffBox port (wave 0d C5),
-which needs the generalised `MachCSL/CtxBox.lean` and a gset-authority camera
-(see Xv6/IcacheRefDefs.lean deviation 6) -- neither is here yet.
+over the generalised `MachCSL/CtxBox.lean` (stamps `ElemG GF (StampsRF _)`,
+the two register ghost variables); it still needs a gset-authority camera
+(see Xv6/IcacheRefDefs.lean deviation 6), which is not here yet.
 
 ## Dropped/simplified vs Rocq
 
