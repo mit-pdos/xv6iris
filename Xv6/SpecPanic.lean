@@ -24,7 +24,7 @@ The precondition is forced by the two `printk` calls:
    passes a `.rodata` literal, so the obligation is discharged out of
    `Xv6.kernelData`, which the caller already holds inside its `kctx`.
 2. **The stack.**  `panic` pushes a four-slot frame and then calls `printk`,
-   whose own budget is 48 slots; hence `Xv6.panicSlots = 52`.
+   whose own budget is 52 slots; hence `Xv6.panicSlots = 56`.
 3. **The interrupt/lock accounting.**  `printk` takes `pr.lock`, and UART1's
    `tx_lock` under it, so neither may be held and the depth needs `+2`
    headroom.  Unlike `printk`'s own, `panic`'s depth is arbitrary: a panic
@@ -53,8 +53,8 @@ open LeanRV64D
 /-- Address of `panic`. -/
 def panicAddr : BitVec 64 := KA.«panic»
 
-/-- `panic`'s own four-slot frame over `printk`'s 48. -/
-def panicSlots : Nat := 4 + 48
+/-- `panic`'s own four-slot frame over `printk`'s 52. -/
+def panicSlots : Nat := 4 + 52
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]

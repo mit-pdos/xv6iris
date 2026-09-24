@@ -63,7 +63,7 @@ theorem printk_br_11ed2 : KA.«printk» + 0x11ed2#64 = KA.«pr» := by decide
 theorem printk_release_tail (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr : GName) (γd : UartNames) (bs cs0 : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hpr : "pr" ∉ k.locks)
+    (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hpr : "pr" ∉ k.locks)
     (R : RegMap) (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFF40#64)
     (hcs : R 9#5 = k.regs 9#5 ∧ R 19#5 = k.regs 19#5 ∧ R 20#5 = k.regs 20#5 ∧ R 21#5 = k.regs 21#5 ∧
       R 22#5 = k.regs 22#5 ∧ R 23#5 = k.regs 23#5 ∧ R 24#5 = k.regs 24#5 ∧ R 25#5 = k.regs 25#5 ∧
@@ -252,7 +252,7 @@ it): restore, release, and return `0`. -/
 theorem printk_exit (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr : GName) (γd : UartNames) (bs cs0 : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hpr : "pr" ∉ k.locks)
+    (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hpr : "pr" ∉ k.locks)
     (pc0 : BitVec 64) (hpc : pc0 = (KA.«printk» + 0x242#64) ∨ pc0 = (KA.«printk» + 0x2fe#64))
     (R : RegMap) (hR : pkRegs k.regs R) (ap w18 : BitVec 64) :
     kctx cpu ((pkBase k).withRegs R) ∗ pcIs cpu pc0 ∗
@@ -338,7 +338,7 @@ theorem printk_prputc (PP : PRPUTC) {hlc : HasLC} {GF : BundledGFunctors} [MachG
 /-- A call to `printint` from the walk. -/
 theorem printk_printint (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (kb : KCtx) (Rc : RegMap) (γl : GName) (γd : UartNames) (bs : List (BitVec 8))
-    (hsie : kb.sie = false) (hK : 24 ≤ kb.avail)
+    (hsie : kb.sie = false) (hK : 28 ≤ kb.avail)
     (hbase : Rc 11#5 = 10#64 ∨ Rc 11#5 = 16#64)
     (hnoff : kb.noff + 1 < 2 ^ 31) (huart : "uart1" ∉ kb.locks)
     (pc : BitVec 64) (imm : BitVec 21) (htgt : pc + BitVec.signExtend 64 imm = printintAddr)
@@ -370,7 +370,7 @@ set_option maxHeartbeats 4000000 in
 theorem printk_arm_d (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
+    (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (huart : "uart1" ∉ k.locks) (hflen : f.length + 4 < 2 ^ 31)
     (i kk : Nat) (R : RegMap) (w18 : BitVec 64) (hR : pkRegs k.regs R) (hR20 : R 20#5 = BitVec.ofNat 64 i)
     (hR9 : R 9#5 = BitVec.ofNat 64 (i + 1))
@@ -451,7 +451,7 @@ set_option maxHeartbeats 4000000 in
 theorem printk_arm_ld (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
+    (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (huart : "uart1" ∉ k.locks) (hflen : f.length + 4 < 2 ^ 31)
     (i kk : Nat) (R : RegMap) (w18 : BitVec 64) (hR : pkRegs k.regs R) (hR20 : R 20#5 = BitVec.ofNat 64 i)
     (hR9 : R 9#5 = BitVec.ofNat 64 (i + 1))
@@ -535,7 +535,7 @@ set_option maxHeartbeats 4000000 in
 theorem printk_arm_lld (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
+    (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (huart : "uart1" ∉ k.locks) (hflen : f.length + 4 < 2 ^ 31)
     (i kk : Nat) (R : RegMap) (w18 : BitVec 64) (hR : pkRegs k.regs R) (hR20 : R 20#5 = BitVec.ofNat 64 i)
     (hR9 : R 9#5 = BitVec.ofNat 64 (i + 1))
@@ -619,7 +619,7 @@ set_option maxHeartbeats 4000000 in
 theorem printk_arm_u (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
+    (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (huart : "uart1" ∉ k.locks) (hflen : f.length + 4 < 2 ^ 31)
     (i kk : Nat) (R : RegMap) (w18 : BitVec 64) (hR : pkRegs k.regs R) (hR20 : R 20#5 = BitVec.ofNat 64 i)
     (hR9 : R 9#5 = BitVec.ofNat 64 (i + 1))
@@ -700,7 +700,7 @@ set_option maxHeartbeats 4000000 in
 theorem printk_arm_lu (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
+    (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (huart : "uart1" ∉ k.locks) (hflen : f.length + 4 < 2 ^ 31)
     (i kk : Nat) (R : RegMap) (w18 : BitVec 64) (hR : pkRegs k.regs R) (hR20 : R 20#5 = BitVec.ofNat 64 i)
     (hR9 : R 9#5 = BitVec.ofNat 64 (i + 1))
@@ -784,7 +784,7 @@ set_option maxHeartbeats 4000000 in
 theorem printk_arm_llu (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
+    (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (huart : "uart1" ∉ k.locks) (hflen : f.length + 4 < 2 ^ 31)
     (i kk : Nat) (R : RegMap) (w18 : BitVec 64) (hR : pkRegs k.regs R) (hR20 : R 20#5 = BitVec.ofNat 64 i)
     (hR9 : R 9#5 = BitVec.ofNat 64 (i + 1))
@@ -868,7 +868,7 @@ set_option maxHeartbeats 4000000 in
 theorem printk_arm_x (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
+    (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (huart : "uart1" ∉ k.locks) (hflen : f.length + 4 < 2 ^ 31)
     (i kk : Nat) (R : RegMap) (w18 : BitVec 64) (hR : pkRegs k.regs R) (hR20 : R 20#5 = BitVec.ofNat 64 i)
     (hR9 : R 9#5 = BitVec.ofNat 64 (i + 1))
@@ -949,7 +949,7 @@ set_option maxHeartbeats 4000000 in
 theorem printk_arm_lx (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
+    (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (huart : "uart1" ∉ k.locks) (hflen : f.length + 4 < 2 ^ 31)
     (i kk : Nat) (R : RegMap) (w18 : BitVec 64) (hR : pkRegs k.regs R) (hR20 : R 20#5 = BitVec.ofNat 64 i)
     (hR9 : R 9#5 = BitVec.ofNat 64 (i + 1))
@@ -1030,7 +1030,7 @@ set_option maxHeartbeats 4000000 in
 theorem printk_arm_llx (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
+    (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (huart : "uart1" ∉ k.locks) (hflen : f.length + 4 < 2 ^ 31)
     (i kk : Nat) (R : RegMap) (w18 : BitVec 64) (hR : pkRegs k.regs R) (hR20 : R 20#5 = BitVec.ofNat 64 i)
     (hR9 : R 9#5 = BitVec.ofNat 64 (i + 1))
@@ -1114,7 +1114,7 @@ set_option maxHeartbeats 4000000 in
 theorem printk_arm_c (PP : PRPUTC) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
+    (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (huart : "uart1" ∉ k.locks) (hflen : f.length + 4 < 2 ^ 31)
     (i kk : Nat) (R : RegMap) (w18 : BitVec 64) (hR : pkRegs k.regs R) (hR20 : R 20#5 = BitVec.ofNat 64 i)
     (hR9 : R 9#5 = BitVec.ofNat 64 (i + 1))
@@ -1188,7 +1188,7 @@ set_option maxHeartbeats 4000000 in
 theorem printk_arm_pct (PP : PRPUTC) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
+    (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (huart : "uart1" ∉ k.locks) (hflen : f.length + 4 < 2 ^ 31)
     (i kk : Nat) (R : RegMap) (w18 : BitVec 64) (hR : pkRegs k.regs R) (hR20 : R 20#5 = BitVec.ofNat 64 i)
     (hR9 : R 9#5 = BitVec.ofNat 64 (i + 1))
@@ -1241,7 +1241,7 @@ set_option maxHeartbeats 4000000 in
 theorem printk_arm_default (PP : PRPUTC) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
+    (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (huart : "uart1" ∉ k.locks) (hflen : f.length + 4 < 2 ^ 31)
     (i kk : Nat) (R : RegMap) (w18 : BitVec 64) (hR : pkRegs k.regs R) (hR20 : R 20#5 = BitVec.ofNat 64 i)
     (hR9 : R 9#5 = BitVec.ofNat 64 (i + 1))
@@ -1313,7 +1313,7 @@ set_option maxHeartbeats 4000000 in
 theorem printk_arm_plain (PP : PRPUTC) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
+    (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (huart : "uart1" ∉ k.locks) (hflen : f.length + 4 < 2 ^ 31)
     (i kk : Nat) (R : RegMap) (w18 : BitVec 64) (hR : pkRegs k.regs R) (hR20 : R 20#5 = BitVec.ofNat 64 i)
     (hR10 : R 10#5 = BitVec.setWidth 64 (fmtByte f i))
@@ -1370,7 +1370,7 @@ set_option maxHeartbeats 4000000 in
 is a `cstr`, which carries `nonul s` itself. -/
 theorem printk_str_loop (PP : PRPUTC) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γd : UartNames)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
+    (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (huart : "uart1" ∉ k.locks) (v : BitVec 64) (dq : DFrac) (s : List (BitVec 8))
     (n : Nat) :
     ∀ (j : Nat) (R : RegMap) (bs : List (BitVec 8)), j + n + 1 = s.length → pkRegs k.regs R →
@@ -1490,7 +1490,7 @@ set_option maxHeartbeats 4000000 in
 /-- One turn of the `%p` digit loop at `0x800006fa`, count `n + 1`. -/
 theorem printk_hex_iter (PP : PRPUTC) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γd : UartNames)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
+    (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (huart : "uart1" ∉ k.locks) (n : Nat) (R : RegMap) (bs : List (BitVec 8))
     (hR : pkRegsN k.regs R) (hR25 : R 25#5 = KA.«digits») (hR20 : R 20#5 = BitVec.ofNat 64 (n + 1))
     (hn : n + 1 ≤ 16) (tgt : BitVec 64) (htgt : tgt = if n = 0 then (KA.«printk» + 0x1ea#64) else (KA.«printk» + 0x1d4#64)) :
@@ -1577,7 +1577,7 @@ set_option maxHeartbeats 4000000 in
 /-- The `%p` digit loop: from count `m + 1` down to the exit at `0x80000710`. -/
 theorem printk_hex_loop (PP : PRPUTC) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γd : UartNames)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
+    (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (huart : "uart1" ∉ k.locks) (m : Nat) :
     ∀ (R : RegMap) (bs : List (BitVec 8)), pkRegsN k.regs R → R 25#5 = KA.«digits» →
     R 20#5 = BitVec.ofNat 64 (m + 1) → m + 1 ≤ 16 →
@@ -1949,7 +1949,7 @@ set_option maxHeartbeats 4000000 in
 theorem printk_arm_p (PP : PRPUTC) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
+    (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (huart : "uart1" ∉ k.locks) (hflen : f.length + 4 < 2 ^ 31)
     (i kk : Nat) (R : RegMap) (w18 : BitVec 64) (hR : pkRegs k.regs R) (hR20 : R 20#5 = BitVec.ofNat 64 i)
     (hR9 : R 9#5 = BitVec.ofNat 64 (i + 1))
@@ -2075,7 +2075,7 @@ set_option maxHeartbeats 4000000 in
 theorem printk_arm_s (PP : PRPUTC) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
+    (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (huart : "uart1" ∉ k.locks) (hflen : f.length + 4 < 2 ^ 31)
     (i kk : Nat) (R : RegMap) (w18 : BitVec 64) (hR : pkRegs k.regs R) (hR20 : R 20#5 = BitVec.ofNat 64 i)
     (hR9 : R 9#5 = BitVec.ofNat 64 (i + 1))
@@ -2212,7 +2212,7 @@ set_option maxHeartbeats 4000000 in
 theorem printk_pct_tail (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
+    (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (huart : "uart1" ∉ k.locks) (hflen : f.length + 4 < 2 ^ 31)
     (hnonul : nonul f) (hdlen : descs.length ≤ 7)
     (i kk : Nat) (R : RegMap) (w18 : BitVec 64) (hR : pkRegs k.regs R) (hR20 : R 20#5 = BitVec.ofNat 64 i)
@@ -2424,7 +2424,7 @@ set_option maxHeartbeats 4000000 in
 theorem printk_pct_5e2 (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
+    (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (huart : "uart1" ∉ k.locks) (hflen : f.length + 4 < 2 ^ 31)
     (hnonul : nonul f) (hdlen : descs.length ≤ 7)
     (i kk : Nat) (R : RegMap) (w18 : BitVec 64) (hR : pkRegs k.regs R) (hR20 : R 20#5 = BitVec.ofNat 64 i)
@@ -2542,7 +2542,7 @@ set_option maxHeartbeats 4000000 in
 theorem printk_pct (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
+    (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (huart : "uart1" ∉ k.locks) (hflen : f.length + 4 < 2 ^ 31)
     (hnonul : nonul f) (hdlen : descs.length ≤ 7)
     (i kk : Nat) (R : RegMap) (w18 : BitVec 64) (hR : pkRegs k.regs R) (hR20 : R 20#5 = BitVec.ofNat 64 i)
@@ -2787,7 +2787,7 @@ set_option maxHeartbeats 4000000 in
 theorem printk_turn (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
+    (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (huart : "uart1" ∉ k.locks) (hflen : f.length + 4 < 2 ^ 31)
     (hnonul : nonul f) (hdlen : descs.length ≤ 7)
     (i kk : Nat) (R : RegMap) (w18 : BitVec 64) (hR : pkRegs k.regs R) (hR20 : R 20#5 = BitVec.ofNat 64 i)
@@ -2817,7 +2817,7 @@ theorem printk_loop (PP : PRPUTC) (PI : PRINTINT) (RE : RELEASE) {hlc : HasLC} {
     [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs0 : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
-    (hsie : k.sie = false) (hK : 48 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
+    (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (hpr : "pr" ∉ k.locks) (huart : "uart1" ∉ k.locks)
     (hflen : f.length + 4 < 2 ^ 31) (hnonul : nonul f) (hdlen : descs.length ≤ 7)
     (n : Nat) :
@@ -3003,7 +3003,7 @@ theorem printk_proof (AC : ACQUIRE) (RE : RELEASE) (PP : PRPUTC) (PI : PRINTINT)
     iapply H $$ %spie %spp %R' %cs %hsp Hk Hpc %h Hstr Hdescs Hsent
   -- the walk, over its base as a context of its own (`k`), at its hart (`cpu`)
   have hsie : (k.pushOffAt spie spp).sie = false := rfl
-  have hK : 48 ≤ (k.pushOffAt spie spp).avail := by simp only [KCtx.pushOffAt_avail]; omega
+  have hK : 52 ≤ (k.pushOffAt spie spp).avail := by simp only [KCtx.pushOffAt_avail]; omega
   have hnoff : (k.pushOffAt spie spp).noff + 1 < 2 ^ 31 := by simp only [KCtx.pushOffAt_noff]; omega
   have hpr : "pr" ∉ (k.pushOffAt spie spp).locks := hpr
   have huart : "uart1" ∉ (k.pushOffAt spie spp).locks := huart

@@ -1,13 +1,13 @@
 /-
 Link `procdump`: the proof instance clients import.  `procdump`'s only
-callee is `printk`, which is itself still parametric in the console
-interfaces (`CONSPUTC`/`PRINTINT`), so `PRINTK` stays a parameter here.
+callee is `printk`, which is now proved, so `PROCDUMP` closes here.
 -/
 import Xv6.ProofProcdump
+import Xv6.LinkPrintk
 
 namespace Xv6
 
-/-- The proved `procdump` interface, given `printk`. -/
-theorem Procdump (PK : PRINTK) : PROCDUMP := procdump_proof PK
+/-- The proved `procdump` interface. -/
+theorem Procdump : PROCDUMP := procdump_proof Printk
 
 end Xv6

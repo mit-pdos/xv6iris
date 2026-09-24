@@ -87,7 +87,7 @@ set_option maxHeartbeats 1000000 in
 theorem pn_printk0 (PK : PRINTK) [CurCtx]
     (c : CPU) (k' : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8))
     (dqf : DFrac) (f : List (BitVec 8))
-    (hK : 48 ≤ k'.avail) (hflen : f.length + 4 < 2 ^ 31) (hkinds : pkKinds f = [])
+    (hK : 52 ≤ k'.avail) (hflen : f.length + 4 < 2 ^ 31) (hkinds : pkKinds f = [])
     (hnoff : k'.noff + 2 < 2 ^ 31) (hpr : "pr" ∉ k'.locks) (huart : "uart1" ∉ k'.locks) :
     kctx c k' ∗ pcIs c KA.«printk» ∗ cstr (k'.regs 10#5) dqf f ∗
     isLock γpr prLock "pr" (fun _ => emp) ∗ isTxLock γl γd ∗ uartSentSub γd bs ∗
@@ -115,7 +115,7 @@ set_option maxHeartbeats 1000000 in
 theorem pn_printk1 (PK : PRINTK) [CurCtx]
     (c : CPU) (k' : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8))
     (dqf : DFrac) (f : List (BitVec 8)) (dm : PkArgDesc)
-    (hK : 48 ≤ k'.avail) (hflen : f.length + 4 < 2 ^ 31)
+    (hK : 52 ≤ k'.avail) (hflen : f.length + 4 < 2 ^ 31)
     (hkinds : pkKinds f = [PkKind.str]) (hkind : dm.kind = PkKind.str)
     (hnoff : k'.noff + 2 < 2 ^ 31) (hpr : "pr" ∉ k'.locks) (huart : "uart1" ∉ k'.locks) :
     kctx c k' ∗ pcIs c KA.«printk» ∗ cstr (k'.regs 10#5) dqf f ∗

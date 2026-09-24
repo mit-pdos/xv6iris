@@ -137,7 +137,7 @@ def pkDescs {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx] (R : 
 def wp_printk_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8))
     (dqf : DFrac) (f : List (BitVec 8)) (descs : List PkArgDesc)
-    (hK : 48 ≤ k.avail)
+    (hK : 52 ≤ k.avail)
     (hflen : f.length + 4 < 2 ^ 31)
     (hkinds : pkKinds f = descs.map PkArgDesc.kind) (hdlen : descs.length ≤ 7)
     (hnoff : k.noff + 2 < 2 ^ 31) (hpr : "pr" ∉ k.locks) (huart : "uart1" ∉ k.locks) : Prop :=

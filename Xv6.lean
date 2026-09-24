@@ -478,3 +478,5 @@ import Xv6.BreadScan
 import Xv6.ProofBread
 import Xv6.LinkBread
 import Xv6.BioInit
+import Xv6.ProofPrintint
+import Xv6.LinkPrintint

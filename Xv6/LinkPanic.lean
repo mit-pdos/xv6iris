@@ -1,13 +1,12 @@
 /-
-`panic` meets its specification, closed with `printk`.  `printk` is itself
-still parametric in the console interfaces (`PRPUTC`/`PRINTINT`), so
-`PRINTK` stays a parameter here, exactly as in `Xv6/LinkProcdump.lean`.
+`panic` meets its specification, closed with the proved `printk`.
 -/
 import Xv6.ProofPanic
+import Xv6.LinkPrintk
 
 namespace Xv6
 
-/-- The proved `panic` interface, given `printk`. -/
-theorem Panic (PK : PRINTK) : PANIC := panic_proof PK
+/-- The proved `panic` interface. -/
+theorem Panic : PANIC := panic_proof Printk
 
 end Xv6

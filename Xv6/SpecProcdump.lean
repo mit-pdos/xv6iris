@@ -72,8 +72,8 @@ open LeanRV64D
 /-- Address of `procdump`. -/
 def procdumpAddr : BitVec 64 := KA.«procdump»
 
-/-- The stack `procdump` needs: its own ten-slot frame over `printk`'s 48. -/
-def procdumpSlots : Nat := 10 + 48
+/-- The stack `procdump` needs: its own ten-slot frame over `printk`'s 52. -/
+def procdumpSlots : Nat := 10 + 52
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
