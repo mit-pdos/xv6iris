@@ -153,7 +153,7 @@ theorem unpaid_sublist (F F' Sb : List Nat) (h : F'.Sublist F) :
   (h.filter _).length_le
 
 section
-variable {GF : BundledGFunctors} [LogG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [LogG GF]
 
 /-! ## The ledger algebra -/
 

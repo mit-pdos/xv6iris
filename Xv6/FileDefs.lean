@@ -156,16 +156,16 @@ structure FileNames where
   fd : GName
   pay : Nat → GName
 
-/-- The ghost libraries the file table uses (Rocq's `fileG`/`fdslotG`). -/
+/-- The ghost libraries the file table uses (Rocq's `fileG`/`fdslotG`).  The
+fd-slot tokens (`FileNames.fd`) use the SHARED `Xv6G.gmUnitG`. -/
 class FileG (GF : BundledGFunctors) where
   [gmRefG : GhostMapG GF Nat (Nat × Qp) RegMapF]
-  [gmFdG : GhostMapG GF Nat Unit RegMapF]
   [gvPayG : GhostVarG GF FPNames]
   /-- a process's per-descriptor state (FdSlots.v's `fd_st`), one ghost
   variable per descriptor -/
   [gvFdstG : GhostVarG GF FdState]
 
-attribute [reducible, instance] FileG.gmRefG FileG.gmFdG FileG.gvPayG FileG.gvFdstG
+attribute [reducible, instance] FileG.gmRefG FileG.gvPayG FileG.gvFdstG
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [CurCtx]

@@ -180,7 +180,7 @@ the ambient context keeps only its TIER here, the holder-side rows below
 are at the ambient context itself). -/
 
 section IcacheBoxLam
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [LogG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [LogG GF]
   [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
 
 /-- Rocq's `ic_hdr`. -/
@@ -345,7 +345,7 @@ end IcacheBoxLam
 /-! ## THE STITCH'S RESIDUES and THE BOX, per slot -/
 
 section IcacheBoxDef
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [LogG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [LogG GF]
   [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
 
 /-- THE STITCH'S Q -- main's durable-disk ghost that rides the box while a
@@ -485,7 +485,7 @@ instance icBoxPay_ok [Icfg] [CurCtx] (cn : IcNames) (γfs : FsNames) (γi : GNam
   q1Timeless c := icQ1_timeless cn γfs γi cov logstart k c
   q2Timeless := icQ2_timeless cn γfs γi cov logstart k
 
-variable [Xv6G GF] [IcboxG GF]
+variable [IcboxG GF]
 
 /-- THE ESCROW IS THE BOX (R3.3): slot `k`'s box, `Q1 := icQ1`, `Q2 :=
 icQ2`, at the slot's names `icfgBox k` and namespace `icBoxN .@ k` (Rocq's

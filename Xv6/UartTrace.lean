@@ -18,7 +18,10 @@ namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
-/-- The ghost state the console cone needs beyond `MachGS`. -/
+/-- The ghost state the xv6 client needs beyond `MachGS` -- and the ONE home
+of every camera two xv6 subsystems share (one instance per camera type, as
+Rocq's `inG`; the subsystems' ghost NAMES keep their resources apart).  The
+`MonoNatG` camera is `MachGS`'s own (`MachFixedGS.mono`). -/
 class Xv6G (GF : BundledGFunctors) where
   [monoListG : MonoListG GF (BitVec 8)]
   [gvListG : GhostVarG GF (List (BitVec 8))]
@@ -30,9 +33,18 @@ class Xv6G (GF : BundledGFunctors) where
   [gvW32G : GhostVarG GF (BitVec 32)]
   /-- the UART's divisor-latch flag (`UartInv.dlabAuth`) -/
   [gvBoolG : GhostVarG GF Bool]
+  /-- THE ONE `Nat ↦ ()` ghost-map camera: the log's open transactions
+  (`LogNames.tx`), the buffer cache's slot tokens (`BcacheNames.slot`) and
+  the file table's fd-slot tokens (`FileNames.fd`) all live here, told
+  apart by their ghost NAMES (Rocq: one `ghost_mapG Σ nat unit`) -/
+  [gmUnitG : GhostMapG GF Nat Unit RegMapF]
+  /-- THE ONE `Nat ↦ block bytes` ghost-map camera: the disk image
+  (`DiskNames.img`) and the log's logged view (`FsNames.cache`) -/
+  [gmBlkG : GhostMapG GF Nat (List (BitVec 8)) RegMapF]
 
 attribute [instance] Xv6G.monoListG Xv6G.gvListG
 attribute [reducible, instance] Xv6G.gvNatG Xv6G.gvUnitG Xv6G.gvCpuG Xv6G.gvW32G Xv6G.gvBoolG
+attribute [reducible, instance] Xv6G.gmUnitG Xv6G.gmBlkG
 
 /-- The names of one port's ghosts (the Rocq `UartNames.uart_names`, the
 subset the Lean port carries): the accepted trace (`mono_list` over

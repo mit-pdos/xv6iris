@@ -472,11 +472,11 @@ end
 
 /-! ## (4) The callees at their call sites -/
 
-theorem itrunc_view_gd {GF : BundledGFunctors} [FsBlocksG GF] (γfs : FsNames) (gd : DiskNames)
+theorem itrunc_view_gd {GF : BundledGFunctors} [Xv6G GF] [FsBlocksG GF] (γfs : FsNames) (gd : DiskNames)
     (dev : BitVec 32) (cov : ExtTreeSet Nat compare) :
     (fsView (GF := GF) γfs gd dev cov).gd = gd := rfl
 
-theorem itrunc_view_cov {GF : BundledGFunctors} [FsBlocksG GF] (γfs : FsNames) (gd : DiskNames)
+theorem itrunc_view_cov {GF : BundledGFunctors} [Xv6G GF] [FsBlocksG GF] (γfs : FsNames) (gd : DiskNames)
     (dev : BitVec 32) (cov : ExtTreeSet Nat compare) :
     (fsView (GF := GF) γfs gd dev cov).cov = cov := rfl
 

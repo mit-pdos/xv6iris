@@ -67,8 +67,7 @@ Rocq's, over the same algebra.
    below is a DEFINITION elaborated inside a section that sees only
    `IrefslotG`, which pins its instance; callers must go through
    `irefFrac` / `irefSlots` / `irefSlotsAuth` and never write the raw
-   `iOwn` (the discipline `Xv6/LogBoot.lean`'s header records for the
-   `BcacheG.gmSlotG` / `LogG.gmTx` collision).
+   `iOwn`.
 4. `seq 0 n` is `List.range n`.
 5. The class carries the NAME, as Rocq's does (`irefslot_name`), and
    `IrefslotGpreS` is the capacity alone; `irefslotΣ` / `subG_irefslotΣ`

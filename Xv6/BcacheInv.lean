@@ -207,18 +207,18 @@ structure BcacheNames where
   box : Nat → BoxNames
 
 /-- The ghost libraries the buffer cache uses (Rocq's `bioG`/`bioslotG`,
-with the escrow's `boxG` folded in -- Rocq `BioInv.v`'s `bioboxG`). -/
+with the escrow's `boxG` folded in -- Rocq `BioInv.v`'s `bioboxG`).  The
+slot tokens (`BcacheNames.slot`), the per-buffer ownership variables and
+the escrow counters use the SHARED cameras `Xv6G.gmUnitG`,
+`Xv6G.gvUnitG` and `Xv6G.gvNatG` (one instance per camera type). -/
 class BcacheG (GF : BundledGFunctors) where
   [gmRefG : GhostMapG GF Nat Nat RegMapF]
-  [gmSlotG : GhostMapG GF Nat Unit RegMapF]
-  [gvOwnG : GhostVarG GF Unit]
   [stmG : ElemG GF (StampsRF BufId)]
-  [gvCnt : GhostVarG GF Nat]
   [gvSlotd : GhostVarG GF (SlotReg BufId BufX)]
   [gvSlotp : GhostVarG GF (L2Reg BufId)]
 
-attribute [reducible, instance] BcacheG.gmRefG BcacheG.gmSlotG BcacheG.gvOwnG
-  BcacheG.stmG BcacheG.gvCnt BcacheG.gvSlotd BcacheG.gvSlotp
+attribute [reducible, instance] BcacheG.gmRefG
+  BcacheG.stmG BcacheG.gvSlotd BcacheG.gvSlotp
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [BcacheG GF]

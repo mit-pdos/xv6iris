@@ -200,7 +200,7 @@ theorem ialloc_refb_claim {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
-  [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
+  [Xv6G GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 /-- THE GHOST STEP ITSELF, at the sixteen-dinode list the scan learned at its
 own bread: `LOG_WRITE.wp_log_write_au_range`'s atomic-update premise at the
@@ -232,7 +232,6 @@ theorem ialloc_claim_au [Fscfg] [Icfg] (inum : BitVec 32) (ty : BitVec 16) (ds :
       iregOpen -∗ txPin icfgLog t qt -∗
       iallocClaimAu inum ty ds e0 (iclaim inum.toNat ty t qt) := by
   unfold iallocClaimAu
-  rw [txPin_elem]
   iintro #Hinv #Hopen Htx
   iapply lwAuRec icfgLog fscFs (IBLOCK inum icfgIst) (⊤ \ ↑iregN) (islot inum) (diblkBytes ds)
     (dinodeBytes (iallocFresh ty)) (iclaim inum.toNat ty t qt) e0

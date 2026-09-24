@@ -150,7 +150,7 @@ theorem iu_shape (ds : List Dinode) (inum : BitVec 32) (dn : Dinode) (hds : dibl
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
-  [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
+  [Xv6G GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 /-- THE GHOST STEP ITSELF, at the sixteen-dinode list the walk learned at
 its own bread (Rocq's `iu_region_au`): exactly

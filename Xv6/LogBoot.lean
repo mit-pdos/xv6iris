@@ -17,9 +17,8 @@ It lives in the definitional layer (no `Code*`/`Proof*` import) so that
 would otherwise belong to (`Xv6/LogInv.lean`) is owned by another agent.
 
 The former `LogTxAuthBridge` residual (a `GhostMapG` instance collision
-between `BcacheG.gmSlotG` and `LogG.gmTx`) is GONE: `Xv6/LogDefs.lean` now
-names the transaction authority (`Xv6.logTxAuth`) and every statement goes
-through it.  The header block's clean tie -- what used to be a second named
+between the bcache's slot map and the log's transaction map) is GONE: both
+use the one shared camera `Xv6G.gmUnitG`, told apart by ghost name.  The header block's clean tie -- what used to be a second named
 hypothesis here -- is DISCHARGED
 in `Xv6/ProofInitlog.lean` (`Xv6.il_pay_agree`) off the bio layer's payload
 hooks, against `Xv6/SpecInitlog.lean`'s boot premise `hdrN bsHdr = 0`.

@@ -381,7 +381,7 @@ theorem lens_insert (C : BlockMap) (b : Nat) (v : List (BitVec 8))
     exact hlens b' bs' hb'
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsBlocksG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsBlocksG GF]
 
 /-! ## The body and the invariant -/
 

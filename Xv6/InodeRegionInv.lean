@@ -314,7 +314,7 @@ end Recs
 
 section Body
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
-  [LogG GF] [FsBytesG GF] [FsTopG GF] [FsLinkG GF]
+  [Xv6G GF] [LogG GF] [FsBytesG GF] [FsTopG GF] [FsLinkG GF]
 
 /-- Block `bi`'s conjunct: the parked list `ds` of its sixteen records,
 well-formed and coupled to the region map `m`, its sixteen record runs and
@@ -426,7 +426,7 @@ ANY share.  Because the entry RECORDS the share, `iregRelease` hands back
 exactly what `iregArm` took. -/
 
 section Top
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [LogG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [LogG GF]
   [FsTopG GF] [FsBytesG GF]
 
 /-- what an arm parks: its transaction's element, at the arm's own share -/
@@ -520,9 +520,9 @@ theorem iregParked_retag [Icfg] (A : RegMapF IregArmEnt) (k t : Nat) (q : Qp)
     (BigSepM.bigSepM_insert_delete (Φ := fun _ e => iregParked (GF := GF) e)
       (x := ((t, q, S') : IregArmEnt))).2
 
-/-- The parked row IS the raw `ln_tx` element (`TxPin.txPin_elem`). -/
+/-- The parked row IS the transaction pin (the raw `ln_tx` element, `TxPin.txPin_elem`). -/
 theorem iregParked_elem [Icfg] (t : Nat) (q : Qp) (S : Std.ExtTreeSet Nat compare) :
-    iregParked (GF := GF) ((t, q, S) : IregArmEnt) ⊣⊢ (icfgLog.tx ↪◯MAP[t]{DFrac.own q} ()) :=
+    iregParked (GF := GF) ((t, q, S) : IregArmEnt) ⊣⊢ txPin icfgLog t q :=
   .rfl
 
 /-! ### THE ARM: a transaction suspends its first inum's row -/
@@ -532,7 +532,7 @@ out.  The key needs no freshness ARGUMENT: the ghost step sees the
 registry's map, so a fresh key is free (see the header above). -/
 theorem iregArm [Icfg] (E : CoPset) (γfs : FsNames) (i t : Nat) (q : Qp)
     (hE : (↑ftopN : CoPset) ⊆ E) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ (icfgLog.tx ↪◯MAP[t]{DFrac.own q} ()) -∗
+    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ txPin icfgLog t q -∗
       |={E}=> ∃ k : Nat, iregArmed k t q ({i} : Std.ExtTreeSet Nat compare) := by
   iintro #Hi Ht
   unfold ftopInv iregArmed
@@ -607,7 +607,7 @@ home. -/
 theorem iregRelease [Icfg] (E : CoPset) (γfs : FsNames) (k t : Nat) (q : Qp)
     (hE : (↑ftopN : CoPset) ⊆ E) :
     ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ iregArmed k t q ∅ -∗
-      |={E}=> (icfgLog.tx ↪◯MAP[t]{DFrac.own q} ()) := by
+      |={E}=> txPin icfgLog t q := by
   iintro #Hi Hrec
   unfold ftopInv iregArmed
   imod (inv_acc_timeless (E := E) (N := ftopN) (P := ftopBody (GF := GF) γfs) hE) $$ Hi
@@ -703,7 +703,7 @@ end Top
 
 section Bundles
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
-  [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
+  [Xv6G GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 /-- THE REGION AT POWERON, BEFORE RECOVERY HAS RUN (durable-disk lane
 E-except).  Its byte row is the bare `fsBytesRow`: the era's mint runs at
@@ -825,7 +825,7 @@ ABSENT rows (ilock's fresh-inode fill and the escrow deposit's free, both
 reading the pre-node's zero count off `iregTopPark`). -/
 
 section Retag
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [LogG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [LogG GF]
   [FsTopG GF] [FsBytesG GF] [Appcfg GF]
 
 /-- Rocq's `ireg_top_retag_gen`. -/
@@ -925,7 +925,7 @@ end Retag
 
 section Acc
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
-  [LogG GF] [FsBytesG GF] [FsTopG GF] [FsLinkG GF]
+  [Xv6G GF] [LogG GF] [FsBytesG GF] [FsTopG GF] [FsLinkG GF]
 
 /-- a block's conjunct only reads the map at its OWN sixteen keys -/
 theorem iregBlk_mono [Icfg] (γi : GName) (γfs : FsNames) (inodestart : Nat)

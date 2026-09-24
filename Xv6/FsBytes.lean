@@ -55,9 +55,8 @@ set_option linter.unusedSectionVars false
 /-! ## The ghost library
 
 A `GhostMapG GF Nat (BitVec 8) RegMapF` exists nowhere else in the tree
-(the disk image is at `List (BitVec 8)`, `Xv6/DiskInvDefs.lean:176`), so
-there is no repeat of the `BcacheG.gmSlotG` / `LogG.gmTx` instance
-collision `Xv6/LogBoot.lean` records. -/
+(the disk image and the logged view are at `List (BitVec 8)`, on the shared
+`Xv6G.gmBlkG`), so this class is the one instance of its camera. -/
 
 /-- The two ghost maps the byte view needs (Rocq's `fsLogG` members for the
 `FsBytes` section). -/

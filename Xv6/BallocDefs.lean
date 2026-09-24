@@ -183,7 +183,7 @@ end
 contract keeps the view a parameter pinned by `hcl`/`hdt`, and a view with
 those two fields IS `fsView` of its own geometry. -/
 
-theorem bioView_eq_fsView {GF : BundledGFunctors} [FsBlocksG GF] (V : BioView GF)
+theorem bioView_eq_fsView {GF : BundledGFunctors} [Xv6G GF] [FsBlocksG GF] (V : BioView GF)
     (γfs : FsNames) (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs) :
     V = fsView γfs V.gd V.dev V.cov := by
   cases V

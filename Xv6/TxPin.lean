@@ -5,7 +5,7 @@ Rocq `TxPin.v` (`/shared/xv6rocq/iris/TxPin.v`, 167 lines), whole.
 Design: claude-notes/design/fs-ghost-state.md, "the pin inventory".
 
 Eight places in the file system park the SAME atom -- a positive share of
-an open transaction's `LogG.gmTx` element (Rocq `LogDefs.ln_tx`) -- so that
+an open transaction's `LogNames.tx` element (Rocq `LogDefs.ln_tx`) -- so that
 a commit, which holds that map's authority EMPTY, can refute the state
 outright:
 
@@ -50,11 +50,10 @@ conclusion names `LogInv.log_tx`, which lives above this leaf.
 ## DEVIATIONS from Rocq
 
 1. **THE AUTHORITY IS SPELLED `logTxAuth γ ∅`** (`Xv6/LogDefs.lean`),
-   not a raw `ghost_map_auth (ln_tx γ) 1 ∅`: `LogG.gmTx` and
-   `BcacheG.gmSlotG` are the same `GhostMapG GF Nat Unit RegMapF` type, and
-   `logTxAuth` is the name that pins the log's instance (LogDefs' reason).
-   `txPin` is defined in a section whose only ghost binder is `[LogG GF]`,
-   so its element is pinned to `LogG.gmTx` the same way.
+   not a raw `ghost_map_auth (ln_tx γ) 1 ∅`: one name per log resource
+   (LogDefs' convention).  The camera is the shared `Xv6G.gmUnitG` (one
+   `Nat ↦ ()` ghost-map instance for the whole client, as Rocq's one
+   `ghost_mapG Σ nat unit`); `γ.tx` is what tells the log's map apart.
 2. **`txPins` IS GENERIC OVER THE MAP TYPE** (`[LawfulFiniteMap H K]`,
    `M : H (Nat × Qp)`) where Rocq is generic over the key (`Countable K`,
    `gmap K`): the port's map types are `RegMapF` (Nat keys) and friends.
@@ -88,7 +87,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section TxPin
-variable {GF : BundledGFunctors} [LogG GF]
+variable {GF : BundledGFunctors} [Xv6G GF] [LogG GF]
 
 /-- ONE PARKED SHARE: transaction `t` is open, and `q` of the evidence for
 that is parked here.  `(t, q)` are always FIELDS of whatever records the

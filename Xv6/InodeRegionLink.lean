@@ -165,7 +165,7 @@ block at the one-slot-updated list and map (`iregCouple_set`). -/
 
 section Acc
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
-  [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
+  [Xv6G GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 theorem iregRec_acc [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames) (inodestart nib : Nat)
     (inum : BitVec 32) (dn : Dinode) (hE : (↑iregN : CoPset) ⊆ E)
@@ -239,7 +239,7 @@ vacuous at every byte-writing mover (iclaim-ledger.md §2.4). -/
 
 section Marked
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
-  [LogG GF] [FsBytesG GF] [FsTopG GF] [FsLinkG GF]
+  [Xv6G GF] [LogG GF] [FsBytesG GF] [FsTopG GF] [FsLinkG GF]
 
 theorem iregSlot_marked_open [Icfg] (γfs : FsNames) (γi : GName) (inum : BitVec 32)
     (dn : Dinode) :
@@ -363,7 +363,7 @@ end Raise
 
 section Movers
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
-  [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
+  [Xv6G GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 /-- `ip->nlink++; iupdate(ip)` (Rocq `ireg_write_link_reg`).
 

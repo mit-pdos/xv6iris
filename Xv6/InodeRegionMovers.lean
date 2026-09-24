@@ -123,7 +123,7 @@ registry and the two re-build wands. -/
 
 section Open
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
-  [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
+  [Xv6G GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 /-- What stays behind when slot `islot inum` of block `iregBi inum` is out:
 the registry, the other blocks, the other fifteen slots. -/
@@ -251,7 +251,7 @@ end Open
 
 section Movers
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
-  [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
+  [Xv6G GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 /-- Rocq's `ireg_read`.  THE FLIP'S ONE ADDITION (durable-disk 1c-flip step
 3): the region holds the block's EXCLUSIVE byte run, not a cache half, so
@@ -553,7 +553,7 @@ theorem iregClaim_au [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames) (inodest
     (hwfc : diblkWf dsc) (ht0c : dsc[islot inum]!.diType.toNat = 0)
     (hfr : freshShape dn') (htyc : iregTyOk dn') :
     ⊢@{IProp GF} iregInv (hlc := hlc) γi γfs inodestart nib -∗ iregOpen -∗
-      (icfgLog.tx ↪◯MAP[t]{DFrac.own qt} ()) -∗
+      txPin icfgLog t qt -∗
       |={E, E \ ↑iregN}=> ∃ recOld : List (BitVec 8),
         ⌜recOld.length = 64⌝ ∗
         FsView.byteRange (fsGammaL γfs) (IBLOCK inum inodestart) (64 * islot inum) recOld ∗
@@ -647,7 +647,6 @@ theorem iregClaim_au [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames) (inodest
   ihave Hfdisj := iregShp_intro (some (.excl ((dn'.diType, (t, qt)) : Ctyval))) fz $$ Hfsh
     [Htx]
   · iapply iregCpin_some ((dn'.diType, (t, qt)) : Ctyval)
-    rw [txPin_elem]
     iexact Htx
   have hfrz' := iregFrzOk_of_off fz cn dn' hfz0
   -- the claimed slot's old record is type-0, so (L3) gives it nlink 0 and

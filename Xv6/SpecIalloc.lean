@@ -77,11 +77,9 @@ ialloc SLEEPS (bread), so it threads the running-process bundle exactly as
    `gset Z → List Nat` deviation); `t ↪[ln_tx icfg_log]{#qt} tt` is
    `Xv6.txPin icfgLog t qt`, which UNFOLDS to the raw element
    `icfgLog.tx ↪◯MAP[t]{DFrac.own qt} ()` that `iregClaim_au` takes
-   (`txPin_elem` is `rfl`).  The named form is NOT cosmetic: in a context
-   that also has `[BcacheG GF]`, the raw notation's `GhostMapG GF Nat Unit
-   RegMapF` instance resolves to `BcacheG.gmSlotG` (the bcache slot map),
-   not `LogG.gmTx`; `txPin` is defined under `[LogG GF]` alone and so pins
-   the log's transaction map.
+   (`txPin_elem` is `rfl`).  There is ONE `GhostMapG GF Nat Unit RegMapF`
+   instance (`Xv6G.gmUnitG`), so the named and raw forms agree in every
+   context; the named form is the file system's spelling.
 4. `0 <= icfg_ist` vanishes at `Nat`; `bv_unsigned inum` is `inum.toNat`
    (the icache's key type).  `j < NPROC`/`γs !! j = Some γl` are
    `hj`/`hproc` as in bread.

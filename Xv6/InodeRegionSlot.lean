@@ -101,10 +101,9 @@ as `(z : Int) = iregRoot`.
    (Rocq `Z`), and `iblkOf_IBLOCK` is still `rfl`.
 2. **THE OBSERVATION COUNTER's `mono_nat` INSTANCE IS `MachGS`'s**
    (`MachFixedGS.mono`, the instance `IcacheRefDefs.iepFunAlloc` mints
-   `icfgIep` with; `Xv6/EscrowDefs.lean` deviation 2), while
-   `logEpochLb` rides `LogG.mnEp`.  A declaration with both classes in
-   scope cannot write a raw `MonoNat.auth_own`, so the counter's two
-   spellings are pinned once, in a section that binds `MachGS` alone:
+   `icfgIep` with; `Xv6/EscrowDefs.lean` deviation 2) -- the one
+   `MonoNatG` instance, which `logEpochLb` rides too.  The counter's two
+   spellings are named once, in a section that binds `MachGS` alone:
    `iepAuth z v` (Rocq `mono_nat_auth_own (icfg_iep z) 1 v`) and `nlzObs`
    (Rocq's own definition), with the three `mono_nat` facts the receipt
    uses (`iepAuth_update`, `iepAuth_lb_valid`, `nlzObs_le`).
@@ -223,7 +222,7 @@ theorem nlzObs_le [Icfg] (z e e' : Nat) (h : e' ≤ e) :
 end IepCounter
 
 section Receipt
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [LogG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [LogG GF]
 
 /-- THE RECEIPT.  THE `⌜v = 0⌝` DISJUNCT IS THE BOOT CORNER, not slack: the
 mkfs image is full of FREE inodes (type 0, nlink 0) for which no witness
@@ -363,7 +362,7 @@ end Receipt
 /-! ## 2.  THE MIRROR CONJUNCT (§3.16's A⁗) AND THE FREEZE's BOOT SHELTER -/
 
 section Freeze
-variable {GF : BundledGFunctors} [IcacheG GF] [LogG GF]
+variable {GF : BundledGFunctors} [IcacheG GF] [Xv6G GF] [LogG GF]
 
 /-- ONE conjunct of `iregSlot`: the region's half of a 1/2-1/2 bool whose
 other half rides under the ITABLE LOCK (`IcacheEscrow.islot2`'s live arm /
@@ -1024,14 +1023,14 @@ end TopPark
 ialloc retags a FREE record to a `freshShape` one and the region keeps the
 fragment on its IN arm until the claimant's first ilock fills the box.  The
 window is inside ONE transaction, and this is what PROVES it: the claim
-parks a POSITIVE share of that transaction's `LogG.gmTx` element, so an
+parks a POSITIVE share of that transaction's `LogNames.tx` element, so an
 empty authority refutes `c ≠ none` outright (`iregCpin_no_ops`) and the IN
 arm's own clause then yields `diType d = 0` (`iregIn_quiesce`).  The c
 column carries `(t, q)` as FIELDS (`Ctyval`) because two halves of one
 element are not the whole.  `ctyPin` is `Xv6/InodeRegion.lean`'s. -/
 
 section Cpin
-variable {GF : BundledGFunctors} [LogG GF]
+variable {GF : BundledGFunctors} [Xv6G GF] [LogG GF]
 
 def iregCpin [Icfg] (c : CtyUR) : IProp GF :=
   txPinO icfgLog (ctyPin c)
@@ -1067,7 +1066,7 @@ theorem iregCpin_no_ops [Icfg] (c : CtyUR) (f : FrzUR) (d : Dinode) (hclm : ireg
 end Cpin
 
 section Shp
-variable {GF : BundledGFunctors} [IcacheG GF] [LogG GF]
+variable {GF : BundledGFunctors} [IcacheG GF] [Xv6G GF] [LogG GF]
 
 /-- THE SHELTER AND THE PIN, AS ONE CONJUNCT, in `iregFsh`'s own position:
 the thirty-odd sites that merely thread the slot's f-shelter through a
@@ -1101,7 +1100,7 @@ end Shp
 
 section Slot
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
-  [LogG GF] [FsBytesG GF] [FsTopG GF] [FsLinkG GF]
+  [Xv6G GF] [LogG GF] [FsBytesG GF] [FsTopG GF] [FsLinkG GF]
 
 /-- THE REGION INVARIANT's PER-INUM CELL (the header lists the conjuncts and
 why each is here).  The ARM, per OPTION A (walk reg-fold): the per-inum

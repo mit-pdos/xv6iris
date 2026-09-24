@@ -183,7 +183,7 @@ WHY NO COLUMN BOUND IS READ HERE EITHER: the bound the licence needs is
 the target's own slot (`iregLnk`). -/
 
 section Lic
-variable {GF : BundledGFunctors} [IregG GF] [IcacheG GF] [FsBlocksG GF] [FsLinkG GF]
+variable {GF : BundledGFunctors} [IregG GF] [IcacheG GF] [Xv6G GF] [FsBlocksG GF] [FsLinkG GF]
 
 /-- THE LICENCE.
 
@@ -277,7 +277,7 @@ end Lic
 (iclaim-ledger.md §2.6, executed as §3.1's RULING A) -/
 
 section Table
-variable {GF : BundledGFunctors} [IregG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [FsLinkG GF]
+variable {GF : BundledGFunctors} [IregG GF] [IcacheG GF] [Xv6G GF] [LogG GF] [FsBlocksG GF] [FsLinkG GF]
 
 /-- THE LICENCE TABLE.  §2.6 wrote a five-row table -- "at a box the free
 path has frozen, EVERY runtime licence is refutable" -- and increment IIIb
@@ -455,7 +455,7 @@ end Table
 
 section BufList
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
-  [FsBlocksG GF] [FsLinkG GF]
+  [Xv6G GF] [FsBlocksG GF] [FsLinkG GF]
 
 /-- THE `bufL` ROW's BLOCK TRANSPORT, ON ITS OWN.  `iname_mintOk` used to
 meet the licence's machinery half against the region's parked CACHE half by
@@ -515,7 +515,7 @@ end BufList
 
 section FreezeOff
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
-  [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
+  [Xv6G GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 /-- Rocq's inline `Hcp (islot inum) Hsl; rewrite -ireg_key_split`: the
 coupling names the region's record at the caller's slot. -/

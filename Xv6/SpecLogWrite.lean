@@ -382,7 +382,7 @@ AU supplier that owes NO receipt of its own -- `Xv6.bitmapFreeAu`,
 two extra wand inputs; this parks the bound at ZERO, where
 `Xv6.logEpochLb_0` mints it for free, and drops both inputs on the way
 back in. -/
-theorem lwAu_lb0 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsBlocksG GF] [LogG GF]
+theorem lwAu_lb0 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsBlocksG GF] [LogG GF]
     (γ : LogNames) (γfs : FsNames) (bno : Nat) (Efs : CoPset)
     (bs bsl : List (BitVec 8)) (Φfsb : IProp GF) (e0 : Nat) :
     (|={⊤, Efs}=> ∃ bsl' : List (BitVec 8),
@@ -444,7 +444,7 @@ inode block, stated over the ABSTRACT view record's run
 carrying no receipt.  `Xv6.gammaByteRange` is the whole bridge, and the
 degenerate anchor is `lwAu_lb0`'s: the bound is parked at 0 and both extra
 wand inputs are dropped. -/
-theorem lwAuRec {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsBlocksG GF] [LogG GF]
+theorem lwAuRec {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsBlocksG GF] [LogG GF]
     (γ : LogNames) (γfs : FsNames) (bno : Nat) (Efs : CoPset)
     (kslot : Nat) (bsl recNew : List (BitVec 8)) (Φfsb : IProp GF) (e0 : Nat) :
     (|={⊤, Efs}=> ∃ recOld : List (BitVec 8),

@@ -75,13 +75,13 @@ their theory over `FsBytesG` alone, exactly as Rocq's `FsBytes` section
 does) while costing not one `[FsBytesG GF]` binder at the ~20 log-layer
 files that already carry `[FsBlocksG GF]`. -/
 class FsBlocksG (GF : BundledGFunctors) extends FsBytesG GF where
-  [gmCache : GhostMapG GF Nat (List (BitVec 8)) RegMapF]
+  -- the logged view (`FsNames.cache`) uses the SHARED `Xv6G.gmBlkG`
   [gmDirty : GhostMapG GF Nat Bool RegMapF]
 
-attribute [reducible, instance] FsBlocksG.gmCache FsBlocksG.gmDirty
+attribute [reducible, instance] FsBlocksG.gmDirty
 
 section
-variable {GF : BundledGFunctors} [FsBlocksG GF]
+variable {GF : BundledGFunctors} [Xv6G GF] [FsBlocksG GF]
 
 /-- **The logged view's authority** (Rocq's `ghost_map_auth (fs_cache γfs) 1 L`):
 the freeze-by-auth that makes `log_write` and the committer the only

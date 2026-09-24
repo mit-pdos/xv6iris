@@ -164,7 +164,9 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
 /-! ## The ghost libraries -/
 
-/-- The ghost libraries the disk needs beyond `Xv6G` (Rocq's `diskG`). -/
+/-- The ghost libraries the disk needs beyond `Xv6G` (Rocq's `diskG`).  The
+block image uses the SHARED `Xv6G.gmBlkG` and the completion counters the
+SHARED `MachFixedGS.mono` (one instance per camera type). -/
 class DiskG (GF : BundledGFunctors) where
   /-- the frozen configuration (`VirtioProto.v`'s `cfg`) -/
   [gvCfgG : GhostVarG GF VirtioCfg]
@@ -172,10 +174,6 @@ class DiskG (GF : BundledGFunctors) where
   [gvHeadG : GhostVarG GF HState]
   /-- the staged head, between the ring store and the `avail->idx` bump -/
   [gvStageG : GhostVarG GF (Option Nat)]
-  /-- the block image -/
-  [gmImgG : GhostMapG GF Nat (List (BitVec 8)) RegMapF]
-  /-- the completion counter -/
-  [mnG : MonoNatG GF]
   /-- the SERVE PERMITS (see `permTok`) -/
   [gmPermG : GhostMapG GF Nat
     (BitVec 16 × Chain × Option VPhase × Option (BitVec 16 × Bool)) RegMapF]
@@ -187,7 +185,7 @@ class DiskG (GF : BundledGFunctors) where
   the device's used-index writes -/
   [mlDoneG : MonoListG GF (Nat × Nat × Nat × Nat)]
 
-attribute [reducible, instance] DiskG.gvCfgG DiskG.gvHeadG DiskG.gvStageG DiskG.gmImgG DiskG.mnG
+attribute [reducible, instance] DiskG.gvCfgG DiskG.gvHeadG DiskG.gvStageG
 attribute [reducible, instance] DiskG.gmPermG
 attribute [reducible, instance] DiskG.mlPosG DiskG.mlDoneG
 

@@ -448,21 +448,21 @@ carry.  So the registry is a ghost map `id ↦ (epoch, block)` whose
 fragments are DISCARDED -- persistent for the same reason, agreeing with
 the authority the same way -- and `Xv6.loggedAt` is the existential over
 the id.  Duplicate rows for one `(e, b)` are harmless: the registry is
-only ever read for membership. -/
+only ever read for membership.
+
+The open transactions (`LogNames.tx`) and the batch epoch (`LogNames.ep`)
+use the SHARED cameras -- `Xv6G.gmUnitG` and `MachFixedGS.mono` -- one
+instance per camera type, as Rocq's `inG`; their names keep them apart. -/
 class LogG (GF : BundledGFunctors) where
   /-- the reservation ledger: op id ↦ (budget, logged set, birth epoch) -/
   [gmOps : GhostMapG GF Nat OpEntry RegMapF]
-  /-- the open transactions: transaction id ↦ () -/
-  [gmTx : GhostMapG GF Nat Unit RegMapF]
   /-- the append registry: row id ↦ (epoch, block) -/
   [gmLg : GhostMapG GF Nat (Nat × Nat) RegMapF]
-  /-- the batch epoch -/
-  [mnEp : MonoNatG GF]
 
-attribute [reducible, instance] LogG.gmOps LogG.gmTx LogG.gmLg LogG.mnEp
+attribute [reducible, instance] LogG.gmOps LogG.gmLg
 
 section
-variable {GF : BundledGFunctors} [LogG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [LogG GF]
 
 /-! ## The two client-side fragments
 
@@ -556,10 +556,10 @@ theorem logMintLogged (γ : LogNames) (X : RegMapF (Nat × Nat)) (nx e b : Nat)
 /-! ## The transactions -/
 
 /-- **THE TRANSACTION AUTHORITY, NAMED** (as `logRegAuth` and
-`logEpochAuth` are).  `LogG.gmTx` and `BcacheG.gmSlotG` are the same
-`GhostMapG GF Nat Unit RegMapF` type; a raw `γ.tx ↪●MAP T` elaborated where
-both are in scope picks whichever instance wins, so every statement about the
-transactions goes through this name, which pins `LogG.gmTx`. -/
+`logEpochAuth` are).  The camera is the ONE shared `Nat ↦ ()` ghost map
+(`Xv6G.gmUnitG`, which also carries the bcache slot tokens and the fd-slot
+tokens under their own names); the name keeps the log's statements readable
+and gives `TxPin` one spelling to refute against. -/
 def logTxAuth (γ : LogNames) (T : RegMapF Unit) : IProp GF := γ.tx ↪●MAP T
 
 instance logTxAuth_timeless (γ : LogNames) (T : RegMapF Unit) :

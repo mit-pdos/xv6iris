@@ -573,7 +573,7 @@ row).  The masks nest `↑iregN` INSIDE `↑icacheN` (brief §6). -/
 
 section Store
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
-  [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [SleepLockG GF]
+  [Xv6G GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [SleepLockG GF]
 
 /-- Rocq `iref_incr_store_pinw_au`: THE CACHE-HIT UP-COUNT, pinw-faced.  The
 frozen alternative dies on the caller's OFF selector; the region's count

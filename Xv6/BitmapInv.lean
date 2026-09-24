@@ -262,7 +262,7 @@ def bitmapGeomOk (cov : ExtTreeSet Nat compare) (logstart bmapstart size : Nat) 
   0 < size ∧ size ≤ BPB ∧ bmapstart ∈ cov ∧ logRegion logstart bmapstart = false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsBlocksG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsBlocksG GF]
 
 /-! ## A free block
 
@@ -665,7 +665,7 @@ structure BmAlloc where
   baPr : GName
 
 /-- Rocq's `bm_alloc_res`. -/
-def bmAllocRes {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsBlocksG GF]
+def bmAllocRes {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsBlocksG GF]
     [CurCtx] (γfs : FsNames) (cov : ExtTreeSet Nat compare) (logstart : Nat)
     (a : BmAlloc) : IProp GF :=
   iprop(⌜bitmapGeomOk cov logstart a.baBms a.baSize⌝ ∗

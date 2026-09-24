@@ -118,7 +118,7 @@ every Timeless instance (`*_timeless`).
    `GEN`, `appcfg`: none is used by any declaration in 3361--4081 (and
    the brief's §5 already records `bioslotG` as unused throughout), so
    they are not bound; the section binds `[MachGS] [IcacheG] [LogG]`
-   (`icPinTx` is `LogG.gmTx`) and the four fs classes of the leg, and Lean
+   (`icPinTx` is a `LogNames.tx` element) and the four fs classes of the leg, and Lean
    includes only those each declaration uses.
 7. **`icDepHeld_introHeld` keeps Rocq's unused premise** `icDepShr d =
    some (s, dev, inum, g, lo)` (its callers pass it; ProofIunlock), under
@@ -251,7 +251,7 @@ they are context-constant, which is what Rocq's `ic_hdr_morph` proves of
 them with `ctx_morph_const`. -/
 
 section IcacheBoxAmb
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [LogG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [LogG GF]
   [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
 
 /-- THE STITCH: the payload's GHOST side -- main's `icLoaded` minus its two

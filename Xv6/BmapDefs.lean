@@ -470,7 +470,7 @@ end
 
 /-- A view with `fsView`'s two fields IS `fsView` of its own geometry
 (a copy of `Xv6.bioView_eq_fsView`, BallocDefs). -/
-theorem bm_view_eq {GF : BundledGFunctors} [FsBlocksG GF] (V : BioView GF)
+theorem bm_view_eq {GF : BundledGFunctors} [Xv6G GF] [FsBlocksG GF] (V : BioView GF)
     (γfs : FsNames) (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs) :
     V = fsView γfs V.gd V.dev V.cov := by
   cases V

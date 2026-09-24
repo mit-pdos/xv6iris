@@ -3,9 +3,8 @@
 `bread`, `brelse`, `install_trans` (recovering arm) and `write_head`.
 
 **CLOSED WITH NO NAMED HYPOTHESIS.**  The former `LogTxAuthBridge` (a
-`GhostMapG` instance collision between `BcacheG.gmSlotG` and `LogG.gmTx`) is
-retired by naming the transaction authority in `Xv6/LogDefs.lean`
-(`Xv6.logTxAuth`).
+`GhostMapG` instance collision between the bcache's slot map and the log's
+transaction map) is retired: there is one shared camera, `Xv6G.gmUnitG`.
 
 The header block's clean tie -- the second hypothesis this file used to
 carry -- is GONE: the bio layer's payload hooks (`Xv6.bioLocked` /

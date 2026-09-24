@@ -267,7 +267,7 @@ end Mirror
 
 section Reg
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
-  [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
+  [Xv6G GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 /-- Rocq `ireg_icnt_acc`.  ONE `↑iregN` OPEN, the slot's `icnt` half in,
 the moved half out.  The shape is an accessor rather than an
@@ -554,7 +554,7 @@ end Reg
 
 section Park
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
-  [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
+  [Xv6G GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 /-- Rocq `frz_park_pre_reclaim` -- THE +0x82 RECLAIM (S1b, iclaim-ledger.md
 §3.16 / ZZProbeFrz P3).  The freezer re-takes the itable lock and peels

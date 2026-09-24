@@ -102,7 +102,7 @@ open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 set_option linter.unusedSectionVars false
 
 section IcacheCover
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [LogG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [LogG GF]
   [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
 
 /-- A window pin is a share of an open transaction: none at quiescence
@@ -121,7 +121,7 @@ def icEscN : Namespace := icBoxN
 theorem icEscrow_nsSub (k : Nat) : (↑(ndot icEscN k) : CoPset) ⊆ (↑icEscN : CoPset) :=
   nclose_subseteq icEscN k
 
-variable [Xv6G GF] [IcboxG GF]
+variable [IcboxG GF]
 
 /-- The escrow's invariant body: the box's own (Rocq's `ic_escrow_body`). -/
 def icEscrowBody [Icfg] [CurCtx] (cn : IcNames) (γfs : FsNames) (γi : GName)

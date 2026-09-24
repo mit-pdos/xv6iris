@@ -32,9 +32,8 @@ The vocabulary:
    "mono_natG is ambient from riscvGS"; it is also the instance
    `IcacheRefDefs.icfgAlloc` mints the `icfgIep` counters with.  The section
    binds `[MachGS hlc GF]` and no other `MonoNatG` source, so `committedA`'s
-   element is pinned to it at definition time (`LogG.mnEp` and
-   `DiskInvDefs`' `mnG` are other `MonoNatG` paths; a consumer with several
-   in scope must go through this name, never a raw `lb_own`).
+   element is pinned to it at definition time.  It is the ONLY `MonoNatG`
+   instance: the log's epoch and the disk's counters use it too.
 3. `ST_EMPTY` / `ST_FILLED` / `ST_REDEEMED` are `abbrev`s (Rocq
    `Notation`s).
 4. Rocq's curried `A -∗ B -∗ C` lemmas are stated `A ∗ B ⊢ C`, the port's

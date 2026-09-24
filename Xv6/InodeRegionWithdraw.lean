@@ -123,7 +123,7 @@ set_option linter.unusedSectionVars false
 /-- The slot accessor's key, re-read at the inum (Rocq's
 `iEval (rewrite Hkey) in "Hslot"`). -/
 theorem iregSlot_atKey {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF]
-    [IcacheG GF] [LogG GF] [FsBytesG GF] [FsTopG GF] [FsLinkG GF] [Icfg]
+    [IcacheG GF] [Xv6G GF] [LogG GF] [FsBytesG GF] [FsTopG GF] [FsLinkG GF] [Icfg]
     (γfs : FsNames) (γi : GName) (inum : BitVec 32) (d : Dinode) :
     iregSlot (GF := GF) γfs γi (16 * iregBi inum + islot inum) d ⊣⊢ iregSlot γfs γi inum.toNat d := by
   rw [iregSlotKey]
@@ -148,7 +148,7 @@ def iregWdLic [Icfg] (o : Ilkc) (g : GName) (z : Nat) : IProp GF :=
 end Lic
 
 section Back
-variable {GF : BundledGFunctors} [IcacheG GF] [LogG GF]
+variable {GF : BundledGFunctors} [IcacheG GF] [Xv6G GF] [LogG GF]
 
 /-- What comes BACK: the claim arm's pair CONVERTS into the plain unit, the
 plain unit is BORROWED and returned verbatim, and the one-shot is persistent
@@ -166,7 +166,7 @@ create's `claimK` fill -- the one site that can be in the window at all --
 splits the pair. -/
 def iregWdBack [Icfg] (o : Ilkc) (g : GName) (z : Nat) : IProp GF :=
   match o with
-  | .claimK _ t q => iprop(runitPlain z ∗ (icfgLog.tx ↪◯MAP[t]{DFrac.own q} ()))
+  | .claimK _ t q => iprop(runitPlain z ∗ txPin icfgLog t q)
   | .plainK => runitPlain z
   | .shotK ty => ityShot g ty
 
@@ -201,7 +201,7 @@ end Claimed
 
 section Withdraw
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
-  [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
+  [Xv6G GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 /-- THE THREE ARMS, DISCHARGED IN ONE STEP (§5'.3, RESHAPED BY RULING C';
 Rocq's inline `iAssert`, deviation 2).  `claimK` is the CONVERSION: the

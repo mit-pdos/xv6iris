@@ -45,10 +45,9 @@ CLIENT HALF -- its own deviation -- and `SpecInitlog`'s precondition hands
 out client halves only for the log's own region.)
 
 **THIS PROOF ASSUMES NOTHING BEYOND ITS CALLEES' CONTRACTS.**  The former
-`LogTxAuthBridge` hypothesis (a `GhostMapG` instance collision between
-`BcacheG.gmSlotG` and `LogG.gmTx`) is retired: `Xv6/LogDefs.lean` names the
-transaction authority (`Xv6.logTxAuth`) and `logFreeTok`, `logResAt` and
-every log proof go through that name.
+`LogTxAuthBridge` hypothesis (a `GhostMapG` instance collision between the
+bcache's slot map and the log's transaction map) is retired: both now use
+the one shared camera `Xv6G.gmUnitG`, told apart by ghost name.
 -/
 import Xv6.SpecInitlog
 import Xv6.LogBoot

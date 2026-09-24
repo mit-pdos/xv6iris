@@ -45,8 +45,8 @@ parts 3--6 are `IcacheEscrowPool` (2105--3360), `IcacheBoxAmb`
    (pure conclusion); `inodeOwnedEra_local` in Lean consumes it.
 5. **Section binders**: each declaration takes only the camera classes it
    names (`Xv6/IcacheEscrowTok.lean` deviation 8).  The pin section takes
-   `[IcacheG GF] [LogG GF]` (Rocq: `hpn` is an `icacheG` member, `ln_tx` is
-   `LogG.gmTx`).
+   `[IcacheG GF] [Xv6G GF] [LogG GF]` (Rocq: `hpn` is an `icacheG` member;
+   `ln_tx` lives on the shared `Xv6G.gmUnitG` camera).
 
 ## Dropped/simplified vs Rocq
 
@@ -196,7 +196,7 @@ for that map is EMPTY -- neither window can be standing.  NO NAMED LEMMA:
 the consumers open the pin's existential and call `txPin_noOps`. -/
 
 section Pin
-variable {GF : BundledGFunctors} [IcacheG GF] [LogG GF]
+variable {GF : BundledGFunctors} [IcacheG GF] [Xv6G GF] [LogG GF]
 
 /-- The slot is in NEITHER of iput's two windows (Rocq's `ic_pin_rest`). -/
 def icPinRest [Icfg] (k : Nat) : IProp GF := hpnFull k none
@@ -273,7 +273,7 @@ def icDepSideTx (d : IcDep) : Option (Nat × Qp) :=
   | _ => none
 
 section Side
-variable {GF : BundledGFunctors} [LogG GF]
+variable {GF : BundledGFunctors} [Xv6G GF] [LogG GF]
 
 /-- Rocq's `ic_dep_side`. -/
 def icDepSide [Icfg] (d : IcDep) : IProp GF := txPinO icfgLog (icDepSideTx d)
