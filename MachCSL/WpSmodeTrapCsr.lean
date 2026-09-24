@@ -33,6 +33,13 @@ variable {lent : Bool}
 @[sail_facts] theorem csr_name_map_forwards_sepc : csr_name_map_forwards 0x141#12 = pure "sepc" := rfl
 @[sail_facts] theorem csr_name_map_forwards_scause : csr_name_map_forwards 0x142#12 = pure "scause" := rfl
 
+-- the `read_CSR` / `write_CSR` arms, so the executor never unfolds the
+-- model's whole match (the unfolded body costs the kernel ~5 s per proof)
+@[sail_facts] theorem read_CSR_sepc : read_CSR 0x141#12 = get_xepc Privilege.Supervisor := rfl
+@[sail_facts] theorem read_CSR_scause : read_CSR 0x142#12 = readReg Register.scause := rfl
+@[sail_facts] theorem write_CSR_sepc (v : BitVec 64) : write_CSR 0x141#12 v =
+    (do let r ← set_xepc Privilege.Supervisor v; pure (.Ok r)) := rfl
+
 /-- Clearing bit 0 of an even value is the identity. -/
 theorem and_lsb0_of_even (pc : BitVec 64) (h : pc.toNat % 2 = 0) : pc &&& 0xFFFFFFFFFFFFFFFE#64 = pc := by
   have h0 : pc.getLsbD 0 = false := (lsb0_iff_even pc).2 h
