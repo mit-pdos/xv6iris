@@ -1085,6 +1085,7 @@ theorem vdrw_loop (FD : FREE_DESC) (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : REL
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdrwK_sie (k.withSpie a b)]
   iintro Hk Hpc
   -- turn 0
+  k_norm
   iapply (vdrw_iter c (vdrwK (k.withSpie a b)) γ pd pav pu (vdrwK_sie _) (fun _ => false) 0
       (by omega) (k.regs 2#5 + 0xFFFFFFFFFFFFFFA0#64) x0 _ ?q9 ?q12 ?q18 ?q20 ?q21 ?q24)
     $$ [- $Hk $Hpc $Hpay $Hi0]

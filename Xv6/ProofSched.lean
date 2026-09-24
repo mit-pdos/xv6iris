@@ -858,6 +858,7 @@ theorem sched_proof (SW : SWTCH) (MP : MYPROC) (HO : HOLDING) : SCHED :=
       · exact f25
       · exact f26
       · exact f27
+    k_norm_g [hproc]
     ihave HΦ' := wpNext_at true (procAddr j) cpu h
       (fun cpu' => iprop(∀ (R' : RegMap) (spie spp : Bool) (ch' : BitVec 64),
         ⌜calleeSaved k.regs R'⌝ -∗

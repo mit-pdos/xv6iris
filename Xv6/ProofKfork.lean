@@ -2858,6 +2858,7 @@ theorem kfork_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCPROC)
             isplitl []
             · iexact Hwl
             unfold kfOfileΨ
+            k_norm_g [hVcb.2.2.2]
             iframe F0 F1 F2 Fs2 Fs3 Fs4 F6 F7 Htc Hclaim Hres Hclient Hpid_p Hks_p Hsz_p Hpg_p Htf_p Hcwd_p Hname_p HPt_p HTf_p Hpid_c Hks_c Hsz_c Hpg_c Htf_c Hctx_c Hcwd_c Hname_c HPtn' HTf_c Hcstack Hheld Hhart Hused
           iapply (kf_ofile_copy FsEnv.filedup Γ j i 1 (by omega) ["proc"]
             (k.regs 2#5 + 0xFFFFFFFFFFFFFFC0#64) kf.avail k.root k.regs V.ofile hlenofp cpu

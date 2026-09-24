@@ -1199,6 +1199,7 @@ theorem lw_append (BP : BPIN) (c : CPU) (k : KCtx) (a b : Bool) (R : RegMap) (kk
   k_step (wp_s_j c _ (KA.«log_write» + 0x7a#64) true 52#21)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
+  k_norm
   iapply HC $$ %_ [] Hk Hpc Hdevc Hbnoc Hn Hbr
   ipureintro
   repeat refine lw_cs_set _ _ ?_ _ _ (by decide)

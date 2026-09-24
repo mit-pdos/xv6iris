@@ -207,6 +207,7 @@ theorem swtch_loads [CurCtx] (cpu : CPU) (k : KCtx)
   k_step (wp_s_ret cpu _ (KA.«swtch» + 0x68#64) true 1#5)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.setReg_eq, KCtx.withAvail_sie, KCtx.withAvail_proc]
   iintro Hk Hpc
+  k_norm
   iapply HΦ $$ %_ [] Hk Hpc [C0 C1 C2 C3 C4 C5 C6 C7 C8 C9 C10 C11 C12 C13] Hold
   · ipureintro
     simp only [calleeImg, RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]

@@ -166,6 +166,7 @@ theorem yield_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : Y
       unfold procLockPay; iintro H; iexact H) $$ HR
   icases procLockRes_elim Γ ξ0 (procAddr j) $$ HR with
     ⟨%st, %ch, Hstate, Hpsl, Hchan, ⟨%kl, %xs, %pid, Hrest⟩, Hslots⟩
+  k_norm_g [hproc]
   ihave Hcl := (show cpuClaim (hlc := hlc) (GF := GF) cpu (procAddr j) ⊢
       pstateHlf Γ j RUNNING ∗ hartHlf Γ j cpu from by
       rw [cpuClaim_eq Γ]; exact procClaim_elim Γ cpu j hj) $$ Hclaim

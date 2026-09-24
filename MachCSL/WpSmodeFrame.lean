@@ -111,12 +111,70 @@ macro_rules
   | `(tactic| k_norm [$extra:term,*]) => `(tactic| k_norm_g [hsie, $extra,*])
   | `(tactic| k_norm [$extra:term,*] at $h:ident) => `(tactic| k_norm_g [hsie, $extra,*] at $h:ident)
 
+
+/-! ### Cheaper steps for `k_step`
+
+`inext` and `k_norm` both walk the whole proof-mode context: `inext` runs an
+instance search per hypothesis to strip laters, `k_norm` simplifies every
+hypothesis along with the goal.  In a `k_step` only the goal needs either. -/
+
+theorem entails'_later_intro {PROP : Type _} [BI PROP] {e Q : PROP} (h : Entails' e Q) :
+    Entails' e iprop(▷ Q) :=
+  (show e ⊢ Q from h).trans later_intro
+
+/-- Whether `e` mentions a later modality anywhere. -/
+def hasLater (e : Lean.Expr) : Bool :=
+  (e.find? fun t => t.isConstOf ``Iris.BI.BIBase.later || t.isConstOf ``Iris.BI.BIBase.laterN).isSome
+
+open Lean Elab Tactic Meta in
+/-- `inext` for a goal `▷ Q` whose context holds no later: drop the goal's
+`▷` by `later_intro`, without visiting the hypotheses (which `inext` would
+leave unchanged anyway).  Otherwise, `inext`. -/
+elab "inext_goal" : tactic => do
+  let tgt ← instantiateMVars (← getMainTarget)
+  if tgt.isAppOfArity ``Iris.ProofMode.Entails' 4 then
+    let e := tgt.getArg! 2
+    let q := tgt.getArg! 3
+    if q.isAppOfArity ``Iris.BI.BIBase.later 3 && !hasLater e then
+      evalTactic (← `(tactic| refine MachCSL.entails'_later_intro ?_))
+      return
+  evalTactic (← `(tactic| inext))
+
+open Lean Elab Tactic Meta in
+/-- `k_norm_g [extra]` on the goal's conclusion only: the hypotheses of the
+proof-mode context are not traversed.  Does nothing when nothing changes. -/
+elab "k_norm_goal" " [" extra:term,* "]" : tactic => withMainContext do
+  let goal ← getMainGoal
+  let tgt ← instantiateMVars (← goal.getType)
+  unless tgt.isAppOfArity ``Iris.ProofMode.Entails' 4 do
+    evalTactic (← `(tactic| k_norm_g [$extra,*])); return
+  let lems ← extra.getElems.mapM fun l => `(Lean.Parser.Tactic.simpLemma| $l:term)
+  let stx ← `(tactic| simp only [k_norm_simps, k_addr, $lems,*])
+  let { ctx, simprocs, .. } ← mkSimpContext stx (eraseLocal := false)
+  let q := tgt.getArg! 3
+  let (r, _) ← Lean.Meta.simp q ctx simprocs
+  if r.expr == q then return
+  let withConcl (x : Lean.Expr) := mkAppN tgt.getAppFn (tgt.getAppArgs.set! 3 x)
+  let tgt' := withConcl r.expr
+  match r.proof? with
+  | none => replaceMainGoal [← goal.replaceTargetDefEq tgt']
+  | some h =>
+    let motive ← withLocalDecl `x .default (← inferType q) fun x =>
+      mkLambdaFVars #[x] (withConcl x)
+    replaceMainGoal [← goal.replaceTargetEq tgt' (← mkCongrArg motive h)]
+
 /-- One instruction: apply its rule (written with `?hs` for the
 interrupt fact) with the pattern `[- $Hk $Hpc]` (frame the
 context, clock and pc, carry the rest); normalise (optionally with extra
 lemmas), frame the rest, strip the later, land on this hart (interrupts
 off).  Side goals other than `hs` (RAM range, alignment) are
-left for the caller, after the main goal. -/
+left for the caller, after the main goal.
+
+Only the goal is normalised (`k_norm_goal`), and the later is stripped
+from the goal alone (`inext_goal`); the whole context is normalised only
+when the goal-only frame leaves the later unexposed.  So a hypothesis the
+step does not frame is NOT rewritten by the step's extra lemmas: a proof
+that later needs it in normal form runs `k_norm [..]` itself. -/
 syntax "k_step" term:max " $$ " specPat : tactic
 syntax "k_step" term:max " $$ " specPat " with " "[" term,* "]" : tactic
 syntax "k_step" term:max " from " term:max ident " $$ " specPat : tactic
@@ -129,10 +187,11 @@ macro_rules
     `(tactic| (iapply $rule:term $$ $pat:specPat
                rotate_right 1
                iframe #
-               k_norm [$extra,*]
+               k_norm_goal [hsie, $extra,*]
                iframe
-               inext
-               k_norm [$extra,*]
+               first
+                 | inext_goal
+                 | (k_norm [$extra,*]; iframe; inext_goal)
                iapply wpNext_off_intro
                try (case hs => k_norm)))
 
@@ -159,10 +218,11 @@ macro_rules
                rotate_right 1
                k_code $code:term $ht:ident
                iframe #
-               k_norm [$extra,*]
+               k_norm_goal [hsie, $extra,*]
                iframe
-               inext
-               k_norm [$extra,*]
+               first
+                 | inext_goal
+                 | (k_norm [$extra,*]; iframe; inext_goal)
                iapply wpNext_off_intro
                try (case hs => k_norm)))
 
@@ -199,9 +259,11 @@ macro_rules
     `(tactic| (iapply $rule:term $$ $pat:specPat
                rotate_right 1
                iframe #
-               k_norm_g [$extra,*]
+               k_norm_goal [$extra,*]
                iframe
-               inext
+               first
+                 | inext_goal
+                 | (k_norm_g [$extra,*]; iframe; inext_goal)
                iapply wpNext_intro_pin
                iintro %$c %$hp
                k_norm_g [$extra,*]
@@ -213,9 +275,11 @@ macro_rules
                rotate_right 1
                k_code $code:term $ht:ident
                iframe #
-               k_norm_g [$extra,*]
+               k_norm_goal [$extra,*]
                iframe
-               inext
+               first
+                 | inext_goal
+                 | (k_norm_g [$extra,*]; iframe; inext_goal)
                iapply wpNext_intro_pin
                iintro %$c %$hp
                k_norm_g [$extra,*]

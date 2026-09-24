@@ -1086,6 +1086,7 @@ theorem ss_entry (AC : ACQUIRE) (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc :
     iintro Hk Hpc Hout
     isimp only [← wordAtN_cur] at Hout
     isimp only [← wordAtN_cur] at Hcmt
+    k_norm
     ihave Hpay := Hclose $$ Hout Hcmt Hnc
     by_cases hbz : bcond bop.BGE 0#64 (BitVec.signExtend 64 (BitVec.ofNat 32 out)) = true
     · -- ==== the FAST arm: nothing to wait for ====
@@ -1132,6 +1133,7 @@ theorem ss_entry (AC : ACQUIRE) (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc :
     iintro Hk Hpc
     isimp only [← wordAtN_cur] at Hout
     isimp only [← wordAtN_cur] at Hcmt
+    k_norm
     ihave Hpay := Hclose $$ Hout Hcmt Hnc
     iapply (ss_setup Γ cpu k γ γb γfs cov ls dev pidv dqp _ hK hsie ?hRs2) $$ [- $Hk $Hpc]
     rotate_right 1

@@ -241,6 +241,7 @@ theorem printk_restore {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Cu
     (k.regs 26#5) (k.regs 27#5) v21 ap v23
     $$ [V0 V1 V2 V3 V4 V5 V6 C7 C8 C9 C10 C11 C12 C13 C14 C15 C16 C17 C18 C19 C20 C21 C22 C23]
   case' _ => iframe
+  k_norm_g [hR2]
   iapply HΦ $$ %_ Hk Hpc Hexit
   ipureintro
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, _root_.and_true]
@@ -1565,6 +1566,7 @@ theorem printk_hex_iter (PP : PRPUTC) {hlc : HasLC} {GF : BundledGFunctors} [Mac
   k_step (wp_s_branch cpu _ (KA.«printk» + 0x1e6#64) false 8174#13 20#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc] with [pk_sx_ofNat n (by omega), bcond_bne_ofNat n (by omega), ite_decide_ne]
   iintro Hk Hpc
+  k_norm_g [hR25]
   iapply HΦ $$ %_ %cs2 Hk Hpc Hsent
   ipureintro
   refine ⟨?_, ?_, ?_, ?_⟩

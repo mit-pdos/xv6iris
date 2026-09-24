@@ -453,6 +453,7 @@ theorem pi_body (cpu : CPU) (kb : KCtx) (hsie : kb.sie = false) (buf dg base : B
   k_step (wp_s_addi cpu _ (KA.«printint» + 0x3e#64) true 1#12 13#5 13#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [h13, pi_succ' buf i]
   iintro Hk Hpc
+  k_norm
   iapply HΦ $$ %_ Hk Hpc Hbuf Hdig
   ipureintro
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
