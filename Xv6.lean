@@ -571,3 +571,4 @@ import Xv6.OffBox
 import Xv6.InodeRegionLink
 import Xv6.FsStateEraResB
 import Xv6.IcacheEscrowTok
+import Xv6.IcacheHeld
