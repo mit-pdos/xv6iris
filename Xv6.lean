@@ -593,3 +593,6 @@ import Xv6.SpecNamecmp
 import Xv6.ProofNamecmp
 import Xv6.LinkNamecmp
 import Xv6.IcachePinwLw
+import Xv6.SpecStati
+import Xv6.ProofStati
+import Xv6.LinkStati
