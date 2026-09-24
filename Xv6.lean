@@ -636,3 +636,13 @@ import Xv6.IgetHit
 import Xv6.IgetScan
 import Xv6.ProofIget
 import Xv6.LinkIget
+import Xv6.SpecBalloc
+import Xv6.BallocParts
+import Xv6.BallocDefs
+import Xv6.BallocTail
+import Xv6.BallocBzero
+import Xv6.BallocAlloc
+import Xv6.BallocScan
+import Xv6.BallocMain
+import Xv6.ProofBalloc
+import Xv6.LinkBalloc
