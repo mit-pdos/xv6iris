@@ -607,3 +607,6 @@ import Xv6.BfreeTail
 import Xv6.BfreeMid
 import Xv6.ProofBfree
 import Xv6.LinkBfree
+import Xv6.SpecIunlock
+import Xv6.ProofIunlock
+import Xv6.LinkIunlock
