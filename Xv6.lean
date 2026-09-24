@@ -507,3 +507,16 @@ import Xv6.LinkLogWrite
 import Xv6.EndOpDefs
 import Xv6.ProofEndOp
 import Xv6.LinkEndOp
+import Xv6.ArrCursor
+import Xv6.ByteCursor
+import Xv6.ByteBuf
+import Xv6.FsGeom
+import Xv6.BlockWords
+import Xv6.BlkmapDefs
+import Xv6.InodeDefs
+import Xv6.DinodeEnc
+import Xv6.BitmapEnc
+import Xv6.CstringInv
+import Xv6.DirentEnc
+import Xv6.PathElems
+import Xv6.ArgPath
