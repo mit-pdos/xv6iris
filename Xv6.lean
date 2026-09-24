@@ -585,3 +585,5 @@ import Xv6.IcacheEscrowPoolMove
 import Xv6.IcacheInvStore
 import Xv6.EscrowDeposit
 import Xv6.IcacheBootRegion
+import Xv6.IcacheBox
+import Xv6.IcacheBoxSites
