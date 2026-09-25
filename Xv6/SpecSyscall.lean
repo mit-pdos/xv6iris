@@ -68,7 +68,11 @@ fallback (+0x40..+0x56) and the shared epilogue (+0x58..+0x62).
    `γs !! j = Some γl` and `fcn_pid fn = pid` premises have nothing to name
    (no `fclose_names`; `Γ` is total).
 4. **`SyscRows` is one record** of Rocq's eighteen separate pure premises of
-   the post (same content, same order; the arms build it once).  sbrk's
+   the post (same content, same order; the arms build it once), plus one
+   Lean-only row `ks` (the kernel stack pointer is unmoved: Rocq reads it
+   off the persistent `is_kstack`, which Lean's block does not carry;
+   usertrap's residue needs it -- every arm builds `V'` by record update or
+   reads it off its callee's post).  sbrk's
    answer is stated as `UsysMemOk.usysSbrkRet` (Rocq spells its body out;
    `r = pv_sz` is `r = BitVec.ofNat 64 sz.toNat`).  read's answer is
    `syscReadRet` (Rocq `UsysMemOk.usys_read_ret`, not in the landed Lean
@@ -263,6 +267,10 @@ structure SyscRows (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' : ProcPriv)
   read : syscNum V ≠ USYS_read ∨ syscReadRet V.tf (syscA0 V')
   /-- getpid's answer -/
   pid : syscRetPid V (syscA0 V') pid
+  /-- THE KERNEL STACK CANNOT MOVE (deviation 4: Lean-only row, after
+  Rocq's eighteen -- usertrap's residue needs it, Rocq's `is_kstack` is
+  persistent) -/
+  ks : V'.kstack = V.kstack
 
 /-! ## §2 The deposit channels (Rocq `Section SyscExec`, deviation 2) -/
 

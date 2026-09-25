@@ -86,6 +86,7 @@ theorem syscPath_rows (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts sts' : L
     (hl : V.tf.length = 36) (hext : V.upt.extSz V.sz P')
     (hup : V1.upt = P') (htf : V1.tf = V.tf) (hsz : V1.sz = V.sz) (hlz : V1.pvLazy = V.pvLazy)
     (hfdg : V1.fdg = V.fdg) (hchg : V1.chg = V.chg) (hgen : V1.gen = V.gen)
+    (hks : V1.kstack = V.kstack)
     (hcwi : (n = USYS_chdir ∧ r.toNat = 0) ∨ V1.cwi = V.cwi)
     (hfd : syscFdOk V r sts sts') :
     SyscRows V M (syscStore V1 r) (viewFaulted V.upt P' M) sts sts' cs cs pid := by
@@ -95,7 +96,7 @@ theorem syscPath_rows (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts sts' : L
   refine ⟨?_, ?_, ?_, syscChOk_refl V cs, hn 2 h2, Or.inr ⟨r, ?_⟩,
     Or.inr (Or.inr ?_), Or.inr (Or.inr ?_), Or.inr (Or.inr ?_), ?_, hfdg, hchg, hgen,
     ?_, Or.inl (hn 12 h12), Or.inl (hn 1 h1), Or.inl (hn 5 h5),
-    syscRetPid_ne _ _ _ n hnum h11⟩
+    syscRetPid_ne _ _ _ n hnum h11, hks⟩
   · unfold syscMemOk
     rw [if_neg (hn USYS_exec h7), if_neg (hn USYS_sbrk h12), if_neg (hn USYS_wait h3),
       if_neg (hn USYS_pipe h4), if_neg (hn USYS_read h5), if_neg (hn USYS_fstat h8)]
@@ -329,17 +330,17 @@ theorem syscall_arm_chdir (SC : SYSCHDIR) (hdep : SyscDepChdir (hlc := hlc) (GF 
   have hpins2 := syscPins_calleeSaved k R R2 hpins hcs
   -- the block the arms returned: `{V with upt := P'}`, its cwd moved on success
   have hV1 : V1.upt = P' ∧ V1.tf = V.tf ∧ V1.sz = V.sz ∧ V1.pvLazy = V.pvLazy ∧ V1.fdg = V.fdg ∧
-      V1.chg = V.chg ∧ V1.gen = V.gen ∧
+      V1.chg = V.chg ∧ V1.gen = V.gen ∧ V1.kstack = V.kstack ∧
       ((USYS_chdir = USYS_chdir ∧ (R2 10#5).toNat = 0) ∨ V1.cwi = V.cwi) := by
     rcases hdisj with ⟨-, rfl⟩ | ⟨hr, ipv, i, rfl⟩
-    · exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, Or.inr rfl⟩
-    · exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, Or.inl ⟨rfl, by rw [hr]; rfl⟩⟩
-  obtain ⟨hup, htf, hsz, hlz, hfdg, hchg, hgen, hcwi⟩ := hV1
+    · exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, Or.inr rfl⟩
+    · exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, Or.inl ⟨rfl, by rw [hr]; rfl⟩⟩
+  obtain ⟨hup, htf, hsz, hlz, hfdg, hchg, hgen, hks, hcwi⟩ := hV1
   have hs2' : R2 18#5 = pageAddr V1.upt.tfp := by
     rw [hcs.2.2.2.1.trans hs2, hup, hext.1.2.1]
   have hrows := syscPath_rows V M sts sts cs pid P' V1 (R2 10#5) 9 hn9 (by decide) (by decide)
     (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) hl hext hup
-    htf hsz hlz hfdg hchg hgen
+    htf hsz hlz hfdg hchg hgen hks
     (by rcases hcwi with h | h; exact Or.inl ⟨rfl, h.2⟩; exact Or.inr h)
     (syscFdOk_refl_at V _ sts 9 hn9 (by decide) (by decide) (by decide) (by decide))
   have ha0 := syscPath_a0 V V1 (R2 10#5) hl htf
@@ -421,7 +422,7 @@ theorem syscall_arm_unlink (SU : SYSUNLINK) (hdep : SyscDepUnlink (hlc := hlc) (
     rw [hcs.2.2.2.1.trans hs2]; exact congrArg pageAddr hext.1.2.1.symm
   have hrows := syscPath_rows V M sts sts cs pid P' { V with upt := P' } (R2 10#5) 18 hn
     (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
-    (by decide) hl hext rfl rfl rfl rfl rfl rfl rfl (Or.inr rfl)
+    (by decide) hl hext rfl rfl rfl rfl rfl rfl rfl rfl (Or.inr rfl)
     (syscFdOk_refl_at V _ sts 18 hn (by decide) (by decide) (by decide) (by decide))
   have ha0 := syscPath_a0 V { V with upt := P' } (R2 10#5) hl rfl
   unfold syscallRet syscallAddr at *
@@ -499,7 +500,7 @@ theorem syscall_arm_link (SL : SYSLINK) (hdep : SyscDepLink (hlc := hlc) (GF := 
     rw [hcs.2.2.2.1.trans hs2]; exact congrArg pageAddr hext.1.2.1.symm
   have hrows := syscPath_rows V M sts sts cs pid P' { V with upt := P' } (R2 10#5) 19 hn
     (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
-    (by decide) hl hext rfl rfl rfl rfl rfl rfl rfl (Or.inr rfl)
+    (by decide) hl hext rfl rfl rfl rfl rfl rfl rfl rfl (Or.inr rfl)
     (syscFdOk_refl_at V _ sts 19 hn (by decide) (by decide) (by decide) (by decide))
   have ha0 := syscPath_a0 V { V with upt := P' } (R2 10#5) hl rfl
   unfold syscallRet syscallAddr at *
@@ -573,7 +574,7 @@ theorem syscall_arm_mkdir (SM : SYSMKDIR) (hdep : SyscDepMkdir (hlc := hlc) (GF 
     rw [hcs.2.2.2.1.trans hs2]; exact congrArg pageAddr hext.1.2.1.symm
   have hrows := syscPath_rows V M sts sts cs pid P' { V with upt := P' } (R2 10#5) 20 hn
     (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
-    (by decide) hl hext rfl rfl rfl rfl rfl rfl rfl (Or.inr rfl)
+    (by decide) hl hext rfl rfl rfl rfl rfl rfl rfl rfl (Or.inr rfl)
     (syscFdOk_refl_at V _ sts 20 hn (by decide) (by decide) (by decide) (by decide))
   have ha0 := syscPath_a0 V { V with upt := P' } (R2 10#5) hl rfl
   unfold syscallRet syscallAddr at *
@@ -652,7 +653,7 @@ theorem syscall_arm_mknod (SN : SYSMKNOD) (hdep : SyscDepMknod (hlc := hlc) (GF 
     rw [hcs.2.2.2.1.trans hs2]; exact congrArg pageAddr hext.1.2.1.symm
   have hrows := syscPath_rows V M sts sts cs pid P' { V with upt := P' } (R2 10#5) 17 hn
     (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
-    (by decide) hl hext rfl rfl rfl rfl rfl rfl rfl (Or.inr rfl)
+    (by decide) hl hext rfl rfl rfl rfl rfl rfl rfl rfl (Or.inr rfl)
     (syscFdOk_refl_at V _ sts 17 hn (by decide) (by decide) (by decide) (by decide))
   have ha0 := syscPath_a0 V { V with upt := P' } (R2 10#5) hl rfl
   unfold syscallRet syscallAddr at *
@@ -807,11 +808,11 @@ theorem syscall_arm_open (SO : SYSOPEN) (hdep : SyscDepOpen (hlc := hlc) (GF := 
   · iframe
   -- the block the split returned: `{V with upt := P'}`, one descriptor cell written on success
   have hV1 : V1.upt = P' ∧ V1.tf = V.tf ∧ V1.sz = V.sz ∧ V1.pvLazy = V.pvLazy ∧ V1.fdg = V.fdg ∧
-      V1.chg = V.chg ∧ V1.gen = V.gen ∧ V1.cwi = V.cwi := by
+      V1.chg = V.chg ∧ V1.gen = V.gen ∧ V1.kstack = V.kstack ∧ V1.cwi = V.cwi := by
     rcases hrow with ⟨-, rfl, -⟩ | ⟨fd, l, kk, rb, wb, t, -, -, rfl, -⟩
-    · exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
-    · exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
-  obtain ⟨hup, htf, hsz, hlz, hfdg, hchg, hgen, hcwi⟩ := hV1
+    · exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
+    · exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
+  obtain ⟨hup, htf, hsz, hlz, hfdg, hchg, hgen, hks, hcwi⟩ := hV1
   icases syscPath_ofileAgreeKeep γ (procAddr j) pid V1 (viewFaulted V.upt P' M) V.fdg hfdg sts' $$
     [Hpriv Hfr] with ⟨%hag, Hpriv, Hfr⟩
   · iframe
@@ -827,7 +828,7 @@ theorem syscall_arm_open (SO : SYSOPEN) (hdep : SyscDepOpen (hlc := hlc) (GF := 
     rw [hcs.2.2.2.1.trans hs2, hup, hext.1.2.1]
   have hrows := syscPath_rows V M sts sts' cs pid P' V1 (R2 10#5) 15 hn
     (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
-    (by decide) hl hext hup htf hsz hlz hfdg hchg hgen (Or.inr hcwi) hfdrow
+    (by decide) hl hext hup htf hsz hlz hfdg hchg hgen hks (Or.inr hcwi) hfdrow
   have ha0 := syscPath_a0 V V1 (R2 10#5) hl htf
   unfold syscallRet syscallAddr at *
   iapply (syscall_ret_tail PT Γ c0 c k spie2 spp2 R2 γ j pid V M sts gn cs ip f V1

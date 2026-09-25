@@ -91,14 +91,15 @@ def SyscDepExec : Prop :=
 theorem syscExec_kexecOk_facts (V V' : ProcPriv) (r entry spv szv' : BitVec 64) (na : Nat)
     (alen : Nat → Nat) (hne : r ≠ 0xFFFFFFFFFFFFFFFF#64) (hok : kexecOk V V' r entry spv szv' na alen) :
     r = BitVec.ofNat 64 na ∧ V'.upt.tfp = V.upt.tfp ∧ V'.fdg = V.fdg ∧ V'.cwi = V.cwi ∧
-      V'.gen = V.gen ∧ V'.chg = V.chg := by
-  rcases hok with ⟨hr, -⟩ | ⟨hr, -, -, -, -, htfp, -, -, hfdg, -, hcwi, hgen, hchg, -⟩
+      V'.gen = V.gen ∧ V'.chg = V.chg ∧ V'.kstack = V.kstack := by
+  rcases hok with ⟨hr, -⟩ | ⟨hr, -, -, -, -, htfp, -, -, hfdg, -, hcwi, hgen, hchg, -, -, -, -, hks, -⟩
   · exact absurd hr hne
-  · exact ⟨hr, htfp, hfdg, hcwi, hgen, hchg⟩
+  · exact ⟨hr, htfp, hfdg, hcwi, hgen, hchg, hks⟩
 
-/-- The five record facts the shared tail needs of the returned block. -/
+/-- The six record facts the shared tail needs of the returned block. -/
 def SyscExecKeep (V V' : ProcPriv) : Prop :=
-  V'.upt.tfp = V.upt.tfp ∧ V'.fdg = V.fdg ∧ V'.chg = V.chg ∧ V'.gen = V.gen ∧ V'.cwi = V.cwi
+  V'.upt.tfp = V.upt.tfp ∧ V'.fdg = V.fdg ∧ V'.chg = V.chg ∧ V'.gen = V.gen ∧ V'.cwi = V.cwi ∧
+    V'.kstack = V.kstack
 
 /-- A successful exec's slot is at the record after the a0 store (Rocq
 `exec_key`'s shape). -/
@@ -133,7 +134,7 @@ theorem syscExec_arms_read (f : UexecSG.sfam GF) (V : ProcPriv) (M : Nat → Lis
     subst hV hM hr
     ihave Hrf := sysExecPostFail_refund (hlc := hlc) _ _ _ _ _ _ _ _ _ _ _ _ _ _ $$ Hfail
     isplitr
-    · ipureintro; exact ⟨htfp0, rfl, rfl, rfl, rfl⟩
+    · ipureintro; exact ⟨htfp0, rfl, rfl, rfl, rfl, rfl⟩
     isplitr
     · unfold syscExecOut
       iintro %_
@@ -160,10 +161,10 @@ theorem syscExec_arms_read (f : UexecSG.sfam GF) (V : ProcPriv) (M : Nat → Lis
         ipureintro; exact ⟨hne, hk⟩
     icases Hs with ⟨%entry, %spv, %szv', %hk, Hslot⟩
     obtain ⟨hne, hok⟩ := hk
-    obtain ⟨hr, htfp, hfdg, hcwi, hgen, hchg⟩ :=
+    obtain ⟨hr, htfp, hfdg, hcwi, hgen, hchg, hks⟩ :=
       syscExec_kexecOk_facts _ V' r entry spv szv' na alen hne hok
     isplitr
-    · ipureintro; exact ⟨htfp.trans htfp0, hfdg, hchg, hgen, hcwi⟩
+    · ipureintro; exact ⟨htfp.trans htfp0, hfdg, hchg, hgen, hcwi, hks⟩
     isplitl [Hslot]
     · unfold syscExecOut
       iintro %_
@@ -194,12 +195,12 @@ theorem syscRows_exec (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' : ProcPri
     (r : BitVec 64) (hn : syscNum V = USYS_exec) (hk : SyscExecKeep V V') :
     SyscRows V M (syscStore V' r) M' sts sts cs cs pid := by
   have hne : ∀ m : Int, (7 : Int) ≠ m → syscNum V ≠ m := fun m h => by rw [hn]; exact h
-  obtain ⟨htfp, hfdg, hchg, hgen, hcwi⟩ := hk
+  obtain ⟨htfp, hfdg, hchg, hgen, hcwi, hks⟩ := hk
   exact ⟨syscMemOk_exec V _ _ _ hn, syscFdOk_refl_at V _ sts 7 hn (by decide) (by decide) (by decide)
       (by decide), syscPipeOk_quiet V _ _ _ sts sts (hne 4 (by decide)), syscChOk_refl V cs,
     hne 2 (by decide), Or.inl hn, Or.inl hn, Or.inl hn, Or.inl hn, htfp, hfdg, hchg, hgen,
     Or.inr hcwi, Or.inl (hne 12 (by decide)), Or.inl (hne 1 (by decide)), Or.inl (hne 5 (by decide)),
-    syscRetPid_ne _ _ _ 7 hn (by decide)⟩
+    syscRetPid_ne _ _ _ 7 hn (by decide), hks⟩
 
 /-- The trapframe's word `i < 36` is its `tfW` reading. -/
 theorem syscTf_get (tf : List (BitVec 64)) (hl : tf.length = 36) (i : Nat) (hi : i < 36) :

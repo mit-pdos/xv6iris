@@ -1175,7 +1175,6 @@ import Xv6.UsertrapParts
 import Xv6.UsertrapSys
 import Xv6.UsertrapSysLive
 import Xv6.UsertrapSysRows
-import Xv6.UsertrapSysSpec
 import Xv6.UsertrapSysTail
 import Xv6.UsertrapTail
 import Xv6.UsertrapTailA6

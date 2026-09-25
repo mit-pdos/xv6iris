@@ -4,14 +4,14 @@
 
     entry  (UsertrapEntry)     +0x00 .. +0x2e, opened by UsertrapOpen
     dispatch (UsertrapDispatch) +0x30 .. +0x54 (devintr: DEVINTR / DEVINTR_NONE)
-    UT_90  (UsertrapSys)       the syscall arm (SYSCALLKS, the read reason)
+    UT_90  (UsertrapSys)       the syscall arm (SYSCALL_XV6, the read reason)
     UT_EA / UT_56 / UT_D0 (UsertrapArms, UsertrapArms56, UsertrapArmsD0)
     UT_A6 / UT_FA (UsertrapTailA6), UT_KEXIT (UsertrapKexit)
     UT_RET (UsertrapTail, UsertrapClose)
 
 Callees, as in Rocq's `UsertrapProof Syscall PrintkGen Myproc Killed
 Setkilled Devintr Vmfault Yield PrepareReturn Kexit Kernelvec`:
-`SYSCALLKS` (SpecSyscall's `SYSCALL` with the kstack row, UsertrapSysSpec),
+`SYSCALL_XV6` (SpecSyscall's `SYSCALL` at the kernel's deposit instance),
 `PRINTK`, `MYPROC`, `KILLED`, `SETKILLED`, `DEVINTR` and `DEVINTR_NONE`
 (devintr's third arm), `VMFAULT`, `YIELD`, `PREPARE_RETURN`, `KEXIT`,
 `KERNELVEC`; plus the deposit instance's read reason `UtReadWhy` (UsertrapParts).
@@ -36,12 +36,12 @@ set_option linter.unusedVariables false
 
 /-- **`usertrap` meets its (corrected) specification**, given its callees'
 interfaces and the deposit instance's read reason. -/
-theorem usertrap_proof (SY : SYSCALLKS) (PK : PRINTK) (MP : MYPROC) (KI : KILLED) (SK : SETKILLED)
+theorem usertrap_proof (SY : SYSCALL_XV6) (PK : PRINTK) (MP : MYPROC) (KI : KILLED) (SK : SETKILLED)
     (DI : DEVINTR) (DN : DEVINTR_NONE) (VM : VMFAULT) (YI : YIELD) (PR : PREPARE_RETURN)
     (KE : KEXIT) (KV : KERNELVEC)
     (hW : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF],
       UtReadWhy (GF := GF)) : USERTRAPK :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ PT _ Γ _ γ0 γ1 γc γl0 γl1 γd γdl γt _
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ PT _ Γ _ γ0 γ1 γc γl0 γl1 γd γdl γt _
       cpu k j P ksp V M sts gn cs pid sep sc tv f Wk hj hproc hctx htier hnoff hstk hgn => by
     have HK := usertrap_kexit_proof PT Γ KE
     have HR := usertrap_ret_proof PT Γ PR

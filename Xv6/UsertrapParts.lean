@@ -65,6 +65,7 @@ import Xv6.ProcPrivAcc
 import Xv6.UsysMemOkSpec
 import Xv6.KillRow
 import MachCSL.WpSmodeFrame
+import Xv6.UexecExecInst
 
 namespace Xv6
 
@@ -142,12 +143,13 @@ def wp_usertrap_bodyK (R : CPU → UPtd → BitVec 64 → ProcPriv → List FdSt
 end Contract
 
 /-- **`SpecUsertrap.USERTRAP` at `wp_usertrap_bodyK`** (the header's
-repair; identical binders). -/
+repair), at the kernel's deposit instance `uexecSGXv6` (the syscall arm
+consumes `SYSCALL_XV6`): `USERTRAP`'s binders without `[UexecSG GF]`. -/
 structure USERTRAPK : Prop where
   wp_usertrap : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
     [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF]
     [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
-    [CtokG GF] [WchG GF] [Appcfg GF] [FileG GF] [UexecSG GF] [Fscfg] [Icfg] [CurCtx]
+    [CtokG GF] [WchG GF] [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
     (PT : SchedNames → IProp GF) [∀ Γ, Persistent (PT Γ)] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
     [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt]

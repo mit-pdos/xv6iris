@@ -13,7 +13,6 @@ bump is `bumpTf` of the prologue's frame (`tfResumeGpr0_bump`,
 Pure.
 -/
 import Xv6.UsertrapParts
-import Xv6.UsertrapSysSpec
 
 namespace Xv6
 
@@ -46,19 +45,19 @@ theorem ut_sys_bump (sep : BitVec 64) (V : ProcPriv) (w : BitVec 64) (hl : V.tf.
   rw [tfW_set_eq _ _ _ (by rw [hl]; decide), List.set_set]
 
 /-- **Rocq's ecall-arm rows** (ProofUsertrapSys `Hrda` / `Hfde` / `Hpipe` /
-`Hpidr`): the dispatcher's rows at `utSysRec`, the kstack row, the block's
+`Hpidr`): the dispatcher's rows at `utSysRec` (their kstack row), the block's
 `umBelow`, are the round's at the entry record. -/
 theorem ut_rows_of_sysc (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitVec 8))
     (sts2 : List FdState) (cs2 : Std.ExtTreeSet Iris.GName compare)
     (hl : A.V.tf.length = 36) (hP : A.V.upt = A.P) (hb : umBelow A.V.sz A.V.upt)
     (hsc : A.sc = uecallScause)
-    (hr : SyscRows (utSysRec A.sep A.V) A.M V2 M2 A.sts sts2 A.cs cs2 A.pid)
-    (hks : V2.kstack = A.V.kstack) : UtRows0 A V2 M2 sts2 cs2 := by
+    (hr : SyscRows (utSysRec A.sep A.V) A.M V2 M2 A.sts sts2 A.cs cs2 A.pid) :
+    UtRows0 A V2 M2 sts2 cs2 := by
   have hn : syscNum (utSysRec A.sep A.V) = usysNum A.V.tf := ut_sysNum_V A.sep A.V
   have hnp : usysNum (utProTf A.sep A.V) = usysNum A.V.tf := by unfold utProTf; rw [usysNum_epc]
   have hl1 : tfArgIdx 0 < (utSysTf A.sep A.V).length := by
     unfold utSysTf; rw [List.length_set, hl]; decide
-  refine ⟨?_, fun h => absurd hsc h, ?_, ?_, ?_, ?_, ?_, ?_, hks⟩
+  refine ⟨?_, fun h => absurd hsc h, ?_, ?_, ?_, ?_, ?_, ?_, hr.ks⟩
   · -- the round
     unfold utRound uroundOk
     rw [if_pos hsc]

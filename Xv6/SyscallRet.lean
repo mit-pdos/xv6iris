@@ -92,7 +92,7 @@ theorem syscRows_keep (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List F
   rw [← syscStore_a0 V r hl] at hpid
   refine ⟨?_, ?_, ?_, syscChOk_refl V cs, hn 2 h2, Or.inr ⟨r, rfl⟩,
     Or.inr (Or.inr (UMemL.extSz_refl _ _)), Or.inr (Or.inr rfl), Or.inr (Or.inr rfl), rfl, rfl, rfl,
-    rfl, Or.inr rfl, Or.inl (hn 12 h12), Or.inl (hn 1 h1), Or.inl (hn 5 h5), hpid⟩
+    rfl, Or.inr rfl, Or.inl (hn 12 h12), Or.inl (hn 1 h1), Or.inl (hn 5 h5), hpid, rfl⟩
   · unfold syscMemOk
     rw [if_neg (hn USYS_exec h7), if_neg (hn USYS_sbrk h12), if_neg (hn USYS_wait h3),
       if_neg (hn USYS_pipe h4), if_neg (hn USYS_read h5), if_neg (hn USYS_fstat h8)]

@@ -65,7 +65,7 @@ theorem syscRows_fork (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List F
   refine ⟨?_, ?_, ?_, fun h _ => absurd hnum h, hn 2 (by decide), Or.inr ⟨r, rfl⟩,
     Or.inr (Or.inr (UMemL.extSz_refl _ _)), Or.inr (Or.inr rfl), Or.inr (Or.inr rfl), rfl, rfl, rfl,
     rfl, Or.inr rfl, Or.inl (hn 12 (by decide)), Or.inr (by rw [ha0]; exact hans),
-    Or.inl (hn 5 (by decide)), syscRetPid_ne _ _ _ 1 hnum (by decide)⟩
+    Or.inl (hn 5 (by decide)), syscRetPid_ne _ _ _ 1 hnum (by decide), rfl⟩
   · unfold syscMemOk
     rw [if_neg (hn USYS_exec (by decide)), if_neg (hn USYS_sbrk (by decide)),
       if_neg (hn USYS_wait (by decide)), if_neg (hn USYS_pipe (by decide)),

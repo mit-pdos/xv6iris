@@ -62,8 +62,7 @@ theorem ut90_tail (hW : UtReadWhy (GF := GF)) (HA : UT_A6 (hlc := hlc) PT Γ) (A
     (hok : UtOk Γ A) (hsc : A.sc = uecallScause) (hb : umBelow A.V.sz A.V.upt)
     (cpu : CPU) (a b : Bool) (R' : RegMap) (V2 : ProcPriv) (M2 : Nat → List (BitVec 8))
     (sts2 : List FdState) (cs2 : ExtTreeSet GName compare) (hpins : utPins A R')
-    (hrows : SyscRows (utSysRec A.sep A.V) A.M V2 M2 A.sts sts2 A.cs cs2 A.pid)
-    (hks : V2.kstack = A.V.kstack) :
+    (hrows : SyscRows (utSysRec A.sep A.V) A.M V2 M2 A.sts sts2 A.cs cs2 A.pid) :
     kctx cpu (((A.k.intrOn.withSpie a b).pushed 4).withRegs R') ∗ pcIs cpu (utPc 0xa6#64) ∗
       utFrame A ∗ trapCsrsExt cpu true ∗ cpuClaimExt cpu true A.k.proc ∗ utCaps A.N ∗ utPay A ∗
       utKont PT Γ A ∗
@@ -76,7 +75,7 @@ theorem ut90_tail (hW : UtReadWhy (GF := GF)) (HA : UT_A6 (hlc := hlc) PT Γ) (A
       syscForkOut A.f (utSysRec A.sep A.V) (syscA0 V2) A.cs cs2 ∗
       syscWaitOut (GF := GF) (utSysRec A.sep A.V) A.M (syscImg V2 M2) (syscA0 V2) A.cs cs2 A.pid
     ⊢ wpLoop (GF := GF) cpu := by
-  have hr0 : UtRows0 A V2 M2 sts2 cs2 := ut_rows_of_sysc A V2 M2 sts2 cs2 hok.hlen hok.hP hb hsc hrows hks
+  have hr0 : UtRows0 A V2 M2 sts2 cs2 := ut_rows_of_sysc A V2 M2 sts2 cs2 hok.hlen hok.hP hb hsc hrows
   have hbase : utBase A.k (A.k.intrOn.withSpie a b) :=
     utBase_withSpie _ _ a b (utBase_intrOn A.k hok.hctx.1 hok.hintena (by rw [hok.havail]; decide))
   have hfdg : V2.fdg = (utSysRec A.sep A.V).fdg := hrows.fdg
