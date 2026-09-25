@@ -32,7 +32,11 @@ Require Import UexecWp.
 Require Import UexecRet.
 Require Import UexecExecInst.   (* the class INSTANCE [uexecSG_xv6]: [xv6_sbundle] *)
 Require Import FsAbsInvFire.    (* [fsabs_chdir_pre] / [fsabs_exec_half] *)
-Require Import FsAbsEra.        (* [ex_start] / [ax_hops_triv] *)
+Require FsAbsEra.               (* [ex_start] / [ax_hops_triv] *)
+Require Import SpecSysRead.     (* [sys_rw_count] *)
+Require Import SpecSysChdir.    (* [chdir_au_pre] *)
+Require Import WpUart.
+Require Import AppInv.
 Require Import SpecFileread.    (* [fileread_in] *)
 Require Import SpecFilewrite.   (* [filewrite_in] *)
 Require Import SpecFileclose.   (* [fileclose_cpay] / [fileclose_cpays] *)
@@ -43,10 +47,18 @@ Require Import PipeQueue.       (* [pipe_qfrag] and the links *)
 Require Import PipeReg.         (* [pipe_reg] / [pipe_row_reg] *)
 Require Import UsysMemOk.
 Require Import UserPerm.
+Require Import UserExec UserPtTree RegFile.
+Require Import UmodeRegs.       (* [uv_regs_u_regs] *)
+Require Import UmodeText.       (* [user_ptm_inv_x_pt] *)
+Require Import ConsoleInv.      (* [CONSOLE] *)
 Require Import ChildTok.
 Require Import ExecEntry.       (* [image_entry_taint] *)
 Require Import PieceFam.        (* [pfam_triv] *)
+Require Import FsAbsDefs.       (* LAST (FsAbs's own rule) *)
+Require Import FsBytesGamma.    (* [fs_gamma_L] *)
+Require Import ProcAvail.       (* [pavG] *)
 Require Import Xv6G.
+Require Import FsCfg.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 
@@ -431,6 +443,346 @@ Section UexecSecc.
   Proof using .
     iIntros "[_ #Hr]". iApply (xv6_sbundle_exit_regs X W Q).
     iApply (secc_rows_regs with "Hr").
+  Qed.
+
+  (* =================================================================== *)
+  (*  4.  THE CONSOLE ROWS, AS ONE PAYER                                 *)
+  (*                                                                     *)
+  (*  The only rows the universe cannot pay out of its key: a read or a  *)
+  (*  write at the console moves the application's console history, and  *)
+  (*  what pays for that is the era credential (SS5 below).  Named, so    *)
+  (*  the minter is stated over the payer and the credential enters once. *)
+  (* =================================================================== *)
+  Definition secc_cons_pay : iProp Σ :=
+    (□ ((∀ (wb : bool) (mj n : Z) (P : iProp Σ),
+           fileread_in (FdOpen true wb (FdDevice mj)) n
+             (pfam_triv (fun _ _ _ _ => True%I)) (fun _ _ => True%I)
+             (fun _ => True%I) (fun _ => True%I) (fun _ _ => True%I) P)
+        ∧ (∀ (rb : bool) (mj n : Z) (pmv : gmap (mword 27) uperm) (sz : Z)
+             (lz : bool) (M : gmap Z (bv 8)) (ua : mword 64),
+             filewrite_in pmv sz lz (FdOpen rb true (FdDevice mj)) n M ua
+               (fun _ => True%I) (fun _ _ => True%I))))%I.
+
+  Global Instance secc_cons_pay_persistent : Persistent secc_cons_pay.
+  Proof using . rewrite /secc_cons_pay. apply _. Qed.
+
+  (* READ'S ROW at any row of the universe *)
+  Lemma secc_fileread_in (st : fdstate) (n : Z) (P : iProp Σ) :
+    secc_cons_pay -∗ secc_row st -∗
+    fileread_in st n (pfam_triv (fun _ _ _ _ => True%I)) (fun _ _ => True%I)
+      (fun _ => True%I) (fun _ => True%I) (fun _ _ => True%I) P.
+  Proof using .
+    iIntros "#Hc #Hs".
+    destruct st as [| rb wb [i γo om | γp | mj]].
+    - rewrite /fileread_in. iIntros "HP". iExact "HP".
+    - rewrite /secc_row. iDestruct "Hs" as "[]".
+    - iApply (wild_fileread_in with "Hs").
+    - destruct rb; [ | rewrite /fileread_in; iIntros "HP"; iExact "HP" ].
+      iDestruct "Hc" as "[Hr _]". iApply "Hr".
+  Qed.
+
+  (* WRITE'S ROW, likewise *)
+  Lemma secc_filewrite_in (st : fdstate) (n : Z)
+      (pmv : gmap (mword 27) uperm) (sz : Z) (lz : bool)
+      (M : gmap Z (bv 8)) (ua : mword 64) :
+    secc_cons_pay -∗ secc_row st -∗
+    filewrite_in pmv sz lz st n M ua (fun _ => True%I) (fun _ _ => True%I).
+  Proof using .
+    iIntros "#Hc #Hs".
+    destruct st as [| rb wb [i γo om | γp | mj]].
+    - rewrite /filewrite_in. done.
+    - rewrite /secc_row. iDestruct "Hs" as "[]".
+    - iApply (wild_filewrite_in with "Hs").
+    - destruct wb; [ | rewrite /filewrite_in; done ].
+      iDestruct "Hc" as "[_ Hw]". iApply "Hw".
+  Qed.
+
+  (* =================================================================== *)
+  (*  5.  THE BUNDLE AT EVERY NUMBER A MASKED KEY CAN REACH              *)
+  (* =================================================================== *)
+
+  (* THE UNIVERSE'S FAMILIES: the point, at the trivial payload.  Every
+     receipt, cursor and refund is [True]; the child's payload is too, and
+     the lend is [emp]. *)
+  Definition secc_fam := xfam_at (Σ := Σ) (fun _ : Z => True%I) xfam_pt.
+
+  Lemma secc_fam_xpay : sexit_pay secc_fam = (fun _ => True%I).
+  Proof using . reflexivity. Qed.
+  Lemma secc_fam_fpay : sfork_pay secc_fam = (fun _ => True%I).
+  Proof using . reflexivity. Qed.
+  Lemma secc_fam_lend : sfork_lend secc_fam = emp%I.
+  Proof using . reflexivity. Qed.
+
+  (* the recursion's shape: a slot at every key in the universe *)
+  Definition secc_slots : iProp Σ :=
+    (□ (∀ W : uvis, secc_key W -∗ my_pay (uvis_gen W) (fun _ => True%I) -∗
+                    uslot W))%I.
+
+  (* EXEC: the bundle needs NO credential.  The walk and the commit are
+     the closed generic ones ([FsAbsInvFire.fsabs_exec_half], exactly
+     [UexecExecInst.xv6_sbundle_of_supply]'s exec branch), and both slot
+     wands are answered from the recursion at the NEW key, which is in the
+     universe by the exec's own two pins: the table is the caller's
+     ([kexec_image_ok] / [exec_key_ok]) and so is the mask. *)
+  Lemma secc_sbundle_exec (W : uvis) :
+    secc_key W -∗ my_pay (uvis_gen W) (fun _ => True%I) -∗ secc_slots -∗
+    exec_sbundle uslot secc_fam W.
+  Proof using .
+    rewrite /secc_slots. iIntros "#Hk #Hpay #IH".
+    rewrite /exec_sbundle /secc_fam /xfam_at /xfam_pt /xfam_exec /xfam_exec_at /=.
+    iSplitR; [ iExact "Hpay" | ].
+    iDestruct (fsabs_exec_half (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W))
+      as "[#Hwalk #Hcommit]".
+    rewrite /sys_exec_au_pre.
+    iSplitR;
+      [ iIntros (pl) "_";
+        rewrite /FsAbsEra.ex_start /FsAbsEra.ex_hops_from;
+        iIntros (r) "_"; iModIntro; iSplit;
+        [ done | iApply FsAbsEra.ax_hops_triv ] | ].
+    iSplitR; [iExact "Hcommit" |].
+    rewrite /pf_at. cbn [pf_recv pf_refund]. iSplit; [| done].
+    rewrite /sys_exec_slot_pre. iIntros (pl na alen afun) "_ _".
+    rewrite /exec_slot_pre. iSplitR.
+    + iIntros (av' i ff nl W') "_ _ _ %Hok _ _ %Hscw _ _ Hp".
+      iApply ("IH" with "[] Hp").
+      iApply (secc_key_exec_image W W' ff na alen afun Hok Hscw with "Hk").
+    + iIntros (av' i a W') "_ _ _ %Hkey _ _ %Hscw _ _ Hp".
+      iApply ("IH" with "[] Hp").
+      iApply (secc_key_exec_key W W' na alen Hkey Hscw with "Hk").
+  Qed.
+
+  Lemma secc_sbundle (n : Z) (W : uvis) :
+    n ∉ secc_B ->
+    secc_cons_pay -∗ secc_key W -∗ my_pay (uvis_gen W) (fun _ => True%I) -∗
+    secc_slots -∗
+    |==> sbundle_at uslot n secc_fam W.
+  Proof using .
+    intros Hnb.
+    destruct (secc_notin_cases n Hnb) as (H6 & H15 & H17 & H18 & H19 & H20).
+    rewrite /secc_slots. iIntros "#Hc #Hk #Hpay #IH". rewrite /sbundle_at /= /xv6_sbundle.
+    destruct (decide (n = USYS_exec)) as [_ | _];
+      [ iModIntro; iApply (secc_sbundle_exec with "Hk Hpay IH") | ].
+    rewrite /secc_fam /xfam_at /xfam_pt /xfam_exec /xfam_exec_at /=.
+    destruct (decide (n = 5)) as [_ | _].
+    { iModIntro. iApply (secc_fileread_in with "Hc").
+      iApply (secc_key_at_arg with "Hk"). }
+    destruct (decide (n = 9)) as [_ | _];
+      [ iModIntro; iApply fsabs_chdir_pre | ].
+    destruct (decide (n = 15)) as [He | _]; [ exfalso; exact (H15 He) | ].
+    destruct (decide (n = 16)) as [_ | _].
+    { iModIntro. iApply (secc_filewrite_in with "Hc").
+      iApply (secc_key_at_arg with "Hk"). }
+    destruct (decide (n = 17)) as [He | _]; [ exfalso; exact (H17 He) | ].
+    destruct (decide (n = 18)) as [He | _]; [ exfalso; exact (H18 He) | ].
+    destruct (decide (n = 19)) as [He | _]; [ exfalso; exact (H19 He) | ].
+    destruct (decide (n = 20)) as [He | _]; [ exfalso; exact (H20 He) | ].
+    destruct (decide (n = 6)) as [He | _]; [ exfalso; exact (H6 He) | ].
+    destruct (decide (n = 21)) as [_ | _];
+      [ iModIntro; iApply (secc_key_close_cpay with "Hk") | ].
+    destruct (decide (n = USYS_exit)) as [_ | _];
+      [ iModIntro; iDestruct "Hk" as "[_ Hr]";
+        iApply (secc_fileclose_cpays with "Hr") | ].
+    by iModIntro.
+  Qed.
+
+  (* =================================================================== *)
+  (*  6.  THE RETURN                                                     *)
+  (* =================================================================== *)
+
+  (* a slot's body is a WP, so it absorbs an update: what lets pipe's
+     resume ALLOCATE the new name's wild pipe before the recursion is
+     applied at the resume key *)
+  Lemma uslot_fupd (W : uvis) : (|={⊤}=> uslot W) -∗ uslot W.
+  Proof using .
+    rewrite {2}(uslot_unfold W). iIntros "H".
+    iIntros (h xi C pt Rfd Rut HRut) "%H1 %H2 %H3 Hb".
+    rewrite /wp_triv. iApply fupd_wp. iMod "H". iModIntro.
+    iEval (rewrite (uslot_unfold W)) in "H".
+    iApply ("H" $! h xi C pt Rfd Rut HRut with "[%] [%] [%] Hb");
+      [ exact H1 | exact H2 | exact H3 ].
+  Qed.
+
+  (* THE RESUME at a returning number: the key stays in the universe *)
+  Lemma secc_ret_cont (n : Z) (W : uvis) :
+    n = uvis_num W -> n ∉ secc_B ->
+    secc_key W -∗ my_pay (uvis_gen W) (fun _ => True%I) -∗ secc_slots -∗
+    uexec_ret_cont_F uslot n secc_fam W.
+  Proof using .
+    intros Hn Hnb. destruct (secc_notin_cases n Hnb) as (_ & H15 & _).
+    rewrite /secc_slots. iIntros "#Hk #Hpay #IH". iDestruct "Hk" as "[%Hm #Hr]".
+    rewrite /uexec_ret_cont_F /uexec_ret_cont_gen.
+    iIntros (r M' π' szv' fdv' cw' g' cs' lz' secc' _ Hfd _ _ Hg _ _ Hsc) "_ Hpost".
+    rewrite (usys_gen_ok_quiet _ _ _ Hg).
+    assert (Hm' : secc_masked secc') by exact (secc_masked_secc_ok _ _ _ _ _ Hm Hsc).
+    iAssert (∀ fdv'' : list fdstate, ⌜fdv'' = fdv'⌝ -∗ secc_rows fdv'' -∗
+               uslot (bump W r M' π' szv' fdv' cw' (uvis_gen W) cs' lz' secc'))%I
+      as "Hgo".
+    { iIntros (fdv'') "-> #Hr'". iApply ("IH" with "[] [Hpay]").
+      - rewrite /secc_key. cbn [uvis_fd uvis_secc bump bump_at].
+        iSplit; [ iPureIntro; exact Hm' | iExact "Hr'" ].
+      - cbn [uvis_gen bump bump_at]. iExact "Hpay". }
+    destruct (decide (n = USYS_pipe)) as [Hp | Hnp].
+    - (* PIPE: the post hands the new name's fragment; park it wild *)
+      rewrite Hp in Hfd. iEval (rewrite Hp) in "Hpost".
+      iDestruct (spost_at_pipe_elim with "Hpost") as "Hpost".
+      destruct (decide (uint r = 0)) as [Hr0 | Hr0].
+      + iDestruct ("Hpost" with "[%]") as (a b γp) "[%Hsh Hf]"; [ exact Hr0 | ].
+        destruct Hsh as (_ & _ & _ & ->).
+        iApply uslot_fupd.
+        iMod (inv_alloc seccN ⊤ (∃ s : pipe_st, pipe_qfrag (pn_queue γp) s)
+                with "[Hf]") as "#Hw"; [ iNext; iExists _; iExact "Hf" | ].
+        iModIntro. iApply ("Hgo" with "[//]").
+        iApply (secc_rows_pipe with "Hw Hr").
+      + iApply ("Hgo" $! (uvis_fd W) with "[%] Hr").
+        symmetry. exact (usys_fd_ok_pipe_fail _ _ _ _ Hr0 Hfd).
+    - iApply ("Hgo" $! fdv' with "[//]").
+      iApply (secc_rows_fd_ok n (uvis_tf W) r (uvis_fd W) fdv' H15 Hnp Hfd with "Hr").
+  Qed.
+
+  (* ...and at wait, whose answer row the universe does not read *)
+  Lemma secc_wait (n : Z) (W : uvis) :
+    n = USYS_wait ->
+    secc_key W -∗ my_pay (uvis_gen W) (fun _ => True%I) -∗ secc_slots -∗
+    uexec_wait_F uslot n secc_fam W.
+  Proof using .
+    intros Hn. rewrite /secc_slots. iIntros "#Hk #Hpay #IH". iDestruct "Hk" as "[%Hm #Hr]".
+    rewrite /uexec_wait_F /uexec_ret_cont_gen.
+    iIntros (r M' π' szv' fdv' cw' g' cs' lz' secc' _ Hfd _ _ Hg _ _ Hsc) "_ _".
+    rewrite (usys_gen_ok_quiet _ _ _ Hg).
+    rewrite Hn in Hfd.
+    rewrite (usys_fd_ok_quiet USYS_wait _ _ _ _ ltac:(vm_compute; discriminate)
+               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+               ltac:(vm_compute; discriminate) Hfd).
+    iApply ("IH" with "[] [Hpay]").
+    - rewrite /secc_key. cbn [uvis_fd uvis_secc bump bump_at].
+      iSplit; [ iPureIntro; exact (secc_masked_secc_ok _ _ _ _ _ Hm Hsc) | iExact "Hr" ].
+    - cbn [uvis_gen bump bump_at]. iExact "Hpay".
+  Qed.
+
+  (* ...and at fork: both legs are the recursion, at the parent's
+     resume key and at the child's (the same table, the same mask), the
+     child's payload is the trivial one and the lend is [emp] *)
+  Lemma secc_fork (W : uvis) :
+    secc_key W -∗ my_pay (uvis_gen W) (fun _ => True%I) -∗ secc_slots -∗
+    uexec_fork_F uslot W secc_fam.
+  Proof using .
+    rewrite /secc_slots. iIntros "#Hk #Hpay #IH".
+    rewrite /uexec_fork_F secc_fam_fpay secc_fam_lend /uexec_fork_parent_F.
+    iSplitL.
+    { iIntros (r fdv' cw' cs') "_ %Hfd _ _". subst fdv'.
+      iApply ("IH" with "[] [Hpay]").
+      - iApply (secc_key_cong with "Hk"); reflexivity.
+      - cbn [uvis_gen bump bump_at]. iExact "Hpay". }
+    iSplitR; [ iIntros "!> _"; done | ].
+    iSplitR; [ done | ].
+    iIntros (fdv' cw' g' pidc) "_ Hp %Hfd _ _". subst fdv'.
+    iApply ("IH" with "[] [Hp]").
+    - iApply (secc_key_fork_child with "Hk").
+    - cbn [uvis_gen bump bump_at]. iExact "Hp".
+  Qed.
+
+  (* THE WHOLE RETURN at a key in the universe, at every cause *)
+  Lemma secc_ret (sc : mword 64) (W : uvis) :
+    secc_cons_pay -∗ secc_key W -∗ my_pay (uvis_gen W) (fun _ => True%I) -∗
+    secc_slots -∗ |==> uexec_ret sc W.
+  Proof using .
+    rewrite /secc_slots. iIntros "#Hc #Hk #Hpay #IH".
+    iPoseProof "Hk" as "[%Hm _]".
+    pose proof (uvis_num_masked W Hm) as Hnb.
+    assert (Hxb : USYS_exit ∉ secc_B)
+      by (rewrite elem_of_list_In; cbn; unfold USYS_exit; lia).
+    rewrite /uexec_ret /uexec_ret_F.
+    iAssert (uexec_pay_dep (SG := uexecSG_xv6) sc W secc_fam) as "Hpd".
+    { iApply (uexec_pay_dep_triv (SG := uexecSG_xv6) sc W secc_fam secc_fam_xpay with "Hpay"). }
+    destruct (decide (sc = uecall_scause)) as [_ | _].
+    - cbv zeta.
+      destruct (decide (uvis_num W = USYS_exit)) as [Hx | Hnx].
+      { iMod (secc_sbundle (uvis_num W) W Hnb with "Hc Hk Hpay IH") as "Hb".
+        iModIntro. iExists secc_fam. iFrame "Hpd Hb". }
+      destruct (decide (uvis_num W = USYS_fork)) as [_ | _].
+      { iModIntro. iExists secc_fam. iFrame "Hpd".
+        iApply (secc_fork with "Hk Hpay IH"). }
+      destruct (decide (uvis_num W = USYS_wait)) as [Hw | _].
+      { iMod (secc_sbundle (uvis_num W) W Hnb with "Hc Hk Hpay IH") as "Hb".
+        iModIntro. iExists secc_fam. iFrame "Hpd Hb".
+        iApply (secc_wait (uvis_num W) W Hw with "Hk Hpay IH"). }
+      iMod (secc_sbundle (uvis_num W) W Hnb with "Hc Hk Hpay IH") as "Hb".
+      iModIntro. iExists secc_fam. iFrame "Hpd Hb".
+      iApply (secc_ret_cont (uvis_num W) W eq_refl Hnb with "Hk Hpay IH").
+    - (* THE KILL ARM at its RIGHT disjunct: the process's own payment at
+         the trivial payload, beside the exit bundle *)
+      iMod (secc_sbundle USYS_exit W Hxb with "Hc Hk Hpay IH") as "Hb".
+      iModIntro. iExists secc_fam. iFrame "Hpd".
+      rewrite /uexec_kill_arm_F. iSplit.
+      + iApply (ukill_cred_at_of_owed with "[] Hb").
+        rewrite /ChildTok.kill_owed. iExists (fun _ => True%I).
+        iSplit; [ iExact "Hpay" | done ].
+      + iApply ("IH" with "Hk Hpay").
+  Qed.
+
+  (* =================================================================== *)
+  (*  7.  THE MINTER, over the console payer                             *)
+  (* =================================================================== *)
+
+  (* [UexecRet.uslot_of_creds]'s Loeb, at the universe: the slot at a key
+     in the universe hands back, at every trap, a return whose every arm
+     is the same family at a key in the universe. *)
+  Lemma useccomp_mint_of_cons :
+    secc_cons_pay -∗ □ uexec_wp -∗
+    □ (∀ W : uvis, □ secc_key W -∗ my_pay (uvis_gen W) (fun _ => True%I) -∗ uslot W).
+  Proof using .
+    iIntros "#Hc #Hwp". iLöb as "IH".
+    iModIntro. iIntros (W) "#Hk #Hpay".
+    rewrite uslot_unfold.
+    iIntros (h xi C pt Rfd Rut HRut) "%Hlo %Hpm %Hlz Hb".
+    rewrite /uvb /uvb_F.
+    iDestruct "Hb" as
+      "(#Hamb & Hur & %Hsz & Hpt & Hfrag & Hcfg & Hg & Hpc & Hrut & Hk')".
+    iDestruct (user_ptm_inv_x_pt with "Hpt") as (Mp) "Hpt".
+    iDestruct (uv_regs_u_regs with "Hur Hg Hpc") as (ms_v sc_v stval_v sepc_v) "[%Hms Hregs]".
+    iDestruct "Hamb" as "(Hhw & Hmi & Hwi)".
+    iPoseProof "Hwp" as "Hwp0".
+    iEval (rewrite uexec_wp_unfold /uexec_F) in "Hwp0".
+    iApply ("Hwp0" $! h xi C pt Rut HRut Mp (tf_resume_gpr0 (uvis_tf W))
+              ms_v sc_v stval_v sepc_v (tf_resume_pc (uvis_tf W))
+              with "[] [] Hhw Hmi Hwi Hregs Hpt Hcfg Hrut [Hk' Hfrag]");
+      [ iPureIntro; exact Hlo | iPureIntro; exact Hms | ].
+    rewrite /ukont_F /ukb_F.
+    iNext. iIntros "[Hframe _]".
+    iDestruct (user_trap_frame_trapped C pt Rut (uvis_sz W) (uvis_perm W)
+                 (uvis_fd W) (uvis_cwd W) (uvis_gen W) (uvis_ch W) (uvis_pid W)
+                 (uvis_lazy W) (uvis_secc W)
+                 with "Hframe")
+      as (W' sc stv)
+         "[%Hperm [%Hszw [%Hfdw [%Hcww [%Hgnw [%Hchw [%Hpidw [%Hlzw [%Hscw Htm]]]]]]]]]".
+    iMod (secc_ret sc W' with "Hc [] [] []") as "Hret".
+    { iApply (secc_key_cong W W' Hfdw Hscw with "Hk"). }
+    { rewrite Hgnw. iExact "Hpay". }
+    { rewrite /secc_slots. iModIntro. iIntros (W'') "#Hk'' Hp''".
+      iApply ("IH" with "Hk'' Hp''"). }
+    iApply ("Hk'" $! W' sc stv with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [Htm Hfrag Hret]");
+      [ exact Hperm | exact Hszw | exact Hfdw | exact Hcww | exact Hgnw
+      | exact Hchw | exact Hpidw | exact Hlzw | exact Hscw | ].
+    rewrite Hfdw. iFrame "Htm Hfrag". iExact "Hret".
+  Qed.
+
+  (* ...AND THE GENERALISED TAINT ENTRY IT ANSWERS (design SS9): at a
+     table in the universe and a masked mask, the exec's two pins put the
+     new key in the universe, so the minter's family IS the entry -- at
+     any escape [T], which it never reads.  This is what the seccomp
+     program's own [exec(x)] hands [ExecBundle.exec_bundle_of]. *)
+  Lemma useccomp_image_entry_taint (T : iProp Σ) (sts : list fdstate)
+      (secc : mword 64) :
+    secc_masked secc ->
+    □ (∀ W : uvis, □ secc_key W -∗ my_pay (uvis_gen W) (fun _ => True%I) -∗ uslot W) -∗
+    secc_rows sts -∗
+    image_entry_taint T sts secc (fun _ => True%I) uslot.
+  Proof using .
+    intros Hm. iIntros "#Hmint #Hr". rewrite /image_entry_taint.
+    iIntros "!>" (W') "_ %Hfd %Hsc Hp".
+    iApply ("Hmint" with "[] Hp").
+    iModIntro. iApply (secc_key_of_pins W' sts secc Hfd Hsc with "Hr").
+    iPureIntro. exact Hm.
   Qed.
 
 End UexecSecc.
