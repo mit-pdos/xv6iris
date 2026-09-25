@@ -1025,6 +1025,8 @@ import Xv6.SpecSysExec
 import Xv6.SysExecParts
 import Xv6.SysExecLoop
 import Xv6.SysExecSetup
+import Xv6.SysExecStepCalls
+import Xv6.SysExecStep
 import Xv6.UsysMemOk
 import Xv6.SyscallDefs
 import Xv6.UsysMemOkSpec
