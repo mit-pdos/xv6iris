@@ -540,15 +540,11 @@ theorem sys_pipe_fd1_bytes (sp : BitVec 64) (hal : (sp + 0xFFFFFFFFFFFFFFC0#64).
 
 /-! ## The private block around `argaddr` and `copyout` -/
 
-/-- The core minus the two fields `copyout` reads and its address space. -/
+/-- The core minus the two fields `copyout` reads and its address space: the
+one bare rest (`EitherDefs.ecRest`, at the block's own context) beside the
+cwd reference and the generation row. -/
 def sysPipeCoreRest (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) : IProp GF := iprop%
-  @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗
-  @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pKstack pa) 8 (DFrac.own 1) V.kstack ∗
-  @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pTrapframe pa) 8 (DFrac.own 1) V.trapframe ∗
-  @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pCwd pa) 8 (DFrac.own 1) V.cwd ∗
-  @pnameCells hlc GF _ ⟨curCtx, KTier.kpt⟩ pa (DFrac.own 1) V.name ∗
-  @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf ∗
-  ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝ ∗
+  @ecRest hlc GF _ ⟨curCtx, KTier.kpt⟩ pa pid V V.upt ∗
   @cwdRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.cwd V.cwi ∗ procGenAt curCtx pa pid V.gen
 
 /-- The trapframe cell and page `argaddr` reads, out and back. -/
@@ -577,7 +573,7 @@ theorem sys_pipe_core_split (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M
       @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz ∗
       @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
       @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt M ∗ sysPipeCoreRest pa pid V := by
-  unfold procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile sysPipeCoreRest
+  unfold procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile sysPipeCoreRest ecRest
   iintro ⟨⟨%hf, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm⟩, Hpt, Htfp, %hlz⟩, Hcw⟩
   iframe Hpid Hks Hsz Hpg Htf Hcwd Hnm Hpt Htfp Hcw
   isplitl []
@@ -593,9 +589,9 @@ theorem sys_pipe_core_ext (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' 
     @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
     @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P' M' ∗ sysPipeCoreRest pa pid V ⊢
       procPrivCoreNoctxAt curCtx pa pid { V with upt := P' } M' := by
-  unfold procPrivCoreNoctxAt procPrivBareAt sysPipeCoreRest procFieldsNoOfile
+  unfold procPrivCoreNoctxAt procPrivBareAt sysPipeCoreRest ecRest procFieldsNoOfile
   rw [hext.1.1, hext.1.2.1]
-  iintro ⟨Hsz, Hpg, Hpt, Hpid, Hks, Htf, Hcwd, Hnm, Htfp, %hlz, Hcw⟩
+  iintro ⟨Hsz, Hpg, Hpt, ⟨Hpid, Hks, Htf, Hcwd, Hnm, Htfp, %hlz⟩, Hcw⟩
   iframe Hsz Hpg Hpt Hpid Hks Htf Hcwd Hnm Htfp Hcw
   isplitl []
   · ipureintro; exact ⟨hf.1, UMemL.umBelow_extSz hf.2.1 hext, hf.2.2.1, hf.2.2.2⟩
@@ -609,8 +605,8 @@ theorem sys_pipe_core_join (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M 
     @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
     @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt M ∗ sysPipeCoreRest pa pid V ⊢
       procPrivCoreNoctxAt curCtx pa pid V M := by
-  unfold procPrivCoreNoctxAt procPrivBareAt sysPipeCoreRest procFieldsNoOfile
-  iintro ⟨Hsz, Hpg, Hpt, Hpid, Hks, Htf, Hcwd, Hnm, Htfp, %hlz, Hcw⟩
+  unfold procPrivCoreNoctxAt procPrivBareAt sysPipeCoreRest ecRest procFieldsNoOfile
+  iintro ⟨Hsz, Hpg, Hpt, ⟨Hpid, Hks, Htf, Hcwd, Hnm, Htfp, %hlz⟩, Hcw⟩
   iframe Hsz Hpg Hpt Hpid Hks Htf Hcwd Hnm Htfp Hcw
   isplitl []
   · ipureintro; exact hf
