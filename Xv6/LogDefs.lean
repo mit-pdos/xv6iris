@@ -238,10 +238,10 @@ Rocq's `log_mirror` is one total block view; the readings below are what
 the log layer states its assertions at.  The GHOST half is dropped (see
 the file header, deviation 3); the picture and its readings are here. -/
 
-/-- The whole durable disk, as one total block view (Rocq's
-`RiscvPtsto.log_mirror`). -/
-structure LogMirror where
-  view : Nat → List (BitVec 8)
+-- The whole durable disk, as one total block view (Rocq's
+-- `RiscvPtsto.log_mirror`), is `MachCSL.LogMirror`: the era's ghost variable
+-- over it is machine-layer (`EraGS.mirrorName`, `MachFixedGS.mirrorG`), as in
+-- Rocq, so the type lives below both.
 
 /-- The era's picture after one block write. -/
 def lmUpd (M : LogMirror) (b : Nat) (bs : List (BitVec 8)) : LogMirror :=

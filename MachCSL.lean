@@ -9,7 +9,10 @@ import MachCSL.Dev.Fabric
 import MachCSL.Lang
 import MachCSL.ObsTrace
 import MachCSL.LogEntryDefs
+import MachCSL.DiskImg
+import MachCSL.DiskOf
 import MachCSL.Resources
+import MachCSL.DiskPermit
 import MachCSL.Ctx
 import MachCSL.Wp
 import MachCSL.WpDev
@@ -97,6 +100,7 @@ import MachCSL.WpDmaCtx
 import MachCSL.WireInv
 import MachCSL.WpWire
 import MachCSL.WpDevDmaStepV
+import MachCSL.WpDevDisk
 import MachCSL.WpSmodeTime
 import MachCSL.WpDmaCtx2
 import MachCSL.WpSmodeFrame12b

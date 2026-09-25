@@ -202,7 +202,7 @@ arm (a hart reserves a byte of the footprint) and the silent no-op arms (the
 guard is off, or the footprint is not DRAM) leave the state alone and are
 closed with the lease untouched -- `wpDev_lift` asks for non-stuckness only,
 so there is no fairness obligation anywhere. -/
-theorem wpDev_dma (N : Namespace) (d : DevId) (hsil : DevSilent d) (rel : DevSt d → DevSt d → Prop)
+theorem wpDev_dma (N : Namespace) (d : DevId) [DevDiskInert d] (hsil : DevSilent d) (rel : DevSt d → DevSt d → Prop)
     (R : DevSt d → IProp GF) [∀ s, Timeless (R s)] (hloc : DevSig.Lease d rel R)
     (hR : ∀ s s', rel s s' → R s ⊢@{IProp GF} |==> R s') :
     devInvR N d R ∗ genCert ⊢@{IProp GF}
@@ -469,7 +469,7 @@ theorem wpDev_dma (N : Namespace) (d : DevId) (hsil : DevSilent d) (rel : DevSt 
         · exact BigSepL.bigSepL_nil_intro
 
 /-- The root thread of a bus-mastering device, as the power thread forks it. -/
-theorem wpDev_dma_root (N : Namespace) (d : DevId) (hsil : DevSilent d) (rel : DevSt d → DevSt d → Prop)
+theorem wpDev_dma_root (N : Namespace) (d : DevId) [DevDiskInert d] (hsil : DevSilent d) (rel : DevSt d → DevSt d → Prop)
     (R : DevSt d → IProp GF) [∀ s, Timeless (R s)] (hloc : DevSig.Lease d rel R)
     (hR : ∀ s s', rel s s' → R s ⊢@{IProp GF} |==> R s') :
     devInvR N d R ∗ genCert ⊢@{IProp GF}

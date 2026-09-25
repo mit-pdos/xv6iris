@@ -74,6 +74,7 @@ the mechanisms both sides rest on.
 import Xv6.DiskInvDefs
 import MachCSL.WpDevDmaStep
 import MachCSL.WpDevDmaStepV
+import MachCSL.WpDevDisk
 
 namespace Xv6
 
@@ -382,6 +383,60 @@ theorem diskProto_drain (γ : DiskNames) (v : VirtioState) (k : Nat) :
     (fun st hok kk r hr => hok kk r (by rwa [drain_reqOf] at hr))
     (dryOk_drain v k)
     (fun hn kk => by unfold Virtio.phase; rw [drain_inflight]; exact hn kk) $$ H
+
+/-- THE DRAIN'S TRANSITIONAL ENVIRONMENT (D40 prototype; C-2a replaces it).
+The drain is the one step that moves the durable image, so the device thread
+must re-establish the crash predicate there (`MachCSL.wpDev_dmaD`'s lent
+`stepD`).  Until the per-request permit channel rides the slots
+(`MachCSL.CrashPermInv`, batch C-2a), the device is handed ONE persistent
+permit for ANY write -- Rocq's deleted `crash_pred_indifferent` in permit
+form -- beside the crash invariant.  It is a PREMISE of `wpDev_disk_inv`
+(which nothing consumes yet), never an axiom. -/
+def diskDrainEnv : IProp GF := iprop%
+  crashInv ∗ □ (∀ w : DiskWr, diskWritePermit (genId (hlc := hlc) (GF := GF)) w iprop(True))
+
+instance diskDrainEnv_persistent : Persistent (diskDrainEnv (hlc := hlc) (GF := GF)) := by
+  unfold diskDrainEnv; infer_instance
+
+/-- The write a drain of sector `k` lands. -/
+def drainWr (v : VirtioState) (k : Nat) : DiskWr :=
+  (Virtio.alistGet v.cache k).map fun bs => (Virtio.sectorSize * k, bs)
+
+theorem drain_disk_wr (v : VirtioState) (k : Nat) :
+    (Virtio.drain v k).disk = wrApply (drainWr v k) v.disk := by
+  unfold Virtio.drain drainWr
+  cases Virtio.alistGet v.cache k <;> rfl
+
+theorem crashN_diskN : (↑crashN : CoPset) ⊆ ⊤ \ ↑diskN := by
+  have hd : (↑crashN : CoPset) ## ↑diskN := ndot_ne_disjoint nroot (by decide)
+  intro p hp
+  rw [CoPset.in_diff]
+  exact ⟨CoPset.subseteq_top p hp, fun hc => hd p ⟨hp, hc⟩⟩
+
+/-- THE DRAIN, LENT (D40): open the crash invariant at the step's first leg,
+and at its second run the environment's permit for the drained sector with
+the durable authority lent; the protocol follows (`diskProto_drain`). -/
+theorem diskDrain_step (γ : DiskNames) (v : VirtioState) (k : Nat) :
+    iprop(diskDrainEnv (hlc := hlc) (GF := GF) ∗ diskRoot γ ∗ diskProto γ v) ⊢@{IProp GF}
+      |={⊤ \ ↑diskN, ∅}=> ▷ (diskLend v.disk ={∅, ⊤ \ ↑diskN}=∗
+        (diskLend (Virtio.drain v k).disk ∗ diskProto γ (Virtio.drain v k) ∗ diskRoot γ)) := by
+  unfold diskDrainEnv crashInv diskWritePermit
+  iintro ⟨⟨#Hci, #Hperm⟩, HC, HR⟩
+  imod (inv_acc (E := ⊤ \ ↑diskN) (N := crashN) (P := MachFixedGS.crashPred (hlc := hlc) (GF := GF))
+    crashN_diskN) $$ Hci with ⟨HP, Hclose⟩
+  iapply fupd_mask_intro LawfulSet.empty_subset
+  iintro Hmask
+  iintro !> Hl
+  unfold diskLend
+  icases Hl with ⟨Hdk, Hst⟩
+  imod Hperm $$ %(drainWr v k) %v.disk %(genId (hlc := hlc) (GF := GF) + 1) Hst %rfl Hdk HP
+    with ⟨Hdk, HP, Hst, _⟩
+  imod Hmask
+  imod Hclose $$ HP
+  imodintro
+  rw [drain_disk_wr v k]
+  iframe Hdk Hst HC
+  iapply diskProto_drain γ v k $$ HR
 
 /-! ### Reading one descriptor slot -/
 
@@ -3047,28 +3102,28 @@ theorem leaseV_ring_pin (γ : DiskNames) (c0 : VirtioCfg) (lo : Nat) (v s' : Vir
 /-! ### The loop -/
 
 set_option maxHeartbeats 1000000 in
-theorem leaseV_body (γ : DiskNames) :
-    DevM.LeaseV (diskProto (GF := GF) γ) (diskTaskRes γ) (diskRoot γ) (diskRoot γ)
-      Virtio.body := by
+theorem leaseD_body (γ : DiskNames) :
+    DevM.LeaseD (fun s : VirtioState => s.disk) (diskDrainEnv (hlc := hlc) (GF := GF)) (⊤ \ ↑diskN)
+      (diskProto (GF := GF) γ) (diskTaskRes γ) (diskRoot γ) (diskRoot γ) Virtio.body := by
   unfold Virtio.body DevM.chooseLt DevM.choose DevM.get DevM.modify DevM.guard DevM.step
     DevM.lift Virtio.dma16 DevM.dmaRead DevM.fork
   simp only [bind, DevM.bind, Pure.pure]
-  refine DevM.LeaseV.op _ _ _ (fun _ _ _ _ => nofun) (fun _ _ => nofun) nofun
+  refine DevM.LeaseD.op _ _ _ (fun _ _ _ _ => nofun) (fun _ _ => nofun) nofun
     (fun _ => nofun) (fun _ => nofun) (fun _ _ _ => nofun) (fun kk => ?_)
   split
-  · refine DevM.LeaseV.get _ (X := Nat × VirtioCfg)
+  · refine DevM.LeaseD.get _ (X := Nat × VirtioCfg)
       (fun s x => bodyKnow γ s x.1 x.2) _ (fun s => leaseV_root_get γ s) (fun v x => ?_)
     obtain ⟨lo, c0⟩ := x
     split
     · rename_i hlive
-      refine DevM.LeaseV.dmaReadV _ _ 2 (fun _ _ => True)
+      refine DevM.LeaseD.dmaReadV _ _ 2 (fun _ _ => True)
         (fun w => iprop(bodyKnow γ v lo c0 ∗ availAnswer γ lo w)) _ ?_ (fun ai _ => ?_)
       · intro s'
         exact leaseV_avail_pin γ c0 lo v s' hlive
       · simp only [bind, DevM.bind, Pure.pure]
         split
         · rename_i hne
-          refine DevM.LeaseV.dmaReadV _ _ 2 (fun _ _ => True)
+          refine DevM.LeaseD.dmaReadV _ _ 2 (fun _ _ => True)
             (fun w => iprop(bodyKnow γ v lo c0 ∗ ringAnswer γ lo w)) _ ?_ (fun hw _ => ?_)
           · intro s'
             iintro ⟨⟨HC, Hans⟩, HR⟩
@@ -3077,17 +3132,17 @@ theorem leaseV_body (γ : DiskNames) :
               (fun hx => hne (by rw [hsn, hx]))
             iframe HC Hans HR
           · simp only [bind, DevM.bind, Pure.pure]
-            refine DevM.LeaseV.get _ (X := Unit)
+            refine DevM.LeaseD.get _ (X := Unit)
               (fun _ _ => iprop(bodyKnow γ v lo c0 ∗ ringAnswer γ lo hw)) _
               (fun s1 => leaseV_get_keep γ _ s1) (fun popped _ => ?_)
             split
-            · refine DevM.LeaseV.pure _ () ?_
+            · refine DevM.LeaseD.pure _ () ?_
               iintro ⟨HC, _⟩
               iapply bodyKnow_root γ v lo c0 $$ HC
-            · refine DevM.LeaseV.step _
+            · refine DevM.LeaseD.step _
                 iprop(diskLoTok γ (lo + 1) ∗ diskUp γ ∗
                   ∃ (k : Nat) (c : Chain), permTok γ k (hw.extractLsb' 0 16) c none none)
-                _ _ ?_ ?_
+                _ _ ?_ ?_ ?_
               · intro s1 s2 os hgs
                 have hgs' := guard_step_inv _ s2 os hgs
                 replace hgs' : (if (Virtio.phase s1 (hw.extractLsb' 0 16)).isSome = true
@@ -3119,31 +3174,42 @@ theorem leaseV_body (γ : DiskNames) :
                 iexists c0
                 iframe Hfr
                 ipureintro; exact ⟨hp.2.2.1, hp.2.2.2⟩
-              · refine DevM.LeaseV.fork _ iprop(diskLoTok γ (lo + 1)) _ _ ?_
-                  (fun _ => DevM.LeaseV.pure _ () (diskLoTok_root γ (lo + 1)))
+              · -- the pop keeps the durable image
+                intro s1 s2 os hgs
+                have hgs' := guard_step_inv _ s2 os hgs
+                replace hgs' : (if (Virtio.phase s1 (hw.extractLsb' 0 16)).isSome = true
+                    then none
+                    else some { Virtio.setPhase s1 (hw.extractLsb' 0 16) .popped with
+                      seen := s1.seen + 1#16 }) = some s2 := hgs'
+                split at hgs'
+                · exact absurd hgs' (by simp)
+                · simp only [Option.some.injEq] at hgs'
+                  subst hgs'
+                  rfl
+              · refine DevM.LeaseD.fork _ iprop(diskLoTok γ (lo + 1)) _ _ ?_
+                  (fun _ => DevM.LeaseD.pure _ () (diskLoTok_root γ (lo + 1)))
                 rw [diskTaskRes_serve]
-        · refine DevM.LeaseV.pure _ () ?_
+        · refine DevM.LeaseD.pure _ () ?_
           iintro ⟨HC, _⟩
           iapply bodyKnow_root γ v lo c0 $$ HC
-    · refine DevM.LeaseV.pure _ () (bodyKnow_root γ v lo c0)
+    · refine DevM.LeaseD.pure _ () (bodyKnow_root γ v lo c0)
   · split
-    · refine DevM.LeaseV.get _ (X := Unit) (fun _ _ => diskRoot γ) _
+    · refine DevM.LeaseD.get _ (X := Unit) (fun _ _ => diskRoot γ) _
         (fun s => leaseV_get_keep γ (diskRoot γ) s) (fun v _ => ?_)
       split
-      · exact DevM.LeaseV.pure _ () .rfl
-      · refine DevM.LeaseV.op _ _ _ (fun _ _ _ _ => nofun) (fun _ _ => nofun) nofun
+      · exact DevM.LeaseD.pure _ () .rfl
+      · refine DevM.LeaseD.op _ _ _ (fun _ _ _ _ => nofun) (fun _ _ => nofun) nofun
           (fun _ => nofun) (fun _ => nofun) (fun _ _ _ => nofun) (fun j => ?_)
-        refine DevM.LeaseV.step _ (diskRoot γ) _ _ ?_ (DevM.LeaseV.pure _ () .rfl)
+        -- THE DRAIN (D40): the one step that moves the durable image, LENT the
+        -- durable authority; the permit it spends is the environment's
+        refine DevM.LeaseD.stepD _ (diskRoot γ) _ _ ?_ (DevM.LeaseD.pure _ () .rfl)
         intro s1 s2 os hgs
         have hs2 : s2 = Virtio.drain s1 (s1.cache.getD (j % v.cache.length) (0, [])).1 := by
           simp only [Option.some.injEq, Prod.mk.injEq] at hgs
           exact hgs.1.symm
         subst hs2
-        iintro ⟨HC, HR⟩
-        imodintro
-        iframe HC
-        iapply diskProto_drain γ s1 _ $$ HR
-    · exact DevM.LeaseV.pure _ () .rfl
+        exact diskDrain_step γ s1 _
+    · exact DevM.LeaseD.pure _ () .rfl
 
 /-! ## The device-side theorem -/
 
@@ -3152,11 +3218,15 @@ covered by a lease out of `diskProto`, every DMA read is pinned, and every
 move of the device's own state carries the protocol along -- the install
 included, which is what the serve permit buys -- and the ROOT LOOP holds
 the pop counter's half from one iteration to the next. -/
-theorem disk_leaseV (γ : DiskNames) :
-    DevSig.LeaseV .virtio (diskProto (GF := GF) γ) (diskTaskRes γ) (diskRoot γ) := by
-  refine ⟨leaseV_body γ, fun t => ?_⟩
+theorem disk_leaseD (γ : DiskNames) :
+    DevSig.LeaseD (diskDrainEnv (hlc := hlc) (GF := GF)) (⊤ \ ↑diskN) (diskProto (GF := GF) γ)
+      (diskTaskRes γ) (diskRoot γ) := by
+  refine ⟨leaseD_body γ, fun t => ?_⟩
   cases t with
-  | serve h => rw [diskTaskRes_serve]; exact leaseV_of_leaseL _ _ _ _ _ (leaseL_serve γ h)
+  | serve h =>
+    rw [diskTaskRes_serve]
+    exact leaseD_of_leaseV _ _ _ _ _ _ _ _
+      (leaseV_of_leaseL _ _ _ _ _ (leaseL_serve γ h)) (Virtio.serve_keepsDisk h)
 
 /-- **The disk's device thread is safe under its invariant**, with no
 assumption left -- the instance of `MachCSL.wpDev_dmaV` the adequacy
@@ -3164,12 +3234,12 @@ theorem forks.  `diskRoot γ` is what the boot client hands the root task
 once, at power-on: the other half of the pop counter, whose invariant half
 sits beside `⌜v.seen = wrap16 lo⌝`. -/
 theorem wpDev_disk_inv (γ : DiskNames) :
-    diskInv γ ∗ genCert ∗ diskRoot γ ⊢@{IProp GF}
+    diskInv γ ∗ genCert ∗ diskDrainEnv ∗ diskRoot γ ⊢@{IProp GF}
       devWP (genId (hlc := hlc) (GF := GF)) .virtio rootTask (DevM.pure ()) := by
   unfold diskInv
-  iintro ⟨Hinv, Hcert, Hroot⟩
-  iapply wpDev_dmaV_root diskN .virtio devSilent_virtio (diskProto γ) (diskTaskRes γ) (diskRoot γ)
-    (disk_leaseV γ)
-  iframe Hinv Hcert Hroot
+  iintro ⟨Hinv, Hcert, Henv, Hroot⟩
+  iapply wpDev_dmaD_root diskN diskDrainEnv (diskProto γ) (diskTaskRes γ) (diskRoot γ)
+    (disk_leaseD γ)
+  iframe Hinv Hcert Henv Hroot
 
 end

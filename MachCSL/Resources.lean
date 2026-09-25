@@ -38,6 +38,8 @@ prototype's `mm_ok`/`itv_ok`/`hr_ok`/`resv_ok`).
 import MachCSL.Lang
 import MachCSL.ObsTrace
 import MachCSL.LogEntryDefs
+import MachCSL.DiskImg
+import MachCSL.DiskOf
 import Iris.BI.Lib.GenHeap
 import Iris.BI.Lib.MonoList
 import Iris.Instances.Lib.Invariants
@@ -86,6 +88,15 @@ abbrev ResvVal := Option Resv × Bool
 ghost variables: one `GhostVarG` covers every device). -/
 abbrev DevVal := (d : DevId) × DevSt d
 
+/-- THE ERA'S MIRROR OF THE DURABLE DISK (Rocq `RiscvPtsto.log_mirror`):
+one total block view -- the era's picture of every durable block's contents,
+homes included.  Defined HERE, not in the FS layer, for Rocq's reason: the
+era record below needs its name and the fixed class below needs its
+`GhostVarG`, and both sit under every FS file.  It carries no FS constant;
+its readings (`lmUpd`, `lmHdr`, ...) are the log layer's (`Xv6.LogDefs`). -/
+structure LogMirror where
+  view : Nat → List (BitVec 8)
+
 /-- One era's ghost names: a register map per hart, the memory heap, and the
 memory-model mirrors. -/
 structure EraGS (GF : BundledGFunctors) where
@@ -121,6 +132,14 @@ structure EraGS (GF : BundledGFunctors) where
   device's invariant (the Rocq prototype's `uart_frag`/`plic_frag`/
   `virtio_frag`) -/
   devName : DevId → GName
+  /-- THE FS LOG-REGION MIRROR (Rocq `era_mirror_name`): this era's ghost
+  variable over the durable disk's picture (`LogMirror`), split 1/2 - 1/2
+  between the log layer and the crash predicate's checked-out arm.  PER-ERA
+  for the durable image's reason: the log layer's half dies with the era,
+  and a fixed name's stranded half could never be re-paired at the next
+  boot.  Which era's name the arm holds is pinned by the swap counter
+  (`MachFixedGS.swapName`). -/
+  mirrorName : GName
 
 /-- The functors the machine needs (for adequacy: what a `BundledGFunctors`
 must contain). -/
@@ -144,6 +163,10 @@ class MachGpreS (hlc : outParam HasLC) (GF : BundledGFunctors) extends InvGpreS 
   obsVar_pre : GhostVarG GF (List Obs)
   /-- the history's growth authority's functor -/
   obsHist_pre : MonoListG GF Obs
+  /-- the durable disk's functor (`MachCSL.DiskImg`) -/
+  diskImg_pre : GhostMapG GF Nat (BitVec 8) DiskMapF
+  /-- the era mirror's functor (`LogMirror`) -/
+  mirror_pre : GhostVarG GF LogMirror
 
 attribute [reducible, instance] MachGpreS.reg_pre
 attribute [reducible, instance] MachGpreS.mem_pre
@@ -159,6 +182,8 @@ attribute [reducible, instance] MachGpreS.kptroot_pre
 attribute [reducible, instance] MachGpreS.dev_pre
 attribute [reducible, instance] MachGpreS.obsVar_pre
 attribute [reducible, instance] MachGpreS.obsHist_pre
+attribute [reducible, instance] MachGpreS.diskImg_pre
+attribute [reducible, instance] MachGpreS.mirror_pre
 
 /-- The fixed layer: allocated once, survives every power cycle. -/
 class MachFixedGS (hlc : outParam HasLC) (GF : BundledGFunctors) where
@@ -250,6 +275,40 @@ class MachFixedGS (hlc : outParam HasLC) (GF : BundledGFunctors) where
   boot (`powerBootRes`). -/
   consRes : Nat → List Obs → ConsHist → IProp GF
   consRes_timeless : ∀ k h H, Timeless (consRes k h H)
+  /-- THE DURABLE DISK'S TYPING (Rocq `riscvF_diskGS`): the ONE capacity
+  instance of the `Nat ↦ BitVec 8` ghost map (`MachCSL.DiskImg`). -/
+  diskImgG : GhostMapG GF Nat (BitVec 8) DiskMapF
+  /-- THE DURABLE DISK'S NAME (Rocq `riscv_disk_name`, crash.md "The durable
+  disk: ONE fixed gname").  A FIXED-layer name: the state interpretation
+  holds its AUTH at the machine's own image (`diskFixedInterp`) -- a fixed
+  conjunct, because the disk is the one thing a power cycle preserves, so
+  both power arms simply frame it.  The crash predicate owns the FRAGMENTS,
+  all of them, forever: no thread that can die ever holds one.  Auth/fragment
+  agreement is THE TIE between the crash predicate and the real disk. -/
+  diskName : GName
+  /-- ...and its SIZE (Rocq `riscv_disk_size`): every minted offset is below
+  it (`diskImgAuthSized`), which is what lets the one owner of the whole
+  `[0, size)` fragment -- the crash predicate -- move the image under any
+  write at all.  A machine constant of the run. -/
+  diskSize : Nat
+  /-- THE CRASH PREDICATE (Rocq `riscv_crash_pred`): the client's durability
+  invariant over the durable disk, sealed into `crashInv`.  A bare
+  proposition: it owns the durable fragments, and a disk DRAIN
+  re-establishes it by running the client's own view shift with the
+  authority lent for the instant (`diskWritePermit`).  An ARBITRARY
+  predicate; nothing between here and the disk thread names it. -/
+  crashPred : IProp GF
+  /-- THE SWAP COUNTER (Rocq `riscv_swap_name`): a mono-nat whose FULL auth
+  lives inside the crash predicate's checked-out arm, at the generation in
+  custody of the FS record; an era keeps only a persistent lower bound
+  (`swapLb`, its swap receipt).  With the started-generations auth the drain
+  lends, the two bounds SQUEEZE the arm's generation onto the ambient one,
+  which identifies the arm's mirror name. -/
+  swapName : GName
+  /-- the era mirror's functor (Rocq `riscvF_mirrorGS`): the ONE capacity
+  instance of `GhostVarG GF LogMirror`; the NAME is per-era
+  (`EraGS.mirrorName`). -/
+  mirrorG : GhostVarG GF LogMirror
 
 attribute [reducible, instance] MachFixedGS.reg
 attribute [reducible, instance] MachFixedGS.memPre
@@ -265,6 +324,8 @@ attribute [reducible, instance] MachFixedGS.kptRootG
 attribute [reducible, instance] MachFixedGS.devG
 attribute [reducible, instance] MachFixedGS.obsVarG
 attribute [reducible, instance] MachFixedGS.obsHistG
+attribute [reducible, instance] MachFixedGS.diskImgG
+attribute [reducible, instance] MachFixedGS.mirrorG
 attribute [instance] MachFixedGS.rxTag_persistent MachFixedGS.rxTag_timeless
 attribute [instance] MachFixedGS.killCred_persistent MachFixedGS.killCred_timeless
 attribute [instance] MachFixedGS.consRes_timeless
@@ -300,6 +361,8 @@ class MachGS (hlc : outParam HasLC) (GF : BundledGFunctors) where
   kptRootName : GName
   /-- the device mirrors (see `EraGS.devName`) -/
   devName : DevId → GName
+  /-- the era's durable-disk mirror (see `EraGS.mirrorName`) -/
+  mirrorName : GName
   gen : Nat
   /-- the running-proc claim of a hart (`MachCSL.KCtx.cpuClaim`): the client
   chooses it when it instantiates the machine (the xv6 client: the claimed
@@ -334,7 +397,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors}
    MachGS.authName (hlc := hlc) (GF := GF), MachGS.resvName (hlc := hlc) (GF := GF),
    MachGS.lockSetName (hlc := hlc) (GF := GF), MachGS.kmapName (hlc := hlc) (GF := GF),
    MachGS.kptRootName (hlc := hlc) (GF := GF),
-   MachGS.devName (hlc := hlc) (GF := GF)⟩
+   MachGS.devName (hlc := hlc) (GF := GF), MachGS.mirrorName (hlc := hlc) (GF := GF)⟩
 
 /-- The register-map ghost name of hart `cpu` in the ambient era. -/
 def regName [MachGS hlc GF] (cpu : CPU) : GName := MachGS.regName (hlc := hlc) (GF := GF) cpu
@@ -937,13 +1000,36 @@ def eraCur (R : RegMapF (EraGS GF)) (g : GState) : IProp GF :=
   | true => iprop(∃ E, ⌜get? R g.gen = some E⌝ ∗ eraInterp E g.m)
   | false => iprop(True)
 
+/-- The durable disk's authority at an image (Rocq `disk_fixed_auth`): what
+the state interpretation holds and what a disk drain lends a permit for the
+instant. -/
+def diskFixedAuth (dk : Nat → BitVec 8) : IProp GF :=
+  diskImgAuthSized (MachFixedGS.diskName (hlc := hlc) (GF := GF))
+    (MachFixedGS.diskSize (hlc := hlc) (GF := GF)) dk
+
+instance (dk : Nat → BitVec 8) : Timeless (PROP := IProp GF) (diskFixedAuth dk) := by
+  unfold diskFixedAuth; infer_instance
+
+/-- THE DURABLE DISK'S MACHINE SIDE (Rocq `disk_fixed_interp`): the fixed
+name's authority, always at the machine's own image.  A FIXED conjunct, not
+part of `eraInterp`: the disk is the one thing a power cycle preserves, so
+its authority survives `PowerOff` -- both power arms frame it (`bootShape`
+keeps the image).  Of the whole machine only the disk's own steps move the
+image, so only the disk's lifting rule (`MachCSL.wpDev_lift_obs_disk`)
+hands this conjunct to its callback; the hart, UART and PLIC rules frame it
+through `MachCSL.hartStep_diskOf`/`devStep_diskOf`. -/
+def diskFixedInterp (g : GState) : IProp GF := diskFixedAuth (diskOf g.m.devs)
+
 /-- The state interpretation: the fixed ghosts pinned to the state, and the
-current era's interpretation while powered. -/
+current era's interpretation while powered.  The durable disk's authority
+rides LAST (Rocq places `disk_fixed_interp` third; last here so the
+positional patterns of the lifting rules keep their shape). -/
 def powerInterp (g : GState) : IProp GF := iprop%
   genAuth g.gen ∗ startAuth (startCount g) ∗
-  ∃ R : RegMapF (EraGS GF),
+  (∃ R : RegMapF (EraGS GF),
     (MachFixedGS.registryName (hlc := hlc) (GF := GF) ↪●MAP R) ∗ ⌜registryOk R (startCount g)⌝ ∗
-    eraCur R g
+    eraCur R g) ∗
+  diskFixedInterp g
 
 /-! ### The observation history (Rocq `RiscvPtsto`: `obs_hist_lb` … `obs_interp`) -/
 
@@ -1139,6 +1225,36 @@ threads' observed arms (through their permits). -/
 def obsInv : IProp GF := inv obsN (MachFixedGS.obsPred (hlc := hlc) (GF := GF))
 
 instance : Persistent (PROP := IProp GF) obsInv := by unfold obsInv; infer_instance
+
+/-! ### The crash-spanning invariant and the swap counter (Rocq `RiscvPtsto`:
+`crashN`, `crash_inv`, `swap_auth`, `swap_lb`) -/
+
+/-- The crash invariant's namespace, disjoint from `obsN` and from every
+device namespace, so the drain can hold them all open. -/
+def crashN : Namespace := ndot nroot "crash"
+
+/-- THE CRASH INVARIANT (Rocq `crash_inv`): the client's predicate, and
+nothing beside it -- the tie to the real disk is the auth/fragment agreement
+against `diskFixedInterp`, available to the one opener (the disk's drain) at
+its step.  Allocated once, in adequacy, over the fixed layer's `crashPred`;
+it spans power cycles for free, since neither power arm moves the image. -/
+def crashInv : IProp GF := inv crashN (MachFixedGS.crashPred (hlc := hlc) (GF := GF))
+
+instance : Persistent (PROP := IProp GF) crashInv := by unfold crashInv; infer_instance
+
+/-- THE SWAP COUNTER's authority (Rocq `swap_auth`): rides in the crash
+predicate's checked-out arm at the generation in custody. -/
+def swapAuth (g : Nat) : IProp GF :=
+  MonoNat.auth_own (MachFixedGS.swapName (hlc := hlc) (GF := GF)) (DFrac.own 1) (.ofNat g)
+
+/-- The persistent SWAP RECEIPT (Rocq `swap_lb`) an era keeps once its
+`initlog` took custody. -/
+def swapLb (g : Nat) : IProp GF :=
+  MonoNat.lb_own (MachFixedGS.swapName (hlc := hlc) (GF := GF)) (.ofNat g)
+
+instance (g : Nat) : Persistent (PROP := IProp GF) (swapLb g) := by unfold swapLb; infer_instance
+instance (g : Nat) : Timeless (PROP := IProp GF) (swapLb g) := by unfold swapLb; infer_instance
+instance (g : Nat) : Timeless (PROP := IProp GF) (swapAuth g) := by unfold swapAuth; infer_instance
 
 /-! ### Facts the counters give against their certificates -/
 

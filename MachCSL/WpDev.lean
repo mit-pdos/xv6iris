@@ -147,8 +147,15 @@ theorem wpDev_elim (d : DevId) (tid : TaskId) (m : DevProg d) :
   iintro ⟨H, Hc⟩
   iapply H $$ Hc
 
-/-- **The lifting lemma for device tasks, OBSERVED** (the Rocq
-`RiscvExec.wp_uart_step`, device-generic).  A device step may be observed
+/-- **The lifting lemma for device tasks, OBSERVED, with the durable disk
+LENT** (the Rocq `RiscvExec.wp_uart_step` and `wp_disk_step`,
+device-generic).  Beside the history ghost (below), the callback is handed
+the state interpretation's durable-disk authority at the image the step
+starts from and the started-generations authority at the live era's count
+(`genId + 1`), and gives them back at the image the step reaches -- which
+is what lets the disk's DRAIN run the client's write permit
+(`MachCSL.diskWritePermit`) at the instant the image moves.  A device that is
+not the disk frames both (`wpDev_lift_obs`).  A device step may be observed
 (the UARTs' tx/rx arms), so this rule hands its callback the state
 interpretation's half of the HISTORY ghost (`obsAuth h`) at the history so
 far -- with the three facts about it the callback can use: the power is on
@@ -158,14 +165,16 @@ the history belongs to THIS generation's era) -- and takes it back at
 `h ++ obs`.  The client can only get there with the OTHER half, which lives
 in its trace predicate (`obsInv`): that is how every observation is
 authorised by the client (`devObsPermit`). -/
-theorem wpDev_lift_obs (d : DevId) (tid : TaskId) (m : DevProg d) :
+theorem wpDev_lift_obs_disk (d : DevId) (tid : TaskId) (m : DevProg d) :
     (∀ σ (h : List Obs),
       ⌜traceShape h true ∧ (∀ i, obsWire i (openSeg h) = σ.devs.wire i) ∧
         obsBoots h = genId (hlc := hlc) (GF := GF) + 1⌝ -∗
-      machInterp σ ∗ obsAuth h ={⊤,∅}=∗
+      machInterp σ ∗ obsAuth h ∗ diskFixedAuth (diskOf σ.devs) ∗
+        startAuth (genId (hlc := hlc) (GF := GF) + 1) ={⊤,∅}=∗
       ⌜∃ obs m' σ' efs, devStep (genId (hlc := hlc) (GF := GF)) d tid m σ obs m' σ' efs⌝ ∗
       ▷ ∀ obs m' σ' efs, ⌜devStep (genId (hlc := hlc) (GF := GF)) d tid m σ obs m' σ' efs⌝ -∗
-        £ 1 ={∅,⊤}=∗ machInterp σ' ∗ obsAuth (h ++ obs) ∗ wpDev d tid m' ∗
+        £ 1 ={∅,⊤}=∗ machInterp σ' ∗ obsAuth (h ++ obs) ∗ diskFixedAuth (diskOf σ'.devs) ∗
+          startAuth (genId (hlc := hlc) (GF := GF) + 1) ∗ wpDev d tid m' ∗
           [∗list] ef ∈ efs, WP ef @ Stuckness.NotStuck; ⊤ {{ _v, True }})
     ⊢@{IProp GF} wpDev d tid m := by
   unfold wpDev devWP
@@ -177,7 +186,7 @@ theorem wpDev_lift_obs (d : DevId) (tid : TaskId) (m : DevProg d) :
   rw [stateInterp_eq]
   icases Hσ with ⟨Hσ, Hobs⟩
   unfold powerInterp
-  icases Hσ with ⟨Hgen, Hstart, %R, HR, %Hok, Hcur⟩
+  icases Hσ with ⟨Hgen, Hstart, ⟨%R, HR, %Hok, Hcur⟩, Hdisk⟩
   ihave %Hb' := genAuth_born _ _ $$ Hgen Hborn
   ihave %Hs' := startAuth_started _ _ $$ Hstart Hstarted
   by_cases hge : g.gen = genId (hlc := hlc) (GF := GF)
@@ -204,8 +213,12 @@ theorem wpDev_lift_obs (d : DevId) (tid : TaskId) (m : DevProg d) :
       obtain ⟨hsh, hbt, hwire⟩ := hwf
       rw [hpow] at hsh hbt
       exact ⟨hsh, hwire hpow, by rw [hbt, hge]; rfl⟩
-    imod H $$ %g.m %h %hfacts [Hera Ha] with ⟨%Hred, H⟩
-    · iframe Hera Ha
+    have hsc : startCount g = genId (hlc := hlc) (GF := GF) + 1 := by
+      simp [startCount, hpow, hge]
+    rw [hsc]
+    unfold diskFixedInterp
+    imod H $$ %g.m %h %hfacts [Hera Ha Hdisk Hstart] with ⟨%Hred, H⟩
+    · iframe Hera Ha Hdisk Hstart
     imodintro
     isplit
     · ipureintro
@@ -214,7 +227,7 @@ theorem wpDev_lift_obs (d : DevId) (tid : TaskId) (m : DevProg d) :
     inext
     iintro %e₂ %g₂ %eₜ %Hstep Hcred
     rcases primStep_dev_inv Hstep with ⟨_, m', σ', rfl, hs, rfl⟩ | ⟨hnl, _⟩
-    · imod H $$ %obs %m' %σ' %eₜ %hs Hcred with ⟨Hσ', Ha, Hwp, Hefs⟩
+    · imod H $$ %obs %m' %σ' %eₜ %hs Hcred with ⟨Hσ', Ha, Hdisk, Hstart, Hwp, Hefs⟩
       imodintro
       -- the trace conjunct, re-packed at the extended history: the client
       -- moved the ghost, the language's step invariant does the rest
@@ -222,14 +235,16 @@ theorem wpDev_lift_obs (d : DevId) (tid : TaskId) (m : DevProg d) :
       rw [stateInterp_eq]
       unfold powerInterp
       iframe Hobs
-      rw [show startCount { g with m := σ' } = startCount g from rfl]
+      rw [show startCount { g with m := σ' } = startCount g from rfl, hsc]
       iframe Hgen Hstart
+      unfold diskFixedInterp
+      iframe Hdisk
       isplitl [HR Hσ']
       · iexists R
         iframe HR
         isplit
         · ipureintro
-          exact Hok
+          rw [← hsc]; exact Hok
         rw [eraCur_true (g := { g with m := σ' }) hpow]
         iexists (MachGS.era (hlc := hlc) (GF := GF))
         isplit
@@ -260,7 +275,7 @@ theorem wpDev_lift_obs (d : DevId) (tid : TaskId) (m : DevProg d) :
     rw [stateInterp_eq]
     unfold powerInterp
     iframe Hobs
-    iframe Hgen Hstart
+    iframe Hgen Hstart Hdisk
     isplitl [HR Hcur]
     · iexists R
       iframe HR Hcur
@@ -271,6 +286,35 @@ theorem wpDev_lift_obs (d : DevId) (tid : TaskId) (m : DevProg d) :
       iexact Hdead
     · exact BigSepL.bigSepL_nil_intro
 
+
+/-- **The lifting lemma for device tasks, OBSERVED** (the Rocq
+`RiscvExec.wp_uart_step`, device-generic): `wpDev_lift_obs_disk` for a
+device whose steps never move the durable image (`DevDiskInert`), which
+frames the lent authorities. -/
+theorem wpDev_lift_obs (d : DevId) [hd : DevDiskInert d] (tid : TaskId) (m : DevProg d) :
+    (∀ σ (h : List Obs),
+      ⌜traceShape h true ∧ (∀ i, obsWire i (openSeg h) = σ.devs.wire i) ∧
+        obsBoots h = genId (hlc := hlc) (GF := GF) + 1⌝ -∗
+      machInterp σ ∗ obsAuth h ={⊤,∅}=∗
+      ⌜∃ obs m' σ' efs, devStep (genId (hlc := hlc) (GF := GF)) d tid m σ obs m' σ' efs⌝ ∗
+      ▷ ∀ obs m' σ' efs, ⌜devStep (genId (hlc := hlc) (GF := GF)) d tid m σ obs m' σ' efs⌝ -∗
+        £ 1 ={∅,⊤}=∗ machInterp σ' ∗ obsAuth (h ++ obs) ∗ wpDev d tid m' ∗
+          [∗list] ef ∈ efs, WP ef @ Stuckness.NotStuck; ⊤ {{ _v, True }})
+    ⊢@{IProp GF} wpDev d tid m := by
+  iintro H
+  iapply wpDev_lift_obs_disk d tid m
+  iintro %σ %h %hf ⟨Hσ, Ha, Hdk, Hst⟩
+  imod H $$ %σ %h %hf [Hσ Ha] with ⟨%Hred, H⟩
+  · iframe Hσ Ha
+  imodintro
+  isplit
+  · ipureintro; exact Hred
+  inext
+  iintro %obs %m' %σ' %efs %hs Hcred
+  imod H $$ %obs %m' %σ' %efs %hs Hcred with ⟨Hσ', Ha, Hwp, Hefs⟩
+  imodintro
+  rw [devStep_diskOf hd.ne hs]
+  iframe Hσ' Ha Hdk Hst Hwp Hefs
 
 /-- A SILENT device's step observes nothing (the PLIC, the disk). -/
 theorem devStep_silent (gen : Nat) (d : DevId) (hsil : DevSilent d) (tid : TaskId) (m : DevProg d)
@@ -312,7 +356,7 @@ theorem devOpStep_obs_nil (gen : Nat) (d : DevId) (o : DevOp (DevSt d) (DevTask 
 /-- The lifting lemma for the tasks of a SILENT device (every device but the
 UARTs): its steps observe nothing, so the history ghost is framed and the
 callback is the unobserved one. -/
-theorem wpDev_lift (d : DevId) (hsil : DevSilent d) (tid : TaskId) (m : DevProg d) :
+theorem wpDev_lift (d : DevId) [DevDiskInert d] (hsil : DevSilent d) (tid : TaskId) (m : DevProg d) :
     (∀ σ, machInterp σ ={⊤,∅}=∗
       ⌜∃ obs m' σ' efs, devStep (genId (hlc := hlc) (GF := GF)) d tid m σ obs m' σ' efs⌝ ∗
       ▷ ∀ obs m' σ' efs, ⌜devStep (genId (hlc := hlc) (GF := GF)) d tid m σ obs m' σ' efs⌝ -∗
@@ -556,7 +600,7 @@ theorem devOpStep_local (gen : Nat) (d : DevId) (o : DevOp (DevSt d) (DevTask d)
 
 set_option maxHeartbeats 4000000 in
 /-- Every task of a local device is safe under its mirror invariant. -/
-theorem wpDev_local (N : Namespace) (d : DevId) (hsil : DevSilent d) (hloc : DevSig.Local d) :
+theorem wpDev_local (N : Namespace) (d : DevId) [DevDiskInert d] (hsil : DevSilent d) (hloc : DevSig.Local d) :
     devInv N d ∗ genCert ⊢@{IProp GF} ∀ (tid : TaskId) (m : DevProg d), ⌜DevM.Local m⌝ →
       devWP (genId (hlc := hlc) (GF := GF)) d tid m := by
   unfold devInv
@@ -786,7 +830,7 @@ theorem devStepPermit_of_obs (N : Namespace) (d : DevId) (rel : DevSt d → DevS
 /-- `wpDev_local` for an invariant carrying `R`: every move of the device is
 a move of `rel`, and the client's step permit carries its ghosts (and the
 history) across it. -/
-theorem wpDev_localO (N : Namespace) (d : DevId) (rel : DevSt d → DevSt d → List DevObs → Prop)
+theorem wpDev_localO (N : Namespace) (d : DevId) [DevDiskInert d] (rel : DevSt d → DevSt d → List DevObs → Prop)
     (R : DevSt d → IProp GF) [∀ s, Timeless (R s)] (hloc : DevSig.LocalO d rel) :
     devInvR N d R ∗ devStepPermit N d rel R ∗ genCert ⊢@{IProp GF}
       ∀ (tid : TaskId) (m : DevProg d), ⌜DevM.LocalO rel m⌝ →
@@ -915,7 +959,7 @@ theorem wpDev_localO (N : Namespace) (d : DevId) (rel : DevSt d → DevSt d → 
 /-- `wpDev_local` for an invariant carrying `R`: the device's own updates
 stay inside `rel`, along which the client updates `R`; its observed moves are
 authorised by the client's permit. -/
-theorem wpDev_localR (N : Namespace) (d : DevId) (rel : DevSt d → DevSt d → Prop)
+theorem wpDev_localR (N : Namespace) (d : DevId) [DevDiskInert d] (rel : DevSt d → DevSt d → Prop)
     (R : DevSt d → IProp GF) [∀ s, Timeless (R s)] (hloc : DevSig.LocalR d rel)
     (hR : ∀ s s', rel s s' → R s ⊢@{IProp GF} |==> R s') :
     devInvR N d R ∗ devObsPermit N d R ∗ genCert ⊢@{IProp GF}

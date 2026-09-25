@@ -178,7 +178,7 @@ theorem wpHart_lift (cpu : CPU) (m : SailM Unit) :
   rw [stateInterp_eq]
   icases Hσ with ⟨Hσ, Hobs⟩
   unfold powerInterp
-  icases Hσ with ⟨Hgen, Hstart, %R, HR, %Hok, Hcur⟩
+  icases Hσ with ⟨Hgen, Hstart, ⟨%R, HR, %Hok, Hcur⟩, Hdisk⟩
   ihave %Hb' := genAuth_born _ _ $$ Hgen Hborn
   ihave %Hs' := startAuth_started _ _ $$ Hstart Hstarted
   by_cases hge : g.gen = genId (hlc := hlc) (GF := GF)
@@ -216,6 +216,11 @@ theorem wpHart_lift (cpu : CPU) (m : SailM Unit) :
       iframe Hobs
       rw [show startCount { g with m := σ' } = startCount g from rfl]
       iframe Hgen Hstart
+      -- the durable disk: a hart step never moves it
+      have hdk : diskFixedInterp (hlc := hlc) (GF := GF) { g with m := σ' } = diskFixedInterp g := by
+        unfold diskFixedInterp; rw [show diskOf σ'.devs = diskOf g.m.devs from hartStep_diskOf hs]
+      rw [hdk]
+      iframe Hdisk
       isplitl [HR Hσ']
       · iexists R
         iframe HR
@@ -254,7 +259,7 @@ theorem wpHart_lift (cpu : CPU) (m : SailM Unit) :
     rw [stateInterp_eq]
     unfold powerInterp
     iframe Hobs
-    iframe Hgen Hstart
+    iframe Hgen Hstart Hdisk
     isplitl [HR Hcur]
     · iexists R
       iframe HR Hcur
