@@ -21,7 +21,7 @@ between the bcache's slot map and the log's transaction map) is GONE: both
 use the one shared camera `Xv6G.gmUnitG`, told apart by ghost name.  The header block's clean tie -- what used to be a second named
 hypothesis here -- is DISCHARGED
 in `Xv6/ProofInitlog.lean` (`Xv6.il_pay_agree`) off the bio layer's payload
-hooks, against `Xv6/SpecInitlog.lean`'s boot premise `hdrN bsHdr = 0`.
+hooks.
 -/
 import Xv6.LogInv
 
@@ -119,10 +119,7 @@ this port's ghost state does not relate, not a false arithmetic.
 `SpecInitlog` could not be specified at `hdr_n > 0` -- is GONE.  The byte
 view is in: the recovering arm's per-entry row is Rocq's `emp` and the home
 block's content moves inside `Xv6.fsBytesInv` through
-`Xv6.fsblock_install_exc`.  `SpecInitlog` still carries
-`hhdr0 : hdrN bsHdr = 0`, but for a different and purely PROOF-side reason,
-recorded in `Xv6/SpecInitlog.lean`: this port's `initlog` walk is written at
-the empty write set throughout.) -/
+`Xv6.fsblock_install_exc`, and `SpecInitlog` is general in `n`.) -/
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]

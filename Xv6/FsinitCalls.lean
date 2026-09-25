@@ -154,12 +154,21 @@ theorem fsinit_initlog_call (IL : INITLOG) [Fscfg] [Icfg] [CurCtx]
       bslots fscBio 2 -∗
       logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev -∗ wpLoop cpu'))
       ⊢ wpLoop (GF := GF) cpu := by
+  unfold fsBytesAt
+  iintro ⟨Hk, Hpc, Hpi, Hte, Hce, Hbc, Hdc, Hpe, Hpid, ⟨%Xv, Hbinv⟩, Hrest⟩
+  -- at a CLEAN header the write set is empty, so initlog's slot-value
+  -- premise is vacuous
   have h := IL.wp_initlog_eb (hlc := hlc) (GF := GF) Γ cpu k icfgLog γl fscBio
     (fsView fscFs fscDisk icfgDev fscCov) fscDlock fscFs pd pav pu j fscLogst icfgDev KA.«sb»
-    bsHdr L D vlock vname vcpu vStart vDev vNc vN pidv dqp dqs hj hproc hK hnoff htier hgeom rfl
-    rfl rfl ha0 ha1 hhdrLen hhdrNodup hhdrHome hhdr0 hclean hpd
+    bsHdr Xv L D vlock vname vcpu vStart vDev vNc vN pidv dqp dqs hj hproc hK hnoff htier hgeom rfl
+    rfl rfl ha0 ha1 hhdrLen hhdrNodup hhdrHome
+    (fun i b hb => by rw [hdrDec_zero bsHdr hhdr0] at hb; simp at hb) hclean hpd
   unfold wp_initlog_eb_body initlogAddr at h
-  exact h
+  simp only [fsView_gd, fsView_cov] at h
+  rw [show KA.«sb» + 20#64 = sbLogstartAddr from rfl] at h
+  iapply h
+  iframe Hk Hpc Hpi Hte Hce Hbc Hdc Hpe Hpid Hbinv
+  iexact Hrest
 
 end
 

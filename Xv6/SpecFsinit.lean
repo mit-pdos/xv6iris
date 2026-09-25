@@ -85,9 +85,13 @@ Every one of those has its Lean counterpart below (deviations listed).
    `sb_bmapstart`/`sb_size` ties), the exception set's slot values (g'') and
    the era's two readings (g').  So `Xv`, `M`, `sbrec` are not parameters.
    The block-map authority `L` stays (initlog's `fsCacheAuth`).
-4. `hhdr0 : hdrN bsHdr = 0` -- initlog's own premise (its recovery walk is
-   proved at the empty write set, `Xv6/SpecInitlog.lean`), threaded.
-   Rocq's three header well-formedness clauses are kept verbatim beside it.
+4. `hhdr0 : hdrN bsHdr = 0` -- AS ROCQ'S premise (g), which Rocq's
+   fsinit still carries although its initlog is general in `n`: a dirty
+   header costs initlog the slot-value premise (`Xv6/SpecInitlog.lean`'s
+   `hxslot`, Rocq's (g'')), and here the byte view's `Xv` is bound inside
+   `bitmapReg`'s row, so fsinit discharges it only vacuously, at a clean
+   header (`Xv6.fsinit_initlog_call`).  Rocq's three header well-formedness
+   clauses are kept verbatim beside it.
 5. The four field ties (c) are SUBSTITUTED into `sbImage` (forkret passes
    `eq_refl`); `bv_unsigned v_magic = FSMAGIC` is `vMagic.toNat = FSMAGIC`.
 6. `icfg_dev = ROOTDEV`, `0 < icfg_nib`, `0 ≤ icfg_ist`, `0 ≤ fsc_bmapstart`

@@ -35,15 +35,18 @@ dirty arm `V.dirty bno bs ∗ bref` -- so with `hcl`/`hdt` (the premises
 every log spec carries: `V.clean = fsMclean γfs`, `V.dirty = fsMdirty
 γfs`) the bytes agree with the header block's `Xv6.fsChalf` on EITHER
 polarity.  That is Rocq `ProofInitlog.v`'s `il_pay_agree`, and it is
-`Xv6.il_pay_agree` below.  The other half -- that the header's content
-DECODES CLEAN -- is a genuine boot premise, Rocq `SpecFsinit.v`'s (g), and
-it now sits in `Xv6/SpecInitlog.lean`'s precondition as
-`hhdr0 : hdrN bsHdr = 0`; at `n = 0` the write set is empty, the copy loop
-at `+0x52` is dead and the `blez` at `+0x40` is proved taken.  (It is
-still forced here rather than derived, because this port's
-`Xv6/SpecInstallTrans.lean` recovering arm takes each entry's HOME block
-CLIENT HALF -- its own deviation -- and `SpecInitlog`'s precondition hands
-out client halves only for the log's own region.)
+`Xv6.il_pay_agree` below.
+
+**RECOVERY IS GENERAL IN `n`, AS ROCQ'S.**  The header decodes to whatever
+it decodes to: `read_head`'s copy loop at `+0x52` is LIVE
+(`Xv6.il_read_head`, `Xv6/InitlogHead.lean`), `install_trans(1)` installs
+every entry of the write set `Xv6.ilW` (`Xv6.il_install_trans`, the
+logged view moving to `Xv6.itRecL`), the WAL's exception handle comes back
+at its empty residue (every pending home block landed) and is sealed, and
+the closing `write_head` clears the header.  The slots' contents come out
+of their client halves as ONE function (`MachCSL.funOfBig`), and the
+premise `hxslot` names them as the byte view's values at the entries' home
+blocks, which is what the recovering install's `hxexc` asks.
 
 **THIS PROOF ASSUMES NOTHING BEYOND ITS CALLEES' CONTRACTS.**  The former
 `LogTxAuthBridge` hypothesis (a `GhostMapG` instance collision between the
@@ -52,6 +55,7 @@ the one shared camera `Xv6G.gmUnitG`, told apart by ghost name.
 -/
 import Xv6.SpecInitlog
 import Xv6.LogBoot
+import Xv6.InitlogHead
 import Xv6.CodeTactics
 import MachCSL.ByteWord4
 import MachCSL.WpSmodeFrame6c
@@ -95,75 +99,11 @@ theorem il_ret_74 : jumpPc (KA.«initlog» + 0x74#64) = (KA.«initlog» + 0x74#6
 
 /-! ## Small arithmetic -/
 
-theorem il_sext0 : BitVec.signExtend 64 (0#32) = 0#64 := by decide
 theorem il_ext0 : BitVec.extractLsb' 0 32 (0#64) = 0#32 := by decide
 theorem il_ext_sext (w : BitVec 32) : BitVec.extractLsb' 0 32 (BitVec.signExtend 64 w) = w := by
   bv_decide
 
-/-- `blez a2` with the header's `n` word at zero: taken. -/
-theorem il_blez_zero : bcond bop.BGE 0#64 0#64 = true := by decide
-
-/-- A four-byte run that assembles to zero IS four zero bytes, hence the
-zero word: what `hdr_n bs = 0` says about `hb->n`. -/
-theorem il_word_zero (l : List (BitVec 8)) (h4 : l.length = 4) (h : leAssemble l = 0) :
-    MachCSL.bytesToWord4 l = 0#32 := by
-  obtain ⟨b0, b1, b2, b3, rfl⟩ := MachCSL.list4 l h4
-  have he : b0.toNat + 256 * (b1.toNat + 256 * (b2.toNat + 256 * (b3.toNat + 0))) = 0 := h
-  have e0 : b0 = 0#8 := by apply BitVec.eq_of_toNat_eq; simp only [BitVec.toNat_ofNat]; omega
-  have e1 : b1 = 0#8 := by apply BitVec.eq_of_toNat_eq; simp only [BitVec.toNat_ofNat]; omega
-  have e2 : b2 = 0#8 := by apply BitVec.eq_of_toNat_eq; simp only [BitVec.toNat_ofNat]; omega
-  have e3 : b3 = 0#8 := by apply BitVec.eq_of_toNat_eq; simp only [BitVec.toNat_ofNat]; omega
-  subst e0; subst e1; subst e2; subst e3
-  decide
-
-theorem il_hdrN_word (bs : List (BitVec 8)) (hl : 4 ≤ bs.length) (h : hdrN bs = 0) :
-    MachCSL.bytesToWord4 ((bs.drop (4 * 0)).take 4) = 0#32 := by
-  refine il_word_zero _ ?_ h
-  simp only [Nat.mul_zero, List.drop_zero, List.length_take]
-  omega
-
-/-- The buffer's first word, read and put straight back. -/
-theorem il_hdr_roundtrip (bs : List (BitVec 8)) (hl : 4 ≤ bs.length) :
-    bs.take (4 * 0) ++ MachCSL.wordToBytes4 (MachCSL.bytesToWord4 ((bs.drop (4 * 0)).take 4))
-      ++ bs.drop (4 * 0 + 4) = bs := by
-  have h4 : ((bs.drop (4 * 0)).take 4).length = 4 := by
-    simp only [Nat.mul_zero, List.drop_zero, List.length_take]; omega
-  rw [MachCSL.wordToBytes4_bytesToWord4 _ h4]
-  simp
-
-/-! ## The buffer's header word -/
-
-section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
-
-/-- `b->data` is four-byte aligned. -/
-theorem il_bufdata_align (kk : Nat) (hkk : kk < NBUF) : (aBufData (bnode kk)).toNat % 4 = 0 := by
-  have h := bufData_toNat kk 0 hkk (by unfold BSIZE; omega)
-  have hz : aBufData (bnode kk) + BitVec.ofNat 64 0 = aBufData (bnode kk) := by simp
-  rw [hz] at h
-  have hbc : KernelSyms.«bcache» = 0x80018278 := rfl
-  rw [hbc] at h
-  omega
-
-theorem il_hdr_addr (kk : Nat) :
-    aBufData (bnode kk) + BitVec.ofNat 64 (4 * 0) = bnode kk + 88#64 := by
-  unfold aBufData bOffData
-  simp
-
-/-- The header's `n` word, at the address `c.lw a2,88(a0)` computes. -/
-theorem il_hdr_acc (kk : Nat) (hkk : kk < NBUF) (bs : List (BitVec 8)) (hl : 4 ≤ bs.length) :
-    byteBuf (GF := GF) (aBufData (bnode kk)) (DFrac.own 1) bs ⊢
-      wordPointsTo (bnode kk + 88#64) 4 (DFrac.own 1)
-        (MachCSL.bytesToWord4 ((bs.drop (4 * 0)).take 4)) ∗
-      (∀ w' : BitVec 32, wordPointsTo (bnode kk + 88#64) 4 (DFrac.own 1) w' -∗
-        byteBuf (aBufData (bnode kk)) (DFrac.own 1)
-          (bs.take (4 * 0) ++ MachCSL.wordToBytes4 w' ++ bs.drop (4 * 0 + 4))) := by
-  have h := byteBuf_word4_at (GF := GF) (aBufData (bnode kk)) bs 0 (by omega)
-    (il_bufdata_align kk hkk)
-  rw [il_hdr_addr kk] at h
-  exact h
-
-end
+/-! ## The held buffer -/
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
@@ -255,12 +195,14 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 set_option maxHeartbeats 2000000 in
-/-- `install_trans(1)` AT THE EMPTY WRITE SET: the recovering arm with
-`log.lh.n = 0`, so the loop is dead, the logged view and the pin authority
-do not move, and the two slot units come straight back. -/
+/-- `install_trans(1)` AT THE HEADER'S WRITE SET (Rocq's recovering call at
+`+0x64`): the loop installs every entry, the logged view MOVES to the
+slots' contents (`Xv6.itRecL`), nothing is pinned, and the WAL's exception
+handle comes back at its residue. -/
 theorem il_install_trans (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (c : CPU) (k' : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (γfs : FsNames) (pd pav pu : BitVec 64) (j : Nat) (logstart : Nat) (dev : BitVec 32)
+    (n : Nat) (W : List (BitVec 32)) (Lw : Nat → List (BitVec 8))
     (L : BlockMap) (D : RegMapF Bool) (pidv : BitVec 32) (dqp : DFrac)
     (homeL : List Nat) (Xv : Nat → List (BitVec 8)) (Xexc : List Nat)
     (pj : BitVec 64) (hpj : k'.proc = pj) (s : Bool) (hs : k'.sie = s)
@@ -269,58 +211,68 @@ theorem il_install_trans (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs (hlc :=
     (htier : k'.tier = KTier.kpt)
     (hgeom : logGeomOk V.cov logstart) (hdev : dev = V.dev)
     (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs)
-    (ha0 : k'.regs 10#5 = 1#64) (hpd : descPageRw pd) :
+    (ha0 : k'.regs 10#5 = 1#64)
+    (hn : n = W.length ∧ n ≤ LOGBLOCKS)
+    (hnodup : ∀ (i k'' : Nat) (v v' : BitVec 32), W[i]? = some v → W[k'']? = some v' →
+      v.toNat = v'.toNat → i = k'')
+    (hhome : ∀ w ∈ W, fsHome V.cov logstart w.toNat)
+    (hlen : ∀ i, (Lw i).length = BSIZE)
+    (hpin : ∀ w ∈ W, PartialMap.get? D w.toNat = some false)
+    (hxexc : ∀ (i : Nat) (w : BitVec 32), W[i]? = some w →
+      w.toNat ∈ Xexc ∧ Xv w.toNat = Lw i)
+    (hpd : descPageRw pd) :
     kctx c k' ∗ pcIs c KA.«install_trans» ∗ procsInv Γ ∗
     trapCsrsExt c s ∗ cpuClaimExt c s pj ∗
     bioCtx γl γb V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
     logFrozen logstart dev ∗
     fsBytesInv γfs.bytes γfs.cache γfs.exc homeL Xv ∗
     wordPointsTo (pPid pj) 4 dqp pidv ∗
-    wordPointsTo lhNAddr 4 (DFrac.own 1) 0#32 ∗
+    wordPointsTo lhNAddr 4 (DFrac.own 1) (BitVec.ofNat 32 n) ∗
+    ([∗list] i ↦ w ∈ W, wordPointsTo (lhBlock i) 4 (DFrac.own 1) w) ∗
     excOwn γfs.exc Xexc ∗
-    fsCacheAuth γfs L ∗ fsDirtyAuth γfs D ∗ bslots γb 2 ∗
+    fsCacheAuth γfs L ∗ fsDirtyAuth γfs D ∗
+    ([∗list] i ↦ _w ∈ W, fsChalf γfs (logSlotBno logstart i) (Lw i)) ∗
+    bslots γb 2 ∗
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt cpu' s -∗ cpuClaimExt cpu' s pj -∗
       wordPointsTo (pPid pj) 4 dqp pidv -∗
-      wordPointsTo lhNAddr 4 (DFrac.own 1) 0#32 -∗
-      excOwn γfs.exc Xexc -∗
-      fsCacheAuth γfs L -∗ fsDirtyAuth γfs D -∗ bslots γb 2 -∗ wpLoop cpu'))
+      wordPointsTo lhNAddr 4 (DFrac.own 1) (BitVec.ofNat 32 n) -∗
+      ([∗list] i ↦ w ∈ W, wordPointsTo (lhBlock i) 4 (DFrac.own 1) w) -∗
+      excOwn γfs.exc (excDelMany Xexc (W.map (fun w => w.toNat))) -∗
+      fsCacheAuth γfs (itRecL W Lw L) -∗ fsDirtyAuth γfs D -∗
+      ([∗list] i ↦ _w ∈ W, fsChalf γfs (logSlotBno logstart i) (Lw i)) -∗
+      bslots γb 2 -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hpj hs
   have h := IT.wp_install_trans_eb (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl γfs pd pav pu j
-    logstart dev true 0 ([] : List (BitVec 32)) (fun _ => List.replicate BSIZE 0#8) L D pidv dqp
-    homeL Xv Xexc
+    logstart dev true n W Lw L D pidv dqp homeL Xv Xexc
     hj hproc hK hnoff htier hgeom hdev hcl hdt
-    (by simp only [if_true]; exact ha0)
-    ⟨rfl, by unfold LOGBLOCKS; omega⟩
-    (by intro i k'' v v' hv; simp at hv)
-    (by intro w hw; exact absurd hw List.not_mem_nil)
-    (by intro i; simp)
+    (by simp only [if_true]; exact ha0) hn hnodup hhome hlen
     (by intro hb; exact absurd hb (by simp))
-    (by intro _ w hw; exact absurd hw List.not_mem_nil)
-    (by intro _ i w hw; simp at hw)
-    hpd
+    (fun _ => hpin) (fun _ => hxexc) hpd
   unfold wp_install_trans_eb_body at h
-  simp only [installTransAddr, if_true, itRecL_nil, Nat.add_zero, List.map_nil,
-    excDelMany_nil] at h
-  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hbc, #Hdc, #Hpe, #Hfr, #Hbinv, Hpid, HlhN, Hexc,
-    HL, HD, Hsl, Hnext⟩
+  simp only [installTransAddr, if_true, Nat.add_zero] at h
+  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hbc, #Hdc, #Hpe, #Hfr, #Hbinv, Hpid, HlhN, HW, Hexc,
+    HL, HD, HS, Hsl, Hnext⟩
   iapply h
-  iframe Hk Hpc Hpi Hte Hce Hbc Hdc Hpe Hfr Hpid Hbinv
-  isplitl [HlhN]
-  · iexact HlhN
-  isplitr [Hexc HL HD Hsl Hnext]
-  · iapply BigSepL.bigSepL_nil.2; iempintro
-  iframe Hexc HL HD
-  isplitr [Hsl Hnext]
-  · iapply BigSepL.bigSepL_nil.2; iempintro
-  iframe Hsl
+  iframe Hk Hpc Hpi Hte Hce Hbc Hdc Hpe Hfr Hpid Hbinv HlhN HW Hexc HL HD Hsl
+  isplitl [HS]
+  · iapply BigSepL.bigSepL_mono ?_ $$ HS
+    intro _ _ _
+    iintro H
+    isplitl [H]
+    · iexact H
+    · iempintro
   iapply wpNext_intro_pin
-  iintro %cpu2 %hp2 %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid HlhN - Hexc HL HD - Hsl
+  iintro %cpu2 %hp2 %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid HlhN HW Hexc HL HD HS Hsl
+  ihave HS := BigSepL.bigSepL_mono
+    (Φ := fun i (_ : BitVec 32) => iprop(fsChalf (GF := GF) γfs (logSlotBno logstart i) (Lw i) ∗ emp))
+    (Ψ := fun i (_ : BitVec 32) => fsChalf (GF := GF) γfs (logSlotBno logstart i) (Lw i)) (l := W)
+    (fun _ => by iintro ⟨H, -⟩; iexact H) $$ HS
   ihave Hn := wpNext_at true k'.proc c cpu2 _ hp2 $$ Hnext
-  iapply Hn $$ %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid HlhN Hexc HL HD Hsl
+  iapply Hn $$ %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid HlhN HW Hexc HL HD HS Hsl
 
 set_option maxHeartbeats 2000000 in
 /-- `write_head()` AT THE EMPTY WRITE SET. -/
@@ -515,9 +467,9 @@ theorem initlog_proof
     (IL : INITLOCK) (BD : BREAD) (BE : BRELSE) (IT : INSTALL_TRANS) (WH : WRITE_HEAD) :
     INITLOG := ⟨
   fun {hlc GF} _ _ _ _ _ _ _ _ Γ _ cpu k γ γl γb V γdl γfs pd pav pu j logstart dev sb
-    bsHdr L D vlock vname vcpu vStart vDev vNc vN pidv dqp dqs
+    bsHdr Xv L D vlock vname vcpu vStart vDev vNc vN pidv dqp dqs
     hj hproc hK hnoff htier hgeom hdev hcl hdt ha0 ha1
-    hhdrLen hhdrNodup hhdrHome hhdr0 hpinned hpd => by
+    hhdrLen hhdrNodup hhdrHome hxslot hpinned hpd => by
   have hcovhdr : logstart ∈ V.cov := hgeom.2 logstart (logRegion_hdr logstart)
   have hls31 : logstart < 2 ^ 31 := (hgeom.1 logstart hcovhdr).2
   have hbnoNat : (BitVec.ofNat 32 logstart).toNat = logstart := by
@@ -530,19 +482,18 @@ theorem initlog_proof
       (K.pushed m).withSpie a b = (K.withSpie a b).pushed m := fun _ _ _ _ => rfl
   unfold wp_initlog_eb_body
   simp only [initlogAddr]
-  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hbc, #Hdc, #Hpe, Hpid, #Hat, Hexc, Htok, Hsb,
+  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hbc, #Hdc, #Hpe, Hpid, #Hbinv, Hexc, Htok, Hsb,
     #Hm1, #Hm2, Hlock, Hname, Hcpu, HlStart, HlDev, Hout, Hcmt, Hnc, HlhN, Hjunk, HL, HD, Hd,
     Hhdr, Hslots, Hpool0, Hnext⟩
-  icases (show fsBytesAt (GF := GF) γfs (fsHomeList V.cov logstart) ⊢
-      ∃ Xv : Nat → List (BitVec 8),
-        fsBytesInv γfs.bytes γfs.cache γfs.exc (fsHomeList V.cov logstart) Xv from by
-    unfold fsBytesAt; iintro H; iexact H) $$ Hat with ⟨%Xv, #Hbinv⟩
-  -- THE EXCEPTION SET IS EMPTY at a clean header (see the `hhdr0` note in
-  -- `Xv6/SpecInitlog.lean`), so the handle the recovering install hands back
-  -- can be SEALED, which is what builds `Xv6.logCtx`'s byte-view row.
-  ihave Hexc := (show excOwn (GF := GF) γfs.exc (hdrDec bsHdr).2 ⊢
-      excOwn γfs.exc ([] : List Nat) from by
-    rw [show (hdrDec bsHdr).2 = ([] : List Nat) from by rw [hdrDec_zero bsHdr hhdr0]]) $$ Hexc
+  ihave #Hat := fsBytesAt_of γfs (fsHomeList V.cov logstart) Xv $$ Hbinv
+  -- `lh.block[]`'s cells as ONE list, and the log slots' client halves as
+  -- ONE function, with what the logged view says of them
+  icases il_list_of_range (fun i w => wordPointsTo (GF := GF) (lhBlock i) 4 (DFrac.own 1) w)
+    LOGBLOCKS $$ Hjunk with ⟨%C, %hC, HC⟩
+  icases funOfBig (fun i bs => fsChalf (GF := GF) γfs (logSlotBno logstart i) bs) LOGBLOCKS
+    $$ Hslots with ⟨%Ls, Hslots⟩
+  icases il_slots_agree γfs L logstart Ls (List.range LOGBLOCKS) $$ HL Hslots
+    with ⟨%hLs, HL, Hslots⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   have hlocks : k.locks = [] := List.eq_nil_of_length_eq_zero (by have := hwf.2.2.2.1; omega)
@@ -666,49 +617,36 @@ theorem initlog_proof
   k_norm_g at hcsb
   obtain ⟨b2, b8, b9, b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩ := hcsb
   -- THE PAYLOAD HOOK, CASHED: the bread'd bytes ARE the header block's
-  -- logged content, and `hhdr0` says that content decodes clean
+  -- logged content
   icases (bioLocked_split γb V kk pidv dev (BitVec.ofNat 32 logstart) bs bsd dd).1
     $$ Hlocked with ⟨Hhold, Hpay⟩
   ihave %hbseq := il_pay_agree γb γfs V hcl hdt kk dev (BitVec.ofNat 32 logstart)
       (logHdrBno logstart) hbnoNat bs bsd bsHdr dd $$ Hpay Hhdr
-  have hbs0 : hdrN bs = 0 := by rw [hbseq]; exact hhdr0
-  -- +0x3a  c.lw a2,88(a0) : lh.n := hb->n  ( = 0 )
+  subst hbseq
   icases il_hold_bytes γb V kk pidv dev (BitVec.ofNat 32 logstart) bs bsd $$ Hhold
     with ⟨%hpure, Hby, Hhclose⟩
   obtain ⟨hkk, -, -, hlen, -⟩ := hpure
-  have hlen4 : 4 ≤ bs.length := by rw [hlen]; unfold BSIZE; omega
-  have hw0 : MachCSL.bytesToWord4 ((bs.drop (4 * 0)).take 4) = 0#32 :=
-    il_hdrN_word bs hlen4 hbs0
-  icases il_hdr_acc kk hkk bs hlen4 $$ Hby with ⟨Hword, Hwclose⟩
-  ihave Hword := (show wordPointsTo (GF := GF) (bnode kk + 88#64) 4 (DFrac.own 1)
-        (MachCSL.bytesToWord4 ((bs.drop (4 * 0)).take 4)) ⊢
-      wordPointsTo (bnode kk + 88#64) 4 (DFrac.own 1) 0#32 from by rw [hw0]) $$ Hword
-  k_step_e (wp_s_lw cpu _ (KA.«initlog» + 0x3a#64) true 88#12 12#5 10#5 (by decide) (by decide)
-      (DFrac.own 1) 0#32)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0kk, il_sext0]
-  iintro Hk Hpc Hword
-  ihave Hword := (show wordPointsTo (GF := GF) (bnode kk + 88#64) 4 (DFrac.own 1) 0#32 ⊢
-      wordPointsTo (bnode kk + 88#64) 4 (DFrac.own 1)
-        (MachCSL.bytesToWord4 ((bs.drop (4 * 0)).take 4)) from by rw [hw0]) $$ Hword
-  ihave Hby := Hwclose $$ %(MachCSL.bytesToWord4 ((bs.drop (4 * 0)).take 4)) Hword
-  ihave Hby := (show byteBuf (GF := GF) (aBufData (bnode kk)) (DFrac.own 1)
-      (bs.take (4 * 0) ++
-        MachCSL.wordToBytes4 (MachCSL.bytesToWord4 ((bs.drop (4 * 0)).take 4)) ++
-        bs.drop (4 * 0 + 4)) ⊢
-      byteBuf (aBufData (bnode kk)) (DFrac.own 1) bs from by
-    rw [il_hdr_roundtrip bs hlen4]) $$ Hby
+  have hnB : hdrN bs ≤ LOGBLOCKS := by rw [← hdrDec_fst]; exact hhdrLen
+  -- ===== read_head, +0x3a .. +0x5a (the copy loop LIVE) =====
+  iapply (il_read_head cpu ((k.withSpie spie3 spp3).pushed 6) k.sie (by k_norm_g) k.proc kk hkk
+      bs C hlen hnB hC R2 vN ha0kk (by rw [b18, a18']))
+  iframe Hk Hpc Hby HlhN HC Hte Hce
+  iintro %cpu %Rh Hk Hpc Hby HlhN HC Hte Hce %hoth
+  have ha0kk : Rh 10#5 = bnode kk :=
+    (hoth 10#5 (by decide) (by decide) (by decide) (by decide)).trans ha0kk
+  have b2 := (hoth 2#5 (by decide) (by decide) (by decide) (by decide)).trans b2
+  have b20 := (hoth 20#5 (by decide) (by decide) (by decide) (by decide)).trans b20
+  have b21 := (hoth 21#5 (by decide) (by decide) (by decide) (by decide)).trans b21
+  have b22 := (hoth 22#5 (by decide) (by decide) (by decide) (by decide)).trans b22
+  have b23 := (hoth 23#5 (by decide) (by decide) (by decide) (by decide)).trans b23
+  have b24 := (hoth 24#5 (by decide) (by decide) (by decide) (by decide)).trans b24
+  have b25 := (hoth 25#5 (by decide) (by decide) (by decide) (by decide)).trans b25
+  have b26 := (hoth 26#5 (by decide) (by decide) (by decide) (by decide)).trans b26
+  have b27 := (hoth 27#5 (by decide) (by decide) (by decide) (by decide)).trans b27
   ihave Hhold := Hhclose $$ %bs %hlen Hby
   ihave Hlocked := (bioLocked_split γb V kk pidv dev (BitVec.ofNat 32 logstart)
       bs bsd dd).2 $$ [Hhold Hpay]
   case' _ => iframe Hhold Hpay
-  -- +0x3c  sw a2,44(s2)
-  k_step_e (wp_s_sw cpu _ (KA.«initlog» + 0x3c#64) false 44#12 18#5 12#5 (by decide) vN)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [b18, a18', il_lhN, il_ext0]
-  iintro Hk Hpc HlhN
-  -- +0x40  blez a2 : TAKEN (the copy loop at +0x52 is dead at a clean header)
-  k_step_e (wp_s_branch0 cpu _ (KA.«initlog» + 0x40#64) false 30#13 12#5 (by decide) bop.BGE)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [il_blez_zero]
-  iintro Hk Hpc
   -- +0x5e  jal ra,brelse
   k_step_e (wp_s_jal cpu _ (KA.«initlog» + 0x5e#64) false 2093098#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [il_br_brelse]
@@ -746,12 +684,64 @@ theorem initlog_proof
   k_step_e (wp_s_jal cpu _ (KA.«initlog» + 0x64#64) false 2096848#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [il_br_install]
   iintro Hk Hpc
-  iapply (il_install_trans IT Γ cpu _ γl γb V γdl γfs pd pav pu j logstart dev L D pidv dqp
-      (fsHomeList V.cov logstart) Xv ([] : List Nat)
+  -- THE WRITE SET, as read_head laid it out, and everything the recovering
+  -- install asks of it
+  have hW := ilW_length bs
+  have hdec : (hdrDec bs).2 = (ilW bs).map (fun w => w.toNat) :=
+    ilW_dec bs (by rw [hlen]; unfold BSIZE; unfold LOGBLOCKS at hnB; omega)
+  let Lw : Nat → List (BitVec 8) := fun i =>
+    if (Ls i).length = BSIZE then Ls i else List.replicate BSIZE 0#8
+  have hent : ∀ (i : Nat) (w : BitVec 32), (ilW bs)[i]? = some w →
+      (hdrDec bs).2[i]? = some w.toNat := by
+    intro i w hw; rw [hdec, List.getElem?_map, hw]; rfl
+  have hLw : ∀ (i : Nat) (w : BitVec 32), (ilW bs)[i]? = some w →
+      Xv w.toNat = Ls i ∧ Lw i = Ls i := by
+    intro i w hw
+    have hi : i < hdrN bs := by
+      rw [← hW]; exact (List.getElem?_eq_some_iff.mp hw).1
+    obtain ⟨h1, h2⟩ := hxslot i w.toNat (hent i w hw)
+    have h3 := hLs i (List.mem_range.2 (by unfold LOGBLOCKS at hnB ⊢; omega))
+    rw [h3] at h1
+    have he : Ls i = Xv w.toNat := Option.some.inj h1
+    refine ⟨he.symm, ?_⟩
+    show (if (Ls i).length = BSIZE then Ls i else List.replicate BSIZE 0#8) = Ls i
+    rw [if_pos (by rw [he]; exact h2)]
+  have hLwn : ∀ i, i < hdrN bs → Lw i = Ls i := by
+    intro i hi
+    have hw : (ilW bs)[i]? = some (ilW bs)[i] := List.getElem?_eq_getElem (by rw [hW]; exact hi)
+    exact (hLw i _ hw).2
+  -- split the cells and the slots at the write set
+  icases BigSepL.bigSepL_append.1 $$ HC with ⟨HW, Hrest⟩
+  have hsplit := bigSepL_range_split
+    (fun i => fsChalf (GF := GF) γfs (logSlotBno logstart i) (Ls i)) (hdrN bs) (LOGBLOCKS - hdrN bs)
+  rw [show hdrN bs + (LOGBLOCKS - hdrN bs) = LOGBLOCKS by omega] at hsplit
+  icases hsplit $$ Hslots with ⟨HsW, HsR⟩
+  ihave HsW := (show ([∗list] i ∈ List.range (hdrN bs),
+        fsChalf (GF := GF) γfs (logSlotBno logstart i) (Ls i)) ⊢
+      [∗list] i ↦ _w ∈ ilW bs, fsChalf γfs (logSlotBno logstart i) (Lw i) from by
+    rw [← il_range_list_ignore (fun i => fsChalf (GF := GF) γfs (logSlotBno logstart i) (Lw i))
+      (ilW bs) (hdrN bs) hW.symm]
+    iintro H
+    iapply BigSepL.bigSepL_mono ?_ $$ H
+    intro k x hx
+    rw [hLwn x (List.mem_range.1 (List.mem_of_getElem? hx))]) $$ HsW
+  iapply (il_install_trans IT Γ cpu _ γl γb V γdl γfs pd pav pu j logstart dev
+      (hdrN bs) (ilW bs) Lw L D pidv dqp (fsHomeList V.cov logstart) Xv (hdrDec bs).2
       k.proc (by k_norm_g) k.sie (by k_norm_g) hj ?tproc ?tK ?tnoff ?ttier hgeom hdev hcl hdt
-      ?ta0 hpd)
-    $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hbc $Hdc $Hpe $Hfroz $Hbinv $Hpid $HlhN $Hexc $HL $HD
-         $Hs2]
+      ?ta0 ⟨hW.symm, hnB⟩
+      (eo_nodup_inj (ilW bs) (hdec ▸ hhdrNodup))
+      (fun w hw => hhdrHome w.toNat (hdec ▸ List.mem_map_of_mem hw))
+      (fun i => by
+        show (if (Ls i).length = BSIZE then Ls i else List.replicate BSIZE 0#8).length = BSIZE
+        split
+        · assumption
+        · simp)
+      (fun w hw => hpinned w.toNat (hhdrHome w.toNat (hdec ▸ List.mem_map_of_mem hw)).1)
+      (fun i w hw => ⟨List.mem_of_getElem? (hent i w hw),
+        (hLw i w hw).1.trans (hLw i w hw).2.symm⟩)
+      hpd)
+    $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hbc $Hdc $Hpe $Hfroz $Hbinv $Hpid $HlhN $HW $Hexc $HL $HD
+         $HsW $Hs2]
   rotate_right 1
   k_norm_g [il_ret_68]
   iframe #
@@ -762,27 +752,71 @@ theorem initlog_proof
   case ta0 => k_norm_g
   -- ===== back from install_trans =====
   iapply wpNext_intro_pin
-  iintro %cpu %_ %spie5 %spp5 %R4 %hcs4 Hk Hpc Hte Hce Hpid HlhN Hexc HL HD Hs2
+  iintro %cpu %_ %spie5 %spp5 %R4 %hcs4 Hk Hpc Hte Hce Hpid HlhN HW Hexc HL HD HsW Hs2
   k_norm_g [il_ret_68, hww, hpsw]
   unfold calleeSaved at hcs4
   k_norm_g at hcs4
   obtain ⟨f2, f8, f9, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27⟩ := hcs4
+  -- EVERY ENTRY LANDED: the exception set's residue is empty
+  ihave Hexc := (show excOwn (GF := GF) γfs.exc
+        (excDelMany (hdrDec bs).2 ((ilW bs).map (fun w => w.toNat))) ⊢
+      excOwn γfs.exc ([] : List Nat) from by
+    rw [excDelMany_eq_nil _ _ (fun b hb => hdec ▸ hb)]) $$ Hexc
+  -- the cells and the slots, whole again
+  ihave Hjunk := (show ([∗list] i ↦ w ∈ ilW bs,
+        wordPointsTo (GF := GF) (lhBlock i) 4 (DFrac.own 1) w) ∗
+      ([∗list] i ↦ w ∈ C.drop (hdrN bs),
+        wordPointsTo (GF := GF) (lhBlock (i + (ilW bs).length)) 4 (DFrac.own 1) w) ⊢
+      [∗list] i ∈ List.range LOGBLOCKS, ∃ w : BitVec 32,
+        wordPointsTo (lhBlock i) 4 (DFrac.own 1) w from by
+    rw [show LOGBLOCKS = (ilW bs ++ C.drop (hdrN bs)).length by
+      simp only [List.length_append, List.length_drop, hW, hC]; unfold LOGBLOCKS at hnB ⊢; omega]
+    iintro H
+    iapply il_range_of_list
+      (fun i w => wordPointsTo (GF := GF) (lhBlock i) 4 (DFrac.own 1) w)
+      (ilW bs ++ C.drop (hdrN bs))
+    iapply (BigSepL.bigSepL_append
+      (Φ := fun i w => wordPointsTo (GF := GF) (lhBlock i) 4 (DFrac.own 1) w)).2
+    iexact H) $$ [HW Hrest]
+  · iframe HW Hrest
+  ihave Hslots := (show ([∗list] i ↦ _w ∈ ilW bs,
+        fsChalf (GF := GF) γfs (logSlotBno logstart i) (Lw i)) ∗
+      ([∗list] j ∈ List.range (LOGBLOCKS - hdrN bs),
+        fsChalf (GF := GF) γfs (logSlotBno logstart (hdrN bs + j)) (Ls (hdrN bs + j))) ⊢
+      [∗list] i ∈ List.range LOGBLOCKS, ∃ bs : List (BitVec 8),
+        fsChalf γfs (logSlotBno logstart i) bs from by
+    rw [← il_range_list_ignore (fun i => fsChalf (GF := GF) γfs (logSlotBno logstart i) (Lw i))
+      (ilW bs) (hdrN bs) hW.symm]
+    iintro ⟨H1, H2⟩
+    have hj := bigSepL_range_join
+      (fun i => iprop(∃ bs : List (BitVec 8), fsChalf (GF := GF) γfs (logSlotBno logstart i) bs))
+      (hdrN bs) (LOGBLOCKS - hdrN bs)
+    rw [show hdrN bs + (LOGBLOCKS - hdrN bs) = LOGBLOCKS by omega] at hj
+    iapply hj
+    isplitl [H1]
+    · iapply BigSepL.bigSepL_mono ?_ $$ H1
+      intro _ _ _; iintro H; iexists _; iexact H
+    · iapply BigSepL.bigSepL_mono ?_ $$ H2
+      intro _ _ _; iintro H; iexists _; iexact H) $$ [HsW HsR]
+  · iframe HsW HsR
   -- +0x68 auipc a5,0x1e ; +0x6c sw zero,1764(a5) : log.lh.n = 0
   k_step_e (wp_s_auipc cpu _ (KA.«initlog» + 0x68#64) false 0x1e#20 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_sw cpu _ (KA.«initlog» + 0x6c#64) false 1764#12 15#5 0#5 (by decide) 0#32)
+  k_step_e (wp_s_sw cpu _ (KA.«initlog» + 0x6c#64) false 1764#12 15#5 0#5 (by decide)
+      (BitVec.ofNat 32 (hdrN bs)))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [il_lhn_reloc, il_ext0]
   iintro Hk Hpc HlhN
   -- +0x70 jal ra,write_head
   icases il_slots_split2 γb $$ Hs2 with ⟨Hu1, Hu2⟩
-  ihave Hch := (show fsChalf (GF := GF) γfs (logHdrBno logstart) bsHdr ⊢
+  ihave Hch := (show fsChalf (GF := GF) γfs (logHdrBno logstart) bs ⊢
       ∃ bsh : List (BitVec 8), fsChalf γfs (logHdrBno logstart) bsh from by
-    iintro H; iexists bsHdr; iexact H) $$ Hhdr
+    iintro H; iexists bs; iexact H) $$ Hhdr
   k_step_e (wp_s_jal cpu _ (KA.«initlog» + 0x70#64) false 2096742#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [il_br_writehead]
   iintro Hk Hpc
-  iapply (il_write_head WH Γ cpu _ γl γb V γdl γfs pd pav pu j logstart dev L pidv dqp
+  iapply (il_write_head WH Γ cpu _ γl γb V γdl γfs pd pav pu j logstart dev
+      (itRecL (ilW bs) Lw L) pidv dqp
       k.proc (by k_norm_g) k.sie (by k_norm_g) hj ?wproc ?wK ?wnoff ?wtier hgeom hdev hcl hdt hpd)
     $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hbc $Hdc $Hpe $Hfroz $Hpid $HlhN $HL $Hch $Hu1]
   rotate_right 1
@@ -813,7 +847,7 @@ theorem initlog_proof
   imodintro
   ihave #Hrow := fsBytesAnyAt_of γfs (fsHomeList V.cov logstart) $$ Hat Hseal
   iapply (il_seal Γ cpu k spie6 spp6 R5 γ γb γfs V logstart dev pidv vNc sb dqp dqs
-      (PartialMap.insert L (logHdrBno logstart) bs') D bs' hK6
+      (PartialMap.insert (itRecL (ilW bs) Lw L) (logHdrBno logstart) bs') D bs' hK6
       ((g2.trans f2).trans ((d2.trans b2).trans a2'))
       ((g20.trans f20).trans ((d20.trans b20).trans a20'))
       ((g21.trans f21).trans ((d21.trans b21).trans a21'))

@@ -499,6 +499,7 @@ import Xv6.LogLedger
 import Xv6.ProofBeginOp
 import Xv6.LinkBeginOp
 import Xv6.LogBoot
+import Xv6.InitlogHead
 import Xv6.ProofInitlog
 import Xv6.LinkInitlog
 import Xv6.ProofSysSync
