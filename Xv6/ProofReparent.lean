@@ -134,7 +134,7 @@ theorem rpKept_trans {R R' R'' : RegMap} (h : rpKept R R') (h' : rpKept R' R'') 
     h'.2.2.2.2.2.2.2.2.2.2.2.trans h.2.2.2.2.2.2.2.2.2.2.2⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-! ## The running payload -/
 
@@ -222,7 +222,7 @@ end
 
 set_option maxHeartbeats 1000000 in
 /-- `wakeup`'s contract at the call site. -/
-theorem rp_wakeup (WK : WAKEUP) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+theorem rp_wakeup (WK : WAKEUP) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [CurCtx] (Γ : SchedNames) (c : CPU) (k' : KCtx)
     (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : wakeupSlots ≤ k'.avail) (hlk' : "proc" ∉ k'.locks)
     (htier' : k'.tier = KTier.kpt) :
@@ -238,7 +238,7 @@ theorem rp_wakeup (WK : WAKEUP) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hl
   exact h
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-! ## One iteration of the scan -/
 
@@ -590,7 +590,7 @@ theorem reparent_br_107b8 : KA.«reparent» + 0x107b8#64 = KA.«proc» := by dec
 set_option maxHeartbeats 8000000 in
 /-- **`reparent` meets its specification.** -/
 theorem reparent_proof (WK : WAKEUP) : REPARENT :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ Γ cpu k parents ip hnoff hK hlk hwl htier => by
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ Γ cpu k parents ip hnoff hK hlk hwl htier => by
   unfold wp_reparent_body
   simp only [reparentAddr]
   iintro ⟨Hk, Hpc, #Hpinv, #Hinit, HW, HPhi⟩

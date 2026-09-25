@@ -39,7 +39,7 @@ theorem bdPins_cs (k : KCtx) (R R' : RegMap) (h : bdPins k R) (hcs : calleeSaved
     c24.trans a24, c25.trans a25, c26.trans a26, c27.trans a27⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [BcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
 variable [SleepLockG GF] [DiskG GF] [CurCtx]
 
 set_option maxHeartbeats 4000000 in

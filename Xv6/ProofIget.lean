@@ -62,7 +62,7 @@ set_option linter.unusedVariables false
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
   [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [SleepLockG GF]
-  [IrefslotG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
+  [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
 /-- `acquire(&itable.lock)` with iget's payload (`R := itableRes2`). -/
 theorem ig_acquire (AC : ACQUIRE) (c : CPU) (k' : KCtx)
@@ -156,7 +156,7 @@ end
 
 set_option maxHeartbeats 16000000 in
 theorem iget_proof (AC : ACQUIRE) (RH : RELEASE_HOOK) (PA : PANIC) : IGET := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ cpu k inum l hK hnoff hnib hpos ha0 ha1 hit hpr huart => by
+  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ cpu k inum l hK hnoff hnib hpos ha0 ha1 hit hpr huart => by
   unfold wp_iget_body
   simp only [igetAddr]
   iintro ⟨Hk, Hpc, #Hit, #Hinv, #Hrinv, #Hpenv, Hislot, Hlic, Hnext⟩

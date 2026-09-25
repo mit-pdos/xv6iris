@@ -123,7 +123,7 @@ set_option linter.unusedSectionVars false
 /-- The slot accessor's key, re-read at the inum (Rocq's
 `iEval (rewrite Hkey) in "Hslot"`). -/
 theorem iregSlot_atKey {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF]
-    [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [LogG GF] [FsBytesG GF] [FsTopG GF] [FsLinkG GF] [Icfg]
+    [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBytesG GF] [FsTopG GF] [FsLinkG GF] [Icfg]
     (γfs : FsNames) (γi : GName) (inum : BitVec 32) (d : Dinode) :
     iregSlot (GF := GF) γfs γi (16 * iregBi inum + islot inum) d ⊣⊢ iregSlot γfs γi inum.toNat d := by
   rw [iregSlotKey]
@@ -148,7 +148,7 @@ def iregWdLic [Icfg] (o : Ilkc) (g : GName) (z : Nat) : IProp GF :=
 end Lic
 
 section Back
-variable {GF : BundledGFunctors} [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [LogG GF]
+variable {GF : BundledGFunctors} [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
 
 /-- What comes BACK: the claim arm's pair CONVERTS into the plain unit, the
 plain unit is BORROWED and returned verbatim, and the one-shot is persistent
@@ -175,7 +175,7 @@ end Back
 /-! ## 2.  THE CLAIM PACKAGE's ELIM (SIMP-2, ghost-simplification.md §5.1) -/
 
 section Claimed
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcacheG GF]
   [SleepLockG GF] [IcboxG GF]
 
 /-- `IcacheRef.inodeClaimed` -- what `SpecIalloc` hands back as ONE row --
@@ -201,7 +201,7 @@ end Claimed
 
 section Withdraw
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
-  [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
+  [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 /-- THE THREE ARMS, DISCHARGED IN ONE STEP (§5'.3, RESHAPED BY RULING C';
 Rocq's inline `iAssert`, deviation 2).  `claimK` is the CONVERSION: the

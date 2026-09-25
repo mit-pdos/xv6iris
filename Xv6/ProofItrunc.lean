@@ -47,7 +47,7 @@ set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
@@ -291,7 +291,7 @@ end
 /-- `itrunc` meets its contract at either entry `SIE`, given its four callees
 (Rocq's `ItruncProof BR BF BL IU`). -/
 theorem itrunc_proof (BR : BREAD) (BF : BFREE) (BE : BRELSE) (IU : IUPDATE) : ITRUNC :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl pd pav pu j ip inum dn dn0 bm data u Sb
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl pd pav pu j ip inum dn dn0 bm data u Sb
       crb cru e0 pidv dqp dqd dqn dqb dqs hj hproc hK hnoff htier hcrb hgeom hbg hcov
       hlog hnib hnz hstab hnl hwf hbel hsz hda hpd ha0 =>
     itrunc_main (hlc := hlc) (GF := GF) BR BF BE IU Γ cpu k γl pd pav pu j ip inum dn dn0 bm data

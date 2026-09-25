@@ -180,7 +180,7 @@ the ambient context keeps only its TIER here, the holder-side rows below
 are at the ambient context itself). -/
 
 section IcacheBoxLam
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [LogG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
   [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
 
 /-- Rocq's `ic_hdr`. -/
@@ -345,7 +345,7 @@ end IcacheBoxLam
 /-! ## THE STITCH'S RESIDUES and THE BOX, per slot -/
 
 section IcacheBoxDef
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [LogG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
   [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
 
 /-- THE STITCH'S Q -- main's durable-disk ghost that rides the box while a
@@ -841,7 +841,7 @@ end IcacheBoxDef
 /-! ## THE SLEEPLOCK PAYLOAD (the L2 row, `CtxBox.l2Row` at `icTok`) -/
 
 section IcacheSlp
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [IcboxG GF] [OffboxG GF] [OffboxBoxG GF]
 
 /-- THE THIRD FINAL SHAPE (r25; items 16/17): ip->lock's payload also holds
@@ -967,7 +967,7 @@ end IcacheSlp
 /-! ## THE L1 ROW -/
 
 section IcacheSlotRow
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [IcboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcboxG GF]
 
 /-- The slot's row in `itable_res2` -- the register half, shut and empty,
 IDENTITY = the table's `ci !! k` (`none` when unidentified: M-1'), bounded

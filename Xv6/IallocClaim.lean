@@ -46,7 +46,7 @@ set_option linter.unusedVariables false
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
-  [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [Appcfg GF]
+  [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF]
 
 set_option maxHeartbeats 16000000 in
 /-- **`+0xa4 .. +0xba`: iget, the restores, and the jump to the join.** -/
@@ -375,7 +375,7 @@ theorem ialloc_claim_lw (LW : LOG_WRITE) (BE : BRELSE) (IG : IGET) [Fscfg] [Icfg
       | (simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h9)
 
 omit [Xv6G GF] [FdslotG GF] [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF]
-  [IcacheG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [Appcfg GF] in
+  [IcacheG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] in
 /-- The zero record's six cells, with the type cell out and the way back at
 the FRESH record (Rocq's `ia_fresh_of_zero` at the `dislot` level: the `sh`
 writes the type halfword and nothing else). -/

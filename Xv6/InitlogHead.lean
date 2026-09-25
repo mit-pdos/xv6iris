@@ -531,7 +531,7 @@ theorem il_read_head {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurC
 /-! ## The glue for the recovering `install_trans` -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [FsBlocksG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [FsBlocksG GF] [CurCtx]
 
 /-- A range-indexed family of per-index existentials IS one list of values
 (Rocq's `il_sepL_exist`). -/

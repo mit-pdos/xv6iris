@@ -293,7 +293,7 @@ end Claims
 section IcacheBootTable
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [LogG GF]
   [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcboxG GF] [SleepLockG GF]
-  [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF]
+  [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF]
 
 /-- ONE itable ENTRY'S RAW CELLS (Rocq's `ientry_raw_at`) -- what the loader
 leaves and iinit does not touch: the two identity words at arbitrary

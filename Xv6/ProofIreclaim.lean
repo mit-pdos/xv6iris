@@ -44,7 +44,7 @@ set_option linter.unusedVariables false
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
-  [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
+  [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF]
 
 /-- The scan entered at `inum = 1`, before any callee has run (so at the
@@ -256,7 +256,7 @@ end
 `IreclaimProof BR BL IG BO IL IU IP EO Printk`). -/
 theorem ireclaim_proof (BR : BREAD) (BL : BRELSE) (IG : IGET) (BO : BEGIN_OP) (IL : ILOCK)
     (IU : IUNLOCK) (IP : IPUT) (EO : END_OP) (PK : PRINTK) : IRECLAIM :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl pd pav pu j pidv dqp dqb dqs dqn
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl pd pav pu j pidv dqp dqb dqs dqn
     hj hproc hK hnoff htier hgeom hblk hbg hbel hn1 hnnib hn31 hpd ha0 =>
   ireclaim_entry PK BR BL IG BO IL IU IP EO Γ cpu k γl pd pav pu j pidv dqp dqb dqs dqn hj hproc
     hK hnoff htier hgeom hblk hbg hbel hn1 hnnib hn31 hpd ha0⟩

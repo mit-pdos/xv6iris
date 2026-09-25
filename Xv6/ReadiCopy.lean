@@ -35,7 +35,7 @@ theorem rd_beq_self (v : BitVec 64) : bcond bop.BEQ v v = true := by
   rw [bcond_beq_eq]; simp
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 /-- **THE LOOP HEAD `+0x7c`, AS A CONTINUATION** (Rocq's loop invariant):

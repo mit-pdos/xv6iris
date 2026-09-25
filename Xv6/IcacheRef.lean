@@ -252,7 +252,7 @@ theorem inodeIdent_halve [CurCtx] (k : Nat) (q : Qp) (dev inum : BitVec 32) :
 end Ident
 
 section SlhHalve
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [SleepLockG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
 
 theorem slhTok_halve_i [Icfg] (k : Nat) (q : Qp) :
     slhTok (GF := GF) (icfgIsl k) q ⊢ slhTok (icfgIsl k) q.half ∗ slhTok (icfgIsl k) q.half := by
@@ -346,7 +346,7 @@ canonical parent `qt = qi` is mass 1).  The keys are recorded by the box
 register; only the mass is pinned here (R-1). -/
 
 section Stamps
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [IcboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcboxG GF]
 
 def icStamps [Icfg] (k : Nat) (i : IcBid) (μ : Rat) : IProp GF :=
   iprop(∃ m : StampMap IcBid, ⌜qsum m = μ⌝ ∗ reference (icfgBox k) i m)
@@ -434,7 +434,7 @@ end Stamps
 /-! ## 4e.  WHAT A REFERENCE IS -/
 
 section IcacheRef
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcacheG GF]
   [SleepLockG GF] [IcboxG GF]
 
 /-- HOLDING ONE REFERENCE to itable slot `k`.  It needs no inode POINTER

@@ -79,7 +79,7 @@ def idupSlots : Nat := 4 + 10
 
 /-- **WP of `idup`** (Rocq `wp_idup_sconf_body`). -/
 def wp_idup_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
-    [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [FsBlocksG GF] [FsTopG GF] [LogG GF] [IregG GF]
+    [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [FsBlocksG GF] [FsTopG GF] [LogG GF] [IregG GF]
     [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (cpu : CPU) (k : KCtx) (kk z : Nat)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : idupSlots ≤ k.avail) (hkk : kk < NINODE)
@@ -98,7 +98,7 @@ def wp_idup_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 /-- The interface of `idup` (Rocq `Module Type IDUP`). -/
 structure IDUP : Prop where
   wp_idup : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
-    [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [FsBlocksG GF] [FsTopG GF] [LogG GF] [IregG GF]
+    [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [FsBlocksG GF] [FsTopG GF] [LogG GF] [IregG GF]
     [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (cpu : CPU) (k : KCtx) (kk z : Nat) hnoff hK hkk hlk ha0,
     wp_idup_body (hlc := hlc) (GF := GF) cpu k kk z hnoff hK hkk hlk ha0

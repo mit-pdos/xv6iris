@@ -90,7 +90,7 @@ theorem range_getElem?_self (j : Nat) (hj : j < NPROC) : (List.range NPROC)[j]? 
   exact ⟨by simpa using hj, List.getElem_range _⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-- One slot's arm of the boot holder: its boot half if never allocated,
 its marker otherwise. -/

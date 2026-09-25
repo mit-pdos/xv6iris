@@ -54,7 +54,7 @@ theorem argstr_calleeSaved_mk (KR R : RegMap)
       | assumption
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-! ## The block, opened at the trapframe -/
 
@@ -194,7 +194,7 @@ end
 
 set_option maxHeartbeats 16000000 in
 theorem argstr_proof (AR : ARGRAW) (FS : FETCHSTR) : ARGSTR :=
-  ⟨fun {hlc GF} _ _ _ _ _ X cpu k γl γk pa pid V M i v old hi ha0 hv hproc htier hnoff hK hlk hmax
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ X cpu k γl γk pa pid V M i v old hi ha0 hv hproc htier hnoff hK hlk hmax
       hmax' => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩

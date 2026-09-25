@@ -142,7 +142,7 @@ continuation (Rocq's `ia_cont`) -/
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
-  [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [Appcfg GF]
+  [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF]
 
 /-- What each of ialloc's two exits carries into the shared epilogue at
 `+0x80`; `av` is the value in `a0` there, which each arm has ALREADY set
@@ -191,7 +191,7 @@ end
 (ClaimL ty t qt)) …) with (runit_claim …)`). -/
 theorem ialloc_refb_claim {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Icfg] [CurCtx]
     [IcacheG GF] [IregG GF] [FsBlocksG GF] [FsLinkG GF] [LogG GF] [SleepLockG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
-    [FsTopG GF] [Appcfg GF] [IrefslotG GF] [IcboxG GF] (ty : BitVec 16) (t : Nat) (qt : Qp) (kk : Nat) (q : Qp)
+    [FsTopG GF] [Appcfg GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcboxG GF] (ty : BitVec 16) (t : Nat) (qt : Qp) (kk : Nat) (q : Qp)
     (dev inum : BitVec 32) :
     inodeRefb (GF := GF) (isClaim (.claimL ty t qt)) kk q dev inum ⊢
       inodeRef kk q dev inum ∗ runitClaim inum.toNat := by
@@ -203,7 +203,7 @@ theorem ialloc_refb_claim {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
-  [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
+  [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 /-- **THE CLAIM** (Rocq 1532–1536): `lwAuRec` ∘ `iregClaim_au`.  No resource
 in beyond the persistent region and seal and the transaction's share; the
@@ -232,7 +232,7 @@ end
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
   [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [SleepLockG GF]
-  [IrefslotG GF] [Appcfg GF]
+  [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF]
 
 set_option maxHeartbeats 1000000 in
 /-- `iget(dev, inum)` at `+0xaa` (Rocq 1751), at the licence the caller
@@ -267,7 +267,7 @@ end
 /-! ## Slot units -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [DiskG GF] [CurCtx]
 
 theorem ialloc_slots_join2 (γ : BcacheNames) : bslot (GF := GF) ∗ bslot ⊢ bslots 2 :=

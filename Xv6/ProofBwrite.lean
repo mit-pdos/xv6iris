@@ -41,7 +41,7 @@ theorem bw_br_vdr : KA.«bwrite» + 0x2c7e#64 = KA.«virtio_disk_rw» := by deci
 theorem bw_beqz : bcond bop.BEQ 1#64 0#64 = false := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx]
 
 /-! ## The two callees, at this call site -/
@@ -111,7 +111,7 @@ function: every step runs at the caller's index, the complement
 `Hte`/`Hce` follows the thread, `virtio_disk_rw` is called at its eb
 contract). -/
 theorem bwrite_proof (HS : HOLDINGSLEEP) (VR : VIRTIO_DISK_RW) : BWRITE := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ Γ _ cpu k γl γ V γdl pd pav pu j kk pidv dev bno dqp bs bsd
+  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl γ V γdl pd pav pu j kk pidv dev bno dqp bs bsd
     hj hproc hK hnoff htier hkk ha0 hbno hbsd hpd => by
   unfold wp_bwrite_eb_body
   simp only [bwriteAddr]

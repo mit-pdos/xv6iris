@@ -314,7 +314,7 @@ end Recs
 
 section Body
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
-  [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [LogG GF] [FsBytesG GF] [FsTopG GF] [FsLinkG GF]
+  [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBytesG GF] [FsTopG GF] [FsLinkG GF]
 
 /-- Block `bi`'s conjunct: the parked list `ds` of its sixteen records,
 well-formed and coupled to the region map `m`, its sixteen record runs and
@@ -426,7 +426,7 @@ ANY share.  Because the entry RECORDS the share, `iregRelease` hands back
 exactly what `iregArm` took. -/
 
 section Top
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [LogG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
   [FsTopG GF] [FsBytesG GF]
 
 /-- what an arm parks: its transaction's element, at the arm's own share -/
@@ -703,7 +703,7 @@ end Top
 
 section Bundles
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
-  [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
+  [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 /-- THE REGION AT POWERON, BEFORE RECOVERY HAS RUN (durable-disk lane
 E-except).  Its byte row is the bare `fsBytesRow`: the era's mint runs at
@@ -825,7 +825,7 @@ ABSENT rows (ilock's fresh-inode fill and the escrow deposit's free, both
 reading the pre-node's zero count off `iregTopPark`). -/
 
 section Retag
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [LogG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
   [FsTopG GF] [FsBytesG GF] [Appcfg GF]
 
 /-- Rocq's `ireg_top_retag_gen`. -/
@@ -925,7 +925,7 @@ end Retag
 
 section Acc
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
-  [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [LogG GF] [FsBytesG GF] [FsTopG GF] [FsLinkG GF]
+  [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBytesG GF] [FsTopG GF] [FsLinkG GF]
 
 /-- a block's conjunct only reads the map at its OWN sixteen keys -/
 theorem iregBlk_mono [Icfg] (γi : GName) (γfs : FsNames) (inodestart : Nat)

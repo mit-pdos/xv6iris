@@ -60,7 +60,7 @@ theorem yield_br_fffffffffffff9de : KA.«yield» + 0xfffffffffffff9de#64 = KA.«
 
 set_option maxHeartbeats 4000000 in
 theorem yield_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : YIELD :=
-  ⟨fun {hlc GF} _ _ _ _ _ X Γ _ cpu k j hj hproc hK hsie hnoff hlocks htier => by
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ X Γ _ cpu k j hj hproc hK hsie hnoff hlocks htier => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
   unfold wp_yield_body

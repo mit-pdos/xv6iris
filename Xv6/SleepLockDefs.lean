@@ -71,7 +71,7 @@ def slNameField (slk : BitVec 64) : BitVec 64 := slk + 32#64
 def slPid (slk : BitVec 64) : BitVec 64 := slk + 40#64
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [SleepLockG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
 
 /-! ## The ghost -/
 
@@ -485,7 +485,7 @@ def slhOf : Option Qp → Option UFrac := Option.map uf
 @[simp] theorem slhOf_some (q : Qp) : slhOf (some q) = some (uf q) := rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [SleepLockG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
 
 /-- A `q`-share of the right to hold the sleeplock. -/
 def slhTok (γ : GName) (q : Qp) : IProp GF := iOwn (F := SlhRF) γ (◯ (some (uf q) : Option UFrac))
@@ -613,7 +613,7 @@ theorem slhAuth_alloc : ⊢@{IProp GF} |==> ∃ γ : GName, slhAuth γ none := b
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [SleepLockG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
 
 /-- The TRACKED sleeplock: the deposit is a share of the "may hold" right
 keyed by the OBJECT's gname `γt` (the icache keys it by the inode slot so

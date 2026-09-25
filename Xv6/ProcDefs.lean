@@ -31,6 +31,8 @@ import Xv6.KernelText
 import Xv6.UPtDefs
 import Xv6.IrefSlots
 import Xv6.ProcGeom
+import Xv6.WaitInvTies
+import Xv6.KillRow
 
 set_option linter.unusedSectionVars false
 
@@ -190,7 +192,7 @@ def dormantSpace (st : BitVec 32) (V : ProcPriv) (pid : BitVec 32) : IProp GF :=
       procPtAt V.upt M ∗ tfPageAt V.upt.tfp V.tf ∗ stackOwn (V.kstack + 4096#64) 512)
 
 section Dormant
-variable [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+variable [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-- **The dormant slot's allowances** (Rocq `proc_dormant`'s four supply
 rows, ProcDefs.v:623): one fd-slot unit per descriptor (`[∗ list] _ ∈

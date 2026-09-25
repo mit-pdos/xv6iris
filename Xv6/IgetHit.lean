@@ -83,7 +83,7 @@ theorem ig_addiw (n : Nat) :
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
   [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [SleepLockG GF]
-  [IrefslotG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
+  [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
 set_option maxHeartbeats 8000000 in
 /-- THE HIT's GHOST MOVES AND ITS STORE's ACCESSOR (Rocq 2098--2380;

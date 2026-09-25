@@ -166,7 +166,7 @@ theorem sys_sbrk_priv_eta (V : ProcPriv) : { V with sz := V.sz, pvLazy := V.pvLa
   cases V; rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [X : CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
 
 /-! ## The private block -/
 
@@ -714,7 +714,7 @@ end
 
 set_option maxHeartbeats 8000000 in
 theorem sys_sbrk_proof (AI : ARGINT) (MP : MYPROC) (GP : GROWPROC) : SYSSBRK :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ cpu k γl γk j pid V M v0 v1 hj hproc hv0 hv1 hnoff hK hlk htier => by
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ cpu k γl γk j pid V M v0 v1 hj hproc hv0 hv1 hnoff hK hlk htier => by
   unfold wp_sys_sbrk_body
   simp only [sysSbrkAddr]
   iintro ⟨Hk, Hpc, #Hlk, Hav, Hpv, HΦ⟩

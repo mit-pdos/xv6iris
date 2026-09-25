@@ -129,7 +129,7 @@ set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- `acquire`'s cancellable contract at pipeclose's call site (entry `0x80000c58`):
 opens `isPipe`→`lockOpenable`, spends the caller's reference `pipeRef γp w 1` as
@@ -290,7 +290,7 @@ theorem pc_epi (cpu cE : CPU) (k : KCtx) (γk : KmemNames) (on : Option Nat)
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-! ## Link registers, lock sets, contexts -/
 
@@ -734,7 +734,7 @@ theorem pipeclose_br_ffffffffffffc640 : KA.«pipeclose» + 0xffffffffffffc640#64
 set_option maxHeartbeats 8000000 in
 theorem pipeclose_proof (Acq : ACQUIRE_GEN) (Wk : WAKEUP) (Rel : RELEASE_REFUTE)
     (RelC : RELEASE_CANCEL) (Kf : KFREE_FREE) : PIPECLOSE := ⟨
-  fun {hlc GF} _ _ _ _ _ _ Γ cpu k γl γp w γkl γk on hw hnoff hK hpipe hproc hkmem htier => by
+  fun {hlc GF} _ _ _ _ _ _ _ _ Γ cpu k γl γp w γkl γk on hw hnoff hK hpipe hproc hkmem htier => by
   unfold wp_pipeclose_body
   simp only [pipecloseAddr]
   iintro ⟨Hk, Hpc, #Hpipe, Href, #Hkl, Hav, #Hpinv, HPhi⟩

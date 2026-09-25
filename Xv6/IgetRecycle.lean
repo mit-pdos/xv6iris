@@ -166,7 +166,7 @@ theorem ig_ciwf_insert (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
   [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [SleepLockG GF]
-  [IrefslotG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
+  [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
 /-! ## (a): the withdraw, and the cells the four stores need -/
 
@@ -283,7 +283,7 @@ theorem ig_ireg_esc (z : Nat) : (↑iregN : CoPset) ## (↑(escAN z) : CoPset) :
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
   [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [SleepLockG GF]
-  [IrefslotG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
+  [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
 theorem lkFloor_keyAt (ξ : CtxId) (t : Nat) :
     lkFloor (GF := GF) ξ t ⊢ keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ t := by

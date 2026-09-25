@@ -58,7 +58,7 @@ block carries the descriptor table (P2) the per-descriptor units travel in
 the group too.  allocproc never spends them: the caller hands them to the
 new process, and a failure tail gives them straight back to `freeproc`
 (`freeprocIn`). -/
-def allocprocPost {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+def allocprocPost {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (γk : KmemNames) (on : Option Nat) (pav : Option Nat) (r : BitVec 64) :
     IProp GF := iprop%
   (⌜r = 0#64 ∧ ((pav = none ∨ pav = some 0) ∨
@@ -76,7 +76,7 @@ holding `p->lock`, and with it the arm its `acquire` paid out
 `false`) -- Rocq's `cpu_own 1 eb p false` carries that pay, and the caller's
 eventual `release` (re-enabling interrupts when the entry had them on) takes
 it back through `popArm`. -/
-def wp_allocproc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+def wp_allocproc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γl γp : GName) (γk : KmemNames) (on : Option Nat)
     (pav : Option Nat)
     (hnoff : k.noff + 2 < 2 ^ 31) (hK : allocprocSlots ≤ k.avail)
@@ -95,7 +95,7 @@ def wp_allocproc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
   ⊢ wpLoop (GF := GF) cpu
 
 structure ALLOCPROC : Prop where
-  wp_allocproc : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx] (Γ : SchedNames) (cpu : CPU) (k : KCtx)
+  wp_allocproc : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx] (Γ : SchedNames) (cpu : CPU) (k : KCtx)
     (γl γp : GName) (γk : KmemNames) (on : Option Nat) (pav : Option Nat) hnoff hK hlk hlp hlq htier,
     wp_allocproc_body (hlc := hlc) (GF := GF) Γ cpu k γl γp γk on pav hnoff hK hlk hlp hlq htier
 

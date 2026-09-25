@@ -169,7 +169,7 @@ def opPending (om : RegMapF OpEntry) (b : Nat) : Prop :=
   ∃ i e, PartialMap.get? om i = some e ∧ b ∈ e.set
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 /-! ## An active operation -/
@@ -217,17 +217,17 @@ instance logOp_timeless (γ : LogNames) (u : Nat) :
 /- The three ledger re-packagings below carry `[LogG GF]` alone (the
 section's other instance binders are omitted): `Xv6/WriteiBudget.lean`'s
 `logAmort` family, stated over `[LogG GF]` only, cites them. -/
-omit [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [BcacheG GF] [DiskG GF] [FsBlocksG GF] [CurCtx] in
+omit [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF] [DiskG GF] [FsBlocksG GF] [CurCtx] in
 theorem logOpSe_opS (γ : LogNames) (u : Nat) (Sb : List Nat) (e0 : Nat) :
     logOpSe (GF := GF) γ u Sb e0 ⊢ logOpS γ u Sb := by
   unfold logOpS; iintro H; iexists e0; iexact H
 
-omit [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [BcacheG GF] [DiskG GF] [FsBlocksG GF] [CurCtx] in
+omit [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF] [DiskG GF] [FsBlocksG GF] [CurCtx] in
 theorem logOpS_named (γ : LogNames) (u : Nat) (Sb : List Nat) :
     logOpS (GF := GF) γ u Sb ⊢ ∃ e0 : Nat, logOpSe γ u Sb e0 := by
   unfold logOpS; iintro H; iexact H
 
-omit [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [BcacheG GF] [DiskG GF] [FsBlocksG GF] [CurCtx] in
+omit [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF] [DiskG GF] [FsBlocksG GF] [CurCtx] in
 theorem logOpS_opb (γ : LogNames) (u : Nat) (Sb : List Nat) :
     logOpS (GF := GF) γ u Sb ⊢ logOpb γ u := by
   unfold logOpb; iintro H; iexists Sb; iexact H
@@ -768,7 +768,7 @@ block maps but not the log's own ghosts, and their consumers
 do not all carry `Xv6.LogG`. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [DiskG GF] [FsBlocksG GF] [CurCtx]
 
 /-- The payload's logical content, read off a CLIENT half (Rocq's

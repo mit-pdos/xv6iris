@@ -207,7 +207,7 @@ theorem opfEra_dir_of (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8
   mkfAbs_of_dir _ (mkfEra_is_dir dn bm data hty) (mkfEra_live dn bm data hnl)
 
 section OpenFire
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [FsTopG GF] [FsBytesG GF]
 
 /-! ## 1.  Item 1: the walk premise -/

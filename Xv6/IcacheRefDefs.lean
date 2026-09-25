@@ -976,18 +976,18 @@ theorem monoSlotFunAlloc (n : Nat) :
 
 /-- The per-slot sleeplock "may hold" counters at their authoritative zero,
 which is what `itable_body` parks for a free slot (deviation 4). -/
-theorem islFunAlloc [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [SleepLockG GF] (n : Nat) :
+theorem islFunAlloc [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF] (n : Nat) :
     ⊢@{IProp GF} |==> ∃ f : Nat → GName,
       [∗list] k ∈ List.range n, slhAuth (f k) none :=
   icFunAlloc 0 (fun _ γ => slhAuth γ none) (fun _ => slhAuth_alloc) n
 
 /-- One slot's box ghosts, whole, at their boot values (deviation 5). -/
-def icBoxRaw [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [IcboxG GF] (γb : BoxNames) : IProp GF := iprop%
+def icBoxRaw [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcboxG GF] (γb : BoxNames) : IProp GF := iprop%
   stampsAuth γb (∅ : StampMap IcBid) ∗ (γb.cnt ↪VAR (0 : Nat)) ∗
   (γb.slotd ↪VAR (default : SlotReg IcBid IcX)) ∗ (γb.slotp ↪VAR (default : L2Reg IcBid))
 
 /-- The per-slot box names, minted as one family (bio_init's pattern). -/
-theorem icfgBoxFunAlloc [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [IcboxG GF] (n : Nat) :
+theorem icfgBoxFunAlloc [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcboxG GF] (n : Nat) :
     ⊢@{IProp GF} |==> ∃ f : Nat → BoxNames, [∗list] k ∈ List.range n, icBoxRaw (f k) :=
   icFunAlloc ⟨0, 0, 0, 0⟩ (fun _ γb => icBoxRaw γb)
     (fun _ => by
@@ -1002,7 +1002,7 @@ theorem icfgBoxFunAlloc [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [Icb
 
 /-- A slot's raw box ghosts are exactly `MachCSL.boxAllocAt`'s ghost
 premises (Rocq's `box_alloc_at` takes the same four rows). -/
-theorem icBoxRaw_allocAt [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [IcboxG GF] (γb : BoxNames) :
+theorem icBoxRaw_allocAt [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcboxG GF] (γb : BoxNames) :
     icBoxRaw (GF := GF) γb ⊢
       stampsAuth γb (∅ : StampMap IcBid) ∗ (γb.cnt ↪VAR (0 : Nat)) ∗
         (∃ r0 : SlotReg IcBid IcX, γb.slotd ↪VAR r0) ∗
@@ -1037,7 +1037,7 @@ contents are a fact about the mkfs IMAGE, and a gname is only usable by
 `IcacheBoot` if the very allocation that mints it also mints the map.
 The off box's set names come out EMPTY (r25 shapes): the authorities go
 into `ic_slp` at IcacheBoot (`Xv6.offSetAuth offCfg k ∅`). -/
-theorem icfgAlloc [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [OffboxBoxG GF]
+theorem icfgAlloc [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [OffboxBoxG GF]
     (dv : BitVec 32) (nib : Nat) (LM : LinkUR) (CM : IcntUR) (BM : FrzmUR)
     (γlog : LogNames) (ist : Nat)
     (hLM : ✓ LM) (hCM : ✓ CM) (hBM : ✓ BM) :

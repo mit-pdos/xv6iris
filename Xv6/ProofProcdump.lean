@@ -356,7 +356,7 @@ theorem pd_slot_acc [CurCtx] (i : Nat) (hi : i < NPROC) :
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-! ## The callee, at its entry address -/
 
@@ -455,7 +455,7 @@ theorem pd_tail [CurCtx] (k : KCtx) (i : Nat) (hi : i < NPROC) (spie spp : Bool)
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 set_option maxHeartbeats 1000000 in
 /-- `printk(f)` with no varargs. -/
@@ -520,7 +520,7 @@ theorem pd_printk3 (PK : PRINTK) [CurCtx]
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 theorem pd_pid_fold [CurCtx] (pa : BitVec 64) (dq : DFrac) (w : BitVec 32) :
     wordPointsTo (GF := GF) (pa + 48#64) 4 dq w ⊢ wordPointsTo (pPid pa) 4 dq w := by
@@ -684,7 +684,7 @@ theorem pd_print (PK : PRINTK) [CurCtx] (k : KCtx) (γpr γl : GName) (γd : Uar
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 theorem pd_state_fold [CurCtx] (pa : BitVec 64) (dq : DFrac) (w : BitVec 32) :
     wordPointsTo (GF := GF) (pa + 24#64) 4 dq w ⊢ wordPointsTo (pState pa) 4 dq w := by
@@ -768,7 +768,7 @@ theorem pd_tbl_arm (PK : PRINTK) [CurCtx] (k : KCtx) (γpr γl : GName) (γd : U
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 set_option maxHeartbeats 4000000 in
 /-- One iteration of the scan, from the loop head at `0x80002468`: read
@@ -987,7 +987,7 @@ theorem pd_iter (PK : PRINTK) [CurCtx] (k : KCtx) (γpr γl : GName) (γd : Uart
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-! ## The loop -/
 
@@ -1149,7 +1149,7 @@ theorem pd_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-! ## The function -/
 
@@ -1168,7 +1168,7 @@ theorem procdump_br_105be : KA.«procdump» + 0x105be#64 = (KA.«proc» + 0x158#
 set_option maxHeartbeats 4000000 in
 /-- **`procdump` meets its specification.** -/
 theorem procdump_proof (PK : PRINTK) : PROCDUMP :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ cpu k γpr γl γd bs hK hnoff hpr huart => by
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ cpu k γpr γl γd bs hK hnoff hpr huart => by
   unfold wp_procdump_body
   simp only [procdumpAddr]
   iintro ⟨Hk, Hpc, #Hlk, #Htx, Hsent, Hview, HPhi⟩

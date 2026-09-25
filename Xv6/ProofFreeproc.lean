@@ -273,7 +273,7 @@ theorem pidsOk_clear (pids : Nat → BitVec 32) (j : Nat) (h : pidsOk pids) :
     exact h j1 j2 h1 h2 hne heq
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-- **The quarter of `proc[j].pid` the payload holds**, with the frame that
 puts the cleared cell back. -/
@@ -319,7 +319,7 @@ end
 /-! ## The block freeproc only carries -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-- The private cells `freeproc` never writes (the name buffer is written
 once, in its last stretch, so it rides here as a parameter). -/
@@ -352,7 +352,7 @@ theorem fp_pnameWf_zero (nm : List (BitVec 8)) (h : nm.length = PNAMELEN) :
   omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-- **The UNUSED block freeproc leaves**: the emptied cells, the kernel
 stack, and the two pure rows its caller brought. -/
@@ -584,7 +584,7 @@ theorem fp_withLocks_self (k : KCtx) (a b : Bool) :
     (k.withSpie a b).withLocks k.locks = k.withSpie a b := rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-! ## The address of a field, folded back after a store -/
 
@@ -939,7 +939,7 @@ theorem freeproc_br_ffffffffffffef6c : KA.«freeproc» + 0xffffffffffffef6c#64 =
 
 theorem freeproc_proof (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE) (RE : RELEASE) :
     FREEPROC :=
-  ⟨fun {hlc GF} _ _ _ _ _ X Γ cpu k γl γp γk j st ch pid V M hj hp hst hnoff hK hsie hlk hlp htier => by
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ X Γ cpu k γl γp γk j st ch pid V M hj hp hst hnoff hK hsie hlk hlp htier => by
     unfold wp_freeproc_body
     simp only [freeprocAddr]
     unfold freeprocIn procFields pnameCells

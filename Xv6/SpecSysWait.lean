@@ -42,7 +42,7 @@ callees: kwait's 62 (argaddr's is 18). -/
 def sysWaitSlots : Nat := 4 + kwaitSlots
 
 /-- **WP of `sys_wait()`.** -/
-def wp_sys_wait_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+def wp_sys_wait_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (v : BitVec 64)
@@ -71,7 +71,7 @@ def wp_sys_wait_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
 contract (`KWAIT.wp_kwait_eb`) passed through -- the trap-CSR complement
 `trapCsrsExt` / `cpuClaimExt` in and out; sys_wait takes no lock of its own,
 so it mints nothing and every stretch outside kwait is level 0. -/
-def wp_sys_wait_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+def wp_sys_wait_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (v : BitVec 64)
@@ -98,7 +98,7 @@ def wp_sys_wait_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
 
 /-- The interface of `sys_wait`. -/
 structure SYSWAIT : Prop where
-  wp_sys_wait_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+  wp_sys_wait_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (v : BitVec 64) hj hproc hv hK hnoff htier,
@@ -108,7 +108,7 @@ structure SYSWAIT : Prop where
 /-- The interrupts-off instance of `wp_sys_wait_eb` (the complement is the
 whole bundle). -/
 theorem SYSWAIT.wp_sys_wait (A : SYSWAIT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
-    [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (v : BitVec 64) hj hproc hv hK hsie hnoff hlocks htier :
     wp_sys_wait_body (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk j pid V M v

@@ -117,7 +117,7 @@ theorem iul_calleeSaved_epi (KR R : RegMap)
       | assumption
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [IcacheG GF] [LogG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcacheG GF] [LogG GF]
   [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF]
   [SleepLockG GF]
 
@@ -259,7 +259,7 @@ end
 
 set_option maxHeartbeats 16000000 in
 theorem iunlock_proof (HS : HOLDINGSLEEP) (RS : RELEASESLEEP_HOOK) : IUNLOCK := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ cpu k γil γisl kk s g lo tl d dev inum dn bm
+  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ cpu k γil γisl kk s g lo tl d dev inum dn bm
     pidv dqp hnoff hK hshr hkk ha0 hsl hp htier hle => by
   unfold wp_iunlock_dep_body
   simp only [iunlockAddr]

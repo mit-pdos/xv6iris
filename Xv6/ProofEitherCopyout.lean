@@ -31,7 +31,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option maxRecDepth 8000
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 set_option maxHeartbeats 1000000 in
 /-- `copyout`'s contract as a rule. -/
@@ -72,7 +72,7 @@ theorem either_copyout_br_fffffffffffff626 : KA.«either_copyout» + 0xfffffffff
 
 set_option maxHeartbeats 4000000 in
 theorem either_copyout_proof (MP : MYPROC) (CO : COPYOUT) (MM : MEMMOVE) : EITHER_COPYOUT :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ cpu k γl γk j pid V P M user dqs bs olds hj hproc hnoff hK hlk huser
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ cpu k γl γk j pid V P M user dqs bs olds hj hproc hnoff hK hlk huser
       hlen hlen' holds => by
   unfold wp_either_copyout_body
   simp only [eitherCopyoutAddr]

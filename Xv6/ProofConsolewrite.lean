@@ -205,7 +205,7 @@ theorem cw_buf_nil (a : BitVec 64) (bs : List (BitVec 8)) (h : bs = []) :
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- The four frame slots of `buf`, opened as its 32 bytes. -/
 theorem cw_buf_open (a : BitVec 64) :
@@ -292,7 +292,7 @@ end
 /-! ## The nine shrink-wrapped slots -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- The nine slots `s2..s10` are saved into, before they are (`sp-32 .. sp-96`). -/
 def cwSpare9 (sp : BitVec 64) : IProp GF := iprop%
@@ -446,7 +446,7 @@ end
 /-! ## The callee call-site wrappers -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- `either_copyin` at consolewrite's call site: the user arm, into the
 bounce buffer at `a0`. -/
@@ -527,7 +527,7 @@ end
 /-! ## The register pins, the caller's continuation, the epilogue -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- Context normalisation inside the frame. -/
 theorem cw_pushed_withSpie (k : KCtx) (m : Nat) (a b : Bool) :
@@ -673,7 +673,7 @@ end
 /-! ## The frame, opened and closed around the loop -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 theorem cw_frame_elim (sp ra s0 s1 : BitVec 64) :
     frame16s1 (GF := GF) sp ra s0 s1 ⊢
@@ -721,7 +721,7 @@ theorem cw_ret_add (N x y : Nat) (n : Int) (hi : x + y ≤ N) (hNn : (N : Int) �
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 set_option maxHeartbeats 4000000 in
 /-- At `+0x98` with the frame in pieces: close it and return. -/
@@ -761,7 +761,7 @@ end
 /-! ## The loop invariant at the guard `+0x60` -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [X : CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
 
 /-- What re-entering the guard needs: the pins, the count in `s1`, the
 extended process block, the trace witness, the frame in pieces, and the
@@ -822,7 +822,7 @@ theorem cwLoopInv_intro (cpu : CPU) (k : KCtx) (γ : UartNames) (bs : List (BitV
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [X : CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
 
 /-- The loop hypothesis as a rule (so the register map can be inferred). -/
 theorem cwLoopInv_use (cpu c : CPU) (k : KCtx) (γ : UartNames) (bs : List (BitVec 8)) (j : Nat)
@@ -853,7 +853,7 @@ end
 /-! ## One chunk of the loop, at `+0x38` -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [X : CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
 
 set_option maxHeartbeats 16000000 in
 /-- `either_copyin(buf, user_src, src + i, nn)`, then either the `-1` exit
@@ -1130,7 +1130,7 @@ end
 /-! ## The loop, closed by Löb at the guard `+0x60` -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [X : CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
 
 set_option maxHeartbeats 16000000 in
 theorem cw_loop (EC : EITHER_COPYIN) (UW : UARTWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
@@ -1205,7 +1205,7 @@ end
 set_option maxHeartbeats 16000000 in
 /-- **`consolewrite` meets its specification.** -/
 theorem consolewrite_proof (EC : EITHER_COPYIN) (UW : UARTWRITE) : CONSOLEWRITE := ⟨
-  fun {hlc GF} _ _ _ _ _ X Γ _ cpu k γl γ bs γkl γk j pid V M n hj hproc hK hnoff htier
+  fun {hlc GF} _ _ _ _ _ _ _ X Γ _ cpu k γl γ bs γkl γk j pid V M n hj hproc hK hnoff htier
       huser hn hn' => by
   unfold wp_consolewrite_eb_body
   simp only [consolewriteAddr]

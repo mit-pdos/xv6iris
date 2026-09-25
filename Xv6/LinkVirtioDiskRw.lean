@@ -50,7 +50,7 @@ set_option maxRecDepth 8000 in
 theorem virtio_disk_rw_proof
     (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP) (FD : FREE_DESC) :
     VIRTIO_DISK_RW :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ Γ _ cpu k γ γl pd pav pu j bno dsk0 dataBuf dataDisk
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ Γ _ cpu k γ γl pd pav pu j bno dsk0 dataBuf dataDisk
       hj hproc hK hnoff htier hbno hdata hpd hkm => by
     unfold wp_virtio_disk_rw_eb_body
     iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hcaps, Hbuf, Hblk, Hnext⟩

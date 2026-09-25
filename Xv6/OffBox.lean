@@ -159,7 +159,7 @@ theorem ctxMorph_bigSepS {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
   exact ctxMorph_bigSepL (FiniteSet.toList (A := A) L) (fun _ x ξ => Φ x ξ) (fun (_ : Nat) (x : A) => h x)
 
 section OffBox
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [OffboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF]
   [OffboxBoxG GF] [CurCtx]
 
 /-! ## The instance's parameters

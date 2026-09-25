@@ -71,7 +71,7 @@ def fetchstrRet (M : Nat → List (BitVec 8)) (va : Nat) (old bs : List (BitVec 
 
 /-- `fetchstr(addr a0, buf a1, max a2)` in the current process `pa`: `old` is
 the buffer's `max` bytes. -/
-def wp_fetchstr_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+def wp_fetchstr_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (pa : BitVec 64) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (old : List (BitVec 8))
     (hproc : k.proc = pa) (htier : k.tier = KTier.kpt)
@@ -92,7 +92,7 @@ def wp_fetchstr_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   ⊢ wpLoop (GF := GF) cpu
 
 structure FETCHSTR : Prop where
-  wp_fetchstr : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+  wp_fetchstr : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (pa : BitVec 64) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (old : List (BitVec 8))
     hproc htier hnoff hK hlk hmax hmax',

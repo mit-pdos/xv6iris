@@ -98,7 +98,7 @@ theorem writei_bltu_size (w : BitVec 32) (off : Nat) (hw : w.toNat < 2 ^ 31) (ho
   rw [writei_sext_toNat w hw, writei_bltu_nat _ _ (by omega) (by omega)]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [X : CurCtx]
 
@@ -360,7 +360,7 @@ namespace Xv6
 /-- **`writei` meets its specification.** -/
 theorem writei_proof (BM : BMAP) (BR : BREAD) (BE : BRELSE) (LW : LOG_WRITE) (EC : EITHER_COPYIN)
     (IU : IUPDATE) : WRITEI :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl pd pav pu j γkl γk ip inum bm data
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl pd pav pu j γkl γk ip inum bm data
     dn dn0 user off n sbs V M ncount Sb pidv dqp dqs dqd dqn dqi dqb dqz
     hj hproc hK hnoff htier hcost hgeom hcov hlog hnib hda hnz hstab hnl hwf hhz
     hcovs hsum hsz hbg hsbs hpd ha0 huser ha3 ha4 => by

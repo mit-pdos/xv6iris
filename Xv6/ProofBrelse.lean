@@ -39,7 +39,7 @@ theorem br_headaddr : KA.«brelse» + 0x1d778#64 = bhead := by
   unfold bhead bcacheHeadAddr; decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx]
 
 /-! ## The two sleeplock callees, at this call site -/
@@ -210,7 +210,7 @@ end
 set_option maxHeartbeats 16000000 in
 theorem brelse_proof (HS : HOLDINGSLEEP) (RS : RELEASESLEEP_HOOK) (AC : ACQUIRE)
     (RE : RELEASE_HOOK) : BRELSE := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ Γ cpu k γl γ V kk pidv dev bno dqp bs bsd d
+  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ Γ cpu k γl γ V kk pidv dev bno dqp bs bsd d
     hnoff hK hlk hsl hp htier hkk ha0 => by
   unfold wp_brelse_body
   simp only [brelseAddr]

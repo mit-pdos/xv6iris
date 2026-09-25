@@ -81,7 +81,7 @@ macro_rules
                k_ext_move))
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-! ## Link registers, immediates -/
 
@@ -752,7 +752,7 @@ theorem pr_cs19 (R R' : RegMap) (hcs : calleeSaved R R') : R' 19#5 = R 19#5 := h
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [X : CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
 
 /-! ## The tail `(KernelSyms.«piperead» + 0xd4)`: wake writers, release, restore, return `s4` -/
 
@@ -1772,7 +1772,7 @@ theorem piperead_br_ffffffffffffd1f6 : KA.«piperead» + 0xffffffffffffd1f6#64 =
 
 theorem piperead_proof (MP : MYPROC) (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP)
     (SP : SLEEP_PREPARE) (SL : SLEEP) (KL : KILLED) (CO : COPYOUT) : PIPEREAD := ⟨
-  fun {hlc GF} _ _ _ _ _ X Γ _ cpu k γl γp w q γkl γk j pid V M n hj hproc hK hnoff htier hn hn' => by
+  fun {hlc GF} _ _ _ _ _ _ _ X Γ _ cpu k γl γp w q γkl γk j pid V M n hj hproc hK hnoff htier hn hn' => by
   unfold wp_piperead_eb_body
   simp only [pipereadAddr]
   iintro ⟨Hk, Hpc, #Hpinv, Hte, Hce, #Hpipe, Href, #Hkl, #Hav, Hpriv, HΦ⟩

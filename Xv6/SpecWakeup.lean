@@ -55,7 +55,7 @@ def wakeupSlots : Nat := 18
 
 /-- **WP of `wakeup`**, at either `SIE` and at any lock depth that does not
 already hold `"proc"`. -/
-def wp_wakeup_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+def wp_wakeup_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : wakeupSlots ≤ k.avail)
     (hlk : "proc" ∉ k.locks) (htier : k.tier = KTier.kpt) : Prop :=
@@ -68,7 +68,7 @@ def wp_wakeup_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G G
 
 /-- The interface of `wakeup`. -/
 structure WAKEUP : Prop where
-  wp_wakeup : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+  wp_wakeup : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) hnoff hK hlk htier,
     wp_wakeup_body (hlc := hlc) (GF := GF) Γ cpu k hnoff hK hlk htier
 

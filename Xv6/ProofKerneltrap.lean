@@ -74,7 +74,7 @@ set_option maxHeartbeats 8000000 in
 /-- **`kerneltrap` meets its specification**, given `devintr`, `myproc` and
 `yield`. -/
 theorem kerneltrap_proof (DI : DEVINTR) (MP : MYPROC) (YI : YIELD) : KERNELTRAP :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ Γ _ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu bs
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ Γ _ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu bs
       cpu k epc sc hsie hspie hspp hnoff hlocks htier hK hsc hepc => by
   unfold wp_kerneltrap_body
   iintro ⟨Hk, Hpc, #Hpinv, #Hcaps, Hcsrs, Hclaim, Hres, HΦ⟩

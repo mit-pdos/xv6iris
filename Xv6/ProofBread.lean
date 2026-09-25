@@ -31,7 +31,7 @@ set_option linter.unusedVariables false
 set_option maxHeartbeats 32000000 in
 theorem bread_proof (AC : ACQUIRE) (RE : RELEASE_HOOK) (AS : ACQUIRESLEEP_LLB)
     (VR : VIRTIO_DISK_RW) (PA : PANIC) : BREAD := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ Γ _ c0 k γl γ V γdl pd pav pu j pidv dev bno dqp
+  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ Γ _ c0 k γl γ V γdl pd pav pu j pidv dev bno dqp
     hj hproc hK hnoff htier hbno hcov hdev hpd ha0 ha1 => by
   unfold wp_bread_eb_body
   simp only [breadAddr]

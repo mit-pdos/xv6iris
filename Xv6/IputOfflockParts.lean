@@ -141,7 +141,7 @@ theorem iput_ofl_mask_ftop (z : Nat) :
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
-  [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
+  [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 /-- THE DEPOSIT (Rocq's `ireg_free_deposit_au` through `lw_au_rec`): the
 region's type-0 write of the corpse, filling the escrow and retiring the
@@ -171,7 +171,7 @@ end
 /-! ## The handle, opened (iupdate's `iu_hold_open`, copied) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [BcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
   [DiskG GF] [FsBlocksG GF] [SleepLockG GF]
 
 theorem iput_ofl_hold_open [CurCtx] (γ : BcacheNames) (V : BioView GF) (kk : Nat)

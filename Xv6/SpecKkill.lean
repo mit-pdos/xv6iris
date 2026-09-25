@@ -19,7 +19,7 @@ open LeanRV64D
 
 def kkillAddr : BitVec 64 := KA.«kkill»
 
-def wp_kkill_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+def wp_kkill_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 16 ≤ k.avail) (hlk : "proc" ∉ k.locks) (htier : k.tier = KTier.kpt) : Prop :=
   kctx cpu k ∗ pcIs cpu kkillAddr ∗ procsInv Γ ∗
@@ -30,7 +30,7 @@ def wp_kkill_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
   ⊢ wpLoop (GF := GF) cpu
 
 structure KKILL : Prop where
-  wp_kkill : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx] (Γ : SchedNames) (cpu : CPU) (k : KCtx)
+  wp_kkill : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx] (Γ : SchedNames) (cpu : CPU) (k : KCtx)
     hnoff hK hlk htier,
     wp_kkill_body (hlc := hlc) (GF := GF) Γ cpu k hnoff hK hlk htier
 

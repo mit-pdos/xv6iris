@@ -162,7 +162,7 @@ theorem kkFrame_join {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurC
   unfold kkFrame; iintro H; iexact H
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-- **The wake step of `kkill`** (the port of `wakeup`'s): at SLEEPING the
 lock owns BOTH halves of the state mirror (`unclaimed SLEEPING`), so the
@@ -204,7 +204,7 @@ to the release. -/
 theorem kkill_br_ffffffffffffeb3c : KA.«kkill» + 0xffffffffffffeb3c#64 = KA.«release» := by decide
 
 theorem kk_rel_nomatch (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors}
-    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) (k : KCtx) (arg : BitVec 64) (hwf : k.wf) (hnoff : k.noff + 1 < 2 ^ 31)
     (hK : 16 ≤ k.avail) (hlk : "proc" ∉ k.locks)
     (i : Nat) (hi : i < NPROC) (spie spp spie1 spp1 : Bool) (R Rr : RegMap)
@@ -306,7 +306,7 @@ theorem kk_rel_nomatch (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors}
 set_option maxHeartbeats 4000000 in
 /-- The match tail at `0x800021ee`: `release(&p->lock)` and `return 0`. -/
 theorem kk_rel_found (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors}
-    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) (k : KCtx) (arg : BitVec 64) (hwf : k.wf) (hnoff : k.noff + 1 < 2 ^ 31)
     (hK : 16 ≤ k.avail) (hlk : "proc" ∉ k.locks)
     (i : Nat) (hi : i < NPROC) (spie spp spie1 spp1 : Bool) (R Rr : RegMap)
@@ -398,7 +398,7 @@ set_option maxHeartbeats 4000000 in
 /-- The match arm at `0x800021e2`: `p->killed = 1`, and at SLEEPING
 `p->state = RUNNABLE`, then the release tail. -/
 theorem kk_found (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors}
-    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [X : CurCtx]
+    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
     (Γ : SchedNames) (k : KCtx) (arg : BitVec 64) (hwf : k.wf) (hnoff : k.noff + 1 < 2 ^ 31)
     (hK : 16 ≤ k.avail) (hlk : "proc" ∉ k.locks) (htier : k.tier = KTier.kpt)
     (i : Nat) (hi : i < NPROC) (spie spp spie1 spp1 : Bool) (R Rr : RegMap)
@@ -513,7 +513,7 @@ set_option maxHeartbeats 4000000 in
 /-- The body at `0x800021c4` for slot `i`: `acquire(&p->lock)`, the pid
 test, and then either the match arm or the no-match release tail. -/
 theorem kk_iter (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors}
-    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [X : CurCtx]
+    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
     (Γ : SchedNames) (k : KCtx) (arg : BitVec 64)
     (hwf : k.wf) (hnoff : k.noff + 1 < 2 ^ 31) (hK : 16 ≤ k.avail)
     (hlk : "proc" ∉ k.locks) (htier : k.tier = KTier.kpt)
@@ -632,7 +632,7 @@ epilogue at `(KernelSyms.«kkill» + 0x52)`, either through a match (`a0 = 0`) o
 of the table (`a0 = -1`).  A bounded loop: induction on a `fuel` bounding
 the iterations left, with the hart quantified inside. -/
 theorem kk_loop (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors}
-    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) (k : KCtx) (arg : BitVec 64)
     (hwf : k.wf) (hnoff : k.noff + 1 < 2 ^ 31) (hK : 16 ≤ k.avail)
     (hlk : "proc" ∉ k.locks) (htier : k.tier = KTier.kpt) (fuel : Nat) :
@@ -815,7 +815,7 @@ theorem kkill_br_106bc : KA.«kkill» + 0x106bc#64 = KA.«proc» := by decide
 set_option maxHeartbeats 4000000 in
 /-- **`kkill` meets its specification.** -/
 theorem kkill_proof (AC : ACQUIRE) (RE : RELEASE) : KKILL :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ Γ cpu k hnoff hK hlk htier => by
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ Γ cpu k hnoff hK hlk htier => by
   unfold wp_kkill_body
   simp only [kkillAddr]
   iintro ⟨Hk, Hpc, #Hpinv, HPhi⟩

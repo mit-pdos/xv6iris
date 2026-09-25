@@ -73,7 +73,7 @@ theorem filestat_ctx_entry {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 reference at the ambient context (by `rfl` once the ambient context is
 taken apart). -/
 theorem filestat_priv_conv {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
-    [FdslotG GF] [BioslotG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF]
+    [FdslotG GF] [BioslotG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [OffboxG GF] [OffboxBoxG GF] [FileG GF] [Icfg] [X : CurCtx]
     (h : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : UPtd)
     (M : Nat → List (BitVec 8)) :
@@ -87,7 +87,7 @@ theorem filestat_priv_conv {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
-  [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
+  [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
 set_option maxHeartbeats 16000000 in

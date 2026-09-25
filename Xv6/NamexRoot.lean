@@ -67,7 +67,7 @@ macro_rules
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF]
-  [SleepLockG GF] [IrefslotG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
+  [SleepLockG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
 theorem namex_rootc_held (kk : Nat) (q : Qp) (hkk : kk < NINODE) (hnib0 : 0 < icfgNib) :
     inodeRefb (GF := GF) (isClaim .rootL) kk q icfgDev (BitVec.ofNat 32 ROOTINO) ⊢

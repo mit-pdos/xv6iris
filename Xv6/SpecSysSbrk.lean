@@ -93,7 +93,7 @@ def sysSbrkOk (V V' : ProcPriv) (M M' : Nat → List (BitVec 8)) (v0 v1 r : BitV
        V.sz.toNat ≤ (V.sz + sysSbrkArg v0).toNat ∧ M' = M)))
 
 /-- **WP of `sys_sbrk()`**, at either `SIE`. -/
-def wp_sys_sbrk_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+def wp_sys_sbrk_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (v0 v1 : BitVec 64)
     (hj : j < NPROC) (hproc : k.proc = procAddr j)
@@ -112,7 +112,7 @@ def wp_sys_sbrk_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
 
 /-- The interface of `sys_sbrk`. -/
 structure SYSSBRK : Prop where
-  wp_sys_sbrk : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+  wp_sys_sbrk : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (v0 v1 : BitVec 64)
     hj hproc hv0 hv1 hnoff hK hlk htier,

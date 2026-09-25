@@ -133,7 +133,7 @@ set_option linter.unusedVariables false in
 `wp_iget_sconf_body`). -/
 def wp_iget_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
     [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [SleepLockG GF]
-    [IrefslotG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
+    [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (cpu : CPU) (k : KCtx) (inum : BitVec 32) (l : Ilic)
     (hK : igetSlots ≤ k.avail) (hnoff : k.noff + 3 < 2 ^ 31)
     (hnib : inum.toNat < 16 * icfgNib) (hpos : 0 < inum.toNat)
@@ -157,7 +157,7 @@ def wp_iget_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 structure IGET : Prop where
   wp_iget : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
     [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [SleepLockG GF]
-    [IrefslotG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
+    [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (cpu : CPU) (k : KCtx) (inum : BitVec 32) (l : Ilic) hK hnoff hnib hpos ha0 ha1 hit hpr huart,
     wp_iget_body (hlc := hlc) (GF := GF) cpu k inum l hK hnoff hnib hpos ha0 ha1 hit hpr huart
 

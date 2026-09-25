@@ -49,7 +49,7 @@ set_option linter.unusedVariables false
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
-  [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [Appcfg GF]
+  [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF]
 
 /-- The scan entered at `inum = 1`, before any callee has run (so at the
 entry's own `spie`/`spp` and hart). -/
@@ -260,7 +260,7 @@ end
 /-- `ialloc` meets its contract, given its six callees. -/
 theorem ialloc_proof (BR : BREAD) (LW : LOG_WRITE) (BL : BRELSE) (MS : MEMSET) (IG : IGET)
     (PK : PRINTK) : IALLOC :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl pd pav pu j ty u Sb t qt
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl pd pav pu j ty u Sb t qt
     pidv dqp dqs dqn hj hproc hK hnoff htier hgeom hblk hn1 hnnib hn31 hty htyk hpd
     ha0 ha1 =>
   ialloc_entry BR MS LW BL IG PK Γ cpu k γl pd pav pu j ty u Sb t qt pidv dqp dqs dqn hj hproc hK

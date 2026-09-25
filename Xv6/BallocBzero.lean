@@ -36,7 +36,7 @@ theorem ba_ret_6a : jumpPc (KA.«balloc» + 0x6a#64) = KA.«balloc» + 0x6a#64 :
 theorem ba_ret_70 : jumpPc (KA.«balloc» + 0x70#64) = KA.«balloc» + 0x70#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 set_option maxHeartbeats 16000000 in

@@ -106,7 +106,7 @@ neither `"pr"` nor `"uart1"` (`printk`'s premises; `procdump` takes no lock of
 its own).  The post says nothing about the values: the callee-saved
 registers come back, `a0` is unconstrained, the view returns untouched, and
 the console trace grew by some bytes. -/
-def wp_procdump_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+def wp_procdump_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8))
     (hK : procdumpSlots ≤ k.avail) (hnoff : k.noff + 2 < 2 ^ 31)
     (hpr : "pr" ∉ k.locks) (huart : "uart1" ∉ k.locks) : Prop :=
@@ -121,7 +121,7 @@ def wp_procdump_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
 
 /-- The interface of `procdump`. -/
 structure PROCDUMP : Prop where
-  wp_procdump : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+  wp_procdump : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8))
     hK hnoff hpr huart,
     wp_procdump_body (hlc := hlc) (GF := GF) cpu k γpr γl γd bs hK hnoff hpr huart

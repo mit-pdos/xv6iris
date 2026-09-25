@@ -206,7 +206,7 @@ end
 /-! # (4) The coupling, at a share -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [BcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
 variable [DiskG GF] [FsBlocksG GF] [SleepLockG GF]
 
 /-- Rocq's `bm_held_content` (deviation 4): `Xv6.dsPay_content` at ANY

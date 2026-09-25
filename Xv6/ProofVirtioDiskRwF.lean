@@ -96,7 +96,7 @@ def vdrw6Pin (R R' : RegMap) (fl nx : BitVec 16) : Prop :=
   R' 9#5 = BitVec.setWidth 64 fl ∧ R' 18#5 = BitVec.setWidth 64 nx
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [DiskG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 set_option maxHeartbeats 8000000 in
 /-- **One turn of the inlined `free_chain`**, from `+0x1f4` to `+0x20c`:
@@ -211,7 +211,7 @@ theorem vdrw6_popctx (k : KCtx) (hsie : k.sie = false) (hlocks : k.locks = [])
       rw [← hlocks]; exact KCtx.withLocks_self k]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [DiskG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 set_option maxHeartbeats 32000000 in
 /-- **P6.**  From `Xv6.vdrwP5Exit` to the caller's continuation. -/

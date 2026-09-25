@@ -37,7 +37,7 @@ theorem ba_sraiw13_0 : BitVec.signExtend 64 ((BitVec.extractLsb' 0 32 (0#64)).ss
 theorem ba_ret_ac : jumpPc (KA.«balloc» + 0xac#64) = KA.«balloc» + 0xac#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 set_option maxHeartbeats 8000000 in

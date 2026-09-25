@@ -142,7 +142,7 @@ end
 
 /-- **WP of `prepare_return`**, at either entry `SIE`, leaving at `SIE = 0`
 on whichever hart the thread landed on. -/
-def wp_prepare_return_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+def wp_prepare_return_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (epc : BitVec 64)
     (hproc : k.proc = pa) (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt)
@@ -165,7 +165,7 @@ def wp_prepare_return_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
 /-- The interface of `prepare_return`. -/
 structure PREPARE_RETURN : Prop where
-  wp_prepare_return : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+  wp_prepare_return : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (epc : BitVec 64) hproc hnoff htier hK hepc,
     wp_prepare_return_body (hlc := hlc) (GF := GF) cpu k pa pid V M epc hproc hnoff htier hK hepc

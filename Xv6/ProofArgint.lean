@@ -52,7 +52,7 @@ theorem ai_withSpie_pushed (k : KCtx) (m : Nat) (a b : Bool) :
     (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-! ## The callee -/
 
@@ -146,7 +146,7 @@ theorem argint_br_ffffffffffffff14 : KA.«argint» + 0xffffffffffffff14#64 = KA.
 
 set_option maxHeartbeats 8000000 in
 theorem argint_proof (MP : MYPROC) (AR : ARGRAW) : ARGINT := ⟨
-  fun {hlc GF} _ _ _ _ _ _ cpu k i tfp ws v old dqt hi ha0 hws hnoff hK => by
+  fun {hlc GF} _ _ _ _ _ _ _ _ cpu k i tfp ws v old dqt hi ha0 hws hnoff hK => by
   unfold wp_argint_body
   simp only [argintAddr]
   iintro ⟨Hk, Hpc, Htf, Hpage, Hcell, Hnext⟩

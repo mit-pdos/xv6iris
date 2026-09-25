@@ -183,7 +183,7 @@ credit rides in as `logCredit γ cr Sb e0 bno` (see the header).
 A caller that HOLDS the run is the degenerate instance: `Efs := ⊤`,
 `Φfsb := fsblock γfs.bytes bno bs`, the fupd two `imodintro`s -- that is
 how `wp_log_write_gen` and `wp_log_write` are derived. -/
-def wp_log_write_au_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+def wp_log_write_au_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γl : GName) (γb : BcacheNames) (V : BioView GF)
     (γfs : FsNames) (logstart : Nat) (dev : BitVec 32)
@@ -256,7 +256,7 @@ checked-out buffer at `off` -- takes the run back at the written bytes and
 pays out `Φfsb`.  Everything else -- the ledger, the credit, the epoch
 anchor, the parked payload crossing the update, the two arms' rows -- is
 `wp_log_write_au_body`'s, unchanged. -/
-def wp_log_write_au_range_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+def wp_log_write_au_range_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γl : GName) (γb : BcacheNames) (V : BioView GF)
     (γfs : FsNames) (logstart : Nat) (dev : BitVec 32)
@@ -302,7 +302,7 @@ caller holds the block's exclusive run, and the credit is the PURE own-set
 claim `cr = true → bno ∈ Sb`.  `logOpS γ (u + 1) Sb` in,
 `logOpS γ (if cr then u + 1 else u) (bno :: Sb)` out -- the shape
 `Xv6.logAmort_present` produces and consumes. -/
-def wp_log_write_gen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+def wp_log_write_gen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γl : GName) (γb : BcacheNames) (V : BioView GF)
     (γfs : FsNames) (logstart : Nat) (dev : BitVec 32)
@@ -335,7 +335,7 @@ def wp_log_write_gen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
 
 /-- **THE UNCREDITED HELD FORM** -- this file's original contract, kept
 verbatim (deviation 5): one unit spent, the append receipt back. -/
-def wp_log_write_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+def wp_log_write_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γl : GName) (γb : BcacheNames) (V : BioView GF)
     (γfs : FsNames) (logstart : Nat) (dev : BitVec 32)
@@ -382,7 +382,7 @@ AU supplier that owes NO receipt of its own -- `Xv6.bitmapFreeAu`,
 two extra wand inputs; this parks the bound at ZERO, where
 `Xv6.logEpochLb_0` mints it for free, and drops both inputs on the way
 back in. -/
-theorem lwAu_lb0 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [FsBlocksG GF] [LogG GF]
+theorem lwAu_lb0 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [FsBlocksG GF] [LogG GF]
     (γ : LogNames) (γfs : FsNames) (bno : Nat) (Efs : CoPset)
     (bs bsl : List (BitVec 8)) (Φfsb : IProp GF) (e0 : Nat) :
     (|={⊤, Efs}=> ∃ bsl' : List (BitVec 8),
@@ -444,7 +444,7 @@ inode block, stated over the ABSTRACT view record's run
 carrying no receipt.  `Xv6.gammaByteRange` is the whole bridge, and the
 degenerate anchor is `lwAu_lb0`'s: the bound is parked at 0 and both extra
 wand inputs are dropped. -/
-theorem lwAuRec {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [FsBlocksG GF] [LogG GF]
+theorem lwAuRec {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [FsBlocksG GF] [LogG GF]
     (γ : LogNames) (γfs : FsNames) (bno : Nat) (Efs : CoPset)
     (kslot : Nat) (bsl recNew : List (BitVec 8)) (Φfsb : IProp GF) (e0 : Nat) :
     (|={⊤, Efs}=> ∃ recOld : List (BitVec 8),
@@ -483,7 +483,7 @@ contracts the header's cleanups drop). -/
 structure LOG_WRITE : Prop where
   /-- the atomic-update, credited form at byte-range granularity: the one
   the proof proves -/
-  wp_log_write_au_range : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+  wp_log_write_au_range : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γl : GName) (γb : BcacheNames) (V : BioView GF)
     (γfs : FsNames) (logstart : Nat) (dev : BitVec 32)
@@ -496,7 +496,7 @@ structure LOG_WRITE : Prop where
       ha0 hdev hcl hdt hhome hlogE hwin hpos hshape
   /-- the atomic-update, credited form at whole-block granularity (derived
   from the range form, `lwAuWhole`) -/
-  wp_log_write_au : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+  wp_log_write_au : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γl : GName) (γb : BcacheNames) (V : BioView GF)
     (γfs : FsNames) (logstart : Nat) (dev : BitVec 32)
@@ -506,7 +506,7 @@ structure LOG_WRITE : Prop where
     wp_log_write_au_body (hlc := hlc) (GF := GF) cpu k γ γl γb V γfs logstart dev kk pidv bno
       bs bsl bsd d u cr Sb e0 vlb Efs Φfsb hK hnoff hlk hbc htier hkk ha0 hdev hcl hdt hhome hlogE
   /-- the held, credited form (derived from the AU form) -/
-  wp_log_write_gen : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+  wp_log_write_gen : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γl : GName) (γb : BcacheNames) (V : BioView GF)
     (γfs : FsNames) (logstart : Nat) (dev : BitVec 32)
@@ -516,7 +516,7 @@ structure LOG_WRITE : Prop where
     wp_log_write_gen_body (hlc := hlc) (GF := GF) cpu k γ γl γb V γfs logstart dev kk pidv bno
       bs bsl bsd d u cr Sb hK hnoff hlk hbc htier hkk ha0 hdev hcl hdt hhome hcredit
   /-- the uncredited held form (derived from the AU form) -/
-  wp_log_write : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+  wp_log_write : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γl : GName) (γb : BcacheNames) (V : BioView GF)
     (γfs : FsNames) (logstart : Nat) (dev : BitVec 32)

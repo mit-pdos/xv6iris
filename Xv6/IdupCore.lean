@@ -82,7 +82,7 @@ theorem id_ent_of_eq {PROP : Type _} [BI PROP] {P Q : PROP} (h : P = Q) : P ⊢ 
 
 section IdupCore
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
-  [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [FsBlocksG GF] [FsTopG GF] [LogG GF] [IregG GF]
+  [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [FsBlocksG GF] [FsTopG GF] [LogG GF] [IregG GF]
   [FsLinkG GF] [Appcfg GF]
 
 /-- Under RULING C' the one flavour a rest home holds is the plain one. -/

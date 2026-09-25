@@ -425,7 +425,7 @@ end IcacheRefGhost
 /-! ## The reference token (needs the sleeplock share; deviation 5) -/
 
 section IcacheRefTok
-variable {GF : BundledGFunctors} [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [SleepLockG GF]
+variable {GF : BundledGFunctors} [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
 
 /-- ONE reference to slot `k`, holding fraction `q` of its identity -- the
 count fragment AND the matching liveness slice, canonically paired (see the

@@ -63,7 +63,7 @@ theorem sys_kill_br_argint : KA.«sys_kill» + 0xfffffffffffffda2#64 = KA.«argi
 theorem sys_kill_br_kkill : KA.«sys_kill» + 0xfffffffffffff628#64 = KA.«kkill» := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-! ## The callees -/
 
@@ -159,7 +159,7 @@ end
 set_option maxHeartbeats 64000000 in
 set_option maxRecDepth 20000 in
 theorem sys_kill_proof (AI : ARGINT) (KK : KKILL) : SYSKILL := ⟨
-  fun {hlc GF} _ _ _ _ _ _ Γ cpu k tfp ws v dqt hws hnoff hK hlk htier => by
+  fun {hlc GF} _ _ _ _ _ _ _ _ Γ cpu k tfp ws v dqt hws hnoff hK hlk htier => by
   unfold wp_sys_kill_body
   simp only [sysKillAddr]
   iintro ⟨Hk, Hpc, #Hpi, Htf, Hpage, Hnext⟩

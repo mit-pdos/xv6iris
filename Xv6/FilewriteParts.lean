@@ -556,7 +556,7 @@ theorem fwr_bytes (Pv P0 P' : UPtd) (M : Nat → List (BitVec 8)) (ua : BitVec 6
 
 section Ref
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
-  [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF]
+  [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF]
   [Icfg] [CurCtx]
 
 /-- The reference, taken apart (Rocq's opening `iDestruct "Href"` +

@@ -338,7 +338,7 @@ structure CrBase (k kb : KCtx) : Prop where
   struct : ∃ (s0 s1b : Bool) (Rb : RegMap), kb = ((k.pushed 12).withSpie s0 s1b).withRegs Rb
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-! ## The payload, opened and closed -/
 
@@ -537,7 +537,7 @@ theorem crFix_cs (k : KCtx) (N : Nat) (R R' : RegMap) (h : crFix k N R)
     c23.trans a23, c24.trans a24, c25.trans a25, c26.trans a26, c27.trans a27⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- The specification's postcondition, named. -/
 def crPost (k : KCtx) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
@@ -832,7 +832,7 @@ end
 
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- The running block at the kernel-page-table context, as `either_copyout`
 asks for it. -/
@@ -1029,7 +1029,7 @@ end
 
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [X : CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
 
 set_option maxHeartbeats 32000000 in
 /-- **One byte out of the ring** (`+0x76`): bump `cons.r`, read
@@ -1328,7 +1328,7 @@ end
 
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-! ## Branch conditions on the ring indices -/
 
@@ -1416,7 +1416,7 @@ theorem crEmpty_intro (cpu : CPU) (k kb : KCtx) (γc : GName) (j : Nat) (pid : B
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [X : CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
 
 set_option maxHeartbeats 32000000 in
 /-- **One round of the sleep loop** (`+0x48`): if the process was killed,
@@ -1737,7 +1737,7 @@ end
 
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [X : CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
 
 theorem cr_addr_zero (a : BitVec 64) : a = a + BitVec.ofNat 64 0 := by simp
 
@@ -1893,7 +1893,7 @@ end
 
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [X : CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
 
 set_option maxHeartbeats 16000000 in
 /-- **Entering the loop** at `+0x38` with nothing delivered: a nonpositive
@@ -1974,7 +1974,7 @@ moves, `acquire(&cons)` and the two address constants are driven here; the
 loop at `+0x38` is `cr_start`. -/
 theorem consoleread_proof (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
     (SP : SLEEP_PREPARE) (SL : SLEEP) (EC : EITHER_COPYOUT) : CONSOLEREAD := ⟨
-  fun {hlc GF} _ _ _ _ _ _ Γ _ c0 k γc γkl γk j pid V M n hj hproc hK hnoff htier huser
+  fun {hlc GF} _ _ _ _ _ _ _ _ Γ _ c0 k γc γkl γk j pid V M n hj hproc hK hnoff htier huser
       hn hn' => by
   unfold wp_consoleread_eb_body
   simp only [consolereadAddr]

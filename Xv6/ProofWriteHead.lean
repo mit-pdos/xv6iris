@@ -277,7 +277,7 @@ theorem wh_slot_acc (kk t : Nat) (hkk : kk < NBUF) (bs : List (BitVec 8))
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx]
 
 /-- Open the held buffer at its data bytes: the pure facts, the byte run,
@@ -478,7 +478,7 @@ theorem wh_lhN : logAddr + 44#64 = lhNAddr := rfl
 /-! ## The three callees, at their call sites -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx]
 
 theorem wh_bwrite (BW : BWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
@@ -515,7 +515,7 @@ end
 
 set_option maxHeartbeats 16000000 in
 theorem wh_tail (BW : BWRITE) (BE : BRELSE)
-    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (spie1 spp1 : Bool) (R : RegMap)
@@ -689,7 +689,7 @@ theorem whBytes_zero (n : Nat) (W : List (BitVec 32)) (bs0 : List (BitVec 8)) :
 
 set_option maxHeartbeats 16000000 in
 theorem writeHead_proof (BD : BREAD) (BW : BWRITE) (BE : BRELSE) : WRITE_HEAD := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl γb V γdl γfs pd pav pu j logstart dev n W L pidv dqp
+  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl γb V γdl γfs pd pav pu j logstart dev n W L pidv dqp
     hj hproc hK hnoff htier hgeom hdev hcl2 hdt2 hn hpd => by
   obtain ⟨hnW, hnB⟩ := hn
   have hcovhdr : logstart ∈ V.cov := hgeom.2 logstart (logRegion_hdr logstart)

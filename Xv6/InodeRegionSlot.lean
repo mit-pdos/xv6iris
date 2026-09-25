@@ -222,7 +222,7 @@ theorem nlzObs_le [Icfg] (z e e' : Nat) (h : e' ≤ e) :
 end IepCounter
 
 section Receipt
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [LogG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
 
 /-- THE RECEIPT.  THE `⌜v = 0⌝` DISJUNCT IS THE BOOT CORNER, not slack: the
 mkfs image is full of FREE inodes (type 0, nlink 0) for which no witness
@@ -362,7 +362,7 @@ end Receipt
 /-! ## 2.  THE MIRROR CONJUNCT (§3.16's A⁗) AND THE FREEZE's BOOT SHELTER -/
 
 section Freeze
-variable {GF : BundledGFunctors} [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [LogG GF]
+variable {GF : BundledGFunctors} [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
 
 /-- ONE conjunct of `iregSlot`: the region's half of a 1/2-1/2 bool whose
 other half rides under the ITABLE LOCK (`IcacheEscrow.islot2`'s live arm /
@@ -1030,7 +1030,7 @@ column carries `(t, q)` as FIELDS (`Ctyval`) because two halves of one
 element are not the whole.  `ctyPin` is `Xv6/InodeRegion.lean`'s. -/
 
 section Cpin
-variable {GF : BundledGFunctors} [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [LogG GF]
+variable {GF : BundledGFunctors} [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
 
 def iregCpin [Icfg] (c : CtyUR) : IProp GF :=
   txPinO icfgLog (ctyPin c)
@@ -1066,7 +1066,7 @@ theorem iregCpin_no_ops [Icfg] (c : CtyUR) (f : FrzUR) (d : Dinode) (hclm : ireg
 end Cpin
 
 section Shp
-variable {GF : BundledGFunctors} [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [LogG GF]
+variable {GF : BundledGFunctors} [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
 
 /-- THE SHELTER AND THE PIN, AS ONE CONJUNCT, in `iregFsh`'s own position:
 the thirty-odd sites that merely thread the slot's f-shelter through a
@@ -1100,7 +1100,7 @@ end Shp
 
 section Slot
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
-  [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [LogG GF] [FsBytesG GF] [FsTopG GF] [FsLinkG GF]
+  [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBytesG GF] [FsTopG GF] [FsLinkG GF]
 
 /-- THE REGION INVARIANT's PER-INUM CELL (the header lists the conjuncts and
 why each is here).  The ARM, per OPTION A (walk reg-fold): the per-inum

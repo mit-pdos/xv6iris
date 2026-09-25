@@ -125,7 +125,7 @@ theorem kl_pcIs_cast {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 /-! ## Naming the lock payload -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 theorem kl_pay_elim (Γ : SchedNames) (ξ : CtxId) (j : Nat) :
     procLockPay (GF := GF) Γ j ξ ⊢ procLockResAt Γ ξ (procAddr j) := by

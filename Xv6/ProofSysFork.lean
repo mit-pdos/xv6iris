@@ -48,7 +48,7 @@ theorem sys_fork_withRegs_withSpie (k : KCtx) (R : RegMap) (a b : Bool) :
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
-  [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
+  [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
 /-- `kfork`'s contract at its entry address (either `SIE`). -/
@@ -81,7 +81,7 @@ set_option maxHeartbeats 8000000 in
 /-- At either entry `SIE`: every step is at the caller's index, the client's
 continuation re-anchored along each step's pinning fact. -/
 theorem sys_fork_proof (KF : KFORK) : SYSFORK :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ _ cpu k γw γp γl γk γft γ j pid V M stsP
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ _ cpu k γw γp γl γk γft γ j pid V M stsP
       hj hproc hK hnoff htier => by
   unfold wp_sys_fork_eb_body
   simp only [sysForkAddr]

@@ -113,7 +113,7 @@ theorem parkOk_not_RUNNING {st : BitVec 32} (h : parkOk st) : st ≠ RUNNING := 
 
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-! ## Transport
 
@@ -481,7 +481,7 @@ def procFieldsNoctx (pa : BitVec 64) (dq : DFrac) (V : ProcPriv) : IProp GF := i
   pnameCells pa dq V.name
 
 section DormantNoctx
-variable [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+variable [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-- `procDormant` minus its context cells (Rocq `proc_dormant_noctx`: a
 ZOMBIE still carries its address space and trapframe page, and the slot's
@@ -536,7 +536,7 @@ theorem dormantSpace_context (st : BitVec 32) (V : ProcPriv) (vs : List (BitVec 
     dormantSpace (GF := GF) st { V with context := vs } pid = dormantSpace st V pid := rfl
 
 section DormantSplit
-variable [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+variable [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-- **The ZOMBIE park's split**: the dormant block is its context cells plus
 the rest. -/
@@ -572,7 +572,7 @@ end
 /-! ## The records and the slot invariant -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-- `&cpus[h].context`. -/
 def cpuCtxAddr (h : CPU) : BitVec 64 := cpuAddr h + 8#64
@@ -1276,7 +1276,7 @@ theorem procSlots_park_gen (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) (st 
     isplitl []
     · iempintro
     iframe Htag Hu
-    iapply (@procDormant_split hlc GF _ ⟨ξl, KTier.kpt⟩ _ _ _ _ pa ZOMBIE).mpr
+    iapply (@procDormant_split hlc GF _ ⟨ξl, KTier.kpt⟩ _ _ _ _ _ _ pa ZOMBIE).mpr
     iframe Hpay Hc
 
 /-- **The slot a park hands back**, in the shape the crossing produces:

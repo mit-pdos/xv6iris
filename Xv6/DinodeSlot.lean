@@ -677,7 +677,7 @@ lives) and `Xv6.bioPay` (where `bsl` does).  `Xv6.bioLocked_split` puts
 them back together. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [BcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
 variable [DiskG GF] [FsBlocksG GF] [SleepLockG GF]
 
 /-- Rocq's `iu_held_k`. -/
@@ -787,7 +787,7 @@ theorem dsSlots_join [CurCtx] (γ : BcacheNames) (a c : Nat) :
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [BcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
 variable [DiskG GF] [FsBlocksG GF] [SleepLockG GF]
 
 /-- **THE COUPLING**: the caller's own EXCLUSIVE byte run against the

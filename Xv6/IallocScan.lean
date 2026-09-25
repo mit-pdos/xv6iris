@@ -54,7 +54,7 @@ def iallocScanRegs [Icfg] (k : KCtx) (ty : BitVec 16) (n : Nat) (R : RegMap) : P
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
-  [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [Appcfg GF]
+  [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF]
 
 set_option maxHeartbeats 8000000 in
 /-- **THE BLOCK, DECODED THROUGH THE REGION** (Rocq 2271–2557): the bytes

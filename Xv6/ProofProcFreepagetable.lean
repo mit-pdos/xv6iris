@@ -28,7 +28,7 @@ set_option linter.unusedSimpArgs false
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-! ## `proc_freepagetable` -/
 
@@ -39,7 +39,7 @@ theorem proc_freepagetable_br_fffffffffffff77c : KA.«proc_freepagetable» + 0xf
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
 theorem proc_freepagetable_proof (UM : UVMUNMAP) (UF : UVMFREE) : PROC_FREEPAGETABLE :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ cpu k γl γk P M hnoff hK hlk hroot hsz hbelow => by
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ cpu k γl γk P M hnoff hK hlk hroot hsz hbelow => by
   unfold wp_proc_freepagetable_body
   simp only [procFreepagetableAddr]
   iintro ⟨Hk, Hpc, #Hlk, Hav, HP, HΦ⟩

@@ -61,7 +61,7 @@ theorem bdOther_of_cs (R0 R : RegMap) (h : calleeSaved R0 R) : bdOther R0 R := b
   exact ⟨c2, c18, c19, c20, c21, c22, c23, c24, c25, c26, c27⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [BcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
 variable [SleepLockG GF] [DiskG GF] [CurCtx]
 
 set_option maxHeartbeats 8000000 in

@@ -118,7 +118,7 @@ def iunlockSlots : Nat := 4 + releasesleepSlots
 
 /-- **WP of `iunlock(ip = a0)` at a withdrawing descriptor `d`** (Rocq
 `wp_iunlock_dep_sconf_body`, the PRIMITIVE form). -/
-def wp_iunlock_dep_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+def wp_iunlock_dep_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF]
     [OffboxG GF] [OffboxBoxG GF] [SleepLockG GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γil γisl : GName) (kk : Nat) (s : Qp) (g : GName)
@@ -150,7 +150,7 @@ def wp_iunlock_dep_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
 /-- **WP of `iunlock` at the WRITE arm** (Rocq `wp_iunlock_tx_sconf_body`):
 the descriptor arrives at `depTx` with the holder's residue beside it
 (`icTxDep`), and the postcondition hands `logTx` back whole. -/
-def wp_iunlock_tx_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+def wp_iunlock_tx_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF]
     [OffboxG GF] [OffboxBoxG GF] [SleepLockG GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γil γisl : GName) (kk : Nat) (s : Qp) (g : GName)
@@ -182,7 +182,7 @@ def wp_iunlock_tx_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv
 (Rocq `wp_iunlock_tx_of_dep`): `icTxDepAt_ofHalf` names the transaction,
 the dep form runs at `depTx s dev inum g lo t ½`, and the side share it
 hands back rejoins the residue (`logTx_join`). -/
-theorem wp_iunlock_tx_of_dep {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+theorem wp_iunlock_tx_of_dep {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF]
     [OffboxG GF] [OffboxBoxG GF] [SleepLockG GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γil γisl : GName) (kk : Nat) (s : Qp) (g : GName)
@@ -219,7 +219,7 @@ theorem wp_iunlock_tx_of_dep {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc G
 /-- The interface of `iunlock` (Rocq `Module Type IUNLOCK`, the generic
 form; the tx form is `IUNLOCK.wp_iunlock_tx`, deviation 6). -/
 structure IUNLOCK : Prop where
-  wp_iunlock_dep : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+  wp_iunlock_dep : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF]
     [OffboxG GF] [OffboxBoxG GF] [SleepLockG GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γil γisl : GName) (kk : Nat) (s : Qp) (g : GName)
@@ -231,7 +231,7 @@ structure IUNLOCK : Prop where
 /-- The transactional form, from the generic one (Rocq
 `wp_iunlock_tx_sconf`, defined by `wp_iunlock_tx_of_dep`). -/
 theorem IUNLOCK.wp_iunlock_tx (A : IUNLOCK) {hlc : HasLC} {GF : BundledGFunctors}
-    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF]
     [OffboxG GF] [OffboxBoxG GF] [SleepLockG GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γil γisl : GName) (kk : Nat) (s : Qp) (g : GName)

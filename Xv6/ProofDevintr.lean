@@ -136,7 +136,7 @@ theorem dv_calleeSaved_mk (k : KCtx) (R : RegMap) (h9 : R 9#5 = k.regs 9#5) (h :
 
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-! ## devintr's post -/
 
@@ -282,7 +282,7 @@ end
 
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-! ## The tail at `+0x22` -/
 
@@ -381,7 +381,7 @@ end
 
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [DiskG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 /-- `virtio_disk_intr`'s contract at `+0x68`. -/
 theorem dv_call_virtio (VI : VIRTIO_DISK_INTR) (Γ : SchedNames) (cpu : CPU) (k' : KCtx)
@@ -574,7 +574,7 @@ end
 
 
 /-- The claim's answer, opened. -/
-theorem dv_retOk_cases {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+theorem dv_retOk_cases {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (γ0 γ1 : UartNames) (v : BitVec 64) :
     plicClaimRetOk (GF := GF) γ0 γ1 v ⊢
       ⌜v = 0#64 ∨ v = 1#64 ∨ v = 10#64 ∨ v = 12#64⌝ ∗
@@ -582,7 +582,7 @@ theorem dv_retOk_cases {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv
   unfold plicClaimRetOk; iintro H; iexact H
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [DiskG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 /-! ## The dispatch at `+0x30`, one lemma per answer
 
@@ -789,7 +789,7 @@ end
 
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [DiskG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 /-- The cone's credentials, opened. -/
 theorem dv_caps_open (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames)
@@ -938,7 +938,7 @@ set_option maxHeartbeats 8000000 in
 /-- **`devintr` meets its specification.** -/
 theorem devintr_proof (PC : PLIC_CLAIM) (PM : PLIC_COMPLETE) (UI : UARTINTR)
     (VI : VIRTIO_DISK_INTR) (CI : CLOCKINTR) : DEVINTR :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu bs cpu k sc
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu bs cpu k sc
       hsie hnoff hlocks htier hK hsc => by
   unfold wp_devintr_body
   simp only [devintrAddr]

@@ -140,7 +140,7 @@ theorem create_pin {j : Nat} (hj : j < NPROC) (k : KCtx) (hproc : k.proc = procA
 section Env
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
-  [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
+  [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
 /-- THE PERSISTENT CONTEXT every half reads and hands back untouched (the
@@ -193,7 +193,7 @@ end Env
 
 section Dirty
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
-  [IrefslotG GF] [IcacheG GF] [LogG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [FsBytesG GF]
+  [IrefslotG GF] [CtokG GF] [WchG GF] [IcacheG GF] [LogG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [FsBytesG GF]
   [Appcfg GF] [Fscfg] [Icfg]
 
 /-- THE CHILD'S ROW IS SUSPENDED (Rocq's `cr_dirty`): between create's
@@ -555,7 +555,7 @@ end Tail
 section Bodies
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
-  [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
+  [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
 /-- **THE PARKED GATE: the whole ALLOCATE half, +0xa2 onward** (Rocq's

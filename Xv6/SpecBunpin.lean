@@ -36,7 +36,7 @@ open LeanRV64D
 def bunpinAddr : BitVec 64 := KA.«bunpin»
 
 /-- **WP of `bunpin(b = a0)`**. -/
-def wp_bunpin_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [BcacheG GF]
+def wp_bunpin_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
     [SleepLockG GF] [DiskG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView GF) (kk : Nat)
     (dev bno : BitVec 32)
@@ -51,7 +51,7 @@ def wp_bunpin_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G G
 
 /-- The interface of `bunpin`. -/
 structure BUNPIN : Prop where
-  wp_bunpin : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [BcacheG GF]
+  wp_bunpin : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
     [SleepLockG GF] [DiskG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView GF) (kk : Nat)
     (dev bno : BitVec 32) hnoff hK hlk hkk ha0,

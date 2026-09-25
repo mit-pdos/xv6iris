@@ -51,16 +51,16 @@ def virtioDiskRwAddr : BitVec 64 := KA.«virtio_disk_rw»
 def virtioDiskRwSlots : Nat := 12 + sleepSlots
 
 /-- The disk's persistent credentials a driver caller holds. -/
-def diskCaps {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [DiskG GF] [CurCtx]
+def diskCaps {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
     (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) : IProp GF := iprop%
   diskInv γ ∗ diskGeom γ pd pav pu ∗ isLock γl aVdiskLock "virtio_disk" (diskRes γ pd pav pu)
 
-instance diskCaps_persistent {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [DiskG GF] [CurCtx]
+instance diskCaps_persistent {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
     (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) : Persistent (diskCaps (GF := GF) γ γl pd pav pu) := by
   unfold diskCaps; infer_instance
 
 /-- **WP of `virtio_disk_rw`.**  `a0 = b`, `a1 = write` (nonzero: write). -/
-def wp_virtio_disk_rw_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [DiskG GF] [CurCtx]
+def wp_virtio_disk_rw_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (bno dsk0 : BitVec 32) (dataBuf dataDisk : List (BitVec 8))
@@ -89,7 +89,7 @@ def wp_virtio_disk_rw_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 `trapCsrsExt` / `cpuClaimExt` in and out (emp at `sie = true`, where the
 function's own `acquire` pays out the bundle its two interior sleeps need).
 Depth 0, so no spinlock is held (`KCtx.wf`).  `a0 = b`, `a1 = write`. -/
-def wp_virtio_disk_rw_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [DiskG GF]
+def wp_virtio_disk_rw_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
     [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (bno dsk0 : BitVec 32) (dataBuf dataDisk : List (BitVec 8))
@@ -114,7 +114,7 @@ def wp_virtio_disk_rw_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc 
 
 /-- The interface of `virtio_disk_rw`. -/
 structure VIRTIO_DISK_RW : Prop where
-  wp_virtio_disk_rw_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [DiskG GF]
+  wp_virtio_disk_rw_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
     [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (bno dsk0 : BitVec 32) (dataBuf dataDisk : List (BitVec 8))
@@ -124,7 +124,7 @@ structure VIRTIO_DISK_RW : Prop where
 
 /-- The interrupts-off instance (the complement is the whole bundle). -/
 theorem VIRTIO_DISK_RW.wp_virtio_disk_rw (V : VIRTIO_DISK_RW) {hlc : HasLC} {GF : BundledGFunctors}
-    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [DiskG GF] [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (bno dsk0 : BitVec 32) (dataBuf dataDisk : List (BitVec 8))
     hj hproc hK hsie hnoff hlocks htier hbno hdata hpd hkm :

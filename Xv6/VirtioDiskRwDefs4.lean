@@ -128,7 +128,7 @@ theorem vdrw5_buf_nz (b : BitVec 64)
 /-! ## The payload's watermark, and a slot the caller has a quarter of -/
 
 section payload
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [DiskG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 /-- **The handler watermark, borrowed out of the payload.**  What
 `Xv6.disk_collect` reads the completion evidence
@@ -231,7 +231,7 @@ end payload
 `Xv6.idxCells_join` needs it, and the frame's own cells carry it. -/
 
 section align
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 theorem vdrw6_sp_align (k : KCtx) :
     vdrwSaved (GF := GF) k ⊢ ⌜(k.regs 2#5).toNat % 8 = 0⌝ ∗ vdrwSaved k := by
@@ -266,7 +266,7 @@ end align
 /-! ## The seam at the end of P5 -/
 
 section seam
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [DiskG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 /-- **The head of the park loop** (`virtio_disk_rw + 0x1b4`, `mv a0,s3`):
 the lock is held with its payload whole, the chain is still armed and the
@@ -438,7 +438,7 @@ end seam
 /-! ## The caller's credentials -/
 
 section caps4
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [DiskG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 /-- The spec's bundle is the phases' bundle. -/
 theorem vdrwCaps_of_diskCaps (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) :
@@ -455,7 +455,7 @@ A `Proof` file may not import another `Proof` file, so the call-site
 wrappers of P5 and P6 live here beside the ones P2 has. -/
 
 section calls
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [DiskG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 theorem vdrw5_sp (SP : SLEEP_PREPARE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (c : CPU) (k' : KCtx) (jp : Nat)

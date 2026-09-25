@@ -72,7 +72,7 @@ theorem descPageRw_at (pd : PAddr) (h : descPageRw pd) (off n : Nat) (hn : 0 < n
 /-! ## From a window to cells and back -/
 
 section cells
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- A kernel cell is a context window: the page's identity claim makes the
 virtual and the physical address the same. -/
@@ -100,7 +100,7 @@ end cells
 /-! ## The four cells of one descriptor -/
 
 section desc
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- Descriptor `i` of the table at `pd`, as the FOUR cells the driver
 loads and stores: `addr` (8), `len` (4), `flags` (2), `next` (2). -/
@@ -150,7 +150,7 @@ theorem descAt_s14 (pd : PAddr) (i : Nat) :
   rw [addr_plus]
 
 section bridge
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- The three facts one of a descriptor's cells needs. -/
 theorem descPageRw_cell (pd : PAddr) (i : Nat) (hpd : descPageRw pd) (hi : i < NUM)
@@ -341,7 +341,7 @@ def vdrwRegs (k : KCtx) (R : RegMap) (sector : BitVec 64) : Prop :=
   R 25#5 = k.regs 25#5 ∧ R 26#5 = k.regs 26#5 ∧ R 27#5 = k.regs 27#5
 
 section resources
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [DiskG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 /-- The twelve frame cells: ten saved registers and the two scratch cells
 that hold `int idx[3]`. -/
@@ -457,7 +457,7 @@ theorem align8_add (a c : BitVec 64) (ha : a.toNat % 8 = 0) (hc : c.toNat % 8 = 
   simpa using this
 
 section idx
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- `idx[0]`, `idx[1]`, `idx[2]` and the padding word, relative to the
 frame's ORIGINAL `sp` (`= s0`). -/

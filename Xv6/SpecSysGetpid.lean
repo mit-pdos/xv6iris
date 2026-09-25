@@ -47,7 +47,7 @@ def sysGetpidAddr : BitVec 64 := KA.«sys_getpid»
 def sysGetpidSlots : Nat := 12
 
 /-- **WP of `sys_getpid()`**, at either `SIE`. -/
-def wp_sys_getpid_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+def wp_sys_getpid_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (pa : BitVec 64) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8))
     (hproc : k.proc = pa) (htier : k.tier = KTier.kpt)
@@ -62,7 +62,7 @@ def wp_sys_getpid_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv
 
 /-- The interface of `sys_getpid`. -/
 structure SYSGETPID : Prop where
-  wp_sys_getpid : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+  wp_sys_getpid : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (pa : BitVec 64) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) hproc htier hnoff hK,
     wp_sys_getpid_body (hlc := hlc) (GF := GF) cpu k pa pid V M hproc htier hnoff hK

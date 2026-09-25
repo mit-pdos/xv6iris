@@ -62,7 +62,7 @@ theorem argFd_lookup (v : BitVec 64) (fs : List (BitVec 64)) (fd : Nat) (fv : Bi
   · exact absurd h (by simp)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
 
 /-- The `int *pfd` out-parameter, which may be null. -/
 def ofdOut (a : BitVec 64) (w : BitVec 32) : IProp GF :=
@@ -95,7 +95,7 @@ def wp_argfd_body (cpu : CPU) (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid 
 end
 
 structure ARGFD : Prop where
-  wp_argfd : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
+  wp_argfd : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (D : List Nat) (i : Nat) (v : BitVec 64)
     (oldfd : BitVec 32) (oldf : BitVec 64) hi ha0 hv hpf hproc htier hnoff hK,

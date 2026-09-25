@@ -453,7 +453,7 @@ end WriteCommit
 /-! ## 3.  Item 1: the chunk fire, fused with the row retag -/
 
 section WriteFire
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [FsTopG GF] [FsBytesG GF] [OffboxG GF]
 
 /-- the delta collapses to the ONE-ROW counted insert: at a nonzero count

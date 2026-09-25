@@ -45,7 +45,7 @@ eb-generic at depth 0. -/
 theorem sys_link_proof (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI) (NP : NAMEIPARENT) (IL : ILOCK)
     (IUN : IUNLOCK) (IU : IUPDATE) (DLK : DIRLINK) (IP : IPUT) (IUP : IUNLOCKPUT) (EO : END_OP) :
     SYSLINK := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X Γ _ cpu k γ j pid V M v0 v1 Ftgt Fent Funt
+  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X Γ _ cpu k γ j pid V M v0 v1 Ftgt Fent Funt
       hj hproc htier hnoff hK hv0 hv1 => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩

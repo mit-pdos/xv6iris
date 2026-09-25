@@ -41,7 +41,7 @@ given nameiparent at its era contract, ilock, iunlockput, dirlookup,
 ialloc, iupdate and dirlink. -/
 theorem create_proof (NP : NPAR_WRAP_ERA) (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP)
     (IA : IALLOC) (IU : IUPDATE) (DLK : DIRLINK) : CREATE := ⟨
-  fun {_ _} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl pd pav pu j γkl γk
+  fun {_ _} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl pd pav pu j γkl γk
       plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn dqpv P Pmiss Farm Fdots Fun Fok Fex
       hj hproc hK hnoff htier hroot hnib0 hgeom hbg hbel hireg hnn hterm hplen
       hn1 hnnib hn31 h16 hty htyk hu hns ha1 ha2 ha3 hpd =>

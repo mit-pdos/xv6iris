@@ -52,7 +52,7 @@ def pipecloseSlots : Nat := 22
 one coupling between an argument and a branch (`hw`).  The lock `pipeclose`
 takes itself is `pi->lock`, which `pipealloc`'s `initlock` names `"pipe"`;
 nothing the caller holds is `"pipe"`, and `wakeup`'s `"proc"` is free too. -/
-def wp_pipeclose_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+def wp_pipeclose_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx)
     (γl : GName) (γp : PipeNames) (w : Bool)
     (γkl : GName) (γk : KmemNames) (on : Option Nat)
@@ -73,7 +73,7 @@ def wp_pipeclose_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
 
 /-- The interface of `pipeclose`. -/
 structure PIPECLOSE : Prop where
-  wp_pipeclose : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+  wp_pipeclose : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx)
     (γl : GName) (γp : PipeNames) (w : Bool)
     (γkl : GName) (γk : KmemNames) (on : Option Nat)

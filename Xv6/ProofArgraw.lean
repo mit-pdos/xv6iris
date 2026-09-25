@@ -87,7 +87,7 @@ theorem ar_withSpie_pushed (k : KCtx) (m : Nat) (a b : Bool) :
     (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-! ## The callee -/
 
@@ -189,7 +189,7 @@ theorem argraw_br_4f4e : KA.«argraw» + 0x4f4e#64 = argrawTbl := by decide
 
 set_option maxHeartbeats 16000000 in
 theorem argraw_proof (MP : MYPROC) : ARGRAW := ⟨
-  fun {hlc GF} _ _ _ _ _ _ cpu k i tfp ws v dqt hi ha0 hws hnoff hK => by
+  fun {hlc GF} _ _ _ _ _ _ _ _ cpu k i tfp ws v dqt hi ha0 hws hnoff hK => by
   unfold wp_argraw_body
   simp only [argrawAddr]
   iintro ⟨Hk, Hpc, Htf, Hpage, Hnext⟩

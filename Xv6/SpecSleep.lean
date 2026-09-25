@@ -44,7 +44,7 @@ def sleepAddr : BitVec 64 := KA.«sleep»
 def sleepSlots : Nat := 20
 
 /-- **WP of `sleep`.** -/
-def wp_sleep_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+def wp_sleep_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (j : Nat)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : sleepSlots ≤ k.avail)
@@ -64,7 +64,7 @@ caller's complement (`trapCsrsExt` / `cpuClaimExt`, emp at `sie = true`),
 handed back at the resuming hart.  Entered at depth 0 (so, by `KCtx.wf`, no
 spinlock held: Rocq's `locks_below lks "proc"` is implied).  It parks, so
 the crossing is the literal `true`. -/
-def wp_sleep_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+def wp_sleep_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (j : Nat)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : sleepSlots ≤ k.avail)
@@ -79,13 +79,13 @@ def wp_sleep_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
 
 /-- The interface of `sleep`. -/
 structure SLEEP : Prop where
-  wp_sleep_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+  wp_sleep_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (j : Nat) hj hproc hK hnoff htier,
     wp_sleep_eb_body (hlc := hlc) (GF := GF) Γ cpu k j hj hproc hK hnoff htier
 
 /-- The interrupts-off instance: the complement is the whole bundle. -/
-theorem SLEEP.wp_sleep (S : SLEEP) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+theorem SLEEP.wp_sleep (S : SLEEP) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (j : Nat) hj hproc hK hsie hnoff hlocks htier :
     wp_sleep_body (hlc := hlc) (GF := GF) Γ cpu k j hj hproc hK hsie hnoff hlocks htier := by
