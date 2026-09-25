@@ -1155,11 +1155,8 @@ import Xv6.UexecExecInst
 import Xv6.InitBoot
 import Xv6.UexecExecMint
 import Xv6.UexecExecLaws
-import Xv6.LinkDevintrNone
 import Xv6.LinkUsertrap
-import Xv6.ProofDevintrNone
 import Xv6.ProofUsertrap
-import Xv6.SpecDevintrNone
 import Xv6.UsertrapArms
 import Xv6.UsertrapArms56
 import Xv6.UsertrapArmsD0

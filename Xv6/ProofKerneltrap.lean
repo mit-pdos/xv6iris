@@ -45,12 +45,16 @@ theorem and_2_of_sie0 (v : BitVec 64) (h : BitVec.extractLsb' 1 1 v = 0#1) : v &
   bv_decide
 theorem bcond_beq_256_0 : bcond bop.BEQ 256#64 0#64 = false := by decide
 theorem bcond_bne_00_kt : bcond bop.BNE 0#64 0#64 = false := by decide
-theorem bcond_beq_dev_0 (sc : BitVec 64) : bcond bop.BEQ (devintrRet sc) 0#64 = false := by
-  unfold devintrRet; split <;> decide
+theorem bcond_beq_dev_0 (sc : BitVec 64) (hsc : sCauseOk sc) : bcond bop.BEQ (devintrRet sc) 0#64 = false := by
+  simp [bcond, devintrRet_ne_zero sc hsc]
 theorem devintrRet_ext (sc : BitVec 64) (h : sc = sCause InterruptType.I_S_External) : devintrRet sc = 1#64 := by
   simp [devintrRet, h]
-theorem devintrRet_timer (sc : BitVec 64) (h : ¬ sc = sCause InterruptType.I_S_External) : devintrRet sc = 2#64 := by
-  simp [devintrRet, h]
+theorem devintrRet_timer (sc : BitVec 64) (hsc : sCauseOk sc) (h : ¬ sc = sCause InterruptType.I_S_External) :
+    devintrRet sc = 2#64 := by
+  unfold sCauseOk at hsc
+  rcases hsc with rfl | rfl
+  · decide
+  · exact absurd rfl h
 theorem bcond_beq_12 : bcond bop.BEQ 1#64 2#64 = false := by decide
 theorem bcond_beq_22 : bcond bop.BEQ 2#64 2#64 = true := by decide
 theorem bcond_beq_ne0 (p : BitVec 64) (h : p ≠ 0#64) : bcond bop.BEQ p 0#64 = false := by
@@ -210,7 +214,7 @@ theorem kerneltrap_proof (DI : DEVINTR) (MP : MYPROC) (YI : YIELD) : KERNELTRAP 
       ⊢ wpLoop (GF := GF) cpu := by
     intro k' hsie' hnoff' hlocks' htier' hK'
     have h := DI.wp_devintr (hlc := hlc) (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu
-      cpu k' sc hsie' hnoff' hlocks' htier' hK' hsc
+      cpu k' sc hsie' hnoff' hlocks' htier' hK'
     unfold wp_devintr_body at h
     simp only [devintrAddr] at h
     exact h
@@ -230,7 +234,7 @@ theorem kerneltrap_proof (DI : DEVINTR) (MP : MYPROC) (YI : YIELD) : KERNELTRAP 
   obtain ⟨c1_2, c1_8, c1_9, c1_18, c1_19, c1_20, c1_21, c1_22, c1_23, c1_24, c1_25, c1_26, c1_27⟩ := hcs1
   -- beqz a0 : not taken, devintr recognized the interrupt
   k_step (wp_s_branch cpu _ (KA.«kerneltrap» + 0x2e#64) true 54#13 10#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
-    $$ [- $Hk $Hpc] with [h10, bcond_beq_dev_0]
+    $$ [- $Hk $Hpc] with [h10, bcond_beq_dev_0 sc hsc]
   iintro Hk Hpc
   -- li a5,2 ; beq a0,a5
   k_step (wp_s_addi cpu _ (KA.«kerneltrap» + 0x30#64) true 2#12 15#5 0#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -253,7 +257,7 @@ theorem kerneltrap_proof (DI : DEVINTR) (MP : MYPROC) (YI : YIELD) : KERNELTRAP 
       exact ⟨c1_20, c1_21, c1_22, c1_23, c1_24, c1_25, c1_26, c1_27⟩
   · -- the timer: myproc, then yield if there is a process
     k_step (wp_s_branch cpu _ (KA.«kerneltrap» + 0x32#64) false 84#13 10#5 15#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
-      $$ [- $Hk $Hpc] with [h10, devintrRet_timer sc hext, bcond_beq_22]
+      $$ [- $Hk $Hpc] with [h10, devintrRet_timer sc hsc hext, bcond_beq_22]
     iintro Hk Hpc
     -- jal myproc
     k_step (wp_s_jal cpu _ (KA.«kerneltrap» + 0x86#64) false 2093420#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kerneltrap_br_fffffffffffff1f2]

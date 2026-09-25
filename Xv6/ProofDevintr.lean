@@ -1,6 +1,6 @@
 /-
-Proof of `devintr`'s specification (`SpecDevintr.DEVINTR`), given the
-interfaces of `plic_claim`, `plic_complete`, `uartintr`,
+Proof of `devintr`'s specification (`SpecDevintr.DEVINTR`, every cause),
+given the interfaces of `plic_claim`, `plic_complete`, `uartintr`,
 `virtio_disk_intr` and `clockintr`.
 
 ```
@@ -10,7 +10,7 @@ interfaces of `plic_claim`, `plic_complete`, `uartintr`,
  +0x12  beq  a4,a5,+0x2a
  +0x16  a5 = -1 << 63 + 5        the timer cause ; a0 = 0
  +0x1e  beq  a4,a5,+0x7e
- +0x22  epilogue                 (the "neither" arm: DEAD under `sCauseOk`)
+ +0x22  epilogue                 (the "neither" arm: returns 0)
  +0x2a  sd s1,8(sp)              SHRINK-WRAPPED: s1 only on the external arm
  +0x2c  jal plic_claim ; a4 = s1 = irq
  +0x36  beq a0,10 -> +0x4e ; beq a0,12 -> +0x60 ; beq a0,1 -> +0x68
@@ -88,8 +88,19 @@ theorem dv_bne_0_0 : bcond bop.BNE 0#64 0#64 = false := by decide
 
 theorem dv_ret_of_ext (sc : BitVec 64) (h : sc = sCause InterruptType.I_S_External) :
     devintrRet sc = 1#64 := by simp only [devintrRet, h, if_pos]
-theorem dv_ret_of_tim : devintrRet (sCause InterruptType.I_S_Timer) = 2#64 := by
-  unfold devintrRet; rw [if_neg (by decide)]
+theorem dv_ret_of_tim : devintrRet (sCause InterruptType.I_S_Timer) = 2#64 := by decide
+
+/-- At a non-device cause neither `beq` is taken. -/
+theorem dv_beq_ext_none (sc : BitVec 64) (h : ¬ sCauseOk sc) :
+    bcond bop.BEQ sc 0x8000000000000009#64 = false := by
+  unfold sCauseOk at h
+  simp only [bcond]
+  exact decide_eq_false (fun he => h (Or.inr (he.trans (by decide))))
+theorem dv_beq_tim_none (sc : BitVec 64) (h : ¬ sCauseOk sc) :
+    bcond bop.BEQ sc 0x8000000000000005#64 = false := by
+  unfold sCauseOk at h
+  simp only [bcond]
+  exact decide_eq_false (fun he => h (Or.inl (he.trans (by decide))))
 
 theorem dv_uart0_idx : (0#64 : BitVec 64) = BitVec.ofNat 64 UartId.uart0.idx := by decide
 theorem dv_uart1_idx : (1#64 : BitVec 64) = BitVec.ofNat 64 UartId.uart1.idx := by decide
@@ -939,7 +950,7 @@ set_option maxHeartbeats 8000000 in
 theorem devintr_proof (PC : PLIC_CLAIM) (PM : PLIC_COMPLETE) (UI : UARTINTR)
     (VI : VIRTIO_DISK_INTR) (CI : CLOCKINTR) : DEVINTR :=
   ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu cpu k sc
-      hsie hnoff hlocks htier hK hsc => by
+      hsie hnoff hlocks htier hK => by
   unfold wp_devintr_body
   simp only [devintrAddr]
   iintro ⟨Hk, Hpc, Hsc, #Hcaps, HΦ⟩
@@ -970,7 +981,7 @@ theorem devintr_proof (PC : PLIC_CLAIM) (PM : PLIC_COMPLETE) (UI : UARTINTR)
   k_step (wp_s_addi cpu _ (KA.«devintr» + 0x10#64) true 9#12 15#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  rcases hsc with rfl | rfl
+  rcases Classical.em (sCauseOk sc) with (rfl | rfl) | hsc
   · -- the timer
     k_step (wp_s_branch cpu _ (KA.«devintr» + 0x12#64) false 24#13 14#5 15#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [dv_beq_tim_ext]
@@ -1013,6 +1024,35 @@ theorem devintr_proof (PC : PLIC_CLAIM) (PM : PLIC_COMPLETE) (UI : UARTINTR)
       unfold dvPres
       refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
         simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
-    case h9 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]⟩
+    case h9 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
+  · -- neither: +0x12 and +0x1e fall through, the epilogue returns 0
+    k_step (wp_s_branch cpu _ (KA.«devintr» + 0x12#64) false 24#13 14#5 15#5 (by decide) bop.BEQ)
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [dv_beq_ext_none sc hsc]
+    iintro Hk Hpc
+    k_step (wp_s_addi cpu _ (KA.«devintr» + 0x16#64) true 4095#12 15#5 0#5 (by decide))
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    iintro Hk Hpc
+    k_step (wp_s_slli cpu _ (KA.«devintr» + 0x18#64) true 63#6 15#5 15#5 (by decide))
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    iintro Hk Hpc
+    k_step (wp_s_addi cpu _ (KA.«devintr» + 0x1a#64) true 5#12 15#5 15#5 (by decide))
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    iintro Hk Hpc
+    k_step (wp_s_addi cpu _ (KA.«devintr» + 0x1c#64) true 0#12 10#5 0#5 (by decide))
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    iintro Hk Hpc
+    k_step (wp_s_branch cpu _ (KA.«devintr» + 0x1e#64) false 96#13 14#5 15#5 (by decide) bop.BEQ)
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [dv_beq_tim_none sc hsc]
+    iintro Hk Hpc
+    iapply (dv_tail cpu k sc hsie hK _ ?hp ?h9 ?h10) $$ [- $Hk $Hpc $Hframe $Hsc $HΦ]
+    rotate_right 1
+    case hp =>
+      unfold dvPres
+      refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
+        simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
+    case h9 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
+    case h10 =>
+      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
+      exact (devintrRet_none sc hsc).symm⟩
 
 end Xv6

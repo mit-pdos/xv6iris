@@ -15,13 +15,12 @@ outgoing route folds them into the trap-CSR bundle (`ut_fold`,
 (`KERNELVEC.handler` under the era's `EnvIs`) and the handler environment
 (`utCaps`' `envAt`).  Everything runs with interrupts off at the entry hart.
 
-devintr is called at EVERY cause but the ecall: at a device cause through
+devintr is called at EVERY cause but the ecall, through its one contract
 `DEVINTR` (credentials out of the handler environment,
-`devintrCaps_of_envAt'`), at any other through `DEVINTR_NONE` (the third
-arm, `SpecDevintrNone`; Lean's `DEVINTR` states only the two device arms).
+`devintrCaps_of_envAt'`): a device cause answers 1 or 2, any other 0
+(`devintrRet_none`).
 -/
 import Xv6.UsertrapBlocks
-import Xv6.SpecDevintrNone
 import Xv6.CodeTactics
 import MachCSL.WpSmodeTrapCsr
 
@@ -161,27 +160,15 @@ theorem ut_devintr_at (DI : DEVINTR)
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
     (pd pav pu : BitVec 64) (cpu : CPU) (k' : KCtx) (sc : BitVec 64) (hsie' : k'.sie = false)
     (hnoff' : k'.noff + 2 < 2 ^ 31) (hlocks' : k'.locks = []) (htier' : k'.tier = KTier.kpt)
-    (hK' : devintrSlots ≤ k'.avail) (hsc : sCauseOk sc) :
+    (hK' : devintrSlots ≤ k'.avail) :
     kctx cpu k' ∗ pcIs cpu KA.«devintr» ∗ Register.scause ↦ᵣ[cpu] sc ∗
     devintrCaps Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu ∗
     (∀ R' : RegMap, kctx cpu (k'.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
       Register.scause ↦ᵣ[cpu] sc -∗ ⌜calleeSaved k'.regs R' ∧ R' 10#5 = devintrRet sc⌝ -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
   have h := DI.wp_devintr (hlc := hlc) (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu
-    cpu k' sc hsie' hnoff' hlocks' htier' hK' hsc
+    cpu k' sc hsie' hnoff' hlocks' htier' hK'
   unfold wp_devintr_body at h
-  simp only [devintrAddr] at h
-  exact h
-
-/-- devintr's third arm at its entry. -/
-theorem ut_devintr_none_at (DN : DEVINTR_NONE) (cpu : CPU) (k' : KCtx) (sc : BitVec 64)
-    (hsie' : k'.sie = false) (hK' : 4 ≤ k'.avail) (hsc : ¬ sCauseOk sc) :
-    kctx cpu k' ∗ pcIs cpu KA.«devintr» ∗ Register.scause ↦ᵣ[cpu] sc ∗
-    (∀ R' : RegMap, kctx cpu (k'.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
-      Register.scause ↦ᵣ[cpu] sc -∗ ⌜calleeSaved k'.regs R' ∧ R' 10#5 = 0#64⌝ -∗ wpLoop cpu)
-    ⊢ wpLoop (GF := GF) cpu := by
-  have h := DN.wp_devintr_none (hlc := hlc) (GF := GF) cpu k' sc hsie' hK' hsc
-  unfold wp_devintr_none_body at h
   simp only [devintrAddr] at h
   exact h
 
@@ -208,7 +195,7 @@ theorem ut_disp_dev (DI : DEVINTR) (HEA : UT_EA (hlc := hlc) PT Γ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [utd_br_devintr]
   iintro Hk Hpc
   k_norm [utd_devintr_norm]
-  iapply (ut_devintr_at Γ DI γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu cpu _ A.sc ?hs1 ?hn1 ?hl1 ?ht1 ?hK1 hsc)
+  iapply (ut_devintr_at Γ DI γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu cpu _ A.sc ?hs1 ?hn1 ?hl1 ?ht1 ?hK1)
     $$ [- $Hk $Hpc $Hsc]
   rotate_right 1
   iframe #
@@ -228,7 +215,7 @@ theorem ut_disp_dev (DI : DEVINTR) (HEA : UT_EA (hlc := hlc) PT Γ)
   -- +0x40  bnez a0 : taken
   k_step (wp_s_branch cpu _ (KA.«usertrap» + 0x40#64) true 170#13 10#5 0#5 (by decide) bop.BNE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [h10, utd_bne_ne _ (devintrRet_ne_zero A.sc), utd_bea]
+    with [h10, utd_bne_ne _ (devintrRet_ne_zero A.sc hsc), utd_bea]
   iintro Hk Hpc
   icases ut_disp_open PT Γ A cpu tv (hI cpu) $$ [Hsc Hres] with ⟨Hfr, Hte, Hce, #Hcaps, Hown, -, -, Hpi, Hki, Hkont⟩
   · iframe Hsc Hres
@@ -316,10 +303,12 @@ theorem ut_disp_fault (HD0 : UT_D0 (hlc := hlc) PT Γ) (H56 : UT_56 (hlc := hlc)
       case hp3 => utd_pins
 
 set_option maxHeartbeats 4000000 in
-/-- **The exception route** (+0x3a at a non-device cause): devintr's third
-arm answers 0, `mv s2,a0`, `bnez a0` falls through to the fault
+/-- **The exception route** (+0x3a at a non-device cause): devintr answers
+0 (`devintrRet_none`), `mv s2,a0`, `bnez a0` falls through to the fault
 demultiplexer. -/
-theorem ut_disp_exc (DN : DEVINTR_NONE) (HD0 : UT_D0 (hlc := hlc) PT Γ) (H56 : UT_56 (hlc := hlc) PT Γ)
+theorem ut_disp_exc (DI : DEVINTR) (HD0 : UT_D0 (hlc := hlc) PT Γ) (H56 : UT_56 (hlc := hlc) PT Γ)
+    (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
+    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt]
     (hI : ∀ c : CPU, ⊢ □ ihs (GF := GF) ⟨c, kernelvecAddr⟩)
     (A : UtArgs GF) (cpu : CPU) (R : RegMap) (tv : BitVec 64) (hok : UtOk Γ A) (hp : utPins A R)
     (h8 : A.sc ≠ 8#64) (hsc : ¬ sCauseOk A.sc) :
@@ -328,16 +317,26 @@ theorem ut_disp_exc (DN : DEVINTR_NONE) (HD0 : UT_D0 (hlc := hlc) PT Γ) (H56 : 
   have hsie : A.k.sie = false := hok.hctx.1
   iintro ⟨Hk, Hpc, Hsc, Hres⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
+  icases kctx_tier _ _ $$ Hk with ⟨%hti, Hk⟩
+  have hct : curTier = KTier.kpt := by rw [← hti]; exact hok.htier
+  icases ut_disp_env PT Γ A cpu tv $$ Hres with ⟨#Henv, Hres⟩
+  icases devintrCaps_of_envAt' Γ γ0 γ1 γc γl0 γl1 γd γdl γt hct $$ Henv with ⟨%pd, %pav, %pu, #Hcaps⟩
   -- +0x3a  jal devintr
   k_step (wp_s_jal cpu _ (KA.«usertrap» + 0x3a#64) false 2096960#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [utd_br_devintr]
   iintro Hk Hpc
   k_norm [utd_devintr_norm]
-  iapply (ut_devintr_none_at DN cpu _ A.sc ?hs1 ?hK1 hsc) $$ [- $Hk $Hpc $Hsc]
+  iapply (ut_devintr_at Γ DI γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu cpu _ A.sc ?hs1 ?hn1 ?hl1 ?ht1 ?hK1)
+    $$ [- $Hk $Hpc $Hsc]
   rotate_right 1
+  iframe #
   case hs1 => k_norm
+  case hn1 => k_norm; rw [hok.hnoff]; decide
+  case hl1 => k_norm; exact hok.hlocks
+  case ht1 => k_norm; exact hok.htier
   case hK1 => k_norm; rw [hok.havail]; decide
   iintro %R1 Hk Hpc Hsc %⟨hcs1, h10⟩
+  rw [devintrRet_none A.sc hsc] at h10
   k_norm [utd_ret_3e]
   have hp1 : utPins A R1 :=
     utPins_calleeSaved A _ R1 (utPins_set A R 1#5 _ hp (by decide) (by decide) (Or.inl (by decide))) hcs1
@@ -355,7 +354,7 @@ theorem ut_disp_exc (DN : DEVINTR_NONE) (HD0 : UT_D0 (hlc := hlc) PT Γ) (H56 : 
 
 set_option maxHeartbeats 4000000 in
 /-- **THE DISPATCH** (Rocq `ut_dispatch`), +0x30. -/
-theorem usertrap_dispatch_proof (DI : DEVINTR) (DN : DEVINTR_NONE) (KV : KERNELVEC)
+theorem usertrap_dispatch_proof (DI : DEVINTR) (KV : KERNELVEC)
     (H90 : UT_90 (hlc := hlc) PT Γ) (HEA : UT_EA (hlc := hlc) PT Γ) (HD0 : UT_D0 (hlc := hlc) PT Γ)
     (H56 : UT_56 (hlc := hlc) PT Γ) [ClaimIs (hlc := hlc) GF Γ]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
@@ -395,7 +394,7 @@ theorem usertrap_dispatch_proof (DI : DEVINTR) (DN : DEVINTR_NONE) (KV : KERNELV
       rotate_left 1
       iframe Hk Hpc Hsc Hres
       case hp2 => utd_pins
-    · iapply (ut_disp_exc PT Γ DN HD0 H56 hI A cpu _ tv hok ?hp3 h8 hsc)
+    · iapply (ut_disp_exc PT Γ DI HD0 H56 γ0 γ1 γc γl0 γl1 γd γdl γt hI A cpu _ tv hok ?hp3 h8 hsc)
       rotate_left 1
       iframe Hk Hpc Hsc Hres
       case hp3 => utd_pins
