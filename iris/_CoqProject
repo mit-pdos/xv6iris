@@ -1763,4 +1763,7 @@ UInitUnionBoot.v
 UUnionBootAdequacy.v
 UInitUnion.v
 FileName.v
+UNameBytes.v
+UNamePath.v
+UStrImg.v
 # UnionAssumptions.v

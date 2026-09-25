@@ -53,7 +53,7 @@ Require Import ArgPath.            (* [arg_path_of]: the name the ecall reads *)
 Require Import PathElems.          (* [path_elems] *)
 Require Import FsAbsEra.           (* [np_elems] / [um_start_of] *)
 Require Import FsImg.              (* [ROOTINO] *)
-Require Import FsImgCheck.         (* [fname_f] *)
+Require Import FsImgCheck.
 Require Import ChildTok.
 Require Import UserCwd.
 Local Open Scope Z_scope.
@@ -110,7 +110,8 @@ Section UkShRedirAns.
      [UkFileOpen.wp_uk_ecall_open_create_deed_d] asks for is exactly this:
      the bytes at [file] as the image the ecall reads
      ([ArgPath.arg_path_of]), that path having no non-path elements, being
-     resolved from the caller's own cwd, and ending in [FsImgCheck.fname_f].
+     resolved from the caller's own cwd, and ending in the name [nm] the
+     line redirects to (any name of the class, cut W3).
      THE LEDGER'S ANSWER IS THE FIFTH: the fd arm says the descriptor is
      fd ONE, which is the caller's business ([UserFd.ualloc_std]) -- the
      redirect child closed fd 1 before it called, so 1 is the lowest closed
@@ -126,7 +127,7 @@ Section UkShRedirAns.
      still holds the lend whole.  The index is abstract ([A], at [dst] for
      the file application) because this file names no claim. *)
   Definition ush_open_call2 {A : Type} (N : uk_names Σ) (cwdv file mode : Z)
-      (l : list fdstate) (K : fdtype -> iProp Σ)
+      (nm : list (bv 8)) (l : list fdstate) (K : fdtype -> iProp Σ)
       (Dd Kf : A -> iProp Σ) : iProp Σ :=
     (∀ (h : CpuId) (m : regfile) (av : nat)
        (Img : gmap Z (bv 8)) (pl : list (bv 8)) (a : A),
@@ -136,7 +137,7 @@ Section UkShRedirAns.
            arg_path_of M (mword_of_int file : mword 64) pl ⌝ -∗
        ⌜ np_elems pl = [] ⌝ -∗
        ⌜ um_start_of cwdv pl = FsImg.ROOTINO ⌝ -∗
-       ⌜ list_basics.last (path_elems pl) = Some FsImgCheck.fname_f ⌝ -∗
+       ⌜ list_basics.last (path_elems pl) = Some nm ⌝ -∗
        ⌜ fd_lowest_closed l = Some 1%nat ⌝ -∗
        ([∗ map] ad ↦ b ∈ Img, ubyteq (ukn_d N) DfracDiscarded ad b) -∗
        Dd a -∗

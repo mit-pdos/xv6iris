@@ -14,10 +14,10 @@
 (* THE THREE ARMS.                                                         *)
 (*   [LEcho ws]  -- [echo a b], first byte 'e': [UkShFork.wp_kshm_body_at] *)
 (*     at [UkSh.ush_line_is], i.e. [UkShFork.ushf_body_law_echo].          *)
-(*   [LEchoF_f ws] -- [echo a b > f], first byte 'e' TOO (the redirect is a  *)
+(*   [LEchoF ws nm] -- [echo a b > nm], first byte 'e' TOO (the redirect is a  *)
 (*     suffix): the SAME walk, at [ushs_lp], closing on the redirect       *)
 (*     child's law.                                                       *)
-(*   [LCat_f]      -- [cat f], first byte 'c': the [bne] at 0x97a is NOT     *)
+(*   [LCat nm]     -- [cat nm], first byte 'c': the [bne] at 0x97a is NOT   *)
 (*     taken and control goes into the three-byte [cd] test.  That test is *)
 (*     three instructions and [cat f] falls out of it at the second        *)
 (*     ('a' is not 'd'), back into the fork the other two arms use, so the *)
@@ -55,6 +55,7 @@ Require Import UkShWords.       (* [wl_cut_in] / [wl_cut_end] *)
 Require Import UkShEcho.        (* [echo_argv_bytes] and the exec arm *)
 Require Import UkShRedirLine.   (* [ushs_line_is] and the typed bridge *)
 Require Import UkShFork.        (* [ushf_body_law] / [wp_kshm_body_at] *)
+Require Import UNameBytes.      (* the line [cat N]'s bytes at any name *)
 Require Import CtxIdDefs.
 Require Import UexecSG.
 Require Import UserCwd.
@@ -107,11 +108,11 @@ Section UkShRedirBody.
   (*                                                                     *)
   (*  The file name is existential because the WALK never reads it: what  *)
   (*  reads it is the child, off its own copy of the line.  At the file   *)
-  (*  application it is [FileDisc.fname_f] and [ushs_lp_of_at] says so.   *)
+  (*  application it is the line's own name ([ushs_lp_of_at], cut W3).    *)
   (* =================================================================== *)
   (* THE WORDS ARE THE WHOLE BODY'S (RULING SLOT-WS, option B;
      [UShPipeRound.ushq_lp] is the same shape one constructor over): what
-     the body walk is handed is [FileDisc.uline_ws (LEchoF_f ws)], which is
+     the body walk is handed is [FileDisc.uline_ws (LEchoF ws nm)], which is
      what the line LEXES to -- four words at `echo a > f' -- and the
      existential binds the command's own. *)
   Definition ushs_lp (wsf : list (list (bv 8))) (g : nat -> bv 8)
@@ -127,15 +128,16 @@ Section UkShRedirBody.
     exact (UkShRedirLine.ushs_line_is_byte0 ws0 file g k len Hl).
   Qed.
 
-  Lemma ushs_lp_of_at (ws : list (list (bv 8))) (f : nat -> bv 8)
-      (k len : nat) :
-    UkSh.ush_line_at (LEchoF_f ws) f k len ->
-    ushs_lp (FileDisc.uline_ws (LEchoF_f ws))
+  Lemma ushs_lp_of_at (ws : list (list (bv 8))) (nm : list (bv 8))
+      (f : nat -> bv 8) (k len : nat) :
+    wl_word nm ->
+    UkSh.ush_line_at (LEchoF ws nm) f k len ->
+    ushs_lp (FileDisc.uline_ws (LEchoF ws nm))
       (fun j : nat => f (k + j)%nat) 0%nat len.
   Proof using .
-    intro H. exists ws, fname_f. split; [ reflexivity | ].
-    exact (UkShRedirLine.ushs_line_is_shift ws fname_f f k len
-             (UkShRedirLine.ushs_line_is_of_at ws f k len H)).
+    intros Hw H. exists ws, nm. split; [ reflexivity | ].
+    exact (UkShRedirLine.ushs_line_is_shift ws nm f k len
+             (UkShRedirLine.ushs_line_is_of_at ws nm f k len Hw H)).
   Qed.
 
   (* =================================================================== *)
@@ -406,7 +408,9 @@ Section UkShRedirBody.
   (* =================================================================== *)
   Definition ushs_lp_cat (ws : list (list (bv 8))) (g : nat -> bv 8)
       (k len : nat) : Prop :=
-    ws = FileDisc.uline_ws FileDisc.LCat_f /\ UkSh.ush_line_at FileDisc.LCat_f g k len.
+    exists nm : list (bv 8),
+      ws = FileDisc.uline_ws (FileDisc.LCat nm)
+      /\ UkSh.ush_line_at (FileDisc.LCat nm) g k len.
 
   Local Lemma ushs_bytes_at (dq : dfrac) (a : Z) (kk j : nat)
       (f : nat -> bv 8) :
@@ -421,15 +425,16 @@ Section UkShRedirBody.
     iSplitL "Hb"; [ iExact "Hb" | iExact "Hcl" ].
   Qed.
 
-  (* the cat line's first two bytes, off the typed line *)
-  Lemma ushs_cat_byte (f : nat -> bv 8) (k len j : nat) (b : bv 8) :
-    UkSh.ush_line_at FileDisc.LCat_f f k len ->
-    (j < 6)%nat ->
-    FileDisc.line_bytes FileDisc.LCat_f !!! j = b ->
-    f (k + j)%nat = b.
+  (* the cat line's first bytes, off the typed line, at a name of any
+     length *)
+  Lemma ushs_cat_byte (nm : list (bv 8)) (f : nat -> bv 8) (k len j : nat) :
+    UkSh.ush_line_at (FileDisc.LCat nm) f k len ->
+    (j < 4)%nat ->
+    f (k + j)%nat = cat_pre !!! j.
   Proof using .
-    intros (Hok & Hlen & Hby) Hj <-.
-    apply Hby. rewrite Hlen. by vm_compute.
+    intros (Hok & Hlen & Hby) Hj.
+    rewrite (Hby j ltac:(rewrite Hlen cat_line_len; lia)).
+    exact (cat_line_head nm j Hj).
   Qed.
 
   (* THE FORK THE CAT ARM ENDS IN, AS A PARAMETER (cut C9f1): the landed
@@ -607,7 +612,7 @@ Section UkShRedirBody.
 
   (* [cat f] itself *)
   Lemma wp_kshm_body_cat_with (Hfork : kshf_fork_law)
-      (Dc : nat)
+      (Dc : nat) (nm : list (bv 8))
       (h : CpuId) (m : regfile) (f : nat -> bv 8) (k len : nat)
       (sz : Z) (l : list fdstate) (n : nat) :
     (Dc <= 68 + UkSh.ush_Dpipe)%nat ->
@@ -617,7 +622,7 @@ Section UkShRedirBody.
     (forall j : nat, (j < len)%nat -> f (k + j)%nat <> ubyte0) ->
     f (k + len)%nat = ubyte0 ->
     (k + len < sh_nbuf)%nat ->
-    UkSh.ush_line_at FileDisc.LCat_f f k len ->
+    UkSh.ush_line_at (FileDisc.LCat nm) f k len ->
     8344 <= sz ->
     UserPtTree.pgroundup sz = sz ->
     usz_ok (sz + 65536) ->
@@ -635,7 +640,7 @@ Section UkShRedirBody.
     UkShFork.ushf_child_law_at Wc ushs_lp_cat Dc -∗
     UkShDiag.ush_panic_law Wc Wb -∗
     ⌜ UkSh.ush_fd0p l ⌝ -∗
-    UkSh.ush_bstate N γp T Wc Wb Pm l (FileDisc.uline_ws FileDisc.LCat_f) -∗
+    UkSh.ush_bstate N γp T Wc Wb Pm l (FileDisc.uline_ws (FileDisc.LCat nm)) -∗
     ushl_dat -∗ usz γs sz -∗
     ubytes γd sh_buf sh_nbuf f -∗
     urun N h m (mword_of_int 0x97a) (16 + (UkSh.ush_Dbody + n)) -∗
@@ -643,20 +648,20 @@ Section UkShRedirBody.
   Proof using .
     intros HDc Hregs Hs1 Ha5 Hnn Hnul Hkl Hline.
     assert (Hb0 : bv_unsigned (f k) = 99%Z).
-    { pose proof (ushs_cat_byte f k len 0%nat _ Hline ltac:(lia) eq_refl) as H0.
+    { pose proof (ushs_cat_byte nm f k len 0%nat Hline ltac:(lia)) as H0.
       rewrite Nat.add_0_r in H0. rewrite H0. by vm_compute. }
     assert (Hb1 : bv_unsigned (f (k + 1)%nat) = 97%Z).
-    { pose proof (ushs_cat_byte f k len 1%nat _ Hline ltac:(lia) eq_refl) as H1.
+    { pose proof (ushs_cat_byte nm f k len 1%nat Hline ltac:(lia)) as H1.
       rewrite H1. by vm_compute. }
     assert (Hlen2 : (2 <= len)%nat).
-    { destruct Hline as (_ & Hl & _). rewrite Hl. vm_compute. lia. }
+    { destruct Hline as (_ & Hl & _). rewrite Hl cat_line_len. lia. }
     exact (wp_kshm_body_ca_with Hfork ushs_lp_cat Dc h m f k len
-             (FileDisc.uline_ws FileDisc.LCat_f) sz l n HDc Hregs Hs1 Ha5 Hnn Hnul Hkl
-             (conj eq_refl Hline) Hb0 Hb1 Hlen2).
+             (FileDisc.uline_ws (FileDisc.LCat nm)) sz l n HDc Hregs Hs1 Ha5 Hnn Hnul Hkl
+             (ex_intro _ nm (conj eq_refl Hline)) Hb0 Hb1 Hlen2).
   Qed.
 
   Lemma wp_kshm_body_cat
-      (Dc : nat)
+      (Dc : nat) (nm : list (bv 8))
       (h : CpuId) (m : regfile) (f : nat -> bv 8) (k len : nat)
       (sz : Z) (l : list fdstate) (n : nat) :
     (Dc <= 68 + UkSh.ush_Dpipe)%nat ->
@@ -666,7 +671,7 @@ Section UkShRedirBody.
     (forall j : nat, (j < len)%nat -> f (k + j)%nat <> ubyte0) ->
     f (k + len)%nat = ubyte0 ->
     (k + len < sh_nbuf)%nat ->
-    UkSh.ush_line_at FileDisc.LCat_f f k len ->
+    UkSh.ush_line_at (FileDisc.LCat nm) f k len ->
     8344 <= sz ->
     UserPtTree.pgroundup sz = sz ->
     usz_ok (sz + 65536) ->
@@ -684,14 +689,14 @@ Section UkShRedirBody.
     UkShFork.ushf_child_law_at Wc ushs_lp_cat Dc -∗
     UkShDiag.ush_panic_law Wc Wb -∗
     ⌜ UkSh.ush_fd0p l ⌝ -∗
-    UkSh.ush_bstate N γp T Wc Wb Pm l (FileDisc.uline_ws FileDisc.LCat_f) -∗
+    UkSh.ush_bstate N γp T Wc Wb Pm l (FileDisc.uline_ws (FileDisc.LCat nm)) -∗
     ushl_dat -∗ usz γs sz -∗
     ubytes γd sh_buf sh_nbuf f -∗
     urun N h m (mword_of_int 0x97a) (16 + (UkSh.ush_Dbody + n)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using HT HWct Hpay Hpsok_free.
     exact (wp_kshm_body_cat_with
-             (UkShFork.wp_kshf_fork_at N γp T Wc Wb Pm Hpsok_free) Dc h m f k len sz l n).
+             (UkShFork.wp_kshf_fork_at N γp T Wc Wb Pm Hpsok_free) Dc nm h m f k len sz l n).
   Qed.
 
   (* =================================================================== *)
@@ -727,7 +732,8 @@ Section UkShRedirBody.
     UkShFork.ushf_kill_law Wc -∗
     UkShFork.ushf_child_law_at Wc ushs_lp_cat 68 -∗
     UkShDiag.ush_panic_law Wc Wb -∗
-    UkShFork.ushf_body_law N γp T Wc Wb Pm (fun l : uline => l = LCat_f) sz.
+    UkShFork.ushf_body_law N γp T Wc Wb Pm
+      (fun l : uline => exists nm : list (bv 8), l = LCat nm) sz.
   Proof using HT HWct Hpay Hpsok_free.
     intros Hszlo Hszal Hszok Hwbl.
     iIntros "#Hkl #Hchl #Hplaw".
@@ -735,9 +741,9 @@ Section UkShRedirBody.
     iIntros "!>" (lu h m f k len l n)
       "%Hd %Hlat %Hregs %Hs1 %Ha5 %Hnn %Hnul %Hkl2 %Hpm1 %Hpmwb %Hfd0
        #Hgen #Hcode #Hjt Hhead Hstd Hdat Hsz Hbuf Hrun".
-    subst lu.
+    destruct Hd as [nm ->].
     iDestruct (UkSh.ush_jtab_ro γt with "Hjt") as "#Hro".
-    iApply (wp_kshm_body_cat 68 h m f k len sz l n ltac:(lia)
+    iApply (wp_kshm_body_cat 68 nm h m f k len sz l n ltac:(lia)
               Hregs Hs1 Ha5 Hnn Hnul Hkl2 Hlat Hszlo Hszal Hszok
               Hpm1 Hpmwb Hwbl
               with "Hgen Hhead Hcode Hro [] Hjt Hkl Hchl Hplaw [%] Hstd
@@ -777,25 +783,24 @@ Section UkShRedirBody.
         [ by exists ws | exact Hlat | exact Hregs | exact Hs1 | exact Ha5
         | exact Hnn | exact Hnul | exact Hkl2 | exact Hpm1 | exact Hpmwb
         | exact Hfd0 ].
-    - (* [echo a b > f] -- the SAME walk at the redirect child's law *)
-      pose proof (proj1 (proj2 (proj1 Hlat))) as Hu. rewrite /FileDisc.uname in Hu. subst Nf.
+    - (* [echo a b > nm] -- the SAME walk at the redirect child's law *)
+      pose proof (proj1 (proj2 (proj1 Hlat))) as Hu.
       iDestruct (UkSh.ush_jtab_ro γt with "Hjt") as "#Hro".
       iApply (UkShFork.wp_kshm_body_at N γp T Wc Wb Pm Hpsok_free ushs_lp 68
-                h m f k len (FileDisc.uline_ws (LEchoF_f ws)) sz l n
+                h m f k len (FileDisc.uline_ws (LEchoF ws Nf)) sz l n
                 ltac:(lia) ushs_lp0
                 Hregs Hs1 Ha5 Hnn Hnul Hkl2
-                (ushs_lp_of_at ws f k len Hlat)
+                (ushs_lp_of_at ws Nf f k len (uname_word Nf Hu) Hlat)
                 Hszlo Hszal Hszok Hpm1 Hpmwb Hwbl
                 with "Hgen Hhead Hcode Hro [] Hjt Hkl Hchr Hplaw [%] Hstd
                       Hdat Hsz Hbuf Hrun").
       + iApply (UkShFork.ushf_code_shp with "Hcode").
       + exact Hfd0.
-    - (* [cat f] -- the 'c' arm, owed *)
-      pose proof (proj1 Hlat) as Hu. rewrite /FileDisc.uline_ok /FileDisc.uname in Hu. subst Nf.
-      iApply ("Hcat" $! LCat_f h m f k len l n with
+    - (* [cat nm] -- the 'c' arm *)
+      iApply ("Hcat" $! (LCat Nf) h m f k len l n with
                 "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hgen Hcode Hjt
                  Hhead Hstd Hdat Hsz Hbuf Hrun");
-        [ reflexivity | exact Hlat | exact Hregs | exact Hs1 | exact Ha5
+        [ by exists Nf | exact Hlat | exact Hregs | exact Hs1 | exact Ha5
         | exact Hnn | exact Hnul | exact Hkl2 | exact Hpm1 | exact Hpmwb
         | exact Hfd0 ].
   Qed.

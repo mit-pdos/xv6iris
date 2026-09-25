@@ -230,7 +230,7 @@ Section union_read_inst.
       iLeft. rewrite /flw. iRight.
       iExists (efl_of y.1). iFrame "Hfl". iPureIntro.
       intros w Hw. rewrite <- HJ in Hw. destruct y as [hy cy].
-      apply elem_of_list_fmap_1.
+      rewrite /efl_of.
       apply (echof_lines_of_consumed (S gen_id) (dl ++ ws) hy cy w).
       - rewrite /seg_of.
         destruct Hpref as [z Hz].

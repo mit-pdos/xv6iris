@@ -1,17 +1,19 @@
-(* AppFile.v -- THE FILE APPLICATION, THE CLAIM (layer A): what the file
-   [f] may hold, as a resource over the abstract view, with the DEED the
-   shell's process chain holds against it.
+(* AppFile.v -- THE FILE APPLICATION, THE CLAIM (layer A): what the files
+   of the user-file class ([FileDisc.uname], FileName.v's laws) may hold,
+   as a resource over the abstract view, with the DEED the shell's process
+   chain holds against it -- ONE deed over the map of those files (cut W2
+   of claude-notes/design/filenames.md, section 2).
 
    Design of record: claude-notes/design/app-file.md (section 2 is this
    file; section 3 is the deed's life, which the program lanes prove).
 
    THE CLAIM.  [file_pred c r av] is the echo application's predicate
    ([AppEcho.echo_pred]: the taint, or the pins beside the console's state)
-   with a FOURTH conjunct, [f_state]: the file [f] in the root directory is
-   in the state the deed says -- absent, or present with exactly these
-   bytes -- and, when present, its bytes are a chunk subset of an
-   [echo … > f] line the console has seen (a lower bound of the ledger's
-   line list says which lines those are).
+   with a FOURTH conjunct, [f_state]: every class name in the root
+   directory is in the state the deed's map says -- absent, or present
+   with exactly these bytes -- and each present file's bytes are a chunk
+   subset of an [echo … > N] line at its own name the console has seen (a
+   lower bound of the ledger's line list says which lines those are).
 
    THE DEED is a [ghost_var] over [FileState.fstate] in two halves: the claim
    keeps one, the process chain (sh, its forked child, the exec'd echo or
@@ -69,6 +71,7 @@ Require Import FsBootParams.
 Require Import FsImgCheck.
 Require Import FsImg.
 Require Import FsState.
+Require Import FsTree.             (* [fname] *)
 Require Import FsAbsDefs.
 Require Import FsInitPin.
 Require Import FsInitPinBoot.
@@ -86,20 +89,27 @@ Require Import AppEcho.            (* [echo_taint], [echo_cl], [cons_state],
                                       [echo_boot], [echo_pred]'s pieces *)
 Require Export FileState.          (* [fstate], [echo_chunks], [subseq], [sel_ok] *)
 Require Import FileFsPure.         (* [file_fs_pure] = echo's pins and cat's *)
-Require Import FsFPin.             (* [f_absent], [era0_recovery_f_absent] *)
+Require FileDisc.                  (* the class [FileDisc.uname] *)
+Require Import FileName.           (* its laws: [uname_laws], L4 at era 0 *)
 Local Open Scope Z_scope.
 
 (* ====================================================================== *)
 (*  1.  NAMES: THE FIXED PART AND THE INSTANCE                             *)
 (* ====================================================================== *)
 
-(* a typed line, as the console sees it: the words of one [echo … > f] *)
+(* a typed line, as the console sees it: the words of one [echo … > N] *)
 Definition wordline : Type := list (list (bv 8)).
 
+(* ...AND THE LINE THE LEDGER FILES: the file the line redirects to beside
+   its words -- the model's [FileDisc.echof_ws] shape, so the ledger's list
+   IS the history's [FileDisc.echof_lines_of] (cut W2 of
+   claude-notes/design/filenames.md) *)
+Definition fwline : Type := list (bv 8) * wordline.
+
 (* THE FIXED PART: echo's (the taint counter and the era map) beside the
-   LINE LIST's name -- a [mono_list] of the [echo … > f] word lists the
-   console has received, in order, whose authority the ledger keeps and
-   whose lower bounds ride the input tag (design section 4). *)
+   LINE LIST's name -- a [mono_list] of the [echo … > N] lines the console
+   has received, in order, whose authority the ledger keeps and whose
+   lower bounds ride the input tag (design section 4). *)
 Definition file_fixed : Type := echo_fixed * gname.
 
 (* THE INSTANCE: echo's console pair beside THE DEED's and THE TICKET's
@@ -111,18 +121,25 @@ Record file_names := MkFileNames {
   fn_esc  : gname;                     (* THE ESCROW LEDGER (section 2a) *)
 }.
 
-(* THE DEED'S STATE: the model's [fstate] with the file's INUM beside its bytes.
-   The inum is what lets a holder identify the row its descriptor sits on
-   with [f]'s (lane F-WRITE's finding: at an existential inum the deed says
-   what [f] holds and never which row is [f], and a free step could even
-   relocate it); the model reads the content only ([dst_content]: the
-   one-name map the deed's content denotes, cut W1 of
-   claude-notes/design/filenames.md -- the deed itself widens at W2). *)
-Definition dst : Type := option (Z * list (bv 8)).
-Definition dst_content (s : dst) : fstate := fst_of ((fun p => p.2) <$> s).
+(* THE DEED'S STATE: the model's [fstate] with each file's INUM beside its
+   bytes (cut W2: a map over the class [FileDisc.uname]).  The inum is
+   what lets a holder identify the row its descriptor sits on with its
+   file's (lane F-WRITE's finding: at an existential inum the deed says
+   what a file holds and never which row is it, and a free step could even
+   relocate it); the model reads the contents only ([dst_content]). *)
+Definition dst : Type := gmap fname (Z * list (bv 8)).
+Definition dst_content (s : dst) : fstate := snd <$> s.
 
-Lemma dst_content_f (s : dst) : dst_content s !! fname_m = snd <$> s.
-Proof using . exact (fst_of_lookup _). Qed.
+Lemma dst_content_lookup (s : dst) (N : fname) :
+  dst_content s !! N = snd <$> s !! N.
+Proof using . exact (lookup_fmap _ _ _). Qed.
+
+Lemma dst_content_insert (s : dst) (N : fname) (i : Z) (bs : list (bv 8)) :
+  dst_content (<[N := (i, bs)]> s) = <[N := bs]> (dst_content s).
+Proof using . exact (fmap_insert _ _ _ _). Qed.
+
+Lemma dst_content_empty : dst_content ∅ = ∅.
+Proof using . exact (fmap_empty _). Qed.
 
 (* ONE ESCROW, as the claim's ledger records it: the content the deed was
    parked AT, and the one-shot name whose token the holder keeps.  The
@@ -134,13 +151,13 @@ Definition esc_rec : Type := dst * gname.
 
 Class fileAppG (Σ : gFunctors) := FileAppG {
   fa_deed : ghost_varG Σ dst;
-  fa_fl   : inG Σ (mono_listR (leibnizO wordline));
+  fa_fl   : inG Σ (mono_listR (leibnizO fwline));
   fa_esc  : inG Σ (mono_listR (leibnizO esc_rec));
 }.
 #[global] Existing Instances fa_deed fa_fl fa_esc.
 
 Definition fileAppΣ : gFunctors :=
-  #[ ghost_varΣ dst; GFunctor (mono_listR (leibnizO wordline));
+  #[ ghost_varΣ dst; GFunctor (mono_listR (leibnizO fwline));
      GFunctor (mono_listR (leibnizO esc_rec)) ].
 
 Global Instance subG_fileAppΣ {Σ} : subG fileAppΣ Σ -> fileAppG Σ.
@@ -164,11 +181,11 @@ Section FileClaim.
   (*  1b.  THE LINE LIST: authority (the ledger's) and lower bounds     *)
   (* ---------------------------------------------------------------- *)
 
-  Definition fl_auth (c : file_fixed) (ls : list wordline) : iProp Σ :=
-    own c.2 (●ML (ls : list (leibnizO wordline))).
+  Definition fl_auth (c : file_fixed) (ls : list fwline) : iProp Σ :=
+    own c.2 (●ML (ls : list (leibnizO fwline))).
 
-  Definition fl_lb (c : file_fixed) (ls : list wordline) : iProp Σ :=
-    own c.2 (◯ML (ls : list (leibnizO wordline))).
+  Definition fl_lb (c : file_fixed) (ls : list fwline) : iProp Σ :=
+    own c.2 (◯ML (ls : list (leibnizO fwline))).
 
   Global Instance fl_lb_persistent c ls : Persistent (fl_lb c ls).
   Proof using . rewrite /fl_lb. apply _. Qed.
@@ -177,16 +194,16 @@ Section FileClaim.
   Global Instance fl_auth_timeless c ls : Timeless (fl_auth c ls).
   Proof using . rewrite /fl_auth. apply _. Qed.
 
-  Lemma fl_auth_lb (c : file_fixed) (ls : list wordline) :
+  Lemma fl_auth_lb (c : file_fixed) (ls : list fwline) :
     fl_auth c ls -∗ fl_auth c ls ∗ fl_lb c ls.
   Proof using .
     rewrite /fl_auth /fl_lb. iIntros "Ha".
-    iDestruct (own_mono _ _ (◯ML (ls : list (leibnizO wordline))) with "Ha")
+    iDestruct (own_mono _ _ (◯ML (ls : list (leibnizO fwline))) with "Ha")
       as "#Hb"; [ apply mono_list_included |].
     iFrame "Ha Hb".
   Qed.
 
-  Lemma fl_lb_prefix (c : file_fixed) (ls ls' : list wordline) :
+  Lemma fl_lb_prefix (c : file_fixed) (ls ls' : list fwline) :
     fl_auth c ls -∗ fl_lb c ls' -∗ ⌜ls' `prefix_of` ls⌝.
   Proof using .
     rewrite /fl_auth /fl_lb. iIntros "Ha Hb".
@@ -195,7 +212,7 @@ Section FileClaim.
   Qed.
 
   (* two lower bounds of one list are comparable *)
-  Lemma fl_lb_lb (c : file_fixed) (ls ls' : list wordline) :
+  Lemma fl_lb_lb (c : file_fixed) (ls ls' : list fwline) :
     fl_lb c ls -∗ fl_lb c ls' -∗ ⌜ls `prefix_of` ls' \/ ls' `prefix_of` ls⌝.
   Proof using .
     rewrite /fl_lb. iIntros "Ha Hb".
@@ -203,11 +220,11 @@ Section FileClaim.
     by iPureIntro.
   Qed.
 
-  Lemma fl_auth_grow (c : file_fixed) (ls : list wordline) (ws : wordline) :
+  Lemma fl_auth_grow (c : file_fixed) (ls : list fwline) (ws : fwline) :
     fl_auth c ls ==∗ fl_auth c (ls ++ [ws]) ∗ fl_lb c (ls ++ [ws]).
   Proof using .
     rewrite /fl_auth. iIntros "Ha".
-    iMod (own_update _ _ (●ML ((ls ++ [ws]) : list (leibnizO wordline)))
+    iMod (own_update _ _ (●ML ((ls ++ [ws]) : list (leibnizO fwline)))
             with "Ha") as "Ha".
     { apply mono_list_update. by exists [ws]. }
     iModIntro. iApply (fl_auth_lb with "Ha").
@@ -220,7 +237,7 @@ Section FileClaim.
   Lemma file_birth : ⊢ |==> ∃ c : file_fixed, file_cl c.
   Proof using .
     iMod echo_birth as (γ) "He".
-    iMod (own_alloc (●ML ([] : list (leibnizO wordline)))) as (g) "Hl";
+    iMod (own_alloc (●ML ([] : list (leibnizO fwline)))) as (g) "Hl";
       [ apply mono_list_auth_valid |].
     iModIntro. iExists (γ, g). rewrite /file_cl /fl_auth /=. iFrame "He Hl".
   Qed.
@@ -498,88 +515,215 @@ Section FileClaim.
   Qed.
 
   (* ---------------------------------------------------------------- *)
-  (*  3.  THE FILE'S STATE ON THE VIEW                                  *)
+  (*  3.  THE FILES' STATE ON THE VIEW                                  *)
   (* ---------------------------------------------------------------- *)
 
-  (* the content the view holds at [f]: the file's bytes at the inum the
-     root's entry [f] names, [None] when there is no such entry -- or when
-     the row is not a plain file, which [f_ok] excludes *)
-  Definition fcontent_of (av : aview) : dst :=
-    match astep av FsImg.ROOTINO fname_f with
-    | None => None
-    | Some i =>
-        match av !! i with
-        | Some (MkAnode (AFile bs) _) => Some (i, bs)
-        | _ => None
-        end
+  (* THE TWO SHAPES a name of the root takes on the view, which every leg
+     of [FileDeltas] is stated over: absent, or resolving to [ino] whose
+     row is [a] ([FsConsPin.cons_absent] and [FsFPin.f_absent] are the
+     first, definitionally). *)
+  Definition name_absent (nm : fname) (av : aview) : Prop :=
+    astep av FsImg.ROOTINO nm = None.
+
+  Definition node_pin (nm : fname) (ino : Z) (a : anode) (av : aview) : Prop :=
+    astep av FsImg.ROOTINO nm = Some ino /\ av !! ino = Some a.
+
+  (* ONE NAME'S ROW, as the deed's entry says: absent, or a plain file with
+     exactly these bytes and one link at the entry's inum.  The link count
+     is pinned at 1 because the application never links a file (a link by
+     an unverified process is an unpaid move: taint), and the pinned
+     observation the read runs on wants the row on the nose. *)
+  Definition f_row (av : aview) (N : fname) (o : option (Z * list (bv 8))) : Prop :=
+    match o with
+    | None => name_absent N av
+    | Some (i, bs) => node_pin N i (MkAnode (AFile bs) 1%nat) av
     end.
 
-  (* [f] is absent, or it is a plain file with exactly these bytes and one
-     link.  The link count is pinned at 1 because the application never
-     links [f] (a link by an unverified process is an unpaid move: taint),
-     and the pinned observation the read runs on wants the row on the
-     nose. *)
+  (* THE CLAIM'S READING OF THE VIEW (cut W2): every name of the class is
+     in the state the deed's map says -- absent where the map has none,
+     pinned where it has one -- the map names only class names, and no
+     two names share an inum.  The last is a real premise: nothing in the
+     view says two root entries are different rows, and a truncate or a
+     write at one file's inode must leave every other file alone. *)
   Definition f_ok (av : aview) (s : dst) : Prop :=
-    match s with
-    | None => f_absent av
-    | Some (i, bs) =>
-        astep av FsImg.ROOTINO fname_f = Some i
-        /\ av !! i = Some (MkAnode (AFile bs) 1%nat)
+    (forall N : fname, FileDisc.uname N -> f_row av N (s !! N))
+    /\ map_Forall (fun N _ => FileDisc.uname N) s
+    /\ (forall (N M : fname) (i : Z) (bs bs' : list (bv 8)),
+          s !! N = Some (i, bs) -> s !! M = Some (i, bs') -> N = M).
+
+  Lemma f_ok_row (av : aview) (s : dst) (N : fname) :
+    f_ok av s -> FileDisc.uname N -> f_row av N (s !! N).
+  Proof using . intros (Hr & _ & _) HN. exact (Hr N HN). Qed.
+
+  Lemma f_ok_dom (av : aview) (s : dst) (N : fname) (p : Z * list (bv 8)) :
+    f_ok av s -> s !! N = Some p -> FileDisc.uname N.
+  Proof using . intros (_ & Hd & _) Hs. exact (Hd N p Hs). Qed.
+
+  Lemma f_ok_inj (av : aview) (s : dst) (N M : fname) (i : Z)
+      (bs bs' : list (bv 8)) :
+    f_ok av s -> s !! N = Some (i, bs) -> s !! M = Some (i, bs') -> N = M.
+  Proof using . intros (_ & _ & Hi). exact (Hi N M i bs bs'). Qed.
+
+  (* a present entry's pin, and an absent class name's *)
+  Lemma f_ok_pin (av : aview) (s : dst) (N : fname) (i : Z)
+      (bs : list (bv 8)) :
+    f_ok av s -> s !! N = Some (i, bs) ->
+    node_pin N i (MkAnode (AFile bs) 1%nat) av.
+  Proof using .
+    intros Hok Hs. pose proof (f_ok_row av s N Hok (f_ok_dom av s N _ Hok Hs)) as H.
+    rewrite Hs in H. exact H.
+  Qed.
+
+  Lemma f_ok_absent (av : aview) (s : dst) (N : fname) :
+    f_ok av s -> FileDisc.uname N -> s !! N = None -> name_absent N av.
+  Proof using .
+    intros Hok HN Hs. pose proof (f_ok_row av s N Hok HN) as H.
+    rewrite Hs in H. exact H.
+  Qed.
+
+  (* the row an inum holds, read as a deed entry: a plain file's bytes *)
+  Definition f_rowc (av : aview) (i : Z) : option (Z * list (bv 8)) :=
+    match av !! i with
+    | Some (MkAnode (AFile bs) _) => Some (i, bs)
+    | _ => None
     end.
+
+  (* the contents the view holds: the root's entries FILTERED TO THE CLASS,
+     each read at its row -- an entry whose row is not a plain file reads
+     as nothing, which [f_ok] excludes *)
+  Definition fcontent_of (av : aview) : dst :=
+    match aents av FsImg.ROOTINO with
+    | None => ∅
+    | Some ents =>
+        omap (f_rowc av) (filter (fun kv : fname * Z => FileDisc.uname kv.1) ents)
+    end.
+
+  Lemma fcontent_of_lookup (av : aview) (N : fname) :
+    fcontent_of av !! N
+    = if decide (FileDisc.uname N) then astep av FsImg.ROOTINO N ≫= f_rowc av
+      else None.
+  Proof using .
+    rewrite /fcontent_of /astep.
+    destruct (aents av FsImg.ROOTINO) as [ents |]; cbn [mbind option_bind];
+      last first.
+    { rewrite lookup_empty. by case_decide. }
+    rewrite lookup_omap.
+    destruct (decide (FileDisc.uname N)) as [HN | HN].
+    - destruct (ents !! N) as [i |] eqn:He.
+      + rewrite (map_lookup_filter_Some_2 _ ents N i He HN). reflexivity.
+      + rewrite (map_lookup_filter_None_2 _ ents N); [reflexivity |]. by left.
+    - rewrite (map_lookup_filter_None_2 _ ents N); [reflexivity |].
+      right. intros x _. exact HN.
+  Qed.
 
   Lemma f_ok_fcontent (av : aview) (s : dst) :
     f_ok av s -> fcontent_of av = s.
   Proof using .
-    rewrite /f_ok /fcontent_of. destruct s as [[i bs] |].
-    - intros (Hs & Hrow). by rewrite Hs Hrow.
-    - rewrite /f_absent. intros Hs. by rewrite Hs.
+    intros Hok. apply map_eq. intros N.
+    change (fcontent_of av !! N = s !! N). rewrite fcontent_of_lookup.
+    destruct (decide (FileDisc.uname N)) as [HN | HN].
+    - pose proof (f_ok_row av s N Hok HN) as Hr.
+      destruct (s !! N) as [[i bs] |] eqn:Hs; cbn [f_row] in Hr.
+      + destruct Hr as (Hst & Hrow). rewrite Hst /= /f_rowc Hrow //.
+      + rewrite /name_absent in Hr. by rewrite Hr.
+    - destruct (s !! N) as [p |] eqn:Hs; [| reflexivity].
+      exfalso. exact (HN (f_ok_dom av s N p Hok Hs)).
   Qed.
 
-  (* the bytes are a chunk subset of one of these lines, and the line is an
-     ADMISSIBLE one ([EchoDisc.line_ok]: alphanumeric words, fewer than ten,
-     shorter than sh's buffer) -- the ledger appends nothing else, and the
-     bound is what keeps [f]'s row apart from the pinned binaries' rows
-     (35 KB and more) at a truncate or a write: two rows with different
-     contents are different inums. *)
-  Definition f_bytes_typed (ls : list wordline) (bs : list (bv 8)) : Prop :=
+  (* THE EMPTY MAP, at a view where no class name is in the root *)
+  Lemma f_ok_empty (av : aview) :
+    (forall N : fname, FileDisc.uname N -> name_absent N av) -> f_ok av ∅.
+  Proof using .
+    intros Hab. split_and!.
+    - intros N HN. rewrite lookup_empty. exact (Hab N HN).
+    - apply map_Forall_empty.
+    - intros N M i bs bs' Hs. by rewrite lookup_empty in Hs.
+  Qed.
+
+  (* a file's bytes are a chunk subset of an [echo … > N] line AT ITS OWN
+     NAME, and the line is an ADMISSIBLE one ([EchoDisc.line_ok]:
+     alphanumeric words, fewer than ten, shorter than sh's buffer) -- the
+     ledger appends nothing else, and the bound is what keeps a file's row
+     apart from the pinned binaries' rows (35 KB and more) at a truncate
+     or a write: two rows with different contents are different inums. *)
+  Definition f_bytes_typed (ls : list fwline) (N : fname) (bs : list (bv 8))
+      : Prop :=
     exists (ws : wordline) (sel : list nat),
-      ws ∈ ls /\ EchoDisc.line_ok ws /\ sel_ok (echo_chunks ws) sel
+      (N, ws) ∈ ls /\ EchoDisc.line_ok ws /\ sel_ok (echo_chunks ws) sel
       /\ bs = subseq (echo_chunks ws) sel.
 
-  Lemma f_bytes_typed_mono (ls ls' : list wordline) (bs : list (bv 8)) :
-    ls `prefix_of` ls' -> f_bytes_typed ls bs -> f_bytes_typed ls' bs.
+  Lemma f_bytes_typed_mono (ls ls' : list fwline) (N : fname) (bs : list (bv 8)) :
+    ls `prefix_of` ls' -> f_bytes_typed ls N bs -> f_bytes_typed ls' N bs.
   Proof using .
     intros Hp (ws & sel & Hin & Hok & Hsel & Hbs). exists ws, sel.
     split; [| by split_and!]. eapply elem_of_prefix; [exact Hin | exact Hp].
   Qed.
 
-  (* ...as the claim carries it: nothing at an absent file, a lower bound
-     of the line list and the pure fact at a present one.  The lower bound
-     sits only in the [Some] arm: a lower bound of the fixed-part list is
-     not mintable from nothing ([◯ML []] is not a unit), and era 0 has no
-     [f]. *)
+  (* ...as the claim carries it: nothing at the empty map, and ONE lower
+     bound of the line list serving every entry otherwise, each entry's
+     name in the class (the ledger files only admitted lines).  The lower
+     bound sits only in the second arm: a lower bound of the fixed-part
+     list is not mintable from nothing ([◯ML []] is not a unit), and era 0
+     holds no file. *)
   Definition f_typed (c : file_fixed) (s : dst) : iProp Σ :=
-    match s with
-    | None => emp
-    | Some (_, bs) => (∃ ls : list wordline, fl_lb c ls ∗ ⌜f_bytes_typed ls bs⌝)%I
-    end.
+    (⌜s = ∅⌝
+     ∨ ∃ ls : list fwline,
+         fl_lb c ls
+         ∗ ⌜map_Forall (fun N p => FileDisc.uname N /\ f_bytes_typed ls N p.2) s⌝)%I.
 
   Global Instance f_typed_persistent c s : Persistent (f_typed c s).
-  Proof using . destruct s as [[i bs] |]; rewrite /f_typed; apply _. Qed.
+  Proof using . rewrite /f_typed. apply _. Qed.
   Global Instance f_typed_timeless c s : Timeless (f_typed c s).
-  Proof using . destruct s as [[i bs] |]; rewrite /f_typed; apply _. Qed.
+  Proof using . rewrite /f_typed. apply _. Qed.
 
-  (* the two ways a process re-proves the typed fact at a new content *)
-  Lemma f_typed_none (c : file_fixed) : ⊢ f_typed c None.
-  Proof using . by rewrite /f_typed. Qed.
+  Lemma f_typed_empty (c : file_fixed) : ⊢ f_typed c ∅.
+  Proof using . rewrite /f_typed. by iLeft. Qed.
 
-  Lemma f_typed_some (c : file_fixed) (ls : list wordline) (ws : wordline)
-      (sel : list nat) (i : Z) :
-    ws ∈ ls -> EchoDisc.line_ok ws -> sel_ok (echo_chunks ws) sel ->
-    fl_lb c ls -∗ f_typed c (Some (i, subseq (echo_chunks ws) sel)).
+  (* one entry's witness *)
+  Lemma f_typed_lookup (c : file_fixed) (s : dst) (N : fname) (i : Z)
+      (bs : list (bv 8)) :
+    s !! N = Some (i, bs) ->
+    f_typed c s -∗ ∃ ls : list fwline, fl_lb c ls ∗ ⌜f_bytes_typed ls N bs⌝.
   Proof using .
-    intros Hin Hok Hsel. iIntros "#Hlb". rewrite /f_typed. iExists ls.
-    iFrame "Hlb". iPureIntro. by exists ws, sel.
+    intros Hs. rewrite /f_typed. iIntros "[%He | (%ls & Hlb & %Hall)]".
+    { subst s. by rewrite lookup_empty in Hs. }
+    iExists ls. iFrame "Hlb". iPureIntro. exact (proj2 (Hall N (i, bs) Hs)).
+  Qed.
+
+  (* THE ONE WAY a process re-proves the typed fact at a new content: the
+     entry it wrote, typed at a lower bound of its own, joins the rest --
+     two lower bounds of one list are comparable, and the longer serves
+     both *)
+  Lemma f_typed_insert (c : file_fixed) (s : dst) (ls : list fwline)
+      (N : fname) (i : Z) (bs : list (bv 8)) :
+    FileDisc.uname N -> f_bytes_typed ls N bs ->
+    f_typed c s -∗ fl_lb c ls -∗ f_typed c (<[N := (i, bs)]> s).
+  Proof using .
+    intros HN Hbt. iIntros "Hty #Hlb". rewrite /f_typed.
+    iDestruct "Hty" as "[%He | (%ls0 & #Hlb0 & %Hall)]".
+    { subst s. iRight. iExists ls. iFrame "Hlb". iPureIntro.
+      apply map_Forall_insert_2; [by split | apply map_Forall_empty]. }
+    iDestruct (fl_lb_lb with "Hlb Hlb0") as %[Hp | Hp].
+    - iRight. iExists ls0. iFrame "Hlb0". iPureIntro.
+      apply map_Forall_insert_2;
+        [split; [exact HN | exact (f_bytes_typed_mono ls ls0 N bs Hp Hbt)] |].
+      exact Hall.
+    - iRight. iExists ls. iFrame "Hlb". iPureIntro.
+      apply map_Forall_insert_2; [by split |].
+      intros M p Hp'. destruct (Hall M p Hp') as [HM Hb].
+      split; [exact HM | exact (f_bytes_typed_mono ls0 ls M p.2 Hp Hb)].
+  Qed.
+
+  (* ...at a chunk subset of a line the list holds *)
+  Lemma f_typed_some (c : file_fixed) (s : dst) (ls : list fwline) (N : fname)
+      (ws : wordline) (sel : list nat) (i : Z) :
+    FileDisc.uname N ->
+    (N, ws) ∈ ls -> EchoDisc.line_ok ws -> sel_ok (echo_chunks ws) sel ->
+    f_typed c s -∗ fl_lb c ls -∗
+    f_typed c (<[N := (i, subseq (echo_chunks ws) sel)]> s).
+  Proof using .
+    intros HN Hin Hok Hsel. iIntros "Hty #Hlb".
+    iApply (f_typed_insert c s ls N i with "Hty Hlb"); [exact HN |]. by exists ws, sel.
   Qed.
 
   (* ---------------------------------------------------------------- *)
@@ -640,7 +784,7 @@ Section FileClaim.
   Proof using . iIntros "Hw Hc". rewrite /f_state. iLeft. iFrame "Hw Hc". Qed.
 
   (* THE PREDICATE: tainted, or the four binaries are the image's AND the
-     console is in one of its states AND [f] is in the deed's state. *)
+     console is in one of its states AND the files are in the deed's state. *)
   Definition file_pred (c : file_fixed) (r : file_names) (av : aview) : iProp Σ :=
     (file_taint c
      ∨ (⌜file_fs_pure av⌝ ∗ cons_state (fn_cons r) av ∗ f_state c r av))%I.
@@ -827,8 +971,8 @@ Section FileClaim.
     - iRight. iRight. iRight. iFrame "Htok Hseal". iPureIntro. by apply Hab.
   Qed.
 
-  (* the file's state is carried across a move that leaves [f] where it
-     was: init's console mknod, every open that creates nothing *)
+  (* the files' state is carried across a move that leaves them where they
+     were: init's console mknod, every open that creates nothing *)
   Lemma f_core_mono (c : file_fixed) (r : file_names) (av av' : aview) :
     (forall s, f_ok av s -> f_ok av' s) ->
     f_core c r av -∗ f_core c r av'.
@@ -852,7 +996,7 @@ Section FileClaim.
       by apply Hok.
   Qed.
 
-  (* THE FREE STEP: a move that touches neither the console nor [f] --
+  (* THE FREE STEP: a move that touches neither the console nor a file --
      what a step wand of [AppInv.app_step]'s shape is built from at every
      such fire, and what a CONSOLE step ([UInitCons]'s four) composes with
      through [file_pred_cons]. *)
@@ -1162,7 +1306,8 @@ Section FileClaim.
 
   (* at the map a boot founds its file system at, when the disk is mkfs's
      image: echo's era-0 claim (its console key beside it, unused here)
-     with [f] absent and the deed at [None] *)
+     with NO FILE of the class present -- law L4, the class is absent from
+     the image's root -- and the deed at the empty map *)
   Lemma file_init (c : file_fixed) (dk : Z -> bv 8)
       (D : gmap Z (list (bv 8))) (S : fs_state_rec) :
     fs_blocks dk = fsimg_P ->
@@ -1172,7 +1317,7 @@ Section FileClaim.
   Proof using .
     intros Hdk Hrec HS.
     iMod (echo_init c.1 dk D S Hdk Hrec HS) as (rc) "He".
-    iMod (fnames_alloc rc None) as (r) "(%Hrc & Hd1 & _ & Ht1 & _ & Ha1)".
+    iMod (fnames_alloc rc ∅) as (r) "(%Hrc & Hd1 & _ & Ht1 & _ & Ha1)".
     iModIntro. iExists r.
     iApply (file_pred_join with "[He]").
     { rewrite Hrc. iExact "He". }
@@ -1180,11 +1325,13 @@ Section FileClaim.
     { iPureIntro. exact (file_fs_era0 dk D S Hdk Hrec HS). }
     rewrite /f_state. iLeft. iSplitL "Ha1".
     { rewrite /f_esc_wrap. iExists []. iFrame "Ha1". rewrite /esc_recs //. }
-    rewrite /f_core. iLeft. iExists None.
+    rewrite /f_core. iLeft. iExists ∅.
     iSplitL "Hd1"; [ iExact "Hd1" |].
     iSplitL "Ht1"; [ iExact "Ht1" |].
-    iSplitR; [ by rewrite /f_typed |].
-    iPureIntro. exact (era0_recovery_f_absent dk D S Hdk Hrec HS).
+    iSplitR; [ iApply f_typed_empty |].
+    iPureIntro. apply f_ok_empty. intros N HN.
+    exact (era0_recovery_class_absent FileDisc.uname dk D S N uname_laws
+             Hdk Hrec HS HN).
   Qed.
 
   (* ...at the theorem's own literal shape ([App.xv6_app_adequacy]'s

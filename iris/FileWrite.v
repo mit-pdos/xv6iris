@@ -118,6 +118,7 @@ Require Import EchoDisc.           (* [line_ok] *)
 Require Import EchoOut.            (* [echoOutG] *)
 Require Import FileState.          (* [fstate], [echo_chunks], [subseq], [sel_ok] *)
 Require Import AppFile.
+Require FileDeltas.                (* [f_ok_write_at]: the per-name legs *)
 Require Import UserOff.            (* [uoff] -- THE PROGRAM'S HALF *)
 Require Import FsAbsWriteFire.     (* [awrite_full_adv] -- the advanced node *)
 Local Open Scope Z_scope.
@@ -233,19 +234,6 @@ Qed.
 (*  3.  [f]'s ROW UNDER THE WRITE, AND THE SPLICE AT THE END              *)
 (* ===================================================================== *)
 
-(* THE ONE LEMMA lane F-OPEN's [FileDeltas.v] will own (it is not on this
-   branch yet, so it is proved here): a write at the inum [f]'s name
-   resolves to moves [f]'s state by the splice, and moves nothing else. *)
-Lemma f_ok_delta_write (av : aview) (i : Z) (off : nat)
-    (new bs0 : list (bv 8)) :
-  f_ok av (Some (i, bs0)) ->
-  f_ok (delta_write i off new av) (Some (i, blk_splice off new bs0)).
-Proof.
-  intros (Hst0 & Hrow). split.
-  - by rewrite delta_write_astep.
-  - by rewrite (delta_write_lookup av i off new bs0 1%nat Hrow).
-Qed.
-
 (* AT THE END OF THE FILE the splice IS the append -- which is the whole
    of what the offset equation buys. *)
 Lemma blk_splice_end (off : nat) (sub bs : list (bv 8)) :
@@ -302,14 +290,17 @@ Section FileWrite.
      ledger's lower bound -- or the taint, which is what a move somebody
      else did not pay leaves behind.  [AppTree]'s [TreeMove.tree_wq] with
      the owner's subtree replaced by the deed's CONTENT. *)
-  Definition file_wq (c : file_fixed) (r : file_names) (i : Z) (ws : wordline)
-      (sel : list nat) (off : nat) : iProp Σ :=
-    ((∃ ls : list wordline,
-        fown r (Some (i, subseq (echo_chunks ws) sel))
+  (* THE DEED IS THE MAP [s] WITH THE LINE'S FILE [N] AT THE CONTENT
+     WRITTEN SO FAR (cut W2): every other file is carried in [s] untouched
+     by the writes, and the line the chunks come from is typed at [N]. *)
+  Definition file_wq (c : file_fixed) (r : file_names) (N : fname) (s : dst)
+      (i : Z) (ws : wordline) (sel : list nat) (off : nat) : iProp Σ :=
+    ((∃ ls : list fwline,
+        fown r (<[N := (i, subseq (echo_chunks ws) sel)]> s)
         ∗ ⌜off = length (subseq (echo_chunks ws) sel)⌝
         ∗ ⌜EchoDisc.line_ok ws⌝
         ∗ ⌜sel_ok (echo_chunks ws) sel⌝
-        ∗ fl_lb c ls ∗ ⌜ws ∈ ls⌝)
+        ∗ fl_lb c ls ∗ ⌜(N, ws) ∈ ls⌝)
      ∨ file_taint c)%I.
 
   (* the tainted fire's step, [TreeMove.tree_app_step_taint]'s twin *)
@@ -365,13 +356,13 @@ Section FileWrite.
      a caller holding the open's receipt discharges them once, since a
      freshly created [f] is at an inum none of the four names. *)
   Lemma file_awrite_phases (γfs : fs_names) (c : file_fixed) (r : file_names)
-      (i : Z) (ws : wordline) (sel : list nat) (jx : nat) (off offk : nat)
+      (N : fname) (s : dst) (i : Z) (ws : wordline) (sel : list nat) (jx : nat) (off offk : nat)
       (I : gmap Z fs_node) (bs bs0 : list (bv 8)) (nl : nat) :
     file_app = MkAppcfg file_names (file_pred c) r ->
     (* the fire's own premise, as [FsAbsWriteFire.awrite_full_at] hands it *)
     wri_pre (abs_view I) i offk bs bs0 nl ->
-    (* PREMISE 1 -- THE NODE EQUATION: the row the fire is at IS [f]'s *)
-    astep (abs_view I) FsImg.ROOTINO fname_f = Some i ->
+    (* PREMISE 1 -- THE NODE EQUATION: the row the fire is at IS [N]'s *)
+    astep (abs_view I) FsImg.ROOTINO N = Some i ->
     (* PREMISE 2 -- THE OFFSET EQUATION: the held offset's tie *)
     offk = off ->
     (* PREMISE 3 -- THE CHUNK EQUATION: the bytes that land ARE chunk [jx] *)
@@ -380,7 +371,7 @@ Section FileWrite.
     Forall (fun k => (k < jx)%nat) sel ->
     (* PREMISE 4 -- [f] is not one of the four pinned binaries *)
     i <> INIT_INO -> i <> SH_INO -> i <> ECHO_INO -> i <> CAT_INO -> i <> GREP_INO ->
-    app_inv γfs -∗ file_wq c r i ws sel off -∗
+    app_inv γfs -∗ file_wq c r N s i ws sel off -∗
     ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I ={appE}=∗
       ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I ∗
       app_step i I (delta_write i offk bs (abs_view I)) ∗
@@ -388,7 +379,7 @@ Section FileWrite.
          ⌜abs_view I' = delta_write i offk bs (abs_view I)⌝ -∗
          ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I' ={appE}=∗
          ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I' ∗
-         file_wq c r i ws (sel ++ [jx]) (off + length bs)).
+         file_wq c r N s i ws (sel ++ [jx]) (off + length bs)).
   Proof using .
     intros Heq Hpre Hnode Hoffk Hbs Hjx Hlt Hi1 Hi2 Hi3 Hi4 Hi5. subst offk.
     iIntros "#Hinv Hq Hka".
@@ -400,19 +391,22 @@ Section FileWrite.
       iIntros (I') "%Hav Hka'". iModIntro. iFrame "Hka'".
       rewrite /file_wq. by iRight. }
     iDestruct "Hq" as (ls) "([Hd Htk] & %Hoff & %Hline & %Hsel & #Hlb & %Hin)".
-    iMod (file_claim_read γfs c r (Some (i, subseq (echo_chunks ws) sel)) I Heq
-            with "Hinv Hd Hka") as "(Hka & Hd & [[%Hok _] | #HT])"; last first.
+    set (s0 := <[N := (i, subseq (echo_chunks ws) sel)]> s).
+    iMod (file_claim_read γfs c r s0 I Heq
+            with "Hinv Hd Hka") as "(Hka & Hd & [[%Hok #Hty] | #HT])"; last first.
     { (* the claim is tainted: pay the step off the taint *)
       iModIntro. iFrame "Hka". iSplitR.
       { iApply (file_app_step_taint c r i I _ Heq). iExact "HT". }
       iIntros (I') "%Hav Hka'". iModIntro. iFrame "Hka'".
       rewrite /file_wq. by iRight. }
-    (* THE EXACT ARM: the deed's content IS the row the fire is at *)
+    (* THE EXACT ARM: the deed's content at [N] IS the row the fire is at *)
+    assert (Hs0N : s0 !! N = Some (i, subseq (echo_chunks ws) sel))
+      by (rewrite /s0; apply lookup_insert).
     destruct Hpre as (Hrow & Hpos & Hle & Hcap).
-    destruct Hok as (Hst0 & Hrow0).
+    destruct (f_ok_pin _ s0 N i _ Hok Hs0N) as (Hst0 & Hrow0).
     pose proof (arow_at_pinned (abs_view I) i _ _ Hrow Hrow0) as Hab.
     injection Hab as Hbs0 Hnl. subst bs0. clear Hnl.
-    (* the offset equation, cashed: the fire is at the END of [f] *)
+    (* the offset equation, cashed: the fire is at the END of [N] *)
     assert (Hend : blk_splice off bs (subseq (echo_chunks ws) sel)
                    = subseq (echo_chunks ws) sel ++ bs)
       by exact (blk_splice_end off bs _ Hoff).
@@ -421,37 +415,36 @@ Section FileWrite.
       by (rewrite subseq_snoc; by rewrite Hbs).
     assert (Hselok : sel_ok (echo_chunks ws) (sel ++ [jx]))
       by exact (sel_ok_snoc _ sel jx Hsel Hjx Hlt).
-    (* the step's own obligations *)
-    assert (Hstep : f_ok (abs_view I) (Some (i, subseq (echo_chunks ws) sel)) ->
-                    f_ok (delta_write i off bs (abs_view I))
-                      (Some (i, subseq (echo_chunks ws) (sel ++ [jx])))).
-    { intros Hok. rewrite Hsnoc -Hend.
-      exact (f_ok_delta_write (abs_view I) i off bs _ Hok). }
-    iAssert (f_typed c (Some (i, subseq (echo_chunks ws) (sel ++ [jx]))))%I
-      as "#Hty'".
-    { iApply (f_typed_some c ls ws (sel ++ [jx]) i Hin Hline Hselok). iExact "Hlb". }
+    set (s1 := <[N := (i, subseq (echo_chunks ws) (sel ++ [jx]))]> s).
+    assert (Hs01 : <[N := (i, subseq (echo_chunks ws) (sel ++ [jx]))]> s0 = s1)
+      by (rewrite /s0 /s1; apply insert_insert).
+    (* the step's own obligations: the write at [N]'s own inum, every
+       other file carried by the map's inum distinctness *)
+    assert (Hstep : f_ok (abs_view I) s0 -> f_ok (delta_write i off bs (abs_view I)) s1).
+    { intros Hok'. rewrite -Hs01 Hsnoc -Hend.
+      exact (FileDeltas.f_ok_write_at N i off bs _ (abs_view I) s0 Hs0N Hok'). }
+    iAssert (f_typed c s1)%I as "#Hty'".
+    { rewrite -Hs01.
+      iApply (f_typed_some c s0 ls N ws (sel ++ [jx]) i
+                (f_ok_dom _ s0 N _ Hok Hs0N) Hin Hline Hselok
+                with "Hty Hlb"). }
     iModIntro. iFrame "Hka". iSplitL "Hd".
-    { iApply (file_app_step_park c r i I _
-                (Some (i, subseq (echo_chunks ws) sel))
-                (Some (i, subseq (echo_chunks ws) (sel ++ [jx]))) Heq
+    { iApply (file_app_step_park c r i I _ s0 s1 Heq
                 (file_fs_pure_write i off bs (abs_view I) Hi1 Hi2 Hi3 Hi4 Hi5)
                 (cons_absent_write i off bs (abs_view I))
                 (fun jc => cons_present_write jc i off bs (abs_view I))
                 Hstep with "Hd Hty'"). }
     (* PHASE 2 *)
     iIntros (I') "%Hav Hka'".
-    assert (Hokpost : f_ok (abs_view I')
-                        (Some (i, subseq (echo_chunks ws) (sel ++ [jx])))).
-    { rewrite Hav. apply Hstep. split; [exact Hst0 | exact Hrow0]. }
-    assert (Hne : (Some (i, subseq (echo_chunks ws) sel) : dst)
-                  <> Some (i, subseq (echo_chunks ws) (sel ++ [jx]))).
-    { intros Hc. injection Hc as Hc. rewrite Hsnoc in Hc.
+    assert (Hokpost : f_ok (abs_view I') s1) by (rewrite Hav; exact (Hstep Hok)).
+    assert (Hne : s0 <> s1).
+    { intros Hc. apply (f_equal (fun m : dst => m !! N)) in Hc.
+      rewrite /s0 /s1 !lookup_insert in Hc. injection Hc as Hc. rewrite Hsnoc in Hc.
       assert (Hl : length (subseq (echo_chunks ws) sel)
                    = length (subseq (echo_chunks ws) sel ++ bs))
         by (by rewrite -Hc).
       rewrite length_app in Hl. lia. }
-    iMod (file_resync γfs c r (Some (i, subseq (echo_chunks ws) sel))
-            (Some (i, subseq (echo_chunks ws) (sel ++ [jx]))) I' appE
+    iMod (file_resync γfs c r s0 s1 I' appE
             ltac:(set_solver) Heq (f_ok_fcontent _ _ Hokpost) Hne
             with "Hinv Htk [Hka']") as "[Hka' Hout]".
     { rewrite /fs_gamma_L /=. iExact "Hka'". }
@@ -477,7 +470,7 @@ Section FileWrite.
   (*  chain is that lemma under [awrite_chain]'s induction and nothing     *)
   (*  else.  WHO OWES WHICH is written at each arrow.                      *)
   (* =================================================================== *)
-  Definition file_awrite_full_anchored (γfs : fs_names) (i : Z) (γo : gname)
+  Definition file_awrite_full_anchored (γfs : fs_names) (N : fname) (i : Z) (γo : gname)
       (M : gmap Z (bv 8)) (ua : mword 64) (nn : Z) (k : nat)
       (off0 : nat) (REST : iProp Σ) : iProp Σ :=
     (∀ (I : gmap Z fs_node) (off : nat) (bs bs0 : list (bv 8)) (nl : nat),
@@ -494,7 +487,7 @@ Section FileWrite.
           [f]'s INUM; today its [Some] arm quantifies it existentially, so
           a deed holder cannot say that the row its descriptor is on is
           [f]'s). *)
-       ⌜astep (abs_view I) FsImg.ROOTINO fname_f = Some i⌝ -∗
+       ⌜astep (abs_view I) FsImg.ROOTINO N = Some i⌝ -∗
        (* RELAY 2 -- THE KERNEL OWES THIS ONE: the anchored offset
           (design/user-write.md section 3c), which the held branch of
           [SpecFilewrite.filewrite_in] can relay off
@@ -527,7 +520,7 @@ Section FileWrite.
      which is the premise [file_awrite_phases] takes and the whole of what
      RELAY 3 was for. *)
   Lemma file_awrite_node (γfs : fs_names) (c : file_fixed) (r : file_names)
-      (i : Z) (ws : wordline) (sel : list nat) (jx : nat) (off : nat)
+      (N : fname) (s : dst) (i : Z) (ws : wordline) (sel : list nat) (jx : nat) (off : nat)
       (γo : gname) (M : gmap Z (bv 8)) (ua : mword 64) (nn : Z) (k : nat) :
     file_app = MkAppcfg file_names (file_pred c) r ->
     (jx < length (echo_chunks ws))%nat ->
@@ -536,9 +529,9 @@ Section FileWrite.
     ubytes_at M (add_vec_int ua (FW_MAX * Z.of_nat k))
       (echo_chunks ws !!! jx) ->
     Z.of_nat (length (echo_chunks ws !!! jx)) = wchunk_at nn k ->
-    app_inv γfs -∗ file_wq c r i ws sel off -∗
-    file_awrite_full_anchored γfs i γo M ua nn k off
-      (file_wq c r i ws (sel ++ [jx])
+    app_inv γfs -∗ file_wq c r N s i ws sel off -∗
+    file_awrite_full_anchored γfs N i γo M ua nn k off
+      (file_wq c r N s i ws (sel ++ [jx])
          (off + length (echo_chunks ws !!! jx))).
   Proof using .
     intros Heq Hjx Hlt Hi1 Hi2 Hi3 Hi4 Hi5 Hbsk Hlenk. iIntros "#Hinv Hq".
@@ -549,7 +542,7 @@ Section FileWrite.
     assert (Hbs : bs = echo_chunks ws !!! jx).
     { apply (ubytes_at_inj M (add_vec_int ua (FW_MAX * Z.of_nat k))
                bs (echo_chunks ws !!! jx) Hby Hbsk). lia. }
-    iMod (file_awrite_phases γfs c r i ws sel jx off off1 I bs bs0 nl
+    iMod (file_awrite_phases γfs c r N s i ws sel jx off off1 I bs bs0 nl
             Heq Hpre Hnode Hoff Hbs Hjx Hlt Hi1 Hi2 Hi3 Hi4 Hi5
             with "Hinv Hq Hka") as "(Hka & Hstep & Hph2)".
     iModIntro. iFrame "Hka Hstep". iIntros (I') "%Hav Hka'".
@@ -574,30 +567,30 @@ Section FileWrite.
   (*  content's length; or TAINTED, and then the half is wherever the      *)
   (*  hijacker left it.                                                    *)
   (* =================================================================== *)
-  Definition file_cur (c : file_fixed) (r : file_names) (i : Z)
-      (ws : wordline) (sel : list nat) (γo : gname) : iProp Σ :=
-    ((file_wq c r i ws sel (length (subseq (echo_chunks ws) sel))
+  Definition file_cur (c : file_fixed) (r : file_names) (N : fname) (s : dst)
+      (i : Z) (ws : wordline) (sel : list nat) (γo : gname) : iProp Σ :=
+    ((file_wq c r N s i ws sel (length (subseq (echo_chunks ws) sel))
       ∗ uoff γo (length (subseq (echo_chunks ws) sel)))
      ∨ (file_taint c ∗ ∃ p : nat, uoff γo p))%I.
 
   (* the two introductions, so a consumer never unfolds the pipe *)
-  Lemma file_cur_fired (c : file_fixed) (r : file_names) (i : Z)
+  Lemma file_cur_fired (c : file_fixed) (r : file_names) (N : fname) (s : dst) (i : Z)
       (ws : wordline) (sel : list nat) (γo : gname) :
-    file_wq c r i ws sel (length (subseq (echo_chunks ws) sel)) -∗
+    file_wq c r N s i ws sel (length (subseq (echo_chunks ws) sel)) -∗
     uoff γo (length (subseq (echo_chunks ws) sel)) -∗
-    file_cur c r i ws sel γo.
+    file_cur c r N s i ws sel γo.
   Proof using . iIntros "Hq Hu". iLeft. iFrame "Hq Hu". Qed.
 
-  Lemma file_cur_taint (c : file_fixed) (r : file_names) (i : Z)
+  Lemma file_cur_taint (c : file_fixed) (r : file_names) (N : fname) (s : dst) (i : Z)
       (ws : wordline) (sel : list nat) (γo : gname) (p : nat) :
-    file_taint c -∗ uoff γo p -∗ file_cur c r i ws sel γo.
+    file_taint c -∗ uoff γo p -∗ file_cur c r N s i ws sel γo.
   Proof using . iIntros "#Ht Hu". iRight. iFrame "Ht". by iExists p. Qed.
 
   (* ...and the half is there on EITHER arm, which is what the node needs
      to read the position it is being fired at. *)
-  Lemma file_cur_half (c : file_fixed) (r : file_names) (i : Z)
+  Lemma file_cur_half (c : file_fixed) (r : file_names) (N : fname) (s : dst) (i : Z)
       (ws : wordline) (sel : list nat) (γo : gname) :
-    file_cur c r i ws sel γo -∗ ∃ p : nat, uoff γo p.
+    file_cur c r N s i ws sel γo -∗ ∃ p : nat, uoff γo p.
   Proof using .
     iIntros "[[_ Hu] | [_ Hu]]"; [ by iExists _ | iExact "Hu" ].
   Qed.
@@ -618,7 +611,7 @@ Section FileWrite.
      moves both halves at once, since the node holds both), which is the
      whole of what a held descriptor's write costs the kernel. *)
   Lemma file_awrite_node_adv (γfs : fs_names) (c : file_fixed)
-      (r : file_names) (i : Z) (ws : wordline) (sel : list nat) (jx : nat)
+      (r : file_names) (N : fname) (s : dst) (i : Z) (ws : wordline) (sel : list nat) (jx : nat)
       (γo : gname) (M : gmap Z (bv 8)) (ua : mword 64) (nn : Z) (k : nat) :
     file_app = MkAppcfg file_names (file_pred c) r ->
     (jx < length (echo_chunks ws))%nat ->
@@ -628,9 +621,9 @@ Section FileWrite.
       (echo_chunks ws !!! jx) ->
     Z.of_nat (length (echo_chunks ws !!! jx)) = wchunk_at nn k ->
     □ (app_taint -∗ file_taint c) -∗
-    app_inv γfs -∗ file_cur c r i ws sel γo -∗
+    app_inv γfs -∗ file_cur c r N s i ws sel γo -∗
     awrite_full_adv (fs_gamma_L γfs) appE i γo M ua nn k
-      (file_cur c r i ws (sel ++ [jx]) γo).
+      (file_cur c r N s i ws (sel ++ [jx]) γo).
   Proof using .
     intros Heq Hjx Hlt Hi1 Hi2 Hi3 Hi4 Hi5 Hbsk Hlenk.
     iIntros "#Hbr #Hinv Hcur". rewrite /awrite_full_adv.
@@ -680,7 +673,7 @@ Section FileWrite.
       iSplitL "Hk"; [ by iApply off_link_of | ].
       iApply (file_cur_taint with "HTf Hu"). }
     iDestruct "Hq" as (ls) "([Hd Htk] & %Hoff0 & %Hline & %Hsel & #Hlb & %Hin)".
-    iMod (file_claim_read γfs c r (Some (i, subseq (echo_chunks ws) sel)) I Heq
+    iMod (file_claim_read γfs c r (<[N := (i, subseq (echo_chunks ws) sel)]> s) I Heq
             with "Hinv Hd Hka") as "(Hka & Hd & [[%Hok _] | #HTf])"; last first.
     { (* the claim is tainted: same answer, off the claim's own taint *)
       iMod (uoff_advance γo off (length bs) with "Hu Hk") as "[Hk Hu]".
@@ -689,13 +682,13 @@ Section FileWrite.
       iIntros (I') "%Hav Hka'". iModIntro. iFrame "Hka'".
       iSplitL "Hk"; [ by iApply off_link_of | ].
       iApply (file_cur_taint with "HTf Hu"). }
-    destruct Hok as [Hnode _].
+    destruct (f_ok_pin _ _ N i _ Hok (lookup_insert _ _ _)) as [Hnode _].
     (* the cursor goes back together for the phase lemma *)
-    iAssert (file_wq c r i ws sel off) with "[Hd Htk]" as "Hq".
+    iAssert (file_wq c r N s i ws sel off) with "[Hd Htk]" as "Hq".
     { rewrite /file_wq. iLeft. iExists ls. iFrame "Hd Htk Hlb".
       iPureIntro. split_and!; [ exact Hoff | exact Hline | exact Hsel
                               | exact Hin ]. }
-    iMod (file_awrite_phases γfs c r i ws sel jx off off I bs bs0 nl
+    iMod (file_awrite_phases γfs c r N s i ws sel jx off off I bs bs0 nl
             Heq Hpre Hnode eq_refl Hbs Hjx Hlt Hi1 Hi2 Hi3 Hi4 Hi5
             with "Hinv Hq Hka") as "(Hka & Hstep & Hph2)".
     iMod (uoff_advance γo off (length bs) with "Hu Hk") as "[Hk Hu]".

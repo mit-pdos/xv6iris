@@ -234,21 +234,31 @@ Proof using.
   exact (line_ok_head_byte0 ws Hok).
 Qed.
 
-(* THE [cat f] PIPELINE'S LINE PREDICATE (cut C9f2): the loop's typed
-   line [cat f | cat | ... | cat] at the one user file *)
+(* THE [cat N] PIPELINE'S LINE PREDICATE (cut C9f2; at any name of the
+   class, cut W3): the loop's typed line [cat N | cat | ... | cat] *)
 Definition pipes_lpc (wsf : list (list (bv 8))) (gf : nat -> bv 8) (k len : nat) : Prop :=
-  exists n : nat,
-    wsf = FileDisc.uline_ws (FileDisc.LPipe (FileDisc.PrCatF FileDisc.fname_f) (FileDisc.cats n))
-    /\ UkSh.ush_line_at (FileDisc.LPipe (FileDisc.PrCatF FileDisc.fname_f) (FileDisc.cats n)) gf k len.
+  exists (nm : list (bv 8)) (n : nat),
+    FileDisc.uname nm
+    /\ wsf = FileDisc.uline_ws (FileDisc.LPipe (FileDisc.PrCatF nm) (FileDisc.cats n))
+    /\ UkSh.ush_line_at (FileDisc.LPipe (FileDisc.PrCatF nm) (FileDisc.cats n)) gf k len.
 
-Lemma pipes_lpc_of_at (n : nat) (f : nat -> bv 8) (k len : nat) :
-  UkSh.ush_line_at (FileDisc.LPipe (FileDisc.PrCatF FileDisc.fname_f) (FileDisc.cats n)) f k len ->
-  pipes_lpc (FileDisc.uline_ws (FileDisc.LPipe (FileDisc.PrCatF FileDisc.fname_f) (FileDisc.cats n)))
+Lemma pipes_lpc_of_at (nm : list (bv 8)) (n : nat) (f : nat -> bv 8) (k len : nat) :
+  FileDisc.uname nm ->
+  UkSh.ush_line_at (FileDisc.LPipe (FileDisc.PrCatF nm) (FileDisc.cats n)) f k len ->
+  pipes_lpc (FileDisc.uline_ws (FileDisc.LPipe (FileDisc.PrCatF nm) (FileDisc.cats n)))
     (fun j : nat => f (k + j)) 0 len.
 Proof using.
-  intros (Hok & Hlen & Hby). exists n. split; [reflexivity |].
+  intros Hu (Hok & Hlen & Hby). exists nm, n. split; [exact Hu |]. split; [reflexivity |].
   split; [exact Hok |]. split; [exact Hlen |].
   intros j Hj. rewrite Nat.add_0_l. exact (Hby j Hj).
+Qed.
+
+(* the producer [cat N]'s body, at a name of any length *)
+Lemma catf_body_len (nm : list (bv 8)) :
+  length (wl_body (FileDisc.prod_words (FileDisc.PrCatF nm))) = 4 + length nm.
+Proof using.
+  unfold FileDisc.prod_words, wl_body. cbn [wl_tail]. rewrite app_nil_r length_app.
+  cbn [length]. change (length FileDisc.fd_w_cat) with 3. lia.
 Qed.
 
 (* its first two bytes are [c] and [a], so the loop's [cd] test falls out
@@ -257,14 +267,13 @@ Lemma pipes_lpc_bytes (wsf : list (list (bv 8))) (gf : nat -> bv 8) (k len : nat
   pipes_lpc wsf gf k len ->
   bv_unsigned (gf k) = 99%Z /\ bv_unsigned (gf (k + 1)) = 97%Z /\ 2 <= len.
 Proof using.
-  intros (n & _ & _ & Hlen & Hby).
-  assert (Hb : length (wl_body (FileDisc.prod_words (FileDisc.PrCatF FileDisc.fname_f))) = 5)
-    by (vm_compute; reflexivity).
+  intros (nm & n & _ & _ & _ & Hlen & Hby).
+  pose proof (catf_body_len nm) as Hb.
   rewrite line_bytes_pipe_length_p Hb in Hlen.
   split_and!; [| | lia].
-  - rewrite -(Nat.add_0_r k) (Hby 0 ltac:(lia)) (pipe_bytes_lo_p (FileDisc.PrCatF FileDisc.fname_f) n 0 ltac:(lia)).
+  - rewrite -(Nat.add_0_r k) (Hby 0 ltac:(lia)) (pipe_bytes_lo_p (FileDisc.PrCatF nm) n 0 ltac:(lia)).
     by vm_compute.
-  - rewrite (Hby 1 ltac:(lia)) (pipe_bytes_lo_p (FileDisc.PrCatF FileDisc.fname_f) n 1 ltac:(lia)).
+  - rewrite (Hby 1 ltac:(lia)) (pipe_bytes_lo_p (FileDisc.PrCatF nm) n 1 ltac:(lia)).
     by vm_compute.
 Qed.
 
@@ -820,9 +829,10 @@ Definition pipes_lpg (wsf : list (list (bv 8))) (gf : nat -> bv 8) (k len : nat)
     /\ UkSh.ush_line_at (FileDisc.LPipe (FileDisc.PrEcho ws) fs) gf k len.
 
 Definition pipes_lpcg (wsf : list (list (bv 8))) (gf : nat -> bv 8) (k len : nat) : Prop :=
-  exists fs : list FileDisc.filt,
-    wsf = FileDisc.uline_ws (FileDisc.LPipe (FileDisc.PrCatF FileDisc.fname_f) fs)
-    /\ UkSh.ush_line_at (FileDisc.LPipe (FileDisc.PrCatF FileDisc.fname_f) fs) gf k len.
+  exists (nm : list (bv 8)) (fs : list FileDisc.filt),
+    FileDisc.uname nm
+    /\ wsf = FileDisc.uline_ws (FileDisc.LPipe (FileDisc.PrCatF nm) fs)
+    /\ UkSh.ush_line_at (FileDisc.LPipe (FileDisc.PrCatF nm) fs) gf k len.
 
 Lemma pipes_lp_g (wsf : list (list (bv 8))) (gf : nat -> bv 8) (k len : nat) :
   pipes_lp wsf gf k len -> pipes_lpg wsf gf k len.
@@ -830,7 +840,7 @@ Proof using. intros (ws & n & H). exists ws, (FileDisc.cats n). exact H. Qed.
 
 Lemma pipes_lpc_g (wsf : list (list (bv 8))) (gf : nat -> bv 8) (k len : nat) :
   pipes_lpc wsf gf k len -> pipes_lpcg wsf gf k len.
-Proof using. intros (n & H). exists (FileDisc.cats n). exact H. Qed.
+Proof using. intros (nm & n & H). exists nm, (FileDisc.cats n). exact H. Qed.
 
 (* below the first bar the line's bytes are the producer's, at any stage
    list *)
@@ -860,15 +870,14 @@ Lemma pipes_lpcg_bytes (wsf : list (list (bv 8))) (gf : nat -> bv 8) (k len : na
   pipes_lpcg wsf gf k len ->
   bv_unsigned (gf k) = 99%Z /\ bv_unsigned (gf (k + 1)) = 97%Z /\ 2 <= len.
 Proof using.
-  intros (fs & _ & _ & Hlen & Hby).
-  assert (Hb : length (wl_body (FileDisc.prod_words (FileDisc.PrCatF FileDisc.fname_f))) = 5)
-    by (vm_compute; reflexivity).
+  intros (nm & fs & _ & _ & _ & Hlen & Hby).
+  pose proof (catf_body_len nm) as Hb.
   rewrite line_bytes_pipe_length_fs Hb in Hlen.
   split_and!; [| | lia].
   - rewrite -(Nat.add_0_r k) (Hby 0 ltac:(lia))
-      (pipe_bytes_lo_fs (FileDisc.PrCatF FileDisc.fname_f) fs 0 ltac:(lia)).
+      (pipe_bytes_lo_fs (FileDisc.PrCatF nm) fs 0 ltac:(lia)).
     by vm_compute.
-  - rewrite (Hby 1 ltac:(lia)) (pipe_bytes_lo_fs (FileDisc.PrCatF FileDisc.fname_f) fs 1 ltac:(lia)).
+  - rewrite (Hby 1 ltac:(lia)) (pipe_bytes_lo_fs (FileDisc.PrCatF nm) fs 1 ltac:(lia)).
     by vm_compute.
 Qed.
 
@@ -881,12 +890,13 @@ Proof using.
   intros j Hj. rewrite Nat.add_0_l. exact (Hby j Hj).
 Qed.
 
-Lemma pipes_lpcg_of_at (fs : list FileDisc.filt) (f : nat -> bv 8) (k len : nat) :
-  UkSh.ush_line_at (FileDisc.LPipe (FileDisc.PrCatF FileDisc.fname_f) fs) f k len ->
-  pipes_lpcg (FileDisc.uline_ws (FileDisc.LPipe (FileDisc.PrCatF FileDisc.fname_f) fs))
+Lemma pipes_lpcg_of_at (nm : list (bv 8)) (fs : list FileDisc.filt) (f : nat -> bv 8) (k len : nat) :
+  FileDisc.uname nm ->
+  UkSh.ush_line_at (FileDisc.LPipe (FileDisc.PrCatF nm) fs) f k len ->
+  pipes_lpcg (FileDisc.uline_ws (FileDisc.LPipe (FileDisc.PrCatF nm) fs))
     (fun j : nat => f (k + j)) 0 len.
 Proof using.
-  intros (Hok & Hlen & Hby). exists fs. split; [reflexivity |].
+  intros Hu (Hok & Hlen & Hby). exists nm, fs. split; [exact Hu |]. split; [reflexivity |].
   split; [exact Hok |]. split; [exact Hlen |].
   intros j Hj. rewrite Nat.add_0_l. exact (Hby j Hj).
 Qed.

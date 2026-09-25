@@ -67,6 +67,7 @@ Require Import FsAbsDelta.         (* [cre_pre] / [delta_arm] / [delta_unarm] *)
 Require Import ConsoleInv.         (* [CONSOLE] *)
 Require Import FsConsPin.
 Require Import FsImgCheck.        (* [fname_f] *)
+Require FileDisc.                 (* the class [FileDisc.uname] *)
 Require Import FsFPin.            (* [f_absent] *)
 Require Import EchoFsPure.
 Require Import FileFsPure.
@@ -154,7 +155,7 @@ Section UInitConsFile.
   Proof using .
     intros Hroot Hrow Hcn Hp.
     assert (Hne : forall (nm : fname) (ino : Z) (bs : list (bv 8)),
-              FileDeltas.node_pin nm ino (MkAnode (AFile bs) 1%nat) av ->
+              node_pin nm ino (MkAnode (AFile bs) 1%nat) av ->
               i <> ino).
     { intros nm ino bs Hpin Hij. destruct Hpin as (_ & Hr).
       rewrite Hij in Hrow. rewrite Hrow in Hr.
@@ -180,12 +181,13 @@ Section UInitConsFile.
   Proof using .
     intros Hfree Hp0 Hrow Hcn Hsep.
     pose proof (echo_fs_pure_unarm_root av0 i Hfree Hp0) as Hroot.
-    (* ...AND THE DEED IS NOT THIS ROW: [f_ok av (Some (j, bs))] pins
+    (* ...AND NO FILE IS THIS ROW: [f_ok av s] pins each entry's
        [av !! j] at a FILE node and the unarmed row is a DEVICE. *)
     assert (Hdeed : forall s : dst,
               f_ok av s ->
-              forall (j : Z) (bs : list (bv 8)), s = Some (j, bs) -> i <> j).
-    { intros s Hok j bs Hs. subst s. destruct Hok as (_ & Hrj).
+              forall (N : fname) (j : Z) (bs : list (bv 8)),
+                s !! N = Some (j, bs) -> i <> j).
+    { intros s Hok N j bs Hs. destruct (f_ok_pin av s N j bs Hok Hs) as (_ & Hrj).
       intros Hij. subst j. rewrite Hrow in Hrj.
       injection Hrj as Hnode.
       rewrite Hcn in Hnode. discriminate Hnode. }
@@ -384,7 +386,7 @@ Section UInitConsFile.
       (ents : gmap fname Z) (nl : nat) (i : Z) :
     cre_pre av d nmn ents nl i cdev ->
     (d <> FsImg.ROOTINO \/ nmn <> fname_console) ->
-    (d <> FsImg.ROOTINO \/ nmn <> fname_f) ->
+    (d <> FsImg.ROOTINO \/ ~ FileDisc.uname nmn) ->
     file_pred (FileOut.fgn_cl g) r av -∗
     file_pred (FileOut.fgn_cl g) r (delta_create d nmn i cdev av).
   Proof using .
@@ -431,7 +433,7 @@ Section UInitConsFile.
           (nl : nat) (i : Z),
           ⌜cre_pre av d nmn ents nl i cdev⌝ -∗
           ⌜d <> FsImg.ROOTINO \/ nmn <> fname_console⌝ -∗
-          ⌜d <> FsImg.ROOTINO \/ nmn <> FsImgCheck.fname_f⌝ -∗
+          ⌜d <> FsImg.ROOTINO \/ ~ FileDisc.uname nmn⌝ -∗
           file_pred (FileOut.fgn_cl g) r av -∗
           file_pred (FileOut.fgn_cl g) r (delta_create d nmn i cdev av)))%I.
 

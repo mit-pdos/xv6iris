@@ -289,35 +289,31 @@ Section file_out.
 
   (* ---- THE TYPED WITNESS: what the deed's evidence for the era's boot
          state looks like once it is inside the claim ---- *)
-  (* the state holds the deed's one file alone (cut W1 of
-     claude-notes/design/filenames.md: the claim is at [f] until W2) *)
+  (* [AppFile.f_typed] at the contents: nothing at the empty state, one
+     lower bound of the ledger's line list typing every file at its own
+     name otherwise (cut W2 of claude-notes/design/filenames.md) *)
   Definition f0_typed (s : fstate) : iProp Σ :=
-    (⌜forall N c, s !! N = Some c -> N = fname_m⌝
-     ∗ match s !! fname_m with
-       | None => emp
-       | Some bs =>
-           (∃ ls : list wordline, fl_lb (fgn_cl g) ls ∗ ⌜f_bytes_typed ls bs⌝)%I
-       end)%I.
+    (⌜s = ∅⌝
+     ∨ ∃ ls : list fwline,
+         fl_lb (fgn_cl g) ls
+         ∗ ⌜map_Forall (fun N bs => uname N /\ f_bytes_typed ls N bs) s⌝)%I.
 
   Global Instance f0_typed_persistent s : Persistent (f0_typed s).
-  Proof using . rewrite /f0_typed. case_match; apply _. Qed.
+  Proof using . rewrite /f0_typed. apply _. Qed.
   Global Instance f0_typed_timeless s : Timeless (f0_typed s).
-  Proof using . rewrite /f0_typed. case_match; apply _. Qed.
+  Proof using . rewrite /f0_typed. apply _. Qed.
 
   Lemma f0_typed_none : ⊢ f0_typed ∅.
-  Proof using .
-    rewrite /f0_typed lookup_empty. iSplit; [| done].
-    iPureIntro. intros N c Hc. by rewrite lookup_empty in Hc.
-  Qed.
+  Proof using . rewrite /f0_typed. by iLeft. Qed.
 
   (* the deed's typed witness, as the ledger's *)
   Lemma f0_typed_of_f_typed (s : dst) : f_typed (fgn_cl g) s -∗ f0_typed (dst_content s).
   Proof using .
-    iIntros "Hty". destruct s as [[i bs] |]; cbn [dst_content fmap option_fmap option_map fst_of snd];
-      [| iApply f0_typed_none].
-    rewrite /f0_typed lookup_singleton. iSplit.
-    - iPureIntro. intros N c Hc. by apply lookup_singleton_Some in Hc as [-> _].
-    - iExact "Hty".
+    rewrite /f_typed /f0_typed. iIntros "[%He | (%ls & Hlb & %Hall)]".
+    { iLeft. iPureIntro. rewrite He. exact dst_content_empty. }
+    iRight. iExists ls. iFrame "Hlb". iPureIntro.
+    rewrite /dst_content. apply map_Forall_fmap. intros N p Hp.
+    exact (Hall N p Hp).
   Qed.
 
   (* ====================================================================== *)
@@ -412,7 +408,7 @@ Section file_out.
 
   (* THE LINE LIST the console has received, as a pure function of the
      history: the words of every complete [echo … > f] line, in order. *)
-  Definition efl_of (h : list mobs) : list wordline := snd <$> echof_lines_of h.
+  Definition efl_of (h : list mobs) : list fwline := echof_lines_of h.
 
   (* THE TAG: [EchoOut.etag] at the FILE discipline, with a lower bound of
      the ledger's line list beside it -- which is how a typed line reaches
@@ -543,8 +539,8 @@ Section file_out.
 
   Lemma efl_of_snoc (h : list mobs) (e : mobs) : efl_of h `prefix_of` efl_of (h ++ [e]).
   Proof using .
-    destruct (echof_lines_of_snoc h e) as [z Hz]. exists (snd <$> z).
-    by rewrite /efl_of Hz fmap_app.
+    destruct (echof_lines_of_snoc h e) as [z Hz]. exists z.
+    by rewrite /efl_of Hz.
   Qed.
 
   Lemma echof_lines_of_power (h : list mobs) (on : bool) :
@@ -650,32 +646,27 @@ Section file_out.
 
 
   (* the deed's typed witness, read against the ledger's own line list *)
-  Lemma f0_typed_adm (Lp : list (list (bv 8) * wordline)) (s0 : fstate) :
-    Forall (fun p => uname p.1) Lp ->
-    fl_auth (fgn_cl g) (snd <$> Lp) -∗ f0_typed s0 -∗
-      fl_auth (fgn_cl g) (snd <$> Lp) ∗ ⌜fadm_boot Lp s0⌝.
+  Lemma f0_typed_adm (Lp : list fwline) (s0 : fstate) :
+    fl_auth (fgn_cl g) Lp -∗ f0_typed s0 -∗
+      fl_auth (fgn_cl g) Lp ∗ ⌜fadm_boot Lp s0⌝.
   Proof using .
-    intros HN. iIntros "Ha [%Hdom Hty]".
-    rewrite (fst_of_dom s0 Hdom).
-    change fname_f with fname_m.
-    destruct (s0 !! fname_m) as [bs |]; last first.
-    { iFrame "Ha". iPureIntro. apply fadm_boot_fst_of; [exact HN | by left]. }
-    iDestruct "Hty" as (ls) "[Hlb %Hbt]".
+    iIntros "Ha [%He | (%ls & Hlb & %Hall)]".
+    { subst s0. iFrame "Ha". iPureIntro. apply fadm_boot_empty. }
     iDestruct (fl_lb_prefix with "Ha Hlb") as %Hpre.
-    iFrame "Ha". iPureIntro. apply fadm_boot_fst_of; [exact HN |]. right.
-    destruct (f_bytes_typed_mono ls _ bs Hpre Hbt)
+    iFrame "Ha". iPureIntro. intros N bs Hs.
+    destruct (f_bytes_typed_mono ls _ N bs Hpre (proj2 (Hall N bs Hs)))
       as (ws & sel & Hin & _ & Hsel & ->).
     by exists ws, sel.
   Qed.
 
   (* the line list grows by whatever the new input completed *)
-  Lemma fl_auth_grow_pre (ls ls' : list wordline) :
+  Lemma fl_auth_grow_pre (ls ls' : list fwline) :
     ls `prefix_of` ls' ->
     fl_auth (fgn_cl g) ls ==∗
       fl_auth (fgn_cl g) ls' ∗ fl_lb (fgn_cl g) ls'.
   Proof using .
     intros Hp. rewrite /f0f_auth. iIntros "Ha".
-    iMod (own_update _ _ (●ML (ls' : list (leibnizO wordline))) with "Ha")
+    iMod (own_update _ _ (●ML (ls' : list (leibnizO fwline))) with "Ha")
       as "Ha".
     { apply mono_list_update. by destruct Hp as [z ->]; exists z. }
     iModIntro. iApply (fl_auth_lb with "Ha").

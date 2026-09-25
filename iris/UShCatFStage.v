@@ -57,16 +57,18 @@ Require Import UkConsOut.
 Require Import UkPipesIface UkPipesEntries.
 Require Import PipesFire UShPipesDefs UShPipesStage UShExecPin.
 Require Import UkCatFIface UkCatFEntries.
-Require ExecWords UkShDiagAt FileDisc.
+Require ExecWords UkShDiagAt FileDisc UNamePath.
 Require User.ShSyms.
 Local Open Scope Z_scope.
 
-(* the producer's words at the one user file *)
-Lemma catf_ws_exec_ok : ExecWords.exec_ok (FileDisc.prod_words (PrCatF fname_f)).
-Proof using . apply (bool_decide_unpack _). vm_compute. exact Logic.I. Qed.
+(* the producer's words at any user file (cut W3) *)
+Lemma catf_ws_exec_ok (f : list (bv 8)) :
+  FileDisc.uname f -> ExecWords.exec_ok (FileDisc.prod_words (PrCatF f)).
+Proof using . exact (UNamePath.cat_words_exec_ok f). Qed.
 
-Lemma catf_ws_head : FileDisc.prod_words (PrCatF fname_f) !!! 0%nat = UShCatPay.cat_pl.
-Proof using . by vm_compute. Qed.
+Lemma catf_ws_head (f : list (bv 8)) :
+  FileDisc.prod_words (PrCatF f) !!! 0%nat = UShCatPay.cat_pl.
+Proof using . exact (UNamePath.cat_words_head f). Qed.
 
 (* the producer's two standard rows: fd 1 the first pipe's write end, fd 2
    the console *)
@@ -137,11 +139,12 @@ Section UShCatFStage.
   (* [UShEchoPipePay.sh_exec_sup_echo_pipe_of_entry] at cat's image: the
      entry at every image the exec can produce, the ledger fragment spent
      at the exec *)
-  Lemma sh_exec_sup_catf_of_entry (γp : pipe_names) (Qv Cr : iProp Σ) :
+  Lemma sh_exec_sup_catf_of_entry (f : list (bv 8)) (Hf : FileDisc.uname f)
+      (γp : pipe_names) (Qv Cr : iProp Σ) :
     □ (∀ (M : gmap Z (bv 8)) (s0 t : Z) (gn : nat -> bv 8)
          (sts : list fdstate) (cs : gset gname) (pidv : mword 32) (rb1 rb2 : bool),
-         ⌜UShEcho.echo_node_img (FileDisc.prod_words (PrCatF fname_f)) M s0 t gn⌝ -∗
-         ⌜UkShEcho.echo_argv_bytes (FileDisc.prod_words (PrCatF fname_f)) gn⌝ -∗
+         ⌜UShEcho.echo_node_img (FileDisc.prod_words (PrCatF f)) M s0 t gn⌝ -∗
+         ⌜UkShEcho.echo_argv_bytes (FileDisc.prod_words (PrCatF f)) gn⌝ -∗
          ⌜length sts = NOFILE⌝ -∗
          ⌜take NSTD sts !! 1%nat = Some (FdOpen rb1 true (FdPipe γp))⌝ -∗
          ⌜take NSTD sts !! 2%nat = Some (FdOpen rb2 true (FdDevice ConsoleInv.CONSOLE))⌝ -∗
@@ -151,7 +154,7 @@ Section UShCatFStage.
     □ (app_taint -∗ Qv) -∗
     UShCatPay.sh_cat_slot T -∗
     UkShEcho.sh_exec_sup_echo_at (SG := uexecSG_xv6) (catf_rows γp)
-      (FileDisc.prod_words (PrCatF fname_f)) (fun _ : Z => Qv) Cr.
+      (FileDisc.prod_words (PrCatF f)) (fun _ : Z => Qv) Cr.
   Proof using .
     iIntros "#Hent #Hkt (#Hinv & #Hcl & #Hgen)".
     rewrite /UkShEcho.sh_exec_sup_echo_at.
@@ -169,17 +172,17 @@ Section UShCatFStage.
     rewrite /uexec_sup_run.
     iIntros (M pm sz fdv chs pidv) "#Hnpw Hheap Hufd".
     iDestruct (UkRun.urun_rows_nopipe _ _ with "Hnpw") as "#Hnp0".
-    iAssert (⌜UShEcho.echo_node_img (FileDisc.prod_words (PrCatF fname_f)) M s0 t gn⌝)%I
+    iAssert (⌜UShEcho.echo_node_img (FileDisc.prod_words (PrCatF f)) M s0 t gn⌝)%I
       as %Himg.
-    { iApply (UShEcho.echo_node_img_of_cmd_x (FileDisc.prod_words (PrCatF fname_f)) _ _ _
-                M pm sz s0 t gn catf_ws_exec_ok with "Hheap Hcmd"). }
+    { iApply (UShEcho.echo_node_img_of_cmd_x (FileDisc.prod_words (PrCatF f)) _ _ _
+                M pm sz s0 t gn (catf_ws_exec_ok f Hf) with "Hheap Hcmd"). }
     iDestruct (ufd_auth_len with "Hufd") as %Hflen.
     iDestruct (ustd_agree (ukn_fd N') fdv ld with "Hufd Hstd") as %Hl.
     iFrame "Hheap Hufd".
     iSplitR "Hstd Hcr".
-    { iPureIntro. rewrite -catf_ws_head.
-      exact (UShEcho.sh_exec_path_of_x_holds (FileDisc.prod_words (PrCatF fname_f))
-               catf_ws_exec_ok M s0 t gn Himg Hbytes). }
+    { iPureIntro. rewrite -(catf_ws_head f).
+      exact (UShEcho.sh_exec_path_of_x_holds (FileDisc.prod_words (PrCatF f))
+               (catf_ws_exec_ok f Hf) M s0 t gn Himg Hbytes). }
     iSplitR "Hstd Hcr".
     { iApply (exec_walk_of_pin FsCatPin.era0_cat_pins T FsImg.ROOTINO
                 UShCatPay.cat_pl [FsImg.ROOTINO; FsCatPin.CAT_INO] FsCatPin.CAT_INO
@@ -298,13 +301,13 @@ Section UShCatFStage.
   (*  3.  THE PREMISE, PAID BY THE ENTRY                                 *)
   (* ================================================================= *)
 
-  Local Notation LEND qf sf γp ds :=
+  Local Notation LEND f qf sf γp ds :=
     (cif_catf_lend cf rf g LM PV CP v I sR lR L termw TOKN pdepR γc γm qf sf (P 0) γp (WLeft 0)
-       ds [cat_dg_open fname_f] ds [cat_dg_open fname_f] (fun _ : Z => QcR (fdq rf qf sf) 0)).
+       ds [cat_dg_open f] ds [cat_dg_open f] (fun _ : Z => QcR (fdq rf qf sf) 0)).
 
   (* the writer's kit at a diagnostic of [cat f], or at its report *)
-  Lemma catf_kit (s : list (bv 8)) (γp : pipe_names) :
-    pr = PrCatF fname_f -> (0 < nc)%nat -> s <> [] -> fire_src fcR pr (lfilts lR) L (WLeft 0) s ->
+  Lemma catf_kit (f s : list (bv 8)) (γp : pipe_names) :
+    pr = PrCatF f -> (0 < nc)%nat -> s <> [] -> fire_src fcR pr (lfilts lR) L (WLeft 0) s ->
     pipe_inv (P 0) γp L -∗ pkitR (WLeft 0) s.
   Proof using Hadmit Hfire HlR.
     intros Hpr Hn Hs Hf. iIntros "#Hpi".
@@ -319,21 +322,22 @@ Section UShCatFStage.
      report's deposit FROM the permit), the deed, the file's context, and
      the exit wand reading the producer device's final state into node 0's
      report *)
-  Lemma catf_lend_of (qf : Qp) (sf : dst) (γp : pipe_names) (ds : list (list (bv 8))) :
-    pr = PrCatF fname_f -> (0 < nc)%nat ->
-    (ds = [[]; cat_dg_write] /\ is_Some (fcR fname_f)) \/ ds = [[]] ->
+  Lemma catf_lend_of (f : list (bv 8)) (qf : Qp) (sf : dst) (γp : pipe_names)
+      (ds : list (list (bv 8))) :
+    pr = PrCatF f -> FileDisc.uname f -> (0 < nc)%nat ->
+    (ds = [[]; cat_dg_write] /\ is_Some (fcR f)) \/ ds = [[]] ->
     FAM -∗ □ (app_taint -∗ file_taint cf) -∗ □ (file_taint cf -∗ app_taint) -∗
     app_inv fsc_fs -∗ (∃ jo : option Z, file_cons_cred cf rf jo) -∗
-    □ (prod_crD γp (fdq rf qf sf) -∗ LEND qf sf γp ds).
+    □ (prod_crD γp (fdq rf qf sf) -∗ LEND f qf sf γp ds).
   Proof using Hadmit Hfire Hkill HlR.
-    intros Hpr Hn Hds. iIntros "#Hfam #Hbr #Hrb #Hai #Hcr".
+    intros Hpr Hf Hn Hds. iIntros "#Hfam #Hbr #Hrb #Hai #Hcr".
     iIntros "!> ((Hw & HsL & Hcw & Hmw) & #HGs & #Hpi & #Hlb & Hdq)".
     assert (Hw0 : WLeft 0 ∈ wsN) by (apply wids_elem; exact Hn).
-    assert (Hfo : fire_src fcR pr (lfilts lR) L (WLeft 0) (cat_dg_open fname_f)).
+    assert (Hfo : fire_src fcR pr (lfilts lR) L (WLeft 0) (cat_dg_open f)).
     { cbn [fire_src]. left. right. split; [reflexivity | by rewrite Hpr]. }
-    assert (Hfso : fail_src pr (lfilts lR) 0 (cat_dg_open fname_f)).
+    assert (Hfso : fail_src pr (lfilts lR) 0 (cat_dg_open f)).
     { right. split; [reflexivity | by rewrite Hpr]. }
-    iPoseProof (catf_kit (cat_dg_open fname_f) γp Hpr Hn (cat_dg_open_ne _) Hfo with "Hpi")
+    iPoseProof (catf_kit f (cat_dg_open f) γp Hpr Hn (cat_dg_open_ne _) Hfo with "Hpi")
       as "#Hko".
     rewrite /cif_catf_lend. iFrame "Hpi Hw Hlb Hdq Hbr Hrb Hai Hcr".
     iSplitL "Hcw Hmw".
@@ -343,7 +347,7 @@ Section UShCatFStage.
       iSplitR.
       { iPureIntro. split.
         - destruct Hds as [[-> _] | ->]; rewrite /cons_short; repeat constructor; vm_compute; lia.
-        - rewrite /cons_short; repeat constructor; vm_compute; lia. }
+        - rewrite /cons_short. constructor; [exact (UNamePath.catopen_short f Hf) | constructor]. }
       iSplitR; [iPureIntro; split; intros a Ha; exact Ha |].
       iSplitL.
       + destruct Hds as [[-> Hsome] | ->].
@@ -351,12 +355,12 @@ Section UShCatFStage.
           assert (Hfw : fire_src fcR pr (lfilts lR) L (WLeft 0) cat_dg_write).
           { cbn [fire_src]. right. split; [exact Hh | reflexivity]. }
           rewrite big_sepL_cons big_sepL_singleton. iSplitR; [by iLeft |]. iRight.
-          iSplitR; [iApply (catf_kit cat_dg_write γp Hpr Hn cat_dg_write_ne Hfw with "Hpi") |].
+          iSplitR; [iApply (catf_kit f cat_dg_write γp Hpr Hn cat_dg_write_ne Hfw with "Hpi") |].
           iApply (pdep_left_write LM PV sR lR L pr P gF gG 0 Hh with "[] HGs").
           rewrite /shotsF. done.
         * rewrite big_sepL_singleton. by iLeft.
       + rewrite big_sepL_singleton. iRight. iFrame "Hko". iIntros "!> Hw0".
-        rewrite (pdep_unfold LM PV sR lR L pr P gF gG (WLeft 0) (cat_dg_open fname_f)
+        rewrite (pdep_unfold LM PV sR lR L pr P gF gG (WLeft 0) (cat_dg_open f)
                    (cat_dg_open_ne _) (or_introl Hfso)) /pdep_ne.
         rewrite bool_decide_true; [| exact Hfso].
         iFrame "Hw0 HGs". rewrite /shotsF. done.
@@ -366,8 +370,8 @@ Section UShCatFStage.
       iDestruct "Hf" as "[[Hp Hcf] | (%x & %Hx & Hwf)]"; last first.
       { apply elem_of_list_singleton in Hx as ->.
         iRight. iLeft. iFrame "HsL".
-        iSplitL "Hdq"; [rewrite /lrd; iExact "Hdq" |]. rewrite /lrep. iExists (Some (cat_dg_open fname_f)).
-        iFrame "Hwf". iLeft. iPureIntro. by exists (cat_dg_open fname_f). }
+        iSplitL "Hdq"; [rewrite /lrd; iExact "Hdq" |]. rewrite /lrep. iExists (Some (cat_dg_open f)).
+        iFrame "Hwf". iLeft. iPureIntro. by exists (cat_dg_open f). }
       iDestruct "Hcf" as (o) "[_ Hwf]".
       iDestruct "Hp" as "[Hle | Hw0]"; last first.
       { iRight. iLeft. iFrame "HsL".
@@ -393,8 +397,8 @@ Section UShCatFStage.
      from the entry, at every pipe *)
   Lemma catf_stage_sup (f : list (bv 8)) (qf : Qp) (sf : dst) (ds : list (list (bv 8))) :
     pr = PrCatF f -> FileDisc.uname f -> (0 < nc)%nat ->
-    (snd <$> sf = Some L /\ fcR f = Some L /\ ds = [[]; cat_dg_write])
-    \/ (sf = None /\ ds = [[]]) ->
+    (snd <$> sf !! f = Some L /\ fcR f = Some L /\ ds = [[]; cat_dg_write])
+    \/ (sf !! f = None /\ ds = [[]]) ->
     FAM -∗ UShCatPay.sh_cat_slot T -∗
     □ (app_taint -∗ file_taint cf) -∗ □ (file_taint cf -∗ app_taint) -∗
     app_inv fsc_fs -∗ (∃ jo : option Z, file_cons_cred cf rf jo) -∗
@@ -403,31 +407,31 @@ Section UShCatFStage.
            (catf_rows γp) (FileDisc.prod_words (PrCatF f))
            (fun _ : Z => QcR (fdq rf qf sf) 0) (prod_crD γp (fdq rf qf sf))).
   Proof using HL31 Hadmit Hcons Heq Hext Hfc Hfire Hkill HlR Hplok Hsup cifRegG0.
-    intros Hpr Hf Hn Hcase. rewrite /FileDisc.uname in Hf. subst f.
+    intros Hpr Hf Hn Hcase.
     iIntros "#Hfam #Hslot #Hbr #Hrb #Hai #Hcr !>" (γp).
-    assert (Hds : (ds = [[]; cat_dg_write] /\ is_Some (fcR fname_f)) \/ ds = [[]]).
+    assert (Hds : (ds = [[]; cat_dg_write] /\ is_Some (fcR f)) \/ ds = [[]]).
     { destruct Hcase as [(_ & Hfc' & ->) | (_ & ->)]; [left; split; [done | by eexists] | by right]. }
-    iPoseProof (catf_lend_of qf sf γp ds Hpr Hn Hds with "Hfam Hbr Hrb Hai Hcr") as "#Hlend".
-    iApply (sh_exec_sup_catf_of_entry γp (QcR (fdq rf qf sf) 0) (prod_crD γp (fdq rf qf sf))
+    iPoseProof (catf_lend_of f qf sf γp ds Hpr Hf Hn Hds with "Hfam Hbr Hrb Hai Hcr") as "#Hlend".
+    iApply (sh_exec_sup_catf_of_entry f Hf γp (QcR (fdq rf qf sf) 0) (prod_crD γp (fdq rf qf sf))
               with "[] [] Hslot").
     - iIntros "!>" (M s1 t1 g1 sts cs pidv rb1 rb2) "%Hi1 %Hb1 %Hl1 %Hr1 %Hr2 #Hnp".
       iApply (UShEchoPipePay.image_entry_pay_mono ElfUser.cat_elf M
                 (mword_of_int (t1 + 8) : mword 64) sts FsImg.ROOTINO ProcDefs.secc_all cs pidv
-                (fun _ : Z => QcR (fdq rf qf sf) 0) (LEND qf sf γp ds) (prod_crD γp (fdq rf qf sf))
+                (fun _ : Z => QcR (fdq rf qf sf) 0) (LEND f qf sf γp ds) (prod_crD γp (fdq rf qf sf))
                 uslot
                 with "Hlend [Hnp]").
-      assert (Hc2 : (snd <$> sf = Some L /\ cat_dg_open fname_f ∈ [cat_dg_open fname_f]
+      assert (Hc2 : (snd <$> sf !! f = Some L /\ cat_dg_open f ∈ [cat_dg_open f]
                      /\ [] ∈ ds /\ cat_dg_write ∈ ds)
-                    \/ (sf = None /\ cat_dg_open fname_f ∈ [cat_dg_open fname_f])).
+                    \/ (sf !! f = None /\ cat_dg_open f ∈ [cat_dg_open f])).
       { destruct Hcase as [(Hs & _ & ->) | (Hs & ->)].
         - left. split_and!; [exact Hs | by left | by left | by right; left].
         - right. split; [exact Hs | by left]. }
       iApply (pse_catf_image_entry_gen (PS := uprogSG_free) cf rf Heq g LM PV CP sd WA Hext
                 Hcons Hkill Hsup v I sR lR HlR Hfc Hadmit Hplok L HL31 termw TOKN pdepR
-                (pdep_timeless LM PV sR lR L pr P gF gG) γc γm fname_f M s1 t1 g1 sts
+                (pdep_timeless LM PV sR lR L pr P gF gG) γc γm f M s1 t1 g1 sts
                 FsImg.ROOTINO cs pidv (fun _ : Z => QcR (fdq rf qf sf) 0) (P 0) γp (WLeft 0)
-                ds [cat_dg_open fname_f] ds [cat_dg_open fname_f] qf sf rb1 rb2
-                (fun _ _ => eq_refl) eq_refl catf_ws_exec_ok Hi1 Hb1 Hl1 eq_refl Hr1 Hr2
+                ds [cat_dg_open f] ds [cat_dg_open f] qf sf rb1 rb2
+                (fun _ _ => eq_refl) Hf (catf_ws_exec_ok f Hf) Hi1 Hb1 Hl1 eq_refl Hr1 Hr2
                 Hc2 with "Hnp []").
       iApply UexecExecMint.udep_free.
     - iIntros "!> #Ht". rewrite Hkill. by iLeft.
@@ -438,8 +442,8 @@ Section UShCatFStage.
       (qf : Qp) (sf : dst) (ds : list (list (bv 8))) :
     pr = PrCatF f -> FileDisc.uname f -> ExecWords.exec_ok (FileDisc.prod_words (PrCatF f)) ->
     echo_argv_bytes (FileDisc.prod_words (PrCatF f)) gs -> (0 < nc)%nat ->
-    (snd <$> sf = Some L /\ fcR f = Some L /\ ds = [[]; cat_dg_write])
-    \/ (sf = None /\ ds = [[]]) ->
+    (snd <$> sf !! f = Some L /\ fcR f = Some L /\ ds = [[]; cat_dg_write])
+    \/ (sf !! f = None /\ ds = [[]]) ->
     FAM -∗ UShCatPay.sh_cat_slot T -∗
     □ (app_taint -∗ file_taint cf) -∗ □ (file_taint cf -∗ app_taint) -∗
     app_inv fsc_fs -∗ (∃ jo : option Z, file_cons_cred cf rf jo) -∗

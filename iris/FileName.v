@@ -43,6 +43,17 @@ Require Import FsImgCheck.      (* [fsimg_byte], the pinned names, [fname_f] *)
 Require Import FsConsPin.       (* [fname_console] *)
 Require Import TreeImg.         (* [img_root_ents] *)
 Require FileState FileDisc.     (* the model's class [FileDisc.uname] *)
+Require Import FsState.         (* [fs_state_rec], [fss_inodes] *)
+Require Import FsStateInode.    (* [dir_entries] *)
+Require Import FsCrash.         (* [fs_blocks], [fs_recovery] *)
+Require Import FsDurSnap.       (* [snap_ok] *)
+Require Import FsImgDisk.       (* [fsimg_P] *)
+Require Import FsBootParams.    (* [fsimg_cov] *)
+Require Import FsCfgBoot.       (* [img_node] *)
+Require Import FsAbsDefs.       (* [astep], [abs_view], [abs_row_dir] *)
+Require Import FsInitPin.       (* [era0_D], [era0_root_row], [fsimg_root_dir] *)
+Require Import FsInitPinBoot.   (* [era0_recovery_D] *)
+Require FsImg.                  (* [ROOTINO] *)
 From stdpp Require Import ssreflect.
 Local Open Scope Z_scope.
 
@@ -323,4 +334,88 @@ Proof using.
   - intros N HN. apply H2, uname_f_name, HN.
   - intros N HN. apply H3, uname_f_name, HN.
   - intros nm z Hnm HN. exact (H4 nm z Hnm (proj1 (uname_f_name nm) HN)).
+Qed.
+
+(* the one name [f] of the claim's tier is in the model's class *)
+Lemma uname_fname_f : FileDisc.uname fname_f.
+Proof using. apply uname_f_name. reflexivity. Qed.
+
+(* ===================================================================== *)
+(*  7.  WHAT THE LAWS SAY TO A LAYER ABOVE                                *)
+(*                                                                        *)
+(*  L3 read as the disequalities the delta legs ask for, and L4 read at   *)
+(*  the view every era 0 founds at: no class name is in the root.  Both   *)
+(*  are stated for ANY class with the laws, so the claim above never     *)
+(*  reads a class's definition.                                          *)
+(* ===================================================================== *)
+
+Section Laws.
+  Context (P : fname -> Prop) `{!forall N, Decision (P N)} (HL : name_laws P).
+
+  Lemma nl_ne_sys (N M : fname) : P N -> M ∈ sys_names -> N <> M.
+  Proof using HL. intros HN HM ->. exact (nl_sys P HL M HN HM). Qed.
+
+  Lemma nl_ne_dot (N : fname) : P N -> N <> DOT.
+  Proof using HL. intros HN. apply (nl_ne_sys N DOT HN). rewrite /sys_names. set_solver. Qed.
+  Lemma nl_ne_dotdot (N : fname) : P N -> N <> DOTDOT.
+  Proof using HL. intros HN. apply (nl_ne_sys N DOTDOT HN). rewrite /sys_names. set_solver. Qed.
+  Lemma nl_ne_console (N : fname) : P N -> N <> fname_console.
+  Proof using HL. intros HN. apply (nl_ne_sys N fname_console HN). rewrite /sys_names. set_solver. Qed.
+  Lemma nl_ne_init (N : fname) : P N -> N <> fname_init.
+  Proof using HL. intros HN. apply (nl_ne_sys N fname_init HN). rewrite /sys_names. set_solver. Qed.
+  Lemma nl_ne_sh (N : fname) : P N -> N <> fname_sh.
+  Proof using HL. intros HN. apply (nl_ne_sys N fname_sh HN). rewrite /sys_names. set_solver. Qed.
+  Lemma nl_ne_echo (N : fname) : P N -> N <> fname_echo.
+  Proof using HL. intros HN. apply (nl_ne_sys N fname_echo HN). rewrite /sys_names. set_solver. Qed.
+  Lemma nl_ne_cat (N : fname) : P N -> N <> fname_cat.
+  Proof using HL. intros HN. apply (nl_ne_sys N fname_cat HN). rewrite /sys_names. set_solver. Qed.
+  Lemma nl_ne_sync (N : fname) : P N -> N <> fname_sync.
+  Proof using HL. intros HN. apply (nl_ne_sys N fname_sync HN). rewrite /sys_names. set_solver. Qed.
+  Lemma nl_ne_grep (N : fname) : P N -> N <> fname_grep.
+  Proof using HL. intros HN. apply (nl_ne_sys N fname_grep HN). rewrite /sys_names. set_solver. Qed.
+End Laws.
+
+(* the root's hop, at a view whose root row is a directory record's *)
+Lemma astep_root_of_row (av : aview) (n : fs_node) (N : fname) :
+  av !! FsImg.ROOTINO = Some (abs_row n) -> fn_is_dir n = true ->
+  astep av FsImg.ROOTINO N = dir_entries n !! N.
+Proof using.
+  intros Hav Hd. rewrite /astep /aents Hav /= /anode_ents (abs_row_dir _ Hd) /=.
+  reflexivity.
+Qed.
+
+(* ERA 0'S ROOT IS THE IMAGE'S: one hop reads [img_root_ents] *)
+Lemma era0_astep_root (S : fs_state_rec) (N : fname) :
+  snap_ok S era0_D ->
+  astep (abs_view (fss_inodes S)) FsImg.ROOTINO N = img_root_ents !! N.
+Proof using.
+  intros HS.
+  rewrite (astep_root_of_row _ _ N (era0_root_row S HS) fsimg_root_dir).
+  by rewrite img_root_ents_eq.
+Qed.
+
+(* L4 AT ERA 0: no name of a lawful class is in the root *)
+Lemma era0_class_absent (P : fname -> Prop) `{!forall N, Decision (P N)}
+    (S : fs_state_rec) (N : fname) :
+  name_laws P -> snap_ok S era0_D -> P N ->
+  astep (abs_view (fss_inodes S)) FsImg.ROOTINO N = None.
+Proof using.
+  intros HL HS HN. rewrite (era0_astep_root S N HS).
+  destruct (img_root_ents !! N) as [z |] eqn:Hz; [| reflexivity].
+  exfalso. exact (nl_img P HL N z Hz HN).
+Qed.
+
+(* ...at every map a recovery from mkfs's image founds at *)
+Lemma era0_recovery_class_absent (P : fname -> Prop) `{!forall N, Decision (P N)}
+    (dk : Z -> bv 8) (D : gmap Z (list (bv 8))) (S : fs_state_rec) (N : fname) :
+  name_laws P ->
+  fs_blocks dk = fsimg_P ->
+  fs_recovery (fs_blocks dk) D fsimg_cov (FsImg.sb_logstart fsimg_sb) ->
+  snap_ok S D -> P N ->
+  astep (abs_view (fss_inodes S)) FsImg.ROOTINO N = None.
+Proof using.
+  intros HL Hdk Hrec HS HN. apply (era0_class_absent P S N HL); [| exact HN].
+  assert (HD : D = era0_D).
+  { apply era0_recovery_D. rewrite <- Hdk. exact Hrec. }
+  rewrite <- HD. exact HS.
 Qed.

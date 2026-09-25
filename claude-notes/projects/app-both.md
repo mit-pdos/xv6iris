@@ -1267,6 +1267,7 @@ tree 13, union 14.  NEXT: the *.txt widening (design/filenames.md).
 
 *.txt WIDENING (design/filenames.md): W0 (FileName.v, the class and its
 laws) and W1 (the model over a map of named files, class still `{f}`)
-LANDED 2026-09-25; `union_phi`'s boot state is now a map.  NEXT: W2 claim,
-W3 handler/programs at a general name, W4 the `*.txt` instance.
+LANDED 2026-09-25; `union_phi`'s boot state is now a map; W2 (the claim
+over a map) and W3 (handler and programs at any class name) LANDED
+2026-09-25.  NEXT: W4, the `*.txt` instance.
 

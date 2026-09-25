@@ -405,7 +405,8 @@ Section union_out.
       cbn [gs_ps gs_cs gs_E gs_w gs_st gstage0 LogEntryDefs.ch_dl length].
       iSplitR; [iExact "Hpin" |].
       iSplitL "Hfla".
-      { iExists vf. iFrame "Hfp Hfla". cbn [f0_wit default f0_typed]. done. }
+      { iExists vf. iFrame "Hfp Hfla". cbn [f0_wit default].
+        iSplit; [done | iApply (f0_typed_none gf)]. }
       iSplitL "Hblk Hcur1 Hrb".
       { rewrite uwa_ext /pext.
         iExists w, 0%nat, gb, [], false. iFrame "Hpera Hcur1 Hrb".
@@ -565,7 +566,7 @@ Section union_out.
     iDestruct "Hgo" as "[#HT | Hgo]".
     { iModIntro. iFrame "Hfl". by iRight. }
     iDestruct "Hgo" as (s0 vf) "(%Hgo & #Hty & #Hfp & #Hlb)".
-    iDestruct (f0_typed_adm gf (echof_lines_of h) s0 (echof_lines_of_names h)
+    iDestruct (f0_typed_adm gf (echof_lines_of h) s0
                  with "Hfl Hty") as "[Hfl %Hadm]".
     iAssert (⌜obs_wire Uart0 (open_seg h) <> [] ->
                exists u1, s0s = u1 ++ [s0]⌝)%I as "%Hlast".

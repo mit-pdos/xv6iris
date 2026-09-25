@@ -285,7 +285,8 @@ Proof using.
   change (lm_step ulmG) with ustep. by destruct a.
 Qed.
 
-Lemma ustep_id_cat (s : fstate) (a : lm_alt U) : lm_step U s LCat_f a = s.
+Lemma ustep_id_cat (s : fstate) (nm : list (bv 8)) (a : lm_alt U) :
+  lm_step U s (LCat nm) a = s.
 Proof using.
   change (lm_step ulmG) with ustep. by destruct a.
 Qed.

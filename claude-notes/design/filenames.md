@@ -1,4 +1,4 @@
-# Design: widening the file model to a class of user files (IN PROGRESS: W0, W1 landed)
+# Design: widening the file model to a class of user files (IN PROGRESS: W0-W3 landed)
 
 Owner ruling (2026-09-24): widen beyond the one name `f` to a class of
 user files (e.g. `*.txt`), not the image's binaries; ORDER: after the
@@ -37,7 +37,60 @@ product of wire subsequences over the named files (`prod_maps`,
 `FileDiscDec.disc_f_dec`/`scands`, FileOutPure §13's `file_phi_body`
 lemmas.  W4 CAVEAT: the parser takes the name generically but its proofs
 substitute `N = fname_f`; W4 redoes them from the class laws.
-NEXT: W2 (the claim's `dst` becomes a map).
+W2 LANDED (92036d0d0, VM w2final on the committed tree; audits
+13/13/14; TCB report runs; top statement unchanged): the claim over a
+map.  `dst := gmap fname (Z * bytes)`, `dst_content := snd <$> s` (W1's
+bridge retired); `f_ok av s` = every class name's row (`f_row`:
+`name_absent` if absent, `node_pin N i (AFile bs, 1)` if present), dom in
+the class, injective inums; `f_typed` = `s = ∅` or one `fl_lb` lower
+bound typing every entry AND each entry's name in the class (needed for
+the boot filing's `fstate_ok`).  Ledger lines are `(name, words)` pairs
+(type `fwline`; `efl_of` is `echof_lines_of`).  `name_absent`/`node_pin`
+moved to AppFile.  FileDeltas: pointwise lift (`f_ok_same`, `f_ok_move`),
+per-name `f_ok_create_at`/`_trunc_at`/`_write_at`/`_append_at`,
+`f_ok_fresh` (an armed inum is no file's).  Era 0 = `f_ok_empty` from L4
+(`FileName.era0_recovery_class_absent`).  FileOpen's create leg: no
+`decide (nm = fname_f)`; receipt `s !! N = None /\ d = ROOTINO /\ nm = N`
+with `fown r (<[N := (i, [])]> s)`; DEVIATION: the kernel's name
+predicate is `redir_at N := nm = N` (from `Hlast`), not
+`redir_name_ok`, because typing the new entry needs a ledger line at
+that exact name.  The append's cursor `file_wq c r N s i ws sel off`
+steps by `f_ok_write_at`.  UInitCons (g)'s side condition is now
+`~ uname nmn`.  The program tier stays at `f` but carries the map
+(`UkFileDev`'s `sf`, `UEchoFile`'s `N s`, redirect payloads indexed by
+the round's map; cat/union entries read `sf !! f`).
+W3 LANDED (f10e98e6e + 89c76e970, VM w3final full build of the
+committed tree; audits 13/13/14; TCB report runs; top statement
+unchanged, no W3 file in its 22-file base): handler, entries, sh walks,
+lexer and round at any class name N, through the class laws only.  New
+low files: UNamePath.v (path facts from L1/L2, cat's argv words),
+UStrImg.v (a string's image at any length), UNameBytes.v (the redirect
+suffix, the `open N failed` windows, the bytes of `cat N`).  Devices
+`FDFile nm ..`/`FDIn s nm ..` (UkFileIface), `UDIn` pinned by `uname nm`
+(UkCatFIface), open laws read `sf !! path`; entries `ucat_image_entry
+nm`, `uefile_image_entry nm`, `pse_catf_image_entry_gen f`; the paid
+open-failed diagnostic `(alt_openfailN nm) (13 + |nm|)`.  Seam (d)'s
+failure was `UkShRedirChild.wp_kshm_child_file_redir`'s `length file =
+1`; now `uname file`.  GOTCHA: a `vm_compute; lia` on cat's diagnostic
+hangs at a non-literal name (use `UNamePath.catopen_short`, from L2);
+and a Require of anything loading PStringBytes (FsImgCheck, FileName)
+made a `Proof using .` lemma in UkShRedirBody pick up section variables,
+hence `uname_word` sits in UNameBytes.
+W4 WORKLIST (from the W3 lane): (1) instance swap at FileDisc.v:88, `.`
+in `fbody_byte` (FileDisc.v:542) and `ubyte` (UnionDisc.v:289); (2)
+`UNameBytes.uname_word` (from `FileDisc.lname_word`, proved by
+substitution) is false at `*.txt` and must go; (3) lexer facts over
+`wl_word` names widen to `fn_byte` names: `ushs_line_is`
+(UkShRedirLine.v:151-155, 261), UShLexRedir.v:331/383,
+UkShRedirBody.v:133 (`UNamePath.fn_byte_val` gives not-symbol,
+not-blank); (4) argv words: `UNamePath.cat_words_exec_ok` needs `wl_wf
+[cat; nm]`, likewise `prod_ok` (FileDisc.v:146) and `pl_parse`
+(PipesDisc.v:247): widen `wl_word`/`wl_wf` and the UkShWords tokenizer;
+(5) model proofs still substituting `fname_f` (FileDisc.v 757-1041,
+2327, 2545, 2602; PipesUline.v:249-253); (6) `uname_laws` moves to
+`txt_laws` (FileName.v:324-336), the frontier print at
+UnionAssumptions.v:63 comes out.  CLEANUP (no blocker): UCatOut.v's
+file-application code at `LCat_f` (78-528) and UCatLend.v are dead.
 
 ## Design: widening the file model from the one name `f` to a class of user files
 
