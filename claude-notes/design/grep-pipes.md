@@ -63,7 +63,20 @@ read-to-EOF arm (grep's `RdEof`/`WrHalt`); `filterer` replaces `copier`.
 Differences: the gate's one-line premise is stored in the registry as
 `⌜fok F L⌝` (True for cat); `lrep` also records `rd_pre`; the STAGE LAWS
 still assume cats (`UShPipesStage.Hstg_cat`, discharged at the node) --
-G7 removes it.
+G7 removes it.  G7 LANDED (5edb6e870/3b61e178c, VM g7merge1, audits
+13/13/14; admission still `adm_u_f`): grep entries
+`pse_grep_mid_image_entry`/`pse_grep_last_image_entry` (via
+`grep_filter_conforms`); stage laws over `F` (exec failure prints
+`filt_dg_exec F`; a middle stage's fd 2 owes `mid_alts F`); the node at
+`Context fs` with `Hline`, `Hgate : Forall (fok F L) fs`, `Hstc`; ONE
+generic exec supply for any pinned program (`UShExecPin.v`,
+`sh_exec_sup_x_of_entry`, `sh_grep_slot`), argv named by line offsets
+(`ush_cmd_rebase`); per-stage lexing (`ushq_rtoks_ws`,
+`ushq_lines_ws_bars`), `PipesCut.pcut_fs`/`pcut_fs_stage`; firing
+per stage program (`halts_at`, `passes fs L`).  `fok` for grep is now
+`oneline L ∧ grep_ok L` (NUL-free).  The content writer's kit is issued
+at its first byte.  G8 must supply: `Hgate` (grep_ok of the content),
+`sh_grep_slot T`, `UShUPipes`'s parse via `pcut_fs`, the admission.
 
 I've planned this from reading only; nothing was edited or built. Grep fits the landed machinery more cheaply than the question expects. Every content in the union is a single line, and on one line grep is just a gate. The real costs are elsewhere: grep has no exec image, pins, stubs or kexec facts yet (the biggest cut), the decider's truncation lemma needs rework (the riskiest cut), and there is one owner ruling on corner B.
 
