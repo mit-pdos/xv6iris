@@ -84,14 +84,59 @@ def wp_acquiresleep_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     wordPointsTo (pPid k.proc) 4 dqp pid -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
-/-- The interface of `acquiresleep`. -/
-structure ACQUIRESLEEP : Prop where
-  wp_acquiresleep_gen : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [SleepLockG GF]
+/-- **WP of `acquiresleep(slk = a0)` at either entry `SIE`** (Rocq
+`wp_acquiresleep_gen_sconf_body`): the balanced-function shape --
+`trapCsrsExt` / `cpuClaimExt` in and out (emp at `sie = true`, where the
+entry acquire pays out the bundle the interior sleep needs; the whole
+bundle at `sie = false`).  Depth 0, so no spinlock is held (`KCtx.wf`;
+Rocq's `locks_below lks "sleep lock"`). -/
+def wp_acquiresleep_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [SleepLockG GF]
     [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl γ : GName) (R : CtxId → IProp GF) [CtxMorph R] (H : Qp → IProp GF) (q : Qp)
-    (j : Nat) (pid : BitVec 32) (dqp : DFrac) hj hproc hK hsie hnoff hlocks htier,
+    (j : Nat) (pid : BitVec 32) (dqp : DFrac)
+    (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : acquiresleepSlots ≤ k.avail)
+    (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) : Prop :=
+  kctx cpu k ∗ pcIs cpu acquiresleepAddr ∗ procsInv Γ ∗
+  trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
+  isSleeplockGen γl γ (k.regs 10#5) R H ∗ H q ∗
+  wordPointsTo (pPid k.proc) 4 dqp pid ∗
+  wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
+    ⌜calleeSaved k.regs R'⌝ -∗
+    kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+    trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
+    sleeplockedQ γ q (k.regs 10#5) pid -∗ R curCtx -∗
+    wordPointsTo (pPid k.proc) 4 dqp pid -∗ wpLoop cpu'))
+  ⊢ wpLoop (GF := GF) cpu
+
+/-- The interface of `acquiresleep`. -/
+structure ACQUIRESLEEP : Prop where
+  wp_acquiresleep_gen_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [SleepLockG GF]
+    [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γl γ : GName) (R : CtxId → IProp GF) [CtxMorph R] (H : Qp → IProp GF) (q : Qp)
+    (j : Nat) (pid : BitVec 32) (dqp : DFrac) hj hproc hK hnoff htier,
+    wp_acquiresleep_gen_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γ R H q j pid dqp
+      hj hproc hK hnoff htier
+
+/-- The interrupts-off instance (the complement is the whole bundle). -/
+theorem ACQUIRESLEEP.wp_acquiresleep_gen (A : ACQUIRESLEEP) {hlc : HasLC} {GF : BundledGFunctors}
+    [MachGS hlc GF] [Xv6G GF] [SleepLockG GF]
+    [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γl γ : GName) (R : CtxId → IProp GF) [CtxMorph R] (H : Qp → IProp GF) (q : Qp)
+    (j : Nat) (pid : BitVec 32) (dqp : DFrac) hj hproc hK hsie hnoff hlocks htier :
     wp_acquiresleep_gen_body (hlc := hlc) (GF := GF) Γ cpu k γl γ R H q j pid dqp
-      hj hproc hK hsie hnoff hlocks htier
+      hj hproc hK hsie hnoff hlocks htier := by
+  have h := A.wp_acquiresleep_gen_eb (hlc := hlc) (GF := GF) Γ cpu k γl γ R H q j pid dqp
+    hj hproc hK hnoff htier
+  unfold wp_acquiresleep_gen_eb_body at h
+  unfold wp_acquiresleep_gen_body
+  rw [hsie] at h
+  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
+  iintro ⟨Hk, Hpc, Hpi, Htc, Hcl, Hir, Hsl, HH, Hpid, Hnext⟩
+  iapply h
+  iframe Hk Hpc Hpi Htc Hcl Hir Hsl HH Hpid
+  iapply wpNext_mono $$ Hnext
+  iintro %cpu' HK %spie %spp %R' %hcs Hk Hpc ⟨Htc, Hir⟩ Hcl Ht HR Hpid
+  iapply HK $$ %spie %spp %R' %hcs Hk Hpc Htc Hcl Hir Ht HR Hpid
 
 /-- The untracked contract, from the general one. -/
 theorem ACQUIRESLEEP.wp_acquiresleep (A : ACQUIRESLEEP) {hlc : HasLC} {GF : BundledGFunctors}
@@ -120,7 +165,26 @@ parks and migrations -- and which is exactly what a transit box's checkout
 wants of a reference minted before the sleeplock was taken (Rocq
 `bbox_checkout`'s row (C), i.e. `Xv6.bufEscrow_take`'s `hKt`).
 
-`wp_acquiresleep_gen_body` is the `tl := 0` instance, derived below. -/
+`wp_acquiresleep_gen_eb_body` is the `tl := 0` instance, derived below. -/
+def wp_acquiresleep_gen_llb_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    [SleepLockG GF] [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γl γ : GName) (R : CtxId → IProp GF) [CtxMorph R] (H : Qp → IProp GF) (q : Qp)
+    (j : Nat) (pid : BitVec 32) (dqp : DFrac) (tl : Nat)
+    (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : acquiresleepSlots ≤ k.avail)
+    (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) : Prop :=
+  kctx cpu k ∗ pcIs cpu acquiresleepAddr ∗ procsInv Γ ∗
+  trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
+  isSleeplockGen γl γ (k.regs 10#5) R H ∗ H q ∗ topLb tl ∗
+  wordPointsTo (pPid k.proc) 4 dqp pid ∗
+  wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
+    ⌜calleeSaved k.regs R'⌝ -∗
+    kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+    trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
+    sleeplockedQ γ q (k.regs 10#5) pid -∗ R curCtx -∗ ctxFloor curCtx tl -∗
+    wordPointsTo (pPid k.proc) 4 dqp pid -∗ wpLoop cpu'))
+  ⊢ wpLoop (GF := GF) cpu
+
+/-- The interrupts-off store-order form (the pinned instance, derived). -/
 def wp_acquiresleep_gen_llb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [SleepLockG GF]
     [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl γ : GName) (R : CtxId → IProp GF) [CtxMorph R] (H : Qp → IProp GF) (q : Qp)
@@ -142,28 +206,49 @@ def wp_acquiresleep_gen_llb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS h
 
 /-- The store-order interface of `acquiresleep`. -/
 structure ACQUIRESLEEP_LLB : Prop where
-  wp_acquiresleep_gen_llb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [SleepLockG GF]
+  wp_acquiresleep_gen_llb_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    [SleepLockG GF] [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γl γ : GName) (R : CtxId → IProp GF) [CtxMorph R] (H : Qp → IProp GF) (q : Qp)
+    (j : Nat) (pid : BitVec 32) (dqp : DFrac) (tl : Nat) hj hproc hK hnoff htier,
+    wp_acquiresleep_gen_llb_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γ R H q j pid dqp tl
+      hj hproc hK hnoff htier
+
+/-- The interrupts-off store-order instance. -/
+theorem ACQUIRESLEEP_LLB.wp_acquiresleep_gen_llb (A : ACQUIRESLEEP_LLB) {hlc : HasLC} {GF : BundledGFunctors}
+    [MachGS hlc GF] [Xv6G GF] [SleepLockG GF]
     [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl γ : GName) (R : CtxId → IProp GF) [CtxMorph R] (H : Qp → IProp GF) (q : Qp)
-    (j : Nat) (pid : BitVec 32) (dqp : DFrac) (tl : Nat) hj hproc hK hsie hnoff hlocks htier,
+    (j : Nat) (pid : BitVec 32) (dqp : DFrac) (tl : Nat) hj hproc hK hsie hnoff hlocks htier :
     wp_acquiresleep_gen_llb_body (hlc := hlc) (GF := GF) Γ cpu k γl γ R H q j pid dqp tl
-      hj hproc hK hsie hnoff hlocks htier
+      hj hproc hK hsie hnoff hlocks htier := by
+  have h := A.wp_acquiresleep_gen_llb_eb (hlc := hlc) (GF := GF) Γ cpu k γl γ R H q j pid dqp tl
+    hj hproc hK hnoff htier
+  unfold wp_acquiresleep_gen_llb_eb_body at h
+  unfold wp_acquiresleep_gen_llb_body
+  rw [hsie] at h
+  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
+  iintro ⟨Hk, Hpc, Hpi, Htc, Hcl, Hir, Hsl, HH, Htl, Hpid, Hnext⟩
+  iapply h
+  iframe Hk Hpc Hpi Htc Hcl Hir Hsl HH Htl Hpid
+  iapply wpNext_mono $$ Hnext
+  iintro %cpu' HK %spie %spp %R' %hcs Hk Hpc ⟨Htc, Hir⟩ Hcl Ht HR Hfl Hpid
+  iapply HK $$ %spie %spp %R' %hcs Hk Hpc Htc Hcl Hir Ht HR Hfl Hpid
 
 /-- `ACQUIRESLEEP` is the `tl := 0` instance. -/
 theorem ACQUIRESLEEP_LLB.toACQUIRESLEEP (A : ACQUIRESLEEP_LLB) : ACQUIRESLEEP := ⟨by
-  intro hlc GF _ _ _ _ Γ _ cpu k γl γ R _ H q j pid dqp hj hproc hK hsie hnoff hlocks htier
-  have h := A.wp_acquiresleep_gen_llb (hlc := hlc) (GF := GF) Γ cpu k γl γ R H q j pid dqp 0
-    hj hproc hK hsie hnoff hlocks htier
-  unfold wp_acquiresleep_gen_llb_body at h
-  unfold wp_acquiresleep_gen_body
-  iintro ⟨Hk, Hpc, Hpi, Htc, Hcl, Hir, Hsl, HH, Hpid, Hnext⟩
+  intro hlc GF _ _ _ _ Γ _ cpu k γl γ R _ H q j pid dqp hj hproc hK hnoff htier
+  have h := A.wp_acquiresleep_gen_llb_eb (hlc := hlc) (GF := GF) Γ cpu k γl γ R H q j pid dqp 0
+    hj hproc hK hnoff htier
+  unfold wp_acquiresleep_gen_llb_eb_body at h
+  unfold wp_acquiresleep_gen_eb_body
+  iintro ⟨Hk, Hpc, Hpi, Htc, Hcl, Hsl, HH, Hpid, Hnext⟩
   iapply h
-  iframe Hk Hpc Hpi Htc Hcl Hir Hsl HH Hpid
+  iframe Hk Hpc Hpi Htc Hcl Hsl HH Hpid
   isplitl []
   · iapply topLbAt_0
   iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %hcs Hk Hpc Htc Hcl Hir Ht HR - Hpid
-  iapply HK $$ %spie %spp %R' %hcs Hk Hpc Htc Hcl Hir Ht HR Hpid⟩
+  iintro %cpu' HK %spie %spp %R' %hcs Hk Hpc Htc Hcl Ht HR - Hpid
+  iapply HK $$ %spie %spp %R' %hcs Hk Hpc Htc Hcl Ht HR Hpid⟩
 
 /-! ## The NON-BLOCKING nested contract (Rocq `wp_acquiresleep_nb_body`)
 

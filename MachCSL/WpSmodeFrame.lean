@@ -293,7 +293,10 @@ set_option hygiene false in
 macro_rules
   | `(tactic| k_ext_move) =>
     `(tactic| (try (have hpin' := fun h => hpin (Or.inl h)
-                    try simp only [k_norm_simps] at hpin'
+                    first
+                      | simp only [k_norm_simps, hsie] at hpin'
+                      | simp only [k_norm_simps] at hpin'
+                      | skip
                     try (ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte)
                     try (ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce)
                     clear hpin')
