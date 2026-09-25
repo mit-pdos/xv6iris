@@ -15,14 +15,19 @@
 (*      producer's [cat: write error] beside a printed prefix of the      *)
 (*      content is admitted -- an honest limit -- while at [echo hi |     *)
 (*      cat] it is not;                                                   *)
-(*    - THE HOOKS' OBSTRUCTION: [exec echo failed] at a [cat f] pipeline  *)
-(*      is admissible at one content and not at another, so no free set   *)
-(*      satisfying [lmh_free_ok] contains it ([no_free_execL]).           *)
+(*    - THE PRODUCER SPLIT (C9b2): [exec echo failed] at a [cat f]      *)
+(*      pipeline is admissible at one content and not at another, so no   *)
+(*      free set satisfying [lmh_free_ok] contains [UPC] of it            *)
+(*      ([no_free_execL]); at an echo pipeline it is [UPE] of it,         *)
+(*      admissible at every state, and free ([demo_execL_echo]).          *)
+(*                                                                        *)
+(*  THE HOOKS: [ulm_hooks adm : lm_hooks (ulm adm)] at every admission,   *)
+(*  and [ulmU_hooks] at the union application's.                          *)
 (* ===================================================================== *)
 From Stdlib Require Import ZArith Lia List String.
 From stdpp Require Import list countable bitvector.definitions.
 Require Import RiscvLang ObsTrace.
-Require Import LineWords EchoDisc LineBytes LineModel.
+Require Import LineWords EchoDisc LineBytes LineModel LineModelLinks.
 Require Import StringBytes ProgTree ProgTreePipes PipesPair PipesDisc PipesDiscDec.
 Require PipeDisc.
 Require Import FileState FileDisc.
@@ -36,9 +41,36 @@ Local Open Scope nat_scope.
 (* ===================================================================== *)
 
 Global Instance uok_dec adm s l a : Decision (uok adm s l a).
-Proof using. destruct l as [ws | ws | | p n], a as [r | x]; cbn [uok]; apply _. Defined.
+Proof using. destruct l as [ws | ws | | [ws | f] n], a as [r | x | x]; cbn [uok]; apply _. Defined.
 
 Global Instance ulm_ok_dec adm s l a : Decision (lm_ok (ulm adm) s l a) := uok_dec adm s l a.
+
+(* ===================================================================== *)
+(*  1b.  THE HOOKS ([LineModelLinks.lm_hooks]) at every admission          *)
+(*                                                                        *)
+(*  Free: the file's state-free alternatives, every non-terminal echo-    *)
+(*  pipeline alternative, and at a [cat f] pipeline the panic, the silent *)
+(*  round and [exec cat failed] ([UnionDisc.ufree]).  The boot state      *)
+(*  [lmh_st0] is the file's, [None].                                      *)
+(* ===================================================================== *)
+Definition ulm_hooks (adm : pline' -> bool) : lm_hooks (ulm adm) :=
+  MkLMH (ulm adm) ufree None upan uexf uexfb unoc (ulm_ok_dec adm)
+    ufree_cont ufree_term (ufree_ok adm)
+    (upan_ok adm) upan_free upan_panic
+    (uexf_ok adm) uexf_free uexf_nopanic uexf_cont
+    (unoc_ok adm) unoc_free unoc_nopanic unoc_cont
+    (ucont_prompt adm) (ucont_nonnil adm).
+
+Definition ulmU_hooks : lm_hooks ulmU := ulm_hooks adm_u_f.
+
+(* the hooks' three codes at a pipeline, read back *)
+Lemma ulm_hooks_pan adm p n : lm_dec (ulm adm) (lmh_pan (ulm_hooks adm) (LPipe p n)) = upl p PLPanic.
+Proof using. exact (ualt_dec_code _). Qed.
+Lemma ulm_hooks_exf adm p n :
+  lm_dec (ulm adm) (lmh_exf (ulm_hooks adm) (LPipe p n)) = upl p (PLRun (pl_exfb (LPipes p n))).
+Proof using. exact (ualt_dec_code _). Qed.
+Lemma ulm_hooks_noc adm p n : lm_dec (ulm adm) (lmh_noc (ulm_hooks adm) (LPipe p n)) = upl p (PLRun []).
+Proof using. exact (ualt_dec_code _). Qed.
 
 Local Ltac dec_yes := apply (bool_decide_unpack _); vm_compute; exact I.
 Local Ltac dec_no := apply (bool_decide_unpack _); vm_compute; exact I.
@@ -59,23 +91,23 @@ Proof using. split; [vm_compute; reflexivity | dec_yes]. Qed.
 
 (* at [Some c]: the content, then the prompt *)
 Example demo_cf2_some :
-  lm_ok ulmU (Some c_hi) l_cf2 (UP (PLRun c_hi))
-  /\ lm_cont ulmU (Some c_hi) l_cf2 (UP (PLRun c_hi)) = c_hi ++ u_prompt.
+  lm_ok ulmU (Some c_hi) l_cf2 (UPC (PLRun c_hi))
+  /\ lm_cont ulmU (Some c_hi) l_cf2 (UPC (PLRun c_hi)) = c_hi ++ u_prompt.
 Proof using. split; [cbn [ulmU ulm lm_ok]; dec_yes | reflexivity]. Qed.
 
 (* ...and not someone else's *)
-Example demo_cf2_some_neg : ~ uok adm_u_f (Some c_hi) l_cf2 (UP (PLRun (sb "bye" ++ nl1))).
+Example demo_cf2_some_neg : ~ uok adm_u_f (Some c_hi) l_cf2 (UPC (PLRun (sb "bye" ++ nl1))).
 Proof using. dec_no. Qed.
 
 (* at [None]: cat's open diagnostic *)
 Example demo_cf2_none :
-  lm_ok ulmU None l_cf2 (UP (PLRun (cat_dg_open fname_f)))
-  /\ lm_cont ulmU None l_cf2 (UP (PLRun (cat_dg_open fname_f)))
+  lm_ok ulmU None l_cf2 (UPC (PLRun (cat_dg_open fname_f)))
+  /\ lm_cont ulmU None l_cf2 (UPC (PLRun (cat_dg_open fname_f)))
      = sb "cat: cannot open f" ++ nl1 ++ u_prompt.
 Proof using. split; [cbn [ulmU ulm lm_ok]; dec_yes | vm_compute; reflexivity]. Qed.
 
 (* ...and at [None] no content *)
-Example demo_cf2_none_neg : ~ uok adm_u_f None l_cf2 (UP (PLRun c_hi)).
+Example demo_cf2_none_neg : ~ uok adm_u_f None l_cf2 (UPC (PLRun c_hi)).
 Proof using. dec_no. Qed.
 
 (* ---- echo x > f, then cat f | cat: the state threaded ---- *)
@@ -85,7 +117,7 @@ Definition b_thr1 : list (bv 8) := sb "echo x > f".
 Definition b_thr2 : list (bv 8) := sb "cat f | cat".
 Definition I_thr : list (bv 8) := b_thr1 ++ nl1 ++ b_thr2 ++ nl1.
 Definition a_thr1 : ualt := UR (RFRan (sel_all (echo_chunks ws_x))).
-Definition a_thr2 : ualt := UP (PLRun x_nl).
+Definition a_thr2 : ualt := UPC (PLRun x_nl).
 (* the stage's choice list: the codes are BUILT, never computed *)
 Definition cs_thr : list nat := [ualt_code a_thr1; ualt_code a_thr2].
 
@@ -156,42 +188,57 @@ Definition l_cf1 : uline := LPipe (PrCatF fname_f) 1.
 Definition corner_blk : list (bv 8) := sb "h" ++ cat_dg_write.
 
 (* at [cat f | cat] the producer's write error beside a printed prefix *)
-Example demo_S3_corner : uok adm_u_f (Some c_hi) l_cf1 (UP (PLRun corner_blk)).
+Example demo_S3_corner : uok adm_u_f (Some c_hi) l_cf1 (UPC (PLRun corner_blk)).
 Proof using. dec_yes. Qed.
 
 (* ... and beside the whole content *)
 Example demo_S3_corner_full :
-  uok adm_u_f (Some c_hi) l_cf1 (UP (PLRun (c_hi ++ cat_dg_write))).
+  uok adm_u_f (Some c_hi) l_cf1 (UPC (PLRun (c_hi ++ cat_dg_write))).
 Proof using. dec_yes. Qed.
 
 (* ... while at [echo hi | cat] (echo's halt is silent) it is not *)
-Example demo_S3_echo_neg : ~ uok adm_u_f (Some c_hi) l_hi1 (UP (PLRun corner_blk)).
+Example demo_S3_echo_neg : ~ uok adm_u_f (Some c_hi) l_hi1 (UPE (PLRun corner_blk)).
 Proof using. dec_no. Qed.
 
 (* ---- THE ADMISSION: [cat g] at another name is not admitted ---- *)
 Example demo_adm_other : ~ ubody_ok adm_u_f (sb "cat g | cat").
 Proof using. dec_no. Qed.
 
-(* ---- THE HOOKS' OBSTRUCTION ---- *)
+(* ---- THE PRODUCER SPLIT: the cross cases ---- *)
+Example demo_split_cross :
+  forall s x, ~ uok adm_u_f s l_hi1 (UPC x) /\ ~ uok adm_u_f s l_cf1 (UPE x).
+Proof using. intros s x. split; intros H; exact H. Qed.
+
+(* ---- WHY THE PRODUCERS ARE SPLIT ---- *)
 (* [exec echo failed] is a content [f] may hold ([echo exec echo failed >
    f]); at [cat f | cat] the last cat then prints it *)
 Example demo_execL_state_dep :
   fstate_ok (Some PipeDisc.dg_execL)
-  /\ uok adm_u_f (Some PipeDisc.dg_execL) l_cf1 (UP (PLRun PipeDisc.dg_execL))
-  /\ ~ uok adm_u_f None l_cf1 (UP (PLRun PipeDisc.dg_execL)).
+  /\ uok adm_u_f (Some PipeDisc.dg_execL) l_cf1 (UPC (PLRun PipeDisc.dg_execL))
+  /\ ~ uok adm_u_f None l_cf1 (UPC (PLRun PipeDisc.dg_execL)).
 Proof using.
   split_and!; [| dec_yes | dec_no].
   right. exists (sb "exec echo failed"). split; [| vm_compute; reflexivity].
   apply (bool_decide_unpack _). vm_compute. exact I.
 Qed.
 
-(* so a free set meeting [lmh_free_ok] never counts it free -- and an echo
-   pipeline's exec alternative is exactly it ([UnionDisc.uexf_echo_not_free]) *)
+(* so a free set meeting [lmh_free_ok] never counts it free at [UPC] ... *)
 Lemma no_free_execL (free : ualt -> bool) :
   (forall s s' l a, free a = true -> uok adm_u_f s l a -> uok adm_u_f s' l a) ->
-  free (UP (PLRun PipeDisc.dg_execL)) = false.
+  free (UPC (PLRun PipeDisc.dg_execL)) = false.
 Proof using.
-  intros Hfr. destruct (free (UP (PLRun PipeDisc.dg_execL))) eqn:E; [| reflexivity].
+  intros Hfr. destruct (free (UPC (PLRun PipeDisc.dg_execL))) eqn:E; [| reflexivity].
   exfalso. destruct demo_execL_state_dep as (_ & Hs & Hn).
   exact (Hn (Hfr _ _ _ _ E Hs)).
+Qed.
+
+(* ... while at an echo pipeline the same block is [UPE] of it: the hooks'
+   exec alternative there, admissible at every state, and free *)
+Example demo_execL_echo :
+  lm_dec ulmU (lmh_exf ulmU_hooks l_hi1) = UPE (PLRun PipeDisc.dg_execL)
+  /\ (forall s, lm_ok ulmU s l_hi1 (UPE (PLRun PipeDisc.dg_execL)))
+  /\ lmh_free ulmU_hooks (UPE (PLRun PipeDisc.dg_execL)) = true.
+Proof using.
+  split_and!; [exact (ulm_hooks_exf adm_u_f (PrEcho [cmd_echo; sb "hi"]) 1) | | reflexivity].
+  intros s. left. right. right. reflexivity.
 Qed.
