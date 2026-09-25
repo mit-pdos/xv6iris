@@ -289,12 +289,12 @@ theorem cw_buf_join (a : BitVec 64) (l1 l2 : List (BitVec 8)) (m : Nat) (hm : l1
   exact (byteBuf_append (GF := GF) a (DFrac.own 1) l1 l2).2
 
 /-- The length of what `either_copyin` hands back. -/
-theorem cw_copyin_len (M' : Nat → List (BitVec 8)) (src : Nat) (old bs' : List (BitVec 8))
+theorem cw_copyin_len {X : Prop} (M' : Nat → List (BitVec 8)) (src : Nat) (old bs' : List (BitVec 8))
     (r : BitVec 64)
     (h : (r = 0#64 ∧ bs' = umemRead M' src old.length) ∨
-         (r = -1#64 ∧ ∃ d, d ≤ old.length ∧ bs' = umemRead M' src d ++ old.drop d)) :
+         (r = -1#64 ∧ (∃ d, d ≤ old.length ∧ bs' = umemRead M' src d ++ old.drop d) ∧ X)) :
     bs'.length = old.length := by
-  rcases h with ⟨-, rfl⟩ | ⟨-, d, hd, rfl⟩
+  rcases h with ⟨-, rfl⟩ | ⟨-, ⟨d, hd, rfl⟩, -⟩
   · rw [UMemL.umemRead_length]
   · rw [List.length_append, UMemL.umemRead_length, List.length_drop]; omega
 
@@ -499,8 +499,9 @@ theorem cw_either_copyin (EC : EITHER_COPYIN) (c : CPU) (k' : KCtx) (γl : GName
       (∃ (P' : UPtd) (bs' : List (BitVec 8)),
         ⌜P.extSz V.sz P' ∧
           ((R' 10#5 = 0#64 ∧ bs' = umemRead (viewFaulted P P' M) (k'.regs 12#5).toNat old.length) ∨
-           (R' 10#5 = -1#64 ∧ ∃ d, d ≤ old.length ∧
-              bs' = umemRead (viewFaulted P P' M) (k'.regs 12#5).toNat d ++ old.drop d))⌝ ∗
+           (R' 10#5 = -1#64 ∧ (∃ d, d ≤ old.length ∧
+              bs' = umemRead (viewFaulted P P' M) (k'.regs 12#5).toNat d ++ old.drop d) ∧
+            ∃ e, e < old.length ∧ ¬ uvaRmapped P (k'.regs 12#5 + BitVec.ofNat 64 e).toNat))⌝ ∗
         procPrivExt (procAddr j) pid V P' (viewFaulted P P' M) ∗
         byteBuf (k'.regs 10#5) (DFrac.own 1) bs') -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))

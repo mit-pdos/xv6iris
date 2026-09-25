@@ -191,8 +191,9 @@ theorem either_copyin_proof (MP : MYPROC) (CI : COPYIN) (MM : MEMMOVE) : EITHER_
         ⌜P.extSz V.sz Q ∧
           ((R3 10#5 = 0#64 ∧
               cs = umemRead (viewFaulted P Q M) (k.regs 12#5).toNat old.length) ∨
-           (R3 10#5 = 18446744073709551615#64 ∧ ∃ d, d ≤ old.length ∧
-              cs = umemRead (viewFaulted P Q M) (k.regs 12#5).toNat d ++ old.drop d))⌝ ∗
+           (R3 10#5 = 18446744073709551615#64 ∧ (∃ d, d ≤ old.length ∧
+              cs = umemRead (viewFaulted P Q M) (k.regs 12#5).toNat d ++ old.drop d) ∧
+            ∃ e, e < old.length ∧ ¬ uvaRmapped P (k.regs 12#5 + BitVec.ofNat 64 e).toNat))⌝ ∗
         procPrivExt (procAddr j) pid V Q (viewFaulted P Q M) ∗
         byteBuf (k.regs 10#5) (DFrac.own 1) cs) $$ [Hsz Hpg Hspace Hrest Hold]
     case' _ =>

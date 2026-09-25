@@ -471,7 +471,7 @@ theorem fetchaddr_proof (MP : MYPROC) (CI : COPYIN) : FETCHADDR :=
         · exact Or.inl h.1
         · exact Or.inr h.1
       have hlen8 : bs'.length = 8 := by
-        rcases hpost.2 with ⟨_, h, _⟩ | ⟨_, d, hd, h⟩ <;> subst h
+        rcases hpost.2 with ⟨_, h, _⟩ | ⟨_, ⟨d, hd, h⟩, _⟩ <;> subst h
         · exact UMemL.umemRead_length _ _ _
         · rw [List.length_append, UMemL.umemRead_length, List.length_drop, wordToBytes_length]; omega
       ihave Hw := wordPointsTo_of_bytes (k.regs 11#5) (DFrac.own 1) bs' hlen8 hal $$ Hbuf

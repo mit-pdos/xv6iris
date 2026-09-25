@@ -17,6 +17,13 @@ back.  The user arm mirrors `Xv6/SpecCopyin.lean`'s success / `-1` arms
 with the return value `0` (the code returns the flag register itself).
 The frame is 48 bytes (six slots), so `either_copyin` needs 6 + 44 slots.
 
+AND THE FAILING EXIT CARRIES ITS REASON (Rocq `either_copyin_post`'s user
+`-1` arm, lane TRAP-ROWS T1): `SpecCopyin`'s relayed -- a byte of the run,
+at the wrapped address `src + e`, not readable (`uvaRmapped`) at the
+descriptor `P` the call was handed (Rocq: at `pv_upt (us_V U)`, the entry
+descriptor; here the caller's current one, which a looping caller restates
+at its own entry by `UMemL.uvaRmapped_mono`).
+
 The private block travels as `procPrivExt` (see `Xv6/EitherDefs.lean`:
 the block at an explicit descriptor, and the ctx-free running block).
 
@@ -65,8 +72,9 @@ def wp_either_copyin_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
       (∃ (P' : UPtd) (bs' : List (BitVec 8)),
         ⌜P.extSz V.sz P' ∧
           ((R' 10#5 = 0#64 ∧ bs' = umemRead (viewFaulted P P' M) (k.regs 12#5).toNat old.length) ∨
-           (R' 10#5 = -1#64 ∧ ∃ d, d ≤ old.length ∧
-              bs' = umemRead (viewFaulted P P' M) (k.regs 12#5).toNat d ++ old.drop d))⌝ ∗
+           (R' 10#5 = -1#64 ∧ (∃ d, d ≤ old.length ∧
+              bs' = umemRead (viewFaulted P P' M) (k.regs 12#5).toNat d ++ old.drop d) ∧
+            ∃ e, e < old.length ∧ ¬ uvaRmapped P (k.regs 12#5 + BitVec.ofNat 64 e).toNat))⌝ ∗
         procPrivExt (procAddr j) pid V P' (viewFaulted P P' M) ∗
         byteBuf (k.regs 10#5) (DFrac.own 1) bs')
      else ⌜R' 10#5 = 0#64⌝ ∗ byteBuf (k.regs 12#5) dqs bs ∗

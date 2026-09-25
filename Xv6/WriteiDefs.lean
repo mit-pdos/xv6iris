@@ -374,7 +374,21 @@ theorem writei_either_copyin (EC : EITHER_COPYIN) (c : CPU) (k' : KCtx) (γl : G
     bs old hj hproc hnoff hK hlk huser hlen hlen' hbs
   unfold wp_either_copyin_body at h
   simp only [eitherCopyinAddr] at h
-  exact h
+  -- writei's inode arm does not relay the failure's reason (yet): drop it
+  iintro ⟨Hk, Hpc, #Hl, Ha, Hd, Hs, HΦ⟩
+  iapply h
+  iframe Hk Hpc Hl Ha Hd Hs
+  iapply wpNext_mono _ _ _ _ _ $$ HΦ
+  iintro %cpu' HK %spie %spp %R' %hsp Hk Hpc Hpost %hcs
+  iapply HK $$ %spie %spp %R' %hsp Hk Hpc [Hpost] %hcs
+  cases user
+  · simp only [Bool.false_eq_true, if_false]; iexact Hpost
+  · simp only [if_true]
+    icases Hpost with ⟨%P', %bs', %hp, Hpriv, Hb⟩
+    iexists P', bs'
+    iframe Hpriv Hb
+    ipureintro
+    exact ⟨hp.1, hp.2.imp id (fun h => ⟨h.1, h.2.1⟩)⟩
 
 end
 

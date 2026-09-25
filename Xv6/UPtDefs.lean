@@ -169,6 +169,17 @@ def UPtd.extSz (sz : BitVec 64) (P P' : UPtd) : Prop :=
   (∀ k w, Iris.Std.PartialMap.get? P.um k = none → Iris.Std.PartialMap.get? P'.um k = some w →
     ∃ r : BitVec 64, w = uLeaf (BitVec.extractLsb' 12 44 r) (PTE_W ||| PTE_U ||| PTE_R))
 
+/-- **The addresses a copyin can read** (Rocq `UserPtTree.uva_rmapped`, lane
+TRAP-ROWS T1): the table has a user leaf at the address's page and that
+leaf passes `V ∧ U` -- walkaddr's test, the ONLY one a failing copyin
+performs (there is no `PTE_R` re-walk on the read side).  Spelled as Rocq's
+PAGE * 4096 + OFFSET decomposition.  The map only grows
+(`UMemL.uvaRmapped_mono`), so a failure reported at a round's grown table
+is restated at the table the caller named. -/
+def uvaRmapped (P : UPtd) (va : Nat) : Prop :=
+  ∃ (vpn : Nat) (w : BitVec 64) (j : Nat),
+    Iris.Std.PartialMap.get? P.um vpn = some w ∧ pteVU w ∧ j < 4096 ∧ va = vpn * 4096 + j
+
 /-- The view with page `k` zeroed. -/
 def viewZero (M : Nat → List (BitVec 8)) (k : Nat) : Nat → List (BitVec 8) :=
   fun k' => if k' = k then List.replicate 4096 0#8 else M k'

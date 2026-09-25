@@ -243,8 +243,9 @@ theorem pw_copyin (CI : COPYIN) (c : CPU) (k' : KCtx) (γl : GName) (γk : KmemN
         ⌜P.extSz (k'.regs 11#5) P' ∧
           ((R' 10#5 = 0#64 ∧ bs' = umemRead (viewFaulted P P' M) (k'.regs 13#5).toNat old.length ∧
               umMapped P' (k'.regs 13#5).toNat old.length) ∨
-           (R' 10#5 = -1#64 ∧ ∃ d, d ≤ old.length ∧
-              bs' = umemRead (viewFaulted P P' M) (k'.regs 13#5).toNat d ++ old.drop d))⌝ ∗
+           (R' 10#5 = -1#64 ∧ (∃ d, d ≤ old.length ∧
+              bs' = umemRead (viewFaulted P P' M) (k'.regs 13#5).toNat d ++ old.drop d) ∧
+            ∃ e, e < old.length ∧ ¬ uvaRmapped P (k'.regs 13#5 + BitVec.ofNat 64 e).toNat))⌝ ∗
         procPtAt P' (viewFaulted P P' M) ∗ byteBuf (k'.regs 12#5) (DFrac.own 1) bs') -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
@@ -1416,7 +1417,7 @@ theorem pw_body (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP) (SP : SLEEP_
   subst spieC; subst sppC
   k_norm_g [pw_withSpie_sec]
   obtain ⟨hext2, hpost⟩ := hpost
-  replace hpost := hpost.imp (fun h => And.intro h.1 h.2.1) id
+  replace hpost := hpost.imp (fun h => And.intro h.1 h.2.1) (fun h => And.intro h.1 h.2.1)
   obtain ⟨b', rfl⟩ := pw_copyin_one _ _ _ _ _ hpost
   have hfixC : pwFix k j n RC := pwFix_cs k j n _ RC
     (by unfold pwFix at hfixK ⊢; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hfixK) hcsC

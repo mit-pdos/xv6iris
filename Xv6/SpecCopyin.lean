@@ -12,6 +12,15 @@ image with every lazy page zeroed (`UMemLazy.umemRead_viewLazy`), Rocq's
 single reading `us_M` (Rocq's `copyin` keeps the image fixed: its `vmfault`
 preserves the view, the Lean one zeroes a page when it is faulted in).
 
+THE FAILURE ARM CARRIES ITS REASON (Rocq `SpecCopyin.copyin_read`'s `-1`
+arm, lane TRAP-ROWS T1): a byte of the requested run, at the wrapped address
+`srcva + e` (Rocq `uint (add_vec_int srcva e)`), that is not readable
+(`uvaRmapped`) at the ENTRY table `P` -- walkaddr answered 0 at its page
+and vmfault declined (mapped nothing).  Which byte is existential: copyin
+walks whole pages, so the failing round may have copied a prefix of its
+own page first.  Beside Rocq's reason the arm keeps the landed statement of
+the prefix copied (Rocq says nothing about the bytes on `-1`).
+
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 
@@ -43,8 +52,9 @@ def wp_copyin_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G G
       ⌜P.extSz (k.regs 11#5) P' ∧
         ((R' 10#5 = 0#64 ∧ bs' = umemRead (viewFaulted P P' M) (k.regs 13#5).toNat old.length ∧
             umMapped P' (k.regs 13#5).toNat old.length) ∨
-         (R' 10#5 = -1#64 ∧ ∃ d, d ≤ old.length ∧
-            bs' = umemRead (viewFaulted P P' M) (k.regs 13#5).toNat d ++ old.drop d))⌝ ∗
+         (R' 10#5 = -1#64 ∧ (∃ d, d ≤ old.length ∧
+            bs' = umemRead (viewFaulted P P' M) (k.regs 13#5).toNat d ++ old.drop d) ∧
+          ∃ e, e < old.length ∧ ¬ uvaRmapped P (k.regs 13#5 + BitVec.ofNat 64 e).toNat))⌝ ∗
       procPtAt P' (viewFaulted P P' M) ∗ byteBuf (k.regs 12#5) (DFrac.own 1) bs') -∗
     ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu

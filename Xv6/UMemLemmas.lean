@@ -636,6 +636,14 @@ theorem umBelow_extSz {sz : BitVec 64} {P P' : UPtd} (hb : umBelow sz P) (h : P.
 
 /-! ## The written prefix is mapped (`umMapped`): chaining chunked copies -/
 
+/-- THE MAP ONLY GROWS (Rocq `uva_rmapped_mono`): a byte readable at a
+table is readable at any extension of it, so a failure reported at a
+round's grown table restates at the table the caller named. -/
+theorem uvaRmapped_mono {P P' : UPtd} (h : P.ext P') {va : Nat} (hr : uvaRmapped P va) :
+    uvaRmapped P' va := by
+  obtain ⟨vpn, w, j, hl, hvu, hj, hva⟩ := hr
+  exact ⟨vpn, w, j, h.2.2 _ _ hl, hvu, hj, hva⟩
+
 theorem umMapped_zero (P : UPtd) (va : Nat) : umMapped P va 0 := fun _ h => absurd h (by omega)
 
 theorem umMapped_le {P : UPtd} {va n m : Nat} (hle : m ≤ n) (h : umMapped P va n) :

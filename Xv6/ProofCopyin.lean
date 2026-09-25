@@ -56,6 +56,12 @@ theorem ci_addSplit (b : BitVec 64) (x y : Nat) :
     b + (BitVec.ofNat 64 x + BitVec.ofNat 64 y) = b + BitVec.ofNat 64 (x + y) := by
   rw [co_ofNat_add]
 
+/-- The wrapped byte address of the spec's reason, where the run does not wrap. -/
+theorem ci_addr_toNat (b : BitVec 64) (e : Nat) (h : b.toNat + e < 2 ^ 64) :
+    (b + BitVec.ofNat 64 e).toNat = b.toNat + e := by
+  rw [BitVec.toNat_add, BitVec.toNat_ofNat, Nat.mod_eq_of_lt (by omega : e < 2 ^ 64)]
+  exact Nat.mod_eq_of_lt h
+
 theorem ci_nval (A d : Nat) (hA64 : A + d < 2 ^ 64) :
     BitVec.ofNat 64 ((A + d) / 4096 * 4096) + (-(BitVec.ofNat 64 A + BitVec.ofNat 64 d) + 4096#64)
       = BitVec.ofNat 64 (4096 - (A + d) % 4096) := by
@@ -261,8 +267,45 @@ def ciPost (psz : BitVec 64) (P : UPtd) (M : Nat → List (BitVec 8)) (A : Nat) 
     (P' : UPtd) (bs' : List (BitVec 8)) (r : BitVec 64) : Prop :=
   P.extSz psz P' ∧
     ((r = 0#64 ∧ bs' = umemRead (viewFaulted P P' M) A old.length ∧ umMapped P' A old.length) ∨
-     (r = -1#64 ∧ ∃ e, e ≤ old.length ∧
-        bs' = umemRead (viewFaulted P P' M) A e ++ old.drop e))
+     (r = -1#64 ∧ (∃ e, e ≤ old.length ∧
+        bs' = umemRead (viewFaulted P P' M) A e ++ old.drop e) ∧
+      ∃ e, e < old.length ∧ A + e < 2 ^ 64 ∧ ¬ uvaRmapped P (A + e)))
+
+/-! ## Why the `-1` arm failed, as a fact about the ENTRY table
+
+Rocq `ProofCopyin.ci_fault_vpn` / `ci_fault_leaf` (lane TRAP-ROWS, T1):
+copyin has no `PTE_R` re-walk, so the only verdict a failing round has is
+walkaddr's, and the predicate it refutes is `uvaRmapped`.  The entry
+table's leaves are all still in the round's grown one (`P.ext P1`), the
+byte's page is the one the round walked, and every user leaf lies below
+`TRAPFRAME`, so walkaddr's `MAXVA` reason cannot fire at a readable byte.
+(The Lean walkaddr reports at the recorded leaves, so Rocq's A/D view step
+is not needed.) -/
+
+theorem ci_fault_leaf (P P1 : UPtd) (x : Nat) (hext : P.ext P1) (hwf : uptWf P1)
+    (hx : x < 2 ^ 64)
+    (hwhy : 2 ^ 38 ≤ (BitVec.ofNat 64 (x / 4096 * 4096)).toNat ∨
+      get? P1.leaves (vpnOf (BitVec.ofNat 64 (x / 4096 * 4096))).toNat = none ∨
+      ∃ w, get? P1.leaves (vpnOf (BitVec.ofNat 64 (x / 4096 * 4096))).toNat = some w ∧ ¬ pteVU w) :
+    ¬ uvaRmapped P x := by
+  rintro ⟨vpn, w, j, hl, hvu, hj, hxe⟩
+  have hl1 := hext.2.2 _ _ hl
+  have hk : vpn < tfVpn.toNat := (hwf.1 _ _ hl1).1
+  rw [UMemL.tfVpn_toNat] at hk
+  have hdiv : x / 4096 * 4096 = vpn * 4096 := by omega
+  have hlt : vpn * 4096 < 2 ^ 38 := by omega
+  have hnat : (BitVec.ofNat 64 (x / 4096 * 4096)).toNat = vpn * 4096 := by
+    rw [hdiv, BitVec.toNat_ofNat]; exact Nat.mod_eq_of_lt (by omega)
+  have h39 : (BitVec.ofNat 64 (x / 4096 * 4096)).toNat < 2 ^ 39 := by
+    rw [hnat]; exact Nat.lt_of_lt_of_le hlt (by decide)
+  have hvpn : (vpnOf (BitVec.ofNat 64 (x / 4096 * 4096))).toNat = vpn := by
+    rw [co_vpnOf_toNat _ h39, hnat]; omega
+  have hlv := UMemL.leaves_of_um P1 hwf vpn w hl1
+  rw [hnat, hvpn] at hwhy
+  rcases hwhy with h | h | ⟨w', h, hn⟩
+  · omega
+  · rw [hlv] at h; cases h
+  · rw [hlv] at h; cases h; exact hn hvu
 
 /-! ## One page: `walkaddr`, and `vmfault` when it is not mapped -/
 
@@ -300,7 +343,7 @@ theorem ci_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
       procPtAt P2 (viewFaulted P P2 M) -∗
       byteBuf dst0 (DFrac.own 1) (umemRead (viewFaulted P P2 M) A d ++ old.drop d) -∗
       ⌜ciKeep R R2 ∧ P.extSz psz P2 ∧ P1.ext P2 ∧
-        ((pcv = (KA.«copyin» + 0x7c#64) ∧ R2 10#5 = -1#64) ∨
+        ((pcv = (KA.«copyin» + 0x7c#64) ∧ R2 10#5 = -1#64 ∧ ¬ uvaRmapped P (A + d)) ∨
          (pcv = (KA.«copyin» + 0x30#64) ∧ get? P2.um ((A + d) / 4096) = some w ∧
           R2 10#5 = pte2pa w ∧ R2 19#5 = BitVec.ofNat 64 ((A + d) / 4096 * 4096) ∧
           (A + d) / 4096 * 4096 < 2 ^ 38))⌝ -∗
@@ -405,12 +448,19 @@ theorem ci_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
         ((hp13 h).trans (hpinB h)))) $$ HΦ
       iapply HΦ' $$ %spie2 %spp2 %_ %P1 %0#64 %_ %hsp3' Hk Hpc HP Hdst
       ipureintro
-      refine ⟨?_, hext1, UMemL.ext_refl P1, Or.inl ⟨rfl, ?_⟩⟩
+      refine ⟨?_, hext1, UMemL.ext_refl P1, Or.inl ⟨rfl, ?_, ?_⟩⟩
       · unfold ciKeep
         simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
         exact ⟨f2.trans e2, f18.trans e18, f20.trans e20, f21.trans e21, f22.trans e22,
           f23.trans e23, f24.trans e24, f25.trans e25, f26.trans e26, f27.trans e27⟩
       · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
+      · -- T1: walkaddr answered 0 at the page, vmfault mapped nothing
+        simp only [walkaddrRet, RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false] at hret2
+        rcases hret2 with ⟨-, hwhy⟩ | ⟨w, hw, hvu, -, hpa⟩
+        · exact ci_fault_leaf P P1 (A + d) hext1.1 hwf1 hA64 hwhy
+        · exfalso
+          have hum := UMemL.um_of_leaves_vu P1 _ w hw hvu
+          exact PtRun.pageValid_ne_zero _ (hwf1.1 _ w hum).2.2 (hpa.symm.trans hz)
     · -- vmfault mapped a fresh zeroed page
       obtain ⟨hR3, hval, hlt, hnone⟩ := hrf
       -- s3(va0) was folded to `ofNat((A+d)/4096*4096)` as a2 (regs 12); a1 (regs 11) = psz
@@ -867,7 +917,8 @@ theorem ci_iter (WA : WALKADDR) (VF : VMFAULT) (MM : MEMMOVE) [Xv6G GF] [CurCtx]
     ihave HΦ' := wpNext_at _ _ _ c _ hp $$ HΦ
     iapply HΦ' $$ %spie2 %spp2 %R2 %P2 %_ %d %_ %hsp2 Hk Hpc HP Hdst
     ipureintro
-    exact ⟨j2.trans hsp, Or.inl ⟨rfl, ⟨hext2, Or.inr ⟨hm1, d, by omega, rfl⟩⟩, j27.trans h27⟩⟩
+    exact ⟨j2.trans hsp, Or.inl ⟨rfl, ⟨hext2, Or.inr ⟨hm1.1, ⟨d, by omega, rfl⟩, d, hd, hA64, hm1.2⟩⟩,
+      j27.trans h27⟩⟩
   · subst hpcv
     ihave HΦ := wpNext_shift _ _ _ _ _ hp $$ HΦ
     iapply (ci_nsel MM k P M old A dst0 psz sp s11 hK d hd hlen' hA64 hmax' P2 w hext2 hum
@@ -1099,7 +1150,10 @@ theorem copyin_proof (WA : WALKADDR) (VF : VMFAULT) (MM : MEMMOVE) : COPYIN :=
         obtain ⟨he, hr⟩ := hcip
         refine ⟨he, ?_⟩
         simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
-        exact hr
+        rcases hr with h | ⟨h1, h2, e, hel, heA, hn⟩
+        · exact Or.inl h
+        · refine Or.inr ⟨h1, h2, e, hel, ?_⟩
+          rwa [ci_addr_toNat _ _ heA]
       · isplitl [HP]
         · iexact HP
         · iexact Hdst
