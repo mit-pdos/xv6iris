@@ -226,6 +226,20 @@ Proof using. apply cat_cont_ran_absent. apply lookup_empty. Qed.
 Lemma cat_cont_noopen (s : fstate) : cont s LCat_f RCNoOpen = alt_catopen.
 Proof using. reflexivity. Qed.
 
+(* ...AT ANY NAME OF THE CLASS (cut W3): the three arms at the line's own
+   file, which is all the union's cat entry reads *)
+Lemma cat_cont_ran_some_at (s : fstate) (nm bs : list (bv 8)) :
+  s !! nm = Some bs -> cont s (LCat nm) RCRan = bs ++ u_prompt.
+Proof using. intros Hs. cbn [cont lname line_file default]. by rewrite Hs. Qed.
+
+Lemma cat_cont_ran_absent_at (s : fstate) (nm : list (bv 8)) :
+  s !! nm = None -> cont s (LCat nm) RCRan = alt_catopenN nm.
+Proof using. intros Hs. cbn [cont lname line_file default]. by rewrite Hs. Qed.
+
+Lemma cat_cont_noopen_at (s : fstate) (nm : list (bv 8)) :
+  cont s (LCat nm) RCNoOpen = alt_catopenN nm.
+Proof using. reflexivity. Qed.
+
 (* the two are byte-identical at an absent file, which is why the
    observer cannot tell them apart and the DEED is what decides which is
    filed ([FileOpen.fdq_agree] at cat's fraction) *)

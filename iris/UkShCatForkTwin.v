@@ -74,7 +74,7 @@ Section UkShCatForkTwin.
   Qed.
 
   Lemma wp_kshm_body_cat_pipe
-      (Dc : nat)
+      (Dc : nat) (nm : list (bv 8))
       (h : CpuId) (m : regfile) (f : nat -> bv 8) (k len : nat)
       (sz : Z) (l : list fdstate) (n : nat) :
     (Dc <= 68 + UkSh.ush_Dpipe)%nat ->
@@ -84,7 +84,7 @@ Section UkShCatForkTwin.
     (forall j : nat, (j < len)%nat -> f (k + j)%nat <> ubyte0) ->
     f (k + len)%nat = ubyte0 ->
     (k + len < sh_nbuf)%nat ->
-    UkSh.ush_line_at FileDisc.LCat_f f k len ->
+    UkSh.ush_line_at (FileDisc.LCat nm) f k len ->
     8344 <= sz ->
     UserPtTree.pgroundup sz = sz ->
     usz_ok (sz + 65536) ->
@@ -102,14 +102,14 @@ Section UkShCatForkTwin.
     UkShFork.ushf_child_law_at Wc UkShRedirBody.ushs_lp_cat Dc -∗
     UkShDiag.ush_panic_law Wc Wb -∗
     ⌜ UkSh.ush_fd0p l ⌝ -∗
-    UkSh.ush_bstate N γp T Wc Wb Pm l (FileDisc.uline_ws FileDisc.LCat_f) -∗
+    UkSh.ush_bstate N γp T Wc Wb Pm l (FileDisc.uline_ws (FileDisc.LCat nm)) -∗
     UkShLoop.ushl_dat γd -∗ usz γs sz -∗
     ubytes γd sh_buf sh_nbuf f -∗
     urun N h m (mword_of_int 0x97a) (16 + (UkSh.ush_Dbody + n)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using HT Hpay Hpsok_free.
     exact (UkShRedirBody.wp_kshm_body_cat_with N γp T Wc Wb Pm kshf_fork_law_pipe
-             Dc h m f k len sz l n).
+             Dc nm h m f k len sz l n).
   Qed.
 
   (* ...as the body law at the cat line *)
@@ -121,7 +121,8 @@ Section UkShCatForkTwin.
     UkShFork.ushf_kill_law Wc -∗
     UkShFork.ushf_child_law_at Wc UkShRedirBody.ushs_lp_cat 68 -∗
     UkShDiag.ush_panic_law Wc Wb -∗
-    UkShFork.ushf_body_law N γp T Wc Wb Pm (fun l : uline => l = LCat_f) sz.
+    UkShFork.ushf_body_law N γp T Wc Wb Pm
+      (fun l : uline => exists nm : list (bv 8), l = LCat nm) sz.
   Proof using HT Hpay Hpsok_free.
     intros Hszlo Hszal Hszok Hwbl.
     iIntros "#Hkl #Hchl #Hplaw".
@@ -129,9 +130,9 @@ Section UkShCatForkTwin.
     iIntros "!>" (lu h m f k len l n)
       "%Hd %Hlat %Hregs %Hs1 %Ha5 %Hnn %Hnul %Hkl2 %Hpm1 %Hpmwb %Hfd0
        #Hgen #Hcode #Hjt Hhead Hstd Hdat Hsz Hbuf Hrun".
-    subst lu.
+    destruct Hd as [nm ->].
     iDestruct (UkSh.ush_jtab_ro γt with "Hjt") as "#Hro".
-    iApply (wp_kshm_body_cat_pipe 68 h m f k len sz l n ltac:(lia)
+    iApply (wp_kshm_body_cat_pipe 68 nm h m f k len sz l n ltac:(lia)
               Hregs Hs1 Ha5 Hnn Hnul Hkl2 Hlat Hszlo Hszal Hszok
               Hpm1 Hpmwb Hwbl
               with "Hgen Hhead Hcode Hro [] Hjt Hkl Hchl Hplaw [%] Hstd

@@ -58,7 +58,7 @@ Require Import FileOutPure.
 Require Import FileState.
 Require Import AppEcho.
 Require Import AppFile.
-Require FileName.                        (* [uname_fname_f] *)
+Require FileDisc.                        (* [uname] *)
 Require Import FileOut.
 Require Import FileLinks.
 Require Import FileOpen.                 (* [fdq], [file_open_pay] *)
@@ -189,19 +189,20 @@ Section UShFileRedir.
      ([FileOpen]'s note at [file_open_fd_K]).  [UkFileOpen.redir_K OffHeld]
      IS that statement, and it is what
      [UkFileOpen.wp_uk_ecall_open_create_deed_d] at [OffHeld] hands back. *)
-  (* ...at the deed's map [s] the call was made at (cut W2): the fd arm
-     leaves the deed at [s] with `f` present and empty *)
-  Definition redir_K (s : dst) (ty : fdtype) : iProp Σ :=
-    UkFileOpen.redir_K OffHeld (fgn_cl g) r FsImgCheck.fname_f s ty.
+  (* ...at the deed's map [s] the call was made at (cut W2) and the name
+     [nm] the line redirects to (cut W3): the fd arm leaves the deed at
+     [s] with [nm] present and empty *)
+  Definition redir_K (nm : list (bv 8)) (s : dst) (ty : fdtype) : iProp Σ :=
+    UkFileOpen.redir_K OffHeld (fgn_cl g) r nm s ty.
 
   (* ...AND THE [-1] ARM'S, WITH THE TAINT (the PROGRAM STREAM): the
      kernel's own payload is [FileOpen.file_open_pay], whose third arm is
      the era's taint -- a failed open at a tainted application hands back
      no deed, and a [Kf] without that arm cannot be produced. *)
-  Definition redir_Kf (s : dst) : iProp Σ :=
+  Definition redir_Kf (nm : list (bv 8)) (s : dst) : iProp Σ :=
     (fown r s
-     ∨ (⌜s !! FsImgCheck.fname_f = None⌝
-        ∗ ∃ i : Z, fown r (<[FsImgCheck.fname_f := (i, [])]> s))
+     ∨ (⌜s !! nm = None⌝
+        ∗ ∃ i : Z, fown r (<[nm := (i, [])]> s))
      ∨ T)%I.
 
   (* ---- WHAT THE OPEN'S RECEIPT SAYS ABOUT THE INODE (the PROGRAM
@@ -212,10 +213,10 @@ Section UShFileRedir.
           [FileFsPure.file_fs_pure], and the contents differ by LENGTH.
           [AppFileCons.file_deed_inum_acc] is that reading; this is the one
           invariant opening that turns the receipt into it. ---- *)
-  Lemma redir_K_inum (s : dst) (ty : fdtype) (E : coPset) :
+  Lemma redir_K_inum (nm : list (bv 8)) (s : dst) (ty : fdtype) (E : coPset) :
     ↑appN ⊆ E ->
-    app_inv fsc_fs -∗ redir_K s ty ={E}=∗
-      redir_K s ty ∗
+    app_inv fsc_fs -∗ redir_K nm s ty ={E}=∗
+      redir_K nm s ty ∗
       ((∃ (i : Z) (γo : gname),
           ⌜ty = FdInode i γo OffHeld⌝
           ∗ ⌜i <> INIT_INO /\ i <> SH_INO /\ i <> ECHO_INO
@@ -233,7 +234,7 @@ Section UShFileRedir.
     iEval (rewrite Heq; cbn [app_pred app_run app_names]) in "Hp".
     iDestruct "Hp" as ">Hp".
     iDestruct (AppFileCons.file_deed_inum_acc (fgn_cl g) r _
-                 (<[FsImgCheck.fname_f := (i, [])]> s) FsImgCheck.fname_f i []
+                 (<[nm := (i, [])]> s) nm i []
                  (lookup_insert _ _ _)
                  ltac:(cbn [length]; rewrite /EchoDisc.line_max; lia)
                  with "Hd Hp") as "(Hp & Hd & Hres)".
@@ -318,8 +319,9 @@ Section UShFileRedir.
      the parse with its lend whole, and the deed flows lend -> call ->
      receipt ([UkShRedirAns.ush_open_call2]'s [Dd]). *)
   Lemma Hopen_hand (N : uk_names Σ) (file : Z) (l : list fdstate) (s0 : dst)
-      (ls : list fwline) (ws : wordline) (jo : option Z) :
-    (FsImgCheck.fname_f, ws) ∈ ls -> EchoDisc.line_ok ws ->
+      (ls : list fwline) (ws : wordline) (jo : option Z) (nm : list (bv 8)) :
+    FileDisc.uname nm ->
+    (nm, ws) ∈ ls -> EchoDisc.line_ok ws ->
     app_inv fsc_fs -∗ file_cons_cred (fgn_cl g) r jo -∗ fl_lb (fgn_cl g) ls -∗
     (* ...AND THE CWD'S CAMERA IS PINNED TOO (the PROGRAM STREAM's rule,
        one class further out than the deposit): [UserCwd.ucwd] takes a
@@ -331,10 +333,10 @@ Section UShFileRedir.
        same proposition unless this says which. *)
     UkShRedirAns.ush_open_call2 (PS := uprogSG_free) (SG := uexecSG_xv6)
       (ghost_varG0 := offbox_offG) (A := unit)
-      N FsImg.ROOTINO file 1537 l (redir_K s0) (fun _ => fown r s0)
-      (fun _ => redir_Kf s0).
+      N FsImg.ROOTINO file 1537 nm l (redir_K nm s0) (fun _ => fown r s0)
+      (fun _ => redir_Kf nm s0).
   Proof using Heq.
-    intros Hin Hokw. iIntros "#Hinv #Hmade #Hlb".
+    intros Hu Hin Hokw. iIntros "#Hinv #Hmade #Hlb".
     rewrite /UkShRedirAns.ush_open_call2.
     iIntros (h m av Img pl u) "%Ha0 %Ha1 %Hpath %Hnp %Hstart %Hlast %Hfdl
              #Himg Hown #Hcode Hcwd Hstd Hrun Hcont".
@@ -379,9 +381,9 @@ Section UShFileRedir.
     (* ---- 0xcc8  ecall -- the DEED's create corollary at [OffHeld] ---- *)
     iApply (UkFileOpen.wp_uk_ecall_open_create_deed_d (PSx := uprogSG_free)
               N OffHeld h1 m1 (mword_of_int 0xcc8) l av (fgn_cl g) r jo
-              FsImgCheck.fname_f s0
+              nm s0
               ls ws FsImg.ROOTINO Img (mword_of_int file : mword 64) pl
-              FileName.uname_fname_f Heq
+              Hu Heq
               ltac:(unfold m1, usysno;
                     rewrite (upd_eq m (Regidx (mword_of_int 17 : mword 5))
                                (mword_of_int 15 : mword 64));
@@ -446,8 +448,8 @@ Section UShFileRedir.
      program's half of the offset at 0, and the claim's fact that `f`'s
      inode is none of the image's ([redir_K_inum]'s conclusion beside the
      receipt).  What the redirect child's exec supply lends. *)
-  Definition redir_K' (s : dst) (ty : fdtype) : iProp Σ :=
-    (redir_K s ty
+  Definition redir_K' (nm : list (bv 8)) (s : dst) (ty : fdtype) : iProp Σ :=
+    (redir_K nm s ty
      ∗ ((∃ (i : Z) (γo : gname),
            ⌜ty = FdInode i γo OffHeld⌝
            ∗ ⌜i <> INIT_INO /\ i <> SH_INO /\ i <> ECHO_INO

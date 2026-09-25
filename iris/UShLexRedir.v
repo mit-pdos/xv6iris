@@ -26,8 +26,8 @@
 (*     ush_line_lexable_holds]'s twin -- the existential form.             *)
 (*   S3 is the bridge FROM THE TYPED LINE: the file application's tag      *)
 (*     ([FileOut.ftag]) gives [FileDisc.disc_f], whose content at one line *)
-(*     is [FileDisc.parse_line J = Some l]; at [l = LEchoF_f ws] that body   *)
-(*     IS [wl_body ws ++ suf_gtf] ([FileDisc.line_body_parse]), which is   *)
+(*     is [FileDisc.parse_line J = Some l]; at [l = LEchoF ws nm] that body *)
+(*     IS [wl_body ws ++ suf_gt nm] ([FileDisc.line_body_parse]), which is *)
 (*     the redirect line positionally.  [sh_redir_line_lexable] is that    *)
 (*     chain in one step: from the line sh READ to the four parser         *)
 (*     premises of [UkShRedirSeam.wp_kshm_child_alloc_redir].             *)
@@ -42,6 +42,7 @@ Require Import UkShParseSym.
 Require Import UkShWords.
 Require Import UkShRedirLine.
 Require Import UkShLoop.
+Require Import UNameBytes.   (* the suffix around a name of any length *)
 
 
 (* ===================================================================== *)
@@ -318,102 +319,83 @@ Qed.
 (* §3 FROM THE TYPED LINE: WHAT [UShRound.Hlexr] IS DISCHARGED FROM        *)
 (* ===================================================================== *)
 
-(* the file name is one alphanumeric byte, so it is a WORD *)
-Lemma fname_f_word : wl_word fname_f.
-Proof using. apply (bool_decide_unpack _); vm_compute; exact I. Qed.
-
-Lemma fname_f_len : length fname_f = 1%nat.
-Proof using. vm_compute; reflexivity. Qed.
-
-(* the redirect suffix, positionally: ' ' '>' ' ' then the file name *)
-Lemma suf_gtf_0 : suf_gtf !!! 0%nat = wl_sp.
-Proof using. apply bv_eq; vm_compute; reflexivity. Qed.
-
-Lemma suf_gtf_1 : suf_gtf !!! 1%nat = ushs_gt.
-Proof using. apply bv_eq; vm_compute; reflexivity. Qed.
-
-Lemma suf_gtf_2 : suf_gtf !!! 2%nat = wl_sp.
-Proof using. apply bv_eq; vm_compute; reflexivity. Qed.
-
-Lemma suf_gtf_3 : suf_gtf !!! 3%nat = fname_f !!! 0%nat.
-Proof using. apply bv_eq; vm_compute; reflexivity. Qed.
-
-(* THE BRIDGE.  The premises are the ones [UkSh.ush_gets_done_line] takes
-   -- the body the read delivered, the buffer holding it at [k] and the
-   newline the loop stored past it -- with [EchoDisc.body_ok J] replaced by
-   the file discipline's own reading of the same body, [FileDisc.parse_line
-   J = Some (LEchoF_f ws)].  That is exactly what [FileOut.ftag]'s
-   [FileDisc.disc_f] says about one line of the input. *)
+(* THE BRIDGE, at ANY name of the class (cut W3).  The premises are the
+   ones [UkSh.ush_gets_done_line] takes -- the body the read delivered,
+   the buffer holding it at [k] and the newline the loop stored past it --
+   with [EchoDisc.body_ok J] replaced by the file discipline's own reading
+   of the same body, [FileDisc.parse_line J = Some (LEchoF ws nm)], and
+   the name a WORD ([UNamePath.uname_word]: the lexer's one non-law
+   fact). *)
 Lemma sh_redir_line_of_typed (J : list (bv 8)) (ws : list (list (bv 8)))
-    (f : nat -> bv 8) (k len : nat) :
-  parse_line J = Some (LEchoF_f ws) ->
+    (nm : list (bv 8)) (f : nat -> bv 8) (k len : nat) :
+  wl_word nm ->
+  parse_line J = Some (LEchoF ws nm) ->
   len = S (length J) ->
   (forall j : nat, (j < length J)%nat -> f (k + j)%nat = J !!! j) ->
   f (k + length J)%nat = wl_nl ->
-  ushs_line_is ws fname_f f k len.
+  ushs_line_is ws nm f k len.
 Proof using.
-  intros Hp Hlen Hf Hnl.
-  pose proof (line_body_parse J (LEchoF_f ws) Hp) as HJ.
+  intros Hw Hp Hlen Hf Hnl.
+  pose proof (line_body_parse J (LEchoF ws nm) Hp) as HJ.
   cbn [line_body] in HJ.
-  pose proof (parse_line_ok J (LEchoF_f ws) Hp) as [ Hok _ ].
-  assert (HlenJ : length J = (length (wl_body ws) + 4)%nat)
-    by (rewrite HJ; rewrite length_app; rewrite suf_gtf_len; lia).
+  pose proof (parse_line_ok J (LEchoF ws nm) Hp) as [ Hok _ ].
+  assert (HlenJ : length J = (length (wl_body ws) + (3 + length nm))%nat)
+    by (rewrite HJ, length_app, suf_gt_len; reflexivity).
   (* every byte of the suffix, off the body's own layout *)
-  assert (Hsuf : forall i : nat, (i < 4)%nat ->
-            f (k + (length (wl_body ws) + i))%nat = suf_gtf !!! i).
+  assert (Hsuf : forall i : nat, (i < 3 + length nm)%nat ->
+            f (k + (length (wl_body ws) + i))%nat = suf_gt nm !!! i).
   { intros i Hi. rewrite (Hf (length (wl_body ws) + i)%nat ltac:(lia)). rewrite HJ.
-    exact (wl_lta_app_r (wl_body ws) suf_gtf i). }
+    exact (wl_lta_app_r (wl_body ws) (suf_gt nm) i). }
   unfold ushs_line_is. split_and!.
   - exact Hok.
-  - exact fname_f_word.
-  - rewrite Hlen. rewrite HlenJ. rewrite fname_f_len. lia.
+  - exact Hw.
+  - rewrite Hlen, HlenJ. lia.
   - intros j Hj. rewrite (Hf j ltac:(lia)). rewrite HJ.
-    exact (wl_lta_app_l (wl_body ws) suf_gtf j Hj).
+    exact (wl_lta_app_l (wl_body ws) (suf_gt nm) j Hj).
   - pose proof (Hsuf 0%nat ltac:(lia)) as H0.
-    rewrite Nat.add_0_r in H0. rewrite H0. exact suf_gtf_0.
+    rewrite Nat.add_0_r in H0. rewrite H0. exact (suf_gt_0 nm).
   - pose proof (Hsuf 1%nat ltac:(lia)) as H1.
     replace (k + length (wl_body ws) + 1)%nat
       with (k + (length (wl_body ws) + 1))%nat by lia.
-    rewrite H1. exact suf_gtf_1.
+    rewrite H1. exact (suf_gt_1 nm).
   - pose proof (Hsuf 2%nat ltac:(lia)) as H2.
     replace (k + length (wl_body ws) + 2)%nat
       with (k + (length (wl_body ws) + 2))%nat by lia.
-    rewrite H2. exact suf_gtf_2.
-  - intros j Hj. rewrite fname_f_len in Hj.
-    replace j with 0%nat by lia. rewrite Nat.add_0_r.
-    pose proof (Hsuf 3%nat ltac:(lia)) as H3.
-    replace (k + length (wl_body ws) + 3)%nat
-      with (k + (length (wl_body ws) + 3))%nat by lia.
-    rewrite H3. exact suf_gtf_3.
-  - rewrite fname_f_len.
-    replace (k + length (wl_body ws) + 3 + 1)%nat with (k + length J)%nat
+    rewrite H2. exact (suf_gt_2 nm).
+  - intros j Hj.
+    pose proof (Hsuf (3 + j)%nat ltac:(lia)) as H3.
+    replace (k + length (wl_body ws) + 3 + j)%nat
+      with (k + (length (wl_body ws) + (3 + j)))%nat by lia.
+    rewrite H3. exact (suf_gt_name nm j).
+  - replace (k + length (wl_body ws) + 3 + length nm)%nat with (k + length J)%nat
       by lia.
     exact Hnl.
 Qed.
 
-(* ...AND THE OBLIGATION, END TO END.  This is the lemma [UShRound] applies
+(* ...AND THE OBLIGATION, END TO END.  This is the lemma the round applies
    at the child: from the line sh READ -- typed, so its body parses -- come
    the four PURE premises of [UkShRedirSeam.wp_kshm_child_alloc_redir]
    ([ushs_redir], [ushs_toks], [0 < length args], [length args < 10]) at
    [args := wl_toks ws], [gp := |wl_body ws| + 1] and
-   [fe := |wl_body ws| + 3 + |fname_f|]. *)
+   [fe := |wl_body ws| + 3 + |nm|], at a name of any length. *)
 Lemma sh_redir_line_lexable (J : list (bv 8)) (ws : list (list (bv 8)))
-    (f : nat -> bv 8) (k len : nat) :
-  parse_line J = Some (LEchoF_f ws) ->
+    (nm : list (bv 8)) (f : nat -> bv 8) (k len : nat) :
+  wl_word nm ->
+  parse_line J = Some (LEchoF ws nm) ->
   len = S (length J) ->
   (forall j : nat, (j < length J)%nat -> f (k + j)%nat = J !!! j) ->
   f (k + length J)%nat = wl_nl ->
   ushs_redir len (fun j : nat => f (k + j)%nat)
     (length (wl_body ws) + 1)%nat
-    (length (wl_body ws) + 3 + length fname_f)%nat
+    (length (wl_body ws) + 3 + length nm)%nat
   /\ ushs_toks len (fun j : nat => f (k + j)%nat)
        (length (wl_body ws) + 1)%nat 0%nat (wl_toks ws)
   /\ (0 < length (wl_toks ws))%nat
   /\ (length (wl_toks ws) < 10)%nat.
 Proof using.
-  intros Hp Hlen Hf Hnl.
-  exact (ush_line_toks_holds_redir ws fname_f f k len
-           (sh_redir_line_of_typed J ws f k len Hp Hlen Hf Hnl)).
+  intros Hw Hp Hlen Hf Hnl.
+  exact (ush_line_toks_holds_redir ws nm f k len
+           (sh_redir_line_of_typed J ws nm f k len Hw Hp Hlen Hf Hnl)).
 Qed.
 
 
@@ -428,6 +410,10 @@ Qed.
 (* [FileDisc.parse_line] answers [LEchoF_f fd_ws] on, and the tokens below   *)
 (* are the three the child's argv is built from.                           *)
 (* ===================================================================== *)
+
+(* the model's own name is a word -- at the demo's instance, by computation *)
+Local Lemma fd_demo_word : wl_word fname_f.
+Proof using. apply (bool_decide_unpack _); vm_compute; exact I. Qed.
 
 Definition fd_demo_f : nat -> bv 8 := fun j : nat => (fd_b0 ++ [wl_nl]) !!! j.
 
@@ -454,8 +440,8 @@ Proof using.
   assert (Hnl : fd_demo_f (0 + length fd_b0)%nat = wl_nl).
   { pose proof (wl_lta_app_r fd_b0 [wl_nl] 0%nat) as Hr.
     rewrite Nat.add_0_r in Hr. exact Hr. }
-  destruct (sh_redir_line_lexable fd_b0 fd_ws fd_demo_f 0%nat
-              (S (length fd_b0)) fd_demo_parse eq_refl Hb Hnl)
+  destruct (sh_redir_line_lexable fd_b0 fd_ws fname_f fd_demo_f 0%nat
+              (S (length fd_b0)) fd_demo_word fd_demo_parse eq_refl Hb Hnl)
     as (Hr & Ht & _ & _).
   rewrite fd_demo_toks in Ht. exact (conj Hr Ht).
 Qed.

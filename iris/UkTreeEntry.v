@@ -181,26 +181,26 @@ Proof.
     rewrite lookup_ge_None_2; [reflexivity | lia].
 Qed.
 
-(* ...and the line `cat f`, as the landed entry pins it: two words, the
-   second the one-byte name [FsImgCheck.fname_f] *)
-Lemma cat_f_tail (ws : list (list (bv 8))) :
+(* ...and the line [cat N], at a name of ANY length (cut W3): two words,
+   the second the name, read positionally over its own length *)
+Lemma cat_name_tail (ws : list (list (bv 8))) (nm : list (bv 8)) :
   length ws = 2%nat ->
-  UkShEcho.echo_alen ws 1%nat = 1%nat ->
-  (forall j : nat, (j < 1)%nat ->
-     wl_line ws !!! (UkShEcho.echo_off ws 1%nat + j)%nat
-     = FsImgCheck.fname_f !!! j) ->
-  drop 1 ws = [FsImgCheck.fname_f].
+  UkShEcho.echo_alen ws 1%nat = length nm ->
+  (forall j : nat, (j < length nm)%nat ->
+     wl_line ws !!! (UkShEcho.echo_off ws 1%nat + j)%nat = nm !!! j) ->
+  drop 1 ws = [nm].
 Proof.
-  intros Hws2 Halen1 Hfname.
+  intros Hws2 Hlen Hf.
   destruct ws as [| w0 [| w1 [| w2 r]]]; cbn in Hws2; try (exfalso; lia).
-  unfold UkShEcho.echo_alen in Halen1. cbn in Halen1.
-  destruct w1 as [| b [| b' r']]; cbn in Halen1; try (exfalso; lia).
   cbn [drop]. f_equal.
-  pose proof (Hfname 0%nat ltac:(lia)) as Hf.
-  unfold UkShEcho.echo_off in Hf.
-  rewrite (wl_line_word [w0; [b]] 1%nat [b] 0%nat eq_refl ltac:(cbn; lia)) in Hf.
-  change ([b] !!! 0%nat) with b in Hf.
-  rewrite Hf. reflexivity.
+  unfold UkShEcho.echo_alen in Hlen. change ([w0; w1] !!! 1%nat) with w1 in Hlen.
+  apply (list_eq_same_length w1 nm (length w1));
+    [symmetry; exact Hlen | reflexivity |].
+  intros j x y Hj Hx Hy.
+  pose proof (Hf j ltac:(lia)) as H. unfold UkShEcho.echo_off in H.
+  rewrite (wl_line_word [w0; w1] 1%nat w1 j eq_refl Hj) in H.
+  rewrite (list_lookup_total_correct _ _ _ Hx) (list_lookup_total_correct _ _ _ Hy) in H.
+  exact H.
 Qed.
 
 (* ===================================================================== *)
@@ -532,9 +532,9 @@ Section UkTreeEntry.
     iApply ("Henv" $! N' with "[%] Hstd Hcwf HPay"). exact Hpq.
   Qed.
 
-  (* ...and at the line `cat f` the landed entry pins (SS3.4e's plan):
+  (* ...and at the line [cat N], at any name (cut W3; SS3.4e's plan):
      [cat_image_entry_env] through [ProgTree.cat_tree_tail]. *)
-  Lemma cat_image_entry_env_f (ws : list (list (bv 8))) (Mn : gmap Z (bv 8))
+  Lemma cat_image_entry_env_name (nm : list (bv 8)) (ws : list (list (bv 8))) (Mn : gmap Z (bv 8))
       (sv t : Z) (gn : nat -> bv 8)
       (sts : list fdstate) (cw : Z) (cs : gset gname) (pidv : mword 32)
       (Q : Z -> iProp Σ) (Pay : iProp Σ)
@@ -545,12 +545,11 @@ Section UkTreeEntry.
     UkShEcho.echo_argv_bytes ws gn ->
     length sts = NOFILE ->
     length ws = 2%nat ->
-    UkShEcho.echo_alen ws 1%nat = 1%nat ->
-    (forall j : nat, (j < 1)%nat ->
-       wl_line ws !!! (UkShEcho.echo_off ws 1%nat + j)%nat
-       = FsImgCheck.fname_f !!! j) ->
-    conforms E (cat_tree [sb "cat"; FsImgCheck.fname_f]) ->
-    safe_fds (dom (pe_fd E)) (cat_tree [sb "cat"; FsImgCheck.fname_f]) ->
+    UkShEcho.echo_alen ws 1%nat = length nm ->
+    (forall j : nat, (j < length nm)%nat ->
+       wl_line ws !!! (UkShEcho.echo_off ws 1%nat + j)%nat = nm !!! j) ->
+    conforms E (cat_tree [sb "cat"; nm]) ->
+    safe_fds (dom (pe_fd E)) (cat_tree [sb "cat"; nm]) ->
     dp_in Dp ds ->
     □ (∀ N' : uk_names Σ,
          ⌜ukn_pay N' = Q⌝ -∗
@@ -564,8 +563,8 @@ Section UkTreeEntry.
       cw cs pidv Q Pay uslot.
   Proof using .
     intros Hok Himg Hbytes Hfdl Hws2 Halen1 Hfname Hc Hs Hdp.
-    assert (Htail : cat_tree ws = cat_tree [sb "cat"; FsImgCheck.fname_f]).
-    { apply cat_tree_tail. rewrite (cat_f_tail ws Hws2 Halen1 Hfname). reflexivity. }
+    assert (Htail : cat_tree ws = cat_tree [sb "cat"; nm]).
+    { apply cat_tree_tail. rewrite (cat_name_tail ws nm Hws2 Halen1 Hfname). reflexivity. }
     rewrite <- Htail in Hc, Hs.
     iIntros "#Henv #Hnpw #Hdep".
     iApply (cat_image_entry_env ws Mn sv t gn sts cw cs pidv Q Pay I E ds

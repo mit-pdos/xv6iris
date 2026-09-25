@@ -10,8 +10,8 @@
 (* over a registry of two kinds:                                          *)
 (*                                                                        *)
 (*   [UDIn s nm i γo]   an input on the file named [nm] (seam (b): the    *)
-(*                      name is a field, pinned to [fname_f] by the       *)
-(*                      binding's last clause), at a tail handle or --   *)
+(*                      name is a field, a name of the class -- cut W3;   *)
+(*                      the binding's last clause), at a tail handle or --  *)
 (*                      [s] set -- a standard slot;                       *)
 (*   [UDProd pn gp w A X]                                                  *)
 (*                      THE PRODUCER DEVICE ([ProgTree.DProd]): fd 1 the  *)
@@ -176,7 +176,7 @@ Definition cif_row (ov : option cfdev) (fd : Z) (l : list fdstate) : Prop :=
 
 (* THE BINDING: the descriptors against the ledger and the registry's
    values, the protected devices [kds] at their values throughout, and
-   every input's name pinned to `f` (seam (b)) *)
+   every input's name a name of the class (cut W3: was pinned to `f`) *)
 Definition cif_ok (kds : list (nat * cfdev)) (fdm : fdmap) (l : list fdstate)
     (vs : gmap nat cfdev) : Prop :=
   (forall fd d, fdm !! fd = Some d -> 0 <= fd < Z.of_nat NOFILE)
@@ -186,7 +186,7 @@ Definition cif_ok (kds : list (nat * cfdev)) (fdm : fdmap) (l : list fdstate)
   /\ (forall fd fd' d s nm i γo, fdm !! fd = Some d -> fdm !! fd' = Some d ->
         vs !! d = Some (UDIn s nm i γo) -> fd = fd')
   /\ (forall dk, dk ∈ kds -> vs !! dk.1 = Some dk.2)
-  /\ (forall d s nm i γo, vs !! d = Some (UDIn s nm i γo) -> nm = fname_f).
+  /\ (forall d s nm i γo, vs !! d = Some (UDIn s nm i γo) -> uname nm).
 
 Lemma cif_slot_ne (k : nat) (fd : Z) : 0 <= fd -> fd <> Z.of_nat k -> k <> Z.to_nat fd.
 Proof using .
@@ -223,14 +223,15 @@ Section cif_ok_lemmas.
       + rewrite lookup_insert_ne; [| congruence]. intros Hfd. right. exact (H4 fd d' Hfd).
   Qed.
 
-  (* a fresh input on `f` at a fresh tail handle *)
-  Lemma cif_ok_open fdm l vs (k : nat) (d : nat) (i : Z) (γo : gname) :
+  (* a fresh input on a class name at a fresh tail handle *)
+  Lemma cif_ok_open fdm l vs (k : nat) (d : nat) (nm : list (bv 8)) (i : Z) (γo : gname) :
     cif_ok kds fdm l vs -> (NSTD <= k < NOFILE)%nat ->
     fdm !! Z.of_nat k = None -> (forall fd', fdm !! fd' <> Some d) -> d ∉ Dp ->
-    cif_ok kds (<[Z.of_nat k := d]> fdm) l (<[d := UDIn false fname_f i γo]> vs).
+    uname nm ->
+    cif_ok kds (<[Z.of_nat k := d]> fdm) l (<[d := UDIn false nm i γo]> vs).
   Proof using .
-    intros (H1 & H2 & H3 & H4 & H5 & H6 & H7) Hk Hnone Hfr HD.
-    destruct (cif_ok_reg_insert fdm vs k d (UDIn false fname_f i γo) H3 H4 Hnone) as [H3' H4'].
+    intros (H1 & H2 & H3 & H4 & H5 & H6 & H7) Hk Hnone Hfr HD Hu.
+    destruct (cif_ok_reg_insert fdm vs k d (UDIn false nm i γo) H3 H4 Hnone) as [H3' H4'].
     split; [| split; [| split; [exact H3' | split; [exact H4' | split; [| split]]]]].
     - intros fd d'. destruct (decide (fd = Z.of_nat k)) as [-> |].
       + intros _. lia.
@@ -256,7 +257,7 @@ Section cif_ok_lemmas.
     - intros dk Hdk. rewrite lookup_insert_ne; [exact (H6 dk Hdk) |].
       intros Hq. apply HD. rewrite Hq. by apply elem_of_list_fmap_1.
     - intros d' s' nm' i' γo'. destruct (decide (d' = d)) as [-> |].
-      + rewrite lookup_insert. intros [= _ <- _ _]. reflexivity.
+      + rewrite lookup_insert. intros [= _ <- _ _]. exact Hu.
       + rewrite lookup_insert_ne; [| congruence]. apply H7.
   Qed.
 
@@ -296,13 +297,14 @@ Section cif_ok_lemmas.
         rewrite Hq. exact H.
   Qed.
 
-  Lemma cif_ok_open_std fdm l vs (k : nat) (d : nat) (i : Z) (γo : gname) :
+  Lemma cif_ok_open_std fdm l vs (k : nat) (d : nat) (nm : list (bv 8)) (i : Z) (γo : gname) :
     cif_ok kds fdm l vs -> length l = NSTD -> l !! k = Some FdClosed ->
     (forall fd', fdm !! fd' <> Some d) -> d ∉ Dp ->
+    uname nm ->
     cif_ok kds (<[Z.of_nat k := d]> fdm) (<[k := FdOpen true false (FdInode i γo OffHeld)]> l)
-      (<[d := UDIn true fname_f i γo]> vs).
+      (<[d := UDIn true nm i γo]> vs).
   Proof using .
-    intros Hok Hlen Hk Hfr HD.
+    intros Hok Hlen Hk Hfr HD Hu.
     pose proof (cif_ok_closed_fresh fdm l vs k Hok Hlen Hk) as Hnone.
     pose proof (lookup_lt_Some _ _ _ Hk) as Hkl.
     assert (Hok' : cif_ok kds fdm (<[k := FdOpen true false (FdInode i γo OffHeld)]> l) vs).
@@ -311,7 +313,7 @@ Section cif_ok_lemmas.
       apply list_lookup_insert_ne. intros Hq. apply (f_equal Z.of_nat) in Hq.
       rewrite Z2Nat.id in Hq; [| exact H0]. rewrite -Hq in Hfd. congruence. }
     destruct Hok' as (H1 & H2 & H3 & H4 & H5 & H6 & H7).
-    destruct (cif_ok_reg_insert fdm vs k d (UDIn true fname_f i γo) H3 H4 Hnone) as [H3' H4'].
+    destruct (cif_ok_reg_insert fdm vs k d (UDIn true nm i γo) H3 H4 Hnone) as [H3' H4'].
     split; [| split; [| split; [exact H3' | split; [exact H4' | split; [| split]]]]].
     - intros fd d'. destruct (decide (fd = Z.of_nat k)) as [-> |].
       + intros _. unfold NSTD, NOFILE in *. lia.
@@ -338,7 +340,7 @@ Section cif_ok_lemmas.
     - intros dk Hdk. rewrite lookup_insert_ne; [exact (H6 dk Hdk) |].
       intros Hq. apply HD. rewrite Hq. by apply elem_of_list_fmap_1.
     - intros d' s' nm' i' γo'. destruct (decide (d' = d)) as [-> |].
-      + rewrite lookup_insert. intros [= _ <- _ _]. reflexivity.
+      + rewrite lookup_insert. intros [= _ <- _ _]. exact Hu.
       + rewrite lookup_insert_ne; [| congruence]. apply H7.
   Qed.
 
@@ -764,7 +766,7 @@ Section UkCatFIface.
   Definition cif_in (d : nat) (S : list (bv 8)) : iProp Σ :=
     (∃ (s : bool) (nm : list (bv 8)) (i : Z) (γo : gname) (p : nat),
        cif_tok d (1/2) (UDIn s nm i γo)
-       ∗ ⌜exists content, sf !! fname_f = Some (i, content) /\ S = drop p content⌝
+       ∗ ⌜exists content, sf !! nm = Some (i, content) /\ S = drop p content⌝
        ∗ uoff γo p)%I.
 
   Definition cif_prod (d : nat) (outs xs ds : list (list (bv 8))) : iProp Σ :=
@@ -783,11 +785,12 @@ Section UkCatFIface.
     | _ => False
     end%I.
 
-  (* THE SCOPE (seam (c)): the described paths are user files, and the
-     files are the deed's *)
+  (* THE SCOPE (seam (c), cut W3): the described paths are user files, and
+     each one's content is the deed's *)
   Definition cif_filesr (files : list (bv 8) -> option (list (bv 8)))
       (paths : list (list (bv 8))) : iProp Σ :=
-    (⌜forall p, p ∈ paths -> uname p⌝ ∗ ⌜files fname_f = snd <$> sf !! fname_f⌝)%I.
+    (⌜forall p, p ∈ paths -> uname p⌝
+     ∗ ⌜forall p, p ∈ paths -> files p = snd <$> sf !! p⌝)%I.
 
   Global Instance cif_filesr_persistent files paths : Persistent (cif_filesr files paths).
   Proof using . rewrite /cif_filesr. apply _. Qed.
@@ -1233,8 +1236,8 @@ Section UkCatFIface.
   Lemma cif_in_file_in (d : nat) (S : list (bv 8)) :
     cif_in d S -∗ fdq rf qf sf -∗
     ∃ (s : bool) (nm : list (bv 8)) (i : Z) (γo : gname) (content : list (bv 8)),
-      ⌜sf !! fname_f = Some (i, content)⌝ ∗ cif_tok d (1/2) (UDIn s nm i γo)
-      ∗ file_in rf sf i γo qf content S.
+      ⌜sf !! nm = Some (i, content)⌝ ∗ cif_tok d (1/2) (UDIn s nm i γo)
+      ∗ file_in rf sf nm i γo qf content S.
   Proof using .
     iIntros "Hin Hd". iDestruct "Hin" as (s nm i γo p) "(Htk & %Hc & Hu)".
     destruct Hc as (content & Hsf & HS). iExists s, nm, i, γo, content.
@@ -1244,8 +1247,8 @@ Section UkCatFIface.
 
   Lemma cif_in_of_file_in (d : nat) (S content : list (bv 8)) (s : bool) (nm : list (bv 8))
       (i : Z) (γo : gname) :
-    sf !! fname_f = Some (i, content) ->
-    cif_tok d (1/2) (UDIn s nm i γo) -∗ file_in rf sf i γo qf content S -∗
+    sf !! nm = Some (i, content) ->
+    cif_tok d (1/2) (UDIn s nm i γo) -∗ file_in rf sf nm i γo qf content S -∗
     cif_in d S ∗ fdq rf qf sf.
   Proof using .
     intros Hsf. iIntros "Htk Hin". iDestruct "Hin" as (p) "(%HS & _ & Hu & Hd)".
@@ -1276,7 +1279,7 @@ Section UkCatFIface.
     destruct (Z_of_nat_complete fd H0) as [k ->].
     destruct s.
     - destruct Hs as (Hsk & Hrow). rewrite Nat2Z.id in Hrow.
-      iApply (file_read_std cf rf sf Heq N P Hsr k l false i γo qf jo content Sin n K
+      iApply (file_read_std cf rf sf nm Heq N P Hsr k l false i γo qf jo content Sin n K
                 ltac:(unfold NSTD in *; lia) Hrow Hn with "Hbr Hrb Hm Hinv Hstd Hin").
       iSplit.
       + iIntros (cb S') "%Hc Hstd Hin". iDestruct "HK" as "[HK _]".
@@ -1287,7 +1290,7 @@ Section UkCatFIface.
         iApply (cif_T_of_file with "Htn He").
     - iDestruct (big_sepM_lookup_acc _ _ _ _ Hfd with "Hhs") as "[Hh Hcl]".
       iEval (rewrite /cif_hdl Hv) in "Hh". iEval (rewrite Nat2Z.id) in "Hh".
-      iApply (file_read cf rf sf Heq N P Hsr k false i γo qf jo content Sin n K
+      iApply (file_read cf rf sf nm Heq N P Hsr k false i γo qf jo content Sin n K
                 ltac:(lia) Hn with "Hbr Hrb Hm Hinv Hh Hin").
       iSplit.
       + iIntros (cb S') "%Hc Hh Hin". iDestruct "HK" as "[HK _]".
@@ -1393,7 +1396,7 @@ Section UkCatFIface.
   Qed.
 
   (* [ei_open] of a present user file: the descriptor the ledger names,
-     the token of a fresh device minted as an input on `f` *)
+     the token of a fresh device minted as an input on that name *)
   Lemma cif_open (fdm : fdmap) (files : list (bv 8) -> option (list (bv 8)))
       (paths : list (list (bv 8))) (path content : list (bv 8)) (K : Z -> iProp Σ) :
     path ∈ paths -> files path = Some content ->
@@ -1407,12 +1410,13 @@ Section UkCatFIface.
     op_obl N P path 0 K.
   Proof using Heq Hkill Hso Hsup TERM dep.
     intros Hp Hf. iIntros "Hfds #Hfiles HK".
-    iAssert (⌜(forall p, p ∈ paths -> uname p) /\ files fname_f = snd <$> sf !! fname_f⌝)%I
+    iAssert (⌜(forall p, p ∈ paths -> uname p)
+              /\ (forall p, p ∈ paths -> files p = snd <$> sf !! p)⌝)%I
       as %[Hpaths Hfs].
     { iDestruct "Hfiles" as "[%A %B]". by iPureIntro. }
-    pose proof (Hpaths path Hp) as Hun. rewrite /uname in Hun. subst path.
-    rewrite Hf in Hfs.
-    destruct (cif_dst_some (sf !! fname_f) content (eq_sym Hfs)) as [i Hsf].
+    pose proof (Hpaths path Hp) as Hun.
+    pose proof (Hfs path Hp) as Hfp. rewrite Hf in Hfp.
+    destruct (cif_dst_some (sf !! path) content (eq_sym Hfp)) as [i Hsf].
     iDestruct "Hfds" as (l vs wv) "(Hstd & Hcwd & %Hok & Hpool & Htoks & Hhs & Hd & #He & Hxk)".
     iPoseProof "He" as "(_ & _ & #Hinv & _)".
     iDestruct (UserFd.ustd_len with "Hstd") as %Hlen.
@@ -1423,8 +1427,8 @@ Section UkCatFIface.
                 -∗ fdq rf qf sf))%I as "#Hjoin".
     { iIntros "!> Ha Hb". iDestruct (fdq_join with "Ha Hb") as "Hd".
       rewrite Qp.div_2. iExact "Hd". }
-    iApply (file_open_present cf rf sf Heq N P Hso l FsImg.ROOTINO (qf / 2) (qf / 2) i content K
-              Hsf eq_refl with "Hinv Hstd Hcwd Hd1 Hd2").
+    iApply (file_open_present cf rf sf path Heq N P Hso l FsImg.ROOTINO (qf / 2) (qf / 2) i content K
+              Hun Hsf eq_refl with "Hinv Hstd Hcwd Hd1 Hd2").
     iSplit; [| iSplit].
     - iIntros (fd γo) "%Hfdlt Hal Hcwd Hin Hd1".
       iDestruct "Hin" as (p) "(%Hp0 & _ & Hu & Hd2)".
@@ -1434,7 +1438,7 @@ Section UkCatFIface.
         pose proof (fd_lowest_closed_is_closed l k0 Elc) as Hk0.
         pose proof (cif_ok_closed_fresh kds fdm l vs k0 Hok Hlen Hk0) as Hnb.
         iMod (own_update with "Hpool") as "Hpool";
-          [apply (cif_pool_update _ wv (UDIn true fname_f i γo)) |].
+          [apply (cif_pool_update _ wv (UDIn true path i γo)) |].
         iModIntro.
         iDestruct "HK" as "[HK _]".
         iApply ("HK" $! (Z.of_nat k0) with "[%] [%] [-] []"); [lia | exact Hnb | | iExact "Hfiles"].
@@ -1447,10 +1451,10 @@ Section UkCatFIface.
         iDestruct "Hpool" as "(Hpool & Htk1 & Htk2)".
         iSplitR "Htk2 Hu".
         * iExists (<[k0 := FdOpen true false (FdInode i γo OffHeld)]> l),
-            (<[d := UDIn true fname_f i γo]> vs), (fun _ => UDIn true fname_f i γo).
+            (<[d := UDIn true path i γo]> vs), (fun _ => UDIn true path i γo).
           iFrame "Hxk Hstd Hcwd Hd".
           iSplit.
-          { iPureIntro. apply cif_ok_open_std; [exact Hok | exact Hlen | exact Hk0 | exact Hfr | exact HD]. }
+          { iPureIntro. apply cif_ok_open_std; [exact Hok | exact Hlen | exact Hk0 | exact Hfr | exact HD | exact Hun]. }
           iSplitL "Hpool"; [by rewrite dom_insert_L |].
           iSplitL "Htoks Htk1".
           { rewrite big_sepM_insert; [| exact Hvd]. iFrame "Htk1 Htoks". }
@@ -1460,12 +1464,12 @@ Section UkCatFIface.
             iApply (big_sepM_impl with "Hhs"). iIntros "!>" (fd' d' Hfd') "Hx".
             rewrite lookup_insert_ne; [iExact "Hx" |]. intros ->. exact (Hfr fd' Hfd'). }
           iApply (cif_env_insert vs d _ Hvd with "He"). cbn [cif_pk_inv]. by iPureIntro.
-        * iExists true, fname_f, i, γo, p. iFrame "Htk2 Hu". iPureIntro. by exists content.
+        * iExists true, path, i, γo, p. iFrame "Htk2 Hu". iPureIntro. by exists content.
       + iDestruct (ualloc_hi γfd l fd _ Elc with "Hal") as "(%Hhi & Hstd & Hh)".
         iDestruct (cif_fresh_fd fdm l vs fd with "Hhs Hh") as "(%Hnb & Hhs & Hh)";
           [exact Hok | lia |].
         iMod (own_update with "Hpool") as "Hpool";
-          [apply (cif_pool_update _ wv (UDIn false fname_f i γo)) |].
+          [apply (cif_pool_update _ wv (UDIn false path i γo)) |].
         iModIntro.
         iDestruct "HK" as "[HK _]".
         iApply ("HK" $! (Z.of_nat fd) with "[%] [%] [-] []"); [lia | exact Hnb | | iExact "Hfiles"].
@@ -1477,10 +1481,10 @@ Section UkCatFIface.
         iEval (rewrite (cif_pool_own_take _ _ d Hdn) cif_tok_halves) in "Hpool".
         iDestruct "Hpool" as "(Hpool & Htk1 & Htk2)".
         iSplitR "Htk2 Hu".
-        * iExists l, (<[d := UDIn false fname_f i γo]> vs), (fun _ => UDIn false fname_f i γo).
+        * iExists l, (<[d := UDIn false path i γo]> vs), (fun _ => UDIn false path i γo).
           iFrame "Hxk Hstd Hcwd Hd".
           iSplit.
-          { iPureIntro. apply cif_ok_open; [exact Hok | exact (conj Hhi Hfdlt) | exact Hnb | exact Hfr | exact HD]. }
+          { iPureIntro. apply cif_ok_open; [exact Hok | exact (conj Hhi Hfdlt) | exact Hnb | exact Hfr | exact HD | exact Hun]. }
           iSplitL "Hpool"; [by rewrite dom_insert_L |].
           iSplitL "Htoks Htk1".
           { rewrite big_sepM_insert; [| exact Hvd]. iFrame "Htk1 Htoks". }
@@ -1490,7 +1494,7 @@ Section UkCatFIface.
             iApply (big_sepM_impl with "Hhs"). iIntros "!>" (fd' d' Hfd') "Hx".
             rewrite lookup_insert_ne; [iExact "Hx" |]. intros ->. exact (Hfr fd' Hfd'). }
           iApply (cif_env_insert vs d _ Hvd with "He"). cbn [cif_pk_inv]. by iPureIntro.
-        * iExists false, fname_f, i, γo, p. iFrame "Htk2 Hu". iPureIntro. by exists content.
+        * iExists false, path, i, γo, p. iFrame "Htk2 Hu". iPureIntro. by exists content.
     - iIntros "Hstd Hcwd Hd1 Hd2". iDestruct "HK" as "[_ [HK _]]".
       iApply ("HK" with "[-] []"); [| iExact "Hfiles"].
       iApply (cif_fds_of with "Hstd Hcwd Hpool Htoks Hhs [Hd1 Hd2] He Hxk"); [exact Hok |].
@@ -1512,16 +1516,18 @@ Section UkCatFIface.
     op_obl N P path m K.
   Proof using Heq Hkill Hso Hsup TERM dep.
     intros Hp Hcm Hf. iIntros "Hfds #Hfiles HK".
-    iAssert (⌜(forall p, p ∈ paths -> uname p) /\ files fname_f = snd <$> sf !! fname_f⌝)%I
+    iAssert (⌜(forall p, p ∈ paths -> uname p)
+              /\ (forall p, p ∈ paths -> files p = snd <$> sf !! p)⌝)%I
       as %[Hpaths Hfs].
     { iDestruct "Hfiles" as "[%A %B]". by iPureIntro. }
-    pose proof (Hpaths path Hp) as Hun. rewrite /uname in Hun. subst path.
-    rewrite Hf in Hfs. pose proof (cif_dst_none (sf !! fname_f) (eq_sym Hfs)) as Hs.
+    pose proof (Hpaths path Hp) as Hun.
+    pose proof (Hfs path Hp) as Hfp. rewrite Hf in Hfp.
+    pose proof (cif_dst_none (sf !! path) (eq_sym Hfp)) as Hs.
     iDestruct "Hfds" as (l vs wv) "(Hstd & Hcwd & %Hok & Hpool & Htoks & Hhs & Hd & #He & Hxk)".
     iPoseProof "He" as "(_ & _ & #Hinv & _)".
     iDestruct (UserFd.ustd_len with "Hstd") as %Hlen.
     iAssert (fdq rf qf sf) with "[Hd]" as "Hd"; [iExact "Hd" |].
-    iApply (file_open_absent cf rf sf Heq N P Hso l FsImg.ROOTINO qf m K Hs eq_refl
+    iApply (file_open_absent cf rf sf path Heq N P Hso l FsImg.ROOTINO qf m K Hun Hs eq_refl
               (cif_om_create m Hcm) with "Hinv Hstd Hcwd Hd").
     iSplit.
     - iIntros "Hstd Hcwd Hd". iDestruct "HK" as "[HK _]".
@@ -1815,16 +1821,18 @@ Section UkCatFIface.
           (device 0, protected) ---- *)
   Lemma cif_catf_env_res (pn : pnames) (gp : pipe_names) (w : wid)
       (A X ds xs : list (list (bv 8))) (l : list fdstate) (rb1 rb2 : bool)
-      (wv : nat -> cfdev) (files : list (bv 8) -> option (list (bv 8))) :
+      (wv : nat -> cfdev) (files : list (bv 8) -> option (list (bv 8)))
+      (nm : list (bv 8)) :
     kds = [(0%nat, UDProd pn gp w A X)] -> wv 0%nat = UDProd pn gp w A X ->
     l !! 1%nat = Some (FdOpen rb1 true (FdPipe gp)) ->
     l !! 2%nat = Some (FdOpen rb2 true (FdDevice CONSOLE)) ->
-    files fname_f = snd <$> sf !! fname_f ->
+    uname nm ->
+    files nm = snd <$> sf !! nm ->
     UserFd.ustd γfd l -∗ UserCwd.ucwd (ukn_cwd N) FsImg.ROOTINO -∗ own γreg (cif_pool ∅ wv) -∗
     cif_catf_lend pn gp w A X ds xs (ukn_pay N) -∗
-    env_res N P cif_iface (catp_env (DProd [L; []] xs ds) files [fname_f]) {[0%nat]}.
+    env_res N P cif_iface (catp_env (DProd [L; []] xs ds) files [nm]) {[0%nat]}.
   Proof using .
-    intros Hk Hw0 Hl1 Hl2 Hfs.
+    intros Hk Hw0 Hl1 Hl2 Hu Hfs.
     set (fdm := (<[1 := 0%nat]> {[2 := 0%nat]} : fdmap)).
     set (vs := ({[0%nat := UDProd pn gp w A X]} : gmap nat cfdev)).
     assert (Hv0 : vs !! 0%nat = Some (UDProd pn gp w A X)) by (rewrite /vs; apply lookup_singleton).
@@ -1843,10 +1851,10 @@ Section UkCatFIface.
         intros ->. left. exists 1. rewrite /fdm. apply lookup_insert.
       - intros fd d Hfd. destruct (Hfdm fd d Hfd) as [-> _].
         rewrite /vs dom_singleton_L. set_solver.
-      - intros fd fd' d s nm i γo _ _ Hv. rewrite /vs lookup_singleton_Some in Hv.
+      - intros fd fd' d s nm' i γo _ _ Hv. rewrite /vs lookup_singleton_Some in Hv.
         by destruct Hv as [_ Hq].
       - intros dk. rewrite Hk elem_of_list_singleton. intros ->. exact Hv0.
-      - intros d s nm i γo Hv. rewrite /vs lookup_singleton_Some in Hv.
+      - intros d s nm' i γo Hv. rewrite /vs lookup_singleton_Some in Hv.
         by destruct Hv as [_ Hq]. }
     iIntros "Hstd Hcwd Hpool (#Hinv & Hw & #Hlb & Hu & Hdq & #Hbr & #Hrb & #Hai & #Hcr & Hxk)".
     rewrite /env_res.
@@ -1868,10 +1876,10 @@ Section UkCatFIface.
       - rewrite /cif_xk Hk. iExact "Hxk". }
     iSplitR.
     { rewrite cif_ei_files /cif_filesr. cbn [catp_env pe_paths pe_files]. iPureIntro. split.
-      - intros p Hp. apply elem_of_list_singleton in Hp as ->. reflexivity.
-      - exact Hfs. }
+      - intros p Hp. apply elem_of_list_singleton in Hp as ->. exact Hu.
+      - intros p Hp. apply elem_of_list_singleton in Hp as ->. exact Hfs. }
     rewrite /dev_res big_sepS_singleton cif_dev_of.
-    assert (E0 : pe_dev (catp_env (DProd [L; []] xs ds) files [fname_f]) 0%nat
+    assert (E0 : pe_dev (catp_env (DProd [L; []] xs ds) files [nm]) 0%nat
                  = DProd [L; []] xs ds) by reflexivity.
     rewrite E0. cbn [cif_dev].
     iExists pn, gp, w, A, X. iFrame "Htk2". iLeft. iFrame "Hw Hlb Hu". by iPureIntro.

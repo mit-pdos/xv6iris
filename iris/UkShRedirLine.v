@@ -30,7 +30,8 @@ From stdpp Require Import gmap bitvector.definitions.
 Require Import RiscvModelBytes.
 Require Import LineWords.
 Require Import EchoDisc.
-Require Import FileDisc.   (* [uline] / [line_bytes] / [fname_f] -- the line
+Require Import UNameBytes. (* the suffix around a name of any length *)
+Require Import FileDisc.   (* [uline] / [line_bytes] -- the line
                               the file discipline TYPES, which the redirect
                               shape below is the positional reading of *)
 Require Import UkSh.
@@ -243,93 +244,67 @@ Qed.
 (* [UkSh.ush_rest_line_at]'s payload says the buffer at [k] holds the     *)
 (* bytes of an admissible line of [FileDisc.uline].  At [LEcho ws] that IS *)
 (* [UkSh.ush_line_is] ([UkSh.ush_line_at_echo], by conversion); at         *)
-(* [LEchoF_f ws] it is the redirect shape at the model's own file name, and  *)
+(* [LEchoF ws nm] it is the redirect shape at the line's own file name, and *)
 (* this section is that one step.  It lives HERE, below [UkShFork], because *)
 (* that is where the command loop's three-way case needs it -- the         *)
 (* TOKENS ([UShLexRedir]) are a file above and are not needed to know       *)
 (* which walk the line takes.                                             *)
 (* ===================================================================== *)
 
-(* the file name is one alphanumeric byte, so it is a WORD *)
-Lemma fname_f_word : wl_word fname_f.
-Proof using. apply (bool_decide_unpack _); vm_compute; exact I. Qed.
-
-Lemma fname_f_len : length fname_f = 1%nat.
-Proof using. vm_compute; reflexivity. Qed.
-
-(* the redirect suffix, positionally: ' ' '>' ' ' then the file name *)
-Lemma suf_gtf_0 : suf_gtf !!! 0%nat = wl_sp.
-Proof using. apply bv_eq; vm_compute; reflexivity. Qed.
-
-Lemma suf_gtf_1 : suf_gtf !!! 1%nat = ushs_gt.
-Proof using. apply bv_eq; vm_compute; reflexivity. Qed.
-
-Lemma suf_gtf_2 : suf_gtf !!! 2%nat = wl_sp.
-Proof using. apply bv_eq; vm_compute; reflexivity. Qed.
-
-Lemma suf_gtf_3 : suf_gtf !!! 3%nat = fname_f !!! 0%nat.
-Proof using. apply bv_eq; vm_compute; reflexivity. Qed.
-
-(* THE BRIDGE: the typed line, read positionally. *)
-Lemma ushs_line_is_of_at (ws : list (list (bv 8))) (f : nat -> bv 8)
-    (k len : nat) :
-  UkSh.ush_line_at (LEchoF_f ws) f k len ->
-  ushs_line_is ws fname_f f k len.
+(* THE BRIDGE: the typed line at ANY name of the class, read
+   positionally (cut W3).  The name is a WORD -- the one fact about a
+   class name the lexer tier needs that is not a class law
+   ([UNamePath.uname_word], which a caller supplies); the suffix
+   [' ' '>' ' '] and the name's bytes are read off [UNameBytes]. *)
+Lemma ushs_line_is_of_at (ws : list (list (bv 8))) (nm : list (bv 8))
+    (f : nat -> bv 8) (k len : nat) :
+  wl_word nm ->
+  UkSh.ush_line_at (LEchoF ws nm) f k len ->
+  ushs_line_is ws nm f k len.
 Proof using.
-  intros (Hok & Hlen & Hby).
+  intros Hw (Hok & Hlen & Hby).
   destruct Hok as [ Hok _ ].
-  (* the line's bytes are [wl_body ws ++ suf_gtf] and then the newline *)
-  assert (Hlb : length (line_bytes (LEchoF_f ws))
-                = (length (wl_body ws) + 4 + 1)%nat).
-  { unfold line_bytes, line_body.
-    rewrite length_app. rewrite length_app. rewrite suf_gtf_len.
-    cbn [length]. lia. }
-  assert (Hpre : length (wl_body ws ++ suf_gtf)
-                 = (length (wl_body ws) + 4)%nat)
-    by (rewrite length_app; rewrite suf_gtf_len; lia).
-  (* ...so every index below the newline reads out of the two pieces *)
-  assert (Hbody : forall j : nat, (j < length (wl_body ws))%nat ->
-            f (k + j)%nat = wl_body ws !!! j).
+  set (p0 := length (wl_body ws)).
+  (* the line's bytes are [wl_body ws ++ suf_gt nm] and then the newline *)
+  assert (Hpre : length (wl_body ws ++ suf_gt nm) = (p0 + (3 + length nm))%nat)
+    by (rewrite length_app, suf_gt_len; reflexivity).
+  assert (Hlb : length (line_bytes (LEchoF ws nm)) = (p0 + (3 + length nm) + 1)%nat).
+  { unfold line_bytes, line_body. rewrite length_app, Hpre. cbn [length]. lia. }
+  assert (Hbody : forall j : nat, (j < p0)%nat -> f (k + j)%nat = wl_body ws !!! j).
   { intros j Hj. rewrite (Hby j ltac:(lia)).
     unfold line_bytes, line_body.
-    rewrite (wl_lta_app_l (wl_body ws ++ suf_gtf) [wl_nl] j ltac:(lia)).
-    exact (wl_lta_app_l (wl_body ws) suf_gtf j Hj). }
-  assert (Hsuf : forall i : nat, (i < 4)%nat ->
-            f (k + (length (wl_body ws) + i))%nat = suf_gtf !!! i).
-  { intros i Hi. rewrite (Hby (length (wl_body ws) + i)%nat ltac:(lia)).
+    rewrite (wl_lta_app_l (wl_body ws ++ suf_gt nm) [wl_nl] j ltac:(lia)).
+    exact (wl_lta_app_l (wl_body ws) (suf_gt nm) j Hj). }
+  assert (Hsuf : forall i : nat, (i < 3 + length nm)%nat ->
+            f (k + (p0 + i))%nat = suf_gt nm !!! i).
+  { intros i Hi. rewrite (Hby (p0 + i)%nat ltac:(lia)).
     unfold line_bytes, line_body.
-    rewrite (wl_lta_app_l (wl_body ws ++ suf_gtf) [wl_nl]
-               (length (wl_body ws) + i)%nat ltac:(lia)).
-    exact (wl_lta_app_r (wl_body ws) suf_gtf i). }
-  assert (Hnl : f (k + (length (wl_body ws) + 4))%nat = wl_nl).
-  { rewrite (Hby (length (wl_body ws) + 4)%nat ltac:(lia)).
+    rewrite (wl_lta_app_l (wl_body ws ++ suf_gt nm) [wl_nl] (p0 + i)%nat ltac:(lia)).
+    exact (wl_lta_app_r (wl_body ws) (suf_gt nm) i). }
+  assert (Hnl : f (k + (p0 + (3 + length nm)))%nat = wl_nl).
+  { rewrite (Hby (p0 + (3 + length nm))%nat ltac:(lia)).
     unfold line_bytes, line_body.
-    pose proof (wl_lta_app_r (wl_body ws ++ suf_gtf) [wl_nl] 0%nat) as Hr.
-    rewrite Hpre in Hr. rewrite Nat.add_0_r in Hr. rewrite Hr. reflexivity. }
+    pose proof (wl_lta_app_r (wl_body ws ++ suf_gt nm) [wl_nl] 0%nat) as Hr.
+    rewrite Hpre, Nat.add_0_r in Hr. rewrite Hr. reflexivity. }
   unfold ushs_line_is. split_and!.
   - exact Hok.
-  - exact fname_f_word.
-  - rewrite Hlen. rewrite Hlb. rewrite fname_f_len. lia.
+  - exact Hw.
+  - rewrite Hlen, Hlb. fold p0. lia.
   - exact Hbody.
   - pose proof (Hsuf 0%nat ltac:(lia)) as H0.
-    rewrite Nat.add_0_r in H0. rewrite H0. exact suf_gtf_0.
-  - pose proof (Hsuf 1%nat ltac:(lia)) as H1.
-    replace (k + length (wl_body ws) + 1)%nat
-      with (k + (length (wl_body ws) + 1))%nat by lia.
-    rewrite H1. exact suf_gtf_1.
-  - pose proof (Hsuf 2%nat ltac:(lia)) as H2.
-    replace (k + length (wl_body ws) + 2)%nat
-      with (k + (length (wl_body ws) + 2))%nat by lia.
-    rewrite H2. exact suf_gtf_2.
-  - intros j Hj. rewrite fname_f_len in Hj.
-    replace j with 0%nat by lia. rewrite Nat.add_0_r.
-    pose proof (Hsuf 3%nat ltac:(lia)) as H3.
-    replace (k + length (wl_body ws) + 3)%nat
-      with (k + (length (wl_body ws) + 3))%nat by lia.
-    rewrite H3. exact suf_gtf_3.
-  - rewrite fname_f_len.
-    replace (k + length (wl_body ws) + 3 + 1)%nat
-      with (k + (length (wl_body ws) + 4))%nat by lia.
+    rewrite Nat.add_0_r in H0. fold p0. rewrite H0. exact (suf_gt_0 nm).
+  - pose proof (Hsuf 1%nat ltac:(lia)) as H1. fold p0.
+    replace (k + p0 + 1)%nat with (k + (p0 + 1))%nat by lia.
+    rewrite H1. exact (suf_gt_1 nm).
+  - pose proof (Hsuf 2%nat ltac:(lia)) as H2. fold p0.
+    replace (k + p0 + 2)%nat with (k + (p0 + 2))%nat by lia.
+    rewrite H2. exact (suf_gt_2 nm).
+  - intros j Hj. fold p0.
+    pose proof (Hsuf (3 + j)%nat ltac:(lia)) as H3.
+    replace (k + p0 + 3 + j)%nat with (k + (p0 + (3 + j)))%nat by lia.
+    rewrite H3. exact (suf_gt_name nm j).
+  - fold p0.
+    replace (k + p0 + 3 + length nm)%nat with (k + (p0 + (3 + length nm)))%nat by lia.
     exact Hnl.
 Qed.
 

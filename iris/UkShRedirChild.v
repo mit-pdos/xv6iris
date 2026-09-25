@@ -46,7 +46,6 @@ Require Import ChildTok.
 Require Import UkShRedirBody.   (* [ushs_fd1f] / [echo_argv_bytes_of_redir] *)
 Require Import UkShRedirAns.    (* [ush_open_call2]: the open, the deed its hand *)
 Require Import UkShRedirPaid.   (* the paid open-failed diagnostic; the call's adapter *)
-Require Import FsImgCheck.      (* [fname_f] *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -89,9 +88,8 @@ Section UkShRedirChild.
     ukn_pay N' = Q ->
     m !!! Regidx s1_idx = (mword_of_int s0 : mword 64) ->
     UkShRedirLine.ushs_line_is ws file fb 0%nat len ->
-    (* THE FILE IS `f` *)
-    length file = 1%nat ->
-    file !!! 0%nat = FsImgCheck.fname_f !!! 0%nat ->
+    (* THE FILE IS A NAME OF THE CLASS, of any length (cut W3) *)
+    FileDisc.uname file ->
     0 < s0 -> s0 + Z.of_nat len + 1 < Z64 -> s0 + Z.of_nat len < 2 ^ 38 ->
     8344 <= sz ->
     UserPtTree.pgroundup sz = sz ->
@@ -115,7 +113,7 @@ Section UkShRedirChild.
     UkShMalloc.ushm_fresh N' sz -∗
     (* the open, as the application's CALL premise -- the deed its hand *)
     UkShRedirAns.ush_open_call2 N' FsImg.ROOTINO
-      (s0 + Z.of_nat (S (S (length (wl_body ws) + 1)))) 1537
+      (s0 + Z.of_nat (S (S (length (wl_body ws) + 1)))) 1537 file
       (<[1%nat := FdClosed]> ld) K Dd Kf -∗
     □ (∀ ty : fdtype, K ty ={⊤}=∗ K' ty) -∗
     (* ...the child's exec supply AT THE FILE the open returned, WITH THE
@@ -125,7 +123,7 @@ Section UkShRedirChild.
     (∀ ty : fdtype, UkShDiag.ush_execfail_law (Cr' ∗ K' ty) Cx) -∗
     □ (Cx -∗ Q (-1)) -∗
     (* ...the FAILED OPEN's diagnostic, at what the call left of its hand *)
-    UkShDiag.ush_execfail_law_at FileDisc.alt_openfail 14%nat
+    UkShDiag.ush_execfail_law_at (FileDisc.alt_openfailN file) (13 + length file)%nat
       (Kf a ∗ Cr') Cd -∗
     □ (Cd -∗ Q (-1)) -∗
     (* ...and the lend, whole across the parse and split at the call *)
@@ -136,7 +134,7 @@ Section UkShRedirChild.
       (68 + (8 + (UkShDiag.ush_Dg + n))) -∗
     mWP (Loop : expr riscv_lang).
   Proof using Hpsok_free.
-    intros Hpeq Hs1 Hline Hfl Hf0 Hs0 Hs64 Hs38 Hszlo Hszal Hszok
+    intros Hpeq Hs1 Hline Hfu Hs0 Hs64 Hs38 Hszlo Hszal Hszok
            Hst1 Hne Hnp Hfd2 Hfdl.
     iIntros "#Hcode #Hjt #Hpcode #Hpro Hstr Hws Hsy Hstd Hcwd Hch HM
              Hopen #Hrd Hsup #Hxl #Hcx #Hol #Hcd #Hpx Hsplit Hcr Hrun".
@@ -146,20 +144,21 @@ Section UkShRedirChild.
                 Hline) as (Hred & Htoks & Hpos & Htlen).
     pose proof (proj1 Hline) as Hok.
     pose proof (lookup_lt_Some ld 1%nat st1 Hst1) as Hlen1.
-    (* the REDIR node's file string IS `f` *)
+    (* the REDIR node's file string IS the line's name *)
     set (gp := (length (wl_body ws) + 1)%nat).
     set (fe := (length (wl_body ws) + 3 + length file)%nat).
     set (fu := UkShRedirSeam.ushs_file s0 len (fun j : nat => fb (0 + j)%nat)
                  (wl_toks ws) gp fe).
-    assert (Hful : ua_len fu = 1%nat).
+    assert (Hful : ua_len fu = length file).
     { rewrite /fu /UkShRedirSeam.ushs_file. cbn [ua_len]. unfold fe, gp. lia. }
-    assert (Hfu0 : ua_bytes fu 0%nat = FsImgCheck.fname_f !!! 0%nat).
-    { rewrite /fu /UkShRedirSeam.ushs_file. cbn [ua_bytes].
+    assert (Hfub : forall j : nat, (j < length file)%nat ->
+                     ua_bytes fu j = file !!! j).
+    { intros j Hj. rewrite /fu /UkShRedirSeam.ushs_file. cbn [ua_bytes].
       rewrite (UkShRedirSeam.ushs_nulcut_filebyte len
                  (fun j : nat => fb (0 + j)%nat) gp fe (wl_toks ws)
-                 Hred Htoks 0%nat ltac:(unfold fe, gp; lia)).
+                 Hred Htoks j ltac:(unfold fe, gp; lia)).
       destruct Hline as (_ & _ & _ & _ & _ & _ & _ & Hfb & _).
-      rewrite <- Hf0, <- (Hfb 0%nat ltac:(lia)).
+      rewrite <- (Hfb j Hj).
       f_equal. unfold gp. lia. }
     assert (Hfd2c : UkSh.ush_fd2p (<[1%nat := FdClosed]> ld)).
     { destruct Hfd2 as [ rb Hrb ]. exists rb.
@@ -171,8 +170,8 @@ Section UkShRedirChild.
               Hszlo Hszal Hszok
               with "Hcode Hjt Hpcode Hpro Hstr Hws Hsy Hstd Hcwd HM
                     [Hopen] [] Hsplit Hcr Hrun").
-    { iApply (UkShRedirPaid.ush_open_call_g_of_call2 N' fu 1537
-                (<[1%nat := FdClosed]> ld) K Dd Kf a Hful Hfu0 Hfdl
+    { iApply (UkShRedirPaid.ush_open_call_g_of_call2 N' fu file 1537
+                (<[1%nat := FdClosed]> ld) K Dd Kf a Hfu Hful Hfub Hfdl
                 with "Hopen"). }
     { iIntros "!> Hc". rewrite Hpeq. iApply ("Hpx" with "Hc"). }
     iSplit.
@@ -213,11 +212,11 @@ Section UkShRedirChild.
       + iApply ("Hsup" $! ty).
       + iApply ("Hxl" $! ty).
       + iFrame "Hcr HK".
-    - (* ============ the open FAILED: "open f failed", exit(1) ============ *)
+    - (* ============ the open FAILED: the diagnostic, exit(1) ============ *)
       iIntros (hf mf) "%Hat #Hfp #Hfs Hstd Hcwd HKf Hcr Hrun".
       iApply (UkShRedirPaid.wp_kshd_openfail_paid N' (Kf a ∗ Cr')%I Cd
-                (<[1%nat := FdClosed]> ld) hf mf (70 + n)%nat fu
-                Hfd2c Hat Hful Hfu0
+                (<[1%nat := FdClosed]> ld) hf mf (70 + n)%nat fu file
+                Hfd2c Hat Hful Hfub
                 with "Hol Hcode Hro Hfp Hfs Hstd [HKf Hcr] [] Hrun").
       + iFrame "HKf Hcr".
       + iIntros "_ Hc". rewrite Hpeq. iApply ("Hcd" with "Hc").
