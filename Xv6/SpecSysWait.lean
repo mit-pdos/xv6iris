@@ -25,12 +25,13 @@ moved, or the reaped child's pid with the four-byte status word at `v`
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
+import Iris.ProofMode
 import Xv6.SpecKwait
 import Xv6.SpecArgaddr
 
 namespace Xv6
 
-open Iris Iris.ProgramLogic Iris.BI Std MachCSL
+open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 /-- Address of `sys_wait`. -/
@@ -66,13 +67,63 @@ def wp_sys_wait_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
-/-- The interface of `sys_wait`. -/
-structure SYSWAIT : Prop where
-  wp_sys_wait : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+/-- **WP of `sys_wait()`, at either entry `SIE`**: kwait's eb-generic
+contract (`KWAIT.wp_kwait_eb`) passed through -- the trap-CSR complement
+`trapCsrsExt` / `cpuClaimExt` in and out; sys_wait takes no lock of its own,
+so it mints nothing and every stretch outside kwait is level 0. -/
+def wp_sys_wait_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
-    (V : ProcPriv) (M : Nat → List (BitVec 8)) (v : BitVec 64) hj hproc hv hK hsie hnoff hlocks htier,
+    (V : ProcPriv) (M : Nat → List (BitVec 8)) (v : BitVec 64)
+    (hj : j < NPROC) (hproc : k.proc = procAddr j) (hv : V.tf[tfArgIdx 0]? = some v)
+    (hK : sysWaitSlots ≤ k.avail)
+    (hnoff : k.noff = 0)
+    (htier : k.tier = KTier.kpt) : Prop :=
+  kctx cpu k ∗ pcIs cpu sysWaitAddr ∗ procsInv Γ ∗
+  trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
+  isLock γw waitLockAddr "wait_lock" waitLockPay ∗
+  isLock γp pidLockAddr "nextpid" pidLockPay ∗
+  isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
+  procPrivNoctxAt curCtx (procAddr j) pid V M ∗
+  wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd)
+    (rv xw : BitVec 32) (d : Nat),
+    ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
+      kwaitAns rv v d⌝ -∗
+    kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+    trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
+    procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' }
+      (umemWrite (viewFaulted V.upt P' M) v.toNat ((xstateBytes xw).take d)) -∗
+    wpLoop cpu'))
+  ⊢ wpLoop (GF := GF) cpu
+
+/-- The interface of `sys_wait`. -/
+structure SYSWAIT : Prop where
+  wp_sys_wait_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
+    (V : ProcPriv) (M : Nat → List (BitVec 8)) (v : BitVec 64) hj hproc hv hK hnoff htier,
+    wp_sys_wait_eb_body (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk j pid V M v
+      hj hproc hv hK hnoff htier
+
+/-- The interrupts-off instance of `wp_sys_wait_eb` (the complement is the
+whole bundle). -/
+theorem SYSWAIT.wp_sys_wait (A : SYSWAIT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+    [Xv6G GF] [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
+    (V : ProcPriv) (M : Nat → List (BitVec 8)) (v : BitVec 64) hj hproc hv hK hsie hnoff hlocks htier :
     wp_sys_wait_body (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk j pid V M v
-      hj hproc hv hK hsie hnoff hlocks htier
+      hj hproc hv hK hsie hnoff hlocks htier := by
+  have h := A.wp_sys_wait_eb (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk j pid V M v hj hproc hv hK
+    hnoff htier
+  unfold wp_sys_wait_eb_body at h
+  unfold wp_sys_wait_body
+  rw [hsie] at h
+  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
+  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, Hnext⟩
+  iapply h
+  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10
+  iapply wpNext_mono $$ Hnext
+  iintro %cpu' HK %spie %spp %R' %P' %rv %xw %d %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6
+  iapply HK $$ %spie %spp %R' %P' %rv %xw %d %p0 H1 H2 Htc Hcl Hir H6
 
 end Xv6
