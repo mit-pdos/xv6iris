@@ -23,7 +23,7 @@ at `sb+20`, at the caller's fraction, handed back), the raw spinlock cells
 (`&log.lock = &log`), the rest of `struct log` (`outstanding` and
 `committing` arrive ZERO -- `initlog` never writes them and the invariant
 needs them zero, which is the `.bss` guarantee for a static object), the
-four ghost names at their genesis values (`Xv6.logFreeTok`), and the
+five ghost names at their genesis values (`Xv6.logFreeTok`), and the
 on-disk header's content `bsHdr` with its well-formedness: the decoded
 write set is bounded by the region, duplicate-free, and names covered HOME
 blocks.  At a clean image the decode is empty and all three are trivial;
@@ -56,12 +56,12 @@ install.
 **Deviations, all the log port's standing ones** (see `Xv6/LogInv.lean`):
 the crash seam, the era certificate, the era's born-true mirror, block 1's
 park and the file system's snapshot law are all dropped with the layers
-they belong to.  One further
-deviation is local to this port: Rocq's contract is an `_at` form in all
-five ghost names because the file system's configuration record names
-them, while this port's lock library mints the lock's own name at the seal
-(`MachCSL.kctx_newlock`), so the post existentially binds that one name
-(`Xv6.LogNames.withLk`) and the other four are the caller's.
+they belong to.
+
+AN `_at` FORM IN ALL FIVE GHOST NAMES, as Rocq's: the caller hands in
+`Xv6.logFreeTok γ` -- the "log" spinlock's free token included -- and the
+lock is sealed AT `γ.lk` (`MachCSL.kctx_newlockAt`, Rocq `newlock_at`), so
+the post is `Xv6.logCtx γ …` at the caller's own names, no existential.
 
 One further deviation in spelling, shared with every other log spec: Rocq
 runs the bio layer at `fs_view γfs γd dev cov` literally, while this port
@@ -128,7 +128,7 @@ def wp_initlog_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G 
   -- entry by entry.
   fsBytesAt γfs (fsHomeList V.cov logstart) ∗
   excOwn γfs.exc (hdrDec bsHdr).2 ∗
-  -- the four ghost names, at their genesis values
+  -- the five ghost names, at their genesis values (the lock's included)
   logFreeTok γ ∗
   -- the superblock field, read once
   wordPointsTo (sb + 20#64) 4 dqs (BitVec.ofNat 32 logstart) ∗
@@ -154,14 +154,14 @@ def wp_initlog_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G 
      fsChalf γfs (logSlotBno logstart i) bs) ∗
   -- the slot pool, stocked: the batch's 32 plus initlog's own working pair
   bslots γb ((LOGBLOCKS + 2) + 2) ∗
-  wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (γlk : GName),
+  wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
     ⌜calleeSaved k.regs R'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
     wordPointsTo (sb + 20#64) 4 dqs (BitVec.ofNat 32 logstart) -∗
     bslots γb 2 -∗
-    logCtx (γ.withLk γlk) γb γfs V.cov logstart dev -∗ wpLoop cpu'))
+    logCtx γ γb γfs V.cov logstart dev -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The eb-generic form of `wp_initlog_body` (Rocq: `cpu_own 0 eb`, the
@@ -205,7 +205,7 @@ def wp_initlog_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv
   -- entry by entry.
   fsBytesAt γfs (fsHomeList V.cov logstart) ∗
   excOwn γfs.exc (hdrDec bsHdr).2 ∗
-  -- the four ghost names, at their genesis values
+  -- the five ghost names, at their genesis values (the lock's included)
   logFreeTok γ ∗
   -- the superblock field, read once
   wordPointsTo (sb + 20#64) 4 dqs (BitVec.ofNat 32 logstart) ∗
@@ -231,14 +231,14 @@ def wp_initlog_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv
      fsChalf γfs (logSlotBno logstart i) bs) ∗
   -- the slot pool, stocked: the batch's 32 plus initlog's own working pair
   bslots γb ((LOGBLOCKS + 2) + 2) ∗
-  wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (γlk : GName),
+  wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
     ⌜calleeSaved k.regs R'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
     wordPointsTo (sb + 20#64) 4 dqs (BitVec.ofNat 32 logstart) -∗
     bslots γb 2 -∗
-    logCtx (γ.withLk γlk) γb γfs V.cov logstart dev -∗ wpLoop cpu'))
+    logCtx γ γb γfs V.cov logstart dev -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `initlog`. -/
@@ -285,7 +285,7 @@ theorem INITLOG.wp_initlog (A : INITLOG) {hlc : HasLC} {GF : BundledGFunctors} [
   iapply h
   iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 H18 H19 H20 H21 H22 H23 H24 H25 H26 H27 H28 H29 H30 H31
   iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %γlk %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6 H7 H8 H9
-  iapply HK $$ %spie %spp %R' %γlk %p0 H1 H2 Htc Hcl Hir H6 H7 H8 H9
+  iintro %cpu' HK %spie %spp %R' %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6 H7 H8 H9
+  iapply HK $$ %spie %spp %R' %p0 H1 H2 Htc Hcl Hir H6 H7 H8 H9
 
 end Xv6

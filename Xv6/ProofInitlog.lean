@@ -19,7 +19,8 @@ its fifth word is `ncommit`), then `recover_from_log` inlined:
 copy loop at `+0x52`, `brelse` at `+0x5e`), `install_trans(1)` at `+0x64`,
 `log.lh.n = 0` at `+0x6c` and `write_head` at `+0x70`.  Then the epilogue,
 and -- as a ghost step, with no instruction of its own -- the lock's birth
-(`MachCSL.kctx_newlock`) over the boot pack `Xv6/LogBoot.lean` assembles.
+AT THE GIVEN NAME `γ.lk` (`MachCSL.kctx_newlockAt`, Rocq `newlock_at`)
+over the boot pack `Xv6/LogBoot.lean` assembles.
 
 THE TWO STORES ARE PUBLISHED, NOT KEPT.  `log.start` and `log.dev` are
 written once and then frozen at `DFrac.discard` (`Xv6.logFrozen`), because
@@ -409,7 +410,7 @@ variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCt
 set_option maxHeartbeats 8000000 in
 /-- From `write_head`'s return at `+0x74`: assemble `Xv6.logResAt` out of
 the raw cells and the block-view material (`Xv6/LogBoot.lean`), SEAL the
-"log" spinlock over it (`MachCSL.kctx_newlock`), run the epilogue and hand
+"log" spinlock over it AT `γ.lk` (`MachCSL.kctx_newlockAt`), run the epilogue and hand
 the caller back `Xv6.logCtx`. -/
 theorem il_seal (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (spie1 spp1 : Bool) (R : RegMap)
@@ -442,14 +443,14 @@ theorem il_seal (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     ([∗list] i ∈ List.range LOGBLOCKS, ∃ bs : List (BitVec 8),
        fsChalf γfs (logSlotBno logstart i) bs) ∗
     bslots γb (LOGBLOCKS + 2) ∗ bslots γb 2 ∗
-    (∀ (cpu' : CPU) (spie spp : Bool) (R' : RegMap) (γlk : GName),
+    (∀ (cpu' : CPU) (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k.regs R'⌝ -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
       wordPointsTo (pPid k.proc) 4 dqp pidv -∗
       wordPointsTo (sb + 20#64) 4 dqs (BitVec.ofNat 32 logstart) -∗
       bslots γb 2 -∗
-      logCtx (γ.withLk γlk) γb γfs V.cov logstart dev -∗ wpLoop cpu')
+      logCtx γ γb γfs V.cov logstart dev -∗ wpLoop cpu')
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hte, Hce, Hframe, Hpid, Hsb, #Hfroz, #Hrow, #Hm1, #Hm2, Hfresh, Htok,
     Hout, Hcmt, Hnc, HlhN, Hjunk, HL, HD, Hd, Hhdr, Hslots, Hpool, Hwork, Hnext⟩
@@ -458,17 +459,18 @@ theorem il_seal (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   ihave Hbatch := logStateAt_boot γb γfs V.cov logstart (opPending (∅ : RegMapF OpEntry))
       L D bsh $$ [HlhN Hjunk HL HD Hd Hhdr Hslots Hpool]
   case' _ => iframe
+  icases logFreeTok_split γ $$ Htok with ⟨Hlkf, Htok⟩
   ihave Hres := logResAt_boot γ γb γfs V.cov logstart vNc
       $$ [Hout Hcmt Hnc Htok Hbatch]
   case' _ => iframe
-  -- the seal
+  -- the seal, AT THE GIVEN NAME `γ.lk` (Rocq `newlock_at`)
   iapply wpLoop_fupd
-  imod (kctx_newlock cpu _ logAddr "log" (logResAt γ γb γfs V.cov logstart))
-    $$ [Hk Hres Hfresh Hm1 Hm2] with ⟨Hk, %γlk, #Hlk⟩
+  imod (kctx_newlockAt cpu _ γ.lk logAddr "log" (logResAt γ γb γfs V.cov logstart))
+    $$ [Hk Hlkf Hres Hfresh Hm1 Hm2] with ⟨Hk, #Hlk⟩
   · iframe Hm1 Hm2
     iframe
   imodintro
-  ihave #Hctx := logCtx_mk γ γlk γb γfs V.cov logstart dev $$ [Hlk Hfroz Hrow]
+  ihave #Hctx := logCtx_mk γ γb γfs V.cov logstart dev $$ [Hlk Hfroz Hrow]
   case' _ => iframe Hlk Hfroz Hrow
   -- the epilogue
   ihave Hframe := (show frame6s3 (GF := GF) (k.regs 2#5) (k.regs 1#5) (k.regs 8#5)
@@ -491,7 +493,7 @@ theorem il_seal (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   k_next_e
   iintro Hk Hpc
   k_norm_g
-  iapply Hnext $$ %cpu %spie1 %spp1 %_ %γlk [] Hk Hpc [Hte] [Hce] [Hpid] [Hsb] [Hwork] [Hctx]
+  iapply Hnext $$ %cpu %spie1 %spp1 %_ [] Hk Hpc [Hte] [Hce] [Hpid] [Hsb] [Hwork] [Hctx]
   · ipureintro
     exact calleeSaved_epi6s3 k.regs R p20 p21 p22 p23 p24 p25 p26 p27
   · iexact Hte
@@ -545,14 +547,14 @@ theorem initlog_proof
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   have hlocks : k.locks = [] := List.eq_nil_of_length_eq_zero (by have := hwf.2.2.2.1; omega)
   -- the caller's continuation is hart-free (a park's crossing, at a proc)
-  ihave Hnext : ∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (γlk : GName),
+  ihave Hnext : ∀ (c : CPU) (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k.regs R'⌝ -∗
       kctx c ((k.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
       wordPointsTo (pPid k.proc) 4 dqp pidv -∗
       wordPointsTo (sb + 20#64) 4 dqs (BitVec.ofNat 32 logstart) -∗
       bslots γb 2 -∗
-      logCtx (γ.withLk γlk) γb γfs V.cov logstart dev -∗ wpLoop c $$ [Hnext]
+      logCtx γ γb γfs V.cov logstart dev -∗ wpLoop c $$ [Hnext]
   · iintro %c
     iapply wpNext_at true k.proc cpu c _ (fun hc => Or.elim hc (fun hx => absurd hx (by decide))
       (fun hx => absurd (hproc ▸ hx) (procAddr_nonzero hj))) $$ Hnext

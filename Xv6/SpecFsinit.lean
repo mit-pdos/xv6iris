@@ -68,16 +68,12 @@ Every one of those has its Lean counterpart below (deviations listed).
 
 ## DEVIATIONS from Rocq, reported
 
-1. THE LOG LOCK'S NAME.  Rocq's `initlog` is an `_at` form in all five log
-   gnames, so fsinit's post is `log_ctx icfg_log …`.  This port's
-   `Xv6/SpecInitlog.lean` mints the "log" lock's gname at the seal
-   (`MachCSL.kctx_newlock`) and returns `logCtx (γ.withLk γlk)` for a fresh
-   `γlk`; hence (a) the post is `∀ γlk, … logCtx (icfgLog.withLk γlk) …`,
-   and (b) `ireclaim` is run at the configuration `Xv6.Icfg.withLk I γlk`
-   (the ambient record with only `icfgLog.lk` replaced -- nothing but
-   `logCtx`'s `isLock` reads that field, `Xv6/FsinitCalls.lean`).  The fix
-   that restores Rocq's post is an `_at` initlog (`MachCSL.newlockAt_llb`
-   exists) with the lock's free token in `Xv6.logFreeTok`.
+1. (RETIRED.)  The log lock's name: `Xv6/SpecInitlog.lean` is now an `_at`
+   form in all five log gnames, as Rocq's (the lock's free token rides in
+   `Xv6.logFreeTok`, sealed by `MachCSL.kctx_newlockAt`), so the post is
+   `logCtx icfgLog …` exactly as Rocq's `log_ctx icfg_log …`, and
+   `ireclaim` runs at the ambient configuration.  The number is kept so
+   the other deviations' cross-references stand.
 2. BLOCK 1 COMES BACK (Rocq's pre-C-3a shape).  Lean's `initlog` has no
    `SbPark` park (`Xv6/SbPark.lean` is standalone, `Xv6.logCtx` unchanged),
    so the run `fsblock fscFs.bytes 1 bsSb` is returned in the post, and
@@ -216,7 +212,7 @@ def wp_fsinit_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
   diskCaps fscDisk fscDlock pd pav pu ∗
   -- the caller's own pid cell
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
-  -- THE LOG'S FOUR GNAMES, AT THEIR GENESIS VALUES, AND THEY ARE `icfgLog`'s
+  -- THE LOG'S FIVE GNAMES, AT THEIR GENESIS VALUES, AND THEY ARE `icfgLog`'s
   logFreeTok icfgLog ∗
   -- THE SUPERBLOCK, BEFORE: block 1's run (which pins the bytes bread
   -- returns) and 32 bytes of RAW .bss at `&sb`
@@ -257,7 +253,7 @@ def wp_fsinit_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
   bslots fscBio ((LOGBLOCKS + 2) + 2 + 1) ∗
   -- ONE ledger unit for ireclaim's iget/iput pair; it comes back
   irefSlot ∗
-  wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (γlk : GName),
+  wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
     ⌜calleeSaved k.regs R'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
@@ -274,8 +270,8 @@ def wp_fsinit_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
     -- block 1's run, handed back (deviation 2)
     fsblock fscFs.bytes 1 bsSb -∗
     -- THE LOG LAYER, BUILT by initlog at +0x4e and already USED by ireclaim
-    -- (at `icfgLog` up to the lock's own name: deviation 1)
-    logCtx (icfgLog.withLk γlk) fscBio fscFs fscCov fscLogst icfgDev -∗
+    -- AT `icfgLog`, the names handed in (what `fs_ready` seals)
+    logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev -∗
     -- three, not two
     bslots fscBio 3 -∗
     irefSlot -∗

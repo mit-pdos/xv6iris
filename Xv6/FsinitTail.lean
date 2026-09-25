@@ -7,8 +7,8 @@ threads (`fsinitEnv`), the eight superblock cells (`fsinitCells`), then
 * `Xv6.fsinit_epilogue` `+0x58 .. +0x62`: THE ONLY EXIT -- restore the four,
   pop, return, discharge the contract;
 * `Xv6.fsinit_reclaim` `+0x52 .. +0x54`: the region and the bitmap upgraded
-  off initlog's seal, then `ireclaim` at the configuration
-  `Xv6.fsinitIcfg I γlk` (`Xv6/FsinitCalls.lean`).
+  off initlog's seal, then `ireclaim` at the ambient configuration, on the
+  `logCtx icfgLog` initlog built (`Xv6/FsinitCalls.lean`).
 
 Deviations from Rocq: `Xv6/FsinitDefs.lean`'s (the explicit register
 equations in place of `fsi_sp` / `fsi_thr4`); the environment bundle is
@@ -66,7 +66,7 @@ of `Xv6.wp_fsinit_eb_body`, at EVERY hart -- a `true` crossing at a process
 across a park. -/
 def fsinitCont [Fscfg] [Icfg] [CurCtx] (k : KCtx) (pidv : BitVec 32) (dqp : DFrac)
     (vMagic vSize vNblocks vNlog : BitVec 32) (bsSb : List (BitVec 8)) : IProp GF :=
-  iprop(∀ (cpu' : CPU) (spie spp : Bool) (R' : RegMap) (γlk : GName),
+  iprop(∀ (cpu' : CPU) (spie spp : Bool) (R' : RegMap),
     ⌜calleeSaved k.regs R'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
@@ -80,7 +80,7 @@ def fsinitCont [Fscfg] [Icfg] [CurCtx] (k : KCtx) (pidv : BitVec 32) (dqp : DFra
     wordPointsTo sbInodestart 4 (DFrac.own 1) (BitVec.ofNat 32 icfgIst) -∗
     wordPointsTo sbBmapstartAddr 4 (DFrac.own 1) (BitVec.ofNat 32 fscBmapstart) -∗
     fsblock fscFs.bytes 1 bsSb -∗
-    logCtx (icfgLog.withLk γlk) fscBio fscFs fscCov fscLogst icfgDev -∗
+    logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev -∗
     bslots fscBio 3 -∗ irefSlot -∗ iregBoot -∗ wpLoop cpu')
 
 /-- The contract's continuation, made hart-free (`true` crossing, `k.proc`
@@ -88,7 +88,7 @@ a process). -/
 theorem fsinit_cont_of_spec [Fscfg] [Icfg] [CurCtx] {j : Nat} (hj : j < NPROC) (cpu : CPU)
     (k : KCtx) (hproc : k.proc = procAddr j) (pidv : BitVec 32) (dqp : DFrac)
     (vMagic vSize vNblocks vNlog : BitVec 32) (bsSb : List (BitVec 8)) :
-    wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (γlk : GName),
+    wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k.regs R'⌝ -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
@@ -102,7 +102,7 @@ theorem fsinit_cont_of_spec [Fscfg] [Icfg] [CurCtx] {j : Nat} (hj : j < NPROC) (
       wordPointsTo sbInodestart 4 (DFrac.own 1) (BitVec.ofNat 32 icfgIst) -∗
       wordPointsTo sbBmapstartAddr 4 (DFrac.own 1) (BitVec.ofNat 32 fscBmapstart) -∗
       fsblock fscFs.bytes 1 bsSb -∗
-      logCtx (icfgLog.withLk γlk) fscBio fscFs fscCov fscLogst icfgDev -∗
+      logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev -∗
       bslots fscBio 3 -∗ irefSlot -∗ iregBoot -∗ wpLoop cpu'))
     ⊢ fsinitCont (GF := GF) k pidv dqp vMagic vSize vNblocks vNlog bsSb := by
   unfold fsinitCont
@@ -114,7 +114,7 @@ set_option maxHeartbeats 8000000 in
 /-- **`+0x58 .. +0x62`: THE ONLY EXIT** (Rocq's `fsi_epilogue`). -/
 theorem fsinit_epilogue [Fscfg] [Icfg] [CurCtx] (cpu : CPU) (k : KCtx) (spie spp : Bool)
     (R : RegMap) (pidv : BitVec 32) (dqp : DFrac) (vMagic vSize vNblocks vNlog : BitVec 32)
-    (bsSb : List (BitVec 8)) (γlk : GName)
+    (bsSb : List (BitVec 8))
     (hK : 4 ≤ k.avail)
     (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64)
     (p19 : R 19#5 = k.regs 19#5) (p20 : R 20#5 = k.regs 20#5) (p21 : R 21#5 = k.regs 21#5)
@@ -125,7 +125,7 @@ theorem fsinit_epilogue [Fscfg] [Icfg] [CurCtx] (cpu : CPU) (k : KCtx) (spie spp
     frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     fsinitCells vMagic vSize vNblocks vNlog ∗ fsblock fscFs.bytes 1 bsSb ∗
-    logCtx (icfgLog.withLk γlk) fscBio fscFs fscCov fscLogst icfgDev ∗
+    logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
     bslots fscBio 3 ∗ irefSlot ∗ iregBoot ∗
     fsinitCont k pidv dqp vMagic vSize vNblocks vNlog bsSb
     ⊢ wpLoop (GF := GF) cpu := by
@@ -153,7 +153,7 @@ theorem fsinit_epilogue [Fscfg] [Icfg] [CurCtx] (cpu : CPU) (k : KCtx) (spie spp
   icases Hcells with ⟨C0, C1, C2, C3, C4, C5, C6, C7⟩
   ispecialize Hnext $$ %cpu
   have hcs := bc_calleeSaved_epi2 k.regs R p19 p20 p21 p22 p23 p24 p25 p26 p27
-  iapply Hnext $$ %spie %spp %_ %γlk %hcs [Hk] Hpc Hte Hce Hpid C0 C1 C2 C3 C4 C5 C6 C7 Hfsb Hlc
+  iapply Hnext $$ %spie %spp %_ %hcs [Hk] Hpc Hte Hce Hpid C0 C1 C2 C3 C4 C5 C6 C7 Hfsb Hlc
     Hsl Hiref Hboot
   iexact Hk
 
@@ -166,7 +166,7 @@ theorem fsinit_reclaim (IR : IRECLAIM) [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl : GName) (pd pav pu : BitVec 64)
     (j : Nat) (pidv : BitVec 32) (dqp : DFrac) (vMagic vSize vNblocks vNlog : BitVec 32)
-    (bsSb : List (BitVec 8)) (γlk : GName)
+    (bsSb : List (BitVec 8))
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : fsinitSlots ≤ k.avail)
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt)
     (hgeom : logGeomOk fscCov fscLogst)
@@ -186,7 +186,7 @@ theorem fsinit_reclaim (IR : IRECLAIM) [Fscfg] [Icfg] [CurCtx]
     frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     fsinitCells vMagic vSize vNblocks vNlog ∗ fsblock fscFs.bytes 1 bsSb ∗
-    logCtx (icfgLog.withLk γlk) fscBio fscFs fscCov fscLogst icfgDev ∗
+    logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
     bslots fscBio 3 ∗ irefSlot ∗ iregBoot ∗
     fsinitCont k pidv dqp vMagic vSize vNblocks vNlog bsSb
     ⊢ wpLoop (GF := GF) cpu := by
@@ -210,7 +210,7 @@ theorem fsinit_reclaim (IR : IRECLAIM) [Fscfg] [Icfg] [CurCtx]
   k_step_e (wp_s_jal cpu _ (KA.«fsinit» + 0x54#64) false 2096868#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fsinit_br_ireclaim]
   iintro Hk Hpc
-  iapply (fsinit_ireclaim_call IR γlk Γ cpu _ γl pd pav pu j pidv dqp (DFrac.own 1)
+  iapply (fsinit_ireclaim_call IR Γ cpu _ γl pd pav pu j pidv dqp (DFrac.own 1)
       (DFrac.own 1) (DFrac.own 1) hj ?dproc ?dK ?dnoff ?dtier hgeom hblk hbg hbel hn1 hnnib hn31
       hpd ?da0)
     $$ [- $Hk $Hpc $Hpi $Hpe $Hbc $Hlc $Hdc $C3 $C6 $C7 $Hinv $Hboot $Hit2 $Hiti $Hslks
@@ -231,7 +231,7 @@ theorem fsinit_reclaim (IR : IRECLAIM) [Fscfg] [Icfg] [CurCtx]
   unfold calleeSaved at hcs
   k_norm_g at hcs
   obtain ⟨e2, e8, e9, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩ := hcs
-  iapply (fsinit_epilogue cpu k spie2 spp2 R2 pidv dqp vMagic vSize vNblocks vNlog bsSb γlk hK4
+  iapply (fsinit_epilogue cpu k spie2 spp2 R2 pidv dqp vMagic vSize vNblocks vNlog bsSb hK4
       (e2.trans hR2) (e19.trans p19) (e20.trans p20) (e21.trans p21) (e22.trans p22)
       (e23.trans p23) (e24.trans p24) (e25.trans p25) (e26.trans p26) (e27.trans p27))
   iframe Hk Hpc Hte Hce Hframe Hpid Hfsb Hlc Hsl Hiref Hboot Hnext

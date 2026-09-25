@@ -81,34 +81,22 @@ theorem lbWord_persist (va : PAddr) (n : Nat) (dq : DFrac) (w : BitVec (8 * n)) 
 
 end
 
-/-! ## The names record, with the lock's own name filled in
-
-`Xv6.LogNames.withLk` only rewrites the `lk` field, and nothing but
-`Xv6.logCtx`'s `isLock` reads it, so both the lock's resource and the
-genesis token are literally unchanged -- which is what lets `initlog` seal
-at the name `MachCSL.kctx_newlock` mints and then hand the caller back a
-`logCtx` at `γ.withLk γlk`. -/
+/-! ## The persistent bundle -/
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 variable [BcacheG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
-theorem logResAt_withLk (γ : LogNames) (γlk : GName) (γb : BcacheNames) (γfs : FsNames)
-    (cov : Std.ExtTreeSet Nat compare) (logstart : Nat) :
-    logResAt (GF := GF) (γ.withLk γlk) γb γfs cov logstart
-      = logResAt γ γb γfs cov logstart := rfl
-
 /-- The persistent bundle `initlog` returns, out of the sealed lock, the
 two frozen cells and THE BYTE VIEW'S SEALED ROW (`Xv6.logCtx`'s third
 conjunct: the invariant at the era's home set plus `initlog`'s own
 certificate that the exception set is empty). -/
-theorem logCtx_mk (γ : LogNames) (γlk : GName) (γb : BcacheNames) (γfs : FsNames)
+theorem logCtx_mk (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (logstart : Nat) (dev : BitVec 32) :
-    isLock γlk logAddr "log" (logResAt (GF := GF) γ γb γfs cov logstart) ∗
+    isLock γ.lk logAddr "log" (logResAt (GF := GF) γ γb γfs cov logstart) ∗
     logFrozen logstart dev ∗ fsBytesAnyAt γfs (fsHomeList cov logstart)
-    ⊢ logCtx (γ.withLk γlk) γb γfs cov logstart dev := by
-  unfold logCtx
-  rw [show (γ.withLk γlk).lk = γlk from rfl, logResAt_withLk γ γlk γb γfs cov logstart]
+    ⊢ logCtx γ γb γfs cov logstart dev := by
+  unfold logCtx; iintro H; iexact H
 
 end
 
@@ -219,6 +207,15 @@ theorem logStateAt_boot (γb : BcacheNames) (γfs : FsNames)
 
 /-! ## The lock's resource, at genesis -/
 
+/-- `Xv6.logFreeTok`, taken apart: the "log" spinlock's free token (what
+`initlog` seals the lock with, `MachCSL.kctx_newlockAt`) and the four
+genesis authorities `Xv6.logResAt_boot` puts into the lock's resource. -/
+theorem logFreeTok_split (γ : LogNames) :
+    logFreeTok (GF := GF) γ ⊢ lockFreeTok γ.lk ∗
+      ((γ.ops ↪●MAP (∅ : RegMapF OpEntry)) ∗ logEpochAuth γ 1 ∗
+        logRegAuth γ (∅ : RegMapF (Nat × Nat)) ∗ logTxAuth γ (∅ : RegMapF Unit)) := by
+  unfold logFreeTok; iintro H; iexact H
+
 /-- **`Xv6.logResAt` AT GENESIS** (Rocq's boot `log_res` pack).  `out = 0`,
 `cmt = false`, the ledger, the registry and the transactions all empty, the
 epoch at ONE (`Xv6.logFreeTok`'s value, and the `1 ≤ E` clause is
@@ -229,15 +226,12 @@ theorem logResAt_boot (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     wordPointsTo (GF := GF) lOut 4 (DFrac.own 1) 0#32 ∗
     wordPointsTo lCmt 4 (DFrac.own 1) 0#32 ∗
     wordPointsTo lNcommit 4 (DFrac.own 1) nc ∗
-    logFreeTok γ ∗
+    ((γ.ops ↪●MAP (∅ : RegMapF OpEntry)) ∗ logEpochAuth γ 1 ∗
+      logRegAuth γ (∅ : RegMapF (Nat × Nat)) ∗ logTxAuth γ (∅ : RegMapF Unit)) ∗
     logStateAt γb γfs cov logstart 0 [] (opPending (∅ : RegMapF OpEntry)) curCtx
     ⊢ logResAt (GF := GF) γ γb γfs cov logstart curCtx := by
   unfold logResAt
-  iintro ⟨Hout, Hcmt, Hnc, Htok, Hbatch⟩
-  ihave ⟨Hops, Hep, Hreg, Htx⟩ := (show logFreeTok (GF := GF) γ ⊢
-      (γ.ops ↪●MAP (∅ : RegMapF OpEntry)) ∗ logEpochAuth γ 1 ∗
-      logRegAuth γ (∅ : RegMapF (Nat × Nat)) ∗ logTxAuth γ (∅ : RegMapF Unit) from by
-    unfold logFreeTok; iintro H; iexact H) $$ Htok
+  iintro ⟨Hout, Hcmt, Hnc, ⟨Hops, Hep, Hreg, Htx⟩, Hbatch⟩
   ihave Hout := (show wordPointsTo (GF := GF) lOut 4 (DFrac.own 1) 0#32 ⊢
       wordAtN curCtx lOut 4 (DFrac.own 1) 0#32 from by rw [wordAtN_cur]) $$ Hout
   ihave Hcmt := (show wordPointsTo (GF := GF) lCmt 4 (DFrac.own 1) 0#32 ⊢

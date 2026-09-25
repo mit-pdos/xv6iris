@@ -19,8 +19,8 @@ THIRTY-FIVE BUFFER SLOTS, AND THE ONE HELD BACK: one is split off for the
 bread at `+0x10` and returned by the brelse at `+0x2c`; 34 go to initlog,
 which seals 32 and returns 2; the held one rejoins them for ireclaim.
 
-**Deviations from Rocq.**  `Xv6/SpecFsinit.lean`'s (above all deviation 1:
-ireclaim runs at `Xv6.fsinitIcfg I γlk`) and `Xv6/FsinitDefs.lean`'s; the
+**Deviations from Rocq.**  `Xv6/SpecFsinit.lean`'s and
+`Xv6/FsinitDefs.lean`'s; the
 four-stage cut (Rocq has one lemma for `+0x00 .. +0x54`) is for elaboration
 speed only.
 -/

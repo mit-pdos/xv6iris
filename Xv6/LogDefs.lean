@@ -48,6 +48,7 @@ The registry (`loggedAt`) is the one ghost construction that changes
 shape; see its own comment.
 -/
 import Xv6.BioPool
+import MachCSL.LockBornHook
 
 namespace Xv6
 
@@ -428,15 +429,6 @@ structure LogNames where
   /-- the open transactions -/
   tx : GName
 
-/-- The record with the lock's name replaced.  Rocq's `initlog` is an
-`_at` form -- the era mints all five names and hands them in -- because
-the file system's configuration record names them.  This port's lock
-library mints the lock's ghost name itself (`MachCSL.kctx_newlock` returns
-it existentially), so `initlog` fills the other four from the caller's
-record and this is how the fifth is put in. -/
-def LogNames.withLk (γ : LogNames) (lk : GName) : LogNames :=
-  { γ with lk := lk }
-
 /-- The ghost libraries the log layer needs (Rocq's `logG`).
 
 THE REGISTRY'S SHAPE IS THE ONE DEVIATION.  Rocq holds the append
@@ -606,24 +598,27 @@ theorem logTxRetire (γ : LogNames) (T : RegMapF Unit) :
   · ipureintro; exact hlk
   · iexact Ha
 
-/-- **THE FOUR GNAMES' FREE STATE, AS ONE TOKEN** (Rocq's `log_free_tok`):
+/-- **THE FIVE GNAMES' FREE STATE, AS ONE TOKEN** (Rocq's `log_free_tok`):
 the names at their GENESIS VALUES, in exactly the shape `Xv6.logResAt`
 wants them.  GENESIS IS EPOCH ONE, not zero: the region receipt's "never
 observed" counter value is zero and the two must not collide, so
 `logResAt`'s `⌜1 ≤ E⌝` is established here and the only later transition
 is the commit bump.
 
-Rocq's fifth conjunct -- the "log" spinlock's own free-state token -- is
-not here: this port's lock library mints the lock's ghost name at the
-seal (`MachCSL.kctx_newlock`), so there is nothing to hand in. -/
+The first conjunct is the "log" spinlock's own free-state token
+(`MachCSL.lockFreeTok`, Rocq `lock_free_tok (ln_lk γ)`): `initlog` seals
+the lock AT `γ.lk` with it (`MachCSL.newlockAt_llb`), so the caller gets
+`Xv6.logCtx` back at the very names it handed in. -/
 def logFreeTok (γ : LogNames) : IProp GF := iprop%
+  lockFreeTok γ.lk ∗
   (γ.ops ↪●MAP (∅ : RegMapF OpEntry)) ∗
   logEpochAuth γ 1 ∗
   logRegAuth γ (∅ : RegMapF (Nat × Nat)) ∗
   logTxAuth γ (∅ : RegMapF Unit)
 
-theorem logGhostAlloc (γlk : GName) :
-    ⊢ |==> (∃ γ : LogNames, ⌜γ.lk = γlk⌝ ∗ logFreeTok (GF := GF) γ) := by
+/-- Rocq's `log_ghost_alloc`: mint all five names at their genesis values. -/
+theorem logGhostAlloc : ⊢ |==> (∃ γ : LogNames, logFreeTok (GF := GF) γ) := by
+  imod (lockGhostAlloc (GF := GF)) with ⟨%γlk, Hl⟩
   imod (ghost_map_alloc_empty (GF := GF) (K := Nat) (V := OpEntry) (H := RegMapF))
     with ⟨%γo, Ho⟩
   imod (MonoNat.own_alloc (GF := GF) (MaxNat.ofNat 1)) with ⟨%γe, ⟨He, -⟩⟩
@@ -633,10 +628,8 @@ theorem logGhostAlloc (γlk : GName) :
     with ⟨%γt, Ht⟩
   imodintro
   iexists ⟨γlk, γo, γe, γg, γt⟩
-  isplitr [Ho He Hg Ht]
-  · ipureintro; rfl
   unfold logFreeTok logEpochAuth logRegAuth logTxAuth
-  iframe Ho He Hg Ht
+  iframe Hl Ho He Hg Ht
 
 /-- ...and using one (Rocq's `logged_at_in`). -/
 theorem loggedAt_in (γ : LogNames) (X : RegMapF (Nat × Nat)) (e b : Nat) :

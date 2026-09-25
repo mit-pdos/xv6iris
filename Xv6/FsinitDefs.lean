@@ -5,8 +5,7 @@ superblock image read back as eight cells (Rocq's `fsi_img` / `fsi_word4` /
 `bb_chunk` bridge), the magic's refutation of the live panic arm, the
 buffer's data window (Rocq's `fsi_data_acc`), the `readsb` crossing (Rocq's
 inline `fs_bytes_agree_exc`), the boot dirty map read as a pure fact (Rocq's
-`initlog_dirty_all_false`), and THE CONFIGURATION `ireclaim` IS RUN AT
-(`Xv6.fsinitIcfg`, `Xv6/SpecFsinit.lean` deviation 1).
+`initlog_dirty_all_false`).
 
 **Deviations from Rocq.**
 1. Rocq threads the register file by `fsi_sp` / `fsi_thr4`; here the live
@@ -16,8 +15,6 @@ inline `fs_bytes_agree_exc`), the boot dirty map read as a pure fact (Rocq's
    at a naming function; here the window is the list `sbImage …` and
    `fsinit_sb_cells` peels it one `wordToBytes4` at a time
    (`Xv6.byteBuf_word4`).
-3. `fsinitIcfg` and its `rfl` transports have no Rocq counterpart: they are
-   what deviation 1 of the Spec costs.
 -/
 import Xv6.SpecFsinit
 import Xv6.CodeTactics
@@ -262,50 +259,6 @@ theorem fsinit_dirty_all_false (γfs : FsNames) (D : RegMapF Bool) :
       · exact hl z hz
     iapply BigSepL.bigSepL_cons.2
     iframe Hb Hl
-
-end
-
-/-! ## THE CONFIGURATION ireclaim RUNS AT (Spec deviation 1)
-
-`initlog` hands back `logCtx (icfgLog.withLk γlk)` for the lock name it
-minted; `ireclaim` takes `logCtx icfgLog` at the ambient record.  So
-`ireclaim` is run at the ambient record with `icfgLog.lk` replaced -- and
-since nothing but `logCtx`'s `isLock` reads that field, every other
-predicate ireclaim takes is literally the ambient one (`rfl`, one per
-predicate, which keeps each unfolding local). -/
-
-/-- The ambient configuration with the log lock's name replaced. -/
-@[reducible] def fsinitIcfg (I : Icfg) (γlk : GName) : Icfg :=
-  { I with icfgLog := I.icfgLog.withLk γlk }
-
-theorem fsinitIcfg_dev (I : Icfg) (γlk : GName) :
-    @icfgDev (fsinitIcfg I γlk) = @icfgDev I := rfl
-theorem fsinitIcfg_nib (I : Icfg) (γlk : GName) :
-    @icfgNib (fsinitIcfg I γlk) = @icfgNib I := rfl
-theorem fsinitIcfg_ist (I : Icfg) (γlk : GName) :
-    @icfgIst (fsinitIcfg I γlk) = @icfgIst I := rfl
-theorem fsinitIcfg_log (I : Icfg) (γlk : GName) :
-    @icfgLog (fsinitIcfg I γlk) = (@icfgLog I).withLk γlk := rfl
-
-section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
-  [SleepLockG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
-  [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxBoxG GF] [IrefslotG GF] [Appcfg GF] [CurCtx]
-
-theorem fsinitIcfg_boot (I : Icfg) (γlk : GName) :
-    @iregBoot GF _ (fsinitIcfg I γlk) = @iregBoot GF _ I := rfl
-theorem fsinitIcfg_itinv (I : Icfg) (γlk : GName) :
-    @itableInv hlc GF _ _ (fsinitIcfg I γlk) = @itableInv hlc GF _ _ I := rfl
-theorem fsinitIcfg_slks (I : Icfg) (γlk : GName) (cn : IcNames) :
-    @icSleeplocks hlc GF _ _ _ _ _ _ (fsinitIcfg I γlk) _ cn =
-      @icSleeplocks hlc GF _ _ _ _ _ _ I _ cn := rfl
-theorem fsinitIcfg_ireg (I : Icfg) (γlk : GName) (γi : GName) (γfs : FsNames) (a b : Nat) :
-    @iregInv hlc GF _ _ _ _ _ _ _ _ _ (fsinitIcfg I γlk) γi γfs a b =
-      @iregInv hlc GF _ _ _ _ _ _ _ _ _ I γi γfs a b := rfl
-theorem fsinitIcfg_it2 (I : Icfg) (γlk : GName) (γl : GName) (cn : IcNames) (γfs : FsNames)
-    (γi : GName) (cov : ExtTreeSet Nat compare) (ls nib : Nat) (dv : BitVec 32) :
-    @isItable2 hlc GF _ _ _ _ _ _ _ _ _ (fsinitIcfg I γlk) _ γl cn γfs γi cov ls nib dv =
-      @isItable2 hlc GF _ _ _ _ _ _ _ _ _ I _ γl cn γfs γi cov ls nib dv := rfl
 
 end
 

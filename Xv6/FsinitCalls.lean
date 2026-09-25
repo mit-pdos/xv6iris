@@ -1,9 +1,8 @@
 /-
 `fsinit`'s two big callees at their call sites: `initlog` at `+0x4e` (the
-ambient view, the caller's `icfgLog` filled) and `ireclaim` at `+0x54`, run
-at the configuration `Xv6.fsinitIcfg I γlk` (`Xv6/SpecFsinit.lean`
-deviation 1) and restated at the ambient one with the log context at
-`icfgLog.withLk γlk`.
+ambient view, the caller's `icfgLog` filled -- all five names, the lock's
+included) and `ireclaim` at `+0x54`, at the ambient configuration, taking
+the `logCtx icfgLog` initlog handed back.
 -/
 import Xv6.FsinitDefs
 
@@ -22,9 +21,9 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
   [Appcfg GF]
 
 set_option maxHeartbeats 1000000 in
-/-- `ireclaim(dev)` at `+0x54`, with the log context `initlog` built: the
-contract at `fsinitIcfg I γlk`, every other premise transported by `rfl`. -/
-theorem fsinit_ireclaim_call (IR : IRECLAIM) [Fscfg] [I : Icfg] [CurCtx] (γlk : GName)
+/-- `ireclaim(dev)` at `+0x54`, with the log context `initlog` built (at the
+ambient `icfgLog`: initlog is an `_at` form). -/
+theorem fsinit_ireclaim_call (IR : IRECLAIM) [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (pidv : BitVec 32) (dqp dqb dqs dqn : DFrac)
@@ -41,7 +40,7 @@ theorem fsinit_ireclaim_call (IR : IRECLAIM) [Fscfg] [I : Icfg] [CurCtx] (γlk :
     kctx cpu k ∗ pcIs cpu KA.«ireclaim» ∗ procsInv Γ ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ panicEnv ∗
     bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
-    logCtx (icfgLog.withLk γlk) fscBio fscFs fscCov fscLogst icfgDev ∗
+    logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
     diskCaps fscDisk fscDlock pd pav pu ∗
     -- the three superblock fields, read and handed straight back
     wordPointsTo sbNinodes 4 dqn (BitVec.ofNat 32 fscNinodes) ∗
@@ -76,12 +75,9 @@ theorem fsinit_ireclaim_call (IR : IRECLAIM) [Fscfg] [I : Icfg] [CurCtx] (γlk :
       -- the boot-shelter token, returned unspent
       iregBoot -∗ wpLoop cpu'))
       ⊢ wpLoop (GF := GF) cpu := by
-  have h := @IRECLAIM.wp_ireclaim_eb IR hlc GF _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-    (fsinitIcfg I γlk) _ Γ _ cpu k γl pd pav pu j pidv dqp dqb dqs dqn hj hproc hK hnoff htier
-    hgeom hblk hbg hbel hn1 hnnib hn31 hpd ha0
+  have h := IR.wp_ireclaim_eb (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j pidv dqp dqb dqs
+    dqn hj hproc hK hnoff htier hgeom hblk hbg hbel hn1 hnnib hn31 hpd ha0
   unfold wp_ireclaim_eb_body ireclaimAddr at h
-  rw [fsinitIcfg_boot, fsinitIcfg_itinv, fsinitIcfg_slks, fsinitIcfg_ireg, fsinitIcfg_it2,
-    fsinitIcfg_log, fsinitIcfg_dev, fsinitIcfg_nib, fsinitIcfg_ist] at h
   exact h
 
 end
@@ -91,7 +87,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF]
 
 set_option maxHeartbeats 1000000 in
-/-- `initlog(dev, &sb)` at `+0x4e`, at the ambient view: the log's four
+/-- `initlog(dev, &sb)` at `+0x4e`, at the ambient view: the log's five
 gnames are `icfgLog`'s, the superblock is `&sb`. -/
 theorem fsinit_initlog_call (IL : INITLOG) [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
@@ -123,7 +119,7 @@ theorem fsinit_initlog_call (IL : INITLOG) [Fscfg] [Icfg] [CurCtx]
     -- entry by entry.
     fsBytesAt fscFs (fsHomeList fscCov fscLogst) ∗
     excOwn fscFs.exc (hdrDec bsHdr).2 ∗
-    -- the four ghost names, at their genesis values
+    -- the five ghost names, at their genesis values (the lock's included)
     logFreeTok icfgLog ∗
     -- the superblock field, read once
     wordPointsTo sbLogstartAddr 4 dqs (BitVec.ofNat 32 fscLogst) ∗
@@ -149,14 +145,14 @@ theorem fsinit_initlog_call (IL : INITLOG) [Fscfg] [Icfg] [CurCtx]
        fsChalf fscFs (logSlotBno fscLogst i) bs) ∗
     -- the slot pool, stocked: the batch's 32 plus initlog's own working pair
     bslots fscBio ((LOGBLOCKS + 2) + 2) ∗
-    wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (γlk : GName),
+    wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k.regs R'⌝ -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
       wordPointsTo (pPid k.proc) 4 dqp pidv -∗
       wordPointsTo sbLogstartAddr 4 dqs (BitVec.ofNat 32 fscLogst) -∗
       bslots fscBio 2 -∗
-      logCtx (icfgLog.withLk γlk) fscBio fscFs fscCov fscLogst icfgDev -∗ wpLoop cpu'))
+      logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev -∗ wpLoop cpu'))
       ⊢ wpLoop (GF := GF) cpu := by
   have h := IL.wp_initlog_eb (hlc := hlc) (GF := GF) Γ cpu k icfgLog γl fscBio
     (fsView fscFs fscDisk icfgDev fscCov) fscDlock fscFs pd pav pu j fscLogst icfgDev KA.«sb»

@@ -163,7 +163,7 @@ theorem fsinit_log (IL : INITLOG) (IR : IRECLAIM) [Fscfg] [Icfg] [CurCtx]
   case da1 => k_norm_g
   -- back from initlog (it PARKS: any hart)
   iapply wpNext_intro_pin
-  iintro %cpu %_ %spie2 %spp2 %R2 %γlk %hcs Hk Hpc Hte Hce Hpid C5 Hsl2 #Hlctx
+  iintro %cpu %_ %spie2 %spp2 %R2 %hcs Hk Hpc Hte Hce Hpid C5 Hsl2 #Hlctx
   k_norm_g [fsinit_ret_52, hww, hpsw]
   unfold calleeSaved at hcs
   k_norm_g at hcs
@@ -172,7 +172,7 @@ theorem fsinit_log (IL : INITLOG) (IR : IRECLAIM) [Fscfg] [Icfg] [CurCtx]
   ihave Hsl3 := bslots_cons fscBio 2 $$ [Hsl1 Hsl2]
   · iframe Hsl1 Hsl2
   iapply (fsinit_reclaim IR Γ cpu k spie2 spp2 R2 γl pd pav pu j pidv dqp vMagic vSize vNblocks
-      vNlog bsSb γlk hj hproc hK hnoff htier hgeom hblk hbg hbel hn1 hnnib hn31 hpd (e18.trans hs2)
+      vNlog bsSb hj hproc hK hnoff htier hgeom hblk hbg hbel hn1 hnnib hn31 hpd (e18.trans hs2)
       (e2.trans hR2) (e19.trans p19) (e20.trans p20) (e21.trans p21) (e22.trans p22)
       (e23.trans p23) (e24.trans p24) (e25.trans p25) (e26.trans p26) (e27.trans p27))
   iframe Hk Hpc Hte Hce Hframe Hpid Hfsb Hlctx Hsl3 Hiref Hboot Hnext

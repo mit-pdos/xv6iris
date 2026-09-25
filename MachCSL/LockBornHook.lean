@@ -198,6 +198,39 @@ theorem kctx_newlock_hook [CurCtx] [KernelImage GF] {lent : Bool} (cpu : CPU) (k
   · iexists γ
     iexact Hlk
 
+/-- **THE BIRTH AT A PRE-ALLOCATED GNAME, AT THE KERNEL EXECUTION CONTEXT**
+(Rocq `WpLockAt.newlock_at` as `ProofInitlog.v` uses it): `newlockAt_llb`
+with no floor to fold (`tl = 0`, the payload deposited as itself), run
+under `kctx` as `MachCSL.kctx_newlock` is.  What a constructor handed its
+lock's name in advance (`Xv6.logFreeTok`'s first conjunct) seals with. -/
+theorem kctx_newlockAt [CurCtx] [KernelImage GF] {lent : Bool} (cpu : CPU) (k : KCtx)
+    (γ : GName) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF) [CtxMorph R] :
+    kctxL lent cpu k ∗ lockFreeTok γ ∗ R curCtx ∗ lkFresh lk ∗
+    kmapId lk ∗ kmapId (lk + 16#64)
+    ⊢ |={⊤}=> (kctxL (GF := GF) lent cpu k ∗ isLock γ lk s R) := by
+  iintro ⟨Hk, Hfree, HR, Hfresh, #Hcl, #Hcl'⟩
+  icases kctx_cases cpu k $$ Hk with
+    ⟨%hwf, HConf, HF, Hstack, Htrans, Harm, Hcpu, Htok, Hclock, #Hro⟩
+  icases ctxTok_cases cpu curCtx $$ Htok with ⟨Hctx, %r, Hfrag⟩
+  ihave #Htl := topLbAt_0 (GF := GF) (E := MachGS.era (hlc := hlc) (GF := GF))
+  imod newlockAt_llb cpu ⊤ γ lk s R R 0 (fun ξ => by iintro ⟨H, -⟩; iexact H)
+    $$ [Hfree Hctx Hfresh HR] with ⟨Hctx, #Hlk⟩
+  · iframe Hfree Hctx Hfresh HR
+    isplit
+    · iexact Hcl
+    isplit
+    · iexact Hcl'
+    · iexact Htl
+  imodintro
+  isplitl [HConf HF Hstack Htrans Harm Hcpu Hctx Hfrag Hclock]
+  · iapply kctx_intro' cpu k hwf
+    iframe HConf HF Hstack Htrans Harm Hcpu Hclock
+    isplitl [Hctx Hfrag]
+    · iapply ctxTok_intro cpu curCtx r
+      iframe Hctx Hfrag
+    · iexact Hro
+  · iexact Hlk
+
 end geom
 
 end
