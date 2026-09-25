@@ -900,3 +900,4 @@ import Xv6.ConsNames
 import Xv6.ConsoleRing
 import Xv6.ConsoleTags
 import Xv6.ConsoleInvDefs
+import Xv6.CreateFail
