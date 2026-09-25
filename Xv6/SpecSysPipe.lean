@@ -36,15 +36,17 @@ and the write end, their bundle rows are `.open true false .pipe` and
 `.open false true .pipe`, and the eight bytes at `v` ARE the two
 descriptor numbers (Rocq's success conjunct on the written bytes).
 
+THE WINDOW IS ROCQ'S ONE MERGED WINDOW AT `v` (`sysPipeMem`): the two
+copyouts' adjacent runs compose (Rocq's `umem_wr_app`; here
+`UMemL.umemWrite_step`, over the `umMapped` conjunct `COPYOUT` carries) into
+the entry view faulted on to `P'` with `b0 ++ b1` written at `v`, every page
+of the run mapped in `P'`.  Rocq's prefix length `d ≤ 8` and bytes `bs` are
+here the two prefix lengths `d0`, `d1` of the two descriptor words (sharper:
+the bytes are named).  The block after a copyout is Rocq's: `procPrivFd` at
+`{ V with upt := P' }`, the grown table under `uptd_ext_sz (pv_sz V)`, so
+`umBelow` survives.
+
 DEVIATIONS FROM ROCQ:
-  * THE WINDOW IS STATED AS THE TWO COPYOUTS' WRITES (`sysPipeMem`), not
-    as one merged window: the Lean `copyout` promises `umemWrite` over
-    `viewFaulted`, and the post composes the two such writes (the
-    intermediate descriptor is existential) instead of proving the
-    adjacent-window merge Rocq's `umem_wr_app` provides.
-  (The block after a copyout is Rocq's: `procPrivFd` at `{ V with upt :=
-  P' }`, the grown table under `uptd_ext_sz (pv_sz V)` -- `sysPipeMem`'s
-  two `extSz` steps -- so `umBelow` survives.)
   * THE PAGE COUNT IS THE UNCOUNTED MODE (`kallocAvail γk none`, Rocq's
     `kalloc_env γa None`): copyout's vmfault needs it, and `none` is
     persistent, so it is not returned (the caller keeps its copy).
@@ -80,13 +82,14 @@ def sysPipeFdBytes (fd : Nat) : List (BitVec 8) := wordToBytes4 (BitVec.ofNat 32
 @[simp] theorem sysPipeFdBytes_length (fd : Nat) : (sysPipeFdBytes fd).length = 4 := rfl
 
 /-- The user image after the two `copyout`s of `b0` at `v` and `b1` at
-`v + 4`: each grows the address space under the break `sz` (`P ⊆ P1 ⊆ P'`,
-Rocq's `uptd_ext_sz`) and writes its bytes over the view with the new pages
-zeroed. -/
+`v + 4`, as ONE window (Rocq's `umem_wr (us_M U) v d bs`): the address space
+grown under the break `sz` (Rocq's `uptd_ext_sz`), and `b0 ++ b1` written at
+`v` over the view with the new pages zeroed, every page of the run mapped
+in `P'`. -/
 def sysPipeMem (sz : BitVec 64) (P : UPtd) (M : Nat → List (BitVec 8)) (v : BitVec 64)
     (b0 b1 : List (BitVec 8)) (P' : UPtd) (M' : Nat → List (BitVec 8)) : Prop :=
-  ∃ P1 : UPtd, P.extSz sz P1 ∧ P1.extSz sz P' ∧
-    M' = umemWrite (viewFaulted P1 P' (umemWrite (viewFaulted P P1 M) v.toNat b0)) (v + 4#64).toNat b1
+  P.extSz sz P' ∧ M' = umemWrite (viewFaulted P P' M) v.toNat (b0 ++ b1) ∧
+    umMapped P' v.toNat (b0 ++ b1).length
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [CurCtx]

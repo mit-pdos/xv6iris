@@ -15,7 +15,7 @@ import Xv6.LazyFree
 import Xv6.SpecSysPipe
 import Xv6.SpecMyproc
 import Xv6.ArgLemmas
-import Xv6.UMemLemmas
+import Xv6.UMemWindow
 import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame8
 
@@ -202,6 +202,31 @@ theorem sys_pipe_unset2 (fs : List (BitVec 64)) (fd0 fd1 : Nat) (a b : BitVec 64
 theorem sys_pipe_unset1 (fs : List (BitVec 64)) (fd0 : Nat) (a : BitVec 64) (h0 : fs[fd0]? = some 0#64) :
     (fs.set fd0 a).set fd0 0#64 = fs := by
   rw [List.set_set]; exact sys_pipe_set_self fs fd0 0#64 h0
+
+/-! ## The merged window (Rocq's `umem_wr_app` at `v`, `v + 4`) -/
+
+/-- Both copyouts ran: the first wrote all four bytes of `b0` at `v`, the
+second some `b1` at `v + 4`; the two adjacent runs are one window. -/
+theorem sysPipeMem_two {sz : BitVec 64} {P P1 P2 : UPtd} {M M1 M2 : Nat → List (BitVec 8)}
+    {v : BitVec 64} {b0 b1 : List (BitVec 8)} (hwf2 : uptWf P2)
+    (hext1 : P.extSz sz P1) (hext2 : P1.extSz sz P2) (hl : b0.length = 4)
+    (hM1 : M1 = umemWrite (viewFaulted P P1 M) v.toNat b0) (hm1 : umMapped P1 v.toNat b0.length)
+    (hM2 : M2 = umemWrite (viewFaulted P1 P2 M1) (v + 4#64).toNat b1)
+    (hm2 : umMapped P2 (v + 4#64).toNat b1.length) :
+    sysPipeMem sz P M v b0 b1 P2 M2 := by
+  have e4 : v + BitVec.ofNat 64 b0.length = v + 4#64 := by rw [hl]
+  rw [← e4] at hM2 hm2
+  subst hM1 hM2
+  obtain ⟨he, hm⟩ := UMemL.umemWrite_step M v b0 b1 hwf2 hext1.1 hext2.1 hm1 hm2
+  exact ⟨UMemL.extSz_trans hext1 hext2, he, hm⟩
+
+/-- Only the first copyout ran (and failed part-way): its prefix is the
+window. -/
+theorem sysPipeMem_one {sz : BitVec 64} {P P1 : UPtd} {M M1 : Nat → List (BitVec 8)}
+    {v : BitVec 64} {b0 : List (BitVec 8)} (hext1 : P.extSz sz P1)
+    (hM1 : M1 = umemWrite (viewFaulted P P1 M) v.toNat b0) (hm1 : umMapped P1 v.toNat b0.length) :
+    sysPipeMem sz P M v b0 [] P1 M1 :=
+  ⟨hext1, by rw [List.append_nil]; exact hM1, by rw [List.append_nil]; exact hm1⟩
 
 /-! ## Stage facts: pin the ambient context -/
 
