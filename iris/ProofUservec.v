@@ -1688,7 +1688,7 @@ Section UservecAllPt.
           iApply (ut_fork_in_ueq _ sc_v (tf_of g (ret_pc sepc_v)) TF
                     (upd_usM (us_tf U (tf_of g (ret_pc sepc_v))) M) UU sts
                     (tf_of_length g (ret_pc sepc_v)) Hlf Hueqf
-                    eq_refl eq_refl eq_refl eq_refl eq_refl
+                    eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
                     with "Hfin")
       end. }
     { (* THE PAYMENT ACROSS THE SAVE WALK.  The row reads the number and
@@ -1705,7 +1705,7 @@ Section UservecAllPt.
                 lia);
           iApply (ut_pay_in_ueq _ sc_v (tf_of g (ret_pc sepc_v)) TF
                     (upd_usM (us_tf U (tf_of g (ret_pc sepc_v))) M) UU
-                    Hueqe eq_refl
+                    Hueqe eq_refl eq_refl
                     with "Hein")
       end. }
     { (* the key's generation is the block's, and the save walk moves no
@@ -1893,8 +1893,8 @@ Section UservecAllPt.
          [ud_data], which [perm_of] does not read. *)
       match goal with
       | |- uv_round _ _ _ _ _ ?UU =>
-          refine (uv_round_of_ut _ U M g sepc_v sc_v UU _ _ _ _ _ _
-                    (ut_round_same sepc_v sc_v _ U2 UU _ _ eq_refl _ _ _ Hrd2))
+          refine (uv_round_of_ut _ U M g sepc_v sc_v UU _ _ _ _ _ _ _
+                    (ut_round_same sepc_v sc_v _ U2 UU _ _ eq_refl _ _ _ _ Hrd2))
       end.
       + exact Hu36.
       + reflexivity.
@@ -1911,11 +1911,17 @@ Section UservecAllPt.
         cbn [us_V pv_lazy pv_secc us_upt upd_upt upd_usV upd_usM us_tf upd_tf pv_gen
              pv_chg pv_cwi].
         reflexivity.
+      + (* ...nor the mask *)
+        cbn [us_V pv_lazy pv_secc us_upt upd_upt upd_usV upd_usM us_tf upd_tf pv_gen
+             pv_chg pv_cwi].
+        reflexivity.
       + cbn [us_V pv_tf us_upt upd_upt upd_usV us_tf upd_tf]. exact Hws1.
       + cbn [us_V pv_upt pv_sz us_upt upd_upt upd_usV us_tf upd_tf].
         rewrite Huptpt2. reflexivity.
       + cbn [us_V pv_sz us_upt upd_upt upd_usV us_tf upd_tf]. reflexivity.
       + cbn [us_V pv_cwi us_upt upd_upt upd_usV us_tf upd_tf pv_gen pv_chg]. reflexivity.
+      + cbn [us_V pv_lazy pv_secc us_upt upd_upt upd_usV us_tf upd_tf pv_gen pv_chg
+             pv_cwi]. reflexivity.
       + cbn [us_V pv_lazy pv_secc us_upt upd_upt upd_usV us_tf upd_tf pv_gen pv_chg
              pv_cwi]. reflexivity.
     - (* THE ROUND'S DESCRIPTOR HALF, forwarded verbatim: this boundary

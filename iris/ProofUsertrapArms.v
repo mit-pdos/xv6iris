@@ -722,7 +722,7 @@ Section Ut56.
                (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
                (uint (pv_sz (us_V U0))) (pv_lazy (us_V U0)) (pv_secc (us_V U0))
                U sts sts gn cs pid) as "Hxo".
-    { iApply (ut_exec_out_quiet _ _ _ _ _ _ _ _ _ _ _ _ _ Hnec). }
+    { iApply (ut_exec_out_quiet _ _ _ _ _ _ _ _ _ _ _ _ _ _ Hnec). }
     (* ...and fork's, refuted through the same cause *)
     iAssert (ut_fork_out fdep scv (pv_secc (us_V U0))
                (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))
@@ -1235,7 +1235,7 @@ Section UtD0.
                  (uint (pv_sz (us_V U0))) (pv_lazy (us_V U0)) (pv_secc (us_V U0))
                  (MkUstate V' (us_M U)) sts sts gn cs pid)
         as "Hxo".
-      { iApply (ut_exec_out_quiet _ _ _ _ _ _ _ _ _ _ _ _ _ Hnec). }
+      { iApply (ut_exec_out_quiet _ _ _ _ _ _ _ _ _ _ _ _ _ _ Hnec). }
     (* ...and fork's, refuted through the same cause *)
     iAssert (ut_fork_out fdep scv (pv_secc (us_V U0))
                (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))
@@ -1509,7 +1509,7 @@ Section UtE8.
                  (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
                  (uint (pv_sz (us_V U0))) (pv_lazy (us_V U0)) (pv_secc (us_V U0))
                  U sts sts gn cs pid) as "Hxo".
-      { iApply (ut_exec_out_quiet _ _ _ _ _ _ _ _ _ _ _ _ _ Hnec). }
+      { iApply (ut_exec_out_quiet _ _ _ _ _ _ _ _ _ _ _ _ _ _ Hnec). }
     (* ...and fork's, refuted through the same cause *)
     iAssert (ut_fork_out fdep scv (pv_secc (us_V U0))
                (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))

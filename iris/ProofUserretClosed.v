@@ -352,6 +352,9 @@ Section UserretClosed.
        real descriptor state rather than a value the key merely names. *)
     iDestruct "Hrut" as (ksp U0)
       "(Hctx & Hclose & %Hsz & %Hgam & %Hcwi & %Hgen0 & %Hlz0 & %Hsc0)".
+    (* the block's mask IS the key's: the residue's pin and the loop's *)
+    assert (Hsecr : pv_secc (us_V U0) = uvis_secc W)
+      by exact (eq_trans Hsc0 (eq_sym Hsecw)).
     iDestruct ("Hclose" $! (uvis_fd W) with "Hfrag Hctx") as "Hures".
     (* put [Hszw] in terms of the residue's size FIRST: otherwise [subst sz]
        has two equations to choose from and takes the wrong one. *)
@@ -484,14 +487,14 @@ Section UserretClosed.
                      (uvis_M W))
                   (uvis_fd W))%I
       with "[Hxin]" as "[Hin Hfin]".
-    { destruct (decide (usys_num (uvis_tf W) = USYS_fork)) as [Hfk | Hnfk].
+    { destruct (decide (uvis_num W = USYS_fork)) as [Hfk | Hnfk].
       - iSplitR.
         + (* the bundle row excludes fork by its own guard *)
           iIntros (n) "%Hg". exfalso.
           (* the guard lost its exit exclusion: exit deposits a bundle row
              like any returning number now (design/pipe.md, "The exit path") *)
           destruct Hg as (_ & Hgn & Hgf). apply Hgf. rewrite <- Hgn.
-          exact (eq_trans (uvis_run_num W) Hfk).
+          exact (eq_trans (uvis_run_eff W _ Hsecr) Hfk).
         + (* THE CHILD'S CONTINUATION.  The deposit's key is the TRAPPED
              frame bumped and the row's is the RUN projection's bumped, and
              the two agree at everything a slot reads
@@ -500,7 +503,7 @@ Section UserretClosed.
           rewrite /uexec_dep /uexec_dep_F. cbv zeta.
           destruct (decide (sc = uecall_scause)) as [_ | Hc];
             [ | exfalso; exact (Hc (proj1 Hg)) ].
-          destruct (decide (usys_num (uvis_tf W) = USYS_fork)) as [_ | Hc];
+          destruct (decide (uvis_num W = USYS_fork)) as [_ | Hc];
             [ | exfalso; exact (Hc Hfk) ].
           (* THE CHILD'S PID IS ∀-BOUND, beside its generation: the process
              deposited a family over every number <allocpid> might choose
@@ -551,8 +554,8 @@ Section UserretClosed.
              view ([UexecApply.uvis_run_arg0] / [_arg1] / [_arg2]) *)
           iIntros (n) "%Hg".
           destruct Hg as (Hgc & Hgn & Hgf).
-          assert (Hn : usys_num (uvis_tf W) = n)
-            by (rewrite <- (uvis_run_num W); exact Hgn).
+          assert (Hn : uvis_num W = n)
+            by (rewrite <- (uvis_run_eff W _ Hsecr); exact Hgn).
           rewrite /uexec_dep /uexec_dep_F. cbv zeta.
           destruct (decide (sc = uecall_scause)) as [_ | Hc];
             [ | exfalso; exact (Hc Hgc) ].
@@ -586,7 +589,7 @@ Section UserretClosed.
           iExact "Hxin".
         + (* not fork, so the fork row is vacuous *)
           rewrite /SpecUsertrap.ut_fork_in. iIntros "%Hg". exfalso.
-          apply Hnfk. rewrite <- (uvis_run_num W). exact (proj2 Hg). }
+          apply Hnfk. rewrite <- (uvis_run_eff W _ Hsecr). exact (proj2 Hg). }
     (* ---- THE PAIR GOES DOWN WHOLE (lane TRAP-ROWS, T3).  At a non-ecall
            cause the arm the process handed over IS the additive conjunction
            of its -1 deposit and its resume slot, and only the KERNEL knows
@@ -627,7 +630,10 @@ Section UserretClosed.
               (eq_sym Hgen0)
               Hstv Hdqc Hmie Hj Hnorm Hptwf
               with "Hkt Hhw Hmin Hclaim Hcreds Hframe Hures Hin Hfin [Hpay] Hkin [-]").
-    { rewrite /SpecUsertrap.ut_pay_in. iExact "Hpay". }
+    { rewrite /SpecUsertrap.ut_pay_in.
+      (* the block's mask is the key's ([Hsecr]) *)
+      change (pv_secc (us_V (upd_usM _ _))) with (pv_secc (us_V U0)).
+      rewrite Hsecr. iExact "Hpay". }
     iApply wp_next_intro. iIntros (CID').
     rewrite /uservec_post.
     iIntros (pt' mf ms' usatp uepc sc' stval' mdv0 U2 sts2 cs2)
@@ -635,6 +641,14 @@ Section UserretClosed.
        %Hpttf %Hmapwf %Hsatpr %Hnorm' %Hptwf' %Hmm %Hretms %Hacc'
        Hhs' Hpriv' Hms' Hmie' Hmdl' Hmenv' Hstvec' #Hsenv' Hsc' Hstval' Hsepc'
        Hupt' Hpc' Hgpr' Hures' #Hhw' #Hmin' #Hcreds' Hxo Hfo Hwo %Hlv Hko Hso".
+    (* THE POST NAMES THE BLOCK'S MASK, and the key's is the same one
+       ([Hsc0k]): the rows are re-spelled at the key's, which is what the
+       round lemma below reads *)
+    rewrite ?Hsc0k in Hchkept Hfdecall Hpipecall Hpidrow Hlv.
+    iEval (rewrite ?Hsc0k) in "Hxo".
+    iEval (rewrite ?Hsc0k) in "Hfo".
+    iEval (rewrite ?Hsc0k) in "Hwo".
+    iEval (rewrite ?Hsc0k) in "Hso".
     (* ...AND THE UNTAKEN SIDE COMES BACK (lane TRAP-ROWS, T3): at a
        non-ecall cause the kernel resumed, so it took the slot and owes it,
        and that is what the round transports to the resumed key. *)
@@ -705,6 +719,7 @@ Section UserretClosed.
     rewrite Hsz0 in Hround'.
     rewrite Hcw0 in Hround'.
     rewrite Hlz0k in Hround'.
+    rewrite Hsc0k in Hround'.
     (* THE RESUMED KEY IS AT [sts2], THE POST-SYSCALL VIEW.  That is the
        whole point of the conditional pin: on an ecall the kernel may have
        retyped a descriptor and the key must say so, and on any other cause
@@ -733,7 +748,7 @@ Section UserretClosed.
        fork, so on that arm the set did not move and the row's slot is at
        the same key. *)
     iAssert (⌜sc = uecall_scause
-             /\ usys_num (tf_of (tf_resume_gpr0 (uvis_tf W))
+             /\ usys_eff (uvis_secc W) (tf_of (tf_resume_gpr0 (uvis_tf W))
                             (ret_pc (tf_w (uvis_tf W) tf_epc_idx)))
                 = USYS_exec⌝ -∗
              (⌜exists r : mword 64,
@@ -753,10 +768,10 @@ Section UserretClosed.
       with "[Hxo]" as "Hxo".
     { iIntros "%Hg".
       assert (Hnf : ~ (sc = uecall_scause
-                       /\ (usys_num (tf_of (tf_resume_gpr0 (uvis_tf W))
+                       /\ (usys_eff (uvis_secc W) (tf_of (tf_resume_gpr0 (uvis_tf W))
                                        (ret_pc (tf_w (uvis_tf W) tf_epc_idx)))
                            = USYS_fork
-                           \/ usys_num (tf_of (tf_resume_gpr0 (uvis_tf W))
+                           \/ usys_eff (uvis_secc W) (tf_of (tf_resume_gpr0 (uvis_tf W))
                                           (ret_pc (tf_w (uvis_tf W) tf_epc_idx)))
                               = USYS_wait))).
       { intros [_ [Hx | Hx]]; rewrite (proj2 Hg) in Hx; discriminate Hx. }
@@ -796,13 +811,13 @@ Section UserretClosed.
            so the transport must NOT go through [Hchkept].  The armed post
            reads the set only as its own last argument, and both sides name
            the same [cs2]. *)
-        iDestruct ("Hso" $! (usys_num (tf_of (tf_resume_gpr0 (uvis_tf W))
+        iDestruct ("Hso" $! (usys_eff (uvis_secc W) (tf_of (tf_resume_gpr0 (uvis_tf W))
                                (ret_pc (tf_w (uvis_tf W) tf_epc_idx))))
                      with "[%]") as "Hso";
         [ split_and!;
           [ exact Hgec | reflexivity | exact Hgex | exact Hgfk ] |];
         iEval (rewrite (spost_at_cong uslot
-                 (usys_num (tf_of (tf_resume_gpr0 (uvis_tf W))
+                 (usys_eff (uvis_secc W) (tf_of (tf_resume_gpr0 (uvis_tf W))
                     (ret_pc (tf_w (uvis_tf W) tf_epc_idx)))) fdep
                  (uvis_of (upd_usM (us_tf (us_upt U0 pt)
                              (tf_of (tf_resume_gpr0 (uvis_tf W))

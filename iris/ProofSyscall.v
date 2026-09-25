@@ -5698,7 +5698,7 @@ Section SyscallArms.
       [ | exfalso; exact (Hcne eq_refl) ].
     (* the guard reads the frame's word directly ([UsysMemOk.usys_num]);
        this entry's number is the same word ([SpecSyscall.sysc_num]) *)
-    change (usys_num (pv_tf (us_V U))) with (sysc_num (us_V U)).
+    change (usys_eff (pv_secc (us_V U)) (pv_tf (us_V U))) with (sysc_num (us_V U)).
     rewrite Hnum.
     destruct (decide (UsysMemOk.USYS_exit = USYS_exit)) as [_ | Hcne];
       [ | exfalso; exact (Hcne eq_refl) ].
@@ -8674,11 +8674,15 @@ Section SyscallArms.
               eq_refl
               ltac:(apply (sysc_ret_pid_ne _ _ _ _ Hnum0);
                     unfold UsysMemOk.USYS_getpid; discriminate)
-              ltac:(apply usys_secc_ok_refl; rewrite Hnum0; unfold USYS_seccomp; discriminate)
+              ltac:(apply usys_secc_ok_refl; intro Hc;
+                    pose proof (eq_trans (eq_sym Hnum0) Hc) as Hc';
+                    unfold USYS_seccomp in Hc'; discriminate Hc')
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] []").
     { iApply sysc_fork_out_ne. rewrite Hnum0. unfold UsysMemOk.USYS_fork. discriminate. }
     { iApply sysc_wait_out_ne. rewrite Hnum0. unfold UsysMemOk.USYS_wait. discriminate. }
-    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ _ ltac:(rewrite Hnum0; discriminate)).
+    iApply (sysc_exec_out_ne _ _ _ _ _ _ _ _
+              ltac:(intro Hc; pose proof (eq_trans (eq_sym Hnum0) Hc) as Hc';
+                    discriminate Hc')).
     iApply (sysc_sys_out_quiet U sts gn cs pid fdep _ _ _ _ _ 0 Hnum0
               ltac:(unfold sysc_num_nofs; lia)).
   Qed.

@@ -162,7 +162,7 @@ Section UkRunExecRef.
        number is rewritten and the destructs below then reduce both copies
        at once *)
     rewrite /uexec_pay_dep /upay_at.
-    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
+    pose proof Hnum as Hnume. unfold uvis_num in Hnume. rewrite ?Hnum ?Hnume. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (USYS_exec = USYS_exit)) as [He | _];
@@ -195,7 +195,8 @@ Section UkRunExecRef.
     (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
        equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
        the full mask [urun] is keyed at *)
-    pose proof (usys_secc_ok_quiet _ _ _ _ _ ltac:(usys_range) Hscrow) as Hscq.
+    pose proof (fun Hne => usys_secc_ok_quiet _ _ _ _ _ Hne Hscrow) as Hscq.
+    specialize (Hscq ltac:(usys_range)).
     cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     assert (Hcw : cw' = c)
       by (refine (usys_cwd_ok_quiet _ _ _ _ _ Hcwrow); vm_compute; discriminate).
@@ -321,7 +322,7 @@ Section UkRunExecRef.
        number is rewritten and the destructs below then reduce both copies
        at once *)
     rewrite /uexec_pay_dep /upay_at.
-    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
+    pose proof Hnum as Hnume. unfold uvis_num in Hnume. rewrite ?Hnum ?Hnume. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (USYS_exec = USYS_exit)) as [He | _];
@@ -354,7 +355,8 @@ Section UkRunExecRef.
     (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
        equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
        the full mask [urun] is keyed at *)
-    pose proof (usys_secc_ok_quiet _ _ _ _ _ ltac:(usys_range) Hscrow) as Hscq.
+    pose proof (fun Hne => usys_secc_ok_quiet _ _ _ _ _ Hne Hscrow) as Hscq.
+    specialize (Hscq ltac:(usys_range)).
     cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     assert (Hcw : cw' = c)
       by (refine (usys_cwd_ok_quiet _ _ _ _ _ Hcwrow); vm_compute; discriminate).

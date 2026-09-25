@@ -351,6 +351,12 @@ Proof.
   unfold usys_num, tf_w. reflexivity.
 Qed.
 
+(* ...and the EFFECTIVE number, at any spelling of the key's mask: the run
+   projection keeps the raw number, and the mask is read beside it *)
+Lemma uvis_run_eff (W : uvis) (secc : mword 64) :
+  secc = uvis_secc W -> usys_eff secc (uvis_tf (uvis_run W)) = uvis_num W.
+Proof. intros ->. unfold uvis_num, usys_eff. rewrite uvis_run_num. reflexivity. Qed.
+
 Lemma uvis_run_arg0 (W : uvis) :
   uvis_tf (uvis_run W) !!! tf_arg_idx 0 = uvis_tf W !!! tf_arg_idx 0.
 Proof. exact (tf_resume_gpr0_a0 (uvis_tf W)). Qed.

@@ -1527,9 +1527,10 @@ Section UtA6.
                    = pv_tf (us_V U0) !!! tf_arg_idx 2)
       by (rewrite list_lookup_total_insert_ne;
           [ reflexivity | unfold tf_epc_idx, tf_arg_idx; lia ]).
-    assert (Hnume : usys_num (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0)))
-                    = usys_num (pv_tf (us_V U0)))
-      by apply usys_num_epc.
+    assert (Hnume : usys_eff (pv_secc (us_V U0))
+                      (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0)))
+                    = usys_eff (pv_secc (us_V U0)) (pv_tf (us_V U0)))
+      by apply usys_eff_epc.
     iAssert ((□ (⌜ut_live_read_g scw (pv_secc (us_V U0))
                     (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) sts0
                     (pv_tf (us_V U) !!! tf_arg_idx 0)⌝ -∗
@@ -1733,11 +1734,11 @@ Section UtA6.
         rewrite /ut_resume_in /ut_kill_out.
         destruct (decide (scw = UsysMemOk.uecall_scause)) as [_ | _].
         + iFrame "Hq Hr Hs Hqp Hrg Htear". iSplitR; [ by iIntros "_" | ].
-          iIntros "_". iPureIntro. exact (ut_live_out_of _ _ _ _ _ Hnr Hnw).
+          iIntros "_". iPureIntro. exact (ut_live_out_of _ _ _ _ _ _ Hnr Hnw).
         + iDestruct "Hres" as "[Hslot | #Hsh]".
           * iFrame "Hq Hr Hs Hqp Hrg Htear". iSplitL "Hslot".
             { iIntros "_". iExact "Hslot". }
-            iIntros "_". iPureIntro. exact (ut_live_out_of _ _ _ _ _ Hnr Hnw).
+            iIntros "_". iPureIntro. exact (ut_live_out_of _ _ _ _ _ _ Hnr Hnw).
           * iDestruct (SchedCtx.kill_paid_shot_nz pid klr (DfracOwn qeighth)
                          (pv_gen (us_V U)) Hpidnz with "Hr Hrg Hsh")
               as "(_ & _ & %Hne)". exfalso. exact (Hne Hkz).

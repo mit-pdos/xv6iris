@@ -1001,7 +1001,7 @@ Section UkFork.
     { assert (Hraw : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c gn Sc pidv false secc_all)) = USYS_fork)
         by (cbn [uvis_tf uvis_of_run]; rewrite tf_of_num; exact Hn).
       rewrite uvis_num_full0; [ exact Hraw | reflexivity | rewrite Hraw; usys_range ]. }
-    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
+    pose proof Hnum as Hnume. unfold uvis_num in Hnume. rewrite ?Hnum ?Hnume. cbv zeta.
     destruct (decide (USYS_fork = USYS_exit)) as [He | _];
       [ exfalso; unfold USYS_fork, USYS_exit in He; lia | ].
     destruct (decide (USYS_fork = USYS_fork)) as [_ | Hne];

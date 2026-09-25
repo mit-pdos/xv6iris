@@ -585,7 +585,7 @@ Section UkRunSys.
        number is rewritten and the destructs below then reduce both copies
        at once *)
     rewrite /uexec_pay_dep /upay_at.
-    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
+    pose proof Hnum as Hnume. unfold uvis_num in Hnume. rewrite ?Hnum ?Hnume. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (n = USYS_exit)) as [He | _]; [ exfalso; exact (Hexit He) | ].
@@ -625,7 +625,8 @@ Section UkRunSys.
     (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
        equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
        the full mask [urun] is keyed at *)
-    pose proof (usys_secc_ok_quiet _ _ _ _ _ ltac:(usys_range) Hscrow) as Hscq.
+    pose proof (fun Hne => usys_secc_ok_quiet _ _ _ _ _ Hne Hscrow) as Hscq.
+    specialize (Hscq ltac:(usys_range)).
     cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
        it, and this is not it -- so the engine's half is re-keyed onto the
@@ -732,7 +733,7 @@ Section UkRunSys.
        number is rewritten and the destructs below then reduce both copies
        at once *)
     rewrite /uexec_pay_dep /upay_at.
-    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
+    pose proof Hnum as Hnume. unfold uvis_num in Hnume. rewrite ?Hnum ?Hnume. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (USYS_chdir = USYS_exit)) as [He | _];
@@ -761,7 +762,8 @@ Section UkRunSys.
     (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
        equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
        the full mask [urun] is keyed at *)
-    pose proof (usys_secc_ok_quiet _ _ _ _ _ ltac:(usys_range) Hscrow) as Hscq.
+    pose proof (fun Hne => usys_secc_ok_quiet _ _ _ _ _ Hne Hscrow) as Hscq.
+    specialize (Hscq ltac:(usys_range)).
     cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     (* the IMAGE and the TABLE crossed the trap untouched, as at a quiet
        call: chdir writes no user byte and moves no descriptor. *)
@@ -901,7 +903,7 @@ Section UkRunSys.
        number is rewritten and the destructs below then reduce both copies
        at once *)
     rewrite /uexec_pay_dep /upay_at.
-    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
+    pose proof Hnum as Hnume. unfold uvis_num in Hnume. rewrite ?Hnum ?Hnume. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (USYS_open = USYS_exit)) as [He | _];
@@ -933,7 +935,8 @@ Section UkRunSys.
     (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
        equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
        the full mask [urun] is keyed at *)
-    pose proof (usys_secc_ok_quiet _ _ _ _ _ ltac:(usys_range) Hscrow) as Hscq.
+    pose proof (fun Hne => usys_secc_ok_quiet _ _ _ _ _ Hne Hscrow) as Hscq.
+    specialize (Hscq ltac:(usys_range)).
     cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
        it, and this is not it -- so the engine's half is re-keyed onto the
@@ -1090,7 +1093,7 @@ Section UkRunSys.
        number is rewritten and the destructs below then reduce both copies
        at once *)
     rewrite /uexec_pay_dep /upay_at.
-    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
+    pose proof Hnum as Hnume. unfold uvis_num in Hnume. rewrite ?Hnum ?Hnume. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (USYS_dup = USYS_exit)) as [He | _];
@@ -1122,7 +1125,8 @@ Section UkRunSys.
     (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
        equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
        the full mask [urun] is keyed at *)
-    pose proof (usys_secc_ok_quiet _ _ _ _ _ ltac:(usys_range) Hscrow) as Hscq.
+    pose proof (fun Hne => usys_secc_ok_quiet _ _ _ _ _ Hne Hscrow) as Hscq.
+    specialize (Hscq ltac:(usys_range)).
     cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
        it, and this is not it -- so the engine's half is re-keyed onto the
@@ -1255,7 +1259,7 @@ Section UkRunSys.
        number is rewritten and the destructs below then reduce both copies
        at once *)
     rewrite /uexec_pay_dep /upay_at.
-    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
+    pose proof Hnum as Hnume. unfold uvis_num in Hnume. rewrite ?Hnum ?Hnume. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (USYS_dup = USYS_exit)) as [He | _];
@@ -1287,7 +1291,8 @@ Section UkRunSys.
     (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
        equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
        the full mask [urun] is keyed at *)
-    pose proof (usys_secc_ok_quiet _ _ _ _ _ ltac:(usys_range) Hscrow) as Hscq.
+    pose proof (fun Hne => usys_secc_ok_quiet _ _ _ _ _ Hne Hscrow) as Hscq.
+    specialize (Hscq ltac:(usys_range)).
     cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
        it, and this is not it -- so the engine's half is re-keyed onto the
@@ -1432,7 +1437,7 @@ Section UkRunSys.
         by (cbn [uvis_tf uvis_of_run]; rewrite tf_of_num; exact Hn).
       rewrite uvis_num_full0; [ exact Hraw | reflexivity | rewrite Hraw; usys_range ]. }
     rewrite /uexec_pay_dep /upay_at.
-    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
+    pose proof Hnum as Hnume. unfold uvis_num in Hnume. rewrite ?Hnum ?Hnume. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (USYS_dup = USYS_exit)) as [He | _];
@@ -1457,7 +1462,8 @@ Section UkRunSys.
     (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
        equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
        the full mask [urun] is keyed at *)
-    pose proof (usys_secc_ok_quiet _ _ _ _ _ ltac:(usys_range) Hscrow) as Hscq.
+    pose proof (fun Hne => usys_secc_ok_quiet _ _ _ _ _ Hne Hscrow) as Hscq.
+    specialize (Hscq ltac:(usys_range)).
     cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     assert (Hcw : cw' = cw)
       by (refine (usys_cwd_ok_quiet _ _ _ _ _ Hcwrow); vm_compute; discriminate).
@@ -1614,7 +1620,7 @@ Section UkRunSys.
        number is rewritten and the destructs below then reduce both copies
        at once *)
     rewrite /uexec_pay_dep /upay_at.
-    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
+    pose proof Hnum as Hnume. unfold uvis_num in Hnume. rewrite ?Hnum ?Hnume. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (USYS_close = USYS_exit)) as [He | _];
@@ -1646,7 +1652,8 @@ Section UkRunSys.
     (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
        equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
        the full mask [urun] is keyed at *)
-    pose proof (usys_secc_ok_quiet _ _ _ _ _ ltac:(usys_range) Hscrow) as Hscq.
+    pose proof (fun Hne => usys_secc_ok_quiet _ _ _ _ _ Hne Hscrow) as Hscq.
+    specialize (Hscq ltac:(usys_range)).
     cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
        it, and this is not it -- so the engine's half is re-keyed onto the
@@ -1736,7 +1743,7 @@ Section UkRunSys.
        number is rewritten and the destructs below then reduce both copies
        at once *)
     rewrite /uexec_pay_dep /upay_at.
-    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
+    pose proof Hnum as Hnume. unfold uvis_num in Hnume. rewrite ?Hnum ?Hnume. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (USYS_close = USYS_exit)) as [He | _];
@@ -1768,7 +1775,8 @@ Section UkRunSys.
     (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
        equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
        the full mask [urun] is keyed at *)
-    pose proof (usys_secc_ok_quiet _ _ _ _ _ ltac:(usys_range) Hscrow) as Hscq.
+    pose proof (fun Hne => usys_secc_ok_quiet _ _ _ _ _ Hne Hscrow) as Hscq.
+    specialize (Hscq ltac:(usys_range)).
     cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
        it, and this is not it -- so the engine's half is re-keyed onto the
@@ -1868,7 +1876,7 @@ Section UkRunSys.
        number is rewritten and the destructs below then reduce both copies
        at once *)
     rewrite /uexec_pay_dep /upay_at.
-    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
+    pose proof Hnum as Hnume. unfold uvis_num in Hnume. rewrite ?Hnum ?Hnume. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (USYS_exec = USYS_exit)) as [He | _];
@@ -1900,7 +1908,8 @@ Section UkRunSys.
     (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
        equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
        the full mask [urun] is keyed at *)
-    pose proof (usys_secc_ok_quiet _ _ _ _ _ ltac:(usys_range) Hscrow) as Hscq.
+    pose proof (fun Hne => usys_secc_ok_quiet _ _ _ _ _ Hne Hscrow) as Hscq.
+    specialize (Hscq ltac:(usys_range)).
     cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
        it, and this is not it -- so the engine's half is re-keyed onto the
@@ -2018,7 +2027,7 @@ Section UkRunSys.
        number is rewritten and the destructs below then reduce both copies
        at once *)
     rewrite /uexec_pay_dep /upay_at.
-    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
+    pose proof Hnum as Hnume. unfold uvis_num in Hnume. rewrite ?Hnum ?Hnume. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (USYS_exec = USYS_exit)) as [He | _];
@@ -2051,7 +2060,8 @@ Section UkRunSys.
     (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
        equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
        the full mask [urun] is keyed at *)
-    pose proof (usys_secc_ok_quiet _ _ _ _ _ ltac:(usys_range) Hscrow) as Hscq.
+    pose proof (fun Hne => usys_secc_ok_quiet _ _ _ _ _ Hne Hscrow) as Hscq.
+    specialize (Hscq ltac:(usys_range)).
     cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     assert (Hcw : cw' = c)
       by (refine (usys_cwd_ok_quiet _ _ _ _ _ Hcwrow); vm_compute; discriminate).
@@ -2255,7 +2265,7 @@ Section UkRunSys.
        number is rewritten and the destructs below then reduce both copies
        at once *)
     rewrite /uexec_pay_dep /upay_at.
-    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
+    pose proof Hnum as Hnume. unfold uvis_num in Hnume. rewrite ?Hnum ?Hnume. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (USYS_wait = USYS_exit)) as [He | _];
@@ -2292,7 +2302,8 @@ Section UkRunSys.
     (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
        equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
        the full mask [urun] is keyed at *)
-    pose proof (usys_secc_ok_quiet _ _ _ _ _ ltac:(usys_range) Hscrow) as Hscq.
+    pose proof (fun Hne => usys_secc_ok_quiet _ _ _ _ _ Hne Hscrow) as Hscq.
+    specialize (Hscq ltac:(usys_range)).
     cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
        it, and this is not it -- so the engine's half is re-keyed onto the
@@ -2602,7 +2613,7 @@ Section UkRunSys.
         by (cbn [uvis_tf uvis_of_run]; rewrite tf_of_num; exact Hn).
       rewrite uvis_num_full0; [ exact Hraw | reflexivity | rewrite Hraw; usys_range ]. }
     rewrite /uexec_pay_dep /upay_at.
-    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
+    pose proof Hnum as Hnume. unfold uvis_num in Hnume. rewrite ?Hnum ?Hnume. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (USYS_wait = USYS_exit)) as [He | _];
@@ -2624,7 +2635,8 @@ Section UkRunSys.
     (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
        equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
        the full mask [urun] is keyed at *)
-    pose proof (usys_secc_ok_quiet _ _ _ _ _ ltac:(usys_range) Hscrow) as Hscq.
+    pose proof (fun Hne => usys_secc_ok_quiet _ _ _ _ _ Hne Hscrow) as Hscq.
+    specialize (Hscq ltac:(usys_range)).
     cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     assert (Hcw : cw' = cw)
       by (refine (usys_cwd_ok_quiet _ _ _ _ _ Hcwrow); vm_compute; discriminate).
@@ -2772,6 +2784,9 @@ Section UkRunSys.
        has its own leaves ([wp_uk_ecall_wait_null] / [_any]): this one
        re-closes the run at the set it opened at. *)
     n <> USYS_wait ->
+    (* ...and a number the full mask passes, not seccomp's
+       ([wp_uk_ecall_quiet]'s two rows) *)
+    (0 <= n < 64)%Z -> n <> USYS_seccomp ->
     is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
     uinstr_is (ukn_t N) pc false (ECALL tt) -∗
     urun N h m pc avail -∗
@@ -2789,7 +2804,7 @@ Section UkRunSys.
        mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
-    intros Hn Hwin Hcapk Hcl Hdp Hop Hpp Hwt Hal4.
+    intros Hn Hwin Hcapk Hcl Hdp Hop Hpp Hwt Hrng Hn23 Hal4.
     iIntros "#Hi Hrun Hsb Hbuf Hcont".
     iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs pidv) "(%Hlo & %Hpm & %Hlzf & %HRut & Hheap & Hstk & Hufd & Hcwda & Hcha & #Hmy & #Hdep & #Hnpx & Hb)".
     iMod (udepw_mint N m pc _ M pm _ fdv cw gn cs pidv
@@ -2826,7 +2841,7 @@ Section UkRunSys.
        number is rewritten and the destructs below then reduce both copies
        at once *)
     rewrite /uexec_pay_dep /upay_at.
-    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
+    pose proof Hnum as Hnume. unfold uvis_num in Hnume. rewrite ?Hnum ?Hnume. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (n = USYS_exit)) as [He | _]; [ exfalso; exact (Hexit He) | ].
@@ -2857,7 +2872,8 @@ Section UkRunSys.
     (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
        equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
        the full mask [urun] is keyed at *)
-    pose proof (usys_secc_ok_quiet _ _ _ _ _ ltac:(usys_range) Hscrow) as Hscq.
+    pose proof (fun Hne => usys_secc_ok_quiet _ _ _ _ _ Hne Hscrow) as Hscq.
+    specialize (Hscq ltac:(usys_range)).
     cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
        it, and this is not it -- so the engine's half is re-keyed onto the
@@ -3164,7 +3180,7 @@ Section UkRunSys.
        number is rewritten and the destructs below then reduce both copies
        at once *)
     rewrite /uexec_pay_dep /upay_at.
-    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
+    pose proof Hnum as Hnume. unfold uvis_num in Hnume. rewrite ?Hnum ?Hnume. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (USYS_pipe = USYS_exit)) as [He | _];
@@ -3199,7 +3215,8 @@ Section UkRunSys.
     (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
        equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
        the full mask [urun] is keyed at *)
-    pose proof (usys_secc_ok_quiet _ _ _ _ _ ltac:(usys_range) Hscrow) as Hscq.
+    pose proof (fun Hne => usys_secc_ok_quiet _ _ _ _ _ Hne Hscrow) as Hscq.
+    specialize (Hscq ltac:(usys_range)).
     cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
        it, and this is not it -- so the engine's half is re-keyed onto the
@@ -3442,6 +3459,7 @@ Section UkRunSys.
               (* ...and read is not wait either, so the children reading it
                  opened at is the one it re-closes at *)
               ltac:(vm_compute; discriminate)
+              ltac:(usys_range) ltac:(usys_range)
               Hal4 with "Hi Hrun Hsb Hbuf").
     iIntros (h' r d g) "%Hd %Hgf %Hrr Hrun Hbuf".
     iApply ("Hcont" $! h' r d g with "[%] [%] [%] Hrun Hbuf");
@@ -3791,7 +3809,7 @@ Section UkRunSys.
                  = Some (dst, cap)).
     { cbn [uvis_tf uvis_of_run]. rewrite usyswin_tf_of. exact Hwin. }
     rewrite /uexec_pay_dep /upay_at.
-    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
+    pose proof Hnum as Hnume. unfold uvis_num in Hnume. rewrite ?Hnum ?Hnume. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (USYS_read = USYS_exit)) as [He | _];
@@ -3818,7 +3836,8 @@ Section UkRunSys.
     (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
        equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
        the full mask [urun] is keyed at *)
-    pose proof (usys_secc_ok_quiet _ _ _ _ _ ltac:(usys_range) Hscrow) as Hscq.
+    pose proof (fun Hne => usys_secc_ok_quiet _ _ _ _ _ Hne Hscrow) as Hscq.
+    specialize (Hscq ltac:(usys_range)).
     cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     assert (Hcw : cw' = cw)
       by (refine (usys_cwd_ok_quiet _ _ _ _ _ Hcwrow); vm_compute; discriminate).
@@ -4105,7 +4124,7 @@ Section UkRunSys.
         by (cbn [uvis_tf uvis_of_run]; rewrite tf_of_num; exact Hn).
       rewrite uvis_num_full0; [ exact Hraw | reflexivity | rewrite Hraw; usys_range ]. }
     rewrite /uexec_pay_dep /upay_at.
-    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
+    pose proof Hnum as Hnume. unfold uvis_num in Hnume. rewrite ?Hnum ?Hnume. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (USYS_open = USYS_exit)) as [He | _];
@@ -4130,7 +4149,8 @@ Section UkRunSys.
     (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
        equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
        the full mask [urun] is keyed at *)
-    pose proof (usys_secc_ok_quiet _ _ _ _ _ ltac:(usys_range) Hscrow) as Hscq.
+    pose proof (fun Hne => usys_secc_ok_quiet _ _ _ _ _ Hne Hscrow) as Hscq.
+    specialize (Hscq ltac:(usys_range)).
     cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     assert (Hcw : cw' = c)
       by (refine (usys_cwd_ok_quiet _ _ _ _ _ Hcwrow); vm_compute; discriminate).
@@ -4268,7 +4288,7 @@ Section UkRunSys.
         by (cbn [uvis_tf uvis_of_run]; rewrite tf_of_num; exact Hn).
       rewrite uvis_num_full0; [ exact Hraw | reflexivity | rewrite Hraw; usys_range ]. }
     rewrite /uexec_pay_dep /upay_at.
-    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
+    pose proof Hnum as Hnume. unfold uvis_num in Hnume. rewrite ?Hnum ?Hnume. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (n = USYS_exit)) as [He | _]; [ exfalso; exact (Hexit He) | ].
@@ -4292,7 +4312,8 @@ Section UkRunSys.
     (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
        equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
        the full mask [urun] is keyed at *)
-    pose proof (usys_secc_ok_quiet _ _ _ _ _ ltac:(usys_range) Hscrow) as Hscq.
+    pose proof (fun Hne => usys_secc_ok_quiet _ _ _ _ _ Hne Hscrow) as Hscq.
+    specialize (Hscq ltac:(usys_range)).
     cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     assert (Hcw : cw' = c) by (exact (usys_cwd_ok_quiet n r c cw' Hcd Hcwrow)).
     assert (Hgn : gn' = gn) by exact (usys_gen_ok_quiet _ _ _ Hgnrow).
@@ -4558,7 +4579,7 @@ Section UkRunSys.
         by (cbn [uvis_tf uvis_of_run]; rewrite tf_of_num; exact Hn).
       rewrite uvis_num_full0; [ exact Hraw | reflexivity | rewrite Hraw; usys_range ]. }
     rewrite /uexec_pay_dep /upay_at.
-    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
+    pose proof Hnum as Hnume. unfold uvis_num in Hnume. rewrite ?Hnum ?Hnume. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (16 = USYS_exit)) as [He | _]; [ discriminate He | ].
@@ -4579,7 +4600,8 @@ Section UkRunSys.
     (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
        equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
        the full mask [urun] is keyed at *)
-    pose proof (usys_secc_ok_quiet _ _ _ _ _ ltac:(usys_range) Hscrow) as Hscq.
+    pose proof (fun Hne => usys_secc_ok_quiet _ _ _ _ _ Hne Hscrow) as Hscq.
+    specialize (Hscq ltac:(usys_range)).
     cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     assert (Hcw : cw' = cw)
       by (refine (usys_cwd_ok_quiet _ _ _ _ _ Hcwrow); vm_compute; discriminate).
@@ -5001,7 +5023,7 @@ Section UkRunSys.
         by (cbn [uvis_tf uvis_of_run]; rewrite tf_of_num; exact Hn).
       rewrite uvis_num_full0; [ exact Hraw | reflexivity | rewrite Hraw; usys_range ]. }
     rewrite /uexec_pay_dep /upay_at.
-    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
+    pose proof Hnum as Hnume. unfold uvis_num in Hnume. rewrite ?Hnum ?Hnume. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (USYS_open = USYS_exit)) as [He | _];
@@ -5026,7 +5048,8 @@ Section UkRunSys.
     (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
        equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
        the full mask [urun] is keyed at *)
-    pose proof (usys_secc_ok_quiet _ _ _ _ _ ltac:(usys_range) Hscrow) as Hscq.
+    pose proof (fun Hne => usys_secc_ok_quiet _ _ _ _ _ Hne Hscrow) as Hscq.
+    specialize (Hscq ltac:(usys_range)).
     cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     assert (Hcw : cw' = c)
       by (refine (usys_cwd_ok_quiet _ _ _ _ _ Hcwrow); vm_compute; discriminate).
@@ -5256,7 +5279,7 @@ Section UkRunSys.
         by (cbn [uvis_tf uvis_of_run]; rewrite tf_of_num; exact Hn).
       rewrite uvis_num_full0; [ exact Hraw | reflexivity | rewrite Hraw; usys_range ]. }
     rewrite /uexec_pay_dep /upay_at.
-    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
+    pose proof Hnum as Hnume. unfold uvis_num in Hnume. rewrite ?Hnum ?Hnume. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (USYS_open = USYS_exit)) as [He | _];
@@ -5281,7 +5304,8 @@ Section UkRunSys.
     (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
        equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
        the full mask [urun] is keyed at *)
-    pose proof (usys_secc_ok_quiet _ _ _ _ _ ltac:(usys_range) Hscrow) as Hscq.
+    pose proof (fun Hne => usys_secc_ok_quiet _ _ _ _ _ Hne Hscrow) as Hscq.
+    specialize (Hscq ltac:(usys_range)).
     cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     assert (Hcw : cw' = c)
       by (refine (usys_cwd_ok_quiet _ _ _ _ _ Hcwrow); vm_compute; discriminate).
@@ -5460,7 +5484,7 @@ Section UkRunSys.
         by (cbn [uvis_tf uvis_of_run]; rewrite tf_of_num; exact Hn).
       rewrite uvis_num_full0; [ exact Hraw | reflexivity | rewrite Hraw; usys_range ]. }
     rewrite /uexec_pay_dep /upay_at.
-    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
+    pose proof Hnum as Hnume. unfold uvis_num in Hnume. rewrite ?Hnum ?Hnume. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (n = USYS_exit)) as [He | _]; [ exfalso; exact (Hexit He) | ].
@@ -5484,7 +5508,8 @@ Section UkRunSys.
     (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
        equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
        the full mask [urun] is keyed at *)
-    pose proof (usys_secc_ok_quiet _ _ _ _ _ ltac:(usys_range) Hscrow) as Hscq.
+    pose proof (fun Hne => usys_secc_ok_quiet _ _ _ _ _ Hne Hscrow) as Hscq.
+    specialize (Hscq ltac:(usys_range)).
     cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     assert (Hcw : cw' = c) by (exact (usys_cwd_ok_quiet n r c cw' Hcd Hcwrow)).
     assert (Hgn : gn' = gn) by exact (usys_gen_ok_quiet _ _ _ Hgnrow).
@@ -5654,7 +5679,7 @@ Section UkRunSys.
        number is rewritten and the destructs below then reduce both copies
        at once *)
     rewrite /uexec_pay_dep /upay_at.
-    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
+    pose proof Hnum as Hnume. unfold uvis_num in Hnume. rewrite ?Hnum ?Hnume. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (USYS_sbrk = USYS_exit)) as [He | _];
@@ -5710,7 +5735,8 @@ Section UkRunSys.
     (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
        equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
        the full mask [urun] is keyed at *)
-    pose proof (usys_secc_ok_quiet _ _ _ _ _ ltac:(usys_range) Hscrow) as Hscq.
+    pose proof (fun Hne => usys_secc_ok_quiet _ _ _ _ _ Hne Hscrow) as Hscq.
+    specialize (Hscq ltac:(usys_range)).
     cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     (* the descriptor view does not move: sbrk is none of the four *)
     assert (Hview : fdv' = fdv).
@@ -5899,7 +5925,7 @@ Section UkRunSys.
        number is rewritten and the destructs below then reduce both copies
        at once *)
     rewrite /uexec_pay_dep /upay_at.
-    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
+    pose proof Hnum as Hnume. unfold uvis_num in Hnume. rewrite ?Hnum ?Hnume. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (USYS_exit = USYS_fork)) as [He | _];

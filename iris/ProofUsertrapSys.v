@@ -553,6 +553,9 @@ Section UtSysBlock.
       (* ...and the lazy bit, for the generation's reason exactly *)
       assert (HV1lz : pv_lazy V1 = pv_lazy (us_V U))
         by (rewrite /V1; destruct (us_V U); reflexivity).
+      (* ...and the mask, likewise *)
+      assert (HV1sc : pv_secc V1 = pv_secc (us_V U))
+        by (rewrite /V1; destruct (us_V U); reflexivity).
       assert (Hbel1 : um_below (pv_sz V1) (ud_um (pv_upt V1)))
         by (rewrite HV1upt HV1sz; exact Hbel0).
       assert (Hszb1 : (uint (pv_sz V1) <= uvm_maxsz)%Z)
@@ -566,7 +569,7 @@ Section UtSysBlock.
       { rewrite (sysc_num_usys V1).
         change (pv_secc V1) with (pv_secc (us_V U)). rewrite HV1tf0. apply usys_eff_epc. }
       pose proof Hpro as Hpro'.
-      destruct Hpro' as (Hpr1 & Hpr2 & Hpr3 & Hpr4 & Hpr5 & Hpr6 & Hpr7).
+      destruct Hpro' as (Hpr1 & Hpr2 & Hpr3 & Hpr4 & Hpr5 & Hpr6 & Hpr7 & Hpr8).
       (* the entry record's number and argument words are the dispatcher's:
          neither epc rewrite reads them -- the deposit's key congruence
          ([SpecUsertrap.ut_sys_in_cong]) *)
@@ -615,7 +618,7 @@ Section UtSysBlock.
         rewrite <- Hpr1. rewrite Htfch.
         (* ...and the lazy bit, the child's eleventh reading: the prologue
            writes one trapframe word and no block field (lane LAZY-FLAG) *)
-        rewrite HV1upt HV1sz HV1cwid HV1lz Hpr2 Hpr3 Hpr4 Hpr5 Hpr7.
+        rewrite HV1upt HV1sz HV1cwid HV1lz HV1sc Hpr2 Hpr3 Hpr4 Hpr5 Hpr7 Hpr8.
         reflexivity. }
       (* ---- +0x9e: csrsi sstatus,2 -- intr_on(), and the reserve is paid ---- *)
       iDestruct (ut_flip_pre (un_pj N) with "Hcpu") as "(Hcnt & Hcells)".
@@ -916,7 +919,7 @@ Section UtSysBlock.
                  (pv_sz V1) (pv_sz V2) (us_M U) M2 Hbel1 Hszb1).
         exact (sysc_mem_ok_sbrk_row V1 V2 (us_M U) M2 Hsb Hmemg). }
       assert (Hrda : ut_round epv scv U0 (MkUstate V2 M2)).
-      { destruct Hpro as (Hp1 & Hp2 & Hp3 & Hp4 & Hp5 & Hp6 & Hp7).
+      { destruct Hpro as (Hp1 & Hp2 & Hp3 & Hp4 & Hp5 & Hp6 & Hp7 & Hp8).
         unfold ut_round.
         rewrite <- Hp1. rewrite <- Hp2. rewrite <- Hp3. rewrite <- Hp4.
         rewrite <- Hp5.
@@ -924,6 +927,7 @@ Section UtSysBlock.
            LAZY-FLAG): the entry record and the one the dispatch ran at
            carry the same bit *)
         rewrite <- Hp7.
+        rewrite <- Hp8.
         unfold uround_ok.
         destruct (decide (scv = uecall_scause)) as [_ | Hc];
           [ | contradiction (Hc Hscec) ].
