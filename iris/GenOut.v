@@ -1141,7 +1141,7 @@ Section gen_out.
     /\ gin_pure M k pops (dl ++ ws) cs0
     /\ nlines (snd <$> (dl ++ ws)) <= S (length cs0).
   Proof using B.
-    intros Hread (Hlog & Hdisc & Hstamp & Hdlp & Hidx & Hbyte & Hbnd & Hall).
+    intros Hread (Hlog & Hdisc & Hstamp & Hdlp & Hidx & Hbyte & Hbnd & Hall & Hdh).
     assert (Hnoer : forall e, e ∈ pops -> cons_erase (le_byte e) = false).
     { intros e He.
       assert (Hends : obs_ends_in Uart0 (open_seg (le_hist e)) (le_byte e)).
@@ -1156,7 +1156,7 @@ Section gen_out.
     split; [exact Hpref |]. split.
     - rewrite /gin_pure. split_and!;
         [exact Hlog | exact Hdisc | exact Hstamp | exact Hpref | exact Hidx
-         | exact Hbyte | exact Hbnd | exact Hall].
+         | exact Hbyte | exact Hbnd | exact Hall | exact Hdh].
     - etrans; [| exact Hbnd]. apply nlines_prefix, epu_fmap_prefix, Hpref.
   Qed.
 
@@ -1503,7 +1503,7 @@ Section gen_out.
     destruct Hall as (Hpure & Hcsl & Hpsl & Hin & Hera & HEtie & Hdlok).
     destruct Hpure as (Hacc & Hwpre & Hidx & Hbyte & Hpsb & Hpinf & Hcsb' & Hdsc
                        & Hpre1 & Hpre2 & Hpre3 & Hnofk & Hf0n & Hfok0).
-    destruct Hin as (Hlog & Hdsc2 & Hstamp & Hdlp & Hidxi & Hbytei & Hbndi & Halle).
+    destruct Hin as (Hlog & Hdsc2 & Hstamp & Hdlp & Hidxi & Hbytei & Hbndi & Halle & Hdhe).
     assert (Hseg : seg_of (echoed (LogEntryDefs.ch_log CH)) = gs_E M so).
     { rewrite HEtie /ch_E Harm ch_arm_E_open app_nil_r. reflexivity. }
     (* the byte's own facts *)

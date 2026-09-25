@@ -156,13 +156,13 @@ Section open_pure.
     gcl_pure_o k ho so' r pre (ConsLog.cons_step H (ConsLog.EvOut b)).
   Proof using.
     intros Hcs' HE' Hout Hop Hp Hdlok' (_ & _ & _ & Hin & Hera & HE & _).
-    destruct Hin as (Hlog & Hdsc & Hbts & Hdl & HEi & HEb & Hcnt & Hall).
+    destruct Hin as (Hlog & Hdsc & Hbts & Hdl & HEi & HEb & Hcnt & Hall & Hdh).
     rewrite /gcl_pure_o /ConsLog.cons_step.
     cbn [LogEntryDefs.ch_acc LogEntryDefs.ch_log LogEntryDefs.ch_dl
          LogEntryDefs.ch_arm].
     split_and!; [exact Hout | exact Hop | exact Hp | | exact Hera | | exact Hdlok'].
     - split_and!; [exact Hlog | exact Hdsc | exact Hbts | exact Hdl
-                  | exact HEi | exact HEb | lia | exact Hall].
+                  | exact HEi | exact HEb | lia | exact Hall | exact Hdh].
     - by rewrite HE' HE /ch_E.
   Qed.
 
@@ -175,13 +175,13 @@ Section open_pure.
     gcl_pure_o k ho so' r' pre' (ConsLog.cons_step H (ConsLog.EvOut b)).
   Proof using.
     intros Hcs' HE' Hout Hop Hp Hdlok' (_ & _ & _ & Hin & Hera & HE & _).
-    destruct Hin as (Hlog & Hdsc & Hbts & Hdl & HEi & HEb & Hcnt & Hall).
+    destruct Hin as (Hlog & Hdsc & Hbts & Hdl & HEi & HEb & Hcnt & Hall & Hdh).
     rewrite /gcl_pure_o /ConsLog.cons_step.
     cbn [LogEntryDefs.ch_acc LogEntryDefs.ch_log LogEntryDefs.ch_dl
          LogEntryDefs.ch_arm].
     split_and!; [exact Hout | exact Hop | exact Hp | | exact Hera | | exact Hdlok'].
     - split_and!; [exact Hlog | exact Hdsc | exact Hbts | exact Hdl
-                  | exact HEi | exact HEb | lia | exact Hall].
+                  | exact HEi | exact HEb | lia | exact Hall | exact Hdh].
     - by rewrite HE' HE /ch_E.
   Qed.
 
@@ -194,13 +194,13 @@ Section open_pure.
     gcl_pure M sd k ho so' (ConsLog.cons_step H (ConsLog.EvOut b)).
   Proof using.
     intros Hcs' HE' Hout Hc Hp Hdlok' (_ & _ & _ & Hin & Hera & HE & _).
-    destruct Hin as (Hlog & Hdsc & Hbts & Hdl & HEi & HEb & Hcnt & Hall).
+    destruct Hin as (Hlog & Hdsc & Hbts & Hdl & HEi & HEb & Hcnt & Hall & Hdh).
     rewrite /gcl_pure /ConsLog.cons_step.
     cbn [LogEntryDefs.ch_acc LogEntryDefs.ch_log LogEntryDefs.ch_dl
          LogEntryDefs.ch_arm].
     split_and!; [exact Hout | exact Hc | exact Hp | | exact Hera | | exact Hdlok'].
     - split_and!; [exact Hlog | exact Hdsc | exact Hbts | exact Hdl
-                  | exact HEi | exact HEb | lia | exact Hall].
+                  | exact HEi | exact HEb | lia | exact Hall | exact Hdh].
     - by rewrite HE' HE /ch_E.
   Qed.
 

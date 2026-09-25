@@ -103,9 +103,9 @@ Section open_events_pure.
     destruct (LogEntryDefs.ch_arm H) as [[[[h c] cs] j] |] eqn:Ha; cycle 1.
     { rewrite /ConsLog.cons_step Ha. exact Hecl. }
     destruct Hecl as (Hout & Hop & Hps & Hin & Hera & HE & Hdlok).
-    destruct Hin as (_ & Hdsc & Hbts & Hdl & _ & _ & _ & Hall).
+    destruct Hin as (_ & Hdsc & Hbts & Hdl & _ & _ & _ & Hall & Hdh).
     rewrite /garm_era Ha in Hera.
-    destruct Hera as (Hdseg & Hboots & _ & _ & _ & Hcsa & _).
+    destruct Hera as (Hdseg & Hboots & Hdish & _ & _ & Hcsa & _).
     destruct Hev as (a & Ha2 & _ & HK3). rewrite Ha in Ha2.
     injection Ha2 as <-.
     cbn [LogEntryDefs.ca_echo LogEntryDefs.ca_byte LogEntryDefs.ca_sent
@@ -140,6 +140,8 @@ Section open_events_pure.
       + rewrite Hseg. by destruct Hout as (_ & _ & HEb & _).
       + rewrite -(seg_of_snd (echoed _)) Hseg Hqq. lia.
       + apply Forall_app. split; [exact Hall | by rewrite Forall_singleton].
+      + intros e He. apply elem_of_app in He as [He | He]; [exact (Hdh e He) |].
+        apply elem_of_list_singleton in He as ->. cbn [le_hist fst snd]. exact Hdish.
     - exact I.
     - rewrite /ch_E. cbn [LogEntryDefs.ch_log LogEntryDefs.ch_arm ch_arm_E].
       rewrite app_nil_r. by rewrite Hseg.
@@ -153,7 +155,7 @@ Section open_events_pure.
     gcl_pure_o M sd k ho so r pre (ConsLog.cons_step H (ConsLog.EvRead ws)).
   Proof using.
     intros Hpre (Hout & Hop & Hp & Hin & Hera & HE & Hdlok).
-    destruct Hin as (Hlog & Hdsc & Hbts & _ & HEi & HEb & Hcnt & Hall).
+    destruct Hin as (Hlog & Hdsc & Hbts & _ & HEi & HEb & Hcnt & Hall & Hdh).
     rewrite /gcl_pure_o /ConsLog.cons_step.
     cbn [LogEntryDefs.ch_acc LogEntryDefs.ch_log LogEntryDefs.ch_dl
          LogEntryDefs.ch_arm].
@@ -214,7 +216,7 @@ Section open_events_pure.
     assert (Hseg : seg_of (echoed (LogEntryDefs.ch_log H)) = gs_E M so).
     { rewrite HE /ch_E Hn. cbn [ch_arm_E]. by rewrite app_nil_r. }
     assert (Hall : Forall log_echoed (LogEntryDefs.ch_log H))
-      by (by destruct Hin as (_ & _ & _ & _ & _ & _ & _ & Hq)).
+      by (by destruct Hin as (_ & _ & _ & _ & _ & _ & _ & Hq & _)).
     assert (Hcnt : length (gs_E M so) = (length (ins (open_seg h)) - 1)%nat).
     { rewrite -Hseg seg_of_length (echoed_all_len _ Hall). lia. }
     assert (Hle : (length (gs_E M so) <= length (ins (open_seg h)))%nat) by lia.
@@ -342,7 +344,7 @@ Section open_events_pure.
     pose proof Hopen as (Hout & Hop & Hpsl & Hin & Hera & HEtie & _).
     destruct Hout as (Hacc & Hidx & Hbyte & Hpsb & Hpinf & Hcsb' & Hdsc
                       & Hpre1 & Hpre2 & Hpre3 & Hnofk & Hf0n & Hfok0).
-    destruct Hin as (Hlog & Hdsc2 & Hstamp & Hdlp & Hidxi & Hbytei & Hbndi & Halle).
+    destruct Hin as (Hlog & Hdsc2 & Hstamp & Hdlp & Hidxi & Hbytei & Hbndi & Halle & Hdhe).
     pose proof Hop as (Hreq & Hwp' & Hne' & ao & Hb2 & Hoarm).
     pose proof Hb2 as (Hnn & Hrr & Hqq & Hokao & Hpanao & Hprefao).
     pose proof (nlines_pos_of_rest_nil _ Hnn Hrr) as Hposn.
