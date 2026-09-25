@@ -24,6 +24,13 @@ fact about the block's own trapframe record, `V.tf[tfArgIdx 0]? = some v`,
 exactly as in `SpecSysWait`.  The trapframe pointer and page are split out
 of the block for the duration of `argint` and put back before `kexit`.
 
+EITHER ENTRY SIE (`wp_sys_exit_eb_body`), as `kexit`'s eb contract: the
+trap-CSR complement `trapCsrsExt` / `cpuClaimExt` goes in and is passed on
+to kexit, which spends it; the closer takes the trap reserve too
+(`trapRes k.sie + k.avail`, Rocq's `kstack_closer ... (trap_res b + av)`).
+Rocq's `SpecSysExit.v` still pins `eb = true`; this form subsumes it.
+The `sie = false` contract `SYSEXIT.wp_sys_exit` is derived.
+
 THE STACK CLOSER is in transit: sys_exit takes the closer anchored at ITS
 entry `sp`, wraps its own (dead) 4-slot frame around it, and hands the
 result to kexit, whose ZOMBIE park is where the page reaches the slot.
@@ -32,10 +39,11 @@ Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.SpecKexit
 import Xv6.SpecArgint
+import Iris.ProofMode
 
 namespace Xv6
 
-open Iris Iris.ProgramLogic Iris.BI Std MachCSL
+open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 /-- Address of `sys_exit`. -/
@@ -62,13 +70,46 @@ def wp_sys_exit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   (stackOwn k.sp k.avail -∗ stackOwn (V.kstack + 4096#64) 512)
   ⊢ wpLoop (GF := GF) cpu
 
-/-- The interface of `sys_exit`. -/
-structure SYSEXIT : Prop where
-  wp_sys_exit : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+/-- **WP of `sys_exit()`, at either entry `SIE`**: the complement in,
+nothing out; depth 0. -/
+def wp_sys_exit_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [FsEnv]
     (cpu : CPU) (k : KCtx) (γw : GName) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) (ip v : BitVec 64) hj hproc hv hK hsie hnoff hlocks htier hinit,
+    (M : Nat → List (BitVec 8)) (ip v : BitVec 64)
+    (hj : j < NPROC) (hproc : k.proc = procAddr j) (hv : V.tf[tfArgIdx 0]? = some v)
+    (hK : sysExitSlots ≤ k.avail) (hnoff : k.noff = 0)
+    (htier : k.tier = KTier.kpt) (hinit : procAddr j ≠ ip) : Prop :=
+  kctx cpu k ∗ pcIs cpu sysExitAddr ∗ procsInv Γ ∗
+  trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
+  isLock γw waitLockAddr "wait_lock" waitLockPay ∗ initprocIs ip ∗
+  procPrivNoctxAt curCtx (procAddr j) pid V M ∗
+  (stackOwn k.sp (trapRes k.sie + k.avail) -∗ stackOwn (V.kstack + 4096#64) 512)
+  ⊢ wpLoop (GF := GF) cpu
+
+/-- The interface of `sys_exit`. -/
+structure SYSEXIT : Prop where
+  wp_sys_exit_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [FsEnv]
+    (cpu : CPU) (k : KCtx) (γw : GName) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) (ip v : BitVec 64) hj hproc hv hK hnoff htier hinit,
+    wp_sys_exit_eb_body (hlc := hlc) (GF := GF) Γ cpu k γw j pid V M ip v
+      hj hproc hv hK hnoff htier hinit
+
+/-- The interrupts-off instance of `wp_sys_exit_eb`. -/
+theorem SYSEXIT.wp_sys_exit (A : SYSEXIT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+    [Xv6G GF] [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [FsEnv]
+    (cpu : CPU) (k : KCtx) (γw : GName) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) (ip v : BitVec 64) hj hproc hv hK hsie hnoff hlocks htier hinit :
     wp_sys_exit_body (hlc := hlc) (GF := GF) Γ cpu k γw j pid V M ip v
-      hj hproc hv hK hsie hnoff hlocks htier hinit
+      hj hproc hv hK hsie hnoff hlocks htier hinit := by
+  have h := A.wp_sys_exit_eb (hlc := hlc) (GF := GF) Γ cpu k γw j pid V M ip v hj hproc hv hK hnoff
+    htier hinit
+  unfold wp_sys_exit_eb_body at h
+  unfold wp_sys_exit_body
+  rw [hsie, trapRes_off] at h
+  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
+  iintro ⟨Hk, Hpc, Hpi, Htc, Hcl, Hir, Hwl, Hin, Hpr, Hcl2⟩
+  iapply h
+  iframe Hk Hpc Hpi Htc Hcl Hir Hwl Hin Hpr Hcl2
 
 end Xv6

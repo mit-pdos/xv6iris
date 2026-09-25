@@ -68,23 +68,25 @@ theorem sysx_argint (AI : ARGINT) (c : CPU) (k' : KCtx) (tfp : BitVec 44) (ws : 
   simp only [argintAddr] at h
   exact h
 
-/-- `kexit`, with its stack closer stated at an explicit `sp`/`avail`. -/
+/-- `kexit` at its eb contract, with its stack closer stated at an explicit
+`sp`/`avail` and the complement at a named index `s`. -/
 theorem sysx_kexit (KX : KEXIT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [FsEnv]
     (c : CPU) (k' : KCtx) (γw : GName) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) (ip : BitVec 64) (sp : BitVec 64) (n : Nat)
+    (M : Nat → List (BitVec 8)) (ip : BitVec 64) (sp : BitVec 64) (n : Nat) (s : Bool)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : kexitSlots ≤ k'.avail)
-    (hsie : k'.sie = false) (hnoff : k'.noff = 0) (hlocks : k'.locks = [])
+    (hs : k'.sie = s) (hnoff : k'.noff = 0)
     (htier : k'.tier = KTier.kpt) (hinit : procAddr j ≠ ip)
-    (hsp : k'.regs 2#5 = sp) (hav : k'.avail = n) :
+    (hsp : k'.regs 2#5 = sp) (hav : trapRes k'.sie + k'.avail = n) :
     kctx c k' ∗ pcIs c KA.«kexit» ∗ procsInv Γ ∗
-    trapCsrs c ∗ cpuClaim c (procAddr j) ∗ intrRes c ∗
+    trapCsrsExt c s ∗ cpuClaimExt c s (procAddr j) ∗
     isLock γw waitLockAddr "wait_lock" waitLockPay ∗ initprocIs ip ∗
     procPrivNoctxAt curCtx (procAddr j) pid V M ∗
     (stackOwn sp n -∗ stackOwn (V.kstack + 4096#64) 512)
     ⊢ wpLoop (GF := GF) c := by
-  have h := KX.wp_kexit (hlc := hlc) (GF := GF) Γ c k' γw j pid V M ip
-    hj hproc hK hsie hnoff hlocks htier hinit
-  unfold wp_kexit_body at h
+  subst hs
+  have h := KX.wp_kexit_eb (hlc := hlc) (GF := GF) Γ c k' γw j pid V M ip
+    hj hproc hK hnoff htier hinit
+  unfold wp_kexit_eb_body at h
   simp only [kexitAddr, KCtx.sp, hsp, hav, hproc] at h
   exact h
 
@@ -147,12 +149,12 @@ theorem sys_exit_br_fffffffffffff71c : KA.«sys_exit» + 0xfffffffffffff71c#64 =
 set_option maxHeartbeats 64000000 in
 set_option maxRecDepth 20000 in
 theorem sys_exit_proof (AI : ARGINT) (KX : KEXIT) : SYSEXIT := ⟨
-  fun {hlc GF} _ _ X Γ _ _ cpu k γw j pid V M ip v hj hproc hv hK hsie hnoff hlocks htier hinit => by
+  fun {hlc GF} _ _ X Γ _ _ cpu k γw j pid V M ip v hj hproc hv hK hnoff htier hinit => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
-  unfold wp_sys_exit_body
+  unfold wp_sys_exit_eb_body
   simp only [sysExitAddr]
-  iintro ⟨Hk, Hpc, #Hpi, Htc, Hcl, Hir, #Hwl, #Hinit, Hblk, Hcloser⟩
+  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hwl, #Hinit, Hblk, Hcloser⟩
   icases kctx_tier cpu k $$ Hk with ⟨%hct, Hk⟩
   have ht0 : t0 = KTier.kpt := hct.symm.trans htier
   subst ht0
@@ -178,39 +180,39 @@ theorem sys_exit_proof (AI : ARGINT) (KX : KEXIT) : SYSEXIT := ⟨
   -- the prologue ; a1 = &n ; a0 = 0 ; jal argint
   iapply (wp_prologue4s0_gen cpu k KA.«sys_exit» hK4)
   k_code (text_instr _ _ _ _ rfl rfl) Htext
-  k_norm_g [hsie]
+  k_norm_g
   iframe
   inext
-  iapply wpNext_off_intro
+  k_next_e
   iintro Hk Hpc Hframe
   icases sysx_frame_open _ _ _ $$ Hframe with ⟨%lo, %n0, %w2, %hal, F0, F1, Flo, Fnn, F3⟩
-  k_step (wp_s_addi cpu _ (KA.«sys_exit» + 0x8#64) false 4076#12 11#5 8#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«sys_exit» + 0x8#64) false 4076#12 11#5 8#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«sys_exit» + 0xc#64) true 0#12 10#5 0#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«sys_exit» + 0xc#64) true 0#12 10#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_zero]
   iintro Hk Hpc
-  k_step (wp_s_jal cpu _ (KA.«sys_exit» + 0xe#64) false 2096942#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_exit» + 0xe#64) false 2096942#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_exit_br_ffffffffffffff3c]
   iintro Hk Hpc
   iapply (sysx_argint AI cpu _ V.upt.tfp V.tf v n0 (DFrac.own 1) ?ha0 hv ?hn ?hKa)
     $$ [- $Hk $Hpc]
   rotate_right 1
-  · k_norm_g [sysx_ret_29f4, hsie, sysx_n_addr]
+  · k_norm_g [sysx_ret_29f4, sysx_n_addr]
     iframe Htf HTf Fnn
-    iapply wpNext_off_intro
-    iintro %spie1 %spp1 %R1 %hsp1 Hk Hpc %hcs1 Htf HTf Fnn
+    k_next_e
+    iintro %spie1 %spp1 %R1 %_ Hk Hpc %hcs1 Htf HTf Fnn
     icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
     k_norm_g
     unfold calleeSaved at hcs1
     k_norm_g at hcs1
     obtain ⟨c2, c8, -⟩ := hcs1
     -- lw a0,-20(s0) ; jal kexit
-    k_step (wp_s_lw cpu _ (KA.«sys_exit» + 0x12#64) false 4076#12 10#5 8#5 (by decide) (by decide)
+    k_step_e (wp_s_lw cpu _ (KA.«sys_exit» + 0x12#64) false 4076#12 10#5 8#5 (by decide) (by decide)
         (DFrac.own 1) (BitVec.extractLsb' 0 32 v))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [c8, sysx_n_addr]
     iintro Hk Hpc Fnn
-    k_step (wp_s_jal cpu _ (KA.«sys_exit» + 0x16#64) false 2094854#21 1#5 (by decide))
+    k_step_e (wp_s_jal cpu _ (KA.«sys_exit» + 0x16#64) false 2094854#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_exit_br_fffffffffffff71c]
     iintro Hk Hpc
     -- the block, closed again
@@ -221,23 +223,24 @@ theorem sys_exit_proof (AI : ARGINT) (KX : KEXIT) : SYSEXIT := ⟨
       unfold procPrivNoctxAt procFieldsNoctx
       iframe Hpid Hks Hsz Hpg Htf Hof Hcwd Hnm HPt HTf
       ipureintro; exact ⟨hVb, hlz⟩
-    ihave Hcl := (show cpuClaim (hlc := hlc) (GF := GF) cpu k.proc ⊢ cpuClaim cpu (procAddr j) from by
-      rw [hproc]) $$ Hcl
+    ihave Hce := (show cpuClaimExt (GF := GF) cpu k.sie k.proc ⊢ cpuClaimExt cpu k.sie (procAddr j) from by
+      rw [hproc]) $$ Hce
     -- the dead frame joins the closer, re-anchored at kexit's entry sp
-    ihave Hcloser := sysx_closer (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) w2 lo _ k.avail hK4 hal
+    ihave Hcloser := sysx_closer (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) w2 lo _ (trapRes k.sie + k.avail)
+      (by omega) hal
       (stackOwn (V.kstack + 4096#64) 512) $$ [F0 F1 Flo Fnn F3 Hcloser]
     case' _ => iframe
-    iapply (sysx_kexit KX Γ cpu _ γw j pid V M ip (k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64) (k.avail - 4)
-        hj ?hpr ?hKx ?hs ?hn2 ?hl ?ht hinit ?hsp ?hav)
-      $$ [- $Hk $Hpc $Hpi $Htc $Hcl $Hir $Hwl $Hinit $Hblk $Hcloser]
+    iapply (sysx_kexit KX Γ cpu _ γw j pid V M ip (k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64)
+        (trapRes k.sie + k.avail - 4) k.sie
+        hj ?hpr ?hKx ?hs ?hn2 ?ht hinit ?hsp ?hav)
+      $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hwl $Hinit $Hblk $Hcloser]
     case hpr => k_norm_g; exact hproc
     case hKx => k_norm_g; unfold sysExitSlots at hK; omega
-    case hs => k_norm_g; exact hsie
+    case hs => k_norm_g
     case hn2 => k_norm_g; exact hnoff
-    case hl => k_norm_g; exact hlocks
     case ht => k_norm_g; exact htier
     case hsp => k_norm_g; exact c2
-    case hav => k_norm_g
+    case hav => k_norm_g; omega
   case ha0 => k_norm_g [sysx_li0]
   case hn => k_norm_g; rw [hnoff]; decide
   case hKa =>

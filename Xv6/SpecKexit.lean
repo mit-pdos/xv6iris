@@ -41,6 +41,18 @@ against the published `initprocIs` is what rules that branch out.
 `fileclose`, `begin_op`, `iput` and `end_op` are the assumed file-system
 boundary (`Xv6/FsEnv.lean`), every one of them sleep-shaped.
 
+EITHER ENTRY SIE (`wp_kexit_eb_body`; Rocq `SpecKexit.v`: `cpu_own 0 eb`,
+`trap_csrs_ext eb` / `cpu_claim_ext eb pj` where `eb = true ->` used to
+be).  The caller brings the trap-CSR complement (`trapCsrsExt` /
+`cpuClaimExt`: emp at `sie = true`, the whole bundle at `sie = false`) and
+gets nothing back -- kexit does not return, so the pair is spent with the
+rest.  kexit's own `acquire(&wait_lock)` pays out the arm; joined with the
+complement it is the whole bundle `sched` takes at the ZOMBIE park.  The
+stack closer is Rocq's `kstack_closer pj sp (trap_res b + av)`: at
+`sie = true` the trap reserve below the budget is the thread's too, and it
+is handed back by that same acquire (`pushOffAt`), so the park owns it.
+The `sie = false` contract `KEXIT.wp_kexit` is the derived instance.
+
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.SchedCtx
@@ -50,10 +62,11 @@ import Xv6.SpecSched
 import Xv6.SpecReparent
 import MachCSL.Lock
 import MachCSL.WpSmodeIntr
+import Iris.ProofMode
 
 namespace Xv6
 
-open Iris Iris.ProgramLogic Iris.BI Std MachCSL
+open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 /-- Address of `kexit`. -/
@@ -79,13 +92,46 @@ def wp_kexit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
   (stackOwn k.sp k.avail -∗ stackOwn (V.kstack + 4096#64) 512)
   ⊢ wpLoop (GF := GF) cpu
 
-/-- The interface of `kexit`. -/
-structure KEXIT : Prop where
-  wp_kexit : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+/-- **WP of `kexit`, at either entry `SIE`** (Rocq `wp_kexit_sconf_body`):
+the complement in, nothing out; depth 0 (so no spinlock held, `KCtx.wf`). -/
+def wp_kexit_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [FsEnv]
     (cpu : CPU) (k : KCtx) (γw : GName) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) (ip : BitVec 64) hj hproc hK hsie hnoff hlocks htier hinit,
+    (M : Nat → List (BitVec 8)) (ip : BitVec 64)
+    (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : kexitSlots ≤ k.avail)
+    (hnoff : k.noff = 0)
+    (htier : k.tier = KTier.kpt) (hinit : procAddr j ≠ ip) : Prop :=
+  kctx cpu k ∗ pcIs cpu kexitAddr ∗ procsInv Γ ∗
+  trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
+  isLock γw waitLockAddr "wait_lock" waitLockPay ∗ initprocIs ip ∗
+  procPrivNoctxAt curCtx (procAddr j) pid V M ∗
+  (stackOwn k.sp (trapRes k.sie + k.avail) -∗ stackOwn (V.kstack + 4096#64) 512)
+  ⊢ wpLoop (GF := GF) cpu
+
+/-- The interface of `kexit`. -/
+structure KEXIT : Prop where
+  wp_kexit_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [FsEnv]
+    (cpu : CPU) (k : KCtx) (γw : GName) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) (ip : BitVec 64) hj hproc hK hnoff htier hinit,
+    wp_kexit_eb_body (hlc := hlc) (GF := GF) Γ cpu k γw j pid V M ip
+      hj hproc hK hnoff htier hinit
+
+/-- The interrupts-off instance of `wp_kexit_eb` (the complement is the
+whole bundle, the trap reserve is empty). -/
+theorem KEXIT.wp_kexit (A : KEXIT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [FsEnv]
+    (cpu : CPU) (k : KCtx) (γw : GName) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) (ip : BitVec 64) hj hproc hK hsie hnoff hlocks htier hinit :
     wp_kexit_body (hlc := hlc) (GF := GF) Γ cpu k γw j pid V M ip
-      hj hproc hK hsie hnoff hlocks htier hinit
+      hj hproc hK hsie hnoff hlocks htier hinit := by
+  have h := A.wp_kexit_eb (hlc := hlc) (GF := GF) Γ cpu k γw j pid V M ip hj hproc hK hnoff htier hinit
+  unfold wp_kexit_eb_body at h
+  unfold wp_kexit_body
+  rw [hsie, trapRes_off] at h
+  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
+  iintro ⟨Hk, Hpc, Hpi, Htc, Hcl, Hir, Hwl, Hin, Hpr, Hcl2⟩
+  iapply h
+  iframe Hk Hpc Hpi Htc Hcl Hir Hwl Hin Hpr Hcl2
 
 end Xv6
