@@ -124,7 +124,7 @@ Section UShPipesNode.
   Context (Hfin : (Rtop ∗ FAM ∗ QtopR ⊢ Qfin)%I).
   Local Notation wdoneR w := (wdone γc γm w).
   Local Notation wfinR w := (wfin γc γm w).
-  Local Notation lrepR k := (lrep L pr γc γm P k).
+  Local Notation lrepR k := (lrep lR L pr γc γm P k).
   Local Notation rrepR j := (rrep LM CP v I lR L γc γm P j).
   Local Notation sufR j ro := (suf LM CP v I lR L γc γm j ro).
   Local Notation a0_idx := (mword_of_int 10 : mword 5).
@@ -143,6 +143,10 @@ Section UShPipesNode.
     pose proof Hplok as Hok. rewrite Hline in Hok. destruct Hok as (_ & Hne & _).
     rewrite Hline. exact (lcats_pos pr _ Hne).
   Qed.
+
+  (* every stage of the round is a cat: the filter of every pipe *)
+  Lemma lfilt_round (j : nat) : lfilt lR j = FCat.
+  Proof using Hline. rewrite Hline. apply lfilt_cats. Qed.
 
   Lemma Hfire : forall w s, w ∈ wsN -> fire_src fcR pr L w s ->
     fire_okN wsN RUNN WITN termw TOKN w s (EXf fcR pr nc L w s).
@@ -216,15 +220,20 @@ Section UShPipesNode.
 
   (* the chain one node up: whatever the suffix's content writer is at,
      the suffix read it through the node's pipe, which the left stage wrote
-     whole -- so the left stage read it too *)
-  Lemma chain_up (wo : wr_out) (ro' ro : rd_out) (oc : option nat) :
+     whole -- what its filter owes for what it read, a nonempty prefix of
+     the line, so by the gate it read exactly that (grep-pipes SS3.4) *)
+  Lemma chain_up (F : filt) (wo : wr_out) (ro' ro : rd_out) (oc : option nat) :
     pipe_pair wo ro' -> chain L ro' oc -> (forall c, oc = Some c -> (0 < c <= length L)%nat) ->
-    copier ro wo -> chain L ro oc.
+    fok F L -> filterer F ro wo -> rd_pre L ro -> chain L ro oc.
   Proof using .
-    intros Hpair Hch Hpos Hcop c Hc. pose proof (Hch c Hc) as Hro'. subst ro'.
+    intros Hpair Hch Hpos Hfok Hflt Hpre c Hc. pose proof (Hch c Hc) as Hro'. subst ro'.
     pose proof (Hpos c Hc) as Hc0.
-    destruct wo as [D | D |]; cbn [pipe_pair] in Hpair.
-    - apply Hcop. by rewrite Hpair.
+    destruct wo as [W | W |]; cbn [pipe_pair] in Hpair.
+    - destruct (Hflt W eq_refl) as (D & -> & HW).
+      assert (HD : D `prefix_of` L) by exact (Hpre D eq_refl).
+      assert (Hne : fapp F D <> []) by (rewrite -HW -Hpair; exact (take_pos_ne c Hc0)).
+      destruct (fok_pass F L D Hfok HD Hne) as [HfD _].
+      rewrite -HfD -HW -Hpair. reflexivity.
     - done.
     - exfalso. exact (take_pos_ne c Hc0 Hpair).
   Qed.
@@ -234,7 +243,7 @@ Section UShPipesNode.
      from stage [k] *)
   Lemma node_read (k : nat) (γp : pipe_names) :
     (k < nc)%nat ->
-    FAM -∗ pipe_invU (P k) γp L (flow_U L (prevP P k)) -∗
+    FAM -∗ pipe_invU (P k) γp L (pflow lR L P k) -∗
     wcurN γc (WSh k) (1/2) 0 -∗ wmodeN γm (WSh k) (1/2) None -∗
     lrepR k -∗ rrepR (S k) ={⊤}=∗
     ∃ ro, (match k with O => ⌜ro = RdEof L \/ ro = RdGone⌝ | S k' => rd_final (P k') ro end)
@@ -299,15 +308,19 @@ Section UShPipesNode.
           iDestruct "Hup" as %Hall.
           set (roup := match wo with WrAll _ => RdEof L | _ => RdGone end).
           assert (Hch' : chain L roup oc).
-          { apply (chain_up wo ro' roup oc Hpair Hch Hpos).
-            intros D HD. rewrite /roup HD. rewrite (Hall D HD). reflexivity. }
+          { apply (chain_up FCat wo ro' roup oc Hpair Hch Hpos Logic.I).
+            - intros W HW. exists L. rewrite /roup HW. split; [reflexivity | exact (Hall W HW)].
+            - intros D HD. rewrite /roup in HD. destruct wo; try discriminate HD.
+              injection HD as <-. reflexivity. }
           iModIntro. iExists roup.
           iSplitR; [iPureIntro; rewrite /roup; destruct wo; [left | right | right]; done |].
           iLeft. iExists oc. iSplitR; [iPureIntro; exact Hch' |]. iFrame "Hwl".
           rewrite (wsub_cons 0 Hk) !big_sepL_cons. iFrame "Hsh Hld Hws".
         * (* a middle cat: what it wrote whole, it read *)
-          iDestruct "Hup" as (rok) "[#Hrk %Hcop]".
-          assert (Hch' : chain L rok oc) by exact (chain_up wo ro' rok oc Hpair Hch Hpos Hcop).
+          iDestruct "Hup" as (rok) "[#Hrk [%Hcop %Hrpre]]".
+          assert (Hch' : chain L rok oc)
+            by exact (chain_up (lfilt lR (S k')) wo ro' rok oc Hpair Hch Hpos
+                        ltac:(rewrite lfilt_round; exact Logic.I) Hcop Hrpre).
           iModIntro. iExists rok. iFrame "Hrk".
           iLeft. iExists oc. iSplitR; [iPureIntro; exact Hch' |]. iFrame "Hwl".
           rewrite (wsub_cons (S k') Hk) !big_sepL_cons. iFrame "Hsh Hld Hws".
@@ -372,7 +385,7 @@ Section UShPipesNode.
   (* what node [k] knows: the shots of the right forks above it and the
      pipes above it *)
   Definition nknow (k : nat) : iProp Σ :=
-    (shotsF gF k ∗ [∗ list] i ∈ seq 0 k, pinv L P i)%I.
+    (shotsF gF k ∗ [∗ list] i ∈ seq 0 k, pinv lR L P i)%I.
 
   Global Instance nknow_persistent k : Persistent (nknow k).
   Proof using . rewrite /nknow. apply _. Qed.
@@ -396,7 +409,7 @@ Section UShPipesNode.
     | S k' =>
         match gin_of st0 with
         | Some gin =>
-            pipe_invU (P k') gin L (flow_U L (prevP P k')) ∗ rcur (P k') 0 ∗ side_R (P k')
+            pipe_invU (P k') gin L (pflow lR L P k') ∗ rcur (P k') 0 ∗ side_R (P k')
         | None => False
         end
     end%I.
@@ -441,12 +454,12 @@ Section UShPipesNode.
   (* WHAT ITS pipe(2) ANSWERS: the pipe at its flow parameter, both
      permits, both side tokens *)
   Definition Rreg (k : nat) (γp : pipe_names) : iProp Σ :=
-    (pipe_invU (P k) γp L (flow_U L (prevP P k)) ∗ rtok (P k) ∗ side_L (P k) ∗ side_R (P k)
+    (pipe_invU (P k) γp L (pflow lR L P k) ∗ rtok (P k) ∗ side_L (P k) ∗ side_R (P k)
      ∗ wcur (P k) 0 ∗ pws_lb (P k) [])%I.
 
   (* node [k+1]'s entry, as node [k]'s right lend *)
   Definition nraw (k : nat) (γp : pipe_names) : iProp Σ :=
-    (pipe_invU (P k) γp L (flow_U L (prevP P k)) ∗ nknow k ∗ osP (gF k)
+    (pipe_invU (P k) γp L (pflow lR L P k) ∗ nknow k ∗ osP (gF k)
      ∗ rcur (P k) 0 ∗ side_R (P k) ∗ nodeown (S k) ∗ below (S k))%I.
 
   (* THE LAW'S THREE FAMILIES *)
@@ -456,14 +469,14 @@ Section UShPipesNode.
     | O => echo_raw L γc γm P gG γp ∗ Rd
     | S k' =>
         match gin_of st0 with
-        | Some gin => mid_raw L γc γm P gF gG k' gin γp
+        | Some gin => mid_raw lR L γc γm P gF gG k' gin γp
         | None => False
         end
     end%I.
   Definition RcRf (k : nat) (st0 : fdstate) (γp : pipe_names) : iProp Σ :=
     if decide (S k = nc) then last_raw lR L γc γm P gF k γp else nraw k γp.
   Definition Rkf (k : nat) (γp : pipe_names) : iProp Σ :=
-    pipe_invU (P k) γp L (flow_U L (prevP P k)).
+    pipe_invU (P k) γp L (pflow lR L P k).
   Definition Cxf (k : nat) (γp : pipe_names) : iProp Σ :=
     (halvesN (WSh k) ∗ match k with O => Rtop | S k' => side_R (P k') end)%I.
 
@@ -497,9 +510,9 @@ Section UShPipesNode.
     ∀ γp, pipe_qfrag (pn_queue γp) pst0 ={⊤}=∗ pipe_reg γp ∗ Rreg k γp.
   Proof using GEN gF gG.
     iIntros "(Hpre & Hw & Hr & HsL & HsR)" (γp) "Hfrag".
-    iMod (pipe_inv_alloc_atU (P k) γp (flow_U L (prevP P k)) with "Hpre Hfrag")
+    iMod (pipe_inv_alloc_atU (P k) γp (pflow lR L P k) with "Hpre Hfrag")
       as "[#Hinv Hreg]".
-    iMod (pws_lb_of_invU (P k) γp L (flow_U L (prevP P k)) 0 with "Hinv Hw") as "[Hw #Hlb]".
+    iMod (pws_lb_of_invU (P k) γp L (pflow lR L P k) 0 with "Hinv Hw") as "[Hw #Hlb]".
     iModIntro. iFrame "Hreg Hinv Hr HsL HsR Hw". rewrite take_0. iExact "Hlb".
   Qed.
 
@@ -554,7 +567,7 @@ Section UShPipesNode.
       iDestruct "Hinp" as "(#Hpin & Hrin & HsRin)".
       iSplitL "Hw HsL HLc HLm HG Hrin".
       { rewrite /RcLf Hg /mid_raw. iFrame "Hw HsL HLc HLm HG Hrin Hlb Hsk".
-        iSplitR; [iExists (prevP P k'); iExact "Hpin" |]. iExact "Hinv". }
+        iSplitR; [iExact "Hpin" |]. iExact "Hinv". }
       iSplitL "HF Hr HsR Hbel"; [| iFrame "HRk"; rewrite /Cxf; iFrame "HSh HsRin"].
       rewrite /RcRf. case_decide as Hlast.
       + rewrite (below_last (S k') Hlast). iDestruct "Hbel" as "[Hc Hm]". rewrite /last_raw.
@@ -919,7 +932,7 @@ Section UShPipesNode.
       assert (H0 : ld !! 0%nat = Some (FdOpen true wb (FdPipe gin))).
       { rewrite /ld list_lookup_insert_ne; [| lia]. apply list_lookup_insert. lia. }
       iApply (stage_mid g LM PV CP sd WA Hext Hcons Hkill Hsup v I sR lR HlR Hfc Hadmit Hplok L HL31 pr
-                Rd γc γm P gF gG Hfire k' a b s0 gs N' h' m' gin γp q szv ld av
+                Rd γc γm P gF gG Hfire lfilt_round k' a b s0 gs N' h' m' gin γp q szv ld av
                 Hab ltac:(lia) Hpeq Ha0
                 ltac:(split; [exists wb; exact H0 | split; [exists false; exact H1 |
                                                           exists rb2; exact H2]])
@@ -949,7 +962,7 @@ Section UShPipesNode.
     assert (H2 : ld !! 2%nat = Some (FdOpen rb2 true (FdDevice ConsoleInv.CONSOLE))).
     { rewrite /ld list_lookup_insert_ne; [exact Hld2 | lia]. }
     iApply (stage_last g LM PV CP sd WA Hext Hcons Hkill Hsup v I sR lR HlR Hfc Hadmit Hplok L HL31 pr
-              Rd γc γm P gF gG Hfire k a b s0 gs N' h' m' γp q szv ld av
+              Rd γc γm P gF gG Hfire lfilt_round k a b s0 gs N' h' m' γp q szv ld av
               Hab Hnc Hpeq Ha0
               ltac:(split; [exists false; exact H0 | split; [exists rb1; exact H1 |
                                                          exists rb2; exact H2]])

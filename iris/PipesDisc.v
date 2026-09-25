@@ -495,6 +495,47 @@ Proof using.
   intros HL HD. destruct F as [| w]; [exact HD | exact (GrepFilt.grep_out_line_prefix w L D HL HD)].
 Qed.
 
+(* THE FILTER DEVICE A STAGE RUNS ([ProgTree.pfilter]): cat's identity, or
+   grep's (cut G5) -- what it owes is [fapp] *)
+Definition filt_pf (F : filt) : pfilter :=
+  match F with FCat => flt_id | FGrep w => GrepFilt.flt_grep w end.
+
+Lemma filt_pf_out (F : filt) (D : bytes) : flt_out (filt_pf F) D = fapp F D.
+Proof using. destruct F; reflexivity. Qed.
+
+Lemma fapp_nil (F : filt) : fapp F [] = [].
+Proof using. destruct F as [| w]; [reflexivity | exact (GrepFilt.grep_out_nil w)]. Qed.
+
+(* a chunk read adds exactly the device's [flt_new] *)
+Lemma fapp_app (F : filt) (R c : bytes) : fapp F (R ++ c) = fapp F R ++ flt_new (filt_pf F) R c.
+Proof using. rewrite <- !filt_pf_out. apply flt_app. Qed.
+
+(* THE GATE A FILTER NEEDS OF THE LINE: nothing for cat, one line for grep
+   (the union's every content is one, [lshape]) *)
+Definition fok (F : filt) (L : bytes) : Prop :=
+  match F with FCat => True | FGrep _ => GrepFilt.oneline L end.
+
+Lemma fok_prefix (F : filt) (L D : bytes) :
+  fok F L -> D `prefix_of` L -> fapp F D `prefix_of` L.
+Proof using. intros HF HD. destruct F as [| w]; [exact HD | exact (fapp_prefix (FGrep w) L D HF HD)]. Qed.
+
+(* ...and a filter that owes a byte of a prefix of the line passed it
+   whole: what it owes is what it read, and it passes the line *)
+Lemma fok_pass (F : filt) (L D : bytes) :
+  fok F L -> D `prefix_of` L -> fapp F D <> [] -> fapp F D = D /\ fapp F L = L.
+Proof using.
+  intros HF HD Hne. destruct F as [| w]; [split; reflexivity |]. cbn [fapp fok] in *.
+  destruct (GrepFilt.grep_out_line w L D HF HD) as [Hq | [-> Hq]]; [by destruct (Hne Hq) |].
+  split; exact Hq.
+Qed.
+
+(* EVERY FILTER OF THE LINE PASSES ITS CONTENT: what the content writer's
+   commit needs (the flow chain's filters and its own) *)
+Definition passes (fs : list filt) (L : bytes) : Prop := Forall (fun F => fapp F L = L) fs.
+
+Lemma passes_cats (n : nat) (L : bytes) : passes (cats n) L.
+Proof using. unfold passes, FileDisc.cats. apply Forall_replicate. reflexivity. Qed.
+
 (* THE LINE'S CONTENT: what the producer writes when all goes well --
    echo's words minus the command name, or the file's content (the empty
    list when the content function has none) *)

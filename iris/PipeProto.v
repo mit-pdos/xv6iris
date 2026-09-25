@@ -2230,13 +2230,16 @@ Section PipeProto.
     iRight. iApply (node_reading E pn γp L U XW XR HE with "Hinv H1 H2").
   Qed.
 
-  (* ---- 9e. THE FLOW CHAIN (design SS2.2) ----
+  (* ---- 9e. THE FLOW CHAIN (design SS2.2; the filter, grep-pipes SS3.3) ----
 
      Pipes [p_0 ... p_n], each at the parameter its writer can supply: the
-     producer's pipe at [True], and pipe [p_(j+1)] -- written by the middle
-     cat that READS [p_j] -- at "a byte reached that cat", i.e. a lower
-     bound of length one on [p_j].  [flow_invs L prev ps] is the chain's
-     invariants, [prev] the pipe before the first one listed. *)
+     producer's pipe at [True], and pipe [p_(j+1)] -- written by the
+     filter stage that READS [p_j] -- at "a byte reached that stage, and
+     its filter [g] passes the line" ([flowF]): a lower bound of length
+     one on [p_j], and [g L = L] (on one line a filter that writes a byte
+     wrote the line, so its writer knows it at its first write).
+     [flow_invs L prev ps] is the chain's invariants, each pipe with its
+     writer's filter, [prev] the pipe before the first one listed. *)
   Definition flow_U (L : list (bv 8)) (prev : option pnames) : iProp Σ :=
     match prev with
     | None => True
@@ -2248,12 +2251,29 @@ Section PipeProto.
   Global Instance flow_U_timeless L prev : Timeless (flow_U L prev).
   Proof using . destruct prev; cbn [flow_U]; apply _. Qed.
 
+  (* THE FLOW PARAMETER of a pipe whose writer applies the filter [g] *)
+  Definition flowF (L : list (bv 8)) (g : list (bv 8) -> list (bv 8)) (prev : option pnames)
+      : iProp Σ :=
+    match prev with
+    | None => True
+    | Some p => pws_lb p (take 1 L) ∗ ⌜g L = L⌝
+    end%I.
+
+  Global Instance flowF_persistent L g prev : Persistent (flowF L g prev).
+  Proof using . destruct prev; cbn [flowF]; apply _. Qed.
+  Global Instance flowF_timeless L g prev : Timeless (flowF L g prev).
+  Proof using . destruct prev; cbn [flowF]; apply _. Qed.
+
+  Lemma flowF_U (L : list (bv 8)) (g : list (bv 8) -> list (bv 8)) (prev : option pnames) :
+    flowF L g prev -∗ flow_U L prev.
+  Proof using . destruct prev; cbn [flowF flow_U]; [iIntros "[$ _]" | iIntros "_"; done]. Qed.
+
   Fixpoint flow_invs (L : list (bv 8)) (prev : option pnames)
-      (ps : list (pnames * pipe_names)) : iProp Σ :=
+      (ps : list (pnames * pipe_names * (list (bv 8) -> list (bv 8)))) : iProp Σ :=
     match ps with
     | [] => True
-    | q :: ps' => pipe_invU q.1 q.2 L (flow_U L prev)
-                  ∗ flow_invs L (Some q.1) ps'
+    | q :: ps' => pipe_invU q.1.1 q.1.2 L (flowF L q.2 prev)
+                  ∗ flow_invs L (Some q.1.1) ps'
     end%I.
 
   Global Instance flow_invs_persistent L prev ps :
@@ -2262,6 +2282,16 @@ Section PipeProto.
     revert prev. induction ps as [| q ps IH]; intros prev; cbn [flow_invs];
       apply _.
   Qed.
+
+  (* EVERY FILTER ABOVE PASSES: each pipe's writer's filter, where the
+     pipe has a pipe before it (the producer's pipe has no filter) *)
+  Fixpoint flow_passes (L : list (bv 8)) (prev : option pnames)
+      (ps : list (pnames * pipe_names * (list (bv 8) -> list (bv 8)))) : Prop :=
+    match ps with
+    | [] => True
+    | q :: ps' => match prev with None => True | Some _ => q.2 L = L end
+                  /\ flow_passes L (Some q.1.1) ps'
+    end.
 
   (* WHAT A MIDDLE CAT SUPPLIES at its first write: its read cursor on its
      input pipe is past zero, so a byte of the line is in that pipe --
@@ -2305,43 +2335,52 @@ Section PipeProto.
   Qed.
 
   (* THE FLOW CHAIN: a byte in the LAST pipe means a byte in every pipe of
-     the chain, read by opening the invariants one after another from the
-     last to the first.  The mask is the protocol's own namespace at any
-     [E] above it -- the landed exclusion's [↑pipeN] is the instance
-     [flow_chain_excl] uses. *)
+     the chain and every filter above it passing the line, read by opening
+     the invariants one after another from the last to the first.  The
+     mask is the protocol's own namespace at any [E] above it -- the
+     landed exclusion's [↑pipeN] is the instance [flow_chain_excl] uses. *)
   Lemma flow_chain (E : coPset) (L : list (bv 8)) (prev : option pnames)
-      (ps : list (pnames * pipe_names)) (q : pnames * pipe_names) :
+      (ps : list (pnames * pipe_names * (list (bv 8) -> list (bv 8))))
+      (q : pnames * pipe_names * (list (bv 8) -> list (bv 8))) :
     ↑pipeN ⊆ E -> L <> [] ->
-    flow_invs L prev (ps ++ [q]) -∗ pws_lb q.1 (take 1 L) ={E}=∗
-    flow_U L prev ∗ [∗ list] q' ∈ ps ++ [q], pws_lb q'.1 (take 1 L).
+    flow_invs L prev (ps ++ [q]) -∗ pws_lb q.1.1 (take 1 L) ={E}=∗
+    flow_U L prev ∗ ([∗ list] q' ∈ ps ++ [q], pws_lb q'.1.1 (take 1 L))
+    ∗ ⌜flow_passes L prev (ps ++ [q])⌝.
   Proof using .
     intros HE HL. revert prev.
     induction ps as [| p ps IH]; intros prev; iIntros "#Hinvs #Hyr".
     - cbn [app flow_invs]. iDestruct "Hinvs" as "[Hinv _]".
-      iMod (flow_step E q.1 q.2 L (flow_U L prev) HE HL with "Hinv Hyr")
+      iMod (flow_step E q.1.1 q.1.2 L (flowF L q.2 prev) HE HL with "Hinv Hyr")
         as "#HU".
-      iModIntro. iSplitR; [ iExact "HU" | ].
-      rewrite big_sepL_singleton. iExact "Hyr".
+      iModIntro. iSplitR; [ iApply (flowF_U with "HU") | ].
+      rewrite big_sepL_singleton. iSplitR; [ iExact "Hyr" | ].
+      destruct prev as [pv |]; cbn [flow_passes];
+        [ iEval (cbn [flowF]) in "HU"; iDestruct "HU" as "[_ %Hg]" | ];
+        iPureIntro; split; done.
     - cbn [app flow_invs]. iDestruct "Hinvs" as "[Hinv Hrest]".
-      iMod (IH (Some p.1) with "Hrest Hyr") as "[#HUp #Hall]".
+      iMod (IH (Some p.1.1) with "Hrest Hyr") as "(#HUp & #Hall & %Hps)".
       cbn [flow_U].
-      iMod (flow_step E p.1 p.2 L (flow_U L prev) HE HL with "Hinv HUp")
+      iMod (flow_step E p.1.1 p.1.2 L (flowF L p.2 prev) HE HL with "Hinv HUp")
         as "#HU".
-      iModIntro. iSplitR; [ iExact "HU" | ].
-      rewrite big_sepL_cons. iSplitR; [ iExact "HUp" | ]. iExact "Hall".
+      iModIntro. iSplitR; [ iApply (flowF_U with "HU") | ].
+      rewrite big_sepL_cons. iSplitR; [ iSplitR; [ iExact "HUp" | iExact "Hall" ] | ].
+      destruct prev as [pv |]; cbn [flow_passes];
+        [ iEval (cbn [flowF]) in "HU"; iDestruct "HU" as "[_ %Hg]" | ];
+        iPureIntro; split; done.
   Qed.
 
   (* ...IN THE FORM THE DESIGN STATES IT: every pipe of the chain, by
      position. *)
   Lemma flow_chain_at (E : coPset) (L : list (bv 8)) (prev : option pnames)
-      (ps : list (pnames * pipe_names)) (q : pnames * pipe_names) :
+      (ps : list (pnames * pipe_names * (list (bv 8) -> list (bv 8))))
+      (q : pnames * pipe_names * (list (bv 8) -> list (bv 8))) :
     ↑pipeN ⊆ E -> L <> [] ->
-    flow_invs L prev (ps ++ [q]) -∗ pws_lb q.1 (take 1 L) ={E}=∗
-    ∀ (j : nat) (qj : pnames * pipe_names),
-      ⌜(ps ++ [q]) !! j = Some qj⌝ -∗ pws_lb qj.1 (take 1 L).
+    flow_invs L prev (ps ++ [q]) -∗ pws_lb q.1.1 (take 1 L) ={E}=∗
+    ∀ (j : nat) (qj : pnames * pipe_names * (list (bv 8) -> list (bv 8))),
+      ⌜(ps ++ [q]) !! j = Some qj⌝ -∗ pws_lb qj.1.1 (take 1 L).
   Proof using .
     intros HE HL. iIntros "#Hinvs #Hyr".
-    iMod (flow_chain E L prev ps q HE HL with "Hinvs Hyr") as "[_ #Hall]".
+    iMod (flow_chain E L prev ps q HE HL with "Hinvs Hyr") as "(_ & #Hall & _)".
     iModIntro. iIntros (j qj Hj).
     iApply (big_sepL_lookup with "Hall"). exact Hj.
   Qed.
@@ -2349,10 +2388,10 @@ Section PipeProto.
   (* AN UNTOUCHED WRITE PERMIT ON ANY PIPE OF THE CHAIN refutes a byte in
      that pipe ([pipe_excl_wtok_lbU] at the pipe's own parameter). *)
   Lemma flow_invs_wtok_lb (E : coPset) (L : list (bv 8))
-      (prev : option pnames) (ps : list (pnames * pipe_names))
-      (qj : pnames * pipe_names) :
+      (prev : option pnames) (ps : list (pnames * pipe_names * (list (bv 8) -> list (bv 8))))
+      (qj : pnames * pipe_names * (list (bv 8) -> list (bv 8))) :
     ↑pipeN ⊆ E -> L <> [] -> qj ∈ ps ->
-    flow_invs L prev ps -∗ wcur qj.1 0%nat -∗ pws_lb qj.1 (take 1 L)
+    flow_invs L prev ps -∗ wcur qj.1.1 0%nat -∗ pws_lb qj.1.1 (take 1 L)
     ={E}=∗ False.
   Proof using .
     intros HE HL. revert prev.
@@ -2362,10 +2401,10 @@ Section PipeProto.
     iDestruct "Hinvs" as "[Hinv Hrest]".
     apply elem_of_cons in Hin as [Heq | Hin].
     - subst p.
-      iDestruct (pipe_excl_wtok_lbU E qj.1 qj.2 L (flow_U L prev) HE HL
+      iDestruct (pipe_excl_wtok_lbU E qj.1.1 qj.1.2 L (flowF L qj.2 prev) HE HL
                    with "Hinv") as "#Hex".
       iApply ("Hex" with "Hw Hlb").
-    - iApply (IH (Some p.1) Hin with "Hrest Hw Hlb").
+    - iApply (IH (Some p.1.1) Hin with "Hrest Hw Hlb").
   Qed.
 
   (* THE EXCLUSION THE N-WRITER CONSOLE SPENDS (design SS2.2's first
@@ -2375,14 +2414,15 @@ Section PipeProto.
      the LAST pipe -- the flow chain carries that byte back to the failed
      stage's pipe, where the permit refutes it. *)
   Lemma flow_chain_excl (L : list (bv 8)) (prev : option pnames)
-      (ps : list (pnames * pipe_names)) (q qj : pnames * pipe_names) :
+      (ps : list (pnames * pipe_names * (list (bv 8) -> list (bv 8))))
+      (q qj : pnames * pipe_names * (list (bv 8) -> list (bv 8))) :
     L <> [] -> qj ∈ ps ++ [q] ->
     flow_invs L prev (ps ++ [q]) -∗
-    □ (wcur qj.1 0%nat -∗ pws_lb q.1 (take 1 L) ={↑pipeN}=∗ False).
+    □ (wcur qj.1.1 0%nat -∗ pws_lb q.1.1 (take 1 L) ={↑pipeN}=∗ False).
   Proof using .
     intros HL Hin. iIntros "#Hinvs !> Hw #Hyr".
     iMod (flow_chain (↑pipeN) L prev ps q ltac:(reflexivity) HL
-            with "Hinvs Hyr") as "[_ #Hall]".
+            with "Hinvs Hyr") as "(_ & #Hall & _)".
     iDestruct (big_sepL_elem_of _ _ qj Hin with "Hall") as "Hlb".
     iApply (flow_invs_wtok_lb (↑pipeN) L prev (ps ++ [q]) qj
               ltac:(reflexivity) HL Hin with "Hinvs Hw Hlb").
@@ -2398,9 +2438,9 @@ Section PipeProto.
     □ (wcur pn 0%nat -∗ pws_lb pn (take 1%nat L) ={↑pipeN}=∗ False).
   Proof using .
     intros HL. iIntros "#Hinv".
-    iApply (flow_chain_excl L None [] (pn, γp) (pn, γp) HL
+    iApply (flow_chain_excl L None [] (pn, γp, fun D => D) (pn, γp, fun D => D) HL
               ltac:(apply elem_of_list_here) with "[]").
-    cbn [app flow_invs flow_U fst snd]. iSplitR; [ iExact "Hinv" | done ].
+    cbn [app flow_invs flowF fst snd]. iSplitR; [ iExact "Hinv" | done ].
   Qed.
 
 End PipeProto.

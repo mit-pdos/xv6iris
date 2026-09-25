@@ -210,6 +210,11 @@ Section UShPipesStage.
   Hypothesis Hfire : forall w s, w ∈ wsN -> fire_src fcR pr L w s ->
     fire_okN wsN RUNN WITN termw TOKN w s (EXf fcR pr nc L w s).
 
+  (* THE ROUND'S STAGES ARE CATS: the stage laws here run cat's image
+     entry ([UkPipesEntries.pse_mid_image_entry] / [pse_last_image_entry_m]
+     at [FCat]); a grep stage's laws are cut G7's (grep-pipes SS5) *)
+  Hypothesis Hstg_cat : forall j, lfilt lR j = FCat.
+
   Lemma dg_execL_len : length dg_execL = 17%nat.
   Proof using . vm_compute. reflexivity. Qed.
   Lemma dg_execR_len : length dg_execR = 16%nat.
@@ -308,7 +313,7 @@ Section UShPipesStage.
                       [lia | rewrite dg_execL_len; lia | intros k Hk; discriminate Hk])
                 with "Hinv [] [] []").
       - iApply (pexcl_left LM PV sR lR L pr P gF gG 0 dg_execL Hn ltac:(vm_compute; discriminate)).
-        rewrite /pinv. iExists γp. cbn [prevP flow_U]. iExact "Hpi".
+        rewrite /pinv /pflow. iExists γp. cbn [prevP flowF]. iExact "Hpi".
       - iIntros "!> (Hw & HsL & Hcw & Hmw)". iFrame "HsL Hcw Hmw".
         rewrite (pdep_unfold LM PV sR lR L pr P gF gG (WLeft 0) dg_execL
                    ltac:(vm_compute; discriminate) (or_introl (or_introl Hdg0))) /pdep_ne.
@@ -409,8 +414,8 @@ Section UShPipesStage.
      family writer, the pending one-shot of the fork that makes it, and the
      shots above it *)
   Definition mid_raw (k' : nat) (gin γp : pipe_names) : iProp Σ :=
-    ((∃ prev, pipe_invU (P k') gin L (flow_U L prev))
-     ∗ pipe_invU (P (S k')) γp L (flow_U L (Some (P k')))
+    (pipe_invU (P k') gin L (pflow lR L P k')
+     ∗ pipe_invU (P (S k')) γp L (pflow lR L P (S k'))
      ∗ rcur (P k') 0 ∗ wcur (P (S k')) 0 ∗ pws_lb (P (S k')) [] ∗ side_L (P (S k'))
      ∗ wcurN γc (WLeft (S k')) (1/2) 0 ∗ wmodeN γm (WLeft (S k')) (1/2) None
      ∗ osP (gG (S k')) ∗ shotsF gF (S k'))%I.
@@ -437,7 +442,7 @@ Section UShPipesStage.
     urun (SG := uexecSG_xv6) (PS := uprogSG_free) N' h' m' (mword_of_int ShSyms.runcmd)
       (2 + (UkShDiag.ush_Dg + av)) -∗
     mWP (Loop : expr riscv_lang).
-  Proof using HL31 Hadmit Hcons Hext Hsup HlR Hfc Hfire Hkill Hplok pnsRegG0 uartGhostG0.
+  Proof using HL31 Hadmit Hcons Hext Hsup HlR Hfc Hfire Hkill Hplok Hstg_cat pnsRegG0 uartGhostG0.
     intros Hbytes Hk Hpeq Ha0 Hfd Hav.
     iIntros "#Hinv #Hslot #Hcode #Hjt #Hcmd Hsz Hstd Hcwd Hch Hraw Hrun".
     pose proof (ukn_const_of_eq N' _ Hpeq (fun x y => eq_refl)) as Hc.
@@ -445,8 +450,8 @@ Section UShPipesStage.
     iApply stg_fupd_mwp. iMod (os_shoot with "HG") as "#HGs". iModIntro.
     assert (Hwk : WLeft (S k') ∈ wsN) by (apply wids_elem; exact Hk).
     assert (Hfd2 : UkSh.ush_fd2p ld) by (destruct Hfd as (_ & _ & Hf2); exact Hf2).
-    iAssert (pinv L P (S k')) as "#Hpk".
-    { rewrite /pinv. iExists γp. cbn [prevP]. iExact "Hpo". }
+    iAssert (pinv lR L P (S k')) as "#Hpk".
+    { rewrite /pinv. iExists γp. iExact "Hpo". }
     iAssert (pkitR (WLeft (S k')) cat_dg_write) as "#Hkw".
     { rewrite /pns_kit. iSplit.
       - iExists (EXf fcR pr nc L (WLeft (S k')) cat_dg_write). iSplitR.
@@ -474,10 +479,13 @@ Section UShPipesStage.
       iApply (image_entry_pay_mono ElfUser.cat_elf M (mword_of_int (t1 + 8) : mword 64)
                 sts FsImg.ROOTINO cs pidv (fun _ : Z => QcR (S k'))
                 (pns_copy_lend g LM PV CP v I sR lR L termw TOKN pdepR γc γm (WLeft (S k')) A2 A2
-                   (P k') gin (CSPipe (P (S k')) γp) (fun _ : Z => QcR (S k'))) Cr uslot
+                   (P k') gin FCat (CSPipe (P (S k')) γp) (fun _ : Z => QcR (S k'))) Cr uslot
                 with "[] [Hnp]").
       + iIntros "!> (Hr & Hw & HsL & Hcw & Hmw)". rewrite /pns_copy_lend.
-        iSplitR; [cbn [pns_pk_inv]; iFrame "Hpin Hpo" |].
+        iSplitR.
+        { cbn [pns_pk_inv]. iSplitR; [iPureIntro; exact Logic.I |].
+          iSplitR; [iExists (prevP P k'), (fapp (lfilt lR k')); iExact "Hpin" |].
+          rewrite -(pflow_cat lR L P k' (Hstg_cat (S k'))). iExact "Hpo". }
         iFrame "Hr". iSplitL "Hw".
         { rewrite /pns_sink take_0. iFrame "Hw Hlb". }
         iSplitR.
@@ -490,20 +498,30 @@ Section UShPipesStage.
         cbn [pns_final snd].
         iDestruct "Hf0" as (o) "[_ Ho]".
         iRight. iLeft. iFrame "HsL". iSplitR; [iApply lrd_S |]. rewrite /lrep. iExists o. iFrame "Ho". iRight.
-        iDestruct "Hf1" as "[Hf1 | Hf1]".
-        * iDestruct "Hf1" as (c) "(#Heof & _ & Hw' & #Hlb')".
-          iExists (WrAll (take c L)). cbn [wr_final]. iFrame "Hlb'".
+        iDestruct "Hf1" as "[Hf1 | [Hf1 | Hf1]]".
+        * (* read to its end, wrote what its filter owes of it *)
+          iDestruct "Hf1" as (c wc) "(%Hwt & #Heof & _ & Hw' & #Hlb')".
+          iExists (WrAll (take wc L)). cbn [wr_final]. iFrame "Hlb'".
           iSplitL "Hw'".
-          { destruct (decide (length L <= c)%nat) as [Hge | Hlt].
+          { destruct (decide (length L <= wc)%nat) as [Hge | Hlt].
             - iLeft. iPureIntro. by rewrite take_ge.
             - iRight. rewrite length_take Nat.min_l; [iExact "Hw'" | lia]. }
           iExists (RdEof (take c L)). cbn [rd_final]. iFrame "Heof".
-          iPureIntro. intros D HD. injection HD as <-. reflexivity.
+          iPureIntro. split.
+          -- intros W HW. injection HW as <-. exists (take c L). split; [reflexivity |].
+             rewrite (Hstg_cat (S k')). exact Hwt.
+          -- intros D HD. injection HD as <-. apply prefix_take.
         * iDestruct "Hf1" as (c wc) "(_ & Hw' & #Hro)".
           iExists (WrHalt (take wc L)). cbn [wr_final].
           iSplitL "Hw'"; [iExists wc; iFrame "Hw' Hro"; done |].
           iExists RdGone. cbn [rd_final]. iSplit; [done |].
-          iPureIntro. intros D HD. discriminate HD.
+          iPureIntro. split; [intros W HW; discriminate HW | intros D HD; discriminate HD].
+        * (* halted, then read on to its end: a cat reports its reader gone *)
+          iDestruct "Hf1" as (c wc) "(_ & _ & Hw' & #Hro)".
+          iExists (WrHalt (take wc L)). cbn [wr_final].
+          iSplitL "Hw'"; [iExists wc; iFrame "Hw' Hro"; done |].
+          iExists RdGone. cbn [rd_final]. iSplit; [done |].
+          iPureIntro. split; [intros W HW; discriminate HW | intros D HD; discriminate HD].
       + iApply (pse_mid_image_entry (PS := uprogSG_free) g LM PV CP sd WA Hext Hcons Hkill Hsup
                   v I sR lR HlR Hfc Hadmit Hplok L HL31 termw TOKN pdepR (pdep_timeless LM PV sR lR L pr P gF gG)
                   γc γm a b M s1 t1 g1 sts FsImg.ROOTINO cs pidv (fun _ : Z => QcR (S k'))
@@ -548,7 +566,7 @@ Section UShPipesStage.
      that makes it, the shots above it, and every pipe's invariant (the
      flow chain its first byte runs) *)
   Definition last_raw (m : nat) (γp : pipe_names) : iProp Σ :=
-    (pipe_invU (P m) γp L (flow_U L (prevP P m)) ∗ ([∗ list] i ∈ seq 0 nc, pinv L P i)
+    (pipe_invU (P m) γp L (pflow lR L P m) ∗ ([∗ list] i ∈ seq 0 nc, pinv lR L P i)
      ∗ rcur (P m) 0 ∗ side_R (P m)
      ∗ wcurN γc WLast (1/2) 0 ∗ wmodeN γm WLast (1/2) None
      ∗ osP (gF m) ∗ shotsF gF m)%I.
@@ -578,7 +596,7 @@ Section UShPipesStage.
     urun (SG := uexecSG_xv6) (PS := uprogSG_free) N' h' m' (mword_of_int ShSyms.runcmd)
       (2 + (UkShDiag.ush_Dg + av)) -∗
     mWP (Loop : expr riscv_lang).
-  Proof using HL31 Hadmit Hcons Hext Hsup HlR Hfc Hfire Hkill Hplok pnsRegG0 uartGhostG0.
+  Proof using HL31 Hadmit Hcons Hext Hsup HlR Hfc Hfire Hkill Hplok Hstg_cat pnsRegG0 uartGhostG0.
     intros Hbytes Hm Hpeq Ha0 Hfd Hav.
     iIntros "#Hinv #Hslot #Hcode #Hjt #Hcmd Hsz Hstd Hcwd Hch Hraw Hrun".
     pose proof (ukn_const_of_eq N' _ Hpeq (fun x y => eq_refl)) as Hc.
@@ -589,7 +607,8 @@ Section UShPipesStage.
     assert (Hfd2 : UkSh.ush_fd2p ld) by (destruct Hfd as (_ & _ & Hf2); exact Hf2).
     (* THE CONTENT WRITER'S KIT AND DEPOSIT, at a nonempty line *)
     iAssert (⌜L = []⌝ ∨ (pkitR WLast L
-               ∗ □ (pws_lb (P (nc - 1)) (take 1 L) ={↑pipeN}=∗ pdepR WLast L)))%I as "#Hkd".
+               ∗ □ (pws_lb (P (nc - 1)) (take 1 L) -∗ ⌜fapp FCat L = L⌝ ={↑pipeN}=∗ pdepR WLast L)))%I
+      as "#Hkd".
     { destruct (decide (L = [])) as [HL0 | HLne]; [by iLeft |]. iRight. iSplit.
       - rewrite /pns_kit. iSplit.
         + iExists (EXf fcR pr nc L WLast L). iSplitR.
@@ -598,7 +617,10 @@ Section UShPipesStage.
         + iPureIntro. intros c [Hc0 Hcl].
           apply (cstep_okV_tok LM PV I sR lR HlR Hadmit WLast L c Hc0 Hcl).
           intros j Hj; discriminate Hj.
-      - iApply (pdep_last_of_lb LM PV sR lR L pr P gF gG HLne ltac:(lia) with "Hsn Hinvs"). }
+      - iPoseProof (pdep_last_of_lb LM PV sR lR L pr P gF gG HLne ltac:(lia) with "Hsn Hinvs")
+          as "#Hdl".
+        iIntros "!> #Hlb %Hp". iApply ("Hdl" with "Hlb"). iPureIntro.
+        rewrite (Hstg_cat nc). exact Hp. }
     replace (nc - 1)%nat with m by lia.
     set (Cr := (rcur (P m) 0 ∗ side_R (P m)
                 ∗ wcurN γc WLast (1/2) 0 ∗ wmodeN γm WLast (1/2) None)%I).
@@ -615,17 +637,22 @@ Section UShPipesStage.
       destruct Hf1 as ([wb Hr0] & [rb1 Hr1] & [rb2 Hr2]).
       iApply (image_entry_pay_mono ElfUser.cat_elf M (mword_of_int (t1 + 8) : mword 64)
                 sts FsImg.ROOTINO cs pidv (fun _ : Z => QcR m)
-                (pns_copy_lend_m g LM PV CP v I sR lR L termw TOKN pdepR γc γm (P m) γp (CSCon WLast)
+                (pns_copy_lend_m g LM PV CP v I sR lR L termw TOKN pdepR γc γm (P m) γp FCat (CSCon WLast)
                    (fun _ : Z => QcR m)) Cr uslot
                 with "[] [Hnp]").
       + iIntros "!> (Hr & HsR & Hcw & Hmw)". rewrite /pns_copy_lend_m.
-        iSplitR; [cbn [pns_pk_inv]; iSplit; [iExists (prevP P m); iExact "Hpo" | done] |].
+        iSplitR.
+        { cbn [pns_pk_inv]. iSplitR; [iPureIntro; exact Logic.I |].
+          iSplit; [iExists (prevP P m), (fapp (lfilt lR m)); iExact "Hpo" | done]. }
         iFrame "Hr". iSplitL "Hcw Hmw".
         { rewrite /pns_sink. iSplitR; [by iPureIntro |]. iSplitR; [iExact "Hinv" |].
           iSplitR; [iExact "Hkd" |]. cbn [pns_cmode]. iFrame "Hcw Hmw". }
         rewrite /pns_xkQ. iIntros "[#HT | (_ & Hf1 & _)]"; [by iLeft |].
         cbn [pns_final snd].
         iDestruct "Hf1" as (c) "(%HcL & #Heof & _ & Hcw & Hmw)".
+        (* a cat owes what it read *)
+        assert (Hlc : length (fapp FCat (take c L)) = c) by (cbn [fapp]; rewrite length_take; lia).
+        iEval (rewrite Hlc) in "Hcw". iEval (rewrite Hlc) in "Hmw".
         iRight. iRight. iFrame "HsR". rewrite /rrep.
         iExists (RdEof (take c L)). replace (S m - 1)%nat with m by lia.
         cbn [rd_final]. iFrame "Heof". iLeft. rewrite /sufN.

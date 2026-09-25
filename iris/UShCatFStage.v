@@ -250,7 +250,7 @@ Section UShCatFStage.
                       [lia | rewrite dg_execR_len; lia | intros k Hk; discriminate Hk])
                 with "Hinv [] [] []").
       - iApply (pexcl_left LM PV sR lR L pr P gF gG 0 dg_execR Hn ltac:(vm_compute; discriminate)).
-        rewrite /pinv. iExists γp. cbn [prevP flow_U]. iExact "Hpi".
+        rewrite /pinv /pflow. iExists γp. cbn [prevP flowF]. iExact "Hpi".
       - iIntros "!> ((Hw & HsL & Hcw & Hmw) & #HG' & _ & _ & HRd)". iFrame "HsL HRd Hcw Hmw".
         rewrite (pdep_unfold LM PV sR lR L pr P gF gG (WLeft 0) dg_execR
                    ltac:(vm_compute; discriminate) (or_introl (or_introl Hdg0))) /pdep_ne.
@@ -312,7 +312,7 @@ Section UShCatFStage.
     iApply (pkit_of LM PV I sR lR HlR Hadmit L pr P gF gG (WLeft 0) s
               ltac:(intros k Hk; discriminate Hk) (Hfire (WLeft 0) s Hw0 Hf)).
     iApply (pexcl_left LM PV sR lR L pr P gF gG 0 s Hn Hs).
-    rewrite /pinv. iExists γp. cbn [prevP flow_U]. iExact "Hpi".
+    rewrite /pinv /pflow. iExists γp. cbn [prevP flowF]. iExact "Hpi".
   Qed.
 
   (* THE LEND, out of the stage's: the writer unfired with the kits (the

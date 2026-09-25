@@ -72,9 +72,22 @@ Local Open Scope Z_scope.
 Definition chain (L : list (bv 8)) (ro : rd_out) (oc : option nat) : Prop :=
   forall c, oc = Some c -> ro = RdEof (take c L).
 
-(* a middle cat's two ends: what it wrote whole, it read to end of file *)
-Definition copier (ro : rd_out) (wo : wr_out) : Prop :=
-  forall D, wo = WrAll D -> ro = RdEof D.
+(* a middle filter stage's two ends: what it wrote whole is what its
+   filter owes for what it read to end of file (grep-pipes SS3.4; cat's
+   is the copier, [W = D]) *)
+Definition filterer (F : filt) (ro : rd_out) (wo : wr_out) : Prop :=
+  forall W, wo = WrAll W -> exists D, ro = RdEof D /\ W = fapp F D.
+
+(* ...and what a reader read of the line is a prefix of it *)
+Definition rd_pre (L : list (bv 8)) (ro : rd_out) : Prop :=
+  forall D, ro = RdEof D -> D `prefix_of` L.
+
+(* the flow chain's pipe indices (outside the section: [lia] there reads
+   the section's context) *)
+Lemma flow_down_nil (i : nat) : ~ (1 <= i <= 0)%nat.
+Proof using. lia. Qed.
+Lemma flow_down_idx (i j : nat) : (1 <= i <= S j)%nat -> i <> S j -> (1 <= i <= j)%nat.
+Proof using. lia. Qed.
 
 (* ===================================================================== *)
 (*  1.  THE ROUND                                                         *)
@@ -182,7 +195,10 @@ Section UShPipesDefs.
         shotsF k ∗ osS (gG k)
         ∗ (if bool_decide (fail_src pr k s) then wcur (P k) 0 else True)
     | WLast =>
-        shotsF nc ∗ (if bool_decide (s = L) then pws_all ∨ ⌜L = dg_execR⌝ else True)
+        (* the content: a byte of every pipe, and every filter of the
+           line passing it (grep-pipes SS3.3) *)
+        shotsF nc ∗ (if bool_decide (s = L) then (pws_all ∗ ⌜passes (lfilts lR) L⌝) ∨ ⌜L = dg_execR⌝
+                     else True)
     end%I.
 
   (* ...and a source no process commits deposits nothing payable *)
@@ -257,47 +273,72 @@ Section UShPipesDefs.
     rewrite /pdep_ne. iDestruct "H" as "($ & _)".
   Qed.
 
-  (* ---- the invariant of a pipe of the chain, at its flow parameter ---- *)
+  (* ---- the invariant of a pipe of the chain, at its flow parameter:
+          the filter of the stage that writes it ([lfilt]) must pass the
+          line (grep-pipes SS3.3) ---- *)
   Definition prevP (j : nat) : option pnames :=
     match j with O => None | S j' => Some (P j') end.
 
+  Definition pflow (j : nat) : iProp Σ := flowF L (fapp (lfilt lR j)) (prevP j).
+
+  Global Instance pflow_persistent j : Persistent (pflow j).
+  Proof using . rewrite /pflow. apply _. Qed.
+  Global Instance pflow_timeless j : Timeless (pflow j).
+  Proof using . rewrite /pflow. apply _. Qed.
+
+  (* at a cat stage the parameter is the landed one plus a trivial pass *)
+  Lemma pflow_cat (j : nat) : lfilt lR (S j) = FCat -> pflow (S j) = flowF L (fapp FCat) (Some (P j)).
+  Proof using . intros HF. rewrite /pflow HF. reflexivity. Qed.
+
   Definition pinv (j : nat) : iProp Σ :=
-    ∃ γp : pipe_names, pipe_invU (P j) γp L (flow_U L (prevP j)).
+    ∃ γp : pipe_names, pipe_invU (P j) γp L (pflow j).
 
   Global Instance pinv_persistent j : Persistent (pinv j).
   Proof using . rewrite /pinv. apply _. Qed.
 
-  (* a byte in pipe [j] is a byte in every pipe above it *)
+  (* a byte in pipe [j] is a byte in every pipe above it, and every filter
+     that wrote one of them passes the line *)
   Lemma flow_down (j : nat) :
     L <> [] ->
     ([∗ list] i ∈ seq 0 (S j), pinv i) -∗ pws_lb (P j) (take 1 L) ={↑pipeN}=∗
-    [∗ list] i ∈ seq 0 (S j), pws_lb (P i) (take 1 L).
+    ([∗ list] i ∈ seq 0 (S j), pws_lb (P i) (take 1 L))
+    ∗ ⌜forall i, (1 <= i <= j)%nat -> fapp (lfilt lR i) L = L⌝.
   Proof using .
     intros HL. induction j as [| j IH]; iIntros "#Hinvs #Hlb".
-    - cbn. iModIntro. iFrame "Hlb".
+    - iModIntro. iSplitL; [| iPureIntro; intros i Hi; exfalso; exact (flow_down_nil i Hi)].
+      cbn. iFrame "Hlb".
     - rewrite !(seq_S (S j)) !big_sepL_app !big_sepL_singleton !Nat.add_0_l.
       iDestruct "Hinvs" as "[Hinvs Hi]". iDestruct "Hi" as (γp) "Hi".
-      cbn [prevP].
-      iMod (flow_step (↑pipeN) (P (S j)) γp L (flow_U L (Some (P j)))
-              ltac:(reflexivity) HL with "Hi Hlb") as "#Hlb'".
-      cbn [flow_U].
-      iMod (IH with "Hinvs Hlb'") as "#Hall". iModIntro. iFrame "Hall Hlb".
+      iMod (flow_step (↑pipeN) (P (S j)) γp L (pflow (S j))
+              ltac:(reflexivity) HL with "Hi Hlb") as "#HU".
+      iEval (rewrite /pflow; cbn [prevP flowF]) in "HU".
+      iDestruct "HU" as "[#Hlb' %Hg]".
+      iMod (IH with "Hinvs Hlb'") as "[#Hall %Hps]". iModIntro. iFrame "Hall Hlb".
+      iPureIntro. intros i Hi. destruct (decide (i = S j)) as [-> | Hne]; [exact Hg |].
+      apply Hps. exact (flow_down_idx i j Hi Hne).
   Qed.
 
-  (* THE CONTENT WRITER'S DEPOSIT, at its first byte *)
+  (* THE CONTENT WRITER'S DEPOSIT, at its first byte, from the last
+     stage's own pass *)
   Lemma pdep_last_of_lb :
     L <> [] -> (0 < nc)%nat ->
     shotsF nc -∗ ([∗ list] i ∈ seq 0 nc, pinv i) -∗
-    □ (pws_lb (P (nc - 1)) (take 1 L) ={↑pipeN}=∗ pdep WLast L).
+    □ (pws_lb (P (nc - 1)) (take 1 L) -∗ ⌜fapp (lfilt lR nc) L = L⌝ ={↑pipeN}=∗ pdep WLast L).
   Proof using GEN.
     intros HL Hn.
     assert (Hnc : exists m, nc = S m) by (exists (nc - 1)%nat; lia).
     destruct Hnc as [m Hm]. rewrite Hm.
     replace (S m - 1)%nat with m by lia.
-    iIntros "#Hs #Hinvs !> #Hlb".
-    iMod (flow_down m HL with "Hinvs Hlb") as "Hall".
+    iIntros "#Hs #Hinvs !> #Hlb %Hlast".
+    iMod (flow_down m HL with "Hinvs Hlb") as "[Hall %Hps]".
     iModIntro. rewrite (pdep_unfold WLast L HL (or_introl (conj eq_refl HL))) /pdep_ne bool_decide_true; [| done].
-    rewrite /pws_all Hm. iFrame "Hs". iLeft. iExact "Hall".
+    rewrite /pws_all Hm. iFrame "Hs". iLeft. iFrame "Hall". iPureIntro.
+    rewrite /passes Forall_lookup. intros i F Hi.
+    assert (Hlen : length (lfilts lR) = S m) by (rewrite -lcats_lfilts; exact Hm).
+    pose proof (lookup_lt_Some _ _ _ Hi) as Hlt.
+    assert (HF : lfilt lR (S i) = F).
+    { rewrite /lfilt. replace (S i - 1)%nat with i by lia. exact (nth_lookup_Some _ _ _ _ Hi). }
+    rewrite -HF. destruct (decide (i = m)) as [-> | Hne]; [exact Hlast |]. apply Hps. lia.
   Qed.
 
   (* ---- THE EXCLUSIONS, REFUTED BY THE DEPOSITS ---- *)
@@ -356,12 +397,12 @@ Section UShPipesDefs.
       rewrite (pdep_unfold (WLeft k) s Hs (or_introl Hfl)) /pdep_ne bool_decide_true; [| done].
       iDestruct "Hd" as "(_ & _ & Hw)".
       rewrite (pdep_unfold WLast L HL (or_introl (conj eq_refl HL))) /pdep_ne bool_decide_true; [| done].
-      iDestruct "Hd'" as "(_ & [Hall | %Hq])"; [| by destruct (HLx Hq)].
+      iDestruct "Hd'" as "(_ & [[Hall _] | %Hq])"; [| by destruct (HLx Hq)].
       rewrite /pws_all.
       iDestruct (big_sepL_elem_of _ _ k with "Hall") as "Hlb";
         [apply elem_of_seq; lia |].
       iDestruct "Hinv" as (γp) "Hinv".
-      iDestruct (pipe_excl_wtok_lbU (↑pipeN) (P k) γp L (flow_U L (prevP k))
+      iDestruct (pipe_excl_wtok_lbU (↑pipeN) (P k) γp L (pflow k)
                    ltac:(reflexivity) HL with "Hinv") as "#Hex".
       iApply ("Hex" with "Hw Hlb").
   Qed.
@@ -380,7 +421,7 @@ Section UShPipesDefs.
       iDestruct (shotsF_at nc j Hj with "Hsn") as "HS".
       iDestruct (os_excl with "HF HS") as %[].
     - rewrite (pdep_unfold WLast L HL (or_introl (conj eq_refl HL))) /pdep_ne bool_decide_true; [| done].
-      iDestruct "Hd" as "(_ & [Hall | %Hq])"; [| by destruct (HLx Hq)].
+      iDestruct "Hd" as "(_ & [[Hall _] | %Hq])"; [| by destruct (HLx Hq)].
       rewrite (pdep_unfold (WLeft j) s' (fail_src_ne pr j s' Hfl) (or_introl Hfl)) /pdep_ne bool_decide_true; [| done].
       iDestruct "Hd'" as "(_ & _ & Hw)".
       rewrite /pws_all.
@@ -389,7 +430,7 @@ Section UShPipesDefs.
       iDestruct (big_sepL_elem_of _ _ j with "Hinvs") as "Hinv";
         [apply elem_of_seq; lia |].
       iDestruct "Hinv" as (γp) "Hinv".
-      iDestruct (pipe_excl_wtok_lbU (↑pipeN) (P j) γp L (flow_U L (prevP j))
+      iDestruct (pipe_excl_wtok_lbU (↑pipeN) (P j) γp L (pflow j)
                    ltac:(reflexivity) HL with "Hinv") as "#Hex".
       iApply ("Hex" with "Hw Hlb").
   Qed.
@@ -525,7 +566,7 @@ Section UShPipesDefs.
      node's pipe [P k], at the outcome of its reader end.  The left one:
      the stage's writer final, and -- unless its exec failed -- its write
      outcome on [P k] and, below the producer, its read outcome on the pipe
-     above, which it copied. *)
+     above (a prefix of the line), which it filtered. *)
   Definition rrep (j : nat) : iProp Σ :=
     ∃ ro, rd_final (P (j - 1)) ro ∗ suf j ro.
   Definition lrep (k : nat) : iProp Σ :=
@@ -534,7 +575,7 @@ Section UShPipesDefs.
          ∨ ∃ wo, wr_final (P k) L wo
              ∗ match k with
                | O => ⌜forall D, wo = WrAll D -> D = L⌝
-               | S k' => ∃ ro, rd_final (P k') ro ∗ ⌜copier ro wo⌝
+               | S k' => ∃ ro, rd_final (P k') ro ∗ ⌜filterer (lfilt lR (S k')) ro wo /\ rd_pre L ro⌝
                end).
 
   (* the producer's loan, back beside the left report of node 0 *)

@@ -548,6 +548,21 @@ Definition lcats (l : pline') : nat :=
 Lemma lcats_cats (p : producer) (n : nat) : lcats (LPipes p (cats n)) = n.
 Proof using. exact (FileDisc.cats_length n). Qed.
 
+(* the filter stages of a line, and the one that writes pipe [j] (pipe 0
+   is the producer's, which is no filter's: [FCat] there is inert) *)
+Definition lfilts (l : pline') : list filt :=
+  match l with LEcho' _ => [] | LPipes _ fs => fs end.
+Definition lfilt (l : pline') (j : nat) : filt := nth (j - 1) (lfilts l) FCat.
+
+Lemma lcats_lfilts (l : pline') : lcats l = length (lfilts l).
+Proof using. by destruct l. Qed.
+
+Lemma nth_cats (n i : nat) : nth i (cats n) FCat = FCat.
+Proof using. unfold FileDisc.cats. revert i. induction n as [| n IH]; intros [| i]; cbn; auto. Qed.
+
+Lemma lfilt_cats (p : producer) (n j : nat) : lfilt (LPipes p (cats n)) j = FCat.
+Proof using. exact (nth_cats n (j - 1)). Qed.
+
 (* ---- THE PER-WRITER RUNS: [PipesDisc.sfx_run] / [line_run] with the
        silent writers' streams in place, in [wids] order, over the line's
        filter stages (cut G5; at [cats n] they are the all-cat runs the
