@@ -1103,3 +1103,9 @@ import Xv6.FsCrashCommit
 import Xv6.FsFlushedCore
 import Xv6.AppDur
 import Xv6.LogSnapLaw
+import Xv6.SpecUservec
+import Xv6.UservecDefs
+import Xv6.UservecPt
+import Xv6.UservecExitPt
+import Xv6.ProofUservec
+import Xv6.LinkUservec
