@@ -69,12 +69,14 @@ the literal `true`.  NOT ITS BUSINESS: `ip->lock` (iput holds it).
 
 **Deviations from Rocq, reported.**
 
-1. PINNED AT `k.sie = false ∧ k.noff = 0 ∧ k.locks = []` (fs1 brief §1,
-   "the `sie` question"): Lean's `BREAD` (and so `BFREE`/`IUPDATE`) is
-   pinned there and has no `eb`; Rocq's `eb`/`b` genericity and its
-   `trap_csrs_ext` / `cpu_claim_ext` complement collapse to the bare
-   `trapCsrs`/`cpuClaim`/`intrRes` bundle; `locks_below lks "log"` is
-   `k.locks = []`.
+1. **eb-GENERIC, as in Rocq** (`cpu_own 0 eb`): the `_eb` bodies take the
+   complement `trapCsrsExt cpu k.sie` / `cpuClaimExt cpu k.sie k.proc` (Rocq
+   `trap_csrs_ext` / `cpu_claim_ext`) in and out, at either entry `SIE`, and are
+   what the interface proves.  Depth 0 implies no spinlock held (`KCtx.wf`:
+   `locks.length ≤ noff`), which is Lean's reading of Rocq's `locks_below`
+   premise (Lean has no lock ranks).  The `sie = false` bodies (the whole trap
+   bundle, `k.locks = []`) are kept as DERIVED instances for the callers not yet
+   generalized.
 2. THE AMBIENT NAMES are `Fscfg`/`Icfg` class fields, exactly as
    `Xv6/SpecIupdate.lean` deviation 2 (`fsc_bmapstart`/`fsc_size` are
    `fscBmapstart`/`fscSize`); the bio layer runs at
@@ -322,11 +324,116 @@ def wp_itrunc_gen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv
       logOpS icfgLog u' Sb') -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
+/-- The eb-generic form of `wp_itrunc_gen_body` (Rocq: `cpu_own 0 eb`, the
+complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
+spinlock held by `KCtx.wf`). -/
+def wp_itrunc_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
+    [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
+    (ip : BitVec 64) (inum : BitVec 32) (dn dn0 : Dinode) (bm : Blkmap)
+    (data : Nat → List (BitVec 8))
+    (u : Nat) (Sb : List Nat) (crb cru : Bool) (e0 : Nat)
+    (pidv : BitVec 32) (dqp dqd dqn dqb dqs : DFrac)
+    (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : itruncSlots ≤ k.avail)
+    (hnoff : k.noff = 0)
+    (htier : k.tier = KTier.kpt)
+    -- THE BITMAP CREDIT'S HONESTY PREMISE (pure: the bitmap block is one
+    -- this op logs itself)
+    (hcrb : crb = true → fscBmapstart ∈ Sb)
+    (hgeom : logGeomOk fscCov fscLogst)
+    -- ONE BITMAP BLOCK, a covered home block (deviation 3)
+    (hbg : bitmapGeomOk fscCov fscLogst fscBmapstart fscSize)
+    -- the inode's own block, for the closing iupdate
+    (hcov : IBLOCK inum icfgIst ∈ fscCov)
+    (hlog : logRegion fscLogst (IBLOCK inum icfgIst) = false)
+    (hnib : inum.toNat < 16 * icfgNib)
+    -- THE INODE IS ALLOCATED; its type and nlink agree with the stale record
+    (hnz : dn.diType.toNat ≠ 0)
+    (hstab : diTypeStable dn dn0) (hnl : diNlinkStable dn dn0)
+    -- the map is well-formed: every block it names is a covered home block,
+    -- and the 269 frees are of DISTINCT blocks
+    (hwf : blkmapWf fscCov fscLogst bm)
+    -- every covered block is in range for the bitmap
+    (hbel : covBelow fscCov fscSize)
+    -- every data block is a block's worth of bytes
+    (hsz : inodeSized data)
+    -- the record's addrs field names the cells the map owns
+    (hda : dn.diAddrs = bmCells bm)
+    (hpd : descPageRw pd) (ha0 : k.regs 10#5 = ip) : Prop :=
+  kctx cpu k ∗ pcIs cpu itruncAddr ∗ procsInv Γ ∗
+  trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ panicEnv ∗
+  bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
+  logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
+  diskCaps fscDisk fscDlock pd pav pu ∗
+  -- ip->dev and ip->inum: read, never written
+  wordPointsTo (iDev ip) 4 dqd icfgDev ∗ wordPointsTo (iInum ip) 4 dqn inum ∗
+  -- the five scalars (ip->size is written), the thirteen addrs cells and
+  -- the indirect block's own resource
+  inodeMeta ip dn ∗ inodeMap fscFs ip bm ∗
+  -- THE DATA BLOCKS, which is what actually gets freed
+  inodeBlocks fscFs bm data ∗
+  -- the two superblock fields, read and handed straight back
+  wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
+  wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
+  -- the bitmap, with its free pool (persistent)
+  bitmapInv fscFs fscBmapstart fscCov fscLogst fscSize ∗
+  -- THE INODE REGION, and this inum's (stale) on-disk record
+  iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
+  wordPointsTo (pPid k.proc) 4 dqp pidv ∗
+  -- THREE slot units: the indirect arm's bread holds one across the loop
+  bslots fscBio 3 ∗
+  -- THE TAIL FLUSH'S CREDIT, AS A RESOURCE AT A NAMED EPOCH
+  logCredit icfgLog cru Sb e0 (IBLOCK inum icfgIst) ∗
+  -- THE RESERVATION, SET FORM AND EPOCH-NAMED
+  logOpSe icfgLog (itEntry crb u) Sb e0 ∗
+  wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
+    ⌜calleeSaved k.regs R'⌝ -∗
+    kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+    trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
+    wordPointsTo (pPid k.proc) 4 dqp pidv -∗
+    wordPointsTo (iDev ip) 4 dqd icfgDev -∗ wordPointsTo (iInum ip) 4 dqn inum -∗
+    wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) -∗
+    wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) -∗
+    -- THE INODE IS EMPTY: no block, size zero
+    inodeMeta ip (diTrunc dn) -∗
+    inodeMap fscFs ip bmEmpty -∗
+    inodeBlocks fscFs bmEmpty (fun _ => List.replicate BSIZE 0) -∗
+    -- the flush landed
+    dinodeAt fscIreg inum (diTrunc dn) -∗
+    bslots fscBio 3 -∗
+    -- THE LEDGER, SET FORM, WITH THE BITMAP REPORT `w`
+    (∃ (w : Bool) (u' : Nat) (Sb' : List Nat),
+      ⌜(∀ x ∈ Sb, x ∈ Sb') ∧ IBLOCK inum icfgIst ∈ Sb' ∧
+        (w = true → fscBmapstart ∈ Sb') ∧ (crb = true → w = false) ∧
+        itEntry crb u - (itBm w + itIu cru) ≤ u' ∧ u' + itIu cru ≤ itEntry crb u⌝ ∗
+      logOpS icfgLog u' Sb') -∗ wpLoop cpu'))
+  ⊢ wpLoop (GF := GF) cpu
+
 /-- The interface of `itrunc` (Rocq's `Module Type ITRUNC`, less
 `wp_itrunc_sconf`, derived below). -/
 structure ITRUNC : Prop where
   /-- the credited set-form contract -/
-  wp_itrunc_gen : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+  wp_itrunc_gen_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
+    [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
+    (ip : BitVec 64) (inum : BitVec 32) (dn dn0 : Dinode) (bm : Blkmap)
+    (data : Nat → List (BitVec 8))
+    (u : Nat) (Sb : List Nat) (crb cru : Bool) (e0 : Nat)
+    (pidv : BitVec 32) (dqp dqd dqn dqb dqs : DFrac)
+    hj hproc hK hnoff htier hcrb hgeom hbg hcov hlog hnib hnz hstab hnl hwf hbel
+    hsz hda hpd ha0,
+    wp_itrunc_gen_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j ip inum dn dn0 bm data
+      u Sb crb cru e0 pidv dqp dqd dqn dqb dqs
+      hj hproc hK hnoff htier hcrb hgeom hbg hcov hlog hnib hnz hstab hnl hwf hbel
+      hsz hda hpd ha0
+
+/-- The interrupts-off instance of `wp_itrunc_gen_eb` (the complement is the whole
+bundle): the contract every not-yet-generalized caller states. -/
+theorem ITRUNC.wp_itrunc_gen (A : ITRUNC) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
@@ -336,11 +443,22 @@ structure ITRUNC : Prop where
     (u : Nat) (Sb : List Nat) (crb cru : Bool) (e0 : Nat)
     (pidv : BitVec 32) (dqp dqd dqn dqb dqs : DFrac)
     hj hproc hK hsie hnoff hlocks htier hcrb hgeom hbg hcov hlog hnib hnz hstab hnl hwf hbel
-    hsz hda hpd ha0,
+    hsz hda hpd ha0 :
     wp_itrunc_gen_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j ip inum dn dn0 bm data
       u Sb crb cru e0 pidv dqp dqd dqn dqb dqs
       hj hproc hK hsie hnoff hlocks htier hcrb hgeom hbg hcov hlog hnib hnz hstab hnl hwf hbel
-      hsz hda hpd ha0
+      hsz hda hpd ha0 := by
+  have h := A.wp_itrunc_gen_eb (hlc := hlc) (GF := GF) (Γ := Γ) (cpu := cpu) (k := k) (γl := γl) (pd := pd) (pav := pav) (pu := pu) (j := j) (ip := ip) (inum := inum) (dn := dn) (dn0 := dn0) (bm := bm) (data := data) (u := u) (Sb := Sb) (crb := crb) (cru := cru) (e0 := e0) (pidv := pidv) (dqp := dqp) (dqd := dqd) (dqn := dqn) (dqb := dqb) (dqs := dqs) (hj := hj) (hproc := hproc) (hK := hK) (hnoff := hnoff) (htier := htier) (hcrb := hcrb) (hgeom := hgeom) (hbg := hbg) (hcov := hcov) (hlog := hlog) (hnib := hnib) (hnz := hnz) (hstab := hstab) (hnl := hnl) (hwf := hwf) (hbel := hbel) (hsz := hsz) (hda := hda) (hpd := hpd) (ha0 := ha0)
+  unfold wp_itrunc_gen_eb_body at h
+  unfold wp_itrunc_gen_body
+  rw [hsie] at h
+  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
+  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, H17, H18, H19, H20, H21, H22, H23, Hnext⟩
+  iapply h
+  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 H18 H19 H20 H21 H22 H23
+  iapply wpNext_mono $$ Hnext
+  iintro %cpu' HK %spie %spp %R' %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16
+  iapply HK $$ %spie %spp %R' %p0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16
 
 /-- **THE COUNTED CONTRACT** (Rocq's `wp_itrunc_sconf_body`): the plain budget
 `logOp γ (u + 2)` in -- one unit for the bitmap block, one for iupdate --
@@ -400,6 +518,63 @@ def wp_itrunc_sconf_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     (∃ u' : Nat, ⌜u ≤ u' ∧ u' ≤ u + 1⌝ ∗ logOp icfgLog u') -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
+/-- The eb-generic form of `wp_itrunc_sconf_body` (Rocq: `cpu_own 0 eb`, the
+complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
+spinlock held by `KCtx.wf`). -/
+def wp_itrunc_sconf_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
+    [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
+    (ip : BitVec 64) (inum : BitVec 32) (dn dn0 : Dinode) (bm : Blkmap)
+    (data : Nat → List (BitVec 8)) (u : Nat)
+    (pidv : BitVec 32) (dqp dqd dqn dqb dqs : DFrac)
+    (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : itruncSlots ≤ k.avail)
+    (hnoff : k.noff = 0)
+    (htier : k.tier = KTier.kpt)
+    (hgeom : logGeomOk fscCov fscLogst)
+    (hbg : bitmapGeomOk fscCov fscLogst fscBmapstart fscSize)
+    (hcov : IBLOCK inum icfgIst ∈ fscCov)
+    (hlog : logRegion fscLogst (IBLOCK inum icfgIst) = false)
+    (hnib : inum.toNat < 16 * icfgNib)
+    (hnz : dn.diType.toNat ≠ 0)
+    (hstab : diTypeStable dn dn0) (hnl : diNlinkStable dn dn0)
+    (hwf : blkmapWf fscCov fscLogst bm) (hbel : covBelow fscCov fscSize)
+    (hsz : inodeSized data) (hda : dn.diAddrs = bmCells bm)
+    (hpd : descPageRw pd) (ha0 : k.regs 10#5 = ip) : Prop :=
+  kctx cpu k ∗ pcIs cpu itruncAddr ∗ procsInv Γ ∗
+  trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ panicEnv ∗
+  bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
+  logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
+  diskCaps fscDisk fscDlock pd pav pu ∗
+  wordPointsTo (iDev ip) 4 dqd icfgDev ∗ wordPointsTo (iInum ip) 4 dqn inum ∗
+  inodeMeta ip dn ∗ inodeMap fscFs ip bm ∗
+  inodeBlocks fscFs bm data ∗
+  wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
+  wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
+  bitmapInv fscFs fscBmapstart fscCov fscLogst fscSize ∗
+  iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
+  wordPointsTo (pPid k.proc) 4 dqp pidv ∗
+  bslots fscBio 3 ∗
+  -- THE RESERVATION: two units
+  logOp icfgLog (u + 2) ∗
+  wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
+    ⌜calleeSaved k.regs R'⌝ -∗
+    kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+    trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
+    wordPointsTo (pPid k.proc) 4 dqp pidv -∗
+    wordPointsTo (iDev ip) 4 dqd icfgDev -∗ wordPointsTo (iInum ip) 4 dqn inum -∗
+    wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) -∗
+    wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) -∗
+    inodeMeta ip (diTrunc dn) -∗
+    inodeMap fscFs ip bmEmpty -∗
+    inodeBlocks fscFs bmEmpty (fun _ => List.replicate BSIZE 0) -∗
+    dinodeAt fscIreg inum (diTrunc dn) -∗
+    bslots fscBio 3 -∗
+    -- SPEND AT MOST TWO, AT LEAST ONE
+    (∃ u' : Nat, ⌜u ≤ u' ∧ u' ≤ u + 1⌝ ∗ logOp icfgLog u') -∗ wpLoop cpu'))
+  ⊢ wpLoop (GF := GF) cpu
+
 /-- The counted contract, derived at `crb = cru = false` (Rocq's
 `wp_itrunc_sconf`, ProofItrunc.v 3008–3058): the counted reservation opens
 at its own set and birth epoch (`Xv6.logOp_openS`, `Xv6.logOpS_named`), the
@@ -443,6 +618,51 @@ theorem ITRUNC.wp_itrunc_sconf (IT : ITRUNC) {hlc : HasLC} {GF : BundledGFunctor
   obtain ⟨-, -, -, -, hlo, hhi⟩ := hf
   ihave Hop := logOpS_op icfgLog u' Sb' $$ HopS Htx
   iapply HΦ $$ %spie %spp %R' %hcs Hk Hpc Htc Hcl Hir Hpid Hidev Hinum Hsb Hsi Hmeta Hmap Hblk
+    Hdn Hsl [Hop]
+  iexists u'
+  isplitl []
+  · ipureintro
+    cases w <;> simp only [itEntry, itBm, itIu, Bool.false_eq_true, if_false, if_true] at hlo hhi <;>
+      omega
+  · iexact Hop
+
+theorem ITRUNC.wp_itrunc_sconf_eb (IT : ITRUNC) {hlc : HasLC} {GF : BundledGFunctors}
+    [MachGS hlc GF] [Xv6G GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
+    [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
+    (ip : BitVec 64) (inum : BitVec 32) (dn dn0 : Dinode) (bm : Blkmap)
+    (data : Nat → List (BitVec 8)) (u : Nat)
+    (pidv : BitVec 32) (dqp dqd dqn dqb dqs : DFrac)
+    hj hproc hK hnoff htier hgeom hbg hcov hlog hnib hnz hstab hnl hwf hbel
+    hsz hda hpd ha0 :
+    wp_itrunc_sconf_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j ip inum dn dn0 bm data
+      u pidv dqp dqd dqn dqb dqs
+      hj hproc hK hnoff htier hgeom hbg hcov hlog hnib hnz hstab hnl hwf hbel
+      hsz hda hpd ha0 := by
+  unfold wp_itrunc_sconf_eb_body
+  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hpe, #Hbc, #Hlc, #Hdc, Hidev, Hinum, Hmeta, Hmap, Hblk,
+    Hsb, Hsi, #Hbmi, #Hinv, Hdn, Hpid, Hsl, Hop, Hnext⟩
+  icases logOp_openS icfgLog (u + 2) $$ Hop with ⟨%Sb, HopS, Htx⟩
+  icases logOpS_named icfgLog (u + 2) Sb $$ HopS with ⟨%e0, Hope⟩
+  ihave #Hcred := logCredit_own (GF := GF) icfgLog false Sb e0 (IBLOCK inum icfgIst)
+    (fun h => absurd h (by simp))
+  ihave Hope := (show logOpSe (GF := GF) icfgLog (u + 2) Sb e0 ⊢
+      logOpSe icfgLog (itEntry false u) Sb e0 from .rfl) $$ Hope
+  have h := IT.wp_itrunc_gen_eb (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j ip inum dn dn0 bm
+    data u Sb false false e0 pidv dqp dqd dqn dqb dqs hj hproc hK hnoff htier
+    (fun h => absurd h (by simp)) hgeom hbg hcov hlog hnib hnz hstab hnl hwf hbel hsz hda hpd ha0
+  unfold wp_itrunc_gen_eb_body at h
+  iapply h
+  iframe Hk Hpc Hpi Hte Hce Hpe Hbc Hlc Hdc Hidev Hinum Hmeta Hmap Hblk Hsb Hsi Hbmi Hinv
+    Hdn Hpid Hsl Hcred Hope
+  iapply wpNext_mono _ _ _ _ _ $$ Hnext
+  iintro %c HΦ %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hidev Hinum Hsb Hsi Hmeta Hmap Hblk
+    Hdn Hsl ⟨%w, %u', %Sb', %hf, HopS⟩
+  obtain ⟨-, -, -, -, hlo, hhi⟩ := hf
+  ihave Hop := logOpS_op icfgLog u' Sb' $$ HopS Htx
+  iapply HΦ $$ %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hidev Hinum Hsb Hsi Hmeta Hmap Hblk
     Hdn Hsl [Hop]
   iexists u'
   isplitl []

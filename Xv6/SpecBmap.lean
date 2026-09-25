@@ -79,13 +79,14 @@ their lemmas; ProofCreate*/WriteiBudget use them by name.
 
 **Deviations from Rocq, reported.**
 
-1. PINNED AT `k.sie = false ∧ k.noff = 0 ∧ k.locks = [] ∧ k.tier = kpt`
-   (fs1 brief §1, "the `sie` question").  Lean's `BREAD` is pinned there and
-   has no `eb` parameter, so Rocq's `eb`/`b` genericity and its
-   `trap_csrs_ext`/`cpu_claim_ext` complement collapse to the bare
-   `trapCsrs`/`cpuClaim`/`intrRes` bundle bread takes; Rocq's
-   `locks_below lks "log"` (gen) and `locks_below lks "bcache"` (noalloc)
-   are `k.locks = []`.
+1. **eb-GENERIC, as in Rocq** (`cpu_own 0 eb`): the `_eb` bodies take the
+   complement `trapCsrsExt cpu k.sie` / `cpuClaimExt cpu k.sie k.proc` (Rocq
+   `trap_csrs_ext` / `cpu_claim_ext`) in and out, at either entry `SIE`, and are
+   what the interface proves.  Depth 0 implies no spinlock held (`KCtx.wf`:
+   `locks.length ≤ noff`), which is Lean's reading of Rocq's `locks_below`
+   premise (Lean has no lock ranks).  The `sie = false` bodies (the whole trap
+   bundle, `k.locks = []`) are kept as DERIVED instances for the callers not yet
+   generalized.
 2. THE VIEW IS A PARAMETER (the log specs' convention, as
    `Xv6/SpecBalloc.lean`): Rocq's `fs_view γfs γd dev cov` is `V` with
    `hcl`/`hdt`/`hdev`, and `cov` is `V.cov`.
@@ -313,6 +314,88 @@ def wp_bmap_gen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     logOpS γ n' Sb' -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
+/-- The eb-generic form of `wp_bmap_gen_body` (Rocq: `cpu_own 0 eb`, the
+complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
+spinlock held by `KCtx.wf`). -/
+def wp_bmap_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
+    (pd pav pu : BitVec 64) (j : Nat) (γ : LogNames) (γfs : FsNames)
+    (logstart bmapstart size : Nat) (dev : BitVec 32)
+    (ip : BitVec 64) (bm : Blkmap) (data : Nat → List (BitVec 8)) (fbn : Nat)
+    (n : Nat) (cr : Bool) (Sb : List Nat) (pidv : BitVec 32) (dqp dqd dqb dqs : DFrac)
+    (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : bmapSlots ≤ k.avail)
+    (hnoff : k.noff = 0)
+    (htier : k.tier = KTier.kpt)
+    -- THE RESERVATION: enough for the deepest arm this index can take
+    (hneed : bmapNeed cr (bmapInd fbn) ≤ n)
+    (hgeom : logGeomOk V.cov logstart) (hbm : bitmapGeomOk V.cov logstart bmapstart size)
+    -- THE CREDIT'S PREMISE: the bitmap block already logged by this op
+    (hcredit : cr = true → bmapstart ∈ Sb)
+    -- KILLS THE `unreachable` ARM
+    (hfbn : fbn < MAXFILE) (hwf : blkmapWf V.cov logstart bm)
+    (hdev : dev = V.dev) (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs)
+    (hpd : descPageRw pd)
+    (ha0 : k.regs 10#5 = ip) (ha1 : k.regs 11#5 = BitVec.signExtend 64 (BitVec.ofNat 32 fbn)) :
+    Prop :=
+  kctx cpu k ∗ pcIs cpu bmapAddr ∗ procsInv Γ ∗
+  trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
+  bioCtx γl γb V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
+  -- THE BYTE VIEW'S ROW: the indirect block's bytes are pinned against it
+  fsBytesAny γfs ∗
+  logCtx γ γb γfs V.cov logstart dev ∗
+  -- ip->dev, read (never written): a FRACTION
+  wordPointsTo (iDev ip) 4 dqd dev ∗
+  -- THE BLOCK MAP and THE FILE'S DATA BLOCKS (the fresh block is deposited)
+  inodeMap γfs ip bm ∗ inodeBlocks γfs bm data ∗
+  wordPointsTo (pPid k.proc) 4 dqp pidv ∗
+  -- the two superblock fields and the bitmap, for balloc's sake
+  wordPointsTo sbSizeAddr 4 dqs (BitVec.ofNat 32 size) ∗
+  wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 bmapstart) ∗
+  bitmapInv γfs bmapstart V.cov logstart size ∗
+  -- THREE slot units: bread's one held across the interior balloc's two
+  bslots γb 3 ∗
+  logOpS γ n Sb ∗
+  wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (bm' : Blkmap)
+      (n' : Nat) (data' : Nat → List (BitVec 8)) (Sb' : List Nat),
+    ⌜calleeSaved k.regs R'⌝ -∗
+    ⌜blkmapWf V.cov logstart bm'⌝ -∗
+    -- bm' agrees with bm at every file index except possibly fbn
+    ⌜∀ i, i < MAXFILE → i ≠ fbn → blkmapGet bm' i = blkmapGet bm i⌝ -∗
+    -- ...and bmap NEVER UN-ALLOCATES
+    ⌜∀ i, i < MAXFILE → (blkmapGet bm i).toNat ≠ 0 → blkmapGet bm' i = blkmapGet bm i⌝ -∗
+    -- the two arms, on the returned a0
+    ⌜(R' 10#5 = 0#64 ∧ (blkmapGet bm' fbn).toNat = 0) ∨
+      (R' 10#5 = BitVec.signExtend 64 (blkmapGet bm' fbn) ∧ (blkmapGet bm' fbn).toNat ≠ 0)⌝ -∗
+    kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+    trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
+    wordPointsTo (pPid k.proc) 4 dqp pidv -∗
+    wordPointsTo sbSizeAddr 4 dqs (BitVec.ofNat 32 size) -∗
+    wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 bmapstart) -∗
+    wordPointsTo (iDev ip) 4 dqd dev -∗
+    inodeMap γfs ip bm' -∗
+    -- THE DEPOSIT, with its zero side condition
+    ⌜data' = data ∨
+      ((blkmapGet bm fbn).toNat = 0 ∧ data' = dataUpd data fbn (List.replicate BSIZE 0#8))⌝ -∗
+    inodeBlocks γfs bm' data' -∗
+    bslots γb 3 -∗
+    -- THE LEDGER, ARM-WISE
+    ⌜-- (a) the spend, arm-wise exact, as an upper bound
+      n ≤ n' + bmapCost cr (bmapAlloced bm bm' fbn) (bmapInd fbn) ∧ n' ≤ n ∧
+      -- (b) the set only grows ...
+      (∀ x ∈ Sb, x ∈ Sb') ∧
+      -- ... by AT MOST the bitmap block, the indirect block and the data block
+      (∀ x ∈ Sb', x ∈ Sb ∨ x = bmapstart ∨ x = bm'.bmInd.toNat ∨ x = (blkmapGet bm' fbn).toNat) ∧
+      -- (c) any allocation at all logged THE BITMAP BLOCK
+      (bmapAlloced bm bm' fbn = true → bmapstart ∈ Sb') ∧
+      -- (d) a freshly allocated DATA block was logged by balloc's own bzero
+      (bmapAd bm bm' fbn = true → (blkmapGet bm' fbn).toNat ∈ Sb') ∧
+      -- (e) THE DIRECT PATH DOES NOT TOUCH THE INDIRECT SLOT
+      (bmapInd fbn = false → bm'.bmInd = bm.bmInd)⌝ -∗
+    logOpS γ n' Sb' -∗ wpLoop cpu'))
+  ⊢ wpLoop (GF := GF) cpu
+
 /-- **bmap FOR A CALLER THAT CANNOT ALLOCATE** (Rocq's
 `wp_bmap_noalloc_sconf_body`): the slot is already allocated, so all three
 allocation sites are dead; the block resources at a SHARE `dq`; one
@@ -357,10 +440,70 @@ def wp_bmap_noalloc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     bslot γb -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
+/-- The eb-generic form of `wp_bmap_noalloc_body` (Rocq: `cpu_own 0 eb`, the
+complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
+spinlock held by `KCtx.wf`). -/
+def wp_bmap_noalloc_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
+    (pd pav pu : BitVec 64) (j : Nat) (γfs : FsNames) (logstart : Nat) (dev : BitVec 32)
+    (ip : BitVec 64) (bm : Blkmap) (data : Nat → List (BitVec 8)) (fbn : Nat)
+    (pidv : BitVec 32) (dqp dq dqd : DFrac)
+    (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : bmapSlots ≤ k.avail)
+    (hnoff : k.noff = 0)
+    (htier : k.tier = KTier.kpt)
+    (hgeom : logGeomOk V.cov logstart)
+    (hfbn : fbn < MAXFILE) (hwf : blkmapWf V.cov logstart bm)
+    -- THE NO-ALLOC PREMISE, and the only one this contract adds
+    (hnz : (blkmapGet bm fbn).toNat ≠ 0)
+    (hdev : dev = V.dev) (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs)
+    (hpd : descPageRw pd)
+    (ha0 : k.regs 10#5 = ip) (ha1 : k.regs 11#5 = BitVec.signExtend 64 (BitVec.ofNat 32 fbn)) :
+    Prop :=
+  kctx cpu k ∗ pcIs cpu bmapAddr ∗ procsInv Γ ∗
+  trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
+  bioCtx γl γb V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
+  fsBytesAny γfs ∗
+  wordPointsTo (iDev ip) 4 dqd dev ∗
+  -- THE BLOCK RESOURCES AT A SHARE `dq` (a read-locker's)
+  inodeMapQ γfs dq ip bm ∗ inodeBlocksQ γfs dq bm data ∗
+  wordPointsTo (pPid k.proc) 4 dqp pidv ∗
+  -- ONE slot unit: the interior bread's, handed back by brelse
+  bslot γb ∗
+  wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
+    ⌜calleeSaved k.regs R'⌝ -∗
+    -- the block the map already named, and nothing else happened
+    ⌜R' 10#5 = BitVec.signExtend 64 (blkmapGet bm fbn)⌝ -∗
+    kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+    trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
+    wordPointsTo (pPid k.proc) 4 dqp pidv -∗
+    wordPointsTo (iDev ip) 4 dqd dev -∗
+    inodeMapQ γfs dq ip bm -∗ inodeBlocksQ γfs dq bm data -∗
+    bslot γb -∗ wpLoop cpu'))
+  ⊢ wpLoop (GF := GF) cpu
+
 /-- The interface of the allocating `bmap` (Rocq's `Module Type BMAP`, less
 the dropped counted form). -/
 structure BMAP : Prop where
-  wp_bmap_gen : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+  wp_bmap_gen_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
+    (pd pav pu : BitVec 64) (j : Nat) (γ : LogNames) (γfs : FsNames)
+    (logstart bmapstart size : Nat) (dev : BitVec 32)
+    (ip : BitVec 64) (bm : Blkmap) (data : Nat → List (BitVec 8)) (fbn : Nat)
+    (n : Nat) (cr : Bool) (Sb : List Nat) (pidv : BitVec 32) (dqp dqd dqb dqs : DFrac)
+    hj hproc hK hnoff htier hneed hgeom hbm hcredit hfbn hwf hdev hcl hdt hpd
+    ha0 ha1,
+    wp_bmap_gen_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γb V γdl pd pav pu j γ γfs
+      logstart bmapstart size dev ip bm data fbn n cr Sb pidv dqp dqd dqb dqs
+      hj hproc hK hnoff htier hneed hgeom hbm hcredit hfbn hwf hdev hcl hdt hpd
+      ha0 ha1
+
+/-- The interrupts-off instance of `wp_bmap_gen_eb` (the complement is the whole
+bundle): the contract every not-yet-generalized caller states. -/
+theorem BMAP.wp_bmap_gen (A : BMAP) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
@@ -369,24 +512,60 @@ structure BMAP : Prop where
     (ip : BitVec 64) (bm : Blkmap) (data : Nat → List (BitVec 8)) (fbn : Nat)
     (n : Nat) (cr : Bool) (Sb : List Nat) (pidv : BitVec 32) (dqp dqd dqb dqs : DFrac)
     hj hproc hK hsie hnoff hlocks htier hneed hgeom hbm hcredit hfbn hwf hdev hcl hdt hpd
-    ha0 ha1,
+    ha0 ha1 :
     wp_bmap_gen_body (hlc := hlc) (GF := GF) Γ cpu k γl γb V γdl pd pav pu j γ γfs
       logstart bmapstart size dev ip bm data fbn n cr Sb pidv dqp dqd dqb dqs
       hj hproc hK hsie hnoff hlocks htier hneed hgeom hbm hcredit hfbn hwf hdev hcl hdt hpd
-      ha0 ha1
+      ha0 ha1 := by
+  have h := A.wp_bmap_gen_eb (hlc := hlc) (GF := GF) (Γ := Γ) (cpu := cpu) (k := k) (γl := γl) (γb := γb) (V := V) (γdl := γdl) (pd := pd) (pav := pav) (pu := pu) (j := j) (γ := γ) (γfs := γfs) (logstart := logstart) (bmapstart := bmapstart) (size := size) (dev := dev) (ip := ip) (bm := bm) (data := data) (fbn := fbn) (n := n) (cr := cr) (Sb := Sb) (pidv := pidv) (dqp := dqp) (dqd := dqd) (dqb := dqb) (dqs := dqs) (hj := hj) (hproc := hproc) (hK := hK) (hnoff := hnoff) (htier := htier) (hneed := hneed) (hgeom := hgeom) (hbm := hbm) (hcredit := hcredit) (hfbn := hfbn) (hwf := hwf) (hdev := hdev) (hcl := hcl) (hdt := hdt) (hpd := hpd) (ha0 := ha0) (ha1 := ha1)
+  unfold wp_bmap_gen_eb_body at h
+  unfold wp_bmap_gen_body
+  rw [hsie] at h
+  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
+  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, H17, H18, H19, Hnext⟩
+  iapply h
+  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 H18 H19
+  iapply wpNext_mono $$ Hnext
+  iintro %cpu' HK %spie %spp %R' %bm' %n' %data' %Sb' %p0 %p1 %p2 %p3 %p4 H5 H6 ⟨Htc, Hir⟩ Hcl H10 H11 H12 H13 H14 %p15 H16 H17 %p18 H19
+  iapply HK $$ %spie %spp %R' %bm' %n' %data' %Sb' %p0 %p1 %p2 %p3 %p4 H5 H6 Htc Hcl Hir H10 H11 H12 H13 H14 %p15 H16 H17 %p18 H19
 
 /-- The interface of the no-alloc `bmap` (Rocq's `Module Type BMAP_NOALLOC`). -/
 structure BMAP_NOALLOC : Prop where
-  wp_bmap_noalloc : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+  wp_bmap_noalloc_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (γfs : FsNames) (logstart : Nat) (dev : BitVec 32)
     (ip : BitVec 64) (bm : Blkmap) (data : Nat → List (BitVec 8)) (fbn : Nat)
     (pidv : BitVec 32) (dqp dq dqd : DFrac)
-    hj hproc hK hsie hnoff hlocks htier hgeom hfbn hwf hnz hdev hcl hdt hpd ha0 ha1,
+    hj hproc hK hnoff htier hgeom hfbn hwf hnz hdev hcl hdt hpd ha0 ha1,
+    wp_bmap_noalloc_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γb V γdl pd pav pu j γfs logstart
+      dev ip bm data fbn pidv dqp dq dqd
+      hj hproc hK hnoff htier hgeom hfbn hwf hnz hdev hcl hdt hpd ha0 ha1
+
+/-- The interrupts-off instance of `wp_bmap_noalloc_eb` (the complement is the whole
+bundle): the contract every not-yet-generalized caller states. -/
+theorem BMAP_NOALLOC.wp_bmap_noalloc (A : BMAP_NOALLOC) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
+    (pd pav pu : BitVec 64) (j : Nat) (γfs : FsNames) (logstart : Nat) (dev : BitVec 32)
+    (ip : BitVec 64) (bm : Blkmap) (data : Nat → List (BitVec 8)) (fbn : Nat)
+    (pidv : BitVec 32) (dqp dq dqd : DFrac)
+    hj hproc hK hsie hnoff hlocks htier hgeom hfbn hwf hnz hdev hcl hdt hpd ha0 ha1 :
     wp_bmap_noalloc_body (hlc := hlc) (GF := GF) Γ cpu k γl γb V γdl pd pav pu j γfs logstart
       dev ip bm data fbn pidv dqp dq dqd
-      hj hproc hK hsie hnoff hlocks htier hgeom hfbn hwf hnz hdev hcl hdt hpd ha0 ha1
+      hj hproc hK hsie hnoff hlocks htier hgeom hfbn hwf hnz hdev hcl hdt hpd ha0 ha1 := by
+  have h := A.wp_bmap_noalloc_eb (hlc := hlc) (GF := GF) (Γ := Γ) (cpu := cpu) (k := k) (γl := γl) (γb := γb) (V := V) (γdl := γdl) (pd := pd) (pav := pav) (pu := pu) (j := j) (γfs := γfs) (logstart := logstart) (dev := dev) (ip := ip) (bm := bm) (data := data) (fbn := fbn) (pidv := pidv) (dqp := dqp) (dq := dq) (dqd := dqd) (hj := hj) (hproc := hproc) (hK := hK) (hnoff := hnoff) (htier := htier) (hgeom := hgeom) (hfbn := hfbn) (hwf := hwf) (hnz := hnz) (hdev := hdev) (hcl := hcl) (hdt := hdt) (hpd := hpd) (ha0 := ha0) (ha1 := ha1)
+  unfold wp_bmap_noalloc_eb_body at h
+  unfold wp_bmap_noalloc_body
+  rw [hsie] at h
+  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
+  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, H12, H13, H14, Hnext⟩
+  iapply h
+  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12 H13 H14
+  iapply wpNext_mono $$ Hnext
+  iintro %cpu' HK %spie %spp %R' %p0 %p1 H2 H3 ⟨Htc, Hir⟩ Hcl H7 H8 H9 H10 H11
+  iapply HK $$ %spie %spp %R' %p0 %p1 H2 H3 Htc Hcl Hir H7 H8 H9 H10 H11
 
 end Xv6

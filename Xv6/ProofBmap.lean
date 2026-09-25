@@ -17,6 +17,16 @@ lemmas are, right to left:
 * `Xv6.bm_head` / `_alloc` / `_ok` `+0x38 .. +0x60` (`Xv6/BmapHead.lean`)
 * `Xv6.bm_core`      `+0x00 .. +0x12` (`Xv6/BmapMain.lean`)
 
+AT EITHER ENTRY `SIE` (the eb-generic sweep; Rocq's `cpu_own 0 eb`): bmap
+holds no spinlock, so the WHOLE body is a level-0 stretch.  Every step is
+`Xv6.bm_step` (the running hart may change when `k.sie = true`; the
+complement `trapCsrsExt` / `cpuClaimExt` follows it), balloc and bread are
+called at their `_eb` contracts (`Xv6.bm_balloc`, `Xv6.bread_call_eb`),
+brelse and log_write were already sie-generic, and the core's continuation
+`Xv6.bmCont` is a `wpNext true` at a nonzero proc, consumable at any hart
+(`Xv6.bm_pin`).  Both public contracts are the `_eb` fields, from the ONE
+core (Rocq Round 13: no second, pinned copy).
+
 THE TWO SEALS below are pure weakenings of the core -- no step of the code
 is proved twice:
 
@@ -97,7 +107,7 @@ theorem bmap_gen (BA : BALLOC) (BR : BREAD) (BE : BRELSE) (LW : LOG_WRITE)
     (ip : BitVec 64) (bm : Blkmap) (data : Nat → List (BitVec 8)) (fbn : Nat)
     (n : Nat) (cr : Bool) (Sb : List Nat) (pidv : BitVec 32) (dqp dqd dqb dqs : DFrac)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : bmapSlots ≤ k.avail)
-    (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
+    (hnoff : k.noff = 0)
     (htier : k.tier = KTier.kpt)
     (hneed : bmapNeed cr (bmapInd fbn) ≤ n)
     (hgeom : logGeomOk V.cov logstart) (hbm : bitmapGeomOk V.cov logstart bmapstart size)
@@ -106,13 +116,13 @@ theorem bmap_gen (BA : BALLOC) (BR : BREAD) (BE : BRELSE) (LW : LOG_WRITE)
     (hdev : dev = V.dev) (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs)
     (hpd : descPageRw pd)
     (ha0 : k.regs 10#5 = ip) (ha1 : k.regs 11#5 = BitVec.signExtend 64 (BitVec.ofNat 32 fbn)) :
-    wp_bmap_gen_body (hlc := hlc) (GF := GF) Γ cpu k γl γb V γdl pd pav pu j γ γfs
+    wp_bmap_gen_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γb V γdl pd pav pu j γ γfs
       logstart bmapstart size dev ip bm data fbn n cr Sb pidv dqp dqd dqb dqs
-      hj hproc hK hsie hnoff hlocks htier hneed hgeom hbm hcredit hfbn hwf hdev hcl hdt hpd
+      hj hproc hK hnoff htier hneed hgeom hbm hcredit hfbn hwf hdev hcl hdt hpd
       ha0 ha1 := by
   let a : BmAlloc := ⟨γ, bmapstart, size, dqb, dqs, γl⟩
-  unfold wp_bmap_gen_body
-  iintro ⟨Hk, Hpc, #Hpi, Htc, Hcl, Hir, #Hbc, #Hdc, #Hpe, #Hany, #Hlc, Hdev, Hmap, Hblk, Hpid,
+  unfold wp_bmap_gen_eb_body
+  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hbc, #Hdc, #Hpe, #Hany, #Hlc, Hdev, Hmap, Hblk, Hpid,
     Hsz, Hbms, #Hbmi, Hsl, Hop, Hnext⟩
   simp only [bmapAddr]
   icases bslots_uncons γb 2 $$ Hsl with ⟨Hsl1, Hsl2⟩
@@ -125,14 +135,14 @@ theorem bmap_gen (BA : BALLOC) (BR : BREAD) (BE : BRELSE) (LW : LOG_WRITE)
   ihave Hmap := inodeMapQ_1_to γfs (DFrac.own 1) ip bm rfl $$ Hmap
   ihave Hblk := inodeBlocksQ_1_to γfs (DFrac.own 1) bm data rfl $$ Hblk
   iapply (bm_core BR BE (some a) (fun _ => BA) (fun _ => LW) Γ cpu k γl γb V γdl pd pav pu j γfs
-      logstart dev ip bm data fbn n cr Sb pidv dqp (DFrac.own 1) dqd hj hproc hK hsie hnoff hlocks
+      logstart dev ip bm data fbn n cr Sb pidv dqp (DFrac.own 1) dqd hj hproc hK hnoff
       htier (fun _ => hneed)
       (fun h x hx => by simp [bmBmsset] at hx; rw [hx]; exact hcredit h)
       (fun h => absurd h (by simp)) hgeom hfbn hwf hdev hcl hdt hpd (fun _ => rfl) ha0 ha1)
-    $$ [$Hk $Hpc $Hpi $Htc $Hcl $Hir $Hbc $Hdc $Hpe $Hany $Hpid $Hdev $Hmap $Hblk $Hsl1 $Hkit Hnext]
+    $$ [$Hk $Hpc $Hpi $Hte $Hce $Hbc $Hdc $Hpe $Hany $Hpid $Hdev $Hmap $Hblk $Hsl1 $Hkit Hnext]
   unfold bmCont
   iapply wpNext_mono _ _ _ _ _ $$ Hnext
-  iintro %c' HΦ %spie %spp %R' %bm' %n' %data' %Sb' %rv %hpost Hk Hpc Htc Hcl Hir Hpid Hdev Hmap
+  iintro %c' HΦ %spie %spp %R' %bm' %n' %data' %Sb' %rv %hpost Hk Hpc Hte Hce Hpid Hdev Hmap
     Hblk Hsl1 Hkit
   obtain ⟨hcs, ha0', hwf', hag, hkeep, -, harm, hdat, hled⟩ := hpost
   icases (bmKit_some a γb γfs V.cov logstart dev n' Sb').1 $$ Hkit with ⟨Hres, -, Hsl2, Hop⟩
@@ -143,7 +153,7 @@ theorem bmap_gen (BA : BALLOC) (BR : BREAD) (BE : BRELSE) (LW : LOG_WRITE)
   ihave Hmap := inodeMapQ_1_of γfs (DFrac.own 1) ip bm' rfl $$ Hmap
   ihave Hblk := inodeBlocksQ_1_of γfs (DFrac.own 1) bm' data' rfl $$ Hblk
   iapply HΦ $$ %spie %spp %R' %bm' %n' %data' %Sb' %hcs %hwf' %hag %hkeep
-    %(bm_arm_a0 R' rv _ ha0' harm) Hk Hpc Htc Hcl Hir Hpid Hsz Hbms Hdev Hmap %hdat Hblk Hsl
+    %(bm_arm_a0 R' rv _ ha0' harm) Hk Hpc Hte Hce Hpid Hsz Hbms Hdev Hmap %hdat Hblk Hsl
     %(bm_ledger_gen a cr bm bm' fbn n n' Sb Sb' hled) Hop
 
 set_option maxHeartbeats 8000000 in
@@ -157,7 +167,7 @@ theorem bmap_noalloc (BR : BREAD) (BE : BRELSE)
     (ip : BitVec 64) (bm : Blkmap) (data : Nat → List (BitVec 8)) (fbn : Nat)
     (pidv : BitVec 32) (dqp dq dqd : DFrac)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : bmapSlots ≤ k.avail)
-    (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
+    (hnoff : k.noff = 0)
     (htier : k.tier = KTier.kpt)
     (hgeom : logGeomOk V.cov logstart)
     (hfbn : fbn < MAXFILE) (hwf : blkmapWf V.cov logstart bm)
@@ -165,23 +175,23 @@ theorem bmap_noalloc (BR : BREAD) (BE : BRELSE)
     (hdev : dev = V.dev) (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs)
     (hpd : descPageRw pd)
     (ha0 : k.regs 10#5 = ip) (ha1 : k.regs 11#5 = BitVec.signExtend 64 (BitVec.ofNat 32 fbn)) :
-    wp_bmap_noalloc_body (hlc := hlc) (GF := GF) Γ cpu k γl γb V γdl pd pav pu j γfs logstart
+    wp_bmap_noalloc_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γb V γdl pd pav pu j γfs logstart
       dev ip bm data fbn pidv dqp dq dqd
-      hj hproc hK hsie hnoff hlocks htier hgeom hfbn hwf hnz hdev hcl hdt hpd ha0 ha1 := by
-  unfold wp_bmap_noalloc_body
-  iintro ⟨Hk, Hpc, #Hpi, Htc, Hcl, Hir, #Hbc, #Hdc, #Hpe, #Hany, Hdev, Hmap, Hblk, Hpid, Hsl,
+      hj hproc hK hnoff htier hgeom hfbn hwf hnz hdev hcl hdt hpd ha0 ha1 := by
+  unfold wp_bmap_noalloc_eb_body
+  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hbc, #Hdc, #Hpe, #Hany, Hdev, Hmap, Hblk, Hpid, Hsl,
     Hnext⟩
   simp only [bmapAddr]
   iapply (bm_core BR BE none (fun h => absurd h (by simp)) (fun h => absurd h (by simp)) Γ cpu k
       γl γb V γdl pd pav pu j γfs logstart dev ip bm data fbn 0 false [] pidv dqp dq dqd hj hproc
-      hK hsie hnoff hlocks htier (fun h => absurd h (by simp)) (fun h => absurd h (by simp))
+      hK hnoff htier (fun h => absurd h (by simp)) (fun h => absurd h (by simp))
       (fun _ => hnz) hgeom hfbn hwf hdev hcl hdt hpd (fun h => absurd h (by simp)) ha0 ha1)
-    $$ [$Hk $Hpc $Hpi $Htc $Hcl $Hir $Hbc $Hdc $Hpe $Hany $Hpid $Hdev $Hmap $Hblk $Hsl Hnext]
+    $$ [$Hk $Hpc $Hpi $Hte $Hce $Hbc $Hdc $Hpe $Hany $Hpid $Hdev $Hmap $Hblk $Hsl Hnext]
   isplitl []
   · iapply bmKit_none
   unfold bmCont
   iapply wpNext_mono _ _ _ _ _ $$ Hnext
-  iintro %c' HΦ %spie %spp %R' %bm' %n' %data' %Sb' %rv %hpost Hk Hpc Htc Hcl Hir Hpid Hdev Hmap
+  iintro %c' HΦ %spie %spp %R' %bm' %n' %data' %Sb' %rv %hpost Hk Hpc Hte Hce Hpid Hdev Hmap
     Hblk Hsl Hkit
   iclear Hkit
   obtain ⟨hcs, ha0', -, -, -, hnoal, harm, -, -⟩ := hpost
@@ -191,23 +201,23 @@ theorem bmap_noalloc (BR : BREAD) (BE : BRELSE)
     rcases harm with ⟨-, hz⟩ | ⟨he, -⟩
     · exact absurd hz hnz
     · rw [ha0', he]
-  iapply HΦ $$ %spie %spp %R' %hcs %hrv Hk Hpc Htc Hcl Hir Hpid Hdev Hmap Hblk Hsl
+  iapply HΦ $$ %spie %spp %R' %hcs %hrv Hk Hpc Hte Hce Hpid Hdev Hmap Hblk Hsl
 
 end
 
 theorem bmap_proof (BA : BALLOC) (BR : BREAD) (BL : BRELSE) (LW : LOG_WRITE) : BMAP :=
   ⟨fun {hlc GF} _ _ _ _ _ _ _ _ Γ _ cpu k γl γb V γdl pd pav pu j γ γfs logstart bmapstart size
-    dev ip bm data fbn n cr Sb pidv dqp dqd dqb dqs hj hproc hK hsie hnoff hlocks htier hneed
+    dev ip bm data fbn n cr Sb pidv dqp dqd dqb dqs hj hproc hK hnoff htier hneed
     hgeom hbm hcredit hfbn hwf hdev hcl hdt hpd ha0 ha1 =>
   bmap_gen BA BR BL LW Γ cpu k γl γb V γdl pd pav pu j γ γfs logstart bmapstart size dev ip bm
-    data fbn n cr Sb pidv dqp dqd dqb dqs hj hproc hK hsie hnoff hlocks htier hneed hgeom hbm
+    data fbn n cr Sb pidv dqp dqd dqb dqs hj hproc hK hnoff htier hneed hgeom hbm
     hcredit hfbn hwf hdev hcl hdt hpd ha0 ha1⟩
 
 theorem bmap_noalloc_proof (BR : BREAD) (BL : BRELSE) : BMAP_NOALLOC :=
   ⟨fun {hlc GF} _ _ _ _ _ _ _ _ Γ _ cpu k γl γb V γdl pd pav pu j γfs logstart dev ip bm data fbn
-    pidv dqp dq dqd hj hproc hK hsie hnoff hlocks htier hgeom hfbn hwf hnz hdev hcl hdt hpd ha0
+    pidv dqp dq dqd hj hproc hK hnoff htier hgeom hfbn hwf hnz hdev hcl hdt hpd ha0
     ha1 =>
   bmap_noalloc BR BL Γ cpu k γl γb V γdl pd pav pu j γfs logstart dev ip bm data fbn pidv dqp dq
-    dqd hj hproc hK hsie hnoff hlocks htier hgeom hfbn hwf hnz hdev hcl hdt hpd ha0 ha1⟩
+    dqd hj hproc hK hnoff htier hgeom hfbn hwf hnz hdev hcl hdt hpd ha0 ha1⟩
 
 end Xv6

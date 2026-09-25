@@ -462,23 +462,46 @@ section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [Fscfg] [Icfg] [CurCtx]
 
-/-- **THE ONE bfree WRAPPER** all three call sites use (brief §3.3):
-`bmPaidS_use` → `logCredit_own` → `BFREE.wp_bfree` → the budget reclosed.
-The freed block's run goes in; `bmPaidS` comes back unchanged. -/
-theorem itrunc_bfree (BF : BFREE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+end
+
+/-! ## (5) The client continuation, named (Rocq's `it_cont`) -/
+
+section
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+  [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
+  [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
+
+end
+
+
+/-! ## (6) The eb-generic call site and continuation (the eb sweep; append-only)
+
+`Xv6.itrunc_bfree_eb` is `Xv6.itrunc_bfree_eb` at EITHER entry `SIE`: the
+trap-CSR complement at a NAMED index `s` (so a caller's `trapCsrsExt c k.sie`
+frames syntactically against a context whose `sie` only normalises to
+`k.sie`), over `BFREE.wp_bfree_eb`.  `Xv6.itContE` is the client's
+continuation made HART-FREE (Rocq's `it_cont` after the entry's
+`wp_next_at`): at level 0 any step may migrate the thread, so nothing the
+walk carries may be anchored at the entry hart. -/
+
+section
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+  [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [Fscfg] [Icfg] [CurCtx]
+
+/-- `Xv6.itrunc_bfree_eb` at either entry `SIE` (`BFREE.wp_bfree_eb`). -/
+theorem itrunc_bfree_eb (BF : BFREE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (c : CPU) (k' : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (bno : BitVec 32) (bs : List (BitVec 8)) (crb : Bool) (w : Nat) (Sb : List Nat) (e0 : Nat)
     (pidv : BitVec 32) (dqp dqb : DFrac)
-    (pj : BitVec 64) (hpj : k'.proc = pj)
+    (pj : BitVec 64) (hpj : k'.proc = pj) (s : Bool) (hs : k'.sie = s)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : bfreeSlots ≤ k'.avail)
-    (hsie : k'.sie = false) (hnoff : k'.noff = 0) (hlocks : k'.locks = [])
-    (htier : k'.tier = KTier.kpt)
+    (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt)
     (hgeom : logGeomOk fscCov fscLogst) (hbg : bitmapGeomOk fscCov fscLogst fscBmapstart fscSize)
     (hbno : bno.toNat < fscSize) (hbs : bs.length = BSIZE) (hpd : descPageRw pd)
     (ha0 : k'.regs 10#5 = BitVec.signExtend 64 icfgDev)
     (ha1 : k'.regs 11#5 = BitVec.signExtend 64 bno) :
     kctx c k' ∗ pcIs c KA.«bfree» ∗ procsInv Γ ∗
-    trapCsrs c ∗ cpuClaim c pj ∗ intrRes c ∗
+    trapCsrsExt c s ∗ cpuClaimExt c s pj ∗
     bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
     diskCaps fscDisk fscDlock pd pav pu ∗ panicEnv ∗
     logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
@@ -490,51 +513,47 @@ theorem itrunc_bfree (BF : BFREE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      trapCsrs cpu' -∗ cpuClaim cpu' pj -∗ intrRes cpu' -∗
+      trapCsrsExt cpu' s -∗ cpuClaimExt cpu' s pj -∗
       wordPointsTo (pPid pj) 4 dqp pidv -∗
       wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) -∗
       bslots fscBio 2 -∗ bmPaidS crb w Sb e0 -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  subst hpj
-  iintro ⟨Hk, Hpc, #Hpi, Htc, Hcl, Hir, #Hbc, #Hdc, #Hpe, #Hlc, Hsb, #Hbmi, Hfsb, Hpid, Hsl,
+  subst hpj hs
+  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hbc, #Hdc, #Hpe, #Hlc, Hsb, #Hbmi, Hfsb, Hpid, Hsl,
     Hpaid, Hnext⟩
   icases itrunc_paid_use crb w Sb e0 $$ Hpaid with ⟨%cr, %u', %Sq, %hf, Hop, Hback⟩
   obtain ⟨hcr, hu, -⟩ := hf
   ihave #Hcred := logCredit_own (GF := GF) icfgLog cr Sq e0 fscBmapstart hcr
-  have h := BF.wp_bfree (hlc := hlc) (GF := GF) Γ c k' γl fscBio
+  have h := BF.wp_bfree_eb (hlc := hlc) (GF := GF) Γ c k' γl fscBio
     (fsView fscFs fscDisk icfgDev fscCov) fscDlock pd pav pu j icfgLog fscFs fscLogst fscBmapstart
-    fscSize icfgDev bno bs u' cr Sq e0 pidv dqp dqb hj hproc hK hsie hnoff hlocks htier hgeom hbg
+    fscSize icfgDev bno bs u' cr Sq e0 pidv dqp dqb hj hproc hK hnoff htier hgeom hbg
     rfl rfl rfl hbno hbs hpd ha0 ha1
-  unfold wp_bfree_body at h
+  unfold wp_bfree_eb_body at h
   simp only [bfreeAddr, fsView_gd, fsView_cov] at h
   iapply h
-  iframe Hk Hpc Hpi Htc Hcl Hir Hbc Hdc Hpe Hlc Hsb Hbmi Hfsb Hpid Hsl Hcred Hop
+  iframe Hk Hpc Hpi Hte Hce Hbc Hdc Hpe Hlc Hsb Hbmi Hfsb Hpid Hsl Hcred Hop
   iapply wpNext_mono _ _ _ _ _ $$ Hnext
-  iintro %c' HΦ %spie %spp %R' %hcs Hk Hpc Htc Hcl Hir Hpid Hsb Hsl Hope
+  iintro %c' HΦ %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hsb Hsl Hope
   ihave Hope := (show logOpSe (GF := GF) icfgLog (if cr then u' + 1 else u') (fscBmapstart :: Sq) e0
       ⊢ logOpSe icfgLog (w + 1) (fscBmapstart :: Sq) e0 from by rw [hu]) $$ Hope
   ihave Hpaid := Hback $$ Hope
-  iapply HΦ $$ %spie %spp %R' %hcs Hk Hpc Htc Hcl Hir Hpid Hsb Hsl Hpaid
+  iapply HΦ $$ %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hsb Hsl Hpaid
 
 end
-
-/-! ## (5) The client continuation, named (Rocq's `it_cont`) -/
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
-/-- **THE CLIENT'S CONTINUATION, NAMED** (Rocq's `it_cont`), at a LEDGER
-resource `L`: the contract's `wpNext` is this at the contract's `∃ w u' Sb'`;
-the tail hands it a CONCRETE `logOpS u Sbf` and the main lemma does the
-widening (`Xv6.itCont_mono`). -/
-def itCont (k : KCtx) (cpu : CPU) (ip : BitVec 64) (inum : BitVec 32) (dn : Dinode)
+/-- **THE CLIENT'S CONTINUATION, HART-FREE** (`Xv6.itContE` at either entry
+`SIE`, the complement in place of the bundle, at every hart). -/
+def itContE (k : KCtx) (ip : BitVec 64) (inum : BitVec 32) (dn : Dinode)
     (pidv : BitVec 32) (dqp dqd dqn dqb dqs : DFrac) (L : IProp GF) : IProp GF :=
-  wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
+  iprop(∀ (cpu' : CPU) (spie spp : Bool) (R' : RegMap),
     ⌜calleeSaved k.regs R'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-    trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
+    trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
     wordPointsTo (iDev ip) 4 dqd icfgDev -∗ wordPointsTo (iInum ip) 4 dqn inum -∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) -∗
@@ -543,19 +562,17 @@ def itCont (k : KCtx) (cpu : CPU) (ip : BitVec 64) (inum : BitVec 32) (dn : Dino
     inodeMap fscFs ip bmEmpty -∗
     inodeBlocks fscFs bmEmpty (fun _ => List.replicate BSIZE 0) -∗
     dinodeAt fscIreg inum (diTrunc dn) -∗
-    bslots fscBio 3 -∗ L -∗ wpLoop cpu'))
+    bslots fscBio 3 -∗ L -∗ wpLoop cpu')
 
-/-- The widening: a continuation for a weaker ledger serves a stronger one. -/
-theorem itCont_mono (k : KCtx) (cpu : CPU) (ip : BitVec 64) (inum : BitVec 32) (dn : Dinode)
+/-- The widening, hart-free. -/
+theorem itContE_mono (k : KCtx) (ip : BitVec 64) (inum : BitVec 32) (dn : Dinode)
     (pidv : BitVec 32) (dqp dqd dqn dqb dqs : DFrac) (L L' : IProp GF) :
-    itCont (GF := GF) k cpu ip inum dn pidv dqp dqd dqn dqb dqs L ⊢
-      (L' -∗ L) -∗ itCont k cpu ip inum dn pidv dqp dqd dqn dqb dqs L' := by
-  unfold itCont
-  iintro H Hw
-  iapply wpNext_mono _ _ _ _ _ $$ H
-  iintro %c HΦ %spie %spp %R' %hcs Hk Hpc Htc Hcl Hir Hpid Hd Hi Hsb Hsi Hm Hmap Hblk Hdn Hsl HL
+    itContE (GF := GF) k ip inum dn pidv dqp dqd dqn dqb dqs L ⊢
+      (L' -∗ L) -∗ itContE k ip inum dn pidv dqp dqd dqn dqb dqs L' := by
+  unfold itContE
+  iintro H Hw %c %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hd Hi Hsb Hsi Hm Hmap Hblk Hdn Hsl HL
   ihave HL := Hw $$ HL
-  iapply HΦ $$ %spie %spp %R' %hcs Hk Hpc Htc Hcl Hir Hpid Hd Hi Hsb Hsi Hm Hmap Hblk Hdn Hsl HL
+  iapply H $$ %c %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hd Hi Hsb Hsi Hm Hmap Hblk Hdn Hsl HL
 
 end
 

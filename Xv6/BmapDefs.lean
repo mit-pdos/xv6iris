@@ -421,6 +421,52 @@ theorem bm_calleeSaved_epi (KR R : RegMap) (v : BitVec 64) (h20 : R 20#5 = KR 20
       | rfl
       | assumption
 
+/-! ## Level-0 steps at the running hart `c`
+
+bmap holds no spinlock of its own: EVERY instruction runs at the caller's
+`SIE` (either index), so every step may migrate the thread.  `bm_step` is
+`MachCSL.k_step_e` with the running hart named `c` (the stage lemmas keep
+`cpu` for the entry hart the continuation `Xv6.bmCont` is stated at); the
+complement `Hte` / `Hce` follows the thread.  `bm_next` is `k_next_e` at `c`.
+The continuation's own pin is the proc's (`bm_pin`): it is a park-crossing
+`wpNext true` at a nonzero proc, consumable at ANY hart. -/
+
+/-- The core's continuation is consumable at any hart: `k.proc ≠ 0`. -/
+theorem bm_pin {k : KCtx} (hpz : k.proc ≠ 0#64) (c cpu : CPU) :
+    true = false ∨ k.proc = 0#64 → c = cpu :=
+  fun h => h.elim (fun x => absurd x (by decide)) (fun x => absurd x hpz)
+
+syntax "bm_step" term:max " from " term:max ident " $$ " specPat : tactic
+syntax "bm_step" term:max " from " term:max ident " $$ " specPat " with " "[" term,* "]" : tactic
+
+set_option hygiene false in
+macro_rules
+  | `(tactic| bm_step $rule:term from $code:term $ht:ident $$ $pat:specPat) =>
+    `(tactic| bm_step $rule:term from $code:term $ht:ident $$ $pat:specPat with [])
+  | `(tactic| bm_step $rule:term from $code:term $ht:ident $$ $pat:specPat with [$extra,*]) =>
+    `(tactic| (iapply $rule:term $$ $pat:specPat
+               rotate_right 1
+               k_code $code:term $ht:ident
+               iframe #
+               k_norm_goal [$extra,*]
+               iframe
+               first
+                 | inext_goal
+                 | (k_norm_g [$extra,*]; iframe; inext_goal)
+               iapply wpNext_intro_pin
+               iintro %c %hpin
+               k_ext_move
+               k_norm_g [$extra,*]
+               try (case hs => k_norm_g)))
+
+syntax "bm_next" : tactic
+set_option hygiene false in
+macro_rules
+  | `(tactic| bm_next) =>
+    `(tactic| (iapply wpNext_intro_pin
+               iintro %c %hpin
+               k_ext_move))
+
 /-! ## The kit, the continuation -/
 
 section
@@ -460,7 +506,7 @@ def bmCont (k : KCtx) (cpu : CPU) (γb : BcacheNames) (γfs : FsNames)
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧
       bmOut ak cr cov logstart bm bm' fbn data data' n n' Sb Sb' rv⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-    trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
+    trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
     wordPointsTo (iDev ip) 4 dqd dev -∗
     inodeMapQ γfs dq ip bm' -∗ inodeBlocksQ γfs dq bm' data' -∗
@@ -510,15 +556,17 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 
 set_option maxHeartbeats 1000000 in
 /-- `balloc(ip->dev)` at `+0x2a` / `+0x50` / `+0x9e`: the credited form
-(Rocq's `balloc_contract`). -/
+(Rocq's `balloc_contract`), at EITHER entry `SIE` (`BALLOC.wp_balloc_gen_eb`):
+the trap-CSR complement at a named index `s`, so a caller's
+`trapCsrsExt c k.sie` frames syntactically. -/
 theorem bm_balloc (BA : BALLOC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (c : CPU) (k' : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (γ : LogNames) (γfs : FsNames)
     (logstart bmapstart size : Nat) (dev : BitVec 32)
     (u : Nat) (cr : Bool) (Sb : List Nat) (pidv : BitVec 32) (dqp dqb dqs : DFrac)
-    (pj : BitVec 64) (hpj : k'.proc = pj)
+    (pj : BitVec 64) (hpj : k'.proc = pj) (s : Bool) (hs : k'.sie = s)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : ballocSlots ≤ k'.avail)
-    (hsie : k'.sie = false) (hnoff : k'.noff = 0) (hlocks : k'.locks = [])
+    (hnoff : k'.noff = 0)
     (htier : k'.tier = KTier.kpt)
     (hgeom : logGeomOk V.cov logstart) (hbm : bitmapGeomOk V.cov logstart bmapstart size)
     (hcredit : cr = true → bmapstart ∈ Sb)
@@ -526,7 +574,7 @@ theorem bm_balloc (BA : BALLOC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (hpd : descPageRw pd)
     (ha0 : k'.regs 10#5 = BitVec.signExtend 64 dev) :
     kctx c k' ∗ pcIs c KA.«balloc» ∗ procsInv Γ ∗
-    trapCsrs c ∗ cpuClaim c pj ∗ intrRes c ∗
+    trapCsrsExt c s ∗ cpuClaimExt c s pj ∗
     bioCtx γl γb V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
     logCtx γ γb γfs V.cov logstart dev ∗
     wordPointsTo (pPid pj) 4 dqp pidv ∗
@@ -537,7 +585,7 @@ theorem bm_balloc (BA : BALLOC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      trapCsrs cpu' -∗ cpuClaim cpu' pj -∗ intrRes cpu' -∗
+      trapCsrsExt cpu' s -∗ cpuClaimExt cpu' s pj -∗
       wordPointsTo (pPid pj) 4 dqp pidv -∗
       wordPointsTo sbSizeAddr 4 dqs (BitVec.ofNat 32 size) -∗
       wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 bmapstart) -∗
@@ -550,11 +598,11 @@ theorem bm_balloc (BA : BALLOC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
           logOpS γ (if cr then u + 1 else u) (blk.toNat :: bmapstart :: Sb))) -∗
       wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  subst hpj
-  have h := BA.wp_balloc_gen (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl pd pav pu j γ γfs
+  subst hpj hs
+  have h := BA.wp_balloc_gen_eb (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl pd pav pu j γ γfs
     logstart bmapstart size dev u cr Sb pidv dqp dqb dqs
-    hj hproc hK hsie hnoff hlocks htier hgeom hbm hcredit hdev hcl hdt hpd ha0
-  unfold wp_balloc_gen_body at h
+    hj hproc hK hnoff htier hgeom hbm hcredit hdev hcl hdt hpd ha0
+  unfold wp_balloc_gen_eb_body at h
   simp only [ballocAddr] at h
   exact h
 

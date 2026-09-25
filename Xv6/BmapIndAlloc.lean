@@ -45,7 +45,7 @@ theorem bm_ind_alloc_fail (BE : BRELSE) (Γ : SchedNames) (c cpu : CPU) (k : KCt
     (dev : BitVec 32) (a : BmAlloc) (ip : BitVec 64) (bm bmI : Blkmap)
     (data : Nat → List (BitVec 8)) (fbn q n nI : Nat) (cr : Bool) (Sb SbI : List Nat)
     (kk : Nat) (bsd : List (BitVec 8)) (d : Bool) (pidv : BitVec 32) (dqp dq dqd : DFrac)
-    (hK : bmapSlots ≤ k.avail) (hsie : k.sie = false) (hnoff : k.noff = 0)
+    (hK : bmapSlots ≤ k.avail) (hnoff : k.noff = 0)
     (hlocks : k.locks = []) (htier : k.tier = KTier.kpt)
     (hwfI : blkmapWf V.cov logstart bmI) (hfbn : fbn = NDIRECT + q) (hq : q < NINDIRECT)
     (hagr : ∀ i, i < MAXFILE → blkmapGet bmI i = blkmapGet bm i)
@@ -53,12 +53,12 @@ theorem bm_ind_alloc_fail (BE : BRELSE) (Γ : SchedNames) (c cpu : CPU) (k : KCt
     (hled0 : bmLedgerOk (some a) cr bm bmI fbn n nI Sb SbI)
     (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64) (h10 : R 10#5 = 0#64)
     (h20 : R 20#5 = bnode kk) (hkk : kk < NBUF) (hp : bmPins k R)
-    (hpin : true = false ∨ k.proc = 0#64 → c = cpu) :
+    (hpz : k.proc ≠ 0#64) :
     kctx c (((k.withSpie spie spp).pushed 6).withRegs R) ∗ pcIs c (KA.«bmap» + 0xa2#64) ∗
     bmFrame4 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) ∗
     procsInv Γ ∗ bioCtx γl γb V ∗
-    trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
+    trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗ wordPointsTo (iDev ip) 4 dqd dev ∗
     inodeAddrs ip (bmCells bmI) ∗ fsblockQ γfs.bytes dq bmI.bmInd.toNat (indBytes bmI.bmEnt) ∗
     inodeBlocksQ γfs dq bmI data ∗
@@ -71,14 +71,14 @@ theorem bm_ind_alloc_fail (BE : BRELSE) (Γ : SchedNames) (c cpu : CPU) (k : KCt
     bmCont k cpu γb γfs V.cov logstart dev (some a) ip bm data fbn n cr Sb pidv dqp dq dqd
     ⊢ wpLoop (GF := GF) c := by
   have hlen : bmI.bmEnt.length = NINDIRECT := blkmapWf_ent_len hwfI
-  iintro ⟨Hk, Hpc, Hframe, #Hpi, #Hbc, Htc, Hcl, Hir, Hpid, Hdev, Haddrs, Hind, Hblk, Hcell, Hcb,
+  iintro ⟨Hk, Hpc, Hframe, #Hpi, #Hbc, Hte, Hce, Hpid, Hdev, Haddrs, Hind, Hblk, Hcell, Hcb,
     Hpay, Hkit, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- +0xa2  c.mv s1,a0 ; +0xa4  c.beqz a0 : TAKEN, back to +0x82
-  k_step (wp_s_add c _ (KA.«bmap» + 0xa2#64) true 9#5 0#5 10#5 (by decide))
+  bm_step (wp_s_add c _ (KA.«bmap» + 0xa2#64) true 9#5 0#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10]
   iintro Hk Hpc
-  k_step (wp_s_branch c _ (KA.«bmap» + 0xa4#64) true 8158#13 10#5 0#5 (by decide) bop.BEQ)
+  bm_step (wp_s_branch c _ (KA.«bmap» + 0xa4#64) true 8158#13 10#5 0#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, bm_beq00]
   iintro Hk Hpc
   -- the borrowed word goes back unchanged; the handle and the map are whole again
@@ -91,8 +91,8 @@ theorem bm_ind_alloc_fail (BE : BRELSE) (Γ : SchedNames) (c cpu : CPU) (k : KCt
   case' _ => unfold inodeMapQ indResQ; iframe
   iapply (bm_release BE Γ c cpu k spie spp _ 0#32 γl γb V γfs logstart dev (some a) ip bm bmI
       data data fbn n nI cr Sb SbI kk bmI.bmInd (indBytes bmI.bmEnt) bsd d pidv dqp dq dqd
-      hK hsie hnoff hlocks htier ?e2 ?e9 ?e20 hkk ?ep ?eo hpin)
-    $$ [$Hk $Hpc $Hframe $Hpi $Hbc $Htc $Hcl $Hir $Hpid $Hdev $Hmap $Hblk $Hkit $Hlk $Hnext]
+      hK hnoff hlocks htier ?e2 ?e9 ?e20 hkk ?ep ?eo hpz)
+    $$ [$Hk $Hpc $Hframe $Hpi $Hbc $Hte $Hce $Hpid $Hdev $Hmap $Hblk $Hkit $Hlk $Hnext]
   case eo =>
     exact bmOut_pass (some a) cr V.cov logstart bm bmI fbn data n nI Sb SbI 0#32 hwfI hagr
       (fun h => absurd h (by simp)) (Or.inl ⟨rfl, hentz⟩) hled0
@@ -112,7 +112,7 @@ theorem bm_ind_alloc_ok (LW : LOG_WRITE) (BE : BRELSE) (Γ : SchedNames) (c cpu 
     (data : Nat → List (BitVec 8)) (fbn q n nI ub w u1 : Nat) (cr crb cri : Bool)
     (Sb SbI : List Nat) (kk : Nat) (bsd : List (BitVec 8)) (d : Bool) (blk : BitVec 32)
     (pidv : BitVec 32) (dqp dq dqd : DFrac)
-    (hK : bmapSlots ≤ k.avail) (hsie : k.sie = false) (hnoff : k.noff = 0)
+    (hK : bmapSlots ≤ k.avail) (hnoff : k.noff = 0)
     (hlocks : k.locks = []) (htier : k.tier = KTier.kpt)
     (hdev : dev = V.dev) (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs)
     (hwfI : blkmapWf V.cov logstart bmI) (hfbn : fbn = NDIRECT + q) (hq : q < NINDIRECT)
@@ -128,12 +128,12 @@ theorem bm_ind_alloc_ok (LW : LOG_WRITE) (BE : BRELSE) (Γ : SchedNames) (c cpu 
     (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64) (h10 : R 10#5 = BitVec.signExtend 64 blk)
     (h19 : R 19#5 = aBufData (bnode kk) + BitVec.ofNat 64 (4 * q))
     (h20 : R 20#5 = bnode kk) (hkk : kk < NBUF) (hp : bmPins k R)
-    (hpin : true = false ∨ k.proc = 0#64 → c = cpu) :
+    (hpz : k.proc ≠ 0#64) :
     kctx c (((k.withSpie spie spp).pushed 6).withRegs R) ∗ pcIs c (KA.«bmap» + 0xa2#64) ∗
     bmFrame4 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) ∗
     procsInv Γ ∗ bioCtx γl γb V ∗
-    trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
+    trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗ wordPointsTo (iDev ip) 4 dqd dev ∗
     inodeAddrs ip (bmCells bmI) ∗ fsblockQ γfs.bytes dq bmI.bmInd.toNat (indBytes bmI.bmEnt) ∗
     inodeBlocksQ γfs dq bmI data ∗
@@ -156,7 +156,7 @@ theorem bm_ind_alloc_ok (LW : LOG_WRITE) (BE : BRELSE) (Γ : SchedNames) (c cpu 
   have hihome := blkmapWf_ind_cov hwfI hindnz
   have hfbnlt : fbn < MAXFILE := by unfold MAXFILE; unfold NDIRECT NINDIRECT at *; omega
   have hz : (blkmapGet bm fbn).toNat = 0 := by rw [← hagr fbn hfbnlt]; exact hentz
-  iintro ⟨Hk, Hpc, Hframe, #Hpi, #Hbc, Htc, Hcl, Hir, Hpid, Hdev, Haddrs, Hind, Hblk, Hcell, Hcb,
+  iintro ⟨Hk, Hpc, Hframe, #Hpi, #Hbc, Hte, Hce, Hpid, Hdev, Haddrs, Hind, Hblk, Hcell, Hcb,
     Hpay, Hres, #Hlc, Hsl2, Hop, Hfsb, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- THE FRESHNESS that re-establishes injectivity: the fresh block's own
@@ -167,22 +167,22 @@ theorem bm_ind_alloc_ok (LW : LOG_WRITE) (BE : BRELSE) (Γ : SchedNames) (c cpu 
   obtain ⟨hwfJ, hagJ, hgetJ⟩ := bm_insert_ent_facts V.cov logstart bmI q blk hwfI hq hindnz hblknz
     hblkhome hfresh
   -- +0xa2  c.mv s1,a0 ; +0xa4  c.beqz a0 : FALLS THROUGH
-  k_step (wp_s_add c _ (KA.«bmap» + 0xa2#64) true 9#5 0#5 10#5 (by decide))
+  bm_step (wp_s_add c _ (KA.«bmap» + 0xa2#64) true 9#5 0#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10]
   iintro Hk Hpc
-  k_step (wp_s_branch c _ (KA.«bmap» + 0xa4#64) true 8158#13 10#5 0#5 (by decide) bop.BEQ)
+  bm_step (wp_s_branch c _ (KA.«bmap» + 0xa4#64) true 8158#13 10#5 0#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, bm_eqz_false blk hblknz]
   iintro Hk Hpc
   -- +0xa6  sw a0,0(s3) : a[q] = blk
-  k_step (wp_s_sw c _ (KA.«bmap» + 0xa6#64) false 0#12 19#5 10#5 (by decide) bmI.bmEnt[q]!)
+  bm_step (wp_s_sw c _ (KA.«bmap» + 0xa6#64) false 0#12 19#5 10#5 (by decide) bmI.bmEnt[q]!)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h19, h10, fw_ext32]
   iintro Hk Hpc Hcell
   ihave Hhold := Hcb $$ %blk Hcell
   -- +0xaa  c.mv a0,s4 ; +0xac  jal log_write  (the held, credited form)
-  k_step (wp_s_add c _ (KA.«bmap» + 0xaa#64) true 10#5 0#5 20#5 (by decide))
+  bm_step (wp_s_add c _ (KA.«bmap» + 0xaa#64) true 10#5 0#5 20#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h20]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ (KA.«bmap» + 0xac#64) false 3572#21 1#5 (by decide))
+  bm_step (wp_s_jal c _ (KA.«bmap» + 0xac#64) false 3572#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bm_br_logwrite]
   iintro Hk Hpc
   ihave Hfsbi := fsblockQ_1_of γfs.bytes (DFrac.own 1) _ _ rfl $$ Hind
@@ -202,16 +202,14 @@ theorem bm_ind_alloc_ok (LW : LOG_WRITE) (BE : BRELSE) (Γ : SchedNames) (c cpu 
   case wtier => k_norm_g; exact htier
   case wa0 => k_norm_g <;> exact h20
   case wcr => intro h; simp [hcri h]
-  iapply wpNext_intro_pin
-  iintro %c2 %hp2 %spie2 %spp2 %R2 %hsp2 Hk Hpc %hcs2 Hop Hfsbi Hlk Hsl1
-  have hc2 : c2 = c := hp2 (Or.inl (by k_norm_g; exact hsie))
-  subst hc2
+  bm_next
+  iintro %spie2 %spp2 %R2 %hsp2 Hk Hpc %hcs2 Hop Hfsbi Hlk Hsl1
   k_norm_g [bm_ret_b0, hww, hpsw]
   unfold calleeSaved at hcs2
   k_norm_g at hcs2
   obtain ⟨b2, b8, b9, b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩ := hcs2
   -- +0xb0  c.j +0x82
-  k_step (wp_s_j c2 _ (KA.«bmap» + 0xb0#64) true 2097106#21)
+  bm_step (wp_s_j c _ (KA.«bmap» + 0xb0#64) true 2097106#21)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- ---- THE NEW MAP, and everything it has to satisfy ----
@@ -240,10 +238,10 @@ theorem bm_ind_alloc_ok (LW : LOG_WRITE) (BE : BRELSE) (Γ : SchedNames) (c cpu 
   ihave Hkit := (bmKit_some a γb γfs V.cov logstart dev (if cri then w + 1 else w)
     (bmI.bmInd.toNat :: blk.toNat :: a.baBms :: SbI)).2 $$ [Hres Hsl2 Hop]
   case' _ => iframe; iexact Hlc
-  iapply (bm_release BE Γ c2 cpu k spie2 spp2 _ blk γl γb V γfs logstart dev (some a) ip bm _
+  iapply (bm_release BE Γ c cpu k spie2 spp2 _ blk γl γb V γfs logstart dev (some a) ip bm _
       data _ (NDIRECT + q) n _ cr Sb _ kk bmI.bmInd (indBytes (bmI.bmEnt.set q blk)) bsd true
-      pidv dqp (DFrac.own 1) dqd hK hsie hnoff hlocks htier ?e2 ?e9 ?e20 hkk ?ep hout hpin)
-    $$ [$Hk $Hpc $Hframe $Hpi $Hbc $Htc $Hcl $Hir $Hpid $Hdev $Hmap $Hblk $Hkit $Hlk $Hnext]
+      pidv dqp (DFrac.own 1) dqd hK hnoff hlocks htier ?e2 ?e9 ?e20 hkk ?ep hout hpz)
+    $$ [$Hk $Hpc $Hframe $Hpi $Hbc $Hte $Hce $Hpid $Hdev $Hmap $Hblk $Hkit $Hlk $Hnext]
   case ep =>
     obtain ⟨p21, p22, p23, p24, p25, p26, p27⟩ := hp
     exact ⟨b21.trans p21, b22.trans p22, b23.trans p23, b24.trans p24, b25.trans p25,
@@ -265,7 +263,7 @@ theorem bm_ind_alloc (BA : BALLOC) (LW : LOG_WRITE) (BE : BRELSE)
     (Sb SbI : List Nat) (kk : Nat) (bsd : List (BitVec 8)) (d : Bool)
     (pidv : BitVec 32) (dqp dq dqd : DFrac)
     (hj : j < NPROC) (hproc : k.proc = procAddr j)
-    (hK : bmapSlots ≤ k.avail) (hsie : k.sie = false) (hnoff : k.noff = 0)
+    (hK : bmapSlots ≤ k.avail) (hnoff : k.noff = 0)
     (hlocks : k.locks = []) (htier : k.tier = KTier.kpt)
     (hgeom : logGeomOk V.cov logstart)
     (hdev : dev = V.dev) (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs)
@@ -282,12 +280,12 @@ theorem bm_ind_alloc (BA : BALLOC) (LW : LOG_WRITE) (BE : BRELSE)
     (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64) (h18 : R 18#5 = ip)
     (h19 : R 19#5 = aBufData (bnode kk) + BitVec.ofNat 64 (4 * q))
     (h20 : R 20#5 = bnode kk) (hkk : kk < NBUF) (hp : bmPins k R)
-    (hpin : true = false ∨ k.proc = 0#64 → c = cpu) :
+    (hpz : k.proc ≠ 0#64) :
     kctx c (((k.withSpie spie spp).pushed 6).withRegs R) ∗ pcIs c (KA.«bmap» + 0x9a#64) ∗
     bmFrame4 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) ∗
     procsInv Γ ∗ bioCtx γl γb V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
-    trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
+    trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗ wordPointsTo (iDev ip) 4 dqd dev ∗
     inodeAddrs ip (bmCells bmI) ∗ fsblockQ γfs.bytes dq bmI.bmInd.toNat (indBytes bmI.bmEnt) ∗
     inodeBlocksQ γfs dq bmI data ∗
@@ -309,7 +307,7 @@ theorem bm_ind_alloc (BA : BALLOC) (LW : LOG_WRITE) (BE : BRELSE)
   obtain ⟨w, hbw⟩ : ∃ w, (if crb then ub + 1 else ub) = w + 1 :=
     ⟨if crb then ub else ub - 1, by cases crb <;> simp at hn3 ⊢ <;> omega⟩
   subst hnn
-  iintro ⟨Hk, Hpc, Hframe, #Hpi, #Hbc, #Hdc, #Hpe, Htc, Hcl, Hir, Hpid, Hdev, Haddrs, Hind, Hblk,
+  iintro ⟨Hk, Hpc, Hframe, #Hpi, #Hbc, #Hdc, #Hpe, Hte, Hce, Hpid, Hdev, Haddrs, Hind, Hblk,
     Hcell, Hcb, Hpay, Hkit, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases (bmKit_some a γb γfs V.cov logstart dev (2 + ub) SbI).1 $$ Hkit
@@ -317,34 +315,32 @@ theorem bm_ind_alloc (BA : BALLOC) (LW : LOG_WRITE) (BE : BRELSE)
   unfold bmAllocRes
   icases Hres with ⟨%hbg, Hsz, Hbms, #Hbmi⟩
   -- +0x9a  lw a0,0(s2) : ip->dev ; +0x9e  jal balloc
-  k_step (wp_s_lw c _ (KA.«bmap» + 0x9a#64) false 0#12 10#5 18#5 (by decide) (by decide) dqd dev)
+  bm_step (wp_s_lw c _ (KA.«bmap» + 0x9a#64) false 0#12 10#5 18#5 (by decide) (by decide) dqd dev)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h18, iDev]
   iintro Hk Hpc Hdev
-  k_step (wp_s_jal c _ (KA.«bmap» + 0x9e#64) false 2096454#21 1#5 (by decide))
+  bm_step (wp_s_jal c _ (KA.«bmap» + 0x9e#64) false 2096454#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bm_br_balloc]
   iintro Hk Hpc
   iapply (bm_balloc BA Γ c _ γl γb V γdl pd pav pu j a.baLog γfs logstart a.baBms a.baSize dev ub
-      crb SbI pidv dqp a.baDqb a.baDqs k.proc (by k_norm_g) hj ?bproc ?bK ?bsie ?bnoff ?blocks ?btier hgeom hbg hcrb
+      crb SbI pidv dqp a.baDqb a.baDqs k.proc (by k_norm_g) k.sie ?bsie hj ?bproc ?bK ?bnoff ?btier hgeom hbg hcrb
       hdev hcl hdt hpd ?ba0)
-    $$ [- $Hk $Hpc $Hpi $Htc $Hcl $Hir $Hbc $Hdc $Hpe $Hlc $Hpid $Hsz $Hbms $Hbmi $Hsl2 $Hop]
+    $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hbc $Hdc $Hpe $Hlc $Hpid $Hsz $Hbms $Hbmi $Hsl2 $Hop]
   rotate_right 1
   k_norm_g [bm_ret_a2]
   iframe #
   case bproc => k_norm_g; exact hproc
   case bK => k_norm_g; unfold bmapSlots at hK; omega
-  case bsie => k_norm_g; exact hsie
+  case bsie => k_norm_g
   case bnoff => k_norm_g; exact hnoff
-  case blocks => k_norm_g; exact hlocks
   case btier => k_norm_g; exact htier
   case ba0 => k_norm_g
   -- ===== back from balloc =====
   iapply wpNext_intro_pin
-  iintro %c1 %hp1 %spie1 %spp1 %R1 %hcs1 Hk Hpc Htc Hcl Hir Hpid Hsz Hbms Hsl2 Harms
+  iintro %c %_ %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid Hsz Hbms Hsl2 Harms
   k_norm_g [bm_ret_a2, hww, hpsw]
   unfold calleeSaved at hcs1
   k_norm_g at hcs1
   obtain ⟨b2, b8, b9, b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩ := hcs1
-  have hpin1 : true = false ∨ k.proc = 0#64 → c1 = cpu := fun h => (hp1 h).trans (hpin h)
   obtain ⟨p21, p22, p23, p24, p25, p26, p27⟩ := hp
   have hp1' : bmPins k R1 := ⟨b21.trans p21, b22.trans p22, b23.trans p23, b24.trans p24,
     b25.trans p25, b26.trans p26, b27.trans p27⟩
@@ -354,19 +350,19 @@ theorem bm_ind_alloc (BA : BALLOC) (LW : LOG_WRITE) (BE : BRELSE)
   · -- ---------- balloc FAILED ----------
     ihave Hkit := (bmKit_some a γb γfs V.cov logstart dev (2 + ub) SbI).2 $$ [Hres Hsl2 Hop]
     case' _ => iframe; iexact Hlc
-    iapply (bm_ind_alloc_fail BE Γ c1 cpu k spie1 spp1 R1 γl γb V γfs logstart dev a ip bm bmI
-      data fbn q n (2 + ub) cr Sb SbI kk bsd d pidv dqp dq dqd hK hsie hnoff hlocks htier hwfI
-      hfbn hq hagr hindnz hentz hled0 (b2.trans hR2) h0 (b20.trans h20) hkk hp1' hpin1)
+    iapply (bm_ind_alloc_fail BE Γ c cpu k spie1 spp1 R1 γl γb V γfs logstart dev a ip bm bmI
+      data fbn q n (2 + ub) cr Sb SbI kk bsd d pidv dqp dq dqd hK hnoff hlocks htier hwfI
+      hfbn hq hagr hindnz hentz hled0 (b2.trans hR2) h0 (b20.trans h20) hkk hp1' hpz)
     rw [hdev0]
     iframe
     iframe #
   · -- ---------- balloc SUCCEEDED ----------
     obtain ⟨ha0, hblknz, hblkhome⟩ := hblk
-    iapply (bm_ind_alloc_ok LW BE Γ c1 cpu k spie1 spp1 R1 γl γb V γfs logstart dev a ip bm bmI
+    iapply (bm_ind_alloc_ok LW BE Γ c cpu k spie1 spp1 R1 γl γb V γfs logstart dev a ip bm bmI
       data fbn q n (2 + ub) ub w (if crb then ub + 1 else ub) cr crb cri Sb SbI kk bsd d blk
-      pidv dqp dq dqd hK hsie hnoff hlocks htier hdev hcl hdt hwfI hfbn hq hagr hindnz hentz
+      pidv dqp dq dqd hK hnoff hlocks htier hdev hcl hdt hwfI hfbn hq hagr hindnz hentz
       hled0 hbud2 hSbI hcri rfl hbw hbw hdq hblknz hblkhome (b2.trans hR2) ha0 (b19.trans h19)
-      (b20.trans h20) hkk hp1' hpin1)
+      (b20.trans h20) hkk hp1' hpz)
     rw [hdev0]
     iframe
     iframe #
