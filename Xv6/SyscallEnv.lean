@@ -230,7 +230,7 @@ theorem syscallEnv_park (PT : SchedNames → IProp GF) (Γ : SchedNames) (γ : F
   · iexact Hcons
   isplitl []
   · unfold firstDone
-    icases Hdone' with ⟨-, #Hrdy⟩
+    icases Hdone' with ⟨-, #Hrdy, -⟩
     iframe Hpe Hrdy
   iframe Hdone Hw Ht
 

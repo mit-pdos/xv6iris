@@ -744,7 +744,7 @@ theorem utCaps_of_park [CurCtx] (N : UtNames) :
     utParkCaps (GF := GF) N ∗ parkGlobals N.Γ N.w N.ft N.f N.ip ∗ firstDone (hlc := hlc) ∗ envAt curCtx ⊢
       utCaps N := by
   unfold utParkCaps parkGlobals firstDone utCaps
-  iintro ⟨#Hig, ⟨#Hp, #Hpe, #Hwl, #Hft, #Hc⟩, ⟨-, #Hrdy⟩, #Henv⟩
+  iintro ⟨#Hig, ⟨#Hp, #Hpe, #Hwl, #Hft, #Hc⟩, ⟨-, #Hrdy, -⟩, #Henv⟩
   iframe Hig Hp Hpe Hwl Hft Hc Hrdy Henv
 
 /-- What the resumer hands the closer, at its context `Xc` and hart `h`

@@ -141,7 +141,7 @@ instance firstBootPersist_morph [Fscfg] [Icfg] :
 
 /-- Rocq `first_fsinit_morph`: fsinit's exclusive pile -- cells and ghost. -/
 instance firstFsinit_morph [Fscfg] [Icfg] :
-    CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, KTier.kpt⟩; firstFsinit (GF := GF)) := by
+    CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, KTier.kpt⟩; firstFsinit (hlc := hlc) (GF := GF)) := by
   unfold firstFsinit byteBuf
   amb_morph_solve
 
@@ -157,14 +157,16 @@ instance firstBoot_morph [Fscfg] [Icfg] :
 instance firstDone_morph [Fscfg] [Icfg] :
     CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, KTier.kpt⟩; firstDone (hlc := hlc) (GF := GF)) := by
   unfold firstDone
-  exact @instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _) fsReady_morph
+  exact @instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
+    (@instCtxMorphSep hlc GF _ _ _ fsReady_morph (instCtxMorphConst _))
 
 /-- Rocq `first_tok_morph`. -/
 instance firstTok_morph [Fscfg] [Icfg] :
     CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, KTier.kpt⟩; firstTok (hlc := hlc) (GF := GF)) := by
   unfold firstTok
   exact @instCtxMorphOr hlc GF _ _ _ firstBoot_morph
-    (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _) fsReady_morph)
+    (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
+      (@instCtxMorphSep hlc GF _ _ _ fsReady_morph (instCtxMorphConst _)))
 
 end
 end Xv6
