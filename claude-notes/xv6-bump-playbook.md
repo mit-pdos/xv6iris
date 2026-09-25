@@ -136,6 +136,21 @@ What bit, and what a script must special-case:
   `UShEcho`/`UShKernel`/`UInitKernel`), the RW segment and `memEnd` did
   not.  Cross-program COMMENTS (init's literal named in a sh file) need a
   separate pass keyed on the program the line names.
+- **The ELF's FILE LENGTH is a third kind of literal**, beside pcs and data,
+  and no pc/data remap sees it.  `ElfUser.<p>_elf_length` is symbolic
+  (`<P>ElfRaw.<p>_elf_size`), but `FileDeltas.<p>_bytes_length` and
+  `Fs<P>Pin.fsimg_<p>_size` restate it in decimal; at the seccomp stub every
+  one moved (+48, grep +56) and failed only at build.  Grep the old sizes
+  (`git show <old>:user-rocq/<P>ElfRaw.v`) in the same pass.
+- **A merge from a branch written against the OLD images auto-merges new
+  lemmas at OLD user addresses.**  The conflict hunks are not the list: at
+  the seccomp bump W3's two new `UkShRedirPaid` lemmas merged cleanly at
+  sh's pre-bump format address 0x12b8 (now 0x12c8).  Re-run the address
+  remap over the merged-in side's ADDED lines, keyed on the OLD dump.
+- **A pin whose upstream diff touches only `user/` moves only that user
+  dump and `FsImgRaw.v`** (7b2c1b1: `user/seccomp.c`); confirm the kernel
+  and every other user dump byte-identical and the job is §4g plus the one
+  program's catalog.
 
 ## 2. Classify before you fix
 
@@ -155,7 +170,14 @@ done
 `UNALIGNED` counts instructions genuinely **inserted or deleted**; everything
 else merely moved. Typically one or two functions changed shape and the rest is
 pure relayout. Cross-check against `git diff <old>..<new> -- kernel/`: if the
-sweep says a function changed shape and the C did not, suspect the tooling.
+sweep says a function changed shape and the C did not, suspect the tooling
+-- **unless a `sizeof` changed.**  gcc divides a pointer difference by a
+struct's size with a shift and a multiply by a modular inverse, and a new
+size is a new constant with a different-length `lui`/`addi`/`slli`
+materialisation.  At a083670 (`struct proc` 360 -> 368) procinit and
+proc_mapstacks reshaped with no C change: `srai 3` + inverse of 45 became
+`srai 4` + inverse of 23 (`KstackArith.magic_recip`; the new inverse is
+negative as a signed word, so the `sint` must be rewritten explicitly).
 
 **`UNALIGNED` is necessary but NOT sufficient, and the wrong map can be
 perfectly self-consistent.** Alignment is on number-normalised ASTs, so when new
@@ -227,6 +249,13 @@ python3 tools/relayout_batch.py            # dry run; pairs every Code<F>.v with
 python3 tools/relayout_batch.py --write    # each file that ANCHORS on its symbols
 python3 tools/relayout_batch.py --residue  # MANDATORY post-step, every pair
 ```
+
+**A dry run that proposes NOTHING on a bump that moved the text is a broken
+tool, not a clean tree.**  At a083670 `relayout_map.py`'s lemma regex wanted a
+bare `Proof.` while the generated Code files say `Proof using .`, so every map
+came back empty and the batch printed a healthy-looking zero (fixed in the
+tool; the next generator-format change can do it again).  Check one moved
+function's map by hand before believing a zero.
 
 The batch refuses to run if any source reports a SHAPE change, so §2 stays
 mandatory. `--allow-shape=Code<F>.v` unblocks a classified one without weakening
@@ -548,6 +577,16 @@ the idiom. Otherwise prefer replacing a literal with `KernelSyms.<sym>`, but
 check first: an opaque constant breaks a `lia` that needs the concrete value,
 and `ltac:(eval vm_compute in …)` gives you both.
 
+**A field appended LAST to `struct proc` is still a relayout of everything
+after it.**  The array grows by NPROC times the field, so every `.bss` symbol
+after `proc` moves by that on top of whatever `.data` did (a083670: `first_1`
+.. `proc` +0x30, `tickslock` .. `end_` +0x230 = +0x30 + 64 x 8).  And the
+STRIDE is spelled wherever a proof walks `proc[]`: `ProcGeom.proc_size`, the
+cursor bumps (procinit's `addi s1,s1,368`) in procinit, allocproc, wakeup, kkill,
+scheduler, procdump and kexit's reparent, BootCarveMain's carve, and the
+division reciprocal of §2.  Appending LAST keeps every other field's offset;
+it keeps nothing else.
+
 **Derived constants are the nastiest, because no address sweep can see them.** A
 proof needing an alignment fact often carries the address *pre-divided* —
 `536895654` is `(bcache + 0x18 + 88) / 4`. Move the symbol by 16 and the literal
@@ -683,6 +722,14 @@ still compiles**, because both slots are `word_pointsto` at an address and
 nothing at the leaf distinguishes them. It surfaces only in the final
 `callee_saved`, if at all.
 
+The opposite case is cheaper and looks the same in the diff: **the roles swap
+and each register KEEPS its spill slot** (kfork at a083670: np moved from s4
+to s3, s3 still spills to `24(sp)` = `pa_stk 5`).  Then the old proof under
+the one permutation `(s3 s4)(slot5 slot6)` is the port, the frame lemmas stay
+at the fixed pairing, and the lazy-slot hypotheses are best named by the
+register they save.  Read the prologue's `sd` lines to decide which case you
+are in before touching a proof.
+
 ### 4f. Link-file functor arity
 
 If a function gains a callee, its proof functor gains a parameter and
@@ -703,7 +750,8 @@ unchanged. **None of the relayout tooling looks at the disk image** — it repor
 `FsImgRaw.v` modified with `KernelSyms.v` clean.
 
 What breaks is the small set of literals that COUNT things in the image rather
-than read them — `fsimg_live_set` and the two lemmas restating its bound. It
+than read them — `fsimg_live_set` and the two lemmas restating its bound, and
+`TreeImg.v`'s root-range check (`kv.2 <=? N`, three sites). It
 fails as an `eq_refl` mismatch whose two sides are both
 `list_to_set (… seq 1 N)`, which reads like a unification bug and is simply the
 wrong `N`. Everything else re-computes off the image and needs no attention. Get
@@ -735,6 +783,44 @@ builds under a per-process CPU cap** (`ulimit -t 1200` in the remote shell
 before `make -k`) so a spin becomes an `Error 152`-style failure the round
 reports instead of a build that never ends; `run-on-gcp --proofs` has no cap.
 
+### 4i. A new field in the process state: follow the last one
+
+When upstream adds process state that decides a syscall's effect (a083670:
+the seccomp mask), it enters `ProcDefs.pprivate`, the user-visible key
+`UexecSlot.uvis`, and every contract between.  The design is in
+[`design/seccomp.md`](design/seccomp.md) §4; what a bump learns from it:
+
+- **Append LAST, and follow the precedent field's path.**  The lazy bit
+  (lane LAZY-FLAG) had already walked `pv_* -> uvis_* -> skey_eq -> the
+  UexecRet bundle -> Rut_at's pins -> ut_pro's rows -> urun`; the mask took
+  the next slot at every one.  `grep -l 'pv_lazy\|uvis_lazy'` is the first
+  draft of the work list.
+- **A field pinned to a CONSTANT at an interface costs a row; one CARRIED
+  across it costs a parameter.**  exec pins `uvis_lazy W' = false` but keeps
+  the CALLER's mask, so `exec_slot_pre`/`exec_au_pre`/`exec_post_fail`/
+  `exec_arms`/`image_entry` all gained an argument, and every entry
+  constructor an instantiation (at `secc_all`) -- forty-odd files of pure
+  arity.  Price that before starting.
+- **Every positional use pays**: record literals (`MkUvis`, the dummy
+  `pprivate` in `LinkNameiRootBoot`), `iIntros` patterns over a row list,
+  and program calls of a generic leaf that gained a premise (each got
+  `ltac:(lia) ltac:(discriminate)` for `0 <= n < 64` and `n <> 23`).
+- **A syscall NUMBER that becomes an EFFECTIVE number is semantic, and it
+  reaches every trap-contract row that cases on the number.**  The cheap
+  shape: rename the raw reading (`SpecSyscall.sysc_raw`) and REDEFINE the old
+  name as the effective one (`sysc_num V := usys_eff (pv_secc V) (pv_tf V)`),
+  so every row is textually unchanged and now speaks of the call that ran.
+  Then model the new refusal as an arm that is already verified if one fits
+  -- a blocked call IS the unknown-number call at 0 -- and the only new row
+  is the one for the entry that moves the field (`usys_secc_ok`).
+- **Pin a verified program's run at the field's initial value**
+  (`UkRun.urun` at `secc_all`), so its ecall leaves rewrite the effective
+  number to the raw one (`uvis_num_full0`) and the entry that would move the
+  field is excluded from the generic leaf rather than handled in it.
+- Syscall adapters whose block comes back as an existential `V'` need the
+  preservation equation (`pv_secc V' = pv_secc (us_V U)`); a Spec whose post
+  never names the record (SpecKfork) does not move at all.
+
 ## 5. Iterating to green
 
 - **`make -k` UNDERCOUNTS, always.** A file whose dependency failed is never
@@ -760,6 +846,12 @@ output means the file can be worked on concurrently with any other.
   a wrong spec surfaces as an unsatisfiable premise at a *call site* far away.
 - A worker confirming "everything else in this file is fine" may stand up a
   temporary `Axiom`, but must delete it **and the `.vo` it produced**.
+- **The user-image relayout is its own lane from the pin commit.**  Its
+  inputs are the user dumps and catalogs only, so it runs in a separate
+  worktree while the kernel tier is red, checks with `-vos` against the new
+  dumps (and `.vo` for every file whose cone has no kernel `Proof`/`Link`),
+  and merges once the kernel tier stands; its first full build is the
+  kernel lane's.
 
 ## 7. Finishing
 
