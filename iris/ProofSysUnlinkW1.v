@@ -525,7 +525,7 @@ Section ProofSysUnlinkW1.
     iEval (rewrite Hpp12) in "Hpc".
     (* ===== +0x12 jal ra,argstr ===== *)
     iApply (wp_jal_s_sconf (CID := CID7) (mword_of_int (SU + 0x12)) Rra
-              (mword_of_int 2087096 : mword 21) M5 (K - 30)%nat b
+              (mword_of_int 2087030 : mword 21) M5 (K - 30)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (suli_012 with "Htext"). }
@@ -533,7 +533,7 @@ Section ProofSysUnlinkW1.
     set (M6 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (SU + 0x12) : mword 64) 4)]> M5).
     assert (Hjas : add_vec (mword_of_int (SU + 0x12) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2087096 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2087030 : mword 21))
                    = mword_of_int KernelSyms.argstr) by pcw.
     iEval (rewrite Hjas) in "Hpc".
     assert (HM6ra : (M6 !!! Regidx Rra : mword 64)

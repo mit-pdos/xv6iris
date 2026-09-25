@@ -24,7 +24,7 @@
 (* region-wide record sweep:                                             *)
 (*                                                                       *)
 (*   [img_root_ents] -- [dir_view] of the root's data, ~24 records;       *)
-(*   [img_root_range_ok] -- every name in it points into [1 .. 22], the   *)
+(*   [img_root_range_ok] -- every name in it points into [1 .. 23], the   *)
 (*     live set [FsImgCheck.fsimg_live_set] already computed;             *)
 (*   [img_root_inj_ok] -- no two PROPER names of the root point at one    *)
 (*     inum (the dots do: the root's [".."] is the root, which is why the *)
@@ -203,14 +203,14 @@ Qed.
 
 (* ---- 2a.  EVERY NAME POINTS INTO THE LIVE SET ----------------------- *)
 Definition img_root_range_b : bool :=
-  List.forallb (fun kv : fname * Z => (1 <=? kv.2) && (kv.2 <=? 22))
+  List.forallb (fun kv : fname * Z => (1 <=? kv.2) && (kv.2 <=? 23))
     (map_to_list img_root_ents).
 
 Lemma img_root_range_ok : img_root_range_b = true.
 Proof. vm_eq. Qed.
 
 Lemma img_root_range (s : fname) (j : Z) :
-  img_root_ents !! s = Some j -> 1 <= j <= 22.
+  img_root_ents !! s = Some j -> 1 <= j <= 23.
 Proof.
   intros Hs.
   assert (Hin : In (s, j) (map_to_list img_root_ents)).

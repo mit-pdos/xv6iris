@@ -227,10 +227,10 @@ Section KforkB1Proof.
     iEval (rewrite Hpp7e) in "Hpc".
     (* ---- +0x7e: jal ra,freeproc ---- *)
     assert (Htgt7e : add_vec (mword_of_int (KF + 0x7e) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2096512 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2096506 : mword 21))
                      = mword_of_int KernelSyms.freeproc)
       by (apply bv_eq; vm_compute; reflexivity).
-    iApply (wp_jal_s_sconf (mword_of_int (KF + 0x7e)) Rra (mword_of_int 2096512 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KF + 0x7e)) Rra (mword_of_int 2096506 : mword 21)
               T0 (trap_res b + (K - 8))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(rewrite Htgt7e; vm_compute; reflexivity)
@@ -287,10 +287,10 @@ Section KforkB1Proof.
     iEval (rewrite Hpp84) in "Hpc".
     (* ---- +0x84: jal ra,release ---- *)
     assert (Htgt84 : add_vec (mword_of_int (KF + 0x84) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2092864 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2092858 : mword 21))
                      = mword_of_int KernelSyms.release)
       by (apply bv_eq; vm_compute; reflexivity).
-    iApply (wp_jal_s_sconf (mword_of_int (KF + 0x84)) Rra (mword_of_int 2092864 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KF + 0x84)) Rra (mword_of_int 2092858 : mword 21)
               T2 (trap_res b + (K - 8))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(rewrite Htgt84; vm_compute; reflexivity)
@@ -397,11 +397,11 @@ Section KforkB1Proof.
     (* ---- +0x8c: c.j +0xfc ---- *)
     assert (Htgt8c : add_vec (mword_of_int (KF + 0x8c) : mword 64)
                        (sign_extend' 64 (sign_extend' 21
-                          (concat_vec (mword_of_int 56 : mword 11) ('b"0"))))
+                          (concat_vec (mword_of_int 60 : mword 11) ('b"0"))))
                      = mword_of_int (KF + 0xfc))
       by (apply bv_eq; vm_compute; reflexivity).
     iApply (wp_cj_s_sconf (mword_of_int (KF + 0x8c))
-              (sign_extend' 21 (concat_vec (mword_of_int 56 : mword 11) ('b"0")))
+              (sign_extend' 21 (concat_vec (mword_of_int 60 : mword 11) ('b"0")))
               T5 (K - 8)%nat (match lvl with O => eb | S _ => false end)
               ltac:(rewrite Htgt8c; vm_compute; reflexivity)
               with "Hcg Hpc []").

@@ -150,7 +150,7 @@ Qed.
 Lemma ui_uarts :
   add_vec (add_vec (mword_of_int (KernelSyms.uartputc_sync + 0x16) : mword 64)
                    (auipc_off (mword_of_int 10 : mword 20)))
-          (sign_extend' 64 (mword_of_int 2302 : mword 12))
+          (sign_extend' 64 (mword_of_int 2350 : mword 12))
   = (mword_of_int KernelSyms.uarts : mword 64).
 Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 
@@ -625,7 +625,7 @@ Section ProofUartPutc.
     set (G16 := <[Regidx (mword_of_int 20) := regval_into_reg (add_vec (mword_of_int (KernelSyms.uartputc_sync + 0x16)) (auipc_off (mword_of_int 10 : mword 20)))]> R4).
     assert (Hpp1a : add_vec_int (mword_of_int (KernelSyms.uartputc_sync + 0x16) : mword 64) 4 = mword_of_int (KernelSyms.uartputc_sync + 0x1a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp1a) in "Hpc".
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.uartputc_sync + 0x1a)) (mword_of_int 20) (mword_of_int 20) (mword_of_int 2302 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.uartputc_sync + 0x1a)) (mword_of_int 20) (mword_of_int 20) (mword_of_int 2350 : mword 12)
               G16 (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (upi_1a with "Ht"). }

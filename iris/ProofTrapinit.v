@@ -37,7 +37,7 @@ Section CodeTrapinitBundle.
      whole-function proof needs to know about trapinit's code. *)
   Lemma tri_code :
     kernel_text -∗ ilw_code KernelSyms.trapinit (mword_of_int 5) (mword_of_int 22)
-                            (mword_of_int 3434) (mword_of_int 3410) (mword_of_int 2090690).
+                            (mword_of_int 3420) (mword_of_int 3956) (mword_of_int 2090676).
   Proof using .
     iIntros "#Ht". rewrite /ilw_code.
     iSplitR; [iApply (tri_00 with "Ht")|].
@@ -87,8 +87,8 @@ Section ProofTrapinit.
                                                                             ltac:(vm_compute; discriminate) Htime
                   with "Hkdata") as "#Hstr".
     iApply (ILW.wp_initlock_wrapper_sconf KT1 m K KernelSyms.trapinit
-              (mword_of_int 5) (mword_of_int 22) (mword_of_int 3434) (mword_of_int 3410)
-              (mword_of_int 2090690) lk name "time"%string vlock vname vcpu b p HK
+              (mword_of_int 5) (mword_of_int 22) (mword_of_int 3420) (mword_of_int 3956)
+              (mword_of_int 2090676) lk name "time"%string vlock vname vcpu b p HK
               ltac:(vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
