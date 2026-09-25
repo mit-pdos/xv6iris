@@ -12,7 +12,9 @@ two arms are the machine's power events:
   memory heap, allocated at the booted machine -- registers it for the new
   generation, and hands the *boot client* everything it owns
   (`powerBootRes`) together with the fact that the machine is booted
-  (`bootFacts`).  The two interrupt pins of every hart do NOT go to the
+  from THE RUN'S IMAGE (`bootFacts σ bootImage`: `powerInterp` pins
+  `GState.image` to the fixed `MachFixedGS.bootImage`, Rocq's language
+  constant `boot_image`).  The two interrupt pins of every hart do NOT go to the
   client: they are split out of the register cells and sealed into
   `wireInv` (`MachCSL.WireInv`), which the client gets instead.  The client owes back the WPs of the new generation's harts,
   which the arm forks.
@@ -464,7 +466,8 @@ theorem wp_power [KernelMap]
       diskFixedAuth dk ∗ ▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf h ⊢@{IProp GF}
         |==> ◇ (diskFixedAuth dk ∗ ▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗
           obsHalf (h ++ [powerEv on]) ∗ powerYield on h))
-    (Hboot : ∀ (E : EraGS GF) (gen : Nat) (σ : MState) (image : Mem), bootFacts σ image →
+    (Hboot : ∀ (E : EraGS GF) (gen : Nat) (σ : MState),
+      bootFacts σ (MachFixedGS.bootImage (hlc := hlc) (GF := GF)) →
       (∃ ds0 : DevStates, σ.devs = ds0.reset) →
       Ppure (diskOf σ.devs) →
       obsInv ∗ powerBootRes Mof Rb E gen σ ⊢@{IProp GF} |={⊤}=>
@@ -479,7 +482,7 @@ theorem wp_power [KernelMap]
   rw [stateInterp_eq]
   icases Hσ with ⟨Hσ, Hobsi⟩
   unfold powerInterp
-  icases Hσ with ⟨Hgen, Hstart, ⟨%R, HR, %Hok, Hcur⟩, Hdisk⟩
+  icases Hσ with ⟨Hgen, Hstart, ⟨%R, HR, %Hok, Hcur⟩, Hdisk, %Himg⟩
   unfold diskFixedInterp
   -- THE TRACE STEP, FIRST: a power event is observed, and the client's trace
   -- predicate authorises it.  Run at ⊤, before the step's mask shrink.
@@ -612,7 +615,7 @@ theorem wp_power [KernelMap]
           iapply BigSepL.bigSepL_mono (fun {_ c} _ => hfrag c) $$ Hfrags'
         · unfold lockSetAt locksMap
           iexact Hls
-    imod (Hboot ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir⟩ g.gen g₂.m g.image hbf
+    imod (Hboot ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir⟩ g.gen g₂.m (Himg ▸ hbf)
       ⟨g.m.devs, hdevs⟩ (by rw [hdk]; exact hpure)) $$ [Hres] with ⟨Hwps, Hdwps⟩
     · isplitl []
       · unfold obsInv; iexact Hoinv
@@ -629,7 +632,8 @@ theorem wp_power [KernelMap]
     iframe Hgen Hstart
     unfold diskFixedInterp
     rw [hdk]
-    iframe Hdisk
+    have Himg₂ := himg.trans Himg
+    iframe Hdisk %Himg₂
     isplitl [HR Hheap Hri Hva Hiv Hrv Htop Hauth Hresv Hda]
     · iexists (insert R g.gen ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir⟩)
       iframe HR
@@ -695,7 +699,7 @@ theorem wp_power [KernelMap]
         simp [startCount], hcount]
       iframe Hgen Hstart
       unfold diskFixedInterp
-      iframe Hdisk
+      iframe Hdisk %Himg
       isplitl [HR]
       · iexists R
         iframe HR

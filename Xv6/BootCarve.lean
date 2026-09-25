@@ -49,10 +49,11 @@ DEVIATIONS from Rocq (none process-layer):
    literal ELF image (`RiscvLang.boot_mem`), so `boot_byte` is a definition.
    Lean's language carries an arbitrary `GState.image`, so the carve takes
    `BootImage image` as a premise; discharging it for the concrete image is
-   a later bounded computation (the D34 precedent).  WORSE, and BLOCKED on
-   MachCSL: `wp_power`/`riscvPowerAdequacy`'s `Hboot` quantifies over
-   `image` with no link to the initial `g.image`, so the top-level client
-   cannot yet supply `BootImage image` at all (see the report).
+   a later bounded computation (the D34 precedent).  The top-level client
+   supplies it from a premise on the initial state: `powerInterp` pins
+   `GState.image` to `MachFixedGS.bootImage`, and
+   `MachCSL.riscvPowerAdequacy`'s `Hboot` receives `bootFacts σ g.image` at
+   the initial `g`, so `BootImage g.image` holds at every boot.
 2. The `.data` section other than the GOT slot (`first`, `nextpid`,
    `uarts`) is not in `BootImage`: the kernel dump (tools/dump_kernel.py)
    emits no `.data` bytes.  Its consumers are `main`'s bundles (SpecMain).

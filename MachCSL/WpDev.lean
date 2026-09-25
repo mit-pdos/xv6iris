@@ -186,7 +186,7 @@ theorem wpDev_lift_obs_disk (d : DevId) (tid : TaskId) (m : DevProg d) :
   rw [stateInterp_eq]
   icases Hσ with ⟨Hσ, Hobs⟩
   unfold powerInterp
-  icases Hσ with ⟨Hgen, Hstart, ⟨%R, HR, %Hok, Hcur⟩, Hdisk⟩
+  icases Hσ with ⟨Hgen, Hstart, ⟨%R, HR, %Hok, Hcur⟩, Hdisk, %Himg⟩
   ihave %Hb' := genAuth_born _ _ $$ Hgen Hborn
   ihave %Hs' := startAuth_started _ _ $$ Hstart Hstarted
   by_cases hge : g.gen = genId (hlc := hlc) (GF := GF)
@@ -238,7 +238,7 @@ theorem wpDev_lift_obs_disk (d : DevId) (tid : TaskId) (m : DevProg d) :
       rw [show startCount { g with m := σ' } = startCount g from rfl, hsc]
       iframe Hgen Hstart
       unfold diskFixedInterp
-      iframe Hdisk
+      iframe Hdisk %Himg
       isplitl [HR Hσ']
       · iexists R
         iframe HR
@@ -275,7 +275,7 @@ theorem wpDev_lift_obs_disk (d : DevId) (tid : TaskId) (m : DevProg d) :
     rw [stateInterp_eq]
     unfold powerInterp
     iframe Hobs
-    iframe Hgen Hstart Hdisk
+    iframe Hgen Hstart Hdisk %Himg
     isplitl [HR Hcur]
     · iexists R
       iframe HR Hcur
