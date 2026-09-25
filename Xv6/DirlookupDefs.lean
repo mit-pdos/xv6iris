@@ -40,7 +40,8 @@ set_option linter.unusedVariables false
 /-- A process block for readi's (dead) user arm: the kernel arm reads none. -/
 def dirlookupVp : ProcPriv :=
   { kstack := 0, sz := 0, pagetable := 0, trapframe := 0, upt := { root := 0, tfp := 0, um := ∅ },
-    tf := [], context := [], ofile := [], cwd := 0, name := [], pvLazy := false }
+    tf := [], context := [], ofile := [], fdg := 0, cwd := 0, name := [], cwi := 0, gen := 0,
+    chg := 0, pvLazy := false }
 
 /-- The facts fixed for the whole call (the contract's premises, and the
 record's alignment, which the prologue reads off the frame). -/

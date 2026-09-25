@@ -32,7 +32,8 @@ set_option linter.unusedVariables false
 the kernel arm's contract still names a block, which it never opens). -/
 def readiKVp : ProcPriv :=
   { kstack := 0, sz := 0, pagetable := 0, trapframe := 0, upt := { root := 0, tfp := 0, um := ∅ },
-    tf := [], context := [], ofile := [], cwd := 0, name := [], pvLazy := false }
+    tf := [], context := [], ofile := [], fdg := 0, cwd := 0, name := [], cwi := 0, gen := 0,
+    chg := 0, pvLazy := false }
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]

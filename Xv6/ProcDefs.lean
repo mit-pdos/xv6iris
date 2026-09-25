@@ -94,8 +94,13 @@ def ZOMBIE : BitVec 32 := 5#32
 
 /-- The values of the fields private to the process (Rocq `pprivate`, plus
 `kstack`, `pagetable`, `trapframe` and the saved `context`, which the Rocq
-block reaches through its page-table and scheduler resources).  Left out:
-the descriptor ghost name `pv_fdg`, the cwd inum `pv_cwi`. -/
+block reaches through its page-table and scheduler resources).  Every Rocq
+field is here, at its Rocq-relative position (Rocq order: `sz upt tf ofile
+fdg cwd name cwi gen chg lazy`); the four Lean-only fields (`kstack`,
+`pagetable`, `trapframe`, `context`) are interleaved where they were.  Three
+of the Rocq fields are GHOST NAMES reserved ahead of their predicates (wave 7
+item A3, decision D7: the record is edited once): `fdg` (P2's per-incarnation
+descriptor ghost), `gen` and `chg` (D8's generation machinery). -/
 structure ProcPriv where
   kstack : BitVec 64
   sz : BitVec 64
@@ -109,9 +114,34 @@ structure ProcPriv where
   context : List (BitVec 64)
   /-- the 16 file pointers of `p->ofile` -/
   ofile : List (BitVec 64)
+  /-- **The descriptor ghost's name** (Rocq `pv_fdg`): THIS incarnation's
+  per-descriptor state ghost (`FdSlots.fd_st`), minted fresh by allocproc and
+  dropped at the process's death; a field rather than a parameter of the
+  block because every spec that touches a process already threads `V`.  No
+  xv6 operation reassigns it (not even exec).  RESERVED: no predicate names
+  it yet (P2, wave-7 item C0, makes `procPrivFd` read it in place of its
+  external `γd : Nat → GName`). -/
+  fdg : GName
   cwd : BitVec 64
   /-- the 16 bytes of `p->name` -/
   name : List (BitVec 8)
+  /-- **The working directory's inum** (Rocq `pv_cwi`, lane C1): what user
+  code can observe of its cwd is the directory it names, not the cached
+  `struct inode *`, so the block carries the inum beside the pointer and
+  `ProcInv.cwdRefAt V.cwd V.cwi` ties the two (`IcacheHeld.inodeHeldAt`, the
+  reference AT this inum).  Not a cell.  chdir writes it, fork copies it,
+  exec and everything else keep it.  A `Nat`, not Rocq's `Z`: the Lean
+  `inodeHeldAt` takes a `Nat` inum (IcacheHeld deviation 3). -/
+  cwi : Nat
+  /-- **This incarnation's generation** (Rocq `pv_gen`): the ghost name
+  allocproc mints for the process (`ChildTok.gen_own`: slot, pid, exit
+  payload).  Changes only at allocproc's mint and the process's death; exec
+  keeps it.  RESERVED: the generation machinery (D8) is a later item. -/
+  gen : GName
+  /-- **The name of its children row** (Rocq `pv_chg`): the key of this
+  process's row in the `wait_lock` children map (`WaitInv.ch_frag`),
+  installed by whoever creates the process under `wait_lock`.  RESERVED (D8). -/
+  chg : GName
   /-- **The lazy-page bit** (Rocq `ProcDefs.pv_lazy`): "this process MAY
   have pages the kernel has promised and not yet mapped".  What it MEANS is
   the claim every live block carries beside `umBelow`:
