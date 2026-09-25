@@ -124,11 +124,11 @@ Proof.
     by apply lookup_union_Some_l.
 Qed.
 
-(* init's two PT_LOADs: (0x0, 0xe6c, 0xe6c, R-X) and (0x1000, 0x10, 0x30, RW-) *)
+(* init's two PT_LOADs: (0x0, 0xe7c, 0xe7c, R-X) and (0x1000, 0x10, 0x30, RW-) *)
 Lemma init_loads :
   exists p0 p1 : elf_phdr,
     elf_loads ElfUser.init_elf = [p0; p1]
-    /\ ep_vaddr p0 = 0 /\ ep_memsz p0 = 0xe6c /\ ep_flags p0 = 5
+    /\ ep_vaddr p0 = 0 /\ ep_memsz p0 = 0xe7c /\ ep_flags p0 = 5
     /\ ep_vaddr p1 = 0x1000 /\ ep_memsz p1 = 0x30 /\ ep_flags p1 = 6.
 Proof.
   pose proof (elf_segments_loads ElfUser.init_elf _ ElfUser.init_elf_segments) as H.

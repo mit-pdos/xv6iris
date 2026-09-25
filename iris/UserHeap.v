@@ -426,7 +426,7 @@ Section UserHeap.
   (* A STRING IN THE TEXT HALF.  [ustr] is the DATA half's string, and a    *)
   (* program's string LITERALS are not there: .rodata shares the            *)
   (* executable segment's pages, so its bytes are X-and-not-W and belong to *)
-  (* [γt].  init's four format strings live at 0x970..0x9e7, inside the R-X *)
+  (* [γt].  init's four format strings live at 0x980..0x9f7, inside the R-X *)
   (* segment, and vprintf LOADS them one byte at a time -- so the tier      *)
   (* needs both this resource and [UkRunMem.wp_uk_lbu_text] to read it.     *)
   (*                                                                       *)

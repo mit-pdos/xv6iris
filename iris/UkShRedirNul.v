@@ -7,8 +7,8 @@
 (* 0x838 c.ld a5,24(s1); 0x83a sb zero,0(a5) -- and then the same 0x83e   *)
 (* tail the EXEC arm falls into, so [UkShParseCmd.wp_kshp_nul_fin] closes *)
 (* both.  Everything ABOVE the switch is the SAME walk at a different     *)
-(* type word: 2 instead of 1, so the jump table is indexed at 0x13b8      *)
-(* instead of 0x13b4 and the row there sends control to 0x832 instead of  *)
+(* type word: 2 instead of 1, so the jump table is indexed at 0x13c8      *)
+(* instead of 0x13c4 and the row there sends control to 0x832 instead of  *)
 (* 0x81a.  [ushp_jrow_redir] is those four .rodata bytes, read off the    *)
 (* image rather than written down.                                        *)
 (*                                                                        *)
@@ -124,31 +124,31 @@ Section UkShRedirNul.
   Local Notation wp_kshp_restore := (UkShParse.wp_kshp_restore N).
   Local Notation wp_kshp_spill := (UkShParse.wp_kshp_spill N).
 
-  (* ---- the REDIR row of the jump table at 0x13b0 ---------------------- *)
-  (* The row is a signed displacement from the table's own base, so 0x13b0 *)
+  (* ---- the REDIR row of the jump table at 0x13c0 ---------------------- *)
+  (* The row is a signed displacement from the table's own base, so 0x13c0 *)
   (* plus it is 0x832 -- which [vm_compute] checks below rather than this  *)
   (* comment asserting it. *)
   Lemma ushp_jrow_redir :
     shp_rodata γt -∗
     [∗ list] j ∈ seq 0 4,
-      utext γt (0x13b8 + Z.of_nat j)
-        (nth_byte (mword_of_int 4294964354 : mword 32) j).
+      utext γt (0x13c8 + Z.of_nat j)
+        (nth_byte (mword_of_int 4294964338 : mword 32) j).
   Proof using .
     iIntros "#H". rewrite !big_sepL_cons big_sepL_nil.
-    iSplit; [ iApply (ushp_ro_byte (0x13b8 + Z.of_nat 0%nat)
-                        (nth_byte (mword_of_int 4294964354 : mword 32) 0%nat)
+    iSplit; [ iApply (ushp_ro_byte (0x13c8 + Z.of_nat 0%nat)
+                        (nth_byte (mword_of_int 4294964338 : mword 32) 0%nat)
                         ltac:(vm_compute; f_equal; apply bv_eq;
                               vm_compute; reflexivity) with "H") | ].
-    iSplit; [ iApply (ushp_ro_byte (0x13b8 + Z.of_nat 1%nat)
-                        (nth_byte (mword_of_int 4294964354 : mword 32) 1%nat)
+    iSplit; [ iApply (ushp_ro_byte (0x13c8 + Z.of_nat 1%nat)
+                        (nth_byte (mword_of_int 4294964338 : mword 32) 1%nat)
                         ltac:(vm_compute; f_equal; apply bv_eq;
                               vm_compute; reflexivity) with "H") | ].
-    iSplit; [ iApply (ushp_ro_byte (0x13b8 + Z.of_nat 2%nat)
-                        (nth_byte (mword_of_int 4294964354 : mword 32) 2%nat)
+    iSplit; [ iApply (ushp_ro_byte (0x13c8 + Z.of_nat 2%nat)
+                        (nth_byte (mword_of_int 4294964338 : mword 32) 2%nat)
                         ltac:(vm_compute; f_equal; apply bv_eq;
                               vm_compute; reflexivity) with "H") | ].
-    iSplit; [ iApply (ushp_ro_byte (0x13b8 + Z.of_nat 3%nat)
-                        (nth_byte (mword_of_int 4294964354 : mword 32) 3%nat)
+    iSplit; [ iApply (ushp_ro_byte (0x13c8 + Z.of_nat 3%nat)
+                        (nth_byte (mword_of_int 4294964338 : mword 32) 3%nat)
                         ltac:(vm_compute; f_equal; apply bv_eq;
                               vm_compute; reflexivity) with "H") | done ].
   Qed.
@@ -439,8 +439,8 @@ Section UkShRedirNul.
       by exact (upd_eq m7 (Regidx a4_idx)
                   (regval_into_reg (mword_of_int 0x180a : mword 64))).
     iApply (wp_uk_addi N h11 m8 (mword_of_int 0x80e)
-              (mword_of_int 2982 : mword 12) a4_idx a4_idx
-              (mword_of_int 0x13b0) (4 + nn)
+              (mword_of_int 2998 : mword 12) a4_idx a4_idx
+              (mword_of_int 0x13c0) (4 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Ha4_8; apply bv_eq; vm_compute; reflexivity)
@@ -448,19 +448,19 @@ Section UkShRedirNul.
     { iApply (uis_shp_80e with "Hcode"). }
     iIntros (h12) "Hrun".
     set (m9 := <[Regidx a4_idx
-                 := regval_into_reg (mword_of_int 0x13b0 : mword 64)]> m8).
+                 := regval_into_reg (mword_of_int 0x13c0 : mword 64)]> m8).
     assert (Hm9 : forall q : mword 5, Regidx q <> Regidx a4_idx ->
                     m9 !!! Regidx q = m8 !!! Regidx q)
       by (intros q Hq; exact (upd_ne m8 (Regidx a4_idx) (Regidx q) _ Hq)).
-    assert (Ha4_9 : m9 !!! Regidx a4_idx = mword_of_int 0x13b0)
+    assert (Ha4_9 : m9 !!! Regidx a4_idx = mword_of_int 0x13c0)
       by exact (upd_eq m8 (Regidx a4_idx)
-                  (regval_into_reg (mword_of_int 0x13b0 : mword 64))).
+                  (regval_into_reg (mword_of_int 0x13c0 : mword 64))).
     assert (Ha5_9 : m9 !!! Regidx a5_idx = (mword_of_int 8 : mword 64)).
     { rewrite (Hm9 a5_idx ltac:(vm_compute; discriminate))
               (Hm8 a5_idx ltac:(vm_compute; discriminate)). exact Ha5_7. }
     (* ---- 0x812  c.add a5,a5,a4 -- the row's address ---- *)
     iApply (wp_uk_cadd N h12 m9 (mword_of_int 0x812) a5_idx
-              a4_idx (mword_of_int 0x13b8) (4 + nn)
+              a4_idx (mword_of_int 0x13c8) (4 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Ha5_9 Ha4_9; symmetry; apply moi_add)
@@ -468,23 +468,23 @@ Section UkShRedirNul.
     { iApply (uis_shp_812 with "Hcode"). }
     iIntros (h13) "Hrun".
     set (m10 := <[Regidx a5_idx
-                  := regval_into_reg (mword_of_int 0x13b8 : mword 64)]> m9).
+                  := regval_into_reg (mword_of_int 0x13c8 : mword 64)]> m9).
     assert (Hm10 : forall q : mword 5, Regidx q <> Regidx a5_idx ->
                      m10 !!! Regidx q = m9 !!! Regidx q)
       by (intros q Hq; exact (upd_ne m9 (Regidx a5_idx) (Regidx q) _ Hq)).
-    assert (Ha5_10 : m10 !!! Regidx a5_idx = mword_of_int 0x13b8)
+    assert (Ha5_10 : m10 !!! Regidx a5_idx = mword_of_int 0x13c8)
       by exact (upd_eq m9 (Regidx a5_idx)
-                  (regval_into_reg (mword_of_int 0x13b8 : mword 64))).
+                  (regval_into_reg (mword_of_int 0x13c8 : mword 64))).
     (* ---- 0x814  c.lw a5,0(a5) -- THE TEXT-HALF LOAD ---- *)
     iApply (wp_uk_clw_text N h13 m10 (mword_of_int 0x814)
               (mword_of_int 0 : mword 5) (mword_of_int 7 : mword 3)
-              (mword_of_int 7 : mword 3) a5_idx a5_idx 0x13b8
-              (mword_of_int 4294964354 : mword 32) (4 + nn)
+              (mword_of_int 7 : mword 3) a5_idx a5_idx 0x13c8
+              (mword_of_int 4294964338 : mword 32) (4 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(rewrite Ha5_10;
-                    rewrite (uint_moi 0x13b8 ltac:(unfold Z64; lia));
+                    rewrite (uint_moi 0x13c8 ltac:(unfold Z64; lia));
                     vm_compute uoff_c4; lia)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; discriminate)
@@ -495,12 +495,12 @@ Section UkShRedirNul.
     set (m11 := <[Regidx a5_idx
                   := regval_into_reg
                        (sign_extend' 64
-                          (mword_of_int 4294964354 : mword 32)
+                          (mword_of_int 4294964338 : mword 32)
                         : mword 64)]> m10).
     assert (Hm11 : forall q : mword 5, Regidx q <> Regidx a5_idx ->
                      m11 !!! Regidx q = m10 !!! Regidx q)
       by (intros q Hq; exact (upd_ne m10 (Regidx a5_idx) (Regidx q) _ Hq)).
-    assert (Ha4_11 : m11 !!! Regidx a4_idx = mword_of_int 0x13b0).
+    assert (Ha4_11 : m11 !!! Regidx a4_idx = mword_of_int 0x13c0).
     { rewrite (Hm11 a4_idx ltac:(vm_compute; discriminate))
               (Hm10 a4_idx ltac:(vm_compute; discriminate)). exact Ha4_9. }
     (* ---- 0x816  c.add a5,a5,a4 -- the arm's pc ---- *)
@@ -512,7 +512,7 @@ Section UkShRedirNul.
                       (upd_eq m10 (Regidx a5_idx)
                          (regval_into_reg
                             (sign_extend' 64
-                               (mword_of_int 4294964354 : mword 32)
+                               (mword_of_int 4294964338 : mword 32)
                              : mword 64)));
                     apply bv_eq; vm_compute; reflexivity)
               with "[] Hrun").

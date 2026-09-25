@@ -38,7 +38,7 @@
 (*   0x16c  c.ld  a0,8(s1)      pcmd->left                                 *)
 (*   0x16e  jal   ra,0x8e       runcmd(pcmd->left)                         *)
 (*   -- panic("pipe") --                                                   *)
-(*   0x172  auipc a0,0x1 ; 0x176 addi a0,a0,342 ; 0x17a jal ra,0x4a        *)
+(*   0x172  auipc a0,0x1 ; 0x176 addi a0,a0,358 ; 0x17a jal ra,0x4a        *)
 (*   -- THE PARENT, second fork --                                         *)
 (*   0x17e  jal   ra,0x68       fork1()                                    *)
 (*   0x182  c.bnez a0,0x1a6     parent -> the two closes and two waits     *)
@@ -1122,11 +1122,11 @@ Section UkShPipe.
     Wr -∗
     ush_wait0_law N Wr Pw -∗
     (* ---- THE THREE PANIC TAILS, as continuations.  Each is at [panic]'s
-       own entry with the message's address in a0 -- 0x12c8 for the pipe
-       panic and 0x1298 for the fork one -- and holds the ledger and the
+       own entry with the message's address in a0 -- 0x12d8 for the pipe
+       panic and 0x12a8 for the fork one -- and holds the ledger and the
        credential that pays it. ---- *)
     □ (∀ (h' : CpuId) (m' : regfile),
-         ⌜ uint (m' !!! Regidx a0_idx) = 0x12c8 ⌝ -∗
+         ⌜ uint (m' !!! Regidx a0_idx) = 0x12d8 ⌝ -∗
          UserFd.ustd (ukn_fd N) ld -∗
          Cr -∗
          urun N h' m' (mword_of_int ShSyms.panic)
@@ -1144,7 +1144,7 @@ Section UkShPipe.
        [Pex] slot, so the returning arm gets it back unchanged and the
        second [fork1] is entered exactly as before. *)
     □ (∀ (h' : CpuId) (m' : regfile) (r : mword 64) (γp : pipe_names),
-         ⌜ uint (m' !!! Regidx a0_idx) = 0x1298 ⌝ -∗
+         ⌜ uint (m' !!! Regidx a0_idx) = 0x12a8 ⌝ -∗
          ⌜ r = (mword_of_int (-1) : mword 64) ⌝ -∗
          ((⌜r = (mword_of_int (-1) : mword 64)⌝
              ∗ UserChildren.uch (ukn_ch N) Sc ∗ RcL γp)
@@ -1165,7 +1165,7 @@ Section UkShPipe.
          mWP (Loop : expr riscv_lang)) -∗
     □ (∀ (h' : CpuId) (m' : regfile) (r : mword 64) (γp : pipe_names)
          (S1 : gset gname),
-         ⌜ uint (m' !!! Regidx a0_idx) = 0x1298 ⌝ -∗
+         ⌜ uint (m' !!! Regidx a0_idx) = 0x12a8 ⌝ -∗
          ⌜ r = (mword_of_int (-1) : mword 64) ⌝ -∗
          ((⌜r = (mword_of_int (-1) : mword 64)⌝
              ∗ UserChildren.uch (ukn_ch N) S1 ∗ RcR γp)
@@ -1391,14 +1391,14 @@ Section UkShPipe.
       rewrite E172. iIntros (h6) "Hrun".
       set (z1 := <[Regidx a0_idx
                    := regval_into_reg (mword_of_int 0x1172 : mword 64)]> m4).
-      (* ---- 0x176  addi a0,a0,342 -- 0x12c8, the "pipe" literal ---- *)
+      (* ---- 0x176  addi a0,a0,358 -- 0x12d8, the "pipe" literal ---- *)
       assert (Ead : add_vec (mword_of_int 0x1172 : mword 64)
-                      (sign_extend' 64 (mword_of_int 342 : mword 12))
-                    = (mword_of_int 0x12c8 : mword 64))
+                      (sign_extend' 64 (mword_of_int 358 : mword 12))
+                    = (mword_of_int 0x12d8 : mword 64))
         by (apply bv_eq; vm_compute; reflexivity).
       iApply (wp_uk_addi N h6 z1 (mword_of_int 0x176)
-                (mword_of_int 342 : mword 12) a0_idx a0_idx
-                (mword_of_int 0x12c8) (2 + (UkShDiag.ush_Dg + av))%nat
+                (mword_of_int 358 : mword 12) a0_idx a0_idx
+                (mword_of_int 0x12d8) (2 + (UkShDiag.ush_Dg + av))%nat
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 ltac:(vm_compute; discriminate)
                 ltac:(rewrite /z1 (upd_eq m4 (Regidx a0_idx)
@@ -1411,7 +1411,7 @@ Section UkShPipe.
         by (apply bv_eq; vm_compute; reflexivity).
       rewrite E176. iIntros (h7) "Hrun".
       set (z2 := <[Regidx a0_idx
-                   := regval_into_reg (mword_of_int 0x12c8 : mword 64)]> z1).
+                   := regval_into_reg (mword_of_int 0x12d8 : mword 64)]> z1).
       (* ---- 0x17a  jal ra,0x4a <panic> ---- *)
       iApply (UkShRun.wp_kshr_jal N h7 z2 0x17a ShSyms.panic 0x17e
                 (mword_of_int 2096848 : mword 21)
@@ -1423,11 +1423,11 @@ Section UkShPipe.
       { iApply (uis_shk_17a with "Hcode"). }
       iIntros (h8) "Hrun".
       set (z3 := <[Regidx ra_idx := (mword_of_int 0x17e : mword 64)]> z2).
-      assert (Ha0_z3 : uint (z3 !!! Regidx a0_idx) = 0x12c8).
+      assert (Ha0_z3 : uint (z3 !!! Regidx a0_idx) = 0x12d8).
       { rewrite /z3 (upd_ne z2 (Regidx ra_idx) (Regidx a0_idx) _
                        ltac:(vm_compute; discriminate)).
         rewrite /z2 (upd_eq z1 (Regidx a0_idx)
-                       (mword_of_int 0x12c8 : mword 64)).
+                       (mword_of_int 0x12d8 : mword 64)).
         vm_compute. reflexivity. }
       replace (2 + (UkShDiag.ush_Dg + av))%nat
         with (UkShDiag.ush_Dg + (2 + av))%nat by lia.
@@ -2351,11 +2351,11 @@ Section UkShPipe.
     Wr -∗
     ush_wait0_law N Wr Pw -∗
     (* ---- THE THREE PANIC TAILS, as continuations.  Each is at [panic]'s
-       own entry with the message's address in a0 -- 0x12c8 for the pipe
-       panic and 0x1298 for the fork one -- and holds the ledger and the
+       own entry with the message's address in a0 -- 0x12d8 for the pipe
+       panic and 0x12a8 for the fork one -- and holds the ledger and the
        credential that pays it. ---- *)
     □ (∀ (h' : CpuId) (m' : regfile),
-         ⌜ uint (m' !!! Regidx a0_idx) = 0x12c8 ⌝ -∗
+         ⌜ uint (m' !!! Regidx a0_idx) = 0x12d8 ⌝ -∗
          UserFd.ustd (ukn_fd N) ld -∗
          Cr -∗
          urun N h' m' (mword_of_int ShSyms.panic)
@@ -2373,7 +2373,7 @@ Section UkShPipe.
        [Pex] slot, so the returning arm gets it back unchanged and the
        second [fork1] is entered exactly as before. *)
     □ (∀ (h' : CpuId) (m' : regfile) (r : mword 64) (γp : pipe_names),
-         ⌜ uint (m' !!! Regidx a0_idx) = 0x1298 ⌝ -∗
+         ⌜ uint (m' !!! Regidx a0_idx) = 0x12a8 ⌝ -∗
          ⌜ r = (mword_of_int (-1) : mword 64) ⌝ -∗
          ((⌜r = (mword_of_int (-1) : mword 64)⌝
              ∗ UserChildren.uch (ukn_ch N) Sc ∗ RcL γp)
@@ -2394,7 +2394,7 @@ Section UkShPipe.
          mWP (Loop : expr riscv_lang)) -∗
     □ (∀ (h' : CpuId) (m' : regfile) (r : mword 64) (γp : pipe_names)
          (S1 : gset gname),
-         ⌜ uint (m' !!! Regidx a0_idx) = 0x1298 ⌝ -∗
+         ⌜ uint (m' !!! Regidx a0_idx) = 0x12a8 ⌝ -∗
          ⌜ r = (mword_of_int (-1) : mword 64) ⌝ -∗
          ((⌜r = (mword_of_int (-1) : mword 64)⌝
              ∗ UserChildren.uch (ukn_ch N) S1 ∗ RcR γp)
@@ -2542,11 +2542,11 @@ Section UkShPipe.
     Wr -∗
     ush_wait0_law N Wr Pw -∗
     (* ---- THE THREE PANIC TAILS, as continuations.  Each is at [panic]'s
-       own entry with the message's address in a0 -- 0x12c8 for the pipe
-       panic and 0x1298 for the fork one -- and holds the ledger and the
+       own entry with the message's address in a0 -- 0x12d8 for the pipe
+       panic and 0x12a8 for the fork one -- and holds the ledger and the
        credential that pays it. ---- *)
     □ (∀ (h' : CpuId) (m' : regfile),
-         ⌜ uint (m' !!! Regidx a0_idx) = 0x12c8 ⌝ -∗
+         ⌜ uint (m' !!! Regidx a0_idx) = 0x12d8 ⌝ -∗
          UserFd.ustd (ukn_fd N) ld -∗
          Cr -∗
          urun N h' m' (mword_of_int ShSyms.panic)
@@ -2564,7 +2564,7 @@ Section UkShPipe.
        [Pex] slot, so the returning arm gets it back unchanged and the
        second [fork1] is entered exactly as before. *)
     □ (∀ (h' : CpuId) (m' : regfile) (r : mword 64) (γp : pipe_names),
-         ⌜ uint (m' !!! Regidx a0_idx) = 0x1298 ⌝ -∗
+         ⌜ uint (m' !!! Regidx a0_idx) = 0x12a8 ⌝ -∗
          ⌜ r = (mword_of_int (-1) : mword 64) ⌝ -∗
          ((⌜r = (mword_of_int (-1) : mword 64)⌝
              ∗ UserChildren.uch (ukn_ch N) Sc ∗ RcL γp)
@@ -2585,7 +2585,7 @@ Section UkShPipe.
          mWP (Loop : expr riscv_lang)) -∗
     □ (∀ (h' : CpuId) (m' : regfile) (r : mword 64) (γp : pipe_names)
          (S1 : gset gname),
-         ⌜ uint (m' !!! Regidx a0_idx) = 0x1298 ⌝ -∗
+         ⌜ uint (m' !!! Regidx a0_idx) = 0x12a8 ⌝ -∗
          ⌜ r = (mword_of_int (-1) : mword 64) ⌝ -∗
          ((⌜r = (mword_of_int (-1) : mword 64)⌝
              ∗ UserChildren.uch (ukn_ch N) S1 ∗ RcR γp)

@@ -218,7 +218,7 @@ Section UInitTreeExec.
                 (UkInit.init_rd (cc_rd (tree_cc c)) (cc_wbn (tree_cc c)))
                 Heq Hcons Hkill). }
     iApply (udepw_at_refR_ids_of_sup_ids N m pc
-              (mword_of_int 0x9a8) (mword_of_int 0x1000)
+              (mword_of_int 0x9b8) (mword_of_int 0x1000)
               FsImg.ROOTINO (tree_taint c) UInitSh.init_sh_pl
               ElfUser.sh_elf 1%nat
               (UserFd.ustd (ukn_fd N) l ∗ upos γ np

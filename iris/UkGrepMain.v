@@ -483,9 +483,9 @@ Section UkGrepMain.
                  := regval_into_reg
                       (sign_extend' 64 (mword_of_int 2 : mword 6)
                        : mword 64)]> m2).
-    (* ---- 0x238  jal ra,0x940 <fprintf> ---- *)
+    (* ---- 0x238  jal ra,0x948 <fprintf> ---- *)
     iApply (wp_uk_jal N h3 m3 (mword_of_int 0x238)
-              (mword_of_int 1800 : mword 21) ra_idx
+              (mword_of_int 1808 : mword 21) ra_idx
               (mword_of_int GrepSyms.fprintf) (mword_of_int 0x23c)
               (10 + (12 + (4 + n)))
               ltac:(unfold unot_sp; vm_compute; discriminate)
@@ -656,9 +656,9 @@ Section UkGrepMain.
     iIntros (h3) "Hrun".
     set (m3 := <[Regidx a0_idx
                  := regval_into_reg (mword_of_int 0xb40 : mword 64)]> m2).
-    (* ---- 0x25c  jal ra,0x96a <printf> ---- *)
+    (* ---- 0x25c  jal ra,0x972 <printf> ---- *)
     iApply (wp_uk_jal N h3 m3 (mword_of_int 0x25c)
-              (mword_of_int 1806 : mword 21) ra_idx
+              (mword_of_int 1814 : mword 21) ra_idx
               (mword_of_int GrepSyms.printf) (mword_of_int 0x260)
               (12 + (12 + (4 + n)))
               ltac:(unfold unot_sp; vm_compute; discriminate)

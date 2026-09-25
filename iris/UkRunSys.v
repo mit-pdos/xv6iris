@@ -4675,7 +4675,7 @@ Section UkRunSys.
   (* ([UserHeap.lazy_free_uw_addr]).  A program that prints a STRING        *)
   (* LITERAL has no such byte: .rodata is X-and-NOT-W and is filed under    *)
   (* the TEXT gname, and no [ubytesq] of it exists.  echo's separator       *)
-  (* (0x930) and its newline (0x938) are exactly that                       *)
+  (* (0x940) and its newline (0x948) are exactly that                       *)
   (* ([UCodeEcho.echo_ro]).                                                *)
   (*                                                                       *)
   (* THE ROW IS STILL TRUE AND ONE TEST WEAKER.  [UserHeap.uheap_text]      *)

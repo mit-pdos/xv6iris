@@ -122,7 +122,7 @@ Section UkShPipesRound.
        ush_wait0_law N Wr Pw ∗
        (* panic("pipe") *)
        □ (∀ (h' : CpuId) (m' : regfile),
-            ⌜ uint (m' !!! Regidx a0_idx) = 0x12c8 ⌝ -∗
+            ⌜ uint (m' !!! Regidx a0_idx) = 0x12d8 ⌝ -∗
             UserFd.ustd (ukn_fd N) ld -∗
             Cr -∗
             urun N h' m' (mword_of_int ShSyms.panic)
@@ -130,7 +130,7 @@ Section UkShPipesRound.
             mWP (Loop : expr riscv_lang)) ∗
        (* the first fork1's panic("fork") *)
        □ (∀ (h' : CpuId) (m' : regfile) (r : mword 64) (γp : pipe_names),
-            ⌜ uint (m' !!! Regidx a0_idx) = 0x1298 ⌝ -∗
+            ⌜ uint (m' !!! Regidx a0_idx) = 0x12a8 ⌝ -∗
             ⌜ r = (mword_of_int (-1) : mword 64) ⌝ -∗
             ((⌜r = (mword_of_int (-1) : mword 64)⌝
                 ∗ UserChildren.uch (ukn_ch N) Sc ∗ RcL γp)
@@ -148,7 +148,7 @@ Section UkShPipesRound.
        (* the second fork1's panic("fork") *)
        □ (∀ (h' : CpuId) (m' : regfile) (r : mword 64) (γp : pipe_names)
             (S1 : gset gname),
-            ⌜ uint (m' !!! Regidx a0_idx) = 0x1298 ⌝ -∗
+            ⌜ uint (m' !!! Regidx a0_idx) = 0x12a8 ⌝ -∗
             ⌜ r = (mword_of_int (-1) : mword 64) ⌝ -∗
             ((⌜r = (mword_of_int (-1) : mword 64)⌝
                 ∗ UserChildren.uch (ukn_ch N) S1 ∗ RcR γp)

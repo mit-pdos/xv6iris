@@ -253,8 +253,8 @@ Section UkShPipeCmd.
       by (intros r Hr; exact (upd_ne m4 (Regidx a0_idx) (Regidx r) _ Hr)).
     (* ---- 0x274  jal 118c <malloc> ---- *)
     iApply (wp_uk_jal N h4 m5 (mword_of_int 0x274)
-              (mword_of_int 3864 : mword 21) ra_idx
-              (mword_of_int 0x118c) (mword_of_int 0x278) (10 + nn)
+              (mword_of_int 3872 : mword 21) ra_idx
+              (mword_of_int 0x1194) (mword_of_int 0x278) (10 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
               ltac:(apply bv_eq; vm_compute; reflexivity)

@@ -5,7 +5,7 @@
 (* [parseexec]'s argument loop calls [parseredirs] after EVERY argument,   *)
 (* so on the pipe line the LAST of those calls sits ON the '|' -- and it   *)
 (* must not turn, because peek's table there is the two redirection bytes  *)
-(* (0x12f0, "<>") and a '|' is neither.                                    *)
+(* (0x1300, "<>") and a '|' is neither.                                    *)
 (*                                                                        *)
 (* [UkShRedirPr.wp_kshp_parseredirs_ns] is that walk and it cannot serve   *)
 (* the pipe line: its premise is that the byte at the blank-scanned cursor *)
@@ -102,7 +102,7 @@ Section UkShPipePr.
     (off <= len)%nat ->
     w0 = mword_of_int (s0 + Z.of_nat off) ->
     (* the WEAKEST thing the walk spends, and the only thing it spends:
-       peek's table at 0x12f0 does not contain the byte at the cursor.
+       peek's table at 0x1300 does not contain the byte at the cursor.
        [UkShRedirPr.wp_kshp_parseredirs_ns] asks instead that the byte be no
        symbol AT ALL, which the '|' falsifies. *)
     ushp_peek_res len f (off + ushp_skipws (len - off) off f)%nat 2
@@ -282,9 +282,9 @@ Section UkShPipePr.
     assert (Hs6_6 : m6 !!! Regidx s6_idx = mword_of_int 0x14cc)
       by exact (upd_eq m5 (Regidx s6_idx)
                   (regval_into_reg (mword_of_int 0x14cc : mword 64))).
-    (* ---- 0x4d0  addi s6,s6,-476 -- the table base 0x12f0 ---- *)
+    (* ---- 0x4d0  addi s6,s6,-460 -- the table base 0x1300 ---- *)
     iApply (wp_uk_addi N h5 m6 (mword_of_int 0x4d0)
-              (mword_of_int 3620 : mword 12) s6_idx s6_idx
+              (mword_of_int 3636 : mword 12) s6_idx s6_idx
               (mword_of_int ushp_T_redir) (8 + (2 + nn))
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
