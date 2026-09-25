@@ -17,7 +17,19 @@ filter), `flt_id`; `DCopy F h R S p`, `DCopyEnd F h p`, `DCopyHalt
 cat at `flt_id`; `reach_exit` + `cat_copy_exits` restated; interface
 `ei_copy d F h R S p` etc. with `ei_read_copy_halt`/`_halt_end`; the
 pipes instance at `flt_id` (`pns_copy` carries `R = take c L`, real
-halted-read laws via `pns_read_atU`/`pns_read_eofU`).
+halted-read laws via `pns_read_atU`/`pns_read_eofU`).  G2 LANDED (32eb10771):
+`flt_grep pat` (grep's filter: `grep_out`, `flt_new R c := gout pat
+(lastpart R) c`), `grep_filter_conforms` (at `DCopy (flt_grep pat) h []
+L []`, premise `grep_ok L` = NUL-free, the owner's; device invariant
+`p = concat outs` + `gf_inv`; the owner's `grep_go_conforms` re-run,
+`scan_outs_ok` bounds each line at 1024 for the halted write),
+`grep_halt_conforms`, `grep_filt_exits`, demos.  G6 LANDED
+(dcc8d3f49/efeece9c4): `ElfUser.grep_elf`, the `/grep` leg (inode 6,
+44,440 bytes), `FsGrepPin`, grep's stub laws, `UShGrep` (two text pages,
+`grep_argv_fits` for every `exec_ok` line), `grep_image_entry_env(_c)`;
+the claim's fixed part now pins grep too (`era0_grep_pins`, `i <>
+GREP_INO`) -- internal only.  Both merged at e24a89617, VM g2merge1,
+audits 13/13/14.
 
 I've planned this from reading only; nothing was edited or built. Grep fits the landed machinery more cheaply than the question expects. Every content in the union is a single line, and on one line grep is just a gate. The real costs are elsewhere: grep has no exec image, pins, stubs or kexec facts yet (the biggest cut), the decider's truncation lemma needs rework (the riskiest cut), and there is one owner ruling on corner B.
 
