@@ -7,7 +7,15 @@ and one top theorem `union_adequacy_closed` replacing the file and
 pipeline applications' theorems (owner: no bridge back).  STATUS:
 proposal of record, AMENDED by an adversarial review (2026-09-24; see
 'Review amendments' below -- they override the body where they differ);
-C9a in flight with B1/S1 folded in.
+C9a LANDED (9dc284690, VM c9amerge1, audits 13/13/14/14, top
+statements byte-identical): `lm_ok : lm_st -> lm_line -> lm_alt -> Prop`,
+`lm_alts_ok s I cs` indexed per line at `lm_upto`, the D4 guards at the
+round's own state with `lml_term_st` moving evidence across states,
+`lml_term_merge` with `lm_st_ok`, `lm_alts_pre`/`lm_rd_stage` at the
+era's boot state, hooks with `lmh_ok_dec` at every state and a new law
+`lmh_free_ok` (a FREE alternative admissible at one state is admissible
+at every state) -- CONSEQUENCE FOR C9b: a state-dependent `UP (PLRun b)`
+must NOT be counted free at the union (union.md said `negb ∘ plterm`).
 
 ## Review amendments (override the plan below)
 
