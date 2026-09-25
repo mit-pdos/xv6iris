@@ -35,7 +35,7 @@ set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
 
 set_option maxHeartbeats 16000000 in
 /-- `+0x7a`, after the second copyout: `li a5,0 ; bgez a0`.  Success settles
@@ -90,24 +90,26 @@ theorem sys_pipe_stage_f (FC : FILECLOSE) (Γ : SchedNames) (cpu c : CPU) (k : K
       ⟨_, List.getElem?_eq_getElem (by rw [hslen]; unfold NOFILE; exact hfd0)⟩
     obtain ⟨st1, hst1⟩ : ∃ st1, sts[fd1]? = some st1 :=
       ⟨_, List.getElem?_eq_getElem (by rw [hslen]; unfold NOFILE; exact hfd1)⟩
-    icases fdFrags_acc γd sts fd0 st0 hst0 $$ Hfrag with ⟨Hf0, Hfw0⟩
+    icases fdFrags_acc γd sts fd0 st0 hst0 $$ Hfrag with ⟨Hf0, -, Hfw0⟩
     icases fdSt_agree' γd fd0 .closed st0 $$ [Ha0 Hf0] with ⟨%he0, Ha0, Hf0⟩
     · iframe
     subst he0
     iapply wpLoop_bupd
     imod fdSt_update γd fd0 .closed .closed (.open true false .pipe) $$ [Ha0 Hf0] with ⟨Ha0, Hf0⟩
     · iframe
-    ihave Hfrag := Hfw0 $$ %(FdState.open true false .pipe) Hf0
+    ihave #Hrp0 := foffRow_pipe (GF := GF) true false
+    ihave Hfrag := Hfw0 $$ %(FdState.open true false .pipe) Hf0 Hrp0
     have hst1' : (sts.set fd0 (.open true false .pipe))[fd1]? = some st1 := by
       rw [List.getElem?_set_ne hne]; exact hst1
-    icases fdFrags_acc γd _ fd1 st1 hst1' $$ Hfrag with ⟨Hf1, Hfw1⟩
+    icases fdFrags_acc γd _ fd1 st1 hst1' $$ Hfrag with ⟨Hf1, -, Hfw1⟩
     icases fdSt_agree' γd fd1 .closed st1 $$ [Ha1 Hf1] with ⟨%he1, Ha1, Hf1⟩
     · iframe
     subst he1
     imod fdSt_update γd fd1 .closed .closed (.open false true .pipe) $$ [Ha1 Hf1] with ⟨Ha1, Hf1⟩
     · iframe
     imodintro
-    ihave Hfrag := Hfw1 $$ %(FdState.open false true .pipe) Hf1
+    ihave #Hrp1 := foffRow_pipe (GF := GF) false true
+    ihave Hfrag := Hfw1 $$ %(FdState.open false true .pipe) Hf1 Hrp1
     -- REPAY fd1, then fd0
     have hl1 : ((V.ofile.set fd0 (fnode k0)).set fd1 (fnode k1))[fd1]? = some (fnode k1) :=
       List.getElem?_set_self (by rw [List.length_set]; exact hlt1)
@@ -158,7 +160,7 @@ end
 set_option maxHeartbeats 16000000 in
 /-- `+0x62`, after the first copyout: `bltz a0` (failure into `+0x80`), then
 the second copyout's arguments and the call. -/
-theorem sys_pipe_stage_e {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF]
+theorem sys_pipe_stage_e {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg]
     [X : CurCtx] (hct : X.curTier = KTier.kpt)
     (FC : FILECLOSE) (CO : COPYOUT) (Γ : SchedNames) (cpu c : CPU) (k : KCtx) (γl : GName) (γ : FileNames)
     (γd : Nat → GName) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
@@ -287,7 +289,7 @@ theorem sys_pipe_stage_e {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
 set_option maxHeartbeats 16000000 in
 /-- `+0x48`, after `fdalloc(wf)`: `sw a0,-64(s0) ; bltz a0` (failure into
 `+0xb4`), then the first copyout's arguments and the call. -/
-theorem sys_pipe_stage_d {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF]
+theorem sys_pipe_stage_d {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg]
     [X : CurCtx] (hct : X.curTier = KTier.kpt)
     (FC : FILECLOSE) (CO : COPYOUT) (Γ : SchedNames) (cpu c : CPU) (k : KCtx) (γl : GName) (γ : FileNames)
     (γd : Nat → GName) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))

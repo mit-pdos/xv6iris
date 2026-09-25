@@ -35,7 +35,7 @@ def sysCloseAddr : BitVec 64 := KA.«sys_close»
 def sysCloseSlots : Nat := 4 + filecloseSlots
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
 
 /-- sys_close's result, keyed by the returned `a0`. -/
 def sysClosePost (γ : FileNames) (γd : Nat → GName) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
@@ -65,7 +65,7 @@ def wp_sys_close_body (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γl : GName) (γ
 end
 
 structure SYSCLOSE : Prop where
-  wp_sys_close : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [CurCtx]
+  wp_sys_close : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γl : GName) (γ : FileNames) (γd : Nat → GName)
     (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
     (v : BitVec 64) (γkl : GName) (γk : KmemNames) (on : Option Nat)

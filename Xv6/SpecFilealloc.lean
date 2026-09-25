@@ -35,12 +35,12 @@ def fileallocAddr : BitVec 64 := KA.«filealloc»
 
 /-- What `filealloc` returns in `a0`: the table was full (the unit back), or
 entry `k`, owned exclusively and untyped. -/
-def fileallocPost {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [CurCtx]
+def fileallocPost {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
     (γ : FileNames) (r : BitVec 64) : IProp GF := iprop%
   (⌜r = 0#64⌝ ∗ fdSlot γ) ∨
   (∃ k : Nat, ⌜k < NFILE ∧ r = fnode k⌝ ∗ fileRef γ k 1 .closed)
 
-def wp_filealloc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [CurCtx]
+def wp_filealloc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γ : FileNames)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 14 ≤ k.avail) (hlk : "ftable" ∉ k.locks) : Prop :=
   kctx cpu k ∗ pcIs cpu fileallocAddr ∗ isFtable γl γ ∗ fdSlot γ ∗
@@ -51,7 +51,7 @@ def wp_filealloc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
   ⊢ wpLoop (GF := GF) cpu
 
 structure FILEALLOC : Prop where
-  wp_filealloc : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [CurCtx]
+  wp_filealloc : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γ : FileNames) hnoff hK hlk,
     wp_filealloc_body (hlc := hlc) (GF := GF) cpu k γl γ hnoff hK hlk
 

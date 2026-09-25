@@ -6,6 +6,7 @@ fd-slot supply grows, and `filedup`'s ghost step: an outstanding reference
 -/
 import Xv6.WordFrac
 import Xv6.FileInv
+import Xv6.FilePay
 
 namespace Xv6
 
@@ -47,24 +48,25 @@ theorem qsum_dup (s t : List (Nat × Qp)) (nx id : Nat) (q : Qp) :
       Qp.half_add_half]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF]
+  [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF]
+  [Icfg] [CurCtx]
 
 /-! ## The content fraction -/
 
 theorem fileFieldsAt_split (ξ : CtxId) (k : Nat) (q1 q2 : Qp) (C : FContent) :
     fileFieldsAt (GF := GF) ξ k (q1 + q2) C ⊢ fileFieldsAt ξ k q1 C ∗ fileFieldsAt ξ k q2 C := by
   unfold fileFieldsAt
-  iintro ⟨H1, H2, H3, H4, H5, H6, %off, H7⟩
+  iintro ⟨H1, H2, H3, H4, H5, H6⟩
   icases wordAtN_split ξ _ _ q1 q2 _ $$ H1 with ⟨A1, B1⟩
   icases wordAtN_split ξ _ _ q1 q2 _ $$ H2 with ⟨A2, B2⟩
   icases wordAtN_split ξ _ _ q1 q2 _ $$ H3 with ⟨A3, B3⟩
   icases wordAtN_split ξ _ _ q1 q2 _ $$ H4 with ⟨A4, B4⟩
   icases wordAtN_split ξ _ _ q1 q2 _ $$ H5 with ⟨A5, B5⟩
   icases wordAtN_split ξ _ _ q1 q2 _ $$ H6 with ⟨A6, B6⟩
-  icases wordAtN_split ξ _ _ q1 q2 _ $$ H7 with ⟨A7, B7⟩
-  isplitl [A1 A2 A3 A4 A5 A6 A7]
-  · iframe A1 A2 A3 A4 A5 A6; iexists off; iexact A7
-  · iframe B1 B2 B3 B4 B5 B6; iexists off; iexact B7
+  isplitl [A1 A2 A3 A4 A5 A6]
+  · iframe A1 A2 A3 A4 A5 A6
+  · iframe B1 B2 B3 B4 B5 B6
 
 theorem FContent.ext' (C1 C2 : FContent) (h1 : C1.type = C2.type) (h2 : C1.readable = C2.readable)
     (h3 : C1.writable = C2.writable) (h4 : C1.pipe = C2.pipe) (h5 : C1.ip = C2.ip)
@@ -75,7 +77,7 @@ theorem fileFieldsAt_merge (ξ : CtxId) (k : Nat) (q1 q2 : Qp) (C1 C2 : FContent
     fileFieldsAt (GF := GF) ξ k q1 C1 ∗ fileFieldsAt ξ k q2 C2 ⊢
       fileFieldsAt ξ k (q1 + q2) C1 ∗ ⌜C1 = C2⌝ := by
   unfold fileFieldsAt
-  iintro ⟨⟨A1, A2, A3, A4, A5, A6, %off, A7⟩, ⟨B1, B2, B3, B4, B5, B6, %off', B7⟩⟩
+  iintro ⟨⟨A1, A2, A3, A4, A5, A6⟩, ⟨B1, B2, B3, B4, B5, B6⟩⟩
   icases wordAtN_merge ξ _ _ q1 q2 _ _ $$ [A1 B1] with ⟨H1, %e1⟩
   · iframe
   icases wordAtN_merge ξ _ _ q1 q2 _ _ $$ [A2 B2] with ⟨H2, %e2⟩
@@ -88,33 +90,12 @@ theorem fileFieldsAt_merge (ξ : CtxId) (k : Nat) (q1 q2 : Qp) (C1 C2 : FContent
   · iframe
   icases wordAtN_merge ξ _ _ q1 q2 _ _ $$ [A6 B6] with ⟨H6, %e6⟩
   · iframe
-  icases wordAtN_merge ξ _ _ q1 q2 _ _ $$ [A7 B7] with ⟨H7, %e7⟩
-  · iframe
   iframe H1 H2 H3 H4 H5 H6
-  isplitl [H7]
-  · iexists off; iexact H7
-  · ipureintro; exact FContent.ext' C1 C2 e1 e2 e3 e4 e5 e6
+  ipureintro; exact FContent.ext' C1 C2 e1 e2 e3 e4 e5 e6
 
-theorem fileCore_split (q1 q2 : Qp) (pn : FPNames) (C : FContent) :
-    fileCore (GF := GF) (q1 + q2) pn C ⊢ fileCore q1 pn C ∗ fileCore q2 pn C := by
-  unfold fileCore
-  split
-  · iintro ⟨#Hp, Hr⟩
-    icases (pipeRef_split pn.pipe (fcWbool C) q1 q2).1 $$ Hr with ⟨Hr1, Hr2⟩
-    isplitl [Hr1]
-    · iframe Hr1; iexact Hp
-    · iframe Hr2; iexact Hp
-  · iintro -; isplitl [] <;> iempintro
-
-theorem fileCore_merge (q1 q2 : Qp) (pn : FPNames) (C : FContent) :
-    fileCore (GF := GF) q1 pn C ∗ fileCore q2 pn C ⊢ fileCore (q1 + q2) pn C := by
-  unfold fileCore
-  split
-  · iintro ⟨⟨#Hp, Hr1⟩, ⟨-, Hr2⟩⟩
-    iframe Hp
-    iapply (pipeRef_split pn.pipe (fcWbool C) q1 q2).2
-    iframe Hr1 Hr2
-  · iintro -; iempintro
+theorem fileCore_merge (k : Nat) (q1 q2 : Qp) (pn : FPNames) (C : FContent) :
+    fileCore (GF := GF) k q1 pn C ∗ fileCore k q2 pn C ⊢ fileCore k (q1 + q2) pn C :=
+  (fileCore_split k q1 q2 pn C).2
 
 theorem fpayTok_split (γ : FileNames) (k : Nat) (q1 q2 : Qp) (pn : FPNames) :
     fpayTok (GF := GF) γ k (q1 + q2) pn ⊢ fpayTok γ k q1 pn ∗ fpayTok γ k q2 pn := by
@@ -138,7 +119,7 @@ theorem filePaySt_split (γ : FileNames) (k : Nat) (q1 q2 : Qp) (C : FContent) (
   unfold filePaySt
   iintro ⟨%pn, %hok, Ht, Hc⟩
   icases fpayTok_split γ k q1 q2 pn $$ Ht with ⟨Ht1, Ht2⟩
-  icases fileCore_split q1 q2 pn C $$ Hc with ⟨Hc1, Hc2⟩
+  icases (fileCore_split k q1 q2 pn C).1 $$ Hc with ⟨Hc1, Hc2⟩
   isplitl [Ht1 Hc1]
   · iexists pn; iframe Ht1 Hc1; ipureintro; exact hok
   · iexists pn; iframe Ht2 Hc2; ipureintro; exact hok
@@ -151,7 +132,7 @@ theorem filePaySt_merge (γ : FileNames) (k : Nat) (q1 q2 : Qp) (C : FContent) (
   icases fpayTok_merge γ k q1 q2 pn pn' $$ [Ht1 Ht2] with ⟨Ht, %he⟩
   · iframe
   subst he
-  ihave Hc := fileCore_merge q1 q2 pn C $$ [Hc1 Hc2]
+  ihave Hc := fileCore_merge k q1 q2 pn C $$ [Hc1 Hc2]
   · iframe
   isplitl [Ht Hc]
   · iexists pn; iframe Ht Hc; ipureintro; exact hok1
@@ -421,12 +402,6 @@ theorem fdSlots_uncons (γ : FileNames) (n : Nat) :
       ipureintro
       exact ⟨by simpa using hlen, hnd, fun j hj => hb j (List.mem_cons_of_mem _ hj)⟩
 
-theorem fileCore_none (q : Qp) (pn : FPNames) (C : FContent) (h : C.type = FD_NONE) :
-    ⊢ fileCore (GF := GF) q pn C := by
-  unfold fileCore
-  rw [if_neg (by rw [h]; decide)]
-  iintro; iempintro
-
 theorem close_ftableOk (M : RegMapF (Nat × Qp)) (Ls : Nat → List (Nat × Qp)) (s t : List (Nat × Qp))
     (id k : Nat) (q : Qp) (hok : ftableOk M Ls) (hL : Ls k = s ++ (id, q) :: t)
     (hnd : ((s ++ (id, q) :: t).map Prod.fst).Nodup) :
@@ -513,7 +488,7 @@ theorem fileRest_absorb (γ : FileNames) (k : Nat) (s t : List (Nat × Qp)) (id 
     icases fpayTok_merge γ k q' q pn pn' $$ [Ht' Ht] with ⟨Ht, %hpn⟩
     · iframe
     subst hpn
-    ihave Hc := fileCore_merge q' q pn C' $$ [Hc' Hc]
+    ihave Hc := fileCore_merge k q' q pn C' $$ [Hc' Hc]
     · iframe
     iexists C', pn, q' + q
     iright
@@ -528,7 +503,7 @@ theorem fileRest_join (γ : FileNames) (k : Nat) (s t : List (Nat × Qp)) (id : 
     fileRestAt (GF := GF) γ curCtx k (qsum (s ++ (id, q) :: t)) q' C' pn ∗
     fileFieldsAt curCtx k q C ∗ filePaySt γ k q C st ⊢
       ∃ pn'' : FPNames, ⌜fdstateOk pn''.inum pn''.ooff C st⌝ ∗
-        fileFieldsAt curCtx k 1 C ∗ fpayTok γ k 1 pn'' ∗ fileCore 1 pn'' C := by
+        fileFieldsAt curCtx k 1 C ∗ fpayTok γ k 1 pn'' ∗ fileCore k 1 pn'' C := by
   obtain ⟨rfl, rfl⟩ := List.append_eq_nil_iff.1 hst
   unfold fileRestAt filePaySt
   simp only [List.nil_append, qsum_single]
@@ -544,7 +519,7 @@ theorem fileRest_join (γ : FileNames) (k : Nat) (s t : List (Nat × Qp)) (id : 
     icases fpayTok_merge γ k q' q pn pn' $$ [Ht' Ht] with ⟨Ht, %hpn⟩
     · iframe
     subst hpn
-    ihave Hc := fileCore_merge q' q pn C' $$ [Hc' Hc]
+    ihave Hc := fileCore_merge k q' q pn C' $$ [Hc' Hc]
     · iframe
     rw [← hq]
     iexists pn

@@ -337,6 +337,7 @@ import Xv6.LinkPiperead
 import Xv6.ProofFilealloc
 import Xv6.WordFrac
 import Xv6.FileFrac
+import Xv6.FilePay
 import Xv6.ProofFiledup
 import Xv6.ProofFileclose
 import Xv6.PipeBirth

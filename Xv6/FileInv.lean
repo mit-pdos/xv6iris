@@ -223,7 +223,7 @@ theorem fc_wbool (b : BitVec 8) : (b != 0#8) = decide (BitVec.zeroExtend 64 b �
     rw [h1, decide_eq_true h2]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
 
 /-! ## Opening the table and a slot -/
 
@@ -276,7 +276,7 @@ theorem fslot_elim (γ : FileNames) (ξ : CtxId) (k : Nat) (L : List (Nat × Qp)
       ⌜(L.map Prod.fst).Nodup ∧ L.length < 2 ^ 31⌝ ∗
       wordAtN ξ (aFref k) 4 (DFrac.own 1) (BitVec.ofNat 32 L.length) ∗
       ([∗list] e ∈ L, frefRest γ k e) ∗ fdSlots γ L.length ∗
-      ((⌜L = [] ∧ C.type = FD_NONE⌝ ∗ fileFieldsAt ξ k 1 C ∗ fpayTok γ k 1 pn ∗ fileCore 1 pn C) ∨
+      ((⌜L = [] ∧ C.type = FD_NONE⌝ ∗ fileFieldsAt ξ k 1 C ∗ fpayTok γ k 1 pn ∗ fileCore k 1 pn C) ∨
        (⌜L ≠ []⌝ ∗ fileRestAt γ ξ k (qsum L) q' C pn)) := by
   unfold fslotAt; iintro H; iexact H
 
@@ -284,7 +284,7 @@ theorem fslot_intro (γ : FileNames) (ξ : CtxId) (k : Nat) (L : List (Nat × Qp
     (pn : FPNames) (q' : Qp) (hnd : (L.map Prod.fst).Nodup) (hlt : L.length < 2 ^ 31) :
     wordAtN (GF := GF) ξ (aFref k) 4 (DFrac.own 1) (BitVec.ofNat 32 L.length) ∗
     ([∗list] e ∈ L, frefRest γ k e) ∗ fdSlots γ L.length ∗
-    ((⌜L = [] ∧ C.type = FD_NONE⌝ ∗ fileFieldsAt ξ k 1 C ∗ fpayTok γ k 1 pn ∗ fileCore 1 pn C) ∨
+    ((⌜L = [] ∧ C.type = FD_NONE⌝ ∗ fileFieldsAt ξ k 1 C ∗ fpayTok γ k 1 pn ∗ fileCore k 1 pn C) ∨
      (⌜L ≠ []⌝ ∗ fileRestAt γ ξ k (qsum L) q' C pn)) ⊢ fslotAt γ ξ k L := by
   unfold fslotAt
   iintro ⟨H1, H2, H3, H4⟩
@@ -347,25 +347,25 @@ by
 /-! ## THE ALLOC STEP: a free slot becomes one exclusive reference -/
 
 /-- `file_alloc_step`: with the authority (the lock held) and the free slot's
-content, mint reference `next` (fresh: nothing at or above `next` exists),
+content, mint reference `nxt` (fresh: nothing at or above `nxt` exists),
 split it into the holder's half (`frefTok`) and the lock's half
 (`frefRest`), park the fd token. -/
-theorem file_alloc_step (γ : FileNames) (M : RegMapF (Nat × Qp)) (next k : Nat) (C : FContent)
-    (pn : FPNames) (hfresh : ∀ i, next ≤ i → PartialMap.get? M i = none) (hty : C.type = FD_NONE) :
-    (γ.ref ↪●MAP M) ∗ fileFieldsAt (GF := GF) curCtx k 1 C ∗ fpayTok γ k 1 pn ∗ fileCore 1 pn C ⊢
-      |==> ((γ.ref ↪●MAP (PartialMap.insert M next (k, 1))) ∗
-        fileRef γ k 1 .closed ∗ frefRest γ k (next, 1)) := by
+theorem file_alloc_step (γ : FileNames) (M : RegMapF (Nat × Qp)) (nxt k : Nat) (C : FContent)
+    (pn : FPNames) (hfresh : ∀ i, nxt ≤ i → PartialMap.get? M i = none) (hty : C.type = FD_NONE) :
+    (γ.ref ↪●MAP M) ∗ fileFieldsAt (GF := GF) curCtx k 1 C ∗ fpayTok γ k 1 pn ∗ fileCore k 1 pn C ⊢
+      |==> ((γ.ref ↪●MAP (PartialMap.insert M nxt (k, 1))) ∗
+        fileRef γ k 1 .closed ∗ frefRest γ k (nxt, 1)) := by
   iintro ⟨Ha, Hf, Hn, Hc⟩
-  ihave Hup := ghost_map_insert next (k, (1 : Qp)) (hfresh next (Nat.le_refl _)) $$ Ha
+  ihave Hup := ghost_map_insert nxt (k, (1 : Qp)) (hfresh nxt (Nat.le_refl _)) $$ Ha
   imod Hup with ⟨Ha, He⟩
   imodintro
   iframe Ha
-  ihave ⟨He1, He2⟩ := fref_halves γ next (k, (1 : Qp)) $$ He
+  ihave ⟨He1, He2⟩ := fref_halves γ nxt (k, (1 : Qp)) $$ He
   isplitl [He1 Hf Hn Hc]
   · unfold fileRef
     iexists C
     isplitl [He1]
-    · unfold frefTok; iexists next; iexact He1
+    · unfold frefTok; iexists nxt; iexact He1
     iframe Hf
     unfold filePaySt
     iexists pn

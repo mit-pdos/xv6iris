@@ -46,7 +46,7 @@ def pipeallocAddr : BitVec 64 := KA.«pipealloc»
 /-- pipealloc's own 6-slot frame over `fileclose`'s cone (the deepest callee). -/
 def pipeallocSlots : Nat := 6 + filecloseSlots
 
-def pipeallocPost {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [CurCtx]
+def pipeallocPost {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
     (γ : FileNames) (γk : KmemNames) (on : Option Nat) (pf0 pf1 r : BitVec 64) : IProp GF := iprop%
   (⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ kallocAvail γk on ∗ fdSlot γ ∗ fdSlot γ ∗
     (∃ w0 w1 : BitVec 64, wordPointsTo pf0 8 (DFrac.own 1) w0 ∗ wordPointsTo pf1 8 (DFrac.own 1) w1)) ∨
@@ -55,7 +55,7 @@ def pipeallocPost {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
       wordPointsTo pf0 8 (DFrac.own 1) (fnode k0) ∗ wordPointsTo pf1 8 (DFrac.own 1) (fnode k1) ∗
       fileRef γ k0 1 (.open true false .pipe) ∗ fileRef γ k1 1 (.open false true .pipe))
 
-def wp_pipealloc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [CurCtx]
+def wp_pipealloc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γl : GName) (γ : FileNames)
     (γkl : GName) (γk : KmemNames) (on : Option Nat) (v0 v1 : BitVec 64)
     (hnoff : k.noff + 2 < 2 ^ 31) (hK : pipeallocSlots ≤ k.avail) (hlk : "ftable" ∉ k.locks)
@@ -72,7 +72,7 @@ def wp_pipealloc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
   ⊢ wpLoop (GF := GF) cpu
 
 structure PIPEALLOC : Prop where
-  wp_pipealloc : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [CurCtx]
+  wp_pipealloc : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γl : GName) (γ : FileNames)
     (γkl : GName) (γk : KmemNames) (on : Option Nat) (v0 v1 : BitVec 64)
     hnoff hK hlk hpipe hproc hkmem htier,

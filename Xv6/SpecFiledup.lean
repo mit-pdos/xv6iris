@@ -22,14 +22,17 @@ import MachCSL.Lock
 import Xv6.FileDefs
 import Xv6.Image
 import Xv6.Geom
-import Xv6.FsEnv
 
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
-def wp_filedup_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [CurCtx]
+/-- `filedup`'s entry (D13: the address lives with its Spec; `FsEnv` no
+longer defines it). -/
+def filedupAddr : BitVec 64 := KA.«filedup»
+
+def wp_filedup_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γ : FileNames) (kk : Nat) (q : Qp) (st : FdState)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 14 ≤ k.avail) (hlk : "ftable" ∉ k.locks)
     (ha0 : k.regs 10#5 = fnode kk) : Prop :=
@@ -42,7 +45,7 @@ def wp_filedup_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G 
   ⊢ wpLoop (GF := GF) cpu
 
 structure FILEDUP : Prop where
-  wp_filedup : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [CurCtx]
+  wp_filedup : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γ : FileNames) (kk : Nat) (q : Qp) (st : FdState)
     hnoff hK hlk ha0,
     wp_filedup_body (hlc := hlc) (GF := GF) cpu k γl γ kk q st hnoff hK hlk ha0

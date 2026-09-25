@@ -10,6 +10,15 @@ and then the descriptor owns its fd-slot unit and the authority says
 `.closed` -- or names a file, with a `fileRef` on it (any fraction) and the
 authority at the file's state.  A descriptor never names an untyped file.
 
+THE OFFSET ROWS (FdSlots.v `foff_row` / `foff_rows`; wave 7 P4, decision
+D4, Rocq-literal).  The bundle `fdFrags γd sts` also carries one PERSISTENT
+row per descriptor, a pure function of its state (`foffRow`): a PARKED inode
+descriptor's row is the offset shadow's user-half invariant (`offUserInv`,
+what fileread/filewrite advance `f->off` against), a HELD one's is `emp`,
+every other row is `True`.  `fdFrags_acc` hands the row out with the
+fragment and its closer takes the NEW state's row (a retype pays for its
+row: closing and piping pay `True`, dup copies the source's).
+
 THE DEFICIT.  A syscall that holds one of its own descriptors' references
 in a register (sys_dup: filedup wants the source's reference in hand, and
 fdalloc runs in between, on the array) leaves the array with that
@@ -71,7 +80,7 @@ theorem bigSepL_set_acc_congr (Φ Ψ : Nat → A → PROP) :
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
 
 /-! ## The descriptor states -/
 
@@ -115,30 +124,127 @@ theorem fdSt_halves (γd : Nat → GName) (fd : Nat) (st : FdState) :
   rw [Qp.half_add_half] at h
   iapply h.1 $$ H
 
-/-- The bundle: every descriptor's fragment (FdSlots.v's `fd_frags`, without
-its offset rows). -/
+/-! ## The offset rows (FdSlots.v `foff_row` / `foff_rows`, P4 / D4) -/
+
+/-- A descriptor's OFFSET ROW, keyed by the mode its state records
+(FdSlots.v `foff_row`): a PARKED inode row claims the user half's invariant
+(`offUserInv`, what fileread/filewrite advance `f->off` against); a HELD one
+claims nothing (the half is in the program's hands); every other row is
+`True`.  PERSISTENT and a PURE FUNCTION OF THE STATE, so every site that
+threads the bundle opaquely is untouched. -/
+def foffRow : FdState → IProp GF
+  | .open _ _ (.inode _ γo .parked) => offUserInv γo
+  | .open _ _ (.inode _ _ .held) => iprop(emp)
+  | _ => iprop(True)
+
+instance foffRow_persistent (st : FdState) : Persistent (foffRow (GF := GF) st) := by
+  cases st with
+  | closed => unfold foffRow; infer_instance
+  | «open» r w t =>
+    cases t with
+    | pipe => unfold foffRow; infer_instance
+    | device mj => unfold foffRow; infer_instance
+    | inode n g om => cases om <;> (unfold foffRow; infer_instance)
+
+theorem foffRow_closed : ⊢ foffRow (GF := GF) .closed := by
+  unfold foffRow; iintro; ipureintro; trivial
+theorem foffRow_pipe (r w : Bool) : ⊢ foffRow (GF := GF) (.open r w .pipe) := by
+  unfold foffRow; iintro; ipureintro; trivial
+theorem foffRow_dev (r w : Bool) (mj : Nat) : ⊢ foffRow (GF := GF) (.open r w (.device mj)) := by
+  unfold foffRow; iintro; ipureintro; trivial
+theorem foffRow_inode (r w : Bool) (i : Nat) (γo : GName) :
+    offUserInv γo ⊢ foffRow (GF := GF) (.open r w (.inode i γo .parked)) := by
+  unfold foffRow; iintro H; iexact H
+theorem foffRow_inode_held (r w : Bool) (i : Nat) (γo : GName) :
+    ⊢ foffRow (GF := GF) (.open r w (.inode i γo .held)) := by
+  unfold foffRow; iintro; iempintro
+
+/-- The reading a walk needs at a state it holds through an EQUATION (Rocq
+`foff_row_inode_of`). -/
+theorem foffRow_inode_of (st : FdState) (r w : Bool) (i : Nat) (γo : GName)
+    (h : st = .open r w (.inode i γo .parked)) :
+    foffRow (GF := GF) st ⊢ offUserInv γo := by
+  subst h; unfold foffRow; iintro H; iexact H
+
+/-- What a publish owes the row of the descriptor it fills (Rocq
+`foff_row_of_ok`): the user half's invariant on the `FD_INODE` arm, nothing
+on the others; the state decides, and the state's shadow name IS the
+payload's. -/
+theorem foffRow_of_ok (inum : BitVec 32) (γo : GName) (C : FContent) (st : FdState)
+    (hok : fdstateOk inum γo C st) :
+    (if C.type = FD_INODE then offUserInv (GF := GF) γo else iprop(True)) ⊢ foffRow st := by
+  cases st with
+  | closed => unfold foffRow; iintro -; ipureintro; trivial
+  | «open» r w t =>
+    cases t with
+    | pipe => unfold foffRow; iintro -; ipureintro; trivial
+    | device mj => unfold foffRow; iintro -; ipureintro; trivial
+    | inode n g om =>
+      obtain ⟨-, -, ht, -, hg, hom⟩ := hok
+      subst hg; subst hom
+      rw [if_pos ht]
+      unfold foffRow; iintro H; iexact H
+
+/-- The rows of a table (Rocq `foff_rows`). -/
+def foffRows (sts : List FdState) : IProp GF := [∗list] st ∈ sts, foffRow st
+
+instance foffRows_persistent (sts : List FdState) : Persistent (foffRows (GF := GF) sts) := by
+  unfold foffRows; infer_instance
+
+theorem foffRows_lookup (sts : List FdState) (fd : Nat) (st : FdState) (h : sts[fd]? = some st) :
+    foffRows (GF := GF) sts ⊢ foffRow st := by
+  unfold foffRows
+  iintro H
+  iapply (BigSepL.bigSepL_lookup (Φ := fun (_ : Nat) (s : FdState) => foffRow (GF := GF) s) h) $$ H
+
+theorem foffRows_insert (sts : List FdState) (fd : Nat) (st st' : FdState) (h : sts[fd]? = some st) :
+    foffRows (GF := GF) sts ∗ foffRow st' ⊢ foffRows (sts.set fd st') := by
+  unfold foffRows
+  iintro ⟨H, Hr⟩
+  icases (BigSepL.bigSepL_insert_acc (Φ := fun (_ : Nat) (s : FdState) => foffRow (GF := GF) s) h) $$ H
+    with ⟨-, Hw⟩
+  iapply Hw $$ %st' Hr
+
+/-- The bundle: every descriptor's fragment and its offset row (FdSlots.v's
+`fd_frags`). -/
 def fdFrags (γd : Nat → GName) (sts : List FdState) : IProp GF := iprop%
-  ⌜sts.length = NOFILE⌝ ∗ [∗list] fd ↦ st ∈ sts, fdSt γd fd st
+  ⌜sts.length = NOFILE⌝ ∗ ([∗list] fd ↦ st ∈ sts, fdSt γd fd st) ∗ foffRows sts
 
 theorem fdFrags_len (γd : Nat → GName) (sts : List FdState) :
     fdFrags (GF := GF) γd sts ⊢ ⌜sts.length = NOFILE⌝ ∗ fdFrags γd sts := by
   unfold fdFrags
-  iintro ⟨%h, H⟩
-  iframe H
+  iintro ⟨%h, H, #Hr⟩
+  iframe H Hr
   isplitl [] <;> ipureintro <;> exact h
 
+theorem fdFrags_rows (γd : Nat → GName) (sts : List FdState) :
+    fdFrags (GF := GF) γd sts ⊢ foffRows sts := by
+  unfold fdFrags
+  iintro ⟨-, -, #Hr⟩
+  iexact Hr
+
+/-- Open one descriptor's fragment and close it back at a new state (Rocq
+`fd_frags_acc`): the row's offset entry comes out with the fragment
+(persistent), and the closer takes the NEW state's entry -- a retype pays
+for its row. -/
 theorem fdFrags_acc (γd : Nat → GName) (sts : List FdState) (fd : Nat) (st : FdState)
     (h : sts[fd]? = some st) :
-    fdFrags (GF := GF) γd sts ⊢ fdSt γd fd st ∗ (∀ st', fdSt γd fd st' -∗ fdFrags γd (sts.set fd st')) := by
+    fdFrags (GF := GF) γd sts ⊢ fdSt γd fd st ∗ foffRow st ∗
+      (∀ st', fdSt γd fd st' -∗ foffRow st' -∗ fdFrags γd (sts.set fd st')) := by
   unfold fdFrags
-  iintro ⟨%hlen, H⟩
+  iintro ⟨%hlen, H, #Hr⟩
   icases (BigSepL.bigSepL_insert_acc (Φ := fun (j : Nat) (s : FdState) => fdSt (GF := GF) γd j s) h) $$ H
     with ⟨Hi, Hw⟩
   iframe Hi
-  iintro %st' Hs
+  isplitr
+  · iapply foffRows_lookup sts fd st h $$ Hr
+  iintro %st' Hs #Hr'
   isplitl []
   · ipureintro; rw [List.length_set]; exact hlen
+  isplitl [Hw Hs]
   · iapply Hw $$ %st' Hs
+  · iapply foffRows_insert sts fd st st' h
+    iframe Hr Hr'
 
 /-! ## One descriptor's cell, with what it owns -/
 

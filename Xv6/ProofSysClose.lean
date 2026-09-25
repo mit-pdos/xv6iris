@@ -111,7 +111,7 @@ def scPins (k : KCtx) (R : RegMap) : Prop :=
   R 25#5 = k.regs 25#5 ∧ R 26#5 = k.regs 26#5 ∧ R 27#5 = k.regs 27#5
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
 
 theorem sc_ofdOut_intro (a : BitVec 64) (w : BitVec 32) (h : a ≠ 0#64) :
     wordPointsTo (GF := GF) a 4 (DFrac.own 1) w ⊢ ofdOut a w := by
@@ -294,7 +294,7 @@ theorem sys_close_br_fffffffffffffd26 : KA.«sys_close» + 0xfffffffffffffd26#64
 set_option maxHeartbeats 64000000 in
 set_option maxRecDepth 20000 in
 theorem sys_close_proof (AF : ARGFD) (MP : MYPROC) (FC : FILECLOSE) : SYSCLOSE := ⟨
-  fun {hlc GF} _ _ _ X Γ cpu k γl γ γd pa pid V M sts v γkl γk on hv hproc htier hsp hpipe hnoff hK hlk hplk
+  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ X Γ cpu k γl γ γd pa pid V M sts v γkl γk on hv hproc htier hsp hpipe hnoff hK hlk hplk
       hprc hkmem => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
@@ -454,7 +454,7 @@ theorem sys_close_proof (AF : ARGFD) (MP : MYPROC) (FC : FILECLOSE) : SYSCLOSE :
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sc_add0, sc_add0'] next c15 hp15
     iintro Hk Hpc Hc
     -- the descriptor's state is a pipe end: what fileclose covers
-    icases fdFrags_acc γd sts fd0 _ hrow $$ Hfr with ⟨Hfrag0, Hfrw0⟩
+    icases fdFrags_acc γd sts fd0 _ hrow $$ Hfr with ⟨Hfrag0, -, Hfrw0⟩
     icases fdSt_agree' γd fd0 st (.open r0 w0 .pipe) $$ [Hauth0 Hfrag0] with ⟨%hst', Hauth0, Hfrag0⟩
     · iframe
     subst hst'
@@ -502,7 +502,8 @@ theorem sys_close_proof (AF : ARGFD) (MP : MYPROC) (FC : FILECLOSE) : SYSCLOSE :
     imod fdSt_update γd fd0 _ _ .closed $$ [Hauth0 Hfrag0] with ⟨Hauth0, Hfrag0⟩
     · iframe
     imodintro
-    ihave Hfr := Hfrw0 $$ %(FdState.closed) Hfrag0
+    ihave #Hrc := foffRow_closed (GF := GF)
+    ihave Hfr := Hfrw0 $$ %(FdState.closed) Hfrag0 Hrc
     ihave Howe := Hcw $$ Hc Hu Hauth0
     ihave Hfd := (show wordPointsTo (GF := GF) afd 4 (DFrac.own 1) _ ⊢
         wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFE8#64 + 4#64) 4 (DFrac.own 1) _ from by rw [← hafd, sc_ec]) $$ Hfd

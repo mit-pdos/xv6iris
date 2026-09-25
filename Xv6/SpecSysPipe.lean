@@ -92,7 +92,7 @@ def sysPipeMem (sz : BitVec 64) (P : UPtd) (M : Nat → List (BitVec 8)) (v : Bi
     umMapped P' v.toNat (b0 ++ b1).length
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
 
 /-- sys_pipe's result, keyed by the returned `a0`. -/
 def sysPipePost (γ : FileNames) (γd : Nat → GName) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
@@ -135,7 +135,7 @@ def wp_sys_pipe_body (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γl : GName) (γ 
 end
 
 structure SYSPIPE : Prop where
-  wp_sys_pipe : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [CurCtx]
+  wp_sys_pipe : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γl : GName) (γ : FileNames) (γd : Nat → GName)
     (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
     (v : BitVec 64) (γkl : GName) (γk : KmemNames)

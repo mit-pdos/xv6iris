@@ -56,7 +56,7 @@ theorem fa_ext1' : BitVec.extractLsb' 0 32 (1#64 : BitVec 64) = 1#32 := by decid
 theorem fa_sext4 : BitVec.signExtend 64 4#12 = 4#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
 
 /-! ## The shared tail: `mv a0,s1` and the epilogue -/
 
@@ -435,7 +435,7 @@ theorem filealloc_br_1e3e8 : KA.«filealloc» + 0x1e3e8#64 = fnode 0 := by decid
 
 set_option maxHeartbeats 16000000 in
 theorem filealloc_proof (AC : ACQUIRE) (RE : RELEASE) : FILEALLOC := ⟨
-  fun {hlc GF} _ _ _ _ cpu k γl γ hnoff hK hlk => by
+  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ cpu k γl γ hnoff hK hlk => by
   unfold wp_filealloc_body
   simp only [fileallocAddr]
   iintro ⟨Hk, Hpc, #Hft, Hfd, Hnext⟩

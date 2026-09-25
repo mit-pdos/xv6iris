@@ -152,7 +152,7 @@ def paPins1 (k : KCtx) (R : RegMap) : Prop :=
   R 26#5 = k.regs 26#5 ∧ R 27#5 = k.regs 27#5
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
 
 theorem pa_frame_open (sp ra s0 s1 s4 : BitVec 64) :
     frame6s4 (GF := GF) sp ra s0 s1 s4 ⊢
@@ -565,24 +565,22 @@ theorem pa_success (IL : INITLOCK) (cpu c : CPU) (k : KCtx) (γ : FileNames) (γ
       wordPointsTo (fnode k0 + BitVec.signExtend 64 9#12) 1 (DFrac.own 1) C0.writable ∗
       wordPointsTo (fnode k0 + BitVec.signExtend 64 16#12) 8 (DFrac.own 1) C0.pipe ∗
       wordPointsTo (aFip k0) 8 (DFrac.own 1) C0.ip ∗
-      wordPointsTo (aFmajor k0) 2 (DFrac.own 1) C0.major ∗
-      (∃ off : BitVec 32, wordPointsTo (aFoff k0) 4 (DFrac.own 1) off) from by
+      wordPointsTo (aFmajor k0) 2 (DFrac.own 1) C0.major from by
     unfold fileFieldsAt
     simp only [wordAtN_cur]
     rw [aFtype_eq, aFreadable_eq, aFwritable_eq, aFpipe_eq]) $$ Hf0
-  icases Hf0 with ⟨Hty0, Hrd0, Hwr0, Hpp0, Hip0, Hmj0, Hoff0⟩
+  icases Hf0 with ⟨Hty0, Hrd0, Hwr0, Hpp0, Hip0, Hmj0⟩
   ihave Hf1 := (show fileFieldsAt (GF := GF) curCtx k1 1 C1 ⊢
       wordPointsTo (fnode k1 + BitVec.signExtend 64 0#12) 4 (DFrac.own 1) C1.type ∗
       wordPointsTo (fnode k1 + BitVec.signExtend 64 8#12) 1 (DFrac.own 1) C1.readable ∗
       wordPointsTo (fnode k1 + BitVec.signExtend 64 9#12) 1 (DFrac.own 1) C1.writable ∗
       wordPointsTo (fnode k1 + BitVec.signExtend 64 16#12) 8 (DFrac.own 1) C1.pipe ∗
       wordPointsTo (aFip k1) 8 (DFrac.own 1) C1.ip ∗
-      wordPointsTo (aFmajor k1) 2 (DFrac.own 1) C1.major ∗
-      (∃ off : BitVec 32, wordPointsTo (aFoff k1) 4 (DFrac.own 1) off) from by
+      wordPointsTo (aFmajor k1) 2 (DFrac.own 1) C1.major from by
     unfold fileFieldsAt
     simp only [wordAtN_cur]
     rw [aFtype_eq, aFreadable_eq, aFwritable_eq, aFpipe_eq]) $$ Hf1
-  icases Hf1 with ⟨Hty1, Hrd1, Hwr1, Hpp1, Hip1, Hmj1, Hoff1⟩
+  icases Hf1 with ⟨Hty1, Hrd1, Hwr1, Hpp1, Hip1, Hmj1⟩
   have h9A : RA 9#5 = k.regs 10#5 := a9.trans h9
   have h20A : RA 20#5 = k.regs 11#5 := a20.trans h20
   have h18A : RA 18#5 = pi := a18.trans h18
@@ -657,61 +655,67 @@ theorem pa_success (IL : INITLOCK) (cpu c : CPU) (k : KCtx) (γ : FileNames) (γ
   -- the two files, each owning one end
   iapply wpLoop_bupd
   ihave Hp0 := (show filePaySt (GF := GF) γ k0 1 C0 .closed ⊢
-      ∃ pn : FPNames, ⌜fdstateOk pn.inum pn.ooff C0 .closed⌝ ∗ fpayTok γ k0 1 pn ∗ fileCore 1 pn C0 from by
+      ∃ pn : FPNames, ⌜fdstateOk pn.inum pn.ooff C0 .closed⌝ ∗ fpayTok γ k0 1 pn ∗ fileCore k0 1 pn C0 from by
     unfold filePaySt; iintro H; iexact H) $$ Hp0
-  icases Hp0 with ⟨%pn0, %hok0, Ht0, -⟩
+  icases Hp0 with ⟨%pn0, %hok0, Ht0, Hc0x⟩
+  icases (fileCore_none k0 1 pn0 C0 hok0).1 $$ Hc0x with ⟨Hi0, Ho0⟩
   ihave Hp1 := (show filePaySt (GF := GF) γ k1 1 C1 .closed ⊢
-      ∃ pn : FPNames, ⌜fdstateOk pn.inum pn.ooff C1 .closed⌝ ∗ fpayTok γ k1 1 pn ∗ fileCore 1 pn C1 from by
+      ∃ pn : FPNames, ⌜fdstateOk pn.inum pn.ooff C1 .closed⌝ ∗ fpayTok γ k1 1 pn ∗ fileCore k1 1 pn C1 from by
     unfold filePaySt; iintro H; iexact H) $$ Hp1
-  icases Hp1 with ⟨%pn1, %hok1, Ht1, -⟩
-  imod fpayTok_update γ k0 pn0 { lock := γlp, pipe := γp, inum := pn0.inum, ooff := pn0.ooff } $$ Ht0 with Ht0
-  imod fpayTok_update γ k1 pn1 { lock := γlp, pipe := γp, inum := pn1.inum, ooff := pn1.ooff } $$ Ht1 with Ht1
+  icases Hp1 with ⟨%pn1, %hok1, Ht1, Hc1x⟩
+  icases (fileCore_none k1 1 pn1 C1 hok1).1 $$ Hc1x with ⟨Hi1, Ho1⟩
+  imod fpayTok_update γ k0 pn0 { pn0 with lock := γlp, pipe := γp } $$ Ht0 with Ht0
+  imod fpayTok_update γ k1 pn1 { pn1 with lock := γlp, pipe := γp } $$ Ht1 with Ht1
   imodintro
   ihave Hf0' : fileFieldsAt (GF := GF) curCtx k0 1
-      { C0 with type := FD_PIPE, readable := 1#8, writable := 0#8, pipe := pi } $$ [Hty0 Hrd0 Hwr0 Hpp0 Hip0 Hmj0 Hoff0]
+      { C0 with type := FD_PIPE, readable := 1#8, writable := 0#8, pipe := pi } $$ [Hty0 Hrd0 Hwr0 Hpp0 Hip0 Hmj0]
   case' _ =>
     unfold fileFieldsAt
     simp only [wordAtN_cur]
     rw [← aFreadable_eq', ← aFwritable_eq', ← aFpipe_eq']
     unfold aFtype FD_PIPE
-    iframe Hrd0 Hwr0 Hpp0 Hip0 Hmj0 Hoff0
+    iframe Hrd0 Hwr0 Hpp0 Hip0 Hmj0
     iexact Hty0
   ihave Hf1' : fileFieldsAt (GF := GF) curCtx k1 1
-      { C1 with type := FD_PIPE, readable := 0#8, writable := 1#8, pipe := pi } $$ [Hty1 Hrd1 Hwr1 Hpp1 Hip1 Hmj1 Hoff1]
+      { C1 with type := FD_PIPE, readable := 0#8, writable := 1#8, pipe := pi } $$ [Hty1 Hrd1 Hwr1 Hpp1 Hip1 Hmj1]
   case' _ =>
     unfold fileFieldsAt
     simp only [wordAtN_cur]
     rw [← aFreadable_eq', ← aFwritable_eq', ← aFpipe_eq']
     unfold aFtype FD_PIPE
-    iframe Hrd1 Hwr1 Hpp1 Hip1 Hmj1 Hoff1
+    iframe Hrd1 Hwr1 Hpp1 Hip1 Hmj1
     iexact Hty1
   ihave Hp0' : filePaySt (GF := GF) γ k0 1 { C0 with type := FD_PIPE, readable := 1#8, writable := 0#8, pipe := pi }
-      (.open true false .pipe) $$ [Ht0 Hr0]
+      (.open true false .pipe) $$ [Ht0 Hr0 Hi0 Ho0]
   case' _ =>
     unfold filePaySt
-    iexists { lock := γlp, pipe := γp, inum := pn0.inum, ooff := pn0.ooff }
+    iexists { pn0 with lock := γlp, pipe := γp }
     isplitl []
     · ipureintro; exact ⟨rfl, rfl, rfl⟩
     iframe Ht0
-    unfold fileCore
-    rw [if_pos rfl]
+    unfold fileCore fileCoreNoff fileCoreOff
+    rw [if_pos rfl, if_neg (show ¬ (FD_PIPE = FD_INODE) by decide)]
+    iframe Ho0
     isplitl []
     · iexact Hpipe
+    iframe Hi0
     unfold fcWbool
     simp only [bne_self_eq_false]
     iexact Hr0
   ihave Hp1' : filePaySt (GF := GF) γ k1 1 { C1 with type := FD_PIPE, readable := 0#8, writable := 1#8, pipe := pi }
-      (.open false true .pipe) $$ [Ht1 Hr1]
+      (.open false true .pipe) $$ [Ht1 Hr1 Hi1 Ho1]
   case' _ =>
     unfold filePaySt
-    iexists { lock := γlp, pipe := γp, inum := pn1.inum, ooff := pn1.ooff }
+    iexists { pn1 with lock := γlp, pipe := γp }
     isplitl []
     · ipureintro; exact ⟨rfl, rfl, rfl⟩
     iframe Ht1
-    unfold fileCore
-    rw [if_pos rfl]
+    unfold fileCore fileCoreNoff fileCoreOff
+    rw [if_pos rfl, if_neg (show ¬ (FD_PIPE = FD_INODE) by decide)]
+    iframe Ho1
     isplitl []
     · iexact Hpipe
+    iframe Hi1
     unfold fcWbool
     simp only [show (1#8 != 0#8) = true by decide]
     iexact Hr1
@@ -761,7 +765,7 @@ theorem pipealloc_br_fffffffffffffc28 : KA.«pipealloc» + 0xfffffffffffffc28#64
 
 set_option maxHeartbeats 16000000 in
 theorem pipealloc_proof (FA : FILEALLOC) (KAL : KALLOC) (IL : INITLOCK) (FC : FILECLOSE) : PIPEALLOC := ⟨
-  fun {hlc GF} _ _ _ _ Γ cpu k γl γ γkl γk on v0 v1 hnoff hK hlk hpipe hproc hkmem htier => by
+  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ Γ cpu k γl γ γkl γk on v0 v1 hnoff hK hlk hpipe hproc hkmem htier => by
   unfold wp_pipealloc_body
   simp only [pipeallocAddr]
   iintro ⟨Hk, Hpc, #Hft, #Hkl, Hav, #Hpi, Hfd1, Hfd2, Hc0, Hc1, Hnext⟩

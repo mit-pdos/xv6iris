@@ -56,7 +56,7 @@ def fclosePost {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
   | .open _ _ .pipe => iprop(kallocAvail γk on ∨ kallocAvail γk (availInc on))
   | _ => kallocAvail γk on
 
-def wp_fileclose_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [CurCtx]
+def wp_fileclose_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γl : GName) (γ : FileNames) (kk : Nat) (q : Qp) (st : FdState)
     (γkl : GName) (γk : KmemNames) (on : Option Nat)
     (hst : fcStateOk st)
@@ -73,7 +73,7 @@ def wp_fileclose_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
   ⊢ wpLoop (GF := GF) cpu
 
 structure FILECLOSE : Prop where
-  wp_fileclose : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [CurCtx]
+  wp_fileclose : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γl : GName) (γ : FileNames) (kk : Nat) (q : Qp) (st : FdState)
     (γkl : GName) (γk : KmemNames) (on : Option Nat)
     hst hnoff hK hlk hpipe hproc hkmem htier ha0,

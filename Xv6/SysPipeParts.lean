@@ -234,7 +234,7 @@ theorem sys_pipe_ctx (X : CurCtx) (h : X.curTier = KTier.kpt) : X = ⟨X.curCtx,
   cases X; simp only at h; subst h; rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
 
 /-! ## The callees -/
 

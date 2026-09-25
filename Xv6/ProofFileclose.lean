@@ -90,7 +90,7 @@ theorem fc_calleeSaved_mk (KR R : RegMap)
       | assumption
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
 
 /-! ## Small resource facts -/
 
@@ -101,13 +101,59 @@ theorem fclosePost_same (γk : KmemNames) (on : Option Nat) (st : FdState) :
   | «open» r w t =>
     cases t with
     | pipe => unfold fclosePost; iintro H; ileft; iexact H
-    | inode n g => unfold fclosePost; iintro H; iexact H
+    | inode n g om => unfold fclosePost; iintro H; iexact H
     | device mj => unfold fclosePost; iintro H; iexact H
 
-theorem fileCore_pipe (q : Qp) (pn : FPNames) (C : FContent) (h : C.type = FD_PIPE) :
-    fileCore (GF := GF) q pn C ⊢ isPipe pn.lock pn.pipe C.pipe ∗ pipeRef pn.pipe (fcWbool C) q := by
-  unfold fileCore
+/-- What the last closer of a pipe or untyped file keeps after the freed
+slot's payload is carved off: the pipe end (for `pipeclose`), or nothing. -/
+def fcPipeRest (pn : FPNames) (C : FContent) : IProp GF :=
+  if C.type = FD_PIPE then iprop(isPipe pn.lock pn.pipe C.pipe ∗ pipeRef pn.pipe (fcWbool C) 1)
+  else iprop(emp)
+
+theorem fcPipeRest_pipe (pn : FPNames) (C : FContent) (h : C.type = FD_PIPE) :
+    fcPipeRest (GF := GF) pn C ⊢ isPipe pn.lock pn.pipe C.pipe ∗ pipeRef pn.pipe (fcWbool C) 1 := by
+  unfold fcPipeRest
   rw [if_pos h]
+
+/-- The last close's payload split (Rocq's `file_core_noff` pipe arm and
+`file_core_off`'s free arm): the untyped slot's payload -- the entry's iref
+unit and the free `f->off` word -- goes back into the freed slot, and the
+pipe end (if any) goes on to `pipeclose`. -/
+theorem fclose_core_take (kk : Nat) (pn : FPNames) (C : FContent)
+    (h : C.type = FD_NONE ∨ C.type = FD_PIPE) :
+    fileCore (GF := GF) kk 1 pn C ⊢ fileCore kk 1 pn { C with type := FD_NONE } ∗ fcPipeRest pn C := by
+  rcases h with h | h
+  · iintro H
+    icases (fileCore_none kk 1 pn C h).1 $$ H with ⟨Hi, Ho⟩
+    isplitl [Hi Ho]
+    · iapply (fileCore_none kk 1 pn { C with type := FD_NONE } rfl).2
+      iframe Hi Ho
+    · unfold fcPipeRest
+      rw [if_neg (by rw [h]; exact fdNone_ne_pipe)]
+      iempintro
+  · unfold fileCore
+    rw [(fileCoreNoff_pipe 1 pn C h).to_eq,
+      (fileCoreOff_free kk 1 pn C (by rw [h]; exact fdPipe_ne_inode)).to_eq]
+    iintro ⟨⟨#Hp, Hr, Hi⟩, Ho⟩
+    isplitl [Hi Ho]
+    · iapply (show irefFrac (GF := GF) 1 ∗ offFree kk 1 ⊢
+          fileCoreNoff 1 pn { C with type := FD_NONE } ∗ fileCoreOff kk 1 pn { C with type := FD_NONE }
+        from (fileCore_none kk 1 pn { C with type := FD_NONE } rfl).2)
+      iframe Hi Ho
+    · unfold fcPipeRest
+      rw [if_pos h]
+      iframe Hp Hr
+
+theorem fclose_type_ok (st : FdState) (pn : FPNames) (C : FContent) (hst : fcStateOk st)
+    (hok : fdstateOk pn.inum pn.ooff C st) : C.type = FD_NONE ∨ C.type = FD_PIPE := by
+  have hty := fdstateOk_type _ _ _ _ hok
+  cases st with
+  | closed => exact Or.inl hty
+  | «open» r w t =>
+    cases t with
+    | pipe => exact Or.inr hty
+    | inode n g om => exact absurd hst (by unfold fcStateOk; simp)
+    | device mj => exact absurd hst (by unfold fcStateOk; simp)
 
 theorem fc_frame_open (sp ra s0 s1 : BitVec 64) :
     frame8s1 (GF := GF) sp ra s0 s1 ⊢
@@ -258,7 +304,7 @@ theorem fc_last (RE : RELEASE) (PC : PIPECLOSE) (Γ : SchedNames) (cpu c : CPU) 
       [∗list] j ∈ List.range NFILE, fslotAt γ curCtx j (updAt Ls kk L' j)) ∗
     wordAtN curCtx (aFref kk) 4 (DFrac.own 1) (BitVec.ofNat 32 0) ∗
     ([∗list] e ∈ ([] : List (Nat × Qp)), frefRest γ kk e) ∗ fdSlots γ 0 ∗
-    fileFieldsAt curCtx kk 1 C ∗ fpayTok γ kk 1 pn ∗ fileCore 1 pn C ∗
+    fileFieldsAt curCtx kk 1 C ∗ fpayTok γ kk 1 pn ∗ fileCore kk 1 pn C ∗
     fdSlot γ ∗ frame8s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
     sieArm c k.sie k.proc ∗
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk on ∗ procsInv Γ ∗
@@ -296,12 +342,11 @@ theorem fc_last (RE : RELEASE) (PC : PIPECLOSE) (Γ : SchedNames) (cpu c : CPU) 
       wordPointsTo (fnode kk + BitVec.signExtend 64 9#12) 1 (DFrac.own 1) C.writable ∗
       wordPointsTo (fnode kk + BitVec.signExtend 64 16#12) 8 (DFrac.own 1) C.pipe ∗
       wordPointsTo (fnode kk + BitVec.signExtend 64 24#12) 8 (DFrac.own 1) C.ip ∗
-      wordPointsTo (aFmajor kk) 2 (DFrac.own 1) C.major ∗
-      (∃ off : BitVec 32, wordPointsTo (aFoff kk) 4 (DFrac.own 1) off) from by
+      wordPointsTo (aFmajor kk) 2 (DFrac.own 1) C.major from by
     unfold fileFieldsAt
     simp only [wordAtN_cur]
     rw [aFtype_eq, aFwritable_eq, aFpipe_eq, aFip_eq]) $$ Hf
-  icases Hf with ⟨Hty, Hrd, Hwr, Hpp, Hip, Hmj, Hoff⟩
+  icases Hf with ⟨Hty, Hrd, Hwr, Hpp, Hip, Hmj⟩
   k_step (wp_s_lw c _ (KA.«fileclose» + 0x2e#64) false 0#12 18#5 9#5 (by decide) (by decide) (DFrac.own 1) C.type)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9]
   iintro Hk Hpc Hty
@@ -337,23 +382,24 @@ theorem fc_last (RE : RELEASE) (PC : PIPECLOSE) (Γ : SchedNames) (cpu c : CPU) 
   ihave Hrefc := (show wordPointsTo (GF := GF) (fnode kk + 4#64) 4 (DFrac.own 1) 0#32 ⊢
       wordAtN curCtx (aFref kk) 4 (DFrac.own 1) (BitVec.ofNat 32 ([] : List (Nat × Qp)).length) from by
     rw [wordAtN_cur, aFref_eq']; rfl) $$ Hrefc
-  ihave Hf' : fileFieldsAt (GF := GF) curCtx kk 1 { C with type := FD_NONE } $$ [Hty Hrd Hwr Hpp Hip Hmj Hoff]
+  ihave Hf' : fileFieldsAt (GF := GF) curCtx kk 1 { C with type := FD_NONE } $$ [Hty Hrd Hwr Hpp Hip Hmj]
   case' _ =>
     unfold fileFieldsAt
     simp only [wordAtN_cur]
     rw [← aFwritable_eq', ← aFpipe_eq', ← aFip_eq']
     unfold aFtype FD_NONE
-    iframe Hrd Hwr Hpp Hip Hmj Hoff
+    iframe Hrd Hwr Hpp Hip Hmj
     iexact Hty
+  icases fclose_core_take kk pn C (fclose_type_ok st pn C hst hok2) $$ Hc with ⟨Hc0, Hc⟩
   ihave Hslot := fslot_intro γ curCtx kk [] { C with type := FD_NONE } pn 1 (by simp) (by simp)
-    $$ [Hrefc Hhalves Hfdn Hf' Ht]
+    $$ [Hrefc Hhalves Hfdn Hf' Ht Hc0]
   case' _ =>
     iframe Hrefc Hhalves Hfdn
     ileft
     iframe Hf' Ht
     isplitl []
     · ipureintro; exact ⟨rfl, rfl⟩
-    iapply fileCore_none 1 pn _ rfl
+    iexact Hc0
   ihave Hs := Hcl $$ %([] : List (Nat × Qp)) Hslot
   ihave HR := ftableRes_intro γ curCtx M nx (updAt Ls kk []) hfresh hok $$ [Ha Hs]
   case' _ => iframe
@@ -453,7 +499,7 @@ theorem fc_last (RE : RELEASE) (PC : PIPECLOSE) (Γ : SchedNames) (cpu c : CPU) 
       $$ [- $Hk $Hpc $Hframe $Hfd $Hpost $Hnext]
   | «open» r w t =>
     cases t with
-    | inode n g => exact absurd hst (by unfold fcStateOk; simp)
+    | inode n g om => exact absurd hst (by unfold fcStateOk; simp)
     | device mj => exact absurd hst (by unfold fcStateOk; simp)
     | pipe =>
       -- FD_PIPE: beq taken ; mv a1,s3 ; mv a0,s4 ; jal pipeclose ; restore ; j 41ec
@@ -471,7 +517,7 @@ theorem fc_last (RE : RELEASE) (PC : PIPECLOSE) (Γ : SchedNames) (cpu c : CPU) 
       k_step_gen (wp_s_jal c4 _ (KA.«fileclose» + 0x9c#64) false 864#21 1#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fileclose_br_3fc] next c5 hp5
       iintro Hk Hpc
-      icases fileCore_pipe 1 pn C hty $$ Hc with ⟨#Hpipe, Hpr⟩
+      icases fcPipeRest_pipe pn C hty $$ Hc with ⟨#Hpipe, Hpr⟩
       iapply (fc_pipeclose PC Γ c5 _ pn.lock pn.pipe (fcWbool C) γkl γk on ?hw ?hnp ?hKp ?hpp ?hpr ?hkp ?htp)
         $$ [- $Hk $Hpc $Hav]
       rotate_right 1
@@ -544,7 +590,7 @@ theorem fileclose_br_ffffffffffffca3c : KA.«fileclose» + 0xffffffffffffca3c#64
 
 set_option maxHeartbeats 16000000 in
 theorem fileclose_proof (AC : ACQUIRE) (RE : RELEASE) (PC : PIPECLOSE) : FILECLOSE := ⟨
-  fun {hlc GF} _ _ _ _ Γ cpu k γl γ kk q st γkl γk on hst hnoff hK hlk hpipe hproc hkmem htier ha0 => by
+  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ Γ cpu k γl γ kk q st γkl γk on hst hnoff hK hlk hpipe hproc hkmem htier ha0 => by
   unfold wp_fileclose_body
   simp only [filecloseAddr]
   iintro ⟨Hk, Hpc, #Hft, Href, #Hkl, Hav, #Hpi, Hnext⟩

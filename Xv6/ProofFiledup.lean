@@ -45,7 +45,7 @@ theorem fd_lock_413a : KA.«filedup» + 0x1e372#64 = ftableAddr := by
   unfold ftableAddr; decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
 
 /-! ## The tail: `mv a0,s1` and the epilogue -/
 
@@ -125,7 +125,7 @@ theorem filedup_br_1e372 : KA.«filedup» + 0x1e372#64 = ftableAddr := by decide
 
 set_option maxHeartbeats 16000000 in
 theorem filedup_proof (AC : ACQUIRE) (RE : RELEASE) : FILEDUP := ⟨
-  fun {hlc GF} _ _ _ _ cpu k γl γ kk q st hnoff hK hlk ha0 => by
+  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ cpu k γl γ kk q st hnoff hK hlk ha0 => by
   unfold wp_filedup_body
   simp only [filedupAddr]
   iintro ⟨Hk, Hpc, #Hft, Hfd, Href, Hnext⟩

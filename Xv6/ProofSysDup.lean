@@ -101,7 +101,7 @@ def sdPins (k : KCtx) (R : RegMap) : Prop :=
   R 25#5 = k.regs 25#5 ∧ R 26#5 = k.regs 26#5 ∧ R 27#5 = k.regs 27#5
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
 
 /-! ## The callees -/
 
@@ -278,7 +278,7 @@ theorem sys_dup_br_fffffffffffffe02 : KA.«sys_dup» + 0xfffffffffffffe02#64 = K
 
 set_option maxHeartbeats 64000000 in
 theorem sys_dup_proof (AF : ARGFD) (FD : FDALLOC) (FU : FILEDUP) : SYSDUP := ⟨
-  fun {hlc GF} _ _ _ X cpu k γl γ γd pa pid V M sts v hv hproc htier hsp hnoff hK hlk => by
+  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ X cpu k γl γ γd pa pid V M sts v hv hproc htier hsp hnoff hK hlk => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
   unfold wp_sys_dup_body
@@ -537,18 +537,18 @@ theorem sys_dup_proof (AF : ARGFD) (FD : FDALLOC) (FU : FILEDUP) : SYSDUP := ⟨
       -- GHOST: the source's row, and the destination's authority moved to it
       obtain ⟨st0, hst0⟩ : ∃ st0, sts[fd0]? = some st0 :=
         ⟨_, List.getElem?_eq_getElem (by rw [hslen]; unfold NOFILE; exact hfd0)⟩
-      icases fdFrags_acc γd sts fd0 st0 hst0 $$ Hfr with ⟨Hfrag0, Hfrw0⟩
+      icases fdFrags_acc γd sts fd0 st0 hst0 $$ Hfr with ⟨Hfrag0, #Hrow0, Hfrw0⟩
       icases fdSt_agree' γd fd0 st st0 $$ [Hauth0 Hfrag0] with ⟨%he0, Hauth0, Hfrag0⟩
       · iframe
       subst he0
-      ihave Hfr := Hfrw0 $$ %st Hfrag0
+      ihave Hfr := Hfrw0 $$ %st Hfrag0 Hrow0
       have hset0 : sts.set fd0 st = sts := by
         obtain ⟨hlt, he⟩ := List.getElem?_eq_some_iff.mp hst0
         rw [← he]; exact List.set_getElem_self hlt
       ihave Hfr := (show fdFrags (GF := GF) γd (sts.set fd0 st) ⊢ fdFrags γd sts from by rw [hset0]) $$ Hfr
       obtain ⟨st1, hst1⟩ : ∃ st1, sts[fd1]? = some st1 :=
         ⟨_, List.getElem?_eq_getElem (by rw [hslen]; unfold NOFILE; exact hfd1lt)⟩
-      icases fdFrags_acc γd sts fd1 st1 hst1 $$ Hfr with ⟨Hfrag1, Hfrw1⟩
+      icases fdFrags_acc γd sts fd1 st1 hst1 $$ Hfr with ⟨Hfrag1, -, Hfrw1⟩
       icases fdSt_agree' γd fd1 .closed st1 $$ [Hauth1 Hfrag1] with ⟨%he1, Hauth1, Hfrag1⟩
       · iframe
       subst he1
@@ -556,7 +556,7 @@ theorem sys_dup_proof (AF : ARGFD) (FD : FDALLOC) (FU : FILEDUP) : SYSDUP := ⟨
       imod fdSt_update γd fd1 .closed .closed st $$ [Hauth1 Hfrag1] with ⟨Hauth1, Hfrag1⟩
       · iframe
       imodintro
-      ihave Hfr := Hfrw1 $$ %st Hfrag1
+      ihave Hfr := Hfrw1 $$ %st Hfrag1 Hrow0
       -- REPAY fd1, then fd0
       have hfd1' : (V.ofile.set fd1 (fnode kk))[fd1]? = some (fnode kk) :=
         List.getElem?_set_self (by rw [hlen]; unfold NOFILE; exact hfd1lt)
