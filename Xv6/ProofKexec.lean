@@ -19,8 +19,9 @@ three things of its own:
    answers the ONE question the arms are keyed on -- is the observed node a
    file `kexecLoadable` describes?  On the `-1` side the cause is `EfNoMem`
    when the node IS a loadable file (its magic passed,
-   `KexecBridge.kexecMagic_of_loadable`) or `EfArgsFit` (never produced by
-   the Lean cone, see deviation 3), and `EfNotLoadable` otherwise.
+   `KexecBridge.kexecMagic_of_loadable`) or `EfArgsFit` (phase C's two
+   `sp < stackbase` tails, `kxau_argsfit_prem`), and `EfNotLoadable`
+   otherwise.
 
 ## Deviations from Rocq
 
@@ -33,16 +34,10 @@ three things of its own:
 2. **PROCESS LAYER (flagged)**: `U`/`U'` are `(A.V, A.M)` / `(V', M')`
    (SpecKexec deviation 2).  The entry trapframe's length is read off the
    block ONCE (`kxau_tf_len`, Rocq `proc_priv_tf` + `tf_page_length`).
-3. **The `KfArgsFit` cause is never produced** (KexecCore deviation 2): the
-   landed phase C closes its two `sp < stackbase` tails at `QF .noMem`, so
-   an arguments-do-not-fit failure on a LOADABLE file is reported as
-   `EfNoMem` (sound: `execFailOk … .noMem` holds of every loadable file),
-   not `EfArgsFit`.  `kxauQFp` keeps Rocq's three rows; Rocq's
-   `kxau_argsfit_prem` has no consumer and is dropped.  REPORTED.
-4. **`kxau_classify` decides classically** (KexecBridge deviation 3).
-5. The phases B..D composition is `KexecCore.kxc_from90` (Rocq inline;
+3. **`kxau_classify` decides classically** (KexecBridge deviation 3).
+4. The phases B..D composition is `KexecCore.kxc_from90` (Rocq inline;
    `kxc_cd` / `kxc_d_tail` are KexecCore's).
-6. `kxau_fb_length` is `fileBytes`' `List.length_map`; `kxau_nomem_ok` is
+5. `kxau_fb_length` is `fileBytes`' `List.length_map`; `kxau_nomem_ok` is
    inlined in `kxau_fail_cause`.
 -/
 import Xv6.KexecA
@@ -109,6 +104,19 @@ theorem kxau_notloadable_prem (f ef : ElfBytes) (na : Nat) (alen : Nat → Nat)
     kxauQFp f na alen .notLoadable := fun hload =>
   KexecImageAlg.kexecLoadable_of_walk (hag hload) hn hload
 
+/-- **Rocq `kxau_argsfit_prem`**: phase C's two `sp < stackbase` tails' plug
+-- on a loadable file the walk's guard holds, so the size the tails saw IS
+`kexecSz f`. -/
+theorem kxau_argsfit_prem (f ef : ElfBytes) (na : Nat) (alen : Nat → Nat)
+    (hag : kexecLoadable f → ∀ j, j < 64 → ef[j]! = f[j]!) :
+    kxcArgsFitQF (kxauQFp f na alen) f ef alen na := by
+  intro z hz hns hload
+  have hw := KexecImageAlg.kxbWalkOk_of_loadable hload (hag hload)
+  have h1 := hz hw
+  have h2 := KexecImageAlg.kexecSz_of_szAfter f
+  rw [show (kexecSz f : Int) = z by omega]
+  exact hns
+
 /-- The header phase A read IS the file's first 64 bytes, whenever the file
 is loadable (it is at least that long). -/
 theorem kxau_hdr (data : Nat → List (BitVec 8)) (dn : Dinode) (ef : ElfBytes)
@@ -120,7 +128,7 @@ theorem kxau_hdr (data : Nat → List (BitVec 8)) (dn : Dinode) (ef : ElfBytes)
   rw [hef j hj, kxcFb, fileBytes_lookup data _ j (by omega)]
 
 /-- **Rocq `kxau_classify`: THE ONE QUESTION THE ARMS ARE KEYED ON, DECIDED**
-(deviation 4): is the node the walk observed a file `kexecLoadable`
+(deviation 3): is the node the walk observed a file `kexecLoadable`
 describes? -/
 theorem kxau_classify (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8))
     (hrow : dn.diType.toNat = T_FILE → absRow (eraNode dn bm data) =
@@ -399,8 +407,9 @@ theorem wp_kexec_main (MP : MYPROC) (BO : BEGIN_OP) (NE : NAMEI_ERA) (IL : ILOCK
     (execBuiltQ (kxcFb data dnf) ef A.na A.alen A.afun) (kxauQFp (kxcFb data dnf) A.na A.alen)
     c k A spie spp R kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2 ef
     (fun sz1 V' M' hb => execBuiltQ_intro _ ef A.na A.alen A.afun sz1 V' M' hb)
-    (kxau_notloadable_prem _ ef A.na A.alen (kxau_hdr data dnf ef hef)) trivial hK hnoff htier hj
-    hproc hargs hna havf havfnz hterm)
+    (kxau_notloadable_prem _ ef A.na A.alen (kxau_hdr data dnf ef hef)) trivial
+    (kxau_argsfit_prem _ ef A.na A.alen (kxau_hdr data dnf ef hef)) hK hnoff htier hj hproc hargs
+    hna havf havfnz hterm)
   iframe Hs Hfab Hcl
 
 end

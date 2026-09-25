@@ -48,10 +48,9 @@ STAGE file (no `Proof` prefix).
 3. **The caller's C-string facts are one `Prop`, `kxcArgsOk A`** (Rocq's
    three premises `alen i < aslen i`, `bb_cstr (afun i) (alen i)`,
    `alen i < 4096`), with `bb_cstr` unfolded to `MachCSL.cstr`'s shape.
-4. **The failure plug.**  Rocq takes `QF KfNoMem` and a `∀ z, …
-   ¬ kxc_stack_ok … → QF KfArgsFit` clause; the frozen `kxc_bad_1d6`
-   relays `∃ c, QF c`, so the args-fit clause is unused here and DROPPED
-   (the `-1` return's cause is existential at this altitude).
+4. **The failure plug** is Rocq's: `QF KfNoMem` (the failed copyout) and
+   the `∀ z, … ¬ kxc_stack_ok … → QF KfArgsFit` clause (`kxcArgsFitQF`,
+   the overflow stub, at `kxcImgRows`' size row: `kxcC_argsFit`).
 5. **Rocq's `(8 aligned elf slots)` premise** is the base's alignment and the
    header's length (`hal`, `hl`), what `kxcFrameB_at` needs.
 6. **The copyout image is collapsed by `KexecBuilt.kxCopyout_covered`**
@@ -79,6 +78,23 @@ set_option linter.unusedVariables false
 def kxcArgsOk (A : KexecArgs) : Prop :=
   ∀ i, i < A.na → A.alen i < A.aslen i ∧ (∀ j, j < A.alen i → A.afun i j ≠ 0#8) ∧
     A.afun i (A.alen i) = 0#8 ∧ A.alen i < 4096
+
+/-- **Rocq's ARGUMENT-FIT plug** (`kxc_argv_step`'s `∀ z, … ¬ kxc_stack_ok … →
+QF KfArgsFit`): at the size the run settled on -- under the walk's own guard,
+what that size IS (`kxcImgRows`' size row) -- a stack the arguments do not
+fit is the `argsFit` cause.  Quantified over `z` because only the tail can
+supply it. -/
+def kxcArgsFitQF (QF : KxfCause → Prop) (fb ef : List (BitVec 8)) (alen : Nat → Nat) (na : Nat) :
+    Prop :=
+  ∀ z : Int, (kxbWalkOk fb ef → z = (pgRoundUpN (KexecBuilt.kexecSzAfter (elfLoads fb)) : Int) + 2 * 4096) →
+    ¬ kxcStackOk z (z - 4096) alen na → QF .argsFit
+
+/-- The plug at the tail's own size: `kxcImgRows`' size row, cast. -/
+theorem kxcC_argsFit {QF : KxfCause → Prop} {fb ef : List (BitVec 8)} {alen : Nat → Nat} {na : Nat}
+    {P : UPtd} {sz1 : BitVec 64} {Mv : ElfMem} (hqfa : kxcArgsFitQF QF fb ef alen na)
+    (himg : kxcImgRows fb ef P sz1 Mv)
+    (hns : ¬ kxcStackOk (sz1.toNat : Int) ((sz1.toNat : Int) - 4096) alen na) : QF .argsFit :=
+  hqfa _ (fun hw => by have := himg.2.1 hw; omega) hns
 
 theorem kxcC_bview_succ (m : Nat) (f : Nat → BitVec 8) : bview (m + 1) f = bview m f ++ [f m] := by
   simp [bview, List.range_succ]
@@ -496,7 +512,8 @@ theorem kxc_argv_step (SL : STRLEN) (CO : COPYOUT) (PFP : PROC_FREEPAGETABLE) (�
     (cpu : CPU) (k : KCtx) (A : KexecArgs) (spie spp : Bool) (R : RegMap) (w13 w67 : BitVec 64)
     (fb ef : List (BitVec 8)) (P : UPtd) (Mi : Nat → List (BitVec 8)) (oldsz sz1 : BitVec 64)
     (ci : Nat)
-    (hqf : QF .noMem) (hK : kexecSlots ≤ k.avail) (hnoff : k.noff = 0)
+    (hqf : QF .noMem) (hqfa : kxcArgsFitQF QF fb ef A.alen A.na)
+    (hK : kexecSlots ≤ k.avail) (hnoff : k.noff = 0)
     (hargs : kxcArgsOk A) (hna : A.na < MAXARG) (hcna : ci < A.na)
     (hsz1 : 8192 ≤ sz1.toNat ∧ sz1.toNat ≤ 2 ^ 38)
     (hal : (kxcElfBuf (k.regs 2#5)).toNat % 8 = 0) (hl : ef.length = 64) :
@@ -580,13 +597,17 @@ theorem kxc_argv_step (SL : STRLEN) (CO : COPYOUT) (PFP : PROC_FREEPAGETABLE) (�
   by_cases hov : kxcSp (sz1.toNat : Int) A.alen (ci + 1) < (sz1.toNat : Int) - 4096
   · -- ===== THE STACK OVERFLOWED: +0x352 =====
     simp only [hov, decide_true, if_true]
+    -- THE CAUSE: `sp < stackbase` after argument `ci`, so the fit condition
+    -- fails already at index `ci + 1 ≤ na`
+    have hfit : QF .argsFit := kxcC_argsFit hqfa himg fun hok => by
+      have := hok.1 (ci + 1) (by omega) (by omega); omega
     ihave Hs := (kxcC_cstr_of (A.avf ci) A.dqas (A.alen ci) (A.afun ci) hnul hnz).2 $$ Hs
     ihave Hsrest := kxcC_bb_addr (kxcC_ofNat_succ _ _) _ _ $$ Hsrest
     ihave Hs := (kxcC_str_open (A.avf ci) A.dqas (A.alen ci) (A.aslen ci) (A.afun ci) hlt).2 $$ [Hs Hsrest]
     · iframe
     ihave Hstrs := Hsback $$ Hs
     iapply (kxcC_stub PFP Γ Q QF cpu k A spie spp _ w13 w67 ef P Mi sz1 ci (KA.«kexec» + 0x352#64)
-        2096770#21 kxcC_j_354 ⟨.noMem, hqf⟩ hK hnoff (by unfold MAXARG at hna; omega) hal hl ?t2 ?t18
+        2096770#21 kxcC_j_354 ⟨.argsFit, hfit⟩ hK hnoff (by unfold MAXARG at hna; omega) hal hl ?t2 ?t18
         ?t22 ?t27 hbelow hcov)
       $$ [- $Hk $Hpc $Hte $Hce $Hfab $Hcl]
     case t2 => simp [RegMap.set_apply, a2]
@@ -710,7 +731,8 @@ theorem kxcC_at21a_pure (k : KCtx) (A : KexecArgs) (c : CPU) (spie spp : Bool) (
 theorem kxc_argv_loop (SL : STRLEN) (CO : COPYOUT) (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames)
     (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → Prop) (QF : KxfCause → Prop)
     (k : KCtx) (A : KexecArgs) (w13 w67 : BitVec 64) (fb ef : List (BitVec 8)) (oldsz sz1 : BitVec 64)
-    (hqf : QF .noMem) (hK : kexecSlots ≤ k.avail) (hnoff : k.noff = 0)
+    (hqf : QF .noMem) (hqfa : kxcArgsFitQF QF fb ef A.alen A.na)
+    (hK : kexecSlots ≤ k.avail) (hnoff : k.noff = 0)
     (hargs : kxcArgsOk A) (hna : A.na < MAXARG) (havf : A.avf A.na = 0#64)
     (hsz1 : 8192 ≤ sz1.toNat ∧ sz1.toNat ≤ 2 ^ 38)
     (hal : (kxcElfBuf (k.regs 2#5)).toNat % 8 = 0) (hl : ef.length = 64) :
@@ -733,7 +755,7 @@ theorem kxc_argv_loop (SL : STRLEN) (CO : COPYOUT) (PFP : PROC_FREEPAGETABLE) (�
   | succ W ih =>
     intro ci cpu spie spp R P Mi hW hci
     iintro ⟨Hst, #Hfab, Hcl, HK⟩
-    iapply (kxc_argv_step SL CO PFP Γ Q QF cpu k A spie spp R w13 w67 fb ef P Mi oldsz sz1 ci hqf hK
+    iapply (kxc_argv_step SL CO PFP Γ Q QF cpu k A spie spp R w13 w67 fb ef P Mi oldsz sz1 ci hqf hqfa hK
         hnoff hargs hna hci hsz1 hal hl)
     iframe Hst Hfab Hcl
     iintro %c %spie' %spp' %R' %P' %Mo (Hn | Hx) Hcl

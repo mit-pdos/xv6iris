@@ -302,6 +302,15 @@ theorem kxcC_ustack_join' [CurCtx] (sp0 : BitVec 64) (n : Nat) (hn : n ≤ 33) :
 
 end Frame
 
+/-- **Rocq `kxc_sp_final_mono`**: the pointer after the vector is antitone
+in the count (the close tests at the count the loop reached, the plug
+speaks at `na`). -/
+theorem kxcC_spFinal_mono (top : Int) (len : Nat → Nat) (i j : Nat) (hij : i ≤ j) :
+    kxcSpFinal top len j ≤ kxcSpFinal top len i := by
+  have := kxcSp_anti top len i j hij
+  unfold kxcSpFinal kxcRound16
+  omega
+
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
@@ -314,7 +323,8 @@ theorem kxc_c_close (CO : COPYOUT) (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames)
     (cpu : CPU) (k : KCtx) (A : KexecArgs) (spie spp : Bool) (R : RegMap) (w13 w67 : BitVec 64)
     (fb ef : List (BitVec 8)) (P : UPtd) (Mi : Nat → List (BitVec 8)) (oldsz sz1 : BitVec 64)
     (ci : Nat)
-    (hqf : QF .noMem) (hK : kexecSlots ≤ k.avail) (hnoff : k.noff = 0)
+    (hqf : QF .noMem) (hqfa : kxcArgsFitQF QF fb ef A.alen A.na)
+    (hK : kexecSlots ≤ k.avail) (hnoff : k.noff = 0)
     (hsz1 : 8192 ≤ sz1.toNat ∧ sz1.toNat ≤ 2 ^ 38)
     (hal : (kxcElfBuf (k.regs 2#5)).toNat % 8 = 0) (hl : ef.length = 64) :
     kxcAt272 k A cpu spie spp R (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5)
@@ -381,6 +391,10 @@ theorem kxc_c_close (CO : COPYOUT) (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames)
   by_cases hov : kxcSpFinal (sz1.toNat : Int) A.alen ci < (sz1.toNat : Int) - 4096
   · -- ===== THE VECTOR OVERFLOWED: to the shared -1 tail =====
     simp only [hov, decide_true, if_true]
+    -- THE CAUSE: the vector does not fit at the count `ci` the loop reached;
+    -- `kxcSpFinal` is antitone, so `ci ≤ na` carries the overflow up
+    have hfit : QF .argsFit := kxcC_argsFit hqfa himg fun hok => by
+      have := kxcC_spFinal_mono (sz1.toNat : Int) A.alen ci A.na hcle; have := hok.2; omega
     ihave Fu := kxcC_ustack_untake (k.regs 2#5) ci hc33 0#64 $$ [Fu Fc]
     · iframe
     ihave Hfr := kxcC_frameC_at (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5)
@@ -388,8 +402,8 @@ theorem kxc_c_close (CO : COPYOUT) (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames)
         (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) (k.regs 26#5) w13 w67 ci sz1 A.alen ef (by omega) hal hl
       $$ [F1 F2 F3 F4 F5 F6 F7 F8 F9 F10 F11 F12 F13 Fu Fw Fp F64 F65 F66 F67 F68 Helf]
     · unfold kxcFrameC; iframe
-    iapply (kxc_bad_1d6 PFP Γ Q QF cpu k A spie spp _ P Mi sz1 w13 ⟨.noMem, hqf⟩ hK hnoff ?s2 ?s24 ?s22
-        ?s27 hbelow hcov)
+    iapply (kxc_bad_1d6 PFP Γ Q QF cpu k A spie spp _ P Mi sz1 w13 ⟨.argsFit, hfit⟩ hK hnoff ?s2 ?s24
+        ?s22 ?s27 hbelow hcov)
       $$ [$Hk $Hpc $Hte $Hce $Hfab $Hpt $Hpriv $Hbufs $Hbs $Hirs $Hfr $Hcl]
     case s2 => simp [RegMap.set_apply, h2]
     case s24 => simp [RegMap.set_apply, h18]
@@ -493,7 +507,8 @@ theorem kxc_phaseC (MP : MYPROC) (UA : UVMALLOC) (UC : UVMCLEAR) (SL : STRLEN) (
     (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → Prop) (QF : KxfCause → Prop)
     (cpu : CPU) (k : KCtx) (A : KexecArgs) (spie spp : Bool) (R : RegMap) (w13 w67 : BitVec 64)
     (fb ef : List (BitVec 8)) (P : UPtd) (Mi : Nat → List (BitVec 8)) (szv : BitVec 64)
-    (hqf : QF .noMem) (hK : kexecSlots ≤ k.avail) (hnoff : k.noff = 0)
+    (hqf : QF .noMem) (hqfa : kxcArgsFitQF QF fb ef A.alen A.na)
+    (hK : kexecSlots ≤ k.avail) (hnoff : k.noff = 0)
     (htier : k.tier = KTier.kpt) (hargs : kxcArgsOk A) (hna : A.na < MAXARG)
     (havf : A.avf A.na = 0#64) :
     kxcAt1ae k A cpu spie spp R (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5)
@@ -529,7 +544,7 @@ theorem kxc_phaseC (MP : MYPROC) (UA : UVMALLOC) (UC : UVMCLEAR) (SL : STRLEN) (
       (∀ c' : CPU, kexecCloser Q QF k A c') -∗ wpLoop c) $$ []
   · imodintro
     iintro %c2 %spie2 %spp2 %R2 %P2 %Mo2 %ci2 HK H272 Hcl
-    iapply (kxc_c_close CO PFP Γ Q QF c2 k A spie2 spp2 R2 w13 w67 fb ef P2 Mo2 A.V.sz sz1 ci2 hqf hK
+    iapply (kxc_c_close CO PFP Γ Q QF c2 k A spie2 spp2 R2 w13 w67 fb ef P2 Mo2 A.V.sz sz1 ci2 hqf hqfa hK
         hnoff hsz1 hal hl)
     iframe H272 Hfab Hcl
     iintro %c3 %spie3 %spp3 %R3 %P3 %Mo3 H2a6 Hcl
@@ -542,7 +557,7 @@ theorem kxc_phaseC (MP : MYPROC) (UA : UVMALLOC) (UC : UVMCLEAR) (SL : STRLEN) (
       rcases Nat.eq_zero_or_pos A.na with h | h
       · rw [h] at havf; exact absurd havf h2
       · exact h
-    iapply (kxc_argv_loop SL CO PFP Γ Q QF k A w13 w67 fb ef A.V.sz sz1 hqf hK hnoff hargs hna havf
+    iapply (kxc_argv_loop SL CO PFP Γ Q QF k A w13 w67 fb ef A.V.sz sz1 hqf hqfa hK hnoff hargs hna havf
         hsz1 hal hl A.na 0 c spie' spp' R' P' Mo (by omega) hlt)
     iframe H21a Hfab Hcl
     iintro %c2 %spie2 %spp2 %R2 %P2 %Mo2 %ci2 H272 Hcl
