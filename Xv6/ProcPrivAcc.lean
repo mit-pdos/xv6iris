@@ -498,10 +498,11 @@ theorem procPrivFd_noctxGen [X : CurCtx] (h : curTier = KTier.kpt) (γ : FileNam
   iframe Hb Hc Hg Ho
 
 /-- **D31's accessor** (wave 8, the dispatch's entry-shape adapter for the
-arms whose landed contracts take the cells form -- getpid, sbrk, wait):
+arms whose bodies run over the cells form -- sys_wait; getpid and sbrk
+now state Rocq's whole block):
 `procPrivFd ⊢ procPrivNoctxAt ∗ (procPrivNoctxAt -∗ procPrivFd)`, the wand
 at any record that keeps the descriptor array, its ghost, the working
-directory, its inum and the generation (sbrk moves `sz`/`upt`, a
+directory, its inum and the generation (a
 `copyout` grows `upt`, none touches those). -/
 theorem procPrivFd_noctx [X : CurCtx] (h : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 64)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :

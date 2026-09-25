@@ -25,11 +25,12 @@ The three things this proof is about (Rocq's header):
    the upper); it is split once (`word8_split4`) and rejoined at the exit.
 3. The wrap test at `+0x44` is dead: `p->sz ≤ TRAPFRAME` and `n < 2^31`.
 
-The private block (`procPrivNoctxAt curCtx`, Rocq `proc_priv`; read at the
+The private block (`procPrivFd γ`, Rocq's whole `proc_priv`; read at the
 ambient context once `kctx_tier` + `htier` give `curTier = kpt`) is opened
-into `p->sz`, the trapframe pointer and page
-(lent to the two `argint` calls), and the rest (`sysSbrkRest`); it is closed
-whole before `growproc`, which takes it whole.  All five exits join at
+into `p->sz`, the trapframe pointer and page (lent to the two `argint`
+calls) and the closing wand `sysSbrkBack` (Rocq's `proc_priv_tf` /
+`proc_priv_addrspace` backs); it is closed whole before `growproc`, which
+takes it whole.  All five exits join at
 `+0x64` (`sys_sbrk_exit`), with `s1` holding the result.
 -/
 import MachCSL.WpSmodeFrame6
@@ -38,6 +39,7 @@ import Xv6.SpecMyproc
 import Xv6.ArgLemmas
 import Xv6.UPtLemmas
 import Xv6.CodeTactics
+import Xv6.ProcPrivAcc
 
 namespace Xv6
 
@@ -166,65 +168,62 @@ theorem sys_sbrk_priv_eta (V : ProcPriv) : { V with sz := V.sz, pvLazy := V.pvLa
   cases V; rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
+  [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+  [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [X : CurCtx]
 
 /-! ## The private block -/
 
-/-- The part of the private block sys_sbrk never touches (all but `p->sz`,
-the trapframe pointer and the trapframe page). -/
-def sysSbrkRest (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
-    IProp GF := iprop%
-  wordPointsTo (pPid pa) 4 pidPriv pid ∗
-  wordPointsTo (pKstack pa) 8 (DFrac.own 1) V.kstack ∗
-  wordPointsTo (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
-  ofileCells pa (DFrac.own 1) V.ofile ∗
-  wordPointsTo (pCwd pa) 8 (DFrac.own 1) V.cwd ∗
-  pnameCells pa (DFrac.own 1) V.name ∗
-  procPtAt V.upt M
+/-- **The block's closing wand** once `p->sz`, the trapframe pointer and the
+trapframe page are out (Rocq's `Hpbacktf` / `Hpback`, `proc_priv_tf` +
+`proc_priv_addrspace` at the table it had): back at a new size `v` over the
+same table and the lazy bit `b` names (Rocq's `upd_lazy`: a ghost write, no
+cell), given what `b` claims at the new break. -/
+def sysSbrkBack (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) : IProp GF := iprop%
+  ∀ (v : BitVec 64) (b : Bool),
+    ⌜v.toNat ≤ uvmMaxsz ∧ umBelow v V.upt ∧ (b = false → lazyFree V.upt.um v)⌝ -∗
+    (wordPointsTo (pSz pa) 8 (DFrac.own 1) v ∗
+      wordPointsTo (pTrapframe pa) 8 (DFrac.own 1) (pageAddr V.upt.tfp) ∗
+      tfPageAt V.upt.tfp V.tf) -∗
+    procPrivFd γ pa pid { V with sz := v, pvLazy := b } M
 
-theorem sys_sbrk_priv_elim (htc : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec 32)
-    (V : ProcPriv) (M : Nat → List (BitVec 8)) :
-    procPrivNoctxAt (GF := GF) curCtx pa pid V M ⊢
+/-- The block opened at `p->sz`, the trapframe pointer and page (lent to the
+two `argint` calls), with its pure row and the closing wand. -/
+theorem sys_sbrk_priv_elim (htc : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 64)
+    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
+    procPrivFd (GF := GF) γ pa pid V M ⊢
       ⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧
         V.pagetable = pageAddr V.upt.root ∧ V.trapframe = pageAddr V.upt.tfp⌝ ∗
       ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝ ∗
       wordPointsTo (pSz pa) 8 (DFrac.own 1) V.sz ∗
       wordPointsTo (pTrapframe pa) 8 (DFrac.own 1) (pageAddr V.upt.tfp) ∗
-      tfPageAt V.upt.tfp V.tf ∗ sysSbrkRest pa pid V M := by
+      tfPageAt V.upt.tfp V.tf ∗ sysSbrkBack γ pa pid V M := by
   obtain ⟨ξ, t⟩ := X
   simp only at htc
   subst htc
-  unfold procPrivNoctxAt procFieldsNoctx sysSbrkRest
-  iintro ⟨%hf, Hpid, ⟨Hks, Hsz, Hpt, Htf, Hof, Hcwd, Hnm⟩, HP, Htp, %hlz⟩
-  rw [hf.2.2.2]
+  letI : CurCtx := ⟨ξ, KTier.kpt⟩
+  unfold sysSbrkBack procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile
+  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm⟩, Hpt, Htfp, %hlz⟩, Hc⟩, Ho⟩
+  ihave Htf := procPrivAcc_eq ξ _ 8 _ _ _ h.2.2.2 $$ Htf
   isplitl []
-  · ipureintro; exact ⟨hf.1, hf.2.1, hf.2.2.1, rfl⟩
+  · ipureintro; exact h
   isplitl []
   · ipureintro; exact hlz
-  iframe
-
-/-- Closing the block with `p->sz` at `v` (the table unchanged) and the lazy
-bit at `b` (Rocq's `upd_lazy`: a ghost write, no cell), given what `b`
-claims at the new break. -/
-theorem sys_sbrk_priv_intro (htc : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
-    (v : BitVec 64) (b : Bool)
-    (hf : v.toNat ≤ uvmMaxsz ∧ umBelow v V.upt ∧
-      V.pagetable = pageAddr V.upt.root ∧ V.trapframe = pageAddr V.upt.tfp)
-    (hlz : b = false → lazyFree V.upt.um v) :
-    wordPointsTo (GF := GF) (pSz pa) 8 (DFrac.own 1) v ∗
-    wordPointsTo (pTrapframe pa) 8 (DFrac.own 1) (pageAddr V.upt.tfp) ∗
-    tfPageAt V.upt.tfp V.tf ∗ sysSbrkRest pa pid V M ⊢
-    procPrivNoctxAt curCtx pa pid { V with sz := v, pvLazy := b } M := by
-  obtain ⟨ξ, t⟩ := X
-  simp only at htc
-  subst htc
-  unfold procPrivNoctxAt procFieldsNoctx sysSbrkRest
-  iintro ⟨Hsz, Htf, Htp, Hpid, Hks, Hpt, Hof, Hcwd, Hnm, HP⟩
-  rw [← hf.2.2.2]
+  iframe Hs Htf Htfp
+  iintro %v %b %hv ⟨Hs, Htf, Htfp⟩
+  ihave Htf := procPrivAcc_eq ξ _ 8 _ _ _ h.2.2.2.symm $$ Htf
+  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hpt Htfp Hc Ho
   isplitl []
-  · ipureintro; exact ⟨hf.1, hf.2.1, hf.2.2.1, rfl⟩
-  iframe
-  ipureintro; exact hlz
+  · ipureintro; exact ⟨hv.1, hv.2.1, h.2.2.1, h.2.2.2⟩
+  · ipureintro; exact hv.2.2
+
+theorem sys_sbrk_priv_same (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) :
+    procPrivFd (GF := GF) γ pa pid { V with sz := V.sz, pvLazy := V.pvLazy } M ⊢
+      procPrivFd γ pa pid V M := by
+  rw [sys_sbrk_priv_eta V]
 
 /-! ## The frame -/
 
@@ -270,13 +269,13 @@ theorem sys_sbrk_frame_close (sp ra s0 s1 w32 w48 : BitVec 64) (n t : BitVec 32)
 /-! ## The post -/
 
 /-- The specification's post, as a λ over the returning hart. -/
-def sysSbrkPost (k : KCtx) (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
+def sysSbrkPost (γ : FileNames) (k : KCtx) (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (v0 v1 : BitVec 64) : CPU → IProp GF := fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool,
   ∀ R' : RegMap,
   ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
   kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
   (∃ (V' : ProcPriv) (M' : Nat → List (BitVec 8)),
-    ⌜sysSbrkOk V V' M M' v0 v1 (R' 10#5)⌝ ∗ procPrivNoctxAt curCtx (procAddr j) pid V' M') -∗
+    ⌜sysSbrkOk V V' M M' v0 v1 (R' 10#5)⌝ ∗ procPrivFd γ (procAddr j) pid V' M') -∗
   ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu')
 
 /-- `s0`/`s2..s11` and the frame pointer, pinned to the entry map
@@ -298,14 +297,14 @@ theorem sysSbrkPins_cs (k : KCtx) (R R' : RegMap) (h : sysSbrkPins k R) (hcs : c
 set_option maxHeartbeats 2000000 in
 /-- **The join point** `+0x64`: `mv a0,s1` and the epilogue, then the
 specification's post with the result `s1`. -/
-theorem sys_sbrk_exit (c : CPU) (k : KCtx) (hK : 6 ≤ k.avail) (j : Nat) (pid : BitVec 32)
+theorem sys_sbrk_exit (c : CPU) (k : KCtx) (hK : 6 ≤ k.avail) (γ : FileNames) (j : Nat) (pid : BitVec 32)
     (V V' : ProcPriv) (M M' : Nat → List (BitVec 8)) (v0 v1 : BitVec 64)
     (spie spp : Bool) (hsp : k.sie = false → spie = k.spie ∧ spp = k.spp)
     (R : RegMap) (hpins : sysSbrkPins k R) (hok : sysSbrkOk V V' M M' v0 v1 (R 9#5)) :
     kctx c (((k.withSpie spie spp).pushed 6).withRegs R) ∗ pcIs c (KA.«sys_sbrk» + 0x64#64) ∗
     frame6s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
-    procPrivNoctxAt curCtx (procAddr j) pid V' M' ∗
-    wpNext k.sie k.proc c (sysSbrkPost k j pid V M v0 v1)
+    procPrivFd γ (procAddr j) pid V' M' ∗
+    wpNext k.sie k.proc c (sysSbrkPost γ k j pid V M v0 v1)
     ⊢ wpLoop (GF := GF) c := by
   iintro ⟨Hk, Hpc, Hframe, Hpv, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
@@ -376,21 +375,21 @@ theorem sys_sbrk_myproc (MP : MYPROC) (c : CPU) (k' : KCtx)
   simp only [myprocAddr] at h
   exact h
 
-theorem sys_sbrk_growproc (GP : GROWPROC) (c : CPU) (k' : KCtx) (γl : GName) (γk : KmemNames) (j : Nat)
+theorem sys_sbrk_growproc (GP : GROWPROC) (c : CPU) (k' : KCtx) (γl : GName) (γk : KmemNames) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (hj : j < NPROC) (hproc : k'.proc = procAddr j)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : growprocSlots ≤ k'.avail) (hlk : "kmem" ∉ k'.locks)
     (htier : k'.tier = KTier.kpt) :
     kctx c k' ∗ pcIs c KA.«growproc» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-    kallocAvail γk none ∗ procPrivNoctxAt curCtx (procAddr j) pid V M ∗
+    kallocAvail γk none ∗ procPrivFd γ (procAddr j) pid V M ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       (∃ (V' : ProcPriv) (M' : Nat → List (BitVec 8)),
-        ⌜growprocOk V V' M M' (k'.regs 10#5) (R' 10#5)⌝ ∗ procPrivNoctxAt curCtx (procAddr j) pid V' M') -∗
+        ⌜growprocOk V V' M M' (k'.regs 10#5) (R' 10#5)⌝ ∗ procPrivFd γ (procAddr j) pid V' M') -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := GP.wp_growproc (hlc := hlc) (GF := GF) c k' γl γk j pid V M hj hproc hnoff hK hlk htier
+  have h := GP.wp_growproc (hlc := hlc) (GF := GF) c k' γl γk γ j pid V M hj hproc hnoff hK hlk htier
   unfold wp_growproc_body at h
   simp only [growprocAddr] at h
   exact h
@@ -398,7 +397,7 @@ theorem sys_sbrk_growproc (GP : GROWPROC) (c : CPU) (k' : KCtx) (γl : GName) (�
 /-! ## The eager arm (`+0x58`): `growproc(n)` -/
 
 set_option maxHeartbeats 4000000 in
-theorem sys_sbrk_eager (GP : GROWPROC) (c : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (j : Nat)
+theorem sys_sbrk_eager (GP : GROWPROC) (c : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (v0 v1 : BitVec 64)
     (hj : j < NPROC) (hproc : k.proc = procAddr j)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : sysSbrkSlots ≤ k.avail) (hlk : "kmem" ∉ k.locks)
@@ -411,8 +410,8 @@ theorem sys_sbrk_eager (GP : GROWPROC) (c : CPU) (k : KCtx) (γl : GName) (γk :
     sysSbrkFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) w32 w48
       (BitVec.extractLsb' 0 32 v0) t ∗
     isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
-    procPrivNoctxAt curCtx (procAddr j) pid V M ∗
-    wpNext k.sie k.proc c (sysSbrkPost k j pid V M v0 v1)
+    procPrivFd γ (procAddr j) pid V M ∗
+    wpNext k.sie k.proc c (sysSbrkPost γ k j pid V M v0 v1)
     ⊢ wpLoop (GF := GF) c := by
   iintro ⟨Hk, Hpc, Hframe, #Hlk, Hav, Hpv, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
@@ -432,7 +431,7 @@ theorem sys_sbrk_eager (GP : GROWPROC) (c : CPU) (k : KCtx) (γl : GName) (γk :
     from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [sys_sbrk_br_growproc] next c2 hp2
   iintro Hk Hpc
   ihave HΦ := wpNext_shift _ _ _ _ _ (fun h => (hp2 h).trans (hp1 h)) $$ HΦ
-  iapply (sys_sbrk_growproc GP c2 _ γl γk j pid V M hj ?hpr ?hn ?hKg ?hl ?ht) $$ [- $Hk $Hpc]
+  iapply (sys_sbrk_growproc GP c2 _ γl γk γ j pid V M hj ?hpr ?hn ?hKg ?hl ?ht) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g [sys_sbrk_ret_60, sys_sbrk_arg_def]
   iframe Hav Hpv
@@ -482,7 +481,7 @@ theorem sys_sbrk_eager (GP : GROWPROC) (c : CPU) (k : KCtx) (γl : GName) (γk :
       refine ⟨?_, hV, hM⟩
       simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
       decide
-    iapply (sys_sbrk_exit c6 k hK6 j pid V V' M M' v0 v1 spie2 spp2 hspf _ hpe hoke)
+    iapply (sys_sbrk_exit c6 k hK6 γ j pid V V' M M' v0 v1 spie2 spp2 hspf _ hpe hoke)
 
     iframe
   case neg =>
@@ -494,7 +493,7 @@ theorem sys_sbrk_eager (GP : GROWPROC) (c : CPU) (k : KCtx) (γl : GName) (γk :
     ihave HΦ := wpNext_shift _ _ _ _ _ hp4 $$ HΦ
     have hoko : sysSbrkOk V V' M M' v0 v1 (R2 9#5) :=
       Or.inr ⟨e9.trans h9, Or.inl ⟨hpath, sys_sbrk_gp_ok V V' M M' _ _ hgp hneg⟩⟩
-    iapply (sys_sbrk_exit c4 k hK6 j pid V V' M M' v0 v1 spie2 spp2 hspf R2 hpins2 hoko)
+    iapply (sys_sbrk_exit c4 k hK6 γ j pid V V' M M' v0 v1 spie2 spp2 hspf R2 hpins2 hoko)
 
     iframe
 
@@ -503,7 +502,7 @@ theorem sys_sbrk_eager (GP : GROWPROC) (c : CPU) (k : KCtx) (γl : GName) (γk :
 theorem sys_sbrk_slli : (0x1FFFFFF#64) <<< (13 : Nat) = 0x3FFFFFE000#64 := by decide
 
 set_option maxHeartbeats 8000000 in
-theorem sys_sbrk_lazy (MP : MYPROC) (GP : GROWPROC) (c : CPU) (k : KCtx) (γl : GName) (γk : KmemNames)
+theorem sys_sbrk_lazy (MP : MYPROC) (GP : GROWPROC) (c : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (γ : FileNames)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (v0 v1 : BitVec 64)
     (hj : j < NPROC) (hproc : k.proc = procAddr j)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : sysSbrkSlots ≤ k.avail) (hlk : "kmem" ∉ k.locks)
@@ -521,10 +520,10 @@ theorem sys_sbrk_lazy (MP : MYPROC) (GP : GROWPROC) (c : CPU) (k : KCtx) (γl : 
     isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     wordPointsTo (pSz (procAddr j)) 8 (DFrac.own 1) V.sz ∗
     wordPointsTo (pTrapframe (procAddr j)) 8 (DFrac.own 1) (pageAddr V.upt.tfp) ∗
-    tfPageAt V.upt.tfp V.tf ∗ sysSbrkRest (procAddr j) pid V M ∗
-    wpNext k.sie k.proc c (sysSbrkPost k j pid V M v0 v1)
+    tfPageAt V.upt.tfp V.tf ∗ sysSbrkBack γ (procAddr j) pid V M ∗
+    wpNext k.sie k.proc c (sysSbrkPost γ k j pid V M v0 v1)
     ⊢ wpLoop (GF := GF) c := by
-  iintro ⟨Hk, Hpc, Hframe, #Hlk, Hav, Hsz, Htf, Htp, Hrest, HΦ⟩
+  iintro ⟨Hk, Hpc, Hframe, #Hlk, Hav, Hsz, Htf, Htp, Hback, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
   icases kctx_tier _ _ $$ Hk with ⟨%hct, Hk⟩
   have htc : curTier = KTier.kpt := by rw [← hct]; exact htier
@@ -546,15 +545,16 @@ theorem sys_sbrk_lazy (MP : MYPROC) (GP : GROWPROC) (c : CPU) (k : KCtx) (γl : 
       with [KCtx.rget_eq, sys_sbrk_bltz_pos _ hneg] next c2 hp2
     iintro Hk Hpc
     ihave HΦ := wpNext_shift _ _ _ _ _ (fun h => (hp2 h).trans (hp1 h)) $$ HΦ
-    ihave Hpv := sys_sbrk_priv_intro htc (procAddr j) pid V M V.sz V.pvLazy hf hlz $$ [Hsz Htf Htp Hrest]
+    unfold sysSbrkBack
+    ihave Hpv := Hback $$ %V.sz %V.pvLazy %⟨hf.1, hf.2.1, hlz⟩ [Hsz Htf Htp]
     case' _ => iframe
-    rw [sys_sbrk_priv_eta V]
+    ihave Hpv := sys_sbrk_priv_same γ (procAddr j) pid V M $$ Hpv
     have hpins' : sysSbrkPins k (R.set 15#5 (sysSbrkArg v0)) := by
       refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
         simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] <;> assumption
     have h9' : (R.set 15#5 (sysSbrkArg v0)) 9#5 = V.sz := by
       simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h9
-    iapply (sys_sbrk_eager GP c2 k γl γk j pid V M v0 v1 hj hproc hnoff hK hlk htier spie spp hsp _
+    iapply (sys_sbrk_eager GP c2 k γl γk γ j pid V M v0 v1 hj hproc hnoff hK hlk htier spie spp hsp _
       hpins' h9' w32 w48 (BitVec.extractLsb' 0 32 v1) hal (Or.inr hneg))
     unfold sysSbrkFrame
     iframe
@@ -596,13 +596,14 @@ theorem sys_sbrk_lazy (MP : MYPROC) (GP : GROWPROC) (c : CPU) (k : KCtx) (γl : 
         from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] next c9 hp9
       iintro Hk Hpc
       ihave HΦ := wpNext_shift _ _ _ _ _ (fun h => (hp9 h).trans ((hp8 h).trans (hp7 h))) $$ HΦ
-      ihave Hpv := sys_sbrk_priv_intro htc (procAddr j) pid V M V.sz V.pvLazy hf hlz $$ [Hsz Htf Htp Hrest]
+      unfold sysSbrkBack
+      ihave Hpv := Hback $$ %V.sz %V.pvLazy %⟨hf.1, hf.2.1, hlz⟩ [Hsz Htf Htp]
       case' _ => iframe
-      rw [sys_sbrk_priv_eta V]
+      ihave Hpv := sys_sbrk_priv_same γ (procAddr j) pid V M $$ Hpv
       ihave Hframe := sys_sbrk_frame_close (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) w32 w48
         (BitVec.extractLsb' 0 32 v0) (BitVec.extractLsb' 0 32 v1) hal $$ [F0 F1 F2 F3 Fn Ft F5]
       case' _ => unfold sysSbrkFrame; iframe
-      iapply (sys_sbrk_exit c9 k hK6 j pid V V M M v0 v1 spie spp hsp _ ?hpe ?hoke)
+      iapply (sys_sbrk_exit c9 k hK6 γ j pid V V M M v0 v1 spie spp hsp _ ?hpe ?hoke)
       all_goals first | (iframe; done) | skip
       case hpe =>
         refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
@@ -673,17 +674,17 @@ theorem sys_sbrk_lazy (MP : MYPROC) (GP : GROWPROC) (c : CPU) (k : KCtx) (γl : 
       -- THE ONE WRITE of the lazy bit (Rocq `SpecSysSbrk`'s lazy arm): the
       -- break rose over an untouched table, so the bit is raised and its
       -- claim is vacuous
-      ihave Hpv := sys_sbrk_priv_intro htc (procAddr j) pid V M (V.sz + sysSbrkArg v0) true
-        ⟨by omega, Xv6.UPt.umBelow_mono V.sz _ V.upt hle hf.2.1, hf.2.2.1, hf.2.2.2⟩
-        (fun h => absurd h (by decide))
-        $$ [Hsz Htf Htp Hrest]
+      unfold sysSbrkBack
+      ihave Hpv := Hback $$ %(V.sz + sysSbrkArg v0) %true
+        %⟨by omega, Xv6.UPt.umBelow_mono V.sz _ V.upt hle hf.2.1, fun h => absurd h (by decide)⟩
+        [Hsz Htf Htp]
       case' _ => iframe
       ihave Hframe := sys_sbrk_frame_close (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) w32 w48
         (BitVec.extractLsb' 0 32 v0) (BitVec.extractLsb' 0 32 v1) hal $$ [F0 F1 F2 F3 Fn Ft F5]
       case' _ => unfold sysSbrkFrame; iframe
       have hoko : sysSbrkOk V { V with sz := V.sz + sysSbrkArg v0, pvLazy := true } M M v0 v1 V.sz :=
         Or.inr ⟨rfl, Or.inr ⟨hnot, by omega, by omega, rfl, hle, rfl⟩⟩
-      iapply (sys_sbrk_exit c15 k hK6 j pid V { V with sz := V.sz + sysSbrkArg v0, pvLazy := true } M M v0 v1 spie2 spp2 hspf
+      iapply (sys_sbrk_exit c15 k hK6 γ j pid V { V with sz := V.sz + sysSbrkArg v0, pvLazy := true } M M v0 v1 spie2 spp2 hspf
         _ ?hpo ?hko)
       all_goals first | (iframe; done) | skip
       case hpo =>
@@ -697,15 +698,15 @@ theorem sys_sbrk_lazy (MP : MYPROC) (GP : GROWPROC) (c : CPU) (k : KCtx) (γl : 
         simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, e9, h9]
         exact hoko
 
-theorem sysSbrkPost_of_spec (cpu : CPU) (k : KCtx) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
+theorem sysSbrkPost_of_spec (γ : FileNames) (cpu : CPU) (k : KCtx) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (v0 v1 : BitVec 64) :
     wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
       (∃ (V' : ProcPriv) (M' : Nat → List (BitVec 8)),
-        ⌜sysSbrkOk V V' M M' v0 v1 (R' 10#5)⌝ ∗ procPrivNoctxAt curCtx (procAddr j) pid V' M') -∗
+        ⌜sysSbrkOk V V' M M' v0 v1 (R' 10#5)⌝ ∗ procPrivFd γ (procAddr j) pid V' M') -∗
       ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
-    ⊢ wpNext (GF := GF) k.sie k.proc cpu (sysSbrkPost k j pid V M v0 v1) := by
+    ⊢ wpNext (GF := GF) k.sie k.proc cpu (sysSbrkPost γ k j pid V M v0 v1) := by
   unfold sysSbrkPost; iintro H; iexact H
 
 end
@@ -714,16 +715,16 @@ end
 
 set_option maxHeartbeats 8000000 in
 theorem sys_sbrk_proof (AI : ARGINT) (MP : MYPROC) (GP : GROWPROC) : SYSSBRK :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ cpu k γl γk j pid V M v0 v1 hj hproc hv0 hv1 hnoff hK hlk htier => by
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ cpu k γl γk γ j pid V M v0 v1 hj hproc hv0 hv1 hnoff hK hlk htier => by
   unfold wp_sys_sbrk_body
   simp only [sysSbrkAddr]
   iintro ⟨Hk, Hpc, #Hlk, Hav, Hpv, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_tier _ _ $$ Hk with ⟨%hct, Hk⟩
   have htc : curTier = KTier.kpt := by rw [← hct]; exact htier
-  ihave HΦ := sysSbrkPost_of_spec cpu k j pid V M v0 v1 $$ HΦ
+  ihave HΦ := sysSbrkPost_of_spec γ cpu k j pid V M v0 v1 $$ HΦ
   have hK6 : 6 ≤ k.avail := by unfold sysSbrkSlots growprocSlots at hK; omega
-  icases sys_sbrk_priv_elim htc (procAddr j) pid V M $$ Hpv with ⟨%hf, %hlz, Hsz, Htf, Htp, Hrest⟩
+  icases sys_sbrk_priv_elim htc γ (procAddr j) pid V M $$ Hpv with ⟨%hf, %hlz, Hsz, Htf, Htp, Hback⟩
   ihave Htf := (show wordPointsTo (GF := GF) (pTrapframe (procAddr j)) 8 (DFrac.own 1)
       (pageAddr V.upt.tfp) ⊢ wordPointsTo (pTrapframe k.proc) 8 (DFrac.own 1) (pageAddr V.upt.tfp)
       from by rw [hproc]) $$ Htf
@@ -847,10 +848,11 @@ theorem sys_sbrk_proof (AI : ARGINT) (MP : MYPROC) (GP : GROWPROC) : SYSSBRK :=
     ihave Htf := (show wordPointsTo (GF := GF) (pTrapframe k.proc) 8 (DFrac.own 1) (pageAddr V.upt.tfp) ⊢
         wordPointsTo (pTrapframe (procAddr j)) 8 (DFrac.own 1) (pageAddr V.upt.tfp)
         from by rw [hproc]) $$ Htf
-    ihave Hpv := sys_sbrk_priv_intro htc (procAddr j) pid V M V.sz V.pvLazy hf hlz $$ [Hsz Htf Htp Hrest]
+    unfold sysSbrkBack
+    ihave Hpv := Hback $$ %V.sz %V.pvLazy %⟨hf.1, hf.2.1, hlz⟩ [Hsz Htf Htp]
     case' _ => iframe
-    rw [sys_sbrk_priv_eta V]
-    iapply (sys_sbrk_eager GP c15 k γl γk j pid V M v0 v1 hj hproc hnoff hK hlk htier spie3 spp3 hspf _
+    ihave Hpv := sys_sbrk_priv_same γ (procAddr j) pid V M $$ Hpv
+    iapply (sys_sbrk_eager GP c15 k γl γk γ j pid V M v0 v1 hj hproc hnoff hK hlk htier spie3 spp3 hspf _
       ?hpe ?h9e w32 w48 (BitVec.extractLsb' 0 32 v1) hal (Or.inl heager))
     all_goals first | (unfold sysSbrkFrame; iframe; iframe #; done) | skip
     case hpe =>
@@ -868,7 +870,7 @@ theorem sys_sbrk_proof (AI : ARGINT) (MP : MYPROC) (GP : GROWPROC) : SYSSBRK :=
     ihave Htf := (show wordPointsTo (GF := GF) (pTrapframe k.proc) 8 (DFrac.own 1) (pageAddr V.upt.tfp) ⊢
         wordPointsTo (pTrapframe (procAddr j)) 8 (DFrac.own 1) (pageAddr V.upt.tfp)
         from by rw [hproc]) $$ Htf
-    iapply (sys_sbrk_lazy MP GP c15 k γl γk j pid V M v0 v1 hj hproc hnoff hK hlk htier spie3 spp3 hspf _
+    iapply (sys_sbrk_lazy MP GP c15 k γl γk γ j pid V M v0 v1 hj hproc hnoff hK hlk htier spie3 spp3 hspf _
       ?hpl ?h9l w32 w48 hal heager hf hlz)
     all_goals first | (unfold sysSbrkFrame; iframe; iframe #; done) | skip
     case hpl =>

@@ -37,10 +37,9 @@ the lazy path's two range tests).  Success returns the OLD size and says
 which path ran.  The wrap test `addr + n < addr` is DEAD (`p->sz` is at
 most `TRAPFRAME` and `n < 2^31`), so the contract has no disjunct for it.
 
-THE BLOCK.  The contract takes the running process's private block
-without the context words, `procPrivNoctxAt curCtx` (Rocq's `proc_priv`),
-as the other current-process syscalls do and as `growproc` -- to which
-sys_sbrk hands it whole -- takes it.  The two arguments are named as facts
+THE BLOCK.  The contract takes the running process's whole private
+block, `FdTable.procPrivFd γ` (Rocq's `proc_priv γf`, D16), as `growproc`
+-- to which sys_sbrk hands it whole -- takes it.  The two arguments are named as facts
 about that block's own trapframe record, as in `SpecSysWait`; the proof
 splits the trapframe fraction and page out for the two `argint` calls and
 puts them back.
@@ -93,30 +92,36 @@ def sysSbrkOk (V V' : ProcPriv) (M M' : Nat → List (BitVec 8)) (v0 v1 r : BitV
        V.sz.toNat ≤ (V.sz + sysSbrkArg v0).toNat ∧ M' = M)))
 
 /-- **WP of `sys_sbrk()`**, at either `SIE`. -/
-def wp_sys_sbrk_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
-    (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
+def wp_sys_sbrk_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
+    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+    [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
+    (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (γ : FileNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (v0 v1 : BitVec 64)
     (hj : j < NPROC) (hproc : k.proc = procAddr j)
     (hv0 : V.tf[tfArgIdx 0]? = some v0) (hv1 : V.tf[tfArgIdx 1]? = some v1)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : sysSbrkSlots ≤ k.avail) (hlk : "kmem" ∉ k.locks)
     (htier : k.tier = KTier.kpt) : Prop :=
   kctx cpu k ∗ pcIs cpu sysSbrkAddr ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-  kallocAvail γk none ∗ procPrivNoctxAt curCtx (procAddr j) pid V M ∗
+  kallocAvail γk none ∗ procPrivFd γ (procAddr j) pid V M ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
     ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     (∃ (V' : ProcPriv) (M' : Nat → List (BitVec 8)),
-      ⌜sysSbrkOk V V' M M' v0 v1 (R' 10#5)⌝ ∗ procPrivNoctxAt curCtx (procAddr j) pid V' M') -∗
+      ⌜sysSbrkOk V V' M M' v0 v1 (R' 10#5)⌝ ∗ procPrivFd γ (procAddr j) pid V' M') -∗
     ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `sys_sbrk`. -/
 structure SYSSBRK : Prop where
-  wp_sys_sbrk : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
-    (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
+  wp_sys_sbrk : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
+    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+    [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
+    (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (γ : FileNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (v0 v1 : BitVec 64)
     hj hproc hv0 hv1 hnoff hK hlk htier,
-    wp_sys_sbrk_body (hlc := hlc) (GF := GF) cpu k γl γk j pid V M v0 v1
+    wp_sys_sbrk_body (hlc := hlc) (GF := GF) cpu k γl γk γ j pid V M v0 v1
       hj hproc hv0 hv1 hnoff hK hlk htier
 
 end Xv6

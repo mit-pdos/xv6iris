@@ -4,10 +4,10 @@ grown (`uvmalloc`, refused above `TRAPFRAME` or when the allocator is
 dry, `-1`) or shrunk (`uvmdealloc`), `p->sz` updated.  Uncounted; needs
 46 slots (4 + `uvmalloc`'s 42).
 
-The block is `procPrivNoctxAt curCtx` (Rocq `ProcInv.proc_priv`: the
-running process's private block WITHOUT the 14 context words, which the
-lock's RUNNING arm owns) -- the same block the current-process syscalls
-(`sys_sbrk`, its one caller) hold.
+The block is Rocq's whole `ProcInv.proc_priv`, `FdTable.procPrivFd γ`
+(D16; Rocq `wp_growproc_sconf_body` states `proc_priv γf p pid U`) -- the
+same block its one caller, `sys_sbrk`, holds.  The proof opens it with
+`ProcPrivAcc.procPrivFd_addrspace` (Rocq `proc_priv_addrspace`).
 
 THE LAZY BIT is kept (`growprocOk`'s `V'` is `V` with `sz` and `upt`
 replaced, Rocq's `pv_lazy V` unchanged): the grow maps exactly the run that
@@ -20,6 +20,7 @@ Imports only definitional files (never a `Code*` or `Proof*` file).
 import MachCSL.WpSmodeFrame
 import MachCSL.Lock
 import Xv6.SchedCtx
+import Xv6.FdTable
 import Xv6.SpecUvmalloc
 import Xv6.PidLock
 import Xv6.Image
@@ -45,26 +46,32 @@ def growprocOk (V V' : ProcPriv) (M M' : Nat → List (BitVec 8)) (n r : BitVec 
     V' = { V with sz := uvmdRsz sz (sz + n),
                   upt := V.upt.delRun (pgRoundUpN (sz + n).toNat / 4096) (uvmdNp sz (sz + n)) } ∧ M' = M)
 
-def wp_growproc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
-    (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
+def wp_growproc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
+    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+    [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
+    (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (γ : FileNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8))
     (hj : j < NPROC) (hproc : k.proc = procAddr j)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : growprocSlots ≤ k.avail) (hlk : "kmem" ∉ k.locks)
     (htier : k.tier = KTier.kpt) : Prop :=
   kctx cpu k ∗ pcIs cpu growprocAddr ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
-  procPrivNoctxAt curCtx (procAddr j) pid V M ∗
+  procPrivFd γ (procAddr j) pid V M ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
     ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     (∃ (V' : ProcPriv) (M' : Nat → List (BitVec 8)),
-      ⌜growprocOk V V' M M' (k.regs 10#5) (R' 10#5)⌝ ∗ procPrivNoctxAt curCtx (procAddr j) pid V' M') -∗
+      ⌜growprocOk V V' M M' (k.regs 10#5) (R' 10#5)⌝ ∗ procPrivFd γ (procAddr j) pid V' M') -∗
     ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
 structure GROWPROC : Prop where
-  wp_growproc : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
-    (γl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
+  wp_growproc : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
+    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+    [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx] (cpu : CPU) (k : KCtx)
+    (γl : GName) (γk : KmemNames) (γ : FileNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     hj hproc hnoff hK hlk htier,
-    wp_growproc_body (hlc := hlc) (GF := GF) cpu k γl γk j pid V M hj hproc hnoff hK hlk htier
+    wp_growproc_body (hlc := hlc) (GF := GF) cpu k γl γk γ j pid V M hj hproc hnoff hK hlk htier
 
 end Xv6
