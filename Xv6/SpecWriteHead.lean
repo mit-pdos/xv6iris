@@ -36,11 +36,18 @@ the header's `int n` field -- and the FULL on-disk encoding
 durable state this write commits to, so at `n > 0` this `bwrite` is THE
 COMMIT POINT.
 
-**Deviations from Rocq.**  (1) Rocq's contract carries a CRASH PERMIT
-family `∀ bs', ⌜…⌝ -∗ disk_seq_permit gen_id (Some (1024 * hdr, bs')) (Q bs')`
-and hands `▷ Q bs'` back from the DMA completion; this port's disk layer
-has no crash permits at all (`Xv6/DiskInvDefs.lean`), and `Xv6.SpecBwrite`
-produces no receipt, so the family and `Q` are dropped.  (2) Rocq runs the
+THE CRASH PERMIT (Rocq's, restored by crash batch C-2b).  The caller does
+not know the header IMAGE this function will assemble -- it is built from
+`n` and `W` by the copy loop -- so the permit is supplied as a FAMILY over
+the bytes, given the three facts the assembly establishes about them:
+`∀ bs', ⌜len⌝ -∗ ⌜hdrN⌝ -∗ ⌜hdrDec⌝ -∗ diskSeqPermit genId (some (1024 * hdr,
+bs')) (Q bs')`.  It is the SEQUENTIAL permit (the header lands one 512-byte
+sector at a time); `▷ Q bs'` comes back from `bwrite`'s DMA completion, AT
+the image laid down.  At `n = 0` (initlog's clear, the commit's clear) the
+clear's permit (`Xv6.fsClearKeep_seqPermit`) consumes the family; the
+COMMIT arm's (`Xv6.fsCommitL_seqPermit`) reads `hdrDec`.
+
+**Deviation from Rocq.**  (1) (retired: the permit family is Rocq's.)  (2) Rocq runs the
 bio layer at `fs_view γfs γd dev cov` LITERALLY; this port keeps the
 client view `V` a parameter and says the same thing with the two premises
 `hcl`/`hdt` (`V.clean = fsMclean γfs`, `V.dirty = fsMdirty γfs`).  That is
@@ -79,6 +86,7 @@ def wp_write_head_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (γfs : FsNames) (pd pav pu : BitVec 64) (j : Nat) (logstart : Nat) (dev : BitVec 32)
     (n : Nat) (W : List (BitVec 32)) (L : BlockMap) (pidv : BitVec 32) (dqp : DFrac)
+    (Q : List (BitVec 8) → IProp GF)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : writeHeadSlots ≤ k.avail)
     (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
     (htier : k.tier = KTier.kpt)
@@ -96,6 +104,12 @@ def wp_write_head_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv
   fsCacheAuth γfs L ∗
   (∃ bsh : List (BitVec 8), fsChalf γfs (logHdrBno logstart) bsh) ∗
   bslot ∗
+  -- THE CRASH PERMIT for the header write, as a FAMILY over the bytes the
+  -- copy loop assembles (Rocq `SpecWriteHead.v`): the sequential permit,
+  -- given the three facts the assembly establishes about them
+  (∀ bs' : List (BitVec 8), ⌜bs'.length = BSIZE⌝ -∗ ⌜hdrN bs' = n⌝ -∗
+     ⌜hdrDec bs' = (n, W.map (fun w => w.toNat))⌝ -∗
+     diskSeqPermit (genId (hlc := hlc) (GF := GF)) (some (1024 * logHdrBno logstart, bs')) (Q bs')) ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap)
       (bs' : List (BitVec 8)),
     ⌜calleeSaved k.regs R'⌝ -∗
@@ -107,7 +121,9 @@ def wp_write_head_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv
     fsCacheAuth γfs (PartialMap.insert L (logHdrBno logstart) bs') -∗
     fsChalf γfs (logHdrBno logstart) bs' -∗
     ⌜bs'.length = BSIZE ∧ hdrN bs' = n ∧ hdrDec bs' = (n, W.map (fun w => w.toNat))⌝ -∗
-    bslot -∗ wpLoop cpu'))
+    bslot -∗
+    -- the permit's RECEIPT, back from the DMA completion, at the image laid down
+    ▷ Q bs' -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The eb-generic form of `wp_write_head_body` (Rocq: `cpu_own 0 eb`, the
@@ -119,6 +135,7 @@ def wp_write_head_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (γfs : FsNames) (pd pav pu : BitVec 64) (j : Nat) (logstart : Nat) (dev : BitVec 32)
     (n : Nat) (W : List (BitVec 32)) (L : BlockMap) (pidv : BitVec 32) (dqp : DFrac)
+    (Q : List (BitVec 8) → IProp GF)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : writeHeadSlots ≤ k.avail)
     (hnoff : k.noff = 0)
     (htier : k.tier = KTier.kpt)
@@ -136,6 +153,12 @@ def wp_write_head_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
   fsCacheAuth γfs L ∗
   (∃ bsh : List (BitVec 8), fsChalf γfs (logHdrBno logstart) bsh) ∗
   bslot ∗
+  -- THE CRASH PERMIT for the header write, as a FAMILY over the bytes the
+  -- copy loop assembles (Rocq `SpecWriteHead.v`): the sequential permit,
+  -- given the three facts the assembly establishes about them
+  (∀ bs' : List (BitVec 8), ⌜bs'.length = BSIZE⌝ -∗ ⌜hdrN bs' = n⌝ -∗
+     ⌜hdrDec bs' = (n, W.map (fun w => w.toNat))⌝ -∗
+     diskSeqPermit (genId (hlc := hlc) (GF := GF)) (some (1024 * logHdrBno logstart, bs')) (Q bs')) ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap)
       (bs' : List (BitVec 8)),
     ⌜calleeSaved k.regs R'⌝ -∗
@@ -147,7 +170,9 @@ def wp_write_head_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
     fsCacheAuth γfs (PartialMap.insert L (logHdrBno logstart) bs') -∗
     fsChalf γfs (logHdrBno logstart) bs' -∗
     ⌜bs'.length = BSIZE ∧ hdrN bs' = n ∧ hdrDec bs' = (n, W.map (fun w => w.toNat))⌝ -∗
-    bslot -∗ wpLoop cpu'))
+    bslot -∗
+    -- the permit's RECEIPT, back from the DMA completion, at the image laid down
+    ▷ Q bs' -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `write_head`. -/
@@ -158,9 +183,10 @@ structure WRITE_HEAD : Prop where
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (γfs : FsNames) (pd pav pu : BitVec 64) (j : Nat) (logstart : Nat) (dev : BitVec 32)
     (n : Nat) (W : List (BitVec 32)) (L : BlockMap) (pidv : BitVec 32) (dqp : DFrac)
+    (Q : List (BitVec 8) → IProp GF)
     hj hproc hK hnoff htier hgeom hdev hcl hdt hn hpd,
     wp_write_head_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γb V γdl γfs pd pav pu j
-      logstart dev n W L pidv dqp hj hproc hK hnoff htier hgeom hdev hcl hdt hn hpd
+      logstart dev n W L pidv dqp Q hj hproc hK hnoff htier hgeom hdev hcl hdt hn hpd
 
 /-- The interrupts-off instance of `wp_write_head_eb` (the complement is the whole
 bundle): the contract every not-yet-generalized caller states. -/
@@ -170,19 +196,20 @@ theorem WRITE_HEAD.wp_write_head (A : WRITE_HEAD) {hlc : HasLC} {GF : BundledGFu
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (γfs : FsNames) (pd pav pu : BitVec 64) (j : Nat) (logstart : Nat) (dev : BitVec 32)
     (n : Nat) (W : List (BitVec 32)) (L : BlockMap) (pidv : BitVec 32) (dqp : DFrac)
+    (Q : List (BitVec 8) → IProp GF)
     hj hproc hK hsie hnoff hlocks htier hgeom hdev hcl hdt hn hpd :
     wp_write_head_body (hlc := hlc) (GF := GF) Γ cpu k γl γb V γdl γfs pd pav pu j
-      logstart dev n W L pidv dqp hj hproc hK hsie hnoff hlocks htier hgeom hdev hcl hdt hn hpd := by
-  have h := A.wp_write_head_eb (hlc := hlc) (GF := GF) (Γ := Γ) (cpu := cpu) (k := k) (γl := γl) (γb := γb) (V := V) (γdl := γdl) (γfs := γfs) (pd := pd) (pav := pav) (pu := pu) (j := j) (logstart := logstart) (dev := dev) (n := n) (W := W) (L := L) (pidv := pidv) (dqp := dqp) (hj := hj) (hproc := hproc) (hK := hK) (hnoff := hnoff) (htier := htier) (hgeom := hgeom) (hdev := hdev) (hcl := hcl) (hdt := hdt) (hn := hn) (hpd := hpd)
+      logstart dev n W L pidv dqp Q hj hproc hK hsie hnoff hlocks htier hgeom hdev hcl hdt hn hpd := by
+  have h := A.wp_write_head_eb (hlc := hlc) (GF := GF) (Γ := Γ) (cpu := cpu) (k := k) (γl := γl) (γb := γb) (V := V) (γdl := γdl) (γfs := γfs) (pd := pd) (pav := pav) (pu := pu) (j := j) (logstart := logstart) (dev := dev) (n := n) (W := W) (L := L) (pidv := pidv) (dqp := dqp) (Q := Q) (hj := hj) (hproc := hproc) (hK := hK) (hnoff := hnoff) (htier := htier) (hgeom := hgeom) (hdev := hdev) (hcl := hcl) (hdt := hdt) (hn := hn) (hpd := hpd)
   unfold wp_write_head_eb_body at h
   unfold wp_write_head_body
   rw [hsie] at h
   simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, Hnext⟩
+  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, Hnext⟩
   iapply h
-  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12 H13 H14 H15
+  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16
   iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %bs' %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6 H7 H8 H9 H10 %p11 H12
-  iapply HK $$ %spie %spp %R' %bs' %p0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 %p11 H12
+  iintro %cpu' HK %spie %spp %R' %bs' %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6 H7 H8 H9 H10 %p11 H12 HQ
+  iapply HK $$ %spie %spp %R' %bs' %p0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 %p11 H12 HQ
 
 end Xv6

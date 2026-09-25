@@ -158,6 +158,21 @@ theorem BWRITE.wp_bwrite_eb_any (A : BWRITE) {hlc : HasLC} {GF : BundledGFunctor
   iintro %cpu' HK %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hhold _
   iapply HK $$ %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hhold
 
+/-- **TEMPORARY (crash batch C-2b removes it with `Xv6.diskWriteAny`)**: the
+any-write permit, read off `diskCaps` and handed back beside it. -/
+theorem diskCaps_writeAny {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+    [DiskG GF] [CurCtx] (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) :
+    diskCaps (GF := GF) γ γl pd pav pu ⊢
+      diskCaps γ γl pd pav pu ∗
+        □ (∀ w : DiskWr, diskSeqPermit (genId (hlc := hlc) (GF := GF)) w iprop(True)) := by
+  iintro #Hdc
+  isplitl []
+  · iexact Hdc
+  unfold diskCaps diskCrashCaps
+  icases Hdc with ⟨-, -, -, -, #Ha⟩
+  unfold diskWriteAny
+  iexact Ha
+
 /-- The interrupts-off instance of `wp_bwrite_eb` (the complement is the whole
 bundle): the contract every not-yet-generalized caller states. -/
 theorem BWRITE.wp_bwrite (A : BWRITE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]

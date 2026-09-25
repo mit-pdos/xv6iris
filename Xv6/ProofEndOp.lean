@@ -227,10 +227,20 @@ theorem eo_wh (WH : WRITE_HEAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     ⊢ wpLoop (GF := GF) c := by
   subst hpj hs
   have h := WH.wp_write_head_eb (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl γfs pd pav pu j
-    logstart dev n W L pidv dqp hj hproc hK hnoff htier hgeom hdev hcl hdt hn hpd
+    logstart dev n W L pidv dqp (fun _ => iprop(True)) hj hproc hK hnoff htier hgeom hdev hcl hdt
+    hn hpd
   unfold wp_write_head_eb_body at h
   simp only [writeHeadAddr] at h
-  exact h
+  iintro ⟨H0, H1, H2, H3, H4, H5, H6, H7, H8, H9, H10, H11, H12, H13, H14, Hnext⟩
+  icases diskCaps_writeAny V.gd γdl pd pav pu $$ H6 with ⟨H6, #Hany⟩
+  iapply h
+  iframe H0 H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 H13 H14
+  isplitl []
+  · iintro %bs' %_ %_ %_
+    iapply Hany
+  iapply wpNext_mono $$ Hnext
+  iintro %cpu' HK %spie %spp %R' %bs' %p0 G1 G2 G3 G4 G5 G6 G7 G8 G9 %p10 G11 -
+  iapply HK $$ %spie %spp %R' %bs' %p0 G1 G2 G3 G4 G5 G6 G7 G8 G9 %p10 G11
 
 theorem eo_it (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (c : CPU) (k' : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
@@ -282,13 +292,26 @@ theorem eo_it (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
     ⊢ wpLoop (GF := GF) c := by
   subst hpj hs
   have h := IT.wp_install_trans_eb (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl γfs pd pav pu j
-    logstart dev false n W Lw L D pidv dqp homeL Xv Xexc
+    logstart dev false n W Lw L D pidv dqp homeL Xv Xexc (fun _ => iprop(True))
     hj hproc hK hnoff htier hgeom hdev
     hcl hdt (by simp only [Bool.false_eq_true, if_false]; exact ha0) hn hnodup hhome hlen
     (fun _ => hcommit) (by simp) (by simp) hpd
   unfold wp_install_trans_eb_body at h
   simp only [installTransAddr, Bool.false_eq_true, if_false] at h
-  exact h
+  iintro ⟨H0, H1, H2, H3, H4, H5, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, H17,
+    Hnext⟩
+  icases diskCaps_writeAny V.gd γdl pd pav pu $$ H6 with ⟨H6, #Hany⟩
+  iapply h
+  iframe H0 H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17
+  isplitl []
+  · imodintro
+    iintro %i %w %_ %_ -
+    iapply Hany
+  isplitl []
+  · inext; ipureintro; trivial
+  iapply wpNext_mono $$ Hnext
+  iintro %cpu' HK %spie %spp %R' %p0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12 -
+  iapply HK $$ %spie %spp %R' %p0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12
 
 end
 

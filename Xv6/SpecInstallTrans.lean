@@ -50,9 +50,13 @@ minted -- which is what lets `bunpin`'s slot-indexed contract play the
 WAL's block-indexed pin.  The client view is `Xv6.fsView` (the premises
 `hcl`/`hdt` below say so), exactly Rocq's `fs_view γfs γd dev cov`.
 
-One further deviation from Rocq, forced: the CRASH PERMIT generator
-`□ (∀ i w, … -∗ ▷ R i -∗ disk_seq_permit …)` and its threaded `R` are
-dropped (this port's disk layer has no crash permits).
+THE CRASH PERMITS (Rocq's, restored by crash batch C-2b): a REUSABLE,
+CURSOR-INDEXED generator `□ (∀ i w, ⌜W[i]? = some w⌝ -∗ ⌜len⌝ -∗ ▷ Rt i -∗
+diskSeqPermit genId (some (1024 * w, Lw i)) (Rt (i + 1)))` over one threaded
+resource `Rt` (Rocq's `R`), `▷ Rt 0` in and `▷ Rt n` out.  The entries' fupds
+are SEQUENTIAL -- each consumes what the previous one returned (for end_op's
+committer, the era's mirror half at the chained picture) -- so a big-op of
+independent permits could never be supplied.
 
 **THE RECOVERING ARM'S PER-ENTRY ROW IS `emp`, AS IN ROCQ**, and the byte
 view is how it gets by with that.  The recovering install is the ONE place
@@ -213,7 +217,7 @@ def wp_install_trans_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
     (γfs : FsNames) (pd pav pu : BitVec 64) (j : Nat) (logstart : Nat) (dev : BitVec 32)
     (recovering : Bool) (n : Nat) (W : List (BitVec 32)) (Lw : Nat → List (BitVec 8))
     (L : BlockMap) (D : RegMapF Bool) (pidv : BitVec 32) (dqp : DFrac)
-    (homeL : List Nat) (Xv : Nat → List (BitVec 8)) (Xexc : List Nat)
+    (homeL : List Nat) (Xv : Nat → List (BitVec 8)) (Xexc : List Nat) (Rt : Nat → IProp GF)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : installTransSlots ≤ k.avail)
     (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
     (htier : k.tier = KTier.kpt)
@@ -254,6 +258,13 @@ def wp_install_trans_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
   ([∗list] i ↦ w ∈ W, fsChalf γfs (logSlotBno logstart i) (Lw i) ∗
      (if recovering then iprop(emp) else fsDirtyHalf γfs w.toNat true)) ∗
   bslots 2 ∗
+  -- THE CRASH PERMITS for the home writes (Rocq's, restored by crash batch
+  -- C-2b): a REUSABLE, CURSOR-INDEXED generator over the one threaded
+  -- resource `Rt` -- entry `i` consumes `▷ Rt i` and its sequential permit
+  -- returns `Rt (i + 1)`; the bytes are the log copy's `Lw i`
+  □ (∀ (i : Nat) (w : BitVec 32), ⌜W[i]? = some w⌝ -∗ ⌜(Lw i).length = BSIZE⌝ -∗ ▷ Rt i -∗
+       diskSeqPermit (genId (hlc := hlc) (GF := GF)) (some (1024 * w.toNat, Lw i)) (Rt (i + 1))) ∗
+  ▷ Rt 0 ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
     ⌜calleeSaved k.regs R'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
@@ -269,7 +280,9 @@ def wp_install_trans_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
     fsDirtyAuth γfs (if recovering then D else dirtyClear D (W.map (fun w => w.toNat))) -∗
     ([∗list] i ↦ w ∈ W, fsChalf γfs (logSlotBno logstart i) (Lw i) ∗
        (if recovering then iprop(emp) else fsDirtyHalf γfs w.toNat false)) -∗
-    bslots (2 + (if recovering then 0 else W.length)) -∗ wpLoop cpu'))
+    bslots (2 + (if recovering then 0 else W.length)) -∗
+    -- the threaded resource, back from the last entry's DMA completion
+    ▷ Rt n -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The eb-generic form of `wp_install_trans_body` (Rocq: `cpu_own 0 eb`, the
@@ -282,7 +295,7 @@ def wp_install_trans_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc G
     (γfs : FsNames) (pd pav pu : BitVec 64) (j : Nat) (logstart : Nat) (dev : BitVec 32)
     (recovering : Bool) (n : Nat) (W : List (BitVec 32)) (Lw : Nat → List (BitVec 8))
     (L : BlockMap) (D : RegMapF Bool) (pidv : BitVec 32) (dqp : DFrac)
-    (homeL : List Nat) (Xv : Nat → List (BitVec 8)) (Xexc : List Nat)
+    (homeL : List Nat) (Xv : Nat → List (BitVec 8)) (Xexc : List Nat) (Rt : Nat → IProp GF)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : installTransSlots ≤ k.avail)
     (hnoff : k.noff = 0)
     (htier : k.tier = KTier.kpt)
@@ -323,6 +336,13 @@ def wp_install_trans_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc G
   ([∗list] i ↦ w ∈ W, fsChalf γfs (logSlotBno logstart i) (Lw i) ∗
      (if recovering then iprop(emp) else fsDirtyHalf γfs w.toNat true)) ∗
   bslots 2 ∗
+  -- THE CRASH PERMITS for the home writes (Rocq's, restored by crash batch
+  -- C-2b): a REUSABLE, CURSOR-INDEXED generator over the one threaded
+  -- resource `Rt` -- entry `i` consumes `▷ Rt i` and its sequential permit
+  -- returns `Rt (i + 1)`; the bytes are the log copy's `Lw i`
+  □ (∀ (i : Nat) (w : BitVec 32), ⌜W[i]? = some w⌝ -∗ ⌜(Lw i).length = BSIZE⌝ -∗ ▷ Rt i -∗
+       diskSeqPermit (genId (hlc := hlc) (GF := GF)) (some (1024 * w.toNat, Lw i)) (Rt (i + 1))) ∗
+  ▷ Rt 0 ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
     ⌜calleeSaved k.regs R'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
@@ -338,7 +358,9 @@ def wp_install_trans_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc G
     fsDirtyAuth γfs (if recovering then D else dirtyClear D (W.map (fun w => w.toNat))) -∗
     ([∗list] i ↦ w ∈ W, fsChalf γfs (logSlotBno logstart i) (Lw i) ∗
        (if recovering then iprop(emp) else fsDirtyHalf γfs w.toNat false)) -∗
-    bslots (2 + (if recovering then 0 else W.length)) -∗ wpLoop cpu'))
+    bslots (2 + (if recovering then 0 else W.length)) -∗
+    -- the threaded resource, back from the last entry's DMA completion
+    ▷ Rt n -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `install_trans`. -/
@@ -350,11 +372,11 @@ structure INSTALL_TRANS : Prop where
     (γfs : FsNames) (pd pav pu : BitVec 64) (j : Nat) (logstart : Nat) (dev : BitVec 32)
     (recovering : Bool) (n : Nat) (W : List (BitVec 32)) (Lw : Nat → List (BitVec 8))
     (L : BlockMap) (D : RegMapF Bool) (pidv : BitVec 32) (dqp : DFrac)
-    (homeL : List Nat) (Xv : Nat → List (BitVec 8)) (Xexc : List Nat)
+    (homeL : List Nat) (Xv : Nat → List (BitVec 8)) (Xexc : List Nat) (Rt : Nat → IProp GF)
     hj hproc hK hnoff htier hgeom hdev hcl hdt ha0 hn hnodup hhome hlen hcommit hpin
     hxexc hpd,
     wp_install_trans_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γb V γdl γfs pd pav pu j
-      logstart dev recovering n W Lw L D pidv dqp homeL Xv Xexc
+      logstart dev recovering n W Lw L D pidv dqp homeL Xv Xexc Rt
       hj hproc hK hnoff htier hgeom hdev hcl hdt ha0 hn hnodup hhome hlen hcommit hpin
       hxexc hpd
 
@@ -367,23 +389,26 @@ theorem INSTALL_TRANS.wp_install_trans (A : INSTALL_TRANS) {hlc : HasLC} {GF : B
     (γfs : FsNames) (pd pav pu : BitVec 64) (j : Nat) (logstart : Nat) (dev : BitVec 32)
     (recovering : Bool) (n : Nat) (W : List (BitVec 32)) (Lw : Nat → List (BitVec 8))
     (L : BlockMap) (D : RegMapF Bool) (pidv : BitVec 32) (dqp : DFrac)
-    (homeL : List Nat) (Xv : Nat → List (BitVec 8)) (Xexc : List Nat)
+    (homeL : List Nat) (Xv : Nat → List (BitVec 8)) (Xexc : List Nat) (Rt : Nat → IProp GF)
     hj hproc hK hsie hnoff hlocks htier hgeom hdev hcl hdt ha0 hn hnodup hhome hlen hcommit hpin
     hxexc hpd :
     wp_install_trans_body (hlc := hlc) (GF := GF) Γ cpu k γl γb V γdl γfs pd pav pu j
-      logstart dev recovering n W Lw L D pidv dqp homeL Xv Xexc
+      logstart dev recovering n W Lw L D pidv dqp homeL Xv Xexc Rt
       hj hproc hK hsie hnoff hlocks htier hgeom hdev hcl hdt ha0 hn hnodup hhome hlen hcommit hpin
       hxexc hpd := by
-  have h := A.wp_install_trans_eb (hlc := hlc) (GF := GF) (Γ := Γ) (cpu := cpu) (k := k) (γl := γl) (γb := γb) (V := V) (γdl := γdl) (γfs := γfs) (pd := pd) (pav := pav) (pu := pu) (j := j) (logstart := logstart) (dev := dev) (recovering := recovering) (n := n) (W := W) (Lw := Lw) (L := L) (D := D) (pidv := pidv) (dqp := dqp) (homeL := homeL) (Xv := Xv) (Xexc := Xexc) (hj := hj) (hproc := hproc) (hK := hK) (hnoff := hnoff) (htier := htier) (hgeom := hgeom) (hdev := hdev) (hcl := hcl) (hdt := hdt) (ha0 := ha0) (hn := hn) (hnodup := hnodup) (hhome := hhome) (hlen := hlen) (hcommit := hcommit) (hpin := hpin) (hxexc := hxexc) (hpd := hpd)
+  have h := A.wp_install_trans_eb (hlc := hlc) (GF := GF) (Γ := Γ) (cpu := cpu) (k := k) (γl := γl) (γb := γb) (V := V) (γdl := γdl) (γfs := γfs) (pd := pd) (pav := pav) (pu := pu) (j := j) (logstart := logstart) (dev := dev) (recovering := recovering) (n := n) (W := W) (Lw := Lw) (L := L) (D := D) (pidv := pidv) (dqp := dqp) (homeL := homeL) (Xv := Xv) (Xexc := Xexc) (Rt := Rt) (hj := hj) (hproc := hproc) (hK := hK) (hnoff := hnoff) (htier := htier) (hgeom := hgeom) (hdev := hdev) (hcl := hcl) (hdt := hdt) (ha0 := ha0) (hn := hn) (hnodup := hnodup) (hhome := hhome) (hlen := hlen) (hcommit := hcommit) (hpin := hpin) (hxexc := hxexc) (hpd := hpd)
   unfold wp_install_trans_eb_body at h
   unfold wp_install_trans_body
   rw [hsie] at h
   simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, H17, H18, Hnext⟩
+  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, H17, H18,
+    #Hgen, HR0, Hnext⟩
   iapply h
-  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 H18
+  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 H18 HR0
+  isplitr
+  · iexact Hgen
   iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6 H7 H8 H9 H10 H11 H12 H13
-  iapply HK $$ %spie %spp %R' %p0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12 H13
+  iintro %cpu' HK %spie %spp %R' %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6 H7 H8 H9 H10 H11 H12 H13 HR
+  iapply HK $$ %spie %spp %R' %p0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12 H13 HR
 
 end Xv6

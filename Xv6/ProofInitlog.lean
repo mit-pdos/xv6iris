@@ -247,7 +247,7 @@ theorem il_install_trans (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs (hlc :=
     ⊢ wpLoop (GF := GF) c := by
   subst hpj hs
   have h := IT.wp_install_trans_eb (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl γfs pd pav pu j
-    logstart dev true n W Lw L D pidv dqp homeL Xv Xexc
+    logstart dev true n W Lw L D pidv dqp homeL Xv Xexc (fun _ => iprop(True))
     hj hproc hK hnoff htier hgeom hdev hcl hdt
     (by simp only [if_true]; exact ha0) hn hnodup hhome hlen
     (by intro hb; exact absurd hb (by simp))
@@ -256,6 +256,7 @@ theorem il_install_trans (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs (hlc :=
   simp only [installTransAddr, if_true, Nat.add_zero] at h
   iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hbc, #Hdc, #Hpe, #Hfr, #Hbinv, Hpid, HlhN, HW, Hexc,
     HL, HD, HS, Hsl, Hnext⟩
+  icases diskCaps_writeAny V.gd γdl pd pav pu $$ Hdc with ⟨-, #Hany⟩
   iapply h
   iframe Hk Hpc Hpi Hte Hce Hbc Hdc Hpe Hfr Hpid Hbinv HlhN HW Hexc HL HD Hsl
   isplitl [HS]
@@ -265,8 +266,14 @@ theorem il_install_trans (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs (hlc :=
     isplitl [H]
     · iexact H
     · iempintro
+  isplitl []
+  · imodintro
+    iintro %i %w %_ %_ -
+    iapply Hany
+  isplitl []
+  · inext; ipureintro; trivial
   iapply wpNext_intro_pin
-  iintro %cpu2 %hp2 %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid HlhN HW Hexc HL HD HS Hsl
+  iintro %cpu2 %hp2 %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid HlhN HW Hexc HL HD HS Hsl -
   ihave HS := BigSepL.bigSepL_mono
     (Φ := fun i (_ : BitVec 32) => iprop(fsChalf (GF := GF) γfs (logSlotBno logstart i) (Lw i) ∗ emp))
     (Ψ := fun i (_ : BitVec 32) => fsChalf (GF := GF) γfs (logSlotBno logstart i) (Lw i)) (l := W)
@@ -306,13 +313,14 @@ theorem il_write_head (WH : WRITE_HEAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
     ⊢ wpLoop (GF := GF) c := by
   subst hpj hs
   have h := WH.wp_write_head_eb (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl γfs pd pav pu j
-    logstart dev 0 ([] : List (BitVec 32)) L pidv dqp
+    logstart dev 0 ([] : List (BitVec 32)) L pidv dqp (fun _ => iprop(True))
     hj hproc hK hnoff htier hgeom hdev hcl hdt
     ⟨rfl, by unfold LOGBLOCKS; omega⟩ hpd
   unfold wp_write_head_eb_body at h
   simp only [writeHeadAddr] at h
   iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hbc, #Hdc, #Hpe, #Hfr, Hpid, HlhN, HL, Hch, Hsl,
     Hnext⟩
+  icases diskCaps_writeAny V.gd γdl pd pav pu $$ Hdc with ⟨-, #Hany⟩
   iapply h
   iframe Hk Hpc Hpi Hte Hce Hbc Hdc Hpe Hfr Hpid
   isplitl [HlhN]
@@ -320,8 +328,11 @@ theorem il_write_head (WH : WRITE_HEAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
   isplitr [HL Hch Hsl Hnext]
   · iapply BigSepL.bigSepL_nil.2; iempintro
   iframe HL Hch Hsl
+  isplitl []
+  · iintro %bs' %_ %_ %_
+    iapply Hany
   iapply wpNext_intro_pin
-  iintro %cpu2 %hp2 %spie %spp %R' %bs' %hcs Hk Hpc Hte Hce Hpid HlhN - HL Hch %hbs Hsl
+  iintro %cpu2 %hp2 %spie %spp %R' %bs' %hcs Hk Hpc Hte Hce Hpid HlhN - HL Hch %hbs Hsl -
   ihave Hn := wpNext_at true k'.proc c cpu2 _ hp2 $$ Hnext
   iapply Hn $$ %spie %spp %R' %bs' %hcs Hk Hpc Hte Hce Hpid HlhN HL Hch Hsl
 
