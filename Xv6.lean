@@ -1116,3 +1116,9 @@ import Xv6.FsCollectAllRows
 import Xv6.FsCollectAllHand
 import Xv6.FsCollectAllBodies
 import Xv6.FsCollectAll
+import Xv6.MainSecondarySpin
+import Xv6.SpecMain
+import Xv6.SpecMainSecondary
+import Xv6.MainSecondaryParts
+import Xv6.ProofMainSecondary
+import Xv6.LinkMainSecondary
