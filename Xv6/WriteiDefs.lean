@@ -8,7 +8,7 @@ instruction stream computes, and each callee's contract at its call site.
 **Deviations from Rocq.**
 
 1. THE ARGUMENTS ARE ONE RECORD (`Xv6.WiArgs`) and the contract's premises
-   one structure (`Xv6.WiFacts`): Rocq threads thirty-odd section
+   one structure (`Xv6.WiFactsEb`): Rocq threads thirty-odd section
    parameters through five lemmas; a record keeps every stage statement to
    the facts that actually change.
 2. THE FRAME IN THREE STRENGTHS (Rocq's `wi_fr7` / `wi_fr8` / `wi_fr13`) is
@@ -24,14 +24,14 @@ instruction stream computes, and each callee's contract at its call site.
    at the running descriptor and the lazy view (what `either_copyin`
    takes); the pid share is borrowed out of either arm by ONE lemma
    (`Xv6.wiSrc_pid`, Rocq's `wi_src_bare`), at `Xv6.wiQ` (Rocq's `wi_q`).
-5. The continuation (`Xv6.wiCont`) is the contract's, with the five
+5. The continuation (`Xv6.wiContEb`) is the contract's, with the five
    read-only cells bundled (`Xv6.wiCells`) and the source at `wiSrc`; the
    entry lemma converts once.
 6. The callee call sites: `bread`/`brelse` are the shared
    `Xv6.bread_callF`/`brelse_callF` (`Xv6/FsCallSitesF.lean`), `log_write`
    the shared `Xv6.log_write_gen_call` at the ambient view
-   (`Xv6.writei_log_writeF`).  `writei_bmap` (BMAP has no shared call site
-   yet), `writei_either_copyin` and `writei_iupdate` (a copy of
+   (`Xv6.writei_log_writeF`).  `writei_bmap_eb` (BMAP has no shared call site
+   yet), `writei_either_copyin` and `writei_iupdate_eb` (a copy of
    `Xv6.itrunc_iupdate` at a general record, which a stage file may not
    import) are local; promotion candidates.
 -/
@@ -88,34 +88,6 @@ structure WiArgs where
   dqi : DFrac
   dqb : DFrac
   dqz : DFrac
-
-/-- The contract's premises, as one structure (deviation 1). -/
-structure WiFacts [Fscfg] [Icfg] (k : KCtx) (A : WiArgs) : Prop where
-  hj : A.j < NPROC
-  hproc : k.proc = procAddr A.j
-  hK : writeiSlots ≤ k.avail
-  hsie : k.sie = false
-  hnoff : k.noff = 0
-  hlocks : k.locks = []
-  htier : k.tier = KTier.kpt
-  hcost : wiCostBmonly A.off A.n ≤ A.ncount
-  hgeom : logGeomOk fscCov fscLogst
-  hcov : IBLOCK A.inum icfgIst ∈ fscCov
-  hlog : logRegion fscLogst (IBLOCK A.inum icfgIst) = false
-  hnib : A.inum.toNat < 16 * icfgNib
-  hda : A.dn.diAddrs = bmCells A.bm
-  hnz : A.dn.diType.toNat ≠ 0
-  hstab : diTypeStable A.dn A.dn0
-  hnl : diNlinkStable A.dn A.dn0
-  hwf : blkmapWf fscCov fscLogst A.bm
-  hhz : blkHolesZero A.bm A.data
-  hcovs : bmCovers A.bm A.dn.diSize.toNat
-  hsum : A.off + A.n < 2 ^ 31
-  hsz : A.dn.diSize.toNat < 2 ^ 31
-  hbg : bitmapGeomOk fscCov fscLogst fscBmapstart fscSize
-  hsbs : A.sbs.length = A.n
-  hpd : descPageRw A.pd
-  huser : if A.user then k.regs 11#5 ≠ 0#64 else k.regs 11#5 = 0#64
 
 /-! ## The frame -/
 
@@ -305,22 +277,6 @@ theorem wiSrc_pidAt (A : WiArgs) (src : BitVec 64) (P : UPtd) (pa : BitVec 64)
       (wordPointsTo (pPid pa) 4 (wiQ A) A.pidv -∗ wiSrc A src P) := by
   subst h; exact wiSrc_pid A src P
 
-/-- **THE CONTINUATION, NAMED** (Rocq's `wi_cont`; deviation 5). -/
-def wiCont (k : KCtx) (cpu : CPU) (A : WiArgs) : IProp GF :=
-  wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap)
-      (tot : Nat) (bm' : Blkmap) (data' : Nat → List (BitVec 8)) (dn' dn0' : Dinode)
-      (n' : Nat) (wrote : Nat → BitVec 8) (dist : Nat) (dstb : Nat → BitVec 8) (P' : UPtd)
-      (Sb' : List Nat),
-    ⌜calleeSaved k.regs R'⌝ -∗
-    ⌜WriteiOut fscCov fscLogst fscBmapstart A.inum icfgIst A.bm A.data A.dn A.dn0 A.user A.off
-      A.n A.sbs A.V A.M (k.regs 12#5) A.ncount A.Sb (R' 10#5) tot bm' data' dn' dn0' n' wrote
-      dist dstb P' Sb'⌝ -∗
-    kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-    trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
-    wiCells A -∗ inodeMeta A.ip dn' -∗ inodeMap fscFs A.ip bm' -∗ inodeBlocks fscFs bm' data' -∗
-    dinodeAt fscIreg A.inum dn0' -∗ wiSrc A (k.regs 12#5) P' -∗
-    bslots fscBio 3 -∗ logOpS icfgLog n' Sb' -∗ wpLoop cpu'))
-
 end
 
 end Xv6
@@ -336,66 +292,6 @@ section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-
-set_option maxHeartbeats 2000000 in
-/-- `iupdate(ip)` at `+0xd4`: the credited flush (a copy of
-`Xv6.itrunc_iupdate`, at a general record), the anchor parked at `0`, the
-receipt dropped, the payout's allocated branch. -/
-theorem writei_iupdate (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (c : CPU) (k' : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
-    (ip : BitVec 64) (inum : BitVec 32) (dn dn0 : Dinode) (bm : Blkmap)
-    (u : Nat) (Sb0 : List Nat) (cru : Bool) (e0 : Nat)
-    (pidv : BitVec 32) (dqp dqd dqn dqs : DFrac)
-    (pj : BitVec 64) (hpj : k'.proc = pj)
-    (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : iupdateSlots ≤ k'.avail)
-    (hsie : k'.sie = false) (hnoff : k'.noff = 0) (hlocks : k'.locks = [])
-    (htier : k'.tier = KTier.kpt)
-    (hgeom : logGeomOk fscCov fscLogst)
-    (hcov : IBLOCK inum icfgIst ∈ fscCov)
-    (hlog : logRegion fscLogst (IBLOCK inum icfgIst) = false)
-    (hnib : inum.toNat < 16 * icfgNib)
-    (hnz : dn.diType.toNat ≠ 0) (hstab : diTypeStable dn dn0) (hnl : diNlinkStable dn dn0)
-    (hda : dn.diAddrs = bmCells bm) (hdir : bm.bmDir.length = NDIRECT)
-    (hpd : descPageRw pd) (ha0 : k'.regs 10#5 = ip) :
-    kctx c k' ∗ pcIs c KA.«iupdate» ∗ procsInv Γ ∗
-    trapCsrs c ∗ cpuClaim c pj ∗ intrRes c ∗ panicEnv ∗
-    bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
-    logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
-    diskCaps fscDisk fscDlock pd pav pu ∗
-    iuCells ip inum dn bm dqd dqn dqs ∗
-    iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
-    wordPointsTo (pPid pj) 4 dqp pidv ∗
-    bslots fscBio 2 ∗
-    logCredit icfgLog cru Sb0 e0 (IBLOCK inum icfgIst) ∗
-    logOpSe icfgLog (u + 1) Sb0 e0 ∗
-    wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
-      ⌜calleeSaved k'.regs R'⌝ -∗
-      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      trapCsrs cpu' -∗ cpuClaim cpu' pj -∗ intrRes cpu' -∗
-      wordPointsTo (pPid pj) 4 dqp pidv -∗
-      iuCells ip inum dn bm dqd dqn dqs -∗
-      dinodeAt fscIreg inum dn -∗
-      bslots fscBio 2 -∗
-      logOpS icfgLog (if cru then u + 1 else u) (IBLOCK inum icfgIst :: Sb0) -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  subst hpj
-  iintro ⟨Hk, Hpc, #Hpi, Htc, Hcl, Hir, #Hpe, #Hbc, #Hlc, #Hdc, HF, #Hinv, Hdn, Hpid, Hsl,
-    #Hcrd, Hop, Hnext⟩
-  iapply wpLoop_bupd
-  ihave Hlb0 := logEpochLb_0 (GF := GF) icfgLog
-  imod Hlb0 with #Hlb0
-  imodintro
-  have h := IU.wp_iupdate_credgen (hlc := hlc) (GF := GF) Γ c k' γl pd pav pu j ip inum
-    dn dn0 bm u Sb0 cru e0 0 pidv dqp dqd dqn dqs hj hproc hK hsie hnoff hlocks
-    htier hgeom hcov hlog hnib hstab hnl hnz hda hdir hpd ha0
-  unfold wp_iupdate_credgen_body at h
-  simp only [iupdateAddr] at h
-  iapply h
-  iframe Hk Hpc Hpi Htc Hcl Hir Hpe Hbc Hlc Hdc HF Hinv Hdn Hpid Hsl Hlb0 Hcrd Hop
-  iapply wpNext_mono _ _ _ _ _ $$ Hnext
-  iintro %c' HΦ %spie %spp %R' %hcs Hk Hpc Htc Hcl Hir Hpid HF Hout Hsl Hop -
-  ihave Hdn := iregOut_alloc_inv fscIreg inum dn hnz $$ Hout
-  iapply HΦ $$ %spie %spp %R' %hcs Hk Hpc Htc Hcl Hir Hpid HF Hdn Hsl Hop
 
 end
 
@@ -486,18 +382,153 @@ section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
+end
+
+end Xv6
+
+/-! ## At either entry `SIE` (the eb-generic sweep; append-only)
+
+writei holds no spinlock at all: its whole body is a LEVEL-0 stretch, so
+the eb form changes only the index of every step (`k_step_e`) and threads
+the complement (`trapCsrsExt` / `cpuClaimExt`) through the three sleeping
+callees (`bmap`, `bread`, `iupdate`, at their `_eb` contracts) in place of
+the pinned bundle.  The continuation is taken hart-free once at the entry
+(`wiContEb`: `wpNext true` at a proc is `∀ cpu'`), so no stage carries a
+hart-pinning chain (Rocq `wi_cont` keeps `wp_next` and transports
+`trap_csrs_ext` with `trap_csrs_ext_transport` at each crossing instead). -/
+
+namespace Xv6
+
+open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
+open LeanRV64D
+
+/-- The eb contract's premises (`Xv6.WiFactsEb` less `hsie`). -/
+structure WiFactsEb [Fscfg] [Icfg] (k : KCtx) (A : WiArgs) : Prop where
+  hj : A.j < NPROC
+  hproc : k.proc = procAddr A.j
+  hK : writeiSlots ≤ k.avail
+  hnoff : k.noff = 0
+  hlocks : k.locks = []
+  htier : k.tier = KTier.kpt
+  hcost : wiCostBmonly A.off A.n ≤ A.ncount
+  hgeom : logGeomOk fscCov fscLogst
+  hcov : IBLOCK A.inum icfgIst ∈ fscCov
+  hlog : logRegion fscLogst (IBLOCK A.inum icfgIst) = false
+  hnib : A.inum.toNat < 16 * icfgNib
+  hda : A.dn.diAddrs = bmCells A.bm
+  hnz : A.dn.diType.toNat ≠ 0
+  hstab : diTypeStable A.dn A.dn0
+  hnl : diNlinkStable A.dn A.dn0
+  hwf : blkmapWf fscCov fscLogst A.bm
+  hhz : blkHolesZero A.bm A.data
+  hcovs : bmCovers A.bm A.dn.diSize.toNat
+  hsum : A.off + A.n < 2 ^ 31
+  hsz : A.dn.diSize.toNat < 2 ^ 31
+  hbg : bitmapGeomOk fscCov fscLogst fscBmapstart fscSize
+  hsbs : A.sbs.length = A.n
+  hpd : descPageRw A.pd
+  huser : if A.user then k.regs 11#5 ≠ 0#64 else k.regs 11#5 = 0#64
+
+section
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+  [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
+  [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
+
+/-- **THE CONTINUATION, HART-FREE** (the eb contract's, `wpNext true` at a
+proc read at every hart; the complement comes back at the caller's `SIE`). -/
+def wiContEb (k : KCtx) (A : WiArgs) : IProp GF :=
+  iprop(∀ (cpu' : CPU) (spie spp : Bool) (R' : RegMap)
+      (tot : Nat) (bm' : Blkmap) (data' : Nat → List (BitVec 8)) (dn' dn0' : Dinode)
+      (n' : Nat) (wrote : Nat → BitVec 8) (dist : Nat) (dstb : Nat → BitVec 8) (P' : UPtd)
+      (Sb' : List Nat),
+    ⌜calleeSaved k.regs R'⌝ -∗
+    ⌜WriteiOut fscCov fscLogst fscBmapstart A.inum icfgIst A.bm A.data A.dn A.dn0 A.user A.off
+      A.n A.sbs A.V A.M (k.regs 12#5) A.ncount A.Sb (R' 10#5) tot bm' data' dn' dn0' n' wrote
+      dist dstb P' Sb'⌝ -∗
+    kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+    trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
+    wiCells A -∗ inodeMeta A.ip dn' -∗ inodeMap fscFs A.ip bm' -∗ inodeBlocks fscFs bm' data' -∗
+    dinodeAt fscIreg A.inum dn0' -∗ wiSrc A (k.regs 12#5) P' -∗
+    bslots fscBio 3 -∗ logOpS icfgLog n' Sb' -∗ wpLoop cpu')
+
+set_option maxHeartbeats 2000000 in
+/-- `iupdate(ip)` at `+0xd4` at EITHER entry `SIE` (`Xv6.writei_iupdate` at
+`IUPDATE.wp_iupdate_credgen_eb`; the complement at the named index `s`). -/
+theorem writei_iupdate_eb (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (c : CPU) (k' : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
+    (ip : BitVec 64) (inum : BitVec 32) (dn dn0 : Dinode) (bm : Blkmap)
+    (u : Nat) (Sb0 : List Nat) (cru : Bool) (e0 : Nat)
+    (pidv : BitVec 32) (dqp dqd dqn dqs : DFrac)
+    (pj : BitVec 64) (hpj : k'.proc = pj) (s : Bool) (hs : k'.sie = s)
+    (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : iupdateSlots ≤ k'.avail)
+    (hnoff : k'.noff = 0)
+    (htier : k'.tier = KTier.kpt)
+    (hgeom : logGeomOk fscCov fscLogst)
+    (hcov : IBLOCK inum icfgIst ∈ fscCov)
+    (hlog : logRegion fscLogst (IBLOCK inum icfgIst) = false)
+    (hnib : inum.toNat < 16 * icfgNib)
+    (hnz : dn.diType.toNat ≠ 0) (hstab : diTypeStable dn dn0) (hnl : diNlinkStable dn dn0)
+    (hda : dn.diAddrs = bmCells bm) (hdir : bm.bmDir.length = NDIRECT)
+    (hpd : descPageRw pd) (ha0 : k'.regs 10#5 = ip) :
+    kctx c k' ∗ pcIs c KA.«iupdate» ∗ procsInv Γ ∗
+    trapCsrsExt c s ∗ cpuClaimExt c s pj ∗ panicEnv ∗
+    bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
+    logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
+    diskCaps fscDisk fscDlock pd pav pu ∗
+    iuCells ip inum dn bm dqd dqn dqs ∗
+    iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
+    wordPointsTo (pPid pj) 4 dqp pidv ∗
+    bslots fscBio 2 ∗
+    logCredit icfgLog cru Sb0 e0 (IBLOCK inum icfgIst) ∗
+    logOpSe icfgLog (u + 1) Sb0 e0 ∗
+    wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
+      ⌜calleeSaved k'.regs R'⌝ -∗
+      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
+      trapCsrsExt cpu' s -∗ cpuClaimExt cpu' s pj -∗
+      wordPointsTo (pPid pj) 4 dqp pidv -∗
+      iuCells ip inum dn bm dqd dqn dqs -∗
+      dinodeAt fscIreg inum dn -∗
+      bslots fscBio 2 -∗
+      logOpS icfgLog (if cru then u + 1 else u) (IBLOCK inum icfgIst :: Sb0) -∗ wpLoop cpu'))
+    ⊢ wpLoop (GF := GF) c := by
+  subst hpj hs
+  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hpe, #Hbc, #Hlc, #Hdc, HF, #Hinv, Hdn, Hpid, Hsl,
+    #Hcrd, Hop, Hnext⟩
+  iapply wpLoop_bupd
+  ihave Hlb0 := logEpochLb_0 (GF := GF) icfgLog
+  imod Hlb0 with #Hlb0
+  imodintro
+  have h := IU.wp_iupdate_credgen_eb (hlc := hlc) (GF := GF) Γ c k' γl pd pav pu j ip inum
+    dn dn0 bm u Sb0 cru e0 0 pidv dqp dqd dqn dqs hj hproc hK hnoff
+    htier hgeom hcov hlog hnib hstab hnl hnz hda hdir hpd ha0
+  unfold wp_iupdate_credgen_eb_body at h
+  simp only [iupdateAddr] at h
+  iapply h
+  iframe Hk Hpc Hpi Hte Hce Hpe Hbc Hlc Hdc HF Hinv Hdn Hpid Hsl Hlb0 Hcrd Hop
+  iapply wpNext_mono _ _ _ _ _ $$ Hnext
+  iintro %c' HΦ %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid HF Hout Hsl Hop -
+  ihave Hdn := iregOut_alloc_inv fscIreg inum dn hnz $$ Hout
+  iapply HΦ $$ %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid HF Hdn Hsl Hop
+
+end
+
+section
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+  [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+
 set_option maxHeartbeats 1000000 in
-/-- `bmap(ip, off/BSIZE)` at `+0x88`: the allocating, credited form
-(Rocq's `BM.wp_bmap_gen` at `wi_loop`'s head). -/
-theorem writei_bmap (BM : BMAP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+/-- `bmap(ip, off/BSIZE)` at `+0x88` at EITHER entry `SIE`
+(the call at `BMAP.wp_bmap_gen_eb`; the complement at the named
+index `s`). -/
+theorem writei_bmap_eb (BM : BMAP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (c : CPU) (k' : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (γ : LogNames) (γfs : FsNames)
     (logstart bmapstart size : Nat) (dev : BitVec 32)
     (ip : BitVec 64) (bm : Blkmap) (data : Nat → List (BitVec 8)) (fbn : Nat)
     (n : Nat) (cr : Bool) (Sb : List Nat) (pidv : BitVec 32) (dqp dqd dqb dqs : DFrac)
-    (pj : BitVec 64) (hpj : k'.proc = pj)
+    (pj : BitVec 64) (hpj : k'.proc = pj) (s : Bool) (hs : k'.sie = s)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : bmapSlots ≤ k'.avail)
-    (hsie : k'.sie = false) (hnoff : k'.noff = 0) (hlocks : k'.locks = [])
+    (hnoff : k'.noff = 0)
     (htier : k'.tier = KTier.kpt)
     (hneed : bmapNeed cr (bmapInd fbn) ≤ n)
     (hgeom : logGeomOk V.cov logstart) (hbm : bitmapGeomOk V.cov logstart bmapstart size)
@@ -507,7 +538,7 @@ theorem writei_bmap (BM : BMAP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (hpd : descPageRw pd)
     (ha0 : k'.regs 10#5 = ip) (ha1 : k'.regs 11#5 = BitVec.signExtend 64 (BitVec.ofNat 32 fbn)) :
     kctx c k' ∗ pcIs c KA.«bmap» ∗ procsInv Γ ∗
-    trapCsrs c ∗ cpuClaim c pj ∗ intrRes c ∗
+    trapCsrsExt c s ∗ cpuClaimExt c s pj ∗
     bioCtx γl γb V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
     fsBytesAny γfs ∗
     logCtx γ γb γfs V.cov logstart dev ∗
@@ -528,7 +559,7 @@ theorem writei_bmap (BM : BMAP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       ⌜(R' 10#5 = 0#64 ∧ (blkmapGet bm' fbn).toNat = 0) ∨
         (R' 10#5 = BitVec.signExtend 64 (blkmapGet bm' fbn) ∧ (blkmapGet bm' fbn).toNat ≠ 0)⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      trapCsrs cpu' -∗ cpuClaim cpu' pj -∗ intrRes cpu' -∗
+      trapCsrsExt cpu' s -∗ cpuClaimExt cpu' s pj -∗
       wordPointsTo (pPid pj) 4 dqp pidv -∗
       wordPointsTo sbSizeAddr 4 dqs (BitVec.ofNat 32 size) -∗
       wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 bmapstart) -∗
@@ -547,11 +578,11 @@ theorem writei_bmap (BM : BMAP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
         (bmapInd fbn = false → bm'.bmInd = bm.bmInd)⌝ -∗
       logOpS γ n' Sb' -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  subst hpj
-  have h := BM.wp_bmap_gen (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl pd pav pu j γ γfs
-    logstart bmapstart size dev ip bm data fbn n cr Sb pidv dqp dqd dqb dqs hj hproc hK hsie
-    hnoff hlocks htier hneed hgeom hbm hcredit hfbn hwf hdev hcl hdt hpd ha0 ha1
-  unfold wp_bmap_gen_body at h
+  subst hpj hs
+  have h := BM.wp_bmap_gen_eb (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl pd pav pu j γ γfs
+    logstart bmapstart size dev ip bm data fbn n cr Sb pidv dqp dqd dqb dqs hj hproc hK
+    hnoff htier hneed hgeom hbm hcredit hfbn hwf hdev hcl hdt hpd ha0 ha1
+  unfold wp_bmap_gen_eb_body at h
   simp only [bmapAddr] at h
   exact h
 

@@ -58,13 +58,13 @@ theorem iput_locked (RH : RELEASE_HOOK) (AC : ACQUIRE_LLB) (ASN : ACQUIRESLEEP_N
     -- the successor stage (`IputOfflock.iput_offlock_spec`)
     (HO : IputOfflockSpec)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu c : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat) (γil γisl : GName)
+    (c : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat) (γil γisl : GName)
     (kk : Nat) (q : Qp) (inum : BitVec 32) (dn : Dinode) (bm : Blkmap) (g1 g2 : GName)
     (Mt : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × BitVec 32))
     (n : Nat) (Sb : List Nat) (crb cru crz : Bool) (e0 : Nat) (tid : Nat) (qtx : Qp)
     (pidv : BitVec 32) (dqp dqb dqs : DFrac) (rgb bfl : Bool) (td T0 Kw : Nat) (R : RegMap)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : iputSlots ≤ k.avail)
-    (hwf : k.wf) (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
+    (hwf : k.wf) (hnoff : k.noff = 0) (hlocks : k.locks = [])
     (htier : k.tier = KTier.kpt) (hkk : kk < NINODE) (hn : iputUnits ≤ n)
     (hcrb : crb = true → fscBmapstart ∈ Sb)
     (hgeom : logGeomOk fscCov fscLogst)
@@ -79,12 +79,11 @@ theorem iput_locked (RH : RELEASE_HOOK) (AC : ACQUIRE_LLB) (ASN : ACQUIRESLEEP_N
     (h10 : R 10#5 = iLock (ientry kk)) (h9 : R 9#5 = ientry kk)
     (h18 : R 18#5 = BitVec.signExtend 64 inum) (h19 : R 19#5 = iLock (ientry kk))
     (h20 : R 20#5 = BitVec.signExtend 64 icfgDev)
-    (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64) (hpins : iputPins k.regs R)
-    (hpin : true = false ∨ k.proc = 0#64 → c = cpu) :
+    (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64) (hpins : iputPins k.regs R) :
     kctx c ((((k.pushOffAt k.spie k.spp).withLocks ("itable" :: k.locks)).pushed 6).withRegs R) ∗
     pcIs c (KA.«iput» + 0x5a#64) ∗ iputEnv Γ γl pd pav pu γil γisl kk ∗
     locked fscItlock c ∗ sieArm c k.sie k.proc ∗
-    trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
+    trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗
     -- the table: its half, the payload rows' back-wand (the slot's row is
     -- OUT), the slot's exact-read stamp row
     itableHalf Mt ∗
@@ -127,12 +126,12 @@ theorem iput_locked (RH : RELEASE_HOOK) (AC : ACQUIRE_LLB) (ASN : ACQUIRESLEEP_N
     bslots fscBio 3 ∗
     iputFrame6 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5)
       (k.regs 19#5) (k.regs 20#5) ∗
-    iputPost cpu k n Sb crb cru crz tid qtx pidv dqp dqb dqs rgb
+    iputPost k n Sb crb cru crz tid qtx pidv dqp dqb dqs rgb
     ⊢ wpLoop (GF := GF) c :=
-  iput_lk_a RH AC ASN RSH IT HO Γ cpu c k γl pd pav pu j γil γisl kk q inum dn bm g1 g2 Mt ci n Sb
-    crb cru crz e0 tid qtx pidv dqp dqb dqs rgb bfl td T0 Kw R hj hproc hK hwf hsie hnoff hlocks
+  iput_lk_a RH AC ASN RSH IT HO Γ c k γl pd pav pu j γil γisl kk q inum dn bm g1 g2 Mt ci n Sb
+    crb cru crz e0 tid qtx pidv dqp dqb dqs rgb bfl td T0 Kw R hj hproc hK hwf hnoff hlocks
     htier hkk hn hcrb hgeom hbg hcov hlog hnib hbel hpd hnl0 hMwf hciwf hMk hcik hTKw h10 h9 h18
-    h19 h20 hR2 hpins hpin
+    h19 h20 hR2 hpins
 
 /-- The locked block, packaged (`IputStages.IputLockedSpec`). -/
 theorem iput_locked_spec (RH : RELEASE_HOOK) (AC : ACQUIRE_LLB) (ASN : ACQUIRESLEEP_NB)

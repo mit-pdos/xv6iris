@@ -193,7 +193,7 @@ theorem iput_lk_itrunc (IT : ITRUNC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
     (data : Nat → List (BitVec 8)) (u : Nat) (Sb : List Nat) (crb cru : Bool) (e0 : Nat)
     (pidv : BitVec 32) (dqp dqd dqn dqb dqs : DFrac)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : itruncSlots ≤ k'.avail)
-    (hsie : k'.sie = false) (hnoff : k'.noff = 0) (hlocks : k'.locks = [])
+    (s : Bool) (hs : k'.sie = s) (hnoff : k'.noff = 0)
     (htier : k'.tier = KTier.kpt)
     (hcrb : crb = true → fscBmapstart ∈ Sb)
     (hgeom : logGeomOk fscCov fscLogst)
@@ -205,7 +205,7 @@ theorem iput_lk_itrunc (IT : ITRUNC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
     (hsz : inodeSized data) (hda : dn.diAddrs = bmCells bm)
     (hpd : descPageRw pd) (ha0 : k'.regs 10#5 = ip) :
     kctx c k' ∗ pcIs c KA.«itrunc» ∗ procsInv Γ ∗
-    trapCsrs c ∗ cpuClaim c k'.proc ∗ intrRes c ∗ panicEnv ∗
+    trapCsrsExt c s ∗ cpuClaimExt c s k'.proc ∗ panicEnv ∗
     bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
     logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
     diskCaps fscDisk fscDlock pd pav pu ∗
@@ -222,7 +222,7 @@ theorem iput_lk_itrunc (IT : ITRUNC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
     wpNext true k'.proc c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      trapCsrs cpu' -∗ cpuClaim cpu' k'.proc -∗ intrRes cpu' -∗
+      trapCsrsExt cpu' s -∗ cpuClaimExt cpu' s k'.proc -∗
       wordPointsTo (pPid k'.proc) 4 dqp pidv -∗
       wordPointsTo (iDev ip) 4 dqd icfgDev -∗ wordPointsTo (iInum ip) 4 dqn inum -∗
       wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) -∗
@@ -238,10 +238,11 @@ theorem iput_lk_itrunc (IT : ITRUNC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
           itEntry crb u - (itBm w + itIu cru) ≤ u' ∧ u' + itIu cru ≤ itEntry crb u⌝ ∗
         logOpS icfgLog u' Sb') -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := IT.wp_itrunc_gen (hlc := hlc) (GF := GF) Γ c k' γl pd pav pu j ip inum dn dn bm data
-    u Sb crb cru e0 pidv dqp dqd dqn dqb dqs hj hproc hK hsie hnoff hlocks htier hcrb hgeom hbg
+  subst hs
+  have h := IT.wp_itrunc_gen_eb (hlc := hlc) (GF := GF) Γ c k' γl pd pav pu j ip inum dn dn bm data
+    u Sb crb cru e0 pidv dqp dqd dqn dqb dqs hj hproc hK hnoff htier hcrb hgeom hbg
     hcov hlog hnib hnz (diTypeStable_refl dn) (diNlinkStable_refl dn hnz) hwf hbel hsz hda hpd ha0
-  unfold wp_itrunc_gen_body at h
+  unfold wp_itrunc_gen_eb_body at h
   simp only [itruncAddr] at h
   exact h
 
@@ -282,13 +283,13 @@ set_option maxHeartbeats 16000000 in
 theorem iput_lk_a (RH : RELEASE_HOOK) (AC : ACQUIRE_LLB) (ASN : ACQUIRESLEEP_NB)
     (RSH : RELEASESLEEP_HOOK) (IT : ITRUNC) (HO : IputOfflockSpec)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu c : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat) (γil γisl : GName)
+    (c : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat) (γil γisl : GName)
     (kk : Nat) (q : Qp) (inum : BitVec 32) (dn : Dinode) (bm : Blkmap) (g1 g2 : GName)
     (Mt : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × BitVec 32))
     (n : Nat) (Sb : List Nat) (crb cru crz : Bool) (e0 : Nat) (tid : Nat) (qtx : Qp)
     (pidv : BitVec 32) (dqp dqb dqs : DFrac) (rgb bfl : Bool) (td T0 Kw : Nat) (R : RegMap)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : iputSlots ≤ k.avail)
-    (hwf : k.wf) (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
+    (hwf : k.wf) (hnoff : k.noff = 0) (hlocks : k.locks = [])
     (htier : k.tier = KTier.kpt) (hkk : kk < NINODE) (hn : iputUnits ≤ n)
     (hcrb : crb = true → fscBmapstart ∈ Sb)
     (hgeom : logGeomOk fscCov fscLogst)
@@ -303,12 +304,11 @@ theorem iput_lk_a (RH : RELEASE_HOOK) (AC : ACQUIRE_LLB) (ASN : ACQUIRESLEEP_NB)
     (h10 : R 10#5 = iLock (ientry kk)) (h9 : R 9#5 = ientry kk)
     (h18 : R 18#5 = BitVec.signExtend 64 inum) (h19 : R 19#5 = iLock (ientry kk))
     (h20 : R 20#5 = BitVec.signExtend 64 icfgDev)
-    (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64) (hpins : iputPins k.regs R)
-    (hpin : true = false ∨ k.proc = 0#64 → c = cpu) :
+    (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64) (hpins : iputPins k.regs R) :
     kctx c ((((k.pushOffAt k.spie k.spp).withLocks ("itable" :: k.locks)).pushed 6).withRegs R) ∗
     pcIs c (KA.«iput» + 0x5a#64) ∗ iputEnv Γ γl pd pav pu γil γisl kk ∗
     locked fscItlock c ∗ sieArm c k.sie k.proc ∗
-    trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
+    trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗
     itableHalf Mt ∗
     (∀ (M' : RegMapF (Qp × PosNat)) (ci' : RegMapF (BitVec 32 × BitVec 32)),
       ⌜∀ j, j ≠ kk → PartialMap.get? M' j = PartialMap.get? Mt j⌝ -∗
@@ -339,11 +339,12 @@ theorem iput_lk_a (RH : RELEASE_HOOK) (AC : ACQUIRE_LLB) (ASN : ACQUIRESLEEP_NB)
     bslots fscBio 3 ∗
     iputFrame6 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5)
       (k.regs 19#5) (k.regs 20#5) ∗
-    iputPost cpu k n Sb crb cru crz tid qtx pidv dqp dqb dqs rgb
+    iputPost k n Sb crb cru crz tid qtx pidv dqp dqb dqs rgb
     ⊢ wpLoop (GF := GF) c := by
   have hK16 : 16 ≤ k.avail := by unfold iputSlots itruncSlots bfreeSlots at hK; omega
   have hlk : "itable" ∉ k.locks := by simp [hlocks]
-  iintro ⟨Hk, Hpc, #Henv, Hlocked, Harm, Htc, Hcl, Hir, Hhalf, Hstampsback, Hstk, Hreg, #Hllbd,
+  have hsie : (k.pushOffAt k.spie k.spp).sie = false := rfl
+  iintro ⟨Hk, Hpc, #Henv, Hlocked, Harm, Hte, Hce, Hhalf, Hstampsback, Hstk, Hreg, #Hllbd,
     #Hflw, Hc, Hvld, Hid, Hnl, Hsele, Hiauth, Hipool, Hpool, Hslots, Hfrg, Hrslh, Hrident, HgidH,
     Hlg, -, -, Hpre, Hru, Hnlz, #Hcrd, Hop, Hhpn, Htxh, Hpid, Hsb, Hsi, Hbsl, Hframe, Hpost⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -366,7 +367,7 @@ theorem iput_lk_a (RH : RELEASE_HOOK) (AC : ACQUIRE_LLB) (ASN : ACQUIRESLEEP_NB)
   k_norm_g
   iframe
   case ha => k_norm_g [h10]
-  case hk => k_norm_g; have := iput_lk_asl_slots; simp only [hsie, trapRes]; omega
+  case hk => k_norm_g; have := iput_lk_asl_slots; omega
   case hs => k_norm_g
   case hn => k_norm_g; omega
   case hsl => k_norm_g; simp [hlocks]
@@ -407,21 +408,21 @@ theorem iput_lk_a (RH : RELEASE_HOOK) (AC : ACQUIRE_LLB) (ASN : ACQUIRESLEEP_NB)
   k_step (wp_s_jal c2 _ (KA.«iput» + 0x66#64) false 2086912#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iput_br_release]
   iintro Hk Hpc
-  iapply (iput_release RH c2 k hwf hsie hK16 hlk _ ?h10 (KA.«iput» + 0x6a#64) ?h1)
-    $$ [- $Hk $Hpc $Hit $Hlocked $Harm $HRin]
+  iapply (iput_release RH c2 k hwf hK16 hlk _ ?h10 (KA.«iput» + 0x6a#64) ?h1)
+    $$ [- $Hk $Hpc $Hit $Hlocked $Harm $HRin $Hte $Hce]
   rotate_right 1
   case h10 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
   case h1 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
-  iintro %R3 %hcs3 Hk Hpc
+  iintro %c %R3 %hcs3 Hk Hpc Hte Hce
   rw [iput_lk_ret_6a]
   obtain ⟨f2, f8, f9, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27⟩ := hcs3
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at f2 f9 f18 f19 f20 f21 f22 f23 f24 f25 f26 f27
   have g9 : R3 9#5 = ientry kk := f9.trans (e9.trans h9)
   -- +0x6a c.mv a0,s1 ; +0x6c jal itrunc
-  k_step (wp_s_add c2 _ (KA.«iput» + 0x6a#64) true 10#5 0#5 9#5 (by decide))
+  k_step_c (wp_s_add c _ (KA.«iput» + 0x6a#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g9]
   iintro Hk Hpc
-  k_step (wp_s_jal c2 _ (KA.«iput» + 0x6c#64) false 2096896#21 1#5 (by decide))
+  k_step_c (wp_s_jal c _ (KA.«iput» + 0x6c#64) false 2096896#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iput_br_itrunc]
   iintro Hk Hpc
   -- the bundle, unpacked for itrunc; the group credit cashed
@@ -439,24 +440,23 @@ theorem iput_lk_a (RH : RELEASE_HOOK) (AC : ACQUIRE_LLB) (ASN : ACQUIRESLEEP_NB)
   have hent := iput_lk_entry crb n hn3
   ihave Hop := iput_lk_ent_eq (show logOpSe (GF := GF) icfgLog n Sb e0 =
     logOpSe icfgLog (itEntry crb (n - if crb then 1 else 2)) Sb e0 by rw [hent]) $$ Hop
-  iapply (iput_lk_itrunc IT Γ c2 _ γl pd pav pu j (ientry kk) inum dn bm data
+  iapply (iput_lk_itrunc IT Γ c _ γl pd pav pu j (ientry kk) inum dn bm data
     (n - if crb then 1 else 2) Sb crb (cru || crz) e0 pidv dqp (DFrac.own (1 : Qp).half)
-    (DFrac.own (1 : Qp).half) dqb dqs hj ?hip ?hiK ?his ?hin ?hil ?hit hcrb hgeom hbg hcov hlog hnib hnz
+    (DFrac.own (1 : Qp).half) dqb dqs hj ?hip ?hiK k.sie ?his ?hin ?hit hcrb hgeom hbg hcov hlog hnib hnz
     hbmwf hbel hsz hda hpd ?hia)
-    $$ [- $Hk $Hpc $Hpi $Htc $Hir $Hpe $Hbc $Hlc $Hdc $Hidv $Hinh $Hmeta $Hmap $Hblks $Hsb $Hsi
+    $$ [- $Hk $Hpc $Hpi $Hte $Hpe $Hbc $Hlc $Hdc $Hidv $Hinh $Hmeta $Hmap $Hblks $Hsb $Hsi
       $Hbmi $Hireg $Hdat $Hbsl $Hcrd2 $Hop]
   rotate_right 1
   k_norm_g
   iframe
   case hip => k_norm_g; exact hproc
   case hiK => k_norm_g; have := iput_lk_it_slots; omega
-  case his => k_norm_g; exact hsie
+  case his => k_norm_g
   case hin => k_norm_g; exact hnoff
-  case hil => k_norm_g; exact hlocks
   case hit => k_norm_g; exact htier
   case hia => k_norm_g [g9]
   iapply wpNext_intro_pin
-  iintro %c3 %hp3 %s' %p' %R4 %hcs4 Hk Hpc Htc Hcl Hir Hpid Hidv Hinh Hsb Hsi Hmeta Hmap -
+  iintro %c3 %hp3 %s' %p' %R4 %hcs4 Hk Hpc Hte Hce Hpid Hidv Hinh Hsb Hsi Hmeta Hmap -
     Hdn Hbsl ⟨%w, %u', %Sb', %hf, HopS⟩
   ihave Hk := iput_lk_kctx_it c3 k s' p' R4 $$ Hk
   rw [iput_lk_ret_70]
@@ -471,9 +471,9 @@ theorem iput_lk_a (RH : RELEASE_HOOK) (AC : ACQUIRE_LLB) (ASN : ACQUIRESLEEP_NB)
   icases logOpS_named icfgLog (u + 1) Sb' $$ HopS with ⟨%e1, HopS⟩
   have hnd : fnNlink (eraNode dn bm data) = 0 := by unfold fnNlink; rw [eraNode_rec]; exact hnl0
   obtain ⟨p21, p22, p23, p24, p25, p26, p27⟩ := hpins
-  iapply (iput_lk_b RH AC RSH HO Γ cpu c3 k s' p' γl pd pav pu j γil γisl kk q inum (diTrunc dn)
+  iapply (iput_lk_b RH AC RSH HO Γ c3 k s' p' γl pd pav pu j γil γisl kk q inum (diTrunc dn)
     (eraNode dn bm data) g2 n Sb crb cru crz tid qtx pidv dqp dqb dqs rgb bfl u Sb' e1 w R4
-    hj hproc hK hwf hsie hnoff hlocks htier hkk hgeom hcov hlog hnib hpd (diTrunc_wf dn) hnl0
+    hj hproc hK hwf hnoff hlocks htier hkk hgeom hcov hlog hnib hpd (diTrunc_wf dn) hnl0
     (iput_lk_bare dn) hnd hib hled
     (i9.trans (f9.trans (e9.trans h9))) (i18.trans (f18.trans (e18.trans h18)))
     (i19.trans (f19.trans (e19.trans h19))) (i20.trans (f20.trans (e20.trans h20)))
@@ -481,9 +481,8 @@ theorem iput_lk_a (RH : RELEASE_HOOK) (AC : ACQUIRE_LLB) (ASN : ACQUIRESLEEP_NB)
     ⟨i21.trans (f21.trans (e21.trans p21)), i22.trans (f22.trans (e22.trans p22)),
       i23.trans (f23.trans (e23.trans p23)), i24.trans (f24.trans (e24.trans p24)),
       i25.trans (f25.trans (e25.trans p25)), i26.trans (f26.trans (e26.trans p26)),
-      i27.trans (f27.trans (e27.trans p27))⟩
-    (fun h => (hp3 h).trans (hpin h)))
-  iframe Hk Hpc Henv Htc Hcl Hir Hvld Hidv Hinh Hmeta Hmap Hdep Hpinr Htxp Hhold Hstok Hictok Hoffr
+      i27.trans (f27.trans (e27.trans p27))⟩)
+  iframe Hk Hpc Henv Hte Hce Hvld Hidv Hinh Hmeta Hmap Hdep Hpinr Htxp Hhold Hstok Hictok Hoffr
     Hrident Hpre Hru Htop Hdn Hpid Hsb Hsi Hbsl HopS Hframe Hpost
 
 end

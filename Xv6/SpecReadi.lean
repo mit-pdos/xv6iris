@@ -44,12 +44,14 @@ Specification of `readi` (kernel/fs.c): the public contract.  Mirrors Rocq
 
 **Deviations from Rocq, reported.**
 
-1. PINNED AT `k.sie = false ∧ k.noff = 0 ∧ k.locks = [] ∧ k.tier = kpt`
-   (fs1 brief §1, "the `sie` question"): Lean's `BREAD` is pinned there, so
-   Rocq's `eb`/`b` genericity, `trap_csrs_ext`/`cpu_claim_ext` and
-   `locks_below lks "bcache"` collapse to bread's bundle and `k.locks = []`.
-   The destination tier `ktb` is gone (Lean's `byteBuf` is at the ambient
-   context).
+1. **eb-GENERIC, as in Rocq** (`cpu_own 0 eb`): the `_eb` bodies take the
+   complement `trapCsrsExt cpu k.sie` / `cpuClaimExt cpu k.sie k.proc` (Rocq
+   `trap_csrs_ext` / `cpu_claim_ext`) in and out, at either entry `SIE`, and are
+   what the interface proves.  Depth 0 implies no spinlock held (`KCtx.wf`:
+   `locks.length ≤ noff`), which is Lean's reading of Rocq's `locks_below`
+   premise (Lean has no lock ranks).  The `sie = false` bodies (the whole trap
+   bundle, `k.locks = []`) are kept as DERIVED instances for the callers not yet
+   generalized.
 2. THE VIEW IS A PARAMETER (`V` with `hcl`/`hdt`/`hdev`), as in
    `Xv6/SpecBmap.lean`; `fs_bytes_any` is `fsBytesAny γfs`.
 3. THE PROCESS BLOCK.  Rocq's `if user then proc_priv_core pj pidv U else
@@ -208,9 +210,88 @@ def wp_readi_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
     bslot γb -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
+/-- The eb-generic form of `wp_readi_body` (Rocq: `cpu_own 0 eb`, the
+complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
+spinlock held by `KCtx.wf`). -/
+def wp_readi_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
+    (pd pav pu : BitVec 64) (j : Nat) (γfs : FsNames) (logstart : Nat) (dev : BitVec 32)
+    (γkl : GName) (γk : KmemNames)
+    (ip : BitVec 64) (bm : Blkmap) (data : Nat → List (BitVec 8)) (dn : Dinode)
+    (user : Bool) (off n : Nat) (olds : List (BitVec 8))
+    (pidv : BitVec 32) (Vp : ProcPriv) (M : Nat → List (BitVec 8)) (dqp dq dqd : DFrac)
+    (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : readiSlots ≤ k.avail)
+    (hnoff : k.noff = 0)
+    (htier : k.tier = KTier.kpt)
+    (hgeom : logGeomOk V.cov logstart) (hwf : blkmapWf V.cov logstart bm)
+    -- EVERY BLOCK BELOW THE SIZE IS ALLOCATED: every bmap is a no-alloc one
+    (hcov : bmCovers bm dn.diSize.toNat)
+    -- the file-system invariant readi trusts instead of checking
+    (hsz : dn.diSize.toNat ≤ MAXFILE * BSIZE)
+    -- `off` is a uint; THE JOINT BOUND, GUARDED BY THE SIZE TEST
+    (hoff : off < 2 ^ 32) (hjoint : off ≤ dn.diSize.toNat → off + n < 2 ^ 32)
+    (hdev : dev = V.dev) (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs)
+    (hpd : descPageRw pd)
+    (ha0 : k.regs 10#5 = ip)
+    (huser : if user then k.regs 11#5 ≠ 0#64 else k.regs 11#5 = 0#64)
+    (ha3 : k.regs 13#5 = BitVec.signExtend 64 (BitVec.ofNat 32 off))
+    (ha4 : k.regs 14#5 = BitVec.signExtend 64 (BitVec.ofNat 32 n))
+    -- the kernel destination is the caller's `n`-byte buffer
+    (holds : user = false → olds.length = n) : Prop :=
+  kctx cpu k ∗ pcIs cpu readiAddr ∗ procsInv Γ ∗
+  trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
+  bioCtx γl γb V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
+  fsBytesAny γfs ∗
+  -- either_copyout's user arm reaches copyout, which reaches kalloc
+  isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
+  wordPointsTo (iDev ip) 4 dqd dev ∗
+  inodeMeta ip dn ∗
+  inodeMapQ γfs dq ip bm ∗ inodeBlocksQ γfs dq bm data ∗
+  (if user then procPrivRun (procAddr j) pidv Vp M
+   else byteBuf (k.regs 12#5) (DFrac.own 1) olds ∗ wordPointsTo (pPid k.proc) 4 dqp pidv) ∗
+  bslot γb ∗
+  wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (tot : Nat),
+    ⌜calleeSaved k.regs R'⌝ -∗
+    ⌜tot ≤ rdClamp dn.diSize off n⌝ -∗
+    ⌜(R' 10#5 = -1#64 ∧ user = true) ∨
+      (R' 10#5 = BitVec.ofNat 64 tot ∧ tot = rdClamp dn.diSize off n)⌝ -∗
+    kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+    trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
+    wordPointsTo (iDev ip) 4 dqd dev -∗
+    inodeMeta ip dn -∗
+    inodeMapQ γfs dq ip bm -∗ inodeBlocksQ γfs dq bm data -∗
+    (if user then
+      (∃ (P' : UPtd) (M' : Nat → List (BitVec 8)),
+        ⌜Vp.upt.extSz Vp.sz P' ∧ rdImg Vp.upt P' M M' (k.regs 12#5) data off tot⌝ ∗
+        procPrivRun (procAddr j) pidv { Vp with upt := P' } M')
+     else byteBuf (k.regs 12#5) (DFrac.own 1) (rdDelivered data olds off tot) ∗
+       wordPointsTo (pPid k.proc) 4 dqp pidv) -∗
+    bslot γb -∗ wpLoop cpu'))
+  ⊢ wpLoop (GF := GF) cpu
+
 /-- The interface of `readi` (Rocq's `Module Type READI`). -/
 structure READI : Prop where
-  wp_readi : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+  wp_readi_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
+    (pd pav pu : BitVec 64) (j : Nat) (γfs : FsNames) (logstart : Nat) (dev : BitVec 32)
+    (γkl : GName) (γk : KmemNames)
+    (ip : BitVec 64) (bm : Blkmap) (data : Nat → List (BitVec 8)) (dn : Dinode)
+    (user : Bool) (off n : Nat) (olds : List (BitVec 8))
+    (pidv : BitVec 32) (Vp : ProcPriv) (M : Nat → List (BitVec 8)) (dqp dq dqd : DFrac)
+    hj hproc hK hnoff htier hgeom hwf hcov hsz hoff hjoint hdev hcl hdt hpd
+    ha0 huser ha3 ha4 holds,
+    wp_readi_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γb V γdl pd pav pu j γfs logstart dev
+      γkl γk ip bm data dn user off n olds pidv Vp M dqp dq dqd
+      hj hproc hK hnoff htier hgeom hwf hcov hsz hoff hjoint hdev hcl hdt hpd
+      ha0 huser ha3 ha4 holds
+
+/-- The interrupts-off instance of `wp_readi_eb` (the complement is the whole
+bundle): the contract every not-yet-generalized caller states. -/
+theorem READI.wp_readi (A : READI) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
@@ -220,10 +301,21 @@ structure READI : Prop where
     (user : Bool) (off n : Nat) (olds : List (BitVec 8))
     (pidv : BitVec 32) (Vp : ProcPriv) (M : Nat → List (BitVec 8)) (dqp dq dqd : DFrac)
     hj hproc hK hsie hnoff hlocks htier hgeom hwf hcov hsz hoff hjoint hdev hcl hdt hpd
-    ha0 huser ha3 ha4 holds,
+    ha0 huser ha3 ha4 holds :
     wp_readi_body (hlc := hlc) (GF := GF) Γ cpu k γl γb V γdl pd pav pu j γfs logstart dev
       γkl γk ip bm data dn user off n olds pidv Vp M dqp dq dqd
       hj hproc hK hsie hnoff hlocks htier hgeom hwf hcov hsz hoff hjoint hdev hcl hdt hpd
-      ha0 huser ha3 ha4 holds
+      ha0 huser ha3 ha4 holds := by
+  have h := A.wp_readi_eb (hlc := hlc) (GF := GF) (Γ := Γ) (cpu := cpu) (k := k) (γl := γl) (γb := γb) (V := V) (γdl := γdl) (pd := pd) (pav := pav) (pu := pu) (j := j) (γfs := γfs) (logstart := logstart) (dev := dev) (γkl := γkl) (γk := γk) (ip := ip) (bm := bm) (data := data) (dn := dn) (user := user) (off := off) (n := n) (olds := olds) (pidv := pidv) (Vp := Vp) (M := M) (dqp := dqp) (dq := dq) (dqd := dqd) (hj := hj) (hproc := hproc) (hK := hK) (hnoff := hnoff) (htier := htier) (hgeom := hgeom) (hwf := hwf) (hcov := hcov) (hsz := hsz) (hoff := hoff) (hjoint := hjoint) (hdev := hdev) (hcl := hcl) (hdt := hdt) (hpd := hpd) (ha0 := ha0) (huser := huser) (ha3 := ha3) (ha4 := ha4) (holds := holds)
+  unfold wp_readi_eb_body at h
+  unfold wp_readi_body
+  rw [hsie] at h
+  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
+  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, H17, Hnext⟩
+  iapply h
+  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17
+  iapply wpNext_mono $$ Hnext
+  iintro %cpu' HK %spie %spp %R' %tot %p0 %p1 %p2 H3 H4 ⟨Htc, Hir⟩ Hcl H8 H9 H10 H11 H12 H13
+  iapply HK $$ %spie %spp %R' %tot %p0 %p1 %p2 H3 H4 Htc Hcl Hir H8 H9 H10 H11 H12 H13
 
 end Xv6

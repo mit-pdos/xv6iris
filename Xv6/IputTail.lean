@@ -529,28 +529,29 @@ theorem iput_tail_one_au (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c : CPU
 set_option maxHeartbeats 8000000 in
 /-- THE TAIL's EXIT (Rocq `ip_tail_exit`): after the close's store, `+0x24
 auipc a0 ; +0x28 addi a0 ; +0x2c jal release`, then the epilogue. -/
-theorem iput_tail_exit (RH : RELEASE_HOOK) (cpu c : CPU) (k : KCtx)
+theorem iput_tail_exit (RH : RELEASE_HOOK) (c : CPU) (k : KCtx)
     (n : Nat) (Sb : List Nat) (crb cru crz : Bool) (tid : Nat) (qtx : Qp)
     (pidv : BitVec 32) (dqp dqb dqs : DFrac) (rg : Bool) (R : RegMap)
-    (hwf : k.wf) (hsie : k.sie = false) (hlocks : k.locks = [])
+    (hwf : k.wf) (hlocks : k.locks = [])
     (hK : iputSlots ≤ k.avail)
     (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64)
     (h18 : R 18#5 = k.regs 18#5) (h19 : R 19#5 = k.regs 19#5) (h20 : R 20#5 = k.regs 20#5)
-    (hpins : iputPins k.regs R) (hpin : true = false ∨ k.proc = 0#64 → c = cpu) :
+    (hpins : iputPins k.regs R) :
     kctx c ((((k.pushOffAt k.spie k.spp).withLocks ("itable" :: k.locks)).pushed 6).withRegs R) ∗
     pcIs c (KA.«iput» + 0x24#64) ∗
     isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
     locked fscItlock c ∗ sieArm c k.sie k.proc ∗ iputRin curCtx ∗ irefSlot ∗
     txPin icfgLog tid qtx ∗
     frame6s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
-    trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
+    trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗
     iputRet k n Sb pidv dqp dqb dqs rg ∗
-    iputPost cpu k n Sb crb cru crz tid qtx pidv dqp dqb dqs rg
+    iputPost k n Sb crb cru crz tid qtx pidv dqp dqb dqs rg
     ⊢ wpLoop (GF := GF) c := by
   have hK' : 16 ≤ k.avail := by unfold iputSlots itruncSlots bfreeSlots at hK; omega
   have hK6 : 6 ≤ k.avail := by omega
   have hlk : "itable" ∉ k.locks := by rw [hlocks]; simp
-  iintro ⟨Hk, Hpc, #Hit, Hlocked, Harm, HRin, Hslot, Htx, Hframe, Htc, Hcl, Hir, Hret, Hpost⟩
+  have hsie : (k.pushOffAt k.spie k.spp).sie = false := rfl
+  iintro ⟨Hk, Hpc, #Hit, Hlocked, Harm, HRin, Hslot, Htx, Hframe, Hte, Hce, Hret, Hpost⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   k_step (wp_s_auipc c _ (KA.«iput» + 0x24#64) false 0x1d#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -561,20 +562,20 @@ theorem iput_tail_exit (RH : RELEASE_HOOK) (cpu c : CPU) (k : KCtx)
   k_step (wp_s_jal c _ (KA.«iput» + 0x2c#64) false 2086970#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iput_br_release]
   iintro Hk Hpc
-  iapply (iput_release RH c k hwf hsie hK' hlk _ ?h10 (KA.«iput» + 0x30#64) ?h1)
-    $$ [- $Hk $Hpc $Hit $Hlocked $Harm $HRin]
+  iapply (iput_release RH c k hwf hK' hlk _ ?h10 (KA.«iput» + 0x30#64) ?h1)
+    $$ [- $Hk $Hpc $Hit $Hlocked $Harm $HRin $Hte $Hce]
   rotate_right 1
   case h10 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
   case h1 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
-  iintro %R' %hcs Hk Hpc
+  iintro %c %R' %hcs Hk Hpc Hte Hce
   rw [iput_tail_ret_30]
   obtain ⟨c2, c8, c9, c18, c19, c20, c21, c22, c23, c24, c25, c26, c27⟩ := hcs
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at c2 c18 c19 c20 c21 c22 c23 c24 c25 c26 c27
   obtain ⟨p21, p22, p23, p24, p25, p26, p27⟩ := hpins
-  iapply (iput_epi cpu c k k.spie k.spp R' n Sb crb cru crz tid qtx pidv dqp dqb dqs rg n Sb false
-    hsie hK6 (c2.trans hR2) (c18.trans h18) (c19.trans h19) (c20.trans h20)
+  iapply (iput_epi c k k.spie k.spp R' n Sb crb cru crz tid qtx pidv dqp dqb dqs rg n Sb false
+    hK6 (c2.trans hR2) (c18.trans h18) (c19.trans h19) (c20.trans h20)
     ⟨c21.trans p21, c22.trans p22, c23.trans p23, c24.trans p24, c25.trans p25, c26.trans p26,
-      c27.trans p27⟩ hpin (iputLedger_refl n Sb crb cru crz))
+      c27.trans p27⟩ (iputLedger_refl n Sb crb cru crz))
   rw [KCtx.withSpie_self' k _ _ rfl rfl]
   iframe
 
@@ -583,39 +584,39 @@ set_option maxHeartbeats 8000000 in
 at `+0x20` with itable.lock held, the table opened at `(Mt, ci)` and `a5`
 holding the count just read. -/
 theorem iput_tail_ne (RH : RELEASE_HOOK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu c : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (γil γisl : GName)
+    (c : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (γil γisl : GName)
     (kk : Nat) (q : Qp) (inum : BitVec 32)
     (n : Nat) (Sb : List Nat) (crb cru crz : Bool) (tid : Nat) (qtx : Qp)
     (pidv : BitVec 32) (dqp dqb dqs : DFrac) (rg : Bool)
     (R : RegMap) (Mt : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × BitVec 32))
     (qt : Qp) (cnt : PosNat)
-    (hwf : k.wf) (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
+    (hwf : k.wf) (hnoff : k.noff = 0) (hlocks : k.locks = [])
     (hK : iputSlots ≤ k.avail) (hkk : kk < NINODE)
     (hMwf : icMWf Mt) (hciwf : icCiWf Mt ci icfgNib icfgDev)
     (hMk : PartialMap.get? Mt kk = some (qt, cnt)) (hne : cnt.val ≠ 1)
     (h9 : R 9#5 = ientry kk) (h15 : R 15#5 = BitVec.signExtend 64 (irefWord Mt kk))
     (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64)
     (h18 : R 18#5 = k.regs 18#5) (h19 : R 19#5 = k.regs 19#5) (h20 : R 20#5 = k.regs 20#5)
-    (hpins : iputPins k.regs R) (hpin : true = false ∨ k.proc = 0#64 → c = cpu) :
+    (hpins : iputPins k.regs R) :
     kctx c ((((k.pushOffAt k.spie k.spp).withLocks ("itable" :: k.locks)).pushed 6).withRegs R) ∗
     pcIs c (KA.«iput» + 0x20#64) ∗ iputEnv Γ γl pd pav pu γil γisl kk ∗
     locked fscItlock c ∗ sieArm c k.sie k.proc ∗
     iputTab Mt ci ∗ inodeRef kk q icfgDev inum ∗ runitAny inum.toNat ∗
     frame6s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
-    trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
+    trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗
     iputRet k n Sb pidv dqp dqb dqs rg ∗ txPin icfgLog tid qtx ∗
-    iputPost cpu k n Sb crb cru crz tid qtx pidv dqp dqb dqs rg
+    iputPost k n Sb crb cru crz tid qtx pidv dqp dqb dqs rg
     ⊢ wpLoop (GF := GF) c := by
   obtain ⟨m, hm⟩ : ∃ m : PosNat, cnt = m.succ :=
     ⟨⟨cnt.val - 1, by have := cnt.pos; omega⟩, PosNat.ext' (by simp; have := cnt.pos; omega)⟩
   subst hm
   have hcb : m.succ.val < 2 ^ 31 := icMWf_count Mt kk qt m.succ hMwf hMk
   rw [PosNat.succ_val] at hcb
-  have hsie' : (k.pushOffAt k.spie k.spp).sie = false := rfl
+  have hsie : (k.pushOffAt k.spie k.spp).sie = false := rfl
   obtain ⟨hram, hal⟩ := iRef_ram_aligned kk hkk
   have h15' : R 15#5 = BitVec.signExtend 64 (BitVec.ofNat 32 (m.val + 1)) := by
     rw [h15]; unfold irefWord; rw [hMk]; rfl
-  iintro ⟨Hk, Hpc, #Henv, Hlocked, Harm, Htab, Href, Hru, Hframe, Htc, Hcl, Hir, Hret, Htx, Hpost⟩
+  iintro ⟨Hk, Hpc, #Henv, Hlocked, Harm, Htab, Href, Hru, Hframe, Hte, Hce, Hret, Htx, Hpost⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases iput_tail_env Γ γl pd pav pu γil γisl kk $$ Henv with ⟨#Hit, -, -, -⟩
   ihave #Hclaims := isItable2_claims $$ Hit
@@ -636,9 +637,9 @@ theorem iput_tail_ne (RH : RELEASE_HOOK) (Γ : SchedNames) [ClaimIs (hlc := hlc)
     with [iput_tail_decr1]
   case ha => k_norm [h9]; rfl
   iintro Hk Hpc ⟨HRin, Hslot⟩
-  iapply (iput_tail_exit RH cpu c k n Sb crb cru crz tid qtx pidv dqp dqb dqs rg _ hwf hsie hlocks hK
-    ?e2 ?e18 ?e19 ?e20 ?epins hpin) $$ [- $Hk $Hpc $Hit $Hlocked $Harm $HRin $Hslot $Htx $Hframe
-      $Htc $Hcl $Hir $Hret $Hpost]
+  iapply (iput_tail_exit RH c k n Sb crb cru crz tid qtx pidv dqp dqb dqs rg _ hwf hlocks hK
+    ?e2 ?e18 ?e19 ?e20 ?epins) $$ [- $Hk $Hpc $Hit $Hlocked $Harm $HRin $Hslot $Htx $Hframe
+      $Hte $Hce $Hret $Hpost]
   case e2 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hR2
   case e18 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h18
   case e19 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h19
@@ -652,19 +653,19 @@ at `+0x3a` left the header out of the box (`iputWindow`), the table row open
 (`iputRowOpen`) and the pin's name-half in hand (`iputPin`); the reference's
 stamps are in the window. -/
 theorem iput_tail_one (RH : RELEASE_HOOK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu c : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (γil γisl : GName)
+    (c : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (γil γisl : GName)
     (kk : Nat) (q : Qp) (inum : BitVec 32)
     (n : Nat) (Sb : List Nat) (crb cru crz : Bool) (tid : Nat) (qtx : Qp)
     (pidv : BitVec 32) (dqp dqb dqs : DFrac) (rg : Bool)
     (R : RegMap) (Mt : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × BitVec 32))
-    (hwf : k.wf) (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
+    (hwf : k.wf) (hnoff : k.noff = 0) (hlocks : k.locks = [])
     (hK : iputSlots ≤ k.avail) (hkk : kk < NINODE)
     (hMwf : icMWf Mt) (hciwf : icCiWf Mt ci icfgNib icfgDev)
     (hMk : PartialMap.get? Mt kk = some (q, PosNat.one))
     (h9 : R 9#5 = ientry kk) (h15 : R 15#5 = BitVec.signExtend 64 (irefWord Mt kk))
     (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64)
     (h18 : R 18#5 = k.regs 18#5) (h19 : R 19#5 = k.regs 19#5) (h20 : R 20#5 = k.regs 20#5)
-    (hpins : iputPins k.regs R) (hpin : true = false ∨ k.proc = 0#64 → c = cpu) :
+    (hpins : iputPins k.regs R) :
     kctx c ((((k.pushOffAt k.spie k.spp).withLocks ("itable" :: k.locks)).pushed 6).withRegs R) ∗
     pcIs c (KA.«iput» + 0x20#64) ∗ iputEnv Γ γl pd pav pu γil γisl kk ∗
     locked fscItlock c ∗ sieArm c k.sie k.proc ∗
@@ -675,16 +676,16 @@ theorem iput_tail_one (RH : RELEASE_HOOK) (Γ : SchedNames) [ClaimIs (hlc := hlc
     iputWindow kk Mt ci icfgDev inum ∗ iputRowOpen kk Mt ci q icfgDev inum ∗
     iputPin kk tid qtx ∗ runitAny inum.toNat ∗
     frame6s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
-    trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
+    trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗
     iputRet k n Sb pidv dqp dqb dqs rg ∗
-    iputPost cpu k n Sb crb cru crz tid qtx pidv dqp dqb dqs rg
+    iputPost k n Sb crb cru crz tid qtx pidv dqp dqb dqs rg
     ⊢ wpLoop (GF := GF) c := by
-  have hsie' : (k.pushOffAt k.spie k.spp).sie = false := rfl
+  have hsie : (k.pushOffAt k.spie k.spp).sie = false := rfl
   obtain ⟨hram, hal⟩ := iRef_ram_aligned kk hkk
   have h15' : R 15#5 = BitVec.signExtend 64 (BitVec.ofNat 32 1) := by
     rw [h15]; unfold irefWord; rw [hMk]; rfl
   iintro ⟨Hk, Hpc, #Henv, Hlocked, Harm, Hhalf, Hiauth, Hipool, Hpool, Hfrag, Hlf, Hslh, Hident,
-    Hwin, Hrow, Hpin, Hru, Hframe, Htc, Hcl, Hir, Hret, Hpost⟩
+    Hwin, Hrow, Hpin, Hru, Hframe, Hte, Hce, Hret, Hpost⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases iput_tail_env Γ γl pd pav pu γil γisl kk $$ Henv with ⟨#Hit, -, -, -⟩
   ihave #Hclaims := isItable2_claims $$ Hit
@@ -711,9 +712,9 @@ theorem iput_tail_one (RH : RELEASE_HOOK) (Γ : SchedNames) [ClaimIs (hlc := hlc
   imod HΨ $$ Hctx with ⟨Hctx, HRin, Hslot, Htx⟩
   ihave Hk := Hkback $$ Hctx
   imodintro
-  iapply (iput_tail_exit RH cpu c k n Sb crb cru crz tid qtx pidv dqp dqb dqs rg _ hwf hsie hlocks hK
-    ?e2 ?e18 ?e19 ?e20 ?epins hpin) $$ [- $Hk $Hpc $Hit $Hlocked $Harm $HRin $Hslot $Htx $Hframe
-      $Htc $Hcl $Hir $Hret $Hpost]
+  iapply (iput_tail_exit RH c k n Sb crb cru crz tid qtx pidv dqp dqb dqs rg _ hwf hlocks hK
+    ?e2 ?e18 ?e19 ?e20 ?epins) $$ [- $Hk $Hpc $Hit $Hlocked $Harm $HRin $Hslot $Htx $Hframe
+      $Hte $Hce $Hret $Hpost]
   case e2 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hR2
   case e18 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h18
   case e19 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h19

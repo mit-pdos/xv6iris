@@ -26,8 +26,17 @@ needs), the `ref` read and the split, and hands each arm to its stage.
 ## DEVIATIONS from Rocq
 
 1. The stage plumbing (IputParts deviations 1--3).
-2. Rocq's `cpu_own_eb_agree` / `subst b` and its `trap_csrs_ext` /
-   `cpu_claim_ext` transports vanish with the pin (SpecIput deviation 1).
+2. Proved at EITHER entry `SIE` (`wp_iput_gen_eb_body`, the eb-generic
+   sweep).  Rocq's `trap_csrs_ext` / `cpu_claim_ext` transports are the
+   level-0 steps' `k_ext_move` (`k_step_e` / `IputParts.k_step_c`); the
+   caller's `wpNext true` crossing is turned hart-free once
+   (`IputParts.iputPost`); the entry acquire's arm rides beside the
+   complement (Rocq never joins them: nothing in iput's critical sections
+   sleeps), is handed back at each release (`iput_release`), and each
+   sleeping callee (itrunc, bread) takes the complement at its `_eb`
+   contract.  The stages are stated at the base context `k.withSpie a b`
+   (`a b` the acquire's pinned bits), whose `pushOffAt` is the acquire's
+   inner context.
 3. Rocq's functor takes `IUPDATE` too; the reordered iput never calls it
    (the off-lock free flushes `ip->type = 0` by hand).  Dropped/simplified
    vs Rocq: the `IU : IUPDATE` parameter -- uses checked: ProofIput.v /
@@ -83,6 +92,11 @@ theorem iput_main_irefWord (M : RegMapF (Qp × PosNat)) (k : Nat) (q : Qp) (n : 
     (h : PartialMap.get? M k = some (q, n)) : irefWord M k = BitVec.ofNat 32 n.val := by
   unfold irefWord; rw [h]
 
+/-- The stages' base context `k.withSpie a b` read back at `k` (every field
+but the two pinned bits). -/
+theorem iput_main_ws_pushOffAt (k : KCtx) (a b : Bool) :
+    (k.withSpie a b).pushOffAt (k.withSpie a b).spie (k.withSpie a b).spp = k.pushOffAt a b := rfl
+
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
@@ -99,7 +113,7 @@ theorem iput_main (AC : ACQUIRE_LLB) (HN : IputTailNeSpec) (HE : IputEntrySpec)
     (n : Nat) (Sb : List Nat) (crb cru crz : Bool) (e0 : Nat) (tid : Nat) (qtx : Qp)
     (pidv : BitVec 32) (dqp dqb dqs : DFrac) (rg : Bool)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : iputSlots ≤ k.avail)
-    (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
+    (hnoff : k.noff = 0)
     (htier : k.tier = KTier.kpt) (hkk : kk < NINODE)
     (hcrb : crb = true → fscBmapstart ∈ Sb)
     (hcru : cru = true → IBLOCK inum icfgIst ∈ Sb)
@@ -109,16 +123,23 @@ theorem iput_main (AC : ACQUIRE_LLB) (HN : IputTailNeSpec) (HE : IputEntrySpec)
     (hlog : logRegion fscLogst (IBLOCK inum icfgIst) = false)
     (hnib : inum.toNat < 16 * icfgNib) (hbel : covBelow fscCov fscSize)
     (hn : iputUnits ≤ n) (hpd : descPageRw pd) (ha0 : k.regs 10#5 = ientry kk) :
-    wp_iput_gen_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γil γisl kk q inum
+    wp_iput_gen_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γil γisl kk q inum
       n Sb crb cru crz e0 tid qtx pidv dqp dqb dqs rg
-      hj hproc hK hsie hnoff hlocks htier hkk hcrb hcru hgeom hbg hcov hlog hnib hbel hn hpd
+      hj hproc hK hnoff htier hkk hcrb hcru hgeom hbg hcov hlog hnib hbel hn hpd
       ha0 := by
-  unfold wp_iput_gen_body
+  unfold wp_iput_gen_eb_body
   simp only [iputAddr]
-  iintro ⟨Hk, Hpc, #Hpi, Htc, Hcl, Hir, #Hpe, #Hbc, #Hlc, #Hdc, #Hit, #Hinv, #Hesc, #Hireg,
+  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hpe, #Hbc, #Hlc, #Hdc, #Hit, #Hinv, #Hesc, #Hireg,
     Hrg, #Hslk, Hrefp, Hsbb, Hsbi, #Hbmi, Hpid, Hsl, Hnlz, Hop, Htx, Hpost⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
+  have hlocks : k.locks = [] := List.eq_nil_of_length_eq_zero (by have := hwf.2.2.2.1; omega)
+  -- the caller's continuation is hart-free (a park's crossing, at a proc)
+  ihave Hpost : iputPost (GF := GF) k n Sb crb cru crz tid qtx pidv dqp dqb dqs rg $$ [Hpost]
+  · unfold iputPost
+    iintro %c
+    iapply wpNext_at true k.proc cpu c _ (fun hc => Or.elim hc (fun hx => absurd hx (by decide))
+      (fun hx => absurd (hproc ▸ hx) (procAddr_nonzero hj))) $$ Hpost
   have hK6 : 6 ≤ k.avail := by unfold iputSlots itruncSlots at hK; omega
   have hK16 : 16 ≤ k.avail := by
     unfold iputSlots itruncSlots bfreeSlots at hK; omega
@@ -139,33 +160,37 @@ theorem iput_main (AC : ACQUIRE_LLB) (HN : IputTailNeSpec) (HE : IputEntrySpec)
   k_norm_g
   iframe
   inext
-  iapply wpNext_intro_pin
-  iintro %c1 %hp1 Hk Hpc Hframe
-  obtain rfl : c1 = cpu := hp1 (Or.inl hsie)
+  k_next_e
+  iintro Hk Hpc Hframe
   -- +0x0a c.mv s1,a0
-  k_step (wp_s_add c1 _ (KA.«iput» + 0xa#64) true 9#5 0#5 10#5 (by decide))
+  k_step_e (wp_s_add cpu _ (KA.«iput» + 0xa#64) true 9#5 0#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0]
   iintro Hk Hpc
   -- +0x0c auipc a0 ; +0x10 addi a0 ; +0x14 jal acquire
-  k_step (wp_s_auipc c1 _ (KA.«iput» + 0xc#64) false 0x1d#20 10#5 (by decide))
+  k_step_e (wp_s_auipc cpu _ (KA.«iput» + 0xc#64) false 0x1d#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c1 _ (KA.«iput» + 0x10#64) false 1234#12 10#5 10#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«iput» + 0x10#64) false 1234#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iput_lock]
   iintro Hk Hpc
-  k_step (wp_s_jal c1 _ (KA.«iput» + 0x14#64) false 2086858#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«iput» + 0x14#64) false 2086858#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iput_br_acquire]
   iintro Hk Hpc
-  iapply (iput_acquire AC c1 k (maxStamp mst) hwf hsie hnoff hK16 hlk _ ?h10
+  iapply (iput_acquire AC cpu k (maxStamp mst) hwf hnoff hK16 hlk _ ?h10
       (KA.«iput» + 0x18#64) ?h1)
-    $$ [- $Hk $Hpc]
+    $$ [- $Hk $Hpc $Hte $Hce]
   rotate_right 2
   k_norm_g
   iframe #
   all_goals try (case h10 => k_norm_g)
   all_goals try (case h1 => k_norm_g)
-  -- the critical section (interrupts off: one hart throughout)
-  iintro %R1 %hcs1 Hk Hpc Hlocked HR ⟨%Kt, %hKt, #Hflt⟩ Harm
+  -- the critical section (interrupts off: one hart throughout), at the
+  -- balanced pair's inner context `k.pushOffAt a b`; the stages are stated
+  -- at their base context `k.withSpie a b` (whose own pushOffAt this is)
+  iintro %c1 %a %b %R1 %hcs1 Hk Hpc Hlocked HR ⟨%Kt, %hKt, #Hflt⟩ Harm Hte Hce
+  have hsie : (k.pushOffAt a b).sie = false := rfl
+  ihave Hpost := (show iputPost (GF := GF) k n Sb crb cru crz tid qtx pidv dqp dqb dqs rg ⊢
+    iputPost (k.withSpie a b) n Sb crb cru crz tid qtx pidv dqp dqb dqs rg from .rfl) $$ Hpost
   k_norm_g [iput_main_ret_18]
   unfold calleeSaved at hcs1
   k_norm_g at hcs1
@@ -206,7 +231,6 @@ theorem iput_main (AC : ACQUIRE_LLB) (HN : IputTailNeSpec) (HE : IputEntrySpec)
       14#5 1#64) := by
     refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
       simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] <;> assumption
-  have hpin : true = false ∨ k.proc = 0#64 → c1 = c1 := fun _ => rfl
   have e9 : ((R1.set 15#5 (BitVec.signExtend 64 (BitVec.ofNat 32 cnt.val))).set 14#5 1#64) 9#5 =
       ientry kk := by
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]
@@ -238,10 +262,10 @@ theorem iput_main (AC : ACQUIRE_LLB) (HN : IputTailNeSpec) (HE : IputEntrySpec)
       with [iput_main_beq_one, if_true]
     iintro Hk Hpc
     ihave #Hcred := logCredit_own (GF := GF) icfgLog cru Sb e0 (IBLOCK inum icfgIst) hcru
-    iapply (HE Γ c1 c1 k γl pd pav pu j γil γisl kk q inum Mt ci n Sb crb cru crz e0 tid qtx
+    iapply (HE Γ c1 (k.withSpie a b) γl pd pav pu j γil γisl kk q inum Mt ci n Sb crb cru crz e0 tid qtx
       pidv dqp dqb dqs rg mst Kt
-      ((R1.set 15#5 (BitVec.signExtend 64 (BitVec.ofNat 32 PosNat.one.val))).set 14#5 1#64) hj hproc hK hwf hsie hnoff hlocks htier hkk hn hcrb hgeom
-      hbg hcov hlog hnib hbel hpd hMwf hciwf hMk hKt ?g9 ?g15 ?g2 ?g18 ?g19 ?g20 ?gpins hpin)
+      ((R1.set 15#5 (BitVec.signExtend 64 (BitVec.ofNat 32 PosNat.one.val))).set 14#5 1#64) hj hproc hK hwf hnoff hlocks htier hkk hn hcrb hgeom
+      hbg hcov hlog hnib hbel hpd hMwf hciwf hMk hKt ?g9 ?g15 ?g2 ?g18 ?g19 ?g20 ?gpins)
     case g9 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; first | assumption | (rw [b9]; exact ha0) | rw [b9]
     case g15 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]; rw [iput_main_irefWord Mt kk _ _ hMk]
     case g2 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; first | assumption | rw [b2]
@@ -249,8 +273,9 @@ theorem iput_main (AC : ACQUIRE_LLB) (HN : IputTailNeSpec) (HE : IputEntrySpec)
     case g19 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; first | assumption | rw [b19]
     case g20 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; first | assumption | rw [b20]
     case gpins => refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;> simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] <;> assumption
-    unfold iputPost
-    iframe Hk Hpc Henv Hlocked Harm Htc Hcl Hir Hrg Hnlz Hcred Hop Htx Hpid Hsbb Hsbi Hsl
+    simp only [iput_main_ws_pushOffAt, KCtx.withSpie_sie, KCtx.withSpie_proc, KCtx.withSpie_regs,
+      KCtx.withSpie_locks]
+    iframe Hk Hpc Henv Hlocked Harm Hte Hce Hrg Hnlz Hcred Hop Htx Hpid Hsbb Hsbi Hsl
       Hframe Hpost Hru Hflt
     isplitl [Hhalf Hstamps Hiauth Hipool Hslots Hpool]
     · unfold iputTab; iframe
@@ -262,18 +287,19 @@ theorem iput_main (AC : ACQUIRE_LLB) (HN : IputTailNeSpec) (HE : IputEntrySpec)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [iput_main_beq cnt.val hcntb, hc1, decide_false, Bool.false_eq_true, if_false]
     iintro Hk Hpc
-    iapply (HN Γ c1 c1 k γl pd pav pu γil γisl kk q inum n Sb crb cru crz tid qtx pidv dqp dqb dqs
-      rg _ Mt ci qt cnt hwf hsie hnoff hlocks hK hkk hMwf hciwf hMk hc1 e9 e15 e2 e18 e19
-      e20 hpins hpin)
-    unfold iputPost
-    iframe Hk Hpc Henv Hlocked Harm Htc Hcl Hir Htx Hframe Hpost Hru
+    iapply (HN Γ c1 (k.withSpie a b) γl pd pav pu γil γisl kk q inum n Sb crb cru crz tid qtx pidv dqp dqb dqs
+      rg _ Mt ci qt cnt hwf hnoff hlocks hK hkk hMwf hciwf hMk hc1 e9 e15 e2 e18 e19
+      e20 hpins)
+    unfold iputRet
+    simp only [iput_main_ws_pushOffAt, KCtx.withSpie_sie, KCtx.withSpie_proc, KCtx.withSpie_regs,
+      KCtx.withSpie_locks]
+    iframe Hk Hpc Henv Hlocked Harm Hte Hce Htx Hframe Hpost Hru
     isplitl [Hhalf Hstamps Hiauth Hipool Hslots Hpool]
     · unfold iputTab; iframe
     isplitl [Hfrag Hlf Hslh Hid Hrefm]
     · unfold inodeRef icRefStamps icRefStampsAt icStamps
       iframe
       ipureintro; exact hm
-    unfold iputRet
     iframe
     iapply logOpSe_opS
     iexact Hop

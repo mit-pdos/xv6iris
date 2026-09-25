@@ -69,12 +69,14 @@ running-process bundle; its crossing is the literal `true`.
 
 **Deviations from Rocq, reported.**
 
-1. PINNED AT `k.sie = false ∧ k.noff = 0 ∧ k.locks = [] ∧ k.tier = kpt`
-   (fs1 brief §1, "the `sie` question"): Lean's `BREAD`/`BMAP`/`IUPDATE`
-   are pinned there, so Rocq's `eb`/`b` genericity, its
-   `trap_csrs_ext`/`cpu_claim_ext` complement and `locks_below lks "log"`
-   collapse to the bare `trapCsrs`/`cpuClaim`/`intrRes` bundle and
-   `k.locks = []`.
+1. **eb-GENERIC, as in Rocq** (`cpu_own 0 eb`): the `_eb` bodies take the
+   complement `trapCsrsExt cpu k.sie` / `cpuClaimExt cpu k.sie k.proc` (Rocq
+   `trap_csrs_ext` / `cpu_claim_ext`) in and out, at either entry `SIE`, and are
+   what the interface proves.  Depth 0 implies no spinlock held (`KCtx.wf`:
+   `locks.length ≤ noff`), which is Lean's reading of Rocq's `locks_below`
+   premise (Lean has no lock ranks).  The `sie = false` bodies (the whole trap
+   bundle, `k.locks = []`) are kept as DERIVED instances for the callers not yet
+   generalized.
 2. THE AMBIENT NAMES are the `Fscfg`/`Icfg` fields (as `SpecIupdate.lean`);
    the kalloc environment Rocq reads off `fsc_kalloc` is the lock gname
    `γkl` and the counter names `γk` as parameters (as `SpecConsolewrite`),
@@ -148,7 +150,7 @@ import Xv6.SpecEitherCopyin
 
 namespace Xv6
 
-open Iris Iris.ProgramLogic Iris.BI Std MachCSL
+open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 set_option linter.unusedVariables false
@@ -393,10 +395,118 @@ def wp_writei_gen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv
     logOpS icfgLog n' Sb' -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
+/-- The eb-generic form of `wp_writei_gen_body` (Rocq: `cpu_own 0 eb`, the
+complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
+spinlock held by `KCtx.wf`). -/
+def wp_writei_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
+    [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
+    (γkl : GName) (γk : KmemNames)
+    (ip : BitVec 64) (inum : BitVec 32) (bm : Blkmap) (data : Nat → List (BitVec 8))
+    (dn dn0 : Dinode) (user : Bool) (off n : Nat) (sbs : List (BitVec 8))
+    (V : ProcPriv) (M : Nat → List (BitVec 8)) (ncount : Nat) (Sb : List Nat)
+    (pidv : BitVec 32) (dqp dqs dqd dqn dqi dqb dqz : DFrac)
+    (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : writeiSlots ≤ k.avail)
+    (hnoff : k.noff = 0)
+    (htier : k.tier = KTier.kpt)
+    -- ENOUGH BUDGET for the worst case
+    (hcost : wiCostBmonly off n ≤ ncount)
+    (hgeom : logGeomOk fscCov fscLogst)
+    -- the inode's own block, exactly as iupdate takes it
+    (hcov : IBLOCK inum icfgIst ∈ fscCov)
+    (hlog : logRegion fscLogst (IBLOCK inum icfgIst) = false)
+    (hnib : inum.toNat < 16 * icfgNib)
+    (hda : dn.diAddrs = bmCells bm)
+    -- THE INODE IS ALLOCATED, and its type/nlink agree with the stale record
+    (hnz : dn.diType.toNat ≠ 0)
+    (hstab : diTypeStable dn dn0) (hnl : diNlinkStable dn dn0)
+    -- the block map, and the normalisation of its holes
+    (hwf : blkmapWf fscCov fscLogst bm) (hhz : blkHolesZero bm data)
+    -- EVERY BLOCK BELOW THE FILE'S SIZE IS ALLOCATED
+    (hcovs : bmCovers bm dn.diSize.toNat)
+    -- THE JOINT NUMERIC PREMISE (kills the `addw` wrap and the +0x2e test)
+    (hsum : off + n < 2 ^ 31) (hsz : dn.diSize.toNat < 2 ^ 31)
+    -- the bitmap's geometry, forwarded through bmap to balloc
+    (hbg : bitmapGeomOk fscCov fscLogst fscBmapstart fscSize)
+    (hsbs : sbs.length = n)
+    (hpd : descPageRw pd)
+    (ha0 : k.regs 10#5 = ip)
+    (huser : if user then k.regs 11#5 ≠ 0#64 else k.regs 11#5 = 0#64)
+    (ha3 : k.regs 13#5 = BitVec.ofNat 64 off) (ha4 : k.regs 14#5 = BitVec.ofNat 64 n) : Prop :=
+  kctx cpu k ∗ pcIs cpu writeiAddr ∗ procsInv Γ ∗
+  trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ panicEnv ∗
+  bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
+  logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
+  diskCaps fscDisk fscDlock pd pav pu ∗
+  -- either_copyin's user arm reaches copyin, which reaches vmfault/kalloc
+  isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
+  -- ip->dev and ip->inum: read, never written
+  wordPointsTo (iDev ip) 4 dqd icfgDev ∗ wordPointsTo (iInum ip) 4 dqn inum ∗
+  -- the five scalars, the addrs cells + indirect block, the data blocks
+  inodeMeta ip dn ∗ inodeMap fscFs ip bm ∗ inodeBlocks fscFs bm data ∗
+  -- the three superblock fields
+  wordPointsTo sbInodestart 4 dqi (BitVec.ofNat 32 icfgIst) ∗
+  wordPointsTo sbSizeAddr 4 dqz (BitVec.ofNat 32 fscSize) ∗
+  wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
+  bitmapInv fscFs fscBmapstart fscCov fscLogst fscSize ∗
+  -- THE INODE REGION, and this inum's (stale) on-disk record
+  iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
+  -- THE SOURCE: the running block on the user arm, the caller's buffer and
+  -- the pid share on the kernel arm (ONE OR THE OTHER, never both)
+  (if user then procPrivNoctxAt curCtx (procAddr j) pidv V M
+   else iprop(byteBuf (k.regs 12#5) dqs sbs ∗ wordPointsTo (pPid k.proc) 4 dqp pidv)) ∗
+  -- THREE slot units -- bmap's peak
+  bslots fscBio 3 ∗
+  -- THE RESERVATION, SET FORM
+  logOpS icfgLog ncount Sb ∗
+  wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap)
+      (tot : Nat) (bm' : Blkmap) (data' : Nat → List (BitVec 8)) (dn' dn0' : Dinode)
+      (n' : Nat) (wrote : Nat → BitVec 8) (dist : Nat) (dstb : Nat → BitVec 8) (P' : UPtd)
+      (Sb' : List Nat),
+    ⌜calleeSaved k.regs R'⌝ -∗
+    ⌜WriteiOut fscCov fscLogst fscBmapstart inum icfgIst bm data dn dn0 user off n sbs V M
+      (k.regs 12#5) ncount Sb (R' 10#5) tot bm' data' dn' dn0' n' wrote dist dstb P' Sb'⌝ -∗
+    kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+    trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
+    wordPointsTo (iDev ip) 4 dqd icfgDev -∗ wordPointsTo (iInum ip) 4 dqn inum -∗
+    inodeMeta ip dn' -∗ inodeMap fscFs ip bm' -∗ inodeBlocks fscFs bm' data' -∗
+    wordPointsTo sbInodestart 4 dqi (BitVec.ofNat 32 icfgIst) -∗
+    wordPointsTo sbSizeAddr 4 dqz (BitVec.ofNat 32 fscSize) -∗
+    wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) -∗
+    dinodeAt fscIreg inum dn0' -∗
+    -- the source goes back the way it came
+    (if user then procPrivNoctxAt curCtx (procAddr j) pidv { V with upt := P' }
+        (viewFaulted V.upt P' M)
+     else iprop(byteBuf (k.regs 12#5) dqs sbs ∗ wordPointsTo (pPid k.proc) 4 dqp pidv)) -∗
+    bslots fscBio 3 -∗
+    logOpS icfgLog n' Sb' -∗ wpLoop cpu'))
+  ⊢ wpLoop (GF := GF) cpu
+
 /-- The interface of `writei` (Rocq's `Module Type WRITEI`, less the dropped
 counted form). -/
 structure WRITEI : Prop where
-  wp_writei_gen : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+  wp_writei_gen_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
+    [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
+    (γkl : GName) (γk : KmemNames)
+    (ip : BitVec 64) (inum : BitVec 32) (bm : Blkmap) (data : Nat → List (BitVec 8))
+    (dn dn0 : Dinode) (user : Bool) (off n : Nat) (sbs : List (BitVec 8))
+    (V : ProcPriv) (M : Nat → List (BitVec 8)) (ncount : Nat) (Sb : List Nat)
+    (pidv : BitVec 32) (dqp dqs dqd dqn dqi dqb dqz : DFrac)
+    hj hproc hK hnoff htier hcost hgeom hcov hlog hnib hda hnz hstab hnl hwf hhz
+    hcovs hsum hsz hbg hsbs hpd ha0 huser ha3 ha4,
+    wp_writei_gen_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γkl γk ip inum bm data
+      dn dn0 user off n sbs V M ncount Sb pidv dqp dqs dqd dqn dqi dqb dqz
+      hj hproc hK hnoff htier hcost hgeom hcov hlog hnib hda hnz hstab hnl hwf hhz
+      hcovs hsum hsz hbg hsbs hpd ha0 huser ha3 ha4
+
+/-- The interrupts-off instance of `wp_writei_gen_eb` (the complement is the whole
+bundle): the contract every not-yet-generalized caller states. -/
+theorem WRITEI.wp_writei_gen (A : WRITEI) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
@@ -407,10 +517,21 @@ structure WRITEI : Prop where
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (ncount : Nat) (Sb : List Nat)
     (pidv : BitVec 32) (dqp dqs dqd dqn dqi dqb dqz : DFrac)
     hj hproc hK hsie hnoff hlocks htier hcost hgeom hcov hlog hnib hda hnz hstab hnl hwf hhz
-    hcovs hsum hsz hbg hsbs hpd ha0 huser ha3 ha4,
+    hcovs hsum hsz hbg hsbs hpd ha0 huser ha3 ha4 :
     wp_writei_gen_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γkl γk ip inum bm data
       dn dn0 user off n sbs V M ncount Sb pidv dqp dqs dqd dqn dqi dqb dqz
       hj hproc hK hsie hnoff hlocks htier hcost hgeom hcov hlog hnib hda hnz hstab hnl hwf hhz
-      hcovs hsum hsz hbg hsbs hpd ha0 huser ha3 ha4
+      hcovs hsum hsz hbg hsbs hpd ha0 huser ha3 ha4 := by
+  have h := A.wp_writei_gen_eb (hlc := hlc) (GF := GF) (Γ := Γ) (cpu := cpu) (k := k) (γl := γl) (pd := pd) (pav := pav) (pu := pu) (j := j) (γkl := γkl) (γk := γk) (ip := ip) (inum := inum) (bm := bm) (data := data) (dn := dn) (dn0 := dn0) (user := user) (off := off) (n := n) (sbs := sbs) (V := V) (M := M) (ncount := ncount) (Sb := Sb) (pidv := pidv) (dqp := dqp) (dqs := dqs) (dqd := dqd) (dqn := dqn) (dqi := dqi) (dqb := dqb) (dqz := dqz) (hj := hj) (hproc := hproc) (hK := hK) (hnoff := hnoff) (htier := htier) (hcost := hcost) (hgeom := hgeom) (hcov := hcov) (hlog := hlog) (hnib := hnib) (hda := hda) (hnz := hnz) (hstab := hstab) (hnl := hnl) (hwf := hwf) (hhz := hhz) (hcovs := hcovs) (hsum := hsum) (hsz := hsz) (hbg := hbg) (hsbs := hsbs) (hpd := hpd) (ha0 := ha0) (huser := huser) (ha3 := ha3) (ha4 := ha4)
+  unfold wp_writei_gen_eb_body at h
+  unfold wp_writei_gen_body
+  rw [hsie] at h
+  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
+  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, H17, H18, H19, H20, H21, H22, H23, H24, H25, Hnext⟩
+  iapply h
+  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 H18 H19 H20 H21 H22 H23 H24 H25
+  iapply wpNext_mono $$ Hnext
+  iintro %cpu' HK %spie %spp %R' %tot %bm' %data' %dn' %dn0' %n' %wrote %dist %dstb %P' %Sb' %p0 %p1 H2 H3 ⟨Htc, Hir⟩ Hcl H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 H18
+  iapply HK $$ %spie %spp %R' %tot %bm' %data' %dn' %dn0' %n' %wrote %dist %dstb %P' %Sb' %p0 %p1 H2 H3 Htc Hcl Hir H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 H18
 
 end Xv6

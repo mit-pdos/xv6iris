@@ -112,14 +112,17 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 set_option maxHeartbeats 1000000 in
-/-- `bmap(ip, off / BSIZE)` at `+0x82`: the no-alloc contract. -/
+/-- `bmap(ip, off / BSIZE)` at `+0x82`: the no-alloc contract, at EITHER
+entry `SIE` (`BMAP_NOALLOC.wp_bmap_noalloc_eb`), the trap-CSR complement at a
+named index `s` (so the caller's `trapCsrsExt c k.sie` frames syntactically). -/
 theorem rd_bmap (BM : BMAP_NOALLOC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (c : CPU) (k' : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (γfs : FsNames) (logstart : Nat) (dev : BitVec 32)
     (ip : BitVec 64) (bm : Blkmap) (data : Nat → List (BitVec 8)) (fbn : Nat)
     (pidv : BitVec 32) (dqp dq dqd : DFrac) (pj : BitVec 64) (hpj : k'.proc = pj)
+    (s : Bool) (hs : k'.sie = s)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : bmapSlots ≤ k'.avail)
-    (hsie : k'.sie = false) (hnoff : k'.noff = 0) (hlocks : k'.locks = [])
+    (hnoff : k'.noff = 0)
     (htier : k'.tier = KTier.kpt)
     (hgeom : logGeomOk V.cov logstart)
     (hfbn : fbn < MAXFILE) (hwf : blkmapWf V.cov logstart bm)
@@ -128,7 +131,7 @@ theorem rd_bmap (BM : BMAP_NOALLOC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
     (hpd : descPageRw pd)
     (ha0 : k'.regs 10#5 = ip) (ha1 : k'.regs 11#5 = BitVec.signExtend 64 (BitVec.ofNat 32 fbn)) :
     kctx c k' ∗ pcIs c KA.«bmap» ∗ procsInv Γ ∗
-    trapCsrs c ∗ cpuClaim c pj ∗ intrRes c ∗
+    trapCsrsExt c s ∗ cpuClaimExt c s pj ∗
     bioCtx γl γb V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
     fsBytesAny γfs ∗
     wordPointsTo (iDev ip) 4 dqd dev ∗
@@ -139,17 +142,17 @@ theorem rd_bmap (BM : BMAP_NOALLOC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
       ⌜calleeSaved k'.regs R'⌝ -∗
       ⌜R' 10#5 = BitVec.signExtend 64 (blkmapGet bm fbn)⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      trapCsrs cpu' -∗ cpuClaim cpu' pj -∗ intrRes cpu' -∗
+      trapCsrsExt cpu' s -∗ cpuClaimExt cpu' s pj -∗
       wordPointsTo (pPid pj) 4 dqp pidv -∗
       wordPointsTo (iDev ip) 4 dqd dev -∗
       inodeMapQ γfs dq ip bm -∗ inodeBlocksQ γfs dq bm data -∗
       bslot γb -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  subst hpj
-  have h := BM.wp_bmap_noalloc (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl pd pav pu j γfs
-    logstart dev ip bm data fbn pidv dqp dq dqd hj hproc hK hsie hnoff hlocks htier hgeom hfbn
+  subst hpj hs
+  have h := BM.wp_bmap_noalloc_eb (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl pd pav pu j γfs
+    logstart dev ip bm data fbn pidv dqp dq dqd hj hproc hK hnoff htier hgeom hfbn
     hwf hnz hdev hcl hdt hpd ha0 ha1
-  unfold wp_bmap_noalloc_body at h
+  unfold wp_bmap_noalloc_eb_body at h
   simp only [bmapAddr] at h
   exact h
 
@@ -387,7 +390,6 @@ structure RdStatic (k : KCtx) (j : Nat) (V : BioView GF) (logstart : Nat) (dev :
   hj : j < NPROC
   hproc : k.proc = procAddr j
   hK : readiSlots ≤ k.avail
-  hsie : k.sie = false
   hnoff : k.noff = 0
   hlocks : k.locks = []
   htier : k.tier = KTier.kpt

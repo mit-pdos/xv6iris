@@ -61,7 +61,7 @@ theorem iput_ent_td0 : KA.«iput» + 0xd0#64 + BitVec.signExtend 64 2096976#21 =
 /-- What rides the whole entry untouched: the closer's provenance unit, the
 regime, the group credit, the tail flush's credit, the reservation, the
 thread's cells, the three slots and the contract's continuation. -/
-def iputEntRest (cpu : CPU) (k : KCtx) (inum : BitVec 32) (n : Nat) (Sb : List Nat)
+def iputEntRest (k : KCtx) (inum : BitVec 32) (n : Nat) (Sb : List Nat)
     (crb cru crz : Bool) (e0 : Nat) (tid : Nat) (qtx : Qp) (pidv : BitVec 32)
     (dqp dqb dqs : DFrac) (rgb : Bool) : IProp GF :=
   iprop(runitAny inum.toNat ∗
@@ -71,7 +71,7 @@ def iputEntRest (cpu : CPU) (k : KCtx) (inum : BitVec 32) (n : Nat) (Sb : List N
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
     bslots fscBio 3 ∗
-    iputPost cpu k n Sb crb cru crz tid qtx pidv dqp dqb dqs rgb)
+    iputPost k n Sb crb cru crz tid qtx pidv dqp dqb dqs rgb)
 
 /-- The closer's identity share, as the two plain cells the loads read. -/
 theorem iput_ent_ident_open (kk : Nat) (q : Qp) (dev inum : BitVec 32) :
@@ -96,14 +96,14 @@ set_option maxHeartbeats 4000000 in
 /-- **EXIT A** (Rocq's `ip_entry_exit1`): at `+0x20` with the window open,
 into the last close (`HT`). -/
 theorem iput_ent_exitA (HT : IputTailOneSpec) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu c : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (γil γisl : GName)
+    (c : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (γil γisl : GName)
     (kk : Nat) (q : Qp) (inum : BitVec 32)
     (Mt : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × BitVec 32))
     (n : Nat) (Sb : List Nat) (crb cru crz : Bool) (e0 : Nat) (tid : Nat) (qtx : Qp)
     (pidv : BitVec 32) (dqp dqb dqs : DFrac) (rgb : Bool)
     (g : GName) (lo tl : Nat) (x0 : IcX) (td T0 : Nat) (R : RegMap)
     (hK : iputSlots ≤ k.avail)
-    (hwf : k.wf) (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
+    (hwf : k.wf) (hnoff : k.noff = 0) (hlocks : k.locks = [])
     (hkk : kk < NINODE)
     (hMwf : icMWf Mt) (hciwf : icCiWf Mt ci icfgNib icfgDev)
     (hMk : PartialMap.get? Mt kk = some (q, PosNat.one))
@@ -111,19 +111,20 @@ theorem iput_ent_exitA (HT : IputTailOneSpec) (Γ : SchedNames) [ClaimIs (hlc :=
     (h9 : R 9#5 = ientry kk) (h15 : R 15#5 = BitVec.signExtend 64 (irefWord Mt kk))
     (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64)
     (h18 : R 18#5 = k.regs 18#5) (h19 : R 19#5 = k.regs 19#5) (h20 : R 20#5 = k.regs 20#5)
-    (hpins : iputPins k.regs R) (hpin : true = false ∨ k.proc = 0#64 → c = cpu) :
+    (hpins : iputPins k.regs R) :
     kctx c ((((k.pushOffAt k.spie k.spp).withLocks ("itable" :: k.locks)).pushed 6).withRegs R) ∗
     pcIs c (KA.«iput» + 0x20#64) ∗ iputEnv Γ γl pd pav pu γil γisl kk ∗
     locked fscItlock c ∗ sieArm c k.sie k.proc ∗
-    trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
+    trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗
     iputEntCom kk Mt ci q icfgDev inum tid qtx g lo tl ∗ inodeIdent kk (.own q) icfgDev inum ∗
     icRegd kk ⟨td, true, some (icfgDev, inum), some (x0, T0)⟩ ∗ topLb td ∗ icCnt kk 1 ∗
     icHdr fscIc fscFs fscIreg fscCov fscLogst kk (some (icfgDev, inum)) x0 curCtx ∗
     iregRegime rgb ∗
     frame6s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
-    iputEntRest cpu k inum n Sb crb cru crz e0 tid qtx pidv dqp dqb dqs rgb
+    iputEntRest k inum n Sb crb cru crz e0 tid qtx pidv dqp dqb dqs rgb
     ⊢ wpLoop (GF := GF) c := by
-  iintro ⟨Hk, Hpc, #Henv, Hlocked, Harm, Htc, Hcl, Hir, Hcom, Hid, Hrd, Hllbd, Hc, Hhdr, Hrg,
+  have hsie : (k.pushOffAt k.spie k.spp).sie = false := rfl
+  iintro ⟨Hk, Hpc, #Henv, Hlocked, Harm, Hte, Hce, Hcom, Hid, Hrd, Hllbd, Hc, Hhdr, Hrg,
     Hframe, Hrest⟩
   icases iput_ent_toTail kk Mt ci q inum tid qtx g lo tl x0 td T0 hx0 hcik
     $$ [Hcom Hrd Hllbd Hc Hhdr] with ⟨Hhalf, Hiauth, Hipool, Hpool, Hfrag, Hlv, Hslh, Hwin,
@@ -132,10 +133,10 @@ theorem iput_ent_exitA (HT : IputTailOneSpec) (Γ : SchedNames) [ClaimIs (hlc :=
   unfold iputEntRest
   icases Hrest with ⟨Hru, -, -, Hop, Hpid, Hsb, Hsi, Hsl, Hpost⟩
   ihave Hop := logOpSe_opS icfgLog n Sb e0 $$ Hop
-  iapply (HT Γ cpu c k γl pd pav pu γil γisl kk q inum n Sb crb cru crz tid qtx pidv dqp dqb dqs
-    rgb R Mt ci hwf hsie hnoff hlocks hK hkk hMwf hciwf hMk h9 h15 hR2 h18 h19 h20 hpins hpin)
+  iapply (HT Γ c k γl pd pav pu γil γisl kk q inum n Sb crb cru crz tid qtx pidv dqp dqb dqs
+    rgb R Mt ci hwf hnoff hlocks hK hkk hMwf hciwf hMk h9 h15 hR2 h18 h19 h20 hpins)
   iframe Hk Hpc Henv Hlocked Harm Hhalf Hiauth Hipool Hpool Hfrag Hlv Hslh Hid Hwin Hrow Hpin Hru
-    Hframe Htc Hcl Hir Hpost
+    Hframe Hte Hce Hpost
   unfold iputRet
   iframe Hpid Hsb Hsi Hsl Hop Hrg
 
@@ -144,7 +145,7 @@ set_option maxHeartbeats 8000000 in
 rides `sd s3`, then `addi a5,s1,16 ; mv s3,a5 ; mv a0,a5`, the
 regeneration and the frozen park, and into the locked block (`HL`). -/
 theorem iput_ent_free (HL : IputLockedSpec) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu c : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat) (γil γisl : GName)
+    (c : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat) (γil γisl : GName)
     (kk : Nat) (q : Qp) (inum : BitVec 32)
     (Mt : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × BitVec 32))
     (n : Nat) (Sb : List Nat) (crb cru crz : Bool) (e0 : Nat) (tid : Nat) (qtx : Qp)
@@ -152,7 +153,7 @@ theorem iput_ent_free (HL : IputLockedSpec) (Γ : SchedNames) [ClaimIs (hlc := h
     (g : GName) (lo tl : Nat) (ga : GName) (dn : Dinode) (bm : Blkmap) (td T0 Kw : Nat)
     (R : RegMap)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : iputSlots ≤ k.avail)
-    (hwf : k.wf) (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
+    (hwf : k.wf) (hnoff : k.noff = 0) (hlocks : k.locks = [])
     (htier : k.tier = KTier.kpt) (hkk : kk < NINODE) (hn : iputUnits ≤ n)
     (hcrb : crb = true → fscBmapstart ∈ Sb)
     (hgeom : logGeomOk fscCov fscLogst)
@@ -167,11 +168,11 @@ theorem iput_ent_free (HL : IputLockedSpec) (Γ : SchedNames) [ClaimIs (hlc := h
     (h9 : R 9#5 = ientry kk) (h18 : R 18#5 = BitVec.signExtend 64 inum)
     (h19 : R 19#5 = k.regs 19#5) (h20 : R 20#5 = BitVec.signExtend 64 icfgDev)
     (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64)
-    (hpins : iputPins k.regs R) (hpin : true = false ∨ k.proc = 0#64 → c = cpu) :
+    (hpins : iputPins k.regs R) :
     kctx c ((((k.pushOffAt k.spie k.spp).withLocks ("itable" :: k.locks)).pushed 6).withRegs R) ∗
     pcIs c (KA.«iput» + 0x50#64) ∗ iputEnv Γ γl pd pav pu γil γisl kk ∗
     locked fscItlock c ∗ sieArm c k.sie k.proc ∗
-    trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
+    trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗
     iputEntCom kk Mt ci q icfgDev inum tid qtx g lo tl ∗ inodeIdent kk (.own q) icfgDev inum ∗
     icRegd kk ⟨td, true, some (icfgDev, inum), some (.icLoaded ga dn bm, T0)⟩ ∗ topLb td ∗
     ctxFloor curCtx Kw ∗ icCnt kk 1 ∗
@@ -188,9 +189,10 @@ theorem iput_ent_free (HL : IputLockedSpec) (Γ : SchedNames) [ClaimIs (hlc := h
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64) 8 (DFrac.own 1) (k.regs 18#5) ∗
     (∃ w : BitVec 64, wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFD8#64) 8 (DFrac.own 1) w) ∗
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64) 8 (DFrac.own 1) (k.regs 20#5) ∗
-    iputEntRest cpu k inum n Sb crb cru crz e0 tid qtx pidv dqp dqb dqs rgb
+    iputEntRest k inum n Sb crb cru crz e0 tid qtx pidv dqp dqb dqs rgb
     ⊢ wpLoop (GF := GF) c := by
-  iintro ⟨Hk, Hpc, #Henv, Hlocked, Harm, Htc, Hcl, Hir, Hcom, Hid, Hrd, #Hllbd, #Hflw, Hc, Hval,
+  have hsie : (k.pushOffAt k.spie k.spp).sie = false := rfl
+  iintro ⟨Hk, Hpc, #Henv, Hlocked, Harm, Hte, Hce, Hcom, Hid, Hrd, #Hllbd, #Hflw, Hc, Hval,
     Hidh, Hnl, Hgid4, Hlg, #Hshot, Hoff, Hlvh, Hrg, Hf1, Hf2, Hf3, Hf4, ⟨%w5, Hf5⟩, Hf6, Hrest⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- +0x50 c.sdsp s3,8(sp)
@@ -229,18 +231,18 @@ theorem iput_ent_free (HL : IputLockedSpec) (Γ : SchedNames) [ClaimIs (hlc := h
   ihave Hst : iprop(∃ tst : Nat, istmpAuth (GF := GF) kk (1 : Qp).half tst ∗ topLb tst) $$ [Hst]
   · iexists tst
     iframe Hst Hllbk
-  iapply (HL Γ cpu c k γl pd pav pu j γil γisl kk q inum dn bm ga g2 Mt ci n Sb crb cru crz e0
+  iapply (HL Γ c k γl pd pav pu j γil γisl kk q inum dn bm ga g2 Mt ci n Sb crb cru crz e0
     tid qtx pidv dqp dqb dqs rgb false td T0 Kw
     (((R.set 15#5 (ientry kk + 16#64)).set 19#5 (ientry kk + 16#64)).set 10#5 (ientry kk + 16#64))
-    hj hproc hK hwf hsie hnoff hlocks htier hkk hn
+    hj hproc hK hwf hnoff hlocks htier hkk hn
     hcrb hgeom hbg hcov hlog hnib hbel hpd hnl0 hMwf hciwf hMk hcik hTKw
     (by simp [RegMap.set_apply, e10]) (by simp [RegMap.set_apply, h9])
     (by simp [RegMap.set_apply, h18]) (by simp [RegMap.set_apply, e10])
     (by simp [RegMap.set_apply, h20]) (by simp [RegMap.set_apply, hR2])
     (iputPins_set _ _ (iputPins_set _ _ (iputPins_set _ _ hpins _ _ (by decide)) _ _ (by decide))
-      _ _ (by decide)) hpin)
+      _ _ (by decide)))
   iframe Hst
-  iframe Hk Hpc Henv Hlocked Harm Htc Hcl Hir Hhalf Hsb Hrd Hllbd Hflw Hc Hval Hidh Hnl Hsele
+  iframe Hk Hpc Henv Hlocked Harm Hte Hce Hhalf Hsb Hrd Hllbd Hflw Hc Hval Hidh Hnl Hsele
     Hiauth Hipool Hpool Hslots Hfrag Hslh Hid Hgid4 Hlg Hshot Hpend Hpre Hru Hnlz Hcrd Hop Hhpn
     Htxh Hpid Hsbb Hsi Hsl Hpost
   unfold iputFrame6
@@ -250,25 +252,25 @@ set_option maxHeartbeats 4000000 in
 /-- **nlink ≠ 0: THE UNDO** (Rocq 4722--4800): `+0xcc ld s2 ; +0xce ld s4 ;
 +0xd0 c.j +0x20`, the header re-formed, and EXIT A. -/
 theorem iput_ent_undo (HT : IputTailOneSpec) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu c : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (γil γisl : GName)
+    (c : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (γil γisl : GName)
     (kk : Nat) (q : Qp) (inum : BitVec 32)
     (Mt : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × BitVec 32))
     (n : Nat) (Sb : List Nat) (crb cru crz : Bool) (e0 : Nat) (tid : Nat) (qtx : Qp)
     (pidv : BitVec 32) (dqp dqb dqs : DFrac) (rgb : Bool)
     (g : GName) (lo tl : Nat) (x0 : IcX) (td T0 : Nat) (R : RegMap)
     (hK : iputSlots ≤ k.avail)
-    (hwf : k.wf) (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
+    (hwf : k.wf) (hnoff : k.noff = 0) (hlocks : k.locks = [])
     (hkk : kk < NINODE)
     (hMwf : icMWf Mt) (hciwf : icCiWf Mt ci icfgNib icfgDev)
     (hMk : PartialMap.get? Mt kk = some (q, PosNat.one))
     (hx0 : x0 ≠ .icRaw) (hcik : PartialMap.get? ci kk = some (icfgDev, inum))
     (h9 : R 9#5 = ientry kk) (h15 : R 15#5 = BitVec.signExtend 64 (irefWord Mt kk))
     (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64) (h19 : R 19#5 = k.regs 19#5)
-    (hpins : iputPins k.regs R) (hpin : true = false ∨ k.proc = 0#64 → c = cpu) :
+    (hpins : iputPins k.regs R) :
     kctx c ((((k.pushOffAt k.spie k.spp).withLocks ("itable" :: k.locks)).pushed 6).withRegs R) ∗
     pcIs c (KA.«iput» + 0xcc#64) ∗ iputEnv Γ γl pd pav pu γil γisl kk ∗
     locked fscItlock c ∗ sieArm c k.sie k.proc ∗
-    trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
+    trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗
     iputEntCom kk Mt ci q icfgDev inum tid qtx g lo tl ∗ inodeIdent kk (.own q) icfgDev inum ∗
     icRegd kk ⟨td, true, some (icfgDev, inum), some (x0, T0)⟩ ∗ topLb td ∗ icCnt kk 1 ∗
     icHdr fscIc fscFs fscIreg fscCov fscLogst kk (some (icfgDev, inum)) x0 curCtx ∗
@@ -279,9 +281,10 @@ theorem iput_ent_undo (HT : IputTailOneSpec) (Γ : SchedNames) [ClaimIs (hlc := 
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64) 8 (DFrac.own 1) (k.regs 18#5) ∗
     (∃ w : BitVec 64, wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFD8#64) 8 (DFrac.own 1) w) ∗
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64) 8 (DFrac.own 1) (k.regs 20#5) ∗
-    iputEntRest cpu k inum n Sb crb cru crz e0 tid qtx pidv dqp dqb dqs rgb
+    iputEntRest k inum n Sb crb cru crz e0 tid qtx pidv dqp dqb dqs rgb
     ⊢ wpLoop (GF := GF) c := by
-  iintro ⟨Hk, Hpc, #Henv, Hlocked, Harm, Htc, Hcl, Hir, Hcom, Hid, Hrd, Hllbd, Hc, Hhdr, Hrg,
+  have hsie : (k.pushOffAt k.spie k.spp).sie = false := rfl
+  iintro ⟨Hk, Hpc, #Henv, Hlocked, Harm, Hte, Hce, Hcom, Hid, Hrd, Hllbd, Hc, Hhdr, Hrg,
     Hf1, Hf2, Hf3, Hf4, Hf5, Hf6, Hrest⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   k_step (wp_s_ld c _ (KA.«iput» + 0xcc#64) true 16#12 18#5 2#5 (by decide) (by decide)
@@ -295,14 +298,14 @@ theorem iput_ent_undo (HT : IputTailOneSpec) (Γ : SchedNames) [ClaimIs (hlc := 
   k_step (wp_s_j c _ (KA.«iput» + 0xd0#64) true 2096976#21)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iput_ent_td0]
   iintro Hk Hpc
-  iapply (iput_ent_exitA HT Γ cpu c k γl pd pav pu γil γisl kk q inum Mt ci n Sb crb cru crz e0 tid
+  iapply (iput_ent_exitA HT Γ c k γl pd pav pu γil γisl kk q inum Mt ci n Sb crb cru crz e0 tid
     qtx pidv dqp dqb dqs rgb g lo tl x0 td T0 ((R.set 18#5 (k.regs 18#5)).set 20#5 (k.regs 20#5))
-    hK hwf hsie hnoff hlocks hkk hMwf hciwf hMk hx0 hcik
+    hK hwf hnoff hlocks hkk hMwf hciwf hMk hx0 hcik
     (by simp [RegMap.set_apply, h9]) (by simp [RegMap.set_apply, h15])
     (by simp [RegMap.set_apply, hR2]) (by simp [RegMap.set_apply])
     (by simp [RegMap.set_apply, h19]) (by simp [RegMap.set_apply])
-    (iputPins_set _ _ (iputPins_set _ _ hpins _ _ (by decide)) _ _ (by decide)) hpin)
-  iframe Hk Hpc Henv Hlocked Harm Htc Hcl Hir Hcom Hid Hrd Hllbd Hc Hhdr Hrg Hrest
+    (iputPins_set _ _ (iputPins_set _ _ hpins _ _ (by decide)) _ _ (by decide)))
+  iframe Hk Hpc Henv Hlocked Harm Hte Hce Hcom Hid Hrd Hllbd Hc Hhdr Hrg Hrest
   unfold frame6s1 frame6s1rest
   iframe Hf1 Hf2 Hf3 Hf5
   isplitl [Hf4]
@@ -316,7 +319,7 @@ refuted, `+0x3e sd s2 ; +0x40 sd s4`, `+0x42 lw s4,0(s1)` (dev) and
 (nlink) off the header in hand, `+0x4e c.bnez`: the undo or the free. -/
 theorem iput_ent_loaded (HT : IputTailOneSpec) (HL : IputLockedSpec)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu c : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat) (γil γisl : GName)
+    (c : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat) (γil γisl : GName)
     (kk : Nat) (q : Qp) (inum : BitVec 32)
     (Mt : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × BitVec 32))
     (n : Nat) (Sb : List Nat) (crb cru crz : Bool) (e0 : Nat) (tid : Nat) (qtx : Qp)
@@ -324,7 +327,7 @@ theorem iput_ent_loaded (HT : IputTailOneSpec) (HL : IputLockedSpec)
     (g : GName) (lo tl : Nat) (ga : GName) (dn : Dinode) (bm : Blkmap) (td T0 Kw : Nat)
     (R : RegMap)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : iputSlots ≤ k.avail)
-    (hwf : k.wf) (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
+    (hwf : k.wf) (hnoff : k.noff = 0) (hlocks : k.locks = [])
     (htier : k.tier = KTier.kpt) (hkk : kk < NINODE) (hn : iputUnits ≤ n)
     (hcrb : crb = true → fscBmapstart ∈ Sb)
     (hgeom : logGeomOk fscCov fscLogst)
@@ -338,20 +341,21 @@ theorem iput_ent_loaded (HT : IputTailOneSpec) (HL : IputLockedSpec)
     (h9 : R 9#5 = ientry kk) (h15 : R 15#5 = BitVec.signExtend 64 (irefWord Mt kk))
     (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64)
     (h18 : R 18#5 = k.regs 18#5) (h19 : R 19#5 = k.regs 19#5) (h20 : R 20#5 = k.regs 20#5)
-    (hpins : iputPins k.regs R) (hpin : true = false ∨ k.proc = 0#64 → c = cpu) :
+    (hpins : iputPins k.regs R) :
     kctx c ((((k.pushOffAt k.spie k.spp).withLocks ("itable" :: k.locks)).pushed 6).withRegs R) ∗
     pcIs c (KA.«iput» + 0x3e#64) ∗ iputEnv Γ γl pd pav pu γil γisl kk ∗
     locked fscItlock c ∗ sieArm c k.sie k.proc ∗
-    trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
+    trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗
     iputEntCom kk Mt ci q icfgDev inum tid qtx g lo tl ∗ inodeIdent kk (.own q) icfgDev inum ∗
     icRegd kk ⟨td, true, some (icfgDev, inum), some (.icLoaded ga dn bm, T0)⟩ ∗ topLb td ∗
     ctxFloor curCtx Kw ∗ icCnt kk 1 ∗
     icHdrAmb fscIc fscFs fscIreg fscCov fscLogst kk (some (icfgDev, inum)) (.icLoaded ga dn bm) ∗
     iregRegime rgb ∗
     frame6s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
-    iputEntRest cpu k inum n Sb crb cru crz e0 tid qtx pidv dqp dqb dqs rgb
+    iputEntRest k inum n Sb crb cru crz e0 tid qtx pidv dqp dqb dqs rgb
     ⊢ wpLoop (GF := GF) c := by
-  iintro ⟨Hk, Hpc, #Henv, Hlocked, Harm, Htc, Hcl, Hir, Hcom, Hid, Hrd, #Hllbd, #Hflw, Hc, Hhdr,
+  have hsie : (k.pushOffAt k.spie k.spp).sie = false := rfl
+  iintro ⟨Hk, Hpc, #Henv, Hlocked, Harm, Hte, Hce, Hcom, Hid, Hrd, #Hllbd, #Hflw, Hc, Hhdr,
     Hrg, Hframe, Hrest⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   ihave #Hinv := (show iputEnv (GF := GF) Γ γl pd pav pu γil γisl kk ⊢ itableInv (hlc := hlc)
@@ -403,17 +407,15 @@ theorem iput_ent_loaded (HT : IputTailOneSpec) (HL : IputLockedSpec)
     have hb : (dn.diNlink == 0#16) = true := by simp [hz]
     simp only [hb, Bool.not_true, Bool.false_eq_true, ↓reduceIte]
     have hnl0 : dn.diNlink.toNat = 0 := by rw [hz]; rfl
-    iapply (iput_ent_free HL Γ cpu c k γl pd pav pu j γil γisl kk q inum Mt ci n Sb crb cru crz e0
+    iapply (iput_ent_free HL Γ c k γl pd pav pu j γil γisl kk q inum Mt ci n Sb crb cru crz e0
       tid qtx pidv dqp dqb dqs rgb g lo tl ga dn bm td T0 Kw
       (((R.set 20#5 (BitVec.signExtend 64 icfgDev)).set 18#5 (BitVec.signExtend 64 inum)).set 14#5
         (BitVec.signExtend 64 dn.diNlink))
-      hj hproc hK hwf hsie hnoff hlocks htier hkk hn hcrb hgeom hbg hcov hlog hnib hbel hpd hMwf
+      hj hproc hK hwf hnoff hlocks htier hkk hn hcrb hgeom hbg hcov hlog hnib hbel hpd hMwf
       hciwf hMk hcik hTKw hnl0 (by simp [RegMap.set_apply, h9]) (by simp [RegMap.set_apply])
       (by simp [RegMap.set_apply, h19]) (by simp [RegMap.set_apply])
-      (by simp [RegMap.set_apply, hR2]) (p18 _) hpin)
-    ihave Harm := (show sieArm (GF := GF) c false k.proc ⊢ sieArm c k.sie k.proc by
-      rw [hsie]) $$ Harm
-    iframe Hk Hpc Henv Hlocked Harm Htc Hcl Hir Hcom Hrd Hllbd Hflw Hc Hval Hidh Hnl Hgid4 Hlg
+      (by simp [RegMap.set_apply, hR2]) (p18 _))
+    iframe Hk Hpc Henv Hlocked Harm Hte Hce Hcom Hrd Hllbd Hflw Hc Hval Hidh Hnl Hgid4 Hlg
       Hshot Hoff Hlvh Hrg Hf1 Hf2 Hf3 Hf4 Hf6 Hrest
     isplitl [Hdev Hino]
     · iapply iput_ent_ident_close kk q icfgDev inum
@@ -422,16 +424,14 @@ theorem iput_ent_loaded (HT : IputTailOneSpec) (HL : IputLockedSpec)
   · -- nlink ≠ 0: the undo at +0xcc
     have hb : (dn.diNlink == 0#16) = false := by simp [hz]
     simp only [hb, Bool.not_false, ↓reduceIte]
-    iapply (iput_ent_undo HT Γ cpu c k γl pd pav pu γil γisl kk q inum Mt ci n Sb crb cru crz e0
+    iapply (iput_ent_undo HT Γ c k γl pd pav pu γil γisl kk q inum Mt ci n Sb crb cru crz e0
       tid qtx pidv dqp dqb dqs rgb g lo tl (.icLoaded ga dn bm) td T0
       (((R.set 20#5 (BitVec.signExtend 64 icfgDev)).set 18#5 (BitVec.signExtend 64 inum)).set 14#5
         (BitVec.signExtend 64 dn.diNlink))
-      hK hwf hsie hnoff hlocks hkk hMwf hciwf hMk (by simp) hcik
+      hK hwf hnoff hlocks hkk hMwf hciwf hMk (by simp) hcik
       (by simp [RegMap.set_apply, h9]) (by simp [RegMap.set_apply, h15])
-      (by simp [RegMap.set_apply, hR2]) (by simp [RegMap.set_apply, h19]) (p18 _) hpin)
-    ihave Harm := (show sieArm (GF := GF) c false k.proc ⊢ sieArm c k.sie k.proc by
-      rw [hsie]) $$ Harm
-    iframe Hk Hpc Henv Hlocked Harm Htc Hcl Hir Hcom Hrd Hllbd Hc Hrg Hf1 Hf2 Hf3 Hf4 Hf6 Hrest
+      (by simp [RegMap.set_apply, hR2]) (by simp [RegMap.set_apply, h19]) (p18 _))
+    iframe Hk Hpc Henv Hlocked Harm Hte Hce Hcom Hrd Hllbd Hc Hrg Hf1 Hf2 Hf3 Hf4 Hf6 Hrest
     isplitl [Hdev Hino]
     · iapply iput_ent_ident_close kk q icfgDev inum
       iframe Hdev Hino
@@ -456,14 +456,14 @@ theorem iput_entry (RH : RELEASE_HOOK) (AC : ACQUIRE_LLB) (ASN : ACQUIRESLEEP_NB
     -- `IputLocked.iput_locked_spec`)
     (HT : IputTailOneSpec) (HL : IputLockedSpec)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu c : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat) (γil γisl : GName)
+    (c : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat) (γil γisl : GName)
     (kk : Nat) (q : Qp) (inum : BitVec 32)
     (Mt : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × BitVec 32))
     (n : Nat) (Sb : List Nat) (crb cru crz : Bool) (e0 : Nat) (tid : Nat) (qtx : Qp)
     (pidv : BitVec 32) (dqp dqb dqs : DFrac) (rgb : Bool)
     (mst : StampMap IcBid) (Kt : Nat) (R : RegMap)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : iputSlots ≤ k.avail)
-    (hwf : k.wf) (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
+    (hwf : k.wf) (hnoff : k.noff = 0) (hlocks : k.locks = [])
     (htier : k.tier = KTier.kpt) (hkk : kk < NINODE) (hn : iputUnits ≤ n)
     (hcrb : crb = true → fscBmapstart ∈ Sb)
     (hgeom : logGeomOk fscCov fscLogst)
@@ -476,11 +476,11 @@ theorem iput_entry (RH : RELEASE_HOOK) (AC : ACQUIRE_LLB) (ASN : ACQUIRESLEEP_NB
     (h9 : R 9#5 = ientry kk) (h15 : R 15#5 = BitVec.signExtend 64 (irefWord Mt kk))
     (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64)
     (h18 : R 18#5 = k.regs 18#5) (h19 : R 19#5 = k.regs 19#5) (h20 : R 20#5 = k.regs 20#5)
-    (hpins : iputPins k.regs R) (hpin : true = false ∨ k.proc = 0#64 → c = cpu) :
+    (hpins : iputPins k.regs R) :
     kctx c ((((k.pushOffAt k.spie k.spp).withLocks ("itable" :: k.locks)).pushed 6).withRegs R) ∗
     pcIs c (KA.«iput» + 0x3a#64) ∗ iputEnv Γ γl pd pav pu γil γisl kk ∗
     locked fscItlock c ∗ sieArm c k.sie k.proc ∗
-    trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
+    trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗
     iputTab Mt ci ∗
     -- the closer's unit with its stamps fragment NAMED, and the acquire's
     -- floor over it: the guard's (a) presents both
@@ -495,9 +495,10 @@ theorem iput_entry (RH : RELEASE_HOOK) (AC : ACQUIRE_LLB) (ASN : ACQUIRESLEEP_NB
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
     bslots fscBio 3 ∗
     frame6s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
-    iputPost cpu k n Sb crb cru crz tid qtx pidv dqp dqb dqs rgb
+    iputPost k n Sb crb cru crz tid qtx pidv dqp dqb dqs rgb
     ⊢ wpLoop (GF := GF) c := by
-  iintro ⟨Hk, Hpc, #Henv, Hlocked, Harm, Htc, Hcl, Hir, Htab, Href, #Hflt, Hru, Hrg, Hnlz, #Hcrd,
+  have hsie : (k.pushOffAt k.spie k.spp).sie = false := rfl
+  iintro ⟨Hk, Hpc, #Henv, Hlocked, Harm, Hte, Hce, Htab, Href, #Hflt, Hru, Hrg, Hnlz, #Hcrd,
     Hop, Htx, Hpid, Hsbb, Hsi, Hsl, Hframe, Hpost⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   ihave #Hinv := (show iputEnv (GF := GF) Γ γl pd pav pu γil γisl kk ⊢ itableInv (hlc := hlc)
@@ -515,7 +516,7 @@ theorem iput_entry (RH : RELEASE_HOOK) (AC : ACQUIRE_LLB) (ASN : ACQUIRESLEEP_NB
   obtain ⟨hx0, hTKw, hcik⟩ := hfacts
   ihave Hk := Hkb $$ Hrun
   imodintro
-  ihave Hrest : iprop(iputEntRest (GF := GF) cpu k inum n Sb crb cru crz e0 tid qtx pidv dqp dqb
+  ihave Hrest : iprop(iputEntRest (GF := GF) k inum n Sb crb cru crz e0 tid qtx pidv dqp dqb
       dqs rgb) $$ [Hru Hnlz Hop Hpid Hsbb Hsi Hsl Hpost]
   · unfold iputEntRest
     iframe Hru Hnlz Hcrd Hop Hpid Hsbb Hsi Hsl Hpost
@@ -539,36 +540,32 @@ theorem iput_entry (RH : RELEASE_HOOK) (AC : ACQUIRE_LLB) (ASN : ACQUIRESLEEP_NB
   | icUnloaded ga =>
     -- valid = 0: EXIT A, the window open into the last close
     simp only [icXLoaded, Bool.not_false, ↓reduceIte, iput_ent_t3c]
-    iapply (iput_ent_exitA HT Γ cpu c k γl pd pav pu γil γisl kk q inum Mt ci n Sb crb cru crz e0
+    iapply (iput_ent_exitA HT Γ c k γl pd pav pu γil γisl kk q inum Mt ci n Sb crb cru crz e0
       tid qtx pidv dqp dqb dqs rgb g lo tl (.icUnloaded ga) td T0
       (R.set 14#5 (BitVec.signExtend 64 (validWord false)))
-      hK hwf hsie hnoff hlocks hkk hMwf hciwf hMk hx0 hcik
+      hK hwf hnoff hlocks hkk hMwf hciwf hMk hx0 hcik
       (by simp [RegMap.set_apply, h9]) (by simp [RegMap.set_apply, h15])
       (by simp [RegMap.set_apply, hR2]) (by simp [RegMap.set_apply, h18])
       (by simp [RegMap.set_apply, h19]) (by simp [RegMap.set_apply, h20])
-      (iputPins_set _ _ hpins _ _ (by decide)) hpin)
-    ihave Harm := (show sieArm (GF := GF) c false k.proc ⊢ sieArm c k.sie k.proc by
-      rw [hsie]) $$ Harm
+      (iputPins_set _ _ hpins _ _ (by decide)))
     ihave Hhdr := (show icHdrAmb (GF := GF) fscIc fscFs fscIreg fscCov fscLogst kk
         (some (icfgDev, inum)) (.icUnloaded ga) ⊢
         icHdr fscIc fscFs fscIreg fscCov fscLogst kk (some (icfgDev, inum)) (.icUnloaded ga)
           curCtx from .rfl) $$ Hhdr
-    iframe Hk Hpc Henv Hlocked Harm Htc Hcl Hir Hcom Hid Hrd Hllbd Hc Hhdr Hrg Hframe Hrest
+    iframe Hk Hpc Henv Hlocked Harm Hte Hce Hcom Hid Hrd Hllbd Hc Hhdr Hrg Hframe Hrest
   | icLoaded ga dn bm =>
     -- valid = 1: the loaded arm
     simp only [icXLoaded, Bool.not_true, Bool.false_eq_true, ↓reduceIte]
-    iapply (iput_ent_loaded HT HL Γ cpu c k γl pd pav pu j γil γisl kk q inum Mt ci n Sb crb cru
+    iapply (iput_ent_loaded HT HL Γ c k γl pd pav pu j γil γisl kk q inum Mt ci n Sb crb cru
       crz e0 tid qtx pidv dqp dqb dqs rgb g lo tl ga dn bm td T0 Kw
       (R.set 14#5 (BitVec.signExtend 64 (validWord true)))
-      hj hproc hK hwf hsie hnoff hlocks htier hkk hn hcrb hgeom hbg hcov hlog hnib hbel hpd hMwf
+      hj hproc hK hwf hnoff hlocks htier hkk hn hcrb hgeom hbg hcov hlog hnib hbel hpd hMwf
       hciwf hMk hcik hTKw
       (by simp [RegMap.set_apply, h9]) (by simp [RegMap.set_apply, h15])
       (by simp [RegMap.set_apply, hR2]) (by simp [RegMap.set_apply, h18])
       (by simp [RegMap.set_apply, h19]) (by simp [RegMap.set_apply, h20])
-      (iputPins_set _ _ hpins _ _ (by decide)) hpin)
-    ihave Harm := (show sieArm (GF := GF) c false k.proc ⊢ sieArm c k.sie k.proc by
-      rw [hsie]) $$ Harm
-    iframe Hk Hpc Henv Hlocked Harm Htc Hcl Hir Hcom Hid Hrd Hllbd Hflw Hc Hhdr Hrg Hframe Hrest
+      (iputPins_set _ _ hpins _ _ (by decide)))
+    iframe Hk Hpc Henv Hlocked Harm Hte Hce Hcom Hid Hrd Hllbd Hflw Hc Hhdr Hrg Hframe Hrest
 
 /-- The free-path entry, packaged (`IputStages.IputEntrySpec`). -/
 theorem iput_entry_spec (RH : RELEASE_HOOK) (AC : ACQUIRE_LLB) (ASN : ACQUIRESLEEP_NB)

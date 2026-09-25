@@ -28,12 +28,15 @@ THE STAGES (Rocq ProofIput.v's lemmas, right to left):
    `ip_entry_exit1/2`): the free path's stages call their successor
    directly, so the exits' re-assembly wands are not needed.  The proof
    route (which instruction does which ghost move) is Rocq's.
-2. The machine vocabulary is fs1 §1's; iput is pinned at
-   `k.sie = false ∧ k.noff = 0 ∧ k.locks = []` (SpecIput deviation 1), so
-   inside the itable hold the context is `(k.pushOffAt k.spie k.spp)` and a
-   release returns it exactly; the sleeping callees (itrunc, bread, …) hand
-   back `k.withSpie s p`, which is why the off-lock stages are stated at a
-   generic `(s, p)`.
+2. The machine vocabulary is fs1 §1's; iput runs at depth 0 at EITHER
+   entry `SIE` (the eb-generic sweep).  A stage's `k` is the base context
+   `k.withSpie a b` (the entry acquire's pinned bits), so inside the itable
+   hold the context is `(k.pushOffAt k.spie k.spp)` and a release returns
+   `k` exactly (at whatever hart); the sleeping callees (itrunc, bread, …)
+   hand back `k.withSpie s p`, which is why the off-lock stages are stated
+   at a generic `(s, p)`.  The trap-CSR complement (`trapCsrsExt` /
+   `cpuClaimExt`) is threaded through every stage and moved along every
+   level-0 step (`k_step_c`); the continuation `iputPost` is hart-free.
 3. `iputEnv` bundles the persistent environment (Rocq threads each piece as
    its own `#H`).
 -/
@@ -297,14 +300,19 @@ def iputRet (k : KCtx) (n' : Nat) (Sb' : List Nat) (pidv : BitVec 32) (dqp dqb d
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
     bslots fscBio 3 ∗ logOpS icfgLog n' Sb' ∗ iregRegime rg)
 
-/-- THE CONTRACT'S CONTINUATION (`wp_iput_gen_body`'s last conjunct). -/
-def iputPost (cpu : CPU) (k : KCtx) (n : Nat) (Sb : List Nat) (crb cru crz : Bool)
+/-- THE CONTRACT'S CONTINUATION (`wp_iput_gen_eb_body`'s last conjunct),
+HART-FREE: the contract's crossing is the literal `wpNext true` at a proc
+(`k.proc ≠ 0`), so `iput_main` turns it into this `∀ cpu'` form once, and
+every stage (at whatever hart a level-0 stretch migrated it to) consumes
+it there.  The complement `trapCsrsExt` / `cpuClaimExt` comes back at the
+index `k.sie` of the caller. -/
+def iputPost (k : KCtx) (n : Nat) (Sb : List Nat) (crb cru crz : Bool)
     (tid : Nat) (qtx : Qp) (pidv : BitVec 32) (dqp dqb dqs : DFrac) (rg : Bool) : IProp GF :=
-  wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (n' : Nat)
+  iprop(∀ (cpu' : CPU) (spie spp : Bool) (R' : RegMap) (n' : Nat)
       (Sb' : List Nat) (w : Bool),
     ⌜calleeSaved k.regs R'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-    trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
+    trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) -∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) -∗
@@ -314,7 +322,7 @@ def iputPost (cpu : CPU) (k : KCtx) (n : Nat) (Sb : List Nat) (crb cru crz : Boo
     logOpS icfgLog n' Sb' -∗
     txPin icfgLog tid qtx -∗
     irefSlot -∗
-    iregRegime rg -∗ wpLoop cpu'))
+    iregRegime rg -∗ wpLoop cpu')
 
 /-! ## The guard's OPEN WINDOW (Rocq's `ip_window`, `ip_row_open`, `ip_pin`)
 
@@ -388,22 +396,22 @@ set_option maxHeartbeats 4000000 in
 `ip_tail_exit` / `wp_iput_gen`'s Exit B seam): `ld ra/s0/s1`, `addi
 sp,48`, `ret`, then the contract's continuation.  Every arm reaches it --
 the two close arms as release's return address, the free path from the
-off-lock tail's `j +0x30`. -/
-theorem iput_epi (cpu c : CPU) (k : KCtx) (s p : Bool) (R : RegMap)
+off-lock tail's `j +0x30`.  A LEVEL-0 stretch (depth 0, the caller's
+`SIE`): the thread may migrate at every step, the complement follows it. -/
+theorem iput_epi (c : CPU) (k : KCtx) (s p : Bool) (R : RegMap)
     (n : Nat) (Sb : List Nat) (crb cru crz : Bool) (tid : Nat) (qtx : Qp) (pidv : BitVec 32)
     (dqp dqb dqs : DFrac) (rg : Bool) (n' : Nat) (Sb' : List Nat) (w : Bool)
-    (hsie : k.sie = false) (hK : 6 ≤ k.avail) (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64)
+    (hK : 6 ≤ k.avail) (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64)
     (h18 : R 18#5 = k.regs 18#5) (h19 : R 19#5 = k.regs 19#5) (h20 : R 20#5 = k.regs 20#5)
     (hpins : iputPins k.regs R)
-    (hpin : true = false ∨ k.proc = 0#64 → c = cpu)
     (hled : iputLedger n Sb crb cru crz n' Sb' w) :
     kctx c (((k.withSpie s p).pushed 6).withRegs R) ∗ pcIs c (KA.«iput» + 0x30#64) ∗
     frame6s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
-    trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
+    trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗
     iputRet k n' Sb' pidv dqp dqb dqs rg ∗ txPin icfgLog tid qtx ∗ irefSlot ∗
-    iputPost cpu k n Sb crb cru crz tid qtx pidv dqp dqb dqs rg
+    iputPost k n Sb crb cru crz tid qtx pidv dqp dqb dqs rg
     ⊢ wpLoop (GF := GF) c := by
-  iintro ⟨Hk, Hpc, Hframe, Htc, Hcl, Hir, Hret, Htx, Hslot, Hpost⟩
+  iintro ⟨Hk, Hpc, Hframe, Hte, Hce, Hret, Htx, Hslot, Hpost⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
   iapply (wp_epilogue6s1_gen c (k.withSpie s p) (KA.«iput» + 0x30#64)
     (by simp only [KCtx.withSpie_avail]; exact hK) R
@@ -414,13 +422,11 @@ theorem iput_epi (cpu c : CPU) (k : KCtx) (s p : Bool) (R : RegMap)
   iframe
   inext
   iapply wpNext_intro_pin
-  iintro %c2 %hp2 Hk Hpc
-  have hc2 : c2 = c := hp2 (Or.inl hsie)
-  subst hc2
+  iintro %c2 %hpin Hk Hpc
+  k_ext_move
   unfold iputPost iputRet
-  ihave HΦ := wpNext_at _ _ _ c2 _ hpin $$ Hpost
   icases Hret with ⟨Hpid, Hsb, Hsi, Hsl, Hop, Hrg⟩
-  iapply HΦ $$ %s %p %_ %n' %Sb' %w [] [Hk] Hpc Htc Hcl Hir Hpid Hsb Hsi Hsl %hled Hop Htx
+  iapply Hpost $$ %c2 %s %p %_ %n' %Sb' %w [] [Hk] Hpc Hte Hce Hpid Hsb Hsi Hsl %hled Hop Htx
     Hslot Hrg
   · ipureintro
     exact iput_calleeSaved_epi k.regs R h18 h19 h20 hpins
@@ -450,22 +456,25 @@ theorem iput_filter_itable (l : List String) (h : "itable" ∉ l) :
   exact List.filter_eq_self.2 (fun x hx => by simp; intro e; subst e; exact h hx)
 
 /-- `acquire(&itable.lock)` in its store-order (`llb`) tier (Rocq's
-`wp_acquire_llb_sconf`), interrupts OFF (iput's pin): the lock's payload
-`itableRes2 curCtx`, the SIE arm the release takes back, and the receipt
-`topLb tl` cashed into the hart-free floor `ctxFloor curCtx K` with
-`tl ≤ K` (`kctx_floor_of_view`), all at the SAME hart. -/
+`wp_acquire_llb_sconf`), at DEPTH 0 and either entry `SIE`: the lock's
+payload `itableRes2 curCtx`, the SIE arm the release takes back, and the
+receipt `topLb tl` cashed into the hart-free floor `ctxFloor curCtx K` with
+`tl ≤ K` (`kctx_floor_of_view`), at the hart the acquire returns on (the
+complement `Hte` / `Hce` follows the thread there). -/
 theorem iput_acquire (AC : ACQUIRE_LLB) (c : CPU) (kb : KCtx) (tl : Nat) (hwf : kb.wf)
-    (hsie : kb.sie = false) (hnoff : kb.noff = 0) (hK : 16 ≤ kb.avail)
+    (hnoff : kb.noff = 0) (hK : 16 ≤ kb.avail)
     (hlk : "itable" ∉ kb.locks) (R : RegMap) (h10 : R 10#5 = itableLock) (ret : BitVec 64)
     (h1 : R 1#5 = ret) :
     kctx c ((kb.pushed 6).withRegs R) ∗ pcIs c KA.«acquire» ∗
     isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗ topLb tl ∗
-    (∀ R' : RegMap, ⌜calleeSaved R R'⌝ -∗
-      kctx c ((((kb.pushOffAt kb.spie kb.spp).withLocks ("itable" :: kb.locks)).pushed 6).withRegs R') -∗
-      pcIs c (jumpPc ret) -∗ locked fscItlock c -∗ iputR curCtx -∗
-      (∃ K : Nat, ⌜tl ≤ K⌝ ∗ ctxFloor curCtx K) -∗ sieArm c kb.sie kb.proc -∗ wpLoop c)
+    trapCsrsExt c kb.sie ∗ cpuClaimExt c kb.sie kb.proc ∗
+    (∀ (c' : CPU) (a b : Bool) (R' : RegMap), ⌜calleeSaved R R'⌝ -∗
+      kctx c' ((((kb.pushOffAt a b).withLocks ("itable" :: kb.locks)).pushed 6).withRegs R') -∗
+      pcIs c' (jumpPc ret) -∗ locked fscItlock c' -∗ iputR curCtx -∗
+      (∃ K : Nat, ⌜tl ≤ K⌝ ∗ ctxFloor curCtx K) -∗ sieArm c' kb.sie kb.proc -∗
+      trapCsrsExt c' kb.sie -∗ cpuClaimExt c' kb.sie kb.proc -∗ wpLoop c')
     ⊢ wpLoop (GF := GF) c := by
-  iintro ⟨Hk, Hpc, #Hit, #Htl, Hcont⟩
+  iintro ⟨Hk, Hpc, #Hit, #Htl, Hte, Hce, Hcont⟩
   ihave #Hlk := isItable2_lock fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev $$ Hit
   have h := AC.wp_acquire_llb (hlc := hlc) (GF := GF) c ((kb.pushed 6).withRegs R) fscItlock
     "itable" iputR tl ?hna ?hKa ?hla
@@ -479,19 +488,16 @@ theorem iput_acquire (AC : ACQUIRE_LLB) (c : CPU) (kb : KCtx) (tl : Nat) (hwf : 
   k_norm_g [h10]
   iframe Hk Hpc Hlk Htl
   iapply wpNext_intro_pin
-  iintro %c' %hp %spie %spp %R' %hsp Hk Hpc %hcs Hlocked HR ⟨%K, #HK, %htK⟩ Harm
-  have hc : c' = c := hp (Or.inl hsie)
-  subst hc
-  obtain ⟨hs1, hs2⟩ := hsp hsie
-  subst hs1 hs2
+  iintro %c' %hpin %spie %spp %R' %hsp Hk Hpc %hcs Hlocked HR ⟨%K, #HK, %htK⟩ Harm
+  k_ext_move
   iapply wpLoop_fupd
   imod kctx_floor_of_view c' _ K $$ [$Hk $HK] with ⟨Hk, #Hfl⟩
   imodintro
-  have hkb : ((((kb.pushed 6).withRegs R).pushOffAt kb.spie kb.spp).withLocks
+  have hkb : ((((kb.pushed 6).withRegs R).pushOffAt spie spp).withLocks
       ("itable" :: kb.locks)).withRegs R' =
-      (((kb.pushOffAt kb.spie kb.spp).withLocks ("itable" :: kb.locks)).pushed 6).withRegs R' := by
+      (((kb.pushOffAt spie spp).withLocks ("itable" :: kb.locks)).pushed 6).withRegs R' := by
     rw [KCtx.pushOffAt_withRegs, KCtx.pushOffAt_pushed _ _ _ _ (by omega)]; rfl
-  iapply Hcont $$ %R' %hcs [Hk] [Hpc] Hlocked HR [] Harm
+  iapply Hcont $$ %c' %spie %spp %R' %hcs [Hk] [Hpc] Hlocked HR [] Harm Hte Hce
   · rw [← hkb]
     iexact Hk
   · k_norm_g [h1]
@@ -501,19 +507,23 @@ theorem iput_acquire (AC : ACQUIRE_LLB) (c : CPU) (kb : KCtx) (tl : Nat) (hwf : 
     ipureintro; exact htK
 
 /-- `release(&itable.lock)` (the hooked release: `Rin := itableRes2Llb`,
-the hook `itableCtxHook`, A6.144), interrupts OFF: the context comes back
-exactly (`KCtx.pushOffAt_popExit` at the pinned bits), at the SAME hart. -/
+the hook `itableCtxHook`, A6.144) of the depth-0 acquire, at either entry
+`SIE`: `reen = kb.sie`, the arm goes back (`popArm_sie`), the context
+comes back exactly (`KCtx.pushOffAt_popExit`), at the hart the release
+returns on (the complement `Hte` / `Hce` follows the thread there). -/
 theorem iput_release (RH : RELEASE_HOOK) (c : CPU) (kb : KCtx) (hwf : kb.wf)
-    (hsie : kb.sie = false) (hK : 16 ≤ kb.avail) (hlk : "itable" ∉ kb.locks)
+    (hK : 16 ≤ kb.avail) (hlk : "itable" ∉ kb.locks)
     (R : RegMap) (h10 : R 10#5 = itableLock) (ret : BitVec 64) (h1 : R 1#5 = ret) :
     kctx c ((((kb.pushOffAt kb.spie kb.spp).withLocks ("itable" :: kb.locks)).pushed 6).withRegs R) ∗
     pcIs c KA.«release» ∗
     isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
     locked fscItlock c ∗ sieArm c kb.sie kb.proc ∗ iputRin curCtx ∗
-    (∀ R' : RegMap, ⌜calleeSaved R R'⌝ -∗ kctx c ((kb.pushed 6).withRegs R') -∗
-      pcIs c (jumpPc ret) -∗ wpLoop c)
+    trapCsrsExt c kb.sie ∗ cpuClaimExt c kb.sie kb.proc ∗
+    (∀ (c' : CPU) (R' : RegMap), ⌜calleeSaved R R'⌝ -∗ kctx c' ((kb.pushed 6).withRegs R') -∗
+      pcIs c' (jumpPc ret) -∗ trapCsrsExt c' kb.sie -∗ cpuClaimExt c' kb.sie kb.proc -∗
+      wpLoop c')
     ⊢ wpLoop (GF := GF) c := by
-  iintro ⟨Hk, Hpc, #Hit, Hlocked, Harm, HRin, Hcont⟩
+  iintro ⟨Hk, Hpc, #Hit, Hlocked, Harm, HRin, Hte, Hce, Hcont⟩
   ihave #Hlk := isItable2_lock fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev $$ Hit
   have hkb : (kb.withSpie kb.spie kb.spp).withLocks kb.locks = kb := by
     rw [KCtx.withSpie_self' kb _ _ rfl rfl]; rfl
@@ -523,9 +533,13 @@ theorem iput_release (RH : RELEASE_HOOK) (c : CPU) (kb : KCtx) (hwf : kb.wf)
     fscItlock "itable" iputR iputRin rfl ?hnr ?hKr kb.sie ?hrr ?hor
   rotate_left
   case hnr => k_norm_g; omega
-  case hKr => k_norm_g; simp only [hsie, trapRes]; omega
+  case hKr => k_norm_g; omega
   case hrr => k_norm_g; exact KCtx.reen_of_wf kb hwf
-  case hor => k_norm_g; intro h; rw [hsie] at h; cases h
+  case hor =>
+    k_norm_g
+    intro hon
+    refine ⟨(hwf.2.2.1 hon).2.2.2, ?_⟩
+    rw [hon]; simp only [trapRes, kvFrameSlots]; omega
   unfold wp_release_hook_body at h
   simp only [releaseAddr] at h
   iapply h
@@ -536,12 +550,47 @@ theorem iput_release (RH : RELEASE_HOOK) (c : CPU) (kb : KCtx) (hwf : kb.wf)
   isplitl [Harm]
   · iapply (popArm_sie c kb _ (by rfl)) $$ Harm
   iapply wpNext_intro_pin
-  iintro %cr %hpr %R' Hk Hpc %hcs
-  have hc : cr = c := hpr (Or.inl hsie)
-  subst hc
+  iintro %cr %hpin %R' Hk Hpc %hcs
+  k_ext_move
   k_norm_g [hfilt, KCtx.pushOffAt_popExit kb kb.spie kb.spp hwf, hkb, h1]
-  iapply Hcont $$ %R' %hcs Hk Hpc
+  iapply Hcont $$ %cr %R' %hcs Hk Hpc Hte Hce
 
 end Lock
+
+/-! ## Level-0 steps at the stage's hart name `c`
+
+`MachCSL.k_step_e` / `k_next_e` shadow the name `cpu`; iput's stages call
+their current hart `c`.  These are the same tactics at that name. -/
+
+syntax "k_step_c" term:max " from " term:max ident " $$ " specPat : tactic
+syntax "k_step_c" term:max " from " term:max ident " $$ " specPat " with " "[" term,* "]" : tactic
+
+set_option hygiene false in
+macro_rules
+  | `(tactic| k_step_c $rule:term from $code:term $ht:ident $$ $pat:specPat) =>
+    `(tactic| k_step_c $rule:term from $code:term $ht:ident $$ $pat:specPat with [])
+  | `(tactic| k_step_c $rule:term from $code:term $ht:ident $$ $pat:specPat with [$extra,*]) =>
+    `(tactic| (iapply $rule:term $$ $pat:specPat
+               rotate_right 1
+               k_code $code:term $ht:ident
+               iframe #
+               k_norm_goal [$extra,*]
+               iframe
+               first
+                 | inext_goal
+                 | (k_norm_g [$extra,*]; iframe; inext_goal)
+               iapply wpNext_intro_pin
+               iintro %c %hpin
+               k_ext_move
+               k_norm_g [$extra,*]
+               try (case hs => k_norm_g)))
+
+syntax "k_next_c" : tactic
+set_option hygiene false in
+macro_rules
+  | `(tactic| k_next_c) =>
+    `(tactic| (iapply wpNext_intro_pin
+               iintro %c %hpin
+               k_ext_move))
 
 end Xv6

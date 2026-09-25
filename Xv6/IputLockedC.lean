@@ -401,6 +401,13 @@ theorem iput_lk_kctx_ws [KernelGeom] [KernelImage GF] (c : CPU) (k : KCtx) (s p 
 theorem iput_lk_arm_ws [KernelGeom] [KernelImage GF] (c : CPU) (k : KCtx) (s p : Bool) :
     sieArm (GF := GF) c k.sie k.proc ⊢ sieArm c (k.withSpie s p).sie (k.withSpie s p).proc := .rfl
 
+theorem iput_lk_te_ws [KernelGeom] [KernelImage GF] (c : CPU) (k : KCtx) (s p : Bool) :
+    trapCsrsExt (GF := GF) c k.sie ⊢ trapCsrsExt c (k.withSpie s p).sie := .rfl
+
+theorem iput_lk_ce_ws [KernelGeom] [KernelImage GF] (c : CPU) (k : KCtx) (s p : Bool) :
+    cpuClaimExt (GF := GF) c k.sie k.proc ⊢
+      cpuClaimExt c (k.withSpie s p).sie (k.withSpie s p).proc := .rfl
+
 theorem iput_lk_ret_98 : jumpPc (KA.«iput» + 0x98#64) = (KA.«iput» + 0x98#64) := by decide
 
 /-- The three transaction shares the free path parks rejoin. -/
@@ -426,13 +433,13 @@ set_option maxHeartbeats 8000000 in
 /-- **PART C's WALK** (`+0x86 .. +0x94`, then the successor at `+0x98`). -/
 theorem iput_lk_c (RH : RELEASE_HOOK) (HO : IputOfflockSpec)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu c : CPU) (k : KCtx) (s p : Bool) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
+    (c : CPU) (k : KCtx) (s p : Bool) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γil γisl : GName) (kk : Nat) (q : Qp) (inum : BitVec 32) (dn : Dinode) (nd : FsNode)
     (n : Nat) (Sb : List Nat) (crb cru crz : Bool) (tid : Nat) (qtx : Qp)
     (pidv : BitVec 32) (dqp dqb dqs : DFrac) (rgb bfl : Bool)
     (u : Nat) (Sb1 : List Nat) (e1 : Nat) (w : Bool) (Tp K : Nat) (R : RegMap)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : iputSlots ≤ k.avail)
-    (hwf : k.wf) (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
+    (hwf : k.wf) (hnoff : k.noff = 0) (hlocks : k.locks = [])
     (htier : k.tier = KTier.kpt) (hkk : kk < NINODE)
     (hgeom : logGeomOk fscCov fscLogst)
     (hcov : IBLOCK inum icfgIst ∈ fscCov)
@@ -445,12 +452,11 @@ theorem iput_lk_c (RH : RELEASE_HOOK) (HO : IputOfflockSpec)
     (hTpK : Tp ≤ K)
     (h9 : R 9#5 = ientry kk)
     (h18 : R 18#5 = BitVec.signExtend 64 inum) (h20 : R 20#5 = BitVec.signExtend 64 icfgDev)
-    (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64) (hpins : iputPins k.regs R)
-    (hpin : true = false ∨ k.proc = 0#64 → c = cpu) :
+    (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64) (hpins : iputPins k.regs R) :
     kctx c (((((k.withSpie s p).pushOffAt s p).withLocks ("itable" :: k.locks)).pushed 6).withRegs R) ∗
     pcIs c (KA.«iput» + 0x86#64) ∗ iputEnv Γ γl pd pav pu γil γisl kk ∗
     locked fscItlock c ∗ sieArm c k.sie k.proc ∗
-    trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
+    trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗
     iputR curCtx ∗ ctxFloor curCtx K ∗
     irefFrag kk q ∗ slhTok (icfgIsl kk) q ∗ inodeIdent kk (DFrac.own q) icfgDev inum ∗
     reference (icfgBox kk) (some (icfgDev, inum))
@@ -464,16 +470,16 @@ theorem iput_lk_c (RH : RELEASE_HOOK) (HO : IputOfflockSpec)
     bslots fscBio 3 ∗ logOpSe icfgLog (u + 1) Sb1 e1 ∗
     iputFrame6 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5)
       (k.regs 19#5) (k.regs 20#5) ∗
-    iputPost cpu k n Sb crb cru crz tid qtx pidv dqp dqb dqs rgb
+    iputPost k n Sb crb cru crz tid qtx pidv dqp dqb dqs rgb
     ⊢ wpLoop (GF := GF) c := by
   have hkwf : (k.withSpie s p).wf := hwf
   have hK16 : 16 ≤ (k.withSpie s p).avail := by
     simp only [KCtx.withSpie_avail]; unfold iputSlots itruncSlots bfreeSlots at hK; omega
   have hlk : "itable" ∉ (k.withSpie s p).locks := by simp [hlocks]
-  have hsie' : ((((k.withSpie s p).pushOffAt s p).withLocks ("itable" :: k.locks)).pushed 6).sie =
+  have hsie : ((((k.withSpie s p).pushOffAt s p).withLocks ("itable" :: k.locks)).pushed 6).sie =
     false := rfl
   obtain ⟨hram, hal⟩ := iRef_ram_aligned kk hkk
-  iintro ⟨Hk, Hpc, #Henv, Hlocked, Harm, Htc, Hcl, Hir, HR, #HflK, Hfrg, Hslh, Hrident, Href,
+  iintro ⟨Hk, Hpc, #Henv, Hlocked, Harm, Hte, Hce, HR, #HflK, Hfrg, Hslh, Hrident, Href,
     Hhpn, Htxq, Hpre, Hru, Htop, Hdn, Hpid, Hsb, Hsi, Hbsl, Hop, Hframe, Hpost⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases iput_lk_env_parts Γ γl pd pav pu γil γisl kk $$ Henv with ⟨#Hit, #Hinv, #Hesc, #Hireg⟩
@@ -535,7 +541,7 @@ theorem iput_lk_c (RH : RELEASE_HOOK) (HO : IputOfflockSpec)
   k_step (wp_s_jal c _ (KA.«iput» + 0x94#64) false 2086866#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iput_br_release]
   iintro Hk Hpc
-  iapply (iput_release RH c (k.withSpie s p) hkwf hsie hK16 hlk
+  iapply (iput_release RH c (k.withSpie s p) hkwf hK16 hlk
     ((((((R.set 15#5 1#64).set 15#5 0#64).set (10#5) (KA.«iput» + 118924#64)).set (10#5)
       itableLock).set (1#5) (KA.«iput» + 152#64))) ?h10 (KA.«iput» + 0x98#64) ?h1)
     $$ [- $Hpc $Hit $Hlocked $HRin]
@@ -546,18 +552,26 @@ theorem iput_lk_c (RH : RELEASE_HOOK) (HO : IputOfflockSpec)
   · iapply iput_lk_kctx_ws; iexact Hk
   isplitl [Harm]
   · iapply iput_lk_arm_ws; iexact Harm
-  iintro %R' %hcs Hk Hpc
+  isplitl [Hte]
+  · iapply iput_lk_te_ws; iexact Hte
+  isplitl [Hce]
+  · iapply iput_lk_ce_ws; iexact Hce
+  iintro %c %R' %hcs Hk Hpc Hte Hce
+  ihave Hte := (show trapCsrsExt (GF := GF) c (k.withSpie s p).sie ⊢ trapCsrsExt c k.sie
+    from .rfl) $$ Hte
+  ihave Hce := (show cpuClaimExt (GF := GF) c (k.withSpie s p).sie (k.withSpie s p).proc ⊢
+    cpuClaimExt c k.sie k.proc from .rfl) $$ Hce
   rw [iput_lk_ret_98]
   obtain ⟨c2, c8, c9, c18, c19, c20, c21, c22, c23, c24, c25, c26, c27⟩ := hcs
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at c2 c18 c20 c21 c22 c23 c24 c25 c26 c27
   obtain ⟨p21, p22, p23, p24, p25, p26, p27⟩ := hpins
-  iapply (HO Γ cpu c k γl pd pav pu j γil γisl kk inum dn ge gr gd n Sb crb cru crz tid qtx
-    qtx.half.half qtx.half.half qtx.half pidv dqp dqb dqs rgb u Sb1 e1 w s p R' hj hproc hK hwf hsie
+  iapply (HO Γ c k γl pd pav pu j γil γisl kk inum dn ge gr gd n Sb crb cru crz tid qtx
+    qtx.half.half qtx.half.half qtx.half pidv dqp dqb dqs rgb u Sb1 e1 w s p R' hj hproc hK hwf
     hnoff hlocks htier hkk hgeom hcov hlog hnib hdn hnl0 hbare hib hled (iput_lk_q qtx) hpd
     (c18.trans h18) (c20.trans h20) (c2.trans hR2)
     ⟨c21.trans p21, c22.trans p22, c23.trans p23, c24.trans p24, c25.trans p25, c26.trans p26,
-      c27.trans p27⟩ hpin)
-  iframe Hk Hpc Henv Htc Hcl Hir Hdn Hescr Htkd Hcel Htxa Hpid Hsb Hsi Hbsl Hop Hslot Hframe Hpost
+      c27.trans p27⟩)
+  iframe Hk Hpc Henv Hte Hce Hdn Hescr Htkd Hcel Htxa Hpid Hsb Hsi Hbsl Hop Hslot Hframe Hpost
 
 end
 
