@@ -24,7 +24,7 @@ needs the transports -- needs the pointer-keyed forms too.
    `CtxMorph (λ ξ, inode_ident (XI := ξ) …)` re-binds the ambient `CurCtx`.
    Lean's `CurCtx` carries the context AND its tier (`⟨curCtx, curTier⟩`), so
    the transported family is `fun ξ => @inodeIdent … ⟨ξ, t⟩ …` for a tier
-   `t` quantified by the instance (the `Xv6/ConsoleDefs.lean` /
+   `t` quantified by the instance (the `ConsoleInvDefs.consResAt` /
    `MachCSL.instCtxMorphWordAt` pattern).  As in Rocq's `IcacheHeldAny`,
    the morph section binds NO ambient `CurCtx` (§0.8′ rule 3: the wrapper
    must never capture one); a consumer at `⟨ξ, curTier⟩` instantiates

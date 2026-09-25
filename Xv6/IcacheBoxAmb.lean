@@ -165,7 +165,7 @@ ProofIput), `ic_pay` (IcacheCover, ProofIput, ProofIlock),
 * **`IcacheBox` (4082--5516): the box λs.**  Rocq's `ic_hdr cn … k i x ξ :=
   ic_hdr_amb (XI := ξ) …` (and `ic_hdr_bare`, `ic_hdr_frz`, `ic_rest`,
   `ic_hdr_held`) are `fun ξ => @icHdrAmb … ⟨ξ, curTier⟩ …` -- the
-  `Xv6/ConsoleDefs.lean` `consRes` pattern (IcacheHeld deviation 1 states
+  `ConsoleInvDefs.consResAt` pattern (IcacheHeld deviation 1 states
   its transports at a quantified tier `t`; either works).  With `t :=
   curTier`, `@wordPointsTo … ⟨ξ, curTier⟩ a n dq w` is definitionally the
   ambient `wordAtN ξ a n dq w` (`Xv6.wordAtN_cur`'s `rfl`), so

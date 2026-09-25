@@ -31,10 +31,9 @@ Deviations from Rocq:
    `uartPort` carries the base word.
 3. `consEchoShift` has no `CurCtx` binder (Rocq keeps an unused one for its
    `CtxMorph` proof); here it is a constant, which transports for free.
-4. The raw ring's handle (`isConsLock`, over `consBody`) is being RETIRED
-   (the I/O-trace track's step 5): the interrupt path speaks
-   `ConsoleInvDefs.consResAt` (the bare lock in `consoleCaps`); the interim
-   section at the end serves consoleread until its re-proof.
+4. The raw ring's handle (`isConsLock`, over `consBody`) is RETIRED (the
+   I/O-trace track's step 5(c)): every user speaks the ring
+   (`ConsoleInvDefs.consResAt` / `isConslock`).
 -/
 import Xv6.ConsoleInvDefs
 import Xv6.UartInv
@@ -89,51 +88,6 @@ def uartRxCaps [CurCtx] (i : UartId) (γc γl : GName) (γ : UartNames) : IProp 
 instance uartRxCaps_persistent [CurCtx] (i : UartId) (γc γl : GName) (γ : UartNames) :
     Persistent (uartRxCaps (GF := GF) i γc γl γ) := by
   cases i <;> unfold uartRxCaps <;> infer_instance
-
-end
-
-/-! ## INTERIM: the raw ring's handle (retired in step 5(c))
-
-consoleread's landed proof still speaks the RAW payload; it moves to the
-ring (`ConsoleInvDefs.isConslock`) in step 5(b)'s last layer, and this
-section goes with it. -/
-
-section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
-
-/-- What `cons.lock` protects: the ring and the three indices, raw. -/
-def consBody [CurCtx] : IProp GF := iprop%
-  ∃ (buf : List (BitVec 8)) (r w e : BitVec 32),
-    ⌜buf.length = 128⌝ ∗ byteBuf consBufAddr (DFrac.own 1) buf ∗
-    wordPointsTo consRAddr 4 (DFrac.own 1) r ∗
-    wordPointsTo consWAddr 4 (DFrac.own 1) w ∗
-    wordPointsTo consEAddr 4 (DFrac.own 1) e
-
-/-- The payload as a function of the context that owns the cells: the
-lock's own until a winner takes it at its own (`lockPay`/`lock_pay_take`).
-It must NOT close over the ambient context, or the handle would not
-transport -- the shape `Xv6.ticksResAt`, `Xv6.diskRes` and
-`Xv6.procLockPay` have.  At the ambient context it IS the raw body
-(`consRes_cur`, `rfl`), so a holder still sees `consBody`. -/
-def consRes [CurCtx] : CtxId → IProp GF := fun ξ => @consBody hlc GF _ ⟨ξ, curTier⟩
-
-/-- The payload a holder takes is the raw body. -/
-theorem consRes_cur [CurCtx] : consRes (GF := GF) curCtx = consBody := rfl
-
-local instance ctxMorph_byteBufT (t : KTier) (a : BitVec 64) (dq : DFrac) (bs : List (BitVec 8)) :
-    CtxMorph (GF := GF) (fun ξ => @byteBuf hlc GF _ ⟨ξ, t⟩ a dq bs) :=
-  ctxMorph_bigSepL bs
-    (fun j b ξ => @wordPointsTo hlc GF _ ⟨ξ, t⟩ (a + BitVec.ofNat 64 j) 1 dq b)
-    (fun _ _ => instCtxMorphWordAt _ _ _ _ _)
-
-instance consRes_morph [CurCtx] : CtxMorph (GF := GF) consRes := by
-  unfold consRes consBody; infer_instance
-
-/-- The credential of `cons.lock`. -/
-def isConsLock [CurCtx] (γc : GName) : IProp GF := isLock γc consAddr "cons" consRes
-
-instance isConsLock_persistent [CurCtx] (γc : GName) : Persistent (isConsLock (GF := GF) γc) := by
-  unfold isConsLock; infer_instance
 
 end
 

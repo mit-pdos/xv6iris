@@ -46,7 +46,7 @@ instances (`ic_hdr_morph` → `icHdr_morph`, `ic_rest_morph`,
    `ic_hdr … ξ := ic_hdr_amb (XI := ξ) …` re-instantiates its section's
    `CurCtx`; Lean's `CurCtx` carries the context AND its tier, so the λs
    are `letI : CurCtx := ⟨ξ, curTier⟩; icHdrAmb …` (the
-   `Xv6/ConsoleDefs.lean` `consRes` pattern, `IcacheBoxAmb`'s FOR THE LATER
+   `ConsoleInvDefs.consResAt` pattern, `IcacheBoxAmb`'s FOR THE LATER
    PARTS): they take the ambient `[CurCtx]` for its TIER only, and so do
    `icBoxPay` / `icEscrow` / `icEscrows` (as the bcache's `bufBoxPay`
    does).  The holder-side rows (`icBody`, `icDeposit2`, `icHandle`,
@@ -175,7 +175,7 @@ set_option linter.unusedSectionVars false
 /-! ## The box λs: the ambient bundle at an explicit context
 
 Rocq's `ic_hdr … ξ := ic_hdr_amb (XI := ξ) …`: the ambient `[CurCtx]` is
-re-bound at `⟨ξ, curTier⟩` (the `Xv6/ConsoleDefs.lean` `consRes` pattern;
+re-bound at `⟨ξ, curTier⟩` (the `ConsoleInvDefs.consResAt` pattern;
 the ambient context keeps only its TIER here, the holder-side rows below
 are at the ambient context itself). -/
 

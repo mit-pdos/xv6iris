@@ -56,16 +56,15 @@ Ported one-to-one (Rocq → Lean, camelCased): `a_cons_r_nz`, `a_cons_nz`,
 transport instances `devsw_table_morph`, `console_inv_morph`.
 
 Deviations from Rocq:
-1. NAMES THAT WOULD CLASH with the landed `Xv6/ConsoleDefs.lean` (which this
-   file replaces; step 5 retires it): Rocq `cons_res` is `consResCur` (the
-   ambient-context body; `ConsoleDefs.consBody`'s role) and `cons_res_at` is
-   `consResAt` (the context-indexed payload the lock takes;
-   `ConsoleDefs.consRes`'s role); Rocq `is_conslock` is `isConslock`
-   (camelCase of the Rocq name; the landed `isConsLock` is the raw ring's
-   handle).  The geometry (`consAddr`, `consBufAddr`, `consRAddr`,
+1. NAMES: Rocq `cons_res` is `consResCur` (the ambient-context body) and
+   `cons_res_at` is `consResAt` (the context-indexed payload the lock
+   takes); Rocq `is_conslock` is `isConslock` (camelCase of the Rocq name).
+   The raw ring's `ConsoleDefs.consBody`/`consRes`/`isConsLock` these
+   replaced are retired (step 5(c)); `ConsoleDefs` keeps only the
+   interrupt path's credentials.  The geometry (`consAddr`, `consBufAddr`, `consRAddr`,
    `consWAddr`, `consEAddr`) lives HERE since step 5 (moved out of
    ConsoleDefs).
-2. `pa_add a_cons (cons_buf_off + j) ↦ₘ b` is `ConsoleDefs`' byte buffer
+2. `pa_add a_cons (cons_buf_off + j) ↦ₘ b` is `consData`'s byte buffer
    (`byteBuf consBufAddr`: byte `j` at `consBufAddr + j`); `↦₄` is
    `wordPointsTo _ 4 (DFrac.own 1)`, `↦₈□` is `wordPointsTo _ 8
    DFrac.discard`.  `cons_data_upd`'s `<[i := b']>` is `List.set`.
@@ -112,8 +111,8 @@ set_option linter.unusedSectionVars false
 struct { struct spinlock lock; char buf[128]; uint r, w, e; } cons;
 ```
 at `KA.«cons»`: the lock at +0 (24 bytes), the ring at +24, `r` at +152,
-`w` at +156, `e` at +160 (moved here from the retired raw-ring file
-`Xv6/ConsoleDefs.lean`). -/
+`w` at +156, `e` at +160 (moved here from `Xv6/ConsoleDefs.lean`,
+whose raw-ring half is retired). -/
 
 /-- `&cons` (= `&cons.lock`). -/
 def consAddr : BitVec 64 := KA.«cons»

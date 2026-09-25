@@ -85,7 +85,7 @@ functions first and the record assembled at the end.
    (XI := ξ)` / `islot_free_at (XI := ξ)` re-instantiate the section's
    `CurCtx`; Lean's `CurCtx` carries the context AND its tier, so they are
    `islotRestAtCtx ξ` / `islotFreeAtCtx ξ` := `letI : CurCtx := ⟨ξ,
-   curTier⟩; islotRestAt …` (the `IcacheBox` deviation-1 / `consRes`
+   curTier⟩; islotRestAt …` (the `IcacheBox` deviation-1 / `consResAt`
    pattern), and every row here takes the ambient `[CurCtx]` for its TIER
    only (`wordAtN ξ` reads the tier).  So `itableRes2 ξ` is closed in `ξ`
    up to the tier, as Rocq's is closed in `ξ`.  `TsoCtx.ctx_word4_pointsto
@@ -142,7 +142,7 @@ functions first and the record assembled at the end.
 * `ctxMorph_ofEq` (a ξ-constant row transports; deviation 6).
 * `islotRestAtCtx_cur` / `islotFreeAtCtx_cur` / `itableSlotFree_cur`
   (`rfl`: at the ambient context the payload's cells are the holder's
-  `islotRestAt` / `islotFreeAt` / `wordPointsTo`, the `consRes_cur` idiom).
+  `islotRestAt` / `islotFreeAt` / `wordPointsTo`, the `consResAt_cur` idiom).
 * `itableSlotFree_morph`, `icSlotRowFl_morph`, `itableSlotLive_morph` (the
   arms' own transports, from which the row instances are assembled).
 * The arm equations of deviation 2.
