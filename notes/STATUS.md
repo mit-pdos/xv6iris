@@ -7,6 +7,13 @@ A new coordinator session should read, in order: this file; `notes/coord/wave7b_
 `notes/briefs/crash_layer.md` (USER RULINGS at the top of each are final);
 `notes/coord/pending_edits.txt` (queued cleanups and deferrals).
 
+## ROCQ SOURCE (2026-09-25): use /shared/xv6rocq-main (detached worktree of Rocq origin/main,
+f22c1c9ca; refresh with `git -C /shared/xv6rocq fetch && git -C /shared/xv6rocq-main checkout --detach origin/main`).
+NOT /shared/xv6rocq: that checkout is the user's stale WIP branch `sail-upstream-bump` (forked from main
+Sept 16, 1466 commits behind). Everything landed before 2026-09-25 was ported against that Sept-16 base.
+User ruling: bump the kernel now (to xv6 verified 3e9926ea = Rocq main's XV6_REV); AUDIT the landed
+contracts against Rocq main LATER (after wave 8) -> notes/briefs/rocq_drift.md (to be written).
+
 ## CURRENT USER DIRECTIVE (2026-09-25)
 Do NOT start new subagents; only land results from the agents already running (usage limits are
 near). Resume launching the NEXT list only when the user says so.

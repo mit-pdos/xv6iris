@@ -1,4 +1,4 @@
-You are one agent of WAVE 7b (era walk layer, create, the sys_open family, kexec) of the xv6 port from Rocq (/shared/xv6rocq/iris/*.v) to Lean 4 (/shared/lean-xv6, branch lean-v2).
+You are one agent of WAVE 7b (era walk layer, create, the sys_open family, kexec) of the xv6 port from Rocq (/shared/xv6rocq-main/iris/*.v) to Lean 4 (/shared/lean-xv6, branch lean-v2).
 
 Read IN FULL before starting: /shared/lean-xv6/notes/briefs/fs7b_era_create_open_exec.md (THE brief — the DECISIONS block at its top, your item in §8, the inventory section for your family, §10 risks); skim notes/briefs/fs7_file_layer.md for the wave-7 context, notes/briefs/fs0_common.md (porting rules). Skim notes/briefs/fs1_leaves.md §1 for the Lean proof idioms and the layering rule.
 
