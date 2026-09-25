@@ -13,10 +13,6 @@ forked from main Sept 16, 1466 commits behind). User ruling: bump the kernel now
 Rocq main's XV6_REV); AUDIT the landed contracts against Rocq main LATER (after wave 8) ->
 notes/briefs/rocq_drift.md (to be written; diff base = 0be24e13b).
 
-## CURRENT USER DIRECTIVE (2026-09-25)
-Do NOT start new subagents; only land results from the agents already running (usage limits are
-near). Resume launching the NEXT list only when the user says so.
-
 ## Workflow (how every result lands)
 - Main-tree agents write new files in /shared/lean-xv6 (no git, no Xv6.lean edits); the
   coordinator appends `import Xv6.<M>` to Xv6.lean, commits, then VERIFIES in the clean worktree
