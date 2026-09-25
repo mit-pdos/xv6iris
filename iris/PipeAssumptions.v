@@ -64,3 +64,22 @@ Print Assumptions pipe_adequacy_pipeΣ_final.
 Require Import UnionDecU.
 
 Print Assumptions lm_disc_ulmU_dec.
+
+(* ---------------------------------------------------------------------- *)
+(* FRONTIER (cut C9e', design/union.md section 3): the union claim, its   *)
+(* ledger and its link and read records -- [UnionOut.union_led_rx] /      *)
+(* [_tx] / [_pow] / [_phi] (the ledger's steps, the counter casing on    *)
+(* [lm_disc_ulmU_dec]), [UnionOut.pblkU_ecl_holds] (the N-writer family's *)
+(* obligation at the claim) and [UnionReadInst.union_read_inst] (the read *)
+(* record over [UnionLinkInst.union_link_inst] and [UnionLinks]) -- are  *)
+(* in no anchor's cone until the switch (C9g).  ONE print over their      *)
+(* tuple; it must show only axioms already counted above.  DELETE this    *)
+(* block when the union anchor lands.                                     *)
+(* ---------------------------------------------------------------------- *)
+Require Import UnionOut UnionReadInst.
+
+Definition union_c9e_frontier :=
+  (@union_led_rx, @union_led_tx, @union_led_pow, @union_led_phi,
+   @pblkU_ecl_holds, @union_read_inst).
+
+Print Assumptions union_c9e_frontier.
