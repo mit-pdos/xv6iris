@@ -40,3 +40,11 @@
 - W8-J deferred: main_globals_raw/main_locks_raw + boot_* carves → with SpecMain (W8-I); GOT word stack0Slot fractions across 8 harts + per-hart boot stacks → BootShared (8-4).
 - uservec: caller must pass k with sp = kernel_sp (whole-page stack); userret's leftover is deeper → W8-R/W8-L re-form it; kernel-words fact uservecKWords from prepare_return_tf_kernel_words.
 - DONE (T1, 0a120da60/726949cff): copyin/either_copyin reason, consolewrite relay, filewrite_extra P. OPEN from it: writei chain's own short reason (Rocq write_arms_at takes P; WriteiDefs.writei_either_copyin currently drops it); pipewrite's pipe_wpost should use uvaRmapped (pw_copyin carries it, pipewrite discards).
+- W8-I gaps (SpecMain provisional until these land):
+  (a) FsCfgKits.v not ported (fs_kit_icache, fs_kit_fsinit_ghost, flive_auth_at, off-box auths) → fs_boot_supply's kits (with C-4/C-5).
+  (b) init_boot_bundle + park token (W8-K, W8-P2).
+  (c) no ftable boot site: fentry_raw, fd_slots_auth, isFtable minting (FileDefs:77).
+  (d) procinit re-spec, Rocq-literal (pre-stack dormant block, procs_inv_alloc) → 8-P.
+  (e) DECIDED (follow Rocq SpecKernelvec.v:125, KERNELVEC ∀ pd pav pu): Lean's EnvIs/KERNELVEC fix the disk pages at era-instance build, but virtio_disk_init picks them by kalloc → make the handler spec ∀-quantified over pd/pav/pu (Rocq form), so main installs the handler at the pages virtio_disk_init chose. Do before W8-N.
+  (f) W8-N: retire DISK_INIT_WM; mint the userret trampoline claim kmapAt trampVpn.
+  (g) move MainSecondarySpin's mainSec_wp_s_lw_aur / fence r,rw rules into MachCSL/WpSmodeFenceFloor.lean.
