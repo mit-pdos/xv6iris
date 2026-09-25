@@ -1049,3 +1049,7 @@ import Xv6.ProofSysExec
 import Xv6.LinkSysExec
 import Xv6.KexecNe
 import Xv6.SysExecNe
+import Xv6.FsCrashSector
+import Xv6.FsCrashPure
+import Xv6.FsBootParams
+import Xv6.FsCfgBoot
