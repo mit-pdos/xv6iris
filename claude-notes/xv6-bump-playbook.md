@@ -90,6 +90,52 @@ different on a bump:
   catalog**, and the edit is about to be lost. The fix is to move the content
   to a hand-written file beside the catalog (`iris/UInitArgv.v` is the worked
   example) or into the generator, never to re-apply it.
+- **"Needs a built `iris/`" means built AGAINST THE NEW `kernel-rocq/`.**
+  The probe imports `RiscvLang`, which `Require`s `Kernel.KernelInstrs`, so an
+  old-pin build with a re-dumped kernel fails "Cannot find library" (the sync
+  dropped the dump's `.vo`) or "inconsistent assumptions".  The cheap fix is
+  the probe's cone only: compile `kernel-rocq/` and `user-rocq/` in place,
+  then `make -f CoqMakefile UmodeAbi.vo WpRvcBridge.vo DecodeTotalU.vo
+  RiscvExtras.vo RiscvPtsto.vo` in `iris/` (~80 files, minutes).
+- **A `ucode_<prog>.txt` `omit <pc>` goes stale SILENTLY.**  At the
+  seccomp bump sh's page-straddle omit at 0xffe named a pc that was no longer
+  an instruction boundary; the generator ignored it and emitted the arm.
+  Re-derive every `pc`/`omit`/`omitfrom` line from the new dump.
+
+**THE USER-IMAGE RELAYOUT (first done at a083670, the 8-byte `seccomp`
+stub in `usys.S`).**  Every proof in the user tier spells pcs as bare hex
+(`mword_of_int 0x5c4`), catalog names encode them (`uis_grep_5c4`), and
+immediates are the catalog's AST spelling (`mword_of_int 2096998 : mword
+21`), so the job is: remap every hex pc/data literal through old->new,
+rename the `uis_*` references, and rewrite each immediate from the OLD vs
+NEW catalog AST at that pc (the proof must match the catalog verbatim).
+What bit, and what a script must special-case:
+
+- **The auipc intermediate COLLIDES with moved pcs and rodata.**  An
+  unmoved `auipc a0,0x1` at 0x82 yields 0x1082, which is ALSO a moved pc of
+  sh's vprintf and must NOT move; 0x14cc-style results sit inside rodata.
+  Collect every unmoved auipc's result, never remap those values, and
+  resolve by hand the few that are also moved pcs (`0x10aa` is both
+  fprintf and runcmd's auipc result).
+- **Round constants land in sh's text range.**  sh's moved text is
+  0xd2e..0x127e, so `0x1000` (a page), `0x1020`, `0x1220` in sh-side files
+  are NOT pcs.  `USh<Other>.v` (UShCat, UShEcho, UShGrep) are about the
+  OTHER program's image though named for sh -- classify a file by what it
+  proves, not its prefix.
+- **The section start and the first string can move differently.**  sh's
+  .rodata start went 0x1280 -> 0x1288 (8 leading zero bytes) while "$ "
+  went 0x1280 -> 0x1290; cat's and grep's strings did not move at all (the
+  growth fell into alignment padding).  Build the data map from CONTENT.
+- **An immediate is stated outside its instruction's `iApply`** -- an
+  `assert` before it, a block lemma (`shd_die_lits 0x54 ... (mword_of_int
+  572 : mword 12)`), a register fact three instructions later.  Replace a
+  leftover old token globally only when it is unambiguous (one new value,
+  and no unchanged pc of the program carries it); `2982 : mword 12` is
+  both the moved-data site 0x80e and the unmoved 0x466.
+- **Geometry**: every program's text `filesz` moved (`ep_memsz p0` in
+  `UShEcho`/`UShKernel`/`UInitKernel`), the RW segment and `memEnd` did
+  not.  Cross-program COMMENTS (init's literal named in a sh file) need a
+  separate pass keyed on the program the line names.
 
 ## 2. Classify before you fix
 

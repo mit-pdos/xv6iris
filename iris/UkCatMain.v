@@ -542,9 +542,9 @@ Section UkCatMain.
                  := regval_into_reg
                       (sign_extend' 64 (mword_of_int 2 : mword 6)
                        : mword 64)]> m3).
-    (* ---- 0xec  jal ra,0x7d0 <fprintf> ---- *)
+    (* ---- 0xec  jal ra,0x7d8 <fprintf> ---- *)
     iApply (wp_uk_jal N h4 m4 (mword_of_int 0xec)
-              (mword_of_int 1764 : mword 21) ra_idx
+              (mword_of_int 1772 : mword 21) ra_idx
               (mword_of_int CatSyms.fprintf) (mword_of_int 0xf0)
               (10 + (12 + (4 + n)))
               ltac:(unfold unot_sp; vm_compute; discriminate)

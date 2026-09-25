@@ -262,14 +262,14 @@ Proof using.
       by (vm_compute in Hp |- *; lia).
     exact (list_lookup_lookup_total_lt FileDisc.alt_execcat p Hl).
   - intros p Hp.
-    apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x12a8)
+    apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x12b8)
              (fun q : nat => FileDisc.alt_execcat !!! q) 0%nat 5%nat);
       [vm_compute; reflexivity | lia].
   - intros j Hj.
     assert (Hj3 : (j < 3)%nat) by (vm_compute in Hj; lia).
     destruct j as [| [| [| j]]]; try lia; vm_compute; reflexivity.
   - intros p Hp.
-    apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x12a8)
+    apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x12b8)
              (fun q : nat => FileDisc.alt_execcat !!! (q + 1)%nat)
              7%nat 8%nat);
       [vm_compute; reflexivity | lia].

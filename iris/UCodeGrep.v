@@ -42,10 +42,10 @@
                           worked example.
 
    Image geometry, as dumped:
-     text  0x0 .. 0xb16   (2838 bytes)
+     text  0x0 .. 0xb1e   (2846 bytes)
      PT_LOAD 0x0      filesz 0x10cc   memsz 0x10cc   flags 5   (executable: 2 text page(s))
      PT_LOAD 0x2000   filesz 0x0      memsz 0x420    flags 6
-     data  0xb16 .. 0x10cc   (1462 bytes)
+     data  0xb1e .. 0x10cc   (1454 bytes)
      entry 0x266, MemBase 0x0, MemEnd 0x2420
 
    Catalogued: 601 instruction(s), 423 distinct word(s), in 17 function(s):
@@ -57,10 +57,10 @@
      <matchstar>      0x0      .. 0x4a        32 instr
      <strchr>         0x318    .. 0x33e       17 instr
      <memmove>        0x43e    .. 0x498       33 instr
-     <fprintf>        0x940    .. 0x968       17 instr
-     <printf>         0x96a    .. 0x99a       20 instr
-     <vprintf>        0x680    .. 0x93e      250 instr
-     <putc>           0x5c4    .. 0x5e0       12 instr
+     <fprintf>        0x948    .. 0x970       17 instr
+     <printf>         0x972    .. 0x9a2       20 instr
+     <vprintf>        0x688    .. 0x946      250 instr
+     <putc>           0x5cc    .. 0x5e8       12 instr
      <read>           0x534    .. 0x53a        3 instr
      <write>          0x53c    .. 0x542        3 instr
      <open>           0x55c    .. 0x562        3 instr
@@ -69,8 +69,8 @@
 
    NOT catalogued, because no proof ever fetches it:
        atoi, chdir, dup, exec, fork, getpid, kill, link, memcmp, memcpy,
-       memset, mkdir, mknod, pause, pipe, strcmp, strcpy, strlen, sync, unlink,
-       uptime, wait -- (no reason recorded)
+       memset, mkdir, mknod, pause, pipe, seccomp, strcmp, strcpy, strlen,
+       sync, unlink, uptime, wait -- (no reason recorded)
        free, malloc -- unreachable: grep allocates nothing
        stat -- unreachable: grep never stats
        gets -- unreachable: grep reads with read(), never gets
@@ -133,7 +133,7 @@ Lemma grep_img_data (M : gmap Z (bv 8)) : grep_img_sub M -> grep_data_sub M.
 Proof using . intros [ _ H ]. exact H. Qed.
 
 (* ---- the KEY RANGE of each dumped map ------------------------------- *)
-(* The bounds are COMPUTED from the dump (text keys stop at 0xb15, data keys
+(* The bounds are COMPUTED from the dump (text keys stop at 0xb1d, data keys
    at 0x10cb) and rounded up to the next page, which is the shape the users of
    the fact want: [UmodeAbi.uM_only_img] asks exactly "the written window is
    disjoint from every key of [img]", and the windows a program writes are
@@ -300,10 +300,10 @@ Lemma grep_syms_pins :
   GrepSyms.matchstar = 0x0 /\
   GrepSyms.strchr = 0x318 /\
   GrepSyms.memmove = 0x43e /\
-  GrepSyms.fprintf = 0x940 /\
-  GrepSyms.printf = 0x96a /\
-  GrepSyms.vprintf = 0x680 /\
-  GrepSyms.putc = 0x5c4 /\
+  GrepSyms.fprintf = 0x948 /\
+  GrepSyms.printf = 0x972 /\
+  GrepSyms.vprintf = 0x688 /\
+  GrepSyms.putc = 0x5cc /\
   GrepSyms.read = 0x534 /\
   GrepSyms.write = 0x53c /\
   GrepSyms.open = 0x55c /\
@@ -553,12 +553,12 @@ Lemma udec_c691 :
   udecode_rvc (mword_of_int 0xc691) (C_BEQZ (mword_of_int 6 : mword 8, Cregidx (mword_of_int 5))).
 Proof using . udec_rvc_oneshot. Qed.
 
-(* c985  c.beqz a1,8a0 <vprintf+0x220> *)
+(* c985  c.beqz a1,8a8 <vprintf+0x220> *)
 Lemma udec_c985 :
   udecode_rvc (mword_of_int 0xc985) (C_BEQZ (mword_of_int 24 : mword 8, Cregidx (mword_of_int 3))).
 Proof using . udec_rvc_oneshot. Qed.
 
-(* ca95  c.beqz a3,738 <vprintf+0xb8> *)
+(* ca95  c.beqz a3,740 <vprintf+0xb8> *)
 Lemma udec_ca95 :
   udecode_rvc (mword_of_int 0xca95) (C_BEQZ (mword_of_int 26 : mword 8, Cregidx (mword_of_int 5))).
 Proof using . udec_rvc_oneshot. Qed.
@@ -568,7 +568,7 @@ Lemma udec_cb81 :
   udecode_rvc (mword_of_int 0xcb81) (C_BEQZ (mword_of_int 8 : mword 8, Cregidx (mword_of_int 7))).
 Proof using . udec_rvc_oneshot. Qed.
 
-(* cc91  c.beqz s1,886 <vprintf+0x206> *)
+(* cc91  c.beqz s1,88e <vprintf+0x206> *)
 Lemma udec_cc91 :
   udecode_rvc (mword_of_int 0xcc91) (C_BEQZ (mword_of_int 14 : mword 8, Cregidx (mword_of_int 1))).
 Proof using . udec_rvc_oneshot. Qed.
@@ -588,17 +588,17 @@ Lemma udec_dd79 :
   udecode_rvc (mword_of_int 0xdd79) (C_BEQZ (mword_of_int 239 : mword 8, Cregidx (mword_of_int 2))).
 Proof using . udec_rvc_oneshot. Qed.
 
-(* e119  c.bnez a0,8e4 <vprintf+0x264> *)
+(* e119  c.bnez a0,8ec <vprintf+0x264> *)
 Lemma udec_e119 :
   udecode_rvc (mword_of_int 0xe119) (C_BNEZ (mword_of_int 3 : mword 8, Cregidx (mword_of_int 2))).
 Proof using . udec_rvc_oneshot. Qed.
 
-(* e199  c.bnez a1,90a <vprintf+0x28a> *)
+(* e199  c.bnez a1,912 <vprintf+0x28a> *)
 Lemma udec_e199 :
   udecode_rvc (mword_of_int 0xe199) (C_BNEZ (mword_of_int 3 : mword 8, Cregidx (mword_of_int 3))).
 Proof using . udec_rvc_oneshot. Qed.
 
-(* e219  c.bnez a2,900 <vprintf+0x280> *)
+(* e219  c.bnez a2,908 <vprintf+0x280> *)
 Lemma udec_e219 :
   udecode_rvc (mword_of_int 0xe219) (C_BNEZ (mword_of_int 3 : mword 8, Cregidx (mword_of_int 4))).
 Proof using . udec_rvc_oneshot. Qed.
@@ -613,17 +613,17 @@ Lemma udec_e911 :
   udecode_rvc (mword_of_int 0xe911) (C_BNEZ (mword_of_int 10 : mword 8, Cregidx (mword_of_int 2))).
 Proof using . udec_rvc_oneshot. Qed.
 
-(* e99d  c.bnez a1,738 <vprintf+0xb8> *)
+(* e99d  c.bnez a1,740 <vprintf+0xb8> *)
 Lemma udec_e99d :
   udecode_rvc (mword_of_int 0xe99d) (C_BNEZ (mword_of_int 27 : mword 8, Cregidx (mword_of_int 3))).
 Proof using . udec_rvc_oneshot. Qed.
 
-(* f4f5  c.bnez s1,830 <vprintf+0x1b0> *)
+(* f4f5  c.bnez s1,838 <vprintf+0x1b0> *)
 Lemma udec_f4f5 :
   udecode_rvc (mword_of_int 0xf4f5) (C_BNEZ (mword_of_int 246 : mword 8, Cregidx (mword_of_int 1))).
 Proof using . udec_rvc_oneshot. Qed.
 
-(* f9f5  c.bnez a1,872 <vprintf+0x1f2> *)
+(* f9f5  c.bnez a1,87a <vprintf+0x1f2> *)
 Lemma udec_f9f5 :
   udecode_rvc (mword_of_int 0xf9f5) (C_BNEZ (mword_of_int 250 : mword 8, Cregidx (mword_of_int 3))).
 Proof using . udec_rvc_oneshot. Qed.
@@ -638,7 +638,7 @@ Lemma udec_fbfd :
   udecode_rvc (mword_of_int 0xfbfd) (C_BNEZ (mword_of_int 251 : mword 8, Cregidx (mword_of_int 7))).
 Proof using . udec_rvc_oneshot. Qed.
 
-(* a00d  c.j 6d6 <vprintf+0x56> *)
+(* a00d  c.j 6de <vprintf+0x56> *)
 Lemma udec_a00d :
   udecode_rvc (mword_of_int 0xa00d) (C_J (mword_of_int 17 : mword 11)).
 Proof using . udec_rvc_oneshot. Qed.
@@ -648,7 +648,7 @@ Lemma udec_a011 :
   udecode_rvc (mword_of_int 0xa011) (C_J (mword_of_int 2 : mword 11)).
 Proof using . udec_rvc_oneshot. Qed.
 
-(* a019  c.j 6c4 <vprintf+0x44> *)
+(* a019  c.j 6cc <vprintf+0x44> *)
 Lemma udec_a019 :
   udecode_rvc (mword_of_int 0xa019) (C_J (mword_of_int 3 : mword 11)).
 Proof using . udec_rvc_oneshot. Qed.
@@ -663,42 +663,42 @@ Lemma udec_a081 :
   udecode_rvc (mword_of_int 0xa081) (C_J (mword_of_int 32 : mword 11)).
 Proof using . udec_rvc_oneshot. Qed.
 
-(* b359  c.j 6c4 <vprintf+0x44> *)
+(* b359  c.j 6cc <vprintf+0x44> *)
 Lemma udec_b359 :
   udecode_rvc (mword_of_int 0xb359) (C_J (mword_of_int 1731 : mword 11)).
 Proof using . udec_rvc_oneshot. Qed.
 
-(* b505  c.j 6c4 <vprintf+0x44> *)
+(* b505  c.j 6cc <vprintf+0x44> *)
 Lemma udec_b505 :
   udecode_rvc (mword_of_int 0xb505) (C_J (mword_of_int 1808 : mword 11)).
 Proof using . udec_rvc_oneshot. Qed.
 
-(* b51d  c.j 6c4 <vprintf+0x44> *)
+(* b51d  c.j 6cc <vprintf+0x44> *)
 Lemma udec_b51d :
   udecode_rvc (mword_of_int 0xb51d) (C_J (mword_of_int 1811 : mword 11)).
 Proof using . udec_rvc_oneshot. Qed.
 
-(* b581  c.j 6c4 <vprintf+0x44> *)
+(* b581  c.j 6cc <vprintf+0x44> *)
 Lemma udec_b581 :
   udecode_rvc (mword_of_int 0xb581) (C_J (mword_of_int 1824 : mword 11)).
 Proof using . udec_rvc_oneshot. Qed.
 
-(* b595  c.j 6c4 <vprintf+0x44> *)
+(* b595  c.j 6cc <vprintf+0x44> *)
 Lemma udec_b595 :
   udecode_rvc (mword_of_int 0xb595) (C_J (mword_of_int 1842 : mword 11)).
 Proof using . udec_rvc_oneshot. Qed.
 
-(* b5c1  c.j 6c4 <vprintf+0x44> *)
+(* b5c1  c.j 6cc <vprintf+0x44> *)
 Lemma udec_b5c1 :
   udecode_rvc (mword_of_int 0xb5c1) (C_J (mword_of_int 1888 : mword 11)).
 Proof using . udec_rvc_oneshot. Qed.
 
-(* b71d  c.j 6c4 <vprintf+0x44> *)
+(* b71d  c.j 6cc <vprintf+0x44> *)
 Lemma udec_b71d :
   udecode_rvc (mword_of_int 0xb71d) (C_J (mword_of_int 1939 : mword 11)).
 Proof using . udec_rvc_oneshot. Qed.
 
-(* b731  c.j 6c4 <vprintf+0x44> *)
+(* b731  c.j 6cc <vprintf+0x44> *)
 Lemma udec_b731 :
   udecode_rvc (mword_of_int 0xb731) (C_J (mword_of_int 1926 : mword 11)).
 Proof using . udec_rvc_oneshot. Qed.
@@ -708,17 +708,17 @@ Lemma udec_b75d :
   udecode_rvc (mword_of_int 0xb75d) (C_J (mword_of_int 2003 : mword 11)).
 Proof using . udec_rvc_oneshot. Qed.
 
-(* b779  c.j 6c4 <vprintf+0x44> *)
+(* b779  c.j 6cc <vprintf+0x44> *)
 Lemma udec_b779 :
   udecode_rvc (mword_of_int 0xb779) (C_J (mword_of_int 1991 : mword 11)).
 Proof using . udec_rvc_oneshot. Qed.
 
-(* b781  c.j 6c4 <vprintf+0x44> *)
+(* b781  c.j 6cc <vprintf+0x44> *)
 Lemma udec_b781 :
   udecode_rvc (mword_of_int 0xb781) (C_J (mword_of_int 1952 : mword 11)).
 Proof using . udec_rvc_oneshot. Qed.
 
-(* b7c5  c.j 6c4 <vprintf+0x44> *)
+(* b7c5  c.j 6cc <vprintf+0x44> *)
 Lemma udec_b7c5 :
   udecode_rvc (mword_of_int 0xb7c5) (C_J (mword_of_int 2032 : mword 11)).
 Proof using . udec_rvc_oneshot. Qed.
@@ -738,17 +738,17 @@ Lemma udec_b7f5 :
   udecode_rvc (mword_of_int 0xb7f5) (C_J (mword_of_int 2038 : mword 11)).
 Proof using . udec_rvc_oneshot. Qed.
 
-(* bda5  c.j 6c4 <vprintf+0x44> *)
+(* bda5  c.j 6cc <vprintf+0x44> *)
 Lemma udec_bda5 :
   udecode_rvc (mword_of_int 0xbda5) (C_J (mword_of_int 1852 : mword 11)).
 Proof using . udec_rvc_oneshot. Qed.
 
-(* bdd5  c.j 6c4 <vprintf+0x44> *)
+(* bdd5  c.j 6cc <vprintf+0x44> *)
 Lemma udec_bdd5 :
   udecode_rvc (mword_of_int 0xbdd5) (C_J (mword_of_int 1914 : mword 11)).
 Proof using . udec_rvc_oneshot. Qed.
 
-(* bde9  c.j 6c4 <vprintf+0x44> *)
+(* bde9  c.j 6cc <vprintf+0x44> *)
 Lemma udec_bde9 :
   udecode_rvc (mword_of_int 0xbde9) (C_J (mword_of_int 1901 : mword 11)).
 Proof using . udec_rvc_oneshot. Qed.
@@ -758,7 +758,7 @@ Lemma udec_bf7d :
   udecode_rvc (mword_of_int 0xbf7d) (C_J (mword_of_int 2015 : mword 11)).
 Proof using . udec_rvc_oneshot. Qed.
 
-(* bfa1  c.j 6c4 <vprintf+0x44> *)
+(* bfa1  c.j 6cc <vprintf+0x44> *)
 Lemma udec_bfa1 :
   udecode_rvc (mword_of_int 0xbfa1) (C_J (mword_of_int 1964 : mword 11)).
 Proof using . udec_rvc_oneshot. Qed.
@@ -1589,7 +1589,7 @@ Lemma udec_02d70563 :
   udecode_base (mword_of_int 0x02d70563) (BTYPE (mword_of_int 42 : mword 13, Regidx (mword_of_int 13), Regidx (mword_of_int 14), BEQ)).
 Proof using . udec_base_bridge. Qed.
 
-(* 03598363  beq s3,s5,6e6 <vprintf+0x66> *)
+(* 03598363  beq s3,s5,6ee <vprintf+0x66> *)
 Lemma udec_03598363 :
   udecode_base (mword_of_int 0x03598363) (BTYPE (mword_of_int 38 : mword 13, Regidx (mword_of_int 21), Regidx (mword_of_int 19), BEQ)).
 Proof using . udec_base_bridge. Qed.
@@ -1599,7 +1599,7 @@ Lemma udec_03604463 :
   udecode_base (mword_of_int 0x03604463) (BTYPE (mword_of_int 40 : mword 13, Regidx (mword_of_int 22), Regidx (mword_of_int 0), BLT)).
 Proof using . udec_base_bridge. Qed.
 
-(* 03878763  beq a5,s8,720 <vprintf+0xa0> *)
+(* 03878763  beq a5,s8,728 <vprintf+0xa0> *)
 Lemma udec_03878763 :
   udecode_base (mword_of_int 0x03878763) (BTYPE (mword_of_int 46 : mword 13, Regidx (mword_of_int 24), Regidx (mword_of_int 15), BEQ)).
 Proof using . udec_base_bridge. Qed.
@@ -1619,82 +1619,82 @@ Lemma udec_04a7db63 :
   udecode_base (mword_of_int 0x04a7db63) (BTYPE (mword_of_int 86 : mword 13, Regidx (mword_of_int 10), Regidx (mword_of_int 15), BGE)).
 Proof using . udec_base_bridge. Qed.
 
-(* 18051363  bnez a0,8d2 <vprintf+0x252> *)
+(* 18051363  bnez a0,8da <vprintf+0x252> *)
 Lemma udec_18051363 :
   udecode_base (mword_of_int 0x18051363) (BTYPE (mword_of_int 390 : mword 13, Regidx (mword_of_int 0), Regidx (mword_of_int 10), BNE)).
 Proof using . udec_base_bridge. Qed.
 
-(* 18070163  beqz a4,8d2 <vprintf+0x252> *)
+(* 18070163  beqz a4,8da <vprintf+0x252> *)
 Lemma udec_18070163 :
   udecode_base (mword_of_int 0x18070163) (BTYPE (mword_of_int 386 : mword 13, Regidx (mword_of_int 0), Regidx (mword_of_int 14), BEQ)).
 Proof using . udec_base_bridge. Qed.
 
-(* 1c048a63  beqz s1,8a6 <vprintf+0x226> *)
+(* 1c048a63  beqz s1,8ae <vprintf+0x226> *)
 Lemma udec_1c048a63 :
   udecode_base (mword_of_int 0x1c048a63) (BTYPE (mword_of_int 468 : mword 13, Regidx (mword_of_int 0), Regidx (mword_of_int 9), BEQ)).
 Proof using . udec_base_bridge. Qed.
 
-(* 1c060863  beqz a2,8be <vprintf+0x23e> *)
+(* 1c060863  beqz a2,8c6 <vprintf+0x23e> *)
 Lemma udec_1c060863 :
   udecode_base (mword_of_int 0x1c060863) (BTYPE (mword_of_int 464 : mword 13, Regidx (mword_of_int 0), Regidx (mword_of_int 12), BEQ)).
 Proof using . udec_base_bridge. Qed.
 
-(* 22048363  beqz s1,8b4 <vprintf+0x234> *)
+(* 22048363  beqz s1,8bc <vprintf+0x234> *)
 Lemma udec_22048363 :
   udecode_base (mword_of_int 0x22048363) (BTYPE (mword_of_int 550 : mword 13, Regidx (mword_of_int 0), Regidx (mword_of_int 9), BEQ)).
 Proof using . udec_base_bridge. Qed.
 
-(* e4e78fe3  beq a5,a4,720 <vprintf+0xa0> *)
+(* e4e78fe3  beq a5,a4,728 <vprintf+0xa0> *)
 Lemma udec_e4e78fe3 :
   udecode_base (mword_of_int 0xe4e78fe3) (BTYPE (mword_of_int 7774 : mword 13, Regidx (mword_of_int 14), Regidx (mword_of_int 15), BEQ)).
 Proof using . udec_base_bridge. Qed.
 
-(* e8a78ce3  beq a5,a0,76e <vprintf+0xee> *)
+(* e8a78ce3  beq a5,a0,776 <vprintf+0xee> *)
 Lemma udec_e8a78ce3 :
   udecode_base (mword_of_int 0xe8a78ce3) (BTYPE (mword_of_int 7832 : mword 13, Regidx (mword_of_int 10), Regidx (mword_of_int 15), BEQ)).
 Proof using . udec_base_bridge. Qed.
 
-(* ea0693e3  bnez a3,786 <vprintf+0x106> *)
+(* ea0693e3  bnez a3,78e <vprintf+0x106> *)
 Lemma udec_ea0693e3 :
   udecode_base (mword_of_int 0xea0693e3) (BTYPE (mword_of_int 7846 : mword 13, Regidx (mword_of_int 0), Regidx (mword_of_int 13), BNE)).
 Proof using . udec_base_bridge. Qed.
 
-(* ea071be3  bnez a4,7a0 <vprintf+0x120> *)
+(* ea071be3  bnez a4,7a8 <vprintf+0x120> *)
 Lemma udec_ea071be3 :
   udecode_base (mword_of_int 0xea071be3) (BTYPE (mword_of_int 7862 : mword 13, Regidx (mword_of_int 0), Regidx (mword_of_int 14), BNE)).
 Proof using . udec_base_bridge. Qed.
 
-(* ec069be3  bnez a3,7d2 <vprintf+0x152> *)
+(* ec069be3  bnez a3,7da <vprintf+0x152> *)
 Lemma udec_ec069be3 :
   udecode_base (mword_of_int 0xec069be3) (BTYPE (mword_of_int 7894 : mword 13, Regidx (mword_of_int 0), Regidx (mword_of_int 13), BNE)).
 Proof using . udec_base_bridge. Qed.
 
-(* eca784e3  beq a5,a0,7ba <vprintf+0x13a> *)
+(* eca784e3  beq a5,a0,7c2 <vprintf+0x13a> *)
 Lemma udec_eca784e3 :
   udecode_base (mword_of_int 0xeca784e3) (BTYPE (mword_of_int 7880 : mword 13, Regidx (mword_of_int 10), Regidx (mword_of_int 15), BEQ)).
 Proof using . udec_base_bridge. Qed.
 
-(* ee0713e3  bnez a4,7ec <vprintf+0x16c> *)
+(* ee0713e3  bnez a4,7f4 <vprintf+0x16c> *)
 Lemma udec_ee0713e3 :
   udecode_base (mword_of_int 0xee0713e3) (BTYPE (mword_of_int 7910 : mword 13, Regidx (mword_of_int 0), Regidx (mword_of_int 14), BNE)).
 Proof using . udec_base_bridge. Qed.
 
-(* eee78ce3  beq a5,a4,806 <vprintf+0x186> *)
+(* eee78ce3  beq a5,a4,80e <vprintf+0x186> *)
 Lemma udec_eee78ce3 :
   udecode_base (mword_of_int 0xeee78ce3) (BTYPE (mword_of_int 7928 : mword 13, Regidx (mword_of_int 14), Regidx (mword_of_int 15), BEQ)).
 Proof using . udec_base_bridge. Qed.
 
-(* f2e78ce3  beq a5,a4,84e <vprintf+0x1ce> *)
+(* f2e78ce3  beq a5,a4,856 <vprintf+0x1ce> *)
 Lemma udec_f2e78ce3 :
   udecode_base (mword_of_int 0xf2e78ce3) (BTYPE (mword_of_int 7992 : mword 13, Regidx (mword_of_int 14), Regidx (mword_of_int 15), BEQ)).
 Proof using . udec_base_bridge. Qed.
 
-(* f4e782e3  beq a5,a4,862 <vprintf+0x1e2> *)
+(* f4e782e3  beq a5,a4,86a <vprintf+0x1e2> *)
 Lemma udec_f4e782e3 :
   udecode_base (mword_of_int 0xf4e782e3) (BTYPE (mword_of_int 8004 : mword 13, Regidx (mword_of_int 14), Regidx (mword_of_int 15), BEQ)).
 Proof using . udec_base_bridge. Qed.
 
-(* f6e787e3  beq a5,a4,894 <vprintf+0x214> *)
+(* f6e787e3  beq a5,a4,89c <vprintf+0x214> *)
 Lemma udec_f6e787e3 :
   udecode_base (mword_of_int 0xf6e787e3) (BTYPE (mword_of_int 8046 : mword 13, Regidx (mword_of_int 14), Regidx (mword_of_int 15), BEQ)).
 Proof using . udec_base_bridge. Qed.
@@ -1704,12 +1704,12 @@ Lemma udec_fcfb13e3 :
   udecode_base (mword_of_int 0xfcfb13e3) (BTYPE (mword_of_int 8134 : mword 13, Regidx (mword_of_int 15), Regidx (mword_of_int 22), BNE)).
 Proof using . udec_base_bridge. Qed.
 
-(* fd579ce3  bne a5,s5,6b6 <vprintf+0x36> *)
+(* fd579ce3  bne a5,s5,6be <vprintf+0x36> *)
 Lemma udec_fd579ce3 :
   udecode_base (mword_of_int 0xfd579ce3) (BTYPE (mword_of_int 8152 : mword 13, Regidx (mword_of_int 21), Regidx (mword_of_int 15), BNE)).
 Proof using . udec_base_bridge. Qed.
 
-(* fe0993e3  bnez s3,6c0 <vprintf+0x40> *)
+(* fe0993e3  bnez s3,6c8 <vprintf+0x40> *)
 Lemma udec_fe0993e3 :
   udecode_base (mword_of_int 0xfe0993e3) (BTYPE (mword_of_int 8166 : mword 13, Regidx (mword_of_int 0), Regidx (mword_of_int 19), BNE)).
 Proof using . udec_base_bridge. Qed.
@@ -1894,14 +1894,14 @@ Lemma udec_07800593 :
   udecode_base (mword_of_int 0x07800593) (ITYPE (mword_of_int 120 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 11), ADDI)).
 Proof using . udec_base_bridge. Qed.
 
-(* 2d248493  addi s1,s1,722 # b58 <malloc+0x136> *)
-Lemma udec_2d248493 :
-  udecode_base (mword_of_int 0x2d248493) (ITYPE (mword_of_int 722 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)).
+(* 2ca48493  addi s1,s1,714 # b58 <malloc+0x12e> *)
+Lemma udec_2ca48493 :
+  udecode_base (mword_of_int 0x2ca48493) (ITYPE (mword_of_int 714 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)).
 Proof using . udec_base_bridge. Qed.
 
-(* 338b8b93  addi s7,s7,824 # b60 <digits> *)
-Lemma udec_338b8b93 :
-  udecode_base (mword_of_int 0x338b8b93) (ITYPE (mword_of_int 824 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 23), ADDI)).
+(* 330b8b93  addi s7,s7,816 # b60 <digits> *)
+Lemma udec_330b8b93 :
+  udecode_base (mword_of_int 0x330b8b93) (ITYPE (mword_of_int 816 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 23), ADDI)).
 Proof using . udec_base_bridge. Qed.
 
 (* 3ff00793  li a5,1023 *)
@@ -1914,12 +1914,12 @@ Lemma udec_3ff00d13 :
   udecode_base (mword_of_int 0x3ff00d13) (ITYPE (mword_of_int 1023 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 26), ADDI)).
 Proof using . udec_base_bridge. Qed.
 
-(* 8ec50513  addi a0,a0,-1812 # b40 <malloc+0x11e> *)
+(* 8ec50513  addi a0,a0,-1812 # b40 <malloc+0x116> *)
 Lemma udec_8ec50513 :
   udecode_base (mword_of_int 0x8ec50513) (ITYPE (mword_of_int 2284 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
 Proof using . udec_base_bridge. Qed.
 
-(* 8f258593  addi a1,a1,-1806 # b20 <malloc+0xfe> *)
+(* 8f258593  addi a1,a1,-1806 # b20 <malloc+0xf6> *)
 Lemma udec_8f258593 :
   udecode_base (mword_of_int 0x8f258593) (ITYPE (mword_of_int 2290 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)).
 Proof using . udec_base_bridge. Qed.
@@ -2054,97 +2054,97 @@ Lemma udec_3d8000ef :
   udecode_base (mword_of_int 0x3d8000ef) (JAL (mword_of_int 984 : mword 21, Regidx (mword_of_int 1))).
 Proof using . udec_base_bridge. Qed.
 
-(* 708000ef  jal 940 <fprintf> *)
-Lemma udec_708000ef :
-  udecode_base (mword_of_int 0x708000ef) (JAL (mword_of_int 1800 : mword 21, Regidx (mword_of_int 1))).
+(* 710000ef  jal 948 <fprintf> *)
+Lemma udec_710000ef :
+  udecode_base (mword_of_int 0x710000ef) (JAL (mword_of_int 1808 : mword 21, Regidx (mword_of_int 1))).
 Proof using . udec_base_bridge. Qed.
 
-(* 70e000ef  jal 96a <printf> *)
-Lemma udec_70e000ef :
-  udecode_base (mword_of_int 0x70e000ef) (JAL (mword_of_int 1806 : mword 21, Regidx (mword_of_int 1))).
+(* 716000ef  jal 972 <printf> *)
+Lemma udec_716000ef :
+  udecode_base (mword_of_int 0x716000ef) (JAL (mword_of_int 1814 : mword 21, Regidx (mword_of_int 1))).
 Proof using . udec_base_bridge. Qed.
 
-(* c8dff0ef  jal 5c4 <putc> *)
+(* c8dff0ef  jal 5cc <putc> *)
 Lemma udec_c8dff0ef :
   udecode_base (mword_of_int 0xc8dff0ef) (JAL (mword_of_int 2096268 : mword 21, Regidx (mword_of_int 1))).
 Proof using . udec_base_bridge. Qed.
 
-(* c95ff0ef  jal 5c4 <putc> *)
+(* c95ff0ef  jal 5cc <putc> *)
 Lemma udec_c95ff0ef :
   udecode_base (mword_of_int 0xc95ff0ef) (JAL (mword_of_int 2096276 : mword 21, Regidx (mword_of_int 1))).
 Proof using . udec_base_bridge. Qed.
 
-(* cf1ff0ef  jal 680 <vprintf> *)
+(* cf1ff0ef  jal 688 <vprintf> *)
 Lemma udec_cf1ff0ef :
   udecode_base (mword_of_int 0xcf1ff0ef) (JAL (mword_of_int 2096368 : mword 21, Regidx (mword_of_int 1))).
 Proof using . udec_base_bridge. Qed.
 
-(* d23ff0ef  jal 680 <vprintf> *)
+(* d23ff0ef  jal 688 <vprintf> *)
 Lemma udec_d23ff0ef :
   udecode_base (mword_of_int 0xd23ff0ef) (JAL (mword_of_int 2096418 : mword 21, Regidx (mword_of_int 1))).
 Proof using . udec_base_bridge. Qed.
 
-(* d2dff0ef  jal 5c4 <putc> *)
+(* d2dff0ef  jal 5cc <putc> *)
 Lemma udec_d2dff0ef :
   udecode_base (mword_of_int 0xd2dff0ef) (JAL (mword_of_int 2096428 : mword 21, Regidx (mword_of_int 1))).
 Proof using . udec_base_bridge. Qed.
 
-(* d51ff0ef  jal 5c4 <putc> *)
+(* d51ff0ef  jal 5cc <putc> *)
 Lemma udec_d51ff0ef :
   udecode_base (mword_of_int 0xd51ff0ef) (JAL (mword_of_int 2096464 : mword 21, Regidx (mword_of_int 1))).
 Proof using . udec_base_bridge. Qed.
 
-(* d6dff0ef  jal 5c4 <putc> *)
+(* d6dff0ef  jal 5cc <putc> *)
 Lemma udec_d6dff0ef :
   udecode_base (mword_of_int 0xd6dff0ef) (JAL (mword_of_int 2096492 : mword 21, Regidx (mword_of_int 1))).
 Proof using . udec_base_bridge. Qed.
 
-(* d89ff0ef  jal 5c4 <putc> *)
+(* d89ff0ef  jal 5cc <putc> *)
 Lemma udec_d89ff0ef :
   udecode_base (mword_of_int 0xd89ff0ef) (JAL (mword_of_int 2096520 : mword 21, Regidx (mword_of_int 1))).
 Proof using . udec_base_bridge. Qed.
 
-(* da3ff0ef  jal 5c4 <putc> *)
+(* da3ff0ef  jal 5cc <putc> *)
 Lemma udec_da3ff0ef :
   udecode_base (mword_of_int 0xda3ff0ef) (JAL (mword_of_int 2096546 : mword 21, Regidx (mword_of_int 1))).
 Proof using . udec_base_bridge. Qed.
 
-(* dadff0ef  jal 5c4 <putc> *)
+(* dadff0ef  jal 5cc <putc> *)
 Lemma udec_dadff0ef :
   udecode_base (mword_of_int 0xdadff0ef) (JAL (mword_of_int 2096556 : mword 21, Regidx (mword_of_int 1))).
 Proof using . udec_base_bridge. Qed.
 
-(* de9ff0ef  jal 5e2 <printint> *)
+(* de9ff0ef  jal 5ea <printint> *)
 Lemma udec_de9ff0ef :
   udecode_base (mword_of_int 0xde9ff0ef) (JAL (mword_of_int 2096616 : mword 21, Regidx (mword_of_int 1))).
 Proof using . udec_base_bridge. Qed.
 
-(* e03ff0ef  jal 5e2 <printint> *)
+(* e03ff0ef  jal 5ea <printint> *)
 Lemma udec_e03ff0ef :
   udecode_base (mword_of_int 0xe03ff0ef) (JAL (mword_of_int 2096642 : mword 21, Regidx (mword_of_int 1))).
 Proof using . udec_base_bridge. Qed.
 
-(* e1bff0ef  jal 5e2 <printint> *)
+(* e1bff0ef  jal 5ea <printint> *)
 Lemma udec_e1bff0ef :
   udecode_base (mword_of_int 0xe1bff0ef) (JAL (mword_of_int 2096666 : mword 21, Regidx (mword_of_int 1))).
 Proof using . udec_base_bridge. Qed.
 
-(* e35ff0ef  jal 5e2 <printint> *)
+(* e35ff0ef  jal 5ea <printint> *)
 Lemma udec_e35ff0ef :
   udecode_base (mword_of_int 0xe35ff0ef) (JAL (mword_of_int 2096692 : mword 21, Regidx (mword_of_int 1))).
 Proof using . udec_base_bridge. Qed.
 
-(* e4fff0ef  jal 5e2 <printint> *)
+(* e4fff0ef  jal 5ea <printint> *)
 Lemma udec_e4fff0ef :
   udecode_base (mword_of_int 0xe4fff0ef) (JAL (mword_of_int 2096718 : mword 21, Regidx (mword_of_int 1))).
 Proof using . udec_base_bridge. Qed.
 
-(* e67ff0ef  jal 5e2 <printint> *)
+(* e67ff0ef  jal 5ea <printint> *)
 Lemma udec_e67ff0ef :
   udecode_base (mword_of_int 0xe67ff0ef) (JAL (mword_of_int 2096742 : mword 21, Regidx (mword_of_int 1))).
 Proof using . udec_base_bridge. Qed.
 
-(* e81ff0ef  jal 5e2 <printint> *)
+(* e81ff0ef  jal 5ea <printint> *)
 Lemma udec_e81ff0ef :
   udecode_base (mword_of_int 0xe81ff0ef) (JAL (mword_of_int 2096768 : mword 21, Regidx (mword_of_int 1))).
 Proof using . udec_base_bridge. Qed.
@@ -2154,12 +2154,12 @@ Lemma udec_eb3ff0ef :
   udecode_base (mword_of_int 0xeb3ff0ef) (JAL (mword_of_int 2096818 : mword 21, Regidx (mword_of_int 1))).
 Proof using . udec_base_bridge. Qed.
 
-(* eb5ff0ef  jal 5e2 <printint> *)
+(* eb5ff0ef  jal 5ea <printint> *)
 Lemma udec_eb5ff0ef :
   udecode_base (mword_of_int 0xeb5ff0ef) (JAL (mword_of_int 2096820 : mword 21, Regidx (mword_of_int 1))).
 Proof using . udec_base_bridge. Qed.
 
-(* ecfff0ef  jal 5e2 <printint> *)
+(* ecfff0ef  jal 5ea <printint> *)
 Lemma udec_ecfff0ef :
   udecode_base (mword_of_int 0xecfff0ef) (JAL (mword_of_int 2096846 : mword 21, Regidx (mword_of_int 1))).
 Proof using . udec_base_bridge. Qed.
@@ -2169,9 +2169,14 @@ Lemma udec_ee1ff0ef :
   udecode_base (mword_of_int 0xee1ff0ef) (JAL (mword_of_int 2096864 : mword 21, Regidx (mword_of_int 1))).
 Proof using . udec_base_bridge. Qed.
 
-(* f0bff0ef  jal 5c4 <putc> *)
+(* f0bff0ef  jal 5cc <putc> *)
 Lemma udec_f0bff0ef :
   udecode_base (mword_of_int 0xf0bff0ef) (JAL (mword_of_int 2096906 : mword 21, Regidx (mword_of_int 1))).
+Proof using . udec_base_bridge. Qed.
+
+(* f5fff0ef  jal 53c <write> *)
+Lemma udec_f5fff0ef :
+  udecode_base (mword_of_int 0xf5fff0ef) (JAL (mword_of_int 2096990 : mword 21, Regidx (mword_of_int 1))).
 Proof using . udec_base_bridge. Qed.
 
 (* f63ff0ef  jal 1d0 <main> *)
@@ -2182,11 +2187,6 @@ Proof using . udec_base_bridge. Qed.
 (* f65ff0ef  jal b2 <match> *)
 Lemma udec_f65ff0ef :
   udecode_base (mword_of_int 0xf65ff0ef) (JAL (mword_of_int 2096996 : mword 21, Regidx (mword_of_int 1))).
-Proof using . udec_base_bridge. Qed.
-
-(* f67ff0ef  jal 53c <write> *)
-Lemma udec_f67ff0ef :
-  udecode_base (mword_of_int 0xf67ff0ef) (JAL (mword_of_int 2096998 : mword 21, Regidx (mword_of_int 1))).
 Proof using . udec_base_bridge. Qed.
 
 (* f69ff0ef  jal 4c <matchhere> *)
@@ -2535,7 +2535,7 @@ Section UCodeGrep.
   Global Instance grep_code_persistent g : Persistent (grep_code g).
   Proof using . apply _. Qed.
 
-  (* Keep typeclass resolution from unfolding this into its 2838-entry
+  (* Keep typeclass resolution from unfolding this into its 2846-entry
      [big_sepM]; cf. [KernelText.kernel_text], which learned it the hard
      way.  Conversion can still see through it -- [grep_code_img] below is
      the one place that needs to. *)
@@ -3017,7 +3017,7 @@ Section UCodeGrep.
     uis_base g 0x22e (mword_of_int 0x00001597 : mword 32) udec_00001597.
   Qed.
 
-  (* 0x232  addi a1,a1,-1806 # b20 <malloc+0xfe>  (base, 2 mod 4 -> split fetch) *)
+  (* 0x232  addi a1,a1,-1806 # b20 <malloc+0xf6>  (base, 2 mod 4 -> split fetch) *)
   Lemma uis_grep_232 (g : gname) :
     grep_code g -∗
     uinstr_is g (mword_of_int 0x232) false
@@ -3037,14 +3037,14 @@ Section UCodeGrep.
     uis_rvc2 g 0x236 (mword_of_int 0x4509 : mword 16) udec_4509.
   Qed.
 
-  (* 0x238  jal 940 <fprintf>  (base, 4-aligned) *)
+  (* 0x238  jal 948 <fprintf>  (base, 4-aligned) *)
   Lemma uis_grep_238 (g : gname) :
     grep_code g -∗
     uinstr_is g (mword_of_int 0x238) false
-      (JAL (mword_of_int 1800 : mword 21, Regidx (mword_of_int 1))).
+      (JAL (mword_of_int 1808 : mword 21, Regidx (mword_of_int 1))).
   Proof using .
     iIntros "#Ht".
-    uis_base g 0x238 (mword_of_int 0x708000ef : mword 32) udec_708000ef.
+    uis_base g 0x238 (mword_of_int 0x710000ef : mword 32) udec_710000ef.
   Qed.
 
   (* 0x23c  c.li a0,1  (RVC, 4-aligned) *)
@@ -3139,7 +3139,7 @@ Section UCodeGrep.
     uis_base g 0x254 (mword_of_int 0x00001517 : mword 32) udec_00001517.
   Qed.
 
-  (* 0x258  addi a0,a0,-1812 # b40 <malloc+0x11e>  (base, 4-aligned) *)
+  (* 0x258  addi a0,a0,-1812 # b40 <malloc+0x116>  (base, 4-aligned) *)
   Lemma uis_grep_258 (g : gname) :
     grep_code g -∗
     uinstr_is g (mword_of_int 0x258) false
@@ -3149,14 +3149,14 @@ Section UCodeGrep.
     uis_base g 0x258 (mword_of_int 0x8ec50513 : mword 32) udec_8ec50513.
   Qed.
 
-  (* 0x25c  jal 96a <printf>  (base, 4-aligned) *)
+  (* 0x25c  jal 972 <printf>  (base, 4-aligned) *)
   Lemma uis_grep_25c (g : gname) :
     grep_code g -∗
     uinstr_is g (mword_of_int 0x25c) false
-      (JAL (mword_of_int 1806 : mword 21, Regidx (mword_of_int 1))).
+      (JAL (mword_of_int 1814 : mword 21, Regidx (mword_of_int 1))).
   Proof using .
     iIntros "#Ht".
-    uis_base g 0x25c (mword_of_int 0x70e000ef : mword 32) udec_70e000ef.
+    uis_base g 0x25c (mword_of_int 0x716000ef : mword 32) udec_716000ef.
   Qed.
 
   (* 0x260  c.li a0,1  (RVC, 4-aligned) *)
@@ -5584,2927 +5584,2896 @@ Section UCodeGrep.
       (mword_of_int 0x1141bfc1 : mword 32).
   Qed.
 
-  (* ---------------- <fprintf> @ 0x940 ---------------- *)
+  (* ---------------- <fprintf> @ 0x948 ---------------- *)
 
-  (* 0x940  c.addi16sp  (RVC, 4-aligned) *)
-  Lemma uis_grep_940 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x940) true
-      (C_ADDI16SP (mword_of_int 59 : mword 6)).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x940 (mword_of_int 0x715d : mword 16) udec_715d
-      (mword_of_int 0xec06715d : mword 32).
-  Qed.
-
-  (* 0x942  c.sdsp ra,24(sp)  (RVC, 2 mod 4) *)
-  Lemma uis_grep_942 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x942) true
-      (C_SDSP (mword_of_int 3 : mword 6, Regidx (mword_of_int 1))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x942 (mword_of_int 0xec06 : mword 16) udec_ec06.
-  Qed.
-
-  (* 0x944  c.sdsp s0,16(sp)  (RVC, 4-aligned) *)
-  Lemma uis_grep_944 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x944) true
-      (C_SDSP (mword_of_int 2 : mword 6, Regidx (mword_of_int 8))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x944 (mword_of_int 0xe822 : mword 16) udec_e822
-      (mword_of_int 0x1000e822 : mword 32).
-  Qed.
-
-  (* 0x946  c.addi4spn s0,sp,32  (RVC, 2 mod 4) *)
-  Lemma uis_grep_946 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x946) true
-      (C_ADDI4SPN (Cregidx (mword_of_int 0), mword_of_int 8 : mword 8)).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x946 (mword_of_int 0x1000 : mword 16) udec_1000.
-  Qed.
-
-  (* 0x948  c.sd a2,0(s0)  (RVC, 4-aligned) *)
+  (* 0x948  c.addi16sp  (RVC, 4-aligned) *)
   Lemma uis_grep_948 (g : gname) :
     grep_code g -∗
     uinstr_is g (mword_of_int 0x948) true
-      (C_SD (mword_of_int 0 : mword 5, Cregidx (mword_of_int 0), Cregidx (mword_of_int 4))).
+      (C_ADDI16SP (mword_of_int 59 : mword 6)).
   Proof using .
     iIntros "#Ht".
-    uis_rvc4 g 0x948 (mword_of_int 0xe010 : mword 16) udec_e010
-      (mword_of_int 0xe414e010 : mword 32).
+    uis_rvc4 g 0x948 (mword_of_int 0x715d : mword 16) udec_715d
+      (mword_of_int 0xec06715d : mword 32).
   Qed.
 
-  (* 0x94a  c.sd a3,8(s0)  (RVC, 2 mod 4) *)
+  (* 0x94a  c.sdsp ra,24(sp)  (RVC, 2 mod 4) *)
   Lemma uis_grep_94a (g : gname) :
     grep_code g -∗
     uinstr_is g (mword_of_int 0x94a) true
-      (C_SD (mword_of_int 1 : mword 5, Cregidx (mword_of_int 0), Cregidx (mword_of_int 5))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x94a (mword_of_int 0xe414 : mword 16) udec_e414.
-  Qed.
-
-  (* 0x94c  c.sd a4,16(s0)  (RVC, 4-aligned) *)
-  Lemma uis_grep_94c (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x94c) true
-      (C_SD (mword_of_int 2 : mword 5, Cregidx (mword_of_int 0), Cregidx (mword_of_int 6))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x94c (mword_of_int 0xe818 : mword 16) udec_e818
-      (mword_of_int 0xec1ce818 : mword 32).
-  Qed.
-
-  (* 0x94e  c.sd a5,24(s0)  (RVC, 2 mod 4) *)
-  Lemma uis_grep_94e (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x94e) true
-      (C_SD (mword_of_int 3 : mword 5, Cregidx (mword_of_int 0), Cregidx (mword_of_int 7))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x94e (mword_of_int 0xec1c : mword 16) udec_ec1c.
-  Qed.
-
-  (* 0x950  sd a6,32(s0)  (base, 4-aligned) *)
-  Lemma uis_grep_950 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x950) false
-      (STORE (mword_of_int 32 : mword 12, Regidx (mword_of_int 16), Regidx (mword_of_int 8), 8)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x950 (mword_of_int 0x03043023 : mword 32) udec_03043023.
-  Qed.
-
-  (* 0x954  sd a7,40(s0)  (base, 4-aligned) *)
-  Lemma uis_grep_954 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x954) false
-      (STORE (mword_of_int 40 : mword 12, Regidx (mword_of_int 17), Regidx (mword_of_int 8), 8)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x954 (mword_of_int 0x03143423 : mword 32) udec_03143423.
-  Qed.
-
-  (* 0x958  c.mv a2,s0  (RVC, 4-aligned) *)
-  Lemma uis_grep_958 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x958) true
-      (C_MV (Regidx (mword_of_int 12), Regidx (mword_of_int 8))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x958 (mword_of_int 0x8622 : mword 16) udec_8622
-      (mword_of_int 0x34238622 : mword 32).
-  Qed.
-
-  (* 0x95a  sd s0,-24(s0)  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_95a (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x95a) false
-      (STORE (mword_of_int 4072 : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 8), 8)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x95a (mword_of_int 0xfe843423 : mword 32) udec_fe843423.
-  Qed.
-
-  (* 0x95e  jal 680 <vprintf>  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_95e (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x95e) false
-      (JAL (mword_of_int 2096418 : mword 21, Regidx (mword_of_int 1))).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x95e (mword_of_int 0xd23ff0ef : mword 32) udec_d23ff0ef.
-  Qed.
-
-  (* 0x962  c.ldsp ra,24(sp)  (RVC, 2 mod 4) *)
-  Lemma uis_grep_962 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x962) true
-      (C_LDSP (mword_of_int 3 : mword 6, Regidx (mword_of_int 1))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x962 (mword_of_int 0x60e2 : mword 16) udec_60e2.
-  Qed.
-
-  (* 0x964  c.ldsp s0,16(sp)  (RVC, 4-aligned) *)
-  Lemma uis_grep_964 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x964) true
-      (C_LDSP (mword_of_int 2 : mword 6, Regidx (mword_of_int 8))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x964 (mword_of_int 0x6442 : mword 16) udec_6442
-      (mword_of_int 0x61616442 : mword 32).
-  Qed.
-
-  (* 0x966  c.addi16sp sp,sp,80  (RVC, 2 mod 4) *)
-  Lemma uis_grep_966 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x966) true
-      (C_ADDI16SP (mword_of_int 5 : mword 6)).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x966 (mword_of_int 0x6161 : mword 16) udec_6161.
-  Qed.
-
-  (* 0x968  c.jr  (RVC, 4-aligned) *)
-  Lemma uis_grep_968 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x968) true
-      (C_JR (Regidx (mword_of_int 1))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x968 (mword_of_int 0x8082 : mword 16) udec_8082
-      (mword_of_int 0x711d8082 : mword 32).
-  Qed.
-
-  (* ---------------- <printf> @ 0x96a ---------------- *)
-
-  (* 0x96a  c.addi16sp  (RVC, 2 mod 4) *)
-  Lemma uis_grep_96a (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x96a) true
-      (C_ADDI16SP (mword_of_int 58 : mword 6)).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x96a (mword_of_int 0x711d : mword 16) udec_711d.
-  Qed.
-
-  (* 0x96c  c.sdsp ra,24(sp)  (RVC, 4-aligned) *)
-  Lemma uis_grep_96c (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x96c) true
       (C_SDSP (mword_of_int 3 : mword 6, Regidx (mword_of_int 1))).
   Proof using .
     iIntros "#Ht".
-    uis_rvc4 g 0x96c (mword_of_int 0xec06 : mword 16) udec_ec06
-      (mword_of_int 0xe822ec06 : mword 32).
+    uis_rvc2 g 0x94a (mword_of_int 0xec06 : mword 16) udec_ec06.
   Qed.
 
-  (* 0x96e  c.sdsp s0,16(sp)  (RVC, 2 mod 4) *)
-  Lemma uis_grep_96e (g : gname) :
+  (* 0x94c  c.sdsp s0,16(sp)  (RVC, 4-aligned) *)
+  Lemma uis_grep_94c (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x96e) true
+    uinstr_is g (mword_of_int 0x94c) true
       (C_SDSP (mword_of_int 2 : mword 6, Regidx (mword_of_int 8))).
   Proof using .
     iIntros "#Ht".
-    uis_rvc2 g 0x96e (mword_of_int 0xe822 : mword 16) udec_e822.
+    uis_rvc4 g 0x94c (mword_of_int 0xe822 : mword 16) udec_e822
+      (mword_of_int 0x1000e822 : mword 32).
   Qed.
 
-  (* 0x970  c.addi4spn s0,sp,32  (RVC, 4-aligned) *)
-  Lemma uis_grep_970 (g : gname) :
+  (* 0x94e  c.addi4spn s0,sp,32  (RVC, 2 mod 4) *)
+  Lemma uis_grep_94e (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x970) true
+    uinstr_is g (mword_of_int 0x94e) true
       (C_ADDI4SPN (Cregidx (mword_of_int 0), mword_of_int 8 : mword 8)).
   Proof using .
     iIntros "#Ht".
-    uis_rvc4 g 0x970 (mword_of_int 0x1000 : mword 16) udec_1000
-      (mword_of_int 0xe40c1000 : mword 32).
+    uis_rvc2 g 0x94e (mword_of_int 0x1000 : mword 16) udec_1000.
   Qed.
 
-  (* 0x972  c.sd a1,8(s0)  (RVC, 2 mod 4) *)
-  Lemma uis_grep_972 (g : gname) :
+  (* 0x950  c.sd a2,0(s0)  (RVC, 4-aligned) *)
+  Lemma uis_grep_950 (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x972) true
-      (C_SD (mword_of_int 1 : mword 5, Cregidx (mword_of_int 0), Cregidx (mword_of_int 3))).
+    uinstr_is g (mword_of_int 0x950) true
+      (C_SD (mword_of_int 0 : mword 5, Cregidx (mword_of_int 0), Cregidx (mword_of_int 4))).
   Proof using .
     iIntros "#Ht".
-    uis_rvc2 g 0x972 (mword_of_int 0xe40c : mword 16) udec_e40c.
+    uis_rvc4 g 0x950 (mword_of_int 0xe010 : mword 16) udec_e010
+      (mword_of_int 0xe414e010 : mword 32).
   Qed.
 
-  (* 0x974  c.sd a2,16(s0)  (RVC, 4-aligned) *)
-  Lemma uis_grep_974 (g : gname) :
+  (* 0x952  c.sd a3,8(s0)  (RVC, 2 mod 4) *)
+  Lemma uis_grep_952 (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x974) true
-      (C_SD (mword_of_int 2 : mword 5, Cregidx (mword_of_int 0), Cregidx (mword_of_int 4))).
+    uinstr_is g (mword_of_int 0x952) true
+      (C_SD (mword_of_int 1 : mword 5, Cregidx (mword_of_int 0), Cregidx (mword_of_int 5))).
   Proof using .
     iIntros "#Ht".
-    uis_rvc4 g 0x974 (mword_of_int 0xe810 : mword 16) udec_e810
-      (mword_of_int 0xec14e810 : mword 32).
+    uis_rvc2 g 0x952 (mword_of_int 0xe414 : mword 16) udec_e414.
   Qed.
 
-  (* 0x976  c.sd a3,24(s0)  (RVC, 2 mod 4) *)
-  Lemma uis_grep_976 (g : gname) :
+  (* 0x954  c.sd a4,16(s0)  (RVC, 4-aligned) *)
+  Lemma uis_grep_954 (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x976) true
-      (C_SD (mword_of_int 3 : mword 5, Cregidx (mword_of_int 0), Cregidx (mword_of_int 5))).
+    uinstr_is g (mword_of_int 0x954) true
+      (C_SD (mword_of_int 2 : mword 5, Cregidx (mword_of_int 0), Cregidx (mword_of_int 6))).
   Proof using .
     iIntros "#Ht".
-    uis_rvc2 g 0x976 (mword_of_int 0xec14 : mword 16) udec_ec14.
+    uis_rvc4 g 0x954 (mword_of_int 0xe818 : mword 16) udec_e818
+      (mword_of_int 0xec1ce818 : mword 32).
   Qed.
 
-  (* 0x978  c.sd a4,32(s0)  (RVC, 4-aligned) *)
-  Lemma uis_grep_978 (g : gname) :
+  (* 0x956  c.sd a5,24(s0)  (RVC, 2 mod 4) *)
+  Lemma uis_grep_956 (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x978) true
-      (C_SD (mword_of_int 4 : mword 5, Cregidx (mword_of_int 0), Cregidx (mword_of_int 6))).
+    uinstr_is g (mword_of_int 0x956) true
+      (C_SD (mword_of_int 3 : mword 5, Cregidx (mword_of_int 0), Cregidx (mword_of_int 7))).
   Proof using .
     iIntros "#Ht".
-    uis_rvc4 g 0x978 (mword_of_int 0xf018 : mword 16) udec_f018
-      (mword_of_int 0xf41cf018 : mword 32).
+    uis_rvc2 g 0x956 (mword_of_int 0xec1c : mword 16) udec_ec1c.
   Qed.
 
-  (* 0x97a  c.sd a5,40(s0)  (RVC, 2 mod 4) *)
-  Lemma uis_grep_97a (g : gname) :
+  (* 0x958  sd a6,32(s0)  (base, 4-aligned) *)
+  Lemma uis_grep_958 (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x97a) true
-      (C_SD (mword_of_int 5 : mword 5, Cregidx (mword_of_int 0), Cregidx (mword_of_int 7))).
+    uinstr_is g (mword_of_int 0x958) false
+      (STORE (mword_of_int 32 : mword 12, Regidx (mword_of_int 16), Regidx (mword_of_int 8), 8)).
   Proof using .
     iIntros "#Ht".
-    uis_rvc2 g 0x97a (mword_of_int 0xf41c : mword 16) udec_f41c.
+    uis_base g 0x958 (mword_of_int 0x03043023 : mword 32) udec_03043023.
   Qed.
 
-  (* 0x97c  sd a6,48(s0)  (base, 4-aligned) *)
-  Lemma uis_grep_97c (g : gname) :
+  (* 0x95c  sd a7,40(s0)  (base, 4-aligned) *)
+  Lemma uis_grep_95c (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x97c) false
-      (STORE (mword_of_int 48 : mword 12, Regidx (mword_of_int 16), Regidx (mword_of_int 8), 8)).
+    uinstr_is g (mword_of_int 0x95c) false
+      (STORE (mword_of_int 40 : mword 12, Regidx (mword_of_int 17), Regidx (mword_of_int 8), 8)).
   Proof using .
     iIntros "#Ht".
-    uis_base g 0x97c (mword_of_int 0x03043823 : mword 32) udec_03043823.
+    uis_base g 0x95c (mword_of_int 0x03143423 : mword 32) udec_03143423.
   Qed.
 
-  (* 0x980  sd a7,56(s0)  (base, 4-aligned) *)
-  Lemma uis_grep_980 (g : gname) :
+  (* 0x960  c.mv a2,s0  (RVC, 4-aligned) *)
+  Lemma uis_grep_960 (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x980) false
-      (STORE (mword_of_int 56 : mword 12, Regidx (mword_of_int 17), Regidx (mword_of_int 8), 8)).
+    uinstr_is g (mword_of_int 0x960) true
+      (C_MV (Regidx (mword_of_int 12), Regidx (mword_of_int 8))).
   Proof using .
     iIntros "#Ht".
-    uis_base g 0x980 (mword_of_int 0x03143c23 : mword 32) udec_03143c23.
+    uis_rvc4 g 0x960 (mword_of_int 0x8622 : mword 16) udec_8622
+      (mword_of_int 0x34238622 : mword 32).
   Qed.
 
-  (* 0x984  addi a2,s0,8  (base, 4-aligned) *)
-  Lemma uis_grep_984 (g : gname) :
+  (* 0x962  sd s0,-24(s0)  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_962 (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x984) false
-      (ITYPE (mword_of_int 8 : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 12), ADDI)).
+    uinstr_is g (mword_of_int 0x962) false
+      (STORE (mword_of_int 4072 : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 8), 8)).
   Proof using .
     iIntros "#Ht".
-    uis_base g 0x984 (mword_of_int 0x00840613 : mword 32) udec_00840613.
+    uis_base g 0x962 (mword_of_int 0xfe843423 : mword 32) udec_fe843423.
   Qed.
 
-  (* 0x988  sd a2,-24(s0)  (base, 4-aligned) *)
-  Lemma uis_grep_988 (g : gname) :
+  (* 0x966  jal 688 <vprintf>  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_966 (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x988) false
-      (STORE (mword_of_int 4072 : mword 12, Regidx (mword_of_int 12), Regidx (mword_of_int 8), 8)).
+    uinstr_is g (mword_of_int 0x966) false
+      (JAL (mword_of_int 2096418 : mword 21, Regidx (mword_of_int 1))).
   Proof using .
     iIntros "#Ht".
-    uis_base g 0x988 (mword_of_int 0xfec43423 : mword 32) udec_fec43423.
+    uis_base g 0x966 (mword_of_int 0xd23ff0ef : mword 32) udec_d23ff0ef.
   Qed.
 
-  (* 0x98c  c.mv a1,a0  (RVC, 4-aligned) *)
-  Lemma uis_grep_98c (g : gname) :
+  (* 0x96a  c.ldsp ra,24(sp)  (RVC, 2 mod 4) *)
+  Lemma uis_grep_96a (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x98c) true
-      (C_MV (Regidx (mword_of_int 11), Regidx (mword_of_int 10))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x98c (mword_of_int 0x85aa : mword 16) udec_85aa
-      (mword_of_int 0x450585aa : mword 32).
-  Qed.
-
-  (* 0x98e  c.li a0,1  (RVC, 2 mod 4) *)
-  Lemma uis_grep_98e (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x98e) true
-      (C_LI (mword_of_int 1 : mword 6, Regidx (mword_of_int 10))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x98e (mword_of_int 0x4505 : mword 16) udec_4505.
-  Qed.
-
-  (* 0x990  jal 680 <vprintf>  (base, 4-aligned) *)
-  Lemma uis_grep_990 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x990) false
-      (JAL (mword_of_int 2096368 : mword 21, Regidx (mword_of_int 1))).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x990 (mword_of_int 0xcf1ff0ef : mword 32) udec_cf1ff0ef.
-  Qed.
-
-  (* 0x994  c.ldsp ra,24(sp)  (RVC, 4-aligned) *)
-  Lemma uis_grep_994 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x994) true
+    uinstr_is g (mword_of_int 0x96a) true
       (C_LDSP (mword_of_int 3 : mword 6, Regidx (mword_of_int 1))).
   Proof using .
     iIntros "#Ht".
-    uis_rvc4 g 0x994 (mword_of_int 0x60e2 : mword 16) udec_60e2
-      (mword_of_int 0x644260e2 : mword 32).
+    uis_rvc2 g 0x96a (mword_of_int 0x60e2 : mword 16) udec_60e2.
   Qed.
 
-  (* 0x996  c.ldsp s0,16(sp)  (RVC, 2 mod 4) *)
-  Lemma uis_grep_996 (g : gname) :
+  (* 0x96c  c.ldsp s0,16(sp)  (RVC, 4-aligned) *)
+  Lemma uis_grep_96c (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x996) true
+    uinstr_is g (mword_of_int 0x96c) true
       (C_LDSP (mword_of_int 2 : mword 6, Regidx (mword_of_int 8))).
   Proof using .
     iIntros "#Ht".
-    uis_rvc2 g 0x996 (mword_of_int 0x6442 : mword 16) udec_6442.
+    uis_rvc4 g 0x96c (mword_of_int 0x6442 : mword 16) udec_6442
+      (mword_of_int 0x61616442 : mword 32).
   Qed.
 
-  (* 0x998  c.addi16sp sp,sp,96  (RVC, 4-aligned) *)
-  Lemma uis_grep_998 (g : gname) :
+  (* 0x96e  c.addi16sp sp,sp,80  (RVC, 2 mod 4) *)
+  Lemma uis_grep_96e (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x998) true
-      (C_ADDI16SP (mword_of_int 6 : mword 6)).
+    uinstr_is g (mword_of_int 0x96e) true
+      (C_ADDI16SP (mword_of_int 5 : mword 6)).
   Proof using .
     iIntros "#Ht".
-    uis_rvc4 g 0x998 (mword_of_int 0x6125 : mword 16) udec_6125
-      (mword_of_int 0x80826125 : mword 32).
+    uis_rvc2 g 0x96e (mword_of_int 0x6161 : mword 16) udec_6161.
   Qed.
 
-  (* 0x99a  c.jr  (RVC, 2 mod 4) *)
-  Lemma uis_grep_99a (g : gname) :
+  (* 0x970  c.jr  (RVC, 4-aligned) *)
+  Lemma uis_grep_970 (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x99a) true
+    uinstr_is g (mword_of_int 0x970) true
       (C_JR (Regidx (mword_of_int 1))).
   Proof using .
     iIntros "#Ht".
-    uis_rvc2 g 0x99a (mword_of_int 0x8082 : mword 16) udec_8082.
+    uis_rvc4 g 0x970 (mword_of_int 0x8082 : mword 16) udec_8082
+      (mword_of_int 0x711d8082 : mword 32).
   Qed.
 
-  (* ---------------- <vprintf> @ 0x680 ---------------- *)
+  (* ---------------- <printf> @ 0x972 ---------------- *)
 
-  (* 0x680  c.addi16sp  (RVC, 4-aligned) *)
-  Lemma uis_grep_680 (g : gname) :
+  (* 0x972  c.addi16sp  (RVC, 2 mod 4) *)
+  Lemma uis_grep_972 (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x680) true
+    uinstr_is g (mword_of_int 0x972) true
       (C_ADDI16SP (mword_of_int 58 : mword 6)).
   Proof using .
     iIntros "#Ht".
-    uis_rvc4 g 0x680 (mword_of_int 0x711d : mword 16) udec_711d
-      (mword_of_int 0xec86711d : mword 32).
+    uis_rvc2 g 0x972 (mword_of_int 0x711d : mword 16) udec_711d.
   Qed.
 
-  (* 0x682  c.sdsp ra,88(sp)  (RVC, 2 mod 4) *)
-  Lemma uis_grep_682 (g : gname) :
+  (* 0x974  c.sdsp ra,24(sp)  (RVC, 4-aligned) *)
+  Lemma uis_grep_974 (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x682) true
-      (C_SDSP (mword_of_int 11 : mword 6, Regidx (mword_of_int 1))).
+    uinstr_is g (mword_of_int 0x974) true
+      (C_SDSP (mword_of_int 3 : mword 6, Regidx (mword_of_int 1))).
   Proof using .
     iIntros "#Ht".
-    uis_rvc2 g 0x682 (mword_of_int 0xec86 : mword 16) udec_ec86.
+    uis_rvc4 g 0x974 (mword_of_int 0xec06 : mword 16) udec_ec06
+      (mword_of_int 0xe822ec06 : mword 32).
   Qed.
 
-  (* 0x684  c.sdsp s0,80(sp)  (RVC, 4-aligned) *)
-  Lemma uis_grep_684 (g : gname) :
+  (* 0x976  c.sdsp s0,16(sp)  (RVC, 2 mod 4) *)
+  Lemma uis_grep_976 (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x684) true
-      (C_SDSP (mword_of_int 10 : mword 6, Regidx (mword_of_int 8))).
+    uinstr_is g (mword_of_int 0x976) true
+      (C_SDSP (mword_of_int 2 : mword 6, Regidx (mword_of_int 8))).
   Proof using .
     iIntros "#Ht".
-    uis_rvc4 g 0x684 (mword_of_int 0xe8a2 : mword 16) udec_e8a2
-      (mword_of_int 0xe4a6e8a2 : mword 32).
+    uis_rvc2 g 0x976 (mword_of_int 0xe822 : mword 16) udec_e822.
   Qed.
 
-  (* 0x686  c.sdsp s1,72(sp)  (RVC, 2 mod 4) *)
-  Lemma uis_grep_686 (g : gname) :
+  (* 0x978  c.addi4spn s0,sp,32  (RVC, 4-aligned) *)
+  Lemma uis_grep_978 (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x686) true
-      (C_SDSP (mword_of_int 9 : mword 6, Regidx (mword_of_int 9))).
+    uinstr_is g (mword_of_int 0x978) true
+      (C_ADDI4SPN (Cregidx (mword_of_int 0), mword_of_int 8 : mword 8)).
   Proof using .
     iIntros "#Ht".
-    uis_rvc2 g 0x686 (mword_of_int 0xe4a6 : mword 16) udec_e4a6.
+    uis_rvc4 g 0x978 (mword_of_int 0x1000 : mword 16) udec_1000
+      (mword_of_int 0xe40c1000 : mword 32).
   Qed.
 
-  (* 0x688  c.addi4spn s0,sp,96  (RVC, 4-aligned) *)
-  Lemma uis_grep_688 (g : gname) :
+  (* 0x97a  c.sd a1,8(s0)  (RVC, 2 mod 4) *)
+  Lemma uis_grep_97a (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x688) true
-      (C_ADDI4SPN (Cregidx (mword_of_int 0), mword_of_int 24 : mword 8)).
+    uinstr_is g (mword_of_int 0x97a) true
+      (C_SD (mword_of_int 1 : mword 5, Cregidx (mword_of_int 0), Cregidx (mword_of_int 3))).
   Proof using .
     iIntros "#Ht".
-    uis_rvc4 g 0x688 (mword_of_int 0x1080 : mword 16) udec_1080
-      (mword_of_int 0xc4831080 : mword 32).
+    uis_rvc2 g 0x97a (mword_of_int 0xe40c : mword 16) udec_e40c.
   Qed.
 
-  (* 0x68a  lbu s1,0(a1)  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_68a (g : gname) :
+  (* 0x97c  c.sd a2,16(s0)  (RVC, 4-aligned) *)
+  Lemma uis_grep_97c (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x68a) false
-      (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 9), true, 1)).
+    uinstr_is g (mword_of_int 0x97c) true
+      (C_SD (mword_of_int 2 : mword 5, Cregidx (mword_of_int 0), Cregidx (mword_of_int 4))).
   Proof using .
     iIntros "#Ht".
-    uis_base g 0x68a (mword_of_int 0x0005c483 : mword 32) udec_0005c483.
+    uis_rvc4 g 0x97c (mword_of_int 0xe810 : mword 16) udec_e810
+      (mword_of_int 0xec14e810 : mword 32).
   Qed.
 
-  (* 0x68e  beqz s1,8b4 <vprintf+0x234>  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_68e (g : gname) :
+  (* 0x97e  c.sd a3,24(s0)  (RVC, 2 mod 4) *)
+  Lemma uis_grep_97e (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x68e) false
-      (BTYPE (mword_of_int 550 : mword 13, Regidx (mword_of_int 0), Regidx (mword_of_int 9), BEQ)).
+    uinstr_is g (mword_of_int 0x97e) true
+      (C_SD (mword_of_int 3 : mword 5, Cregidx (mword_of_int 0), Cregidx (mword_of_int 5))).
   Proof using .
     iIntros "#Ht".
-    uis_base g 0x68e (mword_of_int 0x22048363 : mword 32) udec_22048363.
+    uis_rvc2 g 0x97e (mword_of_int 0xec14 : mword 16) udec_ec14.
   Qed.
 
-  (* 0x692  c.sdsp s2,64(sp)  (RVC, 2 mod 4) *)
-  Lemma uis_grep_692 (g : gname) :
+  (* 0x980  c.sd a4,32(s0)  (RVC, 4-aligned) *)
+  Lemma uis_grep_980 (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x692) true
-      (C_SDSP (mword_of_int 8 : mword 6, Regidx (mword_of_int 18))).
+    uinstr_is g (mword_of_int 0x980) true
+      (C_SD (mword_of_int 4 : mword 5, Cregidx (mword_of_int 0), Cregidx (mword_of_int 6))).
   Proof using .
     iIntros "#Ht".
-    uis_rvc2 g 0x692 (mword_of_int 0xe0ca : mword 16) udec_e0ca.
+    uis_rvc4 g 0x980 (mword_of_int 0xf018 : mword 16) udec_f018
+      (mword_of_int 0xf41cf018 : mword 32).
   Qed.
 
-  (* 0x694  c.sdsp s3,56(sp)  (RVC, 4-aligned) *)
-  Lemma uis_grep_694 (g : gname) :
+  (* 0x982  c.sd a5,40(s0)  (RVC, 2 mod 4) *)
+  Lemma uis_grep_982 (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x694) true
-      (C_SDSP (mword_of_int 7 : mword 6, Regidx (mword_of_int 19))).
+    uinstr_is g (mword_of_int 0x982) true
+      (C_SD (mword_of_int 5 : mword 5, Cregidx (mword_of_int 0), Cregidx (mword_of_int 7))).
   Proof using .
     iIntros "#Ht".
-    uis_rvc4 g 0x694 (mword_of_int 0xfc4e : mword 16) udec_fc4e
-      (mword_of_int 0xf852fc4e : mword 32).
+    uis_rvc2 g 0x982 (mword_of_int 0xf41c : mword 16) udec_f41c.
   Qed.
 
-  (* 0x696  c.sdsp s4,48(sp)  (RVC, 2 mod 4) *)
-  Lemma uis_grep_696 (g : gname) :
+  (* 0x984  sd a6,48(s0)  (base, 4-aligned) *)
+  Lemma uis_grep_984 (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x696) true
-      (C_SDSP (mword_of_int 6 : mword 6, Regidx (mword_of_int 20))).
+    uinstr_is g (mword_of_int 0x984) false
+      (STORE (mword_of_int 48 : mword 12, Regidx (mword_of_int 16), Regidx (mword_of_int 8), 8)).
   Proof using .
     iIntros "#Ht".
-    uis_rvc2 g 0x696 (mword_of_int 0xf852 : mword 16) udec_f852.
+    uis_base g 0x984 (mword_of_int 0x03043823 : mword 32) udec_03043823.
   Qed.
 
-  (* 0x698  c.sdsp s5,40(sp)  (RVC, 4-aligned) *)
-  Lemma uis_grep_698 (g : gname) :
+  (* 0x988  sd a7,56(s0)  (base, 4-aligned) *)
+  Lemma uis_grep_988 (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x698) true
-      (C_SDSP (mword_of_int 5 : mword 6, Regidx (mword_of_int 21))).
+    uinstr_is g (mword_of_int 0x988) false
+      (STORE (mword_of_int 56 : mword 12, Regidx (mword_of_int 17), Regidx (mword_of_int 8), 8)).
   Proof using .
     iIntros "#Ht".
-    uis_rvc4 g 0x698 (mword_of_int 0xf456 : mword 16) udec_f456
-      (mword_of_int 0xf05af456 : mword 32).
+    uis_base g 0x988 (mword_of_int 0x03143c23 : mword 32) udec_03143c23.
   Qed.
 
-  (* 0x69a  c.sdsp s6,32(sp)  (RVC, 2 mod 4) *)
-  Lemma uis_grep_69a (g : gname) :
+  (* 0x98c  addi a2,s0,8  (base, 4-aligned) *)
+  Lemma uis_grep_98c (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x69a) true
-      (C_SDSP (mword_of_int 4 : mword 6, Regidx (mword_of_int 22))).
+    uinstr_is g (mword_of_int 0x98c) false
+      (ITYPE (mword_of_int 8 : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 12), ADDI)).
   Proof using .
     iIntros "#Ht".
-    uis_rvc2 g 0x69a (mword_of_int 0xf05a : mword 16) udec_f05a.
+    uis_base g 0x98c (mword_of_int 0x00840613 : mword 32) udec_00840613.
   Qed.
 
-  (* 0x69c  c.sdsp s7,24(sp)  (RVC, 4-aligned) *)
-  Lemma uis_grep_69c (g : gname) :
+  (* 0x990  sd a2,-24(s0)  (base, 4-aligned) *)
+  Lemma uis_grep_990 (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x69c) true
-      (C_SDSP (mword_of_int 3 : mword 6, Regidx (mword_of_int 23))).
+    uinstr_is g (mword_of_int 0x990) false
+      (STORE (mword_of_int 4072 : mword 12, Regidx (mword_of_int 12), Regidx (mword_of_int 8), 8)).
   Proof using .
     iIntros "#Ht".
-    uis_rvc4 g 0x69c (mword_of_int 0xec5e : mword 16) udec_ec5e
-      (mword_of_int 0xe862ec5e : mword 32).
+    uis_base g 0x990 (mword_of_int 0xfec43423 : mword 32) udec_fec43423.
   Qed.
 
-  (* 0x69e  c.sdsp s8,16(sp)  (RVC, 2 mod 4) *)
-  Lemma uis_grep_69e (g : gname) :
+  (* 0x994  c.mv a1,a0  (RVC, 4-aligned) *)
+  Lemma uis_grep_994 (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x69e) true
-      (C_SDSP (mword_of_int 2 : mword 6, Regidx (mword_of_int 24))).
+    uinstr_is g (mword_of_int 0x994) true
+      (C_MV (Regidx (mword_of_int 11), Regidx (mword_of_int 10))).
   Proof using .
     iIntros "#Ht".
-    uis_rvc2 g 0x69e (mword_of_int 0xe862 : mword 16) udec_e862.
+    uis_rvc4 g 0x994 (mword_of_int 0x85aa : mword 16) udec_85aa
+      (mword_of_int 0x450585aa : mword 32).
   Qed.
 
-  (* 0x6a0  c.mv s6,a0  (RVC, 4-aligned) *)
-  Lemma uis_grep_6a0 (g : gname) :
+  (* 0x996  c.li a0,1  (RVC, 2 mod 4) *)
+  Lemma uis_grep_996 (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x6a0) true
-      (C_MV (Regidx (mword_of_int 22), Regidx (mword_of_int 10))).
+    uinstr_is g (mword_of_int 0x996) true
+      (C_LI (mword_of_int 1 : mword 6, Regidx (mword_of_int 10))).
   Proof using .
     iIntros "#Ht".
-    uis_rvc4 g 0x6a0 (mword_of_int 0x8b2a : mword 16) udec_8b2a
-      (mword_of_int 0x8a2e8b2a : mword 32).
+    uis_rvc2 g 0x996 (mword_of_int 0x4505 : mword 16) udec_4505.
   Qed.
 
-  (* 0x6a2  c.mv s4,a1  (RVC, 2 mod 4) *)
-  Lemma uis_grep_6a2 (g : gname) :
+  (* 0x998  jal 688 <vprintf>  (base, 4-aligned) *)
+  Lemma uis_grep_998 (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x6a2) true
-      (C_MV (Regidx (mword_of_int 20), Regidx (mword_of_int 11))).
+    uinstr_is g (mword_of_int 0x998) false
+      (JAL (mword_of_int 2096368 : mword 21, Regidx (mword_of_int 1))).
   Proof using .
     iIntros "#Ht".
-    uis_rvc2 g 0x6a2 (mword_of_int 0x8a2e : mword 16) udec_8a2e.
+    uis_base g 0x998 (mword_of_int 0xcf1ff0ef : mword 32) udec_cf1ff0ef.
   Qed.
 
-  (* 0x6a4  c.mv s7,a2  (RVC, 4-aligned) *)
-  Lemma uis_grep_6a4 (g : gname) :
+  (* 0x99c  c.ldsp ra,24(sp)  (RVC, 4-aligned) *)
+  Lemma uis_grep_99c (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x6a4) true
-      (C_MV (Regidx (mword_of_int 23), Regidx (mword_of_int 12))).
+    uinstr_is g (mword_of_int 0x99c) true
+      (C_LDSP (mword_of_int 3 : mword 6, Regidx (mword_of_int 1))).
   Proof using .
     iIntros "#Ht".
-    uis_rvc4 g 0x6a4 (mword_of_int 0x8bb2 : mword 16) udec_8bb2
-      (mword_of_int 0x49818bb2 : mword 32).
+    uis_rvc4 g 0x99c (mword_of_int 0x60e2 : mword 16) udec_60e2
+      (mword_of_int 0x644260e2 : mword 32).
   Qed.
 
-  (* 0x6a6  c.li s3,0  (RVC, 2 mod 4) *)
-  Lemma uis_grep_6a6 (g : gname) :
+  (* 0x99e  c.ldsp s0,16(sp)  (RVC, 2 mod 4) *)
+  Lemma uis_grep_99e (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x6a6) true
-      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 19))).
+    uinstr_is g (mword_of_int 0x99e) true
+      (C_LDSP (mword_of_int 2 : mword 6, Regidx (mword_of_int 8))).
   Proof using .
     iIntros "#Ht".
-    uis_rvc2 g 0x6a6 (mword_of_int 0x4981 : mword 16) udec_4981.
+    uis_rvc2 g 0x99e (mword_of_int 0x6442 : mword 16) udec_6442.
   Qed.
 
-  (* 0x6a8  c.li s2,0  (RVC, 4-aligned) *)
-  Lemma uis_grep_6a8 (g : gname) :
+  (* 0x9a0  c.addi16sp sp,sp,96  (RVC, 4-aligned) *)
+  Lemma uis_grep_9a0 (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x6a8) true
-      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 18))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x6a8 (mword_of_int 0x4901 : mword 16) udec_4901
-      (mword_of_int 0x47014901 : mword 32).
-  Qed.
-
-  (* 0x6aa  c.li a4,0  (RVC, 2 mod 4) *)
-  Lemma uis_grep_6aa (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x6aa) true
-      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 14))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x6aa (mword_of_int 0x4701 : mword 16) udec_4701.
-  Qed.
-
-  (* 0x6ac  li s5,37  (base, 4-aligned) *)
-  Lemma uis_grep_6ac (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x6ac) false
-      (ITYPE (mword_of_int 37 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 21), ADDI)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x6ac (mword_of_int 0x02500a93 : mword 32) udec_02500a93.
-  Qed.
-
-  (* 0x6b0  li s8,100  (base, 4-aligned) *)
-  Lemma uis_grep_6b0 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x6b0) false
-      (ITYPE (mword_of_int 100 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 24), ADDI)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x6b0 (mword_of_int 0x06400c13 : mword 32) udec_06400c13.
-  Qed.
-
-  (* 0x6b4  c.j 6d6 <vprintf+0x56>  (RVC, 4-aligned) *)
-  Lemma uis_grep_6b4 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x6b4) true
-      (C_J (mword_of_int 17 : mword 11)).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x6b4 (mword_of_int 0xa00d : mword 16) udec_a00d
-      (mword_of_int 0x85a6a00d : mword 32).
-  Qed.
-
-  (* 0x6b6  c.mv a1,s1  (RVC, 2 mod 4) *)
-  Lemma uis_grep_6b6 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x6b6) true
-      (C_MV (Regidx (mword_of_int 11), Regidx (mword_of_int 9))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x6b6 (mword_of_int 0x85a6 : mword 16) udec_85a6.
-  Qed.
-
-  (* 0x6b8  c.mv a0,s6  (RVC, 4-aligned) *)
-  Lemma uis_grep_6b8 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x6b8) true
-      (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 22))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x6b8 (mword_of_int 0x855a : mword 16) udec_855a
-      (mword_of_int 0xf0ef855a : mword 32).
-  Qed.
-
-  (* 0x6ba  jal 5c4 <putc>  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_6ba (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x6ba) false
-      (JAL (mword_of_int 2096906 : mword 21, Regidx (mword_of_int 1))).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x6ba (mword_of_int 0xf0bff0ef : mword 32) udec_f0bff0ef.
-  Qed.
-
-  (* 0x6be  c.j 6c4 <vprintf+0x44>  (RVC, 2 mod 4) *)
-  Lemma uis_grep_6be (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x6be) true
-      (C_J (mword_of_int 3 : mword 11)).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x6be (mword_of_int 0xa019 : mword 16) udec_a019.
-  Qed.
-
-  (* 0x6c0  beq s3,s5,6e6 <vprintf+0x66>  (base, 4-aligned) *)
-  Lemma uis_grep_6c0 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x6c0) false
-      (BTYPE (mword_of_int 38 : mword 13, Regidx (mword_of_int 21), Regidx (mword_of_int 19), BEQ)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x6c0 (mword_of_int 0x03598363 : mword 32) udec_03598363.
-  Qed.
-
-  (* 0x6c4  addiw a5,s2,1  (base, 4-aligned) *)
-  Lemma uis_grep_6c4 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x6c4) false
-      (ADDIW (mword_of_int 1 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 15))).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x6c4 (mword_of_int 0x0019079b : mword 32) udec_0019079b.
-  Qed.
-
-  (* 0x6c8  c.mv s2,a5  (RVC, 4-aligned) *)
-  Lemma uis_grep_6c8 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x6c8) true
-      (C_MV (Regidx (mword_of_int 18), Regidx (mword_of_int 15))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x6c8 (mword_of_int 0x893e : mword 16) udec_893e
-      (mword_of_int 0x873e893e : mword 32).
-  Qed.
-
-  (* 0x6ca  c.mv a4,a5  (RVC, 2 mod 4) *)
-  Lemma uis_grep_6ca (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x6ca) true
-      (C_MV (Regidx (mword_of_int 14), Regidx (mword_of_int 15))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x6ca (mword_of_int 0x873e : mword 16) udec_873e.
-  Qed.
-
-  (* 0x6cc  c.add a5,a5,s4  (RVC, 4-aligned) *)
-  Lemma uis_grep_6cc (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x6cc) true
-      (C_ADD (Regidx (mword_of_int 15), Regidx (mword_of_int 20))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x6cc (mword_of_int 0x97d2 : mword 16) udec_97d2
-      (mword_of_int 0xc48397d2 : mword 32).
-  Qed.
-
-  (* 0x6ce  lbu s1,0(a5)  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_6ce (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x6ce) false
-      (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 9), true, 1)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x6ce (mword_of_int 0x0007c483 : mword 32) udec_0007c483.
-  Qed.
-
-  (* 0x6d2  beqz s1,8a6 <vprintf+0x226>  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_6d2 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x6d2) false
-      (BTYPE (mword_of_int 468 : mword 13, Regidx (mword_of_int 0), Regidx (mword_of_int 9), BEQ)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x6d2 (mword_of_int 0x1c048a63 : mword 32) udec_1c048a63.
-  Qed.
-
-  (* 0x6d6  sext.w a5,s1  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_6d6 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x6d6) false
-      (ADDIW (mword_of_int 0 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15))).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x6d6 (mword_of_int 0x0004879b : mword 32) udec_0004879b.
-  Qed.
-
-  (* 0x6da  bnez s3,6c0 <vprintf+0x40>  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_6da (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x6da) false
-      (BTYPE (mword_of_int 8166 : mword 13, Regidx (mword_of_int 0), Regidx (mword_of_int 19), BNE)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x6da (mword_of_int 0xfe0993e3 : mword 32) udec_fe0993e3.
-  Qed.
-
-  (* 0x6de  bne a5,s5,6b6 <vprintf+0x36>  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_6de (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x6de) false
-      (BTYPE (mword_of_int 8152 : mword 13, Regidx (mword_of_int 21), Regidx (mword_of_int 15), BNE)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x6de (mword_of_int 0xfd579ce3 : mword 32) udec_fd579ce3.
-  Qed.
-
-  (* 0x6e2  c.mv s3,a5  (RVC, 2 mod 4) *)
-  Lemma uis_grep_6e2 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x6e2) true
-      (C_MV (Regidx (mword_of_int 19), Regidx (mword_of_int 15))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x6e2 (mword_of_int 0x89be : mword 16) udec_89be.
-  Qed.
-
-  (* 0x6e4  c.j 6c4 <vprintf+0x44>  (RVC, 4-aligned) *)
-  Lemma uis_grep_6e4 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x6e4) true
-      (C_J (mword_of_int 2032 : mword 11)).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x6e4 (mword_of_int 0xb7c5 : mword 16) udec_b7c5
-      (mword_of_int 0x06b3b7c5 : mword 32).
-  Qed.
-
-  (* 0x6e6  add a3,s4,a4  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_6e6 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x6e6) false
-      (RTYPE (Regidx (mword_of_int 14), Regidx (mword_of_int 20), Regidx (mword_of_int 13), ADD)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x6e6 (mword_of_int 0x00ea06b3 : mword 32) udec_00ea06b3.
-  Qed.
-
-  (* 0x6ea  lbu a2,1(a3)  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_6ea (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x6ea) false
-      (LOAD (mword_of_int 1 : mword 12, Regidx (mword_of_int 13), Regidx (mword_of_int 12), true, 1)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x6ea (mword_of_int 0x0016c603 : mword 32) udec_0016c603.
-  Qed.
-
-  (* 0x6ee  beqz a2,8be <vprintf+0x23e>  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_6ee (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x6ee) false
-      (BTYPE (mword_of_int 464 : mword 13, Regidx (mword_of_int 0), Regidx (mword_of_int 12), BEQ)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x6ee (mword_of_int 0x1c060863 : mword 32) udec_1c060863.
-  Qed.
-
-  (* 0x6f2  beq a5,s8,720 <vprintf+0xa0>  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_6f2 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x6f2) false
-      (BTYPE (mword_of_int 46 : mword 13, Regidx (mword_of_int 24), Regidx (mword_of_int 15), BEQ)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x6f2 (mword_of_int 0x03878763 : mword 32) udec_03878763.
-  Qed.
-
-  (* 0x6f6  addi a3,a5,-108  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_6f6 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x6f6) false
-      (ITYPE (mword_of_int 3988 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 13), ADDI)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x6f6 (mword_of_int 0xf9478693 : mword 32) udec_f9478693.
-  Qed.
-
-  (* 0x6fa  seqz a3,a3  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_6fa (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x6fa) false
-      (ITYPE (mword_of_int 1 : mword 12, Regidx (mword_of_int 13), Regidx (mword_of_int 13), SLTIU)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x6fa (mword_of_int 0x0016b693 : mword 32) udec_0016b693.
-  Qed.
-
-  (* 0x6fe  addi a1,a2,-100  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_6fe (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x6fe) false
-      (ITYPE (mword_of_int 3996 : mword 12, Regidx (mword_of_int 12), Regidx (mword_of_int 11), ADDI)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x6fe (mword_of_int 0xf9c60593 : mword 32) udec_f9c60593.
-  Qed.
-
-  (* 0x702  c.bnez a1,738 <vprintf+0xb8>  (RVC, 2 mod 4) *)
-  Lemma uis_grep_702 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x702) true
-      (C_BNEZ (mword_of_int 27 : mword 8, Cregidx (mword_of_int 3))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x702 (mword_of_int 0xe99d : mword 16) udec_e99d.
-  Qed.
-
-  (* 0x704  c.beqz a3,738 <vprintf+0xb8>  (RVC, 4-aligned) *)
-  Lemma uis_grep_704 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x704) true
-      (C_BEQZ (mword_of_int 26 : mword 8, Cregidx (mword_of_int 5))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x704 (mword_of_int 0xca95 : mword 16) udec_ca95
-      (mword_of_int 0x8493ca95 : mword 32).
-  Qed.
-
-  (* 0x706  addi s1,s7,8  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_706 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x706) false
-      (ITYPE (mword_of_int 8 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 9), ADDI)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x706 (mword_of_int 0x008b8493 : mword 32) udec_008b8493.
-  Qed.
-
-  (* 0x70a  c.li a3,1  (RVC, 2 mod 4) *)
-  Lemma uis_grep_70a (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x70a) true
-      (C_LI (mword_of_int 1 : mword 6, Regidx (mword_of_int 13))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x70a (mword_of_int 0x4685 : mword 16) udec_4685.
-  Qed.
-
-  (* 0x70c  c.li a2,10  (RVC, 4-aligned) *)
-  Lemma uis_grep_70c (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x70c) true
-      (C_LI (mword_of_int 10 : mword 6, Regidx (mword_of_int 12))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x70c (mword_of_int 0x4629 : mword 16) udec_4629
-      (mword_of_int 0xb5834629 : mword 32).
-  Qed.
-
-  (* 0x70e  ld a1,0(s7)  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_70e (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x70e) false
-      (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 11), false, 8)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x70e (mword_of_int 0x000bb583 : mword 32) udec_000bb583.
-  Qed.
-
-  (* 0x712  c.mv a0,s6  (RVC, 2 mod 4) *)
-  Lemma uis_grep_712 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x712) true
-      (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 22))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x712 (mword_of_int 0x855a : mword 16) udec_855a.
-  Qed.
-
-  (* 0x714  jal 5e2 <printint>  (base, 4-aligned) *)
-  Lemma uis_grep_714 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x714) false
-      (JAL (mword_of_int 2096846 : mword 21, Regidx (mword_of_int 1))).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x714 (mword_of_int 0xecfff0ef : mword 32) udec_ecfff0ef.
-  Qed.
-
-  (* 0x718  c.addiw s2,s2,1  (RVC, 4-aligned) *)
-  Lemma uis_grep_718 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x718) true
-      (C_ADDIW (mword_of_int 1 : mword 6, Regidx (mword_of_int 18))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x718 (mword_of_int 0x2905 : mword 16) udec_2905
-      (mword_of_int 0x8ba62905 : mword 32).
-  Qed.
-
-  (* 0x71a  c.mv s7,s1  (RVC, 2 mod 4) *)
-  Lemma uis_grep_71a (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x71a) true
-      (C_MV (Regidx (mword_of_int 23), Regidx (mword_of_int 9))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x71a (mword_of_int 0x8ba6 : mword 16) udec_8ba6.
-  Qed.
-
-  (* 0x71c  c.li s3,0  (RVC, 4-aligned) *)
-  Lemma uis_grep_71c (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x71c) true
-      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 19))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x71c (mword_of_int 0x4981 : mword 16) udec_4981
-      (mword_of_int 0xb75d4981 : mword 32).
-  Qed.
-
-  (* 0x71e  c.j 6c4 <vprintf+0x44>  (RVC, 2 mod 4) *)
-  Lemma uis_grep_71e (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x71e) true
-      (C_J (mword_of_int 2003 : mword 11)).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x71e (mword_of_int 0xb75d : mword 16) udec_b75d.
-  Qed.
-
-  (* 0x720  addi s1,s7,8  (base, 4-aligned) *)
-  Lemma uis_grep_720 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x720) false
-      (ITYPE (mword_of_int 8 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 9), ADDI)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x720 (mword_of_int 0x008b8493 : mword 32) udec_008b8493.
-  Qed.
-
-  (* 0x724  c.li a3,1  (RVC, 4-aligned) *)
-  Lemma uis_grep_724 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x724) true
-      (C_LI (mword_of_int 1 : mword 6, Regidx (mword_of_int 13))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x724 (mword_of_int 0x4685 : mword 16) udec_4685
-      (mword_of_int 0x46294685 : mword 32).
-  Qed.
-
-  (* 0x726  c.li a2,10  (RVC, 2 mod 4) *)
-  Lemma uis_grep_726 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x726) true
-      (C_LI (mword_of_int 10 : mword 6, Regidx (mword_of_int 12))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x726 (mword_of_int 0x4629 : mword 16) udec_4629.
-  Qed.
-
-  (* 0x728  lw a1,0(s7)  (base, 4-aligned) *)
-  Lemma uis_grep_728 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x728) false
-      (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 11), false, 4)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x728 (mword_of_int 0x000ba583 : mword 32) udec_000ba583.
-  Qed.
-
-  (* 0x72c  c.mv a0,s6  (RVC, 4-aligned) *)
-  Lemma uis_grep_72c (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x72c) true
-      (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 22))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x72c (mword_of_int 0x855a : mword 16) udec_855a
-      (mword_of_int 0xf0ef855a : mword 32).
-  Qed.
-
-  (* 0x72e  jal 5e2 <printint>  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_72e (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x72e) false
-      (JAL (mword_of_int 2096820 : mword 21, Regidx (mword_of_int 1))).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x72e (mword_of_int 0xeb5ff0ef : mword 32) udec_eb5ff0ef.
-  Qed.
-
-  (* 0x732  c.mv s7,s1  (RVC, 2 mod 4) *)
-  Lemma uis_grep_732 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x732) true
-      (C_MV (Regidx (mword_of_int 23), Regidx (mword_of_int 9))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x732 (mword_of_int 0x8ba6 : mword 16) udec_8ba6.
-  Qed.
-
-  (* 0x734  c.li s3,0  (RVC, 4-aligned) *)
-  Lemma uis_grep_734 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x734) true
-      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 19))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x734 (mword_of_int 0x4981 : mword 16) udec_4981
-      (mword_of_int 0xb7794981 : mword 32).
-  Qed.
-
-  (* 0x736  c.j 6c4 <vprintf+0x44>  (RVC, 2 mod 4) *)
-  Lemma uis_grep_736 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x736) true
-      (C_J (mword_of_int 1991 : mword 11)).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x736 (mword_of_int 0xb779 : mword 16) udec_b779.
-  Qed.
-
-  (* 0x738  c.add a4,a4,s4  (RVC, 4-aligned) *)
-  Lemma uis_grep_738 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x738) true
-      (C_ADD (Regidx (mword_of_int 14), Regidx (mword_of_int 20))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x738 (mword_of_int 0x9752 : mword 16) udec_9752
-      (mword_of_int 0x45839752 : mword 32).
-  Qed.
-
-  (* 0x73a  lbu a1,2(a4)  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_73a (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x73a) false
-      (LOAD (mword_of_int 2 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 11), true, 1)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x73a (mword_of_int 0x00274583 : mword 32) udec_00274583.
-  Qed.
-
-  (* 0x73e  addi a4,a2,-108  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_73e (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x73e) false
-      (ITYPE (mword_of_int 3988 : mword 12, Regidx (mword_of_int 12), Regidx (mword_of_int 14), ADDI)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x73e (mword_of_int 0xf9460713 : mword 32) udec_f9460713.
-  Qed.
-
-  (* 0x742  seqz a4,a4  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_742 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x742) false
-      (ITYPE (mword_of_int 1 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), SLTIU)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x742 (mword_of_int 0x00173713 : mword 32) udec_00173713.
-  Qed.
-
-  (* 0x746  c.and a4,a4,a3  (RVC, 2 mod 4) *)
-  Lemma uis_grep_746 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x746) true
-      (C_AND (Cregidx (mword_of_int 6), Cregidx (mword_of_int 5))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x746 (mword_of_int 0x8f75 : mword 16) udec_8f75.
-  Qed.
-
-  (* 0x748  addi a0,a1,-100  (base, 4-aligned) *)
-  Lemma uis_grep_748 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x748) false
-      (ITYPE (mword_of_int 3996 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 10), ADDI)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x748 (mword_of_int 0xf9c58513 : mword 32) udec_f9c58513.
-  Qed.
-
-  (* 0x74c  bnez a0,8d2 <vprintf+0x252>  (base, 4-aligned) *)
-  Lemma uis_grep_74c (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x74c) false
-      (BTYPE (mword_of_int 390 : mword 13, Regidx (mword_of_int 0), Regidx (mword_of_int 10), BNE)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x74c (mword_of_int 0x18051363 : mword 32) udec_18051363.
-  Qed.
-
-  (* 0x750  beqz a4,8d2 <vprintf+0x252>  (base, 4-aligned) *)
-  Lemma uis_grep_750 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x750) false
-      (BTYPE (mword_of_int 386 : mword 13, Regidx (mword_of_int 0), Regidx (mword_of_int 14), BEQ)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x750 (mword_of_int 0x18070163 : mword 32) udec_18070163.
-  Qed.
-
-  (* 0x754  addi s1,s7,8  (base, 4-aligned) *)
-  Lemma uis_grep_754 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x754) false
-      (ITYPE (mword_of_int 8 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 9), ADDI)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x754 (mword_of_int 0x008b8493 : mword 32) udec_008b8493.
-  Qed.
-
-  (* 0x758  c.li a3,1  (RVC, 4-aligned) *)
-  Lemma uis_grep_758 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x758) true
-      (C_LI (mword_of_int 1 : mword 6, Regidx (mword_of_int 13))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x758 (mword_of_int 0x4685 : mword 16) udec_4685
-      (mword_of_int 0x46294685 : mword 32).
-  Qed.
-
-  (* 0x75a  c.li a2,10  (RVC, 2 mod 4) *)
-  Lemma uis_grep_75a (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x75a) true
-      (C_LI (mword_of_int 10 : mword 6, Regidx (mword_of_int 12))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x75a (mword_of_int 0x4629 : mword 16) udec_4629.
-  Qed.
-
-  (* 0x75c  ld a1,0(s7)  (base, 4-aligned) *)
-  Lemma uis_grep_75c (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x75c) false
-      (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 11), false, 8)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x75c (mword_of_int 0x000bb583 : mword 32) udec_000bb583.
-  Qed.
-
-  (* 0x760  c.mv a0,s6  (RVC, 4-aligned) *)
-  Lemma uis_grep_760 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x760) true
-      (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 22))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x760 (mword_of_int 0x855a : mword 16) udec_855a
-      (mword_of_int 0xf0ef855a : mword 32).
-  Qed.
-
-  (* 0x762  jal 5e2 <printint>  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_762 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x762) false
-      (JAL (mword_of_int 2096768 : mword 21, Regidx (mword_of_int 1))).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x762 (mword_of_int 0xe81ff0ef : mword 32) udec_e81ff0ef.
-  Qed.
-
-  (* 0x766  c.addiw s2,s2,2  (RVC, 2 mod 4) *)
-  Lemma uis_grep_766 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x766) true
-      (C_ADDIW (mword_of_int 2 : mword 6, Regidx (mword_of_int 18))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x766 (mword_of_int 0x2909 : mword 16) udec_2909.
-  Qed.
-
-  (* 0x768  c.mv s7,s1  (RVC, 4-aligned) *)
-  Lemma uis_grep_768 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x768) true
-      (C_MV (Regidx (mword_of_int 23), Regidx (mword_of_int 9))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x768 (mword_of_int 0x8ba6 : mword 16) udec_8ba6
-      (mword_of_int 0x49818ba6 : mword 32).
-  Qed.
-
-  (* 0x76a  c.li s3,0  (RVC, 2 mod 4) *)
-  Lemma uis_grep_76a (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x76a) true
-      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 19))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x76a (mword_of_int 0x4981 : mword 16) udec_4981.
-  Qed.
-
-  (* 0x76c  c.j 6c4 <vprintf+0x44>  (RVC, 4-aligned) *)
-  Lemma uis_grep_76c (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x76c) true
-      (C_J (mword_of_int 1964 : mword 11)).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x76c (mword_of_int 0xbfa1 : mword 16) udec_bfa1
-      (mword_of_int 0x8493bfa1 : mword 32).
-  Qed.
-
-  (* 0x76e  addi s1,s7,8  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_76e (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x76e) false
-      (ITYPE (mword_of_int 8 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 9), ADDI)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x76e (mword_of_int 0x008b8493 : mword 32) udec_008b8493.
-  Qed.
-
-  (* 0x772  c.li a3,0  (RVC, 2 mod 4) *)
-  Lemma uis_grep_772 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x772) true
-      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 13))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x772 (mword_of_int 0x4681 : mword 16) udec_4681.
-  Qed.
-
-  (* 0x774  c.li a2,10  (RVC, 4-aligned) *)
-  Lemma uis_grep_774 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x774) true
-      (C_LI (mword_of_int 10 : mword 6, Regidx (mword_of_int 12))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x774 (mword_of_int 0x4629 : mword 16) udec_4629
-      (mword_of_int 0xe5834629 : mword 32).
-  Qed.
-
-  (* 0x776  lwu a1,0(s7)  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_776 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x776) false
-      (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 11), true, 4)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x776 (mword_of_int 0x000be583 : mword 32) udec_000be583.
-  Qed.
-
-  (* 0x77a  c.mv a0,s6  (RVC, 2 mod 4) *)
-  Lemma uis_grep_77a (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x77a) true
-      (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 22))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x77a (mword_of_int 0x855a : mword 16) udec_855a.
-  Qed.
-
-  (* 0x77c  jal 5e2 <printint>  (base, 4-aligned) *)
-  Lemma uis_grep_77c (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x77c) false
-      (JAL (mword_of_int 2096742 : mword 21, Regidx (mword_of_int 1))).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x77c (mword_of_int 0xe67ff0ef : mword 32) udec_e67ff0ef.
-  Qed.
-
-  (* 0x780  c.mv s7,s1  (RVC, 4-aligned) *)
-  Lemma uis_grep_780 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x780) true
-      (C_MV (Regidx (mword_of_int 23), Regidx (mword_of_int 9))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x780 (mword_of_int 0x8ba6 : mword 16) udec_8ba6
-      (mword_of_int 0x49818ba6 : mword 32).
-  Qed.
-
-  (* 0x782  c.li s3,0  (RVC, 2 mod 4) *)
-  Lemma uis_grep_782 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x782) true
-      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 19))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x782 (mword_of_int 0x4981 : mword 16) udec_4981.
-  Qed.
-
-  (* 0x784  c.j 6c4 <vprintf+0x44>  (RVC, 4-aligned) *)
-  Lemma uis_grep_784 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x784) true
-      (C_J (mword_of_int 1952 : mword 11)).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x784 (mword_of_int 0xb781 : mword 16) udec_b781
-      (mword_of_int 0x8493b781 : mword 32).
-  Qed.
-
-  (* 0x786  addi s1,s7,8  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_786 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x786) false
-      (ITYPE (mword_of_int 8 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 9), ADDI)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x786 (mword_of_int 0x008b8493 : mword 32) udec_008b8493.
-  Qed.
-
-  (* 0x78a  c.li a3,0  (RVC, 2 mod 4) *)
-  Lemma uis_grep_78a (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x78a) true
-      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 13))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x78a (mword_of_int 0x4681 : mword 16) udec_4681.
-  Qed.
-
-  (* 0x78c  c.li a2,10  (RVC, 4-aligned) *)
-  Lemma uis_grep_78c (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x78c) true
-      (C_LI (mword_of_int 10 : mword 6, Regidx (mword_of_int 12))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x78c (mword_of_int 0x4629 : mword 16) udec_4629
-      (mword_of_int 0xb5834629 : mword 32).
-  Qed.
-
-  (* 0x78e  ld a1,0(s7)  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_78e (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x78e) false
-      (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 11), false, 8)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x78e (mword_of_int 0x000bb583 : mword 32) udec_000bb583.
-  Qed.
-
-  (* 0x792  c.mv a0,s6  (RVC, 2 mod 4) *)
-  Lemma uis_grep_792 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x792) true
-      (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 22))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x792 (mword_of_int 0x855a : mword 16) udec_855a.
-  Qed.
-
-  (* 0x794  jal 5e2 <printint>  (base, 4-aligned) *)
-  Lemma uis_grep_794 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x794) false
-      (JAL (mword_of_int 2096718 : mword 21, Regidx (mword_of_int 1))).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x794 (mword_of_int 0xe4fff0ef : mword 32) udec_e4fff0ef.
-  Qed.
-
-  (* 0x798  c.addiw s2,s2,1  (RVC, 4-aligned) *)
-  Lemma uis_grep_798 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x798) true
-      (C_ADDIW (mword_of_int 1 : mword 6, Regidx (mword_of_int 18))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x798 (mword_of_int 0x2905 : mword 16) udec_2905
-      (mword_of_int 0x8ba62905 : mword 32).
-  Qed.
-
-  (* 0x79a  c.mv s7,s1  (RVC, 2 mod 4) *)
-  Lemma uis_grep_79a (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x79a) true
-      (C_MV (Regidx (mword_of_int 23), Regidx (mword_of_int 9))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x79a (mword_of_int 0x8ba6 : mword 16) udec_8ba6.
-  Qed.
-
-  (* 0x79c  c.li s3,0  (RVC, 4-aligned) *)
-  Lemma uis_grep_79c (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x79c) true
-      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 19))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x79c (mword_of_int 0x4981 : mword 16) udec_4981
-      (mword_of_int 0xb71d4981 : mword 32).
-  Qed.
-
-  (* 0x79e  c.j 6c4 <vprintf+0x44>  (RVC, 2 mod 4) *)
-  Lemma uis_grep_79e (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x79e) true
-      (C_J (mword_of_int 1939 : mword 11)).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x79e (mword_of_int 0xb71d : mword 16) udec_b71d.
-  Qed.
-
-  (* 0x7a0  addi s1,s7,8  (base, 4-aligned) *)
-  Lemma uis_grep_7a0 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x7a0) false
-      (ITYPE (mword_of_int 8 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 9), ADDI)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x7a0 (mword_of_int 0x008b8493 : mword 32) udec_008b8493.
-  Qed.
-
-  (* 0x7a4  c.li a3,0  (RVC, 4-aligned) *)
-  Lemma uis_grep_7a4 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x7a4) true
-      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 13))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x7a4 (mword_of_int 0x4681 : mword 16) udec_4681
-      (mword_of_int 0x46294681 : mword 32).
-  Qed.
-
-  (* 0x7a6  c.li a2,10  (RVC, 2 mod 4) *)
-  Lemma uis_grep_7a6 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x7a6) true
-      (C_LI (mword_of_int 10 : mword 6, Regidx (mword_of_int 12))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x7a6 (mword_of_int 0x4629 : mword 16) udec_4629.
-  Qed.
-
-  (* 0x7a8  ld a1,0(s7)  (base, 4-aligned) *)
-  Lemma uis_grep_7a8 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x7a8) false
-      (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 11), false, 8)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x7a8 (mword_of_int 0x000bb583 : mword 32) udec_000bb583.
-  Qed.
-
-  (* 0x7ac  c.mv a0,s6  (RVC, 4-aligned) *)
-  Lemma uis_grep_7ac (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x7ac) true
-      (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 22))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x7ac (mword_of_int 0x855a : mword 16) udec_855a
-      (mword_of_int 0xf0ef855a : mword 32).
-  Qed.
-
-  (* 0x7ae  jal 5e2 <printint>  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_7ae (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x7ae) false
-      (JAL (mword_of_int 2096692 : mword 21, Regidx (mword_of_int 1))).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x7ae (mword_of_int 0xe35ff0ef : mword 32) udec_e35ff0ef.
-  Qed.
-
-  (* 0x7b2  c.addiw s2,s2,2  (RVC, 2 mod 4) *)
-  Lemma uis_grep_7b2 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x7b2) true
-      (C_ADDIW (mword_of_int 2 : mword 6, Regidx (mword_of_int 18))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x7b2 (mword_of_int 0x2909 : mword 16) udec_2909.
-  Qed.
-
-  (* 0x7b4  c.mv s7,s1  (RVC, 4-aligned) *)
-  Lemma uis_grep_7b4 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x7b4) true
-      (C_MV (Regidx (mword_of_int 23), Regidx (mword_of_int 9))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x7b4 (mword_of_int 0x8ba6 : mword 16) udec_8ba6
-      (mword_of_int 0x49818ba6 : mword 32).
-  Qed.
-
-  (* 0x7b6  c.li s3,0  (RVC, 2 mod 4) *)
-  Lemma uis_grep_7b6 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x7b6) true
-      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 19))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x7b6 (mword_of_int 0x4981 : mword 16) udec_4981.
-  Qed.
-
-  (* 0x7b8  c.j 6c4 <vprintf+0x44>  (RVC, 4-aligned) *)
-  Lemma uis_grep_7b8 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x7b8) true
-      (C_J (mword_of_int 1926 : mword 11)).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x7b8 (mword_of_int 0xb731 : mword 16) udec_b731
-      (mword_of_int 0x8493b731 : mword 32).
-  Qed.
-
-  (* 0x7ba  addi s1,s7,8  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_7ba (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x7ba) false
-      (ITYPE (mword_of_int 8 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 9), ADDI)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x7ba (mword_of_int 0x008b8493 : mword 32) udec_008b8493.
-  Qed.
-
-  (* 0x7be  c.li a3,0  (RVC, 2 mod 4) *)
-  Lemma uis_grep_7be (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x7be) true
-      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 13))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x7be (mword_of_int 0x4681 : mword 16) udec_4681.
-  Qed.
-
-  (* 0x7c0  c.li a2,16  (RVC, 4-aligned) *)
-  Lemma uis_grep_7c0 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x7c0) true
-      (C_LI (mword_of_int 16 : mword 6, Regidx (mword_of_int 12))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x7c0 (mword_of_int 0x4641 : mword 16) udec_4641
-      (mword_of_int 0xe5834641 : mword 32).
-  Qed.
-
-  (* 0x7c2  lwu a1,0(s7)  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_7c2 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x7c2) false
-      (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 11), true, 4)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x7c2 (mword_of_int 0x000be583 : mword 32) udec_000be583.
-  Qed.
-
-  (* 0x7c6  c.mv a0,s6  (RVC, 2 mod 4) *)
-  Lemma uis_grep_7c6 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x7c6) true
-      (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 22))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x7c6 (mword_of_int 0x855a : mword 16) udec_855a.
-  Qed.
-
-  (* 0x7c8  jal 5e2 <printint>  (base, 4-aligned) *)
-  Lemma uis_grep_7c8 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x7c8) false
-      (JAL (mword_of_int 2096666 : mword 21, Regidx (mword_of_int 1))).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x7c8 (mword_of_int 0xe1bff0ef : mword 32) udec_e1bff0ef.
-  Qed.
-
-  (* 0x7cc  c.mv s7,s1  (RVC, 4-aligned) *)
-  Lemma uis_grep_7cc (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x7cc) true
-      (C_MV (Regidx (mword_of_int 23), Regidx (mword_of_int 9))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x7cc (mword_of_int 0x8ba6 : mword 16) udec_8ba6
-      (mword_of_int 0x49818ba6 : mword 32).
-  Qed.
-
-  (* 0x7ce  c.li s3,0  (RVC, 2 mod 4) *)
-  Lemma uis_grep_7ce (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x7ce) true
-      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 19))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x7ce (mword_of_int 0x4981 : mword 16) udec_4981.
-  Qed.
-
-  (* 0x7d0  c.j 6c4 <vprintf+0x44>  (RVC, 4-aligned) *)
-  Lemma uis_grep_7d0 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x7d0) true
-      (C_J (mword_of_int 1914 : mword 11)).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x7d0 (mword_of_int 0xbdd5 : mword 16) udec_bdd5
-      (mword_of_int 0x8493bdd5 : mword 32).
-  Qed.
-
-  (* 0x7d2  addi s1,s7,8  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_7d2 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x7d2) false
-      (ITYPE (mword_of_int 8 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 9), ADDI)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x7d2 (mword_of_int 0x008b8493 : mword 32) udec_008b8493.
-  Qed.
-
-  (* 0x7d6  c.li a3,0  (RVC, 2 mod 4) *)
-  Lemma uis_grep_7d6 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x7d6) true
-      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 13))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x7d6 (mword_of_int 0x4681 : mword 16) udec_4681.
-  Qed.
-
-  (* 0x7d8  c.li a2,16  (RVC, 4-aligned) *)
-  Lemma uis_grep_7d8 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x7d8) true
-      (C_LI (mword_of_int 16 : mword 6, Regidx (mword_of_int 12))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x7d8 (mword_of_int 0x4641 : mword 16) udec_4641
-      (mword_of_int 0xb5834641 : mword 32).
-  Qed.
-
-  (* 0x7da  ld a1,0(s7)  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_7da (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x7da) false
-      (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 11), false, 8)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x7da (mword_of_int 0x000bb583 : mword 32) udec_000bb583.
-  Qed.
-
-  (* 0x7de  c.mv a0,s6  (RVC, 2 mod 4) *)
-  Lemma uis_grep_7de (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x7de) true
-      (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 22))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x7de (mword_of_int 0x855a : mword 16) udec_855a.
-  Qed.
-
-  (* 0x7e0  jal 5e2 <printint>  (base, 4-aligned) *)
-  Lemma uis_grep_7e0 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x7e0) false
-      (JAL (mword_of_int 2096642 : mword 21, Regidx (mword_of_int 1))).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x7e0 (mword_of_int 0xe03ff0ef : mword 32) udec_e03ff0ef.
-  Qed.
-
-  (* 0x7e4  c.addiw s2,s2,1  (RVC, 4-aligned) *)
-  Lemma uis_grep_7e4 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x7e4) true
-      (C_ADDIW (mword_of_int 1 : mword 6, Regidx (mword_of_int 18))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x7e4 (mword_of_int 0x2905 : mword 16) udec_2905
-      (mword_of_int 0x8ba62905 : mword 32).
-  Qed.
-
-  (* 0x7e6  c.mv s7,s1  (RVC, 2 mod 4) *)
-  Lemma uis_grep_7e6 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x7e6) true
-      (C_MV (Regidx (mword_of_int 23), Regidx (mword_of_int 9))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x7e6 (mword_of_int 0x8ba6 : mword 16) udec_8ba6.
-  Qed.
-
-  (* 0x7e8  c.li s3,0  (RVC, 4-aligned) *)
-  Lemma uis_grep_7e8 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x7e8) true
-      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 19))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x7e8 (mword_of_int 0x4981 : mword 16) udec_4981
-      (mword_of_int 0xbde94981 : mword 32).
-  Qed.
-
-  (* 0x7ea  c.j 6c4 <vprintf+0x44>  (RVC, 2 mod 4) *)
-  Lemma uis_grep_7ea (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x7ea) true
-      (C_J (mword_of_int 1901 : mword 11)).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x7ea (mword_of_int 0xbde9 : mword 16) udec_bde9.
-  Qed.
-
-  (* 0x7ec  addi s1,s7,8  (base, 4-aligned) *)
-  Lemma uis_grep_7ec (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x7ec) false
-      (ITYPE (mword_of_int 8 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 9), ADDI)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x7ec (mword_of_int 0x008b8493 : mword 32) udec_008b8493.
-  Qed.
-
-  (* 0x7f0  c.li a3,0  (RVC, 4-aligned) *)
-  Lemma uis_grep_7f0 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x7f0) true
-      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 13))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x7f0 (mword_of_int 0x4681 : mword 16) udec_4681
-      (mword_of_int 0x46414681 : mword 32).
-  Qed.
-
-  (* 0x7f2  c.li a2,16  (RVC, 2 mod 4) *)
-  Lemma uis_grep_7f2 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x7f2) true
-      (C_LI (mword_of_int 16 : mword 6, Regidx (mword_of_int 12))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x7f2 (mword_of_int 0x4641 : mword 16) udec_4641.
-  Qed.
-
-  (* 0x7f4  ld a1,0(s7)  (base, 4-aligned) *)
-  Lemma uis_grep_7f4 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x7f4) false
-      (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 11), false, 8)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x7f4 (mword_of_int 0x000bb583 : mword 32) udec_000bb583.
-  Qed.
-
-  (* 0x7f8  c.mv a0,s6  (RVC, 4-aligned) *)
-  Lemma uis_grep_7f8 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x7f8) true
-      (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 22))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x7f8 (mword_of_int 0x855a : mword 16) udec_855a
-      (mword_of_int 0xf0ef855a : mword 32).
-  Qed.
-
-  (* 0x7fa  jal 5e2 <printint>  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_7fa (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x7fa) false
-      (JAL (mword_of_int 2096616 : mword 21, Regidx (mword_of_int 1))).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x7fa (mword_of_int 0xde9ff0ef : mword 32) udec_de9ff0ef.
-  Qed.
-
-  (* 0x7fe  c.addiw s2,s2,2  (RVC, 2 mod 4) *)
-  Lemma uis_grep_7fe (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x7fe) true
-      (C_ADDIW (mword_of_int 2 : mword 6, Regidx (mword_of_int 18))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x7fe (mword_of_int 0x2909 : mword 16) udec_2909.
-  Qed.
-
-  (* 0x800  c.mv s7,s1  (RVC, 4-aligned) *)
-  Lemma uis_grep_800 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x800) true
-      (C_MV (Regidx (mword_of_int 23), Regidx (mword_of_int 9))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x800 (mword_of_int 0x8ba6 : mword 16) udec_8ba6
-      (mword_of_int 0x49818ba6 : mword 32).
-  Qed.
-
-  (* 0x802  c.li s3,0  (RVC, 2 mod 4) *)
-  Lemma uis_grep_802 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x802) true
-      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 19))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x802 (mword_of_int 0x4981 : mword 16) udec_4981.
-  Qed.
-
-  (* 0x804  c.j 6c4 <vprintf+0x44>  (RVC, 4-aligned) *)
-  Lemma uis_grep_804 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x804) true
-      (C_J (mword_of_int 1888 : mword 11)).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x804 (mword_of_int 0xb5c1 : mword 16) udec_b5c1
-      (mword_of_int 0xe466b5c1 : mword 32).
-  Qed.
-
-  (* 0x806  c.sdsp s9,8(sp)  (RVC, 2 mod 4) *)
-  Lemma uis_grep_806 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x806) true
-      (C_SDSP (mword_of_int 1 : mword 6, Regidx (mword_of_int 25))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x806 (mword_of_int 0xe466 : mword 16) udec_e466.
-  Qed.
-
-  (* 0x808  addi a5,s7,8  (base, 4-aligned) *)
-  Lemma uis_grep_808 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x808) false
-      (ITYPE (mword_of_int 8 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 15), ADDI)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x808 (mword_of_int 0x008b8793 : mword 32) udec_008b8793.
-  Qed.
-
-  (* 0x80c  c.mv s9,a5  (RVC, 4-aligned) *)
-  Lemma uis_grep_80c (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x80c) true
-      (C_MV (Regidx (mword_of_int 25), Regidx (mword_of_int 15))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x80c (mword_of_int 0x8cbe : mword 16) udec_8cbe
-      (mword_of_int 0xb9838cbe : mword 32).
-  Qed.
-
-  (* 0x80e  ld s3,0(s7)  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_80e (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x80e) false
-      (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 19), false, 8)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x80e (mword_of_int 0x000bb983 : mword 32) udec_000bb983.
-  Qed.
-
-  (* 0x812  li a1,48  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_812 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x812) false
-      (ITYPE (mword_of_int 48 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 11), ADDI)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x812 (mword_of_int 0x03000593 : mword 32) udec_03000593.
-  Qed.
-
-  (* 0x816  c.mv a0,s6  (RVC, 2 mod 4) *)
-  Lemma uis_grep_816 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x816) true
-      (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 22))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x816 (mword_of_int 0x855a : mword 16) udec_855a.
-  Qed.
-
-  (* 0x818  jal 5c4 <putc>  (base, 4-aligned) *)
-  Lemma uis_grep_818 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x818) false
-      (JAL (mword_of_int 2096556 : mword 21, Regidx (mword_of_int 1))).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x818 (mword_of_int 0xdadff0ef : mword 32) udec_dadff0ef.
-  Qed.
-
-  (* 0x81c  li a1,120  (base, 4-aligned) *)
-  Lemma uis_grep_81c (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x81c) false
-      (ITYPE (mword_of_int 120 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 11), ADDI)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x81c (mword_of_int 0x07800593 : mword 32) udec_07800593.
-  Qed.
-
-  (* 0x820  c.mv a0,s6  (RVC, 4-aligned) *)
-  Lemma uis_grep_820 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x820) true
-      (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 22))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x820 (mword_of_int 0x855a : mword 16) udec_855a
-      (mword_of_int 0xf0ef855a : mword 32).
-  Qed.
-
-  (* 0x822  jal 5c4 <putc>  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_822 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x822) false
-      (JAL (mword_of_int 2096546 : mword 21, Regidx (mword_of_int 1))).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x822 (mword_of_int 0xda3ff0ef : mword 32) udec_da3ff0ef.
-  Qed.
-
-  (* 0x826  c.li s1,16  (RVC, 2 mod 4) *)
-  Lemma uis_grep_826 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x826) true
-      (C_LI (mword_of_int 16 : mword 6, Regidx (mword_of_int 9))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x826 (mword_of_int 0x44c1 : mword 16) udec_44c1.
-  Qed.
-
-  (* 0x828  auipc s7,0x0  (base, 4-aligned) *)
-  Lemma uis_grep_828 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x828) false
-      (UTYPE (mword_of_int 0 : mword 20, Regidx (mword_of_int 23), AUIPC)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x828 (mword_of_int 0x00000b97 : mword 32) udec_00000b97.
-  Qed.
-
-  (* 0x82c  addi s7,s7,824 # b60 <digits>  (base, 4-aligned) *)
-  Lemma uis_grep_82c (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x82c) false
-      (ITYPE (mword_of_int 824 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 23), ADDI)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x82c (mword_of_int 0x338b8b93 : mword 32) udec_338b8b93.
-  Qed.
-
-  (* 0x830  srli a5,s3,0x3c  (base, 4-aligned) *)
-  Lemma uis_grep_830 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x830) false
-      (SHIFTIOP (mword_of_int 60 : mword 6, Regidx (mword_of_int 19), Regidx (mword_of_int 15), SRLI)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x830 (mword_of_int 0x03c9d793 : mword 32) udec_03c9d793.
-  Qed.
-
-  (* 0x834  c.add a5,a5,s7  (RVC, 4-aligned) *)
-  Lemma uis_grep_834 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x834) true
-      (C_ADD (Regidx (mword_of_int 15), Regidx (mword_of_int 23))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x834 (mword_of_int 0x97de : mword 16) udec_97de
-      (mword_of_int 0xc58397de : mword 32).
-  Qed.
-
-  (* 0x836  lbu a1,0(a5)  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_836 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x836) false
-      (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 11), true, 1)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x836 (mword_of_int 0x0007c583 : mword 32) udec_0007c583.
-  Qed.
-
-  (* 0x83a  c.mv a0,s6  (RVC, 2 mod 4) *)
-  Lemma uis_grep_83a (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x83a) true
-      (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 22))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x83a (mword_of_int 0x855a : mword 16) udec_855a.
-  Qed.
-
-  (* 0x83c  jal 5c4 <putc>  (base, 4-aligned) *)
-  Lemma uis_grep_83c (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x83c) false
-      (JAL (mword_of_int 2096520 : mword 21, Regidx (mword_of_int 1))).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x83c (mword_of_int 0xd89ff0ef : mword 32) udec_d89ff0ef.
-  Qed.
-
-  (* 0x840  c.slli s3,s3,0x4  (RVC, 4-aligned) *)
-  Lemma uis_grep_840 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x840) true
-      (C_SLLI (mword_of_int 4 : mword 6, Regidx (mword_of_int 19))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x840 (mword_of_int 0x0992 : mword 16) udec_0992
-      (mword_of_int 0x34fd0992 : mword 32).
-  Qed.
-
-  (* 0x842  c.addiw s1,s1,-1  (RVC, 2 mod 4) *)
-  Lemma uis_grep_842 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x842) true
-      (C_ADDIW (mword_of_int 63 : mword 6, Regidx (mword_of_int 9))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x842 (mword_of_int 0x34fd : mword 16) udec_34fd.
-  Qed.
-
-  (* 0x844  c.bnez s1,830 <vprintf+0x1b0>  (RVC, 4-aligned) *)
-  Lemma uis_grep_844 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x844) true
-      (C_BNEZ (mword_of_int 246 : mword 8, Cregidx (mword_of_int 1))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x844 (mword_of_int 0xf4f5 : mword 16) udec_f4f5
-      (mword_of_int 0x8be6f4f5 : mword 32).
-  Qed.
-
-  (* 0x846  c.mv s7,s9  (RVC, 2 mod 4) *)
-  Lemma uis_grep_846 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x846) true
-      (C_MV (Regidx (mword_of_int 23), Regidx (mword_of_int 25))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x846 (mword_of_int 0x8be6 : mword 16) udec_8be6.
-  Qed.
-
-  (* 0x848  c.li s3,0  (RVC, 4-aligned) *)
-  Lemma uis_grep_848 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x848) true
-      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 19))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x848 (mword_of_int 0x4981 : mword 16) udec_4981
-      (mword_of_int 0x6ca24981 : mword 32).
-  Qed.
-
-  (* 0x84a  c.ldsp s9,8(sp)  (RVC, 2 mod 4) *)
-  Lemma uis_grep_84a (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x84a) true
-      (C_LDSP (mword_of_int 1 : mword 6, Regidx (mword_of_int 25))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x84a (mword_of_int 0x6ca2 : mword 16) udec_6ca2.
-  Qed.
-
-  (* 0x84c  c.j 6c4 <vprintf+0x44>  (RVC, 4-aligned) *)
-  Lemma uis_grep_84c (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x84c) true
-      (C_J (mword_of_int 1852 : mword 11)).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x84c (mword_of_int 0xbda5 : mword 16) udec_bda5
-      (mword_of_int 0x8493bda5 : mword 32).
-  Qed.
-
-  (* 0x84e  addi s1,s7,8  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_84e (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x84e) false
-      (ITYPE (mword_of_int 8 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 9), ADDI)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x84e (mword_of_int 0x008b8493 : mword 32) udec_008b8493.
-  Qed.
-
-  (* 0x852  lbu a1,0(s7)  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_852 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x852) false
-      (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 11), true, 1)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x852 (mword_of_int 0x000bc583 : mword 32) udec_000bc583.
-  Qed.
-
-  (* 0x856  c.mv a0,s6  (RVC, 2 mod 4) *)
-  Lemma uis_grep_856 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x856) true
-      (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 22))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x856 (mword_of_int 0x855a : mword 16) udec_855a.
-  Qed.
-
-  (* 0x858  jal 5c4 <putc>  (base, 4-aligned) *)
-  Lemma uis_grep_858 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x858) false
-      (JAL (mword_of_int 2096492 : mword 21, Regidx (mword_of_int 1))).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x858 (mword_of_int 0xd6dff0ef : mword 32) udec_d6dff0ef.
-  Qed.
-
-  (* 0x85c  c.mv s7,s1  (RVC, 4-aligned) *)
-  Lemma uis_grep_85c (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x85c) true
-      (C_MV (Regidx (mword_of_int 23), Regidx (mword_of_int 9))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x85c (mword_of_int 0x8ba6 : mword 16) udec_8ba6
-      (mword_of_int 0x49818ba6 : mword 32).
-  Qed.
-
-  (* 0x85e  c.li s3,0  (RVC, 2 mod 4) *)
-  Lemma uis_grep_85e (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x85e) true
-      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 19))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x85e (mword_of_int 0x4981 : mword 16) udec_4981.
-  Qed.
-
-  (* 0x860  c.j 6c4 <vprintf+0x44>  (RVC, 4-aligned) *)
-  Lemma uis_grep_860 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x860) true
-      (C_J (mword_of_int 1842 : mword 11)).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x860 (mword_of_int 0xb595 : mword 16) udec_b595
-      (mword_of_int 0x8993b595 : mword 32).
-  Qed.
-
-  (* 0x862  addi s3,s7,8  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_862 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x862) false
-      (ITYPE (mword_of_int 8 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 19), ADDI)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x862 (mword_of_int 0x008b8993 : mword 32) udec_008b8993.
-  Qed.
-
-  (* 0x866  ld s1,0(s7)  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_866 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x866) false
-      (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 9), false, 8)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x866 (mword_of_int 0x000bb483 : mword 32) udec_000bb483.
-  Qed.
-
-  (* 0x86a  c.beqz s1,886 <vprintf+0x206>  (RVC, 2 mod 4) *)
-  Lemma uis_grep_86a (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x86a) true
-      (C_BEQZ (mword_of_int 14 : mword 8, Cregidx (mword_of_int 1))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x86a (mword_of_int 0xcc91 : mword 16) udec_cc91.
-  Qed.
-
-  (* 0x86c  lbu a1,0(s1)  (base, 4-aligned) *)
-  Lemma uis_grep_86c (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x86c) false
-      (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 11), true, 1)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x86c (mword_of_int 0x0004c583 : mword 32) udec_0004c583.
-  Qed.
-
-  (* 0x870  c.beqz a1,8a0 <vprintf+0x220>  (RVC, 4-aligned) *)
-  Lemma uis_grep_870 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x870) true
-      (C_BEQZ (mword_of_int 24 : mword 8, Cregidx (mword_of_int 3))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x870 (mword_of_int 0xc985 : mword 16) udec_c985
-      (mword_of_int 0x855ac985 : mword 32).
-  Qed.
-
-  (* 0x872  c.mv a0,s6  (RVC, 2 mod 4) *)
-  Lemma uis_grep_872 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x872) true
-      (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 22))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x872 (mword_of_int 0x855a : mword 16) udec_855a.
-  Qed.
-
-  (* 0x874  jal 5c4 <putc>  (base, 4-aligned) *)
-  Lemma uis_grep_874 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x874) false
-      (JAL (mword_of_int 2096464 : mword 21, Regidx (mword_of_int 1))).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x874 (mword_of_int 0xd51ff0ef : mword 32) udec_d51ff0ef.
-  Qed.
-
-  (* 0x878  c.addi s1,s1,1  (RVC, 4-aligned) *)
-  Lemma uis_grep_878 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x878) true
-      (C_ADDI (mword_of_int 1 : mword 6, Regidx (mword_of_int 9))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x878 (mword_of_int 0x0485 : mword 16) udec_0485
-      (mword_of_int 0xc5830485 : mword 32).
-  Qed.
-
-  (* 0x87a  lbu a1,0(s1)  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_87a (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x87a) false
-      (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 11), true, 1)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x87a (mword_of_int 0x0004c583 : mword 32) udec_0004c583.
-  Qed.
-
-  (* 0x87e  c.bnez a1,872 <vprintf+0x1f2>  (RVC, 2 mod 4) *)
-  Lemma uis_grep_87e (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x87e) true
-      (C_BNEZ (mword_of_int 250 : mword 8, Cregidx (mword_of_int 3))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x87e (mword_of_int 0xf9f5 : mword 16) udec_f9f5.
-  Qed.
-
-  (* 0x880  c.mv s7,s3  (RVC, 4-aligned) *)
-  Lemma uis_grep_880 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x880) true
-      (C_MV (Regidx (mword_of_int 23), Regidx (mword_of_int 19))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x880 (mword_of_int 0x8bce : mword 16) udec_8bce
-      (mword_of_int 0x49818bce : mword 32).
-  Qed.
-
-  (* 0x882  c.li s3,0  (RVC, 2 mod 4) *)
-  Lemma uis_grep_882 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x882) true
-      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 19))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x882 (mword_of_int 0x4981 : mword 16) udec_4981.
-  Qed.
-
-  (* 0x884  c.j 6c4 <vprintf+0x44>  (RVC, 4-aligned) *)
-  Lemma uis_grep_884 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x884) true
-      (C_J (mword_of_int 1824 : mword 11)).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x884 (mword_of_int 0xb581 : mword 16) udec_b581
-      (mword_of_int 0x0497b581 : mword 32).
-  Qed.
-
-  (* 0x886  auipc s1,0x0  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_886 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x886) false
-      (UTYPE (mword_of_int 0 : mword 20, Regidx (mword_of_int 9), AUIPC)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x886 (mword_of_int 0x00000497 : mword 32) udec_00000497.
-  Qed.
-
-  (* 0x88a  addi s1,s1,722 # b58 <malloc+0x136>  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_88a (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x88a) false
-      (ITYPE (mword_of_int 722 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x88a (mword_of_int 0x2d248493 : mword 32) udec_2d248493.
-  Qed.
-
-  (* 0x88e  li a1,40  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_88e (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x88e) false
-      (ITYPE (mword_of_int 40 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 11), ADDI)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x88e (mword_of_int 0x02800593 : mword 32) udec_02800593.
-  Qed.
-
-  (* 0x892  c.j 872 <vprintf+0x1f2>  (RVC, 2 mod 4) *)
-  Lemma uis_grep_892 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x892) true
-      (C_J (mword_of_int 2032 : mword 11)).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x892 (mword_of_int 0xb7c5 : mword 16) udec_b7c5.
-  Qed.
-
-  (* 0x894  c.mv a1,a5  (RVC, 4-aligned) *)
-  Lemma uis_grep_894 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x894) true
-      (C_MV (Regidx (mword_of_int 11), Regidx (mword_of_int 15))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x894 (mword_of_int 0x85be : mword 16) udec_85be
-      (mword_of_int 0x855a85be : mword 32).
-  Qed.
-
-  (* 0x896  c.mv a0,s6  (RVC, 2 mod 4) *)
-  Lemma uis_grep_896 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x896) true
-      (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 22))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x896 (mword_of_int 0x855a : mword 16) udec_855a.
-  Qed.
-
-  (* 0x898  jal 5c4 <putc>  (base, 4-aligned) *)
-  Lemma uis_grep_898 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x898) false
-      (JAL (mword_of_int 2096428 : mword 21, Regidx (mword_of_int 1))).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x898 (mword_of_int 0xd2dff0ef : mword 32) udec_d2dff0ef.
-  Qed.
-
-  (* 0x89c  c.li s3,0  (RVC, 4-aligned) *)
-  Lemma uis_grep_89c (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x89c) true
-      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 19))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x89c (mword_of_int 0x4981 : mword 16) udec_4981
-      (mword_of_int 0xb51d4981 : mword 32).
-  Qed.
-
-  (* 0x89e  c.j 6c4 <vprintf+0x44>  (RVC, 2 mod 4) *)
-  Lemma uis_grep_89e (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x89e) true
-      (C_J (mword_of_int 1811 : mword 11)).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x89e (mword_of_int 0xb51d : mword 16) udec_b51d.
-  Qed.
-
-  (* 0x8a0  c.mv s7,s3  (RVC, 4-aligned) *)
-  Lemma uis_grep_8a0 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x8a0) true
-      (C_MV (Regidx (mword_of_int 23), Regidx (mword_of_int 19))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x8a0 (mword_of_int 0x8bce : mword 16) udec_8bce
-      (mword_of_int 0x49818bce : mword 32).
-  Qed.
-
-  (* 0x8a2  c.li s3,0  (RVC, 2 mod 4) *)
-  Lemma uis_grep_8a2 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x8a2) true
-      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 19))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x8a2 (mword_of_int 0x4981 : mword 16) udec_4981.
-  Qed.
-
-  (* 0x8a4  c.j 6c4 <vprintf+0x44>  (RVC, 4-aligned) *)
-  Lemma uis_grep_8a4 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x8a4) true
-      (C_J (mword_of_int 1808 : mword 11)).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x8a4 (mword_of_int 0xb505 : mword 16) udec_b505
-      (mword_of_int 0x6906b505 : mword 32).
-  Qed.
-
-  (* 0x8a6  c.ldsp s2,64(sp)  (RVC, 2 mod 4) *)
-  Lemma uis_grep_8a6 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x8a6) true
-      (C_LDSP (mword_of_int 8 : mword 6, Regidx (mword_of_int 18))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x8a6 (mword_of_int 0x6906 : mword 16) udec_6906.
-  Qed.
-
-  (* 0x8a8  c.ldsp s3,56(sp)  (RVC, 4-aligned) *)
-  Lemma uis_grep_8a8 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x8a8) true
-      (C_LDSP (mword_of_int 7 : mword 6, Regidx (mword_of_int 19))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x8a8 (mword_of_int 0x79e2 : mword 16) udec_79e2
-      (mword_of_int 0x7a4279e2 : mword 32).
-  Qed.
-
-  (* 0x8aa  c.ldsp s4,48(sp)  (RVC, 2 mod 4) *)
-  Lemma uis_grep_8aa (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x8aa) true
-      (C_LDSP (mword_of_int 6 : mword 6, Regidx (mword_of_int 20))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x8aa (mword_of_int 0x7a42 : mword 16) udec_7a42.
-  Qed.
-
-  (* 0x8ac  c.ldsp s5,40(sp)  (RVC, 4-aligned) *)
-  Lemma uis_grep_8ac (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x8ac) true
-      (C_LDSP (mword_of_int 5 : mword 6, Regidx (mword_of_int 21))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x8ac (mword_of_int 0x7aa2 : mword 16) udec_7aa2
-      (mword_of_int 0x7b027aa2 : mword 32).
-  Qed.
-
-  (* 0x8ae  c.ldsp s6,32(sp)  (RVC, 2 mod 4) *)
-  Lemma uis_grep_8ae (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x8ae) true
-      (C_LDSP (mword_of_int 4 : mword 6, Regidx (mword_of_int 22))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x8ae (mword_of_int 0x7b02 : mword 16) udec_7b02.
-  Qed.
-
-  (* 0x8b0  c.ldsp s7,24(sp)  (RVC, 4-aligned) *)
-  Lemma uis_grep_8b0 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x8b0) true
-      (C_LDSP (mword_of_int 3 : mword 6, Regidx (mword_of_int 23))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x8b0 (mword_of_int 0x6be2 : mword 16) udec_6be2
-      (mword_of_int 0x6c426be2 : mword 32).
-  Qed.
-
-  (* 0x8b2  c.ldsp s8,16(sp)  (RVC, 2 mod 4) *)
-  Lemma uis_grep_8b2 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x8b2) true
-      (C_LDSP (mword_of_int 2 : mword 6, Regidx (mword_of_int 24))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x8b2 (mword_of_int 0x6c42 : mword 16) udec_6c42.
-  Qed.
-
-  (* 0x8b4  c.ldsp ra,88(sp)  (RVC, 4-aligned) *)
-  Lemma uis_grep_8b4 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x8b4) true
-      (C_LDSP (mword_of_int 11 : mword 6, Regidx (mword_of_int 1))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x8b4 (mword_of_int 0x60e6 : mword 16) udec_60e6
-      (mword_of_int 0x644660e6 : mword 32).
-  Qed.
-
-  (* 0x8b6  c.ldsp s0,80(sp)  (RVC, 2 mod 4) *)
-  Lemma uis_grep_8b6 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x8b6) true
-      (C_LDSP (mword_of_int 10 : mword 6, Regidx (mword_of_int 8))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x8b6 (mword_of_int 0x6446 : mword 16) udec_6446.
-  Qed.
-
-  (* 0x8b8  c.ldsp s1,72(sp)  (RVC, 4-aligned) *)
-  Lemma uis_grep_8b8 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x8b8) true
-      (C_LDSP (mword_of_int 9 : mword 6, Regidx (mword_of_int 9))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x8b8 (mword_of_int 0x64a6 : mword 16) udec_64a6
-      (mword_of_int 0x612564a6 : mword 32).
-  Qed.
-
-  (* 0x8ba  c.addi16sp sp,sp,96  (RVC, 2 mod 4) *)
-  Lemma uis_grep_8ba (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x8ba) true
+    uinstr_is g (mword_of_int 0x9a0) true
       (C_ADDI16SP (mword_of_int 6 : mword 6)).
   Proof using .
     iIntros "#Ht".
-    uis_rvc2 g 0x8ba (mword_of_int 0x6125 : mword 16) udec_6125.
+    uis_rvc4 g 0x9a0 (mword_of_int 0x6125 : mword 16) udec_6125
+      (mword_of_int 0x80826125 : mword 32).
   Qed.
 
-  (* 0x8bc  c.jr  (RVC, 4-aligned) *)
-  Lemma uis_grep_8bc (g : gname) :
+  (* 0x9a2  c.jr  (RVC, 2 mod 4) *)
+  Lemma uis_grep_9a2 (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x8bc) true
+    uinstr_is g (mword_of_int 0x9a2) true
       (C_JR (Regidx (mword_of_int 1))).
   Proof using .
     iIntros "#Ht".
-    uis_rvc4 g 0x8bc (mword_of_int 0x8082 : mword 16) udec_8082
-      (mword_of_int 0x07138082 : mword 32).
+    uis_rvc2 g 0x9a2 (mword_of_int 0x8082 : mword 16) udec_8082.
   Qed.
 
-  (* 0x8be  li a4,100  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_8be (g : gname) :
+  (* ---------------- <vprintf> @ 0x688 ---------------- *)
+
+  (* 0x688  c.addi16sp  (RVC, 4-aligned) *)
+  Lemma uis_grep_688 (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x8be) false
-      (ITYPE (mword_of_int 100 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 14), ADDI)).
+    uinstr_is g (mword_of_int 0x688) true
+      (C_ADDI16SP (mword_of_int 58 : mword 6)).
   Proof using .
     iIntros "#Ht".
-    uis_base g 0x8be (mword_of_int 0x06400713 : mword 32) udec_06400713.
+    uis_rvc4 g 0x688 (mword_of_int 0x711d : mword 16) udec_711d
+      (mword_of_int 0xec86711d : mword 32).
   Qed.
 
-  (* 0x8c2  beq a5,a4,720 <vprintf+0xa0>  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_8c2 (g : gname) :
+  (* 0x68a  c.sdsp ra,88(sp)  (RVC, 2 mod 4) *)
+  Lemma uis_grep_68a (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x8c2) false
-      (BTYPE (mword_of_int 7774 : mword 13, Regidx (mword_of_int 14), Regidx (mword_of_int 15), BEQ)).
+    uinstr_is g (mword_of_int 0x68a) true
+      (C_SDSP (mword_of_int 11 : mword 6, Regidx (mword_of_int 1))).
   Proof using .
     iIntros "#Ht".
-    uis_base g 0x8c2 (mword_of_int 0xe4e78fe3 : mword 32) udec_e4e78fe3.
+    uis_rvc2 g 0x68a (mword_of_int 0xec86 : mword 16) udec_ec86.
   Qed.
 
-  (* 0x8c6  addi a3,a5,-108  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_8c6 (g : gname) :
+  (* 0x68c  c.sdsp s0,80(sp)  (RVC, 4-aligned) *)
+  Lemma uis_grep_68c (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x8c6) false
-      (ITYPE (mword_of_int 3988 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 13), ADDI)).
+    uinstr_is g (mword_of_int 0x68c) true
+      (C_SDSP (mword_of_int 10 : mword 6, Regidx (mword_of_int 8))).
   Proof using .
     iIntros "#Ht".
-    uis_base g 0x8c6 (mword_of_int 0xf9478693 : mword 32) udec_f9478693.
+    uis_rvc4 g 0x68c (mword_of_int 0xe8a2 : mword 16) udec_e8a2
+      (mword_of_int 0xe4a6e8a2 : mword 32).
   Qed.
 
-  (* 0x8ca  seqz a3,a3  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_8ca (g : gname) :
+  (* 0x68e  c.sdsp s1,72(sp)  (RVC, 2 mod 4) *)
+  Lemma uis_grep_68e (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x8ca) false
-      (ITYPE (mword_of_int 1 : mword 12, Regidx (mword_of_int 13), Regidx (mword_of_int 13), SLTIU)).
+    uinstr_is g (mword_of_int 0x68e) true
+      (C_SDSP (mword_of_int 9 : mword 6, Regidx (mword_of_int 9))).
   Proof using .
     iIntros "#Ht".
-    uis_base g 0x8ca (mword_of_int 0x0016b693 : mword 32) udec_0016b693.
+    uis_rvc2 g 0x68e (mword_of_int 0xe4a6 : mword 16) udec_e4a6.
   Qed.
 
-  (* 0x8ce  c.mv a1,a2  (RVC, 2 mod 4) *)
-  Lemma uis_grep_8ce (g : gname) :
+  (* 0x690  c.addi4spn s0,sp,96  (RVC, 4-aligned) *)
+  Lemma uis_grep_690 (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x8ce) true
-      (C_MV (Regidx (mword_of_int 11), Regidx (mword_of_int 12))).
+    uinstr_is g (mword_of_int 0x690) true
+      (C_ADDI4SPN (Cregidx (mword_of_int 0), mword_of_int 24 : mword 8)).
   Proof using .
     iIntros "#Ht".
-    uis_rvc2 g 0x8ce (mword_of_int 0x85b2 : mword 16) udec_85b2.
+    uis_rvc4 g 0x690 (mword_of_int 0x1080 : mword 16) udec_1080
+      (mword_of_int 0xc4831080 : mword 32).
   Qed.
 
-  (* 0x8d0  c.li a4,0  (RVC, 4-aligned) *)
-  Lemma uis_grep_8d0 (g : gname) :
+  (* 0x692  lbu s1,0(a1)  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_692 (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x8d0) true
+    uinstr_is g (mword_of_int 0x692) false
+      (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 9), true, 1)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x692 (mword_of_int 0x0005c483 : mword 32) udec_0005c483.
+  Qed.
+
+  (* 0x696  beqz s1,8bc <vprintf+0x234>  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_696 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x696) false
+      (BTYPE (mword_of_int 550 : mword 13, Regidx (mword_of_int 0), Regidx (mword_of_int 9), BEQ)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x696 (mword_of_int 0x22048363 : mword 32) udec_22048363.
+  Qed.
+
+  (* 0x69a  c.sdsp s2,64(sp)  (RVC, 2 mod 4) *)
+  Lemma uis_grep_69a (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x69a) true
+      (C_SDSP (mword_of_int 8 : mword 6, Regidx (mword_of_int 18))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x69a (mword_of_int 0xe0ca : mword 16) udec_e0ca.
+  Qed.
+
+  (* 0x69c  c.sdsp s3,56(sp)  (RVC, 4-aligned) *)
+  Lemma uis_grep_69c (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x69c) true
+      (C_SDSP (mword_of_int 7 : mword 6, Regidx (mword_of_int 19))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x69c (mword_of_int 0xfc4e : mword 16) udec_fc4e
+      (mword_of_int 0xf852fc4e : mword 32).
+  Qed.
+
+  (* 0x69e  c.sdsp s4,48(sp)  (RVC, 2 mod 4) *)
+  Lemma uis_grep_69e (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x69e) true
+      (C_SDSP (mword_of_int 6 : mword 6, Regidx (mword_of_int 20))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x69e (mword_of_int 0xf852 : mword 16) udec_f852.
+  Qed.
+
+  (* 0x6a0  c.sdsp s5,40(sp)  (RVC, 4-aligned) *)
+  Lemma uis_grep_6a0 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x6a0) true
+      (C_SDSP (mword_of_int 5 : mword 6, Regidx (mword_of_int 21))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x6a0 (mword_of_int 0xf456 : mword 16) udec_f456
+      (mword_of_int 0xf05af456 : mword 32).
+  Qed.
+
+  (* 0x6a2  c.sdsp s6,32(sp)  (RVC, 2 mod 4) *)
+  Lemma uis_grep_6a2 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x6a2) true
+      (C_SDSP (mword_of_int 4 : mword 6, Regidx (mword_of_int 22))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x6a2 (mword_of_int 0xf05a : mword 16) udec_f05a.
+  Qed.
+
+  (* 0x6a4  c.sdsp s7,24(sp)  (RVC, 4-aligned) *)
+  Lemma uis_grep_6a4 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x6a4) true
+      (C_SDSP (mword_of_int 3 : mword 6, Regidx (mword_of_int 23))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x6a4 (mword_of_int 0xec5e : mword 16) udec_ec5e
+      (mword_of_int 0xe862ec5e : mword 32).
+  Qed.
+
+  (* 0x6a6  c.sdsp s8,16(sp)  (RVC, 2 mod 4) *)
+  Lemma uis_grep_6a6 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x6a6) true
+      (C_SDSP (mword_of_int 2 : mword 6, Regidx (mword_of_int 24))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x6a6 (mword_of_int 0xe862 : mword 16) udec_e862.
+  Qed.
+
+  (* 0x6a8  c.mv s6,a0  (RVC, 4-aligned) *)
+  Lemma uis_grep_6a8 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x6a8) true
+      (C_MV (Regidx (mword_of_int 22), Regidx (mword_of_int 10))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x6a8 (mword_of_int 0x8b2a : mword 16) udec_8b2a
+      (mword_of_int 0x8a2e8b2a : mword 32).
+  Qed.
+
+  (* 0x6aa  c.mv s4,a1  (RVC, 2 mod 4) *)
+  Lemma uis_grep_6aa (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x6aa) true
+      (C_MV (Regidx (mword_of_int 20), Regidx (mword_of_int 11))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x6aa (mword_of_int 0x8a2e : mword 16) udec_8a2e.
+  Qed.
+
+  (* 0x6ac  c.mv s7,a2  (RVC, 4-aligned) *)
+  Lemma uis_grep_6ac (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x6ac) true
+      (C_MV (Regidx (mword_of_int 23), Regidx (mword_of_int 12))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x6ac (mword_of_int 0x8bb2 : mword 16) udec_8bb2
+      (mword_of_int 0x49818bb2 : mword 32).
+  Qed.
+
+  (* 0x6ae  c.li s3,0  (RVC, 2 mod 4) *)
+  Lemma uis_grep_6ae (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x6ae) true
+      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 19))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x6ae (mword_of_int 0x4981 : mword 16) udec_4981.
+  Qed.
+
+  (* 0x6b0  c.li s2,0  (RVC, 4-aligned) *)
+  Lemma uis_grep_6b0 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x6b0) true
+      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 18))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x6b0 (mword_of_int 0x4901 : mword 16) udec_4901
+      (mword_of_int 0x47014901 : mword 32).
+  Qed.
+
+  (* 0x6b2  c.li a4,0  (RVC, 2 mod 4) *)
+  Lemma uis_grep_6b2 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x6b2) true
       (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 14))).
   Proof using .
     iIntros "#Ht".
-    uis_rvc4 g 0x8d0 (mword_of_int 0x4701 : mword 16) udec_4701
-      (mword_of_int 0x05134701 : mword 32).
+    uis_rvc2 g 0x6b2 (mword_of_int 0x4701 : mword 16) udec_4701.
   Qed.
 
-  (* 0x8d2  li a0,117  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_8d2 (g : gname) :
+  (* 0x6b4  li s5,37  (base, 4-aligned) *)
+  Lemma uis_grep_6b4 (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x8d2) false
-      (ITYPE (mword_of_int 117 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 10), ADDI)).
+    uinstr_is g (mword_of_int 0x6b4) false
+      (ITYPE (mword_of_int 37 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 21), ADDI)).
   Proof using .
     iIntros "#Ht".
-    uis_base g 0x8d2 (mword_of_int 0x07500513 : mword 32) udec_07500513.
+    uis_base g 0x6b4 (mword_of_int 0x02500a93 : mword 32) udec_02500a93.
   Qed.
 
-  (* 0x8d6  beq a5,a0,76e <vprintf+0xee>  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_8d6 (g : gname) :
+  (* 0x6b8  li s8,100  (base, 4-aligned) *)
+  Lemma uis_grep_6b8 (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x8d6) false
-      (BTYPE (mword_of_int 7832 : mword 13, Regidx (mword_of_int 10), Regidx (mword_of_int 15), BEQ)).
+    uinstr_is g (mword_of_int 0x6b8) false
+      (ITYPE (mword_of_int 100 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 24), ADDI)).
   Proof using .
     iIntros "#Ht".
-    uis_base g 0x8d6 (mword_of_int 0xe8a78ce3 : mword 32) udec_e8a78ce3.
+    uis_base g 0x6b8 (mword_of_int 0x06400c13 : mword 32) udec_06400c13.
   Qed.
 
-  (* 0x8da  addi a0,a2,-117  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_8da (g : gname) :
+  (* 0x6bc  c.j 6de <vprintf+0x56>  (RVC, 4-aligned) *)
+  Lemma uis_grep_6bc (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x8da) false
-      (ITYPE (mword_of_int 3979 : mword 12, Regidx (mword_of_int 12), Regidx (mword_of_int 10), ADDI)).
+    uinstr_is g (mword_of_int 0x6bc) true
+      (C_J (mword_of_int 17 : mword 11)).
   Proof using .
     iIntros "#Ht".
-    uis_base g 0x8da (mword_of_int 0xf8b60513 : mword 32) udec_f8b60513.
+    uis_rvc4 g 0x6bc (mword_of_int 0xa00d : mword 16) udec_a00d
+      (mword_of_int 0x85a6a00d : mword 32).
   Qed.
 
-  (* 0x8de  c.bnez a0,8e4 <vprintf+0x264>  (RVC, 2 mod 4) *)
-  Lemma uis_grep_8de (g : gname) :
+  (* 0x6be  c.mv a1,s1  (RVC, 2 mod 4) *)
+  Lemma uis_grep_6be (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x8de) true
-      (C_BNEZ (mword_of_int 3 : mword 8, Cregidx (mword_of_int 2))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x8de (mword_of_int 0xe119 : mword 16) udec_e119.
-  Qed.
-
-  (* 0x8e0  bnez a3,786 <vprintf+0x106>  (base, 4-aligned) *)
-  Lemma uis_grep_8e0 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x8e0) false
-      (BTYPE (mword_of_int 7846 : mword 13, Regidx (mword_of_int 0), Regidx (mword_of_int 13), BNE)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x8e0 (mword_of_int 0xea0693e3 : mword 32) udec_ea0693e3.
-  Qed.
-
-  (* 0x8e4  addi a0,a1,-117  (base, 4-aligned) *)
-  Lemma uis_grep_8e4 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x8e4) false
-      (ITYPE (mword_of_int 3979 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 10), ADDI)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x8e4 (mword_of_int 0xf8b58513 : mword 32) udec_f8b58513.
-  Qed.
-
-  (* 0x8e8  c.bnez a0,8ee <vprintf+0x26e>  (RVC, 4-aligned) *)
-  Lemma uis_grep_8e8 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x8e8) true
-      (C_BNEZ (mword_of_int 3 : mword 8, Cregidx (mword_of_int 2))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x8e8 (mword_of_int 0xe119 : mword 16) udec_e119
-      (mword_of_int 0x1be3e119 : mword 32).
-  Qed.
-
-  (* 0x8ea  bnez a4,7a0 <vprintf+0x120>  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_8ea (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x8ea) false
-      (BTYPE (mword_of_int 7862 : mword 13, Regidx (mword_of_int 0), Regidx (mword_of_int 14), BNE)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x8ea (mword_of_int 0xea071be3 : mword 32) udec_ea071be3.
-  Qed.
-
-  (* 0x8ee  li a0,120  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_8ee (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x8ee) false
-      (ITYPE (mword_of_int 120 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 10), ADDI)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x8ee (mword_of_int 0x07800513 : mword 32) udec_07800513.
-  Qed.
-
-  (* 0x8f2  beq a5,a0,7ba <vprintf+0x13a>  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_8f2 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x8f2) false
-      (BTYPE (mword_of_int 7880 : mword 13, Regidx (mword_of_int 10), Regidx (mword_of_int 15), BEQ)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x8f2 (mword_of_int 0xeca784e3 : mword 32) udec_eca784e3.
-  Qed.
-
-  (* 0x8f6  addi a2,a2,-120  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_8f6 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x8f6) false
-      (ITYPE (mword_of_int 3976 : mword 12, Regidx (mword_of_int 12), Regidx (mword_of_int 12), ADDI)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x8f6 (mword_of_int 0xf8860613 : mword 32) udec_f8860613.
-  Qed.
-
-  (* 0x8fa  c.bnez a2,900 <vprintf+0x280>  (RVC, 2 mod 4) *)
-  Lemma uis_grep_8fa (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x8fa) true
-      (C_BNEZ (mword_of_int 3 : mword 8, Cregidx (mword_of_int 4))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x8fa (mword_of_int 0xe219 : mword 16) udec_e219.
-  Qed.
-
-  (* 0x8fc  bnez a3,7d2 <vprintf+0x152>  (base, 4-aligned) *)
-  Lemma uis_grep_8fc (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x8fc) false
-      (BTYPE (mword_of_int 7894 : mword 13, Regidx (mword_of_int 0), Regidx (mword_of_int 13), BNE)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x8fc (mword_of_int 0xec069be3 : mword 32) udec_ec069be3.
-  Qed.
-
-  (* 0x900  addi a1,a1,-120  (base, 4-aligned) *)
-  Lemma uis_grep_900 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x900) false
-      (ITYPE (mword_of_int 3976 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x900 (mword_of_int 0xf8858593 : mword 32) udec_f8858593.
-  Qed.
-
-  (* 0x904  c.bnez a1,90a <vprintf+0x28a>  (RVC, 4-aligned) *)
-  Lemma uis_grep_904 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x904) true
-      (C_BNEZ (mword_of_int 3 : mword 8, Cregidx (mword_of_int 3))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x904 (mword_of_int 0xe199 : mword 16) udec_e199
-      (mword_of_int 0x13e3e199 : mword 32).
-  Qed.
-
-  (* 0x906  bnez a4,7ec <vprintf+0x16c>  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_906 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x906) false
-      (BTYPE (mword_of_int 7910 : mword 13, Regidx (mword_of_int 0), Regidx (mword_of_int 14), BNE)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x906 (mword_of_int 0xee0713e3 : mword 32) udec_ee0713e3.
-  Qed.
-
-  (* 0x90a  li a4,112  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_90a (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x90a) false
-      (ITYPE (mword_of_int 112 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 14), ADDI)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x90a (mword_of_int 0x07000713 : mword 32) udec_07000713.
-  Qed.
-
-  (* 0x90e  beq a5,a4,806 <vprintf+0x186>  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_90e (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x90e) false
-      (BTYPE (mword_of_int 7928 : mword 13, Regidx (mword_of_int 14), Regidx (mword_of_int 15), BEQ)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x90e (mword_of_int 0xeee78ce3 : mword 32) udec_eee78ce3.
-  Qed.
-
-  (* 0x912  li a4,99  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_912 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x912) false
-      (ITYPE (mword_of_int 99 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 14), ADDI)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x912 (mword_of_int 0x06300713 : mword 32) udec_06300713.
-  Qed.
-
-  (* 0x916  beq a5,a4,84e <vprintf+0x1ce>  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_916 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x916) false
-      (BTYPE (mword_of_int 7992 : mword 13, Regidx (mword_of_int 14), Regidx (mword_of_int 15), BEQ)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x916 (mword_of_int 0xf2e78ce3 : mword 32) udec_f2e78ce3.
-  Qed.
-
-  (* 0x91a  li a4,115  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_91a (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x91a) false
-      (ITYPE (mword_of_int 115 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 14), ADDI)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x91a (mword_of_int 0x07300713 : mword 32) udec_07300713.
-  Qed.
-
-  (* 0x91e  beq a5,a4,862 <vprintf+0x1e2>  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_91e (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x91e) false
-      (BTYPE (mword_of_int 8004 : mword 13, Regidx (mword_of_int 14), Regidx (mword_of_int 15), BEQ)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x91e (mword_of_int 0xf4e782e3 : mword 32) udec_f4e782e3.
-  Qed.
-
-  (* 0x922  li a4,37  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_922 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x922) false
-      (ITYPE (mword_of_int 37 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 14), ADDI)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x922 (mword_of_int 0x02500713 : mword 32) udec_02500713.
-  Qed.
-
-  (* 0x926  beq a5,a4,894 <vprintf+0x214>  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_926 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x926) false
-      (BTYPE (mword_of_int 8046 : mword 13, Regidx (mword_of_int 14), Regidx (mword_of_int 15), BEQ)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x926 (mword_of_int 0xf6e787e3 : mword 32) udec_f6e787e3.
-  Qed.
-
-  (* 0x92a  li a1,37  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_92a (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x92a) false
-      (ITYPE (mword_of_int 37 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 11), ADDI)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x92a (mword_of_int 0x02500593 : mword 32) udec_02500593.
-  Qed.
-
-  (* 0x92e  c.mv a0,s6  (RVC, 2 mod 4) *)
-  Lemma uis_grep_92e (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x92e) true
-      (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 22))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x92e (mword_of_int 0x855a : mword 16) udec_855a.
-  Qed.
-
-  (* 0x930  jal 5c4 <putc>  (base, 4-aligned) *)
-  Lemma uis_grep_930 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x930) false
-      (JAL (mword_of_int 2096276 : mword 21, Regidx (mword_of_int 1))).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x930 (mword_of_int 0xc95ff0ef : mword 32) udec_c95ff0ef.
-  Qed.
-
-  (* 0x934  c.mv a1,s1  (RVC, 4-aligned) *)
-  Lemma uis_grep_934 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x934) true
+    uinstr_is g (mword_of_int 0x6be) true
       (C_MV (Regidx (mword_of_int 11), Regidx (mword_of_int 9))).
   Proof using .
     iIntros "#Ht".
-    uis_rvc4 g 0x934 (mword_of_int 0x85a6 : mword 16) udec_85a6
-      (mword_of_int 0x855a85a6 : mword 32).
+    uis_rvc2 g 0x6be (mword_of_int 0x85a6 : mword 16) udec_85a6.
+  Qed.
+
+  (* 0x6c0  c.mv a0,s6  (RVC, 4-aligned) *)
+  Lemma uis_grep_6c0 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x6c0) true
+      (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 22))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x6c0 (mword_of_int 0x855a : mword 16) udec_855a
+      (mword_of_int 0xf0ef855a : mword 32).
+  Qed.
+
+  (* 0x6c2  jal 5cc <putc>  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_6c2 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x6c2) false
+      (JAL (mword_of_int 2096906 : mword 21, Regidx (mword_of_int 1))).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x6c2 (mword_of_int 0xf0bff0ef : mword 32) udec_f0bff0ef.
+  Qed.
+
+  (* 0x6c6  c.j 6cc <vprintf+0x44>  (RVC, 2 mod 4) *)
+  Lemma uis_grep_6c6 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x6c6) true
+      (C_J (mword_of_int 3 : mword 11)).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x6c6 (mword_of_int 0xa019 : mword 16) udec_a019.
+  Qed.
+
+  (* 0x6c8  beq s3,s5,6ee <vprintf+0x66>  (base, 4-aligned) *)
+  Lemma uis_grep_6c8 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x6c8) false
+      (BTYPE (mword_of_int 38 : mword 13, Regidx (mword_of_int 21), Regidx (mword_of_int 19), BEQ)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x6c8 (mword_of_int 0x03598363 : mword 32) udec_03598363.
+  Qed.
+
+  (* 0x6cc  addiw a5,s2,1  (base, 4-aligned) *)
+  Lemma uis_grep_6cc (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x6cc) false
+      (ADDIW (mword_of_int 1 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 15))).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x6cc (mword_of_int 0x0019079b : mword 32) udec_0019079b.
+  Qed.
+
+  (* 0x6d0  c.mv s2,a5  (RVC, 4-aligned) *)
+  Lemma uis_grep_6d0 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x6d0) true
+      (C_MV (Regidx (mword_of_int 18), Regidx (mword_of_int 15))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x6d0 (mword_of_int 0x893e : mword 16) udec_893e
+      (mword_of_int 0x873e893e : mword 32).
+  Qed.
+
+  (* 0x6d2  c.mv a4,a5  (RVC, 2 mod 4) *)
+  Lemma uis_grep_6d2 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x6d2) true
+      (C_MV (Regidx (mword_of_int 14), Regidx (mword_of_int 15))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x6d2 (mword_of_int 0x873e : mword 16) udec_873e.
+  Qed.
+
+  (* 0x6d4  c.add a5,a5,s4  (RVC, 4-aligned) *)
+  Lemma uis_grep_6d4 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x6d4) true
+      (C_ADD (Regidx (mword_of_int 15), Regidx (mword_of_int 20))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x6d4 (mword_of_int 0x97d2 : mword 16) udec_97d2
+      (mword_of_int 0xc48397d2 : mword 32).
+  Qed.
+
+  (* 0x6d6  lbu s1,0(a5)  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_6d6 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x6d6) false
+      (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 9), true, 1)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x6d6 (mword_of_int 0x0007c483 : mword 32) udec_0007c483.
+  Qed.
+
+  (* 0x6da  beqz s1,8ae <vprintf+0x226>  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_6da (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x6da) false
+      (BTYPE (mword_of_int 468 : mword 13, Regidx (mword_of_int 0), Regidx (mword_of_int 9), BEQ)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x6da (mword_of_int 0x1c048a63 : mword 32) udec_1c048a63.
+  Qed.
+
+  (* 0x6de  sext.w a5,s1  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_6de (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x6de) false
+      (ADDIW (mword_of_int 0 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15))).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x6de (mword_of_int 0x0004879b : mword 32) udec_0004879b.
+  Qed.
+
+  (* 0x6e2  bnez s3,6c8 <vprintf+0x40>  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_6e2 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x6e2) false
+      (BTYPE (mword_of_int 8166 : mword 13, Regidx (mword_of_int 0), Regidx (mword_of_int 19), BNE)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x6e2 (mword_of_int 0xfe0993e3 : mword 32) udec_fe0993e3.
+  Qed.
+
+  (* 0x6e6  bne a5,s5,6be <vprintf+0x36>  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_6e6 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x6e6) false
+      (BTYPE (mword_of_int 8152 : mword 13, Regidx (mword_of_int 21), Regidx (mword_of_int 15), BNE)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x6e6 (mword_of_int 0xfd579ce3 : mword 32) udec_fd579ce3.
+  Qed.
+
+  (* 0x6ea  c.mv s3,a5  (RVC, 2 mod 4) *)
+  Lemma uis_grep_6ea (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x6ea) true
+      (C_MV (Regidx (mword_of_int 19), Regidx (mword_of_int 15))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x6ea (mword_of_int 0x89be : mword 16) udec_89be.
+  Qed.
+
+  (* 0x6ec  c.j 6cc <vprintf+0x44>  (RVC, 4-aligned) *)
+  Lemma uis_grep_6ec (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x6ec) true
+      (C_J (mword_of_int 2032 : mword 11)).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x6ec (mword_of_int 0xb7c5 : mword 16) udec_b7c5
+      (mword_of_int 0x06b3b7c5 : mword 32).
+  Qed.
+
+  (* 0x6ee  add a3,s4,a4  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_6ee (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x6ee) false
+      (RTYPE (Regidx (mword_of_int 14), Regidx (mword_of_int 20), Regidx (mword_of_int 13), ADD)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x6ee (mword_of_int 0x00ea06b3 : mword 32) udec_00ea06b3.
+  Qed.
+
+  (* 0x6f2  lbu a2,1(a3)  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_6f2 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x6f2) false
+      (LOAD (mword_of_int 1 : mword 12, Regidx (mword_of_int 13), Regidx (mword_of_int 12), true, 1)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x6f2 (mword_of_int 0x0016c603 : mword 32) udec_0016c603.
+  Qed.
+
+  (* 0x6f6  beqz a2,8c6 <vprintf+0x23e>  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_6f6 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x6f6) false
+      (BTYPE (mword_of_int 464 : mword 13, Regidx (mword_of_int 0), Regidx (mword_of_int 12), BEQ)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x6f6 (mword_of_int 0x1c060863 : mword 32) udec_1c060863.
+  Qed.
+
+  (* 0x6fa  beq a5,s8,728 <vprintf+0xa0>  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_6fa (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x6fa) false
+      (BTYPE (mword_of_int 46 : mword 13, Regidx (mword_of_int 24), Regidx (mword_of_int 15), BEQ)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x6fa (mword_of_int 0x03878763 : mword 32) udec_03878763.
+  Qed.
+
+  (* 0x6fe  addi a3,a5,-108  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_6fe (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x6fe) false
+      (ITYPE (mword_of_int 3988 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 13), ADDI)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x6fe (mword_of_int 0xf9478693 : mword 32) udec_f9478693.
+  Qed.
+
+  (* 0x702  seqz a3,a3  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_702 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x702) false
+      (ITYPE (mword_of_int 1 : mword 12, Regidx (mword_of_int 13), Regidx (mword_of_int 13), SLTIU)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x702 (mword_of_int 0x0016b693 : mword 32) udec_0016b693.
+  Qed.
+
+  (* 0x706  addi a1,a2,-100  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_706 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x706) false
+      (ITYPE (mword_of_int 3996 : mword 12, Regidx (mword_of_int 12), Regidx (mword_of_int 11), ADDI)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x706 (mword_of_int 0xf9c60593 : mword 32) udec_f9c60593.
+  Qed.
+
+  (* 0x70a  c.bnez a1,740 <vprintf+0xb8>  (RVC, 2 mod 4) *)
+  Lemma uis_grep_70a (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x70a) true
+      (C_BNEZ (mword_of_int 27 : mword 8, Cregidx (mword_of_int 3))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x70a (mword_of_int 0xe99d : mword 16) udec_e99d.
+  Qed.
+
+  (* 0x70c  c.beqz a3,740 <vprintf+0xb8>  (RVC, 4-aligned) *)
+  Lemma uis_grep_70c (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x70c) true
+      (C_BEQZ (mword_of_int 26 : mword 8, Cregidx (mword_of_int 5))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x70c (mword_of_int 0xca95 : mword 16) udec_ca95
+      (mword_of_int 0x8493ca95 : mword 32).
+  Qed.
+
+  (* 0x70e  addi s1,s7,8  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_70e (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x70e) false
+      (ITYPE (mword_of_int 8 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 9), ADDI)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x70e (mword_of_int 0x008b8493 : mword 32) udec_008b8493.
+  Qed.
+
+  (* 0x712  c.li a3,1  (RVC, 2 mod 4) *)
+  Lemma uis_grep_712 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x712) true
+      (C_LI (mword_of_int 1 : mword 6, Regidx (mword_of_int 13))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x712 (mword_of_int 0x4685 : mword 16) udec_4685.
+  Qed.
+
+  (* 0x714  c.li a2,10  (RVC, 4-aligned) *)
+  Lemma uis_grep_714 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x714) true
+      (C_LI (mword_of_int 10 : mword 6, Regidx (mword_of_int 12))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x714 (mword_of_int 0x4629 : mword 16) udec_4629
+      (mword_of_int 0xb5834629 : mword 32).
+  Qed.
+
+  (* 0x716  ld a1,0(s7)  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_716 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x716) false
+      (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 11), false, 8)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x716 (mword_of_int 0x000bb583 : mword 32) udec_000bb583.
+  Qed.
+
+  (* 0x71a  c.mv a0,s6  (RVC, 2 mod 4) *)
+  Lemma uis_grep_71a (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x71a) true
+      (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 22))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x71a (mword_of_int 0x855a : mword 16) udec_855a.
+  Qed.
+
+  (* 0x71c  jal 5ea <printint>  (base, 4-aligned) *)
+  Lemma uis_grep_71c (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x71c) false
+      (JAL (mword_of_int 2096846 : mword 21, Regidx (mword_of_int 1))).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x71c (mword_of_int 0xecfff0ef : mword 32) udec_ecfff0ef.
+  Qed.
+
+  (* 0x720  c.addiw s2,s2,1  (RVC, 4-aligned) *)
+  Lemma uis_grep_720 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x720) true
+      (C_ADDIW (mword_of_int 1 : mword 6, Regidx (mword_of_int 18))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x720 (mword_of_int 0x2905 : mword 16) udec_2905
+      (mword_of_int 0x8ba62905 : mword 32).
+  Qed.
+
+  (* 0x722  c.mv s7,s1  (RVC, 2 mod 4) *)
+  Lemma uis_grep_722 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x722) true
+      (C_MV (Regidx (mword_of_int 23), Regidx (mword_of_int 9))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x722 (mword_of_int 0x8ba6 : mword 16) udec_8ba6.
+  Qed.
+
+  (* 0x724  c.li s3,0  (RVC, 4-aligned) *)
+  Lemma uis_grep_724 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x724) true
+      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 19))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x724 (mword_of_int 0x4981 : mword 16) udec_4981
+      (mword_of_int 0xb75d4981 : mword 32).
+  Qed.
+
+  (* 0x726  c.j 6cc <vprintf+0x44>  (RVC, 2 mod 4) *)
+  Lemma uis_grep_726 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x726) true
+      (C_J (mword_of_int 2003 : mword 11)).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x726 (mword_of_int 0xb75d : mword 16) udec_b75d.
+  Qed.
+
+  (* 0x728  addi s1,s7,8  (base, 4-aligned) *)
+  Lemma uis_grep_728 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x728) false
+      (ITYPE (mword_of_int 8 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 9), ADDI)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x728 (mword_of_int 0x008b8493 : mword 32) udec_008b8493.
+  Qed.
+
+  (* 0x72c  c.li a3,1  (RVC, 4-aligned) *)
+  Lemma uis_grep_72c (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x72c) true
+      (C_LI (mword_of_int 1 : mword 6, Regidx (mword_of_int 13))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x72c (mword_of_int 0x4685 : mword 16) udec_4685
+      (mword_of_int 0x46294685 : mword 32).
+  Qed.
+
+  (* 0x72e  c.li a2,10  (RVC, 2 mod 4) *)
+  Lemma uis_grep_72e (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x72e) true
+      (C_LI (mword_of_int 10 : mword 6, Regidx (mword_of_int 12))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x72e (mword_of_int 0x4629 : mword 16) udec_4629.
+  Qed.
+
+  (* 0x730  lw a1,0(s7)  (base, 4-aligned) *)
+  Lemma uis_grep_730 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x730) false
+      (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 11), false, 4)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x730 (mword_of_int 0x000ba583 : mword 32) udec_000ba583.
+  Qed.
+
+  (* 0x734  c.mv a0,s6  (RVC, 4-aligned) *)
+  Lemma uis_grep_734 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x734) true
+      (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 22))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x734 (mword_of_int 0x855a : mword 16) udec_855a
+      (mword_of_int 0xf0ef855a : mword 32).
+  Qed.
+
+  (* 0x736  jal 5ea <printint>  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_736 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x736) false
+      (JAL (mword_of_int 2096820 : mword 21, Regidx (mword_of_int 1))).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x736 (mword_of_int 0xeb5ff0ef : mword 32) udec_eb5ff0ef.
+  Qed.
+
+  (* 0x73a  c.mv s7,s1  (RVC, 2 mod 4) *)
+  Lemma uis_grep_73a (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x73a) true
+      (C_MV (Regidx (mword_of_int 23), Regidx (mword_of_int 9))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x73a (mword_of_int 0x8ba6 : mword 16) udec_8ba6.
+  Qed.
+
+  (* 0x73c  c.li s3,0  (RVC, 4-aligned) *)
+  Lemma uis_grep_73c (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x73c) true
+      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 19))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x73c (mword_of_int 0x4981 : mword 16) udec_4981
+      (mword_of_int 0xb7794981 : mword 32).
+  Qed.
+
+  (* 0x73e  c.j 6cc <vprintf+0x44>  (RVC, 2 mod 4) *)
+  Lemma uis_grep_73e (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x73e) true
+      (C_J (mword_of_int 1991 : mword 11)).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x73e (mword_of_int 0xb779 : mword 16) udec_b779.
+  Qed.
+
+  (* 0x740  c.add a4,a4,s4  (RVC, 4-aligned) *)
+  Lemma uis_grep_740 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x740) true
+      (C_ADD (Regidx (mword_of_int 14), Regidx (mword_of_int 20))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x740 (mword_of_int 0x9752 : mword 16) udec_9752
+      (mword_of_int 0x45839752 : mword 32).
+  Qed.
+
+  (* 0x742  lbu a1,2(a4)  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_742 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x742) false
+      (LOAD (mword_of_int 2 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 11), true, 1)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x742 (mword_of_int 0x00274583 : mword 32) udec_00274583.
+  Qed.
+
+  (* 0x746  addi a4,a2,-108  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_746 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x746) false
+      (ITYPE (mword_of_int 3988 : mword 12, Regidx (mword_of_int 12), Regidx (mword_of_int 14), ADDI)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x746 (mword_of_int 0xf9460713 : mword 32) udec_f9460713.
+  Qed.
+
+  (* 0x74a  seqz a4,a4  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_74a (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x74a) false
+      (ITYPE (mword_of_int 1 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), SLTIU)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x74a (mword_of_int 0x00173713 : mword 32) udec_00173713.
+  Qed.
+
+  (* 0x74e  c.and a4,a4,a3  (RVC, 2 mod 4) *)
+  Lemma uis_grep_74e (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x74e) true
+      (C_AND (Cregidx (mword_of_int 6), Cregidx (mword_of_int 5))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x74e (mword_of_int 0x8f75 : mword 16) udec_8f75.
+  Qed.
+
+  (* 0x750  addi a0,a1,-100  (base, 4-aligned) *)
+  Lemma uis_grep_750 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x750) false
+      (ITYPE (mword_of_int 3996 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 10), ADDI)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x750 (mword_of_int 0xf9c58513 : mword 32) udec_f9c58513.
+  Qed.
+
+  (* 0x754  bnez a0,8da <vprintf+0x252>  (base, 4-aligned) *)
+  Lemma uis_grep_754 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x754) false
+      (BTYPE (mword_of_int 390 : mword 13, Regidx (mword_of_int 0), Regidx (mword_of_int 10), BNE)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x754 (mword_of_int 0x18051363 : mword 32) udec_18051363.
+  Qed.
+
+  (* 0x758  beqz a4,8da <vprintf+0x252>  (base, 4-aligned) *)
+  Lemma uis_grep_758 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x758) false
+      (BTYPE (mword_of_int 386 : mword 13, Regidx (mword_of_int 0), Regidx (mword_of_int 14), BEQ)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x758 (mword_of_int 0x18070163 : mword 32) udec_18070163.
+  Qed.
+
+  (* 0x75c  addi s1,s7,8  (base, 4-aligned) *)
+  Lemma uis_grep_75c (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x75c) false
+      (ITYPE (mword_of_int 8 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 9), ADDI)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x75c (mword_of_int 0x008b8493 : mword 32) udec_008b8493.
+  Qed.
+
+  (* 0x760  c.li a3,1  (RVC, 4-aligned) *)
+  Lemma uis_grep_760 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x760) true
+      (C_LI (mword_of_int 1 : mword 6, Regidx (mword_of_int 13))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x760 (mword_of_int 0x4685 : mword 16) udec_4685
+      (mword_of_int 0x46294685 : mword 32).
+  Qed.
+
+  (* 0x762  c.li a2,10  (RVC, 2 mod 4) *)
+  Lemma uis_grep_762 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x762) true
+      (C_LI (mword_of_int 10 : mword 6, Regidx (mword_of_int 12))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x762 (mword_of_int 0x4629 : mword 16) udec_4629.
+  Qed.
+
+  (* 0x764  ld a1,0(s7)  (base, 4-aligned) *)
+  Lemma uis_grep_764 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x764) false
+      (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 11), false, 8)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x764 (mword_of_int 0x000bb583 : mword 32) udec_000bb583.
+  Qed.
+
+  (* 0x768  c.mv a0,s6  (RVC, 4-aligned) *)
+  Lemma uis_grep_768 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x768) true
+      (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 22))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x768 (mword_of_int 0x855a : mword 16) udec_855a
+      (mword_of_int 0xf0ef855a : mword 32).
+  Qed.
+
+  (* 0x76a  jal 5ea <printint>  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_76a (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x76a) false
+      (JAL (mword_of_int 2096768 : mword 21, Regidx (mword_of_int 1))).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x76a (mword_of_int 0xe81ff0ef : mword 32) udec_e81ff0ef.
+  Qed.
+
+  (* 0x76e  c.addiw s2,s2,2  (RVC, 2 mod 4) *)
+  Lemma uis_grep_76e (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x76e) true
+      (C_ADDIW (mword_of_int 2 : mword 6, Regidx (mword_of_int 18))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x76e (mword_of_int 0x2909 : mword 16) udec_2909.
+  Qed.
+
+  (* 0x770  c.mv s7,s1  (RVC, 4-aligned) *)
+  Lemma uis_grep_770 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x770) true
+      (C_MV (Regidx (mword_of_int 23), Regidx (mword_of_int 9))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x770 (mword_of_int 0x8ba6 : mword 16) udec_8ba6
+      (mword_of_int 0x49818ba6 : mword 32).
+  Qed.
+
+  (* 0x772  c.li s3,0  (RVC, 2 mod 4) *)
+  Lemma uis_grep_772 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x772) true
+      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 19))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x772 (mword_of_int 0x4981 : mword 16) udec_4981.
+  Qed.
+
+  (* 0x774  c.j 6cc <vprintf+0x44>  (RVC, 4-aligned) *)
+  Lemma uis_grep_774 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x774) true
+      (C_J (mword_of_int 1964 : mword 11)).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x774 (mword_of_int 0xbfa1 : mword 16) udec_bfa1
+      (mword_of_int 0x8493bfa1 : mword 32).
+  Qed.
+
+  (* 0x776  addi s1,s7,8  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_776 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x776) false
+      (ITYPE (mword_of_int 8 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 9), ADDI)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x776 (mword_of_int 0x008b8493 : mword 32) udec_008b8493.
+  Qed.
+
+  (* 0x77a  c.li a3,0  (RVC, 2 mod 4) *)
+  Lemma uis_grep_77a (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x77a) true
+      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 13))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x77a (mword_of_int 0x4681 : mword 16) udec_4681.
+  Qed.
+
+  (* 0x77c  c.li a2,10  (RVC, 4-aligned) *)
+  Lemma uis_grep_77c (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x77c) true
+      (C_LI (mword_of_int 10 : mword 6, Regidx (mword_of_int 12))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x77c (mword_of_int 0x4629 : mword 16) udec_4629
+      (mword_of_int 0xe5834629 : mword 32).
+  Qed.
+
+  (* 0x77e  lwu a1,0(s7)  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_77e (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x77e) false
+      (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 11), true, 4)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x77e (mword_of_int 0x000be583 : mword 32) udec_000be583.
+  Qed.
+
+  (* 0x782  c.mv a0,s6  (RVC, 2 mod 4) *)
+  Lemma uis_grep_782 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x782) true
+      (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 22))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x782 (mword_of_int 0x855a : mword 16) udec_855a.
+  Qed.
+
+  (* 0x784  jal 5ea <printint>  (base, 4-aligned) *)
+  Lemma uis_grep_784 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x784) false
+      (JAL (mword_of_int 2096742 : mword 21, Regidx (mword_of_int 1))).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x784 (mword_of_int 0xe67ff0ef : mword 32) udec_e67ff0ef.
+  Qed.
+
+  (* 0x788  c.mv s7,s1  (RVC, 4-aligned) *)
+  Lemma uis_grep_788 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x788) true
+      (C_MV (Regidx (mword_of_int 23), Regidx (mword_of_int 9))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x788 (mword_of_int 0x8ba6 : mword 16) udec_8ba6
+      (mword_of_int 0x49818ba6 : mword 32).
+  Qed.
+
+  (* 0x78a  c.li s3,0  (RVC, 2 mod 4) *)
+  Lemma uis_grep_78a (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x78a) true
+      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 19))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x78a (mword_of_int 0x4981 : mword 16) udec_4981.
+  Qed.
+
+  (* 0x78c  c.j 6cc <vprintf+0x44>  (RVC, 4-aligned) *)
+  Lemma uis_grep_78c (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x78c) true
+      (C_J (mword_of_int 1952 : mword 11)).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x78c (mword_of_int 0xb781 : mword 16) udec_b781
+      (mword_of_int 0x8493b781 : mword 32).
+  Qed.
+
+  (* 0x78e  addi s1,s7,8  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_78e (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x78e) false
+      (ITYPE (mword_of_int 8 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 9), ADDI)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x78e (mword_of_int 0x008b8493 : mword 32) udec_008b8493.
+  Qed.
+
+  (* 0x792  c.li a3,0  (RVC, 2 mod 4) *)
+  Lemma uis_grep_792 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x792) true
+      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 13))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x792 (mword_of_int 0x4681 : mword 16) udec_4681.
+  Qed.
+
+  (* 0x794  c.li a2,10  (RVC, 4-aligned) *)
+  Lemma uis_grep_794 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x794) true
+      (C_LI (mword_of_int 10 : mword 6, Regidx (mword_of_int 12))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x794 (mword_of_int 0x4629 : mword 16) udec_4629
+      (mword_of_int 0xb5834629 : mword 32).
+  Qed.
+
+  (* 0x796  ld a1,0(s7)  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_796 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x796) false
+      (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 11), false, 8)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x796 (mword_of_int 0x000bb583 : mword 32) udec_000bb583.
+  Qed.
+
+  (* 0x79a  c.mv a0,s6  (RVC, 2 mod 4) *)
+  Lemma uis_grep_79a (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x79a) true
+      (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 22))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x79a (mword_of_int 0x855a : mword 16) udec_855a.
+  Qed.
+
+  (* 0x79c  jal 5ea <printint>  (base, 4-aligned) *)
+  Lemma uis_grep_79c (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x79c) false
+      (JAL (mword_of_int 2096718 : mword 21, Regidx (mword_of_int 1))).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x79c (mword_of_int 0xe4fff0ef : mword 32) udec_e4fff0ef.
+  Qed.
+
+  (* 0x7a0  c.addiw s2,s2,1  (RVC, 4-aligned) *)
+  Lemma uis_grep_7a0 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x7a0) true
+      (C_ADDIW (mword_of_int 1 : mword 6, Regidx (mword_of_int 18))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x7a0 (mword_of_int 0x2905 : mword 16) udec_2905
+      (mword_of_int 0x8ba62905 : mword 32).
+  Qed.
+
+  (* 0x7a2  c.mv s7,s1  (RVC, 2 mod 4) *)
+  Lemma uis_grep_7a2 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x7a2) true
+      (C_MV (Regidx (mword_of_int 23), Regidx (mword_of_int 9))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x7a2 (mword_of_int 0x8ba6 : mword 16) udec_8ba6.
+  Qed.
+
+  (* 0x7a4  c.li s3,0  (RVC, 4-aligned) *)
+  Lemma uis_grep_7a4 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x7a4) true
+      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 19))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x7a4 (mword_of_int 0x4981 : mword 16) udec_4981
+      (mword_of_int 0xb71d4981 : mword 32).
+  Qed.
+
+  (* 0x7a6  c.j 6cc <vprintf+0x44>  (RVC, 2 mod 4) *)
+  Lemma uis_grep_7a6 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x7a6) true
+      (C_J (mword_of_int 1939 : mword 11)).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x7a6 (mword_of_int 0xb71d : mword 16) udec_b71d.
+  Qed.
+
+  (* 0x7a8  addi s1,s7,8  (base, 4-aligned) *)
+  Lemma uis_grep_7a8 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x7a8) false
+      (ITYPE (mword_of_int 8 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 9), ADDI)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x7a8 (mword_of_int 0x008b8493 : mword 32) udec_008b8493.
+  Qed.
+
+  (* 0x7ac  c.li a3,0  (RVC, 4-aligned) *)
+  Lemma uis_grep_7ac (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x7ac) true
+      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 13))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x7ac (mword_of_int 0x4681 : mword 16) udec_4681
+      (mword_of_int 0x46294681 : mword 32).
+  Qed.
+
+  (* 0x7ae  c.li a2,10  (RVC, 2 mod 4) *)
+  Lemma uis_grep_7ae (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x7ae) true
+      (C_LI (mword_of_int 10 : mword 6, Regidx (mword_of_int 12))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x7ae (mword_of_int 0x4629 : mword 16) udec_4629.
+  Qed.
+
+  (* 0x7b0  ld a1,0(s7)  (base, 4-aligned) *)
+  Lemma uis_grep_7b0 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x7b0) false
+      (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 11), false, 8)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x7b0 (mword_of_int 0x000bb583 : mword 32) udec_000bb583.
+  Qed.
+
+  (* 0x7b4  c.mv a0,s6  (RVC, 4-aligned) *)
+  Lemma uis_grep_7b4 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x7b4) true
+      (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 22))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x7b4 (mword_of_int 0x855a : mword 16) udec_855a
+      (mword_of_int 0xf0ef855a : mword 32).
+  Qed.
+
+  (* 0x7b6  jal 5ea <printint>  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_7b6 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x7b6) false
+      (JAL (mword_of_int 2096692 : mword 21, Regidx (mword_of_int 1))).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x7b6 (mword_of_int 0xe35ff0ef : mword 32) udec_e35ff0ef.
+  Qed.
+
+  (* 0x7ba  c.addiw s2,s2,2  (RVC, 2 mod 4) *)
+  Lemma uis_grep_7ba (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x7ba) true
+      (C_ADDIW (mword_of_int 2 : mword 6, Regidx (mword_of_int 18))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x7ba (mword_of_int 0x2909 : mword 16) udec_2909.
+  Qed.
+
+  (* 0x7bc  c.mv s7,s1  (RVC, 4-aligned) *)
+  Lemma uis_grep_7bc (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x7bc) true
+      (C_MV (Regidx (mword_of_int 23), Regidx (mword_of_int 9))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x7bc (mword_of_int 0x8ba6 : mword 16) udec_8ba6
+      (mword_of_int 0x49818ba6 : mword 32).
+  Qed.
+
+  (* 0x7be  c.li s3,0  (RVC, 2 mod 4) *)
+  Lemma uis_grep_7be (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x7be) true
+      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 19))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x7be (mword_of_int 0x4981 : mword 16) udec_4981.
+  Qed.
+
+  (* 0x7c0  c.j 6cc <vprintf+0x44>  (RVC, 4-aligned) *)
+  Lemma uis_grep_7c0 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x7c0) true
+      (C_J (mword_of_int 1926 : mword 11)).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x7c0 (mword_of_int 0xb731 : mword 16) udec_b731
+      (mword_of_int 0x8493b731 : mword 32).
+  Qed.
+
+  (* 0x7c2  addi s1,s7,8  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_7c2 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x7c2) false
+      (ITYPE (mword_of_int 8 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 9), ADDI)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x7c2 (mword_of_int 0x008b8493 : mword 32) udec_008b8493.
+  Qed.
+
+  (* 0x7c6  c.li a3,0  (RVC, 2 mod 4) *)
+  Lemma uis_grep_7c6 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x7c6) true
+      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 13))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x7c6 (mword_of_int 0x4681 : mword 16) udec_4681.
+  Qed.
+
+  (* 0x7c8  c.li a2,16  (RVC, 4-aligned) *)
+  Lemma uis_grep_7c8 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x7c8) true
+      (C_LI (mword_of_int 16 : mword 6, Regidx (mword_of_int 12))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x7c8 (mword_of_int 0x4641 : mword 16) udec_4641
+      (mword_of_int 0xe5834641 : mword 32).
+  Qed.
+
+  (* 0x7ca  lwu a1,0(s7)  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_7ca (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x7ca) false
+      (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 11), true, 4)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x7ca (mword_of_int 0x000be583 : mword 32) udec_000be583.
+  Qed.
+
+  (* 0x7ce  c.mv a0,s6  (RVC, 2 mod 4) *)
+  Lemma uis_grep_7ce (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x7ce) true
+      (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 22))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x7ce (mword_of_int 0x855a : mword 16) udec_855a.
+  Qed.
+
+  (* 0x7d0  jal 5ea <printint>  (base, 4-aligned) *)
+  Lemma uis_grep_7d0 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x7d0) false
+      (JAL (mword_of_int 2096666 : mword 21, Regidx (mword_of_int 1))).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x7d0 (mword_of_int 0xe1bff0ef : mword 32) udec_e1bff0ef.
+  Qed.
+
+  (* 0x7d4  c.mv s7,s1  (RVC, 4-aligned) *)
+  Lemma uis_grep_7d4 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x7d4) true
+      (C_MV (Regidx (mword_of_int 23), Regidx (mword_of_int 9))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x7d4 (mword_of_int 0x8ba6 : mword 16) udec_8ba6
+      (mword_of_int 0x49818ba6 : mword 32).
+  Qed.
+
+  (* 0x7d6  c.li s3,0  (RVC, 2 mod 4) *)
+  Lemma uis_grep_7d6 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x7d6) true
+      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 19))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x7d6 (mword_of_int 0x4981 : mword 16) udec_4981.
+  Qed.
+
+  (* 0x7d8  c.j 6cc <vprintf+0x44>  (RVC, 4-aligned) *)
+  Lemma uis_grep_7d8 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x7d8) true
+      (C_J (mword_of_int 1914 : mword 11)).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x7d8 (mword_of_int 0xbdd5 : mword 16) udec_bdd5
+      (mword_of_int 0x8493bdd5 : mword 32).
+  Qed.
+
+  (* 0x7da  addi s1,s7,8  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_7da (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x7da) false
+      (ITYPE (mword_of_int 8 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 9), ADDI)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x7da (mword_of_int 0x008b8493 : mword 32) udec_008b8493.
+  Qed.
+
+  (* 0x7de  c.li a3,0  (RVC, 2 mod 4) *)
+  Lemma uis_grep_7de (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x7de) true
+      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 13))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x7de (mword_of_int 0x4681 : mword 16) udec_4681.
+  Qed.
+
+  (* 0x7e0  c.li a2,16  (RVC, 4-aligned) *)
+  Lemma uis_grep_7e0 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x7e0) true
+      (C_LI (mword_of_int 16 : mword 6, Regidx (mword_of_int 12))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x7e0 (mword_of_int 0x4641 : mword 16) udec_4641
+      (mword_of_int 0xb5834641 : mword 32).
+  Qed.
+
+  (* 0x7e2  ld a1,0(s7)  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_7e2 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x7e2) false
+      (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 11), false, 8)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x7e2 (mword_of_int 0x000bb583 : mword 32) udec_000bb583.
+  Qed.
+
+  (* 0x7e6  c.mv a0,s6  (RVC, 2 mod 4) *)
+  Lemma uis_grep_7e6 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x7e6) true
+      (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 22))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x7e6 (mword_of_int 0x855a : mword 16) udec_855a.
+  Qed.
+
+  (* 0x7e8  jal 5ea <printint>  (base, 4-aligned) *)
+  Lemma uis_grep_7e8 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x7e8) false
+      (JAL (mword_of_int 2096642 : mword 21, Regidx (mword_of_int 1))).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x7e8 (mword_of_int 0xe03ff0ef : mword 32) udec_e03ff0ef.
+  Qed.
+
+  (* 0x7ec  c.addiw s2,s2,1  (RVC, 4-aligned) *)
+  Lemma uis_grep_7ec (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x7ec) true
+      (C_ADDIW (mword_of_int 1 : mword 6, Regidx (mword_of_int 18))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x7ec (mword_of_int 0x2905 : mword 16) udec_2905
+      (mword_of_int 0x8ba62905 : mword 32).
+  Qed.
+
+  (* 0x7ee  c.mv s7,s1  (RVC, 2 mod 4) *)
+  Lemma uis_grep_7ee (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x7ee) true
+      (C_MV (Regidx (mword_of_int 23), Regidx (mword_of_int 9))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x7ee (mword_of_int 0x8ba6 : mword 16) udec_8ba6.
+  Qed.
+
+  (* 0x7f0  c.li s3,0  (RVC, 4-aligned) *)
+  Lemma uis_grep_7f0 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x7f0) true
+      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 19))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x7f0 (mword_of_int 0x4981 : mword 16) udec_4981
+      (mword_of_int 0xbde94981 : mword 32).
+  Qed.
+
+  (* 0x7f2  c.j 6cc <vprintf+0x44>  (RVC, 2 mod 4) *)
+  Lemma uis_grep_7f2 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x7f2) true
+      (C_J (mword_of_int 1901 : mword 11)).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x7f2 (mword_of_int 0xbde9 : mword 16) udec_bde9.
+  Qed.
+
+  (* 0x7f4  addi s1,s7,8  (base, 4-aligned) *)
+  Lemma uis_grep_7f4 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x7f4) false
+      (ITYPE (mword_of_int 8 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 9), ADDI)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x7f4 (mword_of_int 0x008b8493 : mword 32) udec_008b8493.
+  Qed.
+
+  (* 0x7f8  c.li a3,0  (RVC, 4-aligned) *)
+  Lemma uis_grep_7f8 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x7f8) true
+      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 13))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x7f8 (mword_of_int 0x4681 : mword 16) udec_4681
+      (mword_of_int 0x46414681 : mword 32).
+  Qed.
+
+  (* 0x7fa  c.li a2,16  (RVC, 2 mod 4) *)
+  Lemma uis_grep_7fa (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x7fa) true
+      (C_LI (mword_of_int 16 : mword 6, Regidx (mword_of_int 12))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x7fa (mword_of_int 0x4641 : mword 16) udec_4641.
+  Qed.
+
+  (* 0x7fc  ld a1,0(s7)  (base, 4-aligned) *)
+  Lemma uis_grep_7fc (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x7fc) false
+      (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 11), false, 8)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x7fc (mword_of_int 0x000bb583 : mword 32) udec_000bb583.
+  Qed.
+
+  (* 0x800  c.mv a0,s6  (RVC, 4-aligned) *)
+  Lemma uis_grep_800 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x800) true
+      (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 22))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x800 (mword_of_int 0x855a : mword 16) udec_855a
+      (mword_of_int 0xf0ef855a : mword 32).
+  Qed.
+
+  (* 0x802  jal 5ea <printint>  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_802 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x802) false
+      (JAL (mword_of_int 2096616 : mword 21, Regidx (mword_of_int 1))).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x802 (mword_of_int 0xde9ff0ef : mword 32) udec_de9ff0ef.
+  Qed.
+
+  (* 0x806  c.addiw s2,s2,2  (RVC, 2 mod 4) *)
+  Lemma uis_grep_806 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x806) true
+      (C_ADDIW (mword_of_int 2 : mword 6, Regidx (mword_of_int 18))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x806 (mword_of_int 0x2909 : mword 16) udec_2909.
+  Qed.
+
+  (* 0x808  c.mv s7,s1  (RVC, 4-aligned) *)
+  Lemma uis_grep_808 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x808) true
+      (C_MV (Regidx (mword_of_int 23), Regidx (mword_of_int 9))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x808 (mword_of_int 0x8ba6 : mword 16) udec_8ba6
+      (mword_of_int 0x49818ba6 : mword 32).
+  Qed.
+
+  (* 0x80a  c.li s3,0  (RVC, 2 mod 4) *)
+  Lemma uis_grep_80a (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x80a) true
+      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 19))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x80a (mword_of_int 0x4981 : mword 16) udec_4981.
+  Qed.
+
+  (* 0x80c  c.j 6cc <vprintf+0x44>  (RVC, 4-aligned) *)
+  Lemma uis_grep_80c (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x80c) true
+      (C_J (mword_of_int 1888 : mword 11)).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x80c (mword_of_int 0xb5c1 : mword 16) udec_b5c1
+      (mword_of_int 0xe466b5c1 : mword 32).
+  Qed.
+
+  (* 0x80e  c.sdsp s9,8(sp)  (RVC, 2 mod 4) *)
+  Lemma uis_grep_80e (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x80e) true
+      (C_SDSP (mword_of_int 1 : mword 6, Regidx (mword_of_int 25))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x80e (mword_of_int 0xe466 : mword 16) udec_e466.
+  Qed.
+
+  (* 0x810  addi a5,s7,8  (base, 4-aligned) *)
+  Lemma uis_grep_810 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x810) false
+      (ITYPE (mword_of_int 8 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 15), ADDI)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x810 (mword_of_int 0x008b8793 : mword 32) udec_008b8793.
+  Qed.
+
+  (* 0x814  c.mv s9,a5  (RVC, 4-aligned) *)
+  Lemma uis_grep_814 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x814) true
+      (C_MV (Regidx (mword_of_int 25), Regidx (mword_of_int 15))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x814 (mword_of_int 0x8cbe : mword 16) udec_8cbe
+      (mword_of_int 0xb9838cbe : mword 32).
+  Qed.
+
+  (* 0x816  ld s3,0(s7)  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_816 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x816) false
+      (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 19), false, 8)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x816 (mword_of_int 0x000bb983 : mword 32) udec_000bb983.
+  Qed.
+
+  (* 0x81a  li a1,48  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_81a (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x81a) false
+      (ITYPE (mword_of_int 48 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 11), ADDI)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x81a (mword_of_int 0x03000593 : mword 32) udec_03000593.
+  Qed.
+
+  (* 0x81e  c.mv a0,s6  (RVC, 2 mod 4) *)
+  Lemma uis_grep_81e (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x81e) true
+      (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 22))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x81e (mword_of_int 0x855a : mword 16) udec_855a.
+  Qed.
+
+  (* 0x820  jal 5cc <putc>  (base, 4-aligned) *)
+  Lemma uis_grep_820 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x820) false
+      (JAL (mword_of_int 2096556 : mword 21, Regidx (mword_of_int 1))).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x820 (mword_of_int 0xdadff0ef : mword 32) udec_dadff0ef.
+  Qed.
+
+  (* 0x824  li a1,120  (base, 4-aligned) *)
+  Lemma uis_grep_824 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x824) false
+      (ITYPE (mword_of_int 120 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 11), ADDI)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x824 (mword_of_int 0x07800593 : mword 32) udec_07800593.
+  Qed.
+
+  (* 0x828  c.mv a0,s6  (RVC, 4-aligned) *)
+  Lemma uis_grep_828 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x828) true
+      (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 22))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x828 (mword_of_int 0x855a : mword 16) udec_855a
+      (mword_of_int 0xf0ef855a : mword 32).
+  Qed.
+
+  (* 0x82a  jal 5cc <putc>  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_82a (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x82a) false
+      (JAL (mword_of_int 2096546 : mword 21, Regidx (mword_of_int 1))).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x82a (mword_of_int 0xda3ff0ef : mword 32) udec_da3ff0ef.
+  Qed.
+
+  (* 0x82e  c.li s1,16  (RVC, 2 mod 4) *)
+  Lemma uis_grep_82e (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x82e) true
+      (C_LI (mword_of_int 16 : mword 6, Regidx (mword_of_int 9))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x82e (mword_of_int 0x44c1 : mword 16) udec_44c1.
+  Qed.
+
+  (* 0x830  auipc s7,0x0  (base, 4-aligned) *)
+  Lemma uis_grep_830 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x830) false
+      (UTYPE (mword_of_int 0 : mword 20, Regidx (mword_of_int 23), AUIPC)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x830 (mword_of_int 0x00000b97 : mword 32) udec_00000b97.
+  Qed.
+
+  (* 0x834  addi s7,s7,816 # b60 <digits>  (base, 4-aligned) *)
+  Lemma uis_grep_834 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x834) false
+      (ITYPE (mword_of_int 816 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 23), ADDI)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x834 (mword_of_int 0x330b8b93 : mword 32) udec_330b8b93.
+  Qed.
+
+  (* 0x838  srli a5,s3,0x3c  (base, 4-aligned) *)
+  Lemma uis_grep_838 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x838) false
+      (SHIFTIOP (mword_of_int 60 : mword 6, Regidx (mword_of_int 19), Regidx (mword_of_int 15), SRLI)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x838 (mword_of_int 0x03c9d793 : mword 32) udec_03c9d793.
+  Qed.
+
+  (* 0x83c  c.add a5,a5,s7  (RVC, 4-aligned) *)
+  Lemma uis_grep_83c (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x83c) true
+      (C_ADD (Regidx (mword_of_int 15), Regidx (mword_of_int 23))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x83c (mword_of_int 0x97de : mword 16) udec_97de
+      (mword_of_int 0xc58397de : mword 32).
+  Qed.
+
+  (* 0x83e  lbu a1,0(a5)  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_83e (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x83e) false
+      (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 11), true, 1)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x83e (mword_of_int 0x0007c583 : mword 32) udec_0007c583.
+  Qed.
+
+  (* 0x842  c.mv a0,s6  (RVC, 2 mod 4) *)
+  Lemma uis_grep_842 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x842) true
+      (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 22))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x842 (mword_of_int 0x855a : mword 16) udec_855a.
+  Qed.
+
+  (* 0x844  jal 5cc <putc>  (base, 4-aligned) *)
+  Lemma uis_grep_844 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x844) false
+      (JAL (mword_of_int 2096520 : mword 21, Regidx (mword_of_int 1))).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x844 (mword_of_int 0xd89ff0ef : mword 32) udec_d89ff0ef.
+  Qed.
+
+  (* 0x848  c.slli s3,s3,0x4  (RVC, 4-aligned) *)
+  Lemma uis_grep_848 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x848) true
+      (C_SLLI (mword_of_int 4 : mword 6, Regidx (mword_of_int 19))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x848 (mword_of_int 0x0992 : mword 16) udec_0992
+      (mword_of_int 0x34fd0992 : mword 32).
+  Qed.
+
+  (* 0x84a  c.addiw s1,s1,-1  (RVC, 2 mod 4) *)
+  Lemma uis_grep_84a (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x84a) true
+      (C_ADDIW (mword_of_int 63 : mword 6, Regidx (mword_of_int 9))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x84a (mword_of_int 0x34fd : mword 16) udec_34fd.
+  Qed.
+
+  (* 0x84c  c.bnez s1,838 <vprintf+0x1b0>  (RVC, 4-aligned) *)
+  Lemma uis_grep_84c (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x84c) true
+      (C_BNEZ (mword_of_int 246 : mword 8, Cregidx (mword_of_int 1))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x84c (mword_of_int 0xf4f5 : mword 16) udec_f4f5
+      (mword_of_int 0x8be6f4f5 : mword 32).
+  Qed.
+
+  (* 0x84e  c.mv s7,s9  (RVC, 2 mod 4) *)
+  Lemma uis_grep_84e (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x84e) true
+      (C_MV (Regidx (mword_of_int 23), Regidx (mword_of_int 25))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x84e (mword_of_int 0x8be6 : mword 16) udec_8be6.
+  Qed.
+
+  (* 0x850  c.li s3,0  (RVC, 4-aligned) *)
+  Lemma uis_grep_850 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x850) true
+      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 19))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x850 (mword_of_int 0x4981 : mword 16) udec_4981
+      (mword_of_int 0x6ca24981 : mword 32).
+  Qed.
+
+  (* 0x852  c.ldsp s9,8(sp)  (RVC, 2 mod 4) *)
+  Lemma uis_grep_852 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x852) true
+      (C_LDSP (mword_of_int 1 : mword 6, Regidx (mword_of_int 25))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x852 (mword_of_int 0x6ca2 : mword 16) udec_6ca2.
+  Qed.
+
+  (* 0x854  c.j 6cc <vprintf+0x44>  (RVC, 4-aligned) *)
+  Lemma uis_grep_854 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x854) true
+      (C_J (mword_of_int 1852 : mword 11)).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x854 (mword_of_int 0xbda5 : mword 16) udec_bda5
+      (mword_of_int 0x8493bda5 : mword 32).
+  Qed.
+
+  (* 0x856  addi s1,s7,8  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_856 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x856) false
+      (ITYPE (mword_of_int 8 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 9), ADDI)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x856 (mword_of_int 0x008b8493 : mword 32) udec_008b8493.
+  Qed.
+
+  (* 0x85a  lbu a1,0(s7)  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_85a (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x85a) false
+      (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 11), true, 1)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x85a (mword_of_int 0x000bc583 : mword 32) udec_000bc583.
+  Qed.
+
+  (* 0x85e  c.mv a0,s6  (RVC, 2 mod 4) *)
+  Lemma uis_grep_85e (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x85e) true
+      (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 22))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x85e (mword_of_int 0x855a : mword 16) udec_855a.
+  Qed.
+
+  (* 0x860  jal 5cc <putc>  (base, 4-aligned) *)
+  Lemma uis_grep_860 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x860) false
+      (JAL (mword_of_int 2096492 : mword 21, Regidx (mword_of_int 1))).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x860 (mword_of_int 0xd6dff0ef : mword 32) udec_d6dff0ef.
+  Qed.
+
+  (* 0x864  c.mv s7,s1  (RVC, 4-aligned) *)
+  Lemma uis_grep_864 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x864) true
+      (C_MV (Regidx (mword_of_int 23), Regidx (mword_of_int 9))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x864 (mword_of_int 0x8ba6 : mword 16) udec_8ba6
+      (mword_of_int 0x49818ba6 : mword 32).
+  Qed.
+
+  (* 0x866  c.li s3,0  (RVC, 2 mod 4) *)
+  Lemma uis_grep_866 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x866) true
+      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 19))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x866 (mword_of_int 0x4981 : mword 16) udec_4981.
+  Qed.
+
+  (* 0x868  c.j 6cc <vprintf+0x44>  (RVC, 4-aligned) *)
+  Lemma uis_grep_868 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x868) true
+      (C_J (mword_of_int 1842 : mword 11)).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x868 (mword_of_int 0xb595 : mword 16) udec_b595
+      (mword_of_int 0x8993b595 : mword 32).
+  Qed.
+
+  (* 0x86a  addi s3,s7,8  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_86a (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x86a) false
+      (ITYPE (mword_of_int 8 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 19), ADDI)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x86a (mword_of_int 0x008b8993 : mword 32) udec_008b8993.
+  Qed.
+
+  (* 0x86e  ld s1,0(s7)  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_86e (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x86e) false
+      (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 9), false, 8)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x86e (mword_of_int 0x000bb483 : mword 32) udec_000bb483.
+  Qed.
+
+  (* 0x872  c.beqz s1,88e <vprintf+0x206>  (RVC, 2 mod 4) *)
+  Lemma uis_grep_872 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x872) true
+      (C_BEQZ (mword_of_int 14 : mword 8, Cregidx (mword_of_int 1))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x872 (mword_of_int 0xcc91 : mword 16) udec_cc91.
+  Qed.
+
+  (* 0x874  lbu a1,0(s1)  (base, 4-aligned) *)
+  Lemma uis_grep_874 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x874) false
+      (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 11), true, 1)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x874 (mword_of_int 0x0004c583 : mword 32) udec_0004c583.
+  Qed.
+
+  (* 0x878  c.beqz a1,8a8 <vprintf+0x220>  (RVC, 4-aligned) *)
+  Lemma uis_grep_878 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x878) true
+      (C_BEQZ (mword_of_int 24 : mword 8, Cregidx (mword_of_int 3))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x878 (mword_of_int 0xc985 : mword 16) udec_c985
+      (mword_of_int 0x855ac985 : mword 32).
+  Qed.
+
+  (* 0x87a  c.mv a0,s6  (RVC, 2 mod 4) *)
+  Lemma uis_grep_87a (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x87a) true
+      (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 22))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x87a (mword_of_int 0x855a : mword 16) udec_855a.
+  Qed.
+
+  (* 0x87c  jal 5cc <putc>  (base, 4-aligned) *)
+  Lemma uis_grep_87c (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x87c) false
+      (JAL (mword_of_int 2096464 : mword 21, Regidx (mword_of_int 1))).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x87c (mword_of_int 0xd51ff0ef : mword 32) udec_d51ff0ef.
+  Qed.
+
+  (* 0x880  c.addi s1,s1,1  (RVC, 4-aligned) *)
+  Lemma uis_grep_880 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x880) true
+      (C_ADDI (mword_of_int 1 : mword 6, Regidx (mword_of_int 9))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x880 (mword_of_int 0x0485 : mword 16) udec_0485
+      (mword_of_int 0xc5830485 : mword 32).
+  Qed.
+
+  (* 0x882  lbu a1,0(s1)  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_882 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x882) false
+      (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 11), true, 1)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x882 (mword_of_int 0x0004c583 : mword 32) udec_0004c583.
+  Qed.
+
+  (* 0x886  c.bnez a1,87a <vprintf+0x1f2>  (RVC, 2 mod 4) *)
+  Lemma uis_grep_886 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x886) true
+      (C_BNEZ (mword_of_int 250 : mword 8, Cregidx (mword_of_int 3))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x886 (mword_of_int 0xf9f5 : mword 16) udec_f9f5.
+  Qed.
+
+  (* 0x888  c.mv s7,s3  (RVC, 4-aligned) *)
+  Lemma uis_grep_888 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x888) true
+      (C_MV (Regidx (mword_of_int 23), Regidx (mword_of_int 19))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x888 (mword_of_int 0x8bce : mword 16) udec_8bce
+      (mword_of_int 0x49818bce : mword 32).
+  Qed.
+
+  (* 0x88a  c.li s3,0  (RVC, 2 mod 4) *)
+  Lemma uis_grep_88a (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x88a) true
+      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 19))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x88a (mword_of_int 0x4981 : mword 16) udec_4981.
+  Qed.
+
+  (* 0x88c  c.j 6cc <vprintf+0x44>  (RVC, 4-aligned) *)
+  Lemma uis_grep_88c (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x88c) true
+      (C_J (mword_of_int 1824 : mword 11)).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x88c (mword_of_int 0xb581 : mword 16) udec_b581
+      (mword_of_int 0x0497b581 : mword 32).
+  Qed.
+
+  (* 0x88e  auipc s1,0x0  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_88e (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x88e) false
+      (UTYPE (mword_of_int 0 : mword 20, Regidx (mword_of_int 9), AUIPC)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x88e (mword_of_int 0x00000497 : mword 32) udec_00000497.
+  Qed.
+
+  (* 0x892  addi s1,s1,714 # b58 <malloc+0x12e>  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_892 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x892) false
+      (ITYPE (mword_of_int 714 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x892 (mword_of_int 0x2ca48493 : mword 32) udec_2ca48493.
+  Qed.
+
+  (* 0x896  li a1,40  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_896 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x896) false
+      (ITYPE (mword_of_int 40 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 11), ADDI)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x896 (mword_of_int 0x02800593 : mword 32) udec_02800593.
+  Qed.
+
+  (* 0x89a  c.j 87a <vprintf+0x1f2>  (RVC, 2 mod 4) *)
+  Lemma uis_grep_89a (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x89a) true
+      (C_J (mword_of_int 2032 : mword 11)).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x89a (mword_of_int 0xb7c5 : mword 16) udec_b7c5.
+  Qed.
+
+  (* 0x89c  c.mv a1,a5  (RVC, 4-aligned) *)
+  Lemma uis_grep_89c (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x89c) true
+      (C_MV (Regidx (mword_of_int 11), Regidx (mword_of_int 15))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x89c (mword_of_int 0x85be : mword 16) udec_85be
+      (mword_of_int 0x855a85be : mword 32).
+  Qed.
+
+  (* 0x89e  c.mv a0,s6  (RVC, 2 mod 4) *)
+  Lemma uis_grep_89e (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x89e) true
+      (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 22))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x89e (mword_of_int 0x855a : mword 16) udec_855a.
+  Qed.
+
+  (* 0x8a0  jal 5cc <putc>  (base, 4-aligned) *)
+  Lemma uis_grep_8a0 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x8a0) false
+      (JAL (mword_of_int 2096428 : mword 21, Regidx (mword_of_int 1))).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x8a0 (mword_of_int 0xd2dff0ef : mword 32) udec_d2dff0ef.
+  Qed.
+
+  (* 0x8a4  c.li s3,0  (RVC, 4-aligned) *)
+  Lemma uis_grep_8a4 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x8a4) true
+      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 19))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x8a4 (mword_of_int 0x4981 : mword 16) udec_4981
+      (mword_of_int 0xb51d4981 : mword 32).
+  Qed.
+
+  (* 0x8a6  c.j 6cc <vprintf+0x44>  (RVC, 2 mod 4) *)
+  Lemma uis_grep_8a6 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x8a6) true
+      (C_J (mword_of_int 1811 : mword 11)).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x8a6 (mword_of_int 0xb51d : mword 16) udec_b51d.
+  Qed.
+
+  (* 0x8a8  c.mv s7,s3  (RVC, 4-aligned) *)
+  Lemma uis_grep_8a8 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x8a8) true
+      (C_MV (Regidx (mword_of_int 23), Regidx (mword_of_int 19))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x8a8 (mword_of_int 0x8bce : mword 16) udec_8bce
+      (mword_of_int 0x49818bce : mword 32).
+  Qed.
+
+  (* 0x8aa  c.li s3,0  (RVC, 2 mod 4) *)
+  Lemma uis_grep_8aa (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x8aa) true
+      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 19))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x8aa (mword_of_int 0x4981 : mword 16) udec_4981.
+  Qed.
+
+  (* 0x8ac  c.j 6cc <vprintf+0x44>  (RVC, 4-aligned) *)
+  Lemma uis_grep_8ac (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x8ac) true
+      (C_J (mword_of_int 1808 : mword 11)).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x8ac (mword_of_int 0xb505 : mword 16) udec_b505
+      (mword_of_int 0x6906b505 : mword 32).
+  Qed.
+
+  (* 0x8ae  c.ldsp s2,64(sp)  (RVC, 2 mod 4) *)
+  Lemma uis_grep_8ae (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x8ae) true
+      (C_LDSP (mword_of_int 8 : mword 6, Regidx (mword_of_int 18))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x8ae (mword_of_int 0x6906 : mword 16) udec_6906.
+  Qed.
+
+  (* 0x8b0  c.ldsp s3,56(sp)  (RVC, 4-aligned) *)
+  Lemma uis_grep_8b0 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x8b0) true
+      (C_LDSP (mword_of_int 7 : mword 6, Regidx (mword_of_int 19))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x8b0 (mword_of_int 0x79e2 : mword 16) udec_79e2
+      (mword_of_int 0x7a4279e2 : mword 32).
+  Qed.
+
+  (* 0x8b2  c.ldsp s4,48(sp)  (RVC, 2 mod 4) *)
+  Lemma uis_grep_8b2 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x8b2) true
+      (C_LDSP (mword_of_int 6 : mword 6, Regidx (mword_of_int 20))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x8b2 (mword_of_int 0x7a42 : mword 16) udec_7a42.
+  Qed.
+
+  (* 0x8b4  c.ldsp s5,40(sp)  (RVC, 4-aligned) *)
+  Lemma uis_grep_8b4 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x8b4) true
+      (C_LDSP (mword_of_int 5 : mword 6, Regidx (mword_of_int 21))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x8b4 (mword_of_int 0x7aa2 : mword 16) udec_7aa2
+      (mword_of_int 0x7b027aa2 : mword 32).
+  Qed.
+
+  (* 0x8b6  c.ldsp s6,32(sp)  (RVC, 2 mod 4) *)
+  Lemma uis_grep_8b6 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x8b6) true
+      (C_LDSP (mword_of_int 4 : mword 6, Regidx (mword_of_int 22))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x8b6 (mword_of_int 0x7b02 : mword 16) udec_7b02.
+  Qed.
+
+  (* 0x8b8  c.ldsp s7,24(sp)  (RVC, 4-aligned) *)
+  Lemma uis_grep_8b8 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x8b8) true
+      (C_LDSP (mword_of_int 3 : mword 6, Regidx (mword_of_int 23))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x8b8 (mword_of_int 0x6be2 : mword 16) udec_6be2
+      (mword_of_int 0x6c426be2 : mword 32).
+  Qed.
+
+  (* 0x8ba  c.ldsp s8,16(sp)  (RVC, 2 mod 4) *)
+  Lemma uis_grep_8ba (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x8ba) true
+      (C_LDSP (mword_of_int 2 : mword 6, Regidx (mword_of_int 24))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x8ba (mword_of_int 0x6c42 : mword 16) udec_6c42.
+  Qed.
+
+  (* 0x8bc  c.ldsp ra,88(sp)  (RVC, 4-aligned) *)
+  Lemma uis_grep_8bc (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x8bc) true
+      (C_LDSP (mword_of_int 11 : mword 6, Regidx (mword_of_int 1))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x8bc (mword_of_int 0x60e6 : mword 16) udec_60e6
+      (mword_of_int 0x644660e6 : mword 32).
+  Qed.
+
+  (* 0x8be  c.ldsp s0,80(sp)  (RVC, 2 mod 4) *)
+  Lemma uis_grep_8be (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x8be) true
+      (C_LDSP (mword_of_int 10 : mword 6, Regidx (mword_of_int 8))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x8be (mword_of_int 0x6446 : mword 16) udec_6446.
+  Qed.
+
+  (* 0x8c0  c.ldsp s1,72(sp)  (RVC, 4-aligned) *)
+  Lemma uis_grep_8c0 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x8c0) true
+      (C_LDSP (mword_of_int 9 : mword 6, Regidx (mword_of_int 9))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x8c0 (mword_of_int 0x64a6 : mword 16) udec_64a6
+      (mword_of_int 0x612564a6 : mword 32).
+  Qed.
+
+  (* 0x8c2  c.addi16sp sp,sp,96  (RVC, 2 mod 4) *)
+  Lemma uis_grep_8c2 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x8c2) true
+      (C_ADDI16SP (mword_of_int 6 : mword 6)).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x8c2 (mword_of_int 0x6125 : mword 16) udec_6125.
+  Qed.
+
+  (* 0x8c4  c.jr  (RVC, 4-aligned) *)
+  Lemma uis_grep_8c4 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x8c4) true
+      (C_JR (Regidx (mword_of_int 1))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x8c4 (mword_of_int 0x8082 : mword 16) udec_8082
+      (mword_of_int 0x07138082 : mword 32).
+  Qed.
+
+  (* 0x8c6  li a4,100  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_8c6 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x8c6) false
+      (ITYPE (mword_of_int 100 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 14), ADDI)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x8c6 (mword_of_int 0x06400713 : mword 32) udec_06400713.
+  Qed.
+
+  (* 0x8ca  beq a5,a4,728 <vprintf+0xa0>  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_8ca (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x8ca) false
+      (BTYPE (mword_of_int 7774 : mword 13, Regidx (mword_of_int 14), Regidx (mword_of_int 15), BEQ)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x8ca (mword_of_int 0xe4e78fe3 : mword 32) udec_e4e78fe3.
+  Qed.
+
+  (* 0x8ce  addi a3,a5,-108  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_8ce (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x8ce) false
+      (ITYPE (mword_of_int 3988 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 13), ADDI)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x8ce (mword_of_int 0xf9478693 : mword 32) udec_f9478693.
+  Qed.
+
+  (* 0x8d2  seqz a3,a3  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_8d2 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x8d2) false
+      (ITYPE (mword_of_int 1 : mword 12, Regidx (mword_of_int 13), Regidx (mword_of_int 13), SLTIU)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x8d2 (mword_of_int 0x0016b693 : mword 32) udec_0016b693.
+  Qed.
+
+  (* 0x8d6  c.mv a1,a2  (RVC, 2 mod 4) *)
+  Lemma uis_grep_8d6 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x8d6) true
+      (C_MV (Regidx (mword_of_int 11), Regidx (mword_of_int 12))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x8d6 (mword_of_int 0x85b2 : mword 16) udec_85b2.
+  Qed.
+
+  (* 0x8d8  c.li a4,0  (RVC, 4-aligned) *)
+  Lemma uis_grep_8d8 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x8d8) true
+      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 14))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x8d8 (mword_of_int 0x4701 : mword 16) udec_4701
+      (mword_of_int 0x05134701 : mword 32).
+  Qed.
+
+  (* 0x8da  li a0,117  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_8da (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x8da) false
+      (ITYPE (mword_of_int 117 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 10), ADDI)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x8da (mword_of_int 0x07500513 : mword 32) udec_07500513.
+  Qed.
+
+  (* 0x8de  beq a5,a0,776 <vprintf+0xee>  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_8de (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x8de) false
+      (BTYPE (mword_of_int 7832 : mword 13, Regidx (mword_of_int 10), Regidx (mword_of_int 15), BEQ)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x8de (mword_of_int 0xe8a78ce3 : mword 32) udec_e8a78ce3.
+  Qed.
+
+  (* 0x8e2  addi a0,a2,-117  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_8e2 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x8e2) false
+      (ITYPE (mword_of_int 3979 : mword 12, Regidx (mword_of_int 12), Regidx (mword_of_int 10), ADDI)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x8e2 (mword_of_int 0xf8b60513 : mword 32) udec_f8b60513.
+  Qed.
+
+  (* 0x8e6  c.bnez a0,8ec <vprintf+0x264>  (RVC, 2 mod 4) *)
+  Lemma uis_grep_8e6 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x8e6) true
+      (C_BNEZ (mword_of_int 3 : mword 8, Cregidx (mword_of_int 2))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x8e6 (mword_of_int 0xe119 : mword 16) udec_e119.
+  Qed.
+
+  (* 0x8e8  bnez a3,78e <vprintf+0x106>  (base, 4-aligned) *)
+  Lemma uis_grep_8e8 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x8e8) false
+      (BTYPE (mword_of_int 7846 : mword 13, Regidx (mword_of_int 0), Regidx (mword_of_int 13), BNE)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x8e8 (mword_of_int 0xea0693e3 : mword 32) udec_ea0693e3.
+  Qed.
+
+  (* 0x8ec  addi a0,a1,-117  (base, 4-aligned) *)
+  Lemma uis_grep_8ec (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x8ec) false
+      (ITYPE (mword_of_int 3979 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 10), ADDI)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x8ec (mword_of_int 0xf8b58513 : mword 32) udec_f8b58513.
+  Qed.
+
+  (* 0x8f0  c.bnez a0,8f6 <vprintf+0x26e>  (RVC, 4-aligned) *)
+  Lemma uis_grep_8f0 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x8f0) true
+      (C_BNEZ (mword_of_int 3 : mword 8, Cregidx (mword_of_int 2))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x8f0 (mword_of_int 0xe119 : mword 16) udec_e119
+      (mword_of_int 0x1be3e119 : mword 32).
+  Qed.
+
+  (* 0x8f2  bnez a4,7a8 <vprintf+0x120>  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_8f2 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x8f2) false
+      (BTYPE (mword_of_int 7862 : mword 13, Regidx (mword_of_int 0), Regidx (mword_of_int 14), BNE)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x8f2 (mword_of_int 0xea071be3 : mword 32) udec_ea071be3.
+  Qed.
+
+  (* 0x8f6  li a0,120  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_8f6 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x8f6) false
+      (ITYPE (mword_of_int 120 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 10), ADDI)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x8f6 (mword_of_int 0x07800513 : mword 32) udec_07800513.
+  Qed.
+
+  (* 0x8fa  beq a5,a0,7c2 <vprintf+0x13a>  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_8fa (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x8fa) false
+      (BTYPE (mword_of_int 7880 : mword 13, Regidx (mword_of_int 10), Regidx (mword_of_int 15), BEQ)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x8fa (mword_of_int 0xeca784e3 : mword 32) udec_eca784e3.
+  Qed.
+
+  (* 0x8fe  addi a2,a2,-120  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_8fe (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x8fe) false
+      (ITYPE (mword_of_int 3976 : mword 12, Regidx (mword_of_int 12), Regidx (mword_of_int 12), ADDI)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x8fe (mword_of_int 0xf8860613 : mword 32) udec_f8860613.
+  Qed.
+
+  (* 0x902  c.bnez a2,908 <vprintf+0x280>  (RVC, 2 mod 4) *)
+  Lemma uis_grep_902 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x902) true
+      (C_BNEZ (mword_of_int 3 : mword 8, Cregidx (mword_of_int 4))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x902 (mword_of_int 0xe219 : mword 16) udec_e219.
+  Qed.
+
+  (* 0x904  bnez a3,7da <vprintf+0x152>  (base, 4-aligned) *)
+  Lemma uis_grep_904 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x904) false
+      (BTYPE (mword_of_int 7894 : mword 13, Regidx (mword_of_int 0), Regidx (mword_of_int 13), BNE)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x904 (mword_of_int 0xec069be3 : mword 32) udec_ec069be3.
+  Qed.
+
+  (* 0x908  addi a1,a1,-120  (base, 4-aligned) *)
+  Lemma uis_grep_908 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x908) false
+      (ITYPE (mword_of_int 3976 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x908 (mword_of_int 0xf8858593 : mword 32) udec_f8858593.
+  Qed.
+
+  (* 0x90c  c.bnez a1,912 <vprintf+0x28a>  (RVC, 4-aligned) *)
+  Lemma uis_grep_90c (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x90c) true
+      (C_BNEZ (mword_of_int 3 : mword 8, Cregidx (mword_of_int 3))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x90c (mword_of_int 0xe199 : mword 16) udec_e199
+      (mword_of_int 0x13e3e199 : mword 32).
+  Qed.
+
+  (* 0x90e  bnez a4,7f4 <vprintf+0x16c>  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_90e (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x90e) false
+      (BTYPE (mword_of_int 7910 : mword 13, Regidx (mword_of_int 0), Regidx (mword_of_int 14), BNE)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x90e (mword_of_int 0xee0713e3 : mword 32) udec_ee0713e3.
+  Qed.
+
+  (* 0x912  li a4,112  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_912 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x912) false
+      (ITYPE (mword_of_int 112 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 14), ADDI)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x912 (mword_of_int 0x07000713 : mword 32) udec_07000713.
+  Qed.
+
+  (* 0x916  beq a5,a4,80e <vprintf+0x186>  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_916 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x916) false
+      (BTYPE (mword_of_int 7928 : mword 13, Regidx (mword_of_int 14), Regidx (mword_of_int 15), BEQ)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x916 (mword_of_int 0xeee78ce3 : mword 32) udec_eee78ce3.
+  Qed.
+
+  (* 0x91a  li a4,99  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_91a (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x91a) false
+      (ITYPE (mword_of_int 99 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 14), ADDI)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x91a (mword_of_int 0x06300713 : mword 32) udec_06300713.
+  Qed.
+
+  (* 0x91e  beq a5,a4,856 <vprintf+0x1ce>  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_91e (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x91e) false
+      (BTYPE (mword_of_int 7992 : mword 13, Regidx (mword_of_int 14), Regidx (mword_of_int 15), BEQ)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x91e (mword_of_int 0xf2e78ce3 : mword 32) udec_f2e78ce3.
+  Qed.
+
+  (* 0x922  li a4,115  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_922 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x922) false
+      (ITYPE (mword_of_int 115 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 14), ADDI)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x922 (mword_of_int 0x07300713 : mword 32) udec_07300713.
+  Qed.
+
+  (* 0x926  beq a5,a4,86a <vprintf+0x1e2>  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_926 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x926) false
+      (BTYPE (mword_of_int 8004 : mword 13, Regidx (mword_of_int 14), Regidx (mword_of_int 15), BEQ)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x926 (mword_of_int 0xf4e782e3 : mword 32) udec_f4e782e3.
+  Qed.
+
+  (* 0x92a  li a4,37  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_92a (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x92a) false
+      (ITYPE (mword_of_int 37 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 14), ADDI)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x92a (mword_of_int 0x02500713 : mword 32) udec_02500713.
+  Qed.
+
+  (* 0x92e  beq a5,a4,89c <vprintf+0x214>  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_92e (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x92e) false
+      (BTYPE (mword_of_int 8046 : mword 13, Regidx (mword_of_int 14), Regidx (mword_of_int 15), BEQ)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x92e (mword_of_int 0xf6e787e3 : mword 32) udec_f6e787e3.
+  Qed.
+
+  (* 0x932  li a1,37  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_932 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x932) false
+      (ITYPE (mword_of_int 37 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 11), ADDI)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x932 (mword_of_int 0x02500593 : mword 32) udec_02500593.
   Qed.
 
   (* 0x936  c.mv a0,s6  (RVC, 2 mod 4) *)
@@ -8517,161 +8486,192 @@ Section UCodeGrep.
     uis_rvc2 g 0x936 (mword_of_int 0x855a : mword 16) udec_855a.
   Qed.
 
-  (* 0x938  jal 5c4 <putc>  (base, 4-aligned) *)
+  (* 0x938  jal 5cc <putc>  (base, 4-aligned) *)
   Lemma uis_grep_938 (g : gname) :
     grep_code g -∗
     uinstr_is g (mword_of_int 0x938) false
-      (JAL (mword_of_int 2096268 : mword 21, Regidx (mword_of_int 1))).
+      (JAL (mword_of_int 2096276 : mword 21, Regidx (mword_of_int 1))).
   Proof using .
     iIntros "#Ht".
-    uis_base g 0x938 (mword_of_int 0xc8dff0ef : mword 32) udec_c8dff0ef.
+    uis_base g 0x938 (mword_of_int 0xc95ff0ef : mword 32) udec_c95ff0ef.
   Qed.
 
-  (* 0x93c  c.li s3,0  (RVC, 4-aligned) *)
+  (* 0x93c  c.mv a1,s1  (RVC, 4-aligned) *)
   Lemma uis_grep_93c (g : gname) :
     grep_code g -∗
     uinstr_is g (mword_of_int 0x93c) true
-      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 19))).
+      (C_MV (Regidx (mword_of_int 11), Regidx (mword_of_int 9))).
   Proof using .
     iIntros "#Ht".
-    uis_rvc4 g 0x93c (mword_of_int 0x4981 : mword 16) udec_4981
-      (mword_of_int 0xb3594981 : mword 32).
+    uis_rvc4 g 0x93c (mword_of_int 0x85a6 : mword 16) udec_85a6
+      (mword_of_int 0x855a85a6 : mword 32).
   Qed.
 
-  (* 0x93e  c.j 6c4 <vprintf+0x44>  (RVC, 2 mod 4) *)
+  (* 0x93e  c.mv a0,s6  (RVC, 2 mod 4) *)
   Lemma uis_grep_93e (g : gname) :
     grep_code g -∗
     uinstr_is g (mword_of_int 0x93e) true
+      (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 22))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x93e (mword_of_int 0x855a : mword 16) udec_855a.
+  Qed.
+
+  (* 0x940  jal 5cc <putc>  (base, 4-aligned) *)
+  Lemma uis_grep_940 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x940) false
+      (JAL (mword_of_int 2096268 : mword 21, Regidx (mword_of_int 1))).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x940 (mword_of_int 0xc8dff0ef : mword 32) udec_c8dff0ef.
+  Qed.
+
+  (* 0x944  c.li s3,0  (RVC, 4-aligned) *)
+  Lemma uis_grep_944 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x944) true
+      (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 19))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x944 (mword_of_int 0x4981 : mword 16) udec_4981
+      (mword_of_int 0xb3594981 : mword 32).
+  Qed.
+
+  (* 0x946  c.j 6cc <vprintf+0x44>  (RVC, 2 mod 4) *)
+  Lemma uis_grep_946 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x946) true
       (C_J (mword_of_int 1731 : mword 11)).
   Proof using .
     iIntros "#Ht".
-    uis_rvc2 g 0x93e (mword_of_int 0xb359 : mword 16) udec_b359.
+    uis_rvc2 g 0x946 (mword_of_int 0xb359 : mword 16) udec_b359.
   Qed.
 
-  (* ---------------- <putc> @ 0x5c4 ---------------- *)
+  (* ---------------- <putc> @ 0x5cc ---------------- *)
 
-  (* 0x5c4  c.addi  (RVC, 4-aligned) *)
-  Lemma uis_grep_5c4 (g : gname) :
+  (* 0x5cc  c.addi  (RVC, 4-aligned) *)
+  Lemma uis_grep_5cc (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x5c4) true
+    uinstr_is g (mword_of_int 0x5cc) true
       (C_ADDI (mword_of_int 32 : mword 6, Regidx (mword_of_int 2))).
   Proof using .
     iIntros "#Ht".
-    uis_rvc4 g 0x5c4 (mword_of_int 0x1101 : mword 16) udec_1101
+    uis_rvc4 g 0x5cc (mword_of_int 0x1101 : mword 16) udec_1101
       (mword_of_int 0xec061101 : mword 32).
   Qed.
 
-  (* 0x5c6  c.sdsp ra,24(sp)  (RVC, 2 mod 4) *)
-  Lemma uis_grep_5c6 (g : gname) :
+  (* 0x5ce  c.sdsp ra,24(sp)  (RVC, 2 mod 4) *)
+  Lemma uis_grep_5ce (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x5c6) true
+    uinstr_is g (mword_of_int 0x5ce) true
       (C_SDSP (mword_of_int 3 : mword 6, Regidx (mword_of_int 1))).
   Proof using .
     iIntros "#Ht".
-    uis_rvc2 g 0x5c6 (mword_of_int 0xec06 : mword 16) udec_ec06.
+    uis_rvc2 g 0x5ce (mword_of_int 0xec06 : mword 16) udec_ec06.
   Qed.
 
-  (* 0x5c8  c.sdsp s0,16(sp)  (RVC, 4-aligned) *)
-  Lemma uis_grep_5c8 (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x5c8) true
-      (C_SDSP (mword_of_int 2 : mword 6, Regidx (mword_of_int 8))).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc4 g 0x5c8 (mword_of_int 0xe822 : mword 16) udec_e822
-      (mword_of_int 0x1000e822 : mword 32).
-  Qed.
-
-  (* 0x5ca  c.addi4spn s0,sp,32  (RVC, 2 mod 4) *)
-  Lemma uis_grep_5ca (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x5ca) true
-      (C_ADDI4SPN (Cregidx (mword_of_int 0), mword_of_int 8 : mword 8)).
-  Proof using .
-    iIntros "#Ht".
-    uis_rvc2 g 0x5ca (mword_of_int 0x1000 : mword 16) udec_1000.
-  Qed.
-
-  (* 0x5cc  sb a1,-17(s0)  (base, 4-aligned) *)
-  Lemma uis_grep_5cc (g : gname) :
-    grep_code g -∗
-    uinstr_is g (mword_of_int 0x5cc) false
-      (STORE (mword_of_int 4079 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 8), 1)).
-  Proof using .
-    iIntros "#Ht".
-    uis_base g 0x5cc (mword_of_int 0xfeb407a3 : mword 32) udec_feb407a3.
-  Qed.
-
-  (* 0x5d0  c.li a2,1  (RVC, 4-aligned) *)
+  (* 0x5d0  c.sdsp s0,16(sp)  (RVC, 4-aligned) *)
   Lemma uis_grep_5d0 (g : gname) :
     grep_code g -∗
     uinstr_is g (mword_of_int 0x5d0) true
+      (C_SDSP (mword_of_int 2 : mword 6, Regidx (mword_of_int 8))).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc4 g 0x5d0 (mword_of_int 0xe822 : mword 16) udec_e822
+      (mword_of_int 0x1000e822 : mword 32).
+  Qed.
+
+  (* 0x5d2  c.addi4spn s0,sp,32  (RVC, 2 mod 4) *)
+  Lemma uis_grep_5d2 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x5d2) true
+      (C_ADDI4SPN (Cregidx (mword_of_int 0), mword_of_int 8 : mword 8)).
+  Proof using .
+    iIntros "#Ht".
+    uis_rvc2 g 0x5d2 (mword_of_int 0x1000 : mword 16) udec_1000.
+  Qed.
+
+  (* 0x5d4  sb a1,-17(s0)  (base, 4-aligned) *)
+  Lemma uis_grep_5d4 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x5d4) false
+      (STORE (mword_of_int 4079 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 8), 1)).
+  Proof using .
+    iIntros "#Ht".
+    uis_base g 0x5d4 (mword_of_int 0xfeb407a3 : mword 32) udec_feb407a3.
+  Qed.
+
+  (* 0x5d8  c.li a2,1  (RVC, 4-aligned) *)
+  Lemma uis_grep_5d8 (g : gname) :
+    grep_code g -∗
+    uinstr_is g (mword_of_int 0x5d8) true
       (C_LI (mword_of_int 1 : mword 6, Regidx (mword_of_int 12))).
   Proof using .
     iIntros "#Ht".
-    uis_rvc4 g 0x5d0 (mword_of_int 0x4605 : mword 16) udec_4605
+    uis_rvc4 g 0x5d8 (mword_of_int 0x4605 : mword 16) udec_4605
       (mword_of_int 0x05934605 : mword 32).
   Qed.
 
-  (* 0x5d2  addi a1,s0,-17  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_5d2 (g : gname) :
+  (* 0x5da  addi a1,s0,-17  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_5da (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x5d2) false
+    uinstr_is g (mword_of_int 0x5da) false
       (ITYPE (mword_of_int 4079 : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 11), ADDI)).
   Proof using .
     iIntros "#Ht".
-    uis_base g 0x5d2 (mword_of_int 0xfef40593 : mword 32) udec_fef40593.
+    uis_base g 0x5da (mword_of_int 0xfef40593 : mword 32) udec_fef40593.
   Qed.
 
-  (* 0x5d6  jal 53c <write>  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_grep_5d6 (g : gname) :
+  (* 0x5de  jal 53c <write>  (base, 2 mod 4 -> split fetch) *)
+  Lemma uis_grep_5de (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x5d6) false
-      (JAL (mword_of_int 2096998 : mword 21, Regidx (mword_of_int 1))).
+    uinstr_is g (mword_of_int 0x5de) false
+      (JAL (mword_of_int 2096990 : mword 21, Regidx (mword_of_int 1))).
   Proof using .
     iIntros "#Ht".
-    uis_base g 0x5d6 (mword_of_int 0xf67ff0ef : mword 32) udec_f67ff0ef.
+    uis_base g 0x5de (mword_of_int 0xf5fff0ef : mword 32) udec_f5fff0ef.
   Qed.
 
-  (* 0x5da  c.ldsp ra,24(sp)  (RVC, 2 mod 4) *)
-  Lemma uis_grep_5da (g : gname) :
+  (* 0x5e2  c.ldsp ra,24(sp)  (RVC, 2 mod 4) *)
+  Lemma uis_grep_5e2 (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x5da) true
+    uinstr_is g (mword_of_int 0x5e2) true
       (C_LDSP (mword_of_int 3 : mword 6, Regidx (mword_of_int 1))).
   Proof using .
     iIntros "#Ht".
-    uis_rvc2 g 0x5da (mword_of_int 0x60e2 : mword 16) udec_60e2.
+    uis_rvc2 g 0x5e2 (mword_of_int 0x60e2 : mword 16) udec_60e2.
   Qed.
 
-  (* 0x5dc  c.ldsp s0,16(sp)  (RVC, 4-aligned) *)
-  Lemma uis_grep_5dc (g : gname) :
+  (* 0x5e4  c.ldsp s0,16(sp)  (RVC, 4-aligned) *)
+  Lemma uis_grep_5e4 (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x5dc) true
+    uinstr_is g (mword_of_int 0x5e4) true
       (C_LDSP (mword_of_int 2 : mword 6, Regidx (mword_of_int 8))).
   Proof using .
     iIntros "#Ht".
-    uis_rvc4 g 0x5dc (mword_of_int 0x6442 : mword 16) udec_6442
+    uis_rvc4 g 0x5e4 (mword_of_int 0x6442 : mword 16) udec_6442
       (mword_of_int 0x61056442 : mword 32).
   Qed.
 
-  (* 0x5de  c.addi16sp sp,sp,32  (RVC, 2 mod 4) *)
-  Lemma uis_grep_5de (g : gname) :
+  (* 0x5e6  c.addi16sp sp,sp,32  (RVC, 2 mod 4) *)
+  Lemma uis_grep_5e6 (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x5de) true
+    uinstr_is g (mword_of_int 0x5e6) true
       (C_ADDI16SP (mword_of_int 2 : mword 6)).
   Proof using .
     iIntros "#Ht".
-    uis_rvc2 g 0x5de (mword_of_int 0x6105 : mword 16) udec_6105.
+    uis_rvc2 g 0x5e6 (mword_of_int 0x6105 : mword 16) udec_6105.
   Qed.
 
-  (* 0x5e0  c.jr  (RVC, 4-aligned) *)
-  Lemma uis_grep_5e0 (g : gname) :
+  (* 0x5e8  c.jr  (RVC, 4-aligned) *)
+  Lemma uis_grep_5e8 (g : gname) :
     grep_code g -∗
-    uinstr_is g (mword_of_int 0x5e0) true
+    uinstr_is g (mword_of_int 0x5e8) true
       (C_JR (Regidx (mword_of_int 1))).
   Proof using .
     iIntros "#Ht".
-    uis_rvc4 g 0x5e0 (mword_of_int 0x8082 : mword 16) udec_8082
+    uis_rvc4 g 0x5e8 (mword_of_int 0x8082 : mword 16) udec_8082
       (mword_of_int 0x715d8082 : mword 32).
   Qed.
 
@@ -8858,7 +8858,7 @@ Section UCodeGrep.
      in [GrepInstrs.grep_bytes] and they are not in the data half either:
      .rodata shares the EXECUTABLE segment's pages, so its bytes are
      X-and-not-W and the heap files them under [γt] exactly as it files the
-     code. This program's literals land at 0xb16..0x10cc, inside the R-X
+     code. This program's literals land at 0xb1e..0x10cc, inside the R-X
      segment, and a printf-family walk LOADS them one byte at a time. This is
      the part of [GrepData.grep_data] that lands there -- everything below
      the end of the executable segment -- and [UserHeap.utext_str_of_img]

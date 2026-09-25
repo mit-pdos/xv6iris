@@ -1083,14 +1083,14 @@ Section UkShEcho.
       assert (Hl : (p < length alt_execfail)%nat) by (vm_compute in Hp |- *; lia).
       exact (list_lookup_lookup_total_lt alt_execfail p Hl).
     - intros p Hp.
-      apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x12a8)
+      apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x12b8)
                (fun q : nat => alt_execfail !!! q) 0%nat 5%nat);
         [ vm_compute; reflexivity | lia ].
     - intros j Hj.
       assert (Hj4 : (j < 4)%nat) by (vm_compute in Hj; lia).
       destruct j as [| [| [| [| j]]]]; try lia; vm_compute; reflexivity.
     - intros p Hp.
-      apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x12a8)
+      apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x12b8)
                (fun q : nat => alt_execfail !!! (q + 2)%nat) 7%nat 8%nat);
         [ vm_compute; reflexivity | lia ].
   Qed.

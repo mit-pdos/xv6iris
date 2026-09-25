@@ -93,7 +93,7 @@ Section UInitBannerGen.
   Local Notation a1_idx := (mword_of_int 11 : mword 5).
   Local Notation a2_idx := (mword_of_int 12 : mword 5).
   Local Notation a7_idx := (mword_of_int 17 : mword 5).
-  Local Notation LIT_START := 0x978.
+  Local Notation LIT_START := 0x988.
 
   (* =================================================================== *)
   (*  S1  THE PURE HALF: init's rodata banner IS the era's                *)

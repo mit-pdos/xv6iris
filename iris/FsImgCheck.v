@@ -1,7 +1,7 @@
 (* ====================================================================== *)
 (*  FsImgCheck.v -- THE SANITY CHECK, DISK SIDE: the fs.img mkfs built IS   *)
 (*  a well-formed file system, and the six verified user programs it holds  *)
-(*  ARE the tracked ELF raws, byte for byte.                               *)
+(*  (and the seccomp binary) ARE the tracked ELF raws, byte for byte.      *)
 (* ====================================================================== *)
 
 (*  WHAT THIS FILE IS.
@@ -13,10 +13,10 @@
     theorems below read it through the general file-system semantics of
     [FsImg.v] -- the superblock parses, [fsimg_wf] holds, and
 
-        /cat /echo /grep /init /sh /sync  resolve, in the ROOT DIRECTORY,
-        to inodes 3 4 6 7 13 22, whose CONTENT BYTES are literally
-        [ElfUser.cat_elf], [echo_elf], [grep_elf], [init_elf], [sh_elf],
-        [sync_elf].
+        /cat /echo /grep /init /sh /sync /seccomp  resolve, in the ROOT
+        DIRECTORY, to inodes 3 4 6 7 13 22 23, whose CONTENT BYTES are
+        literally [ElfUser.cat_elf], [echo_elf], [grep_elf], [init_elf],
+        [sh_elf], [sync_elf], [seccomp_elf].
 
     ...and ONE NAME THE ROOT DOES NOT HOLD: [fname_f], the file
     application's `f` (claude-notes/design/app-file.md).  Its absence is
@@ -81,7 +81,8 @@ From xv6iris Require Import
 From User Require Import
   SyncInstrs SyncData EchoInstrs EchoData
   ShInstrs   ShData   InitInstrs InitData
-  CatInstrs  CatData  GrepInstrs GrepData.
+  CatInstrs  CatData  GrepInstrs GrepData
+  SeccompInstrs SeccompData.
 
 Local Open Scope Z_scope.
 
@@ -418,6 +419,9 @@ Definition fname_cat : fname :=
   [fsimg_byte 0x63; fsimg_byte 0x61; fsimg_byte 0x74].
 Definition fname_grep : fname :=
   [fsimg_byte 0x67; fsimg_byte 0x72; fsimg_byte 0x65; fsimg_byte 0x70].
+Definition fname_seccomp : fname :=
+  [fsimg_byte 0x73; fsimg_byte 0x65; fsimg_byte 0x63; fsimg_byte 0x63;
+   fsimg_byte 0x6f; fsimg_byte 0x6d; fsimg_byte 0x70].
 
 (* `f`, THE FILE APPLICATION'S ONE FILE -- the only name here that the
    image does NOT hold.  It is spelled beside the five that it does
@@ -473,6 +477,10 @@ Lemma fsimg_grep_path :
   path_at (tree_of_disk fsimg_P fsimg_sb) ROOTINO [fname_grep] = Some 6.
 Proof. rewrite fsimg_path_root. vm_eq. Qed.
 
+Lemma fsimg_seccomp_path :
+  path_at (tree_of_disk fsimg_P fsimg_sb) ROOTINO [fname_seccomp] = Some 23.
+Proof. rewrite fsimg_path_root. vm_eq. Qed.
+
 (* ====================================================================== *)
 (*  4.  THE FILES' BYTES                                                   *)
 (* ====================================================================== *)
@@ -495,7 +503,7 @@ Proof.
     rewrite Hty; cbv [T_FILE_z T_DIR_z]; lia.
 Qed.
 
-(* ---- echo, inum 4, 35592 bytes --------------------------------------- *)
+(* ---- echo, inum 4, 35640 bytes --------------------------------------- *)
 
 Lemma fsimg_echo_type :
   bv_unsigned (di_type (fs_dinode fsimg_P fsimg_sb 4)) = T_FILE_z.
@@ -503,7 +511,7 @@ Proof. vm_eq. Qed.
 
 (* [bool_decide] on a [list (bv 8)] equality, exactly as [ElfUser.v] states
    its image equalities: the decision procedure computes, so the proof term
-   stays [eq_refl] and no 35592-element list enters it.  Resolution of the
+   stays [eq_refl] and no 35640-element list enters it.  Resolution of the
    [Decision] instance goes by the TYPE, so [Typeclasses Opaque echo_elf]
    is never forced. *)
 Lemma fsimg_echo_bytes_bool :
@@ -517,7 +525,7 @@ Proof.
   rewrite (fsimg_node_file 4 fsimg_echo_type), H. reflexivity.
 Qed.
 
-(* ---- cat, inum 3, 36728 bytes ---------------------------------------- *)
+(* ---- cat, inum 3, 36776 bytes ---------------------------------------- *)
 
 Lemma fsimg_cat_type :
   bv_unsigned (di_type (fs_dinode fsimg_P fsimg_sb 3)) = T_FILE_z.
@@ -534,7 +542,7 @@ Proof.
   rewrite (fsimg_node_file 3 fsimg_cat_type), H. reflexivity.
 Qed.
 
-(* ---- grep, inum 6, 44440 bytes --------------------------------------- *)
+(* ---- grep, inum 6, 44496 bytes --------------------------------------- *)
 
 Lemma fsimg_grep_type :
   bv_unsigned (di_type (fs_dinode fsimg_P fsimg_sb 6)) = T_FILE_z.
@@ -551,7 +559,7 @@ Proof.
   rewrite (fsimg_node_file 6 fsimg_grep_type), H. reflexivity.
 Qed.
 
-(* ---- init, inum 7, 35976 bytes --------------------------------------- *)
+(* ---- init, inum 7, 36024 bytes --------------------------------------- *)
 
 Lemma fsimg_init_type :
   bv_unsigned (di_type (fs_dinode fsimg_P fsimg_sb 7)) = T_FILE_z.
@@ -568,7 +576,7 @@ Proof.
   rewrite (fsimg_node_file 7 fsimg_init_type), H. reflexivity.
 Qed.
 
-(* ---- sh, inum 13, 58312 bytes ---------------------------------------- *)
+(* ---- sh, inum 13, 58360 bytes ---------------------------------------- *)
 
 Lemma fsimg_sh_type :
   bv_unsigned (di_type (fs_dinode fsimg_P fsimg_sb 13)) = T_FILE_z.
@@ -589,7 +597,7 @@ Proof.
   rewrite (fsimg_node_file 13 fsimg_sh_type), H. reflexivity.
 Qed.
 
-(* ---- sync, inum 22, 34944 bytes -------------------------------------- *)
+(* ---- sync, inum 22, 34992 bytes -------------------------------------- *)
 
 Lemma fsimg_sync_type :
   bv_unsigned (di_type (fs_dinode fsimg_P fsimg_sb 22)) = T_FILE_z.
@@ -604,6 +612,23 @@ Lemma fsimg_sync_at :
 Proof.
   pose proof fsimg_sync_bytes_bool as H. apply bool_decide_eq_true_1 in H.
   rewrite (fsimg_node_file 22 fsimg_sync_type), H. reflexivity.
+Qed.
+
+(* ---- seccomp, inum 23, 36144 bytes ----------------------------------- *)
+
+Lemma fsimg_seccomp_type :
+  bv_unsigned (di_type (fs_dinode fsimg_P fsimg_sb 23)) = T_FILE_z.
+Proof. vm_eq. Qed.
+
+Lemma fsimg_seccomp_bytes_bool :
+  bool_decide (fsimg_file_bytes 23 = ElfUser.seccomp_elf) = true.
+Proof. vm_eq. Qed.
+
+Lemma fsimg_seccomp_at :
+  node_at fsimg_P fsimg_sb 23 = Some (NFile ElfUser.seccomp_elf).
+Proof.
+  pose proof fsimg_seccomp_bytes_bool as H. apply bool_decide_eq_true_1 in H.
+  rewrite (fsimg_node_file 23 fsimg_seccomp_type), H. reflexivity.
 Qed.
 
 (* ====================================================================== *)
@@ -686,4 +711,16 @@ Proof.
   split; [exact fsimg_sync_path |].
   split; [exact fsimg_sync_at |].
   split; [exact ElfUser.sync_elf_wf | exact ElfUser.sync_elf_file_image].
+Qed.
+
+Theorem fsimg_seccomp_ok :
+  path_at (tree_of_disk fsimg_P fsimg_sb) ROOTINO [fname_seccomp] = Some 23
+  /\ node_at fsimg_P fsimg_sb 23 = Some (NFile ElfUser.seccomp_elf)
+  /\ elf_wf ElfUser.seccomp_elf = true
+  /\ elf_file_image ElfUser.seccomp_elf
+     = SeccompInstrs.seccomp_bytes ∪ SeccompData.seccomp_data.
+Proof.
+  split; [exact fsimg_seccomp_path |].
+  split; [exact fsimg_seccomp_at |].
+  split; [exact ElfUser.seccomp_elf_wf | exact ElfUser.seccomp_elf_file_image].
 Qed.

@@ -21,8 +21,8 @@
 (*                                                                       *)
 (*    S1  [wp_kshd_panic_paid_at]: [UkShDiag.wp_kshd_panic_paid] with     *)
 (*        its MESSAGE as a parameter.  The landed one is hard-wired to    *)
-(*        the "fork" literal at 0x1298 and to [EchoDisc.alt_panic]; the   *)
-(*        pipe arm also panics with "pipe" at 0x12c8, whose five bytes    *)
+(*        the "fork" literal at 0x12a8 and to [EchoDisc.alt_panic]; the   *)
+(*        pipe arm also panics with "pipe" at 0x12d8, whose five bytes    *)
 (*        are [wl_line PipeDisc.dg_pipe].  The walk underneath            *)
 (*        ([UkShDiag.wp_kshd_panic_chain]) was general in the message     *)
 (*        all along, so this costs one lemma and no new walk.             *)
@@ -125,7 +125,7 @@ Section UkShPipePaid.
   (*  [UkShDiag.wp_kshd_panic_paid] at a parameterised literal.  [panic]  *)
   (*  is [fprintf(2, "%s\n", s); exit(1)], so what reaches the wire is    *)
   (*  the message's four bytes and then the newline the format's own      *)
-  (*  literal at 0x1290 contributes -- five in all, which is why the law  *)
+  (*  literal at 0x12a0 contributes -- five in all, which is why the law  *)
   (*  below is spent at index 5 and why [dg] has that length.            *)
   (*                                                                     *)
   (*  THE LAW IS [UkShDiag.ush_execfail_law_at] AND NOT [ush_panic_law].  *)
@@ -147,7 +147,7 @@ Section UkShPipePaid.
     shd_fmt_ok msg 4%nat = true ->
     length dg = 5%nat ->
     (forall p : nat, (p < 4)%nat -> shd_lit msg p = dg !!! p) ->
-    shd_lit 0x1290 2%nat = dg !!! 4%nat ->
+    shd_lit 0x12a0 2%nat = dg !!! 4%nat ->
     ush_execfail_law_at dg 5%nat Cr Cd -∗
     shk_code (ukn_t N) -∗
     shk_rodata (ukn_t N) -∗
@@ -194,30 +194,30 @@ Section UkShPipePaid.
   (* =================================================================== *)
   (*  S2  THE TWO MESSAGES' BYTES                                         *)
   (*                                                                     *)
-  (*  "fork" at 0x1298 is [EchoDisc.alt_panic] and [UkShDiag] already has *)
-  (*  its three facts; "pipe" at 0x12c8 is [wl_line PipeDisc.dg_pipe] and *)
+  (*  "fork" at 0x12a8 is [EchoDisc.alt_panic] and [UkShDiag] already has *)
+  (*  its three facts; "pipe" at 0x12d8 is [wl_line PipeDisc.dg_pipe] and *)
   (*  these are them, proved the same way.                               *)
   (* =================================================================== *)
   Lemma ushq_pipe_msg_len : length (wl_line PipeDisc.dg_pipe) = 5%nat.
   Proof using . vm_compute. reflexivity. Qed.
 
-  Lemma ushq_pipe_msg_fmt : shd_fmt_ok 0x12c8 4%nat = true.
+  Lemma ushq_pipe_msg_fmt : shd_fmt_ok 0x12d8 4%nat = true.
   Proof using . vm_compute. reflexivity. Qed.
 
   Lemma ushq_pipe_msg_byte (p : nat) :
-    (p < 4)%nat -> shd_lit 0x12c8 p = wl_line PipeDisc.dg_pipe !!! p.
+    (p < 4)%nat -> shd_lit 0x12d8 p = wl_line PipeDisc.dg_pipe !!! p.
   Proof using .
     intro Hp.
-    apply (ush_bytes_of_forallb (shd_lit 0x12c8)
+    apply (ush_bytes_of_forallb (shd_lit 0x12d8)
              (fun q : nat => wl_line PipeDisc.dg_pipe !!! q) 0%nat 4%nat);
       [ vm_compute; reflexivity | lia ].
   Qed.
 
   Lemma ushq_pipe_msg_nl :
-    shd_lit 0x1290 2%nat = wl_line PipeDisc.dg_pipe !!! 4%nat.
+    shd_lit 0x12a0 2%nat = wl_line PipeDisc.dg_pipe !!! 4%nat.
   Proof using . apply bv_eq. vm_compute. reflexivity. Qed.
 
-  Lemma ushq_fork_msg_fmt : shd_fmt_ok 0x1298 4%nat = true.
+  Lemma ushq_fork_msg_fmt : shd_fmt_ok 0x12a8 4%nat = true.
   Proof using . vm_compute. reflexivity. Qed.
 
   (* =================================================================== *)
@@ -362,7 +362,7 @@ Section UkShPipePaid.
                     HWr Hwl [] [] [] Hrun HcL HcR Hpar").
     - (* ---- panic("pipe"): the lend pays its five bytes ---- *)
       iIntros "!>" (h' m') "%Ha0' Hstd' Hcr' Hrun'".
-      iApply (wp_kshd_panic_paid_at N 0x12c8 (wl_line PipeDisc.dg_pipe)
+      iApply (wp_kshd_panic_paid_at N 0x12d8 (wl_line PipeDisc.dg_pipe)
                 Cr Bp ld h' m' (2 + av)%nat
                 Hfd2 Ha0' ltac:(lia) ushq_pipe_msg_fmt ushq_pipe_msg_len
                 ushq_pipe_msg_byte ushq_pipe_msg_nl
@@ -370,7 +370,7 @@ Section UkShPipePaid.
       iIntros "Hstd'' Hb". iApply ("Hbp" with "Hstd'' Hb").
     - (* ---- the first fork1's panic("fork"): SS4.3u's borrowed pair ---- *)
       iIntros "!>" (h' m' r γp) "%Ha0' %Hr' _ Hstd' HRcR Hcx Hrun'".
-      iApply (wp_kshd_panic_paid_at N 0x1298 EchoDisc.alt_panic
+      iApply (wp_kshd_panic_paid_at N 0x12a8 EchoDisc.alt_panic
                 (RcR γp ∗ Cx γp)%I (Bx γp) ld h' m' av
                 Hfd2 Ha0' ltac:(lia) ushq_fork_msg_fmt ush_fork_msg_len
                 ush_fork_msg_byte ush_fork_msg_nl
@@ -389,7 +389,7 @@ Section UkShPipePaid.
         iDestruct "Hpid" as (γ pidv) "(%Hr2 & %Hrng & _ & _ & _)".
         iExFalso. iPureIntro.
         apply (ushq_pid_sext_ne_m1 pidv Hrng). rewrite -Hr2. exact Hr'. }
-      iApply (wp_kshd_panic_paid_at N 0x1298 EchoDisc.alt_panic
+      iApply (wp_kshd_panic_paid_at N 0x12a8 EchoDisc.alt_panic
                 (RcR γp ∗ Cx γp)%I (Bx γp) ld h' m' av
                 Hfd2 Ha0' ltac:(lia) ushq_fork_msg_fmt ush_fork_msg_len
                 ush_fork_msg_byte ush_fork_msg_nl

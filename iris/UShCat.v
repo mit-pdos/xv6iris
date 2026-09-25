@@ -13,7 +13,7 @@
 (*     [kexec_top] is 0x2000 and [kexec_sz] 0x4000 for BOTH, and every   *)
 (*     closed number [UShEcho]'s geometry computes is cat's too.  What   *)
 (*     differs in the literals is only the FIRST PT_LOAD's memsz (cat    *)
-(*     0xecc, echo 0xdcc), the SECOND's (cat 0x220, echo 0x20) and the   *)
+(*     0xecc, echo 0xddc), the SECOND's (cat 0x220, echo 0x20) and the   *)
 (*     entry ([CatSyms.start] 0xf6 against [EchoSyms.start] 0x7c).       *)
 (*                                                                       *)
 (*  2. cat's FRAME IS 42 WORDS, not echo's twelve.                       *)

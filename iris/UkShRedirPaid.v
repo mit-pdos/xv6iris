@@ -78,11 +78,11 @@ Section UkShRedirPaid.
     exact Hp.
   Qed.
 
-  (* the format's two windows at 0x12b8 ("open " and " failed\n") and the
+  (* the format's two windows at 0x12c8 ("open " and " failed\n") and the
      one-byte argument are the alternative's first fourteen bytes *)
   Lemma ush_openfail_w1 :
     forall p : nat, (0 <= p < 0 + 5)%nat ->
-      shd_lit 0x12b8 p = alt_openfail !!! p.
+      shd_lit 0x12c8 p = alt_openfail !!! p.
   Proof using . apply ush_bytes_of_forallb. vm_compute. reflexivity. Qed.
 
   Lemma ush_openfail_arg :
@@ -91,9 +91,9 @@ Section UkShRedirPaid.
 
   Lemma ush_openfail_w2 :
     forall p : nat, (7 <= p < 7 + 8)%nat ->
-      shd_lit 0x12b8 p = alt_openfail !!! (p - 1)%nat.
+      shd_lit 0x12c8 p = alt_openfail !!! (p - 1)%nat.
   Proof using .
-    apply (ush_bytes_of_forallb (shd_lit 0x12b8)
+    apply (ush_bytes_of_forallb (shd_lit 0x12c8)
              (fun p : nat => alt_openfail !!! (p - 1)%nat)).
     vm_compute. reflexivity.
   Qed.
@@ -154,10 +154,10 @@ Section UkShRedirPaid.
                  (ua_len x) (ua_bytes x)
                  with "Hxs") as "#Hs".
     assert (Hlits110 : shd_die_lits 0x110 0x114 0x118 0x11a 0x11e 0x120
-                      (mword_of_int 1 : mword 20) (mword_of_int 424 : mword 12)
-                      (mword_of_int 3984 : mword 21) (mword_of_int 2918 : mword 21)
+                      (mword_of_int 1 : mword 20) (mword_of_int 440 : mword 12)
+                      (mword_of_int 3992 : mword 21) (mword_of_int 2918 : mword 21)
                       (mword_of_int 1 : mword 6)
-                      0x12b8 15%nat 5%nat)
+                      0x12c8 15%nat 5%nat)
       by shd_die_solve.
     set (C1 := (fun p : nat => UserFd.ustd (ukn_fd N) l ∗ Pf p)%I).
     set (C2 := (fun p : nat => UserFd.ustd (ukn_fd N) l ∗ Pf (5 + p)%nat)%I).
@@ -167,10 +167,10 @@ Section UkShRedirPaid.
       by (rewrite Hxlen; reflexivity).
     iApply (wp_kshd_die_chain N false DfracDiscarded
               0x110 0x114 0x118 0x11a 0x11e 0x120
-              (mword_of_int 1 : mword 20) (mword_of_int 424 : mword 12)
-              (mword_of_int 3984 : mword 21) (mword_of_int 2918 : mword 21)
+              (mword_of_int 1 : mword 20) (mword_of_int 440 : mword 12)
+              (mword_of_int 3992 : mword 21) (mword_of_int 2918 : mword 21)
               (mword_of_int 1 : mword 6)
-              0x12b8 15%nat 5%nat
+              0x12c8 15%nat 5%nat
               (ua_ptr x) (ua_len x) (ua_bytes x) C1 C2 C3 h1 m1 (n + 2)
               Hlits110
               ltac:(lia)

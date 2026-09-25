@@ -42,10 +42,10 @@
                           worked example.
 
    Image geometry, as dumped:
-     text  0x0 .. 0x8c2   (2242 bytes)
-     PT_LOAD 0x0      filesz 0xd44    memsz 0xd44    flags 5   (executable: 1 text page(s))
+     text  0x0 .. 0x8ca   (2250 bytes)
+     PT_LOAD 0x0      filesz 0xd54    memsz 0xd54    flags 5   (executable: 1 text page(s))
      PT_LOAD 0x1000   filesz 0x0      memsz 0x20     flags 6
-     data  0x8c2 .. 0xd44   (1154 bytes)
+     data  0x8ca .. 0xd54   (1162 bytes)
      entry 0x12, MemBase 0x0, MemEnd 0x1020
 
    Catalogued: 18 instruction(s), 13 distinct word(s), in 4 function(s):
@@ -80,9 +80,9 @@
        0x2ce -- exit's [c.jr ra] -- the ecall at 0x2ca never returns
        atoi, chdir, close, dup, exec, fork, fprintf, free, fstat, getpid, gets,
        kill, link, malloc, memcmp, memcpy, memmove, memset, mkdir, mknod, open,
-       pause, pipe, printf, printint, putc, read, sbrk, sbrklazy, stat, strchr,
-       strcmp, strcpy, strlen, sys_sbrk, unlink, uptime, vprintf, wait, write
-       -- library or syscall stub that sync never calls
+       pause, pipe, printf, printint, putc, read, sbrk, sbrklazy, seccomp,
+       stat, strchr, strcmp, strcpy, strlen, sys_sbrk, unlink, uptime, vprintf,
+       wait, write -- library or syscall stub that sync never calls
 
    sync's four functions. The [c.jr ra] at 0x2ce is dead -- exit's ecall at
    0x2ca never returns -- but 0x1e's [jal exit] IS catalogued, because
@@ -137,8 +137,8 @@ Lemma sync_img_data (M : gmap Z (bv 8)) : sync_img_sub M -> sync_data_sub M.
 Proof using . intros [ _ H ]. exact H. Qed.
 
 (* ---- the KEY RANGE of each dumped map ------------------------------- *)
-(* The bounds are COMPUTED from the dump (text keys stop at 0x8c1, data keys
-   at 0xd43) and rounded up to the next page, which is the shape the users of
+(* The bounds are COMPUTED from the dump (text keys stop at 0x8c9, data keys
+   at 0xd53) and rounded up to the next page, which is the shape the users of
    the fact want: [UmodeAbi.uM_only_img] asks exactly "the written window is
    disjoint from every key of [img]", and the windows a program writes are
    its stack, which starts at a page boundary above the image. *)
@@ -463,7 +463,7 @@ Section UCodeSync.
   Global Instance sync_code_persistent g : Persistent (sync_code g).
   Proof using . apply _. Qed.
 
-  (* Keep typeclass resolution from unfolding this into its 2242-entry
+  (* Keep typeclass resolution from unfolding this into its 2250-entry
      [big_sepM]; cf. [KernelText.kernel_text], which learned it the hard
      way.  Conversion can still see through it -- [sync_code_img] below is
      the one place that needs to. *)
@@ -742,7 +742,7 @@ Section UCodeSync.
      in [SyncInstrs.sync_bytes] and they are not in the data half either:
      .rodata shares the EXECUTABLE segment's pages, so its bytes are
      X-and-not-W and the heap files them under [γt] exactly as it files the
-     code. This program's literals land at 0x8c2..0xd44, inside the R-X
+     code. This program's literals land at 0x8ca..0xd54, inside the R-X
      segment, and a printf-family walk LOADS them one byte at a time. This is
      the part of [SyncData.sync_data] that lands there -- everything below
      the end of the executable segment -- and [UserHeap.utext_str_of_img]

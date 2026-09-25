@@ -460,7 +460,7 @@ Section UShPanicGen.
     assert (Hua : uint (m !!! Regidx a1_idx) = sh_prompt_pv)
       by (rewrite Ha1; apply uint_moi; unfold UkSh.sh_prompt_pv, Z64; lia).
     (* the two keys the console chain is indexed by, as plain addresses:
-       the buffer is a .rodata literal at 0x1280, so neither add wraps *)
+       the buffer is a .rodata literal at 0x1290, so neither add wraps *)
     assert (Havi0 : uint (add_vec_int (m !!! Regidx a1_idx) (Z.of_nat 0))
                     = sh_prompt_pv).
     { assert (Hhi : uint (m !!! Regidx a1_idx) + Z.of_nat 0

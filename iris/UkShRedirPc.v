@@ -646,7 +646,7 @@ Section UkShRedirPc.
       by exact (upd_eq m14 (Regidx a2_idx)
                   (regval_into_reg (mword_of_int 0x189a : mword 64))).
     iApply (wp_uk_addi N h17 m15 (mword_of_int 0x89e)
-              (mword_of_int 2542 : mword 12) a2_idx a2_idx
+              (mword_of_int 2558 : mword 12) a2_idx a2_idx
               (mword_of_int ushp_T_none) (60 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)

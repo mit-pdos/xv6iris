@@ -364,11 +364,11 @@ Section UkShCatDiag.
     (* the alternative is long enough for the whole block... *)
     (forall p : nat, (p < 13 + length cmd)%nat -> dg !! p = Some (dg !!! p)) ->
     (* ...and its bytes ARE the literal around the name *)
-    (forall p : nat, (p < 5)%nat -> UkShDiag.shd_lit 0x12a8 p = dg !!! p) ->
+    (forall p : nat, (p < 5)%nat -> UkShDiag.shd_lit 0x12b8 p = dg !!! p) ->
     (forall j : nat, (j < length cmd)%nat ->
        cmd !!! j = dg !!! (5 + j)%nat) ->
     (forall p : nat, (7 <= p < 15)%nat ->
-       UkShDiag.shd_lit 0x12a8 p = dg !!! (p + (length cmd - 2))%nat) ->
+       UkShDiag.shd_lit 0x12b8 p = dg !!! (p + (length cmd - 2))%nat) ->
     UkShDiag.ush_execfail_law_at dg (13 + length cmd)%nat Cr Cd -∗
     shk_code (ukn_t N) -∗
     shk_rodata (ukn_t N) -∗
@@ -389,11 +389,11 @@ Section UkShCatDiag.
      [cmd := EchoDisc.cmd_echo], [dg := EchoDisc.alt_execfail]. *)
   Lemma execfail_at_echo_bytes :
     (forall p : nat, (p < 5)%nat ->
-       UkShDiag.shd_lit 0x12a8 p = EchoDisc.alt_execfail !!! p)
+       UkShDiag.shd_lit 0x12b8 p = EchoDisc.alt_execfail !!! p)
     /\ (forall j : nat, (j < length EchoDisc.cmd_echo)%nat ->
           EchoDisc.cmd_echo !!! j = EchoDisc.alt_execfail !!! (5 + j)%nat)
     /\ (forall p : nat, (7 <= p < 15)%nat ->
-          UkShDiag.shd_lit 0x12a8 p
+          UkShDiag.shd_lit 0x12b8 p
           = EchoDisc.alt_execfail
               !!! (p + (length EchoDisc.cmd_echo - 2))%nat).
   Proof using .
@@ -414,10 +414,10 @@ Section UkShCatDiag.
   Qed.
 
   Lemma cat_execfail_w1 (p : nat) :
-    (p < 5)%nat -> UkShDiag.shd_lit 0x12a8 p = alt_execR !!! p.
+    (p < 5)%nat -> UkShDiag.shd_lit 0x12b8 p = alt_execR !!! p.
   Proof using .
     intro Hp.
-    apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x12a8)
+    apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x12b8)
              (fun q : nat => alt_execR !!! q) 0%nat 5%nat);
       [ vm_compute; reflexivity | lia ].
   Qed.
@@ -432,10 +432,10 @@ Section UkShCatDiag.
   Qed.
 
   Lemma cat_execfail_w2 (p : nat) :
-    (7 <= p < 15)%nat -> UkShDiag.shd_lit 0x12a8 p = alt_execR !!! (p + 1)%nat.
+    (7 <= p < 15)%nat -> UkShDiag.shd_lit 0x12b8 p = alt_execR !!! (p + 1)%nat.
   Proof using .
     intro Hp.
-    apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x12a8)
+    apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x12b8)
              (fun q : nat => alt_execR !!! (q + 1)%nat) 7%nat 8%nat);
       [ vm_compute; reflexivity | lia ].
   Qed.

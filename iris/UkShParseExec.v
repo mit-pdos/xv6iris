@@ -1337,9 +1337,9 @@ Section UkShParseExec.
     assert (Ha2_5 : m5 !!! Regidx a2_idx = mword_of_int 0x15a2)
       by exact (upd_eq m4 (Regidx a2_idx)
                   (regval_into_reg (mword_of_int 0x15a2 : mword 64))).
-    (* ---- 0x5a6  addi a2,a2,-682 -- the open-paren table ---- *)
+    (* ---- 0x5a6  addi a2,a2,-666 -- the open-paren table ---- *)
     iApply (wp_uk_addi N h6 m5 (mword_of_int 0x5a6)
-              (mword_of_int 3414 : mword 12) a2_idx a2_idx
+              (mword_of_int 3430 : mword 12) a2_idx a2_idx
               (mword_of_int ushp_T_block) (24 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
@@ -1765,7 +1765,7 @@ Section UkShParseExec.
       by exact (upd_eq m19 (Regidx s6_idx)
                   (regval_into_reg (mword_of_int 0x15d6 : mword 64))).
     iApply (wp_uk_addi N h23 m20 (mword_of_int 0x5da)
-              (mword_of_int 3394 : mword 12) s6_idx s6_idx
+              (mword_of_int 3410 : mword 12) s6_idx s6_idx
               (mword_of_int ushp_T_arg) (24 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)

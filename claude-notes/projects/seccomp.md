@@ -106,6 +106,21 @@ Old dumps for the tools: `$SCRATCH/old/OldKernelInstrs.v`,
    and the manifest row, `UCodeSeccomp.v` generated.
 4. Deliver as commits on `secc/user`; lane K merges and builds.
 
+STATUS (2026-09-25): all four steps landed on `secc/user`.  Catalogs
+regenerated (70 immediates, no shape change; ShK gains `uis_shk_1006`
+because the stale page-straddle omit went away).  Hand-written relayout:
+~4700 literal sites in ~70 files (pc/rodata remaps, `uis_*` renames, the
+70 immediates at their proof sites, sh's two JUMP TABLES' entries --
+data, pc-relative to the moved table -- and the text `filesz` of every
+image).  Seccomp: dumps, `ElfUser.seccomp_elf`, `FsImgCheck` inum 23,
+`UCodeSeccomp.v`.  Checked on the VM against the new dumps: every edited
+file elaborates (`-vos`) except the 9 whose cone reaches K's three red
+kernel proofs (ProofKvminit, ProofSysFork, ProofUserinit); the 57 whose
+`.vo` cone has no kernel Proof/Link file were built as `.vo` (proofs
+run).  `FsImgCheck.fsimg_live_set` 22 -> 23 was made here (a separate
+commit) to build the seccomp byte lemmas; `TreeImg.v`'s `<=? 22` root
+range (lines 27/206/213) is the same fs.img-count class and is K's.
+
 ## Lane M -- the pure model (design §3)
 
 Worktree at the OLD pin, so the tree is green underneath.

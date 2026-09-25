@@ -11,7 +11,7 @@
 (* naming:                                                                *)
 (*                                                                        *)
 (*  THE PATH IS NOT A CONSTANT.  init's "sh" is a literal in its rodata    *)
-(*  ([UCodeInit.init_ro] at 0x9a8) and its argv a literal in its data, so  *)
+(*  ([UCodeInit.init_ro] at 0x9b8) and its argv a literal in its data, so  *)
 (*  [UInitSh.init_args_det] is three [vm_compute]s over the dump.  sh's    *)
 (*  "echo" is a run of the LINE BUFFER, cut by [nulterminate], and its     *)
 (*  argv is a malloc'd node -- so the reading is off the NODE                *)
@@ -210,7 +210,7 @@ Qed.
 (* ===================================================================== *)
 (*  3a. THE IMAGE exec BUILDS FOR /echo, as two numbers                   *)
 (*                                                                        *)
-(*  echo's PT_LOADs are (0, 0xdcc, R-X) and (0x1000, 0x20, RW-), so the   *)
+(*  echo's PT_LOADs are (0, 0xddc, R-X) and (0x1000, 0x20, RW-), so the   *)
 (*  loaded top is [pgroundup 0x1020 = 0x2000] and the new [p->sz] is that *)
 (*  plus the guard and the stack page.  Everything the room condition     *)
 (*  needs is closed arithmetic over these two.                            *)
@@ -293,14 +293,14 @@ Qed.
 (* ===================================================================== *)
 (*  3b. THE TWO PT_LOADs, AND THE ENTRY                                   *)
 (*                                                                        *)
-(*  [UShKernel.sh_loads] at echo: (0x0, 0xdcc, R-X) and (0x1000, 0x20,    *)
+(*  [UShKernel.sh_loads] at echo: (0x0, 0xddc, R-X) and (0x1000, 0x20,    *)
 (*  RW-).  Only the FIRST is read below -- echo's entry asks for page 0   *)
 (*  to be X-and-not-W and for nothing else about the loaded image.        *)
 (* ===================================================================== *)
 Lemma echo_loads :
   exists p0 p1 : elf_phdr,
     elf_loads ElfUser.echo_elf = [p0; p1]
-    /\ ep_vaddr p0 = 0 /\ ep_memsz p0 = 0xdcc /\ ep_flags p0 = 5
+    /\ ep_vaddr p0 = 0 /\ ep_memsz p0 = 0xddc /\ ep_flags p0 = 5
     /\ ep_vaddr p1 = 0x1000 /\ ep_memsz p1 = 0x20 /\ ep_flags p1 = 6.
 Proof.
   pose proof (UShKernel.elf_segments_loads ElfUser.echo_elf _

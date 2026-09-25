@@ -102,7 +102,7 @@ Local Open Scope Z_scope.
 (*                                                                        *)
 (*  [UInitConsK.init_cons_path_of]'s twin at sh's own literal.  The string *)
 (*  is the SAME one ([UInitCons.init_cons_pl]); only the base differs --   *)
-(*  0x970 in /init's image, [UkSh.sh_cons_pv] (0x1378) in sh's, which      *)
+(*  0x980 in /init's image, [UkSh.sh_cons_pv] (0x1388) in sh's, which      *)
 (*  0x8f8/0x8fc compute and 0x902 passes.  Both facts are one              *)
 (*  [vm_compute] on the dump.                                             *)
 (* ===================================================================== *)

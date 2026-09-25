@@ -122,7 +122,7 @@ Section UkShParseLex.
   (* §6 THE ONE HYPOTHESIS OF STAGE 4: MALLOC.                              *)
   (*                                                                       *)
   (* All five cmd constructors begin [cmd = malloc(sizeof( *cmd))], and     *)
-  (* malloc (0x118c, 91 instructions) -> morecore -> sbrk (0xc52) ->        *)
+  (* malloc (0x1194, 91 instructions) -> morecore -> sbrk (0xc52) ->        *)
   (* sys_sbrk (0xd0e) is STAGE 3, which is blocked on the second unbuilt    *)
   (* consumer leaf, [wp_uk_ecall_sbrk] -- and that one moves [pi] and [sz], *)
   (* so it is strictly harder than the window row stage 2 needed.           *)
@@ -1633,13 +1633,13 @@ Section UkShParseLex.
   Qed.
 
   (* ---- the seven bases, named ------------------------------------------ *)
-  Definition ushp_T_redir : Z := 0x12f0.   (* the two redirection bytes, parseredirs *)
-  Definition ushp_T_block : Z := 0x12f8.   (* the open paren, parseexec *)
-  Definition ushp_T_arg   : Z := 0x1318.   (* the four argument-loop stoppers, parseexec *)
-  Definition ushp_T_pipe  : Z := 0x1320.   (* the pipe byte, parsepipe *)
-  Definition ushp_T_back  : Z := 0x1328.   (* the ampersand, parseline *)
-  Definition ushp_T_list  : Z := 0x1330.   (* the semicolon, parseline *)
-  Definition ushp_T_none  : Z := 0x1288.   (* the empty table, parsecmd *)
+  Definition ushp_T_redir : Z := 0x1300.   (* the two redirection bytes, parseredirs *)
+  Definition ushp_T_block : Z := 0x1308.   (* the open paren, parseexec *)
+  Definition ushp_T_arg   : Z := 0x1328.   (* the four argument-loop stoppers, parseexec *)
+  Definition ushp_T_pipe  : Z := 0x1330.   (* the pipe byte, parsepipe *)
+  Definition ushp_T_back  : Z := 0x1338.   (* the ampersand, parseline *)
+  Definition ushp_T_list  : Z := 0x1340.   (* the semicolon, parseline *)
+  Definition ushp_T_none  : Z := 0x1298.   (* the empty table, parsecmd *)
 
   (* ...and the two decidable checks, discharged once each *)
   Lemma ushp_T_redir_ok : ushp_lit_ok ushp_T_redir 2 = true.
@@ -1703,7 +1703,7 @@ Section UkShParseLex.
   (* memset's two fit inside those ten.                                     *)
   (* ===================================================================== *)
 
-  Lemma shpp_malloc : ShSyms.malloc = 0x118c.
+  Lemma shpp_malloc : ShSyms.malloc = 0x1194.
   Proof using . unfold ShSyms.malloc. reflexivity. Qed.
   Lemma shpp_memset : ShSyms.memset = 0xa5c.
   Proof using . unfold ShSyms.memset. reflexivity. Qed.
@@ -1874,8 +1874,8 @@ Section UkShParseLex.
       by (intros q Hq; exact (upd_ne m2 (Regidx a0_idx) (Regidx q) _ Hq)).
     (* ---- 0x1e0  jal 118c <malloc> ---- *)
     iApply (wp_uk_jal N h4 m3 (mword_of_int 0x1e0)
-              (mword_of_int 4012 : mword 21) ra_idx
-              (mword_of_int 0x118c) (mword_of_int 0x1e4) (10 + nn)
+              (mword_of_int 4020 : mword 21) ra_idx
+              (mword_of_int 0x1194) (mword_of_int 0x1e4) (10 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
               ltac:(apply bv_eq; vm_compute; reflexivity)
