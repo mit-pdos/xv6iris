@@ -172,7 +172,7 @@ theorem fwr_dispatch (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) 
     iintro Hk Hpc
     obtain ⟨rb, wb, rfl⟩ := fwr_st_pipe inumC γoC C st hok h1
     iapply (fwr_arm_pipe PW Γ cpu k k.spie k.spp _ γl γu γ fk q C rb wb j pid V M γkl γk n Q w2 w4 w5 w8 w9
-      w10 w11 hK hj hproc hnoff htier ht0 hn h1 ?hrp ?h10p ?h12p) $$ [- $Hk $Hpc]
+      w10 w11 hK hj hproc hnoff htier ht0 hn h1 ?hrp ?h10p ?h12p ?h11p) $$ [- $Hk $Hpc]
     rotate_right 1
     k_norm_g
     iframe
@@ -182,6 +182,7 @@ theorem fwr_dispatch (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) 
       exact hr
     case h10p => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]; exact h10
     case h12p => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]; exact h12
+    case h11p => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]; exact h11
   -- FD_PIPE: falls
   k_step_e (wp_s_branch cpu _ (KA.«filewrite» + 0x28#64) false 52#13 15#5 14#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filerw_beq1, decide_eq_false h1]

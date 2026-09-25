@@ -171,7 +171,8 @@ theorem fwr_arm_pipe (PW : PIPEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) (ht : curTier = KTier.kpt)
     (hn : -2 ^ 31 ≤ n ∧ n < 2 ^ 31) (hty : C.type = FD_PIPE)
     (hr : fwrRegs k fk n (k.regs 9#5) (k.regs 19#5) (k.regs 20#5) (k.regs 23#5) (k.regs 24#5)
-      (k.regs 25#5) R) (h10 : R 10#5 = fnode fk) (h12 : R 12#5 = BitVec.ofInt 64 n) :
+      (k.regs 25#5) R) (h10 : R 10#5 = fnode fk) (h12 : R 12#5 = BitVec.ofInt 64 n)
+    (h11 : R 11#5 = k.regs 11#5) :
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗
     pcIs cpu (KA.«filewrite» + 0x5c#64) ∗
     frame12 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) w2 (k.regs 18#5) w4 w5 (k.regs 21#5)
@@ -211,7 +212,7 @@ theorem fwr_arm_pipe (PW : PIPEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
   case ptier => k_norm_g; exact htier
   case pn => k_norm_g; exact h12
   -- ===== back from pipewrite =====
-  iintro %cpu %spie1 %spp1 %R1 %P' %⟨hcs1, hext, hret⟩ Hk Hpc Hte Hce Hpref Hpriv
+  iintro %cpu %spie1 %spp1 %R1 %P' %⟨hcs1, hext, hret, hwp⟩ Hk Hpc Hte Hce Hpref Hpriv
   k_norm_g [fwr_ret_62, fwr_ww, fwr_psw]
   have hr1 : fwrRegs k fk n (k.regs 9#5) (k.regs 19#5) (k.regs 20#5) (k.regs 23#5) (k.regs 24#5)
       (k.regs 25#5) R1 := by
@@ -240,7 +241,7 @@ theorem fwr_arm_pipe (PW : PIPEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
     rw [h10']
     isplitr
     · ipureintro; exact hret
-    iapply filewriteExtra_pipe
+    iapply filewriteExtra_pipe _ _ _ _ _ _ _ _ (fun _ => by rw [h11] at hwp; exact hwp)
 
 /-! ## The FD_DEVICE arm's readings -/
 

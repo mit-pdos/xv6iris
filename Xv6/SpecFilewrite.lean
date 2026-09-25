@@ -163,6 +163,12 @@ untouched); the `n < 0` test (+0x1c); the three-way dispatch; FD_PIPE
    `filewriteIn/Extra/Arms`, `fw_chunk_joint` → `fwrChunkJoint`,
    `fw_off_advance` → `fwrOffAdvance` (the `fw_` prefix is taken:
    FsWords / freewalk).
+11. **THE FD_PIPE ARM** of `filewriteExtra` is `⌜pipeWpostR P ua n.toNat r⌝`
+   (Rocq `pipe_wpost P …`, lane TRAP-ROWS T1): pipewrite's answer and its
+   short reason at the writer's table, WITHOUT Rocq's byte-queue resources
+   (the chain at the stop cursor, the read-shut observation, the kill shot,
+   the taint), and `filewriteIn`'s pipe arm (Rocq `pipe_wpay`) is `emp` --
+   the queue (`PipeQueue.v`) is not ported (SpecPipewrite deviation 1).
 
 ## Dropped/simplified vs Rocq
 
@@ -533,14 +539,17 @@ def filewriteIn (st : FdState) (n : Int) (M : Nat → List (BitVec 8)) (ua : Bit
   | _ => emp
 
 /-- WHAT THE ARM PAYS BEYOND THE LANDED BLANKET (Rocq `filewrite_extra`;
-`P` is the WRITER'S OWN TABLE, Rocq lane TRAP-ROWS T1, read by the console
-arm's short reason).  The console's arm only: elsewhere the caller cannot
-know the callee was consolewrite. -/
+`P` is the WRITER'S OWN TABLE, Rocq lanes TRAP-ROWS T1 / WRITE-RELAY-2, read
+by the short reason of each arm: the inode chain's partial arms, the
+console's short count, pipewrite's answer -- deviation 11).  A device at a
+major other than the console arms nothing: the caller cannot know the
+callee was consolewrite. -/
 def filewriteExtra (P : UPtd) (st : FdState) (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64)
     (Q : Nat → IProp GF) (r : BitVec 64) : IProp GF :=
   match st with
   | .open _ true (.inode i γo _) => writeArmsAt (hlc := hlc) (fsGammaL fscFs) i γo P n M ua Q r
   | .open _ true (.device mj) => if mj = CONSOLE then writeConsArms P ua Q n r else emp
+  | .open _ true .pipe => iprop(⌜pipeWpostR P ua n.toNat r⌝)
   | _ => emp
 
 /-- THE WHOLE POST'S ARMED PART (Rocq `filewrite_arms`): the landed blanket
@@ -601,11 +610,16 @@ theorem filewriteExtra_dev_drop (P : UPtd) (rb : Bool) (mj : Nat) (hmj : mj ≠ 
   iintro -
   iapply filewriteExtra_dev_other P rb true mj hmj
 
-/-- Rocq `filewrite_extra_pipe`. -/
+/-- Rocq `filewrite_extra_pipe`: the pipe arm is pipewrite's answer and its
+reason (`SpecPipewrite.pipeWpostR`, Rocq `pipe_wpost`'s pure part) at a
+writable end. -/
 theorem filewriteExtra_pipe (P : UPtd) (rb wb : Bool) (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64)
-    (Q : Nat → IProp GF) (r : BitVec 64) :
+    (Q : Nat → IProp GF) (r : BitVec 64) (h : wb = true → pipeWpostR P ua n.toNat r) :
     ⊢ filewriteExtra (hlc := hlc) P (.open rb wb .pipe) n M ua Q r := by
-  unfold filewriteExtra; cases wb <;> exact .rfl
+  unfold filewriteExtra
+  cases wb
+  · exact .rfl
+  · exact BI.pure_intro (h rfl)
 
 /-- Rocq `filewrite_extra_unwritable`: the `f->writable == 0` early return
 arms nothing -- every armed state is WRITABLE. -/
@@ -644,7 +658,10 @@ theorem filewriteExtra_neg (P : UPtd) (st : FdState) (n : Int) (M : Nat → List
   · cases wb
     · unfold filewriteIn filewriteExtra; rcases t with _ | ⟨i, g, om⟩ | mj <;> exact .rfl
     · rcases t with _ | ⟨i, g, om⟩ | mj
-      · exact .rfl
+      · -- a negative request never reaches the pipe (Rocq `pipe_wpost_neg`)
+        iintro -
+        iapply filewriteExtra_pipe P rb true n M ua Q (-1#64) (fun _ => by
+          rw [show n.toNat = 0 by omega]; exact pipeWpostR_neg P ua)
       · unfold filewriteIn filewriteExtra
         iintro ⟨-, Hc⟩
         iapply writeArmsAt_neg _ i g P n M ua Q hn $$ Hc

@@ -312,7 +312,8 @@ theorem fwr_pipewrite (PW : PIPEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     procPrivExt (procAddr j) pid V V.upt M ∗
     (∀ (c' : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd),
-      ⌜calleeSaved k'.regs R' ∧ V.upt.extSz V.sz P' ∧ pipeRwRet n (R' 10#5)⌝ -∗
+      ⌜calleeSaved k'.regs R' ∧ V.upt.extSz V.sz P' ∧ pipeRwRet n (R' 10#5) ∧
+        pipeWpostR V.upt (k'.regs 11#5) n.toNat (R' 10#5)⌝ -∗
       kctx c' ((k'.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c' k'.sie -∗ cpuClaimExt c' k'.sie k'.proc -∗
       pipeRef γp w q -∗
