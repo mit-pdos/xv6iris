@@ -70,7 +70,7 @@ THE PLAN (reverse-engineered; see the report accompanying this file):
   `release(&np->lock)`, `ForkretRecord.forkret_record` builds
   `procCtxAt Γ curCtx (procAddr i)` from the child's context cells
   (unchanged) and its WHOLE block `procPrivFd` (`kf_child_close`: the
-  copied table with its payloads at the fresh descriptor ghost, the cwd
+  copied table with its payloads at allocproc's descriptor ghost, the cwd
   reference, the generation row `kf_gen_split` assembled) beside its
   fragment bundle, + stack + `procsInv`; `procSlots_used_intro`
   assembles `procSlotsAt USED` from `procCtxAt` + `hartAtAny`; split
@@ -1382,9 +1382,9 @@ theorem kf_ofile_copy [CurCtx] (FD : FILEDUP) (Γ : SchedNames) (jp jc : Nat)
 /-! ## The two blocks at the copy loop's edges -/
 
 /-- The fresh child table at loop index `0`: allocproc's null cells, the
-per-descriptor units out of the dormant block, and the freshly minted keys
-(`fdSt_alloc`), each split into its authority (the slot's) and fragment
-(over the PARENT's states). -/
+per-descriptor units, and the keys of the descriptor ghost allocproc minted
+(`FdTable.procPrivNocwd_null_open`), each split into its authority (the
+slot's) and fragment (over the PARENT's states). -/
 theorem kf_child_init [CurCtx] (γ : FileNames) (γd : GName) (pa : BitVec 64) (sts : List FdState)
     (hs : sts.length = NOFILE) :
     ([∗list] i ↦ c ∈ List.replicate NOFILE (0#64 : BitVec 64),
@@ -2890,7 +2890,7 @@ theorem kfork_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCPROC)
     unfold wp_allocproc_body at hal
     simp only [allocprocAddr] at hal
     -- the steady regime (`procsAvailAt Γ none false`), at the caller's payload `Q`
-    iapply (hal Γ cpu _ γl γp γk none none false Q ?hnA ?hKA ?hlkA ?hlpA ?hlqA ?htA)
+    iapply (hal Γ γ cpu _ γl γp γk none none false Q ?hnA ?hKA ?hlkA ?hlpA ?hlqA ?htA)
       $$ [- $Hk $Hpc $Hpinv $Hkm $Hpl $Hkav $Hpav $Hkw]
     rotate_right 1
     case hnA => k_norm_g [KCtx.setReg_noff]; omega
@@ -2967,7 +2967,7 @@ theorem kfork_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCPROC)
         · exact b2_26.trans a1_26
         · exact b2_27.trans a1_27
     · -- allocproc succeeded (r = procAddr i ≠ 0): fall through
-      icases (show allocprocPost Γ cpu γk none none false Q (R2 10#5) ⊢
+      icases (show allocprocPost Γ γ cpu γk none none false Q (R2 10#5) ⊢
           (⌜R2 10#5 = 0#64 ∧ (((none : Option Nat) = none ∨ (none : Option Nat) = some 0) ∨
               ∃ g : Nat, g ≤ procPagetableNodes + 1 ∧ availZero (availSub none g))⌝ ∗
             (procsAvailAt Γ none false ∨ pavSpent Γ none) ∗
@@ -2979,7 +2979,9 @@ theorem kfork_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCPROC)
               (if pavBoot none false then pid_c.toNat = 1 else pid_c.toNat ≠ 1)⌝ ∗
             procHeld Γ cpu i USED ch ∗ hartAtAny Γ (procAddr i) ∗ slotUsed Γ (procAddr i) ∗
             pavSpent Γ (pavDec none) ∗
-            procPriv (procAddr i) pid_c V_c M_c ∗ dormantAllow ∗ chFrag V_c.chg (procAddr i) ∅ ∗
+            procPrivNocwd γ (procAddr i) pid_c V_c M_c ∗ contextCells (procAddr i) (DFrac.own 1) V_c.context ∗
+            fdFrags V_c.fdg (List.replicate NOFILE .closed) ∗
+            fdSlots FDSPARE ∗ irefSlots (1 + IREFSPARE) ∗ bslots 3 ∗ chFrag V_c.chg (procAddr i) ∅ ∗
             genNew V_c.gen (procAddr i) pid_c Q ∗ slotGen (procAddr i) (.own 1) V_c.gen ∗
             pidRegRest pid_c V_c.gen ∗
             (∃ xsv : BitVec 32, wordPointsTo (pXstate (procAddr i)) 4 xsHalf xsv) ∗
@@ -2987,9 +2989,14 @@ theorem kfork_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCPROC)
           from by unfold allocprocPost; iintro H; iexact H) $$ Hpost
         with (⟨%hbad, _, _⟩ |
           ⟨%i, %ch, %pid_c, %V_c, %M_c, %gc, %hpure, Hheld, Hhart, #Hused, _,
-            HcPriv, Hcal, Hcch, Hgn, Hsgw, Hprr, Hxs, Hcstack, Hcav⟩)
+            HcNc, HcCtx, HcFr, HcFs, HcIr, HcBs, Hcch, Hgn, Hsgw, Hprr, Hxs, Hcstack, Hcav⟩)
       · exact absurd hbad.1 hrne
       obtain ⟨hri, hi, hpid1, hpid2, hVc, hg, -⟩ := hpure
+      -- THE CHILD'S DESCRIPTOR GHOST IS allocproc's (Rocq `proc_dormant_unused`):
+      -- its null table opened into the raw cells, the units and the keys at
+      -- `closed`, which the copy loop retypes
+      icases procPrivNocwd_null_open rfl γ (procAddr i) pid_c V_c M_c hVc.1
+        $$ [$HcNc $HcCtx $HcFr $HcFs $HcIr $HcBs] with ⟨HcPriv, Hcal, Hkeys⟩
       -- from here to the release of `np->lock` interrupts are off (the `k_step`s' `hsie`)
       have hsie : (k.pushOffAt a1 b1).sie = false := rfl
       -- the arm allocproc's acquire paid out, handed back at that release
@@ -3484,20 +3491,17 @@ theorem kfork_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCPROC)
             unfold kfOfileΨ
             k_norm_g [hVcb.2.2.2]
             iframe F0 F1 F2 Fs2 Fs3 Fs4 F6 F7 Harm0 Hcl Hpid_p Hks_p Hsz_p Hpg_p Htf_p Hcwd_p Hname_p HPt_p HTf_p Hpid_c Hks_c Hsz_c Hpg_c Htf_c Hctx_c Hcwd_c Hname_c HPtn' HTf_c Hcstack Hheld Hhart Hused Hcwr Hfsp Hirs Hbs Hcch HgP Hrowp Htok HgC Hsg34 Hpr34 Hgs Hgp
-          -- THE CHILD'S DESCRIPTOR GHOST, minted fresh (process-layer
-          -- deviation 1: Rocq mints it in allocproc), at loop index 0
+          -- THE CHILD'S DESCRIPTOR GHOST, allocproc's (`V_c.fdg`, its keys
+          -- whole at `closed`), at loop index 0
           have hslen16 : stsP.length = 16 := by rw [hslen]; rfl
           rw [hcof] at hlenofc
           ihave HofwC := (show ([∗list] jj ↦ f ∈ V_c.ofile, wordPointsTo (GF := GF) (pOfile (procAddr i) jj) 8 (DFrac.own 1) f) ⊢
               [∗list] jj ↦ f ∈ List.replicate NOFILE (0#64 : BitVec 64), wordPointsTo (GF := GF) (pOfile (procAddr i) jj) 8 (DFrac.own 1) f
             from by rw [hcof]) $$ HofwC
-          iapply wpLoop_bupd
-          imod (fdSt_alloc (GF := GF) NOFILE) with ⟨%γdC, Hkeys⟩
-          imodintro
-          icases kf_child_init γ γdC (procAddr i) stsP hslen $$ [HofwC Hfds Hkeys] with ⟨Hchild, Hcfr⟩
+          icases kf_child_init γ V_c.fdg (procAddr i) stsP hslen $$ [HofwC Hfds Hkeys] with ⟨Hchild, Hcfr⟩
           · iframe
           iapply (kf_ofile_copy FD Γ j i 1 (by omega) ["proc"] (by decide)
-            (k.regs 2#5 + 0xFFFFFFFFFFFFFFC0#64) kf.avail k.root k.regs k.sie γft γ V.fdg γdC stsP hslen16
+            (k.regs 2#5 + 0xFFFFFFFFFFFFFFC0#64) kf.avail k.root k.regs k.sie γft γ V.fdg V_c.fdg stsP hslen16
             V.ofile hlenofp cpu
             (iprop(isLock γw waitLockAddr "wait_lock" waitLockPay ∗
               isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
@@ -3508,7 +3512,7 @@ theorem kfork_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCPROC)
           case hΨ =>
             intro kp Cfp hfr hcfl
             iintro ⟨HkP, HpcP, #HpinvP, #HftP, HparP, HpaysP, HfrP, HchildP, HcfrP, #HwlP, #HitP, #HitiP, #HiregP, HΨP⟩
-            iapply (kf_publish AC RE SS ID Γ γw γft γ γdC stsP Q csP cpu k j i hj hi pid pid_c V V_c M M_c Mnew' Pnew' ch R2 R3 w7
+            iapply (kf_publish AC RE SS ID Γ γw γft γ V_c.fdg stsP Q csP cpu k j i hj hi pid pid_c V V_c M M_c Mnew' Pnew' ch R2 R3 w7
               hproc hnoff hintena hlocks htier hK hVb hlzP hlenofp hVcb ⟨hcof, hccwd, hcsz, hcum, hcctx⟩ hpid1 hpid2 hok kp Cfp kf.avail
               hfr hkfav8
               (c3_18.trans (b2_18.trans a1_18)) (c3_19.trans (b2_19.trans a1_19)) (b2_20.trans a1_20) hcfl)

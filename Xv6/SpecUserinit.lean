@@ -37,7 +37,7 @@ of `allocproc`, and are spent as Rocq's are (SpecUserinit.v: "THE ONE
 [iref_slot] namei's [iget] spends is NOT a premise"): the cwd's unit pays
 the root's `iget`, and the rest (`liveAllow`) is parked with the process
 (`ForkretRecord.newbornPay`) with the process's WHOLE block (D8 wiring):
-its null descriptor table at a fresh descriptor ghost (the per-descriptor
+its null descriptor table at the descriptor ghost allocproc minted (the per-descriptor
 units parked in the null slots), stated at the file table's names `γ`
 (Rocq's `is_ftable γft γf` premise; the null table reads none of it), its cwd reference (`inodeHeldAt ipv
 ROOTINO`, namei's result), and its generation row (`FdTable.procGenAt`).

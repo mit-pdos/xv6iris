@@ -17,6 +17,7 @@ import Xv6.PidLock
 import Xv6.SpecProcPagetable
 import Xv6.Image
 import Xv6.Geom
+import Xv6.FdTable
 
 namespace Xv6
 
@@ -50,14 +51,19 @@ on g)` for some `g ≤ procPagetableNodes + 1`, exactly as `pptPost` does).
 A caller that lends more than `procPagetableNodes + 1` pages
 (`userinit`) refutes that disjunct from its own count.
 
-THE SLOT'S ALLOWANCES come out of the dormant block with the rest
-(`dormantAllow`: Rocq's post carries `fd_slots FDSPARE ∗ iref_slots (1 +
-IREFSPARE) ∗ bslots 3` beside the block, and the per-descriptor
-`fd_slot`s inside `proc_priv_nocwd`'s `proc_ofiles`; wave 7 P3).  Until the
-block carries the descriptor table (P2) the per-descriptor units travel in
-the group too.  allocproc never spends them: the caller hands them to the
-new process, and a failure tail gives them straight back to `freeproc`
-(`freeprocIn`).
+THE BLOCK IS ROCQ'S `proc_priv_nocwd` (batch 8-P; closes SpecKfork's
+process-layer deviation 1): allocproc is the one function that chooses a
+process's descriptor ghost `V.fdg` (Rocq `ProcInv.proc_dormant_unused`), so
+it MINTS it, under a name nothing has held, and hands out the bare block
+with its null descriptor table (`FdTable.procPrivNocwd`: each null slot
+owning its `fd_slot` unit and its closed authority), the save area
+(`contextCells`, what the caller's park takes), and the fragment bundle at
+all-`closed` (`fdFrags V.fdg (replicate NOFILE .closed)`, Rocq `fd_frags
+(pv_fdg) fdt0`).  THE SLOT'S OTHER ALLOWANCES come out beside it, as in
+Rocq's post: `fdSlots FDSPARE ∗ irefSlots (1 + IREFSPARE) ∗ bslots 3`.
+allocproc never spends them: the caller hands them to the new process, and
+a failure tail gives them straight back to `freeproc` (the descriptor
+ghost simply dies with the incarnation that never started).
 
 THE SLOT'S CHILDREN ROW (Rocq's `ch_frag (pv_chg (us_V U)) (proc_addr j)
 ∅`, D8 wiring) comes out of the dormant block with the rest, at `∅` and at
@@ -85,9 +91,10 @@ refutes `pid_lock`'s payload marks and so pins the pid to the literal 1;
 the sealed one hands the shot and init's registration, which refutes the
 candidate 1.  Both come back as `pavSpent` once the pid section ran (the
 null arm, which returns before it, hands the ledger back as it came). -/
-def allocprocPost {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
-    (Γ : SchedNames) (cpu : CPU) (γk : KmemNames) (on : Option Nat) (pav : Option Nat) (tk : Bool)
-    (Q : Int → IProp GF) (r : BitVec 64) :
+def allocprocPost {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF]
+    [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
+    (Γ : SchedNames) (γ : FileNames) (cpu : CPU) (γk : KmemNames) (on : Option Nat) (pav : Option Nat)
+    (tk : Bool) (Q : Int → IProp GF) (r : BitVec 64) :
     IProp GF := iprop%
   (⌜r = 0#64 ∧ ((pav = none ∨ pav = some 0) ∨
       ∃ g : Nat, g ≤ procPagetableNodes + 1 ∧ availZero (availSub on g))⌝ ∗
@@ -97,7 +104,9 @@ def allocprocPost {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
     ⌜r = procAddr j ∧ j < NPROC ∧ 1 ≤ pid.toNat ∧ pid.toNat ≤ PIDMAX ∧ allocprocPriv V ∧ g ≤ procPagetableNodes + 1 ∧
       (if pavBoot pav tk then pid.toNat = 1 else pid.toNat ≠ 1)⌝ ∗
     procHeld Γ cpu j USED ch ∗ hartAtAny Γ (procAddr j) ∗ slotUsed Γ (procAddr j) ∗ pavSpent Γ (pavDec pav) ∗
-    procPriv (procAddr j) pid V M ∗ dormantAllow ∗ chFrag V.chg (procAddr j) ∅ ∗
+    procPrivNocwd γ (procAddr j) pid V M ∗ contextCells (procAddr j) (DFrac.own 1) V.context ∗
+    fdFrags V.fdg (List.replicate NOFILE .closed) ∗
+    fdSlots FDSPARE ∗ irefSlots (1 + IREFSPARE) ∗ bslots 3 ∗ chFrag V.chg (procAddr j) ∅ ∗
     genNew V.gen (procAddr j) pid Q ∗ slotGen (procAddr j) (.own 1) V.gen ∗ pidRegRest pid V.gen ∗
     (∃ xsv : BitVec 32, wordPointsTo (pXstate (procAddr j)) 4 xsHalf xsv) ∗
     stackOwn (V.kstack + 4096#64) 512 ∗
@@ -109,8 +118,9 @@ holding `p->lock`, and with it the arm its `acquire` paid out
 `false`) -- Rocq's `cpu_own 1 eb p false` carries that pay, and the caller's
 eventual `release` (re-enabling interrupts when the entry had them on) takes
 it back through `popArm`. -/
-def wp_allocproc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
-    (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γl γp : GName) (γk : KmemNames) (on : Option Nat)
+def wp_allocproc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF]
+    [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
+    (Γ : SchedNames) (γ : FileNames) (cpu : CPU) (k : KCtx) (γl γp : GName) (γk : KmemNames) (on : Option Nat)
     (pav : Option Nat) (tk : Bool) (Q : Int → IProp GF)
     (hnoff : k.noff + 2 < 2 ^ 31) (hK : allocprocSlots ≤ k.avail)
     (hlk : "kmem" ∉ k.locks) (hlp : "nextpid" ∉ k.locks) (hlq : "proc" ∉ k.locks) (htier : k.tier = KTier.kpt) : Prop :=
@@ -123,14 +133,15 @@ def wp_allocproc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
      (⌜R' 10#5 ≠ 0#64⌝ ∗ kctx cpu' (((k.pushOffAt spie spp).withRegs R').withLocks ("proc" :: k.locks)) ∗
       sieArm cpu' k.sie k.proc)) -∗
     pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-    allocprocPost Γ cpu' γk on pav tk Q (R' 10#5) -∗
+    allocprocPost Γ γ cpu' γk on pav tk Q (R' 10#5) -∗
     ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
 structure ALLOCPROC : Prop where
-  wp_allocproc : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx] (Γ : SchedNames) (cpu : CPU) (k : KCtx)
+  wp_allocproc : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF]
+    [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx] (Γ : SchedNames) (γ : FileNames) (cpu : CPU) (k : KCtx)
     (γl γp : GName) (γk : KmemNames) (on : Option Nat) (pav : Option Nat) (tk : Bool) (Q : Int → IProp GF)
     hnoff hK hlk hlp hlq htier,
-    wp_allocproc_body (hlc := hlc) (GF := GF) Γ cpu k γl γp γk on pav tk Q hnoff hK hlk hlp hlq htier
+    wp_allocproc_body (hlc := hlc) (GF := GF) Γ γ cpu k γl γp γk on pav tk Q hnoff hK hlk hlp hlq htier
 
 end Xv6

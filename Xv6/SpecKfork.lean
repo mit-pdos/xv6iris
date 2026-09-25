@@ -70,14 +70,15 @@ THE CHILD'S SUPPLY ALLOWANCES (`dormantAllow`, wave 7 P3) come out of
 descriptor's `fd_slot` on its `filedup` (the others stay in the child's
 null slots), the cwd's `iref_slot` on `idup`; the rest (`liveAllow`:
 `fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗ bslots 3`) is PARKED with the child
-(`ForkretRecord.newbornPay`).  The child's file table is built at a fresh
-descriptor ghost (`fdSt_alloc`), each descriptor retyped to the parent's
-state.
+(`ForkretRecord.newbornPay`).  The child's file table is built at the
+descriptor ghost allocproc minted (`V_c.fdg`, Rocq `proc_dormant_unused`),
+each descriptor retyped to the parent's state.
 
 PROCESS-LAYER DEVIATIONS (flagged):
-1. The child's descriptor ghost is minted by kfork at the copy loop, not by
-   allocproc (Rocq `proc_dormant_unused` / allocproc's post: Lean's
-   allocproc returns the fd-free block `procPriv`).
+1. (Fixed, batch 8-P: allocproc mints the child's descriptor ghost and
+   hands out Rocq's `proc_priv_nocwd` with its null table and the
+   all-`closed` fragment bundle, `SpecAllocproc.allocprocPost`; the copy
+   loop retypes that table.)
 2. (Fixed, D8 wiring: the newborn record parks the child's WHOLE block
    `procPrivFd` -- core with the cwd reference and the generation row,
    descriptor table with its payloads -- beside its fragment bundle, as

@@ -657,7 +657,28 @@ theorem ap_tail {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
 section Body
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
-/-- `allocproc`'s continuation, as the specification states it. -/
+/-- **The cells-level post** the body is proved against (the landed pre-8-P
+`apPostCells`): the raw block `procPriv` (null descriptor cells) and the
+slot's allowances `dormantAllow`.  `allocproc_proof` mints the descriptor
+ghost out of them (`FdTable.procPriv_null_mint`, Rocq
+`proc_dormant_unused`). -/
+def apPostCells [CurCtx] (Γ : SchedNames) (cpu : CPU) (γk : KmemNames) (on : Option Nat)
+    (pav : Option Nat) (tk : Bool) (Q : Int → IProp GF) (r : BitVec 64) : IProp GF := iprop%
+  (⌜r = 0#64 ∧ ((pav = none ∨ pav = some 0) ∨
+      ∃ g : Nat, g ≤ procPagetableNodes + 1 ∧ availZero (availSub on g))⌝ ∗
+    (procsAvailAt Γ pav tk ∨ pavSpent Γ pav) ∗
+    ∃ on' : Option Nat, ⌜on' = on ∨ on' = none⌝ ∗ kallocAvail γk on') ∨
+  (∃ (j : Nat) (ch : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (g : Nat),
+    ⌜r = procAddr j ∧ j < NPROC ∧ 1 ≤ pid.toNat ∧ pid.toNat ≤ PIDMAX ∧ allocprocPriv V ∧ g ≤ procPagetableNodes + 1 ∧
+      (if pavBoot pav tk then pid.toNat = 1 else pid.toNat ≠ 1)⌝ ∗
+    procHeld Γ cpu j USED ch ∗ hartAtAny Γ (procAddr j) ∗ slotUsed Γ (procAddr j) ∗ pavSpent Γ (pavDec pav) ∗
+    procPriv (procAddr j) pid V M ∗ dormantAllow ∗ chFrag V.chg (procAddr j) ∅ ∗
+    genNew V.gen (procAddr j) pid Q ∗ slotGen (procAddr j) (.own 1) V.gen ∗ pidRegRest pid V.gen ∗
+    (∃ xsv : BitVec 32, wordPointsTo (pXstate (procAddr j)) 4 xsHalf xsv) ∗
+    stackOwn (V.kstack + 4096#64) 512 ∗
+    kallocAvail γk (availSub on g))
+
+/-- `allocproc`'s continuation, at the cells-level post. -/
 def apCont [CurCtx] (Γ : SchedNames) (k : KCtx) (γk : KmemNames) (on : Option Nat)
     (pav : Option Nat) (tk : Bool) (Q : Int → IProp GF) :
     CPU → IProp GF := fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
@@ -666,7 +687,7 @@ def apCont [CurCtx] (Γ : SchedNames) (k : KCtx) (γk : KmemNames) (on : Option 
    (⌜R' 10#5 ≠ 0#64⌝ ∗ kctx cpu' (((k.pushOffAt spie spp).withLocks ("proc" :: k.locks)).withRegs R') ∗
     sieArm cpu' k.sie k.proc)) -∗
   pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-  allocprocPost Γ cpu' γk on pav tk Q (R' 10#5) -∗
+  apPostCells Γ cpu' γk on pav tk Q (R' 10#5) -∗
   ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu')
 
 end Body
@@ -2304,9 +2325,9 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
         ileft; isplitl []
         · ipureintro; exact h10
         · iexact Hk
-      ihave Hpost : allocprocPost (GF := GF) Γ c8 γk on pav tk Q (R'' 10#5) $$ [Havn Hpav]
+      ihave Hpost : apPostCells (GF := GF) Γ c8 γk on pav tk Q (R'' 10#5) $$ [Havn Hpav]
       case' _ =>
-        unfold allocprocPost
+        unfold apPostCells
         ileft
         isplitl []
         · ipureintro; exact ⟨h10, Or.inr hfail⟩
@@ -2700,10 +2721,10 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
             · ipureintro; rw [h10]; exact procAddr_nonzero hn
             · iframe Hk
               rw [hgc]; iexact Harm
-          ihave Hpost : allocprocPost (GF := GF) Γ cg γk on pav tk Q (R'' 10#5)
+          ihave Hpost : apPostCells (GF := GF) Γ cg γk on pav tk Q (R'' 10#5)
             $$ [Hheld Hhart Hused Hpav Hpriv Hal Hch Hgen Hsg Hprr Hxs Hstack Hav4]
           case' _ =>
-            unfold allocprocPost
+            unfold apPostCells
             rw [hgc]
             iright
             iexists n, ch, pid, V, Mpp, 4
@@ -2725,7 +2746,7 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
                  (⌜R' 10#5 ≠ 0#64⌝ ∗ kctx cg (((k.pushOffAt spie spp).withLocks
                     ("proc" :: k.locks)).withRegs R') ∗ sieArm cg k.sie k.proc)) -∗
                 pcIs cg (jumpPc (k.regs 1#5)) -∗
-                allocprocPost Γ cg γk on pav tk Q (R' 10#5) -∗
+                apPostCells Γ cg γk on pav tk Q (R' 10#5) -∗
                 ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cg)
               from by unfold apCont; iintro H; iexact H) $$ HΦ
           iapply HΦ $$ %spie6 %spp6 %R'' %hspc6 Hdisj Hpc Hpost
@@ -3013,9 +3034,9 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
           ileft; isplitl []
           · ipureintro; exact h10
           · iexact Hk
-        ihave Hpost : allocprocPost (GF := GF) Γ c8 γk on pav tk Q (R'' 10#5) $$ [Havn Hpav]
+        ihave Hpost : apPostCells (GF := GF) Γ c8 γk on pav tk Q (R'' 10#5) $$ [Havn Hpav]
         case' _ =>
-          unfold allocprocPost
+          unfold apPostCells
           ileft
           isplitl []
           · ipureintro; exact ⟨h10, Or.inr hfail⟩
@@ -3206,10 +3227,10 @@ theorem ap_scan (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
           isplitl []
           · ipureintro; exact h10
           · iexact Hk
-        ihave Hpost : allocprocPost (GF := GF) Γ c8 γk on pav tk Q (R'' 10#5)
+        ihave Hpost : apPostCells (GF := GF) Γ c8 γk on pav tk Q (R'' 10#5)
           $$ [Hav Hpav Hmarks]
         case' _ =>
-          unfold allocprocPost
+          unfold apPostCells
           -- every slot has been allocated at least once: the counted regime
           -- with a free slot left is refuted, the other two report `0`
           cases pav with
@@ -3379,10 +3400,20 @@ theorem ap_scan (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
 
 set_option maxHeartbeats 4000000 in
 /-- **`allocproc` meets its specification.** -/
-theorem allocproc_proof (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
-    (PP : PROC_PAGETABLE) (FP : FREEPROC) : ALLOCPROC :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ X Γ cpu k γl γp γk on pav tk Q hnoff hK hlk hlp hlq htier => by
-  unfold wp_allocproc_body
+theorem allocproc_cells (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
+    (PP : PROC_PAGETABLE) (FP : FREEPROC)
+    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+    [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
+    (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γl γp : GName) (γk : KmemNames) (on : Option Nat)
+    (pav : Option Nat) (tk : Bool) (Q : Int → IProp GF)
+    (hnoff : k.noff + 2 < 2 ^ 31) (hK : allocprocSlots ≤ k.avail)
+    (hlk : "kmem" ∉ k.locks) (hlp : "nextpid" ∉ k.locks) (hlq : "proc" ∉ k.locks)
+    (htier : k.tier = KTier.kpt) :
+    kctx cpu k ∗ pcIs cpu allocprocAddr ∗ procsInv Γ ∗
+    isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ isLock γp pidLockAddr "nextpid" pidLockPay ∗ kallocAvail γk on ∗
+    procsAvailAt Γ pav tk ∗ □ (MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ Q (-1)) ∗
+    wpNext k.sie k.proc cpu (apCont Γ k γk on pav tk Q)
+    ⊢ wpLoop (GF := GF) cpu := by
   simp only [allocprocAddr]
   iintro ⟨Hk, Hpc, #Hpinv, #Hlk, #Hlp, Hav, Hpav, #Hkw, HΦ⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
@@ -3440,7 +3471,53 @@ theorem allocproc_proof (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSE
   case h25 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
   case h26 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
   case h27 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
-  
-⟩
+
+/-! ## The descriptor ghost, minted (Rocq `proc_dormant_unused`) -/
+
+set_option maxHeartbeats 4000000 in
+/-- **`allocproc` meets its specification** (Rocq `allocproc_post`): the
+cells-level body, and in the found arm the raw block and the slot's
+allowances become Rocq's `proc_priv_nocwd` under a FRESH descriptor ghost,
+the save area, the fragment bundle at all-`closed` and the three
+allowances (`FdTable.procPriv_null_mint`). -/
+theorem allocproc_proof (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
+    (PP : PROC_PAGETABLE) (FP : FREEPROC) : ALLOCPROC :=
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ X Γ γ cpu k γl γp γk on pav tk Q hnoff hK hlk hlp hlq htier => by
+  have h := allocproc_cells AC RE KAL MS PP FP (hlc := hlc) (GF := GF) Γ cpu k γl γp γk on pav tk Q
+    hnoff hK hlk hlp hlq htier
+  unfold wp_allocproc_body
+  iintro ⟨Hk, Hpc, #Hpinv, #Hlk, #Hlp, Hav, Hpav, #Hkw, HΦ⟩
+  icases kctx_tier cpu k $$ Hk with ⟨%hct, Hk⟩
+  have hkpt : curTier = KTier.kpt := hct.symm.trans htier
+  iapply h
+  iframe Hk Hpc Hav Hpav
+  iframe #
+  iapply wpNext_mono $$ HΦ
+  unfold apCont apPostCells
+  iintro %cpu' HK %spie %spp %R' %hs Hk Hpc Hpost %hcs
+  ihave Hk := (show iprop((⌜R' 10#5 = 0#64⌝ ∗ kctx (GF := GF) cpu' ((k.withSpie spie spp).withRegs R')) ∨
+      (⌜R' 10#5 ≠ 0#64⌝ ∗ kctx cpu' (((k.pushOffAt spie spp).withLocks ("proc" :: k.locks)).withRegs R') ∗
+        sieArm cpu' k.sie k.proc)) ⊢
+      iprop((⌜R' 10#5 = 0#64⌝ ∗ kctx (GF := GF) cpu' ((k.withSpie spie spp).withRegs R')) ∨
+      (⌜R' 10#5 ≠ 0#64⌝ ∗ kctx cpu' (((k.pushOffAt spie spp).withRegs R').withLocks ("proc" :: k.locks)) ∗
+        sieArm cpu' k.sie k.proc)) from .rfl) $$ Hk
+  iapply wpLoop_bupd
+  icases Hpost with (Hnull | ⟨%j, %ch, %pid, %V, %M, %g, %hpure, Hheld, Hhart, #Hused, Hsp, Hpriv, Hal,
+    Hrow, Hgn, Hsg, Hpr, Hxs, Hstk, Hkav⟩)
+  · imodintro
+    iapply HK $$ %spie %spp %R' %hs Hk Hpc [Hnull] %hcs
+    unfold allocprocPost
+    ileft
+    iexact Hnull
+  · imod procPriv_null_mint hkpt γ (procAddr j) pid V M hpure.2.2.2.2.1.1 $$ [$Hpriv $Hal]
+      with ⟨%γd, Hnc, Hctx, Hfr, Hfs, Hir, Hbs⟩
+    imodintro
+    iapply HK $$ %spie %spp %R' %hs Hk Hpc [-] %hcs
+    unfold allocprocPost
+    iright
+    iexists j, ch, pid, { V with fdg := γd }, M, g
+    iframe Hheld Hhart Hused Hsp Hnc Hctx Hfr Hfs Hir Hbs Hrow Hgn Hsg Hpr Hxs Hstk Hkav
+    ipureintro
+    exact hpure⟩
 
 end Xv6

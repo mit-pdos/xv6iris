@@ -799,6 +799,247 @@ theorem procOfilesOwe_cells (γ : FileNames) (γd : GName) (pa : BitVec 64) (fs 
       · iintro ⟨-, H⟩; iexact H
       · unfold ofileSlot; iintro ⟨H, -⟩; iexact H) $$ H
 
+
+/-! ## The null table a fresh incarnation is born with (Rocq
+`ProcInv.proc_dormant_unused`'s mint, `proc_ofiles_null_split`) -/
+
+/-- The two halves of a key make it whole again (`fdSt_halves` backwards). -/
+theorem fdSt_join (γd : GName) (fd : Nat) (st : FdState) :
+    fdStAuth (GF := GF) γd fd st ∗ fdSt γd fd st ⊢ fdStAt γd fd (.own 1) st := by
+  unfold fdStAuth fdSt fdStAt
+  have h : fdstElt (.own 1) st = CMRA.op (fdstElt (.own (1 : Qp).half) st) (fdstElt (.own (1 : Qp).half) st) := by
+    have := @DFracAgree.Frac.mk_op (DiscreteO FdState) _ (1 : Qp).half (1 : Qp).half ⟨st⟩
+    rw [Qp.half_add_half] at this
+    exact this
+  show _ ⊢ iOwn (F := FdstF) γd (PartialMap.singleton fd (fdstElt (.own 1) st) : FdstUR)
+  rw [h, ← Heap.singleton_op_singleton]
+  exact iOwn_op.2
+
+/-- A closed table's offset rows are free. -/
+theorem foffRows_closed : ∀ n : Nat, ⊢ foffRows (GF := GF) (List.replicate n .closed)
+  | 0 => by unfold foffRows; rw [List.replicate_zero]; iapply BigSepL.bigSepL_nil.2; itrivial
+  | n + 1 => by
+    unfold foffRows
+    rw [List.replicate_succ]
+    iapply BigSepL.bigSepL_cons.2
+    isplitl []
+    · iapply foffRow_closed
+    · have h := foffRows_closed n
+      unfold foffRows at h
+      exact h
+
+theorem fdNull_getElem {α : Type _} {n k : Nat} {a x : α} (h : (List.replicate n a)[k]? = some x) :
+    x = a := by
+  rw [List.getElem?_replicate] at h
+  split at h
+  · exact (Option.some.inj h).symm
+  · cases h
+
+/-- **The null table, opened** (Rocq `proc_ofiles_null_split` + the
+fragments): every cell at null, its unit, and each descriptor's key WHOLE
+at `closed` (the two halves joined). -/
+theorem procOfiles_null_open (γ : FileNames) (γd : GName) (pa : BitVec 64) :
+    procOfiles (GF := GF) γ γd pa (List.replicate NOFILE 0#64) ∗
+      fdFrags γd (List.replicate NOFILE .closed) ⊢
+      ([∗list] i ↦ c ∈ List.replicate NOFILE (0#64 : BitVec 64),
+        wordPointsTo (pOfile pa i) 8 (DFrac.own 1) c) ∗
+      ([∗list] _f ∈ List.replicate NOFILE (0#64 : BitVec 64), fdSlot) ∗
+      ([∗list] i ∈ List.range NOFILE, fdStAt γd i (.own 1) .closed) := by
+  unfold procOfiles procOfilesOwe fdFrags
+  iintro ⟨⟨-, Ho⟩, ⟨-, Hf, -⟩⟩
+  ihave Ho := BigSepL.bigSepL_mono
+    (Φ := fun fd v => ofileLentOrSlot (GF := GF) γ γd pa [] fd v)
+    (Ψ := fun fd v => iprop(wordPointsTo (GF := GF) (pOfile pa fd) 8 (DFrac.own 1) v ∗
+      (fdSlot ∗ fdStAuth γd fd .closed)))
+    (fun {k x} hx => by
+      have hx0 := fdNull_getElem hx
+      subst hx0
+      rw [ofileLentOrSlot_out γ γd pa [] k 0#64 (List.not_mem_nil)]
+      exact ofileSlot_null γ γd pa k) $$ Ho
+  icases BigSepL.bigSepL_sep_eqv.1 $$ Ho with ⟨Hc, Ho⟩
+  icases BigSepL.bigSepL_sep_eqv.1 $$ Ho with ⟨Hs, Ha⟩
+  iframe Hc Hs
+  ihave Hf := BigSepL.bigSepL_mono
+    (Φ := fun fd st => fdSt (GF := GF) γd fd st)
+    (Ψ := fun fd (_ : FdState) => fdSt (GF := GF) γd fd .closed)
+    (fun {k x} hx => by rw [fdNull_getElem hx]) $$ Hf
+  have e1 := bigSepL_range_of_list (fun fd (_ : BitVec 64) => fdStAuth (GF := GF) γd fd .closed)
+    (List.replicate NOFILE (0#64 : BitVec 64)) 0#64
+  have e2 := bigSepL_range_of_list (fun fd (_ : FdState) => fdSt (GF := GF) γd fd .closed)
+    (List.replicate NOFILE FdState.closed) .closed
+  rw [List.length_replicate] at e1 e2
+  ihave Ha := (show ([∗list] j ↦ _x ∈ List.replicate NOFILE (0#64 : BitVec 64), fdStAuth (GF := GF) γd j .closed) ⊢
+      [∗list] j ∈ List.range NOFILE, fdStAuth (GF := GF) γd j .closed from by rw [e1]) $$ Ha
+  ihave Hf := (show ([∗list] j ↦ _x ∈ List.replicate NOFILE FdState.closed, fdSt (GF := GF) γd j .closed) ⊢
+      [∗list] j ∈ List.range NOFILE, fdSt (GF := GF) γd j .closed from by rw [e2]) $$ Hf
+  ihave H := BigSepL.bigSepL_sep_eqv.2 $$ [$Ha $Hf]
+  iapply BigSepL.bigSepL_mono_of_forall (fun {_ i} => fdSt_join γd i .closed) $$ H
+
+/-- **The null table, closed** (Rocq `proc_ofiles_null` + `fd_frags`): the
+null cells, their units and each descriptor's key WHOLE at `closed` make the
+table and its fragment bundle at all-`closed`. -/
+theorem procOfiles_null_close (γ : FileNames) (γd : GName) (pa : BitVec 64) :
+    ([∗list] i ↦ c ∈ List.replicate NOFILE (0#64 : BitVec 64),
+        wordPointsTo (GF := GF) (pOfile pa i) 8 (DFrac.own 1) c) ∗
+      ([∗list] _f ∈ List.replicate NOFILE (0#64 : BitVec 64), fdSlot) ∗
+      ([∗list] i ∈ List.range NOFILE, fdStAt γd i (.own 1) .closed) ⊢
+      procOfiles γ γd pa (List.replicate NOFILE 0#64) ∗
+        fdFrags γd (List.replicate NOFILE .closed) := by
+  iintro ⟨Hc, Hs, Hk⟩
+  ihave Hk := BigSepL.bigSepL_mono_of_forall (fun {_ i} => fdSt_halves (GF := GF) γd i .closed) $$ Hk
+  icases BigSepL.bigSepL_sep_eqv.1 $$ Hk with ⟨Ha, Hf⟩
+  have e1 := bigSepL_range_of_list (fun fd (_ : BitVec 64) => fdStAuth (GF := GF) γd fd .closed)
+    (List.replicate NOFILE (0#64 : BitVec 64)) 0#64
+  have e2 := bigSepL_range_of_list (fun fd (_ : FdState) => fdSt (GF := GF) γd fd .closed)
+    (List.replicate NOFILE FdState.closed) .closed
+  rw [List.length_replicate] at e1 e2
+  ihave Ha := (show ([∗list] j ∈ List.range NOFILE, fdStAuth (GF := GF) γd j .closed) ⊢
+      [∗list] j ↦ _x ∈ List.replicate NOFILE (0#64 : BitVec 64), fdStAuth (GF := GF) γd j .closed from by rw [e1]) $$ Ha
+  ihave Hf := (show ([∗list] j ∈ List.range NOFILE, fdSt (GF := GF) γd j .closed) ⊢
+      [∗list] j ↦ _x ∈ List.replicate NOFILE FdState.closed, fdSt (GF := GF) γd j .closed from by rw [e2]) $$ Hf
+  unfold procOfiles procOfilesOwe fdFrags
+  isplitl [Hc Hs Ha]
+  · isplitl []
+    · ipureintro; exact List.length_replicate
+    ihave H := BigSepL.bigSepL_sep_eqv.2 $$ [$Hs $Ha]
+    ihave H := BigSepL.bigSepL_sep_eqv.2 $$ [$Hc $H]
+    iapply BigSepL.bigSepL_mono
+      (Φ := fun fd v => iprop(wordPointsTo (GF := GF) (pOfile pa fd) 8 (DFrac.own 1) v ∗
+        (fdSlot ∗ fdStAuth γd fd .closed)))
+      (fun {k x} hx => by
+        have hx0 := fdNull_getElem hx
+        subst hx0
+        rw [ofileLentOrSlot_out γ γd pa [] k 0#64 (List.not_mem_nil)]
+        exact ofileSlot_closed γ γd pa k) $$ H
+  isplitl []
+  · ipureintro; exact List.length_replicate
+  isplitl [Hf]
+  · iapply BigSepL.bigSepL_mono
+      (Φ := fun fd (_ : FdState) => fdSt (GF := GF) γd fd .closed)
+      (fun {k x} hx => by rw [fdNull_getElem hx]) $$ Hf
+  · iapply foffRows_closed
+
+/-- **The null table, minted** (Rocq `proc_dormant_unused`'s
+`fd_st_alloc` step): the null cells and their units become a fresh
+incarnation's table under a name nothing has held, with its fragment
+bundle at all-`closed`. -/
+theorem procOfiles_null_mint (γ : FileNames) (pa : BitVec 64) :
+    ([∗list] i ↦ c ∈ List.replicate NOFILE (0#64 : BitVec 64),
+        wordPointsTo (GF := GF) (pOfile pa i) 8 (DFrac.own 1) c) ∗
+      ([∗list] _f ∈ List.replicate NOFILE (0#64 : BitVec 64), fdSlot) ⊢
+      |==> ∃ γd : GName, procOfiles γ γd pa (List.replicate NOFILE 0#64) ∗
+        fdFrags γd (List.replicate NOFILE .closed) := by
+  iintro ⟨Hc, Hs⟩
+  imod (fdSt_alloc (GF := GF) NOFILE) with ⟨%γd, Hk⟩
+  imodintro
+  iexists γd
+  iapply procOfiles_null_close γ γd pa
+  iframe Hc Hs Hk
+
+/-! ## The block before the working directory (Rocq `proc_priv_nocwd`) -/
+
+/-- **Rocq `ProcInv.proc_priv_nocwd`**: the bare block (no cwd reference,
+no generation row) and the descriptor table, named by the block's own
+`V.fdg`.  allocproc hands it out: the table is null and the name is the one
+allocproc just minted (Rocq `proc_dormant_unused`). -/
+def procPrivNocwd (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) : IProp GF := iprop%
+  procPrivBareAt curCtx pa pid V M ∗ procOfiles γ V.fdg pa V.ofile
+
+end
+
+section NocwdNull
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg]
+
+/-- `ProcDefs.procPriv` (the raw block, save area and descriptor cells
+included) is the bare block, the save area and the descriptor cells. -/
+theorem procPriv_bare_split [X : CurCtx] (h : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec 32)
+    (V : ProcPriv) (M : Nat → List (BitVec 8)) :
+    procPriv (GF := GF) pa pid V M ⊣⊢
+      procPrivBareAt curCtx pa pid V M ∗ contextCells pa (DFrac.own 1) V.context ∗
+        ofileCells pa (DFrac.own 1) V.ofile := by
+  obtain ⟨ξ, t⟩ := X
+  simp only at h
+  subst h
+  unfold procPriv procPrivBareAt procFields procFieldsNoOfile
+  constructor
+  · iintro ⟨%hf, Hpid, ⟨Hk, Hs, Hpg, Htf, Hctx, Hof, Hcwd, Hnm⟩, Hpt, Htfp, %hlz⟩
+    iframe Hctx Hof
+    iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hpt Htfp
+    isplitl []
+    · ipureintro; exact hf
+    · ipureintro; exact hlz
+  · iintro ⟨⟨%hf, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm⟩, Hpt, Htfp, %hlz⟩, Hctx, Hof⟩
+    iframe Hpid Hk Hs Hpg Htf Hctx Hof Hcwd Hnm Hpt Htfp
+    isplitl []
+    · ipureintro; exact hf
+    · ipureintro; exact hlz
+
+/-- **allocproc's hand-over, minted** (Rocq `proc_dormant_unused`): the raw
+block a fresh slot's dormant block becomes (all-null descriptor array) and
+the slot's allowances make, under a descriptor ghost nothing has held, the
+block before its working directory, the save area, the fragment bundle at
+all-`closed`, and the three allowances the running thread carries beside
+it. -/
+theorem procPriv_null_mint [X : CurCtx] (h : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 64)
+    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
+    (hof : V.ofile = List.replicate NOFILE 0#64) :
+    procPriv (GF := GF) pa pid V M ∗ dormantAllow ⊢
+      |==> ∃ γd : GName, procPrivNocwd γ pa pid { V with fdg := γd } M ∗
+        contextCells pa (DFrac.own 1) V.context ∗ fdFrags γd (List.replicate NOFILE .closed) ∗
+        fdSlots FDSPARE ∗ irefSlots (1 + IREFSPARE) ∗ bslots 3 := by
+  iintro ⟨Hp, Ha⟩
+  icases (procPriv_bare_split h pa pid V M).1 $$ Hp with ⟨Hb, Hc, Ho⟩
+  ihave Ho := (show ofileCells (GF := GF) pa (DFrac.own 1) V.ofile ⊢
+      [∗list] i ↦ c ∈ List.replicate NOFILE (0#64 : BitVec 64), wordPointsTo (pOfile pa i) 8 (DFrac.own 1) c
+    from by rw [hof]; unfold ofileCells; iintro ⟨-, H⟩; iexact H) $$ Ho
+  icases (show dormantAllow (GF := GF) ⊢
+      ([∗list] _f ∈ List.replicate NOFILE (0#64 : BitVec 64), fdSlot) ∗ fdSlots FDSPARE ∗
+        irefSlots (1 + IREFSPARE) ∗ bslots 3 from by unfold dormantAllow; exact .rfl) $$ Ha
+    with ⟨Hs, Hfs, Hir, Hbs⟩
+  imod procOfiles_null_mint γ pa $$ [$Ho $Hs] with ⟨%γd, Hot, Hfr⟩
+  imodintro
+  iexists γd
+  iframe Hc Hfr Hfs Hir Hbs
+  unfold procPrivNocwd
+  ihave Hb := (show procPrivBareAt (GF := GF) curCtx pa pid V M ⊢
+      procPrivBareAt curCtx pa pid { V with fdg := γd } M from .rfl) $$ Hb
+  iframe Hb
+  rw [show ({ V with fdg := γd } : ProcPriv).ofile = List.replicate NOFILE 0#64 from hof]
+  iexact Hot
+
+/-- **...and opened again** (kfork / userinit, who retype or fill the null
+table): the raw block, the slot's allowances, and each descriptor's key
+WHOLE at `closed` under the block's own name. -/
+theorem procPrivNocwd_null_open [X : CurCtx] (h : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 64)
+    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
+    (hof : V.ofile = List.replicate NOFILE 0#64) :
+    procPrivNocwd (GF := GF) γ pa pid V M ∗ contextCells pa (DFrac.own 1) V.context ∗
+      fdFrags V.fdg (List.replicate NOFILE .closed) ∗
+      fdSlots FDSPARE ∗ irefSlots (1 + IREFSPARE) ∗ bslots 3 ⊢
+      procPriv pa pid V M ∗ dormantAllow ∗
+        [∗list] i ∈ List.range NOFILE, fdStAt V.fdg i (.own 1) .closed := by
+  unfold procPrivNocwd
+  rw [hof]
+  iintro ⟨⟨Hb, Hot⟩, Hc, Hfr, Hfs, Hir, Hbs⟩
+  icases procOfiles_null_open γ V.fdg pa $$ [$Hot $Hfr] with ⟨Ho, Hs, Hk⟩
+  iframe Hk
+  isplitl [Hb Hc Ho]
+  · iapply (procPriv_bare_split h pa pid V M).2
+    iframe Hb Hc
+    rw [hof]
+    unfold ofileCells
+    isplitl []
+    · ipureintro; exact List.length_replicate
+    · iexact Ho
+  · unfold dormantAllow
+    iframe Hs Hfs Hir Hbs
+
+end NocwdNull
+
+section
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
+
 end
 
 end Xv6

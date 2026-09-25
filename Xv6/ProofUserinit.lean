@@ -39,8 +39,8 @@ THE PARK IS THE WHOLE BLOCK (D8 wiring, SpecForkret's deviation 1 fixed):
 cwd (at `ROOTINO`), the generation row `procGenAt` (the boot deposit
 `firstBoot` as `firstTok`, the kernel's quarter and `myPay` out of
 `genNew`, the xstate half, `genHalvesPriv`), and the all-null descriptor
-table at a FRESH descriptor ghost (`fdSt_alloc`, each slot owning its
-`fdSlot` unit and the `.closed` authority) -- beside the all-closed
+table at the descriptor ghost allocproc minted (`V.fdg`, each slot owning
+its `fdSlot` unit and the `.closed` authority) -- beside the all-closed
 `fdFrags`.
 
 INIT'S IDENTITY (Rocq ProofUserinit.v, lane TRAP-ROWS-3/4): the pid is the
@@ -162,83 +162,13 @@ theorem ui_priv_cwd_acc [CurCtx] (pa : BitVec 64) (pid : BitVec 32) (V : ProcPri
 
 /-! ## The first process's descriptor table and block (D8 wiring)
 
-`allocproc` hands back the null array's cells (inside `procPriv`) and one
-`fdSlot` unit per descriptor (`dormantAllow`); `fdSt_alloc` mints a fresh
-descriptor ghost with every key whole at `.closed`.  Each key splits into
-the slot's authority and the fragment, so the array becomes `procOfiles`
-(every slot null: cell, unit, closed authority) and the fragments the
-all-closed `fdFrags` (the pattern of kfork's `kf_child_init`, Rocq
-`fd_st_alloc` + `proc_ofiles_null`). -/
-
-/-- the `range`-indexed big-op as a list-indexed one -/
-theorem ui_range_list [CurCtx] {A : Type _} (P : Nat → IProp GF) (l : List A) (d : A) :
-    ([∗list] i ∈ List.range l.length, P i) ⊢ [∗list] i ↦ _x ∈ l, P i := by
-  rw [bigSepL_range_of_list (fun i (_ : A) => P i) l d]
-
-theorem ui_ofiles_fresh [CurCtx] (γ : FileNames) (γd : GName) (pa : BitVec 64) :
-    ([∗list] i ↦ c ∈ List.replicate NOFILE (0#64 : BitVec 64),
-        wordPointsTo (GF := GF) (pOfile pa i) 8 (DFrac.own 1) c) ∗
-      ([∗list] _f ∈ List.replicate NOFILE (0#64 : BitVec 64), fdSlot) ∗
-      ([∗list] i ∈ List.range NOFILE, fdStAt γd i (.own 1) .closed) ⊢
-      procOfiles γ γd pa (List.replicate NOFILE 0#64) ∗
-      fdFrags γd (List.replicate NOFILE FdState.closed) := by
-  iintro ⟨Hc, Hs, Hk⟩
-  ihave Hk := BigSepL.bigSepL_mono (Φ := fun (_ : Nat) i => fdStAt (GF := GF) γd i (.own 1) .closed)
-    (Ψ := fun (_ : Nat) i => iprop(fdStAuth (GF := GF) γd i .closed ∗ fdSt γd i .closed))
-    (l := List.range NOFILE) (fun {_ i} _ => fdSt_halves γd i .closed) $$ Hk
-  icases BigSepL.bigSepL_sep_eqv.1 $$ Hk with ⟨Ha, Hf⟩
-  have hrl : List.range NOFILE = List.range (List.replicate NOFILE (0#64 : BitVec 64)).length := by
-    rw [List.length_replicate]
-  have hrs : List.range NOFILE = List.range (List.replicate NOFILE FdState.closed).length := by
-    rw [List.length_replicate]
-  ihave Ha := (show ([∗list] i ∈ List.range NOFILE, fdStAuth (GF := GF) γd i .closed) ⊢
-      [∗list] i ↦ _c ∈ List.replicate NOFILE (0#64 : BitVec 64), fdStAuth (GF := GF) γd i .closed from by
-    rw [hrl]; exact ui_range_list (fun i => fdStAuth (GF := GF) γd i .closed) _ 0#64) $$ Ha
-  ihave Hf := (show ([∗list] i ∈ List.range NOFILE, fdSt (GF := GF) γd i .closed) ⊢
-      [∗list] i ↦ _st ∈ List.replicate NOFILE FdState.closed, fdSt (GF := GF) γd i .closed from by
-    rw [hrs]; exact ui_range_list (fun i => fdSt (GF := GF) γd i .closed) _ .closed) $$ Hf
-  isplitl [Hc Hs Ha]
-  · ihave H := (BigSepL.bigSepL_sep_eqv (Φ := fun (_ : Nat) (_ : BitVec 64) => fdSlot (GF := GF))
-        (Ψ := fun i (_ : BitVec 64) => fdStAuth (GF := GF) γd i .closed)
-        (l := List.replicate NOFILE (0#64 : BitVec 64))).2 $$ [Hs Ha]
-    · iframe Hs Ha
-    ihave H := (BigSepL.bigSepL_sep_eqv
-        (Φ := fun i c => wordPointsTo (GF := GF) (pOfile pa i) 8 (DFrac.own 1) c)
-        (Ψ := fun i (_ : BitVec 64) => iprop(fdSlot (GF := GF) ∗ fdStAuth (GF := GF) γd i .closed))
-        (l := List.replicate NOFILE (0#64 : BitVec 64))).2 $$ [Hc H]
-    · iframe Hc H
-    unfold procOfiles procOfilesOwe
-    isplitl []
-    · ipureintro; exact List.length_replicate
-    iapply BigSepL.bigSepL_mono
-      (Φ := fun i c => iprop(wordPointsTo (GF := GF) (pOfile pa i) 8 (DFrac.own 1) c ∗ fdSlot ∗
-        fdStAuth γd i .closed))
-      (Ψ := fun i c => ofileLentOrSlot (GF := GF) γ γd pa [] i c) (fun {i c} hc => by
-      have hc0 : c = 0#64 := by
-        rw [List.getElem?_replicate] at hc
-        split at hc
-        · exact (Option.some.inj hc).symm
-        · exact absurd hc (by simp)
-      subst hc0
-      rw [ofileLentOrSlot_out γ γd pa [] i 0#64 (by simp)]
-      exact ofileSlot_closed γ γd pa i) $$ H
-  · unfold fdFrags foffRows
-    isplitl []
-    · ipureintro; exact List.length_replicate
-    ihave H := BigSepL.bigSepL_mono
-      (Φ := fun i (_ : FdState) => fdSt (GF := GF) γd i .closed)
-      (Ψ := fun i st => iprop(fdSt (GF := GF) γd i st ∗ foffRow st))
-      (l := List.replicate NOFILE FdState.closed) (fun {i x} hx => by
-        have hx0 : x = FdState.closed := by
-          rw [List.getElem?_replicate] at hx
-          split at hx
-          · exact (Option.some.inj hx).symm
-          · exact absurd hx (by simp)
-        subst hx0
-        iintro H
-        iframe H
-        iapply foffRow_closed) $$ Hf
-    iapply BigSepL.bigSepL_sep_eqv.1 $$ H
+`allocproc` MINTED the descriptor ghost (`V.fdg`, Rocq
+`proc_dormant_unused`) and hands back the null table, opened here by
+`FdTable.procPrivNocwd_null_open` into the array's cells, one `fdSlot` unit
+per descriptor and every key whole at `.closed`; the publish closes them
+again into `procOfiles` and the all-closed `fdFrags`
+(`FdTable.procOfiles_null_close`, Rocq `proc_ofiles_null`), once the
+block's cwd and generation row are in. -/
 
 /-- **The first process's WHOLE block** (D8 wiring, SpecForkret's deviation 1
 fixed): the save area comes out for the record, and the rest -- the bare
@@ -261,7 +191,7 @@ theorem ui_block [X : CurCtx] (hct : curTier = KTier.kpt) (γ : FileNames) (γd 
   iintro ⟨⟨%hV, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hctx, ⟨%hlen, Hof⟩, Hcwd, Hnm⟩, Hpt, Htfp, %hlz⟩,
     Hcref, Hgen, Hfds, Hkeys⟩
   rw [hof]
-  icases ui_ofiles_fresh γ γd pa $$ [Hof Hfds Hkeys] with ⟨Hofs, Hfr⟩
+  icases procOfiles_null_close γ γd pa $$ [Hof Hfds Hkeys] with ⟨Hofs, Hfr⟩
   · iframe
   iframe Hctx Hfr
   unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile cwdRefAt
@@ -300,7 +230,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 
 set_option maxHeartbeats 1000000 in
 /-- `allocproc`'s contract at `0x80001b7e`. -/
-theorem ui_allocproc (AP : ALLOCPROC) (Γ : SchedNames) (c : CPU) (k' : KCtx)
+theorem ui_allocproc (AP : ALLOCPROC) (Γ : SchedNames) (γ : FileNames) (c : CPU) (k' : KCtx)
     (γl γp : GName) (γk : KmemNames) (on pav : Option Nat) (tk : Bool) (Q : Int → IProp GF)
     (hnoff : k'.noff + 2 < 2 ^ 31) (hK : allocprocSlots ≤ k'.avail)
     (hlk : "kmem" ∉ k'.locks) (hlp : "nextpid" ∉ k'.locks) (hlq : "proc" ∉ k'.locks)
@@ -315,10 +245,10 @@ theorem ui_allocproc (AP : ALLOCPROC) (Γ : SchedNames) (c : CPU) (k' : KCtx)
        (⌜R' 10#5 ≠ 0#64⌝ ∗
          kctx cpu' (((k'.pushOffAt spie spp).withRegs R').withLocks ("proc" :: k'.locks)))) -∗
       pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      allocprocPost Γ cpu' γk on pav tk Q (R' 10#5) -∗
+      allocprocPost Γ γ cpu' γk on pav tk Q (R' 10#5) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := AP.wp_allocproc (hlc := hlc) (GF := GF) Γ c k' γl γp γk on pav tk Q hnoff hK hlk hlp hlq htier
+  have h := AP.wp_allocproc (hlc := hlc) (GF := GF) Γ γ c k' γl γp γk on pav tk Q hnoff hK hlk hlp hlq htier
   unfold wp_allocproc_body at h
   simp only [allocprocAddr] at h
   iintro ⟨Hk, Hpc, #Hpi, #Hkm, #Hpl, Hav, Hpav, #HKw, Hnext⟩
@@ -431,6 +361,7 @@ theorem ui_finish [X : CurCtx] (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc :=
     chFrag V.chg (procAddr j) ∅ ∗
     inodeHeldAt (kf.regs 10#5) ROOTINO ∗ procGenAt curCtx (procAddr j) pid V.gen ∗
     ([∗list] _f ∈ List.replicate NOFILE (0#64 : BitVec 64), fdSlot) ∗
+    ([∗list] i ∈ List.range NOFILE, fdStAt V.fdg i (.own 1) .closed) ∗
     (∀ R5 : RegMap,
       kctx cpu ((kf.popOff.withRegs R5).withLocks (kf.locks.filter (fun x => x ≠ "proc"))) -∗
       pcIs cpu (KA.«userinit» + 0x32#64) -∗ ⌜calleeSaved kf.regs R5⌝ -∗ wpLoop cpu)
@@ -438,7 +369,7 @@ theorem ui_finish [X : CurCtx] (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc :=
   obtain ⟨ξ0, t0⟩ := X
   subst hct
   letI : CurCtx := ⟨ξ0, KTier.kpt⟩
-  iintro ⟨Hk, Hpc, #Hpinv, Hheld, Hhart, #Hused, Hpriv, Hstack, Hal, Hch, Hcref, Hgen, Hfds, Hcont⟩
+  iintro ⟨Hk, Hpc, #Hpinv, Hheld, Hhart, #Hused, Hpriv, Hstack, Hal, Hch, Hcref, Hgen, Hfds, Hkeys, Hcont⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   ihave #HlkI := procsInv_lookup Γ j hj $$ Hpinv
   -- open the private block at `p->cwd`
@@ -474,12 +405,11 @@ theorem ui_finish [X : CurCtx] (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc :=
   -- ===== the ghost publish =====
   iapply wpLoop_bupd
   -- THE FIRST PROCESS'S BLOCK, WHOLE (D8 wiring; SpecForkret's deviation 1
-  -- fixed): a fresh descriptor ghost for its null table, the root's
-  -- reference as its cwd (at `ROOTINO`), its generation row
-  imod (fdSt_alloc (GF := GF) NOFILE) with ⟨%γd, Hkeys⟩
-  icases ui_block rfl γ γd (procAddr j) pid { V with cwd := kf.regs 10#5 } M hof
+  -- fixed): allocproc's descriptor ghost for its null table (`V.fdg`), the
+  -- root's reference as its cwd (at `ROOTINO`), its generation row
+  icases ui_block rfl γ V.fdg (procAddr j) pid { V with cwd := kf.regs 10#5 } M hof
     $$ [$Hpriv $Hcref $Hgen $Hfds $Hkeys] with ⟨Hctxc, Hblk, Hfr⟩
-  imod (forkret_record Γ cpu _ j γ pid { V with cwd := kf.regs 10#5, cwi := ROOTINO, fdg := γd } M
+  imod (forkret_record Γ cpu _ j γ pid { V with cwd := kf.regs 10#5, cwi := ROOTINO, fdg := V.fdg } M
       (List.replicate NOFILE FdState.closed) hj rfl hctx)
     $$ [$Hk $Hpinv $Hctxc $Hblk $Hfr $Hstack $Hal $Hch] with ⟨Hk, HprocCtx⟩
   imod (pstateWhole_update Γ (procAddr j) USED RUNNABLE) $$ Hwhole with Hwhole
@@ -572,6 +502,7 @@ theorem ui_publish [X : CurCtx] (RE : RELEASE) (NR : NAMEI_ROOT) (Γ : SchedName
     procPriv (procAddr j) pid V M ∗ stackOwn (V.kstack + 4096#64) 512 ∗
     procGenAt curCtx (procAddr j) pid V.gen ∗
     ([∗list] _f ∈ List.replicate NOFILE (0#64 : BitVec 64), fdSlot) ∗
+    ([∗list] i ∈ List.range NOFILE, fdStAt V.fdg i (.own 1) .closed) ∗
     (∀ R5 : RegMap,
       kctx cpu ((kb.popOff.withRegs R5).withLocks (kb.locks.filter (fun x => x ≠ "proc"))) -∗
       pcIs cpu (KA.«userinit» + 0x32#64) -∗ ⌜calleeSaved (kb.regs.set 9#5 (procAddr j)) R5⌝ -∗
@@ -581,7 +512,7 @@ theorem ui_publish [X : CurCtx] (RE : RELEASE) (NR : NAMEI_ROOT) (Γ : SchedName
   subst hct
   letI : CurCtx := ⟨ξ0, KTier.kpt⟩
   iintro ⟨Hk, Hpc, #Hpinv, ⟨%w0, Hinit⟩, #Hit, #Hiti, #Hireg, #Hpe, Hir, Hal, Hch, Hheld, Hhart, #Hused,
-    Hpriv, Hstack, Hgen, Hfds, Hcont⟩
+    Hpriv, Hstack, Hgen, Hfds, Hkeys, Hcont⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- c.mv s1,a0 : s1 = p
   k_step (wp_s_add cpu _ (KA.«userinit» + 0xe#64) true 9#5 0#5 10#5 (by decide))
@@ -642,7 +573,7 @@ theorem ui_publish [X : CurCtx] (RE : RELEASE) (NR : NAMEI_ROOT) (Γ : SchedName
       inodeHeldAt ((kb.withRegs R3).regs 10#5) ROOTINO from by rw [KCtx.withRegs_regs, hip]) $$ Hcref
   iapply (ui_finish RE Γ cpu (kb.withRegs R3) j ch γ pid V M hj rfl hctx hof hs1
       ?hsie2 ?hnoff2 ?hintena2 ?hlocks2 ?htier2 ?hK2)
-    $$ [- $Hk $Hpc $Hpinv $Hheld $Hhart $Hused $Hpriv $Hstack $Hal $Hch $Hcref $Hgen $Hfds]
+    $$ [- $Hk $Hpc $Hpinv $Hheld $Hhart $Hused $Hpriv $Hstack $Hal $Hch $Hcref $Hgen $Hfds $Hkeys]
   rotate_right 1
   · iintro %R5 Hk Hpc %hcs5
     have hcs5' : calleeSaved (kb.regs.set 9#5 (procAddr j)) R5 :=
@@ -739,7 +670,7 @@ theorem userinit_proof (AP : ALLOCPROC) (RE : RELEASE) (NR : NAMEI_ROOT) : USERI
   -- <init>'S PAYLOAD IS THE TRIVIAL ONE, and so is the wand that says how a
   -- killer pays for it (Rocq: `Q := fun _ => True`, the wand by `done`)
   ihave #HKw := ui_killw (hlc := hlc) (GF := GF)
-  iapply (ui_allocproc AP Γ cpu _ γl γp γk (some nb) (some (np + 1)) true (fun _ => iprop(True))
+  iapply (ui_allocproc AP Γ γ cpu _ γl γp γk (some nb) (some (np + 1)) true (fun _ => iprop(True))
       ?hna ?hKa ?hlka ?hlpa ?hlqa ?hta) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm
@@ -768,9 +699,14 @@ theorem userinit_proof (AP : ALLOCPROC) (RE : RELEASE) (NR : NAMEI_ROOT) : USERI
         · have hnz : nb - gg = 0 := Option.some.inj h
           omega)
   icases Hsucc with
-    ⟨%j, %ch, %pid, %V, %M, %g, %hfacts, Hheld, Hhart, #Hused, Hpav, Hpriv, Hal, Hch, Hgn, Hsg, Hpr,
-      Hxs, Hstack, Hkav⟩
+    ⟨%j, %ch, %pid, %V, %M, %g, %hfacts, Hheld, Hhart, #Hused, Hpav, Hnc, Hctx0, Hfr0, Hfs0, Hir0, Hbs0,
+      Hch, Hgn, Hsg, Hpr, Hxs, Hstack, Hkav⟩
   obtain ⟨hrj, hj, hpid1, hpid2, hVp, hgle, hboot⟩ := hfacts
+  -- THE DESCRIPTOR GHOST IS allocproc's (Rocq `proc_dormant_unused`): the
+  -- null table opened into the raw cells, the units and the keys at `closed`,
+  -- which the block's table is rebuilt from at the publish (`ui_block`)
+  icases procPrivNocwd_null_open rfl γ (procAddr j) pid V M hVp.1
+    $$ [$Hnc $Hctx0 $Hfr0 $Hfs0 $Hir0 $Hbs0] with ⟨Hpriv, Hal, Hkeys⟩
   -- <INIT>'S PID IS THE LITERAL 1: the ledger's boot-era token pinned it
   -- (`pavBoot`)
   have hp1 : pid.toNat = 1 := by simpa [pavBoot] using hboot
@@ -829,7 +765,7 @@ theorem userinit_proof (AP : ALLOCPROC) (RE : RELEASE) (NR : NAMEI_ROOT) : USERI
   iapply (ui_publish RE NR Γ cpu _ j ch γ 1#32 V M hj rfl hVp.2.2.2.2 hVp.1
       ?ha0 ?hsie2 ?hnoff2 ?hintena2 ?hlocks2 ?htier2 ?hK2 hroot hnib0)
     $$ [- $Hk $Hpc $Hpinv $Hinit $Hit $Hiti $Hireg $Hpe $Hir $Hal $Hch $Hheld $Hhart $Hused $Hpriv $Hstack
-      $Hgen $Hfds]
+      $Hgen $Hfds $Hkeys]
   rotate_right 1
   · iintro %R5 Hk Hpc %hcs5 #Hinitp
     k_norm [ui_pushOffAt_pushed k hsie, hlocks, ui_filter_one, ui_withLocks_nil k hlocks, ui_ret_c12]
