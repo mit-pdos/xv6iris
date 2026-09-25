@@ -1,3 +1,10 @@
+> **DECISIONS (user + coordinator, Sept 24 2026):** D1–D6, D9–D13 approved as recommended (D6 default:
+> leave the two off-box classes). **D7: Rocq-literal process block, one record edit (A3).** **D5b:
+> port Rocq's console ghost into consoleread FIRST, then a Rocq-literal fileread.** **D8: PORT the
+> fork/exit generation machinery in wave 7** (user: "we'll have to port it eventually; do whatever is
+> more efficient" — kfork/kexit/kwait/kkill are re-proved in this wave anyway by A3/C, so port it with
+> them rather than re-proving twice).
+
 > **COORDINATOR DECISIONS PENDING.** §8 lists them (D1–D13). W7-A (§7.2) needs D1–D4 and D7 answered.
 > W7-D needs D5b and D10. Wave 7b needs D9. D7 and D8 are process-layer changes, so they also go to
 > the user (rule 3).
