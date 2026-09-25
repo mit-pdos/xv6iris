@@ -92,6 +92,23 @@ Proof.
     destruct Hval as [ H2 | [ H2 | [ H2 | [ H2 | H2 ]]]]; lia.
 Qed.
 
+(* ...and at a byte of a file name, which may be the dot (cut W4) *)
+Lemma ushs_fn_not_sym (b : bv 8) : fn_byte b -> ushp_is_sym b = false.
+Proof.
+  intro Ha. destruct (ushp_is_sym b) eqn:E; [ exfalso | reflexivity ].
+  pose proof (ushs_sym_val b E) as Hval. apply fn_byte_val in Ha.
+  destruct Ha as [ H1 | [ H1 | [ H1 | H1 ] ] ];
+    destruct Hval as [ H2 | [ H2 | [ H2 | [ H2 | [ H2 | [ H2 | H2 ]]]]]]; lia.
+Qed.
+
+Lemma ushs_fn_not_ws (b : bv 8) : fn_byte b -> ushp_is_ws b = false.
+Proof.
+  intro Ha. destruct (ushp_is_ws b) eqn:E; [ exfalso | reflexivity ].
+  pose proof (ushs_ws_val b E) as Hval. apply fn_byte_val in Ha.
+  destruct Ha as [ H1 | [ H1 | [ H1 | H1 ] ] ];
+    destruct Hval as [ H2 | [ H2 | [ H2 | [ H2 | H2 ]]]]; lia.
+Qed.
+
 Lemma ushs_sp_ws : ushp_is_ws wl_sp = true.
 Proof. vm_compute. reflexivity. Qed.
 
@@ -107,6 +124,12 @@ Proof. vm_compute. reflexivity. Qed.
 Lemma ushs_body_not_sym (b : bv 8) : wl_body_byte b -> ushp_is_sym b = false.
 Proof.
   intros [ Ha | -> ]; [ exact (ushs_alnum_not_sym b Ha) | exact ushs_sp_not_sym ].
+Qed.
+
+(* ...and at a body of name words ([LineWords.wl_body_bytes_fn]) *)
+Lemma ushs_fnbody_not_sym (b : bv 8) : fn_byte b \/ b = wl_sp -> ushp_is_sym b = false.
+Proof.
+  intros [ Ha | -> ]; [ exact (ushs_fn_not_sym b Ha) | exact ushs_sp_not_sym ].
 Qed.
 
 
@@ -152,7 +175,7 @@ Definition ushs_line_is (ws : list (list (bv 8))) (file : list (bv 8))
     (f : nat -> bv 8) (k len : nat) : Prop :=
   let p0 := length (wl_body ws) in
   line_ok ws
-  /\ wl_word file
+  /\ fn_word file
   /\ len = (p0 + 3 + length file + 1)%nat
   /\ (forall j : nat, (j < p0)%nat -> f (k + j)%nat = wl_body ws !!! j)
   /\ f (k + p0)%nat = wl_sp
@@ -181,7 +204,7 @@ Proof.
     refine (Forall_lookup_1 _ _ _ _ (wl_body_bytes ws (line_ok_wf ws Hok)) _).
     exact (list_lookup_lookup_total_lt (wl_body ws) j Hj). }
   assert (Hfilecl : forall j : nat, (j < length file)%nat ->
-            wl_alnum (f (k + p0 + 3 + j)%nat)).
+            fn_byte (f (k + p0 + 3 + j)%nat)).
   { intros j Hj. rewrite (Hfb j Hj).
     destruct Hfile as [ _ Hall ].
     refine (Forall_lookup_1 _ _ _ _ Hall _).
@@ -199,7 +222,7 @@ Proof.
     destruct (lt_dec j (p0 + 3 + length file)%nat) as [ Hfi | Hgf ].
     { assert (Hd : (j - (p0 + 3) < length file)%nat) by lia.
       replace (k + j)%nat with (k + p0 + 3 + (j - (p0 + 3)))%nat by lia.
-      exact (ushs_alnum_not_sym _ (Hfilecl (j - (p0 + 3))%nat Hd)). }
+      exact (ushs_fn_not_sym _ (Hfilecl (j - (p0 + 3))%nat Hd)). }
     assert (Hj' : j = (p0 + 3 + length file)%nat) by lia. subst j.
     replace (k + (p0 + 3 + length file))%nat
       with (k + p0 + 3 + length file)%nat by lia.
@@ -228,7 +251,7 @@ Proof.
     intros j Hj.
     assert (Hd : (j - (p0 + 3) < length file)%nat) by lia.
     replace (k + j)%nat with (k + p0 + 3 + (j - (p0 + 3)))%nat by lia.
-    exact (ushs_alnum_not_ws _ (Hfilecl (j - (p0 + 3))%nat Hd)).
+    exact (ushs_fn_not_ws _ (Hfilecl (j - (p0 + 3))%nat Hd)).
   - (* ...and past it there is only the newline *)
     intros j Hj.
     assert (Hj' : j = (p0 + 3 + length file)%nat) by lia. subst j.
@@ -252,18 +275,17 @@ Qed.
 (* ===================================================================== *)
 
 (* THE BRIDGE: the typed line at ANY name of the class, read
-   positionally (cut W3).  The name is a WORD -- the one fact about a
-   class name the lexer tier needs that is not a class law
-   ([UNamePath.uname_word], which a caller supplies); the suffix
-   [' ' '>' ' '] and the name's bytes are read off [UNameBytes]. *)
+   positionally (cut W3).  The name is a word of name bytes by L1
+   ([FileDisc.uname_lex], cut W4); the suffix [' ' '>' ' '] and the
+   name's bytes are read off [UNameBytes]. *)
 Lemma ushs_line_is_of_at (ws : list (list (bv 8))) (nm : list (bv 8))
     (f : nat -> bv 8) (k len : nat) :
-  wl_word nm ->
   UkSh.ush_line_at (LEchoF ws nm) f k len ->
   ushs_line_is ws nm f k len.
 Proof using.
-  intros Hw (Hok & Hlen & Hby).
-  destruct Hok as [ Hok _ ].
+  intros (Hok & Hlen & Hby).
+  destruct Hok as [ Hok [ Hu _ ] ].
+  pose proof (uname_lex nm Hu) as Hw.
   set (p0 := length (wl_body ws)).
   (* the line's bytes are [wl_body ws ++ suf_gt nm] and then the newline *)
   assert (Hpre : length (wl_body ws ++ suf_gt nm) = (p0 + (3 + length nm))%nat)

@@ -422,9 +422,18 @@ Qed.
 (* ...and no byte of the line is the NUL [gets] plants past it, which is
    what turns "the first NUL at or after 0" into "the line's length" *)
 Lemma ush_line_no_nul (ws : list (list (bv 8))) (j : nat) :
-  wl_wf ws -> (j < length (wl_line ws))%nat -> wl_line ws !!! j <> ubyte0.
+  fn_wf ws -> (j < length (wl_line ws))%nat -> wl_line ws !!! j <> ubyte0.
 Proof.
-  intros Hwf Hj Hc. pose proof (ush_line_byte_val ws j Hwf Hj) as Hv.
+  intros Hwf Hj Hc.
+  assert (Hv : bv_unsigned (wl_line ws !!! j) = 10%Z \/ bv_unsigned (wl_line ws !!! j) = 32%Z
+               \/ bv_unsigned (wl_line ws !!! j) = 46%Z
+               \/ (48 <= bv_unsigned (wl_line ws !!! j) <= 57)%Z
+               \/ (65 <= bv_unsigned (wl_line ws !!! j) <= 90)%Z
+               \/ (97 <= bv_unsigned (wl_line ws !!! j) <= 122)%Z).
+  { apply (wl_line_byte_val_fn ws _ Hwf).
+    destruct (lookup_lt_is_Some_2 (wl_line ws) j Hj) as [b Hb].
+    rewrite list_lookup_total_alt Hb. cbn [default from_option].
+    exact (elem_of_list_lookup_2 (wl_line ws) j b Hb). }
   rewrite Hc in Hv.
   rewrite (_ : bv_unsigned ubyte0 = 0%Z) in Hv; [ lia | by vm_compute ].
 Qed.
@@ -486,6 +495,7 @@ Lemma ush_uline_body_val (lu : FileDisc.uline) (j : nat) :
   \/ bv_unsigned (FileDisc.line_bytes lu !!! j) = 32%Z
   \/ bv_unsigned (FileDisc.line_bytes lu !!! j) = 62%Z
   \/ bv_unsigned (FileDisc.line_bytes lu !!! j) = 124%Z
+  \/ bv_unsigned (FileDisc.line_bytes lu !!! j) = 46%Z
   \/ (48 <= bv_unsigned (FileDisc.line_bytes lu !!! j) <= 57)%Z
   \/ (65 <= bv_unsigned (FileDisc.line_bytes lu !!! j) <= 90)%Z
   \/ (97 <= bv_unsigned (FileDisc.line_bytes lu !!! j) <= 122)%Z.
@@ -503,13 +513,14 @@ Proof.
     exact (proj1 (Forall_lookup _ _)
              (FileDisc.line_bytes_bytes lu Hok) q b Hq). }
   destruct Hb as [Hfb | [-> | ->]].
-  - destruct Hfb as [[Ha | ->] | ->].
+  - destruct Hfb as [[Ha | ->] | [-> | ->]].
     + destruct Ha as [H | [H | H]];
-        [ right; right; right; right; by left
-        | right; right; right; right; right; by left
-        | right; right; right; right; right; by right ].
+        [ right; right; right; right; right; by left
+        | right; right; right; right; right; right; by left
+        | right; right; right; right; right; right; by right ].
     + right. left. exact wl_sp_val.
     + right. right. left. by vm_compute.
+    + right. right. right. right. left. exact fn_dot_val.
   - right. right. right. left. by vm_compute.
   - left. exact wl_nl_val.
 Qed.
@@ -555,19 +566,21 @@ Proof.
   { destruct lu as [ws | ws Nf | Nf | ws npc]; cbn [FileDisc.uline_ok] in Hok.
     - left. rewrite FileDisc.line_bytes_echo.
       exact (line_ok_head_byte0 ws Hok).
-    - left. pose proof (proj1 (proj2 Hok)) as Hu. rewrite /FileDisc.uname in Hu. subst Nf.
+    - left.
       pose proof (ush_wl_body_pos ws (proj1 Hok)) as Hwb.
       rewrite FileDisc.line_bytes_body. cbn [FileDisc.line_body].
-      rewrite (wl_lta_app_l (wl_body ws ++ FileDisc.suf_gtf) [wl_nl] 0%nat
+      rewrite (wl_lta_app_l (wl_body ws ++ FileDisc.suf_gt Nf) [wl_nl] 0%nat
                  ltac:(rewrite length_app; lia)).
-      rewrite (wl_lta_app_l (wl_body ws) FileDisc.suf_gtf 0%nat Hwb).
+      rewrite (wl_lta_app_l (wl_body ws) (FileDisc.suf_gt Nf) 0%nat Hwb).
       pose proof (line_ok_head_byte0 ws (proj1 Hok)) as Hh.
       rewrite /wl_line (wl_lta_app_l (wl_body ws) [wl_nl] 0%nat Hwb) in Hh.
       exact Hh.
-    - right. rewrite /FileDisc.uname in Hok. subst Nf.
+    - right.
       rewrite FileDisc.line_bytes_body. cbn [FileDisc.line_body].
-      rewrite (wl_lta_app_l FileDisc.cmd_cat_f [wl_nl] 0%nat
-                 ltac:(rewrite FileDisc.cmd_cat_f_len; lia)).
+      rewrite (wl_lta_app_l (FileDisc.cmd_cat Nf) [wl_nl] 0%nat
+                 ltac:(rewrite FileDisc.cmd_cat_len; lia)).
+      rewrite (_ : FileDisc.cmd_cat Nf = FileDisc.fd_w_cat ++ wl_tail [Nf]); [| reflexivity].
+      rewrite (wl_lta_app_l FileDisc.fd_w_cat _ 0%nat ltac:(vm_compute; lia)).
       by vm_compute.
     - (* the pipe line: its head is its producer's, one suffix over --
          the echo line's, or [cat]'s *)

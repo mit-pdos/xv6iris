@@ -286,6 +286,8 @@ Definition ubody_ok (adm : pline' -> bool) (b : list (bv 8)) : Prop :=
 Global Instance ubody_ok_dec adm b : Decision (ubody_ok adm b).
 Proof using. unfold ubody_ok. apply _. Defined.
 
+(* the partial line's alphabet: the file lines' ([fbody_byte], which has
+   the dot a file name is typed through, cut W4) and the bar *)
 Definition ubyte (b : bv 8) : Prop := fbody_byte b \/ b = fd_bar.
 
 Global Instance ubyte_dec b : Decision (ubyte b).
@@ -338,9 +340,6 @@ Proof using.
   cbn [adm_u_g]. rewrite andb_true_iff, bool_decide_eq_true, filts_okb_true. reflexivity.
 Qed.
 
-Lemma adm_u_g_catf_f (fs : list filt) :
-  Forall filt_ok fs -> adm_u_g (LPipes (PrCatF fname_f) fs) = true.
-Proof using. intros H. apply adm_u_g_catf. split; [reflexivity | exact H]. Qed.
 
 (* an admitted pipeline's stages are admissible filters *)
 Lemma adm_u_g_fs (p : producer) (fs : list filt) :
@@ -517,7 +516,7 @@ Section laws.
         destruct (pl_parse b) as [[ws | p n] |] eqn:Hq; intros Hb; try contradiction.
         destruct (pl_parse_some b _ Hq) as [Hok ->].
         eapply Forall_impl; [exact (pl_body_bytes _ Hok) |].
-        intros x [Hx | Hx]; [left; left; exact Hx | right; exact Hx].
+        intros x [[Hx | Hx] | Hx]; [left; left; exact Hx | right; exact Hx | left; right; right; exact Hx].
     - intros b [Hb | Hb]; [exact (fbody_ok_short b Hb) |].
       revert Hb. unfold upipe_ok.
       destruct (pl_parse b) as [[ws | p n] |] eqn:Hq; intros Hb; try contradiction.

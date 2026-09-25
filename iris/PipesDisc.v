@@ -244,7 +244,7 @@ Definition prod_parse (r : bytes) : option producer :=
   if decide (body_ok r) then Some (PrEcho (wl_words r))
   else match wl_words r with
        | [c; f] =>
-           if decide (c = cmd_cat /\ wl_word f /\ wl_body [c; f] = r)
+           if decide (c = cmd_cat /\ fn_word f /\ wl_body [c; f] = r)
            then Some (PrCatF f) else None
        | _ => None
        end.
@@ -267,10 +267,10 @@ Definition pl_of (b : bytes) : pline' := default (LEcho' []) (pl_parse b).
 Lemma cmd_cat_ne_echo : cmd_cat <> cmd_echo.
 Proof using. intros H. apply (f_equal (@length _)) in H. vm_compute in H. discriminate H. Qed.
 
-Lemma cat_not_echo_ok (f : bytes) : wl_word f -> ~ body_ok (wl_body [cmd_cat; f]).
+Lemma cat_not_echo_ok (f : bytes) : fn_word f -> ~ body_ok (wl_body [cmd_cat; f]).
 Proof using.
   intros Hf [_ Hok].
-  rewrite (wl_words_body [cmd_cat; f] (prod_wf (PrCatF f) Hf)) in Hok.
+  rewrite (wl_words_body_fn [cmd_cat; f] (prod_wf (PrCatF f) Hf)) in Hok.
   apply line_ok_head in Hok. change (Some cmd_cat = Some cmd_echo) in Hok.
   exact (cmd_cat_ne_echo (inj Some _ _ Hok)).
 Qed.
@@ -279,10 +279,10 @@ Lemma prod_parse_body (p : producer) : prod_ok p -> prod_parse (prod_body p) = S
 Proof using.
   intros Hp. pose proof (prod_wf p Hp) as Hwf. unfold prod_parse, prod_body.
   destruct p as [ws | f]; cbn [prod_words prod_ok] in *.
-  - rewrite decide_True; [by rewrite (wl_words_body ws Hwf) |].
-    unfold body_ok. rewrite (wl_words_body ws Hwf). split; [reflexivity | exact Hp].
+  - rewrite decide_True; [by rewrite (wl_words_body_fn ws Hwf) |].
+    unfold body_ok. rewrite (wl_words_body_fn ws Hwf). split; [reflexivity | exact Hp].
   - rewrite decide_False; [| exact (cat_not_echo_ok f Hp)].
-    rewrite (wl_words_body _ Hwf). rewrite decide_True; [reflexivity |].
+    rewrite (wl_words_body_fn _ Hwf). rewrite decide_True; [reflexivity |].
     split; [reflexivity | split; [exact Hp | reflexivity]].
 Qed.
 
@@ -342,7 +342,11 @@ Qed.
 (* the bar is in no producer and no filter stage *)
 Lemma prod_body_nobar p : prod_ok p -> wl_bar ∉ prod_body p.
 Proof using.
-  intros Hp Hin. exact (wl_bar_not_body (proj1 (Forall_forall _ _) (prod_body_bytes p Hp) _ Hin)).
+  intros Hp Hin.
+  destruct (proj1 (Forall_forall _ _) (prod_body_bytes p Hp) _ Hin) as [Hb | Hb].
+  - apply fn_byte_val in Hb.
+    assert (Hbar : bv_unsigned wl_bar = 124%Z) by (vm_compute; reflexivity). lia.
+  - exact (wl_bar_not_body (or_intror Hb)).
 Qed.
 
 Lemma filt_body_nobar F : filt_ok F -> wl_bar ∉ filt_body F.
@@ -854,13 +858,23 @@ Definition pl_nz (l : pline') : Prop :=
 Lemma pl_ok_nz l : pl_ok l -> pl_nz l.
 Proof using. destruct l as [ws | p [| F fs]]; cbn; [done | intros (_ & H & _); exact (H eq_refl) | done]. Qed.
 
+(* the partial line's alphabet: [PipeDisc]'s, and the dot a [cat N]
+   producer's file name is typed through (cut W4) *)
+Definition psbyte (b : bv 8) : Prop := pbody_byte b \/ b = fn_dot.
+
+Global Instance psbyte_dec b : Decision (psbyte b).
+Proof using. unfold psbyte. apply _. Defined.
+
+Lemma psbyte_of_body b : wl_body_byte b -> psbyte b.
+Proof using. intros H. left. exact (pbody_byte_of_body b H). Qed.
+
 (* THE LINE MODEL.  State [unit]: nothing survives a round; [fc] is the
    content function [cat f] reads, [adm] the line shapes the application
    admits. *)
 Definition pipes_lm (fc : bytes -> option bytes) (adm : pline' -> bool) : lmodel :=
   MkLM unit pline' pl_of plalt plalt_of plpanic (fun _ _ a => plcont a)
        (fun _ _ _ => tt) (fun _ l a => plsafe l a \/ (adm l = true /\ plalt_ok fc l a))
-       (pl_body_ok adm) pbody_byte pl_ok (fun _ => True) plterm (pl_merge fc adm).
+       (pl_body_ok adm) psbyte pl_ok (fun _ => True) plterm (pl_merge fc adm).
 
 Lemma pipes_lm_cont_run fc adm s l b : lm_cont (pipes_lm fc adm) s l (PLRun b) = b ++ u_prompt.
 Proof using. reflexivity. Qed.
@@ -1368,10 +1382,10 @@ Qed.
 
 (* ---- '$'-freedom ---- *)
 
-Lemma word_nodollar f : wl_word f -> Forall nodollar f.
+Lemma word_nodollar f : fn_word f -> Forall nodollar f.
 Proof using.
-  intros [_ Hf]. eapply Forall_impl; [exact (wl_alnum_body f Hf) |].
-  exact body_byte_nodollar.
+  intros [_ Hf]. eapply Forall_impl; [exact Hf |].
+  intros b Hb. apply fn_byte_val in Hb. unfold nodollar. lia.
 Qed.
 
 Lemma prefix_forall {A} (P : A -> Prop) (l1 l2 : list A) :
@@ -1385,7 +1399,7 @@ Lemma filt_dg_exec_nodollar F : Forall nodollar (filt_dg_exec F).
 Proof using. destruct F; [exact dg_execR_nodollar | exact dg_execG_nodollar]. Qed.
 
 Lemma stage_out_nodollar fc L st so :
-  Forall nodollar L -> GrepFilt.oneline L -> (forall f, st = SProd (PrCatF f) -> wl_word f) ->
+  Forall nodollar L -> GrepFilt.oneline L -> (forall f, st = SProd (PrCatF f) -> fn_word f) ->
   stage_out fc L st so -> Forall nodollar (so_cons so).
 Proof using.
   intros HL HL1 Hf H.
@@ -1641,19 +1655,22 @@ Proof using.
         cbn [prod_content] in HLp. rewrite HLp in Hm. exact Hm.
 Qed.
 
-Lemma pl_body_bytes l : pl_ok l -> Forall pbody_byte (pl_body l).
+Lemma pl_body_bytes l : pl_ok l -> Forall psbyte (pl_body l).
 Proof using.
   destruct l as [ws | p fs]; cbn [pl_ok pl_body]; intros Hok.
-  - eapply Forall_impl; [exact (wl_body_bytes ws (line_ok_wf ws Hok)) | exact pbody_byte_of_body].
+  - eapply Forall_impl; [exact (wl_body_bytes ws (line_ok_wf ws Hok)) | exact psbyte_of_body].
   - destruct Hok as (Hp & _ & HF & _). apply Forall_app. split.
-    + eapply Forall_impl; [exact (prod_body_bytes p Hp) | exact pbody_byte_of_body].
+    + eapply Forall_impl; [exact (prod_body_bytes p Hp) |].
+      intros b [[Ha | ->] | ->];
+        [left; left; left; exact Ha | right; reflexivity | left; left; right; reflexivity].
     + clear Hp. induction fs as [| F fs IH]; [constructor |].
       apply Forall_cons_1 in HF as [HF1 HF].
       rewrite FileDisc.suf_filts_cons, suf_filt_sep. apply Forall_app. split; [| exact (IH HF)].
       apply Forall_app. split.
-      * unfold pl_sep. constructor; [left; right; reflexivity |].
-        constructor; [right; reflexivity |]. constructor; [left; right; reflexivity | constructor].
-      * eapply Forall_impl; [exact (wl_body_bytes _ (FileDisc.filt_wf F HF1)) | exact pbody_byte_of_body].
+      * unfold pl_sep. constructor; [left; left; right; reflexivity |].
+        constructor; [left; right; reflexivity |].
+        constructor; [left; left; right; reflexivity | constructor].
+      * eapply Forall_impl; [exact (wl_body_bytes _ (FileDisc.filt_wf F HF1)) | exact psbyte_of_body].
 Qed.
 
 Lemma pl_body_short l : pl_ok l -> S (length (pl_body l)) < line_max.
@@ -1821,10 +1838,11 @@ Proof using.
     exact (pl_body_bytes _ Hok).
   - intros b Hb. destruct (pl_body_ok_line adm b Hb) as (_ & Hok & Hbeq). rewrite Hbeq.
     exact (pl_body_short _ Hok).
-  - intros b Hb. destruct Hb as [[Ha | ->] | ->].
+  - intros b Hb. destruct Hb as [[[Ha | ->] | ->] | ->].
     + destruct Ha as [H | [H | H]]; lia.
     + rewrite wl_sp_val. lia.
     + assert (Hbar : bv_unsigned wl_bar = 124%Z) by (vm_compute; reflexivity). rewrite Hbar. lia.
+    + rewrite fn_dot_val. lia.
   - unfold plalt_of. rewrite decide_True; reflexivity.
 Qed.
 
@@ -2557,7 +2575,7 @@ Proof using.
   split.
   - destruct Hdi as (Hb & Hr & Hs). unfold lm_disc_input.
     cbn [pipes_lm1 pipes_lm lm_body_ok lm_body_byte].
-    split; [| split; [exact Hr | exact Hs]].
+    split; [| split; [eapply Forall_impl; [exact Hr | intros b Hb'; by left] | exact Hs]].
     eapply Forall_impl; [exact Hb |]. intros b. apply pbody_ok_adm1.
   - exists ps, (cs_to (ins seg) cs). split; [| split].
     + apply (alts_ok_of_corr _ _ cs); [rewrite cs_to_length; exact Hlen | exact Hcorr].

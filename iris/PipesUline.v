@@ -126,6 +126,15 @@ Proof using.
     destruct H as [H1 H2]; first [ by apply H1 | by apply H2 ].
 Qed.
 
+(* ...and a word of name bytes (cut W4): the dot is not the bar either *)
+Lemma fn_word_ne_bar (w : list (bv 8)) : fn_word w -> w <> FileDisc.fd_w_bar.
+Proof using.
+  intros [_ Hw] ->. rewrite FileDisc.fd_w_bar_eq in Hw.
+  apply Forall_cons_1 in Hw as [Hb _]. apply fn_byte_val in Hb.
+  assert (Hbar : bv_unsigned FileDisc.fd_bar = 124%Z) by (vm_compute; reflexivity).
+  rewrite Hbar in Hb. lia.
+Qed.
+
 Lemma line_ok_no_bar (ws : list (list (bv 8))) :
   line_ok ws -> Forall (fun w => w <> FileDisc.fd_w_bar) ws.
 Proof using.
@@ -137,8 +146,8 @@ Qed.
 Lemma prod_no_bar (p : producer) :
   prod_ok p -> Forall (fun w => w <> FileDisc.fd_w_bar) (prod_words p).
 Proof using.
-  intros Hok. pose proof (wl_wf_alnum _ (prod_wf p Hok)) as Ha.
-  eapply Forall_impl; [exact Ha |]. intros w Hw. exact (alnum_word_ne_bar w Hw).
+  intros Hok. pose proof (prod_wf p Hok) as Ha.
+  eapply Forall_impl; [exact Ha |]. intros w Hw. exact (fn_word_ne_bar w Hw).
 Qed.
 
 (* A WORD LIST WITH NO BAR, FOLLOWED BY NOTHING OR BY A BAR, splits
@@ -245,19 +254,23 @@ Proof using.
     exact (proj1 (Forall_forall _ _) (line_ok_no_bar ws' Hok) _ Hin eq_refl).
   - (* LEchoF: the command's words, `>' and [f] *)
     exfalso. destruct Hok as (Hok' & Hu' & _).
-    rewrite /FileDisc.uname in Hu'. subst N'.
-    rewrite (FileDisc.uline_ws_gtf ws' FileDisc.fname_f Hok' eq_refl) in Hin.
+    rewrite (FileDisc.uline_ws_gtf ws' N' Hok' Hu') in Hin.
     cbn [FileDisc.uline_ws] in Hin.
     apply elem_of_app in Hin as [Hin | Hin].
     + exact (proj1 (Forall_forall _ _) (line_ok_no_bar ws' Hok') _ Hin eq_refl).
-    + assert (Hn' : FileDisc.fd_w_bar ∉ [FileDisc.fd_w_gt; FileDisc.fname_f])
-        by (apply (bool_decide_unpack _); vm_compute; exact I).
-      exact (Hn' Hin).
-  - (* LCat: [cat] and [f] *)
-    exfalso. rewrite /FileDisc.uline_ok /FileDisc.uname in Hok. subst N'.
-    assert (Hn' : FileDisc.fd_w_bar ∉ wl_words FileDisc.cmd_cat_f)
-      by (apply (bool_decide_unpack _); vm_compute; exact I).
-    exact (Hn' Hin).
+    + apply elem_of_cons in Hin as [Hin | Hin].
+      * apply (f_equal (fun w : list (bv 8) => bv_unsigned (w !!! 0%nat))) in Hin.
+        vm_compute in Hin. discriminate Hin.
+      * apply elem_of_list_singleton in Hin.
+        exact (fn_word_ne_bar N' (FileDisc.uname_lex N' Hu') (eq_sym Hin)).
+  - (* LCat: [cat] and [N] *)
+    exfalso. cbn [FileDisc.line_body] in Hin.
+    rewrite (FileDisc.cat_words_N N' (FileDisc.uname_lex N' Hok)) in Hin.
+    apply elem_of_cons in Hin as [Hin | Hin].
+    + apply (f_equal (fun w : list (bv 8) => bv_unsigned (w !!! 0%nat))) in Hin.
+        vm_compute in Hin. discriminate Hin.
+    + apply elem_of_list_singleton in Hin.
+      exact (fn_word_ne_bar N' (FileDisc.uname_lex N' Hok) (eq_sym Hin)).
   - (* LPipe: the words determine the producer and the stages *)
     destruct Hok as (Hok' & Hn' & HF' & _).
     rewrite (FileDisc.uline_ws_pipe ws' fs' Hok' HF') in Hw. cbn [FileDisc.uline_ws] in Hw.

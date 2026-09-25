@@ -96,7 +96,7 @@ Qed.
    would run on into it).  [UkShWords.wl_tokens_tail] is this at
    [c := wl_nl] and [stop = len]. *)
 Lemma ushs_toks_tail (ws : list (list (bv 8))) :
-  wl_wf ws ->
+  fn_wf ws ->
   forall (f : nat -> bv 8) (c : bv 8) (p len stop : nat),
     ushp_is_ws c = true ->
     stop = (p + length (wl_tail ws) + 1)%nat ->
@@ -120,8 +120,8 @@ Proof using.
       - destruct Hend as [ He | He ]; [ left; lia | ].
         right. replace (p + 1)%nat with stop by lia. exact He. }
     lia.
-  - destruct (wl_wf_cons w r Hwf) as [ Hword Hr ].
-    pose proof (wl_word_pos w Hword) as Hwpos.
+  - destruct (fn_wf_cons w r Hwf) as [ Hword Hr ].
+    pose proof (fn_word_pos w Hword) as Hwpos.
     pose proof (wl_word_plain w Hword) as Hwpl.
     assert (Hlenw : length (wl_tail (w :: r))
                     = (1 + length w + length (wl_tail r))%nat).
@@ -175,7 +175,7 @@ Qed.
    wl_tokens] is this at [c := wl_nl] and [stop = len]. *)
 Lemma ushs_toks_line (ws : list (list (bv 8))) (f : nat -> bv 8) (c : bv 8)
     (len stop : nat) :
-  wl_wf ws ->
+  fn_wf ws ->
   ushp_is_ws c = true ->
   stop = (length (wl_body ws) + 1)%nat ->
   (stop <= len)%nat ->
@@ -196,8 +196,8 @@ Proof using.
       - destruct Hend as [ He | He ]; [ left; lia | ].
         right. replace (0 + 1)%nat with stop by lia. exact He. }
     lia.
-  - destruct (wl_wf_cons w r Hwf) as [ Hword Hr ].
-    pose proof (wl_word_pos w Hword) as Hwpos.
+  - destruct (fn_wf_cons w r Hwf) as [ Hword Hr ].
+    pose proof (fn_word_pos w Hword) as Hwpos.
     pose proof (wl_word_plain w Hword) as Hwpl.
     assert (Hlenb : length (wl_body (w :: r))
                     = (length w + length (wl_tail r))%nat)
@@ -259,7 +259,7 @@ Proof using.
     by (destruct Hfile as [ Hne _ ]; destruct file; [ done | cbn; lia ]).
   apply (ushs_toks_line ws (fun j : nat => f (k + j)%nat) wl_sp len
            (length (wl_body ws) + 1)%nat).
-  - exact (line_ok_wf ws Hok).
+  - exact (wl_wf_fn ws (line_ok_wf ws Hok)).
   - exact wl_sp_ws.
   - reflexivity.
   - lia.
@@ -323,22 +323,21 @@ Qed.
    ones [UkSh.ush_gets_done_line] takes -- the body the read delivered,
    the buffer holding it at [k] and the newline the loop stored past it --
    with [EchoDisc.body_ok J] replaced by the file discipline's own reading
-   of the same body, [FileDisc.parse_line J = Some (LEchoF ws nm)], and
-   the name a WORD ([UNamePath.uname_word]: the lexer's one non-law
-   fact). *)
+   of the same body, [FileDisc.parse_line J = Some (LEchoF ws nm)]; the
+   name is a word of name bytes by L1 ([FileDisc.uname_lex], cut W4). *)
 Lemma sh_redir_line_of_typed (J : list (bv 8)) (ws : list (list (bv 8)))
     (nm : list (bv 8)) (f : nat -> bv 8) (k len : nat) :
-  wl_word nm ->
   parse_line J = Some (LEchoF ws nm) ->
   len = S (length J) ->
   (forall j : nat, (j < length J)%nat -> f (k + j)%nat = J !!! j) ->
   f (k + length J)%nat = wl_nl ->
   ushs_line_is ws nm f k len.
 Proof using.
-  intros Hw Hp Hlen Hf Hnl.
+  intros Hp Hlen Hf Hnl.
   pose proof (line_body_parse J (LEchoF ws nm) Hp) as HJ.
   cbn [line_body] in HJ.
-  pose proof (parse_line_ok J (LEchoF ws nm) Hp) as [ Hok _ ].
+  pose proof (parse_line_ok J (LEchoF ws nm) Hp) as [ Hok [ Hu _ ] ].
+  pose proof (uname_lex nm Hu) as Hw.
   assert (HlenJ : length J = (length (wl_body ws) + (3 + length nm))%nat)
     by (rewrite HJ, length_app, suf_gt_len; reflexivity).
   (* every byte of the suffix, off the body's own layout *)
@@ -380,7 +379,6 @@ Qed.
    [fe := |wl_body ws| + 3 + |nm|], at a name of any length. *)
 Lemma sh_redir_line_lexable (J : list (bv 8)) (ws : list (list (bv 8)))
     (nm : list (bv 8)) (f : nat -> bv 8) (k len : nat) :
-  wl_word nm ->
   parse_line J = Some (LEchoF ws nm) ->
   len = S (length J) ->
   (forall j : nat, (j < length J)%nat -> f (k + j)%nat = J !!! j) ->
@@ -393,9 +391,9 @@ Lemma sh_redir_line_lexable (J : list (bv 8)) (ws : list (list (bv 8)))
   /\ (0 < length (wl_toks ws))%nat
   /\ (length (wl_toks ws) < 10)%nat.
 Proof using.
-  intros Hw Hp Hlen Hf Hnl.
+  intros Hp Hlen Hf Hnl.
   exact (ush_line_toks_holds_redir ws nm f k len
-           (sh_redir_line_of_typed J ws nm f k len Hw Hp Hlen Hf Hnl)).
+           (sh_redir_line_of_typed J ws nm f k len Hp Hlen Hf Hnl)).
 Qed.
 
 
@@ -403,23 +401,20 @@ Qed.
 (* §4 A DEMO: THE MODEL'S OWN LINE                                        *)
 (*                                                                        *)
 (* [UkShWords] §6 is the mould.  This is not decoration: [ushs_line_is]    *)
-(* and [parse_line _ = Some (LEchoF_f _)] are PREMISES of everything above,  *)
+(* and [parse_line _ = Some (LEchoF _ _)] are PREMISES of everything above, *)
 (* so a lane that never instantiates them cannot tell a threaded premise   *)
 (* from an unsatisfiable one (durable-notes, Vacuity).  [FileDisc.fd_ws]   *)
 (* is the model's own [echo hello world], [FileDisc.fd_b0] the body        *)
-(* [FileDisc.parse_line] answers [LEchoF_f fd_ws] on, and the tokens below   *)
+(* [FileDisc.parse_line] answers [LEchoF fd_ws fd_nm] on (the name        *)
+(* `a.txt`), and the tokens below                                          *)
 (* are the three the child's argv is built from.                           *)
 (* ===================================================================== *)
 
-(* the model's own name is a word -- at the demo's instance, by computation *)
-Local Lemma fd_demo_word : wl_word fname_f.
-Proof using. apply (bool_decide_unpack _); vm_compute; exact I. Qed.
-
 Definition fd_demo_f : nat -> bv 8 := fun j : nat => (fd_b0 ++ [wl_nl]) !!! j.
 
-Lemma fd_demo_parse : parse_line fd_b0 = Some (LEchoF_f fd_ws).
+Lemma fd_demo_parse : parse_line fd_b0 = Some (LEchoF fd_ws fd_nm).
 Proof using.
-  apply (parse_line_body (LEchoF_f fd_ws)); [ exact (uline_nopipe_echof fd_ws fname_f) |].
+  apply (parse_line_body (LEchoF fd_ws fd_nm)); [ exact (uline_nopipe_echof fd_ws fd_nm) |].
   apply (bool_decide_unpack _); vm_compute; exact I.
 Qed.
 
@@ -429,7 +424,7 @@ Proof using. vm_compute; reflexivity. Qed.
 Lemma fd_demo_lexes :
   ushs_redir (S (length fd_b0)) (fun j : nat => fd_demo_f (0 + j)%nat)
     (length (wl_body fd_ws) + 1)%nat
-    (length (wl_body fd_ws) + 3 + length fname_f)%nat
+    (length (wl_body fd_ws) + 3 + length fd_nm)%nat
   /\ ushs_toks (S (length fd_b0)) (fun j : nat => fd_demo_f (0 + j)%nat)
        (length (wl_body fd_ws) + 1)%nat 0%nat
        [(0, 4)%nat; (5, 10)%nat; (11, 16)%nat].
@@ -440,8 +435,8 @@ Proof using.
   assert (Hnl : fd_demo_f (0 + length fd_b0)%nat = wl_nl).
   { pose proof (wl_lta_app_r fd_b0 [wl_nl] 0%nat) as Hr.
     rewrite Nat.add_0_r in Hr. exact Hr. }
-  destruct (sh_redir_line_lexable fd_b0 fd_ws fname_f fd_demo_f 0%nat
-              (S (length fd_b0)) fd_demo_word fd_demo_parse eq_refl Hb Hnl)
+  destruct (sh_redir_line_lexable fd_b0 fd_ws fd_nm fd_demo_f 0%nat
+              (S (length fd_b0)) fd_demo_parse eq_refl Hb Hnl)
     as (Hr & Ht & _ & _).
   rewrite fd_demo_toks in Ht. exact (conj Hr Ht).
 Qed.

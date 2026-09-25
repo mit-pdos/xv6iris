@@ -91,22 +91,19 @@ Proof using . intros H. exact (fname_f_ne_console (eq_sym H)). Qed.
    inhabitant and the console's name is not (law L3). *)
 Definition redir_name_ok (nm : fname) : Prop := FileDisc.uname nm.
 
-Lemma redir_name_ok_f : redir_name_ok fname_f.
-Proof using . exact uname_fname_f. Qed.
-
 Lemma redir_name_ok_ne_console (nm : fname) :
   redir_name_ok nm -> nm <> fname_console.
-Proof using . exact (nl_ne_console FileDisc.uname uname_laws nm). Qed.
+Proof using . exact (nl_ne_console txt_name txt_laws nm). Qed.
 
 (* the class's other disequalities, as the legs below ask for them *)
 Lemma uname_ne_dot (nm : fname) : FileDisc.uname nm -> nm <> DOT.
-Proof using . exact (nl_ne_dot FileDisc.uname uname_laws nm). Qed.
+Proof using . exact (nl_ne_dot txt_name txt_laws nm). Qed.
 
 Lemma uname_ne_dotdot (nm : fname) : FileDisc.uname nm -> nm <> DOTDOT.
-Proof using . exact (nl_ne_dotdot FileDisc.uname uname_laws nm). Qed.
+Proof using . exact (nl_ne_dotdot txt_name txt_laws nm). Qed.
 
 Lemma uname_ne_console (nm : fname) : FileDisc.uname nm -> nm <> fname_console.
-Proof using . exact (nl_ne_console FileDisc.uname uname_laws nm). Qed.
+Proof using . exact (nl_ne_console txt_name txt_laws nm). Qed.
 
 (* ====================================================================== *)
 (*  1.  THE TWO SHAPES, AND THE FOUR READINGS OF THEM                      *)

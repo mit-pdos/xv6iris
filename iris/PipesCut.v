@@ -502,9 +502,8 @@ Proof using. apply (bool_decide_unpack _). vm_compute. exact I. Qed.
 Lemma filt_ws_ok (F : FileDisc.filt) : FileDisc.filt_ok F -> ushq_ws_ok (FileDisc.filt_words F).
 Proof using.
   destruct F as [| w]; cbn [FileDisc.filt_ok FileDisc.filt_words]; intros HF.
-  - split_and!; [constructor; [exact FileDisc.fd_w_cat_word | constructor] | cbn; lia | cbn; lia].
-  - split_and!; [constructor; [exact fd_w_grep_word | constructor; [exact HF | constructor]]
-                | cbn; lia | cbn; lia].
+  - split_and!; [exact (wl_wf_fn _ (FileDisc.filt_wf FileDisc.FCat HF)) | cbn; lia | cbn; lia].
+  - split_and!; [exact (wl_wf_fn _ (FileDisc.filt_wf (FileDisc.FGrep w) HF)) | cbn; lia | cbn; lia].
 Qed.
 
 Lemma bat_cons3 (g : nat -> bv 8) (c : nat) (a b d : bv 8) (l : list (bv 8)) :

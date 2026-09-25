@@ -28,8 +28,12 @@ From stdpp Require Import ssreflect.
 Require Import LineWords.
 Require Import EchoDisc.
 
+(* the words are words of NAME bytes ([LineWords.fn_wf], cut W4): an
+   argv may carry a file name of the class, `a.txt`, and the dot is
+   neither a blank nor one of sh's metacharacters, so the lexer reads it
+   exactly as it reads an alphanumeric word *)
 Definition exec_ok (ws : list (list (bv 8))) : Prop :=
-  wl_wf ws
+  fn_wf ws
   /\ (0 < length ws)%nat
   /\ (length ws < 10)%nat
   /\ (length (wl_line ws) < line_max)%nat.
@@ -37,7 +41,7 @@ Definition exec_ok (ws : list (list (bv 8))) : Prop :=
 Global Instance exec_ok_dec ws : Decision (exec_ok ws).
 Proof. rewrite /exec_ok. apply _. Defined.
 
-Lemma exec_ok_wf ws : exec_ok ws -> wl_wf ws.
+Lemma exec_ok_wf ws : exec_ok ws -> fn_wf ws.
 Proof. by intros (H & _ & _ & _). Qed.
 
 Lemma exec_ok_pos ws : exec_ok ws -> (0 < length ws)%nat.
@@ -61,6 +65,6 @@ Qed.
 Lemma line_ok_exec_ok ws : line_ok ws -> exec_ok ws.
 Proof.
   intro Hok. split_and!;
-    [ exact (line_ok_wf ws Hok) | exact (line_ok_pos ws Hok)
+    [ exact (wl_wf_fn ws (line_ok_wf ws Hok)) | exact (line_ok_pos ws Hok)
     | exact (line_ok_lt10 ws Hok) | exact (line_ok_len ws Hok) ].
 Qed.

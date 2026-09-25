@@ -119,30 +119,6 @@ Lemma cat_ws_line (nm : list (bv 8)) :
   wl_line (FileDisc.uline_ws (FileDisc.LCat nm)) = FileDisc.line_bytes (FileDisc.LCat nm).
 Proof using. reflexivity. Qed.
 
-(* ===================================================================== *)
-(*  S3  THE ONE FACT THAT IS NOT A LAW                                    *)
-(*                                                                        *)
-(*  A class name is a [wl_word] -- alphanumeric bytes only.  It is read   *)
-(*  off the model's [FileDisc.lname_word], proved at the instance [{f}]. *)
-(*  Its consumers are the WORD machinery a name passes through:          *)
-(*    - [UkShRedirLine.ushs_line_is]'s [wl_word file] (the redirect      *)
-(*      line's positional shape, what [ushs_line_is_redir] and          *)
-(*      [UShLexRedir.ushs_line_is_toks] lex);                            *)
-(*    - [ExecWords.exec_ok [cat; nm]] (cat's argv words, [wl_wf]), at     *)
-(*      [UShURound.ucat_ws_exec_ok] and the cat entries;                  *)
-(*    - [UkShRedirLine.ushs_line_is_of_at] / [UShLexRedir.                *)
-(*      sh_redir_line_of_typed] take it as a premise.                    *)
-(*  AT `*.txt` THIS IS FALSE (the dot is not [wl_alnum]).  Cut W4 must    *)
-(*  (i) widen [ushs_line_is]'s [wl_word file] to [file <> [] /\ Forall    *)
-(*  fn_byte file] -- [ushs_line_is_redir] needs only that no byte of the *)
-(*  name is a symbol or a blank, which [fn_byte_val] gives; (ii) widen   *)
-(*  the WORD vocabulary ([wl_word], [wl_wf], [UkShWords]' tokenizer) so  *)
-(*  [cat a.txt]'s argv and the pipeline producer [PrCatF] lex; (iii)     *)
-(*  retire this lemma and [FileDisc.lname_word]'s instance proof.        *)
-(* ===================================================================== *)
-Lemma uname_word (nm : list (bv 8)) : FileDisc.uname nm -> wl_word nm.
-Proof using. intros Hu. exact (FileDisc.lname_word (FileDisc.LCat nm) Hu). Qed.
-
 (* the diagnostic's own length, the prompt taken off: what the paid walk's
    block length is *)
 Lemma alt_openfailN_nlen (nm : list (bv 8)) :

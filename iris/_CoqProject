@@ -1757,6 +1757,7 @@ AppUnionRec.v
 UInitUnionBoot.v
 UUnionBootAdequacy.v
 UInitUnion.v
+FileClass.v
 FileName.v
 UNameBytes.v
 UNamePath.v

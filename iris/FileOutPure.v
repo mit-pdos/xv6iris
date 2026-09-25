@@ -75,17 +75,19 @@ Qed.
 Lemma disc_input_f_byte_val (I : list (bv 8)) (b : bv 8) :
   disc_input_f I -> b ∈ I ->
   bv_unsigned b = 10%Z \/ bv_unsigned b = 32%Z \/ bv_unsigned b = 62%Z
+  \/ bv_unsigned b = 46%Z
   \/ (48 <= bv_unsigned b <= 57)%Z
   \/ (65 <= bv_unsigned b <= 90)%Z
   \/ (97 <= bv_unsigned b <= 122)%Z.
 Proof using.
-  intros Hd Hin. destruct (disc_input_f_byte I b Hd Hin) as [[[Ha | ->] | ->] | ->].
+  intros Hd Hin. destruct (disc_input_f_byte I b Hd Hin) as [[[Ha | ->] | [-> | ->]] | ->].
   - destruct Ha as [H | [H | H]];
-      [ right; right; right; by left
-      | right; right; right; right; by left
-      | right; right; right; right; by right ].
+      [ right; right; right; right; by left
+      | right; right; right; right; right; by left
+      | right; right; right; right; right; by right ].
   - right. left. exact wl_sp_val.
   - right. right. left. exact wl_gt_val.
+  - right. right. right. left. exact fn_dot_val.
   - left. exact wl_nl_val.
 Qed.
 

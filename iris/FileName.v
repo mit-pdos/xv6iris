@@ -23,11 +23,13 @@
 (*                          discipline decidable.                        *)
 (*                                                                        *)
 (*  THREE INSTANCES, each with every law proved:                          *)
-(*    [f_name]    the class in use today, the one name [fname_f];         *)
 (*    [txt_name]  `stem.txt` for an alphanumeric stem of at most nine     *)
-(*                bytes -- the class the widening lands at;               *)
+(*                bytes -- THE MODEL'S CLASS ([FileDisc.uname] is it,     *)
+(*                cut W4; its syntax is [FileClass], its laws           *)
+(*                [txt_laws] here);                                       *)
+(*    [f_name]    the one name [fname_f], the class before cut W4;       *)
 (*    [one_name]  one alphanumeric byte (62 names, `f` among them), the   *)
-(*                fallback if the dot does not go through the sh walks.  *)
+(*                fallback the dot did not need.                         *)
 (*                                                                        *)
 (*  Each instance is decided by a boolean over [bv_unsigned] ([alnumb],   *)
 (*  [bytes_eqb]) so that L3 and L4 are closed by the virtual machine      *)
@@ -36,13 +38,13 @@
 From Stdlib Require Import ZArith Lia List Bool.
 From stdpp Require Import gmap list bitvector.definitions.
 Require Import SailStdpp.Values.
-Require Import LineWords.       (* [wl_alnum], [wl_word] *)
+Require Import LineWords.       (* [wl_alnum], [wl_word], [fn_byte] *)
+Require Export FileClass.       (* the class [txt_name] and its deciders *)
 Require Import DirentEnc.       (* [DIRSIZ] *)
 Require Import FsTree.          (* [fname], [DOT], [DOTDOT] *)
 Require Import FsImgCheck.      (* [fsimg_byte], the pinned names, [fname_f] *)
 Require Import FsConsPin.       (* [fname_console] *)
 Require Import TreeImg.         (* [img_root_ents] *)
-Require FileState FileDisc.     (* the model's class [FileDisc.uname] *)
 Require Import FsState.         (* [fs_state_rec], [fss_inodes] *)
 Require Import FsStateInode.    (* [dir_entries] *)
 Require Import FsCrash.         (* [fs_blocks], [fs_recovery] *)
@@ -69,10 +71,8 @@ Local Ltac vm_eq :=
 (*  1.  THE ALPHABET AND THE SYSTEM NAMES                                 *)
 (* ===================================================================== *)
 
-(* the dot, spelled the way [FsTree.DOT] spells it *)
-Definition fn_dot : bv 8 := fsimg_byte 0x2e.
-
-Definition fn_byte (b : bv 8) : Prop := wl_alnum b \/ b = fn_dot.
+(* the alphabet [fn_byte] is [LineWords]', the class's syntax
+   [FileClass]'s *)
 
 (* the names a user file may never take: the two every directory has,
    the console node /init makes, and the binaries the claim pins *)
@@ -97,47 +97,7 @@ Record name_laws (P : fname -> Prop) `{!forall N, Decision (P N)} : Prop :=
 (*  3.  BOOLEAN DECIDERS OVER [bv_unsigned]                               *)
 (* ===================================================================== *)
 
-Definition alnumb (b : bv 8) : bool :=
-  let z := bv_unsigned b in
-  ((48 <=? z) && (z <=? 57)) || ((65 <=? z) && (z <=? 90))
-  || ((97 <=? z) && (z <=? 122)).
-
-Lemma alnumb_spec (b : bv 8) : alnumb b = true <-> wl_alnum b.
-Proof using.
-  rewrite /alnumb /wl_alnum.
-  rewrite !orb_true_iff !andb_true_iff !Z.leb_le. tauto.
-Qed.
-
-Fixpoint bytes_eqb (u v : list (bv 8)) : bool :=
-  match u, v with
-  | [], [] => true
-  | a :: u', b :: v' => Z.eqb (bv_unsigned a) (bv_unsigned b) && bytes_eqb u' v'
-  | _, _ => false
-  end.
-
-Lemma bytes_eqb_spec (u v : list (bv 8)) : bytes_eqb u v = true <-> u = v.
-Proof using.
-  revert v. induction u as [| a u IH]; intros [| b v]; cbn.
-  - done.
-  - split; [discriminate | intros H; discriminate H].
-  - split; [discriminate | intros H; discriminate H].
-  - rewrite andb_true_iff Z.eqb_eq IH -bv_eq. split.
-    + by intros [-> ->].
-    + by intros [= -> ->].
-Qed.
-
-Definition wordb (w : list (bv 8)) : bool :=
-  match w with [] => false | _ => forallb alnumb w end.
-
-Lemma wordb_spec (w : list (bv 8)) : wordb w = true <-> wl_word w.
-Proof using.
-  rewrite /wordb /wl_word. destruct w as [| b w].
-  - split; [discriminate | by intros []].
-  - rewrite List.forallb_forall -List.Forall_forall. split.
-    + intros H. split; [discriminate |].
-      eapply Forall_impl; [exact H | intros x Hx; by apply alnumb_spec].
-    + intros [_ H]. eapply Forall_impl; [exact H | intros x Hx; by apply alnumb_spec].
-Qed.
+(* [alnumb], [bytes_eqb], [wordb] and their specs are [FileClass]'s *)
 
 (* a class is excluded from a finite name list by one boolean sweep *)
 Lemma not_in_of_forallb (P : fname -> Prop) (p : fname -> bool) (l : list fname) :
@@ -164,11 +124,8 @@ Proof using.
   rewrite (Hp nm HP) in Hl. discriminate.
 Qed.
 
-Lemma fn_byte_of_alnumb (b : bv 8) : alnumb b = true -> fn_byte b.
-Proof using. intros H. left. by apply alnumb_spec. Qed.
-
 (* ===================================================================== *)
-(*  4.  THE CLASS IN USE TODAY: THE ONE NAME [fname_f]                    *)
+(*  4.  THE CLASS BEFORE CUT W4: THE ONE NAME [fname_f]                   *)
 (* ===================================================================== *)
 
 Definition f_name (N : fname) : Prop := N = fname_f.
@@ -200,45 +157,10 @@ Proof using.
 Qed.
 
 (* ===================================================================== *)
-(*  5.  THE WIDENED CLASS: `stem.txt`                                     *)
+(*  5.  THE MODEL'S CLASS: `stem.txt`                                     *)
 (* ===================================================================== *)
 
-Definition txt_ext : fname :=
-  [fn_dot; fsimg_byte 0x74; fsimg_byte 0x78; fsimg_byte 0x74].
-
-Definition txt_name (N : fname) : Prop :=
-  exists stem, N = stem ++ txt_ext /\ wl_word stem /\ (length stem <= 9)%nat.
-
-Definition txt_nameb (N : fname) : bool :=
-  Nat.leb 5 (length N) && Nat.leb (length N) 13
-  && bytes_eqb (drop (length N - 4) N) txt_ext
-  && wordb (take (length N - 4) N).
-
-Lemma txt_nameb_spec (N : fname) : txt_nameb N = true <-> txt_name N.
-Proof using.
-  rewrite /txt_nameb /txt_name.
-  rewrite !andb_true_iff !Nat.leb_le bytes_eqb_spec wordb_spec.
-  split.
-  - intros [[[H5 H13] Hd] Hw]. exists (take (length N - 4) N).
-    split_and!; [| exact Hw | rewrite length_take; lia].
-    by rewrite -Hd take_drop.
-  - intros (stem & -> & Hw & Hl).
-    pose proof (wl_word_pos stem Hw) as Hpos.
-    rewrite length_app /=.
-    replace (length stem + 4 - 4)%nat with (length stem) by lia.
-    rewrite drop_app_length take_app_length.
-    split_and!; [lia | lia | reflexivity | exact Hw].
-Qed.
-
-Global Instance txt_name_dec N : Decision (txt_name N).
-Proof using.
-  destruct (txt_nameb N) eqn:E.
-  - left. by apply txt_nameb_spec.
-  - right. intros H. apply txt_nameb_spec in H. congruence.
-Defined.
-
-Lemma txt_nameb_of (N : fname) : txt_name N -> txt_nameb N = true.
-Proof using. apply txt_nameb_spec. Qed.
+(* [txt_ext], [txt_name], [txt_nameb] and [txt_name_dec] are [FileClass]'s *)
 
 Lemma txt_sys_ok : forallb (fun N => negb (txt_nameb N)) sys_names = true.
 Proof using. vm_compute. reflexivity. Qed.
@@ -248,21 +170,11 @@ Lemma txt_img_ok :
     (map_to_list img_root_ents) = true.
 Proof using. vm_eq. Qed.
 
-Lemma txt_ext_bytes : Forall fn_byte txt_ext.
-Proof using.
-  constructor; [by right |].
-  do 3 (constructor; [apply fn_byte_of_alnumb; vm_compute; reflexivity |]).
-  constructor.
-Qed.
-
 Lemma txt_laws : name_laws txt_name.
 Proof using.
   split.
-  - intros N (stem & -> & [Hne Hw] & _). split.
-    + by destruct stem.
-    + apply Forall_app. split; [| exact txt_ext_bytes].
-      eapply Forall_impl; [exact Hw | intros b Hb; by left].
-  - intros N (stem & -> & _ & Hl). rewrite length_app /= /DIRSIZ. lia.
+  - intros N HN. exact (txt_lex N HN).
+  - intros N HN. rewrite /DIRSIZ. exact (txt_len N HN).
   - exact (not_in_of_forallb txt_name txt_nameb sys_names txt_nameb_of txt_sys_ok).
   - exact (map_Forall_of_forallb txt_name txt_nameb img_root_ents
              txt_nameb_of txt_img_ok).
@@ -314,31 +226,10 @@ Proof using.
              one_nameb_of one_img_ok).
 Qed.
 
-(* the class in use today lies inside the fallback: `f` is one
+(* the class before cut W4 lies inside the fallback: `f` is one
    alphanumeric byte *)
 Lemma f_name_one (N : fname) : f_name N -> one_name N.
 Proof using. intros ->. apply one_nameb_spec. vm_compute. reflexivity. Qed.
-
-(* THE MODEL'S CLASS ([FileDisc.uname], cut W1) IS [f_name]: the model
-   spells [f] as [FileState.fname_m], the same byte *)
-Lemma uname_f_name (N : fname) : FileDisc.uname N <-> f_name N.
-Proof using.
-  assert (E : FileState.fname_m = fname_f) by (vm_compute; reflexivity).
-  rewrite /FileDisc.uname /f_name E. reflexivity.
-Qed.
-
-Lemma uname_laws : name_laws FileDisc.uname.
-Proof using.
-  destruct f_laws as [H1 H2 H3 H4]. split.
-  - intros N HN. apply H1, uname_f_name, HN.
-  - intros N HN. apply H2, uname_f_name, HN.
-  - intros N HN. apply H3, uname_f_name, HN.
-  - intros nm z Hnm HN. exact (H4 nm z Hnm (proj1 (uname_f_name nm) HN)).
-Qed.
-
-(* the one name [f] of the claim's tier is in the model's class *)
-Lemma uname_fname_f : FileDisc.uname fname_f.
-Proof using. apply uname_f_name. reflexivity. Qed.
 
 (* ===================================================================== *)
 (*  7.  WHAT THE LAWS SAY TO A LAYER ABOVE                                *)

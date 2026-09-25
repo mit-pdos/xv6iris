@@ -78,7 +78,7 @@ Require Import FileState.
 Require Import AppEcho.
 Require Import AppFile.
 Require UNamePath.                (* the path/argv facts off the class laws *)
-Require Import UNameBytes.        (* [uname_word], the diagnostic windows *)
+Require Import UNameBytes.        (* the diagnostic windows *)
 Require Import FileOut.
 Require Import FileOpen.
 Require Import FileWrite.
@@ -1273,7 +1273,7 @@ Section UShURound.
                 (FileDisc.uline_ws (LEchoF ws Nf)) sz l n
                 ltac:(lia) UkShRedirBody.ushs_lp0
                 Hregs Hs1 Ha5 Hnn Hnul Hkl2
-                (UkShRedirBody.ushs_lp_of_at ws Nf f k len (uname_word Nf Hu) Hlat)
+                (UkShRedirBody.ushs_lp_of_at ws Nf f k len Hlat)
                 Hszlo Hszal Hszok Hpm1 Hpmwb (uHwbl_u ug r s0 PT PD)
                 with "Hgen Hhead Hcode Hro [] Hjt Hkl Hchr Hplaw [%] Hstd
                       Hdat Hsz Hbuf Hrun").

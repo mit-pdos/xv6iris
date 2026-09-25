@@ -269,14 +269,15 @@ Fixpoint ushq_tail_is (g : nat -> bv 8) (c len : nat)
          end
   end.
 
-(* what the lexing needs of the left command's words: well formed, and
-   between one and nine of them -- echo's admissible lines, and [cat f] *)
+(* what the lexing needs of the left command's words: words of name
+   bytes (cut W4: [cat a.txt]'s argument carries the dot), and between one
+   and nine of them -- echo's admissible lines, and [cat N] *)
 Definition ushq_ws_ok (ws : list (list (bv 8))) : Prop :=
-  wl_wf ws /\ (0 < length ws)%nat /\ (length ws < 10)%nat.
+  fn_wf ws /\ (0 < length ws)%nat /\ (length ws < 10)%nat.
 
 Lemma ushq_ws_ok_of_line_ok (ws : list (list (bv 8))) : line_ok ws -> ushq_ws_ok ws.
 Proof using.
-  intros Hok. split_and!; [exact (line_ok_wf ws Hok) | exact (line_ok_pos ws Hok)
+  intros Hok. split_and!; [exact (wl_wf_fn ws (line_ok_wf ws Hok)) | exact (line_ok_pos ws Hok)
                           | exact (line_ok_lt10 ws Hok)].
 Qed.
 
@@ -523,9 +524,9 @@ Proof using.
   { intros j Hj Hs. left. rewrite Eg in Hs.
     destruct (lt_dec j (length (wl_body ws))%nat) as [ Hlo | Hge ].
     { exfalso. rewrite (Hbody j Hlo) in Hs.
-      rewrite (ushs_body_not_sym _
+      rewrite (ushs_fnbody_not_sym _
                  (Forall_lookup_1 _ _ _ _
-                    (wl_body_bytes ws Hwf)
+                    (wl_body_bytes_fn ws Hwf)
                     (list_lookup_lookup_total_lt (wl_body ws) j Hlo))) in Hs.
       discriminate. }
     destruct (Nat.eq_dec j (length (wl_body ws))%nat) as [ Hj0 | Hn0 ].
@@ -623,27 +624,29 @@ Qed.
 
 (* a nonempty word list's body starts with a word byte *)
 Lemma ushq_ws_first_nonws (r : list (list (bv 8))) :
-  wl_wf r -> (0 < length r)%nat -> ushp_is_ws (wl_body r !!! 0%nat) = false.
+  fn_wf r -> (0 < length r)%nat -> ushp_is_ws (wl_body r !!! 0%nat) = false.
 Proof using.
   intros Hwf Hpos. destruct r as [| w rest]; [cbn in Hpos; lia |].
-  destruct (wl_wf_cons w rest Hwf) as [Hw _].
-  rewrite wl_body_cons, (wl_lta_app_l w _ 0 (wl_word_pos w Hw)).
-  exact (ushs_alnum_not_ws _ (ushq_word_byte w 0 Hw (wl_word_pos w Hw))).
+  destruct (fn_wf_cons w rest Hwf) as [Hw _].
+  pose proof (fn_word_pos w Hw) as Hwp.
+  rewrite wl_body_cons, (wl_lta_app_l w _ 0 Hwp).
+  apply ushs_fn_not_ws. destruct Hw as [_ Hall].
+  exact (Forall_lookup_1 _ _ _ _ Hall (list_lookup_lookup_total_lt w 0 Hwp)).
 Qed.
 
 Lemma ushq_ws_body_pos (r : list (list (bv 8))) :
-  wl_wf r -> (0 < length r)%nat -> (0 < length (wl_body r))%nat.
+  fn_wf r -> (0 < length r)%nat -> (0 < length (wl_body r))%nat.
 Proof using.
   intros Hwf Hpos. destruct r as [| w rest]; [cbn in Hpos; lia |].
-  destruct (wl_wf_cons w rest Hwf) as [Hw _].
-  rewrite wl_body_cons, length_app. pose proof (wl_word_pos w Hw). lia.
+  destruct (fn_wf_cons w rest Hwf) as [Hw _].
+  rewrite wl_body_cons, length_app. pose proof (fn_word_pos w Hw). lia.
 Qed.
 
 (* A STAGE's WORDS at offset [c], ended by a blank [b]: the left
    command's lexing, at the stage's offset *)
 Lemma ushq_stage_toks (len stop : nat) (g : nat -> bv 8) (c : nat)
     (r : list (list (bv 8))) (b : bv 8) :
-  wl_wf r ->
+  fn_wf r ->
   (forall j : nat, (j < length (wl_body r))%nat -> g (c + j)%nat = wl_body r !!! j) ->
   g (c + length (wl_body r))%nat = b -> ushp_is_ws b = true ->
   stop = (c + length (wl_body r) + 1)%nat -> (stop <= len)%nat ->
@@ -722,14 +725,14 @@ Qed.
 
 (* a stage's body bytes are neither blank-free symbols *)
 Lemma ushq_body_not_sym (g : nat -> bv 8) (c : nat) (r : list (list (bv 8))) :
-  wl_wf r ->
+  fn_wf r ->
   (forall j : nat, (j < length (wl_body r))%nat -> g (c + j)%nat = wl_body r !!! j) ->
   forall j : nat, (c <= j < c + length (wl_body r))%nat -> ushp_is_sym (g j) = false.
 Proof using.
   intros Hwf Hb j Hj. replace j with (c + (j - c))%nat by lia.
   rewrite (Hb (j - c)%nat ltac:(lia)).
-  apply ushs_body_not_sym.
-  exact (Forall_lookup_1 _ _ _ _ (wl_body_bytes r Hwf)
+  apply ushs_fnbody_not_sym.
+  exact (Forall_lookup_1 _ _ _ _ (wl_body_bytes_fn r Hwf)
            (list_lookup_lookup_total_lt (wl_body r) (j - c) ltac:(lia))).
 Qed.
 
@@ -831,9 +834,9 @@ Proof using.
   { intros j Hj Hs. left. rewrite Eg in Hs.
     destruct (lt_dec j (length (wl_body ws))%nat) as [ Hlo | Hge ].
     { exfalso. rewrite (Hbody j Hlo) in Hs.
-      rewrite (ushs_body_not_sym _
+      rewrite (ushs_fnbody_not_sym _
                  (Forall_lookup_1 _ _ _ _
-                    (wl_body_bytes ws Hwf)
+                    (wl_body_bytes_fn ws Hwf)
                     (list_lookup_lookup_total_lt (wl_body ws) j Hlo))) in Hs.
       discriminate. }
     destruct (Nat.eq_dec j (length (wl_body ws))%nat) as [ Hj0 | Hn0 ].

@@ -563,7 +563,7 @@ Proof using.
     by (destruct Hright as [ Hne _ ]; destruct right; [ done | cbn; lia ]).
   apply (ushs_toks_line ws (fun j : nat => f (k + j)%nat) wl_sp len
            (length (wl_body ws) + 1)%nat).
-  - exact (line_ok_wf ws Hok).
+  - exact (wl_wf_fn ws (line_ok_wf ws Hok)).
   - exact wl_sp_ws.
   - reflexivity.
   - lia.
@@ -624,7 +624,7 @@ Proof using.
           with ((right ++ [wl_nl]) !!! length right).
         pose proof (wl_lta_app_r right [wl_nl] 0%nat) as Hq.
         rewrite Nat.add_0_r in Hq. rewrite Hq. reflexivity. }
-  pose proof (ushs_toks_tail [right] Hwf (fun j : nat => f (k + j)%nat)
+  pose proof (ushs_toks_tail [right] (wl_wf_fn _ Hwf) (fun j : nat => f (k + j)%nat)
                 wl_nl (p0 + 2)%nat len len wl_nl_ws
                 ltac:(rewrite Hlentl; lia) ltac:(lia)
                 (or_introl eq_refl) Hf) as Ht.
