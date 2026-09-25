@@ -131,13 +131,13 @@ section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
 
 /-- fdalloc's result, keyed by the returned `a0`. -/
-def fdallocPost (γ : FileNames) (γd : Nat → GName) (pa : BitVec 64) (fs : List (BitVec 64)) (D : List Nat)
+def fdallocPost (γ : FileNames) (γd : GName) (pa : BitVec 64) (fs : List (BitVec 64)) (D : List Nat)
     (k : Nat) (r : BitVec 64) : IProp GF := iprop%
   (⌜r = 0xFFFFFFFFFFFFFFFF#64 ∧ fdFrees fs = []⌝ ∗ procOfilesOwe γ γd pa fs D) ∨
   (∃ (fd : Nat) (l : List Nat), ⌜r = BitVec.ofNat 64 fd ∧ fdFrees fs = fd :: l⌝ ∗
     procOfilesOwe γ γd pa (fs.set fd (fnode k)) (fd :: D) ∗ fdSlot ∗ fdStAuth γd fd .closed)
 
-def wp_fdalloc_body (cpu : CPU) (k : KCtx) (γ : FileNames) (γd : Nat → GName) (kk : Nat)
+def wp_fdalloc_body (cpu : CPU) (k : KCtx) (γ : FileNames) (γd : GName) (kk : Nat)
     (fs : List (BitVec 64)) (D : List Nat)
     (ha0 : k.regs 10#5 = fnode kk) (hkk : kk < NFILE)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : fdallocSlots ≤ k.avail) : Prop :=
@@ -152,7 +152,7 @@ end
 
 structure FDALLOC : Prop where
   wp_fdalloc : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
-    (cpu : CPU) (k : KCtx) (γ : FileNames) (γd : Nat → GName) (kk : Nat) (fs : List (BitVec 64))
+    (cpu : CPU) (k : KCtx) (γ : FileNames) (γd : GName) (kk : Nat) (fs : List (BitVec 64))
     (D : List Nat) ha0 hkk hnoff hK,
     wp_fdalloc_body (hlc := hlc) (GF := GF) cpu k γ γd kk fs D ha0 hkk hnoff hK
 

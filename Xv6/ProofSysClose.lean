@@ -129,11 +129,11 @@ theorem sc_core_pid (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat �
       @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗
       (@wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid -∗
         procPrivCoreNoctxAt curCtx pa pid V M) := by
-  unfold procPrivCoreNoctxAt
-  iintro ⟨%hf, Hpid, Hf, Hpt, Htfp, %hlz⟩
+  unfold procPrivCoreNoctxAt procPrivBareAt
+  iintro ⟨⟨%hf, Hpid, Hf, Hpt, Htfp, %hlz⟩, Hcw⟩
   iframe Hpid
   iintro Hpid
-  iframe Hpid Hf Hpt Htfp
+  iframe Hpid Hf Hpt Htfp Hcw
   isplitl []
   · ipureintro; exact hf
   · ipureintro; exact hlz
@@ -148,23 +148,23 @@ theorem sc_ofdOut_elim (a : BitVec 64) (w : BitVec 32) (h : a ≠ 0#64) :
 
 /-! ## The callees -/
 
-theorem sc_argfd (AF : ARGFD) (c : CPU) (k' : KCtx) (γ : FileNames) (γd : Nat → GName) (pa : BitVec 64)
+theorem sc_argfd (AF : ARGFD) (c : CPU) (k' : KCtx) (γ : FileNames) (pa : BitVec 64)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (D : List Nat) (i : Nat) (v : BitVec 64)
     (oldfd : BitVec 32) (oldf : BitVec 64)
     (hi : i < NARG) (ha0 : k'.regs 10#5 = BitVec.ofNat 64 i) (hv : V.tf[tfArgIdx i]? = some v)
     (hpf : k'.regs 12#5 ≠ 0#64) (hproc : k'.proc = pa) (htier : k'.tier = KTier.kpt)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : argfdSlots ≤ k'.avail) :
     kctx c k' ∗ pcIs c KA.«argfd» ∗
-    procPrivCoreNoctxAt curCtx pa pid V M ∗ procOfilesOwe γ γd pa V.ofile D ∗
+    procPrivCoreNoctxAt curCtx pa pid V M ∗ procOfilesOwe γ V.fdg pa V.ofile D ∗
     ofdOut (k'.regs 11#5) oldfd ∗ wordPointsTo (k'.regs 12#5) 8 (DFrac.own 1) oldf ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗
-      procPrivCoreNoctxAt curCtx pa pid V M -∗ procOfilesOwe γ γd pa V.ofile D -∗
+      procPrivCoreNoctxAt curCtx pa pid V M -∗ procOfilesOwe γ V.fdg pa V.ofile D -∗
       argfdPost (k'.regs 11#5) (k'.regs 12#5) oldfd oldf v V.ofile (R' 10#5) -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := AF.wp_argfd (hlc := hlc) (GF := GF) c k' γ γd pa pid V M D i v oldfd oldf hi ha0 hv hpf hproc htier hnoff hK
+  have h := AF.wp_argfd (hlc := hlc) (GF := GF) c k' γ pa pid V M D i v oldfd oldf hi ha0 hv hpf hproc htier hnoff hK
   unfold wp_argfd_body at h
   simp only [argfdAddr] at h
   exact h
@@ -242,7 +242,7 @@ theorem sc_tail (c : CPU) (kb : KCtx) (hK : 4 ≤ kb.avail)
 /-- Either arm's exit: at `mv a0,a5` with `r` in `a5`, the post, the
 environment back and the iref loan; the complement and the caller's crossing
 at the current hart, moved by the epilogue's own steps. -/
-theorem sc_exit (Γ : SchedNames) (cr : CPU) (k : KCtx) (γ : FileNames) (γd : Nat → GName) (pa : BitVec 64)
+theorem sc_exit (Γ : SchedNames) (cr : CPU) (k : KCtx) (γ : FileNames) (γd : GName) (pa : BitVec 64)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (v : BitVec 64)
     (j : Nat) (γkl : GName) (γk : KmemNames) (hK : 4 ≤ k.avail)
     (spie spp : Bool)
@@ -292,7 +292,7 @@ theorem sc_exit (Γ : SchedNames) (cr : CPU) (k : KCtx) (γ : FileNames) (γd : 
   · rw [hfacts.2]; iexact Hpost
 
 /-- The caller's `true` crossing moves along the process pin alone. -/
-theorem sc_cont_shift (Γ : SchedNames) (cpu c : CPU) (k : KCtx) (γ : FileNames) (γd : Nat → GName)
+theorem sc_cont_shift (Γ : SchedNames) (cpu c : CPU) (k : KCtx) (γ : FileNames) (γd : GName)
     (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
     (v : BitVec 64) (j : Nat) (γkl : GName) (γk : KmemNames) (h : k.proc = 0#64 → c = cpu) :
     sysCloseCont (hlc := hlc) (GF := GF) Γ cpu k γ γd pa pid V M sts v j γkl γk ⊢
@@ -320,10 +320,10 @@ theorem sc_frame_close (sp ra s0 w1 w2 : BitVec 64) :
   · iexists w1; iexact H3
   iexists w2; iexact H4
 
-theorem sc_block_join (γ : FileNames) (γd : Nat → GName) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+theorem sc_block_join (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) :
-    procPrivCoreNoctxAt (GF := GF) curCtx pa pid V M ∗ procOfilesOwe γ γd pa V.ofile [] ⊢
-      procPrivFd γ γd pa pid V M := by
+    procPrivCoreNoctxAt (GF := GF) curCtx pa pid V M ∗ procOfilesOwe γ V.fdg pa V.ofile [] ⊢
+      procPrivFd γ pa pid V M := by
   unfold procPrivFd procOfiles; iintro H; iexact H
 
 end
@@ -339,7 +339,7 @@ theorem sys_close_br_fffffffffffffd26 : KA.«sys_close» + 0xfffffffffffffd26#64
 set_option maxHeartbeats 64000000 in
 set_option maxRecDepth 20000 in
 theorem sys_close_proof (AF : ARGFD) (MP : MYPROC) (FC : FILECLOSE) : SYSCLOSE := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X Γ _ cpu k γl γ γd pa pid V M sts v j γkl γk on
+  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X Γ _ cpu k γl γ pa pid V M sts v j γkl γk on
       hv hproc htier hsp hnoff hK => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
@@ -353,9 +353,9 @@ theorem sys_close_proof (AF : ARGFD) (MP : MYPROC) (FC : FILECLOSE) : SYSCLOSE :
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   have hK4 : 4 ≤ k.avail := by rw [sysCloseSlots_eq] at hK; omega
   have hlocks : k.locks = [] := List.eq_nil_of_length_eq_zero (by have := hwf.2.2.2.1; omega)
-  icases (procPrivFd_split γ γd pa pid V M).1 $$ Hblk with ⟨Hcore, Howe⟩
-  icases procOfilesOwe_len γ γd pa V.ofile [] $$ Howe with ⟨%hlen, Howe⟩
-  icases fdFrags_len γd sts $$ Hfr with ⟨%hslen, Hfr⟩
+  icases (procPrivFd_split γ pa pid V M).1 $$ Hblk with ⟨Hcore, Howe⟩
+  icases procOfilesOwe_len γ V.fdg pa V.ofile [] $$ Howe with ⟨%hlen, Howe⟩
+  icases fdFrags_len V.fdg sts $$ Hfr with ⟨%hslen, Hfr⟩
   -- the prologue ; a2 = &f ; a1 = &fd ; a0 = 0 ; jal argfd
   iapply (wp_prologue4s0_gen cpu k KA.«sys_close» hK4)
   k_code (text_instr _ _ _ _ rfl rfl) Htext
@@ -383,7 +383,7 @@ theorem sys_close_proof (AF : ARGFD) (MP : MYPROC) (FC : FILECLOSE) : SYSCLOSE :
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_close_br_fffffffffffffd26] next c5 hp5
   iintro Hk Hpc
   ihave Hpfd := sc_ofdOut_intro afd oldfd hafd_nz $$ Hfd
-  iapply (sc_argfd AF c5 _ γ γd pa pid V M [] 0 v oldfd wf (by decide) ?ha0 hv ?hpf ?hpr ?ht ?hn ?hKa)
+  iapply (sc_argfd AF c5 _ γ pa pid V M [] 0 v oldfd wf (by decide) ?ha0 hv ?hpf ?hpr ?ht ?hn ?hKa)
     $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g [sc_ret_4e42, sc_li0, sc_fd_addr, hafd]
@@ -423,9 +423,9 @@ theorem sys_close_proof (AF : ARGFD) (MP : MYPROC) (FC : FILECLOSE) : SYSCLOSE :
     · iframe
     ihave Hframe := sc_frame_close (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) w1' wf $$ [Hra Hs0 Hslot Hcf]
     case' _ => iframe
-    ihave Hblk := sc_block_join γ γd pa pid V M $$ [Hcore Howe]
+    ihave Hblk := sc_block_join γ pa pid V M $$ [Hcore Howe]
     case' _ => iframe
-    ihave Hpost : sysClosePost (GF := GF) γ γd pa pid V M sts v 0xFFFFFFFFFFFFFFFF#64 $$ [Hblk Hfr]
+    ihave Hpost : sysClosePost (GF := GF) γ V.fdg pa pid V M sts v 0xFFFFFFFFFFFFFFFF#64 $$ [Hblk Hfr]
     case' _ =>
       unfold sysClosePost
       ileft
@@ -435,10 +435,10 @@ theorem sys_close_proof (AF : ARGFD) (MP : MYPROC) (FC : FILECLOSE) : SYSCLOSE :
     · iexists on; iexact Hpenv
     ihave Hte := trapCsrsExt_move _ _ _ (fun h => hpin8 (Or.inl h)) $$ Hte
     ihave Hce := cpuClaimExt_move _ _ _ _ (fun h => hpin8 (Or.inl h)) $$ Hce
-    ihave Hnext := sc_cont_shift Γ cpu c8 k γ γd pa pid V M sts v j γkl γk (fun h => hpin8 (Or.inr h))
+    ihave Hnext := sc_cont_shift Γ cpu c8 k γ V.fdg pa pid V M sts v j γkl γk (fun h => hpin8 (Or.inr h))
       $$ Hnext
     obtain ⟨p9, p18, p19, p20, p21, p22, p23, p24, p25, p26, p27⟩ := hpins1
-    iapply (sc_exit Γ c8 k γ γd pa pid V M sts v j γkl γk hK4 spie spp _
+    iapply (sc_exit Γ c8 k γ V.fdg pa pid V M sts v j γkl γk hK4 spie spp _
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact b2)
         (by
           refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
@@ -491,17 +491,17 @@ theorem sys_close_proof (AF : ARGFD) (MP : MYPROC) (FC : FILECLOSE) : SYSCLOSE :
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [d10', sc_ofile_addr pa fd0 hfd0] next c14 hp14
     iintro Hk Hpc
     -- LEND fd0's reference, and open its cell for the store
-    icases procOfilesOwe_lend γ γd pa V.ofile [] fd0 fv (by simp) hfv hnz $$ Howe
+    icases procOfilesOwe_lend γ V.fdg pa V.ofile [] fd0 fv (by simp) hfv hnz $$ Howe
       with ⟨%kk, %q, %st, %⟨hfvk, hkk, hst⟩, Href, Hauth0, Howe⟩
     subst hfvk
     have hfv' : V.ofile[fd0]? = some (fnode kk) := hfv
-    icases procOfilesOwe_close γ γd pa V.ofile [] fd0 (fnode kk) (by simp) hfv' $$ Howe with ⟨Hc, Hcw⟩
+    icases procOfilesOwe_close γ V.fdg pa V.ofile [] fd0 (fnode kk) (by simp) hfv' $$ Howe with ⟨Hc, Hcw⟩
     k_step_gen (wp_s_sd c14 _ (KA.«sys_close» + 0x2c#64) false 0#12 10#5 0#5 (by decide) (fnode kk))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sc_add0, sc_add0'] next c15 hp15
     iintro Hk Hpc Hc
     -- the descriptor's state: the row the bundle holds
-    icases fdFrags_acc γd sts fd0 _ hrow $$ Hfr with ⟨Hfrag0, -, Hfrw0⟩
-    icases fdSt_agree' γd fd0 st st0 $$ [Hauth0 Hfrag0] with ⟨%hst', Hauth0, Hfrag0⟩
+    icases fdFrags_acc V.fdg sts fd0 _ hrow $$ Hfr with ⟨Hfrag0, -, Hfrw0⟩
+    icases fdSt_agree' V.fdg fd0 st st0 $$ [Hauth0 Hfrag0] with ⟨%hst', Hauth0, Hfrag0⟩
     · iframe
     subst hst'
     -- a0 = f ; jal fileclose
@@ -548,10 +548,10 @@ theorem sys_close_proof (AF : ARGFD) (MP : MYPROC) (FC : FILECLOSE) : SYSCLOSE :
     iintro Hk Hpc
     ihave Hte := trapCsrsExt_move _ _ _ (fun h => hp19 (Or.inl h)) $$ Hte
     ihave Hce := cpuClaimExt_move _ _ _ _ (fun h => hp19 (Or.inl h)) $$ Hce
-    ihave Hnext := sc_cont_shift Γ cpu c19 k γ γd pa pid V M sts v j γkl γk
+    ihave Hnext := sc_cont_shift Γ cpu c19 k γ V.fdg pa pid V M sts v j γkl γk
       (fun e => (hp19 (Or.inr e)).trans ((hp18 (Or.inr e)).trans (hpin17 (Or.inr e)))) $$ Hnext
     iapply wpLoop_bupd
-    imod fdSt_update γd fd0 _ _ .closed $$ [Hauth0 Hfrag0] with ⟨Hauth0, Hfrag0⟩
+    imod fdSt_update V.fdg fd0 _ _ .closed $$ [Hauth0 Hfrag0] with ⟨Hauth0, Hfrag0⟩
     · iframe
     imodintro
     ihave #Hrc := foffRow_closed (GF := GF)
@@ -563,20 +563,20 @@ theorem sys_close_proof (AF : ARGFD) (MP : MYPROC) (FC : FILECLOSE) : SYSCLOSE :
     · iframe
     ihave Hframe := sc_frame_close (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) w1' _ $$ [Hra Hs0 Hslot Hcf]
     case' _ => iframe
-    ihave Hblk := sc_block_join γ γd pa pid { V with ofile := V.ofile.set fd0 0#64 } M $$ [Hcore Howe]
+    ihave Hblk := sc_block_join γ pa pid { V with ofile := V.ofile.set fd0 0#64 } M $$ [Hcore Howe]
     case' _ =>
       isplitl [Hcore]
       · iapply (show procPrivCoreNoctxAt (GF := GF) curCtx pa pid V M ⊢
             procPrivCoreNoctxAt curCtx pa pid { V with ofile := V.ofile.set fd0 0#64 } M from .rfl) $$ Hcore
       · iexact Howe
-    ihave Hpost : sysClosePost (GF := GF) γ γd pa pid V M sts v 0#64 $$ [Hblk Hfr]
+    ihave Hpost : sysClosePost (GF := GF) γ V.fdg pa pid V M sts v 0#64 $$ [Hblk Hfr]
     case' _ =>
       unfold sysClosePost
       iright
       iexists fd0, fnode kk
       iframe Hblk Hfr
       ipureintro; exact ⟨rfl, hsome⟩
-    iapply (sc_exit Γ c19 k γ γd pa pid V M sts v j γkl γk hK4 spie3 spp3 _
+    iapply (sc_exit Γ c19 k γ V.fdg pa pid V M sts v j γkl γk hK4 spie3 spp3 _
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact f2.trans d2')
         (by
           refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>

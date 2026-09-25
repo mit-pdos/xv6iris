@@ -18,8 +18,8 @@ THE ALTITUDE IS argfd's (Rocq): the caller holds the process block and both
 callees want a PIECE of it -- argraw the `p->trapframe` cell and the
 trapframe page, fetchstr the cells and address space it borrows itself.
 Taking the block whole and splitting inside keeps the two splits from meeting
-in a caller.  The block is fetchstr's (`procPrivCoreNoctxAt`, the fd-free,
-ctx-free core, back at `{ V with upt := P' }` under `V.upt.extSz V.sz P'`,
+in a caller.  The block is fetchstr's (`procPrivBareAt`, the fd-free,
+cwd-free, ctx-free part of the core, back at `{ V with upt := P' }` under `V.upt.extSz V.sz P'`,
 Rocq's `uptd_ext_sz`), and the trapframe word is read through `V.tf`, so the
 block supplies argraw's premises.
 
@@ -53,14 +53,14 @@ def wp_argstr_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G G
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : argstrSlots ≤ k.avail) (hlk : "kmem" ∉ k.locks)
     (hmax : k.regs 12#5 = BitVec.ofNat 64 old.length) (hmax' : old.length < 2 ^ 31) : Prop :=
   kctx cpu k ∗ pcIs cpu argstrAddr ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-  kallocAvail γk none ∗ procPrivCoreNoctxAt curCtx pa pid V M ∗
+  kallocAvail γk none ∗ procPrivBareAt curCtx pa pid V M ∗
   byteBuf (k.regs 11#5) (DFrac.own 1) old ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
     ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     (∃ (P' : UPtd) (bs : List (BitVec 8)),
       ⌜V.upt.extSz V.sz P' ∧ fetchstrRet (viewFaulted V.upt P' M) v.toNat old bs (R' 10#5)⌝ ∗
-      procPrivCoreNoctxAt curCtx pa pid { V with upt := P' } (viewFaulted V.upt P' M) ∗
+      procPrivBareAt curCtx pa pid { V with upt := P' } (viewFaulted V.upt P' M) ∗
       byteBuf (k.regs 11#5) (DFrac.own 1) bs) -∗
     ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu

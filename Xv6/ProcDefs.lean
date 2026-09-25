@@ -117,9 +117,10 @@ structure ProcPriv where
   per-descriptor state ghost (`FdSlots.fd_st`), minted fresh by allocproc and
   dropped at the process's death; a field rather than a parameter of the
   block because every spec that touches a process already threads `V`.  No
-  xv6 operation reassigns it (not even exec).  RESERVED: no predicate names
-  it yet (P2, wave-7 item C0, makes `procPrivFd` read it in place of its
-  external `γd : Nat → GName`). -/
+  xv6 operation reassigns it (not even exec).  The block `FdTable.procPrivFd`
+  names the descriptor table's states by it (`procOfiles γ V.fdg`, wave 7
+  P2), and the fragment bundle travels as `fdFrags V.fdg sts`; the camera
+  is `FileDefs.FdstUR` (one map per name, keyed by descriptor). -/
   fdg : GName
   cwd : BitVec 64
   /-- the 16 bytes of `p->name` -/

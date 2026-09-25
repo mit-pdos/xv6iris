@@ -139,14 +139,14 @@ def fetchstrRest [CurCtx] (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P :
 
 theorem fetchstr_priv_split [X : CurCtx] (ξ : CtxId) (hX : X = ⟨ξ, KTier.kpt⟩) (pa : BitVec 64)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
-    procPrivCoreNoctxAt (GF := GF) ξ pa pid V M ⊢
+    procPrivBareAt (GF := GF) ξ pa pid V M ⊢
       ⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧ V.pagetable = pageAddr V.upt.root ∧
         V.trapframe = pageAddr V.upt.tfp⌝ ∗
       wordPointsTo (pSz pa) 8 (DFrac.own 1) V.sz ∗
       wordPointsTo (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
       procPtAt V.upt M ∗ fetchstrRest pa pid V V.upt := by
   subst hX
-  unfold procPrivCoreNoctxAt fetchstrRest procFieldsNoOfile
+  unfold procPrivBareAt fetchstrRest procFieldsNoOfile
   iintro ⟨%hf, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm⟩, Hpt, Htfp⟩
   isplitl []
   · ipureintro; exact hf
@@ -159,7 +159,7 @@ theorem fetchstr_priv_close [X : CurCtx] (ξ : CtxId) (hX : X = ⟨ξ, KTier.kpt
     wordPointsTo (pSz pa) 8 (DFrac.own 1) V.sz ∗
     wordPointsTo (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
     procPtAt P' M' ∗ fetchstrRest pa pid V P ⊢
-      procPrivCoreNoctxAt (GF := GF) ξ pa pid { V with upt := P' } M' := by
+      procPrivBareAt (GF := GF) ξ pa pid { V with upt := P' } M' := by
   subst hX
   letI : CurCtx := ⟨ξ, KTier.kpt⟩
   show _ ⊢ iprop(⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz P' ∧ V.pagetable = pageAddr P'.root ∧
@@ -504,7 +504,7 @@ theorem fetchstr_proof (MP : MYPROC) (CI : COPYINSTR) (SL : STRLEN) : FETCHSTR :
     iapply (fetchstr_tail_ok SL cpu c13 k
       (fun r => iprop(∃ (Q' : UPtd) (cs : List (BitVec 8)),
         ⌜P.extSz V.sz Q' ∧ fetchstrRet (viewFaulted P Q' M) (k.regs 10#5).toNat old cs r⌝ ∗
-        procPrivCoreNoctxAt curCtx pa pid { V with upt := Q' } (viewFaulted P Q' M) ∗ byteBuf (k.regs 11#5) (DFrac.own 1) cs)) hK56 hpin13 spie2 spp2 hsp12 R2 hR2 hpins (f9.trans e9) h0
+        procPrivBareAt curCtx pa pid { V with upt := Q' } (viewFaulted P Q' M) ∗ byteBuf (k.regs 11#5) (DFrac.own 1) cs)) hK56 hpin13 spie2 spp2 hsp12 R2 hR2 hpins (f9.trans e9) h0
         pl (old.drop (pl ++ [0#8]).length) (by omega) hnul)
       $$ [- $Hk $Hpc $Hframe $Hbuf $HΦ]
     iintro Hbuf
@@ -517,7 +517,7 @@ theorem fetchstr_proof (MP : MYPROC) (CI : COPYINSTR) (SL : STRLEN) : FETCHSTR :
     iapply (fetchstr_tail_fail cpu c13 k
       (fun r => iprop(∃ (Q' : UPtd) (cs : List (BitVec 8)),
         ⌜P.extSz V.sz Q' ∧ fetchstrRet (viewFaulted P Q' M) (k.regs 10#5).toNat old cs r⌝ ∗
-        procPrivCoreNoctxAt curCtx pa pid { V with upt := Q' } (viewFaulted P Q' M) ∗ byteBuf (k.regs 11#5) (DFrac.own 1) cs)) hK56 hpin13 spie2 spp2 hsp12 R2 hR2 hpins hm1)
+        procPrivBareAt curCtx pa pid { V with upt := Q' } (viewFaulted P Q' M) ∗ byteBuf (k.regs 11#5) (DFrac.own 1) cs)) hK56 hpin13 spie2 spp2 hsp12 R2 hR2 hpins hm1)
       $$ [- $Hk $Hpc $Hframe $HΦ]
     iexists P'
     iexists bs'

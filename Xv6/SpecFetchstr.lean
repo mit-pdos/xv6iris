@@ -34,8 +34,10 @@ passes is `p->sz`, read out of the block (`V.sz ≤ uvmMaxsz ≤ 2^38`).  `max <
 
 THE BLOCK is Rocq's: `proc_priv` whole in, back at `us_upt U P'` under
 `uptd_ext_sz (pv_sz V)`.  This port's running-thread block is
-`procPrivCoreNoctxAt` (`Xv6/FdTable.lean`, Rocq's `proc_priv_core`: the
-fd-free, ctx-free part `argfd` also takes); it comes back at
+`procPrivBareAt` (`Xv6/FdTable.lean`, Rocq's `proc_priv_bare` plus the
+lazy claim: the fd-free, cwd-free, ctx-free part -- a holder of the whole
+block (`procPrivFd`) frames the cwd reference and the descriptor array
+across the call, wave 7 P2); it comes back at
 `{ V with upt := P' }` with `V.upt.extSz V.sz P'` (every leaf copyinstr's
 faults gained lies below the break, so `umBelow` survives).  A caller that
 fetches in a LOOP (`exec`'s argv) re-enters at the block it got back.
@@ -75,7 +77,7 @@ def wp_fetchstr_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : fetchstrSlots ≤ k.avail) (hlk : "kmem" ∉ k.locks)
     (hmax : k.regs 12#5 = BitVec.ofNat 64 old.length) (hmax' : old.length < 2 ^ 31) : Prop :=
   kctx cpu k ∗ pcIs cpu fetchstrAddr ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-  kallocAvail γk none ∗ procPrivCoreNoctxAt curCtx pa pid V M ∗
+  kallocAvail γk none ∗ procPrivBareAt curCtx pa pid V M ∗
   byteBuf (k.regs 11#5) (DFrac.own 1) old ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
     ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
@@ -83,7 +85,7 @@ def wp_fetchstr_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     (∃ (P' : UPtd) (bs : List (BitVec 8)),
       ⌜V.upt.extSz V.sz P' ∧
         fetchstrRet (viewFaulted V.upt P' M) (k.regs 10#5).toNat old bs (R' 10#5)⌝ ∗
-      procPrivCoreNoctxAt curCtx pa pid { V with upt := P' } (viewFaulted V.upt P' M) ∗
+      procPrivBareAt curCtx pa pid { V with upt := P' } (viewFaulted V.upt P' M) ∗
       byteBuf (k.regs 11#5) (DFrac.own 1) bs) -∗
     ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu

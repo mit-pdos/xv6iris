@@ -258,17 +258,17 @@ theorem sys_pipe_core_pid (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M :
       @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗
       (@wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid -∗
         procPrivCoreNoctxAt curCtx pa pid V M) := by
-  unfold procPrivCoreNoctxAt
-  iintro ⟨%hf, Hpid, Hf, Hpt, Htfp, %hlz⟩
+  unfold procPrivCoreNoctxAt procPrivBareAt
+  iintro ⟨⟨%hf, Hpid, Hf, Hpt, Htfp, %hlz⟩, Hcw⟩
   iframe Hpid
   iintro Hpid
-  iframe Hpid Hf Hpt Htfp
+  iframe Hpid Hf Hpt Htfp Hcw
   isplitl []
   · ipureintro; exact hf
   · ipureintro; exact hlz
 
 /-- The caller's `true` crossing moves along the process pin alone. -/
-theorem sys_pipe_cont_shift (cpu c : CPU) (k : KCtx) (γ : FileNames) (γd : Nat → GName) (pa : BitVec 64)
+theorem sys_pipe_cont_shift (cpu c : CPU) (k : KCtx) (γ : FileNames) (γd : GName) (pa : BitVec 64)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (v : BitVec 64)
     (h : k.proc = 0#64 → c = cpu) :
     sysPipeCont (GF := GF) cpu k γ γd pa pid V M sts v ⊢ sysPipeCont c k γ γd pa pid V M sts v := by
@@ -278,7 +278,7 @@ theorem sys_pipe_cont_shift (cpu c : CPU) (k : KCtx) (γ : FileNames) (γd : Nat
 /-- THE PASS-THROUGH ROWS sys_pipe threads to its closes (and pipealloc's):
 panic's credentials, the trap-CSR complement at the base hart `cpu`, the
 iref loan, and the caller's `true` crossing. -/
-def sysPipeTurn (cpu : CPU) (k : KCtx) (γ : FileNames) (γd : Nat → GName) (pa : BitVec 64)
+def sysPipeTurn (cpu : CPU) (k : KCtx) (γ : FileNames) (γd : GName) (pa : BitVec 64)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (v : BitVec 64) :
     IProp GF := iprop(
   panicEnv ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ irefSlot ∗
@@ -341,7 +341,7 @@ theorem sys_pipe_pipealloc (PA : PIPEALLOC) (Γ : SchedNames) [ClaimIs (hlc := h
   simp only [pipeallocAddr] at h
   exact h
 
-theorem sys_pipe_fdalloc (FD : FDALLOC) (c : CPU) (k' : KCtx) (γ : FileNames) (γd : Nat → GName) (kk : Nat)
+theorem sys_pipe_fdalloc (FD : FDALLOC) (c : CPU) (k' : KCtx) (γ : FileNames) (γd : GName) (kk : Nat)
     (fs : List (BitVec 64)) (D : List Nat)
     (ha0 : k'.regs 10#5 = fnode kk) (hkk : kk < NFILE) (hnoff : k'.noff + 1 < 2 ^ 31) (hK : fdallocSlots ≤ k'.avail) :
     kctx c k' ∗ pcIs c KA.«fdalloc» ∗ procOfilesOwe γ γd k'.proc fs D ∗
@@ -566,7 +566,8 @@ def sysPipeCoreRest (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) : IProp GF
   @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pCwd pa) 8 (DFrac.own 1) V.cwd ∗
   @pnameCells hlc GF _ ⟨curCtx, KTier.kpt⟩ pa (DFrac.own 1) V.name ∗
   @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf ∗
-  ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝
+  ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝ ∗
+  @cwdRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.cwd V.cwi
 
 /-- The trapframe cell and page `argaddr` reads, out and back. -/
 theorem sys_pipe_core_tf (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
@@ -576,13 +577,13 @@ theorem sys_pipe_core_tf (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : 
       @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf ∗
       (@wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pTrapframe pa) 8 (DFrac.own 1) V.trapframe -∗
         @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf -∗ procPrivCoreNoctxAt curCtx pa pid V M) := by
-  unfold procPrivCoreNoctxAt procFieldsNoOfile
-  iintro ⟨%hf, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm⟩, Hpt, Htfp, %hlz⟩
+  unfold procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile
+  iintro ⟨⟨%hf, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm⟩, Hpt, Htfp, %hlz⟩, Hcw⟩
   iframe Htf Htfp
   isplitl []
   · ipureintro; exact hf.2.2.2
   iintro Htf Htfp
-  iframe Hpid Hks Hsz Hpg Htf Hcwd Hnm Hpt Htfp
+  iframe Hpid Hks Hsz Hpg Htf Hcwd Hnm Hpt Htfp Hcw
   isplitl []
   · ipureintro; exact hf
   · ipureintro; exact hlz
@@ -594,23 +595,26 @@ theorem sys_pipe_core_split (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M
       @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz ∗
       @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
       @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt M ∗ sysPipeCoreRest pa pid V := by
-  unfold procPrivCoreNoctxAt procFieldsNoOfile sysPipeCoreRest
-  iintro ⟨%hf, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm⟩, Hpt, Htfp⟩
-  iframe Hpid Hks Hsz Hpg Htf Hcwd Hnm Hpt Htfp
-  ipureintro; exact hf
+  unfold procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile sysPipeCoreRest
+  iintro ⟨⟨%hf, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm⟩, Hpt, Htfp, %hlz⟩, Hcw⟩
+  iframe Hpid Hks Hsz Hpg Htf Hcwd Hnm Hpt Htfp Hcw
+  isplitl []
+  · ipureintro; exact hf
+  · ipureintro; exact hlz
 
 /-- `procPrivCoreNoctxAt` at the descriptor `copyout` grew the space to
 (`EitherDefs.procPrivExt`'s descriptor form, fd-free): the same resource as
 the core at `{ V with upt := P' }` (`sysPipeCoreExt_eq`). -/
 def sysPipeCoreExt (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
     (M' : Nat → List (BitVec 8)) : IProp GF := iprop%
-  ⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz P' ∧
+  (⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz P' ∧
     V.pagetable = pageAddr P'.root ∧ V.trapframe = pageAddr P'.tfp⌝ ∗
   @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗
   @procFieldsNoOfile hlc GF _ ⟨curCtx, KTier.kpt⟩ pa (DFrac.own 1) V ∗
   @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P' M' ∗
   @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P'.tfp V.tf ∗
-  ⌜V.pvLazy = false → lazyFree P'.um V.sz⌝
+  ⌜V.pvLazy = false → lazyFree P'.um V.sz⌝) ∗
+  @cwdRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.cwd V.cwi
 
 theorem sysPipeCoreExt_eq (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
     (M' : Nat → List (BitVec 8)) :
@@ -628,8 +632,8 @@ theorem sys_pipe_core_ext (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' 
       sysPipeCoreExt pa pid V P' M' := by
   unfold sysPipeCoreExt sysPipeCoreRest procFieldsNoOfile
   rw [hext.1.1, hext.1.2.1]
-  iintro ⟨Hsz, Hpg, Hpt, Hpid, Hks, Htf, Hcwd, Hnm, Htfp, %hlz⟩
-  iframe Hsz Hpg Hpt Hpid Hks Htf Hcwd Hnm Htfp
+  iintro ⟨Hsz, Hpg, Hpt, Hpid, Hks, Htf, Hcwd, Hnm, Htfp, %hlz, Hcw⟩
+  iframe Hsz Hpg Hpt Hpid Hks Htf Hcwd Hnm Htfp Hcw
   isplitl []
   · ipureintro; exact ⟨hf.1, UMemL.umBelow_extSz hf.2.1 hext, hf.2.2.1, hf.2.2.2⟩
   · ipureintro; exact fun h => LazyFree.lazyFree_extSz hext (hlz h)
@@ -642,10 +646,12 @@ theorem sys_pipe_core_join (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M 
     @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
     @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt M ∗ sysPipeCoreRest pa pid V ⊢
       procPrivCoreNoctxAt curCtx pa pid V M := by
-  unfold procPrivCoreNoctxAt sysPipeCoreRest procFieldsNoOfile
-  iintro ⟨Hsz, Hpg, Hpt, Hpid, Hks, Htf, Hcwd, Hnm, Htfp⟩
-  iframe Hsz Hpg Hpt Hpid Hks Htf Hcwd Hnm Htfp
-  ipureintro; exact hf
+  unfold procPrivCoreNoctxAt procPrivBareAt sysPipeCoreRest procFieldsNoOfile
+  iintro ⟨Hsz, Hpg, Hpt, Hpid, Hks, Htf, Hcwd, Hnm, Htfp, %hlz, Hcw⟩
+  iframe Hsz Hpg Hpt Hpid Hks Htf Hcwd Hnm Htfp Hcw
+  isplitl []
+  · ipureintro; exact hf
+  · ipureintro; exact hlz
 
 /-- The core does not mention the array. -/
 theorem sys_pipe_coreExt_ofile (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
@@ -689,7 +695,7 @@ theorem sys_pipe_tail (c : CPU) (kb : KCtx) (hK : 8 ≤ kb.avail)
 /-- Any arm's exit: at `mv a0,a5` with `r` in `a5`, the post and the two
 units; the pass-through rows at the base hart `cpu` make one wide hop to the
 returning hart. -/
-theorem sys_pipe_exit (cpu cr : CPU) (k : KCtx) (γ : FileNames) (γd : Nat → GName) (pa : BitVec 64)
+theorem sys_pipe_exit (cpu cr : CPU) (k : KCtx) (γ : FileNames) (γd : GName) (pa : BitVec 64)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (v : BitVec 64)
     (hK : 8 ≤ k.avail)
     (hpin : k.sie = false ∨ k.proc = 0#64 → cr = cpu)
@@ -733,7 +739,7 @@ theorem sys_pipe_exit (cpu cr : CPU) (k : KCtx) (γ : FileNames) (γd : Nat → 
   · rw [hfacts.2]; iexact Hpost
 
 /-- The exit with the frame in its named form. -/
-theorem sys_pipe_exit' (cpu cr : CPU) (k : KCtx) (γ : FileNames) (γd : Nat → GName) (pa : BitVec 64)
+theorem sys_pipe_exit' (cpu cr : CPU) (k : KCtx) (γ : FileNames) (γd : GName) (pa : BitVec 64)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (v : BitVec 64)
     (hK : 8 ≤ k.avail)
     (hpin : k.sie = false ∨ k.proc = 0#64 → cr = cpu)

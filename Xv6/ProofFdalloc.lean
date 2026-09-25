@@ -268,7 +268,7 @@ theorem fda_tail (c : CPU) (kb : KCtx) (hK : 4 ≤ kb.avail)
   · iexact HP
 
 /-- Any arm's exit: at the epilogue with `a0 = r` and the matching post. -/
-theorem fda_exit (cpu cr : CPU) (k : KCtx) (γ : FileNames) (γd : Nat → GName) (kk : Nat)
+theorem fda_exit (cpu cr : CPU) (k : KCtx) (γ : FileNames) (γd : GName) (kk : Nat)
     (fs : List (BitVec 64)) (D : List Nat) (hK : 4 ≤ k.avail)
     (hpin : k.sie = false ∨ k.proc = 0#64 → cr = cpu)
     (spie spp : Bool) (hsp : k.sie = false → spie = k.spie ∧ spp = k.spp)
@@ -300,7 +300,7 @@ set_option maxHeartbeats 16000000 in
 /-- Descriptor `fd` (`a5 = &p->ofile[fd]`, `a0 = fd`): `ld a4,0(a5)`; null →
 install `f` there and return `fd`; else step the cursor and either continue
 (`Hloop`, when `fd + 1 < NOFILE`) or fall out with `-1`. -/
-theorem fda_body (cpu c : CPU) (k : KCtx) (γ : FileNames) (γd : Nat → GName) (kk : Nat)
+theorem fda_body (cpu c : CPU) (k : KCtx) (γ : FileNames) (γd : GName) (kk : Nat)
     (fs : List (BitVec 64)) (D : List Nat) (hkk : kk < NFILE) (hK : 4 ≤ k.avail)
     (spie spp : Bool) (hsp : k.sie = false → spie = k.spie ∧ spp = k.spp)
     (hpin : k.sie = false ∨ k.proc = 0#64 → c = cpu)
@@ -463,7 +463,7 @@ theorem fda_body (cpu c : CPU) (k : KCtx) (γ : FileNames) (γd : Nat → GName)
 /-! ## The scan: a bounded induction over the descriptors left -/
 
 set_option maxHeartbeats 16000000 in
-theorem fda_scan (cpu : CPU) (k : KCtx) (γ : FileNames) (γd : Nat → GName) (kk : Nat)
+theorem fda_scan (cpu : CPU) (k : KCtx) (γ : FileNames) (γd : GName) (kk : Nat)
     (fs : List (BitVec 64)) (D : List Nat) (hkk : kk < NFILE) (hK : 4 ≤ k.avail)
     (spie spp : Bool) (hsp : k.sie = false → spie = k.spie ∧ spp = k.spp) (fuel : Nat) :
     ∀ (c : CPU) (fd : Nat) (R : RegMap), (k.sie = false ∨ k.proc = 0#64 → c = cpu) →

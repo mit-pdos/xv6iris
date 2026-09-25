@@ -89,6 +89,8 @@ import Xv6.OffBox
 import Xv6.DirView
 import Xv6.FsImg
 import Iris.Instances.Lib.CInvariants
+import Iris.Algebra.Heap
+import Iris.Algebra.Lib.DFracAgree
 
 namespace Xv6
 
@@ -261,17 +263,29 @@ structure FileNames where
   ref : GName
   pay : Nat → GName
 
+/-- The per-descriptor state camera (Rocq FdSlots.v `fdstUR := gmapUR nat
+(frac × agree fdstate)`): ONE ghost name per process incarnation
+(`ProcPriv.fdg`, Rocq `pv_fdg`), keyed by descriptor, with NO authority on
+the map -- an exclusive holder of a key retypes it by a frame-preserving
+update with nothing else in hand (FdSlots.v's header).  The element is
+iris-lean's `DFracAgree` (the ghost-variable element), so a key's two halves
+behave exactly as a ghost variable's. -/
+abbrev FdstUR : Type := RegMapF (DFracAgree.DFracAgreeR (DiscreteO FdState))
+
+abbrev FdstF : COFE.OFunctorPre := constOF FdstUR
+
 /-- The ghost libraries the file table uses (Rocq's `fileG`/`fdslotG`).  The
 fd-slot tokens (`FdslotG.fdslotName`) use the SHARED `Xv6G.gmUnitG`; the inode
 arm's cancellable invariant the shared `Xv6G.cinvG`. -/
 class FileG (GF : BundledGFunctors) where
   [gmRefG : GhostMapG GF Nat (Nat × Qp) RegMapF]
   [gvPayG : GhostVarG GF FPNames]
-  /-- a process's per-descriptor state (FdSlots.v's `fd_st`), one ghost
-  variable per descriptor -/
-  [gvFdstG : GhostVarG GF FdState]
+  /-- a process's per-descriptor states (FdSlots.v's `fd_st`), one map per
+  process incarnation, named by `ProcPriv.fdg` (Rocq's `fdst_inG`, which
+  rides `fdslotG`; here the file table's class owns the camera, rule 1) -/
+  [fdstG : ElemG GF FdstF]
 
-attribute [reducible, instance] FileG.gmRefG FileG.gvPayG FileG.gvFdstG
+attribute [reducible, instance] FileG.gmRefG FileG.gvPayG FileG.fdstG
 
 /-! ## The inode arm's parked core (NO `CurCtx`: ghost only) -/
 

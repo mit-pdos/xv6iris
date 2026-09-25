@@ -41,7 +41,8 @@ payloads (P2).  This file is the layer above them.
    The consumers that NEED the reference move to `procPrivCwd` in their own
    items: kfork (`idup(p->cwd)`), kexit (`iput(p->cwd)`), userinit, sys_chdir,
    namex (wave-7 items C / 7b).  `FdTable.procPrivCoreNoctxAt` (A1/C0's file)
-   is where P2 puts it beside `procOfiles` (FdTable may import IcacheHeld).
+   now carries it (wave 7 P2): `procPrivCoreNoctxAt = procPrivBareAt ∗
+   cwdRefAt V.cwd V.cwi`, and the block `procPrivFd` is that core beside `procOfiles`.
 2. **`proc_priv_core`'s D8 conjuncts are absent**: `first_tok`, `∃Q, gen_kq ∗
    my_pay`, the `p->xstate` half and `gen_halves_priv` (the fork/exit
    generation machinery; the record's `gen`/`chg` fields are reserved for it).

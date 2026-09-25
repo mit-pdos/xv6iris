@@ -75,20 +75,20 @@ def argfdPost (pfd pf : BitVec 64) (oldfd : BitVec 32) (oldf : BitVec 64) (v : B
   (∃ (fd : Nat) (fv : BitVec 64), ⌜r = 0#64 ∧ argFd v fs = some (fd, fv)⌝ ∗
     ofdOut pfd (BitVec.extractLsb' 0 32 v) ∗ wordPointsTo pf 8 (DFrac.own 1) fv)
 
-def wp_argfd_body (cpu : CPU) (k : KCtx) (γ : FileNames) (γd : Nat → GName) (pa : BitVec 64) (pid : BitVec 32)
+def wp_argfd_body (cpu : CPU) (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (D : List Nat) (i : Nat) (v : BitVec 64)
     (oldfd : BitVec 32) (oldf : BitVec 64)
     (hi : i < NARG) (ha0 : k.regs 10#5 = BitVec.ofNat 64 i) (hv : V.tf[tfArgIdx i]? = some v)
     (hpf : k.regs 12#5 ≠ 0#64) (hproc : k.proc = pa) (htier : k.tier = KTier.kpt)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : argfdSlots ≤ k.avail) : Prop :=
   kctx cpu k ∗ pcIs cpu argfdAddr ∗
-  procPrivCoreNoctxAt curCtx pa pid V M ∗ procOfilesOwe γ γd pa V.ofile D ∗
+  procPrivCoreNoctxAt curCtx pa pid V M ∗ procOfilesOwe γ V.fdg pa V.ofile D ∗
   ofdOut (k.regs 11#5) oldfd ∗ wordPointsTo (k.regs 12#5) 8 (DFrac.own 1) oldf ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
     ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     ⌜calleeSaved k.regs R'⌝ -∗
-    procPrivCoreNoctxAt curCtx pa pid V M -∗ procOfilesOwe γ γd pa V.ofile D -∗
+    procPrivCoreNoctxAt curCtx pa pid V M -∗ procOfilesOwe γ V.fdg pa V.ofile D -∗
     argfdPost (k.regs 11#5) (k.regs 12#5) oldfd oldf v V.ofile (R' 10#5) -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
@@ -96,9 +96,9 @@ end
 
 structure ARGFD : Prop where
   wp_argfd : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
-    (cpu : CPU) (k : KCtx) (γ : FileNames) (γd : Nat → GName) (pa : BitVec 64) (pid : BitVec 32)
+    (cpu : CPU) (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (D : List Nat) (i : Nat) (v : BitVec 64)
     (oldfd : BitVec 32) (oldf : BitVec 64) hi ha0 hv hpf hproc htier hnoff hK,
-    wp_argfd_body (hlc := hlc) (GF := GF) cpu k γ γd pa pid V M D i v oldfd oldf hi ha0 hv hpf hproc htier hnoff hK
+    wp_argfd_body (hlc := hlc) (GF := GF) cpu k γ pa pid V M D i v oldfd oldf hi ha0 hv hpf hproc htier hnoff hK
 
 end Xv6

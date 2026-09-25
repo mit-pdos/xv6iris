@@ -40,7 +40,7 @@ set_option maxHeartbeats 16000000 in
 set_option maxRecDepth 20000 in
 theorem sys_pipe_proof (MP : MYPROC) (AA : ARGADDR) (PA : PIPEALLOC) (FD : FDALLOC) (CO : COPYOUT)
     (FC : FILECLOSE) : SYSPIPE := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X Γ _ cpu k γl γ γd pa pid V M sts v γkl γk
+  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X Γ _ cpu k γl γ pa pid V M sts v γkl γk
       hv hproc htier hnoff hK => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
@@ -58,7 +58,7 @@ theorem sys_pipe_proof (MP : MYPROC) (AA : ARGADDR) (PA : PIPEALLOC) (FD : FDALL
   have hprc : "proc" ∉ k.locks := by rw [hlocks]; exact List.not_mem_nil
   have hkmem : "kmem" ∉ k.locks := by rw [hlocks]; exact List.not_mem_nil
   have hK8 : 8 ≤ k.avail := by rw [sysPipeSlots_eq] at hK; omega
-  icases (procPrivFd_split γ γd pa pid V M).1 $$ Hblk with ⟨Hcore, Howe⟩
+  icases (procPrivFd_split γ pa pid V M).1 $$ Hblk with ⟨Hcore, Howe⟩
   -- the prologue ; jal myproc
   iapply (wp_prologue8s1_gen cpu k KA.«sys_pipe» hK8)
   k_code (text_instr _ _ _ _ rfl rfl) Htext
@@ -178,9 +178,9 @@ theorem sys_pipe_proof (MP : MYPROC) (AA : ARGADDR) (PA : PIPEALLOC) (FD : FDALL
   ihave Hce := (show cpuClaimExt (GF := GF) c12 k.sie pa ⊢ cpuClaimExt c12 k.sie k.proc from by
     rw [hproc]) $$ Hce
   ihave Hcore := Hcw $$ Hpid
-  ihave Hnext := sys_pipe_cont_shift cpu c12 k γ γd pa pid V M sts v
+  ihave Hnext := sys_pipe_cont_shift cpu c12 k γ V.fdg pa pid V M sts v
     (fun e => (hp12 (Or.inr (hproc.symm.trans e))).trans (hpin11 (Or.inr e))) $$ Hnext
-  iapply (sys_pipe_stage_b rfl FC FD CO Γ c12 c12 k γl γ γd pa pid V M sts v γkl γk spie3 spp3 R3
+  iapply (sys_pipe_stage_b rfl FC FD CO Γ c12 c12 k γl γ pa pid V M sts v γkl γk spie3 spp3 R3
       hproc htier hnoff hK hlk hplk hprc hkmem (fun _ => rfl) hpins3
       (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] at h9'; exact h9'.trans h9) w0 w1)
     $$ [- $Hk $Hpc $Hfr $Hpost $Hcore $Howe $Hfrag]

@@ -55,14 +55,14 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
 /-- sys_close's result, keyed by the returned `a0`. -/
-def sysClosePost (γ : FileNames) (γd : Nat → GName) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+def sysClosePost (γ : FileNames) (γd : GName) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (sts : List FdState) (v : BitVec 64) (r : BitVec 64) : IProp GF := iprop%
-  (⌜r = 0xFFFFFFFFFFFFFFFF#64 ∧ argFd v V.ofile = none⌝ ∗ procPrivFd γ γd pa pid V M ∗ fdFrags γd sts) ∨
+  (⌜r = 0xFFFFFFFFFFFFFFFF#64 ∧ argFd v V.ofile = none⌝ ∗ procPrivFd γ pa pid V M ∗ fdFrags γd sts) ∨
   (∃ (fd : Nat) (fv : BitVec 64), ⌜r = 0#64 ∧ argFd v V.ofile = some (fd, fv)⌝ ∗
-    procPrivFd γ γd pa pid { V with ofile := V.ofile.set fd 0#64 } M ∗ fdFrags γd (sts.set fd .closed))
+    procPrivFd γ pa pid { V with ofile := V.ofile.set fd 0#64 } M ∗ fdFrags γd (sts.set fd .closed))
 
 /-- What sys_close's caller resumes with: the `true` crossing. -/
-def sysCloseCont (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γ : FileNames) (γd : Nat → GName)
+def sysCloseCont (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γ : FileNames) (γd : GName)
     (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
     (v : BitVec 64) (j : Nat) (γkl : GName) (γk : KmemNames) : IProp GF :=
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
@@ -78,7 +78,7 @@ def sysCloseCont (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γ : FileNames) (γd 
 /-- **WP of `sys_close()`** (Rocq `wp_sys_close_sconf_body`), eb-generic at
 depth 0. -/
 def wp_sys_close_eb_body (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx)
-    (γl : GName) (γ : FileNames) (γd : Nat → GName)
+    (γl : GName) (γ : FileNames)
     (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
     (v : BitVec 64) (j : Nat) (γkl : GName) (γk : KmemNames) (on : Option Nat)
     (hv : V.tf[tfArgIdx 0]? = some v) (hproc : k.proc = pa) (htier : k.tier = KTier.kpt)
@@ -87,10 +87,10 @@ def wp_sys_close_eb_body (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : C
   kctx cpu k ∗ pcIs cpu sysCloseAddr ∗
   trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
   isFtable γl γ ∗ panicEnv ∗
-  procPrivFd γ γd pa pid V M ∗ fdFrags γd sts ∗
+  procPrivFd γ pa pid V M ∗ fdFrags V.fdg sts ∗
   irefSlot ∗
   fileclosePipeEnv (hlc := hlc) Γ γkl γk on ∗ filecloseFsEnv (hlc := hlc) Γ j k.proc ∗
-  sysCloseCont Γ cpu k γ γd pa pid V M sts v j γkl γk
+  sysCloseCont Γ cpu k γ V.fdg pa pid V M sts v j γkl γk
   ⊢ wpLoop (GF := GF) cpu
 
 end
@@ -101,11 +101,10 @@ structure SYSCLOSE : Prop where
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx) (γl : GName) (γ : FileNames)
-    (γd : Nat → GName)
     (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
     (v : BitVec 64) (j : Nat) (γkl : GName) (γk : KmemNames) (on : Option Nat)
     hv hproc htier hsp hnoff hK,
-    wp_sys_close_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γ γd pa pid V M sts v j γkl γk on
+    wp_sys_close_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γ pa pid V M sts v j γkl γk on
       hv hproc htier hsp hnoff hK
 
 end Xv6

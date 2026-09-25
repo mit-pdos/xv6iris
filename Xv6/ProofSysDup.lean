@@ -105,28 +105,28 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 
 /-! ## The callees -/
 
-theorem sd_argfd (AF : ARGFD) (c : CPU) (k' : KCtx) (γ : FileNames) (γd : Nat → GName) (pa : BitVec 64)
+theorem sd_argfd (AF : ARGFD) (c : CPU) (k' : KCtx) (γ : FileNames) (pa : BitVec 64)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (D : List Nat) (i : Nat) (v : BitVec 64)
     (oldfd : BitVec 32) (oldf : BitVec 64)
     (hi : i < NARG) (ha0 : k'.regs 10#5 = BitVec.ofNat 64 i) (hv : V.tf[tfArgIdx i]? = some v)
     (hpf : k'.regs 12#5 ≠ 0#64) (hproc : k'.proc = pa) (htier : k'.tier = KTier.kpt)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : argfdSlots ≤ k'.avail) :
     kctx c k' ∗ pcIs c KA.«argfd» ∗
-    procPrivCoreNoctxAt curCtx pa pid V M ∗ procOfilesOwe γ γd pa V.ofile D ∗
+    procPrivCoreNoctxAt curCtx pa pid V M ∗ procOfilesOwe γ V.fdg pa V.ofile D ∗
     ofdOut (k'.regs 11#5) oldfd ∗ wordPointsTo (k'.regs 12#5) 8 (DFrac.own 1) oldf ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗
-      procPrivCoreNoctxAt curCtx pa pid V M -∗ procOfilesOwe γ γd pa V.ofile D -∗
+      procPrivCoreNoctxAt curCtx pa pid V M -∗ procOfilesOwe γ V.fdg pa V.ofile D -∗
       argfdPost (k'.regs 11#5) (k'.regs 12#5) oldfd oldf v V.ofile (R' 10#5) -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := AF.wp_argfd (hlc := hlc) (GF := GF) c k' γ γd pa pid V M D i v oldfd oldf hi ha0 hv hpf hproc htier hnoff hK
+  have h := AF.wp_argfd (hlc := hlc) (GF := GF) c k' γ pa pid V M D i v oldfd oldf hi ha0 hv hpf hproc htier hnoff hK
   unfold wp_argfd_body at h
   simp only [argfdAddr] at h
   exact h
 
-theorem sd_fdalloc (FD : FDALLOC) (c : CPU) (k' : KCtx) (γ : FileNames) (γd : Nat → GName) (kk : Nat)
+theorem sd_fdalloc (FD : FDALLOC) (c : CPU) (k' : KCtx) (γ : FileNames) (γd : GName) (kk : Nat)
     (fs : List (BitVec 64)) (D : List Nat)
     (ha0 : k'.regs 10#5 = fnode kk) (hkk : kk < NFILE) (hnoff : k'.noff + 1 < 2 ^ 31) (hK : fdallocSlots ≤ k'.avail) :
     kctx c k' ∗ pcIs c KA.«fdalloc» ∗ procOfilesOwe γ γd k'.proc fs D ∗
@@ -190,7 +190,7 @@ theorem sd_tail (c : CPU) (kb : KCtx) (hK : 6 ≤ kb.avail)
   · iexact HP
 
 /-- Any arm's exit: at `mv a0,a5` with `r` in `a5` and the matching post. -/
-theorem sd_exit (cpu cr : CPU) (k : KCtx) (γ : FileNames) (γd : Nat → GName) (pa : BitVec 64) (pid : BitVec 32)
+theorem sd_exit (cpu cr : CPU) (k : KCtx) (γ : FileNames) (γd : GName) (pa : BitVec 64) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (v : BitVec 64)
     (hK : 6 ≤ k.avail)
     (hpin : k.sie = false ∨ k.proc = 0#64 → cr = cpu)
@@ -260,10 +260,10 @@ theorem sd_frame_close (sp ra s0 w1 w2 w3 : BitVec 64) :
   iexists w3; iexact H5
 
 /-- The whole block, from its two halves (the deficit closed). -/
-theorem sd_block_join (γ : FileNames) (γd : Nat → GName) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+theorem sd_block_join (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) :
-    procPrivCoreNoctxAt (GF := GF) curCtx pa pid V M ∗ procOfilesOwe γ γd pa V.ofile [] ⊢
-      procPrivFd γ γd pa pid V M := by
+    procPrivCoreNoctxAt (GF := GF) curCtx pa pid V M ∗ procOfilesOwe γ V.fdg pa V.ofile [] ⊢
+      procPrivFd γ pa pid V M := by
   unfold procPrivFd procOfiles; iintro H; iexact H
 
 end
@@ -278,7 +278,7 @@ theorem sys_dup_br_fffffffffffffe02 : KA.«sys_dup» + 0xfffffffffffffe02#64 = K
 
 set_option maxHeartbeats 64000000 in
 theorem sys_dup_proof (AF : ARGFD) (FD : FDALLOC) (FU : FILEDUP) : SYSDUP := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ X cpu k γl γ γd pa pid V M sts v hv hproc htier hsp hnoff hK hlk => by
+  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ X cpu k γl γ pa pid V M sts v hv hproc htier hsp hnoff hK hlk => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
   unfold wp_sys_dup_body
@@ -290,9 +290,9 @@ theorem sys_dup_proof (AF : ARGFD) (FD : FDALLOC) (FU : FILEDUP) : SYSDUP := ⟨
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   have hK6 : 6 ≤ k.avail := by unfold sysDupSlots argfdSlots argintSlots argrawSlots at hK; omega
-  icases (procPrivFd_split γ γd pa pid V M).1 $$ Hblk with ⟨Hcore, Howe⟩
-  icases procOfilesOwe_len γ γd pa V.ofile [] $$ Howe with ⟨%hlen, Howe⟩
-  icases fdFrags_len γd sts $$ Hfr with ⟨%hslen, Hfr⟩
+  icases (procPrivFd_split γ pa pid V M).1 $$ Hblk with ⟨Hcore, Howe⟩
+  icases procOfilesOwe_len γ V.fdg pa V.ofile [] $$ Howe with ⟨%hlen, Howe⟩
+  icases fdFrags_len V.fdg sts $$ Hfr with ⟨%hslen, Hfr⟩
   -- the prologue ; a2 = &f ; a1 = 0 ; a0 = 0 ; jal argfd
   iapply (wp_prologue6s0_gen cpu k KA.«sys_dup» hK6)
   k_code (text_instr _ _ _ _ rfl rfl) Htext
@@ -316,7 +316,7 @@ theorem sys_dup_proof (AF : ARGFD) (FD : FDALLOC) (FU : FILEDUP) : SYSDUP := ⟨
   iintro Hk Hpc
   ihave Hpfd : ofdOut (GF := GF) 0#64 0#32 $$ []
   case' _ => unfold ofdOut; rw [if_pos rfl]; iempintro
-  iapply (sd_argfd AF c5 _ γ γd pa pid V M [] 0 v 0#32 wf (by decide) ?ha0 hv ?hpf ?hpr ?ht ?hn ?hKa)
+  iapply (sd_argfd AF c5 _ γ pa pid V M [] 0 v 0#32 wf (by decide) ?ha0 hv ?hpf ?hpr ?ht ?hn ?hKa)
     $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g [sd_ret_4d64, sd_li0, sd_f_addr]
@@ -351,16 +351,16 @@ theorem sys_dup_proof (AF : ARGFD) (FD : FDALLOC) (FU : FILEDUP) : SYSDUP := ⟨
     have hpin8 : k.sie = false ∨ k.proc = 0#64 → c8 = cpu := fun h => (hp8 h).trans (hpin7 h)
     ihave Hframe := sd_frame_close (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) w1 w2 wf $$ [Hra Hs0 Hc24 Hc16 Hcf Hc0]
     case' _ => iframe
-    ihave Hblk := sd_block_join γ γd pa pid V M $$ [Hcore Howe]
+    ihave Hblk := sd_block_join γ pa pid V M $$ [Hcore Howe]
     case' _ => iframe
-    ihave Hpost : sysDupPost (GF := GF) γ γd pa pid V M sts v 0xFFFFFFFFFFFFFFFF#64 $$ [Hblk Hfr]
+    ihave Hpost : sysDupPost (GF := GF) γ V.fdg pa pid V M sts v 0xFFFFFFFFFFFFFFFF#64 $$ [Hblk Hfr]
     case' _ =>
       unfold sysDupPost
       ileft
       iframe Hblk Hfr
       ipureintro; exact ⟨rfl, hnone⟩
     obtain ⟨p9, p18, p19, p20, p21, p22, p23, p24, p25, p26, p27⟩ := hpins1
-    iapply (sd_exit cpu c8 k γ γd pa pid V M sts v hK6 hpin8 spie spp hsp1 _
+    iapply (sd_exit cpu c8 k γ V.fdg pa pid V M sts v hK6 hpin8 spie spp hsp1 _
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact b2)
         (by
           refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
@@ -388,7 +388,7 @@ theorem sys_dup_proof (AF : ARGFD) (FD : FDALLOC) (FU : FILEDUP) : SYSDUP := ⟨
     have hpin12 : k.sie = false ∨ k.proc = 0#64 → c12 = cpu := fun h =>
       (hp12 h).trans ((hp11 h).trans ((hp10 h).trans ((hp9 h).trans ((hp8 h).trans (hpin7 h)))))
     -- LEND fd0's reference
-    icases procOfilesOwe_lend γ γd pa V.ofile [] fd0 fv (by simp) hfv hnz $$ Howe
+    icases procOfilesOwe_lend γ V.fdg pa V.ofile [] fd0 fv (by simp) hfv hnz $$ Howe
       with ⟨%kk, %q, %st, %⟨hfvk, hkk, hst⟩, Href, Hauth0, Howe⟩
     subst hfvk
     have hfv' : V.ofile[fd0]? = some (fnode kk) := hfv
@@ -396,9 +396,9 @@ theorem sys_dup_proof (AF : ARGFD) (FD : FDALLOC) (FU : FILEDUP) : SYSDUP := ⟨
     k_step_gen (wp_s_jal c12 _ (KA.«sys_dup» + 0x24#64) false 2096696#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_dup_br_fffffffffffffe5c] next c13 hp13
     iintro Hk Hpc
-    ihave Howe := (show procOfilesOwe (GF := GF) γ γd pa V.ofile [fd0] ⊢ procOfilesOwe γ γd k.proc V.ofile [fd0] from by
+    ihave Howe := (show procOfilesOwe (GF := GF) γ V.fdg pa V.ofile [fd0] ⊢ procOfilesOwe γ V.fdg k.proc V.ofile [fd0] from by
       rw [hproc]) $$ Howe
-    iapply (sd_fdalloc FD c13 _ γ γd kk V.ofile [fd0] ?ha1 hkk ?hn1 ?hK1) $$ [- $Hk $Hpc]
+    iapply (sd_fdalloc FD c13 _ γ V.fdg kk V.ofile [fd0] ?ha1 hkk ?hn1 ?hK1) $$ [- $Hk $Hpc]
     rotate_right 1
     k_norm_g [sd_ret_4d78]
     iframe Howe
@@ -431,8 +431,8 @@ theorem sys_dup_proof (AF : ARGFD) (FD : FDALLOC) (FU : FILEDUP) : SYSDUP := ⟨
     iintro Hk Hpc
     have hpin16 : k.sie = false ∨ k.proc = 0#64 → c16 = cpu := fun h =>
       (hp16 h).trans ((hp15 h).trans (hpin14 h))
-    ihave Hpost2 := (show fdallocPost (GF := GF) γ γd k.proc V.ofile [fd0] kk (R2 10#5) ⊢
-        fdallocPost γ γd pa V.ofile [fd0] kk (R2 10#5) from by rw [hproc]) $$ Hpost2
+    ihave Hpost2 := (show fdallocPost (GF := GF) γ V.fdg k.proc V.ofile [fd0] kk (R2 10#5) ⊢
+        fdallocPost γ V.fdg pa V.ofile [fd0] kk (R2 10#5) from by rw [hproc]) $$ Hpost2
     unfold fdallocPost
     icases Hpost2 with ⟨⟨%⟨hr2, hfull⟩, Howe⟩ | ⟨%fd1, %l, %⟨hr2, hfrees⟩, Howe, Hfd, Hauth1⟩⟩
     · -- the table is full: bltz taken to 4d96 ; restore s1/s2 ; j 4d8c
@@ -451,20 +451,20 @@ theorem sys_dup_proof (AF : ARGFD) (FD : FDALLOC) (FU : FILEDUP) : SYSDUP := ⟨
       have hpin20 : k.sie = false ∨ k.proc = 0#64 → c20 = cpu := fun h =>
         (hp20 h).trans ((hp19 h).trans ((hp18 h).trans ((hp17 h).trans (hpin16 h))))
       -- REPAY fd0
-      ihave Howe := procOfilesOwe_repay γ γd pa V.ofile [] fd0 kk q st (by simp) hfv' hkk hst $$ [Howe Href Hauth0]
+      ihave Howe := procOfilesOwe_repay γ V.fdg pa V.ofile [] fd0 kk q st (by simp) hfv' hkk hst $$ [Howe Href Hauth0]
       case' _ => iframe
       ihave Hframe := sd_frame_close (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) _ _ _ $$ [Hra Hs0 Hc24 Hc16 Hcf Hc0]
       case' _ => iframe
-      ihave Hblk := sd_block_join γ γd pa pid V M $$ [Hcore Howe]
+      ihave Hblk := sd_block_join γ pa pid V M $$ [Hcore Howe]
       case' _ => iframe
-      ihave Hpost : sysDupPost (GF := GF) γ γd pa pid V M sts v 0xFFFFFFFFFFFFFFFF#64 $$ [Hblk Hfr]
+      ihave Hpost : sysDupPost (GF := GF) γ V.fdg pa pid V M sts v 0xFFFFFFFFFFFFFFFF#64 $$ [Hblk Hfr]
       case' _ =>
         unfold sysDupPost
         iright; ileft
         iexists fd0, fnode kk
         iframe Hblk Hfr
         ipureintro; exact ⟨rfl, hsome, hfull⟩
-      iapply (sd_exit cpu c20 k γ γd pa pid V M sts v hK6 hpin20 spie2 spp2 hsp2' _
+      iapply (sd_exit cpu c20 k γ V.fdg pa pid V M sts v hK6 hpin20 spie2 spp2 hsp2' _
           (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact d2')
           (by
             refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
@@ -537,23 +537,23 @@ theorem sys_dup_proof (AF : ARGFD) (FD : FDALLOC) (FU : FILEDUP) : SYSDUP := ⟨
       -- GHOST: the source's row, and the destination's authority moved to it
       obtain ⟨st0, hst0⟩ : ∃ st0, sts[fd0]? = some st0 :=
         ⟨_, List.getElem?_eq_getElem (by rw [hslen]; unfold NOFILE; exact hfd0)⟩
-      icases fdFrags_acc γd sts fd0 st0 hst0 $$ Hfr with ⟨Hfrag0, #Hrow0, Hfrw0⟩
-      icases fdSt_agree' γd fd0 st st0 $$ [Hauth0 Hfrag0] with ⟨%he0, Hauth0, Hfrag0⟩
+      icases fdFrags_acc V.fdg sts fd0 st0 hst0 $$ Hfr with ⟨Hfrag0, #Hrow0, Hfrw0⟩
+      icases fdSt_agree' V.fdg fd0 st st0 $$ [Hauth0 Hfrag0] with ⟨%he0, Hauth0, Hfrag0⟩
       · iframe
       subst he0
       ihave Hfr := Hfrw0 $$ %st Hfrag0 Hrow0
       have hset0 : sts.set fd0 st = sts := by
         obtain ⟨hlt, he⟩ := List.getElem?_eq_some_iff.mp hst0
         rw [← he]; exact List.set_getElem_self hlt
-      ihave Hfr := (show fdFrags (GF := GF) γd (sts.set fd0 st) ⊢ fdFrags γd sts from by rw [hset0]) $$ Hfr
+      ihave Hfr := (show fdFrags (GF := GF) V.fdg (sts.set fd0 st) ⊢ fdFrags V.fdg sts from by rw [hset0]) $$ Hfr
       obtain ⟨st1, hst1⟩ : ∃ st1, sts[fd1]? = some st1 :=
         ⟨_, List.getElem?_eq_getElem (by rw [hslen]; unfold NOFILE; exact hfd1lt)⟩
-      icases fdFrags_acc γd sts fd1 st1 hst1 $$ Hfr with ⟨Hfrag1, -, Hfrw1⟩
-      icases fdSt_agree' γd fd1 .closed st1 $$ [Hauth1 Hfrag1] with ⟨%he1, Hauth1, Hfrag1⟩
+      icases fdFrags_acc V.fdg sts fd1 st1 hst1 $$ Hfr with ⟨Hfrag1, -, Hfrw1⟩
+      icases fdSt_agree' V.fdg fd1 .closed st1 $$ [Hauth1 Hfrag1] with ⟨%he1, Hauth1, Hfrag1⟩
       · iframe
       subst he1
       iapply wpLoop_bupd
-      imod fdSt_update γd fd1 .closed .closed st $$ [Hauth1 Hfrag1] with ⟨Hauth1, Hfrag1⟩
+      imod fdSt_update V.fdg fd1 .closed .closed st $$ [Hauth1 Hfrag1] with ⟨Hauth1, Hfrag1⟩
       · iframe
       imodintro
       ihave Hfr := Hfrw1 $$ %st Hfrag1 Hrow0
@@ -562,22 +562,22 @@ theorem sys_dup_proof (AF : ARGFD) (FD : FDALLOC) (FU : FILEDUP) : SYSDUP := ⟨
         List.getElem?_set_self (by rw [hlen]; unfold NOFILE; exact hfd1lt)
       have hfd0' : (V.ofile.set fd1 (fnode kk))[fd0]? = some (fnode kk) := by
         rw [List.getElem?_set_ne (Ne.symm hne)]; exact hfv'
-      ihave Howe := procOfilesOwe_repay γ γd pa (V.ofile.set fd1 (fnode kk)) [fd0] fd1 kk q.half st
+      ihave Howe := procOfilesOwe_repay γ V.fdg pa (V.ofile.set fd1 (fnode kk)) [fd0] fd1 kk q.half st
         (by simp [hne.symm]) hfd1' hkk hst $$ [Howe Href1 Hauth1]
       case' _ => iframe
-      ihave Howe := procOfilesOwe_repay γ γd pa (V.ofile.set fd1 (fnode kk)) [] fd0 kk q.half st
+      ihave Howe := procOfilesOwe_repay γ V.fdg pa (V.ofile.set fd1 (fnode kk)) [] fd0 kk q.half st
         (by simp) hfd0' hkk hst $$ [Howe Href2 Hauth0]
       case' _ => iframe
       ihave Hframe := sd_frame_close (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) _ _ _ $$ [Hra Hs0 Hc24 Hc16 Hcf Hc0]
       case' _ => iframe
-      ihave Hblk := sd_block_join γ γd pa pid { V with ofile := V.ofile.set fd1 (fnode kk) } M $$ [Hcore Howe]
+      ihave Hblk := sd_block_join γ pa pid { V with ofile := V.ofile.set fd1 (fnode kk) } M $$ [Hcore Howe]
       case' _ =>
         isplitl [Hcore]
         · iapply (show procPrivCoreNoctxAt (GF := GF) curCtx pa pid V M ⊢
               procPrivCoreNoctxAt curCtx pa pid { V with ofile := V.ofile.set fd1 (fnode kk) } M from .rfl) $$ Hcore
         · iexact Howe
       have hgetD : sts.getD fd0 FdState.closed = st := by rw [List.getD_eq_getElem?_getD, hst0]; rfl
-      ihave Hpost : sysDupPost (GF := GF) γ γd pa pid V M sts v (BitVec.ofNat 64 fd1) $$ [Hblk Hfr]
+      ihave Hpost : sysDupPost (GF := GF) γ V.fdg pa pid V M sts v (BitVec.ofNat 64 fd1) $$ [Hblk Hfr]
       case' _ =>
         unfold sysDupPost
         iright; iright
@@ -585,7 +585,7 @@ theorem sys_dup_proof (AF : ARGFD) (FD : FDALLOC) (FU : FILEDUP) : SYSDUP := ⟨
         rw [hgetD]
         iframe Hblk Hfr
         ipureintro; exact ⟨rfl, hsome, hfrees, hst1⟩
-      iapply (sd_exit cpu c23 k γ γd pa pid V M sts v hK6 hpin23 spie3 spp3 hsp3' _
+      iapply (sd_exit cpu c23 k γ V.fdg pa pid V M sts v hK6 hpin23 spie3 spp3 hsp3' _
           (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact f2')
           (by
             refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>

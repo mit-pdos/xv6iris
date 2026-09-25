@@ -173,7 +173,7 @@ theorem af_tail (c : CPU) (kb : KCtx) (hK : 6 ≤ kb.avail)
   · iexact HP
 
 /-- Any arm's exit: at the epilogue with `r` in `a0` and the matching post. -/
-theorem af_exit (cpu cr : CPU) (k : KCtx) (γ : FileNames) (γd : Nat → GName) (pa : BitVec 64) (pid : BitVec 32)
+theorem af_exit (cpu cr : CPU) (k : KCtx) (γ : FileNames) (γd : GName) (pa : BitVec 64) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (D : List Nat) (v : BitVec 64) (oldfd : BitVec 32) (oldf : BitVec 64)
     (hK : 6 ≤ k.avail)
     (hpin : k.sie = false ∨ k.proc = 0#64 → cr = cpu)
@@ -238,7 +238,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 set_option maxHeartbeats 16000000 in
 /-- From `0x80004c50` (the descriptor found, `*pfd` already handled):
 `li a0,0 ; if (pf) *pf = f ; epilogue`. -/
-theorem af_pf_tail (cpu c : CPU) (k : KCtx) (γ : FileNames) (γd : Nat → GName) (pa : BitVec 64) (pid : BitVec 32)
+theorem af_pf_tail (cpu c : CPU) (k : KCtx) (γ : FileNames) (γd : GName) (pa : BitVec 64) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (D : List Nat) (v : BitVec 64) (oldfd : BitVec 32) (oldf : BitVec 64)
     (fd : Nat) (fv : BitVec 64) (hsome : argFd v V.ofile = some (fd, fv)) (hpf : k.regs 12#5 ≠ 0#64)
     (hK : 6 ≤ k.avail)
@@ -294,7 +294,7 @@ theorem argfd_br_ffffffffffffdd0e : KA.«argfd» + 0xffffffffffffdd0e#64 = KA.«
 
 set_option maxHeartbeats 32000000 in
 theorem argfd_proof (AI : ARGINT) (MP : MYPROC) : ARGFD := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ X cpu k γ γd pa pid V M D i v oldfd oldf hi ha0 hv hpf hproc htier hnoff hK => by
+  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ X cpu k γ pa pid V M D i v oldfd oldf hi ha0 hv hpf hproc htier hnoff hK => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
   unfold wp_argfd_body
@@ -307,7 +307,8 @@ theorem argfd_proof (AI : ARGINT) (MP : MYPROC) : ARGFD := ⟨
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   have hK6 : 6 ≤ k.avail := by unfold argfdSlots argintSlots argrawSlots at hK; omega
   -- the core, opened
-  icases (show procPrivCoreNoctxAt (GF := GF) curCtx pa pid V M ⊢
+  icases (procPrivCoreNoctxAt_bare curCtx pa pid V M).1 $$ Hcore with ⟨Hcore, Hcw⟩
+  icases (show procPrivBareAt (GF := GF) curCtx pa pid V M ⊢
       ⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧ V.pagetable = pageAddr V.upt.root ∧
         V.trapframe = pageAddr V.upt.tfp⌝ ∗
       wordPointsTo (pPid pa) 4 pidPriv pid ∗
@@ -318,7 +319,7 @@ theorem argfd_proof (AI : ARGINT) (MP : MYPROC) : ARGFD := ⟨
        wordPointsTo (pCwd pa) 8 (DFrac.own 1) V.cwd ∗
        pnameCells pa (DFrac.own 1) V.name) ∗
       procPtAt V.upt M ∗ tfPageAt V.upt.tfp V.tf ∗ ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝
-      from by unfold procPrivCoreNoctxAt procFieldsNoOfile; iintro H; iexact H) $$ Hcore
+      from by unfold procPrivBareAt procFieldsNoOfile; iintro H; iexact H) $$ Hcore
     with ⟨%hVb, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm⟩, HPt, HTf, %hlz⟩
   ihave Htf := (show wordPointsTo (GF := GF) (pTrapframe pa) 8 (DFrac.own 1) V.trapframe ⊢
       wordPointsTo (pTrapframe k.proc) 8 (DFrac.own 1) (pageAddr V.upt.tfp) from by rw [hVb.2.2.2, hproc]) $$ Htf
@@ -387,10 +388,10 @@ theorem argfd_proof (AI : ARGINT) (MP : MYPROC) : ARGFD := ⟨
   -- the core, closed again (for either exit)
   ihave Htf := (show wordPointsTo (GF := GF) (pTrapframe k.proc) 8 (DFrac.own 1) (pageAddr V.upt.tfp) ⊢
       wordPointsTo (pTrapframe pa) 8 (DFrac.own 1) V.trapframe from by rw [hVb.2.2.2, hproc]) $$ Htf
-  ihave Hcore : procPrivCoreNoctxAt (GF := GF) curCtx pa pid V M $$ [Hpid Hks Hsz Hpg Htf Hcwd Hnm HPt HTf]
+  ihave Hcore : procPrivCoreNoctxAt (GF := GF) curCtx pa pid V M $$ [Hpid Hks Hsz Hpg Htf Hcwd Hnm HPt HTf Hcw]
   case' _ =>
-    unfold procPrivCoreNoctxAt procFieldsNoOfile
-    iframe Hpid Hks Hsz Hpg Htf Hcwd Hnm HPt HTf
+    unfold procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile
+    iframe Hpid Hks Hsz Hpg Htf Hcwd Hnm HPt HTf Hcw
     ipureintro; exact ⟨hVb, hlz⟩
   by_cases hr : 0 ≤ argZ v ∧ argZ v < 16
   · -- in range: bltu falls through ; jal myproc
@@ -445,10 +446,10 @@ theorem argfd_proof (AI : ARGINT) (MP : MYPROC) : ARGFD := ⟨
     k_step_gen (wp_s_add c14 _ (KA.«argfd» + 0x32#64) true 10#5 10#5 15#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [d10', af_ofile_addr' pa fd hfd16] next c15 hp15
     iintro Hk Hpc
-    icases procOfilesOwe_len γ γd pa V.ofile D $$ Howe with ⟨%hlen, Howe⟩
+    icases procOfilesOwe_len γ V.fdg pa V.ofile D $$ Howe with ⟨%hlen, Howe⟩
     obtain ⟨fv, hfv⟩ : ∃ fv, V.ofile[fd]? = some fv :=
       ⟨_, List.getElem?_eq_getElem (by rw [hlen]; unfold NOFILE; exact hfd16)⟩
-    icases procOfilesOwe_read γ γd pa V.ofile D fd fv hfv $$ Howe with ⟨Hc, Hcl⟩
+    icases procOfilesOwe_read γ V.fdg pa V.ofile D fd fv hfv $$ Howe with ⟨Hc, Hcl⟩
     k_step_gen (wp_s_ld c15 _ (KA.«argfd» + 0x34#64) true 0#12 15#5 10#5 (by decide) (by decide) (DFrac.own 1) fv)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [af_add0, af_add0'] next c16 hp16
     iintro Hk Hpc Hc
@@ -488,7 +489,7 @@ theorem argfd_proof (AI : ARGINT) (MP : MYPROC) : ARGFD := ⟨
         ileft
         iframe Hpfd Hpf
         ipureintro; exact ⟨rfl, hnone⟩
-      iapply (af_exit cpu c19 k γ γd pa pid V M D v oldfd oldf hK6 hpin19 spie2 spp2 hsp2' _
+      iapply (af_exit cpu c19 k γ V.fdg pa pid V M D v oldfd oldf hK6 hpin19 spie2 spp2 hsp2' _
           (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact d2')
           (by
             obtain ⟨p19, p20, p21, p22, p23, p24, p25, p26, p27⟩ := hpins2
@@ -525,7 +526,7 @@ theorem argfd_proof (AI : ARGINT) (MP : MYPROC) : ARGFD := ⟨
         have hpin18 : k.sie = false ∨ k.proc = 0#64 → c18 = cpu := fun h => (hp18 h).trans (hpin17 h)
         ihave Hpfd := (show ofdOut (GF := GF) (k.regs 11#5) oldfd ⊢ ofdOut (k.regs 11#5) (BitVec.extractLsb' 0 32 v) from by
           unfold ofdOut; simp only [hpfd, ↓reduceIte]; iintro H; iexact H) $$ Hpfd
-        iapply (af_pf_tail cpu c18 k γ γd pa pid V M D v oldfd oldf fd fv hsome hpf hK6 hpin18 spie2 spp2 hsp2' _
+        iapply (af_pf_tail cpu c18 k γ V.fdg pa pid V M D v oldfd oldf fd fv hsome hpf hK6 hpin18 spie2 spp2 hsp2' _
             (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact d9')
             (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true])
             (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact d2')
@@ -546,7 +547,7 @@ theorem argfd_proof (AI : ARGINT) (MP : MYPROC) : ARGFD := ⟨
         have hpin19 : k.sie = false ∨ k.proc = 0#64 → c19 = cpu := fun h => (hp19 h).trans ((hp18 h).trans (hpin17 h))
         ihave Hpfd := (show wordPointsTo (GF := GF) (k.regs 11#5) 4 (DFrac.own 1) (BitVec.extractLsb' 0 32 v) ⊢
             ofdOut (k.regs 11#5) (BitVec.extractLsb' 0 32 v) from by unfold ofdOut; rw [if_neg hpfd]) $$ Hpfd
-        iapply (af_pf_tail cpu c19 k γ γd pa pid V M D v oldfd oldf fd fv hsome hpf hK6 hpin19 spie2 spp2 hsp2' _
+        iapply (af_pf_tail cpu c19 k γ V.fdg pa pid V M D v oldfd oldf fd fv hsome hpf hK6 hpin19 spie2 spp2 hsp2' _
             (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact d9')
             (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true])
             (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact d2')
@@ -586,7 +587,7 @@ theorem argfd_proof (AI : ARGINT) (MP : MYPROC) : ARGFD := ⟨
       ileft
       iframe Hpfd Hpf
       ipureintro; exact ⟨rfl, hnone⟩
-    iapply (af_exit cpu c11 k γ γd pa pid V M D v oldfd oldf hK6 hpin11 spie spp hsp _
+    iapply (af_exit cpu c11 k γ V.fdg pa pid V M D v oldfd oldf hK6 hpin11 spie spp hsp _
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact b2)
         (by
           obtain ⟨p19, p20, p21, p22, p23, p24, p25, p26, p27⟩ := hpins1
