@@ -30,7 +30,15 @@ LANDED (17cc9177c, VM c9b2merge2, audits 13/13/14/14): `ualt := UR | UPE
 | UPC`, `uok_echo_st` (an echo pipeline's admission is state-independent),
 `ufree` (every non-terminal `UPE`; at `UPC` only `PLPanic`, `PLRun []`,
 `PLRun dg_execR`), `ulm_hooks adm : lm_hooks (ulm adm)` with every field
-proved, `ulmU_hooks`.
+proved, `ulmU_hooks`.  C9e-dec LANDED (8f138579f, VM c9edmerge1, audits
+13/13/14/14): `UnionDecU.lm_disc_ulmU_dec : Decision (lm_disc ulmU h)`,
+constructive -- its FRONTIER print (below the pipe anchor, remove at
+C9g) is 'Closed under the global context'; `umerge_spec` (the `∃ s` is
+`s = Some []`), the truncation lemma `blocks_trunc`/`terms_trunc`, the
+boot-state canonicalisation `u_canon_s` over the finite `scandsU`,
+state-dependent candidates `ualts_dep`; seam (a): `line_file`,
+`ustep_local`, `uok_local`, `ucont_local`.  The review's fallback (a
+finite per-history boot set) was NOT needed.
 
 ## Review amendments (override the plan below)
 

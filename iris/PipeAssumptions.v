@@ -53,3 +53,14 @@
 Require Import UInitPipeAdequacy.
 
 Print Assumptions pipe_adequacy_pipeΣ_final.
+
+(* ---------------------------------------------------------------------- *)
+(* FRONTIER (cut C9e-dec, design/union.md review S2): the union           *)
+(* discipline's decider [UnionDecU.lm_disc_ulmU_dec], which the union     *)
+(* ledger's taint counter will case on, is in no anchor's cone until the  *)
+(* union application's switch (C9g).  Its print must show only axioms     *)
+(* already counted above.  DELETE this block when the union anchor lands. *)
+(* ---------------------------------------------------------------------- *)
+Require Import UnionDecU.
+
+Print Assumptions lm_disc_ulmU_dec.
