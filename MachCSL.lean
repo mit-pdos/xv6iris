@@ -110,3 +110,4 @@ import MachCSL.LockBornHook
 import MachCSL.BigSepLib
 import MachCSL.ByteWord4
 import MachCSL.WpSmodeDivRem
+import MachCSL.WpStoreFree4

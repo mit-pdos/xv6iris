@@ -1000,3 +1000,8 @@ import Xv6.KexecA2R
 import Xv6.KexecA
 import Xv6.ProofKexec
 import Xv6.LinkKexec
+import Xv6.SysOpenTails
+import Xv6.SysOpenStores
+import Xv6.SysOpenAlloc
+import Xv6.ProofSysOpen
+import Xv6.LinkSysOpen
