@@ -1090,3 +1090,5 @@ import Xv6.UserretEntryPt
 import Xv6.UserretPt
 import Xv6.ProofUserret
 import Xv6.LinkUserret
+import Xv6.BootCarve
+import Xv6.BootCarveMain
