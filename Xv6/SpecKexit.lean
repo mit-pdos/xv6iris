@@ -56,7 +56,8 @@ descriptor may hold a pipe's last end: fileclose's pipe environment), and
 `FsReady.fsReady` with the three bcache slots (fileclose's FS environment,
 and `begin_op(); iput(p->cwd); end_op();`).  Rocq's `bio_ctx`, `log_ctx`,
 the disk fabric and `log_geom_ok` rows are `fsReady`'s projections; its
-`fs_crash_seam` / `gen_cert` are dropped (D11).
+`fs_crash_seam` / `gen_cert` are `fsReady`'s too (`fsReady_seam` /
+`fsReady_gen`, crash batch C-4, D38).
 
 THE SLOT'S CHILDREN ROW (D8 wiring, Rocq `ch_frag (pv_chg) pj cs`): the
 caller brings its row at its own set `cs`, and kexit EMPTIES it under

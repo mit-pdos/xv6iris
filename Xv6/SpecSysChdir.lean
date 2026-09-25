@@ -83,8 +83,10 @@ frame: ra @ `sp0-8`, s0 @ `sp0-16` (the frame pointer, = the entry sp), s1
    two superblock cells -- Rocq's `dqb dqs`, in and back out; here
    `fsSbCells` at `DFrac.discard`, persistent, so nothing is returned) and
    the eleven geometry premises (`FsGeomOk`).  `panic_env` is `panicEnv`.
-3. **THE CRASH LAYER IS DROPPED** (D11): `fs_crash_seam fsc_cov fsc_logst`
-   and `gen_cert` (SpecEndOp / SpecIreclaim deviation text).
+3. (RETIRED by crash batch C-4, D38.)  Rocq's separate
+   `fs_crash_seam fsc_cov fsc_logst` and `gen_cert` premises ride `fsReady`
+   (its last two conjuncts; `fsReady_seam` / `fsReady_gen`), which this
+   contract already takes: no premise is dropped.
 4. **PROCESS LAYER (flagged).**  Rocq's `proc_priv γf pj pid U` is the ONE
    block `procPrivFd γ (procAddr j) pid V M` (user decision D16; C0's
    `FdTable.procPrivFd` = `procPrivCoreNoctxAt ∗ procOfiles`, Rocq's

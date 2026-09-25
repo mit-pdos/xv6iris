@@ -77,9 +77,9 @@ the arity-free `fsCrashSeam` ride `SpecMain`/`firstBootPersist`, not a kit.
    are kept.
 7. **Crash rows (D35, Rocq-literal)**: kit 2 carries `fsBytesInv … Pb`,
    `excOwn fscFs.exc Xexc`, `fsCrashSeamAt appGuest fscCov fscLogst` and
-   `appXfer`, exactly Rocq's rows.  Lean's CURRENT `fsinit` contract does
-   not take the last two or the named byte view (SpecFsinit deviations 3/7);
-   batch C-4 restores them, and this kit is the target shape.
+   `appXfer`, exactly Rocq's rows; `fsinit` takes all of them (SpecFsinit
+   deviations 3/7 retired, crash batch C-4) and `FirstTok.firstFsinit`
+   holds this kit.
 -/
 import Xv6.FsReady
 import Xv6.FsBytesInv

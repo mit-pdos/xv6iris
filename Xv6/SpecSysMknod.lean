@@ -67,7 +67,8 @@ leaves a0, so no callee-saved register beyond ra and s0 is touched.
   and end_op park).
 * THE IMAGE: only the DESCRIPTOR grows (argstr's faults); the block comes
   back at `{ V with upt := P' }` (deviation 5 for the view).
-* NOTHING ABOUT DURABILITY (the crash layer is dropped, deviation 3).
+* NOTHING ABOUT DURABILITY in the post (Rocq's neither: the crash seam and
+  the era certificate are premises, riding `fsReady`, deviation 3).
 
 ## Deviations from Rocq
 
@@ -85,8 +86,10 @@ leaves a0, so no callee-saved register beyond ra and s0 is touched.
    `fsSbCells` at `DFrac.discard`, persistent, so nothing is returned and
    Rocq's `dqb dqs dqbs dqn` binders go) and the geometry premises
    (`FsGeomOk`, which carries ialloc's three and mkfs's `ushort` tie).
-3. **THE CRASH LAYER IS DROPPED** (D11): `fs_crash_seam fsc_cov fsc_logst`
-   and `gen_cert` (SpecEndOp / SpecIreclaim deviation text).
+3. (RETIRED by crash batch C-4, D38.)  Rocq's separate
+   `fs_crash_seam fsc_cov fsc_logst` and `gen_cert` premises ride `fsReady`
+   (its last two conjuncts; `fsReady_seam` / `fsReady_gen`), which this
+   contract already takes: no premise is dropped.
 4. **PROCESS LAYER (flagged).**  Rocq's `proc_priv γf pj pid U` is the ONE
    block `procPrivFd γ (procAddr j) pid V M` (user decision D16; C0's
    `FdTable.procPrivFd` = `procPrivCoreNoctxAt ∗ procOfiles`, Rocq's

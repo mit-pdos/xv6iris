@@ -71,8 +71,10 @@ iunlockput's argument is already in place).
    `log_geom_ok`, the four bitmap premises, `0 <= icfg_ist`, `cov_below`,
    `ireg_blocks_ok`, mkfs's `1 < ninodes <= 16 * nib < 2^31` and the
    `ushort` tie), all in `FsGeomOk`.  `printk_env` is `panicEnv`.
-3. **THE CRASH LAYER IS DROPPED** (D11): `fs_crash_seam fsc_cov fsc_logst`
-   and `gen_cert` (SpecEndOp / SpecIreclaim deviation text).
+3. (RETIRED by crash batch C-4, D38.)  Rocq's separate
+   `fs_crash_seam fsc_cov fsc_logst` and `gen_cert` premises ride `fsReady`
+   (its last two conjuncts; `fsReady_seam` / `fsReady_gen`), which this
+   contract already takes: no premise is dropped.
 4. **PROCESS LAYER (flagged).**  Rocq's `proc_priv γf pj pid U` is the ONE
    block `procPrivFd γ (procAddr j) pid V M` (user decision D16; C0's
    `FdTable.procPrivFd` = `procPrivCoreNoctxAt ∗ procOfiles`, Rocq's

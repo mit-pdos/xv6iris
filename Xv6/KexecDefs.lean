@@ -77,8 +77,9 @@ header, in short (every clause that is about content is kept):
 5. **`fs_fabric` is `fsReady ∗ panicEnv ∗ procsInv Γ ∗ diskCaps …`**: Rocq's
    `printk_env` is `panicEnv` (the port's standing spelling), and
    `disk_geom` + `is_lock … disk_res_at` (+ `dev_inv`) is `diskCaps`
-   (FsReady deviation 4); `kernel_data`, the crash seam and `gen_cert` are
-   not rows (FsReady deviations 1/3, D11).  `fs_fabric_all` is
+   (FsReady deviation 4); `kernel_data` is not a row (FsReady deviation 3),
+   and the crash seam and `gen_cert` ride `fsReady` (`fsFabric_ready`, then
+   `fsReady_seam` / `fsReady_gen`; crash batch C-4, D38).  `fs_fabric_all` is
    `fsFabric_all`, handing back `fsReady_all`'s rows plus the three.
 6. Rocq's section binders (`GenId`, `CpuId`, the cameras) are the port's
    class variables.

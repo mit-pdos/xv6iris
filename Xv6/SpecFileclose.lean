@@ -75,8 +75,8 @@ EVERY arm.
    two as equal (`reflexivity`); `filecloseLoop_open` is stated over
    `filecloseFsEnv` directly (its only use, kexit's loop).
 6. `ic_escrows_acc` (Rocq, stated here) is `FsReady.fsReady_escrow` in Lean.
-7. The crash layer (`fs_crash_seam`, `gen_cert`) is absent from `fsReady`
-   (D11).
+7. (RETIRED by crash batch C-4, D38.)  The crash layer's `fs_crash_seam`
+   and `gen_cert` ride `fsReady` (`fsReady_seam` / `fsReady_gen`).
 
 Dropped/simplified vs Rocq: 1, 2, 5 above (uses checked: SpecKexit.v /
 ProofKexit.v use `fileclose_loop_open` and `fileclose_fs_env_nopid` only as

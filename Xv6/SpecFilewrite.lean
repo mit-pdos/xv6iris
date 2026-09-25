@@ -79,7 +79,8 @@ untouched); the `n < 0` test (+0x1c); the three-way dispatch; FD_PIPE
    constituent of Rocq's `filewrite_fs_env` is a projection of `fsReady`
    (log/bio/disk/icache/escrow/region/sleeplocks, the three superblock
    cells at `DFrac.discard`, the bitmap invariant, the geometry facts) but
-   the three slot units; `fs_crash_seam`/`gen_cert` are dropped (D11);
+   the three slot units; `fs_crash_seam`/`gen_cert` are too (`fsReady_seam`
+   / `fsReady_gen`, crash batch C-4, D38);
    `kernel_data`/`printk_env` are in `kctx`/`panicEnv` (FsReady deviation
    3).  So Rocq's `fwrite_names` record is GONE: its per-arm fields were
    ambient names or fractions `fsReady` already fixes; the device-arm

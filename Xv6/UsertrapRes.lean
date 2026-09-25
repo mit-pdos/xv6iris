@@ -96,8 +96,8 @@ av⌝` inside the residue; here it is the context's `avail`, and
 5. **`utCaps` rows**: Rocq's `kernel_data` is in `KernelImage.ro` (inside
    `kctx`); `bio_ctx` / `log_ctx` / the kmem lock / `dev_inv` / `disk_geom` /
    `kalloc_avail` are `fsReady`'s projections (as SpecKexit states them);
-   `fs_crash_seam` / `gen_cert` ride `fsReady` when the crash layer lands
-   there (D23); `is_kstack` is gone (4); `devintr_caps_any` + the kernelvec
+   `fs_crash_seam` / `gen_cert` ride `fsReady` (`fsReady_seam` /
+   `fsReady_gen`, crash batch C-4); `is_kstack` is gone (4); `devintr_caps_any` + the kernelvec
    handler's environment are ONE row, `envAt curCtx` (`HandlerEnv`:
    `procsInv` beside `∃ pd pav pu, devintrCaps`, read with
    `devintrCaps_of_envAt'` under the era's `EnvIs`), which is also what the

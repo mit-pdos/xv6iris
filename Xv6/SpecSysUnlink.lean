@@ -82,8 +82,10 @@ three LIVE panics (+0xf4 "unlink: nlink < 1", +0x136 "isdirempty: readi",
    `Xv6/SpecSysLink.lean` deviation 2 (same constituents, same geometry
    premises inside `FsGeomOk`, the superblock cells persistent at
    `DFrac.discard`, `printk_env` is `panicEnv`).
-3. **THE CRASH LAYER IS DROPPED** (D11): `fs_crash_seam` and `gen_cert`
-   (SpecEndOp / SpecIreclaim deviation text).
+3. (RETIRED by crash batch C-4, D38.)  Rocq's separate
+   `fs_crash_seam fsc_cov fsc_logst` and `gen_cert` premises ride `fsReady`
+   (its last two conjuncts; `fsReady_seam` / `fsReady_gen`), which this
+   contract already takes: no premise is dropped.
 4. **PROCESS LAYER (flagged; user D16).**  Rocq's `proc_priv γf pj pid U` is
    the ONE block `procPrivFd γ (procAddr j) pid V M` (C0's `FdTable.procPrivFd`
    = `procPrivCoreNoctxAt ∗ procOfiles`, Rocq's `proc_priv = core ∗
