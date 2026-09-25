@@ -125,6 +125,9 @@ Section UkGen.
           way), so this copy of the bundle does not take the bit as a
           parameter.  [X_unfold] below carries the matching guard. *)
        ⌜uvis_lazy W' = false⌝ -∗
+       (* ...AND THE MASK, the ninth pin, at the literal [secc_all] for the
+          same reason: the U tier's run is at the full mask *)
+       ⌜uvis_secc W' = ProcDefs.secc_all⌝ -∗
        trapped_machine C pt Rut sz sc stv W' ∗ Rfd (uvis_fd W') ∗
        RetF X sc W' -∗
        mWP (Loop : expr riscv_lang))%I.
@@ -178,6 +181,7 @@ Section UkGen.
      where the premise is [eq_refl]. *)
   Hypothesis X_unfold : forall W : uvis,
     uvis_lazy W = false ->
+    uvis_secc W = ProcDefs.secc_all ->
     X W ⊣⊢
     ukc' (uvis_perm W) (uvis_M W) (uvis_sz W) (uvis_fd W) (uvis_cwd W)
       (uvis_gen W) (uvis_ch W) (uvis_pid W)
@@ -206,11 +210,11 @@ Section UkGen.
       (π : gmap (mword 27) uperm) (szv : Z) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (pidv : mword 32) :
     m !!! Regidx (mword_of_int 0) = zero_reg ->
     is_aligned_vaddr (Virtaddr pc) 2 = true ->
-    X (uvis_of_run m pc M π szv fdv cw gn cs pidv false) ⊣⊢ ukc' π M szv fdv cw gn cs pidv m pc.
+    X (uvis_of_run m pc M π szv fdv cw gn cs pidv false secc_all) ⊣⊢ ukc' π M szv fdv cw gn cs pidv m pc.
   Proof using X_unfold.
     intros Hx0 Hal.
-    rewrite (X_unfold (uvis_of_run m pc M π szv fdv cw gn cs pidv false)
-               eq_refl).
+    rewrite (X_unfold (uvis_of_run m pc M π szv fdv cw gn cs pidv false secc_all)
+               eq_refl eq_refl).
     cbn [uvis_tf uvis_M uvis_perm uvis_sz uvis_fd uvis_cwd uvis_gen uvis_ch
          uvis_pid uvis_of_run].
     rewrite (tf_of_resume_gpr m pc Hx0) (tf_of_resume_pc m pc Hal).
@@ -544,11 +548,11 @@ Section UkGenArms.
               with "Hany Hmm Hres Hctx []").
     iIntros "Hframe Hctx ((#Hmyp & Hkc) & Hbak & Hfdr & Hkb)".
     iDestruct ("Hbak" with "Hctx") as "Hrut".
-    iApply ("Hkb" $! (uvis_of_run m pc M π sz fdv cw gn cs pidv false)
+    iApply ("Hkb" $! (uvis_of_run m pc M π sz fdv cw gn cs pidv false secc_all)
               (utrap_scause (Interrupt i) (register_lookup (R_bitvector_64 scause) rsA))
-              (tval None) with "[%] [%] [%] [%] [%] [%] [%] [%] [Hframe Hrut Hfdr Hkc]");
+              (tval None) with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [Hframe Hrut Hfdr Hkc]");
       [ reflexivity | reflexivity | reflexivity | reflexivity
-      | reflexivity | reflexivity | reflexivity | reflexivity | ].
+      | reflexivity | reflexivity | reflexivity | reflexivity | reflexivity | ].
     iSplitL "Hframe Hrut".
     { iApply (trapped_of_uv_trap_frame C pt Rut _ _ m pc M Mp sz π fdv cw gn cs pidv Hpure Hx0
                 with "Hframe Hrut"). }
@@ -559,7 +563,7 @@ Section UkGenArms.
        [ukb_F']'s body, i.e. [RetF X _ _], and it is discharged by the
        transparent arm plus the fixpoint's reading at the running key. *)
     iApply (bi.equiv_entails_1_2 _ _
-              (Ret_transparent _ (uvis_of_run m pc M π sz fdv cw gn cs pidv false)
+              (Ret_transparent _ (uvis_of_run m pc M π sz fdv cw gn cs pidv false secc_all)
                  (utrap_scause_intr_ne i (register_lookup (R_bitvector_64 scause) rsA)))).
     rewrite /UexecRet.uexec_kill_arm_F.
     (* THE DEPOSIT AT THE TRANSPARENT ARM IS THE PAY FACT ALONE (lane
@@ -567,7 +571,7 @@ Section UkGenArms.
        free ([UexecRet.uexec_pay_dep_ne]). *)
     iExists (sfam_at Qp sfam_pt).
     iSplitR;
-      [ iApply (uexec_pay_dep_ne _ (uvis_of_run m pc M π sz fdv cw gn cs pidv false) _ (sfam_at Qp sfam_pt)
+      [ iApply (uexec_pay_dep_ne _ (uvis_of_run m pc M π sz fdv cw gn cs pidv false secc_all) _ (sfam_at Qp sfam_pt)
                   (utrap_scause_intr_ne i
                      (register_lookup (R_bitvector_64 scause) rsA))
                   (sexit_pay_at Qp sfam_pt) with "Hmyp") | ].
@@ -902,7 +906,7 @@ Section UkGenEcallPost.
     uv_tree_ok pt (upa_map pt Mp) t' ->
     uk_pt_pure pt sz M Mp ->
     gen_cert -∗
-    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb_F' C pt Rfd Rut sz π fdv cw gn cs pidv ∗ RetF X uecall_scause (uvis_of_run m pc M π sz fdv cw gn cs pidv false)) -∗
+    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb_F' C pt Rfd Rut sz π fdv cw gn cs pidv ∗ RetF X uecall_scause (uvis_of_run m pc M π sz fdv cw gn cs pidv false secc_all)) -∗
     resv_any cpu_id -∗
     TsoCtx.own_context XI -∗
     uv_bytes pt Mp t' -∗
@@ -1087,13 +1091,13 @@ Section UkGenEcallPost.
     iIntros "Hframe Hrun HR".
     iDestruct ("Hk" with "HR") as "(Hbak & Hfdr & Hkb & Hret)".
     iDestruct ("Hbak" with "Hrun") as "Hrut".
-    iApply ("Hkb" $! (uvis_of_run m pc M π sz fdv cw gn cs pidv false)
+    iApply ("Hkb" $! (uvis_of_run m pc M π sz fdv cw gn cs pidv false secc_all)
               (utrap_scause (rv64d_types.Exception (E_U_EnvCall tt))
                  (register_lookup (R_bitvector_64 scause) rsx))
               (tval (xtval_exception_value (E_U_EnvCall tt) (zeros' 64)))
-              with "[%] [%] [%] [%] [%] [%] [%] [%] [Hframe Hrut Hfdr Hret]");
+              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [Hframe Hrut Hfdr Hret]");
       [ reflexivity | reflexivity | reflexivity | reflexivity
-      | reflexivity | reflexivity | reflexivity | reflexivity | ].
+      | reflexivity | reflexivity | reflexivity | reflexivity | reflexivity | ].
     iSplitL "Hframe Hrut".
     { iApply (trapped_of_uv_trap_frame C pt Rut _ _ m pc M Mp sz π fdv cw gn cs pidv Hpure Hx0
                 with "Hframe Hrut"). }
@@ -1131,7 +1135,7 @@ Section UkGenEcall.
     (* the payment enters here and the return is behind it -- see
        [UkStep.wp_uk_ecall] *)
     my_pay gn Qp -∗
-    RetF X uecall_scause (uvis_of_run m pc M π sz fdv cw gn cs pidv false) -∗
+    RetF X uecall_scause (uvis_of_run m pc M π sz fdv cw gn cs pidv false secc_all) -∗
     mWP (Loop : expr riscv_lang).
   Proof using HQ0 HRut Hlf0 Hlo Hpm Ret_transparent X_unfold.
     intros Hui Hg.
@@ -1147,7 +1151,7 @@ Section UkGenEcall.
       "%HQo %Hlo' %Hpm' %Hlf' %Hpure %Hpre #Hamb Hk Hany Hrw Hro Hctx Hmm Hres".
     iAssert (R -∗ (TsoCtx.own_context (CID := CIDo) XIo -∗ Rut' pt') ∗ Rfd' fdv ∗
              ukb_F' (CID := CIDo) C' pt' Rfd' Rut' sz π fdv cw gn cs pidv ∗
-             RetF X uecall_scause (uvis_of_run m pc M π sz fdv cw gn cs pidv false))%I with "[Hk]" as "Hk".
+             RetF X uecall_scause (uvis_of_run m pc M π sz fdv cw gn cs pidv false secc_all))%I with "[Hk]" as "Hk".
     { iIntros "HR". iDestruct ("Hk" with "HR") as "(Hbak & Hfdr & Hkb & Hkc)".
       iDestruct "Hkc" as "(_ & Hkc)".
       iDestruct "Hkc" as "[Hkc _]". iFrame "Hbak Hfdr Hkb". iExact "Hkc". }
@@ -1908,13 +1912,14 @@ Section UkGenPlain.
      the only difference from [uslot_unfold] is one vacuous premise. *)
   Lemma uslot_unfold_gen (W : uvis) :
     uvis_lazy W = false ->
+    uvis_secc W = ProcDefs.secc_all ->
     uslot W ⊣⊢
     ukc' uexec_ret_F uslot (fun _ : CtxIdDefs.CurCtx => Logic.True) (uvis_perm W) (uvis_M W)
       (uvis_sz W) (uvis_fd W) (uvis_cwd W) (uvis_gen W) (uvis_ch W)
       (uvis_pid W)
       (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W)).
   Proof using .
-    intros Hlz. rewrite (uslot_unfold W) /ukc' /uvb_F' /ukont_F' /ukb_F' Hlz.
+    intros Hlz Hsc. rewrite (uslot_unfold W) /ukc' /uvb_F' /ukont_F' /ukb_F' Hlz Hsc.
     iSplit.
     - iIntros "H" (h xi C pt Rfd Rut HRut) "_ %Hlo %Hpm %Hlf Hb".
       iApply ("H" $! h xi C pt Rfd Rut HRut with "[%] [%] [%] Hb");
@@ -1951,9 +1956,9 @@ Section UkGenPlain.
          register_lookup cur_privilege s.(sregs) = User ->
          register_lookup (R_bitvector_64 PC) s.(sregs) = pc ->
          goodmb Du_r Du_w (execute (ECALL tt)) s ∅ = true) ->
-      uvb C pt Rfd Rut sz π fdv cw gn cs pidv false M m pc -∗
+      uvb C pt Rfd Rut sz π fdv cw gn cs pidv false secc_all M m pc -∗
       my_pay gn Qp -∗
-      uexec_ret uecall_scause (uvis_of_run m pc M π sz fdv cw gn cs pidv false) -∗
+      uexec_ret uecall_scause (uvis_of_run m pc M π sz fdv cw gn cs pidv false secc_all) -∗
       mWP (Loop : expr riscv_lang).
 
   (* inhabitant 1: upstream's own constant *)

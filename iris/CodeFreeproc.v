@@ -20,6 +20,7 @@ Require Import KernelDecode02.
 Require Import KernelDecode03.
 Require Import KernelDecode04.
 Require Import KernelDecode05.
+Require Import KernelDecode06.
 Require Import KernelDecode08.
 Require Import KernelDecode09.
 Require Import KernelDecode10.
@@ -35,7 +36,6 @@ Require Import KernelDecode23.
 Require Import KernelDecode26.
 Require Import KernelDecode27.
 Require Import KernelDecode28.
-Require Import KernelDecode30.
 Require Import KernelDecode31.
 Local Open Scope Z_scope.
 Import Defs.
@@ -115,9 +115,9 @@ Section CodeFreeproc.
   Proof using . mk_base (KernelSyms.freeproc + 0x2a) (mword_of_int 0x00011517 : mword 32)
     (mword_of_int (KernelSyms.freeproc + 0x2a) : mword 64) (UTYPE (mword_of_int 17 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00011517. Qed.
 
-  Lemma fri_2e : kernel_text -∗ instr (mword_of_int (KernelSyms.freeproc + 0x2e) : mword 64) false (ITYPE (mword_of_int 2284 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof using . mk_base (KernelSyms.freeproc + 0x2e) (mword_of_int 0x8ec50513 : mword 32)
-    (mword_of_int (KernelSyms.freeproc + 0x2e) : mword 64) (ITYPE (mword_of_int 2284 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_8ec50513. Qed.
+  Lemma fri_2e : kernel_text -∗ instr (mword_of_int (KernelSyms.freeproc + 0x2e) : mword 64) false (ITYPE (mword_of_int 2332 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof using . mk_base (KernelSyms.freeproc + 0x2e) (mword_of_int 0x91c50513 : mword 32)
+    (mword_of_int (KernelSyms.freeproc + 0x2e) : mword 64) (ITYPE (mword_of_int 2332 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_91c50513. Qed.
 
   Lemma fri_32 : kernel_text -∗ instr (mword_of_int (KernelSyms.freeproc + 0x32) : mword 64) false (JAL (mword_of_int 2093324 : mword 21, Regidx (mword_of_int 1))).
   Proof using . mk_base (KernelSyms.freeproc + 0x32) (mword_of_int 0x90cff0ef : mword 32)
@@ -131,9 +131,9 @@ Section CodeFreeproc.
   Proof using . mk_base (KernelSyms.freeproc + 0x3a) (mword_of_int 0x00011517 : mword 32)
     (mword_of_int (KernelSyms.freeproc + 0x3a) : mword 64) (UTYPE (mword_of_int 17 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00011517. Qed.
 
-  Lemma fri_3e : kernel_text -∗ instr (mword_of_int (KernelSyms.freeproc + 0x3e) : mword 64) false (ITYPE (mword_of_int 2268 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof using . mk_base (KernelSyms.freeproc + 0x3e) (mword_of_int 0x8dc50513 : mword 32)
-    (mword_of_int (KernelSyms.freeproc + 0x3e) : mword 64) (ITYPE (mword_of_int 2268 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_8dc50513. Qed.
+  Lemma fri_3e : kernel_text -∗ instr (mword_of_int (KernelSyms.freeproc + 0x3e) : mword 64) false (ITYPE (mword_of_int 2316 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof using . mk_base (KernelSyms.freeproc + 0x3e) (mword_of_int 0x90c50513 : mword 32)
+    (mword_of_int (KernelSyms.freeproc + 0x3e) : mword 64) (ITYPE (mword_of_int 2316 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_90c50513. Qed.
 
   Lemma fri_42 : kernel_text -∗ instr (mword_of_int (KernelSyms.freeproc + 0x42) : mword 64) false (JAL (mword_of_int 2093444 : mword 21, Regidx (mword_of_int 1))).
   Proof using . mk_base (KernelSyms.freeproc + 0x42) (mword_of_int 0x984ff0ef : mword 32)

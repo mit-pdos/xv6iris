@@ -197,10 +197,10 @@ Section UkReadPipe.
     iIntros (M pm sz fdv cw gn cs pidv) "%Hkey _ Hheap Hufd".
     iFrame "Hheap Hufd".
     iApply (sbundle_at_read_intro uslot (read_pipe_fam (ukn_pay N) Rp Rpe)
-              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)
+              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)
               (m !!! Regidx a0_idx) (m !!! Regidx a2_idx) fdv
               (tf_of_arg0 m pc) (tf_of_arg2 m pc)
-              (uvis_of_run_fd m pc M pm sz fdv cw gn cs pidv false)).
+              (uvis_of_run_fd m pc M pm sz fdv cw gn cs pidv false secc_all)).
     rewrite Hkey. rewrite /fileread_in /=. iIntros "$". iExact "Hpay".
   Qed.
 
@@ -583,10 +583,10 @@ Section UkReadPipe.
     iIntros (M pm sz fdv cw gn cs pidv) "%Htake _ Hheap Hufd".
     iFrame "Hheap Hufd".
     iApply (sbundle_at_read_intro uslot (read_pipe_fam (ukn_pay N) Rp Rpe)
-              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)
+              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)
               (m !!! Regidx a0_idx) (m !!! Regidx a2_idx) fdv
               (tf_of_arg0 m pc) (tf_of_arg2 m pc)
-              (uvis_of_run_fd m pc M pm sz fdv cw gn cs pidv false)).
+              (uvis_of_run_fd m pc M pm sz fdv cw gn cs pidv false secc_all)).
     rewrite (std_fd_st_of_key (m !!! Regidx a0_idx) fdv l fd
                (FdOpen true wb (FdPipe γp)) H0 Hlt Htake Hl).
     rewrite /fileread_in /=. iIntros "$". iExact "Hpay".

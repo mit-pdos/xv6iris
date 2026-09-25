@@ -1665,7 +1665,7 @@ Section UservecAllPt.
                        term on both sides (lane CONS-SWALLOW, W4) -- and the
                        lazy bit beside them, which the walk does not touch
                        either (lane LAZY-FLAG) *)
-                    eq_refl eq_refl eq_refl
+                    eq_refl eq_refl eq_refl eq_refl
                     with "Hxin")
       end. }
     { (* FORK'S DEPOSIT ACROSS THE SAVE WALK.  The row reads the whole
@@ -1688,7 +1688,7 @@ Section UservecAllPt.
           iApply (ut_fork_in_ueq _ sc_v (tf_of g (ret_pc sepc_v)) TF
                     (upd_usM (us_tf U (tf_of g (ret_pc sepc_v))) M) UU sts
                     (tf_of_length g (ret_pc sepc_v)) Hlf Hueqf
-                    eq_refl eq_refl eq_refl eq_refl eq_refl
+                    eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
                     with "Hfin")
       end. }
     { (* THE PAYMENT ACROSS THE SAVE WALK.  The row reads the number and
@@ -1705,7 +1705,7 @@ Section UservecAllPt.
                 lia);
           iApply (ut_pay_in_ueq _ sc_v (tf_of g (ret_pc sepc_v)) TF
                     (upd_usM (us_tf U (tf_of g (ret_pc sepc_v))) M) UU
-                    Hueqe eq_refl
+                    Hueqe eq_refl eq_refl
                     with "Hein")
       end. }
     { (* the key's generation is the block's, and the save walk moves no
@@ -1893,8 +1893,8 @@ Section UservecAllPt.
          [ud_data], which [perm_of] does not read. *)
       match goal with
       | |- uv_round _ _ _ _ _ ?UU =>
-          refine (uv_round_of_ut _ U M g sepc_v sc_v UU _ _ _ _ _ _
-                    (ut_round_same sepc_v sc_v _ U2 UU _ _ eq_refl _ _ _ Hrd2))
+          refine (uv_round_of_ut _ U M g sepc_v sc_v UU _ _ _ _ _ _ _
+                    (ut_round_same sepc_v sc_v _ U2 UU _ _ eq_refl _ _ _ _ Hrd2))
       end.
       + exact Hu36.
       + reflexivity.
@@ -1908,7 +1908,11 @@ Section UservecAllPt.
         cbn [us_V pv_cwi us_upt upd_upt upd_usV upd_usM us_tf upd_tf pv_gen pv_chg].
         reflexivity.
       + (* ...nor the lazy bit (lane LAZY-FLAG) *)
-        cbn [us_V pv_lazy us_upt upd_upt upd_usV upd_usM us_tf upd_tf pv_gen
+        cbn [us_V pv_lazy pv_secc us_upt upd_upt upd_usV upd_usM us_tf upd_tf pv_gen
+             pv_chg pv_cwi].
+        reflexivity.
+      + (* ...nor the mask *)
+        cbn [us_V pv_lazy pv_secc us_upt upd_upt upd_usV upd_usM us_tf upd_tf pv_gen
              pv_chg pv_cwi].
         reflexivity.
       + cbn [us_V pv_tf us_upt upd_upt upd_usV us_tf upd_tf]. exact Hws1.
@@ -1916,7 +1920,9 @@ Section UservecAllPt.
         rewrite Huptpt2. reflexivity.
       + cbn [us_V pv_sz us_upt upd_upt upd_usV us_tf upd_tf]. reflexivity.
       + cbn [us_V pv_cwi us_upt upd_upt upd_usV us_tf upd_tf pv_gen pv_chg]. reflexivity.
-      + cbn [us_V pv_lazy us_upt upd_upt upd_usV us_tf upd_tf pv_gen pv_chg
+      + cbn [us_V pv_lazy pv_secc us_upt upd_upt upd_usV us_tf upd_tf pv_gen pv_chg
+             pv_cwi]. reflexivity.
+      + cbn [us_V pv_lazy pv_secc us_upt upd_upt upd_usV us_tf upd_tf pv_gen pv_chg
              pv_cwi]. reflexivity.
     - (* THE ROUND'S DESCRIPTOR HALF, forwarded verbatim: this boundary
          moves no descriptor state of its own -- it saves and restores a
@@ -1926,7 +1932,7 @@ Section UservecAllPt.
     - (* ...and the children set's row, across the save walk: the guard
          reads the entry frame's a7 word only, and the two frames agree
          there ([ut_ch_kept_cong]). *)
-      refine (SpecUsertrap.ut_ch_kept_cong _ _ _ _ _ _ Hchk2);
+      refine (SpecUsertrap.ut_ch_kept_cong _ _ _ _ _ _ _ Hchk2);
         cbn [us_V pv_tf upd_usM us_tf upd_usV upd_tf];
         unfold UsysMemOk.usys_num, tf_arg_idx, tf_of; reflexivity.
     - (* ...and the generation's, verbatim: neither the save walk nor the
@@ -1938,19 +1944,19 @@ Section UservecAllPt.
          where this boundary speaks [tf_of g].  Those are the same words the
          round above crosses by; restricted to two indices the agreement is
          definitional, so the two side goals close by computation. *)
-      refine (SpecUsertrap.ut_fd_ecall_in _ _ _ _ _ _ _ _ Hfde2);
+      refine (SpecUsertrap.ut_fd_ecall_in _ _ _ _ _ _ _ _ _ Hfde2);
         cbn [us_V pv_tf us_upt upd_upt upd_usV us_tf upd_tf];
         unfold tf_arg_idx, tf_of; reflexivity.
     - (* ...and pipe's join across the same walk.  The trapframe side moves
          by the same two definitional lookups; the IMAGE side is [M] on the
          nose, the very map the entry frame handed in. *)
-      refine (SpecUsertrap.ut_pipe_ecall_in _ _ _ _ _ _ _ _ _ _ Hpipe2);
+      refine (SpecUsertrap.ut_pipe_ecall_in _ _ _ _ _ _ _ _ _ _ _ Hpipe2);
         cbn [us_V pv_tf us_upt upd_upt upd_usV us_tf upd_tf];
         unfold tf_arg_idx, tf_of; reflexivity.
     - (* ...and getpid's answer across the same walk: the row reads the
          entry frame at a7 alone ([SpecUsertrap.ut_ret_pid_in]) and the
          outgoing one at a0, which is the record usertrap left. *)
-      refine (SpecUsertrap.ut_ret_pid_in _ _ _ _ _ _ Hpidr2);
+      refine (SpecUsertrap.ut_ret_pid_in _ _ _ _ _ _ _ Hpidr2);
         cbn [us_V pv_tf us_upt upd_upt upd_usV us_tf upd_tf];
         unfold tf_arg_idx, tf_of; reflexivity.
     - (* the resume pc, straight off usertrap's own row *)
@@ -1980,10 +1986,10 @@ Section UservecAllPt.
          the image, permission map and break are the entry frame's own. *)
       match goal with
       | |- environments.envs_entails _
-             (SpecUsertrap.ut_exec_out _ _ _ _ _ _ _ ?UU' _ _ _ _ _) =>
+             (SpecUsertrap.ut_exec_out _ _ _ _ _ _ _ _ ?UU' _ _ _ _ _) =>
           iApply (SpecUsertrap.ut_exec_out_ueq _ sc_v _ (tf_of g (ret_pc sepc_v)) M
                     (UserPerm.perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U))))
-                    (uint (pv_sz (us_V U))) (pv_lazy (us_V U))
+                    (uint (pv_sz (us_V U))) (pv_lazy (us_V U)) (pv_secc (us_V U))
                     U2 UU' sts sts2 gn cs pid Hu36
                     ltac:(cbn [us_V pv_tf us_upt upd_upt upd_usV us_tf upd_tf];
                           rewrite Hws1; apply TfUser.tf_ueq_refl)
@@ -1995,7 +2001,11 @@ Section UservecAllPt.
                           reflexivity)
                     (* ...and the lazy bit, which neither move touches
                        (lane LAZY-FLAG) *)
-                    ltac:(cbn [us_V pv_lazy us_upt upd_upt upd_usV us_tf upd_tf
+                    ltac:(cbn [us_V pv_lazy pv_secc us_upt upd_upt upd_usV us_tf upd_tf
+                               pv_gen pv_chg pv_cwi];
+                          reflexivity)
+                    (* ...and the mask *)
+                    ltac:(cbn [us_V pv_lazy pv_secc us_upt upd_upt upd_usV us_tf upd_tf
                                pv_gen pv_chg pv_cwi];
                           reflexivity)
                     with "Hxo2")
@@ -2063,7 +2073,7 @@ Section UservecAllPt.
                        walk, so the key's permission projection is the same
                        term on both sides (lane CONS-SWALLOW, W4) -- and the
                        lazy bit beside them (lane LAZY-FLAG) *)
-                    eq_refl eq_refl eq_refl
+                    eq_refl eq_refl eq_refl eq_refl
                     with "Hso2")
       end.
   Qed.

@@ -433,6 +433,7 @@ Section UEchoKernel.
        it; exec's slot post is what will supply it there
        ([SpecKexec.exec_slot_pre], lane LAZY-FLAG's K4). *)
     uvis_lazy W = false ->
+    uvis_secc W = ProcDefs.secc_all ->
     (* NO ALL-PARKED PREMISE (lane OFF-HAND-6, H3): a record's held set is
        dead data now ([UkRun.urun_parked_row]), so this entry may be taken
        at a key with a HELD descriptor (design/app-file.md SS3 fact 4). *)
@@ -457,14 +458,14 @@ Section UEchoKernel.
     UkRun.urun_nopipe (uvis_fd W) -∗
     udep -∗ my_pay (uvis_gen W) (fun _ => True)%I -∗ uslot W.
   Proof using ghost_varG1.
-    intros Hpc Hsub Hx Hroom Hal8 Hstk Hargs Havd Havs Hfdlen Hstop Hlzf.
+    intros Hpc Hsub Hx Hroom Hal8 Hstk Hargs Havd Havs Hfdlen Hstop Hlzf Hscf.
     iIntros "#Hwr #Hnpw #Hdep #Hpay".
     assert (Hsp0 : 0 <= uint (uvis_sp W)) by lia.
     assert (Hargc0 : 0 <= uvis_argc W)
       by exact (proj1 (uka_argc _ _ _ _ _ _ Hargs)).
     iApply (uslot_of_urun_ro W 12 (fun _ => True)%I
               Hal8
-              ltac:(unfold uvis_sp in Hroom; lia) Hstk Hfdlen Hstop Hlzf
+              ltac:(unfold uvis_sp in Hroom; lia) Hstk Hfdlen Hstop Hlzf Hscf
               with "Hdep Hnpw Hpay").
     (* echo makes no descriptor call, so its ledger is dropped here *)
     (* echo makes no descriptor call, no chdir and no fork, so its ledger,

@@ -834,6 +834,12 @@
   2
  ],
  [
+  "CodeSysSeccomp.v",
+  "sys_seccomp",
+  "secci_",
+  2
+ ],
+ [
   "CodeSysSync.v",
   "sys_sync",
   "ssi_",

@@ -125,9 +125,9 @@ Proof.
            pd_base_nonneg pd_stride_pos pd_end_fits Hj).
 Qed.
 
-(* p++ : the [addi s1,s1,360] at +0x66. *)
+(* p++ : the [addi s1,s1,368] at +0x66. *)
 Lemma pd_cur_succ (j : nat) :
-  add_vec (pd_cur j) (sign_extend' 64 (mword_of_int 360 : mword 12)) = pd_cur (S j).
+  add_vec (pd_cur j) (sign_extend' 64 (mword_of_int 368 : mword 12)) = pd_cur (S j).
 Proof.
   apply (acur_step pd_base proc_size j).
   apply bv_eq; vm_compute; reflexivity.

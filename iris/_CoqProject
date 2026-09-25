@@ -322,6 +322,7 @@ UCodeInit.v
 UInitArgv.v
 UCodeCat.v
 UCodeGrep.v
+UCodeSeccomp.v
 UkGrepLib.v
 UkGrepMatch.v
 UkGrepPutc.v
@@ -804,6 +805,10 @@ SpecSysGetpid.v
 CodeSysGetpid.v
 ProofSysGetpid.v
 LinkSysGetpid.v
+SpecSysSeccomp.v
+CodeSysSeccomp.v
+ProofSysSeccomp.v
+LinkSysSeccomp.v
 SpecArgraw.v
 CodeArgraw.v
 ProofArgraw.v

@@ -150,7 +150,7 @@ Section UShCatFStage.
          ⌜take NSTD sts !! 2%nat = Some (FdOpen rb2 true (FdDevice ConsoleInv.CONSOLE))⌝ -∗
          UkRun.urun_nopipe sts -∗
          image_entry ElfUser.cat_elf M (mword_of_int (t + 8) : mword 64)
-           sts FsImg.ROOTINO cs pidv (fun _ : Z => Qv) Cr uslot) -∗
+           sts FsImg.ROOTINO ProcDefs.secc_all cs pidv (fun _ : Z => Qv) Cr uslot) -∗
     □ (app_taint -∗ Qv) -∗
     UShCatPay.sh_cat_slot T -∗
     UkShEcho.sh_exec_sup_echo_at (SG := uexecSG_xv6) (catf_rows γp)
@@ -193,7 +193,7 @@ Section UShCatFStage.
     iPoseProof ("Hent" $! M s0 t gn fdv chs pidv rb1 rb2 with "[%] [%] [%] [%] [%] Hnp0") as "#He";
       [ exact Himg | exact Hbytes | exact Hflen | rewrite Hl; exact Hl1 | rewrite Hl; exact Hl2 | ].
     iApply (UShEchoPipePay.image_entry_pay_mono ElfUser.cat_elf M
-              (mword_of_int (t + 8) : mword 64) fdv FsImg.ROOTINO chs pidv
+              (mword_of_int (t + 8) : mword 64) fdv FsImg.ROOTINO ProcDefs.secc_all chs pidv
               (fun _ : Z => Qv) Cr (UserFd.ustd (ukn_fd N') ld ∗ Cr)%I uslot with "[] He").
     iIntros "!> [_ Hc]". iExact "Hc".
   Qed.
@@ -416,7 +416,7 @@ Section UShCatFStage.
               with "[] [] Hslot").
     - iIntros "!>" (M s1 t1 g1 sts cs pidv rb1 rb2) "%Hi1 %Hb1 %Hl1 %Hr1 %Hr2 #Hnp".
       iApply (UShEchoPipePay.image_entry_pay_mono ElfUser.cat_elf M
-                (mword_of_int (t1 + 8) : mword 64) sts FsImg.ROOTINO cs pidv
+                (mword_of_int (t1 + 8) : mword 64) sts FsImg.ROOTINO ProcDefs.secc_all cs pidv
                 (fun _ : Z => QcR (fdq rf qf sf) 0) (LEND f qf sf γp ds) (prod_crD γp (fdq rf qf sf))
                 uslot
                 with "Hlend [Hnp]").

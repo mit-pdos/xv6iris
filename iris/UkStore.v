@@ -479,8 +479,8 @@ Section UkStorePostFetch.
     uv_tree_ok pt (upa_map pt Mp) t' ->
     uk_pt_pure pt sz M Mp ->
     gen_cert -∗ uv_amb -∗
-    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw gn cs pidv false ∗
-          (uvb C pt Rfd Rut sz π fdv cw gn cs pidv false (uM_store M (uint va) kk wval) m (add_vec_int pc dpc) -∗
+    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw gn cs pidv false ProcDefs.secc_all ∗
+          (uvb C pt Rfd Rut sz π fdv cw gn cs pidv false ProcDefs.secc_all (uM_store M (uint va) kk wval) m (add_vec_int pc dpc) -∗
            mWP (Loop : expr riscv_lang))) -∗
     resv_any cpu_id -∗
     TsoCtx.own_context XI -∗
@@ -818,7 +818,7 @@ Section UkStorePostFetch.
     (⊢ (Kcx ∗ ChildTok.my_pay gn Qp -∗
         (app_taint ∨ (ChildTok.kill_owed gn ∗
             sbundle_at uslot USYS_exit fx
-              (uvis_of_run m pc M π sz fdv cw gn cs pidv false))) : iProp Σ)) ->
+              (uvis_of_run m pc M π sz fdv cw gn cs pidv false ProcDefs.secc_all))) : iProp Σ)) ->
     Z.rem (uint va) 4096 <= 4096 - kk ->
     uva_inj pt Mp ->
     match o with
@@ -852,9 +852,9 @@ Section UkStorePostFetch.
     uv_tree_ok pt (upa_map pt Mp) t' ->
     uk_pt_pure pt sz M Mp ->
     gen_cert -∗ uv_amb -∗
-    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw gn cs pidv false ∗
+    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw gn cs pidv false ProcDefs.secc_all ∗
           UkStep.uk_paycont Qp gn
-            (Kcx ∧ uslot (uvis_of_run m pc M π sz fdv cw gn cs pidv false))) -∗
+            (Kcx ∧ uslot (uvis_of_run m pc M π sz fdv cw gn cs pidv false ProcDefs.secc_all))) -∗
     resv_any cpu_id -∗
     TsoCtx.own_context XI -∗
     uv_bytes pt Mp t' -∗
@@ -1069,13 +1069,13 @@ Section UkStorePostFetch.
     iIntros "Hframe Hctx HR".
     iDestruct ("Hk" with "HR") as "(Hbak & Hfdr & Hkb & Hret)".
     iDestruct ("Hbak" with "Hctx") as "Hrut".
-    iApply ("Hkb" $! (uvis_of_run m pc M π sz fdv cw gn cs pidv false)
+    iApply ("Hkb" $! (uvis_of_run m pc M π sz fdv cw gn cs pidv false ProcDefs.secc_all)
               (utrap_scause (rv64d_types.Exception (E_SAMO_Page_Fault tt))
                  (register_lookup (R_bitvector_64 scause) rsx))
               (tval (xtval_exception_value (E_SAMO_Page_Fault tt) va))
-              with "[%] [%] [%] [%] [%] [%] [%] [%] [Hframe Hrut Hfdr Hret]");
+              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [Hframe Hrut Hfdr Hret]");
       [ reflexivity | reflexivity | reflexivity | reflexivity
-      | reflexivity | reflexivity | reflexivity | reflexivity | ].
+      | reflexivity | reflexivity | reflexivity | reflexivity | reflexivity | ].
     iSplitL "Hframe Hrut".
     { iApply (trapped_of_uv_trap_frame C pt Rut _ _ m pc M Mp sz π fdv cw gn cs pidv Hpure Hx0
                 with "Hframe Hrut"). }
@@ -1083,7 +1083,7 @@ Section UkStorePostFetch.
        second conjunct); the key is built AT [fdv], so this is [Rfd fdv] *)
     iSplitL "Hfdr"; [ iExact "Hfdr" | ].
     iApply (bi.equiv_entails_1_2 _ _
-              (uexec_ret_transparent _ (uvis_of_run m pc M π sz fdv cw gn cs pidv false)
+              (uexec_ret_transparent _ (uvis_of_run m pc M π sz fdv cw gn cs pidv false ProcDefs.secc_all)
                  (utrap_scause_samo_ne
                     (register_lookup (R_bitvector_64 scause) rsx)))).
     rewrite /UexecRet.uexec_kill_arm /UexecRet.uexec_kill_arm_F.
@@ -1093,7 +1093,7 @@ Section UkStorePostFetch.
     iDestruct "Hret" as "(#Hmyp & Hret)".
     iExists fx.
     iSplitR;
-      [ iApply (uexec_pay_dep_ne _ (uvis_of_run m pc M π sz fdv cw gn cs pidv false) _ fx
+      [ iApply (uexec_pay_dep_ne _ (uvis_of_run m pc M π sz fdv cw gn cs pidv false ProcDefs.secc_all) _ fx
                   (utrap_scause_samo_ne (register_lookup (R_bitvector_64 scause) rsx))
                   Hfx with "Hmyp") | ].
     (* THE KILL ROW, out of the fault witness -- the LEFT side of the
@@ -1175,18 +1175,18 @@ Section UkStoreObl.
      ⊢ (Kcx ∗ ChildTok.my_pay gn Qp -∗
         (app_taint ∨ (ChildTok.kill_owed gn ∗
             sbundle_at uslot USYS_exit fx
-              (uvis_of_run m pc M π sz fdv cw gn cs pidv false))) : iProp Σ)) ->
+              (uvis_of_run m pc M π sz fdv cw gn cs pidv false ProcDefs.secc_all))) : iProp Σ)) ->
     uva_canon va ->
     Z.rem (uint va) 4096 <= 4096 - kk ->
     is_aligned_vaddr (Virtaddr va) kk = true ->
     gen_cert -∗ uv_amb -∗
     uv_fetch_bridge (uc_dqc C) pt Mp rsA t (F_Base w) -∗
-    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw gn cs pidv false ∗
+    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw gn cs pidv false ProcDefs.secc_all ∗
           ((⌜uk_store_retires pt Mp va kk⌝ -∗
-            uvb C pt Rfd Rut sz π fdv cw gn cs pidv false (uM_store M (uint va) kk wval) m (add_vec_int pc 4) -∗
+            uvb C pt Rfd Rut sz π fdv cw gn cs pidv false ProcDefs.secc_all (uM_store M (uint va) kk wval) m (add_vec_int pc 4) -∗
             mWP (Loop : expr riscv_lang))
            ∧ UkStep.uk_paycont Qp gn
-               (Kcx ∧ uslot (uvis_of_run m pc M π sz fdv cw gn cs pidv false)))) -∗
+               (Kcx ∧ uslot (uvis_of_run m pc M π sz fdv cw gn cs pidv false ProcDefs.secc_all)))) -∗
     resv_any cpu_id -∗
     hreg_frame rsA u_Drw -∗ hreg_frame_ro (u_Df (uc_dqc C)) rsA u_Dro -∗
     TsoCtx.own_context XI -∗
@@ -1350,18 +1350,18 @@ Section UkStoreObl.
      ⊢ (Kcx ∗ ChildTok.my_pay gn Qp -∗
         (app_taint ∨ (ChildTok.kill_owed gn ∗
             sbundle_at uslot USYS_exit fx
-              (uvis_of_run m pc M π sz fdv cw gn cs pidv false))) : iProp Σ)) ->
+              (uvis_of_run m pc M π sz fdv cw gn cs pidv false ProcDefs.secc_all))) : iProp Σ)) ->
     uva_canon va ->
     Z.rem (uint va) 4096 <= 4096 - kk ->
     is_aligned_vaddr (Virtaddr va) kk = true ->
     gen_cert -∗ uv_amb -∗
     uv_fetch_bridge (uc_dqc C) pt Mp rsA t (F_RVC h) -∗
-    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw gn cs pidv false ∗
+    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw gn cs pidv false ProcDefs.secc_all ∗
           ((⌜uk_store_retires pt Mp va kk⌝ -∗
-            uvb C pt Rfd Rut sz π fdv cw gn cs pidv false (uM_store M (uint va) kk wval) m (add_vec_int pc 2) -∗
+            uvb C pt Rfd Rut sz π fdv cw gn cs pidv false ProcDefs.secc_all (uM_store M (uint va) kk wval) m (add_vec_int pc 2) -∗
             mWP (Loop : expr riscv_lang))
            ∧ UkStep.uk_paycont Qp gn
-               (Kcx ∧ uslot (uvis_of_run m pc M π sz fdv cw gn cs pidv false)))) -∗
+               (Kcx ∧ uslot (uvis_of_run m pc M π sz fdv cw gn cs pidv false ProcDefs.secc_all)))) -∗
     resv_any cpu_id -∗
     hreg_frame rsA u_Drw -∗ hreg_frame_ro (u_Df (uc_dqc C)) rsA u_Dro -∗
     TsoCtx.own_context XI -∗
@@ -1547,7 +1547,7 @@ Section UkStore.
     is_aligned_vaddr (Virtaddr va) k = true ->
     (forall j : nat, (j < Z.to_nat k)%nat ->
        exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
-    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false M m pc -∗
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false ProcDefs.secc_all M m pc -∗
     ▷ ukcq Qp π (uM_store M (uint va) k wval) sz fdv cw gn cs pidv m (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using HRut Hlf0 Hlo Hpm.
@@ -1629,7 +1629,7 @@ Section UkStore.
                       (app_taint ∨
                        (ChildTok.kill_owed gn ∗
                         sbundle_at uslot USYS_exit (sfam_at Qp sfam_pt)
-                          (uvis_of_run m pc M π sz fdv cw gn cs pidv false)))
+                          (uvis_of_run m pc M π sz fdv cw gn cs pidv false ProcDefs.secc_all)))
                       : iProp Σ)).
     { intros Hfl. exfalso.
       destruct (lazy_free_wmapped pt' sz (svpn_of va) q Hwf' Hlf'
@@ -1656,13 +1656,13 @@ Section UkStore.
                         HgagA & LstvecA & LmieA & LmdlA & LmedlA & LmenvA &
                         LsatpA & LpcfgA & LpaddrA & LmiA & Hx0).
     (* the continuation at THIS table, out of the table-generic one *)
-    iAssert (R -∗ (TsoCtx.own_context (CID := CIDo) XIo -∗ Rut' pt') ∗ Rfd' fdv ∗ ukb C' pt' Rfd' Rut' sz π fdv cw gn cs pidv false ∗
+    iAssert (R -∗ (TsoCtx.own_context (CID := CIDo) XIo -∗ Rut' pt') ∗ Rfd' fdv ∗ ukb C' pt' Rfd' Rut' sz π fdv cw gn cs pidv false ProcDefs.secc_all ∗
              ((⌜uk_store_retires pt' Mp' va k⌝ -∗
-               uvb (CID := CIDo) C' pt' Rfd' Rut' sz π fdv cw gn cs pidv false (uM_store M (uint va) k wval) m
+               uvb (CID := CIDo) C' pt' Rfd' Rut' sz π fdv cw gn cs pidv false ProcDefs.secc_all (uM_store M (uint va) k wval) m
                  (add_vec_int pc (if is_rvc then 2 else 4)) -∗
                mWP (Loop : expr riscv_lang))
               ∧ UkStep.uk_paycont Qp gn
-                  (True ∧ uslot (uvis_of_run m pc M π sz fdv cw gn cs pidv false))))%I with "[Hk]" as "Hk".
+                  (True ∧ uslot (uvis_of_run m pc M π sz fdv cw gn cs pidv false ProcDefs.secc_all))))%I with "[Hk]" as "Hk".
     { iIntros "HR". iDestruct ("Hk" with "HR") as "(Hrut & Hfdr & Hkb & Hkc)".
       iFrame "Hrut Hfdr Hkb". iSplit.
       - (* the RETIRE leg: the continuation's own side.  The guard is free
@@ -1724,7 +1724,7 @@ Section UkStore.
     is_aligned_vaddr (Virtaddr va) k = true ->
     (forall j : nat, (j < Z.to_nat k)%nat ->
        exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
-    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false M m pc -∗
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false ProcDefs.secc_all M m pc -∗
     ukcq Qp π (uM_store M (uint va) k wval) sz fdv cw gn cs pidv m (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using HRut Hlf0 Hlo Hpm.
@@ -1791,7 +1791,7 @@ Section UkStore.
     uva_canon va ->
     Z.rem (uint va) 4096 <= 4096 - k ->
     is_aligned_vaddr (Virtaddr va) k = true ->
-    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false M m pc -∗
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false ProcDefs.secc_all M m pc -∗
     ChildTok.my_pay gn Qp -∗
     (* THE PAYLOAD AT THE KILL STATUS, AS A RESOURCE (the IO-LEAF review).
        It used to be the Coq-level [⊢ Qp (-1)] -- "the payload is free" --
@@ -1806,7 +1806,7 @@ Section UkStore.
        since xv6's kexit closes every descriptor that now includes one
        close payment per row of its table. *)
     sbundle_at uslot USYS_exit fx
-      (uvis_of_run m pc M π sz fdv cw gn cs pidv false) -∗
+      (uvis_of_run m pc M π sz fdv cw gn cs pidv false ProcDefs.secc_all) -∗
     mWP (Loop : expr riscv_lang).
   Proof using HRut Hlf0 Hlo Hpm.
     intros Hfx Hkw Hui Hred Hg1 Hlpad Hexp Hva Hwval Hden Hcanon Hpg Hal.
@@ -1817,12 +1817,12 @@ Section UkStore.
        and the tear-down's close payments *)
     iAssert (▷ (ChildTok.my_pay gn Qp ∗
                 (Qp (-1) ∗ sbundle_at uslot USYS_exit fx
-                             (uvis_of_run m pc M π sz fdv cw gn cs pidv false))))%I
+                             (uvis_of_run m pc M π sz fdv cw gn cs pidv false ProcDefs.secc_all))))%I
       with "[Hpay Hrow]" as "Hkc";
       [ iNext; iFrame "Hmy Hpay Hrow" | ].
     iApply (wp_uk_step C pt Rfd Rut π sz Hlo Hpm HRut Hlf0
               (Qp (-1) ∗ sbundle_at uslot USYS_exit fx
-                           (uvis_of_run m pc M π sz fdv cw gn cs pidv false))%I
+                           (uvis_of_run m pc M π sz fdv cw gn cs pidv false ProcDefs.secc_all))%I
               Qp M m pc
               fdv cw gn cs pidv Hal2 with "Hb [] Hkc").
     iModIntro.
@@ -1849,11 +1849,11 @@ Section UkStore.
     (* THE PRICE, and it is the process's own ([ChildTok.kill_owed]) *)
     assert (Hkcf : u_fault_flavor (Store Data) (ud_tfp pt') (ud_um pt') va ->
                    ⊢ ((Qp (-1) ∗ sbundle_at uslot USYS_exit fx
-                                   (uvis_of_run m pc M π sz fdv cw gn cs pidv false))
+                                   (uvis_of_run m pc M π sz fdv cw gn cs pidv false ProcDefs.secc_all))
                       ∗ ChildTok.my_pay gn Qp -∗
                       (app_taint ∨ (ChildTok.kill_owed gn ∗
                        sbundle_at uslot USYS_exit fx
-                         (uvis_of_run m pc M π sz fdv cw gn cs pidv false))) : iProp Σ)).
+                         (uvis_of_run m pc M π sz fdv cw gn cs pidv false ProcDefs.secc_all))) : iProp Σ)).
     { intros _. iIntros "((Hp & Hb) & #Hm)". iRight. iFrame "Hb".
       iApply (ChildTok.kill_owed_of gn Qp with "Hm Hp"). }
     iPoseProof "Hamb" as "(#Hhw & _ & _)".
@@ -1863,15 +1863,15 @@ Section UkStore.
     pose proof Hpre as (Hinj & Htok & HpinsA & LhsA & LcpA & HmsokA & LpcA &
                         HgagA & LstvecA & LmieA & LmdlA & LmedlA & LmenvA &
                         LsatpA & LpcfgA & LpaddrA & LmiA & Hx0).
-    iAssert (R -∗ (TsoCtx.own_context (CID := CIDo) XIo -∗ Rut' pt') ∗ Rfd' fdv ∗ ukb C' pt' Rfd' Rut' sz π fdv cw gn cs pidv false ∗
+    iAssert (R -∗ (TsoCtx.own_context (CID := CIDo) XIo -∗ Rut' pt') ∗ Rfd' fdv ∗ ukb C' pt' Rfd' Rut' sz π fdv cw gn cs pidv false ProcDefs.secc_all ∗
              ((⌜uk_store_retires pt' Mp' va k⌝ -∗
-               uvb (CID := CIDo) C' pt' Rfd' Rut' sz π fdv cw gn cs pidv false (uM_store M (uint va) k wval) m
+               uvb (CID := CIDo) C' pt' Rfd' Rut' sz π fdv cw gn cs pidv false ProcDefs.secc_all (uM_store M (uint va) k wval) m
                  (add_vec_int pc (if is_rvc then 2 else 4)) -∗
                mWP (Loop : expr riscv_lang))
               ∧ UkStep.uk_paycont Qp gn
                   ((Qp (-1) ∗ sbundle_at uslot USYS_exit fx
-                                (uvis_of_run m pc M π sz fdv cw gn cs pidv false))
-                   ∧ uslot (uvis_of_run m pc M π sz fdv cw gn cs pidv false))))%I with "[Hk]" as "Hk".
+                                (uvis_of_run m pc M π sz fdv cw gn cs pidv false ProcDefs.secc_all))
+                   ∧ uslot (uvis_of_run m pc M π sz fdv cw gn cs pidv false ProcDefs.secc_all))))%I with "[Hk]" as "Hk".
     { iIntros "HR". iDestruct ("Hk" with "HR") as "(Hrut & Hfdr & Hkb & Hkc)".
       iFrame "Hrut Hfdr Hkb". iSplit.
       - (* the RETIRE leg is UNREACHABLE and says so *)
@@ -1894,7 +1894,7 @@ Section UkStore.
       iApply (uk_store_obl_rvc C' pt' Rfd' R Rut' sz π M Mp' m pc h i o k imm rs1 rs2 va wval
                 t usatp pcfg paddr rs1s rsA fdv cw gn cs pidv
                 (Qp (-1) ∗ sbundle_at uslot USYS_exit fx
-                             (uvis_of_run m pc M π sz fdv cw gn cs pidv false))%I
+                             (uvis_of_run m pc M π sz fdv cw gn cs pidv false ProcDefs.secc_all))%I
                 fx Hfx
                 Hpre Hpure Hdecrvc Hkw Hred Hg1 Hexp
                 Hva Hwval Hdisp Hkcf Hcanon Hpg Hal
@@ -1903,7 +1903,7 @@ Section UkStore.
       iApply (uk_store_obl_base C' pt' Rfd' R Rut' sz π M Mp' m pc w i o k imm rs1 rs2 va wval
                 t usatp pcfg paddr rs1s rsA fdv cw gn cs pidv
                 (Qp (-1) ∗ sbundle_at uslot USYS_exit fx
-                             (uvis_of_run m pc M π sz fdv cw gn cs pidv false))%I
+                             (uvis_of_run m pc M π sz fdv cw gn cs pidv false ProcDefs.secc_all))%I
                 fx Hfx
                 Hpre Hpure Hdecbase Hkw Hred Hg1 Hexp
                 Hva Hwval Hdisp Hkcf Hcanon Hpg Hal
@@ -1925,7 +1925,7 @@ Section UkStore.
     Z.rem (uint va) 4096 <= 4088 ->
     is_aligned_vaddr (Virtaddr va) 8 = true ->
     (forall j : nat, (j < 8)%nat -> exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
-    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false M m pc -∗
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false ProcDefs.secc_all M m pc -∗
     ukcq Qp π (uM_store8 M (uint va) wval) sz fdv cw gn cs pidv m (add_vec_int pc 4) -∗
     mWP (Loop : expr riscv_lang).
   Proof using HRut Hlf0 Hlo Hpm.
@@ -1950,7 +1950,7 @@ Section UkStore.
     Z.rem (uint va) 4096 <= 4092 ->
     is_aligned_vaddr (Virtaddr va) 4 = true ->
     (forall j : nat, (j < 4)%nat -> exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
-    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false M m pc -∗
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false ProcDefs.secc_all M m pc -∗
     ukcq Qp π (uM_store M (uint va) 4 wval) sz fdv cw gn cs pidv m (add_vec_int pc 4) -∗
     mWP (Loop : expr riscv_lang).
   Proof using HRut Hlf0 Hlo Hpm.
@@ -1973,7 +1973,7 @@ Section UkStore.
     uk_store_ok va ->
     uva_canon va ->
     M !! (uint va) = Some bb ->
-    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false M m pc -∗
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false ProcDefs.secc_all M m pc -∗
     ukcq Qp π (uM_store M (uint va) 1 wval) sz fdv cw gn cs pidv m (add_vec_int pc 4) -∗
     mWP (Loop : expr riscv_lang).
   Proof using HRut Hlf0 Hlo Hpm.
@@ -2005,13 +2005,13 @@ Section UkStore.
     wval = m !!! Regidx rs2 ->
     uk_store_denied va ->
     uva_canon va ->
-    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false M m pc -∗
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false ProcDefs.secc_all M m pc -∗
     ChildTok.my_pay gn Qp -∗
     (* the payload at the kill status, as a RESOURCE (the IO-LEAF review) *)
     Qp (-1) -∗
     (* ...and the tear-down's close payments (design/pipe.md) *)
     sbundle_at uslot USYS_exit fx
-      (uvis_of_run m pc M π sz fdv cw gn cs pidv false) -∗
+      (uvis_of_run m pc M π sz fdv cw gn cs pidv false ProcDefs.secc_all) -∗
     mWP (Loop : expr riscv_lang).
   Proof using HRut Hlf0 Hlo Hpm.
     intros Hfx Hui Hva Hwval Hden Hcanon.
@@ -2036,7 +2036,7 @@ Section UkStore.
     Z.rem (uint tgt) 4096 <= 4088 ->
     is_aligned_vaddr (Virtaddr tgt) 8 = true ->
     (forall j : nat, (j < 8)%nat -> exists bb : bv 8, M !! (uint tgt + Z.of_nat j) = Some bb) ->
-    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false M m pc -∗
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false ProcDefs.secc_all M m pc -∗
     ukcq Qp π (uM_store8 M (uint tgt) wval) sz fdv cw gn cs pidv m (add_vec_int pc 2) -∗
     mWP (Loop : expr riscv_lang).
   Proof using HRut Hlf0 Hlo Hpm.
@@ -2069,7 +2069,7 @@ Section UkStore.
     Z.rem (uint va) 4096 <= 4088 ->
     is_aligned_vaddr (Virtaddr va) 8 = true ->
     (forall j : nat, (j < 8)%nat -> exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
-    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false M m pc -∗
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false ProcDefs.secc_all M m pc -∗
     ukcq Qp π (uM_store8 M (uint va) wval) sz fdv cw gn cs pidv m (add_vec_int pc 2) -∗
     mWP (Loop : expr riscv_lang).
   Proof using HRut Hlf0 Hlo Hpm.
@@ -2106,7 +2106,7 @@ Section UkStore.
     Z.rem (uint va) 4096 <= 4092 ->
     is_aligned_vaddr (Virtaddr va) 4 = true ->
     (forall j : nat, (j < 4)%nat -> exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
-    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false M m pc -∗
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false ProcDefs.secc_all M m pc -∗
     ukcq Qp π (uM_store M (uint va) 4 wval) sz fdv cw gn cs pidv m (add_vec_int pc 2) -∗
     mWP (Loop : expr riscv_lang).
   Proof using HRut Hlf0 Hlo Hpm.

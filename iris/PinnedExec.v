@@ -198,7 +198,7 @@ Section PinnedExec.
      [pinned_exec_bundle_boot] is handed them). *)
   Lemma pex_slot_at (γfs : fs_names) (X : uvis -d> iPropO Σ)
       (Pin : aview -> Prop) (T : iProp Σ) `{!Persistent T} `{!Timeless T}
-      (cw : Z) (pl : list (bv 8)) (hops : list Z) (ino : Z)
+      (cw : Z) (secc : mword 64) (pl : list (bv 8)) (hops : list Z) (ino : Z)
       (f : elf_bytes) (nl : nat) (Pay : iProp Σ) (Q : Z -> iProp Σ)
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) (cs : gset gname) (pidv : mword 32) :
@@ -211,6 +211,7 @@ Section PinnedExec.
     □ (∀ W' : uvis,
          ⌜kexec_image_ok f na alen afun sts W'⌝ -∗
          ⌜uvis_cwd W' = cw⌝ -∗ ⌜uvis_lazy W' = false⌝ -∗
+         ⌜uvis_secc W' = secc⌝ -∗
          (* ...AND THE TWO IDENTITY ROWS (lane EXEC-SEAM): the resumed
             key's children set and pid are the caller's *)
          ⌜uvis_ch W' = cs⌝ -∗ ⌜uvis_pid W' = pidv⌝ -∗
@@ -222,7 +223,7 @@ Section PinnedExec.
     □ (∀ W' : uvis, T -∗ my_pay (uvis_gen W') Q -∗ X W') -∗
     Pay -∗
     exec_slot_pre X Q (pobs_P T hops (length (path_elems pl)))
-      (pobs_recv Pin T) cw na alen afun sts cs pidv.
+      (pobs_recv Pin T) cw secc na alen afun sts cs pidv.
   (* ...AND IT IS [ExecBundle.exec_slot_of_entry_at] AT THE PIN.  The two
      arms are stated and proved there, over an ARBITRARY supplier of
      [ex_node_id]; what is left here is which supplier, and the [□]
@@ -230,7 +231,7 @@ Section PinnedExec.
   Proof using .
     intros Hres Hload. iIntros "#Hcon #Hgen HPay".
     iApply (exec_slot_of_entry_at X T (pobs_P T hops (length (path_elems pl)))
-              (pobs_recv Pin T) f nl Pay Q cw na alen afun sts cs pidv Hload
+              (pobs_recv Pin T) f nl Pay Q cw secc na alen afun sts cs pidv Hload
               with "[] [] [] HPay").
     - iApply (pobs_node_id Pin T cw pl hops ino (MkAnode (AFile f) nl) Hres).
     - rewrite /image_entry_at. iExact "Hcon".
@@ -239,7 +240,7 @@ Section PinnedExec.
 
   Lemma pex_slot (γfs : fs_names) (X : uvis -d> iPropO Σ)
       (Pin : aview -> Prop) (T : iProp Σ) `{!Persistent T} `{!Timeless T}
-      (cw : Z) (pl : list (bv 8)) (hops : list Z) (ino : Z)
+      (cw : Z) (secc : mword 64) (pl : list (bv 8)) (hops : list Z) (ino : Z)
       (f : elf_bytes) (nl : nat) (Pay : iProp Σ)
       (* THE EXEC'D PROCESS'S PAYLOAD.  The kernel hands the slot wands the
          exec'ing process's own [ChildTok.my_pay] at it ([SpecKexec.
@@ -278,6 +279,7 @@ Section PinnedExec.
             [false]. *)
          ⌜uvis_cwd W' = cw⌝ -∗
          ⌜uvis_lazy W' = false⌝ -∗
+         ⌜uvis_secc W' = secc⌝ -∗
          (* ...AND ITS TWO IDENTITY ROWS (lane EXEC-SEAM): the children
             set and the pid are the caller's, so a freshly exec'd program
             can say it has no children yet and is not <init>. *)
@@ -311,14 +313,14 @@ Section PinnedExec.
     □ (∀ W' : uvis, T -∗ my_pay (uvis_gen W') Q -∗ X W') -∗
     Pay -∗
     pf_at (fun S => sys_exec_slot_pre S Q (pobs_P T hops) (pobs_recv Pin T)
-                      cw M pv av sts cs pidv) (MkPfam X Pay).
+                      cw secc M pv av sts cs pidv) (MkPfam X Pay).
   (* ...AND IT IS [ExecBundle.sys_exec_slot_of_entry] AT THE PIN: the path
      reading's uniqueness, the argument reading's relay into the entry and
      the two arms are all stated there; the pin supplies [ex_node_id]. *)
   Proof using .
     intros Hres Hload Hpath. iIntros "#Hcon #Hgen HPay".
     iApply (sys_exec_slot_of_entry X T (pobs_P T hops) (pobs_recv Pin T)
-              f nl Pay Q cw pl M pv av sts cs pidv Hload Hpath
+              f nl Pay Q cw secc pl M pv av sts cs pidv Hload Hpath
               with "[] [] [] HPay").
     - iApply (pobs_node_id Pin T cw pl hops ino (MkAnode (AFile f) nl) Hres).
     - rewrite /image_entry. iExact "Hcon".
@@ -331,7 +333,7 @@ Section PinnedExec.
 
   Lemma pinned_exec_bundle_at (γfs : fs_names) (X : uvis -d> iPropO Σ)
       (Pin : aview -> Prop) (T : iProp Σ) `{!Persistent T} `{!Timeless T}
-      (cw : Z) (pl : list (bv 8)) (hops : list Z) (ino : Z)
+      (cw : Z) (secc : mword 64) (pl : list (bv 8)) (hops : list Z) (ino : Z)
       (f : elf_bytes) (nl : nat) (Pay : iProp Σ) (Q : Z -> iProp Σ)
       (M : gmap Z (bv 8)) (pv av : mword 64) (sts : list fdstate)
       (cs : gset gname) (pidv : mword 32) :
@@ -360,6 +362,7 @@ Section PinnedExec.
             [false]. *)
          ⌜uvis_cwd W' = cw⌝ -∗
          ⌜uvis_lazy W' = false⌝ -∗
+         ⌜uvis_secc W' = secc⌝ -∗
          (* ...and its two identity rows (lane EXEC-SEAM), see [pex_slot] *)
          ⌜uvis_ch W' = cs⌝ -∗
          ⌜uvis_pid W' = pidv⌝ -∗
@@ -373,7 +376,7 @@ Section PinnedExec.
        payload beside it -- see [pex_slot] *)
     □ (∀ W' : uvis, T -∗ my_pay (uvis_gen W') Q -∗ X W') -∗
     Pay -∗
-    sys_exec_au_pre (MkPfam X Pay) (fs_gamma_L γfs) γfs cw Q
+    sys_exec_au_pre (MkPfam X Pay) (fs_gamma_L γfs) γfs cw secc Q
       (pobs_P T hops) (pobs_Pmiss T) (pobs_Fo Pin T) M pv av sts cs pidv.
   (* ...AND IT IS [ExecBundle.exec_bundle_of] AT THE PIN SUPPLIER OF (W):
      the walk is [PinnedObs.pobs_walk], the observation [pobs_aopen] and
@@ -383,7 +386,7 @@ Section PinnedExec.
     intros Hres Hload Hpath.
     iIntros "#Hcl #Hinv #Hcon #Hgen HPay".
     iApply (exec_bundle_of γfs X T (pobs_P T hops) (pobs_Pmiss T)
-              (pobs_Fo Pin T) cw pl f nl Pay Q M pv av sts cs pidv
+              (pobs_Fo Pin T) cw secc pl f nl Pay Q M pv av sts cs pidv
               Hload Hpath with "[] [] [] [] [] HPay").
     - iApply (pobs_walk γfs Pin T (pobs_Pmiss T) cw pl hops ino
                 (MkAnode (AFile f) nl) Hres with "[] Hcl Hinv").
@@ -400,7 +403,7 @@ Section PinnedExec.
      ([UexecExecInst.sbundle_exec_intro] takes exactly this quadruple). *)
   Lemma pinned_exec_bundle (γfs : fs_names) (X : uvis -d> iPropO Σ)
       (Pin : aview -> Prop) (T : iProp Σ) `{!Persistent T} `{!Timeless T}
-      (cw : Z) (pl : list (bv 8)) (hops : list Z) (ino : Z)
+      (cw : Z) (secc : mword 64) (pl : list (bv 8)) (hops : list Z) (ino : Z)
       (f : elf_bytes) (nl : nat) (Pay : iProp Σ) (Q : Z -> iProp Σ)
       (M : gmap Z (bv 8)) (pv av : mword 64) (sts : list fdstate)
       (cs : gset gname) (pidv : mword 32) :
@@ -425,6 +428,7 @@ Section PinnedExec.
             [false]. *)
          ⌜uvis_cwd W' = cw⌝ -∗
          ⌜uvis_lazy W' = false⌝ -∗
+         ⌜uvis_secc W' = secc⌝ -∗
          (* ...and its two identity rows (lane EXEC-SEAM), see [pex_slot] *)
          ⌜uvis_ch W' = cs⌝ -∗
          ⌜uvis_pid W' = pidv⌝ -∗
@@ -443,12 +447,12 @@ Section PinnedExec.
        refund IS the linear resource the caller put in. *)
     ∃ (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)),
-      sys_exec_au_pre (MkPfam X Pay) (fs_gamma_L γfs) γfs cw Q P Pmiss Fo
+      sys_exec_au_pre (MkPfam X Pay) (fs_gamma_L γfs) γfs cw secc Q P Pmiss Fo
         M pv av sts cs pidv.
   Proof using .
     intros Hres Hload Hpath. iIntros "#Hcl #Hinv #Hcon #Hgen HPay".
     iExists (pobs_P T hops), (pobs_Pmiss T), (pobs_Fo Pin T).
-    iApply (pinned_exec_bundle_at γfs X Pin T cw pl hops ino f nl Pay Q
+    iApply (pinned_exec_bundle_at γfs X Pin T cw secc pl hops ino f nl Pay Q
               M pv av sts cs pidv Hres Hload Hpath
               with "Hcl Hinv Hcon Hgen HPay").
   Qed.
@@ -472,7 +476,7 @@ Section PinnedExec.
   (* ------------------------------------------------------------------ *)
   Lemma pinned_exec_bundle_boot_at (γfs : fs_names) (X : uvis -d> iPropO Σ)
       (Pin : aview -> Prop) (T : iProp Σ) `{!Persistent T} `{!Timeless T}
-      (cw : Z) (pl : list (bv 8)) (hops : list Z) (ino : Z)
+      (cw : Z) (secc : mword 64) (pl : list (bv 8)) (hops : list Z) (ino : Z)
       (f : elf_bytes) (nl : nat) (Pay : iProp Σ) (Q : Z -> iProp Σ)
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) (cs : gset gname) (pidv : mword 32) :
@@ -495,10 +499,11 @@ Section PinnedExec.
     □ (∀ W' : uvis,
          ⌜kexec_image_ok f na alen afun sts W'⌝ -∗
          ⌜uvis_cwd W' = cw⌝ -∗ ⌜uvis_lazy W' = false⌝ -∗
+         ⌜uvis_secc W' = secc⌝ -∗
          my_pay (uvis_gen W') Q -∗ Pay -∗ X W') -∗
     □ (∀ W' : uvis, T -∗ my_pay (uvis_gen W') Q -∗ X W') -∗
     Pay -∗
-    exec_au_pre (MkPfam X Pay) (fs_gamma_L γfs) γfs cw Q
+    exec_au_pre (MkPfam X Pay) (fs_gamma_L γfs) γfs cw secc Q
       (pobs_P T hops) (pobs_Pmiss T) (pobs_Fo Pin T) pl na alen afun sts
       cs pidv.
   (* ...AND IT IS [ExecBundle.exec_bundle_of_at] AT THE SAME SUPPLIER: the
@@ -509,7 +514,7 @@ Section PinnedExec.
   Proof using .
     intros Hres Hload. iIntros "#Hcl #Hinv #Hcon #Hgen HPay".
     iApply (exec_bundle_of_at γfs X T (pobs_P T hops) (pobs_Pmiss T)
-              (pobs_Fo Pin T) cw pl f nl Pay Q na alen afun sts cs pidv
+              (pobs_Fo Pin T) cw secc pl f nl Pay Q na alen afun sts cs pidv
               Hload with "[] [] [] [] [] HPay").
     - iApply (pobs_walk γfs Pin T (pobs_Pmiss T) cw pl hops ino
                 (MkAnode (AFile f) nl) Hres with "[] Hcl Hinv").
@@ -518,9 +523,9 @@ Section PinnedExec.
     - rewrite /pobs_Fo /pfam_triv. cbn [pf_recv].
       iApply (pobs_node_id Pin T cw pl hops ino (MkAnode (AFile f) nl) Hres).
     - rewrite /image_entry_at.
-      iIntros "!>" (W') "%Hok %Hcwq %Hlzq _ _ Hp HPay".
-      iApply ("Hcon" $! W' with "[%] [%] [%] Hp HPay");
-        [ exact Hok | exact Hcwq | exact Hlzq ].
+      iIntros "!>" (W') "%Hok %Hcwq %Hlzq %Hscw _ _ Hp HPay".
+      iApply ("Hcon" $! W' with "[%] [%] [%] [%] Hp HPay");
+        [ exact Hok | exact Hcwq | exact Hlzq | exact Hscw ].
     - rewrite /image_entry_taint. iExact "Hgen".
   Qed.
 
@@ -528,7 +533,7 @@ Section PinnedExec.
      leave existentially, exactly as they do at a syscall deposit site. *)
   Lemma pinned_exec_bundle_boot (γfs : fs_names) (X : uvis -d> iPropO Σ)
       (Pin : aview -> Prop) (T : iProp Σ) `{!Persistent T} `{!Timeless T}
-      (cw : Z) (pl : list (bv 8)) (hops : list Z) (ino : Z)
+      (cw : Z) (secc : mword 64) (pl : list (bv 8)) (hops : list Z) (ino : Z)
       (f : elf_bytes) (nl : nat) (Pay : iProp Σ) (Q : Z -> iProp Σ)
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) :
@@ -546,6 +551,7 @@ Section PinnedExec.
     □ (∀ W' : uvis,
          ⌜kexec_image_ok f na alen afun sts W'⌝ -∗
          ⌜uvis_cwd W' = cw⌝ -∗ ⌜uvis_lazy W' = false⌝ -∗
+         ⌜uvis_secc W' = secc⌝ -∗
          my_pay (uvis_gen W') Q -∗ Pay -∗ X W') -∗
     □ (∀ W' : uvis, T -∗ my_pay (uvis_gen W') Q -∗ X W') -∗
     Pay -∗
@@ -555,13 +561,13 @@ Section PinnedExec.
          first process's readings when it spends the bundle, and the
          application's constructor reads neither. *)
       ∀ (cs : gset gname) (pidv : mword 32),
-        exec_au_pre (MkPfam X R) (fs_gamma_L γfs) γfs cw Q P Pmiss Fo
+        exec_au_pre (MkPfam X R) (fs_gamma_L γfs) γfs cw secc Q P Pmiss Fo
           pl na alen afun sts cs pidv.
   Proof using .
     intros Hres Hload. iIntros "#Hcl #Hinv #Hcon #Hgen HPay".
     iExists (pobs_P T hops), (pobs_Pmiss T), (pobs_Fo Pin T), Pay.
     iIntros (cs pidv).
-    iApply (pinned_exec_bundle_boot_at γfs X Pin T cw pl hops ino f nl Pay Q
+    iApply (pinned_exec_bundle_boot_at γfs X Pin T cw secc pl hops ino f nl Pay Q
               na alen afun sts cs pidv Hres Hload
               with "Hcl Hinv Hcon Hgen HPay").
   Qed.

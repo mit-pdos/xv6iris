@@ -297,7 +297,7 @@ Section UInitTreeCons.
     iApply (sbundle_at_open_intro_at uslot
               (tree_open_fam (tree_taint c) (fun v => subtree v root = Some t)
                  (resolve_hops t d pl) (ukn_pay N))
-              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)
+              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)
               cw M pv (m !!! Regidx a1_idx)
               eq_refl eq_refl
               (eq_trans (tf_of_arg0 m pc) Ha0)
@@ -473,7 +473,7 @@ Section UInitTreeCons.
     rewrite E0 Em.
     iIntros (h1) "Hrun".
     set (m1 := <[Regidx a7_idx := (mword_of_int 15 : mword 64)]> m).
-    assert (Ha0' : m1 !!! Regidx a0_idx = (mword_of_int 0x970 : mword 64)).
+    assert (Ha0' : m1 !!! Regidx a0_idx = (mword_of_int 0x980 : mword 64)).
     { unfold m1.
       rewrite (upd_ne m (Regidx a7_idx) (Regidx a0_idx)
                  (mword_of_int 15 : mword 64)
@@ -488,7 +488,7 @@ Section UInitTreeCons.
     (* ---- 0x3b4  ecall, at the DEVICE the owner's tree records ---- *)
     iApply (wp_uk_ecall_open_dev_own N h1 m1 (mword_of_int 0x3b4) ufd_l0 avail
               c r g FsImg.ROOTINO FsImg.ROOTINO i FsImg.ROOTINO t CONSOLE 0
-              UCodeInit.init_ro (mword_of_int 0x970) init_cons_pl
+              UCodeInit.init_ro (mword_of_int 0x980) init_cons_pl
               Heq
               ltac:(unfold m1, usysno;
                     rewrite (upd_eq m (Regidx a7_idx)
@@ -652,7 +652,7 @@ Section UInitTreeCons.
     rewrite E0 Em.
     iIntros (h1) "Hrun".
     set (m1 := <[Regidx a7_idx := (mword_of_int 17 : mword 64)]> m).
-    assert (Ha0' : m1 !!! Regidx a0_idx = (mword_of_int 0x970 : mword 64)).
+    assert (Ha0' : m1 !!! Regidx a0_idx = (mword_of_int 0x980 : mword 64)).
     { unfold m1.
       rewrite (upd_ne m (Regidx a7_idx) (Regidx a0_idx)
                  (mword_of_int 17 : mword 64)
@@ -683,12 +683,13 @@ Section UInitTreeCons.
               ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
               ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
               ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
+              ltac:(lia) ltac:(discriminate)
               ltac:(vm_compute; reflexivity)
               with "[] [] Hrun Hcwd [Hown]").
     { iApply (uis_init_3bc with "Hcode"). }
     { iApply (init_rodata_img with "Hro"). }
     { iApply (tree_mknod_sup N c r g t CONSOLE 0 FsImg.ROOTINO
-                UCodeInit.init_ro (mword_of_int 0x970) m1 (mword_of_int 0x3bc)
+                UCodeInit.init_ro (mword_of_int 0x980) m1 (mword_of_int 0x3bc)
                 init_cons_pl Heq (fun M H => init_cons_path_of M H) Ha0'
                 ltac:(rewrite Ha1'; exact init_cons_dev_major)
                 ltac:(rewrite Ha2'; exact init_cons_dev_minor)
@@ -700,12 +701,12 @@ Section UInitTreeCons.
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite E1.
     iIntros (h2 ret W cs') "%Himg %Hk0 %Hk1 %Hk2 %Hcw Hpost Hcwd Hrun".
-    assert (Hpath : arg_path_of (uvis_M W) (mword_of_int 0x970 : mword 64)
+    assert (Hpath : arg_path_of (uvis_M W) (mword_of_int 0x980 : mword 64)
                       init_cons_pl)
       by exact (init_cons_path_of (uvis_M W) Himg).
     iDestruct (spost_at_mknod_elim_at uslot
                  (tree_mknod_fam c r g t CONSOLE 0 (ukn_pay N)) W
-                 FsImg.ROOTINO (uvis_M W) (mword_of_int 0x970) CONSOLE 0
+                 FsImg.ROOTINO (uvis_M W) (mword_of_int 0x980) CONSOLE 0
                  ret (uvis_M W) (uvis_fd W) FsImg.ROOTINO cs'
                  Hcw eq_refl
                  ltac:(rewrite Hk0; exact Ha0')
@@ -739,7 +740,7 @@ Section UInitTreeCons.
       - (* THE MOVE COMMITTED: the deed records the device, and the frozen
            deed is what the second open's leaf runs on *)
         iDestruct (tree_mknod_ok_recv c r g t CONSOLE 0 (uvis_M W)
-                     (mword_of_int 0x970) init_cons_pl fname_console
+                     (mword_of_int 0x980) init_cons_pl fname_console
                      Hpath init_cons_last with "Hok") as "[Hm | #HT]";
           last first.
         { iModIntro. rewrite /UkInit.uki_mknod_out.
@@ -756,7 +757,7 @@ Section UInitTreeCons.
       - (* THE CALL FAILED: the deed comes straight back, and the second
            open is the dead one again *)
         iDestruct (tree_mknod_fail_recv c r g t CONSOLE 0 FsImg.ROOTINO
-                     (uvis_M W) (mword_of_int 0x970) with "Hfail")
+                     (uvis_M W) (mword_of_int 0x980) with "Hfail")
           as "[Hown | #HT]"; last first.
         { iModIntro. rewrite /UkInit.uki_mknod_out.
           iRight. iRight. iExact "HT". }

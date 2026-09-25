@@ -219,6 +219,8 @@ Section UtEntry.
           field, so [ProcDefs.pv_lazy] is the entry record's -- which is
           what [SpecUsertrap.ut_pro]'s seventh row states. *)
        ⌜pv_lazy V' = pv_lazy (us_V U)⌝ -∗
+       (* ...and its mask, likewise ([SpecUsertrap.ut_pro]'s eighth row) *)
+       ⌜pv_secc V' = pv_secc (us_V U)⌝ -∗
        pc_is (mword_of_int (UT + 0x30)) -∗
        sie_cap_gpr KT1 M (av - 4)%nat false (un_pj N) -∗
        cpu_own 0%nat false (un_pj N) false ∅ -∗ cpu_claim (un_pj N) -∗
@@ -442,17 +444,17 @@ Section UtEntry.
     iEval (rewrite Hp1a) in "Hpc".
     (* ---- +0x1a: addi a5,a5,3722 -- the pair sums to kernelvec ---- *)
     iApply (wp_addi4_s_sconf (mword_of_int (UT + 0x1a)) Ra5 Ra5
-              (mword_of_int 4060 : mword 12) M5 (av - 4)%nat false
+              (mword_of_int 30 : mword 12) M5 (av - 4)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] [-]").
     { iApply (uti_01a with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (M6 := <[Regidx Ra5 := regval_into_reg
                    (add_vec (rget M5 Ra5)
-                      (sign_extend' 64 (mword_of_int 4060 : mword 12)))]> M5).
+                      (sign_extend' 64 (mword_of_int 30 : mword 12)))]> M5).
     change (<[Regidx Ra5 := regval_into_reg
                (add_vec (rget M5 Ra5)
-                  (sign_extend' 64 (mword_of_int 4060 : mword 12)))]> M5) with M6.
+                  (sign_extend' 64 (mword_of_int 30 : mword 12)))]> M5) with M6.
     assert (HM6sp : M6 !!! Regidx csp_rs1 = pa_stk ksp 4)
       by (rewrite /M6 upd_ne; [exact HM5sp | reg_neq]).
     assert (HM6a5 : rget M6 Ra5
@@ -477,7 +479,7 @@ Section UtEntry.
     (*  +0x22 .. +0x26: p = myproc(); s1 = p.                            *)
     (* =============================================================== *)
     iApply (wp_jal_s_sconf (mword_of_int (UT + 0x22)) Rra
-              (mword_of_int 2093784 : mword 21) M6 (av - 4)%nat false
+              (mword_of_int 2093770 : mword 21) M6 (av - 4)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc [] [-]").
     { iApply (uti_022 with "Htext"). }
@@ -487,7 +489,7 @@ Section UtEntry.
     change (<[Regidx Rra := regval_into_reg
                (add_vec_int (mword_of_int (UT + 0x22) : mword 64) 4)]> M6) with M7.
     assert (Hmyp : add_vec (mword_of_int (UT + 0x22) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2093784 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2093770 : mword 21))
                    = mword_of_int KernelSyms.myproc) by pcw.
     iEval (rewrite Hmyp) in "Hpc".
     assert (HM7sp : M7 !!! Regidx csp_rs1 = pa_stk ksp 4)
@@ -669,7 +671,7 @@ Section UtEntry.
       iSplitL "Hb3"; [iExact "Hb3" | iExact "Hb4"]. }
     assert (HS3a4 : rget S3 Ra4 = ret_pc sepc_v)
       by (rgne; rewrite /S3; apply upd_eq).
-    iApply ("Hcont" $! S3 V' with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hpc Hcg Hcpu Hclm
+    iApply ("Hcont" $! S3 V' with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hpc Hcg Hcpu Hclm
               Hraw Henv Hfr").
     - exact HS3sp.
     - exact HS3s1.
@@ -682,6 +684,8 @@ Section UtEntry.
     - (* ...and the generation: the prologue writes one trapframe word *)
       rewrite /V'; destruct (us_V U); reflexivity.
     - (* ...and the lazy bit, for the generation's reason (lane LAZY-FLAG) *)
+      rewrite /V'; destruct (us_V U); reflexivity.
+    - (* ...and the mask *)
       rewrite /V'; destruct (us_V U); reflexivity.
   Qed.
 
@@ -1481,12 +1485,12 @@ Section UtSeal.
               Hms Hav Hsp Htp Hmiev Hmask Hmenvv
               with "Htext Hpc Hhw Hminv Hhs Hpriv Hms Hsc Hst Hep Hstv
                     Hmie Hmdl Hmenv Hgpr Htc Htrap Henv [Hcont Hxin Hfin Hein Hkin]").
-    iIntros (M V') "%HMsp %HMs1 %HMa0 %HcsM %HuptV %HtfV %HszV %HcwiV %HgenV %HlzV Hpc Hcg Hcpu Hclm Hraw Henv Hfr".
+    iIntros (M V') "%HMsp %HMs1 %HMa0 %HcsM %HuptV %HtfV %HszV %HcwiV %HgenV %HlzV %HscV Hpc Hcg Hcpu Hclm Hraw Henv Hfr".
     iApply (ut_dispatch N (MkUstate V Mu) (MkUstate V' Mu) pt ksp m M av (av - 4)%nat sepc_v sc_v stval_v
               mie_v menvcfg0 sts gn cs pid fdep Wk
               ltac:(cbn [us_V]; exact Hgnq)
               (conj HtfV (conj HuptV (conj HszV (conj eq_refl
-                 (conj HcwiV (conj HgenV HlzV))))))
+                 (conj HcwiV (conj HgenV (conj HlzV HscV)))))))
               Hwf Hav
               (trap_res_off (av - 4)%nat)
               ltac:(rewrite HuptV Hupt; reflexivity) Hksp Hsp HMsp HMs1 HMa0 HcsM

@@ -295,7 +295,7 @@ Proof.
   (*  +0x54: jal ra, prepare_return.                                     *)
   (* ================================================================== *)
   iApply (wp_jal_s_sconf (mword_of_int (FR + 0x54)) Rra
-            (mword_of_int 2864 : mword 21) mt av2 eb
+            (mword_of_int 2878 : mword 21) mt av2 eb
             ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
             with "Hcg Hpc []").
   { iApply (fkr_54 with "Htext"). }
@@ -307,7 +307,7 @@ Proof.
   assert (HT5sp : T5 !!! Regidx csp_rs1 = pa_stk ksp 6)
     by (rewrite /T5 upd_ne; [exact Hmtsp | reg_neq]).
   assert (Hprep : add_vec (mword_of_int (FR + 0x54) : mword 64)
-                    (sign_extend' 64 (mword_of_int 2864 : mword 21))
+                    (sign_extend' 64 (mword_of_int 2878 : mword 21))
                   = mword_of_int KernelSyms.prepare_return) by pcw.
   iEval (rewrite Hprep) in "Hpc".
   (* the three hart-indexed carriers, moved to the current binder in one
@@ -373,6 +373,8 @@ Proof.
                 the resumed record's run key reads it
                 ([UexecRet.urun_eq]). *)
              ⌜pv_lazy V' = pv_lazy (us_V U)⌝ ∗
+             (* ...nor the mask ([ProcDefs.pv_secc]), for the same reason *)
+             ⌜pv_secc V' = pv_secc (us_V U)⌝ ∗
              (* ...nor the break.  [upd_tf] rewrites the word list and
                 nothing else, and the resumed record's RUN KEY reads the
                 size ([UexecRet.urun_eq]), so the steady mode's closer
@@ -385,9 +387,10 @@ Proof.
                 sret's to is the [sepc] cell prepare_return wrote from it. *)
              ⌜tf_ueq (pv_tf (us_V U)) (pv_tf V')⌝ ∗
              UsertrapRes.ut_tfk (CID := CIDf) ksp V' ∗ proc_priv γf p pid (MkUstate V' ((us_M U))))%I
-    with "[Hpv]" as (V') "(%HuptV' & %Hfg & %Hcg & %Hgenk & %Hcwi & %Hlzq & %Hpsz & %Htueq & #Htfk & Hpv)".
+    with "[Hpv]" as (V') "(%HuptV' & %Hfg & %Hcg & %Hgenk & %Hcwi & %Hlzq & %Hscq & %Hpsz & %Htueq & #Htfk & Hpv)".
   { iExists (upd_tf (us_V U) (prepare_return_tf (pv_tf (us_V U)) ksat ksp (cid_word (CID := CIDf)))).
     iFrame "Hpv". iSplitR; [iPureIntro; reflexivity |].
+    iSplitR; [iPureIntro; reflexivity |].
     iSplitR; [iPureIntro; reflexivity |].
     iSplitR; [iPureIntro; reflexivity |].
     iSplitR; [iPureIntro; reflexivity |].
@@ -796,14 +799,16 @@ Proof.
   { destruct steady; [| exact I].
     refine (urun_eq_resume (uvis_of U [] gn cs pid) U
               (MkUstate (upd_upt V' pt) (us_M U))
-              (urun_eq_of U [] gn cs pid) _ _ _ _ _ _).
+              (urun_eq_of U [] gn cs pid) _ _ _ _ _ _ _).
     - exact Htueq.
     - reflexivity.
     - exact Hpsz.
     - exact Hcwi.
     - reflexivity.
     (* the lazy bit: forkret writes no block field (lane LAZY-FLAG) *)
-    - cbn [us_V]. exact Hlzq. }
+    - cbn [us_V]. exact Hlzq.
+    (* ...nor the mask *)
+    - cbn [us_V]. exact Hscq. }
   (* ---- the config record for this round ---- *)
   assert (HSEa0 : tp_pin SE !!! Regidx (mword_of_int 10)
                   = kvi_satp_word (ud_root pt)).
@@ -836,7 +841,7 @@ Proof.
                     (urun_eq_of U sts gn cs pid) Htueq eq_refl Hpsz Hcwi eq_refl
                     (* the lazy bit: prepare_return writes trapframe words
                        and no block field (lane LAZY-FLAG) *)
-                    Hlzq)
+                    Hlzq Hscq)
                  eq_refl eq_refl eq_refl eq_refl)).
     iExact "Hbslot". }
   assert (Hpcslot : tf_resume_pc
@@ -976,7 +981,7 @@ Lemma fkr_boot
      +0x46, and what comes back is the slot the tail runs the trap loop on.
      THE KERNEL MINTS NOTHING -- the bundle is the application's, handed
      down from [SystemAdequacy.xv6_power_adequacy_gen]'s [Hinit_boot]. *)
-  init_boot_bundle (pv_cwi (us_V U)) sts -∗
+  init_boot_bundle (pv_cwi (us_V U)) (pv_secc (us_V U)) sts -∗
   (* ...AND THE CONSOLE'S READER TOKEN, off the same row and for the same
      reason (app-echo.md, "SH-LINE RULING", R3): the bundle is a WAND from
      it, and this arm is where it is applied -- the token born with the
@@ -1047,11 +1052,11 @@ Proof.
          sign-extends its word on RV64).  The token's arm says 1, so the
          [c.beqz] below FALLS THROUGH. ---- *)
   assert (Hbfaddr : add_vec (rget B1 Ra5)
-                      (sign_extend' 64 (mword_of_int 2274 : mword 12)) = first_addr).
+                      (sign_extend' 64 (mword_of_int 2322 : mword 12)) = first_addr).
   { rgne. rewrite /B1 upd_eq. exact fkr_first_addr. }
   iEval (rewrite -Hbfaddr) in "Hf1".
   iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (FR + 0x18)) Ra5 Ra5
-            (mword_of_int 2274 : mword 12) B1 av2 (mword_of_int 1 : mword 32) eb
+            (mword_of_int 2322 : mword 12) B1 av2 (mword_of_int 1 : mword 32) eb
             ltac:(vm_compute; discriminate) ltac:(rdok)
             with "Hcg Hpc [] Hf1").
   { iApply (fkr_18 with "Htext"). }
@@ -1149,7 +1154,7 @@ Proof.
   iEval (rewrite Hbp20) in "Hpc".
   (* ---- +0x20: jal ra, fsinit ---- *)
   iApply (wp_jal_s_sconf (mword_of_int (FR + 0x20)) Rra
-            (mword_of_int 7248 : mword 21) B3 av2 eb
+            (mword_of_int 7328 : mword 21) B3 av2 eb
             ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
             with "Hcg Hpc []").
   { iApply (fkr_20 with "Htext"). }
@@ -1256,11 +1261,11 @@ Proof.
   iEval (rewrite Hcp28) in "Hpc".
   (* ---- +0x28: sw zero,-1838(a5) -- the one-shot is spent ---- *)
   assert (Hcfaddr : add_vec (rget C1 Ra5)
-                      (sign_extend' 64 (mword_of_int 2258 : mword 12)) = first_addr).
+                      (sign_extend' 64 (mword_of_int 2306 : mword 12)) = first_addr).
   { rgne. rewrite /C1 upd_eq. exact fkr_first_addr2. }
   iEval (rewrite -Hcfaddr) in "Hf1".
   iApply (wp_sw_zero_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (FR + 0x28)) Ra5
-            (mword_of_int 2258 : mword 12) C1 av2 (mword_of_int 1 : mword 32) eb
+            (mword_of_int 2306 : mword 12) C1 av2 (mword_of_int 1 : mword 32) eb
             with "Hcg Hpc [] Hf1").
   { iApply (fkr_28 with "Htext"). }
   iIntros (CIDb12 Hkb12) "Hcg Hpc Hf1".
@@ -1444,7 +1449,7 @@ Proof.
   iEval (rewrite Hdp42) in "Hpc".
   (* ---- +0x42: jal ra, kexec ---- *)
   iApply (wp_jal_s_sconf (mword_of_int (FR + 0x42)) Rra
-            (mword_of_int 11952 : mword 21) D4 av2 eb
+            (mword_of_int 12032 : mword 21) D4 av2 eb
             ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
             with "Hcg Hpc []").
   { iApply (fkr_42 with "Htext"). }
@@ -2179,11 +2184,11 @@ Proof.
          acquire [fence] and the [sext.w] that used to follow it are gone
          (on RV64 [lw] already delivers the sign-extended word). ---- *)
   assert (Hfaddr : add_vec (rget T1 Ra5)
-                     (sign_extend' 64 (mword_of_int 2274 : mword 12)) = first_addr).
+                     (sign_extend' 64 (mword_of_int 2322 : mword 12)) = first_addr).
   { rgne. rewrite /T1 upd_eq. exact fkr_first_addr. }
   iEval (rewrite -Hfaddr) in "Hfirst".
   iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (FR + 0x18)) Ra5 Ra5
-            (mword_of_int 2274 : mword 12) T1 av2 (mword_of_int 0 : mword 32) eb
+            (mword_of_int 2322 : mword 12) T1 av2 (mword_of_int 0 : mword 32) eb
             ltac:(vm_compute; discriminate) ltac:(rdok)
             with "Hcg Hpc [] Hfirst").
   { iApply (fkr_18 with "Htext"). }

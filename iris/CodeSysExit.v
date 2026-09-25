@@ -16,14 +16,13 @@ Require Import KernelText.
 Require Import WpMmodeLeafBase.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
-Require Import KernelDecode00.
-Require Import KernelDecode01.
 Require Import KernelDecode04.
 Require Import KernelDecode06.
 Require Import KernelDecode10.
 Require Import KernelDecode13.
 Require Import KernelDecode14.
 Require Import KernelDecode15.
+Require Import KernelDecode16.
 Require Import KernelDecode17.
 Require Import KernelDecode19.
 Require Import KernelDecode21.
@@ -62,17 +61,17 @@ Section CodeSysExit.
   Proof using . mk_rvc (KernelSyms.sys_exit + 0xc) (mword_of_int 0x4501 : mword 16)
     (mword_of_int (KernelSyms.sys_exit + 0xc) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)) kd_4501 exec_execute_C_LI. Qed.
 
-  Lemma se_0e : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_exit + 0xe) : mword 64) false (JAL (mword_of_int 2096942 : mword 21, Regidx (mword_of_int 1))).
-  Proof using . mk_base (KernelSyms.sys_exit + 0xe) (mword_of_int 0xf2fff0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_exit + 0xe) : mword 64) (JAL (mword_of_int 2096942 : mword 21, Regidx (mword_of_int 1))) kd_f2fff0ef. Qed.
+  Lemma se_0e : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_exit + 0xe) : mword 64) false (JAL (mword_of_int 2096922 : mword 21, Regidx (mword_of_int 1))).
+  Proof using . mk_base (KernelSyms.sys_exit + 0xe) (mword_of_int 0xf1bff0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_exit + 0xe) : mword 64) (JAL (mword_of_int 2096922 : mword 21, Regidx (mword_of_int 1))) kd_f1bff0ef. Qed.
 
   Lemma se_12 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_exit + 0x12) : mword 64) false (LOAD (mword_of_int 4076 : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 10), false, 4)).
   Proof using . mk_base (KernelSyms.sys_exit + 0x12) (mword_of_int 0xfec42503 : mword 32)
     (mword_of_int (KernelSyms.sys_exit + 0x12) : mword 64) (LOAD (mword_of_int 4076 : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 10), false, 4)) kd_fec42503. Qed.
 
-  Lemma se_16 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_exit + 0x16) : mword 64) false (JAL (mword_of_int 2094848 : mword 21, Regidx (mword_of_int 1))).
-  Proof using . mk_base (KernelSyms.sys_exit + 0x16) (mword_of_int 0xf00ff0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_exit + 0x16) : mword 64) (JAL (mword_of_int 2094848 : mword 21, Regidx (mword_of_int 1))) kd_f00ff0ef. Qed.
+  Lemma se_16 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_exit + 0x16) : mword 64) false (JAL (mword_of_int 2094828 : mword 21, Regidx (mword_of_int 1))).
+  Proof using . mk_base (KernelSyms.sys_exit + 0x16) (mword_of_int 0xeecff0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_exit + 0x16) : mword 64) (JAL (mword_of_int 2094828 : mword 21, Regidx (mword_of_int 1))) kd_eecff0ef. Qed.
 
   Lemma se_1a : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_exit + 0x1a) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)).
   Proof using . mk_rvc (KernelSyms.sys_exit + 0x1a) (mword_of_int 0x4501 : mword 16)

@@ -4,7 +4,7 @@
 (*                                                                        *)
 (* [UkInit.init_exec_sup] is what init's proof carries in place of         *)
 (* [UkRun.uxsup] -- the exec deposit at init's OWN two argument registers  *)
-(* (a0 = 0x9a8, the string "sh" in its rodata; a1 = 0x1000, the argument   *)
+(* (a0 = 0x9b8, the string "sh" in its rodata; a1 = 0x1000, the argument   *)
 (* vector in its .data) and at the ONE working directory it ever has       *)
 (* ([FsImg.ROOTINO]).  This file is where that supply is PAID, out of the  *)
 (* application's claim that /sh is the file [ElfUser.sh_elf]:              *)
@@ -21,7 +21,7 @@
 (* COUNT and LENGTHS -- and the exec channel offers those only as bound    *)
 (* variables.  [SpecSysExec.exec_args_of] ties them to the caller's own    *)
 (* image, and init's image is a constant: the word at 0x1000 is the        *)
-(* pointer 0x9a8, the word at 0x1008 is NULL, and the string at 0x9a8 is   *)
+(* pointer 0x9b8, the word at 0x1008 is NULL, and the string at 0x9b8 is   *)
 (* "sh".  So [na = 1] and [alen 0 = 2], and the room premise is closed     *)
 (* arithmetic ([kxc_sp_final 0x5000 alen 1 = 0x4FE0], and sh's frames need *)
 (* 0x4000 + 8 * (106 + n0) below the top of its image).                    *)
@@ -186,7 +186,7 @@ Lemma init_argv_words_bool :
   forallb (fun k : nat =>
       bool_decide (
         UInitArgv.init_argv_map !! (0x1000 + Z.of_nat k)
-          = Some (nth_byte (mword_of_int 0x9a8 : mword 64) k)
+          = Some (nth_byte (mword_of_int 0x9b8 : mword 64) k)
         /\ UInitArgv.init_argv_map !! (0x1008 + Z.of_nat k)
           = Some (nth_byte (mword_of_int 0 : mword 64) k)))
     (seq 0 8) = true.
@@ -195,7 +195,7 @@ Proof. vm_compute. reflexivity. Qed.
 Lemma init_argv_words (k : nat) :
   (k < 8)%nat ->
   UInitArgv.init_argv_map !! (0x1000 + Z.of_nat k)
-    = Some (nth_byte (mword_of_int 0x9a8 : mword 64) k)
+    = Some (nth_byte (mword_of_int 0x9b8 : mword 64) k)
   /\ UInitArgv.init_argv_map !! (0x1008 + Z.of_nat k)
     = Some (nth_byte (mword_of_int 0 : mword 64) k).
 Proof.
@@ -208,13 +208,13 @@ Qed.
 Lemma init_ro_sh_bool :
   bool_decide (
       UCodeInit.init_ro
-        !! uint (add_vec_int (mword_of_int 0x9a8 : mword 64) (Z.of_nat 0%nat))
+        !! uint (add_vec_int (mword_of_int 0x9b8 : mword 64) (Z.of_nat 0%nat))
       = init_sh_pl !! 0%nat
    /\ UCodeInit.init_ro
-        !! uint (add_vec_int (mword_of_int 0x9a8 : mword 64) (Z.of_nat 1%nat))
+        !! uint (add_vec_int (mword_of_int 0x9b8 : mword 64) (Z.of_nat 1%nat))
       = init_sh_pl !! 1%nat
    /\ UCodeInit.init_ro
-        !! uint (add_vec_int (mword_of_int 0x9a8 : mword 64) (Z.of_nat 2%nat))
+        !! uint (add_vec_int (mword_of_int 0x9b8 : mword 64) (Z.of_nat 2%nat))
       = Some (bv_0 8)) = true.
 Proof. vm_compute. reflexivity. Qed.
 
@@ -248,7 +248,7 @@ Proof. apply bv_eq. vm_compute. reflexivity. Qed.
    image -- [default ubyte0] past the end of the name is exactly that,
    and it is what [ByteBuf.bb_cstr] asks for. *)
 Definition init_argv_args : list uarg :=
-  [UArg 0x9a8 2%nat (fun j : nat => default ubyte0 (init_sh_pl !! j))].
+  [UArg 0x9b8 2%nat (fun j : nat => default ubyte0 (init_sh_pl !! j))].
 
 Lemma init_argv_args_length : length init_argv_args = 1%nat.
 Proof. reflexivity. Qed.
@@ -256,7 +256,7 @@ Proof. reflexivity. Qed.
 Lemma init_argv_args_lookup (i : nat) (x : uarg) :
   init_argv_args !! i = Some x ->
   i = 0%nat
-  /\ x = UArg 0x9a8 2%nat (fun j : nat => default ubyte0 (init_sh_pl !! j)).
+  /\ x = UArg 0x9b8 2%nat (fun j : nat => default ubyte0 (init_sh_pl !! j)).
 Proof.
   intro Hi. rewrite /init_argv_args in Hi.
   destruct i as [| i]; cbn in Hi; [ | discriminate Hi ].
@@ -282,7 +282,7 @@ Qed.
    the list lookups, so the reading needs no case split at the use site *)
 Lemma init_ro_sh_bytes_bool :
   forallb (fun j : nat =>
-      bool_decide (UCodeInit.init_ro !! (0x9a8 + Z.of_nat j)
+      bool_decide (UCodeInit.init_ro !! (0x9b8 + Z.of_nat j)
                    = Some (default ubyte0 (init_sh_pl !! j))))
     (seq 0 3) = true.
 Proof. vm_compute. reflexivity. Qed.
@@ -296,7 +296,7 @@ Proof.
   (* the two windows, in the contract's spelling *)
   assert (Hb0 : forall k : nat, (k < 8)%nat ->
             M !! (0x1000 + Z.of_nat k)
-            = bv_to_little_endian 8 8 0x9a8 !! k).
+            = bv_to_little_endian 8 8 0x9b8 !! k).
   { apply img_word_of_bytes. intros k Hk.
     exact (Hav _ _ (proj1 (init_argv_words k Hk))). }
   assert (Hb1 : forall k : nat, (k < 8)%nat ->
@@ -1015,7 +1015,7 @@ Section UInitSh.
   (* ------------------------------------------------------------------- *)
   Lemma init_sh_path_of (M : gmap Z (bv 8)) :
     uimg_sub UCodeInit.init_ro M ->
-    exec_path_of M (mword_of_int 0x9a8 : mword 64) init_sh_pl.
+    exec_path_of M (mword_of_int 0x9b8 : mword 64) init_sh_pl.
   Proof using .
     intro Hro.
     pose proof (bool_decide_eq_true_1 _ init_ro_sh_bool) as (Hb0 & Hb1 & Hb2).
@@ -1166,7 +1166,7 @@ Section UInitSh.
     UkSh.ush_fd0 T (take NSTD fdv) -∗
     image_entry_taint T (ucons_pay cn γp T (UkInit.init_rd (cc_rd Cr) (cc_wbn Cr))) uslot -∗
     image_entry ElfUser.sh_elf M (mword_of_int 0x1000 : mword 64) fdv
-      FsImg.ROOTINO cs pidv
+      FsImg.ROOTINO ProcDefs.secc_all cs pidv
       (ucons_pay cn γp T (UkInit.init_rd (cc_rd Cr) (cc_wbn Cr)))
       (sh_pay_at Dl T Cr Rsh n0 ∗ upos γp np
          ∗ ucons_pay cn γp T (cc_rd Cr) (-1)
@@ -1187,7 +1187,7 @@ Section UInitSh.
     iIntros "#Hnpw #Hdep #Hdp #Hplaw #Hcons #Hfd0 #Hgen'".
     rewrite /image_entry. iModIntro.
     iIntros (na alen afun W')
-      "%Hok %Hcwd0 %Hlzf %Hchq %Hpiq %Hargs #Hmp
+      "%Hok %Hcwd0 %Hlzf %Hscf %Hchq %Hpiq %Hargs #Hmp
        [[#Hp1 [#Hp2 #Htag]] [Hps [Hls [Hstd' Hcred]]]]".
     assert (Hch0 : uvis_ch W' = ∅) by (rewrite Hchq; exact Hcs).
     assert (Hpid1 : bv_unsigned (uvis_pid W') <> 1)
@@ -1250,7 +1250,7 @@ Section UInitSh.
                   1%nat alen afun fdv W' n0 np
                   Hbd
                   (ucons_pay_const cn γp T (UkInit.init_rd (cc_rd Cr) (cc_wbn Cr))) Hok Hcwd0
-                  (init_sh_room alen n0 Halen Hn0) Hlen Hlzf Hch0 Hpid1)
+                  (init_sh_room alen n0 Halen Hn0) Hlen Hlzf Hscf Hch0 Hpid1)
       as Hsk.
     iApply (Hsk with "[] Hnpw Hdep Hdp Htag Hplaw [] [] Hcons Hgen' Hmp Hps
                       Hls Hwcp").
@@ -1304,7 +1304,7 @@ Section UInitSh.
     UkSh.ush_fd0 T (take NSTD fdv) -∗
     image_entry_taint T (ucons_pay cn γp T (UkInit.init_rd (cc_rd Cr) (cc_wbn Cr))) uslot -∗
     image_entry ElfUser.sh_elf M (mword_of_int 0x1000 : mword 64) fdv
-      FsImg.ROOTINO cs pidv
+      FsImg.ROOTINO ProcDefs.secc_all cs pidv
       (ucons_pay cn γp T (UkInit.init_rd (cc_rd Cr) (cc_wbn Cr)))
       (sh_pay T Cr Rsh n0 ∗ upos γp np
          ∗ ucons_pay cn γp T (cc_rd Cr) (-1)
@@ -1407,7 +1407,7 @@ Section UInitSh.
        /init's own SUPPLY -- its readings of its own image and of the
        record's authorities, the PIN as (W)'s supplier, and sh's entry. ---- *)
     iApply (udepw_at_refR_ids_of_sup_ids N m pc
-              (mword_of_int 0x9a8) (mword_of_int 0x1000)
+              (mword_of_int 0x9b8) (mword_of_int 0x1000)
               FsImg.ROOTINO T init_sh_pl ElfUser.sh_elf 1%nat
               (sh_pay_at Dl T Cr Rsh n0 ∗ upos γp np
                  ∗ ucons_pay cn γp T (cc_rd Cr) (-1)

@@ -258,7 +258,7 @@ Proof.
      spells it as a [match] on the run key it carries, and the key is
      [steady]'s own [if], so the two agree by iota on each arm. *)
   iAssert (if steady then FirstTok.first_done
-           else init_boot_bundle (pv_cwi (us_V U)) sts
+           else init_boot_bundle (pv_cwi (us_V U)) (pv_secc (us_V U)) sts
                 ∗ ConsoleInv.cons_reader fsc_cons 0%nat)%I with "[Hmode]" as "Hmode".
   { destruct steady; [iExact "Hmode" | iExact "Hmode"]. }
   iMod (ctx_move (R := λ ξ, ctx_cells (XI := ξ) (p_context (proc_addr j))
@@ -297,7 +297,7 @@ Proof.
      [first_addr ↦₄ 1] comes out of the block that was just moved, so the
      [↦₄□ 0] that refutes it has to be at the same identity. *)
   iMod (ctx_move (R := λ ξ, (if steady then FirstTok.first_done (XI := ξ)
-                             else init_boot_bundle (pv_cwi (us_V U)) sts
+                             else init_boot_bundle (pv_cwi (us_V U)) (pv_secc (us_V U)) sts
                                   ∗ ConsoleInv.cons_reader fsc_cons 0%nat)%I)
           cur_ctx XIc with "Hrun Hthr Hmode") as "(Hrun & Hthr & Hmode)".
   iMod (ctx_park XIc cur_ctx with "Hrun Hthr") as "[Hrun Hpk]".

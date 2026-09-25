@@ -103,12 +103,13 @@ Section ExecEntry.
      THIS arm only: the taint arm never hands a caller a constructor. *)
   Definition image_entry_at (f : elf_bytes) (na : nat) (alen : nat -> nat)
       (afun : nat -> nat -> bv 8) (sts : list fdstate)
-      (cw : Z) (cs : gset gname) (pidv : mword 32)
+      (cw : Z) (secc : mword 64) (cs : gset gname) (pidv : mword 32)
       (Q : Z -> iProp Σ) (Pay : iProp Σ) (X : uvis -d> iPropO Σ) : iProp Σ :=
     (□ (∀ W' : uvis,
           ⌜kexec_image_ok f na alen afun sts W'⌝ -∗
           ⌜uvis_cwd W' = cw⌝ -∗
           ⌜uvis_lazy W' = false⌝ -∗
+          ⌜uvis_secc W' = secc⌝ -∗
           ⌜uvis_ch W' = cs⌝ -∗
           ⌜uvis_pid W' = pidv⌝ -∗
           (* NO ALL-PARKED ROW HERE (lane OFF-HAND-4, S2; design/app-file.md
@@ -134,13 +135,14 @@ Section ExecEntry.
      shape a SYSCALL's bundle needs, where the argument shape is whatever
      the caller's image at [av] turns out to hold. *)
   Definition image_entry (f : elf_bytes) (M : gmap Z (bv 8)) (av : mword 64)
-      (sts : list fdstate) (cw : Z) (cs : gset gname) (pidv : mword 32)
+      (sts : list fdstate) (cw : Z) (secc : mword 64) (cs : gset gname) (pidv : mword 32)
       (Q : Z -> iProp Σ) (Pay : iProp Σ) (X : uvis -d> iPropO Σ) : iProp Σ :=
     (□ (∀ (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
           (W' : uvis),
           ⌜kexec_image_ok f na alen afun sts W'⌝ -∗
           ⌜uvis_cwd W' = cw⌝ -∗
           ⌜uvis_lazy W' = false⌝ -∗
+          ⌜uvis_secc W' = secc⌝ -∗
           ⌜uvis_ch W' = cs⌝ -∗
           ⌜uvis_pid W' = pidv⌝ -∗
           (* ...and NO all-parked row -- [image_entry_at]'s note (lane
@@ -171,13 +173,13 @@ Section ExecEntry.
       (X : uvis -d> iPropO Σ) : iProp Σ :=
     (□ (∀ W' : uvis, T -∗ my_pay (uvis_gen W') Q -∗ X W'))%I.
 
-  Global Instance image_entry_at_persistent f na alen afun sts cw cs pidv
+  Global Instance image_entry_at_persistent f na alen afun sts cw secc cs pidv
       Q Pay X :
-    Persistent (image_entry_at f na alen afun sts cw cs pidv Q Pay X).
+    Persistent (image_entry_at f na alen afun sts cw secc cs pidv Q Pay X).
   Proof using . rewrite /image_entry_at. apply _. Qed.
 
-  Global Instance image_entry_persistent f M av sts cw cs pidv Q Pay X :
-    Persistent (image_entry f M av sts cw cs pidv Q Pay X).
+  Global Instance image_entry_persistent f M av sts cw secc cs pidv Q Pay X :
+    Persistent (image_entry f M av sts cw secc cs pidv Q Pay X).
   Proof using . rewrite /image_entry. apply _. Qed.
 
   Global Instance image_entry_taint_persistent T Q X :
@@ -194,35 +196,35 @@ Section ExecEntry.
      range that matters ([UInitSh.init_args_det], [UShEcho.echo_args_det])
      -- and then knows the vector its room bound is about. *)
   Lemma image_entry_of_at (f : elf_bytes) (M : gmap Z (bv 8)) (av : mword 64)
-      (sts : list fdstate) (cw : Z) (cs : gset gname) (pidv : mword 32)
+      (sts : list fdstate) (cw : Z) (secc : mword 64) (cs : gset gname) (pidv : mword 32)
       (Q : Z -> iProp Σ) (Pay : iProp Σ) (X : uvis -d> iPropO Σ) :
     □ (∀ (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8),
          ⌜exec_args_of M av na alen afun⌝ -∗
-         image_entry_at f na alen afun sts cw cs pidv Q Pay X) -∗
-    image_entry f M av sts cw cs pidv Q Pay X.
+         image_entry_at f na alen afun sts cw secc cs pidv Q Pay X) -∗
+    image_entry f M av sts cw secc cs pidv Q Pay X.
   Proof using .
     iIntros "#H". rewrite /image_entry. iIntros "!>" (na alen afun W')
-      "%Hok %Hcw %Hlz %Hch %Hpid %Hargs Hp HPay".
+      "%Hok %Hcw %Hlz %Hscw %Hch %Hpid %Hargs Hp HPay".
     iDestruct ("H" $! na alen afun with "[%]") as "#He"; [ exact Hargs | ].
     rewrite /image_entry_at.
-    iApply ("He" $! W' with "[%] [%] [%] [%] [%] Hp HPay");
-      [ exact Hok | exact Hcw | exact Hlz | exact Hch | exact Hpid ].
+    iApply ("He" $! W' with "[%] [%] [%] [%] [%] [%] Hp HPay");
+      [ exact Hok | exact Hcw | exact Hlz | exact Hscw | exact Hch | exact Hpid ].
   Qed.
 
   (* ...and back, at any shape the reading admits *)
   Lemma image_entry_at_of (f : elf_bytes) (M : gmap Z (bv 8)) (av : mword 64)
-      (sts : list fdstate) (cw : Z) (cs : gset gname) (pidv : mword 32)
+      (sts : list fdstate) (cw : Z) (secc : mword 64) (cs : gset gname) (pidv : mword 32)
       (Q : Z -> iProp Σ) (Pay : iProp Σ) (X : uvis -d> iPropO Σ)
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8) :
     exec_args_of M av na alen afun ->
-    image_entry f M av sts cw cs pidv Q Pay X -∗
-    image_entry_at f na alen afun sts cw cs pidv Q Pay X.
+    image_entry f M av sts cw secc cs pidv Q Pay X -∗
+    image_entry_at f na alen afun sts cw secc cs pidv Q Pay X.
   Proof using .
     intros Hargs. iIntros "#H". rewrite /image_entry_at.
-    iIntros "!>" (W') "%Hok %Hcw %Hlz %Hch %Hpid Hp HPay".
+    iIntros "!>" (W') "%Hok %Hcw %Hlz %Hscw %Hch %Hpid Hp HPay".
     rewrite /image_entry.
-    iApply ("H" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] Hp HPay");
-      [ exact Hok | exact Hcw | exact Hlz | exact Hch | exact Hpid
+    iApply ("H" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] [%] Hp HPay");
+      [ exact Hok | exact Hcw | exact Hlz | exact Hscw | exact Hch | exact Hpid
       | exact Hargs ].
   Qed.
 

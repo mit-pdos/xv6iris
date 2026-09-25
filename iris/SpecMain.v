@@ -728,7 +728,7 @@ Section SpecMain.
        process runs on is that bundle's own slot piece.  LINEAR, at the
        root inode and the all-closed table allocproc mints.  Born at boot,
        from [SystemAdequacy.xv6_power_adequacy_gen]'s [Hinit_boot]. *)
-    init_boot_bundle (bv_unsigned InodeInv.ROOTINO) fdt0 -∗
+    init_boot_bundle (bv_unsigned InodeInv.ROOTINO) ProcDefs.secc_all fdt0 -∗
     uart_tx_own γd l0 -∗ uart_sent γd l0 -∗ uart_out_lb γd l0 -∗
     (* THE RECEIVE TOKEN, born with the device invariant and carried by main
        to uartinit's FCR flush; main parks it in the PLIC invariant between

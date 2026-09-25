@@ -487,7 +487,7 @@ Section UkShFork.
        [UkShRun.wp_kshr_fork1].  The children set was opened at some [Sc]
        for the fork, so the arm is over it. *)
     (∀ (Sc : gset gname) (h' : CpuId) (m' : regfile) (r : mword 64),
-       ⌜ uint (m' !!! Regidx a0_idx) = 0x1298 ⌝ -∗
+       ⌜ uint (m' !!! Regidx a0_idx) = 0x12a8 ⌝ -∗
        ⌜ r = (mword_of_int (-1) : mword 64) ⌝ -∗
        ((⌜r = (mword_of_int (-1) : mword 64)⌝ ∗
            UserChildren.uch γch Sc ∗ Rc)

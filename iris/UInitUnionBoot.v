@@ -155,7 +155,7 @@ Section UnionInitBoot.
     @riscvF_app_iface Σ (@riscv_fixedGS Σ HR) = union_ifc ug ->
     ⊢ app_inv fsc_fs -∗ file_boot (fgn_cl (ugn_file ug)) (S gen_id) r -∗
       fturn (ugn_file ug) (S gen_id) -∗
-      |==> init_boot_bundle (bv_unsigned InodeInv.ROOTINO) fdt0.
+      |==> init_boot_bundle (bv_unsigned InodeInv.ROOTINO) ProcDefs.secc_all fdt0.
   Proof using HU HfifR cifRegG0 pipeProtoG0 pnsRegG0 pipesNG0.
     intros Heq Hiface.
     (* the three projections, off the one equation *)
@@ -287,6 +287,7 @@ Section UnionInitBoot.
                      (fun _ => init_boot_bytes) fdt0 W'⌝ -∗
                   ⌜uvis_cwd W' = FsImg.ROOTINO⌝ -∗
                   ⌜uvis_lazy W' = false⌝ -∗
+                  ⌜uvis_secc W' = ProcDefs.secc_all⌝ -∗
                   my_pay (uvis_gen W') (fun _ => True)%I -∗
                   UInitKernel.init_boot_pay (PS := uprogSG_free)
                     (file_taint (fgn_cl (ugn_file ug)))
@@ -356,13 +357,14 @@ Section UnionInitBoot.
                      (fun _ => init_boot_bytes) fdt0 W'⌝ -∗
                   ⌜uvis_cwd W' = FsImg.ROOTINO⌝ -∗
                   ⌜uvis_lazy W' = false⌝ -∗
+                  ⌜uvis_secc W' = ProcDefs.secc_all⌝ -∗
                   my_pay (uvis_gen W') (fun _ => True)%I -∗
                   (Pay0 ∗ ▷ Pay1) -∗ uslot W'))%I as "#Hcon'".
-    { iIntros "!>" (W') "%Hok %Hcw %Hlz Hp [HP0 HP1]".
+    { iIntros "!>" (W') "%Hok %Hcw %Hlz %Hsc Hp [HP0 HP1]".
       iApply uslot_except_0_u. rewrite /Pay1. iMod "HP1" as "[Hrd0 Hwb0]".
       iModIntro.
-      iApply ("Hcon" $! W' with "[%] [%] [%] Hp [HP0 Hrd0 Hwb0]");
-        [ exact Hok | exact Hcw | exact Hlz | ].
+      iApply ("Hcon" $! W' with "[%] [%] [%] [%] Hp [HP0 Hrd0 Hwb0]");
+        [ exact Hok | exact Hcw | exact Hlz | exact Hsc | ].
       rewrite /UInitKernel.init_boot_pay /Pay0.
       iDestruct "HP0" as "(Hdn & Hrd & #Hbl & #Hdg)".
       iSplitL "Hdn"; [ iExact "Hdn" | ].

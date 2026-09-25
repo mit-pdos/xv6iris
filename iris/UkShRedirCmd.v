@@ -377,8 +377,8 @@ Section UkShRedirCmd.
       by (intros r Hr; exact (upd_ne m7 (Regidx a0_idx) (Regidx r) _ Hr)).
     (* ---- 0x222  jal 118c <malloc> ---- *)
     iApply (wp_uk_jal N h7 m8 (mword_of_int 0x222)
-              (mword_of_int 3946 : mword 21) ra_idx
-              (mword_of_int 0x118c) (mword_of_int 0x226) (10 + nn)
+              (mword_of_int 3954 : mword 21) ra_idx
+              (mword_of_int 0x1194) (mword_of_int 0x226) (10 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
               ltac:(apply bv_eq; vm_compute; reflexivity)

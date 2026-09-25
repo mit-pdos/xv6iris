@@ -1,5 +1,5 @@
 (* ProofKforkB4.v -- kfork's idup / safestrcpy / pid-read stretch,
-   +0xa4 .. +0xc0 (block ends at pc = +0xc2):
+   +0xa4 .. +0xc8 (block ends at pc = +0xca):
 
      +0xa4  ld a0,336(s5)          a0 := p->cwd
      +0xa8  jal ra,idup
@@ -8,7 +8,7 @@
      +0xb2  addi a1,s5,344         a1 := p->name
      +0xb6  addi a0,s4,344         a0 := np->name
      +0xba  jal ra,safestrcpy
-     +0xbe  lw s1,48(s4)           s1 := np->pid  (THE RETURN VALUE)
+     +0xc6  lw s1,48(s4)           s1 := np->pid  (THE RETURN VALUE)
 
    Interrupts are OFF throughout (the child's lock, taken by allocproc, is
    still held): every leaf and every callee's own [wp_next] collapses via
@@ -101,7 +101,7 @@ Notation KF := KernelSyms.kfork (only parsing).
    in this file reduces to. *)
 Lemma pprivate_eta (V : pprivate) :
   MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) (pv_fdg V) (pv_cwd V) (pv_name V)
-          (pv_cwi V) (pv_gen V) (pv_chg V) (pv_lazy V) = V.
+          (pv_cwi V) (pv_gen V) (pv_chg V) (pv_lazy V) (pv_secc V) = V.
 Proof. destruct V; reflexivity. Qed.
 
 Lemma upd_cwd_id (V : pprivate) : upd_cwd V (pv_cwd V) = V.
@@ -157,19 +157,19 @@ Section KforkB4Res.
     pname_cells pa (DfracOwn 1) (pv_name (us_V U)) ∗
     ⌜length (pv_name (us_V U)) = PNAMELEN⌝ ∗
     (∀ ns : list (bv 8), ⌜length ns = PNAMELEN⌝ -∗ pname_cells pa (DfracOwn 1) ns -∗
-       proc_priv γf pa pid (upd_usV U (MkPPriv (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_tf (us_V U)) (pv_ofile (us_V U)) (pv_fdg (us_V U)) (pv_cwd (us_V U)) ns (pv_cwi (us_V U)) (pv_gen (us_V U)) (pv_chg (us_V U)) (pv_lazy (us_V U))))).
+       proc_priv γf pa pid (upd_usV U (MkPPriv (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_tf (us_V U)) (pv_ofile (us_V U)) (pv_fdg (us_V U)) (pv_cwd (us_V U)) ns (pv_cwi (us_V U)) (pv_gen (us_V U)) (pv_chg (us_V U)) (pv_lazy (us_V U)) (pv_secc (us_V U))))).
   Proof using .
     iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft & Hgq & Hxs & Hgh) Ho]".
-    rewrite /proc_fields. iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
+    rewrite /proc_fields. iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm & Hsecc)".
     iSplitL "Hnm"; [iExact "Hnm" |].
     iSplitR; [done |].
     iIntros (ns) "%Hnl' Hnm'".
     rewrite /proc_priv /proc_priv_core /proc_fields.
-    cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_gen pv_chg].
+    cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_gen pv_chg pv_secc].
     iSplitR "Ho"; [| iExact "Ho"].
     iSplitR; [done|]. iSplitR; [done|]. iFrame "Hpid".
-    iSplitL "Hsz Hcwd Hnm'".
-    { iFrame "Hsz Hcwd Hnm'". iPureIntro. exact Hnl'. }
+    iSplitL "Hsz Hcwd Hnm' Hsecc".
+    { iFrame "Hsz Hcwd Hnm' Hsecc". iPureIntro. exact Hnl'. }
     iSplitL "Hpt"; [iExact "Hpt"|].
     iSplitL "Htfp"; [iExact "Htfp"|].
     iSplitL "Hc"; [iExact "Hc"|].
@@ -209,8 +209,10 @@ Section KforkB4Proof.
   Notation Ra1 := (mword_of_int 11 : mword 5).
   Notation Ra2 := (mword_of_int 12 : mword 5).
   Notation Rs1 := (mword_of_int 9 : mword 5).
+  Notation Rs3 := (mword_of_int 19 : mword 5).
   Notation Rs4 := (mword_of_int 20 : mword 5).
   Notation Rs5 := (mword_of_int 21 : mword 5).
+  Notation Ra5 := (mword_of_int 15 : mword 5).
 
   Local Ltac regne := reg_ne_side.
 
@@ -235,7 +237,7 @@ Section KforkB4Proof.
        reference is inside its OWN block now, and the slot it names is read
        off it. *)
     m !!! Regidx Rs5 = pme ->
-    m !!! Regidx Rs4 = npa ->
+    m !!! Regidx Rs3 = npa ->
     (* THE FRESHNESS PREMISE: this block's [idup(p->cwd)] acquires and
        releases [itable.lock] internally (balanced -- [lks] is unchanged),
        so the caller must already hold only locks BELOW its rank. *)
@@ -293,7 +295,7 @@ Section KforkB4Proof.
          mf !!! Regidx Rs1 = sign_extend' 64 pid_c⌝ -∗
         sie_cap_gpr KT1 mf (rsv + (K - 8))%nat false pme -∗
         cpu_own lvl eb pme false lks -∗
-        pc_is (mword_of_int (KF + 0xc2) : mword 64) -∗
+        pc_is (mword_of_int (KF + 0xca) : mword 64) -∗
         proc_priv γf pme pid_p Up -∗
         (∃ Vc' : pprivate,
            ⌜pv_sz Vc' = pv_sz (us_V Uc) /\ pv_upt Vc' = pv_upt (us_V Uc) /\
@@ -314,7 +316,10 @@ Section KforkB4Proof.
                (lane LAZY-FLAG): kfork writes it once, at the close after
                uvmcopy ([ProofKforkB6]), and the child's run key reads it
                ([KforkChild.urun_eq_kfork_child]). *)
-            pv_lazy Vc' = pv_lazy (us_V Uc)⌝ ∗
+            pv_lazy Vc' = pv_lazy (us_V Uc) /\
+            (* ...AND THE MASK, COPIED from the parent (upstream a083670):
+               [ld a5,360(s5); sd a5,360(s3)] at +0xbe/+0xc2. *)
+            pv_secc Vc' = pv_secc (us_V Up)⌝ ∗
            proc_priv γf npa pid_c (MkUstate Vc' ((us_M Uc)))) -∗
         iref_slots IREFSPARE -∗
         mWP (Loop : expr riscv_lang)) -∗
@@ -374,7 +379,7 @@ Section KforkB4Proof.
     set (M0 := <[Regidx Ra0 := regval_into_reg (pv_cwd (us_V Up))]> m).
     change (<[Regidx Ra0 := regval_into_reg (pv_cwd (us_V Up))]> m) with M0.
     assert (HM0a0 : M0 !!! Regidx Ra0 = ientry ck) by (rewrite /M0 upd_eq; exact Hcwd).
-    assert (HM0s4 : M0 !!! Regidx Rs4 = npa)
+    assert (HM0s4 : M0 !!! Regidx Rs3 = npa)
       by (rewrite /M0 upd_ne; [exact Hms4 | vm_compute; discriminate]).
     assert (HM0s5 : M0 !!! Regidx Rs5 = pme)
       by (rewrite /M0 upd_ne; [exact Hms5 | vm_compute; discriminate]).
@@ -385,10 +390,10 @@ Section KforkB4Proof.
     (* +0xa8: jal ra,idup.                                            *)
     (* ------------------------------------------------------------- *)
     assert (Hjidup : add_vec (mword_of_int (KF + 0xa8) : mword 64)
-                       (sign_extend' 64 (mword_of_int 5364 : mword 21))
+                       (sign_extend' 64 (mword_of_int 5438 : mword 21))
                      = mword_of_int KernelSyms.idup)
       by (apply bv_eq; vm_compute; reflexivity).
-    iApply (wp_jal_s_sconf (mword_of_int (KF + 0xa8)) Rra (mword_of_int 5364 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KF + 0xa8)) Rra (mword_of_int 5438 : mword 21)
               M0 (rsv + (K - 8))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
@@ -402,7 +407,7 @@ Section KforkB4Proof.
       by (rewrite /M1; apply upd_eq).
     assert (HM1a0 : M1 !!! Regidx Ra0 = ientry ck)
       by (rewrite /M1 upd_ne; [exact HM0a0 | vm_compute; discriminate]).
-    assert (HM1s4 : M1 !!! Regidx Rs4 = npa)
+    assert (HM1s4 : M1 !!! Regidx Rs3 = npa)
       by (rewrite /M1 upd_ne; [exact HM0s4 | vm_compute; discriminate]).
     assert (HM1s5 : M1 !!! Regidx Rs5 = pme)
       by (rewrite /M1 upd_ne; [exact HM0s5 | vm_compute; discriminate]).
@@ -431,19 +436,19 @@ Section KforkB4Proof.
     assert (Hpc0ac : ret_pc (M1 !!! Regidx Rra) = mword_of_int (KF + 0xac)).
     { rewrite HM1ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc0ac) in "Hpc".
-    assert (Hmrs4 : mr !!! Regidx Rs4 = npa).
-    { rewrite (callee_saved_lookup Hcs_idup Rs4 ltac:(vm_compute; reflexivity)). exact HM1s4. }
+    assert (Hmrs4 : mr !!! Regidx Rs3 = npa).
+    { rewrite (callee_saved_lookup Hcs_idup Rs3 ltac:(vm_compute; reflexivity)). exact HM1s4. }
     assert (Hmrs5 : mr !!! Regidx Rs5 = pme).
     { rewrite (callee_saved_lookup Hcs_idup Rs5 ltac:(vm_compute; reflexivity)). exact HM1s5. }
     (* ------------------------------------------------------------- *)
     (* +0xac: sd a0,336(s4) -- np->cwd := a0 (= ientry ck).           *)
     (* ------------------------------------------------------------- *)
     iDestruct (proc_priv_nocwd_cwd γf npa pid_c Uc with "Hchild") as "(Hccwd & Hcback)".
-    assert (Hpa0ac : add_vec (rget mr Rs4) (sign_extend' 64 (mword_of_int 336 : mword 12))
+    assert (Hpa0ac : add_vec (rget mr Rs3) (sign_extend' 64 (mword_of_int 336 : mword 12))
                      = p_cwd npa).
-    { rewrite (rget_ne mr Rs4 ltac:(vm_compute; discriminate)) Hmrs4. apply p_cwd_sext. }
+    { rewrite (rget_ne mr Rs3 ltac:(vm_compute; discriminate)) Hmrs4. apply p_cwd_sext. }
     iEval (rewrite -Hpa0ac) in "Hccwd".
-    iApply (wp_sd_s_sconf (mword_of_int (KF + 0xac)) Ra0 Rs4 (mword_of_int 336 : mword 12)
+    iApply (wp_sd_s_sconf (mword_of_int (KF + 0xac)) Ra0 Rs3 (mword_of_int 336 : mword 12)
               mr (rsv + (K - 8))%nat (pv_cwd (us_V Uc)) false
               with "Hcg Hpc [] Hccwd").
     { iApply (kfk_0ac with "Htext"). }
@@ -498,7 +503,7 @@ Section KforkB4Proof.
     set (M3 := <[Regidx Ra2 := regval_into_reg (mword_of_int 16 : mword 64)]> M2).
     change (<[Regidx Ra2 := regval_into_reg (mword_of_int 16 : mword 64)]> M2) with M3.
     assert (HM3a2 : M3 !!! Regidx Ra2 = mword_of_int 16) by (rewrite /M3; apply upd_eq).
-    assert (HM3s4 : M3 !!! Regidx Rs4 = npa)
+    assert (HM3s4 : M3 !!! Regidx Rs3 = npa)
       by (rewrite /M3 upd_ne; [exact Hmrs4 | vm_compute; discriminate]).
     assert (HM3s5 : M3 !!! Regidx Rs5 = pme)
       by (rewrite /M3 upd_ne; [exact Hmrs5 | vm_compute; discriminate]).
@@ -519,7 +524,7 @@ Section KforkB4Proof.
       with M4.
     assert (HM4a1 : M4 !!! Regidx Ra1 = kfk_name_base pme).
     { rewrite /M4 upd_eq HM3s5 kfk_344_sext. reflexivity. }
-    assert (HM4s4 : M4 !!! Regidx Rs4 = npa)
+    assert (HM4s4 : M4 !!! Regidx Rs3 = npa)
       by (rewrite /M4 upd_ne; [exact HM3s4 | vm_compute; discriminate]).
     assert (HM4a2 : M4 !!! Regidx Ra2 = mword_of_int 16)
       by (rewrite /M4 upd_ne; [exact HM3a2 | vm_compute; discriminate]).
@@ -529,14 +534,14 @@ Section KforkB4Proof.
     (* ------------------------------------------------------------- *)
     (* +0xb6: addi a0,s4,344 -- a0 := np->name.                       *)
     (* ------------------------------------------------------------- *)
-    iApply (wp_addi4_s_sconf (mword_of_int (KF + 0xb6)) Ra0 Rs4 (mword_of_int 344 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KF + 0xb6)) Ra0 Rs3 (mword_of_int 344 : mword 12)
               M4 (rsv + (K - 8))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (kfk_0b6 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
-    set (M5 := <[Regidx Ra0 := regval_into_reg (add_vec (M4 !!! Regidx Rs4) (sign_extend' 64 (mword_of_int 344 : mword 12)))]> M4).
-    change (<[Regidx Ra0 := regval_into_reg (add_vec (M4 !!! Regidx Rs4) (sign_extend' 64 (mword_of_int 344 : mword 12)))]> M4)
+    set (M5 := <[Regidx Ra0 := regval_into_reg (add_vec (M4 !!! Regidx Rs3) (sign_extend' 64 (mword_of_int 344 : mword 12)))]> M4).
+    change (<[Regidx Ra0 := regval_into_reg (add_vec (M4 !!! Regidx Rs3) (sign_extend' 64 (mword_of_int 344 : mword 12)))]> M4)
       with M5.
     assert (HM5a0 : M5 !!! Regidx Ra0 = kfk_name_base npa).
     { rewrite /M5 upd_eq HM4s4 kfk_344_sext. reflexivity. }
@@ -551,10 +556,10 @@ Section KforkB4Proof.
     (* +0xba: jal ra,safestrcpy.                                      *)
     (* ------------------------------------------------------------- *)
     assert (Hjss : add_vec (mword_of_int (KF + 0xba) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2093206 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2093200 : mword 21))
                    = mword_of_int KernelSyms.safestrcpy)
       by (apply bv_eq; vm_compute; reflexivity).
-    iApply (wp_jal_s_sconf (mword_of_int (KF + 0xba)) Rra (mword_of_int 2093206 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KF + 0xba)) Rra (mword_of_int 2093200 : mword 21)
               M5 (rsv + (K - 8))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
@@ -572,7 +577,7 @@ Section KforkB4Proof.
       by (rewrite /M6 upd_ne; [exact HM5a1 | vm_compute; discriminate]).
     assert (HM6a2 : M6 !!! Regidx Ra2 = mword_of_int 16)
       by (rewrite /M6 upd_ne; [exact HM5a2 | vm_compute; discriminate]).
-    assert (HM6s4 : M6 !!! Regidx Rs4 = npa)
+    assert (HM6s4 : M6 !!! Regidx Rs3 = npa)
       by (rewrite /M6 upd_ne; [exact HM4s4 | vm_compute; discriminate]).
     assert (HM6s5 : M6 !!! Regidx Rs5 = pme)
       by (rewrite /M6 upd_ne; [exact HM3s5 | vm_compute; discriminate]).
@@ -611,8 +616,8 @@ Section KforkB4Proof.
     assert (Hpc0be : ret_pc (M6 !!! Regidx Rra) = mword_of_int (KF + 0xbe)).
     { rewrite HM6ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc0be) in "Hpc".
-    assert (Hmr2s4 : mr2 !!! Regidx Rs4 = npa).
-    { rewrite (callee_saved_lookup Hcs_ss Rs4 ltac:(vm_compute; reflexivity)). exact HM6s4. }
+    assert (Hmr2s4 : mr2 !!! Regidx Rs3 = npa).
+    { rewrite (callee_saved_lookup Hcs_ss Rs3 ltac:(vm_compute; reflexivity)). exact HM6s4. }
     assert (Hmr2s5 : mr2 !!! Regidx Rs5 = pme).
     { rewrite (callee_saved_lookup Hcs_ss Rs5 ltac:(vm_compute; reflexivity)). exact HM6s5. }
     (* re-fold the parent's name bytes back to EXACTLY [pv_name Vp] *)
@@ -642,22 +647,67 @@ Section KforkB4Proof.
     iDestruct ("HnmCback" $! (h <$> seq 0 16%nat) Hlen_hn with "HnmCfold") as "Hchild3".
     set (Vc3 := MkPPriv (pv_sz Vc2) (pv_upt Vc2) (pv_tf Vc2) (pv_ofile Vc2)
                   (pv_fdg Vc2) (pv_cwd Vc2) (h <$> seq 0 16%nat) (pv_cwi Vc2)
-                  (pv_gen Vc2) (pv_chg Vc2) (pv_lazy Vc2)).
+                  (pv_gen Vc2) (pv_chg Vc2) (pv_lazy Vc2) (pv_secc Vc2)).
     (* ------------------------------------------------------------- *)
-    (* +0xbe: lw s1,48(s4) -- s1 := np->pid, THE RETURN VALUE.        *)
+    (* +0xbe: ld a5,360(s5) -- a5 := p->seccomp (upstream a083670).   *)
+    (* The parent's mask cell, borrowed out of its block and put back *)
+    (* at the value it held.                                          *)
     (* ------------------------------------------------------------- *)
-    iDestruct (proc_priv_pid γf npa pid_c (MkUstate Vc3 _) with "Hchild3") as "[Hcpid Hcpidback]".
-    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KF + 0xbe)) Rs1 Rs4 (mword_of_int 48 : mword 12)
-              mr2 (rsv + (K - 8))%nat pid_c false (dqm := DfracOwn (1/4))
+    iDestruct (proc_priv_secc γf pme pid_p Up with "Hparent3") as "[HscP HscPback]".
+    iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KF + 0xbe)) Ra5 Rs5 (mword_of_int 360 : mword 12)
+              mr2 (rsv + (K - 8))%nat (pv_secc (us_V Up)) false (dqm := DfracOwn 1)
+              ltac:(vm_compute; discriminate) ltac:(rdok)
+              with "Hcg Hpc [] [HscP]").
+    { iApply (kfk_0be with "Htext"). }
+    { iEval (rewrite (rget_ne mr2 Rs5 ltac:(vm_compute; discriminate)) Hmr2s5). iExact "HscP". }
+    iApply wp_next_off_intro. iIntros "Hcg Hpc HscP".
+    iEval (rewrite (rget_ne mr2 Rs5 ltac:(vm_compute; discriminate)) Hmr2s5) in "HscP".
+    iDestruct ("HscPback" with "HscP") as "Hparent3".
+    iEval (rewrite us_set_secc_id) in "Hparent3".
+    set (mr3 := <[Regidx Ra5 := regval_into_reg (pv_secc (us_V Up))]> mr2).
+    change (<[Regidx Ra5 := regval_into_reg (pv_secc (us_V Up))]> mr2) with mr3.
+    assert (Hmr3s4 : mr3 !!! Regidx Rs3 = npa)
+      by (rewrite /mr3 upd_ne; [exact Hmr2s4 | vm_compute; discriminate]).
+    assert (Hmr3a5 : mr3 !!! Regidx Ra5 = pv_secc (us_V Up))
+      by (rewrite /mr3; apply upd_eq).
+    assert (Hpp0c2 : add_vec_int (mword_of_int (KF + 0xbe) : mword 64) 4 = mword_of_int (KF + 0xc2))
+      by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp0c2) in "Hpc".
+    (* ------------------------------------------------------------- *)
+    (* +0xc2: sd a5,360(s3) -- np->seccomp := a5.  The child's block  *)
+    (* is written at its own cell and comes back at [set_secc].       *)
+    (* ------------------------------------------------------------- *)
+    iDestruct (proc_priv_secc γf npa pid_c (MkUstate Vc3 (us_M Uc)) with "Hchild3") as "[HscC HscCback]".
+    iApply (wp_sd_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KF + 0xc2)) Ra5 Rs3 (mword_of_int 360 : mword 12)
+              mr3 (rsv + (K - 8))%nat (pv_secc (us_V (MkUstate Vc3 (us_M Uc)))) false
+              with "Hcg Hpc [] [HscC]").
+    { iApply (kfk_0c2 with "Htext"). }
+    { iEval (rewrite (rget_ne mr3 Rs3 ltac:(vm_compute; discriminate)) Hmr3s4). iExact "HscC". }
+    iApply wp_next_off_intro. iIntros "Hcg Hpc HscC".
+    iEval (rewrite (rget_ne mr3 Rs3 ltac:(vm_compute; discriminate)) Hmr3s4
+                   (rget_ne mr3 Ra5 ltac:(vm_compute; discriminate)) Hmr3a5) in "HscC".
+    iDestruct ("HscCback" with "HscC") as "Hchild3".
+    set (Vc4 := set_secc Vc3 (pv_secc (us_V Up))).
+    change (us_set_secc (MkUstate Vc3 (us_M Uc)) (pv_secc (us_V Up)))
+      with (MkUstate Vc4 (us_M Uc)) in *.
+    assert (Hpp0c6 : add_vec_int (mword_of_int (KF + 0xc2) : mword 64) 4 = mword_of_int (KF + 0xc6))
+      by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp0c6) in "Hpc".
+    (* ------------------------------------------------------------- *)
+    (* +0xc6: lw s1,48(s3) -- s1 := np->pid, THE RETURN VALUE.        *)
+    (* ------------------------------------------------------------- *)
+    iDestruct (proc_priv_pid γf npa pid_c (MkUstate Vc4 _) with "Hchild3") as "[Hcpid Hcpidback]".
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KF + 0xc6)) Rs1 Rs3 (mword_of_int 48 : mword 12)
+              mr3 (rsv + (K - 8))%nat pid_c false (dqm := DfracOwn (1/4))
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] [Hcpid]").
-    { iApply (kfk_0be with "Htext"). }
-    { iEval (rewrite (rget_ne mr2 Rs4 ltac:(vm_compute; discriminate)) Hmr2s4). iExact "Hcpid". }
+    { iApply (kfk_0c6 with "Htext"). }
+    { iEval (rewrite (rget_ne mr3 Rs3 ltac:(vm_compute; discriminate)) Hmr3s4). iExact "Hcpid". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hcpid".
-    iEval (rewrite (rget_ne mr2 Rs4 ltac:(vm_compute; discriminate)) Hmr2s4) in "Hcpid".
+    iEval (rewrite (rget_ne mr3 Rs3 ltac:(vm_compute; discriminate)) Hmr3s4) in "Hcpid".
     iDestruct ("Hcpidback" with "Hcpid") as "Hchild4".
-    set (Mf := <[Regidx Rs1 := regval_into_reg (sign_extend' 64 pid_c)]> mr2).
-    change (<[Regidx Rs1 := regval_into_reg (sign_extend' 64 pid_c)]> mr2) with Mf.
+    set (Mf := <[Regidx Rs1 := regval_into_reg (sign_extend' 64 pid_c)]> mr3).
+    change (<[Regidx Rs1 := regval_into_reg (sign_extend' 64 pid_c)]> mr3) with Mf.
     assert (HMfs1 : Mf !!! Regidx Rs1 = sign_extend' 64 pid_c) by (rewrite /Mf; apply upd_eq).
     (* ------------------------------------------------------------- *)
     (* THE OVERALL callee-saved CHAIN, [m] -> [Mf], excluding [s1].   *)
@@ -666,6 +716,7 @@ Section KforkB4Proof.
                       Mf !!! Regidx r = m !!! Regidx r).
     { intros r Hr Hne.
       rewrite /Mf upd_ne; [| congruence].
+      rewrite /mr3 upd_ne; [| regne].
       rewrite (callee_saved_lookup Hcs_ss r Hr).
       rewrite /M6 upd_ne; [| regne].
       rewrite /M5 upd_ne; [| regne].
@@ -676,9 +727,9 @@ Section KforkB4Proof.
       rewrite /M1 upd_ne; [| regne].
       rewrite /M0 upd_ne; [| regne].
       reflexivity. }
-    assert (Hpp0c2 : add_vec_int (mword_of_int (KF + 0xbe) : mword 64) 4 = mword_of_int (KF + 0xc2))
+    assert (Hpp0ca : add_vec_int (mword_of_int (KF + 0xc6) : mword 64) 4 = mword_of_int (KF + 0xca))
       by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpp0c2) in "Hpc".
+    iEval (rewrite Hpp0ca) in "Hpc".
     (* ------------------------------------------------------------- *)
     (* Package the child's final block as the existential [Vc'].     *)
     (* ------------------------------------------------------------- *)
@@ -690,14 +741,15 @@ Section KforkB4Proof.
                 pv_cwi Vc' = pv_cwi (us_V Up) /\
                 pv_gen Vc' = pv_gen (us_V Uc) /\
                 pv_chg Vc' = pv_chg (us_V Uc) /\
-                pv_lazy Vc' = pv_lazy (us_V Uc)⌝ ∗
+                pv_lazy Vc' = pv_lazy (us_V Uc) /\
+                pv_secc Vc' = pv_secc (us_V Up)⌝ ∗
                proc_priv γf npa pid_c (MkUstate Vc' ((us_M Uc))))%I
       with "[Hchild4]" as "HchildFinal".
-    { iExists Vc3.
+    { iExists Vc4.
       iSplitR.
-      - iPureIntro. rewrite /Vc3 /Vc2 /upd_cwi /upd_cwd.
+      - iPureIntro. rewrite /Vc4 /Vc3 /Vc2 /set_secc /upd_cwi /upd_cwd.
         cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_fdg pv_cwi pv_gen pv_chg
-             pv_lazy].
+             pv_lazy pv_secc].
         rewrite Hcwd. repeat split; reflexivity.
       - iExact "Hchild4". }
     iSpecialize ("Hcont" $! CID0 with "[%]"); [intros _; reflexivity |].

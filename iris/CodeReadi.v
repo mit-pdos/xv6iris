@@ -213,9 +213,9 @@ Section CodeReadi.
   Proof using . mk_rvc (KernelSyms.readi + 0x5e) (mword_of_int 0x855e : mword 16)
     (mword_of_int (KernelSyms.readi + 0x5e) : mword 64) (RTYPE (Regidx (mword_of_int 23), zreg, Regidx (mword_of_int 10), ADD)) kd_855e exec_execute_C_MV. Qed.
 
-  Lemma rdi_060 : kernel_text -∗ instr (mword_of_int (KernelSyms.readi + 0x60) : mword 64) false (JAL (mword_of_int 2092080 : mword 21, Regidx (mword_of_int 1))).
-  Proof using . mk_base (KernelSyms.readi + 0x60) (mword_of_int 0xc31fe0ef : mword 32)
-    (mword_of_int (KernelSyms.readi + 0x60) : mword 64) (JAL (mword_of_int 2092080 : mword 21, Regidx (mword_of_int 1))) kd_c31fe0ef. Qed.
+  Lemma rdi_060 : kernel_text -∗ instr (mword_of_int (KernelSyms.readi + 0x60) : mword 64) false (JAL (mword_of_int 2092014 : mword 21, Regidx (mword_of_int 1))).
+  Proof using . mk_base (KernelSyms.readi + 0x60) (mword_of_int 0xbeffe0ef : mword 32)
+    (mword_of_int (KernelSyms.readi + 0x60) : mword 64) (JAL (mword_of_int 2092014 : mword 21, Regidx (mword_of_int 1))) kd_beffe0ef. Qed.
 
   Lemma rdi_064 : kernel_text -∗ instr (mword_of_int (KernelSyms.readi + 0x64) : mword 64) false (BTYPE (mword_of_int 70 : mword 13, Regidx (mword_of_int 24), Regidx (mword_of_int 10), BEQ)).
   Proof using . mk_base (KernelSyms.readi + 0x64) (mword_of_int 0x05850363 : mword 32)

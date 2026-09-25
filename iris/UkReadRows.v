@@ -319,7 +319,7 @@ Section UkReadRows.
        uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗ ufd_auth (ukn_fd N) fdv -∗
        uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz ∗ ufd_auth (ukn_fd N) fdv ∗
        sbundle_at uslot n fdep
-         (uvis_of_run m pc M pm sz fdv cw gn cs pidv false))%I.
+         (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all))%I.
 
   (* ...AND IT IS [UkRunSys.udepwf_K] AT THAT READING, so the one read walk
      and the one write walk take it as it stands. *)

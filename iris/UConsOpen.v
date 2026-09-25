@@ -10,7 +10,7 @@
 (* INSTANTIATIONS (the PINNING ruling's (3): factor before the second      *)
 (* hand-rolled instance).  This file was cut out of UInitConsK.v verbatim; *)
 (* what stayed there is exactly what names /init's own image: its rodata   *)
-(* base 0x970, its stub addresses, and the MKNOD, which only /init calls.  *)
+(* base 0x980, its stub addresses, and the MKNOD, which only /init calls.  *)
 (*                                                                        *)
 (* WHAT A CALLER SUPPLIES, and all it supplies:                           *)
 (*   its READ-ONLY IMAGE [Img] (a persistent [UserHeap.utext_img]) and the *)
@@ -518,7 +518,7 @@ Section UConsOpen.
 
   (* THE SUPPLIER AT THE MISSING PIN, at the CALLER's own literal.  The
      path reading is a premise because it is the one thing that is the
-     caller's: /init's literal is at 0x970 in [UCodeInit.init_ro] and sh's
+     caller's: /init's literal is at 0x980 in [UCodeInit.init_ro] and sh's
      at [UkSh.sh_cons_pv] in [UCodeShK.shk_ro], and both are one
      [vm_compute] over the caller's own dump. *)
   Lemma cons_sup_absent (N : uk_names Σ) (T K : iProp Σ)
@@ -540,7 +540,7 @@ Section UConsOpen.
     iDestruct (cons_ro_sub N Img M pm sz with "Hheap Hro") as %Hsro.
     iFrame "Hheap Hufd".
     iApply (sbundle_at_open_intro_at uslot (init_cons_absent_fam T K (ukn_pay N))
-              (uvis_of_run m pc M pm sz fdv FsImg.ROOTINO gn cs pidv false)
+              (uvis_of_run m pc M pm sz fdv FsImg.ROOTINO gn cs pidv false secc_all)
               FsImg.ROOTINO M pv (mword_of_int 2)
               eq_refl eq_refl
               (eq_trans (tf_of_arg0 m pc) Ha0)
@@ -590,7 +590,7 @@ Section UConsOpen.
     iFrame "Hheap Hufd".
     iApply (sbundle_at_open_intro_at uslot
               (init_cons_console_fam T i (ukn_pay N))
-              (uvis_of_run m pc M pm sz fdv FsImg.ROOTINO gn cs pidv false)
+              (uvis_of_run m pc M pm sz fdv FsImg.ROOTINO gn cs pidv false secc_all)
               FsImg.ROOTINO M pv (mword_of_int 2)
               eq_refl eq_refl
               (eq_trans (tf_of_arg0 m pc) Ha0)

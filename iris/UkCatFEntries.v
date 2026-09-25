@@ -132,7 +132,7 @@ Section UkCatFEntries.
     (snd <$> sf !! f = Some L /\ cat_dg_open f ∈ xs /\ [] ∈ ds /\ cat_dg_write ∈ ds)
     \/ (sf !! f = None /\ cat_dg_open f ∈ xs) ->
     UkRun.urun_nopipe sts -∗ udep -∗
-    image_entry ElfUser.cat_elf Mn (mword_of_int (t + 8) : mword 64) sts cw cs pidv Q
+    image_entry ElfUser.cat_elf Mn (mword_of_int (t + 8) : mword 64) sts cw ProcDefs.secc_all cs pidv Q
       (LEND qf sf pn gp w A X ds xs Q) uslot.
   Proof using HL31 Hadmit Hcons Heq Hext Hfc Hkill HlR Hplok Hsup cifRegG0 dep_tl ufdG0.
     intros HQc Hf Hok Hnode Hab Hfdl Hcw Hl1 Hl2 Hcase.
@@ -150,7 +150,7 @@ Section UkCatFEntries.
       - apply (cat_file_prod_absent_conforms_gen f); [rewrite Hfs Hs; reflexivity
                                                            | by right; left | exact Hx]. }
     rewrite /image_entry.
-    iIntros "!>" (na alen afun W') "%Hokk %Hcwv %Hlz %Hch %Hpid %Hargs Hmp HPay".
+    iIntros "!>" (na alen afun W') "%Hokk %Hcwv %Hlz %Hscw %Hch %Hpid %Hargs Hmp HPay".
     iApply uslot_bupd.
     iMod (cif_reg_alloc wv) as (γreg) "Hpool". iModIntro.
     set (If := fun (N' : uk_names Σ) (Hpq : ukn_pay N' = Q) =>
@@ -172,8 +172,8 @@ Section UkCatFEntries.
                 (cfe_kdp0 pn gp w A X) qf sf pn gp w A X ds xs (take NSTD sts) rb1 rb2 wv files f
                 eq_refl eq_refl Hl1 Hl2 Hf Hfs
                 with "Hstd Hcwd Hpool Hlend"). }
-    iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] Hmp [Hpool HPay]");
-      [ exact Hokk | exact Hcwv | exact Hlz | exact Hch | exact Hpid | exact Hargs | ].
+    iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] [%] Hmp [Hpool HPay]");
+      [ exact Hokk | exact Hcwv | exact Hlz | exact Hscw | exact Hch | exact Hpid | exact Hargs | ].
     iFrame "Hpool HPay".
   Qed.
 
@@ -191,7 +191,7 @@ Section UkCatFEntries.
     take NSTD sts !! 1%nat = Some (FdOpen rb1 true (FdPipe gp)) ->
     take NSTD sts !! 2%nat = Some (FdOpen rb2 true (FdDevice CONSOLE)) ->
     UkRun.urun_nopipe sts -∗ udep -∗
-    image_entry ElfUser.cat_elf Mn (mword_of_int (t + 8) : mword 64) sts cw cs pidv Q
+    image_entry ElfUser.cat_elf Mn (mword_of_int (t + 8) : mword 64) sts cw ProcDefs.secc_all cs pidv Q
       (LEND qf sf pn gp w [[]; cat_dg_write] [cat_dg_open f]
          [[]; cat_dg_write] [cat_dg_open f] Q) uslot.
   Proof using HL31 Hadmit Hcons Heq Hext Hfc Hkill HlR Hplok Hsup cifRegG0 dep_tl ufdG0.
@@ -215,7 +215,7 @@ Section UkCatFEntries.
     take NSTD sts !! 1%nat = Some (FdOpen rb1 true (FdPipe gp)) ->
     take NSTD sts !! 2%nat = Some (FdOpen rb2 true (FdDevice CONSOLE)) ->
     UkRun.urun_nopipe sts -∗ udep -∗
-    image_entry ElfUser.cat_elf Mn (mword_of_int (t + 8) : mword 64) sts cw cs pidv Q
+    image_entry ElfUser.cat_elf Mn (mword_of_int (t + 8) : mword 64) sts cw ProcDefs.secc_all cs pidv Q
       (LEND qf sf pn gp w [[]] [cat_dg_open f] [[]] [cat_dg_open f] Q) uslot.
   Proof using HL31 Hadmit Hcons Heq Hext Hfc Hkill HlR Hplok Hsup cifRegG0 dep_tl ufdG0.
     intros HQc Hf HsN Hok Hnode Hab Hfdl Hcw Hl1 Hl2.

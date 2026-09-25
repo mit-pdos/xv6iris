@@ -239,7 +239,7 @@ Section ProofSysExit.
     assert (Hpp0e : add_vec_int (mword_of_int (SE + 0x0c) : mword 64) 2 = mword_of_int (SE + 0x0e)) by pcstep.
     iEval (rewrite Hpp0e) in "Hpc".
     (* +0x0e jal ra,argint *)
-    iApply (wp_jal_s_sconf (mword_of_int (SE + 0x0e)) Rra (mword_of_int 2096942 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (SE + 0x0e)) Rra (mword_of_int 2096922 : mword 21)
               A3 (av - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
@@ -248,7 +248,7 @@ Section ProofSysExit.
     set (A4 := <[Regidx Rra := regval_into_reg (add_vec_int (mword_of_int (SE + 0x0e) : mword 64) 4)]> A3).
     change (<[Regidx Rra := regval_into_reg (add_vec_int (mword_of_int (SE + 0x0e) : mword 64) 4)]> A3) with A4.
     assert (Hjai : add_vec (mword_of_int (SE + 0x0e) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2096942 : mword 21)) = mword_of_int KernelSyms.argint)
+                     (sign_extend' 64 (mword_of_int 2096922 : mword 21)) = mword_of_int KernelSyms.argint)
       by pcstep.
     iEval (rewrite Hjai) in "Hpc".
     assert (HA4ra : A4 !!! Regidx Rra = add_vec_int (mword_of_int (SE + 0x0e) : mword 64) 4)
@@ -302,7 +302,7 @@ Section ProofSysExit.
     assert (Hpp16 : add_vec_int (mword_of_int (SE + 0x12) : mword 64) 4 = mword_of_int (SE + 0x16)) by pcstep.
     iEval (rewrite Hpp16) in "Hpc".
     (* +0x16 jal ra,kexit *)
-    iApply (wp_jal_s_sconf (mword_of_int (SE + 0x16)) Rra (mword_of_int 2094848 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (SE + 0x16)) Rra (mword_of_int 2094828 : mword 21)
               B1 (av - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
@@ -326,7 +326,7 @@ Section ProofSysExit.
     assert (Hix : (trap_res b + av - 4)%nat = (trap_res b + (av - 4))%nat) by lia.
     iEval (rewrite Hix -HB2sp) in "Hcl4".
     assert (Hjke : add_vec (mword_of_int (SE + 0x16) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2094848 : mword 21)) = mword_of_int KernelSyms.kexit)
+                     (sign_extend' 64 (mword_of_int 2094828 : mword 21)) = mword_of_int KernelSyms.kexit)
       by pcstep.
     iEval (rewrite Hjke) in "Hpc".
     (* ===================== kexit(n) -- DIVERGES ===================== *)

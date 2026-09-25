@@ -313,14 +313,14 @@ Section UkInit.
        init_code γt -∗
        (* THE READ-ONLY IMAGE AND THE TWO ARGUMENT WORDS.  A pinned open is
           about a PATH, and the path is a string in /init's own .rodata at
-          0x970 read through the LOANED heap ([UInitConsK]'s supplier), so
+          0x980 read through the LOANED heap ([UInitConsK]'s supplier), so
           the era-level discharge needs the persistent view of those bytes
           and the two registers the stub is called with: a0 = "console",
           a1 = O_RDWR.  Both call sites hold them
           ([UkInitMain.wp_kinit_main] @0x0e-0x16,
           [wp_kinit_main_repair_tail] @0x74-0x7e). *)
        init_rodata γt -∗
-       ⌜ m !!! Regidx a0_idx = (mword_of_int 0x970 : mword 64)
+       ⌜ m !!! Regidx a0_idx = (mword_of_int 0x980 : mword 64)
          /\ m !!! Regidx a1_idx = (mword_of_int 2 : mword 64) ⌝ -∗
        urun N h m (mword_of_int InitSyms.open) avail -∗
        UserCwd.ucwd γcwd FsImg.ROOTINO -∗
@@ -354,7 +354,7 @@ Section UkInit.
        (* the read-only image and the two argument words, for
           [uki_open_console_leaf]'s reason *)
        init_rodata γt -∗
-       ⌜ m !!! Regidx a0_idx = (mword_of_int 0x970 : mword 64)
+       ⌜ m !!! Regidx a0_idx = (mword_of_int 0x980 : mword 64)
          /\ m !!! Regidx a1_idx = (mword_of_int 2 : mword 64) ⌝ -∗
        urun N h m (mword_of_int InitSyms.open) avail -∗
        UserCwd.ucwd γcwd FsImg.ROOTINO -∗
@@ -400,11 +400,11 @@ Section UkInit.
     (∀ (h : CpuId) (m : regfile) (avail : nat),
        init_code γt -∗
        (* the read-only image and the THREE argument words: a0 = "console"
-          at 0x970, a1 = CONSOLE, a2 = 0 -- the numbers row 17 reads
+          at 0x980, a1 = CONSOLE, a2 = 0 -- the numbers row 17 reads
           through [SysMknodDefs.dev_arg].  The repair arm holds all four
           ([UkInitMain.wp_kinit_main_repair] @0x64-0x70). *)
        init_rodata γt -∗
-       ⌜ m !!! Regidx a0_idx = (mword_of_int 0x970 : mword 64)
+       ⌜ m !!! Regidx a0_idx = (mword_of_int 0x980 : mword 64)
          /\ m !!! Regidx a1_idx = (mword_of_int 1 : mword 64)
          /\ m !!! Regidx a2_idx = (mword_of_int 0 : mword 64) ⌝ -∗
        urun N h m (mword_of_int InitSyms.mknod) avail -∗
@@ -454,7 +454,7 @@ Section UkInit.
        (* the read-only image and the two argument words, threaded to
           whichever of the three leaves the mknod's answer chose *)
        init_rodata γt -∗
-       ⌜ m !!! Regidx a0_idx = (mword_of_int 0x970 : mword 64)
+       ⌜ m !!! Regidx a0_idx = (mword_of_int 0x980 : mword 64)
          /\ m !!! Regidx a1_idx = (mword_of_int 2 : mword 64) ⌝ -∗
        urun N h m (mword_of_int InitSyms.open) avail -∗
        UserCwd.ucwd γcwd FsImg.ROOTINO -∗
@@ -508,7 +508,7 @@ Section UkInit.
     (∀ (h : CpuId) (m : regfile) (avail : nat),
        init_code γt -∗
        init_rodata γt -∗
-       ⌜ m !!! Regidx a0_idx = (mword_of_int 0x970 : mword 64)
+       ⌜ m !!! Regidx a0_idx = (mword_of_int 0x980 : mword 64)
          /\ m !!! Regidx a1_idx = (mword_of_int 1 : mword 64)
          /\ m !!! Regidx a2_idx = (mword_of_int 0 : mword 64) ⌝ -∗
        urun N h m (mword_of_int InitSyms.mknod) avail -∗
@@ -640,6 +640,8 @@ Section UkInit.
               (* ...and the three descriptor-moving numbers, and chdir *)
               ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
               ltac:(discriminate)
+              (* ...and a number the full mask passes, not seccomp's *)
+              ltac:(lia) ltac:(discriminate)
               ltac:(vm_compute; reflexivity)
               with "[] Hrun []").
     { iApply (uis_init_3bc with "Hcode"). }
@@ -710,7 +712,7 @@ Section UkInit.
     (∀ (h : CpuId) (m : regfile) (avail : nat),
        init_code γt -∗
        init_rodata γt -∗
-       ⌜ m !!! Regidx a0_idx = (mword_of_int 0x970 : mword 64)
+       ⌜ m !!! Regidx a0_idx = (mword_of_int 0x980 : mword 64)
          /\ m !!! Regidx a1_idx = (mword_of_int 2 : mword 64) ⌝ -∗
        urun N h m (mword_of_int InitSyms.open) avail -∗
        UserCwd.ucwd γcwd FsImg.ROOTINO -∗
@@ -1229,6 +1231,8 @@ Section UkInit.
               (* ...and the three descriptor-moving numbers, and chdir *)
               ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
               ltac:(discriminate)
+              (* ...and a number the full mask passes, not seccomp's *)
+              ltac:(lia) ltac:(discriminate)
               ltac:(vm_compute; reflexivity)
               with "[] Hrun []").
     { iApply (uis_init_394 with "Hcode"). }
@@ -1544,7 +1548,7 @@ Section UkInit.
   (*                                                                       *)
   (* [uxsup] is the exec bundle at EVERY key -- what a program that answers *)
   (* for nothing runs on.  init answers for exactly one exec: the child     *)
-  (* arm's [exec("sh", argv)], at a0 = 0x9a8 ("sh" in its rodata), a1 =     *)
+  (* arm's [exec("sh", argv)], at a0 = 0x9b8 ("sh" in its rodata), a1 =     *)
   (* 0x1000 (its .data argument vector) and the working directory it was    *)
   (* born with and never moves ([FsImg.ROOTINO]).  So what init carries is  *)
   (* the [c]-indexed deposit at THOSE keys and no other, and the deposit    *)
@@ -1585,7 +1589,7 @@ Section UkInit.
              at this lane owes its parent nothing, and its record says so --
              the entry constructor's row, or [UkFork]'s child arm. *)
           ⌜ ukn_pay N' = (fun _ => True)%I ⌝ -∗
-          ⌜ m !!! Regidx a0_idx = (mword_of_int 0x9a8 : mword 64) ⌝ -∗
+          ⌜ m !!! Regidx a0_idx = (mword_of_int 0x9b8 : mword 64) ⌝ -∗
           ⌜ m !!! Regidx a1_idx = (mword_of_int 0x1000 : mword 64) ⌝ -∗
           init_rodata (ukn_t N') -∗
           init_argv (ukn_d N') -∗
@@ -1788,7 +1792,7 @@ Section UkInit.
           The spender is /init's exec leaf, whose record carries the class
           ([UkRun.ukn_parked]); the child that execs sh is minted at its
           parent's set ([UkFork.wp_uk_ecall_fork]). *)
-       ⌜ m !!! Regidx a0_idx = (mword_of_int 0x9a8 : mword 64) ⌝ -∗
+       ⌜ m !!! Regidx a0_idx = (mword_of_int 0x9b8 : mword 64) ⌝ -∗
        ⌜ m !!! Regidx a1_idx = (mword_of_int 0x1000 : mword 64) ⌝ -∗
        init_rodata (ukn_t N') -∗
        init_argv (ukn_d N') -∗

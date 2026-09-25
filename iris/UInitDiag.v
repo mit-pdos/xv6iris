@@ -100,8 +100,8 @@ Import Defs.
 (* ===================================================================== *)
 Section UInitDiagPure.
   (* init's literals, by base ([UkInitMain]'s table) *)
-  Local Notation LIT_FORK  := 0x990.   (* "init: fork failed\n"     *)
-  Local Notation LIT_EXEC  := 0x9b0.   (* "init: exec sh failed\n"  *)
+  Local Notation LIT_FORK  := 0x9a0.   (* "init: fork failed\n"     *)
+  Local Notation LIT_EXEC  := 0x9c0.   (* "init: exec sh failed\n"  *)
 
   Lemma init_execfail_bytes_bool :
     forallb (fun j : nat =>
@@ -162,9 +162,9 @@ Section UInitDiagGen.
   Local Notation a2_idx := (mword_of_int 12 : mword 5).
   Local Notation a7_idx := (mword_of_int 17 : mword 5).
   (* init's literals, by base ([UkInitMain]'s table) *)
-  Local Notation LIT_START := 0x978.   (* "init: starting sh\n"     *)
-  Local Notation LIT_FORK  := 0x990.   (* "init: fork failed\n"     *)
-  Local Notation LIT_EXEC  := 0x9b0.   (* "init: exec sh failed\n"  *)
+  Local Notation LIT_START := 0x988.   (* "init: starting sh\n"     *)
+  Local Notation LIT_FORK  := 0x9a0.   (* "init: fork failed\n"     *)
+  Local Notation LIT_EXEC  := 0x9c0.   (* "init: exec sh failed\n"  *)
 
   (* =================================================================== *)
   (*  S2  ONE BYTE OF A DIAGNOSTIC, THROUGH THE ERA'S LINKS               *)
@@ -425,8 +425,8 @@ Section UInitDiagEcho.
   Context `{PS : uprogSG Σ}.
 
   Local Notation stc_cons := (FdOpen true true (FdDevice CONSOLE)).
-  Local Notation LIT_FORK  := 0x990.
-  Local Notation LIT_EXEC  := 0x9b0.
+  Local Notation LIT_FORK  := 0x9a0.
+  Local Notation LIT_EXEC  := 0x9c0.
   Local Notation EI := (echo_link_inst T γ).
 
   Definition pdg (v : era_pins) (I : list (bv 8)) (a i : nat) : iProp Σ :=

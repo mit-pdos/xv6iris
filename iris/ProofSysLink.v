@@ -948,7 +948,7 @@ Section ProofSysLinkBody.
     iEval (rewrite Hpp12) in "Hpc".
     (* ================= +0x12 jal ra,argstr ================= *)
     iApply (wp_jal_s_sconf (CID := CID7) (mword_of_int (SL + 0x12)) Rra
-              (mword_of_int 2087388 : mword 21) M5 (K - 38)%nat b
+              (mword_of_int 2087322 : mword 21) M5 (K - 38)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (slki_12 with "Htext"). }
@@ -956,7 +956,7 @@ Section ProofSysLinkBody.
     set (M6 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (SL + 0x12) : mword 64) 4)]> M5).
     assert (Hjas : add_vec (mword_of_int (SL + 0x12) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2087388 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2087322 : mword 21))
                    = mword_of_int KernelSyms.argstr) by pcw.
     iEval (rewrite Hjas) in "Hpc".
     assert (HM6ra : (M6 !!! Regidx Rra : mword 64)
@@ -1086,7 +1086,7 @@ Section ProofSysLinkBody.
       iEval (rewrite Hpp26) in "Hpc".
       (* ================= +0x26 jal ra,argstr ================= *)
       iApply (wp_jal_s_sconf (CID := CID14) (mword_of_int (SL + 0x26)) Rra
-                (mword_of_int 2087368 : mword 21) N2 (K - 38)%nat b
+                (mword_of_int 2087302 : mword 21) N2 (K - 38)%nat b
                 ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (slki_26 with "Htext"). }
@@ -1094,7 +1094,7 @@ Section ProofSysLinkBody.
       set (N3 := <[Regidx Rra := regval_into_reg
                     (add_vec_int (mword_of_int (SL + 0x26) : mword 64) 4)]> N2).
       assert (Hjas2 : add_vec (mword_of_int (SL + 0x26) : mword 64)
-                        (sign_extend' 64 (mword_of_int 2087368 : mword 21))
+                        (sign_extend' 64 (mword_of_int 2087302 : mword 21))
                       = mword_of_int KernelSyms.argstr) by pcw.
       iEval (rewrite Hjas2) in "Hpc".
       assert (HN3ra : (N3 !!! Regidx Rra : mword 64)

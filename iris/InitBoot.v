@@ -142,22 +142,22 @@ Section InitBoot.
      for is the taint arm of whichever builder inhabits this bundle --
      [SpecKexec.exec_au_pre_triv_at] for the generic application,
      [PinnedExec.pinned_exec_bundle_boot] for a constraining one. *)
-  Definition init_boot_bundle (cw : Z) (sts : list fdstate) : iProp Σ :=
+  Definition init_boot_bundle (cw : Z) (secc : mword 64) (sts : list fdstate) : iProp Σ :=
     ((cons_reader fsc_cons 0%nat -∗
      ∃ (P Pmiss : nat -> Z -> iProp Σ)
        (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
        (R : iProp Σ),
        ∀ (cs : gset gname) (pidv : mword 32),
-         exec_au_pre (MkPfam uslot R) (fs_gamma_L fsc_fs) fsc_fs cw
+         exec_au_pre (MkPfam uslot R) (fs_gamma_L fsc_fs) fsc_fs cw secc
            (fun _ => True%I) P Pmiss Fo init_boot_path
            1%nat (fun _ => 5%nat) (fun _ => init_boot_bytes) sts cs pidv))%I.
 
   (* THE GENERIC APPLICATION'S: a slot at every key answers both wands and
      tracks nothing.  [App.xv6_app_adequacy_triv_xv6Σ] reaches the family
      through [AppInv.app_sup_raw_triv] and [UexecExecMint.uslot_mint]. *)
-  Lemma init_boot_bundle_triv (cw : Z) (sts : list fdstate) :
+  Lemma init_boot_bundle_triv (cw : Z) (secc : mword 64) (sts : list fdstate) :
     □ (∀ W : uvis, my_pay (uvis_gen W) (fun _ => True)%I -∗ uslot W) -∗
-    init_boot_bundle cw sts.
+    init_boot_bundle cw secc sts.
   Proof using .
     iIntros "#HS". rewrite /init_boot_bundle.
     (* THE GENERIC INSTANCE DROPS THE TOKEN: a program that tracks nothing
@@ -167,7 +167,7 @@ Section InitBoot.
     iExists (fun _ _ => True%I), (fun _ _ => True%I),
             (pfam_triv (fun _ _ _ => True%I)), True%I.
     iIntros (cs pidv).
-    iApply (exec_au_pre_triv_at uslot (fs_gamma_L fsc_fs) fsc_fs cw
+    iApply (exec_au_pre_triv_at uslot (fs_gamma_L fsc_fs) fsc_fs cw secc
               init_boot_path 1%nat (fun _ => 5%nat) (fun _ => init_boot_bytes)
               sts cs pidv).
     iModIntro. iIntros (W) "Hp".

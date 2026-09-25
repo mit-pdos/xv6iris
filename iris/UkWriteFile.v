@@ -153,11 +153,11 @@ Section UkWriteFile.
     iDestruct ("Hch" $! M pm sz with "Hheap") as "[Hheap Hch]".
     iFrame "Hheap Hufd".
     iApply (sbundle_at_write_intro_at uslot (write_file_fam Q (ukn_pay N))
-              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)
+              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)
               (m !!! Regidx a0_idx) (m !!! Regidx a1_idx)
               (m !!! Regidx a2_idx) fdv M _ _ _
               (tf_of_arg0 m pc) (tf_of_arg1 m pc) (tf_of_arg2 m pc)
-              (uvis_of_run_fd m pc M pm sz fdv cw gn cs pidv false)
+              (uvis_of_run_fd m pc M pm sz fdv cw gn cs pidv false secc_all)
               eq_refl eq_refl eq_refl eq_refl).
     rewrite Hkey. cbn [write_file_fam xfam_wr wf_Q].
     rewrite /filewrite_in Hcnt. iExact "Hch".
@@ -428,11 +428,11 @@ Section UkWriteFile.
     iDestruct ("Hch" $! M pm sz with "Hheap") as "[Hheap Hch]".
     iFrame "Hheap Hufd".
     iApply (sbundle_at_write_intro_at uslot (write_file_fam Q (ukn_pay N))
-              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)
+              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)
               (m !!! Regidx a0_idx) (m !!! Regidx a1_idx)
               (m !!! Regidx a2_idx) fdv M _ _ _
               (tf_of_arg0 m pc) (tf_of_arg1 m pc) (tf_of_arg2 m pc)
-              (uvis_of_run_fd m pc M pm sz fdv cw gn cs pidv false)
+              (uvis_of_run_fd m pc M pm sz fdv cw gn cs pidv false secc_all)
               eq_refl eq_refl eq_refl eq_refl).
     rewrite (uwr_fd_st_std (m !!! Regidx a0_idx) fdv l 1%nat
                (FdOpen rb true (FdInode i γo OffParked))
@@ -471,11 +471,11 @@ Section UkWriteFile.
     iDestruct ("Hch" $! M pm sz with "Hheap") as "[Hheap Hch]".
     iFrame "Hheap Hufd".
     iApply (sbundle_at_write_intro_at uslot (write_file_fam Q (ukn_pay N))
-              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)
+              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)
               (m !!! Regidx a0_idx) (m !!! Regidx a1_idx)
               (m !!! Regidx a2_idx) fdv M _ _ _
               (tf_of_arg0 m pc) (tf_of_arg1 m pc) (tf_of_arg2 m pc)
-              (uvis_of_run_fd m pc M pm sz fdv cw gn cs pidv false)
+              (uvis_of_run_fd m pc M pm sz fdv cw gn cs pidv false secc_all)
               eq_refl eq_refl eq_refl eq_refl).
     rewrite (uwr_fd_st_std (m !!! Regidx a0_idx) fdv l 1%nat
                (FdOpen rb true (FdInode i γo OffHeld))

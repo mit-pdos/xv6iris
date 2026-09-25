@@ -13,7 +13,7 @@
 (*     [kexec_top] is 0x2000 and [kexec_sz] 0x4000 for BOTH, and every   *)
 (*     closed number [UShEcho]'s geometry computes is cat's too.  What   *)
 (*     differs in the literals is only the FIRST PT_LOAD's memsz (cat    *)
-(*     0xecc, echo 0xdcc), the SECOND's (cat 0x220, echo 0x20) and the   *)
+(*     0xecc, echo 0xddc), the SECOND's (cat 0x220, echo 0x20) and the   *)
 (*     entry ([CatSyms.start] 0xf6 against [EchoSyms.start] 0x7c).       *)
 (*                                                                       *)
 (*  2. cat's FRAME IS 42 WORDS, not echo's twelve.                       *)
@@ -969,6 +969,7 @@ Section UShCat.
     (forall (p : mword 27) (q : UserPerm.uperm), uvis_perm W !! p = Some q ->
        bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W)) ->
     uvis_lazy W = false ->
+    uvis_secc W = ProcDefs.secc_all ->
     udep -∗
     UkRun.urun_nopipe (uvis_fd W) -∗
     my_pay (uvis_gen W) Q -∗
@@ -998,14 +999,14 @@ Section UShCat.
     uslot W.
   Proof using ghost_varG1.
     intros Hpc Hsub Hsub2 Hx Hroom Hal8 Hstk Hbuf Hargs Havd Havs
-           Hfdlen Hstop Hlzf.
+           Hfdlen Hstop Hlzf Hscf.
     iIntros "#Hdep #Hnpw Hmp Hprog".
     assert (Hsp0 : 0 <= uint (uvis_sp W)) by lia.
     assert (Hargc0 : 0 <= uvis_argc W)
       by exact (proj1 (uka_argc _ _ _ _ _ _ Hargs)).
     iApply (uslot_of_urun_all W 42 Q
               Hal8 ltac:(unfold uvis_sp in Hroom; lia) Hstk Hfdlen Hstop
-              Hlzf with "Hdep Hnpw Hmp").
+              Hlzf Hscf with "Hdep Hnpw Hmp").
     iIntros (N h) "%Hpayeq %Hsz Hszf #Ht Hstd Hcwf _ _ Dlo Dhi Hrun".
     (* ---- the buffer, out of the EXCLUSIVE low half ---- *)
     iDestruct (ubytes_of_map (ukn_d N) _ CatSyms.buf 512
@@ -1074,6 +1075,7 @@ Section UShCat.
     (forall (p : mword 27) (q : UserPerm.uperm), uvis_perm W !! p = Some q ->
        bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W)) ->
     uvis_lazy W = false ->
+    uvis_secc W = ProcDefs.secc_all ->
     fd_lowest_closed (take NSTD (uvis_fd W)) = None ->
     (* NO [udepw_law 21] (lane SUP-ONE): cat closes the descriptor its
        own open returned and the leaf exports [FdSlots.fdst_nopipe] for
@@ -1083,7 +1085,7 @@ Section UShCat.
     my_pay (uvis_gen W) (fun _ => True)%I -∗ uslot W.
   Proof using ghost_varG1.
     intros Hpc Hsub Hsub2 Hx Hroom Hal8 Hstk Hbuf Hargs Havd Havs Hnz
-           Hfdlen Hstop Hlzf Hnone.
+           Hfdlen Hstop Hlzf Hscf Hnone.
     iIntros "#Hrd #Hop #Hwr #Hnpw #Hdep Hmp".
     assert (Hargc0 : 0 <= uvis_argc W)
       by exact (proj1 (uka_argc _ _ _ _ _ _ Hargs)).
@@ -1099,7 +1101,7 @@ Section UShCat.
       injection Hj as <-. cbn [UserHeap.ua_ptr echo_arg].
       exact (Hnz j Hlt). }
     iApply (cat_entry_run W (fun _ => True)%I Hpc Hsub Hsub2 Hx Hroom Hal8
-              Hstk Hbuf Hargs Havd Havs Hfdlen Hstop Hlzf
+              Hstk Hbuf Hargs Havd Havs Hfdlen Hstop Hlzf Hscf
               with "Hdep Hnpw Hmp").
     iIntros (N h) "%Hpayeq Hstd _ #Hcode #Hro #Hargv _ Hbuf Hrun".
     pose proof (Hpayeq : UkRun.ukn_triv N) as Hti.
@@ -1133,6 +1135,7 @@ Section UShCat.
         <= kxc_sp_final (kexec_sz ElfUser.cat_elf) alen na ->
       length sts = NOFILE ->
       uvis_lazy W' = false ->
+      uvis_secc W' = ProcDefs.secc_all ->
       fd_lowest_closed (take NSTD sts) = None ->
       ⊢ UkRun.udepw_law 5 -∗ UkRun.udepw_law 15 -∗ UkRun.udepw_law 16 -∗
         UkRun.urun_nopipe sts -∗ udep -∗
@@ -1140,7 +1143,7 @@ Section UShCat.
 
   Lemma cat_slot_of_kexec_holds : cat_slot_of_kexec.
   Proof using ghost_varG1.
-    intros na alen afun sts W' Hok Hroom Hfdl Hlzf Hnone.
+    intros na alen afun sts W' Hok Hroom Hfdl Hlzf Hscf Hnone.
     destruct (cat_kexec_pages na alen afun sts W' Hok)
       as (Hpc & Hsub & Hsub2 & Hx & Hdw & Hbufb & Hwr & Hrp).
     destruct (cat_kexec_entry_rows na alen afun sts W' Hok Hroom Hfdl Hwr Hrp)
@@ -1154,7 +1157,7 @@ Section UShCat.
     iAssert (UkRun.urun_nopipe (uvis_fd W')) as "#Hnpw'";
       [ rewrite Hfd; iExact "Hnpw" | ].
     iApply (cat_uexec_slot W' Hpc Hsub Hsub2 Hx Hroom336 Hal8 Hstkrow Hbuf
-              Hargsrow Havd Havs Hnz Hfdlen Hstop Hlzf
+              Hargsrow Havd Havs Hnz Hfdlen Hstop Hlzf Hscf
               ltac:(rewrite Hfd; exact Hnone)
               with "Hrd Hop Hwr Hnpw' Hdep Hmp").
   Qed.

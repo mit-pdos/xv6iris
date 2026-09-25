@@ -559,7 +559,7 @@ Section SystemBoot.
                 what no per-era resource can say on its own -- that THIS
                 era's console turn is <init>'s, once. *)
              Tn -∗
-             |==> init_boot_bundle (bv_unsigned InodeInv.ROOTINO) fdt0)
+             |==> init_boot_bundle (bv_unsigned InodeInv.ROOTINO) ProcDefs.secc_all fdt0)
       (* THE ECHO'S JUSTIFICATION (lane OUT-FUPD, F3), the second thing the
          application owes the kernel about the console and the twin of
          [Hinit_boot] one level down: consoleintr's echo pushes bytes at
@@ -1027,7 +1027,7 @@ End SystemBoot.
 Lemma init_boot_of_sup {Σ}
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ, !wchG Σ, !ufdG Σ} `{GEN : GenId}
-    (cw : Z) (sts : list fdstate) :
+    (cw : Z) (secc : mword 64) (sts : list fdstate) :
   (* ...AND THE KILL CREDENTIAL AND THE OUTPUT LICENCE BESIDE THE SUPPLY
      (lanes KILL-PAY §1c and OUT-FUPD).  The generic slot's deposit is the
      generic supply, and since the trap deposit at an unexpected cause
@@ -1043,12 +1043,12 @@ Lemma init_boot_of_sup {Σ}
   (* NO ALL-PARKED FACT (lane OFF-HAND-6, H3): the exec crossing's taint
      arm stopped asking for one, because a held row's half is in the
      descriptor bundle (design/app-file.md SS3 fact 4). *)
-  app_sup -∗ app_taint -∗ init_boot_bundle cw sts.
+  app_sup -∗ app_taint -∗ init_boot_bundle cw secc sts.
 Proof.
   iIntros "#Hsup #Hkc".
   iPoseProof LinkUserinit.UG.uexec_wp_gen as "#Hgen".
   iDestruct (UexecExecMint.uslot_mint with "Hsup Hkc Hgen") as "#Hmk".
-  iApply (init_boot_bundle_triv cw sts with "Hmk").
+  iApply (init_boot_bundle_triv cw secc sts with "Hmk").
 Qed.
 
 (* ...and at the generic application's predicate, which is what the three
@@ -1056,14 +1056,14 @@ Qed.
 Lemma init_boot_of_triv {Σ}
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ, !wchG Σ, !ufdG Σ} `{GEN : GenId}
-    (cw : Z) (sts : list fdstate) :
+    (cw : Z) (secc : mword 64) (sts : list fdstate) :
   (forall r av, app_pred r av ⊣⊢ True) ->
   (* ...and the machine's kill credential is the trivial one, so the
      generic discharge pays it for nothing (lane KILL-PAY, K1) *)
   app_taint = kill_cred_triv ->
-  ⊢ init_boot_bundle cw sts.
+  ⊢ init_boot_bundle cw secc sts.
 Proof.
-  intros Htriv Hkc. iApply (init_boot_of_sup cw sts).
+  intros Htriv Hkc. iApply (init_boot_of_sup cw secc sts).
   { iApply app_sup_of_triv. exact Htriv. }
   rewrite Hkc /kill_cred_triv. done.
 Qed.
@@ -1235,7 +1235,7 @@ Theorem xv6_power_adequacy_gen Σ
               boot resource: the application's own per-era credential,
               minted at the power-on step and handed to <init>. *)
            Tnn c (Datatypes.S gen_id) -∗
-           |==> init_boot_bundle (bv_unsigned InodeInv.ROOTINO) fdt0)
+           |==> init_boot_bundle (bv_unsigned InodeInv.ROOTINO) ProcDefs.secc_all fdt0)
     (* THE ECHO'S JUSTIFICATION (lane OUT-FUPD, F3), the SECOND thing the
        application owes the kernel about the console.  consoleintr echoes
        an input byte through consputc at [Uart0] -- the port whose

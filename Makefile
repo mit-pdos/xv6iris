@@ -123,6 +123,11 @@ SAIL_RISCV_REV ?= 070832a1e4b086f0c6f7635de54cc2b4cfd66993
 # immediate; fs.img and the user dumps unchanged; a8957838 -> 3e9926e: grep
 # skips a line too long for its buffer instead of stopping at it -- user/
 # grep.c only, the kernel dumps unchanged, the grep dumps and fs.img move).
+# 3e9926e -> 7b2c1b1: seccomp -- struct proc gains uint64 seccomp (368 B; every
+# .bss symbol after proc moves), syscall() gains the mask-check arm,
+# sys_seccomp is entry 23, userinit/kfork store the mask, user/seccomp.c is a
+# new binary (inum 23; its mask clears open, kill, link, unlink, mkdir, mknod)
+# and every user ELF gains the seccomp stub (+8 after usys).
 # Nothing here is a local commit:
 # `git -C xv6-riscv checkout --detach $(XV6_REV)` reproduces the image, and
 # that is the whole recipe.
@@ -132,7 +137,7 @@ SAIL_RISCV_REV ?= 070832a1e4b086f0c6f7635de54cc2b4cfd66993
 # stays reachable only from your local clone -- expect the diff between two
 # consecutive pins to be an upstream commit that landed UNDER the series, not
 # on top of it.
-XV6_REV ?= 3e9926ea1b1f8d540984e95e8113b5c4131bb2aa
+XV6_REV ?= 7b2c1b1bad7974f7d6abd6b3f58870adc80d6259
 
 KDUMP_SRCS := $(KDUMP)/KernelInstrs.v $(KDUMP)/KernelData.v $(KDUMP)/KernelSyms.v \
               $(KDUMP)/KernelElfRaw.v $(KDUMP)/FsImgRaw.v
@@ -141,7 +146,7 @@ KDUMP_SRCS := $(KDUMP)/KernelInstrs.v $(KDUMP)/KernelData.v $(KDUMP)/KernelSyms.
 # prefix> pairs (the ELF is $(USER_DIR)/_<program>).  Adding one here also needs
 # its dumped .v files listed in user-rocq/_CoqProject (three, plus the
 # <P>ElfRaw.v where a program's whole-file raw is wanted -- cat has four).
-USER_DUMPS ?= sync:Sync echo:Echo sh:Sh init:Init cat:Cat grep:Grep
+USER_DUMPS ?= sync:Sync echo:Echo sh:Sh init:Init cat:Cat grep:Grep seccomp:Seccomp
 
 .PHONY: all proofs model kernel user dump dump-force kernel-rocq user-rocq \
         xv6-rev-check sail-rev-check gen-code check-decode update-decode \

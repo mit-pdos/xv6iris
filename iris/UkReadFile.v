@@ -253,10 +253,10 @@ Section UkReadFile.
     iIntros (M pm sz fdv cw gn cs pidv) "%Hkey _ Hheap Hufd".
     iFrame "Hheap Hufd".
     iApply (sbundle_at_read_intro uslot (xfam_rdf (ukn_pay N) F)
-              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)
+              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)
               (m !!! Regidx a0_idx) (m !!! Regidx a2_idx) fdv
               (tf_of_arg0 m pc) (tf_of_arg2 m pc)
-              (uvis_of_run_fd m pc M pm sz fdv cw gn cs pidv false)).
+              (uvis_of_run_fd m pc M pm sz fdv cw gn cs pidv false secc_all)).
     rewrite Hkey. rewrite /fileread_in /=. iIntros "$". iExact "Hau".
   Qed.
 
@@ -276,10 +276,10 @@ Section UkReadFile.
     iIntros (M pm sz fdv cw gn cs pidv) "%Hkey _ Hheap Hufd".
     iFrame "Hheap Hufd".
     iApply (sbundle_at_read_intro uslot (xfam_rdf (ukn_pay N) F)
-              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)
+              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)
               (m !!! Regidx a0_idx) (m !!! Regidx a2_idx) fdv
               (tf_of_arg0 m pc) (tf_of_arg2 m pc)
-              (uvis_of_run_fd m pc M pm sz fdv cw gn cs pidv false)).
+              (uvis_of_run_fd m pc M pm sz fdv cw gn cs pidv false secc_all)).
     rewrite Hkey. rewrite /fileread_in /=. iIntros "$".
     rewrite /aread_in_om. by iLeft.
   Qed.

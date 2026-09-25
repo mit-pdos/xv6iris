@@ -303,10 +303,10 @@ Section UShLine.
     iFrame "Hheap Hufd".
     iApply (sbundle_at_read_intro uslot
               (ush_read_fam_at γp T n Rin (ukn_pay N))
-              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)
+              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)
               (m !!! Regidx a0_idx) (m !!! Regidx a2_idx) fdv
               (tf_of_arg0 m pc) (tf_of_arg2 m pc)
-              (uvis_of_run_fd m pc M pm sz fdv cw gn cs pidv false)).
+              (uvis_of_run_fd m pc M pm sz fdv cw gn cs pidv false secc_all)).
     rewrite (ush_fd_st_closed (m !!! Regidx a0_idx) fdv l Ha0 Htake Hl0).
     rewrite /fileread_in. iIntros "HP". iExact "HP".
   Qed.

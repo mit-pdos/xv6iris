@@ -509,7 +509,7 @@ Section UkRun.
            the one the leaf hands the trap beside [ukn_pay N (-1)], and
            read's bundle is a wand from exactly that. *)
         ∨ sbundle_pay uslot n (ukn_pay N)
-            (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)))%I.
+            (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)))%I.
 
   (* THE FAMILY-NAMED EXPLICIT DEPOSIT (app-echo.md, lane CONS-CURSOR, C3).
      [udepw]'s explicit disjunct hides the deposited FAMILY under an
@@ -536,7 +536,7 @@ Section UkRun.
        my_pay gn (ukn_pay N) -∗
        uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗ ufd_auth (ukn_fd N) fdv -∗
        uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz ∗ ufd_auth (ukn_fd N) fdv ∗
-       sbundle_at uslot n fdep (uvis_of_run m pc M pm sz fdv cw gn cs pidv false))%I.
+       sbundle_at uslot n fdep (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all))%I.
 
   Lemma udepwf_udepw (N : uk_names Σ) (m : regfile) (pc : mword 64)
       (n : Z) (fdep : sfam) :
@@ -608,7 +608,7 @@ Section UkRun.
     udep -∗ my_pay gn (ukn_pay N) -∗ udepw N m pc n -∗
     uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗ ufd_auth (ukn_fd N) fdv ==∗
     uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz ∗ ufd_auth (ukn_fd N) fdv ∗
-    sbundle_pay uslot n (ukn_pay N) (uvis_of_run m pc M pm sz fdv cw gn cs pidv false).
+    sbundle_pay uslot n (ukn_pay N) (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all).
   Proof using .
     iIntros "#Hdep #Hmp Hsb Hheap Hufd".
     iDestruct ("Hsb" $! M pm sz fdv cw gn cs pidv with "Hmp Hheap Hufd")
@@ -648,7 +648,7 @@ Section UkRun.
        uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz ∗ ufd_auth (ukn_fd N) fdv ∗
        (⌜psok n /\ n <> USYS_exec⌝
         ∨ |==> sbundle_pay uslot n (ukn_pay N)
-            (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)))%I.
+            (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)))%I.
 
   (* the forgetful direction: a payer for every table pays at this one *)
   Lemma udepw_row_of_udepw (N : uk_names Σ) (m : regfile) (pc : mword 64)
@@ -671,7 +671,7 @@ Section UkRun.
     udep -∗ my_pay gn (ukn_pay N) -∗ udepw_row N m pc n st -∗
     uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗ ufd_auth (ukn_fd N) fdv ==∗
     uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz ∗ ufd_auth (ukn_fd N) fdv ∗
-    sbundle_pay uslot n (ukn_pay N) (uvis_of_run m pc M pm sz fdv cw gn cs pidv false).
+    sbundle_pay uslot n (ukn_pay N) (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all).
   Proof using .
     intros Hkey. iIntros "#Hdep #Hmp Hsb Hheap Hufd".
     iDestruct ("Hsb" $! M pm sz fdv cw gn cs pidv with "[%] Hmp Hheap Hufd")
@@ -756,22 +756,22 @@ Section UkRun.
     uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗ ufd_auth (ukn_fd N) fdv ==∗
     uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz ∗ ufd_auth (ukn_fd N) fdv ∗
     sbundle_pay uslot 21 (ukn_pay N)
-      (uvis_of_run m pc M pm sz fdv cw gn cs pidv false).
+      (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all).
   Proof using .
     intros Hkey. iIntros "#Hdep #Hmp [%Hnp | Hsb] Hheap Hufd".
     - iFrame "Hheap Hufd".
       assert (Hnpk : ukey_nonpipe
-                       (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)).
+                       (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)).
       { rewrite /ukey_nonpipe.
         (* the key's argument 0 IS a0, and its table IS [fdv]: both by
            [reflexivity] at [uvis_of_run] *)
-        assert (Ha0 : tf_w (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false))
+        assert (Ha0 : tf_w (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all))
                         (tf_arg_idx 0) = m !!! Regidx (mword_of_int 10 : mword 5))
           by reflexivity.
-        assert (Hfd : uvis_fd (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)
+        assert (Hfd : uvis_fd (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)
                       = fdv) by reflexivity.
         rewrite Ha0 Hfd Hkey. exact Hnp. }
-      iApply (udep_close_dep (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)
+      iApply (udep_close_dep (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)
                 (ukn_pay N) Hnpk with "Hdep").
     - iApply (udepw_row_mint N m pc 21 st M pm sz fdv cw gn cs pidv Hkey
                 with "Hdep Hmp Hsb Hheap Hufd").
@@ -1074,14 +1074,14 @@ Section UkRun.
       (pidv : mword 32) :
     udep -∗ urun_rows N fdv ==∗
     sbundle_pay uslot USYS_exit (ukn_pay N)
-      (uvis_of_run m pc M pm sz fdv cw gn cs pidv false).
+      (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all).
   Proof using .
     iIntros "#Hdep Hrows".
     iDestruct (urun_rows_nopipe N fdv with "Hrows") as "Hnpx".
     rewrite /urun_nopipe. iDestruct "Hnpx" as "[Hr | #Ht]".
-    - iApply (udep_exit_regs (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)
+    - iApply (udep_exit_regs (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)
                 (ukn_pay N) with "Hr Hdep").
-    - iApply (udep_exit_taint (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)
+    - iApply (udep_exit_taint (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)
                 (ukn_pay N) with "Ht Hdep").
   Qed.
 
@@ -1198,7 +1198,7 @@ Section UkRun.
        uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz ∗ ufd_auth (ukn_fd N) fdv ∗
        (⌜psok n /\ n <> USYS_exec⌝
         ∨ sbundle_pay uslot n (ukn_pay N)
-            (uvis_of_run m pc M pm sz fdv c gn cs pidv false)))%I.
+            (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all)))%I.
 
   (* [udepw] IS THE ∀-CWD FORM, one direction.  The two differ only in
      where the [cw] binder sits, so the equivalence holds both ways; this
@@ -1226,7 +1226,7 @@ Section UkRun.
     n <> USYS_read -> n <> USYS_exec ->
     (∀ (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (sz : Z)
        (fdv : list fdstate) (gn : gname) (cs : gset gname) (pidv : mword 32),
-       sbundle uslot n (uvis_of_run m pc M pm sz fdv c gn cs pidv false)) -∗
+       sbundle uslot n (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all)) -∗
     udepw_at N m pc n c.
   Proof using .
     intros Hne Hnx. iIntros "Hb" (M pm sz fdv gn cs pidv) "_ _ Hh Hf".
@@ -1267,7 +1267,7 @@ Section UkRun.
     udep -∗ my_pay gn (ukn_pay N) -∗ urun_rows N fdv -∗ udepw_at N m pc n c -∗
     uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗ ufd_auth (ukn_fd N) fdv ==∗
     uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz ∗ ufd_auth (ukn_fd N) fdv ∗
-    sbundle_pay uslot n (ukn_pay N) (uvis_of_run m pc M pm sz fdv c gn cs pidv false).
+    sbundle_pay uslot n (ukn_pay N) (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all).
   Proof using .
     iIntros "#Hdep #Hmp #Hnpw Hsb Hheap Hufd".
     iDestruct ("Hsb" $! M pm sz fdv gn cs with "Hmp Hnpw Hheap Hufd")
@@ -1314,7 +1314,7 @@ Section UkRun.
        uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗ ufd_auth (ukn_fd N) fdv -∗
        uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz ∗ ufd_auth (ukn_fd N) fdv ∗
        sbundle_pay_ref uslot (ukn_pay N)
-         (uvis_of_run m pc M pm sz fdv c gn cs pidv false))%I.
+         (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all))%I.
 
   (* ...AND THE FORGETFUL DIRECTION, for a leaf that wants no refund *)
   Lemma udepw_at_of_ref (N : uk_names Σ) (m : regfile) (pc : mword 64)
@@ -1337,7 +1337,7 @@ Section UkRun.
     iIntros "#Hx" (M pm sz fdv gn cs pidv) "_ _ Hh Hf".
     iFrame "Hh Hf".
     iAssert (sbundle_pay uslot USYS_exec (fun _ => True)%I
-               (uvis_of_run m pc M pm sz fdv c gn cs pidv false)) as "Hb";
+               (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all)) as "Hb";
       [ iApply "Hx" | ].
     iDestruct "Hb" as (f) "[%Hpay Hb]".
     rewrite (ukn_triv_eq (N := N)).
@@ -1375,7 +1375,7 @@ Section UkRun.
        my_pay gn (ukn_pay N) -∗
        uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗ ufd_auth (ukn_fd N) fdv -∗
        uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz ∗ ufd_auth (ukn_fd N) fdv ∗
-       sbundle_at uslot n fdep (uvis_of_run m pc M pm sz fdv c gn cs pidv false))%I.
+       sbundle_at uslot n fdep (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all))%I.
 
   (* [udepwf] IS THE ∀-CWD FORM, in the direction a caller that has one
      needs -- [udepw_at_of_udepw]'s twin, and stated rather than made the
@@ -1429,7 +1429,7 @@ Section UkRun.
        my_pay gn (ukn_pay N) -∗
        uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗ ufd_auth (ukn_fd N) fdv -∗
        uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz ∗ ufd_auth (ukn_fd N) fdv ∗
-       sbundle_at uslot n fdep (uvis_of_run m pc M pm sz fdv cw gn cs pidv false))%I.
+       sbundle_at uslot n fdep (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all))%I.
 
   (* [udepwf] IS THE ∀-LEDGER FORM, in the direction a caller that has one
      needs -- [udepwf_at_of_udepwf]'s twin. *)
@@ -1579,7 +1579,7 @@ Section UkRun.
           here, [UkRunSys.wp_uk_ecall_exit] and the fault leaves' owed side
           take no deposit at all. *)
        urun_rows N fdv ∗
-       uvb (CID := h) (XI := xi) C pt Rfd Rut sz pm fdv cw gn cs pidv false M m pc)%I.
+       uvb (CID := h) (XI := xi) C pt Rfd Rut sz pm fdv cw gn cs pidv false secc_all M m pc)%I.
 
   (* THE ROUND'S EFFECT ON THE CWD, AT EVERY NUMBER BUT CHDIR.  A leaf
      re-closes [urun] at the [cw'] the round resumed the process at, and
@@ -1752,7 +1752,7 @@ Section UkRun.
     iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs pidv)
       "(%Hlo & %Hpm & %Hlzf & %HRut & Hheap & Hstk & Hufd & Hcwda & Hcha & #Hmy & #Hdep & #Hnpx & Hb)".
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
-    iDestruct ("Hgen" $! (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)
+    iDestruct ("Hgen" $! (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)
                  with "HT []") as "Hslot".
     { cbn [uvis_gen uvis_of_run]. iExact "Hmy". }
     rewrite (uslot_run m pc M pm sz fdv cw gn cs pidv Hx0 Hal).
@@ -2113,6 +2113,11 @@ Section UkRun.
        eager ([SpecKexec.exec_slot_pre]'s success wands; lane LAZY-FLAG's
        K4 is what puts the fact on them). *)
     uvis_lazy W = false ->
+    (* ...AND ITS MASK IS FULL (upstream a083670): [urun] is keyed at
+       [ProcDefs.secc_all], as it is at [false] above.  WHO SUPPLIES IT:
+       userinit's first record, fork's copy, exec's keep
+       ([SpecKexec.exec_slot_pre]'s mask row). *)
+    uvis_secc W = ProcDefs.secc_all ->
     (* ...AND NO HONESTY ROW ON THE HELD SET (lane OFF-HAND-6's H3 emptied
        it, lane OFF-LINK-2's L6 deleted the field): a constructor says
        nothing about offsets and an entry may be taken at a key with a HELD
@@ -2190,9 +2195,9 @@ Section UkRun.
        mWP (Loop : expr riscv_lang))
     -∗ uslot W.
   Proof using .
-    intros Hal8 Hroom Hstk Hfdlen Hstop Hlzf.
+    intros Hal8 Hroom Hstk Hfdlen Hstop Hlzf Hscf.
     iIntros "#Hdep #Hnpx #Hpay Hprog".
-    rewrite uslot_ukc /ukc Hlzf.
+    rewrite uslot_ukc /ukc Hlzf Hscf.
     iIntros (h xi C pt Rfd Rut HRut) "%Hlo %Hpm %Hlzr Hb".
     set (sz := uvis_sz W).
     assert (Hwf : proc_pt_wf pt)
@@ -2308,6 +2313,11 @@ Section UkRun.
        bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W)) ->
     (* ...AND THE KEY'S LAZY BIT IS [false] -- see [uslot_of_urun_all]. *)
     uvis_lazy W = false ->
+    (* ...AND ITS MASK IS FULL (upstream a083670): [urun] is keyed at
+       [ProcDefs.secc_all], as it is at [false] above.  WHO SUPPLIES IT:
+       userinit's first record, fork's copy, exec's keep
+       ([SpecKexec.exec_slot_pre]'s mask row). *)
+    uvis_secc W = ProcDefs.secc_all ->
     (* ...AND NO HONESTY ROW ON THE HELD SET (lane OFF-HAND-6's H3 emptied
        it, lane OFF-LINK-2's L6 deleted the field): a constructor says
        nothing about offsets and an entry may be taken at a key with a HELD
@@ -2387,8 +2397,8 @@ Section UkRun.
        mWP (Loop : expr riscv_lang))
     -∗ uslot W.
   Proof using .
-    intros Hal8 Hroom Hstk Hfdlen Hstop Hlzf.
-    iIntros "#Hdep #Hnpx #Hpay Hprog". rewrite uslot_ukc /ukc Hlzf.
+    intros Hal8 Hroom Hstk Hfdlen Hstop Hlzf Hscf.
+    iIntros "#Hdep #Hnpx #Hpay Hprog". rewrite uslot_ukc /ukc Hlzf Hscf.
     iIntros (h xi C pt Rfd Rut HRut) "%Hlo %Hpm %Hlzr Hb".
     set (sz := uvis_sz W).
     assert (Hwf : proc_pt_wf pt)
@@ -2488,6 +2498,11 @@ Section UkRun.
        bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W)) ->
     (* ...AND THE KEY'S LAZY BIT IS [false] -- see [uslot_of_urun_all]. *)
     uvis_lazy W = false ->
+    (* ...AND ITS MASK IS FULL (upstream a083670): [urun] is keyed at
+       [ProcDefs.secc_all], as it is at [false] above.  WHO SUPPLIES IT:
+       userinit's first record, fork's copy, exec's keep
+       ([SpecKexec.exec_slot_pre]'s mask row). *)
+    uvis_secc W = ProcDefs.secc_all ->
     (* ...AND NO HONESTY ROW ON THE HELD SET (lane OFF-HAND-6's H3 emptied
        it, lane OFF-LINK-2's L6 deleted the field): a constructor says
        nothing about offsets and an entry may be taken at a key with a HELD
@@ -2572,8 +2587,8 @@ Section UkRun.
        mWP (Loop : expr riscv_lang))
     -∗ uslot W.
   Proof using .
-    intros Hal8 Hroom Hstk Hfdlen Hstop Hlzf.
-    iIntros "#Hdep #Hnpx #Hpay Hprog". rewrite uslot_ukc /ukc Hlzf.
+    intros Hal8 Hroom Hstk Hfdlen Hstop Hlzf Hscf.
+    iIntros "#Hdep #Hnpx #Hpay Hprog". rewrite uslot_ukc /ukc Hlzf Hscf.
     iIntros (h xi C pt Rfd Rut HRut) "%Hlo %Hpm %Hlzr Hb".
     set (sz := uvis_sz W).
     assert (Hwf : proc_pt_wf pt)

@@ -23,10 +23,10 @@
      +0x07c .. +0x08c   THE uvmcopy-FAILURE TAIL (freeproc, release, -1)
      +0x08e .. +0x0a2   the ROTATED filedup scan
      +0x0a4 .. +0x0bc   idup(p->cwd); safestrcpy(np->name, p->name, 16)
-     +0x0be .. +0x0f4   pid = np->pid; release; wait_lock; RUNNABLE; release
-     +0x0f6 .. +0x0fa   the three lazy reloads
-     +0x0fc .. +0x108   THE SHARED EPILOGUE ([ProofKforkParts.kfk_epi])
-     +0x10a .. +0x10c   THE allocproc-FAILURE TAIL (-1) *)
+     +0xc6 .. +0xfc   pid = np->pid; release; wait_lock; RUNNABLE; release
+     +0xfe .. +0x102   the three lazy reloads
+     +0x104 .. +0x110   THE SHARED EPILOGUE ([ProofKforkParts.kfk_epi])
+     +0x112 .. +0x114   THE allocproc-FAILURE TAIL (-1) *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
@@ -140,7 +140,7 @@ Section ProofKfork.
         r <> Rs0 -> r <> Rs1 -> r <> Rs5 -> Mt !!! Regidx r = m !!! Regidx r) ->
     sie_cap_gpr KT1 Mt (K - 8)%nat b p -∗
     kernel_text -∗
-    pc_is (mword_of_int (KF + 0xfc) : mword 64) -∗
+    pc_is (mword_of_int (KF + 0x104) : mword 64) -∗
     kfk_frame sp0 ra0 s00 s10 s50 -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
@@ -159,9 +159,9 @@ Section ProofKfork.
   Qed.
 
   (* =================================================================== *)
-  (*  +0x10a: THE allocproc-FAILURE TAIL.                                 *)
+  (*  +0x112: THE allocproc-FAILURE TAIL.                                 *)
   (*                                                                      *)
-  (*    c.li s1,-1 ; c.j +0xfc                                            *)
+  (*    c.li s1,-1 ; c.j +0x104                                            *)
   (*                                                                      *)
   (*  It jumps PAST the three lazy reloads, and that is exactly right:    *)
   (*  neither s2 nor s3 nor s4 has been written on this path, so the      *)
@@ -182,7 +182,7 @@ Section ProofKfork.
         r <> Rs0 -> r <> Rs1 -> r <> Rs5 -> Mt !!! Regidx r = m !!! Regidx r) ->
     sie_cap_gpr KT1 Mt (K - 8)%nat b p -∗
     kernel_text -∗
-    pc_is (mword_of_int (KF + 0x10a) : mword 64) -∗
+    pc_is (mword_of_int (KF + 0x112) : mword 64) -∗
     kfk_frame sp0 ra0 s00 s10 s50 -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
@@ -194,33 +194,33 @@ Section ProofKfork.
   Proof using .
     intros HK Hsp0 Hra0 Hs00 Hs10 Hs50 Hmtsp Hthr.
     iIntros "Hcg #Htext Hpc Hframe Hcont".
-    (* ---- +0x10a: c.li s1,-1 ---- *)
-    iApply (wp_cli_s_sconf (mword_of_int (KF + 0x10a)) Rs1
+    (* ---- +0x112: c.li s1,-1 ---- *)
+    iApply (wp_cli_s_sconf (mword_of_int (KF + 0x112)) Rs1
               (mword_of_int 63 : mword 6) (mword_of_int (-1) : mword 64)
               Mt (K - 8)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc []").
-    { iApply (kfk_10a with "Htext"). }
+    { iApply (kfk_112 with "Htext"). }
     iIntros (CID1 Hs1) "Hcg Hpc".
     set (T1 := <[Regidx Rs1 := regval_into_reg (mword_of_int (-1) : mword 64)]> Mt).
     change (<[Regidx Rs1 := regval_into_reg (mword_of_int (-1) : mword 64)]> Mt)
       with T1.
-    assert (Hpp10c : add_vec_int (mword_of_int (KF + 0x10a) : mword 64) 2
-                     = mword_of_int (KF + 0x10c)) by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpp10c) in "Hpc".
-    (* ---- +0x10c: c.j +0xfc ---- *)
-    assert (Htgt : add_vec (mword_of_int (KF + 0x10c) : mword 64)
+    assert (Hpp114 : add_vec_int (mword_of_int (KF + 0x112) : mword 64) 2
+                     = mword_of_int (KF + 0x114)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp114) in "Hpc".
+    (* ---- +0x114: c.j +0x104 ---- *)
+    assert (Htgt : add_vec (mword_of_int (KF + 0x114) : mword 64)
                      (sign_extend' 64 (sign_extend' 21
                         (concat_vec (mword_of_int 2040 : mword 11) ('b"0"))))
-                   = mword_of_int (KF + 0xfc))
+                   = mword_of_int (KF + 0x104))
       by (apply bv_eq; vm_compute; reflexivity).
-    iApply (wp_cj_s_sconf (mword_of_int (KF + 0x10c))
+    iApply (wp_cj_s_sconf (mword_of_int (KF + 0x114))
               (sign_extend' 21 (concat_vec (mword_of_int 2040 : mword 11) ('b"0")))
               T1 (K - 8)%nat b
               ltac:(rewrite Htgt; vm_compute; reflexivity)
               with "Hcg Hpc []").
-    { iApply (kfk_10c with "Htext"). }
+    { iApply (kfk_114 with "Htext"). }
     iIntros (CID2 Hs2). iApply bi.later_intro. iIntros "Hcg Hpc".
     iEval (rewrite Htgt) in "Hpc".
     assert (HT1sp : T1 !!! Regidx csp_rs1 = pa_stk sp0 8)
@@ -241,7 +241,7 @@ Section ProofKfork.
   Qed.
 
   (* =================================================================== *)
-  (*  +0xf6 .. +0xfa: THE THREE LAZY RELOADS, on the success path only.   *)
+  (*  +0xfe .. +0x102: THE THREE LAZY RELOADS, on the success path only.   *)
   (*                                                                      *)
   (*    c.ldsp s2,32(sp) ; c.ldsp s3,24(sp) ; c.ldsp s4,16(sp)            *)
   (*                                                                      *)
@@ -267,7 +267,7 @@ Section ProofKfork.
         Mt !!! Regidx r = m !!! Regidx r) ->
     sie_cap_gpr KT1 Mt (K - 8)%nat b p -∗
     kernel_text -∗
-    pc_is (mword_of_int (KF + 0xf6) : mword 64) -∗
+    pc_is (mword_of_int (KF + 0xfe) : mword 64) -∗
     ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
     ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 2) (DfracOwn 1) s00 -∗
     ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 3) (DfracOwn 1) s10 -∗
@@ -286,55 +286,55 @@ Section ProofKfork.
   Proof using .
     intros HK Hsp0 Hra0 Hs00 Hs10 Hs50 Hmtsp Hmts1 Hthr.
     iIntros "Hcg #Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hcont".
-    (* ---- +0xf6: c.ldsp s2,32(sp) ---- *)
+    (* ---- +0xfe: c.ldsp s2,32(sp) ---- *)
     assert (Hpa4 : add_vec (Mt !!! Regidx csp_rs1)
                      (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000")))
                    = pa_stk sp0 4) by (rewrite Hmtsp; apply kfk_frm4).
     iEval (rewrite -Hpa4) in "Hb4".
-    iApply (wp_cldsp_s_sconf (mword_of_int (KF + 0xf6)) (mword_of_int 4 : mword 6) Rs2
+    iApply (wp_cldsp_s_sconf (mword_of_int (KF + 0xfe)) (mword_of_int 4 : mword 6) Rs2
               Mt (K - 8)%nat (m !!! Regidx Rs2) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] Hb4").
-    { iApply (kfk_0f6 with "Htext"). }
+    { iApply (kfk_0fe with "Htext"). }
     iIntros (CID1 Hc1) "Hcg Hpc Hb4". iEval (rewrite Hpa4) in "Hb4".
     set (U1 := <[Regidx Rs2 := regval_into_reg (m !!! Regidx Rs2)]> Mt).
     assert (HU1sp : U1 !!! Regidx csp_rs1 = pa_stk sp0 8)
       by (rewrite /U1 upd_ne; [exact Hmtsp | vm_compute; discriminate]).
-    assert (Hpp0f8 : add_vec_int (mword_of_int (KF + 0xf6) : mword 64) 2
-                     = mword_of_int (KF + 0xf8)) by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpp0f8) in "Hpc".
-    (* ---- +0xf8: c.ldsp s3,24(sp) ---- *)
+    assert (Hpp100 : add_vec_int (mword_of_int (KF + 0xfe) : mword 64) 2
+                     = mword_of_int (KF + 0x100)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp100) in "Hpc".
+    (* ---- +0x100: c.ldsp s3,24(sp) ---- *)
     assert (Hpa5 : add_vec (U1 !!! Regidx csp_rs1)
                      (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000")))
                    = pa_stk sp0 5) by (rewrite HU1sp; apply kfk_frm5).
     iEval (rewrite -Hpa5) in "Hb5".
-    iApply (wp_cldsp_s_sconf (mword_of_int (KF + 0xf8)) (mword_of_int 3 : mword 6) Rs3
+    iApply (wp_cldsp_s_sconf (mword_of_int (KF + 0x100)) (mword_of_int 3 : mword 6) Rs3
               U1 (K - 8)%nat (m !!! Regidx Rs3) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] Hb5").
-    { iApply (kfk_0f8 with "Htext"). }
+    { iApply (kfk_100 with "Htext"). }
     iIntros (CID2 Hc2) "Hcg Hpc Hb5". iEval (rewrite Hpa5) in "Hb5".
     set (U2 := <[Regidx Rs3 := regval_into_reg (m !!! Regidx Rs3)]> U1).
     assert (HU2sp : U2 !!! Regidx csp_rs1 = pa_stk sp0 8)
       by (rewrite /U2 upd_ne; [exact HU1sp | vm_compute; discriminate]).
-    assert (Hpp0fa : add_vec_int (mword_of_int (KF + 0xf8) : mword 64) 2
-                     = mword_of_int (KF + 0xfa)) by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpp0fa) in "Hpc".
-    (* ---- +0xfa: c.ldsp s4,16(sp) ---- *)
+    assert (Hpp102 : add_vec_int (mword_of_int (KF + 0x100) : mword 64) 2
+                     = mword_of_int (KF + 0x102)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp102) in "Hpc".
+    (* ---- +0x102: c.ldsp s4,16(sp) ---- *)
     assert (Hpa6 : add_vec (U2 !!! Regidx csp_rs1)
                      (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000")))
                    = pa_stk sp0 6) by (rewrite HU2sp; apply kfk_frm6).
     iEval (rewrite -Hpa6) in "Hb6".
-    iApply (wp_cldsp_s_sconf (mword_of_int (KF + 0xfa)) (mword_of_int 2 : mword 6) Rs4
+    iApply (wp_cldsp_s_sconf (mword_of_int (KF + 0x102)) (mword_of_int 2 : mword 6) Rs4
               U2 (K - 8)%nat (m !!! Regidx Rs4) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] Hb6").
-    { iApply (kfk_0fa with "Htext"). }
+    { iApply (kfk_102 with "Htext"). }
     iIntros (CID3 Hc3) "Hcg Hpc Hb6". iEval (rewrite Hpa6) in "Hb6".
     set (U3 := <[Regidx Rs4 := regval_into_reg (m !!! Regidx Rs4)]> U2).
-    assert (Hpp0fc : add_vec_int (mword_of_int (KF + 0xfa) : mword 64) 2
-                     = mword_of_int (KF + 0xfc)) by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpp0fc) in "Hpc".
+    assert (Hpp104 : add_vec_int (mword_of_int (KF + 0x102) : mword 64) 2
+                     = mword_of_int (KF + 0x104)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp104) in "Hpc".
     (* ---- fall into the epilogue ---- *)
     assert (HU3sp : U3 !!! Regidx csp_rs1 = pa_stk sp0 8)
       by (rewrite /U3 upd_ne; [exact HU2sp | vm_compute; discriminate]).

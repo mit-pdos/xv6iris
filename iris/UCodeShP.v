@@ -42,10 +42,10 @@
                           worked example.
 
    Image geometry, as dumped:
-     text  0x0 .. 0x1280   (4736 bytes)
-     PT_LOAD 0x0      filesz 0x1c54   memsz 0x1c54   flags 5   (executable: 2 text page(s))
+     text  0x0 .. 0x1288   (4744 bytes)
+     PT_LOAD 0x0      filesz 0x1c64   memsz 0x1c64   flags 5   (executable: 2 text page(s))
      PT_LOAD 0x2000   filesz 0x10     memsz 0x98     flags 6
-     data  0x1280 .. 0x2010   (2532 bytes)
+     data  0x1288 .. 0x2010   (2540 bytes)
      entry 0x9d0, MemBase 0x0, MemEnd 0x2098
 
    Catalogued: 630 instruction(s), 377 distinct word(s), in 13 function(s):
@@ -69,10 +69,11 @@
        atoi, chdir, close, dup, exec, exit, fork, fork1, fprintf, free, fstat,
        getcmd, getpid, gets, kill, link, main, memcmp, memcpy, memmove, mkdir,
        mknod, open, pause, pipe, printf, printint, putc, read, runcmd, sbrk,
-       sbrklazy, start, stat, strcmp, strcpy, sync, sys_sbrk, unlink, uptime,
-       vprintf, wait, write -- not on the parser's path: the command loop and
-       the ELF entry are UCodeShK.v's (SH lane stages 1-2), the allocator is
-       stage 3's, and runcmd's tree walk with its fork/exec arms is stage 5's
+       sbrklazy, seccomp, start, stat, strcmp, strcpy, sync, sys_sbrk, unlink,
+       uptime, vprintf, wait, write -- not on the parser's path: the command
+       loop and the ELF entry are UCodeShK.v's (SH lane stages 1-2), the
+       allocator is stage 3's, and runcmd's tree walk with its fork/exec arms
+       is stage 5's
        backcmd -- reached only from parseline's [peek(ps,es,'&')] loop --
        excluded by [ushp_no_symbols]
        listcmd -- reached only from parseline's [peek(ps,es,';')] arm --
@@ -156,7 +157,7 @@ Lemma shp_img_data (M : gmap Z (bv 8)) : shp_img_sub M -> shp_data_sub M.
 Proof using . intros [ _ H ]. exact H. Qed.
 
 (* ---- the KEY RANGE of each dumped map ------------------------------- *)
-(* The bounds are COMPUTED from the dump (text keys stop at 0x127f, data keys
+(* The bounds are COMPUTED from the dump (text keys stop at 0x1287, data keys
    at 0x200f) and rounded up to the next page, which is the shape the users of
    the fact want: [UmodeAbi.uM_only_img] asks exactly "the written window is
    disjoint from every key of [img]", and the windows a program writes are
@@ -1689,24 +1690,19 @@ Lemma udec_60100693 :
   udecode_base (mword_of_int 0x60100693) (ITYPE (mword_of_int 1537 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 13), ADDI)).
 Proof using . udec_base_bridge. Qed.
 
-(* 9ee60613  addi a2,a2,-1554 # 1288 <malloc+0xfc> *)
-Lemma udec_9ee60613 :
-  udecode_base (mword_of_int 0x9ee60613) (ITYPE (mword_of_int 2542 : mword 12, Regidx (mword_of_int 12), Regidx (mword_of_int 12), ADDI)).
+(* 9fe60613  addi a2,a2,-1538 # 1298 <malloc+0x104> *)
+Lemma udec_9fe60613 :
+  udecode_base (mword_of_int 0x9fe60613) (ITYPE (mword_of_int 2558 : mword 12, Regidx (mword_of_int 12), Regidx (mword_of_int 12), ADDI)).
 Proof using . udec_base_bridge. Qed.
 
-(* a2a50513  addi a0,a0,-1494 # 1300 <malloc+0x174> *)
-Lemma udec_a2a50513 :
-  udecode_base (mword_of_int 0xa2a50513) (ITYPE (mword_of_int 2602 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+(* a3a50513  addi a0,a0,-1478 # 1310 <malloc+0x17c> *)
+Lemma udec_a3a50513 :
+  udecode_base (mword_of_int 0xa3a50513) (ITYPE (mword_of_int 2618 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
 Proof using . udec_base_bridge. Qed.
 
-(* aa058593  addi a1,a1,-1376 # 1368 <malloc+0x1dc> *)
-Lemma udec_aa058593 :
-  udecode_base (mword_of_int 0xaa058593) (ITYPE (mword_of_int 2720 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)).
-Proof using . udec_base_bridge. Qed.
-
-(* ba670713  addi a4,a4,-1114 # 13b0 <malloc+0x224> *)
-Lemma udec_ba670713 :
-  udecode_base (mword_of_int 0xba670713) (ITYPE (mword_of_int 2982 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)).
+(* ab058593  addi a1,a1,-1360 # 1378 <malloc+0x1e4> *)
+Lemma udec_ab058593 :
+  udecode_base (mword_of_int 0xab058593) (ITYPE (mword_of_int 2736 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)).
 Proof using . udec_base_bridge. Qed.
 
 (* ba698993  addi s3,s3,-1114 # 2008 <whitespace> *)
@@ -1714,9 +1710,9 @@ Lemma udec_ba698993 :
   udecode_base (mword_of_int 0xba698993) (ITYPE (mword_of_int 2982 : mword 12, Regidx (mword_of_int 19), Regidx (mword_of_int 19), ADDI)).
 Proof using . udec_base_bridge. Qed.
 
-(* c0a60613  addi a2,a2,-1014 # 1330 <malloc+0x1a4> *)
-Lemma udec_c0a60613 :
-  udecode_base (mword_of_int 0xc0a60613) (ITYPE (mword_of_int 3082 : mword 12, Regidx (mword_of_int 12), Regidx (mword_of_int 12), ADDI)).
+(* bb670713  addi a4,a4,-1098 # 13c0 <malloc+0x22c> *)
+Lemma udec_bb670713 :
+  udecode_base (mword_of_int 0xbb670713) (ITYPE (mword_of_int 2998 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)).
 Proof using . udec_base_bridge. Qed.
 
 (* c0ca8a93  addi s5,s5,-1012 # 2000 <symbols> *)
@@ -1724,14 +1720,19 @@ Lemma udec_c0ca8a93 :
   udecode_base (mword_of_int 0xc0ca8a93) (ITYPE (mword_of_int 3084 : mword 12, Regidx (mword_of_int 21), Regidx (mword_of_int 21), ADDI)).
 Proof using . udec_base_bridge. Qed.
 
+(* c1a60613  addi a2,a2,-998 # 1340 <malloc+0x1ac> *)
+Lemma udec_c1a60613 :
+  udecode_base (mword_of_int 0xc1a60613) (ITYPE (mword_of_int 3098 : mword 12, Regidx (mword_of_int 12), Regidx (mword_of_int 12), ADDI)).
+Proof using . udec_base_bridge. Qed.
+
 (* c1c98993  addi s3,s3,-996 # 2008 <whitespace> *)
 Lemma udec_c1c98993 :
   udecode_base (mword_of_int 0xc1c98993) (ITYPE (mword_of_int 3100 : mword 12, Regidx (mword_of_int 19), Regidx (mword_of_int 19), ADDI)).
 Proof using . udec_base_bridge. Qed.
 
-(* c2ca0a13  addi s4,s4,-980 # 1328 <malloc+0x19c> *)
-Lemma udec_c2ca0a13 :
-  udecode_base (mword_of_int 0xc2ca0a13) (ITYPE (mword_of_int 3116 : mword 12, Regidx (mword_of_int 20), Regidx (mword_of_int 20), ADDI)).
+(* c3ca0a13  addi s4,s4,-964 # 1338 <malloc+0x1a4> *)
+Lemma udec_c3ca0a13 :
+  udecode_base (mword_of_int 0xc3ca0a13) (ITYPE (mword_of_int 3132 : mword 12, Regidx (mword_of_int 20), Regidx (mword_of_int 20), ADDI)).
 Proof using . udec_base_bridge. Qed.
 
 (* c7898993  addi s3,s3,-904 # 2008 <whitespace> *)
@@ -1739,14 +1740,14 @@ Lemma udec_c7898993 :
   udecode_base (mword_of_int 0xc7898993) (ITYPE (mword_of_int 3192 : mword 12, Regidx (mword_of_int 19), Regidx (mword_of_int 19), ADDI)).
 Proof using . udec_base_bridge. Qed.
 
-(* c8260613  addi a2,a2,-894 # 1320 <malloc+0x194> *)
-Lemma udec_c8260613 :
-  udecode_base (mword_of_int 0xc8260613) (ITYPE (mword_of_int 3202 : mword 12, Regidx (mword_of_int 12), Regidx (mword_of_int 12), ADDI)).
+(* c9260613  addi a2,a2,-878 # 1330 <malloc+0x19c> *)
+Lemma udec_c9260613 :
+  udecode_base (mword_of_int 0xc9260613) (ITYPE (mword_of_int 3218 : mword 12, Regidx (mword_of_int 12), Regidx (mword_of_int 12), ADDI)).
 Proof using . udec_base_bridge. Qed.
 
-(* cb250513  addi a0,a0,-846 # 1308 <malloc+0x17c> *)
-Lemma udec_cb250513 :
-  udecode_base (mword_of_int 0xcb250513) (ITYPE (mword_of_int 3250 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+(* cc250513  addi a0,a0,-830 # 1318 <malloc+0x184> *)
+Lemma udec_cc250513 :
+  udecode_base (mword_of_int 0xcc250513) (ITYPE (mword_of_int 3266 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
 Proof using . udec_base_bridge. Qed.
 
 (* cda98993  addi s3,s3,-806 # 2008 <whitespace> *)
@@ -1754,29 +1755,29 @@ Lemma udec_cda98993 :
   udecode_base (mword_of_int 0xcda98993) (ITYPE (mword_of_int 3290 : mword 12, Regidx (mword_of_int 19), Regidx (mword_of_int 19), ADDI)).
 Proof using . udec_base_bridge. Qed.
 
-(* cf850513  addi a0,a0,-776 # 1300 <malloc+0x174> *)
-Lemma udec_cf850513 :
-  udecode_base (mword_of_int 0xcf850513) (ITYPE (mword_of_int 3320 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+(* d0850513  addi a0,a0,-760 # 1310 <malloc+0x17c> *)
+Lemma udec_d0850513 :
+  udecode_base (mword_of_int 0xd0850513) (ITYPE (mword_of_int 3336 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
 Proof using . udec_base_bridge. Qed.
 
-(* d42b0b13  addi s6,s6,-702 # 1318 <malloc+0x18c> *)
-Lemma udec_d42b0b13 :
-  udecode_base (mword_of_int 0xd42b0b13) (ITYPE (mword_of_int 3394 : mword 12, Regidx (mword_of_int 22), Regidx (mword_of_int 22), ADDI)).
+(* d52b0b13  addi s6,s6,-686 # 1328 <malloc+0x194> *)
+Lemma udec_d52b0b13 :
+  udecode_base (mword_of_int 0xd52b0b13) (ITYPE (mword_of_int 3410 : mword 12, Regidx (mword_of_int 22), Regidx (mword_of_int 22), ADDI)).
 Proof using . udec_base_bridge. Qed.
 
-(* d5660613  addi a2,a2,-682 # 12f8 <malloc+0x16c> *)
-Lemma udec_d5660613 :
-  udecode_base (mword_of_int 0xd5660613) (ITYPE (mword_of_int 3414 : mword 12, Regidx (mword_of_int 12), Regidx (mword_of_int 12), ADDI)).
+(* d6660613  addi a2,a2,-666 # 1308 <malloc+0x174> *)
+Lemma udec_d6660613 :
+  udecode_base (mword_of_int 0xd6660613) (ITYPE (mword_of_int 3430 : mword 12, Regidx (mword_of_int 12), Regidx (mword_of_int 12), ADDI)).
 Proof using . udec_base_bridge. Qed.
 
-(* dee50513  addi a0,a0,-530 # 12d0 <malloc+0x144> *)
-Lemma udec_dee50513 :
-  udecode_base (mword_of_int 0xdee50513) (ITYPE (mword_of_int 3566 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+(* dfe50513  addi a0,a0,-514 # 12e0 <malloc+0x14c> *)
+Lemma udec_dfe50513 :
+  udecode_base (mword_of_int 0xdfe50513) (ITYPE (mword_of_int 3582 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
 Proof using . udec_base_bridge. Qed.
 
-(* e24b0b13  addi s6,s6,-476 # 12f0 <malloc+0x164> *)
-Lemma udec_e24b0b13 :
-  udecode_base (mword_of_int 0xe24b0b13) (ITYPE (mword_of_int 3620 : mword 12, Regidx (mword_of_int 22), Regidx (mword_of_int 22), ADDI)).
+(* e34b0b13  addi s6,s6,-460 # 1300 <malloc+0x16c> *)
+Lemma udec_e34b0b13 :
+  udecode_base (mword_of_int 0xe34b0b13) (ITYPE (mword_of_int 3636 : mword 12, Regidx (mword_of_int 22), Regidx (mword_of_int 22), ADDI)).
 Proof using . udec_base_bridge. Qed.
 
 (* f8040c13  addi s8,s0,-128 *)
@@ -1849,9 +1850,9 @@ Lemma udec_6e0000ef :
   udecode_base (mword_of_int 0x6e0000ef) (JAL (mword_of_int 1760 : mword 21, Regidx (mword_of_int 1))).
 Proof using . udec_base_bridge. Qed.
 
-(* 719000ef  jal 118c <malloc> *)
-Lemma udec_719000ef :
-  udecode_base (mword_of_int 0x719000ef) (JAL (mword_of_int 3864 : mword 21, Regidx (mword_of_int 1))).
+(* 721000ef  jal 1194 <malloc> *)
+Lemma udec_721000ef :
+  udecode_base (mword_of_int 0x721000ef) (JAL (mword_of_int 3872 : mword 21, Regidx (mword_of_int 1))).
 Proof using . udec_base_bridge. Qed.
 
 (* 742000ef  jal a82 <strchr> *)
@@ -1859,24 +1860,24 @@ Lemma udec_742000ef :
   udecode_base (mword_of_int 0x742000ef) (JAL (mword_of_int 1858 : mword 21, Regidx (mword_of_int 1))).
 Proof using . udec_base_bridge. Qed.
 
-(* 76b000ef  jal 118c <malloc> *)
-Lemma udec_76b000ef :
-  udecode_base (mword_of_int 0x76b000ef) (JAL (mword_of_int 3946 : mword 21, Regidx (mword_of_int 1))).
+(* 773000ef  jal 1194 <malloc> *)
+Lemma udec_773000ef :
+  udecode_base (mword_of_int 0x773000ef) (JAL (mword_of_int 3954 : mword 21, Regidx (mword_of_int 1))).
 Proof using . udec_base_bridge. Qed.
 
-(* 7ad000ef  jal 118c <malloc> *)
-Lemma udec_7ad000ef :
-  udecode_base (mword_of_int 0x7ad000ef) (JAL (mword_of_int 4012 : mword 21, Regidx (mword_of_int 1))).
-Proof using . udec_base_bridge. Qed.
-
-(* 7d8000ef  jal 10aa <fprintf> *)
-Lemma udec_7d8000ef :
-  udecode_base (mword_of_int 0x7d8000ef) (JAL (mword_of_int 2008 : mword 21, Regidx (mword_of_int 1))).
+(* 7b5000ef  jal 1194 <malloc> *)
+Lemma udec_7b5000ef :
+  udecode_base (mword_of_int 0x7b5000ef) (JAL (mword_of_int 4020 : mword 21, Regidx (mword_of_int 1))).
 Proof using . udec_base_bridge. Qed.
 
 (* 7de000ef  jal a5c <memset> *)
 Lemma udec_7de000ef :
   udecode_base (mword_of_int 0x7de000ef) (JAL (mword_of_int 2014 : mword 21, Regidx (mword_of_int 1))).
+Proof using . udec_base_bridge. Qed.
+
+(* 7e0000ef  jal 10b2 <fprintf> *)
+Lemma udec_7e0000ef :
+  udecode_base (mword_of_int 0x7e0000ef) (JAL (mword_of_int 2016 : mword 21, Regidx (mword_of_int 1))).
 Proof using . udec_base_bridge. Qed.
 
 (* 9edff0ef  jal 4a <panic> *)
@@ -2320,7 +2321,7 @@ Section UCodeShP.
   Global Instance shp_code_persistent g : Persistent (shp_code g).
   Proof using . apply _. Qed.
 
-  (* Keep typeclass resolution from unfolding this into its 4736-entry
+  (* Keep typeclass resolution from unfolding this into its 4744-entry
      [big_sepM]; cf. [KernelText.kernel_text], which learned it the hard
      way.  Conversion can still see through it -- [shp_code_img] below is
      the one place that needs to. *)
@@ -2585,14 +2586,14 @@ Section UCodeShP.
     uis_base g 0x89a (mword_of_int 0x00001617 : mword 32) udec_00001617.
   Qed.
 
-  (* 0x89e  addi a2,a2,-1554 # 1288 <malloc+0xfc>  (base, 2 mod 4 -> split fetch) *)
+  (* 0x89e  addi a2,a2,-1538 # 1298 <malloc+0x104>  (base, 2 mod 4 -> split fetch) *)
   Lemma uis_shp_89e (g : gname) :
     shp_code g -∗
     uinstr_is g (mword_of_int 0x89e) false
-      (ITYPE (mword_of_int 2542 : mword 12, Regidx (mword_of_int 12), Regidx (mword_of_int 12), ADDI)).
+      (ITYPE (mword_of_int 2558 : mword 12, Regidx (mword_of_int 12), Regidx (mword_of_int 12), ADDI)).
   Proof using .
     iIntros "#Ht".
-    uis_base g 0x89e (mword_of_int 0x9ee60613 : mword 32) udec_9ee60613.
+    uis_base g 0x89e (mword_of_int 0x9fe60613 : mword 32) udec_9fe60613.
   Qed.
 
   (* 0x8a2  c.mv a1,s1  (RVC, 2 mod 4) *)
@@ -2760,14 +2761,14 @@ Section UCodeShP.
     uis_base g 0x8c8 (mword_of_int 0x00001597 : mword 32) udec_00001597.
   Qed.
 
-  (* 0x8cc  addi a1,a1,-1376 # 1368 <malloc+0x1dc>  (base, 4-aligned) *)
+  (* 0x8cc  addi a1,a1,-1360 # 1378 <malloc+0x1e4>  (base, 4-aligned) *)
   Lemma uis_shp_8cc (g : gname) :
     shp_code g -∗
     uinstr_is g (mword_of_int 0x8cc) false
-      (ITYPE (mword_of_int 2720 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)).
+      (ITYPE (mword_of_int 2736 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)).
   Proof using .
     iIntros "#Ht".
-    uis_base g 0x8cc (mword_of_int 0xaa058593 : mword 32) udec_aa058593.
+    uis_base g 0x8cc (mword_of_int 0xab058593 : mword 32) udec_ab058593.
   Qed.
 
   (* 0x8d0  c.li a0,2  (RVC, 4-aligned) *)
@@ -2781,14 +2782,14 @@ Section UCodeShP.
       (mword_of_int 0x00ef4509 : mword 32).
   Qed.
 
-  (* 0x8d2  jal 10aa <fprintf>  (base, 2 mod 4 -> split fetch) *)
+  (* 0x8d2  jal 10b2 <fprintf>  (base, 2 mod 4 -> split fetch) *)
   Lemma uis_shp_8d2 (g : gname) :
     shp_code g -∗
     uinstr_is g (mword_of_int 0x8d2) false
-      (JAL (mword_of_int 2008 : mword 21, Regidx (mword_of_int 1))).
+      (JAL (mword_of_int 2016 : mword 21, Regidx (mword_of_int 1))).
   Proof using .
     iIntros "#Ht".
-    uis_base g 0x8d2 (mword_of_int 0x7d8000ef : mword 32) udec_7d8000ef.
+    uis_base g 0x8d2 (mword_of_int 0x7e0000ef : mword 32) udec_7e0000ef.
   Qed.
 
   (* 0x8d6  auipc a0,0x1  (base, 2 mod 4 -> split fetch) *)
@@ -2801,14 +2802,14 @@ Section UCodeShP.
     uis_base g 0x8d6 (mword_of_int 0x00001517 : mword 32) udec_00001517.
   Qed.
 
-  (* 0x8da  addi a0,a0,-1494 # 1300 <malloc+0x174>  (base, 2 mod 4 -> split fetch) *)
+  (* 0x8da  addi a0,a0,-1478 # 1310 <malloc+0x17c>  (base, 2 mod 4 -> split fetch) *)
   Lemma uis_shp_8da (g : gname) :
     shp_code g -∗
     uinstr_is g (mword_of_int 0x8da) false
-      (ITYPE (mword_of_int 2602 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+      (ITYPE (mword_of_int 2618 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
   Proof using .
     iIntros "#Ht".
-    uis_base g 0x8da (mword_of_int 0xa2a50513 : mword 32) udec_a2a50513.
+    uis_base g 0x8da (mword_of_int 0xa3a50513 : mword 32) udec_a3a50513.
   Qed.
 
   (* 0x8de  jal 4a <panic>  (base, 2 mod 4 -> split fetch) *)
@@ -2958,14 +2959,14 @@ Section UCodeShP.
     uis_base g 0x6fc (mword_of_int 0x00001a17 : mword 32) udec_00001a17.
   Qed.
 
-  (* 0x700  addi s4,s4,-980 # 1328 <malloc+0x19c>  (base, 4-aligned) *)
+  (* 0x700  addi s4,s4,-964 # 1338 <malloc+0x1a4>  (base, 4-aligned) *)
   Lemma uis_shp_700 (g : gname) :
     shp_code g -∗
     uinstr_is g (mword_of_int 0x700) false
-      (ITYPE (mword_of_int 3116 : mword 12, Regidx (mword_of_int 20), Regidx (mword_of_int 20), ADDI)).
+      (ITYPE (mword_of_int 3132 : mword 12, Regidx (mword_of_int 20), Regidx (mword_of_int 20), ADDI)).
   Proof using .
     iIntros "#Ht".
-    uis_base g 0x700 (mword_of_int 0xc2ca0a13 : mword 32) udec_c2ca0a13.
+    uis_base g 0x700 (mword_of_int 0xc3ca0a13 : mword 32) udec_c3ca0a13.
   Qed.
 
   (* 0x704  c.j 71a <parseline+0x38>  (RVC, 4-aligned) *)
@@ -3124,14 +3125,14 @@ Section UCodeShP.
     uis_base g 0x726 (mword_of_int 0x00001617 : mword 32) udec_00001617.
   Qed.
 
-  (* 0x72a  addi a2,a2,-1014 # 1330 <malloc+0x1a4>  (base, 2 mod 4 -> split fetch) *)
+  (* 0x72a  addi a2,a2,-998 # 1340 <malloc+0x1ac>  (base, 2 mod 4 -> split fetch) *)
   Lemma uis_shp_72a (g : gname) :
     shp_code g -∗
     uinstr_is g (mword_of_int 0x72a) false
-      (ITYPE (mword_of_int 3082 : mword 12, Regidx (mword_of_int 12), Regidx (mword_of_int 12), ADDI)).
+      (ITYPE (mword_of_int 3098 : mword 12, Regidx (mword_of_int 12), Regidx (mword_of_int 12), ADDI)).
   Proof using .
     iIntros "#Ht".
-    uis_base g 0x72a (mword_of_int 0xc0a60613 : mword 32) udec_c0a60613.
+    uis_base g 0x72a (mword_of_int 0xc1a60613 : mword 32) udec_c1a60613.
   Qed.
 
   (* 0x72e  c.mv a1,s3  (RVC, 2 mod 4) *)
@@ -3553,14 +3554,14 @@ Section UCodeShP.
     uis_base g 0x69e (mword_of_int 0x00001617 : mword 32) udec_00001617.
   Qed.
 
-  (* 0x6a2  addi a2,a2,-894 # 1320 <malloc+0x194>  (base, 2 mod 4 -> split fetch) *)
+  (* 0x6a2  addi a2,a2,-878 # 1330 <malloc+0x19c>  (base, 2 mod 4 -> split fetch) *)
   Lemma uis_shp_6a2 (g : gname) :
     shp_code g -∗
     uinstr_is g (mword_of_int 0x6a2) false
-      (ITYPE (mword_of_int 3202 : mword 12, Regidx (mword_of_int 12), Regidx (mword_of_int 12), ADDI)).
+      (ITYPE (mword_of_int 3218 : mword 12, Regidx (mword_of_int 12), Regidx (mword_of_int 12), ADDI)).
   Proof using .
     iIntros "#Ht".
-    uis_base g 0x6a2 (mword_of_int 0xc8260613 : mword 32) udec_c8260613.
+    uis_base g 0x6a2 (mword_of_int 0xc9260613 : mword 32) udec_c9260613.
   Qed.
 
   (* 0x6a6  c.mv a1,s1  (RVC, 2 mod 4) *)
@@ -3941,14 +3942,14 @@ Section UCodeShP.
     uis_base g 0x5a2 (mword_of_int 0x00001617 : mword 32) udec_00001617.
   Qed.
 
-  (* 0x5a6  addi a2,a2,-682 # 12f8 <malloc+0x16c>  (base, 2 mod 4 -> split fetch) *)
+  (* 0x5a6  addi a2,a2,-666 # 1308 <malloc+0x174>  (base, 2 mod 4 -> split fetch) *)
   Lemma uis_shp_5a6 (g : gname) :
     shp_code g -∗
     uinstr_is g (mword_of_int 0x5a6) false
-      (ITYPE (mword_of_int 3414 : mword 12, Regidx (mword_of_int 12), Regidx (mword_of_int 12), ADDI)).
+      (ITYPE (mword_of_int 3430 : mword 12, Regidx (mword_of_int 12), Regidx (mword_of_int 12), ADDI)).
   Proof using .
     iIntros "#Ht".
-    uis_base g 0x5a6 (mword_of_int 0xd5660613 : mword 32) udec_d5660613.
+    uis_base g 0x5a6 (mword_of_int 0xd6660613 : mword 32) udec_d6660613.
   Qed.
 
   (* 0x5aa  jal 448 <peek>  (base, 2 mod 4 -> split fetch) *)
@@ -4159,14 +4160,14 @@ Section UCodeShP.
     uis_base g 0x5d6 (mword_of_int 0x00001b17 : mword 32) udec_00001b17.
   Qed.
 
-  (* 0x5da  addi s6,s6,-702 # 1318 <malloc+0x18c>  (base, 2 mod 4 -> split fetch) *)
+  (* 0x5da  addi s6,s6,-686 # 1328 <malloc+0x194>  (base, 2 mod 4 -> split fetch) *)
   Lemma uis_shp_5da (g : gname) :
     shp_code g -∗
     uinstr_is g (mword_of_int 0x5da) false
-      (ITYPE (mword_of_int 3394 : mword 12, Regidx (mword_of_int 22), Regidx (mword_of_int 22), ADDI)).
+      (ITYPE (mword_of_int 3410 : mword 12, Regidx (mword_of_int 22), Regidx (mword_of_int 22), ADDI)).
   Proof using .
     iIntros "#Ht".
-    uis_base g 0x5da (mword_of_int 0xd42b0b13 : mword 32) udec_d42b0b13.
+    uis_base g 0x5da (mword_of_int 0xd52b0b13 : mword 32) udec_d52b0b13.
   Qed.
 
   (* 0x5de  addi s8,s0,-128  (base, 2 mod 4 -> split fetch) *)
@@ -4355,14 +4356,14 @@ Section UCodeShP.
     uis_base g 0x608 (mword_of_int 0x00001517 : mword 32) udec_00001517.
   Qed.
 
-  (* 0x60c  addi a0,a0,-776 # 1300 <malloc+0x174>  (base, 4-aligned) *)
+  (* 0x60c  addi a0,a0,-760 # 1310 <malloc+0x17c>  (base, 4-aligned) *)
   Lemma uis_shp_60c (g : gname) :
     shp_code g -∗
     uinstr_is g (mword_of_int 0x60c) false
-      (ITYPE (mword_of_int 3320 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+      (ITYPE (mword_of_int 3336 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
   Proof using .
     iIntros "#Ht".
-    uis_base g 0x60c (mword_of_int 0xcf850513 : mword 32) udec_cf850513.
+    uis_base g 0x60c (mword_of_int 0xd0850513 : mword 32) udec_d0850513.
   Qed.
 
   (* 0x610  jal 4a <panic>  (base, 4-aligned) *)
@@ -4633,14 +4634,14 @@ Section UCodeShP.
     uis_base g 0x656 (mword_of_int 0x00001517 : mword 32) udec_00001517.
   Qed.
 
-  (* 0x65a  addi a0,a0,-846 # 1308 <malloc+0x17c>  (base, 2 mod 4 -> split fetch) *)
+  (* 0x65a  addi a0,a0,-830 # 1318 <malloc+0x184>  (base, 2 mod 4 -> split fetch) *)
   Lemma uis_shp_65a (g : gname) :
     shp_code g -∗
     uinstr_is g (mword_of_int 0x65a) false
-      (ITYPE (mword_of_int 3250 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+      (ITYPE (mword_of_int 3266 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
   Proof using .
     iIntros "#Ht".
-    uis_base g 0x65a (mword_of_int 0xcb250513 : mword 32) udec_cb250513.
+    uis_base g 0x65a (mword_of_int 0xcc250513 : mword 32) udec_cc250513.
   Qed.
 
   (* 0x65e  jal 4a <panic>  (base, 2 mod 4 -> split fetch) *)
@@ -4968,14 +4969,14 @@ Section UCodeShP.
     uis_base g 0x4cc (mword_of_int 0x00001b17 : mword 32) udec_00001b17.
   Qed.
 
-  (* 0x4d0  addi s6,s6,-476 # 12f0 <malloc+0x164>  (base, 4-aligned) *)
+  (* 0x4d0  addi s6,s6,-460 # 1300 <malloc+0x16c>  (base, 4-aligned) *)
   Lemma uis_shp_4d0 (g : gname) :
     shp_code g -∗
     uinstr_is g (mword_of_int 0x4d0) false
-      (ITYPE (mword_of_int 3620 : mword 12, Regidx (mword_of_int 22), Regidx (mword_of_int 22), ADDI)).
+      (ITYPE (mword_of_int 3636 : mword 12, Regidx (mword_of_int 22), Regidx (mword_of_int 22), ADDI)).
   Proof using .
     iIntros "#Ht".
-    uis_base g 0x4d0 (mword_of_int 0xe24b0b13 : mword 32) udec_e24b0b13.
+    uis_base g 0x4d0 (mword_of_int 0xe34b0b13 : mword 32) udec_e34b0b13.
   Qed.
 
   (* 0x4d4  addi s9,s0,-112  (base, 4-aligned) *)
@@ -5029,14 +5030,14 @@ Section UCodeShP.
     uis_base g 0x4e2 (mword_of_int 0x00001517 : mword 32) udec_00001517.
   Qed.
 
-  (* 0x4e6  addi a0,a0,-530 # 12d0 <malloc+0x144>  (base, 2 mod 4 -> split fetch) *)
+  (* 0x4e6  addi a0,a0,-514 # 12e0 <malloc+0x14c>  (base, 2 mod 4 -> split fetch) *)
   Lemma uis_shp_4e6 (g : gname) :
     shp_code g -∗
     uinstr_is g (mword_of_int 0x4e6) false
-      (ITYPE (mword_of_int 3566 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+      (ITYPE (mword_of_int 3582 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
   Proof using .
     iIntros "#Ht".
-    uis_base g 0x4e6 (mword_of_int 0xdee50513 : mword 32) udec_dee50513.
+    uis_base g 0x4e6 (mword_of_int 0xdfe50513 : mword 32) udec_dfe50513.
   Qed.
 
   (* 0x4ea  jal 4a <panic>  (base, 2 mod 4 -> split fetch) *)
@@ -5805,14 +5806,14 @@ Section UCodeShP.
     uis_base g 0x80a (mword_of_int 0x00001717 : mword 32) udec_00001717.
   Qed.
 
-  (* 0x80e  addi a4,a4,-1114 # 13b0 <malloc+0x224>  (base, 2 mod 4 -> split fetch) *)
+  (* 0x80e  addi a4,a4,-1098 # 13c0 <malloc+0x22c>  (base, 2 mod 4 -> split fetch) *)
   Lemma uis_shp_80e (g : gname) :
     shp_code g -∗
     uinstr_is g (mword_of_int 0x80e) false
-      (ITYPE (mword_of_int 2982 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)).
+      (ITYPE (mword_of_int 2998 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)).
   Proof using .
     iIntros "#Ht".
-    uis_base g 0x80e (mword_of_int 0xba670713 : mword 32) udec_ba670713.
+    uis_base g 0x80e (mword_of_int 0xbb670713 : mword 32) udec_bb670713.
   Qed.
 
   (* 0x812  c.add a5,a5,a4  (RVC, 2 mod 4) *)
@@ -7737,14 +7738,14 @@ Section UCodeShP.
     uis_base g 0x1dc (mword_of_int 0x0a800513 : mword 32) udec_0a800513.
   Qed.
 
-  (* 0x1e0  jal 118c <malloc>  (base, 4-aligned) *)
+  (* 0x1e0  jal 1194 <malloc>  (base, 4-aligned) *)
   Lemma uis_shp_1e0 (g : gname) :
     shp_code g -∗
     uinstr_is g (mword_of_int 0x1e0) false
-      (JAL (mword_of_int 4012 : mword 21, Regidx (mword_of_int 1))).
+      (JAL (mword_of_int 4020 : mword 21, Regidx (mword_of_int 1))).
   Proof using .
     iIntros "#Ht".
-    uis_base g 0x1e0 (mword_of_int 0x7ad000ef : mword 32) udec_7ad000ef.
+    uis_base g 0x1e0 (mword_of_int 0x7b5000ef : mword 32) udec_7b5000ef.
   Qed.
 
   (* 0x1e4  c.mv s1,a0  (RVC, 4-aligned) *)
@@ -8042,14 +8043,14 @@ Section UCodeShP.
     uis_base g 0x21e (mword_of_int 0x02800513 : mword 32) udec_02800513.
   Qed.
 
-  (* 0x222  jal 118c <malloc>  (base, 2 mod 4 -> split fetch) *)
+  (* 0x222  jal 1194 <malloc>  (base, 2 mod 4 -> split fetch) *)
   Lemma uis_shp_222 (g : gname) :
     shp_code g -∗
     uinstr_is g (mword_of_int 0x222) false
-      (JAL (mword_of_int 3946 : mword 21, Regidx (mword_of_int 1))).
+      (JAL (mword_of_int 3954 : mword 21, Regidx (mword_of_int 1))).
   Proof using .
     iIntros "#Ht".
-    uis_base g 0x222 (mword_of_int 0x76b000ef : mword 32) udec_76b000ef.
+    uis_base g 0x222 (mword_of_int 0x773000ef : mword 32) udec_773000ef.
   Qed.
 
   (* 0x226  c.mv s1,a0  (RVC, 2 mod 4) *)
@@ -8386,14 +8387,14 @@ Section UCodeShP.
     uis_rvc2 g 0x272 (mword_of_int 0x4561 : mword 16) udec_4561.
   Qed.
 
-  (* 0x274  jal 118c <malloc>  (base, 4-aligned) *)
+  (* 0x274  jal 1194 <malloc>  (base, 4-aligned) *)
   Lemma uis_shp_274 (g : gname) :
     shp_code g -∗
     uinstr_is g (mword_of_int 0x274) false
-      (JAL (mword_of_int 3864 : mword 21, Regidx (mword_of_int 1))).
+      (JAL (mword_of_int 3872 : mword 21, Regidx (mword_of_int 1))).
   Proof using .
     iIntros "#Ht".
-    uis_base g 0x274 (mword_of_int 0x719000ef : mword 32) udec_719000ef.
+    uis_base g 0x274 (mword_of_int 0x721000ef : mword 32) udec_721000ef.
   Qed.
 
   (* 0x278  c.mv s1,a0  (RVC, 4-aligned) *)
@@ -8949,7 +8950,7 @@ Section UCodeShP.
      in [ShInstrs.sh_bytes] and they are not in the data half either: .rodata
      shares the EXECUTABLE segment's pages, so its bytes are X-and-not-W and
      the heap files them under [γt] exactly as it files the code. This
-     program's literals land at 0x1280..0x1c54, inside the R-X segment, and a
+     program's literals land at 0x1288..0x1c64, inside the R-X segment, and a
      printf-family walk LOADS them one byte at a time. This is the part of
      [ShData.sh_data] that lands there -- everything below the end of the
      executable segment -- and [UserHeap.utext_str_of_img] cuts a literal out

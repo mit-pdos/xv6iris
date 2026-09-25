@@ -1023,6 +1023,7 @@ Section UShGrep.
     (forall (p : mword 27) (q : UserPerm.uperm), uvis_perm W !! p = Some q ->
        bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W)) ->
     uvis_lazy W = false ->
+    uvis_secc W = ProcDefs.secc_all ->
     udep -∗
     UkRun.urun_nopipe (uvis_fd W) -∗
     my_pay (uvis_gen W) Q -∗
@@ -1044,14 +1045,14 @@ Section UShGrep.
     uslot W.
   Proof using ghost_varG1.
     intros Hpc Hsub Hsub2 Hx Hroom Hal8 Hstk Hbuf Hargs Havd Havs
-           Hfdlen Hstop Hlzf.
+           Hfdlen Hstop Hlzf Hscf.
     iIntros "#Hdep #Hnpw Hmp Hprog".
     assert (Hsp0 : 0 <= uint (uvis_sp W)) by lia.
     assert (Hargc0 : 0 <= uvis_argc W)
       by exact (proj1 (uka_argc _ _ _ _ _ _ Hargs)).
     iApply (uslot_of_urun_all W K Q
               Hal8 ltac:(unfold uvis_sp in Hroom; lia) Hstk Hfdlen Hstop
-              Hlzf with "Hdep Hnpw Hmp").
+              Hlzf Hscf with "Hdep Hnpw Hmp").
     iIntros (N h) "%Hpayeq %Hsz Hszf #Ht Hstd Hcwf _ _ Dlo Dhi Hrun".
     (* ---- the buffer, out of the EXCLUSIVE low half ---- *)
     iDestruct (ubytes_of_map (ukn_d N) _ GrepSyms.buf 1024

@@ -188,6 +188,8 @@ Definition sync_gate (W : uvis) : Prop :=
      which is the honest reading of a tier that does not support it.
      Decidable like every other conjunct here. *)
   uvis_lazy W = false /\
+  (* ...and the mask is full ([UkRun.urun] is keyed at it) *)
+  uvis_secc W = ProcDefs.secc_all /\
   (* ...and the map stops at the break *)
   ustop_gate W.
 
@@ -224,6 +226,8 @@ Definition echo_gate (W : uvis) : Prop :=
   length (uvis_fd W) = NOFILE /\
   (* ...and the lazy bit is [false] -- see [sync_gate] *)
   uvis_lazy W = false /\
+  (* ...and the mask is full ([UkRun.urun] is keyed at it) *)
+  uvis_secc W = ProcDefs.secc_all /\
   (* ...and the map stops at the break -- see [sync_gate] *)
   ustop_gate W.
 
@@ -282,13 +286,13 @@ Section UexecCond.
     UkRun.urun_nopipe (uvis_fd W) -∗
     udep (PS := PF) -∗ my_pay (uvis_gen W) (fun _ => True)%I -∗ uslot W.
   Proof using ghost_varG0 ghost_varG1 ufdG0.
-    intros Hpsok_free (Hteq & Hpc & Hxo & Hroom & Hal8 & Hstk & Hfdlen & Hlzf
+    intros Hpsok_free (Hteq & Hpc & Hxo & Hroom & Hal8 & Hstk & Hfdlen & Hlzf & Hscf
                       & Hstop).
     exact (sync_uexec_slot (PS := PF) W Hpc
              (text_region_eq_uimg_sub (uvis_M W) Hteq)
              (sync_xopage_addrs (uvis_perm W) Hxo)
              Hroom Hal8 (sync_stkdata_all W Hstk) Hfdlen
-             (ustop_gate_at W Hstop) Hpsok_free Hlzf).
+             (ustop_gate_at W Hstop) Hpsok_free Hlzf Hscf).
   Qed.
 
   (* ...and echo's *)
@@ -314,13 +318,13 @@ Section UexecCond.
     udep (PS := PF) -∗ my_pay (uvis_gen W) (fun _ => True)%I -∗ uslot W.
   Proof using ghost_varG1.
     intros (Hteq & Hpc & Hxo & Hroom & Hal8 & Hstk & Hargs & Havd & Havs
-            & Hfdlen & Hlzf & Hstop).
+            & Hfdlen & Hlzf & Hscf & Hstop).
     exact (echo_uexec_slot (PS := PF) W Hpc
              (text_region_eq_of_uimg_sub EchoInstrs.echo_bytes (uvis_M W) Hteq)
              (sync_xopage_addrs (uvis_perm W) Hxo)
              Hroom Hal8 (echo_stkdata_all W Hstk) Hargs
              (echo_avd_arr_all W Havd) (echo_avd_str_all W Havs) Hfdlen
-             (ustop_gate_at W Hstop) Hlzf).
+             (ustop_gate_at W Hstop) Hlzf Hscf).
   Qed.
 
   (* THE SUPPLY REACHES EVERY BRANCH, not only the generic tail: sync and

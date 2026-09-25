@@ -408,7 +408,7 @@ Class xv6_app_laws (A : xv6_app Σ) := MkAppLaws {
               power-on step and carried here by the kernel.  <init> holds
               it; lane IO-LEAF spends it at the era's first banner byte. *)
            app_turn A c (S gen_id) -∗
-           |==> init_boot_bundle (bv_unsigned InodeInv.ROOTINO) fdt0;
+           |==> init_boot_bundle (bv_unsigned InodeInv.ROOTINO) ProcDefs.secc_all fdt0;
   al_echo :
        forall (HR : riscvGS Σ) (c : app_fixed A),
          (* the shift reads the ambient tag family and the ambient console
@@ -579,7 +579,7 @@ Section AppTriv.
     ⊢ AppInv.app_inv FsCfg.fsc_fs -∗ app_boot (app_triv Σ) c (S gen_id) r -∗
       (* ...and the era's turn, likewise taken and not used *)
       app_turn (app_triv Σ) c (S gen_id) -∗
-      |==> init_boot_bundle (bv_unsigned InodeInv.ROOTINO) fdt0.
+      |==> init_boot_bundle (bv_unsigned InodeInv.ROOTINO) ProcDefs.secc_all fdt0.
   Proof using .
     intros Heq Hiface _. iIntros "_ _ _". iModIntro.
     (* the rewrite goes BEFORE the [intros]: [r'] is typed at

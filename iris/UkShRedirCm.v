@@ -363,7 +363,7 @@ Section UkShRedirCm.
       by exact (upd_eq m7 (Regidx a2_idx)
                   (regval_into_reg (mword_of_int 0x169e : mword 64))).
     iApply (wp_uk_addi N h8 m8 (mword_of_int 0x6a2)
-              (mword_of_int 3202 : mword 12) a2_idx a2_idx
+              (mword_of_int 3218 : mword 12) a2_idx a2_idx
               (mword_of_int ushp_T_pipe) (16 + (24 + (8 + nn)))
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
@@ -854,7 +854,7 @@ Section UkShRedirCm.
       by exact (upd_eq m6 (Regidx s4_idx)
                   (regval_into_reg (mword_of_int 0x16fc : mword 64))).
     iApply (wp_uk_addi N h7 m7 (mword_of_int 0x700)
-              (mword_of_int 3116 : mword 12) s4_idx s4_idx
+              (mword_of_int 3132 : mword 12) s4_idx s4_idx
               (mword_of_int ushp_T_back) (6 + (16 + (24 + (8 + nn))))
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
@@ -1032,7 +1032,7 @@ Section UkShRedirCm.
       by exact (upd_eq m13 (Regidx a2_idx)
                   (regval_into_reg (mword_of_int 0x1726 : mword 64))).
     iApply (wp_uk_addi N h16 m14 (mword_of_int 0x72a)
-              (mword_of_int 3082 : mword 12) a2_idx a2_idx
+              (mword_of_int 3098 : mword 12) a2_idx a2_idx
               (mword_of_int ushp_T_list) (6 + (16 + (24 + (8 + nn))))
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)

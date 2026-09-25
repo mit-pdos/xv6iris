@@ -213,7 +213,7 @@ Definition wp_userret_closed_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslot
          continuation is handed the record it is being resumed under, so
          the bit it is keyed at IS the one that record stores -- the same
          reading the cwd's inum gets one field over. *)
-      (pv_lazy (us_V U))
+      (pv_lazy (us_V U)) (pv_secc (us_V U))
       (tf_resume_gpr0 (pv_tf (us_V U))) (ret_pc sepc0) -∗
   (* ---- the kernel-side bundle, at THIS hart ---- *)
   URes CID pt ksp U sts cs pidv -∗

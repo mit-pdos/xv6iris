@@ -231,13 +231,13 @@ Section UkPipesEntries.
     L = wl_line (drop 1 ws) ->
     UkRun.urun_nopipe sts -∗ udep -∗
     image_entry ElfUser.echo_elf M (mword_of_int (t + 8) : mword 64) sts
-      cw cs pidv Q (pns_echo_lend LM CP L γc γm pn gp Q) uslot.
+      cw ProcDefs.secc_all cs pidv Q (pns_echo_lend LM CP L γc γm pn gp Q) uslot.
   Proof using HL31 Hadmit Hcons Hext Hsup HlR Hfc Hkill Hplok TERM TOK dep_tl pnsRegG0 ufdG0 v.
     intros HQc Hok Hnode Hab Hfdl Hl1 HLw.
     iIntros "#Hnpw #Hdep".
     set (wv := fun _ : nat => PDWr pn gp).
     rewrite /image_entry.
-    iIntros "!>" (na alen afun W') "%Hokk %Hcw %Hlz %Hch %Hpid %Hargs Hmp HPay".
+    iIntros "!>" (na alen afun W') "%Hokk %Hcw %Hlz %Hscw %Hch %Hpid %Hargs Hmp HPay".
     iApply uslot_bupd.
     iMod (pns_reg_alloc wv) as (γreg) "Hpool". iModIntro.
     set (If := fun (N' : uk_names Σ) (Hpq : ukn_pay N' = Q) =>
@@ -260,8 +260,8 @@ Section UkPipesEntries.
                 (echo_stub_close N') (echo_stub_exit N') γreg _ (pse_nodup0 _)
                 pn gp (take NSTD sts) rb wv (fun _ => None) eq_refl eq_refl Hl1
                 with "Hstd Hpool Hlend"). }
-    iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] Hmp [Hpool HPay]");
-      [ exact Hokk | exact Hcw | exact Hlz | exact Hch | exact Hpid | exact Hargs | ].
+    iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] [%] Hmp [Hpool HPay]");
+      [ exact Hokk | exact Hcw | exact Hlz | exact Hscw | exact Hch | exact Hpid | exact Hargs | ].
     iFrame "Hpool HPay".
   Qed.
 
@@ -283,14 +283,14 @@ Section UkPipesEntries.
     take NSTD sts !! 2%nat = Some (FdOpen rb2 true (FdDevice CONSOLE)) ->
     [] ∈ alts2 -> (pns_sink_h sk = true -> cat_dg_write ∈ alts2) ->
     UkRun.urun_nopipe sts -∗ udep -∗
-    image_entry ElfUser.cat_elf Mn (mword_of_int (t + 8) : mword 64) sts cw cs pidv Q
+    image_entry ElfUser.cat_elf Mn (mword_of_int (t + 8) : mword 64) sts cw ProcDefs.secc_all cs pidv Q
       (pns_copy_lend g LM PV CP v I sR lR L TERM TOK dep γc γm w2 A2 alts2 pin gin FCat sk Q) uslot.
   Proof using HL31 Hadmit Hcons Hext Hsup HlR Hfc Hkill Hplok dep_tl pnsRegG0 ufdG0.
     intros HQc Hok Hnode Hab Hfdl Hl0 Hl1 Hl2 Hnil Hdg.
     iIntros "#Hnpw #Hdep".
     set (wv := fun d : nat => match d with O => PDCon w2 A2 | S _ => PDCopy (pin, gin) FCat sk end).
     rewrite /image_entry.
-    iIntros "!>" (na alen afun W') "%Hokk %Hcw %Hlz %Hch %Hpid %Hargs Hmp HPay".
+    iIntros "!>" (na alen afun W') "%Hokk %Hcw %Hlz %Hscw %Hch %Hpid %Hargs Hmp HPay".
     iApply uslot_bupd.
     iMod (pns_reg_alloc wv) as (γreg) "Hpool". iModIntro.
     set (If := fun (N' : uk_names Σ) (Hpq : ukn_pay N' = Q) =>
@@ -316,8 +316,8 @@ Section UkPipesEntries.
                 w2 A2 alts2 pin gin FCat sk (take NSTD sts) wb rb1 rb2 wv (fun _ => None)
                 eq_refl eq_refl eq_refl Hl0 Hl1 Hl2
                 with "Hstd Hpool Hlend"). }
-    iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] Hmp [Hpool HPay]");
-      [ exact Hokk | exact Hcw | exact Hlz | exact Hch | exact Hpid | exact Hargs | ].
+    iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] [%] Hmp [Hpool HPay]");
+      [ exact Hokk | exact Hcw | exact Hlz | exact Hscw | exact Hch | exact Hpid | exact Hargs | ].
     iFrame "Hpool HPay".
   Qed.
 
@@ -337,7 +337,7 @@ Section UkPipesEntries.
     take NSTD sts !! 2%nat = Some (FdOpen rb2 true (FdDevice CONSOLE)) ->
     [] ∈ alts2 -> cat_dg_write ∈ alts2 ->
     UkRun.urun_nopipe sts -∗ udep -∗
-    image_entry ElfUser.cat_elf Mn (mword_of_int (t + 8) : mword 64) sts cw cs pidv Q
+    image_entry ElfUser.cat_elf Mn (mword_of_int (t + 8) : mword 64) sts cw ProcDefs.secc_all cs pidv Q
       (pns_copy_lend g LM PV CP v I sR lR L TERM TOK dep γc γm w2 A2 alts2 pin gin FCat (CSPipe pn gp) Q)
       uslot.
   Proof using HL31 Hadmit Hcons Hext Hsup HlR Hfc Hkill Hplok dep_tl pnsRegG0 ufdG0.
@@ -362,14 +362,14 @@ Section UkPipesEntries.
     take NSTD sts !! 1%nat = Some (FdOpen rb1 true (FdDevice CONSOLE)) ->
     take NSTD sts !! 2%nat = Some (FdOpen rb2 true (FdDevice CONSOLE)) ->
     UkRun.urun_nopipe sts -∗ udep -∗
-    image_entry ElfUser.cat_elf Mn (mword_of_int (t + 8) : mword 64) sts cw cs pidv Q
+    image_entry ElfUser.cat_elf Mn (mword_of_int (t + 8) : mword 64) sts cw ProcDefs.secc_all cs pidv Q
       (pns_copy_lend_m g LM PV CP v I sR lR L TERM TOK dep γc γm pin gin FCat (CSCon wL) Q) uslot.
   Proof using HL31 Hadmit Hcons Hext Hsup HlR Hfc Hkill Hplok dep_tl pnsRegG0 ufdG0.
     intros HQc Hok Hnode Hab Hfdl Hl0 Hl1 Hl2.
     iIntros "#Hnpw #Hdep".
     set (wv := fun d : nat => match d with O => PDMute | S _ => PDCopy (pin, gin) FCat (CSCon wL) end).
     rewrite /image_entry.
-    iIntros "!>" (na alen afun W') "%Hokk %Hcw %Hlz %Hch %Hpid %Hargs Hmp HPay".
+    iIntros "!>" (na alen afun W') "%Hokk %Hcw %Hlz %Hscw %Hch %Hpid %Hargs Hmp HPay".
     iApply uslot_bupd.
     iMod (pns_reg_alloc wv) as (γreg) "Hpool". iModIntro.
     set (If := fun (N' : uk_names Σ) (Hpq : ukn_pay N' = Q) =>
@@ -396,8 +396,8 @@ Section UkPipesEntries.
                 pin gin FCat (CSCon wL) (take NSTD sts) wb rb1 rb2 wv (fun _ => None)
                 eq_refl eq_refl eq_refl Hl0 Hl1 Hl2
                 with "Hstd Hpool Hlend"). }
-    iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] Hmp [Hpool HPay]");
-      [ exact Hokk | exact Hcw | exact Hlz | exact Hch | exact Hpid | exact Hargs | ].
+    iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] [%] Hmp [Hpool HPay]");
+      [ exact Hokk | exact Hcw | exact Hlz | exact Hscw | exact Hch | exact Hpid | exact Hargs | ].
     iFrame "Hpool HPay".
   Qed.
 
@@ -426,7 +426,7 @@ Section UkPipesEntries.
     take NSTD sts !! 2%nat = Some (FdOpen rb2 true (FdDevice CONSOLE)) ->
     GrepTree.grep_ok L -> [] ∈ alts2 ->
     UkRun.urun_nopipe sts -∗ udep -∗
-    image_entry ElfUser.grep_elf Mn (mword_of_int (t + 8) : mword 64) sts cw cs pidv Q
+    image_entry ElfUser.grep_elf Mn (mword_of_int (t + 8) : mword 64) sts cw ProcDefs.secc_all cs pidv Q
       (pns_copy_lend g LM PV CP v I sR lR L TERM TOK dep γc γm w2 A2 alts2 pin gin (FGrep wp) sk Q)
       uslot.
   Proof using HL31 Hadmit Hcons Hext Hsup HlR Hfc Hkill Hplok dep_tl pnsRegG0 ufdG0.
@@ -434,7 +434,7 @@ Section UkPipesEntries.
     iIntros "#Hnpw #Hdep".
     set (wv := fun d : nat => match d with O => PDCon w2 A2 | S _ => PDCopy (pin, gin) (FGrep wp) sk end).
     rewrite /image_entry.
-    iIntros "!>" (na alen afun W') "%Hokk %Hcw %Hlz %Hch %Hpid %Hargs Hmp HPay".
+    iIntros "!>" (na alen afun W') "%Hokk %Hcw %Hlz %Hscw %Hch %Hpid %Hargs Hmp HPay".
     iApply uslot_bupd.
     iMod (pns_reg_alloc wv) as (γreg) "Hpool". iModIntro.
     set (If := fun (N' : uk_names Σ) (Hpq : ukn_pay N' = Q) =>
@@ -461,8 +461,8 @@ Section UkPipesEntries.
                 w2 A2 alts2 pin gin (FGrep wp) sk (take NSTD sts) wb rb1 rb2 wv (fun _ => None)
                 eq_refl eq_refl eq_refl Hl0 Hl1 Hl2
                 with "Hstd Hpool Hlend"). }
-    iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] Hmp [Hpool HPay]");
-      [ exact Hokk | exact Hcw | exact Hlz | exact Hch | exact Hpid | exact Hargs | ].
+    iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] [%] Hmp [Hpool HPay]");
+      [ exact Hokk | exact Hcw | exact Hlz | exact Hscw | exact Hch | exact Hpid | exact Hargs | ].
     iFrame "Hpool HPay".
   Qed.
 
@@ -482,7 +482,7 @@ Section UkPipesEntries.
     take NSTD sts !! 2%nat = Some (FdOpen rb2 true (FdDevice CONSOLE)) ->
     GrepTree.grep_ok L -> [] ∈ alts2 ->
     UkRun.urun_nopipe sts -∗ udep -∗
-    image_entry ElfUser.grep_elf Mn (mword_of_int (t + 8) : mword 64) sts cw cs pidv Q
+    image_entry ElfUser.grep_elf Mn (mword_of_int (t + 8) : mword 64) sts cw ProcDefs.secc_all cs pidv Q
       (pns_copy_lend g LM PV CP v I sR lR L TERM TOK dep γc γm w2 A2 alts2 pin gin (FGrep wp)
          (CSPipe pn gp) Q)
       uslot.
@@ -506,14 +506,14 @@ Section UkPipesEntries.
     take NSTD sts !! 2%nat = Some (FdOpen rb2 true (FdDevice CONSOLE)) ->
     GrepTree.grep_ok L ->
     UkRun.urun_nopipe sts -∗ udep -∗
-    image_entry ElfUser.grep_elf Mn (mword_of_int (t + 8) : mword 64) sts cw cs pidv Q
+    image_entry ElfUser.grep_elf Mn (mword_of_int (t + 8) : mword 64) sts cw ProcDefs.secc_all cs pidv Q
       (pns_copy_lend_m g LM PV CP v I sR lR L TERM TOK dep γc γm pin gin (FGrep wp) (CSCon wL) Q) uslot.
   Proof using HL31 Hadmit Hcons Hext Hsup HlR Hfc Hkill Hplok dep_tl pnsRegG0 ufdG0.
     intros HQc Hok Hnode Hab Hfdl Hl0 Hl1 Hl2 HLg.
     iIntros "#Hnpw #Hdep".
     set (wv := fun d : nat => match d with O => PDMute | S _ => PDCopy (pin, gin) (FGrep wp) (CSCon wL) end).
     rewrite /image_entry.
-    iIntros "!>" (na alen afun W') "%Hokk %Hcw %Hlz %Hch %Hpid %Hargs Hmp HPay".
+    iIntros "!>" (na alen afun W') "%Hokk %Hcw %Hlz %Hscw %Hch %Hpid %Hargs Hmp HPay".
     iApply uslot_bupd.
     iMod (pns_reg_alloc wv) as (γreg) "Hpool". iModIntro.
     set (If := fun (N' : uk_names Σ) (Hpq : ukn_pay N' = Q) =>
@@ -541,8 +541,8 @@ Section UkPipesEntries.
                 pin gin (FGrep wp) (CSCon wL) (take NSTD sts) wb rb1 rb2 wv (fun _ => None)
                 eq_refl eq_refl eq_refl Hl0 Hl1 Hl2
                 with "Hstd Hpool Hlend"). }
-    iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] Hmp [Hpool HPay]");
-      [ exact Hokk | exact Hcw | exact Hlz | exact Hch | exact Hpid | exact Hargs | ].
+    iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] [%] Hmp [Hpool HPay]");
+      [ exact Hokk | exact Hcw | exact Hlz | exact Hscw | exact Hch | exact Hpid | exact Hargs | ].
     iFrame "Hpool HPay".
   Qed.
 End UkPipesEntries.

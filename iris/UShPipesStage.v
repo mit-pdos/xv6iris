@@ -244,7 +244,7 @@ Section UShPipesStage.
                   with "[] [] Hslot") as "#Hsup".
     { iIntros "!>" (M s1 t1 g1 sts cs pidv rb) "%Hi1 %Hb1 %Hl1 %Hr1 #Hnp".
       iApply (image_entry_pay_mono ElfUser.echo_elf M (mword_of_int (t1 + 8) : mword 64)
-                sts FsImg.ROOTINO cs pidv (fun _ : Z => QcR 0)
+                sts FsImg.ROOTINO ProcDefs.secc_all cs pidv (fun _ : Z => QcR 0)
                 (pns_echo_lend LM CP L γc γm (P 0) γp (fun _ : Z => QcR 0)) Cr uslot
                 with "[] [Hnp]").
       - iIntros "!> (Hw & HsL & Hcw & Hmw)". rewrite /pns_echo_lend.
@@ -417,7 +417,7 @@ Section UShPipesStage.
     take NSTD sts !! 2%nat = Some (FdOpen rb2 true (FdDevice ConsoleInv.CONSOLE)) ->
     fok F L ->
     UkRun.urun_nopipe sts -∗
-    image_entry (filt_elf F) M (mword_of_int (t1 + 8) : mword 64) sts FsImg.ROOTINO cs pidv Q
+    image_entry (filt_elf F) M (mword_of_int (t1 + 8) : mword 64) sts FsImg.ROOTINO ProcDefs.secc_all cs pidv Q
       (pns_copy_lend g LM PV CP v I sR lR L termw TOKN pdepR γc γm w2 (mid_alts F) (mid_alts F)
          pin gin F (CSPipe pn gp) Q) uslot.
   Proof using HL31 Hadmit Hcons Hext Hsup HlR Hfc Hkill Hplok pnsRegG0 ufdG0.
@@ -452,7 +452,7 @@ Section UShPipesStage.
     take NSTD sts !! 2%nat = Some (FdOpen rb2 true (FdDevice ConsoleInv.CONSOLE)) ->
     fok F L ->
     UkRun.urun_nopipe sts -∗
-    image_entry (filt_elf F) M (mword_of_int (t1 + 8) : mword 64) sts FsImg.ROOTINO cs pidv Q
+    image_entry (filt_elf F) M (mword_of_int (t1 + 8) : mword 64) sts FsImg.ROOTINO ProcDefs.secc_all cs pidv Q
       (pns_copy_lend_m g LM PV CP v I sR lR L termw TOKN pdepR γc γm pin gin F (CSCon wL) Q) uslot.
   Proof using HL31 Hadmit Hcons Hext Hsup HlR Hfc Hkill Hplok pnsRegG0 ufdG0.
     intros HQ Hok Hi Hb Hl Hr0 Hr1 Hr2 Hfok. iIntros "#Hnp".
@@ -558,7 +558,7 @@ Section UShPipesStage.
     { iIntros "!>" (M s1 t1 g1 sts cs pidv) "%Hi1 %Hb1 %Hl1 %Hf1 #Hnp".
       destruct Hf1 as ([wb Hr0] & [rb1 Hr1] & [rb2 Hr2]).
       iApply (image_entry_pay_mono (filt_elf F) M (mword_of_int (t1 + 8) : mword 64)
-                sts FsImg.ROOTINO cs pidv (fun _ : Z => QcR (S k'))
+                sts FsImg.ROOTINO ProcDefs.secc_all cs pidv (fun _ : Z => QcR (S k'))
                 (pns_copy_lend g LM PV CP v I sR lR L termw TOKN pdepR γc γm (WLeft (S k'))
                    (mid_alts F) (mid_alts F) (P k') gin F (CSPipe (P (S k')) γp) (fun _ : Z => QcR (S k')))
                 Cr uslot
@@ -708,7 +708,7 @@ Section UShPipesStage.
     { iIntros "!>" (M s1 t1 g1 sts cs pidv) "%Hi1 %Hb1 %Hl1 %Hf1 #Hnp".
       destruct Hf1 as ([wb Hr0] & [rb1 Hr1] & [rb2 Hr2]).
       iApply (image_entry_pay_mono (filt_elf F) M (mword_of_int (t1 + 8) : mword 64)
-                sts FsImg.ROOTINO cs pidv (fun _ : Z => QcR m)
+                sts FsImg.ROOTINO ProcDefs.secc_all cs pidv (fun _ : Z => QcR m)
                 (pns_copy_lend_m g LM PV CP v I sR lR L termw TOKN pdepR γc γm (P m) γp F (CSCon WLast)
                    (fun _ : Z => QcR m)) Cr uslot
                 with "[] [Hnp]").

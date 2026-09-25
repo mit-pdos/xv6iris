@@ -175,11 +175,11 @@ Require FsImg.
 (* [ush_rest_l] at the arity every file that discharges them already uses.  *)
 (* ===================================================================== *)
 (* THE BASE OF SH'S OWN "console" LITERAL, NAMED ONCE (lane SH-OPEN, ruling
-   (D)).  0x8f8's [auipc s2,0x1] and 0x8fc's [addi s2,s2,-1408] compute it
+   (D)).  0x8f8's [auipc s2,0x1] and 0x8fc's [addi s2,s2,-1392] compute it
    into s2, 0x902's [c.mv a0,s2] passes it, and the eight bytes there are
-   "console\0" ([user-rocq/ShData.v], .rodata 0x1280..0x13d9, inside
-   [UCodeShK.shk_ro] since 0x1378 < 0x2000).  /init's twin is 0x970. *)
-Definition sh_cons_pv : Z := 0x1378.
+   "console\0" ([user-rocq/ShData.v], .rodata 0x1288..0x13e9, inside
+   [UCodeShK.shk_ro] since 0x1388 < 0x2000).  /init's twin is 0x980. *)
+Definition sh_cons_pv : Z := 0x1388.
 
 Definition ush_fd0p (l : list fdstate) : Prop :=
   (exists wr : bool, l !! 0%nat = Some (FdOpen true wr (FdDevice CONSOLE)))
@@ -255,12 +255,12 @@ Qed.
 (* (lane IO-LEAF, M4a).                                                   *)
 (*                                                                        *)
 (* getcmd's [write(2, "$ ", 2)] at 0x10..0x1c takes its buffer out of sh's *)
-(* OWN .rodata: 0x12's [auipc a1,0x1] and 0x16's [addi a1,a1,622] compute  *)
-(* 0x1280, and the two bytes there are "$ " ([UCodeShK.shk_ro]).  The      *)
+(* OWN .rodata: 0x12's [auipc a1,0x1] and 0x16's [addi a1,a1,638] compute  *)
+(* 0x1290, and the two bytes there are "$ " ([UCodeShK.shk_ro]).  The      *)
 (* address is named here because the walk needs it in a REGISTER fact and  *)
 (* the payment ([UShOut.ksh_w_of_link_prompt]) needs it in a statement.    *)
 (* ===================================================================== *)
-Definition sh_prompt_pv : Z := 0x1280.
+Definition sh_prompt_pv : Z := 0x1290.
 
 (* ...AND THE ROW: sh's fd 2 IS the console.  PURE, for [ush_fd0p]'s       *)
 (* reason -- it is what the command loop carries -- and preserved by the   *)
@@ -688,25 +688,25 @@ Proof.
 Qed.
 
 
-(* THE JUMP TABLE at 0x1398 (.rodata), read as six SIGNED 32-bit
+(* THE JUMP TABLE at 0x13a8 (.rodata), read as six SIGNED 32-bit
    displacements from the table's own base.  The six values are the dump's
-   ([user-rocq/ShData.v], 0x1398..0x13af); the arm each one names is
+   ([user-rocq/ShData.v], 0x13a8..0x13bf); the arm each one names is
    [ush_jarm] below and every one of those is checked by [vm_compute]
    against the pc the walk actually continues at. *)
-Definition SH_JTAB : Z := 0x1398.
+Definition SH_JTAB : Z := 0x13a8.
 
 Definition ush_jent (k : Z) : mword 32 :=
   mword_of_int
-    (if Z.eqb k 1 then 0xffffed36
-     else if Z.eqb k 2 then 0xffffed5e
-     else if Z.eqb k 3 then 0xffffeda4
-     else if Z.eqb k 4 then 0xffffed8c
-     else if Z.eqb k 5 then 0xffffee2c
-     else 0xffffed2a).
+    (if Z.eqb k 1 then 0xffffed26
+     else if Z.eqb k 2 then 0xffffed4e
+     else if Z.eqb k 3 then 0xffffed94
+     else if Z.eqb k 4 then 0xffffed7c
+     else if Z.eqb k 5 then 0xffffee1c
+     else 0xffffed1a).
 
 (* ...AND THE TABLE'S TWENTY BYTES ARE IN SH'S OWN .rodata, which is what
    lets the ENTRY pay [ush_jtab] instead of a caller carrying it (lane
-   SH-LINE 2b, (b)).  0x1398 is below 0x2000, so it is inside
+   SH-LINE 2b, (b)).  0x13a8 is below 0x2000, so it is inside
    [UCodeShK.shk_ro]; the check is one [vm_compute] on the dump, in the
    [forallb]-over-[seq] shape [UShConsK.sh_cons_ro_bytes_bool] uses for
    sh's "console" literal. *)
@@ -1098,6 +1098,9 @@ Section UkSh.
     (* ...and chdir, the one row that moves the working directory, which
        [urun] carries the process's own authority over *)
     n <> USYS_chdir ->
+    (* ...and a number the full mask passes, not seccomp's
+       ([UkRunSys.wp_uk_ecall_quiet]'s two new rows) *)
+    (0 <= n < 64)%Z -> n <> USYS_seccomp ->
     add_vec_int (mword_of_int pc0 : mword 64) 2 = mword_of_int pc1 ->
     add_vec_int (mword_of_int pc1 : mword 64) 4 = mword_of_int pc2 ->
     is_aligned_vaddr (Virtaddr (mword_of_int pc2 : mword 64)) 2 = true ->
@@ -1120,7 +1123,7 @@ Section UkSh.
        mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
-    intros Himm Hno He Hf Hx Hs Hw Hp Hr Hst Hcl Hdp Hop Hcd E01 E12 Hal2.
+    intros Himm Hno He Hf Hx Hs Hw Hp Hr Hst Hcl Hdp Hop Hcd Hrng Hn23 E01 E12 Hal2.
     iIntros "#Hdp #Ci0 #Ci1 #Ci2 Hrun Hcont".
     (* ---- pc0  c.li a7,n ---- *)
     iApply (wp_uk_cli N h m (mword_of_int pc0) imm a7_idx avail
@@ -1134,7 +1137,7 @@ Section UkSh.
     set (m1 := <[Regidx a7_idx := (mword_of_int n : mword 64)]> m).
     (* ---- pc1  ecall -- the QUIET row ---- *)
     iApply (wp_uk_ecall_quiet N h1 m1 (mword_of_int pc1) n avail
-              Hno He Hf Hx Hs Hw Hp Hr Hst Hcl Hdp Hop Hcd
+              Hno He Hf Hx Hs Hw Hp Hr Hst Hcl Hdp Hop Hcd Hrng Hn23
               ltac:(rewrite E12; exact Hal2)
               with "Ci1 Hrun []").
     (* THE FLAGGED DEPOSIT, at this stub's own number: its one caller is
@@ -1355,6 +1358,7 @@ Section UkSh.
               (* ...and the three descriptor-moving numbers, and chdir *)
               ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
               ltac:(discriminate)
+              ltac:(lia) ltac:(discriminate)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
@@ -1468,7 +1472,7 @@ Section UkSh.
   (* ...AND THE SAME STUB WITH THE SOURCE RUN IN THE TEXT HALF (lane
      TXT-ROW's leaf, at sh; [UkEcho.wp_kecho_write_chain_txt] is the twin).
 
-     EVERY LITERAL SH WRITES IS .rodata: the prompt "$ " at 0x1338, the
+     EVERY LITERAL SH WRITES IS .rodata: the prompt "$ " at 0x1348, the
      three panic strings, the two "%s" formats.  A .rodata run is filed
      under [UkRun.ukn_t] and its pages are X-and-NOT-W, so
      [UserHeap.uheap_ubytes_w] -- which is what [wp_ksh_write_chain] hands
@@ -6136,9 +6140,9 @@ Section UkSh.
                     n6 !!! Regidx r = n5 !!! Regidx r)
       by (intros r Hr; exact (upd_ne n5 (Regidx a1_idx) (Regidx r) _ Hr)).
     iApply (wp_uk_addi N h10 n6 (mword_of_int 0x16)
-              (mword_of_int 622 : mword 12) a1_idx a1_idx
+              (mword_of_int 638 : mword 12) a1_idx a1_idx
               (add_vec (n6 !!! Regidx a1_idx)
-                 (sign_extend' 64 (mword_of_int 622 : mword 12))) (12 + nn)
+                 (sign_extend' 64 (mword_of_int 638 : mword 12))) (12 + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) eq_refl
               with "[] Hrun").
@@ -6151,7 +6155,7 @@ Section UkSh.
                  := regval_into_reg
                       (add_vec (n6 !!! Regidx a1_idx)
                          (sign_extend' 64
-                            (mword_of_int 622 : mword 12)))]> n6).
+                            (mword_of_int 638 : mword 12)))]> n6).
     assert (Hn7 : forall r : mword 5, Regidx r <> Regidx a1_idx ->
                     n7 !!! Regidx r = n6 !!! Regidx r)
       by (intros r Hr; exact (upd_ne n6 (Regidx a1_idx) (Regidx r) _ Hr)).
@@ -6227,7 +6231,7 @@ Section UkSh.
         [ exact (upd_eq n6 (Regidx a1_idx)
                    (regval_into_reg
                       (add_vec (n6 !!! Regidx a1_idx)
-                         (sign_extend' 64 (mword_of_int 622 : mword 12))))) | ].
+                         (sign_extend' 64 (mword_of_int 638 : mword 12))))) | ].
       rewrite Ha1_6. apply bv_eq; vm_compute; reflexivity. }
     iApply ("Hw" $! h13 n9 (12 + nn)%nat with "[%] [%] [%] Hcode Hstd Hrun").
     { exact Ha0_9. }
@@ -7040,7 +7044,7 @@ Section UkSh.
   (* over the abstract pieces and DISCHARGED at the era, where the pin      *)
   (* lives.  The difference from /init's is only in the ADDRESSES: sh's     *)
   (* stub is at [ShSyms.open] (0xcc6) and its "console" literal is the      *)
-  (* eight bytes at 0x1378 in its own .rodata ([UCodeShK.shk_ro]), which    *)
+  (* eight bytes at 0x1388 in its own .rodata ([UCodeShK.shk_ro]), which    *)
   (* 0x8f8/0x8fc compute into s2 and 0x902 moves into a0.                   *)
   (*                                                                       *)
   (*   [T]  THE TAINT, exactly [ush_fd0]'s third arm.                       *)
@@ -7070,7 +7074,7 @@ Section UkSh.
     (∀ (h : CpuId) (m : regfile) (l : list fdstate) (avail : nat),
        shk_code γt -∗
        (* the read-only image and the two argument words: a0 = "console" at
-          0x1378, a1 = O_RDWR.  The preamble holds both at 0x904
+          0x1388, a1 = O_RDWR.  The preamble holds both at 0x904
           ([wp_ksh_console]'s walk from 0x900). *)
        shk_rodata γt -∗
        ⌜ m !!! Regidx a0_idx = (mword_of_int sh_cons_pv : mword 64)
@@ -7439,7 +7443,7 @@ Section UkSh.
        utext g (SH_JTAB + 4 * k + Z.of_nat j) (nth_byte (ush_jent k) j))%I.
 
   (* ...AND SH'S READ-ONLY IMAGE BESIDE THEM.  The jump table IS .rodata
-     (0x1398 is inside [ShData.sh_data]), so the two belong together, and
+     (0x13a8 is inside [ShData.sh_data]), so the two belong together, and
      what makes it worth saying is the DIAGNOSTIC CUT below: every site that
      reaches sh's printer needs the three format strings, which are .rodata
      too, and every one of those sites already carries [ush_jtab] -- through
@@ -8751,7 +8755,7 @@ Section UkSh.
     assert (HraC : mC !!! Regidx ra_idx = mword_of_int 0x908)
       by exact (upd_eq mB (Regidx ra_idx) (mword_of_int 0x908 : mword 64)).
     (* THE TWO ARGUMENT WORDS THE PINNED OPEN IS ABOUT: a0 is the address
-       of sh's own "console" literal (0x1378, [UCodeShK.shk_ro]) and a1 is
+       of sh's own "console" literal (0x1388, [UCodeShK.shk_ro]) and a1 is
        O_RDWR.  Both are read off the two [c.mv]s just walked. *)
     assert (Hs2A : mA !!! Regidx s2_idx = (mword_of_int sh_cons_pv : mword 64)).
     { rewrite /mA (upd_ne m (Regidx a1_idx) (Regidx s2_idx) _
@@ -9186,11 +9190,11 @@ Section UkSh.
                  := regval_into_reg
                       (add_vec (mword_of_int 0x8f8 : mword 64)
                          (auipc_off (mword_of_int 1 : mword 20)))]> mC).
-    (* ---- 0x8fc  addi s2,s2,-1408  (&"console") ---- *)
+    (* ---- 0x8fc  addi s2,s2,-1392  (&"console") ---- *)
     iApply (wp_uk_addi N hd mD (mword_of_int 0x8fc)
-              (mword_of_int 2688 : mword 12) s2_idx s2_idx
+              (mword_of_int 2704 : mword 12) s2_idx s2_idx
               (add_vec (mD !!! Regidx s2_idx)
-                 (sign_extend' 64 (mword_of_int 2688 : mword 12))) n
+                 (sign_extend' 64 (mword_of_int 2704 : mword 12))) n
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) eq_refl
               with "[] Hrun").
@@ -9216,9 +9220,9 @@ Section UkSh.
       rewrite /mC (upd_eq mB (Regidx s1_idx) _).
       apply bv_eq; vm_compute; reflexivity.
     - (* ...and s2 is the address of sh's own "console" literal, off the
-         auipc/addi pair at 0x8f8/0x8fc: 0x8f8 + 0x1000 - 1408 = 0x1378
+         auipc/addi pair at 0x8f8/0x8fc: 0x8f8 + 0x1000 - 1392 = 0x1388
          ([ShData.sh_data] has "console\0" there, inside [UCodeShK.shk_ro]
-         since 0x1378 < 0x2000). *)
+         since 0x1388 < 0x2000). *)
       iPureIntro.
       rewrite (upd_eq mD (Regidx s2_idx) _).
       rewrite /mD (upd_eq mC (Regidx s2_idx) _).
@@ -9246,7 +9250,7 @@ Section UkSh.
        produce ([ush_rest_l]'s header) *)
     ush_jtab γt -∗
     (* sh's own READ-ONLY IMAGE, which the pinned open needs: the path is a
-       string in it ([UCodeShK.shk_ro] at 0x1378). *)
+       string in it ([UCodeShK.shk_ro] at 0x1388). *)
     shk_rodata γt -∗
     (* ...AND THE TAINT'S CONTINUATION.  sh's console open is PINNED, so at
        the taint there is no bundle to pay it with -- the preamble does not

@@ -97,11 +97,11 @@ Proof. lia. Qed.
 (* the two &pid_lock relocations (auipc a0,0x11 + addi), at +0x2a and +0x3a *)
 Lemma fr_pidlk_reloc1 :
   add_vec (add_vec (mword_of_int (KernelSyms.freeproc + 0x2a) : mword 64) (auipc_off (mword_of_int 17 : mword 20)))
-          (sign_extend' 64 (mword_of_int 2284 : mword 12)) = alp_pid_lock.
+          (sign_extend' 64 (mword_of_int 2332 : mword 12)) = alp_pid_lock.
 Proof. rewrite /alp_pid_lock. apply bv_eq; vm_compute; reflexivity. Qed.
 Lemma fr_pidlk_reloc2 :
   add_vec (add_vec (mword_of_int (KernelSyms.freeproc + 0x3a) : mword 64) (auipc_off (mword_of_int 17 : mword 20)))
-          (sign_extend' 64 (mword_of_int 2268 : mword 12)) = alp_pid_lock.
+          (sign_extend' 64 (mword_of_int 2316 : mword 12)) = alp_pid_lock.
 Proof. rewrite /alp_pid_lock. apply bv_eq; vm_compute; reflexivity. Qed.
 Lemma fr_lka (B : regfile) :
   B !!! Regidx (mword_of_int 10 : mword 5) = alp_pid_lock ->
@@ -254,7 +254,7 @@ Section ProofFreeproc.
     iMod (pstate_whole_update (proc_addr j) st UNUSED with "Hpsg") as "Hpsg".
     iModIntro.
     iDestruct "Hpub" as (kl xs pid2) "(Hkilled & Hxstate & Hpid2 & Hkrow)".
-    iDestruct "Hfields" as "(Hsz & Hcwd & %Hnmlen & Hnm)".
+    iDestruct "Hfields" as "(Hsz & Hcwd & %Hnmlen & Hnm & Hsecc)".
     (* [proc_held] is stated at [proc_addr j] and the block at the [let]-bound
        [pa].  Convertible, but [iFrame]/[iSpecialize] want them SYNTACTICALLY
        equal, so fold once here and unfold once at the hand-back. *)
@@ -420,7 +420,7 @@ Section ProofFreeproc.
         p_sz pa ↦₈ pv_sz V -∗
         mWP (Loop : expr riscv_lang)))%I
       with "[Hcont Hr24 Hr16 Hr8 Hr0 Hlk Hstate Hpsg Hchan Hkilled Hxstate Hpid Hpid2
-             Hcwd Hnm Hof Hunits Hspare Hkst Hctx Hrow Hsg Hpr Hkrow]" as "ZERO".
+             Hcwd Hnm Hsecc Hof Hunits Hspare Hkst Hctx Hrow Hsg Hpr Hkrow]" as "ZERO".
     { iIntros (CIDz Hsz0 me pgv).
       iIntros "(%Hmesp & %Hmes1 & %Hmethr) Hcg Hcpu Hpc Hpg Htf Hsz".
       (* release below spells the window index at its own exit arm; the two
@@ -470,16 +470,16 @@ Section ProofFreeproc.
       assert (Hq2e : add_vec_int (mword_of_int (FR + 0x2a) : mword 64) 4 = mword_of_int (FR + 0x2e))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hq2e) in "Hpc".
-      iApply (wp_addi4_s_sconf (mword_of_int (FR + 0x2e)) Ra0 Ra0 (mword_of_int 2284 : mword 12)
+      iApply (wp_addi4_s_sconf (mword_of_int (FR + 0x2e)) Ra0 Ra0 (mword_of_int 2332 : mword 12)
                 Z1 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc []").
       { iApply (fri_2e with "Htext"). }
       iIntros (CIDz3b Hsz3b) "Hcg Hpc".
       iEval (rgne) in "Hcg".
       set (Z2 := <[Regidx Ra0 := regval_into_reg
-          (add_vec (Z1 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 2284 : mword 12)))]> Z1).
+          (add_vec (Z1 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 2332 : mword 12)))]> Z1).
       change (<[Regidx Ra0 := regval_into_reg
-          (add_vec (Z1 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 2284 : mword 12)))]> Z1) with Z2.
+          (add_vec (Z1 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 2332 : mword 12)))]> Z1) with Z2.
       assert (Hq32 : add_vec_int (mword_of_int (FR + 0x2e) : mword 64) 4 = mword_of_int (FR + 0x32))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hq32) in "Hpc".
@@ -617,16 +617,16 @@ Section ProofFreeproc.
       assert (Hq3e : add_vec_int (mword_of_int (FR + 0x3a) : mword 64) 4 = mword_of_int (FR + 0x3e))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hq3e) in "Hpc".
-      iApply (wp_addi4_s_sconf (mword_of_int (FR + 0x3e)) Ra0 Ra0 (mword_of_int 2268 : mword 12)
+      iApply (wp_addi4_s_sconf (mword_of_int (FR + 0x3e)) Ra0 Ra0 (mword_of_int 2316 : mword 12)
                 Y1 (trap_res false + (K - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc []").
       { iApply (fri_3e with "Htext"). }
       iApply wp_next_off_intro. iIntros "Hcg Hpc".
       iEval (rgne) in "Hcg".
       set (Y2 := <[Regidx Ra0 := regval_into_reg
-          (add_vec (Y1 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 2268 : mword 12)))]> Y1).
+          (add_vec (Y1 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 2316 : mword 12)))]> Y1).
       change (<[Regidx Ra0 := regval_into_reg
-          (add_vec (Y1 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 2268 : mword 12)))]> Y1) with Y2.
+          (add_vec (Y1 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 2316 : mword 12)))]> Y1) with Y2.
       assert (Hq42 : add_vec_int (mword_of_int (FR + 0x3e) : mword 64) 4 = mword_of_int (FR + 0x42))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hq42) in "Hpc".
@@ -854,7 +854,7 @@ Section ProofFreeproc.
       iEval (rewrite -Hxhalf2 ctx_word4_pointsto_frac_split) in "Hxstate".
       iDestruct "Hxstate" as "[Hxs1 Hxs2]".
       iApply ("Hcont" $! E3 with "Hcg Hcpu Hpc [%] [Hlk Hstate Hpsg Hchan Hkilled Hxs1 Hpid2]
-                                  [Hpid Hsz Hcwd Hnm Hof Hunits Hspare Hkst Hctx Hrow Hsg Hxs2 Hpg Htf]").
+                                  [Hpid Hsz Hcwd Hnm Hsecc Hof Hunits Hspare Hkst Hctx Hrow Hsg Hxs2 Hpg Htf]").
       { (* callee_saved mm E3 *)
         assert (HE3thr : fr_thr mm E3).
         { thr_done. }
@@ -898,17 +898,17 @@ Section ProofFreeproc.
                            (* the parked block is DORMANT, so its lazy bit
                               is [true] -- raising it is free, the claim at
                               [true] promises nothing (lane LAZY-FLAG, K2) *)
-                           (pv_cwi V) g (pv_chg V) true)
+                           (pv_cwi V) g (pv_chg V) true (pv_secc V))
                   (mword_of_int 0 : mword 32) (pv_sz V) (mword_of_int 0 : mword 32)
                   ltac:(vm_compute; reflexivity) ltac:(reflexivity)
-                  with "[Hpid Hsz Hcwd Hnm Hof Hunits Hspare Hkst Hctx] [Hrow] [Hsg] [Hxs2] [Hpg] [Htf]").
-        - rewrite /fp_rest. cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_cwi pv_gen pv_chg pv_lazy].
+                  with "[Hpid Hsz Hcwd Hnm Hsecc Hof Hunits Hspare Hkst Hctx] [Hrow] [Hsg] [Hxs2] [Hpg] [Htf]").
+        - rewrite /fp_rest. cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_cwi pv_gen pv_chg pv_lazy pv_secc].
           iSplitR.
           { iPureIntro. split_and!; [exact Hofv | exact Hcwdv |].
             rewrite uint_unsigned. unfold uvm_maxsz. vm_compute. discriminate. }
           iFrame "Hpid Hof Hunits Hspare Hkst Hctx".
-          rewrite /proc_fields. cbn [pv_sz pv_cwd pv_name pv_fdg].
-          iFrame "Hsz Hcwd".
+          rewrite /proc_fields. cbn [pv_sz pv_cwd pv_name pv_fdg pv_secc].
+          iFrame "Hsz Hcwd Hsecc".
           iSplitR. { iPureIntro. apply fr_name_len. exact Hnmlen. }
           rewrite /pname_cells. iExact "Hnm".
         (* the row's key is [pv_chg], which the emptied block keeps *)

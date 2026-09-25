@@ -1196,19 +1196,19 @@ Qed.
 
 (* ---- 5c.  ...SO ITS ROW IS NOT A PINNED BINARY'S --------------------- *)
 
-Lemma init_bytes_length : Z.of_nat (length init_bytes) = 35976.
+Lemma init_bytes_length : Z.of_nat (length init_bytes) = 36024.
 Proof using . exact ElfUser.init_elf_length. Qed.
 
-Lemma sh_bytes_length : Z.of_nat (length sh_bytes) = 58312.
+Lemma sh_bytes_length : Z.of_nat (length sh_bytes) = 58360.
 Proof using . exact ElfUser.sh_elf_length. Qed.
 
-Lemma echo_bytes_length : Z.of_nat (length echo_bytes) = 35592.
+Lemma echo_bytes_length : Z.of_nat (length echo_bytes) = 35640.
 Proof using . exact ElfUser.echo_elf_length. Qed.
 
-Lemma cat_bytes_length : Z.of_nat (length cat_bytes) = 36728.
+Lemma cat_bytes_length : Z.of_nat (length cat_bytes) = 36776.
 Proof using . exact ElfUser.cat_elf_length. Qed.
 
-Lemma grep_bytes_length : Z.of_nat (length grep_bytes) = 44440.
+Lemma grep_bytes_length : Z.of_nat (length grep_bytes) = 44496.
 Proof using . exact ElfUser.grep_elf_length. Qed.
 
 (* THE ROW'S CONTENT LENGTH, WITHOUT [injection].  Two rows at one inum

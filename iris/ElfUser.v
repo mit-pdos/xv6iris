@@ -10,7 +10,8 @@
    the leaf-by-design rule (NOTHING IMPORTS THIS FILE, and nothing should)
    are all identical here and are not repeated.  This file is the same
    theorem set six more times, for the six verified user programs:
-   [sync], [echo], [sh], [init], [cat], [grep].
+   [sync], [echo], [sh], [init], [cat], [grep] -- and a seventh time for
+   [seccomp], the binary the seccomp round execs (inum 23).
 
    WHAT IS NEW HERE, AND WHY IT IS WORTH FOUR MORE INSTANCES.  These are
    not just four more binaries: their SHAPES exercise parts of the general
@@ -72,7 +73,8 @@ From User Require Import
   ShElfRaw   ShInstrs   ShData
   InitElfRaw InitInstrs InitData
   CatElfRaw  CatInstrs  CatData
-  GrepElfRaw GrepInstrs GrepData.
+  GrepElfRaw GrepInstrs GrepData
+  SeccompElfRaw SeccompInstrs SeccompData.
 
 Local Open Scope Z_scope.
 
@@ -104,7 +106,7 @@ Local Ltac vm_eq :=
 (* ====================================================================== *)
 (*  sync                                                                  *)
 (*                                                                        *)
-(*  entry 0x12; loads (0x0, 0xd44, 0xd44, R-X) and                        *)
+(*  entry 0x12; loads (0x0, 0xd54, 0xd54, R-X) and                        *)
 (*  (0x1000, 0x0, 0x20, RW-) -- the pure-bss writable segment.            *)
 (* ====================================================================== *)
 (* ====================================================================== *)
@@ -185,7 +187,7 @@ Qed.
 (*  The zero part (.bss), and the full loaded image                        *)
 (* ---------------------------------------------------------------------- *)
 
-(* Text is (vaddr 0x0, filesz 0xd44, memsz 0xd44): filesz = memsz, so its
+(* Text is (vaddr 0x0, filesz 0xd54, memsz 0xd54): filesz = memsz, so its
    zero window is EMPTY.  The whole .bss is the writable segment's
    (vaddr 0x1000, filesz 0x0, memsz 0x20), i.e. [0x1000, 0x1020).  Both
    literals are [Z]: [replicate] wants a [nat], but a [nat] LITERAL of 32
@@ -239,7 +241,7 @@ Proof. rewrite sync_elf_image, sync_elf_zero_image. reflexivity. Qed.
 (* ====================================================================== *)
 (*  echo                                                                  *)
 (*                                                                        *)
-(*  Same shape as [sync]: entry 0x7c; loads (0x0, 0xdcc, 0xdcc, R-X) and  *)
+(*  Same shape as [sync]: entry 0x7c; loads (0x0, 0xddc, 0xddc, R-X) and  *)
 (*  (0x1000, 0x0, 0x20, RW-) -- again a pure-bss writable segment.        *)
 (* ====================================================================== *)
 (* ====================================================================== *)
@@ -327,7 +329,7 @@ Proof. rewrite echo_elf_image, echo_elf_zero_image. reflexivity. Qed.
 (* ====================================================================== *)
 (*  sh                                                                    *)
 (*                                                                        *)
-(*  The interesting one: entry 0x9d0; loads (0x0, 0x1c54, 0x1c54, R-X)    *)
+(*  The interesting one: entry 0x9d0; loads (0x0, 0x1c64, 0x1c64, R-X)    *)
 (*  and (0x2000, 0x10, 0x98, RW-).  The writable segment has a NONEMPTY   *)
 (*  file window (0x10 bytes of .data) AND a .bss tail, so BOTH legs of    *)
 (*  [seg_map] are nonempty for it and both segments contribute to         *)
@@ -366,7 +368,7 @@ Lemma sh_elf_rodata_end :
   elf_rodata_end sh_elf = Some ShData.shRodataEnd.
 Proof. vm_eq. Qed.
 
-(* Here the fold really is over two nonempty file windows: [0x0, 0x1c54)
+(* Here the fold really is over two nonempty file windows: [0x0, 0x1c64)
    from the text segment and [0x2000, 0x2010) from the writable one.  The
    dump's split puts the latter entirely in [sh_data] (whose top is
    0x2010), so this equality checks the [∪] across segments too. *)
@@ -423,7 +425,7 @@ Proof. rewrite sh_elf_image, sh_elf_zero_image. reflexivity. Qed.
 (* ====================================================================== *)
 (*  init                                                                  *)
 (*                                                                        *)
-(*  entry 0xbc; loads (0x0, 0xe6c, 0xe6c, R-X) and                        *)
+(*  entry 0xbc; loads (0x0, 0xe7c, 0xe7c, R-X) and                        *)
 (*  (0x1000, 0x10, 0x30, RW-) -- like [sh], .data then .bss above it.     *)
 (* ====================================================================== *)
 (* ====================================================================== *)
@@ -696,3 +698,103 @@ Lemma grep_elf_image_concrete :
   = (GrepInstrs.grep_bytes ∪ GrepData.grep_data)
     ∪ map_seqZ grep_bss_lo (replicate (Z.to_nat grep_bss_size) elf_zero_byte).
 Proof. rewrite grep_elf_image, grep_elf_zero_image. reflexivity. Qed.
+
+(* ====================================================================== *)
+(* ====================================================================== *)
+(*  seccomp                                                               *)
+(*                                                                        *)
+(*  cat's shape again: entry 0x96; loads (0x0, 0xe5c, 0xe5c, R-X) and     *)
+(*  (0x1000, 0x0, 0x20, RW-) -- a pure-bss writable segment holding       *)
+(*  malloc's [freep] and [base].                                          *)
+(*                                                                        *)
+(*  WHY THE SEVENTH PROGRAM IS HERE.  The seccomp round execs /seccomp    *)
+(*  (claude-notes/design/seccomp.md), and [FsImgCheck.v] pins the image's *)
+(*  inum-23 bytes to this tracked raw.                                    *)
+(* ====================================================================== *)
+(* ====================================================================== *)
+
+Definition seccomp_elf : elf_bytes :=
+  pstring_hex_bytes SeccompElfRaw.seccomp_elf_hex.
+Global Typeclasses Opaque seccomp_elf.
+
+Lemma seccomp_elf_length :
+  Z.of_nat (length seccomp_elf) = SeccompElfRaw.seccomp_elf_size.
+Proof.
+  unfold seccomp_elf. rewrite pstring_hex_bytes_length. vm_compute. reflexivity.
+Qed.
+
+Lemma seccomp_elf_wf : elf_wf seccomp_elf = true.
+Proof. vm_eq. Qed.
+
+Lemma seccomp_elf_sections_wf : elf_sections_wf seccomp_elf = true.
+Proof. vm_eq. Qed.
+
+Lemma seccomp_elf_entry : elf_entry seccomp_elf = Some SeccompData.seccompEntry.
+Proof. vm_eq. Qed.
+
+Lemma seccomp_elf_segments :
+  elf_segments seccomp_elf = Some SeccompData.seccomp_segments.
+Proof. vm_eq. Qed.
+
+Lemma seccomp_elf_base :
+  elf_mem_base seccomp_elf = Some SeccompData.seccompMemBase.
+Proof. vm_eq. Qed.
+
+Lemma seccomp_elf_end : elf_mem_end seccomp_elf = Some SeccompData.seccompMemEnd.
+Proof. vm_eq. Qed.
+
+Lemma seccomp_elf_rodata_end :
+  elf_rodata_end seccomp_elf = Some SeccompData.seccompRodataEnd.
+Proof. vm_eq. Qed.
+
+Lemma seccomp_elf_file_image_bool :
+  bool_decide (elf_file_image seccomp_elf
+               = SeccompInstrs.seccomp_bytes ∪ SeccompData.seccomp_data) = true.
+Proof. vm_eq. Qed.
+
+Lemma seccomp_elf_file_image :
+  elf_file_image seccomp_elf
+  = SeccompInstrs.seccomp_bytes ∪ SeccompData.seccomp_data.
+Proof.
+  pose proof seccomp_elf_file_image_bool as H.
+  apply bool_decide_eq_true_1 in H. exact H.
+Qed.
+
+(* Writable segment (vaddr 0x1000, filesz 0x0, memsz 0x20): .bss is
+   [0x1000, 0x1020), and the text segment's zero window is empty. *)
+Definition seccomp_bss_lo : Z := 0x1000.
+Definition seccomp_bss_size : Z := 32.   (* 0x20 = memsz - filesz *)
+
+Lemma seccomp_elf_zero_image_bool :
+  bool_decide (elf_zero_image seccomp_elf
+               = map_seqZ seccomp_bss_lo
+                   (replicate (Z.to_nat seccomp_bss_size) elf_zero_byte)) = true.
+Proof. vm_eq. Qed.
+
+Lemma seccomp_elf_zero_image :
+  elf_zero_image seccomp_elf
+  = map_seqZ seccomp_bss_lo (replicate (Z.to_nat seccomp_bss_size) elf_zero_byte).
+Proof.
+  pose proof seccomp_elf_zero_image_bool as H.
+  apply bool_decide_eq_true_1 in H. exact H.
+Qed.
+
+Lemma seccomp_bss_top :
+  seccomp_bss_lo + seccomp_bss_size = SeccompData.seccompMemEnd.
+Proof. vm_eq. Qed.
+
+Lemma seccomp_elf_image :
+  elf_image seccomp_elf
+  = (SeccompInstrs.seccomp_bytes ∪ SeccompData.seccomp_data)
+    ∪ elf_zero_image seccomp_elf.
+Proof.
+  destruct (elf_image_split seccomp_elf seccomp_elf_wf) as [Hsplit _].
+  rewrite Hsplit, seccomp_elf_file_image. reflexivity.
+Qed.
+
+Lemma seccomp_elf_image_concrete :
+  elf_image seccomp_elf
+  = (SeccompInstrs.seccomp_bytes ∪ SeccompData.seccomp_data)
+    ∪ map_seqZ seccomp_bss_lo
+        (replicate (Z.to_nat seccomp_bss_size) elf_zero_byte).
+Proof. rewrite seccomp_elf_image, seccomp_elf_zero_image. reflexivity. Qed.

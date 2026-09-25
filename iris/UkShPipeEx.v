@@ -59,8 +59,8 @@ Import Defs.
 (* computed [ushp_peek_res], so a table HIT is a pure lemma and not a      *)
 (* walk -- UkShRedirLex's finding, at the other byte.  Both tables are     *)
 (* read off the image dump: entry 0 of the four argument-loop stoppers at  *)
-(* 0x1318 is '|' (the four are "|)&;"), and so is the one byte of the      *)
-(* pipe table at 0x1320.                                                  *)
+(* 0x1328 is '|' (the four are "|)&;"), and so is the one byte of the      *)
+(* pipe table at 0x1330.                                                  *)
 (* ===================================================================== *)
 
 Lemma ushp_T_arg_bar : ushp_lit ushp_T_arg 0%nat = ushq_bar.
@@ -142,7 +142,7 @@ Proof using.
   intros j Hj. exact (Hne j ltac:(lia)).
 Qed.
 
-(* ...at the '|', for the redirect table "<>" (0x12f0) *)
+(* ...at the '|', for the redirect table "<>" (0x1300) *)
 Lemma ushp_peek_redir_miss_bar (len : nat) (f : nat -> bv 8) (k : nat) :
   f k = ushq_bar -> ushp_peek_res len f k 2 (ushp_lit ushp_T_redir) = 0.
 Proof using.

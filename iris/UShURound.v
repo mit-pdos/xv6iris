@@ -267,14 +267,14 @@ Proof using.
       by (vm_compute in Hp |- *; lia).
     exact (list_lookup_lookup_total_lt FileDisc.alt_execcat p Hl).
   - intros p Hp.
-    apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x12a8)
+    apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x12b8)
              (fun q : nat => FileDisc.alt_execcat !!! q) 0%nat 5%nat);
       [vm_compute; reflexivity | lia].
   - intros j Hj.
     assert (Hj3 : (j < 3)%nat) by (vm_compute in Hj; lia).
     destruct j as [| [| [| j]]]; try lia; vm_compute; reflexivity.
   - intros p Hp.
-    apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x12a8)
+    apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x12b8)
              (fun q : nat => FileDisc.alt_execcat !!! (q + 1)%nat)
              7%nat 8%nat);
       [vm_compute; reflexivity | lia].
@@ -498,7 +498,7 @@ Section UShURound.
                 UShEcho.sh_echo_pin_resolves with "Hcl Hinv"). }
     iSplitR "Hstd Hcr HR"; [| iFrame "Hstd Hcr HR"].
     rewrite Hpeq. rewrite /image_entry. iModIntro.
-    iIntros (na alen afun W') "%Hok %Hcwd0 %Hlzf %Hch0 %Hpid0 %Hargs Hmp
+    iIntros (na alen afun W') "%Hok %Hcwd0 %Hlzf %Hscw %Hch0 %Hpid0 %Hargs Hmp
                                (_ & Hc & HR)".
     cbn [lk_pin lk_lpr union_link_inst_at gen_link_inst gwc_lpr].
     rewrite /ush_pre_at. iDestruct "HR" as "[Hdeed #Hwit]".
@@ -526,9 +526,9 @@ Section UShURound.
     { iIntros "!> #HT". rewrite /UkShFork.ushf_wq. iRight.
       iApply (uWcu_taint' I 0%nat v with "Hpin HT"). }
     rewrite /image_entry.
-    iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] Hmp
+    iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] [%] Hmp
                                           [Hc Hdq Htk]");
-      [ exact Hok | exact Hcwd0 | exact Hlzf | exact Hch0 | exact Hpid0
+      [ exact Hok | exact Hcwd0 | exact Hlzf | exact Hscw | exact Hch0 | exact Hpid0
       | exact Hargs | ].
     rewrite /FileOpen.fdq. iFrame "Hc Hdq Htk".
   Qed.
@@ -624,7 +624,7 @@ Section UShURound.
                 UShCatPay.sh_cat_pin_resolves with "Hcl Hinv"). }
     iSplitR "Hstd Hcr"; [| iFrame "Hstd Hcr"].
     rewrite Hpeq. rewrite /image_entry. iModIntro.
-    iIntros (na alen afun W') "%Hok %Hcwd0 %Hlzf %Hch0 %Hpid0 %Hargs Hmp
+    iIntros (na alen afun W') "%Hok %Hcwd0 %Hlzf %Hscw %Hch0 %Hpid0 %Hargs Hmp
                                (_ & Hc & Hd)".
     (* ---- the lend, OPENED into the round's cursor ---- *)
     rewrite {1}/uWcl /lk_lcred.
@@ -677,9 +677,9 @@ Section UShURound.
                   Hlen Hpos Hc' with "[] Hpost Hown Hty Hpin Hcs").
         cbn [lk_pin union_link_inst_at gen_link_inst]. iExact "Hpin". }
     rewrite /image_entry.
-    iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] Hmp
+    iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] [%] Hmp
                                           [Htn Hd]");
-      [ exact Hok | exact Hcwd0 | exact Hlzf | exact Hch0 | exact Hpid0
+      [ exact Hok | exact Hcwd0 | exact Hlzf | exact Hscw | exact Hch0 | exact Hpid0
       | exact Hargs | ].
     rewrite /fown /fdeed /FileOpen.fdq.
     iDestruct "Hd" as "[Hdq Htk]". iFrame "Hdq Htk".
@@ -955,7 +955,7 @@ Section UShURound.
                 UShEcho.sh_echo_pin_resolves with "Hcl Hinv"). }
     iSplitR "Hstd Hcr"; [| iFrame "Hstd Hcr"].
     rewrite Hpeq. rewrite /image_entry. iModIntro.
-    iIntros (na alen afun W') "%Hok %Hcwd0 %Hlzf %Hch0 %Hpid0 %Hargs Hmp
+    iIntros (na alen afun W') "%Hok %Hcwd0 %Hlzf %Hscw %Hch0 %Hpid0 %Hargs Hmp
                                (Hstd & Hc & HK & Hino)".
     (* a tainted receipt buys the generic slot *)
     iDestruct "Hino" as "[Hino | #HT]"; last first.
@@ -992,9 +992,9 @@ Section UShURound.
     { iIntros "!> #HT". rewrite /UkShFork.ushf_wq. iRight.
       iApply (uWcu_taint' I 0%nat v' with "Hpin' HT"). }
     rewrite /image_entry.
-    iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] Hmp
+    iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] [%] Hmp
                                           [Hstd Hc Hd Hu]");
-      [ exact Hok | exact Hcwd0 | exact Hlzf | exact Hch0 | exact Hpid0
+      [ exact Hok | exact Hcwd0 | exact Hlzf | exact Hscw | exact Hch0 | exact Hpid0
       | exact Hargs | ].
     rewrite /UEchoFile.ef_pay /UEchoFile.efq. iFrame "Hstd Hc".
     iApply (FileWrite.file_cur_fired (fgn_cl gf) r nm sp i ws [] γo

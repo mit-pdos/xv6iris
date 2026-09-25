@@ -116,17 +116,17 @@ Section UShEchoPipePay.
   (* the exec channel's entry is CONTRAVARIANT in its linear payload, and
      that is the whole of the seam between the round's lend and echo's own *)
   Lemma image_entry_pay_mono (f : elf_bytes) (M : gmap Z (bv 8))
-      (av : mword 64) (sts : list fdstate) (cw : Z) (cs : gset gname)
+      (av : mword 64) (sts : list fdstate) (cw : Z) (secc : mword 64) (cs : gset gname)
       (pidv : mword 32) (Q : Z -> iProp Σ) (P P' : iProp Σ)
       (X : uvis -d> iPropO Σ) :
     □ (P' -∗ P) -∗
-    image_entry f M av sts cw cs pidv Q P X -∗
-    image_entry f M av sts cw cs pidv Q P' X.
+    image_entry f M av sts cw secc cs pidv Q P X -∗
+    image_entry f M av sts cw secc cs pidv Q P' X.
   Proof using .
     iIntros "#Hw #He". rewrite /image_entry.
-    iIntros "!>" (na alen afun W') "%Hok %Hcw %Hlz %Hch %Hpid %Hargs Hp HP".
-    iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] Hp [HP]");
-      [ exact Hok | exact Hcw | exact Hlz | exact Hch | exact Hpid
+    iIntros "!>" (na alen afun W') "%Hok %Hcw %Hlz %Hscw %Hch %Hpid %Hargs Hp HP".
+    iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] [%] Hp [HP]");
+      [ exact Hok | exact Hcw | exact Hlz | exact Hscw | exact Hch | exact Hpid
       | exact Hargs | ].
     iApply ("Hw" with "HP").
   Qed.
@@ -157,7 +157,7 @@ Section UShEchoPipePay.
          ⌜take NSTD sts !! 1%nat = Some (FdOpen rb true (FdPipe γp))⌝ -∗
          UkRun.urun_nopipe sts -∗
          image_entry ElfUser.echo_elf M (mword_of_int (t + 8) : mword 64)
-           sts FsImg.ROOTINO cs pidv (fun _ : Z => Qv) Cr uslot) -∗
+           sts FsImg.ROOTINO ProcDefs.secc_all cs pidv (fun _ : Z => Qv) Cr uslot) -∗
     □ (app_taint -∗ Qv) -∗
     UShEcho.sh_echo_slot T -∗
     UkShEcho.sh_exec_sup_echo_at (ush_fd1pipe γp) ws (fun _ : Z => Qv) Cr.
@@ -205,7 +205,7 @@ Section UShEchoPipePay.
                     with "[%] [%] [%] [%] Hnp0") as "#He";
         [ exact Himg | exact Hbytes | exact Hlen | exact Hl1' | ].
       iApply (image_entry_pay_mono ElfUser.echo_elf M
-                (mword_of_int (t + 8) : mword 64) fdv FsImg.ROOTINO cs pidv
+                (mword_of_int (t + 8) : mword 64) fdv FsImg.ROOTINO ProcDefs.secc_all cs pidv
                 (fun _ : Z => Qv) Cr
                 (UserFd.ustd (ukn_fd N') ld ∗ Cr)%I uslot with "[] He").
       iIntros "!> [_ Hc]". iExact "Hc". }

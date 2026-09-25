@@ -120,7 +120,7 @@ Local Open Scope Z_scope.
 (*  string off its image as a [list (bv 8)] and the pin speaks of a list   *)
 (*  of NAMES, and at a single-element path the join is the identity on the *)
 (*  bytes -- so the byte list is spelled AS the name.  init's argument 0   *)
-(*  is 0x970 at both call sites ([UCodeInit.uis_init_12] / [uis_init_7a]). *)
+(*  is 0x980 at both call sites ([UCodeInit.uis_init_12] / [uis_init_7a]). *)
 (* ===================================================================== *)
 Definition init_cons_pl : list (bv 8) := fname_console.
 

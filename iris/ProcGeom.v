@@ -11,8 +11,9 @@
 
      struct cpu (128 B, cpus[8] @ 0x80012420 = pid_lock + 48):
        proc@0, context@8 (14*8 B), noff@120, intena@124.
-     struct proc (360 B, proc[64] @ 0x80012820 -- directly after cpus[]):
-       lock@0 (locked word@0, cpu ptr@16), state@24, chan@32, context@96.
+     struct proc (368 B, proc[64] -- directly after cpus[]):
+       lock@0 (locked word@0, cpu ptr@16), state@24, chan@32, context@96,
+       seccomp@360 (the syscall mask, last).
 
    [cur_proc p] is THE current-process resource: the current proc structure
    of this CPU (the ambient CpuId; [cid_word] is its tp-register image) is
@@ -55,7 +56,7 @@ Definition NPROC : nat := 64%nat.
    than generated into KernelConsts.v -- see durable-notes.md, "Image
    constants are generated". *)
 Definition PIDMAX : Z := 1000.
-Definition proc_size : Z := 360.
+Definition proc_size : Z := 368.
 Definition proc_base : mword 64 := mword_of_int KernelSyms.proc.
 Definition proc_addr (i : nat) : mword 64 :=
   add_vec proc_base (mword_of_int (proc_size * Z.of_nat i)).
@@ -75,8 +76,9 @@ Definition p_pid (pa : mword 64) : mword 64 :=
 
 (* The three private (p->lock-free) address-space fields -- sz (+72),
    pagetable (+80), trapframe (+88) -- packed between kstack (+64) and
-   context (+96).  [proc_size = 360] pins the whole layout: 96 + context
-   (14 words = 112) + ofile[16] (128) + cwd (8) + name[16] (16) = 360.
+   context (+96).  [proc_size = 368] pins the whole layout: 96 + context
+   (14 words = 112) + ofile[16] (128) + cwd (8) + name[16] (16) + seccomp
+   (8) = 368.
 
    Spelled in the exact address form of the [ld/sd rd,off(rs)] that reach
    them (the [p_pid] shape, NOT the [mword_of_int] shape above) --
@@ -88,6 +90,12 @@ Definition p_pagetable (pa : mword 64) : mword 64 :=
   add_vec pa (sign_extend' 64 (mword_of_int 80 : mword 12)).
 Definition p_trapframe (pa : mword 64) : mword 64 :=
   add_vec pa (sign_extend' 64 (mword_of_int 88 : mword 12)).
+(* p->seccomp (uint64 at +360, the LAST field): the syscall mask, bit n set
+   = syscall n allowed.  Reached only by 12-bit displacements
+   ([sd a5,360(s1)] in userinit, [ld a5,360(s5)]/[sd a5,360(s3)] in kfork,
+   [ld a5,360(a0)] in syscall), hence this spelling. *)
+Definition p_secc (pa : mword 64) : mword 64 :=
+  add_vec pa (sign_extend' 64 (mword_of_int 360 : mword 12)).
 
 (* The rest of [struct proc], in the [mword_of_int] shape (these are reached
    by whole-word address computations, not by a 12-bit [ld/sd] displacement;
@@ -657,7 +665,7 @@ Proof.
 Qed.
 
 (* p++ : &proc[k] + sizeof(proc) = &proc[k+1].  The addi's 12-bit immediate
-   [360] sign-extends to the same 64-bit constant, and mword addition agrees
+   [368] sign-extends to the same 64-bit constant, and mword addition agrees
    with Z addition mod 2^64 (via [avi_mword]). *)
 Lemma proc_addr_succ (k : nat) :
   add_vec (proc_addr k) (sign_extend' 64 (mword_of_int proc_size : mword 12)) = proc_addr (S k).

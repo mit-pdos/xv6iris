@@ -411,7 +411,7 @@ Section UexecExecMint.
     iIntros (M pm sz fdv cw gn cs pidv) "%Hst #Hmp Hheap Hufd".
     iFrame "Hheap Hufd". iRight.
     iApply (xv6_sbundle_close_of_reg _
-              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)
+              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)
               (ukn_pay N) rb wb γp ltac:(exact Hst) with "Hr").
   Qed.
 

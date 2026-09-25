@@ -527,15 +527,15 @@ Section ProofProcdumpLoop.
           by (rgne; reflexivity).
         iApply (wp_addi4_s_sconf (CID := CIDa)
                   (mword_of_int (KernelSyms.procdump + 0x66)) Rs1 Rs1
-                  (mword_of_int 360 : mword 12) Ma K' b
+                  (mword_of_int 368 : mword 12) Ma K' b
                   ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi66").
         iIntros (CIDb Hsb) "Hcg Hpc".
         iEval (rewrite Hrg66) in "Hcg".
         set (Ma66 := <[Regidx Rs1 := regval_into_reg
                         (add_vec (Ma !!! Regidx Rs1)
-                           (sign_extend' 64 (mword_of_int 360 : mword 12)))]> Ma).
+                           (sign_extend' 64 (mword_of_int 368 : mword 12)))]> Ma).
         assert (Hval66 : add_vec (Ma !!! Regidx Rs1)
-                           (sign_extend' 64 (mword_of_int 360 : mword 12))
+                           (sign_extend' 64 (mword_of_int 368 : mword 12))
                          = pd_cur (S j)).
         { rewrite (pdl_get_s1 Ma spv j Hral). apply pd_cur_succ. }
         assert (Hral66 : pd_regs_loop Ma66 spv (S j))
@@ -669,7 +669,7 @@ Section ProofProcdumpLoop.
         (* ---- +0x5c jal ra,printk ---- *)
         iApply (wp_jal_s_sconf (CID := CIDq2)
                   (mword_of_int (KernelSyms.procdump + 0x5c)) Rra
-                  (mword_of_int 2089178 : mword 21) P5a K' b
+                  (mword_of_int 2089164 : mword 21) P5a K' b
                   ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi5c").
         iIntros (CIDq3 Hsq3) "Hcg Hpc".
@@ -678,7 +678,7 @@ Section ProofProcdumpLoop.
                           (mword_of_int (KernelSyms.procdump + 0x5c) : mword 64) 4)]> P5a).
         assert (Htgtpk1 : add_vec
                             (mword_of_int (KernelSyms.procdump + 0x5c) : mword 64)
-                            (sign_extend' 64 (mword_of_int 2089178 : mword 21))
+                            (sign_extend' 64 (mword_of_int 2089164 : mword 21))
                           = mword_of_int KernelSyms.printk) by pcw.
         iEval (rewrite Htgtpk1) in "Hpc".
         assert (Hra_5c : P5c !!! Regidx Rra
@@ -753,7 +753,7 @@ Section ProofProcdumpLoop.
         (* ---- +0x62 jal ra,printk ---- *)
         iApply (wp_jal_s_sconf (CID := CIDq5)
                   (mword_of_int (KernelSyms.procdump + 0x62)) Rra
-                  (mword_of_int 2089172 : mword 21) P60 K' b
+                  (mword_of_int 2089158 : mword 21) P60 K' b
                   ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi62").
         iIntros (CIDq6 Hsq6) "Hcg Hpc".
@@ -762,7 +762,7 @@ Section ProofProcdumpLoop.
                           (mword_of_int (KernelSyms.procdump + 0x62) : mword 64) 4)]> P60).
         assert (Htgtpk2 : add_vec
                             (mword_of_int (KernelSyms.procdump + 0x62) : mword 64)
-                            (sign_extend' 64 (mword_of_int 2089172 : mword 21))
+                            (sign_extend' 64 (mword_of_int 2089158 : mword 21))
                           = mword_of_int KernelSyms.printk) by pcw.
         iEval (rewrite Htgtpk2) in "Hpc".
         assert (Hra_62 : P62 !!! Regidx Rra

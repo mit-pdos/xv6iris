@@ -137,7 +137,7 @@ Section UkCatCat.
     (∃ w : mword 64, uword γd (uint sp0 - 80) w) -∗
     (∃ w : mword 64, uword γd (uint sp0 - 88) w) -∗
     (∃ w : mword 64, uword γd (uint sp0 - 96) w) -∗
-    urun N h m (mword_of_int 0x744) n -∗
+    urun N h m (mword_of_int 0x74c) n -∗
     (∀ (h' : CpuId) (m' : regfile),
        ⌜ m' !!! Regidx csp_rs1 = sp0 ⌝ -∗
        ⌜ m' !!! Regidx s0_idx = vs0 ⌝ -∗
@@ -180,18 +180,18 @@ Section UkCatCat.
       by (vm_compute; reflexivity).
     assert (Ho72 : uoff_sdsp (mword_of_int 9 : mword 6) = 72)
       by (vm_compute; reflexivity).
-    (* ---- 0x744  c.ldsp ra,88(sp) ---- *)
-    iApply (wp_uk_cldsp N h m (mword_of_int 0x744)
+    (* ---- 0x74c  c.ldsp ra,88(sp) ---- *)
+    iApply (wp_uk_cldsp N h m (mword_of_int 0x74c)
               (mword_of_int 11 : mword 6) ra_idx (uint sp0 - 8) vra n
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(rewrite Hsp Hsp96 Ho88; lia)
               ltac:(rewrite Zminus_mod Hal8; reflexivity)
               ltac:(vm_compute; discriminate)
               with "[] Hwra Hrun").
-    { iApply (uis_cat_744 with "Hcode"). }
+    { iApply (uis_cat_74c with "Hcode"). }
     iIntros "Hwra".
-    assert (E70a : add_vec_int (mword_of_int 0x744 : mword 64) 2
-                 = mword_of_int 0x746)
+    assert (E70a : add_vec_int (mword_of_int 0x74c : mword 64) 2
+                 = mword_of_int 0x74e)
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite E70a.
     iIntros (h1) "Hrun".
@@ -201,18 +201,18 @@ Section UkCatCat.
     { rewrite <- Hsp.
       exact (upd_ne m (Regidx ra_idx) (Regidx csp_rs1) (regval_into_reg vra)
                ltac:(vm_compute; discriminate)). }
-    (* ---- 0x746  c.ldsp s0,80(sp) ---- *)
-    iApply (wp_uk_cldsp N h1 mm1 (mword_of_int 0x746)
+    (* ---- 0x74e  c.ldsp s0,80(sp) ---- *)
+    iApply (wp_uk_cldsp N h1 mm1 (mword_of_int 0x74e)
               (mword_of_int 10 : mword 6) s0_idx (uint sp0 - 16) vs0 n
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(rewrite Hsp1 Hsp96 Ho80; lia)
               ltac:(rewrite Zminus_mod Hal8; reflexivity)
               ltac:(vm_compute; discriminate)
               with "[] Hws0 Hrun").
-    { iApply (uis_cat_746 with "Hcode"). }
+    { iApply (uis_cat_74e with "Hcode"). }
     iIntros "Hws0".
-    assert (E70c : add_vec_int (mword_of_int 0x746 : mword 64) 2
-                 = mword_of_int 0x748)
+    assert (E70c : add_vec_int (mword_of_int 0x74e : mword 64) 2
+                 = mword_of_int 0x750)
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite E70c.
     iIntros (h2) "Hrun".
@@ -222,18 +222,18 @@ Section UkCatCat.
     { rewrite <- Hsp1.
       exact (upd_ne mm1 (Regidx s0_idx) (Regidx csp_rs1) (regval_into_reg vs0)
                ltac:(vm_compute; discriminate)). }
-    (* ---- 0x748  c.ldsp s1,72(sp) ---- *)
-    iApply (wp_uk_cldsp N h2 mm2 (mword_of_int 0x748)
+    (* ---- 0x750  c.ldsp s1,72(sp) ---- *)
+    iApply (wp_uk_cldsp N h2 mm2 (mword_of_int 0x750)
               (mword_of_int 9 : mword 6) s1_idx (uint sp0 - 24) vs1 n
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(rewrite Hsp2 Hsp96 Ho72; lia)
               ltac:(rewrite Zminus_mod Hal8; reflexivity)
               ltac:(vm_compute; discriminate)
               with "[] Hws1 Hrun").
-    { iApply (uis_cat_748 with "Hcode"). }
+    { iApply (uis_cat_750 with "Hcode"). }
     iIntros "Hws1".
-    assert (E70e : add_vec_int (mword_of_int 0x748 : mword 64) 2
-                 = mword_of_int 0x74a)
+    assert (E70e : add_vec_int (mword_of_int 0x750 : mword 64) 2
+                 = mword_of_int 0x752)
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite E70e.
     iIntros (h3) "Hrun".
@@ -243,20 +243,20 @@ Section UkCatCat.
     { rewrite <- Hsp2.
       exact (upd_ne mm2 (Regidx s1_idx) (Regidx csp_rs1) (regval_into_reg vs1)
                ltac:(vm_compute; discriminate)). }
-    (* ---- 0x74a  c.addi16sp sp,sp,96 -- THE POP ---- *)
-    iApply (wp_uk_caddi16sp_up N h3 mm3 (mword_of_int 0x74a)
+    (* ---- 0x752  c.addi16sp sp,sp,96 -- THE POP ---- *)
+    iApply (wp_uk_caddi16sp_up N h3 mm3 (mword_of_int 0x752)
               (mword_of_int 6 : mword 6) 12 n
               ltac:(apply bv_eq; vm_compute; reflexivity)
               with "[] [Hwra Hws0 Hws1 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12] Hrun").
-    { iApply (uis_cat_74a with "Hcode"). }
+    { iApply (uis_cat_752 with "Hcode"). }
     { rewrite Hsp3 Hup.
       iApply (ustack_12_close γd sp0 Hal8
                 with "[Hwra] [Hws0] [Hws1] Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12").
       { iExists vra. iExact "Hwra". }
       { iExists vs0. iExact "Hws0". }
       { iExists vs1. iExact "Hws1". } }
-    assert (E710 : add_vec_int (mword_of_int 0x74a : mword 64) 2
-                   = mword_of_int 0x74c)
+    assert (E710 : add_vec_int (mword_of_int 0x752 : mword 64) 2
+                   = mword_of_int 0x754)
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite Hsp3 Hup E710.
     iIntros (h4) "Hrun".
@@ -269,13 +269,13 @@ Section UkCatCat.
       rewrite /mm2 (upd_ne mm1 (Regidx s0_idx) (Regidx ra_idx)
                      (regval_into_reg vs0) ltac:(vm_compute; discriminate)).
       rewrite /mm1. exact (upd_eq m (Regidx ra_idx) (regval_into_reg vra)). }
-    (* ---- 0x74c  c.jr ra ---- *)
-    iApply (wp_uk_cjr N h4 mm4 (mword_of_int 0x74c) ra_idx
+    (* ---- 0x754  c.jr ra ---- *)
+    iApply (wp_uk_cjr N h4 mm4 (mword_of_int 0x754) ra_idx
               (ret_pc vra) (12 + n)
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Hra4; reflexivity)
               with "[] Hrun").
-    { iApply (uis_cat_74c with "Hcode"). }
+    { iApply (uis_cat_754 with "Hcode"). }
     iIntros (h5) "Hrun".
     iApply ("Hcont" $! h5 mm4 with "[] [] [] [] Hrun").
     { iPureIntro. rewrite /mm4.
@@ -646,9 +646,9 @@ Section UkCatCat.
     { rewrite <- Ha1cw.
       exact (upd_ne cwb (Regidx a0_idx) (Regidx a1_idx) _
                ltac:(vm_compute; discriminate)). }
-    (* ---- 0x4a  jal ra,0x7d0 <fprintf> ---- *)
+    (* ---- 0x4a  jal ra,0x7d8 <fprintf> ---- *)
     iApply (wp_uk_jal N hcwc cwc (mword_of_int 0x4a)
-              (mword_of_int 1926 : mword 21) ra_idx
+              (mword_of_int 1934 : mword 21) ra_idx
               (mword_of_int CatSyms.fprintf) (mword_of_int 0x4e) (10 + (12 + (4 + n)))
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
@@ -785,9 +785,9 @@ Section UkCatCat.
     { rewrite <- Ha1cr.
       exact (upd_ne crb (Regidx a0_idx) (Regidx a1_idx) _
                ltac:(vm_compute; discriminate)). }
-    (* ---- 0x74  jal ra,0x7d0 <fprintf> ---- *)
+    (* ---- 0x74  jal ra,0x7d8 <fprintf> ---- *)
     iApply (wp_uk_jal N hcrc crc (mword_of_int 0x74)
-              (mword_of_int 1884 : mword 21) ra_idx
+              (mword_of_int 1892 : mword 21) ra_idx
               (mword_of_int CatSyms.fprintf) (mword_of_int 0x78) (10 + (12 + (4 + n)))
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)

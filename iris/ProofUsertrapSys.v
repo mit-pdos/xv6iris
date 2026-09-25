@@ -553,6 +553,9 @@ Section UtSysBlock.
       (* ...and the lazy bit, for the generation's reason exactly *)
       assert (HV1lz : pv_lazy V1 = pv_lazy (us_V U))
         by (rewrite /V1; destruct (us_V U); reflexivity).
+      (* ...and the mask, likewise *)
+      assert (HV1sc : pv_secc V1 = pv_secc (us_V U))
+        by (rewrite /V1; destruct (us_V U); reflexivity).
       assert (Hbel1 : um_below (pv_sz V1) (ud_um (pv_upt V1)))
         by (rewrite HV1upt HV1sz; exact Hbel0).
       assert (Hszb1 : (uint (pv_sz V1) <= uvm_maxsz)%Z)
@@ -562,15 +565,16 @@ Section UtSysBlock.
          one (durable-notes, "CpuId IS A CLASS") *)
       assert (HV1tf0 : pv_tf V1 = <[tf_epc_idx := rget S3 Ra5]> (pv_tf (us_V U)))
         by (rewrite /V1; destruct (us_V U); reflexivity).
-      assert (Hnumeq0 : sysc_num V1 = usys_num (pv_tf (us_V U))).
-      { rewrite (sysc_num_usys V1). rewrite HV1tf0. apply usys_num_epc. }
+      assert (Hnumeq0 : sysc_num V1 = usys_eff (pv_secc (us_V U)) (pv_tf (us_V U))).
+      { rewrite (sysc_num_usys V1).
+        change (pv_secc V1) with (pv_secc (us_V U)). rewrite HV1tf0. apply usys_eff_epc. }
       pose proof Hpro as Hpro'.
-      destruct Hpro' as (Hpr1 & Hpr2 & Hpr3 & Hpr4 & Hpr5 & Hpr6 & Hpr7).
+      destruct Hpro' as (Hpr1 & Hpr2 & Hpr3 & Hpr4 & Hpr5 & Hpr6 & Hpr7 & Hpr8).
       (* the entry record's number and argument words are the dispatcher's:
          neither epc rewrite reads them -- the deposit's key congruence
          ([SpecUsertrap.ut_sys_in_cong]) *)
-      assert (Hn0 : usys_num (pv_tf (us_V U0)) = sysc_num V1).
-      { rewrite Hnumeq0 Hpr1 usys_num_epc. reflexivity. }
+      assert (Hn0 : usys_eff (pv_secc (us_V U0)) (pv_tf (us_V U0)) = sysc_num V1).
+      { rewrite Hnumeq0 Hpr1 usys_eff_epc (ut_pro_secc _ _ _ Hpro). reflexivity. }
       assert (Hargw : forall i : nat, (i < 3)%nat ->
                 tf_w (pv_tf (us_V U0)) (tf_arg_idx i)
                 = tf_w (pv_tf V1) (tf_arg_idx i)).
@@ -614,7 +618,7 @@ Section UtSysBlock.
         rewrite <- Hpr1. rewrite Htfch.
         (* ...and the lazy bit, the child's eleventh reading: the prologue
            writes one trapframe word and no block field (lane LAZY-FLAG) *)
-        rewrite HV1upt HV1sz HV1cwid HV1lz Hpr2 Hpr3 Hpr4 Hpr5 Hpr7.
+        rewrite HV1upt HV1sz HV1cwid HV1lz HV1sc Hpr2 Hpr3 Hpr4 Hpr5 Hpr7 Hpr8.
         reflexivity. }
       (* ---- +0x9e: csrsi sstatus,2 -- intr_on(), and the reserve is paid ---- *)
       iDestruct (ut_flip_pre (un_pj N) with "Hcpu") as "(Hcnt & Hcells)".
@@ -721,7 +725,9 @@ Section UtSysBlock.
              | (cbn [uvis_of uvis_sz]; rewrite HV1sz Hpr3; reflexivity)
              (* ...and the lazy bit: neither epc rewrite touches the block's
                 own field ([ProcDefs.pv_lazy]) *)
-             | (cbn [uvis_of uvis_lazy]; rewrite HV1lz Hpr7; reflexivity) ]. }
+             | (cbn [uvis_of uvis_lazy]; rewrite HV1lz Hpr7; reflexivity)
+             (* ...and the mask, likewise *)
+             | (cbn [uvis_of uvis_secc]; rewrite HV1sc Hpr8; reflexivity) ]. }
          rewrite <- (sbundle_at_cong uslot n fdep (uvis_of U0 sts gn cs pid)
                        (uvis_of (MkUstate V1 (us_M U)) sts gn cs pid) Hkey).
          iExact "Hx". }
@@ -732,7 +738,7 @@ Section UtSysBlock.
        ([UsysMemOk.usys_num_epc]). *)
     2: { rewrite /sysc_fork_in. iIntros "%Hk". cbn [us_V] in Hk.
          iDestruct ("Hfin" with "[%]") as "Hj".
-         { split; [ exact Hscec | rewrite usys_num_epc Hn0; exact Hk ]. }
+         { split; [ exact Hscec | rewrite usys_eff_epc Hn0; exact Hk ]. }
          (* ...AND THE CHILD'S PAYMENT WAND RIDES WITH THE SLOT (lane
             SELF-KILL, §4b'), relayed unchanged. *)
          (* ...AND THE LEND WITH IT (lane FORK-REFUND), beside the slot
@@ -755,13 +761,17 @@ Section UtSysBlock.
          { rewrite list_lookup_total_insert_ne;
              [ exact (Hargw 0%nat ltac:(lia))
              | unfold tf_epc_idx, tf_arg_idx; lia ]. }
+         assert (HnumV1 : usys_num (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))
+                          = usys_num (pv_tf V1))
+           by (rewrite HV1tf0 Hpr1 !usys_num_epc; reflexivity).
          iApply (upay_at_ueq (pv_gen (us_V U0)) (pv_gen V1) uecall_scause
+                   (pv_secc V1)
                    (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))
                    (pv_tf V1) fdep
-                   ltac:(transitivity (usys_num (pv_tf (us_V U0)));
-                         [ apply usys_num_epc | exact Hn0 ])
+                   HnumV1
                    Ha0e ltac:(rewrite HV1gen; symmetry; exact Hpr6)).
-         rewrite /upay_at. iFrame "Hmyp". rewrite Hscec. iExact "Hein". } 
+         (* the block's mask across the prologue: one trapframe word moved *)
+         rewrite /upay_at HV1sc Hpr8. iFrame "Hmyp". rewrite Hscec. iExact "Hein". } 
       (* [cpu_own_on_intro] mints the bundle at the literal [∅]; [lks = ∅]
          at depth 0 makes that the set syscall's contract names.  It now
          takes no premise at all -- [cpu_own] carries no caller frame to
@@ -810,7 +820,7 @@ Section UtSysBlock.
          read -- like [Hmemg], they are the CALLER's to consume, and the trap
          loop's own invariant is indifferent to all four. *)
       iIntros (CID2 Hk2 mg U2 stsR csR)
-        "%Hcsg %Hmemg %Hfdrow %Hpiperow %Hchrow %Hmemne2 %Hmema0 %Hmemupt %Hmemsz %Hmemlz %Htfg %Hfgg %Hchgg %Hgengg %Hcwig %Hsbrg %Hfkg %Hrdg %Hpidg Hcg Hcpu Hbs Hip Hfd Hir Hsy Hpv Hufr Hch Hpc Hxo Hso Hfo Hwo".
+        "%Hcsg %Hmemg %Hfdrow %Hpiperow %Hchrow %Hmemne2 %Hmema0 %Hmemupt %Hmemsz %Hmemlz %Htfg %Hfgg %Hchgg %Hgengg %Hcwig %Hsbrg %Hfkg %Hrdg %Hpidg %Hsecg Hcg Hcpu Hbs Hip Hfd Hir Hsy Hpv Hufr Hch Hpc Hxo Hso Hfo Hwo".
       destruct U2 as [V2 M2].
       assert (Hreta6 : ret_pc (S4 !!! Regidx Rra) = mword_of_int (UT + 0xa6))
         by (rewrite HS4ra; pcw).
@@ -877,8 +887,9 @@ Section UtSysBlock.
          [tf_ueq] is the wrong tool here, since the epc IS the difference. *)
       assert (HV1tf : pv_tf V1 = <[tf_epc_idx := rget S3 Ra5]> (pv_tf (us_V U)))
         by (rewrite /V1; destruct (us_V U); reflexivity).
-      assert (Hnumeq : sysc_num V1 = usys_num (pv_tf (us_V U))).
-      { rewrite (sysc_num_usys V1). rewrite HV1tf. apply usys_num_epc. }
+      assert (Hnumeq : sysc_num V1 = usys_eff (pv_secc (us_V U)) (pv_tf (us_V U))).
+      { rewrite (sysc_num_usys V1).
+        change (pv_secc V1) with (pv_secc (us_V U)). rewrite HV1tf. apply usys_eff_epc. }
       (* the bumped epc, in [bump_tf]'s [add_vec_int] spelling *)
       assert (HS2a5 : rget S2 Ra5 = uepc)
         by (rgne; rewrite /S2 upd_eq; reflexivity).
@@ -914,7 +925,7 @@ Section UtSysBlock.
                  (pv_sz V1) (pv_sz V2) (us_M U) M2 Hbel1 Hszb1).
         exact (sysc_mem_ok_sbrk_row V1 V2 (us_M U) M2 Hsb Hmemg). }
       assert (Hrda : ut_round epv scv U0 (MkUstate V2 M2)).
-      { destruct Hpro as (Hp1 & Hp2 & Hp3 & Hp4 & Hp5 & Hp6 & Hp7).
+      { destruct Hpro as (Hp1 & Hp2 & Hp3 & Hp4 & Hp5 & Hp6 & Hp7 & Hp8).
         unfold ut_round.
         rewrite <- Hp1. rewrite <- Hp2. rewrite <- Hp3. rewrite <- Hp4.
         rewrite <- Hp5.
@@ -922,6 +933,7 @@ Section UtSysBlock.
            LAZY-FLAG): the entry record and the one the dispatch ran at
            carry the same bit *)
         rewrite <- Hp7.
+        rewrite <- Hp8.
         unfold uround_ok.
         destruct (decide (scv = uecall_scause)) as [_ | Hc];
           [ | contradiction (Hc Hscec) ].
@@ -929,10 +941,15 @@ Section UtSysBlock.
         - (* exec, whose cwd inum the dispatcher's clause pins: exec is not
              chdir, so the clause's right arm is the one that holds *)
           left. split; [ rewrite <- Hnumeq; exact Hex | ].
-          cbn [us_V pv_cwi pv_gen pv_chg].
-          destruct Hcwig as [[H9 _] | Hc9];
-            [ exfalso; rewrite Hex in H9; discriminate H9 | ].
-          rewrite Hc9. exact HV1cwi.
+          split.
+          + cbn [us_V pv_cwi pv_gen pv_chg].
+            destruct Hcwig as [[H9 _] | Hc9];
+              [ exfalso; rewrite Hex in H9; discriminate H9 | ].
+            rewrite Hc9. exact HV1cwi.
+          + (* ...and exec keeps the mask: not seccomp's number *)
+            cbn [us_V]. rewrite <- HV1sc.
+            eapply usys_secc_ok_quiet; [ | exact Hsecg ].
+            cbn [us_V]. rewrite Hex. unfold USYS_seccomp. lia.
         - right.
           (* THE ARM RETURNED, SO IT WAS NOT [exit] (milestone J, K1).  The
              dispatcher's returning post now says so outright; without it
@@ -992,7 +1009,7 @@ Section UtSysBlock.
           (* THE CWD ROW, off the dispatcher's clause: a chdir that returned
              nonzero moved nothing, and every other entry moved nothing.
              The clause reads the stored a0 word, which is [w]. *)
-          assert (Hcwrow : usys_cwd_ok (usys_num (pv_tf (us_V U))) w
+          assert (Hcwrow : usys_cwd_ok (usys_eff (pv_secc (us_V U)) (pv_tf (us_V U))) w
                              (pv_cwi (us_V U)) (pv_cwi V2)).
           { rewrite <- Hnumeq.
             unfold usys_cwd_ok.
@@ -1003,7 +1020,15 @@ Section UtSysBlock.
               + rewrite Hc9. exact HV1cwi.
             - destruct Hcwig as [[H9 _] | Hc9]; [ contradiction (Hn9 H9) | ].
               rewrite Hc9. exact HV1cwi. }
-          split; [ | split; [ | exact Hcwrow ] ].
+          (* THE MASK ROW, off the dispatcher's: it reads argument 0, which
+             the prologue's epc store leaves alone, and the stored a0 word *)
+          assert (Hscrow : usys_secc_ok (usys_eff (pv_secc (us_V U)) (pv_tf (us_V U)))
+                             (pv_tf (us_V U)) (pv_secc (us_V U)) (pv_secc V2) w).
+          { rewrite <- Hnumeq. rewrite <- HV1sc. rewrite <- Ha0w.
+            refine (usys_secc_ok_arg_cong _ (pv_tf V1) _ _ _ _ _ Hsecg).
+            rewrite HV1tf. apply list_lookup_total_insert_ne.
+            unfold tf_epc_idx, tf_arg_idx; lia. }
+          split; [ | split; [ | split; [ exact Hcwrow | exact Hscrow ] ] ].
           + (* THE BUMP *)
             unfold uround_bump_ok. rewrite Hbump. split.
             * unfold tf_resume_gpr0.
@@ -1063,16 +1088,16 @@ Section UtSysBlock.
          of the outgoing trapframe -- so the two epc inserts peel off by
          [UsysMemOk.usys_fd_ok_epc], the descriptor twin of the
          [usys_mem_ok_epc] the image row above crosses by. *)
-      assert (Hfde : ut_fd_ecall scv (pv_tf (us_V U0))
+      assert (Hfde : ut_fd_ecall scv (pv_secc (us_V U0)) (pv_tf (us_V U0))
                        (pv_tf (us_V (MkUstate V2 M2))) sts stsR).
-      { intros _. destruct Hpro as (Hp1 & _ & _ & _).
+      { intros _. pose proof (ut_pro_secc _ _ _ Hpro) as Hsc0. destruct Hpro as (Hp1 & _ & _ & _).
         assert (Hlen1 : (tf_epc_idx < length (pv_tf (us_V U)))%nat)
           by (rewrite Htflen0; unfold tf_epc_idx, TFWORDS; lia).
         assert (Hlen0 : (tf_epc_idx < length (pv_tf (us_V U0)))%nat).
         { pose proof Htflen0 as HL. rewrite Hp1 length_insert in HL.
           rewrite HL. unfold tf_epc_idx, TFWORDS. lia. }
-        assert (Hnum0 : usys_num (pv_tf (us_V U0)) = sysc_num V1).
-        { rewrite Hnumeq Hp1 usys_num_epc. reflexivity. }
+        assert (Hnum0 : usys_eff (pv_secc (us_V U0)) (pv_tf (us_V U0)) = sysc_num V1).
+        { rewrite Hnumeq Hp1 usys_eff_epc Hsc0. reflexivity. }
         cbn [us_V pv_tf]. rewrite Hnum0.
         apply (usys_fd_ok_epc _ _ (ret_pc epv) _ _ _ Hlen0).
         rewrite <- Hp1.
@@ -1084,17 +1109,17 @@ Section UtSysBlock.
          -- and the IMAGE side crosses on the nose: the prologue rewrites a
          trapframe word, and [ut_pro]'s fourth conjunct is exactly that it
          leaves [us_M] alone. *)
-      assert (Hpipe : ut_pipe_ecall scv (pv_tf (us_V U0))
+      assert (Hpipe : ut_pipe_ecall scv (pv_secc (us_V U0)) (pv_tf (us_V U0))
                         (pv_tf (us_V (MkUstate V2 M2)))
                         (us_M U0) (us_M (MkUstate V2 M2)) sts stsR).
-      { intros _. destruct Hpro as (Hp1 & _ & _ & HM1 & _).
+      { intros _. pose proof (ut_pro_secc _ _ _ Hpro) as Hsc0. destruct Hpro as (Hp1 & _ & _ & HM1 & _).
         assert (Hlen1 : (tf_epc_idx < length (pv_tf (us_V U)))%nat)
           by (rewrite Htflen0; unfold tf_epc_idx, TFWORDS; lia).
         assert (Hlen0 : (tf_epc_idx < length (pv_tf (us_V U0)))%nat).
         { pose proof Htflen0 as HL. rewrite Hp1 length_insert in HL.
           rewrite HL. unfold tf_epc_idx, TFWORDS. lia. }
-        assert (Hnum0 : usys_num (pv_tf (us_V U0)) = sysc_num V1).
-        { rewrite Hnumeq Hp1 usys_num_epc. reflexivity. }
+        assert (Hnum0 : usys_eff (pv_secc (us_V U0)) (pv_tf (us_V U0)) = sysc_num V1).
+        { rewrite Hnumeq Hp1 usys_eff_epc Hsc0. reflexivity. }
         cbn [us_V us_M pv_tf]. rewrite Hnum0. rewrite <- HM1.
         apply (usys_pipe_ok_epc _ _ (ret_pc epv) _ _ _ _ _ Hlen0).
         rewrite <- Hp1.
@@ -1106,11 +1131,11 @@ Section UtSysBlock.
          prologue's epc rewrite nor the epilogue's bump touches either --
          this is the hop that takes [SpecSysGetpid]'s [a0 = sign_extend' 64
          pid] out to the user-execution round ([SpecUsertrap.ut_ret_pid]). *)
-      assert (Hpidr : ut_ret_pid scv (pv_tf (us_V U0))
+      assert (Hpidr : ut_ret_pid scv (pv_secc (us_V U0)) (pv_tf (us_V U0))
                         (pv_tf (us_V (MkUstate V2 M2))) pid).
-      { intros _. destruct Hpro as (Hp1 & _ & _ & _).
-        assert (Hnum0 : usys_num (pv_tf (us_V U0)) = sysc_num V1).
-        { rewrite Hnumeq Hp1 usys_num_epc. reflexivity. }
+      { intros _. pose proof (ut_pro_secc _ _ _ Hpro) as Hsc0. destruct Hpro as (Hp1 & _ & _ & _).
+        assert (Hnum0 : usys_eff (pv_secc (us_V U0)) (pv_tf (us_V U0)) = sysc_num V1).
+        { rewrite Hnumeq Hp1 usys_eff_epc Hsc0. reflexivity. }
         cbn [us_V pv_tf]. rewrite Hnum0. exact Hpidg. }
       (* THE EXEC CHANNEL'S ANSWER, re-spelled from the dispatcher's record
          to the round's entry trapframe.  Failure is [sysc_exec_failed]: the
@@ -1121,12 +1146,12 @@ Section UtSysBlock.
       iAssert (ut_exec_out fdep scv (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))
                  (us_M U0)
                  (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
-                 (uint (pv_sz (us_V U0))) (pv_lazy (us_V U0))
+                 (uint (pv_sz (us_V U0))) (pv_lazy (us_V U0)) (pv_secc (us_V U0))
                  (MkUstate V2 M2) sts stsR gn cs pid)
         with "[Hxo]" as "Hxo".
       { rewrite /ut_exec_out. iIntros "%Hc". destruct Hc as [_ Hc7].
         iDestruct ("Hxo" with "[%]") as "[%Hfail | Hslot]".
-        { cbn [us_V]. rewrite <- Hn0. rewrite usys_num_epc in Hc7. exact Hc7. }
+        { cbn [us_V]. rewrite <- Hn0. rewrite usys_eff_epc in Hc7. exact Hc7. }
         - iLeft. iPureIntro.
           destruct Hfail as (Htf2 & HM2 & Hpi2 & Hsz2 & Hlz2 & Hsts).
           cbn [us_V us_M] in Htf2, HM2, Hpi2, Hsz2, Hlz2.
@@ -1171,17 +1196,18 @@ Section UtSysBlock.
           | (cbn [uvis_of uvis_perm];
              rewrite HV1upt HV1sz Hpr2 Hpr3; reflexivity)
           | (cbn [uvis_of uvis_sz]; rewrite HV1sz Hpr3; reflexivity)
-          | (cbn [uvis_of uvis_lazy]; rewrite HV1lz Hpr7; reflexivity) ]. }
+          | (cbn [uvis_of uvis_lazy]; rewrite HV1lz Hpr7; reflexivity)
+          | (cbn [uvis_of uvis_secc]; rewrite HV1sc Hpr8; reflexivity) ]. }
       (* FORK'S ANSWER, from the dispatcher's row to the trap contract's:
          the two are the same disjunction, read at the same a0 word, and
          the guard differs only in the cause conjunct the dispatcher does
          not carry ([SpecUsertrap.ut_fork_out]). *)
-      iAssert (ut_fork_out fdep scv (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))
+      iAssert (ut_fork_out fdep scv (pv_secc (us_V U0)) (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))
                  (pv_tf (us_V (MkUstate V2 M2)) !!! tf_arg_idx 0) cs csR)%I
         with "[Hfo]" as "Hfo".
       { rewrite /ut_fork_out /sysc_fork_out. iIntros "%Hc".
         iApply "Hfo". iPureIntro. destruct Hc as [_ Hc7].
-        cbn [us_V]. rewrite <- Hn0. rewrite usys_num_epc in Hc7. exact Hc7. }
+        cbn [us_V]. rewrite <- Hn0. rewrite usys_eff_epc in Hc7. exact Hc7. }
       (* ...AND WAIT'S, on the same terms: one disjunction, one a0 word,
          one guard shorter by the cause ([SpecUsertrap.ut_wait_out]). *)
       (* the row's two readings -- the caller's generation and its status
@@ -1195,7 +1221,7 @@ Section UtSysBlock.
           | unfold tf_epc_idx, tf_arg_idx; lia ]. }
       assert (Hgnw : pv_gen V1 = gn)
         by (rewrite HV1gen Hgnq; exact Hpr6).
-      iAssert (ut_wait_out scv (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))
+      iAssert (ut_wait_out scv (pv_secc (us_V U0)) (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))
                  (us_M U0) (us_M (MkUstate V2 M2))
                  (pv_tf (us_V (MkUstate V2 M2)) !!! tf_arg_idx 0) cs csR gn pid)%I
         with "[Hwo]" as "Hwo".
@@ -1206,7 +1232,7 @@ Section UtSysBlock.
         rewrite <- Hpr4.
         iIntros "%Hc".
         iApply "Hwo". iPureIntro. destruct Hc as [_ Hc7].
-        cbn [us_V]. rewrite <- Hn0. rewrite usys_num_epc in Hc7. exact Hc7. }
+        cbn [us_V]. rewrite <- Hn0. rewrite usys_eff_epc in Hc7. exact Hc7. }
       iAssert (∀ n : Z, ut_sys_out n fdep scv (pv_tf (us_V U0)) U0 sts gn cs pid
                  (pv_tf (us_V (MkUstate V2 M2)) !!! tf_arg_idx 0)
                  (us_M (MkUstate V2 M2))

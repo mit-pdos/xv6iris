@@ -1,7 +1,7 @@
 (* ===================================================================== *)
 (* UkShRun.v -- sh's [runcmd] on the urun engine, SH LANE STAGE 5: the     *)
 (* COMMAND TREE walk.  [runcmd] (0x8e, 102 instructions) dispatches on the *)
-(* node type through the 0x1398 jump table and never returns; its five     *)
+(* node type through the 0x13a8 jump table and never returns; its five     *)
 (* arms are EXEC, REDIR, PIPE, LIST and BACK, and four of the five call    *)
 (* [runcmd] again on a SUBTREE.  [fork1] (0x68) is fork with a panic on    *)
 (* -1, and LIST, PIPE and BACK all go through it.                         *)
@@ -53,7 +53,7 @@
 (* WHAT DISCHARGING IT COST THIS FILE, and it is worth knowing why: the    *)
 (* premise as first written handed the walk only [shk_code], which is      *)
 (* [ShInstrs.sh_bytes] -- the INSTRUCTIONS.  The format strings are at     *)
-(* 0x1290..0x12c7, i.e. in [ShData.sh_data], and panic's own '%s' argument *)
+(* 0x12a0..0x12d7, i.e. in [ShData.sh_data], and panic's own '%s' argument *)
 (* is a .rodata literal too, so no amount of [shk_code] produces them: the *)
 (* premise was not dischargeable, and its ∀ over the gname triple (a       *)
 (* forked child runs it at FRESH names) meant no caller could supply the   *)
@@ -75,7 +75,7 @@
 (* [wp_uk_lbu] already expose it), and a persistent tree cannot be read    *)
 (* without them.  RELOCATION ASK, beside [UkRunBr.wp_uk_btype0]'s.         *)
 (*                                                                        *)
-(* THE JUMP TABLE'S READ IS AN ENGINE LEAF.  The table at 0x1398 lives in  *)
+(* THE JUMP TABLE'S READ IS AN ENGINE LEAF.  The table at 0x13a8 lives in  *)
 (* .rodata, which shares the executable segment's pages, so the heap files *)
 (* its words under [utext] as X-and-not-W and [UkLoad.uk_load_ok]'s        *)
 (* WRITABLE target page is not available: the read is driven at the memory *)
@@ -1240,7 +1240,7 @@ Section UkShRun.
   (*   0xda  the exec-failed tail          -- inside runcmd's EXEC arm      *)
   (*   0x10e the open-failed tail          -- inside runcmd's REDIR arm     *)
   (*                                                                       *)
-  (* Each runs [fprintf] (0x10aa, 279 instructions with vprintf and putc    *)
+  (* Each runs [fprintf] (0x10b2, 279 instructions with vprintf and putc    *)
   (* under it) and then [exit].  The walk is [UkShDiag.v]'s, so the cut     *)
   (* here is the subtree as ONE premise, at those three pcs, with exactly   *)
   (* what each site has in hand:                                            *)
@@ -1261,7 +1261,7 @@ Section UkShRun.
   (* [_fork1_final] are those two with it supplied.                         *)
   (* ===================================================================== *)
   Definition ush_panic_msg (z : Z) : Prop :=
-    z = 0x1298 \/ z = 0x12a0 \/ z = 0x12c8.
+    z = 0x12a8 \/ z = 0x12b0 \/ z = 0x12d8.
 
   (* The two tails' first instruction is [c.ld a2,<k>(s1)], and a [c.ld] is
      8-aligned or it is not a step at all -- so the node's own alignment,
@@ -1293,7 +1293,7 @@ Section UkShRun.
   Qed.
 
   (* [shk_rodata] IS NOT DECORATION.  All three sites read a format
-     string out of .rodata (0x1290, 0x12a8, 0x12b8) and panic's own '%s'
+     string out of .rodata (0x12a0, 0x12b8, 0x12c8) and panic's own '%s'
      argument is a .rodata literal too; none of them is in
      [ShInstrs.sh_bytes], so [shk_code] cannot produce them and the premise
      is not dischargeable without this conjunct.  It costs its callers
@@ -1370,7 +1370,7 @@ Section UkShRun.
        address of "fork", and the run is at [panic]'s entry with the
        diagnostic subtree's stack need in hand. *)
     (∀ (h' : CpuId) (m' : regfile),
-       ⌜ uint (m' !!! Regidx a0_idx) = 0x1298 ⌝ -∗
+       ⌜ uint (m' !!! Regidx a0_idx) = 0x12a8 ⌝ -∗
        ⌜ mt !!! Regidx a0_idx = (mword_of_int (-1) : mword 64) ⌝ -∗
        X -∗
        urun N h' m' (mword_of_int ShSyms.panic) (Dg + n) -∗
@@ -1470,16 +1470,16 @@ Section UkShRun.
                    := regval_into_reg (mword_of_int 0x1082 : mword 64)]> t1).
       assert (Ha0_2 : t2 !!! Regidx a0_idx = (mword_of_int 0x1082 : mword 64))
         by exact (upd_eq t1 (Regidx a0_idx) _).
-      (* 0x86  addi a0,a0,534 *)
+      (* 0x86  addi a0,a0,550 *)
       iApply (wp_uk_addi N h3 t2 (mword_of_int 0x86)
-                (mword_of_int 534 : mword 12) a0_idx a0_idx
-                (mword_of_int 0x1298) (Dg + n)
+                (mword_of_int 550 : mword 12) a0_idx a0_idx
+                (mword_of_int 0x12a8) (Dg + n)
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 ltac:(vm_compute; discriminate)
                 ltac:(rewrite Ha0_2;
                       assert (Es : (sign_extend' 64
-                                      (mword_of_int 534 : mword 12) : mword 64)
-                                   = mword_of_int 534)
+                                      (mword_of_int 550 : mword 12) : mword 64)
+                                   = mword_of_int 550)
                         by (apply bv_eq; vm_compute; reflexivity);
                       rewrite Es moi_add; f_equal; lia)
                 with "[] Hrun").
@@ -1489,7 +1489,7 @@ Section UkShRun.
         by (apply bv_eq; vm_compute; reflexivity).
       rewrite E86. iIntros (h4) "Hrun".
       set (t3 := <[Regidx a0_idx
-                   := regval_into_reg (mword_of_int 0x1298 : mword 64)]> t2).
+                   := regval_into_reg (mword_of_int 0x12a8 : mword 64)]> t2).
       (* 0x8a  jal ra,0x4a <panic> -- and the diagnostic cut takes over *)
       iApply (wp_kshr_jal N h4 t3 0x8a 0x4a 0x8e
                 (mword_of_int 2097088 : mword 21) (Dg + n)
@@ -1500,11 +1500,11 @@ Section UkShRun.
       { iApply (uis_shk_8a with "Hcode"). }
       iIntros (h5) "Hrun".
       set (t4 := <[Regidx ra_idx := (mword_of_int 0x8e : mword 64)]> t3).
-      assert (Hmsg : uint (t4 !!! Regidx a0_idx) = 0x1298).
+      assert (Hmsg : uint (t4 !!! Regidx a0_idx) = 0x12a8).
       { rewrite /t4 (upd_ne t3 (Regidx ra_idx) (Regidx a0_idx) _
                        ltac:(vm_compute; discriminate)).
         rewrite /t3 (upd_eq t2 (Regidx a0_idx)
-                       (mword_of_int 0x1298 : mword 64)).
+                       (mword_of_int 0x12a8 : mword 64)).
         apply uint_moi. unfold Z64. lia. }
       (* the branch was taken, so a0 WAS -1 *)
       assert (Hneg : mt !!! Regidx a0_idx = (mword_of_int (-1) : mword 64)).
@@ -1663,7 +1663,7 @@ Section UkShRun.
         borrowed.  Its text, .rodata, break, cwd and descriptors are
         dropped: nothing after [panic] reads them. *)
      (∀ (h' : CpuId) (m' : regfile) (r : mword 64),
-        ⌜ uint (m' !!! Regidx a0_idx) = 0x1298 ⌝ -∗
+        ⌜ uint (m' !!! Regidx a0_idx) = 0x12a8 ⌝ -∗
         ⌜ r = (mword_of_int (-1) : mword 64) ⌝ -∗
         ((⌜r = (mword_of_int (-1) : mword 64)⌝ ∗
             UserChildren.uch (ukn_ch N) Sc ∗ Rc)
@@ -2123,7 +2123,7 @@ Section UkShRun.
   (*                                                                       *)
   (*   push 48 ; spill ra,s0 ; s0 = fp ; if(cmd==0) exit(1) ; spill s1 ;    *)
   (*   s1 = cmd ; a4 = cmd->type ; if(5 <u a4) panic ;                      *)
-  (*   a5 = 0x1398 + the signed word at 0x1398 + 4*type ; jr a5            *)
+  (*   a5 = 0x13a8 + the signed word at 0x13a8 + 4*type ; jr a5            *)
   (*                                                                       *)
   (* TWO BRANCHES ARE REFUTED HERE, and the node predicate is what refutes  *)
   (* them: [ush_cmd] says the node's address is positive (so the null test  *)
@@ -2482,16 +2482,16 @@ Section UkShRun.
       by (intros q Hq; exact (upd_ne n7 (Regidx a4_idx) (Regidx q) _ Hq)).
     assert (Ha4_8 : n8 !!! Regidx a4_idx = (mword_of_int 0x10aa : mword 64))
       by exact (upd_eq n7 (Regidx a4_idx) _).
-    (* ---- 0xae  addi a4,a4,750 -- a4 = 0x1398, the table ---- *)
+    (* ---- 0xae  addi a4,a4,766 -- a4 = 0x13a8, the table ---- *)
     iApply (wp_uk_addi N h13 n8 (mword_of_int 0xae)
-              (mword_of_int 750 : mword 12) a4_idx a4_idx
+              (mword_of_int 766 : mword 12) a4_idx a4_idx
               (mword_of_int SH_JTAB) n
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Ha4_8;
                     assert (Es : (sign_extend' 64
-                                    (mword_of_int 750 : mword 12) : mword 64)
-                                 = mword_of_int 750)
+                                    (mword_of_int 766 : mword 12) : mword 64)
+                                 = mword_of_int 766)
                       by (apply bv_eq; vm_compute; reflexivity);
                     rewrite Es moi_add; unfold SH_JTAB; f_equal; lia)
               with "[] Hrun").

@@ -12,7 +12,7 @@
 (* application laws -- beside [AppInv.app_inv].                            *)
 (*                                                                        *)
 (*   S1  the path, READ OFF THE LOANED HEAP: "console" is seven bytes of   *)
-(*       /init's own .rodata at 0x970 ([UCodeInit.init_ro]), and           *)
+(*       /init's own .rodata at 0x980 ([UCodeInit.init_ro]), and           *)
 (*       [ArgPath.arg_path_of] is what rows 15 and 17 name.                *)
 (*   S2  the deposit's FAMILIES, as [UexecExecInst.xfam] records: the      *)
 (*       pinned families in the branch the ecall reads and the trivial     *)
@@ -28,10 +28,10 @@
 (*                                                                        *)
 (* WHY THE LEAF BODIES CARRY THE RODATA AND THE ARGUMENT WORDS.  A pinned  *)
 (* open is about a PATH, and the path is a string in the caller's own      *)
-(* image: the supplier reads [arg_path_of M 0x970 init_cons_pl] off the    *)
+(* image: the supplier reads [arg_path_of M 0x980 init_cons_pl] off the    *)
 (* LOANED heap ([UkRun.udepwf_at] lends it), which needs the persistent    *)
 (* view of those bytes ([UCodeInit.init_rodata]) and the knowledge that    *)
-(* argument 0 IS 0x970 and the omode is O_RDWR.  Every call site holds all *)
+(* argument 0 IS 0x980 and the omode is O_RDWR.  Every call site holds all *)
 (* three ([UkInitMain] at 0x0e-0x16, 0x64-0x70 and 0x74-0x7e), so the rows *)
 (* are premises of the bodies and the leaves lose no force.                *)
 (*                                                                        *)
@@ -108,7 +108,7 @@ Local Open Scope Z_scope.
 (*  S1.  THE PATH, OFF /init's READ-ONLY IMAGE                             *)
 (*                                                                        *)
 (*  [UInitSh.init_sh_path_of]'s twin at "console".  The literal is at      *)
-(*  0x970 ([UCodeInit.uis_init_12] / [uis_init_7a] compute the pointer and *)
+(*  0x980 ([UCodeInit.uis_init_12] / [uis_init_7a] compute the pointer and *)
 (*  [UkInitMain]'s walk carries it into a0), seven bytes and a NUL.  Both  *)
 (*  facts are one [vm_compute] on the dump.                                *)
 (* ===================================================================== *)
@@ -116,7 +116,7 @@ Lemma init_cons_ro_bytes_bool :
   forallb (fun k : nat =>
       bool_decide (
           UCodeInit.init_ro
-            !! uint (add_vec_int (mword_of_int 0x970 : mword 64) (Z.of_nat k))
+            !! uint (add_vec_int (mword_of_int 0x980 : mword 64) (Z.of_nat k))
           = init_cons_pl !! k))
     (seq 0 7) = true.
 Proof. vm_compute. reflexivity. Qed.
@@ -124,7 +124,7 @@ Proof. vm_compute. reflexivity. Qed.
 Lemma init_cons_ro_byte (k : nat) :
   (k < 7)%nat ->
   UCodeInit.init_ro
-    !! uint (add_vec_int (mword_of_int 0x970 : mword 64) (Z.of_nat k))
+    !! uint (add_vec_int (mword_of_int 0x980 : mword 64) (Z.of_nat k))
   = init_cons_pl !! k.
 Proof.
   intro Hk.
@@ -136,13 +136,13 @@ Qed.
 Lemma init_cons_ro_nul_bool :
   bool_decide (
       UCodeInit.init_ro
-        !! uint (add_vec_int (mword_of_int 0x970 : mword 64) (Z.of_nat 7%nat))
+        !! uint (add_vec_int (mword_of_int 0x980 : mword 64) (Z.of_nat 7%nat))
       = Some (bv_0 8)) = true.
 Proof. vm_compute. reflexivity. Qed.
 
 Lemma init_cons_path_of (M : gmap Z (bv 8)) :
   uimg_sub UCodeInit.init_ro M ->
-  arg_path_of M (mword_of_int 0x970 : mword 64) init_cons_pl.
+  arg_path_of M (mword_of_int 0x980 : mword 64) init_cons_pl.
 Proof.
   intro Hro.
   split_and!.
@@ -344,7 +344,7 @@ Section UInitConsK.
   Lemma init_cons_sup_absent (N : uk_names Σ) (T K : iProp Σ)
       (m : regfile) (pc : mword 64) :
     Persistent T -> Timeless T -> Timeless K ->
-    m !!! Regidx a0_idx = (mword_of_int 0x970 : mword 64) ->
+    m !!! Regidx a0_idx = (mword_of_int 0x980 : mword 64) ->
     m !!! Regidx a1_idx = (mword_of_int 2 : mword 64) ->
     init_cons_abs_law T K -∗ app_inv fsc_fs -∗ init_rodata (ukn_t N) -∗ K -∗
     udepwf_at N m pc USYS_open (init_cons_absent_fam T K (ukn_pay N))
@@ -352,7 +352,7 @@ Section UInitConsK.
   Proof using .
     intros HPT HTT HTK Ha0 Ha1. iIntros "#Habs #Hinv #Hro HK".
     iApply (cons_sup_absent N T K UCodeInit.init_ro
-              (mword_of_int 0x970) m pc HPT HTT HTK
+              (mword_of_int 0x980) m pc HPT HTT HTK
               (fun M H => init_cons_path_of M H) Ha0 Ha1
               with "Habs Hinv [Hro] HK").
     iApply (init_rodata_img with "Hro").
@@ -360,12 +360,12 @@ Section UInitConsK.
 
 
   (* /INIT'S INSTANCE of [UConsOpen.cons_sup_console]: its own literal, at
-     0x970 in its own .rodata. *)
+     0x980 in its own .rodata. *)
   Lemma init_cons_sup_console (N : uk_names Σ) (Pv : aview -> Prop)
       (T K : iProp Σ) (r : echo_names)
       (i : Z) (m : regfile) (pc : mword 64) :
     Persistent T -> Timeless T ->
-    m !!! Regidx a0_idx = (mword_of_int 0x970 : mword 64) ->
+    m !!! Regidx a0_idx = (mword_of_int 0x980 : mword 64) ->
     m !!! Regidx a1_idx = (mword_of_int 2 : mword 64) ->
     init_cons_laws_at echo_fs_pure (cons_made r) Pv T K -∗
     cons_made r i -∗ app_inv fsc_fs -∗
@@ -376,7 +376,7 @@ Section UInitConsK.
     intros HPT HTT Ha0 Ha1. iIntros "#Hlaws #Hmade #Hinv #Hro".
     iApply (cons_sup_console N echo_fs_pure (cons_made r) Pv T K i
               UCodeInit.init_ro
-              (mword_of_int 0x970) m pc HPT HTT
+              (mword_of_int 0x980) m pc HPT HTT
               (fun M H => init_cons_path_of M H) Ha0 Ha1
               with "Hlaws Hmade Hinv [Hro]").
     iApply (init_rodata_img with "Hro").
@@ -393,7 +393,7 @@ Section UInitConsK.
       (m : regfile) (pc : mword 64) :
     Persistent T -> Timeless T -> Timeless K ->
     (forall v : aview, Timeless (app_pred app_run v)) ->
-    m !!! Regidx a0_idx = (mword_of_int 0x970 : mword 64) ->
+    m !!! Regidx a0_idx = (mword_of_int 0x980 : mword 64) ->
     m !!! Regidx a1_idx = (mword_of_int 1 : mword 64) ->
     m !!! Regidx a2_idx = (mword_of_int 0 : mword 64) ->
     init_cons_laws_at echo_fs_pure (cons_made r) Pv T K -∗ app_inv fsc_fs -∗
@@ -408,8 +408,8 @@ Section UInitConsK.
     iFrame "Hheap Hufd".
     iApply (sbundle_at_mknod_intro_at uslot
               (init_cons_mknod_fam Pv T K r (ukn_pay N))
-              (uvis_of_run m pc M pm sz fdv FsImg.ROOTINO gn cs pidv false)
-              FsImg.ROOTINO M (mword_of_int 0x970) CONSOLE 0
+              (uvis_of_run m pc M pm sz fdv FsImg.ROOTINO gn cs pidv false secc_all)
+              FsImg.ROOTINO M (mword_of_int 0x980) CONSOLE 0
               eq_refl eq_refl
               (eq_trans (tf_of_arg0 m pc) Ha0)
               ltac:(unfold tf_w; cbn [uvis_tf uvis_of_run];
@@ -421,7 +421,7 @@ Section UInitConsK.
     cbn [init_cons_mknod_fam xfam_mknod nf_P nf_Pmiss nf_Farm nf_Fun
          nf_Fok nf_Fex].
     iApply (init_cons_laws_mknod_bundle fsc_fs echo_fs_pure (cons_made r)
-              Pv T K M (mword_of_int 0x970)
+              Pv T K M (mword_of_int 0x980)
               (init_cons_path_of M Hsro) with "Hlaws Hinv HK").
   Qed.
 
@@ -465,7 +465,7 @@ Section UInitConsK.
     rewrite E0 Em.
     iIntros (h1) "Hrun".
     set (m1 := <[Regidx a7_idx := (mword_of_int 15 : mword 64)]> m).
-    assert (Ha0' : m1 !!! Regidx a0_idx = (mword_of_int 0x970 : mword 64)).
+    assert (Ha0' : m1 !!! Regidx a0_idx = (mword_of_int 0x980 : mword 64)).
     { unfold m1.
       rewrite (upd_ne m (Regidx a7_idx) (Regidx a0_idx)
                  (mword_of_int 15 : mword 64)
@@ -497,14 +497,14 @@ Section UInitConsK.
     rewrite E1.
     iIntros (h2 ret W M' fdv' cw' cs')
       "%Himg %Hlen %Hk0 %Hk1 %Hcw %Htk Hfd Hpost Hcwd Hrun".
-    assert (Hpath : arg_path_of (uvis_M W) (mword_of_int 0x970 : mword 64)
+    assert (Hpath : arg_path_of (uvis_M W) (mword_of_int 0x980 : mword 64)
                       init_cons_pl)
       by exact (init_cons_path_of (uvis_M W) Himg).
     (* ---- the receipt: the walk died at hop 0, so the call returned -1
        and the table did not move -- or the application is tainted ---- *)
     iDestruct (spost_at_open_elim_at uslot
                  (init_cons_absent_fam T K (ukn_pay N)) W
-                 FsImg.ROOTINO (uvis_M W) (mword_of_int 0x970)
+                 FsImg.ROOTINO (uvis_M W) (mword_of_int 0x980)
                  (mword_of_int 2) ret M' fdv' cw' cs'
                  Hcw eq_refl
                  ltac:(rewrite Hk0; exact Ha0')
@@ -515,7 +515,7 @@ Section UInitConsK.
       in "Hrc".
     iApply fupd_wp_triv.
     iMod (cons_open_dead_recv fsc_fs T K
-            (uvis_M W) (mword_of_int 0x970) (mword_of_int 2)
+            (uvis_M W) (mword_of_int 0x980) (mword_of_int 2)
             (pfam_triv (fun (_ : aview) (_ : Z) (_ : anode) => True%I))
             (pfam_triv (fun (_ : aview) (_ : Z) (_ : list (bv 8)) => True%I))
             (uvis_fd W) ret fdv' HPT init_cons_om2_trunc Hpath with "Hrc") as "Hans".
@@ -584,7 +584,7 @@ Section UInitConsK.
     rewrite E0 Em.
     iIntros (h1) "Hrun".
     set (m1 := <[Regidx a7_idx := (mword_of_int 15 : mword 64)]> m).
-    assert (Ha0' : m1 !!! Regidx a0_idx = (mword_of_int 0x970 : mword 64)).
+    assert (Ha0' : m1 !!! Regidx a0_idx = (mword_of_int 0x980 : mword 64)).
     { unfold m1.
       rewrite (upd_ne m (Regidx a7_idx) (Regidx a0_idx)
                  (mword_of_int 15 : mword 64)
@@ -616,12 +616,12 @@ Section UInitConsK.
     rewrite E1.
     iIntros (h2 ret W M' fdv' cw' cs')
       "%Himg %Hlen %Hk0 %Hk1 %Hcw %Htk Hfd Hpost Hcwd Hrun".
-    assert (Hpath : arg_path_of (uvis_M W) (mword_of_int 0x970 : mword 64)
+    assert (Hpath : arg_path_of (uvis_M W) (mword_of_int 0x980 : mword 64)
                       init_cons_pl)
       by exact (init_cons_path_of (uvis_M W) Himg).
     iDestruct (spost_at_open_elim_at uslot
                  (init_cons_console_fam T i (ukn_pay N)) W
-                 FsImg.ROOTINO (uvis_M W) (mword_of_int 0x970)
+                 FsImg.ROOTINO (uvis_M W) (mword_of_int 0x980)
                  (mword_of_int 2) ret M' fdv' cw' cs'
                  Hcw eq_refl
                  ltac:(rewrite Hk0; exact Ha0')
@@ -629,7 +629,7 @@ Section UInitConsK.
                  with "Hpost") as "Hrc".
     iEval (rewrite /open_receipt init_cons_om2_create) in "Hrc".
     iDestruct (init_cons_recv fsc_fs T i
-                 (uvis_M W) (mword_of_int 0x970) (mword_of_int 2)
+                 (uvis_M W) (mword_of_int 0x980) (mword_of_int 2)
                  (pfam_triv (fun (_ : aview) (_ : Z) (_ : list (bv 8)) => True%I))
                  (uvis_fd W) ret fdv' Hpath init_cons_om2_trunc with "Hrc") as "Hans".
     (* ---- 0x3b8  c.jr ra ---- *)
@@ -740,7 +740,7 @@ Section UInitConsK.
     rewrite E0 Em.
     iIntros (h1) "Hrun".
     set (m1 := <[Regidx a7_idx := (mword_of_int 17 : mword 64)]> m).
-    assert (Ha0' : m1 !!! Regidx a0_idx = (mword_of_int 0x970 : mword 64)).
+    assert (Ha0' : m1 !!! Regidx a0_idx = (mword_of_int 0x980 : mword 64)).
     { unfold m1.
       rewrite (upd_ne m (Regidx a7_idx) (Regidx a0_idx)
                  (mword_of_int 17 : mword 64)
@@ -770,6 +770,7 @@ Section UInitConsK.
               ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
               ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
               ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
+              ltac:(lia) ltac:(discriminate)
               ltac:(vm_compute; reflexivity)
               with "[] [] Hrun Hcwd [HK]").
     { iApply (uis_init_3bc with "Hcode"). }
@@ -782,12 +783,12 @@ Section UInitConsK.
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite E1.
     iIntros (h2 ret W cs') "%Himg %Hk0 %Hk1 %Hk2 %Hcw Hpost Hcwd Hrun".
-    assert (Hpath : arg_path_of (uvis_M W) (mword_of_int 0x970 : mword 64)
+    assert (Hpath : arg_path_of (uvis_M W) (mword_of_int 0x980 : mword 64)
                       init_cons_pl)
       by exact (init_cons_path_of (uvis_M W) Himg).
     iDestruct (spost_at_mknod_elim_at uslot
                  (init_cons_mknod_fam Pv T K r (ukn_pay N)) W
-                 FsImg.ROOTINO (uvis_M W) (mword_of_int 0x970) CONSOLE 0
+                 FsImg.ROOTINO (uvis_M W) (mword_of_int 0x980) CONSOLE 0
                  ret (uvis_M W) (uvis_fd W) FsImg.ROOTINO cs'
                  Hcw eq_refl
                  ltac:(rewrite Hk0; exact Ha0')
@@ -819,7 +820,7 @@ Section UInitConsK.
       - (* THE NODE EXISTS: the flag, and hence the SECOND open's leaf *)
         iDestruct (init_cons_mknod_recv fsc_fs echo_fs_pure (cons_made r)
                      Pv T K
-                     (uvis_M W) (mword_of_int 0x970) Hpath with "Hok") as "Hm".
+                     (uvis_M W) (mword_of_int 0x980) Hpath with "Hok") as "Hm".
         iDestruct "Hm" as "[Hm | #HT]"; last first.
         { iModIntro. rewrite /UkInit.uki_mknod_out.
           iRight. iRight. iExact "HT". }
@@ -831,7 +832,7 @@ Section UInitConsK.
       - (* THE MKNOD FAILED: what the credential becomes is the caller's *)
         iDestruct (init_cons_mknod_fail_recv fsc_fs echo_fs_pure (cons_made r)
                      Pv T K (fun _ _ => True%I)
-                     (uvis_M W) (mword_of_int 0x970) with "Hfail") as "Hk".
+                     (uvis_M W) (mword_of_int 0x980) with "Hfail") as "Hk".
         iDestruct "Hk" as "[HK | #HT]"; last first.
         { iModIntro. rewrite /UkInit.uki_mknod_out.
           iRight. iRight. iExact "HT". }

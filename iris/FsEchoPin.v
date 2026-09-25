@@ -154,7 +154,7 @@ Qed.
 (* ====================================================================== *)
 
 Lemma fsimg_echo_size :
-  bv_unsigned (di_size (fs_dinode fsimg_P fsimg_sb ECHO_INO)) = 35592.
+  bv_unsigned (di_size (fs_dinode fsimg_P fsimg_sb ECHO_INO)) = 35640.
 Proof. vm_eq. Qed.
 
 Lemma fsimg_echo_nlink :

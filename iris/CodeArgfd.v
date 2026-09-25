@@ -16,8 +16,8 @@ Require Import KernelText.
 Require Import WpMmodeLeafBase.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import KernelDecode00.
 Require Import KernelDecode01.
-Require Import KernelDecode02.
 Require Import KernelDecode04.
 Require Import KernelDecode05.
 Require Import KernelDecode06.
@@ -28,9 +28,9 @@ Require Import KernelDecode13.
 Require Import KernelDecode14.
 Require Import KernelDecode15.
 Require Import KernelDecode16.
+Require Import KernelDecode17.
 Require Import KernelDecode18.
 Require Import KernelDecode20.
-Require Import KernelDecode21.
 Require Import KernelDecode23.
 Require Import KernelDecode25.
 Require Import KernelDecode26.
@@ -84,9 +84,9 @@ Section CodeArgfd.
   Proof using . mk_base (KernelSyms.argfd + 0x10) (mword_of_int 0xfdc40593 : mword 32)
     (mword_of_int (KernelSyms.argfd + 0x10) : mword 64) (ITYPE (mword_of_int 4060 : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 11), ADDI)) kd_fdc40593. Qed.
 
-  Lemma afi_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.argfd + 0x14) : mword 64) false (JAL (mword_of_int 2088186 : mword 21, Regidx (mword_of_int 1))).
-  Proof using . mk_base (KernelSyms.argfd + 0x14) (mword_of_int 0xcfbfd0ef : mword 32)
-    (mword_of_int (KernelSyms.argfd + 0x14) : mword 64) (JAL (mword_of_int 2088186 : mword 21, Regidx (mword_of_int 1))) kd_cfbfd0ef. Qed.
+  Lemma afi_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.argfd + 0x14) : mword 64) false (JAL (mword_of_int 2088120 : mword 21, Regidx (mword_of_int 1))).
+  Proof using . mk_base (KernelSyms.argfd + 0x14) (mword_of_int 0xcb9fd0ef : mword 32)
+    (mword_of_int (KernelSyms.argfd + 0x14) : mword 64) (JAL (mword_of_int 2088120 : mword 21, Regidx (mword_of_int 1))) kd_cb9fd0ef. Qed.
 
   Lemma afi_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.argfd + 0x18) : mword 64) false (LOAD (mword_of_int 4060 : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 14), false, 4)).
   Proof using . mk_base (KernelSyms.argfd + 0x18) (mword_of_int 0xfdc42703 : mword 32)
@@ -100,9 +100,9 @@ Section CodeArgfd.
   Proof using . mk_base (KernelSyms.argfd + 0x1e) (mword_of_int 0x02e7ea63 : mword 32)
     (mword_of_int (KernelSyms.argfd + 0x1e) : mword 64) (BTYPE (mword_of_int 52 : mword 13, Regidx (mword_of_int 14), Regidx (mword_of_int 15), BLTU)) kd_02e7ea63. Qed.
 
-  Lemma afi_22 : kernel_text -∗ instr (mword_of_int (KernelSyms.argfd + 0x22) : mword 64) false (JAL (mword_of_int 2084192 : mword 21, Regidx (mword_of_int 1))).
-  Proof using . mk_base (KernelSyms.argfd + 0x22) (mword_of_int 0xd61fc0ef : mword 32)
-    (mword_of_int (KernelSyms.argfd + 0x22) : mword 64) (JAL (mword_of_int 2084192 : mword 21, Regidx (mword_of_int 1))) kd_d61fc0ef. Qed.
+  Lemma afi_22 : kernel_text -∗ instr (mword_of_int (KernelSyms.argfd + 0x22) : mword 64) false (JAL (mword_of_int 2084112 : mword 21, Regidx (mword_of_int 1))).
+  Proof using . mk_base (KernelSyms.argfd + 0x22) (mword_of_int 0xd11fc0ef : mword 32)
+    (mword_of_int (KernelSyms.argfd + 0x22) : mword 64) (JAL (mword_of_int 2084112 : mword 21, Regidx (mword_of_int 1))) kd_d11fc0ef. Qed.
 
   Lemma afi_26 : kernel_text -∗ instr (mword_of_int (KernelSyms.argfd + 0x26) : mword 64) false (LOAD (mword_of_int 4060 : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 14), false, 4)).
   Proof using . mk_base (KernelSyms.argfd + 0x26) (mword_of_int 0xfdc42703 : mword 32)

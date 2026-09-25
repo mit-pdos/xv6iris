@@ -739,23 +739,23 @@ Section ExecArgsLift.
      and is done -- which is what section 1's second ruling (the argv
      reading is a premise the entry may consume) costs once general. *)
   Lemma image_entry_of_at_reading (f : elf_bytes) (M : gmap Z (bv 8))
-      (av : mword 64) (sts : list fdstate) (cw : Z) (cs : gset gname)
+      (av : mword 64) (sts : list fdstate) (cw : Z) (secc : mword 64) (cs : gset gname)
       (pidv : mword 32) (Q : Z -> iProp Σ) (Pay : iProp Σ)
       (X : uvis -d> iPropO Σ)
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8) :
     exec_args_of M av na alen afun ->
-    image_entry_at f na alen afun sts cw cs pidv Q Pay X -∗
-    image_entry f M av sts cw cs pidv Q Pay X.
+    image_entry_at f na alen afun sts cw secc cs pidv Q Pay X -∗
+    image_entry f M av sts cw secc cs pidv Q Pay X.
   Proof using .
     intros Hargs. iIntros "#H". rewrite /image_entry.
     iIntros "!>" (na' alen' afun' W')
-      "%Hok %Hcw %Hlz %Hch %Hpid %Hargs' Hp HPay".
+      "%Hok %Hcw %Hlz %Hscw %Hch %Hpid %Hargs' Hp HPay".
     destruct (exec_args_of_agree M av na alen afun na' alen' afun'
                 Hargs Hargs') as (Hn & Hl & Hb).
     subst na'.
     rewrite /image_entry_at.
-    iApply ("H" $! W' with "[%] [%] [%] [%] [%] Hp HPay");
-      [ | exact Hcw | exact Hlz | exact Hch | exact Hpid ].
+    iApply ("H" $! W' with "[%] [%] [%] [%] [%] [%] Hp HPay");
+      [ | exact Hcw | exact Hlz | exact Hscw | exact Hch | exact Hpid ].
     refine (kexec_image_ok_ext f na alen' alen afun' afun sts W'
               _ _ Hok).
     - intros i Hi. exact (eq_sym (Hl i Hi)).

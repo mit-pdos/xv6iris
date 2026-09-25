@@ -171,6 +171,7 @@ Section USyncKernel.
        build a slot for a key that says so.  exec's slot post is what will
        supply it ([SpecKexec.exec_slot_pre], lane LAZY-FLAG's K4). *)
     uvis_lazy W = false ->
+    uvis_secc W = ProcDefs.secc_all ->
     (* NO ALL-PARKED PREMISE (lane OFF-HAND-6, H3): a record's held set is
        dead data now ([UkRun.urun_parked_row]), so this entry may be taken
        at a key with a HELD descriptor (design/app-file.md SS3 fact 4). *)
@@ -186,11 +187,11 @@ Section USyncKernel.
     UkRun.urun_nopipe (uvis_fd W) -∗
     udep -∗ my_pay (uvis_gen W) (fun _ => True)%I -∗ uslot W.
   Proof using ghost_varG0 ghost_varG1 ufdG0.
-    intros Hpc Hsub Hx Hroom Hal8 Hdata Hfdlen Hstop Hpsok_free Hlzf.
+    intros Hpc Hsub Hx Hroom Hal8 Hdata Hfdlen Hstop Hpsok_free Hlzf Hscf.
     iIntros "#Hnpw #Hdep #Hpay".
     iApply (uslot_of_urun W 4 (fun _ => True)%I
               Hal8 ltac:(lia) Hdata Hfdlen
-              Hstop Hlzf with "Hdep Hnpw Hpay").
+              Hstop Hlzf Hscf with "Hdep Hnpw Hpay").
     (* sync makes no descriptor call, so its ledger is dropped here *)
     (* sync makes no descriptor call and no chdir, so its ledger and its
        working directory are both dropped here *)

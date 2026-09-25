@@ -42,10 +42,10 @@
                           worked example.
 
    Image geometry, as dumped:
-     text  0x0 .. 0x92c   (2348 bytes)
-     PT_LOAD 0x0      filesz 0xdcc    memsz 0xdcc    flags 5   (executable: 1 text page(s))
+     text  0x0 .. 0x934   (2356 bytes)
+     PT_LOAD 0x0      filesz 0xddc    memsz 0xddc    flags 5   (executable: 1 text page(s))
      PT_LOAD 0x1000   filesz 0x0      memsz 0x20     flags 6
-     data  0x92c .. 0xdcc   (1184 bytes)
+     data  0x934 .. 0xddc   (1192 bytes)
      entry 0x7c, MemBase 0x0, MemEnd 0x1020
 
    Catalogued: 82 instruction(s), 68 distinct word(s), in 8 function(s):
@@ -72,7 +72,7 @@
           2e:  00a58a33  add s4,a1,a0
           32:  4985      c.li s3,1
           34:  00001b17  auipc s6,0x1
-          38:  8fcb0b13  addi s6,s6,-1796 # 930 <malloc+0xf8>
+          38:  90cb0b13  addi s6,s6,-1780 # 940 <malloc+0x100>
           3c:  a809      c.j 4e <main+0x4e>
           3e:  864e      c.mv a2,s3
           40:  85da      c.mv a1,s6
@@ -90,7 +90,7 @@
           62:  fd549ee3  bne s1,s5,3e <main+0x3e>
           66:  4605      c.li a2,1
           68:  00001597  auipc a1,0x1
-          6c:  8d058593  addi a1,a1,-1840 # 938 <malloc+0x100>
+          6c:  8e058593  addi a1,a1,-1824 # 948 <malloc+0x108>
           70:  8532      c.mv a0,a2
           72:  2e0000ef  jal 352 <write>
           76:  4501      c.li a0,0
@@ -152,8 +152,8 @@
        0x338 -- exit's [c.jr ra] -- the ecall at 0x334 never returns
        atoi, chdir, dup, exec, fork, fprintf, free, fstat, getpid, gets, kill,
        link, malloc, memcmp, memcpy, memmove, memset, mkdir, mknod, pause,
-       pipe, printf, printint, putc, sbrk, sbrklazy, stat, strchr, strcmp,
-       strcpy, sync, sys_sbrk, unlink, uptime, vprintf, wait -- library
+       pipe, printf, printint, putc, sbrk, sbrklazy, seccomp, stat, strchr,
+       strcmp, strcpy, sync, sys_sbrk, unlink, uptime, vprintf, wait -- library
        function or other syscall stub that echo never calls
 
    echo's five reachable functions. main and start diverge; strlen and the
@@ -212,8 +212,8 @@ Lemma echo_img_data (M : gmap Z (bv 8)) : echo_img_sub M -> echo_data_sub M.
 Proof using . intros [ _ H ]. exact H. Qed.
 
 (* ---- the KEY RANGE of each dumped map ------------------------------- *)
-(* The bounds are COMPUTED from the dump (text keys stop at 0x92b, data keys
-   at 0xdcb) and rounded up to the next page, which is the shape the users of
+(* The bounds are COMPUTED from the dump (text keys stop at 0x933, data keys
+   at 0xddb) and rounded up to the next page, which is the shape the users of
    the fact want: [UmodeAbi.uM_only_img] asks exactly "the written window is
    disjoint from every key of [img]", and the windows a program writes are
    its stack, which starts at a page boundary above the image. *)
@@ -665,14 +665,14 @@ Lemma udec_00858493 :
   udecode_base (mword_of_int 0x00858493) (ITYPE (mword_of_int 8 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 9), ADDI)).
 Proof using . udec_base_bridge. Qed.
 
-(* 8d058593  addi a1,a1,-1840 # 938 <malloc+0x100> *)
-Lemma udec_8d058593 :
-  udecode_base (mword_of_int 0x8d058593) (ITYPE (mword_of_int 2256 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)).
+(* 8e058593  addi a1,a1,-1824 # 948 <malloc+0x108> *)
+Lemma udec_8e058593 :
+  udecode_base (mword_of_int 0x8e058593) (ITYPE (mword_of_int 2272 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)).
 Proof using . udec_base_bridge. Qed.
 
-(* 8fcb0b13  addi s6,s6,-1796 # 930 <malloc+0xf8> *)
-Lemma udec_8fcb0b13 :
-  udecode_base (mword_of_int 0x8fcb0b13) (ITYPE (mword_of_int 2300 : mword 12, Regidx (mword_of_int 22), Regidx (mword_of_int 22), ADDI)).
+(* 90cb0b13  addi s6,s6,-1780 # 940 <malloc+0x100> *)
+Lemma udec_90cb0b13 :
+  udecode_base (mword_of_int 0x90cb0b13) (ITYPE (mword_of_int 2316 : mword 12, Regidx (mword_of_int 22), Regidx (mword_of_int 22), ADDI)).
 Proof using . udec_base_bridge. Qed.
 
 (* 088000ef  jal dc <strlen> *)
@@ -821,7 +821,7 @@ Section UCodeEcho.
   Global Instance echo_code_persistent g : Persistent (echo_code g).
   Proof using . apply _. Qed.
 
-  (* Keep typeclass resolution from unfolding this into its 2348-entry
+  (* Keep typeclass resolution from unfolding this into its 2356-entry
      [big_sepM]; cf. [KernelText.kernel_text], which learned it the hard
      way.  Conversion can still see through it -- [echo_code_img] below is
      the one place that needs to. *)
@@ -1106,14 +1106,14 @@ Section UCodeEcho.
     uis_base g 0x34 (mword_of_int 0x00001b17 : mword 32) udec_00001b17.
   Qed.
 
-  (* 0x38  addi s6,s6,-1796 # 930 <malloc+0xf8>  (base, 4-aligned) *)
+  (* 0x38  addi s6,s6,-1780 # 940 <malloc+0x100>  (base, 4-aligned) *)
   Lemma uis_echo_38 (g : gname) :
     echo_code g -∗
     uinstr_is g (mword_of_int 0x38) false
-      (ITYPE (mword_of_int 2300 : mword 12, Regidx (mword_of_int 22), Regidx (mword_of_int 22), ADDI)).
+      (ITYPE (mword_of_int 2316 : mword 12, Regidx (mword_of_int 22), Regidx (mword_of_int 22), ADDI)).
   Proof using .
     iIntros "#Ht".
-    uis_base g 0x38 (mword_of_int 0x8fcb0b13 : mword 32) udec_8fcb0b13.
+    uis_base g 0x38 (mword_of_int 0x90cb0b13 : mword 32) udec_90cb0b13.
   Qed.
 
   (* 0x3c  c.j 4e <main+0x4e>  (RVC, 4-aligned) *)
@@ -1291,14 +1291,14 @@ Section UCodeEcho.
     uis_base g 0x68 (mword_of_int 0x00001597 : mword 32) udec_00001597.
   Qed.
 
-  (* 0x6c  addi a1,a1,-1840 # 938 <malloc+0x100>  (base, 4-aligned) *)
+  (* 0x6c  addi a1,a1,-1824 # 948 <malloc+0x108>  (base, 4-aligned) *)
   Lemma uis_echo_6c (g : gname) :
     echo_code g -∗
     uinstr_is g (mword_of_int 0x6c) false
-      (ITYPE (mword_of_int 2256 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)).
+      (ITYPE (mword_of_int 2272 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)).
   Proof using .
     iIntros "#Ht".
-    uis_base g 0x6c (mword_of_int 0x8d058593 : mword 32) udec_8d058593.
+    uis_base g 0x6c (mword_of_int 0x8e058593 : mword 32) udec_8e058593.
   Qed.
 
   (* 0x70  c.mv a0,a2  (RVC, 4-aligned) *)
@@ -1767,7 +1767,7 @@ Section UCodeEcho.
      in [EchoInstrs.echo_bytes] and they are not in the data half either:
      .rodata shares the EXECUTABLE segment's pages, so its bytes are
      X-and-not-W and the heap files them under [γt] exactly as it files the
-     code. This program's literals land at 0x92c..0xdcc, inside the R-X
+     code. This program's literals land at 0x934..0xddc, inside the R-X
      segment, and a printf-family walk LOADS them one byte at a time. This is
      the part of [EchoData.echo_data] that lands there -- everything below
      the end of the executable segment -- and [UserHeap.utext_str_of_img]

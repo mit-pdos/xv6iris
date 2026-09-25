@@ -16,6 +16,7 @@ Require Import KernelText.
 Require Import WpMmodeLeafBase.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import KernelDecode03.
 Require Import KernelDecode04.
 Require Import KernelDecode07.
 Require Import KernelDecode09.
@@ -29,7 +30,7 @@ Require Import KernelDecode18.
 Require Import KernelDecode19.
 Require Import KernelDecode20.
 Require Import KernelDecode21.
-Require Import KernelDecode22.
+Require Import KernelDecode24.
 Require Import KernelDecode26.
 Require Import KernelDecode29.
 Require Import KernelDecode31.
@@ -75,9 +76,9 @@ Section CodeFetchaddr.
   Proof using . mk_rvc (KernelSyms.fetchaddr + 0xe) (mword_of_int 0x892e : mword 16)
     (mword_of_int (KernelSyms.fetchaddr + 0xe) : mword 64) (RTYPE (Regidx (mword_of_int 11), zreg, Regidx (mword_of_int 18), ADD)) kd_892e exec_execute_C_MV. Qed.
 
-  Lemma fai_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.fetchaddr + 0x10) : mword 64) false (JAL (mword_of_int 2093296 : mword 21, Regidx (mword_of_int 1))).
-  Proof using . mk_base (KernelSyms.fetchaddr + 0x10) (mword_of_int 0x8f0ff0ef : mword 32)
-    (mword_of_int (KernelSyms.fetchaddr + 0x10) : mword 64) (JAL (mword_of_int 2093296 : mword 21, Regidx (mword_of_int 1))) kd_8f0ff0ef. Qed.
+  Lemma fai_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.fetchaddr + 0x10) : mword 64) false (JAL (mword_of_int 2093282 : mword 21, Regidx (mword_of_int 1))).
+  Proof using . mk_base (KernelSyms.fetchaddr + 0x10) (mword_of_int 0x8e2ff0ef : mword 32)
+    (mword_of_int (KernelSyms.fetchaddr + 0x10) : mword 64) (JAL (mword_of_int 2093282 : mword 21, Regidx (mword_of_int 1))) kd_8e2ff0ef. Qed.
 
   Lemma fai_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.fetchaddr + 0x14) : mword 64) true (LOAD (mword_of_int 72 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 11), false, 8)).
   Proof using . mk_rvc (KernelSyms.fetchaddr + 0x14) (mword_of_int 0x652c : mword 16)
@@ -111,9 +112,9 @@ Section CodeFetchaddr.
   Proof using . mk_rvc (KernelSyms.fetchaddr + 0x28) (mword_of_int 0x6928 : mword 16)
     (mword_of_int (KernelSyms.fetchaddr + 0x28) : mword 64) (LOAD (mword_of_int 80 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), false, 8)) kd_6928 ke_6928. Qed.
 
-  Lemma fai_2a : kernel_text -∗ instr (mword_of_int (KernelSyms.fetchaddr + 0x2a) : mword 64) false (JAL (mword_of_int 2092502 : mword 21, Regidx (mword_of_int 1))).
-  Proof using . mk_base (KernelSyms.fetchaddr + 0x2a) (mword_of_int 0xdd7fe0ef : mword 32)
-    (mword_of_int (KernelSyms.fetchaddr + 0x2a) : mword 64) (JAL (mword_of_int 2092502 : mword 21, Regidx (mword_of_int 1))) kd_dd7fe0ef. Qed.
+  Lemma fai_2a : kernel_text -∗ instr (mword_of_int (KernelSyms.fetchaddr + 0x2a) : mword 64) false (JAL (mword_of_int 2092488 : mword 21, Regidx (mword_of_int 1))).
+  Proof using . mk_base (KernelSyms.fetchaddr + 0x2a) (mword_of_int 0xdc9fe0ef : mword 32)
+    (mword_of_int (KernelSyms.fetchaddr + 0x2a) : mword 64) (JAL (mword_of_int 2092488 : mword 21, Regidx (mword_of_int 1))) kd_dc9fe0ef. Qed.
 
   Lemma fai_2e : kernel_text -∗ instr (mword_of_int (KernelSyms.fetchaddr + 0x2e) : mword 64) false (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 10), SLTU)).
   Proof using . mk_base (KernelSyms.fetchaddr + 0x2e) (mword_of_int 0x00a03533 : mword 32)

@@ -276,7 +276,7 @@ Section UkPipeDev.
        my_pay gn (ukn_pay N) -∗
        uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗ ufd_auth (ukn_fd N) fdv -∗
        uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz ∗ ufd_auth (ukn_fd N) fdv ∗
-       sbundle_at uslot n fdep (uvis_of_run m pc M pm sz fdv cw gn cs pidv false))%I.
+       sbundle_at uslot n fdep (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all))%I.
 
   (* [UkRunSys.wp_uk_ecall_write_at], word for word, but for the deposit's
      one extra premise *)
@@ -330,10 +330,12 @@ Section UkPipeDev.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)) = 16).
-    { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
+    assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all) = 16).
+    { assert (Hraw : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = 16)
+        by (cbn [uvis_tf uvis_of_run]; rewrite tf_of_num; exact Hn).
+      rewrite uvis_num_full0; [ exact Hraw | reflexivity | rewrite Hraw; usys_range ]. }
     rewrite /uexec_pay_dep /upay_at.
-    rewrite Hnum. cbv zeta.
+    pose proof Hnum as Hnume. unfold uvis_num in Hnume. rewrite ?Hnum ?Hnume. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (16 = USYS_exit)) as [He | _]; [ discriminate He | ].
@@ -343,12 +345,18 @@ Section UkPipeDev.
     cbn [uvis_gen uvis_of_run].
     iSplitR; [ iFrame "Hmy" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz')
-      "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hchrow Hpost".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc')
+      "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow Hpost".
     assert (Hlzq : lz' = false)
       by (refine (usys_mem_ok_lazy _ _ _ _ _ _ _ _ _ _ _ _ Hok);
           vm_compute; discriminate).
     subst lz'.
+    (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
+       equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
+       the full mask [urun] is keyed at *)
+    pose proof (fun Hne => usys_secc_ok_quiet _ _ _ _ _ Hne Hscrow) as Hscq.
+    specialize (Hscq ltac:(usys_range)).
+    cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     assert (Hcw : cw' = cw)
       by (refine (usys_cwd_ok_quiet _ _ _ _ _ Hcwrow); vm_compute; discriminate).
     assert (Hgn : gn' = gn) by exact (usys_gen_ok_quiet _ _ _ Hgnrow).
@@ -362,21 +370,21 @@ Section UkPipeDev.
                   ltac:(discriminate) ltac:(discriminate)
                   ltac:(discriminate) ltac:(discriminate) Hfdok) as ->.
     cbn [uvis_M uvis_perm uvis_of_run].
-    rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw gn gn cs cs pidv false false r Hx0 Hal4).
+    rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw gn gn cs cs pidv false false secc_all secc_all r Hx0 Hal4).
     iApply ukcq_ukc.
     iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _ _ _ _
               ltac:(unfold unot_sp; vm_compute; discriminate)
               with "Hheap Hstk Hufd Hcwda Hcha Hmy Hdep Hnpx").
     iIntros (h') "Hrun".
-    iApply ("Hcont" $! h' r (uvis_of_run m pc M pm sz fdv cw gn cs pidv false) cw cs
+    iApply ("Hcont" $! h' r (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all) cw cs
               with "[%] [%] [%] [%] [%] [%] Hstd Hbuf [Hpost] Hrun").
     { rewrite /tf_w. cbn [uvis_tf uvis_of_run]. exact (tf_of_arg0 m pc). }
     { rewrite /tf_w. cbn [uvis_tf uvis_of_run]. exact (tf_of_arg1 m pc). }
     { rewrite /tf_w. cbn [uvis_tf uvis_of_run]. exact (tf_of_arg2 m pc). }
-    { rewrite (uvis_of_run_fd m pc M pm sz fdv cw gn cs pidv false). exact Htake. }
+    { rewrite (uvis_of_run_fd m pc M pm sz fdv cw gn cs pidv false secc_all). exact Htake. }
     { reflexivity. }
     { cbn [uvis_M uvis_perm uvis_sz uvis_of_run]. exact Hnf. }
-    rewrite (uvis_of_run_fd m pc M pm sz fdv cw gn cs pidv false).
+    rewrite (uvis_of_run_fd m pc M pm sz fdv cw gn cs pidv false secc_all).
     cbn [uvis_M uvis_of_run]. iExact "Hpost".
   Qed.
 
@@ -425,11 +433,11 @@ Section UkPipeDev.
       iIntros (M pm sz fdv cw gn cs pidv) "%Htake %Hsok _ Hheap Hufd".
       iFrame "Hheap Hufd".
       iApply (sbundle_at_write_intro_at uslot (write_pipe_fam Q Qe (ukn_pay N))
-                (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)
+                (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)
                 (m !!! Regidx a0_idx) (m !!! Regidx a1_idx)
                 (m !!! Regidx a2_idx) fdv M _ _ _
                 (tf_of_arg0 m pc) (tf_of_arg1 m pc) (tf_of_arg2 m pc)
-                (uvis_of_run_fd m pc M pm sz fdv cw gn cs pidv false)
+                (uvis_of_run_fd m pc M pm sz fdv cw gn cs pidv false secc_all)
                 eq_refl eq_refl eq_refl eq_refl).
       rewrite (std_fd_st_of_key (m !!! Regidx a0_idx) fdv l fd
                  (FdOpen rb true (FdPipe γp)) H0 Hlt Htake Hl).

@@ -198,7 +198,7 @@ Section UkFileOpen.
     iFrame "Hheap Hufd".
     iApply (sbundle_at_open_intro_at uslot
               (file_open_fam omo c r q1 q2 i bs Nf s (ukn_pay N))
-              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)
+              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)
               cw M pv (m !!! Regidx a1_idx) eq_refl eq_refl
               (eq_trans (tf_of_arg0 m pc) Ha0)
               (tf_of_arg1 m pc)).
@@ -352,7 +352,7 @@ Section UkFileOpen.
     iFrame "Hheap Hufd".
     iApply (sbundle_at_open_intro_at uslot
               (file_miss_fam c r q s (ukn_pay N))
-              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)
+              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)
               cw M pv (m !!! Regidx a1_idx) eq_refl eq_refl
               (eq_trans (tf_of_arg0 m pc) Ha0)
               (tf_of_arg1 m pc)).
@@ -896,7 +896,7 @@ Section UkFileOpen.
     iFrame "Hheap Hufd".
     iApply (sbundle_at_open_intro_at uslot
               (file_create_fam omo c r jo Nf n s g (ukn_pay N))
-              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)
+              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)
               cw M pv (m !!! Regidx a1_idx) eq_refl eq_refl
               (eq_trans (tf_of_arg0 m pc) Ha0)
               (tf_of_arg1 m pc)).
@@ -1084,7 +1084,7 @@ Section UkFileOpen.
     iFrame "Hheap Hufd".
     iApply (sbundle_at_open_intro_at uslot
               (file_open_fam omo c r q1 q2 i bs Nf s (ukn_pay N))
-              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)
+              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)
               cw M pv (m !!! Regidx a1_idx) eq_refl eq_refl
               (eq_trans (tf_of_arg0 m pc) Ha0)
               (tf_of_arg1 m pc)).
@@ -1117,7 +1117,7 @@ Section UkFileOpen.
     iFrame "Hheap Hufd".
     iApply (sbundle_at_open_intro_at uslot
               (file_miss_fam c r q s (ukn_pay N))
-              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)
+              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)
               cw M pv (m !!! Regidx a1_idx) eq_refl eq_refl
               (eq_trans (tf_of_arg0 m pc) Ha0)
               (tf_of_arg1 m pc)).
@@ -1154,7 +1154,7 @@ Section UkFileOpen.
     iFrame "Hheap Hufd".
     iApply (sbundle_at_open_intro_at uslot
               (file_create_fam omo c r jo Nf n s g (ukn_pay N))
-              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)
+              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)
               cw M pv (m !!! Regidx a1_idx) eq_refl eq_refl
               (eq_trans (tf_of_arg0 m pc) Ha0)
               (tf_of_arg1 m pc)).

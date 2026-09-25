@@ -501,7 +501,7 @@ Section UexecExecInst.
       : iProp Σ :=
     (my_pay (uvis_gen W) (kf_xpay f) ∗
      sys_exec_au_pre (MkPfam X (xf_Rs f)) (fs_gamma_L fsc_fs) fsc_fs
-       (uvis_cwd W) (kf_xpay f) (xf_P f) (xf_Pmiss f) (xf_Fo f)
+       (uvis_cwd W) (uvis_secc W) (kf_xpay f) (xf_P f) (xf_Pmiss f) (xf_Fo f)
        (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 0))
        (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W) (uvis_ch W) (uvis_pid W))%I.
 
@@ -512,7 +512,7 @@ Section UexecExecInst.
     (* the pay row does not mention the slot predicate, so it is untouched
        by the distance; only the AU half moves *)
     rewrite (sys_exec_au_pre_ne n X Y (xf_Rs f) (fs_gamma_L fsc_fs) fsc_fs
-               (uvis_cwd W) (kf_xpay f) (xf_P f) (xf_Pmiss f) (xf_Fo f)
+               (uvis_cwd W) (uvis_secc W) (kf_xpay f) (xf_P f) (xf_Pmiss f) (xf_Fo f)
                (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 0))
                (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W) (uvis_ch W) (uvis_pid W) HXY).
     reflexivity.
@@ -533,10 +533,12 @@ Section UexecExecInst.
        EXEC-SEAM); [UexecSG.skey_eq] pins both *)
     uvis_ch W = uvis_ch W' ->
     uvis_pid W = uvis_pid W' ->
+    (* ...and the mask, which the slot piece's pin names (upstream a083670) *)
+    uvis_secc W = uvis_secc W' ->
     exec_sbundle X f W ⊣⊢ exec_sbundle X f W'.
   Proof using .
-    intros HM Hpv Hav Hfd Hcw Hgn Hch Hpi.
-    rewrite /exec_sbundle HM Hpv Hav Hfd Hcw Hgn Hch Hpi. reflexivity.
+    intros HM Hpv Hav Hfd Hcw Hgn Hch Hpi Hsc.
+    rewrite /exec_sbundle HM Hpv Hav Hfd Hcw Hgn Hch Hpi Hsc. reflexivity.
   Qed.
 
   (* ===================================================================== *)
@@ -868,10 +870,10 @@ Section UexecExecInst.
   Proof using .
     intros Hk.
     pose proof Hk as (HM & Ha0 & Ha1 & Ha2 & Hfd & Hcw & Hgn & Hch & Hpi
-                      & Hpm & Hsz & Hlz).
+                      & Hpm & Hsz & Hlz & Hsc).
     rewrite /xv6_sbundle.
     destruct (decide (n = USYS_exec)) as [_ | _];
-      [ exact (exec_sbundle_cong X f W W' HM Ha0 Ha1 Hfd Hcw Hgn Hch Hpi) | ].
+      [ exact (exec_sbundle_cong X f W W' HM Ha0 Ha1 Hfd Hcw Hgn Hch Hpi Hsc) | ].
     (* RULING WR-TB: row 16 now reads the key's permission map, break and
        lazy bit too, and [UexecSG.skey_eq] already fixes all three. *)
     rewrite /xk_a /tf_w HM Ha0 Ha1 Ha2 Hfd Hcw Hpm Hsz Hlz.
@@ -889,7 +891,7 @@ Section UexecExecInst.
   Proof using .
     intros Hk.
     pose proof Hk as (HM & Ha0 & Ha1 & Ha2 & Hfd & Hcw & Hgn & _ & _ & Hpi & Hsz
-                      & Hlz).
+                      & Hlz & Hsc).
     rewrite /xv6_spost /xk_a /tf_w HM Ha0 Ha1 Ha2 Hfd Hcw Hgn Hpi Hsz Hlz.
     reflexivity.
   Qed.
@@ -925,15 +927,15 @@ Section UexecExecInst.
     rewrite /exec_slot_pre.
     iDestruct "Hslot" as "[Hsa Hsb]".
     iSplitL "Hsa".
-    - iIntros (av i ff nl W') "HP Ho %Hld %Him %Hcwq %Hlzq %Hchq %Hpiq Hpy".
+    - iIntros (av i ff nl W') "HP Ho %Hld %Him %Hcwq %Hlzq %Hscw %Hchq %Hpiq Hpy".
       iApply "Hup".
-      iApply ("Hsa" $! av i ff nl W' with "HP Ho [%] [%] [%] [%] [%] [%] Hpy");
-        [ exact Hld | exact Him | exact Hcwq | exact Hlzq | exact Hchq
+      iApply ("Hsa" $! av i ff nl W' with "HP Ho [%] [%] [%] [%] [%] [%] [%] Hpy");
+        [ exact Hld | exact Him | exact Hcwq | exact Hlzq | exact Hscw | exact Hchq
         | exact Hpiq ].
-    - iIntros (av i a W') "HP Ho %Hnl %Hkk %Hcwq %Hlzq %Hchq %Hpiq Hpy".
+    - iIntros (av i a W') "HP Ho %Hnl %Hkk %Hcwq %Hlzq %Hscw %Hchq %Hpiq Hpy".
       iApply "Hup".
-      iApply ("Hsb" $! av i a W' with "HP Ho [%] [%] [%] [%] [%] [%] Hpy");
-        [ exact Hnl | exact Hkk | exact Hcwq | exact Hlzq | exact Hchq
+      iApply ("Hsb" $! av i a W' with "HP Ho [%] [%] [%] [%] [%] [%] [%] Hpy");
+        [ exact Hnl | exact Hkk | exact Hcwq | exact Hlzq | exact Hscw | exact Hchq
         | exact Hpiq ].
   Qed.
 
@@ -1093,9 +1095,9 @@ Section UexecExecInst.
          could answer only one of them, and the new image is handed no
          payload by the kernel any more. *)
       rewrite /exec_slot_pre. iSplitR.
-      + iIntros (av' i ff nl W') "_ _ _ _ _ _ _ _ Hp".
+      + iIntros (av' i ff nl W') "_ _ _ _ _ _ _ _ _ Hp".
         iApply ("Hs" with "Hp HR").
-      + iIntros (av' i a W') "_ _ _ _ _ _ _ _ Hp".
+      + iIntros (av' i a W') "_ _ _ _ _ _ _ _ _ Hp".
         iApply ("Hs" with "Hp HR").
     - iApply (xv6_sbundle_of_supply_ne X n W (fun _ => R)%I Hne).
       rewrite /xv6_ssupply. iModIntro.
@@ -1600,7 +1602,7 @@ Section UexecExecInst.
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)) (Rs : iProp Σ) :
     my_pay (uvis_gen W) (fun _ => True)%I -∗
-    sys_exec_au_pre (MkPfam X Rs) (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
+    sys_exec_au_pre (MkPfam X Rs) (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W) (uvis_secc W)
       (fun _ => True)%I P Pmiss Fo
       (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 0))
       (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W) (uvis_ch W) (uvis_pid W) -∗
@@ -1616,7 +1618,7 @@ Section UexecExecInst.
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)) (Rs : iProp Σ) :
     my_pay (uvis_gen W) (fun _ => True)%I -∗
-    sys_exec_au_pre (MkPfam X Rs) (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
+    sys_exec_au_pre (MkPfam X Rs) (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W) (uvis_secc W)
       (fun _ => True)%I P Pmiss Fo
       (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 0))
       (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W) (uvis_ch W) (uvis_pid W) -∗
@@ -1638,7 +1640,7 @@ Section UexecExecInst.
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)) (Rs : iProp Σ) :
     my_pay (uvis_gen W) Q -∗
-    sys_exec_au_pre (MkPfam X Rs) (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
+    sys_exec_au_pre (MkPfam X Rs) (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W) (uvis_secc W)
       Q P Pmiss Fo
       (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 0))
       (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W) (uvis_ch W) (uvis_pid W) -∗
@@ -1663,7 +1665,7 @@ Section UexecExecInst.
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)) (Rs : iProp Σ) :
     □ (Rs -∗ Q (-1)) -∗
     my_pay (uvis_gen W) Q -∗
-    sys_exec_au_pre (MkPfam X Rs) (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
+    sys_exec_au_pre (MkPfam X Rs) (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W) (uvis_secc W)
       Q P Pmiss Fo
       (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 0))
       (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W) (uvis_ch W) (uvis_pid W) -∗
@@ -1683,7 +1685,7 @@ Section UexecExecInst.
     sbundle_at X USYS_exec f W -∗
     my_pay (uvis_gen W) (kf_xpay f) ∗
     sys_exec_au_pre (MkPfam X (xf_Rs f)) (fs_gamma_L fsc_fs) fsc_fs
-      (uvis_cwd W) (kf_xpay f) (xf_P f) (xf_Pmiss f) (xf_Fo f)
+      (uvis_cwd W) (uvis_secc W) (kf_xpay f) (xf_P f) (xf_Pmiss f) (xf_Fo f)
       (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 0))
       (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W) (uvis_ch W) (uvis_pid W).
   Proof using .
@@ -1698,7 +1700,7 @@ Section UexecExecInst.
     ∃ (Q : Z -> iProp Σ) (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)) (Rs : iProp Σ),
       my_pay (uvis_gen W) Q ∗
-      sys_exec_au_pre (MkPfam X Rs) (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
+      sys_exec_au_pre (MkPfam X Rs) (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W) (uvis_secc W)
         Q P Pmiss Fo
         (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 0))
         (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W) (uvis_ch W) (uvis_pid W).

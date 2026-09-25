@@ -115,7 +115,7 @@ Section TreeAdequacy.
     @riscvF_genGS Σ (@riscv_fixedGS Σ HR) = riscv_pre_genGS ->
     ⊢ AppInv.app_inv FsCfg.fsc_fs -∗ app_boot app_tree c (S gen_id) r -∗
       app_turn app_tree c (S gen_id) -∗
-      |==> init_boot_bundle (bv_unsigned InodeInv.ROOTINO) fdt0.
+      |==> init_boot_bundle (bv_unsigned InodeInv.ROOTINO) ProcDefs.secc_all fdt0.
   Proof using ufdG0.
     intros Heq Hiface _.
     (* the console claim and the kill credential, off the one equation:
@@ -133,7 +133,7 @@ Section TreeAdequacy.
     iEval (cbn [app_tree app_turn]) in "Hturn".
     iMod (tree_sup_of_bump c r with "Hturn") as "#Hsup".
     iModIntro.
-    iApply (init_boot_of_sup (bv_unsigned InodeInv.ROOTINO) fdt0).
+    iApply (init_boot_of_sup (bv_unsigned InodeInv.ROOTINO) ProcDefs.secc_all fdt0).
     - (* the supply, at the era's record equation *)
       rewrite /AppInv.app_sup Heq.
       cbn [AppCfg.app_pred AppCfg.app_run AppCfg.app_names

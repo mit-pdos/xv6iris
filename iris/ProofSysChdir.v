@@ -1067,7 +1067,7 @@ Section ProofSysChdirBody.
     iEval (rewrite Hpp0a) in "Hpc".
     (* ================= +0x0a jal ra,myproc ================= *)
     iApply (wp_jal_s_sconf (CID := CID5) (mword_of_int (SC + 0x0a)) Rra
-              (mword_of_int 2082174 : mword 21) M2 (K - 20)%nat b
+              (mword_of_int 2082094 : mword 21) M2 (K - 20)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (schdi_0a with "Htext"). }
@@ -1075,7 +1075,7 @@ Section ProofSysChdirBody.
     set (M3 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (SC + 0x0a) : mword 64) 4)]> M2).
     assert (Hjmp : add_vec (mword_of_int (SC + 0x0a) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2082174 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2082094 : mword 21))
                    = mword_of_int KernelSyms.myproc) by pcw.
     iEval (rewrite Hjmp) in "Hpc".
     assert (HM3ra : (M3 !!! Regidx Rra : mword 64)
@@ -1277,7 +1277,7 @@ Section ProofSysChdirBody.
     iEval (rewrite Hpp1e) in "Hpc".
     (* ================= +0x1e jal ra,argstr ================= *)
     iApply (wp_jal_s_sconf (CID := CID13) (mword_of_int (SC + 0x1e)) Rra
-              (mword_of_int 2086190 : mword 21) M8 (K - 20)%nat b
+              (mword_of_int 2086124 : mword 21) M8 (K - 20)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (schdi_1e with "Htext"). }
@@ -1285,7 +1285,7 @@ Section ProofSysChdirBody.
     set (M9 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (SC + 0x1e) : mword 64) 4)]> M8).
     assert (Hjas : add_vec (mword_of_int (SC + 0x1e) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2086190 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2086124 : mword 21))
                    = mword_of_int KernelSyms.argstr) by pcw.
     iEval (rewrite Hjas) in "Hpc".
     assert (HM9ra : (M9 !!! Regidx Rra : mword 64)

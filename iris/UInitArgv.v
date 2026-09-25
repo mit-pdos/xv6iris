@@ -34,7 +34,7 @@ Section UInitArgv.
 
   (* [init_ro]'s complement in the image's data half: the sixteen bytes of
      .data at 0x1000..0x100f, which are the array [{ "sh", 0 }] init's child
-     arm passes to exec -- the pointer 0x9a8 in the first word and the
+     arm passes to exec -- the pointer 0x9b8 in the first word and the
      terminating NULL in the second.  The map is COMPUTED from the dump, not
      retyped: everything of [InitData.init_data] at or above the end of the
      executable segment.

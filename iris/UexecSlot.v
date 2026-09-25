@@ -66,6 +66,7 @@ Require Import SpecUserret.  (* [userret_gpr] -- the 31-insert register file *)
 Require Import ProcDefs.     (* [pprivate] / [ustate] / [pv_tf] *)
 Require Import UserPerm.     (* [uperm] / [perm_of] -- the permission view *)
 Require Import FdSlots.     (* [fdstate] -- the per-descriptor user-visible state *)
+Require Import UsysMemOk.   (* [usys_eff] -- the effective syscall number *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -182,6 +183,13 @@ Record uvis := MkUvis {
      LAST in the record, so every existing [MkUvis] and every componentwise
      proof keeps its order. *)
   uvis_lazy : bool;
+  (* THE SYSCALL MASK (upstream a083670), [ProcDefs.pv_secc] read off the
+     block exactly as the lazy bit is.  Process-visible because it decides
+     a call's effect: a number the mask blocks is the unknown-number call
+     ([UsysMemOk.usys_eff], [uvis_num] below).  sys_seccomp is the one
+     entry that moves it ([UsysMemOk.usys_secc_ok]), fork copies it, exec
+     keeps it.  LAST, after the lazy bit, for the lazy bit's reason. *)
+  uvis_secc : mword 64;
 }.
 
 (* the projection from the kernel's process state to the slot's key: drop
@@ -211,14 +219,50 @@ Definition uvis_of (U : ustate) (sts : list fdstate) (g : gname)
             ([ProcDefs.pv_lazy]).  No new argument: the boundary is holding
             the block, so the bit is a PROJECTION of [ustate] the way the
             permission map and the break are. *)
-         (pv_lazy (us_V U)).
+         (pv_lazy (us_V U))
+         (* ...and the mask, the same kind of projection *)
+         (pv_secc (us_V U)).
 
 (* the key with its lazy bit replaced, and nothing else moved -- the shape
    a syscall row that MOVES the bit is read at ([UexecRet.bump] takes it as
    an argument; this is for the arms that do not bump). *)
 Definition uvis_lz (W : uvis) (lz : bool) : uvis :=
   MkUvis (uvis_tf W) (uvis_M W) (uvis_perm W) (uvis_sz W) (uvis_fd W)
-         (uvis_cwd W) (uvis_gen W) (uvis_ch W) (uvis_pid W) lz.
+         (uvis_cwd W) (uvis_gen W) (uvis_ch W) (uvis_pid W) lz (uvis_secc W).
+
+(* the all-allowing mask, spelled where the U tier can see it: a verified
+   program's run is pinned at it ([UkRun.urun]) *)
+Notation secc_all := ProcDefs.secc_all (only parsing).
+
+(* THE EFFECTIVE SYSCALL NUMBER OF A KEY: the a7 reading where the key's
+   mask allows it, 0 (the unknown number) where it blocks it.  Every row of
+   the trap contract is keyed on this and not on the raw reading. *)
+Definition uvis_num (W : uvis) : Z := usys_eff (uvis_secc W) (uvis_tf W).
+
+(* ...and at a key whose mask allows everything -- every verified program's,
+   whose run pins it ([UkRun.urun]) -- the effective number of an in-range
+   call is the raw one, which is what an ecall leaf rewrites with. *)
+Lemma uvis_num_full (W : uvis) :
+  uvis_secc W = secc_all -> 0 < usys_num (uvis_tf W) < 64 ->
+  uvis_num W = usys_num (uvis_tf W).
+Proof.
+  intros Hs Hn. unfold uvis_num. rewrite Hs. unfold secc_all.
+  apply usys_eff_all. lia.
+Qed.
+
+(* ...and at a number the stub itself fixed, which may be 0: the mask's
+   low 64 bits are all set, so every number in [0, 64) is its own. *)
+Lemma uvis_num_full0 (W : uvis) :
+  uvis_secc W = secc_all -> 0 <= usys_num (uvis_tf W) < 64 ->
+  uvis_num W = usys_num (uvis_tf W).
+Proof.
+  intros Hs Hn. unfold uvis_num. rewrite Hs. unfold secc_all.
+  apply usys_eff_all. exact Hn.
+Qed.
+
+Lemma usys_eff_secc_all (tf : list (mword 64)) :
+  0 <= usys_num tf < 64 -> usys_eff secc_all tf = usys_num tf.
+Proof. intros Hn. unfold secc_all. apply usys_eff_all. exact Hn. Qed.
 
 Lemma uvis_lz_id (W : uvis) : uvis_lz W (uvis_lazy W) = W.
 Proof. destruct W; reflexivity. Qed.

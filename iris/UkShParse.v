@@ -999,12 +999,12 @@ Section UkShParse.
   (* CONTRACTS, NOT IN THE CODE.  [peek(ps, es, toks)] is called at seven   *)
   (* sites and EVERY [toks] it is passed is a STRING LITERAL:               *)
   (*                                                                       *)
-  (*   parseredirs  "<>"   @0x12f0     parseexec  "("    @0x12f8            *)
-  (*   parseexec    "|)&;" @0x1318     parsepipe  "|"    @0x1320            *)
-  (*   parseline    "&"    @0x1328     parseline  ";"    @0x1330            *)
-  (*   parsecmd     ""     @0x1288                                          *)
+  (*   parseredirs  "<>"   @0x1300     parseexec  "("    @0x1308            *)
+  (*   parseexec    "|)&;" @0x1328     parsepipe  "|"    @0x1330            *)
+  (*   parseline    "&"    @0x1338     parseline  ";"    @0x1340            *)
+  (*   parsecmd     ""     @0x1298                                          *)
   (*                                                                       *)
-  (* and all seven sit in .rodata (0x1280..0x13d9), which shares the        *)
+  (* and all seven sit in .rodata (0x1288..0x13e9), which shares the        *)
   (* EXECUTABLE segment's pages -- the same reason [UCodeShP.shp_rodata]    *)
   (* exists and is a [utext_img] under GAMMA-T.  The landed [wp_kshp_peek]  *)
   (* took its table as [ustr γd dt toks tlen tf], a DATA-half string, and   *)
@@ -3083,7 +3083,7 @@ Section UkShParse.
 
   (* the type word each arm stores: EXEC 1, REDIR 2, PIPE 3, LIST 4,
      BACK 5 -- sh.c's #defines, and the index [nulterminate]'s jump table
-     at 0x13b0 is keyed by *)
+     at 0x13c0 is keyed by *)
   Definition ushp_ty (t : ushp_cmd) : Z :=
     match t with
     | UshpExec _ => 1 | UshpRedir _ _ _ _ _ => 2 | UshpPipe _ _ => 3

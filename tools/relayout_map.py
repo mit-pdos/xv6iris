@@ -73,7 +73,7 @@ IRIS = os.path.join(ROOT, 'iris')
 LEMMA_RE = re.compile(
     r'Lemma\s+(\w+)\s*:\s*\n?\s*kernel_text\s*-∗\s*instr\s*'
     r'\(mword_of_int\s*\(?KernelSyms\.(\w+)(?:\s*\+\s*(0x[0-9a-fA-F]+))?\)?'
-    r'\s*:\s*mword 64\)\s+(true|false)\s+(.*?)\.\s*\n\s*Proof\.',
+    r'\s*:\s*mword 64\)\s+(true|false)\s+(.*?)\.\s*\n\s*Proof(?:\s+using[^.]*)?\.',
     re.S)
 NUM_RE = re.compile(r'\b(0x[0-9a-fA-F]+|\d+)\b')
 

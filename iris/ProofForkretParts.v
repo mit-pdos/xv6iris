@@ -72,7 +72,7 @@ Definition fkr_exec_msg  : Z := 0x80007190.   (* the string "exec"  *)
 Lemma fkr_first_addr :
   add_vec (add_vec (mword_of_int (FR + 0x14) : mword 64)
              (auipc_off (mword_of_int 9 : mword 20)))
-    (sign_extend' 64 (mword_of_int 2274 : mword 12))
+    (sign_extend' 64 (mword_of_int 2322 : mword 12))
   = (mword_of_int KernelSyms.first_1 : mword 64).
 Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 
@@ -113,7 +113,7 @@ Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 (* ---- +0x20 jal fsinit ---- *)
 Lemma fkr_fsinit_tgt :
   add_vec (mword_of_int (FR + 0x20) : mword 64)
-    (sign_extend' 64 (mword_of_int 7248 : mword 21))
+    (sign_extend' 64 (mword_of_int 7328 : mword 21))
   = (mword_of_int KernelSyms.fsinit : mword 64).
 Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 
@@ -127,7 +127,7 @@ Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 Lemma fkr_first_addr2 :
   add_vec (add_vec (mword_of_int (FR + 0x24) : mword 64)
              (auipc_off (mword_of_int 9 : mword 20)))
-    (sign_extend' 64 (mword_of_int 2258 : mword 12))
+    (sign_extend' 64 (mword_of_int 2306 : mword 12))
   = (mword_of_int KernelSyms.first_1 : mword 64).
 Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 
@@ -161,7 +161,7 @@ Proof. apply stk_push. apply bv_eq; vm_compute; reflexivity. Qed.
 (* ---- +0x42 jal kexec ---- *)
 Lemma fkr_kexec_tgt :
   add_vec (mword_of_int (FR + 0x42) : mword 64)
-    (sign_extend' 64 (mword_of_int 11952 : mword 21))
+    (sign_extend' 64 (mword_of_int 12032 : mword 21))
   = (mword_of_int KernelSyms.kexec : mword 64).
 Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 

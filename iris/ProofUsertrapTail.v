@@ -431,7 +431,7 @@ Section UtRet2.
     (* ...and the children set's, on the same terms: every entry but fork
        keeps it, and fork's move is the kernel's answer, not a pure row
        ([SpecUsertrap.ut_ch_kept]). *)
-    ut_ch_kept scw (pv_tf (us_V U0)) cs cs2 ->
+    ut_ch_kept scw (pv_secc (us_V U0)) (pv_tf (us_V U0)) cs cs2 ->
     (* ...and the ECALL's half, the row the syscall table states.  Relayed
        exactly like [ut_fd_kept]: the tail re-closes the residue with the
        fragments it borrowed, so whether the round moved the states -- and
@@ -440,16 +440,16 @@ Section UtRet2.
        and the return value out of the one being
        parked -- the ENTRY record is [U0], which these tails already carry
        for [ut_wf]. *)
-    ut_fd_ecall scw (pv_tf (us_V U0)) (pv_tf (us_V U)) sts0 sts ->
+    ut_fd_ecall scw (pv_secc (us_V U0)) (pv_tf (us_V U0)) (pv_tf (us_V U)) sts0 sts ->
     (* ...and pipe's join, off the same two records and the same pair of
        images: these tails move neither, so it rides across exactly as the
        descriptor row does. *)
-    ut_pipe_ecall scw (pv_tf (us_V U0)) (pv_tf (us_V U))
+    ut_pipe_ecall scw (pv_secc (us_V U0)) (pv_tf (us_V U0)) (pv_tf (us_V U))
                   (us_M U0) (us_M U) sts0 sts ->
     (* ...and getpid's answer, off the same two records: these tails move
        neither the number nor the a0 word, so it rides across exactly as
        the descriptor and pipe rows do ([SpecUsertrap.ut_ret_pid]). *)
-    ut_ret_pid scw (pv_tf (us_V U0)) (pv_tf (us_V U)) pid ->
+    ut_ret_pid scw (pv_secc (us_V U0)) (pv_tf (us_V U0)) (pv_tf (us_V U)) pid ->
     (K_usertrap <= av)%nat ->
     (trap_res b + nx)%nat = (av - 4)%nat ->
     ud_tfp (pv_upt (us_V U)) = ud_tfp pt ->
@@ -474,7 +474,7 @@ Section UtRet2.
     (* ...AND WHAT A RESUME PROVES, relayed to the post (lane TRAP-ROWS,
        T2(iii)): +0xa6's [killed] check refuted the read's shot, and this
        tail only carries the conclusion -- [SpecUsertrap.ut_live_out]. *)
-    ut_live_out scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) sts0
+    ut_live_out scw (pv_secc (us_V U0)) (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) sts0
       (pv_tf (us_V U) !!! tf_arg_idx 0) cs2 ->
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xb2)) -∗
@@ -499,12 +499,12 @@ Section UtRet2.
        this tail moves nothing the row reads -- [SpecUsertrap.ut_exec_out] *)
     ut_exec_out fdep scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) (us_M U0)
       (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
-      (uint (pv_sz (us_V U0))) (pv_lazy (us_V U0)) U sts0 sts gn cs pid -∗
+      (uint (pv_sz (us_V U0))) (pv_lazy (us_V U0)) (pv_secc (us_V U0)) U sts0 sts gn cs pid -∗
     (* ...and FORK'S, relayed the same way -- [SpecUsertrap.ut_fork_out] *)
-    ut_fork_out fdep scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0)))
+    ut_fork_out fdep scw (pv_secc (us_V U0)) (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0)))
       (pv_tf (us_V U) !!! tf_arg_idx 0) cs cs2 -∗
     (* ...and WAIT'S, beside it -- [SpecUsertrap.ut_wait_out] *)
-    ut_wait_out scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0)))
+    ut_wait_out scw (pv_secc (us_V U0)) (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0)))
       (us_M U0) (us_M U)
       (pv_tf (us_V U) !!! tf_arg_idx 0) cs cs2 gn pid -∗
     (* ...AND THE UNTAKEN CONTINUATION (lane TRAP-ROWS, T3) *)
@@ -894,7 +894,7 @@ Section UtRet2.
     iDestruct "Hstval" as (stv) "Hstval".
     iSpecialize ("Hcont" $! CID with "[%]"); [intros _; reflexivity|].
     iDestruct ("Hownback" $! U sts cs2 with "Hpv Hufr Hch Hsy") as "Hown".
-    iAssert (⌜ut_live_out scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) sts0
+    iAssert (⌜ut_live_out scw (pv_secc (us_V U0)) (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) sts0
                 (pv_tf (us_V U) !!! tf_arg_idx 0) cs2⌝)%I as "Hlv";
       [ iPureIntro; exact Hlive | ].
     iApply ("Hcont" $! (pv_upt (us_V U)) (tp_pin S9) msg
@@ -1007,7 +1007,7 @@ Section UtRet.
     (* ...and the children set's, on the same terms: every entry but fork
        keeps it, and fork's move is the kernel's answer, not a pure row
        ([SpecUsertrap.ut_ch_kept]). *)
-    ut_ch_kept scw (pv_tf (us_V U0)) cs cs2 ->
+    ut_ch_kept scw (pv_secc (us_V U0)) (pv_tf (us_V U0)) cs cs2 ->
     (* ...and the ECALL's half, the row the syscall table states.  Relayed
        exactly like [ut_fd_kept]: the tail re-closes the residue with the
        fragments it borrowed, so whether the round moved the states -- and
@@ -1016,16 +1016,16 @@ Section UtRet.
        and the return value out of the one being
        parked -- the ENTRY record is [U0], which these tails already carry
        for [ut_wf]. *)
-    ut_fd_ecall scw (pv_tf (us_V U0)) (pv_tf (us_V U)) sts0 sts ->
+    ut_fd_ecall scw (pv_secc (us_V U0)) (pv_tf (us_V U0)) (pv_tf (us_V U)) sts0 sts ->
     (* ...and pipe's join, off the same two records and the same pair of
        images: these tails move neither, so it rides across exactly as the
        descriptor row does. *)
-    ut_pipe_ecall scw (pv_tf (us_V U0)) (pv_tf (us_V U))
+    ut_pipe_ecall scw (pv_secc (us_V U0)) (pv_tf (us_V U0)) (pv_tf (us_V U))
                   (us_M U0) (us_M U) sts0 sts ->
     (* ...and getpid's answer, off the same two records: these tails move
        neither the number nor the a0 word, so it rides across exactly as
        the descriptor and pipe rows do ([SpecUsertrap.ut_ret_pid]). *)
-    ut_ret_pid scw (pv_tf (us_V U0)) (pv_tf (us_V U)) pid ->
+    ut_ret_pid scw (pv_secc (us_V U0)) (pv_tf (us_V U0)) (pv_tf (us_V U)) pid ->
     (K_usertrap <= av)%nat ->
     (trap_res b + nx)%nat = (av - 4)%nat ->
     ud_tfp (pv_upt (us_V U)) = ud_tfp pt ->
@@ -1041,7 +1041,7 @@ Section UtRet.
     (* ...AND WHAT A RESUME PROVES, relayed to the post (lane TRAP-ROWS,
        T2(iii)): +0xa6's [killed] check refuted the read's shot, and this
        tail only carries the conclusion -- [SpecUsertrap.ut_live_out]. *)
-    ut_live_out scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) sts0
+    ut_live_out scw (pv_secc (us_V U0)) (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) sts0
       (pv_tf (us_V U) !!! tf_arg_idx 0) cs2 ->
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xae)) -∗
@@ -1053,12 +1053,12 @@ Section UtRet.
        this tail moves nothing the row reads -- [SpecUsertrap.ut_exec_out] *)
     ut_exec_out fdep scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) (us_M U0)
       (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
-      (uint (pv_sz (us_V U0))) (pv_lazy (us_V U0)) U sts0 sts gn cs pid -∗
+      (uint (pv_sz (us_V U0))) (pv_lazy (us_V U0)) (pv_secc (us_V U0)) U sts0 sts gn cs pid -∗
     (* ...and FORK'S, relayed the same way -- [SpecUsertrap.ut_fork_out] *)
-    ut_fork_out fdep scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0)))
+    ut_fork_out fdep scw (pv_secc (us_V U0)) (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0)))
       (pv_tf (us_V U) !!! tf_arg_idx 0) cs cs2 -∗
     (* ...and WAIT'S, beside it -- [SpecUsertrap.ut_wait_out] *)
-    ut_wait_out scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0)))
+    ut_wait_out scw (pv_secc (us_V U0)) (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0)))
       (us_M U0) (us_M U)
       (pv_tf (us_V U) !!! tf_arg_idx 0) cs cs2 gn pid -∗
     (* ...AND THE UNTAKEN CONTINUATION (lane TRAP-ROWS, T3) *)
@@ -1165,7 +1165,7 @@ Section UtRet.
                       (add_vec (un_ks N) (mword_of_int 4096)) (cid_word (CID := CIDp)))
       by (rewrite /Vr; destruct (us_V U); reflexivity).
     assert (Hrdr : ut_round epw scw U0 (MkUstate Vr (us_M U))).
-    { refine (ut_round_ueq epw scw U0 U (MkUstate Vr (us_M U)) _ _ eq_refl _ _ _
+    { refine (ut_round_ueq epw scw U0 U (MkUstate Vr (us_M U)) _ _ eq_refl _ _ _ _
                 Hrd).
       - cbn [us_V]. rewrite HVrtf. apply prepare_return_tf_ueq.
       - cbn [us_V]. rewrite HVrupt HVrsz. reflexivity.
@@ -1173,6 +1173,8 @@ Section UtRet.
       - cbn [us_V]. rewrite /Vr; destruct (us_V U); reflexivity.
       (* the lazy bit: prepare_return writes trapframe words and no block
          field ([ProcDefs.pv_lazy]) -- lane LAZY-FLAG *)
+      - cbn [us_V]. rewrite /Vr; destruct (us_V U); reflexivity.
+      (* ...nor the mask *)
       - cbn [us_V]. rewrite /Vr; destruct (us_V U); reflexivity. }
     (* ...and the cwd's inum, which prepare_return's four stores leave alone *)
     assert (HVrcwi : pv_cwi (us_V (MkUstate Vr (us_M U))) = pv_cwi (us_V U))
@@ -1186,11 +1188,13 @@ Section UtRet.
                       (uint (pv_sz (us_V (MkUstate Vr (us_M U)))))
                     = perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U)))).
     { cbn [us_V]. rewrite HVrupt HVrsz. reflexivity. }
-    iDestruct (ut_exec_out_ueq fdep scw _ _ _ _ _ _ U (MkUstate Vr (us_M U))
+    iDestruct (ut_exec_out_ueq fdep scw _ _ _ _ _ _ _ U (MkUstate Vr (us_M U))
                  sts0 sts gn cs pid
                  (tf_ueq_refl _) HVru eq_refl HVrpi HVrsz HVrcwi
                  (* the lazy bit across the re-arming: prepare_return writes
                     no block field (lane LAZY-FLAG) *)
+                 ltac:(cbn [us_V]; rewrite /Vr; destruct (us_V U); reflexivity)
+                 (* ...and the mask, likewise *)
                  ltac:(cbn [us_V]; rewrite /Vr; destruct (us_V U); reflexivity)
                  with "Hxo") as "Hxo".
     (* ...and the syscall channel's row across the same re-arming.  It reads
@@ -1212,28 +1216,28 @@ Section UtRet.
        words -- which is exactly what [tf_ueq] is blind to -- so it crosses
        by [TfUser.tf_ueq_arg], the argument-word twin of the [tf_ueq_epc]
        the round above crosses by. *)
-    assert (Hfder : ut_fd_ecall scw (pv_tf (us_V U0))
+    assert (Hfder : ut_fd_ecall scw (pv_secc (us_V U0)) (pv_tf (us_V U0))
                       (pv_tf (us_V (MkUstate Vr (us_M U)))) sts0 sts).
-    { refine (ut_fd_ecall_out scw (pv_tf (us_V U0)) (pv_tf (us_V U)) _
+    { refine (ut_fd_ecall_out scw (pv_secc (us_V U0)) (pv_tf (us_V U0)) (pv_tf (us_V U)) _
                 sts0 sts _ Hfde).
       cbn [us_V]. rewrite HVrtf.
       exact (tf_ueq_arg _ _ 0 ltac:(lia) (prepare_return_tf_ueq _ _ _ _)). }
     (* ...and pipe's join across the same re-arming, by the same word: the
        image half is untouched here ([us_M] rides through the [Vr] swap
        unchanged), so only the a0 reading has to move. *)
-    assert (Hpiper : ut_pipe_ecall scw (pv_tf (us_V U0))
+    assert (Hpiper : ut_pipe_ecall scw (pv_secc (us_V U0)) (pv_tf (us_V U0))
                        (pv_tf (us_V (MkUstate Vr (us_M U))))
                        (us_M U0) (us_M (MkUstate Vr (us_M U))) sts0 sts).
-    { refine (ut_pipe_ecall_out scw (pv_tf (us_V U0)) (pv_tf (us_V U)) _
+    { refine (ut_pipe_ecall_out scw (pv_secc (us_V U0)) (pv_tf (us_V U0)) (pv_tf (us_V U)) _
                 _ _ sts0 sts _ Hpipe).
       cbn [us_V]. rewrite HVrtf.
       exact (tf_ueq_arg _ _ 0 ltac:(lia) (prepare_return_tf_ueq _ _ _ _)). }
     (* ...and getpid's answer across the same re-arming, off the same word:
        prepare_return re-arms the four KERNEL words and a0 is not one of
        them ([SpecUsertrap.ut_ret_pid_out]). *)
-    assert (Hpidrr : ut_ret_pid scw (pv_tf (us_V U0))
+    assert (Hpidrr : ut_ret_pid scw (pv_secc (us_V U0)) (pv_tf (us_V U0))
                        (pv_tf (us_V (MkUstate Vr (us_M U)))) pid).
-    { refine (ut_ret_pid_out scw (pv_tf (us_V U0)) (pv_tf (us_V U)) _ _ _ Hpidr).
+    { refine (ut_ret_pid_out scw (pv_secc (us_V U0)) (pv_tf (us_V U0)) (pv_tf (us_V U)) _ _ _ Hpidr).
       cbn [us_V]. rewrite HVrtf.
       exact (tf_ueq_arg _ _ 0 ltac:(lia) (prepare_return_tf_ueq _ _ _ _)). }
     assert (Hepcw : pv_tf (us_V (MkUstate Vr (us_M U))) !!! tf_epc_idx = uepc).
@@ -1312,7 +1316,7 @@ Section UtA6.
     (* ...and the children set's, on the same terms: every entry but fork
        keeps it, and fork's move is the kernel's answer, not a pure row
        ([SpecUsertrap.ut_ch_kept]). *)
-    ut_ch_kept scw (pv_tf (us_V U0)) cs cs2 ->
+    ut_ch_kept scw (pv_secc (us_V U0)) (pv_tf (us_V U0)) cs cs2 ->
     (* ...and the ECALL's half, the row the syscall table states.  Relayed
        exactly like [ut_fd_kept]: the tail re-closes the residue with the
        fragments it borrowed, so whether the round moved the states -- and
@@ -1321,16 +1325,16 @@ Section UtA6.
        and the return value out of the one being
        parked -- the ENTRY record is [U0], which these tails already carry
        for [ut_wf]. *)
-    ut_fd_ecall scw (pv_tf (us_V U0)) (pv_tf (us_V U)) sts0 sts ->
+    ut_fd_ecall scw (pv_secc (us_V U0)) (pv_tf (us_V U0)) (pv_tf (us_V U)) sts0 sts ->
     (* ...and pipe's join, off the same two records and the same pair of
        images: these tails move neither, so it rides across exactly as the
        descriptor row does. *)
-    ut_pipe_ecall scw (pv_tf (us_V U0)) (pv_tf (us_V U))
+    ut_pipe_ecall scw (pv_secc (us_V U0)) (pv_tf (us_V U0)) (pv_tf (us_V U))
                   (us_M U0) (us_M U) sts0 sts ->
     (* ...and getpid's answer, off the same two records: these tails move
        neither the number nor the a0 word, so it rides across exactly as
        the descriptor and pipe rows do ([SpecUsertrap.ut_ret_pid]). *)
-    ut_ret_pid scw (pv_tf (us_V U0)) (pv_tf (us_V U)) pid ->
+    ut_ret_pid scw (pv_secc (us_V U0)) (pv_tf (us_V U0)) (pv_tf (us_V U)) pid ->
     (K_usertrap <= av)%nat ->
     (trap_res b + nx)%nat = (av - 4)%nat ->
     ud_tfp (pv_upt (us_V U)) = ud_tfp pt ->
@@ -1382,12 +1386,12 @@ Section UtA6.
        this tail moves nothing the row reads -- [SpecUsertrap.ut_exec_out] *)
     ut_exec_out fdep scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) (us_M U0)
       (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
-      (uint (pv_sz (us_V U0))) (pv_lazy (us_V U0)) U sts0 sts gn cs pid -∗
+      (uint (pv_sz (us_V U0))) (pv_lazy (us_V U0)) (pv_secc (us_V U0)) U sts0 sts gn cs pid -∗
     (* ...and FORK'S, relayed the same way -- [SpecUsertrap.ut_fork_out] *)
-    ut_fork_out fdep scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0)))
+    ut_fork_out fdep scw (pv_secc (us_V U0)) (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0)))
       (pv_tf (us_V U) !!! tf_arg_idx 0) cs cs2 -∗
     (* ...and WAIT'S, beside it -- [SpecUsertrap.ut_wait_out] *)
-    ut_wait_out scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0)))
+    ut_wait_out scw (pv_secc (us_V U0)) (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0)))
       (us_M U0) (us_M U)
       (pv_tf (us_V U) !!! tf_arg_idx 0) cs cs2 gn pid -∗
     (* ...AND THE UNTAKEN CONTINUATION, OR THE FACT THAT THERE IS NO RESUME
@@ -1523,10 +1527,11 @@ Section UtA6.
                    = pv_tf (us_V U0) !!! tf_arg_idx 2)
       by (rewrite list_lookup_total_insert_ne;
           [ reflexivity | unfold tf_epc_idx, tf_arg_idx; lia ]).
-    assert (Hnume : usys_num (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0)))
-                    = usys_num (pv_tf (us_V U0)))
-      by apply usys_num_epc.
-    iAssert ((□ (⌜ut_live_read_g scw
+    assert (Hnume : usys_eff (pv_secc (us_V U0))
+                      (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0)))
+                    = usys_eff (pv_secc (us_V U0)) (pv_tf (us_V U0)))
+      by apply usys_eff_epc.
+    iAssert ((□ (⌜ut_live_read_g scw (pv_secc (us_V U0))
                     (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) sts0
                     (pv_tf (us_V U) !!! tf_arg_idx 0)⌝ -∗
                  (⌜(sys_rw_count (pv_tf (us_V U0) !!! tf_arg_idx 2) < 0)%Z⌝
@@ -1536,7 +1541,7 @@ Section UtA6.
                   (pv_tf (us_V U) !!! tf_arg_idx 0) (us_M U) sts
                   (pv_cwi (us_V U)) cs2))%I
       with "[Hso]" as "(#Hrwhy & Hso)".
-    { destruct (decide (ut_live_read_g scw
+    { destruct (decide (ut_live_read_g scw (pv_secc (us_V U0))
                           (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) sts0
                           (pv_tf (us_V U) !!! tf_arg_idx 0))) as [Hgr | Hgr].
       - pose proof Hgr as Hgr2.
@@ -1565,15 +1570,15 @@ Section UtA6.
        [UserChildren.wait_ans_m1]) and what is left is the failing arm,
        which is wholly PERSISTENT -- so the channel is rebuilt from its
        own reason and goes back untouched. *)
-    iAssert ((□ (⌜ut_live_wait_g scw
+    iAssert ((□ (⌜ut_live_wait_g scw (pv_secc (us_V U0))
                     (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0)))
                     (pv_tf (us_V U) !!! tf_arg_idx 0)⌝ -∗
                  ⌜cs2 = cs⌝ ∗ wait_why cs (pv_gen (us_V U)) true)) ∗
-             ut_wait_out scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0)))
+             ut_wait_out scw (pv_secc (us_V U0)) (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0)))
                (us_M U0) (us_M U)
                (pv_tf (us_V U) !!! tf_arg_idx 0) cs cs2 gn pid)%I
       with "[Hwo]" as "(#Hwwhy & Hwo)".
-    { destruct (decide (ut_live_wait_g scw
+    { destruct (decide (ut_live_wait_g scw (pv_secc (us_V U0))
                           (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0)))
                           (pv_tf (us_V U) !!! tf_arg_idx 0))) as [Hgw | Hgw].
       - pose proof Hgw as Hgw2.
@@ -1617,7 +1622,7 @@ Section UtA6.
                 (* ...AND WHAT THE ZERO FLAG PROVES ABOUT THE READ (lane
                    TRAP-ROWS, T2(iii)) *)
                 (⌜klr = (mword_of_int 0 : mword 32)⌝ -∗
-                   ⌜ut_live_out scw
+                   ⌜ut_live_out scw (pv_secc (us_V U0))
                       (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) sts0
                       (pv_tf (us_V U) !!! tf_arg_idx 0) cs2⌝) ∗
                   (* ...AND WHO WOULD PAY A TEAR-DOWN, read INSIDE the
@@ -1682,13 +1687,13 @@ Section UtA6.
            what [Hres] is carrying can only be the slot -- AND the read's
            own one-shot is refuted the same way, which is what makes its -1
            arm unreachable (lane TRAP-ROWS, T2(ii)). *)
-        iAssert (⌜~ ut_live_read_g scw
+        iAssert (⌜~ ut_live_read_g scw (pv_secc (us_V U0))
                      (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) sts0
                      (pv_tf (us_V U) !!! tf_arg_idx 0)⌝ ∗
                  SchedCtx.kill_paid pid klr ∗
                  pid_reg pid (DfracOwn qeighth) (pv_gen (us_V U)))%I
           with "[Hr Hrg]" as "(%Hnr & Hr & Hrg)".
-        { destruct (decide (ut_live_read_g scw
+        { destruct (decide (ut_live_read_g scw (pv_secc (us_V U0))
                               (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0)))
                               sts0 (pv_tf (us_V U) !!! tf_arg_idx 0)))
             as [Hgr | Hgr].
@@ -1706,14 +1711,14 @@ Section UtA6.
            zero flag kills the shot, and what is left is the caller's own
            children column at [∅] -- which the reap-nothing arm did not
            move. *)
-        iAssert (⌜ut_live_wait_g scw
+        iAssert (⌜ut_live_wait_g scw (pv_secc (us_V U0))
                      (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0)))
                      (pv_tf (us_V U) !!! tf_arg_idx 0) ->
                    cs2 = (∅ : gset gname)⌝ ∗
                  SchedCtx.kill_paid pid klr ∗
                  pid_reg pid (DfracOwn qeighth) (pv_gen (us_V U)))%I
           with "[Hr Hrg]" as "(%Hnw & Hr & Hrg)".
-        { destruct (decide (ut_live_wait_g scw
+        { destruct (decide (ut_live_wait_g scw (pv_secc (us_V U0))
                               (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0)))
                               (pv_tf (us_V U) !!! tf_arg_idx 0)))
             as [Hgw | Hgw].
@@ -1729,11 +1734,11 @@ Section UtA6.
         rewrite /ut_resume_in /ut_kill_out.
         destruct (decide (scw = UsysMemOk.uecall_scause)) as [_ | _].
         + iFrame "Hq Hr Hs Hqp Hrg Htear". iSplitR; [ by iIntros "_" | ].
-          iIntros "_". iPureIntro. exact (ut_live_out_of _ _ _ _ _ Hnr Hnw).
+          iIntros "_". iPureIntro. exact (ut_live_out_of _ _ _ _ _ _ Hnr Hnw).
         + iDestruct "Hres" as "[Hslot | #Hsh]".
           * iFrame "Hq Hr Hs Hqp Hrg Htear". iSplitL "Hslot".
             { iIntros "_". iExact "Hslot". }
-            iIntros "_". iPureIntro. exact (ut_live_out_of _ _ _ _ _ Hnr Hnw).
+            iIntros "_". iPureIntro. exact (ut_live_out_of _ _ _ _ _ _ Hnr Hnw).
           * iDestruct (SchedCtx.kill_paid_shot_nz pid klr (DfracOwn qeighth)
                          (pv_gen (us_V U)) Hpidnz with "Hr Hrg Hsh")
               as "(_ & _ & %Hne)". exfalso. exact (Hne Hkz).
@@ -1752,7 +1757,7 @@ Section UtA6.
                   p_pid (un_pj N) ↦₄{DfracOwn (1/4)} pid ∗
                   pid_reg pid (DfracOwn qeighth) (pv_gen (us_V U)) ∗
                   (⌜klv = (mword_of_int 0 : mword 32)⌝ -∗
-                     ⌜ut_live_out scw
+                     ⌜ut_live_out scw (pv_secc (us_V U0))
                         (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) sts0
                         (pv_tf (us_V U) !!! tf_arg_idx 0) cs2⌝) ∗
                   (((⌜klv = (mword_of_int 0 : mword 32)⌝
@@ -2010,7 +2015,7 @@ Section UtFa.
     (* ...and the children set's, on the same terms: every entry but fork
        keeps it, and fork's move is the kernel's answer, not a pure row
        ([SpecUsertrap.ut_ch_kept]). *)
-    ut_ch_kept scw (pv_tf (us_V U0)) cs cs2 ->
+    ut_ch_kept scw (pv_secc (us_V U0)) (pv_tf (us_V U0)) cs cs2 ->
     (* ...and the ECALL's half, the row the syscall table states.  Relayed
        exactly like [ut_fd_kept]: the tail re-closes the residue with the
        fragments it borrowed, so whether the round moved the states -- and
@@ -2019,16 +2024,16 @@ Section UtFa.
        and the return value out of the one being
        parked -- the ENTRY record is [U0], which these tails already carry
        for [ut_wf]. *)
-    ut_fd_ecall scw (pv_tf (us_V U0)) (pv_tf (us_V U)) sts0 sts ->
+    ut_fd_ecall scw (pv_secc (us_V U0)) (pv_tf (us_V U0)) (pv_tf (us_V U)) sts0 sts ->
     (* ...and pipe's join, off the same two records and the same pair of
        images: these tails move neither, so it rides across exactly as the
        descriptor row does. *)
-    ut_pipe_ecall scw (pv_tf (us_V U0)) (pv_tf (us_V U))
+    ut_pipe_ecall scw (pv_secc (us_V U0)) (pv_tf (us_V U0)) (pv_tf (us_V U))
                   (us_M U0) (us_M U) sts0 sts ->
     (* ...and getpid's answer, off the same two records: these tails move
        neither the number nor the a0 word, so it rides across exactly as
        the descriptor and pipe rows do ([SpecUsertrap.ut_ret_pid]). *)
-    ut_ret_pid scw (pv_tf (us_V U0)) (pv_tf (us_V U)) pid ->
+    ut_ret_pid scw (pv_secc (us_V U0)) (pv_tf (us_V U0)) (pv_tf (us_V U)) pid ->
     (K_usertrap <= av)%nat ->
     (trap_res b + nx)%nat = (av - 4)%nat ->
     ud_tfp (pv_upt (us_V U)) = ud_tfp pt ->
@@ -2044,7 +2049,7 @@ Section UtFa.
     (* ...AND WHAT A RESUME PROVES, relayed to the post (lane TRAP-ROWS,
        T2(iii)): +0xa6's [killed] check refuted the read's shot, and this
        tail only carries the conclusion -- [SpecUsertrap.ut_live_out]. *)
-    ut_live_out scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) sts0
+    ut_live_out scw (pv_secc (us_V U0)) (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) sts0
       (pv_tf (us_V U) !!! tf_arg_idx 0) cs2 ->
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xfc)) -∗
@@ -2056,12 +2061,12 @@ Section UtFa.
        this tail moves nothing the row reads -- [SpecUsertrap.ut_exec_out] *)
     ut_exec_out fdep scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) (us_M U0)
       (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
-      (uint (pv_sz (us_V U0))) (pv_lazy (us_V U0)) U sts0 sts gn cs pid -∗
+      (uint (pv_sz (us_V U0))) (pv_lazy (us_V U0)) (pv_secc (us_V U0)) U sts0 sts gn cs pid -∗
     (* ...and FORK'S, relayed the same way -- [SpecUsertrap.ut_fork_out] *)
-    ut_fork_out fdep scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0)))
+    ut_fork_out fdep scw (pv_secc (us_V U0)) (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0)))
       (pv_tf (us_V U) !!! tf_arg_idx 0) cs cs2 -∗
     (* ...and WAIT'S, beside it -- [SpecUsertrap.ut_wait_out] *)
-    ut_wait_out scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0)))
+    ut_wait_out scw (pv_secc (us_V U0)) (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0)))
       (us_M U0) (us_M U)
       (pv_tf (us_V U) !!! tf_arg_idx 0) cs cs2 gn pid -∗
     (* ...AND THE UNTAKEN CONTINUATION (lane TRAP-ROWS, T3) *)

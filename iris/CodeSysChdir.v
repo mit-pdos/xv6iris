@@ -28,11 +28,11 @@ Require Import KernelDecode10.
 Require Import KernelDecode11.
 Require Import KernelDecode13.
 Require Import KernelDecode14.
+Require Import KernelDecode15.
 Require Import KernelDecode16.
 Require Import KernelDecode18.
 Require Import KernelDecode19.
 Require Import KernelDecode20.
-Require Import KernelDecode21.
 Require Import KernelDecode24.
 Require Import KernelDecode26.
 Require Import KernelDecode27.
@@ -70,9 +70,9 @@ Section CodeSysChdir.
   Proof using . mk_rvc (KernelSyms.sys_chdir + 0x8) (mword_of_int 0x1100 : mword 16)
     (mword_of_int (KernelSyms.sys_chdir + 0x8) : mword 64) (ITYPE (caddi4spn_imm (mword_of_int 40 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)) kd_1100 exec_execute_C_ADDI4SPN. Qed.
 
-  Lemma schdi_0a : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_chdir + 0xa) : mword 64) false (JAL (mword_of_int 2082174 : mword 21, Regidx (mword_of_int 1))).
-  Proof using . mk_base (KernelSyms.sys_chdir + 0xa) (mword_of_int 0xd7efc0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_chdir + 0xa) : mword 64) (JAL (mword_of_int 2082174 : mword 21, Regidx (mword_of_int 1))) kd_d7efc0ef. Qed.
+  Lemma schdi_0a : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_chdir + 0xa) : mword 64) false (JAL (mword_of_int 2082094 : mword 21, Regidx (mword_of_int 1))).
+  Proof using . mk_base (KernelSyms.sys_chdir + 0xa) (mword_of_int 0xd2efc0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_chdir + 0xa) : mword 64) (JAL (mword_of_int 2082094 : mword 21, Regidx (mword_of_int 1))) kd_d2efc0ef. Qed.
 
   Lemma schdi_0e : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_chdir + 0xe) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 18), ADD)).
   Proof using . mk_rvc (KernelSyms.sys_chdir + 0xe) (mword_of_int 0x892a : mword 16)
@@ -94,9 +94,9 @@ Section CodeSysChdir.
   Proof using . mk_rvc (KernelSyms.sys_chdir + 0x1c) (mword_of_int 0x4501 : mword 16)
     (mword_of_int (KernelSyms.sys_chdir + 0x1c) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)) kd_4501 exec_execute_C_LI. Qed.
 
-  Lemma schdi_1e : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_chdir + 0x1e) : mword 64) false (JAL (mword_of_int 2086190 : mword 21, Regidx (mword_of_int 1))).
-  Proof using . mk_base (KernelSyms.sys_chdir + 0x1e) (mword_of_int 0xd2efd0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_chdir + 0x1e) : mword 64) (JAL (mword_of_int 2086190 : mword 21, Regidx (mword_of_int 1))) kd_d2efd0ef. Qed.
+  Lemma schdi_1e : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_chdir + 0x1e) : mword 64) false (JAL (mword_of_int 2086124 : mword 21, Regidx (mword_of_int 1))).
+  Proof using . mk_base (KernelSyms.sys_chdir + 0x1e) (mword_of_int 0xcecfd0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_chdir + 0x1e) : mword 64) (JAL (mword_of_int 2086124 : mword 21, Regidx (mword_of_int 1))) kd_cecfd0ef. Qed.
 
   Lemma schdi_22 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_chdir + 0x22) : mword 64) false (BTYPE (mword_of_int 70 : mword 13, zreg, Regidx (mword_of_int 10), BLT)).
   Proof using . mk_base (KernelSyms.sys_chdir + 0x22) (mword_of_int 0x04054363 : mword 32)

@@ -207,7 +207,7 @@ Section ProofSysWait.
     assert (Hpp0e : add_vec_int (mword_of_int (SW + 0x0c) : mword 64) 2 = mword_of_int (SW + 0x0e)) by pcstep.
     iEval (rewrite Hpp0e) in "Hpc".
     (* +0x0e jal ra,argaddr *)
-    iApply (wp_jal_s_sconf (mword_of_int (SW + 0x0e)) Rra (mword_of_int 2096892 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (SW + 0x0e)) Rra (mword_of_int 2096872 : mword 21)
               A3 (av - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
@@ -216,7 +216,7 @@ Section ProofSysWait.
     set (A4 := <[Regidx Rra := regval_into_reg (add_vec_int (mword_of_int (SW + 0x0e) : mword 64) 4)]> A3).
     change (<[Regidx Rra := regval_into_reg (add_vec_int (mword_of_int (SW + 0x0e) : mword 64) 4)]> A3) with A4.
     assert (Hjaa : add_vec (mword_of_int (SW + 0x0e) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2096892 : mword 21)) = mword_of_int KernelSyms.argaddr)
+                     (sign_extend' 64 (mword_of_int 2096872 : mword 21)) = mword_of_int KernelSyms.argaddr)
       by pcstep.
     iEval (rewrite Hjaa) in "Hpc".
     assert (HA4ra : A4 !!! Regidx Rra = add_vec_int (mword_of_int (SW + 0x0e) : mword 64) 4)
@@ -273,7 +273,7 @@ Section ProofSysWait.
     assert (Hpp16 : add_vec_int (mword_of_int (SW + 0x12) : mword 64) 4 = mword_of_int (SW + 0x16)) by pcstep.
     iEval (rewrite Hpp16) in "Hpc".
     (* +0x16 jal ra,kwait *)
-    iApply (wp_jal_s_sconf (mword_of_int (SW + 0x16)) Rra (mword_of_int 2095122 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (SW + 0x16)) Rra (mword_of_int 2095102 : mword 21)
               B1 (av - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
@@ -282,7 +282,7 @@ Section ProofSysWait.
     set (B2 := <[Regidx Rra := regval_into_reg (add_vec_int (mword_of_int (SW + 0x16) : mword 64) 4)]> B1).
     change (<[Regidx Rra := regval_into_reg (add_vec_int (mword_of_int (SW + 0x16) : mword 64) 4)]> B1) with B2.
     assert (Hjkw : add_vec (mword_of_int (SW + 0x16) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2095122 : mword 21)) = mword_of_int KernelSyms.kwait)
+                     (sign_extend' 64 (mword_of_int 2095102 : mword 21)) = mword_of_int KernelSyms.kwait)
       by pcstep.
     iEval (rewrite Hjkw) in "Hpc".
     assert (HB2ra : B2 !!! Regidx Rra = add_vec_int (mword_of_int (SW + 0x16) : mword 64) 4)

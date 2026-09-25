@@ -1039,6 +1039,8 @@ Section UkEcho.
               (* ...and the three descriptor-moving numbers, and chdir *)
               ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
               ltac:(discriminate)
+              (* ...and a number the full mask passes, not seccomp's *)
+              ltac:(lia) ltac:(discriminate)
               ltac:(vm_compute; reflexivity)
               with "[] Hrun []").
     { iApply (uis_echo_354 with "Hcode"). }
@@ -1208,7 +1210,7 @@ Section UkEcho.
 
 
   (* ...AND THE SAME STUB WITH THE SOURCE RUN IN THE TEXT HALF (lane
-     TXT-ROW).  echo's separator (0x930) and its newline (0x938) are
+     TXT-ROW).  echo's separator (0x940) and its newline (0x948) are
      .rodata -- X and NOT W, filed under [γt] ([UCodeEcho.echo_ro]) -- so
      no [ubytesq] of them exists and [wp_kecho_write_chain] above cannot
      carry them.  The leaf underneath is
@@ -1388,11 +1390,11 @@ Section UkEcho.
   Qed.
 
   (* echo's two one-byte literals live in its .rodata: the SEPARATOR (a
-     space) at 0x930 and the NEWLINE at 0x938 (user/_echo's dump, which is
+     space) at 0x940 and the NEWLINE at 0x948 (user/_echo's dump, which is
      [UCodeEcho.echo_ro]).  main loads each with an [auipc]/[addi] pair
      whose value is closed; these are the two values those pairs compute. *)
-  Definition echo_sep_ptr : Z := 0x930.
-  Definition echo_nl_ptr : Z := 0x938.
+  Definition echo_sep_ptr : Z := 0x940.
+  Definition echo_nl_ptr : Z := 0x948.
 
   (* THE WHOLE WALK'S PAYMENT, as the chain the loop actually spends: [k]
      arguments still to print after [args !!! i], each one followed by the
@@ -2079,9 +2081,9 @@ Section UkEcho.
                            (auipc_off (mword_of_int 1 : mword 20)))]> n1).
       (* ---- 0x6c  addi a1,a1,2256 ---- *)
       iApply (wp_uk_addi N h3 n2 (mword_of_int 0x6c)
-                (mword_of_int 2256 : mword 12) a1_idx a1_idx
+                (mword_of_int 2272 : mword 12) a1_idx a1_idx
                 (add_vec (n2 !!! Regidx a1_idx)
-                   (sign_extend' 64 (mword_of_int 2256 : mword 12))) (2 + n)
+                   (sign_extend' 64 (mword_of_int 2272 : mword 12))) (2 + n)
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 ltac:(vm_compute; discriminate) eq_refl
                 with "[] Hrun").
@@ -2094,7 +2096,7 @@ Section UkEcho.
                    := regval_into_reg
                         (add_vec (n2 !!! Regidx a1_idx)
                            (sign_extend' 64
-                              (mword_of_int 2256 : mword 12)))]> n2).
+                              (mword_of_int 2272 : mword 12)))]> n2).
       (* ---- 0x70  c.mv a0,a2 ---- *)
       iApply (wp_uk_cmv N h4 n3 (mword_of_int 0x70)
                 a0_idx a2_idx (add_vec zero_reg (n3 !!! Regidx a2_idx)) (2 + n)
@@ -2729,9 +2731,9 @@ Section UkEcho.
                       (add_vec (mword_of_int 0x34 : mword 64)
                          (auipc_off (mword_of_int 1 : mword 20)))]> mK).
     iApply (wp_uk_addi N hm mL (mword_of_int 0x38)
-              (mword_of_int 2300 : mword 12) s6_idx s6_idx
+              (mword_of_int 2316 : mword 12) s6_idx s6_idx
               (add_vec (mL !!! Regidx s6_idx)
-                 (sign_extend' 64 (mword_of_int 2300 : mword 12))) (2 + n)
+                 (sign_extend' 64 (mword_of_int 2316 : mword 12))) (2 + n)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) eq_refl
               with "[] Hrun").
@@ -2744,7 +2746,7 @@ Section UkEcho.
                  := regval_into_reg
                       (add_vec (mL !!! Regidx s6_idx)
                          (sign_extend' 64
-                            (mword_of_int 2300 : mword 12)))]> mL).
+                            (mword_of_int 2316 : mword 12)))]> mL).
     (* ---- 0x3c  c.j 0x4e ---- *)
     iApply (wp_uk_cj N hn mM (mword_of_int 0x3c)
               (mword_of_int 9 : mword 11) (mword_of_int 0x4e) (2 + n)

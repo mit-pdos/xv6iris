@@ -466,7 +466,11 @@ Definition kexec_ok (V V' : pprivate) (r : mword 64)
       ([ProcInv.upd_exec] writes the literal); this is the row that carries
       it OUT, and [SpecKexec.exec_slot_pre]'s [uvis_lazy W' = false] is
       read off it. *)
-   pv_lazy V' = false).
+   pv_lazy V' = false /\
+   (* ...AND THE MASK IS KEPT (upstream a083670): exec does not touch
+      [p->seccomp], so [ProcDefs.pv_secc] survives it -- a masked process
+      stays masked across exec, which is the whole point of the mask. *)
+   pv_secc V' = pv_secc V).
 
 (* ===================================================================== *)
 (*  THE FILE SYSTEM FABRIC, as one bundle.                                *)

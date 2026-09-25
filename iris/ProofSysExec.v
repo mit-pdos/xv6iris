@@ -130,7 +130,7 @@ Section SysExecAUBridge.
 
   (* (1) the caller's WP, instantiated at the vector the walk built *)
   Lemma sys_exec_au_pre_at (Fs : pfam Σ (uvis -> iProp Σ)) Γ
-      (γfs : fs_names) (cw : Z) (Qpay : Z -> iProp Σ)
+      (γfs : fs_names) (cw : Z) (secc : mword 64) (Qpay : Z -> iProp Σ)
       (Pw Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (Mim : gmap Z (bv 8)) (pvp avp : mword 64) (sts : list fdstate)
@@ -139,8 +139,8 @@ Section SysExecAUBridge.
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8) :
     exec_path_of Mim pvp pl ->
     exec_args_of Mim avp na alen afun ->
-    sys_exec_au_pre Fs Γ γfs cw Qpay Pw Pmiss Fo Mim pvp avp sts cs pidv -∗
-    exec_au_pre Fs Γ γfs cw Qpay Pw Pmiss Fo pl na alen afun sts cs pidv.
+    sys_exec_au_pre Fs Γ γfs cw secc Qpay Pw Pmiss Fo Mim pvp avp sts cs pidv -∗
+    exec_au_pre Fs Γ γfs cw secc Qpay Pw Pmiss Fo pl na alen afun sts cs pidv.
   Proof using .
     intros Hpsh Hsh. rewrite /sys_exec_au_pre /exec_au_pre.
     iIntros "(Hera & Hcom & Hslot)".
@@ -287,7 +287,7 @@ Section SysExecBreakAU.
        of what its exit owes, which the new image's slot is built against
        ([SpecKexec.exec_slot_pre]) *)
     my_pay gn Qpay -∗
-    sys_exec_au_pre Fs (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) Qpay Pw Pmiss Fo Mim pvp avp sts
+    sys_exec_au_pre Fs (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) (pv_secc (us_V U)) Qpay Pw Pmiss Fo Mim pvp avp sts
       cs pid -∗
     sx_body γf jp pid U K eb b lks sp0 m plen pfun rest uav
             M P i pg alen afun uvf (mword_of_int (SX + 0xb6) : mword 64) -∗
@@ -301,7 +301,7 @@ Section SysExecBreakAU.
         (* the armed post, at the block the copy-ins left and the returned
            a0; [exec_arms_landed] turns it back into the landed
            [kexec_ok] whenever a caller wants that instead. *)
-        exec_arms Fs (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) Qpay Pw Pmiss Fo
+        exec_arms Fs (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) (pv_secc (us_V U)) Qpay Pw Pmiss Fo
                   (bview plen pfun) i alen afun sts gn cs pid
                   (us_upt U P) U' (mf !!! Regidx Ra0) -∗
         (* the READING the walk established, which the composition needs to
@@ -351,7 +351,7 @@ Section SysExecBreakAU.
       - exact (sx_avf_eq uvf i).
       - intros j Hj. rewrite (sx_avf_lt uvf i j Hj).
         exact (proj2 (proj2 (Havok j Hj))). }
-    iDestruct (sys_exec_au_pre_at Fs (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) Qpay Pw Pmiss Fo
+    iDestruct (sys_exec_au_pre_at Fs (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) (pv_secc (us_V U)) Qpay Pw Pmiss Fo
                  Mim pvp avp sts cs pid (bview plen pfun) i alen afun
                  Hpof Hargs with "Hau") as "Hau".
     iDestruct (sx_carry_open sp0 m plen pfun rest with "Hcarry")

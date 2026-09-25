@@ -133,14 +133,14 @@ Proof using .
     assert (Hl : (j < length alt_execR)%nat) by (vm_compute in Hj |- *; lia).
     exact (list_lookup_lookup_total_lt alt_execR j Hl).
   - intros j Hj.
-    apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x12a8)
+    apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x12b8)
              (fun i : nat => alt_execR !!! i) 0%nat 5%nat);
       [vm_compute; reflexivity | lia].
   - intros j Hj.
     assert (Hj3 : (j < 3)%nat) by (vm_compute in Hj; lia).
     destruct j as [| [| [| j]]]; try lia; vm_compute; reflexivity.
   - intros j Hj.
-    apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x12a8)
+    apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x12b8)
              (fun i : nat => alt_execR !!! (i + 1)%nat) 7%nat 8%nat);
       [vm_compute; reflexivity | lia].
 Qed.
@@ -154,14 +154,14 @@ Proof using .
     assert (Hl : (j < length (filt_alt (FGrep [])))%nat) by (vm_compute in Hj |- *; lia).
     exact (list_lookup_lookup_total_lt _ j Hl).
   - intros j Hj.
-    apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x12a8)
+    apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x12b8)
              (fun i : nat => filt_alt (FGrep []) !!! i) 0%nat 5%nat);
       [vm_compute; reflexivity | lia].
   - intros j Hj.
     assert (Hj4 : (j < 4)%nat) by (vm_compute in Hj; lia).
     destruct j as [| [| [| [| j]]]]; try lia; vm_compute; reflexivity.
   - intros j Hj.
-    apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x12a8)
+    apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x12b8)
              (fun i : nat => filt_alt (FGrep []) !!! (i + 2)%nat) 7%nat 8%nat);
       [vm_compute; reflexivity | lia].
 Qed.
@@ -346,7 +346,7 @@ Section UShExecPin.
          ⌜Fd (take NSTD sts)⌝ -∗
          UkRun.urun_nopipe sts -∗
          image_entry elf M (mword_of_int (t + 8) : mword 64)
-           sts FsImg.ROOTINO cs pidv (fun _ : Z => Qv) Cr uslot) -∗
+           sts FsImg.ROOTINO ProcDefs.secc_all cs pidv (fun _ : Z => Qv) Cr uslot) -∗
     □ (app_taint -∗ Qv) -∗
     sh_pin_slot pins T -∗
     UkShEcho.sh_exec_sup_echo_at (SG := uexecSG_xv6) Fd ws (fun _ : Z => Qv) Cr.
@@ -383,7 +383,7 @@ Section UShExecPin.
     iPoseProof ("Hent" $! M s0 t gn fdv chs pidv with "[%] [%] [%] [%] Hnp0") as "#He";
       [ exact Himg | exact Hbytes | exact Hflen | rewrite Hl; exact Hrows | ].
     iApply (UShEchoPipePay.image_entry_pay_mono elf M
-              (mword_of_int (t + 8) : mword 64) fdv FsImg.ROOTINO chs pidv
+              (mword_of_int (t + 8) : mword 64) fdv FsImg.ROOTINO ProcDefs.secc_all chs pidv
               (fun _ : Z => Qv) Cr (UserFd.ustd (ukn_fd N') ld ∗ Cr)%I uslot with "[] He").
     iIntros "!> [_ Hc]". iExact "Hc".
   Qed.
@@ -400,7 +400,7 @@ Section UShExecPin.
          ⌜Fd (take NSTD sts)⌝ -∗
          UkRun.urun_nopipe sts -∗
          image_entry (filt_elf F) M (mword_of_int (t + 8) : mword 64)
-           sts FsImg.ROOTINO cs pidv (fun _ : Z => Qv) Cr uslot) -∗
+           sts FsImg.ROOTINO ProcDefs.secc_all cs pidv (fun _ : Z => Qv) Cr uslot) -∗
     □ (app_taint -∗ Qv) -∗
     sh_pin_slot (filt_pins F) T -∗
     UkShEcho.sh_exec_sup_echo_at (SG := uexecSG_xv6) Fd (filt_words F) (fun _ : Z => Qv) Cr.

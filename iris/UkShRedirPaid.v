@@ -79,23 +79,23 @@ Section UkShRedirPaid.
     intros Hp. apply list_lookup_lookup_total_lt. rewrite alt_openfailN_len. lia.
   Qed.
 
-  (* the format's two windows at 0x12b8, around the argument *)
+  (* the format's two windows at 0x12c8, around the argument *)
   Lemma ush_openfail_lit1 :
-    forall p : nat, (0 <= p < 0 + 5)%nat -> shd_lit 0x12b8 p = openfail_pre !!! p.
+    forall p : nat, (0 <= p < 0 + 5)%nat -> shd_lit 0x12c8 p = openfail_pre !!! p.
   Proof using . apply ush_bytes_of_forallb. vm_compute. reflexivity. Qed.
 
   Lemma ush_openfail_lit2 :
     forall p : nat, (7 <= p < 7 + 8)%nat ->
-      shd_lit 0x12b8 p = openfail_suf !!! (p - 7)%nat.
+      shd_lit 0x12c8 p = openfail_suf !!! (p - 7)%nat.
   Proof using .
-    apply (ush_bytes_of_forallb (shd_lit 0x12b8)
+    apply (ush_bytes_of_forallb (shd_lit 0x12c8)
              (fun p : nat => openfail_suf !!! (p - 7)%nat)).
     vm_compute. reflexivity.
   Qed.
 
   Lemma ush_openfail_w1 (nm : list (bv 8)) :
     forall p : nat, (0 <= p < 0 + 5)%nat ->
-      shd_lit 0x12b8 p = alt_openfailN nm !!! p.
+      shd_lit 0x12c8 p = alt_openfailN nm !!! p.
   Proof using .
     intros p Hp. rewrite (ush_openfail_lit1 p Hp). symmetry.
     apply alt_openfailN_w1. lia.
@@ -103,7 +103,7 @@ Section UkShRedirPaid.
 
   Lemma ush_openfail_w2 (nm : list (bv 8)) :
     forall p : nat, (7 <= p < 7 + 8)%nat ->
-      shd_lit 0x12b8 p = alt_openfailN nm !!! (p - 2 + length nm)%nat.
+      shd_lit 0x12c8 p = alt_openfailN nm !!! (p - 2 + length nm)%nat.
   Proof using .
     intros p Hp. rewrite (ush_openfail_lit2 p Hp).
     replace (p - 2 + length nm)%nat with (5 + length nm + (p - 7))%nat by lia.
@@ -166,10 +166,10 @@ Section UkShRedirPaid.
                  (ua_len x) (ua_bytes x)
                  with "Hxs") as "#Hs".
     assert (Hlits110 : shd_die_lits 0x110 0x114 0x118 0x11a 0x11e 0x120
-                      (mword_of_int 1 : mword 20) (mword_of_int 424 : mword 12)
-                      (mword_of_int 3984 : mword 21) (mword_of_int 2918 : mword 21)
+                      (mword_of_int 1 : mword 20) (mword_of_int 440 : mword 12)
+                      (mword_of_int 3992 : mword 21) (mword_of_int 2918 : mword 21)
                       (mword_of_int 1 : mword 6)
-                      0x12b8 15%nat 5%nat)
+                      0x12c8 15%nat 5%nat)
       by shd_die_solve.
     set (C1 := (fun p : nat => UserFd.ustd (ukn_fd N) l ∗ Pf p)%I).
     set (C2 := (fun p : nat => UserFd.ustd (ukn_fd N) l ∗ Pf (5 + p)%nat)%I).
@@ -180,10 +180,10 @@ Section UkShRedirPaid.
       by (rewrite Hxlen; reflexivity).
     iApply (wp_kshd_die_chain N false DfracDiscarded
               0x110 0x114 0x118 0x11a 0x11e 0x120
-              (mword_of_int 1 : mword 20) (mword_of_int 424 : mword 12)
-              (mword_of_int 3984 : mword 21) (mword_of_int 2918 : mword 21)
+              (mword_of_int 1 : mword 20) (mword_of_int 440 : mword 12)
+              (mword_of_int 3992 : mword 21) (mword_of_int 2918 : mword 21)
               (mword_of_int 1 : mword 6)
-              0x12b8 15%nat 5%nat
+              0x12c8 15%nat 5%nat
               (ua_ptr x) (ua_len x) (ua_bytes x) C1 C2 C3 h1 m1 (n + 2)
               Hlits110
               ltac:(lia)

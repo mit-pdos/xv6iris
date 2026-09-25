@@ -9,7 +9,7 @@
      +0x07a  c.j +28 -> +0x96  (enter the fd scan at its TEST)
 
    Straight line, [b = false] throughout (the child's lock is held from
-   allocproc through the release at +0xc4), so every leaf closes with
+   allocproc through the release at +0xcc), so every leaf closes with
    [wp_next_off_intro] and there is no hart-migration bookkeeping at all --
    the same shape [ProofKforkB2]'s copy loop uses.
 
@@ -104,7 +104,7 @@ Section KforkB7.
   (* =================================================================== *)
   Lemma kfk_b7 (γf : gname) (npa pme : mword 64) (pid_c : mword 32) (U : ustate)
       (M : regfile) (n : nat) (p : mword 64) :
-    M !!! Regidx Rs4 = npa ->
+    M !!! Regidx Rs3 = npa ->
     M !!! Regidx Rs5 = pme ->
     sie_cap_gpr KT1 M n false p -∗
     kernel_text -∗
@@ -113,10 +113,10 @@ Section KforkB7.
     wp_next false p (fun (CID : CpuId) =>
       ∀ Mx : regfile,
         ⌜ Mx !!! Regidx Rs1 = p_ofile pme 0 /\ Mx !!! Regidx Rs2 = p_ofile npa 0 /\
-          Mx !!! Regidx Rs3 = p_cwd pme /\ Mx !!! Regidx Rs4 = npa /\
+          Mx !!! Regidx Rs4 = p_cwd pme /\ Mx !!! Regidx Rs3 = npa /\
           Mx !!! Regidx Rs5 = pme /\
           (forall r : mword 5, is_cs_idx r = true ->
-              r <> Rs1 -> r <> Rs2 -> r <> Rs3 -> Mx !!! Regidx r = M !!! Regidx r) ⌝ -∗
+              r <> Rs1 -> r <> Rs2 -> r <> Rs4 -> Mx !!! Regidx r = M !!! Regidx r) ⌝ -∗
         sie_cap_gpr KT1 Mx n false p -∗
         pc_is (mword_of_int (KF + 0x96) : mword 64) -∗
         proc_priv_nocwd γf npa pid_c (us_pt U (pv_upt (us_V U)) (<[(14%nat) := zero_reg]> (pv_tf (us_V U)))) -∗
@@ -145,9 +145,9 @@ Section KforkB7.
                  ltac:(vm_compute; lia) Hw14 with "Hptc Htfp")
       as "[Hcell Hback]".
     (* ---- +0x66: ld a5,88(s4) ---- *)
-    assert (Htgt66 : add_vec (M !!! Regidx Rs4) (sign_extend' 64 (mword_of_int 88 : mword 12))
+    assert (Htgt66 : add_vec (M !!! Regidx Rs3) (sign_extend' 64 (mword_of_int 88 : mword 12))
                      = p_trapframe npa) by (rewrite HM4; reflexivity).
-    iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KF + 0x66) : mword 64) Ra5 Rs4 (mword_of_int 88 : mword 12)
+    iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KF + 0x66) : mword 64) Ra5 Rs3 (mword_of_int 88 : mword 12)
               M n (page_base (ud_tfp (pv_upt (us_V U)))) false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] [Htf]").
@@ -158,7 +158,7 @@ Section KforkB7.
     set (T1 := <[Regidx Ra5 := regval_into_reg (page_base (ud_tfp (pv_upt (us_V U))))]> M).
     assert (HT1a5 : T1 !!! Regidx Ra5 = page_base (ud_tfp (pv_upt (us_V U))))
       by (rewrite /T1 upd_eq; reflexivity).
-    assert (HT1s4 : T1 !!! Regidx Rs4 = npa)
+    assert (HT1s4 : T1 !!! Regidx Rs3 = npa)
       by (rewrite /T1 upd_ne; [exact HM4 | vm_compute; discriminate]).
     assert (HT1s5 : T1 !!! Regidx Rs5 = pme)
       by (rewrite /T1 upd_ne; [exact HM5 | vm_compute; discriminate]).
@@ -193,7 +193,7 @@ Section KforkB7.
                   (add_vec (T1 !!! Regidx Rs5) (sign_extend' 64 (mword_of_int 208 : mword 12)))]> T1).
     assert (HT2s1 : T2 !!! Regidx Rs1 = p_ofile pme 0).
     { rewrite /T2 upd_eq HT1s5. apply p_ofile_zero. }
-    assert (HT2s4 : T2 !!! Regidx Rs4 = npa)
+    assert (HT2s4 : T2 !!! Regidx Rs3 = npa)
       by (rewrite /T2 upd_ne; [exact HT1s4 | vm_compute; discriminate]).
     assert (HT2s5 : T2 !!! Regidx Rs5 = pme)
       by (rewrite /T2 upd_ne; [exact HT1s5 | vm_compute; discriminate]).
@@ -201,19 +201,19 @@ Section KforkB7.
                      = mword_of_int (KF + 0x72)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp072) in "Hpc".
     (* ---- +0x72: addi s2,s4,208 ---- *)
-    iApply (wp_addi4_s_sconf (mword_of_int (KF + 0x72) : mword 64) Rs2 Rs4 (mword_of_int 208 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KF + 0x72) : mword 64) Rs2 Rs3 (mword_of_int 208 : mword 12)
               T2 n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (kfk_072 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". iEval (rgne) in "Hcg".
     set (T3 := <[Regidx Rs2 := regval_into_reg
-                  (add_vec (T2 !!! Regidx Rs4) (sign_extend' 64 (mword_of_int 208 : mword 12)))]> T2).
+                  (add_vec (T2 !!! Regidx Rs3) (sign_extend' 64 (mword_of_int 208 : mword 12)))]> T2).
     assert (HT3s2 : T3 !!! Regidx Rs2 = p_ofile npa 0).
     { rewrite /T3 upd_eq HT2s4. apply p_ofile_zero. }
     assert (HT3s1 : T3 !!! Regidx Rs1 = p_ofile pme 0)
       by (rewrite /T3 upd_ne; [exact HT2s1 | vm_compute; discriminate]).
-    assert (HT3s4 : T3 !!! Regidx Rs4 = npa)
+    assert (HT3s4 : T3 !!! Regidx Rs3 = npa)
       by (rewrite /T3 upd_ne; [exact HT2s4 | vm_compute; discriminate]).
     assert (HT3s5 : T3 !!! Regidx Rs5 = pme)
       by (rewrite /T3 upd_ne; [exact HT2s5 | vm_compute; discriminate]).
@@ -221,21 +221,21 @@ Section KforkB7.
                      = mword_of_int (KF + 0x76)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp076) in "Hpc".
     (* ---- +0x76: addi s3,s5,336 ---- *)
-    iApply (wp_addi4_s_sconf (mword_of_int (KF + 0x76) : mword 64) Rs3 Rs5 (mword_of_int 336 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KF + 0x76) : mword 64) Rs4 Rs5 (mword_of_int 336 : mword 12)
               T3 n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (kfk_076 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". iEval (rgne) in "Hcg".
-    set (T4 := <[Regidx Rs3 := regval_into_reg
+    set (T4 := <[Regidx Rs4 := regval_into_reg
                   (add_vec (T3 !!! Regidx Rs5) (sign_extend' 64 (mword_of_int 336 : mword 12)))]> T3).
-    assert (HT4s3 : T4 !!! Regidx Rs3 = p_cwd pme).
+    assert (HT4s3 : T4 !!! Regidx Rs4 = p_cwd pme).
     { rewrite /T4 upd_eq HT3s5. apply p_cwd_sext. }
     assert (HT4s1 : T4 !!! Regidx Rs1 = p_ofile pme 0)
       by (rewrite /T4 upd_ne; [exact HT3s1 | vm_compute; discriminate]).
     assert (HT4s2 : T4 !!! Regidx Rs2 = p_ofile npa 0)
       by (rewrite /T4 upd_ne; [exact HT3s2 | vm_compute; discriminate]).
-    assert (HT4s4 : T4 !!! Regidx Rs4 = npa)
+    assert (HT4s4 : T4 !!! Regidx Rs3 = npa)
       by (rewrite /T4 upd_ne; [exact HT3s4 | vm_compute; discriminate]).
     assert (HT4s5 : T4 !!! Regidx Rs5 = pme)
       by (rewrite /T4 upd_ne; [exact HT3s5 | vm_compute; discriminate]).
@@ -258,7 +258,7 @@ Section KforkB7.
     iEval (rewrite Htgt7a) in "Hpc".
     (* ---- assemble the exit and hand off to Hcont ---- *)
     assert (HT4thr : forall r : mword 5, is_cs_idx r = true ->
-                r <> Rs1 -> r <> Rs2 -> r <> Rs3 -> T4 !!! Regidx r = M !!! Regidx r).
+                r <> Rs1 -> r <> Rs2 -> r <> Rs4 -> T4 !!! Regidx r = M !!! Regidx r).
     { intros r Hr N1 N2 N3.
       rewrite /T4 upd_ne; [| congruence].
       rewrite /T3 upd_ne; [| congruence].

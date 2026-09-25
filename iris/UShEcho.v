@@ -11,7 +11,7 @@
 (* naming:                                                                *)
 (*                                                                        *)
 (*  THE PATH IS NOT A CONSTANT.  init's "sh" is a literal in its rodata    *)
-(*  ([UCodeInit.init_ro] at 0x9a8) and its argv a literal in its data, so  *)
+(*  ([UCodeInit.init_ro] at 0x9b8) and its argv a literal in its data, so  *)
 (*  [UInitSh.init_args_det] is three [vm_compute]s over the dump.  sh's    *)
 (*  "echo" is a run of the LINE BUFFER, cut by [nulterminate], and its     *)
 (*  argv is a malloc'd node -- so the reading is off the NODE                *)
@@ -210,7 +210,7 @@ Qed.
 (* ===================================================================== *)
 (*  3a. THE IMAGE exec BUILDS FOR /echo, as two numbers                   *)
 (*                                                                        *)
-(*  echo's PT_LOADs are (0, 0xdcc, R-X) and (0x1000, 0x20, RW-), so the   *)
+(*  echo's PT_LOADs are (0, 0xddc, R-X) and (0x1000, 0x20, RW-), so the   *)
 (*  loaded top is [pgroundup 0x1020 = 0x2000] and the new [p->sz] is that *)
 (*  plus the guard and the stack page.  Everything the room condition     *)
 (*  needs is closed arithmetic over these two.                            *)
@@ -293,14 +293,14 @@ Qed.
 (* ===================================================================== *)
 (*  3b. THE TWO PT_LOADs, AND THE ENTRY                                   *)
 (*                                                                        *)
-(*  [UShKernel.sh_loads] at echo: (0x0, 0xdcc, R-X) and (0x1000, 0x20,    *)
+(*  [UShKernel.sh_loads] at echo: (0x0, 0xddc, R-X) and (0x1000, 0x20,    *)
 (*  RW-).  Only the FIRST is read below -- echo's entry asks for page 0   *)
 (*  to be X-and-not-W and for nothing else about the loaded image.        *)
 (* ===================================================================== *)
 Lemma echo_loads :
   exists p0 p1 : elf_phdr,
     elf_loads ElfUser.echo_elf = [p0; p1]
-    /\ ep_vaddr p0 = 0 /\ ep_memsz p0 = 0xdcc /\ ep_flags p0 = 5
+    /\ ep_vaddr p0 = 0 /\ ep_memsz p0 = 0xddc /\ ep_flags p0 = 5
     /\ ep_vaddr p1 = 0x1000 /\ ep_memsz p1 = 0x20 /\ ep_flags p1 = 6.
 Proof.
   pose proof (UShKernel.elf_segments_loads ElfUser.echo_elf _
@@ -1508,6 +1508,7 @@ Section UShEcho.
          [UShKernel.sh_slot_of_kexec]; the caller reads it off
          [SpecKexec.exec_slot_pre]'s wand ([PinnedExec.pex_slot]'s row). *)
       uvis_lazy W' = false ->
+      uvis_secc W' = ProcDefs.secc_all ->
       ⊢ udepw_law 16 -∗
         (* ...and whether the exec'ing process's table held a pipe row
            (design/pipe.md, "The exit path"): echo's run carries it and its
@@ -1518,7 +1519,7 @@ Section UShEcho.
 
   Lemma echo_slot_of_kexec_holds : echo_slot_of_kexec.
   Proof.
-    intros na alen afun sts W' Hok Hroom Hfdl Hlzf.
+    intros na alen afun sts W' Hok Hroom Hfdl Hlzf Hscf.
     destruct (echo_kexec_pages na alen afun sts W' Hok)
       as (Hpc & Hsub & Hx & Hwr & Hrp).
     destruct (echo_kexec_entry_rows na alen afun sts W' Hok Hroom Hfdl Hwr Hrp)
@@ -1530,7 +1531,7 @@ Section UShEcho.
     iAssert (UkRun.urun_nopipe (uvis_fd W')) as "#Hnpw'";
       [ rewrite (kexec_image_ok_fd _ na alen afun sts W' Hok); iExact "Hnpw" | ].
     iApply (echo_uexec_slot W' Hpc Hsub Hx Hroom96 Hal8 Hstkrow Hargsrow
-              Havd Havs Hfdlen Hstop Hlzf
+              Havd Havs Hfdlen Hstop Hlzf Hscf
               with "Hwr Hnpw' Hdep Hmp").
   Qed.
 
@@ -1618,16 +1619,16 @@ Section UShEcho.
        "The exit path") *)
     UkRun.urun_nopipe sts -∗ udep -∗
     image_entry ElfUser.echo_elf M (mword_of_int (t + 8) : mword 64) sts
-      cw cs pidv (fun _ : Z => True)%I emp uslot.
+      cw ProcDefs.secc_all cs pidv (fun _ : Z => True)%I emp uslot.
   Proof.
     intros Hok Himg Hbytes Hfdl. iIntros "#Hwr #Hnpw #Hdep".
     iApply image_entry_of_at. iIntros "!>" (na alen afun) "%Hargs".
     destruct (echo_args_det_holds ws Hok M s0 t g na alen afun Himg Hbytes
                 Hargs) as (Hna & Halen & _).
-    rewrite /image_entry_at. iIntros "!>" (W') "%Hokk _ %Hlzf _ _ Hmp _".
+    rewrite /image_entry_at. iIntros "!>" (W') "%Hokk _ %Hlzf %Hscf _ _ Hmp _".
     iApply (echo_slot_of_kexec_holds na alen afun sts W' Hokk
               (echo_room_of_det ws na alen Hok Hna Halen) Hfdl
-              Hlzf with "Hwr Hnpw Hdep Hmp").
+              Hlzf Hscf with "Hwr Hnpw Hdep Hmp").
   Qed.
 
   (* =================================================================== *)

@@ -37,7 +37,10 @@ Require Import UmodeArith.
 Local Open Scope Z_scope.
 
 (* the number the dispatcher reads is the number the table is keyed by *)
-Lemma sysc_num_usys (V : pprivate) : sysc_num V = usys_num (pv_tf V).
+(* ...at the EFFECTIVE number: the mask is read with the frame (upstream
+   a083670), so a blocked call is the unknown-number call on both sides *)
+Lemma sysc_num_usys (V : pprivate) :
+  sysc_num V = usys_eff (pv_secc V) (pv_tf V).
 Proof. reflexivity. Qed.
 
 (* Every entry but exec and sbrk: the kernel's table implies the user's, at
