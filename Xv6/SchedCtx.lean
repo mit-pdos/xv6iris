@@ -517,9 +517,13 @@ def procFieldsNoctx (pa : BitVec 64) (dq : DFrac) (V : ProcPriv) : IProp GF := i
   wordPointsTo (pCwd pa) 8 dq V.cwd ∗
   pnameCells pa dq V.name
 
-/-- `procDormant` minus its context cells (a ZOMBIE still carries its
-address space and trapframe page); the lazy bit SET, as in `procDormant`
-(`kexit`'s park raises it). -/
+section DormantNoctx
+variable [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+
+/-- `procDormant` minus its context cells (Rocq `proc_dormant_noctx`: a
+ZOMBIE still carries its address space and trapframe page, and the slot's
+allowances `dormantAllow` ride here as in `procDormant`); the lazy bit SET,
+as in `procDormant` (`kexit`'s park raises it). -/
 def procDormantNoctx (pa : BitVec 64) (st : BitVec 32) : IProp GF := iprop%
   ⌜st = UNUSED ∨ st = ZOMBIE⌝ ∗
   ∃ (V : ProcPriv) (pid : BitVec 32),
@@ -527,7 +531,10 @@ def procDormantNoctx (pa : BitVec 64) (st : BitVec 32) : IProp GF := iprop%
       V.pvLazy = true⌝ ∗
     wordPointsTo (pPid pa) 4 pidPriv pid ∗
     procFieldsNoctx pa (DFrac.own 1) V ∗
+    dormantAllow ∗
     dormantSpace st V pid
+
+end DormantNoctx
 
 /-- The 14 words of `p->context` ARE the save area at `&p->context`. -/
 theorem pContext_shift (pa : BitVec 64) (j : Nat) :
@@ -565,14 +572,17 @@ theorem dormantSpace_context (st : BitVec 32) (V : ProcPriv) (vs : List (BitVec 
     (pid : BitVec 32) :
     dormantSpace (GF := GF) st { V with context := vs } pid = dormantSpace st V pid := rfl
 
+section DormantSplit
+variable [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+
 /-- **The ZOMBIE park's split**: the dormant block is its context cells plus
 the rest. -/
 theorem procDormant_split (pa : BitVec 64) (st : BitVec 32) :
     procDormant (GF := GF) pa st ⊣⊢ procDormantNoctx pa st ∗ ownCtxCells (pContext pa 0) := by
   constructor
   · unfold procDormant procDormantNoctx procFields procFieldsNoctx
-    iintro ⟨%hst, %V, %pid, %hV, Hpid, ⟨Hks, Hsz, Hpt, Htf, Hctx, Hof, Hcwd, Hnm⟩, Has⟩
-    isplitl [Hpid Hks Hsz Hpt Htf Hof Hcwd Hnm Has]
+    iintro ⟨%hst, %V, %pid, %hV, Hpid, ⟨Hks, Hsz, Hpt, Htf, Hctx, Hof, Hcwd, Hnm⟩, Hal, Has⟩
+    isplitl [Hpid Hks Hsz Hpt Htf Hof Hcwd Hnm Hal Has]
     · isplitl []
       · ipureintro; exact hst
       iexists V, pid
@@ -582,15 +592,17 @@ theorem procDormant_split (pa : BitVec 64) (st : BitVec 32) :
     · iapply ownCtxCells_intro (pContext pa 0) V.context
       iapply contextCells_to_ctxCells pa V.context $$ Hctx
   · unfold procDormant procDormantNoctx procFields procFieldsNoctx ownCtxCells
-    iintro ⟨⟨%hst, %V, %pid, %hV, Hpid, ⟨Hks, Hsz, Hpt, Htf, Hof, Hcwd, Hnm⟩, Has⟩, ⟨%vs, Hcells⟩⟩
+    iintro ⟨⟨%hst, %V, %pid, %hV, Hpid, ⟨Hks, Hsz, Hpt, Htf, Hof, Hcwd, Hnm⟩, Hal, Has⟩, ⟨%vs, Hcells⟩⟩
     isplitl []
     · ipureintro; exact hst
     iexists { V with context := vs }, pid
     isplitl []
     · ipureintro; exact hV
     simp only [dormantSpace_context]
-    iframe Hpid Hks Hsz Hpt Hof Hcwd Hnm Htf Has
+    iframe Hpid Hks Hsz Hpt Hof Hcwd Hnm Htf Hal Has
     iapply ctxCells_to_contextCells pa vs $$ Hcells
+
+end DormantSplit
 
 end
 
@@ -639,7 +651,7 @@ theorem procHeldAt_intro (Γ : SchedNames) (ξ : CtxId) (h : CPU) (j : Nat) (st 
 at a resumable park, the dormant block (minus the context cells the swtch
 is about to write) at the ZOMBIE park. -/
 def parkPayAt (ξ : CtxId) (pa : BitVec 64) (st : BitVec 32) : IProp GF :=
-  if invDormant st then @procDormantNoctx hlc GF _ ⟨ξ, KTier.kpt⟩ pa st else iprop(emp)
+  if invDormant st then @procDormantNoctx hlc GF _ ⟨ξ, KTier.kpt⟩ _ _ _ _ pa st else iprop(emp)
 
 theorem parkPay_live (ξ : CtxId) (pa : BitVec 64) (st : BitVec 32) (h : ¬ invDormant st) :
     ⊢ parkPayAt (hlc := hlc) (GF := GF) ξ pa st := by
@@ -764,7 +776,7 @@ instance instCtxMorphProcFieldsNoctx (tier : KTier) (pa : BitVec 64) (dq : DFrac
               (instCtxMorphPnameCells _ _ _ _))))))
 
 instance instCtxMorphProcDormantNoctx (tier : KTier) (pa : BitVec 64) (st : BitVec 32) :
-    CtxMorph (GF := GF) (fun ξ => @procDormantNoctx hlc GF _ ⟨ξ, tier⟩ pa st) :=
+    CtxMorph (GF := GF) (fun ξ => @procDormantNoctx hlc GF _ ⟨ξ, tier⟩ _ _ _ _ pa st) :=
   @instCtxMorphSep hlc GF _ (fun _ => iprop(⌜st = UNUSED ∨ st = ZOMBIE⌝)) _ (instCtxMorphConst _)
     (@instCtxMorphExists hlc GF _ _
       (fun (V : ProcPriv) ξ => iprop(∃ pid : BitVec 32,
@@ -772,12 +784,14 @@ instance instCtxMorphProcDormantNoctx (tier : KTier) (pa : BitVec 64) (st : BitV
       V.pvLazy = true⌝ ∗
         @wordPointsTo hlc GF _ ⟨ξ, tier⟩ (pPid pa) 4 pidPriv pid ∗
         @procFieldsNoctx hlc GF _ ⟨ξ, tier⟩ pa (DFrac.own 1) V ∗
+        dormantAllow ∗
         @dormantSpace hlc GF _ ⟨ξ, tier⟩ st V pid))
       (fun _ => @instCtxMorphExists hlc GF _ _ _
         (fun _ => @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
           (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
             (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphProcFieldsNoctx _ _ _ _)
-              (instCtxMorphDormantSpace _ _ _ _))))))
+              (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
+                (instCtxMorphDormantSpace _ _ _ _)))))))
 
 /-- **`procPriv` minus the 14 context words** (Rocq's `proc_priv`: the
 running process's block, whose save area lives in the lock's RUNNING arm,
@@ -854,7 +868,7 @@ instance instCtxMorphProcFields (tier : KTier) (pa : BitVec 64) (dq : DFrac) (V 
                 (instCtxMorphPnameCells _ _ _ _)))))))
 
 instance instCtxMorphProcDormant (tier : KTier) (pa : BitVec 64) (st : BitVec 32) :
-    CtxMorph (GF := GF) (fun ξ => @procDormant hlc GF _ ⟨ξ, tier⟩ pa st) :=
+    CtxMorph (GF := GF) (fun ξ => @procDormant hlc GF _ ⟨ξ, tier⟩ _ _ _ _ pa st) :=
   @instCtxMorphSep hlc GF _ (fun _ => iprop(⌜st = UNUSED ∨ st = ZOMBIE⌝)) _ (instCtxMorphConst _)
     (@instCtxMorphExists hlc GF _ _
       (fun (V : ProcPriv) ξ => iprop(∃ pid : BitVec 32,
@@ -862,12 +876,14 @@ instance instCtxMorphProcDormant (tier : KTier) (pa : BitVec 64) (st : BitVec 32
       V.pvLazy = true⌝ ∗
         @wordPointsTo hlc GF _ ⟨ξ, tier⟩ (pPid pa) 4 pidPriv pid ∗
         @procFields hlc GF _ ⟨ξ, tier⟩ pa (DFrac.own 1) V ∗
+        dormantAllow ∗
         @dormantSpace hlc GF _ ⟨ξ, tier⟩ st V pid))
       (fun _ => @instCtxMorphExists hlc GF _ _ _
         (fun _ => @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
           (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
             (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphProcFields _ _ _ _)
-              (instCtxMorphDormantSpace _ _ _ _))))))
+              (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
+                (instCtxMorphDormantSpace _ _ _ _)))))))
 
 instance instCtxMorphParkPay (pa : BitVec 64) (st : BitVec 32) :
     CtxMorph (GF := GF) (fun ξ => parkPayAt (hlc := hlc) ξ pa st) := by
@@ -1198,7 +1214,7 @@ record, the running arm, the dormant block, the hart tag, the marker arm. -/
 def procSlotsAt (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) (st : BitVec 32) : IProp GF := iprop%
   (if needsCtx st then procCtxAt Γ ξl pa else emp) ∗
   (if isRunning st then runSlotAt Γ ξl pa else emp) ∗
-  (if invDormant st then @procDormant hlc GF _ ⟨ξl, KTier.kpt⟩ pa st else emp) ∗
+  (if invDormant st then @procDormant hlc GF _ ⟨ξl, KTier.kpt⟩ _ _ _ _ pa st else emp) ∗
   (if notRunning st then hartAtAny Γ pa else emp) ∗
   pavSlot Γ pa st
 
@@ -1297,7 +1313,7 @@ theorem procSlots_park_gen (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) (st 
     isplitl []
     · iempintro
     iframe Htag Hu
-    iapply (@procDormant_split hlc GF _ ⟨ξl, KTier.kpt⟩ pa ZOMBIE).mpr
+    iapply (@procDormant_split hlc GF _ ⟨ξl, KTier.kpt⟩ _ _ _ _ pa ZOMBIE).mpr
     iframe Hpay Hc
 
 /-- **The slot a park hands back**, in the shape the crossing produces:
@@ -1548,14 +1564,14 @@ table's own transport. -/
 /-- `procsInv` mentions the context only through its lock handles, so it
 transports along a domination. -/
 instance instCtxMorphProcsInv (Γ : SchedNames) :
-    CtxMorph (GF := GF) (fun ξ => @procsInv hlc GF _ _ ⟨ξ, KTier.kpt⟩ Γ) :=
+    CtxMorph (GF := GF) (fun ξ => @procsInv hlc GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ Γ) :=
   ctxMorph_bigSepL (List.range NPROC)
     (fun _ j ξ => @isLock hlc GF _ _ ⟨ξ, KTier.kpt⟩ (Γ.lock j) (procAddr j) "proc" (procLockPay Γ j))
     (fun _ _ => instCtxMorphIsLock _ _ _ _ _)
 
 /-- The tier is irrelevant to the table's invariant. -/
 theorem procsInv_toKpt (X : CurCtx) (Γ : SchedNames) :
-    @procsInv hlc GF _ _ X Γ = @procsInv hlc GF _ _ ⟨X.curCtx, KTier.kpt⟩ Γ := rfl
+    @procsInv hlc GF _ _ _ _ _ X Γ = @procsInv hlc GF _ _ _ _ _ ⟨X.curCtx, KTier.kpt⟩ Γ := rfl
 
 end
 

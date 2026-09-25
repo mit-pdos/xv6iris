@@ -35,6 +35,15 @@ The frames above `sp` belong to its callers, so the closer is what the
 caller hands over when it calls the function that never returns -- and
 `kexit` uses it exactly once, at the park.
 
+THE SLOT'S ALLOWANCES (wave 7 P3, `dormantAllow`): the ZOMBIE park returns
+Rocq `proc_dormant`'s supply rows to the slot, so the caller brings them.
+**Interim shape (process-layer deviation, flagged):** Rocq's pre carries
+only `fd_slots FDSPARE ∗ iref_slots IREFSPARE ∗ bslots 3`; the other
+seventeen units (one `fd_slot` per descriptor, the cwd's `iref_slot`) come
+back from the real `fileclose` / `iput` it calls.  The assumed `FsEnv`
+entries return nothing, so until the reconnect (W7-C) retires them the pre
+takes the whole group.
+
 `initproc` may not exit (the C panics); the premise `procAddr j ≠ ip`
 against the published `initprocIs` is what rules that branch out.
 
@@ -88,7 +97,7 @@ def wp_kexit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
   kctx cpu k ∗ pcIs cpu kexitAddr ∗ procsInv Γ ∗
   trapCsrs cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ∗
   isLock γw waitLockAddr "wait_lock" waitLockPay ∗ initprocIs ip ∗
-  procPrivNoctxAt curCtx (procAddr j) pid V M ∗
+  procPrivNoctxAt curCtx (procAddr j) pid V M ∗ dormantAllow ∗
   (stackOwn k.sp k.avail -∗ stackOwn (V.kstack + 4096#64) 512)
   ⊢ wpLoop (GF := GF) cpu
 
@@ -104,7 +113,7 @@ def wp_kexit_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   kctx cpu k ∗ pcIs cpu kexitAddr ∗ procsInv Γ ∗
   trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
   isLock γw waitLockAddr "wait_lock" waitLockPay ∗ initprocIs ip ∗
-  procPrivNoctxAt curCtx (procAddr j) pid V M ∗
+  procPrivNoctxAt curCtx (procAddr j) pid V M ∗ dormantAllow ∗
   (stackOwn k.sp (trapRes k.sie + k.avail) -∗ stackOwn (V.kstack + 4096#64) 512)
   ⊢ wpLoop (GF := GF) cpu
 
@@ -130,8 +139,8 @@ theorem KEXIT.wp_kexit (A : KEXIT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS
   unfold wp_kexit_body
   rw [hsie, trapRes_off] at h
   simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨Hk, Hpc, Hpi, Htc, Hcl, Hir, Hwl, Hin, Hpr, Hcl2⟩
+  iintro ⟨Hk, Hpc, Hpi, Htc, Hcl, Hir, Hwl, Hin, Hpr, Hal, Hcl2⟩
   iapply h
-  iframe Hk Hpc Hpi Htc Hcl Hir Hwl Hin Hpr Hcl2
+  iframe Hk Hpc Hpi Htc Hcl Hir Hwl Hin Hpr Hal Hcl2
 
 end Xv6

@@ -236,14 +236,42 @@ def dormantSpace (st : BitVec 32) (V : ProcPriv) (pid : BitVec 32) : IProp GF :=
         umBelow V.sz V.upt⌝ ∗
       procPtAt V.upt M ∗ tfPageAt V.upt.tfp V.tf ∗ stackOwn (V.kstack + 4096#64) 512)
 
+section Dormant
+variable [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
+
+/-- **The dormant slot's allowances** (Rocq `proc_dormant`'s four supply
+rows, ProcDefs.v:623): one fd-slot unit per descriptor (`[∗ list] _ ∈
+pv_ofile V, fd_slot`, at the dormant block's all-null array), the fd
+allowance `fd_slots FDSPARE`, the cwd's unit plus the iref allowance
+`iref_slots (1 + IREFSPARE)`, and the bio allowance `bslots 3`.  Rocq writes
+the four inline in `proc_dormant`, `proc_dormant_noctx`, `SpecFreeproc.fp_rest`
+and allocproc's post; the port names the group once (a presentation
+cleanup: every one of those sites moves the four together), keyed at the
+literal `List.replicate NOFILE 0` rather than `pv_ofile V` -- the same list
+under the block's own pure conjunct, and a `V`-free name is what lets a
+proof that rebuilds `V` carry the group untouched. -/
+def dormantAllow : IProp GF := iprop%
+  ([∗list] _f ∈ List.replicate NOFILE (0#64 : BitVec 64), fdSlot) ∗
+  fdSlots FDSPARE ∗ irefSlots (1 + IREFSPARE) ∗ bslots 3
+
+instance dormantAllow_timeless : Timeless (dormantAllow (GF := GF)) := by
+  unfold dormantAllow; infer_instance
+
 /-- A slot nobody runs (UNUSED or ZOMBIE): the private block's cells with
-existential values, no open files, no cwd (Rocq `proc_dormant`; its file
-descriptor / inode / buffer allowances are not ported).  A ZOMBIE keeps
-its address space and trapframe page until `wait` reaps it; `freeproc`
-empties them and the slot becomes UNUSED.  The lazy bit is SET (Rocq
-`proc_dormant`'s `pv_lazy V = true`): the block invariant's claim is vacuous
-there, which is what lets `allocproc` hand out an empty table with nothing
-to prove; `freeproc` and `kexit`'s park write it (it is not a cell). -/
+existential values, no open files, no cwd, and the slot's SUPPLY
+ALLOWANCES (`dormantAllow`: the per-descriptor fd slots, `fdSlots FDSPARE`,
+`irefSlots (1 + IREFSPARE)`, `bslots 3` -- Rocq `proc_dormant`, wave 7 P3;
+allocproc hands them to the new process, freeproc passes them through,
+kexit's park returns them).  A ZOMBIE keeps its address space and
+trapframe page until `wait` reaps it; `freeproc` empties them and the slot
+becomes UNUSED.  The lazy bit is SET (Rocq `proc_dormant`'s `pv_lazy V =
+true`): the block invariant's claim is vacuous there, which is what lets
+`allocproc` hand out an empty table with nothing to prove; `freeproc` and
+`kexit`'s park write it (it is not a cell).
+
+Rocq's remaining `proc_dormant` rows -- `ch_frag (pv_chg V) pa ∅`,
+`gen_halves_dorm`, the `p->xstate` half with the ZOMBIE `exit_tok` -- are
+the D8 generation machinery (not ported). -/
 def procDormant (pa : BitVec 64) (st : BitVec 32) : IProp GF := iprop%
   ⌜st = UNUSED ∨ st = ZOMBIE⌝ ∗
   ∃ (V : ProcPriv) (pid : BitVec 32),
@@ -251,6 +279,7 @@ def procDormant (pa : BitVec 64) (st : BitVec 32) : IProp GF := iprop%
       V.pvLazy = true⌝ ∗
     wordPointsTo (pPid pa) 4 pidPriv pid ∗
     procFields pa (DFrac.own 1) V ∗
+    dormantAllow ∗
     dormantSpace st V pid
 
 /-- What slot `i` owes at state `st` besides the lock-protected part
@@ -258,6 +287,8 @@ def procDormant (pa : BitVec 64) (st : BitVec 32) : IProp GF := iprop%
 (the running/parked contexts of `SchedCtx.v` are not ported). -/
 def procSlot (i : Nat) (st : BitVec 32) : IProp GF :=
   if st = UNUSED ∨ st = ZOMBIE then procDormant (procAddr i) st else iprop(True)
+
+end Dormant
 
 /-! ## The current process (Rocq `ProcGeom.cur_proc`) -/
 

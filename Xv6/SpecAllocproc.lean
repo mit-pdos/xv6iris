@@ -48,7 +48,16 @@ nodes) came back empty, and that says nothing about the proc count; so
 the arm reports the page-allocator alternative too (`availZero (availSub
 on g)` for some `g ≤ procPagetableNodes + 1`, exactly as `pptPost` does).
 A caller that lends more than `procPagetableNodes + 1` pages
-(`userinit`) refutes that disjunct from its own count. -/
+(`userinit`) refutes that disjunct from its own count.
+
+THE SLOT'S ALLOWANCES come out of the dormant block with the rest
+(`dormantAllow`: Rocq's post carries `fd_slots FDSPARE ∗ iref_slots (1 +
+IREFSPARE) ∗ bslots 3` beside the block, and the per-descriptor
+`fd_slot`s inside `proc_priv_nocwd`'s `proc_ofiles`; wave 7 P3).  Until the
+block carries the descriptor table (P2) the per-descriptor units travel in
+the group too.  allocproc never spends them: the caller hands them to the
+new process, and a failure tail gives them straight back to `freeproc`
+(`freeprocIn`). -/
 def allocprocPost {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (γk : KmemNames) (on : Option Nat) (pav : Option Nat) (r : BitVec 64) :
     IProp GF := iprop%
@@ -58,7 +67,8 @@ def allocprocPost {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
   (∃ (j : Nat) (ch : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (g : Nat),
     ⌜r = procAddr j ∧ j < NPROC ∧ 1 ≤ pid.toNat ∧ pid.toNat ≤ PIDMAX ∧ allocprocPriv V ∧ g ≤ procPagetableNodes + 1⌝ ∗
     procHeld Γ cpu j USED ch ∗ hartAtAny Γ (procAddr j) ∗ slotUsed Γ (procAddr j) ∗ procsAvail Γ (pavDec pav) ∗
-    procPriv (procAddr j) pid V M ∗ stackOwn (V.kstack + 4096#64) 512 ∗ kallocAvail γk (availSub on g))
+    procPriv (procAddr j) pid V M ∗ dormantAllow ∗ stackOwn (V.kstack + 4096#64) 512 ∗
+    kallocAvail γk (availSub on g))
 
 /-- **WP of `allocproc`**, at either entry `SIE`.  On success it returns
 holding `p->lock`, and with it the arm its `acquire` paid out

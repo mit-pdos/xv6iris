@@ -1281,22 +1281,23 @@ section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
 
 /-- The UNUSED dormant block, opened: the private fields (with `pid`,
-`pagetable`, `trapframe`, `sz` zero and no files), and the kernel stack. -/
+`pagetable`, `trapframe`, `sz` zero and no files), the slot's allowances
+(`dormantAllow`), and the kernel stack. -/
 theorem ap_dormant_unused_elim [CurCtx] (pa : BitVec 64) :
     procDormant (GF := GF) pa UNUSED ⊢
       ∃ (V : ProcPriv), ⌜V.ofile = List.replicate NOFILE 0#64 ∧ V.cwd = 0#64 ∧
         V.pagetable = 0#64 ∧ V.trapframe = 0#64 ∧ V.sz = 0#64 ∧ V.pvLazy = true⌝ ∗
       wordPointsTo (pPid pa) 4 pidPriv 0#32 ∗ procFields pa (DFrac.own 1) V ∗
-      stackOwn (V.kstack + 4096#64) 512 := by
+      dormantAllow ∗ stackOwn (V.kstack + 4096#64) 512 := by
   unfold procDormant dormantSpace
-  iintro ⟨_, %V, %pidd, %⟨hof, hcwd, _, hlz⟩, Hpid, Hfields, Hspace⟩
+  iintro ⟨_, %V, %pidd, %⟨hof, hcwd, _, hlz⟩, Hpid, Hfields, Hal, Hspace⟩
   rw [if_pos (rfl : UNUSED = UNUSED)]
   icases Hspace with ⟨%⟨hpt, htf, hsz, hpd⟩, Hstack⟩
   subst hpd
   iexists V
   isplitl []
   · ipureintro; exact ⟨hof, hcwd, hpt, htf, hsz, hlz⟩
-  iframe Hpid Hfields Hstack
+  iframe Hpid Hfields Hal Hstack
 
 set_option maxHeartbeats 1000000 in
 /-- `acquire(&pid_lock)` as a rule (a copy of `ProofFreeproc.fp_acquire`). -/
@@ -1528,7 +1529,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 /-- The UNUSED slot's dormant block and hart tag. -/
 theorem ap_slots_unused_elim (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) :
     procSlotsAt (GF := GF) Γ ξl pa UNUSED ⊢
-      @procDormant hlc GF _ ⟨ξl, KTier.kpt⟩ pa UNUSED ∗ hartAtAny Γ pa ∗
+      @procDormant hlc GF _ ⟨ξl, KTier.kpt⟩ _ _ _ _ pa UNUSED ∗ hartAtAny Γ pa ∗
       (slotFree Γ pa ∨ slotUsed Γ pa) := by
   unfold procSlotsAt
   rw [if_neg (by decide : ¬ needsCtx UNUSED), if_neg (by decide : ¬ isRunning UNUSED),
@@ -1595,7 +1596,7 @@ theorem ap_avail_none (γk : KmemNames) (on : Option Nat) :
 
 /-- Rebuild an UNUSED slot from its dormant block and hart tag. -/
 theorem ap_slots_unused_intro (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) :
-    @procDormant hlc GF _ ⟨ξl, KTier.kpt⟩ pa UNUSED ∗ hartAtAny Γ pa ∗
+    @procDormant hlc GF _ ⟨ξl, KTier.kpt⟩ _ _ _ _ pa UNUSED ∗ hartAtAny Γ pa ∗
       (slotFree Γ pa ∨ slotUsed Γ pa) ⊢
       procSlotsAt (GF := GF) Γ ξl pa UNUSED := by
   unfold procSlotsAt
@@ -1803,7 +1804,7 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
   -- open the dormant block and the pid word's three fractions
   icases ap_slots_unused_elim Γ ξ0 (procAddr n) $$ Hslots with ⟨Hdorm, Hhart, Hpavarm⟩
   icases ap_dormant_unused_elim (procAddr n) $$ Hdorm with
-    ⟨%V0, %⟨hV0of, hV0cwd, hV0pt, hV0tf, hV0sz, hV0lz⟩, Hpriv, Hfields, Hstack⟩
+    ⟨%V0, %⟨hV0of, hV0cwd, hV0pt, hV0tf, hV0sz, hV0lz⟩, Hpriv, Hfields, Hal, Hstack⟩
   icases (show procPubRest (GF := GF) (procAddr n) kl xs pid0 ⊢
       wordPointsTo (pKilled (procAddr n)) 4 (DFrac.own 1) kl ∗
         wordPointsTo (pXstate (procAddr n)) 4 (DFrac.own 1) xs ∗
@@ -1976,13 +1977,13 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
       iframe Hlocked Hpstw Hstate Hchan Hkilled Hxstate HpidPub
     -- freeprocIn (trapframe = 0, pagetable = 0)
     ihave HfpIn : freeprocIn (GF := GF) (procAddr n) pid V0 (fun _ => [])
-      $$ [HpidPriv Hfields Hstack]
+      $$ [HpidPriv Hfields Hal Hstack]
     case _ =>
       unfold freeprocIn
       rw [if_pos hV0tf, if_pos hV0pt]
       isplitl []
       · ipureintro; exact ⟨hV0of, hV0cwd⟩
-      iframe HpidPriv Hfields Hstack
+      iframe HpidPriv Hfields Hal Hstack
       isplitl [] <;> iempintro
     -- 0x80001c6e c.mv a0,s1
     k_step (wp_s_add c _ (KA.«allocproc» + 0xe0#64) true 10#5 0#5 9#5 (by decide))
@@ -2534,7 +2535,7 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
             · iframe Hk
               rw [hgc]; iexact Harm
           ihave Hpost : allocprocPost (GF := GF) Γ cg γk on pav (R'' 10#5)
-            $$ [Hheld Hhart Hused Hpav Hpriv Hstack Hav4]
+            $$ [Hheld Hhart Hused Hpav Hpriv Hal Hstack Hav4]
           case' _ =>
             unfold allocprocPost
             rw [hgc]
@@ -2550,7 +2551,7 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
               · rw [hVctx, hVks]
               · unfold procPagetableNodes; omega
             · rw [hVks]
-              iframe Hheld Hhart Hused Hpav Hpriv Hstack Hav4
+              iframe Hheld Hhart Hused Hpav Hpriv Hal Hstack Hav4
           ihave HΦ := (show apCont Γ k γk on pav cg ⊢
               (∀ (spie spp : Bool) (R' : RegMap),
                 ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
@@ -2665,7 +2666,7 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
         iframe Hlocked Hpstw Hstate Hchan Hkilled Hxstate HpidPub
       -- freeprocIn: trapframe present (Rk 10), pagetable absent (Rpp 10 = 0)
       ihave HfpIn : freeprocIn (GF := GF) (procAddr n) pid V1 (fun _ => [])
-        $$ [HpidPriv Hfields Hstack Htfpage]
+        $$ [HpidPriv Hfields Hal Hstack Htfpage]
       case _ =>
         unfold freeprocIn
         rw [if_neg (show ¬ (V1.trapframe = 0#64) from by rw [hV1tf]; exact hRk10ne),
@@ -2673,7 +2674,7 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
         isplitl []
         · ipureintro; exact ⟨hV1of, hV1cwd⟩
         rw [hV1ks]
-        iframe HpidPriv Hfields Hstack
+        iframe HpidPriv Hfields Hal Hstack
         isplitl [Htfpage]
         · isplitl []
           · ipureintro

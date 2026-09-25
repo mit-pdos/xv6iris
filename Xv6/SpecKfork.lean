@@ -51,6 +51,15 @@ threading contract `KFORK.wp_kfork` is derived.
 
 The returned pid is the child's, which `allocproc` minted in `[1, PIDMAX]`.
 
+THE CHILD'S SUPPLY ALLOWANCES (`dormantAllow`, wave 7 P3) come out of
+`allocproc`.  On the failure tails they go straight back to `freeproc`
+(`freeprocIn`); on success they are DROPPED (process-layer deviation,
+flagged): Rocq pays idup's `iref_slot` and the ofile dups' `fd_slot`s out of
+them and parks the rest in the child's trap residue
+(`SpecForkretParkPaid`), neither of which the Lean port has yet (the
+assumed `FsEnv` idup/filedup take no units; the residue is D8 / the trap
+path).  The reconnect (W7-C) is where they get spent.
+
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.SchedCtx

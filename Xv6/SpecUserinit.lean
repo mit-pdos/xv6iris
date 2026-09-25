@@ -26,6 +26,15 @@ returning the arm, so a caller at `SIE = 1` cannot re-enable them.  Drop
 this hypothesis only together with an `allocproc` post that hands
 `sieArm cpu' k.sie k.proc` back on the success arm.
 
+THE NEW PROCESS'S SUPPLY ALLOWANCES (`dormantAllow`, wave 7 P3) come out
+of `allocproc` and are DROPPED here (process-layer deviation, flagged): Rocq
+hands them to `SpecForkretParkPaid`'s park, i.e. to the process's trap
+residue for the syscalls it will make; the Lean forkret park carries no
+residue yet (D8 / the trap path).  Nothing is unsound in dropping them --
+the supplies only have to be conserved where something mints them again,
+and the boot carve is not ported -- but the units are lost to the system
+until that residue exists.
+
 IT PUBLISHES `initproc`.  The word at `&initproc` is written exactly once,
 here, and read forever after (`kexit`'s "init exiting" check, `reparent`'s
 target), so `userinit` takes it owned and gives it back DISCARDED, as the

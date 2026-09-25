@@ -24,6 +24,9 @@ fact about the block's own trapframe record, `V.tf[tfArgIdx 0]? = some v`,
 exactly as in `SpecSysWait`.  The trapframe pointer and page are split out
 of the block for the duration of `argint` and put back before `kexit`.
 
+The slot's allowances (`dormantAllow`) are kexit's too (wave 7 P3; see
+`SpecKexit`'s header for the interim shape), passed straight through.
+
 EITHER ENTRY SIE (`wp_sys_exit_eb_body`), as `kexit`'s eb contract: the
 trap-CSR complement `trapCsrsExt` / `cpuClaimExt` goes in and is passed on
 to kexit, which spends it; the closer takes the trap reserve too
@@ -66,7 +69,7 @@ def wp_sys_exit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   kctx cpu k ∗ pcIs cpu sysExitAddr ∗ procsInv Γ ∗
   trapCsrs cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ∗
   isLock γw waitLockAddr "wait_lock" waitLockPay ∗ initprocIs ip ∗
-  procPrivNoctxAt curCtx (procAddr j) pid V M ∗
+  procPrivNoctxAt curCtx (procAddr j) pid V M ∗ dormantAllow ∗
   (stackOwn k.sp k.avail -∗ stackOwn (V.kstack + 4096#64) 512)
   ⊢ wpLoop (GF := GF) cpu
 
@@ -82,7 +85,7 @@ def wp_sys_exit_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
   kctx cpu k ∗ pcIs cpu sysExitAddr ∗ procsInv Γ ∗
   trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
   isLock γw waitLockAddr "wait_lock" waitLockPay ∗ initprocIs ip ∗
-  procPrivNoctxAt curCtx (procAddr j) pid V M ∗
+  procPrivNoctxAt curCtx (procAddr j) pid V M ∗ dormantAllow ∗
   (stackOwn k.sp (trapRes k.sie + k.avail) -∗ stackOwn (V.kstack + 4096#64) 512)
   ⊢ wpLoop (GF := GF) cpu
 
@@ -108,8 +111,8 @@ theorem SYSEXIT.wp_sys_exit (A : SYSEXIT) {hlc : HasLC} {GF : BundledGFunctors} 
   unfold wp_sys_exit_body
   rw [hsie, trapRes_off] at h
   simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨Hk, Hpc, Hpi, Htc, Hcl, Hir, Hwl, Hin, Hpr, Hcl2⟩
+  iintro ⟨Hk, Hpc, Hpi, Htc, Hcl, Hir, Hwl, Hin, Hpr, Hal, Hcl2⟩
   iapply h
-  iframe Hk Hpc Hpi Htc Hcl Hir Hwl Hin Hpr Hcl2
+  iframe Hk Hpc Hpi Htc Hcl Hir Hwl Hin Hpr Hal Hcl2
 
 end Xv6

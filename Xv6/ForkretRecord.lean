@@ -129,7 +129,7 @@ theorem forkret_resume [ForkretIs] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
     (ξp : CtxId) (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (hj : j < NPROC)
     (hctx : V.context = [forkretAddr, V.kstack + 4096#64] ++ List.replicate 12 0#64) :
-    @procsInv hlc GF _ _ ⟨ξp, KTier.kpt⟩ Γ ∗ procPrivNoctxAt ξp (procAddr j) pid V M ⊢
+    @procsInv hlc GF _ _ _ _ _ ⟨ξp, KTier.kpt⟩ Γ ∗ procPrivNoctxAt ξp (procAddr j) pid V M ⊢
       ∀ (h : CPU) (R : RegMap) (spie spp eb' : Bool) (root : BitVec 44),
         ⌜adm none h⌝ -∗ ⌜calleeImg R = V.context⌝ -∗
         @kctx hlc GF _ ⟨ξp, KTier.kpt⟩ _ _ h (resumedK R spie spp 512 eb' root (procAddr j)) -∗
@@ -181,7 +181,7 @@ def newbornPay (Γ : SchedNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
   @ctxCells hlc GF _ ⟨ξ, KTier.kpt⟩ (pContext (procAddr j) 0) V.context ∗
   @stackOwn hlc GF _ ⟨ξ, KTier.kpt⟩ (V.kstack + 4096#64) 512 ∗
   procPrivNoctxAt ξ (procAddr j) pid V M ∗
-  @procsInv hlc GF _ _ ⟨ξ, KTier.kpt⟩ Γ
+  @procsInv hlc GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ Γ
 
 instance instCtxMorphNewbornPay (Γ : SchedNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) : CtxMorph (GF := GF) (newbornPay Γ j pid V M) := by

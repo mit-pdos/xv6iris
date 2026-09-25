@@ -114,7 +114,7 @@ instance instCtxMorphDevintrCaps (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γ
 credentials, at the kernel tier. -/
 def envFam (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames)
     (γdl γt : GName) (pd pav pu : BitVec 64) (bs : List (BitVec 8)) (ξ : CtxId) : IProp GF :=
-  iprop(@procsInv hlc GF _ _ ⟨ξ, KTier.kpt⟩ Γ ∗
+  iprop(@procsInv hlc GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ Γ ∗
     @devintrCaps hlc GF _ _ _ _ _ _ ⟨ξ, KTier.kpt⟩ Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu bs)
 
 instance envFam_persistent (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName)
@@ -188,7 +188,7 @@ theorem procsInv_of_envAt {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
     (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
     (pd pav pu : BitVec 64) (bs : List (BitVec 8))
     [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu bs] (ξ : CtxId) :
-    envAt (hlc := hlc) (GF := GF) ξ ⊢ @procsInv hlc GF _ _ ⟨ξ, KTier.kpt⟩ Γ := by
+    envAt (hlc := hlc) (GF := GF) ξ ⊢ @procsInv hlc GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ Γ := by
   refine (env_of_envAt Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu bs ξ).trans ?_
   unfold envFam
   iintro ⟨H, _⟩

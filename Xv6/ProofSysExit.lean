@@ -80,7 +80,7 @@ theorem sysx_kexit (KX : KEXIT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [
     kctx c k' ∗ pcIs c KA.«kexit» ∗ procsInv Γ ∗
     trapCsrsExt c s ∗ cpuClaimExt c s (procAddr j) ∗
     isLock γw waitLockAddr "wait_lock" waitLockPay ∗ initprocIs ip ∗
-    procPrivNoctxAt curCtx (procAddr j) pid V M ∗
+    procPrivNoctxAt curCtx (procAddr j) pid V M ∗ dormantAllow ∗
     (stackOwn sp n -∗ stackOwn (V.kstack + 4096#64) 512)
     ⊢ wpLoop (GF := GF) c := by
   subst hs
@@ -154,7 +154,7 @@ theorem sys_exit_proof (AI : ARGINT) (KX : KEXIT) : SYSEXIT := ⟨
   letI : CurCtx := ⟨ξ0, t0⟩
   unfold wp_sys_exit_eb_body
   simp only [sysExitAddr]
-  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hwl, #Hinit, Hblk, Hcloser⟩
+  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hwl, #Hinit, Hblk, Hal, Hcloser⟩
   icases kctx_tier cpu k $$ Hk with ⟨%hct, Hk⟩
   have ht0 : t0 = KTier.kpt := hct.symm.trans htier
   subst ht0
@@ -233,7 +233,7 @@ theorem sys_exit_proof (AI : ARGINT) (KX : KEXIT) : SYSEXIT := ⟨
     iapply (sysx_kexit KX Γ cpu _ γw j pid V M ip (k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64)
         (trapRes k.sie + k.avail - 4) k.sie
         hj ?hpr ?hKx ?hs ?hn2 ?ht hinit ?hsp ?hav)
-      $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hwl $Hinit $Hblk $Hcloser]
+      $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hwl $Hinit $Hblk $Hal $Hcloser]
     case hpr => k_norm_g; exact hproc
     case hKx => k_norm_g; unfold sysExitSlots at hK; omega
     case hs => k_norm_g

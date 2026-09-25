@@ -29,9 +29,13 @@ def freeprocAddr : BitVec 64 := KA.«freeproc»
 def freeprocSlots : Nat := 44
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
 
-/-- What `freeproc` takes of the block: the private fields, the trapframe
+/-- What `freeproc` takes of the block: the private fields, the slot's
+allowances (`dormantAllow`, Rocq `fp_rest`'s `[∗ list] _ ∈ pv_ofile V,
+fd_slot ∗ fd_slots FDSPARE ∗ iref_slots (1 + IREFSPARE) ∗ bslots 3`:
+freeproc moves none of them, which is what makes its ZOMBIE → UNUSED step a
+pass-through for the supplies), the trapframe
 page if `trapframe ≠ 0`, the address space if `pagetable ≠ 0`.  The files
 are already closed and the cwd dropped (the Rocq `fp_rest`'s two pure
 rows): `freeproc` only zeroes cells, so what the UNUSED block it rebuilds
@@ -42,7 +46,7 @@ supply. -/
 def freeprocIn (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) : IProp GF := iprop%
   ⌜V.ofile = List.replicate NOFILE 0#64 ∧ V.cwd = 0#64⌝ ∗
   wordPointsTo (pPid pa) 4 pidPriv pid ∗ procFields pa (DFrac.own 1) V ∗
-  stackOwn (V.kstack + 4096#64) 512 ∗
+  dormantAllow ∗ stackOwn (V.kstack + 4096#64) 512 ∗
   (if V.trapframe = 0#64 then emp else
     ⌜V.trapframe = pageAddr V.upt.tfp ∧ pageValid V.trapframe⌝ ∗ tfPageAt V.upt.tfp V.tf) ∗
   (if V.pagetable = 0#64 then emp else

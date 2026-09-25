@@ -280,6 +280,9 @@ theorem fdSlots_eq (n : Nat) : fdSlots (GF := GF) n = slotToks (FdslotG.fdslotNa
 instance fdSlots_timeless (n : Nat) : Timeless (fdSlots (GF := GF) n) := by
   unfold fdSlots; infer_instance
 
+instance fdSlot_timeless : Timeless (fdSlot (GF := GF)) := by
+  unfold fdSlot; infer_instance
+
 theorem fdSlots_zero : ⊢ fdSlots (GF := GF) 0 := slotToks_zero _ _
 
 theorem fdSlots_bound (n : Nat) : fdSlots (GF := GF) n ⊢ fdSlots n ∗ ⌜n ≤ FDSLOTS⌝ :=
@@ -341,6 +344,9 @@ theorem bslots_eq (n : Nat) : bslots (GF := GF) n = slotToks (BioslotG.bioslotNa
 
 instance bslots_timeless (n : Nat) : Timeless (bslots (GF := GF) n) := by
   unfold bslots; infer_instance
+
+instance bslot_timeless : Timeless (bslot (GF := GF)) := by
+  unfold bslot; infer_instance
 
 theorem bslots_zero : ⊢ bslots (GF := GF) 0 := slotToks_zero _ _
 

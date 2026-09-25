@@ -567,7 +567,7 @@ theorem userinit_proof (AP : ALLOCPROC) (RE : RELEASE) : USERINIT :=
           ⌜R2 10#5 = procAddr j ∧ j < NPROC ∧ 1 ≤ pid.toNat ∧ pid.toNat ≤ PIDMAX ∧
             allocprocPriv V ∧ g ≤ procPagetableNodes + 1⌝ ∗
           procHeld Γ cpu j USED ch ∗ hartAtAny Γ (procAddr j) ∗ slotUsed Γ (procAddr j) ∗
-          procsAvail Γ (pavDec (some (np + 1))) ∗ procPriv (procAddr j) pid V M ∗
+          procsAvail Γ (pavDec (some (np + 1))) ∗ procPriv (procAddr j) pid V M ∗ dormantAllow ∗
           stackOwn (V.kstack + 4096#64) 512 ∗ kallocAvail γk (availSub (some nb) g)))
       from by unfold allocprocPost; iintro H; iexact H) $$ Hpost with ⟨Hfail | Hsucc⟩
   · -- the failure arm: no free slot, or no page -- both refuted by the counted regimes
@@ -582,7 +582,7 @@ theorem userinit_proof (AP : ALLOCPROC) (RE : RELEASE) : USERINIT :=
         · have hnz : nb - gg = 0 := Option.some.inj h
           omega)
   icases Hsucc with
-    ⟨%j, %ch, %pid, %V, %M, %g, %hfacts, Hheld, Hhart, #Hused, Hpav, Hpriv, Hstack, Hkav⟩
+    ⟨%j, %ch, %pid, %V, %M, %g, %hfacts, Hheld, Hhart, #Hused, Hpav, Hpriv, -, Hstack, Hkav⟩
   obtain ⟨hrj, hj, hpid1, hpid2, hVp, hgle⟩ := hfacts
   icases Hkd with ⟨⟨%hz, Hk⟩ | ⟨%hnz, Hk⟩⟩
   · exact absurd (hrj.symm.trans hz) (procAddr_nonzero hj)
