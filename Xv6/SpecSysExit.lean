@@ -16,14 +16,17 @@ the function by never handing control back.
 THE CONTRACT IS THE UNION OF ITS TWO CALLEES', and kexit's dominates it:
 everything `kexit` asks for (`procsInv`, wait_lock, `initIdentAt`, the
 not-init premise, the whole private block, the file system, the stack
-closer, the caller's children row `chFrag V.chg pa cs`, and -- D8 wiring --
-the exit payment `myPay V.gen Q ∗ (Q (xstateOf v) ∨ (⌜xstateOf v = -1⌝ ∗
-killShot V.gen))`) is here verbatim.  The `int n` cell is carved out of
-sys_exit's own frame, so it does not appear.  THE STATUS is the syscall's
-argument 0, `v` (`V.tf[tfArgIdx 0]? = some v`, as in `SpecSysWait`): argint
-reads its low word and `lw` sign-extends it back into `a0`, and kexit's
-payment is keyed at `xstateOf a0`, which only reads the low word
-(`ProofSysExit.sysx_status`).  The trapframe pointer and page are split out
+closer, the caller's children row `chFrag V.chg pa cs`) is here verbatim,
+and the exit DEPOSIT is Rocq's (`SpecSysExit.v`, batch 8-P): `myPay V.gen Q
+∗ Q (exitXs V.tf)` -- the payload paid at the status the trapframe carries
+(`ProcGeom.exitXs`, Rocq `exit_xs (pv_tf)`); the proof hands kexit the
+left arm of its payment (the killed route is usertrap's, straight to
+kexit).  The `int n` cell is carved out of sys_exit's own frame, so it does
+not appear.  THE STATUS is the syscall's argument 0, `v` (`V.tf[tfArgIdx
+0]? = some v`, as in `SpecSysWait`; `exitXs V.tf = xstateOf v`,
+`ProcGeom.exitXs_of_arg0`): argint reads its low word and `lw`
+sign-extends it back into `a0`, and kexit's payment is keyed at `xstateOf
+a0`, which only reads the low word (`ProofSysExit.sysx_status`).  The trapframe pointer and page are split out
 of the block for the duration of `argint` and put back before `kexit`.
 
 The block is Rocq's whole `proc_priv` (`procPrivFd`, wave 7 W7-C) with its
@@ -83,7 +86,7 @@ def wp_sys_exit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗
   procPrivFd γ (procAddr j) pid V M ∗ (∃ sts, fdFrags V.fdg sts) ∗
   chFrag V.chg (procAddr j) cs ∗
-  myPay V.gen Q ∗ (Q (xstateOf v) ∨ (⌜xstateOf v = -1⌝ ∗ killShot V.gen)) ∗
+  myPay V.gen Q ∗ Q (exitXs V.tf) ∗
   (stackOwn k.sp k.avail -∗ stackOwn (V.kstack + 4096#64) 512)
   ⊢ wpLoop (GF := GF) cpu
 
@@ -109,7 +112,7 @@ def wp_sys_exit_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
   fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗
   procPrivFd γ (procAddr j) pid V M ∗ (∃ sts, fdFrags V.fdg sts) ∗
   chFrag V.chg (procAddr j) cs ∗
-  myPay V.gen Q ∗ (Q (xstateOf v) ∨ (⌜xstateOf v = -1⌝ ∗ killShot V.gen)) ∗
+  myPay V.gen Q ∗ Q (exitXs V.tf) ∗
   (stackOwn k.sp (trapRes k.sie + k.avail) -∗ stackOwn (V.kstack + 4096#64) 512)
   ⊢ wpLoop (GF := GF) cpu
 

@@ -30,8 +30,6 @@ def argrawAddr : BitVec 64 := KA.«argraw»
 /-- The number of syscall arguments in registers (`a0..a5`). -/
 def NARG : Nat := 6
 
-/-- Trapframe word of argument `i` (`a0` is word 14). -/
-def tfArgIdx (i : Nat) : Nat := 14 + i
 
 /-- argraw's 4-slot frame over `myproc`'s 10. -/
 def argrawSlots : Nat := 14

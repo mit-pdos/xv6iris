@@ -177,6 +177,12 @@ theorem sys_exit_proof (AI : ARGINT) (KX : KEXIT) : SYSEXIT := ⟨
   simp only [sysExitAddr]
   iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hwl, #Hinit, #Hft, #Hpe, #Hkl, Hav, #Hrdy, Hbs, Hfsp, Hirs,
     Hblk, Hfr, Hch, Hmy, Hpay, Hcloser⟩
+  -- Rocq's deposit, at the status argument 0 carries: kexit's left arm
+  ihave Hpay : iprop(Q (xstateOf v) ∨ (⌜xstateOf v = -1⌝ ∗ killShot V.gen)) $$ [Hpay]
+  case' _ =>
+    ileft
+    rw [← exitXs_of_arg0 hv]
+    iexact Hpay
   icases kctx_tier cpu k $$ Hk with ⟨%hct, Hk⟩
   have ht0 : t0 = KTier.kpt := hct.symm.trans htier
   subst ht0

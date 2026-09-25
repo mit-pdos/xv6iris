@@ -11,7 +11,11 @@ is an explicit parameter of the final theorem.  What USER *says* has to exist
 now, because the kernel side of the trap loop (userret/uservec, 8-M/8-U/8-V),
 the slot fixpoint (`UexecWp`) and the generic inhabitant (`ProofUexecWp`) are
 all stated over it.  This file is that vocabulary, and nothing else: no rule,
-no proof tower.
+no proof tower.  Its last section (moved from `UexecSlot`/`UexecRet` §0,
+batch 8-P) is the lazy image `umemLazy` and the frames stated at it:
+`userPtmInv`/`userPtmInvX` (Rocq `UserPtTree.user_ptm_inv`, `UmodeText`),
+`userTrapFrameAt(m)` (Rocq `UserExec.user_trap_frame_at(m)`), `uvRegs`/`uvAmb`
+(Rocq `UmodeRegs`).
 
 **LEAN-NATIVE, over MachCSL's existing resources.**  Every definition names
 its Rocq source; the resources are MachCSL's (`regPointsTo`, `gprFile`,
@@ -63,11 +67,13 @@ import MachCSL.KCtx
 import MachCSL.WireInv
 import MachCSL.WpCsr
 import Xv6.UPtDefs
+import Xv6.ElfFile
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
 open LeanRV64D LeanRV64D.Functions Sail
+open Iris.Std (get?)
 
 set_option linter.unusedSectionVars false
 
@@ -261,5 +267,146 @@ def stvecHandlerWp [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → I
   iprop(userTrapFrame cpu C pt Rut -∗ wpLoop cpu)
 
 end UserExec
+
+/-! ## The lazy image and the U-tier frames (moved from `UexecSlot` / `UexecRet` §0) -/
+
+/-- **The lazy view of an address space** (Rocq `us_M` under `proc_ptm P sz M`):
+a mapped byte reads its page, a live unmapped byte reads zero. -/
+def umemLazy (P : UPtd) (sz : Nat) (M : Nat → List (BitVec 8)) : ElfMem :=
+  fun n => if (get? P.um (n / 4096)).isSome then (M (n / 4096))[n % 4096]?
+    else if n < pgRoundUpN sz then some 0#8 else none
+
+section UVocab
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+
+/-- **Rocq `UserPtTree.user_ptm_inv`**: `userPtInv` at the LAZY view -- the
+page view `Mp` the ownership is at, read as `umemLazy P sz Mp` (UexecSlot's
+lazy view, deviation 3). -/
+def userPtmInv [xi : CurCtx] (cpu : CPU) (P : UPtd) (sz : Nat) (M : ElfMem) : IProp GF :=
+  iprop(∃ Mp : Nat → List (BitVec 8), userPtInv cpu P Mp ∗ ⌜umemLazy P sz Mp = M⌝)
+
+/-- **Rocq `UmodeText.user_ptm_inv_x`** (no stamp, UserExec deviation 7). -/
+def userPtmInvX [xi : CurCtx] (cpu : CPU) (P : UPtd) (sz : Nat) (M : ElfMem) : IProp GF :=
+  userPtmInv cpu P sz M
+
+/-- Rocq `user_ptm_inv_any`. -/
+theorem userPtmInv_any [CurCtx] (cpu : CPU) (P : UPtd) (sz : Nat) (M : ElfMem) :
+    userPtmInv (GF := GF) cpu P sz M ⊢ userPtAny cpu P := by
+  unfold userPtmInv userPtAny
+  iintro ⟨%Mp, H, -⟩
+  iexists Mp
+  iexact H
+
+/-- Rocq `user_ptm_inv_intro`. -/
+theorem userPtmInv_intro [CurCtx] (cpu : CPU) (P : UPtd) (sz : Nat) :
+    userPtAny (GF := GF) cpu P ⊢ ∃ M : ElfMem, userPtmInv cpu P sz M := by
+  unfold userPtmInv userPtAny
+  iintro ⟨%Mp, H⟩
+  iexists umemLazy P sz Mp
+  iexists Mp
+  isplitl [H]
+  · iexact H
+  · ipureintro; rfl
+
+/-- Rocq `user_ptm_inv_x_pt`: the stamped lazy view forgets to the page view. -/
+theorem userPtmInvX_pt [CurCtx] (cpu : CPU) (P : UPtd) (sz : Nat) (M : ElfMem) :
+    userPtmInvX (GF := GF) cpu P sz M ⊢ ∃ Mp, userPtInvX cpu P Mp := by
+  unfold userPtmInvX userPtmInv userPtInvX
+  iintro ⟨%Mp, H, -⟩
+  iexists Mp
+  iexact H
+
+/-- **Rocq `UserExec.user_trap_frame_at`**: `userTrapFrame` at NAMED CSR
+values and register file. -/
+def userTrapFrameAt [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IProp GF)
+    (ms sc stv sep : BitVec 64) (g : RegMap) : IProp GF := iprop%
+  ⌜trapMstatusOk ms⌝ ∗
+  Register.hart_state ↦ᵣ[cpu] HartState.HART_ACTIVE () ∗
+  Register.cur_privilege ↦ᵣ[cpu] Privilege.Supervisor ∗
+  Register.mstatus ↦ᵣ[cpu] ms ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] stv ∗
+  Register.sepc ↦ᵣ[cpu] sep ∗ pcIs cpu (stvecBase C.stvec) ∗ clockCells cpu ∗ gprFile cpu g ∗
+  userPtAny cpu pt ∗ userCfg cpu C ∗ Rut pt
+
+/-- **Rocq `UserExec.user_trap_frame_atm`**: the same at the LAZY image `M`. -/
+def userTrapFrameAtm [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IProp GF)
+    (sz : Nat) (M : ElfMem) (ms sc stv sep : BitVec 64) (g : RegMap) : IProp GF := iprop%
+  ⌜trapMstatusOk ms⌝ ∗
+  Register.hart_state ↦ᵣ[cpu] HartState.HART_ACTIVE () ∗
+  Register.cur_privilege ↦ᵣ[cpu] Privilege.Supervisor ∗
+  Register.mstatus ↦ᵣ[cpu] ms ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] stv ∗
+  Register.sepc ↦ᵣ[cpu] sep ∗ pcIs cpu (stvecBase C.stvec) ∗ clockCells cpu ∗ gprFile cpu g ∗
+  userPtmInv cpu pt sz M ∗ userCfg cpu C ∗ Rut pt
+
+/-- Rocq `user_trap_frame_atm_at`: forget the image. -/
+theorem userTrapFrameAtm_at [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IProp GF)
+    (sz : Nat) (M : ElfMem) (ms sc stv sep : BitVec 64) (g : RegMap) :
+    userTrapFrameAtm cpu C pt Rut sz M ms sc stv sep g ⊢ userTrapFrameAt cpu C pt Rut ms sc stv sep g := by
+  unfold userTrapFrameAtm userTrapFrameAt
+  iintro ⟨%Hok, Hhs, Hpr, Hms, Hsc, Hstv, Hsep, Hpc, Hck, Hg, Hpt, Hcfg, Hrut⟩
+  ihave Hany := userPtmInv_any cpu pt sz M $$ Hpt
+  iframe
+  ipureintro; exact Hok
+
+/-- Rocq `user_trap_frame_at_frame`: the named frame is a frame. -/
+theorem userTrapFrameAt_frame [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IProp GF)
+    (ms sc stv sep : BitVec 64) (g : RegMap) :
+    userTrapFrameAt (GF := GF) cpu C pt Rut ms sc stv sep g ⊢ userTrapFrame cpu C pt Rut := by
+  unfold userTrapFrameAt userTrapFrame
+  iintro H
+  iexists ms, sc, stv, sep, g
+  iexact H
+
+/-- **Rocq `UmodeRegs.uv_regs`**: the per-step CSR cells with their values
+swallowed, plus the clock riders (UserExec deviation 2). -/
+def uvRegs (cpu : CPU) : IProp GF := iprop%
+  ∃ ms sc stv sep : BitVec 64, ⌜userMstatusOk ms⌝ ∗
+    Register.hart_state ↦ᵣ[cpu] HartState.HART_ACTIVE () ∗ Register.cur_privilege ↦ᵣ[cpu] Privilege.User ∗
+    Register.mstatus ↦ᵣ[cpu] ms ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] stv ∗
+    Register.sepc ↦ᵣ[cpu] sep ∗ clockCells cpu
+
+/-- **Rocq `UmodeRegs.uv_amb`** (deviation 3: `wireInv` alone). -/
+abbrev uvAmb : IProp GF := wireInv
+
+instance uvAmb_persistent : Persistent (uvAmb (GF := GF)) := by
+  unfold uvAmb; infer_instance
+
+/-- Rocq `u_regs_uv_regs`. -/
+theorem uRegs_uvRegs (cpu : CPU) (ms sc stv sep va : BitVec 64) (g : RegMap) (hms : userMstatusOk ms) :
+    uRegs (GF := GF) cpu (HartState.HART_ACTIVE ()) ms sc stv sep va va g ⊢
+      uvRegs cpu ∗ gprFile cpu g ∗ pcIs cpu va := by
+  unfold uRegs uvRegs pcIs
+  iintro ⟨Hhs, Hpr, Hms, Hsc, Hstv, Hsep, Hpc, Hnpc, Hck, Hg⟩
+  isplitl [Hhs Hpr Hms Hsc Hstv Hsep Hck]
+  · iexists ms, sc, stv, sep
+    iframe
+    ipureintro; exact hms
+  · iframe
+
+/-- Rocq `uv_regs_u_regs`. -/
+theorem uvRegs_uRegs (cpu : CPU) (va : BitVec 64) (g : RegMap) :
+    uvRegs (GF := GF) cpu ∗ gprFile cpu g ∗ pcIs cpu va ⊢
+      ∃ ms sc stv sep : BitVec 64, ⌜userMstatusOk ms⌝ ∗
+        uRegs cpu (HartState.HART_ACTIVE ()) ms sc stv sep va va g := by
+  unfold uRegs uvRegs pcIs
+  iintro ⟨⟨%ms, %sc, %stv, %sep, %hms, Hhs, Hpr, Hms, Hsc, Hstv, Hsep, Hck⟩, Hg, Hpc, Hnpc⟩
+  iexists ms, sc, stv, sep
+  isplitr
+  · ipureintro; exact hms
+  · iframe
+
+/-- **The register file does not own x0** (deviation 2; Rocq `gpr_file_x0`'s
+role): two maps agreeing off x0 are the same file. -/
+theorem uexec_gprFile_congr (cpu : CPU) (g g' : RegMap) (h : ∀ i, i ≠ 0#5 → g i = g' i) :
+    gprFile (GF := GF) cpu g ⊢ gprFile cpu g' := by
+  unfold gprFile
+  refine BigSepL.bigSepL_mono (fun {k x} hk => ?_)
+  have hx : x ∈ gprIdxs := List.mem_of_getElem? hk
+  have hx0 : x ≠ 0#5 := by
+    have : ∀ y ∈ gprIdxs, y ≠ 0#5 := by decide
+    exact this x hx
+  rw [h x hx0]
+
+end UVocab
+
 
 end Xv6

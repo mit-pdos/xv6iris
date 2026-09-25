@@ -2,7 +2,10 @@
 **The slot's key: the user-visible record** (Rocq `UexecSlot.v`), MINIMAL
 port (user decision D17, wave 7b): §0 the record `Uvis`, its projection
 `uvisOf` from the kernel's process state, `uvisLz`; §1 the trapframe word
-reader `tfW` and the resume pc `tfResumePc`.
+reader `tfW` and the resume pc `tfResumePc`; §2 the register file userret
+rebuilds (`zeroRf`, `tfResumeGpr`, `tfResumeGpr0` and their plain peels,
+moved here from `UexecRet`, batch 8-P).  The lazy view `umemLazy` lives in
+`Xv6/UserExec.lean` beside `userPtmInv`, which reads it.
 
 Rocq's header, in short: `uvis` is what a per-process user-execution
 contract is keyed on -- the trapframe words userret rebuilds the registers
@@ -16,8 +19,6 @@ is a VALUE the trap boundary reads off what it holds, never a resource.
 
 ## Deferred (with the consumer grep)
 
-`tf_resume_gpr` and its peels `tf_resume_gpr_sp/_a0/_a1` (need
-`SpecUserret.userret_gpr` and the register-file model, absent in Lean),
 `tf_ueq_resume_pc` (TfUser, absent), `addv_sext4` (UsysMemOk's bump): their
 consumers are the user-mode return layer (UexecRet, UexecRound, UexecApply,
 SpecUservec, the `Uk*` engine), wave 8 (D12).  The unused `ufdG` section
@@ -46,18 +47,13 @@ import Xv6.UserPerm
 import Xv6.FileDefs
 import Xv6.ElfFile
 import Xv6.KexecDefs
+import Xv6.UserExec
 import Std.Data.ExtTreeSet
 
 namespace Xv6
 
 open Iris MachCSL
 open Iris.Std (get?)
-
-/-- **The lazy view of an address space** (Rocq `us_M` under `proc_ptm P sz M`):
-a mapped byte reads its page, a live unmapped byte reads zero. -/
-def umemLazy (P : UPtd) (sz : Nat) (M : Nat → List (BitVec 8)) : ElfMem :=
-  fun n => if (get? P.um (n / 4096)).isSome then (M (n / 4096))[n % 4096]?
-    else if n < pgRoundUpN sz then some 0#8 else none
 
 /-! ## §0 THE KEY: the user-visible record -/
 
@@ -104,5 +100,45 @@ def tfResumePc (tf : List (BitVec 64)) : BitVec 64 := retPc (tfW tf tfEpcIdx)
 /-- Rocq `ret_pc_idem`. -/
 theorem retPc_idem (v : BitVec 64) : retPc (retPc v) = retPc v := by
   unfold retPc; bv_decide
+
+/-! ## §2 The register file userret rebuilds (moved from `UexecRet`) -/
+
+/-- Rocq `zero_rf`: the canonical dead base. -/
+def zeroRf : RegMap := fun _ => 0#64
+
+/-- **Rocq `UexecSlot.tf_resume_gpr`** (deviation 1): the file userret
+rebuilds out of trapframe words 5..35 (`x_k` is word `4 + k`), `x0` from the
+base. -/
+def tfResumeGpr (b : RegMap) (tf : List (BitVec 64)) : RegMap :=
+  fun i => if i = 0#5 then b 0#5 else tfW tf (4 + i.toNat)
+
+/-- Rocq `tf_resume_gpr0`. -/
+def tfResumeGpr0 (tf : List (BitVec 64)) : RegMap := tfResumeGpr zeroRf tf
+
+/-- Rocq `tf_resume_gpr_x0`: the base only matters at x0. -/
+theorem tfResumeGpr_x0 (b : RegMap) (tf : List (BitVec 64)) (hb : b 0#5 = 0#64) :
+    tfResumeGpr b tf = tfResumeGpr0 tf := by
+  funext i; unfold tfResumeGpr0 tfResumeGpr zeroRf
+  by_cases hi : i = 0#5 <;> simp [hi, hb]
+
+/-- Rocq `tf_resume_gpr0_x0`. -/
+theorem tfResumeGpr0_x0 (tf : List (BitVec 64)) : tfResumeGpr0 tf 0#5 = 0#64 := rfl
+
+/-- Rocq `UexecApply.tf_resume_gpr0_a0` (and `tf_resume_gpr_a0`). -/
+theorem tfResumeGpr_a0 (b : RegMap) (tf : List (BitVec 64)) :
+    tfResumeGpr b tf 10#5 = tfW tf (tfArgIdx 0) := rfl
+
+theorem tfResumeGpr_a1 (b : RegMap) (tf : List (BitVec 64)) :
+    tfResumeGpr b tf 11#5 = tfW tf (tfArgIdx 1) := rfl
+
+theorem tfResumeGpr_a2 (b : RegMap) (tf : List (BitVec 64)) :
+    tfResumeGpr b tf 12#5 = tfW tf (tfArgIdx 2) := rfl
+
+theorem tfResumeGpr_a7 (b : RegMap) (tf : List (BitVec 64)) :
+    tfResumeGpr b tf 17#5 = tfW tf (tfArgIdx 7) := rfl
+
+/-- Rocq `UexecSlot.tf_resume_gpr_sp`. -/
+theorem tfResumeGpr_sp (b : RegMap) (tf : List (BitVec 64)) :
+    tfResumeGpr b tf 2#5 = tfW tf 6 := rfl
 
 end Xv6

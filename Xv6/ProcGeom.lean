@@ -89,6 +89,25 @@ def xstateVal (w : BitVec 32) : Int := w.toInt
 `ProcGeom.xstate_of`: `sw` stores the low 32 bits). -/
 def xstateOf (v : BitVec 64) : Int := xstateVal (v.setWidth 32)
 
+/-- Word index of syscall argument `i` in the trapframe (`a_i`, at
+`struct trapframe` offset `112 + 8 i`; Rocq `tf_arg_idx`). -/
+def tfArgIdx (i : Nat) : Nat := 14 + i
+
+/-- **Rocq `ProcGeom.exit_xs`**: the exit status a trapframe carries --
+argument 0 read through the store `kexit` makes (`xstateOf`, Rocq
+`xstate_of (tf !!! tf_arg_idx 0)`). -/
+def exitXs (tf : List (BitVec 64)) : Int := xstateOf (tf.getD (tfArgIdx 0) 0#64)
+
+/-- Rocq `exit_xs_arg0`: two frames that agree on argument 0 agree on it. -/
+theorem exitXs_arg0 {tf tf' : List (BitVec 64)}
+    (h : tf.getD (tfArgIdx 0) 0#64 = tf'.getD (tfArgIdx 0) 0#64) : exitXs tf = exitXs tf' := by
+  unfold exitXs; rw [h]
+
+/-- The status a frame carries is the one its argument-0 word stores. -/
+theorem exitXs_of_arg0 {tf : List (BitVec 64)} {v : BitVec 64} (h : tf[tfArgIdx 0]? = some v) :
+    exitXs tf = xstateOf v := by
+  unfold exitXs; rw [List.getD_eq_getElem?_getD, h]; rfl
+
 /-! ## `&proc[j]` is injective -/
 
 /-- `&proc[]` as a number: the symbol's value (below `2^32`). -/
