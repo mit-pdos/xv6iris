@@ -31,47 +31,44 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 set_option maxHeartbeats 8000000 in
 /-- **`+0x96 .. +0xaa`: THE TAIL** -- the record's cells, the epilogue, and
 the contract's continuation at the arm the caller reached it on. -/
-theorem dirlookup_tail (c cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap)
+theorem dirlookup_tail (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap)
     (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap) (data : Nat → List (BitVec 8))
     (dn dr : Dinode) (fn : Nat → BitVec 8) (hasp : Bool) (pofv pidv : BitVec 32)
     (dqp dqd dqn : DFrac) (found : Bool) (kk kslot : Nat) (q : Qp)
     (v10 : BitVec 64) (bs : List (BitVec 8)) (a0 : BitVec 64)
-    (hK : 12 ≤ k.avail) (hsie : k.sie = false)
+    (hK : 12 ≤ k.avail)
     (hal : (dirlookupDeAddr (k.regs 2#5)).toNat % 8 = 0)
     (hR2 : R 2#5 = dirlookupDeAddr (k.regs 2#5)) (ha0 : R 10#5 = a0)
     (h24 : R 24#5 = k.regs 24#5) (h25 : R 25#5 = k.regs 25#5)
-    (h26 : R 26#5 = k.regs 26#5) (h27 : R 27#5 = k.regs 27#5)
-    (hpin : true = false ∨ k.proc = 0#64 → c = cpu) :
-    kctx c (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs c (KA.«dirlookup» + 0x96#64) ∗
+    (h26 : R 26#5 = k.regs 26#5) (h27 : R 27#5 = k.regs 27#5) :
+    kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«dirlookup» + 0x96#64) ∗
     dirlookupFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) v10 ∗
     dirlookupDe (k.regs 2#5) bs ∗
-    trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     dirlookupKeep k ip dinum bm data dn dr fn pidv dqp dqd dqn ∗
     dirlookupArm data dn fn hasp (k.regs 12#5) pofv found kk kslot q a0 ∗
-    wpNext true k.proc cpu (dirlookupPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn)
-    ⊢ wpLoop (GF := GF) c := by
+    (∀ c' : CPU, dirlookupPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn c')
+    ⊢ wpLoop (GF := GF) cpu := by
   have hK' : 12 ≤ (k.withSpie spie spp).avail := hK
-  iintro ⟨Hk, Hpc, Hframe, Hde, Htc, Hcl, Hir, Hkeep, Harm, Hnext⟩
+  iintro ⟨Hk, Hpc, Hframe, Hde, Hte, Hce, Hkeep, Harm, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases dirlookup_frame_close _ _ _ _ _ _ _ _ _ _ _ bs hal $$ [Hframe Hde]
     with ⟨%v10', %v11', Hf⟩
   · iframe
-  iapply (wp_epilogue_dirlookup c (k.withSpie spie spp) (KA.«dirlookup» + 0x96#64) hK' R hR2
+  iapply (wp_epilogue_dirlookup cpu (k.withSpie spie spp) (KA.«dirlookup» + 0x96#64) hK' R hR2
       (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5) (k.regs 20#5)
       (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) v10 v10' v11')
   k_code (text_instr _ _ _ _ rfl rfl) Htext
-  k_norm
+  k_norm_g
   iframe
   inext
-  iapply wpNext_intro_pin
-  iintro %c2 %hp2 Hk Hpc
-  have hc2 : c2 = c := hp2 (Or.inl (by k_norm))
-  subst hc2
-  k_norm
-  ihave HΦ := wpNext_at true k.proc cpu c2 _ hpin $$ Hnext
-  ihave HΦ := dirlookupPost_elim _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ $$ HΦ
-  iapply HΦ $$ %spie %spp %_ %found %kk %kslot %q [] Hk Hpc Htc Hcl Hir Hkeep
+  k_next_e
+  iintro Hk Hpc
+  k_norm_g
+  ispecialize Hnext $$ %cpu
+  ihave HΦ := dirlookupPost_elim _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ $$ Hnext
+  iapply HΦ $$ %spie %spp %_ %found %kk %kslot %q [] Hk Hpc Hte Hce Hkeep
   · ipureintro
     unfold calleeSaved
     refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>

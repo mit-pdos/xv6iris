@@ -192,17 +192,104 @@ def wp_ireclaim_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     iregBoot -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
-/-- The interface of `ireclaim` (Rocq's `Module Type IRECLAIM`). -/
-structure IRECLAIM : Prop where
-  wp_ireclaim : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+/-- The eb-generic form of `wp_ireclaim_body` (Rocq: `cpu_own 0 eb`, the
+complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
+spinlock held by `KCtx.wf`). -/
+def wp_ireclaim_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (pidv : BitVec 32) (dqp dqb dqs dqn : DFrac)
-    hj hproc hK hsie hnoff hlocks htier hgeom hblk hbg hbel hn1 hnnib hn31 hpd ha0,
+    (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : ireclaimSlots ≤ k.avail)
+    (hnoff : k.noff = 0)
+    (htier : k.tier = KTier.kpt)
+    (hgeom : logGeomOk fscCov fscLogst)
+    -- EVERY inum the region covers lives in a covered HOME block (bread's,
+    -- ilock's and iput's premise, quantified: the scan cannot know its inum)
+    (hblk : iregBlocksOk icfgIst icfgNib fscCov fscLogst)
+    -- itrunc's geometry, threaded through iput verbatim
+    (hbg : bitmapGeomOk fscCov fscLogst fscBmapstart fscSize)
+    (hbel : covBelow fscCov fscSize)
+    -- THE THREE GEOMETRY PREMISES (SpecIalloc's, verbatim)
+    (hn1 : 1 < fscNinodes) (hnnib : fscNinodes ≤ 16 * icfgNib) (hn31 : fscNinodes < 2 ^ 31)
+    (hpd : descPageRw pd)
+    (ha0 : k.regs 10#5 = BitVec.signExtend 64 icfgDev) : Prop :=
+  kctx cpu k ∗ pcIs cpu ireclaimAddr ∗ procsInv Γ ∗
+  trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ panicEnv ∗
+  bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
+  logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
+  diskCaps fscDisk fscDlock pd pav pu ∗
+  -- the three superblock fields, read and handed straight back
+  wordPointsTo sbNinodes 4 dqn (BitVec.ofNat 32 fscNinodes) ∗
+  wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
+  wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
+  -- THE INODE REGION (persistent) and THE BOOT-SHELTER TOKEN (exclusive,
+  -- lent to iget's licence and to iput's regime, returned)
+  iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ iregBoot ∗
+  -- THE ICACHE, as iget / ilock / iput take it
+  isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
+  itableInv (hlc := hlc) ∗
+  -- THE FIFTY ENTRY SLEEPLOCKS, as a family
+  icSleeplocks fscIc ∗
+  -- itrunc's bitmap, through iput
+  bitmapInv fscFs fscBmapstart fscCov fscLogst fscSize ∗
+  -- the caller's own pid cell
+  wordPointsTo (pPid k.proc) 4 dqp pidv ∗
+  -- THREE slot units: iput's indirect arm forces three
+  bslots fscBio 3 ∗
+  -- ONE ledger unit: iget spends it, iput returns it, every iteration
+  irefSlot ∗
+  wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
+    ⌜calleeSaved k.regs R'⌝ -∗
+    kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+    trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
+    wordPointsTo sbNinodes 4 dqn (BitVec.ofNat 32 fscNinodes) -∗
+    wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) -∗
+    wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) -∗
+    wordPointsTo (pPid k.proc) 4 dqp pidv -∗
+    bslots fscBio 3 -∗
+    irefSlot -∗
+    -- the boot-shelter token, returned unspent
+    iregBoot -∗ wpLoop cpu'))
+  ⊢ wpLoop (GF := GF) cpu
+
+/-- The interface of `ireclaim` (Rocq's `Module Type IRECLAIM`). -/
+structure IRECLAIM : Prop where
+  wp_ireclaim_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
+    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
+    [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
+    (pidv : BitVec 32) (dqp dqb dqs dqn : DFrac)
+    hj hproc hK hnoff htier hgeom hblk hbg hbel hn1 hnnib hn31 hpd ha0,
+    wp_ireclaim_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j pidv dqp dqb dqs dqn
+      hj hproc hK hnoff htier hgeom hblk hbg hbel hn1 hnnib hn31 hpd ha0
+
+/-- The interrupts-off instance of `wp_ireclaim_eb` (the complement is the whole
+bundle): the contract every not-yet-generalized caller states. -/
+theorem IRECLAIM.wp_ireclaim (A : IRECLAIM) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
+    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
+    [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
+    (pidv : BitVec 32) (dqp dqb dqs dqn : DFrac)
+    hj hproc hK hsie hnoff hlocks htier hgeom hblk hbg hbel hn1 hnnib hn31 hpd ha0 :
     wp_ireclaim_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j pidv dqp dqb dqs dqn
-      hj hproc hK hsie hnoff hlocks htier hgeom hblk hbg hbel hn1 hnnib hn31 hpd ha0
+      hj hproc hK hsie hnoff hlocks htier hgeom hblk hbg hbel hn1 hnnib hn31 hpd ha0 := by
+  have h := A.wp_ireclaim_eb (hlc := hlc) (GF := GF) (Γ := Γ) (cpu := cpu) (k := k) (γl := γl) (pd := pd) (pav := pav) (pu := pu) (j := j) (pidv := pidv) (dqp := dqp) (dqb := dqb) (dqs := dqs) (dqn := dqn) (hj := hj) (hproc := hproc) (hK := hK) (hnoff := hnoff) (htier := htier) (hgeom := hgeom) (hblk := hblk) (hbg := hbg) (hbel := hbel) (hn1 := hn1) (hnnib := hnnib) (hn31 := hn31) (hpd := hpd) (ha0 := ha0)
+  unfold wp_ireclaim_eb_body at h
+  unfold wp_ireclaim_body
+  rw [hsie] at h
+  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
+  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, H17, H18, H19, H20, H21, Hnext⟩
+  iapply h
+  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 H18 H19 H20 H21
+  iapply wpNext_mono $$ Hnext
+  iintro %cpu' HK %spie %spp %R' %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6 H7 H8 H9 H10 H11 H12
+  iapply HK $$ %spie %spp %R' %p0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12
 
 end Xv6

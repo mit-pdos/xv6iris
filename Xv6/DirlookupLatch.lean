@@ -67,26 +67,24 @@ set_option maxHeartbeats 16000000 in
 /-- **`+0x52 .. +0x5a` (and `+0x94`): THE LATCH** -- `off += 16`, the size
 re-read and the loop test; the exhausted exit into the tail, or record
 `i + 1` through the induction hypothesis. -/
-theorem dirlookup_latch (c cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (j : Nat)
+theorem dirlookup_latch (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (j : Nat)
     (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap) (data : Nat → List (BitVec 8))
     (dn dr : Dinode) (fn : Nat → BitVec 8) (hasp : Bool) (pofv pidv : BitVec 32)
     (dqp dqd dqn : DFrac) (i fuel : Nat) (v10 : BitVec 64) (bs : List (BitVec 8))
     (hs : DirlookupStatic k j bm data dn dr fn hasp)
     (hr : dirlookupRegs k ip R i) (hlt : 16 * i < dn.diSize.toNat)
     (hnone : dirFirst data (i + 1) (bname 14 fn) = none)
-    (hfu : dirNrec dn.diSize.toNat + 1 - i < fuel + 1)
-    (hpin : true = false ∨ k.proc = 0#64 → c = cpu) :
-    kctx c (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs c (KA.«dirlookup» + 0x52#64) ∗
+    (hfu : dirNrec dn.diSize.toNat + 1 - i < fuel + 1) :
+    kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«dirlookup» + 0x52#64) ∗
     dirlookupFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) v10 ∗
     dirlookupDe (k.regs 2#5) bs ∗
-    trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     dirlookupKeep k ip dinum bm data dn dr fn pidv dqp dqd dqn ∗
     dirlookupIn hasp (k.regs 12#5) pofv ∗
-    wpNext true k.proc cpu (dirlookupPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn) ∗
-    dirlookupLoop cpu k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn fuel
-    ⊢ wpLoop (GF := GF) c := by
-  have hsie := hs.hsie
+    (∀ c' : CPU, dirlookupPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn c') ∗
+    dirlookupLoop k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn fuel
+    ⊢ wpLoop (GF := GF) cpu := by
   have hmaxb := dirlookup_maxbytes
   have hsz := hs.hsz
   have hsz31 : dn.diSize.toNat < 2 ^ 31 := by omega
@@ -100,29 +98,29 @@ theorem dirlookup_latch (c cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) 
       = decide (dn.diSize.toNat ≤ 16 * i + 16) := by
     rw [hs16, fw_bgeu_nat _ _ (by omega) (by omega), show 16 * (i + 1) = 16 * i + 16 by omega]
   have hsx := dirlookup_sext_small dn.diSize hsz31
-  iintro ⟨Hk, Hpc, Hframe, Hde, Htc, Hcl, Hir, Hkeep, Hin, Hnext, IH⟩
+  iintro ⟨Hk, Hpc, Hframe, Hde, Hte, Hce, Hkeep, Hin, Hnext, IH⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- +0x52  c.addiw s1,s1,16
-  k_step (wp_s_addiw c _ (KA.«dirlookup» + 0x52#64) true 16#12 9#5 9#5 (by decide))
+  k_step_e (wp_s_addiw cpu _ (KA.«dirlookup» + 0x52#64) true 16#12 9#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [r9, ha16]
   iintro Hk Hpc
   -- +0x54  lw a5,76(s2)
   icases dirlookup_keep_size k ip dinum bm data dn dr fn pidv dqp dqd dqn $$ Hkeep
     with ⟨Hsz, Hkcl⟩
-  k_step (wp_s_lw c _ (KA.«dirlookup» + 0x54#64) false 76#12 15#5 18#5 (by decide) (by decide)
+  k_step_e (wp_s_lw cpu _ (KA.«dirlookup» + 0x54#64) false 76#12 15#5 18#5 (by decide) (by decide)
       (DFrac.own 1) dn.diSize)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r18, iSize]
   iintro Hk Hpc Hsz
   ihave Hkeep := Hkcl $$ Hsz
   -- +0x58  bgeu s1,a5,+0x94
   by_cases hex : dn.diSize.toNat ≤ 16 * i + 16
-  · k_step (wp_s_branch c _ (KA.«dirlookup» + 0x58#64) false 60#13 9#5 15#5 (by decide) bop.BGEU)
+  · k_step_e (wp_s_branch cpu _ (KA.«dirlookup» + 0x58#64) false 60#13 9#5 15#5 (by decide) bop.BGEU)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [hsx, hbg, decide_eq_true hex]
     iintro Hk Hpc
     -- +0x94  c.li a0,0 : the scan is exhausted
-    k_step (wp_s_addi c _ (KA.«dirlookup» + 0x94#64) true 0#12 10#5 0#5 (by decide))
+    k_step_e (wp_s_addi cpu _ (KA.«dirlookup» + 0x94#64) true 0#12 10#5 0#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
     have hnrec : dirFirst data (dirNrec dn.diSize.toNat) (bname 14 fn) = none :=
@@ -134,19 +132,19 @@ theorem dirlookup_latch (c cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) 
       iframe Hsl Hpf
       ipureintro
       exact ⟨hnrec, by first | rfl | trivial⟩
-    iapply (dirlookup_tail c cpu k spie spp _ ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn
-        false 0 0 1 v10 bs 0#64 (by have := hs.hK; unfold dirlookupSlots at this; omega) hsie
-        hs.hal ?t2 ?t10 ?t24 ?t25 ?t26 ?t27 hpin)
-      $$ [$Hk $Hpc $Hframe $Hde $Htc $Hcl $Hir $Hkeep $Harm $Hnext]
+    iapply (dirlookup_tail cpu k spie spp _ ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn
+        false 0 0 1 v10 bs 0#64 (by have := hs.hK; unfold dirlookupSlots at this; omega)
+        hs.hal ?t2 ?t10 ?t24 ?t25 ?t26 ?t27)
+      $$ [$Hk $Hpc $Hframe $Hde $Hte $Hce $Hkeep $Harm $Hnext]
     all_goals (simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;>
       first | assumption | rfl)
-  · k_step (wp_s_branch c _ (KA.«dirlookup» + 0x58#64) false 60#13 9#5 15#5 (by decide) bop.BGEU)
+  · k_step_e (wp_s_branch cpu _ (KA.«dirlookup» + 0x58#64) false 60#13 9#5 15#5 (by decide) bop.BGEU)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [hsx, hbg, decide_eq_false hex]
     iintro Hk Hpc
     have hle := dirlookup_le_nrec _ i hlt
-    ihave IH := dirlookupLoop_elim _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ $$ IH
-    iapply IH $$ %c %spie %spp %_ %(i + 1) %v10 %bs [] Hk Hpc Hframe Hde Htc Hcl Hir Hkeep Hin Hnext
+    ihave IH := dirlookupLoop_elim _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ $$ IH
+    iapply IH $$ %cpu %spie %spp %_ %(i + 1) %v10 %bs [] Hk Hpc Hframe Hde Hte Hce Hkeep Hin Hnext
     ipureintro
     refine ⟨?_, by omega, hnone, by omega⟩
     refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>

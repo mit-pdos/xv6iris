@@ -49,7 +49,6 @@ structure DirlookupStatic [Fscfg] [Icfg] (k : KCtx) (j : Nat) (bm : Blkmap)
   hj : j < NPROC
   hproc : k.proc = procAddr j
   hK : dirlookupSlots ≤ k.avail
-  hsie : k.sie = false
   hnoff : k.noff = 0
   hlocks : k.locks = []
   htier : k.tier = KTier.kpt
@@ -155,20 +154,22 @@ def dirlookupPost (k : KCtx) (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap)
   fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (found : Bool) (kk kslot : Nat) (q : Qp),
     ⌜calleeSaved k.regs R'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-    trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
+    trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     dirlookupKeep k ip dinum bm data dn dr fn pidv dqp dqd dqn -∗
     dirlookupArm data dn fn hasp (k.regs 12#5) pofv found kk kslot q (R' 10#5) -∗
     wpLoop cpu')
 
-/-- The specification's `wpNext`, named. -/
-theorem dirlookup_post_of_spec (cpu : CPU) (k : KCtx) (ip : BitVec 64) (dinum : BitVec 32)
+/-- The specification's `wpNext`, named, and hart-free: a `true` crossing at
+a process (`dirlookup_pin`), so any hart may consume it. -/
+theorem dirlookup_post_of_spec {j : Nat} (hj : j < NPROC) (cpu : CPU) (k : KCtx)
+    (hproc : k.proc = procAddr j) (ip : BitVec 64) (dinum : BitVec 32)
     (bm : Blkmap) (data : Nat → List (BitVec 8)) (dn dr : Dinode) (fn : Nat → BitVec 8)
     (hasp : Bool) (pofv pidv : BitVec 32) (dqp dqd dqn : DFrac) :
     wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap)
         (found : Bool) (kk kslot : Nat) (q : Qp),
       ⌜calleeSaved k.regs R'⌝ -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-      trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
+      trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
       wordPointsTo (iDev ip) 4 dqd icfgDev -∗ inodeMeta ip dn -∗
       inodeMap fscFs ip bm -∗ inodeBlocks fscFs bm data -∗
       byteBuf (k.regs 11#5) dqn (bview 14 fn) -∗
@@ -187,15 +188,13 @@ theorem dirlookup_post_of_spec (cpu : CPU) (k : KCtx) (ip : BitVec 64) (dinum : 
           irefSlot ∗
           (if hasp then wordPointsTo (k.regs 12#5) 4 (DFrac.own 1) pofv else emp))) -∗
       wpLoop cpu'))
-    ⊢ wpNext (GF := GF) true k.proc cpu
-        (dirlookupPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn) := by
+    ⊢ ∀ c : CPU, dirlookupPost (GF := GF) k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn c := by
   unfold dirlookupPost
-  iintro H
-  iapply wpNext_mono _ _ _ _ _ $$ H
-  iintro %cpu' HK %spie %spp %R' %found %kk %kslot %q %hcs Hk Hpc Htc Hcl Hir Hkeep Harm
+  iintro H %c %spie %spp %R' %found %kk %kslot %q %hcs Hk Hpc Hte Hce Hkeep Harm
+  ihave HK := wpNext_at true k.proc cpu c _ (dirlookup_pin hj k hproc c cpu) $$ H
   unfold dirlookupKeep
   icases Hkeep with ⟨Hdev, Hmeta, Hmap, Hblk, Hnm, Hpid, Hsl, Hlk, Hdi⟩
-  iapply HK $$ %spie %spp %R' %found %kk %kslot %q %hcs Hk Hpc Htc Hcl Hir Hdev Hmeta Hmap Hblk
+  iapply HK $$ %spie %spp %R' %found %kk %kslot %q %hcs Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk
     Hnm Hpid Hsl Hlk Hdi
   unfold dirlookupArm
   iexact Harm
@@ -207,7 +206,7 @@ theorem dirlookupPost_elim (k : KCtx) (ip : BitVec 64) (dinum : BitVec 32) (bm :
       ∀ (spie spp : Bool) (R' : RegMap) (found : Bool) (kk kslot : Nat) (q : Qp),
       ⌜calleeSaved k.regs R'⌝ -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-      trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
+      trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
       dirlookupKeep k ip dinum bm data dn dr fn pidv dqp dqd dqn -∗
       dirlookupArm data dn fn hasp (k.regs 12#5) pofv found kk kslot q (R' 10#5) -∗
       wpLoop cpu' := by
@@ -215,7 +214,7 @@ theorem dirlookupPost_elim (k : KCtx) (ip : BitVec 64) (dinum : BitVec 32) (bm :
 
 /-- **THE SCAN'S STATEMENT at `+0x5c`** (Rocq's `dl_loop_body`), for record
 `i` below the size and no match below `i`. -/
-def dirlookupLoop (cpu : CPU) (k : KCtx) (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap)
+def dirlookupLoop (k : KCtx) (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap)
     (data : Nat → List (BitVec 8)) (dn dr : Dinode) (fn : Nat → BitVec 8) (hasp : Bool)
     (pofv pidv : BitVec 32) (dqp dqd dqn : DFrac) (fuel : Nat) : IProp GF := iprop(
   ∀ (c : CPU) (spie spp : Bool) (R : RegMap) (i : Nat) (v10 : BitVec 64) (bs : List (BitVec 8)),
@@ -226,16 +225,16 @@ def dirlookupLoop (cpu : CPU) (k : KCtx) (ip : BitVec 64) (dinum : BitVec 32) (b
     dirlookupFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) v10 -∗
     dirlookupDe (k.regs 2#5) bs -∗
-    trapCsrs c -∗ cpuClaim c k.proc -∗ intrRes c -∗
+    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
     dirlookupKeep k ip dinum bm data dn dr fn pidv dqp dqd dqn -∗
     dirlookupIn hasp (k.regs 12#5) pofv -∗
-    wpNext true k.proc cpu (dirlookupPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn) -∗
+    (∀ c' : CPU, dirlookupPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn c') -∗
     wpLoop c)
 
-theorem dirlookupLoop_elim (cpu : CPU) (k : KCtx) (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap)
+theorem dirlookupLoop_elim (k : KCtx) (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap)
     (data : Nat → List (BitVec 8)) (dn dr : Dinode) (fn : Nat → BitVec 8) (hasp : Bool)
     (pofv pidv : BitVec 32) (dqp dqd dqn : DFrac) (fuel : Nat) :
-    dirlookupLoop (GF := GF) cpu k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn fuel ⊢
+    dirlookupLoop (GF := GF) k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn fuel ⊢
     ∀ (c : CPU) (spie spp : Bool) (R : RegMap) (i : Nat) (v10 : BitVec 64) (bs : List (BitVec 8)),
       ⌜dirlookupRegs k ip R i ∧ 16 * i < dn.diSize.toNat ∧ dirFirst data i (bname 14 fn) = none ∧
         dirNrec dn.diSize.toNat + 1 - i < fuel⌝ -∗
@@ -244,14 +243,14 @@ theorem dirlookupLoop_elim (cpu : CPU) (k : KCtx) (ip : BitVec 64) (dinum : BitV
       dirlookupFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
         (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) v10 -∗
       dirlookupDe (k.regs 2#5) bs -∗
-      trapCsrs c -∗ cpuClaim c k.proc -∗ intrRes c -∗
+      trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
       dirlookupKeep k ip dinum bm data dn dr fn pidv dqp dqd dqn -∗
       dirlookupIn hasp (k.regs 12#5) pofv -∗
-      wpNext true k.proc cpu (dirlookupPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn) -∗
+      (∀ c' : CPU, dirlookupPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn c') -∗
       wpLoop c := by
   unfold dirlookupLoop; iintro H; iexact H
 
-theorem dirlookupLoop_intro (cpu : CPU) (k : KCtx) (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap)
+theorem dirlookupLoop_intro (k : KCtx) (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap)
     (data : Nat → List (BitVec 8)) (dn dr : Dinode) (fn : Nat → BitVec 8) (hasp : Bool)
     (pofv pidv : BitVec 32) (dqp dqd dqn : DFrac) (fuel : Nat) :
     (∀ (c : CPU) (spie spp : Bool) (R : RegMap) (i : Nat) (v10 : BitVec 64) (bs : List (BitVec 8)),
@@ -262,12 +261,12 @@ theorem dirlookupLoop_intro (cpu : CPU) (k : KCtx) (ip : BitVec 64) (dinum : Bit
       dirlookupFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
         (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) v10 -∗
       dirlookupDe (k.regs 2#5) bs -∗
-      trapCsrs c -∗ cpuClaim c k.proc -∗ intrRes c -∗
+      trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
       dirlookupKeep k ip dinum bm data dn dr fn pidv dqp dqd dqn -∗
       dirlookupIn hasp (k.regs 12#5) pofv -∗
-      wpNext true k.proc cpu (dirlookupPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn) -∗
+      (∀ c' : CPU, dirlookupPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn c') -∗
       wpLoop c) ⊢
-    dirlookupLoop (GF := GF) cpu k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn fuel := by
+    dirlookupLoop (GF := GF) k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn fuel := by
   unfold dirlookupLoop; iintro H; iexact H
 
 end
@@ -289,7 +288,7 @@ theorem dirlookup_readi (RD : READI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
     (ip : BitVec 64) (bm : Blkmap) (data : Nat → List (BitVec 8)) (dn : Dinode)
     (off : Nat) (olds : List (BitVec 8)) (pidv : BitVec 32) (dqp dqd : DFrac)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : readiSlots ≤ k'.avail)
-    (hsie : k'.sie = false) (hnoff : k'.noff = 0) (hlocks : k'.locks = [])
+    (hnoff : k'.noff = 0)
     (htier : k'.tier = KTier.kpt)
     (hgeom : logGeomOk fscCov fscLogst) (hwf : blkmapWf fscCov fscLogst bm)
     (hcov : bmCovers bm dn.diSize.toNat) (hsz : dn.diSize.toNat ≤ MAXFILE * BSIZE)
@@ -298,7 +297,7 @@ theorem dirlookup_readi (RD : READI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
     (ha3 : k'.regs 13#5 = BitVec.ofNat 64 off) (ha4 : k'.regs 14#5 = 16#64)
     (holds : olds.length = 16) :
     kctx c k' ∗ pcIs c KA.«readi» ∗ procsInv Γ ∗
-    trapCsrs c ∗ cpuClaim c k'.proc ∗ intrRes c ∗
+    trapCsrsExt c k'.sie ∗ cpuClaimExt c k'.sie k'.proc ∗
     bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
     diskCaps fscDisk fscDlock pd pav pu ∗ panicEnv ∗ fsBytesAny fscFs ∗
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
@@ -310,34 +309,34 @@ theorem dirlookup_readi (RD : READI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
       ⌜calleeSaved k'.regs R'⌝ -∗
       ⌜R' 10#5 = BitVec.ofNat 64 tot ∧ tot = rdClamp dn.diSize off 16⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      trapCsrs cpu' -∗ cpuClaim cpu' k'.proc -∗ intrRes cpu' -∗
+      trapCsrsExt cpu' k'.sie -∗ cpuClaimExt cpu' k'.sie k'.proc -∗
       wordPointsTo (iDev ip) 4 dqd icfgDev -∗ inodeMeta ip dn -∗
       inodeMap fscFs ip bm -∗ inodeBlocks fscFs bm data -∗
       byteBuf (k'.regs 12#5) (DFrac.own 1) (rdDelivered data olds off tot) -∗
       wordPointsTo (pPid k'.proc) 4 dqp pidv -∗
       bslot fscBio -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := RD.wp_readi (hlc := hlc) (GF := GF) Γ c k' γl fscBio
+  have h := RD.wp_readi_eb (hlc := hlc) (GF := GF) Γ c k' γl fscBio
     (fsView fscFs fscDisk icfgDev fscCov) fscDlock pd pav pu j fscFs fscLogst icfgDev γkl γk ip
-    bm data dn false off 16 olds pidv dirlookupVp (fun _ => []) dqp (DFrac.own 1) dqd hj hproc hK hsie
-    hnoff hlocks htier hgeom hwf hcov hsz (by omega) (fun _ => by omega) rfl rfl rfl hpd ha0
+    bm data dn false off 16 olds pidv dirlookupVp (fun _ => []) dqp (DFrac.own 1) dqd hj hproc hK
+    hnoff htier hgeom hwf hcov hsz (by omega) (fun _ => by omega) rfl rfl rfl hpd ha0
     (by simp only [Bool.false_eq_true, if_false]; exact ha1)
     (by rw [ha3, fw_sext32 _ (by omega)]) (by rw [ha4]; rfl) (fun _ => holds)
-  unfold wp_readi_body at h
+  unfold wp_readi_eb_body at h
   simp only [readiAddr, Bool.false_eq_true, if_false, and_false, false_or, fsView_gd] at h
-  iintro ⟨Hk, Hpc, #Hpi, Htc, Hcl, Hir, #Hbc, #Hdc, #Hpe, #Hany, #Hkl, #Hav, Hdev, Hmeta, Hmap,
+  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hbc, #Hdc, #Hpe, #Hany, #Hkl, #Hav, Hdev, Hmeta, Hmap,
     Hblk, Hbuf, Hpid, Hsl, Hnext⟩
   ihave Hmap := inodeMapQ_1_to fscFs (DFrac.own 1) ip bm rfl $$ Hmap
   ihave Hblk := inodeBlocksQ_1_to fscFs (DFrac.own 1) bm data rfl $$ Hblk
   iapply h
-  iframe Hk Hpc Htc Hcl Hir Hdev Hmeta Hmap Hblk Hbuf Hpid Hsl
+  iframe Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk Hbuf Hpid Hsl
   iframe #
   iapply wpNext_mono _ _ _ _ _ $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %tot %hcs %_ %hret Hk Hpc Htc Hcl Hir Hdev Hmeta Hmap Hblk
+  iintro %cpu' HK %spie %spp %R' %tot %hcs %_ %hret Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk
     ⟨Hbuf, Hpid⟩ Hsl
   ihave Hmap := inodeMapQ_1_of fscFs (DFrac.own 1) ip bm rfl $$ Hmap
   ihave Hblk := inodeBlocksQ_1_of fscFs (DFrac.own 1) bm data rfl $$ Hblk
-  iapply HK $$ %spie %spp %R' %tot %hcs %hret Hk Hpc Htc Hcl Hir Hdev Hmeta Hmap Hblk Hbuf Hpid Hsl
+  iapply HK $$ %spie %spp %R' %tot %hcs %hret Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk Hbuf Hpid Hsl
 
 /-- `namecmp(name, de.name)` at `+0x78`. -/
 theorem dirlookup_namecmp (NC : NAMECMP) (c : CPU) (k' : KCtx) (f g : Nat → BitVec 8)

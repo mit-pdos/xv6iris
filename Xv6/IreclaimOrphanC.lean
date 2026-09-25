@@ -46,12 +46,12 @@ theorem ireclaim_iput_units : iputUnits ≤ MAXOPBLOCKS := by
 set_option maxHeartbeats 16000000 in
 /-- **`+0x64 .. +0x6c`: iput, end_op, and the fall into the step.** -/
 theorem ireclaim_orphan_c (IP : IPUT) (EO : END_OP) [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c cpu : CPU) (k : KCtx)
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx)
     (spie spp : Bool) (R : RegMap) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (pidv : BitVec 32) (dqp dqb dqs dqn : DFrac) (n : Nat)
     (kslot : Nat) (q : Qp) (Sb : List Nat)
     (hj : j < NPROC) (hproc : k.proc = procAddr j)
-    (hK : ireclaimSlots ≤ k.avail) (hsie : k.sie = false) (hnoff : k.noff = 0)
+    (hK : ireclaimSlots ≤ k.avail) (hnoff : k.noff = 0)
     (hlocks : k.locks = []) (htier : k.tier = KTier.kpt)
     (hgeom : logGeomOk fscCov fscLogst) (hblk : iregBlocksOk icfgIst icfgNib fscCov fscLogst)
     (hbg : bitmapGeomOk fscCov fscLogst fscBmapstart fscSize) (hbel : covBelow fscCov fscSize)
@@ -59,17 +59,16 @@ theorem ireclaim_orphan_c (IP : IPUT) (EO : END_OP) [Fscfg] [Icfg] [CurCtx]
     (hn : n < fscNinodes)
     (hb : ireclaimBody k R) (h9 : R 9#5 = BitVec.ofNat 64 n) (h19 : R 19#5 = ientry kslot)
     (hkslot : kslot < NINODE)
-    (hpin : true = false ∨ k.proc = 0#64 → c = cpu)
     (IH : n + 1 < fscNinodes → ∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap),
-      (true = false ∨ k.proc = 0#64 → c' = cpu) → ireclaimLoopRegs k (n + 1) R' →
-      ireclaimLoopPre (hlc := hlc) Γ c' cpu k spie' spp' R' γl pd pav pu pidv dqp dqb dqs dqn ⊢
+      ireclaimLoopRegs k (n + 1) R' →
+      ireclaimLoopPre (hlc := hlc) Γ c' k spie' spp' R' γl pd pav pu pidv dqp dqb dqs dqn ⊢
         wpLoop (GF := GF) c') :
-    kctx c (((k.withSpie spie spp).pushed 8).withRegs R) ∗ pcIs c (KA.«ireclaim» + 0x64#64) ∗
-    ireclaimEnv (hlc := hlc) Γ γl pd pav pu ∗ ireclaimTurn c cpu k pidv dqp dqb dqs dqn ∗
+    kctx cpu (((k.withSpie spie spp).pushed 8).withRegs R) ∗ pcIs cpu (KA.«ireclaim» + 0x64#64) ∗
+    ireclaimEnv (hlc := hlc) Γ γl pd pav pu ∗ ireclaimTurn cpu k pidv dqp dqb dqs dqn ∗
     bslots fscBio 3 ∗ iregBoot ∗
     inodeRef kslot q icfgDev (BitVec.ofNat 32 n) ∗ runitPlain (BitVec.ofNat 32 n).toNat ∗
     logOpS icfgLog MAXOPBLOCKS Sb ∗ logTx icfgLog
-    ⊢ wpLoop (GF := GF) c := by
+    ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨hK8, -, -, -, -, -, -, -, hKip, hKeo⟩ := ireclaim_slots k.avail hK
   have hww : ∀ (K : KCtx) (a b c d : Bool), (K.withSpie a b).withSpie c d = K.withSpie c d :=
     fun _ _ _ _ _ => rfl
@@ -84,7 +83,7 @@ theorem ireclaim_orphan_c (IP : IPUT) (EO : END_OP) [Fscfg] [Icfg] [CurCtx]
   unfold ireclaimEnv
   icases Henv with ⟨#Hpe, #Hpi, #Hbc, #Hdc, #Hlc, #Hinv, #Hit2, #Hiti, #Hslks, #Hbmi⟩
   unfold ireclaimTurn
-  icases Hturn with ⟨Htc, Hcl, Hir, Hsn, Hsi, Hsb, Hpid, Hframe, Hnext⟩
+  icases Hturn with ⟨Hte, Hce, Hsn, Hsi, Hsb, Hpid, Hframe, Hnext⟩
   -- the run's slot: its escrow and its sleeplock, projected out of the families
   ihave #Hescs := isItable2_escrows _ _ _ _ _ _ _ _ $$ Hit2
   ihave #Hesc := icEscrows_lookup fscIc fscFs fscIreg fscCov fscLogst kslot hkslot $$ Hescs
@@ -97,34 +96,31 @@ theorem ireclaim_orphan_c (IP : IPUT) (EO : END_OP) [Fscfg] [Icfg] [CurCtx]
   · unfold inodeRefp runitAny
     iframe
   -- +0x64  c.mv a0,s3 ; +0x66  jal iput
-  k_step (wp_s_add c _ (KA.«ireclaim» + 0x64#64) true 10#5 0#5 19#5 (by decide))
+  k_step_e (wp_s_add cpu _ (KA.«ireclaim» + 0x64#64) true 10#5 0#5 19#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h19]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ (KA.«ireclaim» + 0x66#64) false 2096808#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«ireclaim» + 0x66#64) false 2096808#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ireclaim_br_iput]
   iintro Hk Hpc
-  iapply (ireclaim_iput IP Γ c _ γl pd pav pu j γil γisl kslot q (BitVec.ofNat 32 n)
-      MAXOPBLOCKS Sb e0 t (1 : Qp).half pidv dqp dqb dqs hj ?iproc ?iK ?isie ?inoff ?ilocks
+  iapply (ireclaim_iput IP Γ cpu _ γl pd pav pu j γil γisl kslot q (BitVec.ofNat 32 n)
+      MAXOPBLOCKS Sb e0 t (1 : Qp).half pidv dqp dqb dqs k.sie (by k_norm_g) hj ?iproc ?iK ?inoff
       ?itier hkslot hgeom hbg hcov hlog hnib hbel ireclaim_iput_units hpd ?ia0)
-    $$ [- $Hk $Hpc $Hpi $Htc $Hir $Hpe $Hbc $Hlc $Hdc $Hit2 $Hiti $Hesc $Hinv $Hboot $Hslk
+    $$ [- $Hk $Hpc $Hpi $Hte $Hpe $Hbc $Hlc $Hdc $Hit2 $Hiti $Hesc $Hinv $Hboot $Hslk
         $Hsb $Hsi $Hbmi $Hsl $Hope $Ht1 $Hrefp]
   rotate_right 1
   k_norm_g [ireclaim_ret_6a]
-  iframe Hcl Hpid
+  iframe Hce Hpid
   iframe #
   case iproc => k_norm_g; exact hproc
   case iK => k_norm_g; exact hKip
-  case isie => k_norm_g; exact hsie
   case inoff => k_norm_g; exact hnoff
-  case ilocks => k_norm_g; exact hlocks
   case itier => k_norm_g; exact htier
   case ia0 => k_norm_g; try exact h19
   -- back from iput (at any hart)
   iapply wpNext_intro_pin
-  iintro %c1 %hp1 %spie1 %spp1 %R1 %n' %Sb' %w %hcs1 Hk Hpc Htc Hcl Hir Hpid Hsb Hsi Hsl HopS
+  iintro %cpu %_ %spie1 %spp1 %R1 %n' %Sb' %w %hcs1 Hk Hpc Hte Hce Hpid Hsb Hsi Hsl HopS
     Ht1 Hiref Hboot
   k_norm_g [ireclaim_ret_6a, hww, hpsw]
-  have hpin1 : true = false ∨ k.proc = 0#64 → c1 = cpu := fun h => (hp1 h).trans (hpin h)
   ihave Htx := logTx_join icfgLog t $$ Ht1 Ht2
   ihave Hop := logOpS_op icfgLog n' Sb' $$ HopS Htx
   have hb1 : ireclaimBody k R1 := ireclaimBody_callee k _ R1 (by k_norm_g at hcs1; exact hcs1)
@@ -136,26 +132,23 @@ theorem ireclaim_orphan_c (IP : IPUT) (EO : END_OP) [Fscfg] [Icfg] [CurCtx]
       | exact h9
       | (simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h9)
   -- +0x6a  jal end_op
-  k_step (wp_s_jal c1 _ (KA.«ireclaim» + 0x6a#64) false 2072#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«ireclaim» + 0x6a#64) false 2072#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ireclaim_br_end_op]
   iintro Hk Hpc
-  iapply (ireclaim_end_op EO Γ c1 _ γl pd pav pu j n' pidv dqp k.proc (by k_norm_g) hj ?eproc
-      ?eK ?esie ?enoff ?elocks ?etier hgeom hpd)
-    $$ [- $Hk $Hpc $Hpi $Htc $Hcl $Hir $Hbc $Hdc $Hpe $Hlc $Hpid $Hop]
+  iapply (ireclaim_end_op EO Γ cpu _ γl pd pav pu j n' pidv dqp k.proc (by k_norm_g) k.sie
+      (by k_norm_g) hj ?eproc ?eK ?enoff ?etier hgeom hpd)
+    $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hbc $Hdc $Hpe $Hlc $Hpid $Hop]
   rotate_right 1
   k_norm_g [ireclaim_ret_6e]
   iframe #
   case eproc => k_norm_g; exact hproc
   case eK => k_norm_g; exact hKeo
-  case esie => k_norm_g; exact hsie
   case enoff => k_norm_g; exact hnoff
-  case elocks => k_norm_g; exact hlocks
   case etier => k_norm_g; exact htier
   -- back from end_op (at any hart), FALL into the step
   iapply wpNext_intro_pin
-  iintro %c2 %hp2 %spie2 %spp2 %R2 %hcs2 Hk Hpc Htc Hcl Hir Hpid
+  iintro %cpu %_ %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid
   k_norm_g [ireclaim_ret_6e, hww, hpsw]
-  have hpin2 : true = false ∨ k.proc = 0#64 → c2 = cpu := fun h => (hp2 h).trans (hpin1 h)
   have hb2 : ireclaimBody k R2 := ireclaimBody_callee k _ R2 (by k_norm_g at hcs2; exact hcs2)
     (by ireclaim_body_tac)
   have h9'' : R2 9#5 = BitVec.ofNat 64 n := by
@@ -164,9 +157,9 @@ theorem ireclaim_orphan_c (IP : IPUT) (EO : END_OP) [Fscfg] [Icfg] [CurCtx]
     first
       | exact h9'
       | (simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h9')
-  iapply (ireclaim_step Γ c2 cpu k spie2 spp2 R2 γl pd pav pu pidv dqp dqb dqs dqn n hK hsie hn31
-      hn hb2 h9'' hpin2 (fun hlt spie' spp' R' hr' => IH hlt c2 spie' spp' R' hpin2 hr'))
-    $$ [$Hk $Hpc Htc Hcl Hir Hsn Hsi Hsb Hpid Hframe Hnext $Hsl $Hiref $Hboot]
+  iapply (ireclaim_step Γ cpu k spie2 spp2 R2 γl pd pav pu pidv dqp dqb dqs dqn n hK hn31
+      hn hb2 h9'' IH)
+    $$ [$Hk $Hpc Hte Hce Hsn Hsi Hsb Hpid Hframe Hnext $Hsl $Hiref $Hboot]
   unfold ireclaimEnv ireclaimTurn
   iframe
   iframe #
