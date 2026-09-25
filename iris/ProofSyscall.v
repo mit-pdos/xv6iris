@@ -3954,6 +3954,17 @@ Section SyscallArms.
       [exact (conj Him Hlz) | exfalso; lia].
   Qed.
 
+  (* THE MASK ROW AT A QUIET ENTRY: every entry but sys_seccomp hands the
+     block back at the mask it was given.  An arm whose block comes back
+     through an adapter carries that as a hypothesis [pv_secc V' = ...];
+     the others return [U] itself (or an [upd_*] of it), where it is
+     definitional. *)
+  Ltac sysc_secc_quiet Hnum :=
+    cbn [us_V upd_usV];
+    first [ match goal with H : pv_secc ?V = pv_secc (us_V _) |- _ => rewrite H end
+          | idtac ];
+    apply usys_secc_ok_refl; rewrite Hnum; unfold USYS_seccomp; lia.
+
   (* ------------------------------------------------------------------- *)
   (* THE FIRST REAL ARM: k = 11, [sys_getpid].  It is the entry that needs
      the LEAST from the environment -- [proc_priv] and nothing else (no lock,
@@ -4041,7 +4052,7 @@ Section SyscallArms.
                  the row is that reading, kept rather than dropped *)
               (sysc_ret_pid_of _ _ _ Hpidw)
               (* ...and the mask row: not seccomp's number, so the mask is kept *)
-              ltac:(apply usys_secc_ok_refl; rewrite Hnum; unfold USYS_seccomp; lia)
+              ltac:(sysc_secc_quiet Hnum)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] []").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
@@ -4387,7 +4398,7 @@ Section SyscallArms.
               ltac:(apply (sysc_ret_pid_ne _ _ _ _ Hnum);
                     unfold UsysMemOk.USYS_getpid in *; lia)
               (* ...and the mask row: not seccomp's number, so the mask is kept *)
-              ltac:(apply usys_secc_ok_refl; rewrite Hnum; unfold USYS_seccomp; lia)
+              ltac:(sysc_secc_quiet Hnum)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] []").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
@@ -4513,7 +4524,7 @@ Section SyscallArms.
               ltac:(apply (sysc_ret_pid_ne _ _ _ _ Hnum);
                     unfold UsysMemOk.USYS_getpid in *; lia)
               (* ...and the mask row: not seccomp's number, so the mask is kept *)
-              ltac:(apply usys_secc_ok_refl; rewrite Hnum; unfold USYS_seccomp; lia)
+              ltac:(sysc_secc_quiet Hnum)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [Hans] [] []").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
@@ -4645,7 +4656,7 @@ Section SyscallArms.
               ltac:(apply (sysc_ret_pid_ne _ _ _ _ Hnum);
                     unfold UsysMemOk.USYS_getpid in *; lia)
               (* ...and the mask row: not seccomp's number, so the mask is kept *)
-              ltac:(apply usys_secc_ok_refl; rewrite Hnum; unfold USYS_seccomp; lia)
+              ltac:(sysc_secc_quiet Hnum)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] []").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
@@ -4750,7 +4761,7 @@ Section SyscallArms.
               ltac:(apply (sysc_ret_pid_ne _ _ _ _ Hnum);
                     unfold UsysMemOk.USYS_getpid in *; lia)
               (* ...and the mask row: not seccomp's number, so the mask is kept *)
-              ltac:(apply usys_secc_ok_refl; rewrite Hnum; unfold USYS_seccomp; lia)
+              ltac:(sysc_secc_quiet Hnum)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] []").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
@@ -4851,7 +4862,7 @@ Section SyscallArms.
               ltac:(apply (sysc_ret_pid_ne _ _ _ _ Hnum);
                     unfold UsysMemOk.USYS_getpid in *; lia)
               (* ...and the mask row: not seccomp's number, so the mask is kept *)
-              ltac:(apply usys_secc_ok_refl; rewrite Hnum; unfold USYS_seccomp; lia)
+              ltac:(sysc_secc_quiet Hnum)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] []").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
@@ -4911,6 +4922,8 @@ Section SyscallArms.
       (* ...AND THE LAZY BIT, which only sbrk writes (lane LAZY-FLAG,
          K1): this entry hands the block back at the bit it was given. *)
       ⌜pv_lazy V' = pv_lazy (us_V U)⌝ ∗
+      (* ...and the mask, which only sys_seccomp writes *)
+      ⌜pv_secc V' = pv_secc (us_V U)⌝ ∗
       ⌜sysc_fd_ok (us_V U) r sts sts'⌝ ∗
       proc_priv γf p pid (MkUstate V' ((us_M U))) ∗
       fd_frags (pv_fdg (us_V U)) sts'.
@@ -4930,7 +4943,7 @@ Section SyscallArms.
       iExists (us_V U), sts. iFrame "Hp Hfr". iPureIntro.
       split_and!; [reflexivity | reflexivity | reflexivity | reflexivity | reflexivity
                   | reflexivity | apply uptd_ext_sz_refl | reflexivity
-                  | reflexivity |].
+                  | reflexivity | reflexivity |].
       (* nothing was installed: the row's right disjunct, at its FIRST
          reason *)
       right. split_and!; [exact Hr | reflexivity |]. left.
@@ -4959,7 +4972,7 @@ Section SyscallArms.
       iExists (us_V U), sts. iFrame "Hp Hfr". iPureIntro.
       split_and!; [reflexivity | reflexivity | reflexivity | reflexivity | reflexivity
                   | reflexivity | apply uptd_ext_sz_refl | reflexivity
-                  | reflexivity |].
+                  | reflexivity | reflexivity |].
       (* nothing was installed: the row's right disjunct, at its SECOND
          reason *)
       right. split_and!; [exact Hr | reflexivity |]. right.
@@ -5018,7 +5031,7 @@ Section SyscallArms.
       iFrame "Hp Hfr". iPureIntro.
       split_and!; [reflexivity | reflexivity | reflexivity | reflexivity | reflexivity
                   | reflexivity | apply uptd_ext_sz_refl | reflexivity
-                  | reflexivity |].
+                  | reflexivity | reflexivity |].
       (* THE TWO INDICES ARE THE POST'S.  The row reads the returned and the
          argument descriptor as C [int]s; the post names them [fd1] and
          [fd0].  [usys_retfd_moi] is the return's round trip -- a descriptor
@@ -5079,7 +5092,7 @@ Section SyscallArms.
     iDestruct (sysc_dup_priv _ _ _ _ _ _ _ Hnum
                  (list_lookup_total_correct _ _ _ Hv0) Hoflen with "Hpost")
       as (V' sts')
-      "(%Htfp' & %Hfg' & %Hchg' & %Hgeng' & %Hcwi' & %Htfw' & %Hupte' & %Hszv' & %Hlzv' & %Hfdrow & Hpriv & Hufrag)".
+      "(%Htfp' & %Hfg' & %Hchg' & %Hgeng' & %Hcwi' & %Htfw' & %Hupte' & %Hszv' & %Hlzv' & %Hscv' & %Hfdrow & Hpriv & Hufrag)".
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
     assert (Hmfs2 : mf !!! Regidx Rs2 = page_base (ud_tfp (pv_upt V'))).
@@ -5128,7 +5141,7 @@ Section SyscallArms.
               ltac:(apply (sysc_ret_pid_ne _ _ _ _ Hnum);
                     unfold UsysMemOk.USYS_getpid in *; lia)
               (* ...and the mask row: not seccomp's number, so the mask is kept *)
-              ltac:(apply usys_secc_ok_refl; rewrite Hnum; unfold USYS_seccomp; lia)
+              ltac:(sysc_secc_quiet Hnum)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] []").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
@@ -5330,7 +5343,7 @@ Section SyscallArms.
               ltac:(apply (sysc_ret_pid_ne _ _ _ _ Hnum);
                     unfold UsysMemOk.USYS_getpid in *; lia)
               (* ...and the mask row: not seccomp's number, so the mask is kept *)
-              ltac:(apply usys_secc_ok_refl; rewrite Hnum; unfold USYS_seccomp; lia)
+              ltac:(sysc_secc_quiet Hnum)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [Hans] [] [] []").
     (* ...AND FORK'S ANSWER, which this arm alone owes.  It was already
        packed at [cs'] above, so there is nothing left to say. *)
@@ -5612,7 +5625,7 @@ Section SyscallArms.
               ltac:(apply (sysc_ret_pid_ne _ _ _ _ Hnum);
                     unfold UsysMemOk.USYS_getpid in *; lia)
               (* ...and the mask row: not seccomp's number, so the mask is kept *)
-              ltac:(apply usys_secc_ok_refl; rewrite Hnum; unfold USYS_seccomp; lia)
+              ltac:(sysc_secc_quiet Hnum)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] Hxo [Hrf]").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
@@ -5852,7 +5865,7 @@ Section SyscallArms.
               ltac:(apply (sysc_ret_pid_ne _ _ _ _ Hnum);
                     unfold UsysMemOk.USYS_getpid in *; lia)
               (* ...and the mask row: not seccomp's number, so the mask is kept *)
-              ltac:(apply usys_secc_ok_refl; rewrite Hnum; unfold USYS_seccomp; lia)
+              ltac:(sysc_secc_quiet Hnum)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] []").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
@@ -6063,7 +6076,7 @@ Section SyscallArms.
               ltac:(apply (sysc_ret_pid_ne _ _ _ _ Hnum);
                     unfold UsysMemOk.USYS_getpid in *; lia)
               (* ...and the mask row: not seccomp's number, so the mask is kept *)
-              ltac:(apply usys_secc_ok_refl; rewrite Hnum; unfold USYS_seccomp; lia)
+              ltac:(sysc_secc_quiet Hnum)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [Hex]").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
@@ -6249,7 +6262,7 @@ Section SyscallArms.
               ltac:(apply (sysc_ret_pid_ne _ _ _ _ Hnum);
                     unfold UsysMemOk.USYS_getpid in *; lia)
               (* ...and the mask row: not seccomp's number, so the mask is kept *)
-              ltac:(apply usys_secc_ok_refl; rewrite Hnum; unfold USYS_seccomp; lia)
+              ltac:(sysc_secc_quiet Hnum)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [Hex]").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
@@ -6370,7 +6383,7 @@ Section SyscallArms.
               ltac:(apply (sysc_ret_pid_ne _ _ _ _ Hnum);
                     unfold UsysMemOk.USYS_getpid in *; lia)
               (* ...and the mask row: not seccomp's number, so the mask is kept *)
-              ltac:(apply usys_secc_ok_refl; rewrite Hnum; unfold USYS_seccomp; lia)
+              ltac:(sysc_secc_quiet Hnum)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] []").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
@@ -6478,23 +6491,25 @@ Section SyscallArms.
                (* ...AND THE LAZY BIT, which only sbrk writes (lane LAZY-FLAG,
                   K1): this entry hands the block back at the bit it was given. *)
                ⌜pv_lazy V' = pv_lazy (us_V U)⌝ ∗
+               (* ...and the mask, which only sys_seccomp writes *)
+               ⌜pv_secc V' = pv_secc (us_V U)⌝ ∗
                proc_priv γf (proc_addr j) pid (MkUstate V' (us_M U)) ∗
                chdir_receipt (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U))
                  (cf_P fdep) (cf_Pmiss fdep) (cf_Fo fdep)
                  (mf !!! Regidx (mword_of_int 10 : mword 5)) (pv_cwi V'))%I
       with "[Hpv Hrc]" as
-      (V') "(%Htfp' & %Hfg' & %Hchg' & %Hgeng' & %Hcw' & %Htfw' & %Hupte' & %Hszv' & %Hlzv' & Hpriv & Hrcpt)".
+      (V') "(%Htfp' & %Hfg' & %Hchg' & %Hgeng' & %Hcw' & %Htfw' & %Hupte' & %Hszv' & %Hlzv' & %Hscv' & Hpriv & Hrcpt)".
     { pose proof Hextz as Hue. destruct Hext as (_ & Htf & _).
       destruct Hdisj as [[Hr ->] | [Hr (ipv & z & ->)]].
       - iExists (upd_upt (us_V U) P'). iFrame "Hpv Hrc". iPureIntro.
         split_and!; [exact Htf | reflexivity | reflexivity | reflexivity
                      | right; reflexivity | reflexivity | exact Hue
-                     | reflexivity | reflexivity].
+                     | reflexivity | reflexivity | reflexivity].
       - iExists (upd_cwi (upd_cwd (upd_upt (us_V U) P') ipv) z).
         iFrame "Hpv Hrc". iPureIntro.
         split_and!; [exact Htf | reflexivity | reflexivity | reflexivity
                      | left; rewrite Hr; reflexivity
-                     | reflexivity | exact Hue | reflexivity | reflexivity]. }
+                     | reflexivity | exact Hue | reflexivity | reflexivity | reflexivity]. }
     iDestruct (sysc_iref_join with "Hirk Hirc") as "Hir".
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
@@ -6548,7 +6563,7 @@ Section SyscallArms.
               ltac:(apply (sysc_ret_pid_ne _ _ _ _ Hnum);
                     unfold UsysMemOk.USYS_getpid in *; lia)
               (* ...and the mask row: not seccomp's number, so the mask is kept *)
-              ltac:(apply usys_secc_ok_refl; rewrite Hnum; unfold USYS_seccomp; lia)
+              ltac:(sysc_secc_quiet Hnum)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [Hrcpt]").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
@@ -6688,7 +6703,7 @@ Section SyscallArms.
               ltac:(apply (sysc_ret_pid_ne _ _ _ _ Hnum);
                     unfold UsysMemOk.USYS_getpid in *; lia)
               (* ...and the mask row: not seccomp's number, so the mask is kept *)
-              ltac:(apply usys_secc_ok_refl; rewrite Hnum; unfold USYS_seccomp; lia)
+              ltac:(sysc_secc_quiet Hnum)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [Harms]").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
@@ -6817,7 +6832,7 @@ Section SyscallArms.
               ltac:(apply (sysc_ret_pid_ne _ _ _ _ Hnum);
                     unfold UsysMemOk.USYS_getpid in *; lia)
               (* ...and the mask row: not seccomp's number, so the mask is kept *)
-              ltac:(apply usys_secc_ok_refl; rewrite Hnum; unfold USYS_seccomp; lia)
+              ltac:(sysc_secc_quiet Hnum)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [Harms]").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
@@ -6916,12 +6931,14 @@ Section SyscallArms.
                (* ...AND THE LAZY BIT, which only sbrk writes (lane LAZY-FLAG,
                   K1): this entry hands the block back at the bit it was given. *)
                ⌜pv_lazy V' = pv_lazy (us_V U)⌝ ∗
+               (* ...and the mask, which only sys_seccomp writes *)
+               ⌜pv_secc V' = pv_secc (us_V U)⌝ ∗
                ⌜sysc_fd_ok (us_V U) (mf !!! Regidx (mword_of_int 10 : mword 5))
                            sts sts'⌝ ∗
                proc_priv γf (proc_addr j) pid (MkUstate V' ((us_M U))) ∗
                fd_frags (pv_fdg (us_V U)) sts')%I
       with "[Hpost]" as (V' sts')
-        "(%Htfp' & %Hfg' & %Hchg' & %Hgeng' & %Hcwi' & %Htfw' & %Hupte' & %Hszv' & %Hlzv' & %Hfdrow & Hpriv & Hufrag)".
+        "(%Htfp' & %Hfg' & %Hchg' & %Hgeng' & %Hcwi' & %Htfw' & %Hupte' & %Hszv' & %Hlzv' & %Hscv' & %Hfdrow & Hpriv & Hufrag)".
     { rewrite /sysc_fd_ok /usys_fd_ok Hnum.
       destruct (decide (21 = USYS_close)) as [_ | Hcc];
         [| exfalso; exact (Hcc eq_refl)].
@@ -6937,7 +6954,7 @@ Section SyscallArms.
         iExists (us_V U), sts. iFrame "Hpv Hfr". iPureIntro.
         split_and!; [reflexivity | reflexivity | reflexivity | reflexivity | reflexivity
                     | reflexivity | apply uptd_ext_sz_refl | reflexivity
-                    | reflexivity |].
+                    | reflexivity | reflexivity |].
         split.
         + (* the failure arm returns -1, so the guard is false *)
           rewrite decide_False; [reflexivity |].
@@ -6962,7 +6979,7 @@ Section SyscallArms.
         iFrame "Hpv Hfr". iPureIntro.
         split_and!; [reflexivity | reflexivity | reflexivity | reflexivity | reflexivity
                     | reflexivity | apply uptd_ext_sz_refl | reflexivity
-                    | reflexivity |].
+                    | reflexivity | reflexivity |].
         split.
         + (* success returns 0, and the row's index is [arg_fd]'s own *)
           rewrite decide_True; [| rewrite Hr; vm_compute; reflexivity].
@@ -7017,7 +7034,7 @@ Section SyscallArms.
               ltac:(apply (sysc_ret_pid_ne _ _ _ _ Hnum);
                     unfold UsysMemOk.USYS_getpid in *; lia)
               (* ...and the mask row: not seccomp's number, so the mask is kept *)
-              ltac:(apply usys_secc_ok_refl; rewrite Hnum; unfold USYS_seccomp; lia)
+              ltac:(sysc_secc_quiet Hnum)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd [Hir Hiru] Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [Hcpost]").
     iApply (sysc_iref_join3 with "Hir Hiru").
     (* fork answers nothing at this entry: not its number *)
@@ -7155,6 +7172,8 @@ Section SyscallArms.
                (* ...AND THE LAZY BIT, which only sbrk writes (lane LAZY-FLAG,
                   K1): this entry hands the block back at the bit it was given. *)
                ⌜pv_lazy V' = pv_lazy (us_V U)⌝ ∗
+               (* ...and the mask, which only sys_seccomp writes *)
+               ⌜pv_secc V' = pv_secc (us_V U)⌝ ∗
                ⌜sysc_fd_ok (us_V U) (mf !!! Regidx (mword_of_int 10 : mword 5))
                            sts sts'⌝ ∗
                (* ...and pipe's JOINED row: the two descriptors it opened
@@ -7165,7 +7184,7 @@ Section SyscallArms.
                              sts sts'⌝ ∗
                proc_priv γf (proc_addr j) pid (MkUstate V' M') ∗
                fd_frags (pv_fdg (us_V U)) sts')%I with "[Hpv]" as
-      (V' sts') "(Hpqrow & %Htfp' & %Hfg' & %Hchg' & %Hgeng' & %Hcwi' & %Htfw' & %Hupte' & %Hszv' & %Hlzv' & %Hfdrow
+      (V' sts') "(Hpqrow & %Htfp' & %Hfg' & %Hchg' & %Hgeng' & %Hcwi' & %Htfw' & %Hupte' & %Hszv' & %Hlzv' & %Hscv' & %Hfdrow
                   & %Hpiperow & Hpriv & Hufrag)".
     { rewrite /sysc_fd_ok /usys_fd_ok Hnum.
       destruct (decide (4 = USYS_close)) as [Hcc | _]; [discriminate Hcc |].
@@ -7182,7 +7201,7 @@ Section SyscallArms.
         iSplitR.
         { iIntros (Hz). exfalso. rewrite Hr in Hz. vm_compute in Hz. discriminate. }
         iFrame "Hpv Hb". iPureIntro.
-        split_and!; [exact Htfpe | reflexivity | reflexivity | reflexivity | reflexivity | reflexivity | exact Huptz | reflexivity | reflexivity | |].
+        split_and!; [exact Htfpe | reflexivity | reflexivity | reflexivity | reflexivity | reflexivity | exact Huptz | reflexivity | reflexivity | reflexivity | |].
         (* ...AND THE ROW'S FAILURE ARM NAMES THAT -1 (lane PIPE-NEG1): the
            post's own [Hr] is exactly the new conjunct, so the row is
            discharged where it was already being refuted.  All FIVE of
@@ -7283,7 +7302,7 @@ Section SyscallArms.
         { iIntros (_). iExists fd0, fd1, γq. iFrame "Hqf". iPureIntro.
           split_and!; [exact Hne | exact Hleast0 | exact Hleast1 | reflexivity]. }
         iFrame "Hpv Hb". iPureIntro.
-        split_and!; [exact Htfpe | reflexivity | reflexivity | reflexivity | reflexivity | reflexivity | exact Huptz | reflexivity | reflexivity | |].
+        split_and!; [exact Htfpe | reflexivity | reflexivity | reflexivity | reflexivity | reflexivity | exact Huptz | reflexivity | reflexivity | reflexivity | |].
         { rewrite decide_True; [| rewrite Hr; vm_compute; reflexivity].
         (* the table's row binds the two NUMBERS existentially -- at this
            vocabulary they are reported by being WRITTEN -- and the post
@@ -7359,7 +7378,7 @@ Section SyscallArms.
               ltac:(apply (sysc_ret_pid_ne _ _ _ _ Hnum);
                     unfold UsysMemOk.USYS_getpid in *; lia)
               (* ...and the mask row: not seccomp's number, so the mask is kept *)
-              ltac:(apply usys_secc_ok_refl; rewrite Hnum; unfold USYS_seccomp; lia)
+              ltac:(sysc_secc_quiet Hnum)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd [Hir Hiru] Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [Hpqrow]").
     iApply (sysc_iref_join3 with "Hir Hiru").
     (* fork answers nothing at this entry: not its number *)
@@ -7528,7 +7547,7 @@ Section SyscallArms.
               ltac:(apply (sysc_ret_pid_ne _ _ _ _ Hnum);
                     unfold UsysMemOk.USYS_getpid in *; lia)
               (* ...and the mask row: not seccomp's number, so the mask is kept *)
-              ltac:(apply usys_secc_ok_refl; rewrite Hnum; unfold USYS_seccomp; lia)
+              ltac:(sysc_secc_quiet Hnum)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [Harms]").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
@@ -7669,7 +7688,7 @@ Section SyscallArms.
               ltac:(apply (sysc_ret_pid_ne _ _ _ _ Hnum);
                     unfold UsysMemOk.USYS_getpid in *; lia)
               (* ...and the mask row: not seccomp's number, so the mask is kept *)
-              ltac:(apply usys_secc_ok_refl; rewrite Hnum; unfold USYS_seccomp; lia)
+              ltac:(sysc_secc_quiet Hnum)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [Harms]").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
@@ -7865,6 +7884,8 @@ Section SyscallArms.
                (* ...AND THE LAZY BIT, which only sbrk writes (lane LAZY-FLAG,
                   K1): this entry hands the block back at the bit it was given. *)
                ⌜pv_lazy V' = pv_lazy (us_V U)⌝ ∗
+               (* ...and the mask, which only sys_seccomp writes *)
+               ⌜pv_secc V' = pv_secc (us_V U)⌝ ∗
                ⌜sysc_fd_ok (us_V U) (mf !!! Regidx (mword_of_int 10 : mword 5))
                            sts sts'⌝ ∗
                proc_priv γf (proc_addr j) pid (MkUstate V' (us_M U)) ∗
@@ -7877,7 +7898,7 @@ Section SyscallArms.
                  (of_Fok fdep) (of_Fex fdep) (of_Fo fdep) (of_Ft fdep) sts
                  (mf !!! Regidx (mword_of_int 10 : mword 5)) sts')%I
       with "[Hpv Hb Hrc]" as
-      (V' sts') "(%Htfp' & %Hfg' & %Hchg' & %Hgeng' & %Hcwi' & %Htfw' & %Hupte' & %Hszv' & %Hlzv' & %Hfdrow & Hpriv & Hufrag & Hrcpt)".
+      (V' sts') "(%Htfp' & %Hfg' & %Hchg' & %Hgeng' & %Hcwi' & %Htfw' & %Hupte' & %Hszv' & %Hlzv' & %Hscv' & %Hfdrow & Hpriv & Hufrag & Hrcpt)".
     { rewrite /sysc_fd_ok /usys_fd_ok Hnum.
       destruct (decide (15 = USYS_close)) as [Hcc | _]; [discriminate Hcc |].
       destruct (decide (15 = USYS_dup)) as [Hcd | _]; [discriminate Hcd |].
@@ -7886,7 +7907,7 @@ Section SyscallArms.
         [(Hr & -> & ->)
         | (fd & ll & kf & rb & wb & tp & Hr & Hfrees & -> & Hcl & -> & Hnp)].
       - iExists (upd_upt (us_V U) P'), sts. iFrame "Hpv Hb Hrc". iPureIntro.
-        split_and!; [exact Htfpe | reflexivity | reflexivity | reflexivity | reflexivity | reflexivity | exact Hextz | reflexivity | reflexivity |].
+        split_and!; [exact Htfpe | reflexivity | reflexivity | reflexivity | reflexivity | reflexivity | exact Hextz | reflexivity | reflexivity | reflexivity |].
         (* the failure arm installs nothing: the row's right disjunct *)
         by right.
       - (* FDALLOC'S SCAN, CONVERTED -- the same three lines as dup's arm.
@@ -7913,7 +7934,7 @@ Section SyscallArms.
         iExists (upd_ofile (upd_upt (us_V U) P') fd (fnode kf)),
                 (<[fd := FdOpen rb wb tp]> sts).
         iFrame "Hpv Hb Hrc". iPureIntro.
-        split_and!; [exact Htfpe | reflexivity | reflexivity | reflexivity | reflexivity | reflexivity | exact Hextz | reflexivity | reflexivity |].
+        split_and!; [exact Htfpe | reflexivity | reflexivity | reflexivity | reflexivity | reflexivity | exact Hextz | reflexivity | reflexivity | reflexivity |].
         (* the table's open row binds the descriptor, the mode bits and the
            type existentially; the split names all three, so the arm
            exhibits them.  The fourth conjunct is the OFFSET MODE
@@ -7970,7 +7991,7 @@ Section SyscallArms.
               ltac:(apply (sysc_ret_pid_ne _ _ _ _ Hnum);
                     unfold UsysMemOk.USYS_getpid in *; lia)
               (* ...and the mask row: not seccomp's number, so the mask is kept *)
-              ltac:(apply usys_secc_ok_refl; rewrite Hnum; unfold USYS_seccomp; lia)
+              ltac:(sysc_secc_quiet Hnum)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [Hrcpt]").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }

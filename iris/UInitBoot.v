@@ -344,6 +344,7 @@ Section UInitBoot.
             (fun _ => init_boot_bytes) fdt0 W'⌝ -∗
          ⌜uvis_cwd W' = FsImg.ROOTINO⌝ -∗
          ⌜uvis_lazy W' = false⌝ -∗
+         ⌜uvis_secc W' = ProcDefs.secc_all⌝ -∗
          my_pay (uvis_gen W') (fun _ => True)%I -∗ Pay -∗ uslot W') -∗
     (* the taint's generic slot at the (trivial) payload *)
     □ (∀ W' : uvis, T -∗ my_pay (uvis_gen W') (fun _ => True)%I -∗ uslot W') -∗
@@ -362,9 +363,9 @@ Section UInitBoot.
                  1%nat (fun _ => 5%nat) (fun _ => init_boot_bytes) fdt0
                  init_boot_pin_resolves init_elf_loadable
                  with "Hcl Hinv [] [] HPay") as (P Pmiss Fo R) "Hb".
-    - iModIntro. iIntros (W') "%Hok %Hcw %Hlz #Hp HP".
-      iApply ("Hcon" $! W' with "[%] [%] [%] Hp HP");
-        [ exact Hok | exact Hcw | exact Hlz ].
+    - iModIntro. iIntros (W') "%Hok %Hcw %Hlz %Hsc #Hp HP".
+      iApply ("Hcon" $! W' with "[%] [%] [%] [%] Hp HP");
+        [ exact Hok | exact Hcw | exact Hlz | exact Hsc ].
     - (* the taint arm takes the key and nothing else (lane OFF-HAND-6,
          H3): [ExecEntry.image_entry_taint] carries no all-parked row. *)
       iModIntro. iIntros (W') "#HT #Hp". iApply ("Hgen" $! W' with "HT Hp").

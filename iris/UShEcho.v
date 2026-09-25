@@ -1505,6 +1505,7 @@ Section UShEcho.
          [UShKernel.sh_slot_of_kexec]; the caller reads it off
          [SpecKexec.exec_slot_pre]'s wand ([PinnedExec.pex_slot]'s row). *)
       uvis_lazy W' = false ->
+      uvis_secc W' = ProcDefs.secc_all ->
       ⊢ udepw_law 16 -∗
         (* ...and whether the exec'ing process's table held a pipe row
            (design/pipe.md, "The exit path"): echo's run carries it and its
@@ -1515,7 +1516,7 @@ Section UShEcho.
 
   Lemma echo_slot_of_kexec_holds : echo_slot_of_kexec.
   Proof.
-    intros na alen afun sts W' Hok Hroom Hfdl Hlzf.
+    intros na alen afun sts W' Hok Hroom Hfdl Hlzf Hscf.
     destruct (echo_kexec_pages na alen afun sts W' Hok)
       as (Hpc & Hsub & Hx & Hwr & Hrp).
     destruct (echo_kexec_entry_rows na alen afun sts W' Hok Hroom Hfdl Hwr Hrp)
@@ -1527,7 +1528,7 @@ Section UShEcho.
     iAssert (UkRun.urun_nopipe (uvis_fd W')) as "#Hnpw'";
       [ rewrite (kexec_image_ok_fd _ na alen afun sts W' Hok); iExact "Hnpw" | ].
     iApply (echo_uexec_slot W' Hpc Hsub Hx Hroom96 Hal8 Hstkrow Hargsrow
-              Havd Havs Hfdlen Hstop Hlzf
+              Havd Havs Hfdlen Hstop Hlzf Hscf
               with "Hwr Hnpw' Hdep Hmp").
   Qed.
 
@@ -1621,10 +1622,10 @@ Section UShEcho.
     iApply image_entry_of_at. iIntros "!>" (na alen afun) "%Hargs".
     destruct (echo_args_det_holds ws Hok M s0 t g na alen afun Himg Hbytes
                 Hargs) as (Hna & Halen & _).
-    rewrite /image_entry_at. iIntros "!>" (W') "%Hokk _ %Hlzf _ _ Hmp _".
+    rewrite /image_entry_at. iIntros "!>" (W') "%Hokk _ %Hlzf %Hscf _ _ Hmp _".
     iApply (echo_slot_of_kexec_holds na alen afun sts W' Hokk
               (echo_room_of_det ws na alen Hok Hna Halen) Hfdl
-              Hlzf with "Hwr Hnpw Hdep Hmp").
+              Hlzf Hscf with "Hwr Hnpw Hdep Hmp").
   Qed.
 
   (* =================================================================== *)

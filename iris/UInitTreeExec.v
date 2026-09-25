@@ -356,6 +356,7 @@ Section UInitTreeExec.
               (fun _ => init_boot_bytes) fdt0 W'⌝ -∗
            ⌜uvis_cwd W' = FsImg.ROOTINO⌝ -∗
            ⌜uvis_lazy W' = false⌝ -∗
+           ⌜uvis_secc W' = ProcDefs.secc_all⌝ -∗
            my_pay (uvis_gen W') (fun _ => True)%I -∗
            UInitKernel.init_boot_pay (PS := uprogSG_free) (tree_taint c)
              True fsc_cons init_cons_fd (tree_cc c) -∗
@@ -473,6 +474,7 @@ Section UInitTreeExec.
       (fun _ => init_boot_bytes) fdt0 W' ->
     uvis_cwd W' = FsImg.ROOTINO ->
     uvis_lazy W' = false ->
+    uvis_secc W' = ProcDefs.secc_all ->
     app_inv fsc_fs -∗
     tree_own r g FsImg.ROOTINO t -∗
     tree_turn c -∗
@@ -482,11 +484,11 @@ Section UInitTreeExec.
   (* the dance's leaves reach two more of the section's classes than this
      file's other statements do *)
   Proof using GEN fileG0 ghost_varG0 riscvGS0 treeG0 uartGhostG0 ufdG0 xv6G0 Σ.
-    intros Heq Hcons Hkill Hd He Hok Hcw Hlz.
+    intros Heq Hcons Hkill Hd He Hok Hcw Hlz Hscf.
     iIntros "#Hinv Hown Htn Hrd Hmp".
     iDestruct (tree_init_boot_con c r Heq Hcons Hkill) as "#Hcon".
-    iApply ("Hcon" $! W' with "[%] [%] [%] Hmp [Hown Htn Hrd]");
-      [ exact Hok | exact Hcw | exact Hlz | ].
+    iApply ("Hcon" $! W' with "[%] [%] [%] [%] Hmp [Hown Htn Hrd]");
+      [ exact Hok | exact Hcw | exact Hlz | exact Hscf | ].
     iApply (tree_init_boot_pay c r fsc_cons init_cons_fd Heq Hcons Hkill
               with "[Hown] Hrd Htn").
     iApply (tree_init_cons_dance_all c r g t e Heq Hd He with "Hinv Hown").

@@ -314,6 +314,7 @@ Section UInitKernel.
        LAZY-FLAG's K4 puts [uvis_lazy W' = false] on
        [SpecKexec.kexec_image_ok] and on [exec_slot_pre]'s two wands. *)
     uvis_lazy W = false ->
+    uvis_secc W = ProcDefs.secc_all ->
     (* ...AND THE THREE DEPOSITS IT DOES NOT ADMIT FREE: write(16) always,
        open(15) and mknod(17) on the taint arms.  [UkInit.init_deps] is the
        bundle and its header says who owes what. *)
@@ -394,7 +395,7 @@ Section UInitKernel.
     uslot W.
   Proof using .
     intros Hne Hkt Hpc Hsub Hx Hwd Hszd Hbase Hal8 Hroom Hstk Hfdlen Hl0 Hnpk
-           Hstop Hcw Hpsok_free Hlzf.
+           Hstop Hcw Hpsok_free Hlzf Hscf.
     (* [Hdp] LINEARLY, and that is not a style choice: [UkInit.init_deps]
        is persistent, but its [T]-indexed conjuncts send the [Persistent]
        search for the WHOLE bundle off unfolding [udepw]'s wand chain and
@@ -405,7 +406,7 @@ Section UInitKernel.
     iAssert (UkRun.urun_nopipe (uvis_fd W)) as "#Hnpw";
       [ iApply (UkRun.urun_nopipe_intro _ Hnpk) | ].
     iApply (uslot_of_urun_all W (2 + (4 + (12 + (12 + (4 + n0))))) (fun _ => True)%I
-              Hal8 Hroom Hstk Hfdlen Hstop Hlzf with "Hdep Hnpw Hmp").
+              Hal8 Hroom Hstk Hfdlen Hstop Hlzf Hscf with "Hdep Hnpw Hmp").
     (* init's own half of its children set travels with its cwd: nothing
        on init's walk READS it, but fork MOVES it, so the fragment goes
        down the chain index-free ([UserChildren.uch_any]). *)
@@ -506,6 +507,7 @@ Section UInitKernel.
     (* ...and the lazy bit, passed straight through: see [init_uexec_slot].
        Lane LAZY-FLAG's K4 turns it into a reading of [kexec_image_ok]. *)
     uvis_lazy W' = false ->
+    uvis_secc W' = ProcDefs.secc_all ->
     (* the three deposits /init owes, passed straight through: see
        [init_uexec_slot] and [UkInit.init_deps] *)
     UkInit.init_deps T -∗
@@ -537,7 +539,7 @@ Section UInitKernel.
     UkInitMain.kinit_diag_law stc (cc_wp Cr) (cc_wbn Cr) -∗
     my_pay (uvis_gen W') (fun _ => True)%I -∗ uslot W'.
   Proof using .
-    intros Hne Hkt Hok Hroom Hlen Hl0 Hnpk Hcw Hpsok_free Hlzf.
+    intros Hne Hkt Hok Hroom Hlen Hl0 Hnpk Hcw Hpsok_free Hlzf Hscf.
     (* THE MAP STOPS AT THE BREAK, off the image fact's own row --
        [UShKernel.sh_slot_of_kexec]'s note is the reasoning. *)
     pose proof (kexec_image_ok_below _ _ _ _ _ _ Hok) as Hstop.
@@ -634,6 +636,7 @@ Section UInitKernel.
     - exact Hcw.
     - exact Hpsok_free.
     - exact Hlzf.
+    - exact Hscf.
   Qed.
 
   (* ===================================================================== *)
@@ -740,6 +743,7 @@ Section UInitKernel.
          ⌜kexec_image_ok ElfUser.init_elf na alen afun sts W'⌝ -∗
          ⌜uvis_cwd W' = FsImg.ROOTINO⌝ -∗
          ⌜uvis_lazy W' = false⌝ -∗
+         ⌜uvis_secc W' = ProcDefs.secc_all⌝ -∗
          my_pay (uvis_gen W') (fun _ => True)%I -∗
          init_boot_pay T Cns cn stc Cr -∗ uslot W').
   Proof using .
@@ -749,9 +753,9 @@ Section UInitKernel.
        statement's note. *)
     intros Hne Hkt Hroom Hlen Hl0 Hnpk Hpsok.
     iIntros "#Hdp #Hdep #Hxs !>"
-      (W') "%Hok %Hcw %Hlz #Hmp (Hdn & Hrd & Hrd0 & Hbn & #Hblaw & #Hdlaw)".
+      (W') "%Hok %Hcw %Hlz %Hscf #Hmp (Hdn & Hrd & Hrd0 & Hbn & #Hblaw & #Hdlaw)".
     iApply (init_slot_of_kexec T Cns stc Cr cn na alen afun sts W' n0
-              Hne Hkt Hok Hroom Hlen Hl0 Hnpk Hcw Hpsok Hlz
+              Hne Hkt Hok Hroom Hlen Hl0 Hnpk Hcw Hpsok Hlz Hscf
               with "Hdp Hdep Hxs Hdn Hrd Hrd0 Hbn Hblaw Hdlaw Hmp").
   Qed.
 

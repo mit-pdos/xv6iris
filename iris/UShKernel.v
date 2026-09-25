@@ -582,6 +582,7 @@ Section UShKernel.
        LAZY-FLAG's K4 puts [uvis_lazy W' = false] on
        [SpecKexec.kexec_image_ok] and on [exec_slot_pre]'s two wands. *)
     uvis_lazy W = false ->
+    uvis_secc W = ProcDefs.secc_all ->
     (* ...AND ITS TWO IDENTITY ROWS (lane EXEC-SEAM): a freshly exec'd sh
        has NO CHILDREN and is NOT <init>.  Both are read off
        [SpecKexec.exec_slot_pre]'s wands by the caller (init's supply, which
@@ -703,11 +704,11 @@ Section UShKernel.
         ∗ UkSh.ush_wcp Wc Wb (take NSTD (uvis_fd W)) I 0%nat) ∨ T) -∗
     uslot W.
   Proof using .
-    intros Hbd HQc Hpc Hsub Hx Hal8 Hroom Hstk Hfdlen Hstop Hcwd0 Hlzf Hch0 Hpid1.
+    intros Hbd HQc Hpc Hsub Hx Hal8 Hroom Hstk Hfdlen Hstop Hcwd0 Hlzf Hscf Hch0 Hpid1.
     iIntros "#Hpay #Hnpw #Hdep #Hdp #Htag #Hplaw #Hrest #Hfd0 Hin #Hgen #Hmp Hpos
              Hlease Hwcp".
     iApply (uslot_of_urun_all W (2 + (8 + (16 + (ush_Dbody + n0)))) Q
-              Hal8 Hroom Hstk Hfdlen Hstop Hlzf with "Hdep Hnpw Hmp").
+              Hal8 Hroom Hstk Hfdlen Hstop Hlzf Hscf with "Hdep Hnpw Hmp").
     (* sh's own half of its children set travels in [UkSh.ush_pstate]
        beside the ledger and the cwd: fork1 MOVES the set, so the fragment
        goes down the chain index-free ([UserChildren.uch_any]). *)
@@ -858,6 +859,7 @@ Section UShKernel.
        [KexecBuilt]'s coverage row is what will make this a READING of
        [kexec_image_ok] instead of a premise (lane LAZY-FLAG, K4). *)
     uvis_lazy W' = false ->
+    uvis_secc W' = ProcDefs.secc_all ->
     (* ...and the two identity rows, passed straight through: see
        [sh_uexec_slot] (lane EXEC-SEAM) *)
     uvis_ch W' = ∅ ->
@@ -919,7 +921,7 @@ Section UShKernel.
         ∗ UkSh.ush_wcp Wc Wb (take NSTD sts) I 0%nat) ∨ T) -∗
     uslot W'.
   Proof using .
-    intros Hbd HQc Hok Hcwd0 Hroom Hlen Hlzf Hch0 Hpid1.
+    intros Hbd HQc Hok Hcwd0 Hroom Hlen Hlzf Hscf Hch0 Hpid1.
     (* THE MAP STOPS AT THE BREAK, off the image fact's own row: exec built
        a fresh address space, so [KexecBuilt.kxb_perm_below] says it maps
        nothing above the break, which is what lets sh's later [sbrk] see
@@ -1025,6 +1027,7 @@ Section UShKernel.
     - exact Hstop.
     - exact Hcwd0.
     - exact Hlzf.
+    - exact Hscf.
     - exact Hch0.
     - exact Hpid1.
   Qed.
@@ -1157,14 +1160,14 @@ Section UShKernel.
     intros Hbd HQc Hroom Hlen -> Hpid1.
     iIntros "#Hpay #Hnpw #Hdep #Hdp #Htag #Hplaw #Hrest #Hfd0 #Hin #Hgen".
     rewrite /image_entry_at. iIntros "!>" (W')
-      "%Hok %Hcwd0 %Hlzf %Hchq %Hpiq Hmp (Hpos & Hlease & Hwcp)".
+      "%Hok %Hcwd0 %Hlzf %Hscf %Hchq %Hpiq Hmp (Hpos & Hlease & Hwcp)".
     assert (Hch0 : uvis_ch W' = ∅) by exact Hchq.
     assert (Hpid1' : bv_unsigned (uvis_pid W') <> 1)
       by (rewrite Hpiq; exact Hpid1).
     iApply (sh_slot_of_kexec R γp cn T K Q Ql Pm Wc Wb Dsc Hdncr Hdshort
               Dl Hdline Hrl Hpm1 Hpm3 Hpmwb
               Hwc Hwbwc Hwbl Hwbr na alen afun sts W' n0 n Hbd HQc Hok Hcwd0
-              Hroom Hlen Hlzf Hch0 Hpid1'
+              Hroom Hlen Hlzf Hscf Hch0 Hpid1'
               with "[] Hnpw Hdep Hdp Htag Hplaw Hrest Hfd0 [] [] Hmp Hpos Hlease
                     Hwcp").
     - (* the payload at THIS key, off the [∀]-over-keys wand *)

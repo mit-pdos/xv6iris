@@ -710,6 +710,7 @@ Section UEchoOutGen.
     (forall (p : mword 27) (q : uperm), uvis_perm W !! p = Some q ->
        bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W)) ->
     uvis_lazy W = false ->
+    uvis_secc W = ProcDefs.secc_all ->
     (* ...AND THE KEY'S TABLE IS ALL PARKED (lane OFF-HAND-3, R1): this
        program answers for its own offsets ([UkRun.ukn_held] at [empty]),
        and a record may claim that only at a key with no offset half
@@ -735,14 +736,14 @@ Section UEchoOutGen.
     uslot W.
   Proof using ghost_varG0 ghost_varG1 ufdG0.
     intros Halt HQc Hws2 Hst Hargv1 Hl1 Hpc Hsub Hsub2 Hx Hroom Hal8 Hstk Hargs
-           Havd Havs Hfdlen Hstop Hlzf.
+           Havd Havs Hfdlen Hstop Hlzf Hscf.
     iIntros "#Hq #Hpin #Hlk #Hnpw #Hdep Hpay Hc".
     assert (Hsp0 : 0 <= uint (uvis_sp W)) by lia.
     assert (Hargc0 : 0 <= uvis_argc W)
       by exact (proj1 (uka_argc _ _ _ _ _ _ Hargs)).
     iApply (uslot_of_urun_ro W 12 Q
               Hal8
-              ltac:(unfold uvis_sp in Hroom; lia) Hstk Hfdlen Hstop Hlzf
+              ltac:(unfold uvis_sp in Hroom; lia) Hstk Hfdlen Hstop Hlzf Hscf
               with "Hdep Hnpw Hpay").
     iIntros (N h) "%Hpayeq %Hsz Hszf #Ht Hstd _ _ _ #HA Hrun".
     pose proof (ukn_const_of_eq N _ Hpayeq HQc) as Htc.
@@ -960,6 +961,7 @@ Section UEchoOutEcho.
     (forall (p : mword 27) (q : uperm), uvis_perm W !! p = Some q ->
        bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W)) ->
     uvis_lazy W = false ->
+    uvis_secc W = ProcDefs.secc_all ->
     (* ...AND THE KEY'S TABLE IS ALL PARKED (lane OFF-HAND-3, R1): this
        program answers for its own offsets ([UkRun.ukn_held] at [empty]),
        and a record may claim that only at a key with no offset half
