@@ -25,7 +25,12 @@ two-stage corner).  OPEN (C9b2): `lm_hooks (ulm adm)` cannot be built as
 designed -- at an echo pipeline the exec alternative `UP (PLRun
 dg_execL)` is state-DEPENDENT at `cat f | cat` (f may hold those bytes),
 so it cannot be free (`no_free_execL`); FIX (b): split `UP` by producer
-(`UPE`/`UPC`), since an echo pipeline's admission reads no state.
+(`UPE`/`UPC`), since an echo pipeline's admission reads no state.  C9b2
+LANDED (17cc9177c, VM c9b2merge2, audits 13/13/14/14): `ualt := UR | UPE
+| UPC`, `uok_echo_st` (an echo pipeline's admission is state-independent),
+`ufree` (every non-terminal `UPE`; at `UPC` only `PLPanic`, `PLRun []`,
+`PLRun dg_execR`), `ulm_hooks adm : lm_hooks (ulm adm)` with every field
+proved, `ulmU_hooks`.
 
 ## Review amendments (override the plan below)
 
@@ -55,7 +60,28 @@ ruling); FRONTIER print of the decider at C9e; (S3) corner (B) now also
 appears at TWO stages (`cat f | cat`: a cat producer's write error beside
 a printed prefix) -- an honest limit, demo it; (S4) `adm_u` admitting
 only `fname_f` is an input restriction forced by the file model's
-one-name scope -- OWNER RULING needed; (S5) C9d depends on C9e's link
+one-name scope -- RULED (owner, 2026-09-24): WIDEN the file model beyond
+the one name `f`: 'i'd be OK with allowing some set of files, like
+*.txt, if that makes the reasoning simpler.  otherwise, if it's possible
+to cat /sh, then the transcript spec has to say precisely what bytes
+will be dumped out from /sh.  that seems not terribly interesting to
+specify.'  So: a class of user files (e.g. names ending in `.txt`),
+created and read by the user's lines, and NOT the image's binaries.
+ORDER (owner, same day): 'let's land the union app first. then we'll go
+broaden it to *.txt or something.' -- the union lands at the one name
+`f` (`adm_u_f`); the widening is the NEXT effort after C9h;
+SEAMS for the later widening (design/filenames.md §5; they change no
+landed statement): (a) C9e-dec states its canonicalisation through a
+`line_file : uline -> option fname` and two name-locality lemmas, even
+at one name; (b) C9d' gives `UDFile`/`UDIn` a name field pinned to
+`fname_f`; (c) C9d'/C9f state the scope, `stage_catf` and the catf entry
+over a `uname` definition that is `(= fname_f)` for now; (d) C9f states
+argv/diagnostic byte facts positionally over `|g|`, never `ua_len = 1`;
+also AFTER the union (owner, same day): 'add support for grep into the
+pipeline' -- grep as a pipe stage (the first non-cat filter: its output
+is a function of its input, so the copy device generalises to a FILTER
+device whose owed output is `grep_out` of what was read; the owner's
+`GrepTree.v`/`UkGrepTree.v` give grep's tree and entry); (S5) C9d depends on C9e's link
 record: state it over abstract link projections; only the producer `cat
 f` needs a merged registry; (S6) C9f is larger (UShRound's ties call the
 file model directly; PipesFire needs PrCatF); (S7) `pwc_blkN` also
