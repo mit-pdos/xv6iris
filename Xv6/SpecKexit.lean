@@ -58,6 +58,13 @@ and `begin_op(); iput(p->cwd); end_op();`).  Rocq's `bio_ctx`, `log_ctx`,
 the disk fabric and `log_geom_ok` rows are `fsReady`'s projections; its
 `fs_crash_seam` / `gen_cert` are dropped (D11).
 
+THE SLOT'S CHILDREN ROW (D8 wiring, INTERIM, flagged): the ZOMBIE park
+returns the row to the slot at `∅` (`ProcDefs.procDormant`), so the caller
+brings `chFrag V.chg (procAddr j) ∅`.  Rocq's pre takes the row at the
+caller's set `cs` and EMPTIES it under `wait_lock` at the reparent
+(`WaitInv.orphans_own`); that needs the `waitInvResAt` payload, which is the
+next D8 layer, so until then the row comes in already empty.
+
 `initproc` may not exit (the C panics); the premise `procAddr j ≠ ip`
 against the published `initprocIs` is what rules that branch out.
 
@@ -122,6 +129,7 @@ def wp_kexit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
   fsReady (hlc := hlc) ∗ bslots 3 ∗
   fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗
   procPrivFd γ (procAddr j) pid V M ∗ (∃ sts, fdFrags V.fdg sts) ∗
+  chFrag V.chg (procAddr j) ∅ ∗
   (stackOwn k.sp k.avail -∗ stackOwn (V.kstack + 4096#64) 512)
   ⊢ wpLoop (GF := GF) cpu
 
@@ -146,6 +154,7 @@ def wp_kexit_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   fsReady (hlc := hlc) ∗ bslots 3 ∗
   fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗
   procPrivFd γ (procAddr j) pid V M ∗ (∃ sts, fdFrags V.fdg sts) ∗
+  chFrag V.chg (procAddr j) ∅ ∗
   (stackOwn k.sp (trapRes k.sie + k.avail) -∗ stackOwn (V.kstack + 4096#64) 512)
   ⊢ wpLoop (GF := GF) cpu
 
@@ -178,8 +187,8 @@ theorem KEXIT.wp_kexit (A : KEXIT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS
   unfold wp_kexit_body
   rw [hsie, trapRes_off] at h
   simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨Hk, Hpc, Hpi, Htc, Hcl, Hir, Hwl, Hin, Hft, Hpe, Hkl, Hav, Hrdy, Hbs, Hfs, Hirs, Hpr, Hfr, Hcl2⟩
+  iintro ⟨Hk, Hpc, Hpi, Htc, Hcl, Hir, Hwl, Hin, Hft, Hpe, Hkl, Hav, Hrdy, Hbs, Hfs, Hirs, Hpr, Hfr, Hch, Hcl2⟩
   iapply h
-  iframe Hk Hpc Hpi Htc Hcl Hir Hwl Hin Hft Hpe Hkl Hav Hrdy Hbs Hfs Hirs Hpr Hfr Hcl2
+  iframe Hk Hpc Hpi Htc Hcl Hir Hwl Hin Hft Hpe Hkl Hav Hrdy Hbs Hfs Hirs Hpr Hfr Hch Hcl2
 
 end Xv6

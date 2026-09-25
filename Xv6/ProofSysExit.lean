@@ -89,6 +89,7 @@ theorem sysx_kexit (KX : KEXIT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     fsReady (hlc := hlc) ∗ bslots 3 ∗
     fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗
     procPrivFd γ (procAddr j) pid V M ∗ (∃ sts, fdFrags V.fdg sts) ∗
+    chFrag V.chg (procAddr j) ∅ ∗
     (stackOwn sp n -∗ stackOwn (V.kstack + 4096#64) 512)
     ⊢ wpLoop (GF := GF) c := by
   subst hs
@@ -164,7 +165,7 @@ theorem sys_exit_proof (AI : ARGINT) (KX : KEXIT) : SYSEXIT := ⟨
   unfold wp_sys_exit_eb_body
   simp only [sysExitAddr]
   iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hwl, #Hinit, #Hft, #Hpe, #Hkl, Hav, #Hrdy, Hbs, Hfsp, Hirs,
-    Hblk, Hfr, Hcloser⟩
+    Hblk, Hfr, Hch, Hcloser⟩
   icases kctx_tier cpu k $$ Hk with ⟨%hct, Hk⟩
   have ht0 : t0 = KTier.kpt := hct.symm.trans htier
   subst ht0
@@ -245,7 +246,7 @@ theorem sys_exit_proof (AI : ARGINT) (KX : KEXIT) : SYSEXIT := ⟨
         (trapRes k.sie + k.avail - 4) k.sie
         hj ?hpr ?hKx ?hs ?hn2 ?ht hinit ?hsp ?hav)
       $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hwl $Hinit $Hft $Hpe $Hkl $Hav $Hrdy $Hbs $Hfsp $Hirs $Hblk $Hfr
-          $Hcloser]
+          $Hch $Hcloser]
     case hpr => k_norm_g; exact hproc
     case hKx => k_norm_g; unfold sysExitSlots at hK; omega
     case hs => k_norm_g

@@ -298,6 +298,7 @@ theorem ui_finish [X : CurCtx] (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc :=
     kctx cpu kf ∗ pcIs cpu (KA.«userinit» + 0x24#64) ∗ procsInv Γ ∗
     procHeld Γ cpu j USED ch ∗ hartAtAny Γ (procAddr j) ∗ slotUsed Γ (procAddr j) ∗
     procPriv (procAddr j) pid V M ∗ stackOwn (V.kstack + 4096#64) 512 ∗ liveAllow ∗
+    chFrag V.chg (procAddr j) ∅ ∗
     (∀ R5 : RegMap,
       kctx cpu ((kf.popOff.withRegs R5).withLocks (kf.locks.filter (fun x => x ≠ "proc"))) -∗
       pcIs cpu (KA.«userinit» + 0x32#64) -∗ ⌜calleeSaved kf.regs R5⌝ -∗ wpLoop cpu)
@@ -305,7 +306,7 @@ theorem ui_finish [X : CurCtx] (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc :=
   obtain ⟨ξ0, t0⟩ := X
   subst hct
   letI : CurCtx := ⟨ξ0, KTier.kpt⟩
-  iintro ⟨Hk, Hpc, #Hpinv, Hheld, Hhart, #Hused, Hpriv, Hstack, Hal, Hcont⟩
+  iintro ⟨Hk, Hpc, #Hpinv, Hheld, Hhart, #Hused, Hpriv, Hstack, Hal, Hch, Hcont⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   ihave #HlkI := procsInv_lookup Γ j hj $$ Hpinv
   -- open the private block at `p->cwd`
@@ -341,7 +342,7 @@ theorem ui_finish [X : CurCtx] (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc :=
   -- ===== the ghost publish =====
   iapply wpLoop_bupd
   imod (forkret_record Γ cpu _ j pid { V with cwd := kf.regs 10#5 } M hj rfl hctx)
-    $$ [$Hk $Hpinv $Hpriv $Hstack $Hal] with ⟨Hk, HprocCtx⟩
+    $$ [$Hk $Hpinv $Hpriv $Hstack $Hal $Hch] with ⟨Hk, HprocCtx⟩
   imod (pstateWhole_update Γ (procAddr j) USED RUNNABLE) $$ Hwhole with Hwhole
   imodintro
   ihave Hslots := ui_slots_runnable Γ ξ0 (procAddr j) $$ [$Hused $HprocCtx $Hhart]
@@ -426,7 +427,7 @@ theorem ui_publish [X : CurCtx] (RE : RELEASE) (NR : NAMEI_ROOT) (Γ : SchedName
     (∃ w : BitVec 64, wordPointsTo initprocAddr 8 (DFrac.own 1) w) ∗
     isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
     itableInv (hlc := hlc) ∗ iregReg (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ panicEnv ∗
-    irefSlot ∗ liveAllow ∗
+    irefSlot ∗ liveAllow ∗ chFrag V.chg (procAddr j) ∅ ∗
     procHeld Γ cpu j USED ch ∗ hartAtAny Γ (procAddr j) ∗ slotUsed Γ (procAddr j) ∗
     procPriv (procAddr j) pid V M ∗ stackOwn (V.kstack + 4096#64) 512 ∗
     (∀ R5 : RegMap,
@@ -437,7 +438,7 @@ theorem ui_publish [X : CurCtx] (RE : RELEASE) (NR : NAMEI_ROOT) (Γ : SchedName
   obtain ⟨ξ0, t0⟩ := X
   subst hct
   letI : CurCtx := ⟨ξ0, KTier.kpt⟩
-  iintro ⟨Hk, Hpc, #Hpinv, ⟨%w0, Hinit⟩, #Hit, #Hiti, #Hireg, #Hpe, Hir, Hal, Hheld, Hhart, #Hused,
+  iintro ⟨Hk, Hpc, #Hpinv, ⟨%w0, Hinit⟩, #Hit, #Hiti, #Hireg, #Hpe, Hir, Hal, Hch, Hheld, Hhart, #Hused,
     Hpriv, Hstack, Hcont⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- c.mv s1,a0 : s1 = p
@@ -497,7 +498,7 @@ theorem ui_publish [X : CurCtx] (RE : RELEASE) (NR : NAMEI_ROOT) (Γ : SchedName
     simpa [RegMap.set_apply] using h9
   iapply (ui_finish RE Γ cpu (kb.withRegs R3) j ch pid V M hj rfl hctx hs1
       ?hsie2 ?hnoff2 ?hintena2 ?hlocks2 ?htier2 ?hK2)
-    $$ [- $Hk $Hpc $Hpinv $Hheld $Hhart $Hused $Hpriv $Hstack $Hal]
+    $$ [- $Hk $Hpc $Hpinv $Hheld $Hhart $Hused $Hpriv $Hstack $Hal $Hch]
   rotate_right 1
   · iintro %R5 Hk Hpc %hcs5
     have hcs5' : calleeSaved (kb.regs.set 9#5 (procAddr j)) R5 :=
@@ -610,7 +611,7 @@ theorem userinit_proof (AP : ALLOCPROC) (RE : RELEASE) (NR : NAMEI_ROOT) : USERI
             allocprocPriv V ∧ g ≤ procPagetableNodes + 1⌝ ∗
           procHeld Γ cpu j USED ch ∗ hartAtAny Γ (procAddr j) ∗ slotUsed Γ (procAddr j) ∗
           procsAvail Γ (pavDec (some (np + 1))) ∗ procPriv (procAddr j) pid V M ∗ dormantAllow ∗
-          stackOwn (V.kstack + 4096#64) 512 ∗ kallocAvail γk (availSub (some nb) g)))
+          chFrag V.chg (procAddr j) ∅ ∗ stackOwn (V.kstack + 4096#64) 512 ∗ kallocAvail γk (availSub (some nb) g)))
       from by unfold allocprocPost; iintro H; iexact H) $$ Hpost with ⟨Hfail | Hsucc⟩
   · -- the failure arm: no free slot, or no page -- both refuted by the counted regimes
     icases Hfail with ⟨%hf, -, -⟩
@@ -624,7 +625,7 @@ theorem userinit_proof (AP : ALLOCPROC) (RE : RELEASE) (NR : NAMEI_ROOT) : USERI
         · have hnz : nb - gg = 0 := Option.some.inj h
           omega)
   icases Hsucc with
-    ⟨%j, %ch, %pid, %V, %M, %g, %hfacts, Hheld, Hhart, #Hused, Hpav, Hpriv, Hal, Hstack, Hkav⟩
+    ⟨%j, %ch, %pid, %V, %M, %g, %hfacts, Hheld, Hhart, #Hused, Hpav, Hpriv, Hal, Hch, Hstack, Hkav⟩
   -- THE SLOT'S ALLOWANCES: the cwd's unit pays namei's iget, the rest is
   -- parked; the null table's per-descriptor units are dropped at the park
   -- (SpecForkret's deviation)
@@ -645,7 +646,7 @@ theorem userinit_proof (AP : ALLOCPROC) (RE : RELEASE) (NR : NAMEI_ROOT) : USERI
   k_norm [ui_ret_bee]
   iapply (ui_publish RE NR Γ cpu _ j ch pid V M hj rfl hVp.2.2.2.2
       ?ha0 ?hsie2 ?hnoff2 ?hintena2 ?hlocks2 ?htier2 ?hK2 hroot hnib0)
-    $$ [- $Hk $Hpc $Hpinv $Hinit $Hit $Hiti $Hireg $Hpe $Hir $Hal $Hheld $Hhart $Hused $Hpriv $Hstack]
+    $$ [- $Hk $Hpc $Hpinv $Hinit $Hit $Hiti $Hireg $Hpe $Hir $Hal $Hch $Hheld $Hhart $Hused $Hpriv $Hstack]
   rotate_right 1
   · iintro %R5 Hk Hpc %hcs5 #Hinitp
     k_norm [ui_pushOffAt_pushed k hsie, hlocks, ui_filter_one, ui_withLocks_nil k hlocks, ui_ret_c12]

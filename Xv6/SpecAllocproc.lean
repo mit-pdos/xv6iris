@@ -57,7 +57,12 @@ IREFSPARE) ∗ bslots 3` beside the block, and the per-descriptor
 block carries the descriptor table (P2) the per-descriptor units travel in
 the group too.  allocproc never spends them: the caller hands them to the
 new process, and a failure tail gives them straight back to `freeproc`
-(`freeprocIn`). -/
+(`freeprocIn`).
+
+THE SLOT'S CHILDREN ROW (Rocq's `ch_frag (pv_chg (us_V U)) (proc_addr j)
+∅`, D8 wiring) comes out of the dormant block with the rest, at `∅` and at
+the block's own `chg`: allocproc cannot mint it (the authority is
+`wait_lock`'s), so it is the row boot put in the slot. -/
 def allocprocPost {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (γk : KmemNames) (on : Option Nat) (pav : Option Nat) (r : BitVec 64) :
     IProp GF := iprop%
@@ -67,7 +72,8 @@ def allocprocPost {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
   (∃ (j : Nat) (ch : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (g : Nat),
     ⌜r = procAddr j ∧ j < NPROC ∧ 1 ≤ pid.toNat ∧ pid.toNat ≤ PIDMAX ∧ allocprocPriv V ∧ g ≤ procPagetableNodes + 1⌝ ∗
     procHeld Γ cpu j USED ch ∗ hartAtAny Γ (procAddr j) ∗ slotUsed Γ (procAddr j) ∗ procsAvail Γ (pavDec pav) ∗
-    procPriv (procAddr j) pid V M ∗ dormantAllow ∗ stackOwn (V.kstack + 4096#64) 512 ∗
+    procPriv (procAddr j) pid V M ∗ dormantAllow ∗ chFrag V.chg (procAddr j) ∅ ∗
+    stackOwn (V.kstack + 4096#64) 512 ∗
     kallocAvail γk (availSub on g))
 
 /-- **WP of `allocproc`**, at either entry `SIE`.  On success it returns

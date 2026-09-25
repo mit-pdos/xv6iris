@@ -237,9 +237,15 @@ true`): the block invariant's claim is vacuous there, which is what lets
 `allocproc` hand out an empty table with nothing to prove; `freeproc` and
 `kexit`'s park write it (it is not a cell).
 
-Rocq's remaining `proc_dormant` rows -- `ch_frag (pv_chg V) pa ∅`,
-`gen_halves_dorm`, the `p->xstate` half with the ZOMBIE `exit_tok` -- are
-the D8 generation machinery (not ported). -/
+THE SLOT'S CHILDREN ROW (Rocq `ch_frag (pv_chg V) pa ∅`, D8 wiring): born
+once at boot, handed out with the block by allocproc, parked with a newborn
+(its trap residue in Rocq, the newborn record here), brought back by kexit's
+ZOMBIE park at `∅` and returned by freeproc.  Keyed at the block's own
+`chg`, AT `∅` at both states.
+
+Rocq's remaining `proc_dormant` rows -- `gen_halves_dorm`, the `p->xstate`
+half with the ZOMBIE `exit_tok` -- are the rest of the D8 generation
+machinery (not yet wired). -/
 def procDormant (pa : BitVec 64) (st : BitVec 32) : IProp GF := iprop%
   ⌜st = UNUSED ∨ st = ZOMBIE⌝ ∗
   ∃ (V : ProcPriv) (pid : BitVec 32),
@@ -247,7 +253,7 @@ def procDormant (pa : BitVec 64) (st : BitVec 32) : IProp GF := iprop%
       V.pvLazy = true⌝ ∗
     wordPointsTo (pPid pa) 4 pidPriv pid ∗
     procFields pa (DFrac.own 1) V ∗
-    dormantAllow ∗
+    dormantAllow ∗ chFrag V.chg pa ∅ ∗
     dormantSpace st V pid
 
 /-- What slot `i` owes at state `st` besides the lock-protected part

@@ -36,7 +36,9 @@ produces when a scheduler resumes it:
 * the process's private block, and its spare allowances (`liveAllow`:
   `fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗ bslots 3`, wave 7 W7-C -- the rest
   of what its creator took out of the slot's dormant block; Rocq's newborn
-  park carries them into the trap residue, `SpecForkretParkPaid`).
+  park carries them into the trap residue, `SpecForkretParkPaid`), and the
+  slot's children row at `∅` (`chFrag V.chg (procAddr j) ∅`, D8 wiring;
+  Rocq's `UsertrapRes.ut_own` carries it, where fork moves it).
 
 DEVIATION (process layer, flagged, wave 7 W7-C): Rocq's park also carries
 the newborn's file table (`proc_ofiles` at its fresh `pv_fdg`), its fragment
@@ -85,7 +87,7 @@ def wp_forkret_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G 
   pcIs cpu forkretAddr ∗ procsInv Γ ∗ trapCsrs cpu ∗ intrRes cpu ∗
   procHeld Γ cpu j RUNNING ch ∗ hartFull Γ j cpu ∗
   ▷ schedVcAt Γ cpu (cpuCtxAddr cpu) (procAddr j) ∗
-  procPriv (procAddr j) pid V M ∗ liveAllow
+  procPriv (procAddr j) pid V M ∗ liveAllow ∗ chFrag V.chg (procAddr j) ∅
   ⊢ wpLoop (GF := GF) cpu
 
 /-- **The `forkret` boundary** (assumed; the retired `FsEnv` boundary's last sibling): the user-mode

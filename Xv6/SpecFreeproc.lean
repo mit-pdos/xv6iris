@@ -42,11 +42,12 @@ rows): `freeproc` only zeroes cells, so what the UNUSED block it rebuilds
 records of `ofile`/`cwd` has to arrive here.  The trapframe page carries
 its `pageValid` (Rocq `fp_tf`), which is what `kfree` demands of the
 pointer it is handed and which the pagetable arm, when absent, cannot
-supply. -/
+supply.  The slot's children row (`chFrag V.chg pa ∅`, Rocq `fp_rest`'s
+`ch_frag`) passes through into the UNUSED block, at `∅`. -/
 def freeprocIn (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) : IProp GF := iprop%
   ⌜V.ofile = List.replicate NOFILE 0#64 ∧ V.cwd = 0#64⌝ ∗
   wordPointsTo (pPid pa) 4 pidPriv pid ∗ procFields pa (DFrac.own 1) V ∗
-  dormantAllow ∗ stackOwn (V.kstack + 4096#64) 512 ∗
+  dormantAllow ∗ chFrag V.chg pa ∅ ∗ stackOwn (V.kstack + 4096#64) 512 ∗
   (if V.trapframe = 0#64 then emp else
     ⌜V.trapframe = pageAddr V.upt.tfp ∧ pageValid V.trapframe⌝ ∗ tfPageAt V.upt.tfp V.tf) ∗
   (if V.pagetable = 0#64 then emp else
