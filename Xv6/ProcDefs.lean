@@ -258,6 +258,19 @@ def dormantAllow : IProp GF := iprop%
 instance dormantAllow_timeless : Timeless (dormantAllow (GF := GF)) := by
   unfold dormantAllow; infer_instance
 
+/-- **A live process's spare allowances** (Rocq's trap residue rows
+`fd_slots FDSPARE ∗ iref_slots IREFSPARE ∗ bslots 3`, `UsertrapRes.ut_own`):
+what is left of `dormantAllow` once the per-descriptor units sit in the fd
+table and the cwd's unit is spent on the working directory's reference.  A
+newborn's park carries them (`ForkretRecord.newbornPay`); kexit's ZOMBIE park
+returns them to the slot with the descriptors' units and the cwd's.  Ghost
+only, so they cross a context move untouched. -/
+def liveAllow : IProp GF := iprop%
+  fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗ bslots 3
+
+instance liveAllow_timeless : Timeless (liveAllow (GF := GF)) := by
+  unfold liveAllow; infer_instance
+
 /-- A slot nobody runs (UNUSED or ZOMBIE): the private block's cells with
 existential values, no open files, no cwd, and the slot's SUPPLY
 ALLOWANCES (`dormantAllow`: the per-descriptor fd slots, `fdSlots FDSPARE`,

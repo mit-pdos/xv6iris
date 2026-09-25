@@ -33,7 +33,20 @@ produces when a scheduler resumes it:
   handler;
 * `p->lock` HELD at RUNNING with the whole hart tag and the resuming hart's
   parked scheduler record -- what `swtch` handed over;
-* the process's private block.
+* the process's private block, and its spare allowances (`liveAllow`:
+  `fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗ bslots 3`, wave 7 W7-C -- the rest
+  of what its creator took out of the slot's dormant block; Rocq's newborn
+  park carries them into the trap residue, `SpecForkretParkPaid`).
+
+DEVIATION (process layer, flagged, wave 7 W7-C): Rocq's park also carries
+the newborn's file table (`proc_ofiles` at its fresh `pv_fdg`), its fragment
+bundle and its working directory's reference (`cwd_ref_at`), i.e. the whole
+`proc_priv`; the Lean record transports its payload across the context
+move (`ctx_move`, a `CtxMorph`), and the file-layer predicates have no
+`CtxMorph` yet (`FsReady` deviation 8, the D8 park machinery), so the record
+carries the non-fd block `procPriv` and the ghost-only allowances, and the
+creator (kfork / userinit) DROPS the file table and the cwd reference at
+the park.
 
 THE CONTEXT CELLS ARE INSIDE `procPriv` (`procFields` owns them), NOT a
 separate `ownCtxCells`: the record hands its 14 save-area words back to the
@@ -72,10 +85,10 @@ def wp_forkret_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G 
   pcIs cpu forkretAddr ∗ procsInv Γ ∗ trapCsrs cpu ∗ intrRes cpu ∗
   procHeld Γ cpu j RUNNING ch ∗ hartFull Γ j cpu ∗
   ▷ schedVcAt Γ cpu (cpuCtxAddr cpu) (procAddr j) ∗
-  procPriv (procAddr j) pid V M
+  procPriv (procAddr j) pid V M ∗ liveAllow
   ⊢ wpLoop (GF := GF) cpu
 
-/-- **The `forkret` boundary** (assumed, like `Xv6.FsEnv`): the user-mode
+/-- **The `forkret` boundary** (assumed; the retired `FsEnv` boundary's last sibling): the user-mode
 return is out of scope. -/
 class ForkretIs : Prop where
   wp_forkret : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]

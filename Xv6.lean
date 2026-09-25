@@ -241,7 +241,6 @@ import Xv6.ProofUvmunmap
 import Xv6.LinkUvmunmap
 
 import Xv6.WaitLock
-import Xv6.FsEnv
 import Xv6.KstackMap
 import Xv6.UPtFreeLemmas
 import Xv6.ProofFreewalk

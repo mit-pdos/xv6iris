@@ -129,7 +129,8 @@ theorem forkret_resume [ForkretIs] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
     (ξp : CtxId) (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (hj : j < NPROC)
     (hctx : V.context = [forkretAddr, V.kstack + 4096#64] ++ List.replicate 12 0#64) :
-    @procsInv hlc GF _ _ _ _ _ ⟨ξp, KTier.kpt⟩ Γ ∗ procPrivNoctxAt ξp (procAddr j) pid V M ⊢
+    @procsInv hlc GF _ _ _ _ _ ⟨ξp, KTier.kpt⟩ Γ ∗ procPrivNoctxAt ξp (procAddr j) pid V M ∗
+      liveAllow ⊢
       ∀ (h : CPU) (R : RegMap) (spie spp eb' : Bool) (root : BitVec 44),
         ⌜adm none h⌝ -∗ ⌜calleeImg R = V.context⌝ -∗
         @kctx hlc GF _ ⟨ξp, KTier.kpt⟩ _ _ h (resumedK R spie spp 512 eb' root (procAddr j)) -∗
@@ -142,7 +143,7 @@ theorem forkret_resume [ForkretIs] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
           pSched Γ h A' (pContext (procAddr j) 0) cret (hartId h) (procAddr j) back ξp) -∗
         wpLoop h := by
   letI : CurCtx := ⟨ξp, KTier.kpt⟩
-  iintro ⟨#Hpinv, Hnoctx⟩ %h %R %spie %spp %eb' %root %_hadm %hcimg Hk Hpc Hcells Hres
+  iintro ⟨#Hpinv, Hnoctx, Hal⟩ %h %R %spie %spp %eb' %root %_hadm %hcimg Hk Hpc Hcells Hres
   -- the saved `ra` and `sp` ARE `forkret` and the top of the kernel stack
   have hra : R 1#5 = forkretAddr := by
     have hc := congrArg (fun l => l[0]!) hcimg
@@ -168,7 +169,7 @@ theorem forkret_resume [ForkretIs] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
     hj hra hsp
   unfold wp_forkret_body forkretStack at hf
   iapply hf
-  iframe Hk Hpc Htc Hir Hheld Htag Hvc Hpriv
+  iframe Hk Hpc Htc Hir Hheld Htag Hvc Hpriv Hal
   iexact Hpinv
 
 /-! ## The record -/
@@ -181,7 +182,7 @@ def newbornPay (Γ : SchedNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
   @ctxCells hlc GF _ ⟨ξ, KTier.kpt⟩ (pContext (procAddr j) 0) V.context ∗
   @stackOwn hlc GF _ ⟨ξ, KTier.kpt⟩ (V.kstack + 4096#64) 512 ∗
   procPrivNoctxAt ξ (procAddr j) pid V M ∗
-  @procsInv hlc GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ Γ
+  @procsInv hlc GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ Γ ∗ liveAllow
 
 instance instCtxMorphNewbornPay (Γ : SchedNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) : CtxMorph (GF := GF) (newbornPay Γ j pid V M) := by
@@ -189,7 +190,7 @@ instance instCtxMorphNewbornPay (Γ : SchedNames) (j : Nat) (pid : BitVec 32) (V
   exact @instCtxMorphSep hlc GF _ _ _ (instCtxMorphCtxCells _ _ _)
     (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphStackOwn _ _ _)
       (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphProcPrivNoctxAt _ _ _ _)
-        (instCtxMorphProcsInv _)))
+        (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphProcsInv _) (instCtxMorphConst _))))
 
 /-- **THE RECORD OF A NEWBORN PROCESS.**  From `allocproc`'s output -- the
 private block whose saved context is `[forkret, kstack + PGSIZE, 0 x 12]`
@@ -201,12 +202,12 @@ theorem forkret_record [ForkretIs] [X : CurCtx] (Γ : SchedNames) [ClaimIs (hlc 
     (hj : j < NPROC) (hct : curTier = KTier.kpt)
     (hctx : V.context = [forkretAddr, V.kstack + 4096#64] ++ List.replicate 12 0#64) :
     kctx (GF := GF) cpu k ∗ procsInv Γ ∗ procPriv (procAddr j) pid V M ∗
-      stackOwn (V.kstack + 4096#64) 512 ⊢
+      stackOwn (V.kstack + 4096#64) 512 ∗ liveAllow ⊢
       |==> (kctx cpu k ∗ procCtxAt Γ curCtx (procAddr j)) := by
   obtain ⟨ξ0, t0⟩ := X
   subst hct
   letI : CurCtx := ⟨ξ0, KTier.kpt⟩
-  iintro ⟨Hk, #Hpinv, Hpriv, Hstack⟩
+  iintro ⟨Hk, #Hpinv, Hpriv, Hstack, Hal⟩
   -- the creator's own running token, borrowed from its bundle
   icases kctx_token_acc cpu k $$ Hk with ⟨Hown, Hback⟩
   -- a context is born
@@ -214,9 +215,9 @@ theorem forkret_record [ForkretIs] [X : CurCtx] (Γ : SchedNames) [ClaimIs (hlc 
   -- the block comes apart at the save area
   icases (procPriv_split ξ0 (procAddr j) pid V M).1 $$ Hpriv with ⟨Hnoctx, Hcells⟩
   -- and everything the newborn needs moves to its context
-  ihave Hpay : newbornPay Γ j pid V M ξ0 $$ [Hcells Hstack Hnoctx]
+  ihave Hpay : newbornPay Γ j pid V M ξ0 $$ [Hcells Hstack Hnoctx Hal]
   · unfold newbornPay
-    iframe Hcells Hstack Hnoctx
+    iframe Hcells Hstack Hnoctx Hal
     iexact Hpinv
   imod (ctx_move (newbornPay Γ j pid V M) cpu ξ0 ξp) $$ [$Hown $Hp $Hpay]
     with ⟨Hown, Hp, Hpay⟩
@@ -226,9 +227,9 @@ theorem forkret_record [ForkretIs] [X : CurCtx] (Γ : SchedNames) [ClaimIs (hlc 
   isplitl [Hback Hown]
   · iapply Hback $$ Hown
   unfold newbornPay
-  icases Hpay with ⟨Hcells, Hstack, Hnoctx, #Hpinv'⟩
+  icases Hpay with ⟨Hcells, Hstack, Hnoctx, #Hpinv', Hal⟩
   ihave Hrec : validCtx (pSched Γ) ⟨none, pContext (procAddr j) 0, procAddr j, ξp⟩
-      $$ [Hcells Hstack Hnoctx]
+      $$ [Hcells Hstack Hnoctx Hal]
   · iapply validCtx_intro (pSched Γ) ⟨none, pContext (procAddr j) 0, procAddr j, ξp⟩
     iexists V.context, 512
     isplitl []
@@ -238,7 +239,7 @@ theorem forkret_record [ForkretIs] [X : CurCtx] (Γ : SchedNames) [ClaimIs (hlc 
     rw [show V.context[1]! = V.kstack + 4096#64 from by rw [hctx]; rfl]
     iframe Hstack
     iapply forkret_resume Γ ξp j pid V M hj hctx
-    iframe Hnoctx
+    iframe Hnoctx Hal
     iexact Hpinv'
   unfold procCtxAt
   iexists ξp

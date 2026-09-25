@@ -1,16 +1,18 @@
 /-
-Link `userinit`: the proof instance clients import.  `userinit` calls
-`allocproc`, `namei` (the boot arm of the file-system boundary, assumed as
-`FsEnv.nameiBoot`) and `release`; the `allocproc` and `release` interfaces
-stay PARAMETERS here, so a client may close them with the linked ones
-(`LinkAllocproc`, `LinkRelease`) or with its own -- and this file needs no
-`Link*` import of its own.
+Link `userinit`: the proof instance clients import.  Rocq `LinkUserinit.v`:
+`Module Userinit := UserinitProof Allocproc NameiRootBoot Release
+ForkretParkPaid`.  `namei("/")` is the REAL root corner (`NameiRoot`, which
+is also Rocq's `NameiRootBoot`, `Xv6/SpecNamei.lean`'s header; wave 7 W7-C
+retired the assumed `FsEnv.nameiBoot`); the `allocproc` and `release`
+interfaces stay PARAMETERS here.  Rocq's `ForkretParkPaid` is the assumed
+`[ForkretIs]` of the contract (D8 / the trap path).
 -/
 import Xv6.ProofUserinit
+import Xv6.LinkNamei
 
 namespace Xv6
 
 /-- The `userinit` interface, given `allocproc` and `release`. -/
-theorem Userinit (AP : ALLOCPROC) (RE : RELEASE) : USERINIT := userinit_proof AP RE
+theorem Userinit (AP : ALLOCPROC) (RE : RELEASE) : USERINIT := userinit_proof AP RE NameiRoot
 
 end Xv6
