@@ -1065,8 +1065,9 @@ downgrade, never an error.
 **UPDATE (2026-09-25, union C9g):** the application audit is now `make
 audit-union-only` (`iris/UnionAssumptions.v`), which prints
 `UInitUnion.union_adequacy_closed` -- ONE application for `echo ws`,
-`echo ws > f`, `cat f`, `echo ws | cat^n` and `cat f | cat^n` at the
-union model `ulmG` (was `ulmU` before grep) (concrete functor list `unionΣ`, disk at the mkfs
+`echo ws > N`, `cat N`, and pipelines `echo ws | ..` / `cat N | ..` of
+any mix of `cat` and `grep pat` stages, N any `stem.txt` name
+(`FileClass.txt_name`, since W4), at the union model `ulmG` (concrete functor list `unionΣ`, disk at the mkfs
 image).  It must print exactly 14 distinct axioms: the 13 of
 `audit-only` plus `PrimString.length`.  `make audit-all-only` is `audit-only
 audit-union-only`, and CI runs `audit-union-only`.  The file and pipe

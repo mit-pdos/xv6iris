@@ -1,4 +1,4 @@
-# Design: widening the file model to a class of user files (IN PROGRESS: W0-W3 landed)
+# Design: widening the file model to a class of user files (LANDED 2026-09-25, W0-W4: the class is `*.txt`)
 
 Owner ruling (2026-09-24): widen beyond the one name `f` to a class of
 user files (e.g. `*.txt`), not the image's binaries; ORDER: after the
@@ -91,6 +91,35 @@ not-blank); (4) argv words: `UNamePath.cat_words_exec_ok` needs `wl_wf
 `txt_laws` (FileName.v:324-336), the frontier print at
 UnionAssumptions.v:63 comes out.  CLEANUP (no blocker): UCatOut.v's
 file-application code at `LCat_f` (78-528) and UCatLend.v are dead.
+
+W4 LANDED (933cb0715, VM w4final after the commit; audits 13/13/14, the
+`txt_laws` frontier print REMOVED; TCB report runs, its base now includes
+the new low file FileClass.v): THE MODEL'S FILE CLASS IS `stem.txt`.
+`txt_name N := exists stem, N = stem ++ txt_ext /\ wl_word stem /\
+length stem <= 9` (FileClass.v); `FileDisc.uname := txt_name`;
+`FileName.txt_laws` is its law bundle.  `union_adequacy_closed` and
+`union_phi` are byte-identical; the class they name changed.  THE DOT
+ONLY IN FILE-NAME POSITIONS: the partial-line alphabets admit `.`
+(`fbody_byte`, hence `ubyte`; PipesDisc's `psbyte`) because a line being
+typed may end `> a.`; complete lines admit it only in a redirect's
+target, `cat N`'s argument and the `cat N` producer (`fn_word`);
+argv/lexer facts at `fn_word`/`fn_wf` (`ExecWords.exec_ok`, UkShWords,
+UShLexRedir, UkShPipesLex, UkShRedirLine); echo words and grep patterns
+stay `wl_word`, so `echo a.txt` and `| grep a.txt` are refused.  Model
+proofs read the class only through `uname_lex`/`uname_len`; the one-name
+readings (`uname_word`, `lname_word`, `fst_of_dom`, ...) are gone.
+DECIDER: a wire may show a prefix of `cat: cannot open N`, so UnionDecU
+tries the finitely many class names a wire can show (`gcands`; lemmas
+`pmt_trunc`, `pmt_ext`, `pmt_stray_trunc`, `FileClass.txt_prefix_complete`);
+`ud_adm`'s witness is any class name; `lm_disc_ulmG_dec` unchanged.
+Demos (UnionDiscDec.v §3): `demo_txt_ok`/`_cat` (`echo hi > a.txt; cat
+a.txt` prints `hi`), `demo_2f_*` (two independent files),
+`demo_txt_grep`, `demo_txt_neg` (`cat README`, `cat f`, `echo x > sh`,
+`cat /sh`, `cat README | cat`, `echo a.txt`, `echo hi | grep a.txt` not
+admitted).  GOTCHA: `rewrite /nlines .. in H` in a demo makes Qed
+evaluate the input cut lazily for minutes; use the `*_nlines` lemmas
+and `dec_yes`.  THE WIDENING IS COMPLETE.  Open cleanup: the dead
+UCatOut.v/UCatLend.v file-application code.
 
 ## Design: widening the file model from the one name `f` to a class of user files
 
