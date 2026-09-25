@@ -9,7 +9,8 @@ line), `acquire`, `reparent`, `wakeup`, `release` and `sched`.
     80002068: auipc a5,0x8; ld a5,536(a5)          -- a5 = *initproc
     80002070: addi s1,a0,208; addi s2,a0,336       -- s1=&ofile[0], s2=&cwd
     80002078: bne a5,a0,(KernelSyms.«kexit» + 0x3e)                 -- p != initproc: enter loop
-    ...       (panic("init exiting"), NOT taken)
+    ...       auipc a0; addi a0; jal panic       -- p == initproc: panic("init exiting"),
+                                                    LIVE (`kx_init_panic`), as Rocq
     80002088: addi s1,8; beq s1,s2,(KernelSyms.«kexit» + 0x4c); ld a0,0(s1); beqz a0,back;
               jal fileclose; sd zero,0(s1); j back  -- the ofile loop
     8000209c: jal begin_op; ld a0,336(s3); jal iput; jal end_op; sd zero,336(s3)
@@ -80,6 +81,7 @@ import Xv6.SpecRelease
 import Xv6.SpecSched
 import Xv6.SpecReparent
 import Xv6.SpecWakeup
+import Xv6.SpecPanic
 import Xv6.FsCallSitesOp
 import Xv6.ProcPrivAcc
 import Xv6.CodeTactics
@@ -784,7 +786,6 @@ theorem kx_rest (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP) (SC 
     (hV : V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧
       V.pagetable = pageAddr V.upt.root ∧ V.trapframe = pageAddr V.upt.tfp)
     (hlz : V.pvLazy = false → lazyFree V.upt.um V.sz)
-    (hinit : procAddr j ≠ ip)
     (cpu : CPU) (k : KCtx) (hf : kxFrame k j eb status spval availval) :
     kctx cpu k ∗ pcIs cpu (KA.«kexit» + 0x4c#64) ∗ procsInv Γ ∗ trapCsrsExt cpu eb ∗
     cpuClaimExt cpu eb (procAddr j) ∗ panicEnv ∗ fsReady (hlc := hlc) ∗ bslots 3 ∗
@@ -1334,7 +1335,7 @@ theorem kx_after_loop (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (ip : BitVec 64)
     (cs : ExtTreeSet GName compare) (Q : Int → IProp GF)
     (eb : Bool) (status : BitVec 64) (spval : BitVec 64) (availval : Nat)
-    (hinit : procAddr j ≠ ip) (hX : curTier = KTier.kpt) :
+    (hX : curTier = KTier.kpt) :
     kxLoopExit (hlc := hlc) (GF := GF) Γ γ γkl γk j pid V M eb status spval availval
       iprop(fdSlots FDSPARE ∗ irefSlots 3 ∗ panicEnv ∗ stackOwn (spval + 48#64) 6 ∗
         (stackOwn (spval + 48#64) ((trapRes eb + availval) + 6) -∗ stackOwn (V.kstack + 4096#64) 512) ∗
@@ -1354,7 +1355,7 @@ theorem kx_after_loop (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP
   ihave Hirs := (show irefSlot (GF := GF) ∗ irefSlots 3 ⊢ irefSlots IREFSPARE from
     irefSlots_combine 1 3) $$ [Hir Hirs]
   · iframe
-  iapply (kx_rest AC RE RP WU SC BO IP EO Γ γw j hj pid V M ip cs Q eb status spval availval hV hlz hinit
+  iapply (kx_rest AC RE RP WU SC BO IP EO Γ γw j hj pid V M ip cs Q eb status spval availval hV hlz
     c' kk hkk)
   iframe Hk Hpc Hte Hce Hbs Hofile Hfds Hfsp Hirs Hpid Hks Hsz Hpg Htf Hcwd Hcwr Hgen Hname HPt HTf Hframe
     Hcloser Hch HQ
@@ -1382,6 +1383,89 @@ theorem kx_sp48 (sp : BitVec 64) : (sp - 8#64 * BitVec.ofNat 64 6) + 48#64 = sp 
 
 end
 
+/-! ## The live panic arm: `panic("init exiting")` (Rocq `kx_msg*`, ProofKexit.v +0x28 fall) -/
+
+theorem kexit_br_panic : KA.«kexit» + 0xffffffffffffe74a#64 = KA.«panic» := by decide
+
+/-- `auipc a0,0x5` + `addi a0,a0,238` at `+0x2c`: the panic literal. -/
+theorem kx_msg_addr : KA.«kexit» + 0x511a#64 = KStr.«init exiting» := by decide
+
+/-- `init exiting` at `0x80007208` (Rocq `kx_msg`). -/
+def kxMsgStr : List (BitVec 8) :=
+  [0x69#8, 0x6e#8, 0x69#8, 0x74#8, 0x20#8, 0x65#8, 0x78#8, 0x69#8, 0x74#8, 0x69#8,
+   0x6e#8, 0x67#8]
+
+theorem kx_slots_panic (a : Nat) (h : kexitSlots ≤ a) : panicSlots ≤ a - 6 := by
+  have h1 : panicSlots = 56 := by decide
+  rw [kexitSlots_eq] at h
+  omega
+
+section
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+
+set_option maxRecDepth 100000 in
+/-- Rocq's `kx_msg_str`. -/
+theorem kx_cstr_msg [CurCtx] :
+    kmapStatic (GF := GF) ⊢ kernelData -∗ cstr KStr.«init exiting» DFrac.discard kxMsgStr := by
+  iintro #HS #H
+  iapply cstr_intro KStr.«init exiting» DFrac.discard kxMsgStr
+    (by unfold nonul kxMsgStr; decide +kernel)
+  iapply (kernelData_buf KStr.«init exiting» (kxMsgStr ++ [0#8]) (by decide +kernel)) $$ HS H
+
+/-- `panic("init exiting")` as an ordinary call: panic never returns. -/
+theorem kx_panic_call [CurCtx] (PN : PANIC) (c : CPU) (k' : KCtx)
+    (haddr : k'.regs 10#5 = KStr.«init exiting»)
+    (hK : panicSlots ≤ k'.avail) (hnoff : k'.noff + 2 < 2 ^ 31)
+    (hpr : "pr" ∉ k'.locks) (huart : "uart1" ∉ k'.locks) :
+    kctx c k' ∗ pcIs c KA.«panic» ∗ panicEnv ∗
+    cstr KStr.«init exiting» DFrac.discard kxMsgStr ⊢ wpLoop (GF := GF) c := by
+  have h := PN.wp_panic (hlc := hlc) (GF := GF) c k' (PkArgDesc.str DFrac.discard kxMsgStr)
+    hK rfl hnoff hpr huart
+  unfold wp_panic_body at h
+  simp only [panicAddr] at h
+  iintro ⟨Hk, Hpc, #Henv, Hmsg⟩
+  iapply h
+  iframe Hk Hpc
+  isplitl []
+  · iexact Henv
+  unfold pkDescRes
+  rw [haddr]
+  isplitl []
+  · ipureintro; decide
+  · iexact Hmsg
+
+set_option maxHeartbeats 16000000 in
+/-- **`+0x2c .. +0x34`: THE LIVE PANIC ARM** (`p == initproc`): the literal,
+and `panic("init exiting")` as an ordinary call, which never returns (Rocq
+`SpecKexit.v`: "the panic arm is NOT ruled out ... closes at zero cost"). -/
+theorem kx_init_panic [CurCtx] (PN : PANIC) (cpu : CPU) (k : KCtx)
+    (hK : panicSlots ≤ k.avail) (hnoff : k.noff = 0) (hlocks : k.locks = []) :
+    kctx cpu k ∗ pcIs cpu (KA.«kexit» + 0x2c#64) ∗ panicEnv
+    ⊢ wpLoop (GF := GF) cpu := by
+  iintro ⟨Hk, Hpc, #Hpe⟩
+  icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
+  icases kctx_kmapStatic _ _ $$ Hk with ⟨#HS, Hk⟩
+  icases kctx_kernelData _ _ $$ Hk with ⟨#HD, Hk⟩
+  ihave #Hmsg := kx_cstr_msg $$ HS HD
+  -- +0x2c  auipc a0,0x5 ; +0x30  addi a0,a0,238 ; +0x34  jal panic
+  k_step_e (wp_s_auipc cpu _ (KA.«kexit» + 0x2c#64) false 5#20 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  iintro Hk Hpc
+  k_step_e (wp_s_addi cpu _ (KA.«kexit» + 0x30#64) false 238#12 10#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  iintro Hk Hpc
+  k_step_e (wp_s_jal cpu _ (KA.«kexit» + 0x34#64) false 2090774#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kexit_br_panic]
+  iintro Hk Hpc
+  iapply (kx_panic_call PN cpu _ ?pa ?pK ?pn ?ppr ?pu) $$ [$Hk $Hpc $Hpe $Hmsg]
+  case pa => k_norm_g [KCtx.setReg_regs, RegMap.set_apply, KCtx.rget_eq, kx_msg_addr]
+  case pK => k_norm_g [KCtx.setReg_avail]; exact hK
+  case pn => k_norm_g [KCtx.setReg_noff]; simp only [hnoff]; omega
+  case ppr => k_norm_g [KCtx.setReg_locks]; rw [hlocks]; simp
+  case pu => k_norm_g [KCtx.setReg_locks]; rw [hlocks]; simp
+
+end
+
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
@@ -1396,9 +1480,9 @@ prologue, myproc, the ofile scan and the fs window run at the caller's
 index with the complement following the thread (`k_step_e`); see
 `kx_rest` for the join at `acquire(&wait_lock)`. -/
 theorem kexit_proof (MP : MYPROC) (FC : FILECLOSE) (BO : BEGIN_OP) (IP : IPUT) (EO : END_OP)
-    (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP) (SC : SCHED) : KEXIT :=
+    (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP) (SC : SCHED) (PN : PANIC) : KEXIT :=
   ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X Γ _ cpu k γw γl γ γkl γk on j pid V M ip cs Q
-      hj hproc hK hnoff htier hinit => by
+      hj hproc hK hnoff htier => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
   unfold wp_kexit_eb_body
@@ -1515,7 +1599,14 @@ theorem kexit_proof (MP : MYPROC) (FC : FILECLOSE) (BO : BEGIN_OP) (IP : IPUT) (
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [kx_ite_bne, KCtx.rget_eq, KCtx.setReg_regs, RegMap.set_apply, h10]
   iintro Hk Hpc
-  ihave Hpc := kx_pcIs_pos cpu _ _ _ (show ip ≠ procAddr j from fun e => hinit e.symm) $$ Hpc
+  by_cases hinit : ip = procAddr j
+  · -- p IS initproc: panic("init exiting") -- NOT ruled out (Rocq SpecKexit.v's header)
+    ihave Hpc := kx_pcIs_neg cpu _ _ _ (fun h => h hinit) $$ Hpc
+    iapply (kx_init_panic PN cpu _ ?pK ?pn ?pl) $$ [$Hk $Hpc $Hpe]
+    case pK => k_norm_g; exact kx_slots_panic _ hK
+    case pn => k_norm_g; exact hnoff
+    case pl => k_norm_g; exact hlocks
+  ihave Hpc := kx_pcIs_pos cpu _ _ _ hinit $$ Hpc
   -- reassemble the 6-slot frame and re-shape the stack closer
   ihave Hframe : stackOwn (GF := GF) (k.regs 2#5 - 8#64 * BitVec.ofNat 64 6 + 48#64) 6
     $$ [F0 F1 F2 F3 F4 F5]
@@ -1538,7 +1629,7 @@ theorem kexit_proof (MP : MYPROC) (FC : FILECLOSE) (BO : BEGIN_OP) (IP : IPUT) (
         chFrag V.chg (procAddr j) cs ∗
         myPay V.gen Q ∗ (Q (xstateOf (k.regs 10#5)) ∨ (⌜xstateOf (k.regs 10#5) = -1⌝ ∗ killShot V.gen))) rfl
       (kx_after_loop AC RE RP WU SC BO IP EO Γ γw γ γkl γk j hj pid V M ip cs Q k.sie (k.regs 10#5)
-        (k.regs 2#5 - 8#64 * BitVec.ofNat 64 6) (k.avail - 6) hinit rfl)
+        (k.regs 2#5 - 8#64 * BitVec.ofNat 64 6) (k.avail - 6) rfl)
       15 0 (by decide) cpu _ V.ofile ?hkframe ?h9 hoflen (fun i hi => absurd hi (Nat.not_lt_zero i)))
     $$ [- $Hk $Hpc $Hte $Hce $Hft $Hpe $Hcore $Hofs $Hfr $Hpenv $Hfenv $Hir $Hfsp $Hirs $Hframe
         $Hcloser $Hwl $Hinit $Hch $Hmy $HQ]

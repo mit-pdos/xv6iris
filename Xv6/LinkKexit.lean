@@ -16,11 +16,12 @@ import Xv6.LinkSched
 import Xv6.LinkBeginOp
 import Xv6.LinkIput
 import Xv6.LinkEndOp
+import Xv6.LinkPanic
 
 namespace Xv6
 
 /-- The proved `kexit` interface, given the proved `fileclose`. -/
 theorem Kexit (FC : FILECLOSE) : KEXIT :=
-  kexit_proof Myproc FC BeginOp Iput EndOp Acquire Release (Reparent Wakeup) Wakeup Sched
+  kexit_proof Myproc FC BeginOp Iput EndOp Acquire Release (Reparent Wakeup) Wakeup Sched Panic
 
 end Xv6

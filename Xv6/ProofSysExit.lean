@@ -80,7 +80,7 @@ theorem sysx_kexit (KX : KEXIT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (sp : BitVec 64) (n : Nat) (s : Bool) (st : Int)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : kexitSlots ≤ k'.avail)
     (hs : k'.sie = s) (hnoff : k'.noff = 0)
-    (htier : k'.tier = KTier.kpt) (hinit : procAddr j ≠ ip)
+    (htier : k'.tier = KTier.kpt)
     (hsp : k'.regs 2#5 = sp) (hav : trapRes k'.sie + k'.avail = n) (hst : xstateOf (k'.regs 10#5) = st) :
     kctx c k' ∗ pcIs c KA.«kexit» ∗ procsInv Γ ∗
     trapCsrsExt c s ∗ cpuClaimExt c s (procAddr j) ∗
@@ -97,7 +97,7 @@ theorem sysx_kexit (KX : KEXIT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   subst hs
   subst hst
   have h := KX.wp_kexit_eb (hlc := hlc) (GF := GF) Γ c k' γw γl γ γkl γk on j pid V M ip cs Q
-    hj hproc hK hnoff htier hinit
+    hj hproc hK hnoff htier
   unfold wp_kexit_eb_body at h
   simp only [kexitAddr, KCtx.sp, hsp, hav, hproc] at h
   exact h
@@ -170,7 +170,7 @@ set_option maxHeartbeats 64000000 in
 set_option maxRecDepth 20000 in
 theorem sys_exit_proof (AI : ARGINT) (KX : KEXIT) : SYSEXIT := ⟨
   fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X Γ _ cpu k γw γl γ γkl γk on j pid V M ip v cs Q
-      hj hproc hv hK hnoff htier hinit => by
+      hj hproc hv hK hnoff htier => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
   unfold wp_sys_exit_eb_body
@@ -261,7 +261,7 @@ theorem sys_exit_proof (AI : ARGINT) (KX : KEXIT) : SYSEXIT := ⟨
     case' _ => iframe
     iapply (sysx_kexit KX Γ cpu _ γw γl γ γkl γk on j pid V M ip cs Q (k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64)
         (trapRes k.sie + k.avail - 4) k.sie (xstateOf v)
-        hj ?hpr ?hKx ?hs ?hn2 ?ht hinit ?hsp ?hav ?hst)
+        hj ?hpr ?hKx ?hs ?hn2 ?ht ?hsp ?hav ?hst)
       $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hwl $Hinit $Hft $Hpe $Hkl $Hav $Hrdy $Hbs $Hfsp $Hirs $Hblk $Hfr
           $Hch $Hmy $Hpay $Hcloser]
     case hpr => k_norm_g; exact hproc

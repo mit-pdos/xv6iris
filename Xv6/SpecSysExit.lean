@@ -14,8 +14,10 @@ tail is decoded by nobody -- kexit's own contract discharges the rest of
 the function by never handing control back.
 
 THE CONTRACT IS THE UNION OF ITS TWO CALLEES', and kexit's dominates it:
-everything `kexit` asks for (`procsInv`, wait_lock, `initIdentAt`, the
-not-init premise, the whole private block, the file system, the stack
+everything `kexit` asks for (`procsInv`, wait_lock, `initIdentAt`,
+`panicEnv` for the live `panic("init exiting")` arm -- NO not-init premise,
+as in Rocq: init may call exit, and kexit's panic closes that arm at zero
+cost -- the whole private block, the file system, the stack
 closer, the caller's children row `chFrag V.chg pa cs`) is here verbatim,
 and the exit DEPOSIT is Rocq's (`SpecSysExit.v`, batch 8-P): `myPay V.gen Q
 ∗ Q (exitXs V.tf)` -- the payload paid at the status the trapframe carries
@@ -76,7 +78,7 @@ def wp_sys_exit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hv : V.tf[tfArgIdx 0]? = some v)
     (hK : sysExitSlots ≤ k.avail)
     (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
-    (htier : k.tier = KTier.kpt) (hinit : procAddr j ≠ ip) : Prop :=
+    (htier : k.tier = KTier.kpt) : Prop :=
   kctx cpu k ∗ pcIs cpu sysExitAddr ∗ procsInv Γ ∗
   trapCsrs cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ∗
   isLock γw waitLockAddr "wait_lock" waitLockPay ∗ initIdentAt curCtx ip ∗
@@ -102,7 +104,7 @@ def wp_sys_exit_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
     (M : Nat → List (BitVec 8)) (ip v : BitVec 64) (cs : ExtTreeSet GName compare) (Q : Int → IProp GF)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hv : V.tf[tfArgIdx 0]? = some v)
     (hK : sysExitSlots ≤ k.avail) (hnoff : k.noff = 0)
-    (htier : k.tier = KTier.kpt) (hinit : procAddr j ≠ ip) : Prop :=
+    (htier : k.tier = KTier.kpt) : Prop :=
   kctx cpu k ∗ pcIs cpu sysExitAddr ∗ procsInv Γ ∗
   trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
   isLock γw waitLockAddr "wait_lock" waitLockPay ∗ initIdentAt curCtx ip ∗
@@ -126,9 +128,9 @@ structure SYSEXIT : Prop where
     (cpu : CPU) (k : KCtx) (γw γl : GName) (γ : FileNames) (γkl : GName) (γk : KmemNames)
     (on : Option Nat) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (ip v : BitVec 64) (cs : ExtTreeSet GName compare) (Q : Int → IProp GF)
-    hj hproc hv hK hnoff htier hinit,
+    hj hproc hv hK hnoff htier,
     wp_sys_exit_eb_body (hlc := hlc) (GF := GF) Γ cpu k γw γl γ γkl γk on j pid V M ip v cs Q
-      hj hproc hv hK hnoff htier hinit
+      hj hproc hv hK hnoff htier
 
 /-- The interrupts-off instance of `wp_sys_exit_eb`. -/
 theorem SYSEXIT.wp_sys_exit (A : SYSEXIT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
@@ -139,11 +141,11 @@ theorem SYSEXIT.wp_sys_exit (A : SYSEXIT) {hlc : HasLC} {GF : BundledGFunctors} 
     (cpu : CPU) (k : KCtx) (γw γl : GName) (γ : FileNames) (γkl : GName) (γk : KmemNames)
     (on : Option Nat) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (ip v : BitVec 64) (cs : ExtTreeSet GName compare) (Q : Int → IProp GF)
-    hj hproc hv hK hsie hnoff hlocks htier hinit :
+    hj hproc hv hK hsie hnoff hlocks htier :
     wp_sys_exit_body (hlc := hlc) (GF := GF) Γ cpu k γw γl γ γkl γk on j pid V M ip v cs Q
-      hj hproc hv hK hsie hnoff hlocks htier hinit := by
+      hj hproc hv hK hsie hnoff hlocks htier := by
   have h := A.wp_sys_exit_eb (hlc := hlc) (GF := GF) Γ cpu k γw γl γ γkl γk on j pid V M ip v cs Q hj hproc hv hK hnoff
-    htier hinit
+    htier
   unfold wp_sys_exit_eb_body at h
   unfold wp_sys_exit_body
   rw [hsie, trapRes_off] at h

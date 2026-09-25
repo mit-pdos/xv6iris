@@ -81,8 +81,12 @@ xstate half joins `p->lock`'s at the store and is re-split.
 sealed generation, Rocq `initproc ↦₈□ ip ∗ init_ident ip`): the reparent's
 orphan conjunct can only be re-established at an address named as init's.
 
-`initproc` may not exit (the C panics); the premise `procAddr j ≠ ip`
-against the published `initprocIs` is what rules that branch out.
+THE PANIC ARM IS NOT RULED OUT (Rocq `SpecKexit.v`, verbatim in spirit):
+the caller does not have to prove `p ≠ initproc`.  `panic` never returns,
+so the no-postcondition convention closes the `panic("init exiting")` arm
+at zero cost (`SpecPanic`, `panicEnv` above), and the honest reading of the
+contract is "exits the calling process, or panics".  That is what lets the
+syscall dispatcher call `sys_exit` for ANY process, init included.
 
 EITHER ENTRY SIE (`wp_kexit_eb_body`; Rocq `SpecKexit.v`: `cpu_own 0 eb`,
 `trap_csrs_ext eb` / `cpu_claim_ext eb pj` where `eb = true ->` used to
@@ -136,7 +140,7 @@ def wp_kexit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
     (M : Nat → List (BitVec 8)) (ip : BitVec 64) (cs : ExtTreeSet GName compare) (Q : Int → IProp GF)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : kexitSlots ≤ k.avail)
     (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
-    (htier : k.tier = KTier.kpt) (hinit : procAddr j ≠ ip) : Prop :=
+    (htier : k.tier = KTier.kpt) : Prop :=
   kctx cpu k ∗ pcIs cpu kexitAddr ∗ procsInv Γ ∗
   trapCsrs cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ∗
   isLock γw waitLockAddr "wait_lock" waitLockPay ∗ initIdentAt curCtx ip ∗
@@ -162,7 +166,7 @@ def wp_kexit_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     (M : Nat → List (BitVec 8)) (ip : BitVec 64) (cs : ExtTreeSet GName compare) (Q : Int → IProp GF)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : kexitSlots ≤ k.avail)
     (hnoff : k.noff = 0)
-    (htier : k.tier = KTier.kpt) (hinit : procAddr j ≠ ip) : Prop :=
+    (htier : k.tier = KTier.kpt) : Prop :=
   kctx cpu k ∗ pcIs cpu kexitAddr ∗ procsInv Γ ∗
   trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
   isLock γw waitLockAddr "wait_lock" waitLockPay ∗ initIdentAt curCtx ip ∗
@@ -186,9 +190,9 @@ structure KEXIT : Prop where
     (cpu : CPU) (k : KCtx) (γw γl : GName) (γ : FileNames) (γkl : GName) (γk : KmemNames)
     (on : Option Nat) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (ip : BitVec 64) (cs : ExtTreeSet GName compare) (Q : Int → IProp GF)
-    hj hproc hK hnoff htier hinit,
+    hj hproc hK hnoff htier,
     wp_kexit_eb_body (hlc := hlc) (GF := GF) Γ cpu k γw γl γ γkl γk on j pid V M ip cs Q
-      hj hproc hK hnoff htier hinit
+      hj hproc hK hnoff htier
 
 /-- The interrupts-off instance of `wp_kexit_eb` (the complement is the
 whole bundle, the trap reserve is empty). -/
@@ -199,10 +203,10 @@ theorem KEXIT.wp_kexit (A : KEXIT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS
     (cpu : CPU) (k : KCtx) (γw γl : GName) (γ : FileNames) (γkl : GName) (γk : KmemNames)
     (on : Option Nat) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (ip : BitVec 64) (cs : ExtTreeSet GName compare) (Q : Int → IProp GF)
-    hj hproc hK hsie hnoff hlocks htier hinit :
+    hj hproc hK hsie hnoff hlocks htier :
     wp_kexit_body (hlc := hlc) (GF := GF) Γ cpu k γw γl γ γkl γk on j pid V M ip cs Q
-      hj hproc hK hsie hnoff hlocks htier hinit := by
-  have h := A.wp_kexit_eb (hlc := hlc) (GF := GF) Γ cpu k γw γl γ γkl γk on j pid V M ip cs Q hj hproc hK hnoff htier hinit
+      hj hproc hK hsie hnoff hlocks htier := by
+  have h := A.wp_kexit_eb (hlc := hlc) (GF := GF) Γ cpu k γw γl γ γkl γk on j pid V M ip cs Q hj hproc hK hnoff htier
   unfold wp_kexit_eb_body at h
   unfold wp_kexit_body
   rw [hsie, trapRes_off] at h
