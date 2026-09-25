@@ -1,170 +1,174 @@
-# Worklist: seccomp -- the bump to a083670 and `seccomp x` in the union theorem
+# Worklist: seccomp -- `seccomp x` in the union theorem
 
-Design of record: [`../design/seccomp.md`](../design/seccomp.md).
-Opened 2026-09-25.  Read `xv6-bump-playbook.md` before lane K or U.
+Design of record: [`../design/seccomp.md`](../design/seccomp.md) (§9 and
+§10 are the owner's rulings and WIN over §3-§7 where they differ).
+Opened 2026-09-25.  The bump itself (checkpoint 1) is DONE and archived in
+[`../completed/xv6-bump-7b2c1b1.md`](../completed/xv6-bump-7b2c1b1.md).
 
 ## RESUME HERE  (written for a FRESH agent; the session that started this may have died)
 
-OWNER'S CHECKPOINTS (2026-09-25): (1) a CLEAN BUMP to upstream `verified`
-7b2c1b1, the whole tree green, audits 13/13/14, `check-decode`,
-`check-ucode`, `vtest-check-ci`; `sys_seccomp` and `syscall()` at the
-modest specs of design section 4 (a blocked call is the unknown-number
-call; sys_seccomp ands the mask and returns 0); the seccomp user program
-DUMPED AND CATALOGUED BUT NOT VERIFIED and not in the union app -- that
-is lanes K + U merged, committed and PUSHED TO main.  (2) then the
-theorem: lane M's model, the universe slot (S1), the claim arm (S2), the
-seccomp program (S3), the round and the knob (S4).
+CHECKPOINT 1 LANDED (2026-09-25): `main` = `origin/main` = f347775c7 (+ the
+owner's notes commits) is the kernel bump to upstream 7b2c1b1 with the
+mask in the contracts (design §4) merged with the filenames W2/W3/W4
+work; whole tree green on the VM, audits system 13 / union 14 / tree 13
+textually at the baseline, `check-decode` clean, `gen-ucode` unchanged,
+`vtest-check-ci` 77 cases, `xv6-rev-check` ok.  The seccomp binary is
+dumped and catalogued (`UCodeSeccomp.v`, inum 23) but NOT verified and
+not in the union app.
 
-WHERE THINGS ARE (verify with the commands; do not trust this text over
-`git log`):
-- `main` (local and origin) is still at the OLD pin 3e9926e (92cd62067).
-- Branch `secc/bump`, checked out in `/shared/xv6iris-3`: base
-  6c97101b7 (pin a083670, dumps, generated decode layer), c2ee5c64c (pin
-  7b2c1b1: FsImgRaw.v), notes commits, then LANE K's commits (prefix
-  "WIP:" while red).  `git status` there shows lane K's uncommitted
-  sweep edits if it died mid-way; `git diff --stat` says how far.  Its
-  VM tree is /mnt/rocq/trees/_shared_xv6iris-3 (log names in the Lane K
-  status line below; `gcp-rocq/run-on-gcp -q --no-sync bash -c 'ls -t
-  /tmp/*.log | head; tail -3 /tmp/<name>.log'`).
-- Branch `secc/user`, worktree `/shared/xv6iris-3-lanes/secc-user`:
-  DONE (e4a5502f5), rebased on c2ee5c64c: the user-tier relayout, the
-  seccomp binary's dumps/catalog/ELF/fs.img lemmas, `fsimg_live_set` 23.
-  To be MERGED into secc/bump when K's kernel tier is green (`git merge
-  secc/user` in /shared/xv6iris-3; then TreeImg.v's `<=? 22` -> 23 if K
-  has not done it).
-- Branch `secc/model`, worktree `/shared/xv6iris-3-lanes/secc-model`
-  (from 92cd62067, the OLD pin): LANE M in flight (design section 3;
-  status line below); its VM tree is
-  /mnt/rocq/trees/_shared_xv6iris-3-lanes_secc-model.  NOT part of
-  checkpoint 1; rebase onto main after the push.
-- Old dumps for the relayout tools: `git show 92cd62067:kernel-rocq/
-  KernelSyms.v` etc. (the scratchpad copies die with the session);
-  `RELAYOUT_OLD_REV=92cd62067`.
+CHECKPOINT 2 IS THE THEOREM, cut as S0 -> S1 || S2 -> S3 -> S4 (below).
+Lanes run as Opus subagents in their own worktrees under
+`/shared/xv6iris-3-lanes/`, each with a VM mirror
+`/mnt/rocq/trees/_shared_xv6iris-3-lanes_<name>` seeded by copying an
+idle built mirror of its base (`cp -a /mnt/rocq/trees/_shared_… …`),
+then `run-on-gcp -q bash -c '<vmbuild.sh's commands at the mirror path>'`
+FROM the worktree.  Every lane: commit by explicit path (`WIP:` prefix
+while red), no `Admitted`, `Proof using` everywhere, the three audits
+textually at the baseline before it reports, one status paragraph under
+its own heading in THIS file (on a rebase conflict in this file keep
+main's text and re-add your paragraph).
 
-HOW TO FINISH CHECKPOINT 1 if lane K died: read its status line, `git
-log secc/bump`, `git status`; continue its list (section "Lane K" below)
-in /shared/xv6iris-3 with `gcp-rocq/vmbuild.sh xv6iris-3 <log>`; merge
-secc/user; green; the five checks; then `git checkout main && git merge
---ff-only secc/bump` (or a merge commit if main moved: `git fetch
-origin && git rebase origin/main secc/bump` first), `git push origin
-main`.  Then write `claude-notes/completed/xv6-bump-7b2c1b1.md` from the
-Lane K/U status lines and prune this file's checkpoint-1 text.
+WHERE THINGS ARE (trust `git log`/`git worktree list` over this text):
+- `/shared/xv6iris-3`: `secc/bump` = main plus the owner's notes commits.
+  The owner (top-level agent) works here: design, briefs, merges to main.
+- `secc/model`, worktree `secc-model`: lane M, the pure model (§3, §9),
+  DONE and rebased onto main: tip 79c00bfef, green, audits at the
+  baseline.  Owner's answer to its question: the words after `seccomp`
+  ALSO accept file-name words (`fn_wf`, so `seccomp rm a.txt` is a
+  line); S4 widens `secc_ok`.
+- `secc/s0`, worktree `secc-s0`: lane S0 (below), in flight, off main.
+- `secc/s1`, worktree `secc-s1`: lane S1 (below), in flight, off main;
+  merges `secc/s0` for its minter.
+- `secc/s2`, worktree `secc-s2`: lane S2 (below), off 79c00bfef; merges
+  `secc/s0` for its items 1, 5, 6.
+- Then: S3 off S1 + S2 (+ the model); S4 off S3.
+- Origin: every `secc/*` branch is pushed as a safety copy when it
+  reports; `main` moves only at green checkpoints.
 
-THEN CHECKPOINT 2: rebase secc/model onto main; then S1-S4 per design
-sections 5-7 (briefs to be written into this file; the design sections
-are detailed enough to brief from).
+## Lane M -- the pure model (design §3, §9)
 
-## Lane K -- the kernel bump and the mask (design §4)
+Landed at the old pin (e8728827e), rebased onto W3, W4 and main
+(79c00bfef): `LSecc`, `US`, the line-indexed `lm_merge`, the knob `ulm
+adm adm_s` / `ulmG := ulm adm_u_g adm_s_off`, `RSExec`, the knob-generic
+decider, the demos (`echo hi > a.txt`, `seccomp rm a`, power cycle, `cat
+a.txt` prints `hi`; `demo_secc_nodot`; `demo_secc_d4`).  Its detailed
+status (conflicts at each rebase, deviations from §3 -- now accepted as
+§9) is in the `secc/model` branch's copy of this file.
 
-Base state: the pin, dumps and generated layer are already in the tree
-(`make xv6-rev-check`, `make check-decode` show the bump's own diff).
-Old dumps for the tools: `$SCRATCH/old/OldKernelInstrs.v`,
-`OldKernelSyms.v` (the scratchpad path is in the brief).
+## S0 -- the wild credential's plumbing (design §6, §9, §10.1-10.2)
 
-1. Playbook §1-§3: `fix_proof_imms.py --old-image`, `relayout_batch.py`
-   (`--skip` the four reshaped Code files: Syscall, Userinit, Kfork; and
-   there is no old CodeSysSeccomp), the `.rodata` content sweep, the
-   `.data`/`.bss` remap (everything from `started` to `proc` moved +0x30,
-   `tickslock`..`end_` +0x230; SWEEP DECIMAL AND PRE-DIVIDED FORMS), the
-   stride 360 -> 368 wherever a proof spells it (`ProcGeom.proc_size`
-   and any literal 360/`0x168`; the `proc[]` loops in procinit, allocproc,
-   wakeup, kkill, scheduler, procdump, kexit's reparent, kwait).  ONE
-   PASS EACH, from the pre-bump text.
-2. §4's semantic changes: `pv_secc`, `proc_fields`, `uvis_secc`,
-   `skey_eq`, `usys_eff`, `sysc_raw`/`sysc_num`, `uvis_num`,
-   `usys_secc_ok` (LAST rows), `secc_all`, `uvis_num_full`, the pin in
-   `UkRun.urun`, `USYS_seccomp`.
-3. The four reshaped functions: `syscall` (the blocked arm at
-   `sysc_num = 0`; the 23rd table entry), `userinit` (the store of
-   `secc_all`), `kfork` (the copy), `sys_seccomp` (new Spec/Proof/Link/
-   Code + manifest row + `_CoqProject`).  Stack budgets: re-derive from
-   the image (`K_syscall` should not move).
-4. `FsImgCheck`: 23 live inodes.
-5. Build on the VM to green in the KERNEL tier; the user tier is lane U's
-   and goes red only where the user images moved.  Then merge `secc/user`,
-   build to green, `make check-decode`, `make check-ucode`, `make
-   audit-all-only` (13 / 14), `make vtest-check-ci`.
-6. Commit by explicit path; update `xv6-bump-playbook.md` with anything
-   this bump taught; a `completed/xv6-bump-a083670.md` narrative.
+Branch `secc/s0` off main.  Small, cross-cutting, ahead of S1 and S2.
 
-STATUS, Lane K2 (merge of origin/main W2/W3, 2026-09-25): `origin/main`
-6d48ce9d0 (filenames W2/W3) merged into secc/bump as 19ddc4d12 (a merge
-commit; nothing under kernel-rocq/ or user-rocq/ moved).  Five files
-conflicted, all resolved by carrying BOTH sides: UShCatFStage,
-UkCatFEntries, UkUnionEntries (image_entry at `ProcDefs.secc_all` AND
-W3's name/map arguments; echo's file entry keeps `%Hscw` and W3's
-`efany_of .. nm s`), UkFileOpen (six `uvis_of_run .. false secc_all`
-with W3's per-name family arguments), UkShRedirPaid (W3's general-name
-diagnostic windows at the bumped sh's format address 0x12c8, including
-W3's two new lemmas that auto-merged at the pre-bump 0x12b8).  No
-design question arose; no semantic fallout outside the conflicts.
-vmbuild k4r1: COMPILED=100, EXIT=0, zero `Error`, `make -n` 0 compiles
-left.  Audits (/tmp/k4audit.log on the VM): system 13, union 14, tree
-13, textually the baseline and identical to /tmp/k3audit.log.
-`gen-ucode` on the VM: all nine UCode*.v unchanged (md5).  Local
-`make check-decode`: passes.
+1. `RiscvPtsto.app_iface` += `ai_wild : nat -> iProp Σ` (persistent,
+   timeless) and `ai_wild_lic : forall k, ai_wild k ⊢ □ ∀ h H ev,
+   ⌜wild_ev ev⌝ -∗ ⌜cons_hist_ok H⌝ -∗ ⌜cons_ev_ok H ev⌝ -∗ ai_cons k h H
+   ==∗ ai_cons k h (cons_step H ev)` with `wild_ev` true at `EvOut`/`EvRead`
+   only; `riscv_wild := ai_wild riscvF_app_iface`.  The three
+   `MkAppIface` instances at `fun _ => False`.
+2. `WpUart.cons_licence_at k` (same statement), `cons_licence_at_of_licence`,
+   `cons_licence_at_of_wild`; `out_link_of_licence_at`, `cons_read_pay_triv_at`
+   as the general lemmas with the old names as corollaries.
+3. `AppInv.app_rdcred := app_sup ∨ riscv_wild (S gen_id)` under a `GenId`
+   binder; every `cons_dirty_cred app_sup` / `cons_acc _ app_sup _` site
+   (ProofMain's escrow allocation, SpecFileread, SpecSysRead,
+   ProofFileread, FsAbsInvFire, UkReadCons, UShLine) at `app_rdcred`; the
+   generic reader pays `iLeft`.
+4. The shell tier keeps `ush_rd_ret`'s two arms; the read lemmas that turn
+   the dirty credential into `lk_T L` gain the premise `(⊢ riscv_wild (S
+   gen_id) -∗ lk_T L)` (or the one premise `(⊢ app_rdcred -∗ lk_T L)`),
+   discharged at the union and at echo from the `False` instance.  S2
+   replaces that discharge by `iRight` of `lk_T := UT ∨ secc_tok`.
+5. Green; audits 13/14/13; status paragraph; report.
 
-Then W4 (`origin/main` 2eac5dc78, the class is stem.txt) merged as
-5e3e07a19 with NO textual conflict and no semantic fallout (W4 adds no
-binary literal; the files both sides changed carry disjoint edits).
-vmbuild k5r1: COMPILED=208, EXIT=0, zero `Error`, 0 compiles left.
-Audits (/tmp/k5audit.log): 13 / 14 / 13, each list textually identical
-to k4's; the only diff is W4's intended removal of the union file's
-`txt_laws` frontier print.  gen-ucode unchanged; check-decode passes.
+## S1 -- the universe: the generic slot without the taint (design §5, §9)
 
-## Lane U -- the user tier (design §0, §4 last bullet)
+Branch `secc/s1` off main; merges `secc/s0` before item 5.  New file
+`iris/UexecSecc.v` after `UexecExecMint.v`.  Nothing about the claim,
+the model or sh is touched.
 
-1. `make gen-ucode` on the VM against the OLD build (the remote tree's
-   `.vo` are the old pin's; the generator needs only the model and
-   `WpDecodeBridge`/`DecodeTotalU`/`WpRvcBridge`), diff the catalogs:
-   every shift is +8 in text after `usys` and +0x10 in data.
-2. Hand-written user proofs (`Uk*`, `USh*`, `UEcho*`, `UInit*`,
-   `UkAbi`, `ElfUser`): every immediate that crosses the shift boundary
-   (calls from main/ulib into printf/malloc, `auipc/addi` pairs at
-   `digits`), every user DATA address literal, every ELF geometry
-   constant (`sz`, data start, entry rows).  Verify each from the new
-   dump, not by +8.
-3. The seccomp binary: `USER_DUMPS += seccomp:Seccomp`, the four dumps
-   in `user-rocq/_CoqProject`, `ElfUser.seccomp_elf`,
-   `FsImgCheck.fsimg_seccomp_path/type/bytes` at inum 23, a
-   `tools/ucode_seccomp.txt` (main, the stubs it issues, fprintf cone)
-   and the manifest row, `UCodeSeccomp.v` generated.
-4. Deliver as commits on `secc/user`; lane K merges and builds.
+1. Pure: `secc_B := [6;15;17;18;19;20]`, `secc_masked m`,
+   `usys_eff_masked`, `secc_masked_and`.
+2. `wild_pipe γp := inv seccN (∃ s, pipe_qfrag (pn_queue γp) s)`;
+   `secc_row` (inode `False`, pipe `wild_pipe`, device/closed `True`);
+   `secc_key W := ⌜secc_masked (uvis_secc W)⌝ ∗ [∗ list] st ∈ uvis_fd W,
+   secc_row st`; preservation along `usys_fd_ok` (pipe adds two pipe
+   rows, dup copies, close clears, the rest keep), `usys_secc_ok`, the
+   fork child's key, an exec'd key.
+3. The links out of `wild_pipe` at the trivial protocol (`pipe_clink`,
+   `pipe_rchain`, `pipe_wchain`; `PipeProto.pipe_reg_of_inv`'s mould);
+   the deposit rows the universe pays out of them: `fileread_in` /
+   `filewrite_in` / `fileclose_cpay` at a pipe row; console rows via the
+   era licence and `app_rdcred`; inode rows refuted.
+4. `ExecEntry.image_entry_taint T Q X` GENERALISED to take `sts secc` and
+   the pins `⌜uvis_fd W' = sts⌝ -∗ ⌜uvis_secc W' = secc⌝` (~25 sites
+   ignore them).
+5. `useccomp_mint : riscv_wild (S gen_id) -∗ □ uexec_wp -∗ □ (∀ W, □
+   secc_key W -∗ my_pay (uvis_gen W) (fun _ => True) -∗ uslot W)` by Löb
+   on `uexec_dep_F_of_supply` / `uslot_mint_all`'s mould: blocked numbers
+   never reached (`usys_eff_masked`), read/write/close/exit from item 3,
+   chdir from `fsabs_chdir_pre`, exec by the taint-shaped walk at `T :=
+   riscv_wild` with the generalised entry answered from the Löb
+   hypothesis, fork's child from the hypothesis, pipe's `wild_pipe`
+   allocated under the slot's WP, the kill arm at `ukill_cred_at`'s right
+   disjunct (`kill_owed` free at the trivial payload).
+6. Green; audits unchanged; `Print Assumptions useccomp_mint` at the
+   baseline; status paragraph; report.
 
-STATUS (2026-09-25): all four steps landed on `secc/user`.  Catalogs
-regenerated (70 immediates, no shape change; ShK gains `uis_shk_1006`
-because the stale page-straddle omit went away).  Hand-written relayout:
-~4700 literal sites in ~70 files (pc/rodata remaps, `uis_*` renames, the
-70 immediates at their proof sites, sh's two JUMP TABLES' entries --
-data, pc-relative to the moved table -- and the text `filesz` of every
-image).  Seccomp: dumps, `ElfUser.seccomp_elf`, `FsImgCheck` inum 23,
-`UCodeSeccomp.v`.  Checked on the VM against the new dumps: every edited
-file elaborates (`-vos`) except the 9 whose cone reaches K's three red
-kernel proofs (ProofKvminit, ProofSysFork, ProofUserinit); the 57 whose
-`.vo` cone has no kernel Proof/Link file were built as `.vo` (proofs
-run).  `FsImgCheck.fsimg_live_set` 22 -> 23 was made here (a separate
-commit) to build the seccomp byte lemmas; `TreeImg.v`'s `<=? 22` root
-range (lines 27/206/213) is the same fs.img-count class and is K's.
+## S2 -- the claim's terminal arm (design §10; §6 where §10 is silent)
 
-## Lane M -- the pure model (design §3)
+Branch `secc/s2` off lane M's tip 79c00bfef; merges `secc/s0` for items
+1, 5, 6.  The knob stays OFF: `ush_line_union` is `False` at `LSecc`; the
+transition (§10.4) is a lemma that fires only at an admitted `LSecc`.
+Order: 2, 3, 4 first (they need nothing from S0), then merge S0 for 1,
+5, 6, 7.
 
-Worktree at the OLD pin, so the tree is green underneath.
+1. §10.1: `ep_secc` in `era_pins`, `era_full`, `secc_flag`, `secc_tok`
+   (carrying `inp_lb v I0` and `cs_frozen_at v (nlines I0 - 1)`), the
+   absurdity lemma; `ai_wild := secc_tok` at the union's `union_ifc`.
+2. §10.4's generic-tier change: `GenOutHist.gin_pure` += `forall e, e ∈
+   pops -> lm_disc M (le_hist e)`, maintained at `EvClose` from
+   `garm_era`; the echo/pipe instances follow for free.
+3. §10.3: `ucl` redefined under its name (`UT ∨ (UPIN ∗ secc_flag v 0 ∗
+   peclV …) ∨ usecc`); `usecc` as listed; `union_era_split` at `secc_flag v
+   0`; `ucl_taint`; every `ucl_*` lemma, `pblkU_ecl_holds`,
+   `pwc_blkU_file*` re-proved with the third arm closed by REFUTING the
+   presenter off the turn (the pure lemmas about `lm_proc_before` /
+   `lm_proc_stream` this needs go in `LineModel.v` or a sibling; if one
+   refutation is underivable, use §10.3's escape fallback and say so).
+4. The read wrapper's TRANSITION (§10.4) and what the reader gets
+   (`secc_tok`); `ucl_drain` at the third arm (§10.3 last bullet); the
+   echo law at the third arm (refute `lm_disc U h` by D4, or `UT`).
+5. `union_cons_lic` from `UT` unchanged; the wild licence from `secc_tok`
+   (`ai_wild_lic` at the union: third arm closed under `EvOut`/`EvRead`,
+   middle arm refuted by the flag, first arm rebuilt).
+6. §10.5: `lk_T := UT ∨ secc_tok (S gen_id)` at the union's LinkRec and
+   the families/lease that follow; `useccomp_shape`; `uWcu`'s fourth arm,
+   `uWbf`'s wild arm; `uWcu_taint` at `T'`; the wild-arm cases of
+   `uWcu_read` (vacuous through `cs_frozen_at_lb_absurd`), `uWcu_inp`,
+   `uHwbl_u`, `ush_prompt_law_u`, `uHpanic`, `ush_kill_law_u`; the
+   `ush_read_pay_era_at` premises discharged at `T'` (S0's `False`
+   discharge removed).
+7. `UInitUnionCC` / `UInitUnionBoot` / `UShUPipes` / `UkUnionEntries` /
+   `UnionLinks` / `UShURound` follow `Hcons` and the new shapes; the
+   knob-off proof of `union_adequacy_closed` unchanged in statement.
+8. Green; audits 13/14/13; status paragraph; report every refutation
+   lemma by name and any escape you had to take.
 
-1. `LineModel.lm_merge` line-indexed; port `lml_term_merge`,
-   `lml_merge_prefix`, `lm_d4`, the determinacy section, `GenOut`,
-   `PipesDisc`/`PipesDecE`/`UnionDisc`/`UnionDecU` instances.
-2. `FileDisc.uline` gains `LSecc`; the parser; `uline_ws`/`line_body`/
-   `line_file`; every `match` on `uline` in the pure files.
-3. `UnionDisc`: `US`, codes mod 4, `uok`/`ucont`/`ustep`/`uterm`/
-   `upanic`/`ufree`/`umerge`, `ulm adm adm_s`, laws, hooks, `ulmG` at
-   the knob OFF.  `UnionDiscDec` decidability, `UnionDecU`'s decider
-   (canonical `US []`), `UnionView.pview_union` (no pipeline at `LSecc`).
-4. The Iris tier must stay green with the knob off: every law that cases
-   on a `uline` refutes the `LSecc` arm from `uline_ok`; where a lemma is
-   stated over an arbitrary line, add the admitted-line premise its
-   callers already have.  `union_adequacy_closed`'s statement may change
-   only through the model's definitions.
-5. Demos (design §3 last bullet).  Build green, audits 13/14, commit on
-   `secc/model`.
+## S3 -- the seccomp program (design §7, §9) -- brief written when S1 and S2 land
 
-## S1-S4 (after K, U, M land) -- briefs written when they start.
+`UCodeSeccomp.v` is generated.  sh-style proof (fork, wait): the child's
+`seccomp(mask)` at row 23, `exec(argv[1], argv+1)` through the
+taint-shaped walk at `T := secc_tok k` with the generalised
+`image_entry_taint` answered by `useccomp_mint` and the child's
+`secc_key` (the one place the literal mask enters: `secc_masked` of the
+binary's mask, true at upstream 7b2c1b1); the `fprintf` diagnostic and
+`exit(1)`; the parent's `wait(0)`, `exit(0)`; an entry `secc_image_entry`
+whose `Pay` carries `secc_tok k`; `FsSeccPin.v` on `FsGrepPin.v`'s mould.
+
+## S4 -- the round and the knob (design §7, §10.6) -- brief written when S3 lands
+
+`ush_line_union` at `LSecc`; sh's round law at the wild shape (fork twin;
+the exec resolution (W) of `/seccomp`; wait; prompt through the licence);
+init's wild arm on the panic path; `secc_ok` widened to file-name words;
+the knob `adm_s := fun ws => bool_decide (ws <> [])`; the top theorem's
+statement changes only through the model; audits; the completed note.
