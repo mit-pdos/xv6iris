@@ -1679,11 +1679,9 @@ UkFileOpen.v
 UkShRedirAns.v
 UkShRedirPaid.v
 UkShRedirChild.v
-UCatOut.v
 UShCat.v
 UShGrep.v
 UkTreeEntry.v
-UCatLend.v
 UInitTree.v
 UInitTreeCons.v
 UInitTreeBoot.v
