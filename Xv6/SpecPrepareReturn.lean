@@ -130,8 +130,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
 /-- What the caller BRINGS (Rocq `trap_csrs_ext`): nothing at `sie = true`
 (the `csrci` pays it out of the arm), the trap CSRs and the installed
 handler at `sie = false`. -/
-def prepareReturnExt (cpu : CPU) (sie : Bool) : IProp GF :=
-  if sie then iprop(emp) else iprop(trapCsrs cpu ∗ intrRes cpu)
+abbrev prepareReturnExt (cpu : CPU) (sie : Bool) : IProp GF := trapCsrsExt cpu sie
 
 /-- What the function HANDS BACK of the arm besides the cells (Rocq
 `cpu_claim_pay 0`): the running claim at `sie = true`, nothing at `false`

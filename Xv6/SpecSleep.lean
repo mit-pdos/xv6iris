@@ -30,10 +30,11 @@ Imports only definitional files.
 -/
 import Xv6.SchedCtx
 import MachCSL.WpSmodeIntr
+import Iris.ProofMode
 
 namespace Xv6
 
-open Iris Iris.ProgramLogic Iris.BI Std MachCSL
+open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 /-- Address of `sleep`. -/
@@ -57,11 +58,47 @@ def wp_sleep_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
     ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
+/-- **WP of `sleep`, at either entry `SIE`** (Rocq `wp_sleep_sconf_body`):
+the trap bundle `sched` needs is what sleep's own `acquire` pays out plus the
+caller's complement (`trapCsrsExt` / `cpuClaimExt`, emp at `sie = true`),
+handed back at the resuming hart.  Entered at depth 0 (so, by `KCtx.wf`, no
+spinlock held: Rocq's `locks_below lks "proc"` is implied).  It parks, so
+the crossing is the literal `true`. -/
+def wp_sleep_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (j : Nat)
+    (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : sleepSlots ≤ k.avail)
+    (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) : Prop :=
+  kctx cpu k ∗ pcIs cpu sleepAddr ∗ procsInv Γ ∗
+  trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
+  wpNext true k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
+    kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+    trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
+    ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
+  ⊢ wpLoop (GF := GF) cpu
+
 /-- The interface of `sleep`. -/
 structure SLEEP : Prop where
-  wp_sleep : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+  wp_sleep_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (j : Nat) hj hproc hK hsie hnoff hlocks htier,
-    wp_sleep_body (hlc := hlc) (GF := GF) Γ cpu k j hj hproc hK hsie hnoff hlocks htier
+    (cpu : CPU) (k : KCtx) (j : Nat) hj hproc hK hnoff htier,
+    wp_sleep_eb_body (hlc := hlc) (GF := GF) Γ cpu k j hj hproc hK hnoff htier
+
+/-- The interrupts-off instance: the complement is the whole bundle. -/
+theorem SLEEP.wp_sleep (S : SLEEP) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (j : Nat) hj hproc hK hsie hnoff hlocks htier :
+    wp_sleep_body (hlc := hlc) (GF := GF) Γ cpu k j hj hproc hK hsie hnoff hlocks htier := by
+  have h := S.wp_sleep_eb (hlc := hlc) (GF := GF) Γ cpu k j hj hproc hK hnoff htier
+  unfold wp_sleep_eb_body at h
+  unfold wp_sleep_body
+  rw [hsie] at h
+  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
+  iintro ⟨Hk, Hpc, Hpi, Htc, Hcl, Hir, Hnext⟩
+  iapply h
+  iframe Hk Hpc Hpi Htc Hcl Hir
+  iapply wpNext_mono $$ Hnext
+  iintro %cpu' HK %spie %spp %R' Hk Hpc ⟨Htc, Hir⟩ Hcl %hcs
+  iapply HK $$ %spie %spp %R' Hk Hpc Htc Hcl Hir %hcs
 
 end Xv6

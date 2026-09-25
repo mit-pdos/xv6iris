@@ -285,6 +285,95 @@ macro_rules
                k_norm_g [$extra,*]
                try (case hs => k_norm_g)))
 
+/-- Move the trap-CSR complement (`MachCSL.trapCsrsExt` / `cpuClaimExt`, by
+the conventional hypothesis names `Hte` / `Hce`) along a step whose pinning
+fact is `hpin`, then drop the fact.  A no-op for a hypothesis that is absent. -/
+syntax "k_ext_move" : tactic
+set_option hygiene false in
+macro_rules
+  | `(tactic| k_ext_move) =>
+    `(tactic| (try (have hpin' := fun h => hpin (Or.inl h)
+                    try simp only [k_norm_simps] at hpin'
+                    try (ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte)
+                    try (ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce)
+                    clear hpin')
+               clear hpin))
+
+/-- `k_step` at either `SIE`, in a LEVEL-0 stretch of a balanced function:
+the continuation is introduced at a fresh hart that SHADOWS the name `cpu`
+(so the rest of the proof keeps saying `cpu`), and the trap-CSR complement
+`Hte` / `Hce` follows it (`k_ext_move`).  Everything else the proof holds at
+this point must be hart-free. -/
+syntax "k_step_e" term:max " $$ " specPat : tactic
+syntax "k_step_e" term:max " $$ " specPat " with " "[" term,* "]" : tactic
+syntax "k_step_e" term:max " from " term:max ident " $$ " specPat : tactic
+syntax "k_step_e" term:max " from " term:max ident " $$ " specPat " with " "[" term,* "]" : tactic
+
+set_option hygiene false in
+macro_rules
+  | `(tactic| k_step_e $rule:term $$ $pat:specPat) => `(tactic| k_step_e $rule:term $$ $pat:specPat with [])
+  | `(tactic| k_step_e $rule:term $$ $pat:specPat with [$extra,*]) =>
+    `(tactic| (iapply $rule:term $$ $pat:specPat
+               rotate_right 1
+               iframe #
+               k_norm_goal [$extra,*]
+               iframe
+               first
+                 | inext_goal
+                 | (k_norm_g [$extra,*]; iframe; inext_goal)
+               iapply wpNext_intro_pin
+               iintro %cpu %hpin
+               k_ext_move
+               k_norm_g [$extra,*]
+               try (case hs => k_norm_g)))
+  | `(tactic| k_step_e $rule:term from $code:term $ht:ident $$ $pat:specPat) =>
+    `(tactic| k_step_e $rule:term from $code:term $ht:ident $$ $pat:specPat with [])
+  | `(tactic| k_step_e $rule:term from $code:term $ht:ident $$ $pat:specPat with [$extra,*]) =>
+    `(tactic| (iapply $rule:term $$ $pat:specPat
+               rotate_right 1
+               k_code $code:term $ht:ident
+               iframe #
+               k_norm_goal [$extra,*]
+               iframe
+               first
+                 | inext_goal
+                 | (k_norm_g [$extra,*]; iframe; inext_goal)
+               iapply wpNext_intro_pin
+               iintro %cpu %hpin
+               k_ext_move
+               k_norm_g [$extra,*]
+               try (case hs => k_norm_g)))
+
+attribute [ext] KCtx
+
+/-- Re-index the context along an equation of contexts (proved field by
+field with `kctx_ext`). -/
+theorem kctx_eq_mono [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k k' : KCtx) (h : k = k') :
+    kctx (GF := GF) cpu k ⊢ kctx cpu k' := h ▸ .rfl
+
+/-- Close an equation of contexts field by field: `k_norm`'s projections,
+the balanced-pair constructors, the extra lemmas, then `omega`. -/
+syntax "kctx_ext" : tactic
+syntax "kctx_ext" " [" term,* "]" : tactic
+macro_rules
+  | `(tactic| kctx_ext) => `(tactic| kctx_ext [])
+  | `(tactic| kctx_ext [$extra:term,*]) => do
+    let lems ← extra.getElems.mapM fun l => `(Lean.Parser.Tactic.simpLemma| $l:term)
+    `(tactic| (apply KCtx.ext <;>
+               simp only [k_norm_simps, KCtx.pushOffAt, KCtx.withSpie, KCtx.popExit, KCtx.popOff,
+                 KCtx.intrOn, KCtx.pushed, KCtx.withRegs, KCtx.withLocks, $lems,*] <;>
+               first | rfl | omega | skip))
+
+/-- Enter a callee's (or a frame lemma's) `wpNext k.sie k.proc cpu` continuation
+at a fresh hart shadowing `cpu`, moving the complement along. -/
+syntax "k_next_e" : tactic
+set_option hygiene false in
+macro_rules
+  | `(tactic| k_next_e) =>
+    `(tactic| (iapply wpNext_intro_pin
+               iintro %cpu %hpin
+               k_ext_move))
+
 set_option maxHeartbeats 4000000 in
 /-- The standard prologue at `pc`: push two slots, save `ra`/`s0`, `s0 := sp₀`. -/
 theorem wp_prologue2 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)

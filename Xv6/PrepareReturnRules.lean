@@ -224,11 +224,11 @@ theorem prepare_return_flip_res (cpu c : CPU) (sie : Bool) (p : BitVec 64)
       trapCsrs c ∗ intrRes c ∗ prepareReturnPay c sie p := by
   cases sie
   · obtain rfl := hpin (Or.inl rfl)
-    unfold prepareReturnExt prepareReturnPay
+    unfold prepareReturnExt trapCsrsExt prepareReturnPay
     simp only [Bool.false_eq_true, ite_false]
     iintro ⟨_, Hc, Hr⟩
     iframe Hc Hr
-  · unfold prepareReturnExt prepareReturnPay sieArm sieArmP
+  · unfold prepareReturnExt trapCsrsExt prepareReturnPay sieArm sieArmP
     simp only [ite_true]
     iintro ⟨⟨Hc, Hcl, Hr⟩, _⟩
     iframe Hc Hcl

@@ -582,6 +582,13 @@ def KCtx.withSpie (k : KCtx) (spie spp : Bool) : KCtx :=
 theorem KCtx.withSpie_withRegs (k : KCtx) (R : RegMap) (a b : Bool) :
     (k.withRegs R).withSpie a b = (k.withSpie a b).withRegs R := rfl
 
+theorem KCtx.withSpie_twice (k : KCtx) (a b c d : Bool) : (k.withSpie a b).withSpie c d = k.withSpie c d := rfl
+theorem KCtx.withSpie_pushed (k : KCtx) (m : Nat) (a b : Bool) :
+    (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
+theorem KCtx.withSpie_withLocks (k : KCtx) (l : List String) (a b : Bool) :
+    (k.withLocks l).withSpie a b = (k.withSpie a b).withLocks l := rfl
+theorem KCtx.withSpie_pushOffAt (k : KCtx) (a b c d : Bool) : (k.withSpie a b).pushOffAt c d = k.pushOffAt c d := rfl
+
 /-- With interrupts off the pinned bits are the context's own. -/
 theorem KCtx.withSpie_self' (k : KCtx) (a b : Bool) (ha : a = k.spie) (hb : b = k.spp) : k.withSpie a b = k := by
   subst ha hb; cases k; rfl
@@ -618,5 +625,112 @@ theorem KCtx.pushOffAt_popExit (k : KCtx) (a b : Bool) (hwf : k.wf) :
     subst hn hi
     simp only [KCtx.popExit_true, KCtx.pushOffAt, KCtx.popOff, KCtx.intrOn, KCtx.withSpie, KCtx.mk.injEq,
       _root_.true_and, _root_.and_true, trapRes, ite_true, Nat.add_sub_cancel_left]
+
+/-! ## The trap-CSR complement (Rocq `trap_csrs_ext` / `cpu_claim_ext`)
+
+A push/pop-BALANCED function (it acquires at depth 0 and releases before it
+returns) whose interior sleeps needs, inside its critical section, the WHOLE
+trap bundle -- `trapCsrs`, `cpuClaim`, `intrRes` -- at the hart it runs on.
+Its own `acquire` pays out `sieArm cpu k.sie k.proc`: at `sie = true` that
+IS the whole bundle, at `sie = false` it is nothing.  The caller therefore
+brings exactly the COMPLEMENT of what the acquire mints (Rocq
+`IntrDefs.trap_csrs_ext` / `cpu_claim_ext`; Rocq's `trap_csrs` includes
+`intr_res`): nothing at `sie = true`, the bundle at `sie = false` (where the
+caller holds it because the trap handed it over).  So at `sie = true` no
+existing caller gains an obligation, and at `sie = false` the contract is
+the honest pinned one.
+
+`armExt_split` / `armExt_join` move between the two spellings (Rocq
+`arm_pay_ext_split` / `_join`): join after the entry acquire, split before
+the exit release.  The complement is hart-indexed, so a level-0 stretch
+moves it with `trapCsrsExt_move` / `cpuClaimExt_move` (at `sie = false` the
+hart cannot change; at `sie = true` it is `emp`). -/
+
+section
+variable [CurCtx] [KernelGeom] [KernelImage GF]
+
+/-- What a balanced caller brings of the trap CSRs and the installed handler
+(Rocq `trap_csrs_ext`). -/
+def trapCsrsExt (cpu : CPU) (sie : Bool) : IProp GF :=
+  if sie then iprop(emp) else iprop(trapCsrs cpu ∗ intrRes cpu)
+
+/-- What a balanced caller brings of the running claim (Rocq `cpu_claim_ext`). -/
+def cpuClaimExt (cpu : CPU) (sie : Bool) (p : BitVec 64) : IProp GF :=
+  if sie then iprop(emp) else cpuClaim cpu p
+
+@[simp] theorem trapCsrsExt_true (cpu : CPU) : trapCsrsExt (GF := GF) cpu true = iprop(emp) := rfl
+@[simp] theorem trapCsrsExt_false (cpu : CPU) :
+    trapCsrsExt (GF := GF) cpu false = iprop(trapCsrs cpu ∗ intrRes cpu) := rfl
+@[simp] theorem cpuClaimExt_true (cpu : CPU) (p : BitVec 64) : cpuClaimExt (GF := GF) cpu true p = iprop(emp) := rfl
+@[simp] theorem cpuClaimExt_false (cpu : CPU) (p : BitVec 64) :
+    cpuClaimExt (GF := GF) cpu false p = cpuClaim cpu p := rfl
+
+/-- Rocq `arm_pay_ext_split`: the whole bundle is the arm a push at `sie`
+pays out plus the complement. -/
+theorem armExt_split (cpu : CPU) (sie : Bool) (p : BitVec 64) :
+    trapCsrs (GF := GF) cpu ∗ cpuClaim cpu p ∗ intrRes cpu ⊢
+      sieArm cpu sie p ∗ trapCsrsExt cpu sie ∗ cpuClaimExt cpu sie p := by
+  cases sie
+  · unfold sieArm sieArmP
+    simp only [Bool.false_eq_true, ite_false, trapCsrsExt_false, cpuClaimExt_false]
+    iintro ⟨Ht, Hc, Hr⟩
+    iframe Ht Hc Hr
+  · unfold sieArm sieArmP
+    simp only [ite_true, trapCsrsExt_true, cpuClaimExt_true]
+    iintro ⟨Ht, Hc, Hr⟩
+    iframe Ht Hc
+    isplitl [Hr]
+    · unfold intrRes; iexact Hr
+    · isplit <;> iempintro
+
+/-- Rocq `arm_pay_ext_join`. -/
+theorem armExt_join (cpu : CPU) (sie : Bool) (p : BitVec 64) :
+    sieArm (GF := GF) cpu sie p ∗ trapCsrsExt cpu sie ∗ cpuClaimExt cpu sie p ⊢
+      trapCsrs cpu ∗ cpuClaim cpu p ∗ intrRes cpu := by
+  cases sie
+  · simp only [trapCsrsExt_false, cpuClaimExt_false]
+    iintro ⟨-, ⟨Ht, Hr⟩, Hc⟩
+    iframe Ht Hc Hr
+  · unfold sieArm sieArmP
+    simp only [ite_true, trapCsrsExt_true, cpuClaimExt_true]
+    iintro ⟨⟨Ht, Hc, Hr⟩, -, -⟩
+    iframe Ht Hc
+    unfold intrRes; iexact Hr
+
+/-- The complement follows the thread: it can only move where the hart
+cannot (`sie = false` pins it). -/
+theorem trapCsrsExt_move (cpu c : CPU) (sie : Bool) (h : sie = false → c = cpu) :
+    trapCsrsExt (GF := GF) cpu sie ⊢ trapCsrsExt c sie := by
+  cases sie
+  · rw [h rfl]
+  · simp only [trapCsrsExt_true]; exact .rfl
+
+theorem cpuClaimExt_move (cpu c : CPU) (sie : Bool) (p : BitVec 64) (h : sie = false → c = cpu) :
+    cpuClaimExt (GF := GF) cpu sie p ⊢ cpuClaimExt c sie p := by
+  cases sie
+  · rw [h rfl]
+  · simp only [cpuClaimExt_true]; exact .rfl
+
+/-- The pair moved by one hart-pinning fact (the shape `wpNext_intro_pin`
+hands a step's continuation). -/
+theorem armExt_move (cpu c : CPU) (sie : Bool) (p q : BitVec 64) (h : sie = false ∨ q = 0#64 → c = cpu) :
+    trapCsrsExt (GF := GF) cpu sie ∗ cpuClaimExt cpu sie p ⊢ trapCsrsExt c sie ∗ cpuClaimExt c sie p := by
+  iintro ⟨Ht, Hc⟩
+  isplitl [Ht]
+  · iapply trapCsrsExt_move cpu c sie (fun h' => h (Or.inl h')) $$ Ht
+  · iapply cpuClaimExt_move cpu c sie p (fun h' => h (Or.inl h')) $$ Hc
+
+/-- At a balanced pair's release: the arm the entry acquire paid out, and
+the complement, re-split from the bundle so the release takes its share
+(`popArm_sie`). -/
+theorem armExt_popArm (cpu : CPU) (k k' : KCtx) (hp : k'.proc = k.proc) :
+    trapCsrs (GF := GF) cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ⊢
+      popArm cpu k' k.sie ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc := by
+  iintro H
+  icases armExt_split cpu k.sie k.proc $$ H with ⟨Ha, Ht, Hc⟩
+  iframe Ht Hc
+  iapply popArm_sie cpu k k' hp $$ Ha
+
+end
 
 end MachCSL
