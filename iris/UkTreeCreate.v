@@ -517,6 +517,7 @@ Section UkTreeCreate.
               ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
               ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
               ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
+              ltac:(lia) ltac:(discriminate)
               Hal4 with "Hi Hro Hrun Hcwd Hsb").
     iIntros (h' rv W cs') "%Himg %Hk0 %Hk1 %Hk2 %Hcw Hpost Hcwd Hrun".
     iDestruct (spost_at_mknod_elim_tr uslot
@@ -726,6 +727,7 @@ Section UkTreeCreate.
               ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
               ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
               ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
+              ltac:(lia) ltac:(discriminate)
               Hal4 with "Hi Hro Hrun Hcwd Hsb").
     iIntros (h' rv W cs') "%Himg %Hk0 %Hk1 %Hk2 %Hcw Hpost Hcwd Hrun".
     iDestruct (spost_at_mkdir_elim_tr uslot

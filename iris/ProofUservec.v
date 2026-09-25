@@ -1932,7 +1932,7 @@ Section UservecAllPt.
     - (* ...and the children set's row, across the save walk: the guard
          reads the entry frame's a7 word only, and the two frames agree
          there ([ut_ch_kept_cong]). *)
-      refine (SpecUsertrap.ut_ch_kept_cong _ _ _ _ _ _ Hchk2);
+      refine (SpecUsertrap.ut_ch_kept_cong _ _ _ _ _ _ _ Hchk2);
         cbn [us_V pv_tf upd_usM us_tf upd_usV upd_tf];
         unfold UsysMemOk.usys_num, tf_arg_idx, tf_of; reflexivity.
     - (* ...and the generation's, verbatim: neither the save walk nor the
@@ -1944,19 +1944,19 @@ Section UservecAllPt.
          where this boundary speaks [tf_of g].  Those are the same words the
          round above crosses by; restricted to two indices the agreement is
          definitional, so the two side goals close by computation. *)
-      refine (SpecUsertrap.ut_fd_ecall_in _ _ _ _ _ _ _ _ Hfde2);
+      refine (SpecUsertrap.ut_fd_ecall_in _ _ _ _ _ _ _ _ _ Hfde2);
         cbn [us_V pv_tf us_upt upd_upt upd_usV us_tf upd_tf];
         unfold tf_arg_idx, tf_of; reflexivity.
     - (* ...and pipe's join across the same walk.  The trapframe side moves
          by the same two definitional lookups; the IMAGE side is [M] on the
          nose, the very map the entry frame handed in. *)
-      refine (SpecUsertrap.ut_pipe_ecall_in _ _ _ _ _ _ _ _ _ _ Hpipe2);
+      refine (SpecUsertrap.ut_pipe_ecall_in _ _ _ _ _ _ _ _ _ _ _ Hpipe2);
         cbn [us_V pv_tf us_upt upd_upt upd_usV us_tf upd_tf];
         unfold tf_arg_idx, tf_of; reflexivity.
     - (* ...and getpid's answer across the same walk: the row reads the
          entry frame at a7 alone ([SpecUsertrap.ut_ret_pid_in]) and the
          outgoing one at a0, which is the record usertrap left. *)
-      refine (SpecUsertrap.ut_ret_pid_in _ _ _ _ _ _ Hpidr2);
+      refine (SpecUsertrap.ut_ret_pid_in _ _ _ _ _ _ _ Hpidr2);
         cbn [us_V pv_tf us_upt upd_upt upd_usV us_tf upd_tf];
         unfold tf_arg_idx, tf_of; reflexivity.
     - (* the resume pc, straight off usertrap's own row *)

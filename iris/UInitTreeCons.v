@@ -683,6 +683,7 @@ Section UInitTreeCons.
               ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
               ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
               ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
+              ltac:(lia) ltac:(discriminate)
               ltac:(vm_compute; reflexivity)
               with "[] [] Hrun Hcwd [Hown]").
     { iApply (uis_init_3bc with "Hcode"). }

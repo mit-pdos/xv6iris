@@ -346,7 +346,7 @@ Section UkPipeDev.
     iSplitR; [ iFrame "Hmy" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
     iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc')
-      \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow Hpost".
+      "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow Hpost".
     assert (Hlzq : lz' = false)
       by (refine (usys_mem_ok_lazy _ _ _ _ _ _ _ _ _ _ _ _ Hok);
           vm_compute; discriminate).

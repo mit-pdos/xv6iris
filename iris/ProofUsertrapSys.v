@@ -725,7 +725,9 @@ Section UtSysBlock.
              | (cbn [uvis_of uvis_sz]; rewrite HV1sz Hpr3; reflexivity)
              (* ...and the lazy bit: neither epc rewrite touches the block's
                 own field ([ProcDefs.pv_lazy]) *)
-             | (cbn [uvis_of uvis_lazy]; rewrite HV1lz Hpr7; reflexivity) ]. }
+             | (cbn [uvis_of uvis_lazy]; rewrite HV1lz Hpr7; reflexivity)
+             (* ...and the mask, likewise *)
+             | (cbn [uvis_of uvis_secc]; rewrite HV1sc Hpr8; reflexivity) ]. }
          rewrite <- (sbundle_at_cong uslot n fdep (uvis_of U0 sts gn cs pid)
                        (uvis_of (MkUstate V1 (us_M U)) sts gn cs pid) Hkey).
          iExact "Hx". }
@@ -736,7 +738,7 @@ Section UtSysBlock.
        ([UsysMemOk.usys_num_epc]). *)
     2: { rewrite /sysc_fork_in. iIntros "%Hk". cbn [us_V] in Hk.
          iDestruct ("Hfin" with "[%]") as "Hj".
-         { split; [ exact Hscec | rewrite usys_num_epc Hn0; exact Hk ]. }
+         { split; [ exact Hscec | rewrite usys_eff_epc Hn0; exact Hk ]. }
          (* ...AND THE CHILD'S PAYMENT WAND RIDES WITH THE SLOT (lane
             SELF-KILL, §4b'), relayed unchanged. *)
          (* ...AND THE LEND WITH IT (lane FORK-REFUND), beside the slot
@@ -760,12 +762,13 @@ Section UtSysBlock.
              [ exact (Hargw 0%nat ltac:(lia))
              | unfold tf_epc_idx, tf_arg_idx; lia ]. }
          iApply (upay_at_ueq (pv_gen (us_V U0)) (pv_gen V1) uecall_scause
+                   (pv_secc V1)
                    (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))
                    (pv_tf V1) fdep
-                   ltac:(transitivity (usys_num (pv_tf (us_V U0)));
-                         [ apply usys_num_epc | exact Hn0 ])
+                   ltac:(rewrite HV1tf0 Hpr1 !usys_num_epc; reflexivity)
                    Ha0e ltac:(rewrite HV1gen; symmetry; exact Hpr6)).
-         rewrite /upay_at. iFrame "Hmyp". rewrite Hscec. iExact "Hein". } 
+         (* the block's mask across the prologue: one trapframe word moved *)
+         rewrite /upay_at HV1sc Hpr8. iFrame "Hmyp". rewrite Hscec. iExact "Hein". } 
       (* [cpu_own_on_intro] mints the bundle at the literal [∅]; [lks = ∅]
          at depth 0 makes that the set syscall's contract names.  It now
          takes no premise at all -- [cpu_own] carries no caller frame to
@@ -1132,7 +1135,7 @@ Section UtSysBlock.
         with "[Hxo]" as "Hxo".
       { rewrite /ut_exec_out. iIntros "%Hc". destruct Hc as [_ Hc7].
         iDestruct ("Hxo" with "[%]") as "[%Hfail | Hslot]".
-        { cbn [us_V]. rewrite <- Hn0. rewrite usys_num_epc in Hc7. exact Hc7. }
+        { cbn [us_V]. rewrite <- Hn0. rewrite usys_eff_epc in Hc7. exact Hc7. }
         - iLeft. iPureIntro.
           destruct Hfail as (Htf2 & HM2 & Hpi2 & Hsz2 & Hlz2 & Hsts).
           cbn [us_V us_M] in Htf2, HM2, Hpi2, Hsz2, Hlz2.
@@ -1187,7 +1190,7 @@ Section UtSysBlock.
         with "[Hfo]" as "Hfo".
       { rewrite /ut_fork_out /sysc_fork_out. iIntros "%Hc".
         iApply "Hfo". iPureIntro. destruct Hc as [_ Hc7].
-        cbn [us_V]. rewrite <- Hn0. rewrite usys_num_epc in Hc7. exact Hc7. }
+        cbn [us_V]. rewrite <- Hn0. rewrite usys_eff_epc in Hc7. exact Hc7. }
       (* ...AND WAIT'S, on the same terms: one disjunction, one a0 word,
          one guard shorter by the cause ([SpecUsertrap.ut_wait_out]). *)
       (* the row's two readings -- the caller's generation and its status
@@ -1212,7 +1215,7 @@ Section UtSysBlock.
         rewrite <- Hpr4.
         iIntros "%Hc".
         iApply "Hwo". iPureIntro. destruct Hc as [_ Hc7].
-        cbn [us_V]. rewrite <- Hn0. rewrite usys_num_epc in Hc7. exact Hc7. }
+        cbn [us_V]. rewrite <- Hn0. rewrite usys_eff_epc in Hc7. exact Hc7. }
       iAssert (∀ n : Z, ut_sys_out n fdep scv (pv_tf (us_V U0)) U0 sts gn cs pid
                  (pv_tf (us_V (MkUstate V2 M2)) !!! tf_arg_idx 0)
                  (us_M (MkUstate V2 M2))

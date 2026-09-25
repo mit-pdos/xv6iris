@@ -9211,6 +9211,7 @@ Section SyscallMain.
           r <> csp_rs1 -> r <> Rs0 -> r <> Rs1 -> r <> Rs2 ->
           C7 !!! Regidx r = m !!! Regidx r).
       { intros r Hr Ncsp N8 N9 N18.
+        assert (N1 : r <> Rra) by (intro He; rewrite He in Hr; vm_compute in Hr; discriminate).
         assert (N13 : r <> Ra3) by (intro He; rewrite He in Hr; vm_compute in Hr; discriminate).
         assert (N14 : r <> Ra4) by (intro He; rewrite He in Hr; vm_compute in Hr; discriminate).
         assert (N15 : r <> Ra5) by (intro He; rewrite He in Hr; vm_compute in Hr; discriminate).
@@ -9250,7 +9251,7 @@ Section SyscallMain.
                   ltac:(rewrite (rget_ne C7 Ra5 ltac:(vm_compute; discriminate));
                         apply eq_vec_false_iff; intro Hc;
                         apply (f_equal (@bv_unsigned 64)) in Hc;
-                        rewrite HC7a5 Hbit in Hc; vm_compute in Hc; discriminate Hc)
+                        rewrite HC7a5 in Hc; rewrite ?Hbit in Hc; vm_compute in Hc; discriminate Hc)
                   with "Hcg Hpc []").
         { iApply (syci_42 with "Htext"). }
         iIntros (CID21d Hs21d) "Hcg Hpc".
@@ -9306,7 +9307,7 @@ Section SyscallMain.
                   ltac:(vm_compute; discriminate)
                   ltac:(rewrite (rget_ne C7 Ra5 ltac:(vm_compute; discriminate));
                         apply eq_vec_true_iff; apply bv_eq;
-                        rewrite HC7a5 Hbit; vm_compute; reflexivity)
+                        rewrite HC7a5; rewrite ?Hbit; vm_compute; reflexivity)
                   ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (syci_42 with "Htext"). }

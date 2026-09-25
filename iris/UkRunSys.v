@@ -3823,7 +3823,7 @@ Section UkRunSys.
     iSplitR; [ iFrame "Hmy" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
     iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc')
-      \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow Hpost".
+      "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow Hpost".
     (* THE LAZY BIT CROSSED THE TRAP UNCHANGED (lane LAZY-FLAG, L6).  The
        trapping key is at [false] -- the U tier's run is
        ([UexecRet.ukcq]) -- and every row but sbrk's is the equation
@@ -4136,7 +4136,7 @@ Section UkRunSys.
     iSplitR; [ iFrame "Hmy" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
     iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc')
-      \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow Hpost".
+      "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow Hpost".
     (* THE LAZY BIT CROSSED THE TRAP UNCHANGED (lane LAZY-FLAG, L6).  The
        trapping key is at [false] -- the U tier's run is
        ([UexecRet.ukcq]) -- and every row but sbrk's is the equation
@@ -4248,6 +4248,9 @@ Section UkRunSys.
     n <> USYS_wait -> n <> USYS_pipe -> n <> USYS_read -> n <> USYS_fstat ->
     n <> USYS_close -> n <> USYS_dup -> n <> USYS_open ->
     n <> USYS_chdir ->
+    (* ...and a number the full mask passes, not seccomp's
+       ([wp_uk_ecall_quiet]'s two rows) *)
+    (0 <= n < 64)%Z -> n <> USYS_seccomp ->
     is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
     uinstr_is (ukn_t N) pc false (ECALL tt) -∗
     urun N h m pc avail -∗
@@ -4265,7 +4268,7 @@ Section UkRunSys.
        mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
-    intros Hn Hexit Hfork Hexec Hsbrk H3 H4 H5 H8 Hcl Hdp Hop Hcd Hal4.
+    intros Hn Hexit Hfork Hexec Hsbrk H3 H4 H5 H8 Hcl Hdp Hop Hcd Hrng Hn23 Hal4.
     iIntros "#Hi Hrun Hcwd Hsb Hcont".
     iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs pidv) "(%Hlo & %Hpm & %Hlzf & %HRut & Hheap & Hstk & Hufd & Hcwda & Hcha & #Hmy & #Hdep & #Hnpx & Hb)".
     iDestruct (ucwd_agree with "Hcwda Hcwd") as %->.
@@ -4299,7 +4302,7 @@ Section UkRunSys.
     iSplitR; [ iFrame "Hmy" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
     iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc')
-      \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow Hpost".
+      "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow Hpost".
     (* THE LAZY BIT CROSSED THE TRAP UNCHANGED (lane LAZY-FLAG, L6).  The
        trapping key is at [false] -- the U tier's run is
        ([UexecRet.ukcq]) -- and every row but sbrk's is the equation
@@ -4590,7 +4593,7 @@ Section UkRunSys.
     iSplitR; [ iFrame "Hmy" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
     iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc')
-      \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow Hpost".
+      "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow Hpost".
     (* THE LAZY BIT, THE CWD, THE GENERATION AND THE CHILDREN ALL CROSSED
        THE TRAP UNCHANGED: 16 is none of the rows that move them. *)
     assert (Hlzq : lz' = false)
@@ -5035,7 +5038,7 @@ Section UkRunSys.
     iSplitR; [ iFrame "Hmy" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
     iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc')
-      \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow Hpost".
+      "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow Hpost".
     (* THE LAZY BIT CROSSED THE TRAP UNCHANGED (lane LAZY-FLAG, L6).  The
        trapping key is at [false] -- the U tier's run is
        ([UexecRet.ukcq]) -- and every row but sbrk's is the equation
@@ -5291,7 +5294,7 @@ Section UkRunSys.
     iSplitR; [ iFrame "Hmy" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
     iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc')
-      \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow Hpost".
+      "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow Hpost".
     (* THE LAZY BIT CROSSED THE TRAP UNCHANGED (lane LAZY-FLAG, L6).  The
        trapping key is at [false] -- the U tier's run is
        ([UexecRet.ukcq]) -- and every row but sbrk's is the equation
@@ -5433,6 +5436,9 @@ Section UkRunSys.
     n <> USYS_wait -> n <> USYS_pipe -> n <> USYS_read -> n <> USYS_fstat ->
     n <> USYS_close -> n <> USYS_dup -> n <> USYS_open ->
     n <> USYS_chdir ->
+    (* ...and a number the full mask passes, not seccomp's
+       ([wp_uk_ecall_quiet]'s two rows) *)
+    (0 <= n < 64)%Z -> n <> USYS_seccomp ->
     is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
     uinstr_is (ukn_t N) pc false (ECALL tt) -∗
     (* the caller's own PERSISTENT view of a piece of its image *)
@@ -5454,7 +5460,7 @@ Section UkRunSys.
        mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
-    intros Hn Hexit Hfork Hexec Hsbrk H3 H4 H5 H8 Hcl Hdp Hop Hcd Hal4.
+    intros Hn Hexit Hfork Hexec Hsbrk H3 H4 H5 H8 Hcl Hdp Hop Hcd Hrng Hn23 Hal4.
     iIntros "#Hi #Himg Hrun Hcwd Hsb Hcont".
     iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs pidv) "(%Hlo & %Hpm & %Hlzf & %HRut & Hheap & Hstk & Hufd & Hcwda & Hcha & #Hmy & #Hdep & #Hnpx & Hb)".
     iDestruct (ucwd_agree with "Hcwda Hcwd") as %->.
@@ -5495,7 +5501,7 @@ Section UkRunSys.
     iSplitR; [ iFrame "Hmy" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
     iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc')
-      \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow Hpost".
+      "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow Hpost".
     (* THE LAZY BIT CROSSED THE TRAP UNCHANGED (lane LAZY-FLAG, L6).  The
        trapping key is at [false] -- the U tier's run is
        ([UexecRet.ukcq]) -- and every row but sbrk's is the equation

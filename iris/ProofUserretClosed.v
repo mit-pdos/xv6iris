@@ -795,7 +795,7 @@ Section UserretClosed.
                  (* ...AND WHAT THE RESUME PROVES, at the U tier's spelling
                     (lane TRAP-ROWS, T2(iii)) *)
                  ltac:(intro Hec;
-                       exact (SpecUsertrap.uexec_live_ok_of_live _ _ _ _ _ Hec Hlv))
+                       exact (SpecUsertrap.uexec_live_ok_of_live _ _ _ _ _ _ Hec Hlv))
                  Hround'
                  (* ...AND THE SYSCALL'S ARMED POST, back under the arm's own
                     [∀ r], AT THE FAMILIES THE DEPOSIT WAS MADE AT ([fdep],
@@ -815,7 +815,7 @@ Section UserretClosed.
                                (ret_pc (tf_w (uvis_tf W) tf_epc_idx))))
                      with "[%]") as "Hso";
         [ split_and!;
-          [ exact Hgec | reflexivity | exact Hgex | exact Hgfk ] |];
+          [ exact Hgec | (rewrite -Hsc0k; reflexivity) | exact Hgex | exact Hgfk ] |];
         iEval (rewrite (spost_at_cong uslot
                  (usys_eff (uvis_secc W) (tf_of (tf_resume_gpr0 (uvis_tf W))
                     (ret_pc (tf_w (uvis_tf W) tf_epc_idx)))) fdep

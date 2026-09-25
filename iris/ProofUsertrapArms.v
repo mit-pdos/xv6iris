@@ -727,13 +727,13 @@ Section Ut56.
     iAssert (ut_fork_out fdep scv (pv_secc (us_V U0))
                (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))
                (pv_tf (us_V U) !!! tf_arg_idx 0) cs cs) as "Hfo".
-    { iApply (ut_fork_out_quiet _ _ _ _ _ _ Hnec). }
+    { iApply (ut_fork_out_quiet _ _ _ _ _ _ _ Hnec). }
     (* ...and wait's, refuted through the same cause *)
     iAssert (ut_wait_out scv (pv_secc (us_V U0))
                (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))
                (us_M U0) (us_M U)
                (pv_tf (us_V U) !!! tf_arg_idx 0) cs cs gn pid) as "Hwo".
-    { iApply (ut_wait_out_quiet _ _ _ _ _ _ _ _ _ Hnec). }
+    { iApply (ut_wait_out_quiet _ _ _ _ _ _ _ _ _ _ Hnec). }
     iAssert (∀ n : Z, ut_sys_out n fdep scv (pv_tf (us_V U0)) U0 sts gn cs pid
                (pv_tf (us_V U) !!! tf_arg_idx 0) (us_M U) sts
                (pv_cwi (us_V U)) cs)%I as "Hso".
@@ -1221,7 +1221,7 @@ Section UtD0.
       assert (HV'tf : pv_tf V' = pv_tf (us_V U))
         by (rewrite /V'; destruct (us_V U); reflexivity).
       assert (Hrd' : ut_round epv scv U0 (MkUstate V' (us_M U))).
-      { refine (ut_round_same epv scv U0 U (MkUstate V' (us_M U)) _ _ eq_refl _ _ _ Hrd).
+      { refine (ut_round_same epv scv U0 U (MkUstate V' (us_M U)) _ _ eq_refl _ _ _ _ Hrd).
         - cbn [us_V]. exact HV'tf.
         - cbn [us_V]. rewrite HV'upt HV'sz.
           exact (perm_of_uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) Pd Hextd).
@@ -1229,6 +1229,8 @@ Section UtD0.
         - cbn [us_V]. rewrite /V'; destruct (us_V U); reflexivity.
         (* the lazy bit: vmfault writes a leaf, not a block field
            ([ProcDefs.pv_lazy]) -- lane LAZY-FLAG *)
+        - cbn [us_V]. rewrite /V'; destruct (us_V U); reflexivity.
+        (* ...nor the mask *)
         - cbn [us_V]. rewrite /V'; destruct (us_V U); reflexivity. }
       iAssert (ut_exec_out fdep scv (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0))) (us_M U0)
                  (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
@@ -1240,13 +1242,13 @@ Section UtD0.
     iAssert (ut_fork_out fdep scv (pv_secc (us_V U0))
                (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))
                (pv_tf (us_V U) !!! tf_arg_idx 0) cs cs) as "Hfo".
-    { iApply (ut_fork_out_quiet _ _ _ _ _ _ Hnec). }
+    { iApply (ut_fork_out_quiet _ _ _ _ _ _ _ Hnec). }
     (* ...and wait's, refuted through the same cause *)
     iAssert (ut_wait_out scv (pv_secc (us_V U0))
                (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))
                (us_M U0) (us_M U)
                (pv_tf (us_V U) !!! tf_arg_idx 0) cs cs gn pid) as "Hwo".
-    { iApply (ut_wait_out_quiet _ _ _ _ _ _ _ _ _ Hnec). }
+    { iApply (ut_wait_out_quiet _ _ _ _ _ _ _ _ _ _ Hnec). }
     iAssert (∀ n : Z, ut_sys_out n fdep scv (pv_tf (us_V U0)) U0 sts gn cs pid
                  (pv_tf (us_V (MkUstate V' (us_M U))) !!! tf_arg_idx 0)
                  (us_M (MkUstate V' (us_M U)))
@@ -1514,13 +1516,13 @@ Section UtE8.
     iAssert (ut_fork_out fdep scv (pv_secc (us_V U0))
                (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))
                (pv_tf (us_V U) !!! tf_arg_idx 0) cs cs) as "Hfo".
-    { iApply (ut_fork_out_quiet _ _ _ _ _ _ Hnec). }
+    { iApply (ut_fork_out_quiet _ _ _ _ _ _ _ Hnec). }
     (* ...and wait's, refuted through the same cause *)
     iAssert (ut_wait_out scv (pv_secc (us_V U0))
                (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))
                (us_M U0) (us_M U)
                (pv_tf (us_V U) !!! tf_arg_idx 0) cs cs gn pid) as "Hwo".
-    { iApply (ut_wait_out_quiet _ _ _ _ _ _ _ _ _ Hnec). }
+    { iApply (ut_wait_out_quiet _ _ _ _ _ _ _ _ _ _ Hnec). }
     iAssert (∀ n : Z, ut_sys_out n fdep scv (pv_tf (us_V U0)) U0 sts gn cs pid
                  (pv_tf (us_V U) !!! tf_arg_idx 0) (us_M U) sts
                  (pv_cwi (us_V U)) cs)%I as "Hso".
