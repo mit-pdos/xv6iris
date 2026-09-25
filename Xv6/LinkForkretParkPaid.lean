@@ -10,8 +10,8 @@ import Xv6.ProofForkretPark
 namespace Xv6
 
 /-- The paid park at the proved forkret. -/
-theorem ForkretParkPaid (RG : RELEASE_GEN) (RR : RELEASE_REFUTE) (RC : RELEASE_CANCEL) (KFF : KFREE_FREE)
+theorem ForkretParkPaid
     (FC : FILECLOSE) (VF : VMFAULT) : FORKRET_PARK_PAID :=
-  forkret_park_proof (Forkret RG RR RC KFF FC VF)
+  forkret_park_proof (Forkret FC VF)
 
 end Xv6

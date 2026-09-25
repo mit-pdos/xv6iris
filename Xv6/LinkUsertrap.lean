@@ -9,8 +9,8 @@ prepare_return, kernelvec over the linked kerneltrap, and `syscall` by
 `LinkSyscall.Syscall` (the contract at the kernel's deposit instance,
 `SYSCALL_XV6`).  Left as parameters, as their own links leave them:
 `fileclose` (kexit's, `LinkKexit`), `vmfault` (its `LinkVmfault` takes its
-callees), `LinkSyscall`'s own parameters (the four lock / allocator leaves;
-the park token is `ParkCap.parkToken`, W8-P2).  The deposit instance's read reason `UtReadWhy` is
+callees).  `LinkSyscall` is closed (the park token is
+`ParkCap.parkToken`, W8-P2).  The deposit instance's read reason `UtReadWhy` is
 proved at the instance (`UtReadWhyXv6.utReadWhy_xv6`, Rocq
 `spost_at_read_why`).
 -/
@@ -32,10 +32,10 @@ namespace Xv6
 open Iris MachCSL
 
 /-- The proved `usertrap` interface,
-given `fileclose`, `vmfault` and `LinkSyscall`'s parameters. -/
-theorem Usertrap (RG : RELEASE_GEN) (RR : RELEASE_REFUTE) (RC : RELEASE_CANCEL) (KFF : KFREE_FREE)
+given `fileclose` and `vmfault`. -/
+theorem Usertrap
     (FC : FILECLOSE) (VF : VMFAULT) : USERTRAP :=
-  usertrap_proof (Syscall RG RR RC KFF) Printk Myproc Killed Setkilled Devintr VF Yield PrepareReturn
+  usertrap_proof Syscall Printk Myproc Killed Setkilled Devintr VF Yield PrepareReturn
     (Kexit FC) (Kernelvec (Kerneltrap Yield))
 
 end Xv6

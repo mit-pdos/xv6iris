@@ -7,9 +7,8 @@ Type-checking this file is what makes the trap loop a theorem about the
 actual kernel rather than a composition of interfaces.
 
 Left as parameters, exactly as `LinkUsertrap.Usertrap` leaves them:
-`LinkSyscall`'s four lock / allocator leaves (`RELEASE_GEN`,
-`RELEASE_REFUTE`, `RELEASE_CANCEL`, `KFREE_FREE`; `[ForkretIs]` is retired,
-W8-P2), `fileclose` (kexit's) and `vmfault`.  (The read reason `UtReadWhy` is
+`fileclose` (kexit's) and `vmfault` (`[ForkretIs]` is retired, W8-P2; the
+lock / allocator leaves are linked inside `LinkSyscall`).  (The read reason `UtReadWhy` is
 discharged at `uexecSGXv6` by `UtReadWhyXv6`, inside `Usertrap`.)
 
 No `USER` / `UEXEC_GEN` (Rocq's `UGrc := UexecGen UserProof` is not
@@ -26,8 +25,8 @@ open Iris MachCSL
 
 /-- **The closed trap loop is inhabited**, given usertrap's link
 parameters. -/
-theorem UserretClosed (RG : RELEASE_GEN) (RR : RELEASE_REFUTE) (RC : RELEASE_CANCEL) (KFF : KFREE_FREE)
+theorem UserretClosed
     (FC : FILECLOSE) (VF : VMFAULT) : USERRET_CLOSED :=
-  userretClosed_proof (Usertrap RG RR RC KFF FC VF) uservec_link userret_link
+  userretClosed_proof (Usertrap FC VF) uservec_link userret_link
 
 end Xv6

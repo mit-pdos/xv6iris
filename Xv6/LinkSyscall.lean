@@ -9,13 +9,11 @@ callees) and `myproc` / `printk`.
 CLOSED down to the leaves, as `LinkKexec.Kexec` is: the vm.c callees
 (`copyout`, `copyin`, `walkaddr`, `vmfault`, the table builders and
 freers), the proc.c chain behind `kfork` / `kwait` / `kexit`, the file
-layer.  What stays a PARAMETER:
-
-* the four lock / allocator contracts no Link proves yet: `RELEASE_GEN`
-  (piperead / pipewrite), and `pipeclose`'s `RELEASE_REFUTE`,
-  `RELEASE_CANCEL`, `KFREE_FREE` (LinkPipeclose's own parameters);
-* nothing else: the park token is `ParkCap.parkToken` (the seal's
-  `SYSCALL_XV6`, W8-P2), and the write deposit law is discharged.
+layer, and the lock / allocator variants piperead / pipewrite / pipeclose
+take (`LinkRelease.ReleaseGen` / `ReleaseRefute` / `ReleaseCancel`,
+`LinkKfree.KfreeFree` over `LinkMemset.MemsetFree`).  Nothing stays a
+parameter: the park token is `ParkCap.parkToken` (the seal's `SYSCALL_XV6`,
+W8-P2), and the write deposit law is discharged.
 
 Rocq's `LinkSyscall` supplies the environment nowhere either: `syscall_env`
 is a precondition of the WP, owed by whoever applies usertrap's theorem.
@@ -101,10 +99,8 @@ namespace Xv6
 
 open Iris MachCSL
 
-/-- The proved `syscall` interface at the kernel's deposit instance, given
-the unproven lock / allocator leaves. -/
-theorem Syscall (RG : RELEASE_GEN) (RR : RELEASE_REFUTE) (RC : RELEASE_CANCEL) (KFF : KFREE_FREE) :
-    SYSCALL_XV6 :=
+/-- The proved `syscall` interface at the kernel's deposit instance. -/
+theorem Syscall : SYSCALL_XV6 :=
   let AC := Acquire
   let RE := Release
   let MS := Memset
@@ -123,9 +119,9 @@ theorem Syscall (RG : RELEASE_GEN) (RR : RELEASE_REFUTE) (RC : RELEASE_CANCEL) (
   let AF := Argfd AI Myproc
   let SP := SleepPrepare Myproc AC RE
   let SL := Sleep Myproc AC RE Sched
-  let PC := Pipeclose AcquireGen Wakeup RR RC KFF
-  let PR := Piperead Myproc AcquireGen RG Wakeup SP SL Killed CO
-  let PW := Pipewrite Myproc AcquireGen RG Wakeup SP SL Killed CI
+  let PC := Pipeclose AcquireGen Wakeup ReleaseRefute ReleaseCancel (KfreeFree AC RE MemsetFree)
+  let PR := Piperead Myproc AcquireGen ReleaseGen Wakeup SP SL Killed CO
+  let PW := Pipewrite Myproc AcquireGen ReleaseGen Wakeup SP SL Killed CI
   let FC := Fileclose AC RE PC BeginOp Iput EndOp
   let PFP := ProcFreepagetable UM UF
   let FP := Freeproc KF PFP AC RE
