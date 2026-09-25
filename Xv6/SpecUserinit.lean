@@ -36,16 +36,28 @@ THE NEW PROCESS'S SUPPLY ALLOWANCES (`dormantAllow`, wave 7 P3) come out
 of `allocproc`, and are spent as Rocq's are (SpecUserinit.v: "THE ONE
 [iref_slot] namei's [iget] spends is NOT a premise"): the cwd's unit pays
 the root's `iget`, and the rest (`liveAllow`) is parked with the process
-(`ForkretRecord.newbornPay`) with the process's WHOLE block (D8 wiring):
-its null descriptor table at the descriptor ghost allocproc minted (the per-descriptor
-units parked in the null slots), stated at the file table's names `γ`
-(Rocq's `is_ftable γft γf` premise; the null table reads none of it), its cwd reference (`inodeHeldAt ipv
-ROOTINO`, namei's result), and its generation row (`FdTable.procGenAt`).
+with the process's block at THE BOOT MODE's shape (`ParkCap.parkBootBlock`):
+its null descriptor table at the descriptor ghost allocproc minted (the
+per-descriptor units parked in the null slots), stated at the file table's
+names `γ` (Rocq's `is_ftable γft γf` premise), its cwd reference
+(`inodeHeldAt ipv ROOTINO`, namei's result), and the generation pair at the
+trivial payload beside `firstBoot`'s rows.
 
 THE BOOT-TOKEN DEPOSIT (Rocq's `first_addr ↦₄ 1 ∗ first_boot_persist ∗
 first_fsinit`, here the one row `FirstTok.firstBoot`): userinit is the
-COURIER -- it reads none of it; it becomes the first process's `firstTok`
-(the boot arm forkret's `if (first)` consumes) inside the block it parks.
+COURIER -- it reads none of it; it rides the park as the boot mode's own row
+(`ParkCap.parkBootBlock`), which forkret's boot arm consumes.
+
+THE PARK (W8-P2, Rocq's six park rows, the exec bundle and the reader
+token): userinit parks `<init>` with the park token at THE BOOT MODE
+(`ParkCap.parkToken_park`), the token out of `FORKRET_PARK_PAID`'s
+`park_token_intro` (ProofUserinit's parameter, Rocq's functor argument).
+The package's rows are the wait lock, the ticks lock, the console
+(`consoleReadyApp`), the device complement (`devintrCaps` at existential
+names, Rocq's `devintr_caps_any`), `wireInv`, the trampoline claim, and
+THE FIRST PROCESS'S EXEC BUNDLE (`InitBoot.initBootBundle` at the root and
+the all-closed table) with the console's reader token it is a wand from --
+LINEAR, userinit mints nothing.
 
 INIT'S IDENTITY, SEALED (Rocq `init_pid_tok` in, `init_gen` / `procs_avail
 None` out, lane TRAP-ROWS-3/4): the ledger's boot-era token pins the
@@ -55,8 +67,7 @@ it into the saved-pid ghost and SEALS it (`SlotGen.initPid_set` /
 and pid registration that a forking parent would have deposited (init has no
 parent), and publishes `WaitInv.initIdentAt` -- the `initproc` cell
 discarded, init's slot generation, its pid 1 -- and seals the proc ledger
-with init's registration (`ProcAvail.procsAvail_seal_spent`).  The six park
-rows and the exec bundle are 8-P's.
+with init's registration (`ProcAvail.procsAvail_seal_spent`).
 
 IT PUBLISHES `initproc`.  The word at `&initproc` is written exactly once,
 here, and read forever after (`kexit`'s "init exiting" check, `reparent`'s
@@ -73,16 +84,16 @@ empty-table arm -- with the boot-era token, and gets back the SEALED
 ledger `procsAvailAt Γ none false` (nothing allocates a proc after userinit
 in the boot chain; the seal is where init's registration is filed).  The
 whole of the first process -- its block, its kernel stack, its parked
-`forkret` record (`Xv6/ForkretRecord.lean`, whence `[ForkretIs]`) -- goes
-into `procsInv` at the closing `release`, and the slot is left RUNNABLE
-for the first scheduler that looks.
+`forkret` record (`ParkCap.parkToken_park`) -- goes
+into `procsInv` at the closing `release` (the park), and the slot is left
+RUNNABLE for the first scheduler that looks.
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.SchedCtx
 import Xv6.WaitLock
 import Xv6.PidLock
-import Xv6.SpecForkret
+import Xv6.ParkCap
 import Xv6.SpecNamei
 import Xv6.SpecAllocproc
 import Xv6.ProcAvail
@@ -102,12 +113,28 @@ K_namei_root_boot`): its own 4-slot frame over `namei`'s root corner
 (`allocproc` needs 48, `release` 10). -/
 def userinitSlots : Nat := 4 + nameiRootSlots
 
+/-- **THE PARK ROWS** userinit is the courier of (Rocq SpecUserinit's six
+park rows, the exec bundle and the reader token): the wait lock, the ticks
+lock, the console, the device complement, `wireInv`, the trampoline claim;
+the first process's exec bundle at the root and the all-closed table, and
+the console's reader token. -/
+def userinitPark {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+    [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF]
+    [SleepLockG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [BcacheG GF] [DiskG GF] [OffboxG GF] [OffboxBoxG GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
+    (Γ : SchedNames) (γw γtk : GName) : IProp GF := iprop%
+  isLock γw waitLockAddr "wait_lock" waitLockPay ∗ isTickslock γtk ∗ consoleReadyApp ∗
+  (∃ (γ0 γ1 : UartNames) (γc γl0 γl1 γt : GName) (pd pav pu : BitVec 64),
+    devintrCaps Γ γ0 γ1 γc γl0 γl1 fscDisk fscDlock γt pd pav pu) ∗
+  wireInv ∗ syscTrampCl ∗
+  initBootBundle (hlc := hlc) (SG := SG) ROOTINO (List.replicate NOFILE FdState.closed) ∗
+  consReader fscCons 0
+
 /-- **WP of `userinit`.** -/
 def wp_userinit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF]
-    [SleepLockG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [BcacheG GF] [DiskG GF] [OffboxG GF] [OffboxBoxG GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [ForkretIs]
-    (cpu : CPU) (k : KCtx) (γp γl : GName) (γk : KmemNames) (γft : GName) (γ : FileNames) (nb np : Nat)
+    [SleepLockG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [BcacheG GF] [DiskG GF] [OffboxG GF] [OffboxBoxG GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γp γl : GName) (γk : KmemNames) (γft : GName) (γ : FileNames) (γw γtk : GName) (nb np : Nat)
     (hnoff : k.noff + 2 < 2 ^ 31) (hnoff0 : k.noff = 0) (hK : userinitSlots ≤ k.avail)
     (hlk : "kmem" ∉ k.locks) (hlp : "nextpid" ∉ k.locks) (hlq : "proc" ∉ k.locks)
     (hlocks : k.locks = []) (htier : k.tier = KTier.kpt) (hproc : k.proc = 0#64)
@@ -122,6 +149,7 @@ def wp_userinit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
   itableInv (hlc := hlc) ∗ iregReg (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ panicEnv ∗
   isFtable γft γ ∗
+  userinitPark (hlc := hlc) (SG := SG) Γ γw γtk ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (ip : BitVec 64)
     (g : Nat),
     ⌜(k.sie = false → spie = k.spie ∧ spp = k.spp) ∧ calleeSaved k.regs R' ∧
@@ -134,11 +162,11 @@ def wp_userinit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
 structure USERINIT : Prop where
   wp_userinit : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF]
-    [SleepLockG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [BcacheG GF] [DiskG GF] [OffboxG GF] [OffboxBoxG GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [ForkretIs]
-    (cpu : CPU) (k : KCtx) (γp γl : GName) (γk : KmemNames) (γft : GName) (γ : FileNames) (nb np : Nat)
+    [SleepLockG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [BcacheG GF] [DiskG GF] [OffboxG GF] [OffboxBoxG GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γp γl : GName) (γk : KmemNames) (γft : GName) (γ : FileNames) (γw γtk : GName) (nb np : Nat)
     hnoff hnoff0 hK hlk hlp hlq hlocks htier hproc hsie hnb hroot hnib0,
-    wp_userinit_body (hlc := hlc) (GF := GF) Γ cpu k γp γl γk γft γ nb np
+    wp_userinit_body (hlc := hlc) (GF := GF) Γ cpu k γp γl γk γft γ γw γtk nb np
       hnoff hnoff0 hK hlk hlp hlq hlocks htier hproc hsie hnb hroot hnib0
 
 end Xv6

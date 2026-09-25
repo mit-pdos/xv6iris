@@ -27,19 +27,16 @@ THE SHAPE (Rocq's conjunct order, which the arms' destruct patterns read):
     syscallEnv PT Γ γ =
       syscProcEnv Γ γ ∗ consoleReadyApp ∗ syscFsEnv ∗ firstDone ∗ parkWorld Γ ∗ PT Γ
 
-## THE PARK TOKEN IS AN ABSTRACT PARAMETER (flagged; W8-P2)
+## THE PARK TOKEN IS A PARAMETER HERE (W8-P2)
 
 Rocq's last conjunct is `ParkCap.park_token (fcn_procs fn)`, the guarded
 fixpoint that ties the park → forkret → trap loop → kfork → park knot.
-`ParkCap` is not landed (it waits on W8-P2), so the token is the parameter
-`PT : SchedNames → IProp GF` of every definition here, persistent by the
-instance argument `[∀ Γ, Persistent (PT Γ)]` where persistence is needed.
-WHAT ParkCap MUST SUPPLY: `parkToken : SchedNames → IProp GF` with
-`∀ Γ, Persistent (parkToken Γ)` (Rocq `park_token_persistent`); the
-dispatch is then instantiated at `PT := parkToken` (SpecSyscall's
-`SYSCALL` is ∀-quantified over `PT`, so nothing is re-proved), and kfork's
-re-spec (W8-P2) consumes `PT Γ` from `syscallEnv_token`.  No landed Lean
-contract consumes the token yet (Lean's kfork parks through `[ForkretIs]`).
+`ParkCap` sits ABOVE this file (it names the residue, which names this
+environment), so the token is the parameter `PT : SchedNames → IProp GF` of
+every definition here, persistent by `[∀ Γ, Persistent (PT Γ)]` where
+persistence is needed.  The seal is at `PT := ParkCap.parkToken`
+(`SpecSyscallXv6.SYSCALL_XV6`; `parkToken_persistent`), where the fork arm
+hands kfork the token out of `syscallEnv_token` (`SpecKfork.kforkPark`).
 
 ## Deviations from Rocq
 

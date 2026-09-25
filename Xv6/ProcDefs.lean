@@ -227,7 +227,7 @@ instance dormantAllow_timeless : Timeless (dormantAllow (GF := GF)) := by
 `fd_slots FDSPARE ∗ iref_slots IREFSPARE ∗ bslots 3`, `UsertrapRes.ut_own`):
 what is left of `dormantAllow` once the per-descriptor units sit in the fd
 table and the cwd's unit is spent on the working directory's reference.  A
-newborn's park carries them (`ForkretRecord.newbornPay`); kexit's ZOMBIE park
+newborn's park carries them (`ParkCap.parkChild`); kexit's ZOMBIE park
 returns them to the slot with the descriptors' units and the cwd's.  Ghost
 only, so they cross a context move untouched. -/
 def liveAllow : IProp GF := iprop%

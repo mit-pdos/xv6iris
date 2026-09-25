@@ -1,50 +1,28 @@
 /-
-**The record of a newborn process** (the Rocq prototype's
-`SpecForkretPark`).
+**A context is born** (the newborn park's ghost steps; the Rocq prototype's
+`SpecForkretPark` record, now `ProofForkretPark`'s producer).
 
 `allocproc` leaves a fresh slot at USED with its save area written by hand
 -- `ra = forkret`, `sp = p->kstack + PGSIZE`, the twelve `s` words zero --
-and hands the creator the private block and the whole kernel stack.  Before
-it may release `p->lock`, the creator owes the slot a PARKED RECORD
-(`procCtxAt`, the `needsCtx` arm of `procSlotsAt`): "the context saved at
-`&p->context` admits a WP to run".  Every other record in the kernel is
-minted by a `swtch` (the crossing's `back = true` arm); this one is built
-from nothing, and that is what this file does.
+and the creator owes the slot a PARKED RECORD before it may release
+`p->lock`.  That record is built by the PARK TOKEN's cap
+(`ParkCap.parkCap`, proved as `ProofForkretPark.forkret_park_paid`), whose
+three ghost steps are:
 
-Three steps, all of them ghost:
+1. `ctx_fresh` (here): a brand-new context `ξp` -- two fresh ghost names,
+   bound 0, no dirty keys -- with its running token on this hart.
+   (Contexts are ghost identities; this is the one place in the kernel
+   where a thread of control is BORN.)
+2. `ctx_move`: the record's rows move from the creator's context to `ξp`.
+3. `ctx_park`: `ξp`'s token parks under the creator's context.
 
-1. `ctx_fresh`: a brand-new context `ξp` -- two fresh ghost names, bound 0,
-   no dirty keys -- with its running token on this hart.  (Contexts are
-   ghost identities; nothing in the model bounds how many there are.  This
-   is the one place in the kernel where a thread of control is BORN, so it
-   is the one place that needs it.)
-2. `ctx_move`: the payload -- the 14 save-area cells, the kernel stack, the
-   rest of the private block, the proc table's invariant -- moves from the
-   creator's context to `ξp`, which is what makes the newborn's reads of
-   the words its parent wrote legal (`ctx_register`: `ξp` inherits the
-   creator's bound and dirty keys).
-3. `ctx_park`: `ξp`'s token parks under the creator's context, which is the
-   context the slot's payload is stated at.  The creator's own token, which
-   steps 2 and 3 borrow from its `kctx` bundle, goes back.
-
-The record's resume wand is `ForkretIs.wp_forkret` (`Xv6/SpecForkret.lean`),
-which is assumed: the newborn's first instruction is `forkret`, and what
-`forkret` does after `release(&p->lock)` -- `fsinit`, `kexec`, the return to
-user mode through the trampoline -- is out of this port's scope.
-
-THE CONTEXT CELLS are the creator's `contextCells pa (own 1) V.context`
-(`ProcDefs.procFields` owns them), and `contextCells_ctxCells` says they ARE
-the save area at `&p->context`: they go into the record's own `ctxCells`
-slot, and the resumed `forkret` is handed them back.  THE REST IS THE WHOLE
-BLOCK (D8 wiring, Rocq's park): `procPrivFd` -- core with the cwd reference
-and the generation row, descriptor table with its payloads -- beside its
-fragment bundle, all of which the resume wand closes over (their transports:
-`EnvMorph.procPrivFd_morph`).
+`procPriv_split` says the private block is the record's 14 cells and the
+rest.  (W8-P2 retired this file's `forkret_resume` / `forkret_record` /
+`newbornPay`, which assumed forkret's WP through `ForkretIs`.)
 
 A lemma file: it imports Spec files, never a Proof or Link file.
 -/
 import Xv6.SpecForkret
-import Xv6.EnvMorph
 
 namespace Xv6
 
@@ -121,151 +99,6 @@ theorem procPriv_split (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : Proc
     · ipureintro; exact hV
     iframe Hpid Hks Hsz Hpt Htf Hof Hcwd Hnm Hspace Htfp
     iapply ctxCells_to_contextCells pa V.context $$ Hcells
-
-/-! ## The resume wand -/
-
-end
-
-section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
-  [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
-  [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-  [Appcfg GF] [FileG GF] [Fscfg] [Icfg]
-
-/-- **What a newborn does when a scheduler picks it up**: it IS `forkret`,
-resumed out of its own record on whatever hart dispatched it.  The
-save-area words the record hands back are the private block's context
-cells; the rest of the block (whole) and its fragment bundle come out of the
-record's closure. -/
-theorem forkret_resume [ForkretIs] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (ξp : CtxId) (j : Nat) (γ : FileNames) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
-    (sts : List FdState) (hj : j < NPROC)
-    (hctx : V.context = [forkretAddr, V.kstack + 4096#64] ++ List.replicate 12 0#64) :
-    @procsInv hlc GF _ _ _ _ _ _ _ ⟨ξp, KTier.kpt⟩ Γ ∗
-      (letI : CurCtx := ⟨ξp, KTier.kpt⟩; procPrivFd (GF := GF) γ (procAddr j) pid V M) ∗
-      fdFrags V.fdg sts ∗ liveAllow ∗ chFrag V.chg (procAddr j) ∅ ⊢
-      ∀ (h : CPU) (R : RegMap) (spie spp eb' : Bool) (root : BitVec 44),
-        ⌜adm none h⌝ -∗ ⌜calleeImg R = V.context⌝ -∗
-        @kctx hlc GF _ ⟨ξp, KTier.kpt⟩ _ _ h (resumedK R spie spp 512 eb' root (procAddr j)) -∗
-        pcIs h (jumpPc (R 1#5)) -∗
-        @ctxCells hlc GF _ ⟨ξp, KTier.kpt⟩ (pContext (procAddr j) 0) V.context -∗
-        (∃ (A' : CtxAdm) (cret : BitVec 64) (back : Bool),
-          (if back then ∃ ξo : CtxId, parkTokAt ξp A' ξo ∗
-              ▷ validCtx (pSched Γ) ⟨A', cret, procAddr j, ξo⟩
-           else @ownCtxCells hlc GF _ ⟨ξp, KTier.kpt⟩ cret) ∗
-          pSched Γ h A' (pContext (procAddr j) 0) cret (hartId h) (procAddr j) back ξp) -∗
-        wpLoop h := by
-  letI : CurCtx := ⟨ξp, KTier.kpt⟩
-  iintro ⟨#Hpinv, Hpriv, Hfr, Hal, Hch⟩ %h %R %spie %spp %eb' %root %_hadm %hcimg Hk Hpc Hcells Hres
-  -- the saved `ra` and `sp` ARE `forkret` and the top of the kernel stack
-  have hra : R 1#5 = forkretAddr := by
-    have hc := congrArg (fun l => l[0]!) hcimg
-    simpa [calleeImg, hctx] using hc
-  have hsp : R 2#5 = V.kstack + 4096#64 := by
-    have hc := congrArg (fun l => l[1]!) hcimg
-    simpa [calleeImg, hctx] using hc
-  -- the chain payload: the resumer was hart `h`'s scheduler
-  icases Hres with ⟨%A', %cret, %back, Hrec, HP⟩
-  icases pSched_at_proc Γ ξp h A' j cret (hartId h) (procAddr j) back hj $$ HP with
-    ⟨%⟨_, hcret, _, hA', hback⟩, Htc, Hir, %ch, Hheld, Htag⟩
-  subst hA'
-  subst hback
-  subst hcret
-  simp only [reduceIte, parkTokAt_some]
-  icases Hrec with ⟨%ξo, Hown, Hrec⟩
-  ihave Hvc := schedVcAt_intro Γ h (cpuCtxAddr h) (procAddr j) ξo $$ [$Hown $Hrec]
-  -- the save area, as the block's context cells
-  ihave Hcells := ctxCells_to_contextCells (procAddr j) V.context $$ Hcells
-  -- `forkret` is where the newborn starts
-  rw [hra, jumpPc_forkretAddr]
-  have hf := ForkretIs.wp_forkret (hlc := hlc) (GF := GF) Γ h R spie spp eb' root j ch γ pid V M sts
-    hj hra hsp
-  unfold wp_forkret_body forkretStack at hf
-  iapply hf
-  iframe Hk Hpc Htc Hir Hheld Htag Hvc Hcells Hpriv Hfr Hal Hch
-  iexact Hpinv
-
-/-! ## The record -/
-
-/-- Everything the newborn's context is handed at birth: its save area, its
-kernel stack, its WHOLE private block and fragment bundle, the proc table's
-invariant, its spare allowances and its children row (the record's resume
-wand closes over all but the first two). -/
-def newbornPay (Γ : SchedNames) (j : Nat) (γ : FileNames) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) (sts : List FdState) (ξ : CtxId) : IProp GF := iprop%
-  @ctxCells hlc GF _ ⟨ξ, KTier.kpt⟩ (pContext (procAddr j) 0) V.context ∗
-  @stackOwn hlc GF _ ⟨ξ, KTier.kpt⟩ (V.kstack + 4096#64) 512 ∗
-  (letI : CurCtx := ⟨ξ, KTier.kpt⟩; procPrivFd (GF := GF) γ (procAddr j) pid V M) ∗
-  fdFrags V.fdg sts ∗
-  @procsInv hlc GF _ _ _ _ _ _ _ ⟨ξ, KTier.kpt⟩ Γ ∗ liveAllow ∗ chFrag V.chg (procAddr j) ∅
-
-instance instCtxMorphNewbornPay (Γ : SchedNames) (j : Nat) (γ : FileNames) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) (sts : List FdState) : CtxMorph (GF := GF) (newbornPay Γ j γ pid V M sts) := by
-  unfold newbornPay
-  exact @instCtxMorphSep hlc GF _ _ _ (instCtxMorphCtxCells _ _ _)
-    (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphStackOwn _ _ _)
-      (@instCtxMorphSep hlc GF _ _ _ (procPrivFd_morph γ (procAddr j) pid V M)
-        (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-          (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphProcsInv _)
-            (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) (instCtxMorphConst _))))))
-
-/-- **THE RECORD OF A NEWBORN PROCESS.**  From `allocproc`'s output -- the
-save area written as `[forkret, kstack + PGSIZE, 0 x 12]` and the whole
-kernel stack -- and the creator-assembled WHOLE block with its fragment
-bundle, plus the creator's own bundle, a parked record for slot `j`:
-exactly what `procSlotsAt` demands of a slot at RUNNABLE (or USED, or
-SLEEPING).  A GHOST STEP: a context is born. -/
-theorem forkret_record [ForkretIs] [X : CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (j : Nat) (γ : FileNames) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
-    (sts : List FdState)
-    (hj : j < NPROC) (hct : curTier = KTier.kpt)
-    (hctx : V.context = [forkretAddr, V.kstack + 4096#64] ++ List.replicate 12 0#64) :
-    kctx (GF := GF) cpu k ∗ procsInv Γ ∗ contextCells (procAddr j) (DFrac.own 1) V.context ∗
-      procPrivFd γ (procAddr j) pid V M ∗ fdFrags V.fdg sts ∗
-      stackOwn (V.kstack + 4096#64) 512 ∗ liveAllow ∗ chFrag V.chg (procAddr j) ∅ ⊢
-      |==> (kctx cpu k ∗ procCtxAt Γ curCtx (procAddr j)) := by
-  obtain ⟨ξ0, t0⟩ := X
-  subst hct
-  letI : CurCtx := ⟨ξ0, KTier.kpt⟩
-  iintro ⟨Hk, #Hpinv, Hctx, Hpriv, Hfr, Hstack, Hal, Hch⟩
-  -- the creator's own running token, borrowed from its bundle
-  icases kctx_token_acc cpu k $$ Hk with ⟨Hown, Hback⟩
-  -- a context is born
-  imod (ctx_fresh (GF := GF) cpu) with ⟨%ξp, Hp⟩
-  -- the save area, as the record's cells
-  ihave Hcells := contextCells_to_ctxCells (procAddr j) V.context $$ Hctx
-  -- and everything the newborn needs moves to its context
-  ihave Hpay : newbornPay Γ j γ pid V M sts ξ0 $$ [Hcells Hstack Hpriv Hfr Hal Hch]
-  · unfold newbornPay
-    iframe Hcells Hstack Hpriv Hfr Hal Hch
-    iexact Hpinv
-  imod (ctx_move (newbornPay Γ j γ pid V M sts) cpu ξ0 ξp) $$ [$Hown $Hp $Hpay]
-    with ⟨Hown, Hp, Hpay⟩
-  -- the newborn's token parks under the creator's context
-  imod (ctx_park cpu ξp ξ0) $$ [$Hown $Hp] with ⟨Hown, Hpark⟩
-  imodintro
-  isplitl [Hback Hown]
-  · iapply Hback $$ Hown
-  unfold newbornPay
-  icases Hpay with ⟨Hcells, Hstack, Hpriv, Hfr, #Hpinv', Hal, Hch⟩
-  ihave Hrec : validCtx (pSched Γ) ⟨none, pContext (procAddr j) 0, procAddr j, ξp⟩
-      $$ [Hcells Hstack Hpriv Hfr Hal Hch]
-  · iapply validCtx_intro (pSched Γ) ⟨none, pContext (procAddr j) 0, procAddr j, ξp⟩
-    iexists V.context, 512
-    isplitl []
-    · ipureintro
-      refine ⟨by rw [hctx]; rfl, jumpPc_even _⟩
-    iframe Hcells
-    rw [show V.context[1]! = V.kstack + 4096#64 from by rw [hctx]; rfl]
-    iframe Hstack
-    iapply forkret_resume Γ ξp j γ pid V M sts hj hctx
-    iframe Hpriv Hfr Hal Hch
-    iexact Hpinv'
-  unfold procCtxAt
-  iexists ξp
-  iframe Hpark
-  iapply (BI.later_intro (PROP := IProp GF))
-  iexact Hrec
 
 end
 

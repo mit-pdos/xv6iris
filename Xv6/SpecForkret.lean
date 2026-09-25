@@ -102,38 +102,6 @@ theorem jumpPc_forkretAddr : jumpPc forkretAddr = forkretAddr := by
   unfold forkretAddr jumpPc
   decide
 
-/-- **WP of `forkret`** (assumed): the resume wand of a fresh process's
-record. -/
-def wp_forkret_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
-    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (R : RegMap) (spie spp intena : Bool) (root : BitVec 44)
-    (j : Nat) (ch : BitVec 64) (γ : FileNames) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
-    (sts : List FdState)
-    (hj : j < NPROC) (hra : R 1#5 = forkretAddr) (hsp : R 2#5 = V.kstack + 4096#64) : Prop :=
-  kctx cpu (resumedK R spie spp forkretStack intena root (procAddr j)) ∗
-  pcIs cpu forkretAddr ∗ procsInv Γ ∗ trapCsrs cpu ∗ intrRes cpu ∗
-  procHeld Γ cpu j RUNNING ch ∗ hartFull Γ j cpu ∗
-  ▷ schedVcAt Γ cpu (cpuCtxAddr cpu) (procAddr j) ∗
-  contextCells (procAddr j) (DFrac.own 1) V.context ∗
-  procPrivFd γ (procAddr j) pid V M ∗ fdFrags V.fdg sts ∗ liveAllow ∗ chFrag V.chg (procAddr j) ∅
-  ⊢ wpLoop (GF := GF) cpu
-
-/-- **The `forkret` boundary** (assumed; the retired `FsEnv` boundary's last sibling): the user-mode
-return is out of scope. -/
-class ForkretIs : Prop where
-  wp_forkret : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
-    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (R : RegMap) (spie spp intena : Bool) (root : BitVec 44)
-    (j : Nat) (ch : BitVec 64) (γ : FileNames) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
-    (sts : List FdState) hj hra hsp,
-    wp_forkret_body (hlc := hlc) (GF := GF) Γ cpu R spie spp intena root j ch γ pid V M sts hj hra hsp
-
 /-! ## The contract (Rocq `forkret_closer`, `wp_forkret_gen_body`, `FORKRET`) -/
 
 section Gen

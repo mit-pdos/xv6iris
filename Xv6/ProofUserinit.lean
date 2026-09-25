@@ -16,9 +16,10 @@ BOOT code: `k.proc = 0`, `k.noff = 0`, `k.locks = []`, `k.sie = false`.
 `allocproc` returns the found slot USED and held; `userinit` publishes
 `initproc` (the owned word, discarded to the persistent `initprocIs`, the
 cell half of `initIdentAt`),
-writes `namei`'s result into `p->cwd`, sets the slot RUNNABLE, mints the
-newborn's parked record (`forkret_record`) and releases `p->lock`, leaving
-the slot RUNNABLE inside `procsInv`.
+writes `namei`'s result into `p->cwd`, sets the slot RUNNABLE, parks the
+newborn with THE PARK TOKEN at the BOOT MODE (`ParkCap.parkToken_park`, the
+token out of `FORKRET_PARK_PAID.park_token_intro`, Rocq's functor argument)
+and releases `p->lock`, leaving the slot RUNNABLE inside `procsInv`.
 
 REFUTING `allocproc`'s failure arm.  The `r = 0` arm reports both reasons
 it can fire: no free slot (`pav = none ∨ pav = some 0`, refuted by the
@@ -34,14 +35,15 @@ literal "/" (`kernelData`), the cwd's iref unit out of allocproc's
 allowances pays the root's `iget`, and the rest of the allowances
 (`liveAllow`) is parked with the process.
 
-THE PARK IS THE WHOLE BLOCK (D8 wiring, SpecForkret's deviation 1 fixed):
-`procPrivFd` -- the bare block, the root reference `namei` returned as the
-cwd (at `ROOTINO`), the generation row `procGenAt` (the boot deposit
-`firstBoot` as `firstTok`, the kernel's quarter and `myPay` out of
-`genNew`, the xstate half, `genHalvesPriv`), and the all-null descriptor
-table at the descriptor ghost allocproc minted (`V.fdg`, each slot owning
-its `fdSlot` unit and the `.closed` authority) -- beside the all-closed
-`fdFrags`.
+THE PARK IS THE BOOT MODE'S (`ParkCap.parkBootBlock`, Rocq `park_child`'s
+`false` arm): the bare block, the all-null descriptor table at the
+descriptor ghost allocproc minted (`V.fdg`, each slot owning its `fdSlot`
+unit and the `.closed` authority), the root reference `namei` returned as
+the cwd (at `ROOTINO`), and -- SPLIT, as their own rows -- the boot deposit
+`firstBoot`, the kernel's quarter and `myPay` at the trivial payload, the
+two quarters `genHalvesPriv` and the xstate half (`uiBootRows`); beside the
+all-closed `fdFrags`.  The package carries the exec bundle and the reader
+token (`SpecUserinit.userinitPark`).
 
 INIT'S IDENTITY (Rocq ProofUserinit.v, lane TRAP-ROWS-3/4): the pid is the
 literal 1 (`pavBoot`); the saved pid is set and sealed (`initPid_set` /
@@ -57,7 +59,7 @@ import MachCSL.Lock
 import Xv6.SpecUserinit
 import Xv6.SpecAllocproc
 import Xv6.SpecRelease
-import Xv6.ForkretRecord
+import Xv6.SpecForkretParkPaid
 import Xv6.CodeTactics
 
 namespace Xv6
@@ -178,25 +180,26 @@ fragment bundle. -/
 theorem ui_block [X : CurCtx] (hct : curTier = KTier.kpt) (γ : FileNames) (γd : GName)
     (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (hof : V.ofile = List.replicate NOFILE 0#64) :
-    procPriv (GF := GF) pa pid V M ∗ inodeHeldAt V.cwd ROOTINO ∗ procGenAt curCtx pa pid V.gen ∗
+    procPriv (GF := GF) pa pid V M ∗ inodeHeldAt V.cwd ROOTINO ∗
       ([∗list] _f ∈ List.replicate NOFILE (0#64 : BitVec 64), fdSlot) ∗
       ([∗list] i ∈ List.range NOFILE, fdStAt γd i (.own 1) .closed) ⊢
       contextCells pa (DFrac.own 1) V.context ∗
-      procPrivFd γ pa pid { V with cwi := ROOTINO, fdg := γd } M ∗
+      (procPrivBareAt curCtx pa pid { V with cwi := ROOTINO, fdg := γd } M ∗
+        procOfiles γ γd pa V.ofile ∗ cwdRefAt V.cwd ROOTINO) ∗
       fdFrags γd (List.replicate NOFILE FdState.closed) := by
   obtain ⟨ξ0, t0⟩ := X
   subst hct
   letI : CurCtx := ⟨ξ0, KTier.kpt⟩
   unfold procPriv procFields ofileCells
   iintro ⟨⟨%hV, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hctx, ⟨%hlen, Hof⟩, Hcwd, Hnm⟩, Hpt, Htfp, %hlz⟩,
-    Hcref, Hgen, Hfds, Hkeys⟩
+    Hcref, Hfds, Hkeys⟩
   rw [hof]
   icases procOfiles_null_close γ γd pa $$ [Hof Hfds Hkeys] with ⟨Hofs, Hfr⟩
   · iframe
   iframe Hctx Hfr
-  unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile cwdRefAt
+  unfold procPrivBareAt procFieldsNoOfile cwdRefAt
   dsimp only
-  iframe Hofs Hpid Hks Hsz Hpg Htf Hcwd Hnm Hpt Htfp Hcref Hgen
+  iframe Hofs Hpid Hks Hsz Hpg Htf Hcwd Hnm Hpt Htfp Hcref
   isplitl []
   · ipureintro; exact hV
   · ipureintro; exact hlz
@@ -218,6 +221,30 @@ theorem ui_slots_runnable [CurCtx] (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 
   isplitl [Hh]
   · iexact Hh
   · iapply (parkPay_needsCtx ξl pa RUNNABLE (by decide))
+
+end
+
+/-! ## The boot mode's rows and the park's (W8-P2) -/
+
+section
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF]
+  [SleepLockG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [BcacheG GF] [DiskG GF] [OffboxG GF] [OffboxBoxG GF] [FileG GF] [Fscfg] [Icfg]
+
+/-- **THE BOOT MODE'S GENERATION ROWS** (`ParkCap.parkBootBlock`'s tail):
+`firstBoot`, the kernel's quarter and `myPay` at the trivial payload, the two
+quarters, the xstate half -- split, as their own rows (Rocq `park_child`). -/
+def uiBootRows [CurCtx] (pa : BitVec 64) (pid : BitVec 32) (g : GName) : IProp GF := iprop%
+  firstBoot (hlc := hlc) ∗ genKq g pa pid (fun _ => iprop(True)) ∗ myPay g (fun _ => iprop(True)) ∗
+  genHalvesPriv pa pid g ∗ (∃ xsv : BitVec 32, wordPointsTo (pXstate pa) 4 xsHalf xsv)
+
+/-- **THE PARK'S ROWS**, what the publish owes the package beside the
+parker's own: userinit's park premise, the nextpid lock, the SEALED ledger,
+the ftable handle and `<init>`'s identity. -/
+def uiParkRows [CurCtx] [SG : UexecSG GF] (Γ : SchedNames) (γw γtk γp γft : GName) (γ : FileNames)
+    (ip : BitVec 64) : IProp GF := iprop%
+  userinitPark (hlc := hlc) (SG := SG) Γ γw γtk ∗ isLock γp pidLockAddr "nextpid" pidLockPay ∗
+  procsAvailAt Γ none false ∗ isFtable γft γ ∗ initGen ip 1#32
 
 end
 
@@ -346,8 +373,9 @@ set_option maxHeartbeats 2000000 in
 newborn's parked record, and `release(&p->lock)`. -/
 theorem userinit_br_fffffffffffff062 : KA.«userinit» + 0xfffffffffffff062#64 = KA.«release» := by decide
 
-theorem ui_finish [X : CurCtx] (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    [ForkretIs] (cpu : CPU) (kf : KCtx) (j : Nat) (ch : BitVec 64) (γ : FileNames) (pid : BitVec 32)
+theorem ui_finish [X : CurCtx] (RE : RELEASE) (FP : FORKRET_PARK_PAID) [SG : UexecSG GF]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (γw γtk γp γft : GName) (cpu : CPU) (kf : KCtx) (j : Nat) (ch : BitVec 64) (γ : FileNames) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8))
     (hj : j < NPROC) (hct : curTier = KTier.kpt)
     (hctx : V.context = [forkretAddr, V.kstack + 4096#64] ++ List.replicate 12 0#64)
@@ -359,9 +387,10 @@ theorem ui_finish [X : CurCtx] (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc :=
     procHeld Γ cpu j USED ch ∗ hartAtAny Γ (procAddr j) ∗ slotUsed Γ (procAddr j) ∗
     procPriv (procAddr j) pid V M ∗ stackOwn (V.kstack + 4096#64) 512 ∗ liveAllow ∗
     chFrag V.chg (procAddr j) ∅ ∗
-    inodeHeldAt (kf.regs 10#5) ROOTINO ∗ procGenAt curCtx (procAddr j) pid V.gen ∗
+    inodeHeldAt (kf.regs 10#5) ROOTINO ∗ uiBootRows (procAddr j) pid V.gen ∗
     ([∗list] _f ∈ List.replicate NOFILE (0#64 : BitVec 64), fdSlot) ∗
     ([∗list] i ∈ List.range NOFILE, fdStAt V.fdg i (.own 1) .closed) ∗
+    uiParkRows (hlc := hlc) (SG := SG) Γ γw γtk γp γft γ (procAddr j) ∗ panicEnv ∗ initprocIs (procAddr j) ∗
     (∀ R5 : RegMap,
       kctx cpu ((kf.popOff.withRegs R5).withLocks (kf.locks.filter (fun x => x ≠ "proc"))) -∗
       pcIs cpu (KA.«userinit» + 0x32#64) -∗ ⌜calleeSaved kf.regs R5⌝ -∗ wpLoop cpu)
@@ -369,7 +398,8 @@ theorem ui_finish [X : CurCtx] (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc :=
   obtain ⟨ξ0, t0⟩ := X
   subst hct
   letI : CurCtx := ⟨ξ0, KTier.kpt⟩
-  iintro ⟨Hk, Hpc, #Hpinv, Hheld, Hhart, #Hused, Hpriv, Hstack, Hal, Hch, Hcref, Hgen, Hfds, Hkeys, Hcont⟩
+  iintro ⟨Hk, Hpc, #Hpinv, Hheld, Hhart, #Hused, Hpriv, Hstack, Hal, Hch, Hcref, Hgen, Hfds, Hkeys, Hpk, #Hpe,
+    #Hinitp, Hcont⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   ihave #HlkI := procsInv_lookup Γ j hj $$ Hpinv
   -- open the private block at `p->cwd`
@@ -404,14 +434,55 @@ theorem ui_finish [X : CurCtx] (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc :=
       from by unfold pState RUNNABLE; iintro H; iexact H) $$ HstateW
   -- ===== the ghost publish =====
   iapply wpLoop_bupd
-  -- THE FIRST PROCESS'S BLOCK, WHOLE (D8 wiring; SpecForkret's deviation 1
-  -- fixed): allocproc's descriptor ghost for its null table (`V.fdg`), the
-  -- root's reference as its cwd (at `ROOTINO`), its generation row
+  -- THE FIRST PROCESS'S BLOCK, AT THE BOOT MODE (ParkCap.parkBootBlock):
+  -- allocproc's descriptor ghost for its null table (`V.fdg`), the root's
+  -- reference as its cwd (at `ROOTINO`), and the generation rows SPLIT
   icases ui_block rfl γ V.fdg (procAddr j) pid { V with cwd := kf.regs 10#5 } M hof
-    $$ [$Hpriv $Hcref $Hgen $Hfds $Hkeys] with ⟨Hctxc, Hblk, Hfr⟩
-  imod (forkret_record Γ cpu _ j γ pid { V with cwd := kf.regs 10#5, cwi := ROOTINO, fdg := V.fdg } M
-      (List.replicate NOFILE FdState.closed) hj rfl hctx)
-    $$ [$Hk $Hpinv $Hctxc $Hblk $Hfr $Hstack $Hal $Hch] with ⟨Hk, HprocCtx⟩
+    $$ [$Hpriv $Hcref $Hfds $Hkeys] with ⟨Hctxc, ⟨Hbare, Hofs, Hcwr⟩, Hfr⟩
+  unfold uiParkRows userinitPark
+  icases Hpk with ⟨⟨#Hwl, #Htk, #Hcons, #Hdev, #Hwire, #Htramp, Hbun, Hrd⟩, #Hpl, #Hpav, #Hft, #Hig⟩
+  -- THE PACKAGE'S ROWS, at this context
+  ihave Hrows : iprop(parkGlobals Γ γw γft γ (procAddr j) ∗ utSysParkRows Γ ∗
+      stackOwn (V.kstack + 4096#64) forkretStack) $$ [Hstack]
+  · unfold parkGlobals utSysParkRows syscParkExtra parkWorld syscPidLock forkretStack
+    iframe Hstack
+    isplitr
+    · iframe Hpinv Hpe Hwl Hft
+      iapply (show initprocIs (GF := GF) (procAddr j) ⊢ initIdentCell curCtx (procAddr j) from .rfl)
+        $$ Hinitp
+    iexists γtk
+    isplitr
+    · isplitr
+      · iexists γp; iexact Hpl
+      iframe Hpav Htk Hcons
+    iframe Hdev Hcons Hpav Hwire Htramp
+    isplitr
+    · iexists γp; iexact Hpl
+    iexists (procAddr j)
+    iframe Hig
+    iapply (show initprocIs (GF := GF) (procAddr j) ⊢ initIdentCell curCtx (procAddr j) from .rfl)
+      $$ Hinitp
+  unfold liveAllow uiBootRows
+  icases Hal with ⟨Hfsp, Hirs, Hbs⟩
+  icases Hgen with ⟨Hfb, Hkq, #Hmp, Hgh, Hxs⟩
+  ihave Hchildr : parkChild (hlc := hlc) ξ0 ⟨γft, γ, γw, Γ, j, procAddr j, pid⟩ (List.replicate 12 0#64)
+      { V with cwd := kf.regs 10#5, cwi := ROOTINO, fdg := V.fdg } M false
+      $$ [Hctxc Hbare Hofs Hcwr Hfb Hkq Hgh Hxs Hfsp Hirs]
+  · unfold parkChild parkBlock parkBootBlock UtNames.pj
+    simp only [Bool.false_eq_true, ↓reduceIte]
+    rw [show (parkForkretPc :: (V.kstack + 4096#64) :: List.replicate 12 0#64) = V.context from by
+      rw [hctx]; rfl]
+    iframe Hctxc Hbare Hofs Hcwr Hfb Hkq Hgh Hxs Hfsp Hirs
+    iexact Hmp
+  ihave #Htok := FP.park_token_intro (hlc := hlc) (GF := GF) (SG := SG) Γ
+  icases kctx_token_acc cpu _ $$ Hk with ⟨Hown, Hback⟩
+  have hup := parkToken_park (hlc := hlc) (SG := SG) cpu ξ0 ⟨γft, γ, γw, Γ, j, procAddr j, pid⟩
+    (List.replicate 12 0#64) { V with cwd := kf.regs 10#5, cwi := ROOTINO, fdg := V.fdg } M
+    (List.replicate NOFILE FdState.closed) ∅ hj (by simp)
+  dsimp only [UtNames.pj, parkOwn, utParkCaps] at hup
+  ihave Hup := hup $$ Hown Htok Hrows Hused Hbs Hig Hfr Hch Hbun Hrd Hchildr
+  imod Hup with ⟨Hown, HprocCtx⟩
+  ihave Hk := Hback $$ Hown
   imod (pstateWhole_update Γ (procAddr j) USED RUNNABLE) $$ Hwhole with Hwhole
   imodintro
   ihave Hslots := ui_slots_runnable Γ ξ0 (procAddr j) $$ [$Hused $HprocCtx $Hhart]
@@ -483,8 +554,9 @@ theorem userinit_br_86c2 : KA.«userinit» + 0x86c2#64 = KA.«initproc» := by d
 set_option maxHeartbeats 2000000 in
 /-- **From `0x80001c8c`**: `s1 = p`, `initproc = p` (published), `a0 = "/"`,
 `namei`, then `ui_finish`. -/
-theorem ui_publish [X : CurCtx] (RE : RELEASE) (NR : NAMEI_ROOT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    [ForkretIs] (cpu : CPU) (kb : KCtx) (j : Nat) (ch : BitVec 64) (γ : FileNames) (pid : BitVec 32)
+theorem ui_publish [X : CurCtx] (RE : RELEASE) (NR : NAMEI_ROOT) (FP : FORKRET_PARK_PAID) [SG : UexecSG GF]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (γw γtk γp γft : GName) (cpu : CPU) (kb : KCtx) (j : Nat) (ch : BitVec 64) (γ : FileNames) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8))
     (hj : j < NPROC) (hct : curTier = KTier.kpt)
     (hctx : V.context = [forkretAddr, V.kstack + 4096#64] ++ List.replicate 12 0#64)
@@ -500,9 +572,10 @@ theorem ui_publish [X : CurCtx] (RE : RELEASE) (NR : NAMEI_ROOT) (Γ : SchedName
     irefSlot ∗ liveAllow ∗ chFrag V.chg (procAddr j) ∅ ∗
     procHeld Γ cpu j USED ch ∗ hartAtAny Γ (procAddr j) ∗ slotUsed Γ (procAddr j) ∗
     procPriv (procAddr j) pid V M ∗ stackOwn (V.kstack + 4096#64) 512 ∗
-    procGenAt curCtx (procAddr j) pid V.gen ∗
+    uiBootRows (procAddr j) pid V.gen ∗
     ([∗list] _f ∈ List.replicate NOFILE (0#64 : BitVec 64), fdSlot) ∗
     ([∗list] i ∈ List.range NOFILE, fdStAt V.fdg i (.own 1) .closed) ∗
+    uiParkRows (hlc := hlc) (SG := SG) Γ γw γtk γp γft γ (procAddr j) ∗
     (∀ R5 : RegMap,
       kctx cpu ((kb.popOff.withRegs R5).withLocks (kb.locks.filter (fun x => x ≠ "proc"))) -∗
       pcIs cpu (KA.«userinit» + 0x32#64) -∗ ⌜calleeSaved (kb.regs.set 9#5 (procAddr j)) R5⌝ -∗
@@ -512,7 +585,7 @@ theorem ui_publish [X : CurCtx] (RE : RELEASE) (NR : NAMEI_ROOT) (Γ : SchedName
   subst hct
   letI : CurCtx := ⟨ξ0, KTier.kpt⟩
   iintro ⟨Hk, Hpc, #Hpinv, ⟨%w0, Hinit⟩, #Hit, #Hiti, #Hireg, #Hpe, Hir, Hal, Hch, Hheld, Hhart, #Hused,
-    Hpriv, Hstack, Hgen, Hfds, Hkeys, Hcont⟩
+    Hpriv, Hstack, Hgen, Hfds, Hkeys, Hpk, Hcont⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- c.mv s1,a0 : s1 = p
   k_step (wp_s_add cpu _ (KA.«userinit» + 0xe#64) true 9#5 0#5 10#5 (by decide))
@@ -571,9 +644,10 @@ theorem ui_publish [X : CurCtx] (RE : RELEASE) (NR : NAMEI_ROOT) (Γ : SchedName
     simpa [RegMap.set_apply] using h9
   ihave Hcref := (show inodeHeldAt (GF := GF) ipv ROOTINO ⊢
       inodeHeldAt ((kb.withRegs R3).regs 10#5) ROOTINO from by rw [KCtx.withRegs_regs, hip]) $$ Hcref
-  iapply (ui_finish RE Γ cpu (kb.withRegs R3) j ch γ pid V M hj rfl hctx hof hs1
+  iapply (ui_finish RE FP Γ γw γtk γp γft cpu (kb.withRegs R3) j ch γ pid V M hj rfl hctx hof hs1
       ?hsie2 ?hnoff2 ?hintena2 ?hlocks2 ?htier2 ?hK2)
-    $$ [- $Hk $Hpc $Hpinv $Hheld $Hhart $Hused $Hpriv $Hstack $Hal $Hch $Hcref $Hgen $Hfds $Hkeys]
+    $$ [- $Hk $Hpc $Hpinv $Hheld $Hhart $Hused $Hpriv $Hstack $Hal $Hch $Hcref $Hgen $Hfds $Hkeys $Hpk $Hpe
+      $Hinitp]
   rotate_right 1
   · iintro %R5 Hk Hpc %hcs5
     have hcs5' : calleeSaved (kb.regs.set 9#5 (procAddr j)) R5 :=
@@ -637,14 +711,16 @@ theorem userinit_br_ffffffffffffff00 : KA.«userinit» + 0xffffffffffffff00#64 =
 
 set_option maxHeartbeats 4000000 in
 /-- **`userinit` meets its specification.** -/
-theorem userinit_proof (AP : ALLOCPROC) (RE : RELEASE) (NR : NAMEI_ROOT) : USERINIT :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X Γ _ _ cpu k γp γl γk γft γ nb np
+theorem userinit_proof (AP : ALLOCPROC) (RE : RELEASE) (NR : NAMEI_ROOT) (FP : FORKRET_PARK_PAID) :
+    USERINIT :=
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ SG _ _ X Γ _ cpu k γp γl γk γft γ γw γtk nb np
       hnoff hnoff0 hK hlk hlp hlq hlocks htier hproc hsie hnb hroot hnib0 => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
   unfold wp_userinit_body
   simp only [userinitAddr]
-  iintro ⟨Hk, Hpc, #Hpinv, #Hkml, #Hpml, Hkav, Hpav, Hinit, Hfb, Hipt, #Hit, #Hiti, #Hireg, #Hpe, #Hft, HPhi⟩
+  iintro ⟨Hk, Hpc, #Hpinv, #Hkml, #Hpml, Hkav, Hpav, Hinit, Hfb, Hipt, #Hit, #Hiti, #Hireg, #Hpe, #Hft, Hupk,
+    HPhi⟩
   icases kctx_tier cpu k $$ Hk with ⟨%hct, Hk⟩
   have ht0 : t0 = KTier.kpt := hct.symm.trans htier
   subst ht0
@@ -736,14 +812,20 @@ theorem userinit_proof (AP : ALLOCPROC) (RE : RELEASE) (NR : NAMEI_ROOT) : USERI
   ihave Hpav := (show pavSpent (GF := GF) Γ (pavDec (some (np + 1))) ⊢ pavSpent Γ (some np)
     from by rw [show pavDec (some (np + 1)) = some np from by simp [pavDec]]) $$ Hpav
   imod procsAvail_seal_spent Γ np $$ [$Hir $Hpav] with #Hpav
-  -- THE GENERATION ROW of the block: the boot deposit is the first
-  -- process's `firstTok` (userinit is its courier)
-  ihave Hgen : procGenAt (GF := GF) curCtx (procAddr j) 1#32 V.gen $$ [Hfb Hkq Hxs Hgh]
-  · unfold procGenAt
-    iframe Hxs Hgh
-    isplitl [Hfb]
-    · iapply firstTok_of_boot (hlc := hlc) $$ Hfb
-    · iexists _; iframe Hkq Hmp
+  -- THE BOOT MODE'S GENERATION ROWS: the boot deposit rides the park as its
+  -- own row (userinit is its courier), beside the pair at the trivial payload
+  ihave Hgen : uiBootRows (GF := GF) (procAddr j) 1#32 V.gen $$ [Hfb Hkq Hxs Hgh]
+  · unfold uiBootRows
+    iframe Hfb Hkq Hxs Hgh
+    iexact Hmp
+  -- <init>'s identity, for the package (`utParkCaps`, the park world)
+  ihave #Hig : initGen (GF := GF) (procAddr j) 1#32 $$ []
+  · unfold initGen
+    iexists V.gen
+    iframe Hsgd Hgpid Hipis Hprd
+  ihave Hpk : uiParkRows (hlc := hlc) (SG := SG) Γ γw γtk γp γft γ (procAddr j) $$ [Hupk]
+  · unfold uiParkRows
+    iframe Hupk Hpml Hpav Hft Hig
   imodintro
   -- THE SLOT'S ALLOWANCES: the cwd's unit pays namei's iget, the rest is
   -- parked; the null table's per-descriptor units go into the block's
@@ -762,10 +844,10 @@ theorem userinit_proof (AP : ALLOCPROC) (RE : RELEASE) (NR : NAMEI_ROOT) : USERI
   subst hspie
   subst hsppv
   k_norm [ui_ret_bee]
-  iapply (ui_publish RE NR Γ cpu _ j ch γ 1#32 V M hj rfl hVp.2.2.2.2 hVp.1
+  iapply (ui_publish RE NR FP Γ γw γtk γp γft cpu _ j ch γ 1#32 V M hj rfl hVp.2.2.2.2 hVp.1
       ?ha0 ?hsie2 ?hnoff2 ?hintena2 ?hlocks2 ?htier2 ?hK2 hroot hnib0)
     $$ [- $Hk $Hpc $Hpinv $Hinit $Hit $Hiti $Hireg $Hpe $Hir $Hal $Hch $Hheld $Hhart $Hused $Hpriv $Hstack
-      $Hgen $Hfds $Hkeys]
+      $Hgen $Hfds $Hkeys $Hpk]
   rotate_right 1
   · iintro %R5 Hk Hpc %hcs5 #Hinitp
     k_norm [ui_pushOffAt_pushed k hsie, hlocks, ui_filter_one, ui_withLocks_nil k hlocks, ui_ret_c12]

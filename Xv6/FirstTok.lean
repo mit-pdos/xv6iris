@@ -88,9 +88,8 @@ honest source is the process's own block.
    `first_boot_persist_morph`, `first_done_morph`, `first_boot_morph`,
    `first_tok_morph`) are DEFERRED, as `fs_ready_morph` is (FsReady
    deviation 8): the Lean cells here are `wordPointsTo` at the ambient
-   `CurCtx`, not a λ-context form, and the consumer (the park carrying a
-   block across `p->lock`, D8's ParkCap/ForkretIs retirement) does not exist
-   in Lean yet.
+   `CurCtx`, not a λ-context form.  (Landed since: `FsReadyMorph`'s
+   instances, which the park uses, ProofForkretPark.)
 7. **Rocq's `Typeclasses Opaque first_tok / first_boot /
    first_boot_persist` has no Lean counterpart**: Lean `iframe` matches by
    head symbol and never unfolds a `def`, so the correctness reason Rocq
@@ -116,7 +115,7 @@ honest source is the process's own block.
   + `firstTok_of_boot`) to deposit the exclusive arm into `<init>`'s block,
   out of the boot bundle's `firstBootPersist`, `kallocAvail fsReadyKmem
   none` (the seal allocproc's last counted draw leaves) and `firstFsinit`.
-* **forkret** (the ForkretIs retirement): `firstTok_open`; boot arm →
+* **forkret** (W8-P2's proof): `firstTok_open`; boot arm →
   `firstFsinit_open` feeds `wp_fsinit_eb` (premises by `FsGeomOk`
   projections), then `fsReady_seal` + `firstPersistPre` build `fsReady`,
   the store of 0 is persisted and `firstDone` is formed; steady arm →

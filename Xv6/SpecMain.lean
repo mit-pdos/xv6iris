@@ -81,8 +81,11 @@ name: main holds that name's `lockFreeTok` (`MachCSL.LockBornHook`), which
      `fs_kit_fsinit_ghost`) plus `flive_auth_at` and the off-box set
      authorities: FsCfgKits is not ported (FsCfgBoot header, blocker 2).
      The supply's TEN TIES are here, as pure premises.
-   * `init_boot_bundle` (InitBoot, W8-K) and the park token (ParkCap,
-     W8-P2): userinit still takes `[ForkretIs]` and no exec bundle.
+   * `init_boot_bundle` and the console's reader token: userinit takes
+     them now (W8-P2, `SpecUserinit.userinitPark`, with the wait / ticks
+     locks, the console, the device complement, `wireInv` and the
+     trampoline claim), and its proof takes `FORKRET_PARK_PAID` (the park
+     token); main's contract does not carry the two linear rows yet (W8-N).
    * `fentry_raw` (the hundred `struct file` entries) and `fd_slots_auth`:
      Lean has no ftable boot site (FileDefs.lean:77) and no slot authority
      (SlotSupply deviation 3).

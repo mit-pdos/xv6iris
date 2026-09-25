@@ -14,9 +14,8 @@ layer.  What stays a PARAMETER:
 * the four lock / allocator contracts no Link proves yet: `RELEASE_GEN`
   (piperead / pipewrite), and `pipeclose`'s `RELEASE_REFUTE`,
   `RELEASE_CANCEL`, `KFREE_FREE` (LinkPipeclose's own parameters);
-* the seal's two flagged hypotheses (ProofSyscall): `[ForkretIs]` (W8-P2)
-  and the write deposit law `SyscDepWrite` (until filewrite drops its
-  no-wrap premise).
+* nothing else: the park token is `ParkCap.parkToken` (the seal's
+  `SYSCALL_XV6`, W8-P2), and the write deposit law is discharged.
 
 Rocq's `LinkSyscall` supplies the environment nowhere either: `syscall_env`
 is a precondition of the WP, owed by whoever applies usertrap's theorem.
@@ -103,9 +102,8 @@ namespace Xv6
 open Iris MachCSL
 
 /-- The proved `syscall` interface at the kernel's deposit instance, given
-the unproven lock / allocator leaves, the forkret class (ProofSyscall's flagged hypothesis). -/
-theorem Syscall (RG : RELEASE_GEN) (RR : RELEASE_REFUTE) (RC : RELEASE_CANCEL) (KFF : KFREE_FREE)
-    [ForkretIs] :
+the unproven lock / allocator leaves. -/
+theorem Syscall (RG : RELEASE_GEN) (RR : RELEASE_REFUTE) (RC : RELEASE_CANCEL) (KFF : KFREE_FREE) :
     SYSCALL_XV6 :=
   let AC := Acquire
   let RE := Release

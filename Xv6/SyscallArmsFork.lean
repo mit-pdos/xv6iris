@@ -14,15 +14,19 @@ contract, crossing `k.sie`) from the dispatch's rows, per the frozen recipe
   `sforkLend f` refunded on `-1` (`uforkAns`'s left arm), dropped on success
   beside the parent's `childTok` at a FRESH generation.
 
+* The park (W8-P2): kfork's `kforkPark` rows out of the environment --
+  printk's credentials, the park world with the syscall side's rows
+  (`syscallEnv_parkRows`), THE PARK TOKEN (`syscallEnv_token`, read as
+  `ParkCap.parkToken` by `hPTk`), the lend `sforkLend f` and the child's
+  slot deposit (`syscForkIn`'s wand, at `syscForkChild V` =
+  `KforkChild.kforkChild V`).  kfork refunds the lend on `-1`.
+
 ## Deviations from Rocq (flagged)
 
-1. **`[ForkretIs]` is an instance argument of the arm** (SpecSysFork's
-   assumed class; W8-P2's `ParkCap.park_token` retires it).  It is NOT a
-   field of `SYSCALL`: the seal (W8-E2) will carry it until W8-P2 lands.
-2. **PROCESS LAYER: `syscForkIn`'s child-slot wand is DROPPED** (SpecSyscall
-   deviation 7): Lean's kfork threads no `uslot` / `Rc` / `park_token`, so
-   the child's slot and the lend it would carry have no taker.  The lend
-   stays with the parent and is refunded (failure) or dropped (success).
+1. **The token is read through `hPTk : ∀ Γ, PT Γ ⊢ parkToken Γ`**: the
+   environment's token is the abstract `PT` of `SpecSyscall.SYSCALL`; the
+   seal is at `PT := parkToken` (`SpecSyscallXv6`), where `hPTk` is
+   `fun _ => .rfl`.
 -/
 import Xv6.SyscallRet
 
@@ -86,12 +90,12 @@ success. -/
 theorem syscArmFork_out (f : UexecSG.sfam GF) (V : ProcPriv) (j : Nat)
     (cs cs' : ExtTreeSet GName compare) (rv : BitVec 32) :
     (⌜rv = -1#32 ∧ cs' = cs⌝ ∗ UexecSG.sforkLend f) ∨
-      (UexecSG.sforkLend f ∗ ∃ γc : GName, ⌜1 ≤ rv.toNat ∧ rv.toNat ≤ PIDMAX⌝ ∗ ⌜γc ∉ cs⌝ ∗
+      (∃ γc : GName, ⌜1 ≤ rv.toNat ∧ rv.toNat ≤ PIDMAX⌝ ∗ ⌜γc ∉ cs⌝ ∗
         ⌜cs' = cs ∪ {γc}⌝ ∗ childTok γc rv (UexecSG.sforkPay f)) ⊢
       syscForkOut f V (BitVec.signExtend 64 rv) cs cs' := by
   unfold syscForkOut uforkAns
   iintro H %_
-  icases H with (⟨%h, Hl⟩ | ⟨-, %γc, %hr, %hf, %hcs, Ht⟩)
+  icases H with (⟨%h, Hl⟩ | ⟨%γc, %hr, %hf, %hcs, Ht⟩)
   · ileft
     iframe Hl
     ipureintro
@@ -104,11 +108,25 @@ theorem syscArmFork_out (f : UexecSG.sfam GF) (V : ProcPriv) (j : Nat)
     ipureintro
     exact ⟨rfl, hr, hf, hcs⟩
 
+/-- The syscall side's park rows (the park world, the ticks and nextpid
+locks, the console), off the environment. -/
+theorem syscallEnv_parkRows (PT : SchedNames → IProp GF) (Γ : SchedNames) (γ : FileNames) :
+    syscallEnv (hlc := hlc) PT Γ γ ⊢ utSysParkRows Γ := by
+  unfold syscallEnv syscProcEnv utSysParkRows syscParkExtra syscPidLock
+  iintro ⟨⟨%γp, %γw, %γft, %γtk, #Hnp, #Hpav, -, -, #Htk⟩, #Hcons, -, -, #Hw, -⟩
+  iexists γtk
+  isplitr
+  · isplitr
+    · iexists γp; iexact Hnp
+    iframe Hpav Htk Hcons
+  iexact Hw
+
 set_option maxHeartbeats 4000000 in
 /-- **Arm 1, `sys_fork`** (Rocq `sysc_arm_fork`).  Deviations 1-2 of the
 header (flagged). -/
-theorem syscall_arm_fork (SF : SYSFORK) [ForkretIs]
-    (PT : SchedNames → IProp GF) [hPT : ∀ Γ, Persistent (PT Γ)] (Γ : SchedNames)
+theorem syscall_arm_fork (SF : SYSFORK)
+    (PT : SchedNames → IProp GF) [hPT : ∀ Γ, Persistent (PT Γ)]
+    (hPTk : ∀ Γ', PT Γ' ⊢ parkToken (hlc := hlc) (SG := SG) Γ') (Γ : SchedNames)
     [ClaimIs (hlc := hlc) GF Γ]
     (c0 cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γw : GName) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
@@ -142,19 +160,32 @@ theorem syscall_arm_fork (SF : SYSFORK) [ForkretIs]
   icases fsReady_icache $$ Hrdy with ⟨#Hit2, #Hiti, -⟩
   icases fsReady_region $$ Hrdy with ⟨#Hreg, -⟩
   ihave #Hdone := syscallEnv_first PT Γ γ $$ Henv
-  -- fork's deposit: the kill wand and the lend (the child's slot has no taker, deviation 2)
+  -- fork's deposit: the kill wand, the lend and the child's slot -- the park rows
   unfold syscForkIn
-  icases HfIn $$ %hn1 with ⟨#Hkw, Hlend, -⟩
+  icases HfIn $$ %hn1 with ⟨#Hkw, Hlend, Hslotw⟩
+  ihave #Hpe := syscallEnv_panic PT Γ γ $$ Henv
+  ihave #HG := syscallEnv_parkRows PT Γ γ $$ Henv
+  ihave #HT := syscallEnv_token PT Γ γ $$ Henv
+  ihave #HT := hPTk Γ $$ HT
+  ihave Hpk : kforkPark (hlc := hlc) (SG := SG) Γ V M sts (UexecSG.sforkPay f) (UexecSG.sforkLend f)
+      $$ [Hlend Hslotw]
+  · unfold kforkPark kforkChild
+    unfold syscForkChild at *
+    isplitr; · iexact Hpe
+    isplitr; · iexact HG
+    isplitr; · iexact HT
+    iframe Hlend
+    iexact Hslotw
   have hU := SF.wp_sys_fork_eb (hlc := hlc) (GF := GF) Γ cpu
     (((k.withSpie spie spp).pushed 4).withRegs R) γw γp fscKalloc fsReadyKmem γft γ j pid V M sts
-    (UexecSG.sforkPay f) cs hj hprocK
+    (UexecSG.sforkPay f) cs (UexecSG.sforkLend f) hj hprocK
     (by k_norm_g; have : sysForkSlots + 4 ≤ syscallSlots := by decide
         omega)
     hnoffK (by k_norm_g; exact htier)
   unfold wp_sys_fork_eb_body at hU
   rw [syscTarget_fork]
   iapply hU
-  iframe Hk Hpi Hwl Hnp Hkl Hka Hpav Hft Hit2 Hiti Hreg Hkw Hdone Hpriv Hfr Hch Hpc
+  iframe Hk Hpi Hwl Hnp Hkl Hka Hpav Hft Hit2 Hiti Hreg Hkw Hdone Hpk Hpriv Hfr Hch Hpc
   k_next_e
   unfold kforkPost kforkPostB kforkRet
   iintro %spie2 %spp2 %R2 %rv %⟨hcs, ha0, hans⟩ Hk Hpc ⟨Hpriv, Hfr, Hret⟩
@@ -163,7 +194,7 @@ theorem syscall_arm_fork (SF : SYSFORK) [ForkretIs]
   have hpins2 := syscPins_calleeSaved k R R2 hpins hcs
   have hs2' : R2 18#5 = pageAddr V.upt.tfp := hcs.2.2.2.1.trans hs2
   -- the children set the post is keyed at, and fork's answer
-  icases Hret with (⟨%hrv, Hch⟩ | ⟨%γc, %hr, %hf, Htok, Hch⟩)
+  icases Hret with (⟨%hrv, Hch, Hlend⟩ | ⟨%γc, %hr, %hf, Htok, Hch⟩)
   · have hrows := syscRows_fork V M sts cs cs pid (R2 10#5) hn1 (by rw [hl]; decide)
       (by rw [ha0]; exact syscArmFork_ans rv hans)
     unfold syscallRet syscallAddr at *
@@ -191,11 +222,10 @@ theorem syscall_arm_fork (SF : SYSFORK) [ForkretIs]
     · iapply syscExecOut_ne; rw [hn1]; decide
     isplitr
     · iapply syscSysOut_fork f V M sts gn cs pid _ _ sts _ _ hn1
-    isplitl [Hlend Htok]
+    isplitl [Htok]
     · rw [syscStore_a0 V _ (by rw [hl]; decide), ha0]
       iapply syscArmFork_out f V j cs (cs ∪ {γc}) rv
       iright
-      iframe Hlend
       iexists γc
       iframe Htok
       ipureintro; exact ⟨hr, hf, rfl⟩

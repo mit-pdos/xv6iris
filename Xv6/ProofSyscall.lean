@@ -24,10 +24,9 @@ Every arm's deposit law is discharged AT THE INSTANCE from
 
 1. (retired) `SyscDepWrite` is discharged by `syscDepWrite_holds` now that
    filewrite/consolewrite take no no-wrap premise.
-2. **`[ForkretIs]`** (PROCESS LAYER): the fork arm's `SYSFORK` carries the
-   assumed forkret class until W8-P2's re-spec of kfork retires it.
-3. The park token stays ABSTRACT (`PT`, ∀-quantified by the contract):
-   ParkCap is W8-P2.
+2. (retired, W8-P2) `[ForkretIs]`: kfork parks through the park token.
+3. The park token is `ParkCap.parkToken` (SpecSyscallXv6); the fork arm
+   reads it with `hPTk := fun _ => .rfl`.
 
 ## Deviations from Rocq
 
@@ -58,24 +57,24 @@ set_option linter.unusedSectionVars false
 set_option linter.unusedVariables false
 
 /-- **`syscall()` meets its specification** at the kernel's deposit instance,
-given the 22 table entries' interfaces, `myproc`, `printk`, the forkret
-class (W8-P2) and the write deposit law (hypothesis 1). -/
+given the 22 table entries' interfaces, `myproc` and `printk`. -/
 theorem syscall_proof (MP : MYPROC) (PK : PRINTK)
     (SFK : SYSFORK) (SEX : SYSEXIT) (SWT : SYSWAIT) (SPP : SYSPIPE) (SRD : SYSREAD) (SKL : SYSKILL)
     (SEC : SYSEXEC) (SFS : SYSFSTAT) (SCD : SYSCHDIR) (SDP : SYSDUP) (SGP : SYSGETPID)
     (SSB : SYSSBRK) (SPS : SYSPAUSE) (SUP : SYSUPTIME) (SOP : SYSOPEN) (SWR : SYSWRITE)
     (SMN : SYSMKNOD) (SUL : SYSUNLINK) (SLK : SYSLINK) (SMD : SYSMKDIR) (SCL : SYSCLOSE)
-    (SSY : SYS_SYNC) [ForkretIs] :
+    (SSY : SYS_SYNC) :
     SYSCALL_XV6 :=
   ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-      PT _ Γ _ c0 k γw γ j pid V M sts gn cs ip f hj hproc hK hnoff htier hgn => by
+      Γ _ c0 k γw γ j pid V M sts gn cs ip f hj hproc hK hnoff htier hgn => by
+    let PT := parkToken (hlc := hlc) (GF := GF) (SG := uexecSGXv6)
     have hE : SyscSpostEmp (GF := GF) := syscSpostEmp_xv6 (hlc := hlc)
     refine syscall_head_entry MP PT Γ c0 k γw γ j pid V M sts gn cs ip f hE hj hproc hK hnoff htier hgn
       ?_ ?_
     · intro cpu spie spp R n hn1 hn22 hnum hpins hs1 hs2 hra
       exact syscall_arms_all SEC syscDepExec_holds PT Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f
         hE hj hproc hK hnoff htier hgn hpins hs1 hs2 hra
-        (fun h => syscall_arm_fork SFK PT Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj hproc
+        (fun h => syscall_arm_fork SFK PT (fun _ => .rfl) Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj hproc
           hK hnoff htier hgn h hpins hs1 hs2 hra)
         (fun h => syscall_arm_exit SEX PT Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj hproc
           hK hnoff htier hgn h hpins hs1 hs2 hra)
