@@ -1516,6 +1516,7 @@ FileState.v
 ProgTreeFile.v
 ProgTreePipes.v
 GrepTree.v
+GrepFilt.v
 EchoDisc.v
 LineBytes.v
 LineModel.v
