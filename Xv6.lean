@@ -1045,3 +1045,7 @@ import Xv6.CtxAmb
 import Xv6.FileMorph
 import Xv6.FsReadyMorph
 import Xv6.EnvMorph
+import Xv6.ProofSysExec
+import Xv6.LinkSysExec
+import Xv6.KexecNe
+import Xv6.SysExecNe

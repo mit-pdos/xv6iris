@@ -80,9 +80,8 @@ arms, the frame and the seal); its pure §1 is `Xv6/KexecLoad.lean` +
    `kexecK`.
 5. **DROPPED / DEFERRED**: the `ufdG` section binder (D17: the slot's
    descriptor leg is not a Lean camera yet); `exec_slot_pre_ne` /
-   `exec_au_pre_ne` (the non-expansiveness of the bundle in `S`, consumer
-   `UexecExecInst` -- the user-mode dispatcher, wave 8: DEFERRED there,
-   together with the fixpoint that needs it).
+   `exec_au_pre_ne` (the non-expansiveness of the bundle in `S`) are split
+   out to `Xv6/KexecNe.lean` (D33).
 6. Numbers as `FsAbsDefs` deviation 1 (inums `Nat`, `-1` is
    `0xFFFFFFFFFFFFFFFF#64`); Rocq `Z → iProp` payload families are
    `Int → IProp` (`ChildTok.myPay`).

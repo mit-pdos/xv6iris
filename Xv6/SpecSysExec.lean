@@ -130,8 +130,7 @@ than handed in.  A port of Rocq `SpecSysExec.v`
    own `hargs` spelling); `-1` is `0xFFFFFFFFFFFFFFFF#64`.
 7. **DROPPED / DEFERRED**: the `ufdG` section binder (SpecKexec deviation 5);
    `sys_exec_slot_pre_ne` / `sys_exec_au_pre_ne` (non-expansiveness in the
-   slot predicate, consumer `UexecExecInst` -- the user-mode dispatcher,
-   wave 8: DEFERRED with `exec_au_pre_ne`, SpecKexec deviation 5);
+   slot predicate) are in `Xv6/SysExecNe.lean` (D33);
    `kernel_text` / `kernel_data` ride in `kctx`; the unused `gs`/`gl`, `b`,
    `lks`, `m`, `K`, `eb`, `dqb dqs` (statement packaging).
 
