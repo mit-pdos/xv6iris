@@ -1,7 +1,8 @@
 # Design: `seccomp x` -- an arbitrary binary under a syscall mask, in the union theorem
 
-Owner's request (2026-09-25): bump to upstream `verified` at a083670
-(`8e195e0 seccomp`, `a083670 add user/seccomp.c`), then extend
+Owner's request (2026-09-25): bump to upstream `verified` (a083670:
+`8e195e0 seccomp`, `a083670 add user/seccomp.c`; then 7b2c1b1, the mask
+widened at our finding in §1), then extend
 `UInitUnion.union_adequacy_closed` so that the user may type `seccomp x`
 for ANY `x` -- whatever binary runs under the mask -- and the theorem still
 holds, because a masked process cannot affect the state the theorem cares
@@ -52,16 +53,14 @@ exec/fstat/chdir/dup/getpid/sbrk/pause/uptime/write/close/sync/seccomp):
 `write` reaches only the descriptors the process holds, and without
 `open` those are the console it inherited and pipes it made; `chdir`,
 `exec`, `close`, `exit` move reference counts, never a link count or a
-byte.  The proof is built mask-parametric at `B`; the ONE place the
-binary's literal mask enters is the seccomp program's own tree proof
-(`mask = ~0 & ~(1<<15) & ~(1<<6)` does NOT clear 17-20), so with the
-upstream binary as it stands the final assembly fails LOUDLY at that
-literal.  OWNER DECISION NEEDED (asked 2026-09-25): extend
-`user/seccomp.c`'s mask to `B` upstream (two lines), or accept the
-weaker theorem where the seccomp round leaves the state arbitrary (which
-the model cannot represent without a directory/device arm, so it is not
-a small change either).  Everything below except the last assembly step
-is independent of the answer.
+byte.  The proof is built mask-parametric at `B`; the ONE place the binary's
+literal mask enters is the seccomp program's own tree proof.  RESOLVED
+(owner, 2026-09-25): upstream 7b2c1b1 ("seccomp: block more syscalls")
+makes `user/seccomp.c` clear exactly `B` (open, kill, link, unlink,
+mkdir, mknod), and the tree is pinned there.  Everything else `x` can
+still do -- print anything, read the console, fork, pipe, exec any
+binary in the image, chdir, sbrk, sync, exit with any status -- is
+admitted by the proof, not excluded.
 
 ## 2. The console cannot be tamed, so the round is TERMINAL
 
@@ -184,120 +183,159 @@ the contracts case on becomes the EFFECTIVE number.
 
 ## 5. The universe: a generic slot without the taint (cut S1)
 
-`UexecRet.uexec_dep_F_of_supply` builds the GENERIC keyed slot from `□
-ssupply` and the taint; the seccomp universe gets the same construction
-from a different, weaker credential, and the whole novelty is which
-numbers it has to pay and with what.  A key `W` is IN THE UNIVERSE when
+`UexecRet.uexec_dep_F_of_supply` / `uexec_ret_of_all` build the GENERIC
+keyed slot from `□ ssupply` and the taint, and `UexecExecMint.uslot_mint_all`
+(the minter the union boot binds as `Hmint`; `uslot_mint_pay` has no
+callers) packages it.  The seccomp universe gets the same construction
+from a weaker, per-era credential; the novelty is which numbers it must
+pay and with what.  A key `W` is IN THE UNIVERSE when
 
-    secc_key W := ⌜forall n, n ∈ B -> Z.testbit (uvis_secc W) n = false⌝
+    secc_key W := ⌜forall n, n ∈ B -> Z.testbit (bv_unsigned (uvis_secc W)) n = false⌝
                   ∗ [∗ list] st ∈ uvis_fd W, secc_row st
     secc_row (FdOpen _ _ (FdInode _ _ _)) := False
     secc_row (FdOpen _ _ (FdPipe γp))     := wild_pipe γp      (persistent)
     secc_row _                            := True               (console, closed)
 
-and `useccomp_slot : secc_env -∗ □ secc_key W -∗ my_pay .. -∗ uslot W`
-with `secc_env := secc_lic (S gen_id)` (§6) is a Löb over the same arms
-as the generic slot.  Per number (`UexecExecInst.xv6_sbundle`):
+and `useccomp_mint : secc_env -∗ □ (∀ W, □ secc_key W -∗ my_pay (uvis_gen W)
+(fun _ => True) -∗ uslot W)` with `secc_env := secc_tok (S gen_id)` (§6) is
+a Löb over the same arms as `uexec_ret_of_all`, at the trivial payload.
+Per number (`UexecExecInst.xv6_sbundle` / `xv6_spost`):
 
 | n | deposit | paid by |
 |---|---|---|
 | free numbers, 23 | `emp` | -- |
 | 6 15 17 18 19 20 | never asked: `uvis_num W = 0` under `secc_key` | the mask |
-| 5 read | `fileread_in` at the row | inode: refuted by `secc_row`; pipe: `pipe_rpay` from `wild_pipe`; console: `cons_acc` DIRTY arm + `cons_read_pay` from `secc_lic` (see §6 for the dirty credential) |
-| 16 write | `filewrite_in` | inode: refuted; pipe: `pipe_wpay` links from `wild_pipe`; console: `cons_out_chain` from `secc_lic` |
-| 21 close, 2 exit | `fileclose_cpay(s)` | pipe rows: `pipe_reg_of_inv` at `wild_pipe`; others `emp` |
-| 4 pipe | `emp`; the POST hands the fragment | allocate `wild_pipe γp` from it; the resume key satisfies `secc_key` |
-| 1 fork | the child's slot at the copied key | Löb: `secc_key` is the same table and mask |
-| 7 exec | `exec_sbundle`: the AU (observations) and the slot wand | Löb: `exec_key` keeps table and mask |
+| 5 read | `fileread_in` at the row | inode: refuted by `secc_row`; pipe: `pipe_rchain` from `wild_pipe`; console: `cons_acc` DIRTY arm at the widened credential (§6) + `cons_read_pay` from the era licence |
+| 16 write | `filewrite_in` | inode: refuted; pipe: `pipe_wchain` from `wild_pipe`; console: `cons_out_chain` from the era licence (`cons_run_of_licence`'s era-k twin) |
+| 21 close, 2 exit | `fileclose_cpay(s)` | pipe rows: `pipe_clink` from `wild_pipe` (`PipeProto.pipe_clink_of_inv`'s mould); others `emp` |
+| 4 pipe | `emp`; the POST hands `pipe_qfrag (pn_queue γp) pst0` and the two rows | allocate `wild_pipe γp`; the resume key satisfies `secc_key` |
+| 1 fork | the child's slot at `kfork_child`'s key, `sfork_pay = fun _ => True`, lend `emp` | Löb: same table, same mask |
+| 7 exec | `exec_sbundle`: the AU at the escape `T := secc_tok k` (`ExecRun.exec_walk_of_taint` is already parametric in `T`; `ex_node_id T` says nothing at a true `T`) and the slot wand | Löb: `exec_key` keeps the table; a NEW pin in the wand's premises says the new key's mask is the caller's |
+| the kill arm | the payload at -1 is `True` | free (check `uexec_kill_arm_F_of_cred` at the trivial payload) |
 | the rest | `emp` | -- |
 
-`wild_pipe γp := inv seccN (∃ s, pipe_qfrag (pn_queue γp) s)` -- the
-pipe's queue fragment parked with NO protocol; every link the universe
-needs (`pipe_wlink`/`rlink`/`clink` are `={⊤}=∗`-shaped) opens it, and
-`PipeProto.pipe_reg_of_inv` is the mould.  `secc_key` is preserved by
-every row of `usys_fd_ok` (pipe adds pipe rows, dup copies, close
-removes, open never runs) and by `usys_secc_ok` (the mask shrinks).
+`wild_pipe γp := inv seccN (∃ s, pipe_qfrag (pn_queue γp) s)` -- the queue
+fragment parked with NO protocol; every link the universe needs
+(`pipe_wlink`/`rlink`/`clink` are `={⊤}=∗`-shaped) opens it, and
+`PipeProto.pipe_reg_of_inv` is the mould.  `secc_key` is preserved by every
+row of `usys_fd_ok` (pipe adds pipe rows, dup copies, close removes, open
+never runs) and by `usys_secc_ok` (the mask shrinks).
 
-`ExecEntry.image_entry_secc S Q X := □ (∀ W', S -∗ □ secc_key W' -∗
-my_pay (uvis_gen W') Q -∗ X W')` is the seccomp twin of
-`image_entry_taint`; the seccomp program's tree answers its `exec(x)`
-with it, and `exec_bundle_of` gets a third arm beside the pinned and the
-taint ones.
+`ExecEntry.image_entry_secc S Q X := □ (∀ W', S -∗ □ secc_key W' -∗ my_pay
+(uvis_gen W') Q -∗ X W')` is the seccomp twin of `image_entry_taint`.
+`exec_bundle_of` takes BOTH `image_entry f ..` and `image_entry_taint T` and
+the WALK decides (`exec_walk_of_pin` identifies the node unless `T`;
+`exec_walk_of_taint` identifies it only by `T`); the seccomp program's
+`exec(x)` uses the taint-shaped walk at `T := secc_tok k` and answers the
+`image_entry_taint`-slot with `image_entry_secc`, proving `secc_key W'` from
+its own key (the table is the caller's, the mask is the caller's -- the pin
+added to `SpecKexec.exec_slot_pre`'s wand premises).
 
-## 6. The claim's terminal arm and the era licence (cut S2)
+## 6. The claim's terminal arm, the era token and the licence (cut S2)
 
-`UnionOut.ucl := peclV ..` is `gcl ∨ popenU`.  It gains a third arm and a
-per-era token:
+THE EXPORT IS AT EVERY OUTPUT BYTE, NOT AT THE END.  `AppUnionRec.union_al_tx`
+calls `UnionOut.ucl_drain` at each `ObsUartOut Uart0 b`, which must return
 
-    ucl' k ho H := UT ∨ (secc_clean k ∗ ucl k ho H) ∨ usecc k ho H
+    udrain_ret k seg := UT ∨ ∃ s0 vf, ⌜lm_good_out U s0 seg⌝ ∗ ⌜fstate_ok s0⌝
+                        ∗ f0_typed gf s0 ∗ file_era_pin gf k vf ∗ f0_lb vf s0
+
+with `s0` the era's already-drained state, under `ins seg = ins (open_seg
+h)` and `obs_wire Uart0 seg ⊑ ch_acc CH`.  So the third arm must carry the
+era's boot witness (`f0cw gf k s0`, which `WA k s0` is) and a pure fact
+giving `obs_wire seg ⊑ lm_sess ps cs' s0 (ins seg)` at `cs' := cs ++
+[ualt_code (US u)]`, `u` the wire's tail after the echoed line -- which
+`lm_blk`'s definition makes literal.  `ins seg = I0` is pinned by
+`inp_lb v I0` plus D4 (`lm_disc_in`: no input after the last line).
+
+`UnionOut.ucl := peclV ..` is `gcl ∨ popenU`.  It gains a third arm and the
+era gains ONE `mono_nat`:
+
+    ucl' k ho H := UT ∨ (secc_clean_half k ∗ ucl k ho H) ∨ usecc k ho H
     usecc k ho H := secc_tok k ∗ ∃ v ps cs s0 I0 u,
-        PIN k v ∗ ps_lb v ps ∗ cs_lb v cs ∗ inp_lb v I0 ∗ WA k s0
+        PIN k v ∗ ps_lb v ps ∗ cs_lb v cs ∗ inp_lb v I0 ∗ f0cw gf k s0
+        ∗ cs_frozen v cs
         ∗ ⌜nlines I0 = S (length cs) /\ rest_of I0 = []
            /\ lm_of U (last body of I0) = LSecc _
-           /\ lm_pro_ok ps cs (nlines I0) /\ (lm_alts_ok at the first length cs lines)
-           /\ out(H) = lm_sess ps cs s0 I0' ++ body ++ [nl] ++ u⌝
+           /\ lm_pro_ok ps cs (nlines I0) /\ lm_alts_ok' (the first length cs lines)
+           /\ ch_acc H = lm_sess ps cs s0 I0' ++ body ++ [wl_nl] ++ u⌝
 
-where `secc_clean k`/`secc_tok k` are the exclusive authority at 0 and
-the persistent lower bound at 1 of ONE `mono_nat` per era, minted with
-the era's pins (`EchoOut.era_pins` gains `ep_secc`; `PIN k v` carries
-the name and `era_pin_agree` identifies it).  `secc_tok k` refutes the
-middle arm, so the LICENCE
+`EchoOut.era_pins` gains `ep_secc : gname` (only `EchoOut.v` and
+`PipeOut.v:539` name pins' fields, so this is cheap); `era_full` gains
+`mono_nat_auth_own (ep_secc v) 1 0`, split at `union_era_split` into TWO
+HALVES: one in the claim's middle arm, one in the SHELL's per-round
+credential (`uWcu' I p := secc_clean_half k ∗ uWcu I p ∨ useccomp_shape I`,
+riding down from init's lend beside `fturn`).  `secc_tok k :=
+mono_nat_lb_own (ep_secc v) 1` under `PIN k v`; it refutes either half.
 
-    secc_lic k := □ ∀ h H ev, riscv_cons_res k h H ==∗ riscv_cons_res k h (cons_step H ev)
-
-follows from `secc_tok k` (the T arm is closed under everything, the
-`usecc` arm under every event because `u` is existential and the input
-side is not read), and `WpUart.cons_link_of_licence`'s proof is the
-era-restricted twin.  `RiscvPtsto.app_iface` gains `ai_wild : nat ->
-iProp Σ` with law `ai_wild_lic`, instantiated at `secc_tok`; the trivial
-application takes `False`.
+THE LICENCE.  `secc_lic k := □ ∀ h H ev, riscv_cons_res k h H ==∗
+riscv_cons_res k h (cons_step H ev)` follows from `secc_tok k` (the T arm
+is closed under everything, the middle arm is refuted, the `usecc` arm is
+closed under every event because `u` is existential and it reads no input
+ghost).  `RiscvPtsto.app_iface` gains `ai_wild : nat -> iProp Σ` with the
+law `ai_wild_lic : ai_wild k ⊢ □ ∀ h H ev, ai_cons k h H ==∗ ai_cons k h
+(cons_step H ev)`; the union instantiates it at `secc_tok`, the trivial
+application at `False`; `RiscvPtsto.riscv_wild := ai_wild riscvF_app_iface`;
+`WpUart.cons_link_of_licence` / `cons_run_of_licence` / `cons_read_pay_triv`
+get era-k twins.
 
 THE DIRTY CREDENTIAL.  A tokenless console read pays
-`ConsoleInv.cons_dirty_cred Wd = □ Wd`, and `SpecFileread` names `Wd :=
-AppInv.app_sup`, which only the taint yields.  `Wd` becomes `app_sup ∨
-riscv_wild (S gen_id)`: the generic reader still pays with `app_sup`;
-the universe pays with `secc_tok`; the token holder (sh) that finds the
-ring dirty gets `□ (app_sup ∨ secc_tok k)` back and either arm ends its
-round -- `app_sup` gives `T` as today, `secc_tok k` says the era is in
-its terminal arm, which sh's non-terminal credential refutes through the
-claim's middle arm.  (Rejected: a shared reader token in an invariant --
-`cons_acc`'s left arm returns the token under a plain `==∗`, so an
-invariant cannot close around it; and `Wd := app_taint` alone, which the
-universe never holds.)
+`ConsoleInv.cons_dirty_cred Wd = □ Wd`, and the boot (`ProofMain.v:755`),
+`SpecFileread` (a dozen sites), `SpecSysRead`, `ProofFileread`,
+`FsAbsInvFire`, `UkReadCons` and `UShLine` all fix `Wd := AppInv.app_sup`.
+It becomes ONE new name, `AppInv.app_rdcred := app_sup ∨ riscv_wild (S
+gen_id)`: the generic reader still pays `app_sup` (`iLeft`), the universe
+pays `secc_tok` (`iRight`).  The token holder's dirty arm
+(`UShLine.ush_read_pay_era_at`, which today turns `□ app_sup` into `T`
+through the premise `app_sup -∗ lk_T L`) returns a THIRD outcome of
+`ush_rd_ret`, "the era is wild": `secc_tok k ∗ position`; the loop laws
+(`uWcu_read` and its siblings) refute it with the shell's half in every
+non-seccomp shape and absorb it in `useccomp_shape`.  Rejected: a shared
+reader token in an invariant -- `cons_acc`'s left arm returns the token
+under a plain `==∗`, and two concurrent universe readers would both need
+it at deposit time; and `Wd := app_taint`, which the universe never holds.
 
-ENTERING THE ARM.  sh's round law at `LSecc ws`: after `gets` returns
-the line and before the fork, sh opens the claim (it holds the round's
-cursor, `uWcu I p`), moves `gcl` into `usecc` at `u := []`, bumps the
-`mono_nat` to 1 and keeps `secc_tok k`; it forks, the child execs
-`/seccomp` with `secc_tok k` in its supplier, sh waits.  sh's widened
-credential `uWcu` gains a fourth disjunct, the SECCOMP-TERMINAL shape
-`useccomp_shape I := secc_tok (S gen_id) ∗ era_pin .. ∗ inp_lb v I`
-(no deed -- ruling B3's reason), under which the prompt, the next `gets`
-and every later round are paid by the licence and the read's byte, if
-one ever comes, is undisciplined by D4 and yields `T` exactly as the
-pipeline's terminal shape does (`ush_deed_taint`).
+ENTERING THE ARM.  sh's round law at `LSecc ws`: after `gets` returns the
+line and before the fork, sh opens the claim with its half and the
+round's cursor (`uWcu I p` at the pre-fork shape), joins the halves,
+bumps the `mono_nat` to 1 (keeping `secc_tok k`), freezes `cs`
+(`PipeOut.pcs_freeze`, as the pipeline's terminal round does at
+`peclV_blkN_open_gen`), and re-closes at `usecc` with `u := []`; it
+forks, the child execs `/seccomp` with `secc_tok k` in its supplier, sh
+waits.  Afterwards sh runs at `useccomp_shape I := secc_tok (S gen_id) ∗
+era_pin .. v ∗ inp_lb v I ∗ cs_frozen_at v (nlines I - 1)` (no deed --
+ruling B3's reason): the prompt and every later write go through the
+licence, and a later read's `cs_lb`, one longer, is absurd against the
+freeze (`PipeOut.cs_frozen_at_lb_absurd`) exactly as `uterm_read_law`
+does it for the pipeline's terminal shape.
 
-THE EXPORT.  `union_led`'s per-cycle conclusion at the `usecc` arm:
-`ins seg = I0` under the discipline (D4), and `lm_good_out` holds at
-`cs ++ [ualt_code (US u)]` with `u` the wire's tail -- `lm_sess` at the
-extended list IS `out(H)` by `lm_blk`'s definition.  The durable claim
-and the boot-state admissibility are untouched: the seccomp round's
-`lm_step` is the identity and no universe syscall retags a row.
+THE DRAIN.  `ucl'_drain` at the `usecc` arm: `lm_good_out s0 seg` from the
+pure fact at `cs ++ [ualt_code (US u)]`, `u` read off `ch_acc H`; the
+existing arms through `ucl_drain` unchanged.  The durable claim and the
+boot-state admissibility are untouched: the seccomp round's `lm_step` is
+the identity and no universe syscall retags a row.
 
 ## 7. The seccomp program (cut S3) and the round (cut S4)
 
-`user/seccomp.c` is a verified program on the `Uk*` engine like `cat`:
-`UCodeSeccomp.v` (main, fork/seccomp/exec/wait/exit stubs, the fprintf
-cone), a tree `secc_tree ws` in `ProgTree`, `UkSeccompTree.v`, an entry
-`UkTreeEntry.secc_image_entry` with the exec of `x` answered by
-`image_entry_secc` at `secc_key` -- the one place the mask LITERAL must
-clear `B`.  `FsImgCheck` pins `/seccomp` as inum 23.  sh's round:
-`UShURound`'s dispatch gains the `LSecc` arm through the fork twin
-(`UkShCatForkTwin`'s shape), the entry resolution `(W)` for the name
-`seccomp` at the image, and the terminal-shape laws for the main loop
-(`UShURoundLaws` at `useccomp_shape`).  Then the knob flips
-(`adm_s := fun ws => bool_decide (ws <> [])`) and the top theorem's
-statement changes only through the model.
+`user/seccomp.c` is a verified program on the `Uk*` engine.  It forks and
+waits, which no tree program does today (`ProgTree` has no fork node), so
+it is proved sh-style rather than as a tree: `UCodeSeccomp.v`, the walk
+of `main` (fork; child: `seccomp(mask)` -- row 23's post gives the new
+mask -- then `exec(argv[1], argv+1)` through the taint-shaped walk at `T
+:= secc_tok k` and `image_entry_secc`, the `fprintf` diagnostic and
+`exit(1)` on failure; parent: `wait(0)`, `exit(0)`), an entry
+`secc_image_entry` on `UkTreeEntry`'s mould, `FsImgCheck` pinning
+`/seccomp` as inum 23 and an `FsSeccPin.v` twin of `FsGrepPin.v`.  THE ONE
+PLACE THE MASK LITERAL ENTERS is the child's `secc_key` after row 23:
+`Z.testbit (~0 & ~(1<<15) & ~(1<<6)) n = false` for `n ∈ B` is FALSE at
+17-20 with the upstream binary (§1).
+
+sh's round (S4): `UShURound`'s dispatch gains the `LSecc` arm through the
+fork twin (`UkShCatForkTwin`'s shape), the exec resolution `(W)` of the
+name `seccomp` at the image, the enter-the-arm step above, and the
+terminal-shape laws for the main loop (`UShURoundLaws` at
+`useccomp_shape`).  Then the knob flips (`adm_s := fun ws => bool_decide
+(ws <> [])`) and the top theorem's statement changes only through the
+model.
 
 ## 8. Honest limits
 

@@ -15,8 +15,8 @@ Opened 2026-09-25.  Read `xv6-bump-playbook.md` before lane K or U.
 - Lane M (pure model: `LSecc`, `US`, line-indexed `lm_merge`, knob off):
   IN FLIGHT in worktree `/shared/xv6iris-3-lanes/secc-model` (branch
   `secc/model`, from HEAD = the OLD pin; rebased onto K+U when they land).
-- OWNER QUESTION OPEN: the binary's mask must clear
-  `{6,15,17,18,19,20}` for the theorem to be true (design §1).
+- RESOLVED (owner, same day): the mask must clear `{6,15,17,18,19,20}`;
+  upstream 7b2c1b1 does; pin moved (commit c2ee5c64c on `secc/bump`).
 - Then S1 (universe slot), S2 (claim arm + licence + dirty credential),
   S3 (the seccomp program), S4 (sh's round, knob on, top theorem, audits).
 
