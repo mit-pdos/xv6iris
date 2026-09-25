@@ -275,6 +275,99 @@ def procDormant (pa : BitVec 64) (st : BitVec 32) : IProp GF := iprop%
       (if st = ZOMBIE then exitTok V.gen pid (xstateVal xsv) else iprop(emp))) ∗
     dormantSpace st V pid
 
+/-! ### The block before boot seals it (Rocq `ProcInv.proc_dormant_nofd` /
+`proc_dormant_prestk` / `proc_dormant_prestk_seal`) -/
+
+/-- `procFields` minus the `p->kstack` cell: the private cells `procinit`
+does not write (Rocq `proc_fields` + `ofile_cells` + the two zeroed
+address-space cells + `own_ctx (p_context)`). -/
+def procFieldsNoKstack (pa : BitVec 64) (dq : DFrac) (V : ProcPriv) : IProp GF := iprop%
+  wordPointsTo (pSz pa) 8 dq V.sz ∗
+  wordPointsTo (pPagetable pa) 8 dq V.pagetable ∗
+  wordPointsTo (pTrapframe pa) 8 dq V.trapframe ∗
+  contextCells pa dq V.context ∗
+  ofileCells pa dq V.ofile ∗
+  wordPointsTo (pCwd pa) 8 dq V.cwd ∗
+  pnameCells pa dq V.name
+
+/-- **The UNUSED block without its supply units** (Rocq
+`ProcInv.proc_dormant_nofd`): what `procinit` is handed for each process
+before the fd / iref / bio supplies are routed to it.  Nothing in procinit
+touches these cells (the BSS is already zero).  The pid cell's half is at
+`0` (the image's `.bss`), the lazy bit set, and the slot's half of
+`p->xstate` rides here.
+
+DEVIATION (Lean block shape): Lean's `procDormant` OWNS the `p->kstack`
+cell (in `procFields`) where Rocq persists it into `is_kstack`, so the
+cell is not here -- procinit writes it -- and joins the block at the seal
+(`procDormantPrestk_seal`); the UNUSED arm's zeroed `sz` / `pagetable` /
+`trapframe` / pid are pure facts (`dormantSpace`). -/
+def procDormantNofd (pa : BitVec 64) : IProp GF := iprop%
+  ∃ (V : ProcPriv) (pid : BitVec 32),
+    ⌜V.ofile = List.replicate NOFILE 0#64 ∧ V.cwd = 0#64 ∧ V.pvLazy = true ∧
+      V.pagetable = 0#64 ∧ V.trapframe = 0#64 ∧ V.sz = 0#64 ∧ pid = 0#32⌝ ∗
+    wordPointsTo (pPid pa) 4 pidPriv pid ∗
+    procFieldsNoKstack pa (DFrac.own 1) V ∗
+    (∃ xsv : BitVec 32, wordPointsTo (pXstate pa) 4 xsHalf xsv)
+
+/-- **The block with its units routed but its stack not yet deposited**
+(Rocq `ProcInv.proc_dormant_prestk`): procinit's output per slot, beside
+the `p->kstack` cell it just wrote. -/
+def procDormantPrestk (pa : BitVec 64) : IProp GF := iprop%
+  procDormantNofd pa ∗ fdSlots (NOFILE + FDSPARE) ∗ irefSlots (1 + IREFSPARE) ∗ bslots 3
+
+/-- Rocq `proc_dormant_prestk_intro`. -/
+theorem procDormantPrestk_intro (pa : BitVec 64) :
+    procDormantNofd (GF := GF) pa ∗ fdSlots (NOFILE + FDSPARE) ∗ irefSlots (1 + IREFSPARE) ∗
+      bslots 3 ⊢ procDormantPrestk pa := .rfl
+
+/-- **The seal** (Rocq `proc_dormant_prestk_seal`): the pre-stack block, the
+`p->kstack` cell procinit wrote (Lean's block owns it; Rocq's `is_kstack`),
+the slot's kernel stack below it, and boot's children row and slot
+generation make the UNUSED dormant block, at the row's and the
+generation's names. -/
+theorem procDormantPrestk_seal (pa : BitVec 64) (ks : BitVec 64) (γ0 g : GName) :
+    procDormantPrestk (GF := GF) pa ∗ wordPointsTo (pKstack pa) 8 (DFrac.own 1) ks ∗
+      stackOwn (ks + 4096#64) 512 ∗ chFrag γ0 pa ∅ ∗ slotGen pa (DFrac.own 1) g ⊢
+      procDormant pa UNUSED := by
+  unfold procDormantPrestk procDormantNofd procDormant
+  iintro ⟨⟨⟨%V, %pid, %hV, Hpid, Hf, ⟨%xsv, Hxs⟩⟩, Hfd, Hir, Hbs⟩, Hks, Hstk, Hch, Hsg⟩
+  obtain ⟨hof, hcwd, hlz, hpg, htf, hsz, hpid⟩ := hV
+  isplitl []
+  · ipureintro; exact Or.inl rfl
+  iexists { V with kstack := ks, chg := γ0, gen := g }, pid
+  isplitl []
+  · ipureintro
+    refine ⟨hof, hcwd, ?_, hlz⟩
+    show V.sz.toNat ≤ uvmMaxsz
+    rw [hsz]; unfold uvmMaxsz; decide
+  iframe Hpid
+  isplitl [Hks Hf]
+  · unfold procFields
+    unfold procFieldsNoKstack
+    iframe Hks Hf
+  icases fdSlots_split NOFILE FDSPARE $$ Hfd with ⟨Hfd, Hsp⟩
+  isplitl [Hfd Hsp Hir Hbs]
+  · unfold dormantAllow
+    iframe Hsp Hir Hbs
+    iapply fdSlots_to_list (List.replicate NOFILE (0#64 : BitVec 64))
+    rw [List.length_replicate]
+    iexact Hfd
+  iframe Hch
+  isplitl [Hsg]
+  · unfold genHalvesDorm
+    rw [if_neg (show ¬ (UNUSED = ZOMBIE) by decide)]
+    iframe Hsg
+    ipureintro; rw [hpid]; rfl
+  isplitl [Hxs]
+  · iexists xsv
+    rw [if_neg (show ¬ (UNUSED = ZOMBIE) by decide)]
+    iframe Hxs
+  unfold dormantSpace
+  rw [if_pos rfl]
+  iframe Hstk
+  ipureintro; exact ⟨hpg, htf, hsz, hpid⟩
+
 /-- What slot `i` owes at state `st` besides the lock-protected part
 (Rocq `proc_slots`): the dormant block at UNUSED/ZOMBIE, nothing else yet
 (the running/parked contexts of `SchedCtx.v` are not ported). -/

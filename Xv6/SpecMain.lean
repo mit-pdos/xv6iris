@@ -86,12 +86,11 @@ name: main holds that name's `lockFreeTok` (`MachCSL.LockBornHook`), which
    * `fentry_raw` (the hundred `struct file` entries) and `fd_slots_auth`:
      Lean has no ftable boot site (FileDefs.lean:77) and no slot authority
      (SlotSupply deviation 3).
-   * the per-slot DORMANT block of `proc_raw` (Rocq `proc_dormant_nofd`)
-     and the `pidPriv` half of the pid cell: Lean's `procinit` contract
-     does not carry a pre-stack dormant block (`procDormant` owns the
-     `kstack` word procinit writes), and there is no `procs_inv_alloc`.
-     The slot rows here are procinit's `procFieldsIn` plus Rocq's
-     `p_chan`/`proc_pub`/`pid_lock_share` (PROVISIONAL shapes).
+   * (Closed, batch 8-P.)  The proc table's rows are Rocq's: procinit's
+     `procRaw` (Rocq `proc_raw`, with the fd-slot-free dormant block
+     `procDormantNofd` and its `pidPriv` half of the pid cell) plus
+     `p_chan`/`proc_pub`/`pid_lock_share`; the seal is
+     `ProcsInvAlloc.procsInv_alloc` (Rocq `procs_inv_alloc`).
    * `wire_inv` is included; the echo claim `cons_echo_shift` is
      `consEchoShift`.
 
@@ -218,8 +217,8 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 
 /-- **The rest of the raw global image the init sequence writes** (Rocq
 `main_globals_raw`), in Rocq's order: the devsw table, kmem's NULL free
-list, the kernel page-table root, the proc table (PROVISIONAL, deviation
-5), wait_lock's parent cells, the three slot supplies' proc-layer shares
+list, the kernel page-table root, the proc table (Rocq's `proc_raw` rows),
+wait_lock's parent cells, the three slot supplies' proc-layer shares
 and the file table's iref share, `initproc`, the ticks cell, the buffer
 cache (binit's rows and the rest of each buffer), the superblock bytes,
 the itable (iinit's sleeplocks and the rest of each entry), the log, the
@@ -230,7 +229,7 @@ def mainGlobalsRaw (cn : ConsNames) : IProp GF := iprop%
   devswRest ∗
   wordPointsTo kmemFreelistAddr 8 (DFrac.own 1) 0#64 ∗
   (∃ kpt0 : BitVec 64, wordPointsTo kernelPagetableAddr 8 (DFrac.own 1) kpt0) ∗
-  ([∗list] i ∈ List.range NPROC, procFieldsIn i) ∗
+  ([∗list] i ∈ List.range NPROC, procRaw i) ∗
   ([∗list] i ∈ List.range NPROC,
     (∃ ch : BitVec 64, wordPointsTo (pChan (procAddr i)) 8 (DFrac.own 1) ch) ∗
     (∃ kl xs pid : BitVec 32, procPubRest (procAddr i) kl xs pid)) ∗

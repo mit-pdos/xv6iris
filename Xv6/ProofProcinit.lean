@@ -590,9 +590,27 @@ theorem procinit_br_10b92 : KA.«procinit» + 0x10b92#64 = KA.«pid_lock» := by
 theorem procinit_br_58ca : KA.«procinit» + 0x58ca#64 = KStr.«nextpid» := by decide
 
 set_option maxHeartbeats 4000000 in
-theorem procinit_proof (IL : INITLOCK) : PROCINIT :=
-  ⟨fun {hlc GF} _ _ cpu k hK => by
-  unfold wp_procinit_body
+/-- **The cells-level contract** the body is proved against (the landed
+pre-8-P `wp_procinit_body`): the lock, state and kstack words only.
+`procinit_proof` frames the dormant blocks and the supply shares around it
+and routes the shares (`pi_route`). -/
+def procinitCellsBody {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+    (cpu : CPU) (k : KCtx) : Prop :=
+  kctx cpu k ∗ pcIs cpu procinitAddr ∗
+  (∃ vlock vname vcpu, lockWords pidLockAddr vlock vname vcpu) ∗
+  (∃ vlock vname vcpu, lockWords waitLockAddr vlock vname vcpu) ∗
+  ([∗list] i ∈ List.range 64, procFieldsIn i) ∗
+  wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ R' : RegMap,
+    kctx cpu' (k.withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+    lockInited pidLockAddr nextpidNameAddr -∗ lockInited waitLockAddr waitLockNameAddr -∗
+    ([∗list] i ∈ List.range 64, procFieldsOut i) -∗
+    ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
+  ⊢ wpLoop (GF := GF) cpu
+
+theorem procinit_cells (IL : INITLOCK) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+    [CurCtx] (cpu : CPU) (k : KCtx) (hK : 10 ≤ k.avail) :
+    procinitCellsBody (hlc := hlc) (GF := GF) cpu k := by
+  unfold procinitCellsBody
   simp only [procinitAddr]
   iintro ⟨Hk, Hpc, Hpid, Hwait, Hlist, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -772,8 +790,105 @@ theorem procinit_proof (IL : INITLOCK) : PROCINIT :=
   case g19 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
   case g20 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
   case g21 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
-  case g22 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; rfl⟩
+  case g22 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; rfl
 
 end
+
+/-! ## The supplies, routed (Rocq `ProofProcinit`'s carve) -/
+
+section Route
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+
+/-- `n` shares of `m` units, one per slot. -/
+theorem pi_supply_split (S : Nat → IProp GF) (hs : ∀ a b, S (a + b) ⊢ S a ∗ S b) (m : Nat) :
+    ∀ n : Nat, S (n * m) ⊢ [∗list] _i ∈ List.range n, S m
+  | 0 => by
+    rw [List.range_zero]
+    iintro -
+    iapply BigSepL.bigSepL_nil.2
+    itrivial
+  | n + 1 => by
+    rw [Nat.succ_mul, List.range_succ]
+    iintro H
+    icases hs (n * m) m $$ H with ⟨H1, H2⟩
+    iapply BigSepL.bigSepL_append.2
+    isplitl [H1]
+    · iapply pi_supply_split S hs m n $$ H1
+    · iapply BigSepL.bigSepL_singleton.2
+      iexact H2
+
+/-- The lock's identity claims, copied out of the words `initlock` takes
+(persistent). -/
+theorem pi_claims (i : Nat) :
+    procFieldsIn (GF := GF) i ⊢
+      procFieldsIn i ∗ (kmapId (procAddr i) ∗ kmapId (procAddr i + 16#64)) := by
+  unfold procFieldsIn lockWords
+  iintro ⟨%vl, %vn, %vc, %vs, %vk, ⟨#H1, #H2, Hl, Hn, Hc⟩, Hs, Hk⟩
+  isplitl [Hl Hn Hc Hs Hk]
+  · iexists vl, vn, vc, vs, vk
+    iframe H1 H2 Hl Hn Hc Hs Hk
+  · isplitl []
+    · iexact H1
+    · iexact H2
+
+/-- **The route** (Rocq `proc_dormant_prestk_intro`, per slot): the cells
+procinit wrote, the claims, the fd-slot-free block and one share of each
+supply make `procReady`. -/
+theorem pi_route :
+    ([∗list] i ∈ List.range NPROC, procFieldsOut (GF := GF) i) ∗
+    ([∗list] i ∈ List.range NPROC, kmapId (GF := GF) (procAddr i) ∗ kmapId (procAddr i + 16#64)) ∗
+    ([∗list] i ∈ List.range NPROC, procDormantNofd (GF := GF) (procAddr i)) ∗
+    fdSlots (GF := GF) (NPROC * (NOFILE + FDSPARE)) ∗
+    irefSlots (GF := GF) (NPROC * (1 + IREFSPARE)) ∗
+    bslots (GF := GF) (NPROC * 3) ⊢
+    [∗list] i ∈ List.range NPROC, procReady (GF := GF) i := by
+  iintro ⟨Ho, Hc, Hd, Hf, Hr, Hb⟩
+  ihave Hf := pi_supply_split (fun n => fdSlots (GF := GF) n) (fun a b => fdSlots_split a b)
+    (NOFILE + FDSPARE) NPROC $$ Hf
+  ihave Hr := pi_supply_split (fun n => irefSlots (GF := GF) n) (fun a b => (irefSlots_op a b).1)
+    (1 + IREFSPARE) NPROC $$ Hr
+  ihave Hb := pi_supply_split (fun n => bslots (GF := GF) n) (fun a b => bslots_split a b)
+    3 NPROC $$ Hb
+  ihave H := BigSepL.bigSepL_sep_eqv.2 $$ [$Hr $Hb]
+  ihave H := BigSepL.bigSepL_sep_eqv.2 $$ [$Hf $H]
+  ihave H := BigSepL.bigSepL_sep_eqv.2 $$ [$Hd $H]
+  ihave H := BigSepL.bigSepL_sep_eqv.2 $$ [$Hc $H]
+  ihave H := BigSepL.bigSepL_sep_eqv.2 $$ [$Ho $H]
+  iapply BigSepL.bigSepL_mono_of_forall (fun {_ i} => by
+    unfold procReady procDormantPrestk
+    iintro ⟨Ho, ⟨Hc1, Hc2⟩, Hd, Hf, Hr, Hb⟩
+    iframe Ho Hc1 Hc2 Hd Hf Hr Hb) $$ H
+
+end Route
+
+set_option maxHeartbeats 4000000 in
+/-- **`procinit` meets its specification** (Rocq `wp_procinit_sconf`): the
+cells-level body, with the dormant blocks and the supply shares framed
+across it and routed into `procReady` at the return. -/
+theorem procinit_proof (IL : INITLOCK) : PROCINIT :=
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ cpu k hK => by
+  have h := procinit_cells IL (hlc := hlc) (GF := GF) cpu k hK
+  unfold procinitCellsBody at h
+  unfold wp_procinit_body
+  iintro ⟨Hk, Hpc, Hpid, Hwait, Hraw, Hf, Hr, Hb, HΦ⟩
+  ihave Hraw := (show ([∗list] i ∈ List.range NPROC, procRaw (GF := GF) i) ⊢
+      [∗list] i ∈ List.range NPROC, iprop(procFieldsIn (GF := GF) i ∗ procDormantNofd (procAddr i))
+    from .rfl) $$ Hraw
+  icases BigSepL.bigSepL_sep_eqv.1 $$ Hraw with ⟨Hin, Hd⟩
+  ihave Hin := BigSepL.bigSepL_mono_of_forall (fun {_ i} => pi_claims (GF := GF) i) $$ Hin
+  icases BigSepL.bigSepL_sep_eqv.1 $$ Hin with ⟨Hin, Hc⟩
+  ihave Hin := (show ([∗list] i ∈ List.range NPROC, procFieldsIn (GF := GF) i) ⊢
+      [∗list] i ∈ List.range 64, procFieldsIn (GF := GF) i from .rfl) $$ Hin
+  iapply h
+  iframe Hk Hpc Hpid Hwait Hin
+  iapply wpNext_mono $$ HΦ
+  iintro %cpu' HK %R' Hk Hpc Hp Hw Hout %hcs
+  ihave Hout := (show ([∗list] i ∈ List.range 64, procFieldsOut (GF := GF) i) ⊢
+      [∗list] i ∈ List.range NPROC, procFieldsOut (GF := GF) i from .rfl) $$ Hout
+  iapply HK $$ %R' Hk Hpc Hp Hw [Hout Hc Hd Hf Hr Hb]
+  · iapply pi_route
+    iframe Hout Hc Hd Hf Hr Hb
+  ipureintro; exact hcs⟩
 
 end Xv6

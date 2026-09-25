@@ -169,6 +169,7 @@ import Xv6.SpecPrintkinit
 import Xv6.ProofPrintkinit
 import Xv6.LinkPrintkinit
 import Xv6.ProofProcinit
+import Xv6.ProcsInvAlloc
 import Xv6.LinkProcinit
 import Xv6.ProofBinit
 import Xv6.LinkBinit
