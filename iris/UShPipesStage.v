@@ -382,8 +382,10 @@ Section UShPipesStage.
      pipe's write end at [DOutH [L; []]], fd 2 the stage's family writer
      at [[]; cat: cannot open f; cat: write error]); the EXEC FAILS arm is
      the stage's family writer at [exec cat failed], depositing its
-     untouched write permit, as echo's does.  (The entry's refused-open
-     deposit is the open item recorded at [UShPipesDefs]'s header.) *)
+     untouched write permit, as echo's does.  The premise carries no deed,
+     which [cat f] needs to read or refuse `f`: [UShCatFStage.
+     stage_catf_d] is this law at the lend with the deed, its premise paid
+     by the entry ([UShCatFStage.stage_catf_law_holds]). *)
   Lemma stage_catf (f : list (bv 8)) (s0 : Z) (gs : nat -> bv 8)
       (N' : uk_names Σ) (h' : CpuId) (m' : regfile) (γp : pipe_names) (q szv : Z)
       (ld : list fdstate) (av : nat) :
