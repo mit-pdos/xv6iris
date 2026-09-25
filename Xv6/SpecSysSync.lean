@@ -12,19 +12,21 @@ Mirrors Rocq `SpecSysSync.v`.
       return 0;
     }
 
-**THE RECEIPT IS GONE IN THIS PORT.**  Rocq's contract is the DURABILITY
-form: the caller hands in its invocation-time batch witness
-`log_epoch_lb γ e` and gets `flushed_sync γ e` back -- "the batch counter
-had reached some `e'` at or past yours, and here is the durable state
-standing there".  That receipt is `FsFlushed.flushed`, a lower bound on
-the CRASH RECORD's monotone history, and it is produced by
-`LogInv.log_res`'s banked copy `log_flushed_bank`.  This port has no crash
-record, no durable epoch registry and therefore no bank (see
-`Xv6/LogInv.lean`'s header), so the contract below keeps the witness --
-which is free, persistent and constrains no caller -- and returns only the
-machine half: `a0 = 0`.  What `sys_sync` proves here is that it runs, not
-that anything is durable.  Restoring the receipt needs the crash layer,
-not the log layer.
+**ONE CONTRACT, THE DURABILITY FORM** (Rocq's, D44): the caller hands in
+its invocation-time batch witness `logEpochLb γ e` and gets the receipt
+`flushedSync γ e` back beside the machine half -- "the batch counter had
+reached some `e'` at or past yours, and here is the durable state standing
+there" (`logFlushedBank`, a copy of the frozen snapshot certificate, a
+lower bound on the crash record's monotone history).  The witness
+constrains no caller: it is persistent, free at zero (`sync_witness_0`)
+and available at the caller's own batch from `begin_op`'s mint.
+
+The producer is `flushedSync_ofRes`: with the log lock held and the
+witness in hand, `logResAt` yields the receipt and closes UNCHANGED
+(`LogInv.logResAt_flushed`, off the bank conjunct deposited by `end_op`'s
+epoch bump and by `initlog`'s seal).  Both arms of the code reach it at the
+final `release`; the bound is `e ≤ e'`, not `e < e'` (the fast path
+honestly stated -- see Rocq `SpecSysSync.v`'s last header section).
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
@@ -41,6 +43,61 @@ open LeanRV64D
 
 /-- Address of `sys_sync`. -/
 def sysSyncAddr : BitVec 64 := KA.«sys_sync»
+
+section
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable [BcacheG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+
+/-- **The postcondition** (Rocq `flushed_sync`): by the time the call
+returned, the batch counter had reached some `e'` at or past the caller's
+own `e`, and here is the durable state standing there. -/
+def flushedSync (γ : LogNames) (e : Nat) : IProp GF := iprop%
+  ∃ e' : Nat, ⌜e ≤ e'⌝ ∗ logFlushedBank (hlc := hlc) γ e'
+
+instance flushedSync_persistent (γ : LogNames) (e : Nat) :
+    Persistent (flushedSync (hlc := hlc) (GF := GF) γ e) := by
+  unfold flushedSync; infer_instance
+
+/-- Rocq `flushed_sync_of_bank`. -/
+theorem flushedSync_of_bank (γ : LogNames) (e E : Nat) (hle : e ≤ E) :
+    logFlushedBank (hlc := hlc) (GF := GF) γ E ⊢ flushedSync (hlc := hlc) γ e := by
+  unfold flushedSync
+  iintro #H
+  iexists E
+  isplitr
+  · ipureintro; exact hle
+  · iexact H
+
+/-- Rocq `flushed_sync_receipt`: the certificate a consumer composes with
+`FsFlushed.dur_at`. -/
+theorem flushedSync_receipt (γ : LogNames) (e : Nat) :
+    flushedSync (hlc := hlc) (GF := GF) γ e ⊢
+      ∃ (b : Nat) (D : BlockMap), flushed (hlc := hlc) (GF := GF) b D ∗ ⌜snapHolds D⌝ := by
+  unfold flushedSync logFlushedBank
+  iintro ⟨%e', -, %b, %D, -, #Hf, %hh⟩
+  iexists b, D
+  isplitl
+  · iexact Hf
+  · ipureintro; exact hh
+
+/-- Rocq `sync_witness_0`: the witness costs nothing. -/
+theorem sync_witness_0 (γ : LogNames) : ⊢ |==> logEpochLb (GF := GF) γ 0 :=
+  logEpochLb_0 γ
+
+/-- **The producer** (Rocq `flushed_sync_of_res`): with the log lock held
+and the caller's witness in hand, the lock's resource yields the receipt
+and closes UNCHANGED. -/
+theorem flushedSync_ofRes (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
+    (cov : Std.ExtTreeSet Nat compare) (logstart : Nat) (ξ : CtxId) (e : Nat) :
+    logEpochLb (GF := GF) γ e ⊢ logResAt (hlc := hlc) γ γb γfs cov logstart ξ -∗
+      flushedSync (hlc := hlc) γ e ∗ logResAt (hlc := hlc) γ γb γfs cov logstart ξ := by
+  iintro #Hlb Hres
+  icases logResAt_flushed γ γb γfs cov logstart ξ e $$ Hlb Hres with ⟨⟨%E, %hle, #Hb⟩, Hres⟩
+  isplitr [Hres]
+  · iapply flushedSync_of_bank γ e E hle $$ Hb
+  · iexact Hres
+
+end
 
 /-- `sys_sync`'s frame over its deepest callee, `sleep`. -/
 def sysSyncSlots : Nat := 4 + sleepSlots
@@ -59,12 +116,14 @@ def wp_sys_sync_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   trapCsrs cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ∗
   logCtx γ γb γfs V.cov logstart dev ∗
   -- the caller's batch witness: persistent, and free at zero
+  -- (`sync_witness_0`); the receipt `flushedSync γ e` comes back
   logEpochLb γ e ∗
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = 0#64⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
+    flushedSync (hlc := hlc) γ e -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
@@ -91,6 +150,7 @@ def wp_sys_sync_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = 0#64⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
+    flushedSync (hlc := hlc) γ e -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
@@ -125,7 +185,7 @@ theorem SYS_SYNC.wp_sys_sync (A : SYS_SYNC) {hlc : HasLC} {GF : BundledGFunctors
   iapply h
   iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8
   iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6
-  iapply HK $$ %spie %spp %R' %p0 H1 H2 Htc Hcl Hir H6
+  iintro %cpu' HK %spie %spp %R' %p0 H1 H2 ⟨Htc, Hir⟩ Hcl Hfs H6
+  iapply HK $$ %spie %spp %R' %p0 H1 H2 Htc Hcl Hir Hfs H6
 
 end Xv6
