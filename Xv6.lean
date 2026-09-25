@@ -1109,3 +1109,9 @@ import Xv6.UservecPt
 import Xv6.UservecExitPt
 import Xv6.ProofUservec
 import Xv6.LinkUservec
+import Xv6.FsCollect
+import Xv6.FsCollectSlot
+import Xv6.FsCollectAllRows
+import Xv6.FsCollectAllHand
+import Xv6.FsCollectAllBodies
+import Xv6.FsCollectAll
