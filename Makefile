@@ -121,7 +121,9 @@ SAIL_RISCV_REV ?= 070832a1e4b086f0c6f7635de54cc2b4cfd66993
 # leave .rodata so every string at or above 0x80007018 moves -0x10 -- etext
 # itself does NOT move, being page-aligned -- and .data/.bss move -0x10;
 # panic is the ONLY function whose shape changed, every other diff is an
-# immediate; fs.img and the user dumps unchanged).
+# immediate; fs.img and the user dumps unchanged; a8957838 -> 3e9926e: grep
+# skips a line too long for its buffer instead of stopping at it -- user/
+# grep.c only, the kernel dumps unchanged, the grep dumps and fs.img move).
 # Nothing here is a local commit:
 # `git -C xv6-riscv checkout --detach $(XV6_REV)` reproduces the image, and
 # that is the whole recipe.
@@ -131,7 +133,7 @@ SAIL_RISCV_REV ?= 070832a1e4b086f0c6f7635de54cc2b4cfd66993
 # stays reachable only from your local clone -- expect the diff between two
 # consecutive pins to be an upstream commit that landed UNDER the series, not
 # on top of it.
-XV6_REV ?= a8957838d370c67f1cdb3ecfb0ee812756059848
+XV6_REV ?= 3e9926ea1b1f8d540984e95e8113b5c4131bb2aa
 
 KDUMP_SRCS := $(KDUMP)/KernelInstrs.v $(KDUMP)/KernelData.v $(KDUMP)/KernelSyms.v \
               $(KDUMP)/KernelElfRaw.v $(KDUMP)/FsImgRaw.v
@@ -140,7 +142,7 @@ KDUMP_SRCS := $(KDUMP)/KernelInstrs.v $(KDUMP)/KernelData.v $(KDUMP)/KernelSyms.
 # prefix> pairs (the ELF is $(USER_DIR)/_<program>).  Adding one here also needs
 # its dumped .v files listed in user-rocq/_CoqProject (three, plus the
 # <P>ElfRaw.v where a program's whole-file raw is wanted -- cat has four).
-USER_DUMPS ?= sync:Sync echo:Echo sh:Sh init:Init cat:Cat
+USER_DUMPS ?= sync:Sync echo:Echo sh:Sh init:Init cat:Cat grep:Grep
 
 .PHONY: all proofs model kernel user dump dump-force kernel-rocq user-rocq \
         xv6-rev-check sail-rev-check gen-code check-decode update-decode \

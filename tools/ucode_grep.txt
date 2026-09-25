@@ -1,0 +1,56 @@
+# ucode_grep.txt -- the pc set of iris/UCodeGrep.v, for tools/gen_ucode.py.
+#
+# tools/ucode_manifest.json binds this spec to iris/UCodeGrep.v; `make
+# gen-ucode` rewrites that file from it, and `make check-ucode` fails if it
+# moved.
+#
+# grep is the first verified program with RECURSION (matchhere calls
+# itself and matchstar, matchstar calls matchhere, neither as a tail call)
+# and the first to keep state in a global across reads: `buf[1024]`, the
+# leftover of a partial line memmove()d to its front.  Its two diagnostics
+# go through fprintf (usage, fd 2) and printf (cannot open, fd 1), both
+# with at most a %s.
+#
+# Unreachable branches inside a listed function are kept (ucode_cat.txt's
+# rule); whole functions never entered are left out, with the reason.
+
+note This catalog covers grep as it runs: main's walk over argv, the
+note read/scan loop in grep(), the matcher (match, matchhere, matchstar),
+note the two ulib helpers the loop calls (strchr, memmove), and the
+note fprintf/printf cone under its two diagnostics.
+
+# ---- the program ------------------------------------------------------
+func start
+func main
+func grep
+func match_
+func matchhere
+func matchstar
+
+# ---- the ulib helpers grep() calls -----------------------------------
+func strchr
+func memmove
+
+# ---- the printf cone (usage by fprintf, cannot-open by printf) -------
+func fprintf
+func printf
+func vprintf
+func putc
+
+# ---- the syscall stubs it issues --------------------------------------
+func read
+func write
+func open
+func close
+func exit
+
+# ---- and what is deliberately absent ---------------------------------
+skipfunc printint unreachable: vprintf reaches it only from the %d/%u/%x arms, and grep's only conversion is %s
+skipfunc malloc unreachable: grep allocates nothing
+skipfunc free unreachable: grep allocates nothing
+skipfunc sbrk unreachable: only malloc calls it
+skipfunc sbrklazy unreachable: only malloc calls it
+skipfunc sys_sbrk unreachable: only malloc calls it
+skipfunc gets unreachable: grep reads with read(), never gets
+skipfunc stat unreachable: grep never stats
+skipfunc fstat unreachable: only stat calls it

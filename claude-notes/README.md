@@ -293,6 +293,12 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   merging the file and N-stage registries, the claim `gcl ulm ∨ popenU`,
   one top theorem, and the cut plan C9a-C9h with the audit re-anchoring.
 
+- **[`grep.md`](design/grep.md)** — `grep` as a program tree: the
+  Kernighan–Pike matcher and the buffer scan as pure functions, what grep
+  owes (`grep_out`) and on which inputs (`grep_ok`: no NUL), why a line too
+  long for its buffer is skipped, and the walks down to the entry
+  `wp_kgrep_start_tree` — the recursion's pattern-dependent stack.
+
 - **[`contexts.md`](design/contexts.md)** — CONTEXTS (`TsoCtx.v`): the three
   tokens (running, stamped, parked under a context), the one domination
   relation and its four mints, `CtxMorph` as the only transport class with

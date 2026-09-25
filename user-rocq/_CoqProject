@@ -22,3 +22,7 @@ CatInstrs.v
 CatData.v
 CatSyms.v
 CatElfRaw.v
+GrepInstrs.v
+GrepData.v
+GrepSyms.v
+GrepElfRaw.v
