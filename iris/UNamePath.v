@@ -4,7 +4,7 @@
 (*                                                                        *)
 (*  The handler, the entries and sh's redirect walks are stated at ANY    *)
 (*  name [nm] of the model's class [FileDisc.uname], and they may use     *)
-(*  only what [FileName.uname_laws] (L1-L5) gives:                        *)
+(*  only what [FileName.txt_laws] (L1-L5) gives:                          *)
 (*                                                                        *)
 (*    S1  the path facts the open leaves ask for -- the name is its own   *)
 (*        one element, with no parent prefix, resolved from the cwd, and  *)
@@ -13,9 +13,9 @@
 (*    S2  the byte layouts sh prints and reads around a name of ANY       *)
 (*        length: the redirect suffix, the refused open's diagnostic      *)
 (*        `open N failed`, the line `cat N` -- pure list facts, no law;   *)
-(*    S3  THE ONE FACT THAT IS NOT A LAW, [UNameBytes.uname_word]: a     *)
-(*        class name is a [wl_word] (see its comment for what cut W4     *)
-(*        must add).                                                      *)
+(*    S4  cat's argv [cat N] is exec'able: a class name is a word of     *)
+(*        name bytes by L1 ([LineWords.fn_word]; cut W4 retired the      *)
+(*        non-law that it was alphanumeric).                              *)
 (* ===================================================================== *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import list gmap bitvector.definitions.
@@ -27,7 +27,7 @@ Require Import FsTree.          (* [fname] *)
 Require Import PathElems.       (* [path_elems], [skipelem], [SLASH] *)
 Require Import ArgPath.         (* [arg_path_shape] *)
 Require Import FsAbsEra.        (* [np_elems], [um_start_of] *)
-Require Import FileName.        (* [fn_byte], [name_laws], [uname_laws] *)
+Require Import FileName.        (* [name_laws], [txt_laws] *)
 Require FileDisc ExecWords.
 Require Export UNameBytes.   (* S2, the byte layouts: a pure file below this one *)
 From stdpp Require Import ssreflect.
@@ -37,14 +37,7 @@ Local Open Scope Z_scope.
 (*  S1  THE PATH FACTS, OFF L1 AND L2                                     *)
 (* ===================================================================== *)
 
-Lemma fn_byte_val (b : bv 8) :
-  fn_byte b ->
-  bv_unsigned b = 46
-  \/ (48 <= bv_unsigned b <= 57) \/ (65 <= bv_unsigned b <= 90)
-  \/ (97 <= bv_unsigned b <= 122).
-Proof using.
-  intros [Ha | ->]; [right; exact Ha | left; by vm_compute].
-Qed.
+(* [fn_byte_val] is [LineWords]' *)
 
 Lemma fn_byte_not_slash (b : bv 8) : fn_byte b -> b <> SLASH.
 Proof using.
@@ -82,10 +75,10 @@ Section UName.
   Context (nm : fname) (Hu : FileDisc.uname nm).
 
   Lemma uname_lex : nm <> [] /\ Forall fn_byte nm.
-  Proof using Hu. exact (nl_lex FileDisc.uname uname_laws nm Hu). Qed.
+  Proof using Hu. exact (nl_lex txt_name txt_laws nm Hu). Qed.
 
   Lemma uname_len : (length nm < DIRSIZ)%nat.
-  Proof using Hu. exact (nl_len FileDisc.uname uname_laws nm Hu). Qed.
+  Proof using Hu. exact (nl_len txt_name txt_laws nm Hu). Qed.
 
   Lemma uname_pos : (0 < length nm)%nat.
   Proof using Hu.
@@ -138,15 +131,15 @@ End UName.
 
 (* ===================================================================== *)
 (*  S4  THE LINE [cat N] AS AN ARGV: its two words exec at any class name *)
-(*  (the name a word by [uname_word], short by L2)                        *)
+(*  (the name a word of name bytes by L1, short by L2)                    *)
 (* ===================================================================== *)
 Lemma cat_words_exec_ok (nm : list (bv 8)) :
   FileDisc.uname nm -> ExecWords.exec_ok [FileDisc.fd_w_cat; nm].
 Proof using.
-  intros Hu. pose proof (uname_word nm Hu) as Hw. pose proof (uname_len nm Hu) as Hl.
+  intros Hu. pose proof (uname_len nm Hu) as Hl.
   unfold DIRSIZ in Hl. unfold ExecWords.exec_ok. split_and!.
   - constructor; [apply (bool_decide_unpack _); vm_compute; exact I |].
-    constructor; [exact Hw | constructor].
+    constructor; [exact (uname_lex nm Hu) | constructor].
   - cbn [length]. lia.
   - cbn [length]. lia.
   - unfold wl_line, wl_body. cbn [wl_tail]. rewrite app_nil_r.

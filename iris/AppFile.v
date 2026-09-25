@@ -90,7 +90,7 @@ Require Import AppEcho.            (* [echo_taint], [echo_cl], [cons_state],
 Require Export FileState.          (* [fstate], [echo_chunks], [subseq], [sel_ok] *)
 Require Import FileFsPure.         (* [file_fs_pure] = echo's pins and cat's *)
 Require FileDisc.                  (* the class [FileDisc.uname] *)
-Require Import FileName.           (* its laws: [uname_laws], L4 at era 0 *)
+Require Import FileName.           (* its laws: [txt_laws], L4 at era 0 *)
 Local Open Scope Z_scope.
 
 (* ====================================================================== *)
@@ -1330,7 +1330,7 @@ Section FileClaim.
     iSplitL "Ht1"; [ iExact "Ht1" |].
     iSplitR; [ iApply f_typed_empty |].
     iPureIntro. apply f_ok_empty. intros N HN.
-    exact (era0_recovery_class_absent FileDisc.uname dk D S N uname_laws
+    exact (era0_recovery_class_absent txt_name dk D S N txt_laws
              Hdk Hrec HS HN).
   Qed.
 

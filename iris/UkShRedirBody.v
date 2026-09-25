@@ -130,14 +130,13 @@ Section UkShRedirBody.
 
   Lemma ushs_lp_of_at (ws : list (list (bv 8))) (nm : list (bv 8))
       (f : nat -> bv 8) (k len : nat) :
-    wl_word nm ->
     UkSh.ush_line_at (LEchoF ws nm) f k len ->
     ushs_lp (FileDisc.uline_ws (LEchoF ws nm))
       (fun j : nat => f (k + j)%nat) 0%nat len.
   Proof using .
-    intros Hw H. exists ws, nm. split; [ reflexivity | ].
+    intros H. exists ws, nm. split; [ reflexivity | ].
     exact (UkShRedirLine.ushs_line_is_shift ws nm f k len
-             (UkShRedirLine.ushs_line_is_of_at ws nm f k len Hw H)).
+             (UkShRedirLine.ushs_line_is_of_at ws nm f k len H)).
   Qed.
 
   (* =================================================================== *)
@@ -790,7 +789,7 @@ Section UkShRedirBody.
                 h m f k len (FileDisc.uline_ws (LEchoF ws Nf)) sz l n
                 ltac:(lia) ushs_lp0
                 Hregs Hs1 Ha5 Hnn Hnul Hkl2
-                (ushs_lp_of_at ws Nf f k len (uname_word Nf Hu) Hlat)
+                (ushs_lp_of_at ws Nf f k len Hlat)
                 Hszlo Hszal Hszok Hpm1 Hpmwb Hwbl
                 with "Hgen Hhead Hcode Hro [] Hjt Hkl Hchr Hplaw [%] Hstd
                       Hdat Hsz Hbuf Hrun").

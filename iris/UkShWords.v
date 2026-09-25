@@ -50,11 +50,12 @@ Proof. vm_compute. reflexivity. Qed.
 (* ===================================================================== *)
 (*  S2  THE LEXER'S CONDITION, FROM THE DISCIPLINE'S                     *)
 (*                                                                        *)
-(*  [LineWords.wl_wf] says a word is nonempty and ALPHANUMERIC.  What the  *)
-(*  lexer needs is weaker and negative -- no byte of a word is one of      *)
-(*  sh's five whitespace bytes or seven metacharacters -- and it is a      *)
-(*  consequence, proved once here.  Nothing below states its own notion of *)
-(*  a well-formed word.                                                    *)
+(*  [LineWords.fn_wf] says a word is nonempty and made of alphanumerics   *)
+(*  and the dot (an argv may carry a file name, cut W4).  What the lexer   *)
+(*  needs is weaker and negative -- no byte of a word is one of sh's five  *)
+(*  whitespace bytes or seven metacharacters -- and it is a consequence,  *)
+(*  proved once here.  Nothing below states its own notion of a           *)
+(*  well-formed word.                                                      *)
 (* ===================================================================== *)
 
 Definition wl_plain (b : bv 8) : Prop :=
@@ -111,15 +112,28 @@ Proof.
     exfalso. pose proof (ushp_is_sym_val b Hs). lia.
 Qed.
 
-Lemma wl_word_plain (w : list (bv 8)) : wl_word w -> Forall wl_plain w.
+(* ...and the dot a file name carries (cut W4): 46 is neither *)
+Lemma fn_byte_plain (b : bv 8) : fn_byte b -> wl_plain b.
+Proof.
+  intros [Ha | ->]; [exact (wl_alnum_plain b Ha) |].
+  rewrite /wl_plain. split.
+  - destruct (ushp_is_ws fn_dot) eqn:Hw; [| reflexivity].
+    exfalso. pose proof (ushp_is_ws_val fn_dot Hw). rewrite fn_dot_val in H. lia.
+  - destruct (ushp_is_sym fn_dot) eqn:Hs; [| reflexivity].
+    exfalso. pose proof (ushp_is_sym_val fn_dot Hs). rewrite fn_dot_val in H. lia.
+Qed.
+
+(* A WORD OF NAME BYTES ([LineWords.fn_word]) -- every command word, and
+   a file name of the class -- is plain *)
+Lemma wl_word_plain (w : list (bv 8)) : fn_word w -> Forall wl_plain w.
 Proof.
   intros [_ Hw]. induction w as [| b w' IH]; [constructor |].
   destruct (Forall_cons_1 _ _ _ Hw) as [Hb Hw'].
-  constructor; [exact (wl_alnum_plain b Hb) | exact (IH Hw')].
+  constructor; [exact (fn_byte_plain b Hb) | exact (IH Hw')].
 Qed.
 
 Lemma wl_word_head (w : list (bv 8)) :
-  wl_word w -> ushp_is_ws (w !!! 0) = false.
+  fn_word w -> ushp_is_ws (w !!! 0) = false.
 Proof.
   intro Hword. pose proof (wl_word_plain w Hword) as Hpl.
   destruct Hword as [Hne _]. destruct w as [| b w']; [done |].
@@ -252,21 +266,21 @@ Qed.
 (* ===================================================================== *)
 
 Lemma wl_tail_nsym (ws : list (list (bv 8))) :
-  wl_wf ws -> Forall (fun b => ushp_is_sym b = false) (wl_tail ws).
+  fn_wf ws -> Forall (fun b => ushp_is_sym b = false) (wl_tail ws).
 Proof.
   induction ws as [| w r IH]; intro Hwf; cbn [wl_tail]; [constructor |].
-  destruct (wl_wf_cons w r Hwf) as [Hword Hr].
+  destruct (fn_wf_cons w r Hwf) as [Hword Hr].
   constructor; [exact wl_sp_nsym |].
   apply Forall_app.
   split; [exact (wl_nsym_of_plain w (wl_word_plain w Hword)) | exact (IH Hr)].
 Qed.
 
 Lemma wl_line_nsym (ws : list (list (bv 8))) :
-  wl_wf ws -> Forall (fun b => ushp_is_sym b = false) (wl_line ws).
+  fn_wf ws -> Forall (fun b => ushp_is_sym b = false) (wl_line ws).
 Proof.
   intro Hwf. rewrite /wl_line. apply Forall_app. split.
   - destruct ws as [| w r]; cbn [wl_body]; [constructor |].
-    destruct (wl_wf_cons w r Hwf) as [Hword Hr].
+    destruct (fn_wf_cons w r Hwf) as [Hword Hr].
     apply Forall_app.
     split; [exact (wl_nsym_of_plain w (wl_word_plain w Hword))
            | exact (wl_tail_nsym r Hr)].
@@ -274,7 +288,7 @@ Proof.
 Qed.
 
 Lemma wl_no_symbols (ws : list (list (bv 8))) (f : nat -> bv 8) (len : nat) :
-  wl_wf ws ->
+  fn_wf ws ->
   len = length (wl_line ws) ->
   (forall j : nat, j < len -> f j = wl_line ws !!! j) ->
   ushp_no_symbols len f.
@@ -306,7 +320,7 @@ Qed.
    where [UshpTokCons] leaves the scan, and the tokens the relation names
    start one past it. *)
 Lemma wl_tokens_tail (ws : list (list (bv 8))) :
-  wl_wf ws ->
+  fn_wf ws ->
   forall (f : nat -> bv 8) (p len : nat),
     len = p + length (wl_tail ws) + 1 ->
     (forall j : nat, j < length (wl_tail ws) + 1 ->
@@ -322,8 +336,8 @@ Proof.
       rewrite (Hf 0 ltac:(cbn; lia)). exact (wl_tail_head_ws []). }
     replace (p + 0 + 1 - p) with 1 by lia.
     cbn [ushp_skipws]. rewrite Hp. lia.
-  - destruct (wl_wf_cons w r Hwf) as [Hword Hr].
-    pose proof (wl_word_pos w Hword) as Hwpos.
+  - destruct (fn_wf_cons w r Hwf) as [Hword Hr].
+    pose proof (fn_word_pos w Hword) as Hwpos.
     pose proof (wl_word_plain w Hword) as Hwpl.
     (* the tail's bytes, spelled out: ' ' at 0, [w] at 1..|w|, then the
        REST of the tail (or the closing newline) from 1+|w| on *)
@@ -375,7 +389,7 @@ Qed.
 (* ...AND THE LINE.  The first word has no separator before it, so it is
    one [UshpTokCons] at [k = 0] outside the induction. *)
 Lemma wl_tokens (ws : list (list (bv 8))) (f : nat -> bv 8) (len : nat) :
-  wl_wf ws ->
+  fn_wf ws ->
   len = length (wl_line ws) ->
   (forall j : nat, j < len -> f j = wl_line ws !!! j) ->
   ushp_tokens len f 0 (wl_toks ws).
@@ -389,8 +403,8 @@ Proof.
     assert (Hs : ushp_skipws (len - 0) 0 f = 1).
     { replace (len - 0) with 1 by lia. cbn [ushp_skipws]. by rewrite Hp. }
     lia.
-  - destruct (wl_wf_cons w r Hwf) as [Hword Hr].
-    pose proof (wl_word_pos w Hword) as Hwpos.
+  - destruct (fn_wf_cons w r Hwf) as [Hword Hr].
+    pose proof (fn_word_pos w Hword) as Hwpos.
     pose proof (wl_word_plain w Hword) as Hwpl.
     assert (Hlen' : len = length w + (length (wl_tail r) + 1)).
     { rewrite Hlen wl_line_cons length_app length_app. cbn [length]. lia. }
@@ -566,7 +580,7 @@ Lemma wl_demo_lexes :
        (fun j => wl_line wl_demo !!! j) 0 [(0, 2); (3, 6)].
 Proof.
   split.
-  - exact (wl_no_symbols wl_demo _ _ wl_demo_wf eq_refl (fun j _ => eq_refl)).
+  - exact (wl_no_symbols wl_demo _ _ (wl_wf_fn _ wl_demo_wf) eq_refl (fun j _ => eq_refl)).
   - rewrite -wl_demo_toks.
-    exact (wl_tokens wl_demo _ _ wl_demo_wf eq_refl (fun j _ => eq_refl)).
+    exact (wl_tokens wl_demo _ _ (wl_wf_fn _ wl_demo_wf) eq_refl (fun j _ => eq_refl)).
 Qed.

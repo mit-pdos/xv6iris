@@ -1143,9 +1143,12 @@ Section UShEcho.
       pose proof (Forall_lookup_1 _ _ _ _ (exec_ok_wf ws Hok)
                     (exec_ok_at ws 0%nat Hok Hpos)) as [_ Hwa].
       pose proof (Forall_lookup_1 _ _ _ _ Hwa Hj) as Hb.
-      intros ->. revert Hb. rewrite /wl_alnum. vm_compute.
-      intros [H | [H | H]]; destruct H as [H1 H2];
-        first [ by apply H1 | by apply H2 ].
+      intros ->. apply fn_byte_val in Hb.
+      lazymatch type of Hb with
+      | context [bv_unsigned ?X] =>
+          let v := eval vm_compute in (bv_unsigned X) in
+          change (bv_unsigned X) with v in Hb
+      end. lia.
     - intros j b Hj.
       assert (Hjl : (j < length cmd)%nat) by exact (lookup_lt_Some _ _ _ Hj).
       rewrite (uint_avi_moi s0 (Z.of_nat j) ltac:(lia) ltac:(lia)

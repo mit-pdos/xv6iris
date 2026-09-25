@@ -1609,3 +1609,154 @@ Proof. apply (bool_decide_unpack _). vm_compute. exact I. Qed.
 Lemma wl_demo_words :
   wl_words [wl_demo_a; wl_sp; wl_demo_b] = [[wl_demo_a]; [wl_demo_b]].
 Proof. apply (bool_decide_unpack _). vm_compute. exact I. Qed.
+
+(* ===================================================================== *)
+(*  S9  THE FILE-NAME WORD (cut W4; design of record:                     *)
+(*  claude-notes/design/filenames.md section 0, law L1).                  *)
+(*                                                                        *)
+(*  A user file's name is a word over ONE more byte than a command word:  *)
+(*  the alphanumerics and the dot.  The dot is neither a blank nor one of *)
+(*  sh's metacharacters, so everything the word parser and sh's lexer     *)
+(*  know of a [wl_word] they know of an [fn_word]: [wl_words] reads it    *)
+(*  back whole, and [UkShWords] lexes it as one token.  What the dot must *)
+(*  NOT do is widen what an ECHO word or a GREP pattern may be -- those   *)
+(*  stay [wl_word], and the dot reaches a line only at a file-name       *)
+(*  position ([FileDisc.parse_line], [PipesDisc.prod_parse]).  [fn_wf]    *)
+(*  is the argv of an exec, whose words may be either.                    *)
+(* ===================================================================== *)
+
+Definition fn_dot : bv 8 := Z_to_bv 8 46%Z.
+
+Lemma fn_dot_val : bv_unsigned fn_dot = 46%Z.
+Proof. by vm_compute. Qed.
+
+Definition fn_byte (b : bv 8) : Prop := wl_alnum b \/ b = fn_dot.
+
+Global Instance fn_byte_dec b : Decision (fn_byte b).
+Proof. rewrite /fn_byte. apply _. Defined.
+
+Definition fn_word (w : list (bv 8)) : Prop := w <> [] /\ Forall fn_byte w.
+
+Global Instance fn_word_dec w : Decision (fn_word w).
+Proof. rewrite /fn_word. apply _. Defined.
+
+Definition fn_wf (ws : list (list (bv 8))) : Prop := Forall fn_word ws.
+
+Global Instance fn_wf_dec ws : Decision (fn_wf ws).
+Proof. rewrite /fn_wf. apply _. Defined.
+
+Lemma fn_byte_val (b : bv 8) :
+  fn_byte b ->
+  bv_unsigned b = 46%Z
+  \/ (48 <= bv_unsigned b <= 57)%Z \/ (65 <= bv_unsigned b <= 90)%Z
+  \/ (97 <= bv_unsigned b <= 122)%Z.
+Proof.
+  intros [Ha | ->]; [right; exact Ha | left; exact fn_dot_val].
+Qed.
+
+Lemma fn_byte_of_alnum (b : bv 8) : wl_alnum b -> fn_byte b.
+Proof. by left. Qed.
+
+Lemma fn_byte_ne_sp (b : bv 8) : fn_byte b -> b <> wl_sp.
+Proof.
+  intros Hb ->. apply fn_byte_val in Hb. rewrite wl_sp_val in Hb. lia.
+Qed.
+
+Lemma fn_byte_ne_nl (b : bv 8) : fn_byte b -> b <> wl_nl.
+Proof.
+  intros Hb ->. apply fn_byte_val in Hb. rewrite wl_nl_val in Hb. lia.
+Qed.
+
+Lemma wl_word_fn (w : list (bv 8)) : wl_word w -> fn_word w.
+Proof.
+  intros [Hne Hw]. split; [exact Hne |].
+  eapply Forall_impl; [exact Hw | exact fn_byte_of_alnum].
+Qed.
+
+Lemma wl_wf_fn (ws : list (list (bv 8))) : wl_wf ws -> fn_wf ws.
+Proof.
+  intros H. eapply Forall_impl; [exact H | exact wl_word_fn].
+Qed.
+
+Lemma fn_wf_cons (w : list (bv 8)) (r : list (list (bv 8))) :
+  fn_wf (w :: r) -> fn_word w /\ fn_wf r.
+Proof. rewrite /fn_wf. apply Forall_cons_1. Qed.
+
+Lemma fn_word_pos (w : list (bv 8)) : fn_word w -> 0 < length w.
+Proof. intros [Hne _]. destruct w as [| b w']; [done | cbn; lia]. Qed.
+
+(* the word parser on a word of name bytes: the same three steps as
+   [wl_words_prepend] / [wl_words_word] / [wl_words_body], since all
+   they read of a byte is that it is not the blank *)
+Lemma wl_words_prepend_fn (w : list (bv 8)) :
+  forall (l w0 : list (bv 8)) (r : list (list (bv 8))),
+    Forall fn_byte w -> wl_words l = w0 :: r ->
+    wl_words (w ++ l) = (w ++ w0) :: r.
+Proof.
+  induction w as [| b w' IH]; intros l w0 r Hw Hl; [exact Hl |].
+  destruct (Forall_cons_1 _ _ _ Hw) as [Hb Hw'].
+  change ((b :: w') ++ l) with (b :: (w' ++ l)).
+  by rewrite (wl_words_cons_other_cons b (w' ++ l) (w' ++ w0) r
+                (fn_byte_ne_sp b Hb) (IH l w0 r Hw' Hl)).
+Qed.
+
+Lemma wl_words_word_fn (w : list (bv 8)) : fn_word w -> wl_words w = [w].
+Proof.
+  intros [Hne Hw].
+  induction w as [| b w' IH]; [by destruct (Hne eq_refl) |].
+  destruct (Forall_cons_1 _ _ _ Hw) as [Hb Hw'].
+  destruct w' as [| b1 w1].
+  - exact (wl_words_cons_other_nil b [] (fn_byte_ne_sp b Hb) wl_words_nil).
+  - assert (Hne1 : b1 :: w1 <> []) by discriminate.
+    by rewrite (wl_words_cons_other_cons b (b1 :: w1) (b1 :: w1) []
+                  (fn_byte_ne_sp b Hb) (IH Hne1 Hw')).
+Qed.
+
+Lemma wl_words_body_fn (ws : list (list (bv 8))) :
+  fn_wf ws -> wl_words (wl_body ws) = ws.
+Proof.
+  induction ws as [| w r IH]; intro Hwf; [reflexivity |].
+  destruct (fn_wf_cons w r Hwf) as [Hword Hr].
+  rewrite wl_body_cons.
+  destruct r as [| w1 r1].
+  - cbn [wl_tail]. rewrite app_nil_r. exact (wl_words_word_fn w Hword).
+  - rewrite wl_tail_cons.
+    assert (Hsp : wl_words (wl_sp :: wl_body (w1 :: r1)) = [] :: (w1 :: r1))
+      by (rewrite wl_words_cons_sp (IH Hr); reflexivity).
+    rewrite (wl_words_prepend_fn w (wl_sp :: wl_body (w1 :: r1)) [] (w1 :: r1)
+               (proj2 Hword) Hsp).
+    by rewrite app_nil_r.
+Qed.
+
+(* every byte of a body of name words: a name byte or the blank *)
+Lemma wl_body_bytes_fn (ws : list (list (bv 8))) :
+  fn_wf ws -> Forall (fun b => fn_byte b \/ b = wl_sp) (wl_body ws).
+Proof.
+  assert (Ht : forall r, fn_wf r ->
+            Forall (fun b => fn_byte b \/ b = wl_sp) (wl_tail r)).
+  { induction r as [| w r IH]; intro Hwf; cbn [wl_tail]; [constructor |].
+    destruct (fn_wf_cons w r Hwf) as [[_ Hw] Hr].
+    constructor; [by right |].
+    apply Forall_app. split; [| exact (IH Hr)].
+    eapply Forall_impl; [exact Hw | intros b Hb; by left]. }
+  intro Hwf. destruct ws as [| w r]; cbn [wl_body]; [constructor |].
+  destruct (fn_wf_cons w r Hwf) as [[_ Hw] Hr].
+  apply Forall_app. split; [| exact (Ht r Hr)].
+  eapply Forall_impl; [exact Hw | intros b Hb; by left].
+Qed.
+
+(* ...and the whole line's, numerically: [wl_line_byte_val] with the dot *)
+Lemma wl_line_byte_val_fn (ws : list (list (bv 8))) (b : bv 8) :
+  fn_wf ws -> b ∈ wl_line ws ->
+  bv_unsigned b = 10%Z \/ bv_unsigned b = 32%Z \/ bv_unsigned b = 46%Z
+  \/ (48 <= bv_unsigned b <= 57)%Z \/ (65 <= bv_unsigned b <= 90)%Z
+  \/ (97 <= bv_unsigned b <= 122)%Z.
+Proof.
+  intros Hwf Hin. rewrite /wl_line in Hin.
+  apply elem_of_app in Hin as [Hin | Hin].
+  - apply elem_of_list_lookup_1 in Hin as [i Hi].
+    destruct (Forall_lookup_1 _ _ _ _ (wl_body_bytes_fn ws Hwf) Hi) as [Hb | ->].
+    + apply fn_byte_val in Hb. tauto.
+    + rewrite wl_sp_val. tauto.
+  - apply elem_of_list_singleton in Hin as ->. rewrite wl_nl_val. tauto.
+Qed.

@@ -1269,5 +1269,8 @@ tree 13, union 14.  NEXT: the *.txt widening (design/filenames.md).
 laws) and W1 (the model over a map of named files, class still `{f}`)
 LANDED 2026-09-25; `union_phi`'s boot state is now a map; W2 (the claim
 over a map) and W3 (handler and programs at any class name) LANDED
-2026-09-25.  NEXT: W4, the `*.txt` instance.
+2026-09-25; W4 (the class is `stem.txt`) LANDED 2026-09-25: THE WIDENING
+IS COMPLETE.  The union theorem admits `echo ws > a.txt`, `cat a.txt`
+and `cat a.txt | grep h | cat` at any `*.txt` name (stem of at most 9
+alphanumeric bytes); `cat README`, `cat /sh`, `cat f` stay out.
 

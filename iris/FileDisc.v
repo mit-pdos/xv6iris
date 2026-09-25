@@ -63,6 +63,7 @@ Require Import EchoDisc.         (* the console discipline this one extends *)
 Require Export LineBytes.        (* [nodollar], the byte facts every model reads *)
 Require Import LineModel.        (* the line model this one instantiates *)
 Require Export FileState.        (* [fstate], [echo_chunks], [sel_ok], [subseq] *)
+Require Export FileClass.        (* the class [txt_name], laws L1 and L2 *)
 From stdpp Require Import ssreflect.
 Local Open Scope nat_scope.
 
@@ -78,17 +79,28 @@ Proof. intro H. exact (app_inv_tail w u v H). Qed.
 (*  1.  THE LINES THE USER MAY TYPE                                        *)
 (* ====================================================================== *)
 
-(* THE NAME CLASS (claude-notes/design/filenames.md, cut W1): the files a
+(* THE NAME CLASS (claude-notes/design/filenames.md, cut W4): the files a
    line may name.  The model is stated over ANY name of the class -- lines
    carry their file, the state is a map ([FileState.fstate]) -- and the
-   class is, for now, the one name [f]; [FileName.v] states the five laws
-   a class obeys and proves them for this one and for [*.txt]. *)
+   class is `stem.txt` ([FileClass.txt_name]); [FileName.v] states the five
+   laws a class obeys and proves them for it ([FileName.txt_laws]).  The
+   proofs below read the class through L1 and L2 alone ([uname_lex],
+   [uname_len]).  [fname_f] is the name the diagnostics of a line that
+   names no file default to ([lname]), which no admissible alternative
+   prints. *)
 Notation fname_f := fname_m (only parsing).
 
-Definition uname (N : list (bv 8)) : Prop := N = fname_f.
+Definition uname (N : list (bv 8)) : Prop := txt_name N.
 
-Global Instance uname_dec N : Decision (uname N).
-Proof using. rewrite /uname. apply _. Defined.
+Global Instance uname_dec N : Decision (uname N) := txt_name_dec N.
+
+(* L1: a class name is a word of name bytes *)
+Lemma uname_lex N : uname N -> fn_word N.
+Proof using. exact (txt_lex N). Qed.
+
+(* L2: ...shorter than a directory entry's name field *)
+Lemma uname_len N : uname N -> (length N < 14)%nat.
+Proof using. exact (txt_len N). Qed.
 
 (* sh's lexer sees '>' as a symbol token; the redirect is CANONICAL -- one
    blank each side, at the end of the line -- which is the shape the sh
@@ -142,9 +154,11 @@ Definition prod_words (p : producer) : list (list (bv 8)) :=
   match p with PrEcho ws => ws | PrCatF f => [fd_w_cat; f] end.
 Definition prod_body (p : producer) : list (bv 8) := wl_body (prod_words p).
 
-(* an admissible producer: an admissible echo line, or [cat] of a word *)
+(* an admissible producer: an admissible echo line, or [cat] of a word
+   of name bytes (cut W4: the dot joins at this, a FILE position; which
+   names the application admits is its admission's, [UnionDisc.adm_u_g]) *)
 Definition prod_ok (p : producer) : Prop :=
-  match p with PrEcho ws => line_ok ws | PrCatF f => wl_word f end.
+  match p with PrEcho ws => line_ok ws | PrCatF f => fn_word f end.
 
 Global Instance prod_ok_dec p : Decision (prod_ok p).
 Proof using. destruct p; unfold prod_ok; apply _. Defined.
@@ -152,15 +166,17 @@ Proof using. destruct p; unfold prod_ok; apply _. Defined.
 Lemma fd_w_cat_word : wl_word fd_w_cat.
 Proof using. apply (bool_decide_unpack _). vm_compute. exact I. Qed.
 
-Lemma prod_wf (p : producer) : prod_ok p -> wl_wf (prod_words p).
+Lemma prod_wf (p : producer) : prod_ok p -> fn_wf (prod_words p).
 Proof using.
   destruct p as [ws | f]; cbn [prod_ok prod_words]; intros H.
-  - exact (line_ok_wf ws H).
-  - unfold wl_wf. constructor; [exact fd_w_cat_word | constructor; [exact H | constructor]].
+  - exact (wl_wf_fn _ (line_ok_wf ws H)).
+  - unfold fn_wf. constructor; [exact (wl_word_fn _ fd_w_cat_word) |].
+    constructor; [exact H | constructor].
 Qed.
 
-Lemma prod_body_bytes p : prod_ok p -> Forall wl_body_byte (prod_body p).
-Proof using. intros Hp. exact (wl_body_bytes _ (prod_wf p Hp)). Qed.
+Lemma prod_body_bytes p :
+  prod_ok p -> Forall (fun b => fn_byte b \/ b = wl_sp) (prod_body p).
+Proof using. intros Hp. exact (wl_body_bytes_fn _ (prod_wf p Hp)). Qed.
 
 Lemma prod_words_ge2 p : prod_ok p -> (2 <= length (prod_words p))%nat.
 Proof using. destruct p as [ws | f]; cbn [prod_ok prod_words length]; [exact (line_ok_ge2 ws) | lia]. Qed.
@@ -350,20 +366,20 @@ Proof using. destruct l; rewrite /uline_ok; apply _. Defined.
    well-formed body absorbs any tail that starts a fresh word. *)
 Lemma fd_wl_words_body_app (ws : list (list (bv 8))) (L : list (bv 8))
     (rest : list (list (bv 8))) :
-  wl_wf ws -> ws <> [] -> wl_words L = [] :: rest ->
+  fn_wf ws -> ws <> [] -> wl_words L = [] :: rest ->
   wl_words (wl_body ws ++ L) = ws ++ rest.
 Proof using.
   revert L rest.
   induction ws as [| w r IH]; intros L rest Hwf Hne HL; [by destruct (Hne eq_refl) |].
-  destruct (wl_wf_cons w r Hwf) as [[Hw0 Ha] Hr].
+  destruct (fn_wf_cons w r Hwf) as [[Hw0 Ha] Hr].
   destruct r as [| w1 r1].
   - cbn [wl_body wl_tail]. rewrite app_nil_r.
-    rewrite (wl_words_prepend w L [] rest Ha HL) app_nil_r. reflexivity.
+    rewrite (wl_words_prepend_fn w L [] rest Ha HL) app_nil_r. reflexivity.
   - assert (Hne1 : (w1 :: r1) <> []) by discriminate.
     rewrite wl_body_cons wl_tail_cons.
     rewrite <- (app_assoc w (wl_sp :: wl_body (w1 :: r1)) L).
     cbn [app].
-    rewrite (wl_words_prepend w (wl_sp :: (wl_body (w1 :: r1) ++ L))
+    rewrite (wl_words_prepend_fn w (wl_sp :: (wl_body (w1 :: r1) ++ L))
                [] ((w1 :: r1) ++ rest) Ha
                ltac:(rewrite wl_words_cons_sp (IH L rest Hr Hne1 HL);
                      reflexivity)).
@@ -447,7 +463,8 @@ Proof using.
   rewrite (wl_words_cons_other_cons fd_bar (wl_sp :: wl_body (filt_words F) ++ L) []
              (filt_words F ++ R) fd_bar_ne_sp); [by rewrite fd_w_bar_eq |].
   rewrite wl_words_cons_sp.
-  rewrite (fd_wl_words_body_app (filt_words F) L R (filt_wf F HF) (filt_words_ne F) HL).
+  rewrite (fd_wl_words_body_app (filt_words F) L R (wl_wf_fn _ (filt_wf F HF))
+             (filt_words_ne F) HL).
   reflexivity.
 Qed.
 
@@ -512,24 +529,42 @@ Proof using.
   destruct fs as [| F fs].
   - cbn [line_body uline_ws].
     change (suf_filts []) with (@nil (bv 8)). change (w_filts []) with (@nil (list (bv 8))).
-    rewrite !app_nil_r. exact (wl_words_body _ (prod_wf p Hok)).
+    rewrite !app_nil_r. exact (wl_words_body_fn _ (prod_wf p Hok)).
   - exact (fd_wl_words_body_app (prod_words p) (suf_filts (F :: fs)) (w_filts (F :: fs))
              (prod_wf p Hok) Hne (wl_words_filts (F :: fs) ltac:(discriminate) HF)).
 Qed.
 
-(* ...and the redirect line's, the same way (RULING SLOT-WS, option B) *)
+(* ...and the redirect line's, the same way (RULING SLOT-WS, option B),
+   at any word of name bytes *)
+Lemma wl_words_gt (N : list (bv 8)) :
+  fn_word N -> wl_words (suf_gt N) = [] :: [fd_w_gt; N].
+Proof using.
+  intros HN.
+  assert (E : sb " > "%string = [wl_sp; Z_to_bv 8 62; wl_sp])
+    by (apply (bool_decide_unpack _); vm_compute; exact I).
+  assert (Eg : fd_w_gt = [Z_to_bv 8 62])
+    by (apply (bool_decide_unpack _); vm_compute; exact I).
+  assert (Hgt : Z_to_bv 8 62 <> wl_sp)
+    by (intros H; apply (f_equal bv_unsigned) in H; revert H; vm_compute; discriminate).
+  rewrite /suf_gt E Eg. cbn [app].
+  rewrite wl_words_cons_sp.
+  rewrite (wl_words_cons_other_cons _ (wl_sp :: N) [] [N] Hgt);
+    [reflexivity |].
+  rewrite wl_words_cons_sp (wl_words_word_fn N HN). reflexivity.
+Qed.
+
 Lemma wl_words_gtf : wl_words suf_gtf = [] :: [fd_w_gt; fname_f].
 Proof using. apply (bool_decide_unpack _). vm_compute. exact I. Qed.
 
 Lemma uline_ws_gtf (ws : list (list (bv 8))) (N : list (bv 8)) :
   line_ok ws -> uname N -> wl_words (line_body (LEchoF ws N)) = uline_ws (LEchoF ws N).
 Proof using.
-  intros Hok ->.
+  intros Hok Hu.
   assert (Hne : ws <> []).
   { pose proof (line_ok_pos ws Hok) as Hp.
     destruct ws as [| w r]; [cbn [length] in Hp; lia | discriminate]. }
-  exact (fd_wl_words_body_app ws suf_gtf [fd_w_gt; fname_f]
-           (line_ok_wf _ Hok) Hne wl_words_gtf).
+  exact (fd_wl_words_body_app ws (suf_gt N) [fd_w_gt; N]
+           (wl_wf_fn _ (line_ok_wf _ Hok)) Hne (wl_words_gt N (uname_lex N Hu))).
 Qed.
 
 (* ---- the redirect suffix, and the bytes a line body may carry -------- *)
@@ -539,13 +574,23 @@ Definition wl_gt : bv 8 := Z_to_bv 8 62%Z.
 (* the partial line the user is in the middle of.  '>' is not a
    [wl_body_byte] and the line [echo hi > f] passes through the input
    [echo hi >], so the file application's D3 admits it. *)
-Definition fbody_byte (b : bv 8) : Prop := wl_body_byte b \/ b = wl_gt.
+Definition fbody_byte (b : bv 8) : Prop := wl_body_byte b \/ b = wl_gt \/ b = fn_dot.
 
 Global Instance fbody_byte_dec b : Decision (fbody_byte b).
 Proof using. rewrite /fbody_byte. apply _. Defined.
 
 Lemma fbody_byte_of_body b : wl_body_byte b -> fbody_byte b.
 Proof using. by left. Qed.
+
+(* cut W4: the dot is a byte of the partial line, because a file name is
+   typed through it ([echo hi > a.] on the way to [echo hi > a.txt]).  A
+   COMPLETE line carries it only where [parse_line] reads a file name:
+   an echo word is [body_ok]'s [wl_word] and a grep pattern [filt_ok]'s. *)
+Lemma fbody_byte_of_fn b : fn_byte b \/ b = wl_sp -> fbody_byte b.
+Proof using.
+  intros [[Ha | ->] | ->];
+    [left; left; exact Ha | right; right; reflexivity | left; right; reflexivity].
+Qed.
 
 Lemma suf_gtf_len : length suf_gtf = 4%nat.
 Proof using. by vm_compute. Qed.
@@ -727,6 +772,55 @@ Proof using. by vm_compute. Qed.
 Lemma cmd_cat_f_lastw : lastw cmd_cat_f = fname_f.
 Proof using. by vm_compute. Qed.
 
+(* ---- the same four facts at ANY word of name bytes (cut W4: the proofs
+   below read a class name through L1 and L2 alone) ---- *)
+Lemma cat_words_N (N : list (bv 8)) : fn_word N -> wl_words (cmd_cat N) = [fd_w_cat; N].
+Proof using. intros HN. exact (wl_words_body_fn [fd_w_cat; N] (prod_wf (PrCatF N) HN)). Qed.
+
+Lemma cat_not_echo_N (N : list (bv 8)) :
+  fn_word N -> wl_words (cmd_cat N) !! 0%nat <> Some cmd_echo.
+Proof using.
+  intros HN. rewrite (cat_words_N N HN).
+  change ([fd_w_cat; N] !! 0%nat) with (Some fd_w_cat).
+  intros H. apply (f_equal (fun o => length (default [] o))) in H.
+  vm_compute in H. discriminate H.
+Qed.
+
+Lemma cmd_cat_len (N : list (bv 8)) : length (cmd_cat N) = (4 + length N)%nat.
+Proof using.
+  rewrite /cmd_cat /wl_body. cbn [wl_tail]. rewrite app_nil_r length_app. reflexivity.
+Qed.
+
+Lemma lastw_cat (N : list (bv 8)) : fn_word N -> lastw (cmd_cat N) = N.
+Proof using. intros HN. rewrite /lastw (cat_words_N N HN). reflexivity. Qed.
+
+Lemma suf_gt_length (N : list (bv 8)) : length (suf_gt N) = (3 + length N)%nat.
+Proof using. rewrite /suf_gt length_app. reflexivity. Qed.
+
+Lemma lastw_gt (ws : list (list (bv 8))) (N : list (bv 8)) :
+  line_ok ws -> uname N -> lastw (wl_body ws ++ suf_gt N) = N.
+Proof using.
+  intros Hok Hu. rewrite /lastw.
+  change (wl_body ws ++ suf_gt N) with (line_body (LEchoF ws N)).
+  rewrite (uline_ws_gtf ws N Hok Hu). cbn [uline_ws].
+  rewrite (app_assoc ws [fd_w_gt] [N]) last_snoc. reflexivity.
+Qed.
+
+(* every byte of a redirect suffix, and of a cat line, at a word of name
+   bytes *)
+Lemma suf_gt_bytes (N : list (bv 8)) : fn_word N -> Forall fbody_byte (suf_gt N).
+Proof using.
+  intros [_ HN]. rewrite /suf_gt. apply Forall_app. split.
+  - apply (bool_decide_unpack _). vm_compute. exact I.
+  - eapply Forall_impl; [exact HN |]. intros b Hb. apply fbody_byte_of_fn. by left.
+Qed.
+
+Lemma cmd_cat_bytes (N : list (bv 8)) : fn_word N -> Forall fbody_byte (cmd_cat N).
+Proof using.
+  intros HN. eapply Forall_impl;
+    [exact (wl_body_bytes_fn [fd_w_cat; N] (prod_wf (PrCatF N) HN)) | exact fbody_byte_of_fn].
+Qed.
+
 Lemma body_no_gt ws N (c : list (bv 8)) :
   line_ok ws -> wl_body ws <> c ++ suf_gt N.
 Proof using.
@@ -754,35 +848,28 @@ Proof using.
     { rewrite /body_ok (wl_words_body ws (line_ok_wf _ Hok)).
       split; [reflexivity | exact Hok]. }
     destruct (decide (uname (lastw (wl_body ws)))) as [Hu | Hu].
-    + rewrite /uname in Hu. rewrite Hu.
-      destruct (decide (wl_body ws = cmd_cat fname_f)) as [Heq | _].
-      { exfalso. apply cat_not_echo. change (cmd_cat fname_f) with cmd_cat_f in Heq.
+    + destruct (decide (wl_body ws = cmd_cat (lastw (wl_body ws)))) as [Heq | _].
+      { exfalso. apply (cat_not_echo_N _ (uname_lex _ Hu)).
         rewrite -Heq (wl_words_body ws (line_ok_wf _ Hok)).
         exact (line_ok_head ws Hok). }
-      destruct (strip_gt fname_f (wl_body ws)) as [c |] eqn:Hs.
-      { exfalso. exact (body_no_gt ws fname_f c Hok (strip_gt_Some _ _ _ Hs)). }
+      destruct (strip_gt (lastw (wl_body ws)) (wl_body ws)) as [c |] eqn:Hs.
+      { exfalso. exact (body_no_gt ws _ c Hok (strip_gt_Some _ _ _ Hs)). }
       destruct (decide (body_ok (wl_body ws))) as [_ | Hn]; [| by destruct Hn].
       by rewrite (wl_words_body ws (line_ok_wf _ Hok)).
     + destruct (decide (body_ok (wl_body ws))) as [_ | Hn]; [| by destruct Hn].
       by rewrite (wl_words_body ws (line_ok_wf _ Hok)).
   - (* LEchoF *)
-    intros (Hok & Hu & Hlen). rewrite /uname in Hu. subst N.
-    assert (Hlw : lastw (wl_body ws ++ suf_gt fname_f) = fname_f).
-    { rewrite /lastw.
-      change (wl_body ws ++ suf_gt fname_f) with (line_body (LEchoF ws fname_f)).
-      rewrite (uline_ws_gtf ws fname_f Hok eq_refl). cbn [uline_ws].
-      rewrite (app_assoc ws [fd_w_gt] [fname_f]) last_snoc. reflexivity. }
+    intros (Hok & Hu & Hlen).
+    pose proof (lastw_gt ws N Hok Hu) as Hlw.
     rewrite /line_body /parse_line Hlw.
-    destruct (decide (uname fname_f)) as [_ | Hn]; [| by destruct Hn].
-    destruct (decide (wl_body ws ++ suf_gt fname_f = cmd_cat fname_f)) as [Heq | _].
+    destruct (decide (uname N)) as [_ | Hn]; [| by destruct Hn].
+    destruct (decide (wl_body ws ++ suf_gt N = cmd_cat N)) as [Heq | _].
     { exfalso. pose proof (line_ok_body_len ws Hok) as Hb.
       apply (f_equal length) in Heq.
-      change (suf_gt fname_f) with suf_gtf in Heq.
-      change (cmd_cat fname_f) with cmd_cat_f in Heq.
-      rewrite length_app suf_gtf_len cmd_cat_f_len in Heq. lia. }
+      rewrite length_app suf_gt_length cmd_cat_len in Heq. lia. }
     rewrite strip_gt_app.
     destruct (decide (body_ok (wl_body ws)
-                      /\ (S (length (wl_body ws ++ suf_gt fname_f)) < line_max)%nat))
+                      /\ (S (length (wl_body ws ++ suf_gt N)) < line_max)%nat))
       as [_ | Hn].
     2: { exfalso. apply Hn. split.
          - rewrite /body_ok (wl_words_body ws (line_ok_wf _ Hok)).
@@ -791,11 +878,10 @@ Proof using.
            cbn [length] in Hlen. rewrite /suf_gt !length_app. lia. }
     by rewrite (wl_words_body ws (line_ok_wf _ Hok)).
   - (* LCat *)
-    intros Hu. rewrite /uline_ok /uname in Hu. subst N. rewrite /line_body /parse_line.
-    change (cmd_cat fname_f) with cmd_cat_f.
-    rewrite cmd_cat_f_lastw.
-    destruct (decide (uname fname_f)) as [_ | Hn]; [| by destruct Hn].
-    destruct (decide (cmd_cat_f = cmd_cat fname_f)) as [_ | Hn]; [reflexivity |].
+    intros Hu. rewrite /line_body /parse_line.
+    rewrite (lastw_cat N (uname_lex N Hu)).
+    destruct (decide (uname N)) as [_ | Hn]; [| by destruct Hn].
+    destruct (decide (cmd_cat N = cmd_cat N)) as [_ | Hn]; [reflexivity |].
     by destruct Hn.
 Qed.
 
@@ -830,7 +916,7 @@ Proof using.
   - cbn [uline_ws line_body]. symmetry.
     exact (wl_words_body ws (line_ok_wf _ Hok)).
   - symmetry. exact (uline_ws_gtf ws N (proj1 Hok) (proj1 (proj2 Hok))).
-  - rewrite /uline_ok /uname in Hok. subst N. by vm_compute.
+  - cbn [uline_ws line_body]. symmetry. exact (cat_words_N N (uname_lex N Hok)).
   - symmetry. exact (uline_ws_pipe ws npc (proj1 Hok) (proj1 (proj2 (proj2 Hok)))).
 Qed.
 
@@ -871,12 +957,10 @@ Proof using.
     apply (f_equal length) in Hw. revert Hw.
     cbn [uline_ws]. rewrite length_app.
     pose proof (line_ok_ge2 ws' Hok') as H2. cbn [length]. lia.
-  - rewrite /uline_ok /uname in Hok. subst N'.
-    assert (Hc : wl_words (cmd_cat fname_f) = [fd_w_cat; fname_f])
-      by (vm_compute; reflexivity).
+  - pose proof (cat_words_N N' (uname_lex N' Hok)) as Hc.
     cbn [line_body uline_ws] in Hw. rewrite Hc in Hw.
-    assert (HN : N = fname_f) by congruence. subst N.
-    apply uline_of_body; [ intros w ? Hp; discriminate Hp | reflexivity ].
+    assert (HN : N = N') by congruence. subst N.
+    apply uline_of_body; [ intros w ? Hp; discriminate Hp | exact Hok ].
   - exfalso. destruct Hok as (Hok' & Hn1 & Hf1 & _).
     rewrite (uline_ws_pipe ws' npc' Hok' Hf1) in Hw.
     apply (f_equal length) in Hw. revert Hw.
@@ -924,11 +1008,10 @@ Proof using.
     apply uline_of_body; [ intros w ? Hp; discriminate Hp | ].
     split_and!; assumption.
   - (* LCat: two words, so the command would have none *)
-    exfalso. rewrite /uline_ok /uname in Hok. subst N'.
-    change (line_body (LCat fname_f)) with cmd_cat_f in Hw.
+    exfalso. change (line_body (LCat N')) with (cmd_cat N') in Hw.
+    rewrite (cat_words_N N' (uname_lex N' Hok)) in Hw.
     apply (f_equal length) in Hw. rewrite length_app in Hw.
-    pose proof (line_ok_pos ws Hws) as Hp.
-    revert Hw. vm_compute (length (wl_words cmd_cat_f)). cbn [length]. lia.
+    pose proof (line_ok_pos ws Hws) as Hp. cbn [length] in Hw. lia.
   - (* LPipe: the word before the last is the bar, or [grep] *)
     exfalso. destruct Hok as (Hok' & Hn1 & Hf1 & _).
     rewrite (uline_ws_pipe ws' npc' Hok' Hf1) in Hw. cbn [uline_ws] in Hw.
@@ -967,12 +1050,11 @@ Proof using.
     [| | | by destruct (Hnp ws npc eq_refl)].
   - apply Forall_impl with (P := wl_body_byte);
       [exact (wl_body_bytes ws (line_ok_wf _ Hok)) | exact fbody_byte_of_body].
-  - destruct Hok as (Hok & Hu & _). rewrite /uname in Hu. subst N.
-    apply Forall_app. split; [| exact suf_gtf_bytes].
+  - destruct Hok as (Hok & Hu & _).
+    apply Forall_app. split; [| exact (suf_gt_bytes N (uname_lex N Hu))].
     apply Forall_impl with (P := wl_body_byte);
       [exact (wl_body_bytes ws (line_ok_wf _ Hok)) | exact fbody_byte_of_body].
-  - rewrite /uline_ok /uname in Hok. subst N.
-    apply (bool_decide_unpack _). vm_compute. exact I.
+  - exact (cmd_cat_bytes N (uname_lex N Hok)).
 Qed.
 
 Lemma fbody_ok_short b : fbody_ok b -> (S (length b) < line_max)%nat.
@@ -985,9 +1067,9 @@ Proof using.
   - destruct Hok as (_ & _ & Hl).
     rewrite /line_bytes /line_body length_app in Hl. cbn [length] in Hl.
     rewrite /line_body. lia.
-  - rewrite /uline_ok /uname in Hok. subst N.
-    change (line_body (LCat fname_f)) with cmd_cat_f.
-    rewrite cmd_cat_f_len /line_max. lia.
+  - pose proof (uname_len N Hok) as HN.
+    change (line_body (LCat N)) with (cmd_cat N).
+    rewrite cmd_cat_len /line_max. lia.
 Qed.
 
 (* ---- EVERY BYTE OF AN ADMISSIBLE LINE, AT EVERY CONSTRUCTOR ---------- *)
@@ -1031,19 +1113,19 @@ Proof using.
   - apply Forall_impl with (P := wl_body_byte);
       [exact (wl_body_bytes ws (line_ok_wf _ Hok)) |].
     intros b Hb. left. exact (fbody_byte_of_body b Hb).
-  - destruct Hok as (Hok & Hu & _). rewrite /uname in Hu. subst N.
+  - destruct Hok as (Hok & Hu & _).
     apply Forall_app. split.
     + apply Forall_impl with (P := wl_body_byte);
         [exact (wl_body_bytes ws (line_ok_wf _ Hok)) |].
       intros b Hb. left. exact (fbody_byte_of_body b Hb).
-    + apply Forall_impl with (P := fbody_byte); [exact suf_gtf_bytes |].
+    + apply Forall_impl with (P := fbody_byte); [exact (suf_gt_bytes N (uname_lex N Hu)) |].
       intros b Hb. by left.
-  - rewrite /uline_ok /uname in Hok. subst N.
-    apply (bool_decide_unpack _). vm_compute. exact I.
+  - apply Forall_impl with (P := fbody_byte); [exact (cmd_cat_bytes N (uname_lex N Hok)) |].
+    intros b Hb. by left.
   - apply Forall_app. split.
-    + apply Forall_impl with (P := wl_body_byte);
+    + apply Forall_impl with (P := fun b => fn_byte b \/ b = wl_sp);
         [exact (prod_body_bytes ws (proj1 Hok)) |].
-      intros b Hb. left. exact (fbody_byte_of_body b Hb).
+      intros b Hb. left. exact (fbody_byte_of_fn b Hb).
     + apply Forall_impl with (P := fun b => fbody_byte b \/ b = fd_bar);
         [exact (suf_filts_bytes npc (proj1 (proj2 (proj2 Hok)))) |].
       intros b [Hb | Hb]; [by left | by right; left].
@@ -1130,37 +1212,6 @@ Proof using. intros Hs HN. exact (Hs N bs HN). Qed.
 Lemma fstate_ok_insert s N bs :
   fstate_ok s -> uname N -> fcont_ok bs -> fstate_ok (<[N := bs]> s).
 Proof using. intros Hs HN Hb. apply map_Forall_insert_2; [by split | exact Hs]. Qed.
-
-(* a state holding [f] alone is the one-name state of its [f] entry *)
-Lemma fst_of_dom (s : fstate) :
-  (forall N c, s !! N = Some c -> N = fname_f) -> s = fst_of (s !! fname_f).
-Proof using.
-  intros Hs. apply map_eq. intros N.
-  destruct (decide (N = fname_f)) as [-> | HN].
-  - by rewrite fst_of_lookup.
-  - rewrite fst_of_lookup_ne; [| exact HN].
-    destruct (s !! N) as [bs |] eqn:HsN; [| exact HsN].
-    exfalso. exact (HN (Hs N bs HsN)).
-Qed.
-
-(* setting [f] in a one-name state is the one-name state of the new content *)
-Lemma insert_fst_of (o : option (list (bv 8))) (v : list (bv 8)) :
-  <[fname_f := v]> (fst_of o) = fst_of (Some v).
-Proof using.
-  destruct o as [b |]; cbn [fst_of]; [apply insert_singleton | apply insert_empty].
-Qed.
-
-(* ...which at the one-name class every state is *)
-Lemma fstate_ok_fst_of s : fstate_ok s -> s = fst_of (s !! fname_f).
-Proof using. intros Hs. apply fst_of_dom. intros N c Hc. exact (proj1 (Hs N c Hc)). Qed.
-
-Lemma fstate_ok_fst_of_iff (o : option (list (bv 8))) :
-  fstate_ok (fst_of o) <-> match o with None => True | Some bs => fcont_ok bs end.
-Proof using.
-  destruct o as [bs |]; cbn [fst_of].
-  - rewrite /fstate_ok map_Forall_singleton. split; [by intros [_ H] | by split].
-  - split; [done | intros _; apply fstate_ok_empty].
-Qed.
 
 (* THE FILES THE APPLICATION DESCRIBES at a state: the state itself, read
    as a content function (cut C9b, moved down from
@@ -1566,17 +1617,42 @@ Proof using.
   exact (line_alts_of_3 (uline_ws l)).
 Qed.
 
-(* the name a round's diagnostics print is a word at every admissible
-   line: a name of the class, the pipeline producer's own word, or [f] *)
-Lemma lname_word l : uline_ok l -> wl_word (lname l).
+(* the name a round's diagnostics print is a word of name bytes at every
+   admissible line: a name of the class, the pipeline producer's own
+   word, or [f] *)
+Lemma lname_fn l : uline_ok l -> fn_word (lname l).
 Proof using.
-  assert (Hf : wl_word fname_f) by (apply (bool_decide_unpack _); vm_compute; exact I).
+  assert (Hf : fn_word fname_f) by (apply (bool_decide_unpack _); vm_compute; exact I).
   destruct l as [ws | ws N | N | [ws | g] fs]; cbn [lname line_file default]; intros Hl.
   - exact Hf.
-  - destruct Hl as (_ & Hu & _). rewrite /uname in Hu. by subst N.
-  - rewrite /uline_ok /uname in Hl. by subst N.
+  - destruct Hl as (_ & Hu & _). exact (uname_lex N Hu).
+  - exact (uname_lex N Hl).
   - exact Hf.
   - exact (proj1 Hl).
+Qed.
+
+(* a word line of name words: '$'-free, one newline, at its end *)
+Lemma fn_nodollar_nonl b : fn_byte b -> nodollar b /\ b <> wl_nl.
+Proof using.
+  intros Hb. apply fn_byte_val in Hb. split.
+  - rewrite /nodollar. lia.
+  - intros ->. assert (Hv : bv_unsigned wl_nl = 10%Z) by (by vm_compute). lia.
+Qed.
+
+Lemma wl_line_shape_fn ws :
+  fn_wf ws ->
+  Forall nodollar (wl_line ws)
+  /\ (wl_nl ∉ wl_line ws
+      \/ exists v, wl_nl ∉ v /\ wl_line ws = v ++ [wl_nl]).
+Proof using.
+  intro Hwf. split.
+  - apply Forall_forall. intros b Hb.
+    pose proof (wl_line_byte_val_fn ws b Hwf Hb) as Hv. rewrite /nodollar. lia.
+  - right. exists (wl_body ws). split; [| reflexivity].
+    intros Hin. apply elem_of_list_lookup_1 in Hin as [i Hi].
+    destruct (Forall_lookup_1 _ _ _ _ (wl_body_bytes_fn ws Hwf) Hi) as [Hb | Hb].
+    + exact (proj2 (fn_nodollar_nonl _ Hb) eq_refl).
+    + apply (f_equal bv_unsigned) in Hb. rewrite wl_sp_val wl_nl_val in Hb. discriminate Hb.
 Qed.
 
 Lemma alnum_nodollar_nonl b : wl_alnum b -> nodollar b /\ b <> wl_nl.
@@ -1586,19 +1662,19 @@ Proof using.
   - intros ->. assert (Hv : bv_unsigned wl_nl = 10%Z) by (by vm_compute). lia.
 Qed.
 
-(* [cat]'s diagnostic at a word: '$'-free, and its one newline is its
-   last byte *)
+(* [cat]'s diagnostic at a word of name bytes: '$'-free, and its one
+   newline is its last byte *)
 Lemma dg_catopenN_shape N :
-  wl_word N ->
+  fn_word N ->
   Forall nodollar (dg_catopenN N)
   /\ (wl_nl ∉ dg_catopenN N
       \/ exists v, wl_nl ∉ v /\ dg_catopenN N = v ++ [wl_nl]).
 Proof using.
   intros [_ HN].
   assert (HNd : Forall nodollar N)
-    by (eapply Forall_impl; [exact HN | intros b Hb; exact (proj1 (alnum_nodollar_nonl b Hb))]).
+    by (eapply Forall_impl; [exact HN | intros b Hb; exact (proj1 (fn_nodollar_nonl b Hb))]).
   assert (HNl : wl_nl ∉ N).
-  { intros Hin. apply (proj2 (alnum_nodollar_nonl wl_nl (proj1 (Forall_forall _ _) HN _ Hin))).
+  { intros Hin. apply (proj2 (fn_nodollar_nonl wl_nl (proj1 (Forall_forall _ _) HN _ Hin))).
     reflexivity. }
   assert (Hc : Forall nodollar (sb "cat: cannot open "%string) /\ wl_nl ∉ sb "cat: cannot open "%string).
   { split; [apply (bool_decide_unpack _); vm_compute; exact I |].
@@ -1620,8 +1696,8 @@ Proof using.
   intros Hl Hs Ha Hp.
   assert (Hex : wl_wf dg_exec)
     by (apply (bool_decide_unpack _); vm_compute; exact I).
-  assert (Hop : wl_wf (dg_openN (lname l))).
-  { pose proof (lname_word l Hl) as Hw. rewrite /wl_wf /dg_openN.
+  assert (Hop : fn_wf (dg_openN (lname l))).
+  { pose proof (lname_fn l Hl) as Hw. rewrite /fn_wf /dg_openN.
     constructor; [apply (bool_decide_unpack _); vm_compute; exact I |].
     constructor; [exact Hw |].
     constructor; [apply (bool_decide_unpack _); vm_compute; exact I | constructor]. }
@@ -1648,9 +1724,9 @@ Proof using.
   - exists (wl_line dg_exec). rewrite /alt_execfail.
     split; [reflexivity |]. exact (wl_line_shape' dg_exec Hex).
   - exists (wl_line (dg_openN (lname l))). rewrite /alt_openfailN.
-    split; [reflexivity |]. exact (wl_line_shape' _ Hop).
+    split; [reflexivity |]. exact (wl_line_shape_fn _ Hop).
   - exists (wl_line (dg_openN (lname l))). rewrite /alt_openfailN.
-    split; [reflexivity |]. exact (wl_line_shape' _ Hop).
+    split; [reflexivity |]. exact (wl_line_shape_fn _ Hop).
   - exact Hpr.
   - discriminate.
   - (* cat ran: the content, or its own diagnostic *)
@@ -1659,9 +1735,9 @@ Proof using.
       pose proof (proj2 (Hs _ _ Hsl)) as Hbs.
       split; [exact (fcont_ok_nodollar bs Hbs) | exact (fcont_ok_nl bs Hbs)].
     + exists (dg_catopenN (lname l)). rewrite /alt_catopenN. split; [reflexivity |].
-      exact (dg_catopenN_shape _ (lname_word l Hl)).
+      exact (dg_catopenN_shape _ (lname_fn l Hl)).
   - exists (dg_catopenN (lname l)). rewrite /alt_catopenN. split; [reflexivity |].
-    exact (dg_catopenN_shape _ (lname_word l Hl)).
+    exact (dg_catopenN_shape _ (lname_fn l Hl)).
   - exists (wl_line dg_exec_cat). rewrite /alt_execcat.
     split; [reflexivity |]. exact (wl_line_shape' dg_exec_cat Hec).
   - exact Hpr.
@@ -2308,25 +2384,6 @@ Proof using.
   split; [exact Hu | exact (fcont_ok_subseq ws sel Hok Hsel)].
 Qed.
 
-(* THE ONE-NAME READING (cut W1: the claim still speaks of [f] alone):
-   the deed's option content, admissible against the word lists of the
-   redirect lines, is an admissible map *)
-Lemma fadm_boot_fst_of (Ls : list (list (bv 8) * list (list (bv 8))))
-    (o : option (list (bv 8))) :
-  Forall (fun p => uname p.1) Ls ->
-  (o = None
-   \/ exists ws sel, ws ∈ snd <$> Ls /\ sel_ok (echo_chunks ws) sel
-                     /\ o = Some (subseq (echo_chunks ws) sel)) ->
-  fadm_boot Ls (fst_of o).
-Proof using.
-  intros HN [-> | (ws & sel & Hin & Hsel & ->)]; [apply fadm_boot_empty |].
-  cbn [fst_of]. rewrite /fadm_boot map_Forall_singleton.
-  exists ws, sel. split_and!; [| exact Hsel | reflexivity].
-  apply elem_of_list_fmap in Hin as ([N ws'] & Hws & Hp). cbn in Hws. subst ws'.
-  pose proof (proj1 (Forall_forall _ _) HN _ Hp) as Hu. cbn in Hu.
-  rewrite /uname in Hu. subst N. exact Hp.
-Qed.
-
 (* THE THEOREM'S CONCLUSION.  The file persists, so the statement is over
    the whole history, cycle by cycle, with each era's boot state chosen
    inside the admissible set -- and the FIRST era's boot state absent,
@@ -2472,10 +2529,11 @@ Proof using.
   constructor.
   - intros l Hl. exact (fbody_ok_bytes l Hl).
   - intros l Hl. exact (fbody_ok_short l Hl).
-  - intros b Hb. destruct Hb as [[Ha | ->] | ->].
+  - intros b Hb. destruct Hb as [[Ha | ->] | [-> | ->]].
     + destruct Ha as [H | [H | H]]; lia.
     + rewrite wl_sp_val. lia.
     + rewrite (_ : bv_unsigned wl_gt = 62%Z); [lia | by vm_compute].
+    + rewrite fn_dot_val. lia.
   - change (ralt_panic (ralt_dec 0) = false).
     rewrite (ralt_dec_lt4 0 ltac:(lia)). by vm_compute.
 Qed.
@@ -2542,18 +2600,15 @@ Proof using.
   intro Hb. pose proof Hb as [Hbody Hok]. rewrite /parse_line.
   destruct (decide (uname (lastw b))) as [Hu | Hu].
   2: { destruct (decide (body_ok b)) as [_ | Hn]; [reflexivity | by destruct Hn]. }
-  rewrite /uname in Hu. rewrite Hu.
-  destruct (decide (b = cmd_cat fname_f)) as [Heq | _].
-  { exfalso. apply cat_not_echo. change (cmd_cat fname_f) with cmd_cat_f in Heq.
-    rewrite -Heq -{1}Hbody.
-    rewrite (wl_words_body (wl_words b) (line_ok_wf _ Hok)).
-    exact (line_ok_head _ Hok). }
-  destruct (strip_gt fname_f b) as [c |] eqn:Hs.
+  destruct (decide (b = cmd_cat (lastw b))) as [Heq | _].
+  { exfalso. apply (cat_not_echo_N _ (uname_lex _ Hu)).
+    rewrite -Heq. exact (line_ok_head _ Hok). }
+  destruct (strip_gt (lastw b) b) as [c |] eqn:Hs.
   { exfalso. pose proof (strip_gt_Some _ b c Hs) as Hbc.
     pose proof (body_ok_bytes b Hb) as Hfb.
     rewrite Hbc in Hfb. apply Forall_app in Hfb as [_ Hsuf].
     exact (wl_gt_not_body
-             (proj1 (Forall_forall _ _) Hsuf wl_gt (suf_gt_gt fname_f))). }
+             (proj1 (Forall_forall _ _) Hsuf wl_gt (suf_gt_gt (lastw b)))). }
   destruct (decide (body_ok b)) as [_ | Hn]; [reflexivity | by destruct Hn].
 Qed.
 
@@ -2568,8 +2623,8 @@ Proof using. intro H. by rewrite /uline_of (parse_line_echo b H). Qed.
 (*  constructors; [EchoDisc.line_ok (wl_words b)] picks the first, and it  *)
 (*  picks it WITHOUT the round trip [wl_body (wl_words b) = b]:            *)
 (*                                                                        *)
-(*    [LCat]    -- its words are "cat f", whose head is not "echo"         *)
-(*                 ([cat_not_echo]);                                       *)
+(*    [LCat]    -- its words are [cat N], whose head is not [echo]         *)
+(*                 ([cat_not_echo_N]);                                     *)
 (*    [LEchoF]  -- its body ends in " > f", so the '>' is one of its       *)
 (*                 bytes, and [LineWords.wl_words_alnum_body] says every   *)
 (*                 byte of a body whose words are alphanumeric is          *)
@@ -2599,9 +2654,9 @@ Proof using.
     exact (wl_gt_not_body
              (proj1 (Forall_forall _ _) Hsuf wl_gt (suf_gt_gt N))).
   - (* LCat: the words are "cat f" *)
-    exfalso. rewrite /uline_ok /uname in Hlok. subst N.
+    exfalso.
     rewrite /line_body in Hbody. rewrite Hbody in Hok.
-    exact (cat_not_echo (line_ok_head _ Hok)).
+    exact (cat_not_echo_N N (uname_lex N Hlok) (line_ok_head _ Hok)).
 Qed.
 
 (* ...AND THE SAME READING AT [fline_ok] (lane ULINE-LPIPE).  Note which
@@ -2622,8 +2677,8 @@ Proof using.
     rewrite /line_body in Hbb. apply Forall_app in Hbb as [_ Hsuf].
     exact (wl_gt_not_body
              (proj1 (Forall_forall _ _) Hsuf wl_gt (suf_gt_gt N))).
-  - exfalso. rewrite /uline_ok /uname in Hlok. subst N.
-    rewrite /line_body in Hok. exact (cat_not_echo (line_ok_head _ Hok)).
+  - exfalso.
+    rewrite /line_body in Hok. exact (cat_not_echo_N N (uname_lex N Hlok) (line_ok_head _ Hok)).
   - exfalso.
     pose proof (wl_words_alnum_body _ (wl_wf_alnum _ (line_ok_wf _ Hok)))
       as Hbb.
@@ -2784,12 +2839,19 @@ Qed.
 (*  nobody echoed into [f].                                                *)
 (* ====================================================================== *)
 
+(* the demos' file: `a.txt`, a name of the class (cut W4) *)
+Definition fd_nm : list (bv 8) := txt_a.
+Definition fd_cat : list (bv 8) := cmd_cat fd_nm.
+
+Lemma fd_nm_class : uname fd_nm.
+Proof using. exact txt_a_name. Qed.
+
 Definition fd_ws : list (list (bv 8)) :=
   [sb "echo"%string; sb "hello"%string; sb "world"%string].
 Definition fd_sel_all : list nat := sel_all (echo_chunks fd_ws).
 Definition fd_content : list (bv 8) := subseq (echo_chunks fd_ws) fd_sel_all.
 Definition fd_content1 : list (bv 8) := subseq (echo_chunks fd_ws) [0%nat].
-Definition fd_b0 : list (bv 8) := line_body (LEchoF fd_ws fname_f).
+Definition fd_b0 : list (bv 8) := line_body (LEchoF fd_ws fd_nm).
 
 (* what a completed [echo hello world > f] round leaves in the file, and
    what a round cut after the first chunk leaves *)
@@ -2804,9 +2866,9 @@ Definition fd_cs1 : list nat := [ralt_enc (RFRan fd_sel_all); ralt_enc RCRan].
 
 Definition fd_seg1 : list mobs :=
   demo_out u_prologue
-  ++ demo_typed (line_bytes (LEchoF fd_ws fname_f))
+  ++ demo_typed (line_bytes (LEchoF fd_ws fd_nm))
   ++ demo_out u_prompt
-  ++ demo_typed (line_bytes (LCat fname_f))
+  ++ demo_typed (line_bytes (LCat fd_nm))
   ++ demo_out (fd_content ++ u_prompt).
 
 Lemma demo_f1 : good_out_f ∅ fd_seg1.
@@ -2816,7 +2878,7 @@ Proof using.
 Qed.
 
 Lemma demo_f1_file :
-  fstate_after fd_cs1 ∅ (ins fd_seg1) !! fname_f = Some (sb "hello world"%string ++ nlb).
+  fstate_after fd_cs1 ∅ (ins fd_seg1) !! fd_nm = Some (sb "hello world"%string ++ nlb).
 (* [vm_cast_no_check], not [vm_compute]: the decision runs the round's whole
    output segment through the model, and a [vm_compute] closing the goal is
    RE-CHECKED by the kernel's lazy conversion at [Qed] -- so the bill is paid
@@ -2837,16 +2899,16 @@ Qed.
    earlier era left, and [cat f] prints it again *)
 Definition fd_seg2 : list mobs :=
   demo_out u_prologue
-  ++ demo_typed (line_bytes (LCat fname_f))
+  ++ demo_typed (line_bytes (LCat fd_nm))
   ++ demo_out (fd_content ++ u_prompt).
 
-Lemma demo_f2 : good_out_f {[fname_f := fd_content]} fd_seg2.
+Lemma demo_f2 : good_out_f {[fd_nm := fd_content]} fd_seg2.
 Proof using.
   exists [3%nat; 0%nat], [ralt_enc RCRan].
   apply (bool_decide_unpack _). vm_compute. exact I.
 Qed.
 
-Lemma demo_f2_adm : fadm_boot [(fname_f, fd_ws)] {[fname_f := fd_content]}.
+Lemma demo_f2_adm : fadm_boot [(fd_nm, fd_ws)] {[fd_nm := fd_content]}.
 Proof using.
   rewrite /fadm_boot map_Forall_singleton. exists fd_ws, fd_sel_all.
   split; [apply elem_of_list_here |]. split; [| reflexivity].
@@ -2858,16 +2920,16 @@ Qed.
    SUBSEQUENCE that landed, and [cat f] prints [hello] *)
 Definition fd_seg3 : list mobs :=
   demo_out u_prologue
-  ++ demo_typed (line_bytes (LCat fname_f))
+  ++ demo_typed (line_bytes (LCat fd_nm))
   ++ demo_out (fd_content1 ++ u_prompt).
 
-Lemma demo_f3 : good_out_f {[fname_f := fd_content1]} fd_seg3.
+Lemma demo_f3 : good_out_f {[fd_nm := fd_content1]} fd_seg3.
 Proof using.
   exists [3%nat; 0%nat], [ralt_enc RCRan].
   apply (bool_decide_unpack _). vm_compute. exact I.
 Qed.
 
-Lemma demo_f3_adm : fadm_boot [(fname_f, fd_ws)] {[fname_f := fd_content1]}.
+Lemma demo_f3_adm : fadm_boot [(fd_nm, fd_ws)] {[fd_nm := fd_content1]}.
 Proof using.
   rewrite /fadm_boot map_Forall_singleton. exists fd_ws, [0%nat].
   split; [apply elem_of_list_here |]. split; [| reflexivity].
@@ -2877,8 +2939,8 @@ Qed.
 (* (4) [cat f] BEFORE ANY ECHO: cat's own diagnostic *)
 Definition fd_seg4 : list mobs :=
   demo_out u_prologue
-  ++ demo_typed (line_bytes (LCat fname_f))
-  ++ demo_out alt_catopen.
+  ++ demo_typed (line_bytes (LCat fd_nm))
+  ++ demo_out (alt_catopenN fd_nm).
 
 Lemma demo_f4 : good_out_f ∅ fd_seg4.
 Proof using.
@@ -2890,9 +2952,9 @@ Qed.
    open truncated [f], so [cat f] prints nothing but the prompt *)
 Definition fd_seg5 : list mobs :=
   demo_out u_prologue
-  ++ demo_typed (line_bytes (LEchoF fd_ws fname_f))
+  ++ demo_typed (line_bytes (LEchoF fd_ws fd_nm))
   ++ demo_out alt_execfail
-  ++ demo_typed (line_bytes (LCat fname_f))
+  ++ demo_typed (line_bytes (LCat fd_nm))
   ++ demo_out u_prompt.
 
 Lemma demo_f5 : good_out_f ∅ fd_seg5.
@@ -2932,21 +2994,21 @@ Qed.
    [echo hello world > f] ever wrote: '$', 'c', 'e', 'f', or one of
    [hello world\n]'s own bytes.  Never 'g'. *)
 Lemma fd_cat_head (s : fstate) (a : ralt) (Z : list (bv 8)) (b : bv 8) :
-  ralt_ok (LCat fname_f) a ->
-  (s !! fname_f = None
+  ralt_ok (LCat fd_nm) a ->
+  (s !! fd_nm = None
    \/ exists sel, sel_ok (echo_chunks fd_ws) sel
-                  /\ s !! fname_f = Some (subseq (echo_chunks fd_ws) sel)) ->
-  (cont s (LCat fname_f) a ++ Z) !! 0%nat = Some b -> bv_unsigned b <> 103%Z.
+                  /\ s !! fd_nm = Some (subseq (echo_chunks fd_ws) sel)) ->
+  (cont s (LCat fd_nm) a ++ Z) !! 0%nat = Some b -> bv_unsigned b <> 103%Z.
 Proof using.
   intros Ha Hs Hb.
-  assert (Hco : alt_catopen !! 0%nat = Some (Z_to_bv 8 99%Z))
+  assert (Hco : alt_catopenN fd_nm !! 0%nat = Some (Z_to_bv 8 99%Z))
     by (apply (bool_decide_unpack _); vm_compute; exact I).
   assert (Hce : alt_execcat !! 0%nat = Some (Z_to_bv 8 101%Z))
     by (apply (bool_decide_unpack _); vm_compute; exact I).
   assert (Hcf : alt_panic !! 0%nat = Some (Z_to_bv 8 102%Z))
     by (apply (bool_decide_unpack _); vm_compute; exact I).
   destruct a; try (by destruct Ha); rewrite /cont in Hb;
-    cbn [lname line_file default] in Hb; change (alt_catopenN fname_f) with alt_catopen in Hb.
+    cbn [lname line_file default] in Hb.
   - (* cat ran *)
     destruct Hs as [Hn | (sel & Hsel & Hsome)].
     + rewrite Hn in Hb. rewrite (fd_head_app _ _ _ _ Hco Hb). by vm_compute.
@@ -2969,10 +3031,10 @@ Qed.
 
 (* the file [echo hello world > f] leaves, whichever way its round went *)
 Lemma fd_fsm_shape (a : ralt) :
-  ralt_ok (LEchoF fd_ws fname_f) a ->
-  fsm ∅ (LEchoF fd_ws fname_f) a !! fname_f = None
+  ralt_ok (LEchoF fd_ws fd_nm) a ->
+  fsm ∅ (LEchoF fd_ws fd_nm) a !! fd_nm = None
   \/ exists sel, sel_ok (echo_chunks fd_ws) sel
-                 /\ fsm ∅ (LEchoF fd_ws fname_f) a !! fname_f
+                 /\ fsm ∅ (LEchoF fd_ws fd_nm) a !! fd_nm
                     = Some (subseq (echo_chunks fd_ws) sel).
 Proof using.
   intro Ha. destruct a; try (by destruct Ha); cbn [fsm].
@@ -3001,14 +3063,14 @@ Qed.
    then [cat f] printed [goodbye].  Nothing the model admits prints a byte
    the user never echoed into the file, and the refutation is the
    determinacy theorem plus one head byte. *)
-Definition fd_bad_J : list (bv 8) := line_bytes (LEchoF fd_ws fname_f) ++ cmd_cat_f.
+Definition fd_bad_J : list (bv 8) := line_bytes (LEchoF fd_ws fd_nm) ++ fd_cat.
 Definition fd_bad_cs : list nat := [ralt_enc (RFRan fd_sel_all)].
 
 Definition fd_seg_bad : list mobs :=
   demo_out u_prologue
-  ++ demo_typed (line_bytes (LEchoF fd_ws fname_f))
+  ++ demo_typed (line_bytes (LEchoF fd_ws fd_nm))
   ++ demo_out u_prompt
-  ++ demo_typed (line_bytes (LCat fname_f))
+  ++ demo_typed (line_bytes (LCat fd_nm))
   ++ demo_out (sb "goodbye"%string ++ nlb ++ u_prompt).
 
 Lemma demo_f_bad : ~ good_out_f ∅ fd_seg_bad.
@@ -3039,35 +3101,35 @@ Proof using.
     by (apply (bool_decide_unpack _); vm_compute; exact I).
   assert (HnJ : nlines fd_bad_J = 1%nat)
     by (apply (bool_decide_unpack _); vm_compute; exact I).
-  assert (HrJ : rest_of fd_bad_J = cmd_cat_f)
+  assert (HrJ : rest_of fd_bad_J = fd_cat)
     by (apply (bool_decide_unpack _); vm_compute; exact I).
-  assert (HbI : bodies_of (ins fd_seg_bad) = [fd_b0; cmd_cat_f])
+  assert (HbI : bodies_of (ins fd_seg_bad) = [fd_b0; fd_cat])
     by (apply (bool_decide_unpack _); vm_compute; exact I).
   assert (HnI : nlines (ins fd_seg_bad) = 2%nat)
     by (apply (bool_decide_unpack _); vm_compute; exact I).
   assert (HrI : rest_of (ins fd_seg_bad) = [])
     by (apply (bool_decide_unpack _); vm_compute; exact I).
   rewrite /sessf HbJ HnJ HrJ HbI HnI HrI in Hpre.
-  rewrite (alt_seq_f_bs_ext ps cs ∅ [fd_b0] [fd_b0; cmd_cat_f] 1
+  rewrite (alt_seq_f_bs_ext ps cs ∅ [fd_b0] [fd_b0; fd_cat] 1
              ltac:(intros j Hj; assert (Hj0 : j = 0%nat) by lia;
                    by rewrite Hj0)) in Hpre.
-  rewrite (alt_seq_f_S ps cs ∅ [fd_b0; cmd_cat_f] 1) /alt_blk_f in Hpre.
-  rewrite (_ : [fd_b0; cmd_cat_f] !!! 1%nat = cmd_cat_f) in Hpre;
+  rewrite (alt_seq_f_S ps cs ∅ [fd_b0; fd_cat] 1) /alt_blk_f in Hpre.
+  rewrite (_ : [fd_b0; fd_cat] !!! 1%nat = fd_cat) in Hpre;
     [| reflexivity].
   apply fd_cancel3 in Hpre.
   (* the cat round's first byte would have to be 'g' *)
   assert (Hg : (sb "goodbye"%string ++ nlb ++ u_prompt) !! 0%nat
                = Some (Z_to_bv 8 103%Z))
     by (apply (bool_decide_unpack _); vm_compute; exact I).
-  assert (HC : alt_cont_f ps cs ∅ [fd_b0; cmd_cat_f] 1%nat !! 0%nat
+  assert (HC : alt_cont_f ps cs ∅ [fd_b0; fd_cat] 1%nat !! 0%nat
                = Some (Z_to_bv 8 103%Z))
     by (eapply lb_prefix_lookup; [exact Hpre | exact Hg]).
-  assert (Hu1 : uline_of ([fd_b0; cmd_cat_f] !!! 1%nat) = LCat fname_f)
+  assert (Hu1 : uline_of ([fd_b0; fd_cat] !!! 1%nat) = LCat fd_nm)
     by (apply (bool_decide_unpack _); vm_compute; exact I).
-  assert (Hu0 : uline_of ([fd_b0; cmd_cat_f] !!! 0%nat) = LEchoF fd_ws fname_f)
+  assert (Hu0 : uline_of ([fd_b0; fd_cat] !!! 0%nat) = LEchoF fd_ws fd_nm)
     by (apply (bool_decide_unpack _); vm_compute; exact I).
-  assert (Hs1 : fstate_upto cs ∅ [fd_b0; cmd_cat_f] 1%nat
-                = fsm ∅ (LEchoF fd_ws fname_f) (ralt_at cs 0%nat))
+  assert (Hs1 : fstate_upto cs ∅ [fd_b0; fd_cat] 1%nat
+                = fsm ∅ (LEchoF fd_ws fd_nm) (ralt_at cs 0%nat))
     by (cbn [fstate_upto]; by rewrite Hu0).
   rewrite /alt_cont_f Hu1 Hs1 in HC.
   (* both rounds' alternatives are ones their line shapes admit *)

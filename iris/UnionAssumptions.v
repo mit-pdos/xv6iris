@@ -52,12 +52,3 @@
 Require Import UInitUnion.
 
 Print Assumptions union_adequacy_closed.
-
-(* ---- FRONTIER (cut W0 of claude-notes/design/filenames.md; removed at
-   W4, when the model's name class becomes [FileName.txt_name] and the
-   laws enter the anchor's cone).  The widened class's law bundle: L1-L4
-   of [FileName.name_laws] at [txt_name], L4 by one computation over the
-   image's root block.  Its axioms must lie within the fourteen above. *)
-Require Import FileName.
-
-Print Assumptions txt_laws.
