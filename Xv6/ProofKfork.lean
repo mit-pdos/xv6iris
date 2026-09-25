@@ -2311,7 +2311,7 @@ theorem kfork_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCPROC)
       iapply wpNext_off_intro
       iintro %spie %spp %R' %hsp Hdisj Hpc Hpost %hcs
       obtain ⟨rfl, rfl⟩ := hsp rfl
-      icases Hdisj with (⟨%h0, Hkd⟩ | ⟨%hne, Hkd⟩)
+      icases Hdisj with (⟨%h0, Hkd⟩ | ⟨%hne, Hkd, _⟩)
       · ihave Hdj : ((⌜R' 10#5 = 0#64⌝ ∗ kctx cpu (k'.withRegs R')) ∨
              (⌜R' 10#5 ≠ 0#64⌝ ∗
               kctx cpu (((k'.pushOffAt k'.spie k'.spp).withRegs R').withLocks ("proc" :: k'.locks)))) $$ [Hkd]

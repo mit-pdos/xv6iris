@@ -185,7 +185,17 @@ theorem ui_allocproc (AP : ALLOCPROC) (Γ : SchedNames) (c : CPU) (k' : KCtx)
   have h := AP.wp_allocproc (hlc := hlc) (GF := GF) Γ c k' γl γp γk on pav hnoff hK hlk hlp hlq htier
   unfold wp_allocproc_body at h
   simp only [allocprocAddr] at h
-  exact h
+  iintro ⟨Hk, Hpc, #Hpi, #Hkm, #Hpl, Hav, Hpav, Hnext⟩
+  iapply h
+  iframe Hk Hpc Hpi Hkm Hpl Hav Hpav
+  iapply wpNext_mono $$ Hnext
+  iintro %cpu' HK %spie %spp %R' %hsp Hd Hpc Hpost %hcs
+  -- the success arm's `sieArm` (the acquire's pay) is not needed here
+  icases Hd with (⟨%h0, Hk⟩ | ⟨%h1, Hk, _⟩)
+  · iapply HK $$ %spie %spp %R' %hsp [Hk] Hpc Hpost %hcs
+    ileft; iframe Hk; ipureintro; exact h0
+  · iapply HK $$ %spie %spp %R' %hsp [Hk] Hpc Hpost %hcs
+    iright; iframe Hk; ipureintro; exact h1
 
 set_option maxHeartbeats 1000000 in
 /-- A non-blocking fs call at `pcnum` (here `namei` at boot). -/

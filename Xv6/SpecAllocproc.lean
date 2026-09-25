@@ -60,6 +60,12 @@ def allocprocPost {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
     procHeld Γ cpu j USED ch ∗ hartAtAny Γ (procAddr j) ∗ slotUsed Γ (procAddr j) ∗ procsAvail Γ (pavDec pav) ∗
     procPriv (procAddr j) pid V M ∗ stackOwn (V.kstack + 4096#64) 512 ∗ kallocAvail γk (availSub on g))
 
+/-- **WP of `allocproc`**, at either entry `SIE`.  On success it returns
+holding `p->lock`, and with it the arm its `acquire` paid out
+(`sieArm cpu' k.sie k.proc`: the trap bundle at `sie = true`, `True` at
+`false`) -- Rocq's `cpu_own 1 eb p false` carries that pay, and the caller's
+eventual `release` (re-enabling interrupts when the entry had them on) takes
+it back through `popArm`. -/
 def wp_allocproc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γl γp : GName) (γk : KmemNames) (on : Option Nat)
     (pav : Option Nat)
@@ -71,7 +77,8 @@ def wp_allocproc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
     ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
     ((⌜R' 10#5 = 0#64⌝ ∗ kctx cpu' ((k.withSpie spie spp).withRegs R')) ∨
-     (⌜R' 10#5 ≠ 0#64⌝ ∗ kctx cpu' (((k.pushOffAt spie spp).withRegs R').withLocks ("proc" :: k.locks)))) -∗
+     (⌜R' 10#5 ≠ 0#64⌝ ∗ kctx cpu' (((k.pushOffAt spie spp).withRegs R').withLocks ("proc" :: k.locks)) ∗
+      sieArm cpu' k.sie k.proc)) -∗
     pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     allocprocPost Γ cpu' γk on pav (R' 10#5) -∗
     ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))

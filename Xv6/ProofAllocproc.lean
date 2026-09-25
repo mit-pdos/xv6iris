@@ -663,7 +663,8 @@ def apCont [CurCtx] (Γ : SchedNames) (k : KCtx) (γk : KmemNames) (on : Option 
     CPU → IProp GF := fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
   ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
   ((⌜R' 10#5 = 0#64⌝ ∗ kctx cpu' ((k.withSpie spie spp).withRegs R')) ∨
-   (⌜R' 10#5 ≠ 0#64⌝ ∗ kctx cpu' (((k.pushOffAt spie spp).withLocks ("proc" :: k.locks)).withRegs R'))) -∗
+   (⌜R' 10#5 ≠ 0#64⌝ ∗ kctx cpu' (((k.pushOffAt spie spp).withLocks ("proc" :: k.locks)).withRegs R') ∗
+    sieArm cpu' k.sie k.proc)) -∗
   pcIs cpu' (jumpPc (k.regs 1#5)) -∗
   allocprocPost Γ cpu' γk on pav (R' 10#5) -∗
   ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu')
@@ -2136,7 +2137,7 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
       unfold apCont
       ihave Hdisj : ((⌜R'' 10#5 = 0#64⌝ ∗ kctx (GF := GF) c8 ((k.withSpie spie5 spp5).withRegs R'')) ∨
           (⌜R'' 10#5 ≠ 0#64⌝ ∗ kctx c8 (((k.pushOffAt spie5 spp5).withLocks
-            ("proc" :: k.locks)).withRegs R''))) $$ [Hk]
+            ("proc" :: k.locks)).withRegs R'') ∗ sieArm c8 k.sie k.proc)) $$ [Hk]
       case' _ =>
         ileft; isplitl []
         · ipureintro; exact h10
@@ -2526,11 +2527,12 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
           imodintro
           ihave Hdisj : ((⌜R'' 10#5 = 0#64⌝ ∗ kctx (GF := GF) cg ((k.withSpie spie6 spp6).withRegs R'')) ∨
               (⌜R'' 10#5 ≠ 0#64⌝ ∗ kctx cg (((k.pushOffAt spie6 spp6).withLocks
-                ("proc" :: k.locks)).withRegs R''))) $$ [Hk]
+                ("proc" :: k.locks)).withRegs R'') ∗ sieArm cg k.sie k.proc)) $$ [Hk Harm]
           case' _ =>
             iright; isplitl []
             · ipureintro; rw [h10]; exact procAddr_nonzero hn
-            · iexact Hk
+            · iframe Hk
+              rw [hgc]; iexact Harm
           ihave Hpost : allocprocPost (GF := GF) Γ cg γk on pav (R'' 10#5)
             $$ [Hheld Hhart Hused Hpav Hpriv Hstack Hav4]
           case' _ =>
@@ -2554,7 +2556,7 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
                 ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
                 ((⌜R' 10#5 = 0#64⌝ ∗ kctx (GF := GF) cg ((k.withSpie spie spp).withRegs R')) ∨
                  (⌜R' 10#5 ≠ 0#64⌝ ∗ kctx cg (((k.pushOffAt spie spp).withLocks
-                    ("proc" :: k.locks)).withRegs R'))) -∗
+                    ("proc" :: k.locks)).withRegs R') ∗ sieArm cg k.sie k.proc)) -∗
                 pcIs cg (jumpPc (k.regs 1#5)) -∗
                 allocprocPost Γ cg γk on pav (R' 10#5) -∗
                 ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cg)
@@ -2833,7 +2835,7 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
         unfold apCont
         ihave Hdisj : ((⌜R'' 10#5 = 0#64⌝ ∗ kctx (GF := GF) c8 ((k.withSpie spie5 spp5).withRegs R'')) ∨
             (⌜R'' 10#5 ≠ 0#64⌝ ∗ kctx c8 (((k.pushOffAt spie5 spp5).withLocks
-              ("proc" :: k.locks)).withRegs R''))) $$ [Hk]
+              ("proc" :: k.locks)).withRegs R'') ∗ sieArm c8 k.sie k.proc)) $$ [Hk]
         case' _ =>
           ileft; isplitl []
           · ipureintro; exact h10
@@ -3023,7 +3025,7 @@ theorem ap_scan (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
         unfold apCont
         ihave Hdisj : ((⌜R'' 10#5 = 0#64⌝ ∗ kctx (GF := GF) c8 ((k.withSpie spie2 spp2).withRegs R'')) ∨
             (⌜R'' 10#5 ≠ 0#64⌝ ∗ kctx c8 (((k.pushOffAt spie2 spp2).withLocks
-              ("proc" :: k.locks)).withRegs R''))) $$ [Hk]
+              ("proc" :: k.locks)).withRegs R'') ∗ sieArm c8 k.sie k.proc)) $$ [Hk]
         case' _ =>
           ileft
           isplitl []
