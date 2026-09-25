@@ -28,7 +28,7 @@ FsCfgKits / FsCfgSnap / ProofMain).
   `SepThread.v`, `SleepLock.v`; the brief listed them missing): ported here,
   at the top of the file, as expressible over MachCSL's public lock API --
   `lock_free_tok` → `lockFreeTok`, `lock_ghost_alloc` → `lockGhostAlloc`,
-  `newlock_at_llb` → `newlockAt_llb` (`MachCSL.newlock_written_hook` with its
+  `newlock_at_llb` → `newlockAt_llb` (the hooked `MachCSL.newlock_written` birth with its
   `lockHalf_alloc` taken out, the fold being `MachCSL.lockHook_llb`, exactly
   Rocq's proof), `big_sepL_fupd_thread` → `bigSepL_fupd_thread`,
   `sl_fresh_new_genl` → `slFresh_newGenl` (`Xv6.kctx_newSleeplock`'s body at

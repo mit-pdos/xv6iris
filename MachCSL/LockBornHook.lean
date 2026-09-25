@@ -13,8 +13,8 @@ the same fold at the lock's BIRTH, which is what `Xv6.bioInitAt` needs.
 Also here, from `Xv6/IcacheBootTable.lean` (Rocq `WpLockAt.v`), the birth at
 a PRE-ALLOCATED gname the itable boot needs: `lockFreeTok` (Rocq
 `lock_free_tok`), `lockGhostAlloc` (`lock_ghost_alloc`) and `newlockAt_llb`
-(`newlock_at_llb`: `newlock_written_hook` with its `lockHalf_alloc` taken
-out).
+(`newlock_at_llb`: `MachCSL.newlock_written` at a pre-allocated name,
+the payload folded through the hook).
 -/
 import MachCSL.Lock
 
@@ -70,8 +70,8 @@ set_option maxHeartbeats 1000000 in
 /-- Rocq `WpLockAt.newlock_at_llb`: `newlock` at the PRE-ALLOCATED gname,
 minted WITH the floor fold (`MachCSL.lockHook_llb`): the payload is
 deposited as `Rdep`, and re-floored at `tl` on the lock's own stamped
-context -- `MachCSL.newlock_written_hook` with its `lockHalf_alloc` taken
-out.  Rocq's `lock_name lk s` / `lk ↦₄ 0` / `lk_cpu_ready lk` are Lean's
+context -- `MachCSL.newlock_written`'s birth at a name allocated
+beforehand (`lockGhostAlloc`) instead of by its own `lockHalf_alloc`.  Rocq's `lock_name lk s` / `lk ↦₄ 0` / `lk_cpu_ready lk` are Lean's
 `lkFresh lk` beside the two identity claims `isLock` carries. -/
 theorem newlockAt_llb [CurCtx] (cpu : CPU) (E : CoPset) (γ : GName) (lk : BitVec 64)
     (s : String) (R Rdep : CtxId → IProp GF) [CtxMorph R] [CtxMorph Rdep] (tl : Nat)
@@ -114,89 +114,6 @@ theorem newlockAt_llb [CurCtx] (cpu : CPU) (E : CoPset) (γ : GName) (lk : BitVe
   isplit
   · iexact Hflo
   · iexact Hflc
-
-set_option maxHeartbeats 1000000 in
-/-- `MachCSL.newlock_written`, with the payload folded at the lock's own
-stamped context. -/
-theorem newlock_written_hook [CurCtx] (cpu : CPU) (lk : BitVec 64) (s : String)
-    (R Rin : CtxId → IProp GF) [CtxMorph R] [CtxMorph Rin]
-    (hok : lockAddrOk lk) (lo lc : Nat) (E : CoPset) :
-    kmapId lk ∗ kmapId (lk + 16#64) ∗ ownCtx cpu curCtx ∗ Rin curCtx ∗ lockCtxHook R Rin ∗
-    wordCell lk 4 lo 0 [] ∗ lkFloor curCtx lo ∗
-    wordCell (lk + 16#64) 8 lc 0 [] ∗ lkFloor curCtx lc
-    ⊢ |={E}=> (ownCtx cpu curCtx ∗ ∃ γ, isLock (GF := GF) γ lk s R) := by
-  iintro ⟨#Hcl, #Hcl', Hrun, HR, Hhook, Hw', #Hflo, Hc', #Hflc⟩
-  imod lock_pay_born_hook cpu R Rin $$ [$Hrun $HR $Hhook] with ⟨Hrun, Hpay⟩
-  imod lockHalf_alloc with ⟨%γ, H1, H2⟩
-  imod inv_alloc lockN E (lockBody γ lk s R lo lc) $$ [Hw' Hc' H1 H2 Hpay] with #Hinv
-  · inext
-    unfold lockBody
-    iexists [], [], none, 0
-    iframe Hw' Hc' H1
-    isplit
-    · ipureintro
-      refine ⟨rfl, fun e he => absurd he (by simp), fun c _ e hl => ?_, fun _ h => by cases h⟩
-      obtain ⟨W1, W2, hW, _, _⟩ := hl
-      cases W1 <;> cases hW
-    isplitr [H2 Hpay]
-    · unfold lkCpuFrag; iempintro
-    · ileft
-      isplit
-      · ipureintro; rfl
-      iframe H2 Hpay
-  imodintro
-  iframe Hrun
-  iexists γ
-  unfold isLock
-  isplit
-  · ipureintro; exact hok
-  isplit
-  · iexact Hcl
-  isplit
-  · iexact Hcl'
-  iexists lo, lc
-  isplit
-  · iexact Hinv
-  isplit
-  · iexact Hflo
-  · iexact Hflc
-
-/-- The hooked birth from a freshly initialised `struct spinlock`. -/
-theorem newlock_of_fresh_hook [CurCtx] (cpu : CPU) (lk : BitVec 64) (s : String)
-    (R Rin : CtxId → IProp GF) [CtxMorph R] [CtxMorph Rin] (E : CoPset) :
-    kmapId lk ∗ kmapId (lk + 16#64) ∗ ownCtx cpu curCtx ∗ Rin curCtx ∗ lockCtxHook R Rin ∗
-    lkFresh lk ⊢ |={E}=> (ownCtx cpu curCtx ∗ ∃ γ, isLock (GF := GF) γ lk s R) := by
-  unfold lkFresh
-  iintro ⟨#Hcl, #Hcl', Hrun, HR, Hhook, %hok, ⟨%lo, %lc, Hw, #Hflo, Hc, #Hflc⟩⟩
-  iapply newlock_written_hook cpu lk s R Rin hok lo lc E
-  iframe Hcl Hcl' Hrun HR Hhook Hw Hc
-  isplit
-  · iexact Hflo
-  · iexact Hflc
-
-/-- The hooked birth at the kernel execution context. -/
-theorem kctx_newlock_hook [CurCtx] [KernelImage GF] {lent : Bool} (cpu : CPU) (k : KCtx)
-    (lk : BitVec 64) (s : String) (R Rin : CtxId → IProp GF) [CtxMorph R] [CtxMorph Rin] :
-    kctxL lent cpu k ∗ Rin curCtx ∗ lockCtxHook R Rin ∗ lkFresh lk ∗
-    kmapId lk ∗ kmapId (lk + 16#64)
-    ⊢ |={⊤}=> (kctxL (GF := GF) lent cpu k ∗ ∃ γ, isLock γ lk s R) := by
-  iintro ⟨Hk, HR, Hhook, Hfresh, #Hcl, #Hcl'⟩
-  icases kctx_cases cpu k $$ Hk with
-    ⟨%hwf, HConf, HF, Hstack, Htrans, Harm, Hcpu, Htok, Hclock, #Hro⟩
-  icases ctxTok_cases cpu curCtx $$ Htok with ⟨Hctx, %r, Hfrag⟩
-  imod newlock_of_fresh_hook cpu lk s R Rin ⊤ $$ [Hctx HR Hhook Hfresh]
-    with ⟨Hctx, ⟨%γ, #Hlk⟩⟩
-  · iframe Hcl Hcl' Hctx HR Hhook Hfresh
-  imodintro
-  isplitl [HConf HF Hstack Htrans Harm Hcpu Hctx Hfrag Hclock]
-  · iapply kctx_intro' cpu k hwf
-    iframe HConf HF Hstack Htrans Harm Hcpu Hclock
-    isplitl [Hctx Hfrag]
-    · iapply ctxTok_intro cpu curCtx r
-      iframe Hctx Hfrag
-    · iexact Hro
-  · iexists γ
-    iexact Hlk
 
 /-- **THE BIRTH AT A PRE-ALLOCATED GNAME, AT THE KERNEL EXECUTION CONTEXT**
 (Rocq `WpLockAt.newlock_at` as `ProofInitlog.v` uses it): `newlockAt_llb`
