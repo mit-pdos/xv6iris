@@ -579,6 +579,313 @@ Qed.
 
 
 (* ===================================================================== *)
+(* §4b THE LINE OF A FILTER PIPELINE (cut G7, grep-pipes SS4):            *)
+(*                                                                        *)
+(*     p w1 .. wm | c1 a1 .. | ... | cn b1 ..                             *)
+(*                                                                        *)
+(* [ushq_tail_is] fixed ONE word per right stage; a filter stage has a    *)
+(* WORD LIST ([cat], or [grep w]), lexed exactly as the left command's    *)
+(* is ([UShLexRedir.ushs_toks_line], at the stage's own offset: the scans *)
+(* read only from their index on, [ushs_toks_unrel]).  [ushq_tail_ws] is  *)
+(* the tail stage by stage, [ushq_rtoks_ws] its token lists, and          *)
+(* [ushq_lines_ws_bars] the line of a pipeline the parse walk             *)
+(* ([UkShPipesParse.wp_kshp_parsepipe_bars]) inducts on -- no walk        *)
+(* changes: the walk already takes any token list per stage.              *)
+(* ===================================================================== *)
+
+(* the shift back up: a token list of the suffix at [c] is the line's *)
+Lemma ushs_toks_unrel (len c stop : nat) (f : nat -> bv 8) :
+  (c <= stop)%nat -> (stop <= len)%nat ->
+  forall (off : nat) (rel : list (nat * nat)),
+    ushs_toks (len - c) (fun j : nat => f (c + j)%nat) (stop - c) off rel ->
+    ushs_toks len f stop (c + off) (ushq_rebase c rel).
+Proof using.
+  intros Hcs Hsl off rel H.
+  induction H as [ off Hnil | off toks k n Hn Ht IH ].
+  - apply UshsTokNil.
+    replace (len - (c + off))%nat with (len - c - off)%nat by lia.
+    rewrite ushp_skipws_shift. lia.
+  - assert (Ek : ushp_skipws (len - (c + off)) (c + off) f = k).
+    { replace (len - (c + off))%nat with (len - c - off)%nat by lia.
+      rewrite ushp_skipws_shift. reflexivity. }
+    assert (En : ushp_toklen (len - (c + off + k)) (c + off + k) f = n).
+    { replace (len - (c + off + k))%nat with (len - c - (off + k))%nat by lia.
+      replace (c + off + k)%nat with (c + (off + k))%nat by lia.
+      rewrite ushp_toklen_shift. reflexivity. }
+    pose proof (UshsTokCons len f stop (c + off) (ushq_rebase c toks)) as C.
+    cbv zeta in C. rewrite Ek, En in C.
+    cbn [ushq_rebase map fst snd].
+    replace (c + (off + k))%nat with (c + off + k)%nat by lia.
+    replace (c + (off + k + n))%nat with (c + off + k + n)%nat by lia.
+    apply C; [exact Hn |].
+    replace (c + off + k + n)%nat with (c + (off + k + n))%nat by lia. exact IH.
+Qed.
+
+(* a nonempty word list's body starts with a word byte *)
+Lemma ushq_ws_first_nonws (r : list (list (bv 8))) :
+  wl_wf r -> (0 < length r)%nat -> ushp_is_ws (wl_body r !!! 0%nat) = false.
+Proof using.
+  intros Hwf Hpos. destruct r as [| w rest]; [cbn in Hpos; lia |].
+  destruct (wl_wf_cons w rest Hwf) as [Hw _].
+  rewrite wl_body_cons, (wl_lta_app_l w _ 0 (wl_word_pos w Hw)).
+  exact (ushs_alnum_not_ws _ (ushq_word_byte w 0 Hw (wl_word_pos w Hw))).
+Qed.
+
+Lemma ushq_ws_body_pos (r : list (list (bv 8))) :
+  wl_wf r -> (0 < length r)%nat -> (0 < length (wl_body r))%nat.
+Proof using.
+  intros Hwf Hpos. destruct r as [| w rest]; [cbn in Hpos; lia |].
+  destruct (wl_wf_cons w rest Hwf) as [Hw _].
+  rewrite wl_body_cons, length_app. pose proof (wl_word_pos w Hw). lia.
+Qed.
+
+(* A STAGE's WORDS at offset [c], ended by a blank [b]: the left
+   command's lexing, at the stage's offset *)
+Lemma ushq_stage_toks (len stop : nat) (g : nat -> bv 8) (c : nat)
+    (r : list (list (bv 8))) (b : bv 8) :
+  wl_wf r ->
+  (forall j : nat, (j < length (wl_body r))%nat -> g (c + j)%nat = wl_body r !!! j) ->
+  g (c + length (wl_body r))%nat = b -> ushp_is_ws b = true ->
+  stop = (c + length (wl_body r) + 1)%nat -> (stop <= len)%nat ->
+  (stop = len \/ ushp_is_ws (g stop) = false) ->
+  ushs_toks len g stop c (ushq_rebase c (wl_toks r)).
+Proof using.
+  intros Hwf Hbody Hb Hbw Hstop Hle Hend.
+  enough (H : ushs_toks len g stop (c + 0) (ushq_rebase c (wl_toks r)))
+    by (rewrite Nat.add_0_r in H; exact H).
+  apply (ushs_toks_unrel len c stop g ltac:(lia) Hle 0 (wl_toks r)).
+  apply (ushs_toks_line r (fun j : nat => g (c + j)%nat) b (len - c) (stop - c) Hwf Hbw).
+  - lia.
+  - lia.
+  - destruct Hend as [He | He]; [left; lia | right; cbv beta].
+    replace (c + (stop - c))%nat with stop by lia. exact He.
+  - intros j Hj. cbv beta. destruct (decide (j < length (wl_body r))%nat) as [Hlt | Hge].
+    + rewrite (Hbody j Hlt). symmetry. exact (wl_lta_app_l _ _ j Hlt).
+    + assert (Hj' : j = length (wl_body r)) by lia. rewrite Hj', Hb.
+      pose proof (wl_lta_app_r (wl_body r) [b] 0) as Hr. rewrite Nat.add_0_r in Hr. rewrite Hr.
+      reflexivity.
+Qed.
+
+(* the tail after the first bar, a word list per stage *)
+Fixpoint ushq_tail_ws (g : nat -> bv 8) (c len : nat)
+    (rs : list (list (list (bv 8)))) : Prop :=
+  match rs with
+  | [] => False
+  | r :: rs' =>
+      ushq_ws_ok r
+      /\ (forall j : nat, (j < length (wl_body r))%nat -> g (c + j)%nat = wl_body r !!! j)
+      /\ match rs' with
+         | [] => len = (c + length (wl_body r) + 1)%nat
+                 /\ g (c + length (wl_body r))%nat = wl_nl
+         | _ :: _ =>
+             g (c + length (wl_body r))%nat = wl_sp
+             /\ g (c + length (wl_body r) + 1)%nat = ushq_bar
+             /\ g (c + length (wl_body r) + 2)%nat = wl_sp
+             /\ ushq_tail_ws g (c + length (wl_body r) + 3) len rs'
+         end
+  end.
+
+Definition ushq_lines_ws (ws : list (list (bv 8))) (rs : list (list (list (bv 8))))
+    (f : nat -> bv 8) (k len : nat) : Prop :=
+  let p0 := length (wl_body ws) in
+  ushq_ws_ok ws
+  /\ (forall j : nat, (j < p0)%nat -> f (k + j)%nat = wl_body ws !!! j)
+  /\ f (k + p0)%nat = wl_sp
+  /\ f (k + p0 + 1)%nat = ushq_bar
+  /\ f (k + p0 + 2)%nat = wl_sp
+  /\ ushq_tail_ws (fun j : nat => f (k + j)%nat) (p0 + 3) len rs.
+
+(* the right-hand stages' token lists: each stage's words at its offset *)
+Fixpoint ushq_rtoks_ws (c : nat) (rs : list (list (list (bv 8))))
+    : list (list (nat * nat)) :=
+  match rs with
+  | [] => []
+  | r :: rs' => ushq_rebase c (wl_toks r) :: ushq_rtoks_ws (c + length (wl_body r) + 3) rs'
+  end.
+
+Lemma ushq_rtoks_ws_length (c : nat) (rs : list (list (list (bv 8)))) :
+  length (ushq_rtoks_ws c rs) = length rs.
+Proof using.
+  revert c. induction rs as [| r rs IH]; intros c; [reflexivity |].
+  cbn [ushq_rtoks_ws length]. by rewrite IH.
+Qed.
+
+Lemma ushq_tail_ws_lt (g : nat -> bv 8) (len : nat) :
+  forall (rs : list (list (list (bv 8)))) (c : nat),
+    ushq_tail_ws g c len rs -> (c < len)%nat.
+Proof using.
+  induction rs as [| r rs IH ]; intros c H; [ destruct H | ].
+  destruct rs as [| r2 rs ].
+  - destruct H as (_ & _ & Hlen & _). lia.
+  - destruct H as (_ & _ & _ & _ & _ & Ht). pose proof (IH _ Ht). lia.
+Qed.
+
+(* a stage's body bytes are neither blank-free symbols *)
+Lemma ushq_body_not_sym (g : nat -> bv 8) (c : nat) (r : list (list (bv 8))) :
+  wl_wf r ->
+  (forall j : nat, (j < length (wl_body r))%nat -> g (c + j)%nat = wl_body r !!! j) ->
+  forall j : nat, (c <= j < c + length (wl_body r))%nat -> ushp_is_sym (g j) = false.
+Proof using.
+  intros Hwf Hb j Hj. replace j with (c + (j - c))%nat by lia.
+  rewrite (Hb (j - c)%nat ltac:(lia)).
+  apply ushs_body_not_sym.
+  exact (Forall_lookup_1 _ _ _ _ (wl_body_bytes r Hwf)
+           (list_lookup_lookup_total_lt (wl_body r) (j - c) ltac:(lia))).
+Qed.
+
+(* every symbol byte after the first bar is a bar *)
+Lemma ushq_tail_ws_sym (g : nat -> bv 8) (len : nat) :
+  forall (rs : list (list (list (bv 8)))) (c : nat),
+    ushq_tail_ws g c len rs ->
+    forall j : nat, (c <= j < len)%nat -> ushp_is_sym (g j) = true ->
+      g j = ushq_bar.
+Proof using.
+  induction rs as [| r rs IH ]; intros c H j Hj Hs; [ destruct H | ].
+  destruct H as ((Hwf & _ & _) & Hb & Hrest).
+  destruct (lt_dec j (c + length (wl_body r))%nat) as [ Hlt | Hge ].
+  { exfalso. rewrite (ushq_body_not_sym g c r Hwf Hb j ltac:(lia)) in Hs. discriminate. }
+  destruct rs as [| r2 rs ].
+  - destruct Hrest as (Hlen & Hnl). exfalso.
+    assert (Hje : j = (c + length (wl_body r))%nat) by lia. rewrite Hje in Hs.
+    rewrite Hnl, ushs_nl_not_sym in Hs. discriminate.
+  - destruct Hrest as (Hsp1 & Hbar & Hsp2 & Ht).
+    destruct (Nat.eq_dec j (c + length (wl_body r))%nat) as [ Hj0 | Hn0 ].
+    { exfalso. rewrite Hj0, Hsp1, ushs_sp_not_sym in Hs. discriminate. }
+    destruct (Nat.eq_dec j (c + length (wl_body r) + 1)%nat) as [ Hj1 | Hn1 ].
+    { rewrite Hj1. exact Hbar. }
+    destruct (Nat.eq_dec j (c + length (wl_body r) + 2)%nat) as [ Hj2 | Hn2 ].
+    { exfalso. rewrite Hj2, Hsp2, ushs_sp_not_sym in Hs. discriminate. }
+    exact (IH _ Ht j ltac:(lia) Hs).
+Qed.
+
+(* the stages after the first bar are a pipeline tail *)
+Lemma ushq_tail_ws_bars (g : nat -> bv 8) (len : nat) :
+  ushq_sym_ok len g ->
+  forall (rs : list (list (list (bv 8)))) (r : list (list (bv 8))) (c : nat),
+    ushq_tail_ws g c len (r :: rs) ->
+    ushq_bars len g c (ushq_rebase c (wl_toks r))
+      (ushq_rtoks_ws (c + length (wl_body r) + 3) rs).
+Proof using.
+  intros Hsym.
+  induction rs as [| r2 rs IH ]; intros r c H.
+  - destruct H as ((Hwf & Hpos & Hlt10) & Hb & Hlen & Hnl).
+    cbn [ushq_rtoks_ws].
+    apply UshqBarsLast.
+    + lia.
+    + intros j Hj.
+      destruct (lt_dec j (c + length (wl_body r))%nat) as [ Hlt | Hge ].
+      * exact (ushq_body_not_sym g c r Hwf Hb j ltac:(lia)).
+      * assert (Hje : j = (c + length (wl_body r))%nat) by lia. rewrite Hje, Hnl.
+        exact ushs_nl_not_sym.
+    + apply (ushq_stage_toks len len g c r wl_nl Hwf Hb Hnl ushs_nl_ws); [lia | lia | left; reflexivity].
+    + rewrite ushq_rebase_length, wl_toks_length. exact Hlt10.
+  - pose proof H as Hall.
+    destruct H as ((Hwf & Hpos & Hlt10) & Hb & Hsp1 & Hbar & Hsp2 & Ht).
+    pose proof (ushq_tail_ws_lt g len _ _ Ht) as Hlt'.
+    pose proof Ht as Ht'. destruct Ht' as ((Hwf2 & Hpos2 & _) & Hb2 & _).
+    pose proof (ushq_ws_body_pos r2 Hwf2 Hpos2) as Hb2pos.
+    cbn [ushq_rtoks_ws].
+    apply (UshqBarsCons len g c (c + length (wl_body r) + 1)%nat).
+    + lia.
+    + unfold ushq_barw.
+      split; [ lia | ].
+      split; [ exact Hbar | ].
+      split.
+      { replace (S (c + length (wl_body r) + 1)) with (c + length (wl_body r) + 2)%nat by lia.
+        rewrite Hsp2. exact ushs_sp_ws. }
+      split; [ | exact Hsym ].
+      replace (S (S (c + length (wl_body r) + 1)))
+        with (c + length (wl_body r) + 3 + 0)%nat by lia.
+      rewrite (Hb2 0%nat Hb2pos).
+      exact (ushq_ws_first_nonws r2 Hwf2 Hpos2).
+    + apply (ushq_stage_toks len _ g c r wl_sp Hwf Hb Hsp1 ushs_sp_ws); [lia | lia |].
+      right. rewrite Hbar. exact ushq_bar_not_ws.
+    + rewrite ushq_rebase_length, wl_toks_length. exact Hpos.
+    + rewrite ushq_rebase_length, wl_toks_length. exact Hlt10.
+    + replace (S (S (c + length (wl_body r) + 1))) with (c + length (wl_body r) + 3)%nat by lia.
+      exact (IH r2 (c + length (wl_body r) + 3)%nat Ht).
+Qed.
+
+(* THE THEOREM: a filter pipeline's line is a line of a pipeline, stage by
+   stage -- the left command's arguments, then each stage's words *)
+Lemma ushq_lines_ws_bars (ws : list (list (bv 8))) (rs : list (list (list (bv 8))))
+    (f : nat -> bv 8) (k len : nat) :
+  ushq_lines_ws ws rs f k len ->
+  ushq_bars len (fun j : nat => f (k + j)%nat) 0%nat (wl_toks ws)
+    (ushq_rtoks_ws (length (wl_body ws) + 3) rs).
+Proof using.
+  intros ((Hwf & Hpos & Hlt10) & Hbody & Hsp1 & Hbar & Hsp2 & Htail).
+  set (g := fun j : nat => f (k + j)%nat) in *.
+  assert (Eg : forall j : nat, g j = f (k + j)%nat) by reflexivity.
+  destruct rs as [| r rs ]; [ destruct Htail | ].
+  pose proof (ushq_tail_ws_lt g len _ _ Htail) as Hlt.
+  pose proof Htail as Ht'. destruct Ht' as ((Hwf2 & Hpos2 & _) & Hb & _).
+  pose proof (ushq_ws_body_pos r Hwf2 Hpos2) as Hrpos.
+  assert (Hg0 : g (length (wl_body ws) + 1)%nat = ushq_bar).
+  { rewrite Eg.
+    replace (k + (length (wl_body ws) + 1))%nat
+      with (k + length (wl_body ws) + 1)%nat by lia.
+    exact Hbar. }
+  (* every symbol of the line is a bar *)
+  assert (Hsym : ushq_sym_ok len g).
+  { intros j Hj Hs. left. rewrite Eg in Hs.
+    destruct (lt_dec j (length (wl_body ws))%nat) as [ Hlo | Hge ].
+    { exfalso. rewrite (Hbody j Hlo) in Hs.
+      rewrite (ushs_body_not_sym _
+                 (Forall_lookup_1 _ _ _ _
+                    (wl_body_bytes ws Hwf)
+                    (list_lookup_lookup_total_lt (wl_body ws) j Hlo))) in Hs.
+      discriminate. }
+    destruct (Nat.eq_dec j (length (wl_body ws))%nat) as [ Hj0 | Hn0 ].
+    { exfalso. rewrite Hj0, Hsp1, ushs_sp_not_sym in Hs. discriminate. }
+    destruct (Nat.eq_dec j (length (wl_body ws) + 1)%nat) as [ Hj1 | Hn1 ].
+    { rewrite Hj1. exact Hg0. }
+    destruct (Nat.eq_dec j (length (wl_body ws) + 2)%nat) as [ Hj2 | Hn2 ].
+    { exfalso.
+      replace (k + j)%nat with (k + length (wl_body ws) + 2)%nat in Hs
+        by lia.
+      rewrite Hsp2, ushs_sp_not_sym in Hs. discriminate. }
+    rewrite <- Eg in Hs.
+    exact (ushq_tail_ws_sym g len _ _ Htail j ltac:(lia) Hs). }
+  cbn [ushq_rtoks_ws].
+  apply (UshqBarsCons len g 0%nat (length (wl_body ws) + 1)%nat).
+  - lia.
+  - unfold ushq_barw.
+    split; [ lia | ].
+    split; [ exact Hg0 | ].
+    split.
+    { rewrite Eg.
+      replace (k + S (length (wl_body ws) + 1))%nat
+        with (k + length (wl_body ws) + 2)%nat by lia.
+      rewrite Hsp2. exact ushs_sp_ws. }
+    split; [ | exact Hsym ].
+    replace (S (S (length (wl_body ws) + 1)))
+      with (length (wl_body ws) + 3 + 0)%nat by lia.
+    rewrite (Hb 0%nat Hrpos).
+    exact (ushq_ws_first_nonws r Hwf2 Hpos2).
+  - (* the left command's arguments: the landed lexing at the first bar *)
+    apply (ushs_toks_line ws g wl_sp len (length (wl_body ws) + 1)%nat).
+    + exact Hwf.
+    + exact wl_sp_ws.
+    + reflexivity.
+    + lia.
+    + right. rewrite Hg0. exact ushq_bar_not_ws.
+    + intros j Hj. rewrite Eg.
+      destruct (Nat.eq_dec j (length (wl_body ws))%nat) as [ -> | Hne ].
+      * rewrite Hsp1.
+        pose proof (wl_lta_app_r (wl_body ws) [wl_sp] 0%nat) as Hr.
+        rewrite Nat.add_0_r in Hr. rewrite Hr. reflexivity.
+      * rewrite (Hbody j ltac:(lia)). symmetry.
+        exact (wl_lta_app_l (wl_body ws) [wl_sp] j ltac:(lia)).
+  - rewrite wl_toks_length. exact Hpos.
+  - rewrite wl_toks_length. exact Hlt10.
+  - replace (S (S (length (wl_body ws) + 1)))
+      with (length (wl_body ws) + 3)%nat by lia.
+    exact (ushq_tail_ws_bars g len Hsym rs r (length (wl_body ws) + 3)%nat
+             Htail).
+Qed.
+
+(* ===================================================================== *)
 (* §5 A DEMO: [echo hello world | cat | cat]                              *)
 (*                                                                        *)
 (* [ushq_lines_is] is a PREMISE of the theorem above, so it is shown       *)

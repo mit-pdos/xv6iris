@@ -9,6 +9,11 @@
 (*    - the parser's cut ([UkShPipesCmd.ushq_nulfolds] over every stage's *)
 (*      tokens) holds echo's argv at the left stage and [cat]'s at every  *)
 (*      right one -- the two readings [UShPipesNode]'s stages take.       *)
+(*  At ANY admissible stage list [fs] (cut G7, the last section): the     *)
+(*  line is [UkShPipesLex.ushq_lines_ws] ([lines_of_pipe_fs]), and the    *)
+(*  cut [pcut_fs] holds the producer's argv ([pcut_fs_echo_bytes]) and    *)
+(*  every stage's words [filt_words F] at its offset ([pcut_fs_stage]);   *)
+(*  [pipes_lpg] / [pipes_lpcg] are the loop's line predicates there.      *)
 (*  Pure.                                                                 *)
 (* ===================================================================== *)
 From Stdlib Require Import ZArith Lia List.
@@ -26,7 +31,7 @@ Require Import UkShPipesCmd.
 Require UkShEcho.
 Require UkShCat.
 Require UkSh.
-Require ExecWords.
+Require ExecWords UmodeAbi.
 Local Open Scope nat_scope.
 
 (* ---- the bytes of a list at an offset ---- *)
@@ -469,4 +474,400 @@ Proof using.
     do 3 (destruct j as [| j]; [vm_compute; reflexivity |]). lia.
   - intros i Hi. cbn [FileDisc.filt_words length] in Hi. assert (i = 0) as -> by lia.
     rewrite Hoff Halen. cbn [Nat.add]. rewrite <- Hb3. exact Hnul.
+Qed.
+
+(* ===================================================================== *)
+(*  THE FILTER PIPELINE's LINE (cut G7, grep-pipes SS4): [p | F1 | .. |   *)
+(*  Fn] at ANY admissible stage list, lexed stage by stage                *)
+(*  ([UkShPipesLex.ushq_lines_ws]) and cut: each stage's argv is its      *)
+(*  words ([FileDisc.filt_words]) at the stage's offset in the line.      *)
+(* ===================================================================== *)
+
+Lemma fd_bar_bar : FileDisc.fd_bar = ushq_bar.
+Proof using. reflexivity. Qed.
+
+Lemma fd_w_grep_word : wl_word FileDisc.fd_w_grep.
+Proof using. apply (bool_decide_unpack _). vm_compute. exact I. Qed.
+
+(* a filter's words lex as a command's *)
+Lemma filt_ws_ok (F : FileDisc.filt) : FileDisc.filt_ok F -> ushq_ws_ok (FileDisc.filt_words F).
+Proof using.
+  destruct F as [| w]; cbn [FileDisc.filt_ok FileDisc.filt_words]; intros HF.
+  - split_and!; [constructor; [exact FileDisc.fd_w_cat_word | constructor] | cbn; lia | cbn; lia].
+  - split_and!; [constructor; [exact fd_w_grep_word | constructor; [exact HF | constructor]]
+                | cbn; lia | cbn; lia].
+Qed.
+
+Lemma bat_cons3 (g : nat -> bv 8) (c : nat) (a b d : bv 8) (l : list (bv 8)) :
+  bat g c (a :: b :: d :: l) -> g c = a /\ g (c + 1) = b /\ g (c + 2) = d /\ bat g (c + 3) l.
+Proof using.
+  intros H. split_and!.
+  - pose proof (H 0 ltac:(cbn; lia)) as H0. rewrite Nat.add_0_r in H0. exact H0.
+  - exact (H 1 ltac:(cbn; lia)).
+  - exact (H 2 ltac:(cbn; lia)).
+  - intros j Hj. replace (c + 3 + j) with (c + (3 + j)) by lia.
+    rewrite (H (3 + j) ltac:(cbn; lia)). reflexivity.
+Qed.
+
+(* the line: the producer, then [ | F] per stage *)
+Lemma line_bytes_pipe_split_fs (p : FileDisc.producer) (F : FileDisc.filt) (fs : list FileDisc.filt) :
+  FileDisc.line_bytes (FileDisc.LPipe p (F :: fs))
+  = wl_body (FileDisc.prod_words p) ++ [wl_sp; ushq_bar; wl_sp]
+    ++ (wl_body (FileDisc.filt_words F) ++ FileDisc.suf_filts fs ++ [wl_nl]).
+Proof using.
+  rewrite FileDisc.line_bytes_body. cbn [FileDisc.line_body].
+  rewrite FileDisc.suf_filts_cons. unfold FileDisc.prod_body, FileDisc.suf_filt.
+  rewrite -!app_assoc. reflexivity.
+Qed.
+
+Lemma line_bytes_pipe_length_fs (p : FileDisc.producer) (fs : list FileDisc.filt) :
+  length (FileDisc.line_bytes (FileDisc.LPipe p fs))
+  = length (wl_body (FileDisc.prod_words p)) + length (FileDisc.suf_filts fs) + 1.
+Proof using.
+  rewrite FileDisc.line_bytes_body. cbn [FileDisc.line_body].
+  rewrite !length_app. unfold FileDisc.prod_body. cbn [length]. lia.
+Qed.
+
+(* ---- the tail after the first bar: a word list per stage ---- *)
+Lemma tail_filts (g : nat -> bv 8) (len : nat) :
+  forall (fs : list FileDisc.filt) (F : FileDisc.filt) (c : nat),
+    Forall FileDisc.filt_ok (F :: fs) ->
+    bat g c (wl_body (FileDisc.filt_words F) ++ FileDisc.suf_filts fs ++ [wl_nl]) ->
+    len = c + (length (wl_body (FileDisc.filt_words F)) + length (FileDisc.suf_filts fs) + 1) ->
+    ushq_tail_ws g c len (map FileDisc.filt_words (F :: fs)).
+Proof using.
+  induction fs as [| F' fs IH]; intros F c HF Hb Hlen.
+  - cbn [map ushq_tail_ws].
+    apply Forall_cons_1 in HF as [HF _].
+    apply bat_app in Hb as [Hbody Hr].
+    split; [exact (filt_ws_ok F HF) |]. split; [exact Hbody |].
+    change (FileDisc.suf_filts []) with (@nil (bv 8)) in Hlen, Hr. cbn [length app] in Hlen, Hr.
+    split; [lia |].
+    pose proof (Hr 0 ltac:(cbn; lia)) as H0. rewrite Nat.add_0_r in H0. exact H0.
+  - cbn [map ushq_tail_ws].
+    apply Forall_cons_1 in HF as [HF HF'].
+    rewrite FileDisc.suf_filts_cons -app_assoc in Hb. unfold FileDisc.suf_filt in Hb.
+    apply bat_app in Hb as [Hbody Hr]. cbn [app] in Hr.
+    destruct (bat_cons3 _ _ _ _ _ _ Hr) as (Hsp1 & Hbar & Hsp2 & Hr').
+    rewrite FileDisc.suf_filts_cons length_app in Hlen. unfold FileDisc.suf_filt in Hlen.
+    cbn [length] in Hlen.
+    split; [exact (filt_ws_ok F HF) |]. split; [exact Hbody |].
+    split; [exact Hsp1 |]. split; [rewrite Hbar; exact fd_bar_bar |]. split; [exact Hsp2 |].
+    apply (IH F' (c + length (wl_body (FileDisc.filt_words F)) + 3) HF' Hr'). lia.
+Qed.
+
+(* ---- THE LINE IS THE LEXER'S, at any stage list ---- *)
+Lemma lines_of_pipe_fs (p : FileDisc.producer) (fs : list FileDisc.filt) (f : nat -> bv 8) (len : nat) :
+  FileDisc.prod_ok p -> fs <> [] -> Forall FileDisc.filt_ok fs ->
+  bat f 0 (FileDisc.line_bytes (FileDisc.LPipe p fs)) ->
+  len = length (FileDisc.line_bytes (FileDisc.LPipe p fs)) ->
+  ushq_lines_ws (FileDisc.prod_words p) (map FileDisc.filt_words fs) f 0 len.
+Proof using.
+  intros Hok Hn HF Hb Hlen.
+  destruct fs as [| F fs]; [done |].
+  rewrite line_bytes_pipe_length_fs in Hlen.
+  rewrite FileDisc.suf_filts_cons length_app in Hlen. unfold FileDisc.suf_filt in Hlen.
+  cbn [length] in Hlen.
+  rewrite line_bytes_pipe_split_fs in Hb.
+  apply bat_app in Hb as [Hbody Hr]. apply bat_app in Hr as [Hs Hr].
+  unfold ushq_lines_is, ushq_lines_ws. cbv zeta.
+  split; [exact (prod_ws_ok p Hok) |].
+  split; [exact Hbody |].
+  split; [pose proof (Hs 0 ltac:(cbn; lia)) as H0; rewrite Nat.add_0_r in H0; exact H0 |].
+  split; [exact (Hs 1 ltac:(cbn; lia)) |].
+  split; [exact (Hs 2 ltac:(cbn; lia)) |].
+  apply (tail_filts (fun j : nat => f (0 + j)) len fs F (length (wl_body (FileDisc.prod_words p)) + 3)).
+  - exact HF.
+  - intros j Hj. cbv beta. rewrite (Hr j Hj). reflexivity.
+  - lia.
+Qed.
+
+(* ---- the stages' offsets and token lists ---- *)
+Fixpoint ushq_soff (c : nat) (rs : list (list (list (bv 8)))) (k : nat) : nat :=
+  match rs with
+  | [] => c
+  | r :: rs' => match k with O => c | S k' => ushq_soff (c + length (wl_body r) + 3) rs' k' end
+  end.
+
+Lemma ushq_soff_ge (rs : list (list (list (bv 8)))) :
+  forall c k, c <= ushq_soff c rs k.
+Proof using.
+  induction rs as [| r rs IH]; intros c k; cbn [ushq_soff]; [lia |].
+  destruct k as [| k]; [lia |]. pose proof (IH (c + length (wl_body r) + 3) k). lia.
+Qed.
+
+Lemma ushq_rtoks_ws_lookup (rs : list (list (list (bv 8)))) :
+  forall c k r, rs !! k = Some r ->
+    ushq_rtoks_ws c rs !! k = Some (ushq_rebase (ushq_soff c rs k) (wl_toks r)).
+Proof using.
+  induction rs as [| r0 rs IH]; intros c k r Hk; [by destruct k |].
+  destruct k as [| k]; cbn in Hk |- *.
+  - by injection Hk as <-.
+  - exact (IH _ k r Hk).
+Qed.
+
+(* a word list's tokens at [off], and at a rebase *)
+Lemma wl_toks_at_shift (r : list (list (bv 8))) :
+  forall c off, wl_toks_at (c + off) r = ushq_rebase c (wl_toks_at off r).
+Proof using.
+  induction r as [| w r IH]; intros c off; [reflexivity |].
+  cbn [wl_toks_at ushq_rebase map fst snd].
+  replace (S (c + off + length w)) with (c + S (off + length w)) by lia.
+  rewrite IH. f_equal. f_equal. lia.
+Qed.
+
+Lemma wl_rebase_toks (r : list (list (bv 8))) (c : nat) :
+  ushq_rebase c (wl_toks r) = wl_toks_at c r.
+Proof using.
+  unfold wl_toks. rewrite <- (Nat.add_0_r c) at 2. rewrite (wl_toks_at_shift r c 0). reflexivity.
+Qed.
+
+Lemma wl_off_shift (r : list (list (bv 8))) :
+  forall c off i, wl_off (c + off) r i = c + wl_off off r i.
+Proof using.
+  induction r as [| w r IH]; intros c off i; cbn [wl_off]; [reflexivity |].
+  destruct i as [| i]; [reflexivity |].
+  replace (S (c + off + length w)) with (c + S (off + length w)) by lia. apply IH.
+Qed.
+
+Lemma wl_toks_at_bounds (r : list (list (bv 8))) :
+  forall off tk, tk ∈ wl_toks_at off r -> off <= fst tk <= snd tk /\ snd tk <= off + length (wl_body r).
+Proof using.
+  induction r as [| w r IH]; intros off tk Htk; [by apply elem_of_nil in Htk |].
+  cbn [wl_toks_at] in Htk. rewrite wl_body_cons length_app.
+  apply elem_of_cons in Htk as [-> | Htk]; cbn [fst snd].
+  - lia.
+  - destruct r as [| w' r']; [by apply elem_of_nil in Htk |].
+    pose proof (IH _ tk Htk) as Hb. rewrite wl_tail_cons. cbn [length]. lia.
+Qed.
+
+(* every token of the stages from [c] on starts at [c] or past it *)
+Lemma ushq_rtoks_ws_ge (rs : list (list (list (bv 8)))) :
+  forall c tk, tk ∈ concat (ushq_rtoks_ws c rs) -> c <= fst tk <= snd tk.
+Proof using.
+  induction rs as [| r rs IH]; intros c tk Htk; [by apply elem_of_nil in Htk |].
+  cbn [ushq_rtoks_ws concat] in Htk. apply elem_of_app in Htk as [Htk | Htk].
+  - rewrite wl_rebase_toks in Htk. pose proof (wl_toks_at_bounds r c tk Htk). lia.
+  - pose proof (IH _ tk Htk). lia.
+Qed.
+
+(* THE FOLD AT A STAGE'S WORD: the stages' cuts leave a word's bytes and
+   put the NUL at its end *)
+Lemma nulfold_stage (rs : list (list (list (bv 8)))) :
+  forall (c k : nat) (r : list (list (bv 8))) (g : nat -> bv 8) (i : nat) (w : list (bv 8)) (j : nat),
+    rs !! k = Some r -> r !! i = Some w -> j <= length w ->
+    UkShParseCmd.ushp_nulfold (concat (ushq_rtoks_ws c rs)) g (wl_off (ushq_soff c rs k) r i + j)
+    = (if Nat.eqb j (length w) then UmodeAbi.ubyte0 else g (wl_off (ushq_soff c rs k) r i + j)).
+Proof using.
+  induction rs as [| r0 rs IH]; intros c k r g i w j Hk Hi Hj; [by destruct k |].
+  cbn [ushq_rtoks_ws concat]. rewrite ushq_nulfold_app.
+  destruct k as [| k]; cbn [ushq_soff] in *.
+  - cbn in Hk. injection Hk as ->.
+    pose proof (wl_off_le_body r c i w j Hi Hj) as Hle.
+    rewrite UkShMain.ushp_nulfold_miss.
+    2:{ intros i' tk Hi'. apply elem_of_list_lookup_2 in Hi'.
+        pose proof (ushq_rtoks_ws_ge rs _ tk Hi'). lia. }
+    rewrite wl_rebase_toks. exact (wl_nulfold_at r c g i w j Hi Hj).
+  - cbn in Hk.
+    pose proof (ushq_soff_ge rs (c + length (wl_body r0) + 3) k) as Hge.
+    pose proof (wl_off_ge r (ushq_soff (c + length (wl_body r0) + 3) rs k) i) as Hge2.
+    rewrite (IH _ k r _ i w j Hk Hi Hj).
+    destruct (Nat.eqb j (length w)); [reflexivity |].
+    apply UkShMain.ushp_nulfold_miss.
+    intros i' tk Hi'. apply elem_of_list_lookup_2 in Hi'.
+    rewrite wl_rebase_toks in Hi'. pose proof (wl_toks_at_bounds r0 c tk Hi'). lia.
+Qed.
+
+(* the stage [k]'s words and the line's bytes there *)
+Lemma tail_ws_stage (g : nat -> bv 8) (len : nat) (rs : list (list (list (bv 8)))) :
+  forall (c k : nat) (r : list (list (bv 8))),
+    ushq_tail_ws g c len rs -> rs !! k = Some r ->
+    ushq_ws_ok r
+    /\ (forall j, j < length (wl_body r) -> g (ushq_soff c rs k + j) = wl_body r !!! j)
+    /\ ushq_soff c rs k + length (wl_body r) + 1 <= len.
+Proof using.
+  induction rs as [| r0 rs IH]; intros c k r Ht Hk; [by destruct k |].
+  destruct k as [| k]; cbn [ushq_soff].
+  - cbn in Hk. injection Hk as <-.
+    destruct Ht as (Hok & Hb & Hrest). split; [exact Hok |]. split; [exact Hb |].
+    destruct rs as [| r2 rs].
+    + destruct Hrest as [Hlen _]. lia.
+    + destruct Hrest as (_ & _ & _ & Ht'). pose proof (ushq_tail_ws_lt g len _ _ Ht'). lia.
+  - cbn in Hk. destruct rs as [| r2 rs]; [by destruct k |].
+    destruct Ht as (_ & _ & _ & _ & _ & Ht'). exact (IH _ k r Ht' Hk).
+Qed.
+
+(* THE CUT of a filter pipeline's line, at the parser's stages *)
+Definition pcut_fs (ws : list (list (bv 8))) (rs : list (list (list (bv 8)))) (len : nat)
+    (f : nat -> bv 8) : nat -> bv 8 :=
+  ushq_nulfolds (wl_toks ws) (ushq_rtoks_ws (length (wl_body ws) + 3) rs)
+    (UkShParseCmd.ushp_ext len f).
+
+(* ...and the producer's argv is there *)
+Lemma pcut_fs_echo_bytes (p : FileDisc.producer) (fs : list FileDisc.filt) (f : nat -> bv 8) (len : nat) :
+  UkSh.ush_line_at (FileDisc.LPipe p fs) f 0 len ->
+  UkShEcho.echo_argv_bytes (FileDisc.prod_words p)
+    (pcut_fs (FileDisc.prod_words p) (map FileDisc.filt_words fs) len f).
+Proof using.
+  intros (Hok & Hlen & Hby).
+  destruct Hok as (Hok & Hn & _).
+  assert (Hblen : length (wl_body (FileDisc.prod_words p)) < len)
+    by (rewrite Hlen line_bytes_pipe_length_fs; lia).
+  assert (Hlo : forall j : nat, j < length (wl_body (FileDisc.prod_words p)) -> f j = wl_line (FileDisc.prod_words p) !!! j).
+  { intros j Hj. pose proof (Hby j ltac:(lia)) as Hfj.
+    rewrite Nat.add_0_l in Hfj. rewrite Hfj.
+    rewrite FileDisc.line_bytes_body. cbn [FileDisc.line_body]. unfold FileDisc.prod_body.
+    rewrite -app_assoc (wl_lta_app_l (wl_body (FileDisc.prod_words p)) _ j Hj).
+    rewrite /wl_line (wl_lta_app_l (wl_body (FileDisc.prod_words p)) [wl_nl] j Hj). reflexivity. }
+  (* below the first bar the stages' cuts are not there *)
+  assert (Hlow : forall x, x <= length (wl_body (FileDisc.prod_words p)) ->
+            pcut_fs (FileDisc.prod_words p) (map FileDisc.filt_words fs) len f x
+            = UkShParseCmd.ushp_nulfold (wl_toks (FileDisc.prod_words p)) (UkShParseCmd.ushp_ext len f) x).
+  { intros x Hx. rewrite /pcut_fs ushq_nulfolds_flat ushq_nulfold_app.
+    apply UkShMain.ushp_nulfold_miss.
+    intros i tk Hi. apply elem_of_list_lookup_2 in Hi.
+    pose proof (ushq_rtoks_ws_ge _ _ tk Hi). lia. }
+  split.
+  - intros i j Hi Hj.
+    destruct (lookup_lt_is_Some_2 (FileDisc.prod_words p) i Hi) as [w Hw].
+    assert (Hwi : (FileDisc.prod_words p) !!! i = w) by (rewrite list_lookup_total_alt Hw; reflexivity).
+    rewrite /UkShEcho.echo_alen Hwi in Hj.
+    rewrite /UkShEcho.echo_off.
+    pose proof (wl_off_le_body (FileDisc.prod_words p) 0 i w (length w) Hw ltac:(lia)) as Hle.
+    rewrite (Hlow (wl_off 0 (FileDisc.prod_words p) i + j) ltac:(lia)).
+    rewrite (wl_cut_in (FileDisc.prod_words p) f len i w j Hw Hj ltac:(lia)).
+    exact (Hlo (wl_off 0 (FileDisc.prod_words p) i + j) ltac:(lia)).
+  - intros i Hi.
+    destruct (lookup_lt_is_Some_2 (FileDisc.prod_words p) i Hi) as [w Hw].
+    assert (Hwi : (FileDisc.prod_words p) !!! i = w) by (rewrite list_lookup_total_alt Hw; reflexivity).
+    rewrite /UkShEcho.echo_off /UkShEcho.echo_alen Hwi.
+    pose proof (wl_off_le_body (FileDisc.prod_words p) 0 i w (length w) Hw ltac:(lia)) as Hle.
+    rewrite (Hlow (wl_off 0 (FileDisc.prod_words p) i + length w) ltac:(lia)).
+    exact (wl_cut_end (FileDisc.prod_words p) f len i w Hw).
+Qed.
+
+(* ...AND STAGE [k]'s: its words at its offset [co], its token list the
+   rebase of its words' there, and an exec'able word list *)
+Lemma pcut_fs_stage (p : FileDisc.producer) (fs : list FileDisc.filt) (f : nat -> bv 8)
+    (len k : nat) (F : FileDisc.filt) :
+  UkSh.ush_line_at (FileDisc.LPipe p fs) f 0 len -> fs !! k = Some F ->
+  let rs := map FileDisc.filt_words fs in
+  let co := ushq_soff (length (wl_body (FileDisc.prod_words p)) + 3) rs k in
+  ushq_rtoks_ws (length (wl_body (FileDisc.prod_words p)) + 3) rs !! k
+    = Some (ushq_rebase co (wl_toks (FileDisc.filt_words F)))
+  /\ ExecWords.exec_ok (FileDisc.filt_words F)
+  /\ UkShEcho.echo_argv_bytes (FileDisc.filt_words F)
+       (fun j : nat => pcut_fs (FileDisc.prod_words p) rs len f (co + j)).
+Proof using.
+  intros Hlat Hk rs co. subst rs co.
+  pose proof Hlat as (Hok & Hlen & Hby).
+  pose proof Hok as (Hp & Hn & HF & Hlm).
+  assert (Hr : map FileDisc.filt_words fs !! k = Some (FileDisc.filt_words F))
+    by (rewrite list_lookup_fmap Hk; reflexivity).
+  set (rs := map FileDisc.filt_words fs) in *.
+  assert (Hbat : bat f 0 (FileDisc.line_bytes (FileDisc.LPipe p fs))).
+  { intros j Hj. apply Hby. rewrite Hlen. exact Hj. }
+  pose proof (lines_of_pipe_fs p fs f len Hp Hn HF Hbat Hlen) as Hlines.
+  destruct Hlines as (_ & _ & _ & _ & _ & Htail).
+  destruct (tail_ws_stage _ len rs _ k _ Htail Hr) as ((Hwf & Hpos & Hlt10) & Hb & Hend).
+  assert (Hco : length (wl_body (FileDisc.prod_words p)) + 3 <= (ushq_soff (length (wl_body (FileDisc.prod_words p)) + 3) rs k)) by apply ushq_soff_ge.
+  split_and!.
+  - exact (ushq_rtoks_ws_lookup rs _ k _ Hr).
+  - split_and!; [exact Hwf | exact Hpos | exact Hlt10 |].
+    rewrite Hlen in Hend. unfold wl_line. rewrite length_app. cbn [length]. lia.
+  - (* the stage's bytes, and the NULs the cut put at its words' ends *)
+    assert (Hval : forall i w j, FileDisc.filt_words F !! i = Some w -> j <= length w ->
+              pcut_fs (FileDisc.prod_words p) rs len f ((ushq_soff (length (wl_body (FileDisc.prod_words p)) + 3) rs k) + (wl_off 0 (FileDisc.filt_words F) i + j))
+              = if Nat.eqb j (length w) then UmodeAbi.ubyte0
+                else f ((ushq_soff (length (wl_body (FileDisc.prod_words p)) + 3) rs k) + (wl_off 0 (FileDisc.filt_words F) i + j))).
+    { intros i w j Hi Hj.
+      rewrite /pcut_fs ushq_nulfolds_flat ushq_nulfold_app.
+      replace ((ushq_soff (length (wl_body (FileDisc.prod_words p)) + 3) rs k) + (wl_off 0 (FileDisc.filt_words F) i + j))
+        with (wl_off (ushq_soff (length (wl_body (FileDisc.prod_words p)) + 3) rs k) (FileDisc.filt_words F) i + j)
+        by (rewrite <- (Nat.add_0_r (ushq_soff _ rs k)) at 1; rewrite (wl_off_shift _ _ 0 i); lia).
+      rewrite (nulfold_stage rs _ k _ _ i w j Hr Hi Hj).
+      destruct (Nat.eqb j (length w)) eqn:Hjw; [reflexivity |].
+      pose proof (wl_off_ge (FileDisc.filt_words F) (ushq_soff (length (wl_body (FileDisc.prod_words p)) + 3) rs k) i) as Hge.
+      rewrite UkShMain.ushp_nulfold_miss.
+      2:{ intros i' tk Hi'. apply elem_of_list_lookup_2 in Hi'.
+          pose proof (wl_toks_end_le (FileDisc.prod_words p) tk Hi'). lia. }
+      rewrite /UkShParseCmd.ushp_ext bool_decide_eq_true_2; [reflexivity |].
+      pose proof (wl_off_le_body _ (ushq_soff (length (wl_body (FileDisc.prod_words p)) + 3) rs k) i w j Hi Hj). lia. }
+    split.
+    + intros i j Hi Hj.
+      destruct (lookup_lt_is_Some_2 _ i Hi) as [w Hw].
+      assert (Hwi : FileDisc.filt_words F !!! i = w) by (rewrite list_lookup_total_alt Hw; reflexivity).
+      rewrite /UkShEcho.echo_alen Hwi in Hj. rewrite /UkShEcho.echo_off.
+      cbv beta. rewrite (Hval i w j Hw ltac:(lia)).
+      rewrite (proj2 (Nat.eqb_neq j (length w)) ltac:(lia)).
+      pose proof (wl_off_le_body _ 0 i w (length w) Hw ltac:(lia)) as Hle.
+      pose proof (Hb (wl_off 0 (FileDisc.filt_words F) i + j) ltac:(lia)) as Hbj.
+      cbv beta in Hbj. rewrite Nat.add_0_l in Hbj. rewrite Hbj.
+      rewrite /wl_line (wl_lta_app_l (wl_body (FileDisc.filt_words F)) [wl_nl] (wl_off 0 (FileDisc.filt_words F) i + j) ltac:(lia)). reflexivity.
+    + intros i Hi.
+      destruct (lookup_lt_is_Some_2 _ i Hi) as [w Hw].
+      assert (Hwi : FileDisc.filt_words F !!! i = w) by (rewrite list_lookup_total_alt Hw; reflexivity).
+      rewrite /UkShEcho.echo_off /UkShEcho.echo_alen Hwi. cbv beta.
+      rewrite (Hval i w (length w) Hw ltac:(lia)) Nat.eqb_refl. reflexivity.
+Qed.
+
+(* ---- THE LOOP'S TYPED LINE at any admissible stage list, as the round's
+        line predicate (the landed [pipes_lp] / [pipes_lpc] are its all-cat
+        members) ---- *)
+Definition pipes_lpg (wsf : list (list (bv 8))) (gf : nat -> bv 8) (k len : nat) : Prop :=
+  exists (ws : list (list (bv 8))) (fs : list FileDisc.filt),
+    wsf = FileDisc.uline_ws (FileDisc.LPipe (FileDisc.PrEcho ws) fs)
+    /\ UkSh.ush_line_at (FileDisc.LPipe (FileDisc.PrEcho ws) fs) gf k len.
+
+Definition pipes_lpcg (wsf : list (list (bv 8))) (gf : nat -> bv 8) (k len : nat) : Prop :=
+  exists fs : list FileDisc.filt,
+    wsf = FileDisc.uline_ws (FileDisc.LPipe (FileDisc.PrCatF FileDisc.fname_f) fs)
+    /\ UkSh.ush_line_at (FileDisc.LPipe (FileDisc.PrCatF FileDisc.fname_f) fs) gf k len.
+
+Lemma pipes_lp_g (wsf : list (list (bv 8))) (gf : nat -> bv 8) (k len : nat) :
+  pipes_lp wsf gf k len -> pipes_lpg wsf gf k len.
+Proof using. intros (ws & n & H). exists ws, (FileDisc.cats n). exact H. Qed.
+
+Lemma pipes_lpc_g (wsf : list (list (bv 8))) (gf : nat -> bv 8) (k len : nat) :
+  pipes_lpc wsf gf k len -> pipes_lpcg wsf gf k len.
+Proof using. intros (n & H). exists (FileDisc.cats n). exact H. Qed.
+
+(* below the first bar the line's bytes are the producer's, at any stage
+   list *)
+Lemma pipe_bytes_lo_fs (p : FileDisc.producer) (fs : list FileDisc.filt) (j : nat) :
+  j < length (wl_body (FileDisc.prod_words p)) ->
+  FileDisc.line_bytes (FileDisc.LPipe p fs) !!! j = wl_line (FileDisc.prod_words p) !!! j.
+Proof using.
+  intros Hj. rewrite FileDisc.line_bytes_body. cbn [FileDisc.line_body].
+  unfold FileDisc.prod_body.
+  rewrite -app_assoc (wl_lta_app_l (wl_body (FileDisc.prod_words p)) _ j Hj).
+  rewrite /wl_line (wl_lta_app_l (wl_body (FileDisc.prod_words p)) [wl_nl] j Hj). reflexivity.
+Qed.
+
+Lemma pipes_lpg0 (wsf : list (list (bv 8))) (gf : nat -> bv 8) (k len : nat) :
+  pipes_lpg wsf gf k len -> bv_unsigned (gf k) = 101%Z.
+Proof using.
+  intros (ws & fs & _ & Hok & Hlen & Hby).
+  destruct Hok as (Hok & _ & _).
+  pose proof (line_ok_body_pos ws Hok) as Hbody.
+  assert (Hlpos : 0 < len) by (rewrite Hlen line_bytes_pipe_length_fs; lia).
+  pose proof (Hby 0 Hlpos) as H0. rewrite Nat.add_0_r in H0.
+  rewrite H0 (pipe_bytes_lo_fs (FileDisc.PrEcho ws) fs 0 Hbody).
+  exact (line_ok_head_byte0 ws Hok).
+Qed.
+
+Lemma pipes_lpcg_bytes (wsf : list (list (bv 8))) (gf : nat -> bv 8) (k len : nat) :
+  pipes_lpcg wsf gf k len ->
+  bv_unsigned (gf k) = 99%Z /\ bv_unsigned (gf (k + 1)) = 97%Z /\ 2 <= len.
+Proof using.
+  intros (fs & _ & _ & Hlen & Hby).
+  assert (Hb : length (wl_body (FileDisc.prod_words (FileDisc.PrCatF FileDisc.fname_f))) = 5)
+    by (vm_compute; reflexivity).
+  rewrite line_bytes_pipe_length_fs Hb in Hlen.
+  split_and!; [| | lia].
+  - rewrite -(Nat.add_0_r k) (Hby 0 ltac:(lia))
+      (pipe_bytes_lo_fs (FileDisc.PrCatF FileDisc.fname_f) fs 0 ltac:(lia)).
+    by vm_compute.
+  - rewrite (Hby 1 ltac:(lia)) (pipe_bytes_lo_fs (FileDisc.PrCatF FileDisc.fname_f) fs 1 ltac:(lia)).
+    by vm_compute.
 Qed.
