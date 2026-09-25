@@ -69,7 +69,7 @@ with both ports past `uartinit`, the disk's credentials, the ticks lock and
 the proc table. -/
 def devintrCaps {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
     (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    (pd pav pu : BitVec 64) (bs : List (BitVec 8)) : IProp GF := iprop(
+    (pd pav pu : BitVec 64) : IProp GF := iprop(
   plicInv γ0 γ1 ∗ uartInited γ0 ∗ uartInited γ1 ∗
   uartPort .uart0 γl0 γ0 ∗ uartPort .uart1 γl1 γ1 ∗
   uartRxWord .uart0 ∗ uartRxWord .uart1 ∗
@@ -78,19 +78,19 @@ def devintrCaps {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] 
 
 instance devintrCaps_persistent {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [DiskG GF] [CurCtx] (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames)
-    (γdl γt : GName) (pd pav pu : BitVec 64) (bs : List (BitVec 8)) :
-    Persistent (devintrCaps (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu bs) := by
+    (γdl γt : GName) (pd pav pu : BitVec 64) :
+    Persistent (devintrCaps (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu) := by
   unfold devintrCaps; infer_instance
 
 /-- **WP of `devintr`.** -/
 def wp_devintr_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
     (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    (pd pav pu : BitVec 64) (bs : List (BitVec 8))
+    (pd pav pu : BitVec 64)
     (cpu : CPU) (k : KCtx) (sc : BitVec 64)
     (hsie : k.sie = false) (hnoff : k.noff + 2 < 2 ^ 31) (hlocks : k.locks = [])
     (htier : k.tier = KTier.kpt) (hK : devintrSlots ≤ k.avail) (hsc : sCauseOk sc) : Prop :=
   kctx cpu k ∗ pcIs cpu devintrAddr ∗ Register.scause ↦ᵣ[cpu] sc ∗
-  devintrCaps Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu bs ∗
+  devintrCaps Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu ∗
   (∀ R' : RegMap, kctx cpu (k.withRegs R') -∗ pcIs cpu (jumpPc (k.regs 1#5)) -∗
     Register.scause ↦ᵣ[cpu] sc -∗ ⌜calleeSaved k.regs R' ∧ R' 10#5 = devintrRet sc⌝ -∗ wpLoop cpu)
   ⊢ wpLoop (GF := GF) cpu
@@ -99,9 +99,9 @@ def wp_devintr_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G 
 structure DEVINTR : Prop where
   wp_devintr : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
     (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    (pd pav pu : BitVec 64) (bs : List (BitVec 8))
+    (pd pav pu : BitVec 64)
     (cpu : CPU) (k : KCtx) (sc : BitVec 64) hsie hnoff hlocks htier hK hsc,
-    wp_devintr_body (hlc := hlc) (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu bs
+    wp_devintr_body (hlc := hlc) (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu
       cpu k sc hsie hnoff hlocks htier hK hsc
 
 end Xv6

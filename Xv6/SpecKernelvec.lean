@@ -49,9 +49,9 @@ named by THE CLAIM the trap hands over (`Xv6.cpuClaim_proc_shape`). -/
 structure KERNELVEC : Prop where
   handler : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
     (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    (pd pav pu : BitVec 64) (bs : List (BitVec 8))
+    (pd pav pu : BitVec 64)
     [ClaimIs (hlc := hlc) GF Γ]
-    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu bs] (cpu : CPU),
+    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu] (cpu : CPU),
     ⊢ ihs (GF := GF) ⟨cpu, kernelvecAddr⟩
 
 /-- **The contract is usable at boot**: a hart holding the vector cell, the
@@ -62,11 +62,11 @@ contract used to demand, made impossible.) -/
 theorem intrRes_of_kernelvec {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [DiskG GF] [CurCtx] (KV : KERNELVEC) (Γ : SchedNames) (γ0 γ1 : UartNames)
     (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName) (pd pav pu : BitVec 64)
-    (bs : List (BitVec 8)) [ClaimIs (hlc := hlc) GF Γ]
-    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu bs]
+    [ClaimIs (hlc := hlc) GF Γ]
+    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu]
     (hT : curTier = KTier.kpt) (cpu : CPU) :
     Register.stvec ↦ᵣ[cpu] kernelvecAddr ∗ procsInv Γ ∗
-      devintrCaps Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu bs ⊢ intrRes (GF := GF) cpu := by
+      devintrCaps Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu ⊢ intrRes (GF := GF) cpu := by
   iintro ⟨Hstv, #Hpinv, #Hcaps⟩
   unfold intrRes intrResP
   iexists kernelvecAddr
@@ -75,7 +75,7 @@ theorem intrRes_of_kernelvec {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc G
   · ipureintro; exact kernelvecAddr_direct
   isplit
   · imodintro
-    iapply (KV.handler Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu bs cpu)
-  · iapply envAt_of_caps' Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu bs hT $$ [$Hpinv $Hcaps]
+    iapply (KV.handler Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu cpu)
+  · iapply envAt_of_caps' Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu hT $$ [$Hpinv $Hcaps]
 
 end Xv6

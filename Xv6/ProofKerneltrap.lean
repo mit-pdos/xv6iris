@@ -74,7 +74,7 @@ set_option maxHeartbeats 8000000 in
 /-- **`kerneltrap` meets its specification**, given `devintr`, `myproc` and
 `yield`. -/
 theorem kerneltrap_proof (DI : DEVINTR) (MP : MYPROC) (YI : YIELD) : KERNELTRAP :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ Γ _ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu bs
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ Γ _ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu
       cpu k epc sc hsie hspie hspp hnoff hlocks htier hK hsc hepc => by
   unfold wp_kerneltrap_body
   iintro ⟨Hk, Hpc, #Hpinv, #Hcaps, Hcsrs, Hclaim, Hres, HΦ⟩
@@ -204,12 +204,12 @@ theorem kerneltrap_proof (DI : DEVINTR) (MP : MYPROC) (YI : YIELD) : KERNELTRAP 
   have hdi : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hnoff' : k'.noff + 2 < 2 ^ 31) (hlocks' : k'.locks = [])
       (htier' : k'.tier = KTier.kpt) (hK' : devintrSlots ≤ k'.avail),
       kctx cpu k' ∗ pcIs cpu KA.«devintr» ∗ Register.scause ↦ᵣ[cpu] sc ∗
-      devintrCaps Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu bs ∗
+      devintrCaps Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu ∗
       (∀ R' : RegMap, kctx cpu (k'.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
         Register.scause ↦ᵣ[cpu] sc -∗ ⌜calleeSaved k'.regs R' ∧ R' 10#5 = devintrRet sc⌝ -∗ wpLoop cpu)
       ⊢ wpLoop (GF := GF) cpu := by
     intro k' hsie' hnoff' hlocks' htier' hK'
-    have h := DI.wp_devintr (hlc := hlc) (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu bs
+    have h := DI.wp_devintr (hlc := hlc) (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu
       cpu k' sc hsie' hnoff' hlocks' htier' hK' hsc
     unfold wp_devintr_body at h
     simp only [devintrAddr] at h

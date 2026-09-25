@@ -412,7 +412,7 @@ none (`1` is neither `10` nor `12`). -/
 set_option maxHeartbeats 4000000 in
 /-- `+0x4e`: `uartintr(0)`. -/
 theorem dv_arm_uart0 (PM : PLIC_COMPLETE) (UI : UARTINTR) (Γ : SchedNames) (cpu : CPU) (k : KCtx)
-    (sc : BitVec 64) (γ0 γ1 : UartNames) (γc γl0 : GName) (bs : List (BitVec 8)) (kp : Nat) (hl : Option (List Obs))
+    (sc : BitVec 64) (γ0 γ1 : UartNames) (γc γl0 : GName) (kp : Nat) (hl : Option (List Obs))
     (hsie : k.sie = false) (hnoff : k.noff + 2 < 2 ^ 31) (hlocks : k.locks = [])
     (htier : k.tier = KTier.kpt) (hK : devintrSlots ≤ k.avail)
     (hext : sc = sCause InterruptType.I_S_External)
@@ -465,7 +465,7 @@ theorem dv_arm_uart0 (PM : PLIC_COMPLETE) (UI : UARTINTR) (Γ : SchedNames) (cpu
 set_option maxHeartbeats 4000000 in
 /-- `+0x60`: `uartintr(1)`, then `j +0x54`. -/
 theorem dv_arm_uart1 (PM : PLIC_COMPLETE) (UI : UARTINTR) (Γ : SchedNames) (cpu : CPU) (k : KCtx)
-    (sc : BitVec 64) (γ0 γ1 : UartNames) (γc γl1 : GName) (bs : List (BitVec 8)) (kp : Nat) (hl : Option (List Obs))
+    (sc : BitVec 64) (γ0 γ1 : UartNames) (γc γl1 : GName) (kp : Nat) (hl : Option (List Obs))
     (hsie : k.sie = false) (hnoff : k.noff + 2 < 2 ^ 31) (hlocks : k.locks = [])
     (htier : k.tier = KTier.kpt) (hK : devintrSlots ≤ k.avail)
     (hext : sc = sCause InterruptType.I_S_External)
@@ -592,7 +592,7 @@ pinned `irq` to one of `0`, `1`, `10`, `12`. -/
 set_option maxHeartbeats 4000000 in
 /-- `irq = 10`: UART0. -/
 theorem dv_disp_10 (PM : PLIC_COMPLETE) (UI : UARTINTR) (Γ : SchedNames) (cpu : CPU) (k : KCtx)
-    (sc : BitVec 64) (γ0 γ1 : UartNames) (γc γl0 : GName) (bs : List (BitVec 8)) (kp : Nat) (hl : Option (List Obs))
+    (sc : BitVec 64) (γ0 γ1 : UartNames) (γc γl0 : GName) (kp : Nat) (hl : Option (List Obs))
     (hsie : k.sie = false) (hnoff : k.noff + 2 < 2 ^ 31) (hlocks : k.locks = [])
     (htier : k.tier = KTier.kpt) (hK : devintrSlots ≤ k.avail)
     (hext : sc = sCause InterruptType.I_S_External)
@@ -616,7 +616,7 @@ theorem dv_disp_10 (PM : PLIC_COMPLETE) (UI : UARTINTR) (Γ : SchedNames) (cpu :
   k_step (wp_s_branch cpu _ (KA.«devintr» + 0x36#64) false 24#13 10#5 15#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hv, dv_beq_10_10]
   iintro Hk Hpc
-  iapply (dv_arm_uart0 PM UI Γ cpu k sc γ0 γ1 γc γl0 bs kp hl hsie hnoff hlocks htier hK hext
+  iapply (dv_arm_uart0 PM UI Γ cpu k sc γ0 γ1 γc γl0 kp hl hsie hnoff hlocks htier hK hext
     _ ?hp ?h9) $$ [- $Hk $Hpc $Hframe $Htok $Hsc $HΦ]
   rotate_right 1
   iframe #
@@ -628,7 +628,7 @@ theorem dv_disp_10 (PM : PLIC_COMPLETE) (UI : UARTINTR) (Γ : SchedNames) (cpu :
 set_option maxHeartbeats 4000000 in
 /-- `irq = 12`: UART1. -/
 theorem dv_disp_12 (PM : PLIC_COMPLETE) (UI : UARTINTR) (Γ : SchedNames) (cpu : CPU) (k : KCtx)
-    (sc : BitVec 64) (γ0 γ1 : UartNames) (γc γl1 : GName) (bs : List (BitVec 8)) (kp : Nat) (hl : Option (List Obs))
+    (sc : BitVec 64) (γ0 γ1 : UartNames) (γc γl1 : GName) (kp : Nat) (hl : Option (List Obs))
     (hsie : k.sie = false) (hnoff : k.noff + 2 < 2 ^ 31) (hlocks : k.locks = [])
     (htier : k.tier = KTier.kpt) (hK : devintrSlots ≤ k.avail)
     (hext : sc = sCause InterruptType.I_S_External)
@@ -658,7 +658,7 @@ theorem dv_disp_12 (PM : PLIC_COMPLETE) (UI : UARTINTR) (Γ : SchedNames) (cpu :
   k_step (wp_s_branch cpu _ (KA.«devintr» + 0x3c#64) false 36#13 10#5 15#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hv, dv_beq_12_12]
   iintro Hk Hpc
-  iapply (dv_arm_uart1 PM UI Γ cpu k sc γ0 γ1 γc γl1 bs kp hl hsie hnoff hlocks htier hK hext
+  iapply (dv_arm_uart1 PM UI Γ cpu k sc γ0 γ1 γc γl1 kp hl hsie hnoff hlocks htier hK hext
     _ ?hp ?h9) $$ [- $Hk $Hpc $Hframe $Htok $Hsc $HΦ]
   rotate_right 1
   iframe #
@@ -793,8 +793,8 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 
 /-- The cone's credentials, opened. -/
 theorem dv_caps_open (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames)
-    (γdl γt : GName) (pd pav pu : BitVec 64) (bs : List (BitVec 8)) :
-    devintrCaps (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu bs ⊢
+    (γdl γt : GName) (pd pav pu : BitVec 64) :
+    devintrCaps (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu ⊢
       plicInv γ0 γ1 ∗ uartInited γ0 ∗ uartInited γ1 ∗
       uartPort .uart0 γl0 γ0 ∗ uartPort .uart1 γl1 γ1 ∗
       uartRxWord .uart0 ∗ uartRxWord .uart1 ∗
@@ -808,7 +808,7 @@ set_option maxHeartbeats 4000000 in
 theorem dv_ext (PC : PLIC_CLAIM) (PM : PLIC_COMPLETE) (UI : UARTINTR) (VI : VIRTIO_DISK_INTR)
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (sc : BitVec 64)
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl : GName)
-    (pd pav pu : BitVec 64) (bs : List (BitVec 8))
+    (pd pav pu : BitVec 64)
     (hsie : k.sie = false) (hnoff : k.noff + 2 < 2 ^ 31) (hlocks : k.locks = [])
     (htier : k.tier = KTier.kpt) (hK : devintrSlots ≤ k.avail)
     (hext : sc = sCause InterruptType.I_S_External)
@@ -860,13 +860,13 @@ theorem dv_ext (PC : PLIC_CLAIM) (PM : PLIC_COMPLETE) (UI : UARTINTR) (VI : VIRT
   · -- 10: UART0, with the token the claim carried out of the slot
     ihave Htok := H10 $$ %hv
     icases plicPayloadUart_elim _ $$ Htok with ⟨%kp, %hl, Htok⟩
-    iapply (dv_disp_10 PM UI Γ cpu k sc γ0 γ1 γc γl0 bs kp hl hsie hnoff hlocks htier hK hext
+    iapply (dv_disp_10 PM UI Γ cpu k sc γ0 γ1 γc γl0 kp hl hsie hnoff hlocks htier hK hext
       R1 hpres1 hv) $$ [- $Hk $Hpc $Hframe $Htok $Hsc $HΦ]
     iframe #
   · -- 12: UART1
     ihave Htok := H12 $$ %hv
     icases plicPayloadUart_elim _ $$ Htok with ⟨%kp, %hl, Htok⟩
-    iapply (dv_disp_12 PM UI Γ cpu k sc γ0 γ1 γc γl1 bs kp hl hsie hnoff hlocks htier hK hext
+    iapply (dv_disp_12 PM UI Γ cpu k sc γ0 γ1 γc γl1 kp hl hsie hnoff hlocks htier hK hext
       R1 hpres1 hv) $$ [- $Hk $Hpc $Hframe $Htok $Hsc $HΦ]
     iframe #
 
@@ -938,12 +938,12 @@ set_option maxHeartbeats 8000000 in
 /-- **`devintr` meets its specification.** -/
 theorem devintr_proof (PC : PLIC_CLAIM) (PM : PLIC_COMPLETE) (UI : UARTINTR)
     (VI : VIRTIO_DISK_INTR) (CI : CLOCKINTR) : DEVINTR :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu bs cpu k sc
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu cpu k sc
       hsie hnoff hlocks htier hK hsc => by
   unfold wp_devintr_body
   simp only [devintrAddr]
   iintro ⟨Hk, Hpc, Hsc, #Hcaps, HΦ⟩
-  icases dv_caps_open Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu bs $$ Hcaps
+  icases dv_caps_open Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu $$ Hcaps
     with ⟨#Hinv, #Hi0, #Hi1, #Hp0, #Hp1, #Hw0, #Hw1, #Hc0, #Hc1, #Hdc, #Htl, #HΓ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK4 : 4 ≤ k.avail := by unfold devintrSlots at hK; omega
@@ -1005,7 +1005,7 @@ theorem devintr_proof (PC : PLIC_CLAIM) (PM : PLIC_COMPLETE) (UI : UARTINTR)
     k_step (wp_s_branch cpu _ (KA.«devintr» + 0x12#64) false 24#13 14#5 15#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [dv_beq_ext_ext]
     iintro Hk Hpc
-    iapply (dv_ext PC PM UI VI Γ cpu k _ γ0 γ1 γc γl0 γl1 γd γdl pd pav pu bs
+    iapply (dv_ext PC PM UI VI Γ cpu k _ γ0 γ1 γc γl0 γl1 γd γdl pd pav pu
       hsie hnoff hlocks htier hK rfl _ ?hp ?h9) $$ [- $Hk $Hpc $Hframe $Hsc $HΦ]
     rotate_right 1
     iframe #
