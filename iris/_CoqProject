@@ -1774,3 +1774,8 @@ UnionOut.v
 UnionLinks.v
 UnionLinkInst.v
 UnionReadInst.v
+UnionLinkInstAt.v
+UkUnionEntries.v
+UShURoundDefs.v
+UkShCatForkTwin.v
+UShURound.v
