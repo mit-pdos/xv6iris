@@ -947,3 +947,9 @@ import Xv6.SysMkdirCalls
 import Xv6.SysMkdirTails
 import Xv6.ProofSysMkdir
 import Xv6.LinkSysMkdir
+import Xv6.SpecSysMknod
+import Xv6.SysMknodFrame
+import Xv6.SysMknodCalls
+import Xv6.SysMknodTails
+import Xv6.ProofSysMknod
+import Xv6.LinkSysMknod
