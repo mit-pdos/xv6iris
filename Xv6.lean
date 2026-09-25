@@ -854,3 +854,4 @@ import Xv6.UserPerm
 import Xv6.UexecSlot
 import Xv6.KexecPtImage
 import Xv6.KexecImageAlg
+import Xv6.KexecImageOk
