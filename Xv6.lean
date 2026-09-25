@@ -1139,3 +1139,4 @@ import Xv6.SpecSyscall
 import Xv6.SyscallTable
 import Xv6.SyscallRet
 import Xv6.UtResFits
+import Xv6.SpecUsertrap
