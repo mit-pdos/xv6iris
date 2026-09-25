@@ -31,7 +31,15 @@ so failure promises the cells back with unspecified contents, both fd
 units back, and the page count untouched.
 
 pipealloc holds no lock across a call; its callees are push/pop balanced.
-Since `fileclose` returns hart-generically, so does pipealloc.
+Since `fileclose` returns hart-generically (its crossing is `true`), so does
+pipealloc.
+
+DEVIATIONS from Rocq: (1) eb-generic at DEPTH 0 (`hnoff : k.noff = 0`,
+SpecFileclose deviation 1): Rocq's `cpu_own n eb` is at a generic `n`, but
+fileclose's Lean contract is at depth 0 and sys_pipe (the one caller) runs
+there; (2) the block is its pid cell (the Lean fs convention);
+(3) `procsInv` is no longer a premise (Rocq has none: the files pipealloc
+closes are untyped, so fileclose's environment is `emp`).
 -/
 import Xv6.SpecFileclose
 import Xv6.SpecKalloc
@@ -46,6 +54,8 @@ def pipeallocAddr : BitVec 64 := KA.«pipealloc»
 /-- pipealloc's own 6-slot frame over `fileclose`'s cone (the deepest callee). -/
 def pipeallocSlots : Nat := 6 + filecloseSlots
 
+theorem pipeallocSlots_eq : pipeallocSlots = 94 := by decide
+
 def pipeallocPost {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
     (γ : FileNames) (γk : KmemNames) (on : Option Nat) (pf0 pf1 r : BitVec 64) : IProp GF := iprop%
   (⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ kallocAvail γk on ∗ fdSlot γ ∗ fdSlot γ ∗
@@ -55,27 +65,48 @@ def pipeallocPost {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
       wordPointsTo pf0 8 (DFrac.own 1) (fnode k0) ∗ wordPointsTo pf1 8 (DFrac.own 1) (fnode k1) ∗
       fileRef γ k0 1 (.open true false .pipe) ∗ fileRef γ k1 1 (.open false true .pipe))
 
-def wp_pipealloc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
-    (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γl : GName) (γ : FileNames)
+/-- **WP of `pipealloc(f0 = a0, f1 = a1)`** (Rocq `wp_pipealloc_sconf_body`),
+eb-generic at depth 0: the trap-CSR complement, the running thread's pid
+cell and fileclose's iref loan are PASS-THROUGHS, in and straight back out
+(the two files the error paths close are untyped, `filecloseEnv_none`, but
+fileclose's crossing is `true` on every arm, so pipealloc's is too). -/
+def wp_pipealloc_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
+    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
+    [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γl : GName) (γ : FileNames)
     (γkl : GName) (γk : KmemNames) (on : Option Nat) (v0 v1 : BitVec 64)
-    (hnoff : k.noff + 2 < 2 ^ 31) (hK : pipeallocSlots ≤ k.avail) (hlk : "ftable" ∉ k.locks)
-    (hpipe : "pipe" ∉ k.locks) (hproc : "proc" ∉ k.locks) (hkmem : "kmem" ∉ k.locks)
-    (htier : k.tier = KTier.kpt) : Prop :=
-  kctx cpu k ∗ pcIs cpu pipeallocAddr ∗ isFtable γl γ ∗
-  isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk on ∗ procsInv Γ ∗
+    (pidv : BitVec 32) (dqp : DFrac)
+    (hK : pipeallocSlots ≤ k.avail) (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) : Prop :=
+  kctx cpu k ∗ pcIs cpu pipeallocAddr ∗
+  trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
+  isFtable γl γ ∗ panicEnv ∗
+  isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk on ∗
   fdSlot γ ∗ fdSlot γ ∗
   wordPointsTo (k.regs 10#5) 8 (DFrac.own 1) v0 ∗ wordPointsTo (k.regs 11#5) 8 (DFrac.own 1) v1 ∗
-  wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
-    ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
+  wordPointsTo (pPid k.proc) 4 dqp pidv ∗ irefSlot ∗
+  wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
+    ⌜calleeSaved k.regs R'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-    ⌜calleeSaved k.regs R'⌝ -∗ pipeallocPost γ γk on (k.regs 10#5) (k.regs 11#5) (R' 10#5) -∗ wpLoop cpu'))
+    trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
+    pipeallocPost γ γk on (k.regs 10#5) (k.regs 11#5) (R' 10#5) -∗
+    wordPointsTo (pPid k.proc) 4 dqp pidv -∗ irefSlot -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
+/-- The interface of `pipealloc` (Rocq `Module Type PIPEALLOC`).  The fs
+ghost classes and `ClaimIs` appear although nothing in the contract mentions
+the file system: fileclose's inode arm needs them (Rocq's header note, the
+same). -/
 structure PIPEALLOC : Prop where
-  wp_pipealloc : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
-    (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γl : GName) (γ : FileNames)
+  wp_pipealloc_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
+    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
+    [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γl : GName) (γ : FileNames)
     (γkl : GName) (γk : KmemNames) (on : Option Nat) (v0 v1 : BitVec 64)
-    hnoff hK hlk hpipe hproc hkmem htier,
-    wp_pipealloc_body (hlc := hlc) (GF := GF) Γ cpu k γl γ γkl γk on v0 v1 hnoff hK hlk hpipe hproc hkmem htier
+    (pidv : BitVec 32) (dqp : DFrac) hK hnoff htier,
+    wp_pipealloc_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γ γkl γk on v0 v1 pidv dqp hK hnoff htier
 
 end Xv6

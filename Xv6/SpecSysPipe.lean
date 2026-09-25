@@ -46,17 +46,29 @@ the bytes are named).  The block after a copyout is Rocq's: `procPrivFd` at
 `{ V with upt := P' }`, the grown table under `uptd_ext_sz (pv_sz V)`, so
 `umBelow` survives.
 
+THE CROSSING IS THE LITERAL `true` (Rocq's): sys_pipe calls pipealloc and
+fileclose, both of which cross at `true`, so it can return on another hart;
+the trap-CSR complement `trapCsrsExt` / `cpuClaimExt` and fileclose's iref
+LOAN (`irefSlot`) are pass-throughs, in and straight back out.  The
+running thread's pid cell the closes need is LENT out of the block for the
+duration of each call (Rocq's `proc_priv_pid` lending, the note in its
+header on the three-quarter trap).
+
 DEVIATIONS FROM ROCQ:
+  * eb-GENERIC AT DEPTH 0 (Rocq's `cpu_own 0 eb` -- the same).
   * THE PAGE COUNT IS THE UNCOUNTED MODE (`kallocAvail γk none`, Rocq's
     `kalloc_env γa None`): copyout's vmfault needs it, and `none` is
     persistent, so it is not returned (the caller keeps its copy).
-  * THE CLOSING ENVIRONMENT is the Lean `fileclose`'s (pipes only): sys_pipe
-    only ever closes the pipe ends it just made, so no restriction on the
-    caller is needed (Rocq threads the fs bundle because its `ofile_slot`
-    forgets the type; here the references are closed straight out of the
-    locals, before they ever reach a descriptor).  The fs locks: `"ftable"`,
-    `"pipe"`, `"proc"`, `"kmem"` are not held (sys_close's premises).
-  * NO PID QUARTER, NO `iref_slot`: the Lean fileclose has no inode arm.
+  * THE CLOSING ENVIRONMENT is fileclose's PIPE bundle only
+    (`fileclosePipeEnv`, whose rows sys_pipe already holds, all persistent at
+    the uncounted page count): sys_pipe closes the two pipe ends it made
+    straight out of its LOCALS, whose states it knows (`.open true false
+    .pipe` / `.open false true .pipe`), so the FS bundle is never asked for.
+    Rocq carries both bundles (`fileclose_pipe_env` / `_fs_env_nopid`)
+    because its `ofile_slot` forgets the type; SHARPER, not weaker.
+    Consequently the post returns no environment (Rocq's `∃ on',
+    fileclose_pipe_env` / `fileclose_fs_env_nopid` rows are the caller's own
+    persistent rows here).
 -/
 import Xv6.SpecArgaddr
 import Xv6.SpecPipealloc
@@ -71,9 +83,12 @@ open LeanRV64D
 
 def sysPipeAddr : BitVec 64 := KA.«sys_pipe»
 
-/-- sys_pipe's 8-slot frame over `copyout`'s 52, its deepest callee
-(pipealloc 36, fileclose 30, argaddr 18, fdalloc 14, myproc 10). -/
-def sysPipeSlots : Nat := 8 + 52
+/-- sys_pipe's 8-slot frame over `pipealloc`'s 94, its deepest callee
+(fileclose 88, copyout 52, argaddr 18, fdalloc 14, myproc 10): Rocq's
+`sys_pipe_stack` = 102. -/
+def sysPipeSlots : Nat := 8 + pipeallocSlots
+
+theorem sysPipeSlots_eq : sysPipeSlots = 102 := by decide
 
 /-- The four bytes `copyout` sends for descriptor `fd` (`sizeof(int)`,
 little-endian: the `int` local's own bytes). -/
@@ -92,7 +107,10 @@ def sysPipeMem (sz : BitVec 64) (P : UPtd) (M : Nat → List (BitVec 8)) (v : Bi
     umMapped P' v.toNat (b0 ++ b1).length
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+  [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
+  [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
+  [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
 /-- sys_pipe's result, keyed by the returned `a0`. -/
 def sysPipePost (γ : FileNames) (γd : Nat → GName) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
@@ -110,37 +128,46 @@ def sysPipePost (γ : FileNames) (γd : Nat → GName) (pa : BitVec 64) (pid : B
     procPrivFd γ γd pa pid { V with ofile := (V.ofile.set fd0 (fnode k0)).set fd1 (fnode k1), upt := P' } M' ∗
     fdFrags γd ((sts.set fd0 (.open true false .pipe)).set fd1 (.open false true .pipe)))
 
-/-- What sys_pipe's caller resumes with. -/
+/-- What sys_pipe's caller resumes with: the `true` crossing. -/
 def sysPipeCont (cpu : CPU) (k : KCtx) (γ : FileNames) (γd : Nat → GName) (pa : BitVec 64)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (v : BitVec 64) :
     IProp GF :=
-  wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
-    ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
+  wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
+    ⌜calleeSaved k.regs R'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-    ⌜calleeSaved k.regs R'⌝ -∗ sysPipePost γ γd pa pid V M sts v (R' 10#5) -∗
-    fdSlot γ -∗ fdSlot γ -∗ wpLoop cpu'))
+    trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
+    sysPipePost γ γd pa pid V M sts v (R' 10#5) -∗
+    fdSlot γ -∗ fdSlot γ -∗ irefSlot -∗ wpLoop cpu'))
 
-def wp_sys_pipe_body (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γl : GName) (γ : FileNames) (γd : Nat → GName)
+/-- **WP of `sys_pipe()`** (Rocq `wp_sys_pipe_sconf_body`), eb-generic at
+depth 0. -/
+def wp_sys_pipe_eb_body (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx)
+    (γl : GName) (γ : FileNames) (γd : Nat → GName)
     (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
     (v : BitVec 64) (γkl : GName) (γk : KmemNames)
     (hv : V.tf[tfArgIdx 0]? = some v) (hproc : k.proc = pa) (htier : k.tier = KTier.kpt)
-    (hnoff : k.noff + 2 < 2 ^ 31) (hK : sysPipeSlots ≤ k.avail) (hlk : "ftable" ∉ k.locks)
-    (hplk : "pipe" ∉ k.locks) (hprc : "proc" ∉ k.locks) (hkmem : "kmem" ∉ k.locks) : Prop :=
-  kctx cpu k ∗ pcIs cpu sysPipeAddr ∗ isFtable γl γ ∗
+    (hnoff : k.noff = 0) (hK : sysPipeSlots ≤ k.avail) : Prop :=
+  kctx cpu k ∗ pcIs cpu sysPipeAddr ∗
+  trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
+  isFtable γl γ ∗ panicEnv ∗
   isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗ procsInv Γ ∗
-  procPrivFd γ γd pa pid V M ∗ fdFrags γd sts ∗ fdSlot γ ∗ fdSlot γ ∗
+  procPrivFd γ γd pa pid V M ∗ fdFrags γd sts ∗ fdSlot γ ∗ fdSlot γ ∗ irefSlot ∗
   sysPipeCont cpu k γ γd pa pid V M sts v
   ⊢ wpLoop (GF := GF) cpu
 
 end
 
 structure SYSPIPE : Prop where
-  wp_sys_pipe : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
-    (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γl : GName) (γ : FileNames) (γd : Nat → GName)
+  wp_sys_pipe_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
+    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
+    [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx) (γl : GName) (γ : FileNames)
+    (γd : Nat → GName)
     (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
     (v : BitVec 64) (γkl : GName) (γk : KmemNames)
-    hv hproc htier hnoff hK hlk hplk hprc hkmem,
-    wp_sys_pipe_body (hlc := hlc) (GF := GF) Γ cpu k γl γ γd pa pid V M sts v γkl γk
-      hv hproc htier hnoff hK hlk hplk hprc hkmem
+    hv hproc htier hnoff hK,
+    wp_sys_pipe_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γ γd pa pid V M sts v γkl γk
+      hv hproc htier hnoff hK
 
 end Xv6

@@ -40,17 +40,24 @@ set_option maxHeartbeats 16000000 in
 set_option maxRecDepth 20000 in
 theorem sys_pipe_proof (MP : MYPROC) (AA : ARGADDR) (PA : PIPEALLOC) (FD : FDALLOC) (CO : COPYOUT)
     (FC : FILECLOSE) : SYSPIPE := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ X Γ cpu k γl γ γd pa pid V M sts v γkl γk hv hproc htier hnoff hK hlk hplk hprc hkmem => by
+  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X Γ _ cpu k γl γ γd pa pid V M sts v γkl γk
+      hv hproc htier hnoff hK => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
-  unfold wp_sys_pipe_body
+  unfold wp_sys_pipe_eb_body
   simp only [sysPipeAddr]
-  iintro ⟨Hk, Hpc, #Hft, #Hkl, #Hav, #Hpi, Hblk, Hfrag, Hu0, Hu1, Hnext⟩
+  iintro ⟨Hk, Hpc, Hte, Hce, #Hft, #Hpe, #Hkl, #Hav, #Hpi, Hblk, Hfrag, Hu0, Hu1, Hir, Hnext⟩
   icases kctx_tier cpu k $$ Hk with ⟨%hct, Hk⟩
   have ht0 : t0 = KTier.kpt := hct.symm.trans htier
   subst ht0
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  have hK8 : 8 ≤ k.avail := by unfold sysPipeSlots at hK; omega
+  icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
+  have hlocks : k.locks = [] := List.eq_nil_of_length_eq_zero (by have := hwf.2.2.2.1; omega)
+  have hlk : "ftable" ∉ k.locks := by rw [hlocks]; exact List.not_mem_nil
+  have hplk : "pipe" ∉ k.locks := by rw [hlocks]; exact List.not_mem_nil
+  have hprc : "proc" ∉ k.locks := by rw [hlocks]; exact List.not_mem_nil
+  have hkmem : "kmem" ∉ k.locks := by rw [hlocks]; exact List.not_mem_nil
+  have hK8 : 8 ≤ k.avail := by rw [sysPipeSlots_eq] at hK; omega
   icases (procPrivFd_split γ γd pa pid V M).1 $$ Hblk with ⟨Hcore, Howe⟩
   -- the prologue ; jal myproc
   iapply (wp_prologue8s1_gen cpu k KA.«sys_pipe» hK8)
@@ -69,7 +76,7 @@ theorem sys_pipe_proof (MP : MYPROC) (AA : ARGADDR) (PA : PIPEALLOC) (FD : FDALL
   k_norm_g [sys_pipe_ret_0e]
   iframe #
   case hnm => k_norm_g; omega
-  case hKm => k_norm_g; unfold sysPipeSlots at hK; omega
+  case hKm => k_norm_g; rw [sysPipeSlots_eq] at hK; omega
   iapply wpNext_intro_pin
   iintro %c3 %hp3 %spie %spp %R1 %hsp1 Hk Hpc %⟨hcs1, h10⟩
   k_norm_g [sys_pipe_pushed_withSpie, sys_pipe_withRegs_withSpie]
@@ -110,7 +117,7 @@ theorem sys_pipe_proof (MP : MYPROC) (AA : ARGADDR) (PA : PIPEALLOC) (FD : FDALL
   iframe Hfa Htf Htfp
   case ha0 => k_norm_g
   case hna => k_norm_g; omega
-  case hKa => k_norm_g; unfold sysPipeSlots at hK; unfold argaddrSlots argrawSlots; omega
+  case hKa => k_norm_g; rw [sysPipeSlots_eq] at hK; unfold argaddrSlots argrawSlots; omega
   iapply wpNext_intro_pin
   iintro %c8 %hp8 %spie2 %spp2 %R2 %hsp2 Hk Hpc %hcs2 Htf Htfp Hfa
   k_norm_g [sys_pipe_withSpie_withSpie, sys_pipe_pushed_withSpie, sys_pipe_withRegs_withSpie]
@@ -127,8 +134,6 @@ theorem sys_pipe_proof (MP : MYPROC) (AA : ARGADDR) (PA : PIPEALLOC) (FD : FDALL
       wordPointsTo (pTrapframe pa) 8 (DFrac.own 1) V.trapframe from by rw [htf, hproc]) $$ Htf
   ihave Hcore := Hcorew $$ Htf Htfp
   ihave Hfr := Hfrw $$ %v Hfa
-  have hsp2' : k.sie = false → spie2 = k.spie ∧ spp2 = k.spp := fun h =>
-    ⟨(hsp2 h).1.trans (hsp1 h).1, (hsp2 h).2.trans (hsp1 h).2⟩
   -- a1 = &wf ; a0 = &rf ; jal pipealloc
   k_step_gen (wp_s_addi c8 _ (KA.«sys_pipe» + 0x1a#64) false 4040#12 11#5 8#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [p8', sys_pipe_a56] next c9 hp9
@@ -139,38 +144,48 @@ theorem sys_pipe_proof (MP : MYPROC) (AA : ARGADDR) (PA : PIPEALLOC) (FD : FDALL
   k_step_gen (wp_s_jal c10 _ (KA.«sys_pipe» + 0x22#64) false 2092952#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pipe_br_pipealloc] next c11 hp11
   iintro Hk Hpc
-  iapply (sys_pipe_pipealloc PA Γ c11 _ γl γ γkl γk none rf wf ?hnp ?hKp ?hl ?hp ?hr ?hkm ?ht)
+  have hpin11 : k.sie = false ∨ k.proc = 0#64 → c11 = cpu := fun h =>
+    (hp11 h).trans ((hp10 h).trans ((hp9 h).trans ((hp8 h).trans ((hp7 h).trans
+      ((hp6 h).trans ((hp5 h).trans ((hp4 (by rw [← hproc]; exact h)).trans (hpin3 h))))))))
+  ihave Hte := trapCsrsExt_move _ _ _ (fun h => hpin11 (Or.inl h)) $$ Hte
+  ihave Hce := cpuClaimExt_move _ _ _ _ (fun h => hpin11 (Or.inl h)) $$ Hce
+  -- THE PID CELL, LENT OUT OF THE BLOCK for the call
+  icases sys_pipe_core_pid pa pid V M $$ Hcore with ⟨Hpid, Hcw⟩
+  ihave Hpid := (show @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ⊢
+      wordPointsTo (pPid pa) 4 pidPriv pid from .rfl) $$ Hpid
+  iapply (sys_pipe_pipealloc PA Γ c11 _ γl γ γkl γk none rf wf pid pidPriv k.sie (by k_norm_g) pa
+      (by k_norm_g; exact hproc) ?hKp ?hnp ?ht)
     $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g [sys_pipe_ret_26, p8', sys_pipe_a48, sys_pipe_a56]
   iframe #
-  iframe Hrf Hwf Hu0 Hu1
-  case hnp => k_norm_g; omega
-  case hKp => k_norm_g; unfold sysPipeSlots at hK; unfold pipeallocSlots filecloseSlots pipecloseSlots; omega
-  case hl => k_norm_g; exact hlk
-  case hp => k_norm_g; exact hplk
-  case hr => k_norm_g; exact hprc
-  case hkm => k_norm_g; exact hkmem
+  iframe Hrf Hwf Hu0 Hu1 Hte Hce Hpid Hir
+  case hKp => k_norm_g; rw [sysPipeSlots_eq] at hK; rw [pipeallocSlots_eq]; omega
+  case hnp => k_norm_g; exact hnoff
   case ht => k_norm_g; exact htier
+  -- back from pipealloc (at any hart)
   iapply wpNext_intro_pin
-  iintro %c12 %hp12 %spie3 %spp3 %R3 %hsp3 Hk Hpc %hcs3 Hpost
+  iintro %c12 %hp12 %spie3 %spp3 %R3 %hcs3 Hk Hpc Hte Hce Hpost Hpid Hir
   k_norm_g [sys_pipe_withSpie_withSpie, sys_pipe_pushed_withSpie, sys_pipe_withRegs_withSpie]
-  k_norm_g at hsp3
   unfold calleeSaved at hcs3
   k_norm_g at hcs3
   have hpins2' : sysPipePins k (((R2.set 11#5 (k.regs 2#5 + 0xFFFFFFFFFFFFFFC8#64)).set 10#5
       (k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64)).set 1#5 (KA.«sys_pipe» + 0x26#64)) := by
     sys_pipe_pins hpins2
   obtain ⟨hpins3, h9'⟩ := sys_pipe_pins_call k _ R3 hpins2' hcs3
-  have hsp3' : k.sie = false → spie3 = k.spie ∧ spp3 = k.spp := fun h =>
-    ⟨(hsp3 h).1.trans (hsp2' h).1, (hsp3 h).2.trans (hsp2' h).2⟩
-  have hpin12 : k.sie = false ∨ k.proc = 0#64 → c12 = cpu := fun h =>
-    (hp12 h).trans ((hp11 h).trans ((hp10 h).trans ((hp9 h).trans ((hp8 h).trans ((hp7 h).trans
-      ((hp6 h).trans ((hp5 h).trans ((hp4 (by rw [← hproc]; exact h)).trans (hpin3 h)))))))))
-  iapply (sys_pipe_stage_b rfl FC FD CO Γ cpu c12 k γl γ γd pa pid V M sts v γkl γk spie3 spp3 R3
-      hproc htier hnoff hK hlk hplk hprc hkmem hpin12 hsp3' hpins3
+  ihave Hpid := (show wordPointsTo (GF := GF) (pPid pa) 4 pidPriv pid ⊢
+      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid from .rfl) $$ Hpid
+  ihave Hce := (show cpuClaimExt (GF := GF) c12 k.sie pa ⊢ cpuClaimExt c12 k.sie k.proc from by
+    rw [hproc]) $$ Hce
+  ihave Hcore := Hcw $$ Hpid
+  ihave Hnext := sys_pipe_cont_shift cpu c12 k γ γd pa pid V M sts v
+    (fun e => (hp12 (Or.inr (hproc.symm.trans e))).trans (hpin11 (Or.inr e))) $$ Hnext
+  iapply (sys_pipe_stage_b rfl FC FD CO Γ c12 c12 k γl γ γd pa pid V M sts v γkl γk spie3 spp3 R3
+      hproc htier hnoff hK hlk hplk hprc hkmem (fun _ => rfl) hpins3
       (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] at h9'; exact h9'.trans h9) w0 w1)
-    $$ [- $Hk $Hpc $Hfr $Hpost $Hcore $Howe $Hfrag $Hnext]
+    $$ [- $Hk $Hpc $Hfr $Hpost $Hcore $Howe $Hfrag]
+  unfold sysPipeTurn
+  iframe Hpe Hte Hce Hir Hnext
   iframe #⟩
 
 end Xv6

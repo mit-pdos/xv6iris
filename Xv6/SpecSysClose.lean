@@ -1,5 +1,5 @@
 /-
-The interface of `sys_close` (Rocq SpecSysClose.v).
+The interface of `sys_close` (Rocq SpecSysClose.v, `wp_sys_close_sconf_body`).
 
     uint64 sys_close(void) {
       int fd; struct file *f;
@@ -12,14 +12,25 @@ The interface of `sys_close` (Rocq SpecSysClose.v).
 TWO ARMS, decided by the syscall argument and the process's own array
 (`argFd`): no such descriptor, everything untouched; or the descriptor's
 cell is nulled, its row in the fragment bundle becomes `.closed`, and the
-file's reference is spent into `fileclose`.  The page-count fact comes back
-as `fileclose`'s disjunction (the descriptor may have held a pipe's last
-end), separately from the two arms.
+file's reference is spent into `fileclose`.
 
-RESTRICTION: the Lean `fileclose` covers only pipes (there is no inode
-layer), so the descriptor argument 0 names, if any, must be a pipe end --
-`hpipe`, read off the caller's bundle.  `hsp` is the stack bound Rocq
-takes from `sie_cap_gpr`: the two locals are passed to argfd by address.
+THE CLOSING ENVIRONMENT (Rocq's): sys_close closes a descriptor of UNKNOWN
+type, so it owns BOTH of fileclose's bundles -- the pipe one
+(`fileclosePipeEnv`) and the file-system one (`filecloseFsEnv`) -- and hands
+over whichever the descriptor's state selects (`filecloseEnv_frame`); the
+whole environment comes back, the page count under an existential (the
+descriptor may have held a pipe's last end).  fileclose's IREF LOAN
+(`irefSlot`) and the trap-CSR complement are pass-throughs; the pid cell the
+FS arm needs is LENT out of the block for the call (Rocq's
+`proc_priv_pid_ofile` lending).  THE CROSSING IS THE LITERAL `true`.
+
+DEVIATIONS from Rocq: eb-generic at DEPTH 0 (`hnoff : k.noff = 0`; Rocq's
+`cpu_own n eb` at a generic `n` -- fileclose's Lean contract is at depth 0,
+SpecFileclose deviation 1; every caller is the syscall dispatch at depth 0);
+the fs bundle is the one bundle (Rocq's `_nopid` twin, SpecFileclose
+deviation 5); `fcn_pid` / `fcn_dq` ties are gone (the lent cell is the
+block's own half, `pidPriv`).  `hsp` is the stack bound Rocq takes from
+`sie_cap_gpr`: the two locals are passed to argfd by address.
 -/
 import Xv6.SpecArgfd
 import Xv6.SpecFileclose
@@ -31,11 +42,17 @@ open LeanRV64D
 
 def sysCloseAddr : BitVec 64 := KA.«sys_close»
 
-/-- sys_close's 4-slot frame over `fileclose`'s cone (argfd's 24, myproc's 10 fit under). -/
+/-- sys_close's 4-slot frame over `fileclose`'s 88 (argfd's 24, myproc's 10
+fit under): Rocq's `sys_close_stack` = 92. -/
 def sysCloseSlots : Nat := 4 + filecloseSlots
 
+theorem sysCloseSlots_eq : sysCloseSlots = 92 := by decide
+
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+  [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
+  [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
+  [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
 /-- sys_close's result, keyed by the returned `a0`. -/
 def sysClosePost (γ : FileNames) (γd : Nat → GName) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
@@ -44,33 +61,51 @@ def sysClosePost (γ : FileNames) (γd : Nat → GName) (pa : BitVec 64) (pid : 
   (∃ (fd : Nat) (fv : BitVec 64), ⌜r = 0#64 ∧ argFd v V.ofile = some (fd, fv)⌝ ∗
     procPrivFd γ γd pa pid { V with ofile := V.ofile.set fd 0#64 } M ∗ fdFrags γd (sts.set fd .closed))
 
-def wp_sys_close_body (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γl : GName) (γ : FileNames) (γd : Nat → GName)
+/-- What sys_close's caller resumes with: the `true` crossing. -/
+def sysCloseCont (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γ : FileNames) (γd : Nat → GName)
     (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
-    (v : BitVec 64) (γkl : GName) (γk : KmemNames) (on : Option Nat)
+    (v : BitVec 64) (j : Nat) (γkl : GName) (γk : KmemNames) : IProp GF :=
+  wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
+    ⌜calleeSaved k.regs R'⌝ -∗
+    kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+    trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
+    sysClosePost γ γd pa pid V M sts v (R' 10#5) -∗
+    -- the whole environment back (the page count may have moved)
+    (∃ on', fileclosePipeEnv (hlc := hlc) Γ γkl γk on') -∗
+    filecloseFsEnv (hlc := hlc) Γ j k.proc -∗
+    irefSlot -∗ wpLoop cpu'))
+
+/-- **WP of `sys_close()`** (Rocq `wp_sys_close_sconf_body`), eb-generic at
+depth 0. -/
+def wp_sys_close_eb_body (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx)
+    (γl : GName) (γ : FileNames) (γd : Nat → GName)
+    (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
+    (v : BitVec 64) (j : Nat) (γkl : GName) (γk : KmemNames) (on : Option Nat)
     (hv : V.tf[tfArgIdx 0]? = some v) (hproc : k.proc = pa) (htier : k.tier = KTier.kpt)
     (hsp : 48 ≤ (k.regs 2#5).toNat)
-    (hpipe : ∀ fd fv, argFd v V.ofile = some (fd, fv) → ∃ r w, sts[fd]? = some (.open r w .pipe))
-    (hnoff : k.noff + 2 < 2 ^ 31) (hK : sysCloseSlots ≤ k.avail) (hlk : "ftable" ∉ k.locks)
-    (hplk : "pipe" ∉ k.locks) (hprc : "proc" ∉ k.locks) (hkmem : "kmem" ∉ k.locks) : Prop :=
-  kctx cpu k ∗ pcIs cpu sysCloseAddr ∗ isFtable γl γ ∗
-  isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk on ∗ procsInv Γ ∗
+    (hnoff : k.noff = 0) (hK : sysCloseSlots ≤ k.avail) : Prop :=
+  kctx cpu k ∗ pcIs cpu sysCloseAddr ∗
+  trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
+  isFtable γl γ ∗ panicEnv ∗
   procPrivFd γ γd pa pid V M ∗ fdFrags γd sts ∗
-  wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
-    ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
-    kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-    ⌜calleeSaved k.regs R'⌝ -∗ sysClosePost γ γd pa pid V M sts v (R' 10#5) -∗
-    (kallocAvail γk on ∨ kallocAvail γk (availInc on)) -∗ wpLoop cpu'))
+  irefSlot ∗
+  fileclosePipeEnv (hlc := hlc) Γ γkl γk on ∗ filecloseFsEnv (hlc := hlc) Γ j k.proc ∗
+  sysCloseCont Γ cpu k γ γd pa pid V M sts v j γkl γk
   ⊢ wpLoop (GF := GF) cpu
 
 end
 
 structure SYSCLOSE : Prop where
-  wp_sys_close : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
-    (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γl : GName) (γ : FileNames) (γd : Nat → GName)
+  wp_sys_close_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
+    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
+    [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx) (γl : GName) (γ : FileNames)
+    (γd : Nat → GName)
     (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
-    (v : BitVec 64) (γkl : GName) (γk : KmemNames) (on : Option Nat)
-    hv hproc htier hsp hpipe hnoff hK hlk hplk hprc hkmem,
-    wp_sys_close_body (hlc := hlc) (GF := GF) Γ cpu k γl γ γd pa pid V M sts v γkl γk on
-      hv hproc htier hsp hpipe hnoff hK hlk hplk hprc hkmem
+    (v : BitVec 64) (j : Nat) (γkl : GName) (γk : KmemNames) (on : Option Nat)
+    hv hproc htier hsp hnoff hK,
+    wp_sys_close_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γ γd pa pid V M sts v j γkl γk on
+      hv hproc htier hsp hnoff hK
 
 end Xv6

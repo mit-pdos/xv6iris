@@ -233,8 +233,56 @@ theorem sysPipeMem_one {sz : BitVec 64} {P P1 : UPtd} {M M1 : Nat → List (BitV
 theorem sys_pipe_ctx (X : CurCtx) (h : X.curTier = KTier.kpt) : X = ⟨X.curCtx, KTier.kpt⟩ := by
   cases X; simp only at h; subst h; rfl
 
+/-- The block's kernel-tier view IS the ambient one once the tier is pinned. -/
+theorem sys_pipe_cur_kpt [inst : CurCtx] (hct : curTier = KTier.kpt) :
+    (⟨curCtx, KTier.kpt⟩ : CurCtx) = inst := (sys_pipe_ctx inst hct).symm
+
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+  [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
+  [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
+  [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
+
+/-- The pid cell of the block, in the ambient view (the tier pinned). -/
+theorem sys_pipe_wpt_cur (hct : curTier = KTier.kpt) (a : BitVec 64) (n : Nat) (dq : DFrac)
+    (w : BitVec (8 * n)) :
+    @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ a n dq w ⊣⊢ wordPointsTo a n dq w := by
+  rw [sys_pipe_cur_kpt hct]
+  exact .rfl
+
+/-- THE PID CELL, LENT OUT OF THE BLOCK for one call (Rocq's
+`proc_priv_pid` lending): the half the block owns, and the wand that puts it
+back. -/
+theorem sys_pipe_core_pid (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
+    procPrivCoreNoctxAt (GF := GF) curCtx pa pid V M ⊢
+      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗
+      (@wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid -∗
+        procPrivCoreNoctxAt curCtx pa pid V M) := by
+  unfold procPrivCoreNoctxAt
+  iintro ⟨%hf, Hpid, Hf, Hpt, Htfp, %hlz⟩
+  iframe Hpid
+  iintro Hpid
+  iframe Hpid Hf Hpt Htfp
+  isplitl []
+  · ipureintro; exact hf
+  · ipureintro; exact hlz
+
+/-- The caller's `true` crossing moves along the process pin alone. -/
+theorem sys_pipe_cont_shift (cpu c : CPU) (k : KCtx) (γ : FileNames) (γd : Nat → GName) (pa : BitVec 64)
+    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (v : BitVec 64)
+    (h : k.proc = 0#64 → c = cpu) :
+    sysPipeCont (GF := GF) cpu k γ γd pa pid V M sts v ⊢ sysPipeCont c k γ γd pa pid V M sts v := by
+  unfold sysPipeCont
+  exact wpNext_shift true k.proc cpu c _ (fun hh => h (hh.elim (fun e => absurd e (by decide)) id))
+
+/-- THE PASS-THROUGH ROWS sys_pipe threads to its closes (and pipealloc's):
+panic's credentials, the trap-CSR complement at the base hart `cpu`, the
+iref loan, and the caller's `true` crossing. -/
+def sysPipeTurn (cpu : CPU) (k : KCtx) (γ : FileNames) (γd : Nat → GName) (pa : BitVec 64)
+    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (v : BitVec 64) :
+    IProp GF := iprop(
+  panicEnv ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ irefSlot ∗
+  sysPipeCont cpu k γ γd pa pid V M sts v)
 
 /-! ## The callees -/
 
@@ -269,22 +317,27 @@ theorem sys_pipe_argaddr (AA : ARGADDR) (c : CPU) (k' : KCtx) (i : Nat) (tfp : B
   simp only [argaddrAddr] at h
   exact h
 
-theorem sys_pipe_pipealloc (PA : PIPEALLOC) (Γ : SchedNames) (c : CPU) (k' : KCtx) (γl : GName) (γ : FileNames)
-    (γkl : GName) (γk : KmemNames) (on : Option Nat) (v0 v1 : BitVec 64)
-    (hnoff : k'.noff + 2 < 2 ^ 31) (hK : pipeallocSlots ≤ k'.avail) (hlk : "ftable" ∉ k'.locks)
-    (hpipe : "pipe" ∉ k'.locks) (hproc : "proc" ∉ k'.locks) (hkmem : "kmem" ∉ k'.locks)
-    (htier : k'.tier = KTier.kpt) :
-    kctx c k' ∗ pcIs c KA.«pipealloc» ∗ isFtable γl γ ∗
-    isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk on ∗ procsInv Γ ∗
+theorem sys_pipe_pipealloc (PA : PIPEALLOC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c : CPU)
+    (k' : KCtx) (γl : GName) (γ : FileNames)
+    (γkl : GName) (γk : KmemNames) (on : Option Nat) (v0 v1 : BitVec 64) (pidv : BitVec 32) (dqp : DFrac)
+    (s : Bool) (hs : k'.sie = s) (pj : BitVec 64) (hpj : k'.proc = pj)
+    (hK : pipeallocSlots ≤ k'.avail) (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt) :
+    kctx c k' ∗ pcIs c KA.«pipealloc» ∗ trapCsrsExt c s ∗ cpuClaimExt c s pj ∗
+    isFtable γl γ ∗ panicEnv ∗
+    isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk on ∗
     fdSlot γ ∗ fdSlot γ ∗
     wordPointsTo (k'.regs 10#5) 8 (DFrac.own 1) v0 ∗ wordPointsTo (k'.regs 11#5) 8 (DFrac.own 1) v1 ∗
-    wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
-      ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
+    wordPointsTo (pPid pj) 4 dqp pidv ∗ irefSlot ∗
+    wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
+      ⌜calleeSaved k'.regs R'⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      ⌜calleeSaved k'.regs R'⌝ -∗ pipeallocPost γ γk on (k'.regs 10#5) (k'.regs 11#5) (R' 10#5) -∗ wpLoop cpu'))
+      trapCsrsExt cpu' s -∗ cpuClaimExt cpu' s pj -∗
+      pipeallocPost γ γk on (k'.regs 10#5) (k'.regs 11#5) (R' 10#5) -∗
+      wordPointsTo (pPid pj) 4 dqp pidv -∗ irefSlot -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := PA.wp_pipealloc (hlc := hlc) (GF := GF) Γ c k' γl γ γkl γk on v0 v1 hnoff hK hlk hpipe hproc hkmem htier
-  unfold wp_pipealloc_body at h
+  subst hs hpj
+  have h := PA.wp_pipealloc_eb (hlc := hlc) (GF := GF) Γ c k' γl γ γkl γk on v0 v1 pidv dqp hK hnoff htier
+  unfold wp_pipealloc_eb_body at h
   simp only [pipeallocAddr] at h
   exact h
 
@@ -328,23 +381,41 @@ theorem sys_pipe_copyout (CO : COPYOUT) (c : CPU) (k' : KCtx) (γl : GName) (γk
   simp only [copyoutAddr] at h
   exact h
 
-theorem sys_pipe_fileclose (FC : FILECLOSE) (Γ : SchedNames) (c : CPU) (k' : KCtx) (γl : GName) (γ : FileNames)
-    (kk : Nat) (q : Qp) (st : FdState) (γkl : GName) (γk : KmemNames) (on : Option Nat) (hst : fcStateOk st)
-    (hnoff : k'.noff + 2 < 2 ^ 31) (hK : filecloseSlots ≤ k'.avail) (hlk : "ftable" ∉ k'.locks)
-    (hpipe : "pipe" ∉ k'.locks) (hproc : "proc" ∉ k'.locks) (hkmem : "kmem" ∉ k'.locks)
-    (htier : k'.tier = KTier.kpt) (ha0 : k'.regs 10#5 = fnode kk) :
-    kctx c k' ∗ pcIs c KA.«fileclose» ∗ isFtable γl γ ∗ fileRef γ kk q st ∗
-    isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk on ∗ procsInv Γ ∗
-    wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
-      ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
+/-- `fileclose` on one of the two pipe ends sys_pipe holds in its locals:
+the environment is the PIPE bundle (`fileclosePipeEnv`), whose rows are
+sys_pipe's own persistent ones at the uncounted page count; the returned
+page-count disjunction is dropped. -/
+theorem sys_pipe_fileclose (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c : CPU)
+    (k' : KCtx) (γl : GName) (γ : FileNames) (kk : Nat) (r w : Bool) (γkl : GName) (γk : KmemNames)
+    (pidv : BitVec 32) (dqp : DFrac) (s : Bool) (hs : k'.sie = s) (pj : BitVec 64) (hpj : k'.proc = pj)
+    (hK : filecloseSlots ≤ k'.avail) (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt)
+    (ha0 : k'.regs 10#5 = fnode kk) :
+    kctx c k' ∗ pcIs c KA.«fileclose» ∗ trapCsrsExt c s ∗ cpuClaimExt c s pj ∗
+    isFtable γl γ ∗ panicEnv ∗ fileRef γ kk 1 (.open r w .pipe) ∗
+    wordPointsTo (pPid pj) 4 dqp pidv ∗ irefSlot ∗
+    procsInv Γ ∗ isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
+    wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
+      ⌜calleeSaved k'.regs R'⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      ⌜calleeSaved k'.regs R'⌝ -∗ fdSlot γ -∗ fclosePost γk on st -∗ wpLoop cpu'))
+      trapCsrsExt cpu' s -∗ cpuClaimExt cpu' s pj -∗
+      wordPointsTo (pPid pj) 4 dqp pidv -∗ fdSlot γ -∗ irefSlot -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := FC.wp_fileclose (hlc := hlc) (GF := GF) Γ c k' γl γ kk q st γkl γk on hst hnoff hK hlk
-    hpipe hproc hkmem htier ha0
-  unfold wp_fileclose_body at h
+  subst hs hpj
+  have h := FC.wp_fileclose_eb (hlc := hlc) (GF := GF) Γ c k' γl γ kk 1 (.open r w .pipe) 0 γkl γk none
+    pidv dqp hK hnoff htier ha0
+  unfold wp_fileclose_eb_body at h
   simp only [filecloseAddr] at h
-  exact h
+  iintro ⟨Hk, Hpc, Hte, Hce, #Hft, #Hpe, Href, Hpid, Hir, #Hpi, #Hkl, #Hav, Hnext⟩
+  iapply h
+  iframe Hk Hpc Hte Hce Hft Hpe Href Hpid Hir
+  isplitl []
+  · iapply (show fileclosePipeEnv (hlc := hlc) (GF := GF) Γ γkl γk none ⊢
+        filecloseEnv (hlc := hlc) Γ 0 k'.proc γkl γk none (.open r w .pipe) from .rfl)
+    unfold fileclosePipeEnv
+    iframe Hpi Hkl Hav
+  iapply wpNext_mono _ _ _ _ _ $$ Hnext
+  iintro %c' HK %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hfd Hir -
+  iapply HK $$ %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hfd Hir
 
 /-! ## The frame -/
 
@@ -615,19 +686,22 @@ theorem sys_pipe_tail (c : CPU) (kb : KCtx) (hK : 8 ≤ kb.avail)
     exact ⟨hcs, by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]⟩
   · iexact HP
 
-/-- Any arm's exit: at `mv a0,a5` with `r` in `a5`, the post and the two units. -/
+/-- Any arm's exit: at `mv a0,a5` with `r` in `a5`, the post and the two
+units; the pass-through rows at the base hart `cpu` make one wide hop to the
+returning hart. -/
 theorem sys_pipe_exit (cpu cr : CPU) (k : KCtx) (γ : FileNames) (γd : Nat → GName) (pa : BitVec 64)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (v : BitVec 64)
     (hK : 8 ≤ k.avail)
     (hpin : k.sie = false ∨ k.proc = 0#64 → cr = cpu)
-    (spie spp : Bool) (hsp : k.sie = false → spie = k.spie ∧ spp = k.spp)
+    (spie spp : Bool)
     (R : RegMap) (hpins : sysPipePins k R) (r : BitVec 64) (h15 : R 15#5 = r) :
     kctx cr (((k.withSpie spie spp).pushed 8).withRegs R) ∗ pcIs cr (KA.«sys_pipe» + 0xda#64) ∗
     frame8s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
     sysPipePost γ γd pa pid V M sts v r ∗ fdSlot γ ∗ fdSlot γ ∗
-    sysPipeCont cpu k γ γd pa pid V M sts v
+    sysPipeTurn cpu k γ γd pa pid V M sts v
     ⊢ wpLoop (GF := GF) cr := by
-  iintro ⟨Hk, Hpc, Hframe, Hpost, Hu0, Hu1, Hnext⟩
+  unfold sysPipeTurn sysPipeCont
+  iintro ⟨Hk, Hpc, Hframe, Hpost, Hu0, Hu1, ⟨-, Hte, Hce, Hir, Hnext⟩⟩
   obtain ⟨p2, p8, p18, p19, p20, p21, p22, p23, p24, p25, p26, p27⟩ := hpins
   iapply (sys_pipe_tail cr (k.withSpie spie spp) (by simp only [KCtx.withSpie_avail]; exact hK)
       k.regs rfl R p2 r h15
@@ -642,17 +716,19 @@ theorem sys_pipe_exit (cpu cr : CPU) (k : KCtx) (γ : FileNames) (γd : Nat → 
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact p25)
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact p26)
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact p27))
-      iprop(sysPipePost γ γd pa pid V M sts v r ∗ fdSlot γ ∗ fdSlot γ))
+      iprop(sysPipePost γ γd pa pid V M sts v r ∗ fdSlot γ ∗ fdSlot γ ∗ irefSlot))
     $$ [- $Hk $Hpc $Hframe]
-  isplitl [Hpost Hu0 Hu1]
-  · iframe Hpost Hu0 Hu1
+  isplitl [Hpost Hu0 Hu1 Hir]
+  · iframe Hpost Hu0 Hu1 Hir
+  iapply wpNext_intro_pin
+  iintro %c %hc %R'' Hk Hpc %hfacts ⟨Hpost, Hu0, Hu1, Hir⟩
+  have hc' : k.sie = false ∨ k.proc = 0#64 → c = cpu := fun h => (hc h).trans (hpin h)
+  ihave Hte := trapCsrsExt_move _ _ _ (fun h => hc' (Or.inl h)) $$ Hte
+  ihave Hce := cpuClaimExt_move _ _ _ _ (fun h => hc' (Or.inl h)) $$ Hce
+  ihave HΦ := wpNext_at true k.proc cpu c _
+    (fun h => hc' (h.elim (fun e => absurd e (by decide)) Or.inr)) $$ Hnext
   k_norm_g
-  unfold sysPipeCont
-  ihave Hnext := wpNext_shift _ _ _ _ _ hpin $$ Hnext
-  iapply wpNext_mono _ _ _ _ _ $$ Hnext
-  iintro %cc H %R'' Hk Hpc %hfacts HP
-  icases HP with ⟨Hpost, Hu0, Hu1⟩
-  iapply H $$ %spie %spp %R'' %hsp Hk Hpc [] [Hpost] Hu0 Hu1
+  iapply HΦ $$ %spie %spp %R'' [] Hk Hpc Hte Hce [Hpost] Hu0 Hu1 Hir
   · ipureintro; exact hfacts.1
   · rw [hfacts.2]; iexact Hpost
 
@@ -661,7 +737,7 @@ theorem sys_pipe_exit' (cpu cr : CPU) (k : KCtx) (γ : FileNames) (γd : Nat →
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (v : BitVec 64)
     (hK : 8 ≤ k.avail)
     (hpin : k.sie = false ∨ k.proc = 0#64 → cr = cpu)
-    (spie spp : Bool) (hsp : k.sie = false → spie = k.spie ∧ spp = k.spp)
+    (spie spp : Bool)
     (R : RegMap) (hpins : sysPipePins k R) (r : BitVec 64) (h15 : R 15#5 = r)
     (fa rf wf : BitVec 64) (w0 w1 : BitVec 32) :
     kctx cr (((k.withSpie spie spp).pushed 8).withRegs R) ∗ pcIs cr (KA.«sys_pipe» + 0xda#64) ∗
@@ -669,12 +745,12 @@ theorem sys_pipe_exit' (cpu cr : CPU) (k : KCtx) (γ : FileNames) (γd : Nat →
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64) 8 (DFrac.own 1) rf ∗
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFC8#64) 8 (DFrac.own 1) wf ∗
     sysPipePost γ γd pa pid V M sts v r ∗ fdSlot γ ∗ fdSlot γ ∗
-    sysPipeCont cpu k γ γd pa pid V M sts v
+    sysPipeTurn cpu k γ γd pa pid V M sts v
     ⊢ wpLoop (GF := GF) cr := by
   iintro ⟨Hk, Hpc, Hfr, Hrf, Hwf, Hpost, Hu0, Hu1, Hnext⟩
   ihave Hframe := sys_pipe_frame_close _ _ _ _ _ _ _ _ _ $$ [Hfr Hrf Hwf]
   · iframe
-  iapply (sys_pipe_exit cpu cr k γ γd pa pid V M sts v hK hpin spie spp hsp R hpins r h15)
+  iapply (sys_pipe_exit cpu cr k γ γd pa pid V M sts v hK hpin spie spp R hpins r h15)
     $$ [- $Hk $Hpc $Hframe $Hpost $Hu0 $Hu1 $Hnext]
 
 end

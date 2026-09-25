@@ -35,12 +35,15 @@ set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+  [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
+  [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
+  [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
 set_option maxHeartbeats 16000000 in
 /-- `+0x7a`, after the second copyout: `li a5,0 ; bgez a0`.  Success settles
 the two descriptors and exits with `0`; failure falls into `+0x80`. -/
-theorem sys_pipe_stage_f (FC : FILECLOSE) (Γ : SchedNames) (cpu c : CPU) (k : KCtx) (γl : GName) (γ : FileNames)
+theorem sys_pipe_stage_f (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu c : CPU) (k : KCtx) (γl : GName) (γ : FileNames)
     (γd : Nat → GName) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (sts : List FdState) (v : BitVec 64) (γkl : GName) (γk : KmemNames) (spie spp : Bool) (R : RegMap)
     (k0 k1 fd0 fd1 : Nat) (hk0 : k0 < NFILE) (hk1 : k1 < NFILE) (hfd0 : fd0 < 16) (hfd1 : fd1 < 16)
@@ -55,9 +58,10 @@ theorem sys_pipe_stage_f (FC : FILECLOSE) (Γ : SchedNames) (cpu c : CPU) (k : K
       (R 10#5 = -1#64 ∧ ∃ d, d < (sysPipeFdBytes fd1).length ∧
         M2 = umemWrite (viewFaulted P1 P2 M1) (v + 4#64).toNat ((sysPipeFdBytes fd1).take d) ∧
         umMapped P2 (v + 4#64).toNat d))
-    (htier : k.tier = KTier.kpt) (hnoff : k.noff + 2 < 2 ^ 31) (hK : sysPipeSlots ≤ k.avail)
+    (hct : curTier = KTier.kpt) (hproc : k.proc = pa)
+    (htier : k.tier = KTier.kpt) (hnoff : k.noff = 0) (hK : sysPipeSlots ≤ k.avail)
     (hlk : "ftable" ∉ k.locks) (hplk : "pipe" ∉ k.locks) (hprc : "proc" ∉ k.locks) (hkmem : "kmem" ∉ k.locks)
-    (hpin : k.sie = false ∨ k.proc = 0#64 → c = cpu) (hsp : k.sie = false → spie = k.spie ∧ spp = k.spp)
+    (hpin : k.sie = false ∨ k.proc = 0#64 → c = cpu)
     (hpins : sysPipePins k R) (h9 : R 9#5 = pa) :
     kctx c (((k.withSpie spie spp).pushed 8).withRegs R) ∗ pcIs c (KA.«sys_pipe» + 0x7a#64) ∗
     isFtable γl γ ∗ isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗ procsInv Γ ∗
@@ -68,11 +72,11 @@ theorem sys_pipe_stage_f (FC : FILECLOSE) (Γ : SchedNames) (cpu c : CPU) (k : K
     sysPipeCoreExt pa pid V P2 M2 ∗
     procOfilesOwe γ γd pa ((V.ofile.set fd0 (fnode k0)).set fd1 (fnode k1)) [fd1, fd0] ∗
     fdSlot γ ∗ fdStAuth γd fd0 .closed ∗ fdSlot γ ∗ fdStAuth γd fd1 .closed ∗ fdFrags γd sts ∗
-    sysPipeCont cpu k γ γd pa pid V M sts v
+    sysPipeTurn cpu k γ γd pa pid V M sts v
     ⊢ wpLoop (GF := GF) c := by
   iintro ⟨Hk, Hpc, #Hft, #Hkl, #Hav, #Hpi, Hfr, Hrf, Hwf, Hr0, Hr1, Hcore, Howe, Hu0, Ha0, Hu1, Ha1, Hfrag, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  have hK8 : 8 ≤ k.avail := by unfold sysPipeSlots at hK; omega
+  have hK8 : 8 ≤ k.avail := by rw [sysPipeSlots_eq] at hK; omega
   have hlt0 := (List.getElem?_eq_some_iff.mp hz0).1
   have hlt1 := (List.getElem?_eq_some_iff.mp hz1).1
   k_step_gen (wp_s_addi c _ (KA.«sys_pipe» + 0x7a#64) true 0#12 15#5 0#5 (by decide))
@@ -135,7 +139,7 @@ theorem sys_pipe_stage_f (FC : FILECLOSE) (Γ : SchedNames) (cpu c : CPU) (k : K
       ipureintro
       exact ⟨rfl, hfrees, hne, hst0, hst1,
         sysPipeMem_two hwf2 hext1 hext2 (sysPipeFdBytes_length fd0) hM1 hmap1 hM2 hmap2⟩
-    iapply (sys_pipe_exit' cpu c2 k γ γd pa pid V M sts v hK8 hpin2 spie spp hsp _ (by sys_pipe_pins hpins)
+    iapply (sys_pipe_exit' cpu c2 k γ γd pa pid V M sts v hK8 hpin2 spie spp _ (by sys_pipe_pins hpins)
         0#64 (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_true]) v _ _ _ _)
       $$ [- $Hk $Hpc $Hfr $Hrf $Hwf $Hpost $Hu0 $Hu1 $Hnext]
   · -- a copyout failed: fall into the tail at +0x80
@@ -150,7 +154,7 @@ theorem sys_pipe_stage_f (FC : FILECLOSE) (Γ : SchedNames) (cpu c : CPU) (k : K
             List.take_of_length_le (by simp)]
           exact sysPipeMem_two hwf2 hext1 hext2 (sysPipeFdBytes_length fd0) hM1 hmap1 hM2
             (by rwa [List.length_take, Nat.min_eq_left (by omega)])⟩
-        htier hnoff hK hlk hplk hprc hkmem hpin2 hsp (by sys_pipe_pins hpins)
+        hct hproc htier hnoff hK hlk hplk hprc hkmem hpin2 (by sys_pipe_pins hpins)
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h9) v)
       $$ [- $Hk $Hpc $Hfr $Hrf $Hwf $Hr0 $Hr1 $Hcore $Howe $Hu0 $Ha0 $Hu1 $Ha1 $Hfrag $Hnext]
     iframe #
@@ -160,9 +164,12 @@ end
 set_option maxHeartbeats 16000000 in
 /-- `+0x62`, after the first copyout: `bltz a0` (failure into `+0x80`), then
 the second copyout's arguments and the call. -/
-theorem sys_pipe_stage_e {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg]
+theorem sys_pipe_stage_e {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
+    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
+    [Appcfg GF] [FileG GF] [Fscfg] [Icfg]
     [X : CurCtx] (hct : X.curTier = KTier.kpt)
-    (FC : FILECLOSE) (CO : COPYOUT) (Γ : SchedNames) (cpu c : CPU) (k : KCtx) (γl : GName) (γ : FileNames)
+    (FC : FILECLOSE) (CO : COPYOUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu c : CPU) (k : KCtx) (γl : GName) (γ : FileNames)
     (γd : Nat → GName) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (sts : List FdState) (v : BitVec 64) (γkl : GName) (γk : KmemNames) (spie spp : Bool) (R : RegMap)
     (k0 k1 fd0 fd1 : Nat) (hk0 : k0 < NFILE) (hk1 : k1 < NFILE) (hfd0 : fd0 < 16) (hfd1 : fd1 < 16)
@@ -175,9 +182,9 @@ theorem sys_pipe_stage_e {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
       (R 10#5 = -1#64 ∧ ∃ d, d < (sysPipeFdBytes fd0).length ∧
         M1 = umemWrite (viewFaulted V.upt P1 M) v.toNat ((sysPipeFdBytes fd0).take d) ∧
         umMapped P1 v.toNat d))
-    (htier : k.tier = KTier.kpt) (hnoff : k.noff + 2 < 2 ^ 31) (hK : sysPipeSlots ≤ k.avail)
+    (hproc : k.proc = pa) (htier : k.tier = KTier.kpt) (hnoff : k.noff = 0) (hK : sysPipeSlots ≤ k.avail)
     (hlk : "ftable" ∉ k.locks) (hplk : "pipe" ∉ k.locks) (hprc : "proc" ∉ k.locks) (hkmem : "kmem" ∉ k.locks)
-    (hpin : k.sie = false ∨ k.proc = 0#64 → c = cpu) (hsp : k.sie = false → spie = k.spie ∧ spp = k.spp)
+    (hpin : k.sie = false ∨ k.proc = 0#64 → c = cpu)
     (hpins : sysPipePins k R) (h9 : R 9#5 = pa) :
     kctx c (((k.withSpie spie spp).pushed 8).withRegs R) ∗ pcIs c (KA.«sys_pipe» + 0x62#64) ∗
     isFtable γl γ ∗ isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗ procsInv Γ ∗
@@ -190,7 +197,7 @@ theorem sys_pipe_stage_e {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P1 M1 ∗ sysPipeCoreRest pa pid V ∗
     procOfilesOwe γ γd pa ((V.ofile.set fd0 (fnode k0)).set fd1 (fnode k1)) [fd1, fd0] ∗
     fdSlot γ ∗ fdStAuth γd fd0 .closed ∗ fdSlot γ ∗ fdStAuth γd fd1 .closed ∗ fdFrags γd sts ∗
-    sysPipeCont cpu k γ γd pa pid V M sts v
+    sysPipeTurn cpu k γ γd pa pid V M sts v
     ⊢ wpLoop (GF := GF) c := by
   obtain ⟨ξ0, t0⟩ := X
   change t0 = KTier.kpt at hct
@@ -238,7 +245,7 @@ theorem sys_pipe_stage_e {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     iframe #
     iframe Hb1
     case hn => k_norm_g; omega
-    case hKc => k_norm_g; unfold sysPipeSlots at hK; omega
+    case hKc => k_norm_g; rw [sysPipeSlots_eq] at hK; omega
     case hl => k_norm_g; exact hkmem
     case hroot => k_norm_g; rw [hf.2.2.1, hext1.1.1]
     case hsz => k_norm_g; have := hf.1; unfold uvmMaxsz at this; omega
@@ -259,14 +266,12 @@ theorem sys_pipe_stage_e {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     ihave Hfr := Hfrw $$ %(BitVec.ofNat 32 fd1) Hc1
     ihave Hcore := sys_pipe_core_ext pa pid V P2 M2 (UMemL.extSz_trans hext1 hext2) hf $$ [Hsz Hpg Hpt Hrest]
     · iframe
-    have hsp2' : k.sie = false → spie2 = k.spie ∧ spp2 = k.spp := fun h =>
-      ⟨(hsp2 h).1.trans (hsp h).1, (hsp2 h).2.trans (hsp h).2⟩
     have hpin9 : k.sie = false ∨ k.proc = 0#64 → c9 = cpu := fun h =>
       (hp9 h).trans ((hp8 h).trans ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans
         ((hp3 h).trans ((hp2 h).trans ((hp1 h).trans (hpin h)))))))))
     iapply (sys_pipe_stage_f FC Γ cpu c9 k γl γ γd pa pid V M sts v γkl γk spie2 spp2 R2 k0 k1 fd0 fd1 hk0 hk1
-        hfd0 hfd1 hz0 hz1 hne l hfrees P1 P2 M1 M2 hext1 hext2 hwf2 hM1 hmap1 hr2 htier hnoff hK hlk hplk hprc hkmem
-        hpin9 hsp2' hpins2 (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] at h9'; exact h9'.trans h9))
+        hfd0 hfd1 hz0 hz1 hne l hfrees P1 P2 M1 M2 hext1 hext2 hwf2 hM1 hmap1 hr2 rfl hproc htier hnoff hK hlk hplk hprc hkmem
+        hpin9 hpins2 (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] at h9'; exact h9'.trans h9))
       $$ [- $Hk $Hpc $Hfr $Hrf $Hwf $Hr0 $Hr1 $Hcore $Howe $Hu0 $Ha0 $Hu1 $Ha1 $Hfrag $Hnext]
     iframe #
   · -- the first copyout failed: the tail at +0x80
@@ -281,7 +286,7 @@ theorem sys_pipe_stage_e {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
         ⟨hfrees, Or.inl ⟨by simpa using hd, rfl⟩, by
           rw [List.take_zero]
           exact sysPipeMem_one hext1 hM1 (by rwa [List.length_take, Nat.min_eq_left (Nat.le_of_lt hd)])⟩
-        htier hnoff hK hlk hplk hprc hkmem hpin1 hsp hpins h9 v)
+        rfl hproc htier hnoff hK hlk hplk hprc hkmem hpin1 hpins h9 v)
       $$ [- $Hk $Hpc $Hfr $Hrf $Hwf $Hr0 $Hr1 $Hcore $Howe $Hu0 $Ha0 $Hu1 $Ha1 $Hfrag $Hnext]
     iframe #
 
@@ -289,16 +294,19 @@ theorem sys_pipe_stage_e {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
 set_option maxHeartbeats 16000000 in
 /-- `+0x48`, after `fdalloc(wf)`: `sw a0,-64(s0) ; bltz a0` (failure into
 `+0xb4`), then the first copyout's arguments and the call. -/
-theorem sys_pipe_stage_d {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg]
+theorem sys_pipe_stage_d {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
+    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
+    [Appcfg GF] [FileG GF] [Fscfg] [Icfg]
     [X : CurCtx] (hct : X.curTier = KTier.kpt)
-    (FC : FILECLOSE) (CO : COPYOUT) (Γ : SchedNames) (cpu c : CPU) (k : KCtx) (γl : GName) (γ : FileNames)
+    (FC : FILECLOSE) (CO : COPYOUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu c : CPU) (k : KCtx) (γl : GName) (γ : FileNames)
     (γd : Nat → GName) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (sts : List FdState) (v : BitVec 64) (γkl : GName) (γk : KmemNames) (spie spp : Bool) (R : RegMap)
     (k0 k1 fd0 : Nat) (hk0 : k0 < NFILE) (hk1 : k1 < NFILE) (hfd0 : fd0 < 16)
     (hz0 : V.ofile[fd0]? = some 0#64) (l0 : List Nat) (hfrees0 : fdFrees V.ofile = fd0 :: l0)
-    (htier : k.tier = KTier.kpt) (hnoff : k.noff + 2 < 2 ^ 31) (hK : sysPipeSlots ≤ k.avail)
+    (hproc : k.proc = pa) (htier : k.tier = KTier.kpt) (hnoff : k.noff = 0) (hK : sysPipeSlots ≤ k.avail)
     (hlk : "ftable" ∉ k.locks) (hplk : "pipe" ∉ k.locks) (hprc : "proc" ∉ k.locks) (hkmem : "kmem" ∉ k.locks)
-    (hpin : k.sie = false ∨ k.proc = 0#64 → c = cpu) (hsp : k.sie = false → spie = k.spie ∧ spp = k.spp)
+    (hpin : k.sie = false ∨ k.proc = 0#64 → c = cpu)
     (hpins : sysPipePins k R) (h9 : R 9#5 = pa) (w1 : BitVec 32) :
     kctx c (((k.withSpie spie spp).pushed 8).withRegs R) ∗ pcIs c (KA.«sys_pipe» + 0x48#64) ∗
     isFtable γl γ ∗ isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗ procsInv Γ ∗
@@ -309,7 +317,7 @@ theorem sys_pipe_stage_d {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     procPrivCoreNoctxAt curCtx pa pid V M ∗
     fdallocPost γ γd pa (V.ofile.set fd0 (fnode k0)) [fd0] k1 (R 10#5) ∗
     fdSlot γ ∗ fdStAuth γd fd0 .closed ∗ fdFrags γd sts ∗
-    sysPipeCont cpu k γ γd pa pid V M sts v
+    sysPipeTurn cpu k γ γd pa pid V M sts v
     ⊢ wpLoop (GF := GF) c := by
   obtain ⟨ξ0, t0⟩ := X
   change t0 = KTier.kpt at hct
@@ -336,7 +344,7 @@ theorem sys_pipe_stage_d {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     iintro Hk Hpc
     have hpin2 : k.sie = false ∨ k.proc = 0#64 → c2 = cpu := fun h => (hp2 h).trans ((hp1 h).trans (hpin h))
     iapply (sys_pipe_unfd0 FC Γ cpu c2 k γl γ γd pa pid V M sts v γkl γk spie spp R k0 k1 fd0 hk0 hk1 hfd0 hz0
-        htier hnoff hK hlk hplk hprc hkmem hpin2 hsp hpins h9 v 0xFFFFFFFF#32)
+        rfl hproc htier hnoff hK hlk hplk hprc hkmem hpin2 hpins h9 v 0xFFFFFFFF#32)
       $$ [- $Hk $Hpc $Hfr $Hrf $Hwf $Hr0 $Hr1 $Hcore $Howe $Hu0 $Ha0 $Hfrag $Hnext]
     iframe #
   · -- fd1 allocated: bltz falls through ; the first copyout
@@ -390,7 +398,7 @@ theorem sys_pipe_stage_d {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     iframe #
     iframe Hb0
     case hn => k_norm_g; omega
-    case hKc => k_norm_g; unfold sysPipeSlots at hK; omega
+    case hKc => k_norm_g; rw [sysPipeSlots_eq] at hK; omega
     case hl => k_norm_g; exact hkmem
     case hroot => k_norm_g; exact hf.2.2.1
     case hsz => k_norm_g; have := hf.1; unfold uvmMaxsz at this; omega
@@ -408,14 +416,12 @@ theorem sys_pipe_stage_d {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     obtain ⟨hpins2, h9'⟩ := sys_pipe_pins_call k _ R2 hpins0 hcs2
     ihave Hc0 := (sys_pipe_fd0_bytes (k.regs 2#5) hal' fd0).2 $$ Hb0
     ihave Hfr := Hfrw $$ %(BitVec.ofNat 32 fd0) Hc0
-    have hsp2' : k.sie = false → spie2 = k.spie ∧ spp2 = k.spp := fun h =>
-      ⟨(hsp2 h).1.trans (hsp h).1, (hsp2 h).2.trans (hsp h).2⟩
     have hpin9 : k.sie = false ∨ k.proc = 0#64 → c9 = cpu := fun h =>
       (hp9 h).trans ((hp8 h).trans ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans
         ((hp3 h).trans ((hp2 h).trans ((hp1 h).trans (hpin h)))))))))
     iapply (sys_pipe_stage_e rfl FC CO Γ cpu c9 k γl γ γd pa pid V M sts v γkl γk spie2 spp2 R2 k0 k1 fd0 fd1
         hk0 hk1 hfd0 hfd1 hz0 hz1 hne l hfrees P1 M1 hext1 hf hr1
-        htier hnoff hK hlk hplk hprc hkmem hpin9 hsp2' hpins2
+        hproc htier hnoff hK hlk hplk hprc hkmem hpin9 hpins2
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] at h9'; exact h9'.trans h9))
       $$ [- $Hk $Hpc $Hfr $Hrf $Hwf $Hr0 $Hr1 $Hsz $Hpg $Hpt $Hrest $Howe $Hu0 $Ha0 $Hu1 $Ha1 $Hfrag $Hnext]
     iframe #

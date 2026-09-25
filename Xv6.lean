@@ -339,6 +339,9 @@ import Xv6.WordFrac
 import Xv6.FileFrac
 import Xv6.FilePay
 import Xv6.ProofFiledup
+import Xv6.FilecloseParts
+import Xv6.FilecloseInode
+import Xv6.FilecloseLast
 import Xv6.ProofFileclose
 import Xv6.PipeBirth
 import Xv6.ProofPipealloc
