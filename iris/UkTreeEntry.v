@@ -67,12 +67,14 @@ Require Import UShEcho.               (* echo's key geometry *)
 Require Import UEchoOut.              (* [echo_out_argv] *)
 Require Import UShEchoOut.            (* [echo_out_argv_of_image] *)
 Require Import UShCat.                (* cat's key geometry and [cat_entry_run] *)
+Require Import UShGrep.               (* grep's key geometry and [grep_entry_run] *)
 Require Import FsImgCheck.            (* [fname_f] *)
 Require Import ProgTree UkTree UkHandler.
 Require Import UkEcho UkEchoTree.
 Require Import UkCatMain UkCatTree.
+Require Import UCodeGrep GrepTree UkGrepLoop UkGrepTree.
 Require Import CtxIdDefs.
-Require User.EchoSyms User.CatSyms.
+Require User.EchoSyms User.CatSyms User.GrepSyms.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -568,6 +570,158 @@ Section UkTreeEntry.
     iIntros "#Henv #Hnpw #Hdep".
     iApply (cat_image_entry_env ws Mn sv t gn sts cw cs pidv Q Pay I E ds
               Hok Himg Hbytes Hfdl Hc Hs Hdp with "Henv Hnpw Hdep").
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (*  1c. grep                                                            *)
+  (* ------------------------------------------------------------------- *)
+
+  (* [cat_image_entry_env_c] at grep (claude-notes/design/grep-pipes.md
+     SS3.5, cut G6): the same bridge from the key's argv to the LINE's
+     words, at [UkGrepTree.wp_kgrep_start_env].  Two differences:
+       - NO [safe_fds] premise: grep's tree is safe at every held set
+         ([GrepTree.grep_tree_safe]), which the program's entry discharges;
+       - THE FRAME IS THE LINE'S NEED, [UShGrep.grep_need ws] words
+         (grep's matcher recurses on the pattern), and the key's argv
+         reading the line's words is what makes [grep_stack] of the key's
+         vector that need. *)
+  Lemma grep_image_entry_env_c (ws : list (list (bv 8))) (Mn : gmap Z (bv 8))
+      (sv t : Z) (gn : nat -> bv 8)
+      (sts : list fdstate) (cw : Z) (cs : gset gname) (pidv : mword 32)
+      (Q : Z -> iProp Σ) (Pay : iProp Σ)
+      {Dp : list nat} (I : forall N' : uk_names Σ, ukn_pay N' = Q -> ep_ifaceP (Dp := Dp) N' (grep_prog N'))
+      (E : penv) (ds : gset nat) :
+    exec_ok ws ->
+    UShEcho.echo_node_img ws Mn sv t gn ->
+    UkShEcho.echo_argv_bytes ws gn ->
+    length sts = NOFILE ->
+    conforms E (grep_tree ws) ->
+    dp_in Dp ds ->
+    □ (∀ (N' : uk_names Σ) (Hpq : ukn_pay N' = Q),
+         UserFd.ustd (ukn_fd N') (take NSTD sts) -∗
+         UserCwd.ucwd (ukn_cwd N') cw -∗
+         Pay -∗
+         env_res N' (grep_prog N') (I N' Hpq) E ds) -∗
+    UkRun.urun_nopipe sts -∗
+    udep -∗
+    image_entry ElfUser.grep_elf Mn (mword_of_int (t + 8) : mword 64) sts
+      cw cs pidv Q Pay uslot.
+  Proof using .
+    intros Hok Himg Hbytes Hfdl Hc Hdp.
+    iIntros "#Henv #Hnpw #Hdep".
+    iApply image_entry_of_at. iIntros "!>" (na alen afun) "%Hargs".
+    destruct (UShGrep.grep_args_det_holds ws Hok Mn sv t gn na alen afun
+                Himg Hbytes Hargs) as (Hna & Halen & Hafun).
+    pose proof (UShGrep.grep_room_of_det_x ws na alen Hok Hna Halen) as Hroom.
+    rewrite /image_entry_at.
+    iIntros "!>" (W') "%Hokk %Hcwv %Hlzf _ _ Hmp HPay".
+    destruct (UShGrep.grep_kexec_pages na alen afun sts W' Hokk)
+      as (Hpc & Hsub & Hsub2 & Hx & Hdw & Hbufb & Hwr & Hrp).
+    destruct (UShGrep.grep_kexec_entry_rows na alen afun sts W'
+                (UShGrep.grep_need ws) Hokk Hroom Hfdl Hwr Hrp)
+      as (HroomK & Hal8 & Hszv & Hstkrow & Hargsrow & Havd & Havs
+          & Hfdlen & Hstop).
+    pose proof (UShGrep.grep_kexec_bufrow na alen afun sts W'
+                  (UShGrep.grep_need ws) Hokk Hroom Hdw Hbufb) as Hbuf.
+    pose proof (UShGrep.grep_kexec_argnz na alen afun sts W'
+                  (UShGrep.grep_need ws) Hokk Hroom) as Hnz.
+    pose proof (kexec_image_ok_fd _ na alen afun sts W' Hokk) as Hfd.
+    assert (Hargc0 : 0 <= uvis_argc W')
+      by exact (proj1 (uka_argc _ _ _ _ _ _ Hargsrow)).
+    assert (Hptr : forall (j : nat) (ga : uarg),
+              UShGrep.grep_args W' !! j = Some ga -> UserHeap.ua_ptr ga <> 0).
+    { intros j ga Hj.
+      assert (Hlt : (j < Z.to_nat (uvis_argc W'))%nat).
+      { pose proof (lookup_lt_Some _ _ _ Hj) as Hl.
+        rewrite /UShGrep.grep_args echo_args_length in Hl. exact Hl. }
+      rewrite /UShGrep.grep_args (echo_args_lookup (uvis_M W') (uvis_av W')
+                                    (Z.to_nat (uvis_argc W')) j Hlt) in Hj.
+      injection Hj as <-. cbn [UserHeap.ua_ptr echo_arg].
+      exact (Hnz j Hlt). }
+    (* ---- THE KEY'S OWN READING OF THE LINE ---- *)
+    assert (Hno : forall i j : nat, (i < na)%nat -> (j < alen i)%nat ->
+              afun i j <> ubyte0).
+    { intros i j Hi Hj.
+      rewrite (Hafun i j ltac:(lia)
+                 ltac:(rewrite <- (Halen i ltac:(lia)); exact Hj)).
+      apply (UShEcho.line_nonul_x ws _ Hok).
+      exact (UkShEcho.echo_off_lt_x ws i j Hok ltac:(lia)
+               ltac:(rewrite <- (Halen i ltac:(lia)); lia)). }
+    destruct (UShGrep.grep_key_args_holds na alen afun sts W' Hokk Hno)
+      as [Hargcna Hkey].
+    assert (Hwords : map uarg_bytes (UShGrep.grep_args W') = ws).
+    { apply (cat_argv_words ws _ alen afun).
+      - rewrite /UShGrep.grep_args echo_args_length Hargcna Hna. reflexivity.
+      - exact Halen.
+      - exact Hafun.
+      - intros i ga Hga.
+        assert (Hlt : (i < na)%nat).
+        { pose proof (lookup_lt_Some _ _ _ Hga) as Hl.
+          rewrite /UShGrep.grep_args echo_args_length Hargcna in Hl. exact Hl. }
+        rewrite /UShGrep.grep_args
+                (echo_args_lookup (uvis_M W') (uvis_av W')
+                   (Z.to_nat (uvis_argc W')) i ltac:(rewrite Hargcna; exact Hlt))
+          in Hga.
+        injection Hga as <-. exact (Hkey i Hlt). }
+    assert (Hc' : conforms E (grep_tree (map uarg_bytes (UShGrep.grep_args W'))))
+      by (rewrite Hwords; exact Hc).
+    (* the frame is the key's own need *)
+    assert (Hneed : (grep_stack (UShGrep.grep_args W') <= UShGrep.grep_need ws)%nat)
+      by (rewrite UShGrep.grep_stack_need Hwords; lia).
+    iAssert (UkRun.urun_nopipe (uvis_fd W')) as "#Hnpw'";
+      [ rewrite Hfd; iExact "Hnpw" | ].
+    iApply (UShGrep.grep_entry_run W' Q (UShGrep.grep_need ws) Hpc Hsub Hsub2
+              Hx HroomK Hal8 Hstkrow Hbuf Hargsrow Havd Havs Hfdlen Hstop Hlzf
+              with "Hdep Hnpw' Hmp").
+    iIntros (N' h) "%Hpayeq Hstd Hcwf #Hcode #Hro #Hargv _ Hbuf' Hrun".
+    assert (Ha0 : tf_resume_gpr0 (uvis_tf W') !!! Regidx (mword_of_int 10 : mword 5)
+                  = mword_of_int (Z.of_nat (length (UShGrep.grep_args W')))).
+    { rewrite /UShGrep.grep_args echo_args_length.
+      rewrite (Z2Nat.id (uvis_argc W') Hargc0).
+      unfold uvis_argc. symmetry. apply moi_of_uint. }
+    assert (Ha1 : tf_resume_gpr0 (uvis_tf W') !!! Regidx (mword_of_int 11 : mword 5)
+                  = mword_of_int (uvis_av W')).
+    { unfold uvis_av. symmetry. apply moi_of_uint. }
+    iApply (wp_kgrep_start_env N' (I N' Hpayeq) E ds h (tf_resume_gpr0 (uvis_tf W'))
+              (uvis_av W') (UShGrep.grep_args W') (fun _ : nat => ubyte0)
+              (UShGrep.grep_need ws)
+              Hc' Hdp Hptr Ha0 Ha1 Hneed
+              with "[Hstd Hcwf HPay] Hcode Hro Hargv Hbuf' Hrun").
+    iApply ("Henv" $! N' Hpayeq with "[Hstd] [Hcwf] HPay");
+      [ rewrite <- Hfd; iExact "Hstd" | rewrite <- Hcwv; iExact "Hcwf" ].
+  Qed.
+
+  (* ...and at an interface that does not read the equation *)
+  Lemma grep_image_entry_env (ws : list (list (bv 8))) (Mn : gmap Z (bv 8))
+      (sv t : Z) (gn : nat -> bv 8)
+      (sts : list fdstate) (cw : Z) (cs : gset gname) (pidv : mword 32)
+      (Q : Z -> iProp Σ) (Pay : iProp Σ)
+      {Dp : list nat} (I : forall N' : uk_names Σ, ep_ifaceP (Dp := Dp) N' (grep_prog N'))
+      (E : penv) (ds : gset nat) :
+    exec_ok ws ->
+    UShEcho.echo_node_img ws Mn sv t gn ->
+    UkShEcho.echo_argv_bytes ws gn ->
+    length sts = NOFILE ->
+    conforms E (grep_tree ws) ->
+    dp_in Dp ds ->
+    □ (∀ N' : uk_names Σ,
+         ⌜ukn_pay N' = Q⌝ -∗
+         UserFd.ustd (ukn_fd N') (take NSTD sts) -∗
+         UserCwd.ucwd (ukn_cwd N') cw -∗
+         Pay -∗
+         env_res N' (grep_prog N') (I N') E ds) -∗
+    UkRun.urun_nopipe sts -∗
+    udep -∗
+    image_entry ElfUser.grep_elf Mn (mword_of_int (t + 8) : mword 64) sts
+      cw cs pidv Q Pay uslot.
+  Proof using .
+    intros Hok Himg Hbytes Hfdl Hc Hdp.
+    iIntros "#Henv #Hnpw #Hdep".
+    iApply (grep_image_entry_env_c ws Mn sv t gn sts cw cs pidv Q Pay
+              (fun N' _ => I N') E ds Hok Himg Hbytes Hfdl Hc Hdp
+              with "[] Hnpw Hdep").
+    iIntros "!>" (N' Hpq) "Hstd Hcwf HPay".
+    iApply ("Henv" $! N' with "[%] Hstd Hcwf HPay"). exact Hpq.
   Qed.
 
 End UkTreeEntry.

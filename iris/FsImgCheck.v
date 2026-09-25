@@ -1,6 +1,6 @@
 (* ====================================================================== *)
 (*  FsImgCheck.v -- THE SANITY CHECK, DISK SIDE: the fs.img mkfs built IS   *)
-(*  a well-formed file system, and the five verified user programs it holds *)
+(*  a well-formed file system, and the six verified user programs it holds  *)
 (*  ARE the tracked ELF raws, byte for byte.                               *)
 (* ====================================================================== *)
 
@@ -13,9 +13,10 @@
     theorems below read it through the general file-system semantics of
     [FsImg.v] -- the superblock parses, [fsimg_wf] holds, and
 
-        /cat /echo /init /sh /sync  resolve, in the ROOT DIRECTORY, to
-        inodes 3 4 7 13 22, whose CONTENT BYTES are literally
-        [ElfUser.cat_elf], [echo_elf], [init_elf], [sh_elf], [sync_elf].
+        /cat /echo /grep /init /sh /sync  resolve, in the ROOT DIRECTORY,
+        to inodes 3 4 6 7 13 22, whose CONTENT BYTES are literally
+        [ElfUser.cat_elf], [echo_elf], [grep_elf], [init_elf], [sh_elf],
+        [sync_elf].
 
     ...and ONE NAME THE ROOT DOES NOT HOLD: [fname_f], the file
     application's `f` (claude-notes/design/app-file.md).  Its absence is
@@ -80,7 +81,7 @@ From xv6iris Require Import
 From User Require Import
   SyncInstrs SyncData EchoInstrs EchoData
   ShInstrs   ShData   InitInstrs InitData
-  CatInstrs  CatData.
+  CatInstrs  CatData  GrepInstrs GrepData.
 
 Local Open Scope Z_scope.
 
@@ -415,6 +416,8 @@ Definition fname_sync : fname :=
   [fsimg_byte 0x73; fsimg_byte 0x79; fsimg_byte 0x6e; fsimg_byte 0x63].
 Definition fname_cat : fname :=
   [fsimg_byte 0x63; fsimg_byte 0x61; fsimg_byte 0x74].
+Definition fname_grep : fname :=
+  [fsimg_byte 0x67; fsimg_byte 0x72; fsimg_byte 0x65; fsimg_byte 0x70].
 
 (* `f`, THE FILE APPLICATION'S ONE FILE -- the only name here that the
    image does NOT hold.  It is spelled beside the five that it does
@@ -464,6 +467,10 @@ Proof. rewrite fsimg_path_root. vm_eq. Qed.
 
 Lemma fsimg_cat_path :
   path_at (tree_of_disk fsimg_P fsimg_sb) ROOTINO [fname_cat] = Some 3.
+Proof. rewrite fsimg_path_root. vm_eq. Qed.
+
+Lemma fsimg_grep_path :
+  path_at (tree_of_disk fsimg_P fsimg_sb) ROOTINO [fname_grep] = Some 6.
 Proof. rewrite fsimg_path_root. vm_eq. Qed.
 
 (* ====================================================================== *)
@@ -525,6 +532,23 @@ Lemma fsimg_cat_at :
 Proof.
   pose proof fsimg_cat_bytes_bool as H. apply bool_decide_eq_true_1 in H.
   rewrite (fsimg_node_file 3 fsimg_cat_type), H. reflexivity.
+Qed.
+
+(* ---- grep, inum 6, 44440 bytes --------------------------------------- *)
+
+Lemma fsimg_grep_type :
+  bv_unsigned (di_type (fs_dinode fsimg_P fsimg_sb 6)) = T_FILE_z.
+Proof. vm_eq. Qed.
+
+Lemma fsimg_grep_bytes_bool :
+  bool_decide (fsimg_file_bytes 6 = ElfUser.grep_elf) = true.
+Proof. vm_eq. Qed.
+
+Lemma fsimg_grep_at :
+  node_at fsimg_P fsimg_sb 6 = Some (NFile ElfUser.grep_elf).
+Proof.
+  pose proof fsimg_grep_bytes_bool as H. apply bool_decide_eq_true_1 in H.
+  rewrite (fsimg_node_file 6 fsimg_grep_type), H. reflexivity.
 Qed.
 
 (* ---- init, inum 7, 35976 bytes --------------------------------------- *)
@@ -615,6 +639,18 @@ Proof.
   split; [exact fsimg_cat_path |].
   split; [exact fsimg_cat_at |].
   split; [exact ElfUser.cat_elf_wf | exact ElfUser.cat_elf_file_image].
+Qed.
+
+Theorem fsimg_grep_ok :
+  path_at (tree_of_disk fsimg_P fsimg_sb) ROOTINO [fname_grep] = Some 6
+  /\ node_at fsimg_P fsimg_sb 6 = Some (NFile ElfUser.grep_elf)
+  /\ elf_wf ElfUser.grep_elf = true
+  /\ elf_file_image ElfUser.grep_elf
+     = GrepInstrs.grep_bytes ∪ GrepData.grep_data.
+Proof.
+  split; [exact fsimg_grep_path |].
+  split; [exact fsimg_grep_at |].
+  split; [exact ElfUser.grep_elf_wf | exact ElfUser.grep_elf_file_image].
 Qed.
 
 Theorem fsimg_init_ok :

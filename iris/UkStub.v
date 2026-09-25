@@ -22,8 +22,9 @@
 (*                                                                        *)
 (* [stub_run] proves it from the three instruction facts at any address   *)
 (* and number, with the successor pcs and the a7 value as EQUATIONS the   *)
-(* instance discharges by computation; the ten instances at the end      *)
-(* (echo's five stubs, cat's five) are one line each.  The exit stub has  *)
+(* instance discharges by computation; the fifteen instances at the end  *)
+(* (echo's, cat's and grep's five stubs each) are one line each.  The     *)
+(* exit stub has                                                         *)
 (* no return.  echo calls only write and exit; its read, close and open   *)
 (* stubs are instantiated so that [UkEchoTree.echo_prog] names all five  *)
 (* addresses a handler record is stated at.                              *)
@@ -43,12 +44,12 @@ Require Import WpUmodeBranch.
 Require Import UmodeArith UmodeAbi.
 Require Import UserHeap UkRun UkRunLeaf UkRunMem UkRunSys.
 Require Import FdSlots UserFd.
-Require Import UCodeEcho UCodeCat.
+Require Import UCodeEcho UCodeCat UCodeGrep.
 Require Import CtxIdDefs.
 Require Import ChildTok.
 Require Import UexecSlot UexecRet UexecSG.
 Require Import ProgTree UkTree.        (* [stub_ret]: the holes' return file *)
-Require User.EchoSyms User.CatSyms.
+Require User.EchoSyms User.CatSyms User.GrepSyms.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -255,6 +256,42 @@ Section UkStub.
              ltac:(apply (proj2 (bv_eq _ _ _)); vm_compute; reflexivity));
       [ iIntros "!> #Hc"; iApply (uis_cat_3ac with "Hc")
       | iIntros "!> #Hc"; iApply (uis_cat_3ae with "Hc") ].
+  Qed.
+
+  (* grep's five, at grep's own addresses ([UCodeGrep.grep_syms_pins]:
+     read 0x534, write 0x53c, close 0x544, open 0x55c, exit 0x51c) *)
+  Lemma grep_stub_read : ⊢ stub_law (grep_code γt) 5 GrepSyms.read.
+  Proof using .
+    destruct grep_syms_pins as (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & -> & _).
+    stub_inst (grep_code γt) 5 0x534 uis_grep_534 uis_grep_536 uis_grep_53a.
+  Qed.
+
+  Lemma grep_stub_write : ⊢ stub_law (grep_code γt) 16 GrepSyms.write.
+  Proof using .
+    destruct grep_syms_pins as (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & -> & _).
+    stub_inst (grep_code γt) 16 0x53c uis_grep_53c uis_grep_53e uis_grep_542.
+  Qed.
+
+  Lemma grep_stub_close : ⊢ stub_law (grep_code γt) 21 GrepSyms.close.
+  Proof using .
+    destruct grep_syms_pins as (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & -> & _).
+    stub_inst (grep_code γt) 21 0x544 uis_grep_544 uis_grep_546 uis_grep_54a.
+  Qed.
+
+  Lemma grep_stub_open : ⊢ stub_law (grep_code γt) 15 GrepSyms.open.
+  Proof using .
+    destruct grep_syms_pins as (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & -> & _).
+    stub_inst (grep_code γt) 15 0x55c uis_grep_55c uis_grep_55e uis_grep_562.
+  Qed.
+
+  Lemma grep_stub_exit : ⊢ exit_stub_law (grep_code γt) GrepSyms.exit.
+  Proof using .
+    destruct grep_syms_pins as (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & ->).
+    iApply (exit_stub_run (grep_code γt) 0x51c
+             ltac:(apply (proj2 (bv_eq _ _ _)); vm_compute; reflexivity)
+             ltac:(apply (proj2 (bv_eq _ _ _)); vm_compute; reflexivity));
+      [ iIntros "!> #Hc"; iApply (uis_grep_51c with "Hc")
+      | iIntros "!> #Hc"; iApply (uis_grep_51e with "Hc") ].
   Qed.
 
 End UkStub.

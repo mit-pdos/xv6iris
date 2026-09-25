@@ -9,8 +9,8 @@
    with [bool_decide_eq_true_1]), the [Typeclasses Opaque] discipline, and
    the leaf-by-design rule (NOTHING IMPORTS THIS FILE, and nothing should)
    are all identical here and are not repeated.  This file is the same
-   theorem set five more times, for the five verified user programs:
-   [sync], [echo], [sh], [init], [cat].
+   theorem set six more times, for the six verified user programs:
+   [sync], [echo], [sh], [init], [cat], [grep].
 
    WHAT IS NEW HERE, AND WHY IT IS WORTH FOUR MORE INSTANCES.  These are
    not just four more binaries: their SHAPES exercise parts of the general
@@ -71,7 +71,8 @@ From User Require Import
   EchoElfRaw EchoInstrs EchoData
   ShElfRaw   ShInstrs   ShData
   InitElfRaw InitInstrs InitData
-  CatElfRaw  CatInstrs  CatData.
+  CatElfRaw  CatInstrs  CatData
+  GrepElfRaw GrepInstrs GrepData.
 
 Local Open Scope Z_scope.
 
@@ -601,3 +602,97 @@ Lemma cat_elf_image_concrete :
   = (CatInstrs.cat_bytes ∪ CatData.cat_data)
     ∪ map_seqZ cat_bss_lo (replicate (Z.to_nat cat_bss_size) elf_zero_byte).
 Proof. rewrite cat_elf_image, cat_elf_zero_image. reflexivity. Qed.
+
+(* ====================================================================== *)
+(* ====================================================================== *)
+(*  grep                                                                  *)
+(*                                                                        *)
+(*  cat's shape again: entry 0x266; loads (0x0, 0x10cc, 0x10cc, R-X) and  *)
+(*  (0x2000, 0x0, 0x420, RW-) -- a pure-bss writable segment holding      *)
+(*  malloc's [freep], grep's 1024-byte [buf] and malloc's [base].         *)
+(*                                                                        *)
+(*  WHY THE SIXTH PROGRAM IS HERE.  A pipeline stage execs /grep          *)
+(*  (claude-notes/design/grep-pipes.md, cut G6), so [iris/FsGrepPin.v]    *)
+(*  names the image's /grep bytes as this tracked raw, which is           *)
+(*  [FsImgCheck.fsimg_grep_at]'s right-hand side.                         *)
+(* ====================================================================== *)
+(* ====================================================================== *)
+
+Definition grep_elf : elf_bytes := pstring_hex_bytes GrepElfRaw.grep_elf_hex.
+Global Typeclasses Opaque grep_elf.
+
+Lemma grep_elf_length : Z.of_nat (length grep_elf) = GrepElfRaw.grep_elf_size.
+Proof.
+  unfold grep_elf. rewrite pstring_hex_bytes_length. vm_compute. reflexivity.
+Qed.
+
+Lemma grep_elf_wf : elf_wf grep_elf = true.
+Proof. vm_eq. Qed.
+
+Lemma grep_elf_sections_wf : elf_sections_wf grep_elf = true.
+Proof. vm_eq. Qed.
+
+Lemma grep_elf_entry : elf_entry grep_elf = Some GrepData.grepEntry.
+Proof. vm_eq. Qed.
+
+Lemma grep_elf_segments :
+  elf_segments grep_elf = Some GrepData.grep_segments.
+Proof. vm_eq. Qed.
+
+Lemma grep_elf_base : elf_mem_base grep_elf = Some GrepData.grepMemBase.
+Proof. vm_eq. Qed.
+
+Lemma grep_elf_end : elf_mem_end grep_elf = Some GrepData.grepMemEnd.
+Proof. vm_eq. Qed.
+
+Lemma grep_elf_rodata_end :
+  elf_rodata_end grep_elf = Some GrepData.grepRodataEnd.
+Proof. vm_eq. Qed.
+
+Lemma grep_elf_file_image_bool :
+  bool_decide (elf_file_image grep_elf
+               = GrepInstrs.grep_bytes ∪ GrepData.grep_data) = true.
+Proof. vm_eq. Qed.
+
+Lemma grep_elf_file_image :
+  elf_file_image grep_elf = GrepInstrs.grep_bytes ∪ GrepData.grep_data.
+Proof.
+  pose proof grep_elf_file_image_bool as H.
+  apply bool_decide_eq_true_1 in H. exact H.
+Qed.
+
+(* Writable segment (vaddr 0x2000, filesz 0x0, memsz 0x420): .bss is
+   [0x2000, 0x2420), and the text segment's zero window is empty. *)
+Definition grep_bss_lo : Z := 0x2000.
+Definition grep_bss_size : Z := 1056.   (* 0x420 = memsz - filesz *)
+
+Lemma grep_elf_zero_image_bool :
+  bool_decide (elf_zero_image grep_elf
+               = map_seqZ grep_bss_lo
+                   (replicate (Z.to_nat grep_bss_size) elf_zero_byte)) = true.
+Proof. vm_eq. Qed.
+
+Lemma grep_elf_zero_image :
+  elf_zero_image grep_elf
+  = map_seqZ grep_bss_lo (replicate (Z.to_nat grep_bss_size) elf_zero_byte).
+Proof.
+  pose proof grep_elf_zero_image_bool as H.
+  apply bool_decide_eq_true_1 in H. exact H.
+Qed.
+
+Lemma grep_bss_top : grep_bss_lo + grep_bss_size = GrepData.grepMemEnd.
+Proof. vm_eq. Qed.
+
+Lemma grep_elf_image :
+  elf_image grep_elf
+  = (GrepInstrs.grep_bytes ∪ GrepData.grep_data) ∪ elf_zero_image grep_elf.
+Proof.
+  destruct (elf_image_split grep_elf grep_elf_wf) as [Hsplit _].
+  rewrite Hsplit, grep_elf_file_image. reflexivity.
+Qed.
+
+Lemma grep_elf_image_concrete :
+  elf_image grep_elf
+  = (GrepInstrs.grep_bytes ∪ GrepData.grep_data)
+    ∪ map_seqZ grep_bss_lo (replicate (Z.to_nat grep_bss_size) elf_zero_byte).
+Proof. rewrite grep_elf_image, grep_elf_zero_image. reflexivity. Qed.

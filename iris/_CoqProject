@@ -1480,6 +1480,7 @@ LinkConsolewrite.v
 FsShPin.v
 FsEchoPin.v
 FsCatPin.v
+FsGrepPin.v
 FsFPin.v
 FsConsPin.v
 SpecKexec.v
@@ -1680,6 +1681,7 @@ UkShRedirPaid.v
 UkShRedirChild.v
 UCatOut.v
 UShCat.v
+UShGrep.v
 UkTreeEntry.v
 UCatLend.v
 UInitTree.v
